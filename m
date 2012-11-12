@@ -1,152 +1,725 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 Nov 2012 12:21:58 +0100
-Subject: [PATCH 1/4] ARM i.MX25: Add missing clock gates
+Date: Mon, 12 Nov 2012 12:22:00 +0100
+Subject: [PATCH 3/4] ARM i.MX25: Add devicetree
 In-Reply-To: <1352719321-23541-1-git-send-email-s.hauer@pengutronix.de>
 References: <1352719321-23541-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1352719321-23541-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1352719321-23541-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This completes the list of clock gates on the i.MX25. There are
-several clocks marked as reserved in the datasheet, but nevertheless
-used in the Freescale kernel. Add some comments to their positions
-and add 'reservedx' entries to the clk enum. This way we can replace
-them with the real names should we need them later. Adding the reserved
-entry names will help us keeping the clk numbers when moving to devicetree.
+This adds a i.MX25 dtsi file along with the i.MX25 clock tree
+documentation. The devicetree should be fairly complete for:
+
+- uart
+- fec
+- i2c
+- spi
+- pwm
+- nand
+- gpio
+- wdog
+- esdhc
+- flexcan
+
+The more exotic devices currently miss clock bindings.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/clk-imx25.c |   63 +++++++++++++++++++++++++++++++++++------
- 1 file changed, 55 insertions(+), 8 deletions(-)
+ .../devicetree/bindings/clock/imx25-clock.txt      |  162 ++++++
+ arch/arm/boot/dts/imx25.dtsi                       |  515 ++++++++++++++++++++
+ 2 files changed, 677 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx25-clock.txt
+ create mode 100644 arch/arm/boot/dts/imx25.dtsi
 
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index bc88580..78a754f 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -64,14 +64,20 @@ enum mx25_clks {
- 	per7_sel, per8_sel, per9_sel, per10_sel, per11_sel, per12_sel,
- 	per13_sel, per14_sel, per15_sel, per0, per1, per2, per3, per4, per5,
- 	per6, per7, per8, per9, per10, per11, per12, per13, per14, per15,
--	csi_ipg_per, esdhc1_ipg_per, esdhc2_ipg_per, gpt_ipg_per, i2c_ipg_per,
--	lcdc_ipg_per, nfc_ipg_per, ssi1_ipg_per, ssi2_ipg_per, uart_ipg_per,
--	csi_ahb, esdhc1_ahb, esdhc2_ahb, fec_ahb, lcdc_ahb, sdma_ahb,
--	usbotg_ahb, can1_ipg, can2_ipg, csi_ipg, cspi1_ipg, cspi2_ipg,
--	cspi3_ipg, dryice_ipg, esdhc1_ipg, esdhc2_ipg, fec_ipg, iim_ipg,
--	kpp_ipg, lcdc_ipg, pwm1_ipg, pwm2_ipg, pwm3_ipg, pwm4_ipg, sdma_ipg,
--	ssi1_ipg, ssi2_ipg, tsc_ipg, uart1_ipg, uart2_ipg, uart3_ipg,
--	uart4_ipg, uart5_ipg, wdt_ipg, clk_max
-+	csi_ipg_per, epit_ipg_per, esai_ipg_per, esdhc1_ipg_per, esdhc2_ipg_per,
-+	gpt_ipg_per, i2c_ipg_per, lcdc_ipg_per, nfc_ipg_per, owire_ipg_per,
-+	pwm_ipg_per, sim1_ipg_per, sim2_ipg_per, ssi1_ipg_per, ssi2_ipg_per,
-+	uart_ipg_per, ata_ahb, reserved1, csi_ahb, emi_ahb, esai_ahb, esdhc1_ahb,
-+	esdhc2_ahb, fec_ahb, lcdc_ahb, rtic_ahb, sdma_ahb, slcdc_ahb, usbotg_ahb,
-+	reserved2, reserved3, reserved4, reserved5, can1_ipg, can2_ipg,	csi_ipg,
-+	cspi1_ipg, cspi2_ipg, cspi3_ipg, dryice_ipg, ect_ipg, epit1_ipg, epit2_ipg,
-+	reserved6, esdhc1_ipg, esdhc2_ipg, fec_ipg, reserved7, reserved8, reserved9,
-+	gpt1_ipg, gpt2_ipg, gpt3_ipg, gpt4_ipg, reserved10, reserved11, reserved12,
-+	iim_ipg, reserved13, reserved14, kpp_ipg, lcdc_ipg, reserved15, pwm1_ipg,
-+	pwm2_ipg, pwm3_ipg, pwm4_ipg, rngb_ipg, reserved16, scc_ipg, sdma_ipg,
-+	sim1_ipg, sim2_ipg, slcdc_ipg, spba_ipg, ssi1_ipg, ssi2_ipg, tsc_ipg,
-+	uart1_ipg, uart2_ipg, uart3_ipg, uart4_ipg, uart5_ipg, reserved17,
-+	wdt_ipg, clk_max
- };
- 
- static struct clk *clk[clk_max];
-@@ -123,22 +129,36 @@ int __init mx25_clocks_init(void)
- 	clk[per14] = imx_clk_divider("per14", "per14_sel", ccm(CCM_PCDR3), 16, 6);
- 	clk[per15] = imx_clk_divider("per15", "per15_sel", ccm(CCM_PCDR3), 24, 6);
- 	clk[csi_ipg_per] = imx_clk_gate("csi_ipg_per", "per0", ccm(CCM_CGCR0), 0);
-+	clk[epit_ipg_per] = imx_clk_gate("epit_ipg_per", "per1", ccm(CCM_CGCR0),  1);
-+	clk[esai_ipg_per] = imx_clk_gate("esai_ipg_per", "per2", ccm(CCM_CGCR0),  2);
- 	clk[esdhc1_ipg_per] = imx_clk_gate("esdhc1_ipg_per", "per3", ccm(CCM_CGCR0),  3);
- 	clk[esdhc2_ipg_per] = imx_clk_gate("esdhc2_ipg_per", "per4", ccm(CCM_CGCR0),  4);
- 	clk[gpt_ipg_per] = imx_clk_gate("gpt_ipg_per", "per5", ccm(CCM_CGCR0),  5);
- 	clk[i2c_ipg_per] = imx_clk_gate("i2c_ipg_per", "per6", ccm(CCM_CGCR0),  6);
- 	clk[lcdc_ipg_per] = imx_clk_gate("lcdc_ipg_per", "per7", ccm(CCM_CGCR0),  7);
- 	clk[nfc_ipg_per] = imx_clk_gate("nfc_ipg_per", "per8", ccm(CCM_CGCR0),  8);
-+	clk[owire_ipg_per] = imx_clk_gate("owire_ipg_per", "per9", ccm(CCM_CGCR0),  9);
-+	clk[pwm_ipg_per] = imx_clk_gate("pwm_ipg_per", "per10", ccm(CCM_CGCR0),  10);
-+	clk[sim1_ipg_per] = imx_clk_gate("sim1_ipg_per", "per11", ccm(CCM_CGCR0),  11);
-+	clk[sim2_ipg_per] = imx_clk_gate("sim2_ipg_per", "per12", ccm(CCM_CGCR0),  12);
- 	clk[ssi1_ipg_per] = imx_clk_gate("ssi1_ipg_per", "per13", ccm(CCM_CGCR0), 13);
- 	clk[ssi2_ipg_per] = imx_clk_gate("ssi2_ipg_per", "per14", ccm(CCM_CGCR0), 14);
- 	clk[uart_ipg_per] = imx_clk_gate("uart_ipg_per", "per15", ccm(CCM_CGCR0), 15);
-+	clk[ata_ahb] = imx_clk_gate("ata_ahb", "ahb", ccm(CCM_CGCR0), 16);
-+	/* CCM_CGCR0(17): reserved */
- 	clk[csi_ahb] = imx_clk_gate("csi_ahb", "ahb", ccm(CCM_CGCR0), 18);
-+	clk[emi_ahb] = imx_clk_gate("emi_ahb", "ahb", ccm(CCM_CGCR0), 19);
-+	clk[esai_ahb] = imx_clk_gate("esai_ahb", "ahb", ccm(CCM_CGCR0), 20);
- 	clk[esdhc1_ahb] = imx_clk_gate("esdhc1_ahb", "ahb", ccm(CCM_CGCR0), 21);
- 	clk[esdhc2_ahb] = imx_clk_gate("esdhc2_ahb", "ahb", ccm(CCM_CGCR0), 22);
- 	clk[fec_ahb] = imx_clk_gate("fec_ahb", "ahb", ccm(CCM_CGCR0), 23);
- 	clk[lcdc_ahb] = imx_clk_gate("lcdc_ahb", "ahb", ccm(CCM_CGCR0), 24);
-+	clk[rtic_ahb] = imx_clk_gate("rtic_ahb", "ahb", ccm(CCM_CGCR0), 25);
- 	clk[sdma_ahb] = imx_clk_gate("sdma_ahb", "ahb", ccm(CCM_CGCR0), 26);
-+	clk[slcdc_ahb] = imx_clk_gate("slcdc_ahb", "ahb", ccm(CCM_CGCR0), 27);
- 	clk[usbotg_ahb] = imx_clk_gate("usbotg_ahb", "ahb", ccm(CCM_CGCR0), 28);
-+	/* CCM_CGCR0(29-31): reserved */
-+	/* CCM_CGCR1(0): reserved in datasheet, used as audmux in FSL kernel */
- 	clk[can1_ipg] = imx_clk_gate("can1_ipg", "ipg", ccm(CCM_CGCR1),  2);
- 	clk[can2_ipg] = imx_clk_gate("can2_ipg", "ipg", ccm(CCM_CGCR1),  3);
- 	clk[csi_ipg] = imx_clk_gate("csi_ipg", "ipg", ccm(CCM_CGCR1),  4);
-@@ -146,17 +166,41 @@ int __init mx25_clocks_init(void)
- 	clk[cspi2_ipg] = imx_clk_gate("cspi2_ipg", "ipg", ccm(CCM_CGCR1),  6);
- 	clk[cspi3_ipg] = imx_clk_gate("cspi3_ipg", "ipg", ccm(CCM_CGCR1),  7);
- 	clk[dryice_ipg] = imx_clk_gate("dryice_ipg", "ipg", ccm(CCM_CGCR1),  8);
-+	clk[ect_ipg] = imx_clk_gate("ect_ipg", "ipg", ccm(CCM_CGCR1),  9);
-+	clk[epit1_ipg] = imx_clk_gate("epit1_ipg", "ipg", ccm(CCM_CGCR1),  10);
-+	clk[epit2_ipg] = imx_clk_gate("epit2_ipg", "ipg", ccm(CCM_CGCR1),  11);
-+	/* CCM_CGCR1(12): reserved in datasheet, used as esai in FSL kernel */
- 	clk[esdhc1_ipg] = imx_clk_gate("esdhc1_ipg", "ipg", ccm(CCM_CGCR1), 13);
- 	clk[esdhc2_ipg] = imx_clk_gate("esdhc2_ipg", "ipg", ccm(CCM_CGCR1), 14);
- 	clk[fec_ipg] = imx_clk_gate("fec_ipg", "ipg", ccm(CCM_CGCR1), 15);
-+	/* CCM_CGCR1(16): reserved in datasheet, used as gpio1 in FSL kernel */
-+	/* CCM_CGCR1(17): reserved in datasheet, used as gpio2 in FSL kernel */
-+	/* CCM_CGCR1(18): reserved in datasheet, used as gpio3 in FSL kernel */
-+	clk[gpt1_ipg] = imx_clk_gate("gpt1_ipg", "ipg", ccm(CCM_CGCR1), 19);
-+	clk[gpt2_ipg] = imx_clk_gate("gpt2_ipg", "ipg", ccm(CCM_CGCR1), 20);
-+	clk[gpt3_ipg] = imx_clk_gate("gpt3_ipg", "ipg", ccm(CCM_CGCR1), 21);
-+	clk[gpt4_ipg] = imx_clk_gate("gpt4_ipg", "ipg", ccm(CCM_CGCR1), 22);
-+	/* CCM_CGCR1(23): reserved in datasheet, used as i2c1 in FSL kernel */
-+	/* CCM_CGCR1(24): reserved in datasheet, used as i2c2 in FSL kernel */
-+	/* CCM_CGCR1(25): reserved in datasheet, used as i2c3 in FSL kernel */
- 	clk[iim_ipg] = imx_clk_gate("iim_ipg", "ipg", ccm(CCM_CGCR1), 26);
-+	/* CCM_CGCR1(27): reserved in datasheet, used as iomuxc in FSL kernel */
-+	/* CCM_CGCR1(28): reserved in datasheet, used as kpp in FSL kernel */
- 	clk[kpp_ipg] = imx_clk_gate("kpp_ipg", "ipg", ccm(CCM_CGCR1), 28);
- 	clk[lcdc_ipg] = imx_clk_gate("lcdc_ipg", "ipg", ccm(CCM_CGCR1), 29);
-+	/* CCM_CGCR1(30): reserved in datasheet, used as owire in FSL kernel */
- 	clk[pwm1_ipg] = imx_clk_gate("pwm1_ipg", "ipg", ccm(CCM_CGCR1), 31);
- 	clk[pwm2_ipg] = imx_clk_gate("pwm2_ipg", "ipg", ccm(CCM_CGCR2),  0);
- 	clk[pwm3_ipg] = imx_clk_gate("pwm3_ipg", "ipg", ccm(CCM_CGCR2),  1);
- 	clk[pwm4_ipg] = imx_clk_gate("pwm4_ipg", "ipg", ccm(CCM_CGCR2),  2);
-+	clk[rngb_ipg] = imx_clk_gate("rngb_ipg", "ipg", ccm(CCM_CGCR2),  3);
-+	/* CCM_CGCR2(4): reserved in datasheet, used as rtic in FSL kernel */
-+	clk[scc_ipg] = imx_clk_gate("scc_ipg", "ipg", ccm(CCM_CGCR2),  5);
- 	clk[sdma_ipg] = imx_clk_gate("sdma_ipg", "ipg", ccm(CCM_CGCR2),  6);
-+	clk[sim1_ipg] = imx_clk_gate("sim1_ipg", "ipg", ccm(CCM_CGCR2),  7);
-+	clk[sim2_ipg] = imx_clk_gate("sim2_ipg", "ipg", ccm(CCM_CGCR2),  8);
-+	clk[slcdc_ipg] = imx_clk_gate("slcdc_ipg", "ipg", ccm(CCM_CGCR2),  9);
-+	clk[spba_ipg] = imx_clk_gate("spba_ipg", "ipg", ccm(CCM_CGCR2),  10);
- 	clk[ssi1_ipg] = imx_clk_gate("ssi1_ipg", "ipg", ccm(CCM_CGCR2), 11);
- 	clk[ssi2_ipg] = imx_clk_gate("ssi2_ipg", "ipg", ccm(CCM_CGCR2), 12);
- 	clk[tsc_ipg] = imx_clk_gate("tsc_ipg", "ipg", ccm(CCM_CGCR2), 13);
-@@ -165,6 +209,7 @@ int __init mx25_clocks_init(void)
- 	clk[uart3_ipg] = imx_clk_gate("uart3_ipg", "ipg", ccm(CCM_CGCR2), 16);
- 	clk[uart4_ipg] = imx_clk_gate("uart4_ipg", "ipg", ccm(CCM_CGCR2), 17);
- 	clk[uart5_ipg] = imx_clk_gate("uart5_ipg", "ipg", ccm(CCM_CGCR2), 18);
-+	/* CCM_CGCR2(19): reserved in datasheet, but used as wdt in FSL kernel */
- 	clk[wdt_ipg] = imx_clk_gate("wdt_ipg", "ipg", ccm(CCM_CGCR2), 19);
- 
- 	for (i = 0; i < ARRAY_SIZE(clk); i++)
-@@ -172,6 +217,8 @@ int __init mx25_clocks_init(void)
- 			pr_err("i.MX25 clk %d: register failed with %ld\n",
- 				i, PTR_ERR(clk[i]));
- 
-+	clk_prepare_enable(clk[emi_ahb]);
+diff --git a/Documentation/devicetree/bindings/clock/imx25-clock.txt b/Documentation/devicetree/bindings/clock/imx25-clock.txt
+new file mode 100644
+index 0000000..c2a3525
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/imx25-clock.txt
+@@ -0,0 +1,162 @@
++* Clock bindings for Freescale i.MX25
 +
- 	/* i.mx25 has the i.mx21 type uart */
- 	clk_register_clkdev(clk[uart1_ipg], "ipg", "imx21-uart.0");
- 	clk_register_clkdev(clk[uart_ipg_per], "per", "imx21-uart.0");
++Required properties:
++- compatible: Should be "fsl,imx25-ccm"
++- reg: Address and length of the register set
++- interrupts: Should contain CCM interrupt
++- #clock-cells: Should be <1>
++
++The clock consumer should specify the desired clock by having the clock
++ID in its "clocks" phandle cell.  The following is a full list of i.MX25
++clocks and IDs.
++
++	Clock			ID
++	---------------------------
++	dummy			0
++	osc			1
++	mpll			2
++	upll			3
++	mpll_cpu_3_4		4
++	cpu_sel			5
++	cpu			6
++	ahb			7
++	usb_div			8
++	ipg			9
++	per0_sel		10
++	per1_sel		11
++	per2_sel		12
++	per3_sel		13
++	per4_sel		14
++	per5_sel		15
++	per6_sel		16
++	per7_sel		17
++	per8_sel		18
++	per9_sel		19
++	per10_sel		20
++	per11_sel		21
++	per12_sel		22
++	per13_sel		23
++	per14_sel		24
++	per15_sel		25
++	per0			26
++	per1			27
++	per2			28
++	per3			29
++	per4			30
++	per5			31
++	per6			32
++	per7			33
++	per8			34
++	per9			35
++	per10			36
++	per11			37
++	per12			38
++	per13			39
++	per14			40
++	per15			41
++	csi_ipg_per		42
++	epit_ipg_per		43
++	esai_ipg_per		44
++	esdhc1_ipg_per		45
++	esdhc2_ipg_per		46
++	gpt_ipg_per		47
++	i2c_ipg_per		48
++	lcdc_ipg_per		49
++	nfc_ipg_per		50
++	owire_ipg_per		51
++	pwm_ipg_per		52
++	sim1_ipg_per		53
++	sim2_ipg_per		54
++	ssi1_ipg_per		55
++	ssi2_ipg_per		56
++	uart_ipg_per		57
++	ata_ahb			58
++	reserved		59
++	csi_ahb			60
++	emi_ahb			61
++	esai_ahb		62
++	esdhc1_ahb		63
++	esdhc2_ahb		64
++	fec_ahb			65
++	lcdc_ahb		66
++	rtic_ahb		67
++	sdma_ahb		68
++	slcdc_ahb		69
++	usbotg_ahb		70
++	reserved		71
++	reserved		72
++	reserved		73
++	reserved		74
++	can1_ipg		75
++	can2_ipg		76
++	csi_ipg			77
++	cspi1_ipg		78
++	cspi2_ipg		79
++	cspi3_ipg		80
++	dryice_ipg		81
++	ect_ipg			82
++	epit1_ipg		83
++	epit2_ipg		84
++	reserved		85
++	esdhc1_ipg		86
++	esdhc2_ipg		87
++	fec_ipg			88
++	reserved		89
++	reserved		90
++	reserved		91
++	gpt1_ipg		92
++	gpt2_ipg		93
++	gpt3_ipg		94
++	gpt4_ipg		95
++	reserved		96
++	reserved		97
++	reserved		98
++	iim_ipg			99
++	reserved		100
++	reserved		101
++	kpp_ipg			102
++	lcdc_ipg		103
++	reserved		104
++	pwm1_ipg		105
++	pwm2_ipg		106
++	pwm3_ipg		107
++	pwm4_ipg		108
++	rngb_ipg		109
++	reserved		110
++	scc_ipg			111
++	sdma_ipg		112
++	sim1_ipg		113
++	sim2_ipg		114
++	slcdc_ipg		115
++	spba_ipg		116
++	ssi1_ipg		117
++	ssi2_ipg		118
++	tsc_ipg			119
++	uart1_ipg		120
++	uart2_ipg		121
++	uart3_ipg		122
++	uart4_ipg		123
++	uart5_ipg		124
++	reserved		125
++	wdt_ipg			126
++
++Examples:
++
++clks: ccm at 53f80000 {
++	compatible = "fsl,imx25-ccm";
++	reg = <0x53f80000 0x4000>;
++	interrupts = <31>;
++	clock-output-names = ...
++			"uart_ipg",
++			"uart_serial",
++			...;
++};
++
++uart1: serial at 43f90000 {
++	compatible = "fsl,imx25-uart", "fsl,imx21-uart";
++	reg = <0x43f90000 0x4000>;
++	interrupts = <45>;
++	clocks = <&clks 79>, <&clks 50>;
++	clock-names = "ipg", "per";
++	status = "disabled";
++};
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+new file mode 100644
+index 0000000..e1b13eb
+--- /dev/null
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -0,0 +1,515 @@
++/*
++ * Copyright 2012 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/include/ "skeleton.dtsi"
++
++/ {
++	aliases {
++		serial0 = &uart1;
++		serial1 = &uart2;
++		serial2 = &uart3;
++		serial3 = &uart4;
++		serial4 = &uart5;
++		gpio0 = &gpio1;
++		gpio1 = &gpio2;
++		gpio2 = &gpio3;
++		gpio3 = &gpio4;
++		usb0 = &usbotg;
++		usb1 = &usbhost1;
++	};
++
++	asic: asic-interrupt-controller at 68000000 {
++		compatible = "fsl,imx25-asic", "fsl,avic";
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		reg = <0x68000000 0x8000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		osc {
++			compatible = "fsl,imx-osc", "fixed-clock";
++			clock-frequency = <24000000>;
++		};
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		interrupt-parent = <&asic>;
++		ranges;
++
++		aips at 43f00000 { /* AIPS1 */
++			compatible = "fsl,aips-bus", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x43f00000 0x100000>;
++			ranges;
++
++			i2c1: i2c at 43f80000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx25-i2c", "fsl,imx21-i2c";
++				reg = <0x43f80000 0x4000>;
++				clocks = <&clks 48>;
++				clock-names = "";
++				interrupts = <3>;
++				status = "disabled";
++			};
++
++			i2c3: i2c at 43f84000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx25-i2c", "fsl,imx21-i2c";
++				reg = <0x43f84000 0x4000>;
++				clocks = <&clks 48>;
++				clock-names = "";
++				interrupts = <10>;
++				status = "disabled";
++			};
++
++			can1: can at 43f88000 {
++				compatible = "fsl,imx25-flexcan", "fsl,p1010-flexcan";
++				reg = <0x43f88000 0x4000>;
++				interrupts = <43>;
++				clocks = <&clks 75>, <&clks 75>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
++			can2: can at 43f8c000 {
++				compatible = "fsl,imx25-flexcan", "fsl,p1010-flexcan";
++				reg = <0x43f8c000 0x4000>;
++				interrupts = <44>;
++				clocks = <&clks 76>, <&clks 76>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
++			uart1: serial at 43f90000 {
++				compatible = "fsl,imx25-uart", "fsl,imx21-uart";
++				reg = <0x43f90000 0x4000>;
++				interrupts = <45>;
++				clocks = <&clks 120>, <&clks 57>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
++			uart2: serial at 43f94000 {
++				compatible = "fsl,imx25-uart", "fsl,imx21-uart";
++				reg = <0x43f94000 0x4000>;
++				interrupts = <32>;
++				clocks = <&clks 121>, <&clks 57>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
++			i2c2: i2c at 43f98000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx25-i2c", "fsl,imx21-i2c";
++				reg = <0x43f98000 0x4000>;
++				clocks = <&clks 48>;
++				clock-names = "";
++				interrupts = <4>;
++				status = "disabled";
++			};
++
++			owire at 43f9c000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0x43f9c000 0x4000>;
++				clocks = <&clks 51>;
++				clock-names = "";
++				interrupts = <2>;
++				status = "disabled";
++			};
++
++			spi1: cspi at 43fa4000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx25-cspi", "fsl,imx35-cspi";
++				reg = <0x43fa4000 0x4000>;
++				clocks = <&clks 62>;
++				clock-names = "ipg";
++				interrupts = <14>;
++				status = "disabled";
++			};
++
++			kpp at 43fa8000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0x43fa8000 0x4000>;
++				clocks = <&clks 102>;
++				clock-names = "";
++				interrupts = <24>;
++				status = "disabled";
++			};
++
++			iomuxc at 43fac000{
++				compatible = "fsl,imx25-iomuxc";
++				reg = <0x43fac000 0x4000>;
++			};
++
++			audmux at 43fb0000 {
++				compatible = "fsl,imx25-audmux", "fsl,imx31-audmux";
++				reg = <0x43fb0000 0x4000>;
++				status = "disabled";
++			};
++		};
++
++		spba at 50000000 {
++			compatible = "fsl,spba-bus", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x50000000 0x40000>;
++			ranges;
++
++			spi3: cspi at 50004000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx25-cspi", "fsl,imx35-cspi";
++				reg = <0x50004000 0x4000>;
++				interrupts = <0>;
++				clocks = <&clks 80>;
++				clock-names = "ipg";
++				status = "disabled";
++			};
++
++			uart4: serial at 50008000 {
++				compatible = "fsl,imx25-uart", "fsl,imx21-uart";
++				reg = <0x50008000 0x4000>;
++				interrupts = <5>;
++				clocks = <&clks 123>, <&clks 57>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
++			uart3: serial at 5000c000 {
++				compatible = "fsl,imx25-uart", "fsl,imx21-uart";
++				reg = <0x5000c000 0x4000>;
++				interrupts = <18>;
++				clocks = <&clks 122>, <&clks 57>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
++			spi2: cspi at 50010000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx25-cspi", "fsl,imx35-cspi";
++				reg = <0x50010000 0x4000>;
++				clocks = <&clks 79>;
++				clock-names = "ipg";
++				interrupts = <13>;
++				status = "disabled";
++			};
++
++			ssi2: ssi at 50014000 {
++				compatible = "fsl,imx25-ssi", "fsl,imx21-ssi";
++				reg = <0x50014000 0x4000>;
++				interrupts = <11>;
++				status = "disabled";
++			};
++
++			esai at 50018000 {
++				reg = <0x50018000 0x4000>;
++				interrupts = <7>;
++			};
++
++			uart5: serial at 5002c000 {
++				compatible = "fsl,imx25-uart", "fsl,imx21-uart";
++				reg = <0x5002c000 0x4000>;
++				interrupts = <40>;
++				clocks = <&clks 124>, <&clks 57>;
++				clock-names = "ipg", "per";
++				status = "disabled";
++			};
++
++			tsc: tsc at 50030000 {
++				compatible = "fsl,imx25-adc", "fsl,imx21-tsc";
++				reg = <0x50030000 0x4000>;
++				interrupts = <46>;
++				clocks = <&clks 119>;
++				clock-names = "ipg";
++				status = "disabled";
++			};
++
++			ssi1: ssi at 50034000 {
++				compatible = "fsl,imx25-ssi", "fsl,imx21-ssi";
++				reg = <0x50034000 0x4000>;
++				interrupts = <12>;
++				status = "disabled";
++			};
++
++			fec: ethernet at 50038000 {
++				compatible = "fsl,imx25-fec";
++				reg = <0x50038000 0x4000>;
++				interrupts = <57>;
++				clocks = <&clks 88>, <&clks 65>;
++				clock-names = "ipg", "ahb";
++				status = "disabled";
++			};
++		};
++
++		aips at 53f00000 { /* AIPS2 */
++			compatible = "fsl,aips-bus", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x53f00000 0x100000>;
++			ranges;
++
++			clks: ccm at 53f80000 {
++				compatible = "fsl,imx25-ccm";
++				reg = <0x53f80000 0x4000>;
++				interrupts = <31>;
++				#clock-cells = <1>;
++			};
++
++			gpt4: timer at 53f84000 {
++				compatible = "fsl,imx25-gpt", "fsl,imx31-gpt";
++				reg = <0x53f84000 0x4000>;
++				clocks = <&clks 9>, <&clks 45>;
++				clock-names = "ipg", "per";
++				interrupts = <1>;
++			};
++
++			gpt3: timer at 53f88000 {
++				compatible = "fsl,imx25-gpt", "fsl,imx31-gpt";
++				reg = <0x53f88000 0x4000>;
++				clocks = <&clks 9>, <&clks 47>;
++				clock-names = "ipg", "per";
++				interrupts = <29>;
++			};
++
++			gpt2: timer at 53f8c000 {
++				compatible = "fsl,imx25-gpt", "fsl,imx31-gpt";
++				reg = <0x53f8c000 0x4000>;
++				clocks = <&clks 9>, <&clks 47>;
++				clock-names = "ipg", "per";
++				interrupts = <53>;
++			};
++
++			gpt1: timer at 53f90000 {
++				compatible = "fsl,imx25-gpt", "fsl,imx31-gpt";
++				reg = <0x53f90000 0x4000>;
++				clocks = <&clks 9>, <&clks 47>;
++				clock-names = "ipg", "per";
++				interrupts = <54>;
++			};
++
++			epit1: timer at 53f94000 {
++				compatible = "fsl,imx25-epit";
++				reg = <0x53f94000 0x4000>;
++				interrupts = <28>;
++			};
++
++			epit2: timer at 53f98000 {
++				compatible = "fsl,imx25-epit";
++				reg = <0x53f98000 0x4000>;
++				interrupts = <27>;
++			};
++
++			gpio4: gpio at 53f9c000 {
++				compatible = "fsl,imx25-gpio", "fsl,imx35-gpio";
++				reg = <0x53f9c000 0x4000>;
++				interrupts = <23>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++			};
++
++			pwm2: pwm at 53fa0000 {
++				compatible = "fsl,imx25-pwm", "fsl,imx27-pwm";
++				#pwm-cells = <2>;
++				reg = <0x53fa0000 0x4000>;
++				clocks = <&clks 106>, <&clks 36>;
++				clock-names = "ipg", "per";
++				interrupts = <36>;
++			};
++
++			gpio3: gpio at 53fa4000 {
++				compatible = "fsl,imx25-gpio", "fsl,imx35-gpio";
++				reg = <0x53fa4000 0x4000>;
++				interrupts = <16>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++			};
++
++			pwm3: pwm at 53fa8000 {
++				compatible = "fsl,imx25-pwm", "fsl,imx27-pwm";
++				#pwm-cells = <2>;
++				reg = <0x53fa8000 0x4000>;
++				clocks = <&clks 107>, <&clks 36>;
++				clock-names = "ipg", "per";
++				interrupts = <41>;
++			};
++
++			esdhc1: esdhc at 53fb4000 {
++				compatible = "fsl,imx25-esdhc";
++				reg = <0x53fb4000 0x4000>;
++				interrupts = <9>;
++				clocks = <&clks 86>, <&clks 63>, <&clks 45>;
++				clock-names = "ipg", "ahb", "per";
++				status = "disabled";
++			};
++
++			esdhc2: esdhc at 53fb8000 {
++				compatible = "fsl,imx25-esdhc";
++				reg = <0x53fb8000 0x4000>;
++				interrupts = <8>;
++				clocks = <&clks 87>, <&clks 64>, <&clks 46>;
++				clock-names = "ipg", "ahb", "per";
++				status = "disabled";
++			};
++
++			lcdc at 53fbc000 {
++				reg = <0x53fbc000 0x4000>;
++				interrupts = <39>;
++				clocks = <&clks 103>, <&clks 66>, <&clks 49>;
++				clock-names = "ipg", "ahb", "per";
++				status = "disabled";
++			};
++
++			slcdc at 53fc0000 {
++				reg = <0x53fc0000 0x4000>;
++				interrupts = <38>;
++				status = "disabled";
++			};
++
++			pwm4: pwm at 53fc8000 {
++				compatible = "fsl,imx25-pwm", "fsl,imx27-pwm";
++				reg = <0x53fc8000 0x4000>;
++				clocks = <&clks 108>, <&clks 36>;
++				clock-names = "ipg", "per";
++				interrupts = <42>;
++			};
++
++			gpio1: gpio at 53fcc000 {
++				compatible = "fsl,imx25-gpio", "fsl,imx35-gpio";
++				reg = <0x53fcc000 0x4000>;
++				interrupts = <52>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++			};
++
++			gpio2: gpio at 53fd0000 {
++				compatible = "fsl,imx25-gpio", "fsl,imx35-gpio";
++				reg = <0x53fd0000 0x4000>;
++				interrupts = <51>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++			};
++
++			sdma at 53fd4000 {
++				compatible = "fsl,imx25-sdma", "fsl,imx35-sdma";
++				reg = <0x53fd4000 0x4000>;
++				clocks = <&clks 112>, <&clks 68>;
++				clock-names = "ipg", "ahb";
++				interrupts = <34>;
++			};
++
++			wdog at 53fdc000 {
++				compatible = "fsl,imx25-wdt", "fsl,imx21-wdt";
++				reg = <0x53fdc000 0x4000>;
++				clocks = <&clks 126>;
++				clock-names = "";
++				interrupts = <55>;
++			};
++
++			pwm1: pwm at 53fe0000 {
++				compatible = "fsl,imx25-pwm", "fsl,imx27-pwm";
++				#pwm-cells = <2>;
++				reg = <0x53fe0000 0x4000>;
++				clocks = <&clks 105>, <&clks 36>;
++				clock-names = "ipg", "per";
++				interrupts = <26>;
++			};
++
++			usbphy1: usbphy at 1 {
++				compatible = "nop-usbphy";
++				status = "disabled";
++			};
++
++			usbphy2: usbphy at 2 {
++				compatible = "nop-usbphy";
++				status = "disabled";
++			};
++
++			usbotg: usb at 53ff4000 {
++				compatible = "fsl,imx25-usb", "fsl,imx27-usb";
++				reg = <0x53ff4000 0x0200>;
++				interrupts = <37>;
++				clocks = <&clks 9>, <&clks 70>, <&clks 8>;
++				clock-names = "ipg", "ahb", "per";
++				fsl,usbmisc = <&usbmisc 0>;
++				status = "disabled";
++			};
++
++			usbhost1: usb at 53ff4400 {
++				compatible = "fsl,imx25-usb", "fsl,imx27-usb";
++				reg = <0x53ff4400 0x0200>;
++				interrupts = <35>;
++				clocks = <&clks 9>, <&clks 70>, <&clks 8>;
++				clock-names = "ipg", "ahb", "per";
++				fsl,usbmisc = <&usbmisc 1>;
++				status = "disabled";
++			};
++
++			usbmisc: usbmisc at 53ff4600 {
++				#index-cells = <1>;
++				compatible = "fsl,imx25-usbmisc";
++				clocks = <&clks 9>, <&clks 70>, <&clks 8>;
++				clock-names = "ipg", "ahb", "per";
++				reg = <0x53ff4600 0x00f>;
++				status = "disabled";
++			};
++
++			dryice at 53ffc000 {
++				compatible = "fsl,imx25-dryice", "fsl,imx25-rtc";
++				reg = <0x53ffc000 0x4000>;
++				clocks = <&clks 81>;
++				clock-names = "ipg";
++				interrupts = <25>;
++			};
++		};
++
++		emi at 80000000 {
++			compatible = "fsl,emi-bus", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x80000000 0x3b002000>;
++			ranges;
++
++			nand at bb000000 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++
++				compatible = "fsl,imx25-nand";
++				reg = <0xbb000000 0x2000>;
++				clocks = <&clks 50>;
++				clock-names = "";
++				interrupts = <33>;
++				status = "disabled";
++			};
++		};
++	};
++};
 -- 
 1.7.10.4
