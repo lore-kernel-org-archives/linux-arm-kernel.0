@@ -1,79 +1,100 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 12 Nov 2012 21:21:07 +0100
-Subject: [PATCH V2 1/5] arm: mvebu: Added support for coherency fabric
- in mach-mvebu
-In-Reply-To: <20121105140258.GO3351@mudshark.cambridge.arm.com>
-References: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
- <1351545108-18954-2-git-send-email-gregory.clement@free-electrons.com>
- <20121105140258.GO3351@mudshark.cambridge.arm.com>
-Message-ID: <50A15A33.60405@free-electrons.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 12 Nov 2012 13:21:40 -0700
+Subject: [PATCH] RFC: pinctrl: grab default handler with bus notifiers
+In-Reply-To: <1352636539-6318-1-git-send-email-linus.walleij@stericsson.com>
+References: <1352636539-6318-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <50A15A54.3090803@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On 11/11/2012 05:22 AM, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This makes the pinctrl subsystem auto-grab the pinctrl handle and
+> set the "default" (PINCTRL_STATE_DEFAULT) state for every device
+> that is present on the platform or AMBA (PrimeCell) bus right
+> before probe. This will account for the lion's share of embedded
+> silicon devcies. The behaviour is achieved using bus notifiers
+> on the platform and AMBA (PrimeCell) busses.
 
-On 11/05/2012 03:02 PM, Will Deacon wrote:
-> Hi Gregory,
-> 
-> On Mon, Oct 29, 2012 at 09:11:44PM +0000, Gregory CLEMENT wrote:
->> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
->> new file mode 100644
->> index 0000000..69e130d
->> --- /dev/null
->> +++ b/arch/arm/mach-mvebu/coherency.c
->> @@ -0,0 +1,89 @@
->> +/*
->> + * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
->> + *
->> + * Copyright (C) 2012 Marvell
->> + *
->> + * Yehuda Yitschak <yehuday@marvell.com>
->> + * Gregory Clement <gregory.clement@free-electrons.com>
->> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2.  This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + *
->> + * The Armada 370 and Armada XP SOCs have a coherency fabric which is
->> + * responsible for ensuring hardware coherency between all CPUs and between
->> + * CPUs and I/O masters. This file initializes the coherency fabric and
->> + * supplies basic routines for configuring and controlling hardware coherency
->> + */
-> 
-> [...]
-> 
->> +int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
->> +{
->> +	int reg;
->> +
->> +	if (!coherency_base) {
->> +		pr_warn("Can't make CPU %d cache coherent.\n", hw_cpu_id);
->> +		pr_warn("Coherency fabric is not initialized\n");
->> +		return 1;
->> +	}
->> +
->> +	/* Enable the CPU in coherency fabric */
->> +	reg = readl(coherency_base + COHERENCY_FABRIC_CTL_OFFSET);
->> +	reg |= 1 << (24 + hw_cpu_id);
->> +	writel(reg, coherency_base + COHERENCY_FABRIC_CTL_OFFSET);
->> +
->> +	/* Add CPU to SMP group */
->> +	reg = readl(coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
->> +	reg |= 1 << (16 + hw_cpu_id + (smp_group_id == 0 ? 8 : 0));
->> +	writel(reg, coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
->> +
->> +	return 0;
->> +}
-> 
-> These writels may expand to code containing calls to outer_sync(), which
-> will attempt to take a spinlock for the aurora l2. Given that the CPU isn't
-> coherent, how does this play out with the exclusive store instruction in the
-> lock?
+Doing this seems reasonable.
 
-I dug a little this subject: and I am not sure there is problem. In SMP mode,
-only the system cache mode of Aurora is used. In this mode, outer_cache.sync
-is void then outer_sync() won't call any function, so there will be no
-access to any spinlock.
+> Notice that the patch disregards deferral as per above:
+...
+> Another solution that was discussed was whether to move
+> the default pinctrl handle and state grab to the device
+> core as an optional field in struct device itself, but
+> I'd like to first propose this less intrusive mechanism.
 
-Gregory
+I think doing that approach makes a lot more sense; wouldn't it
+completely avoid the issues with deferred probe that this notifier-based
+method can't solve? It would also be very much in line with e.g.
+dev_get_regmap() - if every resource that a driver required were handled
+like that, then deferred probe could be significantly isolated into the
+driver core rather than in every driver...
+
+> diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
+> index da40efb..b6c27b1 100644
+> --- a/Documentation/pinctrl.txt
+> +++ b/Documentation/pinctrl.txt
+> @@ -972,6 +972,19 @@ pinmux core.
+>  Pin control requests from drivers
+>  =================================
+>  
+> +When a device driver is about to probe on the platform or AMBA (PrimeCell)
+> +bus,
+
+Why not make this apply to every device? I don't think the specific bus
+type impacts whether pinctrl would be useful?
+
+> @@ -1097,8 +1110,8 @@ situations that can be electrically unpleasant, you will certainly want to
+> -The above can be hidden: using pinctrl hogs, the pin control driver may be
+> -setting up the config and muxing for the pins when it is probing,
+> +The above can be hidden: using device notifiers, the pinctrl core may be
+> +setting up the config and muxing for the pins when the device is probing,
+>  nevertheless orthogonal to the GPIO subsystem.
+
+Why removing "using pinctrl hogs"; can't "it" (although I didn't check
+what "it" is...) be hidden using either pinctrl hogs or device notifiers?
+
+>  But there are also situations where it makes sense for the GPIO subsystem
+> @@ -1144,6 +1157,13 @@ PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-foo", NULL /* group */, "power_func")
+>  
+>  This gives the exact same result as the above construction.
+>  
+> +This should not be used for any kind of device which is represented in
+> +the device model. For platform and AMBA (PrimeCell) devices, such as found
+> +in many SoC:s, the pinctrl core will listen to notifications from these
+> +buses and attempt to do pinctrl_get_select_default() for these devices
+> +right before their device drivers are probed, so hogging these will just
+> +make the model look strange.
+
+(re: the first sentence:) Why not? For the device tree case, that's
+forcing DT authors to sprinkle the device tree across all devices
+throughout the tree, rather than having a simple single "hog" table in
+the pin controller itself. At least where there's no dynamic muxing
+required, I don't think it makes any semantic difference whether the
+pinctrl configuration is represented as a single "pinmux HW"
+configuration, or split up per-device, and writing the single
+centralized configuration is easier.
+
+> diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+
+> @@ -684,9 +687,16 @@ static struct pinctrl *pinctrl_get_locked(struct device *dev)
+>  	if (WARN_ON(!dev))
+>  		return ERR_PTR(-EINVAL);
+>  
+> +	/*
+> +	 * See if somebody else (such as the pinctrl core, using the
+> +	 * notifiers) has already obtained a handle to the pinctrl for
+> +	 * this device. In that case, return another pointer to it.
+> +	 */
+>  	p = find_pinctrl(dev);
+> -	if (p != NULL)
+> -		return ERR_PTR(-EBUSY);
+> +	if (p != NULL) {
+> +		dev_dbg(dev, "obtain a copy of previously claimed pinctrl\n");
+> +		return p;
+
+You'd want to implement full reference-counting then; IIRC, that's why I
+banned pinctrl_get() running twice in the original code.
