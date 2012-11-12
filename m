@@ -1,77 +1,67 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 12 Nov 2012 23:00:07 +0100
-Subject: usb clock not found on imx27 when using dt
-In-Reply-To: <50A15966.8040204@yahoo.fr>
-References: <1352666074.32152.YahooMailNeo@web28806.mail.ir2.yahoo.com>
- <20121112075411.GO10369@pengutronix.de> <50A15966.8040204@yahoo.fr>
-Message-ID: <201211122300.07172.marex@denx.de>
+From: rob.clark@linaro.org (Rob Clark)
+Date: Mon, 12 Nov 2012 17:33:41 -0600
+Subject: [PATCH] ARM: add get_user() support for 8 byte types
+In-Reply-To: <20121112230819.GC28341@n2100.arm.linux.org.uk>
+References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
+ <20121112192727.GB28341@n2100.arm.linux.org.uk>
+ <CAF6AEGu4L+ukxhMBLYK3d2g4CBBXi6o5nN_wXvakZCT8qMfSEA@mail.gmail.com>
+ <20121112230819.GC28341@n2100.arm.linux.org.uk>
+Message-ID: <CAF6AEGtLKjJ=BfBnOq+oE6cgneF5YqsbYqNnCPrz4sTFRzdibg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear trem,
+On Mon, Nov 12, 2012 at 5:08 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Nov 12, 2012 at 01:58:32PM -0600, Rob Clark wrote:
+>> On Mon, Nov 12, 2012 at 1:27 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Fri, Nov 09, 2012 at 03:17:33PM -0600, Rob Clark wrote:
+>> >> From: Rob Clark <rob@ti.com>
+>> >>
+>> >> A new atomic modeset/pageflip ioctl being developed in DRM requires
+>> >> get_user() to work for 64bit types (in addition to just put_user()).
+>> >
+>> > NAK.
+>> >
+>> > (I did write a better email explaining all the ins and outs of why this
+>> > won't work and why 64-bit get_user isn't possible, but my editor crapped
+>> > out and lost all that well written message; I don't fancy typing it all
+>> > out again.)
+>> >
+>> > Nevertheless,
+>> > int test_ptr(unsigned int **v, unsigned int **p)
+>> > {
+>> >         return get_user(*v, p);
+>> > }
+>> >
+>> > produces a warning, and you can't get away from that if you stick 64-bit
+>> > support into get_user().
+>>
+>> Actually, it seems like using 'register typeof(x) __r2 asm("r2");'
+>> does avoid that warning..
+>
+> That seems to pass the checks I've done on it so far, and seems rather
+> obvious (there's been a number of people looking at this, none of whom
+> have come up with that solution).  Provided the final cast is kept
+> (which is there to ensure proper typechecking), it seems like it might
+> be a solution.
 
-> On 12/11/12 08:54, s.hauer at pengutronix.de wrote:
-> > On Sun, Nov 11, 2012 at 08:34:34PM +0000, Philippe Reynes wrote:
-> >> Hi all,
-> >> 
-> >> I try to add the support of usb on my armadeus apf27,
-> >> but there is a problem when try to reclaim the clock.
-> >> imx_usb mxc-ehci.0: Failed to get clock, err=-2
-> >> 
-> >> To avoid adding too many attachment to this mail,
-> >> I've put all the information on a website. You can
-> >> found them here:  http://ryu.zarb.org/~trem/armadeus/
-> >> 
-> >> 
-> >> The initial issue is in the directory : 20121110
-> >> 
-> >> boot-3.7-rc4.log : boot log with the issue
-> >> linux-3.7-rc4.config : the configuration file for the kernel
-> >> investifation.txt : the description of my investigation.
-> > 
-> > You should really post the relevant bits on the mailing list. Nobody
-> > visits websites for investigating your issue. Besides, it will not be
-> > in the mailing list archives so people will not find it later.
-> 
-> You're right, I add an archive with all log as attachment.
-> 
-> >> I've tried to fix the clock issue, but another issue occurs.
-> >> The information about this "fix" is in : 20121111
-> >> boot-3.7-rc4.log : boot log with the new issue
-> >> issue.txt : the description of the change done on the kernel
-> >> 
-> >> I've got severals questions :
-> >> - does my dts correct with usb change ?
-> >> - does someone has already tested usb on imx27 with dt ?
-> > 
-> > Please investigate in using the chipidea driver. This will be the way
-> > forward for i.MX.
-> 
-> I use the chipidea driver for the usb.
-> 
-> The main issue is that the chipidea driver don't found the clock :
-> 
-> [    0.761693] imx_usb mxc-ehci.0: Failed to get clock, err=-2
-> [    0.767620] imx_usb: probe of mxc-ehci.0 failed with error -2
-> 
-> The driver ci13xxx_imx request the clock in the probe function
-> in the following line:
-> data->clk = devm_clk_get(&pdev->dev, NULL);
-> calling: clk = clk_get(dev, id);
-> calling: clk_get_sys(dev_id, con_id);
-> calling: clk_find(dev_id, con_id);
-> with dev_id = mxc-ehci.0 and con_id = NULL
-> This last function fail to found a clock.
-> 
-> In the function mx27_clocks_init, several mxc-ehci.0
-> clocks are registered, but all with a con_id.
-> 
-> So the function clk_find fails.
-> 
-> As I'm not really sure of the dts, I don't know if the problem
-> is in the dts or in the driver (maybe both).
+I'm sort of thinking maybe we want to change 'switch (sizeof(*(__p)))'
+with 'switch (sizeof(typeof(x)))' in case someone ignores the compiler
+warning when they try something like:
 
-Please pull the relevant parts from the attachment and post them inline.
+   uint32_t x;
+   uint64_t *p = ...;
+   get_user(x, p);
 
-Best regards,
-Marek Vasut
+that was my one concern about 'register typeof(x) __r2 ...', but I
+think just changing the switch condition is enough.  But maybe good to
+have some eyes on in case there is something else I'm not thinking of.
+
+BR,
+-R
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
