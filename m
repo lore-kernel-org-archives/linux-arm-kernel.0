@@ -1,54 +1,36 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 Nov 2012 16:23:23 +0100
-Subject: [PATCH 1/7] ARM i.MX51: setup MIPI during startup
+Date: Mon, 12 Nov 2012 16:23:26 +0100
+Subject: [PATCH 4/7] ARM i.MX53: Add IPU support
 In-Reply-To: <1352733809-27230-1-git-send-email-s.hauer@pengutronix.de>
 References: <1352733809-27230-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1352733809-27230-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1352733809-27230-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MIPI interface has to be initialized for proper IPU support.
-The MIPI officially is not supported, but still needs initialization.
-This patch adds this to the SoC startup as all it does is poking
-some magic values into registers for which we do not have documentation.
+This adds the IPU device to the devicetree.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-imx/mm-imx5.c |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/imx53.dtsi |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-index acb0aad..f01e74f 100644
---- a/arch/arm/mach-imx/mm-imx5.c
-+++ b/arch/arm/mach-imx/mm-imx5.c
-@@ -81,8 +81,28 @@ void __init imx50_init_early(void)
- 	mxc_arch_reset_init(MX50_IO_ADDRESS(MX50_WDOG_BASE_ADDR));
- }
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 76ebb1a..3387c5d 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -67,6 +67,13 @@
+ 		interrupt-parent = <&tzic>;
+ 		ranges;
  
-+/*
-+ * The MIPI HSC unit has been removed from the i.MX51 Reference Manual by
-+ * the Freescale marketing division. However this did not remove the
-+ * hardware from the chip which still needs to be configured for proper
-+ * IPU support.
-+ */
-+static void __init imx51_ipu_mipi_setup(void)
-+{
-+	void __iomem *hsc_addr;
-+	hsc_addr = MX51_IO_ADDRESS(MX51_MIPI_HSC_BASE_ADDR);
++		ipu: ipu at 18000000 {
++			#crtc-cells = <1>;
++			compatible = "fsl,imx53-ipu";
++			reg = <0x18000000 0x080000000>;
++			interrupts = <11 10>;
++		};
 +
-+	/* setup MIPI module to legacy mode */
-+	__raw_writel(0xf00, hsc_addr);
-+
-+	/* CSI mode: reserved; DI control mode: legacy (from Freescale BSP) */
-+	__raw_writel(__raw_readl(hsc_addr + 0x800) | 0x30ff,
-+		hsc_addr + 0x800);
-+}
-+
- void __init imx51_init_early(void)
- {
-+	imx51_ipu_mipi_setup();
- 	mxc_set_cpu_type(MXC_CPU_MX51);
- 	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
- 	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
+ 		aips at 50000000 { /* AIPS1 */
+ 			compatible = "fsl,aips-bus", "simple-bus";
+ 			#address-cells = <1>;
 -- 
 1.7.10.4
