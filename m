@@ -1,24 +1,19 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 12 Nov 2012 15:38:48 -0600
-Subject: [PATCH V3 00/13] ARM: OMAP: DMTIMER fixes
-In-Reply-To: <20121112203440.GL6801@atomide.com>
-References: <1352744444-2633-1-git-send-email-jon-hunter@ti.com>
- <20121112203440.GL6801@atomide.com>
-Message-ID: <50A16C68.9020004@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Nov 2012 21:40:09 +0000
+Subject: [PATCH] [TRIVIAL] ARM: cns3xxx: drop unnessesary symbol selection
+In-Reply-To: <1352353029-2725-1-git-send-email-kaloz@openwrt.org>
+References: <1352353029-2725-1-git-send-email-kaloz@openwrt.org>
+Message-ID: <201211122140.09892.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 11/12/2012 02:34 PM, Tony Lindgren wrote:
-> * Jon Hunter <jon-hunter@ti.com> [121112 10:22]:
->> This series includes several fixes for the OMAP DMTIMER driver. This is
->> based upon Tony Lindgren's current master branch [1].
+On Thursday 08 November 2012, Imre Kaloz wrote:
+> ARCH_CNS3XXX already selects MIGHT_HAVE_PCI, so boards don't have to
 > 
-> You should be able to use omap-for-v3.8/dt as the base now with
-> the cleanup merged there. The master branch is just a merge of the
-> various topic branches, and can't be used as a base for pull requests.
+> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
 
-Ok, great will base on top of that branch.
+Applied on next/fixes-non-critical branch, with the subject line fixup.
 
-Cheers
-Jon
+Thanks,
+
+	Arnd
