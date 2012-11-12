@@ -1,69 +1,45 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 12 Nov 2012 22:19:58 +0100
-Subject: [PATCH 1/2] ARM: kirkwood: Add Plat'Home OpenBlocks A6 support
-In-Reply-To: <CABMQnVK5SbT5mbugruZdNursXQiWJOQD4sreEMS1v6GO7PH0mw@mail.gmail.com>
-References: <1352720819-21923-1-git-send-email-iwamatsu@nigauri.org>
- <20121112120535.GA22029@lunn.ch>
- <CABMQnVK5SbT5mbugruZdNursXQiWJOQD4sreEMS1v6GO7PH0mw@mail.gmail.com>
-Message-ID: <20121112211958.GU24583@lunn.ch>
+From: mturquette@ti.com (Mike Turquette)
+Date: Mon, 12 Nov 2012 13:22:12 -0800
+Subject: possibility of parent clock selection through DT
+In-Reply-To: <CAPub148Bq=uwTuky25WzXn4yfCukJ+WacxkBvuyV5yTzGasGOQ@mail.gmail.com>
+References: <CAPub14-CPS48gQ1h8vvAYBpO_=egjheG_rMoZ894Y4XZ2CinUQ@mail.gmail.com>
+ <CAPub148Bq=uwTuky25WzXn4yfCukJ+WacxkBvuyV5yTzGasGOQ@mail.gmail.com>
+Message-ID: <20121112212212.20034.78522@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nobuhiro
-
-> >> +     model = "Plat'Home OpenBlocksA6";
-> >> +     compatible = "plathome,openblocks-a6", "marvell,kirkwood-88f6283", "marvell,kirkwood";
+Quoting Shiraz Hashim (2012-11-06 22:36:10)
+> On Wed, Nov 7, 2012 at 11:42 AM, Shiraz Hashim
+> <shiraz.linux.kernel@gmail.com> wrote:
+> > Hi Mike, Rob,
 > >
-> > Ah, interesting. A 88f6283. I'm a bit surprised this actually works!
-> > This variant is not listed in kirkwood_id(). So do you see messages
-> > like:
+> > Devices in a SoC can have multiple possible clock sources which is
+> > perfectly captured through clk framework.
 > >
-> > "Device-Unknown"
+> > But the device itself may not be aware of the complex hierarchy above it.
+> > In this case how do you suggest a board (through DT) should select its
+> > preference.
 > >
-> > and
-> >
-> > "MPP setup: unknown kirkwood variant"
+> > Is there some work already going on in this direction ?
 > 
-> No, I can not see these message.
-> 88f6283 is same as MV88F6282-Rev-A1. Because this has same CPU ID as
-> MV88F6282-Rev-A1.
-
-Ah. O.K.
-
-Is it pin compatible? Please take a look at 
-
-https://github.com/lunn/linux/blob/v3.7-rc2-pinctrl-v2/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-
-and see if what is valid for 88f6282 is also valid for 88f6283.
-
-If its not compatible, we need to add this variant to the table.
-
-> What kind of value should I set here?
-
-For the moment, keep to 88f6283. At the moment its not actually used.
-However, when we add pinctrl we will need to this about this some
-more, depending on if its pin compatible or not.
-
-> >> +static unsigned int openblocks_a6_mpp_config[] __initdata = {
-> >> +     MPP0_NF_IO2,
-> >> +     MPP1_NF_IO3,
-> >> +     MPP2_NF_IO4,
-> >> +     MPP3_NF_IO5,
-> >> +     MPP4_NF_IO6,
-> >> +     MPP5_NF_IO7,
-> >> +     MPP6_SYSRST_OUTn,
-> >> +     /* MPP7_GPO, */
-> >
-> > Any reason not to actually have MPP7_GPO here?
-> > Is it being used as a GPO line?
+> Just to make it clear, I already have referred the clock DT bindings and
+> Shawn Guo patch on removing clk look up registration from kernel code.
 > 
-> Yes. MPP7 is assigned to GPO in this target boatd.
-> And GPO is not used.
-> The following is also the same.
-> If unnecessary, I will delete these lines.
+> Here I am talking about possibility of selecting desired clock hierarchy
+> by the boards about which device nodes are not aware.
+> 
 
-If they are not used, i would not list them.
- 
- Thanks for the quick response.
+One way to achieve this is to use clk_set_rate as a way to switch
+parents at run-time.  The OMAP CCF code currently does this when
+relocking PLLs and makes use of __clk_reparent to update the clock
+framework's representation of the hierarchy dynamically.
 
- Andrew
+Maybe something like the following is helpful to you:
+http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=blob;f=arch/arm/mach-omap2/dpll3xxx.c;h=f72dedb4eee892ce4cd5bdf22cc8c22510f3d526;hb=clk-omap-3.8#l542
+
+Regards,
+Mike
+
+> -- 
+> regards
+> Shiraz Hashim
