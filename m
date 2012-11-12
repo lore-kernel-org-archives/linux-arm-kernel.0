@@ -1,31 +1,41 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 12 Nov 2012 00:33:02 +0100
-Subject: [PATCH 0/8] mfd: Batch together MFD related patches
-In-Reply-To: <1352128236-11554-1-git-send-email-lee.jones@linaro.org>
-References: <1352128236-11554-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20121111233302.GE27828@sortiz-mobl>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 12 Nov 2012 01:52:22 +0100
+Subject: [PATCH 0/6] ARM: integrator: SoC bus & cleanup
+Message-ID: <1352681542-12835-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+This series will:
 
-On Mon, Nov 05, 2012 at 04:10:28PM +0100, Lee Jones wrote:
-> Hi Sam,
-> 
-> I know you've been busy giving NFC presentations at ELC, but ... :)
-> 
-> All these patches have been on the list in various other patch-sets
-> for some time and have been reviewed by some key people already. All
-> other patches from the patch-sets have been taken, so I thought I'd
-> batch these up for easy review/acceptance.
-Thanks, much appreciated.
-I applied all of them to my for-next branch. I don't think patch #1 is rc
-material though, as it only fixes a boot warning and not an actual bug or
-regression.
+- Switch the Integrator/AP and /CP to use the SoC bus
+  when booting from device tree.
+- Group all devices on the SoC below this bus so as to
+  set a good example of how to do this. The bus was
+  invented by Lee Jones, let's show how it's to be used
+  on a DT:ed SoC.
+- Fetch the special system controller offsets from two
+  special device tree nodes for each case and replace
+  the static mappings with these at boot.
+- Move some static remaps to the ATAG-only code path
+  and delete some static maps that aren't used.
 
-Cheers,
-Samuel.
+Linus Walleij (6):
+  ARM: integrator: hook the AP into the SoC bus
+  ARM: integrator: hook the CP into the SoC bus
+  ARM: integrator: remove static AP syscon mapping
+  ARM: integrator: remove static CP syscon mapping
+  ARM: integrator: delete SC mapping on the CP
+  ARM: integrator: delete static UART1 mapping
+
+ Documentation/devicetree/bindings/arm/arm-boards |   4 +
+ arch/arm/boot/dts/integratorap.dts               |   5 +
+ arch/arm/boot/dts/integratorcp.dts               |   5 +
+ arch/arm/mach-integrator/Kconfig                 |   2 +
+ arch/arm/mach-integrator/common.h                |   1 +
+ arch/arm/mach-integrator/core.c                  |  91 ++++++++++++++++++
+ arch/arm/mach-integrator/integrator_ap.c         | 114 ++++++++++++++++++-----
+ arch/arm/mach-integrator/integrator_cp.c         | 111 ++++++++++++++++------
+ 8 files changed, 283 insertions(+), 50 deletions(-)
 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+1.7.11.7
