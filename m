@@ -1,25 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Nov 2012 21:21:15 +0000
-Subject: [PATCH 0/7] ARM: remove init_consistent_dma_size() stub
-In-Reply-To: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
-References: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <201211122121.16219.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Nov 2012 13:34:55 -0800
+Subject: [PATCH 12/11] ARM: OMAP: Fix relative includes for fpga.h
+In-Reply-To: <50A0D3C6.4070206@ti.com>
+References: <20121030234852.25936.12482.stgit@muffinssi.local>
+ <20121031215252.GB15766@atomide.com> <50A0D3C6.4070206@ti.com>
+Message-ID: <20121112213454.GM6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 November 2012, Marek Szyprowski wrote:
-> Commit e9da6e9905e639b0 ("ARM: dma-mapping: remove custom consistent dma
-> region") replaced custom consistent memory handling, so setting
-> consistent dma memory size is not longer required. This patch series
-> cleans sub-architecture platform code to remove all calls to the
-> obsolated init_consistent_dma_size() function and finally removes the
-> init_consistent_dma_size() stub itself.
+* Benoit Cousson <b-cousson@ti.com> [121112 02:49]:
+> Hi Tony,
 > 
-> Arnd, Olof: could You apply it to arm-soc cleanup branch?
+> After rebasing on top of your omap-for-v3.8/tmp-merge, I realized that this patch is generating a build break due to removal of the fpga.h include from debug-leds.c.
 > 
+> arch/arm/plat-omap/debug-leds.c: In function 'fpga_probe':
+> arch/arm/plat-omap/debug-leds.c:114:9: error: 'H2P2_DBG_FPGA_SIZE' undeclared (first use in this function)
+> arch/arm/plat-omap/debug-leds.c:114:9: note: each undeclared identifier is reported only once for each function it appears in
+> 
+> It does not appear with the omap2plus_config but will appear if you enable the NEW_LEDS support that enable OMAP_DEBUG_LEDS.
+> 
+> I'm not sure why the size is still hard coded. In theory, assuming the resource is properly initialized, resource_size should be usable.
+> The patch below is fixing that.
 
-Applied patches 2-7 to next/cleanup branch, with the Acks that came in.
+Thanks looks like I missed that one. Applying into
+omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3.
 
-Thanks,
+Regards,
 
-	Arnd
+Tony
