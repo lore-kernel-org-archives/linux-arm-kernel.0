@@ -1,76 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 12 Nov 2012 19:02:10 +0900
-Subject: Build failure: OMAP4430 failed due to exynos4 pinctrl
-In-Reply-To: <20121112093329.GC28327@n2100.arm.linux.org.uk>
-References: <20121112093329.GC28327@n2100.arm.linux.org.uk>
-Message-ID: <007701cdc0bc$c84b11c0$58e13540$%kim@samsung.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 12 Nov 2012 11:32:51 +0100
+Subject: [GIT PULL] arm-soc: lpc32xx: platform updates
+In-Reply-To: <509A5992.60009@antcom.de>
+References: <509A5992.60009@antcom.de>
+Message-ID: <50A0D053.8020602@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> 
-> Last night's randconfig for OMAP4430 failed with:
-> 
-> drivers/built-in.o:(.rodata+0x1a60): undefined reference to
-> `exynos4210_pin_ctrl'
-> 
-> Config and log:
-> http://www.arm.linux.org.uk/developer/build/file.php?type=config&idx=2693
-> http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=2693
+Hi Arnd and Olof,
 
-Oops, yeah right.
+this is a follow-up update of the previous pull request, adding only one patch
+to the LPC32xx platform (Motor PWM clock by Alban Bedel).
 
-Thanks for pointing out :-)
+Thanks,
 
-Please test again with following?...
+Roland
 
-(+ Linus Walleij)
 
-8<-------------------------------------------------------------
-From: Kukjin Kim <kgene.kim@samsung.com>
-Subject: [PATCH] pinctrl/samsung: adds dependency for pinctrl-samsung/exynos
+The following changes since commit 91deef8069e7ffafac4467200e1d37af1b2d7c56:
 
-The pinctrl-exynos should be built with ARCH_EXYNOS and pinctrl-samsung
-should be built with pinctrl-exynos. If not, following error can be
-happened.
+  ARM: LPC32xx: Cleanup irq.c (2012-11-07 13:30:50 +0100)
 
-drivers/built-in.o:(.rodata+0x1a60): undefined reference to
-'exynos4210_pin_ctrl'
+are available in the git repository at:
 
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- drivers/pinctrl/Kconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+  git://git.antcom.de/linux-2.6.git lpc32xx/core
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index 7bf914d..18b473b 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -179,11 +179,13 @@ config PINCTRL_COH901
- 
- config PINCTRL_SAMSUNG
- 	bool "Samsung pinctrl driver"
-+	depends on PLAT_SAMSUNG
- 	select PINMUX
- 	select PINCONF
- 
- config PINCTRL_EXYNOS4
- 	bool "Pinctrl driver data for Exynos4 SoC"
-+	depends on PINCTRL_SAMSUNG && ARCH_EXYNOS4
- 	select PINCTRL_SAMSUNG
- 
- config PINCTRL_MVEBU
--- 
-1.7.4.1
+for you to fetch changes up to 84cee34db4d34b9059f4ef66f7d1805e438cc7f3:
 
-8<-------------------------------------------------------------
+  ARM: LPC32xx: Add the motor PWM clock (2012-11-12 11:27:40 +0100)
 
-Thanks.
+----------------------------------------------------------------
+Alban Bedel (1):
+      ARM: LPC32xx: Add the motor PWM clock
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+ arch/arm/mach-lpc32xx/clock.c                 |    8 ++++++++
+ arch/arm/mach-lpc32xx/include/mach/platform.h |    1 +
+ 2 files changed, 9 insertions(+)
