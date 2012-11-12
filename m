@@ -1,40 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Nov 2012 16:22:17 +0000
-Subject: [GIT PULL] musb regression fixes for v3.7-rc4
-In-Reply-To: <20121109223939.GZ6801@atomide.com>
-References: <20121109223939.GZ6801@atomide.com>
-Message-ID: <201211121622.17616.arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 12 Nov 2012 16:26:01 +0000 (UTC)
+Subject: [PATCH linux-next] ARM: OMAP2: Fix compillation error in cm_common
+In-Reply-To: <1352733428-27889-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1352733428-27889-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <alpine.DEB.2.00.1211121625150.6043@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 November 2012, Tony Lindgren wrote:
-> This series fixes an annoying regression to make MUSB working
-> on omap4 again. Although it's getting rather late for these
-> changes for the -rc cycle, it is important as many devices
-> are using MUSB for charging and connectivity.
-> 
-> With the USB PHY changes, MUSB started using the newly added
-> drivers/usb/phy/omap-usb2.c driver introduced by commit
-> 657b306a (usb: phy: add a new driver for omap usb2 phy)
-> that is using the newly introduced drivers/bus/omap-ocp2scp.c
-> introduced by commit 26a84b3e (drivers: bus: add a new driver
-> for omap-ocp2scp).
-> 
-> These changes allowed dropping a lot of PHY related code from
-> arch/arm/mach-omap2/omap_phy_internal.c and have it live in
-> the device driver like it should with commit c9e4412a (arm: omap:
-> phy: remove unused functions from omap-phy-internal.c).
-> 
-> However, MUSB on omap4 broke with these changes for legacy
-> platform data boot, and now only works with device tree for
-> omap4. Unfortunately we are still few critical bindings away
-> from being able to make omap4 usbale with device tree.
-> 
-> Fix the regression properly by adding platform data support
-> to the ocp2scp driver so we can avoid adding back the driver
-> code to arch/arm/mach-omap2.
-> 
+Hi
 
-Applied to fixes branch, will send this soon.
+On Mon, 12 Nov 2012, Peter Ujfalusi wrote:
 
-	Arnd
+> Fixes the following error:
+>   CC      arch/arm/mach-omap2/cm_common.o
+> arch/arm/mach-omap2/cm_common.c: In function ?cm_register?:
+> arch/arm/mach-omap2/cm_common.c:42:11: error: ?EINVAL? undeclared (first use in this function)
+> arch/arm/mach-omap2/cm_common.c:42:11: note: each undeclared identifier is reported only once for each function it appears in
+> arch/arm/mach-omap2/cm_common.c:45:11: error: ?EEXIST? undeclared (first use in this function)
+> arch/arm/mach-omap2/cm_common.c: In function ?cm_unregister?:
+> arch/arm/mach-omap2/cm_common.c:66:11: error: ?EINVAL? undeclared (first use in this function)
+> make[1]: *** [arch/arm/mach-omap2/cm_common.o] Error 1
+> make: *** [arch/arm/mach-omap2] Error 2
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+> 
+> Hi,
+> 
+> with today's linux-next the kernel build failed with the abive error for OMAP.
+> 
+> Regards,
+> Peter
+> 
+>  arch/arm/mach-omap2/cm_common.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
+> index 3246cef..3fafc27 100644
+> --- a/arch/arm/mach-omap2/cm_common.c
+> +++ b/arch/arm/mach-omap2/cm_common.c
+> @@ -13,6 +13,7 @@
+>  
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+> +#include <linux/errno.h>
+>  
+>  #include "cm2xxx.h"
+>  #include "cm3xxx.h"
+> -- 
+> 1.8.0
+
+Acked-by: Paul Walmsley <paul@pwsan.com>
+
+Thanks Peter.
+
+Tony, how would you like to handle this one?
+
+
+- Paul
