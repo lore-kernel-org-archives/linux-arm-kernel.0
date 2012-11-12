@@ -1,26 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Nov 2012 09:55:30 +0000
-Subject: [PATCH v3 0/6] ARM: EXYNOS: Add secure firmware support
-In-Reply-To: <006501cdc0a8$d880c990$89825cb0$%kim@samsung.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 12 Nov 2012 11:09:59 +0100
+Subject: [PATCH v3 4/6] ARM: EXYNOS: Add support for Exynos secure	firmware
+In-Reply-To: <20121112095114.GD28327@n2100.arm.linux.org.uk>
 References: <1351178560-19188-1-git-send-email-t.figa@samsung.com>
- <006501cdc0a8$d880c990$89825cb0$%kim@samsung.com>
-Message-ID: <20121112095530.GF28327@n2100.arm.linux.org.uk>
+ <1351178560-19188-5-git-send-email-t.figa@samsung.com>
+ <20121112095114.GD28327@n2100.arm.linux.org.uk>
+Message-ID: <1632996.MFS2BfkxD2@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2012 at 04:39:28PM +0900, Kukjin Kim wrote:
-> (+ Russell King)
+Hi Russel,
 
-I think there's still an amount of work to do here; it's not a generic
-interface at the moment because it makes some assumptions about how
-things are done (eg, it assumes that there _will_ be a CPU boot register;
-that is not always true.
+On Monday 12 of November 2012 09:51:14 Russell King - ARM Linux wrote:
+> > +
+> > +static int exynos_cpu_boot(int cpu)
+> > +{
+> > +	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
+> > +	return 0;
+> > +}
+> 
+> Same for this (though, what _exactly_ is 'cpu', is it the physical CPU
+> number or the logical CPU number?)
 
-Moreover, the 'cpu' arguments given seem to be uncertain whether they're
-logical CPU numbers or physical CPU numbers.
+Yes, it's the physical CPU number.
 
-Lastly, where is this interface actually documented?  It's just a bunch
-of code _without_ _any_ documentation.  That means people will interpret
-it differently, and it'll get used differently from platform to platform.
+> > +
+> > +static int exynos_cpu_boot_reg(int cpu, void __iomem **ptr)
+> > +{
+> > +	*ptr = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
+> > +	return 0;
+> > +}
+> 
+> This is really bad.  What's it trying to do?  What is the significance
+> of the 'ptr' returned?  What if a platform doesn't have a boot register?
 
-Let's have some documentation on this.
+It returns a pointer to the area where boot code (secondary startup) 
+address must be stored.
+
+This callback (just as all the firmware callbacks) is optional, if it is 
+not appropriate for given platform, it will not use it.
+
+However, now when I think of it, it may be better to just add a callback 
+like set_boot_addr(cpu, addr), which would set boot address of given CPU 
+without exporting address of its boot register outside firmware code. Are 
+you OK with this kind of approach?
+
+
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Linux Platform
