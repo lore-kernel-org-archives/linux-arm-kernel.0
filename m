@@ -1,64 +1,226 @@
-From: smoch@web.de (Soeren Moch)
-Date: Mon, 12 Nov 2012 12:03:00 +0100
-Subject: [PATCH] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <20121112103820.GX22029@lunn.ch>
-References: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
- <20121111172243.GB821@lunn.ch> <50A0C5D2.7000806@web.de>
- <20121112103820.GX22029@lunn.ch>
-Message-ID: <50A0D764.204@web.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 12 Nov 2012 12:21:59 +0100
+Subject: [PATCH 2/4] ARM i.MX25: Add devicetree support
+In-Reply-To: <1352719321-23541-1-git-send-email-s.hauer@pengutronix.de>
+References: <1352719321-23541-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1352719321-23541-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.11.2012 11:38, Andrew Lunn wrote:
-> On Mon, Nov 12, 2012 at 10:48:02AM +0100, Soeren Moch wrote:
->> On 11.11.2012 18:22, Andrew Lunn wrote:
->>> On Thu, Nov 08, 2012 at 07:38:57AM +0100, Marek Szyprowski wrote:
->>>> dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag,
->> regardless
->>>> the flags provided by the caller. This causes excessive pruning of
->>>> emergency memory pools without any good reason. This patch
->> changes the code
->>>> to correctly use gfp flags provided by the dmapool caller. This should
->>>> solve the dmapool usage on ARM architecture, where GFP_ATOMIC DMA
->>>> allocations can be served only from the special, very limited
->> memory pool.
->>>> Reported-by: Soren Moch <smoch@web.de>
->> Please use
->> Reported-by: Soeren Moch <smoch@web.de>
->>
->>>> Reported-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>> Tested-by: Andrew Lunn <andrew@lunn.ch>
->>>
->>> I tested this on a Kirkwood QNAP after removing the call to
->>> init_dma_coherent_pool_size().
->>>
->>>      Andrew
->> Tested-by: Soeren Moch <smoch@web.de>
->>
->> Now I had a chance to test this patch on my Kirkwood guruplug
->> system with linux-3.6.6 . It is running much better now, but with the
->> original 256K coherent pool size I still see errors after several hours
->> of runtime:
->>
->> Nov 12 09:42:32 guru kernel: ERROR: 256 KiB atomic DMA coherent pool
->> is too small!
->> Nov 12 09:42:32 guru kernel: Please increase it with coherent_pool=
->> kernel parameter!
-> Hi Soeren
->
-> Could you tell us what DVB devices you are using.
->
-> Thanks
-> 	Andrew
+This adds a i.MX25 dt machine descriptor and changes the clock
+support to optionally initialize from dt.
 
-from lsusb:
-Bus 001 Device 005: ID 0ccd:00b2 TerraTec Electronic GmbH
-Bus 001 Device 006: ID 2040:5200 Hauppauge
-Bus 001 Device 009: ID 2304:0242 Pinnacle Systems, Inc.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/Kconfig     |    7 ++++++
+ arch/arm/mach-imx/Makefile    |    1 +
+ arch/arm/mach-imx/clk-imx25.c |   56 ++++++++++++++++++++++++++++++++++++++---
+ arch/arm/mach-imx/common.h    |    1 +
+ arch/arm/mach-imx/imx25-dt.c  |   48 +++++++++++++++++++++++++++++++++++
+ 5 files changed, 109 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/mach-imx/imx25-dt.c
 
-If you want to check the drivers, I recommend to start with "em28xx".
-
-Regards,
-Soeren
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index f1bf610..ff702c3 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -272,6 +272,13 @@ config MACH_EUKREA_MBIMXSD25_BASEBOARD
+ 
+ endchoice
+ 
++config MACH_IMX25_DT
++	bool "Support i.MX25 platforms from device tree"
++	select SOC_IMX25
++	help
++	  Include support for Freescale i.MX25 based platforms
++	  using the device tree for discovery
++
+ comment "MX27 platforms:"
+ 
+ config MACH_MX27ADS
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index fe47b71..0634b31 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -50,6 +50,7 @@ obj-$(CONFIG_MACH_MX21ADS) += mach-mx21ads.o
+ obj-$(CONFIG_MACH_MX25_3DS) += mach-mx25_3ds.o
+ obj-$(CONFIG_MACH_EUKREA_CPUIMX25SD) += mach-eukrea_cpuimx25.o
+ obj-$(CONFIG_MACH_EUKREA_MBIMXSD25_BASEBOARD) += eukrea_mbimxsd25-baseboard.o
++obj-$(CONFIG_MACH_IMX25_DT) += imx25-dt.o
+ 
+ # i.MX27 based machines
+ obj-$(CONFIG_MACH_MX27ADS) += mach-mx27ads.o
+diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+index 78a754f..b197aa7 100644
+--- a/arch/arm/mach-imx/clk-imx25.c
++++ b/arch/arm/mach-imx/clk-imx25.c
+@@ -23,6 +23,9 @@
+ #include <linux/io.h>
+ #include <linux/clkdev.h>
+ #include <linux/err.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
+ 
+ #include "clk.h"
+ #include "common.h"
+@@ -55,6 +58,8 @@
+ 
+ #define ccm(x)	(CRM_BASE + (x))
+ 
++static struct clk_onecell_data clk_data;
++
+ static const char *cpu_sel_clks[] = { "mpll", "mpll_cpu_3_4", };
+ static const char *per_sel_clks[] = { "ahb", "upll", };
+ 
+@@ -82,12 +87,12 @@ enum mx25_clks {
+ 
+ static struct clk *clk[clk_max];
+ 
+-int __init mx25_clocks_init(void)
++static int __init __mx25_clocks_init(unsigned long osc_rate)
+ {
+ 	int i;
+ 
+ 	clk[dummy] = imx_clk_fixed("dummy", 0);
+-	clk[osc] = imx_clk_fixed("osc", 24000000);
++	clk[osc] = imx_clk_fixed("osc", osc_rate);
+ 	clk[mpll] = imx_clk_pllv1("mpll", "osc", ccm(CCM_MPCTL));
+ 	clk[upll] = imx_clk_pllv1("upll", "osc", ccm(CCM_UPCTL));
+ 	clk[mpll_cpu_3_4] = imx_clk_fixed_factor("mpll_cpu_3_4", "mpll", 3, 4);
+@@ -219,6 +224,16 @@ int __init mx25_clocks_init(void)
+ 
+ 	clk_prepare_enable(clk[emi_ahb]);
+ 
++	clk_register_clkdev(clk[ipg], "ipg", "imx-gpt.0");
++	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
++
++	return 0;
++}
++
++int __init mx25_clocks_init(void)
++{
++	__mx25_clocks_init(24000000);
++
+ 	/* i.mx25 has the i.mx21 type uart */
+ 	clk_register_clkdev(clk[uart1_ipg], "ipg", "imx21-uart.0");
+ 	clk_register_clkdev(clk[uart_ipg_per], "per", "imx21-uart.0");
+@@ -230,8 +245,6 @@ int __init mx25_clocks_init(void)
+ 	clk_register_clkdev(clk[uart_ipg_per], "per", "imx21-uart.3");
+ 	clk_register_clkdev(clk[uart5_ipg], "ipg", "imx21-uart.4");
+ 	clk_register_clkdev(clk[uart_ipg_per], "per", "imx21-uart.4");
+-	clk_register_clkdev(clk[ipg], "ipg", "imx-gpt.0");
+-	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
+ 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.0");
+ 	clk_register_clkdev(clk[usbotg_ahb], "ahb", "mxc-ehci.0");
+ 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.0");
+@@ -289,5 +302,40 @@ int __init mx25_clocks_init(void)
+ 	clk_register_clkdev(clk[iim_ipg], "iim", NULL);
+ 
+ 	mxc_timer_init(MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), MX25_INT_GPT1);
++
++	return 0;
++}
++
++int __init mx25_clocks_init_dt(void)
++{
++	struct device_node *np;
++	void __iomem *base;
++	int irq;
++	unsigned long osc_rate = 24000000;
++
++	/* retrieve the freqency of fixed clocks from device tree */
++	for_each_compatible_node(np, NULL, "fixed-clock") {
++		u32 rate;
++		if (of_property_read_u32(np, "clock-frequency", &rate))
++			continue;
++
++		if (of_device_is_compatible(np, "fsl,imx-osc"))
++			osc_rate = rate;
++	}
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx25-ccm");
++	clk_data.clks = clk;
++	clk_data.clk_num = ARRAY_SIZE(clk);
++	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
++
++	__mx25_clocks_init(osc_rate);
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx25-gpt");
++	base = of_iomap(np, 0);
++	WARN_ON(!base);
++	irq = irq_of_parse_and_map(np, 0);
++
++	mxc_timer_init(base, irq);
++
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index ef8db6b..7191ab4 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -66,6 +66,7 @@ extern int mx51_clocks_init(unsigned long ckil, unsigned long osc,
+ 			unsigned long ckih1, unsigned long ckih2);
+ extern int mx53_clocks_init(unsigned long ckil, unsigned long osc,
+ 			unsigned long ckih1, unsigned long ckih2);
++extern int mx25_clocks_init_dt(void);
+ extern int mx27_clocks_init_dt(void);
+ extern int mx31_clocks_init_dt(void);
+ extern int mx51_clocks_init_dt(void);
+diff --git a/arch/arm/mach-imx/imx25-dt.c b/arch/arm/mach-imx/imx25-dt.c
+new file mode 100644
+index 0000000..e17dfbc
+--- /dev/null
++++ b/arch/arm/mach-imx/imx25-dt.c
+@@ -0,0 +1,48 @@
++/*
++ * Copyright 2012 Sascha Hauer, Pengutronix
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/irq.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++#include "common.h"
++#include "mx25.h"
++
++static void __init imx25_dt_init(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++static void __init imx25_timer_init(void)
++{
++	mx25_clocks_init_dt();
++}
++
++static struct sys_timer imx25_timer = {
++	.init = imx25_timer_init,
++};
++
++static const char * const imx25_dt_board_compat[] __initconst = {
++	"fsl,imx25",
++	NULL
++};
++
++DT_MACHINE_START(IMX25_DT, "Freescale i.MX25 (Device Tree Support)")
++	.map_io		= mx25_map_io,
++	.init_early	= imx25_init_early,
++	.init_irq	= mx25_init_irq,
++	.handle_irq	= imx25_handle_irq,
++	.timer		= &imx25_timer,
++	.init_machine	= imx25_dt_init,
++	.dt_compat	= imx25_dt_board_compat,
++	.restart	= mxc_restart,
++MACHINE_END
+-- 
+1.7.10.4
