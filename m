@@ -1,21 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Nov 2012 22:32:12 +0000
-Subject: [PATCH V2 0/5]  SMP support for Armada XP
-In-Reply-To: <50A160DF.7030305@free-electrons.com>
-References: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
- <50A160DF.7030305@free-electrons.com>
-Message-ID: <201211122232.12901.arnd@arndb.de>
+From: mfuzzey@gmail.com (Martin Fuzzey)
+Date: Mon, 12 Nov 2012 23:33:40 +0100
+Subject: [PATCH] Fix typo in DT binding documentation for i.MX IPU3
+Message-ID: <20121112223340.20867.75319.stgit@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 November 2012, Gregory CLEMENT wrote:
-> Before sending a new series with the fixes related to Will comments, I
-> would like to know if I need to split the patches in order to send some
-> parts to Russell or if you (Arnd and Olof) will be able to take the whole
-> series (through Jason Cooper's git tree of course).
-> 
+crtc should be crtcs in parallel display.
 
-We can take the whole series through arm-soc, but it would be good to
-get an Ack from Russell for patch 4.
+Signed-off-by: Martin Fuzzey <mfuzzey@gmail.com>
 
-	Arnd
+---
+
+ .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+index 07654f0..68eff34 100644
+--- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
++++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+@@ -23,7 +23,7 @@ Parallel display support
+ 
+ Required properties:
+ - compatible: Should be "fsl,imx-parallel-display"
+-- crtc: the crtc this display is connected to, see below
++- crtcs: the crtc this display is connected to, see below
+ Optional properties:
+ - interface_pix_fmt: How this display is connected to the
+   crtc. Currently supported types: "rgb24", "rgb565"
+@@ -36,6 +36,6 @@ example:
+ display at di0 {
+ 	compatible = "fsl,imx-parallel-display";
+ 	edid = [edid-data];
+-	crtc = <&ipu 0>;
++	crtcs = <&ipu 0>;
+ 	interface-pix-fmt = "rgb24";
+ };
