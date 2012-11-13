@@ -1,55 +1,38 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Tue, 13 Nov 2012 12:37:00 -0600
+From: John.Linn@xilinx.com (John Linn)
+Date: Tue, 13 Nov 2012 18:42:42 +0000
 Subject: [PATCH] arm: zynq: add system level control register manager
-In-Reply-To: <CAD6jFUQC+HPCT11_nWckUkhzgQtPkxLcqcTxbVb==kFmwCaTwA@mail.gmail.com>
+In-Reply-To: <20121113183338.GJ1718@beefymiracle.amer.corp.natinst.com>
 References: <20121031183610.GA2603@thinkbox> <20121108160125.GA5550@kryptos>
- <CAD6jFUQC+HPCT11_nWckUkhzgQtPkxLcqcTxbVb==kFmwCaTwA@mail.gmail.com>
-Message-ID: <20121113183700.GK1718@beefymiracle.amer.corp.natinst.com>
+ <5b1971ea-9ad9-4f58-841e-a3efb7cf905d@CO1EHSMHS022.ehs.local>
+ <20121113183338.GJ1718@beefymiracle.amer.corp.natinst.com>
+Message-ID: <39e6578d-01c8-4a05-8819-e089454c139a@CO9EHSMHS017.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2012 at 10:49:07AM +0100, Daniel Borkmann wrote:
-> On Thu, Nov 8, 2012 at 5:01 PM, Josh Cartwright <joshc@eso.teric.us> wrote:
-> > On Wed, Oct 31, 2012 at 07:36:12PM +0100, Daniel Borkmann wrote:
-> >> This patch for the Xilinx Zynq ARM architecture adds management of system
-> >> level control register. The code is taken from the Xilinx-internal Linux
-> >> Git tree and cleaned up a bit for mainline integration. Besides others,
-> >> this patch is needed in order to integrate further drivers for Zynq such as
-> >> the Zynq xemacps networking device driver. The patch is aganst the latest
-> >> arm-soc tree.
-> >>
-> >> Signed-off-by: Daniel Borkmann <daniel.borkmann@tik.ee.ethz.ch>
-> >> Cc: Michal Simek <michals@xilinx.com>
-> >> Cc: John Linn <john.linn@xilinx.com>
-> >> Cc: Arnd Bergmann <arnd@arndb.de>
-> >> ---
+> -----Original Message-----
+> From: Josh Cartwright [mailto:josh.cartwright at ni.com]
+> Sent: Tuesday, November 13, 2012 10:34 AM
+> To: Michal Simek
+> Cc: Josh Cartwright; Daniel Borkmann; Arnd Bergmann; linux-arm-kernel at lists.infradead.org; John Linn
+> Subject: Re: [PATCH] arm: zynq: add system level control register manager
+> 
+> On Mon, Nov 12, 2012 at 11:35:46AM +0000, Michal Simek wrote:
+> > >    3. Figure out MIO pinctrl support and bindings (?)
 > >
-> > These changes will conflict with my pending clk patchset [1], as I'm
-> > introducing bindings for the SLCR (and its clk interfaces).
+> > We will look at this topic more closely.
 > 
-> Oops, okay. Then your's has priority, of course.
+> For some clarification: are you (or someone at Xilinx) actively looking
+> at this?
 
-I did not mean to discourage.  I just meant to say that we should work
-out how this work can be done on top of the clk changes.
+Hi Josh,
 
-> > It seems like a hefty chunk of the out-of-tree slcr driver is related to
-> > configuring MIO.  I think it would be really nice if this driver was
-> > reworked to use the pinctrl subsystem, and also to provide suitable
-> > device tree bindings.
+No one is looking at it that I know of (other than maybe Michal). Our previous thinking was that this was low priority as the first stage boot loader sets up the MIO prior to the kernel running. U-boot needs the MIO setup for some set of devices also.
+
+I don't know the use cases for dynamic MIO, or I'm just misunderstanding what the pinctrl really does. Do designers often build a board to deal with being able use the pins for multiple purposes?
+
+Thanks
+John
+
 > 
-> Agreed. If there's a chance to help with further Zynq integration and
-> to develop this driver with testing on Qemu for ARM Zynq, I'd like to
-> give it a try. (The board is a bit expensive as a hobby only.)
-
-My concern is that, especially regarding the configuration of MIO, being
-able to do adequate testing will require real hardware.  It isn't clear
-to me what the state of qemu's slcr/mio model is.
-
-  Josh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121113/33c746dc/attachment.sig>
+> Thanks,
+>   Josh
