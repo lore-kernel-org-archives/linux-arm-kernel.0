@@ -1,59 +1,63 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 13 Nov 2012 15:35:07 +0000 (UTC)
-Subject: OMAP baseline test results for v3.7-rc3
-In-Reply-To: <50A266C2.4030303@mimc.co.uk>
-References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
- <508FB226.20604@mimc.co.uk>
- <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
- <508FE8BA.1080404@ti.com> <50912A6F.1040501@mimc.co.uk>
- <79CD15C6BA57404B839C016229A409A83EB563F8@DBDE01.ent.ti.com>
- <5097EF44.5030706@mimc.co.uk>
- <79CD15C6BA57404B839C016229A409A83EB63609@DBDE01.ent.ti.com>
- <5098DC9E.3090307@mimc.co.uk> <50A266C2.4030303@mimc.co.uk>
-Message-ID: <alpine.DEB.2.00.1211131531430.22487@utopia.booyaka.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Tue, 13 Nov 2012 16:43:21 +0100
+Subject: [PATCH v2] i2c: at91: fix SMBus quick command
+Message-ID: <1352821401-1944-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Nov 2012, Mark Jackson wrote:
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-> On 06/11/12 09:47, Mark Jackson wrote:
->
-> > That works ... great !!
-> > 
-> > But now I'm confused, since I thought the DTB was appended to the uImage file.
+The driver claims to support SMBus quick command but it was not the case.
+This patch fixes this issue.
 
-The DTB is appended to the zImage file.  You then need to convert the 
-product of the concatenation to uImage format.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
 
-So ...
+Hi Wolfram,
 
-> > I have the following in my .config:-
-> > 
-> > ARM_ATAG_DTB_COMPAT=y
-> > ARM_APPENDED_DTB=y
-> > ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
-> > 
-> > And then I create my uImage file using:-
-> > 
-> > $ make -j 8 ARCH=arm CROSS_COMPILE=arm-linux- uImage
-> > $ make -j 8 ARCH=arm CROSS_COMPILE=arm-linux- am335x-bone.dtb
+Thanks to Jean explanation about i2cdetect and eeprom behavior, I realized
+that the first version of the patch was incorrect. This time all the i2c
+devices are detected with i2cdetect -q.
 
-instead of this:
+I hope this fix could go into 3.7 since the driver claims SMBus quick
+capability but it doesn't support it. Moreover without it i2cdetect find
+imaginary devices, and with some IP versions, trying to send 0 byte can cause
+issue when writing data to an EEPROM.
 
-> > $ cat arch/arm/boot/uImage arch/arm/boot/am335x-bone.dtb > arch/arm/boot/uImage-dtb.am335x-bone
-> > $ cp arch/arm/boot/uImage-dtb.am335x-bone /media/boot/uImage
+Regards
 
-something like this is what you need to do instead:
+Ludovic
 
-$ cat arch/arm/boot/zImage arch/arm/boot/am335x-bone.dtb > arch/arm/boot/zImage-dtb.am335x-bone
-$ scripts/mkuboot.sh -A arm -O linux -C none  -T kernel -a 0x80008000 -e 0x80008000 -n 'Linux' -d arch/arm/boot/zImage-dtb.am335x-bone arch/arm/boot/uImage-dtb.am335x-bone
+Changes since v1:
+ * enable txcomp irq to have a correct behavior
 
-> > Do you now have to load the DTB as a separate file ?
-> > 
-> > Or should the appended DTB still work ?
+ drivers/i2c/busses/i2c-at91.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Appended DTBs work fine on the testbed here.
-
-
-- Paul
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index f471747..e9c926c 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -44,6 +44,7 @@
+ #define	AT91_TWI_STOP		0x0002	/* Send a Stop Condition */
+ #define	AT91_TWI_MSEN		0x0004	/* Master Transfer Enable */
+ #define	AT91_TWI_SVDIS		0x0020	/* Slave Transfer Disable */
++#define	AT91_TWI_QUICK		0x0040	/* SMBus quick command */
+ #define	AT91_TWI_SWRST		0x0080	/* Software Reset */
+ 
+ #define	AT91_TWI_MMR		0x0004	/* Master Mode Register */
+@@ -386,7 +387,11 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
+ 
+ 	INIT_COMPLETION(dev->cmd_complete);
+ 	dev->transfer_status = 0;
+-	if (dev->msg->flags & I2C_M_RD) {
++
++	if (!dev->buf_len) {
++		at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_QUICK);
++		at91_twi_write(dev, AT91_TWI_IER, AT91_TWI_TXCOMP);
++	} else if (dev->msg->flags & I2C_M_RD) {
+ 		unsigned start_flags = AT91_TWI_START;
+ 
+ 		if (at91_twi_read(dev, AT91_TWI_SR) & AT91_TWI_RXRDY) {
+-- 
+1.7.11.3
