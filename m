@@ -1,35 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 13 Nov 2012 17:07:11 +0000
-Subject: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
-In-Reply-To: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B59@SAFEX1MAIL3.st.com>
-References: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B59@SAFEX1MAIL3.st.com>
-Message-ID: <20121113170711.GI28327@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 13 Nov 2012 10:14:32 -0700
+Subject: [PATCH V2 2/11] time: convert arch_gettimeoffset to a pointer
+In-Reply-To: <50A16BD3.5010707@us.ibm.com>
+References: <1352753462-2915-1-git-send-email-swarren@wwwdotorg.org>
+ <50A16BD3.5010707@us.ibm.com>
+Message-ID: <50A27FF8.3080905@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2012 at 05:08:14PM +0100, Etienne CARRIERE wrote:
-> From: Etienne Carriere <etienne.carriere@stericsson.com>
-> 
-> Secure code in TrustZone space may need to perform L2 cache
-> maintenance operations. A shared mutex is required to synchronize
-> linux l2cc maintenance and TZ l2cc maintenance.
-> 
-> The TZ mutex is an "arch_spinlock": a 32bit DDR cell (ARMv7-A mutex).
-> Linux L2 cache driver must lock TZ mutex if enabled.
->...
-> +#define l2x0_spin_lock_irqsave(flags) \
-> +             do {                                                                                                        \
-> +                             raw_spin_lock_irqsave(&l2x0_lock, flags);           \
-> +                             if (l2x0_tz_mutex)                                                           \
-> +                                             arch_spin_lock(l2x0_tz_mutex);                               \
-> +             } while (0)
+On 11/12/2012 02:36 PM, John Stultz wrote:
+> On 11/12/2012 12:51 PM, Stephen Warren wrote:
+>> Currently, whenever CONFIG_ARCH_USES_GETTIMEOFFSET is enabled, each
+>> arch core provides a single implementation of arch_gettimeoffset(). In
+>> many cases, different sub-architectures, different machines, or
+>> different timer providers exist, and so the arch ends up implementing
+>> arch_gettimeoffset() as a call-through-pointer anyway. Examples are
+>> ARM, Cris, M68K, and it's arguable that the remaining architectures,
+>> M32R and Blackfin, should be doing this anyway.
+>>
+>> Modify arch_gettimeoffset so that it itself is a function pointer, which
+>> the arch initializes. This will allow later changes to move the
+>> initialization of this function into individual machine support or timer
+>> drivers. This is particularly useful for code in drivers/clocksource
+>> which should rely on an arch-independant mechanism to register their
+>> implementation of arch_gettimeoffset().
+...
+> One last thing to watch out for: If you're trying to build a kernel that
+> mixes clocksource support with get_arch_timeoffset, you'll need to
+> rework the #ifdef in update_wall_time(), since we currently assume with
+> get_arch_timeoffset() that you're using tick + interpolation, so every
+> call to update_wall_time() only moves time forward by one jiffy.
 
-Right, so, what this tells me is that the implementation of the spinlock
-in the secure software is potentially the same as the kernel's spinlock.
-The kernel's spinlock implementation is GPL'd.  If the secure side spinlock
-implementation is a copy of the kernel's spinlock implementation, then that
-implementation is also GPL'd, which, as it is linked with the rest of the
-secure software, either the whole of the secure software suite is GPL'd
-_or_ it is in violation of the GPL.
+OK. I don't have any immediate plans to do that, although I wouldn't be
+surprised if we (the ARM community in general) end up wanting to do that
+at some point. It all depends on which ARM sub-architectures end up
+getting converted to the multi-platform zImage support I guess.
 
-I think someone has some explaining to do.
+> Otherwise, thanks for the name tweak. Going through the arm-soc tree is
+> fine with me.
+> 
+> Acked-by: John Stultz <johnstul@us.ibm.com>
+
+Thanks.
