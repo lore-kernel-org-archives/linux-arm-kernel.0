@@ -1,28 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 13 Nov 2012 14:08:31 +0100
-Subject: [PATCH v4 9/9] pinctrl: single: dump pinmux register value
-In-Reply-To: <20121108012550.GV6801@atomide.com>
-References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
- <1352301582-12244-10-git-send-email-haojian.zhuang@gmail.com>
- <20121108012550.GV6801@atomide.com>
-Message-ID: <CACRpkdYRvEzTr6kOE6XYmrKiztJ0F+HUFCv8Jd+m2c-AOFooAw@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 13 Nov 2012 14:08:23 +0100
+Subject: [PATCH v3 RESEND 0/4] ARM: EXYNOS: Power domain DT support extension
+Message-ID: <1352812107-8777-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 8, 2012 at 2:25 AM, Tony Lindgren <tony@atomide.com> wrote:
+This patch series fixes two issues with existing DT support for Exynos
+power domains and extends it with the ability of binding devices to domains,
+basically making it possible to use power domains with DT.
 
-> * Haojian Zhuang <haojian.zhuang@gmail.com> [121107 07:22]:
->> Dump pinmux register value, not only function part in the pinmux
->> register.
->>
->> Also fix the issue on caluclating pin offset. The last parameter
->> should be pin number, not register offset.
->
-> Acked-by: Tony Lindgren <tony@atomide.com>
+Based on for-next branch of Kgene's tree.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Changes since v2:
+ - Rebased to for-next of Kgene's tree.
+Changes since v1:
+ - Added "samsung," prefix to "power-domain" property.
+ - Added power domain nodes to Exynos4 device tree sources.
 
-Shall I apply this to the pinctrl tree?
+Tomasz Figa (4):
+  ARM: EXYNOS: pm_domain: Detect domain state on registration from DT
+  ARM: EXYNOS: pm_domain: Fix power domain name initialization
+  ARM: EXYNOS: pm_domain: Bind devices to power domains using DT
+  ARM: dts: exynos4: Set up power domains
 
-Yours,
-Linus Walleij
+ .../bindings/arm/exynos/power_domain.txt           | 15 +++-
+ arch/arm/boot/dts/exynos4.dtsi                     | 30 +++++++
+ arch/arm/boot/dts/exynos4210.dtsi                  |  5 ++
+ arch/arm/mach-exynos/pm_domains.c                  | 93 +++++++++++++++++++++-
+ 4 files changed, 135 insertions(+), 8 deletions(-)
+
+-- 
+1.8.0
