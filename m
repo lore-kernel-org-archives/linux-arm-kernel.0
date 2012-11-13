@@ -1,38 +1,67 @@
-From: John.Linn@xilinx.com (John Linn)
-Date: Tue, 13 Nov 2012 18:42:42 +0000
-Subject: [PATCH] arm: zynq: add system level control register manager
-In-Reply-To: <20121113183338.GJ1718@beefymiracle.amer.corp.natinst.com>
-References: <20121031183610.GA2603@thinkbox> <20121108160125.GA5550@kryptos>
- <5b1971ea-9ad9-4f58-841e-a3efb7cf905d@CO1EHSMHS022.ehs.local>
- <20121113183338.GJ1718@beefymiracle.amer.corp.natinst.com>
-Message-ID: <39e6578d-01c8-4a05-8819-e089454c139a@CO9EHSMHS017.ehs.local>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 13 Nov 2012 13:46:45 -0500
+Subject: arm: mvebu: Pull request for 'marvell-boards' branch
+In-Reply-To: <1352740839-13586-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1352740839-13586-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20121113184645.GA22106@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Josh Cartwright [mailto:josh.cartwright at ni.com]
-> Sent: Tuesday, November 13, 2012 10:34 AM
-> To: Michal Simek
-> Cc: Josh Cartwright; Daniel Borkmann; Arnd Bergmann; linux-arm-kernel at lists.infradead.org; John Linn
-> Subject: Re: [PATCH] arm: zynq: add system level control register manager
+Thomas,
+
+Nice to see a pull request from you guys!
+
+Comments below:
+
+On Mon, Nov 12, 2012 at 06:20:33PM +0100, Thomas Petazzoni wrote:
+> Jason, Andrew,
 > 
-> On Mon, Nov 12, 2012 at 11:35:46AM +0000, Michal Simek wrote:
-> > >    3. Figure out MIO pinctrl support and bindings (?)
-> >
-> > We will look at this topic more closely.
+> The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
 > 
-> For some clarification: are you (or someone at Xilinx) actively looking
-> at this?
-
-Hi Josh,
-
-No one is looking at it that I know of (other than maybe Michal). Our previous thinking was that this was low priority as the first stage boot loader sets up the MIO prior to the kernel running. U-boot needs the MIO setup for some set of devices also.
-
-I don't know the use cases for dynamic MIO, or I'm just misunderstanding what the pinctrl really does. Do designers often build a board to deal with being able use the pins for multiple purposes?
-
-Thanks
-John
-
+>   Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
 > 
-> Thanks,
->   Josh
+> are available in the git repository at:
+> 
+>   git at github.com:MISL-EBU-System-SW/mainline-public.git marvell-boards
+> 
+> for you to fetch changes up to 39325a96e1d082bf71b7a4d9ac2d5806f80c6d13:
+> 
+>   arm: mvebu: add LED support in defconfig (2012-11-12 18:13:41 +0100)
+> 
+> ----------------------------------------------------------------
+
+I'd like to see a signed tag in here.  If you could have gregory send me
+a signed email with all the fingerprints you guys traded at ELCE, I'd
+appreciate it.
+
+In the future, could you please break these up into the following
+branches:
+
+> Gregory CLEMENT (1):
+>       arm: mvebu: support for the Globalscale Mirabox board
+
+boards
+
+> Thomas Petazzoni (5):
+>       arm: mvebu: fix compatible string in armada-370-xp.dtsi
+>       arm: mvebu: don't list all boards in dt compat field for Armada 370/XP
+>       arm: mvebu: fix typo in machine name for Armada 370/XP
+
+cleanup (also, if any are fixing problems found in older kernels, please
+add a CC to stable as appropriate)
+
+>       arm: mvebu: support for the PlatHome OpenBlocks AX3-4 board
+
+boards
+
+>       arm: mvebu: add LED support in defconfig
+
+defconfig
+
+That would really help me out.  Otherwise, I have to pull this branch
+and cherry-pick the patches into different branches.  Which kind of
+defeats the purpose of the pull request. ;-)
+
+thx,
+
+Jason.
