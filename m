@@ -1,24 +1,27 @@
 From: johnstul@us.ibm.com (John Stultz)
-Date: Tue, 13 Nov 2012 10:57:32 -0800
-Subject: [PATCH V2 3/3] clocksource: time-armada-370-xp converted to clk
+Date: Tue, 13 Nov 2012 10:58:54 -0800
+Subject: [PATCH V4 3/3] clocksource: time-armada-370-xp converted to clk
  framework
-In-Reply-To: <20121030115223.18780.29992@nucleus>
-References: <1349125926-16144-1-git-send-email-gregory.clement@free-electrons.com>
- <1349125926-16144-4-git-send-email-gregory.clement@free-electrons.com>
- <20121030115223.18780.29992@nucleus>
-Message-ID: <50A2981C.4030705@us.ibm.com>
+In-Reply-To: <1351621413-3637-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1351621413-3637-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351621413-3637-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <50A2986E.9020202@us.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2012 04:52 AM, Mike Turquette wrote:
-> Quoting Gregory CLEMENT (2012-10-01 14:12:06)
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> I'm not sure this patch should go through me.  Perhaps John Stultz?
+On 10/30/2012 11:23 AM, Gregory CLEMENT wrote:
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> cc: John Stultz <johnstul@us.ibm.com>
+> ---
+>   arch/arm/boot/dts/armada-370-db.dts      |    4 ----
+>   arch/arm/boot/dts/armada-370-xp.dtsi     |    1 +
+>   drivers/clocksource/time-armada-370-xp.c |   11 ++++++-----
+>   3 files changed, 7 insertions(+), 9 deletions(-)
 
-I can apply it to my tree, but really none of it is generic, so in the 
-future I'd almost rather someone who could reasonably audit the changes 
-for correctness merge it instead (although I always appreciate being 
-Cc'ed into the loop).
+This is missing the patch description.  Since none of it is 
+code/hardware I'm familiar with, I can't really closely review whats 
+being done. So its much more critical that the patch have a clear 
+description of what its doing.
 
 thanks
 -john
