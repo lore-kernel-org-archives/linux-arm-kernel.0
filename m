@@ -1,35 +1,35 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 13 Nov 2012 14:36:53 +0900
-Subject: [GIT PULL v3] Renesas ARM-based SoC boards for v3.8 #2
-In-Reply-To: <201211122111.03440.arnd@arndb.de>
-References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
- <201211122111.03440.arnd@arndb.de>
-Message-ID: <20121113053651.GB18224@opensource.wolfsonmicro.com>
+Date: Tue, 13 Nov 2012 15:35:50 +0900
+Subject: [PATCH] RFC: pinctrl: grab default handler with bus notifiers
+In-Reply-To: <50A15A54.3090803@wwwdotorg.org>
+References: <1352636539-6318-1-git-send-email-linus.walleij@stericsson.com>
+ <50A15A54.3090803@wwwdotorg.org>
+Message-ID: <20121113063546.GD18224@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2012 at 09:11:03PM +0000, Arnd Bergmann wrote:
+On Mon, Nov 12, 2012 at 01:21:40PM -0700, Stephen Warren wrote:
+> On 11/11/2012 05:22 AM, Linus Walleij wrote:
 
-> * Always let the person that owns the dependency know that the changes in
->   their tree are also included elsewhere and that things go bad if those
->   changes get rebased after all, or won't make it into the merge window
->   for some reason.
+> > Another solution that was discussed was whether to move
+> > the default pinctrl handle and state grab to the device
+> > core as an optional field in struct device itself, but
+> > I'd like to first propose this less intrusive mechanism.
 
-Please never pull anything from me unless there's a signed tag for it,
-anything else I won't know about and may be rebased or vanish or
-something.
+> I think doing that approach makes a lot more sense; wouldn't it
+> completely avoid the issues with deferred probe that this notifier-based
+> method can't solve? It would also be very much in line with e.g.
+> dev_get_regmap() - if every resource that a driver required were handled
+> like that, then deferred probe could be significantly isolated into the
+> driver core rather than in every driver...
 
-> I have taken Mark on Cc to let him know about the dependency now, and I've
-> merged ab6f6d85210c4d0265cf48e9958c04e08595055a (which has only shmobile
-> specific ASoC patches) into the next/boards2 branch before merging your
-> branch. This is still not perfect because it breaks bisection, but it's
-> the best I could do aside from forcing you do do another round-trip.
-
-What's the bisection problem?
+I have to say that I agree with this, notifiers seem to make life more
+complicated for limited gain.  Otherwise I guess we could enhance
+notifiers so that they're able to trigger deferrals?
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121113/9edeb3cc/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121113/1dba210d/attachment.sig>
