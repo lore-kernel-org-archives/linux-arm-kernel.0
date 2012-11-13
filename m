@@ -1,15 +1,79 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 13 Nov 2012 10:35:15 +0800
-Subject: [PATCH 1/1] ARM: dts: imx6q-sabresd: add volume up/down gpio keys
-In-Reply-To: <1352708778-25570-1-git-send-email-Ying.Liu@freescale.com>
-References: <1352708778-25570-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <20121113023513.GA1119@S2100-06.ap.freescale.net>
+Date: Tue, 13 Nov 2012 10:37:51 +0800
+Subject: [PATCH resend] rtc: i.MX dryice: Add devicetree support
+In-Reply-To: <1352709770-5919-1-git-send-email-s.hauer@pengutronix.de>
+References: <1352709770-5919-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20121113023750.GB1119@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2012 at 04:26:18PM +0800, Liu Ying wrote:
-> Add volume up/down gpio keys support in imx6q-sabresd.dts.
+On Mon, Nov 12, 2012 at 09:42:50AM +0100, Sascha Hauer wrote:
+> Add devicetree probing, fixing some whitespace damage along the way.
 > 
-> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Applied, thanks.
+Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+
+> ---
+> 
+> Just a resend with Andrew Morton on Cc since I got no reaction from the RTC
+> Maintainer.
+> 
+>  Documentation/devicetree/bindings/rtc/imx-di.txt |   19 +++++++++++++++++++
+>  drivers/rtc/rtc-imxdi.c                          |   12 +++++++++---
+>  2 files changed, 28 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/imx-di.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/rtc/imx-di.txt b/Documentation/devicetree/bindings/rtc/imx-di.txt
+> new file mode 100644
+> index 0000000..42b92b5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/imx-di.txt
+> @@ -0,0 +1,19 @@
+> +* i.MX25 dryice Real Time Clock controller
+> +
+> +This RTC is part of the i.MX25 dryice module. Documentation for this
+> +unit is not publically available. This binding only makes use of the
+> +RTC.
+> +
+> +Required properties:
+> +- compatible: should be "fsl,imx25-rtc"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: interrupt source for the dryice module
+> +
+> +Example:
+> +
+> +	dryice at 53ffc000 {
+> +		compatible = "fsl,imx25-dryice", "fsl,imx25-rtc";
+> +		reg = <0x53ffc000 0x4000>;
+> +		interrupts = <25>;
+> +	};
+> diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
+> index 891cd6c..b2fe920 100644
+> --- a/drivers/rtc/rtc-imxdi.c
+> +++ b/drivers/rtc/rtc-imxdi.c
+> @@ -493,11 +493,17 @@ static int __devexit dryice_rtc_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +static const struct of_device_id of_dryice_rtc_match[] = {
+> +	{ .compatible = "fsl,imx25-rtc", },
+> +	{ },
+> +};
+> +
+>  static struct platform_driver dryice_rtc_driver = {
+>  	.driver = {
+> -		   .name = "imxdi_rtc",
+> -		   .owner = THIS_MODULE,
+> -		   },
+> +		.name = "imxdi_rtc",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = of_dryice_rtc_match,
+> +	},
+>  	.remove = __devexit_p(dryice_rtc_remove),
+>  };
+>  
+> -- 
+> 1.7.10.4
+> 
