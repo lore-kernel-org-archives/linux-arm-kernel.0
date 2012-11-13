@@ -1,40 +1,39 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 13 Nov 2012 11:23:20 -0800
-Subject: [PATCH v5 0/4] arch/arm: support seccomp
-In-Reply-To: <1352587485-18348-1-git-send-email-keescook@chromium.org>
-References: <1352587485-18348-1-git-send-email-keescook@chromium.org>
-Message-ID: <50A29E28.5040303@mit.edu>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 13 Nov 2012 12:23:53 -0700
+Subject: [PATCH] ARM: tegra: trimslice: enable SPI flash
+Message-ID: <1352834633-1426-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2012 02:44 PM, Kees Cook wrote:
-> This adds support for seccomp BPF to ARM. When built with the seccomp
-> improvement patch waiting in linux-next ("seccomp: Make syscall skipping
-> and nr changes more consistent"), this passes the seccomp regression
-> test suite: https://github.com/redpig/seccomp
+From: Stephen Warren <swarren@nvidia.com>
 
-I don't know if this matters much on ARM, but should something like
-https://git.kernel.org/?p=linux/kernel/git/luto/linux.git;a=commit;h=dee1ae5a05149f30baeccb4b8f68f22525ba9ca2
-be added?
+TrimSlice contains a 1MiB SPI flash. Represent this in the device tree.
 
---Andy
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20-trimslice.dts |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-> 
-> Thanks,
-> 
-> -Kees
-> 
-> ---
-> v5:
->  - clean up seccomp failure path, as requested by Will Deacon.
-> v4:
->  - fixed syscall_get_arch, thanks to Will Deacon.
-> v3:
->  - updates suggested by Russell King:
->    - reduced scope of expansion
->    - leveraged TIF_SYSCALL_WORK bit mask
->    - fixed syscall==-1 short-circuit logic
-> v2:
->  - expanded ptrace_syscall_trace() into both callers and do
->    secure_computing() hookup there, as requested by Al Viro.
-> 
+diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
+index 27fb8a6..f4e0428 100644
+--- a/arch/arm/boot/dts/tegra20-trimslice.dts
++++ b/arch/arm/boot/dts/tegra20-trimslice.dts
+@@ -254,6 +254,16 @@
+ 		clock-frequency = <400000>;
+ 	};
+ 
++	spi at 7000c380 {
++		status = "okay";
++		spi-max-frequency = <48000000>;
++		spi-flash at 0 {
++			compatible = "winbond,w25q80bl";
++			reg = <0>;
++			spi-max-frequency = <48000000>;
++		};
++	};
++
+ 	i2c at 7000c400 {
+ 		status = "okay";
+ 		clock-frequency = <400000>;
+-- 
+1.7.0.4
