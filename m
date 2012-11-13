@@ -1,55 +1,35 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 13 Nov 2012 10:26:12 +0100
-Subject: [PATCH] cpufreq: exynos: Broadcast frequency change notifications for
- all cores
-Message-ID: <1887364.fvxYYNb7Mm@amdc1227>
+Date: Tue, 13 Nov 2012 10:27:50 +0100
+Subject: [PATCH] ARM: dts: exynos4210-trats: Remove broken-voltage property
+ from sdhci node
+Message-ID: <1604189.yDsqlPMQyl@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Exynos SoCs all cores share the same frequency setting, so changing
-frequency of one core will affect rest of cores.
+The broken voltage property has been replaced with auto detection based
+on voltages available on vmmc voltage regulator, so there is no use for
+it now.
 
-This patch modifies the exynos-cpufreq driver to inform cpufreq core
-about this behavior and broadcast frequency change notifications for all
-cores.
+This patch removes the now unused property from Trats Device Tree
+sources.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/cpufreq/exynos-cpufreq.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/exynos4210-trats.dts | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-index af2d81e..c0d54a8 100644
---- a/drivers/cpufreq/exynos-cpufreq.c
-+++ b/drivers/cpufreq/exynos-cpufreq.c
-@@ -100,7 +100,8 @@ static int exynos_target(struct cpufreq_policy *policy,
- 	}
- 	arm_volt = volt_table[index];
- 
--	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-+	for_each_cpu(freqs.cpu, policy->cpus)
-+		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
- 
- 	/* When the new frequency is higher than current frequency */
- 	if ((freqs.new > freqs.old) && !safe_arm_volt) {
-@@ -115,7 +116,8 @@ static int exynos_target(struct cpufreq_policy *policy,
- 	if (freqs.new != freqs.old)
- 		exynos_info->set_freq(old_index, index);
- 
--	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-+	for_each_cpu(freqs.cpu, policy->cpus)
-+		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
- 
- 	/* When the new frequency is lower than current frequency */
- 	if ((freqs.new < freqs.old) ||
-@@ -235,6 +237,7 @@ static int exynos_cpufreq_cpu_init(struct cpufreq_policy *policy)
- 		cpumask_copy(policy->related_cpus, cpu_possible_mask);
- 		cpumask_copy(policy->cpus, cpu_online_mask);
- 	} else {
-+		policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
- 		cpumask_setall(policy->cpus);
- 	}
- 
+diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
+index a21511c..9d5d27a 100644
+--- a/arch/arm/boot/dts/exynos4210-trats.dts
++++ b/arch/arm/boot/dts/exynos4210-trats.dts
+@@ -42,7 +42,6 @@
+ 	sdhci_emmc: sdhci at 12510000 {
+ 		bus-width = <8>;
+ 		non-removable;
+-		broken-voltage;
+ 		gpios = <&gpk0 0 2 0 3>,
+ 			<&gpk0 1 2 0 3>,
+ 			<&gpk0 3 2 2 3>,
 -- 
 1.8.0
