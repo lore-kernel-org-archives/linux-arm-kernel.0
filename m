@@ -1,47 +1,59 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 13 Nov 2012 07:30:22 -0800
-Subject: [PATCH v6 2/7] net: mvneta: driver for Marvell Armada 370/XP
- network unit
-In-Reply-To: <1352818843-4457-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1352818843-4457-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1352818843-4457-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1352820622.24230.31.camel@joe-AO722>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 13 Nov 2012 15:35:07 +0000 (UTC)
+Subject: OMAP baseline test results for v3.7-rc3
+In-Reply-To: <50A266C2.4030303@mimc.co.uk>
+References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
+ <508FB226.20604@mimc.co.uk>
+ <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
+ <508FE8BA.1080404@ti.com> <50912A6F.1040501@mimc.co.uk>
+ <79CD15C6BA57404B839C016229A409A83EB563F8@DBDE01.ent.ti.com>
+ <5097EF44.5030706@mimc.co.uk>
+ <79CD15C6BA57404B839C016229A409A83EB63609@DBDE01.ent.ti.com>
+ <5098DC9E.3090307@mimc.co.uk> <50A266C2.4030303@mimc.co.uk>
+Message-ID: <alpine.DEB.2.00.1211131531430.22487@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-11-13 at 16:00 +0100, Thomas Petazzoni wrote:
-> This patch contains a new network driver for the network unit of the
-> ARM Marvell Armada 370 and the Armada XP. Both SoCs use the PJ4B
-> processor, a Marvell-developed ARM core that implements the ARMv7
-> instruction set.
+On Tue, 13 Nov 2012, Mark Jackson wrote:
 
-This looks very clean to me.
+> On 06/11/12 09:47, Mark Jackson wrote:
+>
+> > That works ... great !!
+> > 
+> > But now I'm confused, since I thought the DTB was appended to the uImage file.
 
-trivial:
-some of the logging doesn't use terminating newlines.
+The DTB is appended to the zImage file.  You then need to convert the 
+product of the concatenation to uImage format.
 
-> +static int mvneta_check_mtu_valid(struct net_device *dev, int mtu)
-> +{
-[]
-> +       if (mtu > 9676) {
-> +               netdev_info(dev, "Illegal MTU value %d, round to 9676", mtu);
-[]
-> +	if (!IS_ALIGNED(MVNETA_RX_PKT_SIZE(mtu), 8)) {
-> +		netdev_info(dev, "Illegal MTU value %d, rounding to %d",
+So ...
 
-missing newlines
+> > I have the following in my .config:-
+> > 
+> > ARM_ATAG_DTB_COMPAT=y
+> > ARM_APPENDED_DTB=y
+> > ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
+> > 
+> > And then I create my uImage file using:-
+> > 
+> > $ make -j 8 ARCH=arm CROSS_COMPILE=arm-linux- uImage
+> > $ make -j 8 ARCH=arm CROSS_COMPILE=arm-linux- am335x-bone.dtb
 
-> +static int __devinit mvneta_probe(struct platform_device *pdev)
-[]
-> +	if (register_netdev(dev)) {
-> +		dev_err(&pdev->dev, "failed to register\n");
-> +		err = ENOMEM;
-> +		goto err_base;
-> +	}
-[]
-> +	dev_info(&pdev->dev, "%s, mac: %pM\n", dev->name,
-> +		 dev->dev_addr);
+instead of this:
 
-You could use netdev_info here
+> > $ cat arch/arm/boot/uImage arch/arm/boot/am335x-bone.dtb > arch/arm/boot/uImage-dtb.am335x-bone
+> > $ cp arch/arm/boot/uImage-dtb.am335x-bone /media/boot/uImage
 
-	netdev_info(dev, "mac: %pM\n", dev->dev_addr);
+something like this is what you need to do instead:
+
+$ cat arch/arm/boot/zImage arch/arm/boot/am335x-bone.dtb > arch/arm/boot/zImage-dtb.am335x-bone
+$ scripts/mkuboot.sh -A arm -O linux -C none  -T kernel -a 0x80008000 -e 0x80008000 -n 'Linux' -d arch/arm/boot/zImage-dtb.am335x-bone arch/arm/boot/uImage-dtb.am335x-bone
+
+> > Do you now have to load the DTB as a separate file ?
+> > 
+> > Or should the appended DTB still work ?
+
+Appended DTBs work fine on the testbed here.
+
+
+- Paul
