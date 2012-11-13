@@ -1,44 +1,53 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 13 Nov 2012 10:14:32 -0700
-Subject: [PATCH V2 2/11] time: convert arch_gettimeoffset to a pointer
-In-Reply-To: <50A16BD3.5010707@us.ibm.com>
-References: <1352753462-2915-1-git-send-email-swarren@wwwdotorg.org>
- <50A16BD3.5010707@us.ibm.com>
-Message-ID: <50A27FF8.3080905@wwwdotorg.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 13 Nov 2012 11:16:54 -0600
+Subject: [GIT PULL] ARM: OMAP: DMTIMER fixes
+Message-ID: <50A28086.6050500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2012 02:36 PM, John Stultz wrote:
-> On 11/12/2012 12:51 PM, Stephen Warren wrote:
->> Currently, whenever CONFIG_ARCH_USES_GETTIMEOFFSET is enabled, each
->> arch core provides a single implementation of arch_gettimeoffset(). In
->> many cases, different sub-architectures, different machines, or
->> different timer providers exist, and so the arch ends up implementing
->> arch_gettimeoffset() as a call-through-pointer anyway. Examples are
->> ARM, Cris, M68K, and it's arguable that the remaining architectures,
->> M32R and Blackfin, should be doing this anyway.
->>
->> Modify arch_gettimeoffset so that it itself is a function pointer, which
->> the arch initializes. This will allow later changes to move the
->> initialization of this function into individual machine support or timer
->> drivers. This is particularly useful for code in drivers/clocksource
->> which should rely on an arch-independant mechanism to register their
->> implementation of arch_gettimeoffset().
-...
-> One last thing to watch out for: If you're trying to build a kernel that
-> mixes clocksource support with get_arch_timeoffset, you'll need to
-> rework the #ifdef in update_wall_time(), since we currently assume with
-> get_arch_timeoffset() that you're using tick + interpolation, so every
-> call to update_wall_time() only moves time forward by one jiffy.
+The following changes since commit d308ba50a1234b299a00e63a95e61fdeb2f1a2df:
 
-OK. I don't have any immediate plans to do that, although I wouldn't be
-surprised if we (the ARM community in general) end up wanting to do that
-at some point. It all depends on which ARM sub-architectures end up
-getting converted to the multi-platform zImage support I guess.
+  Merge branch 'omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3' into omap-for-v3.8/dt (2012-11-09 14:58:34 -0800)
 
-> Otherwise, thanks for the name tweak. Going through the arm-soc tree is
-> fine with me.
-> 
-> Acked-by: John Stultz <johnstul@us.ibm.com>
+are available in the git repository at:
 
-Thanks.
+
+  git at github.com:jonhunter/linux.git fixes-timer
+
+for you to fetch changes up to b1538832191d59e29b1077e64cf416a7617b45bc:
+
+  ARM: OMAP: Remove __omap_dm_timer_set_source function (2012-11-12 16:23:57 -0600)
+
+----------------------------------------------------------------
+Several fixes for the OMAP DMTIMER driver including ...
+1. Adding workaround for OMAP3+ errata i103/i767
+2. Fixing posted mode support
+3. Spurious interrupts when using match interrupt
+4. HWMOD fixes for timers
+5. Unnecessary restoration of read-only registers
+6. Adds function for disabling timer interrupts
+7. Fixing timer1 reset for OMAP1
+
+----------------------------------------------------------------
+Jon Hunter (13):
+      ARM: OMAP: Add DMTIMER definitions for posted mode
+      ARM: OMAP3+: Implement timer workaround for errata i103 and i767
+      ARM: OMAP: Fix timer posted mode support
+      ARM: OMAP3: Correct HWMOD DMTIMER SYSC register declarations
+      ARM: OMAP2/3: Define HWMOD software reset status for DMTIMERs
+      ARM: OMAP2+: Don't use __omap_dm_timer_reset()
+      ARM: OMAP: Fix dmtimer reset for timer1
+      ARM: OMAP: Don't restore of DMTIMER TISTAT register
+      ARM: OMAP: Don't restore DMTIMER interrupt status register
+      ARM: OMAP: Fix spurious interrupts when using timer match feature
+      ARM: OMAP: Add dmtimer interrupt disable function
+      ARM: OMAP: Remove unnecessary call to clk_get()
+      ARM: OMAP: Remove __omap_dm_timer_set_source function
+
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   15 +++-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   41 +++++------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    4 +
+ arch/arm/mach-omap2/timer.c                        |   70 +++++++++++++-----
+ arch/arm/plat-omap/dmtimer.c                       |   77 ++++++++++++--------
+ arch/arm/plat-omap/include/plat/dmtimer.h          |   72 +++++++++++++-----
+ 6 files changed, 188 insertions(+), 91 deletions(-)
