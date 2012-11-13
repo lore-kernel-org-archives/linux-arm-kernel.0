@@ -1,64 +1,43 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 13 Nov 2012 20:04:37 +0530
-Subject: [PATCH 02/14] ARM: SPEAr13xx: DT: Add spics gpio controller nodes
-In-Reply-To: <CACRpkdZkgmLF8TxFCZSubP+g+6_ofZugArKtE9=dYTZfemstrw@mail.gmail.com>
-References: <cover.1352608333.git.viresh.kumar@linaro.org>
- <58a7d91cab20b924784fb5a09e16ca08e6f13318.1352608333.git.viresh.kumar@linaro.org>
- <CACRpkdZkgmLF8TxFCZSubP+g+6_ofZugArKtE9=dYTZfemstrw@mail.gmail.com>
-Message-ID: <CAKohpon=AVGZmR_cwUZ4=buw0kr3JVtXh51BtXteWkJ7E-f_bQ@mail.gmail.com>
+From: etienne.carriere@st.com (Etienne CARRIERE)
+Date: Tue, 13 Nov 2012 17:07:55 +0100
+Subject: [PATCH 0/2] L2CC shared mutex with ARM TZ
+Message-ID: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B57@SAFEX1MAIL3.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Nov 13, 2012 7:38 PM, "Linus Walleij" <linus.walleij@linaro.org> wrote:
->
-> On Sun, Nov 11, 2012 at 5:39 AM, Viresh Kumar <viresh.kumar@linaro.org>
-wrote:
->
-> > From: Shiraz Hashim <shiraz.hashim@st.com>
-> >
-> > SPEAr platform provides a provision to control chipselects of ARM PL022
-Prime
-> > Cell spi controller through its system registers, which otherwise
-remains under
-> > PL022 control which some protocols do not want.
->
-> So I guess this platform us utilizing the cs_control field of the
-> PL022 platform data to do the actual magic, right?
+From: Etienne Carriere <etienne.carriere@stericsson.com>
 
-Correct.
+Dear all,
 
-> > This patch adds spics controller nodes in device tree for various
-SPEAr13xx
-> > SoCs.
-> >
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
-> > Reviewed-by: Vipin Kumar <vipin.kumar@st.com>
-> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> (...)
-> >         ahb {
-> > +               spics: spics at e0700000{
-> > +                       compatible = "st,spear-spics-gpio";
-> > +                       reg = <0xe0700000 0x1000>;
-> > +                       st-spics,peripcfg-reg = <0x3b0>;
-> > +                       st-spics,sw-enable-bit = <12>;
-> > +                       st-spics,cs-value-bit = <11>;
-> > +                       st-spics,cs-enable-mask = <3>;
-> > +                       st-spics,cs-enable-shift = <8>;
-> > +                       gpio-controller;
-> > +                       #gpio-cells = <2>;
-> > +               };
-> > +
->
-> Are these bindings documented?
+A need for a shared mutex between linux and TrustZone has raised on ST-Ericsson ux500 platforms and coming ux600 platforms.
 
-The main patch waiting for ur comments is 1/14.
+This patch series shows how we intend to modify ARM L2 cache driver to allow platforms to register a shared mutex between Linux and TrustZone code.
 
-> Apart from that remark:
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Yours,
-> Linus Walleij
+The 1st patch contains the target modifications in L2X0 driver in the kernel main track.
+
+The 2nd patch (romcode-shared_mutex.c) is an example of how such feature could be used by platform specific code.
+This patch does not target merge on kernel main track.
+
+Patch were extracted from local kernel tree and may not apply straight on pristine kernel tree. I hope they clearly describe our purpose.
+
+In the hope to get your feedback,
+Regards.
+
+Etienne Carriere (2)
+ arm: mm: l2cc external shared mutex support
+  mach-ux500: tee: l2cc TEE shared mutex support
+
+arch/arm/include/asm/outercache.h |  9 ++++
+arch/arm/mm/cache-l2x0.c          | 87 +++++++++++++++++++++++++++++----------
+arch/arm/mach-ux500/romcode-shared_mutex.c | 111 +++++++++++++++++++++++++++++
+3 files changed, 185 insertions(+), 22 deletions(-)
+
+
+
+--
+
+1.7.11.3
+
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121113/ccfa29d1/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121113/9a188fa7/attachment-0001.html>
