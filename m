@@ -1,46 +1,39 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Tue, 13 Nov 2012 16:02:57 -0600
-Subject: [PATCH v2 2/5] clk: Add support for fundamental zynq clks
-In-Reply-To: <df95297d-a875-464a-b7a1-c494f2522a43@CO1EHSMHS027.ehs.local>
-References: <cover.1352400580.git.josh.cartwright@ni.com>
- <3569f4619a92904a40aecc9300aafe767ac736f7.1352400580.git.josh.cartwright@ni.com>
- <df95297d-a875-464a-b7a1-c494f2522a43@CO1EHSMHS027.ehs.local>
-Message-ID: <20121113220257.GN1718@beefymiracle.amer.corp.natinst.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 13 Nov 2012 14:12:32 -0800
+Subject: [GIT PULL] ARM: OMAP: DMTIMER fixes
+In-Reply-To: <50A28086.6050500@ti.com>
+References: <50A28086.6050500@ti.com>
+Message-ID: <20121113221231.GL6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 08, 2012 at 03:28:07PM -0800, Soren Brinkmann wrote:
-> One note below:
->
-> On Wed, Oct 31, 2012 at 12:58:52PM -0600, Josh Cartwright wrote:
-[..]
-> > --- /dev/null
-> > +++ b/drivers/clk/clk-zynq.c
-[..]
-> > +struct zynq_periph_clk {
-> > +	struct clk_hw		hw;
-> > +	struct clk_onecell_data	onecell_data;
-> > +	struct clk		*gates[2];
-> > +	void __iomem		*clk_ctrl;
-> > +	spinlock_t		clkact_lock;
-> > +};
-> > +
-> > +#define to_zynq_periph_clk(hw)	container_of(hw, struct zynq_periph_clk, hw)
-> > +
-> > +static const u8 periph_clk_parent_map[] = {
-> > +	0, 0, 1, 2
-> > +};
-> > +#define PERIPH_CLK_CTRL_SRC(x)	(periph_clk_parent_map[((x) & 3) >> 4])
->
-> I think this should be:
-> #define PERIPH_CLK_CTRL_SRC(x)	(periph_clk_parent_map[((x) & 0x30) >> 4])
+* Jon Hunter <jon-hunter@ti.com> [121113 09:18]:
+> The following changes since commit d308ba50a1234b299a00e63a95e61fdeb2f1a2df:
+> 
+>   Merge branch 'omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3' into omap-for-v3.8/dt (2012-11-09 14:58:34 -0800)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git at github.com:jonhunter/linux.git fixes-timer
+> 
+> for you to fetch changes up to b1538832191d59e29b1077e64cf416a7617b45bc:
+> 
+>   ARM: OMAP: Remove __omap_dm_timer_set_source function (2012-11-12 16:23:57 -0600)
+> 
+> ----------------------------------------------------------------
+> Several fixes for the OMAP DMTIMER driver including ...
+> 1. Adding workaround for OMAP3+ errata i103/i767
+> 2. Fixing posted mode support
+> 3. Spurious interrupts when using match interrupt
+> 4. HWMOD fixes for timers
+> 5. Unnecessary restoration of read-only registers
+> 6. Adds function for disabling timer interrupts
+> 7. Fixing timer1 reset for OMAP1
 
-Yes indeed it should be, thanks.
+Thanks pulling into omap-for-v3.8/timer.
 
-Michal-  I'll just be following up with a v3 of this patch instead of
-spinning up the whole set to save myself some time.  If you'd rather I
-spin up the whole set, let me know.
+Regards,
 
-Thanks,
-
-  Josh
+Tony
+Thanks pulled into omap-for-v3.8/timer.
