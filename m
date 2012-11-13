@@ -1,41 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Nov 2012 17:05:40 -0800
-Subject: [GIT PULL 1/6] omap cleanup fixes for v3.8 merge window
-In-Reply-To: <pull-1352768345-815774>
-References: <pull-1352768345-815774>
-Message-ID: <20121113010539.GZ6801@atomide.com>
+From: chuansheng.liu@intel.com (Liu, Chuansheng)
+Date: Tue, 13 Nov 2012 01:21:57 +0000
+Subject: [PATCH 1/7] I2c-nomadik: Fix the usage of
+ wait_for_completion_timeout
+In-Reply-To: <20121112172651.GC15159@pengutronix.de>
+References: <1352222317.15558.1584.camel@cliu38-desktop-build>
+ <20121112172651.GC15159@pengutronix.de>
+Message-ID: <27240C0AC20F114CBF8149A2696CBE4A1C3952@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <ton@atomide.com> [121112 17:01]:
-> The following changes since commit edf8dde393f879fc2d8c22d4bc01ff8d37b80e1a:
-> 
->   Merge branch 'linus' into omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3 (2012-11-09 14:58:01 -0800)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/cleanup-fixes-signed
-> 
-> for you to fetch changes up to e05cf58d50e3ce3601ebf753728eee0df759e38f:
-> 
->   ARM: OMAP2+: remove duplicated include from board-overo.c (2012-11-12 14:02:48 -0800)
-> 
-> ----------------------------------------------------------------
-> Minor fixes to the clean-up done for ARM common multi-platform
-> support for omaps.
 
-FYI, some of the pull requests after this one may break
-compile for omap2plus_defconfig when merging them in.
 
-I suggest you pull requests 2 - 6 with --no-commit option and
-make sure it builds after each pull if you have a chance.
-Or I can follow up with fixes if needed.
-
-If in doubt, I've pushded omap-for-v3.8/tmp-merge that's a
-merge of v3.7-rc5 + recently pulled omap fixes + these pull
-requests merged together for reference.
-
-Cheers,
-
-Tony
+> -----Original Message-----
+> From: Wolfram Sang [mailto:w.sang at pengutronix.de]
+> Sent: Tuesday, November 13, 2012 1:27 AM
+> To: Liu, Chuansheng
+> Cc: linus.walleij at linaro.org; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; linux-i2c at vger.kernel.org
+> Subject: Re: [PATCH 1/7] I2c-nomadik: Fix the usage of
+> wait_for_completion_timeout
+> 
+> On Wed, Nov 07, 2012 at 01:18:37AM +0800, Chuansheng Liu wrote:
+> >
+> > The return value of wait_for_completion_timeout() is always
+> > >= 0 with unsigned int type.
+> >
+> > So the condition "ret < 0" or "ret >= 0" is pointless.
+> >
+> > Signed-off-by: liu chuansheng <chuansheng.liu@intel.com>
+> 
+> You forgot to add the i2c-list, so I nearly overlooked this patch.
+> Luckily I haven't, so applied to for-next, thanks! Did you use a script
+> to find all occurences? Would be nice to know. Also, please take care of
+> the subject line. "I2c" is misspelled.
+Thanks your pointing out. I just manually reviewed the code when found this point.
+Would like to try some auto-script but failed:)
