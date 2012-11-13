@@ -1,62 +1,23 @@
-From: mgherzan@gmail.com (Mircea Gherzan)
-Date: Wed, 14 Nov 2012 00:00:36 +0100
-Subject: [PATCH net-next 2/2] ARM: net: bpf_jit_32: add VLAN instructions
+From: davem@davemloft.net (David Miller)
+Date: Tue, 13 Nov 2012 18:21:28 -0500 (EST)
+Subject: [PATCH net-next 1/2] ARM: net: bpf_jit_32: add XOR instruction
  for BPF JIT
-In-Reply-To: <20121108013101.GB23143@thinkbox>
-References: <20121108013101.GB23143@thinkbox>
-Message-ID: <50A2D114.8080306@gmail.com>
+In-Reply-To: <50A2D0F4.3090202@gmail.com>
+References: <20121108012828.GA23143@thinkbox>
+	<50A2D0F4.3090202@gmail.com>
+Message-ID: <20121113.182128.474002768931513696.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 08.11.2012 02:31, schrieb Daniel Borkmann:
-> This patch is a follow-up for patch "net: filter: add vlan tag access"
-> to support the new VLAN_TAG/VLAN_TAG_PRESENT accessors in BPF JIT.
-> 
-> Signed-off-by: Daniel Borkmann <daniel.borkmann@tik.ee.ethz.ch>
-> Cc: Mircea Gherzan <mgherzan@gmail.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/net/bpf_jit_32.c |   14 ++++++++++++++
->  1 files changed, 14 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-> index 8be702d..9af9a69 100644
-> --- a/arch/arm/net/bpf_jit_32.c
-> +++ b/arch/arm/net/bpf_jit_32.c
-> @@ -16,6 +16,7 @@
->  #include <linux/netdevice.h>
->  #include <linux/string.h>
->  #include <linux/slab.h>
-> +#include <linux/if_vlan.h>
->  #include <asm/cacheflush.h>
->  #include <asm/hwcap.h>
->  
-> @@ -168,6 +169,8 @@ static inline bool is_load_to_a(u16 inst)
->  	case BPF_S_ANC_MARK:
->  	case BPF_S_ANC_PROTOCOL:
->  	case BPF_S_ANC_RXHASH:
-> +	case BPF_S_ANC_VLAN_TAG:
-> +	case BPF_S_ANC_VLAN_TAG_PRESENT:
->  	case BPF_S_ANC_QUEUE:
->  		return true;
->  	default:
-> @@ -815,6 +818,17 @@ b_epilogue:
->  			off = offsetof(struct sk_buff, rxhash);
->  			emit(ARM_LDR_I(r_A, r_skb, off), ctx);
->  			break;
-> +		case BPF_S_ANC_VLAN_TAG:
-> +		case BPF_S_ANC_VLAN_TAG_PRESENT:
-> +			ctx->seen |= SEEN_SKB;
-> +			BUILD_BUG_ON(FIELD_SIZEOF(struct sk_buff, vlan_tci) != 2);
-> +			off = offsetof(struct sk_buff, vlan_tci);
-> +			emit(ARM_LDRH_I(r_A, r_skb, off), ctx);
-> +			if (inst->code == BPF_S_ANC_VLAN_TAG)
-> +				OP_IMM3(ARM_AND, r_A, r_A, VLAN_VID_MASK, ctx);
-> +			else
-> +				OP_IMM3(ARM_AND, r_A, r_A, VLAN_TAG_PRESENT, ctx);
-> +			break;
->  		case BPF_S_ANC_QUEUE:
->  			ctx->seen |= SEEN_SKB;
->  			BUILD_BUG_ON(FIELD_SIZEOF(struct sk_buff,
+From: Mircea Gherzan <mgherzan@gmail.com>
+Date: Wed, 14 Nov 2012 00:00:04 +0100
 
-Acked-by: Mircea Gherzan <mgherzan@gmail.com>
+> Am 08.11.2012 02:28, schrieb Daniel Borkmann:
+>> This patch is a follow-up for patch "filter: add XOR instruction for use
+>> with X/K" that implements BPF ARM JIT parts for the BPF XOR operation.
+>> 
+>> Signed-off-by: Daniel Borkmann <daniel.borkmann@tik.ee.ethz.ch>
+ ...
+> Acked-by: Mircea Gherzan <mgherzan@gmail.com>
+
+Applied, thanks for reviewing.
