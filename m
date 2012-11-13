@@ -1,67 +1,37 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 13 Nov 2012 13:46:45 -0500
-Subject: arm: mvebu: Pull request for 'marvell-boards' branch
-In-Reply-To: <1352740839-13586-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1352740839-13586-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20121113184645.GA22106@titan.lakedaemon.net>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 13 Nov 2012 10:50:30 -0800
+Subject: OMAP baseline test results for v3.7-rc4
+In-Reply-To: <alpine.DEB.2.00.1211092347520.20703@utopia.booyaka.com> (Paul
+ Walmsley's message of "Fri, 9 Nov 2012 23:49:14 +0000 (UTC)")
+References: <alpine.DEB.2.00.1211050241410.23228@utopia.booyaka.com>
+ <87390iicno.fsf@deeprootsystems.com>
+ <alpine.DEB.2.00.1211092347520.20703@utopia.booyaka.com>
+Message-ID: <87r4nxgww9.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+Paul Walmsley <paul@pwsan.com> writes:
 
-Nice to see a pull request from you guys!
+> On Fri, 9 Nov 2012, Kevin Hilman wrote:
+>
+>> I found that disabling MMC in the config made the tests pass again, so
+>> then bisected it down to the commit below removing SYSCONFIG
+>> accesses[2].  I haven't had the time to find out exactly the cause, but
+>> clearly the code that was removed was doing something that hwmod is not
+>> taking care of automatically.
+>> 
+>> Venkat, Felipe, could you please investigate this and hopefully get a
+>> fix out for v3.7-rc?
+>
+> This one might fix it -- it fixes another PM bug in the v3.7-rcs involving 
+> the same commit:
+>
+> http://git.kernel.org/?p=linux/kernel/git/pjw/omap-pending.git;a=commit;h=613ad0e98c3596cd2524172fae2a795c3fc57e4a
+>
 
-Comments below:
+Indeed, that fixes it.  Somehow I thought I was already including that
+fix, but I wasn't.  
 
-On Mon, Nov 12, 2012 at 06:20:33PM +0100, Thomas Petazzoni wrote:
-> Jason, Andrew,
-> 
-> The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
-> 
->   Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
-> 
-> are available in the git repository at:
-> 
->   git at github.com:MISL-EBU-System-SW/mainline-public.git marvell-boards
-> 
-> for you to fetch changes up to 39325a96e1d082bf71b7a4d9ac2d5806f80c6d13:
-> 
->   arm: mvebu: add LED support in defconfig (2012-11-12 18:13:41 +0100)
-> 
-> ----------------------------------------------------------------
+Thanks,
 
-I'd like to see a signed tag in here.  If you could have gregory send me
-a signed email with all the fingerprints you guys traded at ELCE, I'd
-appreciate it.
-
-In the future, could you please break these up into the following
-branches:
-
-> Gregory CLEMENT (1):
->       arm: mvebu: support for the Globalscale Mirabox board
-
-boards
-
-> Thomas Petazzoni (5):
->       arm: mvebu: fix compatible string in armada-370-xp.dtsi
->       arm: mvebu: don't list all boards in dt compat field for Armada 370/XP
->       arm: mvebu: fix typo in machine name for Armada 370/XP
-
-cleanup (also, if any are fixing problems found in older kernels, please
-add a CC to stable as appropriate)
-
->       arm: mvebu: support for the PlatHome OpenBlocks AX3-4 board
-
-boards
-
->       arm: mvebu: add LED support in defconfig
-
-defconfig
-
-That would really help me out.  Otherwise, I have to pull this branch
-and cherry-pick the patches into different branches.  Which kind of
-defeats the purpose of the pull request. ;-)
-
-thx,
-
-Jason.
+Kevin
