@@ -1,27 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Nov 2012 12:50:50 +0000
-Subject: [GIT PULL] Renesas ARM-based SoC for v3.8 #4
-In-Reply-To: <1352776212-3211-1-git-send-email-horms@verge.net.au>
-References: <1352776212-3211-1-git-send-email-horms@verge.net.au>
-Message-ID: <201211131250.50883.arnd@arndb.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 13 Nov 2012 13:51:51 +0100
+Subject: [PATCH v3 0/4] ARM: EXYNOS: Power domain DT support extension
+Message-ID: <1352811115-1198-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 November 2012, Simon Horman wrote:
-> please consider the following SoC fixes for 3.8.
-> Its a little embarrassing, but they all fix problems introduced
-> in previous pull-requests for 3.8 that have been merged.
+This patch series fixes two issues with existing DT support for Exynos
+power domains and extends it with the ability of binding devices to domains,
+basically making it possible to use power domains with DT.
 
-No problem at all, thanks for the quick follow-up!
+Based on for-next branch of Kgene's tree.
 
-> * The three Revert patches back-out secondary CPU initialisation
->   changes from Bastian Hecht which he as advised me are incorrect
->   and break secondary CPU initialisation.
-> 
-> * The clkfwk patch from Morimoto-san resolves a build warning.
-> 
-> This pull-request is based on the renesas/soc3 branch in the arm-soc tree.
+Changes since v2:
+ - Rebased to for-next of Kgene's tree.
+Changes since v1:
+ - Added "samsung," prefix to "power-domain" property.
+ - Added power domain nodes to Exynos4 device tree sources.
 
-Pulled into next/soc2, on top of the previous branch.
+Tomasz Figa (4):
+  ARM: EXYNOS: pm_domain: Detect domain state on registration from DT
+  ARM: EXYNOS: pm_domain: Fix power domain name initialization
+  ARM: EXYNOS: pm_domain: Bind devices to power domains using DT
+  ARM: dts: exynos4: Set up power domains
 
-	Arnd
+ .../bindings/arm/exynos/power_domain.txt           | 15 +++-
+ arch/arm/boot/dts/exynos4.dtsi                     | 30 +++++++
+ arch/arm/boot/dts/exynos4210.dtsi                  |  5 ++
+ arch/arm/mach-exynos/pm_domains.c                  | 93 +++++++++++++++++++++-
+ 4 files changed, 135 insertions(+), 8 deletions(-)
+
+-- 
+1.8.0
