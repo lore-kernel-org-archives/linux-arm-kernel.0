@@ -1,53 +1,197 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 13 Nov 2012 11:16:54 -0600
-Subject: [GIT PULL] ARM: OMAP: DMTIMER fixes
-Message-ID: <50A28086.6050500@ti.com>
+From: wolfram@the-dreams.de (Wolfram Sang)
+Date: Tue, 13 Nov 2012 18:16:43 +0100
+Subject: [PATCH] bindings: i2c: use consistent naming for i2c binding
+ descriptions
+Message-ID: <1352827003-24287-1-git-send-email-wolfram@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d308ba50a1234b299a00e63a95e61fdeb2f1a2df:
+Filenames of devictree binding documentation seems to be arbitrary and
+for me it is unneeded hazzle to find the corresponding documentation for
+a specific driver.
 
-  Merge branch 'omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3' into omap-for-v3.8/dt (2012-11-09 14:58:34 -0800)
+Naming the description the same as the driver is a lot easier and makes
+sense to me since the driver defines the binding it understands.
 
-are available in the git repository at:
+Also, remove a reference in one source to the binding documentation, since path
+information easily gets stale.
 
+Signed-off-by: Wolfram Sang <wolfram@the-dreams.de>
+Cc: Rob Herring <robherring2@gmail.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+---
 
-  git at github.com:jonhunter/linux.git fixes-timer
+I think it would be helpful if other subsystems would follow if we can agree on
+this pattern.
 
-for you to fetch changes up to b1538832191d59e29b1077e64cf416a7617b45bc:
+Thanks,
 
-  ARM: OMAP: Remove __omap_dm_timer_set_source function (2012-11-12 16:23:57 -0600)
+   Wolfram
 
-----------------------------------------------------------------
-Several fixes for the OMAP DMTIMER driver including ...
-1. Adding workaround for OMAP3+ errata i103/i767
-2. Fixing posted mode support
-3. Spurious interrupts when using match interrupt
-4. HWMOD fixes for timers
-5. Unnecessary restoration of read-only registers
-6. Adds function for disabling timer interrupts
-7. Fixing timer1 reset for OMAP1
+ .../bindings/i2c/{atmel-i2c.txt => i2c-at91.txt}     |    0
+ .../bindings/i2c/{davinci.txt => i2c-davinci.txt}    |    0
+ .../bindings/i2c/{gpio-i2c.txt => i2c-gpio.txt}      |    0
+ .../bindings/i2c/{fsl-imx-i2c.txt => i2c-imx.txt}    |    0
+ .../bindings/i2c/{fsl-i2c.txt => i2c-mpc.txt}        |    0
+ .../devicetree/bindings/i2c/{mux.txt => i2c-mux.txt} |    0
+ .../devicetree/bindings/i2c/i2c-mv64xxx.txt          |   18 ++++++++++++++++++
+ .../bindings/i2c/{nomadik.txt => i2c-nomadik.txt}    |    0
+ .../bindings/i2c/{cavium-i2c.txt => i2c-octeon.txt}  |    0
+ .../bindings/i2c/{omap-i2c.txt => i2c-omap.txt}      |    0
+ .../devicetree/bindings/i2c/{pnx.txt => i2c-pnx.txt} |    0
+ .../i2c/{ce4100-i2c.txt => i2c-pxa-pci-ce4100.txt}   |    0
+ .../bindings/i2c/{mrvl-i2c.txt => i2c-pxa.txt}       |   18 ------------------
+ .../i2c/{samsung-i2c.txt => i2c-s3c2410.txt}         |    0
+ .../bindings/i2c/{sirf-i2c.txt => i2c-sirf.txt}      |    0
+ .../i2c/{arm-versatile.txt => i2c-versatile.txt}     |    0
+ .../bindings/i2c/{xiic.txt => i2c-xiic.txt}          |    0
+ drivers/i2c/busses/i2c-ocores.c                      |    4 ----
+ 18 files changed, 18 insertions(+), 22 deletions(-)
+ rename Documentation/devicetree/bindings/i2c/{atmel-i2c.txt => i2c-at91.txt} (100%)
+ rename Documentation/devicetree/bindings/i2c/{davinci.txt => i2c-davinci.txt} (100%)
+ rename Documentation/devicetree/bindings/i2c/{gpio-i2c.txt => i2c-gpio.txt} (100%)
+ rename Documentation/devicetree/bindings/i2c/{fsl-imx-i2c.txt => i2c-imx.txt} (100%)
+ rename Documentation/devicetree/bindings/i2c/{fsl-i2c.txt => i2c-mpc.txt} (100%)
+ rename Documentation/devicetree/bindings/i2c/{mux.txt => i2c-mux.txt} (100%)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+ rename Documentation/devicetree/bindings/i2c/{nomadik.txt => i2c-nomadik.txt} (100%)
+ rename Documentation/devicetree/bindings/i2c/{cavium-i2c.txt => i2c-octeon.txt} (100%)
+ rename Documentation/devicetree/bindings/i2c/{omap-i2c.txt => i2c-omap.txt} (100%)
+ rename Documentation/devicetree/bindings/i2c/{pnx.txt => i2c-pnx.txt} (100%)
+ rename Documentation/devicetree/bindings/i2c/{ce4100-i2c.txt => i2c-pxa-pci-ce4100.txt} (100%)
+ rename Documentation/devicetree/bindings/i2c/{mrvl-i2c.txt => i2c-pxa.txt} (70%)
+ rename Documentation/devicetree/bindings/i2c/{samsung-i2c.txt => i2c-s3c2410.txt} (100%)
+ rename Documentation/devicetree/bindings/i2c/{sirf-i2c.txt => i2c-sirf.txt} (100%)
+ rename Documentation/devicetree/bindings/i2c/{arm-versatile.txt => i2c-versatile.txt} (100%)
+ rename Documentation/devicetree/bindings/i2c/{xiic.txt => i2c-xiic.txt} (100%)
 
-----------------------------------------------------------------
-Jon Hunter (13):
-      ARM: OMAP: Add DMTIMER definitions for posted mode
-      ARM: OMAP3+: Implement timer workaround for errata i103 and i767
-      ARM: OMAP: Fix timer posted mode support
-      ARM: OMAP3: Correct HWMOD DMTIMER SYSC register declarations
-      ARM: OMAP2/3: Define HWMOD software reset status for DMTIMERs
-      ARM: OMAP2+: Don't use __omap_dm_timer_reset()
-      ARM: OMAP: Fix dmtimer reset for timer1
-      ARM: OMAP: Don't restore of DMTIMER TISTAT register
-      ARM: OMAP: Don't restore DMTIMER interrupt status register
-      ARM: OMAP: Fix spurious interrupts when using timer match feature
-      ARM: OMAP: Add dmtimer interrupt disable function
-      ARM: OMAP: Remove unnecessary call to clk_get()
-      ARM: OMAP: Remove __omap_dm_timer_set_source function
-
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   15 +++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   41 +++++------
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    4 +
- arch/arm/mach-omap2/timer.c                        |   70 +++++++++++++-----
- arch/arm/plat-omap/dmtimer.c                       |   77 ++++++++++++--------
- arch/arm/plat-omap/include/plat/dmtimer.h          |   72 +++++++++++++-----
- 6 files changed, 188 insertions(+), 91 deletions(-)
+diff --git a/Documentation/devicetree/bindings/i2c/atmel-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/atmel-i2c.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-at91.txt
+diff --git a/Documentation/devicetree/bindings/i2c/davinci.txt b/Documentation/devicetree/bindings/i2c/i2c-davinci.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/davinci.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-davinci.txt
+diff --git a/Documentation/devicetree/bindings/i2c/gpio-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-gpio.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/gpio-i2c.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-gpio.txt
+diff --git a/Documentation/devicetree/bindings/i2c/fsl-imx-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/fsl-imx-i2c.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-imx.txt
+diff --git a/Documentation/devicetree/bindings/i2c/fsl-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-mpc.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/fsl-i2c.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-mpc.txt
+diff --git a/Documentation/devicetree/bindings/i2c/mux.txt b/Documentation/devicetree/bindings/i2c/i2c-mux.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/mux.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-mux.txt
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+new file mode 100644
+index 0000000..f46d928
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+@@ -0,0 +1,18 @@
++
++* Marvell MV64XXX I2C controller
++
++Required properties :
++
++ - reg             : Offset and length of the register set for the device
++ - compatible      : Should be "marvell,mv64xxx-i2c"
++ - interrupts      : The interrupt number
++ - clock-frequency : Desired I2C bus clock frequency in Hz.
++
++Examples:
++
++	i2c at 11000 {
++		compatible = "marvell,mv64xxx-i2c";
++		reg = <0x11000 0x20>;
++		interrupts = <29>;
++		clock-frequency = <100000>;
++	};
+diff --git a/Documentation/devicetree/bindings/i2c/nomadik.txt b/Documentation/devicetree/bindings/i2c/i2c-nomadik.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/nomadik.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-nomadik.txt
+diff --git a/Documentation/devicetree/bindings/i2c/cavium-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-octeon.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/cavium-i2c.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-octeon.txt
+diff --git a/Documentation/devicetree/bindings/i2c/omap-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-omap.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/omap-i2c.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-omap.txt
+diff --git a/Documentation/devicetree/bindings/i2c/pnx.txt b/Documentation/devicetree/bindings/i2c/i2c-pnx.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/pnx.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-pnx.txt
+diff --git a/Documentation/devicetree/bindings/i2c/ce4100-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-pxa-pci-ce4100.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/ce4100-i2c.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-pxa-pci-ce4100.txt
+diff --git a/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
+similarity index 70%
+rename from Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-pxa.txt
+index 0f79450..12b78ac 100644
+--- a/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
+@@ -31,21 +31,3 @@ Examples:
+ 		reg = <0xd4025000 0x1000>;
+ 		interrupts = <58>;
+ 	};
+-
+-* Marvell MV64XXX I2C controller
+-
+-Required properties :
+-
+- - reg             : Offset and length of the register set for the device
+- - compatible      : Should be "marvell,mv64xxx-i2c"
+- - interrupts      : The interrupt number
+- - clock-frequency : Desired I2C bus clock frequency in Hz.
+-
+-Examples:
+-
+-	i2c at 11000 {
+-		compatible = "marvell,mv64xxx-i2c";
+-		reg = <0x11000 0x20>;
+-		interrupts = <29>;
+-		clock-frequency = <100000>;
+-	};
+diff --git a/Documentation/devicetree/bindings/i2c/samsung-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/samsung-i2c.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
+diff --git a/Documentation/devicetree/bindings/i2c/sirf-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-sirf.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/sirf-i2c.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-sirf.txt
+diff --git a/Documentation/devicetree/bindings/i2c/arm-versatile.txt b/Documentation/devicetree/bindings/i2c/i2c-versatile.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/arm-versatile.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-versatile.txt
+diff --git a/Documentation/devicetree/bindings/i2c/xiic.txt b/Documentation/devicetree/bindings/i2c/i2c-xiic.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/i2c/xiic.txt
+rename to Documentation/devicetree/bindings/i2c/i2c-xiic.txt
+diff --git a/drivers/i2c/busses/i2c-ocores.c b/drivers/i2c/busses/i2c-ocores.c
+index bffd550..15da1ac 100644
+--- a/drivers/i2c/busses/i2c-ocores.c
++++ b/drivers/i2c/busses/i2c-ocores.c
+@@ -9,10 +9,6 @@
+  * kind, whether express or implied.
+  */
+ 
+-/*
+- * This driver can be used from the device tree, see
+- *     Documentation/devicetree/bindings/i2c/ocore-i2c.txt
+- */
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/init.h>
+-- 
+1.7.10.4
