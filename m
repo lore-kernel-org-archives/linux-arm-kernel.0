@@ -1,109 +1,116 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 13 Nov 2012 11:24:30 +0000
-Subject: [PATCH] ARM: add get_user() support for 8 byte types
-In-Reply-To: <201211130911.09613.arnd@arndb.de>
-References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
- <20121112235348.GD28341@n2100.arm.linux.org.uk>
- <CAF6AEGvoXR3YJomjV1YOeNvjr46aYJ2mVxS+jZfH+41+v1nAvw@mail.gmail.com>
- <201211130911.09613.arnd@arndb.de>
-Message-ID: <20121113112430.GF28341@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 13 Nov 2012 12:34:19 +0100
+Subject: [PATCH v4] Network driver for the Armada 370 and Armada XP ARM
+ Marvell SoCs
+In-Reply-To: <20121103115321.GA4539@electric-eye.fr.zoreil.com>
+References: <1351245804-31478-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121030105154.5b7c8e48@skate> <20121102232137.3c9da5e4@skate>
+ <20121103115321.GA4539@electric-eye.fr.zoreil.com>
+Message-ID: <20121113123419.4516b4b8@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2012 at 09:11:09AM +0000, Arnd Bergmann wrote:
-> On Tuesday 13 November 2012, Rob Clark wrote:
-> > right, that is what I was worried about..  but what about something
-> > along the lines of:
-> > 
-> >                 case 8: {                                               \
-> >                         if (sizeof(x) < 8)                              \
-> >                                 __get_user_x(__r2, __p, __e, __l, 4);   \
-> >                         else                                            \
-> >                                 __get_user_x(__r2, __p, __e, __l, 8);   \
-> >                         break;                                          \
-> >                 }                                                       \
+Fran?ois,
+
+Thanks for your detailed review. I have a few comments/questions below
+on specific topics.
+
+On Sat, 3 Nov 2012 12:53:21 +0100, Francois Romieu wrote:
+> > +	if (rxq->descs == NULL) {
+> > +		netdev_err(pp->dev,
+> > +			   "rxQ=%d: Can't allocate %d bytes for %d RX descr\n",
+> > +			   rxq->id, rxq->size * MVNETA_DESC_ALIGNED_SIZE,
+> > +			   rxq->size);
+> > +		return -ENOMEM;
+> > +	}
+> > +
+> > +	BUG_ON(rxq->descs !=
+> > +	       PTR_ALIGN(rxq->descs, MVNETA_CPU_D_CACHE_LINE_SIZE));
 > 
-> I guess that's still broken if x is 8 or 16 bits wide.
+> There is no reason to crash.
 
-Actually, it isn't - because if x is 8 or 16 bits wide, and we load
-a 32-bit quantity, all that follows is a narrowing cast which is exactly
-what happens today.  We don't have a problem with register allocation
-like we have in the 32-bit x vs 64-bit pointer target type, which is what
-the above code works around.
+Well, there is a reason: the hardware will not work properly if
+rxq->descs is not aligned on a MVNETA_CPU_D_CACHE_LINE_SIZE boundary.
+So one solution is to over-allocated to guarantee the alignment, but
+since practically speaking MVNETA_CPU_D_CACHE_LINE_SIZE=32 and
+dma_alloc_coherent() returns things that seem at least 32 bytes
+aligned, it sounded overkill to include more code to fix a problem that
+doesn't exist. This BUG_ON() is here solely for the purpose of noisily
+letting the user know if this implicit assumption on the alignment of
+dma_alloc_coherent() allocated buffer changes in the future. I can turn
+this into an error if you prefer:
 
-> > maybe we need a special variant of __get_user_8() instead to get the
-> > right 32bits on big vs little endian systems, but I think something
-> > roughly along these lines could work.
-> > 
-> > Or maybe in sizeof(x)<8 case, we just __get_user_bad()..  I'm not 100%
-> > sure on whether this is supposed to be treated as an error case at
-> > compile time or not.
+	if (rxq->descs != PTR_ALIGN(rxq->descs, MVNETA_CPU_D_CACHE_LINE_SIZE)) {
+		netdev_err(pp->dev, "improper buffer alignement assumption, driver needs fixing\n");
+		dma_free_coherent(...);
+		return -EINVAL;
+	}
+
+> (...]
+> > +static int mvneta_txq_init(struct mvneta_port *pp,
+> > +			   struct mvneta_tx_queue *txq)
+> > +{
+> > +	txq->size = pp->tx_ring_size;
+> > +
+> > +	/* Allocate memory for TX descriptors */
+> > +	txq->descs = dma_alloc_coherent(pp->dev->dev.parent,
+> > +					txq->size * MVNETA_DESC_ALIGNED_SIZE,
+> > +					&txq->descs_phys,
+> > +					DMA_BIDIRECTIONAL);
 > 
-> We know that nobody is using that at the moment, so we could define
-> it to be a compile-time error.
+> 					&txq->descs_phys, DMA_BIDIRECTIONAL);
+
+Aaah, thanks for pointing this one! It should have been GFP_KERNEL, not
+DMA_BIDIRECTIONAL here.
+
+> > +	if (txq->descs == NULL) {
+> > +		netdev_err(pp->dev,
+> > +			   "txQ=%d: Can't allocate %d bytes for %d TX descr\n",
+> > +			   txq->id, txq->size * MVNETA_DESC_ALIGNED_SIZE,
+> > +			   txq->size);
+> > +		return -ENOMEM;
+> > +	}
+> > +
+> > +	/* Make sure descriptor address is cache line size aligned  */
+> > +	BUG_ON(txq->descs !=
+> > +	       PTR_ALIGN(txq->descs, MVNETA_CPU_D_CACHE_LINE_SIZE));
 > 
-> But I still think this is a pointless exercise, a number of people have
-> concluded independently that it's not worth trying to come up with a
-> solution, whether one exists or not. Why can't you just use copy_from_user()
-> anyway?
+> There is no reason to crash.
 
-You're missing something; that is one of the greatest powers of open
-source.  The many eyes (and minds) effect.  Someone out there probably
-has a solution to whatever problem, the trick is to find that person. :)
+Same as above :-)
 
-I think we have a working solution for this for ARM.  It won't be suitable
-for every arch, where they have 8-bit and 16-bit registers able to be
-allocated by the compiler, but for architectures where the minimum register
-size is 32-bit, what we have below should work.
+> [...]
+> > +static int mvneta_setup_rxqs(struct mvneta_port *pp)
+> > +{
+> > +	int queue;
+> > +
+> > +	for (queue = 0; queue < rxq_number; queue++) {
+> > +		int err = mvneta_rxq_init(pp, &pp->rxqs[queue]);
+> > +		if (err) {
+> > +			netdev_err(pp->dev,
+> > +				   "%s: can't create RxQ rxq=%d\n",
+> 
+> 			netdev_err(pp->dev, "%s: can't create RxQ rxq=%d\n",
+> 
+> > +				   __func__, queue);
+> > +			mvneta_cleanup_rxqs(pp);
+> > +			return -ENODEV;
+> 
+> mvneta_rxq_init should return a proper error code and it should be
+> propagated (option: break instead of return and mvneta_setup_rxqs scoped
+> err variable)
 
-In other words, I don't think this will work for x86-32 where ax, al, ah
-as well as eax are still available.
+Besides turning the "return -ENODEV;" into "return err;", I don't see
+what is the other problem here? mvneta_rxq_init() properly returns
+-ENOMEM where there is a memory allocation failure, and
+mvneta_cleanup_rxqs() properly cleans up *all* initialized rxqs. Is
+there something I'm missing?
 
-What I have currently in my test file, which appears to work correctly,
-is (bear in mind this is based upon an older version of get_user() which
-pre-dates Will's cleanups):
+Thanks again for your review!
 
-#define __get_user_x(__r2,__p,__e,__s,__i...)                           \
-           __asm__ __volatile__ (                                       \
-                "bl     __get_user_" #__s                               \
-                : "=&r" (__e), "=r" (__r2)                              \
-                : "0" (__p)                                             \
-                : __i, "cc")
-
-#ifdef BIG_ENDIAN
-#define __get_user_xb(__r2,__p,__e,__s,__i...)                          \
-	__get_user_x(__r2,(uintptr_t)__p + 4,__s,__i)
-#else
-#define __get_user_xb __get_user_x
-#endif
-
-#define get_user(x,p)                                                   \
-        ({                                                              \
-                register const typeof(*(p)) __user *__p asm("r0") = (p);\
-                register int __e asm("r0");                             \
-                register typeof(x) __r2 asm("r2");                      \
-                switch (sizeof(*(__p))) {                               \
-                case 1:                                                 \
-                        __get_user_x(__r2, __p, __e, 1, "lr");          \
-                        break;                                          \
-                case 2:                                                 \
-                        __get_user_x(__r2, __p, __e, 2, "r3", "lr");    \
-                        break;                                          \
-                case 4:                                                 \
-                        __get_user_x(__r2, __p, __e, 4, "lr");          \
-                        break;                                          \
-                case 8:                                                 \
-                        if (sizeof((x)) < 8)                            \
-                                __get_user_xb(__r2, __p, __e, 4, "lr"); \
-                        else                                            \
-                                __get_user_x(__r2, __p, __e, 8, "lr");  \
-                        break;                                          \
-                default: __e = __get_user_bad(); break;                 \
-                }                                                       \
-                x = (typeof(*(__p))) __r2;                              \
-                __e;                                                    \
-        })
-
-Tested with 8, 16, 32, 64 ints, 32bit int with const p, pointers, const
-pointers, pointer to 64bit with 32bit target, pointer-to-const-pointer
-to non-const pointer (which should and does warn).
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
