@@ -1,38 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Nov 2012 09:21:51 +0000
-Subject: [PATCH 0/7] ARM: remove init_consistent_dma_size() stub
-In-Reply-To: <50A20AAF.9050809@samsung.com>
-References: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
- <201211130849.30280.arnd@arndb.de> <50A20AAF.9050809@samsung.com>
-Message-ID: <201211130921.52410.arnd@arndb.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 13 Nov 2012 10:26:12 +0100
+Subject: [PATCH] cpufreq: exynos: Broadcast frequency change notifications for
+ all cores
+Message-ID: <1887364.fvxYYNb7Mm@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 November 2012, Marek Szyprowski wrote:
-> On 11/13/2012 9:49 AM, Arnd Bergmann wrote:
-> > On Tuesday 13 November 2012, Kukjin Kim wrote:
-> > > Arnd Bergmann wrote:
-> > > >
-> > > > Applied patches 2-7 to next/cleanup branch, with the Acks that came in.
-> > > >
-> > > (- many guys in Cc)
-> > >
-> > > Hi Arnd,
-> > >
-> > > If possible, please adding my ack on Samsung stuff.
-> > >
-> > > Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> > >
-> >
-> > Thanks for your Ack, but I'd prefer not to redo the branch now, since I already
-> > merged other patches on top.
-> 
-> If you redo your branch, please make sure that the patch which removes the
-> init_consistent_dma_size() stub from dma-mapping.h (7th in my series) would
-> be the last one to avoid build break on git bisect. For unknown reason the
-> order of patches on your tree got changed in compared to the series I've 
-> sent.
+On Exynos SoCs all cores share the same frequency setting, so changing
+frequency of one core will affect rest of cores.
 
-Ok, I've redone the branch now and added Kukjin's Ack.
+This patch modifies the exynos-cpufreq driver to inform cpufreq core
+about this behavior and broadcast frequency change notifications for all
+cores.
 
-	Arnd
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/cpufreq/exynos-cpufreq.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+index af2d81e..c0d54a8 100644
+--- a/drivers/cpufreq/exynos-cpufreq.c
++++ b/drivers/cpufreq/exynos-cpufreq.c
+@@ -100,7 +100,8 @@ static int exynos_target(struct cpufreq_policy *policy,
+ 	}
+ 	arm_volt = volt_table[index];
+ 
+-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
++	for_each_cpu(freqs.cpu, policy->cpus)
++		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+ 
+ 	/* When the new frequency is higher than current frequency */
+ 	if ((freqs.new > freqs.old) && !safe_arm_volt) {
+@@ -115,7 +116,8 @@ static int exynos_target(struct cpufreq_policy *policy,
+ 	if (freqs.new != freqs.old)
+ 		exynos_info->set_freq(old_index, index);
+ 
+-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
++	for_each_cpu(freqs.cpu, policy->cpus)
++		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+ 
+ 	/* When the new frequency is lower than current frequency */
+ 	if ((freqs.new < freqs.old) ||
+@@ -235,6 +237,7 @@ static int exynos_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ 		cpumask_copy(policy->related_cpus, cpu_possible_mask);
+ 		cpumask_copy(policy->cpus, cpu_online_mask);
+ 	} else {
++		policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
+ 		cpumask_setall(policy->cpus);
+ 	}
+ 
+-- 
+1.8.0
