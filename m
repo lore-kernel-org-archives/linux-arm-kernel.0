@@ -1,78 +1,71 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 13 Nov 2012 16:00:40 +0100
-Subject: [PATCH v6 4/7] arm: mvebu: add Ethernet controllers using mvneta
- driver for Armada 370/XP
+Date: Tue, 13 Nov 2012 16:00:42 +0100
+Subject: [PATCH v6 6/7] arm: mvebu: enable Ethernet controllers on OpenBlocks
+ AX3-4 platform
 In-Reply-To: <1352818843-4457-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1352818843-4457-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1352818843-4457-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1352818843-4457-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 370 SoC has two network units, while the Armada XP has four
-network units. The first two network units are common to both the
-Armada XP and Armada 370, so they are added to armada-370-xp.dtsi,
-while the other two network units are specific to the Armada XP and
-therefore added to armada-xp.dtsi.
+The PlatHome OpenBlocks AX3-4 platform has 4 Ethernet ports, connected
+to a single quad-port PHY through SGMII.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi |   21 +++++++++++++++++++++
- arch/arm/boot/dts/armada-xp.dtsi     |   14 ++++++++++++++
- 2 files changed, 35 insertions(+)
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |   43 ++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index b113e0b..0cd3331 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -68,6 +68,27 @@
- 			compatible = "marvell,armada-addr-decoding-controller";
- 			reg = <0xd0020000 0x258>;
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index cb86853..bb8d83c 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -65,5 +65,48 @@
+ 				linux,default-trigger = "heartbeat";
+ 			};
  		};
 +
 +		mdio {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "marvell,orion-mdio";
-+			reg = <0xd0072004 0x4>;
++			phy0: ethernet-phy at 0 {
++				reg = <0>;
++			};
++
++			phy1: ethernet-phy at 1 {
++				reg = <1>;
++			};
++
++			phy2: ethernet-phy at 2 {
++				reg = <2>;
++			};
++
++			phy3: ethernet-phy at 3 {
++				reg = <3>;
++			};
 +		};
 +
 +		ethernet at d0070000 {
-+				compatible = "marvell,armada-370-neta";
-+				reg = <0xd0070000 0x2500>;
-+				interrupts = <8>;
-+				status = "disabled";
++			clock-frequency = <250000000>;
++			status = "okay";
++			phy = <&phy0>;
++			phy-mode = "sgmii";
 +		};
-+
 +		ethernet at d0074000 {
-+				compatible = "marvell,armada-370-neta";
-+				reg = <0xd0074000 0x2500>;
-+				interrupts = <10>;
-+				status = "disabled";
++			clock-frequency = <250000000>;
++			status = "okay";
++			phy = <&phy1>;
++			phy-mode = "sgmii";
 +		};
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 71d6b5d..3bbbccf 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -51,5 +51,19 @@
- 				compatible = "marvell,armada-370-xp-system-controller";
- 				reg = <0xd0018200 0x500>;
- 		};
-+
 +		ethernet at d0030000 {
-+				compatible = "marvell,armada-370-neta";
-+				reg = <0xd0030000 0x2500>;
-+				interrupts = <12>;
-+				status = "disabled";
++			clock-frequency = <250000000>;
++			status = "okay";
++			phy = <&phy2>;
++			phy-mode = "sgmii";
 +		};
-+
 +		ethernet at d0034000 {
-+				compatible = "marvell,armada-370-neta";
-+				reg = <0xd0034000 0x2500>;
-+				interrupts = <14>;
-+				status = "disabled";
++			clock-frequency = <250000000>;
++			status = "okay";
++			phy = <&phy3>;
++			phy-mode = "sgmii";
 +		};
  	};
  };
