@@ -1,54 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 13 Nov 2012 10:43:40 +0000
-Subject: [PATCH V2 1/5] arm: mvebu: Added support for coherency fabric in
- mach-mvebu
-In-Reply-To: <50A15A33.60405@free-electrons.com>
-References: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
- <1351545108-18954-2-git-send-email-gregory.clement@free-electrons.com>
- <20121105140258.GO3351@mudshark.cambridge.arm.com>
- <50A15A33.60405@free-electrons.com>
-Message-ID: <20121113104340.GD3940@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 13 Nov 2012 11:04:54 +0000
+Subject: [PATCH] ARM: add get_user() support for 8 byte types
+In-Reply-To: <CAF6AEGvoXR3YJomjV1YOeNvjr46aYJ2mVxS+jZfH+41+v1nAvw@mail.gmail.com>
+References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
+ <20121112192727.GB28341@n2100.arm.linux.org.uk>
+ <CAF6AEGu4L+ukxhMBLYK3d2g4CBBXi6o5nN_wXvakZCT8qMfSEA@mail.gmail.com>
+ <20121112230819.GC28341@n2100.arm.linux.org.uk>
+ <CAF6AEGtLKjJ=BfBnOq+oE6cgneF5YqsbYqNnCPrz4sTFRzdibg@mail.gmail.com>
+ <20121112235348.GD28341@n2100.arm.linux.org.uk>
+ <CAF6AEGvoXR3YJomjV1YOeNvjr46aYJ2mVxS+jZfH+41+v1nAvw@mail.gmail.com>
+Message-ID: <20121113110454.GE28341@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2012 at 08:21:07PM +0000, Gregory CLEMENT wrote:
-> On 11/05/2012 03:02 PM, Will Deacon wrote:
-> > On Mon, Oct 29, 2012 at 09:11:44PM +0000, Gregory CLEMENT wrote:
-> >> +int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
-> >> +{
-> >> +	int reg;
-> >> +
-> >> +	if (!coherency_base) {
-> >> +		pr_warn("Can't make CPU %d cache coherent.\n", hw_cpu_id);
-> >> +		pr_warn("Coherency fabric is not initialized\n");
-> >> +		return 1;
-> >> +	}
-> >> +
-> >> +	/* Enable the CPU in coherency fabric */
-> >> +	reg = readl(coherency_base + COHERENCY_FABRIC_CTL_OFFSET);
-> >> +	reg |= 1 << (24 + hw_cpu_id);
-> >> +	writel(reg, coherency_base + COHERENCY_FABRIC_CTL_OFFSET);
-> >> +
-> >> +	/* Add CPU to SMP group */
-> >> +	reg = readl(coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
-> >> +	reg |= 1 << (16 + hw_cpu_id + (smp_group_id == 0 ? 8 : 0));
-> >> +	writel(reg, coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
-> >> +
-> >> +	return 0;
-> >> +}
-> > 
-> > These writels may expand to code containing calls to outer_sync(), which
-> > will attempt to take a spinlock for the aurora l2. Given that the CPU isn't
-> > coherent, how does this play out with the exclusive store instruction in the
-> > lock?
+On Mon, Nov 12, 2012 at 06:31:50PM -0600, Rob Clark wrote:
+> right, that is what I was worried about..  but what about something
+> along the lines of:
 > 
-> I dug a little this subject: and I am not sure there is problem. In SMP mode,
-> only the system cache mode of Aurora is used. In this mode, outer_cache.sync
-> is void then outer_sync() won't call any function, so there will be no
-> access to any spinlock.
+> 		case 8: {						\
+> 			if (sizeof(x) < 8)				\
+> 				__get_user_x(__r2, __p, __e, __l, 4);	\
+> 			else						\
+> 				__get_user_x(__r2, __p, __e, __l, 8);	\
+> 			break;						\
+> 		}							\
+> 
+> maybe we need a special variant of __get_user_8() instead to get the
+> right 32bits on big vs little endian systems, but I think something
+> roughly along these lines could work.
 
-Hmm, that is pretty subtle and it doesn't really solve the bigger picture.
-printk takes logbuf_lock, for example, and I'm sure that by the time you get
-to this code you will have relied on exclusives behaving correctly.
+The problem with that is... big endian systems - where the 32-bit word we
+want is the second one, so you can't just reduce that down to a 32-bit
+access like that.  You also need to add an offset to the pointer in the BE
+case (which can be done.)
 
-Will
+I'd suggest calling the 4-byte version in there __get_user_xb() and doing
+the 4-byte offset for BE inside that (or aliasing it to __get_user_x for
+LE systems).
