@@ -1,42 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Nov 2012 08:48:03 +0000
-Subject: [GIT PULL v3] Renesas ARM-based SoC boards for v3.8 #2
-In-Reply-To: <20121113053651.GB18224@opensource.wolfsonmicro.com>
-References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
- <201211122111.03440.arnd@arndb.de>
- <20121113053651.GB18224@opensource.wolfsonmicro.com>
-Message-ID: <201211130848.03800.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 13 Nov 2012 09:48:29 +0100
+Subject: linux-next: manual merge of the arm-soc tree with the usb tree
+In-Reply-To: <20121113152029.9bcfc18a4bca8dc53a033a86@canb.auug.org.au>
+References: <20121113152029.9bcfc18a4bca8dc53a033a86@canb.auug.org.au>
+Message-ID: <50A2095D.3020306@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 November 2012, Mark Brown wrote:
->   Show Details
->   On Mon, Nov 12, 2012 at 09:11:03PM +0000, Arnd Bergmann wrote:
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+On 11/13/2012 05:20 AM, Stephen Rothwell :
+> Hi all,
 > 
-> > * Always let the person that owns the dependency know that the changes in
-> >   their tree are also included elsewhere and that things go bad if those
-> >   changes get rebased after all, or won't make it into the merge window
-> >   for some reason.
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/configs/stamp9g20_defconfig between commit 77614e025061
+> ("arch: Change defconfigs to point to g_mass_storage") from the usb
+> tree and commit 2484575268e2 ("arm: at91: drop machine defconfig")
+> from the arm-soc tree.
 > 
-> Please never pull anything from me unless there's a signed tag for it,
-> anything else I won't know about and may be rebased or vanish or
-> something.
+> The latter deleted the file so I did that and can carry the fix as 
+> necessary (no action is required).
 
-Ok, thanks for the reminder. Do you have a signed tag containing ab6f6d8521?
+Yes. Thanks a lot Stephen.
 
-> > I have taken Mark on Cc to let him know about the dependency now, and I've
-> > merged ab6f6d85210c4d0265cf48e9958c04e08595055a (which has only shmobile
-> > specific ASoC patches) into the next/boards2 branch before merging your
-> > branch. This is still not perfect because it breaks bisection, but it's
-> > the best I could do aside from forcing you do do another round-trip.
-> 
-> What's the bisection problem?
+Best regards,
+- -- 
+Nicolas Ferre
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://www.enigmail.net/
 
-I merged ab6f6d8521 first, and then Simon's branch, which means that the
-linear (first-parent) history is ok, but bisecting the entire state of
-the tree may end up in a commit in his branch in a state before it was
-merged into mine, where it doesn't contain the patches it depends on,
-and as Simon mentioned in his pull request, that will cause a build
-failure.
-
-	Arnd
+iQEcBAEBAgAGBQJQogldAAoJEAf03oE53VmQqTgIAKUtqhwnXt8Rm1x+ERPiPLno
+VhFc1ZPgiPUepSecHMFPCcWtgwLBg6HUFXg4muM7kpf1hvMtAB6CmpasjceV8g0N
+KMFC4GrRi6y0dp59DpBUa1gB87i4gpliqmroO3YGu8iGDHGowDBV8HsfmNpLmGTJ
+WmdjDzpWE3hfLjNl5F0qnkI1cqDAyWrQwE9cNIFpzY93GfKkVTjdxiKIf6PprJl8
+SIicUbeHV/lrNyusEZw0CcNa89qtKCovdBN7Yk64xwyyTnLprxq/Sr30WaFx4npf
+A6vdUeCsKL3glD67rD7MUYXZ5KS0pLOuxIVJvvlugbOCwrNDPrZd6NZhqFkgMh8=
+=Fpq2
+-----END PGP SIGNATURE-----
