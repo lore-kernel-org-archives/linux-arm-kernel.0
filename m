@@ -1,32 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 13 Nov 2012 16:50:08 +0900
-Subject: [RFC PATCH v4 2/2] ASoC: sam9g20-wm8731: convert to dt support
-In-Reply-To: <20121108152431.GJ4576@game.jcrosoft.org>
-References: <1352361422-13265-1-git-send-email-voice.shen@atmel.com>
- <1352361422-13265-2-git-send-email-voice.shen@atmel.com>
- <20121108152431.GJ4576@game.jcrosoft.org>
-Message-ID: <20121113075007.GM18224@opensource.wolfsonmicro.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue, 13 Nov 2012 11:53:43 +0400
+Subject: [PATCH v2 12/17] ARM: clps711x: autcpu12: Special driver for
+ handling NAND memory is removed
+In-Reply-To: <201211121617.41304.arnd@arndb.de>
+References: <1352545136-29089-1-git-send-email-shc_work@mail.ru>
+ <1352545136-29089-13-git-send-email-shc_work@mail.ru>
+ <201211121617.41304.arnd@arndb.de>
+Message-ID: <20121113115343.6c3db91def746b8c73802082@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 08, 2012 at 04:24:31PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 15:57 Thu 08 Nov     , Bo Shen wrote:
-> > Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> > ---
-> > Change since v3 RFC:
-> >   Remove dai node, remap ssc in place
-> >   without pinctrl added, so don't modify the dtsi file, will be added
-> >   soon
-> until I see the pinctrl to test this no
-> This code is untested
+On Mon, 12 Nov 2012 16:17:41 +0000
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-I see a version adding the DT pinmux stuff has now been posted but this
-does seem a bit unfair, the code should be fine on a current ASoC branch
-- it's only going to break after merging with the pinctrl support.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121113/ee97a681/attachment.sig>
+> On Saturday 10 November 2012, Alexander Shiyan wrote:
+> > This patch provide migration to using "gpio-nand" and "basic-mmio-gpio"
+> > drivers instead of using special driver for handling NAND memory.
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> 
+> Applying this patch fails to build because it requires "GENERIC_GPIO" to be
+> enabled in Kconfig, which is not enabled here.
+All necessary symbols for build is present in patch:
+[PATCH v2 16/17] ARM: clps711x: Update defconfig due latest changes and
+ new kernel symbols
+
+-- 
+Alexander Shiyan <shc_work@mail.ru>
