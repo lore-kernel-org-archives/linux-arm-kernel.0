@@ -1,25 +1,70 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 Nov 2012 14:26:13 -0800
-Subject: [PATCH 8/8] ARM: OMAP: Move plat/dmtimer.h to plat-omap/dmtimer.h
-In-Reply-To: <1352830403-1706-9-git-send-email-jon-hunter@ti.com>
-References: <1352830403-1706-1-git-send-email-jon-hunter@ti.com>
- <1352830403-1706-9-git-send-email-jon-hunter@ti.com>
-Message-ID: <20121113222613.GM6801@atomide.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 13 Nov 2012 14:32:41 -0800
+Subject: [PATCH V2] wanrouter: Remove it and the drivers that depend on it
+In-Reply-To: <20121113.171736.561094209116852795.davem@davemloft.net>
+References: <67fe0c5701a8c7cfe06b178cf04b1c5c06592714.1352548454.git.joe@perches.com>
+ <20121113.144406.1610017702502358739.davem@davemloft.net>
+ <1352837845.12850.3.camel@joe-AO722>
+ <20121113.171736.561094209116852795.davem@davemloft.net>
+Message-ID: <1352845961.17444.13.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [121113 10:15]:
-> Move plat/dmtimer.h to plat-omap/dmtimer.h in order to support a single
-> zImage for ARM devices.
+On Tue, 2012-11-13 at 17:17 -0500, David Miller wrote:
+> From: Joe Perches <joe@perches.com>
+> Date: Tue, 13 Nov 2012 12:17:25 -0800
+> 
+> > That seems an odd workflow as it leaves dangling CONFIG_<foo>
+> > options set, but I guess it doesn't hurt so here it is.
+> 
+> As you said it's harmless, and more importantly it avoids
+> unnecessary conflicts.
+> 
+> > I just removed the modified arch/.../<foo>defconfig files.
+> 
+> Something is not right here:
 
-Let's skip this one for now as it turns out this solution won't
-work either for multiplatform without adding nasty hacks to
-arch/arm/Makefile to include arch/arm/plat-omap.
+> [davem at drr net-next]$ git am --signoff V2-wanrouter-Remove-it-and-the-drivers-that-depend-on-it.patch 
+> Applying: wanrouter: Remove it and the drivers that depend on it
+> error: removal patch leaves file contents
+> error: net/wanrouter/Kconfig: patch does not apply
+> error: removal patch leaves file contents
+> error: net/wanrouter/Makefile: patch does not apply
+> error: removal patch leaves file contents
+> error: net/wanrouter/patchlevel: patch does not apply
+> error: removal patch leaves file contents
+> error: net/wanrouter/wanmain.c: patch does not apply
+> error: removal patch leaves file contents
+> error: net/wanrouter/wanproc.c: patch does not apply
+> error: removal patch leaves file contents
+> error: drivers/net/wan/cycx_drv.c: patch does not apply
+> error: removal patch leaves file contents
+> error: drivers/net/wan/cycx_main.c: patch does not apply
+> error: removal patch leaves file contents
+> error: drivers/net/wan/cycx_x25.c: patch does not apply
+> error: removal patch leaves file contents
+> error: include/linux/cyclomx.h: patch does not apply
+> error: removal patch leaves file contents
+> error: include/linux/cycx_drv.h: patch does not apply
+> error: removal patch leaves file contents
+> error: include/linux/wanrouter.h: patch does not apply
+> error: removal patch leaves file contents
+> error: include/uapi/linux/wanrouter.h: patch does not apply
 
-Sorry I don't have any real solution in mind other than making
-the remaining dmtimer.h users to use Linux generic timer functions,
-or pass the dmtimer functions in platform_data for now.
+Right, that is unexpected/odd/interesting.
 
-Regards,
+I was trying to save mailing list bandwidth by reducing
+the patch size.
 
-Tony
+I generated this with
+	$ git format-patch -M -D
+but it doesn't apply here either. :(
+
+Using
+	$ git format-patch -M
+does apply correctly.
+
+It's quite a bit larger though. (120KB vs 14)
+I'll send the large patch just to netdev.
+
+Joe
