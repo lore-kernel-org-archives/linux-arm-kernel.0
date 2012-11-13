@@ -1,88 +1,54 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 Nov 2012 11:11:32 -0800
-Subject: [GIT PULL 4/6] omap pm updates for v3.8 merge window
+Date: Tue, 13 Nov 2012 11:12:36 -0800
+Subject: [GIT PULL 5/6] omap board changes for v3.8 merge window
 In-Reply-To: <pull-1352828737-887235>
 References: <pull-1352828737-887235>
-Message-ID: <20121113191132.GG6801@atomide.com>
+Message-ID: <20121113191235.GH6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
+The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
 
-  Linux 3.7-rc4 (2012-11-04 11:07:39 -0800)
+  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/pm-signed
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/board-v2-signed
 
-for you to fetch changes up to 46bf4a562207c5ebd24e1dde5e5ee326cd3d6b91:
+for you to fetch changes up to 0449410b0b8aeafa9b7e8bb719e4eeda8a5623fd:
 
-  Merge tag 'for_3.8-pm-voltage' of git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm into omap-for-v3.8/pm (2012-11-06 17:06:37 -0800)
-
-----------------------------------------------------------------
-
-PM updates for omaps via Kevin Hilman <khilman@deeprootsystems.com>:
-
-- Minor pr_warn() cleanup for OMAP2+ Voltage Processor (VP)
-
-- OMAP: SmartReflex: pass device-independent data via platform_data
-
-- OMAP voltage layer updates towards supporting auto-retention/auto-off
+  ARM: OMAP1: use BUG_ON where possible (2012-11-12 15:20:44 -0800)
 
 ----------------------------------------------------------------
-Jean Pihet (2):
-      ARM: OMAP: hwmod: align the SmartReflex fck names
-      ARM: OMAP: SmartReflex: pass device dependent data via platform data
+Board updates for omaps mostly to deal with enabling
+display support with device tree until the bindings
+are ready.
 
-Nishanth Menon (2):
-      ARM: OMAP2+: PM: VP: minor pr_warn updates
-      ARM: OMAP3+: PM: VP: use uV for max and min voltage limits
+----------------------------------------------------------------
+Pavel Machek (1):
+      ARM: OMAP2+: Nokia N9/N900/N950 -- mention product names
 
-Tero Kristo (13):
-      ARM: OMAP: voltage: renamed vp_vddmin and vp_vddmax fields
-      ARM: OMAP3+: voltage: introduce omap vc / vp params for voltagedomains
-      ARM: OMAP3: VC: calculate ramp times
-      ARM: OMAP4: voltage: add support for VOLTSETUP_x_OFF register
-      ARM: OMAP4: VC: calculate ramp times
-      ARM: OMAP: add support for oscillator setup
-      ARM: OMAP3+: vp: use new vp_params for calculating vddmin and vddmax
-      ARM: OMAP3+: voltage: use oscillator data to calculate setup times
-      ARM: OMAP: TWL: change the vddmin / vddmax voltages to spec
-      ARM: OMAP3+: voltage: remove unused volt_setup_time parameter
-      ARM: OMAP4: vc: fix channel configuration
-      ARM: OMAP4: VC: setup I2C parameters based on board data
-      ARM: OMAP4: TWL: enable high speed mode for PMIC communication
+Sasha Levin (1):
+      ARM: OMAP1: use BUG_ON where possible
 
-Tony Lindgren (3):
-      Merge tag 'for_3.8-cleanup-pm' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-for-v3.8/pm
-      Merge tag 'for_3.8-pm-sr' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-for-v3.8/pm
-      Merge tag 'for_3.8-pm-voltage' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-for-v3.8/pm
+Tomi Valkeinen (3):
+      OMAP: panda: move display init from board file to dss-common.c
+      OMAP: omap4sdp: move display init from board file to dss-common.c
+      OMAP: board-generic: enable DSS for panda & sdp boards
 
-Vishwanath Sripathy (1):
-      ARM: OMAP4: OPP: add OMAP4460 definitions
-
- arch/arm/mach-omap2/clock33xx_data.c          |  12 +-
- arch/arm/mach-omap2/clock3xxx_data.c          |  12 +-
- arch/arm/mach-omap2/clock44xx_data.c          |   6 +-
- arch/arm/mach-omap2/control.h                 |   1 +
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c    |   8 +-
- arch/arm/mach-omap2/omap_opp_data.h           |   9 +-
- arch/arm/mach-omap2/omap_twl.c                |  73 +----
- arch/arm/mach-omap2/opp4xxx_data.c            |  98 +++++-
- arch/arm/mach-omap2/pm.c                      |  30 ++
- arch/arm/mach-omap2/pm.h                      |  10 +
- arch/arm/mach-omap2/sr_device.c               |  13 +
- arch/arm/mach-omap2/vc.c                      | 451 ++++++++++++++++++++++++--
- arch/arm/mach-omap2/vc.h                      |   8 +-
- arch/arm/mach-omap2/vc3xxx_data.c             |  22 ++
- arch/arm/mach-omap2/vc44xx_data.c             |  28 ++
- arch/arm/mach-omap2/voltage.h                 |  44 ++-
- arch/arm/mach-omap2/voltagedomains3xxx_data.c |   5 +
- arch/arm/mach-omap2/voltagedomains44xx_data.c |  23 +-
- arch/arm/mach-omap2/vp.c                      |  19 +-
- arch/arm/mach-omap2/vp.h                      |   7 +
- arch/arm/mach-omap2/vp3xxx_data.c             |  10 +
- arch/arm/mach-omap2/vp44xx_data.c             |  15 +
- drivers/power/avs/smartreflex.c               |  54 +--
- include/linux/power/smartreflex.h             |  14 +-
- 24 files changed, 792 insertions(+), 180 deletions(-)
+ arch/arm/mach-omap1/board-fsample.c    |   3 +-
+ arch/arm/mach-omap1/board-h2.c         |   3 +-
+ arch/arm/mach-omap1/board-h3.c         |   3 +-
+ arch/arm/mach-omap1/board-perseus2.c   |   3 +-
+ arch/arm/mach-omap2/Kconfig            |   4 +-
+ arch/arm/mach-omap2/Makefile           |   2 +-
+ arch/arm/mach-omap2/board-4430sdp.c    | 157 +------------------
+ arch/arm/mach-omap2/board-generic.c    |  10 ++
+ arch/arm/mach-omap2/board-omap4panda.c |  68 +-------
+ arch/arm/mach-omap2/board-rm680.c      |   2 +-
+ arch/arm/mach-omap2/board-rx51.c       |   2 +-
+ arch/arm/mach-omap2/dss-common.c       | 276 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/dss-common.h       |  14 ++
+ 13 files changed, 311 insertions(+), 236 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/dss-common.c
+ create mode 100644 arch/arm/mach-omap2/dss-common.h
