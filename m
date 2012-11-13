@@ -1,26 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 Nov 2012 11:03:08 -0800
-Subject: [GIT PULL 1/6] omap cleanup fixes for v3.8 merge window
-In-Reply-To: <20121113174413.GC6801@atomide.com>
-References: <pull-1352768345-815774> <20121113010539.GZ6801@atomide.com>
- <20121113174413.GC6801@atomide.com>
-Message-ID: <20121113190306.GD6801@atomide.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 13 Nov 2012 14:44:06 -0500 (EST)
+Subject: [PATCH] wanrouter: Remove it and the drivers that depend on it
+In-Reply-To: <67fe0c5701a8c7cfe06b178cf04b1c5c06592714.1352548454.git.joe@perches.com>
+References: <67fe0c5701a8c7cfe06b178cf04b1c5c06592714.1352548454.git.joe@perches.com>
+Message-ID: <20121113.144406.1610017702502358739.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [121113 09:46]:
-> * Tony Lindgren <tony@atomide.com> [121112 17:07]:
-> > * Tony Lindgren <ton@atomide.com> [121112 17:01]:
+From: Joe Perches <joe@perches.com>
+Date: Sat, 10 Nov 2012 06:20:55 -0800
 
-Ah, I have a typo    ^^^ in my script..
+> Remove wanrouter as it's obsolete and has not been updated
+> by sangoma since 2.4.3 or so and it's not used anymore.
+> 
+> Remove obsolete cyclomx drivers.
+> Update defconfig files that enable wanrouter.
+> Update files that include now deleted wanrouter bits.
+> 
+> Signed-off-by: Joe Perches <joe@perches.com>
 
-> Hmm looks like requests 2 - 6 never made it to the lists
-> for whatever reason. I'll resend these, no changes have been
-> made to the pull requests.
+I'm fine with this change, except the arch defconfig bits.
 
-..which probably causes the rest of the thread to be blocked
-by the mailing lists. I'll post the missing pull requests
-manually to the second attempt which also has the typo in
-the first message. Sorry for the spam.
+We've been leaving those alone, and letting the arch maintainers
+do the updates themselves periodically.
 
-Tony
+Please resubmit this with those parts removed.
+
+Thanks.
