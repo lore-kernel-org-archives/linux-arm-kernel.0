@@ -1,37 +1,24 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 13 Nov 2012 10:50:30 -0800
-Subject: OMAP baseline test results for v3.7-rc4
-In-Reply-To: <alpine.DEB.2.00.1211092347520.20703@utopia.booyaka.com> (Paul
- Walmsley's message of "Fri, 9 Nov 2012 23:49:14 +0000 (UTC)")
-References: <alpine.DEB.2.00.1211050241410.23228@utopia.booyaka.com>
- <87390iicno.fsf@deeprootsystems.com>
- <alpine.DEB.2.00.1211092347520.20703@utopia.booyaka.com>
-Message-ID: <87r4nxgww9.fsf@deeprootsystems.com>
+From: johnstul@us.ibm.com (John Stultz)
+Date: Tue, 13 Nov 2012 10:57:32 -0800
+Subject: [PATCH V2 3/3] clocksource: time-armada-370-xp converted to clk
+ framework
+In-Reply-To: <20121030115223.18780.29992@nucleus>
+References: <1349125926-16144-1-git-send-email-gregory.clement@free-electrons.com>
+ <1349125926-16144-4-git-send-email-gregory.clement@free-electrons.com>
+ <20121030115223.18780.29992@nucleus>
+Message-ID: <50A2981C.4030705@us.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
+On 10/30/2012 04:52 AM, Mike Turquette wrote:
+> Quoting Gregory CLEMENT (2012-10-01 14:12:06)
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> I'm not sure this patch should go through me.  Perhaps John Stultz?
 
-> On Fri, 9 Nov 2012, Kevin Hilman wrote:
->
->> I found that disabling MMC in the config made the tests pass again, so
->> then bisected it down to the commit below removing SYSCONFIG
->> accesses[2].  I haven't had the time to find out exactly the cause, but
->> clearly the code that was removed was doing something that hwmod is not
->> taking care of automatically.
->> 
->> Venkat, Felipe, could you please investigate this and hopefully get a
->> fix out for v3.7-rc?
->
-> This one might fix it -- it fixes another PM bug in the v3.7-rcs involving 
-> the same commit:
->
-> http://git.kernel.org/?p=linux/kernel/git/pjw/omap-pending.git;a=commit;h=613ad0e98c3596cd2524172fae2a795c3fc57e4a
->
+I can apply it to my tree, but really none of it is generic, so in the 
+future I'd almost rather someone who could reasonably audit the changes 
+for correctness merge it instead (although I always appreciate being 
+Cc'ed into the loop).
 
-Indeed, that fixes it.  Somehow I thought I was already including that
-fix, but I wasn't.  
-
-Thanks,
-
-Kevin
+thanks
+-john
