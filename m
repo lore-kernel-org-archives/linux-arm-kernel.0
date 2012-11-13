@@ -1,63 +1,75 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Tue, 13 Nov 2012 16:43:21 +0100
-Subject: [PATCH v2] i2c: at91: fix SMBus quick command
-Message-ID: <1352821401-1944-1-git-send-email-ludovic.desroches@atmel.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 13 Nov 2012 16:44:45 +0100
+Subject: [PATCH v2 3/3] ARM: Kirkwood: Convert IB62x0 to use gpio-poweroff.
+In-Reply-To: <1352821485-10032-1-git-send-email-andrew@lunn.ch>
+References: <1352821485-10032-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1352821485-10032-4-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
-
-The driver claims to support SMBus quick command but it was not the case.
-This patch fixes this issue.
-
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
+ arch/arm/boot/dts/kirkwood-ib62x0.dts |    6 ++++++
+ arch/arm/mach-kirkwood/board-ib62x0.c |   13 -------------
+ 2 files changed, 6 insertions(+), 13 deletions(-)
 
-Hi Wolfram,
-
-Thanks to Jean explanation about i2cdetect and eeprom behavior, I realized
-that the first version of the patch was incorrect. This time all the i2c
-devices are detected with i2cdetect -q.
-
-I hope this fix could go into 3.7 since the driver claims SMBus quick
-capability but it doesn't support it. Moreover without it i2cdetect find
-imaginary devices, and with some IP versions, trying to send 0 byte can cause
-issue when writing data to an EEPROM.
-
-Regards
-
-Ludovic
-
-Changes since v1:
- * enable txcomp irq to have a correct behavior
-
- drivers/i2c/busses/i2c-at91.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index f471747..e9c926c 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -44,6 +44,7 @@
- #define	AT91_TWI_STOP		0x0002	/* Send a Stop Condition */
- #define	AT91_TWI_MSEN		0x0004	/* Master Transfer Enable */
- #define	AT91_TWI_SVDIS		0x0020	/* Slave Transfer Disable */
-+#define	AT91_TWI_QUICK		0x0040	/* SMBus quick command */
- #define	AT91_TWI_SWRST		0x0080	/* Software Reset */
- 
- #define	AT91_TWI_MMR		0x0004	/* Master Mode Register */
-@@ -386,7 +387,11 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
- 
- 	INIT_COMPLETION(dev->cmd_complete);
- 	dev->transfer_status = 0;
--	if (dev->msg->flags & I2C_M_RD) {
+diff --git a/arch/arm/boot/dts/kirkwood-ib62x0.dts b/arch/arm/boot/dts/kirkwood-ib62x0.dts
+index 66794ed..9b0e2e3 100644
+--- a/arch/arm/boot/dts/kirkwood-ib62x0.dts
++++ b/arch/arm/boot/dts/kirkwood-ib62x0.dts
+@@ -79,4 +79,10 @@
+ 			gpios = <&gpio0 27 0>;
+ 		};
+ 	};
++	gpio_poweroff {
++		compatible = "gpio-poweroff";
++		gpios = <&gpio0 24 1>;
++	};
 +
-+	if (!dev->buf_len) {
-+		at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_QUICK);
-+		at91_twi_write(dev, AT91_TWI_IER, AT91_TWI_TXCOMP);
-+	} else if (dev->msg->flags & I2C_M_RD) {
- 		unsigned start_flags = AT91_TWI_START;
++
+ };
+diff --git a/arch/arm/mach-kirkwood/board-ib62x0.c b/arch/arm/mach-kirkwood/board-ib62x0.c
+index cfc47f8..7b8adf5 100644
+--- a/arch/arm/mach-kirkwood/board-ib62x0.c
++++ b/arch/arm/mach-kirkwood/board-ib62x0.c
+@@ -17,7 +17,6 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/ata_platform.h>
+ #include <linux/mv643xx_eth.h>
+-#include <linux/gpio.h>
+ #include <linux/input.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -25,8 +24,6 @@
+ #include "common.h"
+ #include "mpp.h"
  
- 		if (at91_twi_read(dev, AT91_TWI_SR) & AT91_TWI_RXRDY) {
+-#define IB62X0_GPIO_POWER_OFF	24
+-
+ static struct mv643xx_eth_platform_data ib62x0_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+ };
+@@ -49,11 +46,6 @@ static unsigned int ib62x0_mpp_config[] __initdata = {
+ 	0
+ };
+ 
+-static void ib62x0_power_off(void)
+-{
+-	gpio_set_value(IB62X0_GPIO_POWER_OFF, 1);
+-}
+-
+ void __init ib62x0_init(void)
+ {
+ 	/*
+@@ -63,9 +55,4 @@ void __init ib62x0_init(void)
+ 
+ 	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&ib62x0_ge00_data);
+-	if (gpio_request(IB62X0_GPIO_POWER_OFF, "ib62x0:power:off") == 0 &&
+-	    gpio_direction_output(IB62X0_GPIO_POWER_OFF, 0) == 0)
+-		pm_power_off = ib62x0_power_off;
+-	else
+-		pr_err("board-ib62x0: failed to configure power-off GPIO\n");
+ }
 -- 
-1.7.11.3
+1.7.10.4
