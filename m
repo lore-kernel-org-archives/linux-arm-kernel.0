@@ -1,149 +1,245 @@
 From: etienne.carriere@st.com (Etienne CARRIERE)
-Date: Tue, 13 Nov 2012 17:08:16 +0100
-Subject: [PATCH 2/2] mach-ux500: L2CC shared mutex with ARM TZ
-Message-ID: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B5A@SAFEX1MAIL3.st.com>
+Date: Tue, 13 Nov 2012 17:08:14 +0100
+Subject: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
+Message-ID: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B59@SAFEX1MAIL3.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Etienne Carriere <etienne.carriere@stericsson.com>
 
-L2 cache mutex is allocated in DDR from TZ/TEE.
-Linux retrieves its physical address using from TEE API.
-It maps it to the kernel address space.
-Mutex needs to be cacheable, as configured in TZ MMU mapping
-Once configured from TEE, enable its use by l2cc driver.
+Secure code in TrustZone space may need to perform L2 cache
+maintenance operations. A shared mutex is required to synchronize
+linux l2cc maintenance and TZ l2cc maintenance.
 
-This patch assumes no L2 cache maintenance is request to TEE
-inside the time frame from linux early boot to this "late_initcall
-of "romcode-sm" probing. The SW architecture insures that.
+The TZ mutex is an "arch_spinlock": a 32bit DDR cell (ARMv7-A mutex).
+Linux L2 cache driver must lock TZ mutex if enabled.
 
-This patch is an example of how ux500 plans to load the TZ shared
-mutex into outer cache driver.
-This patch cannot hit kernel main track. It targets internal kernel
-Trees with enabled TEE driver (API to TZ world).
-
-Signed-off-by: carriere etienne <etienne.carriere@stericsson.com>
+Signed-off-by: Etienne Carriere <etienne.carriere@stericsson.com>
 ---
-arch/arm/mach-ux500/romcode-shared_mutex.c | 111 +++++++++++++++++++++++++++++
-1 file changed, 111 insertions(+)
+arch/arm/include/asm/outercache.h |  9 ++++
+arch/arm/mm/cache-l2x0.c          | 87 +++++++++++++++++++++++++++++----------
+2 files changed, 74 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/romcode-shared_mutex.c b/arch/arm/mach-ux500/romcode-shared_mutex.c
-new file mode 100644
-index 0000000..a09df72
---- /dev/null
-+++ b/arch/arm/mach-ux500/romcode-shared_mutex.c
-@@ -0,0 +1,111 @@
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index 53426c6..7aa5eac 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -35,6 +35,7 @@ struct outer_cache_fns {
+#endif
+               void (*set_debug)(unsigned long);
+               void (*resume)(void);
++             bool (*tz_mutex)(unsigned long);
+};
+ #ifdef CONFIG_OUTER_CACHE
+@@ -81,6 +82,13 @@ static inline void outer_resume(void)
+                               outer_cache.resume();
+}
++static inline bool outer_tz_mutex(unsigned long addr)
++{
++             if (outer_cache.tz_mutex)
++                             return outer_cache.tz_mutex(addr);
++             return false;
++}
++
+#else
+ static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
+@@ -92,6 +100,7 @@ static inline void outer_flush_range(phys_addr_t start, phys_addr_t end)
+static inline void outer_flush_all(void) { }
+static inline void outer_inv_all(void) { }
+static inline void outer_disable(void) { }
++static inline bool outer_tz_mutex(unsigned long addr) { return false; }
+ #endif
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index a53fd2a..eacdc74 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -41,6 +41,26 @@ struct l2x0_of_data {
+               void (*resume)(void);
+};
 +/*
-+ * Copyright (C) ST-Ericsson SA 2012
-+ * License terms:  GNU General Public License (GPL), version 2
-+ * Author:  Etienne Carriere <etienne.carriere@stericsson.com> for ST-Ericsson.
-+ *
-+ * ROM code Mutex Configuration for A9 exclusive load and store operation
-+ * for l2 cache maintenance.
++ * arch_spinlock (single 32bit DDR mutex cell) pointer to synchronise
++ * L2CC maintenance between linux world and secure world (ARM TZ).
 + */
++arch_spinlock_t *l2x0_tz_mutex;
 +
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/tee.h>
-+#include <linux/io.h>
-+#include <linux/platform_device.h>
++#define l2x0_spin_lock_irqsave(flags) \
++             do {                                                                                                        \
++                             raw_spin_lock_irqsave(&l2x0_lock, flags);           \
++                             if (l2x0_tz_mutex)                                                           \
++                                             arch_spin_lock(l2x0_tz_mutex);                               \
++             } while (0)
 +
-+#include <mach/hardware.h>
-+#include <asm/outercache.h>
++#define l2x0_spin_unlock_irqrestore(flags) \
++             do {                                                                                                        \
++                             if (l2x0_tz_mutex)                                                           \
++                                             arch_spin_unlock(l2x0_tz_mutex);         \
++                             raw_spin_unlock_irqrestore(&l2x0_lock, flags);                \
++             } while (0)
 +
-+#define BASS_ROMCODE_SHARED_MUTEX           0
-+
-+#define UUID_TEE_TA_START_LOW    0xBC765EDE
-+#define UUID_TEE_TA_START_MID     0x6724
-+#define UUID_TEE_TA_START_HIGH   0x11DF
-+#define UUID_TEE_TA_START_CLOCKSEQ  \
-+             {0x8E, 0x12, 0xEC, 0xDB, 0xDF, 0xD7, 0x20, 0x85}
-+
-+static int __devinit shared_mutex_config_probe(struct platform_device *pdev)
+static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
+{
+               /* wait for cache operation by line or way to complete */
+@@ -126,9 +146,9 @@ static void l2x0_cache_sync(void)
+{
+               unsigned long flags;
+-              raw_spin_lock_irqsave(&l2x0_lock, flags);
++             l2x0_spin_lock_irqsave(flags);
+               cache_sync();
+-              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++             l2x0_spin_unlock_irqrestore(flags);
+}
+ static void __l2x0_flush_all(void)
+@@ -145,9 +165,9 @@ static void l2x0_flush_all(void)
+               unsigned long flags;
+                /* clean all ways */
+-              raw_spin_lock_irqsave(&l2x0_lock, flags);
++             l2x0_spin_lock_irqsave(flags);
+               __l2x0_flush_all();
+-              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++             l2x0_spin_unlock_irqrestore(flags);
+}
+ static void l2x0_clean_all(void)
+@@ -155,11 +175,11 @@ static void l2x0_clean_all(void)
+               unsigned long flags;
+                /* clean all ways */
+-              raw_spin_lock_irqsave(&l2x0_lock, flags);
++             l2x0_spin_lock_irqsave(flags);
+               writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_CLEAN_WAY);
+               cache_wait_way(l2x0_base + L2X0_CLEAN_WAY, l2x0_way_mask);
+               cache_sync();
+-              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++             l2x0_spin_unlock_irqrestore(flags);
+}
+ static void l2x0_inv_all(void)
+@@ -167,13 +187,13 @@ static void l2x0_inv_all(void)
+               unsigned long flags;
+                /* invalidate all ways */
+-              raw_spin_lock_irqsave(&l2x0_lock, flags);
++             l2x0_spin_lock_irqsave(flags);
+               /* Invalidating when L2 is enabled is a nono */
+               BUG_ON(readl(l2x0_base + L2X0_CTRL) & 1);
+               writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_INV_WAY);
+               cache_wait_way(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
+               cache_sync();
+-              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++             l2x0_spin_unlock_irqrestore(flags);
+}
+ static void l2x0_inv_range(unsigned long start, unsigned long end)
+@@ -181,7 +201,7 @@ static void l2x0_inv_range(unsigned long start, unsigned long end)
+               void __iomem *base = l2x0_base;
+               unsigned long flags;
+-              raw_spin_lock_irqsave(&l2x0_lock, flags);
++             l2x0_spin_lock_irqsave(flags);
+               if (start & (CACHE_LINE_SIZE - 1)) {
+                               start &= ~(CACHE_LINE_SIZE - 1);
+                               debug_writel(0x03);
+@@ -206,13 +226,13 @@ static void l2x0_inv_range(unsigned long start, unsigned long end)
+                               }
+                                if (blk_end < end) {
+-                                              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-                                              raw_spin_lock_irqsave(&l2x0_lock, flags);
++                                             l2x0_spin_unlock_irqrestore(flags);
++                                             l2x0_spin_lock_irqsave(flags);
+                               }
+               }
+               cache_wait(base + L2X0_INV_LINE_PA, 1);
+               cache_sync();
+-              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++             l2x0_spin_unlock_irqrestore(flags);
+}
+ static void l2x0_clean_range(unsigned long start, unsigned long end)
+@@ -225,7 +245,7 @@ static void l2x0_clean_range(unsigned long start, unsigned long end)
+                               return;
+               }
+-              raw_spin_lock_irqsave(&l2x0_lock, flags);
++             l2x0_spin_lock_irqsave(flags);
+               start &= ~(CACHE_LINE_SIZE - 1);
+               while (start < end) {
+                               unsigned long blk_end = start + min(end - start, 4096UL);
+@@ -236,13 +256,13 @@ static void l2x0_clean_range(unsigned long start, unsigned long end)
+                               }
+                                if (blk_end < end) {
+-                                              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-                                              raw_spin_lock_irqsave(&l2x0_lock, flags);
++                                             l2x0_spin_unlock_irqrestore(flags);
++                                             l2x0_spin_lock_irqsave(flags);
+                               }
+               }
+               cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
+               cache_sync();
+-              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++             l2x0_spin_unlock_irqrestore(flags);
+}
+ static void l2x0_flush_range(unsigned long start, unsigned long end)
+@@ -255,7 +275,7 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
+                               return;
+               }
+-              raw_spin_lock_irqsave(&l2x0_lock, flags);
++             l2x0_spin_lock_irqsave(flags);
+               start &= ~(CACHE_LINE_SIZE - 1);
+               while (start < end) {
+                               unsigned long blk_end = start + min(end - start, 4096UL);
+@@ -268,24 +288,24 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
+                               debug_writel(0x00);
+                                if (blk_end < end) {
+-                                              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+-                                              raw_spin_lock_irqsave(&l2x0_lock, flags);
++                                             l2x0_spin_unlock_irqrestore(flags);
++                                             l2x0_spin_lock_irqsave(flags);
+                               }
+               }
+               cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
+               cache_sync();
+-              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++             l2x0_spin_unlock_irqrestore(flags);
+}
+ static void l2x0_disable(void)
+{
+               unsigned long flags;
+-              raw_spin_lock_irqsave(&l2x0_lock, flags);
++             l2x0_spin_lock_irqsave(flags);
+               __l2x0_flush_all();
+               writel_relaxed(0, l2x0_base + L2X0_CTRL);
+               dsb();
+-              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++             l2x0_spin_unlock_irqrestore(flags);
+}
+ static void l2x0_unlock(u32 cache_id)
+@@ -307,6 +327,28 @@ static void l2x0_unlock(u32 cache_id)
+               }
+}
++/* Enable/disable external mutex shared with TZ code */
++static bool l2x0_tz_mutex_cfg(unsigned long addr)
 +{
-+             struct tee_operation op;
-+             struct tee_session sess;
-+             struct tee_context ctx;
-+             uint32_t mutex_type = BASS_ROMCODE_SHARED_MUTEX;
-+             unsigned int paddr;
-+             void __iomem *vaddr;
-+             int err, ori;
++             unsigned long flags;
 +
-+             /* Selects trustzone application needed for the job. */
-+             struct tee_uuid static_uuid = {
-+                             UUID_TEE_TA_START_LOW,
-+                             UUID_TEE_TA_START_MID,
-+                             UUID_TEE_TA_START_HIGH,
-+                             UUID_TEE_TA_START_CLOCKSEQ,
-+             };
++             raw_spin_lock_irqsave(&l2x0_lock, flags);
 +
-+             err = teec_initialize_context(NULL, &ctx);
-+             if (err) {
-+                             pr_err("%s: context init failed, 0x%X\n", __func__, err);
-+                             err = -EINVAL;
-+                             goto out;
++             if (addr && l2x0_tz_mutex && (addr != (uint)l2x0_tz_mutex)) {
++                             raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++                             pr_err("%s: a TZ mutex is already enabled\n", __func__);
++                             return false;
 +             }
 +
-+             err = teec_open_session(&ctx, &sess, &static_uuid,
-+                                             TEEC_LOGIN_PUBLIC, NULL, NULL, &ori);
-+             if (err) {
-+                             pr_err("%s: session failed, 0x%X/0x%X\n", __func__, err, ori);
-+                             err = -EINVAL;
-+                             goto out1;
-+             }
++             l2x0_tz_mutex = (arch_spinlock_t *)addr;
++             /* insure mutex ptr is updated before lock is released */
++             smp_wmb();
 +
-+             memset(&op, 0, sizeof(op));
-+             op.param[0].tmpref.buffer = (void *)&paddr;
-+             op.param[0].tmpref.size = sizeof(uint32_t *);
-+             op.param[1].tmpref.buffer = (void *)&mutex_type;
-+             op.param[1].tmpref.size = sizeof(uint32_t);
-+             op.types = TEEC_PARAM_TYPES(TEEC_MEMREF_TEMP_OUTPUT,
-+                                             TEEC_MEMREF_TEMP_INPUT, TEEC_NONE, TEEC_NONE);
-+
-+             err = teec_invoke_command(&sess, TEE_STA_CONF_SHARED_MUTEX, &op, &ori);
-+             if (err) {
-+                             pr_err("%s: init failed, 0x%X/0x%X", __func__, err, ori);
-+                             err = -EINVAL;
-+                             goto out2;
-+             }
-+
-+             vaddr = ioremap_cached((unsigned long)paddr, SZ_1K);
-+             if (vaddr == NULL) {
-+                             pr_err("%s: mutex map failed, 0x%X\n", __func__, paddr);
-+                             err = -EIO;
-+                             goto out2;
-+             }
-+
-+             if (!outer_tz_mutex((unsigned long)vaddr)) {
-+                             pr_err("%s: load mutex 0x%08X failed\n", __func__, (uint)vaddr);
-+                             err = -EIO;
-+             }
-+out2:
-+             (void)teec_close_session(&sess);
-+out1:
-+             (void)teec_finalize_context(&ctx);
-+out:
-+             return err;
++             raw_spin_unlock_irqrestore(&l2x0_lock, flags);
++             pr_debug("\n%s: %sable TZ mutex\n\n", __func__, (addr) ? "en" : "dis");
++             return true;
 +}
 +
-+static struct platform_driver romcode_sm_driver = {
-+             .driver = {
-+                             .name = "romcode-sm",
-+                             .owner = THIS_MODULE,
-+             },
-+             .probe = shared_mutex_config_probe,
-+};
-+
-+static int __init shared_mutex_config_init(void)
-+{
-+             return platform_driver_register(&romcode_sm_driver);
-+}
-+
-+/* Wait for TEE driver to be initialized. */
-+late_initcall(shared_mutex_config_init);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("TZ shared mutex config");
+void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+{
+               u32 aux;
+@@ -380,6 +422,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+               outer_cache.inv_all = l2x0_inv_all;
+               outer_cache.disable = l2x0_disable;
+               outer_cache.set_debug = l2x0_set_debug;
++             outer_cache.tz_mutex = l2x0_tz_mutex_cfg;
+                printk(KERN_INFO "%s cache controller enabled\n", type);
+               printk(KERN_INFO "l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x, Cache size: %d B\n",
 
 
 
@@ -153,4 +249,4 @@ index 0000000..a09df72
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121113/2b6c134d/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121113/b0f6414c/attachment-0001.html>
