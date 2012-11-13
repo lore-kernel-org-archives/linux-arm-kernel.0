@@ -1,34 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 13 Nov 2012 22:53:07 +0000
-Subject: [PATCH V2 4/5] arm: mm: Added support for PJ4B cpu and init
- routines
-In-Reply-To: <50A26404.9010202@free-electrons.com>
-References: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
- <1351545108-18954-5-git-send-email-gregory.clement@free-electrons.com>
- <50A26404.9010202@free-electrons.com>
-Message-ID: <20121113225307.GA9094@mudshark.cambridge.arm.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 13 Nov 2012 16:54:20 -0600
+Subject: [PATCH 8/8] ARM: OMAP: Move plat/dmtimer.h to plat-omap/dmtimer.h
+In-Reply-To: <20121113222613.GM6801@atomide.com>
+References: <1352830403-1706-1-git-send-email-jon-hunter@ti.com>
+ <1352830403-1706-9-git-send-email-jon-hunter@ti.com>
+ <20121113222613.GM6801@atomide.com>
+Message-ID: <50A2CF9C.1040902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2012 at 03:15:16PM +0000, Gregory CLEMENT wrote:
-> >  __v7_setup:
-> >  	adr	r12, __v7_setup_stack		@ the local stack
-> >  	stmia	r12, {r0-r5, r7, r9, r11, lr}
-> > @@ -342,6 +375,16 @@ __v7_ca9mp_proc_info:
-> >  	.long	0xff0ffff0
-> >  	__v7_proc __v7_ca9mp_setup
-> >  	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
-> > +
-> > +	/*
-> > +	 * Marvell PJ4B processor.
-> > +	 */
-> > +	.type   __v7_pj4b_proc_info, #object
-> > +__v7_pj4b_proc_info:
-> > +	.long	0x562f5842
-> > +	.long	0xffffffff
 
-This mask seems a little excessive -- does your cpuid not contain revision
-information? If so, I'm not sure we want to update the code every time there
-is a new spin of the same CPU.
+On 11/13/2012 04:26 PM, Tony Lindgren wrote:
+> * Jon Hunter <jon-hunter@ti.com> [121113 10:15]:
+>> Move plat/dmtimer.h to plat-omap/dmtimer.h in order to support a single
+>> zImage for ARM devices.
+> 
+> Let's skip this one for now as it turns out this solution won't
+> work either for multiplatform without adding nasty hacks to
+> arch/arm/Makefile to include arch/arm/plat-omap.
+> 
+> Sorry I don't have any real solution in mind other than making
+> the remaining dmtimer.h users to use Linux generic timer functions,
+> or pass the dmtimer functions in platform_data for now.
 
-Will
+Ok, no problem. Are you happy with the others?
+
+One thing that we could do, is not include the dmtimer driver in the
+multi-platform build for now. I believe that only the dsp/iva/gfx is
+using this driver currently.
+
+I believe that there are some issues with building the kernel without
+the dmtimer and so I can look into fixing that.
+
+Is there a way to not include dmtimer with multi-platform but still
+enable in omap2plus_defconfig? Or are we planning to kill
+omap2plus_defconfig too?
+
+Cheers
+Jon
