@@ -1,29 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Nov 2012 08:49:30 +0000
-Subject: [PATCH 0/7] ARM: remove init_consistent_dma_size() stub
-In-Reply-To: <01a301cdc15b$29e23e10$7da6ba30$%kim@samsung.com>
-References: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
- <201211122121.16219.arnd@arndb.de>
- <01a301cdc15b$29e23e10$7da6ba30$%kim@samsung.com>
-Message-ID: <201211130849.30280.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 13 Nov 2012 17:50:54 +0900
+Subject: [PATCH v5 1/3] ARM: at91: atmel-ssc: add pinctrl support
+In-Reply-To: <1352706028-750-2-git-send-email-voice.shen@atmel.com>
+References: <1352706028-750-1-git-send-email-voice.shen@atmel.com>
+ <1352706028-750-2-git-send-email-voice.shen@atmel.com>
+Message-ID: <20121113085052.GR18224@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 November 2012, Kukjin Kim wrote:
-> Arnd Bergmann wrote:
-> > 
-> > Applied patches 2-7 to next/cleanup branch, with the Acks that came in.
-> > 
-> (- many guys in Cc)
-> 
-> Hi Arnd,
-> 
-> If possible, please adding my ack on Samsung stuff.
-> 
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
+On Mon, Nov 12, 2012 at 03:40:25PM +0800, Bo Shen wrote:
 
-Thanks for your Ack, but I'd prefer not to redo the branch now, since I already
-merged other patches on top.
+> +				ssc0 {
+> +					pinctrl_ssc0_tx: ssc0_tx-0 {
+> +						atmel,pins =
+> +							<1 16 0x1 0x1	/* PB16 periph A with pull up */
+> +							 1 17 0x1 0x1	/* PB17 periph A with pull up */
+> +							 1 18 0x1 0x1>;	/* PB18 periph A with pull up */
+> +					};
 
-	Arnd
+Do we really want the pull ups here?  Normally CMOS devices don't have
+pulls, or the pulls are disabled during normal operation, as otherwise
+when the logic level is different to whatever the pull is doing power is
+wasted driving against the resistor.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121113/a2a1b7e3/attachment.sig>
