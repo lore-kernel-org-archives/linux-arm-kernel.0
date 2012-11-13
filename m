@@ -1,48 +1,32 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 Nov 2012 09:34:04 -0800
-Subject: [PATCH v4 2/9] pinctrl: single: support gpio request and free
-In-Reply-To: <CACRpkdbJzjZGLmCA+2mw6ahAVUXuhdpysnyiK7nuj8PLh_QNXg@mail.gmail.com>
+Date: Tue, 13 Nov 2012 09:34:45 -0800
+Subject: [PATCH v4 9/9] pinctrl: single: dump pinmux register value
+In-Reply-To: <CACRpkdYRvEzTr6kOE6XYmrKiztJ0F+HUFCv8Jd+m2c-AOFooAw@mail.gmail.com>
 References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
- <1352301582-12244-3-git-send-email-haojian.zhuang@gmail.com>
- <20121107222738.GR6801@atomide.com>
- <CACRpkdbJzjZGLmCA+2mw6ahAVUXuhdpysnyiK7nuj8PLh_QNXg@mail.gmail.com>
-Message-ID: <20121113173404.GA6801@atomide.com>
+ <1352301582-12244-10-git-send-email-haojian.zhuang@gmail.com>
+ <20121108012550.GV6801@atomide.com>
+ <CACRpkdYRvEzTr6kOE6XYmrKiztJ0F+HUFCv8Jd+m2c-AOFooAw@mail.gmail.com>
+Message-ID: <20121113173444.GB6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [121113 05:09]:
-> On Wed, Nov 7, 2012 at 11:27 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Haojian Zhuang <haojian.zhuang@gmail.com> [121107 07:21]:
-> >> Marvell's PXA/MMP silicon also match the behavior of pinctrl-single.
-> >> Each pin binds to one register. A lot of pins could be configured
-> >> as gpio.
+* Linus Walleij <linus.walleij@linaro.org> [121113 05:10]:
+> On Thu, Nov 8, 2012 at 2:25 AM, Tony Lindgren <tony@atomide.com> wrote:
+> 
+> > * Haojian Zhuang <haojian.zhuang@gmail.com> [121107 07:22]:
+> >> Dump pinmux register value, not only function part in the pinmux
+> >> register.
 > >>
-> >> Now add these properties in below.
-> >> <gpio range phandle>:
-> >>       include "pinctrl-single,gpio" & "pinctrl,gpio-func" properties.
-> >>
-> >>       pinctrl-single,gpio: <gpio base, npins in range, register offset>
-> >>
-> >>       pinctrl-single,gpio-func: <gpio function value in mux>
-> >>
-> >> pinctrl-single,gpio-ranges: phandle list of gpio range array
-> >
-> > This one looks OK to me now:
+> >> Also fix the issue on caluclating pin offset. The last parameter
+> >> should be pin number, not register offset.
 > >
 > > Acked-by: Tony Lindgren <tony@atomide.com>
-> >
-> 
-> So:
-> - Will this patch in isolation apply to my pinctrl tree?
-> - In that case, do you want me to apply it?
 > 
 > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Shall I apply this to the pinctrl tree?
 
-I guess the best way to go is if Linus applies this and
-the debugfs fix one into some immutable pinctrl branch that
-various SoC branches can pull in as needed.
-
-The generic pinconf patch still needs few updates.
+Yes please.
 
 Regards,
 
