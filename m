@@ -1,59 +1,47 @@
-From: mpfj-list@mimc.co.uk (Mark Jackson)
-Date: Tue, 13 Nov 2012 15:26:58 +0000
-Subject: OMAP baseline test results for v3.7-rc3
-In-Reply-To: <5098DC9E.3090307@mimc.co.uk>
-References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
- <508FB226.20604@mimc.co.uk>
- <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
- <508FE8BA.1080404@ti.com> <50912A6F.1040501@mimc.co.uk>
- <79CD15C6BA57404B839C016229A409A83EB563F8@DBDE01.ent.ti.com>
- <5097EF44.5030706@mimc.co.uk>
- <79CD15C6BA57404B839C016229A409A83EB63609@DBDE01.ent.ti.com>
- <5098DC9E.3090307@mimc.co.uk>
-Message-ID: <50A266C2.4030303@mimc.co.uk>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 13 Nov 2012 07:30:22 -0800
+Subject: [PATCH v6 2/7] net: mvneta: driver for Marvell Armada 370/XP
+ network unit
+In-Reply-To: <1352818843-4457-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1352818843-4457-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1352818843-4457-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1352820622.24230.31.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/12 09:47, Mark Jackson wrote:
-> On 06/11/12 06:16, Hiremath, Vaibhav wrote:
->>
->> Where is your DTB? Is it appended to Kernel image?
->> Can you try below sequence/commands from u-boot?
->>
->>
->> mmc rescan 0
->> fatload mmc 0 80000000 am335x-bone.dtb
->> fatload mmc 0 81000000 uImage
->> setenv bootargs console=ttyO0,115200n8 mem=256M root=/dev/mmcblk0p2 rw noinitrd rootfstype=ext3 rootwait earlyprink=serial
->> sendln 'bootm 81000000 - 80000000'
->>
->>
->>
->> To build DTB files, use "make dtbs" command on your kernel home directory.
-> 
-> That works ... great !!
-> 
-> But now I'm confused, since I thought the DTB was appended to the uImage file.
-> 
-> I have the following in my .config:-
-> 
-> ARM_ATAG_DTB_COMPAT=y
-> ARM_APPENDED_DTB=y
-> ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
-> 
-> And then I create my uImage file using:-
-> 
-> $ make -j 8 ARCH=arm CROSS_COMPILE=arm-linux- uImage
-> $ make -j 8 ARCH=arm CROSS_COMPILE=arm-linux- am335x-bone.dtb
-> $ cat arch/arm/boot/uImage arch/arm/boot/am335x-bone.dtb > arch/arm/boot/uImage-dtb.am335x-bone
-> $ cp arch/arm/boot/uImage-dtb.am335x-bone /media/boot/uImage
-> 
-> Do you now have to load the DTB as a separate file ?
-> 
-> Or should the appended DTB still work ?
+On Tue, 2012-11-13 at 16:00 +0100, Thomas Petazzoni wrote:
+> This patch contains a new network driver for the network unit of the
+> ARM Marvell Armada 370 and the Armada XP. Both SoCs use the PJ4B
+> processor, a Marvell-developed ARM core that implements the ARMv7
+> instruction set.
 
-Any update on this ?
+This looks very clean to me.
 
-Cheers
-Mark J.
+trivial:
+some of the logging doesn't use terminating newlines.
+
+> +static int mvneta_check_mtu_valid(struct net_device *dev, int mtu)
+> +{
+[]
+> +       if (mtu > 9676) {
+> +               netdev_info(dev, "Illegal MTU value %d, round to 9676", mtu);
+[]
+> +	if (!IS_ALIGNED(MVNETA_RX_PKT_SIZE(mtu), 8)) {
+> +		netdev_info(dev, "Illegal MTU value %d, rounding to %d",
+
+missing newlines
+
+> +static int __devinit mvneta_probe(struct platform_device *pdev)
+[]
+> +	if (register_netdev(dev)) {
+> +		dev_err(&pdev->dev, "failed to register\n");
+> +		err = ENOMEM;
+> +		goto err_base;
+> +	}
+[]
+> +	dev_info(&pdev->dev, "%s, mac: %pM\n", dev->name,
+> +		 dev->dev_addr);
+
+You could use netdev_info here
+
+	netdev_info(dev, "mac: %pM\n", dev->dev_addr);
