@@ -1,129 +1,59 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 13 Nov 2012 16:15:16 +0100
-Subject: [PATCH V2 4/5] arm: mm: Added support for PJ4B cpu and init
- routines
-In-Reply-To: <1351545108-18954-5-git-send-email-gregory.clement@free-electrons.com>
-References: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
- <1351545108-18954-5-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <50A26404.9010202@free-electrons.com>
+From: mpfj-list@mimc.co.uk (Mark Jackson)
+Date: Tue, 13 Nov 2012 15:26:58 +0000
+Subject: OMAP baseline test results for v3.7-rc3
+In-Reply-To: <5098DC9E.3090307@mimc.co.uk>
+References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
+ <508FB226.20604@mimc.co.uk>
+ <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
+ <508FE8BA.1080404@ti.com> <50912A6F.1040501@mimc.co.uk>
+ <79CD15C6BA57404B839C016229A409A83EB563F8@DBDE01.ent.ti.com>
+ <5097EF44.5030706@mimc.co.uk>
+ <79CD15C6BA57404B839C016229A409A83EB63609@DBDE01.ent.ti.com>
+ <5098DC9E.3090307@mimc.co.uk>
+Message-ID: <50A266C2.4030303@mimc.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-Do you have any comments on this patch?
-Else do you agree to give your acked-by?
-
-Thanks,
-
-Gregory
-
-
-On 10/29/2012 10:11 PM, Gregory CLEMENT wrote:
-> From: Yehuda Yitschak <yehuday@marvell.com>
+On 06/11/12 09:47, Mark Jackson wrote:
+> On 06/11/12 06:16, Hiremath, Vaibhav wrote:
+>>
+>> Where is your DTB? Is it appended to Kernel image?
+>> Can you try below sequence/commands from u-boot?
+>>
+>>
+>> mmc rescan 0
+>> fatload mmc 0 80000000 am335x-bone.dtb
+>> fatload mmc 0 81000000 uImage
+>> setenv bootargs console=ttyO0,115200n8 mem=256M root=/dev/mmcblk0p2 rw noinitrd rootfstype=ext3 rootwait earlyprink=serial
+>> sendln 'bootm 81000000 - 80000000'
+>>
+>>
+>>
+>> To build DTB files, use "make dtbs" command on your kernel home directory.
 > 
-> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/Kconfig |    2 +-
->  arch/arm/mm/Kconfig         |    4 ++++
->  arch/arm/mm/proc-v7.S       |   43 +++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 48 insertions(+), 1 deletion(-)
+> That works ... great !!
 > 
-> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-> index 17d246b..9bfaa0c 100644
-> --- a/arch/arm/mach-mvebu/Kconfig
-> +++ b/arch/arm/mach-mvebu/Kconfig
-> @@ -22,7 +22,7 @@ config MVEBU_CLK_CPU
->  config MACH_ARMADA_370_XP
->  	bool
->  	select ARMADA_370_XP_TIMER
-> -	select CPU_V7
-> +	select CPU_PJ4B
->  
->  config MACH_ARMADA_370
->  	bool "Marvell Armada 370 boards"
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 94186b6..3fd629d 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -352,6 +352,10 @@ config CPU_PJ4
->  	select ARM_THUMBEE
->  	select CPU_V7
->  
-> +config CPU_PJ4B
-> +	bool
-> +	select CPU_V7
-> +
->  # ARMv6
->  config CPU_V6
->  	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 846d279..1a373c2 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -169,6 +169,39 @@ __v7_ca15mp_setup:
->  	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
->  	mcreq	p15, 0, r0, c1, c0, 1
->  #endif
-> +
-> +__v7_pj4b_setup:
-> +#ifdef CONFIG_CPU_PJ4B
-> +	/* Auxiliary Debug Modes Control 1 Register */
-> +	mrc	p15, 1,	r0, c15, c1, 1
-> +	orr	r0, r0, #(1 << 16)     @ Disable data transfer for clean line.
-> +	orr	r0, r0, #(1 << 5)      @ Enable the back off of STREX instr
-> +	orr	r0, r0, #(1 << 8)      @ Disable Internal Parity Handling
-> +	bic	r0, r0, #(1 << 2)      @ Disable Static BP
-> +	mcr	p15, 1,	r0, c15, c1, 1
-> +
-> +	/* Auxiliary Debug Modes Control 2 Register */
-> +	mrc	p15, 1,	r0, c15, c1, 2
-> +	bic	r0, r0, #(1 << 23)   @ Enable fast LDR.
-> +	orr	r0, r0, #(1 << 25)   @ Dont interleave write and snoop data.
-> +	orr	r0, r0, #(1 << 27)   @ Disable Critical Word First feature.
-> +	orr	r0, r0, #(1 << 29)   @ Disable outstanding non cacheable request
-> +	orr	r0, r0, #(1 << 30)   @ L1 replacement - Strict round robin
-> +	mcr	p15, 1,	r0, c15, c1, 2
-> +
-> +	/* Auxiliary Functional Modes Control Register 0 */
-> +	mrc	p15, 1,	r0, c15, c2, 0
-> +	orr	r0, r0, #(1 << 2)     @ Support L1 parity checking
-> +	orr	r0, r0, #(1 << 8)     @ Broadcast Cache and TLB maintenance
-> +	mcr	p15, 1,	r0, c15, c2, 0
-> +
-> +	/* Auxiliary Debug Modes Control 0 Register */
-> +	mrc	p15, 1,	r0, c15, c1, 0
-> +	orr	r0, r0, #(1 << 22)   @ WFI/WFE - serve the DVM and back to idle
-> +	mcr	p15, 1,	r0, c15, c1, 0
-> +
-> +#endif /* CONFIG_CPU_PJ4B */
-> +
->  __v7_setup:
->  	adr	r12, __v7_setup_stack		@ the local stack
->  	stmia	r12, {r0-r5, r7, r9, r11, lr}
-> @@ -342,6 +375,16 @@ __v7_ca9mp_proc_info:
->  	.long	0xff0ffff0
->  	__v7_proc __v7_ca9mp_setup
->  	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
-> +
-> +	/*
-> +	 * Marvell PJ4B processor.
-> +	 */
-> +	.type   __v7_pj4b_proc_info, #object
-> +__v7_pj4b_proc_info:
-> +	.long	0x562f5842
-> +	.long	0xffffffff
-> +	__v7_proc __v7_pj4b_setup
-> +	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
->  #endif	/* CONFIG_ARM_LPAE */
->  
->  	/*
+> But now I'm confused, since I thought the DTB was appended to the uImage file.
 > 
+> I have the following in my .config:-
+> 
+> ARM_ATAG_DTB_COMPAT=y
+> ARM_APPENDED_DTB=y
+> ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
+> 
+> And then I create my uImage file using:-
+> 
+> $ make -j 8 ARCH=arm CROSS_COMPILE=arm-linux- uImage
+> $ make -j 8 ARCH=arm CROSS_COMPILE=arm-linux- am335x-bone.dtb
+> $ cat arch/arm/boot/uImage arch/arm/boot/am335x-bone.dtb > arch/arm/boot/uImage-dtb.am335x-bone
+> $ cp arch/arm/boot/uImage-dtb.am335x-bone /media/boot/uImage
+> 
+> Do you now have to load the DTB as a separate file ?
+> 
+> Or should the appended DTB still work ?
 
+Any update on this ?
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Cheers
+Mark J.
