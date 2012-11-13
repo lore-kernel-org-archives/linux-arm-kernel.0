@@ -1,48 +1,120 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 13 Nov 2012 19:01:48 +0900
-Subject: [GIT PULL v3] Renesas ARM-based SoC boards for v3.8 #2
-In-Reply-To: <201211130848.03800.arnd@arndb.de>
-References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
- <201211122111.03440.arnd@arndb.de>
- <20121113053651.GB18224@opensource.wolfsonmicro.com>
- <201211130848.03800.arnd@arndb.de>
-Message-ID: <20121113100144.GX18224@opensource.wolfsonmicro.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 13 Nov 2012 10:06:59 +0000
+Subject: [PATCH v2 2/5] ARM: kernel: add device tree init map function
+In-Reply-To: <20121112172753.GB2111@linaro.org>
+References: <1352471654-20207-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1352471654-20207-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <20121112172753.GB2111@linaro.org>
+Message-ID: <20121113100659.GF12287@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2012 at 08:48:03AM +0000, Arnd Bergmann wrote:
-> On Tuesday 13 November 2012, Mark Brown wrote:
+On Mon, Nov 12, 2012 at 05:27:53PM +0000, Dave Martin wrote:
+> On Fri, Nov 09, 2012 at 02:34:11PM +0000, Lorenzo Pieralisi wrote:
 
-> > Please never pull anything from me unless there's a signed tag for it,
-> > anything else I won't know about and may be rebased or vanish or
-> > something.
+[...]
 
-> Ok, thanks for the reminder. Do you have a signed tag containing ab6f6d8521?
+> > +Every cpu node is required to set its device_type to "cpu".
+> > +
+> > +Example:
+> > +
+> > +	cpus {
+> > +		#size-cells = <0>;
+> > +		#address-cells = <1>;
+> > +
+> > +		CPU0: cpu at 0 {
+> > +			device_type = "cpu";
+> > +			compatible = <arm, cortex-a15>;
+> > +			reg = <0x0>;
+> > +		};
+> > +
+> > +		CPU1: cpu at 1 {
+> > +			device_type = "cpu";
+> > +			compatible = <arm, cortex-a15>;
+> > +			reg = <0x1>;
+> > +		};
+> > +
+> > +		CPU2: cpu at 100 {
+> > +			device_type = "cpu";
+> > +			compatible = <arm, cortex-a7>;
+> > +			reg = <0x100>;
+> > +		};
+> > +
+> > +		CPU3: cpu at 101 {
+> 
+> Should we document the unit address convention as part of the binding
+> documentation?
+> 
+> Using the MPIDR value here is a bit cumbersome, but I'm not sure if
+> there's a better alternative, unless we make a multi-element vector
+> out of the MPIDR to use as the address -- sounds like overkill.
 
-Nope, your e-mail was the first I'd heard of the cross-merge.  I guess I
-could create one if this is going to get redone for some reason...
+I just followed the booting-without-of.txt convention for /cpu nodes,
+where the unit-address is just the reg property stripped of its leading
+zeros. I think it is the default way of defining the unit-address I do not
+know if I need to add to this, I certainly can.
 
-> > > I have taken Mark on Cc to let him know about the dependency now, and I've
-> > > merged ab6f6d85210c4d0265cf48e9958c04e08595055a (which has only shmobile
-> > > specific ASoC patches) into the next/boards2 branch before merging your
-> > > branch. This is still not perfect because it breaks bisection, but it's
-> > > the best I could do aside from forcing you do do another round-trip.
+> > +			device_type = "cpu";
+> > +			compatible = <arm, cortex-a7>;
+> > +			reg = <0x101>;
+> > +		};
+> > +	};
+> > diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
+> > index aeae9c6..8dd51dc 100644
+> > --- a/arch/arm/include/asm/prom.h
+> > +++ b/arch/arm/include/asm/prom.h
+> > @@ -15,6 +15,7 @@
+> >  
+> >  extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
+> >  extern void arm_dt_memblock_reserve(void);
+> > +extern void __init arm_dt_init_cpu_maps(void);
+> >  
+> >  #else /* CONFIG_OF */
+> >  
+> > @@ -24,6 +25,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
+> >  }
+> >  
+> >  static inline void arm_dt_memblock_reserve(void) { }
+> > +static inline void arm_dt_init_cpu_maps(void) { }
+> >  
+> >  #endif /* CONFIG_OF */
+> >  #endif /* ASMARM_PROM_H */
+> > diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> > index bee7f9d..d64d222 100644
+> > --- a/arch/arm/kernel/devtree.c
+> > +++ b/arch/arm/kernel/devtree.c
+> > @@ -19,8 +19,10 @@
+> >  #include <linux/of_irq.h>
+> >  #include <linux/of_platform.h>
+> >  
+> > +#include <asm/cputype.h>
+> >  #include <asm/setup.h>
+> >  #include <asm/page.h>
+> > +#include <asm/smp_plat.h>
+> >  #include <asm/mach/arch.h>
+> >  #include <asm/mach-types.h>
+> >  
+> > @@ -61,6 +63,80 @@ void __init arm_dt_memblock_reserve(void)
+> >  	}
+> >  }
+> >  
+> > +/*
+> > + * arm_dt_init_cpu_maps - Function retrieves cpu nodes from the device tree
+> > + * and builds the cpu logical map array containing MPIDR values related to
+> > + * logical cpus
+> > + *
+> > + * Updates the cpu possible mask with the number of parsed cpu nodes
+> > + */
+> 
+> Can this function sanity-check that we do not assign the same MPIDR
+> value for multiple logical CPUs?
+> 
+> It turns out to be surprisingly easy to write a DT with duplicate reg
+> properties in the CPUs node due to careless cut-and-paste.  (i.e., I
+> did it, but have been getting away with it up to now).
 
-> > What's the bisection problem?
+Check added. Waiting for some comments on the compatible list of ids to
+post v3.
 
-> I merged ab6f6d8521 first, and then Simon's branch, which means that the
-> linear (first-parent) history is ok, but bisecting the entire state of
-> the tree may end up in a commit in his branch in a state before it was
-> merged into mine, where it doesn't contain the patches it depends on,
-> and as Simon mentioned in his pull request, that will cause a build
-> failure.
-
-Oh, I'd missed the fact that this wasn't coming in via a merge into
-Simon's tree.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121113/498f1a12/attachment.sig>
+Thanks a lot,
+Lorenzo
