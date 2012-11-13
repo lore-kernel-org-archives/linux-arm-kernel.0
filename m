@@ -1,29 +1,19 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 13 Nov 2012 13:55:55 +0900
-Subject: [PATCH 0/7] ARM: remove init_consistent_dma_size() stub
-In-Reply-To: <201211122121.16219.arnd@arndb.de>
-References: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
- <201211122121.16219.arnd@arndb.de>
-Message-ID: <01a301cdc15b$29e23e10$7da6ba30$%kim@samsung.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Tue, 13 Nov 2012 10:33:38 +0530
+Subject: [PATCH 0/3] ARM: tegra: dt: Add entry for tegra20 sflash controller.
+Message-ID: <1352783021-25393-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> 
-> Applied patches 2-7 to next/cleanup branch, with the Acks that came in.
-> 
-(- many guys in Cc)
+This patch series add the dt entry for tegra20 sflash controller,
+add AUXDATA in board dt file for driver name and enable in tegra_defconfig.
 
-Hi Arnd,
+Laxman Dewangan (3):
+  ARM: tegra: dts: add sflash controller dt entry
+  ARM: tegra: Add OF_DEV_AUXDATA for sflash driver in board dt
+  ARM: config: tegra: enable SFLASH controller driver
 
-If possible, please adding my ack on Samsung stuff.
-
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+ arch/arm/boot/dts/tegra20.dtsi         |   10 ++++++++++
+ arch/arm/configs/tegra_defconfig       |    1 +
+ arch/arm/mach-tegra/board-dt-tegra20.c |    2 ++
+ 3 files changed, 13 insertions(+), 0 deletions(-)
