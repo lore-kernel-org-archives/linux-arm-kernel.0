@@ -1,54 +1,309 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 13 Nov 2012 15:34:56 -0800
-Subject: [PATCH 8/8] ARM: OMAP: Move plat/dmtimer.h to plat-omap/dmtimer.h
-In-Reply-To: <50A2CF9C.1040902@ti.com>
-References: <1352830403-1706-1-git-send-email-jon-hunter@ti.com>
- <1352830403-1706-9-git-send-email-jon-hunter@ti.com>
- <20121113222613.GM6801@atomide.com> <50A2CF9C.1040902@ti.com>
-Message-ID: <20121113233455.GN6801@atomide.com>
+From: romieu@fr.zoreil.com (Francois Romieu)
+Date: Wed, 14 Nov 2012 00:12:48 +0100
+Subject: [PATCH v6 2/7] net: mvneta: driver for Marvell Armada 370/XP
+ network unit
+In-Reply-To: <1352818843-4457-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1352818843-4457-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1352818843-4457-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20121113231248.GA30391@electric-eye.fr.zoreil.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [121113 14:56]:
-> 
-> On 11/13/2012 04:26 PM, Tony Lindgren wrote:
-> > * Jon Hunter <jon-hunter@ti.com> [121113 10:15]:
-> >> Move plat/dmtimer.h to plat-omap/dmtimer.h in order to support a single
-> >> zImage for ARM devices.
-> > 
-> > Let's skip this one for now as it turns out this solution won't
-> > work either for multiplatform without adding nasty hacks to
-> > arch/arm/Makefile to include arch/arm/plat-omap.
-> > 
-> > Sorry I don't have any real solution in mind other than making
-> > the remaining dmtimer.h users to use Linux generic timer functions,
-> > or pass the dmtimer functions in platform_data for now.
-> 
-> Ok, no problem. Are you happy with the others?
+Thomas Petazzoni <thomas.petazzoni@free-electrons.com> :
+[...]
+> +static int mvneta_mac_addr_set(struct mvneta_port *pp, unsigned char *addr,
+> +			       int queue)
+> +{
+> +	unsigned int mac_h;
+> +	unsigned int mac_l;
+> +
+> +	if (queue >= 1) {
+> +		netdev_err(pp->dev, "RX queue #%d is out of range\n", queue);
+> +		return -EINVAL;
+> +	}
 
-The others look OK to me thanks.
- 
-> One thing that we could do, is not include the dmtimer driver in the
-> multi-platform build for now. I believe that only the dsp/iva/gfx is
-> using this driver currently.
+(whence q <= 0)
 
-Looks like the users are drivers/staging/tidspbridge and
-drivers/media/rc/ir-rx51.c. Both could use platform_data pointers
-for now, but that really just postpones the problem.
- 
-> I believe that there are some issues with building the kernel without
-> the dmtimer and so I can look into fixing that.
+> +
+> +	if (queue != -1) {
+> +		mac_l = (addr[4] << 8) | (addr[5]);
+> +		mac_h = (addr[0] << 24) | (addr[1] << 16) |
+> +			(addr[2] << 8) | (addr[3] << 0);
+> +
+> +		mvreg_write(pp, MVNETA_MAC_ADDR_LOW, mac_l);
+> +		mvreg_write(pp, MVNETA_MAC_ADDR_HIGH, mac_h);
+> +	}
 
-We can include it from <plat/dmtimer.h> for arch/arm/*omap*/*
-code, but not for drivers.
- 
-> Is there a way to not include dmtimer with multi-platform but still
-> enable in omap2plus_defconfig? Or are we planning to kill
-> omap2plus_defconfig too?
+What is it trying to achieve with the "queue" argument ?
 
-We'll be keeping omap2plus_defconfig, but once we enable multiplatform
-support there's really no reason to go back.
+[...]
+> +/* Refill processing */
+> +static int mvneta_rx_refill(struct mvneta_port *pp,
+> +			    struct mvneta_rx_desc *rx_desc)
+> +
+> +{
+> +	dma_addr_t phys_addr;
+> +	struct sk_buff *skb;
+> +
+> +	skb = netdev_alloc_skb(pp->dev, pp->pkt_size);
+> +	if (!skb)
+> +		return -ENOMEM;
 
-Regards,
+Could netdev_alloc_skb_ip_align be an option ?
 
-Tony
+[...]
+> +static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
+> +		     struct mvneta_rx_queue *rxq)
+> +{
+> +	struct net_device *dev = pp->dev;
+> +	int rx_done, rx_filled;
+> +
+> +	/* Get number of received packets */
+> +	rx_done = mvneta_rxq_busy_desc_num_get(pp, rxq);
+> +
+> +	if (rx_todo > rx_done)
+> +		rx_todo = rx_done;
+> +
+> +	rx_done = 0;
+> +	rx_filled = 0;
+> +
+> +	/* Fairness NAPI loop */
+> +	while (rx_done < rx_todo) {
+> +		struct mvneta_rx_desc *rx_desc = mvneta_rxq_next_desc_get(rxq);
+> +		struct sk_buff *skb;
+> +		u32 rx_status;
+> +		int rx_bytes, err;
+> +
+> +		prefetch(rx_desc);
+> +		rx_done++;
+> +		rx_filled++;
+> +		rx_status = rx_desc->status;
+> +		skb = (struct sk_buff *)rx_desc->buf_cookie;
+> +
+> +		if (!mvneta_rxq_desc_is_first_last(rx_desc) ||
+> +		    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
+> +			dev->stats.rx_errors++;
+> +			mvneta_rx_error(pp, rx_desc);
+> +			mvneta_rx_desc_fill(rx_desc, rx_desc->buf_phys_addr,
+> +					    (u32)skb);
+> +			continue;
+> +		}
+> +
+> +		dma_unmap_single(pp->dev->dev.parent, rx_desc->buf_phys_addr,
+> +				 rx_desc->data_size, DMA_FROM_DEVICE);
+> +
+> +		rx_bytes = rx_desc->data_size -
+> +			(MVNETA_ETH_CRC_SIZE + MVNETA_MH_SIZE);
+> +		u64_stats_update_begin(&pp->rx_stats.syncp);
+> +		pp->rx_stats.packets++;
+> +		pp->rx_stats.bytes += rx_bytes;
+> +		u64_stats_update_end(&pp->rx_stats.syncp);
+> +
+> +		/* Linux processing */
+> +		skb_reserve(skb, MVNETA_MH_SIZE);
+> +		skb_put(skb, rx_bytes);
+
+(I suggested to use skb_reserve / skb_put instead of hand-crafted code but
+I may have ignored the elephant in the living room)
+
+I understand the skb_put, ok. What is the purpose of the skb_reserve ?
+
+Are MVNETA_ETH_CRC_SIZE (4) and MVNETA_MH_SIZE (2) really different from
+ETH_FCS_LEN and NET_IP_ALIGN ?
+
+[...]
+> +static irqreturn_t mvneta_isr(int irq, void *dev_id)
+> +{
+> +	struct mvneta_port *pp = (struct mvneta_port *)dev_id;
+> +
+> +	/* Mask all interrupts */
+> +	mvreg_write(pp, MVNETA_INTR_NEW_MASK, 0);
+> +
+> +	/* Verify that the device not already on the polling list */
+> +	if (napi_schedule_prep(&pp->napi))
+> +		__napi_schedule(&pp->napi);
+
+Hand-crafted napi_schedule.
+
+[...]
+> +static int mvneta_open(struct net_device *dev)
+> +{
+> +	struct mvneta_port *pp = netdev_priv(dev);
+> +	int ret;
+> +
+> +	ret = mvneta_mac_addr_set(pp, dev->dev_addr, rxq_def);
+> +	if (ret < 0) {
+> +		netdev_err(dev, "mvneta_mac_addr_set failed\n");
+> +		goto mac_addr_set_failure;
+> +	}
+
+AFAIU mvneta_mac_addr_set can only fail when (module parameter) rxq_def is
+not set correctly. It imho calls for a check in probe/remove and a removal
+of the failure case in mvneta_mac_addr_set.
+
+> +
+> +	pp->pkt_size = MVNETA_RX_PKT_SIZE(pp->dev->mtu);
+> +
+> +	ret = mvneta_setup_rxqs(pp);
+> +	if (ret)
+> +		goto rxqs_setup_failure;
+> +
+> +	ret = mvneta_setup_txqs(pp);
+> +	if (ret)
+> +		goto txqs_setup_failure;
+> +
+> +	/* Connect to port interrupt line */
+> +	ret = request_irq(pp->dev->irq, mvneta_isr, IRQF_DISABLED,
+> +			  MVNETA_DRIVER_NAME, pp);
+
+include/linux/interrupt.h
+[...]
+ * IRQF_DISABLED - keep irqs disabled when calling the action handler.
+ *                 DEPRECATED. This flag is a NOOP and scheduled to be removed
+
+[...]
+> +static int __devinit mvneta_probe(struct platform_device *pdev)
+> +{
+> +	const struct mbus_dram_target_info *dram_target_info;
+> +	struct device_node *dn = pdev->dev.of_node;
+> +	struct device_node *phy_node;
+> +	u32 phy_addr, clk_rate_hz;
+> +	struct mvneta_port *pp;
+> +	struct net_device *dev;
+> +	const char *mac_addr;
+> +	int phy_mode;
+> +	int err;
+> +
+> +	dev = alloc_etherdev_mq(sizeof(struct mvneta_port), 8);
+> +	if (!dev)
+> +		return -ENOMEM;
+> +
+> +	dev->irq = irq_of_parse_and_map(dn, 0);
+> +	if (dev->irq == 0) {
+> +		err = -EINVAL;
+> +		goto err_irq;
+> +	}
+> +
+> +	phy_node = of_parse_phandle(dn, "phy", 0);
+> +	if (!phy_node) {
+> +		dev_err(&pdev->dev, "no associated PHY\n");
+> +		err = -ENODEV;
+> +		goto err_node;
+> +	}
+> +
+> +	phy_mode = of_get_phy_mode(dn);
+> +	if (phy_mode < 0) {
+> +		dev_err(&pdev->dev, "incorrect phy-mode\n");
+> +		err = -EINVAL;
+> +		goto err_node;
+> +	}
+> +
+> +	if (of_property_read_u32(dn, "clock-frequency", &clk_rate_hz) != 0) {
+> +		dev_err(&pdev->dev, "could not read clock-frequency\n");
+> +		err = -EINVAL;
+> +		goto err_node;
+> +	}
+> +
+> +	mac_addr = of_get_mac_address(dn);
+> +
+> +	if (!mac_addr || !is_valid_ether_addr(mac_addr))
+> +		eth_hw_addr_random(dev);
+> +	else
+> +		memcpy(dev->dev_addr, mac_addr, ETH_ALEN);
+> +
+> +	dev->tx_queue_len = MVNETA_MAX_TXD;
+> +	dev->watchdog_timeo = 5 * HZ;
+> +	dev->netdev_ops = &mvneta_netdev_ops;
+> +
+> +	SET_ETHTOOL_OPS(dev, &mvneta_eth_tool_ops);
+> +
+> +	pp = netdev_priv(dev);
+> +
+> +	pp->tx_done_timer.function = mvneta_tx_done_timer_callback;
+> +	init_timer(&pp->tx_done_timer);
+> +	clear_bit(MVNETA_F_TX_DONE_TIMER_BIT, &pp->flags);
+> +
+> +	pp->weight = MVNETA_RX_POLL_WEIGHT;
+> +	pp->clk_rate_hz = clk_rate_hz;
+> +	pp->phy_node = phy_node;
+> +	pp->phy_interface = phy_mode;
+> +
+> +	pp->base = of_iomap(dn, 0);
+> +	if (pp->base == NULL) {
+> +		err = -ENOMEM;
+> +		goto err_node;
+> +	}
+> +
+> +	pp->tx_done_timer.data = (unsigned long)dev;
+> +
+> +	pp->tx_ring_size = MVNETA_MAX_TXD;
+> +	pp->rx_ring_size = MVNETA_MAX_RXD;
+> +
+> +	pp->dev = dev;
+> +	SET_NETDEV_DEV(dev, &pdev->dev);
+> +
+> +	if (mvneta_init(pp, phy_addr)) {
+> +		dev_err(&pdev->dev, "can't init eth hal\n");
+> +		err = -ENODEV;
+> +		goto err_base;
+> +	}
+
+The error code from mvneta_init() should be used.
+
+> +	mvneta_port_power_up(pp, phy_mode);
+> +
+> +	dram_target_info = mv_mbus_dram_info();
+> +	if (dram_target_info)
+> +		mvneta_conf_mbus_windows(pp, dram_target_info);
+> +
+> +	netif_napi_add(dev, &pp->napi, mvneta_poll, pp->weight);
+> +
+> +	if (register_netdev(dev)) {
+> +		dev_err(&pdev->dev, "failed to register\n");
+> +		err = ENOMEM;
+> +		goto err_base;
+> +	}
+
+- The error code from register_netdev() should be used.
+- Leak: allocations in mvneta_init() are not balanced.
+- Nit: the "err_where_did_it_trigger_first" style of label shows its
+  downside when compared to the "err_what_should_be_done" when
+  it gets used several times.
+
+> +
+> +	dev->features = NETIF_F_SG | NETIF_F_IP_CSUM;
+> +	dev->hw_features =  NETIF_F_SG | NETIF_F_IP_CSUM;
+> +	dev->priv_flags |= IFF_UNICAST_FLT;
+> +
+> +	dev_info(&pdev->dev, "%s, mac: %pM\n", dev->name,
+> +		 dev->dev_addr);
+> +
+> +	platform_set_drvdata(pdev, pp->dev);
+> +
+> +	return 0;
+> +err_base:
+> +	iounmap(pp->base);
+> +err_node:
+> +	irq_dispose_mapping(dev->irq);
+> +err_irq:
+> +	free_netdev(dev);
+> +	return err;
+> +}
+> +
+> +/* Device removal routine */
+> +static int __devexit mvneta_remove(struct platform_device *pdev)
+> +{
+> +	struct net_device  *dev = platform_get_drvdata(pdev);
+> +	struct mvneta_port *pp = netdev_priv(dev);
+> +
+> +	iounmap(pp->base);
+> +
+> +	unregister_netdev(dev);
+> +	irq_dispose_mapping(dev->irq);
+> +	free_netdev(dev);
+> +	mvneta_deinit(pp);
+
+One may expect the same ordering as the mvneta_probe unroll sequence.
+
+-- 
+Ueimor
