@@ -1,32 +1,42 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 13 Nov 2012 20:08:45 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the net-next
- tree
-In-Reply-To: <CAGhQ9Vx3Y3j0qqkEif09HebFyR+1UYmSbp=3jwuXnoiuWBdymQ@mail.gmail.com>
-References: <20121113151536.50d0292e8cb88b10686b576e@canb.auug.org.au>
- <CAGhQ9Vx3Y3j0qqkEif09HebFyR+1UYmSbp=3jwuXnoiuWBdymQ@mail.gmail.com>
-Message-ID: <20121113200845.719276a14b4aa37a3dbdd896@canb.auug.org.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Nov 2012 09:11:09 +0000
+Subject: [PATCH] ARM: add get_user() support for 8 byte types
+In-Reply-To: <CAF6AEGvoXR3YJomjV1YOeNvjr46aYJ2mVxS+jZfH+41+v1nAvw@mail.gmail.com>
+References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
+ <20121112235348.GD28341@n2100.arm.linux.org.uk>
+ <CAF6AEGvoXR3YJomjV1YOeNvjr46aYJ2mVxS+jZfH+41+v1nAvw@mail.gmail.com>
+Message-ID: <201211130911.09613.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joachim,
-
-On Tue, 13 Nov 2012 08:21:26 +0100 Joachim  Eastwood <manabian@gmail.com> wrote:
->
-> The platform_data/atmel.h include shouldn't be necessary since the
-> driver already includes platform_data/macb.h.
+On Tuesday 13 November 2012, Rob Clark wrote:
+> right, that is what I was worried about..  but what about something
+> along the lines of:
 > 
-> Otherwise the fix up looks correct.
+>                 case 8: {                                               \
+>                         if (sizeof(x) < 8)                              \
+>                                 __get_user_x(__r2, __p, __e, __l, 4);   \
+>                         else                                            \
+>                                 __get_user_x(__r2, __p, __e, __l, 8);   \
+>                         break;                                          \
+>                 }                                                       \
 
-Thanks, I have fixed up my fix for tomorrow.
+I guess that's still broken if x is 8 or 16 bits wide.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121113/07aaa4ef/attachment.sig>
+> maybe we need a special variant of __get_user_8() instead to get the
+> right 32bits on big vs little endian systems, but I think something
+> roughly along these lines could work.
+> 
+> Or maybe in sizeof(x)<8 case, we just __get_user_bad()..  I'm not 100%
+> sure on whether this is supposed to be treated as an error case at
+> compile time or not.
+
+We know that nobody is using that at the moment, so we could define
+it to be a compile-time error.
+
+But I still think this is a pointless exercise, a number of people have
+concluded independently that it's not worth trying to come up with a
+solution, whether one exists or not. Why can't you just use copy_from_user()
+anyway?
+
+	Arnd
