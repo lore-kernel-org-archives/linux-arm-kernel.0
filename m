@@ -1,133 +1,42 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 13 Nov 2012 09:52:21 +0100
-Subject: [PATCH v4] Add device tree file for the armadeus apf27
-In-Reply-To: <1352752113-21978-1-git-send-email-tremyfr@yahoo.fr>
-References: <1352752113-21978-1-git-send-email-tremyfr@yahoo.fr>
-Message-ID: <20121113085221.GE10369@pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 13 Nov 2012 09:54:07 +0100
+Subject: [PATCH 0/7] ARM: remove init_consistent_dma_size() stub
+In-Reply-To: <201211130849.30280.arnd@arndb.de>
+References: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
+ <201211122121.16219.arnd@arndb.de>
+ <01a301cdc15b$29e23e10$7da6ba30$%kim@samsung.com>
+ <201211130849.30280.arnd@arndb.de>
+Message-ID: <50A20AAF.9050809@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2012 at 09:28:33PM +0100, Philippe Reynes wrote:
-> Signed-off-by: Philippe Reynes <tremyfr@yahoo.fr>
-> Signed-off-by: Eric Jarrige <eric.jarrige@armadeus.org>
-> ---
-> 
-> v4: update model to use the same format as apf28
->     remove some empty line
-> v3: set 26M clock to 0 (not used)
-> v2: avoid enable again the watchdog
-> 
->  arch/arm/boot/dts/imx27-apf27.dts |   89 +++++++++++++++++++++++++++++++++++++
->  1 files changed, 89 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/imx27-apf27.dts
+Hello,
 
-Applied, thanks
+On 11/13/2012 9:49 AM, Arnd Bergmann wrote:
+> On Tuesday 13 November 2012, Kukjin Kim wrote:
+> > Arnd Bergmann wrote:
+> > >
+> > > Applied patches 2-7 to next/cleanup branch, with the Acks that came in.
+> > >
+> > (- many guys in Cc)
+> >
+> > Hi Arnd,
+> >
+> > If possible, please adding my ack on Samsung stuff.
+> >
+> > Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> >
+>
+> Thanks for your Ack, but I'd prefer not to redo the branch now, since I already
+> merged other patches on top.
 
-Sascha
+If you redo your branch, please make sure that the patch which removes the
+init_consistent_dma_size() stub from dma-mapping.h (7th in my series) would
+be the last one to avoid build break on git bisect. For unknown reason the
+order of patches on your tree got changed in compared to the series I've 
+sent.
 
-> 
-> diff --git a/arch/arm/boot/dts/imx27-apf27.dts b/arch/arm/boot/dts/imx27-apf27.dts
-> new file mode 100644
-> index 0000000..c0327c0
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx27-apf27.dts
-> @@ -0,0 +1,89 @@
-> +/*
-> + * Copyright 2012 Philippe Reynes <tremyfr@yahoo.fr>
-> + * Copyright 2012 Armadeus Systems <support@armadeus.com>
-> + *
-> + * Based on code which is: Copyright 2012 Sascha Hauer, Pengutronix
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "imx27.dtsi"
-> +
-> +/ {
-> +	model = "Armadeus Systems APF27 module";
-> +	compatible = "armadeus,imx27-apf27", "fsl,imx27";
-> +
-> +	memory {
-> +		reg = <0xa0000000 0x04000000>;
-> +	};
-> +
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		osc26m {
-> +			compatible = "fsl,imx-osc26m", "fixed-clock";
-> +			clock-frequency = <0>;
-> +		};
-> +	};
-> +
-> +	soc {
-> +		aipi at 10000000 {
-> +			serial at 1000a000 {
-> +				status = "okay";
-> +			};
-> +
-> +			ethernet at 1002b000 {
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		nand at d8000000 {
-> +			status = "okay";
-> +			nand-bus-width = <16>;
-> +			nand-ecc-mode = "hw";
-> +			nand-on-flash-bbt;
-> +
-> +			partition at 0 {
-> +				label = "u-boot";
-> +				reg = <0x0 0x100000>;
-> +			};
-> +
-> +			partition at 100000 {
-> +				label = "env";
-> +				reg = <0x100000 0x80000>;
-> +			};
-> +
-> +			partition at 180000 {
-> +				label = "env2";
-> +				reg = <0x180000 0x80000>;
-> +			};
-> +
-> +			partition at 200000 {
-> +				label = "firmware";
-> +				reg = <0x200000 0x80000>;
-> +			};
-> +
-> +			partition at 280000 {
-> +				label = "dtb";
-> +				reg = <0x280000 0x80000>;
-> +			};
-> +
-> +			partition at 300000 {
-> +				label = "kernel";
-> +				reg = <0x300000 0x500000>;
-> +			};
-> +
-> +			partition at 800000 {
-> +				label = "rootfs";
-> +				reg = <0x800000 0xf800000>;
-> +			};
-> +		};
-> +	};
-> +};
-> -- 
-> 1.7.4.4
-> 
-> 
-
+Best regards
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Marek Szyprowski
+Samsung Poland R&D Center
