@@ -1,111 +1,121 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 13 Nov 2012 11:33:40 +0100
-Subject: [PATCH] i2c: i2c-s3c2410: Add support for pinctrl
-Message-ID: <14549510.veZygXpPkq@amdc1227>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 13 Nov 2012 11:38:13 +0100
+Subject: [PATCH] ARM: OMAP: board-4430sdp: Proper support for TWL6030 PWM
+ LED/Backlight
+Message-ID: <1352803093-26203-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for pin configuration using pinctrl subsystem
-to the i2c-s3c2410 driver.
+New PWM drivers are being prepared for twl series which will enable the use
+of all PWMs (PWMs and LEDs).
+They are implemented as generic PWM drivers to be able to use them for different
+purposes.
+The current platform code was broken: the leds_pwm driver was not able to pick
+up the PWM since the pwm_id was incorrect.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+With the other patches we will be able to control the followings:
+LCD backlight via pwm-backlight driver
+Keypad leds via leds_pwm driver as normal LED
+Charging indicator via leds_pwm driver as normal LED
+
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- .../devicetree/bindings/i2c/samsung-i2c.txt          | 20 ++++++++++++++++----
- drivers/i2c/busses/i2c-s3c2410.c                     | 12 ++++++++----
- 2 files changed, 24 insertions(+), 8 deletions(-)
+Hello,
 
-diff --git a/Documentation/devicetree/bindings/i2c/samsung-i2c.txt b/Documentation/devicetree/bindings/i2c/samsung-i2c.txt
-index b6cb5a1..e9611ac 100644
---- a/Documentation/devicetree/bindings/i2c/samsung-i2c.txt
-+++ b/Documentation/devicetree/bindings/i2c/samsung-i2c.txt
-@@ -13,11 +13,17 @@ Required properties:
-   - interrupts: interrupt number to the cpu.
-   - samsung,i2c-sda-delay: Delay (in ns) applied to data line (SDA) edges.
+This patch needs the following series to work:
+- twl regmap IO conversion series:
+http://lkml.org/lkml/2012/11/13/97
+
+- PWM drivers for twl4030/6030 (v2):
+https://lkml.org/lkml/2012/11/8/219
+
+- leds-pwm series (v2):
+https://lkml.org/lkml/2012/11/12/222
+
+With these in place we can have keypad light and LCD backlight working on Blaze
+when booting in legacy mode.
+I will send the DT patches after the leds-pwm DT support has been accepted.
+
+Regards,
+Peter
+
+ arch/arm/mach-omap2/board-4430sdp.c | 31 ++++++++++++++++++++++++++++++-
+ 1 file changed, 30 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 3669c12..8cf781e 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -24,8 +24,10 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/fixed.h>
++#include <linux/pwm.h>
+ #include <linux/leds.h>
+ #include <linux/leds_pwm.h>
++#include <linux/pwm_backlight.h>
+ #include <linux/platform_data/omap4-keypad.h>
  
-+Required for all cases except "samsung,s3c2440-hdmiphy-i2c":
-+  - Samsung GPIO variant (deprecated):
-+    - gpios: The order of the gpios should be the following: <SDA, SCL>.
-+      The gpio specifier depends on the gpio controller. Required in all
-+      cases except for "samsung,s3c2440-hdmiphy-i2c" whose input/output
-+      lines are permanently wired to the respective clienta
-+  - Pinctrl variant (preferred, if available):
-+    - pinctrl-0: Pin control group to be used for this controller.
-+    - pinctrl-names: Should contain only one value - "default".
+ #include <asm/hardware/gic.h>
+@@ -263,10 +265,20 @@ static struct gpio_led_platform_data sdp4430_led_data = {
+ 	.num_leds	= ARRAY_SIZE(sdp4430_gpio_leds),
+ };
+ 
++static struct pwm_lookup sdp4430_pwm_lookup[] = {
++	PWM_LOOKUP("twl-pwm", 0, "leds_pwm", "omap4::keypad"),
++	PWM_LOOKUP("twl-pwm", 1, "pwm-backlight", "backlight"),
++	PWM_LOOKUP("twl-pwmled", 0, "leds_pwm", "omap4:green:chrg"),
++};
 +
- Optional properties:
--  - gpios: The order of the gpios should be the following: <SDA, SCL>.
--    The gpio specifier depends on the gpio controller. Required in all
--    cases except for "samsung,s3c2440-hdmiphy-i2c" whose input/output
--    lines are permanently wired to the respective client
-   - samsung,i2c-slave-addr: Slave address in multi-master enviroment. If not
-     specified, default value is 0.
-   - samsung,i2c-max-bus-freq: Desired frequency in Hz of the bus. If not
-@@ -31,8 +37,14 @@ Example:
- 		interrupts = <345>;
- 		samsung,i2c-sda-delay = <100>;
- 		samsung,i2c-max-bus-freq = <100000>;
-+		/* Samsung GPIO variant begins here */
- 		gpios = <&gpd1 2 0 /* SDA */
- 			 &gpd1 3 0 /* SCL */>;
-+		/* Samsung GPIO variant ends here */
-+		/* Pinctrl variant begins here */
-+		pinctrl-0 = <&i2c3_bus>;
-+		pinctrl-names = "default";
-+		/* Pinctrl variant ends here */
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+ static struct led_pwm sdp4430_pwm_leds[] = {
+ 	{
++		.name		= "omap4::keypad",
++		.max_brightness	= 127,
++		.pwm_period_ns	= 7812500,
++	},
++	{
+ 		.name		= "omap4:green:chrg",
+-		.pwm_id		= 1,
+ 		.max_brightness	= 255,
+ 		.pwm_period_ns	= 7812500,
+ 	},
+@@ -285,6 +297,21 @@ static struct platform_device sdp4430_leds_pwm = {
+ 	},
+ };
  
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 3e0335f..ae4304b 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -38,6 +38,7 @@
- #include <linux/io.h>
- #include <linux/of_i2c.h>
- #include <linux/of_gpio.h>
-+#include <linux/pinctrl/consumer.h>
- 
- #include <asm/irq.h>
- 
-@@ -83,6 +84,7 @@ struct s3c24xx_i2c {
- 
- 	struct s3c2410_platform_i2c	*pdata;
- 	int			gpios[2];
-+	struct pinctrl          *pctrl;
- #ifdef CONFIG_CPU_FREQ
- 	struct notifier_block	freq_transition;
- #endif
-@@ -861,9 +863,8 @@ static int s3c24xx_i2c_init(struct s3c24xx_i2c *i2c)
- 
- 	if (pdata->cfg_gpio)
- 		pdata->cfg_gpio(to_platform_device(i2c->dev));
--	else
--		if (s3c24xx_i2c_parse_dt_gpio(i2c))
--			return -EINVAL;
-+	else if (IS_ERR(i2c->pctrl) && s3c24xx_i2c_parse_dt_gpio(i2c))
-+		return -EINVAL;
- 
- 	/* write slave address */
- 
-@@ -1013,6 +1014,8 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
- 	i2c->adap.algo_data = i2c;
- 	i2c->adap.dev.parent = &pdev->dev;
- 
-+	i2c->pctrl = devm_pinctrl_get_select_default(i2c->dev);
++static struct platform_pwm_backlight_data sdp4430_backlight_data = {
++	.pwm_id = 1,
++	.max_brightness = 127,
++	.dft_brightness = 127,
++	.pwm_period_ns = 7812500,
++};
 +
- 	/* initialise the i2c controller */
++static struct platform_device sdp4430_backlight_pwm = {
++	.name   = "pwm-backlight",
++	.id     = -1,
++	.dev    = {
++		.platform_data = &sdp4430_backlight_data,
++	},
++};
++
+ static int omap_prox_activate(struct device *dev)
+ {
+ 	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , 1);
+@@ -419,6 +446,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
+ 	&sdp4430_gpio_keys_device,
+ 	&sdp4430_leds_gpio,
+ 	&sdp4430_leds_pwm,
++	&sdp4430_backlight_pwm,
+ 	&sdp4430_vbat,
+ 	&sdp4430_dmic_codec,
+ 	&sdp4430_abe_audio,
+@@ -862,6 +890,7 @@ static void __init omap_4430sdp_init(void)
+ 				ARRAY_SIZE(sdp4430_spi_board_info));
+ 	}
  
- 	ret = s3c24xx_i2c_init(i2c);
-@@ -1112,7 +1115,8 @@ static int s3c24xx_i2c_remove(struct platform_device *pdev)
- 	iounmap(i2c->regs);
- 
- 	release_resource(i2c->ioarea);
--	s3c24xx_i2c_dt_gpio_free(i2c);
-+	if (pdev->dev.of_node && IS_ERR(i2c->pctrl))
-+		s3c24xx_i2c_dt_gpio_free(i2c);
- 	kfree(i2c->ioarea);
- 
- 	return 0;
++	pwm_add_table(sdp4430_pwm_lookup, ARRAY_SIZE(sdp4430_pwm_lookup));
+ 	status = omap4_keyboard_init(&sdp4430_keypad_data, &keypad_data);
+ 	if (status)
+ 		pr_err("Keypad initialization failed: %d\n", status);
 -- 
 1.8.0
