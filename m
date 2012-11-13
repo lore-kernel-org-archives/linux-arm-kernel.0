@@ -1,118 +1,118 @@
-From: rob.clark@linaro.org (Rob Clark)
-Date: Tue, 13 Nov 2012 09:00:54 -0600
-Subject: [PATCH] ARM: add get_user() support for 8 byte types
-Message-ID: <1352818854-10958-1-git-send-email-rob.clark@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 13 Nov 2012 16:00:36 +0100
+Subject: [PATCH v6] Network driver for the Armada 370 and Armada XP ARM
+ Marvell SoCs
+Message-ID: <1352818843-4457-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Clark <rob@ti.com>
+David,
 
-A new atomic modeset/pageflip ioctl being developed in DRM requires
-get_user() to work for 64bit types (in addition to just put_user()).
+This patch set adds a new network driver for the network unit
+available in the newest Marvell ARM SoCs Armada 370 and Armada XP, as
+well as the necessary Device Tree information to use this driver in
+the two evaluation platforms of those SoCs.
 
-v1: original
-v2: pass correct size to check_uaccess, and better handling of narrowing
-    double word read with __get_user_xb() (Russell King's suggestion)
+The previous versions of this patch set have been sent on September
+4th (v1), October 11th (v2), October 23rd (v3), October 26th (v4),
+November 12th (v5) and now comes the v6 of the driver. The number of
+comments over the last versions have been really small, and I would
+really appreciate if this driver could land into the 3.8 kernel
+release.
 
-Signed-off-by: Rob Clark <rob@ti.com>
----
- arch/arm/include/asm/uaccess.h | 18 +++++++++++++++++-
- arch/arm/lib/getuser.S         | 17 ++++++++++++++++-
- 2 files changed, 33 insertions(+), 2 deletions(-)
+People interested in testing this driver can find it at:
 
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 7e1f760..e2236ad 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -100,6 +100,7 @@ static inline void set_fs(mm_segment_t fs)
- extern int __get_user_1(void *);
- extern int __get_user_2(void *);
- extern int __get_user_4(void *);
-+extern int __get_user_8(void *);
- 
- #define __GUP_CLOBBER_1	"lr", "cc"
- #ifdef CONFIG_CPU_USE_DOMAINS
-@@ -108,6 +109,7 @@ extern int __get_user_4(void *);
- #define __GUP_CLOBBER_2 "lr", "cc"
- #endif
- #define __GUP_CLOBBER_4	"lr", "cc"
-+#define __GUP_CLOBBER_8	"lr", "cc"
- 
- #define __get_user_x(__r2,__p,__e,__l,__s)				\
- 	   __asm__ __volatile__ (					\
-@@ -118,11 +120,19 @@ extern int __get_user_4(void *);
- 		: "0" (__p), "r" (__l)					\
- 		: __GUP_CLOBBER_##__s)
- 
-+/* narrowing a double-word get into a single 32bit word register: */
-+#ifdef BIG_ENDIAN
-+#define __get_user_xb(__r2,__p,__e,__l,__s)				\
-+	__get_user_x(__r2,(uintptr_t)__p + 4,__e,__l,__s)
-+#else
-+#define __get_user_xb __get_user_x
-+#endif
-+
- #define __get_user_check(x,p)							\
- 	({								\
- 		unsigned long __limit = current_thread_info()->addr_limit - 1; \
- 		register const typeof(*(p)) __user *__p asm("r0") = (p);\
--		register unsigned long __r2 asm("r2");			\
-+		register typeof(x) __r2 asm("r2");			\
- 		register unsigned long __l asm("r1") = __limit;		\
- 		register int __e asm("r0");				\
- 		switch (sizeof(*(__p))) {				\
-@@ -135,6 +145,12 @@ extern int __get_user_4(void *);
- 		case 4:							\
- 			__get_user_x(__r2, __p, __e, __l, 4);		\
- 			break;						\
-+		case 8:							\
-+			if (sizeof((x)) < 8)				\
-+				__get_user_xb(__r2, __p, __e, __l, 4);	\
-+			else						\
-+				__get_user_x(__r2, __p, __e, __l, 8);	\
-+			break;						\
- 		default: __e = __get_user_bad(); break;			\
- 		}							\
- 		x = (typeof(*(p))) __r2;				\
-diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
-index 9b06bb4..ed98707 100644
---- a/arch/arm/lib/getuser.S
-+++ b/arch/arm/lib/getuser.S
-@@ -18,7 +18,7 @@
-  * Inputs:	r0 contains the address
-  *		r1 contains the address limit, which must be preserved
-  * Outputs:	r0 is the error code
-- *		r2 contains the zero-extended value
-+ *		r2, r3 contains the zero-extended value
-  *		lr corrupted
-  *
-  * No other registers must be altered.  (see <asm/uaccess.h>
-@@ -66,6 +66,19 @@ ENTRY(__get_user_4)
- 	mov	pc, lr
- ENDPROC(__get_user_4)
- 
-+ENTRY(__get_user_8)
-+	check_uaccess r0, 8, r1, r2, __get_user_bad
-+#ifdef CONFIG_THUMB2_KERNEL
-+5: TUSER(ldr)	r2, [r0]
-+6: TUSER(ldr)	r3, [r0, #4]
-+#else
-+5: TUSER(ldr)	r2, [r0], #4
-+6: TUSER(ldr)	r3, [r0]
-+#endif
-+	mov	r0, #0
-+	mov	pc, lr
-+ENDPROC(__get_user_8)
-+
- __get_user_bad:
- 	mov	r2, #0
- 	mov	r0, #-EFAULT
-@@ -77,4 +90,6 @@ ENDPROC(__get_user_bad)
- 	.long	2b, __get_user_bad
- 	.long	3b, __get_user_bad
- 	.long	4b, __get_user_bad
-+	.long	5b, __get_user_bad
-+	.long	6b, __get_user_bad
- .popsection
--- 
-1.8.0
+ git at github.com:MISL-EBU-System-SW/mainline-public.git marvell-neta-v6
+
+In details:
+
+ * Patch 1 contains a small driver for the MDIO interface of this
+   Ethernet controller. Having a separate driver is useful to more
+   easily handle concurrent accesses on this MDIO interface that is
+   shared between all Ethernet ports.
+
+ * Patch 3 contains the driver itself. The commit log contains a
+   detailed explanation about why a new driver is needed for this new
+   Marvell SoC, compared to older Marvell SoCs (Orion, Kirkwood, Dove)
+   that use the mv643xx_eth driver.
+
+ * Patch 4 adds the necessary entry to the MAINTAINERS file.
+
+ * Patch 5 adds the SoC-level Device Tree information for Armada 370
+   and Armada XP.
+
+ * Patch 6 adds the board-level Device Tree information for the
+   Marvell evaluation boards of Armada 370 and Armada XP.
+
+ * Patch 6 adds the board-level Device Tree information for the
+   PlatHome OpenBlocks AX3-4 platform (based on the Armada XP SoC).
+
+ * Patch 7 adds the board-level Device Tree information for the
+   GlobalScale Mirabox platform (based on the Armada 370 SoC).
+
+Changes since v5:
+ * Take into account comments from Fran?ois Romieu (mainly coding
+   style fixes + addition of a mvneta_rxq_desc_is_first_last() helper
+   function)
+ * Fix a wrong argument passed to dma_alloc_coherent():
+   DMA_BIDIRECTIONAL should have been GFP_KERNEL. Thanks to Fran?ois
+   Romieu for having pointed the issue in his review.
+ * Removed calls to smp_call_function_many() that were useless.
+ * Ordered alphabetically entries in the Kconfig and Makefile.
+
+Changes since v4:
+ * Added a separate MDIO driver, which allow to easily handle
+   concurrent accesses to the MDIO interface.
+ * The Device Tree now has separate nodes for the PHY devices, which
+   belong to the MDIO bus handled by the separate MDIO driver.
+ * Fix tabulation issues in some Device Tree files.
+ * Rebased on top of 3.7-rc5
+ * Added the Device Tree code necessary for the GlobalScale Mirabox
+   platform and the PlatHome OpenBlocks AX3-4 platform.
+
+Changes since v3:
+ * Use phy_find_first() to get the correct PHY. Suggested by Florian
+   Fainelli.
+ * Make pp->cause_rx_tx a simple variable instead of a per-CPU array
+   since it is not useful. Fixes a comment raised by David Miller.
+
+Changes since v2:
+ * Change compatible string from 'marvell,neta' to
+   'marvell,armada-370-neta'. Requested by Rob Herring.
+ * Rename Ethernet DT nodes from eth at ... to ethernet at ... Requested by
+   Rob Herring.
+ * Remove device_type DT property. Requested by Rob Herring.
+ * Change the PHY interface for eth0/eth1 to be rgmii-id, which allows
+   to enable TX/RX delay mechanisms at the PHY level. This fixes CRC
+   errors on received packets during iperf tests (it was a bug in v2).
+ * Remove the mvneta_ prefix from module parameters. Requested by
+   Baruch Siach.
+ * Many code style improvements suggested by Fran?ois Romieu.
+ * Properly stop/restart the TX queue when the number of TX
+   descriptors available becomes low, instead of returning
+   NETDEV_TX_BUSY. Requested by Fran?ois Romieu.
+ * Properly drop packets on the TX path when DMA mapping functions
+   return an error, instead of returning NETDEV_TX_BUSY. Requested by
+   Fran?ois Romieu.
+ * Rebased on top of Linux 3.7-rc2.
+
+Changes since v1:
+ * Reduced the Cc: list in order to make the patch set acceptable for
+   the netdev@ mailing list.
+ * Merge the mvneta.h contents into mvneta.c, since the header was
+   only used by the driver. Requested by Arnd Bergmann.
+ * Completely reorganize the organization of the register list and
+   register values, in order to make it more consistent, and hopefully
+   easier to read (especially easier to match register values with the
+   corresponding register).
+ * Integrate with the phylib, as suggested by Florian Fainelli, and
+   remove the link management code that has become useless as the
+   result of this integration
+ * Fix many small details suggested by Florian Fainelli in his review
+   of the first driver
+ * Simplify various parts of the driver (descriptors array allocation,
+   data structures, etc.)
+
+Thanks,
+
+Thomas Petazzoni
