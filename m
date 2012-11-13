@@ -1,30 +1,46 @@
-From: syamsidhardh@gmail.com (Syam Sidhardhan)
-Date: Tue, 13 Nov 2012 21:19:49 +0530
-Subject: [PATCH 2/3] ARM: prima2: Replace include linux/module.h with
- linux/export.h
-Message-ID: <1352821789-6640-1-git-send-email-s.syam@samsung.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 13 Nov 2012 07:57:58 -0800
+Subject: [PATCH v6 2/7] net: mvneta: driver for Marvell Armada 370/XP
+ network unit
+In-Reply-To: <20121113164658.03ae12f8@skate>
+References: <1352818843-4457-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1352818843-4457-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1352820622.24230.31.camel@joe-AO722> <20121113164658.03ae12f8@skate>
+Message-ID: <1352822278.24230.36.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-include <linux/export.h> is the right to go here.
+On Tue, 2012-11-13 at 16:46 +0100, Thomas Petazzoni wrote:
+> On Tue, 13 Nov 2012 07:30:22 -0800, Joe Perches wrote:
+> > On Tue, 2012-11-13 at 16:00 +0100, Thomas Petazzoni wrote:
+> > > This patch contains a new network driver for the network unit of the
+> > > ARM Marvell Armada 370 and the Armada XP. Both SoCs use the PJ4B
+> > > processor, a Marvell-developed ARM core that implements the ARMv7
+> > > instruction set.
+> > 
+> > This looks very clean to me.
+> 
+> Thanks!
+> 
+> With the below fixes, may I get your formal Acked-by on the driver
+> patch?
 
-Signed-off-by: Syam Sidhardhan <s.syam@samsung.com>
----
- arch/arm/mach-prima2/pm.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Hi Thomas.
 
-diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
-index fb5a791..f4a2270 100644
---- a/arch/arm/mach-prima2/pm.c
-+++ b/arch/arm/mach-prima2/pm.c
-@@ -9,7 +9,7 @@
- #include <linux/kernel.h>
- #include <linux/suspend.h>
- #include <linux/slab.h>
--#include <linux/module.h>
-+#include <linux/export.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
--- 
-1.7.4.1
+I'm not one that believe there's much value in acks.
+I don't have a card, I didn't test it, so I don't
+know that it works.
+
+The code style/readability looks pretty good to me.
+
+> > trivial:
+> > some of the logging doesn't use terminating newlines.
+> > You could use netdev_info
+[]
+> Thanks for those comments, I'll wait a bit to see if any other comment
+> shows up before tomorrow, and I'll send a v7 with those issues fixed.
+
+These trivialities aren't any kind of blocking issue.
+
+Perhaps David will apply it as is and you could send
+a follow up patch later.
