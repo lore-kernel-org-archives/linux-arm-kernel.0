@@ -1,121 +1,38 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 13 Nov 2012 11:38:13 +0100
-Subject: [PATCH] ARM: OMAP: board-4430sdp: Proper support for TWL6030 PWM
- LED/Backlight
-Message-ID: <1352803093-26203-1-git-send-email-peter.ujfalusi@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 13 Nov 2012 10:40:07 +0000
+Subject: [PATCH] ARM: implement optimized percpu variable access
+In-Reply-To: <50A163C6.6080208@gmail.com>
+References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
+ <20121112102354.GA2346@mudshark.cambridge.arm.com>
+ <50A105E7.6000005@gmail.com>
+ <20121112144122.GJ2346@mudshark.cambridge.arm.com>
+ <20121112165117.GB18863@mudshark.cambridge.arm.com>
+ <50A163C6.6080208@gmail.com>
+Message-ID: <20121113104006.GC3940@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-New PWM drivers are being prepared for twl series which will enable the use
-of all PWMs (PWMs and LEDs).
-They are implemented as generic PWM drivers to be able to use them for different
-purposes.
-The current platform code was broken: the leds_pwm driver was not able to pick
-up the PWM since the pwm_id was incorrect.
+On Mon, Nov 12, 2012 at 09:01:58PM +0000, Rob Herring wrote:
+> On 11/12/2012 10:51 AM, Will Deacon wrote:
+> > Ok, similar numbers over here so it looks like this is definitely worth
+> > doing. However, I still object to the "cc", particularly after discussion
+> > with the tools guys here who agree that the behaviour you're seeing is
+> > indicative of a buggy compiler. It may even be part of a larger issue with
+> > GCC's definition of `reachability' for kernel entry points. For interest, I
+> > failed to reproduce with:
+> > 
+> >   gcc version 4.7.3 20121001 (prerelease) (crosstool-NG linaro-1.13.1-4.7-2012.10-20121022 - Linaro GCC 2012.10)
+> > (http://launchpad.net/linaro-toolchain-binaries/trunk/2012.10/+download/gcc-linaro-arm-linux-gnueabihf-4.7-2012.10-20121022_linux.tar.bz2)
+> > 
+> > which sounds fairly close to the tools that you are using. Please can you
+> > file a bug in launchpad? 
+> 
+> Strangely, I can't reproduce it either now...
 
-With the other patches we will be able to control the followings:
-LCD backlight via pwm-backlight driver
-Keypad leds via leds_pwm driver as normal LED
-Charging indicator via leds_pwm driver as normal LED
+Reproduce what? :)
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
-Hello,
+If you remove the "cc" clobber, you can add my ack:
 
-This patch needs the following series to work:
-- twl regmap IO conversion series:
-http://lkml.org/lkml/2012/11/13/97
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-- PWM drivers for twl4030/6030 (v2):
-https://lkml.org/lkml/2012/11/8/219
-
-- leds-pwm series (v2):
-https://lkml.org/lkml/2012/11/12/222
-
-With these in place we can have keypad light and LCD backlight working on Blaze
-when booting in legacy mode.
-I will send the DT patches after the leds-pwm DT support has been accepted.
-
-Regards,
-Peter
-
- arch/arm/mach-omap2/board-4430sdp.c | 31 ++++++++++++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 3669c12..8cf781e 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -24,8 +24,10 @@
- #include <linux/gpio_keys.h>
- #include <linux/regulator/machine.h>
- #include <linux/regulator/fixed.h>
-+#include <linux/pwm.h>
- #include <linux/leds.h>
- #include <linux/leds_pwm.h>
-+#include <linux/pwm_backlight.h>
- #include <linux/platform_data/omap4-keypad.h>
- 
- #include <asm/hardware/gic.h>
-@@ -263,10 +265,20 @@ static struct gpio_led_platform_data sdp4430_led_data = {
- 	.num_leds	= ARRAY_SIZE(sdp4430_gpio_leds),
- };
- 
-+static struct pwm_lookup sdp4430_pwm_lookup[] = {
-+	PWM_LOOKUP("twl-pwm", 0, "leds_pwm", "omap4::keypad"),
-+	PWM_LOOKUP("twl-pwm", 1, "pwm-backlight", "backlight"),
-+	PWM_LOOKUP("twl-pwmled", 0, "leds_pwm", "omap4:green:chrg"),
-+};
-+
- static struct led_pwm sdp4430_pwm_leds[] = {
- 	{
-+		.name		= "omap4::keypad",
-+		.max_brightness	= 127,
-+		.pwm_period_ns	= 7812500,
-+	},
-+	{
- 		.name		= "omap4:green:chrg",
--		.pwm_id		= 1,
- 		.max_brightness	= 255,
- 		.pwm_period_ns	= 7812500,
- 	},
-@@ -285,6 +297,21 @@ static struct platform_device sdp4430_leds_pwm = {
- 	},
- };
- 
-+static struct platform_pwm_backlight_data sdp4430_backlight_data = {
-+	.pwm_id = 1,
-+	.max_brightness = 127,
-+	.dft_brightness = 127,
-+	.pwm_period_ns = 7812500,
-+};
-+
-+static struct platform_device sdp4430_backlight_pwm = {
-+	.name   = "pwm-backlight",
-+	.id     = -1,
-+	.dev    = {
-+		.platform_data = &sdp4430_backlight_data,
-+	},
-+};
-+
- static int omap_prox_activate(struct device *dev)
- {
- 	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , 1);
-@@ -419,6 +446,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
- 	&sdp4430_gpio_keys_device,
- 	&sdp4430_leds_gpio,
- 	&sdp4430_leds_pwm,
-+	&sdp4430_backlight_pwm,
- 	&sdp4430_vbat,
- 	&sdp4430_dmic_codec,
- 	&sdp4430_abe_audio,
-@@ -862,6 +890,7 @@ static void __init omap_4430sdp_init(void)
- 				ARRAY_SIZE(sdp4430_spi_board_info));
- 	}
- 
-+	pwm_add_table(sdp4430_pwm_lookup, ARRAY_SIZE(sdp4430_pwm_lookup));
- 	status = omap4_keyboard_init(&sdp4430_keypad_data, &keypad_data);
- 	if (status)
- 		pr_err("Keypad initialization failed: %d\n", status);
--- 
-1.8.0
+Will
