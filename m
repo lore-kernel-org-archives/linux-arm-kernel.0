@@ -1,83 +1,66 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 13 Nov 2012 16:44:44 +0100
-Subject: [PATCH v2 2/3] ARM: Kirkwood: Convert DNSKW to use gpio-poweroff.
-In-Reply-To: <1352821485-10032-1-git-send-email-andrew@lunn.ch>
-References: <1352821485-10032-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1352821485-10032-3-git-send-email-andrew@lunn.ch>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 13 Nov 2012 16:46:58 +0100
+Subject: [PATCH v6 2/7] net: mvneta: driver for Marvell Armada 370/XP
+ network unit
+In-Reply-To: <1352820622.24230.31.camel@joe-AO722>
+References: <1352818843-4457-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1352818843-4457-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1352820622.24230.31.camel@joe-AO722>
+Message-ID: <20121113164658.03ae12f8@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also enable the gpio-poweroff driver when DT is used.
+Joe,
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Jamie Lentin <jm@lentin.co.uk>
----
- arch/arm/boot/dts/kirkwood-dnskw.dtsi |    5 +++++
- arch/arm/mach-kirkwood/Kconfig        |    4 ++++
- arch/arm/mach-kirkwood/board-dnskw.c  |   12 ------------
- 3 files changed, 9 insertions(+), 12 deletions(-)
+On Tue, 13 Nov 2012 07:30:22 -0800, Joe Perches wrote:
+> On Tue, 2012-11-13 at 16:00 +0100, Thomas Petazzoni wrote:
+> > This patch contains a new network driver for the network unit of the
+> > ARM Marvell Armada 370 and the Armada XP. Both SoCs use the PJ4B
+> > processor, a Marvell-developed ARM core that implements the ARMv7
+> > instruction set.
+> 
+> This looks very clean to me.
 
-diff --git a/arch/arm/boot/dts/kirkwood-dnskw.dtsi b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-index 9b32d02..22aa07a 100644
---- a/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-@@ -35,6 +35,11 @@
- 				      6000 2>;
- 	};
- 
-+	gpio_poweroff {
-+		compatible = "gpio-poweroff";
-+		gpios = <&gpio1 4 0>;
-+	};
-+
- 	ocp at f1000000 {
- 		sata at 80000 {
- 			status = "okay";
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 50bca50..e0d26fe 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -46,7 +46,11 @@ config MACH_GURUPLUG
- 
- config ARCH_KIRKWOOD_DT
- 	bool "Marvell Kirkwood Flattened Device Tree"
-+	select POWER_SUPPLY
-+	select POWER_RESET
-+	select POWER_RESET_GPIO
- 	select USE_OF
-+
- 	help
- 	  Say 'Y' here if you want your kernel to support the
- 	  Marvell Kirkwood using flattened device tree.
-diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
-index 43d16d6..549369e 100644
---- a/arch/arm/mach-kirkwood/board-dnskw.c
-+++ b/arch/arm/mach-kirkwood/board-dnskw.c
-@@ -57,11 +57,6 @@ static unsigned int dnskw_mpp_config[] __initdata = {
- 	0
- };
- 
--static void dnskw_power_off(void)
--{
--	gpio_set_value(36, 1);
--}
--
- /* Register any GPIO for output and set the value */
- static void __init dnskw_gpio_register(unsigned gpio, char *name, int def)
- {
-@@ -81,13 +76,6 @@ void __init dnskw_init(void)
- 	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&dnskw_ge00_data);
- 
--	/* Register power-off GPIO. */
--	if (gpio_request(36, "dnskw:power:off") == 0
--	    && gpio_direction_output(36, 0) == 0)
--		pm_power_off = dnskw_power_off;
--	else
--		pr_err("dnskw: failed to configure power-off GPIO\n");
--
- 	/* Ensure power is supplied to both HDDs */
- 	dnskw_gpio_register(39, "dnskw:power:sata0", 1);
- 	dnskw_gpio_register(40, "dnskw:power:sata1", 1);
+Thanks!
+
+With the below fixes, may I get your formal Acked-by on the driver
+patch?
+
+> trivial:
+> some of the logging doesn't use terminating newlines.
+> 
+> > +static int mvneta_check_mtu_valid(struct net_device *dev, int mtu)
+> > +{
+> []
+> > +       if (mtu > 9676) {
+> > +               netdev_info(dev, "Illegal MTU value %d, round to 9676", mtu);
+> []
+> > +	if (!IS_ALIGNED(MVNETA_RX_PKT_SIZE(mtu), 8)) {
+> > +		netdev_info(dev, "Illegal MTU value %d, rounding to %d",
+> 
+> missing newlines
+> 
+> > +static int __devinit mvneta_probe(struct platform_device *pdev)
+> []
+> > +	if (register_netdev(dev)) {
+> > +		dev_err(&pdev->dev, "failed to register\n");
+> > +		err = ENOMEM;
+> > +		goto err_base;
+> > +	}
+> []
+> > +	dev_info(&pdev->dev, "%s, mac: %pM\n", dev->name,
+> > +		 dev->dev_addr);
+> 
+> You could use netdev_info here
+> 
+> 	netdev_info(dev, "mac: %pM\n", dev->dev_addr);
+
+Thanks for those comments, I'll wait a bit to see if any other comment
+shows up before tomorrow, and I'll send a v7 with those issues fixed.
+
+Thomas
 -- 
-1.7.10.4
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
