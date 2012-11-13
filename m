@@ -1,31 +1,38 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 13 Nov 2012 17:17:22 +0900
-Subject: [PATCH 1/1] regulator: gpio-regulator: fix crash when no states
- property in dt
-In-Reply-To: <CAHrpEqTF80XyRD8ZTDGLs+AywznGNdvZfndfWSuw+pJ-D24Rxw@mail.gmail.com>
-References: <1352450076-22682-1-git-send-email-Frank.Li@freescale.com>
- <20121109165609.GV23807@opensource.wolfsonmicro.com>
- <CAHrpEqSbydeAHngL-NMfQa1HQUsj0US5u=aK6y-ku0DMOW-KkA@mail.gmail.com>
- <20121113075733.GN18224@opensource.wolfsonmicro.com>
- <CAHrpEqTF80XyRD8ZTDGLs+AywznGNdvZfndfWSuw+pJ-D24Rxw@mail.gmail.com>
-Message-ID: <20121113081720.GO18224@opensource.wolfsonmicro.com>
+Date: Tue, 13 Nov 2012 17:30:33 +0900
+Subject: [PATCH v5 2/3] ASoC: atmel-ssc-dai: register dai and pcm directly
+In-Reply-To: <1352706028-750-3-git-send-email-voice.shen@atmel.com>
+References: <1352706028-750-1-git-send-email-voice.shen@atmel.com>
+ <1352706028-750-3-git-send-email-voice.shen@atmel.com>
+Message-ID: <20121113083031.GP18224@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2012 at 04:12:14PM +0800, Frank Li wrote:
+On Mon, Nov 12, 2012 at 03:40:26PM +0800, Bo Shen wrote:
 
-> Yes, I tested it.
-> I use gpio-enable to turn on\off a sensor power switcher.
-> the below is a part of my dt file.
+>  static struct platform_device sam9g20ek_audio_device = {
+>  	.name   = "at91sam9g20ek-audio",
+> -	.id     = -1,
+> +	.id     = 0,
+>  };
 
-You should really use a fixed voltage regulator here, or fix the code so
-you can specify a voltage for the gpio regulator when no GPIO is
-specified (ideally the two drivers would be unified but that's another
-story and mostly orthogonal to the DT).
+Why are you changing this?  Single devices are supposed to specify -1 as
+their id.
+
+>  static int atmel_ssc_startup(struct snd_pcm_substream *substream,
+>  			     struct snd_soc_dai *dai)
+>  {
+> -	struct atmel_ssc_info *ssc_p = &ssc_info[dai->id];
+> +	struct atmel_ssc_info *ssc_p = &ssc_info;
+
+This seems like a very big step backwards, there's now a single global
+variable for the ssc_info which presumably means there can be only one
+SSC active in the system at once.  That's changing a lot more than just
+the registration...
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121113/5c5a887c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121113/c38c8800/attachment.sig>
