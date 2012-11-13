@@ -1,47 +1,40 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 13 Nov 2012 14:00:11 +0100
-Subject: [PATCH v3 0/4] ARM: EXYNOS: Power domain DT support extension
-In-Reply-To: <1352811115-1198-1-git-send-email-t.figa@samsung.com>
-References: <1352811115-1198-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1552856.8ocEO5iISn@amdc1227>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 Nov 2012 14:07:42 +0100
+Subject: [PATCH v4 2/9] pinctrl: single: support gpio request and free
+In-Reply-To: <20121107222738.GR6801@atomide.com>
+References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
+ <1352301582-12244-3-git-send-email-haojian.zhuang@gmail.com>
+ <20121107222738.GR6801@atomide.com>
+Message-ID: <CACRpkdbJzjZGLmCA+2mw6ahAVUXuhdpysnyiK7nuj8PLh_QNXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 7, 2012 at 11:27 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Haojian Zhuang <haojian.zhuang@gmail.com> [121107 07:21]:
+>> Marvell's PXA/MMP silicon also match the behavior of pinctrl-single.
+>> Each pin binds to one register. A lot of pins could be configured
+>> as gpio.
+>>
+>> Now add these properties in below.
+>> <gpio range phandle>:
+>>       include "pinctrl-single,gpio" & "pinctrl,gpio-func" properties.
+>>
+>>       pinctrl-single,gpio: <gpio base, npins in range, register offset>
+>>
+>>       pinctrl-single,gpio-func: <gpio function value in mux>
+>>
+>> pinctrl-single,gpio-ranges: phandle list of gpio range array
+>
+> This one looks OK to me now:
+>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+>
 
-On Tuesday 13 of November 2012 13:51:51 Tomasz Figa wrote:
-> This patch series fixes two issues with existing DT support for Exynos
-> power domains and extends it with the ability of binding devices to
-> domains, basically making it possible to use power domains with DT.
-> 
-> Based on for-next branch of Kgene's tree.
-> 
-> Changes since v2:
->  - Rebased to for-next of Kgene's tree.
-> Changes since v1:
->  - Added "samsung," prefix to "power-domain" property.
->  - Added power domain nodes to Exynos4 device tree sources.
-> 
-> Tomasz Figa (4):
->   ARM: EXYNOS: pm_domain: Detect domain state on registration from DT
->   ARM: EXYNOS: pm_domain: Fix power domain name initialization
->   ARM: EXYNOS: pm_domain: Bind devices to power domains using DT
->   ARM: dts: exynos4: Set up power domains
-> 
->  .../bindings/arm/exynos/power_domain.txt           | 15 +++-
->  arch/arm/boot/dts/exynos4.dtsi                     | 30 +++++++
->  arch/arm/boot/dts/exynos4210.dtsi                  |  5 ++
->  arch/arm/mach-exynos/pm_domains.c                  | 93
-> +++++++++++++++++++++- 4 files changed, 135 insertions(+), 8
-> deletions(-)
+So:
+- Will this patch in isolation apply to my pinctrl tree?
+- In that case, do you want me to apply it?
 
-Sorry, please disregard this series, as I have sent wrong version by 
-mistake.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-I will send correct one later.
-
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Linux Platform
+Yours,
+Linus Walleij
