@@ -1,46 +1,33 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 13 Nov 2012 07:57:58 -0800
-Subject: [PATCH v6 2/7] net: mvneta: driver for Marvell Armada 370/XP
- network unit
-In-Reply-To: <20121113164658.03ae12f8@skate>
-References: <1352818843-4457-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1352818843-4457-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <1352820622.24230.31.camel@joe-AO722> <20121113164658.03ae12f8@skate>
-Message-ID: <1352822278.24230.36.camel@joe-AO722>
+From: mpfj-list@mimc.co.uk (Mark Jackson)
+Date: Tue, 13 Nov 2012 15:57:54 +0000
+Subject: OMAP baseline test results for v3.7-rc3
+In-Reply-To: <alpine.DEB.2.00.1211131531430.22487@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
+ <508FB226.20604@mimc.co.uk>
+ <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
+ <508FE8BA.1080404@ti.com> <50912A6F.1040501@mimc.co.uk>
+ <79CD15C6BA57404B839C016229A409A83EB563F8@DBDE01.ent.ti.com>
+ <5097EF44.5030706@mimc.co.uk>
+ <79CD15C6BA57404B839C016229A409A83EB63609@DBDE01.ent.ti.com>
+ <5098DC9E.3090307@mimc.co.uk> <50A266C2.4030303@mimc.co.uk>
+ <alpine.DEB.2.00.1211131531430.22487@utopia.booyaka.com>
+Message-ID: <50A26E02.9080702@mimc.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-11-13 at 16:46 +0100, Thomas Petazzoni wrote:
-> On Tue, 13 Nov 2012 07:30:22 -0800, Joe Perches wrote:
-> > On Tue, 2012-11-13 at 16:00 +0100, Thomas Petazzoni wrote:
-> > > This patch contains a new network driver for the network unit of the
-> > > ARM Marvell Armada 370 and the Armada XP. Both SoCs use the PJ4B
-> > > processor, a Marvell-developed ARM core that implements the ARMv7
-> > > instruction set.
-> > 
-> > This looks very clean to me.
+On 13/11/12 15:35, Paul Walmsley wrote:
 > 
-> Thanks!
+> instead of this:
 > 
-> With the below fixes, may I get your formal Acked-by on the driver
-> patch?
+>>> $ cat arch/arm/boot/uImage arch/arm/boot/am335x-bone.dtb > arch/arm/boot/uImage-dtb.am335x-bone
+>>> $ cp arch/arm/boot/uImage-dtb.am335x-bone /media/boot/uImage
+> 
+> something like this is what you need to do instead:
+> 
+> $ cat arch/arm/boot/zImage arch/arm/boot/am335x-bone.dtb > arch/arm/boot/zImage-dtb.am335x-bone
+> $ scripts/mkuboot.sh -A arm -O linux -C none  -T kernel -a 0x80008000 -e 0x80008000 -n 'Linux' -d arch/arm/boot/zImage-dtb.am335x-bone arch/arm/boot/uImage-dtb.am335x-bone
 
-Hi Thomas.
+Works like a charm ... thanks.
 
-I'm not one that believe there's much value in acks.
-I don't have a card, I didn't test it, so I don't
-know that it works.
-
-The code style/readability looks pretty good to me.
-
-> > trivial:
-> > some of the logging doesn't use terminating newlines.
-> > You could use netdev_info
-[]
-> Thanks for those comments, I'll wait a bit to see if any other comment
-> shows up before tomorrow, and I'll send a v7 with those issues fixed.
-
-These trivialities aren't any kind of blocking issue.
-
-Perhaps David will apply it as is and you could send
-a follow up patch later.
+Mark J.
