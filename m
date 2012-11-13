@@ -1,35 +1,44 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 13 Nov 2012 10:27:50 +0100
-Subject: [PATCH] ARM: dts: exynos4210-trats: Remove broken-voltage property
- from sdhci node
-Message-ID: <1604189.yDsqlPMQyl@amdc1227>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 13 Nov 2012 10:32:32 +0100
+Subject: [PATCH] ARM: OMAP2+: omap_twl: Change TWL4030_MODULE_PM_RECEIVER to
+ TWL_MODULE_PM_RECEIVER
+Message-ID: <1352799152-20980-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The broken voltage property has been replaced with auto detection based
-on voltages available on vmmc voltage regulator, so there is no use for
-it now.
+To facilitate upcoming cleanup in twl stack.
+No functional change.
 
-This patch removes the now unused property from Trats Device Tree
-sources.
-
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/exynos4210-trats.dts | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-omap2/omap_twl.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-index a21511c..9d5d27a 100644
---- a/arch/arm/boot/dts/exynos4210-trats.dts
-+++ b/arch/arm/boot/dts/exynos4210-trats.dts
-@@ -42,7 +42,6 @@
- 	sdhci_emmc: sdhci at 12510000 {
- 		bus-width = <8>;
- 		non-removable;
--		broken-voltage;
- 		gpios = <&gpk0 0 2 0 3>,
- 			<&gpk0 1 2 0 3>,
- 			<&gpk0 3 2 2 3>,
+diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
+index 2bf35dc..018abb4 100644
+--- a/arch/arm/mach-omap2/omap_twl.c
++++ b/arch/arm/mach-omap2/omap_twl.c
+@@ -337,8 +337,8 @@ int __init omap3_twl_set_sr_bit(bool enable)
+ 	if (twl_sr_enable_autoinit)
+ 		pr_warning("%s: unexpected multiple calls\n", __func__);
+ 
+-	ret = twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER, &temp,
+-					TWL4030_DCDC_GLOBAL_CFG);
++	ret = twl_i2c_read_u8(TWL_MODULE_PM_RECEIVER, &temp,
++			      TWL4030_DCDC_GLOBAL_CFG);
+ 	if (ret)
+ 		goto err;
+ 
+@@ -347,8 +347,8 @@ int __init omap3_twl_set_sr_bit(bool enable)
+ 	else
+ 		temp &= ~SMARTREFLEX_ENABLE;
+ 
+-	ret = twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, temp,
+-				TWL4030_DCDC_GLOBAL_CFG);
++	ret = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, temp,
++			       TWL4030_DCDC_GLOBAL_CFG);
+ 	if (!ret) {
+ 		twl_sr_enable_autoinit = true;
+ 		return 0;
 -- 
 1.8.0
