@@ -1,498 +1,130 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Tue, 13 Nov 2012 11:42:43 +0200
-Subject: [PATCH v2 2/3] serial: mxs-auart: add the DMA support for mx28
-In-Reply-To: <1351074456-25863-3-git-send-email-b32955@freescale.com>
-References: <1351074456-25863-1-git-send-email-b32955@freescale.com>
- <1351074456-25863-3-git-send-email-b32955@freescale.com>
-Message-ID: <50A21613.6030709@bluegiga.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 13 Nov 2012 09:49:48 +0000
+Subject: [PATCH] ARM: backtrace: avoid crash on large invalid fp value
+In-Reply-To: <CAMbhsRQM5FyGum1s-YE+e4XrnqHn+acH89fjJsoMLGueKjhepQ@mail.gmail.com>
+References: <1349851572-9967-1-git-send-email-toddpoynor@google.com>
+ <20121010111517.GC2131@linaro.org>
+ <CAMbhsRTNULfBjL=x3qFgjqsfR25EJt+2A4hY=qTXcDq8gyCxmA@mail.gmail.com>
+ <20121105105421.GB2005@linaro.org>
+ <CAMbhsRR+BVFP7rfyc_3+F0rNQVWFUh6Oca=Bg_TpcQszwF-6Bg@mail.gmail.com>
+ <20121109105648.GA2048@linaro.org>
+ <CAMbhsRQM5FyGum1s-YE+e4XrnqHn+acH89fjJsoMLGueKjhepQ@mail.gmail.com>
+Message-ID: <20121113094948.GA2061@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Huang,
+On Fri, Nov 09, 2012 at 10:17:01AM -0800, Colin Cross wrote:
+> On Fri, Nov 9, 2012 at 2:56 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> > On Thu, Nov 08, 2012 at 06:05:52PM -0800, Colin Cross wrote:
+> >> On Mon, Nov 5, 2012 at 2:54 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> >> > On Fri, Nov 02, 2012 at 04:47:38PM -0700, Colin Cross wrote:
+> >> >> On Wed, Oct 10, 2012 at 4:15 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> >> >> > On Tue, Oct 09, 2012 at 11:46:12PM -0700, Todd Poynor wrote:
+> >> >> >> Invalid frame pointer (signed) -4 <= fp <= -1 defeats check for too high
+> >> >> >> on overflow.
+> >> >> >>
+> >> >> >> Signed-off-by: Todd Poynor <toddpoynor@google.com>
+> >> >> >> ---
+> >> >> >>  arch/arm/kernel/stacktrace.c |    2 +-
+> >> >> >>  1 files changed, 1 insertions(+), 1 deletions(-)
+> >> >> >>
+> >> >> >> diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+> >> >> >> index 00f79e5..6315162 100644
+> >> >> >> --- a/arch/arm/kernel/stacktrace.c
+> >> >> >> +++ b/arch/arm/kernel/stacktrace.c
+> >> >> >> @@ -31,7 +31,7 @@ int notrace unwind_frame(struct stackframe *frame)
+> >> >> >>       high = ALIGN(low, THREAD_SIZE);
+> >> >> >>
+> >> >> >>       /* check current frame pointer is within bounds */
+> >> >> >> -     if (fp < (low + 12) || fp + 4 >= high)
+> >> >> >> +     if (fp < (low + 12) || fp >= high - 4)
+> >> >> >>               return -EINVAL;
+> >> >> >>
+> >> >> >>       /* restore the registers from the stack frame */
+> >> >> >
+> >> >> > sp and fp can still be complete garbage in the case of a corrupted frame,
+> >> >> > so low + 12 can still overflow and cause us to read beyond the stack base.
+> >> >> >
+> >> >> > A more robust patch might be as follows.  This also checks for misaligned
+> >> >> > fp and sp values, since those indicate corruption and there can be no
+> >> >> > sensible way to interpret the resulting frame in that case.
+> >> >> >
+> >> >> > Also, according to the definition of current_thread_info(),
+> >> >> > IS_ALIGNED(sp, THREAD_SIZE) indicates a full stack extending from sp
+> >> >> > to sp + THREAD_SIZE, and not an empty stack extending from sp -
+> >> >> > THREAD_SIZE to sp.  We cannot backtrace this situation anyway, since
+> >> >> > that would imply that the frame record extends beyond the stack...
+> >> >> > but this patch tidies it up in the interest of clarity.
+> >> >> >
+> >> >> > Cheers
+> >> >> > ---Dave
+> >> >> >
+> >> >> > (untested)
+> >> >> >
+> >> >> > diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+> >> >> > index 00f79e5..fec82be 100644
+> >> >> > --- a/arch/arm/kernel/stacktrace.c
+> >> >> > +++ b/arch/arm/kernel/stacktrace.c
+> >> >> > @@ -28,10 +28,20 @@ int notrace unwind_frame(struct stackframe *frame)
+> >> >> >
+> >> >> >         /* only go to a higher address on the stack */
+> >> >> >         low = frame->sp;
+> >> >> > -       high = ALIGN(low, THREAD_SIZE);
+> >> >> > +       if (!IS_ALIGNED(fp, 4))
+> >> >> > +               return -EINVAL;
+> >> >> > +
+> >> >> > +       /*
+> >> >> > +        * low + 1 here ensures that high > sp, consistent with the
+> >> >> > +        * definition of current_thread_info().
+> >> >> > +        * We subtract 1 to compute the highest allowable byte address.
+> >> >> > +        * Otherwise, we might get high == 0 which would confuse our
+> >> >> > +        * comparisons.
+> >> >> > +        */
+> >> >> > +       high = ALIGN(low + 1, THREAD_SIZE) - 1;
+> >>
+> >> ARM eabi stacks are full-descending, meaning that if the sp is a
+> >> multiple of THREAD_SIZE, the stack is empty.  current_thread_info
+> >> takes a short-cut and assumes it can never be called on an empty
+> >> stack, but better not to propagate that anywhere else.
+> >
+> > The effect of the code is consistent with current_thread_info():
+> >
+> >         low = THREAD_SIZE * X --> high = THREAD_SIZE * (X + 1) - 1
+> >         low = THREAD_SIZE * (X + 1) - 1 --> high = THREAD_SIZE * (X + 1) - 1
+> >
+> > i.e., low = THREAD_SIZE * X is treated as a full stack.
+> 
+> current_thread_info() is assuming a sane stack, where the sp is
+> between [THREAD_SIZE * X + sizeof(struct thread_info), THREAD_SIZE *
+> (X + 1) - 8] (see THREAD_START_SP).  It should never see sp =
+> THREAD_SIZE * X, so we shouldn't be copying its behavior in that case.
+> 
+> sp = THREAD_SIZE * x being a full stack would mean that the stack has
+> passed all the way through the struct thread_info stored at the lower
+> addresses of the stack, corrupting the task struct, saved registers,
+> and likely the stack too.  On the other hand, sp = THREAD_SIZE * x
+> being an empty stack would mean somebody started a stack higher than
+> THREAD_START_SP.  Neither one really makes sense, maybe I should just
+> validate the sp above the thread_info and below THREAD_START_SP.
+> 
+> > The comment relates to the case where the stack is right at the top
+> > of the address space: if we define high as ALIGN(low + 1, THREAD_SIZE),
+> > then high overflow to zero in this case, giving unexpected results
+> > for comparisons "some_address >= high".
+> >
+> > Definig high as the address of the last byte of the stack (instead of
+> > the first byte after the stack) avoids this kind of problem, providing
+> > that "some_address >= high" is rewritten as "some_address > high" in
+> > our comparisons.
+> 
+> I agree with using - 1 (or - 4) to prevent high wrapping, but maybe
+> capping at THREAD_START_SP would simplify the code.
 
-DMA support doesn't work with latest stable v3.6.5 or development 
-3.7-rc5 kernels. I get following error message when I open the serial 
-port /dev/ttyAPP0:
+Having a more precise check as you describe seems to be a good thing.
 
-[   48.730000] mxs-auart 8006a000.serial: step 1 error
-[   48.750000] mxs-auart 8006a000.serial: We can not start up the DMA.
+I'm happy to go with your judgement.
 
+[...]
 
-On 10/24/2012 01:27 PM, Huang Shijie wrote:
-> Only we meet the following conditions, we can enable the DMA support for
-> auart:
->
->    (1) We enable the DMA support in the dts file, such as
->        arch/arm/boot/dts/imx28.dtsi.
->
->    (2) We enable the hardware flow control.
-
-Why HW flow control is required?
-
-We need high speed auart without flow control. I have tested kernel from 
-Freescale's BSP and the performance was good without HW flow control.
-
-Best Regards,
-Lauri Hintsala
-
-
->    (3) We use the mx28, not the mx23. Due to hardware bug(see errata: 2836),
->        we can not add the DMA support to mx23.
->
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->   .../bindings/tty/serial/fsl-mxs-auart.txt          |    8 +
->   drivers/tty/serial/mxs-auart.c                     |  318 +++++++++++++++++++-
->   2 files changed, 321 insertions(+), 5 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> index 2ee903f..273a8d5 100644
-> --- a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> @@ -6,11 +6,19 @@ Required properties:
->   - reg : Address and length of the register set for the device
->   - interrupts : Should contain the auart interrupt numbers
->
-> +Optional properties:
-> +- fsl,auart-dma-channel : The DMA channels, the first is for RX, the other
-> +		is for TX. If you add this property, it also means that you
-> +		will enable the DMA support for the auart.
-> +		Note: due to the hardware bug in imx23(see errata : 2836),
-> +		only the imx28 can enable the DMA support for the auart.
-> +
->   Example:
->   auart0: serial at 8006a000 {
->   	compatible = "fsl,imx28-auart", "fsl,imx23-auart";
->   	reg = <0x8006a000 0x2000>;
->   	interrupts = <112 70 71>;
-> +	fsl,auart-dma-channel = <8 9>;
->   };
->
->   Note: Each auart port should have an alias correctly numbered in "aliases"
-> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-> index 06d7271..d593e0a 100644
-> --- a/drivers/tty/serial/mxs-auart.c
-> +++ b/drivers/tty/serial/mxs-auart.c
-> @@ -34,6 +34,8 @@
->   #include <linux/io.h>
->   #include <linux/pinctrl/consumer.h>
->   #include <linux/of_device.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/fsl/mxs-dma.h>
->
->   #include <asm/cacheflush.h>
->
-> @@ -71,6 +73,15 @@
->
->   #define AUART_CTRL0_SFTRST			(1 << 31)
->   #define AUART_CTRL0_CLKGATE			(1 << 30)
-> +#define AUART_CTRL0_RXTO_ENABLE			(1 << 27)
-> +#define AUART_CTRL0_RXTIMEOUT(v)		(((v) & 0x7ff) << 16)
-> +#define AUART_CTRL0_XFER_COUNT(v)		((v) & 0xffff)
-> +
-> +#define AUART_CTRL1_XFER_COUNT(v)		((v) & 0xffff)
-> +
-> +#define AUART_CTRL2_DMAONERR			(1 << 26)
-> +#define AUART_CTRL2_TXDMAE			(1 << 25)
-> +#define AUART_CTRL2_RXDMAE			(1 << 24)
->
->   #define AUART_CTRL2_CTSEN			(1 << 15)
->   #define AUART_CTRL2_RTSEN			(1 << 14)
-> @@ -111,6 +122,7 @@
->   #define AUART_STAT_BERR				(1 << 18)
->   #define AUART_STAT_PERR				(1 << 17)
->   #define AUART_STAT_FERR				(1 << 16)
-> +#define AUART_STAT_RXCOUNT_MASK			0xffff
->
->   static struct uart_driver auart_driver;
->
-> @@ -122,7 +134,10 @@ enum mxs_auart_type {
->   struct mxs_auart_port {
->   	struct uart_port port;
->
-> -	unsigned int flags;
-> +#define MXS_AUART_DMA_CONFIG	0x1
-> +#define MXS_AUART_DMA_ENABLED	0x2
-> +#define MXS_AUART_DMA_TX_SYNC	2  /* bit 2 */
-> +	unsigned long flags;
->   	unsigned int ctrl;
->   	enum mxs_auart_type devtype;
->
-> @@ -130,6 +145,20 @@ struct mxs_auart_port {
->
->   	struct clk *clk;
->   	struct device *dev;
-> +
-> +	/* for DMA */
-> +	struct mxs_dma_data dma_data;
-> +	int dma_channel_rx, dma_channel_tx;
-> +	int dma_irq_rx, dma_irq_tx;
-> +	int dma_channel;
-> +
-> +	struct scatterlist tx_sgl;
-> +	struct dma_chan	*tx_dma_chan;
-> +	void *tx_dma_buf;
-> +
-> +	struct scatterlist rx_sgl;
-> +	struct dma_chan	*rx_dma_chan;
-> +	void *rx_dma_buf;
->   };
->
->   static struct platform_device_id mxs_auart_devtype[] = {
-> @@ -155,14 +184,107 @@ static inline int is_imx28_auart(struct mxs_auart_port *s)
->   	return s->devtype == IMX28_AUART;
->   }
->
-> +static inline bool auart_dma_enabled(struct mxs_auart_port *s)
-> +{
-> +	return s->flags & MXS_AUART_DMA_ENABLED;
-> +}
-> +
->   static void mxs_auart_stop_tx(struct uart_port *u);
->
->   #define to_auart_port(u) container_of(u, struct mxs_auart_port, port)
->
-> -static inline void mxs_auart_tx_chars(struct mxs_auart_port *s)
-> +static void mxs_auart_tx_chars(struct mxs_auart_port *s);
-> +
-> +static void dma_tx_callback(void *param)
->   {
-> +	struct mxs_auart_port *s = param;
->   	struct circ_buf *xmit = &s->port.state->xmit;
->
-> +	dma_unmap_sg(s->dev, &s->tx_sgl, 1, DMA_TO_DEVICE);
-> +
-> +	/* clear the bit used to serialize the DMA tx. */
-> +	clear_bit(MXS_AUART_DMA_TX_SYNC, &s->flags);
-> +	smp_mb__after_clear_bit();
-> +
-> +	/* wake up the possible processes. */
-> +	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-> +		uart_write_wakeup(&s->port);
-> +
-> +	mxs_auart_tx_chars(s);
-> +}
-> +
-> +static int mxs_auart_dma_tx(struct mxs_auart_port *s, int size)
-> +{
-> +	struct dma_async_tx_descriptor *desc;
-> +	struct scatterlist *sgl = &s->tx_sgl;
-> +	struct dma_chan *channel = s->tx_dma_chan;
-> +	u32 pio;
-> +
-> +	/* [1] : send PIO. Note, the first pio word is CTRL1. */
-> +	pio = AUART_CTRL1_XFER_COUNT(size);
-> +	desc = dmaengine_prep_slave_sg(channel, (struct scatterlist *)&pio,
-> +					1, DMA_TRANS_NONE, 0);
-> +	if (!desc) {
-> +		dev_err(s->dev, "step 1 error\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* [2] : set DMA buffer. */
-> +	sg_init_one(sgl, s->tx_dma_buf, size);
-> +	dma_map_sg(s->dev, sgl, 1, DMA_TO_DEVICE);
-> +	desc = dmaengine_prep_slave_sg(channel, sgl,
-> +			1, DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +	if (!desc) {
-> +		dev_err(s->dev, "step 2 error\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* [3] : submit the DMA */
-> +	desc->callback = dma_tx_callback;
-> +	desc->callback_param = s;
-> +	dmaengine_submit(desc);
-> +	dma_async_issue_pending(channel);
-> +	return 0;
-> +}
-> +
-> +static void mxs_auart_tx_chars(struct mxs_auart_port *s)
-> +{
-> +	struct circ_buf *xmit = &s->port.state->xmit;
-> +
-> +	if (auart_dma_enabled(s)) {
-> +		int i = 0;
-> +		int size;
-> +		void *buffer = s->tx_dma_buf;
-> +
-> +		if (test_and_set_bit(MXS_AUART_DMA_TX_SYNC, &s->flags))
-> +			return;
-> +
-> +		while (!uart_circ_empty(xmit) && !uart_tx_stopped(&s->port)) {
-> +			size = min_t(u32, UART_XMIT_SIZE - i,
-> +				     CIRC_CNT_TO_END(xmit->head,
-> +						     xmit->tail,
-> +						     UART_XMIT_SIZE));
-> +			memcpy(buffer + i, xmit->buf + xmit->tail, size);
-> +			xmit->tail = (xmit->tail + size) & (UART_XMIT_SIZE - 1);
-> +
-> +			i += size;
-> +			if (i >= UART_XMIT_SIZE)
-> +				break;
-> +		}
-> +
-> +		if (uart_tx_stopped(&s->port))
-> +			mxs_auart_stop_tx(&s->port);
-> +
-> +		if (i) {
-> +			mxs_auart_dma_tx(s, i);
-> +		} else {
-> +			clear_bit(MXS_AUART_DMA_TX_SYNC, &s->flags);
-> +			smp_mb__after_clear_bit();
-> +		}
-> +		return;
-> +	}
-> +
-> +
->   	while (!(readl(s->port.membase + AUART_STAT) &
->   		 AUART_STAT_TXFF)) {
->   		if (s->port.x_char) {
-> @@ -316,10 +438,155 @@ static u32 mxs_auart_get_mctrl(struct uart_port *u)
->   	return mctrl;
->   }
->
-> +static bool mxs_auart_dma_filter(struct dma_chan *chan, void *param)
-> +{
-> +	struct mxs_auart_port *s = param;
-> +
-> +	if (!mxs_dma_is_apbx(chan))
-> +		return false;
-> +
-> +	if (s->dma_channel == chan->chan_id) {
-> +		chan->private = &s->dma_data;
-> +		return true;
-> +	}
-> +	return false;
-> +}
-> +
-> +static int mxs_auart_dma_prep_rx(struct mxs_auart_port *s);
-> +static void dma_rx_callback(void *arg)
-> +{
-> +	struct mxs_auart_port *s = (struct mxs_auart_port *) arg;
-> +	struct tty_struct *tty = s->port.state->port.tty;
-> +	int count;
-> +	u32 stat;
-> +
-> +	stat = readl(s->port.membase + AUART_STAT);
-> +	stat &= ~(AUART_STAT_OERR | AUART_STAT_BERR |
-> +			AUART_STAT_PERR | AUART_STAT_FERR);
-> +
-> +	count = stat & AUART_STAT_RXCOUNT_MASK;
-> +	tty_insert_flip_string(tty, s->rx_dma_buf, count);
-> +
-> +	writel(stat, s->port.membase + AUART_STAT);
-> +	tty_flip_buffer_push(tty);
-> +
-> +	/* start the next DMA for RX. */
-> +	mxs_auart_dma_prep_rx(s);
-> +}
-> +
-> +static int mxs_auart_dma_prep_rx(struct mxs_auart_port *s)
-> +{
-> +	struct dma_async_tx_descriptor *desc;
-> +	struct scatterlist *sgl = &s->rx_sgl;
-> +	struct dma_chan *channel = s->rx_dma_chan;
-> +	u32 pio[1];
-> +
-> +	/* [1] : send PIO */
-> +	pio[0] = AUART_CTRL0_RXTO_ENABLE
-> +		| AUART_CTRL0_RXTIMEOUT(0x80)
-> +		| AUART_CTRL0_XFER_COUNT(UART_XMIT_SIZE);
-> +	desc = dmaengine_prep_slave_sg(channel, (struct scatterlist *)pio,
-> +					1, DMA_TRANS_NONE, 0);
-> +	if (!desc) {
-> +		dev_err(s->dev, "step 1 error\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* [2] : send DMA request */
-> +	sg_init_one(sgl, s->rx_dma_buf, UART_XMIT_SIZE);
-> +	dma_map_sg(s->dev, sgl, 1, DMA_FROM_DEVICE);
-> +	desc = dmaengine_prep_slave_sg(channel, sgl, 1, DMA_DEV_TO_MEM,
-> +					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +	if (!desc) {
-> +		dev_err(s->dev, "step 2 error\n");
-> +		return -1;
-> +	}
-> +
-> +	/* [3] : submit the DMA, but do not issue it. */
-> +	desc->callback = dma_rx_callback;
-> +	desc->callback_param = s;
-> +	dmaengine_submit(desc);
-> +	dma_async_issue_pending(channel);
-> +	return 0;
-> +}
-> +
-> +static void mxs_auart_dma_exit_channel(struct mxs_auart_port *s)
-> +{
-> +	if (s->tx_dma_chan) {
-> +		dma_release_channel(s->tx_dma_chan);
-> +		s->tx_dma_chan = NULL;
-> +	}
-> +	if (s->rx_dma_chan) {
-> +		dma_release_channel(s->rx_dma_chan);
-> +		s->rx_dma_chan = NULL;
-> +	}
-> +
-> +	kfree(s->tx_dma_buf);
-> +	kfree(s->rx_dma_buf);
-> +	s->tx_dma_buf = NULL;
-> +	s->rx_dma_buf = NULL;
-> +}
-> +
-> +static void mxs_auart_dma_exit(struct mxs_auart_port *s)
-> +{
-> +
-> +	writel(AUART_CTRL2_TXDMAE | AUART_CTRL2_RXDMAE | AUART_CTRL2_DMAONERR,
-> +		s->port.membase + AUART_CTRL2_CLR);
-> +
-> +	mxs_auart_dma_exit_channel(s);
-> +	s->flags &= ~MXS_AUART_DMA_ENABLED;
-> +}
-> +
-> +static int mxs_auart_dma_init(struct mxs_auart_port *s)
-> +{
-> +	dma_cap_mask_t mask;
-> +
-> +	if (auart_dma_enabled(s))
-> +		return 0;
-> +
-> +	/* We do not get the right DMA channels. */
-> +	if (s->dma_channel_rx == -1 || s->dma_channel_rx == -1)
-> +		return -EINVAL;
-> +
-> +	/* init for RX */
-> +	dma_cap_zero(mask);
-> +	dma_cap_set(DMA_SLAVE, mask);
-> +	s->dma_channel = s->dma_channel_rx;
-> +	s->dma_data.chan_irq = s->dma_irq_rx;
-> +	s->rx_dma_chan = dma_request_channel(mask, mxs_auart_dma_filter, s);
-> +	if (!s->rx_dma_chan)
-> +		goto err_out;
-> +	s->rx_dma_buf = kzalloc(UART_XMIT_SIZE, GFP_KERNEL | GFP_DMA);
-> +	if (!s->rx_dma_buf)
-> +		goto err_out;
-> +
-> +	/* init for TX */
-> +	s->dma_channel = s->dma_channel_tx;
-> +	s->dma_data.chan_irq = s->dma_irq_tx;
-> +	s->tx_dma_chan = dma_request_channel(mask, mxs_auart_dma_filter, s);
-> +	if (!s->tx_dma_chan)
-> +		goto err_out;
-> +	s->tx_dma_buf = kzalloc(UART_XMIT_SIZE, GFP_KERNEL | GFP_DMA);
-> +	if (!s->tx_dma_buf)
-> +		goto err_out;
-> +
-> +	/* set the flags */
-> +	s->flags |= MXS_AUART_DMA_ENABLED;
-> +	dev_dbg(s->dev, "enabled the DMA support.");
-> +
-> +	return 0;
-> +
-> +err_out:
-> +	mxs_auart_dma_exit_channel(s);
-> +	return -EINVAL;
-> +
-> +}
-> +
->   static void mxs_auart_settermios(struct uart_port *u,
->   				 struct ktermios *termios,
->   				 struct ktermios *old)
->   {
-> +	struct mxs_auart_port *s = to_auart_port(u);
->   	u32 bm, ctrl, ctrl2, div;
->   	unsigned int cflag, baud;
->
-> @@ -391,10 +658,23 @@ static void mxs_auart_settermios(struct uart_port *u,
->   		ctrl |= AUART_LINECTRL_STP2;
->
->   	/* figure out the hardware flow control settings */
-> -	if (cflag & CRTSCTS)
-> +	if (cflag & CRTSCTS) {
-> +		/*
-> +		 * The DMA has a bug(see errata:2836) in mx23.
-> +		 * So we can not implement the DMA for auart in mx23,
-> +		 * we can only implement the DMA support for auart
-> +		 * in mx28.
-> +		 */
-> +		if (is_imx28_auart(s) && (s->flags & MXS_AUART_DMA_CONFIG)) {
-> +			if (!mxs_auart_dma_init(s))
-> +				/* enable DMA tranfer */
-> +				ctrl2 |= AUART_CTRL2_TXDMAE | AUART_CTRL2_RXDMAE
-> +				       | AUART_CTRL2_DMAONERR;
-> +		}
->   		ctrl2 |= AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN;
-> -	else
-> +	} else {
->   		ctrl2 &= ~(AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN);
-> +	}
->
->   	/* set baud rate */
->   	baud = uart_get_baud_rate(u, termios, old, 0, u->uartclk);
-> @@ -406,6 +686,17 @@ static void mxs_auart_settermios(struct uart_port *u,
->   	writel(ctrl2, u->membase + AUART_CTRL2);
->
->   	uart_update_timeout(u, termios->c_cflag, baud);
-> +
-> +	/* prepare for the DMA RX. */
-> +	if (auart_dma_enabled(s)) {
-> +		if (!mxs_auart_dma_prep_rx(s)) {
-> +			/* Disable the normal RX interrupt. */
-> +			writel(AUART_INTR_RXIEN, u->membase + AUART_INTR_CLR);
-> +		} else {
-> +			mxs_auart_dma_exit(s);
-> +			dev_err(s->dev, "We can not start up the DMA.\n");
-> +		}
-> +	}
->   }
->
->   static irqreturn_t mxs_auart_irq_handle(int irq, void *context)
-> @@ -484,6 +775,9 @@ static void mxs_auart_shutdown(struct uart_port *u)
->   {
->   	struct mxs_auart_port *s = to_auart_port(u);
->
-> +	if (auart_dma_enabled(s))
-> +		mxs_auart_dma_exit(s);
-> +
->   	writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_CLR);
->
->   	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
-> @@ -717,6 +1011,7 @@ static int serial_mxs_probe_dt(struct mxs_auart_port *s,
->   		struct platform_device *pdev)
->   {
->   	struct device_node *np = pdev->dev.of_node;
-> +	u32 dma_channel[2];
->   	int ret;
->
->   	if (!np)
-> @@ -730,6 +1025,20 @@ static int serial_mxs_probe_dt(struct mxs_auart_port *s,
->   	}
->   	s->port.line = ret;
->
-> +	s->dma_irq_rx = platform_get_irq(pdev, 1);
-> +	s->dma_irq_tx = platform_get_irq(pdev, 2);
-> +
-> +	ret = of_property_read_u32_array(np, "fsl,auart-dma-channel",
-> +					dma_channel, 2);
-> +	if (ret == 0) {
-> +		s->dma_channel_rx = dma_channel[0];
-> +		s->dma_channel_tx = dma_channel[1];
-> +
-> +		s->flags |= MXS_AUART_DMA_CONFIG;
-> +	} else {
-> +		s->dma_channel_rx = -1;
-> +		s->dma_channel_tx = -1;
-> +	}
->   	return 0;
->   }
->
-> @@ -787,7 +1096,6 @@ static int __devinit mxs_auart_probe(struct platform_device *pdev)
->   	s->port.type = PORT_IMX;
->   	s->port.dev = s->dev = get_device(&pdev->dev);
->
-> -	s->flags = 0;
->   	s->ctrl = 0;
->
->   	s->irq = platform_get_irq(pdev, 0);
->
+Cheers
+---Dave
