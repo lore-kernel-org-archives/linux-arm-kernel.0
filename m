@@ -1,197 +1,533 @@
-From: wolfram@the-dreams.de (Wolfram Sang)
-Date: Tue, 13 Nov 2012 18:16:43 +0100
-Subject: [PATCH] bindings: i2c: use consistent naming for i2c binding
- descriptions
-Message-ID: <1352827003-24287-1-git-send-email-wolfram@the-dreams.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 13 Nov 2012 17:17:45 +0000
+Subject: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
+In-Reply-To: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B59@SAFEX1MAIL3.st.com>
+References: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B59@SAFEX1MAIL3.st.com>
+Message-ID: <20121113171745.GA6370@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Filenames of devictree binding documentation seems to be arbitrary and
-for me it is unneeded hazzle to find the corresponding documentation for
-a specific driver.
+On Tue, Nov 13, 2012 at 04:08:14PM +0000, Etienne CARRIERE wrote:
+> From: Etienne Carriere <etienne.carriere@stericsson.com>
+> 
+>  
+> 
+> Secure code in TrustZone space may need to perform L2 cache
+> 
+> maintenance operations. A shared mutex is required to synchronize
+> 
+> linux l2cc maintenance and TZ l2cc maintenance.
 
-Naming the description the same as the driver is a lot easier and makes
-sense to me since the driver defines the binding it understands.
+1) Why is this not a denial-of-service risk?  (i.e., why can the Normal
+World not simply hold the mutex forever?)
 
-Also, remove a reference in one source to the binding documentation, since path
-information easily gets stale.
+2) The memory types on both sides have to be _exactly_ the same, not
+just "cached", otherwise unpredictable behaviour may occur when accessing
+the mutex.  It is not obvious how this is ensured.
 
-Signed-off-by: Wolfram Sang <wolfram@the-dreams.de>
-Cc: Rob Herring <robherring2@gmail.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
----
+3) Many people seem to delegate L2 cache maintenence requests via SMC
+in these situations.  Can you do that instead?
 
-I think it would be helpful if other subsystems would follow if we can agree on
-this pattern.
 
-Thanks,
+Cheers
+---Dave
 
-   Wolfram
-
- .../bindings/i2c/{atmel-i2c.txt => i2c-at91.txt}     |    0
- .../bindings/i2c/{davinci.txt => i2c-davinci.txt}    |    0
- .../bindings/i2c/{gpio-i2c.txt => i2c-gpio.txt}      |    0
- .../bindings/i2c/{fsl-imx-i2c.txt => i2c-imx.txt}    |    0
- .../bindings/i2c/{fsl-i2c.txt => i2c-mpc.txt}        |    0
- .../devicetree/bindings/i2c/{mux.txt => i2c-mux.txt} |    0
- .../devicetree/bindings/i2c/i2c-mv64xxx.txt          |   18 ++++++++++++++++++
- .../bindings/i2c/{nomadik.txt => i2c-nomadik.txt}    |    0
- .../bindings/i2c/{cavium-i2c.txt => i2c-octeon.txt}  |    0
- .../bindings/i2c/{omap-i2c.txt => i2c-omap.txt}      |    0
- .../devicetree/bindings/i2c/{pnx.txt => i2c-pnx.txt} |    0
- .../i2c/{ce4100-i2c.txt => i2c-pxa-pci-ce4100.txt}   |    0
- .../bindings/i2c/{mrvl-i2c.txt => i2c-pxa.txt}       |   18 ------------------
- .../i2c/{samsung-i2c.txt => i2c-s3c2410.txt}         |    0
- .../bindings/i2c/{sirf-i2c.txt => i2c-sirf.txt}      |    0
- .../i2c/{arm-versatile.txt => i2c-versatile.txt}     |    0
- .../bindings/i2c/{xiic.txt => i2c-xiic.txt}          |    0
- drivers/i2c/busses/i2c-ocores.c                      |    4 ----
- 18 files changed, 18 insertions(+), 22 deletions(-)
- rename Documentation/devicetree/bindings/i2c/{atmel-i2c.txt => i2c-at91.txt} (100%)
- rename Documentation/devicetree/bindings/i2c/{davinci.txt => i2c-davinci.txt} (100%)
- rename Documentation/devicetree/bindings/i2c/{gpio-i2c.txt => i2c-gpio.txt} (100%)
- rename Documentation/devicetree/bindings/i2c/{fsl-imx-i2c.txt => i2c-imx.txt} (100%)
- rename Documentation/devicetree/bindings/i2c/{fsl-i2c.txt => i2c-mpc.txt} (100%)
- rename Documentation/devicetree/bindings/i2c/{mux.txt => i2c-mux.txt} (100%)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
- rename Documentation/devicetree/bindings/i2c/{nomadik.txt => i2c-nomadik.txt} (100%)
- rename Documentation/devicetree/bindings/i2c/{cavium-i2c.txt => i2c-octeon.txt} (100%)
- rename Documentation/devicetree/bindings/i2c/{omap-i2c.txt => i2c-omap.txt} (100%)
- rename Documentation/devicetree/bindings/i2c/{pnx.txt => i2c-pnx.txt} (100%)
- rename Documentation/devicetree/bindings/i2c/{ce4100-i2c.txt => i2c-pxa-pci-ce4100.txt} (100%)
- rename Documentation/devicetree/bindings/i2c/{mrvl-i2c.txt => i2c-pxa.txt} (70%)
- rename Documentation/devicetree/bindings/i2c/{samsung-i2c.txt => i2c-s3c2410.txt} (100%)
- rename Documentation/devicetree/bindings/i2c/{sirf-i2c.txt => i2c-sirf.txt} (100%)
- rename Documentation/devicetree/bindings/i2c/{arm-versatile.txt => i2c-versatile.txt} (100%)
- rename Documentation/devicetree/bindings/i2c/{xiic.txt => i2c-xiic.txt} (100%)
-
-diff --git a/Documentation/devicetree/bindings/i2c/atmel-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/i2c/atmel-i2c.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-at91.txt
-diff --git a/Documentation/devicetree/bindings/i2c/davinci.txt b/Documentation/devicetree/bindings/i2c/i2c-davinci.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/i2c/davinci.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-davinci.txt
-diff --git a/Documentation/devicetree/bindings/i2c/gpio-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-gpio.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/i2c/gpio-i2c.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-gpio.txt
-diff --git a/Documentation/devicetree/bindings/i2c/fsl-imx-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/i2c/fsl-imx-i2c.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-imx.txt
-diff --git a/Documentation/devicetree/bindings/i2c/fsl-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-mpc.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/i2c/fsl-i2c.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-mpc.txt
-diff --git a/Documentation/devicetree/bindings/i2c/mux.txt b/Documentation/devicetree/bindings/i2c/i2c-mux.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/i2c/mux.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-mux.txt
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-new file mode 100644
-index 0000000..f46d928
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-@@ -0,0 +1,18 @@
-+
-+* Marvell MV64XXX I2C controller
-+
-+Required properties :
-+
-+ - reg             : Offset and length of the register set for the device
-+ - compatible      : Should be "marvell,mv64xxx-i2c"
-+ - interrupts      : The interrupt number
-+ - clock-frequency : Desired I2C bus clock frequency in Hz.
-+
-+Examples:
-+
-+	i2c at 11000 {
-+		compatible = "marvell,mv64xxx-i2c";
-+		reg = <0x11000 0x20>;
-+		interrupts = <29>;
-+		clock-frequency = <100000>;
-+	};
-diff --git a/Documentation/devicetree/bindings/i2c/nomadik.txt b/Documentation/devicetree/bindings/i2c/i2c-nomadik.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/i2c/nomadik.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-nomadik.txt
-diff --git a/Documentation/devicetree/bindings/i2c/cavium-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-octeon.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/i2c/cavium-i2c.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-octeon.txt
-diff --git a/Documentation/devicetree/bindings/i2c/omap-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-omap.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/i2c/omap-i2c.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-omap.txt
-diff --git a/Documentation/devicetree/bindings/i2c/pnx.txt b/Documentation/devicetree/bindings/i2c/i2c-pnx.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/i2c/pnx.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-pnx.txt
-diff --git a/Documentation/devicetree/bindings/i2c/ce4100-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-pxa-pci-ce4100.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/i2c/ce4100-i2c.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-pxa-pci-ce4100.txt
-diff --git a/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
-similarity index 70%
-rename from Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-pxa.txt
-index 0f79450..12b78ac 100644
---- a/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
-@@ -31,21 +31,3 @@ Examples:
- 		reg = <0xd4025000 0x1000>;
- 		interrupts = <58>;
- 	};
--
--* Marvell MV64XXX I2C controller
--
--Required properties :
--
-- - reg             : Offset and length of the register set for the device
-- - compatible      : Should be "marvell,mv64xxx-i2c"
-- - interrupts      : The interrupt number
-- - clock-frequency : Desired I2C bus clock frequency in Hz.
--
--Examples:
--
--	i2c at 11000 {
--		compatible = "marvell,mv64xxx-i2c";
--		reg = <0x11000 0x20>;
--		interrupts = <29>;
--		clock-frequency = <100000>;
--	};
-diff --git a/Documentation/devicetree/bindings/i2c/samsung-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/i2c/samsung-i2c.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-s3c2410.txt
-diff --git a/Documentation/devicetree/bindings/i2c/sirf-i2c.txt b/Documentation/devicetree/bindings/i2c/i2c-sirf.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/i2c/sirf-i2c.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-sirf.txt
-diff --git a/Documentation/devicetree/bindings/i2c/arm-versatile.txt b/Documentation/devicetree/bindings/i2c/i2c-versatile.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/i2c/arm-versatile.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-versatile.txt
-diff --git a/Documentation/devicetree/bindings/i2c/xiic.txt b/Documentation/devicetree/bindings/i2c/i2c-xiic.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/i2c/xiic.txt
-rename to Documentation/devicetree/bindings/i2c/i2c-xiic.txt
-diff --git a/drivers/i2c/busses/i2c-ocores.c b/drivers/i2c/busses/i2c-ocores.c
-index bffd550..15da1ac 100644
---- a/drivers/i2c/busses/i2c-ocores.c
-+++ b/drivers/i2c/busses/i2c-ocores.c
-@@ -9,10 +9,6 @@
-  * kind, whether express or implied.
-  */
- 
--/*
-- * This driver can be used from the device tree, see
-- *     Documentation/devicetree/bindings/i2c/ocore-i2c.txt
-- */
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/init.h>
--- 
-1.7.10.4
+> The TZ mutex is an "arch_spinlock": a 32bit DDR cell (ARMv7-A mutex).
+> 
+> Linux L2 cache driver must lock TZ mutex if enabled.
+> 
+>  
+> 
+> Signed-off-by: Etienne Carriere <etienne.carriere@stericsson.com>
+> 
+> ---
+> 
+> arch/arm/include/asm/outercache.h |  9 ++++
+> 
+> arch/arm/mm/cache-l2x0.c          | 87 +++++++++++++++++++++++++++++----------
+> 
+> 2 files changed, 74 insertions(+), 22 deletions(-)
+> 
+>  
+> 
+> diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/
+> outercache.h
+> 
+> index 53426c6..7aa5eac 100644
+> 
+> --- a/arch/arm/include/asm/outercache.h
+> 
+> +++ b/arch/arm/include/asm/outercache.h
+> 
+> @@ -35,6 +35,7 @@ struct outer_cache_fns {
+> 
+> #endif
+> 
+>                void (*set_debug)(unsigned long);
+> 
+>                void (*resume)(void);
+> 
+> +             bool (*tz_mutex)(unsigned long);
+> 
+> };
+> 
+>  #ifdef CONFIG_OUTER_CACHE
+> 
+> @@ -81,6 +82,13 @@ static inline void outer_resume(void)
+> 
+>                                outer_cache.resume();
+> 
+> }
+> 
+> +static inline bool outer_tz_mutex(unsigned long addr)
+> 
+> +{
+> 
+> +             if (outer_cache.tz_mutex)
+> 
+> +                             return outer_cache.tz_mutex(addr);
+> 
+> +             return false;
+> 
+> +}
+> 
+> +
+> 
+> #else
+> 
+>  static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
+> 
+> @@ -92,6 +100,7 @@ static inline void outer_flush_range(phys_addr_t start,
+> phys_addr_t end)
+> 
+> static inline void outer_flush_all(void) { }
+> 
+> static inline void outer_inv_all(void) { }
+> 
+> static inline void outer_disable(void) { }
+> 
+> +static inline bool outer_tz_mutex(unsigned long addr) { return false; }
+> 
+>  #endif
+> 
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> 
+> index a53fd2a..eacdc74 100644
+> 
+> --- a/arch/arm/mm/cache-l2x0.c
+> 
+> +++ b/arch/arm/mm/cache-l2x0.c
+> 
+> @@ -41,6 +41,26 @@ struct l2x0_of_data {
+> 
+>                void (*resume)(void);
+> 
+> };
+> 
+> +/*
+> 
+> + * arch_spinlock (single 32bit DDR mutex cell) pointer to synchronise
+> 
+> + * L2CC maintenance between linux world and secure world (ARM TZ).
+> 
+> + */
+> 
+> +arch_spinlock_t *l2x0_tz_mutex;
+> 
+> +
+> 
+> +#define l2x0_spin_lock_irqsave(flags) \
+> 
+> +             do
+> {                                                                                                       
+> \
+> 
+> +                             raw_spin_lock_irqsave(&l2x0_lock, flags);
+>            \
+> 
+> +                             if (l2x0_tz_mutex)
+>                                                            \
+> 
+> +                                             arch_spin_lock(l2x0_tz_mutex);
+>                                \
+> 
+> +             } while (0)
+> 
+> +
+> 
+> +#define l2x0_spin_unlock_irqrestore(flags) \
+> 
+> +             do
+> {                                                                                                       
+> \
+> 
+> +                             if (l2x0_tz_mutex)
+>                                                            \
+> 
+> +                                             arch_spin_unlock(l2x0_tz_mutex);
+>          \
+> 
+> +                             raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+>                 \
+> 
+> +             } while (0)
+> 
+> +
+> 
+> static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
+> 
+> {
+> 
+>                /* wait for cache operation by line or way to complete */
+> 
+> @@ -126,9 +146,9 @@ static void l2x0_cache_sync(void)
+> 
+> {
+> 
+>                unsigned long flags;
+> 
+> -              raw_spin_lock_irqsave(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_lock_irqsave(flags);
+> 
+>                cache_sync();
+> 
+> -              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_unlock_irqrestore(flags);
+> 
+> }
+> 
+>  static void __l2x0_flush_all(void)
+> 
+> @@ -145,9 +165,9 @@ static void l2x0_flush_all(void)
+> 
+>                unsigned long flags;
+> 
+>                 /* clean all ways */
+> 
+> -              raw_spin_lock_irqsave(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_lock_irqsave(flags);
+> 
+>                __l2x0_flush_all();
+> 
+> -              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_unlock_irqrestore(flags);
+> 
+> }
+> 
+>  static void l2x0_clean_all(void)
+> 
+> @@ -155,11 +175,11 @@ static void l2x0_clean_all(void)
+> 
+>                unsigned long flags;
+> 
+>                 /* clean all ways */
+> 
+> -              raw_spin_lock_irqsave(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_lock_irqsave(flags);
+> 
+>                writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_CLEAN_WAY);
+> 
+>                cache_wait_way(l2x0_base + L2X0_CLEAN_WAY, l2x0_way_mask);
+> 
+>                cache_sync();
+> 
+> -              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_unlock_irqrestore(flags);
+> 
+> }
+> 
+>  static void l2x0_inv_all(void)
+> 
+> @@ -167,13 +187,13 @@ static void l2x0_inv_all(void)
+> 
+>                unsigned long flags;
+> 
+>                 /* invalidate all ways */
+> 
+> -              raw_spin_lock_irqsave(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_lock_irqsave(flags);
+> 
+>                /* Invalidating when L2 is enabled is a nono */
+> 
+>                BUG_ON(readl(l2x0_base + L2X0_CTRL) & 1);
+> 
+>                writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_INV_WAY);
+> 
+>                cache_wait_way(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
+> 
+>                cache_sync();
+> 
+> -              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_unlock_irqrestore(flags);
+> 
+> }
+> 
+>  static void l2x0_inv_range(unsigned long start, unsigned long end)
+> 
+> @@ -181,7 +201,7 @@ static void l2x0_inv_range(unsigned long start, unsigned
+> long end)
+> 
+>                void __iomem *base = l2x0_base;
+> 
+>                unsigned long flags;
+> 
+> -              raw_spin_lock_irqsave(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_lock_irqsave(flags);
+> 
+>                if (start & (CACHE_LINE_SIZE - 1)) {
+> 
+>                                start &= ~(CACHE_LINE_SIZE - 1);
+> 
+>                                debug_writel(0x03);
+> 
+> @@ -206,13 +226,13 @@ static void l2x0_inv_range(unsigned long start, unsigned
+> long end)
+> 
+>                                }
+> 
+>                                 if (blk_end < end) {
+> 
+> -                                              raw_spin_unlock_irqrestore(&
+> l2x0_lock, flags);
+> 
+> -                                              raw_spin_lock_irqsave(&
+> l2x0_lock, flags);
+> 
+> +                                             l2x0_spin_unlock_irqrestore
+> (flags);
+> 
+> +                                             l2x0_spin_lock_irqsave(flags);
+> 
+>                                }
+> 
+>                }
+> 
+>                cache_wait(base + L2X0_INV_LINE_PA, 1);
+> 
+>                cache_sync();
+> 
+> -              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_unlock_irqrestore(flags);
+> 
+> }
+> 
+>  static void l2x0_clean_range(unsigned long start, unsigned long end)
+> 
+> @@ -225,7 +245,7 @@ static void l2x0_clean_range(unsigned long start, unsigned
+> long end)
+> 
+>                                return;
+> 
+>                }
+> 
+> -              raw_spin_lock_irqsave(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_lock_irqsave(flags);
+> 
+>                start &= ~(CACHE_LINE_SIZE - 1);
+> 
+>                while (start < end) {
+> 
+>                                unsigned long blk_end = start + min(end - start,
+> 4096UL);
+> 
+> @@ -236,13 +256,13 @@ static void l2x0_clean_range(unsigned long start,
+> unsigned long end)
+> 
+>                                }
+> 
+>                                 if (blk_end < end) {
+> 
+> -                                              raw_spin_unlock_irqrestore(&
+> l2x0_lock, flags);
+> 
+> -                                              raw_spin_lock_irqsave(&
+> l2x0_lock, flags);
+> 
+> +                                             l2x0_spin_unlock_irqrestore
+> (flags);
+> 
+> +                                             l2x0_spin_lock_irqsave(flags);
+> 
+>                                }
+> 
+>                }
+> 
+>                cache_wait(base + L2X0_CLEAN_LINE_PA, 1);
+> 
+>                cache_sync();
+> 
+> -              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_unlock_irqrestore(flags);
+> 
+> }
+> 
+>  static void l2x0_flush_range(unsigned long start, unsigned long end)
+> 
+> @@ -255,7 +275,7 @@ static void l2x0_flush_range(unsigned long start, unsigned
+> long end)
+> 
+>                                return;
+> 
+>                }
+> 
+> -              raw_spin_lock_irqsave(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_lock_irqsave(flags);
+> 
+>                start &= ~(CACHE_LINE_SIZE - 1);
+> 
+>                while (start < end) {
+> 
+>                                unsigned long blk_end = start + min(end - start,
+> 4096UL);
+> 
+> @@ -268,24 +288,24 @@ static void l2x0_flush_range(unsigned long start,
+> unsigned long end)
+> 
+>                                debug_writel(0x00);
+> 
+>                                 if (blk_end < end) {
+> 
+> -                                              raw_spin_unlock_irqrestore(&
+> l2x0_lock, flags);
+> 
+> -                                              raw_spin_lock_irqsave(&
+> l2x0_lock, flags);
+> 
+> +                                             l2x0_spin_unlock_irqrestore
+> (flags);
+> 
+> +                                             l2x0_spin_lock_irqsave(flags);
+> 
+>                                }
+> 
+>                }
+> 
+>                cache_wait(base + L2X0_CLEAN_INV_LINE_PA, 1);
+> 
+>                cache_sync();
+> 
+> -              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_unlock_irqrestore(flags);
+> 
+> }
+> 
+>  static void l2x0_disable(void)
+> 
+> {
+> 
+>                unsigned long flags;
+> 
+> -              raw_spin_lock_irqsave(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_lock_irqsave(flags);
+> 
+>                __l2x0_flush_all();
+> 
+>                writel_relaxed(0, l2x0_base + L2X0_CTRL);
+> 
+>                dsb();
+> 
+> -              raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+> 
+> +             l2x0_spin_unlock_irqrestore(flags);
+> 
+> }
+> 
+>  static void l2x0_unlock(u32 cache_id)
+> 
+> @@ -307,6 +327,28 @@ static void l2x0_unlock(u32 cache_id)
+> 
+>                }
+> 
+> }
+> 
+> +/* Enable/disable external mutex shared with TZ code */
+> 
+> +static bool l2x0_tz_mutex_cfg(unsigned long addr)
+> 
+> +{
+> 
+> +             unsigned long flags;
+> 
+> +
+> 
+> +             raw_spin_lock_irqsave(&l2x0_lock, flags);
+> 
+> +
+> 
+> +             if (addr && l2x0_tz_mutex && (addr != (uint)l2x0_tz_mutex)) {
+> 
+> +                             raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+> 
+> +                             pr_err("%s: a TZ mutex is already enabled\n",
+> __func__);
+> 
+> +                             return false;
+> 
+> +             }
+> 
+> +
+> 
+> +             l2x0_tz_mutex = (arch_spinlock_t *)addr;
+> 
+> +             /* insure mutex ptr is updated before lock is released */
+> 
+> +             smp_wmb();
+> 
+> +
+> 
+> +             raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+> 
+> +             pr_debug("\n%s: %sable TZ mutex\n\n", __func__, (addr) ? "en" :
+> "dis");
+> 
+> +             return true;
+> 
+> +}
+> 
+> +
+> 
+> void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+> 
+> {
+> 
+>                u32 aux;
+> 
+> @@ -380,6 +422,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32
+> aux_mask)
+> 
+>                outer_cache.inv_all = l2x0_inv_all;
+> 
+>                outer_cache.disable = l2x0_disable;
+> 
+>                outer_cache.set_debug = l2x0_set_debug;
+> 
+> +             outer_cache.tz_mutex = l2x0_tz_mutex_cfg;
+> 
+>                 printk(KERN_INFO "%s cache controller enabled\n", type);
+> 
+>                printk(KERN_INFO "l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL
+> 0x%08x, Cache size: %d B\n",
+> 
+>  
+> 
+> --
+> 
+> 1.7.11.3
+> 
+>  
+> 
