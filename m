@@ -1,29 +1,51 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 13 Nov 2012 14:44:06 -0500 (EST)
-Subject: [PATCH] wanrouter: Remove it and the drivers that depend on it
-In-Reply-To: <67fe0c5701a8c7cfe06b178cf04b1c5c06592714.1352548454.git.joe@perches.com>
-References: <67fe0c5701a8c7cfe06b178cf04b1c5c06592714.1352548454.git.joe@perches.com>
-Message-ID: <20121113.144406.1610017702502358739.davem@davemloft.net>
+From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
+Date: Wed, 14 Nov 2012 04:54:07 +0900
+Subject: [PATCH] ARM: kirkwood: Add Plat'Home OpenBlocks A6 support
+In-Reply-To: <20121113123739.GS22042@titan.lakedaemon.net>
+References: <1352792590-20052-1-git-send-email-iwamatsu@nigauri.org>
+ <20121113123739.GS22042@titan.lakedaemon.net>
+Message-ID: <CABMQnVKPyEp-cm_M_Y4rSU_tNLHL0fhUKUUgZkTkV+8MhnjVdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joe Perches <joe@perches.com>
-Date: Sat, 10 Nov 2012 06:20:55 -0800
+Hi,
 
-> Remove wanrouter as it's obsolete and has not been updated
-> by sangoma since 2.4.3 or so and it's not used anymore.
-> 
-> Remove obsolete cyclomx drivers.
-> Update defconfig files that enable wanrouter.
-> Update files that include now deleted wanrouter bits.
-> 
-> Signed-off-by: Joe Perches <joe@perches.com>
+On Tue, Nov 13, 2012 at 9:37 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> Nobuhiro,
+>
+> On Tue, Nov 13, 2012 at 04:43:09PM +0900, Nobuhiro Iwamatsu wrote:
+>> Add support for Plat'Home OpenBlocks A6 using the device tree
+>> where possible.
+>> This commit supports SATA, USB, ether and serial console.
+>>
+>> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+>> ---
+>> V2:
+>>   - Remove unnecessary value from bootargs.
+>>   - Update comment for MPP table.
+>>   - Remove kirkwood_uart0_init().
+>
+> Thanks for the patch.  One small note.  In the future, please add a 'V2'
+> to the subject line, eg "[PATCH V2] ...".  It really helps us keep track of
+> which one to merge.
 
-I'm fine with this change, except the arch defconfig bits.
+Although I knew about it , I forgot adding "V2".
 
-We've been leaving those alone, and letting the arch maintainers
-do the updates themselves periodically.
+>
+> No need to resend, I'll keep track of it since I'm about to pull
+> everything together over the next few days.
 
-Please resubmit this with those parts removed.
+Thank you.
 
-Thanks.
+>
+> thx,
+>
+> Jason.
+
+Best regards,
+  Nobuhiro
+
+-- 
+Nobuhiro Iwamatsu
+   iwamatsu at {nigauri.org / debian.org}
+   GPG ID: 40AD1FA6
