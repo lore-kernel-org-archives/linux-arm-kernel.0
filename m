@@ -1,239 +1,81 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 14 Nov 2012 15:04:06 +0100
-Subject: [PATCH v6 2/7] net: mvneta: driver for Marvell Armada 370/XP
- network unit
-In-Reply-To: <20121113231248.GA30391@electric-eye.fr.zoreil.com>
-References: <1352818843-4457-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1352818843-4457-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121113231248.GA30391@electric-eye.fr.zoreil.com>
-Message-ID: <20121114150406.6e85dcc5@skate>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 14 Nov 2012 15:19:06 +0100
+Subject: [PATCH 1/2] pinctrl/nomadik: db8500: split clkout group
+Message-ID: <1352902746-12925-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Francois,
+From: Patrice Chotard <patrice.chotard@stericsson.com>
 
-Thanks again for your detailed review. I have a few comments/questions
-below.
+The clkout group is split into groups clkout1 and clkout2
+which allows pins cklkout1 and clkout2 to be muxed
+separately.
 
-On Wed, 14 Nov 2012 00:12:48 +0100, Francois Romieu wrote:
-> Thomas Petazzoni <thomas.petazzoni@free-electrons.com> :
-> [...]
-> > +static int mvneta_mac_addr_set(struct mvneta_port *pp, unsigned
-> > char *addr,
-> > +			       int queue)
-> > +{
-> > +	unsigned int mac_h;
-> > +	unsigned int mac_l;
-> > +
-> > +	if (queue >= 1) {
-> > +		netdev_err(pp->dev, "RX queue #%d is out of
-> > range\n", queue);
-> > +		return -EINVAL;
-> > +	}
-> 
-> (whence q <= 0)
+Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-nomadik-db8500.c | 21 ++++++++++++++-------
+ 1 file changed, 14 insertions(+), 7 deletions(-)
 
-After changing the code as per your below comments, I have removed this
-check.
-
-> > +
-> > +	if (queue != -1) {
-> > +		mac_l = (addr[4] << 8) | (addr[5]);
-> > +		mac_h = (addr[0] << 24) | (addr[1] << 16) |
-> > +			(addr[2] << 8) | (addr[3] << 0);
-> > +
-> > +		mvreg_write(pp, MVNETA_MAC_ADDR_LOW, mac_l);
-> > +		mvreg_write(pp, MVNETA_MAC_ADDR_HIGH, mac_h);
-> > +	}
-> 
-> What is it trying to achieve with the "queue" argument ?
-
-Basically: queue == -1 is a special value to say "I want to discard the
-entries in the ucast table". It's used when switching from one MAC
-address to another: we remove the old entries by specifying queue=-1,
-and then add the new entries by specifying queue=0.
-
-The thing is that the driver does not yet support the multiqueue
-aspects of the device, but since many registers have queue-related
-aspects, we still have to worry about queues a little bit in the
-driver. Complete multiqueue support is planned as a second step.
-
-> [...]
-> > +/* Refill processing */
-> > +static int mvneta_rx_refill(struct mvneta_port *pp,
-> > +			    struct mvneta_rx_desc *rx_desc)
-> > +
-> > +{
-> > +	dma_addr_t phys_addr;
-> > +	struct sk_buff *skb;
-> > +
-> > +	skb = netdev_alloc_skb(pp->dev, pp->pkt_size);
-> > +	if (!skb)
-> > +		return -ENOMEM;
-> 
-> Could netdev_alloc_skb_ip_align be an option ?
-
-If I'm correct netdev_alloc_skb_ip_align() automatically reserve the
-two bytes at the beginning of the Ethernet header to ensure that the IP
-header will be aligned.
-
-However, with the Marvell hardware, it isn't needed: the hardware
-automatically pads with two empty bytes in the receiving RX buffer
-before putting the real data (Ethernet header).
-
-> [...]
-> > +static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
-> > +		     struct mvneta_rx_queue *rxq)
-> > +{
-> > +	struct net_device *dev = pp->dev;
-> > +	int rx_done, rx_filled;
-> > +
-> > +	/* Get number of received packets */
-> > +	rx_done = mvneta_rxq_busy_desc_num_get(pp, rxq);
-> > +
-> > +	if (rx_todo > rx_done)
-> > +		rx_todo = rx_done;
-> > +
-> > +	rx_done = 0;
-> > +	rx_filled = 0;
-> > +
-> > +	/* Fairness NAPI loop */
-> > +	while (rx_done < rx_todo) {
-> > +		struct mvneta_rx_desc *rx_desc =
-> > mvneta_rxq_next_desc_get(rxq);
-> > +		struct sk_buff *skb;
-> > +		u32 rx_status;
-> > +		int rx_bytes, err;
-> > +
-> > +		prefetch(rx_desc);
-> > +		rx_done++;
-> > +		rx_filled++;
-> > +		rx_status = rx_desc->status;
-> > +		skb = (struct sk_buff *)rx_desc->buf_cookie;
-> > +
-> > +		if (!mvneta_rxq_desc_is_first_last(rx_desc) ||
-> > +		    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
-> > +			dev->stats.rx_errors++;
-> > +			mvneta_rx_error(pp, rx_desc);
-> > +			mvneta_rx_desc_fill(rx_desc,
-> > rx_desc->buf_phys_addr,
-> > +					    (u32)skb);
-> > +			continue;
-> > +		}
-> > +
-> > +		dma_unmap_single(pp->dev->dev.parent,
-> > rx_desc->buf_phys_addr,
-> > +				 rx_desc->data_size,
-> > DMA_FROM_DEVICE); +
-> > +		rx_bytes = rx_desc->data_size -
-> > +			(MVNETA_ETH_CRC_SIZE + MVNETA_MH_SIZE);
-> > +		u64_stats_update_begin(&pp->rx_stats.syncp);
-> > +		pp->rx_stats.packets++;
-> > +		pp->rx_stats.bytes += rx_bytes;
-> > +		u64_stats_update_end(&pp->rx_stats.syncp);
-> > +
-> > +		/* Linux processing */
-> > +		skb_reserve(skb, MVNETA_MH_SIZE);
-> > +		skb_put(skb, rx_bytes);
-> 
-> (I suggested to use skb_reserve / skb_put instead of hand-crafted
-> code but I may have ignored the elephant in the living room)
-> 
-> I understand the skb_put, ok. What is the purpose of the skb_reserve ?
-
-As explained above, to skip the starting 2 bytes filled with zeroes by
-the Marvell hardware, before passing the SKB up to the networking stack.
-
-> Are MVNETA_ETH_CRC_SIZE (4) and MVNETA_MH_SIZE (2) really different
-> from ETH_FCS_LEN and NET_IP_ALIGN ?
-
-I have replaced MVNETA_ETH_CRC_SIZE with ETH_FCS_LEN since they are
-indeed the same. However, I am not sure using NET_IP_ALIGN directly
-instead of MVNETA_MH_SIZE is correct: the Marvell Header (MH) is always
-two bytes: those two bytes are filled with zeroes in the normal case,
-or otherwise they are used for some custom interaction between the
-Marvell Ethernet controller and specific Marvell switches (this
-feature is not supported by the driver being submitted). On the other
-hand, the NET_IP_ALIGN value is not necessarily zero apparently, so I
-have the feeling that those things should remain two separate values.
-
-> > +	if (napi_schedule_prep(&pp->napi))
-> > +		__napi_schedule(&pp->napi);
-> 
-> Hand-crafted napi_schedule.
-
-Agreed, fixed.
-
-> > +	ret = mvneta_mac_addr_set(pp, dev->dev_addr, rxq_def);
-> > +	if (ret < 0) {
-> > +		netdev_err(dev, "mvneta_mac_addr_set failed\n");
-> > +		goto mac_addr_set_failure;
-> > +	}
-> 
-> AFAIU mvneta_mac_addr_set can only fail when (module parameter)
-> rxq_def is not set correctly. It imho calls for a check in
-> probe/remove and a removal of the failure case in mvneta_mac_addr_set.
-
-Good point, fixed.
-
-> > +	/* Connect to port interrupt line */
-> > +	ret = request_irq(pp->dev->irq, mvneta_isr, IRQF_DISABLED,
-> > +			  MVNETA_DRIVER_NAME, pp);
-> 
-> include/linux/interrupt.h
-> [...]
->  * IRQF_DISABLED - keep irqs disabled when calling the action handler.
->  *                 DEPRECATED. This flag is a NOOP and scheduled to
-> be removed
-
-Fixed.
-
-> > +	if (mvneta_init(pp, phy_addr)) {
-> > +		dev_err(&pdev->dev, "can't init eth hal\n");
-> > +		err = -ENODEV;
-> > +		goto err_base;
-> > +	}
-> 
-> The error code from mvneta_init() should be used.
-
-Fixed.
-
-> > +	if (register_netdev(dev)) {
-> > +		dev_err(&pdev->dev, "failed to register\n");
-> > +		err = ENOMEM;
-> > +		goto err_base;
-> > +	}
-> 
-> - The error code from register_netdev() should be used.
-> - Leak: allocations in mvneta_init() are not balanced.
-> - Nit: the "err_where_did_it_trigger_first" style of label shows its
->   downside when compared to the "err_what_should_be_done" when
->   it gets used several times.
-
-Fixed.
-
-> > +/* Device removal routine */
-> > +static int __devexit mvneta_remove(struct platform_device *pdev)
-> > +{
-> > +	struct net_device  *dev = platform_get_drvdata(pdev);
-> > +	struct mvneta_port *pp = netdev_priv(dev);
-> > +
-> > +	iounmap(pp->base);
-> > +
-> > +	unregister_netdev(dev);
-> > +	irq_dispose_mapping(dev->irq);
-> > +	free_netdev(dev);
-> > +	mvneta_deinit(pp);
-> 
-> One may expect the same ordering as the mvneta_probe unroll sequence.
-
-Fixed as well!
-
-Thanks,
-
-Thomas
+diff --git a/drivers/pinctrl/pinctrl-nomadik-db8500.c b/drivers/pinctrl/pinctrl-nomadik-db8500.c
+index 6de52e7..7d88ae3 100644
+--- a/drivers/pinctrl/pinctrl-nomadik-db8500.c
++++ b/drivers/pinctrl/pinctrl-nomadik-db8500.c
+@@ -475,8 +475,10 @@ static const unsigned hsit_a_1_pins[] = { DB8500_PIN_AJ9, DB8500_PIN_AH9,
+ 	DB8500_PIN_AG9, DB8500_PIN_AG8, DB8500_PIN_AF8 };
+ static const unsigned hsit_a_2_pins[] = { DB8500_PIN_AJ9, DB8500_PIN_AH9,
+ 	DB8500_PIN_AG9, DB8500_PIN_AG8 };
+-static const unsigned clkout_a_1_pins[] = { DB8500_PIN_AH7, DB8500_PIN_AJ6 };
+-static const unsigned clkout_a_2_pins[] = { DB8500_PIN_AG7, DB8500_PIN_AF7 };
++static const unsigned clkout1_a_1_pins[] = { DB8500_PIN_AH7 };
++static const unsigned clkout1_a_2_pins[] = { DB8500_PIN_AG7 };
++static const unsigned clkout2_a_1_pins[] = { DB8500_PIN_AJ6 };
++static const unsigned clkout2_a_2_pins[] = { DB8500_PIN_AF7 };
+ static const unsigned usb_a_1_pins[] = { DB8500_PIN_AF28, DB8500_PIN_AE29,
+ 	DB8500_PIN_AD29, DB8500_PIN_AC29, DB8500_PIN_AD28, DB8500_PIN_AD26,
+ 	DB8500_PIN_AE26, DB8500_PIN_AG29, DB8500_PIN_AE27, DB8500_PIN_AD27,
+@@ -592,7 +594,8 @@ static const unsigned stmmod_c_1_pins[] = { DB8500_PIN_C20, DB8500_PIN_B21,
+ 	DB8500_PIN_C21, DB8500_PIN_A22, DB8500_PIN_B24 };
+ static const unsigned usbsim_c_1_pins[] = { DB8500_PIN_D22 };
+ static const unsigned mc4rstn_c_1_pins[] = { DB8500_PIN_AF25 };
+-static const unsigned clkout_c_1_pins[] = { DB8500_PIN_AH13, DB8500_PIN_AH12 };
++static const unsigned clkout1_c_1_pins[] = { DB8500_PIN_AH13 };
++static const unsigned clkout2_c_1_pins[] = { DB8500_PIN_AH12 };
+ static const unsigned i2c3_c_1_pins[] = { DB8500_PIN_AG12, DB8500_PIN_AH11 };
+ static const unsigned spi0_c_1_pins[] = { DB8500_PIN_AH10, DB8500_PIN_AH9,
+ 					  DB8500_PIN_AG9, DB8500_PIN_AG8 };
+@@ -700,8 +703,10 @@ static const struct nmk_pingroup nmk_db8500_groups[] = {
+ 	DB8500_PIN_GROUP(hsir_a_1, NMK_GPIO_ALT_A),
+ 	DB8500_PIN_GROUP(hsit_a_1, NMK_GPIO_ALT_A),
+ 	DB8500_PIN_GROUP(hsit_a_2, NMK_GPIO_ALT_A),
+-	DB8500_PIN_GROUP(clkout_a_1, NMK_GPIO_ALT_A),
+-	DB8500_PIN_GROUP(clkout_a_2, NMK_GPIO_ALT_A),
++	DB8500_PIN_GROUP(clkout1_a_1, NMK_GPIO_ALT_A),
++	DB8500_PIN_GROUP(clkout1_a_2, NMK_GPIO_ALT_A),
++	DB8500_PIN_GROUP(clkout2_a_1, NMK_GPIO_ALT_A),
++	DB8500_PIN_GROUP(clkout2_a_2, NMK_GPIO_ALT_A),
+ 	DB8500_PIN_GROUP(usb_a_1, NMK_GPIO_ALT_A),
+ 	/* Altfunction B column */
+ 	DB8500_PIN_GROUP(trig_b_1, NMK_GPIO_ALT_B),
+@@ -773,7 +778,8 @@ static const struct nmk_pingroup nmk_db8500_groups[] = {
+ 	DB8500_PIN_GROUP(stmmod_c_1, NMK_GPIO_ALT_C),
+ 	DB8500_PIN_GROUP(usbsim_c_1, NMK_GPIO_ALT_C),
+ 	DB8500_PIN_GROUP(mc4rstn_c_1, NMK_GPIO_ALT_C),
+-	DB8500_PIN_GROUP(clkout_c_1, NMK_GPIO_ALT_C),
++	DB8500_PIN_GROUP(clkout1_c_1, NMK_GPIO_ALT_C),
++	DB8500_PIN_GROUP(clkout2_c_1, NMK_GPIO_ALT_C),
+ 	DB8500_PIN_GROUP(i2c3_c_1, NMK_GPIO_ALT_C),
+ 	DB8500_PIN_GROUP(spi0_c_1, NMK_GPIO_ALT_C),
+ 	DB8500_PIN_GROUP(usbsim_c_2, NMK_GPIO_ALT_C),
+@@ -851,7 +857,8 @@ DB8500_FUNC_GROUPS(msp2, "msp2sck_a_1", "msp2_a_1");
+ DB8500_FUNC_GROUPS(mc4, "mc4_a_1", "mc4rstn_c_1");
+ DB8500_FUNC_GROUPS(mc1, "mc1_a_1", "mc1_a_2", "mc1dir_a_1");
+ DB8500_FUNC_GROUPS(hsi, "hsir_a_1", "hsit_a_1", "hsit_a_2");
+-DB8500_FUNC_GROUPS(clkout, "clkout_a_1", "clkout_a_2", "clkout_c_1");
++DB8500_FUNC_GROUPS(clkout, "clkout1_a_1", "clkout1_a_2", "clkout1_c_1",
++		"clkout2_a_1", "clkout2_a_2", "clkout2_c_1");
+ DB8500_FUNC_GROUPS(usb, "usb_a_1");
+ DB8500_FUNC_GROUPS(trig, "trig_b_1");
+ DB8500_FUNC_GROUPS(i2c4, "i2c4_b_1");
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.11.3
