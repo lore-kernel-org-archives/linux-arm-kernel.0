@@ -1,63 +1,61 @@
-From: p.paneri@samsung.com (Praveen Paneri)
-Date: Wed, 14 Nov 2012 15:57:14 +0530
-Subject: [PATCH v8 0/2] usb: phy: samsung: Introducing usb phy driver for
- samsung SoCs
-Message-ID: <1352888836-17192-1-git-send-email-p.paneri@samsung.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 14 Nov 2012 14:17:13 +0400
+Subject: [PATCH v3 2/6] ARM: davinci: Changed pr_warning() to pr_warn()
+ (part 2)
+In-Reply-To: <1352853207-20602-2-git-send-email-rtivy@ti.com>
+References: <1352853207-20602-1-git-send-email-rtivy@ti.com>
+ <1352853207-20602-2-git-send-email-rtivy@ti.com>
+Message-ID: <50A36FA9.5050601@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes from v7:
-Rebased to the latest usb-next branch.
-Separating arch patches from these driver patches.
+Hello.
 
-Changes from v6:
-Modified register definitions according to the existing ones.
-Changed default PHY clk selection for SoCs.
-Improved binding text and rebased to the latest usb-next.
+On 14-11-2012 4:33, Robert Tivy wrote:
 
-Changes from v5:
-Moved clk_get() to driver's probe function. Now reference clock frequency
-selection value is stored in samsung_usbphy structure for later use. Used
-IS_ENABLED() instead of #ifdef in samsung_usbphy_get_driver_data().
+> Also, while modifying those pr_warning() calls I changed hardcoded
+> function names to use '"%s:", __func__' instead
 
-Changes from v4:
-Moved header file contents to driver's source file
-Removed unnecessary print message from driver's probe function
-Dropped the Free Software Foundation address from the header
+> Signed-off-by: Robert Tivy <rtivy@ti.com>
+> ---
+> Clean up files that will be otherwise modified in subsequent patch.
 
-Changes from v3:
-Replaced susbsys_initcall()/module_exit() by module_platform_driver().
-Accordingly in the hsotg driver returned -EPROBE_DEFER until phy driver
-is registered
-Removed unnecessary devm_usb_put_phy() call from the hsotg driver remove.
+> Applies to v3.7-rc2 tag (commit 6f0c0580b70c89094b3422ba81118c7b959c7556) of
+> Linus' mainline kernel at git.kernel.org.
 
-Changes from v2:
-Changed the driver filenames to samsung-usbphy
-Rectified coding style related errors
+>   arch/arm/mach-davinci/board-omapl138-hawk.c |   30 ++++++++++-----------------
+>   1 file changed, 11 insertions(+), 19 deletions(-)
 
-Changes from v1:
-Rebased patches to latest usb-next branch
-Changed the name 'sec_usbphy' to 'samsung_usbphy'
+    Taksing of separation of board and SoC specific changes, this patch 
+shouldn't have been separated from patch 1 at all -- since it's two boards 
+built around the same chip, OMAP-L138...
 
-This patch set introduces a phy driver for samsung SoCs. It uses the existing
-transceiver infrastructure to provide phy control functions. Use of this driver
-can be extended for usb host phy as well. Over the period of time all the phy
-related code for most of the samsung SoCs can be integrated here.
-Removing the existing phy code from mach-s3c64xx. Same can be done for other SoCs
-when they start supporting this phy driver. 
-This driver is tested with smdk6410 and Exynos4210(with DT).
+> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
+> index dc1208e..8aea169 100644
+> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
+> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+> @@ -48,8 +48,7 @@ static __init void omapl138_hawk_config_emac(void)
+>   	val &= ~BIT(8);
+>   	ret = davinci_cfg_reg_list(omapl138_hawk_mii_pins);
+>   	if (ret) {
+> -		pr_warning("%s: cpgmac/mii mux setup failed: %d\n",
+> -			__func__, ret);
+> +		pr_warn("%s: cpgmac/mii mux setup failed: %d\n", __func__, ret);
 
-Praveen Paneri (2):
-  usb: phy: samsung: Introducing usb phy driver for hsotg
-  usb: s3c-hsotg: Adding phy driver support
+    I'd have preferred this as "CPGMAC/MII". Almost all other acronyms in the 
+messages are capitalized.
 
- .../devicetree/bindings/usb/samsung-usbphy.txt     |   11 +
- drivers/usb/gadget/s3c-hsotg.c                     |   37 ++-
- drivers/usb/phy/Kconfig                            |    8 +
- drivers/usb/phy/Makefile                           |    1 +
- drivers/usb/phy/samsung-usbphy.c                   |  360 ++++++++++++++++++++
- include/linux/platform_data/samsung-usbphy.h       |   27 ++
- 6 files changed, 434 insertions(+), 10 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/samsung-usbphy.txt
- create mode 100644 drivers/usb/phy/samsung-usbphy.c
- create mode 100644 include/linux/platform_data/samsung-usbphy.h
+>   		return;
+>   	}
+>
+> @@ -61,8 +60,7 @@ static __init void omapl138_hawk_config_emac(void)
+>
+>   	ret = da8xx_register_emac();
+>   	if (ret)
+> -		pr_warning("%s: emac registration failed: %d\n",
+> -			__func__, ret);
+> +		pr_warn("%s: emac registration failed: %d\n", __func__, ret);
+
+    ... and "EMAC" here.
+
+WBR, Sergei
