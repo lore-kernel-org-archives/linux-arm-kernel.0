@@ -1,29 +1,42 @@
-From: etienne.carriere@st.com (Etienne CARRIERE ST)
-Date: Wed, 14 Nov 2012 12:02:24 +0100
-Subject: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
-In-Reply-To: <20121114105049.GI3290@n2100.arm.linux.org.uk>
-References: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B59@SAFEX1MAIL3.st.com>
- <20121113170711.GI28327@n2100.arm.linux.org.uk>
- <0154077FE026E54BB093CA7EB3FD1AE32B57AF1E29@SAFEX1MAIL3.st.com>
- <20121114102127.GH3290@n2100.arm.linux.org.uk>
- <0154077FE026E54BB093CA7EB3FD1AE32DB61E4D23@SAFEX1MAIL3.st.com>
- <20121114105049.GI3290@n2100.arm.linux.org.uk>
-Message-ID: <0154077FE026E54BB093CA7EB3FD1AE32DB6A62AC7@SAFEX1MAIL3.st.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 14 Nov 2012 12:03:35 +0100
+Subject: [PATCH] i2c: omap: Move the remove constraint
+In-Reply-To: <20121114105734.GE5954@pengutronix.de>
+References: <1352195673-31559-1-git-send-email-shubhrajyoti@ti.com>
+ <CAORVsuW_VAiemnauUs-yW+GcQpv+qpESP4kzyQm=Unmofa4k_Q@mail.gmail.com>
+ <20121114105734.GE5954@pengutronix.de>
+Message-ID: <CAORVsuUxA=AhPowWqTWx5AfzU6R2Ny6OEhvDmtwUh8poh=UnGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Thanks for notifying. I will look at the recent release to see if our 
-> > architecture complies with Kernel code.
-> > 
-> > Our mutex implementation is based on 0/1 lock/unlock value in target 
-> > mutex DDR cell.
-> 
-> Right, so we have another bug here: it is incompatible with the current ARM 
-> spinlock implementation - and using it on the same memory location as a 
-> spinlock will corrupt the spinlock.
+Hi Wolfram, Shubhrajyoti,
 
-Right.
-I see our architecture complies with kernels before v3.6-rc1.
-Until then, it seems we can use our patch, but we must plan something else for the more recent kernels.
+On Wed, Nov 14, 2012 at 11:57 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+>
+>> > Currently we just queue the transfer and release the
+>> > qos constraints, however we donot wait for the transfer
+>> > to complete to release the constraint. Move the remove
+>> > constraint after the bus busy as we are sure that the
+>> > transfers are completed by then.
+>> >
+>> > Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+>>
+>> Good catch, the change definitely makes sense. Feel free to add:
+>>
+>> Acked-by: Jean Pihet <j-pihet@ti.com>
+>
+> Since I just reverted the QoS patch, I suppose this gets merged into the
+> original patch when resent?
+The best for now is to re-submit a new patch that moves the constraint
+release in the original code. Later the PM QoS patch will be applied
+on the new code base.
 
-etienne
+What do you think? I can provide a patch if needed.
+
+Regards,
+Jean
+
+>
+> --
+> Pengutronix e.K.                           | Wolfram Sang                |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
