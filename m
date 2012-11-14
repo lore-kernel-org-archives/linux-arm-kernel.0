@@ -1,39 +1,29 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 14 Nov 2012 16:20:37 -0200
-Subject: [PATCH v2 2/2] ARM: imx_v4_v5_defconfig: Add VPU support
-In-Reply-To: <1352917238-29694-1-git-send-email-fabio.estevam@freescale.com>
-References: <1352917238-29694-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1352917238-29694-2-git-send-email-fabio.estevam@freescale.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 14 Nov 2012 16:22:40 -0200
+Subject: [PATCH v4 2/2] mx2_camera: Fix regression caused by clock
+ conversion
+In-Reply-To: <20121031095702.41649bf9@infradead.org>
+References: <1351598606-8485-1-git-send-email-fabio.estevam@freescale.com>
+ <1351598606-8485-2-git-send-email-fabio.estevam@freescale.com>
+ <20121031095702.41649bf9@infradead.org>
+Message-ID: <CAOMZO5BFZHWzsKF0mr2h0SRGxEdbz3J+fDEiOqY1BmfGCiCE9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let the VPU driver be built by default.
+Hi Sascha,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Fix the dependencies
- arch/arm/configs/imx_v4_v5_defconfig |    3 +++
- 1 file changed, 3 insertions(+)
+On Wed, Oct 31, 2012 at 9:57 AM, Mauro Carvalho Chehab
+<mchehab@infradead.org> wrote:
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index f71302c..a5f12ff 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -121,11 +121,14 @@ CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
- CONFIG_MEDIA_SUPPORT=y
-+CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_VIDEO_DEV=y
- CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_SOC_CAMERA=y
- CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_VIDEO_MX2=y
-+CONFIG_V4L_MEM2MEM_DRIVERS=y
-+CONFIG_VIDEO_CODA=y
- CONFIG_FB=y
- CONFIG_FB_IMX=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
--- 
-1.7.9.5
+> As it seems that those patches depend on some patches at the arm tree,
+> the better is to merge them via -arm tree.
+>
+> So,
+>
+> Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+
+Could you please apply this series via your tree?
+
+Thanks,
+
+Fabio Estevam
