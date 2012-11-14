@@ -1,41 +1,22 @@
-From: anilkumar@ti.com (AnilKumar Ch)
-Date: Wed, 14 Nov 2012 23:38:24 +0530
-Subject: [PATCH 2/3] ARM: dts: AM33XX: Add d_can instances to aliases
-In-Reply-To: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
-References: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1352916505-12343-3-git-send-email-anilkumar@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 14 Nov 2012 19:19:38 +0100
+Subject: [PATCH v2] ARM: Dove: update defconfig
+In-Reply-To: <1351559505-944-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1351539916-29561-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1351559505-944-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <50A3E0BA.5090701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add d_can instances to aliases node to get the D_CAN instance number
-from the driver. To initialize D_CAN message RAM, corresponding instance
-number is required.
+On 10/30/2012 02:11 AM, Sebastian Hesselbarth wrote:
+> It has been a while since dove_defconfig was updated to recent development.
+> This patch adds all currently available Dove boards, including a DT-enabled
+> machine.
 
-To initialize instance 0 message RAM then 0x1 should be written and for
-instance 1 message RAM, 0x2 should be written to control module register.
+Jason,
 
-With device-tree framework ip instance number is "-1" by default for all
-instances. To get device id/instance number then modules should be added
-to DT "aliases" node. of_alias_get_id() gives the device id number based
-on number of alias nodes present in "aliases node".
+there seems to be no discussion at all on this one. Maybe it got lost
+during the ELCE, but if there are no objections I prefer to have this
+accepted for any of the next releases.
 
-Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
----
- arch/arm/boot/dts/am33xx.dtsi |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 5dfd682..c92c35f 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -21,6 +21,8 @@
- 		serial3 = &uart4;
- 		serial4 = &uart5;
- 		serial5 = &uart6;
-+		d_can0 = &dcan0;
-+		d_can1 = &dcan1;
- 	};
- 
- 	cpus {
--- 
-1.7.9.5
+Sebastian
