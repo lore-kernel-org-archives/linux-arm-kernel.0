@@ -1,51 +1,29 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Wed, 14 Nov 2012 06:11:45 +0000
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 14 Nov 2012 15:21:19 +0900
 Subject: [PATCH 1/4] mfd: tps65217: Set PMIC to shutdowm on PWR_EN toggle
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA6B043@DBDE01.ent.ti.com>
 References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
- <1352108549-9341-2-git-send-email-anilkumar@ti.com> <5097F078.50701@ti.com>
+ <1352108549-9341-2-git-send-email-anilkumar@ti.com>
+ <5097F078.50701@ti.com>
  <20121114022341.GM4415@opensource.wolfsonmicro.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA6B043@DBDE01.ent.ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA6B043@DBDE01.ent.ti.com>
+Message-ID: <20121114062117.GC7407@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2012 at 10:40:18, AnilKumar, Chimata wrote:
-> On Wed, Nov 14, 2012 at 07:53:42, Mark Brown wrote:
-> > On Mon, Nov 05, 2012 at 05:59:36PM +0100, Benoit Cousson wrote:
-> > > On 11/05/2012 10:42 AM, AnilKumar Ch wrote:
-> > 
-> > > > +Optional properties:
-> > > > +- ti,pmic-shutdown-controller: Telling the PMIC to shutdown on PWR_EN toggle.
-> > 
-> > > That sounds like a generic functionality to me. Don't we have some more
-> > > generic way to handle that?
-> > 
-> > > If not, that should probably not be a TI only attribute.
-> > 
-> > It's pretty unusual to have this configurable as a single thing rather
-> > than as part of flexible power sequencing or something that's just fixed
-> > in silicon.
-> >
+On Wed, Nov 14, 2012 at 06:11:45AM +0000, AnilKumar, Chimata wrote:
 
-Mark,
+> From these two threads we can infer that this is handled in power_off
+> sequence only. And this is feature of PMIC to go to shutdown mode nothing
+> to be fixed in silicon. PWR_EN line can be connected to any of these like
+> PRCM control or GPIO or some other instead of RTC(in this case).
 
->From these two threads we can infer that this is handled in power_off
-sequence only. And this is feature of PMIC to go to shutdown mode nothing
-to be fixed in silicon. PWR_EN line can be connected to any of these like
-PRCM control or GPIO or some other instead of RTC(in this case).
-
-Thanks
-AnilKumar
- 
-> 
-> "[PATCH 2/4] rtc: OMAP: Add system pm_power_off to rtc driver" thread
-> have the details of how PMIC is connected to RTC module of SoC.
-> 
-> As part of the power_off sequence we have
-> 1. To write STATUS_OFF in TPS65217 PMIC. If we do so then PMIC will
-> go to shutdown if PWR_EN is pulled-down. (This patch doing this)
-> 2. To pull down the PWR_EN signal we have to set PMIC_PWR_EN in RTC
-> module and trigger ALARM2 event. (This piece of code in 2/4 patch).
-> 
-> Thanks
-> AnilKumar
-> 
+OK, but why are you telling me this?  What are you looking for me to do
+with this information?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121114/3d0017b1/attachment-0001.sig>
