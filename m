@@ -1,44 +1,71 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 14 Nov 2012 09:39:19 +0200
-Subject: [PATCH 1/6] ARM/dts: omap4-panda: Add pinmux configuration for
- HDMI
-In-Reply-To: <50A29B12.9030906@ti.com>
-References: <1352121259-5836-1-git-send-email-tomi.valkeinen@ti.com>
- <1352121259-5836-2-git-send-email-tomi.valkeinen@ti.com>
- <50A29B12.9030906@ti.com>
-Message-ID: <50A34AA7.8060700@ti.com>
+From: dmitry.kasatkin@intel.com (Kasatkin, Dmitry)
+Date: Tue, 13 Nov 2012 23:47:57 -0800
+Subject: [PATCH v3 7/7] crypto: omap_sham: Remove usage of private DMA API
+In-Reply-To: <20121109171745.GB13898@animalcreek.com>
+References: <1352257033-32495-1-git-send-email-mgreer@animalcreek.com>
+ <1352257033-32495-8-git-send-email-mgreer@animalcreek.com>
+ <CALLzPKY9fRSwgSTw-t9-wRbCHVbKPA=m+RsTWW4=CaxtDCczcQ@mail.gmail.com>
+ <20121109171745.GB13898@animalcreek.com>
+Message-ID: <CALLzPKZ0qC-mm4tLsywzGi7jtnK8aSQcbW5sGxr2Z1g6hyBpsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 2012-11-13 21:10, Ricardo Neri wrote:
-> Hi Tomi,
-> 
-> On 11/05/2012 07:14 AM, Tomi Valkeinen wrote:
->> From: Ricardo Neri <ricardo.neri@ti.com>
+On Fri, Nov 9, 2012 at 9:17 AM, Mark A. Greer <mgreer@animalcreek.com> wrote:
+> On Fri, Nov 09, 2012 at 06:28:16PM +0200, Kasatkin, Dmitry wrote:
+>> On Wed, Nov 7, 2012 at 4:57 AM, Mark A. Greer <mgreer@animalcreek.com> wrote:
+>> > From: "Mark A. Greer" <mgreer@animalcreek.com>
+>> >
+>> > Remove usage of the private OMAP DMA API.
+>> > The dmaengine API will be used instead.
+>> >
+>> > CC: Russell King <rmk+kernel@arm.linux.org.uk>
+>> > CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
+>> > Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+>> > ---
+>> >  drivers/crypto/omap-sham.c | 117 ---------------------------------------------
+>> >  1 file changed, 117 deletions(-)
+>> >
+>> > diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+>> > index b57277c..ebb5255 100644
+>> > --- a/drivers/crypto/omap-sham.c
+>> > +++ b/drivers/crypto/omap-sham.c
+>
+>> > @@ -807,18 +762,6 @@ static int omap_sham_handle_queue(struct omap_sham_dev *dd,
+>> >         if (err)
+>> >                 goto err1;
+>> >
+>> > -#ifdef OMAP_SHAM_DMA_PRIVATE
+>> > -       omap_set_dma_dest_params(dd->dma_lch, 0,
+>> > -                       OMAP_DMA_AMODE_CONSTANT,
+>> > -                       dd->phys_base + SHA_REG_DIN(0), 0, 16);
+>> > -
+>> > -       omap_set_dma_dest_burst_mode(dd->dma_lch,
+>> > -                       OMAP_DMA_DATA_BURST_16);
+>> > -
+>> > -       omap_set_dma_src_burst_mode(dd->dma_lch,
+>> > -                       OMAP_DMA_DATA_BURST_4);
 >>
->> Add the pinmux configuration for HDMI and TPD12S015A. Configure the
->> gpios for the TPD12S015A and SDA, SCL and CEC for HDMI.
-> 
-> Do you plan to upstream the complete DT-boot support for DSS
-> (specifically, HDMI) for 3.8? I am asking so that I can upstream the
-> audio part.
+>> Burst mode significantly improves performance.
+>> How do you configure burst mode with new API?
+>
+> This is (or should be) taken care of by the dmaengine infrastructure.
+> I've noted that there's an issue and there is a discussion about it
+> here:
+>
+>         http://www.spinics.net/lists/linux-omap/msg79855.html
+>
+> We probably need to extend the dmaengine API to allow API-users to
+> request specific tweaks/optimizations/whatever but that's MHO.
+>
 
-No. This series will enable DSS with DT boot on panda and sdp boards,
-but it's achieved by a hack, as the DSS configuration still comes from
-platform data.
+Hello,
 
-To get full DSS DT support we need to pretty much rewrite the dss panel
-device handling and adapt to common panel framework (which isn't ready yet).
+I am in favor of new APIs.
+The only my concern is that it performs worse..
 
- Tomi
+Is it possible to keep burst mode setting there?
 
+- Dmitry
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 897 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121114/4f5e5a1a/attachment.sig>
+> Mark
+> --
