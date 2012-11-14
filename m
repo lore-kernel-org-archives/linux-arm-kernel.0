@@ -1,40 +1,139 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 14 Nov 2012 15:44:34 +0100
-Subject: [PATCH 2/2] ARM: LPC32xx: Add the motor PWM to base dts file
-In-Reply-To: <1352897985-15419-3-git-send-email-alban.bedel@avionic-design.de>
-References: <1352897985-15419-1-git-send-email-alban.bedel@avionic-design.de>
- <1352897985-15419-3-git-send-email-alban.bedel@avionic-design.de>
-Message-ID: <50A3AE52.6010704@antcom.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 14 Nov 2012 15:56:44 +0100
+Subject: [PATCH v7] Network driver for the Armada 370 and Armada XP ARM
+ Marvell SoCs
+Message-ID: <1352905010-24172-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/12 13:59, Alban Bedel wrote:
-> Signed-off-by: Alban Bedel <alban.bedel@avionic-design.de>
-> ---
->  arch/arm/boot/dts/lpc32xx.dtsi |    7 +++++++
->  1 files changed, 7 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-> index ef0fdc7..a1e6a9b 100644
-> --- a/arch/arm/boot/dts/lpc32xx.dtsi
-> +++ b/arch/arm/boot/dts/lpc32xx.dtsi
-> @@ -182,6 +182,13 @@
->  				pnx,timeout = <0x64>;
->  			};
->  
-> +			mpwm: mpwm at 400E8000 {
-> +				compatible = "nxp,lpc3220-motor-pwm";
-> +				reg = <0x400E8000 0x78>;
-> +				status = "disabled";
-> +				#pwm-cells = <2>;
-> +			};
-> +
->  			i2cusb: i2c at 31020300 {
->  				compatible = "nxp,pnx-i2c";
->  				reg = <0x31020300 0x100>;
+David,
 
-Will take this into my lpc32xx/dts branch.
+This patch set adds a new network driver for the network unit
+available in the newest Marvell ARM SoCs Armada 370 and Armada XP, as
+well as the necessary Device Tree information to use this driver in
+the two evaluation platforms of those SoCs.
+
+The previous versions of this patch set have been sent on September
+4th (v1), October 11th (v2), October 23rd (v3), October 26th (v4),
+November 12th (v5), November 13th (v6) and now comes the v7 of the
+driver. The number of comments over the last versions have been really
+small, and I would really appreciate if this driver could land into
+the 3.8 kernel release.
+
+People interested in testing this driver can find it at:
+
+ git at github.com:MISL-EBU-System-SW/mainline-public.git marvell-neta-v7
+
+In details:
+
+ * Patch 1 contains a small driver for the MDIO interface of this
+   Ethernet controller. Having a separate driver is useful to more
+   easily handle concurrent accesses on this MDIO interface that is
+   shared between all Ethernet ports.
+
+ * Patch 3 contains the driver itself. The commit log contains a
+   detailed explanation about why a new driver is needed for this new
+   Marvell SoC, compared to older Marvell SoCs (Orion, Kirkwood, Dove)
+   that use the mv643xx_eth driver.
+
+ * Patch 4 adds the necessary entry to the MAINTAINERS file.
+
+ * Patch 5 adds the SoC-level Device Tree information for Armada 370
+   and Armada XP.
+
+ * Patch 6 adds the board-level Device Tree information for the
+   Marvell evaluation boards of Armada 370 and Armada XP.
+
+ * Patch 6 adds the board-level Device Tree information for the
+   PlatHome OpenBlocks AX3-4 platform (based on the Armada XP SoC).
+
+ * Patch 7 adds the board-level Device Tree information for the
+   GlobalScale Mirabox platform (based on the Armada 370 SoC).
+
+Changes since v6:
+ * Add more macros to make the MVNETA_RX_PKT_SIZE() math easier to
+   understand.
+ * Use ETH_FCS_LEN instead of our custom
+   MVNETA_ETH_CRC_SIZE. Suggested by Fran?ois Romieu.
+ * Add a comment explaining why we have MVNETA_MH_SIZE.
+ * Added missing newlines at the end of some error/info
+   messages. Suggested by Joe Perches.
+ * Removed the useless error handling of mvneta_mac_addr_set(), and
+   tested once for all the value of rxq_def at probe() time. Suggested
+   by Francois Romieu.
+ * Use napi_schedule() instead of an hand-crafted version of
+   time. Suggested by Francois Romieu.
+ * Don't use IRQF_DISABLED. Suggested by Francois Romieu.
+ * Fix leak in mvneta_probe() on an error path (missing call to
+   mvneta_deinit()). Re-arranged the goto labels for better
+   clarity. Suggested by Francois Romieu.
+ * Use the return value of mvneta_init() and register_netdev() as the
+   return value of the ->probe() function on failure. Suggested by
+   Francois Romieu.
+
+Changes since v5:
+ * Take into account comments from Fran?ois Romieu (mainly coding
+   style fixes + addition of a mvneta_rxq_desc_is_first_last() helper
+   function)
+ * Fix a wrong argument passed to dma_alloc_coherent():
+   DMA_BIDIRECTIONAL should have been GFP_KERNEL. Thanks to Fran?ois
+   Romieu for having pointed the issue in his review.
+ * Removed calls to smp_call_function_many() that were useless.
+ * Ordered alphabetically entries in the Kconfig and Makefile.
+
+Changes since v4:
+ * Added a separate MDIO driver, which allow to easily handle
+   concurrent accesses to the MDIO interface.
+ * The Device Tree now has separate nodes for the PHY devices, which
+   belong to the MDIO bus handled by the separate MDIO driver.
+ * Fix tabulation issues in some Device Tree files.
+ * Rebased on top of 3.7-rc5
+ * Added the Device Tree code necessary for the GlobalScale Mirabox
+   platform and the PlatHome OpenBlocks AX3-4 platform.
+
+Changes since v3:
+ * Use phy_find_first() to get the correct PHY. Suggested by Florian
+   Fainelli.
+ * Make pp->cause_rx_tx a simple variable instead of a per-CPU array
+   since it is not useful. Fixes a comment raised by David Miller.
+
+Changes since v2:
+ * Change compatible string from 'marvell,neta' to
+   'marvell,armada-370-neta'. Requested by Rob Herring.
+ * Rename Ethernet DT nodes from eth at ... to ethernet at ... Requested by
+   Rob Herring.
+ * Remove device_type DT property. Requested by Rob Herring.
+ * Change the PHY interface for eth0/eth1 to be rgmii-id, which allows
+   to enable TX/RX delay mechanisms at the PHY level. This fixes CRC
+   errors on received packets during iperf tests (it was a bug in v2).
+ * Remove the mvneta_ prefix from module parameters. Requested by
+   Baruch Siach.
+ * Many code style improvements suggested by Fran?ois Romieu.
+ * Properly stop/restart the TX queue when the number of TX
+   descriptors available becomes low, instead of returning
+   NETDEV_TX_BUSY. Requested by Fran?ois Romieu.
+ * Properly drop packets on the TX path when DMA mapping functions
+   return an error, instead of returning NETDEV_TX_BUSY. Requested by
+   Fran?ois Romieu.
+ * Rebased on top of Linux 3.7-rc2.
+
+Changes since v1:
+ * Reduced the Cc: list in order to make the patch set acceptable for
+   the netdev@ mailing list.
+ * Merge the mvneta.h contents into mvneta.c, since the header was
+   only used by the driver. Requested by Arnd Bergmann.
+ * Completely reorganize the organization of the register list and
+   register values, in order to make it more consistent, and hopefully
+   easier to read (especially easier to match register values with the
+   corresponding register).
+ * Integrate with the phylib, as suggested by Florian Fainelli, and
+   remove the link management code that has become useless as the
+   result of this integration
+ * Fix many small details suggested by Florian Fainelli in his review
+   of the first driver
+ * Simplify various parts of the driver (descriptors array allocation,
+   data structures, etc.)
 
 Thanks,
 
-Roland
+Thomas Petazzoni
