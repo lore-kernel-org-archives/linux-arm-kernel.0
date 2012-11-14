@@ -1,30 +1,39 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 14 Nov 2012 15:16:05 +0800
-Subject: [PATCH 07/11] watchdog/at91sam9_wdt: add nowayout helpers to Watchdog
- Timer Driver Kernel API
+Date: Wed, 14 Nov 2012 15:16:08 +0800
+Subject: [PATCH 10/11] watchdog/at91sam9_wdt: using dev_info replaces pr_info,
+ dev_crit repalces pr_crit
 In-Reply-To: <1352877369-19740-1-git-send-email-wenyou.yang@atmel.com>
 References: <1352877369-19740-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1352877369-19740-8-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1352877369-19740-11-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
- drivers/watchdog/at91sam9_wdt.c |    2 ++
- 1 file changed, 2 insertions(+)
+ drivers/watchdog/at91sam9_wdt.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index d764f36..187e33f 100644
+index cba5c5d..bd74f40 100644
 --- a/drivers/watchdog/at91sam9_wdt.c
 +++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -225,6 +225,8 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 		return ret;
- 	}
+@@ -106,7 +106,7 @@ static void at91wdt_timer_tick(unsigned long data)
+ 		if (!watchdog_is_open(wddev))
+ 			driver_data->next_heartbeat = jiffies + heartbeat * HZ;
+ 	} else
+-		pr_crit("I will reset your machine !\n");
++		dev_crit(wddev->dev, "I will reset your machine !\n");
+ }
  
-+	watchdog_set_nowayout(&at91_wddev, nowayout);
-+
- 	ret = watchdog_register_device(&at91_wddev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "cannot register watchdog (%d)\n", ret);
+ static int at91wdt_enable(struct watchdog_device *wddev, unsigned int timeout)
+@@ -239,7 +239,7 @@ static int __init at91wdt_probe(struct platform_device *pdev)
+ 					(unsigned long)&at91_wddev);
+ 	mod_timer(&driver_data->timer, jiffies + WDT_TIMEOUT);
+ 
+-	pr_info("enabled (heartbeat=%d sec, nowayout=%d)\n",
++	dev_info(&pdev->dev, "enabled (heartbeat=%d sec, nowayout=%d)\n",
+ 		heartbeat, nowayout);
+ 
+ 	return 0;
 -- 
 1.7.9.5
