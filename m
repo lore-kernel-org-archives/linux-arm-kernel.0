@@ -1,58 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Nov 2012 11:17:32 +0000
-Subject: arch-vt8500 and wm8850 support
-In-Reply-To: <1352879641.2728.8.camel@gitbox>
-References: <1352879641.2728.8.camel@gitbox>
-Message-ID: <201211141117.33485.arnd@arndb.de>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Wed, 14 Nov 2012 12:18:17 +0100
+Subject: [PATCH] ARM: at91/usbh: fix overcurrent gpio setup
+Message-ID: <1352891897-18708-1-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 November 2012, Tony Prisk wrote:
-> Hi Arnd,
-> 
-> Just looking for a little advice re: adding support for the WM8850
-> variant.
-> 
-> At the moment we have the ARM926 variants under ARCH_VT8500. The WM8850
-> is ARMv7, but uses all the same drivers as the ARM926 versions. At the
-> moment, all the drivers depend on ARCH_VT8500.
-> 
-> The obvious solution (to me at least) seems to be to have 3 groups -
-> ARCH_VT8500 keeps everything it has now except 'select CPU_ARM926T', and
-> we add 2 additional groups - the first for all the current models, which
-> selects CPU_ARM926T and ARCH_VT8500, and a second for WM8850 which
-> selects CPU_V7 and ARCH_VT8500.
+Use gpio_is_valid also for overcurrent pins (which are currently
+negative in many board files).
 
-Yes, makes sense. Actually with the move to multiplatform, you already
-need to make the decision for the CPU earlier on, since the multiplatform
-kernel can only be built either for ARMv4/v5 or for ARMv6/v7.
+Signed-off-by: Johan Hovold <jhovold@gmail.com>
+---
+ arch/arm/mach-at91/at91rm9200_devices.c  | 2 +-
+ arch/arm/mach-at91/at91sam9260_devices.c | 2 +-
+ arch/arm/mach-at91/at91sam9261_devices.c | 2 +-
+ arch/arm/mach-at91/at91sam9263_devices.c | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-I would suggest doing it like
-
-config ARCH_VT8500
-	bool
-	select FOO
-	select BAR
-
-config ARCH_WM8505
-	bool "WonderMedia WM8505 or VIA VT8500"
-	depends on ARCH_MULTI_V5
-	select ARCH_VT8500
-	select CPU_ARM926
-
-config ARCH_WM8650
-	bool "WonderMedia WM 8650"
-	depends on ARCH_MULTI_V6
-	select ARCH_VT8500
-	select CPU_V6
-
-config ARCH_WM8850
-	bool "WonderMedia WM 8750/8850"
-	depends on ARCH_MULTI_V7
-	select ARCH_VT8500
-	select CPU_V7
-
-This keeps ARCH_VT8500 as the overall name for the family, but
-lists only the WonderMedia parts in the configuration.
-
-	Arnd
+diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+index 1e122bc..3cee0e6 100644
+--- a/arch/arm/mach-at91/at91rm9200_devices.c
++++ b/arch/arm/mach-at91/at91rm9200_devices.c
+@@ -68,7 +68,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+ 
+ 	/* Enable overcurrent notification */
+ 	for (i = 0; i < data->ports; i++) {
+-		if (data->overcurrent_pin[i])
++		if (gpio_is_valid(data->overcurrent_pin[i]))
+ 			at91_set_gpio_input(data->overcurrent_pin[i], 1);
+ 	}
+ 
+diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+index aa1e587..414bd85 100644
+--- a/arch/arm/mach-at91/at91sam9260_devices.c
++++ b/arch/arm/mach-at91/at91sam9260_devices.c
+@@ -72,7 +72,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+ 
+ 	/* Enable overcurrent notification */
+ 	for (i = 0; i < data->ports; i++) {
+-		if (data->overcurrent_pin[i])
++		if (gpio_is_valid(data->overcurrent_pin[i]))
+ 			at91_set_gpio_input(data->overcurrent_pin[i], 1);
+ 	}
+ 
+diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+index b948769..cd604aa 100644
+--- a/arch/arm/mach-at91/at91sam9261_devices.c
++++ b/arch/arm/mach-at91/at91sam9261_devices.c
+@@ -72,7 +72,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+ 
+ 	/* Enable overcurrent notification */
+ 	for (i = 0; i < data->ports; i++) {
+-		if (data->overcurrent_pin[i])
++		if (gpio_is_valid(data->overcurrent_pin[i]))
+ 			at91_set_gpio_input(data->overcurrent_pin[i], 1);
+ 	}
+ 
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index cb85da2..9c61e59 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -78,7 +78,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+ 
+ 	/* Enable overcurrent notification */
+ 	for (i = 0; i < data->ports; i++) {
+-		if (data->overcurrent_pin[i])
++		if (gpio_is_valid(data->overcurrent_pin[i]))
+ 			at91_set_gpio_input(data->overcurrent_pin[i], 1);
+ 	}
+ 
+-- 
+1.8.0
