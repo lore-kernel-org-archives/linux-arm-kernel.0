@@ -1,71 +1,43 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 14 Nov 2012 16:22:45 +0200
-Subject: [PATCH v3] i2c: omap: ensure writes to dev->buf_len are ordered
-In-Reply-To: <20121114112050.GG5954@pengutronix.de>
-References: <20121114112050.GG5954@pengutronix.de>
-Message-ID: <1352902965-25666-1-git-send-email-balbi@ti.com>
+From: narkewoody@gmail.com (woody)
+Date: Wed, 14 Nov 2012 22:23:55 +0800
+Subject: Kernel uncompression error
+Message-ID: <k809hq$1q3$1@ger.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-if we allow compiler reorder our writes, we could
-fall into a situation where dev->buf_len is reset
-for no apparent reason.
+Hi, List
 
-This bug was found with a simple script which would
-transfer data to an i2c client from 1 to 1024 bytes
-(a simple for loop), when we got to transfer sizes
-bigger than the fifo size, dev->buf_len was reset
-to zero before we had an oportunity to handle XDR
-Interrupt. Because dev->buf_len was zero, we entered
-omap_i2c_transmit_data() to transfer zero bytes,
-which would mean we would just silently exit
-omap_i2c_transmit_data() without actually writing
-anything to DATA register. That would cause XDR
-IRQ to trigger forever and we would never transfer
-the remaining bytes.
+I just built a 3.2.x ARM kernel and tried to have it boot by a boot 
+loader (vivi) on my s3c2410a ARM board.  The kernel was built with 
+default configuration s3c2410.
 
-After adding the memory barrier, we also drop resetting
-dev->buf_len to zero in omap_i2c_xfer_msg() because
-both omap_i2c_transmit_data() and omap_i2c_receive_data()
-will act until dev->buf_len reaches zero, rendering the
-other write in omap_i2c_xfer_msg() redundant.
+... But, the following error printed on the console:
 
-This patch has been tested with pandaboard for a few
-iterations of the script mentioned above.
+---------------------
+Uncompressing Linux...
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
+uncompression error
 
-Changes since v2:
-	- add a comment
+-- System halted
+---------------------
 
-Changes since v1:
-        - use barrier() instead of wmb()
+What kinds of reasons can most possibly lead the error?  I searched on 
+the net and found some answers, but I cannot well judge them:
 
- drivers/i2c/busses/i2c-omap.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+1. There is a D-Cache patch should be applied, but the message was 
+talking about 2.4.x kernel, so I guess if there really was a bug around 
+here, it should already been fixed. Right?
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index db31eae..e88fc26 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -522,6 +522,9 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 	dev->buf = msg->buf;
- 	dev->buf_len = msg->len;
- 
-+	/* make sure writes to dev->buf_len are ordered */
-+	barrier();
-+
- 	omap_i2c_write_reg(dev, OMAP_I2C_CNT_REG, dev->buf_len);
- 
- 	/* Clear the FIFO Buffers */
-@@ -579,7 +582,6 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 	 */
- 	timeout = wait_for_completion_timeout(&dev->cmd_complete,
- 						OMAP_I2C_TIMEOUT);
--	dev->buf_len = 0;
- 	if (timeout == 0) {
- 		dev_err(dev->dev, "controller timed out\n");
- 		omap_i2c_init(dev);
+2. Probably the kernel image (here is a zImage) is too big, then the 
+uncompressed code was overwriting the original compressed part of the 
+image.  This sounds a little relevant.  My boot loader was loading the 
+kernel image to ram address 0x300008000, and my zImage is about 1.9M. 
+Do you think this is the reason?
+
+Thanks in advance!
+
+
+
 -- 
-1.8.0
+woody
+I can't go back to yesterday - because I was a different person then.
