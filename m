@@ -1,132 +1,45 @@
-From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Wed, 14 Nov 2012 17:51:04 +0900
-Subject: [PATCH 2/4] ARM: EXYNOS: Add clk_ops for gating clocks of System MMU
-Message-ID: <002201cdc245$2e05dac0$8a119040$%cho@samsung.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 14 Nov 2012 09:59:44 +0100
+Subject: [PATCH v2] i2c: i2c-gpio: fix name issue when i2c gpio node GT 1
+In-Reply-To: <1350287477-30936-1-git-send-email-voice.shen@atmel.com>
+References: <1350287477-30936-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <20121114085944.GA5954@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Touching some System MMU needs its master devices' clock to be enabled
-before. This commit adds clk_ops.set_parent of gating clocks of System
-MMU to ensure gating clocks of System MMU's mater devices are enabled
-when enabling gating clocks of System MMU.
+On Mon, Oct 15, 2012 at 03:51:17PM +0800, Bo Shen wrote:
+> When i2c-gpio node number is greater than 1, the name for each is same
+> So add the patch to fix it.
+> 
+> The adap->name printing information is add by myself
+> 
+> without this patch the log information is as following
+> ---<8---
+> adap->name = i2c-gpio-1
+> i2c-gpio i2c.2: using pins 30 (SDA) and 31 (SCL)
+> adap->name = i2c-gpio-1
+> i2c-gpio i2c.3: using pins 64 (SDA) and 65 (SCL)
+> --->8---
+> 
+> with this patch, the log information is as following
+> ---<8---
+> adap->name = i2c.2
+> i2c-gpio i2c.2: using pins 30 (SDA) and 31 (SCL)
+> adap->name = i2c.3
+> i2c-gpio i2c.3: using pins 64 (SDA) and 65 (SCL)
+> --->8---
+> 
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
 
-Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
----
- arch/arm/mach-exynos/clock-exynos5.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+Applied to for-next, thanks.
 
-diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-index 9e815ae..9dfb845 100644
---- a/arch/arm/mach-exynos/clock-exynos5.c
-+++ b/arch/arm/mach-exynos/clock-exynos5.c
-@@ -613,6 +613,16 @@ static struct clksrc_clk exynos5_clk_aclk_300_gscl = {
- 	.reg_src = { .reg = EXYNOS5_CLKSRC_TOP3, .shift = 10, .size = 1 },
- };
- 
-+static int exynos5_gate_clk_set_parent(struct clk *clk, struct clk *parent)
-+{
-+	clk->parent = parent;
-+	return 0;
-+}
-+
-+static struct clk_ops exynos5_gate_clk_ops = {
-+	.set_parent = exynos5_gate_clk_set_parent
-+};
-+
- static struct clk exynos5_init_clocks_off[] = {
- 	{
- 		.name		= "timers",
-@@ -854,76 +864,91 @@ static struct clk exynos5_init_clocks_off[] = {
- 		.name		= "sysmmu",
- 		.devname	= "exynos-sysmmu.0",
- 		.enable		= &exynos5_clk_ip_mfc_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 1),
- 	}, {
- 		.name		= "sysmmu",
- 		.devname	= "exynos-sysmmu.1",
- 		.enable		= &exynos5_clk_ip_mfc_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 2),
- 	}, {
- 		.name		= "sysmmu",
- 		.devname	= "exynos-sysmmu.2",
- 		.enable		= &exynos5_clk_ip_disp1_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 9)
- 	}, {
- 		.name		= "sysmmu",
- 		.devname	= "exynos-sysmmu.3",
- 		.enable		= &exynos5_clk_ip_gen_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 7),
- 	}, {
- 		.name		= "sysmmu",
- 		.devname	= "exynos-sysmmu.4",
- 		.enable		= &exynos5_clk_ip_gen_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 6)
- 	}, {
- 		.name		= "sysmmu",
- 		.devname	= "exynos-sysmmu.5",
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 7),
- 	}, {
- 		.name		= "sysmmu",
- 		.devname	= "exynos-sysmmu.6",
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 8),
- 	}, {
- 		.name		= "sysmmu",
- 		.devname	= "exynos-sysmmu.7",
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 9),
- 	}, {
- 		.name		= "sysmmu",
- 		.devname	= "exynos-sysmmu.8",
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 10),
- 	}, {
- 		.name		= "sysmmu",
- 		.devname	= "exynos-sysmmu.9",
- 		.enable		= &exynos5_clk_ip_isp0_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (0x3F << 8),
- 	}, {
- 		.name		= "sysmmu",
- 		.devname	= "exynos-sysmmu.10",
- 		.enable		= &exynos5_clk_ip_isp1_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (0xF << 4),
- 	}, {
- 		.name		= "sysmmu",
- 		.devname	= "exynos-sysmmu.11",
- 		.enable		= &exynos5_clk_ip_disp1_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 8)
- 	}, {
- 		.name		= "sysmmu",
- 		.devname	= "exynos-sysmmu.12",
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 11),
- 	}, {
- 		.name		= "sysmmu",
- 		.devname	= "exynos-sysmmu.13",
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 12),
- 	}, {
- 		.name		= "sysmmu",
- 		.devname	= "exynos-sysmmu.14",
- 		.enable		= &exynos5_clk_ip_acp_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 7)
- 	}
- };
 -- 
-1.8.0
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121114/7bb0cd1e/attachment.sig>
