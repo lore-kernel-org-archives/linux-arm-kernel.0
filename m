@@ -1,39 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Nov 2012 10:21:27 +0000
-Subject: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
-In-Reply-To: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1E29@SAFEX1MAIL3.st.com>
-References: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B59@SAFEX1MAIL3.st.com>
- <20121113170711.GI28327@n2100.arm.linux.org.uk>
- <0154077FE026E54BB093CA7EB3FD1AE32B57AF1E29@SAFEX1MAIL3.st.com>
-Message-ID: <20121114102127.GH3290@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 14 Nov 2012 19:24:53 +0900
+Subject: [PATCH 1/4] mfd: tps65217: Set PMIC to shutdowm on PWR_EN toggle
+In-Reply-To: <50A36DB1.3010706@ti.com>
+References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
+ <1352108549-9341-2-git-send-email-anilkumar@ti.com>
+ <5097F078.50701@ti.com>
+ <20121114022341.GM4415@opensource.wolfsonmicro.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA6B043@DBDE01.ent.ti.com>
+ <20121114062117.GC7407@opensource.wolfsonmicro.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA6B0AF@DBDE01.ent.ti.com>
+ <20121114070046.GE7407@opensource.wolfsonmicro.com>
+ <50A36DB1.3010706@ti.com>
+Message-ID: <20121114102452.GI7407@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2012 at 10:18:31AM +0100, Etienne CARRIERE ST wrote:
-> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
-> > Sent: Tuesday, November 13, 2012 6:07 PM
-> > 
-> > Right, so, what this tells me is that the implementation of the spinlock 
-> > in the secure software is potentially the same as the kernel's spinlock.
-> > The kernel's spinlock implementation is GPL'd.  If the secure side spinlock 
-> > implementation is a copy of the kernel's spinlock implementation, then 
-> > that implementation is also GPL'd (...).
-> > 
-> > I think someone has some explaining to do.
-> 
-> It does.
-> 
-> The TZ implementation of the shared mutex is the ARM native mutex
-> instructions set LDREX/STREX, protected by a native ARM IRQ disabling.
-> I believe this is native ARMv7 natural handling and not subject to
-> GPLization.
+On Wed, Nov 14, 2012 at 11:08:49AM +0100, Benoit Cousson wrote:
 
-Maybe, maybe not.  There's more to locking than just the instructions
-used - there's the values which are used to represent "locked" and
-"unlocked", and then there's the ticket locking implementation found
-in recent kernels which defines the value to have more meaning than
-just "locked" and "unlocked".
+> I was wondering that, because exposing a pin to control the whole PMIC
+> low power mode seems to be something that should be generic enough to be
+> handled by the regulator framework.
 
-With ticket locking, you need to know the details of the implementation
-to be able to lock successfully, and that basically means copying the
-implementation.
+Having something that's controlled by software is really not at all
+generic - suspending a PMIC from a GPIO is generally tied in very
+closely with the CPU power sequencing which means it's typically some
+combination of very hard coded things that we can't control or part of
+much wider control of sequencing.
+
+> In the current situation we do have a pwr_en pin that can be controlled
+> by a GPIO or whatever signal from the SoC.
+> That's very similar, at PMIC level, to the fixedregulator that allow a
+> GPIO binding to enable it.
+
+> Don't you think that should deserve a support in the fmwk?
+
+I'm not seeing a coherent description of a feature here - what exactly
+are you proposing that we do?  When and how would this GPIO be set for
+example?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121114/c909c844/attachment.sig>
