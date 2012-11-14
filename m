@@ -1,183 +1,173 @@
 From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Wed, 14 Nov 2012 17:19:07 +0100
-Subject: [PATCH 6/9] usb: chipidea: add PTW and PTS handling
+Date: Wed, 14 Nov 2012 17:19:05 +0100
+Subject: [PATCH 4/9] usb: chipidea: ci13xxx-imx: add "dr_mode" property to
+ device tree bindings
 In-Reply-To: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
 References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1352909950-32555-7-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <1352909950-32555-5-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes it possible to configure the PTW and PTS bits inside
-the portsc register for host and device mode before the driver starts
-and the phy can be addressed as hardware implementation is designed.
+From: Marc Kleine-Budde <mkl@pengutronix.de>
 
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+Its necessary to limit a hostonly soc to its single role, since
+debugging has shown that reading on the "CAP_DCCPARAMS" register inside
+a host-only port, what ci_hdrc_gadget_init does, can lead to an
+instable behaviour of the IC.
+
+This patch allows the device tree to limit the chipidea to host or
+peripheral mode only. Its uses the oftree name dr_mode, which is already
+mainline and used i.e. in fsl-mph-dr-of.
+
 Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
 ---
- drivers/usb/chipidea/bits.h        |    3 +++
- drivers/usb/chipidea/ci.h          |    2 ++
- drivers/usb/chipidea/ci13xxx_imx.c |    1 +
- drivers/usb/chipidea/core.c        |   47 ++++++++++++++++++++++++++++++++++++
- drivers/usb/chipidea/host.c        |    4 +++
- include/linux/usb/chipidea.h       |    9 +++++++
- 6 files changed, 66 insertions(+)
+ .../devicetree/bindings/usb/ci13xxx-imx.txt        |    4 ++
+ arch/arm/boot/dts/imx28.dtsi                       |    2 +
+ drivers/usb/chipidea/ci13xxx_imx.c                 |    2 +
+ drivers/usb/chipidea/core.c                        |   39 +++++++++++++++++---
+ include/linux/usb/chipidea.h                       |    7 ++++
+ 5 files changed, 48 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-index 4b6ae3e..3cded5f 100644
---- a/drivers/usb/chipidea/bits.h
-+++ b/drivers/usb/chipidea/bits.h
-@@ -48,6 +48,9 @@
- #define PORTSC_SUSP           BIT(7)
- #define PORTSC_HSP            BIT(9)
- #define PORTSC_PTC            (0x0FUL << 16)
-+#define PORTSC_PTS            (BIT(31) | BIT(30))
-+#define PORTSC_PTW            BIT(28)
-+#define PORTSC_STS            BIT(29)
+diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+index 5778b9c..c83aea4 100644
+--- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
++++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+@@ -4,6 +4,9 @@ Required properties:
+ - compatible: Should be "fsl,imx27-usb"
+ - reg: Should contain registers location and length
+ - interrupts: Should contain controller interrupt
++- dr_mode: indicates the working mode for "fsl,imx27-usb" compatible
++  controllers. Can be "host", "peripheral", or "otg". Defaults to
++  "otg" if not defined.
  
- /* DEVLC */
- #define DEVLC_PSPD            (0x03UL << 25)
-diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index cd42b59..1439e51 100644
---- a/drivers/usb/chipidea/ci.h
-+++ b/drivers/usb/chipidea/ci.h
-@@ -314,6 +314,8 @@ static inline u32 hw_test_and_write(struct ci13xxx *ci, enum ci13xxx_regs reg,
- 	return (val & mask) >> ffs_nr(mask);
- }
+ Optional properties:
+ - fsl,usbphy: phandler of usb phy that connects to the only one port
+@@ -20,4 +23,5 @@ usb at 02184000 { /* USB OTG */
+ 	fsl,usbphy = <&usbphy1>;
+ 	fsl,usbmisc = <&usbmisc 0>;
+ 	disable-over-current;
++	dr_mode= "otg";
+ };
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 55c57ea..2a6dd21 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -874,6 +874,7 @@
+ 			clocks = <&clks 60>;
+ 			fsl,usbphy = <&usbphy0>;
+ 			status = "disabled";
++			dr_mode = "otg";
+ 		};
  
-+void hw_portsc_configure(struct ci13xxx *ci);
-+
- int hw_device_reset(struct ci13xxx *ci, u32 mode);
+ 		usb1: usb at 80090000 {
+@@ -883,6 +884,7 @@
+ 			clocks = <&clks 61>;
+ 			fsl,usbphy = <&usbphy1>;
+ 			status = "disabled";
++			dr_mode = "host";
+ 		};
  
- int hw_port_test_set(struct ci13xxx *ci, u8 mode);
+ 		dflpt at 800c0000 {
 diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index ee4dab0..a8257b8 100644
+index 7b99c96..ee4dab0 100644
 --- a/drivers/usb/chipidea/ci13xxx_imx.c
 +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -133,6 +133,7 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
- 		       CI13XXX_PULLUP_ON_VBUS |
- 		       CI13XXX_DISABLE_STREAMING |
- 		       CI13XXX_REGS_SHARED,
-+	ci13xxx_get_dr_flags(pdev->dev.of_node, pdata);
+@@ -237,6 +237,8 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+ 		}
+ 	}
  
- 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
- 	if (!data) {
++	ci13xxx_get_dr_mode(pdev->dev.of_node, pdata);
++
+ 	plat_ci = ci13xxx_add_device(&pdev->dev,
+ 				pdev->resource, pdev->num_resources,
+ 				pdata);
 diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 3e3e159..7e80f1b 100644
+index b50b77a..3e3e159 100644
 --- a/drivers/usb/chipidea/core.c
 +++ b/drivers/usb/chipidea/core.c
-@@ -68,6 +68,8 @@
+@@ -63,6 +63,7 @@
+ #include <linux/kernel.h>
+ #include <linux/slab.h>
+ #include <linux/pm_runtime.h>
++#include <linux/of_platform.h>
+ #include <linux/usb/ch9.h>
  #include <linux/usb/gadget.h>
  #include <linux/usb/otg.h>
- #include <linux/usb/chipidea.h>
-+#include <linux/of_usbphy.h>
-+#include <linux/phy.h>
- 
- #include "ci.h"
- #include "udc.h"
-@@ -213,6 +215,23 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
- 	return 0;
- }
- 
-+void hw_portsc_configure(struct ci13xxx *ci)
-+{
-+	if (ci->platdata->flags & CI13XXX_PORTSC_PTW_16BIT)
-+		hw_write(ci, OP_PORTSC, PORTSC_PTW, 0x1 << ffs_nr(PORTSC_PTW));
-+
-+	if (ci->platdata->flags & CI13XXX_PORTSC_PTS_UTMI) {
-+		hw_write(ci, OP_PORTSC, PORTSC_PTS, 0x0 << ffs_nr(PORTSC_PTS));
-+		hw_write(ci, OP_PORTSC, PORTSC_STS, 0x0 << ffs_nr(PORTSC_STS));
-+	} else if (ci->platdata->flags & CI13XXX_PORTSC_PTS_ULPI) {
-+		hw_write(ci, OP_PORTSC, PORTSC_PTS, 0x2 << ffs_nr(PORTSC_PTS));
-+		hw_write(ci, OP_PORTSC, PORTSC_STS, 0x0 << ffs_nr(PORTSC_STS));
-+	} else if (ci->platdata->flags & CI13XXX_PORTSC_PTS_FSLS) {
-+		hw_write(ci, OP_PORTSC, PORTSC_PTS, 0x3 << ffs_nr(PORTSC_PTS));
-+		hw_write(ci, OP_PORTSC, PORTSC_STS, 0x1 << ffs_nr(PORTSC_STS));
-+	}
-+}
-+
- /**
-  * hw_device_reset: resets chip (execute without interruption)
-  * @ci: the controller
-@@ -237,6 +256,8 @@ int hw_device_reset(struct ci13xxx *ci, u32 mode)
- 	if (ci->platdata->flags & CI13XXX_DISABLE_STREAMING)
- 		hw_write(ci, OP_USBMODE, USBMODE_CI_SDIS, USBMODE_CI_SDIS);
- 
-+	hw_portsc_configure(ci);
-+
- 	/* USBMODE should be configured step by step */
- 	hw_write(ci, OP_USBMODE, USBMODE_CM, USBMODE_CM_IDLE);
- 	hw_write(ci, OP_USBMODE, USBMODE_CM, mode);
-@@ -522,6 +543,32 @@ void ci13xxx_remove_device(struct platform_device *pdev)
+@@ -521,6 +522,23 @@ void ci13xxx_remove_device(struct platform_device *pdev)
  }
  EXPORT_SYMBOL_GPL(ci13xxx_remove_device);
  
-+void ci13xxx_get_dr_flags(struct device_node *of_node, struct ci13xxx_platform_data *pdata)
++void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata)
 +{
-+	int interface = of_get_usbphy_mode(of_node);
++	const unsigned char *dr_mode;
 +
-+	switch (interface) {
-+	case USBPHY_INTERFACE_MODE_UTMI:
-+		pdata->flags |= CI13XXX_PORTSC_PTS_UTMI;
-+		break;
-+	case USBPHY_INTERFACE_MODE_UTMIW:
-+		pdata->flags |= CI13XXX_PORTSC_PTS_UTMI |
-+			CI13XXX_PORTSC_PTW_16BIT;
-+		break;
-+	case USBPHY_INTERFACE_MODE_ULPI:
-+		pdata->flags |= CI13XXX_PORTSC_PTS_ULPI;
-+		break;
-+	case USBPHY_INTERFACE_MODE_SERIAL:
-+		pdata->flags |= CI13XXX_PORTSC_PTS_FSLS;
-+		break;
-+	case USBPHY_INTERFACE_MODE_NA:
-+	default:
-+		pr_err("no phy interface defined\n");
-+	}
++	dr_mode = of_get_property(of_node, "dr_mode", NULL);
++	if (!dr_mode)
++		return;
 +
++	if (!strcmp(dr_mode, "host"))
++		pdata->flags |= CI13XXX_DR_MODE_HOST;
++	else if (!strcmp(dr_mode, "peripheral"))
++		pdata->flags |= CI13XXX_DR_MODE_PERIPHERAL;
++	else if (!strcmp(dr_mode, "otg"))
++		pdata->flags |= CI13XXX_DR_MODE_HOST | CI13XXX_DR_MODE_PERIPHERAL;
 +}
-+EXPORT_SYMBOL_GPL(ci13xxx_get_dr_flags);
++EXPORT_SYMBOL_GPL(ci13xxx_get_dr_mode);
 +
- void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata)
+ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
  {
- 	const unsigned char *dr_mode;
-diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-index ebff9f4..b23ee1d 100644
---- a/drivers/usb/chipidea/host.c
-+++ b/drivers/usb/chipidea/host.c
-@@ -106,6 +106,10 @@ static int host_start(struct ci13xxx *ci)
- 	if (usb_disabled())
- 		return -ENODEV;
+ 	struct device	*dev = &pdev->dev;
+@@ -591,13 +609,22 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
+ 	hw_write(ci, OP_OTGSC, OTGSC_INT_STATUS_BITS, OTGSC_INT_STATUS_BITS);
  
-+	hw_portsc_configure(ci);
+ 	/* initialize role(s) before the interrupt is requested */
+-	ret = ci_hdrc_host_init(ci);
+-	if (ret)
+-		dev_info(dev, "doesn't support host\n");
++	/* default to otg */
++	if (!(ci->platdata->flags & CI13XXX_DR_MODE_MASK))
++		ci->platdata->flags |= CI13XXX_DR_MODE_HOST |
++			CI13XXX_DR_MODE_PERIPHERAL;
 +
-+	mdelay(10);
-+
- 	hcd = usb_create_hcd(&ci_ehci_hc_driver, ci->dev, dev_name(ci->dev));
- 	if (!hcd)
- 		return -ENOMEM;
++	if (ci->platdata->flags & CI13XXX_DR_MODE_HOST) {
++		ret = ci_hdrc_host_init(ci);
++		if (ret)
++			dev_info(dev, "doesn't support host\n");
++	}
+ 
+-	ret = ci_hdrc_gadget_init(ci);
+-	if (ret)
+-		dev_info(dev, "doesn't support gadget\n");
++	if (ci->platdata->flags & CI13XXX_DR_MODE_PERIPHERAL) {
++		ret = ci_hdrc_gadget_init(ci);
++		if (ret)
++			dev_info(dev, "doesn't support gadget\n");
++	}
+ 
+ 	if (!ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]) {
+ 		dev_err(dev, "no supported roles\n");
 diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 906d259..cafca23 100644
+index 544825d..906d259 100644
 --- a/include/linux/usb/chipidea.h
 +++ b/include/linux/usb/chipidea.h
-@@ -21,6 +21,12 @@ struct ci13xxx_platform_data {
+@@ -19,6 +19,10 @@ struct ci13xxx_platform_data {
+ #define CI13XXX_REQUIRE_TRANSCEIVER	BIT(1)
+ #define CI13XXX_PULLUP_ON_VBUS		BIT(2)
  #define CI13XXX_DISABLE_STREAMING	BIT(3)
- #define CI13XXX_DR_MODE_HOST		BIT(4)
- #define CI13XXX_DR_MODE_PERIPHERAL	BIT(5)
-+#define CI13XXX_PORTSC_PTW_8BIT		BIT(6)
-+#define CI13XXX_PORTSC_PTW_16BIT	BIT(7)
-+#define CI13XXX_PORTSC_PTS_UTMI		BIT(8)
-+#define CI13XXX_PORTSC_PTS_ULPI		BIT(9)
-+#define CI13XXX_PORTSC_PTS_FSLS		BIT(10)
-+
- #define CI13XXX_DR_MODE_MASK \
- 	(CI13XXX_DR_MODE_HOST | CI13XXX_DR_MODE_PERIPHERAL)
++#define CI13XXX_DR_MODE_HOST		BIT(4)
++#define CI13XXX_DR_MODE_PERIPHERAL	BIT(5)
++#define CI13XXX_DR_MODE_MASK \
++	(CI13XXX_DR_MODE_HOST | CI13XXX_DR_MODE_PERIPHERAL)
  
-@@ -42,4 +48,7 @@ void ci13xxx_remove_device(struct platform_device *pdev);
- /* Parse of-tree "dr_mode" property */
- void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata);
+ #define CI13XXX_CONTROLLER_RESET_EVENT		0
+ #define CI13XXX_CONTROLLER_STOPPED_EVENT	1
+@@ -35,4 +39,7 @@ struct platform_device *ci13xxx_add_device(struct device *dev,
+ /* Remove ci13xxx device */
+ void ci13xxx_remove_device(struct platform_device *pdev);
  
-+/* Parse of-tree "flags" */
-+void ci13xxx_get_dr_flags(struct device_node *of_node, struct ci13xxx_platform_data *pdata);
++/* Parse of-tree "dr_mode" property */
++void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata);
 +
  #endif
 -- 
