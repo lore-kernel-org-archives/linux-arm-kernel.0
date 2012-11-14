@@ -1,51 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 14 Nov 2012 17:22:16 +0000
-Subject: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
-In-Reply-To: <0154077FE026E54BB093CA7EB3FD1AE32DB61E4CC7@SAFEX1MAIL3.st.com>
-References: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B59@SAFEX1MAIL3.st.com>
- <20121113171745.GA6370@linaro.org>
- <BLU002-W44C55773365E0FDAC8B3C5E36C0@phx.gbl>
- <0154077FE026E54BB093CA7EB3FD1AE32DB61E4CC7@SAFEX1MAIL3.st.com>
-Message-ID: <20121114172216.GG16215@arm.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Wed, 14 Nov 2012 18:37:17 +0100
+Subject: [PATCH 6/9] uprobes: flush cache after xol write
+In-Reply-To: <20121104142927.GA4087@in.ibm.com>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-6-git-send-email-rabin@rab.in>
+ <20121015165756.GA11737@redhat.com>
+ <CAH+eYFAv=UTZ1gQ5jXq8_ziNy1i3BL9y1bOUWMdTow=i3N0n+g@mail.gmail.com>
+ <20121025145839.GB26929@redhat.com> <20121026055239.GA4862@in.ibm.com>
+ <20121026163951.GA17742@redhat.com> <20121029053522.GC3400@in.ibm.com>
+ <20121103163301.GA9496@redhat.com> <20121104142927.GA4087@in.ibm.com>
+Message-ID: <20121114173717.GA19466@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2012 at 10:15:46AM +0000, Etienne CARRIERE ST wrote:
-> > Tue 11-13-2012 8:23 PM
-> > From: Abhimanyu Kapur <abhimanyu.kapur@outlook.com>
+On 11/04, Ananth N Mavinakayanahalli wrote:
+>
+> On Sat, Nov 03, 2012 at 05:33:01PM +0100, Oleg Nesterov wrote:
 > >
-> > > Secure code in TrustZone space may need to perform L2 cache
-> > > maintenance operations. A shared mutex is required to synchronize
-> > > linux l2cc maintenance and TZ l2cc maintenance.
-> > 
-> > If you are using PL310 with thrustzone support then the L2 cache lines 
-> > are secure bit tagged ; your design should be such that the secure (TZ) 
-> > side only does operations on secure cache lines and non-secure side 
-> > does operations only on non-secure cache lines. So each entity (TZ 
-> > and nonTZ) if maintains their own cache and ensures integrity before 
-> > switching over via monitor, this might not be needed.
-> 
-> I don't think 2 cores can safely write the LX20_CLEAN/INV_LINE_PA
-> registers of the PL310 at the same time, even if targeting different
-> lines.
+> > [PATCH] uprobes: flush cache after xol write
+> >
+> > From: Rabin Vincent <rabin@rab.in>
+> >
+> > Flush the cache so that the instructions written to the XOL area are
+> > visible.
+> >
+> > Signed-off-by: Rabin Vincent <rabin@rab.in>
+>
+> Acked-by: Ananth N Mavinakayanahalli <ananth@in.ibm.com>
 
-Actually for the clean/invalidate operations by PA you can safely write
-the registers from two different processors as they get serialised by
-the hardware. What you don't get is protection around the background
-operations (clean/inv by way). I think it depends on how the PL310 is
-wired on your hardware but trying to do a PA operation while a
-background one is in progress would trigger an external abort.
+Thanks Ananth.
 
-So the NS world could simply start a background cache operation without
-taking the lock while the secure world thinks that it has the lock and
-tries to do a PA operation which would abort.
+I assume that Srikar and Rabin agree, applied as 65b6ecc038
 
-My advise is to simply ignore the shared locking and only do atomic PA
-operations on the secure side. The secure side also needs to poll for
-the completion of any background operation that was started in
-non-secure world. Of course, there is still a race, in which case,
-depending on the hardware implementation, you would need to trap any
-possible aborts while in secure mode when writing the PL310 registers.
-
--- 
-Catalin
+> >
+> > --- x/kernel/events/uprobes.c
+> > +++ x/kernel/events/uprobes.c
+> > @@ -1199,6 +1199,11 @@ static unsigned long xol_get_insn_slot(s
+> >  	vaddr = kmap_atomic(area->page);
+> >  	memcpy(vaddr + offset, uprobe->arch.insn, MAX_UINSN_BYTES);
+> >  	kunmap_atomic(vaddr);
+> > +	/*
+> > +	 * We probably need flush_icache_user_range() but it needs vma.
+> > +	 * This should work on supported architectures too.
+> > +	 */
+> > +	flush_dcache_page(area->page);
+> >
+> >  	return current->utask->xol_vaddr;
+> >  }
