@@ -1,36 +1,44 @@
 From: etienne.carriere@st.com (Etienne CARRIERE ST)
-Date: Wed, 14 Nov 2012 11:40:31 +0100
+Date: Wed, 14 Nov 2012 11:45:42 +0100
 Subject: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
-In-Reply-To: <20121114095121.GB10142@mudshark.cambridge.arm.com>
+In-Reply-To: <20121114102127.GH3290@n2100.arm.linux.org.uk>
 References: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B59@SAFEX1MAIL3.st.com>
  <20121113170711.GI28327@n2100.arm.linux.org.uk>
  <0154077FE026E54BB093CA7EB3FD1AE32B57AF1E29@SAFEX1MAIL3.st.com>
- <20121114095121.GB10142@mudshark.cambridge.arm.com>
-Message-ID: <0154077FE026E54BB093CA7EB3FD1AE32DB61E4D16@SAFEX1MAIL3.st.com>
+ <20121114102127.GH3290@n2100.arm.linux.org.uk>
+Message-ID: <0154077FE026E54BB093CA7EB3FD1AE32DB61E4D23@SAFEX1MAIL3.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, I don't catch "swizzle your implementation" ?
+> Sent: Wednesday, November 14, 2012 11:21 AM
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+>
+> > > Right, so, what this tells me is that the implementation of the 
+> > > spinlock in the secure software is potentially the same as the 
+> > > kernel's spinlock.
+> > > The kernel's spinlock implementation is GPL'd.  If the secure side 
+> > > spinlock implementation is a copy of the kernel's spinlock 
+> > > implementation, then that implementation is also GPL'd (...).
+> > > 
+> > > I think someone has some explaining to do.
+> > 
+> > It does.
+> > 
+> > The TZ implementation of the shared mutex is the ARM native mutex 
+> > instructions set LDREX/STREX, protected by a native ARM IRQ disabling.
+> > I believe this is native ARMv7 natural handling and not subject to 
+> > GPLization.
+>
+> Maybe, maybe not.  There's more to locking than just the instructions used 
+> - there's the values which are used to represent "locked" and "unlocked", 
+> and then there's the ticket locking implementation found in recent kernels 
+> which defines the value to have more meaning than just "locked" and "unlocked".
+>
+> With ticket locking, you need to know the details of the implementation to be 
+> able to lock successfully, and that basically means copying the implementation.
 
-You are referring to the raw_spinlock LOCKBREAK stuf ?
-I will look deeper into linux code to check is some deadlock could appear.
+Thanks for notifying. I will look at the recent release to see if our architecture complies with Kernel code.
 
-The shared mutex arch spinlock is locked after raw_spinlick locking and released before l2x0 native raw_spinlock releasing.
-It is intended to leave kernel preemption stuff inside the linux world.
+Our mutex implementation is based on 0/1 lock/unlock value in target mutex DDR cell.
 
-etienne
-
------Original Message-----
-From: Will Deacon [mailto:will.deacon at arm.com] 
-Sent: Wednesday, November 14, 2012 10:51 AM
-To: Etienne CARRIERE ST
-Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org; Marc Zyngier; Catalin Marinas; Linus Walleij; Rabin VINCENT; Srinidhi KASAGAR
-Subject: Re: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
-
-On Wed, Nov 14, 2012 at 09:18:31AM +0000, Etienne CARRIERE ST wrote:
-> This is why the mutex added for TZ shared of L2 cache maintenance is a "arch_spinlock". It assumes linux handles the spinlock as a native ARM native mutex DDR cell, handled from the ARMv7-A LDREX/STREX.
-> I think this is the weakest part of the driver since they is no insurance that linux pristine arch_spinlock will not evolve into something else (i.e features in raw_spinclock).
-
-How does this work with our ticket lock approach? Can you swizzle your locking implementation by inspecting the kernel version of the code running on the non-secure side? (I sincerely hope not...)
-
-Will
+etienne 
