@@ -1,49 +1,36 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Wed, 14 Nov 2012 18:37:17 +0100
-Subject: [PATCH 6/9] uprobes: flush cache after xol write
-In-Reply-To: <20121104142927.GA4087@in.ibm.com>
-References: <1350242593-17761-1-git-send-email-rabin@rab.in>
- <1350242593-17761-6-git-send-email-rabin@rab.in>
- <20121015165756.GA11737@redhat.com>
- <CAH+eYFAv=UTZ1gQ5jXq8_ziNy1i3BL9y1bOUWMdTow=i3N0n+g@mail.gmail.com>
- <20121025145839.GB26929@redhat.com> <20121026055239.GA4862@in.ibm.com>
- <20121026163951.GA17742@redhat.com> <20121029053522.GC3400@in.ibm.com>
- <20121103163301.GA9496@redhat.com> <20121104142927.GA4087@in.ibm.com>
-Message-ID: <20121114173717.GA19466@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Nov 2012 17:39:28 +0000
+Subject: [RFC PATCH 0/3] introduce static_vm for ARM-specific static
+ mapped area
+In-Reply-To: <1352912154-16210-1-git-send-email-js1304@gmail.com>
+References: <1352912154-16210-1-git-send-email-js1304@gmail.com>
+Message-ID: <20121114173928.GK3290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04, Ananth N Mavinakayanahalli wrote:
->
-> On Sat, Nov 03, 2012 at 05:33:01PM +0100, Oleg Nesterov wrote:
-> >
-> > [PATCH] uprobes: flush cache after xol write
-> >
-> > From: Rabin Vincent <rabin@rab.in>
-> >
-> > Flush the cache so that the instructions written to the XOL area are
-> > visible.
-> >
-> > Signed-off-by: Rabin Vincent <rabin@rab.in>
->
-> Acked-by: Ananth N Mavinakayanahalli <ananth@in.ibm.com>
+On Thu, Nov 15, 2012 at 01:55:51AM +0900, Joonsoo Kim wrote:
+> In current implementation, we used ARM-specific flag, that is,
+> VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
+> The purpose of static mapped area is to re-use static mapped area when
+> entire physical address range of the ioremap request can be covered
+> by this area.
+> 
+> This implementation causes needless overhead for some cases.
 
-Thanks Ananth.
+In what cases?
 
-I assume that Srikar and Rabin agree, applied as 65b6ecc038
+> We unnecessarily iterate vmlist for finding matched area even if there
+> is no static mapped area. And if there are some static mapped areas,
+> iterating whole vmlist is not preferable.
 
-> >
-> > --- x/kernel/events/uprobes.c
-> > +++ x/kernel/events/uprobes.c
-> > @@ -1199,6 +1199,11 @@ static unsigned long xol_get_insn_slot(s
-> >  	vaddr = kmap_atomic(area->page);
-> >  	memcpy(vaddr + offset, uprobe->arch.insn, MAX_UINSN_BYTES);
-> >  	kunmap_atomic(vaddr);
-> > +	/*
-> > +	 * We probably need flush_icache_user_range() but it needs vma.
-> > +	 * This should work on supported architectures too.
-> > +	 */
-> > +	flush_dcache_page(area->page);
-> >
-> >  	return current->utask->xol_vaddr;
-> >  }
+Why not?  Please put some explanation into your message rather than
+just statements making unexplained assertions.
+
+> Another reason for doing this work is for removing architecture dependency
+> on vmalloc layer. I think that vmlist and vmlist_lock is internal data
+> structure for vmalloc layer. Some codes for debugging and stat inevitably
+> use vmlist and vmlist_lock. But it is preferable that they are used outside
+> of vmalloc.c as least as possible.
+
+The vmalloc layer is also made available for ioremap use, and it is
+intended that architectures hook into this for ioremap support.
