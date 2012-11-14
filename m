@@ -1,30 +1,38 @@
-From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Wed, 14 Nov 2012 16:44:26 +0100
-Subject: [PATCH v2 1/2] ARM: mx27_3ds: Add VPU support
-In-Reply-To: <20121114143400.GM10369@pengutronix.de>
-References: <1352899174-28022-1-git-send-email-fabio.estevam@freescale.com>
- <20121114143400.GM10369@pengutronix.de>
-Message-ID: <20121114164426.7a730296@eb-e6520>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 14 Nov 2012 16:44:34 +0100
+Subject: [PATCH 1/3] arm: mvebu: fix compatible string in armada-370-xp.dtsi
+In-Reply-To: <1352907876-32482-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1352907876-32482-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1352907876-32482-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+All the Device Tree files for Armada 370 and XP SoCs and boards use
+the "armada-370-xp" common compatible string, except
+armada-370-xp.dtsi which was specifying "armada_370_xp".
 
-Le Wed, 14 Nov 2012 15:34:00 +0100,
-Sascha Hauer <s.hauer@pengutronix.de> a ?crit :
-> On Wed, Nov 14, 2012 at 11:19:33AM -0200, Fabio Estevam wrote:
-> > mx27 has a VPU (Video Processing Unit) block that allows doing H264/MPEG4
-> > decoding and encoding in hardware.
-> > 
-> > Add support for it.
-> > 
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > ---
-> > +	imx27_add_coda();
-> 
-> Why in the board? It's always present so I would register it in the SoC.
-> 
-MCIMX27L* dosn't have the VPU. No idea how will behave the probe in
-that case.
+Fix this inconsistency by making armada-370-xp.dtsi declare a
+compatible string of "armada-370-xp" like everyone else.
 
-Eruc
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370-xp.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 16cc82c..b113e0b 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -20,7 +20,7 @@
+ 
+ / {
+ 	model = "Marvell Armada 370 and XP SoC";
+-	compatible = "marvell,armada_370_xp";
++	compatible = "marvell,armada-370-xp";
+ 
+ 	cpus {
+ 		cpu at 0 {
+-- 
+1.7.9.5
