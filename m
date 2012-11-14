@@ -1,41 +1,70 @@
 From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Wed, 14 Nov 2012 17:19:01 +0100
-Subject: [PATCH 0/9] chipidea fixes and features
-Message-ID: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
+Date: Wed, 14 Nov 2012 17:19:08 +0100
+Subject: [PATCH 7/9] usb: chipidea: udc: add force-full-speed option
+In-Reply-To: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
+References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <1352909950-32555-8-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Kleine-Budde (2):
-  usb: chipidea: pci: mark platformdata as static and __devinitdata
-  usb: chipidea: ci13xxx-imx: add "dr_mode" property to device tree bindings
+This patch makes it possible to set the chipidea udc
+into full-speed only mode. It can be set by the oftree
+property "force-full-speed".
 
-Michael Grzeschik (7):
-  usb: chipidea: ci13xxx_imx: add 2nd and 3rd clock to support imx5x and newer
-  usb: chipidea: ci13xxx-imx: create dynamic platformdata
-  usb: add phy connection by phy-mode
-  usb: chipidea: add PTW and PTS handling
-  usb: chipidea: udc: add force-full-speed option
-  usb: chipidea: udc: remove unlocked ep_queue which can lead to an race
-  usb: chipidea: udc: configure iso endpoints
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+ drivers/usb/chipidea/bits.h  |    1 +
+ drivers/usb/chipidea/core.c  |    5 +++++
+ include/linux/usb/chipidea.h |    1 +
+ 3 files changed, 7 insertions(+)
 
- .../devicetree/bindings/usb/ci13xxx-imx.txt        |    4 +
- arch/arm/boot/dts/imx28.dtsi                       |    2 +
- drivers/of/Kconfig                                 |    4 +
- drivers/of/Makefile                                |    1 +
- drivers/of/of_usbphy.c                             |   49 ++++++++
- drivers/usb/chipidea/bits.h                        |    4 +
- drivers/usb/chipidea/ci.h                          |    2 +
- drivers/usb/chipidea/ci13xxx_imx.c                 |   84 ++++++++++---
- drivers/usb/chipidea/ci13xxx_pci.c                 |    6 +-
- drivers/usb/chipidea/core.c                        |   91 +++++++++++++-
- drivers/usb/chipidea/host.c                        |    4 +
- drivers/usb/chipidea/udc.c                         |  127 ++++++++++++--------
- include/linux/of_usbphy.h                          |   15 +++
- include/linux/usb/chipidea.h                       |   17 +++
- include/linux/usb/phy.h                            |    8 ++
- 15 files changed, 337 insertions(+), 81 deletions(-)
- create mode 100644 drivers/of/of_usbphy.c
- create mode 100644 include/linux/of_usbphy.h
-
+diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
+index 3cded5f..85b6b09 100644
+--- a/drivers/usb/chipidea/bits.h
++++ b/drivers/usb/chipidea/bits.h
+@@ -51,6 +51,7 @@
+ #define PORTSC_PTS            (BIT(31) | BIT(30))
+ #define PORTSC_PTW            BIT(28)
+ #define PORTSC_STS            BIT(29)
++#define PORTSC_PFSC           BIT(24)
+ 
+ /* DEVLC */
+ #define DEVLC_PSPD            (0x03UL << 25)
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 7e80f1b..bc99cea 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -230,6 +230,9 @@ void hw_portsc_configure(struct ci13xxx *ci)
+ 		hw_write(ci, OP_PORTSC, PORTSC_PTS, 0x3 << ffs_nr(PORTSC_PTS));
+ 		hw_write(ci, OP_PORTSC, PORTSC_STS, 0x1 << ffs_nr(PORTSC_STS));
+ 	}
++
++	if (ci->platdata->flags & CI13XXX_PORTSC_PFSC)
++		hw_write(ci, OP_PORTSC, PORTSC_PFSC, 0x1 << ffs_nr(PORTSC_PFSC));
+ }
+ 
+ /**
+@@ -566,6 +569,8 @@ void ci13xxx_get_dr_flags(struct device_node *of_node, struct ci13xxx_platform_d
+ 		pr_err("no phy interface defined\n");
+ 	}
+ 
++	if (of_find_property(of_node, "force-full-speed", NULL))
++		pdata->flags |= CI13XXX_PORTSC_PFSC;
+ }
+ EXPORT_SYMBOL_GPL(ci13xxx_get_dr_flags);
+ 
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index cafca23..9ffe105 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -26,6 +26,7 @@ struct ci13xxx_platform_data {
+ #define CI13XXX_PORTSC_PTS_UTMI		BIT(8)
+ #define CI13XXX_PORTSC_PTS_ULPI		BIT(9)
+ #define CI13XXX_PORTSC_PTS_FSLS		BIT(10)
++#define CI13XXX_PORTSC_PFSC		BIT(11)
+ 
+ #define CI13XXX_DR_MODE_MASK \
+ 	(CI13XXX_DR_MODE_HOST | CI13XXX_DR_MODE_PERIPHERAL)
 -- 
 1.7.10.4
