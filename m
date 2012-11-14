@@ -1,27 +1,44 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 14 Nov 2012 13:06:53 -0600
-Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
-In-Reply-To: <20121114185335.GU6801@atomide.com>
-References: <20121114185335.GU6801@atomide.com>
-Message-ID: <50A3EBCD.3040801@ti.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 14 Nov 2012 11:07:13 -0800
+Subject: [PATCH v5 0/4] arch/arm: support seccomp
+In-Reply-To: <1352587485-18348-1-git-send-email-keescook@chromium.org>
+References: <1352587485-18348-1-git-send-email-keescook@chromium.org>
+Message-ID: <CAGXu5jKYGCkL3GS4Tbep==WUAqP-c_0edAdgy0XQ84rJxZUU2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, any more thoughts on this series? I'd really like to get it into
+-next. It's been running happily for a while now in the Chrome OS ARM
+devices.
 
-On 11/14/2012 12:53 PM, Tony Lindgren wrote:
-> Looks like enabling CONFIG_ARM_ERRATA_751472 causes omap4 blaze
-> to not boot when enabled. The ARM core on it is an earlier r1p2:
-> 
-> CPU: ARMv7 Processor [411fc092] revision 2 (ARMv7), cr=10c53c7d
-> 
-> Unfortunately I don't have the details of errata 751472, but I'm
-> guessing we need to disable it for r1p*.
+Thanks,
 
-I checked the CA9MP errata document and this erratum impacts all
-r0/r1/r2 CPUs. I am wondering if the problem is because the workaround
-requires you to set a bit in the Diagnostic Control register and the
-read-modify-write sequence provided in the workaround is for secure
-mode. Not sure if there is a non-secure workaround available :-(
+-Kees
 
-Cheers
-Jon
+On Sat, Nov 10, 2012 at 2:44 PM, Kees Cook <keescook@chromium.org> wrote:
+> This adds support for seccomp BPF to ARM. When built with the seccomp
+> improvement patch waiting in linux-next ("seccomp: Make syscall skipping
+> and nr changes more consistent"), this passes the seccomp regression
+> test suite: https://github.com/redpig/seccomp
+>
+> Thanks,
+>
+> -Kees
+>
+> ---
+> v5:
+>  - clean up seccomp failure path, as requested by Will Deacon.
+> v4:
+>  - fixed syscall_get_arch, thanks to Will Deacon.
+> v3:
+>  - updates suggested by Russell King:
+>    - reduced scope of expansion
+>    - leveraged TIF_SYSCALL_WORK bit mask
+>    - fixed syscall==-1 short-circuit logic
+> v2:
+>  - expanded ptrace_syscall_trace() into both callers and do
+>    secure_computing() hookup there, as requested by Al Viro.
+
+-- 
+Kees Cook
+Chrome OS Security
