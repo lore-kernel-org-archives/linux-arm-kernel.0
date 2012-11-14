@@ -1,44 +1,42 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 14 Nov 2012 11:07:13 -0800
-Subject: [PATCH v5 0/4] arch/arm: support seccomp
-In-Reply-To: <1352587485-18348-1-git-send-email-keescook@chromium.org>
-References: <1352587485-18348-1-git-send-email-keescook@chromium.org>
-Message-ID: <CAGXu5jKYGCkL3GS4Tbep==WUAqP-c_0edAdgy0XQ84rJxZUU2Q@mail.gmail.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Thu, 15 Nov 2012 00:37:57 +0530
+Subject: [PATCH V5 4/7] net: cpsw: halt network stack before halting the
+ device during suspend
+In-Reply-To: <1352920080-6179-1-git-send-email-mugunthanvnm@ti.com>
+References: <1352920080-6179-1-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <1352920080-6179-5-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, any more thoughts on this series? I'd really like to get it into
--next. It's been running happily for a while now in the Chrome OS ARM
-devices.
+Move network stack halt APIs before halting the hardware to ensure no
+packets are queued to hardware during closing the device during
+suspend sequence.
 
-Thanks,
+Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+Acked-by: Richard Cochran <richardcochran@gmail.com>
+---
+ drivers/net/ethernet/ti/cpsw.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
--Kees
-
-On Sat, Nov 10, 2012 at 2:44 PM, Kees Cook <keescook@chromium.org> wrote:
-> This adds support for seccomp BPF to ARM. When built with the seccomp
-> improvement patch waiting in linux-next ("seccomp: Make syscall skipping
-> and nr changes more consistent"), this passes the seccomp regression
-> test suite: https://github.com/redpig/seccomp
->
-> Thanks,
->
-> -Kees
->
-> ---
-> v5:
->  - clean up seccomp failure path, as requested by Will Deacon.
-> v4:
->  - fixed syscall_get_arch, thanks to Will Deacon.
-> v3:
->  - updates suggested by Russell King:
->    - reduced scope of expansion
->    - leveraged TIF_SYSCALL_WORK bit mask
->    - fixed syscall==-1 short-circuit logic
-> v2:
->  - expanded ptrace_syscall_trace() into both callers and do
->    secure_computing() hookup there, as requested by Al Viro.
-
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index 0da9c75..02c2477 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -698,12 +698,12 @@ static int cpsw_ndo_stop(struct net_device *ndev)
+ 	struct cpsw_priv *priv = netdev_priv(ndev);
+ 
+ 	cpsw_info(priv, ifdown, "shutting down cpsw device\n");
+-	cpsw_intr_disable(priv);
+-	cpdma_ctlr_int_ctrl(priv->dma, false);
+-	cpdma_ctlr_stop(priv->dma);
+ 	netif_stop_queue(priv->ndev);
+ 	napi_disable(&priv->napi);
+ 	netif_carrier_off(priv->ndev);
++	cpsw_intr_disable(priv);
++	cpdma_ctlr_int_ctrl(priv->dma, false);
++	cpdma_ctlr_stop(priv->dma);
+ 	cpsw_ale_stop(priv->ale);
+ 	for_each_slave(priv, cpsw_slave_stop, priv);
+ 	pm_runtime_put_sync(&priv->pdev->dev);
 -- 
-Kees Cook
-Chrome OS Security
+1.7.0.4
