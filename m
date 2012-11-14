@@ -1,62 +1,22 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 15 Nov 2012 06:42:46 +1300
-Subject: arch-vt8500 and wm8850 support
-In-Reply-To: <201211141117.33485.arnd@arndb.de>
-References: <1352879641.2728.8.camel@gitbox> <201211141117.33485.arnd@arndb.de>
-Message-ID: <1352914966.3238.3.camel@gitbox>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Nov 2012 17:44:26 +0000
+Subject: OMAP* Latest build failures
+In-Reply-To: <20121114171730.GS6801@atomide.com>
+References: <20121114092643.GG3290@n2100.arm.linux.org.uk>
+ <50A3844B.8040208@ti.com> <20121114164801.GQ6801@atomide.com>
+ <20121114165947.GR6801@atomide.com> <20121114171730.GS6801@atomide.com>
+Message-ID: <20121114174426.GC3332@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Yes, makes sense. Actually with the move to multiplatform, you already
-> need to make the decision for the CPU earlier on, since the multiplatform
-> kernel can only be built either for ARMv4/v5 or for ARMv6/v7.
+On Wed, Nov 14, 2012 at 09:17:31AM -0800, Tony Lindgren wrote:
+> Looks like the way to do this not to use oldnoconfig but to do:
 > 
-> I would suggest doing it like
+> $ make KCONFIG_ALLCONFIG=../configs/rmk-omap4430-sdp-noconfig allnoconfig
 > 
-> config ARCH_VT8500
-> 	bool
-> 	select FOO
-> 	select BAR
-> 
-> config ARCH_WM8505
-> 	bool "WonderMedia WM8505 or VIA VT8500"
-> 	depends on ARCH_MULTI_V5
-> 	select ARCH_VT8500
-> 	select CPU_ARM926
-> 
-> config ARCH_WM8650
-> 	bool "WonderMedia WM 8650"
-> 	depends on ARCH_MULTI_V6
-> 	select ARCH_VT8500
-> 	select CPU_V6
-> 
-> config ARCH_WM8850
-> 	bool "WonderMedia WM 8750/8850"
-> 	depends on ARCH_MULTI_V7
-> 	select ARCH_VT8500
-> 	select CPU_V7
-> 
-> This keeps ARCH_VT8500 as the overall name for the family, but
-> lists only the WonderMedia parts in the configuration.
-> 
-> 	Arnd
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> It seems that oldnoconfig will pick the new options that have default y?
 
-Makes sense - That's basically what I had in mind. My concern is with
-the bit that made no sense to me - the non-multiplatform version of the
-same. At the moment, we have the default xx_SINGLE for ARCH_VT8500.
-Would I need to add an additional xx_SINGLE variant for each different
-version?
-
-We would need ARCH_WM8505 (To cover VT8500/WM8505/WM8650 ARM926),
-ARCH_WM8750 (for ARMv6) and ARCH_WM8850 (for ARMv7).
-
-Do I need a ARCH_WM8750_SINGLE, ARCH_WM8850_SINGLE etc for each one to
-allow use to continue using earlyprintk?
-
-Regards
-Tony P
+That is the correct way to tell Kconfig to use the seed configuration -
+that forces the options in the ALLCONFIG file to the values in there in
+the final configuration while setting the rest of the options as desired
+by the all*config target.
