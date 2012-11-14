@@ -1,36 +1,31 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 14 Nov 2012 16:52:09 +0900
-Subject: [PATCH] ARM: S3C64XX: Add missing device selects for Cragganmore
-Message-ID: <1352879529-7057-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 14 Nov 2012 20:54:01 +1300
+Subject: arch-vt8500 and wm8850 support
+Message-ID: <1352879641.2728.8.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously unnoticed due to selection by other machines.
+Hi Arnd,
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
+Just looking for a little advice re: adding support for the WM8850
+variant.
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index 63e7ae3..131c862 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -294,6 +294,7 @@ config MACH_WLF_CRAGG_6410
- 	select S3C64XX_SETUP_SDHCI
- 	select S3C64XX_SETUP_SPI
- 	select S3C64XX_SETUP_USB_PHY
-+	select S3C_DEV_FB
- 	select S3C_DEV_HSMMC
- 	select S3C_DEV_HSMMC1
- 	select S3C_DEV_HSMMC2
-@@ -304,6 +305,7 @@ config MACH_WLF_CRAGG_6410
- 	select S3C_DEV_WDT
- 	select SAMSUNG_DEV_ADC
- 	select SAMSUNG_DEV_KEYPAD
-+	select SAMSUNG_DEV_PWM
- 	select SAMSUNG_GPIO_EXTRA128
- 	help
- 	  Machine support for the Wolfson Cragganmore S3C6410 variant.
--- 
-1.7.10.4
+At the moment we have the ARM926 variants under ARCH_VT8500. The WM8850
+is ARMv7, but uses all the same drivers as the ARM926 versions. At the
+moment, all the drivers depend on ARCH_VT8500.
+
+The obvious solution (to me at least) seems to be to have 3 groups -
+ARCH_VT8500 keeps everything it has now except 'select CPU_ARM926T', and
+we add 2 additional groups - the first for all the current models, which
+selects CPU_ARM926T and ARCH_VT8500, and a second for WM8850 which
+selects CPU_V7 and ARCH_VT8500.
+
+The other option seems to be to add WM8850 as ARCH_newmodel, but that
+would require patching all the driver Kconfigs to depends on ARCH_VT8500
+|| ARCH_newmodel.
+
+
+Interested in your feedback.
+
+Regards
+Tony P
