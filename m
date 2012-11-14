@@ -1,44 +1,47 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 14 Nov 2012 15:34:00 +0100
-Subject: [PATCH v2 1/2] ARM: mx27_3ds: Add VPU support
-In-Reply-To: <1352899174-28022-1-git-send-email-fabio.estevam@freescale.com>
-References: <1352899174-28022-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20121114143400.GM10369@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 14 Nov 2012 15:37:11 +0100
+Subject: [PATCH 2/6] pinctrl: Update clock handling for the
+ pinctrl-nomadik GPIO driver
+In-Reply-To: <20121114131806.GA17338@gmail.com>
+References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
+ <1351089926-32161-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkda2NQok7kzh0pFmZPYd4nky1kUw=67DZAYAJAXGuc1yzQ@mail.gmail.com>
+ <CACRpkdbNWE6hOdVFPxHv7MVHkZUBW3LC035CxJkZVmr8j05Kqw@mail.gmail.com>
+ <20121025155143.GK4008@gmail.com>
+ <CACRpkdbkcgE-qwuGgOvK9jGTj-0qy3eTFLsN3LYe1G17LmHk9g@mail.gmail.com>
+ <20121114131806.GA17338@gmail.com>
+Message-ID: <CACRpkdZXvU0nWrV8oi9JvoOhi9CEbA7PWf_D6Z2MPz1J1zeWXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Wed, Nov 14, 2012 at 2:18 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 25 Oct 2012, Linus Walleij wrote:
+>
+>> On Thu, Oct 25, 2012 at 5:51 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>> > On Thu, 25 Oct 2012, Linus Walleij wrote:
+>>
+>> >> Probably some driver is needing a clk_get() or a clk_get_sys() is
+>> >> needs to be added somewhere to bring up some vital cluster,
+>> >> or there may be some out-of-tree driver needed to bring up the
+>> >> cluster properly I have no clue... Maybe some cluster just
+>> >> cannot be declocked like that.
+>> >
+>> > I leave work in 10 mins and won't be coding again for ~2.5 weeks.
+>> > So if this is something you could squeeze in and fix-up, I'd be
+>> > very grateful.
+>>
+>> I'll try. It doesn't look right that a clk_prepare() in the pinctrl
+>> driver is saving the day for somebody else...
+>
+> Hi Linus,
+>
+> Did you apply this in the end?
 
-On Wed, Nov 14, 2012 at 11:19:33AM -0200, Fabio Estevam wrote:
-> mx27 has a VPU (Video Processing Unit) block that allows doing H264/MPEG4
-> decoding and encoding in hardware.
-> 
-> Add support for it.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Do not allocate the coda buffers explicetely
-> 
->  arch/arm/mach-imx/mach-mx27_3ds.c |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-> index d0e547f..e37a114 100644
-> --- a/arch/arm/mach-imx/mach-mx27_3ds.c
-> +++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-> @@ -531,6 +531,7 @@ static void __init mx27pdk_init(void)
->  	imx27_add_imx_ssi(0, &mx27_3ds_ssi_pdata);
->  
->  	imx_add_platform_device("imx_mc13783", 0, NULL, 0, NULL, 0);
-> +	imx27_add_coda();
+No I can't. If I fix the bug in the patch (removing the surplus
+clk_prepare() in the probe function) the thing regresses the
+entire kernel, so I have no patch which actually is working.
 
-Why in the board? It's always present so I would register it in the SoC.
+It needs to be root-caused and fixed properly...
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yours,
+Linus Walleij
