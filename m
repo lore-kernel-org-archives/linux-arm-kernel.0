@@ -1,64 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Nov 2012 23:26:22 +0000
-Subject: arch-vt8500 and wm8850 support
-In-Reply-To: <1352914966.3238.3.camel@gitbox>
-References: <1352879641.2728.8.camel@gitbox>
- <201211141117.33485.arnd@arndb.de> <1352914966.3238.3.camel@gitbox>
-Message-ID: <201211142326.23023.arnd@arndb.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 15 Nov 2012 00:27:17 +0100
+Subject: [PATCH v3 05/11] ARM: dts: add exynos4 clock controller nodes
+In-Reply-To: <1352930853-12268-6-git-send-email-thomas.abraham@linaro.org>
+References: <1352930853-12268-1-git-send-email-thomas.abraham@linaro.org>
+ <1352930853-12268-6-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <4979279.mb3rWrdaG3@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 November 2012, Tony Prisk wrote:
-> Makes sense - That's basically what I had in mind. My concern is with
-> the bit that made no sense to me - the non-multiplatform version of the
-> same. At the moment, we have the default xx_SINGLE for ARCH_VT8500.
-> Would I need to add an additional xx_SINGLE variant for each different
-> version?
+On Thursday 15 of November 2012 03:37:27 Thomas Abraham wrote:
+> Add clock controller nodes for Exynos4210 and Exynos4x12 SoC's.
+> 
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  arch/arm/boot/dts/exynos4210.dtsi |    6 ++++++
+>  arch/arm/boot/dts/exynos4x12.dtsi |    6 ++++++
+>  2 files changed, 12 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4210.dtsi
+> b/arch/arm/boot/dts/exynos4210.dtsi index d6fc306..f7daa09 100644
+> --- a/arch/arm/boot/dts/exynos4210.dtsi
+> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> @@ -50,6 +50,12 @@
+>  		samsung,mct-nr-local-irqs = <4>;
+>  	};
+> 
+> +	clock: clock-controller at 0x10030000 {
+> +		compatible = "samsung,exynos4210-clock";
+> +		reg = <0x10030000 0x20000>;
+> +		#clock-cells = <1>;
+> +	};
+> +
+>  	pinctrl_0: pinctrl at 11400000 {
+>  		compatible = "samsung,pinctrl-exynos4210";
+>  		reg = <0x11400000 0x1000>;
+> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi
+> b/arch/arm/boot/dts/exynos4x12.dtsi index 7cbbd19..bcfdaac 100644
+> --- a/arch/arm/boot/dts/exynos4x12.dtsi
+> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
+> @@ -35,6 +35,12 @@
+>  			     <0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>;
+>  	};
+> 
+> +	clock: clock-controller at 0x10030000 {
+> +		compatible = "samsung,exynos4412-clock";
 
-I think either one option or two (v5 and v6/v7), but we don't need three
-separate ones, as it should be possible to build v6 and v7 together.
+nitpick: I forgot to mention about it in my comments for patch 3, but 
+wouldn't it be better to call it "samsung,exynos4x12-clock"?
 
-> We would need ARCH_WM8505 (To cover VT8500/WM8505/WM8650 ARM926),
-> ARCH_WM8750 (for ARMv6) and ARCH_WM8850 (for ARMv7).
+> +		reg = <0x10030000 0x20000>;
+> +		#clock-cells = <1>;
+> +	};
+> +
+>  	pinctrl_0: pinctrl at 11400000 {
+>  		compatible = "samsung,pinctrl-exynos4x12";
+>  		reg = <0x11400000 0x1000>;
 
-Ah, right, I was mixing up the numbers.
+Otherwise looks fine.
 
-> Do I need a ARCH_WM8750_SINGLE, ARCH_WM8850_SINGLE etc for each one to
-> allow use to continue using earlyprintk?
-
-You just need to ensure that we always set at least one of them, and
-that ARCH_WM8505 isn't set at the same time as one of the v6/v7 parts.
-
-Maybe something like
-
-config ARCH_VT8500
-      bool
-      select FOO
-      select BAR
-
-config ARCH_WM8505
-      bool "WonderMedia WM8505/WM8650 or VIA VT8500" if !ARCH_VT8500_SINGLE
-      depends on ARCH_MULTI_V5
-      default ARCH_VT8500_SINGLE
-      select ARCH_VT8500
-      select CPU_ARM926
-
-config ARCH_WM8750
-      bool "WonderMedia WM 8750"
-      depends on ARCH_MULTI_V6 || ARCH_WM8750_SINGLE
-      select ARCH_VT8500
-      select CPU_V6
-
-config ARCH_WM8850
-      bool "WonderMedia WM 8850/8950"
-      depends on ARCH_MULTI_V7 || ARCH_WM8750_SINGLE
-      select ARCH_VT8500
-      select CPU_V7
-
-config ARCH_WM8850_AUTO
-      def_bool y
-      depends on ARCH_WM8750_SINGLE && !ARCH_WM8750
-      select ARCH_WM8850 # ensure that ARCH_WM8850 is on if ARCH_WM8750 is off
-
-
-	Arnd
+Best regards,
+Tomasz Figa
