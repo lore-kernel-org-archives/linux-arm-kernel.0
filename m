@@ -1,51 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Nov 2012 12:32:21 -0800
-Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
-In-Reply-To: <20121114202244.GE3332@n2100.arm.linux.org.uk>
-References: <20121114185335.GU6801@atomide.com> <50A3EBCD.3040801@ti.com>
- <20121114202244.GE3332@n2100.arm.linux.org.uk>
-Message-ID: <20121114203221.GA6801@atomide.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 14 Nov 2012 12:43:51 -0800
+Subject: [PATCH 1/3] OF: Add helper for matching against linux, stdout-path
+In-Reply-To: <1351849734-9836-2-git-send-email-s.hauer@pengutronix.de>
+References: <1351849734-9836-1-git-send-email-s.hauer@pengutronix.de>
+ <1351849734-9836-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20121114204351.GA5743@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [121114 12:24]:
-> On Wed, Nov 14, 2012 at 01:06:53PM -0600, Jon Hunter wrote:
-> > 
-> > On 11/14/2012 12:53 PM, Tony Lindgren wrote:
-> > > Looks like enabling CONFIG_ARM_ERRATA_751472 causes omap4 blaze
-> > > to not boot when enabled. The ARM core on it is an earlier r1p2:
-> > > 
-> > > CPU: ARMv7 Processor [411fc092] revision 2 (ARMv7), cr=10c53c7d
-> > > 
-> > > Unfortunately I don't have the details of errata 751472, but I'm
-> > > guessing we need to disable it for r1p*.
-> > 
-> > I checked the CA9MP errata document and this erratum impacts all
-> > r0/r1/r2 CPUs. I am wondering if the problem is because the workaround
-> > requires you to set a bit in the Diagnostic Control register and the
-> > read-modify-write sequence provided in the workaround is for secure
-> > mode. Not sure if there is a non-secure workaround available :-(
+On Fri, Nov 02, 2012 at 10:48:52AM +0100, Sascha Hauer wrote:
+> devicetrees may have a linux,stdout-path property in the chosen
+> node describing the console device. This adds a helper function
+> to match a device against this property so a driver can call
+> add_preferred_console for a matching device.
 > 
-> Most likely, and there's not a lot that the kernel can sanely do about
-> that.  We have ended up deciding (through being forced to because of
-> how the security stuff works) that the stages prior to the kernel will
-> implement the work-around enables because those stages are already
-> platform specific, and the kernel will implement a "test for the
-> work-around already enabled."
-> 
-> The net result is, if you enable an Errata in the kernel which your
-> earlier boot stages has not already configured, the kernel will hang.
-> Not much we can do about the hanging aspect, because the kernel takes
-> an exception which we can't trap at those early stages in the boot
-> process.
-> 
-> I'm not particularly happy about that design, but that's what we've
-> ended up with through the 'design' of the security stuff forced onto
-> us.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/of/Kconfig        |    3 +++
+>  drivers/of/Makefile       |    1 +
+>  drivers/of/of_stdout.c    |   27 +++++++++++++++++++++++++++
+>  include/linux/of_stdout.h |   24 ++++++++++++++++++++++++
+>  4 files changed, 55 insertions(+)
+>  create mode 100644 drivers/of/of_stdout.c
+>  create mode 100644 include/linux/of_stdout.h
 
-Checking for the bit already set should work in this case, I'll post
-a patch for that shortly.
+I need an ACK from the OF maintainers before I can take this through the
+tty tree.
 
-Regards,
+thanks,
 
-Tony
+greg k-h
