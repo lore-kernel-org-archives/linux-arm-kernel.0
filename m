@@ -1,56 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Nov 2012 09:17:31 -0800
-Subject: OMAP* Latest build failures
-In-Reply-To: <20121114165947.GR6801@atomide.com>
-References: <20121114092643.GG3290@n2100.arm.linux.org.uk>
- <50A3844B.8040208@ti.com> <20121114164801.GQ6801@atomide.com>
- <20121114165947.GR6801@atomide.com>
-Message-ID: <20121114171730.GS6801@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 14 Nov 2012 17:22:16 +0000
+Subject: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
+In-Reply-To: <0154077FE026E54BB093CA7EB3FD1AE32DB61E4CC7@SAFEX1MAIL3.st.com>
+References: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B59@SAFEX1MAIL3.st.com>
+ <20121113171745.GA6370@linaro.org>
+ <BLU002-W44C55773365E0FDAC8B3C5E36C0@phx.gbl>
+ <0154077FE026E54BB093CA7EB3FD1AE32DB61E4CC7@SAFEX1MAIL3.st.com>
+Message-ID: <20121114172216.GG16215@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [121114 09:02]:
-> * Tony Lindgren <tony@atomide.com> [121114 08:50]:
-> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [121114 03:47]:
-> > > On 2012-11-14 11:26, Russell King - ARM Linux wrote:
-> > > > OMAP* allnoconfig fails:
-> > > > 
-> > > > arch/arm/mach-omap2/built-in.o: In function `omap_dss_set_min_bus_tput':
-> > > > twl-common.c:(.text+0x1e08): undefined reference to `omap_pm_set_min_bus_tput'
-> > > > arch/arm/mach-omap2/built-in.o: In function `omap_hwmod_init_postsetup':
-> > > > twl-common.c:(.init.text+0x8f8): undefined reference to `omap_pm_if_early_init'
-> > > > arch/arm/mach-omap2/built-in.o: In function `omap_serial_init_port':
-> > > > twl-common.c:(.init.text+0x1284): undefined reference to `omap_pm_get_dev_context_loss_count'
-> > > > arch/arm/mach-omap2/built-in.o: In function `omap_timer_init':
-> > > > twl-common.c:(.init.text+0x1544): undefined reference to `omap_pm_get_dev_context_loss_count'
-> > > > arch/arm/mach-omap2/built-in.o: In function `omap2_common_pm_init':
-> > > > twl-common.c:(.init.text+0x1af0): undefined reference to `omap_pm_if_init'
-> > > > arch/arm/mach-omap2/built-in.o: In function `omap2_gpio_dev_init':
-> > > > twl-common.c:(.init.text+0x2168): undefined reference to `omap_pm_get_dev_context_loss_count'
-> > > > arch/arm/mach-omap2/built-in.o: In function `omap_display_init':
-> > > > twl-common.c:(.init.text+0x25cc): undefined reference to `omap_pm_get_dev_context_loss_count'
-> > > 
-> > > I'm not able to reproduce this. I took v3.7-rc5, and the omap4430-sdp
-> > > noconfig
-> > > (http://www.arm.linux.org.uk/developer/build/file.php?type=config&idx=2711),
-> > > and it builds fine for me.
+On Wed, Nov 14, 2012 at 10:15:46AM +0000, Etienne CARRIERE ST wrote:
+> > Tue 11-13-2012 8:23 PM
+> > From: Abhimanyu Kapur <abhimanyu.kapur@outlook.com>
+> >
+> > > Secure code in TrustZone space may need to perform L2 cache
+> > > maintenance operations. A shared mutex is required to synchronize
+> > > linux l2cc maintenance and TZ l2cc maintenance.
 > > 
-> > It happens if in arm-soc/for-next and rmk/for-next. Looks like the
-> > CONFIG_OMAP_PM_NOOP can't be under CONFIG_PM in the makefile where I moved it
-> > in commit 6e740f9a8.
+> > If you are using PL310 with thrustzone support then the L2 cache lines 
+> > are secure bit tagged ; your design should be such that the secure (TZ) 
+> > side only does operations on secure cache lines and non-secure side 
+> > does operations only on non-secure cache lines. So each entity (TZ 
+> > and nonTZ) if maintains their own cache and ensures integrity before 
+> > switching over via monitor, this might not be needed.
 > 
-> This should say just "It happens in arm-soc/for-next".
->  
-> > Looks like in my test configs I run make oldnoconfig on Russell's seed
-> > config, and I do get CONFIG_PM=y set while Russell's generated config
-> > does not have that. No ideas yet why oldnoconfig add CONFIG_PM=y..
+> I don't think 2 cores can safely write the LX20_CLEAN/INV_LINE_PA
+> registers of the PL310 at the same time, even if targeting different
+> lines.
 
-Looks like the way to do this not to use oldnoconfig but to do:
+Actually for the clean/invalidate operations by PA you can safely write
+the registers from two different processors as they get serialised by
+the hardware. What you don't get is protection around the background
+operations (clean/inv by way). I think it depends on how the PL310 is
+wired on your hardware but trying to do a PA operation while a
+background one is in progress would trigger an external abort.
 
-$ make KCONFIG_ALLCONFIG=../configs/rmk-omap4430-sdp-noconfig allnoconfig
+So the NS world could simply start a background cache operation without
+taking the lock while the secure world thinks that it has the lock and
+tries to do a PA operation which would abort.
 
-It seems that oldnoconfig will pick the new options that have default y?
+My advise is to simply ignore the shared locking and only do atomic PA
+operations on the secure side. The secure side also needs to poll for
+the completion of any background operation that was started in
+non-secure world. Of course, there is still a race, in which case,
+depending on the hardware implementation, you would need to trap any
+possible aborts while in secure mode when writing the PL310 registers.
 
-Regards,
-
-Tony
+-- 
+Catalin
