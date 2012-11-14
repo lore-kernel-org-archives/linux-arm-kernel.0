@@ -1,80 +1,134 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Nov 2012 14:21:59 -0800
-Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
-In-Reply-To: <50A413D4.7000405@gmail.com>
-References: <20121114185335.GU6801@atomide.com> <50A3EBCD.3040801@ti.com>
- <20121114202244.GE3332@n2100.arm.linux.org.uk>
- <20121114203221.GA6801@atomide.com> <50A413D4.7000405@gmail.com>
-Message-ID: <20121114222159.GB6801@atomide.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 14 Nov 2012 23:31:47 +0100
+Subject: [PATCH V3 4/5] arm: mm: Added support for PJ4B cpu and init
+ routines
+In-Reply-To: <1352931637-3405-5-git-send-email-gregory.clement@free-electrons.com>
+References: <1352931637-3405-1-git-send-email-gregory.clement@free-electrons.com>
+ <1352931637-3405-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <50A41BD3.9040509@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [121114 13:59]:
-> On 11/14/2012 02:32 PM, Tony Lindgren wrote:
-> > 
-> > Checking for the bit already set should work in this case, I'll post
-> > a patch for that shortly.
+Hello Russell,
+
+With the 2 changes I have done on according your comments
+do you think you can give your acked-by for this patch?
+
+Thanks
+
+On 11/14/2012 11:20 PM, Gregory CLEMENT wrote:
+> From: Yehuda Yitschak <yehuday@marvell.com>
 > 
-> Can you actually read the state of the diagnostic register in non-secure
-> mode? If you can on the A9, is the same true on A8 or others?
+> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/Kconfig |    2 +-
+>  arch/arm/mm/Kconfig         |    4 ++++
+>  arch/arm/mm/proc-v7.S       |   51 +++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 56 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> index 17d246b..9bfaa0c 100644
+> --- a/arch/arm/mach-mvebu/Kconfig
+> +++ b/arch/arm/mach-mvebu/Kconfig
+> @@ -22,7 +22,7 @@ config MVEBU_CLK_CPU
+>  config MACH_ARMADA_370_XP
+>  	bool
+>  	select ARMADA_370_XP_TIMER
+> -	select CPU_V7
+> +	select CPU_PJ4B
+>  
+>  config MACH_ARMADA_370
+>  	bool "Marvell Armada 370 boards"
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index 94186b6..3fd629d 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -352,6 +352,10 @@ config CPU_PJ4
+>  	select ARM_THUMBEE
+>  	select CPU_V7
+>  
+> +config CPU_PJ4B
+> +	bool
+> +	select CPU_V7
+> +
+>  # ARMv6
+>  config CPU_V6
+>  	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 846d279..a4c0ccf 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -169,6 +169,47 @@ __v7_ca15mp_setup:
+>  	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
+>  	mcreq	p15, 0, r0, c1, c0, 1
+>  #endif
+> +
+> +__v7_pj4b_setup:
+> +#ifdef CONFIG_CPU_PJ4B
+> +
+> +#define SNOOP_DATA    (1 << 25) /* Dont interleave write and snoop data */
+> +#define CWF           (1 << 27) /* Disable Critical Word First feature */
+> +#define OUTSANDING_NC (1 << 29) /* Disable outstanding non cacheable request */
+> +#define L1_REP_RR     (1 << 30) /* L1 replacement - Strict round robin */
+> +
+> +#define AUX_DBG_CTRL2 (SNOOP_DATA | CWF | OUTSANDING_NC | L1_REP_RR)
+> +
+> +	/* Auxiliary Debug Modes Control 1 Register */
+> +	mrc	p15, 1,	r0, c15, c1, 1
+> +	orr     r0, r0, #(1 << 16)     @ Disable data transfer for clean line.
+> +	orr     r0, r0, #(1 << 5)      @ Enable the back off of STREX instr
+> +	orr     r0, r0, #(1 << 8)      @ Disable Internal Parity Handling
+> +	bic	r0, r0, #(1 << 2)      @ Disable Static BP
+> +	mcr	p15, 1,	r0, c15, c1, 1
+> +
+> +	/* Auxiliary Debug Modes Control 2 Register */
+> +	mrc	p15, 1,	r0, c15, c1, 2
+> +	bic	r0, r0, #(1 << 23)   @ Enable fast LDR.
+> +	orr	r0, r0, #AUX_DBG_CTRL2
+> +	mcr	p15, 1,	r0, c15, c1, 2
+> +
+> +	/* Auxiliary Functional Modes Control Register 0 */
+> +	mrc	p15, 1,	r0, c15, c2, 0
+> +#ifdef CONFIG_SMP
+> +	orr	r0, r0, #(1 << 1)     @ Set SMP mode. Join the coherency fabric
+> +#endif
+> +	orr	r0, r0, #(1 << 2)     @ Support L1 parity checking
+> +	orr	r0, r0, #(1 << 8)     @ Broadcast Cache and TLB maintenance
+> +	mcr	p15, 1,	r0, c15, c2, 0
+> +
+> +	/* Auxiliary Debug Modes Control 0 Register */
+> +	mrc	p15, 1,	r0, c15, c1, 0
+> +	orr	r0, r0, #(1 << 22)   @ WFI/WFE - serve the DVM and back to idle
+> +	mcr	p15, 1,	r0, c15, c1, 0
+> +
+> +#endif /* CONFIG_CPU_PJ4B */
+> +
+>  __v7_setup:
+>  	adr	r12, __v7_setup_stack		@ the local stack
+>  	stmia	r12, {r0-r5, r7, r9, r11, lr}
+> @@ -342,6 +383,16 @@ __v7_ca9mp_proc_info:
+>  	.long	0xff0ffff0
+>  	__v7_proc __v7_ca9mp_setup
+>  	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
+> +
+> +	/*
+> +	 * Marvell PJ4B processor.
+> +	 */
+> +	.type   __v7_pj4b_proc_info, #object
+> +__v7_pj4b_proc_info:
+> +	.long	0x562f5840
+> +	.long	0xfffffff0
+> +	__v7_proc __v7_pj4b_setup
+> +	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
+>  #endif	/* CONFIG_ARM_LPAE */
+>  
+>  	/*
+> 
 
-Looks like it can be read on at least TI omap 4430 which is A9.
-But it reads as zero, so the below patch is what I came up with.
 
-No idea if assuming that zero value for the diagnostic register
-is safe.. What's the default value of the diagnostic register supposed
-to be?
- 
-> Multi-platform kernels present a new problem in that we basically need
-> to enable all errata work-arounds. I've been meaning to look thru the
-> errata work-arounds to figure out which ones can be selected for
-> multi-platform kernels without side effects on unaffected parts (i.e.
-> set a chicken bit based on core revision). For any in runtime paths, we
-> may need to do runtime patching if they have performance impact.
-
-Yeah that's how I ran into it as multiplatform enabled omap booted
-on other omaps but not on omap4.
-
-Regards,
-
-Tony
-
-
-From: Tony Lindgren <tony@atomide.com>
-Date: Tue, 13 Nov 2012 16:57:42 -0800
-Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 for secure mode
-
-Looks like enabling CONFIG_ARM_ERRATA_751472 causes TI omap4 blaze
-to not boot when enabled. The ARM core on it is an earlier r1p2.
-
-This seems to be caused by the write to the diagnostic register
-that shortly after causes an exception as writing to the diagnostic
-register on systems with secure mode is not allowed.
-
-Also it seems that reading the diagnostic register results zero
-so we may not be able to check if bit #11 is already set.
-
-Let's assume that if the diagnostic register is zero, we don't
-want to touch it as it seems to hint secure mode at least on
-TI omaps. If it's non-zero, check if bit #11 is set and only
-attempt to set it if not set.
-
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -238,9 +238,13 @@ __v7_setup:
- #if defined(CONFIG_ARM_ERRATA_751472) && defined(CONFIG_SMP)
- 	ALT_SMP(cmp r6, #0x30)			@ present prior to r3p0
- 	ALT_UP_B(1f)
--	mrclt	p15, 0, r10, c15, c0, 1		@ read diagnostic register
--	orrlt	r10, r10, #1 << 11		@ set bit #11
--	mcrlt	p15, 0, r10, c15, c0, 1		@ write diagnostic register
-+	bge	1f				@ not needed for r3p0 and later
-+	mrc	p15, 0, r10, c15, c0, 1		@ read diagnostic register
-+	teq	r10, #0				@ zero for secure mode?
-+	beq	1f				@ bail out for secure mode
-+	tst	r10, #1 << 11			@ bit #11 already set?
-+	orreq	r10, r10, #1 << 11		@ set bit #11 if not set
-+	mcreq	p15, 0, r10, c15, c0, 1		@ write diagnostic register
- 1:
- #endif
- 
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
