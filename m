@@ -1,70 +1,61 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 14 Nov 2012 12:20:50 +0100
-Subject: [PATCH v2] i2c: omap: ensure writes to dev->buf_len are ordered
-In-Reply-To: <1352102683-2243-1-git-send-email-balbi@ti.com>
-References: <20121102085447.GE17063@arwen.pp.htv.fi>
- <1352102683-2243-1-git-send-email-balbi@ti.com>
-Message-ID: <20121114112050.GG5954@pengutronix.de>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Wed, 14 Nov 2012 15:22:54 +0400
+Subject: arch-vt8500 and wm8850 support
+In-Reply-To: <201211141117.33485.arnd@arndb.de>
+References: <1352879641.2728.8.camel@gitbox> <201211141117.33485.arnd@arndb.de>
+Message-ID: <CABjd4YypF3u+kTqN5ghUxFsNhR5ZJ4UuHJy_4D=4MS1=KM6v7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2012 at 10:04:43AM +0200, Felipe Balbi wrote:
-> if we allow compiler reorder our writes, we could
-> fall into a situation where dev->buf_len is reset
-> for no apparent reason.
-> 
-> This bug was found with a simple script which would
-> transfer data to an i2c client from 1 to 1024 bytes
-> (a simple for loop), when we got to transfer sizes
-> bigger than the fifo size, dev->buf_len was reset
-> to zero before we had an oportunity to handle XDR
-> Interrupt. Because dev->buf_len was zero, we entered
-> omap_i2c_transmit_data() to transfer zero bytes,
-> which would mean we would just silently exit
-> omap_i2c_transmit_data() without actually writing
-> anything to DATA register. That would cause XDR
-> IRQ to trigger forever and we would never transfer
-> the remaining bytes.
-> 
-> After adding the memory barrier, we also drop resetting
-> dev->buf_len to zero in omap_i2c_xfer_msg() because
-> both omap_i2c_transmit_data() and omap_i2c_receive_data()
-> will act until dev->buf_len reaches zero, rendering the
-> other write in omap_i2c_xfer_msg() redundant.
-> 
-> This patch has been tested with pandaboard for a few
-> iterations of the script mentioned above.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
-> 
-> Changes since v1:
-> 	- use barrier() instead of wmb()
-> 
-> Note: this version was compile-tested only
-> 
->  drivers/i2c/busses/i2c-omap.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index db31eae..ba03bec 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -521,6 +521,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  	/* REVISIT: Could the STB bit of I2C_CON be used with probing? */
->  	dev->buf = msg->buf;
->  	dev->buf_len = msg->len;
-> +	barrier();
+2012/11/14 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 14 November 2012, Tony Prisk wrote:
+>> Hi Arnd,
+>>
+>> Just looking for a little advice re: adding support for the WM8850
+>> variant.
+>>
+>> At the moment we have the ARM926 variants under ARCH_VT8500. The WM8850
+>> is ARMv7, but uses all the same drivers as the ARM926 versions. At the
+>> moment, all the drivers depend on ARCH_VT8500.
+>>
+>> The obvious solution (to me at least) seems to be to have 3 groups -
+>> ARCH_VT8500 keeps everything it has now except 'select CPU_ARM926T', and
+>> we add 2 additional groups - the first for all the current models, which
+>> selects CPU_ARM926T and ARCH_VT8500, and a second for WM8850 which
+>> selects CPU_V7 and ARCH_VT8500.
+>
+> Yes, makes sense. Actually with the move to multiplatform, you already
+> need to make the decision for the CPU earlier on, since the multiplatform
+> kernel can only be built either for ARMv4/v5 or for ARMv6/v7.
+>
+> I would suggest doing it like
+>
+> config ARCH_VT8500
+>         bool
+>         select FOO
+>         select BAR
+>
+> config ARCH_WM8505
+>         bool "WonderMedia WM8505 or VIA VT8500"
+>         depends on ARCH_MULTI_V5
+>         select ARCH_VT8500
+>         select CPU_ARM926
+>
+> config ARCH_WM8650
+>         bool "WonderMedia WM 8650"
+>         depends on ARCH_MULTI_V6
+>         select ARCH_VT8500
+>         select CPU_V6
+>
+> config ARCH_WM8850
+>         bool "WonderMedia WM 8750/8850"
+>         depends on ARCH_MULTI_V7
+>         select ARCH_VT8500
+>         select CPU_V7
 
-I agree adding a comment here is a good idea.
+Just my 2 cents: from what I remember, 8650 is still v5, while 87xx is
+v6 and 88xx+ are v7. The whole arrangement looks pretty neat, though,
+thanks for your feedback!
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121114/5b44e45c/attachment.sig>
+Best,
+Alexey
