@@ -1,36 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Nov 2012 17:39:28 +0000
-Subject: [RFC PATCH 0/3] introduce static_vm for ARM-specific static
- mapped area
-In-Reply-To: <1352912154-16210-1-git-send-email-js1304@gmail.com>
-References: <1352912154-16210-1-git-send-email-js1304@gmail.com>
-Message-ID: <20121114173928.GK3290@n2100.arm.linux.org.uk>
+Date: Wed, 14 Nov 2012 17:34:53 +0000
+Subject: Kernel uncompression error
+In-Reply-To: <k809hq$1q3$1@ger.gmane.org>
+References: <k809hq$1q3$1@ger.gmane.org>
+Message-ID: <20121114173453.GJ3290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 01:55:51AM +0900, Joonsoo Kim wrote:
-> In current implementation, we used ARM-specific flag, that is,
-> VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
-> The purpose of static mapped area is to re-use static mapped area when
-> entire physical address range of the ioremap request can be covered
-> by this area.
-> 
-> This implementation causes needless overhead for some cases.
+On Wed, Nov 14, 2012 at 10:23:55PM +0800, woody wrote:
+> I just built a 3.2.x ARM kernel and tried to have it boot by a boot  
+> loader (vivi) on my s3c2410a ARM board.  The kernel was built with  
+> default configuration s3c2410.
 
-In what cases?
+I reported that S3C2410 is totally dead with 3.x kernels about a month
+ago and got no response what so ever from anyone.  I guess S3C2410 is
+just not cared for anymore.
 
-> We unnecessarily iterate vmlist for finding matched area even if there
-> is no static mapped area. And if there are some static mapped areas,
-> iterating whole vmlist is not preferable.
+When I get sufficient motivation, I'll try and track down what's going
+wrong, but it means taking the old mailing list server (and now list
+archive) offline for a while.
 
-Why not?  Please put some explanation into your message rather than
-just statements making unexplained assertions.
-
-> Another reason for doing this work is for removing architecture dependency
-> on vmalloc layer. I think that vmlist and vmlist_lock is internal data
-> structure for vmalloc layer. Some codes for debugging and stat inevitably
-> use vmlist and vmlist_lock. But it is preferable that they are used outside
-> of vmalloc.c as least as possible.
-
-The vmalloc layer is also made available for ioremap use, and it is
-intended that architectures hook into this for ioremap support.
+I don't think it's cache related; different image sizes seem to behave
+differently - and when they _do_ successfully decompress, they don't
+boot at all.
