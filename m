@@ -1,45 +1,52 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 14 Nov 2012 09:59:44 +0100
-Subject: [PATCH v2] i2c: i2c-gpio: fix name issue when i2c gpio node GT 1
-In-Reply-To: <1350287477-30936-1-git-send-email-voice.shen@atmel.com>
-References: <1350287477-30936-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20121114085944.GA5954@pengutronix.de>
+From: etienne.carriere@st.com (Etienne CARRIERE ST)
+Date: Wed, 14 Nov 2012 10:18:31 +0100
+Subject: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
+In-Reply-To: <20121113170711.GI28327@n2100.arm.linux.org.uk>
+References: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B59@SAFEX1MAIL3.st.com>
+ <20121113170711.GI28327@n2100.arm.linux.org.uk>
+Message-ID: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1E29@SAFEX1MAIL3.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 03:51:17PM +0800, Bo Shen wrote:
-> When i2c-gpio node number is greater than 1, the name for each is same
-> So add the patch to fix it.
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+> Sent: Tuesday, November 13, 2012 6:07 PM
 > 
-> The adap->name printing information is add by myself
+> Right, so, what this tells me is that the implementation of the spinlock 
+> in the secure software is potentially the same as the kernel's spinlock.
+> The kernel's spinlock implementation is GPL'd.  If the secure side spinlock 
+> implementation is a copy of the kernel's spinlock implementation, then 
+> that implementation is also GPL'd (...).
 > 
-> without this patch the log information is as following
-> ---<8---
-> adap->name = i2c-gpio-1
-> i2c-gpio i2c.2: using pins 30 (SDA) and 31 (SCL)
-> adap->name = i2c-gpio-1
-> i2c-gpio i2c.3: using pins 64 (SDA) and 65 (SCL)
-> --->8---
-> 
-> with this patch, the log information is as following
-> ---<8---
-> adap->name = i2c.2
-> i2c-gpio i2c.2: using pins 30 (SDA) and 31 (SCL)
-> adap->name = i2c.3
-> i2c-gpio i2c.3: using pins 64 (SDA) and 65 (SCL)
-> --->8---
-> 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> I think someone has some explaining to do.
 
-Applied to for-next, thanks.
+It does.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121114/7bb0cd1e/attachment.sig>
+The TZ implementation of the shared mutex is the ARM native mutex instructions set LDREX/STREX, protected by a native ARM IRQ disabling.
+I believe this is native ARMv7 natural handling and not subject to GPLization.
+
+This is why the mutex added for TZ shared of L2 cache maintenance is a "arch_spinlock". It assumes linux handles the spinlock as a native ARM native mutex DDR cell, handled from the ARMv7-A LDREX/STREX.
+I think this is the weakest part of the driver since they is no insurance that linux pristine arch_spinlock will not evolve into something else (i.e features in raw_spinclock).
+
+etienne
+
+-----Original Message-----
+To: Etienne CARRIERE
+Cc: linux-arm-kernel at lists.infradead.org; Will Deacon; Marc Zyngier; Catalin Marinas; Linus Walleij (linus.walleij at linaro.org); Rabin VINCENT; Srinidhi KASAGAR
+Subject: Re: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
+
+On Tue, Nov 13, 2012 at 05:08:14PM +0100, Etienne CARRIERE wrote:
+> From: Etienne Carriere <etienne.carriere@stericsson.com>
+> 
+> Secure code in TrustZone space may need to perform L2 cache 
+> maintenance operations. A shared mutex is required to synchronize 
+> linux l2cc maintenance and TZ l2cc maintenance.
+> 
+> The TZ mutex is an "arch_spinlock": a 32bit DDR cell (ARMv7-A mutex).
+> Linux L2 cache driver must lock TZ mutex if enabled.
+>...
+> +#define l2x0_spin_lock_irqsave(flags) \
+> +             do {                                                                                                        \
+> +                             raw_spin_lock_irqsave(&l2x0_lock, flags);           \
+> +                             if (l2x0_tz_mutex)                                                           \
+> +                                             arch_spin_lock(l2x0_tz_mutex);                               \
+> +             } while (0)
