@@ -1,33 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 14 Nov 2012 15:44:21 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP4: hwmod data: ipu and dsp to use parent clocks
- instead of leaf clocks
-In-Reply-To: <1352860750-20100-1-git-send-email-omar.luna@linaro.org>
-References: <1352860750-20100-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <alpine.DEB.2.00.1211141542280.16047@utopia.booyaka.com>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Wed, 14 Nov 2012 16:44:26 +0100
+Subject: [PATCH v2 1/2] ARM: mx27_3ds: Add VPU support
+In-Reply-To: <20121114143400.GM10369@pengutronix.de>
+References: <1352899174-28022-1-git-send-email-fabio.estevam@freescale.com>
+ <20121114143400.GM10369@pengutronix.de>
+Message-ID: <20121114164426.7a730296@eb-e6520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Sascha,
 
-On Tue, 13 Nov 2012, Omar Ramirez Luna wrote:
-
-> This prevents hwmod _enable_clocks...omap2_dflt_clk_enable path
-> from enabling modulemode inside CLKCTRL using its clk->enable_reg
-> field. Instead is left to _omap4_enable_module though soc_ops, as
-> the one in charge of this setting.
+Le Wed, 14 Nov 2012 15:34:00 +0100,
+Sascha Hauer <s.hauer@pengutronix.de> a ?crit :
+> On Wed, Nov 14, 2012 at 11:19:33AM -0200, Fabio Estevam wrote:
+> > mx27 has a VPU (Video Processing Unit) block that allows doing H264/MPEG4
+> > decoding and encoding in hardware.
+> > 
+> > Add support for it.
+> > 
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > ---
+> > +	imx27_add_coda();
 > 
-> According to comments received[1] for related patches the idea is
-> to get rid of leaf clocks in future. So remove these two while at it.
+> Why in the board? It's always present so I would register it in the SoC.
 > 
-> [1] http://lkml.org/lkml/2012/8/20/226
-> 
-> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+MCIMX27L* dosn't have the VPU. No idea how will behave the probe in
+that case.
 
-Does this one belong as part of the "OMAP: iommu: hwmod, reset 
-handling and runtime PM" series?  Looks like applying this one separately 
-might cause these clocks not to be disabled by either the clock code's 
-disable-unused-clocks code, or the hwmod code?
-
-
-- Paul
+Eruc
