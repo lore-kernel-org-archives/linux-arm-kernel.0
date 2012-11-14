@@ -1,29 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Nov 2012 00:14:38 +0000
-Subject: [PATCH V2 4/5] arm: mm: Added support for PJ4B cpu and init
- routines
-In-Reply-To: <1351545108-18954-5-git-send-email-gregory.clement@free-electrons.com>
-References: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
- <1351545108-18954-5-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20121114001438.GF3290@n2100.arm.linux.org.uk>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 13 Nov 2012 17:07:39 -0800
+Subject: OMAP baseline test results for v3.7-rc5
+In-Reply-To: <20121112225830.GW6801@atomide.com> (Tony Lindgren's message of
+ "Mon, 12 Nov 2012 14:58:31 -0800")
+References: <alpine.DEB.2.00.1211121921160.12551@utopia.booyaka.com>
+ <20121112225830.GW6801@atomide.com>
+Message-ID: <87obj1f0v8.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2012 at 10:11:47PM +0100, Gregory CLEMENT wrote:
-> +	/* Auxiliary Debug Modes Control 2 Register */
-> +	mrc	p15, 1,	r0, c15, c1, 2
-> +	bic	r0, r0, #(1 << 23)   @ Enable fast LDR.
-> +	orr	r0, r0, #(1 << 25)   @ Dont interleave write and snoop data.
-> +	orr	r0, r0, #(1 << 27)   @ Disable Critical Word First feature.
-> +	orr	r0, r0, #(1 << 29)   @ Disable outstanding non cacheable request
-> +	orr	r0, r0, #(1 << 30)   @ L1 replacement - Strict round robin
+Tony Lindgren <tony@atomide.com> writes:
 
-This just looks silly to me - setting five bits with five instructions
-when they can all be done in one instruction.  Yes, I know you want
-to comment it, but there's other ways to achieve that.
+> * Paul Walmsley <paul@pwsan.com> [121112 11:33]:
+>> 
+>> Here are some basic OMAP test results for Linux v3.7-rc5.
+>> Logs and other details at:
+>> 
+>>     http://www.pwsan.com/omap/testlogs/test_v3.7-rc5/20121111081034/
+>> 
+>> 
+>> Passing tests
+>> -------------
+>> 
+>> Boot to userspace (9/11): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
+>>     3730beaglexm, 37xxevm, 4430es2panda, 5912osk, am335xbone
+>>   
+>> PM ret/off, suspend + dynamic idle (2/4): 3730beaglexm, 37xxevm
+>> 
+>> 
+>> Failing tests: fixed by posted patches
+>> --------------------------------------
+>> 
+>> Boot tests:
+>> 
+>> * 3530ES3 Beagle: I2C timeouts during userspace init
+>>   - Intermittent, appears on 5 out of 6 boots here
+>>   - Aaro Koskinen observes this also on N900
+>>   - Appears to be caused by commit 3db11feffc1ad2ab9dea27789e6b5b3032827adc
+>>     - http://marc.info/?l=linux-arm-kernel&m=135071372426971&w=2
+>>     - http://marc.info/?l=linux-omap&m=135197877112220&w=2
+>>   - Revert posted, pending I2C maintainers:
+>>     - http://marc.info/?l=linux-arm-kernel&m=135221953727077&w=2
+>
+> Here's one more booting issue I recently ran into:
+>
+>     - If DEBUG_LL and earlyprintk are enabled, and omap-serial.c
+>       is compiled as a module, the kernel boot hangs early as the
+>       clocks for serial port are cut while earlyprintk still uses
+>       the port. This might be regression from v3.6.
+>  
 
-> +__v7_pj4b_proc_info:
-> +	.long	0x562f5842
-> +	.long	0xffffffff
+Can you test if the patch below[1] helps?  With that, it seems to finish
+booting for me (based solely on a ping test.)
 
-Same comment here as Will :)
+The problem is a race between the late_initcall for omap_device (which
+idles devices that have no drivers) and the late_initcall in
+kernel/printk.c which turns off the earlyconsole.   Any printks
+that happen between this omap_device late initcall and the earlyconsole
+late initcall will crash when accessing the UART.
+
+Kevin
+
+[1]
+
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index 7a7d1f2..138114a 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -1275,4 +1275,4 @@ static int __init omap_device_late_init(void)
+ 	bus_for_each_dev(&platform_bus_type, NULL, NULL, omap_device_late_idle);
+ 	return 0;
+ }
+-late_initcall(omap_device_late_init);
++late_initcall_sync(omap_device_late_init);
