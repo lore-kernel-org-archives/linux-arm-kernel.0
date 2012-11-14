@@ -1,31 +1,35 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 14 Nov 2012 16:44:36 +0100
-Subject: [PATCH 3/3] arm: mvebu: fix typo in machine name for Armada 370/XP
-In-Reply-To: <1352907876-32482-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1352907876-32482-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1352907876-32482-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 14 Nov 2012 16:47:00 +0100
+Subject: [GIT PULL] Marvell board changes for the v3.8 merge window
+Message-ID: <1352908022-32628-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/mach-mvebu/armada-370-xp.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index 29c27cd..a2f5bbc 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -51,7 +51,7 @@ static const char * const armada_370_xp_dt_compat[] = {
- 	NULL,
- };
- 
--DT_MACHINE_START(ARMADA_XP_DT, "Marvell Aramada 370/XP (Device Tree)")
-+DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada 370/XP (Device Tree)")
- 	.init_machine	= armada_370_xp_dt_init,
- 	.map_io		= armada_370_xp_map_io,
- 	.init_irq	= armada_370_xp_init_irq,
--- 
-1.7.9.5
+  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
+
+are available in the git repository at:
+
+  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-boards-for-3.8
+
+for you to fetch changes up to e3e37bcab910a68616bc33145ed5c333825053ac:
+
+  arm: mvebu: support for the Globalscale Mirabox board (2012-11-14 16:32:29 +0100)
+
+----------------------------------------------------------------
+Marvell boards changes for 3.8
+
+----------------------------------------------------------------
+Gregory CLEMENT (1):
+      arm: mvebu: support for the Globalscale Mirabox board
+
+Thomas Petazzoni (1):
+      arm: mvebu: support for the PlatHome OpenBlocks AX3-4 board
+
+ arch/arm/boot/dts/Makefile                       |    4 +-
+ arch/arm/boot/dts/armada-370-mirabox.dts         |   37 ++++++++++++
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |   69 ++++++++++++++++++++++
+ 3 files changed, 109 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/armada-370-mirabox.dts
+ create mode 100644 arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
