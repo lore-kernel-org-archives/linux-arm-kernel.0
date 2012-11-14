@@ -1,43 +1,30 @@
-From: narkewoody@gmail.com (woody)
-Date: Wed, 14 Nov 2012 22:23:55 +0800
-Subject: Kernel uncompression error
-Message-ID: <k809hq$1q3$1@ger.gmane.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 14 Nov 2012 16:27:23 +0200
+Subject: [PATCH] ARM: tegra: Implement 6395/1 for Tegra
+Message-ID: <1352903243-5389-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, List
+This patch implements ARM linux patch 6395/1 for Tegra. See commit
+1a8e41cd672f894bbd74874eac601e6cedf838fb for details.
 
-I just built a 3.2.x ARM kernel and tried to have it boot by a boot 
-loader (vivi) on my s3c2410a ARM board.  The kernel was built with 
-default configuration s3c2410.
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/mach-tegra/common.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-... But, the following error printed on the console:
-
----------------------
-Uncompressing Linux...
-
-uncompression error
-
--- System halted
----------------------
-
-What kinds of reasons can most possibly lead the error?  I searched on 
-the net and found some answers, but I cannot well judge them:
-
-1. There is a D-Cache patch should be applied, but the message was 
-talking about 2.4.x kernel, so I guess if there really was a bug around 
-here, it should already been fixed. Right?
-
-2. Probably the kernel image (here is a zImage) is too big, then the 
-uncompressed code was overwriting the original compressed part of the 
-image.  This sounds a little relevant.  My boot loader was loading the 
-kernel image to ram address 0x300008000, and my zImage is about 1.9M. 
-Do you think this is the reason?
-
-Thanks in advance!
-
-
-
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index e635abb..0816562 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -125,7 +125,7 @@ static void __init tegra_init_cache(void)
+ 
+ 	cache_type = readl(p + L2X0_CACHE_TYPE);
+ 	aux_ctrl = (cache_type & 0x700) << (17-8);
+-	aux_ctrl |= 0x7C000001;
++	aux_ctrl |= 0x7C400001;
+ 
+ 	ret = l2x0_of_init(aux_ctrl, 0x8200c3fe);
+ 	if (!ret)
 -- 
-woody
-I can't go back to yesterday - because I was a different person then.
+1.7.7.rc0.72.g4b5ea.dirty
