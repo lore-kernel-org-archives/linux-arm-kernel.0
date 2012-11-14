@@ -1,36 +1,32 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Wed, 14 Nov 2012 14:30:08 +0800
-Subject: [PATCH v5 1/3] ARM: at91: atmel-ssc: add pinctrl support
-In-Reply-To: <20121113085052.GR18224@opensource.wolfsonmicro.com>
-References: <1352706028-750-1-git-send-email-voice.shen@atmel.com>
- <1352706028-750-2-git-send-email-voice.shen@atmel.com>
- <20121113085052.GR18224@opensource.wolfsonmicro.com>
-Message-ID: <50A33A70.1030705@atmel.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Wed, 14 Nov 2012 06:49:58 +0000
+Subject: [PATCH 1/4] mfd: tps65217: Set PMIC to shutdowm on PWR_EN toggle
+In-Reply-To: <20121114062117.GC7407@opensource.wolfsonmicro.com>
+References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
+ <1352108549-9341-2-git-send-email-anilkumar@ti.com> <5097F078.50701@ti.com>
+ <20121114022341.GM4415@opensource.wolfsonmicro.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA6B043@DBDE01.ent.ti.com>
+ <20121114062117.GC7407@opensource.wolfsonmicro.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA6B0AF@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Wed, Nov 14, 2012 at 11:51:19, Mark Brown wrote:
+> On Wed, Nov 14, 2012 at 06:11:45AM +0000, AnilKumar, Chimata wrote:
+> 
+> > From these two threads we can infer that this is handled in power_off
+> > sequence only. And this is feature of PMIC to go to shutdown mode nothing
+> > to be fixed in silicon. PWR_EN line can be connected to any of these like
+> > PRCM control or GPIO or some other instead of RTC(in this case).
+> 
+> OK, but why are you telling me this?  What are you looking for me to do
+> with this information?
+> 
 
-On 11/13/2012 16:50, Mark Brown wrote:
-> On Mon, Nov 12, 2012 at 03:40:25PM +0800, Bo Shen wrote:
->
->> +				ssc0 {
->> +					pinctrl_ssc0_tx: ssc0_tx-0 {
->> +						atmel,pins =
->> +							<1 16 0x1 0x1	/* PB16 periph A with pull up */
->> +							 1 17 0x1 0x1	/* PB17 periph A with pull up */
->> +							 1 18 0x1 0x1>;	/* PB18 periph A with pull up */
->> +					};
->
-> Do we really want the pull ups here?  Normally CMOS devices don't have
-> pulls, or the pulls are disabled during normal operation, as otherwise
-> when the logic level is different to whatever the pull is doing power is
-> wasted driving against the resistor.
+Mark,
 
-After checking with internal, it does not need pull up. I will correct 
-this in next version.
+Earlier you have a comment on this thread, I am adding my comments
+on top of it. Sorry if I am in wrong direction.
 
-Thanks.
-
-Best Regards,
-Bo Shen
+Thanks
+AnilKumar
