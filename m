@@ -1,129 +1,184 @@
 From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Wed, 14 Nov 2012 17:19:03 +0100
-Subject: [PATCH 2/9] usb: chipidea: ci13xxx_imx: add 2nd and 3rd clock to
- support imx5x and newer
+Date: Wed, 14 Nov 2012 17:19:07 +0100
+Subject: [PATCH 6/9] usb: chipidea: add PTW and PTS handling
 In-Reply-To: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
 References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1352909950-32555-3-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <1352909950-32555-7-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for a second and third clock to the chipidea driver. On
-modern freescale ARM cores like the imx51, imx53 and imx6q three clocks ("ahb",
-"ipg" and "per") must be enabled in order to access the USB core.
-
-In the original driver, the clock was requested without specifying the
-connection id, further all mainline ARM archs with support for the chipidea
-core (imx23, imx28) register their USB clock without a connection id.
-
-This patch first renames the existing clk variable to clk_ahb. The connection
-id "ahb" is added to the devm_clk_get() call. Then the clocks "ipg" and "per"
-are requested. As all archs don't specify a connection id, all clk_get return
-the same clock. This ensures compatibility to existing USB support and adds
-support for imx5x at the same time.
-
-This patch has been tested on imx28 and on imx53 with seperate "ahb", "ipg"
-and "per" clocks.
+This patch makes it possible to configure the PTW and PTS bits inside
+the portsc register for host and device mode before the driver starts
+and the phy can be addressed as hardware implementation is designed.
 
 Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
 Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 ---
- drivers/usb/chipidea/ci13xxx_imx.c |   54 ++++++++++++++++++++++++++++++------
- 1 file changed, 45 insertions(+), 9 deletions(-)
+ drivers/usb/chipidea/bits.h        |    3 +++
+ drivers/usb/chipidea/ci.h          |    2 ++
+ drivers/usb/chipidea/ci13xxx_imx.c |    1 +
+ drivers/usb/chipidea/core.c        |   47 ++++++++++++++++++++++++++++++++++++
+ drivers/usb/chipidea/host.c        |    4 +++
+ include/linux/usb/chipidea.h       |    9 +++++++
+ 6 files changed, 66 insertions(+)
 
+diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
+index 4b6ae3e..3cded5f 100644
+--- a/drivers/usb/chipidea/bits.h
++++ b/drivers/usb/chipidea/bits.h
+@@ -48,6 +48,9 @@
+ #define PORTSC_SUSP           BIT(7)
+ #define PORTSC_HSP            BIT(9)
+ #define PORTSC_PTC            (0x0FUL << 16)
++#define PORTSC_PTS            (BIT(31) | BIT(30))
++#define PORTSC_PTW            BIT(28)
++#define PORTSC_STS            BIT(29)
+ 
+ /* DEVLC */
+ #define DEVLC_PSPD            (0x03UL << 25)
+diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+index cd42b59..1439e51 100644
+--- a/drivers/usb/chipidea/ci.h
++++ b/drivers/usb/chipidea/ci.h
+@@ -314,6 +314,8 @@ static inline u32 hw_test_and_write(struct ci13xxx *ci, enum ci13xxx_regs reg,
+ 	return (val & mask) >> ffs_nr(mask);
+ }
+ 
++void hw_portsc_configure(struct ci13xxx *ci);
++
+ int hw_device_reset(struct ci13xxx *ci, u32 mode);
+ 
+ int hw_port_test_set(struct ci13xxx *ci, u8 mode);
 diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index 935de97..570aedf 100644
+index ee4dab0..a8257b8 100644
 --- a/drivers/usb/chipidea/ci13xxx_imx.c
 +++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -32,7 +32,9 @@ struct ci13xxx_imx_data {
- 	struct device_node *phy_np;
- 	struct usb_phy *phy;
- 	struct platform_device *ci_pdev;
--	struct clk *clk;
-+	struct clk *clk_ahb;
-+	struct clk *clk_ipg;
-+	struct clk *clk_per;
- 	struct regulator *reg_vbus;
- };
+@@ -133,6 +133,7 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+ 		       CI13XXX_PULLUP_ON_VBUS |
+ 		       CI13XXX_DISABLE_STREAMING |
+ 		       CI13XXX_REGS_SHARED,
++	ci13xxx_get_dr_flags(pdev->dev.of_node, pdata);
  
-@@ -144,20 +146,48 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
- 		dev_warn(&pdev->dev, "pinctrl get/select failed, err=%ld\n",
- 			PTR_ERR(pinctrl));
+ 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+ 	if (!data) {
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 3e3e159..7e80f1b 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -68,6 +68,8 @@
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/otg.h>
+ #include <linux/usb/chipidea.h>
++#include <linux/of_usbphy.h>
++#include <linux/phy.h>
  
--	data->clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(data->clk)) {
-+	data->clk_ahb = devm_clk_get(&pdev->dev, "ahb");
-+	if (IS_ERR(data->clk_ahb)) {
- 		dev_err(&pdev->dev,
--			"Failed to get clock, err=%ld\n", PTR_ERR(data->clk));
--		return PTR_ERR(data->clk);
-+			"Failed to get ahb clock, err=%ld\n", PTR_ERR(data->clk_ahb));
-+		return PTR_ERR(data->clk_ahb);
- 	}
- 
--	ret = clk_prepare_enable(data->clk);
-+	data->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
-+	if (IS_ERR(data->clk_ipg)) {
-+		dev_err(&pdev->dev,
-+			"Failed to get ipg clock, err=%ld\n", PTR_ERR(data->clk_ipg));
-+		return PTR_ERR(data->clk_ipg);
-+	}
-+
-+	data->clk_per = devm_clk_get(&pdev->dev, "per");
-+	if (IS_ERR(data->clk_per)) {
-+		dev_err(&pdev->dev,
-+			"Failed to get per clock, err=%ld\n", PTR_ERR(data->clk_per));
-+		return PTR_ERR(data->clk_per);
-+	}
-+
-+	ret = clk_prepare_enable(data->clk_ahb);
- 	if (ret) {
- 		dev_err(&pdev->dev,
--			"Failed to prepare or enable clock, err=%d\n", ret);
-+			"Failed to prepare or enable ahb clock, err=%d\n", ret);
- 		return ret;
- 	}
- 
-+	ret = clk_prepare_enable(data->clk_ipg);
-+	if (ret) {
-+		dev_err(&pdev->dev,
-+			"Failed to prepare or enable ipg clock, err=%d\n", ret);
-+		goto err_ipg_failed;
-+	}
-+
-+	ret = clk_prepare_enable(data->clk_per);
-+	if (ret) {
-+		dev_err(&pdev->dev,
-+			"Failed to prepare or enable per clock, err=%d\n", ret);
-+		goto err_per_failed;
-+	}
-+
- 	phy_np = of_parse_phandle(pdev->dev.of_node, "fsl,usbphy", 0);
- 	if (phy_np) {
- 		data->phy_np = phy_np;
-@@ -246,7 +276,11 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
- put_np:
- 	if (phy_np)
- 		of_node_put(phy_np);
--	clk_disable_unprepare(data->clk);
-+	clk_disable_unprepare(data->clk_per);
-+err_per_failed:
-+	clk_disable_unprepare(data->clk_ipg);
-+err_ipg_failed:
-+	clk_disable_unprepare(data->clk_ahb);
- 
- 	return ret;
+ #include "ci.h"
+ #include "udc.h"
+@@ -213,6 +215,23 @@ static int hw_device_init(struct ci13xxx *ci, void __iomem *base)
+ 	return 0;
  }
-@@ -268,7 +302,9 @@ static int __devexit ci13xxx_imx_remove(struct platform_device *pdev)
  
- 	of_node_put(data->phy_np);
++void hw_portsc_configure(struct ci13xxx *ci)
++{
++	if (ci->platdata->flags & CI13XXX_PORTSC_PTW_16BIT)
++		hw_write(ci, OP_PORTSC, PORTSC_PTW, 0x1 << ffs_nr(PORTSC_PTW));
++
++	if (ci->platdata->flags & CI13XXX_PORTSC_PTS_UTMI) {
++		hw_write(ci, OP_PORTSC, PORTSC_PTS, 0x0 << ffs_nr(PORTSC_PTS));
++		hw_write(ci, OP_PORTSC, PORTSC_STS, 0x0 << ffs_nr(PORTSC_STS));
++	} else if (ci->platdata->flags & CI13XXX_PORTSC_PTS_ULPI) {
++		hw_write(ci, OP_PORTSC, PORTSC_PTS, 0x2 << ffs_nr(PORTSC_PTS));
++		hw_write(ci, OP_PORTSC, PORTSC_STS, 0x0 << ffs_nr(PORTSC_STS));
++	} else if (ci->platdata->flags & CI13XXX_PORTSC_PTS_FSLS) {
++		hw_write(ci, OP_PORTSC, PORTSC_PTS, 0x3 << ffs_nr(PORTSC_PTS));
++		hw_write(ci, OP_PORTSC, PORTSC_STS, 0x1 << ffs_nr(PORTSC_STS));
++	}
++}
++
+ /**
+  * hw_device_reset: resets chip (execute without interruption)
+  * @ci: the controller
+@@ -237,6 +256,8 @@ int hw_device_reset(struct ci13xxx *ci, u32 mode)
+ 	if (ci->platdata->flags & CI13XXX_DISABLE_STREAMING)
+ 		hw_write(ci, OP_USBMODE, USBMODE_CI_SDIS, USBMODE_CI_SDIS);
  
--	clk_disable_unprepare(data->clk);
-+	clk_disable_unprepare(data->clk_per);
-+	clk_disable_unprepare(data->clk_ipg);
-+	clk_disable_unprepare(data->clk_ahb);
++	hw_portsc_configure(ci);
++
+ 	/* USBMODE should be configured step by step */
+ 	hw_write(ci, OP_USBMODE, USBMODE_CM, USBMODE_CM_IDLE);
+ 	hw_write(ci, OP_USBMODE, USBMODE_CM, mode);
+@@ -522,6 +543,32 @@ void ci13xxx_remove_device(struct platform_device *pdev)
+ }
+ EXPORT_SYMBOL_GPL(ci13xxx_remove_device);
  
- 	platform_set_drvdata(pdev, NULL);
++void ci13xxx_get_dr_flags(struct device_node *of_node, struct ci13xxx_platform_data *pdata)
++{
++	int interface = of_get_usbphy_mode(of_node);
++
++	switch (interface) {
++	case USBPHY_INTERFACE_MODE_UTMI:
++		pdata->flags |= CI13XXX_PORTSC_PTS_UTMI;
++		break;
++	case USBPHY_INTERFACE_MODE_UTMIW:
++		pdata->flags |= CI13XXX_PORTSC_PTS_UTMI |
++			CI13XXX_PORTSC_PTW_16BIT;
++		break;
++	case USBPHY_INTERFACE_MODE_ULPI:
++		pdata->flags |= CI13XXX_PORTSC_PTS_ULPI;
++		break;
++	case USBPHY_INTERFACE_MODE_SERIAL:
++		pdata->flags |= CI13XXX_PORTSC_PTS_FSLS;
++		break;
++	case USBPHY_INTERFACE_MODE_NA:
++	default:
++		pr_err("no phy interface defined\n");
++	}
++
++}
++EXPORT_SYMBOL_GPL(ci13xxx_get_dr_flags);
++
+ void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata)
+ {
+ 	const unsigned char *dr_mode;
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index ebff9f4..b23ee1d 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -106,6 +106,10 @@ static int host_start(struct ci13xxx *ci)
+ 	if (usb_disabled())
+ 		return -ENODEV;
  
++	hw_portsc_configure(ci);
++
++	mdelay(10);
++
+ 	hcd = usb_create_hcd(&ci_ehci_hc_driver, ci->dev, dev_name(ci->dev));
+ 	if (!hcd)
+ 		return -ENOMEM;
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 906d259..cafca23 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -21,6 +21,12 @@ struct ci13xxx_platform_data {
+ #define CI13XXX_DISABLE_STREAMING	BIT(3)
+ #define CI13XXX_DR_MODE_HOST		BIT(4)
+ #define CI13XXX_DR_MODE_PERIPHERAL	BIT(5)
++#define CI13XXX_PORTSC_PTW_8BIT		BIT(6)
++#define CI13XXX_PORTSC_PTW_16BIT	BIT(7)
++#define CI13XXX_PORTSC_PTS_UTMI		BIT(8)
++#define CI13XXX_PORTSC_PTS_ULPI		BIT(9)
++#define CI13XXX_PORTSC_PTS_FSLS		BIT(10)
++
+ #define CI13XXX_DR_MODE_MASK \
+ 	(CI13XXX_DR_MODE_HOST | CI13XXX_DR_MODE_PERIPHERAL)
+ 
+@@ -42,4 +48,7 @@ void ci13xxx_remove_device(struct platform_device *pdev);
+ /* Parse of-tree "dr_mode" property */
+ void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata);
+ 
++/* Parse of-tree "flags" */
++void ci13xxx_get_dr_flags(struct device_node *of_node, struct ci13xxx_platform_data *pdata);
++
+ #endif
 -- 
 1.7.10.4
