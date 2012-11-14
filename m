@@ -1,130 +1,128 @@
-From: p.paneri@samsung.com (Praveen Paneri)
-Date: Wed, 14 Nov 2012 09:54:29 +0530
-Subject: [PATCH v7 0/5] usb: phy: samsung: Introducing usb phy driver for
- samsung SoCs
-In-Reply-To: <CAD6zSYM5-GdGHYH=W-My34oXRfH0M+rfettFa0fiit3-_V1RDA@mail.gmail.com>
-References: <1351573057-22249-1-git-send-email-p.paneri@samsung.com>
- <20121109115440.GC8078@arwen.pp.htv.fi>
- <CAH9JG2X1a8MqBpnk8uHRjsGnaD7uob5GBhUh_aS5iCprEvi2XQ@mail.gmail.com>
- <CAD6zSYN6xpHt54d-w=6veb6AErTq6ERQcneo7ewC-qsBoMuThQ@mail.gmail.com>
- <20121109135441.GC8567@arwen.pp.htv.fi>
- <004201cdc08f$fa0fd3d0$ee2f7b70$%kim@samsung.com>
- <CAD6zSYM5-GdGHYH=W-My34oXRfH0M+rfettFa0fiit3-_V1RDA@mail.gmail.com>
-Message-ID: <CAD6zSYPv0a3ZAUTVxQB4Ou9kThMLsnv9e0aofWm0kAF_nhS3-A@mail.gmail.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Wed, 14 Nov 2012 05:01:45 +0000
+Subject: [PATCH 2/4] rtc: OMAP: Add system pm_power_off to rtc driver
+References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
+ <1352108549-9341-3-git-send-email-anilkumar@ti.com>
+ <5097ECAD.9010101@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA64F14@DBDE01.ent.ti.com>
+ <50994156.4080305@ti.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA6AE51@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin, Felipe,
++Mark
 
-Since the issue is only with arch patches, which I am going to resolve
-asap, Will it be possible for you to consider taking only driver
-patches? I can resend arch patches separately to linux-samsung after
-updating if Kukjin is also fine with that?
-
-Thanks,
-Praveen
-
-On Wed, Nov 14, 2012 at 9:38 AM, Praveen Paneri <p.paneri@samsung.com> wrote:
-> Hi,
->
-> On Mon, Nov 12, 2012 at 10:11 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> Felipe Balbi wrote:
->>>
->>> Hi,
->>>
->> Hi :-)
->>
->> [...]
->>
->>> Sure, but I still need Kukjin's 'say-so' for the arch/arm/plat-samsung
->>> and arch/arm/mach-exynos part.
->>>
->> Basically, this approach looks OK to me.
->>
->> BTW, I have some comments and need to update...
-> Thanks! I highly appreciate your comments. It would have been even
-> better if I had got these before the closing bell.
->>
->> From 4th patch...
->>
->>> diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-
->>> s3c64xx/mach-smdk6410.c
->>
->> [...]
->>
->>> @@ -72,6 +73,8 @@
->>>  #include <linux/platform_data/touchscreen-s3c2410.h>
->>>  #include <plat/keypad.h>
->>>  #include <plat/backlight.h>
->>> +#include <plat/regs-fb-v4.h>
-> Well it comes from an older state where without this it was giving a
-> build error. Although it shouldn't have been here. Will fix it.
->>
->> Why? In addition, this causes build error with s3c6400_defconfig.
->>
->> [...]
->>
->>> diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
->>> index 03f654d..9cdb666 100644
->>
->> [...]
->>
->>> @@ -1370,6 +1371,30 @@ struct platform_device s5p_device_mixer = {
->>>
->>>  /* USB */
->>>
->>> +#ifdef CONFIG_S3C_DEV_USB_HSOTG
->>> +/* USB PHY*/
->>> +static struct resource samsung_usbphy_resource[] = {
->>> +     [0] = {
->>> +             .start = S3C_PA_USB_PHY,
->>> +             .end   = S3C_PA_USB_PHY + SZ_16 - 1,
->>> +             .flags = IORESOURCE_MEM,
->>> +     },
->>> +};
->>
->> +static struct resource samsung_usbphy_resource[] = {
->> +       [0] = DEFINED_RES_MEM(S3C_PA_USB_PHY, SZ_16),
->> +};
->>
->> [...]
->>
->> Happens build error with s5pv210_defconfig
->>
->> arch/arm/plat-samsung/devs.c:1375: error: 'S3C_PA_USB_PHY' undeclared here
->> (not in a function)
->> make[2]: *** [arch/arm/plat-samsung/devs.o] Error 1
->> make[1]: *** [arch/arm/plat-samsung] Error 2
->> make[1]: *** Waiting for unfinished jobs....
->>
->> And another build error with exynos_defconfig...
-> Will check for both the configs and resolve it.
->
-> Thanks,
-> Praveen
->>
->> arch/arm/mach-exynos/built-in.o: In function `.LANCHOR1':
->> setup-i2c0.c:(.data+0x8080): undefined reference to
->> `s5p_usb_phy_pmu_isolation'
->>
->> From 5th patch....
->>
->> If possible, please to use 'ARM: [sub-arch dir name]: [subject]' format.
->> So I preferred to use 'ARM: EXYNOS: Enabling samsung-usbphy driver for
->> EXYNOS4210' on that.
->>
->> Please make sure your patch has no problem for kernel compilation before
->> submitting...
->>
->> Thanks.
->>
->> Best regards,
->> Kgene.
->> --
->> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
->> SW Solution Development Team, Samsung Electronics Co., Ltd.
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On Mon, Nov 12, 2012 at 15:17:13, AnilKumar, Chimata wrote:
+> On Tue, Nov 06, 2012 at 22:26:54, Cousson, Benoit wrote:
+> > Hi Anil,
+> > 
+> > On 11/06/2012 06:07 AM, AnilKumar, Chimata wrote:
+> > > On Mon, Nov 05, 2012 at 22:13:25, Cousson, Benoit wrote:
+> > >> Hi Anil / Colin,
+> > >>
+> > >> On 11/05/2012 10:42 AM, AnilKumar Ch wrote:
+> > >>> From: Colin Foe-Parker <colin.foeparker@logicpd.com>
+> > >>>
+> > >>> Add system power off control to rtc driver which is the in-charge
+> > >>> of controlling the BeagleBone system power. The power_off routine
+> > >>> can be hooked up to "pm_power_off" system call.
+> > >>>
+> > >>> System power off sequence:-
+> > >>> * Set PMIC STATUS_OFF when PMIC_POWER_EN is pulled low
+> > >>> * Enable PMIC_POWER_EN in rtc module
+> > >>> * Set rtc ALARM2 time
+> > >>> * Enable ALARM2 interrupt
+> > >>>
+> > >>> Added while (1); after the above steps to make sure that no other
+> > >>> process acquire cpu. Otherwise we might see an unexpected behaviour
+> > >>> because we are shutting down all the power rails of SoC except RTC.
+> > >>>
+> > >>> Signed-off-by: Colin Foe-Parker <colin.foeparker@logicpd.com>
+> > >>> [anilkumar at ti.com: move poweroff additions to rtc driver]
+> > >>> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> > >>> ---
+> > >>>  Documentation/devicetree/bindings/rtc/rtc-omap.txt |    5 ++
+> > >>>  drivers/rtc/rtc-omap.c                             |   79 +++++++++++++++++++-
+> > >>>  2 files changed, 83 insertions(+), 1 deletion(-)
+> > >>>
+> > >>> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> > >>> index b47aa41..8d9f4f9 100644
+> > >>> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> > >>> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> > >>> @@ -6,6 +6,10 @@ Required properties:
+> > >>>  - interrupts: rtc timer, alarm interrupts in order
+> > >>>  - interrupt-parent: phandle for the interrupt controller
+> > >>>  
+> > >>> +Optional properties:
+> > >>> +- ti,system-power-controller: Telling whether or not rtc is controlling
+> > >>> +  the system power.
+> > >>
+> > >> I don't know how it is connected at board level, but I'm not sure the
+> > >> binding is the proper one.
+> > > 
+> > > Hi Benoit,
+> > >  ________________________________
+> > > |   ______          _______      |
+> > > |  |      |        |       |     |
+> > > |  |RTC   |        |       |     |
+> > > |  |PMIC  |  Line  |       |     |
+> > > |  |PWR_EN|=======>|PWR_EN |     |
+> > > |  |______|        |_______|     |
+> > > |  AM335x SoC       TPS65217     |
+> > > |                                |
+> > > |________________________________|
+> > >           BeagleBone
+> > > 
+> > > This is how RTC PMIC_PWR_EN is connected to PWR_EN of TPS65217 PMIC. Only when
+> > > RTC pull low in PMIC_PWR_EN then PMIC will go to power off state provided TPS65217
+> > > status should be changed to STATUS_OFF.
+> > > 
+> > > ALARM2 event should be trigger to configure PMIC_PWR_EN properly then the "Line"
+> > > driven low so that PMIC will go to shutdown mode.
+> > 
+> > Thanks for the nice diagram :-)
+> 
+> I missed this mail thread so delayed in response
+> 
+> > 
+> > I'm wondering if we cannot abuse the gpio binding to describe that
+> > connection instead of creating two custom attributes (PMIC + RTC).
+> > 
+> > Ideally we should do that without having to change the RTC to use the
+> > gpiolib at all.
+> > 
+> > 
+> > rtc: rtc at 44e3e000 {
+> > 	compatible = "ti,da830-rtc";
+> > 	reg = <0x44e3e000 0x1000>;
+> > 	interrupts = <75, 76>;
+> > 	ti,hwmods = "rtc";
+> > 
+> > 	/* expose the PWR_EN functionality of this RTC*/
+> > 	gpio-controller;
+> > 	#gpio-cells = <0>; /* assuming we can use 0 ??? */
+> > };
+> > 
+> > ...
+> > 
+> > tps: tps at 24 {
+> >  	compatible = "ti,tps65217";
+> > 	/*
+> >          * Enable the power enable feature from
+> >          * the input line if that attribute is there.
+> >          */
+> > 	gpio-power-en = <&rtc>; /* PWR_EN */
+> > 
+> > 	...
+> > }	
+> > 
+> > Any thought?
+> 
+> No, these two are independent controllers. PMIC can go to power
+> off mode if we pull PWR_EN to low. We can pull down that line
+> by any means like PRCM or GPIO or some other. So these two flags
+> should be independent from each other.
+> 
+> Thanks
+> AnilKumar
+> 
