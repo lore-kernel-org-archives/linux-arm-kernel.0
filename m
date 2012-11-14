@@ -1,75 +1,104 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 14 Nov 2012 17:39:20 +0530
-Subject: [RFC PATCH] ASoC: Samsung: Register the audio platform device
-In-Reply-To: <1352894960-17434-1-git-send-email-padma.v@samsung.com>
-References: <1352894960-17434-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1352894960-17434-2-git-send-email-padma.v@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 14 Nov 2012 12:35:51 +0000
+Subject: [PATCH] mmc: Standardise capability type
+Message-ID: <1352896551-17948-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Audio platform device is not a hardware peripherial.
-So this device can't be added in the dt devices list.
-So expanded the module_platform_driver and registered
-this device using "platform_device_register_simple".
+There are discrepancies with regards to how MMC capabilities
+are carried throughout the subsystem. Let's standardise them
+to elevate any confusion.
 
-Also added the soc-core pm ops structure in the audio
-platform driver.
-
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Cc: Chris Ball <cjb@laptop.org>
+Cc: linux-mmc at vger.kernel.org
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- sound/soc/samsung/smdk_wm8994.c |   31 ++++++++++++++++++++++++++++++-
- 1 files changed, 30 insertions(+), 1 deletions(-)
+ drivers/mmc/core/mmc.c                  |    2 +-
+ include/linux/mmc/dw_mmc.h              |    4 ++--
+ include/linux/mmc/host.h                |    4 ++--
+ include/linux/mmc/sdhci.h               |    4 ++--
+ include/linux/platform_data/pxa_sdhci.h |    4 ++--
+ 5 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/sound/soc/samsung/smdk_wm8994.c b/sound/soc/samsung/smdk_wm8994.c
-index 48dd4dd..7f97969 100644
---- a/sound/soc/samsung/smdk_wm8994.c
-+++ b/sound/soc/samsung/smdk_wm8994.c
-@@ -173,16 +173,45 @@ static int __devexit smdk_audio_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+index 7cc4638..8c2fa80 100644
+--- a/drivers/mmc/core/mmc.c
++++ b/drivers/mmc/core/mmc.c
+@@ -239,7 +239,7 @@ static void mmc_select_card_type(struct mmc_card *card)
+ {
+ 	struct mmc_host *host = card->host;
+ 	u8 card_type = card->ext_csd.raw_card_type & EXT_CSD_CARD_TYPE_MASK;
+-	unsigned int caps = host->caps, caps2 = host->caps2;
++	u32 caps = host->caps, caps2 = host->caps2;
+ 	unsigned int hs_max_dtr = 0;
  
-+static struct platform_device *smdk_audio_device;
-+
- static struct platform_driver smdk_audio_driver = {
- 	.driver		= {
- 		.name	= "smdk-audio",
- 		.owner	= THIS_MODULE,
-+		.pm	= &snd_soc_pm_ops,
- 	},
- 	.probe		= smdk_audio_probe,
- 	.remove		= __devexit_p(smdk_audio_remove),
+ 	if (card_type & EXT_CSD_CARD_TYPE_26)
+diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+index 7c6a113..f825379 100644
+--- a/include/linux/mmc/dw_mmc.h
++++ b/include/linux/mmc/dw_mmc.h
+@@ -229,8 +229,8 @@ struct dw_mci_board {
+ 	u32 quirks; /* Workaround / Quirk flags */
+ 	unsigned int bus_hz; /* Clock speed at the cclk_in pad */
+ 
+-	unsigned int caps;	/* Capabilities */
+-	unsigned int caps2;	/* More capabilities */
++	u32 caps;	/* Capabilities */
++	u32 caps2;	/* More capabilities */
+ 	/*
+ 	 * Override fifo depth. If 0, autodetect it from the FIFOTH register,
+ 	 * but note that this may not be reliable after a bootloader has used
+diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+index 7abb0e1..37442b2 100644
+--- a/include/linux/mmc/host.h
++++ b/include/linux/mmc/host.h
+@@ -211,7 +211,7 @@ struct mmc_host {
+ #define MMC_VDD_34_35		0x00400000	/* VDD voltage 3.4 ~ 3.5 */
+ #define MMC_VDD_35_36		0x00800000	/* VDD voltage 3.5 ~ 3.6 */
+ 
+-	unsigned long		caps;		/* Host capabilities */
++	u32			caps;		/* Host capabilities */
+ 
+ #define MMC_CAP_4_BIT_DATA	(1 << 0)	/* Can the host do 4 bit transfers */
+ #define MMC_CAP_MMC_HIGHSPEED	(1 << 1)	/* Can do MMC high-speed timing */
+@@ -241,7 +241,7 @@ struct mmc_host {
+ #define MMC_CAP_CMD23		(1 << 30)	/* CMD23 supported. */
+ #define MMC_CAP_HW_RESET	(1 << 31)	/* Hardware reset */
+ 
+-	unsigned int		caps2;		/* More host capabilities */
++	u32			caps2;		/* More host capabilities */
+ 
+ #define MMC_CAP2_BOOTPART_NOACC	(1 << 0)	/* Boot partition no access */
+ #define MMC_CAP2_CACHE_CTRL	(1 << 1)	/* Allow cache control */
+diff --git a/include/linux/mmc/sdhci.h b/include/linux/mmc/sdhci.h
+index fa8529a..c76b4a3 100644
+--- a/include/linux/mmc/sdhci.h
++++ b/include/linux/mmc/sdhci.h
+@@ -157,8 +157,8 @@ struct sdhci_host {
+ 
+ 	struct timer_list timer;	/* Timer for timeouts */
+ 
+-	unsigned int caps;	/* Alternative CAPABILITY_0 */
+-	unsigned int caps1;	/* Alternative CAPABILITY_1 */
++	u32 caps;		/* Alternative CAPABILITY_0 */
++	u32 caps1;		/* Alternative CAPABILITY_1 */
+ 
+ 	unsigned int            ocr_avail_sdio;	/* OCR bit masks */
+ 	unsigned int            ocr_avail_sd;
+diff --git a/include/linux/platform_data/pxa_sdhci.h b/include/linux/platform_data/pxa_sdhci.h
+index 59acd98..0d75008 100644
+--- a/include/linux/platform_data/pxa_sdhci.h
++++ b/include/linux/platform_data/pxa_sdhci.h
+@@ -48,8 +48,8 @@ struct sdhci_pxa_platdata {
+ 	unsigned int	ext_cd_gpio;
+ 	bool		ext_cd_gpio_invert;
+ 	unsigned int	max_speed;
+-	unsigned int	host_caps;
+-	unsigned int	host_caps2;
++	u32		host_caps;
++	u32		host_caps2;
+ 	unsigned int	quirks;
+ 	unsigned int	pm_caps;
  };
- 
--module_platform_driver(smdk_audio_driver);
-+static int __init smdk_audio_init(void)
-+{
-+	int ret;
-+
-+	ret = platform_driver_register(&smdk_audio_driver);
-+	if (ret) {
-+		pr_err("unable to register driver\n");
-+		return ret;
-+	}
-+
-+	smdk_audio_device = platform_device_register_simple("smdk-audio", -1, NULL, 0);
-+	if (IS_ERR(smdk_audio_device)) {
-+		platform_driver_unregister(&smdk_audio_driver);
-+		return PTR_ERR(smdk_audio_device);
-+	}
-+
-+	return 0;
-+}
-+
-+static void __exit smdk_audio_exit(void)
-+{
-+	platform_device_unregister(smdk_audio_device);
-+	platform_driver_unregister(&smdk_audio_driver);
-+}
-+
-+module_init(smdk_audio_init);
-+module_exit(smdk_audio_exit);
- 
- MODULE_DESCRIPTION("ALSA SoC SMDK WM8994");
- MODULE_LICENSE("GPL");
 -- 
-1.7.4.4
+1.7.9.5
