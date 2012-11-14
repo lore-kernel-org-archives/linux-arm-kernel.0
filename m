@@ -1,39 +1,28 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 14 Nov 2012 16:51:32 +0100
-Subject: [PATCH] arm: mvebu: add LED support in defconfig
-In-Reply-To: <1352908292-500-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1352908292-500-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1352908292-500-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 14 Nov 2012 16:51:31 +0100
+Subject: [GIT PULL] Marvell defconfig changes for v3.8 merge window
+Message-ID: <1352908292-500-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recently added support for the PlatHome Openblocks AX3 platform
-requires the LED framework, so let's add it to mvebu_defconfig.
+The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
-This is 3.8 material
----
+  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
+
+are available in the git repository at:
+
+  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-defconfig-for-3.8
+
+for you to fetch changes up to 7f84d1cd4c7efd8de13c6707acc0bd3bc5f3efed:
+
+  arm: mvebu: add LED support in defconfig (2012-11-14 16:32:38 +0100)
+
+----------------------------------------------------------------
+Marvell defconfig changes for 3.8
+
+----------------------------------------------------------------
+Thomas Petazzoni (1):
+      arm: mvebu: add LED support in defconfig
+
  arch/arm/configs/mvebu_defconfig |    5 +++++
  1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 3458752..b7ca617 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -26,6 +26,11 @@ CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_USB_SUPPORT is not set
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
--- 
-1.7.9.5
