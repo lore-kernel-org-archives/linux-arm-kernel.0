@@ -1,41 +1,47 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 14 Nov 2012 11:08:49 +0100
-Subject: [PATCH 1/4] mfd: tps65217: Set PMIC to shutdowm on PWR_EN toggle
-In-Reply-To: <20121114070046.GE7407@opensource.wolfsonmicro.com>
-References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
- <1352108549-9341-2-git-send-email-anilkumar@ti.com> <5097F078.50701@ti.com>
- <20121114022341.GM4415@opensource.wolfsonmicro.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA6B043@DBDE01.ent.ti.com>
- <20121114062117.GC7407@opensource.wolfsonmicro.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA6B0AF@DBDE01.ent.ti.com>
- <20121114070046.GE7407@opensource.wolfsonmicro.com>
-Message-ID: <50A36DB1.3010706@ti.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Wed, 14 Nov 2012 18:09:07 +0800
+Subject: [Patch v6 0/4] ASoC: atmel-ssc: Add pinctrl support and change
+ register method
+Message-ID: <1352887751-21848-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+This patch set is based on linux next master branch
+The detail information as following:
+  Git: git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+  Branch: master
+  Commit ID: 75e0ebabd87048b91e4189b90d4af8ef565115db
 
-On 11/14/2012 08:00 AM, Mark Brown wrote:
-> On Wed, Nov 14, 2012 at 06:49:58AM +0000, AnilKumar, Chimata wrote:
-> 
->> Earlier you have a comment on this thread, I am adding my comments
->> on top of it. Sorry if I am in wrong direction.
-> 
-> Ah, I see.  I was just commenting because Benoit was asking if this
-> should be supported with a standard framework feature - I'm not
-> convinced that it should right now as there's not any clear patterns in
-> hardware behaviour.  I've no specific interest in this system.
+Detail information about implement as following:
+  - atmel ssc: add pinctrl support
+  - atmel ssc dai: register dai and pcm directly
+  - at91sam9g20ek wm8731: match new method of dai and pcm register
+  - at91sam9g20ek wm8731: convert to dt support
 
-I was wondering that, because exposing a pin to control the whole PMIC
-low power mode seems to be something that should be generic enough to be
-handled by the regulator framework.
+Bo Shen (4):
+  ARM: at91: atmel-ssc: add pinctrl support
+  ASoC: atmel-ssc-dai: register dai and pcm directly
+  ASoC: atmel-ssc-dai: match new method of dai and pcm register
+  ASoC: at91sam9g20ek-wm8731: convert to dt support
 
-In the current situation we do have a pwr_en pin that can be controlled
-by a GPIO or whatever signal from the SoC.
-That's very similar, at PMIC level, to the fixedregulator that allow a
-GPIO binding to enable it.
+ .../sound/atmel-at91sam9g20ek-wm8731-audio.txt     |   26 ++++
+ arch/arm/boot/dts/at91sam9260.dtsi                 |   18 +++
+ arch/arm/boot/dts/at91sam9263.dtsi                 |   36 +++++
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi        |   32 +++-
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |   36 +++++
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |   26 ++++
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |   32 +++-
+ arch/arm/mach-at91/at91sam9260_devices.c           |    9 --
+ arch/arm/mach-at91/board-sam9g20ek.c               |    6 -
+ drivers/misc/atmel-ssc.c                           |    8 +
+ sound/soc/atmel/Kconfig                            |    3 +-
+ sound/soc/atmel/atmel-pcm.c                        |   23 +--
+ sound/soc/atmel/atmel-pcm.h                        |    3 +
+ sound/soc/atmel/atmel_ssc_dai.c                    |  157 +++++---------------
+ sound/soc/atmel/atmel_ssc_dai.h                    |    3 +-
+ sound/soc/atmel/sam9g20_wm8731.c                   |   75 +++++++++-
+ 16 files changed, 328 insertions(+), 165 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/atmel-at91sam9g20ek-wm8731-audio.txt
 
-Don't you think that should deserve a support in the fmwk?
-
-Regards,
-Benoit
+-- 
+1.7.9.5
