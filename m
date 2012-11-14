@@ -1,50 +1,41 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 14 Nov 2012 11:08:35 +0100
-Subject: OMAP* Latest build failures
-In-Reply-To: <20121114092643.GG3290@n2100.arm.linux.org.uk>
-References: <20121114092643.GG3290@n2100.arm.linux.org.uk>
-Message-ID: <50A36DA3.2080201@ti.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 14 Nov 2012 11:08:49 +0100
+Subject: [PATCH 1/4] mfd: tps65217: Set PMIC to shutdowm on PWR_EN toggle
+In-Reply-To: <20121114070046.GE7407@opensource.wolfsonmicro.com>
+References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
+ <1352108549-9341-2-git-send-email-anilkumar@ti.com> <5097F078.50701@ti.com>
+ <20121114022341.GM4415@opensource.wolfsonmicro.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA6B043@DBDE01.ent.ti.com>
+ <20121114062117.GC7407@opensource.wolfsonmicro.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA6B0AF@DBDE01.ent.ti.com>
+ <20121114070046.GE7407@opensource.wolfsonmicro.com>
+Message-ID: <50A36DB1.3010706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Mark,
 
-On 11/14/2012 10:26 AM, Russell King - ARM Linux wrote:
-> OMAP* allnoconfig fails:
+On 11/14/2012 08:00 AM, Mark Brown wrote:
+> On Wed, Nov 14, 2012 at 06:49:58AM +0000, AnilKumar, Chimata wrote:
 > 
-> arch/arm/mach-omap2/built-in.o: In function `omap_dss_set_min_bus_tput':
-> twl-common.c:(.text+0x1e08): undefined reference to `omap_pm_set_min_bus_tput'
-> arch/arm/mach-omap2/built-in.o: In function `omap_hwmod_init_postsetup':
-> twl-common.c:(.init.text+0x8f8): undefined reference to `omap_pm_if_early_init'
-> arch/arm/mach-omap2/built-in.o: In function `omap_serial_init_port':
-> twl-common.c:(.init.text+0x1284): undefined reference to `omap_pm_get_dev_context_loss_count'
-> arch/arm/mach-omap2/built-in.o: In function `omap_timer_init':
-> twl-common.c:(.init.text+0x1544): undefined reference to `omap_pm_get_dev_context_loss_count'
-> arch/arm/mach-omap2/built-in.o: In function `omap2_common_pm_init':
-> twl-common.c:(.init.text+0x1af0): undefined reference to `omap_pm_if_init'
-> arch/arm/mach-omap2/built-in.o: In function `omap2_gpio_dev_init':
-> twl-common.c:(.init.text+0x2168): undefined reference to `omap_pm_get_dev_context_loss_count'
-> arch/arm/mach-omap2/built-in.o: In function `omap_display_init':
-> twl-common.c:(.init.text+0x25cc): undefined reference to `omap_pm_get_dev_context_loss_count'
-
-Not sure what is going on here but neither of these are referenced within
-twl-common.c directly.
-
-> OMAP4 randconfig fails:
+>> Earlier you have a comment on this thread, I am adding my comments
+>> on top of it. Sorry if I am in wrong direction.
 > 
-> arch/arm/mach-omap2/cm_common.c: In function 'cm_register':
-> arch/arm/mach-omap2/cm_common.c:42:11: error: 'EINVAL' undeclared (first use in this function)
-> arch/arm/mach-omap2/cm_common.c:45:11: error: 'EEXIST' undeclared (first use in this function)
-> arch/arm/mach-omap2/cm_common.c: In function 'cm_unregister':
-> arch/arm/mach-omap2/cm_common.c:66:11: error: 'EINVAL' undeclared (first use in this function)
+> Ah, I see.  I was just commenting because Benoit was asking if this
+> should be supported with a standard framework feature - I'm not
+> convinced that it should right now as there's not any clear patterns in
+> hardware behaviour.  I've no specific interest in this system.
 
-I have already sent a patch to fix this:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/131341.html
+I was wondering that, because exposing a pin to control the whole PMIC
+low power mode seems to be something that should be generic enough to be
+handled by the regulator framework.
 
-> You know where to find the build information and results...
+In the current situation we do have a pwr_en pin that can be controlled
+by a GPIO or whatever signal from the SoC.
+That's very similar, at PMIC level, to the fixedregulator that allow a
+GPIO binding to enable it.
 
-It seams I can not find the link in my mail archives. Could you point me to
-the correct place?
+Don't you think that should deserve a support in the fmwk?
 
--- 
-P?ter
+Regards,
+Benoit
