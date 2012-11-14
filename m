@@ -1,50 +1,29 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Wed, 14 Nov 2012 23:38:25 +0530
-Subject: [PATCH 3/3] ARM: dts: AM33XX: Add memory resource to d_can node
-In-Reply-To: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
-References: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1352916505-12343-4-git-send-email-anilkumar@ti.com>
+Date: Wed, 14 Nov 2012 23:38:22 +0530
+Subject: [PATCH 0/3] can: Add D_CAN raminit support to am335x-evm
+Message-ID: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new address space/memory resource to d_can device tree node. D_CAN
-RAM initialization is achieved through RAMINIT register which is part of
-AM33XX control module address space. D_CAN RAM init or de-init should be
-done by writing instance corresponding value to control module register.
+This patch series adds d_can raminit support to c_can/d_can driver,
+which is required to init/de-init D_CAN message RAM (holds message
+objects). Added corresponding DT changes to get resource of RAMINIT
+register and device instance.
 
-Till we have a separate control module driver to write to control module,
-d_can driver will handle the register writes to control module by itself.
-So a new address space to represent this control module register is added
-to d_can driver.
+These patches were tested on AM335x-EVM along with pinctrl data addition
+patch, which is not added to am335x-evm.dts (only supports CPLD profile#0)
+because d_can1 is supported under CPLD profile#1.
 
-Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
----
- arch/arm/boot/dts/am33xx.dtsi |    6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+AnilKumar Ch (3):
+  can: c_can: Add d_can raminit support
+  ARM: dts: AM33XX: Add d_can instances to aliases
+  ARM: dts: AM33XX: Add memory resource to d_can node
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index c92c35f..ea011d6 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -227,7 +227,8 @@
- 		dcan0: d_can at 481cc000 {
- 			compatible = "bosch,d_can";
- 			ti,hwmods = "d_can0";
--			reg = <0x481cc000 0x2000>;
-+			reg = <0x481cc000 0x2000
-+				0x44e10644 0x4>;
- 			interrupts = <52>;
- 			status = "disabled";
- 		};
-@@ -235,7 +236,8 @@
- 		dcan1: d_can at 481d0000 {
- 			compatible = "bosch,d_can";
- 			ti,hwmods = "d_can1";
--			reg = <0x481d0000 0x2000>;
-+			reg = <0x481d0000 0x2000
-+				0x44e10644 0x4>;
- 			interrupts = <55>;
- 			status = "disabled";
- 		};
+ arch/arm/boot/dts/am33xx.dtsi          |    8 ++++++--
+ drivers/net/can/c_can/c_can.c          |   12 +++++++++++
+ drivers/net/can/c_can/c_can.h          |    3 +++
+ drivers/net/can/c_can/c_can_platform.c |   34 +++++++++++++++++++++++++++++++-
+ 4 files changed, 54 insertions(+), 3 deletions(-)
+
 -- 
 1.7.9.5
