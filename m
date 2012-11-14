@@ -1,34 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Nov 2012 11:21:06 -0800
-Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
-In-Reply-To: <50A3EBCD.3040801@ti.com>
-References: <20121114185335.GU6801@atomide.com>
- <50A3EBCD.3040801@ti.com>
-Message-ID: <20121114192106.GX6801@atomide.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 14 Nov 2012 20:58:41 +0100
+Subject: [PATCH v4 2/2] mx2_camera: Fix regression caused by clock
+ conversion
+In-Reply-To: <CAOMZO5BFZHWzsKF0mr2h0SRGxEdbz3J+fDEiOqY1BmfGCiCE9A@mail.gmail.com>
+References: <1351598606-8485-1-git-send-email-fabio.estevam@freescale.com>
+ <1351598606-8485-2-git-send-email-fabio.estevam@freescale.com>
+ <20121031095702.41649bf9@infradead.org>
+ <CAOMZO5BFZHWzsKF0mr2h0SRGxEdbz3J+fDEiOqY1BmfGCiCE9A@mail.gmail.com>
+Message-ID: <20121114195841.GO10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [121114 11:09]:
+On Wed, Nov 14, 2012 at 04:22:40PM -0200, Fabio Estevam wrote:
+> Hi Sascha,
 > 
-> On 11/14/2012 12:53 PM, Tony Lindgren wrote:
-> > Looks like enabling CONFIG_ARM_ERRATA_751472 causes omap4 blaze
-> > to not boot when enabled. The ARM core on it is an earlier r1p2:
-> > 
-> > CPU: ARMv7 Processor [411fc092] revision 2 (ARMv7), cr=10c53c7d
-> > 
-> > Unfortunately I don't have the details of errata 751472, but I'm
-> > guessing we need to disable it for r1p*.
+> On Wed, Oct 31, 2012 at 9:57 AM, Mauro Carvalho Chehab
+> <mchehab@infradead.org> wrote:
 > 
-> I checked the CA9MP errata document and this erratum impacts all
-> r0/r1/r2 CPUs. I am wondering if the problem is because the workaround
-> requires you to set a bit in the Diagnostic Control register and the
-> read-modify-write sequence provided in the workaround is for secure
-> mode. Not sure if there is a non-secure workaround available :-(
+> > As it seems that those patches depend on some patches at the arm tree,
+> > the better is to merge them via -arm tree.
+> >
+> > So,
+> >
+> > Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+> 
+> Could you please apply this series via your tree?
 
-So it seems :( And I guess we still don't have a generic way to
-check if the core has secure mode or not, and what registers are
-accessible in secure mode.
+Sure, I already have this in my queue.
 
-Regards,
+Sascha
 
-Tony
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
