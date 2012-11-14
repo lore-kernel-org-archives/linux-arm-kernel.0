@@ -1,51 +1,64 @@
-From: arve@android.com (=?ISO-8859-1?Q?Arve_Hj=F8nnev=E5g?=)
-Date: Wed, 14 Nov 2012 15:25:57 -0800
-Subject: Decoding the PTM traces
-In-Reply-To: <CAKZGPAN-DEFD-X4az0O06ngjwdFAyrdowQ57QvtDpe8axZiwTg@mail.gmail.com>
-References: <CAKZGPAN-DEFD-X4az0O06ngjwdFAyrdowQ57QvtDpe8axZiwTg@mail.gmail.com>
-Message-ID: <CAMP5XgegGNn=NM8LEp61tZJWYQC3wbZ9mFz53cMsvPFr=bydaQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Nov 2012 23:26:22 +0000
+Subject: arch-vt8500 and wm8850 support
+In-Reply-To: <1352914966.3238.3.camel@gitbox>
+References: <1352879641.2728.8.camel@gitbox>
+ <201211141117.33485.arnd@arndb.de> <1352914966.3238.3.camel@gitbox>
+Message-ID: <201211142326.23023.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2012 at 6:04 AM, Arun KS <arunks.linux@gmail.com> wrote:
-> Hello,
->
-> I m trying to capture and decode PTM trace from Cortex A9 dual core.
->
-> I m successful  in configuring the driver(arch/arm/kernel/etm.c) and
-> setting the funnel to get data in ETB.
-> But I don't know how to decode these traces.
->
-> Anyone has any pointers?
->
-> Thanks,
-> Arun
+On Wednesday 14 November 2012, Tony Prisk wrote:
+> Makes sense - That's basically what I had in mind. My concern is with
+> the bit that made no sense to me - the non-multiplatform version of the
+> same. At the moment, we have the default xx_SINGLE for ARCH_VT8500.
+> Would I need to add an additional xx_SINGLE variant for each different
+> version?
 
-I attached some tools I use to decode the traces. I have used this on
-the A8, A9 and A15. I assume since you cc-ed me you have already
-applied the kernel patches I posted a while back. Without them you
-will not get useful trace data from a dual core processor.
+I think either one option or two (v5 and v6/v7), but we don't need three
+separate ones, as it should be possible to build v6 and v7 together.
 
--- 
-Arve Hj?nnev?g
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: etm.c
-Type: text/x-csrc
-Size: 20847 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121114/7058a281/attachment-0001.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: objdump.py
-Type: application/octet-stream
-Size: 6317 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121114/7058a281/attachment-0002.obj>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: etm-objdump.py
-Type: application/octet-stream
-Size: 6984 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121114/7058a281/attachment-0003.obj>
+> We would need ARCH_WM8505 (To cover VT8500/WM8505/WM8650 ARM926),
+> ARCH_WM8750 (for ARMv6) and ARCH_WM8850 (for ARMv7).
+
+Ah, right, I was mixing up the numbers.
+
+> Do I need a ARCH_WM8750_SINGLE, ARCH_WM8850_SINGLE etc for each one to
+> allow use to continue using earlyprintk?
+
+You just need to ensure that we always set at least one of them, and
+that ARCH_WM8505 isn't set at the same time as one of the v6/v7 parts.
+
+Maybe something like
+
+config ARCH_VT8500
+      bool
+      select FOO
+      select BAR
+
+config ARCH_WM8505
+      bool "WonderMedia WM8505/WM8650 or VIA VT8500" if !ARCH_VT8500_SINGLE
+      depends on ARCH_MULTI_V5
+      default ARCH_VT8500_SINGLE
+      select ARCH_VT8500
+      select CPU_ARM926
+
+config ARCH_WM8750
+      bool "WonderMedia WM 8750"
+      depends on ARCH_MULTI_V6 || ARCH_WM8750_SINGLE
+      select ARCH_VT8500
+      select CPU_V6
+
+config ARCH_WM8850
+      bool "WonderMedia WM 8850/8950"
+      depends on ARCH_MULTI_V7 || ARCH_WM8750_SINGLE
+      select ARCH_VT8500
+      select CPU_V7
+
+config ARCH_WM8850_AUTO
+      def_bool y
+      depends on ARCH_WM8750_SINGLE && !ARCH_WM8750
+      select ARCH_WM8850 # ensure that ARCH_WM8850 is on if ARCH_WM8750 is off
+
+
+	Arnd
