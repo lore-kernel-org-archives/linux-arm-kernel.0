@@ -1,34 +1,36 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 14 Nov 2012 11:19:33 -0200
-Subject: [PATCH v2 1/2] ARM: mx27_3ds: Add VPU support
-Message-ID: <1352899174-28022-1-git-send-email-fabio.estevam@freescale.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Wed, 14 Nov 2012 15:22:46 +0200
+Subject: [PATCH 1/6] usb: chipidea: usbmisc: unset global varibale usbmisc
+ on driver remove
+In-Reply-To: <1352894137-2050-2-git-send-email-m.grzeschik@pengutronix.de>
+References: <1352894137-2050-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352894137-2050-2-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <87sj8c71zt.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mx27 has a VPU (Video Processing Unit) block that allows doing H264/MPEG4
-decoding and encoding in hardware.
+Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
 
-Add support for it.
+> From: Marc Kleine-Budde <mkl@pengutronix.de>
+>
+> While there fix a potential race condition, first set usbmisc, then call
+> usbmisc_set_ops().
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Do not allocate the coda buffers explicetely
+This should be really two separate patches, both of which could use
+more elaborate commit messages. That is, if you unset variable, what
+kind of scenario it prevents, what exactly is the potential race
+condition, etc. Saves time for everybody.
 
- arch/arm/mach-imx/mach-mx27_3ds.c |    1 +
- 1 file changed, 1 insertion(+)
+>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> ---
+>  drivers/usb/chipidea/usbmisc_imx6q.c |    5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-index d0e547f..e37a114 100644
---- a/arch/arm/mach-imx/mach-mx27_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -531,6 +531,7 @@ static void __init mx27pdk_init(void)
- 	imx27_add_imx_ssi(0, &mx27_3ds_ssi_pdata);
- 
- 	imx_add_platform_device("imx_mc13783", 0, NULL, 0, NULL, 0);
-+	imx27_add_coda();
- }
- 
- static void __init mx27pdk_timer_init(void)
--- 
-1.7.9.5
+I'd also move the renaming patch in front of everything else, but that's
+up to you.
+
+Regards,
+--
+Alex
