@@ -1,28 +1,27 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 14 Nov 2012 11:05:42 -0800
-Subject: [PATCH v5 0/4] arch/arm: support seccomp
-In-Reply-To: <50A29E28.5040303@mit.edu>
-References: <1352587485-18348-1-git-send-email-keescook@chromium.org>
- <50A29E28.5040303@mit.edu>
-Message-ID: <CAGXu5j+a1dmu92wxct=HBok0aWphL-Vu4xwMB1XffRWgrw8Zcw@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 14 Nov 2012 13:06:53 -0600
+Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
+In-Reply-To: <20121114185335.GU6801@atomide.com>
+References: <20121114185335.GU6801@atomide.com>
+Message-ID: <50A3EBCD.3040801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2012 at 11:23 AM, Andy Lutomirski <luto@amacapital.net> wrote:
-> On 11/10/2012 02:44 PM, Kees Cook wrote:
->> This adds support for seccomp BPF to ARM. When built with the seccomp
->> improvement patch waiting in linux-next ("seccomp: Make syscall skipping
->> and nr changes more consistent"), this passes the seccomp regression
->> test suite: https://github.com/redpig/seccomp
->
-> I don't know if this matters much on ARM, but should something like
-> https://git.kernel.org/?p=linux/kernel/git/luto/linux.git;a=commit;h=dee1ae5a05149f30baeccb4b8f68f22525ba9ca2
-> be added?
 
-Not sure -- I'll leave that up to other folks.
+On 11/14/2012 12:53 PM, Tony Lindgren wrote:
+> Looks like enabling CONFIG_ARM_ERRATA_751472 causes omap4 blaze
+> to not boot when enabled. The ARM core on it is an earlier r1p2:
+> 
+> CPU: ARMv7 Processor [411fc092] revision 2 (ARMv7), cr=10c53c7d
+> 
+> Unfortunately I don't have the details of errata 751472, but I'm
+> guessing we need to disable it for r1p*.
 
--Kees
+I checked the CA9MP errata document and this erratum impacts all
+r0/r1/r2 CPUs. I am wondering if the problem is because the workaround
+requires you to set a bit in the Diagnostic Control register and the
+read-modify-write sequence provided in the workaround is for secure
+mode. Not sure if there is a non-secure workaround available :-(
 
--- 
-Kees Cook
-Chrome OS Security
+Cheers
+Jon
