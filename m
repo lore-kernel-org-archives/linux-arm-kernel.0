@@ -1,95 +1,25 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 14 Nov 2012 20:49:54 +0000
-Subject: [PATCH 1/3] OF: Add helper for matching against linux, stdout-path
-In-Reply-To: <1351849734-9836-2-git-send-email-s.hauer@pengutronix.de>
-References: <1351849734-9836-1-git-send-email-s.hauer@pengutronix.de>
- <1351849734-9836-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CACxGe6uW+XN6RDnP+8QFXaCYqqPZO4dZM_aynR6AVMYZT=KuMg@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 14 Nov 2012 13:54:33 -0700
+Subject: [PATCH] ARM: tegra: Implement 6395/1 for Tegra
+In-Reply-To: <1352903243-5389-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1352903243-5389-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <50A40509.5080006@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 2, 2012 at 9:48 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> devicetrees may have a linux,stdout-path property in the chosen
-> node describing the console device. This adds a helper function
-> to match a device against this property so a driver can call
-> add_preferred_console for a matching device.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/of/Kconfig        |    3 +++
->  drivers/of/Makefile       |    1 +
->  drivers/of/of_stdout.c    |   27 +++++++++++++++++++++++++++
->  include/linux/of_stdout.h |   24 ++++++++++++++++++++++++
->  4 files changed, 55 insertions(+)
->  create mode 100644 drivers/of/of_stdout.c
->  create mode 100644 include/linux/of_stdout.h
->
-> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> index dfba3e6..8574ebb 100644
-> --- a/drivers/of/Kconfig
-> +++ b/drivers/of/Kconfig
-> @@ -67,6 +67,9 @@ config OF_MDIO
->         help
->           OpenFirmware MDIO bus (Ethernet PHY) accessors
->
-> +config OF_STDOUT
-> +       def_bool y
-> +
->  config OF_PCI
->         def_tristate PCI
->         depends on PCI
-> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-> index e027f44..c9f3f2f 100644
-> --- a/drivers/of/Makefile
-> +++ b/drivers/of/Makefile
-> @@ -8,6 +8,7 @@ obj-$(CONFIG_OF_I2C)    += of_i2c.o
->  obj-$(CONFIG_OF_NET)   += of_net.o
->  obj-$(CONFIG_OF_SELFTEST) += selftest.o
->  obj-$(CONFIG_OF_MDIO)  += of_mdio.o
-> +obj-$(CONFIG_OF_STDOUT) += of_stdout.o
->  obj-$(CONFIG_OF_PCI)   += of_pci.o
->  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
->  obj-$(CONFIG_OF_MTD)   += of_mtd.o
-> diff --git a/drivers/of/of_stdout.c b/drivers/of/of_stdout.c
-> new file mode 100644
-> index 0000000..c9e370e
-> --- /dev/null
-> +++ b/drivers/of/of_stdout.c
-> @@ -0,0 +1,27 @@
-> +/*
-> + * OF helper for linux,stdoutpath property.
-> + *
-> + * This file is released under the GPLv2
-> + */
-> +#include <linux/of_stdout.h>
-> +
-> +/**
-> + * of_device_is_stdout_path - check if a device node matches the
-> + *                            linux,stdout-path property
-> + *
-> + * Check if this device node matches the linux,stdout-path property
-> + * in the chosen node. return true if yes, false otherwise.
-> + */
-> +int of_device_is_stdout_path(struct device_node *dn)
-> +{
-> +       const char *name;
-> +
-> +       name = of_get_property(of_chosen, "linux,stdout-path", NULL);
-> +       if (name == NULL)
-> +               return 0;
-> +
-> +       if (dn == of_find_node_by_path(name))
+On 11/14/2012 07:27 AM, Peter De Schrijver wrote:
+> This patch implements ARM linux patch 6395/1 for Tegra. See commit
+> 1a8e41cd672f894bbd74874eac601e6cedf838fb for details.
 
-need to of_node_put() the return value of of_find_node_by_path()
+I've applied this patch to Tegra's for-3.8/soc branch with the following
+enhanced commit description:
 
-> +               return 1;
-> +
-> +       return 0;
-> +}
-
-Hi Sascha,
-
-I'm fine with the helper, but there really is no need for a completely
-separate .c file. Just put it in drivers/of/base.c.
-
-g.
+>     ARM: tegra: Implement 6395/1 for Tegra
+>     
+>     This patch implements ARM linux patch 6395/1 for Tegra. See commit
+>     1a8e41c "ARM: 6395/1: VExpress: Set bit 22 in the PL310 (cache
+>     controller) AuxCtlr register" for details.
+>     
+>     Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+>     [swarren: added commit subject for referenced patch]
+>     Signed-off-by: Stephen Warren <swarren@nvidia.com>
