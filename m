@@ -1,135 +1,34 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 13 Nov 2012 17:12:26 -0800
-Subject: [PATCH v3 5/7] crypto: omap-sham: Convert to use pm_runtime API
-In-Reply-To: <1352257033-32495-6-git-send-email-mgreer@animalcreek.com> (Mark
- A. Greer's message of "Tue, 6 Nov 2012 19:57:11 -0700")
-References: <1352257033-32495-1-git-send-email-mgreer@animalcreek.com>
- <1352257033-32495-6-git-send-email-mgreer@animalcreek.com>
-Message-ID: <87bof1f0n9.fsf@deeprootsystems.com>
+Date: Tue, 13 Nov 2012 17:18:13 -0800
+Subject: [GIT PULL] ARM: OMAP4: PM: basic support for core retention in suspend
+Message-ID: <87zk2ldlt6.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Tony,
 
-"Mark A. Greer" <mgreer@animalcreek.com> writes:
+The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
 
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
->
-> Convert the omap-sham crypto driver to use the
-> pm_runtime API instead of the clk API.
->
-> CC: Kevin Hilman <khilman@deeprootsystems.com>
-> CC: Paul Walmsley <paul@pwsan.com>
-> CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
-> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+  Linux 3.7-rc4 (2012-11-04 11:07:39 -0800)
 
-Acked-by: Kevin Hilman <khilman@ti.com>
+are available in the git repository at:
 
-This looks much better and is more obviously a straight forward clock
-API --> runtime PM conversion.
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/for_3.8-pm-omap4-core-ret
 
-Thanks,
+for you to fetch changes up to 4fd7a41233eac62b10ede394b35d8919086f94ec:
 
-Kevin
+  ARM: OMAP4: USB: power down MUSB PHY during boot (2012-11-13 15:57:09 -0800)
 
-> ---
->  drivers/crypto/omap-sham.c | 28 +++++++++++-----------------
->  1 file changed, 11 insertions(+), 17 deletions(-)
->
-> diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-> index a3fd6fc..85d43b2 100644
-> --- a/drivers/crypto/omap-sham.c
-> +++ b/drivers/crypto/omap-sham.c
-> @@ -22,12 +22,12 @@
->  #include <linux/errno.h>
->  #include <linux/interrupt.h>
->  #include <linux/kernel.h>
-> -#include <linux/clk.h>
->  #include <linux/irq.h>
->  #include <linux/io.h>
->  #include <linux/platform_device.h>
->  #include <linux/scatterlist.h>
->  #include <linux/dma-mapping.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/delay.h>
->  #include <linux/crypto.h>
->  #include <linux/cryptohash.h>
-> @@ -141,7 +141,6 @@ struct omap_sham_dev {
->  	struct device		*dev;
->  	void __iomem		*io_base;
->  	int			irq;
-> -	struct clk		*iclk;
->  	spinlock_t		lock;
->  	int			err;
->  	int			dma;
-> @@ -238,7 +237,7 @@ static void omap_sham_copy_ready_hash(struct ahash_request *req)
->  
->  static int omap_sham_hw_init(struct omap_sham_dev *dd)
->  {
-> -	clk_enable(dd->iclk);
-> +	pm_runtime_get_sync(dd->dev);
->  
->  	if (!test_bit(FLAGS_INIT, &dd->flags)) {
->  		omap_sham_write_mask(dd, SHA_REG_MASK,
-> @@ -653,7 +652,8 @@ static void omap_sham_finish_req(struct ahash_request *req, int err)
->  	/* atomic operation is not needed here */
->  	dd->flags &= ~(BIT(FLAGS_BUSY) | BIT(FLAGS_FINAL) | BIT(FLAGS_CPU) |
->  			BIT(FLAGS_DMA_READY) | BIT(FLAGS_OUTPUT_READY));
-> -	clk_disable(dd->iclk);
-> +
-> +	pm_runtime_put_sync(dd->dev);
->  
->  	if (req->base.complete)
->  		req->base.complete(&req->base, err);
-> @@ -1198,14 +1198,6 @@ static int __devinit omap_sham_probe(struct platform_device *pdev)
->  	if (err)
->  		goto dma_err;
->  
-> -	/* Initializing the clock */
-> -	dd->iclk = clk_get(dev, "ick");
-> -	if (IS_ERR(dd->iclk)) {
-> -		dev_err(dev, "clock intialization failed.\n");
-> -		err = PTR_ERR(dd->iclk);
-> -		goto clk_err;
-> -	}
-> -
->  	dd->io_base = ioremap(dd->phys_base, SZ_4K);
->  	if (!dd->io_base) {
->  		dev_err(dev, "can't ioremap\n");
-> @@ -1213,11 +1205,14 @@ static int __devinit omap_sham_probe(struct platform_device *pdev)
->  		goto io_err;
->  	}
->  
-> -	clk_enable(dd->iclk);
-> +	pm_runtime_enable(dev);
-> +	pm_runtime_get_sync(dev);
-> +
->  	dev_info(dev, "hw accel on OMAP rev %u.%u\n",
->  		(omap_sham_read(dd, SHA_REG_REV) & SHA_REG_REV_MAJOR) >> 4,
->  		omap_sham_read(dd, SHA_REG_REV) & SHA_REG_REV_MINOR);
-> -	clk_disable(dd->iclk);
-> +
-> +	pm_runtime_put_sync(&pdev->dev);
->  
->  	spin_lock(&sham.lock);
->  	list_add_tail(&dd->list, &sham.dev_list);
-> @@ -1235,9 +1230,8 @@ err_algs:
->  	for (j = 0; j < i; j++)
->  		crypto_unregister_ahash(&algs[j]);
->  	iounmap(dd->io_base);
-> +	pm_runtime_disable(dev);
->  io_err:
-> -	clk_put(dd->iclk);
-> -clk_err:
->  	omap_sham_dma_cleanup(dd);
->  dma_err:
->  	if (dd->irq >= 0)
-> @@ -1266,7 +1260,7 @@ static int __devexit omap_sham_remove(struct platform_device *pdev)
->  		crypto_unregister_ahash(&algs[i]);
->  	tasklet_kill(&dd->done_task);
->  	iounmap(dd->io_base);
-> -	clk_put(dd->iclk);
-> +	pm_runtime_disable(&pdev->dev);
->  	omap_sham_dma_cleanup(dd);
->  	if (dd->irq >= 0)
->  		free_irq(dd->irq, dd);
+----------------------------------------------------------------
+Add support for full-chip retention in suspend for OMAP4 SoCs.
+
+----------------------------------------------------------------
+Rajendra Nayak (1):
+      ARM: OMAP4: suspend: Program all domains to retention
+
+Tero Kristo (1):
+      ARM: OMAP4: USB: power down MUSB PHY during boot
+
+ arch/arm/mach-omap2/omap_phy_internal.c | 32 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/pm44xx.c            |  7 -------
+ 2 files changed, 32 insertions(+), 7 deletions(-)
