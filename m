@@ -1,108 +1,51 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Wed, 14 Nov 2012 21:26:58 +0100
-Subject: [PATCH] arm/dts: Add basic support for gta04 (Openmoko next
- generation) board.
-In-Reply-To: <1351633367-19082-1-git-send-email-marek.belisko@open-nandra.com>
-References: <1351633367-19082-1-git-send-email-marek.belisko@open-nandra.com>
-Message-ID: <CAAfyv34D4bTO=k8niM42CDQFb0tP4uOnvX_KPT3+F6z59jPg3Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Nov 2012 12:32:21 -0800
+Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
+In-Reply-To: <20121114202244.GE3332@n2100.arm.linux.org.uk>
+References: <20121114185335.GU6801@atomide.com> <50A3EBCD.3040801@ti.com>
+ <20121114202244.GE3332@n2100.arm.linux.org.uk>
+Message-ID: <20121114203221.GA6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC' Grant & Rob
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [121114 12:24]:
+> On Wed, Nov 14, 2012 at 01:06:53PM -0600, Jon Hunter wrote:
+> > 
+> > On 11/14/2012 12:53 PM, Tony Lindgren wrote:
+> > > Looks like enabling CONFIG_ARM_ERRATA_751472 causes omap4 blaze
+> > > to not boot when enabled. The ARM core on it is an earlier r1p2:
+> > > 
+> > > CPU: ARMv7 Processor [411fc092] revision 2 (ARMv7), cr=10c53c7d
+> > > 
+> > > Unfortunately I don't have the details of errata 751472, but I'm
+> > > guessing we need to disable it for r1p*.
+> > 
+> > I checked the CA9MP errata document and this erratum impacts all
+> > r0/r1/r2 CPUs. I am wondering if the problem is because the workaround
+> > requires you to set a bit in the Diagnostic Control register and the
+> > read-modify-write sequence provided in the workaround is for secure
+> > mode. Not sure if there is a non-secure workaround available :-(
+> 
+> Most likely, and there's not a lot that the kernel can sanely do about
+> that.  We have ended up deciding (through being forced to because of
+> how the security stuff works) that the stages prior to the kernel will
+> implement the work-around enables because those stages are already
+> platform specific, and the kernel will implement a "test for the
+> work-around already enabled."
+> 
+> The net result is, if you enable an Errata in the kernel which your
+> earlier boot stages has not already configured, the kernel will hang.
+> Not much we can do about the hanging aspect, because the kernel takes
+> an exception which we can't trap at those early stages in the boot
+> process.
+> 
+> I'm not particularly happy about that design, but that's what we've
+> ended up with through the 'design' of the security stuff forced onto
+> us.
 
-On Tue, Oct 30, 2012 at 10:42 PM, Marek Belisko
-<marek.belisko@open-nandra.com> wrote:
-> Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
-> ---
->  arch/arm/boot/dts/omap3-gta04.dts |   65 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 65 insertions(+)
->  create mode 100644 arch/arm/boot/dts/omap3-gta04.dts
->
-> diff --git a/arch/arm/boot/dts/omap3-gta04.dts b/arch/arm/boot/dts/omap3-gta04.dts
-> new file mode 100644
-> index 0000000..76efd13
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-gta04.dts
-> @@ -0,0 +1,65 @@
-> +/*
-> + * Copyright (C) 2012 Marek Belisko <marek.belisko@open-nandra.com>
-> + *
-> + * Based on omap3-beagle-xm.dts
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +/dts-v1/;
-> +
-> +/include/ "omap3.dtsi"
-> +
-> +/ {
-> +       model = "OMAP3 GTA04";
-> +       compatible = "ti,omap3-gta04", "ti,omap3";
-> +
-> +       memory {
-> +               device_type = "memory";
-> +               reg = <0x80000000 0x20000000>; /* 512 MB */
-> +       };
-> +
-> +       gpio-keys {
-> +               compatible = "gpio-keys";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               aux-button {
-> +                       label = "AUX";
-> +                       linux,code = <169>;
-> +                       gpios = <&gpio1 7 1>;
-> +                       gpio-key,wakeup;
-> +               };
-> +       };
-> +};
-> +
-> +&i2c1 {
-> +       clock-frequency = <2600000>;
-> +
-> +       twl: twl at 48 {
-> +               reg = <0x48>;
-> +               interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-> +               interrupt-parent = <&intc>;
-> +       };
-> +};
-> +
-> +/include/ "twl4030.dtsi"
-> +
-> +&i2c2 {
-> +       clock-frequency = <400000>;
-> +       /* Pressure Sensor */
-> +       bmp085 at 77 {
-> +               compatible = "bosch,bmp085";
-> +               reg = <0x77>;
-> +       };
-> +};
-> +
-> +&i2c3 {
-> +       clock-frequency = <100000>;
-> +};
-> +
-> +&mmc1 {
-> +       vmmc-supply = <&vmmc1>;
-> +       bus-width = <4>;
-> +};
-> +
-> --
-> 1.7.9.5
->
+Checking for the bit already set should work in this case, I'll post
+a patch for that shortly.
 
+Regards,
 
-
--- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
-
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+Tony
