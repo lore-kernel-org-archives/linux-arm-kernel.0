@@ -1,29 +1,93 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 14 Nov 2012 15:00:06 +0900
-Subject: [PATCH 2/4] rtc: OMAP: Add system pm_power_off to rtc driver
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA6AFB4@DBDE01.ent.ti.com>
-References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
- <1352108549-9341-3-git-send-email-anilkumar@ti.com>
- <5097ECAD.9010101@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA64F14@DBDE01.ent.ti.com>
- <50994156.4080305@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA6AFB4@DBDE01.ent.ti.com>
-Message-ID: <20121114060003.GA7407@opensource.wolfsonmicro.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 14 Nov 2012 07:00:58 +0100
+Subject: [PATCH 01/17] of: add dma-mask binding
+In-Reply-To: <50A3164C.3070301@gmail.com>
+References: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
+ <1352710357-3265-2-git-send-email-wenyou.yang@atmel.com>
+ <50A3164C.3070301@gmail.com>
+Message-ID: <20121114060058.GM4576@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2012 at 05:50:46AM +0000, AnilKumar, Chimata wrote:
-> On Wed, Nov 14, 2012 at 10:31:42, AnilKumar, Chimata wrote:
+On 21:55 Tue 13 Nov     , Rob Herring wrote:
+> On 11/12/2012 02:52 AM, Wenyou Yang wrote:
+> > From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > 
+> > This will allow each device to specify its dma-mask for this we use the
+> > coherent_dma_mask as pointer. By default the dma-mask will be set to
+> > DMA_BIT_MASK(32).
+> 
+> Do you really have a use case this is not DMA_BIT_MASK(32)?
+yes as exmample on 64bit platfrom it will be 64 on x86 it's also 24, on power
+pc 40
+> 
+> > The microblaze architecture hook is drop
+> > 
+> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Cc: grant.likely at secretlab.ca
+> > Cc: rob.herring at calxeda.com
+> > Cc: devicetree-discuss at lists.ozlabs.org
+> > ---
+> >  drivers/of/platform.c |   23 ++++++++++++++++-------
+> >  1 file changed, 16 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> > index b80891b..31ed405 100644
+> > --- a/drivers/of/platform.c
+> > +++ b/drivers/of/platform.c
+> > @@ -130,6 +130,21 @@ void of_device_make_bus_id(struct device *dev)
+> >  	dev_set_name(dev, "%s.%d", node->name, magic - 1);
+> >  }
+> >  
+> > +static void of_get_dma_mask(struct device *dev, struct device_node *np)
+> > +{
+> > +	const __be32 *prop;
+> > +	int len;
+> > +
+> > +	prop = of_get_property(np, "dma-mask", &len);
+> 
+> dma-ranges may work for this purpose.
+> 
+> > +
+> > +	dev->dma_mask = &dev->coherent_dma_mask;
+> 
+> I don't really know, but I suspect this is wrong.
+no this is correct was suggest by Russell
+we already do so on other ARM or SH as example
 
-*Please* cut out irrelevant context from your mails.
-
-> Details regarding how PMIC PWR_EN is connected to RTC module
-
-OK...  but what am I expected to do with this information?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121114/8a755791/attachment.sig>
+the dma expect a pointer for dma_mask but the value is the same as coherent
+> 
+> > +
+> > +	if (!prop)
+> > +		dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> > +	else
+> > +		dev->coherent_dma_mask = of_read_number(prop, len / 4);
+> > +}
+> > +
+> >  /**
+> >   * of_device_alloc - Allocate and initialize an of_device
+> >   * @np: device node to assign to device
+> > @@ -171,10 +186,8 @@ struct platform_device *of_device_alloc(struct device_node *np,
+> >  		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
+> >  	}
+> >  
+> > +	of_get_dma_mask(&dev->dev, np);
+> >  	dev->dev.of_node = of_node_get(np);
+> > -#if defined(CONFIG_MICROBLAZE)
+> > -	dev->dev.dma_mask = &dev->archdata.dma_mask;
+> > -#endif
+> >  	dev->dev.parent = parent;
+> >  
+> >  	if (bus_id)
+> > @@ -211,10 +224,6 @@ struct platform_device *of_platform_device_create_pdata(
+> >  	if (!dev)
+> >  		return NULL;
+> >  
+> > -#if defined(CONFIG_MICROBLAZE)
+> > -	dev->archdata.dma_mask = 0xffffffffUL;
+> > -#endif
+> > -	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> >  	dev->dev.bus = &platform_bus_type;
+> >  	dev->dev.platform_data = platform_data;
+> >  
+> > 
