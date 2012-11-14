@@ -1,22 +1,84 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 14 Nov 2012 19:19:38 +0100
-Subject: [PATCH v2] ARM: Dove: update defconfig
-In-Reply-To: <1351559505-944-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1351539916-29561-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1351559505-944-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <50A3E0BA.5090701@gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 14 Nov 2012 16:20:36 -0200
+Subject: [PATCH v2 1/2] ARM: mx27: Add VPU support
+Message-ID: <1352917238-29694-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2012 02:11 AM, Sebastian Hesselbarth wrote:
-> It has been a while since dove_defconfig was updated to recent development.
-> This patch adds all currently available Dove boards, including a DT-enabled
-> machine.
+mx27 has a VPU (Video Processing Unit) block that allows doing H264/MPEG4
+decoding and encoding in hardware.
 
-Jason,
+Add support for it in a common SoC file instead of per board file.
 
-there seems to be no discussion at all on this one. Maybe it got lost
-during the ELCE, but if there are no objections I prefer to have this
-accepted for any of the next releases.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Javier,
 
-Sebastian
+I removed dma_declare_coherent_memory call, as per Sascha's suggestion on my
+first submission of adding mx27pdk VPU support. Hope this is ok with you.
+
+Changes since v1:
+- Call imx27_add_coda() on a common mx27 location instead of per board.
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   18 ------------------
+ arch/arm/mach-imx/mm-imx27.c                |    3 ++-
+ 2 files changed, 2 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+index b744226..ee9cbff 100644
+--- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
++++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+@@ -434,23 +434,6 @@ static const struct imx_ssi_platform_data visstrim_m10_ssi_pdata __initconst = {
+ 	.flags			= IMX_SSI_DMA | IMX_SSI_SYN,
+ };
+ 
+-/* coda */
+-
+-static void __init visstrim_coda_init(void)
+-{
+-	struct platform_device *pdev;
+-	int dma;
+-
+-	pdev = imx27_add_coda();
+-	dma = dma_declare_coherent_memory(&pdev->dev,
+-					  mx2_camera_base + MX2_CAMERA_BUF_SIZE,
+-					  mx2_camera_base + MX2_CAMERA_BUF_SIZE,
+-					  MX2_CAMERA_BUF_SIZE,
+-					  DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+-	if (!(dma & DMA_MEMORY_MAP))
+-		return;
+-}
+-
+ /* DMA deinterlace */
+ static struct platform_device visstrim_deinterlace = {
+ 	.name = "m2m-deinterlace",
+@@ -548,7 +531,6 @@ static void __init visstrim_m10_board_init(void)
+ 	gpio_led_register_device(0, &visstrim_m10_led_data);
+ 	visstrim_deinterlace_init();
+ 	visstrim_camera_init();
+-	visstrim_coda_init();
+ }
+ 
+ static void __init visstrim_m10_timer_init(void)
+diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
+index 4f1be65..fddadb1 100644
+--- a/arch/arm/mach-imx/mm-imx27.c
++++ b/arch/arm/mach-imx/mm-imx27.c
+@@ -25,9 +25,9 @@
+ #include <asm/mach/map.h>
+ 
+ #include "common.h"
+-#include "devices/devices-common.h"
+ #include "hardware.h"
+ #include "iomux-v1.h"
++#include "devices-imx27.h"
+ 
+ /* MX27 memory map definition */
+ static struct map_desc imx27_io_desc[] __initdata = {
+@@ -98,4 +98,5 @@ void __init imx27_soc_init(void)
+ 	/* imx27 has the imx21 type audmux */
+ 	platform_device_register_simple("imx21-audmux", 0, imx27_audmux_res,
+ 					ARRAY_SIZE(imx27_audmux_res));
++	imx27_add_coda();
+ }
+-- 
+1.7.9.5
