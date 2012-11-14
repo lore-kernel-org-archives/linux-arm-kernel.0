@@ -1,48 +1,85 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Wed, 14 Nov 2012 02:59:08 +0000
-Subject: [PATCH 2/3] ARM: prima2: Replace include linux/module.h with
- linux/export.h
-In-Reply-To: <1352821789-6640-1-git-send-email-s.syam@samsung.com>
-References: <1352821789-6640-1-git-send-email-s.syam@samsung.com>
-Message-ID: <5EB3BFCD089AD643B9BB63439F5FD5E9012296E17C@SHAASIEXM01.ASIA.ROOT.PRI>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 13 Nov 2012 21:55:56 -0600
+Subject: [PATCH 01/17] of: add dma-mask binding
+In-Reply-To: <1352710357-3265-2-git-send-email-wenyou.yang@atmel.com>
+References: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
+ <1352710357-3265-2-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <50A3164C.3070301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Syam Sidhardhan [mailto:syamsidhardh at gmail.com]
-> Sent: Tuesday, November 13, 2012 11:50 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Barry Song
-> Subject: [PATCH 2/3] ARM: prima2: Replace include linux/module.h with
-> linux/export.h
+On 11/12/2012 02:52 AM, Wenyou Yang wrote:
+> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > 
-> include <linux/export.h> is the right to go here.
-> 
-> Signed-off-by: Syam Sidhardhan <s.syam@samsung.com>
+> This will allow each device to specify its dma-mask for this we use the
+> coherent_dma_mask as pointer. By default the dma-mask will be set to
+> DMA_BIT_MASK(32).
 
-Acked. Thanks!
+Do you really have a use case this is not DMA_BIT_MASK(32)?
+
+> The microblaze architecture hook is drop
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: grant.likely at secretlab.ca
+> Cc: rob.herring at calxeda.com
+> Cc: devicetree-discuss at lists.ozlabs.org
 > ---
->  arch/arm/mach-prima2/pm.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  drivers/of/platform.c |   23 ++++++++++++++++-------
+>  1 file changed, 16 insertions(+), 7 deletions(-)
 > 
-> diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
-> index fb5a791..f4a2270 100644
-> --- a/arch/arm/mach-prima2/pm.c
-> +++ b/arch/arm/mach-prima2/pm.c
-> @@ -9,7 +9,7 @@
->  #include <linux/kernel.h>
->  #include <linux/suspend.h>
->  #include <linux/slab.h>
-> -#include <linux/module.h>
-> +#include <linux/export.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/of_device.h>
-> --
-> 1.7.4.1
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index b80891b..31ed405 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -130,6 +130,21 @@ void of_device_make_bus_id(struct device *dev)
+>  	dev_set_name(dev, "%s.%d", node->name, magic - 1);
+>  }
+>  
+> +static void of_get_dma_mask(struct device *dev, struct device_node *np)
+> +{
+> +	const __be32 *prop;
+> +	int len;
+> +
+> +	prop = of_get_property(np, "dma-mask", &len);
 
--barry
+dma-ranges may work for this purpose.
 
+> +
+> +	dev->dma_mask = &dev->coherent_dma_mask;
 
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+I don't really know, but I suspect this is wrong.
+
+> +
+> +	if (!prop)
+> +		dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> +	else
+> +		dev->coherent_dma_mask = of_read_number(prop, len / 4);
+> +}
+> +
+>  /**
+>   * of_device_alloc - Allocate and initialize an of_device
+>   * @np: device node to assign to device
+> @@ -171,10 +186,8 @@ struct platform_device *of_device_alloc(struct device_node *np,
+>  		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
+>  	}
+>  
+> +	of_get_dma_mask(&dev->dev, np);
+>  	dev->dev.of_node = of_node_get(np);
+> -#if defined(CONFIG_MICROBLAZE)
+> -	dev->dev.dma_mask = &dev->archdata.dma_mask;
+> -#endif
+>  	dev->dev.parent = parent;
+>  
+>  	if (bus_id)
+> @@ -211,10 +224,6 @@ struct platform_device *of_platform_device_create_pdata(
+>  	if (!dev)
+>  		return NULL;
+>  
+> -#if defined(CONFIG_MICROBLAZE)
+> -	dev->archdata.dma_mask = 0xffffffffUL;
+> -#endif
+> -	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+>  	dev->dev.bus = &platform_bus_type;
+>  	dev->dev.platform_data = platform_data;
+>  
+> 
