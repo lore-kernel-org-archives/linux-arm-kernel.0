@@ -1,26 +1,57 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 14 Nov 2012 14:21:40 +0900
-Subject: [PATCH 2/4] rtc: OMAP: Add system pm_power_off to rtc driver
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA6AE51@DBDE01.ent.ti.com>
-References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
- <1352108549-9341-3-git-send-email-anilkumar@ti.com>
- <5097ECAD.9010101@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA64F14@DBDE01.ent.ti.com>
- <50994156.4080305@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA6AE51@DBDE01.ent.ti.com>
-Message-ID: <20121114052138.GS4415@opensource.wolfsonmicro.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 14 Nov 2012 14:25:09 +0900
+Subject: [PATCH v2 5/5] ARM: Exynos4: Migrate clock support to common clock
+ framework
+In-Reply-To: <1349629855-4962-6-git-send-email-thomas.abraham@linaro.org>
+References: <1349629855-4962-1-git-send-email-thomas.abraham@linaro.org>
+ <1349629855-4962-6-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <03a401cdc228$69f5a8c0$3de0fa40$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2012 at 05:01:45AM +0000, AnilKumar, Chimata wrote:
-> +Mark
+Thomas Abraham wrote:
+> 
+> Remove Samsung specific clock support in Exynos4 and migrate to using
+> common clock framework.
+> 
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  arch/arm/mach-exynos/Kconfig               |    1 +
+>  arch/arm/mach-exynos/Makefile              |    3 -
+>  arch/arm/mach-exynos/clock-exynos4.c       | 1603
+-------------------------
+> ---
+>  arch/arm/mach-exynos/clock-exynos4.h       |   35 -
+>  arch/arm/mach-exynos/clock-exynos4210.c    |  188 ----
+>  arch/arm/mach-exynos/clock-exynos4212.c    |  192 ----
+>  arch/arm/mach-exynos/common.c              |   22 +-
+>  arch/arm/mach-exynos/common.h              |    3 +
+>  arch/arm/mach-exynos/mach-armlex4210.c     |    1 -
+>  arch/arm/mach-exynos/mach-exynos4-dt.c     |    1 -
+>  arch/arm/mach-exynos/mach-nuri.c           |    1 -
+>  arch/arm/mach-exynos/mach-origen.c         |    1 -
+>  arch/arm/mach-exynos/mach-smdk4x12.c       |    1 -
+>  arch/arm/mach-exynos/mach-smdkv310.c       |    1 -
+>  arch/arm/mach-exynos/mach-universal_c210.c |    1 -
+>  arch/arm/mach-exynos/mct.c                 |   11 +-
+>  arch/arm/plat-samsung/Kconfig              |    4 +-
+>  17 files changed, 18 insertions(+), 2051 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos/clock-exynos4.c
+>  delete mode 100644 arch/arm/mach-exynos/clock-exynos4.h
+>  delete mode 100644 arch/arm/mach-exynos/clock-exynos4210.c
+>  delete mode 100644 arch/arm/mach-exynos/clock-exynos4212.c
 
-...without any words as to why I'm being added or what the content in
-the message is?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121114/770b6120/attachment.sig>
+I think, would be better to us if we could keep this clock stuff with common
+clock for a moment, e.g. 3.8. In addition, the clock stuff is still updating
+at this moment so we need some time to move on common clock framework
+entirely. Of course, I have no objection to support common clock on new SoC
+such as exynos5440 :-)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
