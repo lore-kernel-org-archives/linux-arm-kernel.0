@@ -1,123 +1,139 @@
 From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Thu, 15 Nov 2012 17:43:31 +0530
-Subject: [PATCH 2/4] i2c-s3c2410: do not generate STOP for QUIRK_HDMIPHY
+Date: Thu, 15 Nov 2012 17:43:32 +0530
+Subject: [PATCH 3/4] i2c-s3c2410: use exponential back off while polling for
+ bus idle
 In-Reply-To: <1352981613-2098-1-git-send-email-ch.naveen@samsung.com>
 References: <1352981613-2098-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <1352981613-2098-3-git-send-email-ch.naveen@samsung.com>
+Message-ID: <1352981613-2098-4-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Daniel Kurtz <djkurtz@chromium.org>
 
-buses
+Usually, the i2c controller has finished emitting the i2c STOP before the
+driver reaches the bus idle polling loop.  Optimize for this most common
+case by reading IICSTAT first and potentially skipping the loop.
 
-The datasheet says that the STOP sequence should be:
- 1) I2CSTAT.5 = 0	- Clear BUSY (or 'generate STOP')
- 2) I2CCON.4 = 0	- Clear IRQPEND
- 3) Wait until the stop condition takes effect.
- 4*) I2CSTAT.4 = 0 	- Clear TXRXEN
+If the cpu is faster than the hardware, we wait for bus idle in a polling
+loop.  However, since the duration of one iteration of the loop is
+dependent on cpu freq, and this i2c IP is used on many different systems,
+use a time based loop timeout (5 ms).
 
-Where, step "4*" is only for buses with the "HDMIPHY" quirk.
-
-However, after much experimentation, it appears that:
- a) normal buses automatically clear BUSY and transition from
-    Master->Slave when they complete generating a STOP condition.
-    Therefore, step (3) can be done in doxfer() by polling I2CCON.4
-    after starting the STOP generation here.
- b) HDMIPHY bus does neither, so there is no way to do step 3.
-    There is no indication when this bus has finished generating STOP.
-
-In fact, we have found that as soon as the IRQPEND bit is cleared in
-step 2, the HDMIPHY bus generates the STOP condition, and then immediately
-starts transferring another data byte, even though the bus is supposedly
-stopped.  This is presumably because the bus is still in "Master" mode,
-and its BUSY bit is still set.
-
-To avoid these extra post-STOP transactions on HDMI phy devices, we just
-disable Serial Output on the bus (I2CSTAT.4 = 0) directly, instead of
-first generating a proper STOP condition.  This should float SDA & SCK
-terminating the transfer.  Subsequent transfers start with a proper START
-condition, and proceed normally.
-
-The HDMIPHY bus is an internal bus that always has exactly two devices,
-the host as Master and the HDMIPHY device as the slave. Skipping the STOP
-condition has been tested on this bus and works.
-
-Also, since we disable the bus directly from the isr, we can skip the bus
-idle polling loop at the end of doxfer().
+We would like very low latencies to detect bus idle for the normal
+'fast' case.  However, if a device is slow to release the bus for some
+reason, it could hold off the STOP generation for up to several
+milliseconds.  Rapidly polling for bus idle would seriously load the CPU
+while waiting for it to release the bus.  So, use a partial exponential
+backoff as a compromise between idle detection latency and cpu load.
 
 Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+Cc: Olof Johansson <olofj@chromium.org>
+Cc: Benson Leung <bleung@chromium.org>
 Cc: Doug Anderson <dianders@chromium.org>
 Cc: Daniel Kurtz <djkurtz@chromium.org>
 Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
 ---
- drivers/i2c/busses/i2c-s3c2410.c |   47 ++++++++++++++++++++++++++++++++++++--
- 1 file changed, 45 insertions(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-s3c2410.c |   67 ++++++++++++++++++++++++++------------
+ 1 file changed, 47 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 155cb04..fc4bf35 100644
+index fc4bf35..362a307 100644
 --- a/drivers/i2c/busses/i2c-s3c2410.c
 +++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -234,8 +234,47 @@ static inline void s3c24xx_i2c_stop(struct s3c24xx_i2c *i2c, int ret)
+@@ -49,6 +49,9 @@
+ #define QUIRK_HDMIPHY		(1 << 1)
+ #define QUIRK_NO_GPIO		(1 << 2)
  
- 	dev_dbg(i2c->dev, "STOP\n");
- 
--	/* stop the transfer */
--	iicstat &= ~S3C2410_IICSTAT_START;
-+	/*
-+	 * The datasheet says that the STOP sequence should be:
-+	 *  1) I2CSTAT.5 = 0	- Clear BUSY (or 'generate STOP')
-+	 *  2) I2CCON.4 = 0	- Clear IRQPEND
-+	 *  3) Wait until the stop condition takes effect.
-+	 *  4*) I2CSTAT.4 = 0	- Clear TXRXEN
-+	 *
-+	 * Where, step "4*" is only for buses with the "HDMIPHY" quirk.
-+	 *
-+	 * However, after much experimentation, it appears that:
-+	 * a) normal buses automatically clear BUSY and transition from
-+	 *    Master->Slave when they complete generating a STOP condition.
-+	 *    Therefore, step (3) can be done in doxfer() by polling I2CCON.4
-+	 *    after starting the STOP generation here.
-+	 * b) HDMIPHY bus does neither, so there is no way to do step 3.
-+	 *    There is no indication when this bus has finished generating
-+	 *    STOP.
-+	 *
-+	 * In fact, we have found that as soon as the IRQPEND bit is cleared in
-+	 * step 2, the HDMIPHY bus generates the STOP condition, and then
-+	 * immediately starts transferring another data byte, even though the
-+	 * bus is supposedly stopped.  This is presumably because the bus is
-+	 * still in "Master" mode, and its BUSY bit is still set.
-+	 *
-+	 * To avoid these extra post-STOP transactions on HDMI phy devices, we
-+	 * just disable Serial Output on the bus (I2CSTAT.4 = 0) directly,
-+	 * instead of first generating a proper STOP condition.  This should
-+	 * float SDA & SCK terminating the transfer.  Subsequent transfers
-+	 *  start with a proper START condition, and proceed normally.
-+	 *
-+	 * The HDMIPHY bus is an internal bus that always has exactly two
-+	 * devices, the host as Master and the HDMIPHY device as the slave.
-+	 * Skipping the STOP condition has been tested on this bus and works.
-+	 */
-+	if (i2c->quirks & QUIRK_HDMIPHY) {
-+		/* Stop driving the I2C pins */
-+		iicstat &= ~S3C2410_IICSTAT_TXRXEN;
-+	} else {
-+		/* stop the transfer */
-+		iicstat &= ~S3C2410_IICSTAT_START;
-+	}
- 	writel(iicstat, i2c->regs + S3C2410_IICSTAT);
- 
- 	i2c->state = STATE_STOP;
-@@ -560,6 +599,10 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
- 	else if (ret != num)
- 		dev_dbg(i2c->dev, "incomplete xfer (%d)\n", ret);
- 
-+	/* For QUIRK_HDMIPHY, bus is already disabled */
-+	if (i2c->quirks & QUIRK_HDMIPHY)
-+		goto out;
++/* Max time to wait for bus to become idle after a xfer (in us) */
++#define S3C2410_IDLE_TIMEOUT	5000
 +
- 	/* ensure the stop has been through the bus */
+ /* i2c controller state */
+ enum s3c24xx_i2c_state {
+ 	STATE_IDLE,
+@@ -556,6 +559,48 @@ static int s3c24xx_i2c_set_master(struct s3c24xx_i2c *i2c)
+ 	return -ETIMEDOUT;
+ }
  
- 	dev_dbg(i2c->dev, "waiting for bus idle\n");
++/* s3c24xx_i2c_wait_idle
++ *
++ * wait for the i2c bus to become idle.
++*/
++
++static void s3c24xx_i2c_wait_idle(struct s3c24xx_i2c *i2c)
++{
++	unsigned long iicstat;
++	ktime_t start, now;
++	unsigned long delay;
++
++	/* ensure the stop has been through the bus */
++
++	dev_dbg(i2c->dev, "waiting for bus idle\n");
++
++	start = now = ktime_get();
++
++	/*
++	 * Most of the time, the bus is already idle within a few usec of the
++	 * end of a transaction.  However, really slow i2c devices can stretch
++	 * the clock, delaying STOP generation.
++	 *
++	 * As a compromise between idle detection latency for the normal, fast
++	 * case, and system load in the slow device case, use an exponential
++	 * back off in the polling loop, up to 1/10th of the total timeout,
++	 * then continue to poll at a constant rate up to the timeout.
++	 */
++	iicstat = readl(i2c->regs + S3C2410_IICSTAT);
++	delay = 1;
++	while ((iicstat & S3C2410_IICSTAT_START) &&
++	       ktime_us_delta(now, start) < S3C2410_IDLE_TIMEOUT) {
++		usleep_range(delay, 2 * delay);
++		if (delay < S3C2410_IDLE_TIMEOUT / 10)
++			delay <<= 1;
++		now = ktime_get();
++		iicstat = readl(i2c->regs + S3C2410_IICSTAT);
++	}
++
++	if (iicstat & S3C2410_IICSTAT_START)
++		dev_warn(i2c->dev, "timeout waiting for bus idle\n");
++}
++
+ /* s3c24xx_i2c_doxfer
+  *
+  * this starts an i2c transfer
+@@ -564,8 +609,7 @@ static int s3c24xx_i2c_set_master(struct s3c24xx_i2c *i2c)
+ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
+ 			      struct i2c_msg *msgs, int num)
+ {
+-	unsigned long iicstat, timeout;
+-	int spins = 20;
++	unsigned long timeout;
+ 	int ret;
+ 
+ 	if (i2c->suspended)
+@@ -603,24 +647,7 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
+ 	if (i2c->quirks & QUIRK_HDMIPHY)
+ 		goto out;
+ 
+-	/* ensure the stop has been through the bus */
+-
+-	dev_dbg(i2c->dev, "waiting for bus idle\n");
+-
+-	/* first, try busy waiting briefly */
+-	do {
+-		cpu_relax();
+-		iicstat = readl(i2c->regs + S3C2410_IICSTAT);
+-	} while ((iicstat & S3C2410_IICSTAT_START) && --spins);
+-
+-	/* if that timed out sleep */
+-	if (!spins) {
+-		msleep(1);
+-		iicstat = readl(i2c->regs + S3C2410_IICSTAT);
+-	}
+-
+-	if (iicstat & S3C2410_IICSTAT_START)
+-		dev_warn(i2c->dev, "timeout waiting for bus idle\n");
++	s3c24xx_i2c_wait_idle(i2c);
+ 
+  out:
+ 	return ret;
 -- 
 1.7.9.5
