@@ -1,34 +1,97 @@
 From: dahuang@nvidia.com (Danny Huang)
-Date: Thu, 15 Nov 2012 15:42:31 +0800
-Subject: [PATCH V2 0/3] ARM: tegra: add speedo identification for T20/T30
-Message-ID: <1352965354-650-1-git-send-email-dahuang@nvidia.com>
+Date: Thu, 15 Nov 2012 15:42:32 +0800
+Subject: [PATCH V2 1/3] ARM: tegra: flexible spare fuse read function
+In-Reply-To: <1352965354-650-1-git-send-email-dahuang@nvidia.com>
+References: <1352965354-650-1-git-send-email-dahuang@nvidia.com>
+Message-ID: <1352965354-650-2-git-send-email-dahuang@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds speedo identification functionality for tegra
-T20 and T30. It reads speedo value from fuse and chooses CPU and core 
-process ID by checking speedo corner tables.
+Change the spare fuse base from a definition to a variable.
+It provides flexibilty to read spare fuse on different chip.
 
-V2:
-* Split spare fuse related changes to a separate patch
-* Keep original fuse init flow on an unknown chip
-* Change size check of speedo cornor table
-* Set speedo id to 0 with unknown chip revision/SKU
-* Set process id to 0 when speedo value out of range
+Signed-off-by: Danny Huang <dahuang@nvidia.com>
+---
+ arch/arm/mach-tegra/fuse.c | 19 ++++++++++++-------
+ arch/arm/mach-tegra/fuse.h |  2 ++
+ 2 files changed, 14 insertions(+), 7 deletions(-)
 
-Danny Huang (3):
-  ARM: tegra: flexible spare fuse read function
-  ARM: tegra: Add speedo-based process identification
-  ARM: tegra: T30 speedo-based process identification
-
- arch/arm/mach-tegra/Makefile         |   2 +
- arch/arm/mach-tegra/fuse.c           |  49 ++++--
- arch/arm/mach-tegra/fuse.h           |  16 ++
- arch/arm/mach-tegra/tegra20_speedo.c | 109 +++++++++++++
- arch/arm/mach-tegra/tegra30_speedo.c | 292 +++++++++++++++++++++++++++++++++++
- 5 files changed, 457 insertions(+), 11 deletions(-)
- create mode 100644 arch/arm/mach-tegra/tegra20_speedo.c
- create mode 100644 arch/arm/mach-tegra/tegra30_speedo.c
-
+diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
+index 6c752e8..bd19c2f 100644
+--- a/arch/arm/mach-tegra/fuse.c
++++ b/arch/arm/mach-tegra/fuse.c
+@@ -28,7 +28,8 @@
+ #define FUSE_UID_LOW		0x108
+ #define FUSE_UID_HIGH		0x10c
+ #define FUSE_SKU_INFO		0x110
+-#define FUSE_SPARE_BIT		0x200
++
++#define TEGRA20_FUSE_SPARE_BIT		0x200
+ 
+ int tegra_sku_id;
+ int tegra_cpu_process_id;
+@@ -36,6 +37,8 @@ int tegra_core_process_id;
+ int tegra_chip_id;
+ enum tegra_revision tegra_revision;
+ 
++static int tegra_fuse_spare_bit;
++
+ /* The BCT to use at boot is specified by board straps that can be read
+  * through a APB misc register and decoded. 2 bits, i.e. 4 possible BCTs.
+  */
+@@ -56,14 +59,14 @@ static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
+ 	[TEGRA_REVISION_A04]     = "A04",
+ };
+ 
+-static inline u32 tegra_fuse_readl(unsigned long offset)
++u32 tegra_fuse_readl(unsigned long offset)
+ {
+ 	return tegra_apb_readl(TEGRA_FUSE_BASE + offset);
+ }
+ 
+-static inline bool get_spare_fuse(int bit)
++bool tegra_spare_fuse(int bit)
+ {
+-	return tegra_fuse_readl(FUSE_SPARE_BIT + bit * 4);
++	return tegra_fuse_readl(tegra_fuse_spare_bit + bit * 4);
+ }
+ 
+ static enum tegra_revision tegra_get_revision(u32 id)
+@@ -77,7 +80,7 @@ static enum tegra_revision tegra_get_revision(u32 id)
+ 		return TEGRA_REVISION_A02;
+ 	case 3:
+ 		if (tegra_chip_id == TEGRA20 &&
+-			(get_spare_fuse(18) || get_spare_fuse(19)))
++			(tegra_spare_fuse(18) || tegra_spare_fuse(19)))
+ 			return TEGRA_REVISION_A03p;
+ 		else
+ 			return TEGRA_REVISION_A03;
+@@ -99,10 +102,12 @@ void tegra_init_fuse(void)
+ 	reg = tegra_fuse_readl(FUSE_SKU_INFO);
+ 	tegra_sku_id = reg & 0xFF;
+ 
+-	reg = tegra_fuse_readl(FUSE_SPARE_BIT);
++	tegra_fuse_spare_bit = TEGRA20_FUSE_SPARE_BIT;
++
++	reg = tegra_fuse_readl(tegra_fuse_spare_bit);
+ 	tegra_cpu_process_id = (reg >> 6) & 3;
+ 
+-	reg = tegra_fuse_readl(FUSE_SPARE_BIT);
++	reg = tegra_fuse_readl(tegra_fuse_spare_bit);
+ 	tegra_core_process_id = (reg >> 12) & 3;
+ 
+ 	reg = tegra_apb_readl(TEGRA_APB_MISC_BASE + STRAP_OPT);
+diff --git a/arch/arm/mach-tegra/fuse.h b/arch/arm/mach-tegra/fuse.h
+index d2107b2..aef1223 100644
+--- a/arch/arm/mach-tegra/fuse.h
++++ b/arch/arm/mach-tegra/fuse.h
+@@ -48,5 +48,7 @@ extern int tegra_bct_strapping;
+ 
+ unsigned long long tegra_chip_uid(void);
+ void tegra_init_fuse(void);
++bool tegra_spare_fuse(int bit);
++u32 tegra_fuse_readl(unsigned long offset);
+ 
+ #endif
 -- 
 1.8.0
