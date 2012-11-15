@@ -1,68 +1,122 @@
-From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Thu, 15 Nov 2012 17:43:33 +0530
-Subject: [PATCH 4/4] i2c-s3c2410: do not special case HDMIPHY stuck bus
- detection
-In-Reply-To: <1352981613-2098-1-git-send-email-ch.naveen@samsung.com>
-References: <1352981613-2098-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <1352981613-2098-5-git-send-email-ch.naveen@samsung.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 15 Nov 2012 11:59:25 +0000
+Subject: [PATCH] arm/dts: Add basic support for gta04 (Openmoko next
+ generation) board.
+In-Reply-To: <CAAfyv34D4bTO=k8niM42CDQFb0tP4uOnvX_KPT3+F6z59jPg3Q@mail.gmail.com>
+References: <1351633367-19082-1-git-send-email-marek.belisko@open-nandra.com>
+ <CAAfyv34D4bTO=k8niM42CDQFb0tP4uOnvX_KPT3+F6z59jPg3Q@mail.gmail.com>
+Message-ID: <20121115115925.2FE453E09BB@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Kurtz <djkurtz@chromium.org>
+On Wed, 14 Nov 2012 21:26:58 +0100, Belisko Marek <marek.belisko@gmail.com> wrote:
+> CC' Grant & Rob
 
-Commit "i2c-s3c2410: Add HDMIPHY quirk for S3C2440" added support for
-HDMIPHY with some special handling in s3c24xx_i2c_set_master:
+Hi Marek
 
-"due to unknown reason (probably HW bug in HDMIPHY and/or the controller)
-a transfer fails to finish. The controller hangs after sending the last
-byte, the workaround for this bug is resetting the controller after each
-transfer"
+Since this is an OMAP board, you should send the changes to Tony and
+they should be merged through the arm-soc tree.
 
-The "unknown reason" was that the proper sequence for generating a STOP
-condition wasn't being followed as per the datasheet. Since this is fixed
-by "PATCH: i2c-s3c2410: do not generate STOP for QUIRK_HDMIPHY buses",
-remove the special handling.
+g.
 
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-Cc: Daniel Kurtz <djkurtz@chromium.org>
-Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
----
- drivers/i2c/busses/i2c-s3c2410.c |   16 ----------------
- 1 file changed, 16 deletions(-)
+> 
+> On Tue, Oct 30, 2012 at 10:42 PM, Marek Belisko
+> <marek.belisko@open-nandra.com> wrote:
+> > Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
+> > ---
+> >  arch/arm/boot/dts/omap3-gta04.dts |   65 +++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 65 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/omap3-gta04.dts
+> >
+> > diff --git a/arch/arm/boot/dts/omap3-gta04.dts b/arch/arm/boot/dts/omap3-gta04.dts
+> > new file mode 100644
+> > index 0000000..76efd13
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/omap3-gta04.dts
+> > @@ -0,0 +1,65 @@
+> > +/*
+> > + * Copyright (C) 2012 Marek Belisko <marek.belisko@open-nandra.com>
+> > + *
+> > + * Based on omap3-beagle-xm.dts
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +/dts-v1/;
+> > +
+> > +/include/ "omap3.dtsi"
+> > +
+> > +/ {
+> > +       model = "OMAP3 GTA04";
+> > +       compatible = "ti,omap3-gta04", "ti,omap3";
+> > +
+> > +       memory {
+> > +               device_type = "memory";
+> > +               reg = <0x80000000 0x20000000>; /* 512 MB */
+> > +       };
+> > +
+> > +       gpio-keys {
+> > +               compatible = "gpio-keys";
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
+> > +               aux-button {
+> > +                       label = "AUX";
+> > +                       linux,code = <169>;
+> > +                       gpios = <&gpio1 7 1>;
+> > +                       gpio-key,wakeup;
+> > +               };
+> > +       };
+> > +};
+> > +
+> > +&i2c1 {
+> > +       clock-frequency = <2600000>;
+> > +
+> > +       twl: twl at 48 {
+> > +               reg = <0x48>;
+> > +               interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+> > +               interrupt-parent = <&intc>;
+> > +       };
+> > +};
+> > +
+> > +/include/ "twl4030.dtsi"
+> > +
+> > +&i2c2 {
+> > +       clock-frequency = <400000>;
+> > +       /* Pressure Sensor */
+> > +       bmp085 at 77 {
+> > +               compatible = "bosch,bmp085";
+> > +               reg = <0x77>;
+> > +       };
+> > +};
+> > +
+> > +&i2c3 {
+> > +       clock-frequency = <100000>;
+> > +};
+> > +
+> > +&mmc1 {
+> > +       vmmc-supply = <&vmmc1>;
+> > +       bus-width = <4>;
+> > +};
+> > +
+> > --
+> > 1.7.9.5
+> >
+> 
+> 
+> 
+> -- 
+> as simple and primitive as possible
+> -------------------------------------------------
+> Marek Belisko - OPEN-NANDRA
+> Freelance Developer
+> 
+> Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+> Tel: +421 915 052 184
+> skype: marekwhite
+> twitter: #opennandra
+> web: http://open-nandra.com
 
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 362a307..c76ca7c 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -531,13 +531,6 @@ static int s3c24xx_i2c_set_master(struct s3c24xx_i2c *i2c)
- 	unsigned long iicstat;
- 	int timeout = 400;
- 
--	/* the timeout for HDMIPHY is reduced to 10 ms because
--	 * the hangup is expected to happen, so waiting 400 ms
--	 * causes only unnecessary system hangup
--	 */
--	if (i2c->quirks & QUIRK_HDMIPHY)
--		timeout = 10;
--
- 	while (timeout-- > 0) {
- 		iicstat = readl(i2c->regs + S3C2410_IICSTAT);
- 
-@@ -547,15 +540,6 @@ static int s3c24xx_i2c_set_master(struct s3c24xx_i2c *i2c)
- 		msleep(1);
- 	}
- 
--	/* hang-up of bus dedicated for HDMIPHY occurred, resetting */
--	if (i2c->quirks & QUIRK_HDMIPHY) {
--		writel(0, i2c->regs + S3C2410_IICCON);
--		writel(0, i2c->regs + S3C2410_IICSTAT);
--		writel(0, i2c->regs + S3C2410_IICDS);
--
--		return 0;
--	}
--
- 	return -ETIMEDOUT;
- }
- 
 -- 
-1.7.9.5
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
