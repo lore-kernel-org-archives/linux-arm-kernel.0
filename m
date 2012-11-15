@@ -1,106 +1,156 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 Nov 2012 18:20:05 +0100
-Subject: [PATCH] Device Tree binding for the 'mv_xor' XOR engine DMA driver
-Message-ID: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 15 Nov 2012 18:20:06 +0100
+Subject: [PATCH 01/29] mv_xor: use dev_(err|info|notice) instead of dev_printk
+In-Reply-To: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353000034-30567-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The usage of dev_printk() is deprecated, and the dev_err(), dev_info()
+and dev_notice() functions should be used instead.
 
-This patch set adds a Device Tree binding for the Marvell XOR engine
-driver, which allows to support these XOR engines in the Armada 370
-and Armada XP SoCs.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/dma/mv_xor.c |   60 +++++++++++++++++++++++++-------------------------
+ 1 file changed, 30 insertions(+), 30 deletions(-)
 
-As one can immediatly see, this Device Tree binding patch set is not
-as simple as most Device Tree bindings additions. This is due to the
-fact that the mv_xor driver has a fairly odd organization. Instead of
-registering a single platform_driver having platform_device structures
-being instantiated together with platform_data structures describing
-their specificities, this driver was organized around *two*
-platform_driver:
-
- * One platform_driver named 'mv_xor_shared', for which one device was
-   registered for each XOR engine (usually two in each Marvell SoC)
-
- * One platform_driver named 'mv_xor', for which one device was
-   registered for each XOR channel (usually two per XOR engine). When
-   those devices were registered, they contained a reference to the
-   corresponding 'mv_xor_shared' device.
-
-This unusual organization is:
-
- * useless, because the channels description can just as well be passed
-   through platform_data of the 'mv_xor_shared' driver.
-
- * annoying, as it prevents the addition of a simple Device Tree
-   binding for the driver.
-
-Therefore, before adding the Device Tree binding, we cleanup and
-reorganize the driver so that it registers a single platform_driver.
-
-The patch set is organized as follows:
-
- * Patch 1 and 2 are basic cleanups, not really important.
-
- * Patch 3 to 8 are needed to remove the 'mv_xor'
-   platform_driver. Instead of doing that as one big patch, we do it
-   progressively, in small chunks, where each chunk builds and runs
-   properly on the hardware.
-
-   - Patch 3 moves the channel registration/cleanup logic into
-     separate utility functions, so that they can be used for both the
-     old-style probing (through the 'mv_xor' sub-driver) and the
-     new-style probing (through platform_data passed to the main
-     'mv_xor_shared' driver).
-
-   - Patch 4 adds the possibility of registering channels through
-     platform_data passed to the 'mv_xor_shared' main driver.
-
-   - Patch 5 and Patch 6 respectively convert the XOR0 and XOR1 engine
-     registrations to the new style probing.
-
-   - Patch 7 removes some code that became useless in the process.
-
-   - Patch 8 removes the sub-driver 'mv_xor'.
-
- * Patch 8 to 26 are further cleanups to the driver, mainly fixing the
-   following problems:
-
-   - All reference to the notion of 'shared' driver are removed.
-
-   - The mv_xor driver registers one DMA engine and one DMA channel
-     per XOR channel, because the different XOR channels in a given
-     XOR engine have different capabilities. However, the mv_xor
-     driver was internally keeping two structures having a 1:1
-     mapping: mv_xor_device and mv_xor_chan, which was useless. We
-     progressively convert the driver so that mv_xor_device represents
-     one XOR engine, and mv_xor_chan represents one XOR channel.
-
-   - Removing useless properties from the platform_data in order to
-     simplify the Device Tree binding.
-
- * Patch 27 is a bug fix for the removal path, but it isn't very
-   important as the driver cannot be compiled as a module.
-
- * Patch 28 adds the Device Tree binding itself and its documentation.
-
- * Patch 29 adds the Device Tree data to register the XOR engines on
-   Armada 370/XP SoCs. Not Device Tree data is needed at the board
-   level since those devices are purely internal to the SoC.
-
-The resulting patch set is fully bisectable, and has been tested with
-the built-in XOR engine self-test of the driver on both a Kirkwood
-platform and a Armada XP platform.
-
-The code is also available in the 'mvebu-xor' branch in the following
-Git repository:
-
-  git at github.com:MISL-EBU-System-SW/mainline-public.git
-
-Note that PATCH 29 requires the clk patches from Gr?gory Clement for
-the Armada 370/XP SoCs, which have already been Ack'ed, but not merged
-yet.
-
-Best regards,
-
-Thomas
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index e362e2b..610d0b8 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -206,9 +206,9 @@ static void mv_set_mode(struct mv_xor_chan *chan,
+ 		op_mode = XOR_OPERATION_MODE_MEMSET;
+ 		break;
+ 	default:
+-		dev_printk(KERN_ERR, chan->device->common.dev,
+-			   "error: unsupported operation %d.\n",
+-			   type);
++		dev_err(chan->device->common.dev,
++			"error: unsupported operation %d.\n",
++			type);
+ 		BUG();
+ 		return;
+ 	}
+@@ -828,28 +828,28 @@ static void mv_dump_xor_regs(struct mv_xor_chan *chan)
+ 	u32 val;
+ 
+ 	val = __raw_readl(XOR_CONFIG(chan));
+-	dev_printk(KERN_ERR, chan->device->common.dev,
+-		   "config       0x%08x.\n", val);
++	dev_err(chan->device->common.dev,
++		"config       0x%08x.\n", val);
+ 
+ 	val = __raw_readl(XOR_ACTIVATION(chan));
+-	dev_printk(KERN_ERR, chan->device->common.dev,
+-		   "activation   0x%08x.\n", val);
++	dev_err(chan->device->common.dev,
++		"activation   0x%08x.\n", val);
+ 
+ 	val = __raw_readl(XOR_INTR_CAUSE(chan));
+-	dev_printk(KERN_ERR, chan->device->common.dev,
+-		   "intr cause   0x%08x.\n", val);
++	dev_err(chan->device->common.dev,
++		"intr cause   0x%08x.\n", val);
+ 
+ 	val = __raw_readl(XOR_INTR_MASK(chan));
+-	dev_printk(KERN_ERR, chan->device->common.dev,
+-		   "intr mask    0x%08x.\n", val);
++	dev_err(chan->device->common.dev,
++		"intr mask    0x%08x.\n", val);
+ 
+ 	val = __raw_readl(XOR_ERROR_CAUSE(chan));
+-	dev_printk(KERN_ERR, chan->device->common.dev,
+-		   "error cause  0x%08x.\n", val);
++	dev_err(chan->device->common.dev,
++		"error cause  0x%08x.\n", val);
+ 
+ 	val = __raw_readl(XOR_ERROR_ADDR(chan));
+-	dev_printk(KERN_ERR, chan->device->common.dev,
+-		   "error addr   0x%08x.\n", val);
++	dev_err(chan->device->common.dev,
++		"error addr   0x%08x.\n", val);
+ }
+ 
+ static void mv_xor_err_interrupt_handler(struct mv_xor_chan *chan,
+@@ -861,9 +861,9 @@ static void mv_xor_err_interrupt_handler(struct mv_xor_chan *chan,
+ 	     return;
+ 	}
+ 
+-	dev_printk(KERN_ERR, chan->device->common.dev,
+-		   "error on chan %d. intr cause 0x%08x.\n",
+-		   chan->idx, intr_cause);
++	dev_err(chan->device->common.dev,
++		"error on chan %d. intr cause 0x%08x.\n",
++		chan->idx, intr_cause);
+ 
+ 	mv_dump_xor_regs(chan);
+ 	BUG();
+@@ -950,8 +950,8 @@ static int __devinit mv_xor_memcpy_self_test(struct mv_xor_device *device)
+ 
+ 	if (mv_xor_status(dma_chan, cookie, NULL) !=
+ 	    DMA_SUCCESS) {
+-		dev_printk(KERN_ERR, dma_chan->device->dev,
+-			   "Self-test copy timed out, disabling\n");
++		dev_err(dma_chan->device->dev,
++			"Self-test copy timed out, disabling\n");
+ 		err = -ENODEV;
+ 		goto free_resources;
+ 	}
+@@ -960,8 +960,8 @@ static int __devinit mv_xor_memcpy_self_test(struct mv_xor_device *device)
+ 	dma_sync_single_for_cpu(&mv_chan->device->pdev->dev, dest_dma,
+ 				MV_XOR_TEST_SIZE, DMA_FROM_DEVICE);
+ 	if (memcmp(src, dest, MV_XOR_TEST_SIZE)) {
+-		dev_printk(KERN_ERR, dma_chan->device->dev,
+-			   "Self-test copy failed compare, disabling\n");
++		dev_err(dma_chan->device->dev,
++			"Self-test copy failed compare, disabling\n");
+ 		err = -ENODEV;
+ 		goto free_resources;
+ 	}
+@@ -1048,8 +1048,8 @@ mv_xor_xor_self_test(struct mv_xor_device *device)
+ 
+ 	if (mv_xor_status(dma_chan, cookie, NULL) !=
+ 	    DMA_SUCCESS) {
+-		dev_printk(KERN_ERR, dma_chan->device->dev,
+-			   "Self-test xor timed out, disabling\n");
++		dev_err(dma_chan->device->dev,
++			"Self-test xor timed out, disabling\n");
+ 		err = -ENODEV;
+ 		goto free_resources;
+ 	}
+@@ -1060,10 +1060,10 @@ mv_xor_xor_self_test(struct mv_xor_device *device)
+ 	for (i = 0; i < (PAGE_SIZE / sizeof(u32)); i++) {
+ 		u32 *ptr = page_address(dest);
+ 		if (ptr[i] != cmp_word) {
+-			dev_printk(KERN_ERR, dma_chan->device->dev,
+-				   "Self-test xor failed compare, disabling."
+-				   " index %d, data %x, expected %x\n", i,
+-				   ptr[i], cmp_word);
++			dev_err(dma_chan->device->dev,
++				"Self-test xor failed compare, disabling."
++				" index %d, data %x, expected %x\n", i,
++				ptr[i], cmp_word);
+ 			err = -ENODEV;
+ 			goto free_resources;
+ 		}
+@@ -1212,7 +1212,7 @@ static int __devinit mv_xor_probe(struct platform_device *pdev)
+ 			goto err_free_dma;
+ 	}
+ 
+-	dev_printk(KERN_INFO, &pdev->dev, "Marvell XOR: "
++	dev_info(&pdev->dev, "Marvell XOR: "
+ 	  "( %s%s%s%s)\n",
+ 	  dma_has_cap(DMA_XOR, dma_dev->cap_mask) ? "xor " : "",
+ 	  dma_has_cap(DMA_MEMSET, dma_dev->cap_mask)  ? "fill " : "",
+@@ -1275,7 +1275,7 @@ static int mv_xor_shared_probe(struct platform_device *pdev)
+ 	struct mv_xor_shared_private *msp;
+ 	struct resource *res;
+ 
+-	dev_printk(KERN_NOTICE, &pdev->dev, "Marvell shared XOR driver\n");
++	dev_notice(&pdev->dev, "Marvell shared XOR driver\n");
+ 
+ 	msp = devm_kzalloc(&pdev->dev, sizeof(*msp), GFP_KERNEL);
+ 	if (!msp)
+-- 
+1.7.9.5
