@@ -1,114 +1,50 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 Nov 2012 18:20:13 +0100
-Subject: [PATCH 08/29] mv_xor: remove sub-driver 'mv_xor'
+Date: Thu, 15 Nov 2012 18:20:12 +0100
+Subject: [PATCH 07/29] arm: plat-orion: remove unused orion_xor_init_channels()
 In-Reply-To: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353000034-30567-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353000034-30567-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that XOR channels are directly registered by the main
-'mv_xor_shared' device ->probe() function and all users of the
-'mv_xor' device have been removed, we can get rid of the latter.
+Now that xor0 and xor1 are registered in a single driver manner, the
+orion_xor_init_channels() function has become useless.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor.c                     |   49 +-----------------------------
- include/linux/platform_data/dma-mv_xor.h |    1 -
- 2 files changed, 1 insertion(+), 49 deletions(-)
+ arch/arm/plat-orion/common.c |   20 --------------------
+ 1 file changed, 20 deletions(-)
 
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 3eaa0b2..614968e 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -1219,35 +1219,6 @@ mv_xor_channel_add(struct mv_xor_shared_private *msp,
- 	return ERR_PTR(ret);
- }
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index afbbb97..c6e6666 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -606,26 +606,6 @@ void __init orion_wdt_init(void)
+  ****************************************************************************/
+ static u64 orion_xor_dmamask = DMA_BIT_MASK(32);
  
--static int __devexit mv_xor_remove(struct platform_device *pdev)
+-void __init orion_xor_init_channels(
+-	struct mv_xor_platform_data *orion_xor0_data,
+-	struct platform_device *orion_xor0_channel,
+-	struct mv_xor_platform_data *orion_xor1_data,
+-	struct platform_device *orion_xor1_channel)
 -{
--	struct mv_xor_device *device = platform_get_drvdata(pdev);
--	return mv_xor_channel_remove(device);
+-	/*
+-	 * two engines can't do memset simultaneously, this limitation
+-	 * satisfied by removing memset support from one of the engines.
+-	 */
+-	dma_cap_set(DMA_MEMCPY, orion_xor0_data->cap_mask);
+-	dma_cap_set(DMA_XOR, orion_xor0_data->cap_mask);
+-	platform_device_register(orion_xor0_channel);
+-
+-	dma_cap_set(DMA_MEMCPY, orion_xor1_data->cap_mask);
+-	dma_cap_set(DMA_MEMSET, orion_xor1_data->cap_mask);
+-	dma_cap_set(DMA_XOR, orion_xor1_data->cap_mask);
+-	platform_device_register(orion_xor1_channel);
 -}
 -
--static int __devinit mv_xor_probe(struct platform_device *pdev)
--{
--	struct mv_xor_platform_data *plat_data = pdev->dev.platform_data;
--	struct mv_xor_shared_private *msp =
--		platform_get_drvdata(plat_data->shared);
--	struct mv_xor_device *mv_xor_device;
--	int irq;
--
--	irq = platform_get_irq(pdev, 0);
--	if (irq < 0)
--		return irq;
--
--	mv_xor_device = mv_xor_channel_add(msp, pdev, plat_data->hw_id,
--					   plat_data->cap_mask,
--					   plat_data->pool_size, irq);
--	if (IS_ERR(mv_xor_device))
--		return PTR_ERR(mv_xor_device);
--
--	platform_set_drvdata(pdev, mv_xor_device);
--
--	return 0;
--}
--
- static void
- mv_xor_conf_mbus_windows(struct mv_xor_shared_private *msp,
- 			 const struct mbus_dram_target_info *dram)
-@@ -1279,15 +1250,6 @@ mv_xor_conf_mbus_windows(struct mv_xor_shared_private *msp,
- 	writel(win_enable, base + WINDOW_BAR_ENABLE(1));
- }
- 
--static struct platform_driver mv_xor_driver = {
--	.probe		= mv_xor_probe,
--	.remove		= __devexit_p(mv_xor_remove),
--	.driver		= {
--		.owner	= THIS_MODULE,
--		.name	= MV_XOR_NAME,
--	},
--};
--
- static int mv_xor_shared_probe(struct platform_device *pdev)
- {
- 	const struct mbus_dram_target_info *dram;
-@@ -1406,15 +1368,7 @@ static struct platform_driver mv_xor_shared_driver = {
- 
- static int __init mv_xor_init(void)
- {
--	int rc;
--
--	rc = platform_driver_register(&mv_xor_shared_driver);
--	if (!rc) {
--		rc = platform_driver_register(&mv_xor_driver);
--		if (rc)
--			platform_driver_unregister(&mv_xor_shared_driver);
--	}
--	return rc;
-+	return platform_driver_register(&mv_xor_shared_driver);
- }
- module_init(mv_xor_init);
- 
-@@ -1422,7 +1376,6 @@ module_init(mv_xor_init);
- #if 0
- static void __exit mv_xor_exit(void)
- {
--	platform_driver_unregister(&mv_xor_driver);
- 	platform_driver_unregister(&mv_xor_shared_driver);
- 	return;
- }
-diff --git a/include/linux/platform_data/dma-mv_xor.h b/include/linux/platform_data/dma-mv_xor.h
-index f2aed97..6abe5f9 100644
---- a/include/linux/platform_data/dma-mv_xor.h
-+++ b/include/linux/platform_data/dma-mv_xor.h
-@@ -11,7 +11,6 @@
- #include <linux/mbus.h>
- 
- #define MV_XOR_SHARED_NAME	"mv_xor_shared"
--#define MV_XOR_NAME		"mv_xor"
- 
- struct mv_xor_platform_data {
- 	struct platform_device		*shared;
+ /*****************************************************************************
+  * XOR0
+  ****************************************************************************/
 -- 
 1.7.9.5
