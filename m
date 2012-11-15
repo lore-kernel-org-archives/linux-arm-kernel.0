@@ -1,80 +1,89 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 15 Nov 2012 11:00:12 +0100
-Subject: [PATCH RESEND 3/4] pinctrl: at91: Prevent NULL dereference if
- of_match_device returns NULL
-In-Reply-To: <1352955480.6793.8.camel@phoenix>
-References: <1352955096.6793.1.camel@phoenix> <1352955266.6793.4.camel@phoenix>
- <1352955480.6793.8.camel@phoenix>
-Message-ID: <20121115100012.GA4398@game.jcrosoft.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 15 Nov 2012 10:04:05 +0000
+Subject: [PATCH 0/2] Boottime: measure bootloader and kernel bootup time
+Message-ID: <1352973847-21605-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:58 Thu 15 Nov     , Axel Lin wrote:
-> of_match_device() may return NULL.
-this is not possible on at91
+This patchset supplies a new tool which measures boottime inclusive
+of bootloader involvement. It seems to be accurate and adds no
+latency to the booting of the system.
 
-and I do a oups here as if we have a NULL pointer which means the driver is
-wrong
+In the first round of testing we booted the kernel 3 times each with
+boottime enabled and disabled. Actually, when it was disabled, the
+code was completely removed from the kernel source and the kernel was
+rebuilt. The difference between present & enabled and completely
+removed was very little indeed. In fact, averaging out the 3 runs of
+each, when boottime was enabled the system booted 4ms _faster_, go
+figure!
 
-Best Regards,
-J.
-> 
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
-> ---
-> This resend CC Jean-Christophe.
-> 
->  drivers/pinctrl/pinctrl-at91.c |   17 +++++++++++++----
->  1 file changed, 13 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index 8490a55..32006c8 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -829,13 +829,18 @@ static int __devinit at91_pinctrl_probe_dt(struct platform_device *pdev,
->  	uint32_t *tmp;
->  	struct device_node *np = pdev->dev.of_node;
->  	struct device_node *child;
-> +	const struct of_device_id *match;
->  
->  	if (!np)
->  		return -ENODEV;
->  
-> +	match = of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
-> +	if (!match)
-> +		return -ENODEV;
-> +
->  	info->dev = &pdev->dev;
-> -	info->ops = (struct at91_pinctrl_mux_ops*)
-> -		of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
-> +	info->ops = (struct at91_pinctrl_mux_ops *) match->data;
-> +
->  	at91_pinctrl_child_count(info, np);
->  
->  	if (info->nbanks < 1) {
-> @@ -1359,6 +1364,7 @@ static struct of_device_id at91_gpio_of_match[] __devinitdata = {
->  static int __devinit at91_gpio_probe(struct platform_device *pdev)
->  {
->  	struct device_node *np = pdev->dev.of_node;
-> +	const struct of_device_id *match;
->  	struct resource *res;
->  	struct at91_gpio_chip *at91_chip = NULL;
->  	struct gpio_chip *chip;
-> @@ -1399,8 +1405,11 @@ static int __devinit at91_gpio_probe(struct platform_device *pdev)
->  		goto err;
->  	}
->  
-> -	at91_chip->ops = (struct at91_pinctrl_mux_ops*)
-> -		of_match_device(at91_gpio_of_match, &pdev->dev)->data;
-> +	match = of_match_device(at91_gpio_of_match, &pdev->dev);
-> +	if (!match)
-> +		return -ENODEV;
-> +
-> +	at91_chip->ops = (struct at91_pinctrl_mux_ops *) match->data;
->  	at91_chip->pioc_virq = irq;
->  	at91_chip->pioc_idx = alias_idx;
->  
-> -- 
-> 1.7.9.5
-> 
-> 
-> 
+             Enabled    Disabled
+  1st run    2.983093   2.985168
+  2nd run    2.973266   2.971801
+  3rd run    2.975402   2.987304
+  Average    2.977254   2.981424   -0.004171 (-4ms)
+
+
+For the next round of testing, we delayed the bootloader for varying
+amounts of time, then started to remove key components from kernel
+functionality to see if the boottime system would pick-up on them.
+
+  /* Hang around in the bootloader for a while. */
+  $ cat /sys/kernel/debug/boottime/summary 
+    kernel: 42864 msecs
+    total: 42864 msecs
+    kernel: cpu0 system: 56% idle: 43% iowait: 0% irq: 0% 
+            cpu1 system: 4% idle: 95% iowait: 0% irq: 0%
+
+  /* Hang around in the bootloader for a smaller amount of time. */
+    kernel: 12351 msecs
+    total: 12351 msecs
+    kernel: cpu0 system: 56% idle: 43% iowait: 0% irq: 0% 
+            cpu1 system: 2% idle: 97% iowait: 0% irq: 0%
+  
+  /* Instant boot. (1st run) */
+    kernel: 7833 msecs
+    total: 7833 msecs
+    kernel: cpu0 system: 55% idle: 44% iowait: 0% irq: 0% 
+            cpu1 system: 3% idle: 96% iowait: 0% irq: 0%
+
+  /* Instant boot. (2nd run) */
+    kernel: 7817 msecs
+    total: 7817 msecs
+    kernel: cpu0 system: 53% idle: 46% iowait: 0% irq: 0% 
+            cpu1 system: 8% idle: 91% iowait: 0% irq: 0%
+
+  /* Instant boot. (3rd run) */
+    kernel: 7747 msecs
+    total: 7747 msecs
+    kernel: cpu0 system: 56% idle: 42% iowait: 0% irq: 0% 
+            cpu1 system: 2% idle: 97% iowait: 0% irq: 0%
+
+  /* Instant boot. (4th run)
+          -CONFIG_INPUT_TOUCHSCREEN=y
+          +# CONFIG_INPUT_TOUCHSCREEN is not set
+  */
+    kernel: 7046 msecs
+    total: 7046 msecs
+    kernel: cpu0 system: 72% idle: 27% iowait: 0% irq: 0% 
+            cpu1 system: 5% idle: 94% iowait: 0% irq: 0%
+
+  /* Instant boot. (5th run)
+          -CONFIG_MMC=y
+          +# CONFIG_MMC is not set
+  */
+    kernel: 6778 msecs
+    total: 6778 msecs
+    kernel: cpu0 system: 81% idle: 18% iowait: 0% irq: 0% 
+            cpu1 system: 1% idle: 98% iowait: 0% irq: 0%
+
+ arch/arm/common/Makefile                  |    1 +
+ arch/arm/common/boottime.c                |   46 +++
+ arch/arm/include/uapi/asm/setup.h         |   22 ++
+ drivers/clocksource/clksrc-dbx500-prcmu.c |   20 ++
+ include/linux/boottime.h                  |   89 ++++++
+ init/Kconfig                              |    9 +
+ init/Makefile                             |    1 +
+ init/boottime.c                           |  475 +++++++++++++++++++++++++++++
+ init/main.c                               |    6 +
+ 9 files changed, 669 insertions(+)
