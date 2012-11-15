@@ -1,45 +1,124 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 Nov 2012 22:54:25 +0100
-Subject: [PATCH 0/7] core, cpu and gated clocks for mvebu
-In-Reply-To: <1353014906-31566-1-git-send-email-andrew@lunn.ch>
-References: <1353014906-31566-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20121115225425.6230f370@skate>
+From: rob.clark@linaro.org (Rob Clark)
+Date: Thu, 15 Nov 2012 16:01:19 -0600
+Subject: [PATCH] ARM: add get_user() support for 8 byte types
+Message-ID: <1353016879-15007-1-git-send-email-rob.clark@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+From: Rob Clark <rob@ti.com>
 
-On Thu, 15 Nov 2012 22:28:19 +0100, Andrew Lunn wrote:
-> This patchset combines code from Gregory Clement, Sebastian
-> Hesselbarth and myself to implement core clks, cpu clock and gated
-> clocks on Marvel MVEBU SoCs.
-> 
-> The Armada 370/XP core clock code is a refactored version of the
-> already submitted and ACKed code from Gregory. It has been made to fit
-> inside a framework developed by Sebastian which can handle all MVEBU
-> SoCs. The Armarda 370/XP SoCs have more core clocks than the older SoCs, and
-> the framework needs to handle this. Rather than specify the clock
-> frequencies in DT, a Sample At Reset register is used, which describes
-> each core clock frequency.
-> 
-> Armarda XP is an SMP processor, with each CPU having its own
-> clock. Gregories code for this has been taken as is.
-> 
-> The Armarda 370/XP clock source has been converted to the common clock
-> framework.
-> 
-> Dove, Kirkword, and probably Armarda 370/XP have the ability to gate
-> clocks to various blocks. A clk-gate clock is created for each of the
-> gateable clocks on Dove and Kirkwood. Armarda 370/XP clock gates are
-> currently unimplemented. Dove and Kirkwood board-dt.c and DT
-> descriptions are then modified to make use of these clk gates.
+A new atomic modeset/pageflip ioctl being developed in DRM requires
+get_user() to work for 64bit types (in addition to just put_user()).
 
-I had a quick look and made a few comments, but overall, it looks
-really great. I really hope we can get this in 3.8.
+v1: original
+v2: pass correct size to check_uaccess, and better handling of narrowing
+    double word read with __get_user_xb() (Russell King's suggestion)
+v3: explain in comment about why this works for narrowing fetch to 1,
+    2, or 4 byte type on ARM.
 
-Thomas
+Signed-off-by: Rob Clark <rob@ti.com>
+---
+ arch/arm/include/asm/uaccess.h | 22 +++++++++++++++++++++-
+ arch/arm/lib/getuser.S         | 17 ++++++++++++++++-
+ 2 files changed, 37 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 7e1f760..4cfa793 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -100,6 +100,7 @@ static inline void set_fs(mm_segment_t fs)
+ extern int __get_user_1(void *);
+ extern int __get_user_2(void *);
+ extern int __get_user_4(void *);
++extern int __get_user_8(void *);
+ 
+ #define __GUP_CLOBBER_1	"lr", "cc"
+ #ifdef CONFIG_CPU_USE_DOMAINS
+@@ -108,6 +109,7 @@ extern int __get_user_4(void *);
+ #define __GUP_CLOBBER_2 "lr", "cc"
+ #endif
+ #define __GUP_CLOBBER_4	"lr", "cc"
++#define __GUP_CLOBBER_8	"lr", "cc"
+ 
+ #define __get_user_x(__r2,__p,__e,__l,__s)				\
+ 	   __asm__ __volatile__ (					\
+@@ -118,11 +120,23 @@ extern int __get_user_4(void *);
+ 		: "0" (__p), "r" (__l)					\
+ 		: __GUP_CLOBBER_##__s)
+ 
++/*
++ * Narrowing a double-word get into a single 32bit word register, which works
++ * for 1, 2, or 4 byte types on ARM because there are no integer registers
++ * smaller than 32bit
++ */
++#ifdef BIG_ENDIAN
++#define __get_user_xb(__r2,__p,__e,__l,__s)				\
++	__get_user_x(__r2,(uintptr_t)__p + 4,__e,__l,__s)
++#else
++#define __get_user_xb __get_user_x
++#endif
++
+ #define __get_user_check(x,p)							\
+ 	({								\
+ 		unsigned long __limit = current_thread_info()->addr_limit - 1; \
+ 		register const typeof(*(p)) __user *__p asm("r0") = (p);\
+-		register unsigned long __r2 asm("r2");			\
++		register typeof(x) __r2 asm("r2");			\
+ 		register unsigned long __l asm("r1") = __limit;		\
+ 		register int __e asm("r0");				\
+ 		switch (sizeof(*(__p))) {				\
+@@ -135,6 +149,12 @@ extern int __get_user_4(void *);
+ 		case 4:							\
+ 			__get_user_x(__r2, __p, __e, __l, 4);		\
+ 			break;						\
++		case 8:							\
++			if (sizeof((x)) < 8)				\
++				__get_user_xb(__r2, __p, __e, __l, 4);	\
++			else						\
++				__get_user_x(__r2, __p, __e, __l, 8);	\
++			break;						\
+ 		default: __e = __get_user_bad(); break;			\
+ 		}							\
+ 		x = (typeof(*(p))) __r2;				\
+diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
+index 9b06bb4..ed98707 100644
+--- a/arch/arm/lib/getuser.S
++++ b/arch/arm/lib/getuser.S
+@@ -18,7 +18,7 @@
+  * Inputs:	r0 contains the address
+  *		r1 contains the address limit, which must be preserved
+  * Outputs:	r0 is the error code
+- *		r2 contains the zero-extended value
++ *		r2, r3 contains the zero-extended value
+  *		lr corrupted
+  *
+  * No other registers must be altered.  (see <asm/uaccess.h>
+@@ -66,6 +66,19 @@ ENTRY(__get_user_4)
+ 	mov	pc, lr
+ ENDPROC(__get_user_4)
+ 
++ENTRY(__get_user_8)
++	check_uaccess r0, 8, r1, r2, __get_user_bad
++#ifdef CONFIG_THUMB2_KERNEL
++5: TUSER(ldr)	r2, [r0]
++6: TUSER(ldr)	r3, [r0, #4]
++#else
++5: TUSER(ldr)	r2, [r0], #4
++6: TUSER(ldr)	r3, [r0]
++#endif
++	mov	r0, #0
++	mov	pc, lr
++ENDPROC(__get_user_8)
++
+ __get_user_bad:
+ 	mov	r2, #0
+ 	mov	r0, #-EFAULT
+@@ -77,4 +90,6 @@ ENDPROC(__get_user_bad)
+ 	.long	2b, __get_user_bad
+ 	.long	3b, __get_user_bad
+ 	.long	4b, __get_user_bad
++	.long	5b, __get_user_bad
++	.long	6b, __get_user_bad
+ .popsection
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.0
