@@ -1,71 +1,41 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Thu, 15 Nov 2012 21:44:07 +0800
-Subject: [PATCH 1/4] pinctrl: dove: Prevent NULL dereference if
- of_match_device returns NULL
-In-Reply-To: <20121115083511.08f5a16f@skate>
-References: <1352955096.6793.1.camel@phoenix> <20121115083511.08f5a16f@skate>
-Message-ID: <CAFRkauCybE+UcBD17u3J6hoxEA88GM0tatxkrKtWqVNvDPC9dA@mail.gmail.com>
+From: zql@glomationinc.com (Zhong Li)
+Date: Thu, 15 Nov 2012 11:56:52 -0500
+Subject: Configure the USB device/host on sam9g25 module
+In-Reply-To: <50A51978.7040001@ronetix.at>
+References: <50A51978.7040001@ronetix.at>
+Message-ID: <cc2fa961-1156-48b8-b805-6583df35e126@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/11/15 Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+It is a hardware configuration problem.  You must use a type-A mini USB cable.
 
-> Dear Axel Lin,
+Martin Peevski <martin@ronetix.at> wrote:
+
+>      Hi,
 >
-> On Thu, 15 Nov 2012 12:51:36 +0800, Axel Lin wrote:
-> > of_match_device() may return NULL.
-> >
-> > Signed-off-by: Axel Lin <axel.lin@ingics.com>
+>    I'm working with sam9g25 module placed on sam9x5-ek. sam9g25 has 2 
+>host USB's and 1 device/host USB (on the micro USB of sam9x5-ek). Both 
+>USB hosts accept mass storage devices and works correct. It was 
+>impossible to do 2 things with the USB device/host (placed on the micro
 >
-> Could you detail under what conditions of_match_device() may return
-> NULL in the specific case of this driver? This of_match_device() call
-> is using the same dove_pinctrl_of_match array that is used to ->probe()
-> this driver. So I don't see how you can get into ->probe() without
-> having a matching entry.
+>USB of sam9x5-ek):
 >
-> Am I missing something?
+>      1. Put in it mass storage device - the kernel want not to 
+>enumerate it and give it an name (for example sda, sdb, ...). What I 
+>must do in the config file of kernel to be recognized the inserted mass
 >
-
- hi Thomas,
-You are right.
-
-I was thinking when the case CONFIG_OF is not selected,
-of_match_ptr(dove_pinctrl_of_match) is NULL and of_match_device returns
-NULL.
-But this driver only works when CONFIG_OF is selected.
-
-BTW, I found there is no way to compile the dove and kirkwood pinctrl
-drivers.
-I need add below patch to compile these two drivers, how do you think about
-below patch?
-( In dove, the USE_OF is optional, it is selected only when MACH_DOVE_DT is
-enabled )
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 14f8160..dda6785 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -531,6 +531,8 @@ config ARCH_DOVE
-        select CPU_V7
-        select GENERIC_CLOCKEVENTS
-        select MIGHT_HAVE_PCI
-+       select PINCTRL
-+       select PINCTRL_DOVE if USE_OF
-        select PLAT_ORION_LEGACY
-        select USB_ARCH_HAS_EHCI
-        help
-@@ -542,6 +544,8 @@ config ARCH_KIRKWOOD
-        select CPU_FEROCEON
-        select GENERIC_CLOCKEVENTS
-        select PCI
-+       select PINCTRL
-+       select PINCTRL_KIRKWOOD
-        select PLAT_ORION_LEGACY
-        help
-          Support for the following Marvell Kirkwood series SoCs:
-
-Regards,
-Axel
+>storage device?
+>
+>     2. Connect cable from the micro USB to any of the host USB's and 
+>detect USB serial gadget.
+>
+>I tryed to make some configs for both problems in the kernel but it 
+>don't works. Can you, please, help me solve these problems?
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121115/be2e1627/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121115/96b83b82/attachment-0001.html>
