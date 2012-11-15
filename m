@@ -1,16 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Nov 2012 17:16:15 +0000
-Subject: ttySAC0 or ttyS0 in 3.6.x ARM Linux?
-In-Reply-To: <k824bb$7kp$1@ger.gmane.org>
-References: <k824bb$7kp$1@ger.gmane.org>
-Message-ID: <20121115171615.GP3290@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 15 Nov 2012 18:19:00 +0100
+Subject: [PATCH 2/3] i2c: at91: change struct members indentation
+In-Reply-To: <1352911493-6979-3-git-send-email-ludovic.desroches@atmel.com>
+References: <1352911493-6979-1-git-send-email-ludovic.desroches@atmel.com>
+ <1352911493-6979-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <50A52404.9000503@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 03:07:24PM +0800, woody wrote:
-> In the 3.6.6 ARM kernel, should I use ttySAC0 or ttyS0 to specify the  
-> 'console' kernel command line?
+On 11/14/2012 05:44 PM, ludovic.desroches at atmel.com :
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Replace tabs for struct members indentation by space to minimise line changes
+> when adding new members which would require extra tabs to keep alignment.
 
-That depends on what type of UART you're using.  ttyS is for 8250 ports.
-ttySAC ended up being used for various SoC based ports which aren't
-8250 based.
+Lol, you followed Wolfram's advice... You know my preferences ;-)
+
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+
+Ok, then:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> ---
+>  drivers/i2c/busses/i2c-at91.c | 30 +++++++++++++++---------------
+>  1 file changed, 15 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> index dc8cb22..2c437df 100644
+> --- a/drivers/i2c/busses/i2c-at91.c
+> +++ b/drivers/i2c/busses/i2c-at91.c
+> @@ -66,24 +66,24 @@
+>  #define	AT91_TWI_THR		0x0034	/* Transmit Holding Register */
+>  
+>  struct at91_twi_pdata {
+> -	unsigned	clk_max_div;
+> -	unsigned	clk_offset;
+> -	bool		has_unre_flag;
+> +	unsigned clk_max_div;
+> +	unsigned clk_offset;
+> +	bool has_unre_flag;
+>  };
+>  
+>  struct at91_twi_dev {
+> -	struct device		*dev;
+> -	void __iomem		*base;
+> -	struct completion	cmd_complete;
+> -	struct clk		*clk;
+> -	u8			*buf;
+> -	size_t			buf_len;
+> -	struct i2c_msg		*msg;
+> -	int			irq;
+> -	unsigned		transfer_status;
+> -	struct i2c_adapter	adapter;
+> -	unsigned		twi_cwgr_reg;
+> -	struct at91_twi_pdata	*pdata;
+> +	struct device *dev;
+> +	void __iomem *base;
+> +	struct completion cmd_complete;
+> +	struct clk *clk;
+> +	u8 *buf;
+> +	size_t buf_len;
+> +	struct i2c_msg *msg;
+> +	int irq;
+> +	unsigned transfer_status;
+> +	struct i2c_adapter adapter;
+> +	unsigned twi_cwgr_reg;
+> +	struct at91_twi_pdata *pdata;
+>  };
+>  
+>  static unsigned at91_twi_read(struct at91_twi_dev *dev, unsigned reg)
+> 
+
+
+-- 
+Nicolas Ferre
