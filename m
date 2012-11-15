@@ -1,36 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Nov 2012 08:33:21 +0000
-Subject: [PATCH 1/1] ARM: ux500: Describe UART platform registering issues
- more accurately
-Message-ID: <1352968401-6092-1-git-send-email-lee.jones@linaro.org>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 15 Nov 2012 16:36:29 +0800
+Subject: [PATCH v5 0/10] use pinctrl-single in arch mmp
+Message-ID: <1352968600-15345-1-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-UARTs no longer require call-back information, since the reset
-call-back was removed in 43b5f0d69291374f602ad8e1817f329573a59010.
-The only AUXDATA dependencies remaining for UARTs are DMA settings.
+Changelog:
+v5:
+1. Move the properties of pinconf into pin group. So those mask
+properties could be merged with other pinconf properties. 
+2. Append lookup pinctrl map method.
+3. Append input schmitt disable config parameter.
+4. Clean code.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/cpu-db8500.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+v4:
+1. Define gpio range as sub-node, not label. And remove
+pinctrl-single,gpio-ranges property.
+2. Use new two properties in sub-node, reg &
+pinctrl-single,gpio. GPIO number & GPIO function are listed in
+the pinctrl-single,gpio property.
+3. Reference the names like pinctrl-single,bias.
+4. Add compatible name "pinconf-single". If the compatible name is
+"pinctrl-single", there's no pinconf. If the compatible name is
+"pinconf-single", there's the generic pinconf in pinctrl-single.
+5. Update documents.
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 4a0c40a..d2076ce 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -262,11 +262,10 @@ static struct device * __init u8500_of_init_devices(void)
- static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	/* Requires call-back bindings. */
- 	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
--	/* Requires DMA and call-back bindings. */
-+	/* Requires DMA bindings. */
- 	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", &uart0_plat),
- 	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", &uart1_plat),
- 	OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", &uart2_plat),
--	/* Requires DMA bindings. */
- 	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
- 	OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  &mop500_sdi0_data),
- 	OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  &mop500_sdi1_data),
--- 
-1.7.9.5
+v3:
+1. Add more comments in document.
+2. Replace pcs_readl() & pcs_writel() by pcs->read() & pcs->write().
+3. Clean code.
+
+v2:
+1. Remove "pinctrl-single,gpio-mask". Since GPIO function is one of the
+mux function in the pinmux register of both OMAP and PXA/MMP silicons.
+Use "pinctrl-single,function-mask" instead.
+2. Remove "pinctrl-single,gpio-enable" & "pinctrl-single,gpio-disable".
+Use "pinctrl-single,gpio-func" instead. Because GPIO mode is only one
+of the mux functions in the pinmux register. Defining "gpio-enable" &
+"gpio-disable" are redundant.
+3. Define register with __iomem, not u32 type.
+4. Remove "pinctrl-single,input-schmit-shift",
+"pinctrl-single,power-source-shift", "pinctrl-single,bias-shift". All
+these properties could be calculated by mask fields.
+5. Return -EPROBE_DEFER if pinmux could be got in device driver. And
+the device driver would be probed again deferred.
