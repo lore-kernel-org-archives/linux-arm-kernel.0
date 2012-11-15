@@ -1,10 +1,10 @@
 From: axel.lin@ingics.com (Axel Lin)
-Date: Thu, 15 Nov 2012 12:56:05 +0800
-Subject: [PATCH 4/4] pinctrl: nomadik: Prevent NULL dereference if
+Date: Thu, 15 Nov 2012 12:58:00 +0800
+Subject: [PATCH RESEND 3/4] pinctrl: at91: Prevent NULL dereference if
  of_match_device returns NULL
-In-Reply-To: <1352955096.6793.1.camel@phoenix>
-References: <1352955096.6793.1.camel@phoenix>
-Message-ID: <1352955365.6793.6.camel@phoenix>
+In-Reply-To: <1352955266.6793.4.camel@phoenix>
+References: <1352955096.6793.1.camel@phoenix> <1352955266.6793.4.camel@phoenix>
+Message-ID: <1352955480.6793.8.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,30 +12,57 @@ of_match_device() may return NULL.
 
 Signed-off-by: Axel Lin <axel.lin@ingics.com>
 ---
- drivers/pinctrl/pinctrl-nomadik.c |   11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+This resend CC Jean-Christophe.
 
-diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index 238060e..40bd1b3 100644
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -1863,9 +1863,14 @@ static int __devinit nmk_pinctrl_probe(struct platform_device *pdev)
+ drivers/pinctrl/pinctrl-at91.c |   17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index 8490a55..32006c8 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -829,13 +829,18 @@ static int __devinit at91_pinctrl_probe_dt(struct platform_device *pdev,
+ 	uint32_t *tmp;
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct device_node *child;
++	const struct of_device_id *match;
  
- 	if (platid)
- 		version = platid->driver_data;
--	else if (np)
--		version = (unsigned int)
--			of_match_device(nmk_pinctrl_match, &pdev->dev)->data;
-+	else if (np) {
-+		const struct of_device_id *match;
+ 	if (!np)
+ 		return -ENODEV;
+ 
++	match = of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
++	if (!match)
++		return -ENODEV;
 +
-+		match = of_match_device(nmk_pinctrl_match, &pdev->dev);
-+		if (!match)
-+			return -ENODEV;
-+		version = (unsigned int) match->data;
-+	}
+ 	info->dev = &pdev->dev;
+-	info->ops = (struct at91_pinctrl_mux_ops*)
+-		of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
++	info->ops = (struct at91_pinctrl_mux_ops *) match->data;
++
+ 	at91_pinctrl_child_count(info, np);
  
- 	/* Poke in other ASIC variants here */
- 	if (version == PINCTRL_NMK_STN8815)
+ 	if (info->nbanks < 1) {
+@@ -1359,6 +1364,7 @@ static struct of_device_id at91_gpio_of_match[] __devinitdata = {
+ static int __devinit at91_gpio_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
++	const struct of_device_id *match;
+ 	struct resource *res;
+ 	struct at91_gpio_chip *at91_chip = NULL;
+ 	struct gpio_chip *chip;
+@@ -1399,8 +1405,11 @@ static int __devinit at91_gpio_probe(struct platform_device *pdev)
+ 		goto err;
+ 	}
+ 
+-	at91_chip->ops = (struct at91_pinctrl_mux_ops*)
+-		of_match_device(at91_gpio_of_match, &pdev->dev)->data;
++	match = of_match_device(at91_gpio_of_match, &pdev->dev);
++	if (!match)
++		return -ENODEV;
++
++	at91_chip->ops = (struct at91_pinctrl_mux_ops *) match->data;
+ 	at91_chip->pioc_virq = irq;
+ 	at91_chip->pioc_idx = alias_idx;
+ 
 -- 
 1.7.9.5
