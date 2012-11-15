@@ -1,45 +1,44 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Nov 2012 15:11:53 +0100
-Subject: [PATCH v4 9/9] pinctrl: single: dump pinmux register value
-In-Reply-To: <CAN1soZxSQb2RN41v64SuOaQ6eLcV5NEZWSsMBBb_84dd5xks6Q@mail.gmail.com>
-References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
- <1352301582-12244-10-git-send-email-haojian.zhuang@gmail.com>
- <20121108012550.GV6801@atomide.com>
- <CACRpkdYRvEzTr6kOE6XYmrKiztJ0F+HUFCv8Jd+m2c-AOFooAw@mail.gmail.com>
- <20121113173444.GB6801@atomide.com>
- <CAN1soZxSQb2RN41v64SuOaQ6eLcV5NEZWSsMBBb_84dd5xks6Q@mail.gmail.com>
-Message-ID: <CACRpkdbAhKv8d6wdr-HYsgtNV5ax7go4OpeVmb5vQjKTDqusmw@mail.gmail.com>
+Date: Thu, 15 Nov 2012 15:17:10 +0100
+Subject: [PATCH 01/14] pinctrl: SPEAr: add spi chipselect control driver
+In-Reply-To: <4a92290e8a3b1a19c3a5e864edfa7badfc2af5d0.1352608333.git.viresh.kumar@linaro.org>
+References: <cover.1352608333.git.viresh.kumar@linaro.org>
+ <4a92290e8a3b1a19c3a5e864edfa7badfc2af5d0.1352608333.git.viresh.kumar@linaro.org>
+Message-ID: <CACRpkdb9tSUUGQjWdHqRr5rUSyiPgWm2i3-QZq9VbWFY2EAQeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2012 at 2:45 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Wed, Nov 14, 2012 at 1:34 AM, Tony Lindgren <tony@atomide.com> wrote:
->> * Linus Walleij <linus.walleij@linaro.org> [121113 05:10]:
->>> On Thu, Nov 8, 2012 at 2:25 AM, Tony Lindgren <tony@atomide.com> wrote:
->>>
->>> > * Haojian Zhuang <haojian.zhuang@gmail.com> [121107 07:22]:
->>> >> Dump pinmux register value, not only function part in the pinmux
->>> >> register.
->>> >>
->>> >> Also fix the issue on caluclating pin offset. The last parameter
->>> >> should be pin number, not register offset.
->>> >
->>> > Acked-by: Tony Lindgren <tony@atomide.com>
->>>
->>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>>
->>> Shall I apply this to the pinctrl tree?
->>
->> Yes please.
->>
->> Regards,
->>
->> Tony
->
-> Yes, this patch doesn't impact others. Please help to merge.
+On Sun, Nov 11, 2012 at 5:39 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 
-OK patch applied to the pinctrl tree.
+> From: Shiraz Hashim <shiraz.hashim@st.com>
+>
+> SPEAr platform provides a provision to control chipselects of ARM PL022
+> Prime Cell spi controller through its system registers, which otherwise
+> remains under PL022 control which some protocols do not want.
+>
+> This commit intends to provide the spi chipselect control in software
+> over gpiolib interface. Since it is tied to pinctrl, we place it under
+> 'drivers/pinctrl/spear/' directory.
+>
+> spi chip drivers can use the exported gpiolib interface to define their
+> chipselect through DT or platform data.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
+> Reviewed-by: Vipin Kumar <vipin.kumar@st.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+This sure looks good, sorry for the delay.
+
+Just one question: since this driver is not using any
+pinctrl interfaces, why is it under drivers/pinctrl/*?
+
+Shouldn't it be under drivers/gpio from a technical
+point of view?
+
+I think I'd accept it under drivers/pinctrl/spear/*
+if you just want this to keep everything SPEAr-related
+in one place though, so enlighten me.
 
 Yours,
 Linus Walleij
