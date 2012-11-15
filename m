@@ -1,80 +1,64 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 Nov 2012 18:20:24 +0100
-Subject: [PATCH 19/29] mv_xor: in mv_xor_chan, rename 'common' to 'dmachan'
+Date: Thu, 15 Nov 2012 18:20:21 +0100
+Subject: [PATCH 16/29] mv_xor: simplify dma_sync_single_for_cpu() calls
 In-Reply-To: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353000034-30567-20-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353000034-30567-17-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mv_xor_chan structure embeds a 'struct dma_chan', which is named
-'common', a not very meaningful name. Rename it to 'dmachan', which
-will help avoid confusions later as we merge the mv_xor_device and
-mv_xor_chan structures together.
+In mv_xor_memcpy_self_test() and mv_xor_xor_self_test(), all DMA
+functions are called by passing dma_chan->device->dev as the 'device
+*', except the calls to dma_sync_single_for_cpu() which uselessly goes
+through mv_chan->device->pdev->dev.
+
+Simplify this by using dma_chan->device->dev direclty in
+dma_sync_single_for_cpu() calls.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor.c |   12 ++++++------
- drivers/dma/mv_xor.h |    2 +-
- 2 files changed, 7 insertions(+), 7 deletions(-)
+ drivers/dma/mv_xor.c |    8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 3278782..aa6d96c 100644
+index 7129895..2387f47 100644
 --- a/drivers/dma/mv_xor.c
 +++ b/drivers/dma/mv_xor.c
-@@ -34,7 +34,7 @@
- static void mv_xor_issue_pending(struct dma_chan *chan);
+@@ -905,7 +905,6 @@ static int __devinit mv_xor_memcpy_self_test(struct mv_xor_device *device)
+ 	dma_cookie_t cookie;
+ 	struct dma_async_tx_descriptor *tx;
+ 	int err = 0;
+-	struct mv_xor_chan *mv_chan;
  
- #define to_mv_xor_chan(chan)		\
--	container_of(chan, struct mv_xor_chan, common)
-+	container_of(chan, struct mv_xor_chan, dmachan)
- 
- #define to_mv_xor_slot(tx)		\
- 	container_of(tx, struct mv_xor_desc_slot, async_tx)
-@@ -284,7 +284,7 @@ static void mv_xor_start_new_chain(struct mv_xor_chan *mv_chan,
- 		mv_chan_set_next_descriptor(mv_chan, sw_desc->async_tx.phys);
- 	}
- 	mv_chan->pending += sw_desc->slot_cnt;
--	mv_xor_issue_pending(&mv_chan->common);
-+	mv_xor_issue_pending(&mv_chan->dmachan);
- }
- 
- static dma_cookie_t
-@@ -437,7 +437,7 @@ static void __mv_xor_slot_cleanup(struct mv_xor_chan *mv_chan)
+ 	src = kmalloc(sizeof(u8) * MV_XOR_TEST_SIZE, GFP_KERNEL);
+ 	if (!src)
+@@ -951,8 +950,7 @@ static int __devinit mv_xor_memcpy_self_test(struct mv_xor_device *device)
+ 		goto free_resources;
  	}
  
- 	if (cookie > 0)
--		mv_chan->common.completed_cookie = cookie;
-+		mv_chan->dmachan.completed_cookie = cookie;
- }
+-	mv_chan = to_mv_xor_chan(dma_chan);
+-	dma_sync_single_for_cpu(&mv_chan->device->pdev->dev, dest_dma,
++	dma_sync_single_for_cpu(dma_chan->device->dev, dest_dma,
+ 				MV_XOR_TEST_SIZE, DMA_FROM_DEVICE);
+ 	if (memcmp(src, dest, MV_XOR_TEST_SIZE)) {
+ 		dev_err(dma_chan->device->dev,
+@@ -984,7 +982,6 @@ mv_xor_xor_self_test(struct mv_xor_device *device)
+ 	u8 cmp_byte = 0;
+ 	u32 cmp_word;
+ 	int err = 0;
+-	struct mv_xor_chan *mv_chan;
  
- static void
-@@ -1177,10 +1177,10 @@ mv_xor_channel_add(struct mv_xor_private *msp,
- 	INIT_LIST_HEAD(&mv_chan->chain);
- 	INIT_LIST_HEAD(&mv_chan->completed_slots);
- 	INIT_LIST_HEAD(&mv_chan->all_slots);
--	mv_chan->common.device = dma_dev;
--	dma_cookie_init(&mv_chan->common);
-+	mv_chan->dmachan.device = dma_dev;
-+	dma_cookie_init(&mv_chan->dmachan);
+ 	for (src_idx = 0; src_idx < MV_XOR_NUM_SRC_TEST; src_idx++) {
+ 		xor_srcs[src_idx] = alloc_page(GFP_KERNEL);
+@@ -1049,8 +1046,7 @@ mv_xor_xor_self_test(struct mv_xor_device *device)
+ 		goto free_resources;
+ 	}
  
--	list_add_tail(&mv_chan->common.device_node, &dma_dev->channels);
-+	list_add_tail(&mv_chan->dmachan.device_node, &dma_dev->channels);
- 
- 	if (dma_has_cap(DMA_MEMCPY, dma_dev->cap_mask)) {
- 		ret = mv_xor_memcpy_self_test(adev);
-diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
-index 05add24..ad18f64 100644
---- a/drivers/dma/mv_xor.h
-+++ b/drivers/dma/mv_xor.h
-@@ -101,7 +101,7 @@ struct mv_xor_chan {
- 	struct list_head	chain;
- 	struct list_head	completed_slots;
- 	struct mv_xor_device	*device;
--	struct dma_chan		common;
-+	struct dma_chan		dmachan;
- 	struct mv_xor_desc_slot	*last_used;
- 	struct list_head	all_slots;
- 	int			slots_allocated;
+-	mv_chan = to_mv_xor_chan(dma_chan);
+-	dma_sync_single_for_cpu(&mv_chan->device->pdev->dev, dest_dma,
++	dma_sync_single_for_cpu(dma_chan->device->dev, dest_dma,
+ 				PAGE_SIZE, DMA_FROM_DEVICE);
+ 	for (i = 0; i < (PAGE_SIZE / sizeof(u32)); i++) {
+ 		u32 *ptr = page_address(dest);
 -- 
 1.7.9.5
