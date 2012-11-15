@@ -1,173 +1,72 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 15 Nov 2012 23:46:22 +0100
-Subject: [PATCH 3/6] ARM: sunxi: Add basic support for Allwinner A1x SoCs
+Date: Thu, 15 Nov 2012 23:46:23 +0100
+Subject: [PATCH 4/6] ARM: sunxi: Add earlyprintk support
 In-Reply-To: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1353019586-21043-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1353019586-21043-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/Kconfig                  |    2 ++
- arch/arm/Makefile                 |    1 +
- arch/arm/mach-sunxi/Kconfig       |    9 ++++++
- arch/arm/mach-sunxi/Makefile      |    1 +
- arch/arm/mach-sunxi/Makefile.boot |    1 +
- arch/arm/mach-sunxi/sunxi.c       |   60 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-sunxi/sunxi.h       |   20 +++++++++++++
- 7 files changed, 94 insertions(+)
- create mode 100644 arch/arm/mach-sunxi/Kconfig
- create mode 100644 arch/arm/mach-sunxi/Makefile
- create mode 100644 arch/arm/mach-sunxi/Makefile.boot
- create mode 100644 arch/arm/mach-sunxi/sunxi.c
- create mode 100644 arch/arm/mach-sunxi/sunxi.h
+ arch/arm/Kconfig.debug         |    8 ++++++++
+ arch/arm/include/debug/sunxi.S |   22 ++++++++++++++++++++++
+ 2 files changed, 30 insertions(+)
+ create mode 100644 arch/arm/include/debug/sunxi.S
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ade7e92..1abb573 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1113,6 +1113,8 @@ source "arch/arm/mach-exynos/Kconfig"
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b0f3857..6672b02 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -345,6 +345,13 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on SOCFPGA based platforms.
  
- source "arch/arm/mach-shmobile/Kconfig"
- 
-+source "arch/arm/mach-sunxi/Kconfig"
++	config DEBUG_SUNXI_UART
++		bool "Kernel low-level debugging messages via sunXi UART"
++		depends on ARCH_SUNXI
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Allwinner A1X based platforms.
 +
- source "arch/arm/mach-prima2/Kconfig"
- 
- source "arch/arm/mach-tegra/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 5f914fc..363320a 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -193,6 +193,7 @@ machine-$(CONFIG_ARCH_SPEAR13XX)	+= spear13xx
- machine-$(CONFIG_ARCH_SPEAR3XX)		+= spear3xx
- machine-$(CONFIG_MACH_SPEAR600)		+= spear6xx
- machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
-+machine-$(CONFIG_ARCH_SUNXI)		+= sunxi
- 
- # Platform directory name.  This list is sorted alphanumerically
- # by CONFIG_* macro name.
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+ 	config DEBUG_VEXPRESS_UART0_DETECT
+ 		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
+ 		depends on ARCH_VEXPRESS && CPU_CP15_MMU
+@@ -416,6 +423,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/mvebu.S" if DEBUG_MVEBU_UART
+ 	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
+ 	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
++	default "debug/sunxi.S" if DEBUG_SUNXI_UART
+ 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
+ 		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
+ 	default "mach/debug-macro.S"
+diff --git a/arch/arm/include/debug/sunxi.S b/arch/arm/include/debug/sunxi.S
 new file mode 100644
-index 0000000..3fdd008
+index 0000000..ffd101f
 --- /dev/null
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -0,0 +1,9 @@
-+config ARCH_SUNXI
-+	bool "Allwinner A1X SOCs" if ARCH_MULTI_V7
-+	select CLKSRC_MMIO
-+	select COMMON_CLK
-+	select GENERIC_CLOCKEVENTS
-+	select GENERIC_IRQ_CHIP
-+	select PINCTRL
-+	select SPARSE_IRQ
-+	select SUNXI_TIMER
-diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
-new file mode 100644
-index 0000000..93bebfc
---- /dev/null
-+++ b/arch/arm/mach-sunxi/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
-diff --git a/arch/arm/mach-sunxi/Makefile.boot b/arch/arm/mach-sunxi/Makefile.boot
-new file mode 100644
-index 0000000..46d4cf0
---- /dev/null
-+++ b/arch/arm/mach-sunxi/Makefile.boot
-@@ -0,0 +1 @@
-+zreladdr-$(CONFIG_ARCH_SUNXI)	+= 0x40008000
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-new file mode 100644
-index 0000000..8f42df8
---- /dev/null
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -0,0 +1,60 @@
++++ b/arch/arm/include/debug/sunxi.S
+@@ -0,0 +1,22 @@
 +/*
-+ * Device Tree support for Allwinner A1X SoCs
++ * Early serial output macro for Allwinner A1X SoCs
 + *
 + * Copyright (C) 2012 Maxime Ripard
 + *
 + * Maxime Ripard <maxime.ripard@free-electrons.com>
 + *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <linux/io.h>
-+#include <linux/sunxi_timer.h>
++#define SUNXI_UART1_PHYS_BASE	0x01c28400
++#define SUNXI_UART1_VIRT_BASE	0xf1c28400
 +
-+#include <linux/irqchip/sunxi.h>
++	.macro	addruart, rp, rv, tmp
++	ldr	\rp, =SUNXI_UART1_PHYS_BASE
++	ldr	\rv, =SUNXI_UART1_VIRT_BASE
++	.endm
 +
-+#include <asm/hardware/vic.h>
-+
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+
-+#include "sunxi.h"
-+
-+static struct map_desc sunxi_io_desc[] __initdata = {
-+	{
-+		.virtual	= (unsigned long) SUNXI_REGS_VIRT_BASE,
-+		.pfn		= __phys_to_pfn(SUNXI_REGS_PHYS_BASE),
-+		.length		= SUNXI_REGS_SIZE,
-+		.type		= MT_DEVICE,
-+	},
-+};
-+
-+void __init sunxi_map_io(void)
-+{
-+	iotable_init(sunxi_io_desc, ARRAY_SIZE(sunxi_io_desc));
-+}
-+
-+static void __init sunxi_dt_init(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
-+
-+static const char * const sunxi_board_dt_compat[] = {
-+	"allwinner,sun5i",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
-+	.init_machine	= sunxi_dt_init,
-+	.map_io		= sunxi_map_io,
-+	.init_irq	= sunxi_init_irq,
-+	.handle_irq	= sunxi_handle_irq,
-+	.timer		= &sunxi_timer,
-+	.dt_compat	= sunxi_board_dt_compat,
-+MACHINE_END
-diff --git a/arch/arm/mach-sunxi/sunxi.h b/arch/arm/mach-sunxi/sunxi.h
-new file mode 100644
-index 0000000..33b5871
---- /dev/null
-+++ b/arch/arm/mach-sunxi/sunxi.h
-@@ -0,0 +1,20 @@
-+/*
-+ * Generic definitions for Allwinner SunXi SoCs
-+ *
-+ * Copyright (C) 2012 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __MACH_SUNXI_H
-+#define __MACH_SUNXI_H
-+
-+#define SUNXI_REGS_PHYS_BASE	0x01c00000
-+#define SUNXI_REGS_VIRT_BASE	IOMEM(0xf1c00000)
-+#define SUNXI_REGS_SIZE		(SZ_2M + SZ_1M)
-+
-+#endif /* __MACH_SUNXI_H */
++#define UART_SHIFT	2
++#include <asm/hardware/debug-8250.S>
 -- 
 1.7.9.5
