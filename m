@@ -1,44 +1,37 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Thu, 15 Nov 2012 09:10:31 -0600
-Subject: [PATCH] ARM: OMAP4: hwmod data: ipu and dsp to use parent clocks
- instead of leaf clocks
-In-Reply-To: <alpine.DEB.2.00.1211141542280.16047@utopia.booyaka.com>
-References: <1352860750-20100-1-git-send-email-omar.luna@linaro.org>
- <alpine.DEB.2.00.1211141542280.16047@utopia.booyaka.com>
-Message-ID: <CALLhW=6uwCzAwPLNbjOwVKWVW5KOui=UXZdTUm7HMp=3cZrCNg@mail.gmail.com>
+From: mans.rullgard@linaro.org (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Thu, 15 Nov 2012 15:14:42 +0000
+Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
+In-Reply-To: <20121115135246.GB25985@arm.com> (Catalin Marinas's message of
+ "Thu, 15 Nov 2012 13:52:46 +0000")
+References: <20121114185335.GU6801@atomide.com> <50A3EBCD.3040801@ti.com>
+ <20121114202244.GE3332@n2100.arm.linux.org.uk>
+ <20121114203221.GA6801@atomide.com> <50A413D4.7000405@gmail.com>
+ <20121114222159.GB6801@atomide.com> <50A43D58.5030404@gmail.com>
+ <20121115110137.GA25985@arm.com>
+ <CACY+gR3PurUofCbUeG40B6vXqXAoHrMmbOQSuwAGoc1LS8XXJQ@mail.gmail.com>
+ <20121115135246.GB25985@arm.com>
+Message-ID: <yw1x1ufux5i5.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Catalin Marinas <catalin.marinas@arm.com> writes:
 
-On 14 November 2012 09:44, Paul Walmsley <paul@pwsan.com> wrote:
-> Hi
+> On Thu, Nov 15, 2012 at 12:41:43PM +0000, Siarhei Siamashka wrote:
+>> BTW, I always wondered about what could be preventing TI and the other
+>> silicon vendors from using something like an SMC API based on
+>> asymmetric cryptography? My understanding is that for OMAP4 GP chips,
+>> ROM code switches to non-secure mode before passing control to the
+>> bootloader and there is simply no way to workaround bugs like this.
 >
-> On Tue, 13 Nov 2012, Omar Ramirez Luna wrote:
->
->> This prevents hwmod _enable_clocks...omap2_dflt_clk_enable path
->> from enabling modulemode inside CLKCTRL using its clk->enable_reg
->> field. Instead is left to _omap4_enable_module though soc_ops, as
->> the one in charge of this setting.
->>
->> According to comments received[1] for related patches the idea is
->> to get rid of leaf clocks in future. So remove these two while at it.
->>
->> [1] http://lkml.org/lkml/2012/8/20/226
->>
->> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
->
-> Does this one belong as part of the "OMAP: iommu: hwmod, reset
-> handling and runtime PM" series?  Looks like applying this one separately
-> might cause these clocks not to be disabled by either the clock code's
-> disable-unused-clocks code, or the hwmod code?
+> AFAIK, there are some SMCs to the OMAP secure firmware that allow such
+> bits to be set (see omap4_l2x0_set_debug() for example). I'm not sure
+> they are documented.
 
-You are right, if applied right now, without the others it will break
-the current clocks iommu code uses.
+The trouble with OMAP is that the secure ROM API only allows access to a
+tiny subset of the registers we'd need.  In part this can be explained
+by the important OMAP customers all using the HS chips with full access
+to secure mode.
 
-I will put it along with the other series or wait for the acceptance
-of the other patches first.
-
-Thanks,
-
-Omar
+-- 
+M?ns Rullg?rd
+mans at mansr.com
