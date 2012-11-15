@@ -1,71 +1,36 @@
-From: arunks.linux@gmail.com (Arun KS)
-Date: Thu, 15 Nov 2012 09:11:20 +0530
-Subject: Decoding the PTM traces
-In-Reply-To: <CAMP5XgegGNn=NM8LEp61tZJWYQC3wbZ9mFz53cMsvPFr=bydaQ@mail.gmail.com>
-References: <CAKZGPAN-DEFD-X4az0O06ngjwdFAyrdowQ57QvtDpe8axZiwTg@mail.gmail.com>
- <CAMP5XgegGNn=NM8LEp61tZJWYQC3wbZ9mFz53cMsvPFr=bydaQ@mail.gmail.com>
-Message-ID: <CAKZGPANSW9EEN6tRW7cPxDQkicKBWC9eK9A3dQSH1d61nXsHKQ@mail.gmail.com>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Thu, 15 Nov 2012 12:51:36 +0800
+Subject: [PATCH 1/4] pinctrl: dove: Prevent NULL dereference if
+ of_match_device returns NULL
+Message-ID: <1352955096.6793.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arve,
+of_match_device() may return NULL.
 
-On Thu, Nov 15, 2012 at 4:55 AM, Arve Hj?nnev?g <arve@android.com> wrote:
-> On Wed, Nov 14, 2012 at 6:04 AM, Arun KS <arunks.linux@gmail.com> wrote:
->> Hello,
->>
->> I m trying to capture and decode PTM trace from Cortex A9 dual core.
->>
->> I m successful  in configuring the driver(arch/arm/kernel/etm.c) and
->> setting the funnel to get data in ETB.
->> But I don't know how to decode these traces.
->>
->> Anyone has any pointers?
->>
->> Thanks,
->> Arun
->
-> I attached some tools I use to decode the traces. I have used this on
-> the A8, A9 and A15. I assume since you cc-ed me you have already
-> applied the kernel patches I posted a while back. Without them you
-> will not get useful trace data from a dual core processor.
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+---
+ drivers/pinctrl/mvebu/pinctrl-dove.c |    8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-Thank you very much for the tools. Hope I have taken all your patches.
-
-Here is how my git log --oneline looks on arch/arm/kernel/etm.c
-
-75cbaea ARM: etm: Add sysfs entry to enable return stack if supported
-434032a ARM: etm: Add sysfs entry to disable branch_output flag
-c6b1c35 ARM: etm: Add sysfs entry to set context-id-size
-cfb8dc5 ARM: etm: Add sysfs entry to enable timestamps if supported
-d263bc7 ARM: etm: Check arch version and disable data tracing for ptm
-eff62a8 ARM: etm: Wait for etm/ptm(s) to stop before requesting PowerDown
-4246983 ARM: etm: Power down etm(s) when tracing is not enabled
-992cd59 ARM: etm: Support multiple ETMs/PTMs.
-3a91f3e ARM: etm: Return the entire trace buffer if it is empty after reset
-fe05bda ARM: etm: Add some missing locks and error checks
-0c3da53 ARM: etm: Configure data tracing
-d71c695 ARM: etm: Allow range selection
-f13ae47 ARM: etm: Don't try to clear the buffer full status after
-reading the buffer
-8511b5b ARM: etm: Don't limit tracing to only non-secure code.
-d387659 ARM: etm: Don't require clock control
-73017a5 arm: fix implicit module.h users by adding it to arch/arm as required.
-8e88069 ARM: 6838/1: etm: fix section mismatch warning
-aa25afa ARM: amba: make probe() functions take const id tables
-092e0e7 Merge branch 'llseek' of
-git://git.kernel.org/pub/scm/linux/kernel/git/arnd/bkl
-6038f37 llseek: automatically add .llseek fop
-8234eae ARM: 6291/1: coresight: move struct tracectx inside etm driver
-1495cc9 Input: sysrq - drop tty argument from sysrq ops handlers
-988257c ARM: 6294/1: etm: do a dummy read from OSSRR during initialization
-9e354ea ARM: 6292/1: coresight: add ETM management registers
-c5d6c77 ARM: 5841/1: a driver for on-chip ETM and ETB
-
-I ll let you know the results.
-
-thanks,
-Arun
->
-> --
-> Arve Hj?nnev?g
+diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
+index ffe74b2..a8b9b42 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-dove.c
++++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
+@@ -578,8 +578,12 @@ static struct of_device_id dove_pinctrl_of_match[] __devinitdata = {
+ 
+ static int __devinit dove_pinctrl_probe(struct platform_device *pdev)
+ {
+-	const struct of_device_id *match =
+-		of_match_device(dove_pinctrl_of_match, &pdev->dev);
++	const struct of_device_id *match;
++
++	match = of_match_device(dove_pinctrl_of_match, &pdev->dev);
++	if (!match)
++		return -ENODEV;
++
+ 	pdev->dev.platform_data = match->data;
+ 
+ 	/*
+-- 
+1.7.9.5
