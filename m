@@ -1,43 +1,30 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 Nov 2012 18:20:19 +0100
-Subject: [PATCH 14/29] mv_xor: remove unused id field in mv_xor_device
- structure
+Date: Thu, 15 Nov 2012 18:20:20 +0100
+Subject: [PATCH 15/29] mv_xor: remove unused to_mv_xor_device() macro
 In-Reply-To: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353000034-30567-15-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353000034-30567-16-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor.c |    2 --
- drivers/dma/mv_xor.h |    1 -
- 2 files changed, 3 deletions(-)
+ drivers/dma/mv_xor.c |    3 ---
+ 1 file changed, 3 deletions(-)
 
 diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 7ebb918..25f814a 100644
+index 25f814a..7129895 100644
 --- a/drivers/dma/mv_xor.c
 +++ b/drivers/dma/mv_xor.c
-@@ -1125,8 +1125,6 @@ mv_xor_channel_add(struct mv_xor_private *msp,
- 	if (!adev->dma_desc_pool_virt)
- 		return ERR_PTR(-ENOMEM);
+@@ -36,9 +36,6 @@ static void mv_xor_issue_pending(struct dma_chan *chan);
+ #define to_mv_xor_chan(chan)		\
+ 	container_of(chan, struct mv_xor_chan, common)
  
--	adev->id = hw_id;
+-#define to_mv_xor_device(dev)		\
+-	container_of(dev, struct mv_xor_device, common)
 -
- 	/* discover transaction capabilites from the platform data */
- 	dma_dev->cap_mask = cap_mask;
- 	adev->pdev = pdev;
-diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
-index 7812565..52ca617 100644
---- a/drivers/dma/mv_xor.h
-+++ b/drivers/dma/mv_xor.h
-@@ -71,7 +71,6 @@ struct mv_xor_private {
-  */
- struct mv_xor_device {
- 	struct platform_device		*pdev;
--	int				id;
- 	dma_addr_t			dma_desc_pool;
- 	void				*dma_desc_pool_virt;
- 	size_t                          pool_size;
+ #define to_mv_xor_slot(tx)		\
+ 	container_of(tx, struct mv_xor_desc_slot, async_tx)
+ 
 -- 
 1.7.9.5
