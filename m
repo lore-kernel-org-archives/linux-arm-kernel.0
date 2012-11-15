@@ -1,30 +1,37 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 15 Nov 2012 12:07:27 -0800
-Subject: common clk fixes for 3.7-rc6, part 2
-Message-ID: <20121115200727.7155.72698@nucleus>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 15 Nov 2012 12:23:48 -0800
+Subject: [PATCH v5 0/4] arch/arm: support seccomp
+In-Reply-To: <20121115132550.GA5570@mudshark.cambridge.arm.com>
+References: <1352587485-18348-1-git-send-email-keescook@chromium.org>
+ <CAGXu5jKYGCkL3GS4Tbep==WUAqP-c_0edAdgy0XQ84rJxZUU2Q@mail.gmail.com>
+ <20121115132550.GA5570@mudshark.cambridge.arm.com>
+Message-ID: <CAGXu5jL6og3xq_V=FkemV828Tso5F4wSoLy_24HA_LFw_x20Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
+On Thu, Nov 15, 2012 at 5:25 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Nov 14, 2012 at 07:07:13PM +0000, Kees Cook wrote:
+>> Hi, any more thoughts on this series? I'd really like to get it into
+>> -next. It's been running happily for a while now in the Chrome OS ARM
+>> devices.
+>
+> I'm not familiar with seccomp in general, but the changes look ok now from
+> an ARM point-of-view:
+>
+>   Reviewed-by: Will Deacon <will.deacon@arm.com>
+>
+> These should probably go via Russell (who will put them into -next), so
+> please send them to the patch system.
 
-  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
+Thanks. Is there a sensible way to send an ordered patch series to the
+patch system? The Help doc says:
+   Please omit [PATCH] and other "useful" prefixes.
+(and it wants the "KernelVersion: " in there too)
 
-are available in the git repository at:
+Is there some way to indicate 1/4, 2/4, etc?
 
-  git://git.linaro.org/people/mturquette/linux.git tags/clk-fixes-for-linus
+-Kees
 
-for you to fetch changes up to 93532c8a4890871aa0d84dd91b80dad9f58542e0:
-
-  clk: remove inline usage from clk-provider.h (2012-11-15 11:38:34 -0800)
-
-----------------------------------------------------------------
-GCC 4.7 users get compilation errors from unnecessary use of inline in
-clk-provider.h.  This pull request fixes the regression by removing inline
-usage from those function declarations.
-
-----------------------------------------------------------------
-Igor Mazanov (1):
-      clk: remove inline usage from clk-provider.h
-
- include/linux/clk-provider.h |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+-- 
+Kees Cook
+Chrome OS Security
