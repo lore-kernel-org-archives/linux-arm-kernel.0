@@ -1,44 +1,33 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 15 Nov 2012 13:04:43 +0530
-Subject: [PATCHv2] i2c: omap: Move the remove constraint
-Message-ID: <1352964883-9846-1-git-send-email-shubhrajyoti@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 15 Nov 2012 08:35:11 +0100
+Subject: [PATCH 1/4] pinctrl: dove: Prevent NULL dereference if
+ of_match_device returns NULL
+In-Reply-To: <1352955096.6793.1.camel@phoenix>
+References: <1352955096.6793.1.camel@phoenix>
+Message-ID: <20121115083511.08f5a16f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we just queue the transfer and release the
-qos constraints, however we donot wait for the transfer
-to complete to release the constraint. Move the remove
-constraint after the bus busy as we are sure that the
-transfers are completed by then.
+Dear Axel Lin,
 
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
-v2: rebase to the for-next branch
+On Thu, 15 Nov 2012 12:51:36 +0800, Axel Lin wrote:
+> of_match_device() may return NULL.
+> 
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
 
- drivers/i2c/busses/i2c-omap.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
+Could you detail under what conditions of_match_device() may return
+NULL in the specific case of this driver? This of_match_device() call
+is using the same dove_pinctrl_of_match array that is used to ->probe()
+this driver. So I don't see how you can get into ->probe() without
+having a matching entry.
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 482c63d..fabcbe1 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -654,13 +654,14 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
- 			break;
- 	}
- 
--	if (dev->set_mpu_wkup_lat != NULL)
--		dev->set_mpu_wkup_lat(dev->dev, -1);
--
- 	if (r == 0)
- 		r = num;
- 
- 	omap_i2c_wait_for_bb(dev);
-+
-+	if (dev->set_mpu_wkup_lat != NULL)
-+		dev->set_mpu_wkup_lat(dev->dev, -1);
-+
- out:
- 	pm_runtime_mark_last_busy(dev->dev);
- 	pm_runtime_put_autosuspend(dev->dev);
+Am I missing something?
+
+Best regards,
+
+Thomas
 -- 
-1.7.5.4
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
