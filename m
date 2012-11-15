@@ -1,54 +1,65 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Nov 2012 15:15:41 +0000
-Subject: [PATCH 4/4] pinctrl: nomadik: Prevent NULL dereference if
- of_match_device returns NULL
-In-Reply-To: <CACRpkdbWqFrP7RvXbaR5Bcz1htCL_wSqwUvOi67LmoF_PBjvhg@mail.gmail.com>
-References: <1352955096.6793.1.camel@phoenix> <1352955365.6793.6.camel@phoenix>
- <CACRpkdbWqFrP7RvXbaR5Bcz1htCL_wSqwUvOi67LmoF_PBjvhg@mail.gmail.com>
-Message-ID: <20121115151541.GC14476@gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 15 Nov 2012 17:36:48 +0200
+Subject: [PATCH] remoteproc: fix error path of ->find_vqs
+Message-ID: <1352993808-23212-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Nov 2012, Linus Walleij wrote:
+Eliminate an erroneous invocation of rproc_shutdown inside
+the error path of rproc_virtio_find_vqs.
 
-> On Thu, Nov 15, 2012 at 5:56 AM, Axel Lin <axel.lin@ingics.com> wrote:
-> 
-> > of_match_device() may return NULL.
-> >
-> > Signed-off-by: Axel Lin <axel.lin@ingics.com>
-> > ---
-> >  drivers/pinctrl/pinctrl-nomadik.c |   11 ++++++++---
-> >  1 file changed, 8 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-> > index 238060e..40bd1b3 100644
-> > --- a/drivers/pinctrl/pinctrl-nomadik.c
-> > +++ b/drivers/pinctrl/pinctrl-nomadik.c
-> > @@ -1863,9 +1863,14 @@ static int __devinit nmk_pinctrl_probe(struct platform_device *pdev)
-> >
-> >         if (platid)
-> >                 version = platid->driver_data;
-> > -       else if (np)
-> > -               version = (unsigned int)
-> > -                       of_match_device(nmk_pinctrl_match, &pdev->dev)->data;
-> > +       else if (np) {
-> > +               const struct of_device_id *match;
-> > +
-> > +               match = of_match_device(nmk_pinctrl_match, &pdev->dev);
-> > +               if (!match)
-> > +                       return -ENODEV;
-> > +               version = (unsigned int) match->data;
-> > +       }
-> 
-> AFAICT this can actually happen so patch applied, unless Lee
-> speaks against it.
+Reported-by: Ido Yariv <ido@wizery.com>
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+---
+ drivers/remoteproc/remoteproc_virtio.c | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
 
-At the very least it make the code easy to read.
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
+diff --git a/drivers/remoteproc/remoteproc_virtio.c b/drivers/remoteproc/remoteproc_virtio.c
+index e7a4780..9e198e5 100644
+--- a/drivers/remoteproc/remoteproc_virtio.c
++++ b/drivers/remoteproc/remoteproc_virtio.c
+@@ -120,15 +120,11 @@ static struct virtqueue *rp_find_vq(struct virtio_device *vdev,
+ 	return vq;
+ }
+ 
+-static void rproc_virtio_del_vqs(struct virtio_device *vdev)
++static void __rproc_virtio_del_vqs(struct virtio_device *vdev)
+ {
+ 	struct virtqueue *vq, *n;
+-	struct rproc *rproc = vdev_to_rproc(vdev);
+ 	struct rproc_vring *rvring;
+ 
+-	/* power down the remote processor before deleting vqs */
+-	rproc_shutdown(rproc);
+-
+ 	list_for_each_entry_safe(vq, n, &vdev->vqs, list) {
+ 		rvring = vq->priv;
+ 		rvring->vq = NULL;
+@@ -137,6 +133,16 @@ static void rproc_virtio_del_vqs(struct virtio_device *vdev)
+ 	}
+ }
+ 
++static void rproc_virtio_del_vqs(struct virtio_device *vdev)
++{
++	struct rproc *rproc = vdev_to_rproc(vdev);
++
++	/* power down the remote processor before deleting vqs */
++	rproc_shutdown(rproc);
++
++	__rproc_virtio_del_vqs(vdev);
++}
++
+ static int rproc_virtio_find_vqs(struct virtio_device *vdev, unsigned nvqs,
+ 		       struct virtqueue *vqs[],
+ 		       vq_callback_t *callbacks[],
+@@ -163,7 +169,7 @@ static int rproc_virtio_find_vqs(struct virtio_device *vdev, unsigned nvqs,
+ 	return 0;
+ 
+ error:
+-	rproc_virtio_del_vqs(vdev);
++	__rproc_virtio_del_vqs(vdev);
+ 	return ret;
+ }
+ 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.10.rc3.1067.gb129051
