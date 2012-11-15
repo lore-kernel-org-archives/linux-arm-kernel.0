@@ -1,80 +1,149 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 15 Nov 2012 23:46:20 +0100
-Subject: [PATCH 1/6] clocksource: sunxi: Add Allwinner A1X Timer Driver
+Date: Thu, 15 Nov 2012 23:46:21 +0100
+Subject: [PATCH 2/6] irqchip: sunxi: Add irq controller driver
 In-Reply-To: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1353019586-21043-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1353019586-21043-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 CC: Thomas Gleixner <tglx@linutronix.de>
-CC: John Stultz <johnstul@us.ibm.com>
 ---
- .../bindings/timer/allwinner,sunxi-timer.txt       |   15 ++
- drivers/clocksource/Kconfig                        |    3 +
- drivers/clocksource/Makefile                       |    1 +
- drivers/clocksource/sunxi_timer.c                  |  160 ++++++++++++++++++++
- include/linux/sunxi_timer.h                        |   24 +++
- 5 files changed, 203 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/allwinner,sunxi-timer.txt
- create mode 100644 drivers/clocksource/sunxi_timer.c
- create mode 100644 include/linux/sunxi_timer.h
+ .../interrupt-controller/allwinner,sunxi-ic.txt    |  104 ++++++++++++
+ drivers/irqchip/Makefile                           |    1 +
+ drivers/irqchip/irq-sunxi.c                        |  173 ++++++++++++++++++++
+ include/linux/irqchip/sunxi.h                      |   27 +++
+ 4 files changed, 305 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-ic.txt
+ create mode 100644 drivers/irqchip/irq-sunxi.c
+ create mode 100644 include/linux/irqchip/sunxi.h
 
-diff --git a/Documentation/devicetree/bindings/timer/allwinner,sunxi-timer.txt b/Documentation/devicetree/bindings/timer/allwinner,sunxi-timer.txt
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-ic.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-ic.txt
 new file mode 100644
-index 0000000..c6041ee
+index 0000000..7f9fb85
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/allwinner,sunxi-timer.txt
-@@ -0,0 +1,15 @@
-+Allwinner A1X SoCs Timer Controller
++++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-ic.txt
+@@ -0,0 +1,104 @@
++Allwinner Sunxi Interrupt Controller
 +
 +Required properties:
 +
-+- compatible : should be "allwinner,sunxi-timer"
++- compatible : should be "allwinner,sunxi-ic"
 +- reg : Specifies base physical address and size of the registers.
-+- interrupts : The interrupt of the first timer
++- interrupt-controller : Identifies the node as an interrupt controller
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. The value shall be 1.
++
++The interrupt sources are as follows:
++
++0: ENMI
++1: UART0
++2: UART1
++3: UART2
++4: UART3
++5: IR0
++6: IR1
++7: I2C0
++8: I2C1
++9: I2C2
++10: SPI0
++11: SPI1
++12: SPI2
++13: SPDIF
++14: AC97
++15: TS
++16: I2S
++17: UART4
++18: UART5
++19: UART6
++20: UART7
++21: KEYPAD
++22: TIMER0
++23: TIMER1
++24: TIMER2
++25: TIMER3
++26: CAN
++27: DMA
++28: PIO
++29: TOUCH_PANEL
++30: AUDIO_CODEC
++31: LRADC
++32: SDMC0
++33: SDMC1
++34: SDMC2
++35: SDMC3
++36: MEMSTICK
++37: NAND
++38: USB0
++39: USB1
++40: USB2
++41: SCR
++42: CSI0
++43: CSI1
++44: LCDCTRL0
++45: LCDCTRL1
++46: MP
++47: DEFEBE0
++48: DEFEBE1
++49: PMU
++50: SPI3
++51: TZASC
++52: PATA
++53: VE
++54: SS
++55: EMAC
++56: SATA
++57: GPS
++58: HDMI
++59: TVE
++60: ACE
++61: TVD
++62: PS2_0
++63: PS2_1
++64: USB3
++65: USB4
++66: PLE_PFM
++67: TIMER4
++68: TIMER5
++69: GPU_GP
++70: GPU_GPMMU
++71: GPU_PP0
++72: GPU_PPMMU0
++73: GPU_PMU
++74: GPU_RSV0
++75: GPU_RSV1
++76: GPU_RSV2
++77: GPU_RSV3
++78: GPU_RSV4
++79: GPU_RSV5
++80: GPU_RSV6
++82: SYNC_TIMER0
++83: SYNC_TIMER1
 +
 +Example:
 +
-+timer {
-+	compatible = "allwinner,sunxi-timer";
-+	reg = <0x01c20c00 0x400>;
-+	interrupts = <22>;
++intc: interrupt-controller {
++	compatible = "allwinner,sunxi-ic";
++	reg = <0x01c20400 0x400>;
++	interrupt-controller;
++	#interrupt-cells = <2>;
 +};
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 6a78073..a098573 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -22,6 +22,9 @@ config DW_APB_TIMER_OF
- config ARMADA_370_XP_TIMER
- 	bool
- 
-+config SUNXI_TIMER
-+	bool
-+
- config CLKSRC_DBX500_PRCMU
- 	bool "Clocksource PRCMU Timer"
- 	depends on UX500_SOC_DB8500
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 603be36..36f06de 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -14,5 +14,6 @@ obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
- obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
- obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
- obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
-+obj-$(CONFIG_SUNXI_TIMER)	+= sunxi_timer.o
- 
- obj-$(CONFIG_CLKSRC_ARM_GENERIC)	+= arm_generic.o
-diff --git a/drivers/clocksource/sunxi_timer.c b/drivers/clocksource/sunxi_timer.c
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 054321d..2444d07 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_ARCH_BCM2835) += irq-bcm2835.o
++obj-$(CONFIG_ARCH_SUNXI)   += irq-sunxi.o
+diff --git a/drivers/irqchip/irq-sunxi.c b/drivers/irqchip/irq-sunxi.c
 new file mode 100644
-index 0000000..5dd5b48
+index 0000000..9dcb323
 --- /dev/null
-+++ b/drivers/clocksource/sunxi_timer.c
-@@ -0,0 +1,160 @@
++++ b/drivers/irqchip/irq-sunxi.c
+@@ -0,0 +1,173 @@
 +/*
-+ * Allwinner A1X SoCs timer handling.
++ * Allwinner A1X SoCs IRQ chip driver.
 + *
 + * Copyright (C) 2012 Maxime Ripard
 + *
@@ -89,156 +158,169 @@ index 0000000..5dd5b48
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/clockchips.h>
-+#include <linux/interrupt.h>
++#include <linux/io.h>
 +#include <linux/irq.h>
-+#include <linux/irqreturn.h>
 +#include <linux/of.h>
 +#include <linux/of_address.h>
 +#include <linux/of_irq.h>
-+#include <linux/sunxi_timer.h>
 +
-+#define TIMER_CTL_REG		0x00
-+#define TIMER_CTL_ENABLE		(1 << 0)
-+#define TIMER_IRQ_ST_REG	0x04
-+#define TIMER0_CTL_REG		0x10
-+#define TIMER0_CTL_ENABLE		(1 << 0)
-+#define TIMER0_CTL_AUTORELOAD		(1 << 1)
-+#define TIMER0_CTL_ONESHOT		(1 << 7)
-+#define TIMER0_INTVAL_REG	0x14
-+#define TIMER0_CNTVAL_REG	0x18
++#include <linux/irqchip/sunxi.h>
 +
-+#define TIMER_CLKSRC		24000000
-+#define TIMER_SCAL		16
-+#define TIMER_INTERVAL		(TIMER_CLKSRC / (TIMER_SCAL * HZ))
++#define SUNXI_IRQ_PROTECTION_REG	0x08
++#define SUNXI_IRQ_NMI_CTRL_REG		0x0c
++#define SUNXI_IRQ_PENDING_REG(x)	(0x10 + 0x4 * x)
++#define SUNXI_IRQ_FIQ_PENDING_REG(x)	(0x20 + 0x4 * x)
++#define SUNXI_IRQ_ENABLE_REG(x)		(0x40 + 0x4 * x)
++#define SUNXI_IRQ_MASK_REG(x)		(0x50 + 0x4 * x)
 +
-+static void __iomem *timer_base;
++static void __iomem *sunxi_irq_base;
++static struct irq_domain *sunxi_irq_domain;
 +
-+static void sunxi_clkevt_mode(enum clock_event_mode mode,
-+			      struct clock_event_device *clk)
++void sunxi_irq_ack(struct irq_data *irqd)
 +{
-+	u32 u = readl(timer_base + TIMER0_CTL_REG);
++	unsigned int irq = irqd_to_hwirq(irqd);
++	unsigned int irq_off = irq % 32;
++	int reg = irq / 32;
++	u32 val;
 +
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		writel(TIMER_INTERVAL, timer_base + TIMER0_INTVAL_REG);
-+		u &= ~(TIMER0_CTL_ONESHOT);
-+		writel(u | TIMER0_CTL_ENABLE, timer_base + TIMER0_CTL_REG);
-+		break;
++	val = readl(sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(reg));
++	writel(val & ~(1 << irq_off),
++	       sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(reg));
 +
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		writel(u | TIMER0_CTL_ONESHOT, timer_base + TIMER0_CTL_REG);
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	default:
-+		writel(u & ~(TIMER0_CTL_ENABLE), timer_base + TIMER0_CTL_REG);
-+		break;
-+	}
++	val = readl(sunxi_irq_base + SUNXI_IRQ_MASK_REG(reg));
++	writel(val | (1 << irq_off),
++	       sunxi_irq_base + SUNXI_IRQ_MASK_REG(reg));
++
++	val = readl(sunxi_irq_base + SUNXI_IRQ_PENDING_REG(reg));
++	writel(val | (1 << irq_off),
++	       sunxi_irq_base + SUNXI_IRQ_PENDING_REG(reg));
 +}
 +
-+static int sunxi_clkevt_next_event(unsigned long evt,
-+				   struct clock_event_device *unused)
++static void sunxi_irq_mask(struct irq_data *irqd)
 +{
-+	u32 u = readl(timer_base + TIMER0_CTL_REG);
-+	writel(evt, timer_base + TIMER0_CNTVAL_REG);
-+	writel(u | TIMER0_CTL_ENABLE | TIMER0_CTL_AUTORELOAD,
-+	       timer_base + TIMER0_CTL_REG);
++	unsigned int irq = irqd_to_hwirq(irqd);
++	unsigned int irq_off = irq % 32;
++	int reg = irq / 32;
++	u32 val;
++
++	val = readl(sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(reg));
++	writel(val & ~(1 << irq_off),
++	       sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(reg));
++
++	val = readl(sunxi_irq_base + SUNXI_IRQ_MASK_REG(reg));
++	writel(val | (1 << irq_off),
++	       sunxi_irq_base + SUNXI_IRQ_MASK_REG(reg));
++}
++
++static void sunxi_irq_unmask(struct irq_data *irqd)
++{
++	unsigned int irq = irqd_to_hwirq(irqd);
++	unsigned int irq_off = irq % 32;
++	int reg = irq / 32;
++	u32 val;
++
++	val = readl(sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(reg));
++	writel(val | (1 << irq_off),
++	       sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(reg));
++
++	val = readl(sunxi_irq_base + SUNXI_IRQ_MASK_REG(reg));
++	writel(val & ~(1 << irq_off),
++	       sunxi_irq_base + SUNXI_IRQ_MASK_REG(reg));
++
++	/* Must clear pending bit when enabled */
++	if (irq == 0)
++		writel(1, sunxi_irq_base + SUNXI_IRQ_PENDING_REG(0));
++}
++
++static struct irq_chip sunxi_irq_chip = {
++	.name		= "sunxi_irq",
++	.irq_ack	= sunxi_irq_ack,
++	.irq_mask	= sunxi_irq_mask,
++	.irq_unmask	= sunxi_irq_unmask,
++};
++
++static int sunxi_irq_map(struct irq_domain *d, unsigned int virq,
++			 irq_hw_number_t hw)
++{
++	irq_set_chip(virq, &sunxi_irq_chip);
++	irq_set_handler(virq, handle_level_irq);
++	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
 +
 +	return 0;
 +}
 +
-+static struct clock_event_device sunxi_clockevent = {
-+	.name = "sunxi_tick",
-+	.shift = 32,
-+	.rating = 300,
-+	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.set_mode = sunxi_clkevt_mode,
-+	.set_next_event = sunxi_clkevt_next_event,
++static struct irq_domain_ops sunxi_irq_ops = {
++	.map = sunxi_irq_map,
++	.xlate = irq_domain_xlate_onecell,
 +};
 +
-+
-+static irqreturn_t sunxi_timer_interrupt(int irq, void *dev_id)
++static int __init sunxi_of_init(struct device_node *node,
++				struct device_node *parent)
 +{
-+	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
++	sunxi_irq_base = of_iomap(node, 0);
++	if (!sunxi_irq_base)
++		panic("%s: unable to map IC registers\n",
++			node->full_name);
 +
-+	writel(0x1, timer_base + TIMER_IRQ_ST_REG);
-+	evt->event_handler(evt);
++	/* Disable all interrupts */
++	writel(0, sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(0));
++	writel(0, sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(1));
++	writel(0, sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(2));
 +
-+	return IRQ_HANDLED;
++	/* Mask all the interrupts */
++	writel(0xffffffff, sunxi_irq_base + SUNXI_IRQ_MASK_REG(0));
++	writel(0xffffffff, sunxi_irq_base + SUNXI_IRQ_MASK_REG(1));
++	writel(0xffffffff, sunxi_irq_base + SUNXI_IRQ_MASK_REG(2));
++
++	/* Clear all the pending interrupts */
++	writel(0xffffffff, sunxi_irq_base + SUNXI_IRQ_PENDING_REG(0));
++	writel(0xffffffff, sunxi_irq_base + SUNXI_IRQ_PENDING_REG(1));
++	writel(0xffffffff, sunxi_irq_base + SUNXI_IRQ_PENDING_REG(2));
++
++	/* Enable protection mode */
++	writel(0x01, sunxi_irq_base + SUNXI_IRQ_PROTECTION_REG);
++
++	/* Configure the external interrupt source type */
++	writel(0x00, sunxi_irq_base + SUNXI_IRQ_NMI_CTRL_REG);
++
++	sunxi_irq_domain = irq_domain_add_linear(node, 3 * 32,
++						 &sunxi_irq_ops, NULL);
++	if (!sunxi_irq_domain)
++		panic("%s: unable to create IRQ domain\n", node->full_name);
++
++	return 0;
 +}
 +
-+static struct irqaction sunxi_timer_irq = {
-+	.name = "sunxi_timer0",
-+	.flags = IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler = sunxi_timer_interrupt,
-+	.dev_id = &sunxi_clockevent,
++static struct of_device_id sunxi_irq_dt_ids[] __initconst = {
++	{ .compatible = "allwinner,sunxi-ic", .data = sunxi_of_init }
 +};
 +
-+static struct of_device_id sunxi_timer_dt_ids[] = {
-+	{ .compatible = "allwinner,sunxi-timer" },
-+};
-+
-+static void __init sunxi_timer_init(void)
++void __init sunxi_init_irq(void)
 +{
-+	struct device_node *node;
-+	int ret, irq;
-+	u32 val;
-+
-+	node = of_find_matching_node(NULL, sunxi_timer_dt_ids);
-+	if (!node)
-+		panic("No sunxi timer node");
-+
-+	timer_base = of_iomap(node, 0);
-+	if (!timer_base)
-+		panic("Can't map registers");
-+
-+	irq = irq_of_parse_and_map(node, 0);
-+	if (irq <= 0)
-+		panic("Can't parse IRQ");
-+
-+	writel(TIMER_INTERVAL, timer_base + TIMER0_INTVAL_REG);
-+
-+	/* set clock source to HOSC, 16 pre-division */
-+	val = readl(timer_base + TIMER0_CTL_REG);
-+	val &= ~(0x07 << 4);
-+	val &= ~(0x03 << 2);
-+	val |= (4 << 4) | (1 << 2);
-+	writel(val, timer_base + TIMER0_CTL_REG);
-+
-+	/* set mode to auto reload */
-+	val = readl(timer_base + TIMER0_CTL_REG);
-+	writel(val | TIMER0_CTL_AUTORELOAD, timer_base + TIMER0_CTL_REG);
-+
-+	ret = setup_irq(irq, &sunxi_timer_irq);
-+	if (ret)
-+		pr_warn("failed to setup irq %d\n", irq);
-+
-+	/* Enable timer0 interrupt */
-+	val = readl(timer_base + TIMER_CTL_REG);
-+	writel(val | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG);
-+
-+	sunxi_clockevent.mult = div_sc(TIMER_CLKSRC / TIMER_SCAL,
-+				NSEC_PER_SEC,
-+				sunxi_clockevent.shift);
-+	sunxi_clockevent.max_delta_ns = clockevent_delta2ns(0xff,
-+							    &sunxi_clockevent);
-+	sunxi_clockevent.min_delta_ns = clockevent_delta2ns(0x1,
-+							    &sunxi_clockevent);
-+	sunxi_clockevent.cpumask = cpumask_of(0);
-+
-+	clockevents_register_device(&sunxi_clockevent);
++	of_irq_init(sunxi_irq_dt_ids);
 +}
 +
-+struct sys_timer sunxi_timer = {
-+	.init = sunxi_timer_init,
-+};
-diff --git a/include/linux/sunxi_timer.h b/include/linux/sunxi_timer.h
++asmlinkage void __exception_irq_entry sunxi_handle_irq(struct pt_regs *regs)
++{
++	u32 irq, reg;
++	int i;
++
++	for (i = 0; i < 3; i++) {
++		reg = readl(sunxi_irq_base + SUNXI_IRQ_PENDING_REG(i));
++		if (reg == 0)
++			continue;
++		irq = ilog2(reg);
++		break;
++	}
++	irq = irq_find_mapping(sunxi_irq_domain, irq);
++	handle_IRQ(irq, regs);
++}
+diff --git a/include/linux/irqchip/sunxi.h b/include/linux/irqchip/sunxi.h
 new file mode 100644
-index 0000000..b9165bb
+index 0000000..1fe2c22
 --- /dev/null
-+++ b/include/linux/sunxi_timer.h
-@@ -0,0 +1,24 @@
++++ b/include/linux/irqchip/sunxi.h
+@@ -0,0 +1,27 @@
 +/*
 + * Copyright 2012 Maxime Ripard
 + *
@@ -255,12 +337,15 @@ index 0000000..b9165bb
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef __SUNXI_TIMER_H
-+#define __SUNXI_TIMER_H
++#ifndef __LINUX_IRQCHIP_SUNXI_H
++#define __LINUX_IRQCHIP_SUNXI_H
 +
-+#include <asm/mach/time.h>
++#include <asm/exception.h>
 +
-+extern struct sys_timer sunxi_timer;
++extern void sunxi_init_irq(void);
++
++extern asmlinkage void __exception_irq_entry sunxi_handle_irq(
++	struct pt_regs *regs);
 +
 +#endif
 -- 
