@@ -1,141 +1,58 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Thu, 15 Nov 2012 14:29:55 +0100
-Subject: [PATCH] arm/dts: Add basic support for gta04 (Openmoko next
- generation) board.
-In-Reply-To: <20121115115925.2FE453E09BB@localhost>
-References: <1351633367-19082-1-git-send-email-marek.belisko@open-nandra.com>
- <CAAfyv34D4bTO=k8niM42CDQFb0tP4uOnvX_KPT3+F6z59jPg3Q@mail.gmail.com>
- <20121115115925.2FE453E09BB@localhost>
-Message-ID: <CAAfyv34ihnwL9JheLzY61zthTkBexTOe3cgkbU4Z+sFG2w1g6g@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 15 Nov 2012 14:30:34 +0100
+Subject: [PATCH] ARM i.MX dts: Consistently add labels to devicenodes
+In-Reply-To: <20121115134831.GA2546@S2100-06.ap.freescale.net>
+References: <1352968312-8321-1-git-send-email-s.hauer@pengutronix.de>
+ <20121115134831.GA2546@S2100-06.ap.freescale.net>
+Message-ID: <20121115133034.GD10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC'ing Tony
+On Thu, Nov 15, 2012 at 09:48:33PM +0800, Shawn Guo wrote:
+> On Thu, Nov 15, 2012 at 09:31:52AM +0100, Sascha Hauer wrote:
+> > Having labels before each node allows board bindings to reference
+> > to nodes by using the &nodename {} notation.
+> 
+> I can understand this part.
+> 
+> > This way boards do not
+> > have to resemble the whole devicetree layout. Due to less indention
+> > needed the board files also get better readability.
+> 
+> I do not understand it.  Don't we have to always maintain the device
+> tree layout defined by <soc>.dtsi in <board>.dts, do we?
 
-On Thu, Nov 15, 2012 at 12:59 PM, Grant Likely
-<grant.likely@secretlab.ca> wrote:
-> On Wed, 14 Nov 2012 21:26:58 +0100, Belisko Marek <marek.belisko@gmail.com> wrote:
->> CC' Grant & Rob
->
-> Hi Marek
->
-> Since this is an OMAP board, you should send the changes to Tony and
-> they should be merged through the arm-soc tree.
->
-> g.
->
->>
->> On Tue, Oct 30, 2012 at 10:42 PM, Marek Belisko
->> <marek.belisko@open-nandra.com> wrote:
->> > Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
->> > ---
->> >  arch/arm/boot/dts/omap3-gta04.dts |   65 +++++++++++++++++++++++++++++++++++++
->> >  1 file changed, 65 insertions(+)
->> >  create mode 100644 arch/arm/boot/dts/omap3-gta04.dts
->> >
->> > diff --git a/arch/arm/boot/dts/omap3-gta04.dts b/arch/arm/boot/dts/omap3-gta04.dts
->> > new file mode 100644
->> > index 0000000..76efd13
->> > --- /dev/null
->> > +++ b/arch/arm/boot/dts/omap3-gta04.dts
->> > @@ -0,0 +1,65 @@
->> > +/*
->> > + * Copyright (C) 2012 Marek Belisko <marek.belisko@open-nandra.com>
->> > + *
->> > + * Based on omap3-beagle-xm.dts
->> > + *
->> > + * This program is free software; you can redistribute it and/or modify
->> > + * it under the terms of the GNU General Public License version 2 as
->> > + * published by the Free Software Foundation.
->> > + */
->> > +/dts-v1/;
->> > +
->> > +/include/ "omap3.dtsi"
->> > +
->> > +/ {
->> > +       model = "OMAP3 GTA04";
->> > +       compatible = "ti,omap3-gta04", "ti,omap3";
->> > +
->> > +       memory {
->> > +               device_type = "memory";
->> > +               reg = <0x80000000 0x20000000>; /* 512 MB */
->> > +       };
->> > +
->> > +       gpio-keys {
->> > +               compatible = "gpio-keys";
->> > +               #address-cells = <1>;
->> > +               #size-cells = <0>;
->> > +               aux-button {
->> > +                       label = "AUX";
->> > +                       linux,code = <169>;
->> > +                       gpios = <&gpio1 7 1>;
->> > +                       gpio-key,wakeup;
->> > +               };
->> > +       };
->> > +};
->> > +
->> > +&i2c1 {
->> > +       clock-frequency = <2600000>;
->> > +
->> > +       twl: twl at 48 {
->> > +               reg = <0x48>;
->> > +               interrupts = <7>; /* SYS_NIRQ cascaded to intc */
->> > +               interrupt-parent = <&intc>;
->> > +       };
->> > +};
->> > +
->> > +/include/ "twl4030.dtsi"
->> > +
->> > +&i2c2 {
->> > +       clock-frequency = <400000>;
->> > +       /* Pressure Sensor */
->> > +       bmp085 at 77 {
->> > +               compatible = "bosch,bmp085";
->> > +               reg = <0x77>;
->> > +       };
->> > +};
->> > +
->> > +&i2c3 {
->> > +       clock-frequency = <100000>;
->> > +};
->> > +
->> > +&mmc1 {
->> > +       vmmc-supply = <&vmmc1>;
->> > +       bus-width = <4>;
->> > +};
->> > +
->> > --
->> > 1.7.9.5
->> >
->>
->>
->>
->> --
->> as simple and primitive as possible
->> -------------------------------------------------
->> Marek Belisko - OPEN-NANDRA
->> Freelance Developer
->>
->> Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
->> Tel: +421 915 052 184
->> skype: marekwhite
->> twitter: #opennandra
->> web: http://open-nandra.com
->
-> --
-> Grant Likely, B.Sc, P.Eng.
-> Secret Lab Technologies, Ltd.
+Have a look at for example arch/arm/boot/dts/omap5-evm.dts, it is
+written like this:
 
-Marek
+...
+
+&mmc1 {
+        vmmc-supply = <&vmmcsd_fixed>;
+        bus-width = <4>;
+};
+
+&mmc2 {
+        vmmc-supply = <&vmmcsd_fixed>;
+        bus-width = <8>;
+        ti,non-removable;
+};
+
+&mmc3 {
+        bus-width = <4>;
+        ti,non-removable;
+};
+
+...
+
+I've written some board dts from scratch yesterday and this is much
+easier to write (and I think also easier to read as I don't have to
+care about the tree layout when writing a dts).
+
+Sascha
 
 -- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
-
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
