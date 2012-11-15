@@ -1,97 +1,239 @@
 From: dahuang@nvidia.com (Danny Huang)
-Date: Thu, 15 Nov 2012 15:42:32 +0800
-Subject: [PATCH V2 1/3] ARM: tegra: flexible spare fuse read function
+Date: Thu, 15 Nov 2012 15:42:33 +0800
+Subject: [PATCH V2 2/3] ARM: tegra: Add speedo-based process identification
 In-Reply-To: <1352965354-650-1-git-send-email-dahuang@nvidia.com>
 References: <1352965354-650-1-git-send-email-dahuang@nvidia.com>
-Message-ID: <1352965354-650-2-git-send-email-dahuang@nvidia.com>
+Message-ID: <1352965354-650-3-git-send-email-dahuang@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the spare fuse base from a definition to a variable.
-It provides flexibilty to read spare fuse on different chip.
+Detect CPU and core process ID by checking speedo corner tables.
+This can provide a more accurate process ID.
 
 Signed-off-by: Danny Huang <dahuang@nvidia.com>
 ---
- arch/arm/mach-tegra/fuse.c | 19 ++++++++++++-------
- arch/arm/mach-tegra/fuse.h |  2 ++
- 2 files changed, 14 insertions(+), 7 deletions(-)
+ arch/arm/mach-tegra/Makefile         |   1 +
+ arch/arm/mach-tegra/fuse.c           |  31 +++++++---
+ arch/arm/mach-tegra/fuse.h           |   7 +++
+ arch/arm/mach-tegra/tegra20_speedo.c | 109 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 140 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/tegra20_speedo.c
 
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index 6f224f7..75418f1 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -13,6 +13,7 @@ obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
+ obj-$(CONFIG_CPU_IDLE)			+= sleep.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra20_clocks.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra20_clocks_data.o
++obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra20_speedo.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= sleep-tegra20.o
+ ifeq ($(CONFIG_CPU_IDLE),y)
 diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
-index 6c752e8..bd19c2f 100644
+index bd19c2f..9fd02c5 100644
 --- a/arch/arm/mach-tegra/fuse.c
 +++ b/arch/arm/mach-tegra/fuse.c
-@@ -28,7 +28,8 @@
- #define FUSE_UID_LOW		0x108
- #define FUSE_UID_HIGH		0x10c
- #define FUSE_SKU_INFO		0x110
--#define FUSE_SPARE_BIT		0x200
-+
-+#define TEGRA20_FUSE_SPARE_BIT		0x200
- 
- int tegra_sku_id;
+@@ -35,9 +35,11 @@ int tegra_sku_id;
  int tegra_cpu_process_id;
-@@ -36,6 +37,8 @@ int tegra_core_process_id;
+ int tegra_core_process_id;
  int tegra_chip_id;
++int tegra_soc_speedo_id;
  enum tegra_revision tegra_revision;
  
-+static int tegra_fuse_spare_bit;
-+
+ static int tegra_fuse_spare_bit;
++static void (*tegra_init_speedo_data)(void);
+ 
  /* The BCT to use at boot is specified by board straps that can be read
   * through a APB misc register and decoded. 2 bits, i.e. 4 possible BCTs.
-  */
-@@ -56,14 +59,14 @@ static const char *tegra_revision_name[TEGRA_REVISION_MAX] = {
- 	[TEGRA_REVISION_A04]     = "A04",
- };
- 
--static inline u32 tegra_fuse_readl(unsigned long offset)
-+u32 tegra_fuse_readl(unsigned long offset)
- {
- 	return tegra_apb_readl(TEGRA_FUSE_BASE + offset);
+@@ -91,6 +93,16 @@ static enum tegra_revision tegra_get_revision(u32 id)
+ 	}
  }
  
--static inline bool get_spare_fuse(int bit)
-+bool tegra_spare_fuse(int bit)
++static void tegra_get_process_id(void)
++{
++	u32 reg;
++
++	reg = tegra_fuse_readl(tegra_fuse_spare_bit);
++	tegra_cpu_process_id = (reg >> 6) & 3;
++	reg = tegra_fuse_readl(tegra_fuse_spare_bit);
++	tegra_core_process_id = (reg >> 12) & 3;
++}
++
+ void tegra_init_fuse(void)
  {
--	return tegra_fuse_readl(FUSE_SPARE_BIT + bit * 4);
-+	return tegra_fuse_readl(tegra_fuse_spare_bit + bit * 4);
- }
- 
- static enum tegra_revision tegra_get_revision(u32 id)
-@@ -77,7 +80,7 @@ static enum tegra_revision tegra_get_revision(u32 id)
- 		return TEGRA_REVISION_A02;
- 	case 3:
- 		if (tegra_chip_id == TEGRA20 &&
--			(get_spare_fuse(18) || get_spare_fuse(19)))
-+			(tegra_spare_fuse(18) || tegra_spare_fuse(19)))
- 			return TEGRA_REVISION_A03p;
- 		else
- 			return TEGRA_REVISION_A03;
-@@ -99,10 +102,12 @@ void tegra_init_fuse(void)
+ 	u32 id;
+@@ -102,21 +114,24 @@ void tegra_init_fuse(void)
  	reg = tegra_fuse_readl(FUSE_SKU_INFO);
  	tegra_sku_id = reg & 0xFF;
  
--	reg = tegra_fuse_readl(FUSE_SPARE_BIT);
+-	tegra_fuse_spare_bit = TEGRA20_FUSE_SPARE_BIT;
+-
+-	reg = tegra_fuse_readl(tegra_fuse_spare_bit);
+-	tegra_cpu_process_id = (reg >> 6) & 3;
+-
+-	reg = tegra_fuse_readl(tegra_fuse_spare_bit);
+-	tegra_core_process_id = (reg >> 12) & 3;
+-
+ 	reg = tegra_apb_readl(TEGRA_APB_MISC_BASE + STRAP_OPT);
+ 	tegra_bct_strapping = (reg & RAM_ID_MASK) >> RAM_CODE_SHIFT;
+ 
+ 	id = readl_relaxed(IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804);
+ 	tegra_chip_id = (id >> 8) & 0xff;
+ 
 +	tegra_fuse_spare_bit = TEGRA20_FUSE_SPARE_BIT;
 +
-+	reg = tegra_fuse_readl(tegra_fuse_spare_bit);
- 	tegra_cpu_process_id = (reg >> 6) & 3;
++	switch (tegra_chip_id) {
++	case TEGRA20:
++		tegra_init_speedo_data = &tegra20_init_speedo_data;
++		break;
++	default:
++		tegra_init_speedo_data = &tegra_get_process_id;
++	}
++
+ 	tegra_revision = tegra_get_revision(id);
++	tegra_init_speedo_data();
  
--	reg = tegra_fuse_readl(FUSE_SPARE_BIT);
-+	reg = tegra_fuse_readl(tegra_fuse_spare_bit);
- 	tegra_core_process_id = (reg >> 12) & 3;
- 
- 	reg = tegra_apb_readl(TEGRA_APB_MISC_BASE + STRAP_OPT);
+ 	pr_info("Tegra Revision: %s SKU: %d CPU Process: %d Core Process: %d\n",
+ 		tegra_revision_name[tegra_revision],
 diff --git a/arch/arm/mach-tegra/fuse.h b/arch/arm/mach-tegra/fuse.h
-index d2107b2..aef1223 100644
+index aef1223..7347c88 100644
 --- a/arch/arm/mach-tegra/fuse.h
 +++ b/arch/arm/mach-tegra/fuse.h
-@@ -48,5 +48,7 @@ extern int tegra_bct_strapping;
+@@ -42,6 +42,7 @@ extern int tegra_sku_id;
+ extern int tegra_cpu_process_id;
+ extern int tegra_core_process_id;
+ extern int tegra_chip_id;
++extern int tegra_soc_speedo_id;
+ extern enum tegra_revision tegra_revision;
  
- unsigned long long tegra_chip_uid(void);
- void tegra_init_fuse(void);
-+bool tegra_spare_fuse(int bit);
-+u32 tegra_fuse_readl(unsigned long offset);
+ extern int tegra_bct_strapping;
+@@ -51,4 +52,10 @@ void tegra_init_fuse(void);
+ bool tegra_spare_fuse(int bit);
+ u32 tegra_fuse_readl(unsigned long offset);
  
++#ifdef CONFIG_ARCH_TEGRA_2x_SOC
++void tegra20_init_speedo_data(void);
++#else
++static inline void tegra20_init_speedo_data(void) {}
++#endif
++
  #endif
+diff --git a/arch/arm/mach-tegra/tegra20_speedo.c b/arch/arm/mach-tegra/tegra20_speedo.c
+new file mode 100644
+index 0000000..97feba3
+--- /dev/null
++++ b/arch/arm/mach-tegra/tegra20_speedo.c
+@@ -0,0 +1,109 @@
++/*
++ * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/kernel.h>
++#include <linux/bug.h>
++
++#include "fuse.h"
++
++#define CPU_SPEEDO_LSBIT		20
++#define CPU_SPEEDO_MSBIT		29
++#define CPU_SPEEDO_REDUND_LSBIT		30
++#define CPU_SPEEDO_REDUND_MSBIT		39
++#define CPU_SPEEDO_REDUND_OFFS	(CPU_SPEEDO_REDUND_MSBIT - CPU_SPEEDO_MSBIT)
++
++#define CORE_SPEEDO_LSBIT		40
++#define CORE_SPEEDO_MSBIT		47
++#define CORE_SPEEDO_REDUND_LSBIT	48
++#define CORE_SPEEDO_REDUND_MSBIT	55
++#define CORE_SPEEDO_REDUND_OFFS	(CORE_SPEEDO_REDUND_MSBIT - CORE_SPEEDO_MSBIT)
++
++#define SPEEDO_MULT			4
++
++#define PROCESS_CORNERS_NUM		4
++
++#define SPEEDO_ID_SELECT_0(rev)		((rev) <= 2)
++#define SPEEDO_ID_SELECT_1(sku)		\
++	(((sku) != 20) && ((sku) != 23) && ((sku) != 24) && \
++	 ((sku) != 27) && ((sku) != 28))
++
++enum {
++	SPEEDO_ID_0,
++	SPEEDO_ID_1,
++	SPEEDO_ID_2,
++	SPEEDO_ID_COUNT,
++};
++
++static const u32 cpu_process_speedos[][PROCESS_CORNERS_NUM] = {
++	{315, 366, 420, UINT_MAX},
++	{303, 368, 419, UINT_MAX},
++	{316, 331, 383, UINT_MAX},
++};
++
++static const u32 core_process_speedos[][PROCESS_CORNERS_NUM] = {
++	{165, 195, 224, UINT_MAX},
++	{165, 195, 224, UINT_MAX},
++	{165, 195, 224, UINT_MAX},
++};
++
++void tegra20_init_speedo_data(void)
++{
++	u32 reg;
++	u32 val;
++	int i;
++
++	BUILD_BUG_ON(ARRAY_SIZE(cpu_process_speedos) != SPEEDO_ID_COUNT);
++	BUILD_BUG_ON(ARRAY_SIZE(core_process_speedos) != SPEEDO_ID_COUNT);
++
++	if (SPEEDO_ID_SELECT_0(tegra_revision))
++		tegra_soc_speedo_id = SPEEDO_ID_0;
++	else if (SPEEDO_ID_SELECT_1(tegra_sku_id))
++		tegra_soc_speedo_id = SPEEDO_ID_1;
++	else
++		tegra_soc_speedo_id = SPEEDO_ID_2;
++
++	val = 0;
++	for (i = CPU_SPEEDO_MSBIT; i >= CPU_SPEEDO_LSBIT; i--) {
++		reg = tegra_spare_fuse(i) |
++			tegra_spare_fuse(i + CPU_SPEEDO_REDUND_OFFS);
++		val = (val << 1) | (reg & 0x1);
++	}
++	val = val * SPEEDO_MULT;
++	pr_debug("%s CPU speedo value %u\n", __func__, val);
++
++	for (i = 0; i < (PROCESS_CORNERS_NUM - 1); i++) {
++		if (val <= cpu_process_speedos[tegra_soc_speedo_id][i])
++			break;
++	}
++	tegra_cpu_process_id = i;
++
++	val = 0;
++	for (i = CORE_SPEEDO_MSBIT; i >= CORE_SPEEDO_LSBIT; i--) {
++		reg = tegra_spare_fuse(i) |
++			tegra_spare_fuse(i + CORE_SPEEDO_REDUND_OFFS);
++		val = (val << 1) | (reg & 0x1);
++	}
++	val = val * SPEEDO_MULT;
++	pr_debug("%s Core speedo value %u\n", __func__, val);
++
++	for (i = 0; i < (PROCESS_CORNERS_NUM - 1); i++) {
++		if (val <= core_process_speedos[tegra_soc_speedo_id][i])
++			break;
++	}
++	tegra_core_process_id = i;
++
++	pr_info("Tegra2 Soc Speedo ID %d", tegra_soc_speedo_id);
++}
 -- 
 1.8.0
