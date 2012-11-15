@@ -1,26 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Nov 2012 12:52:35 +0000
-Subject: [PATCH] ARM: pxa: remove pxa95x support
-In-Reply-To: <CAN1soZyfPT7pJjyO_vxGGhzC5hB_5XX1DAR2VwDP9XtH29FV8A@mail.gmail.com>
-References: <1352970366-7154-1-git-send-email-haojian.zhuang@gmail.com>
- <201211151214.47073.arnd@arndb.de>
- <CAN1soZyfPT7pJjyO_vxGGhzC5hB_5XX1DAR2VwDP9XtH29FV8A@mail.gmail.com>
-Message-ID: <201211151252.35355.arnd@arndb.de>
+Date: Thu, 15 Nov 2012 13:00:45 +0000
+Subject: [GIT PULL][for 3.8] pull request from upload/board in arch-pxa
+ git tree
+In-Reply-To: <50991FF6.8070709@yahoo.com>
+References: <CAN1soZzhb361Gs9JVmhkjqqcr6FkGg9MVO_n9Tv29F==HdhwQQ@mail.gmail.com>
+ <20121106140051.GB27284@quad.lixom.net> <50991FF6.8070709@yahoo.com>
+Message-ID: <201211151300.45323.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 November 2012, Haojian Zhuang wrote:
-> On Thu, Nov 15, 2012 at 8:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 15 November 2012, Arnd Bergmann wrote:
+On Tuesday 06 November 2012, Paul Parsons wrote:
+> On 06/11/12 14:00, Olof Johansson wrote:
+> > On Sun, Oct 28, 2012 at 07:59:54AM +0800, Haojian Zhuang wrote:
+> >> ----------------------------------------------------------------
+> >> Paul Parsons (1):
+> >>        ARM: pxa2xx: Remove EXPERIMENTAL dependency from spi-pxa2xx driver
 > >
-> >  "The assumption is that nobody will miss this support. If you are
-> >   reading this text because you actually require pxa95x support on
-> >   a new kernel, we can work out a way to revert this patch or add
-> >   support to the mmp platform".
+> > This is a SPI driver change, and should either go through or be acked by that
+> > maintainer. In this particular case, there's been several series of the
+> > EXPERIMENTAL removals, and I think Kees Cook has one that removes it for all
+> > options in one go. So please ack that patch instead.
 > 
-> Yes, it's great. Please help to paste it into the changeset.
-> 
+> According to the current MAINTAINERS file, the drivers/spi/spi-pxa2xx*
+> driver is maintained by the PXA2xx/PXA3xx guys.
+> That is why I submitted this patch to the linux-arm-kernel list.
+> Is the MAINTAINERS file incorrect?
 
-Ok, applied.
+The file is correct, but it's not always easy to understand. drivers/spi
+overall is maintained by Grant, which arch/arm/mach-* is maintained by
+Olof and me. Haojian maintains the PXA components for each one, so the
+formal way to do this is to have arch/arm/mach-pxa patches go
+
+Author -> Haojian -> arm-soc -> Torvalds
+
+while drivers/spi/spi-pxa* change go
+
+Author -> Haojian -> Grant -> Torvalds
+
+In some cases, you need extra knowledge that is not documented properly,
+e.g. that Grant was on leave recently, and Mark Brown stepped in for
+him, or that the arm-soc maintainership has not been documented at
+all for some time (fixed now). In doubt, just add more people to Cc.
+We're all good at ignoring email that doesn't seem to address us ;-)
 
 	Arnd
