@@ -1,40 +1,40 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 15 Nov 2012 19:38:59 +0530
-Subject: [PATCH 02/14] ARM: SPEAr13xx: DT: Add spics gpio controller nodes
-In-Reply-To: <CACRpkdaJ2kCYfSP=xCRQAG2wDnkMKX9fey+ByhDDiOS==u+XwA@mail.gmail.com>
-References: <cover.1352608333.git.viresh.kumar@linaro.org>
- <58a7d91cab20b924784fb5a09e16ca08e6f13318.1352608333.git.viresh.kumar@linaro.org>
- <CACRpkdZkgmLF8TxFCZSubP+g+6_ofZugArKtE9=dYTZfemstrw@mail.gmail.com>
- <CAKohpon=AVGZmR_cwUZ4=buw0kr3JVtXh51BtXteWkJ7E-f_bQ@mail.gmail.com>
- <CACRpkdaJ2kCYfSP=xCRQAG2wDnkMKX9fey+ByhDDiOS==u+XwA@mail.gmail.com>
-Message-ID: <CAKohpok7-iBCoYk+aAXZPsOODyh6tp2nutC+6wYOot-bK3=wkg@mail.gmail.com>
+From: etienne.carriere@st.com (Etienne CARRIERE ST)
+Date: Thu, 15 Nov 2012 15:10:59 +0100
+Subject: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
+In-Reply-To: <20121115135555.GC25985@arm.com>
+References: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B59@SAFEX1MAIL3.st.com>
+ <20121113171745.GA6370@linaro.org>
+ <BLU002-W44C55773365E0FDAC8B3C5E36C0@phx.gbl>
+ <0154077FE026E54BB093CA7EB3FD1AE32DB61E4CC7@SAFEX1MAIL3.st.com>
+ <20121114172216.GG16215@arm.com>
+ <0154077FE026E54BB093CA7EB3FD1AE32DB6A63266@SAFEX1MAIL3.st.com>
+ <20121115135555.GC25985@arm.com>
+Message-ID: <0154077FE026E54BB093CA7EB3FD1AE32DB6A632CA@SAFEX1MAIL3.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 November 2012 19:36, Linus Walleij <linus.walleij@linaro.org> wrote:
->>> >         ahb {
->>> > +               spics: spics at e0700000{
->>> > +                       compatible = "st,spear-spics-gpio";
->>> > +                       reg = <0xe0700000 0x1000>;
->>> > +                       st-spics,peripcfg-reg = <0x3b0>;
->>> > +                       st-spics,sw-enable-bit = <12>;
->>> > +                       st-spics,cs-value-bit = <11>;
->>> > +                       st-spics,cs-enable-mask = <3>;
->>> > +                       st-spics,cs-enable-shift = <8>;
->>> > +                       gpio-controller;
->>> > +                       #gpio-cells = <2>;
->>> > +               };
->>> > +
->>>
->>> Are these bindings documented?
->>
->> The main patch waiting for ur comments is 1/14.
->
-> I seldom comment on individual DT bindings, I just want
-> to know that they're there :-)
+If I understood well, you stated that on-going background operations on L2 can jeopardize PA operations.
+So the secure code must insure other CPUs do not perform other L2 operations, including non-PA based operations.
 
-Its not that simple. You are required to Ack it, as we have added it in
-drivers/pinctrl/spear because we are controlling pins here :)
+Linux protects both PA and WAY operations using the very same spinlock.
+We must hold this lock while performing any PA operations from secure world.
+
+I am right ?
+
+etienne
+
+-----Original Message-----
+From: Catalin Marinas [mailto:catalin.marinas at arm.com] 
+Sent: Thursday, November 15, 2012 2:56 PM
+To: Etienne CARRIERE ST
+Cc: Abhimanyu Kapur; Dave Martin; Rabin VINCENT; Russell King; Srinidhi KASAGAR; Marc Zyngier; Linus Walleij (linus.walleij at linaro.org); Will Deacon; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
+
+On Thu, Nov 15, 2012 at 01:46:29PM +0000, Etienne CARRIERE ST wrote:
+> I think we will internally use our hack in l2x0 spin locking to 
+> prevent collision, based on old arch_spinlock support.
+
+Or just handle the collision in the secure code and make sure you don't start background operations. If you don't use background operations, you don't need any locking.
 
 --
-viresh
+Catalin
