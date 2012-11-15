@@ -1,59 +1,99 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Nov 2012 21:18:33 +0000
-Subject: [RFC PATCH 3.7.0-rc4] ARM:smp: introduce smp_notify_cpu_stop to
- fix kexec smp case
-In-Reply-To: <1353003478-22291-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1353003478-22291-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <20121115211833.GD13998@mudshark.cambridge.arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 15 Nov 2012 22:28:19 +0100
+Subject: [PATCH 0/7] core, cpu and gated clocks for mvebu
+Message-ID: <1353014906-31566-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patchset combines code from Gregory Clement, Sebastian
+Hesselbarth and myself to implement core clks, cpu clock and gated
+clocks on Marvel MVEBU SoCs.
 
-On Thu, Nov 15, 2012 at 06:17:58PM +0000, Srinivas KANDAGATLA wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> 
-> Use-case is simple kexec on smp system.
-> 
-> Lets say there are two cores core-0 and core-1.
-> 
-> sequence here is:
-> As part of kexec call, the secondary cores are stopped by calling
-> machine_shutdown(), which in turn issues IPIs to off-line the other CPUs
-> and then call smp_ops.cpu_kill.
-> 
-> machine_shutdown invokes smp_send_stop from core-0 which then sends
-> IPI_CPU_STOP ipi message for core-1 and then smp_kill_cpus call
-> smp_ops.cpu_kill from core-0 with cpu=1.
-> 
-> The expectation here is that cpu_kill will relocate secondary-core
-> to safe location from primary-core(core-0).
+The Armada 370/XP core clock code is a refactored version of the
+already submitted and ACKed code from Gregory. It has been made to fit
+inside a framework developed by Sebastian which can handle all MVEBU
+SoCs. The Armarda 370/XP SoCs have more core clocks than the older SoCs, and
+the framework needs to handle this. Rather than specify the clock
+frequencies in DT, a Sample At Reset register is used, which describes
+each core clock frequency.
 
-Not quite. The expectation is actually that you wiggle a line to a power
-controller and the secondary core either disappears or resets.
+Armarda XP is an SMP processor, with each CPU having its own
+clock. Gregories code for this has been taken as is.
 
-> This is a catch 22 situation for SOCs, which can't change PC's of other
-> cores. At the point when cpu_kill is invoked, it cant execute any
-> function calls for core-1, as it is off-line and is spinning in
-> cpu_relax.
+The Armarda 370/XP clock source has been converted to the common clock
+framework.
 
-I thought these SoCs were fairly rare in production -- usually there is
-some way to power down secondary cores.
+Dove, Kirkword, and probably Armarda 370/XP have the ability to gate
+clocks to various blocks. A clk-gate clock is created for each of the
+gateable clocks on Dove and Kirkwood. Armarda 370/XP clock gates are
+currently unimplemented. Dove and Kirkwood board-dt.c and DT
+descriptions are then modified to make use of these clk gates.
 
-> So the only way is to put the core into safe place by executing some
-> SOC specific relocation code.
-> 
-> Having a callback from ipi handler when cpu is stopped would be very
-> usefull for SOC's which want to relocate the secondary-core to safe
-> location.
+This code has been tested on:
 
-I thought about this for Versatile Express but even if you do that, your
-problems are just beginning. The bigger issue is co-ordinating with the
-secondaries so you know when they're safely out of the way and you can
-proceed with the kexec. Remember that you won't have working locks and you
-can't cross-call a function because it won't actually return.
+Kirkwood based QNAP TS219
+Armarda 370 based mirabox
+Armara XP based OpenBlocks
 
-If you can solve the synchronisation problem then we can think about adding
-these hooks.
+and by Sebastian on:
 
-Will
+Dove based Cubox.
+
+Andrew Lunn (1):
+  ARM: Kirkwood: switch to DT clock providers
+
+Gregory CLEMENT (3):
+  clk: mvebu: add armada-370-xp CPU specific clocks
+  clk: armada-370-xp: add support for clock framework
+  clocksource: time-armada-370-xp converted to clk framework
+
+Sebastian Hesselbarth (3):
+  clk: mvebu: add mvebu core clocks.
+  clk: mvebu: add clock gating control provider for DT
+  ARM: dove: switch to DT clock providers
+
+ .../devicetree/bindings/clock/mvebu-core-clock.txt |   47 ++
+ .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   21 +
+ .../bindings/clock/mvebu-gated-clock.txt           |   76 +++
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/armada-370-db.dts                |    4 -
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    1 +
+ arch/arm/boot/dts/armada-370.dtsi                  |    7 +
+ arch/arm/boot/dts/armada-xp.dtsi                   |   42 ++
+ arch/arm/boot/dts/dove.dtsi                        |   20 +
+ arch/arm/boot/dts/kirkwood.dtsi                    |   22 +
+ arch/arm/mach-dove/Kconfig                         |    2 +
+ arch/arm/mach-dove/common.c                        |   64 +-
+ arch/arm/mach-kirkwood/Kconfig                     |    2 +
+ arch/arm/mach-kirkwood/board-dt.c                  |   72 ++-
+ arch/arm/mach-mvebu/Kconfig                        |    6 +
+ arch/arm/mach-mvebu/armada-370-xp.c                |    9 +-
+ arch/arm/plat-orion/include/plat/common.h          |    1 +
+ drivers/clk/Kconfig                                |    2 +
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/mvebu/Kconfig                          |    8 +
+ drivers/clk/mvebu/Makefile                         |    3 +
+ drivers/clk/mvebu/clk-core.c                       |  675 ++++++++++++++++++++
+ drivers/clk/mvebu/clk-core.h                       |   18 +
+ drivers/clk/mvebu/clk-cpu.c                        |  155 +++++
+ drivers/clk/mvebu/clk-cpu.h                        |   18 +
+ drivers/clk/mvebu/clk-gating-ctrl.c                |  177 +++++
+ drivers/clk/mvebu/clk.c                            |   37 ++
+ drivers/clocksource/time-armada-370-xp.c           |   11 +-
+ include/linux/clk/mvebu.h                          |   23 +
+ 29 files changed, 1487 insertions(+), 38 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+ create mode 100644 drivers/clk/mvebu/Kconfig
+ create mode 100644 drivers/clk/mvebu/Makefile
+ create mode 100644 drivers/clk/mvebu/clk-core.c
+ create mode 100644 drivers/clk/mvebu/clk-core.h
+ create mode 100644 drivers/clk/mvebu/clk-cpu.c
+ create mode 100644 drivers/clk/mvebu/clk-cpu.h
+ create mode 100644 drivers/clk/mvebu/clk-gating-ctrl.c
+ create mode 100644 drivers/clk/mvebu/clk.c
+ create mode 100644 include/linux/clk/mvebu.h
+
+-- 
+1.7.10.4
