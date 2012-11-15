@@ -1,39 +1,32 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 14 Nov 2012 22:09:31 -0500 (EST)
-Subject: [PATCH V5 0/7] ARM: AM33XX: net: Add DT support to CPSW and
- MDIO driver
-In-Reply-To: <1352920080-6179-1-git-send-email-mugunthanvnm@ti.com>
-References: <1352920080-6179-1-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <20121114.220931.785168143706732441.davem@davemloft.net>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 15 Nov 2012 11:20:35 +0800
+Subject: [PATCH v2 2/3] serial: mxs-auart: add the DMA support for mx28
+In-Reply-To: <50A21613.6030709@bluegiga.com>
+References: <1351074456-25863-1-git-send-email-b32955@freescale.com>
+ <1351074456-25863-3-git-send-email-b32955@freescale.com>
+ <50A21613.6030709@bluegiga.com>
+Message-ID: <50A45F83.1010009@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mugunthan V N <mugunthanvnm@ti.com>
-Date: Thu, 15 Nov 2012 00:37:53 +0530
+? 2012?11?13? 17:42, Lauri Hintsala ??:
+> Hi Huang,
+>
+> DMA support doesn't work with latest stable v3.6.5 or development 
+> 3.7-rc5 kernels. I get following error message when I open the serial 
+> port /dev/ttyAPP0:
+>
+> [ 48.730000] mxs-auart 8006a000.serial: step 1 error
+> [ 48.750000] mxs-auart 8006a000.serial: We can not start up the DMA.
+>
+I tested this patch set in imx28-evk board Rev C with linux-next-20121114.
+it works fine.
 
-> This patch-series adds support for,
-> 
-> [1/7]: Typo mistake in CPSW driver while invoking runtime_pm api's
-> 
-> [2/7]: Adds parent<->child relation between CPSW & MDIO module inside cpsw
->        driver, as in case of AM33XX, the resources are shared and common
->        register bit-field is provided to control module/clock enable/disable,
->        makes it difficult to handle common resource.
-> 
->        So the solution here is, to create parent<->child relation between them.
-> 
-> [3/7]: cpsw: simplify the setup of the register pointers
-> 
-> [4/7]: cpsw: Kernel warn fix during suspend
-> 
-> [5/7]: Add hwmod entry for MDIO module, required for MDIO driver.
-> 
-> [6/7]: Enable CPSW support to omap2plus_defconfig
-> 
-> [7/7]: Add DT device nodes for both CPSW and MDIO modules in am33xx.dtsi,
->        am335x-evm.dts and am335x-bone.dts file
-> 
-> This patch series has been created on top of net-next/master and tested
-> on BeagleBone platform for NFS boot and basic ping test cases.
+Maybe you can try the linux-next code.
 
-All applied, thanks.
+About the flow control:
+If we do not enable the HW flow control, the data may lost. And I do not 
+know how to handle with the Xon/Xoff when the DMA is supported.
+
+Best Regards
+Huang Shijie
