@@ -1,35 +1,89 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Nov 2012 12:33:41 +0000
-Subject: [PATCH 1/1] ARM: ux500: Describe UART platform registering
- issues more accurately
-In-Reply-To: <201211151223.46989.arnd@arndb.de>
-References: <1352968401-6092-1-git-send-email-lee.jones@linaro.org>
- <201211151223.46989.arnd@arndb.de>
-Message-ID: <20121115123341.GA14476@gmail.com>
+From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
+Date: Thu, 15 Nov 2012 14:41:43 +0200
+Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
+In-Reply-To: <20121115110137.GA25985@arm.com>
+References: <20121114185335.GU6801@atomide.com> <50A3EBCD.3040801@ti.com>
+ <20121114202244.GE3332@n2100.arm.linux.org.uk>
+ <20121114203221.GA6801@atomide.com> <50A413D4.7000405@gmail.com>
+ <20121114222159.GB6801@atomide.com> <50A43D58.5030404@gmail.com>
+ <20121115110137.GA25985@arm.com>
+Message-ID: <CACY+gR3PurUofCbUeG40B6vXqXAoHrMmbOQSuwAGoc1LS8XXJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Nov 2012, Arnd Bergmann wrote:
+On Thu, Nov 15, 2012 at 1:01 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Thu, Nov 15, 2012 at 12:54:48AM +0000, Rob Herring wrote:
+>> On 11/14/2012 04:21 PM, Tony Lindgren wrote:
+>> > * Rob Herring <robherring2@gmail.com> [121114 13:59]:
+>> >> On 11/14/2012 02:32 PM, Tony Lindgren wrote:
+>> >>>
+>> >>> Checking for the bit already set should work in this case, I'll post
+>> >>> a patch for that shortly.
+>> >>
+>> >> Can you actually read the state of the diagnostic register in non-secure
+>> >> mode? If you can on the A9, is the same true on A8 or others?
+>> >
+>> > Looks like it can be read on at least TI omap 4430 which is A9.
+>> > But it reads as zero, so the below patch is what I came up with.
+>> >
+>> > No idea if assuming that zero value for the diagnostic register
+>> > is safe.. What's the default value of the diagnostic register supposed
+>> > to be?
+>>
+>> RTFM. Oh, wait it's a super secret, undocumented register. We shouldn't
+>> even be talking about it.
+>>
+>> It could vary by rev, but I see 0 for the reset value, so this would not
+>> work if the bootloader did not do any setup of the diagnostic register.
+>>
+>> One way to determine secure mode on the A9 would be seeing if you can
+>> change the auxcr register. Something like this (untested):
+>>
+>> mrc   p15, 0, r0, c1, c0, 1; Read ACTLR
+>> eor   r1, r0, #0x100          ; Modify alloc in 1 way
+>> mcr   p15, 0, r1, c1, c0, 1
+>> mrc   p15, 0, r2, c1, c0, 1; Read ACTLR
+>> mcr   p15, 0, r0, c1, c0, 1   ; Restore original value
+>> cmp   r1, r2
+>> bne   skip_errata
+>
+> This would fail on platforms where Linux runs in non-secure mode. What
+> we do for some errata workarounds is to test whether the bit was already
+> set and avoid writing the register. But this assumes that, for a given
+> workaround in the kernel, there is a corresponding workaround in the
+> code running before the kernel (boot-loader, firmware) which sets that
+> bit.
+>
+> Since the kernel will run more often in non-secure mode (on Cortex-A15
+> you need this for the virtualisation extensions) I strongly suggest that
+> the workaround (usually undocumented bit setting) is done before the
+> kernel is started and we simply remove it from Linux (or add a clear
+> comment that it only works if running in secure mode; if unsure say
+> 'N').
+>
+> I don't think it's worth the hassle detecting whether the kernel runs in
+> secure or non-secure mode, just assume the latter and get SoC vendors to
+> update the boot loaders or firmware (if possible) with any errata
+> workarounds.
+>
+> Having a common SMC API for errata workarounds is not feasible since not
+> all registers are public, most are implementation specific and it could
+> have secure implications with exposing them.
 
-> On Thursday 15 November 2012, Lee Jones wrote:
-> > UARTs no longer require call-back information, since the reset
-> > call-back was removed in 43b5f0d69291374f602ad8e1817f329573a59010.
-> > The only AUXDATA dependencies remaining for UARTs are DMA settings.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> What is the state of the DMA binding now? We originally wanted to merge
-> it for 3.7, but that didn't work out, so I hope we can get it done for
-> 3.8.
+BTW, I always wondered about what could be preventing TI and the other
+silicon vendors from using something like an SMC API based on
+asymmetric cryptography? My understanding is that for OMAP4 GP chips,
+ROM code switches to non-secure mode before passing control to the
+bootloader and there is simply no way to workaround bugs like this.
+The users are screwed.
 
-It's dead. The conversation has been stale for weeks.
-
-Perhaps you'd like to go and poke it? :)
+Having some way to pass a small signed chunk of code through SMC API
+could be a life saver if the erratum is particularly nasty. The vendor
+could just contribute the signed piece of code with a few instructions
+to set the needed bits in the needed registers in the case of
+emergency.
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best regards,
+Siarhei Siamashka
