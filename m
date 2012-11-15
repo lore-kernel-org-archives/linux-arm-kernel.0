@@ -1,27 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Nov 2012 17:04:03 +0000
-Subject: [PATCH] pinctrl: nomadik: Staticize non-exported symbols
-In-Reply-To: <1352995295.10636.1.camel@phoenix>
-References: <1352995295.10636.1.camel@phoenix>
-Message-ID: <20121115170403.GD14476@gmail.com>
+From: i.mazanov@gmail.com (Igor Mazanov)
+Date: Thu, 15 Nov 2012 21:07:00 +0400
+Subject: [PATCH] Remove inline from clock framework function definitions to
+ build the kernel with GCC 4.7
+Message-ID: <50A52134.2010502@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Nov 2012, Axel Lin wrote:
+  Remove inline from clock framework function definitions to
+  build the kernel with GCC 4.7
 
-> They are not referenced outside of this file, make them static.
-> 
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
-> ---
->  drivers/pinctrl/pinctrl-nomadik.c |   26 ++++++++++++--------------
->  1 file changed, 12 insertions(+), 14 deletions(-)
+Signed-off-by: Igor Mazanov <i.mazanov@gmail.com>
+---
+  include/linux/clk-provider.h |    4 ++--
+  1 files changed, 2 insertions(+), 2 deletions(-)
 
-Seems sensible:
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index c127315..f9f5e9e 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -335,8 +335,8 @@ const char *__clk_get_name(struct clk *clk);
+  struct clk_hw *__clk_get_hw(struct clk *clk);
+  u8 __clk_get_num_parents(struct clk *clk);
+  struct clk *__clk_get_parent(struct clk *clk);
+-inline int __clk_get_enable_count(struct clk *clk);
+-inline int __clk_get_prepare_count(struct clk *clk);
++int __clk_get_enable_count(struct clk *clk);
++int __clk_get_prepare_count(struct clk *clk);
+  unsigned long __clk_get_rate(struct clk *clk);
+  unsigned long __clk_get_flags(struct clk *clk);
+  int __clk_is_enabled(struct clk *clk);
+--
+1.7.4.4
