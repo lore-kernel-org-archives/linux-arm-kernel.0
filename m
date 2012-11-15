@@ -1,50 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 Nov 2012 08:33:19 +0100
-Subject: [PATCH v7] Network driver for the Armada 370 and Armada XP ARM
- Marvell SoCs
-In-Reply-To: <20121114.215922.1242337385782766449.davem@davemloft.net>
-References: <1352905010-24172-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121114.215922.1242337385782766449.davem@davemloft.net>
-Message-ID: <20121115083319.76483256@skate>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Thu, 15 Nov 2012 13:04:43 +0530
+Subject: [PATCHv2] i2c: omap: Move the remove constraint
+Message-ID: <1352964883-9846-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David,
+Currently we just queue the transfer and release the
+qos constraints, however we donot wait for the transfer
+to complete to release the constraint. Move the remove
+constraint after the bus busy as we are sure that the
+transfers are completed by then.
 
-On Wed, 14 Nov 2012 21:59:22 -0500 (EST), David Miller wrote:
-> From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Date: Wed, 14 Nov 2012 15:56:44 +0100
-> 
-> > The previous versions of this patch set have been sent on September
-> > 4th (v1), October 11th (v2), October 23rd (v3), October 26th (v4),
-> > November 12th (v5), November 13th (v6) and now comes the v7 of the
-> > driver. The number of comments over the last versions have been really
-> > small, and I would really appreciate if this driver could land into
-> > the 3.8 kernel release.
-> 
-> I can't apply this patch to net-next, because for one thing there
-> are missing dependencies.  For example, the file:
-> 
-> arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-> 
-> doesn't exist there, therefore patch #6 won't apply.
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+v2: rebase to the for-next branch
 
-Yes, this is expected: those patches were provided to allow people to
-test the driver on the OpenBlocks platform, which is much more widely
-available than the Armada XP evaluation board from Marvell.
+ drivers/i2c/busses/i2c-omap.c |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
 
-Would you mind if we take, with your Ack, the network driver through
-the arm-soc tree, so that we can carry the related patches modifying
-the Device Tree and so on? If not, then I'll send you a pull request
-with just the drivers/net changes, and we'll integrate the ARM-related
-changes through the arm-soc tree, in which we will have the necessary
-dependencies. I'm fine with any of those solutions.
-
-Thanks,
-
-Thomas
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 482c63d..fabcbe1 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -654,13 +654,14 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 			break;
+ 	}
+ 
+-	if (dev->set_mpu_wkup_lat != NULL)
+-		dev->set_mpu_wkup_lat(dev->dev, -1);
+-
+ 	if (r == 0)
+ 		r = num;
+ 
+ 	omap_i2c_wait_for_bb(dev);
++
++	if (dev->set_mpu_wkup_lat != NULL)
++		dev->set_mpu_wkup_lat(dev->dev, -1);
++
+ out:
+ 	pm_runtime_mark_last_busy(dev->dev);
+ 	pm_runtime_put_autosuspend(dev->dev);
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.5.4
