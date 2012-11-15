@@ -1,46 +1,59 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Nov 2012 21:02:44 +0000
-Subject: [PATCH v5 0/4] arch/arm: support seccomp
-In-Reply-To: <CAGXu5jL6og3xq_V=FkemV828Tso5F4wSoLy_24HA_LFw_x20Zw@mail.gmail.com>
-References: <1352587485-18348-1-git-send-email-keescook@chromium.org>
- <CAGXu5jKYGCkL3GS4Tbep==WUAqP-c_0edAdgy0XQ84rJxZUU2Q@mail.gmail.com>
- <20121115132550.GA5570@mudshark.cambridge.arm.com>
- <CAGXu5jL6og3xq_V=FkemV828Tso5F4wSoLy_24HA_LFw_x20Zw@mail.gmail.com>
-Message-ID: <20121115210244.GB13998@mudshark.cambridge.arm.com>
+Date: Thu, 15 Nov 2012 21:18:33 +0000
+Subject: [RFC PATCH 3.7.0-rc4] ARM:smp: introduce smp_notify_cpu_stop to
+ fix kexec smp case
+In-Reply-To: <1353003478-22291-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1353003478-22291-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <20121115211833.GD13998@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 08:23:48PM +0000, Kees Cook wrote:
-> On Thu, Nov 15, 2012 at 5:25 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Nov 14, 2012 at 07:07:13PM +0000, Kees Cook wrote:
-> >> Hi, any more thoughts on this series? I'd really like to get it into
-> >> -next. It's been running happily for a while now in the Chrome OS ARM
-> >> devices.
-> >
-> > I'm not familiar with seccomp in general, but the changes look ok now from
-> > an ARM point-of-view:
-> >
-> >   Reviewed-by: Will Deacon <will.deacon@arm.com>
-> >
-> > These should probably go via Russell (who will put them into -next), so
-> > please send them to the patch system.
+Hello,
+
+On Thu, Nov 15, 2012 at 06:17:58PM +0000, Srinivas KANDAGATLA wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 > 
-> Thanks. Is there a sensible way to send an ordered patch series to the
-> patch system? The Help doc says:
->    Please omit [PATCH] and other "useful" prefixes.
-> (and it wants the "KernelVersion: " in there too)
+> Use-case is simple kexec on smp system.
 > 
-> Is there some way to indicate 1/4, 2/4, etc?
+> Lets say there are two cores core-0 and core-1.
+> 
+> sequence here is:
+> As part of kexec call, the secondary cores are stopped by calling
+> machine_shutdown(), which in turn issues IPIs to off-line the other CPUs
+> and then call smp_ops.cpu_kill.
+> 
+> machine_shutdown invokes smp_send_stop from core-0 which then sends
+> IPI_CPU_STOP ipi message for core-1 and then smp_kill_cpus call
+> smp_ops.cpu_kill from core-0 with cpu=1.
+> 
+> The expectation here is that cpu_kill will relocate secondary-core
+> to safe location from primary-core(core-0).
 
-If you're using git send-email, you don't need to do anything other than
-add a new tag below your S-o-B to indicate the kernel version, e.g:
+Not quite. The expectation is actually that you wiggle a line to a power
+controller and the secondary core either disappears or resets.
 
-  KernelVersion: 3.7-rc5
+> This is a catch 22 situation for SOCs, which can't change PC's of other
+> cores. At the point when cpu_kill is invoked, it cant execute any
+> function calls for core-1, as it is off-line and is spinning in
+> cpu_relax.
 
-then send the patches (1 by 1 so they don't get re-ordered) to
-patches at arm.linux.org.uk
+I thought these SoCs were fairly rare in production -- usually there is
+some way to power down secondary cores.
 
-You should receive a response indicating whether they were correctly
-formatted or not.
+> So the only way is to put the core into safe place by executing some
+> SOC specific relocation code.
+> 
+> Having a callback from ipi handler when cpu is stopped would be very
+> usefull for SOC's which want to relocate the secondary-core to safe
+> location.
+
+I thought about this for Versatile Express but even if you do that, your
+problems are just beginning. The bigger issue is co-ordinating with the
+secondaries so you know when they're safely out of the way and you can
+proceed with the kexec. Remember that you won't have working locks and you
+can't cross-call a function because it won't actually return.
+
+If you can solve the synchronisation problem then we can think about adding
+these hooks.
 
 Will
