@@ -1,66 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Nov 2012 10:04:07 +0000
-Subject: [PATCH 2/2] clocksource: clksrc-dbx500-prcmu: Add boottime support
-In-Reply-To: <1352973847-21605-1-git-send-email-lee.jones@linaro.org>
-References: <1352973847-21605-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1352973847-21605-3-git-send-email-lee.jones@linaro.org>
+From: mfuzzey@gmail.com (Martin Fuzzey)
+Date: Thu, 15 Nov 2012 11:08:15 +0100
+Subject: [PATCH 6/6] usb: chipidea: usbmisc: add post handling and errata
+ fix for mx25
+In-Reply-To: <1352894137-2050-7-git-send-email-m.grzeschik@pengutronix.de>
+References: <1352894137-2050-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352894137-2050-7-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <CALBypN6U=np93ZwnEZqbh=j0Vb_-x630GaktEiv+4K26eYp4Pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a call-back to provide boottime functionality with a means
-to gain access to CPU run time information. This call-back will be
-invoked numerous times during system boot in order to obtain and
-log various time increments throughout the booting process precisely.
+Hi,
 
-Based heavily on the original driver by Jonas Aaberg.
+On Wed, Nov 14, 2012 at 12:55 PM, Michael Grzeschik
+<m.grzeschik@pengutronix.de> wrote:
+> @@ -213,6 +216,15 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+>                 goto put_np;
+>         }
+>
+> +       if (usbmisc_ops && usbmisc_ops->post) {
+> +               ret = usbmisc_ops->post(&pdev->dev);
+> +               if (ret) {
+> +                       dev_err(&pdev->dev,
+> +                               "usbmisc post failed, ret=%d\n", ret);
+> +                       goto err;
+> +               }
+> +       }
+> +
+>         data->ci_pdev = plat_ci;
+>         platform_set_drvdata(pdev, data);
+>
+This hunk fails to apply for me on 3.7-rc5:
+error: while searching for:
+		goto put_np;
+	}
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/clocksource/clksrc-dbx500-prcmu.c |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+	data->ci_pdev = plat_ci;
+	platform_set_drvdata(pdev, data);
 
-diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c b/drivers/clocksource/clksrc-dbx500-prcmu.c
-index c26c369..0069cd9 100644
---- a/drivers/clocksource/clksrc-dbx500-prcmu.c
-+++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
-@@ -14,6 +14,7 @@
-  */
- #include <linux/clockchips.h>
- #include <linux/clksrc-dbx500-prcmu.h>
-+#include <linux/boottime.h>
- 
- #include <asm/sched_clock.h>
- 
-@@ -68,6 +69,23 @@ static u32 notrace dbx500_prcmu_sched_clock_read(void)
- 
- #endif
- 
-+#ifdef CONFIG_BOOTTIME
-+static unsigned long __init boottime_get_time(void)
-+{
-+	return div_s64(clocksource_cyc2ns(clocksource_dbx500_prcmu.read(
-+						  &clocksource_dbx500_prcmu),
-+					  clocksource_dbx500_prcmu.mult,
-+					  clocksource_dbx500_prcmu.shift),
-+		       1000);
-+}
-+
-+static struct boottime_timer __initdata boottime_timer = {
-+	.init     = NULL,
-+	.get_time = boottime_get_time,
-+	.finalize = NULL,
-+};
-+#endif
-+
- void __init clksrc_dbx500_prcmu_init(void __iomem *base)
- {
- 	clksrc_dbx500_timer_base = base;
-@@ -90,4 +108,6 @@ void __init clksrc_dbx500_prcmu_init(void __iomem *base)
- 			 32, RATE_32K);
- #endif
- 	clocksource_register_hz(&clocksource_dbx500_prcmu, RATE_32K);
-+
-+	boottime_activate(&boottime_timer);
- }
--- 
-1.7.9.5
+Regards,
+
+Martin
