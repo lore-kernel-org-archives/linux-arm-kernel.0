@@ -1,31 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Nov 2012 11:25:43 +0000
-Subject: [PATCH 1/2] Boottime: A tool for automatic measurement of
- kernel/bootloader boot time
-In-Reply-To: <CAH9JG2UX0Wyr-QKw3=tbUXeuEhHe04_cFkkAp6bB2Rr-x7ViHQ@mail.gmail.com>
-References: <1352973847-21605-1-git-send-email-lee.jones@linaro.org>
- <1352973847-21605-2-git-send-email-lee.jones@linaro.org>
- <CAH9JG2UX0Wyr-QKw3=tbUXeuEhHe04_cFkkAp6bB2Rr-x7ViHQ@mail.gmail.com>
-Message-ID: <20121115112543.GC21682@gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 15 Nov 2012 14:29:40 +0300
+Subject: Kernel uncompression error
+In-Reply-To: <20121114173453.GJ3290@n2100.arm.linux.org.uk>
+References: <k809hq$1q3$1@ger.gmane.org>
+ <20121114173453.GJ3290@n2100.arm.linux.org.uk>
+Message-ID: <CA+E=qVdDGszU1jMDXjFepvnSmiRTWJ=A_23BL2LEty+170FNsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +/* for automatic boot timing testcases */
-> > +#define ATAG_BOOTTIME  0x41000403
-> Where can I refer this ATAG usage? can you point out the reference URL
-> or patches?
+On Wed, Nov 14, 2012 at 8:34 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Nov 14, 2012 at 10:23:55PM +0800, woody wrote:
+>> I just built a 3.2.x ARM kernel and tried to have it boot by a boot
+>> loader (vivi) on my s3c2410a ARM board.  The kernel was built with
+>> default configuration s3c2410.
+>
+> I reported that S3C2410 is totally dead with 3.x kernels about a month
+> ago and got no response what so ever from anyone.  I guess S3C2410 is
+> just not cared for anymore.
 
-I assumed this would be in Mainline u-boot, but apparently not.
-On closer inspection of the internal ST-Ericsson u-boot, this
-functionality appears to be provided by patches which currently
-exist as delta. So in essence, the bootloader you use will have
-to be patched in a similar way for you to retrieve information
-surrounding bootloader boot times.
+It was working at least for 3.1 (tested on h1940 machine),
+can you give a link to your post? I still care about s3c2410 and s3c244x :)
 
-And there was me thinking it was magic. ;)
+> When I get sufficient motivation, I'll try and track down what's going
+> wrong, but it means taking the old mailing list server (and now list
+> archive) offline for a while.
+>
+> I don't think it's cache related; different image sizes seem to behave
+> differently - and when they _do_ successfully decompress, they don't
+> boot at all.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards
+Vasily
