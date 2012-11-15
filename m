@@ -1,25 +1,44 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 15 Nov 2012 11:38:01 -0200
-Subject: [PATCH v2 1/2] ARM: mx27: Add VPU support
-In-Reply-To: <20121115081223.GY10369@pengutronix.de>
-References: <1352917238-29694-1-git-send-email-fabio.estevam@freescale.com>
- <20121115081223.GY10369@pengutronix.de>
-Message-ID: <CAOMZO5BrzD5okmRMcY3X3aquMpmxV5Pn2k2upsQNhsmq_Pi5-A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Nov 2012 13:39:07 +0000
+Subject: [PATCH] ARM: add get_user() support for 8 byte types
+In-Reply-To: <CAF6AEGv-O_D6nOnEwi5w8NUcv+dQFe7pJBXhUA8xq+tykG4dfg@mail.gmail.com>
+References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
+ <201211150919.37343.arnd@arndb.de>
+ <CAF6AEGv-O_D6nOnEwi5w8NUcv+dQFe7pJBXhUA8xq+tykG4dfg@mail.gmail.com>
+Message-ID: <201211151339.08016.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 6:12 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On Thursday 15 November 2012, Rob Clark wrote:
+> On Thu, Nov 15, 2012 at 3:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 13 November 2012, Russell King - ARM Linux wrote:
+> >> You're missing something; that is one of the greatest powers of open
+> >> source.  The many eyes (and minds) effect.  Someone out there probably
+> >> has a solution to whatever problem, the trick is to find that person. :)
+> >>
+> >> I think we have a working solution for this for ARM.  It won't be suitable
+> >> for every arch, where they have 8-bit and 16-bit registers able to be
+> >> allocated by the compiler, but for architectures where the minimum register
+> >> size is 32-bit, what we have below should work.
+> >
+> > I don't mind at all adding the extension to ARM, and I think it's pretty
+> > cool that you guys actually found a working solution.
+> >
+> > The part that worries me is that we are making architecture independent
+> > code depend on a clever hack that may or may not be possible to implement
+> > on a given architecture, and that most architecture maintainers wouldn't
+> > know how to implement correctly even if it's possible.
+> 
+> I could always send a 3rd version with a comment smashed on about why
+> that works if you think this is a problem..
 
-> As Eric mentioned this may lead to problems on the i.MX27L without VPU.
-> Do you have the possibility to test this?
+Comments are always good, so I'd surely like to see those get added.
+As I said, I don't have any objections to the addition of your patch to
+the ARM code, which sounds useful to have.
 
-I do not have any board with a MX27L variant. Maybe we could try
-reading the SREV info register to distinguish between MX27 and MX27L.
-MX27RM does not provide any info on this though.
+I still haven't heard a conclusive argument why we need to use get_user()
+rather than copy_from_user() in the DRM code. Is this about a fast path
+where you want to shave off a few cycles for each call, or does this
+simplify the code structure, or something else?
 
-If this does not work, then maybe we should register VPU as per board
-like the v1 patch did.
-
-Regards,
-
-Fabio Estevam
+	Arnd
