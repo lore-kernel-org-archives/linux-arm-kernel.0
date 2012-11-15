@@ -1,39 +1,43 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
-Date: Thu, 15 Nov 2012 16:48:23 +0530
-Subject: Fwd: [PATCH 1/7] I2c-nomadik: Fix the usage of
- wait_for_completion_timeout
-In-Reply-To: <20121115101820.GC418@pengutronix.de>
-References: <1352222317.15558.1584.camel@cliu38-desktop-build>
- <CACRpkdYekQF5111NSNSPeaHdxgS_gpXkCjqT1n-n1_iAdDXbSg@mail.gmail.com>
- <20121115084858.GA29668@bnru10>
- <20121115092953.GA418@pengutronix.de>
- <20121115095741.GA6280@bnru10>
- <20121115101820.GC418@pengutronix.de>
-Message-ID: <20121115111822.GA3911@bnru10>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 15 Nov 2012 11:20:32 +0000
+Subject: [GIT PULL] Ux500 pin changes
+In-Reply-To: <CACRpkdZ0_3ow9VwGGvFtj_pbYNG+cctB6kUK1FBe4sjU=MTgww@mail.gmail.com>
+References: <CACRpkdYjEmQRU530N3sP7t_RfM_NLhEcMf6YCBdf4LC7M7fQDQ@mail.gmail.com>
+ <201211122235.00973.arnd@arndb.de>
+ <CACRpkdZ0_3ow9VwGGvFtj_pbYNG+cctB6kUK1FBe4sjU=MTgww@mail.gmail.com>
+Message-ID: <20121115112032.GB21682@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 11:18:20 +0100, Wolfram Sang wrote:
-> On Thu, Nov 15, 2012 at 03:27:42PM +0530, Srinidhi Kasagar wrote:
-> > On Thu, Nov 15, 2012 at 10:29:53 +0100, Wolfram Sang wrote:
-> > > 
-> > > > > -       if (timeout < 0) {
-> > > > > -               dev_err(&dev->adev->dev,
-> > > > > -                       "wait_for_completion_timeout "
-> > > > > -                       "returned %d waiting for event\n", timeout);
-> > > > > -               status = timeout;
-> > > > > -       }
-> > > > > -
-> > > > No, it is wrong. You need to update the status variable in the case of timeout.
-> > > 
-> > > Looking at the patch context, such code comes later.
-> > But it causes regressions; without looking at the "later" code, we can't afford merging
-> > this code now.
+On Thu, 15 Nov 2012, Linus Walleij wrote:
+
+> On Mon, Nov 12, 2012 at 11:35 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> Later as in "a few lines later" not "some time later". Or am I missing
-> something else?
-I was too fast in reading emails after my short vacation...Sorry.
+> > u8500_defconfig now gives me two new errors in arm-soc/for-next when building with
+> > -Werror:
+> >
+> > arch/arm/mach-ux500/board-mop500-pins.c:73:22: error: 'out_hi_wkup_pdis' defined but not used [-Werror=unused-variable]
+> 
+> I've sent a fix for this, could you apply that patch directly to the
+> drivers branch?
+> 
+> > and the existing:
+> >
+> > ERROR (phandle_references): Reference to non-existent node or label "tc3589x_gpio"
+> >
+> > Can you provide patches to fix these up?
+> 
+> What on earth is that? Lee, do you know how to fix this one up, I shamelessly
+> assume it to be related to commit:
+> commit 3113e679021a3a6bace1c62a8432cc0ec27c09ab
+> "gpio: Enable the tc3298x GPIO expander driver for Device Tree"
 
-Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+I haven't seen this error.
 
-regards/srinidhi
+Which kernel is this? How do I reproduce?
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
