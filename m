@@ -1,17 +1,49 @@
-From: narkewoody@gmail.com (woody)
-Date: Thu, 15 Nov 2012 15:07:24 +0800
-Subject: ttySAC0 or ttyS0 in 3.6.x ARM Linux?
-Message-ID: <k824bb$7kp$1@ger.gmane.org>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Thu, 15 Nov 2012 09:22:39 +0200
+Subject: [PATCH v2 2/3] serial: mxs-auart: add the DMA support for mx28
+In-Reply-To: <50A45F83.1010009@freescale.com>
+References: <1351074456-25863-1-git-send-email-b32955@freescale.com>
+ <1351074456-25863-3-git-send-email-b32955@freescale.com>
+ <50A21613.6030709@bluegiga.com> <50A45F83.1010009@freescale.com>
+Message-ID: <50A4983F.8080407@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-In the 3.6.6 ARM kernel, should I use ttySAC0 or ttyS0 to specify the 
-'console' kernel command line?
+On 11/15/2012 05:20 AM, Huang Shijie wrote:
+> ? 2012?11?13? 17:42, Lauri Hintsala ??:
+>> Hi Huang,
+>>
+>> DMA support doesn't work with latest stable v3.6.5 or development
+>> 3.7-rc5 kernels. I get following error message when I open the serial
+>> port /dev/ttyAPP0:
+>>
+>> [ 48.730000] mxs-auart 8006a000.serial: step 1 error
+>> [ 48.750000] mxs-auart 8006a000.serial: We can not start up the DMA.
+>>
+> I tested this patch set in imx28-evk board Rev C with linux-next-20121114.
+> it works fine.
+>
+> Maybe you can try the linux-next code.
 
-Thanks.
+I tested linux-next-20121114 on apx4devkit (imx28 based device) and I 
+got the same error message:
 
--- 
-woody
-I can't go back to yesterday - because I was a different person then.
+# stty -F /dev/ttyAPP0 crtscts; microcom /dev/ttyAPP0 -s 115200
+[  133.710000] mxs-auart 8006a000.serial: step 1 error
+[  133.720000] mxs-auart 8006a000.serial: We can not start up the DMA.
+
+
+> About the flow control:
+> If we do not enable the HW flow control, the data may lost. And I do not
+> know how to handle with the Xon/Xoff when the DMA is supported.
+
+I do not have the answer but it is already implemented in Freescale's 
+reference kernel 
+(http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/drivers/serial/mxs-auart.c?h=imx_2.6.35_11.09.01). 
+So I think it is possible to handle all data without HW flow control.
+
+
+Best Regards,
+Lauri Hintsala
