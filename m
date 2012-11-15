@@ -1,19 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Nov 2012 18:34:15 +0100
-Subject: [PATCH] pinctrl: nomadik: Staticize non-exported symbols
-In-Reply-To: <1352995295.10636.1.camel@phoenix>
-References: <1352995295.10636.1.camel@phoenix>
-Message-ID: <CACRpkdapymohVKdpovB6V_noH+9E2daV+SbYUK2zPhro=6HUEw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 15 Nov 2012 09:35:59 -0800
+Subject: [GIT PULL 1/5] omap non critical fixes for v3.8 merge window
+In-Reply-To: <201211151651.59049.arnd@arndb.de>
+References: <pull-1352948204-277861>
+ <201211151651.59049.arnd@arndb.de>
+Message-ID: <20121115173559.GJ6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 5:01 PM, Axel Lin <axel.lin@ingics.com> wrote:
+* Arnd Bergmann <arnd@arndb.de> [121115 08:54]:
+> On Thursday 15 November 2012, Tony Lindgren wrote:
+> > The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
+> > 
+> >   Linux 3.7-rc4 (2012-11-04 11:07:39 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/fixes-non-critical-v4-signed
+> 
+> Pulled all five. Please have a look to make sure everything you need is
+> there now and still works.
 
-> They are not referenced outside of this file, make them static.
->
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+Thanks! Diffs fine against what I have in omap-for-v3.8/tmp-merge
+except for the following bit that breaks compile for omap2plus_defconfig,
+maybe apply it directly to one of your branches?
 
-Applied with Lee's ACK, thanks!
+Regards,
 
-Yours,
-Linus Walleij
+Tony
+
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Thu, 15 Nov 2012 09:22:34 -0800
+Subject: [PATCH] ARM: OMAP2+: Fix build for board-generic after a merge conflict
+
+Commit 187e3e06 (ARM: OMAP2+: board files: use SoC-specific system
+restart functions) changed to use SoC specific restart functions to
+simplify the PRCM code. The changes done to board-generic.c in commit
+7dd9d502 (ARM: OMAP3: Add generic machine descriptor for boards with
+OMAP3 GP devices) need to be updated accordingly.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -122,7 +122,7 @@ DT_MACHINE_START(OMAP3_GP_DT, "Generic OMAP3-GP (Flattened Device Tree)")
+ 	.init_machine	= omap_generic_init,
+ 	.timer		= &omap3_secure_timer,
+ 	.dt_compat	= omap3_gp_boards_compat,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+ #endif
+ 
