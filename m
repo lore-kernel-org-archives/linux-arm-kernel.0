@@ -1,36 +1,60 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Nov 2012 18:56:43 -0800
-Subject: [GIT PULL 2/5] omap cleanup fix and soc detection improvment for v3.8
- merge window
+Date: Wed, 14 Nov 2012 18:56:44 -0800
+Subject: [GIT PULL 4/5] omap timer changes for v3.8 merge window
 In-Reply-To: <pull-1352948204-277861>
-Message-ID: <mailman.3.1352948223.1035.linux-arm-kernel@lists.infradead.org>
+Message-ID: <mailman.4.1352948229.1035.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit e05cf58d50e3ce3601ebf753728eee0df759e38f:
+The following changes since commit d308ba50a1234b299a00e63a95e61fdeb2f1a2df:
 
-  ARM: OMAP2+: remove duplicated include from board-overo.c (2012-11-12 14:02:48 -0800)
+  Merge branch 'omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3' into omap-for-v3.8/dt (2012-11-09 14:58:34 -0800)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/cleanup-fixes-part2-v2-signed
 
-for you to fetch changes up to 42a1cc9c0ec2a00b53b4f02849dc4377b09b3b05:
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/timer-signed
 
-  ARM: OMAP4: ID: Improve features detection and check (2012-11-14 12:10:37 -0800)
+for you to fetch changes up to 9dc57643738f9fbe45c10cc062903d5dfda5bdd9:
 
-----------------------------------------------------------------
-One build fix for recent clean up when CONFIG_PM is not set
-and clean up related improvment to the SoC detection.
+  Merge branch 'fixes-timer' of github.com:jonhunter/linux into omap-for-v3.8/timer (2012-11-13 13:52:38 -0800)
 
 ----------------------------------------------------------------
-Ivan Khoronzhuk (1):
-      ARM: OMAP4: ID: Improve features detection and check
+
+Timer fixes for omaps via Jon Hunter <jon-hunter@ti.com>:
+
+Several fixes for the OMAP DMTIMER driver including ...
+1. Adding workaround for OMAP3+ errata i103/i767
+2. Fixing posted mode support
+3. Spurious interrupts when using match interrupt
+4. HWMOD fixes for timers
+5. Unnecessary restoration of read-only registers
+6. Adds function for disabling timer interrupts
+7. Fixing timer1 reset for OMAP1
+
+----------------------------------------------------------------
+Jon Hunter (13):
+      ARM: OMAP: Add DMTIMER definitions for posted mode
+      ARM: OMAP3+: Implement timer workaround for errata i103 and i767
+      ARM: OMAP: Fix timer posted mode support
+      ARM: OMAP3: Correct HWMOD DMTIMER SYSC register declarations
+      ARM: OMAP2/3: Define HWMOD software reset status for DMTIMERs
+      ARM: OMAP2+: Don't use __omap_dm_timer_reset()
+      ARM: OMAP: Fix dmtimer reset for timer1
+      ARM: OMAP: Don't restore of DMTIMER TISTAT register
+      ARM: OMAP: Don't restore DMTIMER interrupt status register
+      ARM: OMAP: Fix spurious interrupts when using timer match feature
+      ARM: OMAP: Add dmtimer interrupt disable function
+      ARM: OMAP: Remove unnecessary call to clk_get()
+      ARM: OMAP: Remove __omap_dm_timer_set_source function
 
 Tony Lindgren (1):
-      ARM: OMAP: Fix compile for OMAP_PM_NOOP if PM is not selected
+      Merge branch 'fixes-timer' of github.com:jonhunter/linux into omap-for-v3.8/timer
 
- arch/arm/mach-omap2/Makefile |  3 ++-
- arch/arm/mach-omap2/id.c     | 25 +++++++------------------
- arch/arm/mach-omap2/soc.h    |  8 ++------
- 3 files changed, 11 insertions(+), 25 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c | 15 ++++-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         | 41 ++++++------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |  4 ++
+ arch/arm/mach-omap2/timer.c                        | 70 +++++++++++++++-----
+ arch/arm/plat-omap/dmtimer.c                       | 77 +++++++++++++---------
+ arch/arm/plat-omap/include/plat/dmtimer.h          | 72 ++++++++++++++------
+ 6 files changed, 188 insertions(+), 91 deletions(-)
