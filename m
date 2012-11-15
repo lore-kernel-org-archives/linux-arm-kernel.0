@@ -1,39 +1,42 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Thu, 15 Nov 2012 13:05:58 -0600
-Subject: [PATCH v4 2/2] ARM: OMAP3/4: iommu: adapt to runtime pm
-In-Reply-To: <CAK=WgbaTupjayMLmgptfLtNkkk_GZL8RYQrYn8O7FG5GpANswg@mail.gmail.com>
-References: <1352860489-19960-1-git-send-email-omar.luna@linaro.org>
- <1352860489-19960-3-git-send-email-omar.luna@linaro.org>
- <CAK=WgbZm+sjavwb_Li_W5ygm0XuS9YMYfQEkdoB188Uir0arGg@mail.gmail.com>
- <CALLhW=46xUZzuEBaQD7vsOTQOGR7bwXMSM_mugN_gWa-oqwfuw@mail.gmail.com>
- <CAK=WgbaTupjayMLmgptfLtNkkk_GZL8RYQrYn8O7FG5GpANswg@mail.gmail.com>
-Message-ID: <CALLhW=6yKs8Moq6zAP06E6Nevhj8v5C-BGSgNyCsQbYXoJpLxQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Nov 2012 20:09:20 +0100
+Subject: [PATCH 01/14] pinctrl: SPEAr: add spi chipselect control driver
+In-Reply-To: <CAKohpomLRYAKJ=dNLVsjj1xf=G6xj4EcTpPmhSDvgBYUMXc1mA@mail.gmail.com>
+References: <cover.1352608333.git.viresh.kumar@linaro.org>
+ <4a92290e8a3b1a19c3a5e864edfa7badfc2af5d0.1352608333.git.viresh.kumar@linaro.org>
+ <CACRpkdb9tSUUGQjWdHqRr5rUSyiPgWm2i3-QZq9VbWFY2EAQeQ@mail.gmail.com>
+ <CAKohpomLRYAKJ=dNLVsjj1xf=G6xj4EcTpPmhSDvgBYUMXc1mA@mail.gmail.com>
+Message-ID: <CACRpkdY+noKODLNUEV4dNM7cJVuRayEhJRjND75Ggm2kBoX1mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 November 2012 11:39, Ohad Ben-Cohen <ohad@wizery.com> wrote:
->> I do agree description is missing, again I thought I had done this
->> somewhere but looks like I didn't, will update these. If you think
->> these should be different patches please let me know, otherwise I
->> would like to keep a single *documented* patch.
->
-> It seems like there are 3 different logical changes here:
->
-> 1. remove clk_* invocations from iommu_fault_handler()
-> 2. keep clocks enabled as long as iommu is enabled
-> 3. convert to runtime pm
->
-> If we split this to three patches in this order, you won't have to add
-> and remove runtime pm functions.
->
-> Let's do it, please. It's a small nuisance now, but may be really
-> helpful in the future when someone tries to debug stuff and understand
-> the motivation behind these changes. It'd make it much easier for you
-> to document the changes, too: you have an entire commit log per
-> change.
+On Thu, Nov 15, 2012 at 3:19 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 15 November 2012 19:47, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-Ok, not a problem then.
+>> Just one question: since this driver is not using any
+>> pinctrl interfaces, why is it under drivers/pinctrl/*?
+>>
+>> Shouldn't it be under drivers/gpio from a technical
+>> point of view?
+>>
+>> I think I'd accept it under drivers/pinctrl/spear/*
+>> if you just want this to keep everything SPEAr-related
+>> in one place though, so enlighten me.
+>
+> That's because they are controlling few pads. They are not
+> actually gpio's but just pads that we are controlling.
+>
+> That's why we thought they are better in this place.
 
-Cheers,
+The grouping of drivers in the kernel is about what in-kernel
+subsystem interface they're using, not how their electronics
+work...
 
-Omar
+Since this driver is only using the GPIO API it should be
+in drivers/gpio/gpio-*.c.
+
+Many, many drivers in drivers/gpio* are controlling pads
+too, so it will be in good company ;-)
+
+Yours,
+Linus Walleij
