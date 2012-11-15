@@ -1,41 +1,34 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 15 Nov 2012 20:24:49 +0800
-Subject: [PATCH] ARM: pxa: remove pxa95x support
-In-Reply-To: <201211151214.47073.arnd@arndb.de>
-References: <1352970366-7154-1-git-send-email-haojian.zhuang@gmail.com>
- <201211151206.33461.arnd@arndb.de>
- <201211151214.47073.arnd@arndb.de>
-Message-ID: <CAN1soZyfPT7pJjyO_vxGGhzC5hB_5XX1DAR2VwDP9XtH29FV8A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Nov 2012 12:25:30 +0000
+Subject: [PATCH 1/2] Boottime: A tool for automatic measurement of
+ kernel/bootloader boot time
+In-Reply-To: <20121115112543.GC21682@gmail.com>
+References: <1352973847-21605-1-git-send-email-lee.jones@linaro.org>
+ <CAH9JG2UX0Wyr-QKw3=tbUXeuEhHe04_cFkkAp6bB2Rr-x7ViHQ@mail.gmail.com>
+ <20121115112543.GC21682@gmail.com>
+Message-ID: <201211151225.31066.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 8:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 15 November 2012, Arnd Bergmann wrote:
->> On Thursday 15 November 2012, Haojian Zhuang wrote:
->> > PXA95x isn't widely used. And it adds the effort on supporting
->> > multiple platform. So remove it.
->> >
->> > Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
->>
->> Looks good to me, thanks for going through this.
->>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->>
->> Should I apply this straight into the arm-soc tree, or are you
->> going to send a pull request?
->>
->
-> One more comment: It would be good to put a disclaimer into the
-> changeset text like
->
->  "The assumption is that nobody will miss this support. If you are
->   reading this text because you actually require pxa95x support on
->   a new kernel, we can work out a way to revert this patch or add
->   support to the mmp platform".
->
->         Arnd
+On Thursday 15 November 2012, Lee Jones wrote:
+> 
+> > > +/* for automatic boot timing testcases */
+> > > +#define ATAG_BOOTTIME  0x41000403
+> > Where can I refer this ATAG usage? can you point out the reference URL
+> > or patches?
+> 
+> I assumed this would be in Mainline u-boot, but apparently not.
+> On closer inspection of the internal ST-Ericsson u-boot, this
+> functionality appears to be provided by patches which currently
+> exist as delta. So in essence, the bootloader you use will have
+> to be patched in a similar way for you to retrieve information
+> surrounding bootloader boot times.
+> 
+> And there was me thinking it was magic. ;)
+> 
 
-Yes, it's great. Please help to paste it into the changeset.
+And since we're moving away from ATAG on ux500 towards DT, it won't
+even work in the future. How essential is this part for the operation
+of your code?
 
-Best Regards
-Haojian
+	Arnd
