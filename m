@@ -1,60 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Nov 2012 21:40:53 +0000
-Subject: [PATCH] ARM: cti: fix manipulation of debug lock registers
-Message-ID: <1353015653-23711-1-git-send-email-will.deacon@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 15 Nov 2012 22:44:59 +0100
+Subject: [PATCH 2/7] clk: mvebu: add armada-370-xp CPU specific clocks
+In-Reply-To: <1353014906-31566-3-git-send-email-andrew@lunn.ch>
+References: <1353014906-31566-1-git-send-email-andrew@lunn.ch>
+ <1353014906-31566-3-git-send-email-andrew@lunn.ch>
+Message-ID: <20121115224459.3ea69329@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LOCKSTATUS register for memory-mapped coresight devices indicates
-whether or not the device in question implements hardware locking. If
-not, locking is not present (i.e. LSR.SLI == 0) and LAR is write-ignore,
-so software doesn't actually need to check the status register at all.
+Dear Andrew Lunn,
 
-This patch removes the broken LSR checks.
+On Thu, 15 Nov 2012 22:28:21 +0100, Andrew Lunn wrote:
+> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> Add Armada 370/XP specific CPU clocks
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  .../devicetree/bindings/clock/mvebu-core-clock.txt |   18 +--
 
-Cc: Ming Lei <ming.lei@canonical.com>
-Reported-by: Mike Williams <michael.williams@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/cti.h |   20 ++------------------
- 1 files changed, 2 insertions(+), 18 deletions(-)
+The changes to this file.
 
-diff --git a/arch/arm/include/asm/cti.h b/arch/arm/include/asm/cti.h
-index a0ada3e..f2e5cad 100644
---- a/arch/arm/include/asm/cti.h
-+++ b/arch/arm/include/asm/cti.h
-@@ -146,15 +146,7 @@ static inline void cti_irq_ack(struct cti *cti)
-  */
- static inline void cti_unlock(struct cti *cti)
- {
--	void __iomem *base = cti->base;
--	unsigned long val;
--
--	val = __raw_readl(base + LOCKSTATUS);
--
--	if (val & 1) {
--		val = LOCKCODE;
--		__raw_writel(val, base + LOCKACCESS);
--	}
-+	__raw_writel(LOCKCODE, cti->base + LOCKACCESS);
- }
- 
- /**
-@@ -166,14 +158,6 @@ static inline void cti_unlock(struct cti *cti)
-  */
- static inline void cti_lock(struct cti *cti)
- {
--	void __iomem *base = cti->base;
--	unsigned long val;
--
--	val = __raw_readl(base + LOCKSTATUS);
--
--	if (!(val & 1)) {
--		val = ~LOCKCODE;
--		__raw_writel(val, base + LOCKACCESS);
--	}
-+	__raw_writel(~LOCKCODE, cti->base + LOCKACCESS);
- }
- #endif
+>  .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   21 +++
+>  drivers/clk/mvebu/Kconfig                          |    3 +
+>  drivers/clk/mvebu/Makefile                         |    1 +
+>  drivers/clk/mvebu/clk-core.c                       |    4 +-
+
+And this one don't appear to belong in this commit, do they?
+
+Thomas
 -- 
-1.7.4.1
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
