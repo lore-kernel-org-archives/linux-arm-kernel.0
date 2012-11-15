@@ -1,47 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Nov 2012 15:42:56 +0100
-Subject: [PATCH 4/4] pinctrl: nomadik: Prevent NULL dereference if
- of_match_device returns NULL
-In-Reply-To: <1352955365.6793.6.camel@phoenix>
-References: <1352955096.6793.1.camel@phoenix> <1352955365.6793.6.camel@phoenix>
-Message-ID: <CACRpkdbWqFrP7RvXbaR5Bcz1htCL_wSqwUvOi67LmoF_PBjvhg@mail.gmail.com>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Thu, 15 Nov 2012 09:10:31 -0600
+Subject: [PATCH] ARM: OMAP4: hwmod data: ipu and dsp to use parent clocks
+ instead of leaf clocks
+In-Reply-To: <alpine.DEB.2.00.1211141542280.16047@utopia.booyaka.com>
+References: <1352860750-20100-1-git-send-email-omar.luna@linaro.org>
+ <alpine.DEB.2.00.1211141542280.16047@utopia.booyaka.com>
+Message-ID: <CALLhW=6uwCzAwPLNbjOwVKWVW5KOui=UXZdTUm7HMp=3cZrCNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 5:56 AM, Axel Lin <axel.lin@ingics.com> wrote:
+Hi,
 
-> of_match_device() may return NULL.
+On 14 November 2012 09:44, Paul Walmsley <paul@pwsan.com> wrote:
+> Hi
 >
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
-> ---
->  drivers/pinctrl/pinctrl-nomadik.c |   11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
+> On Tue, 13 Nov 2012, Omar Ramirez Luna wrote:
 >
-> diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-> index 238060e..40bd1b3 100644
-> --- a/drivers/pinctrl/pinctrl-nomadik.c
-> +++ b/drivers/pinctrl/pinctrl-nomadik.c
-> @@ -1863,9 +1863,14 @@ static int __devinit nmk_pinctrl_probe(struct platform_device *pdev)
+>> This prevents hwmod _enable_clocks...omap2_dflt_clk_enable path
+>> from enabling modulemode inside CLKCTRL using its clk->enable_reg
+>> field. Instead is left to _omap4_enable_module though soc_ops, as
+>> the one in charge of this setting.
+>>
+>> According to comments received[1] for related patches the idea is
+>> to get rid of leaf clocks in future. So remove these two while at it.
+>>
+>> [1] http://lkml.org/lkml/2012/8/20/226
+>>
+>> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
 >
->         if (platid)
->                 version = platid->driver_data;
-> -       else if (np)
-> -               version = (unsigned int)
-> -                       of_match_device(nmk_pinctrl_match, &pdev->dev)->data;
-> +       else if (np) {
-> +               const struct of_device_id *match;
-> +
-> +               match = of_match_device(nmk_pinctrl_match, &pdev->dev);
-> +               if (!match)
-> +                       return -ENODEV;
-> +               version = (unsigned int) match->data;
-> +       }
+> Does this one belong as part of the "OMAP: iommu: hwmod, reset
+> handling and runtime PM" series?  Looks like applying this one separately
+> might cause these clocks not to be disabled by either the clock code's
+> disable-unused-clocks code, or the hwmod code?
 
-AFAICT this can actually happen so patch applied, unless Lee
-speaks against it.
+You are right, if applied right now, without the others it will break
+the current clocks iommu code uses.
 
-Patches 1-3/4 are dropped though, as the maintainers didn't seem
-to like them.
+I will put it along with the other series or wait for the acceptance
+of the other patches first.
 
-Yours,
-Linus Walleij
+Thanks,
+
+Omar
