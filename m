@@ -1,22 +1,25 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 15 Nov 2012 16:30:39 +0000
-Subject: [PATCH] arm-dt: Enable DT proc updates.
-In-Reply-To: <5091D8A8.9010307@gmail.com>
-References: <1351699069-4661-1-git-send-email-panto@antoniou-consulting.com>
- <5091D8A8.9010307@gmail.com>
-Message-ID: <20121115163039.E8BBD3E194B@localhost>
+From: martin@ronetix.at (Martin Peevski)
+Date: Thu, 15 Nov 2012 18:34:00 +0200
+Subject: Configure the USB device/host on sam9g25 module
+Message-ID: <50A51978.7040001@ronetix.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 Oct 2012 21:04:24 -0500, Rob Herring <robherring2@gmail.com> wrote:
-> On 10/31/2012 10:57 AM, Pantelis Antoniou wrote:
-> > This simple patch enables dynamic changes of the DT tree on runtime
-> > to be visible to the device-tree proc interface.
-> > 
-> > Signed-off-by: Pantelis Antoniou <panto@antoniou-consulting.com>
-> 
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
+      Hi,
 
-Applied, thanks.
+      I'm working with sam9g25 module placed on sam9x5-ek. sam9g25 has 2 
+host USB's and 1 device/host USB (on the micro USB of sam9x5-ek). Both 
+USB hosts accept mass storage devices and works correct. It was 
+impossible to do 2 things with the USB device/host (placed on the micro 
+USB of sam9x5-ek):
 
-g.
+      1. Put in it mass storage device - the kernel want not to 
+enumerate it and give it an name (for example sda, sdb, ...). What I 
+must do in the config file of kernel to be recognized the inserted mass 
+storage device?
+
+     2. Connect cable from the micro USB to any of the host USB's and 
+detect USB serial gadget.
+
+I tryed to make some configs for both problems in the kernel but it 
+don't works. Can you, please, help me solve these problems?
