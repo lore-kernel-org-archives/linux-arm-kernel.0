@@ -1,38 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 Nov 2012 09:02:57 +0100
-Subject: [PATCH v7] Network driver for the Armada 370 and Armada XP ARM
- Marvell SoCs
-In-Reply-To: <20121115.024213.1356436436054345008.davem@davemloft.net>
-References: <1352905010-24172-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121114.215922.1242337385782766449.davem@davemloft.net>
- <20121115083319.76483256@skate>
- <20121115.024213.1356436436054345008.davem@davemloft.net>
-Message-ID: <20121115090257.4b9e20c5@skate>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 15 Nov 2012 09:04:53 +0100
+Subject: [PATCH 1/3] OF: Add helper for matching against linux, stdout-path
+In-Reply-To: <CACxGe6uW+XN6RDnP+8QFXaCYqqPZO4dZM_aynR6AVMYZT=KuMg@mail.gmail.com>
+References: <1351849734-9836-1-git-send-email-s.hauer@pengutronix.de>
+ <1351849734-9836-2-git-send-email-s.hauer@pengutronix.de>
+ <CACxGe6uW+XN6RDnP+8QFXaCYqqPZO4dZM_aynR6AVMYZT=KuMg@mail.gmail.com>
+Message-ID: <20121115080453.GW10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David,
-
-On Thu, 15 Nov 2012 02:42:13 -0500 (EST), David Miller wrote:
-> From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Date: Thu, 15 Nov 2012 08:33:19 +0100
+On Wed, Nov 14, 2012 at 08:49:54PM +0000, Grant Likely wrote:
+> > +int of_device_is_stdout_path(struct device_node *dn)
+> > +{
+> > +       const char *name;
+> > +
+> > +       name = of_get_property(of_chosen, "linux,stdout-path", NULL);
+> > +       if (name == NULL)
+> > +               return 0;
+> > +
+> > +       if (dn == of_find_node_by_path(name))
 > 
-> > Would you mind if we take, with your Ack, the network driver through
-> > the arm-soc tree, so that we can carry the related patches modifying
-> > the Device Tree and so on? If not, then I'll send you a pull request
-> > with just the drivers/net changes, and we'll integrate the ARM-related
-> > changes through the arm-soc tree, in which we will have the necessary
-> > dependencies. I'm fine with any of those solutions.
+> need to of_node_put() the return value of of_find_node_by_path()
 > 
-> Sure, no problem, take it via the ARM tree:
+> > +               return 1;
+> > +
+> > +       return 0;
+> > +}
 > 
-> Acked-by: David S. Miller <davem@davemloft.net>
+> Hi Sascha,
+> 
+> I'm fine with the helper, but there really is no need for a completely
+> separate .c file. Just put it in drivers/of/base.c.
 
-Excellent, thanks!
+Agreed.
 
-Thomas
+Thanks,
+ Sascha
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
