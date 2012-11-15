@@ -1,38 +1,40 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Nov 2012 15:03:40 +0100
-Subject: [PATCH] RFC: pinctrl: grab default handler with bus notifiers
-In-Reply-To: <20121113063546.GD18224@opensource.wolfsonmicro.com>
-References: <1352636539-6318-1-git-send-email-linus.walleij@stericsson.com>
- <50A15A54.3090803@wwwdotorg.org>
- <20121113063546.GD18224@opensource.wolfsonmicro.com>
-Message-ID: <CACRpkdY-tye5LNOwxQ-XrjM-x9RffAvj-tPfsFQA3ZWOY8P-Vw@mail.gmail.com>
+Date: Thu, 15 Nov 2012 15:06:32 +0100
+Subject: [PATCH 02/14] ARM: SPEAr13xx: DT: Add spics gpio controller nodes
+In-Reply-To: <CAKohpon=AVGZmR_cwUZ4=buw0kr3JVtXh51BtXteWkJ7E-f_bQ@mail.gmail.com>
+References: <cover.1352608333.git.viresh.kumar@linaro.org>
+ <58a7d91cab20b924784fb5a09e16ca08e6f13318.1352608333.git.viresh.kumar@linaro.org>
+ <CACRpkdZkgmLF8TxFCZSubP+g+6_ofZugArKtE9=dYTZfemstrw@mail.gmail.com>
+ <CAKohpon=AVGZmR_cwUZ4=buw0kr3JVtXh51BtXteWkJ7E-f_bQ@mail.gmail.com>
+Message-ID: <CACRpkdaJ2kCYfSP=xCRQAG2wDnkMKX9fey+ByhDDiOS==u+XwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2012 at 7:35 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Nov 12, 2012 at 01:21:40PM -0700, Stephen Warren wrote:
->> On 11/11/2012 05:22 AM, Linus Walleij wrote:
->
->> > Another solution that was discussed was whether to move
->> > the default pinctrl handle and state grab to the device
->> > core as an optional field in struct device itself, but
->> > I'd like to first propose this less intrusive mechanism.
->
->> I think doing that approach makes a lot more sense; wouldn't it
->> completely avoid the issues with deferred probe that this notifier-based
->> method can't solve? It would also be very much in line with e.g.
->> dev_get_regmap() - if every resource that a driver required were handled
->> like that, then deferred probe could be significantly isolated into the
->> driver core rather than in every driver...
->
-> I have to say that I agree with this, notifiers seem to make life more
-> complicated for limited gain.  Otherwise I guess we could enhance
-> notifiers so that they're able to trigger deferrals?
+On Tue, Nov 13, 2012 at 3:34 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On Nov 13, 2012 7:38 PM, "Linus Walleij" <linus.walleij@linaro.org> wrote:
+>> On Sun, Nov 11, 2012 at 5:39 AM, Viresh Kumar <viresh.kumar@linaro.org>
+>> wrote:
 
-OK I'll have to come up with a patch to the device core
-instead... it'll be much simpler anyway and if both of you guys
-can back it I guess Greg might be OK with it too.
+>> >         ahb {
+>> > +               spics: spics at e0700000{
+>> > +                       compatible = "st,spear-spics-gpio";
+>> > +                       reg = <0xe0700000 0x1000>;
+>> > +                       st-spics,peripcfg-reg = <0x3b0>;
+>> > +                       st-spics,sw-enable-bit = <12>;
+>> > +                       st-spics,cs-value-bit = <11>;
+>> > +                       st-spics,cs-enable-mask = <3>;
+>> > +                       st-spics,cs-enable-shift = <8>;
+>> > +                       gpio-controller;
+>> > +                       #gpio-cells = <2>;
+>> > +               };
+>> > +
+>>
+>> Are these bindings documented?
+>
+> The main patch waiting for ur comments is 1/14.
+
+I seldom comment on individual DT bindings, I just want
+to know that they're there :-)
 
 Yours,
 Linus Walleij
