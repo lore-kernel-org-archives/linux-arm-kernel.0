@@ -1,20 +1,103 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 15 Nov 2012 14:40:13 -0700
-Subject: [PATCH V2 0/3] ARM: tegra: add speedo identification for T20/T30
-In-Reply-To: <1352965354-650-1-git-send-email-dahuang@nvidia.com>
-References: <1352965354-650-1-git-send-email-dahuang@nvidia.com>
-Message-ID: <50A5613D.5080601@wwwdotorg.org>
+From: oleg.matcovschi@ti.com (oleg.matcovschi at ti.com)
+Date: Thu, 15 Nov 2012 13:39:57 -0800
+Subject: [PATCH] OMAP2+: mux: Fixed gpio mux mode analysis.
+Message-ID: <1353015597-22703-1-git-send-email-oleg.matcovschi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2012 12:42 AM, Danny Huang wrote:
-> This patch series adds speedo identification functionality for tegra
-> T20 and T30. It reads speedo value from fuse and chooses CPU and core 
-> process ID by checking speedo corner tables.
+From: Oleg Matcovschi <oleg.matcovschi@ti.com>
 
-I think this all looks fine; I assume there will be some forthcoming
-usage of the new variables.
+OMAP_MODE_GPIO() macro verified only OMAP_MUX_MODE4.
+It is not correct for following platforms:
+    2430 - gpio mux mode 3
+    44xx - gpio mux mode 3
+    54xx - gpio mux mode 6
 
-I applied the series with some very minor changes to the printfs and
-commit description to that "Tegra20" was consistently used instead of
-"T20" or "Tegra2", and the same for Tegra30.
+Patch reserves first 3 bits in partition flags for storing gpio mux
+mode in same format as stored in control pad register.
+Modified OMAP_MODE_GPIO() macro handles all possible cases of gpio mux mode.
+Modified omap_mux_init() flags of omap34xx to include OMAP_MUX_GPIO_IN_MODE4.
+
+Signed-off-by: Oleg Matcovschi <oleg.matcovschi@ti.com>
+---
+ arch/arm/mach-omap2/mux.c     |    4 ++--
+ arch/arm/mach-omap2/mux.h     |   18 +++++++++++++-----
+ arch/arm/mach-omap2/mux34xx.c |    2 +-
+ 3 files changed, 16 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+index 701e17c..75f854e 100644
+--- a/arch/arm/mach-omap2/mux.c
++++ b/arch/arm/mach-omap2/mux.c
+@@ -799,7 +799,7 @@ int __init omap_mux_late_init(void)
+ 			struct omap_mux *m = &e->mux;
+ 			u16 mode = omap_mux_read(partition, m->reg_offset);
+ 
+-			if (OMAP_MODE_GPIO(mode))
++			if (OMAP_MODE_GPIO(partition, mode))
+ 				continue;
+ 
+ #ifndef CONFIG_DEBUG_FS
+@@ -1064,7 +1064,7 @@ static void __init omap_mux_init_list(struct omap_mux_partition *partition,
+ 		}
+ #else
+ 		/* Skip pins that are not muxed as GPIO by bootloader */
+-		if (!OMAP_MODE_GPIO(omap_mux_read(partition,
++		if (!OMAP_MODE_GPIO(partition, omap_mux_read(partition,
+ 				    superset->reg_offset))) {
+ 			superset++;
+ 			continue;
+diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
+index 76f9b3c..8393284 100644
+--- a/arch/arm/mach-omap2/mux.h
++++ b/arch/arm/mach-omap2/mux.h
+@@ -58,7 +58,8 @@
+ #define OMAP_PIN_OFF_INPUT_PULLDOWN	(OMAP_OFF_EN | OMAP_OFF_PULL_EN)
+ #define OMAP_PIN_OFF_WAKEUPENABLE	OMAP_WAKEUP_EN
+ 
+-#define OMAP_MODE_GPIO(x)	(((x) & OMAP_MUX_MODE7) == OMAP_MUX_MODE4)
++#define OMAP_MODE_GPIO(partition, x)	(((x) & OMAP_MUX_MODE7) == \
++					  (partition->flags & OMAP_MUX_MODE7))
+ #define OMAP_MODE_UART(x)	(((x) & OMAP_MUX_MODE7) == OMAP_MUX_MODE0)
+ 
+ /* Flags for omapX_mux_init */
+@@ -79,13 +80,20 @@
+ /*
+  * omap_mux_init flags definition:
+  *
++ * OMAP_GPIO_MUX_MODE, bits 0-2: gpio muxing mode, same like pad control
++ *      register which includes values from 0-7.
+  * OMAP_MUX_REG_8BIT: Ensure that access to padconf is done in 8 bits.
+  * The default value is 16 bits.
+- * OMAP_MUX_GPIO_IN_MODE3: The GPIO is selected in mode3.
+- * The default is mode4.
+  */
+-#define OMAP_MUX_REG_8BIT		(1 << 0)
+-#define OMAP_MUX_GPIO_IN_MODE3		(1 << 1)
++#define OMAP_MUX_GPIO_IN_MODE0		OMAP_MUX_MODE0
++#define OMAP_MUX_GPIO_IN_MODE1		OMAP_MUX_MODE1
++#define OMAP_MUX_GPIO_IN_MODE2		OMAP_MUX_MODE2
++#define OMAP_MUX_GPIO_IN_MODE3		OMAP_MUX_MODE3
++#define OMAP_MUX_GPIO_IN_MODE4		OMAP_MUX_MODE4
++#define OMAP_MUX_GPIO_IN_MODE5		OMAP_MUX_MODE5
++#define OMAP_MUX_GPIO_IN_MODE6		OMAP_MUX_MODE6
++#define OMAP_MUX_GPIO_IN_MODE7		OMAP_MUX_MODE7
++#define OMAP_MUX_REG_8BIT		(1 << 3)
+ 
+ /**
+  * struct omap_board_data - board specific device data
+diff --git a/arch/arm/mach-omap2/mux34xx.c b/arch/arm/mach-omap2/mux34xx.c
+index c47140b..c53609f4 100644
+--- a/arch/arm/mach-omap2/mux34xx.c
++++ b/arch/arm/mach-omap2/mux34xx.c
+@@ -2053,7 +2053,7 @@ int __init omap3_mux_init(struct omap_board_mux *board_subset, int flags)
+ 		return -EINVAL;
+ 	}
+ 
+-	return omap_mux_init("core", 0,
++	return omap_mux_init("core", OMAP_MUX_GPIO_IN_MODE4,
+ 			     OMAP3_CONTROL_PADCONF_MUX_PBASE,
+ 			     OMAP3_CONTROL_PADCONF_MUX_SIZE,
+ 			     omap3_muxmodes, package_subset, board_subset,
+-- 
+1.7.4.1
