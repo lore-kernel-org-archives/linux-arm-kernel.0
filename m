@@ -1,31 +1,26 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Thu, 15 Nov 2012 13:51:52 +0200
-Subject: [PATCH v2 2/3] serial: mxs-auart: add the DMA support for mx28
-In-Reply-To: <50A4B1CE.5070203@freescale.com>
-References: <1351074456-25863-1-git-send-email-b32955@freescale.com>
- <1351074456-25863-3-git-send-email-b32955@freescale.com>
- <50A21613.6030709@bluegiga.com> <50A45F83.1010009@freescale.com>
- <50A4983F.8080407@bluegiga.com> <50A4B1CE.5070203@freescale.com>
-Message-ID: <50A4D758.8050602@bluegiga.com>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Thu, 15 Nov 2012 17:43:29 +0530
+Subject: [PATCH 0/4] i2c-s3c2410: Fix a bug and optimize code
+Message-ID: <1352981613-2098-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following set of patches fixes a bug in i2c-s3c2410 driver
+with respect to the functioning of dedicated HDMIPHY channel.
+1. Removing unwanted spinlock
+2. Correcting the Stop sequence
+3. Optimizing the wait loop for bus idle.
+4. Removing unnecessary HDMI special cases
+Respectively.
 
-On 11/15/2012 11:11 AM, Huang Shijie wrote:
->> I tested linux-next-20121114 on apx4devkit (imx28 based device) and I
->> got the same error message:
->>
->> # stty -F /dev/ttyAPP0 crtscts; microcom /dev/ttyAPP0 -s 115200
->> [  133.710000] mxs-auart 8006a000.serial: step 1 error
->> [  133.720000] mxs-auart 8006a000.serial: We can not start up the DMA.
-> Could you test this patch?
+Daniel Kurtz (4):
+  i2c-s3c2410: grab adapter lock while changing i2c clock
+  i2c-s3c2410: do not generate STOP for QUIRK_HDMIPHY
+  i2c-s3c2410: use exponential back off while polling for bus idle
+  i2c-s3c2410: do not special case HDMIPHY stuck bus detection
 
-I don't get error messages with your latest patch but the CPU freezes 
-after it has received first byte. Freezing happens only if flow control 
-(and of course DMA) is enabled. Sending data doesn't freeze the CPU. Are 
-you able to send data without freezing?
+ drivers/i2c/busses/i2c-s3c2410.c |  134 ++++++++++++++++++++++++++------------
+ 1 file changed, 91 insertions(+), 43 deletions(-)
 
-I used busybox's microcom to transfer data.
-
-Lauri
+-- 
+1.7.9.5
