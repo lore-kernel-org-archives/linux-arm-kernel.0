@@ -1,38 +1,33 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 15 Nov 2012 11:47:19 +0100
-Subject: [PATCH] ARM: ux500: fix pin warning
-Message-ID: <1352976439-24133-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Nov 2012 11:49:57 +0100
+Subject: [GIT PULL] Ux500 pin changes
+In-Reply-To: <201211122235.00973.arnd@arndb.de>
+References: <CACRpkdYjEmQRU530N3sP7t_RfM_NLhEcMf6YCBdf4LC7M7fQDQ@mail.gmail.com>
+ <201211122235.00973.arnd@arndb.de>
+Message-ID: <CACRpkdZ0_3ow9VwGGvFtj_pbYNG+cctB6kUK1FBe4sjU=MTgww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Mon, Nov 12, 2012 at 11:35 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Recent pin changes produce this warning:
+> u8500_defconfig now gives me two new errors in arm-soc/for-next when building with
+> -Werror:
+>
+> arch/arm/mach-ux500/board-mop500-pins.c:73:22: error: 'out_hi_wkup_pdis' defined but not used [-Werror=unused-variable]
 
-arch/arm/mach-ux500/board-mop500-pins.c:73:22:
-error: 'out_hi_wkup_pdis' defined but not used
-[-Werror=unused-variable]
+I've sent a fix for this, could you apply that patch directly to the
+drivers branch?
 
-Fix this by deleting the offending definition.
+> and the existing:
+>
+> ERROR (phandle_references): Reference to non-existent node or label "tc3589x_gpio"
+>
+> Can you provide patches to fix these up?
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/board-mop500-pins.c | 2 --
- 1 file changed, 2 deletions(-)
+What on earth is that? Lee, do you know how to fix this one up, I shamelessly
+assume it to be related to commit:
+commit 3113e679021a3a6bace1c62a8432cc0ec27c09ab
+"gpio: Enable the tc3298x GPIO expander driver for Device Tree"
 
-diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
-index 5770ed0..6679d8a 100644
---- a/arch/arm/mach-ux500/board-mop500-pins.c
-+++ b/arch/arm/mach-ux500/board-mop500-pins.c
-@@ -71,8 +71,6 @@ BIAS(in_wkup_pdis_en, PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|
- 	PIN_SLPM_PDIS_ENABLED);
- BIAS(in_wkup_pdis, PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|
- 	PIN_SLPM_PDIS_DISABLED);
--BIAS(out_hi_wkup_pdis, PIN_SLPM_OUTPUT_HIGH|PIN_SLPM_WAKEUP_ENABLE|
--	PIN_SLPM_PDIS_DISABLED);
- BIAS(out_wkup_pdis, PIN_SLPM_DIR_OUTPUT|PIN_SLPM_WAKEUP_ENABLE|
- 	PIN_SLPM_PDIS_DISABLED);
- 
--- 
-1.7.11.3
+Yours,
+Linus Walleij
