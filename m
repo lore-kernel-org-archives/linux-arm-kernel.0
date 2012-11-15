@@ -1,99 +1,345 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 15 Nov 2012 22:28:19 +0100
-Subject: [PATCH 0/7] core, cpu and gated clocks for mvebu
-Message-ID: <1353014906-31566-1-git-send-email-andrew@lunn.ch>
+Date: Thu, 15 Nov 2012 22:28:21 +0100
+Subject: [PATCH 2/7] clk: mvebu: add armada-370-xp CPU specific clocks
+In-Reply-To: <1353014906-31566-1-git-send-email-andrew@lunn.ch>
+References: <1353014906-31566-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1353014906-31566-3-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset combines code from Gregory Clement, Sebastian
-Hesselbarth and myself to implement core clks, cpu clock and gated
-clocks on Marvel MVEBU SoCs.
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-The Armada 370/XP core clock code is a refactored version of the
-already submitted and ACKed code from Gregory. It has been made to fit
-inside a framework developed by Sebastian which can handle all MVEBU
-SoCs. The Armarda 370/XP SoCs have more core clocks than the older SoCs, and
-the framework needs to handle this. Rather than specify the clock
-frequencies in DT, a Sample At Reset register is used, which describes
-each core clock frequency.
+Add Armada 370/XP specific CPU clocks
 
-Armarda XP is an SMP processor, with each CPU having its own
-clock. Gregories code for this has been taken as is.
-
-The Armarda 370/XP clock source has been converted to the common clock
-framework.
-
-Dove, Kirkword, and probably Armarda 370/XP have the ability to gate
-clocks to various blocks. A clk-gate clock is created for each of the
-gateable clocks on Dove and Kirkwood. Armarda 370/XP clock gates are
-currently unimplemented. Dove and Kirkwood board-dt.c and DT
-descriptions are then modified to make use of these clk gates.
-
-This code has been tested on:
-
-Kirkwood based QNAP TS219
-Armarda 370 based mirabox
-Armara XP based OpenBlocks
-
-and by Sebastian on:
-
-Dove based Cubox.
-
-Andrew Lunn (1):
-  ARM: Kirkwood: switch to DT clock providers
-
-Gregory CLEMENT (3):
-  clk: mvebu: add armada-370-xp CPU specific clocks
-  clk: armada-370-xp: add support for clock framework
-  clocksource: time-armada-370-xp converted to clk framework
-
-Sebastian Hesselbarth (3):
-  clk: mvebu: add mvebu core clocks.
-  clk: mvebu: add clock gating control provider for DT
-  ARM: dove: switch to DT clock providers
-
- .../devicetree/bindings/clock/mvebu-core-clock.txt |   47 ++
- .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   21 +
- .../bindings/clock/mvebu-gated-clock.txt           |   76 +++
- arch/arm/Kconfig                                   |    1 +
- arch/arm/boot/dts/armada-370-db.dts                |    4 -
- arch/arm/boot/dts/armada-370-xp.dtsi               |    1 +
- arch/arm/boot/dts/armada-370.dtsi                  |    7 +
- arch/arm/boot/dts/armada-xp.dtsi                   |   42 ++
- arch/arm/boot/dts/dove.dtsi                        |   20 +
- arch/arm/boot/dts/kirkwood.dtsi                    |   22 +
- arch/arm/mach-dove/Kconfig                         |    2 +
- arch/arm/mach-dove/common.c                        |   64 +-
- arch/arm/mach-kirkwood/Kconfig                     |    2 +
- arch/arm/mach-kirkwood/board-dt.c                  |   72 ++-
- arch/arm/mach-mvebu/Kconfig                        |    6 +
- arch/arm/mach-mvebu/armada-370-xp.c                |    9 +-
- arch/arm/plat-orion/include/plat/common.h          |    1 +
- drivers/clk/Kconfig                                |    2 +
- drivers/clk/Makefile                               |    1 +
- drivers/clk/mvebu/Kconfig                          |    8 +
- drivers/clk/mvebu/Makefile                         |    3 +
- drivers/clk/mvebu/clk-core.c                       |  675 ++++++++++++++++++++
- drivers/clk/mvebu/clk-core.h                       |   18 +
- drivers/clk/mvebu/clk-cpu.c                        |  155 +++++
- drivers/clk/mvebu/clk-cpu.h                        |   18 +
- drivers/clk/mvebu/clk-gating-ctrl.c                |  177 +++++
- drivers/clk/mvebu/clk.c                            |   37 ++
- drivers/clocksource/time-armada-370-xp.c           |   11 +-
- include/linux/clk/mvebu.h                          |   23 +
- 29 files changed, 1487 insertions(+), 38 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ .../devicetree/bindings/clock/mvebu-core-clock.txt |   18 +--
+ .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   21 +++
+ drivers/clk/mvebu/Kconfig                          |    3 +
+ drivers/clk/mvebu/Makefile                         |    1 +
+ drivers/clk/mvebu/clk-core.c                       |    4 +-
+ drivers/clk/mvebu/clk-cpu.c                        |  155 ++++++++++++++++++++
+ drivers/clk/mvebu/clk-cpu.h                        |   18 +++
+ drivers/clk/mvebu/clk.c                            |   14 ++
+ 8 files changed, 223 insertions(+), 11 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
- create mode 100644 Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
- create mode 100644 drivers/clk/mvebu/Kconfig
- create mode 100644 drivers/clk/mvebu/Makefile
- create mode 100644 drivers/clk/mvebu/clk-core.c
- create mode 100644 drivers/clk/mvebu/clk-core.h
  create mode 100644 drivers/clk/mvebu/clk-cpu.c
  create mode 100644 drivers/clk/mvebu/clk-cpu.h
- create mode 100644 drivers/clk/mvebu/clk-gating-ctrl.c
- create mode 100644 drivers/clk/mvebu/clk.c
- create mode 100644 include/linux/clk/mvebu.h
 
+diff --git a/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+index 84cfae7..ffb3d69 100644
+--- a/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
++++ b/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+@@ -4,26 +4,26 @@ Marvell MVEBU SoCs usually allow to determine core clock frequencies by
+ reading the Sample-At-Reset (SAR) register. The core clock consumer should
+ specify the desired clock by having the clock ID in its "clocks" phandle cell.
+ 
+-The following is a list of provided IDs and clock names on Kirkwood and Dove:
+- 0 = tclk   (Internal Bus clock)
+- 1 = cpuclk (CPU0 clock)
+- 2 = l2clk  (L2 Cache clock derived from CPU0 clock)
+- 3 = ddrclk (DDR controller clock derived from CPU0 clock)
+-
+-The following is a list of provided IDs and clock names on 370/XP:
++The following is a list of provided IDs and clock names on Armada 370/XP:
+  0 = tclk    (Internal Bus clock)
+  1 = cpuclk  (CPU clock)
+  2 = nbclk   (L2 Cache clock)
+  3 = hclk    (DRAM control clock)
+  4 = dramclk (DDR clock)
+ 
++The following is a list of provided IDs and clock names on Kirkwood and Dove:
++ 0 = tclk   (Internal Bus clock)
++ 1 = cpuclk (CPU0 clock)
++ 2 = l2clk  (L2 Cache clock derived from CPU0 clock)
++ 3 = ddrclk (DDR controller clock derived from CPU0 clock)
++
+ Required properties:
+ - compatible : shall be one of the following:
++	"marvell,armada-370-core-clocks" - For Armada 370 SoC core clocks
++	"marvell,armada-xp-core-clocks" - For Armada XP SoC core clocks
+ 	"marvell,dove-core-clocks" - for Dove SoC core clocks
+ 	"marvell,kirkwood-core-clocks" - for Kirkwood SoC (except mv88f6180)
+ 	"marvell,mv88f6180-core-clocks" - for Kirkwood MV88f6180 SoC
+-	"marvell,370-core-clocks" - For 370 SoC core clocks
+-	"marvell,xp-core-clocks" - For XP SoC core clocks
+ - reg : shall be the register address of the Sample-At-Reset (SAR) register
+ - #clock-cells : from common clock binding; shall be set to 1
+ 
+diff --git a/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
+new file mode 100644
+index 0000000..1fb5a64
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
+@@ -0,0 +1,21 @@
++Device Tree Clock bindings for cpu clock of Marvell EBU platforms
++
++Required properties:
++- compatible : shall be one of the following:
++	"marvell,armada-xp-cpu-clockctrl" - cpu clocks for Armada XP
++- reg : Address and length of the clock complex register set
++- #clock-cells : should be set to 1.
++- clocks : shall be the input parent clock phandle for the clock.
++
++cpuclk: clock-complex at d0018700 {
++	#clock-cells = <1>;
++	compatible = "marvell,armada-xp-cpu-clockctrl";
++	reg = <0xd0018700 0xA0>;
++	clocks = <&coreclk 1>;
++}
++
++cpu at 0 {
++	compatible = "marvell,sheeva-v7";
++	reg = <0>;
++	clocks = <&cpuclk 0>;
++};
+diff --git a/drivers/clk/mvebu/Kconfig b/drivers/clk/mvebu/Kconfig
+index fd7bf97..1dd93ad 100644
+--- a/drivers/clk/mvebu/Kconfig
++++ b/drivers/clk/mvebu/Kconfig
+@@ -1,3 +1,6 @@
+ config MVEBU_CLK_CORE
+        bool
+ 
++config MVEBU_CLK_CPU
++       bool
++
+diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
+index de1d961..93da083 100644
+--- a/drivers/clk/mvebu/Makefile
++++ b/drivers/clk/mvebu/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_MVEBU_CLK_CORE) 	+= clk.o clk-core.o
++obj-$(CONFIG_MVEBU_CLK_CPU) 	+= clk-cpu.o
+diff --git a/drivers/clk/mvebu/clk-core.c b/drivers/clk/mvebu/clk-core.c
+index 26ba835..1881872 100644
+--- a/drivers/clk/mvebu/clk-core.c
++++ b/drivers/clk/mvebu/clk-core.c
+@@ -634,11 +634,11 @@ static const struct core_clocks mv88f6180_core_clocks = {
+ static const __initdata struct of_device_id clk_core_match[] = {
+ #ifdef CONFIG_MACH_ARMADA_370_XP
+ 	{
+-		.compatible = "marvell,370-core-clocks",
++		.compatible = "marvell,armada-370-core-clocks",
+ 		.data = &a370_core_clocks,
+ 	},
+ 	{
+-		.compatible = "marvell,xp-core-clocks",
++		.compatible = "marvell,armada-xp-core-clocks",
+ 		.data = &xp_core_clocks,
+ 	},
+ #endif
+diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
+new file mode 100644
+index 0000000..1df027a
+--- /dev/null
++++ b/drivers/clk/mvebu/clk-cpu.c
+@@ -0,0 +1,155 @@
++/*
++ * Marvell MVEBU CPU clock handling.
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++#include <linux/kernel.h>
++#include <linux/clkdev.h>
++#include <linux/clk-provider.h>
++#include <linux/of_address.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/delay.h>
++#include "clk-cpu.h"
++
++#define SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET    0x0
++#define SYS_CTRL_CLK_DIVIDER_VALUE_OFFSET   0xC
++#define SYS_CTRL_CLK_DIVIDER_MASK	    0x3F
++
++#define MAX_CPU	    4
++struct cpu_clk {
++	struct clk_hw hw;
++	int cpu;
++	const char *clk_name;
++	const char *parent_name;
++	void __iomem *reg_base;
++};
++
++static struct clk **clks;
++
++static struct clk_onecell_data clk_data;
++
++#define to_cpu_clk(p) container_of(p, struct cpu_clk, hw)
++
++static unsigned long clk_cpu_recalc_rate(struct clk_hw *hwclk,
++					 unsigned long parent_rate)
++{
++	struct cpu_clk *cpuclk = to_cpu_clk(hwclk);
++	u32 reg, div;
++
++	reg = readl(cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_VALUE_OFFSET);
++	div = (reg >> (cpuclk->cpu * 8)) & SYS_CTRL_CLK_DIVIDER_MASK;
++	return parent_rate / div;
++}
++
++static long clk_cpu_round_rate(struct clk_hw *hwclk, unsigned long rate,
++			       unsigned long *parent_rate)
++{
++	/* Valid ratio are 1:1, 1:2 and 1:3 */
++	u32 div;
++
++	div = *parent_rate / rate;
++	if (div == 0)
++		div = 1;
++	else if (div > 3)
++		div = 3;
++
++	return *parent_rate / div;
++}
++
++static int clk_cpu_set_rate(struct clk_hw *hwclk, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	struct cpu_clk *cpuclk = to_cpu_clk(hwclk);
++	u32 reg, div;
++	u32 reload_mask;
++
++	div = parent_rate / rate;
++	reg = (readl(cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_VALUE_OFFSET)
++		& (~(SYS_CTRL_CLK_DIVIDER_MASK << (cpuclk->cpu * 8))))
++		| (div << (cpuclk->cpu * 8));
++	writel(reg, cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_VALUE_OFFSET);
++	/* Set clock divider reload smooth bit mask */
++	reload_mask = 1 << (20 + cpuclk->cpu);
++
++	reg = readl(cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET)
++	    | reload_mask;
++	writel(reg, cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET);
++
++	/* Now trigger the clock update */
++	reg = readl(cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET)
++	    | 1 << 24;
++	writel(reg, cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET);
++
++	/* Wait for clocks to settle down then clear reload request */
++	udelay(1000);
++	reg &= ~(reload_mask | 1 << 24);
++	writel(reg, cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET);
++	udelay(1000);
++
++	return 0;
++}
++
++static const struct clk_ops cpu_ops = {
++	.recalc_rate = clk_cpu_recalc_rate,
++	.round_rate = clk_cpu_round_rate,
++	.set_rate = clk_cpu_set_rate,
++};
++
++void __init of_cpu_clk_setup(struct device_node *node)
++{
++	struct cpu_clk *cpuclk;
++	void __iomem *clock_complex_base = of_iomap(node, 0);
++	int cpu;
++	if (clock_complex_base == NULL) {
++		pr_err("%s: clock-complex base register not set\n",
++			__func__);
++		return;
++	}
++
++	cpuclk = kzalloc(MAX_CPU * sizeof(*cpuclk), GFP_KERNEL);
++	clks = kzalloc(MAX_CPU * sizeof(*clks), GFP_KERNEL);
++
++	if (WARN_ON(!cpuclk))
++		return;
++	for (cpu = 0; cpu < MAX_CPU; cpu++) {
++		struct clk_init_data init;
++		struct clk *clk;
++		struct clk *parent_clk;
++		char *clk_name = kzalloc(5, GFP_KERNEL);
++
++		sprintf(clk_name, "cpu%d", cpu);
++		parent_clk = of_clk_get(node, 0);
++
++		cpuclk[cpu].parent_name = __clk_get_name(parent_clk);
++		cpuclk[cpu].clk_name = clk_name;
++		cpuclk[cpu].cpu = cpu;
++		cpuclk[cpu].reg_base = clock_complex_base;
++		cpuclk[cpu].hw.init = &init;
++
++		init.name = cpuclk[cpu].clk_name;
++		init.ops = &cpu_ops;
++		init.flags = 0;
++		init.parent_names = &cpuclk[cpu].parent_name;
++		init.num_parents = 1;
++
++		clk = clk_register(NULL, &cpuclk[cpu].hw);
++		if (WARN_ON(IS_ERR(clk)))
++			goto bail_out;
++		clks[cpu] = clk;
++	}
++	clk_data.clk_num = MAX_CPU;
++	clk_data.clks = clks;
++	of_clk_add_provider(node, of_clk_src_onecell_get, &clk_data);
++
++	return;
++bail_out:
++	kfree(clks);
++	kfree(cpuclk);
++}
+diff --git a/drivers/clk/mvebu/clk-cpu.h b/drivers/clk/mvebu/clk-cpu.h
+new file mode 100644
+index 0000000..e208336
+--- /dev/null
++++ b/drivers/clk/mvebu/clk-cpu.h
+@@ -0,0 +1,18 @@
++/*
++ * Marvell MVEBU CPU clock handling.
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MVEBU_CLK_CPU_H
++#define __MVEBU_CLK_CPU_H
++
++void __init of_cpu_clk_setup(struct device_node *node);
++
++#endif
+diff --git a/drivers/clk/mvebu/clk.c b/drivers/clk/mvebu/clk.c
+index e6742ac..dc310d6 100644
+--- a/drivers/clk/mvebu/clk.c
++++ b/drivers/clk/mvebu/clk.c
+@@ -16,8 +16,22 @@
+ #include <linux/clk/mvebu.h>
+ #include <linux/of.h>
+ #include "clk-core.h"
++#include "clk-cpu.h"
++
++static const __initconst struct of_device_id clk_match[] = {
++#ifdef CONFIG_MVEBU_CLK_CPU
++	{
++		.compatible = "marvell,armada-xp-cpu-clockctrl",
++		.data = of_cpu_clk_setup,
++	},
++#endif
++	{
++		/* sentinel */
++	}
++};
+ 
+ void __init mvebu_clocks_init(void)
+ {
+ 	mvebu_core_clk_init();
++	of_clk_init(clk_match);
+ }
 -- 
 1.7.10.4
