@@ -1,32 +1,71 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 15 Nov 2012 11:20:35 +0800
-Subject: [PATCH v2 2/3] serial: mxs-auart: add the DMA support for mx28
-In-Reply-To: <50A21613.6030709@bluegiga.com>
-References: <1351074456-25863-1-git-send-email-b32955@freescale.com>
- <1351074456-25863-3-git-send-email-b32955@freescale.com>
- <50A21613.6030709@bluegiga.com>
-Message-ID: <50A45F83.1010009@freescale.com>
+From: arunks.linux@gmail.com (Arun KS)
+Date: Thu, 15 Nov 2012 09:11:20 +0530
+Subject: Decoding the PTM traces
+In-Reply-To: <CAMP5XgegGNn=NM8LEp61tZJWYQC3wbZ9mFz53cMsvPFr=bydaQ@mail.gmail.com>
+References: <CAKZGPAN-DEFD-X4az0O06ngjwdFAyrdowQ57QvtDpe8axZiwTg@mail.gmail.com>
+ <CAMP5XgegGNn=NM8LEp61tZJWYQC3wbZ9mFz53cMsvPFr=bydaQ@mail.gmail.com>
+Message-ID: <CAKZGPANSW9EEN6tRW7cPxDQkicKBWC9eK9A3dQSH1d61nXsHKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?11?13? 17:42, Lauri Hintsala ??:
-> Hi Huang,
->
-> DMA support doesn't work with latest stable v3.6.5 or development 
-> 3.7-rc5 kernels. I get following error message when I open the serial 
-> port /dev/ttyAPP0:
->
-> [ 48.730000] mxs-auart 8006a000.serial: step 1 error
-> [ 48.750000] mxs-auart 8006a000.serial: We can not start up the DMA.
->
-I tested this patch set in imx28-evk board Rev C with linux-next-20121114.
-it works fine.
+Hello Arve,
 
-Maybe you can try the linux-next code.
+On Thu, Nov 15, 2012 at 4:55 AM, Arve Hj?nnev?g <arve@android.com> wrote:
+> On Wed, Nov 14, 2012 at 6:04 AM, Arun KS <arunks.linux@gmail.com> wrote:
+>> Hello,
+>>
+>> I m trying to capture and decode PTM trace from Cortex A9 dual core.
+>>
+>> I m successful  in configuring the driver(arch/arm/kernel/etm.c) and
+>> setting the funnel to get data in ETB.
+>> But I don't know how to decode these traces.
+>>
+>> Anyone has any pointers?
+>>
+>> Thanks,
+>> Arun
+>
+> I attached some tools I use to decode the traces. I have used this on
+> the A8, A9 and A15. I assume since you cc-ed me you have already
+> applied the kernel patches I posted a while back. Without them you
+> will not get useful trace data from a dual core processor.
 
-About the flow control:
-If we do not enable the HW flow control, the data may lost. And I do not 
-know how to handle with the Xon/Xoff when the DMA is supported.
+Thank you very much for the tools. Hope I have taken all your patches.
 
-Best Regards
-Huang Shijie
+Here is how my git log --oneline looks on arch/arm/kernel/etm.c
+
+75cbaea ARM: etm: Add sysfs entry to enable return stack if supported
+434032a ARM: etm: Add sysfs entry to disable branch_output flag
+c6b1c35 ARM: etm: Add sysfs entry to set context-id-size
+cfb8dc5 ARM: etm: Add sysfs entry to enable timestamps if supported
+d263bc7 ARM: etm: Check arch version and disable data tracing for ptm
+eff62a8 ARM: etm: Wait for etm/ptm(s) to stop before requesting PowerDown
+4246983 ARM: etm: Power down etm(s) when tracing is not enabled
+992cd59 ARM: etm: Support multiple ETMs/PTMs.
+3a91f3e ARM: etm: Return the entire trace buffer if it is empty after reset
+fe05bda ARM: etm: Add some missing locks and error checks
+0c3da53 ARM: etm: Configure data tracing
+d71c695 ARM: etm: Allow range selection
+f13ae47 ARM: etm: Don't try to clear the buffer full status after
+reading the buffer
+8511b5b ARM: etm: Don't limit tracing to only non-secure code.
+d387659 ARM: etm: Don't require clock control
+73017a5 arm: fix implicit module.h users by adding it to arch/arm as required.
+8e88069 ARM: 6838/1: etm: fix section mismatch warning
+aa25afa ARM: amba: make probe() functions take const id tables
+092e0e7 Merge branch 'llseek' of
+git://git.kernel.org/pub/scm/linux/kernel/git/arnd/bkl
+6038f37 llseek: automatically add .llseek fop
+8234eae ARM: 6291/1: coresight: move struct tracectx inside etm driver
+1495cc9 Input: sysrq - drop tty argument from sysrq ops handlers
+988257c ARM: 6294/1: etm: do a dummy read from OSSRR during initialization
+9e354ea ARM: 6292/1: coresight: add ETM management registers
+c5d6c77 ARM: 5841/1: a driver for on-chip ETM and ETB
+
+I ll let you know the results.
+
+thanks,
+Arun
+>
+> --
+> Arve Hj?nnev?g
