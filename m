@@ -1,138 +1,45 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Thu, 15 Nov 2012 15:06:17 +0530
-Subject: [PATCH 06/17] spi/atmel_spi: add flag to controller data for lock
- operations
-In-Reply-To: <1352710357-3265-7-git-send-email-wenyou.yang@atmel.com>
-References: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
- <1352710357-3265-7-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <CAM=Q2cvACiM2ynFz_HjRQ9pXg9o7amsP+u8icn7x7pB387VYaA@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 15 Nov 2012 13:46:17 +0400
+Subject: [PATCH v3 2/6] ARM: davinci: Changed pr_warning() to pr_warn()
+ (part 2)
+In-Reply-To: <13514BD7FAEBA745BBD7D8A672905C14311F2D0E@DFLE08.ent.ti.com>
+References: <1352853207-20602-1-git-send-email-rtivy@ti.com>
+ <1352853207-20602-2-git-send-email-rtivy@ti.com>
+ <50A36FA9.5050601@mvista.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311F2D0E@DFLE08.ent.ti.com>
+Message-ID: <50A4B9E9.6000303@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2012 at 2:22 PM, Wenyou Yang <wenyou.yang@atmel.com> wrote:
-> From: Nicolas Ferre <nicolas.ferre@atmel.com>
->
-> Will allow to drop the lock during DMA operations.
->
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: grant.likely at secretlab.ca
-> Cc: spi-devel-general at lists.sourceforge.net
-> ---
->  drivers/spi/spi-atmel.c |   31 +++++++++++++++++++------------
->  1 file changed, 19 insertions(+), 12 deletions(-)
->
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 76a1baf..37f54c3 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -187,6 +187,7 @@
->   */
->  struct atmel_spi {
->         spinlock_t              lock;
-> +       unsigned long           flags;
->
->         resource_size_t         phybase;
->         void __iomem            *regs;
-> @@ -323,6 +324,16 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
->                 gpio_set_value(asd->npcs_pin, !active);
->  }
->
-> +static void atmel_spi_lock(struct atmel_spi *as)
-> +{
-> +               spin_lock_irqsave(&as->lock, as->flags);
-> +}
-> +
-> +static void atmel_spi_unlock(struct atmel_spi *as)
-> +{
-> +               spin_unlock_irqrestore(&as->lock, as->flags);
-> +}
+Hello.
 
-May be this can be called directly.
+On 15-11-2012 5:53, Tivy, Robert wrote:
 
-> +
->  static inline int atmel_spi_xfer_is_last(struct spi_message *msg,
->                                         struct spi_transfer *xfer)
->  {
-> @@ -559,9 +570,9 @@ atmel_spi_msg_done(struct spi_master *master, struct atmel_spi *as,
->                 "xfer complete: %u bytes transferred\n",
->                 msg->actual_length);
->
-> -       spin_unlock(&as->lock);
-> +       atmel_spi_unlock(as);
->         msg->complete(msg->context);
-> -       spin_lock(&as->lock);
-> +       atmel_spi_lock(as);
->
->         as->current_transfer = NULL;
->         as->next_transfer = NULL;
-> @@ -788,13 +799,11 @@ static int atmel_spi_setup(struct spi_device *spi)
->                 spi->controller_state = asd;
->                 gpio_direction_output(npcs_pin, !(spi->mode & SPI_CS_HIGH));
->         } else {
-> -               unsigned long           flags;
-> -
-> -               spin_lock_irqsave(&as->lock, flags);
-> +               atmel_spi_lock(as);
->                 if (as->stay == spi)
->                         as->stay = NULL;
->                 cs_deactivate(as, spi);
-> -               spin_unlock_irqrestore(&as->lock, flags);
-> +               atmel_spi_unlock(as);
->         }
->
->         asd->csr = csr;
-> @@ -813,7 +822,6 @@ static int atmel_spi_transfer(struct spi_device *spi, struct spi_message *msg)
->  {
->         struct atmel_spi        *as;
->         struct spi_transfer     *xfer;
-> -       unsigned long           flags;
->         struct device           *controller = spi->master->dev.parent;
->         u8                      bits;
->         struct atmel_spi_device *asd;
-> @@ -878,11 +886,11 @@ static int atmel_spi_transfer(struct spi_device *spi, struct spi_message *msg)
->         msg->status = -EINPROGRESS;
->         msg->actual_length = 0;
->
-> -       spin_lock_irqsave(&as->lock, flags);
-> +       atmel_spi_lock(as);
->         list_add_tail(&msg->queue, &as->queue);
->         if (!as->current_transfer)
->                 atmel_spi_next_message(spi->master);
-> -       spin_unlock_irqrestore(&as->lock, flags);
-> +       atmel_spi_unlock(as);
->
->         return 0;
->  }
-> @@ -892,17 +900,16 @@ static void atmel_spi_cleanup(struct spi_device *spi)
->         struct atmel_spi        *as = spi_master_get_devdata(spi->master);
->         struct atmel_spi_device *asd = spi->controller_state;
->         unsigned                gpio = (unsigned) spi->controller_data;
-> -       unsigned long           flags;
->
->         if (!asd)
->                 return;
->
-> -       spin_lock_irqsave(&as->lock, flags);
-> +       atmel_spi_lock(as);
->         if (as->stay == spi) {
->                 as->stay = NULL;
->                 cs_deactivate(as, spi);
->         }
-> -       spin_unlock_irqrestore(&as->lock, flags);
-> +       atmel_spi_unlock(as);
->
->         spi->controller_state = NULL;
->         gpio_free(gpio);
-> --
-> 1.7.9.5
->
->
-> ------------------------------------------------------------------------------
-> Everyone hates slow websites. So do we.
-> Make your web apps faster with AppDynamics
-> Download AppDynamics Lite for free today:
-> http://p.sf.net/sfu/appdyn_d2d_nov
-> _______________________________________________
-> spi-devel-general mailing list
-> spi-devel-general at lists.sourceforge.net
-> https://lists.sourceforge.net/lists/listinfo/spi-devel-general
+>>> Also, while modifying those pr_warning() calls I changed hardcoded
+>>> function names to use '"%s:", __func__' instead
+
+>>> Signed-off-by: Robert Tivy <rtivy@ti.com>
+>>> ---
+>>> Clean up files that will be otherwise modified in subsequent patch.
+
+>>> Applies to v3.7-rc2 tag (commit
+>>> 6f0c0580b70c89094b3422ba81118c7b959c7556) of Linus' mainline kernel
+>> at git.kernel.org.
+
+>>>    arch/arm/mach-davinci/board-omapl138-hawk.c |   30 ++++++++++------
+>> -----------
+>>>    1 file changed, 11 insertions(+), 19 deletions(-)
+
+>>      Taksing of separation of board and SoC specific changes, this patch
+
+    I meant "talking". :-/
+
+>> shouldn't have been separated from patch 1 at all -- since it's two
+>> boards built around the same chip, OMAP-L138...
+
+> The 4 patches that are of the same nature ("Changed pr_warning() to pr_warn() (part #)") were split as 4 separate patches on request by Sekhar, for the purpose of making it easier to merge later.
+
+    To quote Sekhar: "My main motivation was to keep board and soc file 
+changes from mixing together." You just went too far.
+
+WBR, Sergei
