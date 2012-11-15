@@ -1,72 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 15 Nov 2012 23:46:23 +0100
-Subject: [PATCH 4/6] ARM: sunxi: Add earlyprintk support
-In-Reply-To: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1353019586-21043-5-git-send-email-maxime.ripard@free-electrons.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 15 Nov 2012 16:20:13 -0700
+Subject: [PATCH 1/2] ARM: tegra: harmony: enable HDMI port
+Message-ID: <1353021614-29200-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/Kconfig.debug         |    8 ++++++++
- arch/arm/include/debug/sunxi.S |   22 ++++++++++++++++++++++
- 2 files changed, 30 insertions(+)
- create mode 100644 arch/arm/include/debug/sunxi.S
+From: Stephen Warren <swarren@nvidia.com>
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b0f3857..6672b02 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -345,6 +345,13 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on SOCFPGA based platforms.
+Enable host1x, and the HDMI output. Harmony also has an optional LCD,
+and a VGA output. The former isn't enabled due to potential issues with
+having multiple outputs enabled. The latter isn't enabled since the
+driver doesn't support VGA yet anyway.
+
+Correct DDC I2C frequency to 100KHz.
+
+Based on work by Thierry Reding for TrimSlice.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20-harmony.dts |   20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
+index a3f2f38..43eb72a 100644
+--- a/arch/arm/boot/dts/tegra20-harmony.dts
++++ b/arch/arm/boot/dts/tegra20-harmony.dts
+@@ -10,6 +10,18 @@
+ 		reg = <0x00000000 0x40000000>;
+ 	};
  
-+	config DEBUG_SUNXI_UART
-+		bool "Kernel low-level debugging messages via sunXi UART"
-+		depends on ARCH_SUNXI
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Allwinner A1X based platforms.
++	host1x {
++		hdmi {
++			status = "okay";
 +
- 	config DEBUG_VEXPRESS_UART0_DETECT
- 		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
- 		depends on ARCH_VEXPRESS && CPU_CP15_MMU
-@@ -416,6 +423,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/mvebu.S" if DEBUG_MVEBU_UART
- 	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
- 	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
-+	default "debug/sunxi.S" if DEBUG_SUNXI_UART
- 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
- 		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
- 	default "mach/debug-macro.S"
-diff --git a/arch/arm/include/debug/sunxi.S b/arch/arm/include/debug/sunxi.S
-new file mode 100644
-index 0000000..ffd101f
---- /dev/null
-+++ b/arch/arm/include/debug/sunxi.S
-@@ -0,0 +1,22 @@
-+/*
-+ * Early serial output macro for Allwinner A1X SoCs
-+ *
-+ * Copyright (C) 2012 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
++			vdd-supply = <&hdmi_vdd_reg>;
++			pll-supply = <&hdmi_pll_reg>;
 +
-+#define SUNXI_UART1_PHYS_BASE	0x01c28400
-+#define SUNXI_UART1_VIRT_BASE	0xf1c28400
++			nvidia,ddc-i2c-bus = <&hdmi_ddc>;
++			nvidia,hpd-gpio = <&gpio 111 0>; /* PN7 */
++		};
++	};
 +
-+	.macro	addruart, rp, rv, tmp
-+	ldr	\rp, =SUNXI_UART1_PHYS_BASE
-+	ldr	\rv, =SUNXI_UART1_VIRT_BASE
-+	.endm
-+
-+#define UART_SHIFT	2
-+#include <asm/hardware/debug-8250.S>
+ 	pinmux {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&state_default>;
+@@ -262,9 +274,9 @@
+ 		};
+ 	};
+ 
+-	i2c at 7000c400 {
++	hdmi_ddc: i2c at 7000c400 {
+ 		status = "okay";
+-		clock-frequency = <400000>;
++		clock-frequency = <100000>;
+ 	};
+ 
+ 	i2c at 7000c500 {
+@@ -369,13 +381,13 @@
+ 					regulator-max-microvolt = <1800000>;
+ 				};
+ 
+-				ldo7 {
++				hdmi_vdd_reg: ldo7 {
+ 					regulator-name = "vdd_ldo7,avdd_hdmi";
+ 					regulator-min-microvolt = <3300000>;
+ 					regulator-max-microvolt = <3300000>;
+ 				};
+ 
+-				ldo8 {
++				hdmi_pll_reg: ldo8 {
+ 					regulator-name = "vdd_ldo8,avdd_hdmi_pll";
+ 					regulator-min-microvolt = <1800000>;
+ 					regulator-max-microvolt = <1800000>;
 -- 
-1.7.9.5
+1.7.10.4
