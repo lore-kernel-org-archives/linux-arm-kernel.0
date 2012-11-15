@@ -1,68 +1,28 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Thu, 15 Nov 2012 12:58:00 +0800
-Subject: [PATCH RESEND 3/4] pinctrl: at91: Prevent NULL dereference if
- of_match_device returns NULL
-In-Reply-To: <1352955266.6793.4.camel@phoenix>
-References: <1352955096.6793.1.camel@phoenix> <1352955266.6793.4.camel@phoenix>
-Message-ID: <1352955480.6793.8.camel@phoenix>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 15 Nov 2012 16:27:39 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the i2c-embedded
+ tree
+Message-ID: <20121115162739.a114b22ad3a1e0b5a04c6aa9@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_match_device() may return NULL.
+Hi all,
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
-This resend CC Jean-Christophe.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/plat-omap/i2c.c between commit 49839dc93970 ("Revert "ARM: OMAP:
+convert I2C driver to PM QoS for MPU latency constraints"") from the
+i2c-embedded tree and various commits from the arm-soc tree.
 
- drivers/pinctrl/pinctrl-at91.c |   17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
+I used the version from the arm-soc tree (not sure if that is the correct
+choice) and can carry the fix as necessary (no action is required).
 
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index 8490a55..32006c8 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -829,13 +829,18 @@ static int __devinit at91_pinctrl_probe_dt(struct platform_device *pdev,
- 	uint32_t *tmp;
- 	struct device_node *np = pdev->dev.of_node;
- 	struct device_node *child;
-+	const struct of_device_id *match;
- 
- 	if (!np)
- 		return -ENODEV;
- 
-+	match = of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
-+	if (!match)
-+		return -ENODEV;
-+
- 	info->dev = &pdev->dev;
--	info->ops = (struct at91_pinctrl_mux_ops*)
--		of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
-+	info->ops = (struct at91_pinctrl_mux_ops *) match->data;
-+
- 	at91_pinctrl_child_count(info, np);
- 
- 	if (info->nbanks < 1) {
-@@ -1359,6 +1364,7 @@ static struct of_device_id at91_gpio_of_match[] __devinitdata = {
- static int __devinit at91_gpio_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-+	const struct of_device_id *match;
- 	struct resource *res;
- 	struct at91_gpio_chip *at91_chip = NULL;
- 	struct gpio_chip *chip;
-@@ -1399,8 +1405,11 @@ static int __devinit at91_gpio_probe(struct platform_device *pdev)
- 		goto err;
- 	}
- 
--	at91_chip->ops = (struct at91_pinctrl_mux_ops*)
--		of_match_device(at91_gpio_of_match, &pdev->dev)->data;
-+	match = of_match_device(at91_gpio_of_match, &pdev->dev);
-+	if (!match)
-+		return -ENODEV;
-+
-+	at91_chip->ops = (struct at91_pinctrl_mux_ops *) match->data;
- 	at91_chip->pioc_virq = irq;
- 	at91_chip->pioc_idx = alias_idx;
- 
 -- 
-1.7.9.5
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121115/e7df45a7/attachment.sig>
