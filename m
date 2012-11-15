@@ -1,31 +1,43 @@
-From: wad@chromium.org (Will Drewry)
-Date: Thu, 15 Nov 2012 14:34:27 -0600
-Subject: [PATCH v5 0/4] arch/arm: support seccomp
-In-Reply-To: <20121115132550.GA5570@mudshark.cambridge.arm.com>
-References: <1352587485-18348-1-git-send-email-keescook@chromium.org>
- <CAGXu5jKYGCkL3GS4Tbep==WUAqP-c_0edAdgy0XQ84rJxZUU2Q@mail.gmail.com>
- <20121115132550.GA5570@mudshark.cambridge.arm.com>
-Message-ID: <CABqD9hYfa0pQS-BCmWjfnCCqNwahsHFHpVvtq_fwMVc4HwEYPw@mail.gmail.com>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Thu, 15 Nov 2012 14:42:13 -0600
+Subject: [PATCH 7/8] ARM: OMAP: Remove unnecessary inclusion of dmtimer.h
+In-Reply-To: <50A3BE85.5000804@ti.com>
+References: <1352830403-1706-1-git-send-email-jon-hunter@ti.com>
+ <1352830403-1706-8-git-send-email-jon-hunter@ti.com>
+ <50A3BE85.5000804@ti.com>
+Message-ID: <CALLhW=5wiTd9u0PorwDH_68K7XRS8_ajDSDOLB7x8F2qvtJvaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 7:25 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Nov 14, 2012 at 07:07:13PM +0000, Kees Cook wrote:
->> Hi, any more thoughts on this series? I'd really like to get it into
->> -next. It's been running happily for a while now in the Chrome OS ARM
->> devices.
->
-> I'm not familiar with seccomp in general, but the changes look ok now from
-> an ARM point-of-view:
->
->   Reviewed-by: Will Deacon <will.deacon@arm.com>
->
-> These should probably go via Russell (who will put them into -next), so
-> please send them to the patch system.
->
+Hi Jon,
 
-For the seccomp side,
+On 14 November 2012 09:53, Jon Hunter <jon-hunter@ti.com> wrote:
+>> diff --git a/drivers/staging/tidspbridge/core/ue_deh.c b/drivers/staging/tidspbridge/core/ue_deh.c
+>> index 3d28b23..6aea6f1 100644
+>> --- a/drivers/staging/tidspbridge/core/ue_deh.c
+>> +++ b/drivers/staging/tidspbridge/core/ue_deh.c
+>> @@ -19,7 +19,6 @@
+>>
+>>  #include <linux/kernel.h>
+>>  #include <linux/interrupt.h>
+>> -#include <plat/dmtimer.h>
+>>
+>>  #include <dspbridge/dbdefs.h>
+>>  #include <dspbridge/dspdeh.h>
+>
+> Hi Omar, I should have had you in copy on this one. Are you ok with the
+> removal of the above dmtimer.h include? It does not appear that this
+> file needs to include dmtimer.h.
 
-Acked-by: Will Drewry <wad@chromium.org>
+Indeed, we don't use it here.
 
-for the whole series.  Thanks!
+> Is it ok for this to go through Tony's tree? If so, care to ACK?
+
+Looks fine to me, but I believe you will want to let Greg know if this
+patch will bypass staging tree.
+
+Acked-by: Omar Ramirez Luna <omar.luna@linaro.org>
+
+Cheers,
+
+Omar
