@@ -1,21 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Nov 2012 13:36:23 +0000
-Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
-In-Reply-To: <CACY+gR3PurUofCbUeG40B6vXqXAoHrMmbOQSuwAGoc1LS8XXJQ@mail.gmail.com>
-References: <20121114185335.GU6801@atomide.com> <50A3EBCD.3040801@ti.com>
- <20121114202244.GE3332@n2100.arm.linux.org.uk>
- <20121114203221.GA6801@atomide.com> <50A413D4.7000405@gmail.com>
- <20121114222159.GB6801@atomide.com> <50A43D58.5030404@gmail.com>
- <20121115110137.GA25985@arm.com>
- <CACY+gR3PurUofCbUeG40B6vXqXAoHrMmbOQSuwAGoc1LS8XXJQ@mail.gmail.com>
-Message-ID: <20121115133623.GG3332@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 15 Nov 2012 11:38:01 -0200
+Subject: [PATCH v2 1/2] ARM: mx27: Add VPU support
+In-Reply-To: <20121115081223.GY10369@pengutronix.de>
+References: <1352917238-29694-1-git-send-email-fabio.estevam@freescale.com>
+ <20121115081223.GY10369@pengutronix.de>
+Message-ID: <CAOMZO5BrzD5okmRMcY3X3aquMpmxV5Pn2k2upsQNhsmq_Pi5-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 02:41:43PM +0200, Siarhei Siamashka wrote:
-> BTW, I always wondered about what could be preventing TI and the other
-> silicon vendors from using something like an SMC API based on
-> asymmetric cryptography?
+On Thu, Nov 15, 2012 at 6:12 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-The answer is... nothing.  But it didn't happen and we're stuck with the
-consequences of that.
+> As Eric mentioned this may lead to problems on the i.MX27L without VPU.
+> Do you have the possibility to test this?
+
+I do not have any board with a MX27L variant. Maybe we could try
+reading the SREV info register to distinguish between MX27 and MX27L.
+MX27RM does not provide any info on this though.
+
+If this does not work, then maybe we should register VPU as per board
+like the v1 patch did.
+
+Regards,
+
+Fabio Estevam
