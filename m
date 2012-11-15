@@ -1,47 +1,57 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 15 Nov 2012 14:55:38 +0100
-Subject: [PATCH 2/2] clocksource/mtu-nomadik: use apb_pclk
-Message-ID: <1352987738-9422-1-git-send-email-linus.walleij@stericsson.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 15 Nov 2012 14:56:35 +0100
+Subject: [PATCH 1/4] pinctrl: dove: Prevent NULL dereference if
+ of_match_device returns NULL
+In-Reply-To: <CAFRkauCybE+UcBD17u3J6hoxEA88GM0tatxkrKtWqVNvDPC9dA@mail.gmail.com>
+References: <1352955096.6793.1.camel@phoenix> <20121115083511.08f5a16f@skate>
+ <CAFRkauCybE+UcBD17u3J6hoxEA88GM0tatxkrKtWqVNvDPC9dA@mail.gmail.com>
+Message-ID: <20121115145635.2fae2fc9@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+Dear Axel Lin,
 
-After improving the clock tree we need to make sure the the
-MTU timer explicitly grabs and enables it silicon clock
-(pclk).
+On Thu, 15 Nov 2012 21:44:07 +0800, Axel Lin wrote:
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Mike Turquette <mturquette@ti.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
-This version of the patch is based upon the ux500
-SPARSE_IRQ commit and is intended to be merged after [1/2]
-so as to avoid conflicts between the clk and ARM SoC trees.
----
- drivers/clocksource/nomadik-mtu.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+> BTW, I found there is no way to compile the dove and kirkwood pinctrl
+> drivers.
+> I need add below patch to compile these two drivers, how do you think about
+> below patch?
+> ( In dove, the USE_OF is optional, it is selected only when MACH_DOVE_DT is
+> enabled )
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 14f8160..dda6785 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -531,6 +531,8 @@ config ARCH_DOVE
+>         select CPU_V7
+>         select GENERIC_CLOCKEVENTS
+>         select MIGHT_HAVE_PCI
+> +       select PINCTRL
+> +       select PINCTRL_DOVE if USE_OF
+>         select PLAT_ORION_LEGACY
+>         select USB_ARCH_HAS_EHCI
+>         help
+> @@ -542,6 +544,8 @@ config ARCH_KIRKWOOD
+>         select CPU_FEROCEON
+>         select GENERIC_CLOCKEVENTS
+>         select PCI
+> +       select PINCTRL
+> +       select PINCTRL_KIRKWOOD
+>         select PLAT_ORION_LEGACY
+>         help
+>           Support for the following Marvell Kirkwood series SoCs:
 
-diff --git a/drivers/clocksource/nomadik-mtu.c b/drivers/clocksource/nomadik-mtu.c
-index 23c780b..8914c3c 100644
---- a/drivers/clocksource/nomadik-mtu.c
-+++ b/drivers/clocksource/nomadik-mtu.c
-@@ -177,9 +177,15 @@ void nmdk_clksrc_reset(void)
- void __init nmdk_timer_init(void __iomem *base, int irq)
- {
- 	unsigned long rate;
--	struct clk *clk0;
-+	struct clk *clk0, *pclk0;
- 
- 	mtu_base = base;
-+
-+	pclk0 = clk_get_sys("mtu0", "apb_pclk");
-+	BUG_ON(IS_ERR(pclk0));
-+	BUG_ON(clk_prepare(pclk0) < 0);
-+	BUG_ON(clk_enable(pclk0) < 0);
-+
- 	clk0 = clk_get_sys("mtu0", NULL);
- 	BUG_ON(IS_ERR(clk0));
- 	BUG_ON(clk_prepare(clk0) < 0);
+See "[PATCH 1/5] ARM: Kirkwood: Allow use of pinctrl" and "[PATCH 4/5]
+ARM: Dove: Make use of pinctrl driver" which have been posted by Andrew
+Lunn on October, 24th.
+
+Best regards,
+
+Thomas
 -- 
-1.7.11.3
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
