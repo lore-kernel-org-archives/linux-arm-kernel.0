@@ -1,43 +1,26 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Thu, 15 Nov 2012 14:42:13 -0600
-Subject: [PATCH 7/8] ARM: OMAP: Remove unnecessary inclusion of dmtimer.h
-In-Reply-To: <50A3BE85.5000804@ti.com>
-References: <1352830403-1706-1-git-send-email-jon-hunter@ti.com>
- <1352830403-1706-8-git-send-email-jon-hunter@ti.com>
- <50A3BE85.5000804@ti.com>
-Message-ID: <CALLhW=5wiTd9u0PorwDH_68K7XRS8_ajDSDOLB7x8F2qvtJvaA@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 15 Nov 2012 22:45:26 +0200
+Subject: [PATCH] ARM: OMAP2+: Fix compiler warning for 32k timer
+In-Reply-To: <1353008644-24745-1-git-send-email-jon-hunter@ti.com>
+References: <1353008644-24745-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <20121115204526.GC12466@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+Hi,
 
-On 14 November 2012 09:53, Jon Hunter <jon-hunter@ti.com> wrote:
->> diff --git a/drivers/staging/tidspbridge/core/ue_deh.c b/drivers/staging/tidspbridge/core/ue_deh.c
->> index 3d28b23..6aea6f1 100644
->> --- a/drivers/staging/tidspbridge/core/ue_deh.c
->> +++ b/drivers/staging/tidspbridge/core/ue_deh.c
->> @@ -19,7 +19,6 @@
->>
->>  #include <linux/kernel.h>
->>  #include <linux/interrupt.h>
->> -#include <plat/dmtimer.h>
->>
->>  #include <dspbridge/dbdefs.h>
->>  #include <dspbridge/dspdeh.h>
->
-> Hi Omar, I should have had you in copy on this one. Are you ok with the
-> removal of the above dmtimer.h include? It does not appear that this
-> file needs to include dmtimer.h.
+On Thu, Nov 15, 2012 at 01:44:04PM -0600, Jon Hunter wrote:
+> +static struct of_device_id omap_counter_match[] __initdata = {
 
-Indeed, we don't use it here.
+not directly related to $SUBJECT, but shouldn't this be static const
+__initconst ?
 
-> Is it ok for this to go through Tony's tree? If so, care to ACK?
-
-Looks fine to me, but I believe you will want to let Greg know if this
-patch will bypass staging tree.
-
-Acked-by: Omar Ramirez Luna <omar.luna@linaro.org>
-
-Cheers,
-
-Omar
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121115/ee3b61c2/attachment.sig>
