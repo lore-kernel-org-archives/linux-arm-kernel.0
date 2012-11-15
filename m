@@ -1,46 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Nov 2012 13:00:45 +0000
-Subject: [GIT PULL][for 3.8] pull request from upload/board in arch-pxa
- git tree
-In-Reply-To: <50991FF6.8070709@yahoo.com>
-References: <CAN1soZzhb361Gs9JVmhkjqqcr6FkGg9MVO_n9Tv29F==HdhwQQ@mail.gmail.com>
- <20121106140051.GB27284@quad.lixom.net> <50991FF6.8070709@yahoo.com>
-Message-ID: <201211151300.45323.arnd@arndb.de>
+From: rob.clark@linaro.org (Rob Clark)
+Date: Thu, 15 Nov 2012 07:04:24 -0600
+Subject: [PATCH] ARM: add get_user() support for 8 byte types
+In-Reply-To: <201211150919.37343.arnd@arndb.de>
+References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
+ <201211130911.09613.arnd@arndb.de>
+ <20121113112430.GF28341@n2100.arm.linux.org.uk>
+ <201211150919.37343.arnd@arndb.de>
+Message-ID: <CAF6AEGv-O_D6nOnEwi5w8NUcv+dQFe7pJBXhUA8xq+tykG4dfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 November 2012, Paul Parsons wrote:
-> On 06/11/12 14:00, Olof Johansson wrote:
-> > On Sun, Oct 28, 2012 at 07:59:54AM +0800, Haojian Zhuang wrote:
-> >> ----------------------------------------------------------------
-> >> Paul Parsons (1):
-> >>        ARM: pxa2xx: Remove EXPERIMENTAL dependency from spi-pxa2xx driver
-> >
-> > This is a SPI driver change, and should either go through or be acked by that
-> > maintainer. In this particular case, there's been several series of the
-> > EXPERIMENTAL removals, and I think Kees Cook has one that removes it for all
-> > options in one go. So please ack that patch instead.
-> 
-> According to the current MAINTAINERS file, the drivers/spi/spi-pxa2xx*
-> driver is maintained by the PXA2xx/PXA3xx guys.
-> That is why I submitted this patch to the linux-arm-kernel list.
-> Is the MAINTAINERS file incorrect?
+On Thu, Nov 15, 2012 at 3:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 13 November 2012, Russell King - ARM Linux wrote:
+>> You're missing something; that is one of the greatest powers of open
+>> source.  The many eyes (and minds) effect.  Someone out there probably
+>> has a solution to whatever problem, the trick is to find that person. :)
+>>
+>> I think we have a working solution for this for ARM.  It won't be suitable
+>> for every arch, where they have 8-bit and 16-bit registers able to be
+>> allocated by the compiler, but for architectures where the minimum register
+>> size is 32-bit, what we have below should work.
+>
+> I don't mind at all adding the extension to ARM, and I think it's pretty
+> cool that you guys actually found a working solution.
+>
+> The part that worries me is that we are making architecture independent
+> code depend on a clever hack that may or may not be possible to implement
+> on a given architecture, and that most architecture maintainers wouldn't
+> know how to implement correctly even if it's possible.
 
-The file is correct, but it's not always easy to understand. drivers/spi
-overall is maintained by Grant, which arch/arm/mach-* is maintained by
-Olof and me. Haojian maintains the PXA components for each one, so the
-formal way to do this is to have arch/arm/mach-pxa patches go
+I could always send a 3rd version with a comment smashed on about why
+that works if you think this is a problem..
 
-Author -> Haojian -> arm-soc -> Torvalds
+BR,
+-R
 
-while drivers/spi/spi-pxa* change go
-
-Author -> Haojian -> Grant -> Torvalds
-
-In some cases, you need extra knowledge that is not documented properly,
-e.g. that Grant was on leave recently, and Mark Brown stepped in for
-him, or that the arm-soc maintainership has not been documented at
-all for some time (fixed now). In doubt, just add more people to Cc.
-We're all good at ignoring email that doesn't seem to address us ;-)
-
-	Arnd
+>         Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
