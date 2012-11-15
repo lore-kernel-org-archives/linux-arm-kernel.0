@@ -1,33 +1,218 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 Nov 2012 20:18:33 +0100
-Subject: [PATCH 2/4] pinctrl: kirkwood: Prevent NULL dereference if
- of_match_device returns NULL
-In-Reply-To: <1352955159.6793.2.camel@phoenix>
-References: <1352955096.6793.1.camel@phoenix> <1352955159.6793.2.camel@phoenix>
-Message-ID: <20121115201833.07ec01c6@skate>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 15 Nov 2012 20:19:57 +0100
+Subject: [PATCH 1/1 v2] of_spi: add generic binding support to specify cs gpio
+In-Reply-To: <20121115165048.543FE3E194B@localhost>
+References: <20121115165048.543FE3E194B@localhost>
+Message-ID: <1353007197-31491-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Axel Lin,
+This will allow to use gpio for chip select with no modification in the
+driver binding
 
-On Thu, 15 Nov 2012 12:52:39 +0800, Axel Lin wrote:
-> of_match_device() may return NULL.
-> 
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+When use the cs-gpios, the gpio number will be passed via the cs_gpio field
+and the number of chip select will automatically increased with max(hw cs, gpio cs).
 
-Why? We already discussed together that this situation could not
-happen: if you are in the probe() function, then there *must* be a
-match, because the probe() function precisely gets called when there is
-a match.
+So if for example the controller has 2 CS lines, and the cs-gpios
+property looks like this:
 
-So unless you give more details about what the problem is, I don't
-think this patch and the similar one you sent for Dove are useful.
+cs-gpios = <&gpio1 0 0> <0> <&gpio1 1 0> <&gpio1 2 0>;
 
-Best regards,
+Then it should be configured so that num_chipselect = 4 with the
+following mapping:
 
-Thomas
+cs0 : &gpio1 0 0
+cs1 : native
+cs2 : &gpio1 1 0
+cs3 : &gpio1 2 0
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: spi-devel-general at lists.sourceforge.net
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+---
+v2:
+	update to allow to overwrite hw gpio via cs-gpio
+	as sugested by Grant
+
+Best Regards,
+J.
+ Documentation/devicetree/bindings/spi/spi-bus.txt |   20 ++++++++
+ drivers/spi/spi.c                                 |   54 +++++++++++++++++++--
+ include/linux/spi/spi.h                           |    3 ++
+ 3 files changed, 74 insertions(+), 3 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/spi/spi-bus.txt b/Documentation/devicetree/bindings/spi/spi-bus.txt
+index d2c33d0..77a8b0d 100644
+--- a/Documentation/devicetree/bindings/spi/spi-bus.txt
++++ b/Documentation/devicetree/bindings/spi/spi-bus.txt
+@@ -12,6 +12,7 @@ The SPI master node requires the following properties:
+ - #size-cells     - should be zero.
+ - compatible      - name of SPI bus controller following generic names
+     		recommended practice.
++- cs-gpios	  - (optional) gpios chip select.
+ No other properties are required in the SPI bus node.  It is assumed
+ that a driver for an SPI bus device will understand that it is an SPI bus.
+ However, the binding does not attempt to define the specific method for
+@@ -24,6 +25,22 @@ support describing the chip select layout.
+ Optional property:
+ - num-cs : total number of chipselects
+ 
++If cs-gpios is used the number of chip select will automatically increased
++with max(cs-gpios > hw cs)
++
++So if for example the controller has 2 CS lines, and the cs-gpios
++property looks like this:
++
++cs-gpios = <&gpio1 0 0> <0> <&gpio1 1 0> <&gpio1 2 0>;
++
++Then it should be configured so that num_chipselect = 4 with the
++following mapping:
++
++cs0 : &gpio1 0 0
++cs1 : native
++cs2 : &gpio1 1 0
++cs3 : &gpio1 2 0
++
+ SPI slave nodes must be children of the SPI master node and can
+ contain the following properties.
+ - reg             - (required) chip select address of device.
+@@ -37,6 +54,9 @@ contain the following properties.
+ - spi-cs-high     - (optional) Empty property indicating device requires
+     		chip select active high
+ 
++If a gpio chipselect is used for the SPI slave the gpio number will be passed
++via the cs_gpio
++
+ SPI example for an MPC5200 SPI bus:
+ 	spi at f00 {
+ 		#address-cells = <1>;
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index fc0da39..efb635f 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -30,6 +30,7 @@
+ #include <linux/slab.h>
+ #include <linux/mod_devicetable.h>
+ #include <linux/spi/spi.h>
++#include <linux/of_gpio.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/export.h>
+ #include <linux/sched.h>
+@@ -327,6 +328,7 @@ struct spi_device *spi_alloc_device(struct spi_master *master)
+ 	spi->dev.parent = &master->dev;
+ 	spi->dev.bus = &spi_bus_type;
+ 	spi->dev.release = spidev_release;
++	spi->cs_gpio = -EINVAL;
+ 	device_initialize(&spi->dev);
+ 	return spi;
+ }
+@@ -344,15 +346,16 @@ EXPORT_SYMBOL_GPL(spi_alloc_device);
+ int spi_add_device(struct spi_device *spi)
+ {
+ 	static DEFINE_MUTEX(spi_add_lock);
+-	struct device *dev = spi->master->dev.parent;
++	struct spi_master *master = spi->master;
++	struct device *dev = master->dev.parent;
+ 	struct device *d;
+ 	int status;
+ 
+ 	/* Chipselects are numbered 0..max; validate. */
+-	if (spi->chip_select >= spi->master->num_chipselect) {
++	if (spi->chip_select >= master->num_chipselect) {
+ 		dev_err(dev, "cs%d >= max %d\n",
+ 			spi->chip_select,
+-			spi->master->num_chipselect);
++			master->num_chipselect);
+ 		return -EINVAL;
+ 	}
+ 
+@@ -376,6 +379,9 @@ int spi_add_device(struct spi_device *spi)
+ 		goto done;
+ 	}
+ 
++	if (master->cs_gpios)
++		spi->cs_gpio = master->cs_gpios[spi->chip_select];
++
+ 	/* Drivers may modify this initial i/o setup, but will
+ 	 * normally rely on the device being setup.  Devices
+ 	 * using SPI_CS_HIGH can't coexist well otherwise...
+@@ -949,6 +955,44 @@ struct spi_master *spi_alloc_master(struct device *dev, unsigned size)
+ }
+ EXPORT_SYMBOL_GPL(spi_alloc_master);
+ 
++#ifdef CONFIG_OF
++static int of_spi_register_master(struct spi_master *master)
++{
++	int nb, i;
++	int *cs;
++	struct device_node *np = master->dev.of_node;
++
++	if (!np)
++		return 0;
++
++	nb = of_gpio_named_count(np, "cs-gpios");
++	master->num_chipselect = max(nb, master->num_chipselect);
++
++	if (nb < 1)
++		return 0;
++
++	cs = devm_kzalloc(&master->dev,
++			  sizeof(int) * master->num_chipselect,
++			  GFP_KERNEL);
++	master->cs_gpios = cs;
++
++	if (!master->cs_gpios)
++		return -ENOMEM;
++
++	memset(cs, -EINVAL, master->num_chipselect);
++
++	for (i = 0; i < nb; i++)
++		cs[i] = of_get_named_gpio(np, "cs-gpios", i);
++
++	return 0;
++}
++#else
++static int of_spi_register_master(struct spi_master *master)
++{
++	return 0;
++}
++#endif
++
+ /**
+  * spi_register_master - register SPI master controller
+  * @master: initialized master, originally from spi_alloc_master()
+@@ -980,6 +1024,10 @@ int spi_register_master(struct spi_master *master)
+ 	if (!dev)
+ 		return -ENODEV;
+ 
++	status = of_spi_register_master(master);
++	if (status)
++		return status;
++
+ 	/* even if it's just one always-selected device, there must
+ 	 * be@least one chipselect
+ 	 */
+diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
+index fa702ae..f629189 100644
+--- a/include/linux/spi/spi.h
++++ b/include/linux/spi/spi.h
+@@ -90,6 +90,7 @@ struct spi_device {
+ 	void			*controller_state;
+ 	void			*controller_data;
+ 	char			modalias[SPI_NAME_SIZE];
++	int			cs_gpio;	/* chip select gpio */
+ 
+ 	/*
+ 	 * likely need more hooks for more protocol options affecting how
+@@ -362,6 +363,8 @@ struct spi_master {
+ 	int (*transfer_one_message)(struct spi_master *master,
+ 				    struct spi_message *mesg);
+ 	int (*unprepare_transfer_hardware)(struct spi_master *master);
++	/* gpio chip select */
++	int			*cs_gpios;
+ };
+ 
+ static inline void *spi_master_get_devdata(struct spi_master *master)
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.10.4
