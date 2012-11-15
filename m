@@ -1,24 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 Nov 2012 13:55:55 +0000
-Subject: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
-In-Reply-To: <0154077FE026E54BB093CA7EB3FD1AE32DB6A63266@SAFEX1MAIL3.st.com>
-References: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B59@SAFEX1MAIL3.st.com>
- <20121113171745.GA6370@linaro.org>
- <BLU002-W44C55773365E0FDAC8B3C5E36C0@phx.gbl>
- <0154077FE026E54BB093CA7EB3FD1AE32DB61E4CC7@SAFEX1MAIL3.st.com>
- <20121114172216.GG16215@arm.com>
- <0154077FE026E54BB093CA7EB3FD1AE32DB6A63266@SAFEX1MAIL3.st.com>
-Message-ID: <20121115135555.GC25985@arm.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 15 Nov 2012 14:55:38 +0100
+Subject: [PATCH 2/2] clocksource/mtu-nomadik: use apb_pclk
+Message-ID: <1352987738-9422-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 01:46:29PM +0000, Etienne CARRIERE ST wrote:
-> I think we will internally use our hack in l2x0 spin locking to
-> prevent collision, based on old arch_spinlock support.
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Or just handle the collision in the secure code and make sure you don't
-start background operations. If you don't use background operations, you
-don't need any locking.
+After improving the clock tree we need to make sure the the
+MTU timer explicitly grabs and enables it silicon clock
+(pclk).
 
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Acked-by: Mike Turquette <mturquette@ti.com>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+This version of the patch is based upon the ux500
+SPARSE_IRQ commit and is intended to be merged after [1/2]
+so as to avoid conflicts between the clk and ARM SoC trees.
+---
+ drivers/clocksource/nomadik-mtu.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clocksource/nomadik-mtu.c b/drivers/clocksource/nomadik-mtu.c
+index 23c780b..8914c3c 100644
+--- a/drivers/clocksource/nomadik-mtu.c
++++ b/drivers/clocksource/nomadik-mtu.c
+@@ -177,9 +177,15 @@ void nmdk_clksrc_reset(void)
+ void __init nmdk_timer_init(void __iomem *base, int irq)
+ {
+ 	unsigned long rate;
+-	struct clk *clk0;
++	struct clk *clk0, *pclk0;
+ 
+ 	mtu_base = base;
++
++	pclk0 = clk_get_sys("mtu0", "apb_pclk");
++	BUG_ON(IS_ERR(pclk0));
++	BUG_ON(clk_prepare(pclk0) < 0);
++	BUG_ON(clk_enable(pclk0) < 0);
++
+ 	clk0 = clk_get_sys("mtu0", NULL);
+ 	BUG_ON(IS_ERR(clk0));
+ 	BUG_ON(clk_prepare(clk0) < 0);
 -- 
-Catalin
+1.7.11.3
