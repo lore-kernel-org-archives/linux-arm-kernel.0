@@ -1,25 +1,77 @@
-From: martin@ronetix.at (Martin Peevski)
-Date: Thu, 15 Nov 2012 18:34:00 +0200
-Subject: Configure the USB device/host on sam9g25 module
-Message-ID: <50A51978.7040001@ronetix.at>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 15 Nov 2012 17:49:17 +0100
+Subject: [PATCH V2 1/5] arm: mvebu: Added support for coherency fabric
+ in mach-mvebu
+In-Reply-To: <20121115162123.GC5885@mudshark.cambridge.arm.com>
+References: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351545108-18954-2-git-send-email-gregory.clement@free-electrons.com>
+ <20121105140258.GO3351@mudshark.cambridge.arm.com>
+ <50A15A33.60405@free-electrons.com>
+ <20121113104340.GD3940@mudshark.cambridge.arm.com>
+ <50A3F860.5010601@free-electrons.com>
+ <20121115101752.GA26453@mudshark.cambridge.arm.com>
+ <50A5103F.1040903@free-electrons.com>
+ <20121115162123.GC5885@mudshark.cambridge.arm.com>
+Message-ID: <50A51D0D.4090009@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-      Hi,
+On 11/15/2012 05:21 PM, Will Deacon wrote:
+> Hi Gregory,
+> 
+> On Thu, Nov 15, 2012 at 03:54:39PM +0000, Gregory CLEMENT wrote:
+>> On 11/15/2012 11:17 AM, Will Deacon wrote:
+>>> Interesting, thanks for asking them about this. Does this mean that:
+>>
+>> Here come the answers to your new questions
+> 
+> Great, thanks for the quick turn-around!
+> 
+>>> 	1. When not running coherently (i.e. before initialising the
+>>> 	   coherency fabric), memory is treated as non-shareable,
+>>> 	   non-cacheable?
+>>
+>> It can be cacheable. The shared memory (as defined on the page table)
+>> will NOT be coherent by HW.
+> 
+> Ok, so we really are incoherent before enabling the fabric.
+> 
+>>> 	2. If (1), then are exclusive accesses the only way to achieve
+>>> 	   coherent memory accesses in this scenario?
+>>
+>> I quote: "I suspect there is terminology miss-use: exclusive accesses
+>> are NOT used to achieve memory coherency - they are used to achieve
+>> atomicity. To achieve memory coherency while fabric is configured to
+>> be non-coherent, SW should use maintenance operations over the L1
+>> caches."
+> 
+> Ok, so if I'm understanding correctly then I don't really see the usefulness
+> of having working exclusives that are incoherent. Surely it means that you
+> can guarantee mutual exclusion on a lock variable, but the value you actually
+> end up reading from the lock is junk unless you litter the accessors with cache
+> clean operations?
+> 
+> Anyway, that's by-the-by as this is all called early enough that we
+> shouldn't care. The thing I don't like now is that the fabric initialisation
+> is done entirely differently on the primary CPU than the secondaries. The
+> primary probes the device-tree (well, it's also now hard-coded for v2) and
+> accesses the registers from a C function(armada_370_xp_set_cpu_coherent) whilst
+> the secondaries have hardcoded addresses and access via asm
+> (armada_xp_secondary_startup).
 
-      I'm working with sam9g25 module placed on sam9x5-ek. sam9g25 has 2 
-host USB's and 1 device/host USB (on the micro USB of sam9x5-ek). Both 
-USB hosts accept mass storage devices and works correct. It was 
-impossible to do 2 things with the USB device/host (placed on the micro 
-USB of sam9x5-ek):
 
-      1. Put in it mass storage device - the kernel want not to 
-enumerate it and give it an name (for example sda, sdb, ...). What I 
-must do in the config file of kernel to be recognized the inserted mass 
-storage device?
+Now it is hardcoded in both case as you pointed it. So the last
+difference is setup from a C function or via asm.
 
-     2. Connect cable from the micro USB to any of the host USB's and 
-detect USB serial gadget.
+The differences between primary and secondary CPU when they enable the
+coherency, is due to the fact that we really are in a different
+situation. For primary CPU, as it is the only CPU online it doesn't
+need to enable the coherency from the beginning, so we can wait to
+have MMU enable and convenient feature. Whereas for the secondary CPU
+they need the coherency from the very beginning are by definition they
+won't be alone. That's why this very first instruction are written in
+asm and they use physical address.
 
-I tryed to make some configs for both problems in the kernel but it 
-don't works. Can you, please, help me solve these problems?
+I don't see how to handle it in a different way.
+
+Gregory
