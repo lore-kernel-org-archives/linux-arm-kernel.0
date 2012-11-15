@@ -1,76 +1,114 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 Nov 2012 18:20:07 +0100
-Subject: [PATCH 02/29] mv_xor: do not use pool_size from platform_data within
- the driver
+Date: Thu, 15 Nov 2012 18:20:13 +0100
+Subject: [PATCH 08/29] mv_xor: remove sub-driver 'mv_xor'
 In-Reply-To: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353000034-30567-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353000034-30567-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver currently pokes into the platform_data structure during its
-normal operation to get the pool_size value. Poking into the
-platform_data structure is not nice when moving to the Device Tree, so
-this commit adds a new pool_size field in the mv_xor_device structure,
-which gets initialized at ->probe() time. The driver then uses this
-field instead of the platform_data.
+Now that XOR channels are directly registered by the main
+'mv_xor_shared' device ->probe() function and all users of the
+'mv_xor' device have been removed, we can get rid of the latter.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor.c |   10 ++++------
- drivers/dma/mv_xor.h |    1 +
- 2 files changed, 5 insertions(+), 6 deletions(-)
+ drivers/dma/mv_xor.c                     |   49 +-----------------------------
+ include/linux/platform_data/dma-mv_xor.h |    1 -
+ 2 files changed, 1 insertion(+), 49 deletions(-)
 
 diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 610d0b8..7042772 100644
+index 3eaa0b2..614968e 100644
 --- a/drivers/dma/mv_xor.c
 +++ b/drivers/dma/mv_xor.c
-@@ -604,9 +604,7 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
- 	int idx;
- 	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
- 	struct mv_xor_desc_slot *slot = NULL;
--	struct mv_xor_platform_data *plat_data =
--		mv_chan->device->pdev->dev.platform_data;
--	int num_descs_in_pool = plat_data->pool_size/MV_XOR_SLOT_SIZE;
-+	int num_descs_in_pool = mv_chan->device->pool_size/MV_XOR_SLOT_SIZE;
+@@ -1219,35 +1219,6 @@ mv_xor_channel_add(struct mv_xor_shared_private *msp,
+ 	return ERR_PTR(ret);
+ }
  
- 	/* Allocate descriptor slots */
- 	idx = mv_chan->slots_allocated;
-@@ -1084,11 +1082,10 @@ static int __devexit mv_xor_remove(struct platform_device *dev)
- 	struct mv_xor_device *device = platform_get_drvdata(dev);
- 	struct dma_chan *chan, *_chan;
- 	struct mv_xor_chan *mv_chan;
--	struct mv_xor_platform_data *plat_data = dev->dev.platform_data;
+-static int __devexit mv_xor_remove(struct platform_device *pdev)
+-{
+-	struct mv_xor_device *device = platform_get_drvdata(pdev);
+-	return mv_xor_channel_remove(device);
+-}
+-
+-static int __devinit mv_xor_probe(struct platform_device *pdev)
+-{
+-	struct mv_xor_platform_data *plat_data = pdev->dev.platform_data;
+-	struct mv_xor_shared_private *msp =
+-		platform_get_drvdata(plat_data->shared);
+-	struct mv_xor_device *mv_xor_device;
+-	int irq;
+-
+-	irq = platform_get_irq(pdev, 0);
+-	if (irq < 0)
+-		return irq;
+-
+-	mv_xor_device = mv_xor_channel_add(msp, pdev, plat_data->hw_id,
+-					   plat_data->cap_mask,
+-					   plat_data->pool_size, irq);
+-	if (IS_ERR(mv_xor_device))
+-		return PTR_ERR(mv_xor_device);
+-
+-	platform_set_drvdata(pdev, mv_xor_device);
+-
+-	return 0;
+-}
+-
+ static void
+ mv_xor_conf_mbus_windows(struct mv_xor_shared_private *msp,
+ 			 const struct mbus_dram_target_info *dram)
+@@ -1279,15 +1250,6 @@ mv_xor_conf_mbus_windows(struct mv_xor_shared_private *msp,
+ 	writel(win_enable, base + WINDOW_BAR_ENABLE(1));
+ }
  
- 	dma_async_device_unregister(&device->common);
+-static struct platform_driver mv_xor_driver = {
+-	.probe		= mv_xor_probe,
+-	.remove		= __devexit_p(mv_xor_remove),
+-	.driver		= {
+-		.owner	= THIS_MODULE,
+-		.name	= MV_XOR_NAME,
+-	},
+-};
+-
+ static int mv_xor_shared_probe(struct platform_device *pdev)
+ {
+ 	const struct mbus_dram_target_info *dram;
+@@ -1406,15 +1368,7 @@ static struct platform_driver mv_xor_shared_driver = {
  
--	dma_free_coherent(&dev->dev, plat_data->pool_size,
-+	dma_free_coherent(&dev->dev, device->pool_size,
- 			device->dma_desc_pool_virt, device->dma_desc_pool);
+ static int __init mv_xor_init(void)
+ {
+-	int rc;
+-
+-	rc = platform_driver_register(&mv_xor_shared_driver);
+-	if (!rc) {
+-		rc = platform_driver_register(&mv_xor_driver);
+-		if (rc)
+-			platform_driver_unregister(&mv_xor_shared_driver);
+-	}
+-	return rc;
++	return platform_driver_register(&mv_xor_shared_driver);
+ }
+ module_init(mv_xor_init);
  
- 	list_for_each_entry_safe(chan, _chan, &device->common.channels,
-@@ -1120,8 +1117,9 @@ static int __devinit mv_xor_probe(struct platform_device *pdev)
- 	 * note: writecombine gives slightly better performance, but
- 	 * requires that we explicitly flush the writes
- 	 */
-+	adev->pool_size = plat_data->pool_size;
- 	adev->dma_desc_pool_virt = dma_alloc_writecombine(&pdev->dev,
--							  plat_data->pool_size,
-+							  adev->pool_size,
- 							  &adev->dma_desc_pool,
- 							  GFP_KERNEL);
- 	if (!adev->dma_desc_pool_virt)
-diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
-index a5b422f..a0641ae 100644
---- a/drivers/dma/mv_xor.h
-+++ b/drivers/dma/mv_xor.h
-@@ -72,6 +72,7 @@ struct mv_xor_device {
- 	int				id;
- 	dma_addr_t			dma_desc_pool;
- 	void				*dma_desc_pool_virt;
-+	size_t                          pool_size;
- 	struct dma_device		common;
- 	struct mv_xor_shared_private	*shared;
- };
+@@ -1422,7 +1376,6 @@ module_init(mv_xor_init);
+ #if 0
+ static void __exit mv_xor_exit(void)
+ {
+-	platform_driver_unregister(&mv_xor_driver);
+ 	platform_driver_unregister(&mv_xor_shared_driver);
+ 	return;
+ }
+diff --git a/include/linux/platform_data/dma-mv_xor.h b/include/linux/platform_data/dma-mv_xor.h
+index f2aed97..6abe5f9 100644
+--- a/include/linux/platform_data/dma-mv_xor.h
++++ b/include/linux/platform_data/dma-mv_xor.h
+@@ -11,7 +11,6 @@
+ #include <linux/mbus.h>
+ 
+ #define MV_XOR_SHARED_NAME	"mv_xor_shared"
+-#define MV_XOR_NAME		"mv_xor"
+ 
+ struct mv_xor_platform_data {
+ 	struct platform_device		*shared;
 -- 
 1.7.9.5
