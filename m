@@ -1,24 +1,46 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Thu, 15 Nov 2012 16:46:09 +0800
-Subject: [PATCH V3 0/5] SMP support for Armada XP
-In-Reply-To: <1352931637-3405-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1352931637-3405-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <50A4ABD1.3070902@gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Thu, 15 Nov 2012 14:19:21 +0530
+Subject: [PATCHv3] i2c: omap: Move the remove constraint
+Message-ID: <1352969361-10521-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for asking a question. Does it support CPU HOTPLUG? I am just 
-testing the marvell 2012_Q4.1, and found the CPU HOTPLUG (echo 0|1 > 
-/sys/devices/system/cpu/cpu1/online) doesn't work on the XP_GP board, 
-does your BSP have the same problem?
+Currently we just queue the transfer and release the
+qos constraints, however we do not wait for the transfer
+to complete to release the constraint. Move the remove
+constraint after the bus busy as we are sure that the
+transfers are completed by then.
 
-Regards,
-Hui.
+Acked-by: Jean Pihet <j-pihet@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+v2: rebase to the for-next branch
+v3: Fix a typo
 
-Gregory CLEMENT wrote:
-> Hello,
->
-> The purpose of this patch set is to add the SMP support for the Armada
-> XP SoCs. Beside the SMP support itself brought by the last 3 patches,
-> this patch set also adds the support for the coherency fabric unit and
->   
+ drivers/i2c/busses/i2c-omap.c |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 482c63d..fabcbe1 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -654,13 +654,14 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 			break;
+ 	}
+ 
+-	if (dev->set_mpu_wkup_lat != NULL)
+-		dev->set_mpu_wkup_lat(dev->dev, -1);
+-
+ 	if (r == 0)
+ 		r = num;
+ 
+ 	omap_i2c_wait_for_bb(dev);
++
++	if (dev->set_mpu_wkup_lat != NULL)
++		dev->set_mpu_wkup_lat(dev->dev, -1);
++
+ out:
+ 	pm_runtime_mark_last_busy(dev->dev);
+ 	pm_runtime_put_autosuspend(dev->dev);
+-- 
+1.7.5.4
