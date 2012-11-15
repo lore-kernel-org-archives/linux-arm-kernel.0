@@ -1,45 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Nov 2012 11:48:57 +0000
-Subject: [GIT PULL] Ux500 pin changes
-In-Reply-To: <20121115112032.GB21682@gmail.com>
-References: <CACRpkdYjEmQRU530N3sP7t_RfM_NLhEcMf6YCBdf4LC7M7fQDQ@mail.gmail.com>
- <CACRpkdZ0_3ow9VwGGvFtj_pbYNG+cctB6kUK1FBe4sjU=MTgww@mail.gmail.com>
- <20121115112032.GB21682@gmail.com>
-Message-ID: <201211151148.57546.arnd@arndb.de>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Thu, 15 Nov 2012 13:51:52 +0200
+Subject: [PATCH v2 2/3] serial: mxs-auart: add the DMA support for mx28
+In-Reply-To: <50A4B1CE.5070203@freescale.com>
+References: <1351074456-25863-1-git-send-email-b32955@freescale.com>
+ <1351074456-25863-3-git-send-email-b32955@freescale.com>
+ <50A21613.6030709@bluegiga.com> <50A45F83.1010009@freescale.com>
+ <50A4983F.8080407@bluegiga.com> <50A4B1CE.5070203@freescale.com>
+Message-ID: <50A4D758.8050602@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 November 2012, Lee Jones wrote:
-> On Thu, 15 Nov 2012, Linus Walleij wrote:
-> 
-> > On Mon, Nov 12, 2012 at 11:35 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > 
-> > > u8500_defconfig now gives me two new errors in arm-soc/for-next when building with
-> > > -Werror:
-> > >
-> > > arch/arm/mach-ux500/board-mop500-pins.c:73:22: error: 'out_hi_wkup_pdis' defined but not used [-Werror=unused-variable]
-> > 
-> > I've sent a fix for this, could you apply that patch directly to the
-> > drivers branch?
-> > 
-> > > and the existing:
-> > >
-> > > ERROR (phandle_references): Reference to non-existent node or label "tc3589x_gpio"
-> > >
-> > > Can you provide patches to fix these up?
-> > 
-> > What on earth is that? Lee, do you know how to fix this one up, I shamelessly
-> > assume it to be related to commit:
-> > commit 3113e679021a3a6bace1c62a8432cc0ec27c09ab
-> > "gpio: Enable the tc3298x GPIO expander driver for Device Tree"
-> 
-> I haven't seen this error.
-> 
-> Which kernel is this? How do I reproduce?
-> 
+Hi,
 
-It's currently in arm-soc/for-next. Reproduce with "make u8500_defconfig && make".
-I haven't bisected the problem, but it's obvious that some dts files reference
-the "tc3589x_gpio" file that is not defined anywhere.
+On 11/15/2012 11:11 AM, Huang Shijie wrote:
+>> I tested linux-next-20121114 on apx4devkit (imx28 based device) and I
+>> got the same error message:
+>>
+>> # stty -F /dev/ttyAPP0 crtscts; microcom /dev/ttyAPP0 -s 115200
+>> [  133.710000] mxs-auart 8006a000.serial: step 1 error
+>> [  133.720000] mxs-auart 8006a000.serial: We can not start up the DMA.
+> Could you test this patch?
 
-	Arnd
+I don't get error messages with your latest patch but the CPU freezes 
+after it has received first byte. Freezing happens only if flow control 
+(and of course DMA) is enabled. Sending data doesn't freeze the CPU. Are 
+you able to send data without freezing?
+
+I used busybox's microcom to transfer data.
+
+Lauri
