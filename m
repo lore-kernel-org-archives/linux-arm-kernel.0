@@ -1,44 +1,54 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 15 Nov 2012 09:04:53 +0100
-Subject: [PATCH 1/3] OF: Add helper for matching against linux, stdout-path
-In-Reply-To: <CACxGe6uW+XN6RDnP+8QFXaCYqqPZO4dZM_aynR6AVMYZT=KuMg@mail.gmail.com>
-References: <1351849734-9836-1-git-send-email-s.hauer@pengutronix.de>
- <1351849734-9836-2-git-send-email-s.hauer@pengutronix.de>
- <CACxGe6uW+XN6RDnP+8QFXaCYqqPZO4dZM_aynR6AVMYZT=KuMg@mail.gmail.com>
-Message-ID: <20121115080453.GW10369@pengutronix.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 15 Nov 2012 09:10:30 +0100
+Subject: [PATCH] ARM: OMAP2+: omap_twl: Change TWL4030_MODULE_PM_RECEIVER
+ to TWL_MODULE_PM_RECEIVER
+In-Reply-To: <1352799152-20980-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1352799152-20980-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <50A4A376.3020703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2012 at 08:49:54PM +0000, Grant Likely wrote:
-> > +int of_device_is_stdout_path(struct device_node *dn)
-> > +{
-> > +       const char *name;
-> > +
-> > +       name = of_get_property(of_chosen, "linux,stdout-path", NULL);
-> > +       if (name == NULL)
-> > +               return 0;
-> > +
-> > +       if (dn == of_find_node_by_path(name))
-> 
-> need to of_node_put() the return value of of_find_node_by_path()
-> 
-> > +               return 1;
-> > +
-> > +       return 0;
-> > +}
-> 
-> Hi Sascha,
-> 
-> I'm fine with the helper, but there really is no need for a completely
-> separate .c file. Just put it in drivers/of/base.c.
+Hi Tony,
 
-Agreed.
+On 11/13/2012 10:32 AM, Peter Ujfalusi wrote:
+> To facilitate upcoming cleanup in twl stack.
+> No functional change.
 
-Thanks,
- Sascha
+Would you please consider this patch for 3.8? It would shorten the time I'll
+need to progress on the cleanup regarding to twl-core greatly.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thank you,
+P?ter
+
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_twl.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
+> index 2bf35dc..018abb4 100644
+> --- a/arch/arm/mach-omap2/omap_twl.c
+> +++ b/arch/arm/mach-omap2/omap_twl.c
+> @@ -337,8 +337,8 @@ int __init omap3_twl_set_sr_bit(bool enable)
+>  	if (twl_sr_enable_autoinit)
+>  		pr_warning("%s: unexpected multiple calls\n", __func__);
+>  
+> -	ret = twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER, &temp,
+> -					TWL4030_DCDC_GLOBAL_CFG);
+> +	ret = twl_i2c_read_u8(TWL_MODULE_PM_RECEIVER, &temp,
+> +			      TWL4030_DCDC_GLOBAL_CFG);
+>  	if (ret)
+>  		goto err;
+>  
+> @@ -347,8 +347,8 @@ int __init omap3_twl_set_sr_bit(bool enable)
+>  	else
+>  		temp &= ~SMARTREFLEX_ENABLE;
+>  
+> -	ret = twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, temp,
+> -				TWL4030_DCDC_GLOBAL_CFG);
+> +	ret = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, temp,
+> +			       TWL4030_DCDC_GLOBAL_CFG);
+>  	if (!ret) {
+>  		twl_sr_enable_autoinit = true;
+>  		return 0;
+> 
