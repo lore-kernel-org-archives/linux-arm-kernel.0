@@ -1,51 +1,51 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 15 Nov 2012 19:49:30 +0530
-Subject: [PATCH 01/14] pinctrl: SPEAr: add spi chipselect control driver
-In-Reply-To: <CACRpkdb9tSUUGQjWdHqRr5rUSyiPgWm2i3-QZq9VbWFY2EAQeQ@mail.gmail.com>
-References: <cover.1352608333.git.viresh.kumar@linaro.org>
- <4a92290e8a3b1a19c3a5e864edfa7badfc2af5d0.1352608333.git.viresh.kumar@linaro.org>
- <CACRpkdb9tSUUGQjWdHqRr5rUSyiPgWm2i3-QZq9VbWFY2EAQeQ@mail.gmail.com>
-Message-ID: <CAKohpomLRYAKJ=dNLVsjj1xf=G6xj4EcTpPmhSDvgBYUMXc1mA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 15 Nov 2012 15:26:52 +0100
+Subject: [PATCH] RFC: pinctrl: grab default handler with bus notifiers
+In-Reply-To: <CACRpkdY-tye5LNOwxQ-XrjM-x9RffAvj-tPfsFQA3ZWOY8P-Vw@mail.gmail.com>
+References: <1352636539-6318-1-git-send-email-linus.walleij@stericsson.com>
+ <50A15A54.3090803@wwwdotorg.org>
+ <20121113063546.GD18224@opensource.wolfsonmicro.com>
+ <CACRpkdY-tye5LNOwxQ-XrjM-x9RffAvj-tPfsFQA3ZWOY8P-Vw@mail.gmail.com>
+Message-ID: <20121115152652.44c567d5@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 November 2012 19:47, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Sun, Nov 11, 2012 at 5:39 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->
->> From: Shiraz Hashim <shiraz.hashim@st.com>
->>
->> SPEAr platform provides a provision to control chipselects of ARM PL022
->> Prime Cell spi controller through its system registers, which otherwise
->> remains under PL022 control which some protocols do not want.
->>
->> This commit intends to provide the spi chipselect control in software
->> over gpiolib interface. Since it is tied to pinctrl, we place it under
->> 'drivers/pinctrl/spear/' directory.
->>
->> spi chip drivers can use the exported gpiolib interface to define their
->> chipselect through DT or platform data.
->>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
->> Reviewed-by: Vipin Kumar <vipin.kumar@st.com>
->> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
->
-> This sure looks good, sorry for the delay.
->
-> Just one question: since this driver is not using any
-> pinctrl interfaces, why is it under drivers/pinctrl/*?
->
-> Shouldn't it be under drivers/gpio from a technical
-> point of view?
->
-> I think I'd accept it under drivers/pinctrl/spear/*
-> if you just want this to keep everything SPEAr-related
-> in one place though, so enlighten me.
+Linus,
 
-That's because they are controlling few pads. They are not
-actually gpio's but just pads that we are controlling.
+On Thu, 15 Nov 2012 15:03:40 +0100, Linus Walleij wrote:
 
-That's why we thought they are better in this place.
+> > I have to say that I agree with this, notifiers seem to make life more
+> > complicated for limited gain.  Otherwise I guess we could enhance
+> > notifiers so that they're able to trigger deferrals?
+> 
+> OK I'll have to come up with a patch to the device core
+> instead... it'll be much simpler anyway and if both of you guys
+> can back it I guess Greg might be OK with it too.
 
---
-viresh
+At ELCE, I've discussed with one person having an interesting use case:
+they are using the same pin for two different purposes during the
+system operation.
+
+At boot time, this pin is muxed as a SPI pin and is used to program the
+bitstream of a FPGA. This is done in Linux, through a userspace
+application.
+
+Then, once it is done, this pin is remuxed as a UART pin, and used to
+communicate with another device on the board.
+
+If the pinctrl configuration is done at probe() time inside the driver
+core, then how can this kind of use case be supported? If each driver
+does its own muxing, we could think of letting the SPI and UART driver
+only do their muxing when the device is opened, and remove their muxing
+when the device is closed, so that such sharing of pins for two
+separate functions could be supported. Is this something we want to
+support?
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
