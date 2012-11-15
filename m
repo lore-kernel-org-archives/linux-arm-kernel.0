@@ -1,33 +1,133 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 15 Nov 2012 23:46:25 +0100
-Subject: [PATCH 6/6] ARM: sunxi: Add entry to MAINTAINERS
+Date: Thu, 15 Nov 2012 23:46:24 +0100
+Subject: [PATCH 5/6] ARM: sunxi: Add device tree for the A13 and the Olinuxino
+ board
 In-Reply-To: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1353019586-21043-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1353019586-21043-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- MAINTAINERS |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/Makefile            |    1 +
+ arch/arm/boot/dts/sun5i-olinuxino.dts |   30 +++++++++++++++++
+ arch/arm/boot/dts/sun5i.dtsi          |   58 +++++++++++++++++++++++++++++++++
+ 3 files changed, 89 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun5i-olinuxino.dts
+ create mode 100644 arch/arm/boot/dts/sun5i.dtsi
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 59203e7..7dbfcb7 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -685,6 +685,12 @@ M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
-+ARM/Allwinner A1X SoC support
-+M:	Maxime Ripard <maxime.ripard@free-electrons.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	arch/arm/mach-sunxi/
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f37cf9f..9b2d3f0 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -84,6 +84,7 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
+ 	spear310-evb.dtb \
+ 	spear320-evb.dtb
+ dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun5i-olinuxino.dtb
+ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+ 	tegra20-medcom-wide.dtb \
+ 	tegra20-paz00.dtb \
+diff --git a/arch/arm/boot/dts/sun5i-olinuxino.dts b/arch/arm/boot/dts/sun5i-olinuxino.dts
+new file mode 100644
+index 0000000..add1e60
+--- /dev/null
++++ b/arch/arm/boot/dts/sun5i-olinuxino.dts
+@@ -0,0 +1,30 @@
++/*
++ * Copyright 2012 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
 +
- ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
- M:	Andrew Victor <linux@maxim.org.za>
- M:	Nicolas Ferre <nicolas.ferre@atmel.com>
++/dts-v1/;
++/include/ "sun5i.dtsi"
++
++/ {
++	model = "Olimex A13-Olinuxino";
++	compatible = "olimex,a13-olinuxino", "allwinner,sun5i";
++
++	memory {
++		reg = <0x40000000 0x40000000>;
++	};
++
++	soc {
++		duart: uart at 01c28400 {
++			status = "okay";
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+new file mode 100644
+index 0000000..5797323
+--- /dev/null
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -0,0 +1,58 @@
++/*
++ * Copyright 2012 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/include/ "skeleton.dtsi"
++
++/ {
++	interrupt-parent = <&intc>;
++
++	cpus {
++		cpu at 0 {
++			compatible = "arm,cortex-a8";
++		};
++	};
++
++	chosen {
++		bootargs = "earlyprintk console=ttyS0,115200";
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x01c20000 0x300000>;
++		ranges;
++
++		timer at 01c20c00 {
++			compatible = "allwinner,sunxi-timer";
++			reg = <0x01c20c00 0x400>;
++			interrupts = <22>;
++		};
++
++		intc: interrupt-controller at 01c20400 {
++			compatible = "allwinner,sunxi-ic";
++			reg = <0x01c20400 0x400>;
++			interrupt-controller;
++			#interrupt-cells = <1>;
++		};
++
++		uart1: uart at 01c28400 {
++			compatible = "ns8250";
++			reg = <0x01c28400 0x400>;
++			interrupts = <2>;
++			reg-shift = <2>;
++			clock-frequency = <24000000>;
++			status = "disabled";
++		};
++	};
++};
 -- 
 1.7.9.5
