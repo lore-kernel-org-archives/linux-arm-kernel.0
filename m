@@ -1,48 +1,43 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 15 Nov 2012 19:39:08 +0200
-Subject: [PATCH v4 2/2] ARM: OMAP3/4: iommu: adapt to runtime pm
-In-Reply-To: <CALLhW=46xUZzuEBaQD7vsOTQOGR7bwXMSM_mugN_gWa-oqwfuw@mail.gmail.com>
-References: <1352860489-19960-1-git-send-email-omar.luna@linaro.org>
- <1352860489-19960-3-git-send-email-omar.luna@linaro.org>
- <CAK=WgbZm+sjavwb_Li_W5ygm0XuS9YMYfQEkdoB188Uir0arGg@mail.gmail.com>
- <CALLhW=46xUZzuEBaQD7vsOTQOGR7bwXMSM_mugN_gWa-oqwfuw@mail.gmail.com>
-Message-ID: <CAK=WgbaTupjayMLmgptfLtNkkk_GZL8RYQrYn8O7FG5GpANswg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 15 Nov 2012 09:43:12 -0800
+Subject: [arm-soc:for-next 24/32]
+ arch/arm/mach-omap2/board-generic.c:115:13: error: 'omap_prcm_restart'
+ undeclared here (not in a function)
+In-Reply-To: <50a52344.hTPnPrYFuOqQEPAJ%fengguang.wu@intel.com>
+References: <50a52344.hTPnPrYFuOqQEPAJ%fengguang.wu@intel.com>
+Message-ID: <20121115174312.GK6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Omar,
+* kbuild test robot <fengguang.wu@intel.com> [121115 09:21]:
+> tree:   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for-next
+> head:   85f1e7156cfb396d46327b9e6cdf4dbf576f3bcc
+> commit: 3b7b5ae34c4604e6a1e0724fc8bd60e44f07e1ef [24/32] Merge branch 'next/dt' into for-next
+> config: make ARCH=arm omap2plus_defconfig
+> 
+> Note: the arm-soc/for-next HEAD 85f1e71 builds fine.
+>       It only hurts bisectibility.
+> 
+> All error/warnings:
+> 
+> arch/arm/mach-omap2/board-generic.c:115:13: error: 'omap_prcm_restart' undeclared here (not in a function)
+> 
+> vim +115 +/omap_prcm_restart arch/arm/mach-omap2/board-generic.c
+> 
+> 7dd9d502 Jon Hunter     2012-09-12  109  	.init_early	= omap3430_init_early,
+> 7dd9d502 Jon Hunter     2012-09-12  110  	.init_irq	= omap_intc_of_init,
+> 7dd9d502 Jon Hunter     2012-09-12  111  	.handle_irq	= omap3_intc_handle_irq,
+> 7dd9d502 Jon Hunter     2012-09-12  112  	.init_machine	= omap_generic_init,
+> 7dd9d502 Jon Hunter     2012-09-12  113  	.timer		= &omap3_secure_timer,
+> 7dd9d502 Jon Hunter     2012-09-12  114  	.dt_compat	= omap3_gp_boards_compat,
+> 7dd9d502 Jon Hunter     2012-09-12 @115  	.restart	= omap_prcm_restart,
+> 7dd9d502 Jon Hunter     2012-09-12  116  MACHINE_END
+> 8d61649d Benoit Cousson 2011-09-20  117  #endif
+> 8d61649d Benoit Cousson 2011-09-20  118  
 
-On Thu, Nov 15, 2012 at 6:53 PM, Omar Ramirez Luna <omar.luna@linaro.org> wrote:
-> On 14 November 2012 03:54, Ohad Ben-Cohen <ohad@wizery.com> wrote:
->> Most of the above questions imply this patch not only converts the
->> iommu to runtime PM, but may carry additional changes that may imply
->> previous implementation is sub-optimal. I hope we can clearly document
->> the motivation behind these changes too (maybe even consider
->> extracting them to a different patch ?).
->
-> I didn't want to extract this changes into different patches since
-> they could be included in this one, otherwise it would look like lines
-> adding and then deleting runtime pm functions.
->
-> I do agree description is missing, again I thought I had done this
-> somewhere but looks like I didn't, will update these. If you think
-> these should be different patches please let me know, otherwise I
-> would like to keep a single *documented* patch.
+Thanks I've posted a fix for that. The solution is to use
+omap3xxx_restart there.
 
-It seems like there are 3 different logical changes here:
+Regards,
 
-1. remove clk_* invocations from iommu_fault_handler()
-2. keep clocks enabled as long as iommu is enabled
-3. convert to runtime pm
-
-If we split this to three patches in this order, you won't have to add
-and remove runtime pm functions.
-
-Let's do it, please. It's a small nuisance now, but may be really
-helpful in the future when someone tries to debug stuff and understand
-the motivation behind these changes. It'd make it much easier for you
-to document the changes, too: you have an entire commit log per
-change.
-
-Thanks,
-Ohad.
+Tony
