@@ -1,156 +1,74 @@
 From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Thu, 15 Nov 2012 13:03:48 +0100
-Subject: [PATCH v2 7/7] usb: chipidea: usbmisc: add post handling and errata
- fix for mx25
+Date: Thu, 15 Nov 2012 13:03:45 +0100
+Subject: [PATCH v2 4/7] usb: chipidea: usbmisc: prepare driver to handle more
+ than one soc
 In-Reply-To: <1352981028-14312-1-git-send-email-m.grzeschik@pengutronix.de>
 References: <1352981028-14312-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1352981028-14312-8-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <1352981028-14312-5-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a post handling routine which is called after
-ci13xxx_add_device was called. The first user is the mx25, which has to
-disable the external-vbus-divider after the udc has started.
+From: Marc Kleine-Budde <mkl@pengutronix.de>
 
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+This attaches the usbmisc_ops to the of_device_id data and
+makes it possible to define special functions per soc.
+
 Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
 ---
- .../devicetree/bindings/usb/ci13xxx-imx.txt        |    2 ++
- drivers/usb/chipidea/ci13xxx_imx.c                 |   12 ++++++++
- drivers/usb/chipidea/ci13xxx_imx.h                 |    3 ++
- drivers/usb/chipidea/usbmisc_imx.c                 |   30 ++++++++++++++++++++
- 4 files changed, 47 insertions(+)
+ drivers/usb/chipidea/usbmisc_imx.c |   11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-index 5778b9c..1c04a4c 100644
---- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-+++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
-@@ -11,6 +11,7 @@ Optional properties:
-   that indicate usb controller index
- - vbus-supply: regulator for vbus
- - disable-over-current: disable over current detect
-+- external-vbus-divider: enables off-chip resistor divider for Vbus
- 
- Examples:
- usb at 02184000 { /* USB OTG */
-@@ -20,4 +21,5 @@ usb at 02184000 { /* USB OTG */
- 	fsl,usbphy = <&usbphy1>;
- 	fsl,usbmisc = <&usbmisc 0>;
- 	disable-over-current;
-+	external-vbus-divider;
- };
-diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index 935de97..d346c99 100644
---- a/drivers/usb/chipidea/ci13xxx_imx.c
-+++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -79,6 +79,9 @@ int usbmisc_get_init_data(struct device *dev, struct usbmisc_usb_device *usbdev)
- 	if (of_find_property(np, "disable-over-current", NULL))
- 		usbdev->disable_oc = 1;
- 
-+	if (of_find_property(np, "external-vbus-divider", NULL))
-+		usbdev->evdo = 1;
-+
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(usbmisc_get_init_data);
-@@ -213,6 +216,15 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
- 		goto put_np;
- 	}
- 
-+	if (usbmisc_ops && usbmisc_ops->post) {
-+		ret = usbmisc_ops->post(&pdev->dev);
-+		if (ret) {
-+			dev_err(&pdev->dev,
-+				"usbmisc post failed, ret=%d\n", ret);
-+			goto put_np;
-+		}
-+	}
-+
- 	data->ci_pdev = plat_ci;
- 	platform_set_drvdata(pdev, data);
- 
-diff --git a/drivers/usb/chipidea/ci13xxx_imx.h b/drivers/usb/chipidea/ci13xxx_imx.h
-index 2e88acc..d065273 100644
---- a/drivers/usb/chipidea/ci13xxx_imx.h
-+++ b/drivers/usb/chipidea/ci13xxx_imx.h
-@@ -13,6 +13,8 @@
- struct usbmisc_ops {
- 	/* It's called once when probe a usb device */
- 	int (*init)(struct device *dev);
-+	/* It's called once after adding a usb device */
-+	int (*post)(struct device *dev);
- };
- 
- struct usbmisc_usb_device {
-@@ -20,6 +22,7 @@ struct usbmisc_usb_device {
- 	int index;
- 
- 	int disable_oc:1; /* over current detect disabled */
-+	int evdo:1; /* set external vbus divider option */
- };
- 
- int usbmisc_set_ops(const struct usbmisc_ops *ops);
 diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-index 9718500..acca109 100644
+index 9145e04..4b1ed7c 100644
 --- a/drivers/usb/chipidea/usbmisc_imx.c
 +++ b/drivers/usb/chipidea/usbmisc_imx.c
-@@ -14,6 +14,7 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/io.h>
-+#include <linux/delay.h>
- 
- #include "ci13xxx_imx.h"
- 
-@@ -54,6 +55,30 @@ static struct usbmisc_usb_device *get_usbdev(struct device *dev)
- 	return &usbmisc->usbdev[i];
- }
- 
-+static int usbmisc_imx25_post(struct device *dev)
-+{
-+	struct usbmisc_usb_device *usbdev;
-+	void __iomem *reg;
-+	unsigned long flags;
-+	u32 val;
-+
-+	usbdev = get_usbdev(dev);
-+	if (IS_ERR(usbdev))
-+		return PTR_ERR(usbdev);
-+
-+	reg = usbmisc->base + 0x08;
-+
-+	if (usbdev->evdo) {
-+		spin_lock_irqsave(&usbmisc->lock, flags);
-+		val = readl(reg);
-+		writel(val | (1 << 23), reg);
-+		spin_unlock_irqrestore(&usbmisc->lock, flags);
-+		mdelay(5); /* needed to stabilize voltage */
-+	}
-+
-+	return 0;
-+}
-+
- static int usbmisc_imx53_init(struct device *dev)
- {
- 	struct usbmisc_usb_device *usbdev;
-@@ -99,6 +124,10 @@ static int usbmisc_imx6q_init(struct device *dev)
- 	return 0;
- }
- 
-+static const struct usbmisc_ops imx25_usbmisc_ops = {
-+	.post = usbmisc_imx25_post,
-+};
-+
- static const struct usbmisc_ops imx53_usbmisc_ops = {
- 	.init = usbmisc_imx53_init,
+@@ -26,6 +26,7 @@ struct imx_usbmisc {
+ 	spinlock_t lock;
+ 	struct clk *clk;
+ 	struct usbmisc_usb_device usbdev[USB_DEV_MAX];
++	const struct usbmisc_ops *ops;
  };
-@@ -108,6 +137,7 @@ static const struct usbmisc_ops imx6q_usbmisc_ops = {
+ 
+ static struct imx_usbmisc *usbmisc;
+@@ -78,7 +79,7 @@ static const struct usbmisc_ops imx6q_usbmisc_ops = {
  };
  
  static const struct of_device_id usbmisc_imx_dt_ids[] = {
-+	{ .compatible = "fsl,imx25-usbmisc", .data = (void *)&imx25_usbmisc_ops },
- 	{ .compatible = "fsl,imx53-usbmisc", .data = (void *)&imx53_usbmisc_ops },
- 	{ .compatible = "fsl,imx6q-usbmisc", .data = (void *)&imx6q_usbmisc_ops },
+-	{ .compatible = "fsl,imx6q-usbmisc"},
++	{ .compatible = "fsl,imx6q-usbmisc", .data = (void *)&imx6q_usbmisc_ops },
  	{ /* sentinel */ }
+ };
+ 
+@@ -87,6 +88,7 @@ static int __devinit usbmisc_imx_probe(struct platform_device *pdev)
+ 	struct resource	*res;
+ 	struct imx_usbmisc *data;
+ 	int ret;
++	struct of_device_id *tmp_dev;
+ 
+ 	if (usbmisc)
+ 		return -EBUSY;
+@@ -116,8 +118,11 @@ static int __devinit usbmisc_imx_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	tmp_dev = (struct of_device_id *)
++		of_match_device(usbmisc_imx_dt_ids, &pdev->dev);
++	data->ops = (const struct usbmisc_ops *)tmp_dev->data;
+ 	usbmisc = data;
+-	ret = usbmisc_set_ops(&imx6q_usbmisc_ops);
++	ret = usbmisc_set_ops(data->ops);
+ 	if (ret) {
+ 		usbmisc = NULL;
+ 		clk_disable_unprepare(data->clk);
+@@ -129,7 +134,7 @@ static int __devinit usbmisc_imx_probe(struct platform_device *pdev)
+ 
+ static int __devexit usbmisc_imx_remove(struct platform_device *pdev)
+ {
+-	usbmisc_unset_ops(&imx6q_usbmisc_ops);
++	usbmisc_unset_ops(usbmisc->ops);
+ 	clk_disable_unprepare(usbmisc->clk);
+ 	usbmisc = NULL;
+ 	return 0;
 -- 
 1.7.10.4
