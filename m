@@ -1,77 +1,22 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 15 Nov 2012 17:49:17 +0100
-Subject: [PATCH V2 1/5] arm: mvebu: Added support for coherency fabric
- in mach-mvebu
-In-Reply-To: <20121115162123.GC5885@mudshark.cambridge.arm.com>
-References: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
- <1351545108-18954-2-git-send-email-gregory.clement@free-electrons.com>
- <20121105140258.GO3351@mudshark.cambridge.arm.com>
- <50A15A33.60405@free-electrons.com>
- <20121113104340.GD3940@mudshark.cambridge.arm.com>
- <50A3F860.5010601@free-electrons.com>
- <20121115101752.GA26453@mudshark.cambridge.arm.com>
- <50A5103F.1040903@free-electrons.com>
- <20121115162123.GC5885@mudshark.cambridge.arm.com>
-Message-ID: <50A51D0D.4090009@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Nov 2012 16:51:58 +0000
+Subject: [GIT PULL 1/5] omap non critical fixes for v3.8 merge window
+In-Reply-To: <pull-1352948204-277861>
+References: <pull-1352948204-277861>
+Message-ID: <201211151651.59049.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2012 05:21 PM, Will Deacon wrote:
-> Hi Gregory,
+On Thursday 15 November 2012, Tony Lindgren wrote:
+> The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
 > 
-> On Thu, Nov 15, 2012 at 03:54:39PM +0000, Gregory CLEMENT wrote:
->> On 11/15/2012 11:17 AM, Will Deacon wrote:
->>> Interesting, thanks for asking them about this. Does this mean that:
->>
->> Here come the answers to your new questions
+>   Linux 3.7-rc4 (2012-11-04 11:07:39 -0800)
 > 
-> Great, thanks for the quick turn-around!
+> are available in the git repository at:
 > 
->>> 	1. When not running coherently (i.e. before initialising the
->>> 	   coherency fabric), memory is treated as non-shareable,
->>> 	   non-cacheable?
->>
->> It can be cacheable. The shared memory (as defined on the page table)
->> will NOT be coherent by HW.
-> 
-> Ok, so we really are incoherent before enabling the fabric.
-> 
->>> 	2. If (1), then are exclusive accesses the only way to achieve
->>> 	   coherent memory accesses in this scenario?
->>
->> I quote: "I suspect there is terminology miss-use: exclusive accesses
->> are NOT used to achieve memory coherency - they are used to achieve
->> atomicity. To achieve memory coherency while fabric is configured to
->> be non-coherent, SW should use maintenance operations over the L1
->> caches."
-> 
-> Ok, so if I'm understanding correctly then I don't really see the usefulness
-> of having working exclusives that are incoherent. Surely it means that you
-> can guarantee mutual exclusion on a lock variable, but the value you actually
-> end up reading from the lock is junk unless you litter the accessors with cache
-> clean operations?
-> 
-> Anyway, that's by-the-by as this is all called early enough that we
-> shouldn't care. The thing I don't like now is that the fabric initialisation
-> is done entirely differently on the primary CPU than the secondaries. The
-> primary probes the device-tree (well, it's also now hard-coded for v2) and
-> accesses the registers from a C function(armada_370_xp_set_cpu_coherent) whilst
-> the secondaries have hardcoded addresses and access via asm
-> (armada_xp_secondary_startup).
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/fixes-non-critical-v4-signed
 
+Pulled all five. Please have a look to make sure everything you need is
+there now and still works.
 
-Now it is hardcoded in both case as you pointed it. So the last
-difference is setup from a C function or via asm.
-
-The differences between primary and secondary CPU when they enable the
-coherency, is due to the fact that we really are in a different
-situation. For primary CPU, as it is the only CPU online it doesn't
-need to enable the coherency from the beginning, so we can wait to
-have MMU enable and convenient feature. Whereas for the secondary CPU
-they need the coherency from the very beginning are by definition they
-won't be alone. That's why this very first instruction are written in
-asm and they use physical address.
-
-I don't see how to handle it in a different way.
-
-Gregory
+	Arnd
