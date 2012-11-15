@@ -1,106 +1,84 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 14 Nov 2012 18:54:48 -0600
-Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
-In-Reply-To: <20121114222159.GB6801@atomide.com>
-References: <20121114185335.GU6801@atomide.com> <50A3EBCD.3040801@ti.com>
- <20121114202244.GE3332@n2100.arm.linux.org.uk>
- <20121114203221.GA6801@atomide.com> <50A413D4.7000405@gmail.com>
- <20121114222159.GB6801@atomide.com>
-Message-ID: <50A43D58.5030404@gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 14 Nov 2012 17:13:04 -0800
+Subject: [PATCH] ARM: OMAP2+: voltage: fixup oscillator handling when
+ CONFIG_PM=n
+Message-ID: <1352941984-11828-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2012 04:21 PM, Tony Lindgren wrote:
-> * Rob Herring <robherring2@gmail.com> [121114 13:59]:
->> On 11/14/2012 02:32 PM, Tony Lindgren wrote:
->>>
->>> Checking for the bit already set should work in this case, I'll post
->>> a patch for that shortly.
->>
->> Can you actually read the state of the diagnostic register in non-secure
->> mode? If you can on the A9, is the same true on A8 or others?
-> 
-> Looks like it can be read on at least TI omap 4430 which is A9.
-> But it reads as zero, so the below patch is what I came up with.
-> 
-> No idea if assuming that zero value for the diagnostic register
-> is safe.. What's the default value of the diagnostic register supposed
-> to be?
+From: Kevin Hilman <khilman@ti.com>
 
-RTFM. Oh, wait it's a super secret, undocumented register. We shouldn't
-even be talking about it.
+commit 908b75e8 (ARM: OMAP: add support for oscillator setup) added a new
+API for oscillator setup, but is broken when CONFIG_PM=n.
 
-It could vary by rev, but I see 0 for the reset value, so this would not
-work if the bootloader did not do any setup of the diagnostic register.
+The new functions have dummy definitions when CONFIG_PM=n, but also have
+full implementations available, which conflict.
 
-One way to determine secure mode on the A9 would be seeing if you can
-change the auxcr register. Something like this (untested):
+To fix, wrap the PM implmentations in #ifdef CONFIG_PM.
 
-mrc	p15, 0, r0, c1, c0, 1; Read ACTLR
-eor	r1, r0, #0x100		; Modify alloc in 1 way
-mcr	p15, 0, r1, c1, c0, 1
-mrc	p15, 0, r2, c1, c0, 1; Read ACTLR
-mcr	p15, 0, r0, c1, c0, 1	; Restore original value
-cmp	r1, r2
-bne	skip_errata
+Cc: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+This applies to Tony's omap-for-v3.8/pm branch, which includes my
+for_3.8-pm-voltage tag where this bug was introduced.
 
+ arch/arm/mach-omap2/pm.c | 2 ++
+ arch/arm/mach-omap2/pm.h | 2 +-
+ arch/arm/mach-omap2/vc.c | 2 ++
+ 3 files changed, 5 insertions(+), 1 deletion(-)
 
-It would be good to do this test for all the errata rather than just
-this one.
-
-Rob
-
->> Multi-platform kernels present a new problem in that we basically need
->> to enable all errata work-arounds. I've been meaning to look thru the
->> errata work-arounds to figure out which ones can be selected for
->> multi-platform kernels without side effects on unaffected parts (i.e.
->> set a chicken bit based on core revision). For any in runtime paths, we
->> may need to do runtime patching if they have performance impact.
-> 
-> Yeah that's how I ran into it as multiplatform enabled omap booted
-> on other omaps but not on omap4.
-> 
-> Regards,
-> 
-> Tony
-> 
-> 
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Tue, 13 Nov 2012 16:57:42 -0800
-> Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 for secure mode
-> 
-> Looks like enabling CONFIG_ARM_ERRATA_751472 causes TI omap4 blaze
-> to not boot when enabled. The ARM core on it is an earlier r1p2.
-> 
-> This seems to be caused by the write to the diagnostic register
-> that shortly after causes an exception as writing to the diagnostic
-> register on systems with secure mode is not allowed.
-> 
-> Also it seems that reading the diagnostic register results zero
-> so we may not be able to check if bit #11 is already set.
-> 
-> Let's assume that if the diagnostic register is zero, we don't
-> want to touch it as it seems to hint secure mode at least on
-> TI omaps. If it's non-zero, check if bit #11 is set and only
-> attempt to set it if not set.
-> 
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -238,9 +238,13 @@ __v7_setup:
->  #if defined(CONFIG_ARM_ERRATA_751472) && defined(CONFIG_SMP)
->  	ALT_SMP(cmp r6, #0x30)			@ present prior to r3p0
->  	ALT_UP_B(1f)
-> -	mrclt	p15, 0, r10, c15, c0, 1		@ read diagnostic register
-> -	orrlt	r10, r10, #1 << 11		@ set bit #11
-> -	mcrlt	p15, 0, r10, c15, c0, 1		@ write diagnostic register
-> +	bge	1f				@ not needed for r3p0 and later
-> +	mrc	p15, 0, r10, c15, c0, 1		@ read diagnostic register
-> +	teq	r10, #0				@ zero for secure mode?
-> +	beq	1f				@ bail out for secure mode
-> +	tst	r10, #1 << 11			@ bit #11 already set?
-> +	orreq	r10, r10, #1 << 11		@ set bit #11 if not set
-> +	mcreq	p15, 0, r10, c15, c0, 1		@ write diagnostic register
->  1:
->  #endif
->  
-> 
+diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+index 109a02e..ef668c756 100644
+--- a/arch/arm/mach-omap2/pm.c
++++ b/arch/arm/mach-omap2/pm.c
+@@ -39,6 +39,7 @@ static struct omap_device_pm_latency *pm_lats;
+  */
+ int (*omap_pm_suspend)(void);
+ 
++#ifdef CONFIG_PM
+ /**
+  * struct omap2_oscillator - Describe the board main oscillator latencies
+  * @startup_time: oscillator startup latency
+@@ -68,6 +69,7 @@ void omap_pm_get_oscillator(u32 *tstart, u32 *tshut)
+ 	*tstart = oscillator.startup_time;
+ 	*tshut = oscillator.shutdown_time;
+ }
++#endif
+ 
+ static int __init _init_omap_device(char *name)
+ {
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 4db7b23..02c291c 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -135,7 +135,7 @@ extern void omap_pm_get_oscillator(u32 *tstart, u32 *tshut);
+ extern void omap_pm_setup_sr_i2c_pcb_length(u32 mm);
+ #else
+ static inline void omap_pm_setup_oscillator(u32 tstart, u32 tshut) { }
+-static inline void omap_pm_get_oscillator(u32 *tstart, u32 *tshut) { }
++static inline void omap_pm_get_oscillator(u32 *tstart, u32 *tshut) { *tstart = *tshut = 0; }
+ static inline void omap_pm_setup_sr_i2c_pcb_length(u32 mm) { }
+ #endif
+ 
+diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
+index 687aa86..a89ec8a 100644
+--- a/arch/arm/mach-omap2/vc.c
++++ b/arch/arm/mach-omap2/vc.c
+@@ -666,6 +666,7 @@ static u8 omap_vc_calc_vsel(struct voltagedomain *voltdm, u32 uvolt)
+ 	return voltdm->pmic->uv_to_vsel(uvolt);
+ }
+ 
++#ifdef CONFIG_PM
+ /**
+  * omap_pm_setup_sr_i2c_pcb_length - set length of SR I2C traces on PCB
+  * @mm: length of the PCB trace in millimetres
+@@ -678,6 +679,7 @@ void __init omap_pm_setup_sr_i2c_pcb_length(u32 mm)
+ {
+ 	sr_i2c_pcb_length = mm;
+ }
++#endif
+ 
+ void __init omap_vc_init_channel(struct voltagedomain *voltdm)
+ {
+-- 
+1.8.0
