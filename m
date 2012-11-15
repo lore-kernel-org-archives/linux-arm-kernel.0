@@ -1,83 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Nov 2012 10:35:28 +0000
-Subject: [PATCH 0/2] Boottime: measure bootloader and kernel bootup time
-In-Reply-To: <20121115101508.GB4398@game.jcrosoft.org>
-References: <1352973847-21605-1-git-send-email-lee.jones@linaro.org>
- <20121115101508.GB4398@game.jcrosoft.org>
-Message-ID: <20121115103528.GA21682@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Nov 2012 11:35:36 +0100
+Subject: [PATCH 1/3] gpio: Add simple poweroff-gpio driver
+In-Reply-To: <50A146E7.2040608@wwwdotorg.org>
+References: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
+ <1352650891-18356-2-git-send-email-andrew@lunn.ch>
+ <50A020C5.4070506@wwwdotorg.org> <20121112082546.GU22029@lunn.ch>
+ <50A1212C.2080601@wwwdotorg.org> <20121112181947.GS24583@lunn.ch>
+ <20121112184340.GA15643@lizard> <50A146E7.2040608@wwwdotorg.org>
+Message-ID: <CACRpkdb=ra9NwqEneyMoM5YnOFTVQoBxPATjUN6anooXVLiCjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Nov 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+On Mon, Nov 12, 2012 at 7:58 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 11/12/2012 11:43 AM, Anton Vorontsov wrote:
 
-> On 10:04 Thu 15 Nov     , Lee Jones wrote:
-> > This patchset supplies a new tool which measures boottime inclusive
-> > of bootloader involvement. It seems to be accurate and adds no
-> > latency to the booting of the system.
-> > 
-> > In the first round of testing we booted the kernel 3 times each with
-> > boottime enabled and disabled. Actually, when it was disabled, the
-> > code was completely removed from the kernel source and the kernel was
-> > rebuilt. The difference between present & enabled and completely
-> > removed was very little indeed. In fact, averaging out the 3 runs of
-> > each, when boottime was enabled the system booted 4ms _faster_, go
-> > figure!
-> > 
-> >              Enabled    Disabled
-> >   1st run    2.983093   2.985168
-> >   2nd run    2.973266   2.971801
-> >   3rd run    2.975402   2.987304
-> >   Average    2.977254   2.981424   -0.004171 (-4ms)
-> > 
-> > 
-> > For the next round of testing, we delayed the bootloader for varying
-> > amounts of time, then started to remove key components from kernel
-> > functionality to see if the boottime system would pick-up on them.
-> > 
-> >   /* Hang around in the bootloader for a while. */
-> >   $ cat /sys/kernel/debug/boottime/summary 
-> >     kernel: 42864 msecs
-> >     total: 42864 msecs
-> >     kernel: cpu0 system: 56% idle: 43% iowait: 0% irq: 0% 
-> >             cpu1 system: 4% idle: 95% iowait: 0% irq: 0%
-> > 
-> >   /* Hang around in the bootloader for a smaller amount of time. */
-> >     kernel: 12351 msecs
-> >     total: 12351 msecs
-> >     kernel: cpu0 system: 56% idle: 43% iowait: 0% irq: 0% 
-> >             cpu1 system: 2% idle: 97% iowait: 0% irq: 0%
-> >   
-> >   /* Instant boot. (1st run) */
-> >     kernel: 7833 msecs
-> >     total: 7833 msecs
-> >     kernel: cpu0 system: 55% idle: 44% iowait: 0% irq: 0% 
-> >             cpu1 system: 3% idle: 96% iowait: 0% irq: 0%
-> > 
-> >   /* Instant boot. (2nd run) */
-> >     kernel: 7817 msecs
-> >     total: 7817 msecs
-> >     kernel: cpu0 system: 53% idle: 46% iowait: 0% irq: 0% 
-> >             cpu1 system: 8% idle: 91% iowait: 0% irq: 0%
-> > 
-> >   /* Instant boot. (3rd run) */
-> >     kernel: 7747 msecs
-> >     total: 7747 msecs
-> >     kernel: cpu0 system: 56% idle: 42% iowait: 0% irq: 0% 
-> >             cpu1 system: 2% idle: 97% iowait: 0% irq: 0%
-> 7/8s? on a u9500 wow it's really slow
+>> Should the gpio driver fix its bindings then?.. Polarity is a quite
+>> generic concept of a GPIO, and flags are there for a reason. I'd rather
+>> prefer having
+>
+> There is no "GPIO driver" to fix; each GPIO driver has its own bindings,
+> and unfortunately, some of the GPIO binding authors chose not to include
+> any flags cell in the GPIO specifier (e.g. Samsung ARM SoCs IIRC, but
+> there are probably more).
 
-No, this is a u8500.
+So can I read this something like we have been too liberal with the
+GPIO DT bindings and they are now a bit messy and need to be shaped
+up? I don't know how to achieve that :-(
 
-> I do 2/3s here
+Alerting Grant to see if he has something to add on this subject...
 
-Really? You installed this quick.
-
-Are you sure you did it correctly?
-
-Don't forget, this times from power-on to userspace.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yours,
+Linus Walleij
