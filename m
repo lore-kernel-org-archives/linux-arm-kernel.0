@@ -1,156 +1,135 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 Nov 2012 18:20:06 +0100
-Subject: [PATCH 01/29] mv_xor: use dev_(err|info|notice) instead of dev_printk
+Date: Thu, 15 Nov 2012 18:20:09 +0100
+Subject: [PATCH 04/29] mv_xor: allow channels to be registered directly from
+ the main device
 In-Reply-To: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353000034-30567-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353000034-30567-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The usage of dev_printk() is deprecated, and the dev_err(), dev_info()
-and dev_notice() functions should be used instead.
+Extend the XOR engine driver (currently called "mv_xor_shared") so
+that XOR channels can be passed in the platform_data structure, and be
+registered from there.
+
+This will allow the users of the driver to be converted to the single
+platform_driver variant of the mv_xor driver.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor.c |   60 +++++++++++++++++++++++++-------------------------
- 1 file changed, 30 insertions(+), 30 deletions(-)
+ drivers/dma/mv_xor.c                     |   45 ++++++++++++++++++++++++++++++
+ drivers/dma/mv_xor.h                     |    8 ++++--
+ include/linux/platform_data/dma-mv_xor.h |    3 ++
+ 3 files changed, 53 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index e362e2b..610d0b8 100644
+index 312e611..3eaa0b2 100644
 --- a/drivers/dma/mv_xor.c
 +++ b/drivers/dma/mv_xor.c
-@@ -206,9 +206,9 @@ static void mv_set_mode(struct mv_xor_chan *chan,
- 		op_mode = XOR_OPERATION_MODE_MEMSET;
- 		break;
- 	default:
--		dev_printk(KERN_ERR, chan->device->common.dev,
--			   "error: unsupported operation %d.\n",
--			   type);
-+		dev_err(chan->device->common.dev,
-+			"error: unsupported operation %d.\n",
-+			type);
- 		BUG();
- 		return;
- 	}
-@@ -828,28 +828,28 @@ static void mv_dump_xor_regs(struct mv_xor_chan *chan)
- 	u32 val;
+@@ -1292,7 +1292,9 @@ static int mv_xor_shared_probe(struct platform_device *pdev)
+ {
+ 	const struct mbus_dram_target_info *dram;
+ 	struct mv_xor_shared_private *msp;
++	struct mv_xor_shared_platform_data *pdata = pdev->dev.platform_data;
+ 	struct resource *res;
++	int i, ret;
  
- 	val = __raw_readl(XOR_CONFIG(chan));
--	dev_printk(KERN_ERR, chan->device->common.dev,
--		   "config       0x%08x.\n", val);
-+	dev_err(chan->device->common.dev,
-+		"config       0x%08x.\n", val);
+ 	dev_notice(&pdev->dev, "Marvell shared XOR driver\n");
  
- 	val = __raw_readl(XOR_ACTIVATION(chan));
--	dev_printk(KERN_ERR, chan->device->common.dev,
--		   "activation   0x%08x.\n", val);
-+	dev_err(chan->device->common.dev,
-+		"activation   0x%08x.\n", val);
+@@ -1334,12 +1336,55 @@ static int mv_xor_shared_probe(struct platform_device *pdev)
+ 	if (!IS_ERR(msp->clk))
+ 		clk_prepare_enable(msp->clk);
  
- 	val = __raw_readl(XOR_INTR_CAUSE(chan));
--	dev_printk(KERN_ERR, chan->device->common.dev,
--		   "intr cause   0x%08x.\n", val);
-+	dev_err(chan->device->common.dev,
-+		"intr cause   0x%08x.\n", val);
- 
- 	val = __raw_readl(XOR_INTR_MASK(chan));
--	dev_printk(KERN_ERR, chan->device->common.dev,
--		   "intr mask    0x%08x.\n", val);
-+	dev_err(chan->device->common.dev,
-+		"intr mask    0x%08x.\n", val);
- 
- 	val = __raw_readl(XOR_ERROR_CAUSE(chan));
--	dev_printk(KERN_ERR, chan->device->common.dev,
--		   "error cause  0x%08x.\n", val);
-+	dev_err(chan->device->common.dev,
-+		"error cause  0x%08x.\n", val);
- 
- 	val = __raw_readl(XOR_ERROR_ADDR(chan));
--	dev_printk(KERN_ERR, chan->device->common.dev,
--		   "error addr   0x%08x.\n", val);
-+	dev_err(chan->device->common.dev,
-+		"error addr   0x%08x.\n", val);
++	if (pdata && pdata->channels) {
++		for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
++			struct mv_xor_platform_data *cd;
++			int irq;
++
++			cd = &pdata->channels[i];
++			if (!cd) {
++				ret = -ENODEV;
++				goto err_channel_add;
++			}
++
++			irq = platform_get_irq(pdev, i);
++			if (irq < 0) {
++				ret = irq;
++				goto err_channel_add;
++			}
++
++			msp->channels[i] =
++				mv_xor_channel_add(msp, pdev, cd->hw_id,
++						   cd->cap_mask,
++						   cd->pool_size, irq);
++			if (IS_ERR(msp->channels[i])) {
++				ret = PTR_ERR(msp->channels[i]);
++				goto err_channel_add;
++			}
++		}
++	}
++
+ 	return 0;
++
++err_channel_add:
++	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++)
++		if (msp->channels[i])
++			mv_xor_channel_remove(msp->channels[i]);
++
++	clk_disable_unprepare(msp->clk);
++	clk_put(msp->clk);
++	return ret;
  }
  
- static void mv_xor_err_interrupt_handler(struct mv_xor_chan *chan,
-@@ -861,9 +861,9 @@ static void mv_xor_err_interrupt_handler(struct mv_xor_chan *chan,
- 	     return;
- 	}
+ static int mv_xor_shared_remove(struct platform_device *pdev)
+ {
+ 	struct mv_xor_shared_private *msp = platform_get_drvdata(pdev);
++	int i;
++
++	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
++		if (msp->channels[i])
++			mv_xor_channel_remove(msp->channels[i]);
++	}
  
--	dev_printk(KERN_ERR, chan->device->common.dev,
--		   "error on chan %d. intr cause 0x%08x.\n",
--		   chan->idx, intr_cause);
-+	dev_err(chan->device->common.dev,
-+		"error on chan %d. intr cause 0x%08x.\n",
-+		chan->idx, intr_cause);
+ 	if (!IS_ERR(msp->clk)) {
+ 		clk_disable_unprepare(msp->clk);
+diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
+index a0641ae..686575f 100644
+--- a/drivers/dma/mv_xor.h
++++ b/drivers/dma/mv_xor.h
+@@ -26,6 +26,7 @@
+ #define USE_TIMER
+ #define MV_XOR_SLOT_SIZE		64
+ #define MV_XOR_THRESHOLD		1
++#define MV_XOR_MAX_CHANNELS             2
  
- 	mv_dump_xor_regs(chan);
- 	BUG();
-@@ -950,8 +950,8 @@ static int __devinit mv_xor_memcpy_self_test(struct mv_xor_device *device)
+ #define XOR_OPERATION_MODE_XOR		0
+ #define XOR_OPERATION_MODE_MEMCPY	2
+@@ -53,9 +54,10 @@
+ #define WINDOW_BAR_ENABLE(chan)	(0x240 + ((chan) << 2))
  
- 	if (mv_xor_status(dma_chan, cookie, NULL) !=
- 	    DMA_SUCCESS) {
--		dev_printk(KERN_ERR, dma_chan->device->dev,
--			   "Self-test copy timed out, disabling\n");
-+		dev_err(dma_chan->device->dev,
-+			"Self-test copy timed out, disabling\n");
- 		err = -ENODEV;
- 		goto free_resources;
- 	}
-@@ -960,8 +960,8 @@ static int __devinit mv_xor_memcpy_self_test(struct mv_xor_device *device)
- 	dma_sync_single_for_cpu(&mv_chan->device->pdev->dev, dest_dma,
- 				MV_XOR_TEST_SIZE, DMA_FROM_DEVICE);
- 	if (memcmp(src, dest, MV_XOR_TEST_SIZE)) {
--		dev_printk(KERN_ERR, dma_chan->device->dev,
--			   "Self-test copy failed compare, disabling\n");
-+		dev_err(dma_chan->device->dev,
-+			"Self-test copy failed compare, disabling\n");
- 		err = -ENODEV;
- 		goto free_resources;
- 	}
-@@ -1048,8 +1048,8 @@ mv_xor_xor_self_test(struct mv_xor_device *device)
+ struct mv_xor_shared_private {
+-	void __iomem	*xor_base;
+-	void __iomem	*xor_high_base;
+-	struct clk	*clk;
++	void __iomem	     *xor_base;
++	void __iomem	     *xor_high_base;
++	struct clk	     *clk;
++	struct mv_xor_device *channels[MV_XOR_MAX_CHANNELS];
+ };
  
- 	if (mv_xor_status(dma_chan, cookie, NULL) !=
- 	    DMA_SUCCESS) {
--		dev_printk(KERN_ERR, dma_chan->device->dev,
--			   "Self-test xor timed out, disabling\n");
-+		dev_err(dma_chan->device->dev,
-+			"Self-test xor timed out, disabling\n");
- 		err = -ENODEV;
- 		goto free_resources;
- 	}
-@@ -1060,10 +1060,10 @@ mv_xor_xor_self_test(struct mv_xor_device *device)
- 	for (i = 0; i < (PAGE_SIZE / sizeof(u32)); i++) {
- 		u32 *ptr = page_address(dest);
- 		if (ptr[i] != cmp_word) {
--			dev_printk(KERN_ERR, dma_chan->device->dev,
--				   "Self-test xor failed compare, disabling."
--				   " index %d, data %x, expected %x\n", i,
--				   ptr[i], cmp_word);
-+			dev_err(dma_chan->device->dev,
-+				"Self-test xor failed compare, disabling."
-+				" index %d, data %x, expected %x\n", i,
-+				ptr[i], cmp_word);
- 			err = -ENODEV;
- 			goto free_resources;
- 		}
-@@ -1212,7 +1212,7 @@ static int __devinit mv_xor_probe(struct platform_device *pdev)
- 			goto err_free_dma;
- 	}
  
--	dev_printk(KERN_INFO, &pdev->dev, "Marvell XOR: "
-+	dev_info(&pdev->dev, "Marvell XOR: "
- 	  "( %s%s%s%s)\n",
- 	  dma_has_cap(DMA_XOR, dma_dev->cap_mask) ? "xor " : "",
- 	  dma_has_cap(DMA_MEMSET, dma_dev->cap_mask)  ? "fill " : "",
-@@ -1275,7 +1275,7 @@ static int mv_xor_shared_probe(struct platform_device *pdev)
- 	struct mv_xor_shared_private *msp;
- 	struct resource *res;
+diff --git a/include/linux/platform_data/dma-mv_xor.h b/include/linux/platform_data/dma-mv_xor.h
+index 2ba1f7d..f2aed97 100644
+--- a/include/linux/platform_data/dma-mv_xor.h
++++ b/include/linux/platform_data/dma-mv_xor.h
+@@ -20,5 +20,8 @@ struct mv_xor_platform_data {
+ 	size_t				pool_size;
+ };
  
--	dev_printk(KERN_NOTICE, &pdev->dev, "Marvell shared XOR driver\n");
-+	dev_notice(&pdev->dev, "Marvell shared XOR driver\n");
++struct mv_xor_shared_platform_data {
++	struct mv_xor_platform_data    *channels;
++};
  
- 	msp = devm_kzalloc(&pdev->dev, sizeof(*msp), GFP_KERNEL);
- 	if (!msp)
+ #endif
 -- 
 1.7.9.5
