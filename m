@@ -1,43 +1,52 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 15 Nov 2012 11:18:20 +0100
-Subject: Fwd: [PATCH 1/7] I2c-nomadik: Fix the usage of
- wait_for_completion_timeout
-In-Reply-To: <20121115095741.GA6280@bnru10>
-References: <1352222317.15558.1584.camel@cliu38-desktop-build>
- <CACRpkdYekQF5111NSNSPeaHdxgS_gpXkCjqT1n-n1_iAdDXbSg@mail.gmail.com>
- <20121115084858.GA29668@bnru10>
- <20121115092953.GA418@pengutronix.de>
- <20121115095741.GA6280@bnru10>
-Message-ID: <20121115101820.GC418@pengutronix.de>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Thu, 15 Nov 2012 11:25:25 +0100
+Subject: [PATCH 6/6] usb: chipidea: usbmisc: add post handling and
+ errata fix for mx25
+In-Reply-To: <CALBypN6U=np93ZwnEZqbh=j0Vb_-x630GaktEiv+4K26eYp4Pg@mail.gmail.com>
+References: <1352894137-2050-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352894137-2050-7-git-send-email-m.grzeschik@pengutronix.de>
+ <CALBypN6U=np93ZwnEZqbh=j0Vb_-x630GaktEiv+4K26eYp4Pg@mail.gmail.com>
+Message-ID: <20121115102525.GA16118@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 03:27:42PM +0530, Srinidhi Kasagar wrote:
-> On Thu, Nov 15, 2012 at 10:29:53 +0100, Wolfram Sang wrote:
-> > 
-> > > > -       if (timeout < 0) {
-> > > > -               dev_err(&dev->adev->dev,
-> > > > -                       "wait_for_completion_timeout "
-> > > > -                       "returned %d waiting for event\n", timeout);
-> > > > -               status = timeout;
-> > > > -       }
-> > > > -
-> > > No, it is wrong. You need to update the status variable in the case of timeout.
-> > 
-> > Looking at the patch context, such code comes later.
-> But it causes regressions; without looking at the "later" code, we can't afford merging
-> this code now.
+On Thu, Nov 15, 2012 at 11:08:15AM +0100, Martin Fuzzey wrote:
+> On Wed, Nov 14, 2012 at 12:55 PM, Michael Grzeschik
+> <m.grzeschik@pengutronix.de> wrote:
+> > @@ -213,6 +216,15 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+> >                 goto put_np;
+> >         }
+> >
+> > +       if (usbmisc_ops && usbmisc_ops->post) {
+> > +               ret = usbmisc_ops->post(&pdev->dev);
+> > +               if (ret) {
+> > +                       dev_err(&pdev->dev,
+> > +                               "usbmisc post failed, ret=%d\n", ret);
+> > +                       goto err;
+> > +               }
+> > +       }
+> > +
+> >         data->ci_pdev = plat_ci;
+> >         platform_set_drvdata(pdev, data);
+> >
+> This hunk fails to apply for me on 3.7-rc5:
+> error: while searching for:
+> 		goto put_np;
+> 	}
 
-Later as in "a few lines later" not "some time later". Or am I missing
-something else?
+This is because that series is based on Peter Chen's work. I should have
+mentioned this in the cover-letter mail. You can merge his master branch
+before adding my series:
+https://github.com/hzpeterchen/linux-usb.git
+
+Apart from the latter patches, his work already got queued up by Greg:
+http://comments.gmane.org/gmane.linux.usb.general/74537
+
+Thanks,
+Michael
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121115/24943c8e/attachment.sig>
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
