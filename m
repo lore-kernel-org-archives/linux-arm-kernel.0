@@ -1,133 +1,173 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 15 Nov 2012 23:46:24 +0100
-Subject: [PATCH 5/6] ARM: sunxi: Add device tree for the A13 and the Olinuxino
- board
+Date: Thu, 15 Nov 2012 23:46:22 +0100
+Subject: [PATCH 3/6] ARM: sunxi: Add basic support for Allwinner A1x SoCs
 In-Reply-To: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1353019586-21043-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1353019586-21043-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/Makefile            |    1 +
- arch/arm/boot/dts/sun5i-olinuxino.dts |   30 +++++++++++++++++
- arch/arm/boot/dts/sun5i.dtsi          |   58 +++++++++++++++++++++++++++++++++
- 3 files changed, 89 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun5i-olinuxino.dts
- create mode 100644 arch/arm/boot/dts/sun5i.dtsi
+ arch/arm/Kconfig                  |    2 ++
+ arch/arm/Makefile                 |    1 +
+ arch/arm/mach-sunxi/Kconfig       |    9 ++++++
+ arch/arm/mach-sunxi/Makefile      |    1 +
+ arch/arm/mach-sunxi/Makefile.boot |    1 +
+ arch/arm/mach-sunxi/sunxi.c       |   60 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-sunxi/sunxi.h       |   20 +++++++++++++
+ 7 files changed, 94 insertions(+)
+ create mode 100644 arch/arm/mach-sunxi/Kconfig
+ create mode 100644 arch/arm/mach-sunxi/Makefile
+ create mode 100644 arch/arm/mach-sunxi/Makefile.boot
+ create mode 100644 arch/arm/mach-sunxi/sunxi.c
+ create mode 100644 arch/arm/mach-sunxi/sunxi.h
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f37cf9f..9b2d3f0 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -84,6 +84,7 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
- 	spear310-evb.dtb \
- 	spear320-evb.dtb
- dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun5i-olinuxino.dtb
- dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
- 	tegra20-medcom-wide.dtb \
- 	tegra20-paz00.dtb \
-diff --git a/arch/arm/boot/dts/sun5i-olinuxino.dts b/arch/arm/boot/dts/sun5i-olinuxino.dts
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ade7e92..1abb573 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1113,6 +1113,8 @@ source "arch/arm/mach-exynos/Kconfig"
+ 
+ source "arch/arm/mach-shmobile/Kconfig"
+ 
++source "arch/arm/mach-sunxi/Kconfig"
++
+ source "arch/arm/mach-prima2/Kconfig"
+ 
+ source "arch/arm/mach-tegra/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 5f914fc..363320a 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -193,6 +193,7 @@ machine-$(CONFIG_ARCH_SPEAR13XX)	+= spear13xx
+ machine-$(CONFIG_ARCH_SPEAR3XX)		+= spear3xx
+ machine-$(CONFIG_MACH_SPEAR600)		+= spear6xx
+ machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
++machine-$(CONFIG_ARCH_SUNXI)		+= sunxi
+ 
+ # Platform directory name.  This list is sorted alphanumerically
+ # by CONFIG_* macro name.
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
 new file mode 100644
-index 0000000..add1e60
+index 0000000..3fdd008
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun5i-olinuxino.dts
-@@ -0,0 +1,30 @@
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -0,0 +1,9 @@
++config ARCH_SUNXI
++	bool "Allwinner A1X SOCs" if ARCH_MULTI_V7
++	select CLKSRC_MMIO
++	select COMMON_CLK
++	select GENERIC_CLOCKEVENTS
++	select GENERIC_IRQ_CHIP
++	select PINCTRL
++	select SPARSE_IRQ
++	select SUNXI_TIMER
+diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
+new file mode 100644
+index 0000000..93bebfc
+--- /dev/null
++++ b/arch/arm/mach-sunxi/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
+diff --git a/arch/arm/mach-sunxi/Makefile.boot b/arch/arm/mach-sunxi/Makefile.boot
+new file mode 100644
+index 0000000..46d4cf0
+--- /dev/null
++++ b/arch/arm/mach-sunxi/Makefile.boot
+@@ -0,0 +1 @@
++zreladdr-$(CONFIG_ARCH_SUNXI)	+= 0x40008000
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+new file mode 100644
+index 0000000..8f42df8
+--- /dev/null
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -0,0 +1,60 @@
 +/*
-+ * Copyright 2012 Maxime Ripard
++ * Device Tree support for Allwinner A1X SoCs
++ *
++ * Copyright (C) 2012 Maxime Ripard
 + *
 + * Maxime Ripard <maxime.ripard@free-electrons.com>
 + *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
 +
-+/dts-v1/;
-+/include/ "sun5i.dtsi"
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <linux/io.h>
++#include <linux/sunxi_timer.h>
 +
-+/ {
-+	model = "Olimex A13-Olinuxino";
-+	compatible = "olimex,a13-olinuxino", "allwinner,sun5i";
++#include <linux/irqchip/sunxi.h>
 +
-+	memory {
-+		reg = <0x40000000 0x40000000>;
-+	};
++#include <asm/hardware/vic.h>
 +
-+	soc {
-+		duart: uart at 01c28400 {
-+			status = "okay";
-+		};
-+	};
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++
++#include "sunxi.h"
++
++static struct map_desc sunxi_io_desc[] __initdata = {
++	{
++		.virtual	= (unsigned long) SUNXI_REGS_VIRT_BASE,
++		.pfn		= __phys_to_pfn(SUNXI_REGS_PHYS_BASE),
++		.length		= SUNXI_REGS_SIZE,
++		.type		= MT_DEVICE,
++	},
 +};
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
++
++void __init sunxi_map_io(void)
++{
++	iotable_init(sunxi_io_desc, ARRAY_SIZE(sunxi_io_desc));
++}
++
++static void __init sunxi_dt_init(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++static const char * const sunxi_board_dt_compat[] = {
++	"allwinner,sun5i",
++	NULL,
++};
++
++DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
++	.init_machine	= sunxi_dt_init,
++	.map_io		= sunxi_map_io,
++	.init_irq	= sunxi_init_irq,
++	.handle_irq	= sunxi_handle_irq,
++	.timer		= &sunxi_timer,
++	.dt_compat	= sunxi_board_dt_compat,
++MACHINE_END
+diff --git a/arch/arm/mach-sunxi/sunxi.h b/arch/arm/mach-sunxi/sunxi.h
 new file mode 100644
-index 0000000..5797323
+index 0000000..33b5871
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -0,0 +1,58 @@
++++ b/arch/arm/mach-sunxi/sunxi.h
+@@ -0,0 +1,20 @@
 +/*
-+ * Copyright 2012 Maxime Ripard
++ * Generic definitions for Allwinner SunXi SoCs
++ *
++ * Copyright (C) 2012 Maxime Ripard
 + *
 + * Maxime Ripard <maxime.ripard@free-electrons.com>
 + *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
 +
-+/include/ "skeleton.dtsi"
++#ifndef __MACH_SUNXI_H
++#define __MACH_SUNXI_H
 +
-+/ {
-+	interrupt-parent = <&intc>;
++#define SUNXI_REGS_PHYS_BASE	0x01c00000
++#define SUNXI_REGS_VIRT_BASE	IOMEM(0xf1c00000)
++#define SUNXI_REGS_SIZE		(SZ_2M + SZ_1M)
 +
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,cortex-a8";
-+		};
-+	};
-+
-+	chosen {
-+		bootargs = "earlyprintk console=ttyS0,115200";
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x01c20000 0x300000>;
-+		ranges;
-+
-+		timer at 01c20c00 {
-+			compatible = "allwinner,sunxi-timer";
-+			reg = <0x01c20c00 0x400>;
-+			interrupts = <22>;
-+		};
-+
-+		intc: interrupt-controller at 01c20400 {
-+			compatible = "allwinner,sunxi-ic";
-+			reg = <0x01c20400 0x400>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		uart1: uart at 01c28400 {
-+			compatible = "ns8250";
-+			reg = <0x01c28400 0x400>;
-+			interrupts = <2>;
-+			reg-shift = <2>;
-+			clock-frequency = <24000000>;
-+			status = "disabled";
-+		};
-+	};
-+};
++#endif /* __MACH_SUNXI_H */
 -- 
 1.7.9.5
