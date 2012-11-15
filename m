@@ -1,60 +1,30 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 15 Nov 2012 13:44:04 -0600
-Subject: [PATCH] ARM: OMAP2+: Fix compiler warning for 32k timer
-Message-ID: <1353008644-24745-1-git-send-email-jon-hunter@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 15 Nov 2012 12:07:27 -0800
+Subject: common clk fixes for 3.7-rc6, part 2
+Message-ID: <20121115200727.7155.72698@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit "ARM: OMAP2+: Add device-tree support for 32kHz counter"
-added structure omap_counter_match to the OMAP2 timer code. When
-CONFIG_OMAP_32K_TIMER is not defined this structure generates the
-following as it is not used.
+The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
 
-  CC      arch/arm/mach-omap2/timer.o
-  arch/arm/mach-omap2/timer.c:163:28: warning: 'omap_counter_match'
-  defined but not used [-Wunused-variable]
+  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
 
-Move the definition of omap_counter_match to avoid this warning when
-CONFIG_OMAP_32K_TIMER is not set.
+are available in the git repository at:
 
-Thanks to Kevin Hilman for tracking down and reporting this problem.
+  git://git.linaro.org/people/mturquette/linux.git tags/clk-fixes-for-linus
 
-Reported-by: Kevin Hilam <khilman@deeprootsystems.com>
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
+for you to fetch changes up to 93532c8a4890871aa0d84dd91b80dad9f58542e0:
 
-This is based upon Tony Lindgren's OMAP master branch.
+  clk: remove inline usage from clk-provider.h (2012-11-15 11:38:34 -0800)
 
- arch/arm/mach-omap2/timer.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+----------------------------------------------------------------
+GCC 4.7 users get compilation errors from unnecessary use of inline in
+clk-provider.h.  This pull request fixes the regression by removing inline
+usage from those function declarations.
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 099e406..2b9d485 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -160,11 +160,6 @@ static struct of_device_id omap_timer_match[] __initdata = {
- 	{ }
- };
- 
--static struct of_device_id omap_counter_match[] __initdata = {
--	{ .compatible = "ti,omap-counter32k", },
--	{ }
--};
--
- /**
-  * omap_get_timer_dt - get a timer using device-tree
-  * @match	- device-tree match structure for matching a device type
-@@ -408,6 +403,11 @@ static u32 notrace dmtimer_read_sched_clock(void)
- }
- 
- #ifdef CONFIG_OMAP_32K_TIMER
-+static struct of_device_id omap_counter_match[] __initdata = {
-+	{ .compatible = "ti,omap-counter32k", },
-+	{ }
-+};
-+
- /* Setup free-running counter for clocksource */
- static int __init omap2_sync32k_clocksource_init(void)
- {
--- 
-1.7.9.5
+----------------------------------------------------------------
+Igor Mazanov (1):
+      clk: remove inline usage from clk-provider.h
+
+ include/linux/clk-provider.h |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
