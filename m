@@ -1,33 +1,25 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 Nov 2012 08:35:11 +0100
-Subject: [PATCH 1/4] pinctrl: dove: Prevent NULL dereference if
- of_match_device returns NULL
-In-Reply-To: <1352955096.6793.1.camel@phoenix>
-References: <1352955096.6793.1.camel@phoenix>
-Message-ID: <20121115083511.08f5a16f@skate>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 15 Nov 2012 02:42:13 -0500 (EST)
+Subject: [PATCH v7] Network driver for the Armada 370 and Armada XP ARM
+ Marvell SoCs
+In-Reply-To: <20121115083319.76483256@skate>
+References: <1352905010-24172-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121114.215922.1242337385782766449.davem@davemloft.net>
+ <20121115083319.76483256@skate>
+Message-ID: <20121115.024213.1356436436054345008.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Axel Lin,
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Date: Thu, 15 Nov 2012 08:33:19 +0100
 
-On Thu, 15 Nov 2012 12:51:36 +0800, Axel Lin wrote:
-> of_match_device() may return NULL.
-> 
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+> Would you mind if we take, with your Ack, the network driver through
+> the arm-soc tree, so that we can carry the related patches modifying
+> the Device Tree and so on? If not, then I'll send you a pull request
+> with just the drivers/net changes, and we'll integrate the ARM-related
+> changes through the arm-soc tree, in which we will have the necessary
+> dependencies. I'm fine with any of those solutions.
 
-Could you detail under what conditions of_match_device() may return
-NULL in the specific case of this driver? This of_match_device() call
-is using the same dove_pinctrl_of_match array that is used to ->probe()
-this driver. So I don't see how you can get into ->probe() without
-having a matching entry.
+Sure, no problem, take it via the ARM tree:
 
-Am I missing something?
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Acked-by: David S. Miller <davem@davemloft.net>
