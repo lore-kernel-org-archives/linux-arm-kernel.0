@@ -1,53 +1,84 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Nov 2012 13:14:48 +0000
-Subject: [PATCH 2/2] ARM: ux500: Move board specific GPIO info out to
- subordinate DTS files
-In-Reply-To: <1352985288-29518-1-git-send-email-lee.jones@linaro.org>
-References: <1352985288-29518-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1352985288-29518-2-git-send-email-lee.jones@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 15 Nov 2012 13:19:26 +0000
+Subject: [PATCH 1/1] mtd: physmap_of: allow to specify the mtd name for
+ retro compatiblity
+In-Reply-To: <1352062641-31850-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1352062641-31850-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20121115131926.47F853E0B12@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO numbers for the newly created gpio-regulator will differ from
-board to board. Therefore it's not sensible to leave this information
-in the top level DTSI file. Let's move them out to the DTS files
-where they can correctly vary.
+On Sun,  4 Nov 2012 21:57:21 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> linux,mtd-name allow to specify the mtd name for retro capability with
+> physmap-flash drivers as boot loader pass the mtd partition via the old
+> device name physmap-flash.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/dbx5x0.dtsi    |    2 --
- arch/arm/boot/dts/hrefprev60.dts |    7 +++++++
- 2 files changed, 7 insertions(+), 2 deletions(-)
+Ummm. I don't follow. Could you explain more about how this change will
+be used?
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index d8ba489..9f55363 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -638,8 +638,6 @@
- 			regulator-name = "mmci-reg";
- 			regulator-type = "voltage";
- 
--			gpios = <&tc3589x_gpio 18 0x4>;
--			gpio-enable = <&tc3589x_gpio 17 0x4>;
- 			states = <1800000 0x1
- 				  2900000 0x0>;
- 
-diff --git a/arch/arm/boot/dts/hrefprev60.dts b/arch/arm/boot/dts/hrefprev60.dts
-index b398946..eec29c4 100644
---- a/arch/arm/boot/dts/hrefprev60.dts
-+++ b/arch/arm/boot/dts/hrefprev60.dts
-@@ -37,5 +37,12 @@
- 				reset-gpio = <&tc3589x_gpio 13 0x4>;
- 			};
- 		};
-+
-+		vmmci: regulator-gpio {
-+			gpios = <&tc3589x_gpio 18 0x4>;
-+			gpio-enable = <&tc3589x_gpio 17 0x4>;
-+
-+			status = "okay";
-+		};
- 	};
- };
+Thanks,
+g.
+
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> ---
+>  Documentation/devicetree/bindings/mtd/mtd-physmap.txt |    3 +++
+>  drivers/mtd/maps/physmap_of.c                         |    5 ++++-
+>  2 files changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+> index 94de19b..dab7847 100644
+> --- a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+> +++ b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+> @@ -23,6 +23,9 @@ file systems on embedded devices.
+>     unaligned accesses as implemented in the JFFS2 code via memcpy().
+>     By defining "no-unaligned-direct-access", the flash will not be
+>     exposed directly to the MTD users (e.g. JFFS2) any more.
+> + - linux,mtd-name: allow to specify the mtd name for retro capability with
+> +   physmap-flash drivers as boot loader pass the mtd partition via the old
+> +   device name physmap-flash.
+>  
+>  For JEDEC compatible devices, the following additional properties
+>  are defined:
+> diff --git a/drivers/mtd/maps/physmap_of.c b/drivers/mtd/maps/physmap_of.c
+> index 6f19aca..9a8db0c 100644
+> --- a/drivers/mtd/maps/physmap_of.c
+> +++ b/drivers/mtd/maps/physmap_of.c
+> @@ -170,6 +170,7 @@ static int __devinit of_flash_probe(struct platform_device *dev)
+>  	resource_size_t res_size;
+>  	struct mtd_part_parser_data ppdata;
+>  	bool map_indirect;
+> +	const char *mtd_name;
+>  
+>  	match = of_match_device(of_flash_match, &dev->dev);
+>  	if (!match)
+> @@ -178,6 +179,8 @@ static int __devinit of_flash_probe(struct platform_device *dev)
+>  
+>  	reg_tuple_size = (of_n_addr_cells(dp) + of_n_size_cells(dp)) * sizeof(u32);
+>  
+> +	of_property_read_string(dp, "linux,mtd-name", &mtd_name);
+> +
+>  	/*
+>  	 * Get number of "reg" tuples. Scan for MTD devices on area's
+>  	 * described by each "reg" region. This makes it possible (including
+> @@ -234,7 +237,7 @@ static int __devinit of_flash_probe(struct platform_device *dev)
+>  			goto err_out;
+>  		}
+>  
+> -		info->list[i].map.name = dev_name(&dev->dev);
+> +		info->list[i].map.name = mtd_name ? mtd_name : dev_name(&dev->dev);
+>  		info->list[i].map.phys = res.start;
+>  		info->list[i].map.size = res_size;
+>  		info->list[i].map.bankwidth = be32_to_cpup(width);
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-1.7.9.5
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
