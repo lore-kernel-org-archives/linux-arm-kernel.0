@@ -1,96 +1,72 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 15 Nov 2012 11:57:52 +0100
-Subject: [PATCH 0/2] Boottime: measure bootloader and kernel bootup time
-In-Reply-To: <20121115103528.GA21682@gmail.com>
-References: <1352973847-21605-1-git-send-email-lee.jones@linaro.org>
- <20121115101508.GB4398@game.jcrosoft.org>
- <20121115103528.GA21682@gmail.com>
-Message-ID: <20121115105752.GC4398@game.jcrosoft.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 15 Nov 2012 11:01:37 +0000
+Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
+In-Reply-To: <50A43D58.5030404@gmail.com>
+References: <20121114185335.GU6801@atomide.com> <50A3EBCD.3040801@ti.com>
+ <20121114202244.GE3332@n2100.arm.linux.org.uk>
+ <20121114203221.GA6801@atomide.com> <50A413D4.7000405@gmail.com>
+ <20121114222159.GB6801@atomide.com> <50A43D58.5030404@gmail.com>
+Message-ID: <20121115110137.GA25985@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:35 Thu 15 Nov     , Lee Jones wrote:
-> On Thu, 15 Nov 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+On Thu, Nov 15, 2012 at 12:54:48AM +0000, Rob Herring wrote:
+> On 11/14/2012 04:21 PM, Tony Lindgren wrote:
+> > * Rob Herring <robherring2@gmail.com> [121114 13:59]:
+> >> On 11/14/2012 02:32 PM, Tony Lindgren wrote:
+> >>>
+> >>> Checking for the bit already set should work in this case, I'll post
+> >>> a patch for that shortly.
+> >>
+> >> Can you actually read the state of the diagnostic register in non-secure
+> >> mode? If you can on the A9, is the same true on A8 or others?
+> > 
+> > Looks like it can be read on at least TI omap 4430 which is A9.
+> > But it reads as zero, so the below patch is what I came up with.
+> > 
+> > No idea if assuming that zero value for the diagnostic register
+> > is safe.. What's the default value of the diagnostic register supposed
+> > to be?
 > 
-> > On 10:04 Thu 15 Nov     , Lee Jones wrote:
-> > > This patchset supplies a new tool which measures boottime inclusive
-> > > of bootloader involvement. It seems to be accurate and adds no
-> > > latency to the booting of the system.
-> > > 
-> > > In the first round of testing we booted the kernel 3 times each with
-> > > boottime enabled and disabled. Actually, when it was disabled, the
-> > > code was completely removed from the kernel source and the kernel was
-> > > rebuilt. The difference between present & enabled and completely
-> > > removed was very little indeed. In fact, averaging out the 3 runs of
-> > > each, when boottime was enabled the system booted 4ms _faster_, go
-> > > figure!
-> > > 
-> > >              Enabled    Disabled
-> > >   1st run    2.983093   2.985168
-> > >   2nd run    2.973266   2.971801
-> > >   3rd run    2.975402   2.987304
-> > >   Average    2.977254   2.981424   -0.004171 (-4ms)
-> > > 
-> > > 
-> > > For the next round of testing, we delayed the bootloader for varying
-> > > amounts of time, then started to remove key components from kernel
-> > > functionality to see if the boottime system would pick-up on them.
-> > > 
-> > >   /* Hang around in the bootloader for a while. */
-> > >   $ cat /sys/kernel/debug/boottime/summary 
-> > >     kernel: 42864 msecs
-> > >     total: 42864 msecs
-> > >     kernel: cpu0 system: 56% idle: 43% iowait: 0% irq: 0% 
-> > >             cpu1 system: 4% idle: 95% iowait: 0% irq: 0%
-> > > 
-> > >   /* Hang around in the bootloader for a smaller amount of time. */
-> > >     kernel: 12351 msecs
-> > >     total: 12351 msecs
-> > >     kernel: cpu0 system: 56% idle: 43% iowait: 0% irq: 0% 
-> > >             cpu1 system: 2% idle: 97% iowait: 0% irq: 0%
-> > >   
-> > >   /* Instant boot. (1st run) */
-> > >     kernel: 7833 msecs
-> > >     total: 7833 msecs
-> > >     kernel: cpu0 system: 55% idle: 44% iowait: 0% irq: 0% 
-> > >             cpu1 system: 3% idle: 96% iowait: 0% irq: 0%
-> > > 
-> > >   /* Instant boot. (2nd run) */
-> > >     kernel: 7817 msecs
-> > >     total: 7817 msecs
-> > >     kernel: cpu0 system: 53% idle: 46% iowait: 0% irq: 0% 
-> > >             cpu1 system: 8% idle: 91% iowait: 0% irq: 0%
-> > > 
-> > >   /* Instant boot. (3rd run) */
-> > >     kernel: 7747 msecs
-> > >     total: 7747 msecs
-> > >     kernel: cpu0 system: 56% idle: 42% iowait: 0% irq: 0% 
-> > >             cpu1 system: 2% idle: 97% iowait: 0% irq: 0%
-> > 7/8s? on a u9500 wow it's really slow
+> RTFM. Oh, wait it's a super secret, undocumented register. We shouldn't
+> even be talking about it.
 > 
-> No, this is a u8500.
+> It could vary by rev, but I see 0 for the reset value, so this would not
+> work if the bootloader did not do any setup of the diagnostic register.
 > 
-> > I do 2/3s here
+> One way to determine secure mode on the A9 would be seeing if you can
+> change the auxcr register. Something like this (untested):
 > 
-> Really? You installed this quick.
-> 
-> Are you sure you did it correctly?
-yes we spend less than 2s (~ 1.5s) in the bootloader
+> mrc	p15, 0, r0, c1, c0, 1; Read ACTLR
+> eor	r1, r0, #0x100		; Modify alloc in 1 way
+> mcr	p15, 0, r1, c1, c0, 1
+> mrc	p15, 0, r2, c1, c0, 1; Read ACTLR
+> mcr	p15, 0, r0, c1, c0, 1	; Restore original value
+> cmp	r1, r2
+> bne	skip_errata
 
-I measure it via scope
-> 
-> Don't forget, this times from power-on to userspace.
-yes
+This would fail on platforms where Linux runs in non-secure mode. What
+we do for some errata workarounds is to test whether the bit was already
+set and avoid writing the register. But this assumes that, for a given
+workaround in the kernel, there is a corresponding workaround in the
+code running before the kernel (boot-loader, firmware) which sets that
+bit.
 
-to the shell prompt
+Since the kernel will run more often in non-secure mode (on Cortex-A15
+you need this for the virtualisation extensions) I strongly suggest that
+the workaround (usually undocumented bit setting) is done before the
+kernel is started and we simply remove it from Linux (or add a clear
+comment that it only works if running in secure mode; if unsure say
+'N').
 
-and gexbox 13s IIRC application
+I don't think it's worth the hassle detecting whether the kernel runs in
+secure or non-secure mode, just assume the latter and get SoC vendors to
+update the boot loaders or firmware (if possible) with any errata
+workarounds.
 
-Best Regards,
-J.
-> 
-> -- 
-> Lee Jones
-> Linaro ST-Ericsson Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+Having a common SMC API for errata workarounds is not feasible since not
+all registers are public, most are implementation specific and it could
+have secure implications with exposing them.
+
+-- 
+Catalin
