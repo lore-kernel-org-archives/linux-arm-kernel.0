@@ -1,78 +1,95 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 15 Nov 2012 09:23:24 +0100
-Subject: [PATCH RESEND 3/4] pinctrl: at91: Prevent NULL dereference if
- of_match_device returns NULL
-In-Reply-To: <1352955480.6793.8.camel@phoenix>
-References: <1352955096.6793.1.camel@phoenix>
- <1352955266.6793.4.camel@phoenix> <1352955480.6793.8.camel@phoenix>
-Message-ID: <50A4A67C.2040306@atmel.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 15 Nov 2012 16:27:19 +0800
+Subject: [PATCH v4 5/9] document: devicetree: bind pinconf with pin-single
+In-Reply-To: <50A15E0C.2010903@wwwdotorg.org>
+References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
+ <1352301582-12244-6-git-send-email-haojian.zhuang@gmail.com>
+ <50A15E0C.2010903@wwwdotorg.org>
+Message-ID: <CAN1soZw8Nx7EyNb1FDtwRkA+o8hokQRv_bEQ1W04+rnNMnozHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2012 05:58 AM, Axel Lin :
-> of_match_device() may return NULL.
-> 
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+On Tue, Nov 13, 2012 at 4:37 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 11/07/2012 08:19 AM, Haojian Zhuang wrote:
+>> Add comments with pinconf & gpio range in the document of
+>> pinctrl-single.
+>
+>> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+>
+>>  Required properties:
+>> -- compatible : "pinctrl-single"
+>> +- compatible : "pinctrl-single" or "pinconf-single".
+>> +  "pinctrl-single" means that pinconf isn't supported.
+>> +  "pinconf-single" means that generic pinconf is supported.
+>>
+>>  - reg : offset and length of the register set for the mux registers
+>>
+>> @@ -14,9 +16,33 @@ Optional properties:
+>>  - pinctrl-single,function-off : function off mode for disabled state if
+>>    available and same for all registers; if not specified, disabling of
+>>    pin functions is ignored
+>> +
+>>  - pinctrl-single,bit-per-mux : boolean to indicate that one register controls
+>>    more than one pin
+>>
+>> +- pinctrl-single,power-source-mask : mask of setting power source in
+>> +  the pinmux register
+>> +
+>> +- pinctrl-single,power-source : value of setting power source field
+>> +  in the pinmux register
+>
+> Isn't power-source an enumeration? As such, shouldn't the pinctrl state
+> definition supply the value, rather than the pin controller definition?
+>
+> The above two properties imply to me that you're saying "these bits
+> (power-source-mask) in any pin register must be set to this one value
+> (power-source)". However, I think you want to say "these bits
+> (power-source-mask) are used to configure the power source", and then
+> allow the state nodes (what's reference from pinctrl client devices'
+> pinctrl-n properties) to define the value.
 
-Seems sensible,
+Got it.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+> Perhaps that's your intent already, but if so, the properties for the
+> two different nodes should be documented separately, not all interleaved
+> in a single list, without any indication of which node they get put into.
+>
+>> +- pinctrl-single,bias-mask : mask of setting bias value in the pinmux
+>> +  register
+>> +
+>> +- pinctrl-single,bias-disable : value of disabling bias in the pinmux
+>> +  register
+>> +
+>> +- pinctrl-single,bias-pull-down : value of setting bias pull down in
+>> +  the pinmux register
+>> +
+>> +- pinctrl-single,bias-pull-up : value of setting bias pull up in the
+>> +  pinmux register
+>> +
+>> +- pinctrl-single,bias : value of setting bias in the pinmux register
+>
+> If there are bias-disable, bias-pull-down, and bias-pull-up properties,
+> what is the plain "bias" property for?
+>
+Sure. I'll use input bias to explain it.
 
-> ---
-> This resend CC Jean-Christophe.
-> 
->  drivers/pinctrl/pinctrl-at91.c |   17 +++++++++++++----
->  1 file changed, 13 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index 8490a55..32006c8 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -829,13 +829,18 @@ static int __devinit at91_pinctrl_probe_dt(struct platform_device *pdev,
->  	uint32_t *tmp;
->  	struct device_node *np = pdev->dev.of_node;
->  	struct device_node *child;
-> +	const struct of_device_id *match;
->  
->  	if (!np)
->  		return -ENODEV;
->  
-> +	match = of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
-> +	if (!match)
-> +		return -ENODEV;
-> +
->  	info->dev = &pdev->dev;
-> -	info->ops = (struct at91_pinctrl_mux_ops*)
-> -		of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
-> +	info->ops = (struct at91_pinctrl_mux_ops *) match->data;
-> +
->  	at91_pinctrl_child_count(info, np);
->  
->  	if (info->nbanks < 1) {
-> @@ -1359,6 +1364,7 @@ static struct of_device_id at91_gpio_of_match[] __devinitdata = {
->  static int __devinit at91_gpio_probe(struct platform_device *pdev)
->  {
->  	struct device_node *np = pdev->dev.of_node;
-> +	const struct of_device_id *match;
->  	struct resource *res;
->  	struct at91_gpio_chip *at91_chip = NULL;
->  	struct gpio_chip *chip;
-> @@ -1399,8 +1405,11 @@ static int __devinit at91_gpio_probe(struct platform_device *pdev)
->  		goto err;
->  	}
->  
-> -	at91_chip->ops = (struct at91_pinctrl_mux_ops*)
-> -		of_match_device(at91_gpio_of_match, &pdev->dev)->data;
-> +	match = of_match_device(at91_gpio_of_match, &pdev->dev);
-> +	if (!match)
-> +		return -ENODEV;
-> +
-> +	at91_chip->ops = (struct at91_pinctrl_mux_ops *) match->data;
->  	at91_chip->pioc_virq = irq;
->  	at91_chip->pioc_idx = alias_idx;
->  
-> 
+>> +- pinctrl-single,input-schmitt-mask : mask of setting input schmitt
+>> +  in the pinmux register
+>
+> And if the "value" properties go into the pinctrl state nodes, why isn't
+> there a "value" property for schmitt?
+>
+>> +Optional sub-node: In case some pins could be configured as GPIO in the pinmux
+>> +register. If both GPIO nubmer and pin base of those pins are in ascending order,
+>> +those pins could be defined as a GPIO range. The sub-node should be defined in
+>> +.dtsi files of those silicons.
+>
+> Pinctrl state definitions are also nodes directly inside the pin
+> controller node. How does the pin controller driver know whether a child
+> node is a state definition, or a GPIO range? Is the node required to
+> have some specific name?
 
-
--- 
-Nicolas Ferre
+I think that "pinctrl-single,gpio" is enough. If the child node
+doesn't contain the
+gpio property, it won't be parsed as gpio range sub-node.
