@@ -1,37 +1,44 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 16 Nov 2012 01:15:48 +0800
-Subject: [arm-soc:for-next 24/32]
- arch/arm/mach-omap2/board-generic.c:115:13: error: 'omap_prcm_restart'
- undeclared here (not in a function)
-Message-ID: <50a52344.hTPnPrYFuOqQEPAJ%fengguang.wu@intel.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 15 Nov 2012 18:16:37 +0100
+Subject: [PATCH 1/3] i2c: at91: fix compilation warning
+In-Reply-To: <1352911493-6979-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1352911493-6979-1-git-send-email-ludovic.desroches@atmel.com>
+ <1352911493-6979-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <50A52375.4070304@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for-next
-head:   85f1e7156cfb396d46327b9e6cdf4dbf576f3bcc
-commit: 3b7b5ae34c4604e6a1e0724fc8bd60e44f07e1ef [24/32] Merge branch 'next/dt' into for-next
-config: make ARCH=arm omap2plus_defconfig
+On 11/14/2012 05:44 PM, ludovic.desroches at atmel.com :
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Note: the arm-soc/for-next HEAD 85f1e71 builds fine.
-      It only hurts bisectibility.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-All error/warnings:
+Maybe tell Wolfram to remove this one from the series and add it to his
+3.7 tree...
 
-arch/arm/mach-omap2/board-generic.c:115:13: error: 'omap_prcm_restart' undeclared here (not in a function)
+Bye,
 
-vim +115 +/omap_prcm_restart arch/arm/mach-omap2/board-generic.c
+> ---
+>  drivers/i2c/busses/i2c-at91.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> index a6670eb..dc8cb22 100644
+> --- a/drivers/i2c/busses/i2c-at91.c
+> +++ b/drivers/i2c/busses/i2c-at91.c
+> @@ -412,7 +412,7 @@ static struct at91_twi_pdata * __devinit at91_twi_get_driver_data(
+>  		match = of_match_node(atmel_twi_dt_ids, pdev->dev.of_node);
+>  		if (!match)
+>  			return NULL;
+> -		return match->data;
+> +		return (struct at91_twi_pdata *) match->data;
+>  	}
+>  	return (struct at91_twi_pdata *) platform_get_device_id(pdev)->driver_data;
+>  }
+> 
 
-7dd9d502 Jon Hunter     2012-09-12  109  	.init_early	= omap3430_init_early,
-7dd9d502 Jon Hunter     2012-09-12  110  	.init_irq	= omap_intc_of_init,
-7dd9d502 Jon Hunter     2012-09-12  111  	.handle_irq	= omap3_intc_handle_irq,
-7dd9d502 Jon Hunter     2012-09-12  112  	.init_machine	= omap_generic_init,
-7dd9d502 Jon Hunter     2012-09-12  113  	.timer		= &omap3_secure_timer,
-7dd9d502 Jon Hunter     2012-09-12  114  	.dt_compat	= omap3_gp_boards_compat,
-7dd9d502 Jon Hunter     2012-09-12 @115  	.restart	= omap_prcm_restart,
-7dd9d502 Jon Hunter     2012-09-12  116  MACHINE_END
-8d61649d Benoit Cousson 2011-09-20  117  #endif
-8d61649d Benoit Cousson 2011-09-20  118  
 
----
-0-DAY kernel build testing backend         Open Source Technology Center
-Fengguang Wu, Yuanhan Liu                              Intel Corporation
+-- 
+Nicolas Ferre
