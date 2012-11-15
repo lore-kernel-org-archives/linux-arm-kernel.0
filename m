@@ -1,105 +1,94 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 15 Nov 2012 09:10:28 +0000
-Subject: [PATCH 1/3] OF: Add helper for matching against linux, stdout-path
-In-Reply-To: <20121115084945.GZ10369@pengutronix.de>
-References: <1351849734-9836-1-git-send-email-s.hauer@pengutronix.de>
- <1351849734-9836-2-git-send-email-s.hauer@pengutronix.de>
- <CACxGe6uW+XN6RDnP+8QFXaCYqqPZO4dZM_aynR6AVMYZT=KuMg@mail.gmail.com>
- <20121115084945.GZ10369@pengutronix.de>
-Message-ID: <CACxGe6vH6BQKzJj3gT8Y-ceMmWiR50bYH2dn44yy2kLdrpBycQ@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 15 Nov 2012 14:43:21 +0530
+Subject: [PATCH v3 04/11] ARM: Exynos4: Migrate clock support to common
+ clock framework
+In-Reply-To: <1496911.LC6ynRgIgc@flatron>
+References: <1352930853-12268-1-git-send-email-thomas.abraham@linaro.org>
+ <1352930853-12268-5-git-send-email-thomas.abraham@linaro.org>
+ <1496911.LC6ynRgIgc@flatron>
+Message-ID: <CAJuYYwQaPXueu6aVoaNQE3BD1gVRRh2pC0LWfjVC71M7QHMYDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 8:49 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Wed, Nov 14, 2012 at 08:49:54PM +0000, Grant Likely wrote:
->> On Fri, Nov 2, 2012 at 9:48 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->> > devicetrees may have a linux,stdout-path property in the chosen
->> > node describing the console device. This adds a helper function
->> > to match a device against this property so a driver can call
->> > add_preferred_console for a matching device.
->> >
->> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->> > ---
->> >  drivers/of/Kconfig        |    3 +++
->> >  drivers/of/Makefile       |    1 +
->> >  drivers/of/of_stdout.c    |   27 +++++++++++++++++++++++++++
->> >  include/linux/of_stdout.h |   24 ++++++++++++++++++++++++
->> >  4 files changed, 55 insertions(+)
->> >  create mode 100644 drivers/of/of_stdout.c
->> >  create mode 100644 include/linux/of_stdout.h
->> >
->> > diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
->> > index dfba3e6..8574ebb 100644
->> > --- a/drivers/of/Kconfig
->> > +++ b/drivers/of/Kconfig
->> > @@ -67,6 +67,9 @@ config OF_MDIO
->> >         help
->> >           OpenFirmware MDIO bus (Ethernet PHY) accessors
->> >
->> > +config OF_STDOUT
->> > +       def_bool y
->> > +
->> >  config OF_PCI
->> >         def_tristate PCI
->> >         depends on PCI
->> > diff --git a/drivers/of/Makefile b/drivers/of/Makefile
->> > index e027f44..c9f3f2f 100644
->> > --- a/drivers/of/Makefile
->> > +++ b/drivers/of/Makefile
->> > @@ -8,6 +8,7 @@ obj-$(CONFIG_OF_I2C)    += of_i2c.o
->> >  obj-$(CONFIG_OF_NET)   += of_net.o
->> >  obj-$(CONFIG_OF_SELFTEST) += selftest.o
->> >  obj-$(CONFIG_OF_MDIO)  += of_mdio.o
->> > +obj-$(CONFIG_OF_STDOUT) += of_stdout.o
->> >  obj-$(CONFIG_OF_PCI)   += of_pci.o
->> >  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
->> >  obj-$(CONFIG_OF_MTD)   += of_mtd.o
->> > diff --git a/drivers/of/of_stdout.c b/drivers/of/of_stdout.c
->> > new file mode 100644
->> > index 0000000..c9e370e
->> > --- /dev/null
->> > +++ b/drivers/of/of_stdout.c
->> > @@ -0,0 +1,27 @@
->> > +/*
->> > + * OF helper for linux,stdoutpath property.
->> > + *
->> > + * This file is released under the GPLv2
->> > + */
->> > +#include <linux/of_stdout.h>
->> > +
->> > +/**
->> > + * of_device_is_stdout_path - check if a device node matches the
->> > + *                            linux,stdout-path property
->> > + *
->> > + * Check if this device node matches the linux,stdout-path property
->> > + * in the chosen node. return true if yes, false otherwise.
->> > + */
->> > +int of_device_is_stdout_path(struct device_node *dn)
->> > +{
->> > +       const char *name;
->> > +
->> > +       name = of_get_property(of_chosen, "linux,stdout-path", NULL);
->> > +       if (name == NULL)
->> > +               return 0;
->> > +
->> > +       if (dn == of_find_node_by_path(name))
+On 15 November 2012 05:01, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On Thursday 15 of November 2012 03:37:26 Thomas Abraham wrote:
+>> Remove Samsung specific clock support in Exynos4 and migrate to use
+>> common clock framework.
 >>
->> need to of_node_put() the return value of of_find_node_by_path()
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>>  arch/arm/mach-exynos/Kconfig               |    1 +
+>>  arch/arm/mach-exynos/Makefile              |    3 -
+>>  arch/arm/mach-exynos/clock-exynos4.c       | 1602
+>> ---------------------------- arch/arm/mach-exynos/clock-exynos4.h
+>> |   35 -
+>>  arch/arm/mach-exynos/clock-exynos4210.c    |  188 ----
+>>  arch/arm/mach-exynos/clock-exynos4212.c    |  192 ----
+>>  arch/arm/mach-exynos/common.c              |   22 +-
+>>  arch/arm/mach-exynos/common.h              |    3 +
+>>  arch/arm/mach-exynos/mach-armlex4210.c     |    1 -
+>>  arch/arm/mach-exynos/mach-exynos4-dt.c     |    1 -
+>>  arch/arm/mach-exynos/mach-nuri.c           |    1 -
+>>  arch/arm/mach-exynos/mach-origen.c         |    1 -
+>>  arch/arm/mach-exynos/mach-smdk4x12.c       |    1 -
+>>  arch/arm/mach-exynos/mach-smdkv310.c       |    1 -
+>>  arch/arm/mach-exynos/mach-universal_c210.c |    1 -
+>>  arch/arm/mach-exynos/mct.c                 |   19 +
+>>  arch/arm/plat-samsung/Kconfig              |    4 +-
+>>  17 files changed, 27 insertions(+), 2049 deletions(-)
+>>  delete mode 100644 arch/arm/mach-exynos/clock-exynos4.c
+>>  delete mode 100644 arch/arm/mach-exynos/clock-exynos4.h
+>>  delete mode 100644 arch/arm/mach-exynos/clock-exynos4210.c
+>>  delete mode 100644 arch/arm/mach-exynos/clock-exynos4212.c
 >>
->> > +               return 1;
->> > +
->> > +       return 0;
->> > +}
+> [snip]
+>> diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+>> index f7792b8..c2e806c 100644
+>> --- a/arch/arm/mach-exynos/mct.c
+>> +++ b/arch/arm/mach-exynos/mct.c
+>> @@ -31,6 +31,7 @@
+>>  #include <mach/map.h>
+>>  #include <mach/irqs.h>
+>>  #include <asm/mach/time.h>
+>> +#include "common.h"
 >>
->> Hi Sascha,
+>>  #define EXYNOS4_MCTREG(x)            (x)
+>>  #define EXYNOS4_MCT_G_CNT_L          EXYNOS4_MCTREG(0x100)
+>> @@ -517,6 +518,24 @@ static void __init exynos4_timer_init(void)
+>>       struct device_node *np;
+>>       u32 nr_irqs, i;
 >>
->> I'm fine with the helper, but there really is no need for a completely
->> separate .c file. Just put it in drivers/of/base.c.
+>> +#ifdef CONFIG_COMMON_CLK
+>> +     /*
+>> +      * Clock lookup should be functional now since the MCT controller
+>> driver +       * looks up clocks. So the clock initialization is initiated
+>> here. +        */
+>> +     if (of_have_populated_dt()) {
+>> +             if (of_machine_is_compatible("samsung,exynos4210") ||
+>> +                      of_machine_is_compatible("samsung,exynos4212") ||
+>> +                      of_machine_is_compatible("samsung,exynos4412"))
+>> +                     exynos4_clk_init();
+>> +     } else {
+>> +             if (soc_is_exynos4210() || soc_is_exynos4212() ||
+>> +                             soc_is_exynos4412()) {
+>> +                     exynos4_clk_init();
+>> +             }
+>> +     }
+>> +#endif
+>> +
 >
-> I guess the same applies to include/linux/of_stdout.h.
->
-> Should I drop the CONFIG_OF_STDOUT aswell?
+> I don't like the idea of initializing the clocks from timer
+> initialization. What about some platforms where MCT isn't used? It is also
+> far from being elegant.
 
-Yup.
+Very true, I did also prefer not do this. But, clock lookup should be
+functional atleast by the time mct initialization begins. So I tried
+few options such as adding .early_init_call callback in MACHINE_DESC
+which then can call exynos4_clk_init, but that did not help since
+mem_init isn't complete by then and memory allocation failed during
+clock registration. Other methods also did not help much. If you know
+of a solution to get around this, could you please let me know.
 
-g.
+Thanks,
+Thomas.
