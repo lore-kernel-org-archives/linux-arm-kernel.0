@@ -1,62 +1,65 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 15 Nov 2012 12:24:40 -0600
-Subject: [PATCH] Remove inline from clock framework function definitions
- to build the kernel with GCC 4.7
-In-Reply-To: <50A52134.2010502@gmail.com>
-References: <50A52134.2010502@gmail.com>
-Message-ID: <50A53368.6090306@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 15 Nov 2012 11:27:38 -0700
+Subject: [PATCH] RFC: pinctrl: grab default handler with bus notifiers
+In-Reply-To: <CACRpkdaXCA9ZDbkGTtdtFBWLhBKQmPf1=EgnLhUSqKOT1xU7oQ@mail.gmail.com>
+References: <1352636539-6318-1-git-send-email-linus.walleij@stericsson.com>
+ <50A15A54.3090803@wwwdotorg.org>
+ <20121113063546.GD18224@opensource.wolfsonmicro.com>
+ <CACRpkdY-tye5LNOwxQ-XrjM-x9RffAvj-tPfsFQA3ZWOY8P-Vw@mail.gmail.com>
+ <20121115152652.44c567d5@skate>
+ <CACRpkdaXCA9ZDbkGTtdtFBWLhBKQmPf1=EgnLhUSqKOT1xU7oQ@mail.gmail.com>
+Message-ID: <50A5341A.4040806@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 11/15/2012 11:07 AM, Igor Mazanov wrote:
->  Remove inline from clock framework function definitions to
->  build the kernel with GCC 4.7
-
-Adding Mike to the party ...
-
-May be good to add some details about the exact problem seen.
-
-I am seeing the same problem today with GCC 4.7 and Tony's master
-branch. For a bit of background it seems that for 4.7 not having
-the body of the inlined function available in the header is
-causing this error. Another example here [1].
-
-The actual compiler error seen for OMAP is ...
-
-In file included from arch/arm/mach-omap2/clockdomain.c:25:0:
-arch/arm/mach-omap2/clockdomain.c: In function ?clkdm_clk_disable?:
-include/linux/clk-provider.h:338:12: error: inlining failed in call to always_inline ?__clk_get_enable_count?: function body not available
-arch/arm/mach-omap2/clockdomain.c:1001:28: error: called from here
-make[1]: *** [arch/arm/mach-omap2/clockdomain.o] Error 1
-make: *** [arch/arm/mach-omap2] Error 2
-
- 
-> Signed-off-by: Igor Mazanov <i.mazanov@gmail.com>
-> ---
->  include/linux/clk-provider.h |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+On 11/15/2012 10:24 AM, Linus Walleij wrote:
+> On Thu, Nov 15, 2012 at 3:26 PM, Thomas Petazzoni
+> <thomas.petazzoni@free-electrons.com> wrote:
 > 
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index c127315..f9f5e9e 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -335,8 +335,8 @@ const char *__clk_get_name(struct clk *clk);
->  struct clk_hw *__clk_get_hw(struct clk *clk);
->  u8 __clk_get_num_parents(struct clk *clk);
->  struct clk *__clk_get_parent(struct clk *clk);
-> -inline int __clk_get_enable_count(struct clk *clk);
-> -inline int __clk_get_prepare_count(struct clk *clk);
-> +int __clk_get_enable_count(struct clk *clk);
-> +int __clk_get_prepare_count(struct clk *clk);
->  unsigned long __clk_get_rate(struct clk *clk);
->  unsigned long __clk_get_flags(struct clk *clk);
->  int __clk_is_enabled(struct clk *clk);
+>> At ELCE, I've discussed with one person having an interesting use case:
+>> they are using the same pin for two different purposes during the
+>> system operation.
+>>
+>> At boot time, this pin is muxed as a SPI pin and is used to program the
+>> bitstream of a FPGA. This is done in Linux, through a userspace
+>> application.
+>>
+>> Then, once it is done, this pin is remuxed as a UART pin, and used to
+>> communicate with another device on the board.
+> 
+> This is not related to the current discussion but interesting
+> anyway...
+> 
+>> If the pinctrl configuration is done at probe() time inside the driver
+>> core, then how can this kind of use case be supported? If each driver
+>> does its own muxing, we could think of letting the SPI and UART driver
+>> only do their muxing when the device is opened, and remove their muxing
+>> when the device is closed, so that such sharing of pins for two
+>> separate functions could be supported. Is this something we want to
+>> support?
+> 
+> This is trivial to support after this commit in the current patch
+> queue:
+> commit 1a78958dc212f3698fdc543857af80155cb30f7f
+> pinctrl: reserve pins when states are activated
+> 
+> Just define function maps for both devices using the same
+> pins. Since the devices need to actively release their
+> pins they need to go to a state which does not mux in
+> any pins, so that the pins will be free:ed.
+> 
+> This state can be any arbitrary string, but if so desired
+> for consistency we can define something like
+> #define PINCTRL_STATE_DECOUPLED "decoupled"
+> in include/linux/pinctrl/pinctrl-state.h to clearly
+> mark that this is a state where the device is not
+> using any pins at all.
 
-Do we also need to remove the inline from the functions declared in
-drivers/clk/clk.c too?
-
-Cheers
-Jon
-
-[1] https://bugs.launchpad.net/linaro-android/+bug/983496
+Well, you'd also need to explicitly code the pinmux logic into the UART
+driver, so that the UART's default state didn't prevent the SPI driver
+from temporarily acquiring the pin to program the FPGA. It's rather
+nasty to put that into the UART driver, which would presumably otherwise
+be completely generic and not need runtime pinmux state changes. I
+wonder if interjecting a mux driver between the UART/SPI and the pins
+would help here, although presumably the UART driver would still need
+some way of interacting with the mux driver which wouldn't be any better...
