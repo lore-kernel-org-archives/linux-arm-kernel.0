@@ -1,32 +1,33 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Nov 2012 17:20:25 -0800
-Subject: [PATCH] ARM: OMAP4: PM: fix errata handling when CONFIG_PM=n
-In-Reply-To: <1352940867-8806-1-git-send-email-khilman@deeprootsystems.com>
-References: <1352940867-8806-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <20121115012025.GE6801@atomide.com>
+Date: Wed, 14 Nov 2012 17:31:54 -0800
+Subject: [PATCH] ARM: OMAP2+: voltage: fixup oscillator handling when
+ CONFIG_PM=n
+In-Reply-To: <1352941984-11828-1-git-send-email-khilman@deeprootsystems.com>
+References: <1352941984-11828-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <20121115013153.GF6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@deeprootsystems.com> [121114 16:56]:
+* Kevin Hilman <khilman@deeprootsystems.com> [121114 17:15]:
 > From: Kevin Hilman <khilman@ti.com>
 > 
-> commit c9621844 (ARM: OMAP4: PM: add errata support) introduced errata
-> handling for OMAP4, but was broken when CONFIG_PM=n.
+> commit 908b75e8 (ARM: OMAP: add support for oscillator setup) added a new
+> API for oscillator setup, but is broken when CONFIG_PM=n.
 > 
-> When CONFIG_PM=n, pm44xx.c is not compiled, yet that is where pm44xx_errata
-> is defined.  However, these errata are needed for the SMP boot/hotplug case
-> also, and are primarily used in omap-smp.c.
+> The new functions have dummy definitions when CONFIG_PM=n, but also have
+> full implementations available, which conflict.
 > 
-> Move the definition of pm44xx_errata to omap-smp.c so that it's available
-> even in the CONFIG_PM=n case.
+> To fix, wrap the PM implmentations in #ifdef CONFIG_PM.
 > 
 > Cc: Tero Kristo <t-kristo@ti.com>
 > Signed-off-by: Kevin Hilman <khilman@ti.com>
 > ---
-> This patch applies on top of Tony's fixes-non-critical-part-2.
-> The bug was introduced in my for_3.8-fixes-pm tag (now included in Tony's fixes-non-critical-part2.)
+> This applies to Tony's omap-for-v3.8/pm branch, which includes my
+> for_3.8-pm-voltage tag where this bug was introduced.
 
-Thanks applied to omap-for-v3.8/fixes-non-critical-v2 and
-pushed out.
+Thanks for fixing this quickly. Applied to omap-for-v3.8/pm-part2
+and pushed out.
+
+Regards,
 
 Tony
