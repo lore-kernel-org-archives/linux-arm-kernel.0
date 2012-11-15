@@ -1,74 +1,21 @@
-From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Thu, 15 Nov 2012 13:03:45 +0100
-Subject: [PATCH v2 4/7] usb: chipidea: usbmisc: prepare driver to handle more
- than one soc
-In-Reply-To: <1352981028-14312-1-git-send-email-m.grzeschik@pengutronix.de>
-References: <1352981028-14312-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1352981028-14312-5-git-send-email-m.grzeschik@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Nov 2012 12:06:33 +0000
+Subject: [PATCH] ARM: pxa: remove pxa95x support
+In-Reply-To: <1352970366-7154-1-git-send-email-haojian.zhuang@gmail.com>
+References: <1352970366-7154-1-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <201211151206.33461.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Kleine-Budde <mkl@pengutronix.de>
+On Thursday 15 November 2012, Haojian Zhuang wrote:
+> PXA95x isn't widely used. And it adds the effort on supporting
+> multiple platform. So remove it.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 
-This attaches the usbmisc_ops to the of_device_id data and
-makes it possible to define special functions per soc.
+Looks good to me, thanks for going through this.
 
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
----
- drivers/usb/chipidea/usbmisc_imx.c |   11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-index 9145e04..4b1ed7c 100644
---- a/drivers/usb/chipidea/usbmisc_imx.c
-+++ b/drivers/usb/chipidea/usbmisc_imx.c
-@@ -26,6 +26,7 @@ struct imx_usbmisc {
- 	spinlock_t lock;
- 	struct clk *clk;
- 	struct usbmisc_usb_device usbdev[USB_DEV_MAX];
-+	const struct usbmisc_ops *ops;
- };
- 
- static struct imx_usbmisc *usbmisc;
-@@ -78,7 +79,7 @@ static const struct usbmisc_ops imx6q_usbmisc_ops = {
- };
- 
- static const struct of_device_id usbmisc_imx_dt_ids[] = {
--	{ .compatible = "fsl,imx6q-usbmisc"},
-+	{ .compatible = "fsl,imx6q-usbmisc", .data = (void *)&imx6q_usbmisc_ops },
- 	{ /* sentinel */ }
- };
- 
-@@ -87,6 +88,7 @@ static int __devinit usbmisc_imx_probe(struct platform_device *pdev)
- 	struct resource	*res;
- 	struct imx_usbmisc *data;
- 	int ret;
-+	struct of_device_id *tmp_dev;
- 
- 	if (usbmisc)
- 		return -EBUSY;
-@@ -116,8 +118,11 @@ static int __devinit usbmisc_imx_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	tmp_dev = (struct of_device_id *)
-+		of_match_device(usbmisc_imx_dt_ids, &pdev->dev);
-+	data->ops = (const struct usbmisc_ops *)tmp_dev->data;
- 	usbmisc = data;
--	ret = usbmisc_set_ops(&imx6q_usbmisc_ops);
-+	ret = usbmisc_set_ops(data->ops);
- 	if (ret) {
- 		usbmisc = NULL;
- 		clk_disable_unprepare(data->clk);
-@@ -129,7 +134,7 @@ static int __devinit usbmisc_imx_probe(struct platform_device *pdev)
- 
- static int __devexit usbmisc_imx_remove(struct platform_device *pdev)
- {
--	usbmisc_unset_ops(&imx6q_usbmisc_ops);
-+	usbmisc_unset_ops(usbmisc->ops);
- 	clk_disable_unprepare(usbmisc->clk);
- 	usbmisc = NULL;
- 	return 0;
--- 
-1.7.10.4
+Should I apply this straight into the arm-soc tree, or are you
+going to send a pull request?
