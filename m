@@ -1,56 +1,51 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 15 Nov 2012 14:18:09 +0000
-Subject: [PATCH v3 1/5] ARM: kernel: smp_setup_processor_id() updates
-In-Reply-To: <20121115134951.GF5570@mudshark.cambridge.arm.com>
-References: <1352983614-22924-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1352983614-22924-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20121115134951.GF5570@mudshark.cambridge.arm.com>
-Message-ID: <20121115141808.GA23513@e102568-lin.cambridge.arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 15 Nov 2012 19:49:30 +0530
+Subject: [PATCH 01/14] pinctrl: SPEAr: add spi chipselect control driver
+In-Reply-To: <CACRpkdb9tSUUGQjWdHqRr5rUSyiPgWm2i3-QZq9VbWFY2EAQeQ@mail.gmail.com>
+References: <cover.1352608333.git.viresh.kumar@linaro.org>
+ <4a92290e8a3b1a19c3a5e864edfa7badfc2af5d0.1352608333.git.viresh.kumar@linaro.org>
+ <CACRpkdb9tSUUGQjWdHqRr5rUSyiPgWm2i3-QZq9VbWFY2EAQeQ@mail.gmail.com>
+Message-ID: <CAKohpomLRYAKJ=dNLVsjj1xf=G6xj4EcTpPmhSDvgBYUMXc1mA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[CC'ed Vincent following MPIDR mask query]
+On 15 November 2012 19:47, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sun, Nov 11, 2012 at 5:39 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>
+>> From: Shiraz Hashim <shiraz.hashim@st.com>
+>>
+>> SPEAr platform provides a provision to control chipselects of ARM PL022
+>> Prime Cell spi controller through its system registers, which otherwise
+>> remains under PL022 control which some protocols do not want.
+>>
+>> This commit intends to provide the spi chipselect control in software
+>> over gpiolib interface. Since it is tied to pinctrl, we place it under
+>> 'drivers/pinctrl/spear/' directory.
+>>
+>> spi chip drivers can use the exported gpiolib interface to define their
+>> chipselect through DT or platform data.
+>>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
+>> Reviewed-by: Vipin Kumar <vipin.kumar@st.com>
+>> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>
+> This sure looks good, sorry for the delay.
+>
+> Just one question: since this driver is not using any
+> pinctrl interfaces, why is it under drivers/pinctrl/*?
+>
+> Shouldn't it be under drivers/gpio from a technical
+> point of view?
+>
+> I think I'd accept it under drivers/pinctrl/spear/*
+> if you just want this to keep everything SPEAr-related
+> in one place though, so enlighten me.
 
-On Thu, Nov 15, 2012 at 01:49:51PM +0000, Will Deacon wrote:
-> On Thu, Nov 15, 2012 at 12:46:50PM +0000, Lorenzo Pieralisi wrote:
-> > This patch applies some basic changes to the smp_setup_processor_id()
-> > ARM implementation to make the code that builds cpu_logical_map more
-> > uniform across the kernel.
-> > 
-> > The function now prints the full extent of the boot CPU MPIDR[23:0] and
-> > initializes the cpu_logical_map for CPUs up to nr_cpu_ids.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  arch/arm/kernel/setup.c | 7 ++++---
-> >  1 file changed, 4 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> > index da1d1aa..d0df6c8 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -426,13 +426,14 @@ int __cpu_logical_map[NR_CPUS];
-> >  void __init smp_setup_processor_id(void)
-> >  {
-> >  	int i;
-> > -	u32 cpu = is_smp() ? read_cpuid_mpidr() & 0xff : 0;
-> > +	u32 mpidr = is_smp() ? read_cpuid_mpidr() & 0xffffff : 0;
-> > +	u32 cpu = mpidr & 0xff;
-> 
-> Can we move the #defines out of topology.c and use those instead of magic
-> masks please? You could use MPIDR_HWID_BITMASK, although the LEVEL mask
-> definitions over there don't look right to me (MPIDR_LEVEL0_MASK is 0x3?)
+That's because they are controlling few pads. They are not
+actually gpio's but just pads that we are controlling.
 
-Yes, I should have done that, you are right. LEVEL0 and LEVEL1 masks look
-wrong to me.
+That's why we thought they are better in this place.
 
-#define MPIDR_LEVEL0_MASK 0x3
-#define MPIDR_LEVEL1_MASK 0xF
-
-Vincent, why are they defined with those values ? They should all be
-defined as 0xFF.
-
-I will fix them and move them to a header file.
-
-Thanks,
-Lorenzo
+--
+viresh
