@@ -1,52 +1,33 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 15 Nov 2012 18:46:15 +0000 (UTC)
-Subject: [PATCH] Remove inline from clock framework function definitions
- to build the kernel with GCC 4.7
-In-Reply-To: <50A52134.2010502@gmail.com>
-References: <50A52134.2010502@gmail.com>
-Message-ID: <alpine.DEB.2.00.1211151845050.18192@utopia.booyaka.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Thu, 15 Nov 2012 10:54:35 -0800
+Subject: [PATCH 0/2] clk: ux500: Make mtu driver use apb_pclock
+In-Reply-To: <CACRpkdaFkS_8i=8FmVYujzm1cMe1+=SO6MJyUbFyFPX7xhz-YA@mail.gmail.com>
+References: <1351080821-18660-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121112183615.17970.20162@nucleus>
+ <CACRpkdYmPvRLcEjSNwC51sZw+g3iH3a5r7+7USEWJONmR4q4JQ@mail.gmail.com>
+ <201211151221.30217.arnd@arndb.de>
+ <CACRpkdaFkS_8i=8FmVYujzm1cMe1+=SO6MJyUbFyFPX7xhz-YA@mail.gmail.com>
+Message-ID: <20121115185435.7155.53498@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Mike
-
-On Thu, 15 Nov 2012, Igor Mazanov wrote:
-
->  Remove inline from clock framework function definitions to
->  build the kernel with GCC 4.7
-
-sparse warns about this also.
-
-> Signed-off-by: Igor Mazanov <i.mazanov@gmail.com>
-
-This one is for Mike to deal with as CCF maintainer; it's out of the hands 
-of the OMAP folks.
-
-Acked-by: Paul Walmsley <paul@pwsan.com>
-
-
-> ---
->  include/linux/clk-provider.h |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+Quoting Linus Walleij (2012-11-15 05:29:32)
+> On Thu, Nov 15, 2012 at 1:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index c127315..f9f5e9e 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -335,8 +335,8 @@ const char *__clk_get_name(struct clk *clk);
->  struct clk_hw *__clk_get_hw(struct clk *clk);
->  u8 __clk_get_num_parents(struct clk *clk);
->  struct clk *__clk_get_parent(struct clk *clk);
-> -inline int __clk_get_enable_count(struct clk *clk);
-> -inline int __clk_get_prepare_count(struct clk *clk);
-> +int __clk_get_enable_count(struct clk *clk);
-> +int __clk_get_prepare_count(struct clk *clk);
->  unsigned long __clk_get_rate(struct clk *clk);
->  unsigned long __clk_get_flags(struct clk *clk);
->  int __clk_is_enabled(struct clk *clk);
-> --
-> 1.7.4.4
+> > If I understand the problem at hand correctly, the safe solution
+> > should be to base the ux500 clk changes on top of c3b9d1db23c4e,
+> > which is in the nomadik/plat-removal branch in arm-soc that got
+> > merged into next/multiplatform. I would prefer if you use that
+> > as a base instead of the larger next/multiplatform branch that
+> > also contains vt8500 and other changes.
+> 
+> OK I'll take a stab at this and see if I can fix it...
 > 
 
+I've dropped both of these patches from clk-next.
 
-- Paul
+Regards,
+Mike
+
+> Yours,
+> Linus Walleij
