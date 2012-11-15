@@ -1,60 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Nov 2012 18:24:01 +0100
-Subject: [PATCH] RFC: pinctrl: grab default handler with bus notifiers
-In-Reply-To: <20121115152652.44c567d5@skate>
-References: <1352636539-6318-1-git-send-email-linus.walleij@stericsson.com>
- <50A15A54.3090803@wwwdotorg.org>
- <20121113063546.GD18224@opensource.wolfsonmicro.com>
- <CACRpkdY-tye5LNOwxQ-XrjM-x9RffAvj-tPfsFQA3ZWOY8P-Vw@mail.gmail.com>
- <20121115152652.44c567d5@skate>
-Message-ID: <CACRpkdaXCA9ZDbkGTtdtFBWLhBKQmPf1=EgnLhUSqKOT1xU7oQ@mail.gmail.com>
+Date: Thu, 15 Nov 2012 18:25:49 +0100
+Subject: [PATCH 02/14] ARM: SPEAr13xx: DT: Add spics gpio controller nodes
+In-Reply-To: <CAKohpok7-iBCoYk+aAXZPsOODyh6tp2nutC+6wYOot-bK3=wkg@mail.gmail.com>
+References: <cover.1352608333.git.viresh.kumar@linaro.org>
+ <58a7d91cab20b924784fb5a09e16ca08e6f13318.1352608333.git.viresh.kumar@linaro.org>
+ <CACRpkdZkgmLF8TxFCZSubP+g+6_ofZugArKtE9=dYTZfemstrw@mail.gmail.com>
+ <CAKohpon=AVGZmR_cwUZ4=buw0kr3JVtXh51BtXteWkJ7E-f_bQ@mail.gmail.com>
+ <CACRpkdaJ2kCYfSP=xCRQAG2wDnkMKX9fey+ByhDDiOS==u+XwA@mail.gmail.com>
+ <CAKohpok7-iBCoYk+aAXZPsOODyh6tp2nutC+6wYOot-bK3=wkg@mail.gmail.com>
+Message-ID: <CACRpkdZmavE0+hoNd4H3PyfOTfB++uw5bSkDAbK4iRk8+cuhoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 3:26 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
+On Thu, Nov 15, 2012 at 3:08 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 15 November 2012 19:36, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-> At ELCE, I've discussed with one person having an interesting use case:
-> they are using the same pin for two different purposes during the
-> system operation.
+>> I seldom comment on individual DT bindings, I just want
+>> to know that they're there :-)
 >
-> At boot time, this pin is muxed as a SPI pin and is used to program the
-> bitstream of a FPGA. This is done in Linux, through a userspace
-> application.
->
-> Then, once it is done, this pin is remuxed as a UART pin, and used to
-> communicate with another device on the board.
+> Its not that simple. You are required to Ack it, as we have added it in
+> drivers/pinctrl/spear because we are controlling pins here :)
 
-This is not related to the current discussion but interesting
-anyway...
-
-> If the pinctrl configuration is done at probe() time inside the driver
-> core, then how can this kind of use case be supported? If each driver
-> does its own muxing, we could think of letting the SPI and UART driver
-> only do their muxing when the device is opened, and remove their muxing
-> when the device is closed, so that such sharing of pins for two
-> separate functions could be supported. Is this something we want to
-> support?
-
-This is trivial to support after this commit in the current patch
-queue:
-commit 1a78958dc212f3698fdc543857af80155cb30f7f
-pinctrl: reserve pins when states are activated
-
-Just define function maps for both devices using the same
-pins. Since the devices need to actively release their
-pins they need to go to a state which does not mux in
-any pins, so that the pins will be free:ed.
-
-This state can be any arbitrary string, but if so desired
-for consistency we can define something like
-#define PINCTRL_STATE_DECOUPLED "decoupled"
-in include/linux/pinctrl/pinctrl-state.h to clearly
-mark that this is a state where the device is not
-using any pins at all.
-
-Yours,
-Linus Walleij
+Yeah I saw, I've commented on it now..
 
 Yours,
 Linus Walleij
