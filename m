@@ -1,47 +1,93 @@
-From: amurray@embedded-bits.co.uk (Andrew Murray)
-Date: Thu, 15 Nov 2012 13:52:06 +0000
-Subject: [PATCH 1/2] Boottime: A tool for automatic measurement of
- kernel/bootloader boot time
-In-Reply-To: <1352973847-21605-2-git-send-email-lee.jones@linaro.org>
-References: <1352973847-21605-1-git-send-email-lee.jones@linaro.org>
- <1352973847-21605-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAPcvp5ER_rMnyzbKR8r8NJf_naNs6y8gBi0jg5TtOwq88Xgh9Q@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 15 Nov 2012 13:52:46 +0000
+Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
+In-Reply-To: <CACY+gR3PurUofCbUeG40B6vXqXAoHrMmbOQSuwAGoc1LS8XXJQ@mail.gmail.com>
+References: <20121114185335.GU6801@atomide.com> <50A3EBCD.3040801@ti.com>
+ <20121114202244.GE3332@n2100.arm.linux.org.uk>
+ <20121114203221.GA6801@atomide.com> <50A413D4.7000405@gmail.com>
+ <20121114222159.GB6801@atomide.com> <50A43D58.5030404@gmail.com>
+ <20121115110137.GA25985@arm.com>
+ <CACY+gR3PurUofCbUeG40B6vXqXAoHrMmbOQSuwAGoc1LS8XXJQ@mail.gmail.com>
+Message-ID: <20121115135246.GB25985@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 November 2012 10:04, Lee Jones <lee.jones@linaro.org> wrote:
-> The overhead is very low and the results will be found under
-> sysfs/bootime, as well as detailed results in debugfs under
-> boottime/. The bootgraph* files are compatible with
-> scripts/bootgraph.pl. The reason for this patch is to provide
-> data (sysfs/boottime) suitable for automatic test-cases as
-> well as help for developers to reduce the boot time (debugfs).
->
-> Based heavily on the original driver by Jonas Aaberg.
->
+On Thu, Nov 15, 2012 at 12:41:43PM +0000, Siarhei Siamashka wrote:
+> On Thu, Nov 15, 2012 at 1:01 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Thu, Nov 15, 2012 at 12:54:48AM +0000, Rob Herring wrote:
+> >> On 11/14/2012 04:21 PM, Tony Lindgren wrote:
+> >> > * Rob Herring <robherring2@gmail.com> [121114 13:59]:
+> >> >> On 11/14/2012 02:32 PM, Tony Lindgren wrote:
+> >> >>>
+> >> >>> Checking for the bit already set should work in this case, I'll post
+> >> >>> a patch for that shortly.
+> >> >>
+> >> >> Can you actually read the state of the diagnostic register in non-secure
+> >> >> mode? If you can on the A9, is the same true on A8 or others?
+> >> >
+> >> > Looks like it can be read on at least TI omap 4430 which is A9.
+> >> > But it reads as zero, so the below patch is what I came up with.
+> >> >
+> >> > No idea if assuming that zero value for the diagnostic register
+> >> > is safe.. What's the default value of the diagnostic register supposed
+> >> > to be?
+> >>
+> >> RTFM. Oh, wait it's a super secret, undocumented register. We shouldn't
+> >> even be talking about it.
+> >>
+> >> It could vary by rev, but I see 0 for the reset value, so this would not
+> >> work if the bootloader did not do any setup of the diagnostic register.
+> >>
+> >> One way to determine secure mode on the A9 would be seeing if you can
+> >> change the auxcr register. Something like this (untested):
+> >>
+> >> mrc   p15, 0, r0, c1, c0, 1; Read ACTLR
+> >> eor   r1, r0, #0x100          ; Modify alloc in 1 way
+> >> mcr   p15, 0, r1, c1, c0, 1
+> >> mrc   p15, 0, r2, c1, c0, 1; Read ACTLR
+> >> mcr   p15, 0, r0, c1, c0, 1   ; Restore original value
+> >> cmp   r1, r2
+> >> bne   skip_errata
+> >
+> > This would fail on platforms where Linux runs in non-secure mode. What
+> > we do for some errata workarounds is to test whether the bit was already
+> > set and avoid writing the register. But this assumes that, for a given
+> > workaround in the kernel, there is a corresponding workaround in the
+> > code running before the kernel (boot-loader, firmware) which sets that
+> > bit.
+> >
+> > Since the kernel will run more often in non-secure mode (on Cortex-A15
+> > you need this for the virtualisation extensions) I strongly suggest that
+> > the workaround (usually undocumented bit setting) is done before the
+> > kernel is started and we simply remove it from Linux (or add a clear
+> > comment that it only works if running in secure mode; if unsure say
+> > 'N').
+> >
+> > I don't think it's worth the hassle detecting whether the kernel runs in
+> > secure or non-secure mode, just assume the latter and get SoC vendors to
+> > update the boot loaders or firmware (if possible) with any errata
+> > workarounds.
+> >
+> > Having a common SMC API for errata workarounds is not feasible since not
+> > all registers are public, most are implementation specific and it could
+> > have secure implications with exposing them.
+> 
+> BTW, I always wondered about what could be preventing TI and the other
+> silicon vendors from using something like an SMC API based on
+> asymmetric cryptography? My understanding is that for OMAP4 GP chips,
+> ROM code switches to non-secure mode before passing control to the
+> bootloader and there is simply no way to workaround bugs like this.
 
-> +
-> +static LIST_HEAD(boottime_list);
-> +static DEFINE_SPINLOCK(boottime_list_lock);
-> +static struct boottime_timer boottime_timer;
-> +static int num_const_boottime_list;
-> +static struct boottime_list const_boottime_list[NUM_STATIC_BOOTTIME_ENTRIES];
-> +static unsigned long time_kernel_done;
-> +static unsigned long time_bootloader_done;
-> +static bool system_up;
-> +static bool boottime_done;
-> +
-> +int __attribute__((weak)) boottime_arch_startup(void)
-> +{
-> +       return 0;
-> +}
-> +
-> +int __attribute__((weak)) boottime_bootloader_idle(void)
-> +{
-> +       return 0;
-> +}
+AFAIK, there are some SMCs to the OMAP secure firmware that allow such
+bits to be set (see omap4_l2x0_set_debug() for example). I'm not sure
+they are documented.
 
-You may wish to use the __weak macro (include/linux/compiler*) instead
-of directly using GCC attributes here.
+But we can't have a standard SMC API since the registers affected are
+not standard (nor documented). Which means that such workarounds must be
+applied in the bootloader specific to that platform. Even if it is
+running in non-secure mode, it can be made aware of the SMC API provided
+by the secure firmware.
 
-Andrew Murray
+-- 
+Catalin
