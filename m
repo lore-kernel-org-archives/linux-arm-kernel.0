@@ -1,30 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Nov 2012 09:19:37 +0000
-Subject: [PATCH] ARM: add get_user() support for 8 byte types
-In-Reply-To: <20121113112430.GF28341@n2100.arm.linux.org.uk>
-References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
- <201211130911.09613.arnd@arndb.de>
- <20121113112430.GF28341@n2100.arm.linux.org.uk>
-Message-ID: <201211150919.37343.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Nov 2012 09:22:42 +0000
+Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
+In-Reply-To: <20121114222159.GB6801@atomide.com>
+References: <20121114185335.GU6801@atomide.com> <50A3EBCD.3040801@ti.com>
+ <20121114202244.GE3332@n2100.arm.linux.org.uk>
+ <20121114203221.GA6801@atomide.com> <50A413D4.7000405@gmail.com>
+ <20121114222159.GB6801@atomide.com>
+Message-ID: <20121115092242.GF3332@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 November 2012, Russell King - ARM Linux wrote:
-> You're missing something; that is one of the greatest powers of open
-> source.  The many eyes (and minds) effect.  Someone out there probably
-> has a solution to whatever problem, the trick is to find that person. :)
-> 
-> I think we have a working solution for this for ARM.  It won't be suitable
-> for every arch, where they have 8-bit and 16-bit registers able to be
-> allocated by the compiler, but for architectures where the minimum register
-> size is 32-bit, what we have below should work.
+On Wed, Nov 14, 2012 at 02:21:59PM -0800, Tony Lindgren wrote:
+> No idea if assuming that zero value for the diagnostic register
+> is safe.. What's the default value of the diagnostic register supposed
+> to be?
 
-I don't mind at all adding the extension to ARM, and I think it's pretty
-cool that you guys actually found a working solution.
+No, that's not safe.  What if your pre-kernel code has asked the secure
+monitor to set the work-around bit already?
 
-The part that worries me is that we are making architecture independent
-code depend on a clever hack that may or may not be possible to implement
-on a given architecture, and that most architecture maintainers wouldn't
-know how to implement correctly even if it's possible.
+>  #if defined(CONFIG_ARM_ERRATA_751472) && defined(CONFIG_SMP)
+>  	ALT_SMP(cmp r6, #0x30)			@ present prior to r3p0
+>  	ALT_UP_B(1f)
+> -	mrclt	p15, 0, r10, c15, c0, 1		@ read diagnostic register
+> -	orrlt	r10, r10, #1 << 11		@ set bit #11
+> -	mcrlt	p15, 0, r10, c15, c0, 1		@ write diagnostic register
+> +	bge	1f				@ not needed for r3p0 and later
+> +	mrc	p15, 0, r10, c15, c0, 1		@ read diagnostic register
+> +	teq	r10, #0				@ zero for secure mode?
+> +	beq	1f				@ bail out for secure mode
 
-	Arnd
+This test for zero is pointless.  What if some other work-around has
+been enabled but not this one?
+
+> +	tst	r10, #1 << 11			@ bit #11 already set?
+> +	orreq	r10, r10, #1 << 11		@ set bit #11 if not set
+> +	mcreq	p15, 0, r10, c15, c0, 1		@ write diagnostic register
+>  1:
+>  #endif
+>  
