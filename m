@@ -1,37 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Nov 2012 14:39:41 +0000
-Subject: [PATCH] ARM: add get_user() support for 8 byte types
-In-Reply-To: <CAF6AEGuJReNtwUZX6HVZCE8GHuyEAyC8bM0GqZuVMV1=DrGJVw@mail.gmail.com>
-References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
- <201211151339.08016.arnd@arndb.de>
- <CAF6AEGuJReNtwUZX6HVZCE8GHuyEAyC8bM0GqZuVMV1=DrGJVw@mail.gmail.com>
-Message-ID: <201211151439.41393.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Nov 2012 15:42:56 +0100
+Subject: [PATCH 4/4] pinctrl: nomadik: Prevent NULL dereference if
+ of_match_device returns NULL
+In-Reply-To: <1352955365.6793.6.camel@phoenix>
+References: <1352955096.6793.1.camel@phoenix> <1352955365.6793.6.camel@phoenix>
+Message-ID: <CACRpkdbWqFrP7RvXbaR5Bcz1htCL_wSqwUvOi67LmoF_PBjvhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 November 2012, Rob Clark wrote:
-> > I still haven't heard a conclusive argument why we need to use get_user()
-> > rather than copy_from_user() in the DRM code. Is this about a fast path
-> > where you want to shave off a few cycles for each call, or does this
-> > simplify the code structure, or something else?
-> 
-> well, it is mostly because it seemed like a good idea to first try to
-> solve the root issue, rather than having to fix things up in each
-> driver when someone from x86-world introduces a 64b get_user()..
+On Thu, Nov 15, 2012 at 5:56 AM, Axel Lin <axel.lin@ingics.com> wrote:
 
-As pointed out by hpa earlier, x86-32 doesn't have a 64b get_user
-either. I don't think we have a lot of drivers that are used only
-on 64-bit x86 and on 32-bit ARM but not on 32-bit x86.
+> of_match_device() may return NULL.
+>
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+> ---
+>  drivers/pinctrl/pinctrl-nomadik.c |   11 ++++++++---
+>  1 file changed, 8 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+> index 238060e..40bd1b3 100644
+> --- a/drivers/pinctrl/pinctrl-nomadik.c
+> +++ b/drivers/pinctrl/pinctrl-nomadik.c
+> @@ -1863,9 +1863,14 @@ static int __devinit nmk_pinctrl_probe(struct platform_device *pdev)
+>
+>         if (platid)
+>                 version = platid->driver_data;
+> -       else if (np)
+> -               version = (unsigned int)
+> -                       of_match_device(nmk_pinctrl_match, &pdev->dev)->data;
+> +       else if (np) {
+> +               const struct of_device_id *match;
+> +
+> +               match = of_match_device(nmk_pinctrl_match, &pdev->dev);
+> +               if (!match)
+> +                       return -ENODEV;
+> +               version = (unsigned int) match->data;
+> +       }
 
-> There are some other arch's that don't have 64b get_user(), but I
-> don't think any that have any DRM drivers.  If 64b get_user() is
-> really not intended to be supported by all archs, it is better to
-> remove it from x86 and the other arch's that do currently support it,
-> rather than making it possible to write drivers that are broken on
-> some archs.
+AFAICT this can actually happen so patch applied, unless Lee
+speaks against it.
 
-The majority of architectures we support have PCI and should be able
-to build the regular (radeon, nouveau, MGA, VIA, ...) DRM drivers
-AFAICT.
+Patches 1-3/4 are dropped though, as the maintainers didn't seem
+to like them.
 
-	Arnd
+Yours,
+Linus Walleij
