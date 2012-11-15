@@ -1,11 +1,11 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 15 Nov 2012 16:27:19 +0800
+Date: Thu, 15 Nov 2012 16:30:20 +0800
 Subject: [PATCH v4 5/9] document: devicetree: bind pinconf with pin-single
 In-Reply-To: <50A15E0C.2010903@wwwdotorg.org>
 References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
  <1352301582-12244-6-git-send-email-haojian.zhuang@gmail.com>
  <50A15E0C.2010903@wwwdotorg.org>
-Message-ID: <CAN1soZw8Nx7EyNb1FDtwRkA+o8hokQRv_bEQ1W04+rnNMnozHw@mail.gmail.com>
+Message-ID: <CAN1soZyScqQ8C7QRyEUiWPc7Ee4BJb971Z7NPa85H7MYhpMFEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
