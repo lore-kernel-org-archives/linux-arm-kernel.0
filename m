@@ -1,84 +1,63 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 15 Nov 2012 13:19:26 +0000
-Subject: [PATCH 1/1] mtd: physmap_of: allow to specify the mtd name for
- retro compatiblity
-In-Reply-To: <1352062641-31850-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1352062641-31850-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20121115131926.47F853E0B12@localhost>
+From: js1304@gmail.com (JoonSoo Kim)
+Date: Thu, 15 Nov 2012 22:22:04 +0900
+Subject: [RFC PATCH 0/3] introduce static_vm for ARM-specific static
+ mapped area
+In-Reply-To: <20121114173928.GK3290@n2100.arm.linux.org.uk>
+References: <1352912154-16210-1-git-send-email-js1304@gmail.com>
+ <20121114173928.GK3290@n2100.arm.linux.org.uk>
+Message-ID: <CAAmzW4Mz_+jeuFSe1f+Z3eY_W65oCXYXD3LL+PT8HtRiTAaFXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun,  4 Nov 2012 21:57:21 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> linux,mtd-name allow to specify the mtd name for retro capability with
-> physmap-flash drivers as boot loader pass the mtd partition via the old
-> device name physmap-flash.
+Hello, Russell.
+Thanks for review.
 
-Ummm. I don't follow. Could you explain more about how this change will
-be used?
+2012/11/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Thu, Nov 15, 2012 at 01:55:51AM +0900, Joonsoo Kim wrote:
+>> In current implementation, we used ARM-specific flag, that is,
+>> VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
+>> The purpose of static mapped area is to re-use static mapped area when
+>> entire physical address range of the ioremap request can be covered
+>> by this area.
+>>
+>> This implementation causes needless overhead for some cases.
+>
+> In what cases?
 
-Thanks,
-g.
+For example, assume that there is only one static mapped area and
+vmlist has 300 areas.
+Every time we call ioremap, we check 300 areas for deciding whether it
+is matched or not.
+Moreover, even if there is no static mapped area and vmlist has 300 areas,
+every time we call ioremap, we check 300 areas in now.
 
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> ---
->  Documentation/devicetree/bindings/mtd/mtd-physmap.txt |    3 +++
->  drivers/mtd/maps/physmap_of.c                         |    5 ++++-
->  2 files changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-> index 94de19b..dab7847 100644
-> --- a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-> +++ b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-> @@ -23,6 +23,9 @@ file systems on embedded devices.
->     unaligned accesses as implemented in the JFFS2 code via memcpy().
->     By defining "no-unaligned-direct-access", the flash will not be
->     exposed directly to the MTD users (e.g. JFFS2) any more.
-> + - linux,mtd-name: allow to specify the mtd name for retro capability with
-> +   physmap-flash drivers as boot loader pass the mtd partition via the old
-> +   device name physmap-flash.
->  
->  For JEDEC compatible devices, the following additional properties
->  are defined:
-> diff --git a/drivers/mtd/maps/physmap_of.c b/drivers/mtd/maps/physmap_of.c
-> index 6f19aca..9a8db0c 100644
-> --- a/drivers/mtd/maps/physmap_of.c
-> +++ b/drivers/mtd/maps/physmap_of.c
-> @@ -170,6 +170,7 @@ static int __devinit of_flash_probe(struct platform_device *dev)
->  	resource_size_t res_size;
->  	struct mtd_part_parser_data ppdata;
->  	bool map_indirect;
-> +	const char *mtd_name;
->  
->  	match = of_match_device(of_flash_match, &dev->dev);
->  	if (!match)
-> @@ -178,6 +179,8 @@ static int __devinit of_flash_probe(struct platform_device *dev)
->  
->  	reg_tuple_size = (of_n_addr_cells(dp) + of_n_size_cells(dp)) * sizeof(u32);
->  
-> +	of_property_read_string(dp, "linux,mtd-name", &mtd_name);
-> +
->  	/*
->  	 * Get number of "reg" tuples. Scan for MTD devices on area's
->  	 * described by each "reg" region. This makes it possible (including
-> @@ -234,7 +237,7 @@ static int __devinit of_flash_probe(struct platform_device *dev)
->  			goto err_out;
->  		}
->  
-> -		info->list[i].map.name = dev_name(&dev->dev);
-> +		info->list[i].map.name = mtd_name ? mtd_name : dev_name(&dev->dev);
->  		info->list[i].map.phys = res.start;
->  		info->list[i].map.size = res_size;
->  		info->list[i].map.bankwidth = be32_to_cpup(width);
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> We unnecessarily iterate vmlist for finding matched area even if there
+>> is no static mapped area. And if there are some static mapped areas,
+>> iterating whole vmlist is not preferable.
+>
+> Why not?  Please put some explanation into your message rather than
+> just statements making unexplained assertions.
 
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+If we construct a extra list for static mapped area, we can eliminate
+above mentioned overhead.
+With a extra list, if there is one static mapped area,
+we just check only one area and proceed next operation quickly.
+
+>> Another reason for doing this work is for removing architecture dependency
+>> on vmalloc layer. I think that vmlist and vmlist_lock is internal data
+>> structure for vmalloc layer. Some codes for debugging and stat inevitably
+>> use vmlist and vmlist_lock. But it is preferable that they are used outside
+>> of vmalloc.c as least as possible.
+>
+> The vmalloc layer is also made available for ioremap use, and it is
+> intended that architectures hook into this for ioremap support.
+
+Yes.
+But, I think that it is preferable to use well-defined vmalloc API rather than
+directly manipulating low-level data structure. IMHO, if there is no suitable
+vmalloc API, making new one is better than directly manipulating
+low-level data structure. It makes vmalloc code more maintainable.
+
+I'm not expert, so please let me know what I missed.
+
+Thanks.
