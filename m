@@ -1,24 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Nov 2012 13:25:50 +0000
-Subject: [PATCH v5 0/4] arch/arm: support seccomp
-In-Reply-To: <CAGXu5jKYGCkL3GS4Tbep==WUAqP-c_0edAdgy0XQ84rJxZUU2Q@mail.gmail.com>
-References: <1352587485-18348-1-git-send-email-keescook@chromium.org>
- <CAGXu5jKYGCkL3GS4Tbep==WUAqP-c_0edAdgy0XQ84rJxZUU2Q@mail.gmail.com>
-Message-ID: <20121115132550.GA5570@mudshark.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Nov 2012 14:29:32 +0100
+Subject: [PATCH 0/2] clk: ux500: Make mtu driver use apb_pclock
+In-Reply-To: <201211151221.30217.arnd@arndb.de>
+References: <1351080821-18660-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121112183615.17970.20162@nucleus>
+ <CACRpkdYmPvRLcEjSNwC51sZw+g3iH3a5r7+7USEWJONmR4q4JQ@mail.gmail.com>
+ <201211151221.30217.arnd@arndb.de>
+Message-ID: <CACRpkdaFkS_8i=8FmVYujzm1cMe1+=SO6MJyUbFyFPX7xhz-YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2012 at 07:07:13PM +0000, Kees Cook wrote:
-> Hi, any more thoughts on this series? I'd really like to get it into
-> -next. It's been running happily for a while now in the Chrome OS ARM
-> devices.
+On Thu, Nov 15, 2012 at 1:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-I'm not familiar with seccomp in general, but the changes look ok now from
-an ARM point-of-view:
+> If I understand the problem at hand correctly, the safe solution
+> should be to base the ux500 clk changes on top of c3b9d1db23c4e,
+> which is in the nomadik/plat-removal branch in arm-soc that got
+> merged into next/multiplatform. I would prefer if you use that
+> as a base instead of the larger next/multiplatform branch that
+> also contains vt8500 and other changes.
 
-  Reviewed-by: Will Deacon <will.deacon@arm.com>
+OK I'll take a stab at this and see if I can fix it...
 
-These should probably go via Russell (who will put them into -next), so
-please send them to the patch system.
-
-Will
+Yours,
+Linus Walleij
