@@ -1,28 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Nov 2012 11:31:50 +0000
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 15 Nov 2012 14:32:21 +0300
 Subject: Kernel uncompression error
-In-Reply-To: <CA+E=qVdDGszU1jMDXjFepvnSmiRTWJ=A_23BL2LEty+170FNsA@mail.gmail.com>
+In-Reply-To: <87mwyjw1og.fsf@lebrac.rtp-net.org>
 References: <k809hq$1q3$1@ger.gmane.org>
  <20121114173453.GJ3290@n2100.arm.linux.org.uk>
- <CA+E=qVdDGszU1jMDXjFepvnSmiRTWJ=A_23BL2LEty+170FNsA@mail.gmail.com>
-Message-ID: <20121115113150.GO3290@n2100.arm.linux.org.uk>
+ <50A4841F.9070507@gmail.com> <20121115093233.GM3290@n2100.arm.linux.org.uk>
+ <87mwyjw1og.fsf@lebrac.rtp-net.org>
+Message-ID: <CA+E=qVeLHZa1w4Sb0TWa+v-8gvMJhWceGRsDiRhp_rt6eouXgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 02:29:40PM +0300, Vasily Khoruzhick wrote:
-> On Wed, Nov 14, 2012 at 8:34 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Nov 14, 2012 at 10:23:55PM +0800, woody wrote:
-> >> I just built a 3.2.x ARM kernel and tried to have it boot by a boot
-> >> loader (vivi) on my s3c2410a ARM board.  The kernel was built with
-> >> default configuration s3c2410.
-> >
-> > I reported that S3C2410 is totally dead with 3.x kernels about a month
-> > ago and got no response what so ever from anyone.  I guess S3C2410 is
-> > just not cared for anymore.
-> 
-> It was working at least for 3.1 (tested on h1940 machine),
-> can you give a link to your post? I still care about s3c2410 and s3c244x :)
+On Thu, Nov 15, 2012 at 2:22 PM, Arnaud Patard
+<arnaud.patard@rtp-net.org> wrote:
+>
+> I guess that a lot of people don't care anymore about 2410 or can't
+> help. For instance, the only serial port available on my h1940 is the IR
+> one and I don't have a device to receive the ir data anymore so this
+> won't help. I won't even talk about gta01, which has no support in
+> mainline. It may also be the usual -ENOTIME error.
 
-Subject: s3c2410 bast (== lists.arm.linux.org.uk) - appears to be broken
-        with 3.1.8...
+Well, I've s3c2440 and s3c2442 (they're close enough to s3c2410)
+machines with serial port, I can take a look.
+
+Regards
+Vasily
