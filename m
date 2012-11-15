@@ -1,53 +1,62 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 15 Nov 2012 11:23:00 -0700
-Subject: [PATCH] RFC: pinctrl: grab default handler with bus notifiers
-In-Reply-To: <CACRpkdY-tye5LNOwxQ-XrjM-x9RffAvj-tPfsFQA3ZWOY8P-Vw@mail.gmail.com>
-References: <1352636539-6318-1-git-send-email-linus.walleij@stericsson.com>
- <50A15A54.3090803@wwwdotorg.org>
- <20121113063546.GD18224@opensource.wolfsonmicro.com>
- <CACRpkdY-tye5LNOwxQ-XrjM-x9RffAvj-tPfsFQA3ZWOY8P-Vw@mail.gmail.com>
-Message-ID: <50A53304.6040904@wwwdotorg.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 15 Nov 2012 12:24:40 -0600
+Subject: [PATCH] Remove inline from clock framework function definitions
+ to build the kernel with GCC 4.7
+In-Reply-To: <50A52134.2010502@gmail.com>
+References: <50A52134.2010502@gmail.com>
+Message-ID: <50A53368.6090306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2012 07:03 AM, Linus Walleij wrote:
-> On Tue, Nov 13, 2012 at 7:35 AM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
->> On Mon, Nov 12, 2012 at 01:21:40PM -0700, Stephen Warren wrote:
->>> On 11/11/2012 05:22 AM, Linus Walleij wrote:
->>
->>>> Another solution that was discussed was whether to move
->>>> the default pinctrl handle and state grab to the device
->>>> core as an optional field in struct device itself, but
->>>> I'd like to first propose this less intrusive mechanism.
->>
->>> I think doing that approach makes a lot more sense; wouldn't it
->>> completely avoid the issues with deferred probe that this notifier-based
->>> method can't solve? It would also be very much in line with e.g.
->>> dev_get_regmap() - if every resource that a driver required were handled
->>> like that, then deferred probe could be significantly isolated into the
->>> driver core rather than in every driver...
->>
->> I have to say that I agree with this, notifiers seem to make life more
->> complicated for limited gain.  Otherwise I guess we could enhance
->> notifiers so that they're able to trigger deferrals?
+
+On 11/15/2012 11:07 AM, Igor Mazanov wrote:
+>  Remove inline from clock framework function definitions to
+>  build the kernel with GCC 4.7
+
+Adding Mike to the party ...
+
+May be good to add some details about the exact problem seen.
+
+I am seeing the same problem today with GCC 4.7 and Tony's master
+branch. For a bit of background it seems that for 4.7 not having
+the body of the inlined function available in the header is
+causing this error. Another example here [1].
+
+The actual compiler error seen for OMAP is ...
+
+In file included from arch/arm/mach-omap2/clockdomain.c:25:0:
+arch/arm/mach-omap2/clockdomain.c: In function ?clkdm_clk_disable?:
+include/linux/clk-provider.h:338:12: error: inlining failed in call to always_inline ?__clk_get_enable_count?: function body not available
+arch/arm/mach-omap2/clockdomain.c:1001:28: error: called from here
+make[1]: *** [arch/arm/mach-omap2/clockdomain.o] Error 1
+make: *** [arch/arm/mach-omap2] Error 2
+
+ 
+> Signed-off-by: Igor Mazanov <i.mazanov@gmail.com>
+> ---
+>  include/linux/clk-provider.h |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> OK I'll have to come up with a patch to the device core
-> instead... it'll be much simpler anyway and if both of you guys
-> can back it I guess Greg might be OK with it too.
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index c127315..f9f5e9e 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -335,8 +335,8 @@ const char *__clk_get_name(struct clk *clk);
+>  struct clk_hw *__clk_get_hw(struct clk *clk);
+>  u8 __clk_get_num_parents(struct clk *clk);
+>  struct clk *__clk_get_parent(struct clk *clk);
+> -inline int __clk_get_enable_count(struct clk *clk);
+> -inline int __clk_get_prepare_count(struct clk *clk);
+> +int __clk_get_enable_count(struct clk *clk);
+> +int __clk_get_prepare_count(struct clk *clk);
+>  unsigned long __clk_get_rate(struct clk *clk);
+>  unsigned long __clk_get_flags(struct clk *clk);
+>  int __clk_is_enabled(struct clk *clk);
 
-I did have one thought here; how will this interact with hogs? If a
-device's pinctrl configuration must be pinctrl_get()'d before the device
-is probed, then a pinctrl device with hogs will never get probed because
-it won't be registered to provide the pinctrl node parsing. Solutions
-might include:
+Do we also need to remove the inline from the functions declared in
+drivers/clk/clk.c too?
 
-a) Some special case where if the pinctrl driver only can't probe due to
-missing pinctrl from its own node, don't defer the probe, but defer the
-pinctrl_get().
+Cheers
+Jon
 
-b) Separate out DT node parsing from device instantiation, so that the
-driver can always parse the DT, without needing the context of a
-specific pinctrl device to do so.
-
-I haven't thought through this in any detail though.
+[1] https://bugs.launchpad.net/linaro-android/+bug/983496
