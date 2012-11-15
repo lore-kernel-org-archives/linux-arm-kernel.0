@@ -1,54 +1,31 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 15 Nov 2012 09:10:30 +0100
-Subject: [PATCH] ARM: OMAP2+: omap_twl: Change TWL4030_MODULE_PM_RECEIVER
- to TWL_MODULE_PM_RECEIVER
-In-Reply-To: <1352799152-20980-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1352799152-20980-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <50A4A376.3020703@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 15 Nov 2012 09:11:09 +0100
+Subject: [PATCH resend] rtc: i.MX dryice: Add devicetree support
+In-Reply-To: <20121114145253.aa79fb48.akpm@linux-foundation.org>
+References: <1352709770-5919-1-git-send-email-s.hauer@pengutronix.de>
+ <20121114145253.aa79fb48.akpm@linux-foundation.org>
+Message-ID: <20121115081109.GX10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On 11/13/2012 10:32 AM, Peter Ujfalusi wrote:
-> To facilitate upcoming cleanup in twl stack.
-> No functional change.
-
-Would you please consider this patch for 3.8? It would shorten the time I'll
-need to progress on the cleanup regarding to twl-core greatly.
-
-Thank you,
-P?ter
-
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_twl.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+On Wed, Nov 14, 2012 at 02:52:53PM -0800, Andrew Morton wrote:
+> On Mon, 12 Nov 2012 09:42:50 +0100
+> Sascha Hauer <s.hauer@pengutronix.de> wrote:
 > 
-> diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
-> index 2bf35dc..018abb4 100644
-> --- a/arch/arm/mach-omap2/omap_twl.c
-> +++ b/arch/arm/mach-omap2/omap_twl.c
-> @@ -337,8 +337,8 @@ int __init omap3_twl_set_sr_bit(bool enable)
->  	if (twl_sr_enable_autoinit)
->  		pr_warning("%s: unexpected multiple calls\n", __func__);
->  
-> -	ret = twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER, &temp,
-> -					TWL4030_DCDC_GLOBAL_CFG);
-> +	ret = twl_i2c_read_u8(TWL_MODULE_PM_RECEIVER, &temp,
-> +			      TWL4030_DCDC_GLOBAL_CFG);
->  	if (ret)
->  		goto err;
->  
-> @@ -347,8 +347,8 @@ int __init omap3_twl_set_sr_bit(bool enable)
->  	else
->  		temp &= ~SMARTREFLEX_ENABLE;
->  
-> -	ret = twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, temp,
-> -				TWL4030_DCDC_GLOBAL_CFG);
-> +	ret = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, temp,
-> +			       TWL4030_DCDC_GLOBAL_CFG);
->  	if (!ret) {
->  		twl_sr_enable_autoinit = true;
->  		return 0;
+> > Add devicetree probing, fixing some whitespace damage along the way.
+> > 
 > 
+> I've already merged the below.  It has better code but a little less
+> documentation:
+
+Oops, missed that. Too many RTCs...
+
+Sorry for the noise.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
