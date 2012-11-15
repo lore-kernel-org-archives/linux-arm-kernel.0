@@ -1,24 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Nov 2012 12:23:46 +0000
-Subject: [PATCH 1/1] ARM: ux500: Describe UART platform registering issues
- more accurately
-In-Reply-To: <1352968401-6092-1-git-send-email-lee.jones@linaro.org>
-References: <1352968401-6092-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <201211151223.46989.arnd@arndb.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 15 Nov 2012 20:24:49 +0800
+Subject: [PATCH] ARM: pxa: remove pxa95x support
+In-Reply-To: <201211151214.47073.arnd@arndb.de>
+References: <1352970366-7154-1-git-send-email-haojian.zhuang@gmail.com>
+ <201211151206.33461.arnd@arndb.de>
+ <201211151214.47073.arnd@arndb.de>
+Message-ID: <CAN1soZyfPT7pJjyO_vxGGhzC5hB_5XX1DAR2VwDP9XtH29FV8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 November 2012, Lee Jones wrote:
-> UARTs no longer require call-back information, since the reset
-> call-back was removed in 43b5f0d69291374f602ad8e1817f329573a59010.
-> The only AUXDATA dependencies remaining for UARTs are DMA settings.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Thu, Nov 15, 2012 at 8:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 15 November 2012, Arnd Bergmann wrote:
+>> On Thursday 15 November 2012, Haojian Zhuang wrote:
+>> > PXA95x isn't widely used. And it adds the effort on supporting
+>> > multiple platform. So remove it.
+>> >
+>> > Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+>>
+>> Looks good to me, thanks for going through this.
+>>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>
+>> Should I apply this straight into the arm-soc tree, or are you
+>> going to send a pull request?
+>>
+>
+> One more comment: It would be good to put a disclaimer into the
+> changeset text like
+>
+>  "The assumption is that nobody will miss this support. If you are
+>   reading this text because you actually require pxa95x support on
+>   a new kernel, we can work out a way to revert this patch or add
+>   support to the mmp platform".
+>
+>         Arnd
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Yes, it's great. Please help to paste it into the changeset.
 
-What is the state of the DMA binding now? We originally wanted to merge
-it for 3.7, but that didn't work out, so I hope we can get it done for
-3.8.
-
-	Arnd
+Best Regards
+Haojian
