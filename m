@@ -1,57 +1,20 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 Nov 2012 14:56:35 +0100
-Subject: [PATCH 1/4] pinctrl: dove: Prevent NULL dereference if
- of_match_device returns NULL
-In-Reply-To: <CAFRkauCybE+UcBD17u3J6hoxEA88GM0tatxkrKtWqVNvDPC9dA@mail.gmail.com>
-References: <1352955096.6793.1.camel@phoenix> <20121115083511.08f5a16f@skate>
- <CAFRkauCybE+UcBD17u3J6hoxEA88GM0tatxkrKtWqVNvDPC9dA@mail.gmail.com>
-Message-ID: <20121115145635.2fae2fc9@skate>
+From: m.grzeschik@pengutronix.de (Michael Grzeschik)
+Date: Thu, 15 Nov 2012 15:00:10 +0100
+Subject: [PATCH 0/4] mx5x usb{misc} devictree bindings and clocks
+Message-ID: <1352988014-14769-1-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Axel Lin,
+Michael Grzeschik (4):
+  ARM: imx: add imx5x usb controller clock lookups
+  ARM: imx: add imx5x usbmisc clock lookups
+  ARM: dts: imx: rename imx5x usb entries as in imx6q.dtsi
+  ARM: dts: imx: add imx5x phy-mode entries
 
-On Thu, 15 Nov 2012 21:44:07 +0800, Axel Lin wrote:
+ arch/arm/boot/dts/imx51.dtsi        |   14 ++++++++++----
+ arch/arm/boot/dts/imx53.dtsi        |   14 ++++++++++----
+ arch/arm/mach-imx/clk-imx51-imx53.c |   30 ++++++++++++++++++++++++++++++
+ 3 files changed, 50 insertions(+), 8 deletions(-)
 
-> BTW, I found there is no way to compile the dove and kirkwood pinctrl
-> drivers.
-> I need add below patch to compile these two drivers, how do you think about
-> below patch?
-> ( In dove, the USE_OF is optional, it is selected only when MACH_DOVE_DT is
-> enabled )
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 14f8160..dda6785 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -531,6 +531,8 @@ config ARCH_DOVE
->         select CPU_V7
->         select GENERIC_CLOCKEVENTS
->         select MIGHT_HAVE_PCI
-> +       select PINCTRL
-> +       select PINCTRL_DOVE if USE_OF
->         select PLAT_ORION_LEGACY
->         select USB_ARCH_HAS_EHCI
->         help
-> @@ -542,6 +544,8 @@ config ARCH_KIRKWOOD
->         select CPU_FEROCEON
->         select GENERIC_CLOCKEVENTS
->         select PCI
-> +       select PINCTRL
-> +       select PINCTRL_KIRKWOOD
->         select PLAT_ORION_LEGACY
->         help
->           Support for the following Marvell Kirkwood series SoCs:
-
-See "[PATCH 1/5] ARM: Kirkwood: Allow use of pinctrl" and "[PATCH 4/5]
-ARM: Dove: Make use of pinctrl driver" which have been posted by Andrew
-Lunn on October, 24th.
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.10.4
