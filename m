@@ -1,66 +1,61 @@
-From: rob.clark@linaro.org (Rob Clark)
-Date: Thu, 15 Nov 2012 07:46:04 -0600
-Subject: [PATCH] ARM: add get_user() support for 8 byte types
-In-Reply-To: <201211151339.08016.arnd@arndb.de>
-References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
- <201211150919.37343.arnd@arndb.de>
- <CAF6AEGv-O_D6nOnEwi5w8NUcv+dQFe7pJBXhUA8xq+tykG4dfg@mail.gmail.com>
- <201211151339.08016.arnd@arndb.de>
-Message-ID: <CAF6AEGuJReNtwUZX6HVZCE8GHuyEAyC8bM0GqZuVMV1=DrGJVw@mail.gmail.com>
+From: etienne.carriere@st.com (Etienne CARRIERE ST)
+Date: Thu, 15 Nov 2012 14:46:29 +0100
+Subject: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
+In-Reply-To: <20121114172216.GG16215@arm.com>
+References: <0154077FE026E54BB093CA7EB3FD1AE32B57AF1B59@SAFEX1MAIL3.st.com>
+ <20121113171745.GA6370@linaro.org>
+ <BLU002-W44C55773365E0FDAC8B3C5E36C0@phx.gbl>
+ <0154077FE026E54BB093CA7EB3FD1AE32DB61E4CC7@SAFEX1MAIL3.st.com>
+ <20121114172216.GG16215@arm.com>
+Message-ID: <0154077FE026E54BB093CA7EB3FD1AE32DB6A63266@SAFEX1MAIL3.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 7:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 15 November 2012, Rob Clark wrote:
->> On Thu, Nov 15, 2012 at 3:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Tuesday 13 November 2012, Russell King - ARM Linux wrote:
->> >> You're missing something; that is one of the greatest powers of open
->> >> source.  The many eyes (and minds) effect.  Someone out there probably
->> >> has a solution to whatever problem, the trick is to find that person. :)
->> >>
->> >> I think we have a working solution for this for ARM.  It won't be suitable
->> >> for every arch, where they have 8-bit and 16-bit registers able to be
->> >> allocated by the compiler, but for architectures where the minimum register
->> >> size is 32-bit, what we have below should work.
->> >
->> > I don't mind at all adding the extension to ARM, and I think it's pretty
->> > cool that you guys actually found a working solution.
->> >
->> > The part that worries me is that we are making architecture independent
->> > code depend on a clever hack that may or may not be possible to implement
->> > on a given architecture, and that most architecture maintainers wouldn't
->> > know how to implement correctly even if it's possible.
->>
->> I could always send a 3rd version with a comment smashed on about why
->> that works if you think this is a problem..
->
-> Comments are always good, so I'd surely like to see those get added.
-> As I said, I don't have any objections to the addition of your patch to
-> the ARM code, which sounds useful to have.
+Thanks for the details.
 
-ok, I'll send a v3 w/ some additional comments
+I think we will internally use our hack in l2x0 spin locking to prevent collision, based on old arch_spinlock support.
 
-> I still haven't heard a conclusive argument why we need to use get_user()
-> rather than copy_from_user() in the DRM code. Is this about a fast path
-> where you want to shave off a few cycles for each call, or does this
-> simplify the code structure, or something else?
+For a definitive outer cache support in TZ, I think we will go into a RPC/SMC based architecture.
+I mean a basic SMC to request secured outer cache maintenance, called from linux L2 cache driver based on its native spinlock, whatever it is.
 
-well, it is mostly because it seemed like a good idea to first try to
-solve the root issue, rather than having to fix things up in each
-driver when someone from x86-world introduces a 64b get_user()..
+This will indeed require some modification in L2 cache driver (cache-l2x0.c). 
+We will work on that once our TZ implementation support such RPC/SMC features for L2 cache maintenance.
 
-There are some other arch's that don't have 64b get_user(), but I
-don't think any that have any DRM drivers.  If 64b get_user() is
-really not intended to be supported by all archs, it is better to
-remove it from x86 and the other arch's that do currently support it,
-rather than making it possible to write drivers that are broken on
-some archs.
+Thanks to all for the feedbacks.
+Regards,
+etienne
 
-BR,
--R
+-----Original Message-----
+From: Catalin Marinas [mailto:catalin.marinas at arm.com] 
+Sent: Wednesday, November 14, 2012 6:22 PM
+To: Etienne CARRIERE ST
+Cc: Abhimanyu Kapur; Dave Martin; Rabin VINCENT; Russell King; Srinidhi KASAGAR; Marc Zyngier; Linus Walleij (linus.walleij at linaro.org); Will Deacon; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH 1/2] arm/mm: L2CC shared mutex with ARM TZ
 
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On Wed, Nov 14, 2012 at 10:15:46AM +0000, Etienne CARRIERE ST wrote:
+> > Tue 11-13-2012 8:23 PM
+> > From: Abhimanyu Kapur <abhimanyu.kapur@outlook.com>
+> >
+> > > Secure code in TrustZone space may need to perform L2 cache 
+> > > maintenance operations. A shared mutex is required to synchronize 
+> > > linux l2cc maintenance and TZ l2cc maintenance.
+> > 
+> > If you are using PL310 with thrustzone support then the L2 cache 
+> > lines are secure bit tagged ; your design should be such that the 
+> > secure (TZ) side only does operations on secure cache lines and 
+> > non-secure side does operations only on non-secure cache lines. So 
+> > each entity (TZ and nonTZ) if maintains their own cache and ensures 
+> > integrity before switching over via monitor, this might not be needed.
+> 
+> I don't think 2 cores can safely write the LX20_CLEAN/INV_LINE_PA 
+> registers of the PL310 at the same time, even if targeting different 
+> lines.
+
+Actually for the clean/invalidate operations by PA you can safely write the registers from two different processors as they get serialised by the hardware. What you don't get is protection around the background operations (clean/inv by way). I think it depends on how the PL310 is wired on your hardware but trying to do a PA operation while a background one is in progress would trigger an external abort.
+
+So the NS world could simply start a background cache operation without taking the lock while the secure world thinks that it has the lock and tries to do a PA operation which would abort.
+
+My advise is to simply ignore the shared locking and only do atomic PA operations on the secure side. The secure side also needs to poll for the completion of any background operation that was started in non-secure world. Of course, there is still a race, in which case, depending on the hardware implementation, you would need to trap any possible aborts while in secure mode when writing the PL310 registers.
+
+--
+Catalin
