@@ -1,60 +1,261 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 15 Nov 2012 12:46:53 +0000
-Subject: [PATCH v3 4/5] ARM: kernel: add logical mappings look-up
+Date: Thu, 15 Nov 2012 12:46:51 +0000
+Subject: [PATCH v3 2/5] ARM: kernel: add device tree init map function
 In-Reply-To: <1352983614-22924-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1352983614-22924-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1352983614-22924-5-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1352983614-22924-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In ARM SMP systems the MPIDR register ([23:0] bits) is used to uniquely
-identify CPUs.
+When booting through a device tree, the kernel cpu logical id map can be
+initialized using device tree data passed by FW or through an embedded blob.
 
-In order to retrieve the logical CPU index corresponding to a given
-MPIDR value and guarantee a consistent translation throughout the kernel,
-this patch adds a look-up based on the MPIDR[23:0] so that kernel subsystems
-can use it whenever the logical cpu index corresponding to a given MPIDR
-value is needed.
+This patch adds a function that parses device tree "cpu" nodes and
+retrieves the corresponding CPUs hardware identifiers (MPIDR).
+It sets the possible cpus and the cpu logical map values according to
+the number of CPUs defined in the device tree and respective properties.
+
+The device tree HW identifiers are considered valid if all CPU nodes contain
+a "reg" property, there are no duplicate "reg" entries and the DT defines a
+CPU node whose "reg" property matches the MPIDR[23:0] of the boot CPU.
+
+The primary CPU is assigned cpu logical number 0 to keep the current convention
+valid.
+
+Current bindings documentation is included in the patch:
+
+Documentation/devicetree/bindings/arm/cpus.txt
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/smp_plat.h | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ Documentation/devicetree/bindings/arm/cpus.txt | 78 ++++++++++++++++++++
+ arch/arm/include/asm/prom.h                    |  2 +
+ arch/arm/kernel/devtree.c                      | 99 ++++++++++++++++++++++++++
+ 3 files changed, 179 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
 
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index 558d6c8..aaa61b6 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -5,6 +5,9 @@
- #ifndef __ASMARM_SMP_PLAT_H
- #define __ASMARM_SMP_PLAT_H
- 
-+#include <linux/cpumask.h>
-+#include <linux/err.h>
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+new file mode 100644
+index 0000000..1fab07a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -0,0 +1,78 @@
++* ARM CPUs binding description
 +
- #include <asm/cputype.h>
++The device tree allows to describe the layout of CPUs in a system through
++the "cpus" node, which in turn contains a number of subnodes (ie "cpu")
++defining properties for every cpu.
++
++Bindings for CPU nodes follow the ePAPR standard, available from:
++
++http://devicetree.org
++
++For the ARM architecture every CPU node must contain the following properties:
++
++- reg:		property matching the CPU MPIDR[23:0] register bits
++		reg[31:24] bits must be set to 0
++- compatible:	should be one of:
++		"arm,arm1020"
++		"arm,arm1020e"
++		"arm,arm1022"
++		"arm,arm1026"
++		"arm,arm720"
++		"arm,arm740"
++		"arm,arm7tdmi"
++		"arm,arm920"
++		"arm,arm922"
++		"arm,arm925"
++		"arm,arm926"
++		"arm,arm940"
++		"arm,arm946"
++		"arm,arm9tdmi"
++		"arm,cortex-a5"
++		"arm,cortex-a7"
++		"arm,cortex-a8"
++		"arm,cortex-a9"
++		"arm,cortex-a15"
++		"arm,arm1136"
++		"arm,arm1156"
++		"arm,arm1176"
++		"arm,arm11mpcore"
++		"faraday,fa526"
++		"intel,sa110"
++		"intel,sa1100"
++		"marvell,feroceon"
++		"marvell,mohawk"
++		"marvell,xsc3"
++		"marvell,xscale"
++
++Every cpu node is required to set its device_type to "cpu".
++
++Example:
++
++	cpus {
++		#size-cells = <0>;
++		#address-cells = <1>;
++
++		CPU0: cpu at 0 {
++			device_type = "cpu";
++			compatible = <arm, cortex-a15>;
++			reg = <0x0>;
++		};
++
++		CPU1: cpu at 1 {
++			device_type = "cpu";
++			compatible = <arm, cortex-a15>;
++			reg = <0x1>;
++		};
++
++		CPU2: cpu at 100 {
++			device_type = "cpu";
++			compatible = <arm, cortex-a7>;
++			reg = <0x100>;
++		};
++
++		CPU3: cpu at 101 {
++			device_type = "cpu";
++			compatible = <arm, cortex-a7>;
++			reg = <0x101>;
++		};
++	};
+diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
+index aeae9c6..8dd51dc 100644
+--- a/arch/arm/include/asm/prom.h
++++ b/arch/arm/include/asm/prom.h
+@@ -15,6 +15,7 @@
  
- /*
-@@ -48,5 +51,19 @@ static inline int cache_ops_need_broadcast(void)
-  */
- extern int __cpu_logical_map[];
- #define cpu_logical_map(cpu)	__cpu_logical_map[cpu]
+ extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
+ extern void arm_dt_memblock_reserve(void);
++extern void __init arm_dt_init_cpu_maps(void);
+ 
+ #else /* CONFIG_OF */
+ 
+@@ -24,6 +25,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
+ }
+ 
+ static inline void arm_dt_memblock_reserve(void) { }
++static inline void arm_dt_init_cpu_maps(void) { }
+ 
+ #endif /* CONFIG_OF */
+ #endif /* ASMARM_PROM_H */
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index bee7f9d..cf840b3 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -19,8 +19,10 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ 
++#include <asm/cputype.h>
+ #include <asm/setup.h>
+ #include <asm/page.h>
++#include <asm/smp_plat.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+ 
+@@ -61,6 +63,103 @@ void __init arm_dt_memblock_reserve(void)
+ 	}
+ }
+ 
 +/*
-+ * Retrieve logical cpu index corresponding to a given MPIDR[23:0]
-+ *  - mpidr: MPIDR[23:0] to be used for the look-up
++ * arm_dt_init_cpu_maps - Function retrieves cpu nodes from the device tree
++ * and builds the cpu logical map array containing MPIDR values related to
++ * logical cpus
 + *
-+ * Returns the cpu logical index or -EINVAL on look-up error
++ * Updates the cpu possible mask with the number of parsed cpu nodes
 + */
-+static inline int get_logical_index(u32 mpidr)
++void __init arm_dt_init_cpu_maps(void)
 +{
-+	int cpu;
-+	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
-+		if (cpu_logical_map(cpu) == mpidr)
-+			return cpu;
-+	return -EINVAL;
++	/*
++	 * Temp logical map is initialized with UINT_MAX values that are
++	 * considered invalid logical map entries since the logical map must
++	 * contain a list of MPIDR[23:0] values where MPIDR[31:24] must
++	 * read as 0.
++	 */
++	struct device_node *cpu, *cpus;
++	u32 i, j, cpuidx = 1;
++	u32 mpidr = is_smp() ? read_cpuid_mpidr() & 0xffffff : 0;
++	u32 tmp_map[NR_CPUS] = { [0 ... NR_CPUS-1] = UINT_MAX };
++	bool bootcpu_valid = false;
++	cpus = of_find_node_by_path("/cpus");
++
++	if (!cpus)
++		return;
++
++	for_each_child_of_node(cpus, cpu) {
++		u32 hwid;
++
++		pr_debug(" * %s...\n", cpu->full_name);
++		/*
++		 * A device tree containing CPU nodes with missing "reg"
++		 * properties is considered invalid to build the
++		 * cpu_logical_map.
++		 */
++		if (of_property_read_u32(cpu, "reg", &hwid)) {
++			pr_debug(" * %s missing reg property\n",
++				     cpu->full_name);
++			return;
++		}
++
++		/*
++		 * 8 MSBs must be set to 0 in the DT since the reg property
++		 * defines the MPIDR[23:0].
++		 */
++		if (hwid & 0xff000000)
++			return;
++
++		/*
++		 * Duplicate MPIDRs are a recipe for disaster.
++		 * Scan all initialized entries and check for
++		 * duplicates. If any is found just bail out.
++		 * temp values were initialized to UINT_MAX
++		 * to avoid matching valid MPIDR[23:0] values.
++		 */
++		for (j = 0; j < cpuidx; j++)
++			if (WARN(tmp_map[j] == hwid, "Duplicate /cpu reg "
++						     "properties in the DT\n"))
++				return;
++
++		/*
++		 * Build a stashed array of MPIDR values. Numbering scheme
++		 * requires that if detected the boot CPU must be assigned
++		 * logical id 0. Other CPUs get sequential indexes starting
++		 * from 1. If a CPU node with a reg property matching the
++		 * boot CPU MPIDR is detected, this is recorded so that the
++		 * logical map built from DT is validated and can be used
++		 * to override the map created in smp_setup_processor_id().
++		 */
++		if (hwid == mpidr) {
++			i = 0;
++			bootcpu_valid = true;
++		} else {
++			i = cpuidx++;
++		}
++
++		tmp_map[i] = hwid;
++
++		if (cpuidx > nr_cpu_ids)
++			break;
++	}
++
++	if (WARN(!bootcpu_valid, "DT missing boot CPU MPIDR[23:0], "
++				 "fall back to default cpu_logical_map\n"))
++		return;
++
++	/*
++	 * Since the boot CPU node contains proper data, and all nodes have
++	 * a reg property, the DT CPU list can be considered valid and the
++	 * logical map created in smp_setup_processor_id() can be overridden
++	 */
++	for (i = 0; i < cpuidx; i++) {
++		set_cpu_possible(i, true);
++		cpu_logical_map(i) = tmp_map[i];
++		pr_debug("cpu logical map 0x%x\n", cpu_logical_map(i));
++	}
 +}
- 
- #endif
++
+ /**
+  * setup_machine_fdt - Machine setup when an dtb was passed to the kernel
+  * @dt_phys: physical address of dt blob
 -- 
 1.7.12
