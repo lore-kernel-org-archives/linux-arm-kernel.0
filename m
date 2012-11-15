@@ -1,24 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Nov 2012 16:27:11 +0000
-Subject: [GIT PULL 1/6] omap cleanup fixes for v3.8 merge window
-In-Reply-To: <pull-1352828737-887235>
-References: <pull-1352828737-887235>
-Message-ID: <201211151627.11465.arnd@arndb.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 15 Nov 2012 16:30:39 +0000
+Subject: [PATCH] arm-dt: Enable DT proc updates.
+In-Reply-To: <5091D8A8.9010307@gmail.com>
+References: <1351699069-4661-1-git-send-email-panto@antoniou-consulting.com>
+ <5091D8A8.9010307@gmail.com>
+Message-ID: <20121115163039.E8BBD3E194B@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 November 2012, Tony Lindgren wrote:
-> The following changes since commit edf8dde393f879fc2d8c22d4bc01ff8d37b80e1a:
+On Wed, 31 Oct 2012 21:04:24 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> On 10/31/2012 10:57 AM, Pantelis Antoniou wrote:
+> > This simple patch enables dynamic changes of the DT tree on runtime
+> > to be visible to the device-tree proc interface.
+> > 
+> > Signed-off-by: Pantelis Antoniou <panto@antoniou-consulting.com>
 > 
->   Merge branch 'linus' into omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3 (2012-11-09 14:58:01 -0800)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/cleanup-fixes-signed
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-Pulled all six branches from this series, thanks!
+Applied, thanks.
 
-I'll have a look at the other five next, but might not get to that today.
-
-	Arnd
+g.
