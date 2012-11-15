@@ -1,159 +1,60 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 15 Nov 2012 18:20:33 +0100
-Subject: [PATCH 28/29] mv_xor: add Device Tree binding
-In-Reply-To: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353000034-30567-29-git-send-email-thomas.petazzoni@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Nov 2012 18:24:01 +0100
+Subject: [PATCH] RFC: pinctrl: grab default handler with bus notifiers
+In-Reply-To: <20121115152652.44c567d5@skate>
+References: <1352636539-6318-1-git-send-email-linus.walleij@stericsson.com>
+ <50A15A54.3090803@wwwdotorg.org>
+ <20121113063546.GD18224@opensource.wolfsonmicro.com>
+ <CACRpkdY-tye5LNOwxQ-XrjM-x9RffAvj-tPfsFQA3ZWOY8P-Vw@mail.gmail.com>
+ <20121115152652.44c567d5@skate>
+Message-ID: <CACRpkdaXCA9ZDbkGTtdtFBWLhBKQmPf1=EgnLhUSqKOT1xU7oQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: devicetree-discuss at lists.ozlabs.org
----
- Documentation/devicetree/bindings/dma/mv-xor.txt |   40 +++++++++++++++
- drivers/dma/mv_xor.c                             |   57 ++++++++++++++++++++--
- 2 files changed, 93 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/mv-xor.txt
+On Thu, Nov 15, 2012 at 3:26 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
 
-diff --git a/Documentation/devicetree/bindings/dma/mv-xor.txt b/Documentation/devicetree/bindings/dma/mv-xor.txt
-new file mode 100644
-index 0000000..7c6cb7f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/mv-xor.txt
-@@ -0,0 +1,40 @@
-+* Marvell XOR engines
-+
-+Required properties:
-+- compatible: Should be "marvell,orion-xor"
-+- reg: Should contain registers location and length (two sets)
-+    the first set is the low registers, the second set the high
-+    registers for the XOR engine.
-+- clocks: pointer to the reference clock
-+
-+The DT node must also contains sub-nodes for each XOR channel that the
-+XOR engine has. Those sub-nodes have the following required
-+properties:
-+- interrupts: interrupt of the XOR channel
-+
-+And the following optional properties:
-+- dmacap,memcpy to indicate that the XOR channel is capable of memcpy operations
-+- dmacap,memset to indicate that the XOR channel is capable of memset operations
-+- dmacap,xor to indicate that the XOR channel is capable of xor operations
-+
-+Example:
-+
-+xor at d0060900 {
-+	compatible = "marvell,orion-xor";
-+	reg = <0xd0060900 0x100
-+	       0xd0060b00 0x100>;
-+	clocks = <&coreclk 0>;
-+	status = "okay";
-+
-+	xor00 {
-+	      interrupts = <51>;
-+	      dmacap,memcpy;
-+	      dmacap,xor;
-+	};
-+	xor01 {
-+	      interrupts = <52>;
-+	      dmacap,memcpy;
-+	      dmacap,xor;
-+	      dmacap,memset;
-+	};
-+};
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 71cbb0e..d645d43 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -26,6 +26,8 @@
- #include <linux/platform_device.h>
- #include <linux/memory.h>
- #include <linux/clk.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
- #include <linux/platform_data/dma-mv_xor.h>
- 
- #include "dmaengine.h"
-@@ -1278,7 +1280,42 @@ static int mv_xor_probe(struct platform_device *pdev)
- 	if (!IS_ERR(xordev->clk))
- 		clk_prepare_enable(xordev->clk);
- 
--	if (pdata && pdata->channels) {
-+	if (pdev->dev.of_node) {
-+		struct device_node *np;
-+		int i = 0;
-+
-+		for_each_child_of_node(pdev->dev.of_node, np) {
-+			dma_cap_mask_t cap_mask;
-+			int irq;
-+
-+			dma_cap_zero(cap_mask);
-+			if (of_property_read_bool(np, "dmacap,memcpy"))
-+				dma_cap_set(DMA_MEMCPY, cap_mask);
-+			if (of_property_read_bool(np, "dmacap,xor"))
-+				dma_cap_set(DMA_XOR, cap_mask);
-+			if (of_property_read_bool(np, "dmacap,memset"))
-+				dma_cap_set(DMA_MEMSET, cap_mask);
-+			if (of_property_read_bool(np, "dmacap,interrupt"))
-+				dma_cap_set(DMA_INTERRUPT, cap_mask);
-+
-+			irq = irq_of_parse_and_map(np, 0);
-+			if (irq < 0) {
-+				ret = irq;
-+				goto err_channel_add;
-+			}
-+
-+			xordev->channels[i] =
-+				mv_xor_channel_add(xordev, pdev, i,
-+						   cap_mask, irq);
-+			if (IS_ERR(xordev->channels[i])) {
-+				ret = PTR_ERR(xordev->channels[i]);
-+				irq_dispose_mapping(irq);
-+				goto err_channel_add;
-+			}
-+
-+			i++;
-+		}
-+	} else if (pdata && pdata->channels) {
- 		for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
- 			struct mv_xor_channel_data *cd;
- 			int irq;
-@@ -1309,8 +1346,11 @@ static int mv_xor_probe(struct platform_device *pdev)
- 
- err_channel_add:
- 	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++)
--		if (xordev->channels[i])
-+		if (xordev->channels[i]) {
-+			if (pdev->dev.of_node)
-+				irq_dispose_mapping(xordev->channels[i]->irq);
- 			mv_xor_channel_remove(xordev->channels[i]);
-+		}
- 
- 	clk_disable_unprepare(xordev->clk);
- 	clk_put(xordev->clk);
-@@ -1335,12 +1375,21 @@ static int mv_xor_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static struct of_device_id mv_xor_dt_ids[] __devinitdata = {
-+       { .compatible = "marvell,orion-xor", },
-+       {},
-+};
-+MODULE_DEVICE_TABLE(of, mv_xor_dt_ids);
-+#endif
-+
- static struct platform_driver mv_xor_driver = {
- 	.probe		= mv_xor_probe,
- 	.remove		= mv_xor_remove,
- 	.driver		= {
--		.owner	= THIS_MODULE,
--		.name	= MV_XOR_NAME,
-+		.owner	        = THIS_MODULE,
-+		.name	        = MV_XOR_NAME,
-+		.of_match_table = of_match_ptr(mv_xor_dt_ids),
- 	},
- };
- 
--- 
-1.7.9.5
+> At ELCE, I've discussed with one person having an interesting use case:
+> they are using the same pin for two different purposes during the
+> system operation.
+>
+> At boot time, this pin is muxed as a SPI pin and is used to program the
+> bitstream of a FPGA. This is done in Linux, through a userspace
+> application.
+>
+> Then, once it is done, this pin is remuxed as a UART pin, and used to
+> communicate with another device on the board.
+
+This is not related to the current discussion but interesting
+anyway...
+
+> If the pinctrl configuration is done at probe() time inside the driver
+> core, then how can this kind of use case be supported? If each driver
+> does its own muxing, we could think of letting the SPI and UART driver
+> only do their muxing when the device is opened, and remove their muxing
+> when the device is closed, so that such sharing of pins for two
+> separate functions could be supported. Is this something we want to
+> support?
+
+This is trivial to support after this commit in the current patch
+queue:
+commit 1a78958dc212f3698fdc543857af80155cb30f7f
+pinctrl: reserve pins when states are activated
+
+Just define function maps for both devices using the same
+pins. Since the devices need to actively release their
+pins they need to go to a state which does not mux in
+any pins, so that the pins will be free:ed.
+
+This state can be any arbitrary string, but if so desired
+for consistency we can define something like
+#define PINCTRL_STATE_DECOUPLED "decoupled"
+in include/linux/pinctrl/pinctrl-state.h to clearly
+mark that this is a state where the device is not
+using any pins at all.
+
+Yours,
+Linus Walleij
+
+Yours,
+Linus Walleij
