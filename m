@@ -1,53 +1,28 @@
-From: narkewoody@gmail.com (Woody Wu)
-Date: Fri, 16 Nov 2012 01:25:00 +0800
-Subject: Kernel uncompression error
-In-Reply-To: <20121115093357.GN3290@n2100.arm.linux.org.uk>
-References: <k809hq$1q3$1@ger.gmane.org>
- <20121114173453.GJ3290@n2100.arm.linux.org.uk>
- <CAAsE_ufdjZN31BXWTcq5XyRhx5YcoECRJVvARcNh8qT-AP1_jw@mail.gmail.com>
- <20121115093357.GN3290@n2100.arm.linux.org.uk>
-Message-ID: <CAAsE_ufLfhwZkTaPqGuy8nQvp12-meCHn8cRz-xk59wDbEE4ug@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 15 Nov 2012 18:05:57 +0000
+Subject: [PATCH 1/3] gpio: Add simple poweroff-gpio driver
+In-Reply-To: <1352650891-18356-2-git-send-email-andrew@lunn.ch>
+References: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
+ <1352650891-18356-2-git-send-email-andrew@lunn.ch>
+Message-ID: <20121115180557.924713E197F@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012-11-15 PM5:34?"Russell King - ARM Linux" <linux@arm.linux.org.uk>
->
-> On Thu, Nov 15, 2012 at 07:35:30AM +0800, Woody Wu wrote:
-> > ? 2012-11-15 AM1:34?"Russell King - ARM Linux" <linux@arm.linux.org.uk>
-wrote:
-> > >
-> > > On Wed, Nov 14, 2012 at 10:23:55PM +0800, woody wrote:
-> > > > I just built a 3.2.x ARM kernel and tried to have it boot by a boot
-> > > > loader (vivi) on my s3c2410a ARM board.  The kernel was built with
-> > > > default configuration s3c2410.
-> > >
-> > > I reported that S3C2410 is totally dead with 3.x kernels about a month
-> > > ago and got no response what so ever from anyone.  I guess S3C2410 is
-> > > just not cared for anymore.
-> > >
-> > > When I get sufficient motivation, I'll try and track down what's going
-> > > wrong, but it means taking the old mailing list server (and now list
-> > > archive) offline for a while.
-> > >
-> > > I don't think it's cache related; different image sizes seem to behave
-> > > differently - and when they _do_ successfully decompress, they don't
-> > > boot at all.
-> >
-> > So, in your opinion, what version of kernel I should go for s3c2410?
->
-> lists.arm.linux.org.uk currently runs 2.6.32.8.  That's the last working
-> kernel I currently know of.
+On Sun, 11 Nov 2012 17:21:29 +0100, Andrew Lunn <andrew@lunn.ch> wrote:
+> From: Jamie Lentin <jm@lentin.co.uk>
+> 
+> Given appropriate devicetree bindings, this driver registers a
+> pm_power_off function to set a GPIO line high/low to power down
+> your board.
+> 
+> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  .../devicetree/bindings/gpio/gpio-poweroff.txt     |   22 ++++
+>  drivers/gpio/Kconfig                               |   10 ++
+>  drivers/gpio/Makefile                              |    2 +
+>  drivers/gpio/gpio-poweroff.c                       |  129 ++++++++++++++++++++
 
-For the 2.6 kernel, I just found a working one, that 2.6.36. From 2.6.7 on,
-even the compiling cant passed, an unresolved function call to a LED
-backlight related function. But 2.6.36 work, passed compiling,
-uncompressing, load and run.
+This isn't a gpio controller driver. Don't put it into drivers/gpio
 
-> As I said, I tried several 3.x kernels, all of them failed.
-
-By far, I probably met the same kind of error with you for the 3.x kernel.
-Uncompressing done, then halt. I really hope someone told me there is a
-working 3.2+ kernel since newer kernels usually have better driver surpport.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/2b45d9de/attachment.html>
+g.
