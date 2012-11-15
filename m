@@ -1,261 +1,144 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 15 Nov 2012 12:46:51 +0000
-Subject: [PATCH v3 2/5] ARM: kernel: add device tree init map function
+Date: Thu, 15 Nov 2012 12:46:54 +0000
+Subject: [PATCH v3 5/5] ARM: gic: use a private mapping for CPU target
+ interfaces
 In-Reply-To: <1352983614-22924-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1352983614-22924-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1352983614-22924-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1352983614-22924-6-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting through a device tree, the kernel cpu logical id map can be
-initialized using device tree data passed by FW or through an embedded blob.
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-This patch adds a function that parses device tree "cpu" nodes and
-retrieves the corresponding CPUs hardware identifiers (MPIDR).
-It sets the possible cpus and the cpu logical map values according to
-the number of CPUs defined in the device tree and respective properties.
+The GIC interface numbering does not necessarily follow the logical
+CPU numbering, especially for complex topologies such as multi-cluster
+systems.
 
-The device tree HW identifiers are considered valid if all CPU nodes contain
-a "reg" property, there are no duplicate "reg" entries and the DT defines a
-CPU node whose "reg" property matches the MPIDR[23:0] of the boot CPU.
+Fortunately we can easily probe the GIC to create a mapping as the
+Interrupt Processor Targets Registers for the first 32 interrupts are
+read-only, and each field returns a value that always corresponds to
+the processor reading the register.
 
-The primary CPU is assigned cpu logical number 0 to keep the current convention
-valid.
+Initially all mappings target all CPUs in case an IPI is required to
+boot secondary CPUs.  It is refined as those CPUs discover what their
+actual mapping is.
 
-Current bindings documentation is included in the patch:
-
-Documentation/devicetree/bindings/arm/cpus.txt
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
 ---
- Documentation/devicetree/bindings/arm/cpus.txt | 78 ++++++++++++++++++++
- arch/arm/include/asm/prom.h                    |  2 +
- arch/arm/kernel/devtree.c                      | 99 ++++++++++++++++++++++++++
- 3 files changed, 179 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
+ arch/arm/common/gic.c | 45 ++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 36 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-new file mode 100644
-index 0000000..1fab07a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -0,0 +1,78 @@
-+* ARM CPUs binding description
-+
-+The device tree allows to describe the layout of CPUs in a system through
-+the "cpus" node, which in turn contains a number of subnodes (ie "cpu")
-+defining properties for every cpu.
-+
-+Bindings for CPU nodes follow the ePAPR standard, available from:
-+
-+http://devicetree.org
-+
-+For the ARM architecture every CPU node must contain the following properties:
-+
-+- reg:		property matching the CPU MPIDR[23:0] register bits
-+		reg[31:24] bits must be set to 0
-+- compatible:	should be one of:
-+		"arm,arm1020"
-+		"arm,arm1020e"
-+		"arm,arm1022"
-+		"arm,arm1026"
-+		"arm,arm720"
-+		"arm,arm740"
-+		"arm,arm7tdmi"
-+		"arm,arm920"
-+		"arm,arm922"
-+		"arm,arm925"
-+		"arm,arm926"
-+		"arm,arm940"
-+		"arm,arm946"
-+		"arm,arm9tdmi"
-+		"arm,cortex-a5"
-+		"arm,cortex-a7"
-+		"arm,cortex-a8"
-+		"arm,cortex-a9"
-+		"arm,cortex-a15"
-+		"arm,arm1136"
-+		"arm,arm1156"
-+		"arm,arm1176"
-+		"arm,arm11mpcore"
-+		"faraday,fa526"
-+		"intel,sa110"
-+		"intel,sa1100"
-+		"marvell,feroceon"
-+		"marvell,mohawk"
-+		"marvell,xsc3"
-+		"marvell,xscale"
-+
-+Every cpu node is required to set its device_type to "cpu".
-+
-+Example:
-+
-+	cpus {
-+		#size-cells = <0>;
-+		#address-cells = <1>;
-+
-+		CPU0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = <arm, cortex-a15>;
-+			reg = <0x0>;
-+		};
-+
-+		CPU1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = <arm, cortex-a15>;
-+			reg = <0x1>;
-+		};
-+
-+		CPU2: cpu at 100 {
-+			device_type = "cpu";
-+			compatible = <arm, cortex-a7>;
-+			reg = <0x100>;
-+		};
-+
-+		CPU3: cpu at 101 {
-+			device_type = "cpu";
-+			compatible = <arm, cortex-a7>;
-+			reg = <0x101>;
-+		};
-+	};
-diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
-index aeae9c6..8dd51dc 100644
---- a/arch/arm/include/asm/prom.h
-+++ b/arch/arm/include/asm/prom.h
-@@ -15,6 +15,7 @@
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 50c9eef..2203c92 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -70,6 +70,14 @@ struct gic_chip_data {
+ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
  
- extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
- extern void arm_dt_memblock_reserve(void);
-+extern void __init arm_dt_init_cpu_maps(void);
- 
- #else /* CONFIG_OF */
- 
-@@ -24,6 +25,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
- }
- 
- static inline void arm_dt_memblock_reserve(void) { }
-+static inline void arm_dt_init_cpu_maps(void) { }
- 
- #endif /* CONFIG_OF */
- #endif /* ASMARM_PROM_H */
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index bee7f9d..cf840b3 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -19,8 +19,10 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- 
-+#include <asm/cputype.h>
- #include <asm/setup.h>
- #include <asm/page.h>
-+#include <asm/smp_plat.h>
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- 
-@@ -61,6 +63,103 @@ void __init arm_dt_memblock_reserve(void)
- 	}
- }
- 
-+/*
-+ * arm_dt_init_cpu_maps - Function retrieves cpu nodes from the device tree
-+ * and builds the cpu logical map array containing MPIDR values related to
-+ * logical cpus
-+ *
-+ * Updates the cpu possible mask with the number of parsed cpu nodes
+ /*
++ * The GIC mapping of CPU interfaces does not necessarily match
++ * the logical CPU numbering.  Let's use a mapping as returned
++ * by the GIC itself.
 + */
-+void __init arm_dt_init_cpu_maps(void)
-+{
-+	/*
-+	 * Temp logical map is initialized with UINT_MAX values that are
-+	 * considered invalid logical map entries since the logical map must
-+	 * contain a list of MPIDR[23:0] values where MPIDR[31:24] must
-+	 * read as 0.
++#define NR_GIC_CPU_IF 8
++static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
++
++/*
+  * Supported arch specific GIC irq extension.
+  * Default make them NULL.
+  */
+@@ -238,11 +246,11 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
+ 	u32 val, mask, bit;
+ 
+-	if (cpu >= 8 || cpu >= nr_cpu_ids)
++	if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
+ 		return -EINVAL;
+ 
+ 	mask = 0xff << shift;
+-	bit = 1 << (cpu_logical_map(cpu) + shift);
++	bit = gic_cpu_map[cpu] << shift;
+ 
+ 	raw_spin_lock(&irq_controller_lock);
+ 	val = readl_relaxed(reg) & ~mask;
+@@ -349,11 +357,6 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+ 	u32 cpumask;
+ 	unsigned int gic_irqs = gic->gic_irqs;
+ 	void __iomem *base = gic_data_dist_base(gic);
+-	u32 cpu = cpu_logical_map(smp_processor_id());
+-
+-	cpumask = 1 << cpu;
+-	cpumask |= cpumask << 8;
+-	cpumask |= cpumask << 16;
+ 
+ 	writel_relaxed(0, base + GIC_DIST_CTRL);
+ 
+@@ -366,6 +369,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+ 	/*
+ 	 * Set all global interrupts to this CPU only.
+ 	 */
++	cpumask = readl_relaxed(base + GIC_DIST_TARGET + 0);
+ 	for (i = 32; i < gic_irqs; i += 4)
+ 		writel_relaxed(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
+ 
+@@ -389,9 +393,25 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
+ {
+ 	void __iomem *dist_base = gic_data_dist_base(gic);
+ 	void __iomem *base = gic_data_cpu_base(gic);
++	unsigned int cpu_mask, cpu = smp_processor_id();
+ 	int i;
+ 
+ 	/*
++	 * Get what the GIC says our CPU mask is.
 +	 */
-+	struct device_node *cpu, *cpus;
-+	u32 i, j, cpuidx = 1;
-+	u32 mpidr = is_smp() ? read_cpuid_mpidr() & 0xffffff : 0;
-+	u32 tmp_map[NR_CPUS] = { [0 ... NR_CPUS-1] = UINT_MAX };
-+	bool bootcpu_valid = false;
-+	cpus = of_find_node_by_path("/cpus");
-+
-+	if (!cpus)
-+		return;
-+
-+	for_each_child_of_node(cpus, cpu) {
-+		u32 hwid;
-+
-+		pr_debug(" * %s...\n", cpu->full_name);
-+		/*
-+		 * A device tree containing CPU nodes with missing "reg"
-+		 * properties is considered invalid to build the
-+		 * cpu_logical_map.
-+		 */
-+		if (of_property_read_u32(cpu, "reg", &hwid)) {
-+			pr_debug(" * %s missing reg property\n",
-+				     cpu->full_name);
-+			return;
-+		}
-+
-+		/*
-+		 * 8 MSBs must be set to 0 in the DT since the reg property
-+		 * defines the MPIDR[23:0].
-+		 */
-+		if (hwid & 0xff000000)
-+			return;
-+
-+		/*
-+		 * Duplicate MPIDRs are a recipe for disaster.
-+		 * Scan all initialized entries and check for
-+		 * duplicates. If any is found just bail out.
-+		 * temp values were initialized to UINT_MAX
-+		 * to avoid matching valid MPIDR[23:0] values.
-+		 */
-+		for (j = 0; j < cpuidx; j++)
-+			if (WARN(tmp_map[j] == hwid, "Duplicate /cpu reg "
-+						     "properties in the DT\n"))
-+				return;
-+
-+		/*
-+		 * Build a stashed array of MPIDR values. Numbering scheme
-+		 * requires that if detected the boot CPU must be assigned
-+		 * logical id 0. Other CPUs get sequential indexes starting
-+		 * from 1. If a CPU node with a reg property matching the
-+		 * boot CPU MPIDR is detected, this is recorded so that the
-+		 * logical map built from DT is validated and can be used
-+		 * to override the map created in smp_setup_processor_id().
-+		 */
-+		if (hwid == mpidr) {
-+			i = 0;
-+			bootcpu_valid = true;
-+		} else {
-+			i = cpuidx++;
-+		}
-+
-+		tmp_map[i] = hwid;
-+
-+		if (cpuidx > nr_cpu_ids)
-+			break;
-+	}
-+
-+	if (WARN(!bootcpu_valid, "DT missing boot CPU MPIDR[23:0], "
-+				 "fall back to default cpu_logical_map\n"))
-+		return;
++	BUG_ON(cpu >= NR_GIC_CPU_IF);
++	cpu_mask = readl_relaxed(dist_base + GIC_DIST_TARGET + 0);
++	gic_cpu_map[cpu] = cpu_mask;
 +
 +	/*
-+	 * Since the boot CPU node contains proper data, and all nodes have
-+	 * a reg property, the DT CPU list can be considered valid and the
-+	 * logical map created in smp_setup_processor_id() can be overridden
++	 * Clear our mask from the other map entries in case they're
++	 * still undefined.
 +	 */
-+	for (i = 0; i < cpuidx; i++) {
-+		set_cpu_possible(i, true);
-+		cpu_logical_map(i) = tmp_map[i];
-+		pr_debug("cpu logical map 0x%x\n", cpu_logical_map(i));
-+	}
-+}
++	for (i = 0; i < NR_GIC_CPU_IF; i++)
++		if (i != cpu)
++			gic_cpu_map[i] &= ~cpu_mask;
 +
- /**
-  * setup_machine_fdt - Machine setup when an dtb was passed to the kernel
-  * @dt_phys: physical address of dt blob
++	/*
+ 	 * Deal with the banked PPI and SGI interrupts - disable all
+ 	 * PPI interrupts, ensure all SGI interrupts are enabled.
+ 	 */
+@@ -654,7 +674,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ {
+ 	irq_hw_number_t hwirq_base;
+ 	struct gic_chip_data *gic;
+-	int gic_irqs, irq_base;
++	int gic_irqs, irq_base, i;
+ 
+ 	BUG_ON(gic_nr >= MAX_GIC_NR);
+ 
+@@ -692,6 +712,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 	}
+ 
+ 	/*
++	 * Initialize the CPU interface map to all CPUs.
++	 * It will be refined as each CPU probes its ID.
++	 */
++	for (i = 0; i < NR_GIC_CPU_IF; i++)
++		gic_cpu_map[i] = 0xff;
++
++	/*
+ 	 * For primary GICs, skip over SGIs.
+ 	 * For secondary GICs, skip over PPIs, too.
+ 	 */
+@@ -746,7 +773,7 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 
+ 	/* Convert our logical CPU mask into a physical one. */
+ 	for_each_cpu(cpu, mask)
+-		map |= 1 << cpu_logical_map(cpu);
++		map |= gic_cpu_map[cpu];
+ 
+ 	/*
+ 	 * Ensure that stores to Normal memory are visible to the
 -- 
 1.7.12
