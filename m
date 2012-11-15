@@ -1,62 +1,120 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 15 Nov 2012 09:16:43 +0100
-Subject: [PATCHv2] i2c: omap: Move the remove constraint
-In-Reply-To: <1352964883-9846-1-git-send-email-shubhrajyoti@ti.com>
-References: <1352964883-9846-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <CAORVsuVuOLKpcx085VWiPRaD4syS-5F4+s+eKXGN8PPRRiTg2g@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 15 Nov 2012 13:48:55 +0530
+Subject: [PATCH] ARM: dts: add board dts file for Exynos4412 based SMDK
+ board
+In-Reply-To: <1629120.eNASZVgxGi@amdc1227>
+References: <1351954172-13645-1-git-send-email-thomas.abraham@linaro.org>
+ <1629120.eNASZVgxGi@amdc1227>
+Message-ID: <CAJuYYwTRnjKPm7fopVOjBVtHEEV2TQhv6OFzQG6hqhHwq4BT+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shubhrajyoti,
+Hi Tomasz,
 
-On Thu, Nov 15, 2012 at 8:34 AM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
-> Currently we just queue the transfer and release the
-> qos constraints, however we donot wait for the transfer
-Typo: donot
+Thanks for your comments.
 
-> to complete to release the constraint. Move the remove
-> constraint after the bus busy as we are sure that the
-> transfers are completed by then.
+On 12 November 2012 19:37, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Thomas,
 >
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-Looks good!
-Acked-by: Jean Pihet <j-pihet@ti.com>
+> On Saturday 03 of November 2012 20:19:32 Thomas Abraham wrote:
+>> Add a minimal board dts file for Samsung Exynos4412 based SMDK board.
+>>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>> This patch depends the on the following patch posted by Tomasz Figa.
+>> "ARM: dts: exynos4: Add support for Exynos4x12 SoCs"
+>>
+>>  arch/arm/boot/dts/Makefile                |    1 +
+>>  arch/arm/boot/dts/exynos4412-smdk4412.dts |   45
+>> +++++++++++++++++++++++++++++ 2 files changed, 46 insertions(+), 0
+>> deletions(-)
+>>  create mode 100644 arch/arm/boot/dts/exynos4412-smdk4412.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index f37cf9f..36488a5 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -23,6 +23,7 @@ dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
+>>  dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+>>       exynos4210-smdkv310.dtb \
+>>       exynos4210-trats.dtb \
+>> +     exynos4412-smdk4412.dtb \
+>>       exynos5250-smdk5250.dtb
+>>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
+>>  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
+>> diff --git a/arch/arm/boot/dts/exynos4412-smdk4412.dts
+>> b/arch/arm/boot/dts/exynos4412-smdk4412.dts new file mode 100644
+>> index 0000000..f05bf57
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/exynos4412-smdk4412.dts
+>> @@ -0,0 +1,45 @@
+>> +/*
+>> + * Samsung's Exynos4412 based SMDK board device tree source
+>> + *
+>> + * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+>> + *           http://www.samsung.com
+>> + *
+>> + * Device tree source file for Samsung's SMDK4412 board which is based
+>> on + * Samsung's Exynos4412 SoC.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as +
+>> * published by the Free Software Foundation.
+>> +*/
+>> +
+>> +/dts-v1/;
+>> +/include/ "exynos4412.dtsi"
+>> +
+>> +/ {
+>> +     model = "Samsung SMDK evaluation board based on Exynos4412";
+>> +     compatible = "samsung,smdk4412", "samsung,exynos4412";
+>> +
+>> +     memory {
+>> +             reg = <0x40000000 0x40000000>;
+>> +     };
+>
+> This will not boot, because section size limit is set to 256 MiB.
+>
+> It might work with CONFIG_ARM_ATAG_DTB_COMPAT enabled, because the memory
+> configuration from DT is ignored and values from ATAGs are taken instead.
+>
+> I suggest you to change it to 4 banks of 256 MiB.
 
-Regards,
-Jean
+Thanks for pointing this out. So are there any existing exynos based
+platforms that use sparse mem? If not, we should probably remove the
+section length configuration itself for mach-exynos. I suspect this
+setting might not help with the single kernel image support as well.
 
-> ---
-> v2: rebase to the for-next branch
+Thanks,
+Thomas.
+
 >
->  drivers/i2c/busses/i2c-omap.c |    7 ++++---
->  1 files changed, 4 insertions(+), 3 deletions(-)
+>> +     chosen {
+>> +             bootargs ="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M
+>> console=ttySAC1,115200 init=/linuxrc"; +      };
+>> +
+>> +     serial at 13800000 {
+>> +             status = "okay";
+>> +     };
+>> +
+>> +     serial at 13810000 {
+>> +             status = "okay";
+>> +     };
+>> +
+>> +     serial at 13820000 {
+>> +             status = "okay";
+>> +     };
+>> +
+>> +     serial at 13830000 {
+>> +             status = "okay";
+>> +     };
+>> +};
 >
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 482c63d..fabcbe1 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -654,13 +654,14 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->                         break;
->         }
+> Otherwise looks fine.
 >
-> -       if (dev->set_mpu_wkup_lat != NULL)
-> -               dev->set_mpu_wkup_lat(dev->dev, -1);
-> -
->         if (r == 0)
->                 r = num;
->
->         omap_i2c_wait_for_bb(dev);
-> +
-> +       if (dev->set_mpu_wkup_lat != NULL)
-> +               dev->set_mpu_wkup_lat(dev->dev, -1);
-> +
->  out:
->         pm_runtime_mark_last_busy(dev->dev);
->         pm_runtime_put_autosuspend(dev->dev);
+> Best regards,
 > --
-> 1.7.5.4
+> Tomasz Figa
+> Samsung Poland R&D Center
+> SW Solution Development, Linux Platform
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
