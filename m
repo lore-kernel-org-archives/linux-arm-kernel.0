@@ -1,37 +1,138 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Nov 2012 09:33:57 +0000
-Subject: Kernel uncompression error
-In-Reply-To: <CAAsE_ufdjZN31BXWTcq5XyRhx5YcoECRJVvARcNh8qT-AP1_jw@mail.gmail.com>
-References: <k809hq$1q3$1@ger.gmane.org>
- <20121114173453.GJ3290@n2100.arm.linux.org.uk>
- <CAAsE_ufdjZN31BXWTcq5XyRhx5YcoECRJVvARcNh8qT-AP1_jw@mail.gmail.com>
-Message-ID: <20121115093357.GN3290@n2100.arm.linux.org.uk>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Thu, 15 Nov 2012 15:06:17 +0530
+Subject: [PATCH 06/17] spi/atmel_spi: add flag to controller data for lock
+ operations
+In-Reply-To: <1352710357-3265-7-git-send-email-wenyou.yang@atmel.com>
+References: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
+ <1352710357-3265-7-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <CAM=Q2cvACiM2ynFz_HjRQ9pXg9o7amsP+u8icn7x7pB387VYaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 07:35:30AM +0800, Woody Wu wrote:
-> ? 2012-11-15 AM1:34?"Russell King - ARM Linux" <linux@arm.linux.org.uk>???
-> >
-> > On Wed, Nov 14, 2012 at 10:23:55PM +0800, woody wrote:
-> > > I just built a 3.2.x ARM kernel and tried to have it boot by a boot
-> > > loader (vivi) on my s3c2410a ARM board.  The kernel was built with
-> > > default configuration s3c2410.
-> >
-> > I reported that S3C2410 is totally dead with 3.x kernels about a month
-> > ago and got no response what so ever from anyone.  I guess S3C2410 is
-> > just not cared for anymore.
-> >
-> > When I get sufficient motivation, I'll try and track down what's going
-> > wrong, but it means taking the old mailing list server (and now list
-> > archive) offline for a while.
-> >
-> > I don't think it's cache related; different image sizes seem to behave
-> > differently - and when they _do_ successfully decompress, they don't
-> > boot at all.
-> 
-> So, in your opinion, what version of kernel I should go for s3c2410?
+On Mon, Nov 12, 2012 at 2:22 PM, Wenyou Yang <wenyou.yang@atmel.com> wrote:
+> From: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+> Will allow to drop the lock during DMA operations.
+>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: grant.likely at secretlab.ca
+> Cc: spi-devel-general at lists.sourceforge.net
+> ---
+>  drivers/spi/spi-atmel.c |   31 +++++++++++++++++++------------
+>  1 file changed, 19 insertions(+), 12 deletions(-)
+>
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index 76a1baf..37f54c3 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -187,6 +187,7 @@
+>   */
+>  struct atmel_spi {
+>         spinlock_t              lock;
+> +       unsigned long           flags;
+>
+>         resource_size_t         phybase;
+>         void __iomem            *regs;
+> @@ -323,6 +324,16 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
+>                 gpio_set_value(asd->npcs_pin, !active);
+>  }
+>
+> +static void atmel_spi_lock(struct atmel_spi *as)
+> +{
+> +               spin_lock_irqsave(&as->lock, as->flags);
+> +}
+> +
+> +static void atmel_spi_unlock(struct atmel_spi *as)
+> +{
+> +               spin_unlock_irqrestore(&as->lock, as->flags);
+> +}
 
-lists.arm.linux.org.uk currently runs 2.6.32.8.  That's the last working
-kernel I currently know of.
+May be this can be called directly.
 
-As I said, I tried several 3.x kernels, all of them failed.
+> +
+>  static inline int atmel_spi_xfer_is_last(struct spi_message *msg,
+>                                         struct spi_transfer *xfer)
+>  {
+> @@ -559,9 +570,9 @@ atmel_spi_msg_done(struct spi_master *master, struct atmel_spi *as,
+>                 "xfer complete: %u bytes transferred\n",
+>                 msg->actual_length);
+>
+> -       spin_unlock(&as->lock);
+> +       atmel_spi_unlock(as);
+>         msg->complete(msg->context);
+> -       spin_lock(&as->lock);
+> +       atmel_spi_lock(as);
+>
+>         as->current_transfer = NULL;
+>         as->next_transfer = NULL;
+> @@ -788,13 +799,11 @@ static int atmel_spi_setup(struct spi_device *spi)
+>                 spi->controller_state = asd;
+>                 gpio_direction_output(npcs_pin, !(spi->mode & SPI_CS_HIGH));
+>         } else {
+> -               unsigned long           flags;
+> -
+> -               spin_lock_irqsave(&as->lock, flags);
+> +               atmel_spi_lock(as);
+>                 if (as->stay == spi)
+>                         as->stay = NULL;
+>                 cs_deactivate(as, spi);
+> -               spin_unlock_irqrestore(&as->lock, flags);
+> +               atmel_spi_unlock(as);
+>         }
+>
+>         asd->csr = csr;
+> @@ -813,7 +822,6 @@ static int atmel_spi_transfer(struct spi_device *spi, struct spi_message *msg)
+>  {
+>         struct atmel_spi        *as;
+>         struct spi_transfer     *xfer;
+> -       unsigned long           flags;
+>         struct device           *controller = spi->master->dev.parent;
+>         u8                      bits;
+>         struct atmel_spi_device *asd;
+> @@ -878,11 +886,11 @@ static int atmel_spi_transfer(struct spi_device *spi, struct spi_message *msg)
+>         msg->status = -EINPROGRESS;
+>         msg->actual_length = 0;
+>
+> -       spin_lock_irqsave(&as->lock, flags);
+> +       atmel_spi_lock(as);
+>         list_add_tail(&msg->queue, &as->queue);
+>         if (!as->current_transfer)
+>                 atmel_spi_next_message(spi->master);
+> -       spin_unlock_irqrestore(&as->lock, flags);
+> +       atmel_spi_unlock(as);
+>
+>         return 0;
+>  }
+> @@ -892,17 +900,16 @@ static void atmel_spi_cleanup(struct spi_device *spi)
+>         struct atmel_spi        *as = spi_master_get_devdata(spi->master);
+>         struct atmel_spi_device *asd = spi->controller_state;
+>         unsigned                gpio = (unsigned) spi->controller_data;
+> -       unsigned long           flags;
+>
+>         if (!asd)
+>                 return;
+>
+> -       spin_lock_irqsave(&as->lock, flags);
+> +       atmel_spi_lock(as);
+>         if (as->stay == spi) {
+>                 as->stay = NULL;
+>                 cs_deactivate(as, spi);
+>         }
+> -       spin_unlock_irqrestore(&as->lock, flags);
+> +       atmel_spi_unlock(as);
+>
+>         spi->controller_state = NULL;
+>         gpio_free(gpio);
+> --
+> 1.7.9.5
+>
+>
+> ------------------------------------------------------------------------------
+> Everyone hates slow websites. So do we.
+> Make your web apps faster with AppDynamics
+> Download AppDynamics Lite for free today:
+> http://p.sf.net/sfu/appdyn_d2d_nov
+> _______________________________________________
+> spi-devel-general mailing list
+> spi-devel-general at lists.sourceforge.net
+> https://lists.sourceforge.net/lists/listinfo/spi-devel-general
