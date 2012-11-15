@@ -1,40 +1,102 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Nov 2012 09:22:42 +0000
-Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
-In-Reply-To: <20121114222159.GB6801@atomide.com>
-References: <20121114185335.GU6801@atomide.com> <50A3EBCD.3040801@ti.com>
- <20121114202244.GE3332@n2100.arm.linux.org.uk>
- <20121114203221.GA6801@atomide.com> <50A413D4.7000405@gmail.com>
- <20121114222159.GB6801@atomide.com>
-Message-ID: <20121115092242.GF3332@n2100.arm.linux.org.uk>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 15 Nov 2012 14:57:28 +0530
+Subject: [PATCH v3 07/11] ARM: Exynos4: allow legacy board support to
+ specify xxti and xusbxti clock speed
+In-Reply-To: <7438966.1DHnOH3JLs@flatron>
+References: <1352930853-12268-1-git-send-email-thomas.abraham@linaro.org>
+ <1352930853-12268-8-git-send-email-thomas.abraham@linaro.org>
+ <7438966.1DHnOH3JLs@flatron>
+Message-ID: <CAJuYYwQR5Rwvj4CV9G5J_GSbQfkgZu2stEx9fsL_G=A4qiBy=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2012 at 02:21:59PM -0800, Tony Lindgren wrote:
-> No idea if assuming that zero value for the diagnostic register
-> is safe.. What's the default value of the diagnostic register supposed
-> to be?
+On 15 November 2012 05:06, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On Thursday 15 of November 2012 03:37:29 Thomas Abraham wrote:
+>> The clock speed of xxti and xusbxti clocks depends on the oscillator
+>> used on the board to generate these clocks. For non-dt platforms, allow
+>> the board support for those platforms to set the clock frequency of
+>> xxti and xusbxti clocks.
+>>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>>  arch/arm/mach-exynos/common.c              |    2 ++
+>>  arch/arm/mach-exynos/common.h              |    1 +
+>>  arch/arm/mach-exynos/mach-nuri.c           |    2 ++
+>>  arch/arm/mach-exynos/mach-origen.c         |    2 ++
+>>  arch/arm/mach-exynos/mach-smdkv310.c       |    2 ++
+>>  arch/arm/mach-exynos/mach-universal_c210.c |    2 ++
+>>  arch/arm/mach-exynos/mct.c                 |    1 +
+>>  7 files changed, 12 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/common.c
+>> b/arch/arm/mach-exynos/common.c index 138a41d..64c0012 100644
+>> --- a/arch/arm/mach-exynos/common.c
+>> +++ b/arch/arm/mach-exynos/common.c
+>> @@ -65,6 +65,8 @@ static void exynos5_init_clocks(int xtal);
+>>  static void exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no);
+>>  static int exynos_init(void);
+>>
+>> +unsigned long xxti_f = 0, xusbxti_f = 0;
+>> +
+>>  static struct cpu_table cpu_ids[] __initdata = {
+>>       {
+>>               .idcode         = EXYNOS4210_CPU_ID,
+>> diff --git a/arch/arm/mach-exynos/common.h
+>> b/arch/arm/mach-exynos/common.h index 2cacd48..f947789 100644
+>> --- a/arch/arm/mach-exynos/common.h
+>> +++ b/arch/arm/mach-exynos/common.h
+>> @@ -22,6 +22,7 @@ void exynos4_restart(char mode, const char *cmd);
+>>  void exynos5_restart(char mode, const char *cmd);
+>>  void exynos_init_late(void);
+>>
+>> +extern unsigned long xxti_f, xusbxti_f;
+>>  void exynos4_clk_init(void);
+>>  void exynos4_clk_register_fixed_ext(unsigned long, unsigned long);
+>>
+>> diff --git a/arch/arm/mach-exynos/mach-nuri.c
+>> b/arch/arm/mach-exynos/mach-nuri.c index 5b5c941..e14332c 100644
+>> --- a/arch/arm/mach-exynos/mach-nuri.c
+>> +++ b/arch/arm/mach-exynos/mach-nuri.c
+>> @@ -1332,6 +1332,8 @@ static void __init nuri_map_io(void)
+>>  {
+>>       exynos_init_io(NULL, 0);
+>>       s3c24xx_init_uarts(nuri_uartcfgs, ARRAY_SIZE(nuri_uartcfgs));
+>> +     xxti_f = 0;
+>> +     xusbxti_f = 24000000;
+>
+> I don't like setting these variables directly from board code.
+>
+> If you didn't remove clock initialization call from board code, you could
+> extend that function to take these two frequencies as arguments?
 
-No, that's not safe.  What if your pre-kernel code has asked the secure
-monitor to set the work-around bit already?
+Right, but I was not in favour of changing the s3c24xx_init_clocks()
+api since that would mean all board code calling this will require
+updates. So I was contemplating of adding a new exynos4 specific api.
+But then did not opt for it, knowing very well that it is just a
+matter of time before we add dt support to existing non-dt exynos4
+board files. So just to keep things functional for now, and not add to
+much of non-dt stuff, I did this.
 
->  #if defined(CONFIG_ARM_ERRATA_751472) && defined(CONFIG_SMP)
->  	ALT_SMP(cmp r6, #0x30)			@ present prior to r3p0
->  	ALT_UP_B(1f)
-> -	mrclt	p15, 0, r10, c15, c0, 1		@ read diagnostic register
-> -	orrlt	r10, r10, #1 << 11		@ set bit #11
-> -	mcrlt	p15, 0, r10, c15, c0, 1		@ write diagnostic register
-> +	bge	1f				@ not needed for r3p0 and later
-> +	mrc	p15, 0, r10, c15, c0, 1		@ read diagnostic register
-> +	teq	r10, #0				@ zero for secure mode?
-> +	beq	1f				@ bail out for secure mode
+>
+>>  }
+>>
+>>  static void __init nuri_reserve(void)
+> [snip]
+>> diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
+>> index c2e806c..cd061b2 100644
+>> --- a/arch/arm/mach-exynos/mct.c
+>> +++ b/arch/arm/mach-exynos/mct.c
+>> @@ -532,6 +532,7 @@ static void __init exynos4_timer_init(void)
+>>               if (soc_is_exynos4210() || soc_is_exynos4212() ||
+>>                               soc_is_exynos4412()) {
+>>                       exynos4_clk_init();
+>> +                     exynos4_clk_register_fixed_ext(xxti_f, xusbxti_f);
+>
+> I don't like registering clocks from unrelated code. IMHO any clock
+> registration should be done from code in drivers/clk/samsung.
 
-This test for zero is pointless.  What if some other work-around has
-been enabled but not this one?
+Ok. I will check for other alternatives.
 
-> +	tst	r10, #1 << 11			@ bit #11 already set?
-> +	orreq	r10, r10, #1 << 11		@ set bit #11 if not set
-> +	mcreq	p15, 0, r10, c15, c0, 1		@ write diagnostic register
->  1:
->  #endif
->  
+Thanks,
+Thomas.
