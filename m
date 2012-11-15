@@ -1,43 +1,74 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 15 Nov 2012 14:43:23 -0800
-Subject: [PATCH 7/8] ARM: OMAP: Remove unnecessary inclusion of dmtimer.h
-In-Reply-To: <CALLhW=5wiTd9u0PorwDH_68K7XRS8_ajDSDOLB7x8F2qvtJvaA@mail.gmail.com>
-References: <1352830403-1706-1-git-send-email-jon-hunter@ti.com>
- <1352830403-1706-8-git-send-email-jon-hunter@ti.com>
- <50A3BE85.5000804@ti.com>
- <CALLhW=5wiTd9u0PorwDH_68K7XRS8_ajDSDOLB7x8F2qvtJvaA@mail.gmail.com>
-Message-ID: <20121115224323.GD16377@kroah.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 15 Nov 2012 23:46:19 +0100
+Subject: [PATCH 0/6] Add basic support for Allwinner A1X SoCs
+Message-ID: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 02:42:13PM -0600, Omar Ramirez Luna wrote:
-> Hi Jon,
-> 
-> On 14 November 2012 09:53, Jon Hunter <jon-hunter@ti.com> wrote:
-> >> diff --git a/drivers/staging/tidspbridge/core/ue_deh.c b/drivers/staging/tidspbridge/core/ue_deh.c
-> >> index 3d28b23..6aea6f1 100644
-> >> --- a/drivers/staging/tidspbridge/core/ue_deh.c
-> >> +++ b/drivers/staging/tidspbridge/core/ue_deh.c
-> >> @@ -19,7 +19,6 @@
-> >>
-> >>  #include <linux/kernel.h>
-> >>  #include <linux/interrupt.h>
-> >> -#include <plat/dmtimer.h>
-> >>
-> >>  #include <dspbridge/dbdefs.h>
-> >>  #include <dspbridge/dspdeh.h>
-> >
-> > Hi Omar, I should have had you in copy on this one. Are you ok with the
-> > removal of the above dmtimer.h include? It does not appear that this
-> > file needs to include dmtimer.h.
-> 
-> Indeed, we don't use it here.
-> 
-> > Is it ok for this to go through Tony's tree? If so, care to ACK?
-> 
-> Looks fine to me, but I believe you will want to let Greg know if this
-> patch will bypass staging tree.
+Hi,
 
-That's fine with me for such trivial stuff.
+You'll find in this patchset the initial support for Allwinner A10 and A13 SoCs
+from Allwinner. Since the internal name of these SoCs are sun4i and sun5i, the
+mach- directory is named sunxi.
 
-greg k-h
+You can find these SoCs in the Cubieboard, the A13-olinuxino or the Melee
+A1000.
+
+Both SoCs should work fine, as the A13 is a trimmed down version of the A10,
+but it has only been tested on a A13-OlinuXino from Olimex.
+
+Support is quite minimal for now, since it only includes timer and IRQ
+controller drivers, so we can only boot to userspace through initramfs. Support
+for the other peripherals on these SoCs will come eventually.
+
+Thanks,
+Maxime
+
+Maxime Ripard (6):
+  clocksource: sunxi: Add Allwinner A1X Timer Driver
+  irqchip: sunxi: Add irq controller driver
+  ARM: sunxi: Add basic support for Allwinner A1x SoCs
+  ARM: sunxi: Add earlyprintk support
+  ARM: sunxi: Add device tree for the A13 and the Olinuxino board
+  ARM: sunxi: Add entry to MAINTAINERS
+
+ .../interrupt-controller/allwinner,sunxi-ic.txt    |  104 ++++++++++++
+ .../bindings/timer/allwinner,sunxi-timer.txt       |   15 ++
+ MAINTAINERS                                        |    6 +
+ arch/arm/Kconfig                                   |    2 +
+ arch/arm/Kconfig.debug                             |    8 +
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/sun5i-olinuxino.dts              |   30 ++++
+ arch/arm/boot/dts/sun5i.dtsi                       |   58 +++++++
+ arch/arm/include/debug/sunxi.S                     |   22 +++
+ arch/arm/mach-sunxi/Kconfig                        |    9 +
+ arch/arm/mach-sunxi/Makefile                       |    1 +
+ arch/arm/mach-sunxi/Makefile.boot                  |    1 +
+ arch/arm/mach-sunxi/sunxi.c                        |   60 +++++++
+ arch/arm/mach-sunxi/sunxi.h                        |   20 +++
+ drivers/clocksource/Kconfig                        |    3 +
+ drivers/clocksource/Makefile                       |    1 +
+ drivers/clocksource/sunxi_timer.c                  |  160 ++++++++++++++++++
+ drivers/irqchip/Makefile                           |    1 +
+ drivers/irqchip/irq-sunxi.c                        |  173 ++++++++++++++++++++
+ include/linux/irqchip/sunxi.h                      |   27 +++
+ include/linux/sunxi_timer.h                        |   24 +++
+ 22 files changed, 727 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-ic.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/allwinner,sunxi-timer.txt
+ create mode 100644 arch/arm/boot/dts/sun5i-olinuxino.dts
+ create mode 100644 arch/arm/boot/dts/sun5i.dtsi
+ create mode 100644 arch/arm/include/debug/sunxi.S
+ create mode 100644 arch/arm/mach-sunxi/Kconfig
+ create mode 100644 arch/arm/mach-sunxi/Makefile
+ create mode 100644 arch/arm/mach-sunxi/Makefile.boot
+ create mode 100644 arch/arm/mach-sunxi/sunxi.c
+ create mode 100644 arch/arm/mach-sunxi/sunxi.h
+ create mode 100644 drivers/clocksource/sunxi_timer.c
+ create mode 100644 drivers/irqchip/irq-sunxi.c
+ create mode 100644 include/linux/irqchip/sunxi.h
+ create mode 100644 include/linux/sunxi_timer.h
+
+-- 
+1.7.9.5
