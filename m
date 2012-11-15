@@ -1,46 +1,41 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 15 Nov 2012 16:36:29 +0800
-Subject: [PATCH v5 0/10] use pinctrl-single in arch mmp
-Message-ID: <1352968600-15345-1-git-send-email-haojian.zhuang@gmail.com>
+Date: Thu, 15 Nov 2012 16:36:30 +0800
+Subject: [PATCH v5 01/10] ARM: mmp: select pinctrl driver
+In-Reply-To: <1352968600-15345-1-git-send-email-haojian.zhuang@gmail.com>
+References: <1352968600-15345-1-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <1352968600-15345-2-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changelog:
-v5:
-1. Move the properties of pinconf into pin group. So those mask
-properties could be merged with other pinconf properties. 
-2. Append lookup pinctrl map method.
-3. Append input schmitt disable config parameter.
-4. Clean code.
+Pinctrl driver is necessary for MMP DT & MMP2 DT platforms.
 
-v4:
-1. Define gpio range as sub-node, not label. And remove
-pinctrl-single,gpio-ranges property.
-2. Use new two properties in sub-node, reg &
-pinctrl-single,gpio. GPIO number & GPIO function are listed in
-the pinctrl-single,gpio property.
-3. Reference the names like pinctrl-single,bias.
-4. Add compatible name "pinconf-single". If the compatible name is
-"pinctrl-single", there's no pinconf. If the compatible name is
-"pinconf-single", there's the generic pinconf in pinctrl-single.
-5. Update documents.
+Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-mmp/Kconfig |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-v3:
-1. Add more comments in document.
-2. Replace pcs_readl() & pcs_writel() by pcs->read() & pcs->write().
-3. Clean code.
-
-v2:
-1. Remove "pinctrl-single,gpio-mask". Since GPIO function is one of the
-mux function in the pinmux register of both OMAP and PXA/MMP silicons.
-Use "pinctrl-single,function-mask" instead.
-2. Remove "pinctrl-single,gpio-enable" & "pinctrl-single,gpio-disable".
-Use "pinctrl-single,gpio-func" instead. Because GPIO mode is only one
-of the mux functions in the pinmux register. Defining "gpio-enable" &
-"gpio-disable" are redundant.
-3. Define register with __iomem, not u32 type.
-4. Remove "pinctrl-single,input-schmit-shift",
-"pinctrl-single,power-source-shift", "pinctrl-single,bias-shift". All
-these properties could be calculated by mask fields.
-5. Return -EPROBE_DEFER if pinmux could be got in device driver. And
-the device driver would be probed again deferred.
+diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
+index 178d4da..ebdda83 100644
+--- a/arch/arm/mach-mmp/Kconfig
++++ b/arch/arm/mach-mmp/Kconfig
+@@ -89,6 +89,8 @@ config MACH_MMP_DT
+ 	select CPU_PXA168
+ 	select CPU_PXA910
+ 	select USE_OF
++	select PINCTRL
++	select PINCTRL_SINGLE
+ 	help
+ 	  Include support for Marvell MMP2 based platforms using
+ 	  the device tree. Needn't select any other machine while
+@@ -99,6 +101,8 @@ config MACH_MMP2_DT
+ 	depends on !CPU_MOHAWK
+ 	select CPU_MMP2
+ 	select USE_OF
++	select PINCTRL
++	select PINCTRL_SINGLE
+ 	help
+ 	  Include support for Marvell MMP2 based platforms using
+ 	  the device tree.
+-- 
+1.7.10.4
