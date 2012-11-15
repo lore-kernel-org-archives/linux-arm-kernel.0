@@ -1,34 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Nov 2012 12:14:46 +0000
-Subject: [PATCH] ARM: pxa: remove pxa95x support
-In-Reply-To: <201211151206.33461.arnd@arndb.de>
-References: <1352970366-7154-1-git-send-email-haojian.zhuang@gmail.com>
- <201211151206.33461.arnd@arndb.de>
-Message-ID: <201211151214.47073.arnd@arndb.de>
+Date: Thu, 15 Nov 2012 12:17:13 +0000
+Subject: [PATCH] ARM: ux500: fix pin warning
+In-Reply-To: <1352976439-24133-1-git-send-email-linus.walleij@stericsson.com>
+References: <1352976439-24133-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <201211151217.13486.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 November 2012, Arnd Bergmann wrote:
-> On Thursday 15 November 2012, Haojian Zhuang wrote:
-> > PXA95x isn't widely used. And it adds the effort on supporting
-> > multiple platform. So remove it.
-> > 
-> > Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+On Thursday 15 November 2012, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Looks good to me, thanks for going through this.
+> Recent pin changes produce this warning:
 > 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> arch/arm/mach-ux500/board-mop500-pins.c:73:22:
+> error: 'out_hi_wkup_pdis' defined but not used
+> [-Werror=unused-variable]
 > 
-> Should I apply this straight into the arm-soc tree, or are you
-> going to send a pull request?
+> Fix this by deleting the offending definition.
 > 
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-One more comment: It would be good to put a disclaimer into the
-changeset text like
-
- "The assumption is that nobody will miss this support. If you are
-  reading this text because you actually require pxa95x support on
-  a new kernel, we can work out a way to revert this patch or add
-  support to the mmp platform".
+Applied on drivers branch, thanks!
 
 	Arnd
