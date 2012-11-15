@@ -1,49 +1,50 @@
-From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
-Date: Thu, 15 Nov 2012 09:22:39 +0200
-Subject: [PATCH v2 2/3] serial: mxs-auart: add the DMA support for mx28
-In-Reply-To: <50A45F83.1010009@freescale.com>
-References: <1351074456-25863-1-git-send-email-b32955@freescale.com>
- <1351074456-25863-3-git-send-email-b32955@freescale.com>
- <50A21613.6030709@bluegiga.com> <50A45F83.1010009@freescale.com>
-Message-ID: <50A4983F.8080407@bluegiga.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 15 Nov 2012 08:33:19 +0100
+Subject: [PATCH v7] Network driver for the Armada 370 and Armada XP ARM
+ Marvell SoCs
+In-Reply-To: <20121114.215922.1242337385782766449.davem@davemloft.net>
+References: <1352905010-24172-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121114.215922.1242337385782766449.davem@davemloft.net>
+Message-ID: <20121115083319.76483256@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+David,
 
-On 11/15/2012 05:20 AM, Huang Shijie wrote:
-> ? 2012?11?13? 17:42, Lauri Hintsala ??:
->> Hi Huang,
->>
->> DMA support doesn't work with latest stable v3.6.5 or development
->> 3.7-rc5 kernels. I get following error message when I open the serial
->> port /dev/ttyAPP0:
->>
->> [ 48.730000] mxs-auart 8006a000.serial: step 1 error
->> [ 48.750000] mxs-auart 8006a000.serial: We can not start up the DMA.
->>
-> I tested this patch set in imx28-evk board Rev C with linux-next-20121114.
-> it works fine.
->
-> Maybe you can try the linux-next code.
+On Wed, 14 Nov 2012 21:59:22 -0500 (EST), David Miller wrote:
+> From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Date: Wed, 14 Nov 2012 15:56:44 +0100
+> 
+> > The previous versions of this patch set have been sent on September
+> > 4th (v1), October 11th (v2), October 23rd (v3), October 26th (v4),
+> > November 12th (v5), November 13th (v6) and now comes the v7 of the
+> > driver. The number of comments over the last versions have been really
+> > small, and I would really appreciate if this driver could land into
+> > the 3.8 kernel release.
+> 
+> I can't apply this patch to net-next, because for one thing there
+> are missing dependencies.  For example, the file:
+> 
+> arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> 
+> doesn't exist there, therefore patch #6 won't apply.
 
-I tested linux-next-20121114 on apx4devkit (imx28 based device) and I 
-got the same error message:
+Yes, this is expected: those patches were provided to allow people to
+test the driver on the OpenBlocks platform, which is much more widely
+available than the Armada XP evaluation board from Marvell.
 
-# stty -F /dev/ttyAPP0 crtscts; microcom /dev/ttyAPP0 -s 115200
-[  133.710000] mxs-auart 8006a000.serial: step 1 error
-[  133.720000] mxs-auart 8006a000.serial: We can not start up the DMA.
+Would you mind if we take, with your Ack, the network driver through
+the arm-soc tree, so that we can carry the related patches modifying
+the Device Tree and so on? If not, then I'll send you a pull request
+with just the drivers/net changes, and we'll integrate the ARM-related
+changes through the arm-soc tree, in which we will have the necessary
+dependencies. I'm fine with any of those solutions.
 
+Thanks,
 
-> About the flow control:
-> If we do not enable the HW flow control, the data may lost. And I do not
-> know how to handle with the Xon/Xoff when the DMA is supported.
-
-I do not have the answer but it is already implemented in Freescale's 
-reference kernel 
-(http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/drivers/serial/mxs-auart.c?h=imx_2.6.35_11.09.01). 
-So I think it is possible to handle all data without HW flow control.
-
-
-Best Regards,
-Lauri Hintsala
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
