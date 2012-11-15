@@ -1,58 +1,21 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 15 Nov 2012 14:30:34 +0100
-Subject: [PATCH] ARM i.MX dts: Consistently add labels to devicenodes
-In-Reply-To: <20121115134831.GA2546@S2100-06.ap.freescale.net>
-References: <1352968312-8321-1-git-send-email-s.hauer@pengutronix.de>
- <20121115134831.GA2546@S2100-06.ap.freescale.net>
-Message-ID: <20121115133034.GD10369@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Nov 2012 13:36:23 +0000
+Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
+In-Reply-To: <CACY+gR3PurUofCbUeG40B6vXqXAoHrMmbOQSuwAGoc1LS8XXJQ@mail.gmail.com>
+References: <20121114185335.GU6801@atomide.com> <50A3EBCD.3040801@ti.com>
+ <20121114202244.GE3332@n2100.arm.linux.org.uk>
+ <20121114203221.GA6801@atomide.com> <50A413D4.7000405@gmail.com>
+ <20121114222159.GB6801@atomide.com> <50A43D58.5030404@gmail.com>
+ <20121115110137.GA25985@arm.com>
+ <CACY+gR3PurUofCbUeG40B6vXqXAoHrMmbOQSuwAGoc1LS8XXJQ@mail.gmail.com>
+Message-ID: <20121115133623.GG3332@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 09:48:33PM +0800, Shawn Guo wrote:
-> On Thu, Nov 15, 2012 at 09:31:52AM +0100, Sascha Hauer wrote:
-> > Having labels before each node allows board bindings to reference
-> > to nodes by using the &nodename {} notation.
-> 
-> I can understand this part.
-> 
-> > This way boards do not
-> > have to resemble the whole devicetree layout. Due to less indention
-> > needed the board files also get better readability.
-> 
-> I do not understand it.  Don't we have to always maintain the device
-> tree layout defined by <soc>.dtsi in <board>.dts, do we?
+On Thu, Nov 15, 2012 at 02:41:43PM +0200, Siarhei Siamashka wrote:
+> BTW, I always wondered about what could be preventing TI and the other
+> silicon vendors from using something like an SMC API based on
+> asymmetric cryptography?
 
-Have a look at for example arch/arm/boot/dts/omap5-evm.dts, it is
-written like this:
-
-...
-
-&mmc1 {
-        vmmc-supply = <&vmmcsd_fixed>;
-        bus-width = <4>;
-};
-
-&mmc2 {
-        vmmc-supply = <&vmmcsd_fixed>;
-        bus-width = <8>;
-        ti,non-removable;
-};
-
-&mmc3 {
-        bus-width = <4>;
-        ti,non-removable;
-};
-
-...
-
-I've written some board dts from scratch yesterday and this is much
-easier to write (and I think also easier to read as I don't have to
-care about the tree layout when writing a dts).
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+The answer is... nothing.  But it didn't happen and we're stuck with the
+consequences of that.
