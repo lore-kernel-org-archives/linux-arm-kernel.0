@@ -1,29 +1,80 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
-Date: Thu, 15 Nov 2012 15:27:42 +0530
-Subject: Fwd: [PATCH 1/7] I2c-nomadik: Fix the usage of
- wait_for_completion_timeout
-In-Reply-To: <20121115092953.GA418@pengutronix.de>
-References: <1352222317.15558.1584.camel@cliu38-desktop-build>
- <CACRpkdYekQF5111NSNSPeaHdxgS_gpXkCjqT1n-n1_iAdDXbSg@mail.gmail.com>
- <20121115084858.GA29668@bnru10>
- <20121115092953.GA418@pengutronix.de>
-Message-ID: <20121115095741.GA6280@bnru10>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 15 Nov 2012 11:00:12 +0100
+Subject: [PATCH RESEND 3/4] pinctrl: at91: Prevent NULL dereference if
+ of_match_device returns NULL
+In-Reply-To: <1352955480.6793.8.camel@phoenix>
+References: <1352955096.6793.1.camel@phoenix> <1352955266.6793.4.camel@phoenix>
+ <1352955480.6793.8.camel@phoenix>
+Message-ID: <20121115100012.GA4398@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 10:29:53 +0100, Wolfram Sang wrote:
-> 
-> > > -       if (timeout < 0) {
-> > > -               dev_err(&dev->adev->dev,
-> > > -                       "wait_for_completion_timeout "
-> > > -                       "returned %d waiting for event\n", timeout);
-> > > -               status = timeout;
-> > > -       }
-> > > -
-> > No, it is wrong. You need to update the status variable in the case of timeout.
-> 
-> Looking at the patch context, such code comes later.
-But it causes regressions; without looking at the "later" code, we can't afford merging
-this code now.
+On 12:58 Thu 15 Nov     , Axel Lin wrote:
+> of_match_device() may return NULL.
+this is not possible on at91
 
-regards/srinidhi
+and I do a oups here as if we have a NULL pointer which means the driver is
+wrong
+
+Best Regards,
+J.
+> 
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+> ---
+> This resend CC Jean-Christophe.
+> 
+>  drivers/pinctrl/pinctrl-at91.c |   17 +++++++++++++----
+>  1 file changed, 13 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index 8490a55..32006c8 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -829,13 +829,18 @@ static int __devinit at91_pinctrl_probe_dt(struct platform_device *pdev,
+>  	uint32_t *tmp;
+>  	struct device_node *np = pdev->dev.of_node;
+>  	struct device_node *child;
+> +	const struct of_device_id *match;
+>  
+>  	if (!np)
+>  		return -ENODEV;
+>  
+> +	match = of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
+> +	if (!match)
+> +		return -ENODEV;
+> +
+>  	info->dev = &pdev->dev;
+> -	info->ops = (struct at91_pinctrl_mux_ops*)
+> -		of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
+> +	info->ops = (struct at91_pinctrl_mux_ops *) match->data;
+> +
+>  	at91_pinctrl_child_count(info, np);
+>  
+>  	if (info->nbanks < 1) {
+> @@ -1359,6 +1364,7 @@ static struct of_device_id at91_gpio_of_match[] __devinitdata = {
+>  static int __devinit at91_gpio_probe(struct platform_device *pdev)
+>  {
+>  	struct device_node *np = pdev->dev.of_node;
+> +	const struct of_device_id *match;
+>  	struct resource *res;
+>  	struct at91_gpio_chip *at91_chip = NULL;
+>  	struct gpio_chip *chip;
+> @@ -1399,8 +1405,11 @@ static int __devinit at91_gpio_probe(struct platform_device *pdev)
+>  		goto err;
+>  	}
+>  
+> -	at91_chip->ops = (struct at91_pinctrl_mux_ops*)
+> -		of_match_device(at91_gpio_of_match, &pdev->dev)->data;
+> +	match = of_match_device(at91_gpio_of_match, &pdev->dev);
+> +	if (!match)
+> +		return -ENODEV;
+> +
+> +	at91_chip->ops = (struct at91_pinctrl_mux_ops *) match->data;
+>  	at91_chip->pioc_virq = irq;
+>  	at91_chip->pioc_idx = alias_idx;
+>  
+> -- 
+> 1.7.9.5
+> 
+> 
+> 
