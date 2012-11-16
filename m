@@ -1,186 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 Nov 2012 11:55:14 -0700
-Subject: [PATCH] ARM: tegra: seaboard: enable internal LCD
-Message-ID: <1353092114-18410-1-git-send-email-swarren@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 16 Nov 2012 18:56:10 +0000
+Subject: [PATCH V2 1/5] arm: mvebu: Added support for coherency fabric in
+ mach-mvebu
+In-Reply-To: <50A51D0D.4090009@free-electrons.com>
+References: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351545108-18954-2-git-send-email-gregory.clement@free-electrons.com>
+ <20121105140258.GO3351@mudshark.cambridge.arm.com>
+ <50A15A33.60405@free-electrons.com>
+ <20121113104340.GD3940@mudshark.cambridge.arm.com>
+ <50A3F860.5010601@free-electrons.com>
+ <20121115101752.GA26453@mudshark.cambridge.arm.com>
+ <50A5103F.1040903@free-electrons.com>
+ <20121115162123.GC5885@mudshark.cambridge.arm.com>
+ <50A51D0D.4090009@free-electrons.com>
+Message-ID: <20121116185610.GA1019@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Thu, Nov 15, 2012 at 04:49:17PM +0000, Gregory CLEMENT wrote:
+> On 11/15/2012 05:21 PM, Will Deacon wrote:
+> > Anyway, that's by-the-by as this is all called early enough that we
+> > shouldn't care. The thing I don't like now is that the fabric initialisation
+> > is done entirely differently on the primary CPU than the secondaries. The
+> > primary probes the device-tree (well, it's also now hard-coded for v2) and
+> > accesses the registers from a C function(armada_370_xp_set_cpu_coherent) whilst
+> > the secondaries have hardcoded addresses and access via asm
+> > (armada_xp_secondary_startup).
+> 
+> 
+> Now it is hardcoded in both case as you pointed it. So the last
+> difference is setup from a C function or via asm.
+> 
+> The differences between primary and secondary CPU when they enable the
+> coherency, is due to the fact that we really are in a different
+> situation. For primary CPU, as it is the only CPU online it doesn't
+> need to enable the coherency from the beginning, so we can wait to
+> have MMU enable and convenient feature. Whereas for the secondary CPU
+> they need the coherency from the very beginning are by definition they
+> won't be alone. That's why this very first instruction are written in
+> asm and they use physical address.
+> 
+> I don't see how to handle it in a different way.
 
-Enable host1x and add the rgb (LCD) output.
+The code paths are fine, I would just like to see less duplication. Can you
+make the asm function PCS compliant and call it from C for the primary
+(setting the link register to secondary_startup for the secondary cores)?
 
-Also add the power sequence that controls the backlight and panel. The
-sequence strictly follows the order and timings of the panel
-specification.
-
-Currently the backlight device controls both backlight and panel, this
-needs to be fixed once the panel framework supports power sequences.
-
-Based on (cut/paste) work for Ventana by Alexandre Courbot.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/boot/dts/tegra20-seaboard.dts |  127 +++++++++++++++++++++++++++++++-
- 1 file changed, 126 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/tegra20-seaboard.dts b/arch/arm/boot/dts/tegra20-seaboard.dts
-index eafeca6..a999430 100644
---- a/arch/arm/boot/dts/tegra20-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra20-seaboard.dts
-@@ -10,6 +10,16 @@
- 		reg = <0x00000000 0x40000000>;
- 	};
- 
-+	host1x {
-+		dc at 54200000 {
-+			rgb {
-+				status = "okay";
-+				nvidia,ddc-i2c-bus = <&lcd_ddc>;
-+				backlight = <&backlight>;
-+			};
-+		};
-+	};
-+
- 	pinmux {
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&state_default>;
-@@ -351,7 +361,7 @@
- 			#size-cells = <0>;
- 		};
- 
--		i2c at 1 {
-+		lcd_ddc: i2c at 1 {
- 			reg = <1>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -600,6 +610,101 @@
- 		};
- 	};
- 
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		brightness-levels = <0 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 255>;
-+		default-brightness-level = <12>;
-+
-+		/* resources used by the power sequences */
-+		pwms = <&pwm 2 5000000>;
-+		pwm-names = "backlight";
-+		power-supply = <&vdd_bl_reg>;
-+		panel-supply = <&vdd_panel_reg>;
-+
-+		power-sequences {
-+			power-on {
-+				/*
-+				 * Panel power and LVDS enable.
-+				 * TODO: move into the panel device as soon as
-+				 * panel framework supports power sequences.
-+				 */
-+				step0 {
-+					type = "regulator";
-+					id = "panel";
-+					enable;
-+				};
-+				step1 {
-+					/* LVDS_SHTDN* */
-+					type = "gpio";
-+					gpio = <&gpio 10 0>; /* GPIO PC6 */ 
-+					value = <1>;
-+				};
-+				step2 {
-+					type = "delay";
-+					delay = <200000>;
-+				};
-+				/* Backlight sequence. This belongs here. */
-+				step3 {
-+					type = "regulator";
-+					id = "power";
-+					enable;
-+				};
-+				step4 {
-+					type = "delay";
-+					delay = <10000>;
-+				};
-+				step5 {
-+					type = "pwm";
-+					id = "backlight";
-+					enable;
-+				};
-+				step6 {
-+					/* LCD_BL_EN */
-+					type = "gpio";
-+					gpio = <&gpio 28 0>; /* GPIO PD4 */
-+					value = <1>;
-+				};
-+			};
-+
-+			power-off {
-+				step0 {
-+					type = "gpio";
-+					gpio = <&gpio 28 0>;
-+					value = <0>;
-+				};
-+				step1 {
-+					type = "pwm";
-+					id = "backlight";
-+					disable;
-+				};
-+				step2 {
-+					type = "delay";
-+					delay = <10000>;
-+				};
-+				step3 {
-+					type = "regulator";
-+					id = "power";
-+					disable;
-+				};
-+				/* This also belongs to the panel sequence */
-+				step4 {
-+					type = "delay";
-+					delay = <200000>;
-+				};
-+				step5 {
-+					type = "gpio";
-+					gpio = <&gpio 10 0>;
-+					value = <0>;
-+				};
-+				step6 {
-+					type = "regulator";
-+					id = "panel";
-+					disable;
-+				};
-+			};
-+		};
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -632,6 +737,26 @@
- 			gpio = <&pmic 1 0>;
- 			enable-active-high;
- 		};
-+
-+		vdd_panel_reg: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "vdd_pnl";
-+			regulator-min-microvolt = <2800000>;
-+			regulator-max-microvolt = <2800000>;
-+			gpio = <&gpio 22 0>; /* gpio PC6 */
-+			enable-active-high;
-+		};
-+
-+		vdd_bl_reg: regulator at 4 {
-+			compatible = "regulator-fixed";
-+			reg = <4>;
-+			regulator-name = "vdd_bl";
-+			regulator-min-microvolt = <2800000>;
-+			regulator-max-microvolt = <2800000>;
-+			gpio = <&gpio 176 0>; /* gpio PW0 */
-+			enable-active-high;
-+		};
- 	};
- 
- 	sound {
--- 
-1.7.10.4
+Will
