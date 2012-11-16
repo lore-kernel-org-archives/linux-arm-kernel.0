@@ -1,68 +1,50 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 16 Nov 2012 11:17:23 +0100
-Subject: [PATCH v3 1/5] ARM: kernel: smp_setup_processor_id() updates
-In-Reply-To: <20121115141808.GA23513@e102568-lin.cambridge.arm.com>
-References: <1352983614-22924-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1352983614-22924-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20121115134951.GF5570@mudshark.cambridge.arm.com>
- <20121115141808.GA23513@e102568-lin.cambridge.arm.com>
-Message-ID: <CAKfTPtBT9Hnv0Bop-RAg69zp=AcgTy4rvCbiXScdnU8QkoEBSQ@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 16 Nov 2012 11:17:49 +0100
+Subject: [PATCH 1/9] usb: chipidea: pci: mark platformdata as static and
+ __devinitdata
+In-Reply-To: <87haop7tfi.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352909950-32555-2-git-send-email-m.grzeschik@pengutronix.de>
+ <87haop7tfi.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <50A612CD.8040004@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 November 2012 15:18, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> [CC'ed Vincent following MPIDR mask query]
->
-> On Thu, Nov 15, 2012 at 01:49:51PM +0000, Will Deacon wrote:
->> On Thu, Nov 15, 2012 at 12:46:50PM +0000, Lorenzo Pieralisi wrote:
->> > This patch applies some basic changes to the smp_setup_processor_id()
->> > ARM implementation to make the code that builds cpu_logical_map more
->> > uniform across the kernel.
->> >
->> > The function now prints the full extent of the boot CPU MPIDR[23:0] and
->> > initializes the cpu_logical_map for CPUs up to nr_cpu_ids.
->> >
->> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> > ---
->> >  arch/arm/kernel/setup.c | 7 ++++---
->> >  1 file changed, 4 insertions(+), 3 deletions(-)
->> >
->> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->> > index da1d1aa..d0df6c8 100644
->> > --- a/arch/arm/kernel/setup.c
->> > +++ b/arch/arm/kernel/setup.c
->> > @@ -426,13 +426,14 @@ int __cpu_logical_map[NR_CPUS];
->> >  void __init smp_setup_processor_id(void)
->> >  {
->> >     int i;
->> > -   u32 cpu = is_smp() ? read_cpuid_mpidr() & 0xff : 0;
->> > +   u32 mpidr = is_smp() ? read_cpuid_mpidr() & 0xffffff : 0;
->> > +   u32 cpu = mpidr & 0xff;
+On 11/16/2012 11:06 AM, Alexander Shishkin wrote:
+> Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
+> 
+>> From: Marc Kleine-Budde <mkl@pengutronix.de>
 >>
->> Can we move the #defines out of topology.c and use those instead of magic
->> masks please? You could use MPIDR_HWID_BITMASK, although the LEVEL mask
->> definitions over there don't look right to me (MPIDR_LEVEL0_MASK is 0x3?)
->
-> Yes, I should have done that, you are right. LEVEL0 and LEVEL1 masks look
-> wrong to me.
->
-> #define MPIDR_LEVEL0_MASK 0x3
-> #define MPIDR_LEVEL1_MASK 0xF
->
-> Vincent, why are they defined with those values ? They should all be
-> defined as 0xFF.
+>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+>> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> 
+> static yes, __devinitdata -- probably not. These structs are used
+> everywhere throughout the driver currently, not only at initialization
+> time.
 
-IIRC, These field are defined to 8bits width by default in the ARM ARM
-but the Cortex A-9 implementation reduced the usage to 2 bits for CPU
-ID and 4 bits for cluster ID. I had choose this implementation because
-it was the only one available at the moment.
-Now we might come back to the full width range
+Yes, but a copy of the platform_data is used:
 
-Vincent
+The PCI driver calls ci13xxx_add_device():
+http://lxr.free-electrons.com/source/drivers/usb/chipidea/ci13xxx_pci.c#L85
 
->
-> I will fix them and move them to a header file.
->
-> Thanks,
-> Lorenzo
->
+which calls  platform_device_add_data():
+http://lxr.free-electrons.com/source/drivers/usb/chipidea/core.c#L364
+
+which makes a copy of the platform_data:
+http://lxr.free-electrons.com/source/drivers/base/platform.c#L246
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/005f48e5/attachment.sig>
