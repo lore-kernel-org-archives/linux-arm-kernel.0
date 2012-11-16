@@ -1,44 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Nov 2012 08:16:50 +0000
-Subject: Additional updates for armsoc-3.8
-In-Reply-To: <1353033963.11943.2.camel@gitbox>
-References: <1353033963.11943.2.camel@gitbox>
-Message-ID: <201211160816.50271.arnd@arndb.de>
+Date: Fri, 16 Nov 2012 08:18:01 +0000
+Subject: [PATCH] ARM: add get_user() support for 8 byte types
+In-Reply-To: <1353016879-15007-1-git-send-email-rob.clark@linaro.org>
+References: <1353016879-15007-1-git-send-email-rob.clark@linaro.org>
+Message-ID: <201211160818.01302.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 November 2012, Tony Prisk wrote:
-> Quick question,
+On Thursday 15 November 2012, Rob Clark wrote:
 > 
-> If I want to send further patches to armsoc for 3.8, should I write them
-> on top of the already pulled patches, or start from clean 3.7-rc?
+> From: Rob Clark <rob@ti.com>
 > 
-> I know you like to pull from a -rc, but these changes are to add the
-> WM8850 support, and will change the already changed files from the
-> previous pull.
+> A new atomic modeset/pageflip ioctl being developed in DRM requires
+> get_user() to work for 64bit types (in addition to just put_user()).
+> 
+> v1: original
+> v2: pass correct size to check_uaccess, and better handling of narrowing
+>     double word read with __get_user_xb() (Russell King's suggestion)
+> v3: explain in comment about why this works for narrowing fetch to 1,
+>     2, or 4 byte type on ARM.
+> 
+> Signed-off-by: Rob Clark <rob@ti.com>
 
-(adding Cc to linux-arm-kernel, I hope you don't mind and this is probably
-of interest to other people as well)
-
-If it's easy to do, you should start from a fresh -rc. In this case, it
-sounds like it makes sense to start from the previously pulled branch.
-No problem there in principle, just mind the ordering of topics:
-
-When you check out the arm-soc tree, you can find a file named
-arch/arm/arm-soc-for-next-contents.txt that lists all the next/*
-branches and what has been pulled into them. The branches are
-roughly in order and sometimes have dependencies between them
-that are documented.
-
-In this case, you have contents in two branches, next/cleanup and
-next/multiplatform. If you want to submit another branch on top of this,
-the main requirement is that it can't go into a branch that I want to
-submit first (which would be "fixes-non-critical" or "headers". Support
-for a new soc would likely go into the "soc" branch, which comes after
-"cleanup" and "multiplatform", so there is no problem here.
-
-The specific set of branches and their order is usually similar from
-one release to the next, but not always the same, because it depends on
-what kind of changes we get during the cycle.
-
-	Arnd
+Acked-by: Arnd Bergmann <arnd@arndb.de>
