@@ -1,33 +1,31 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Fri, 16 Nov 2012 17:12:33 +0800
-Subject: [PATCH RFT 1/2] pinctrl: dove: Fix dove_audio1_ctrl_set when
- BIT(0|1|2|3) of config is clear
-In-Reply-To: <50A0C3C8.2020501@gmail.com>
-References: <1352641495.3113.1.camel@phoenix>
-	<50A0C3C8.2020501@gmail.com>
-Message-ID: <CAFRkauABcnqJSqewueY4rzVbm7uAqkZKitkR9ZmYjF0LhR26-Q@mail.gmail.com>
+From: archit@ti.com (Archit Taneja)
+Date: Fri, 16 Nov 2012 14:46:04 +0530
+Subject: [RFC] fbdev: arm has __raw I/O accessors, use them in fb.h
+Message-ID: <1353057364-21214-1-git-send-email-archit@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/11/12 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
-> On 11/11/2012 02:44 PM, Axel Lin wrote:
->>
->> Current implementation in dove_audio1_ctrl_set() does not clear
->> corresponding
->> register bit if BIT(0|1|2|3) of config is clear. Fix it.
->>
->> Signed-off-by: Axel Lin<axel.lin@ingics.com>
->
->
-> Axel,
->
-> thanks for the hint on not clearing the audio1 bits before setting them.
-> I will test this tonight and guess you should prepare a real patch for
-> this one.
+This removes the sparse warnings on arm platforms:
 
-Hi Sebastian,
-Does this patch work for you?
-May I have your Acked-and-Tested-by if you think this patch is ok.
+warning: cast removes address space of expression
 
-Thanks,
-Axel
+Signed-off-by: Archit Taneja <archit@ti.com>
+---
+ include/linux/fb.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/linux/fb.h b/include/linux/fb.h
+index c7a9571..7fce1e1 100644
+--- a/include/linux/fb.h
++++ b/include/linux/fb.h
+@@ -548,7 +548,7 @@ static inline struct apertures_struct *alloc_apertures(unsigned int max_num) {
+ #define fb_memcpy_fromfb sbus_memcpy_fromio
+ #define fb_memcpy_tofb sbus_memcpy_toio
+ 
+-#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__) || defined(__sh__) || defined(__powerpc__) || defined(__avr32__) || defined(__bfin__)
++#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__) || defined(__sh__) || defined(__powerpc__) || defined(__avr32__) || defined(__bfin__) || defined(__arm__)
+ 
+ #define fb_readb __raw_readb
+ #define fb_readw __raw_readw
+-- 
+1.7.9.5
