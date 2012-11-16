@@ -1,74 +1,47 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 16 Nov 2012 16:06:51 +0200
-Subject: [PATCH 6/9] usb: chipidea: add PTW and PTS handling
-In-Reply-To: <20121116135743.GB21447@pengutronix.de>
-References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
- <1352909950-32555-7-git-send-email-m.grzeschik@pengutronix.de>
- <87zk2h67ik.fsf@ashishki-desk.ger.corp.intel.com>
- <20121116131628.GA21447@pengutronix.de>
- <87lie1659c.fsf@ashishki-desk.ger.corp.intel.com>
- <20121116135743.GB21447@pengutronix.de>
-Message-ID: <87ip9563r8.fsf@ashishki-desk.ger.corp.intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 16 Nov 2012 15:06:55 +0100
+Subject: [GIT PULL] MTU clock fixes
+Message-ID: <CACRpkdYZSpttuzrU2zJrALUMOpfZdYuVsAVK+jEDah1GwavnRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Grzeschik <mgr@pengutronix.de> writes:
+Hi ARM SoC guys,
 
-> On Fri, Nov 16, 2012 at 03:34:23PM +0200, Alexander Shishkin wrote:
->> Michael Grzeschik <mgr@pengutronix.de> writes:
->> 
->> > On Fri, Nov 16, 2012 at 02:45:39PM +0200, Alexander Shishkin wrote:
->> >> Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
->> >> 
->> >> > This patch makes it possible to configure the PTW and PTS bits inside
->> >> > the portsc register for host and device mode before the driver starts
->> >> > and the phy can be addressed as hardware implementation is designed.
->> >> >
->> >> > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
->> >> > Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->> >> > ---
->> >> >  drivers/usb/chipidea/bits.h        |    3 +++
->> >> >  drivers/usb/chipidea/ci.h          |    2 ++
->> >> >  drivers/usb/chipidea/ci13xxx_imx.c |    1 +
->> >> >  drivers/usb/chipidea/core.c        |   47 ++++++++++++++++++++++++++++++++++++
->> >> >  drivers/usb/chipidea/host.c        |    4 +++
->> >> >  include/linux/usb/chipidea.h       |    9 +++++++
->> >> >  6 files changed, 66 insertions(+)
->> >> >
->> >> > diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
->> >> > index 4b6ae3e..3cded5f 100644
->> >> > --- a/drivers/usb/chipidea/bits.h
->> >> > +++ b/drivers/usb/chipidea/bits.h
->> >> > @@ -48,6 +48,9 @@
->> >> >  #define PORTSC_SUSP           BIT(7)
->> >> >  #define PORTSC_HSP            BIT(9)
->> >> >  #define PORTSC_PTC            (0x0FUL << 16)
->> >> > +#define PORTSC_PTS            (BIT(31) | BIT(30))
->> >> > +#define PORTSC_PTW            BIT(28)
->> >> > +#define PORTSC_STS            BIT(29)
->> >> 
->> >> Hm, my spec says these are actually in DEVLC register and only have this
->> >> meaning in device mode. And in portsc these bits fall in device address
->> >> bitfield. Can you refer me to your spec?
->> >
->> > You can find it here:
->> > http://cache.freescale.com/files/32bit/doc/ref_manual/iMX53RM.pdf?fpsp=1
->> > Page 4947
->> 
->> Oh, but see, the offset is 0x184, which in chipidea spec (the version
->> that I have) corresponds to DEVLC and not PORTSC. So in this driver's
->> terminology it's DEVLC too, at least currently.
->> 
->> So have you tested this code and did it make any difference?
->
-> Yes, i have tested this code with MX25, MX28, MX35 and MX53. In every
-> SoCs Datasheet the PORTSC register is defined on PORTBASE+0x184. Without
-> this proper configuration its not possible to communicate with the PHY.
+As agreed with Arnd here is a tag with the two patches to the clock
+and clocksource
+for the MTU timer that we were worried would clash with ARM SoC if they were
+merged into the clk tree.
 
-No, I mean, you're writing DEVLC (using present driver's terminology)
-bits to PORTSC register. It *shouldn't* work. I suppose, it does
-something, but not exactly what you intended.
+It is based on the suggested commit in the multiplatform branch.
 
-Regards,
---
-Alex
+Please pull it in!
+
+Yours,
+Linus Walleij
+
+
+The following changes since commit c3b9d1db23c4ebd4d8a0964ebcf5f27d4eb8fa3f:
+
+  ARM: plat-nomadik: convert platforms to SPARSE_IRQ (2012-11-05 09:55:34 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/mtu-clk-for-arm-soc
+
+for you to fetch changes up to 16defa668d009a762e23d55ce6ecf5ae483dfe10:
+
+  clocksource/mtu-nomadik: use apb_pclk (2012-11-16 14:44:02 +0100)
+
+----------------------------------------------------------------
+This tag contains two MTU patches based on top of the ux500 sparse IRQ
+commit to avoid merge clashes.
+
+----------------------------------------------------------------
+Ulf Hansson (2):
+      clk: ux500: Register mtu apb_pclocks
+      clocksource/mtu-nomadik: use apb_pclk
+
+ drivers/clk/ux500/u8500_clk.c     | 9 +++------
+ drivers/clocksource/nomadik-mtu.c | 8 +++++++-
+ 2 files changed, 10 insertions(+), 7 deletions(-)
