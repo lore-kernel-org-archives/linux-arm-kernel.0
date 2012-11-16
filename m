@@ -1,84 +1,82 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 Nov 2012 12:43:56 -0700
-Subject: [GIT PULL 4/6] ARM: tegra: device tree changes
+Date: Fri, 16 Nov 2012 12:43:57 -0700
+Subject: [GIT PULL 5/6] ARM: tegra: single-zImage preparation work
 In-Reply-To: <1353095038-20031-1-git-send-email-swarren@wwwdotorg.org>
 References: <1353095038-20031-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1353095038-20031-4-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1353095038-20031-5-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A wide variety of device tree additions are made across many Tegra
-boards:
+Various cleanups and enhancements are made to core Tegra code towards the
+aim of including Tegra in a multi-platform ARM kernel:
 
-* WiFi is supported on Seaboard, Ventana, and Cardhu.
-* An I2C mux is added for Ventana, and Tamonten.
-* SPI flash is added to Cardhu, and TrimSlice.
-* Temperature sensors are added to Harmony, Tamonten, and Ventana.
-* host1x (graphics/display controller) is added to the SoC include files.
-* HDMI displays are enabled on Harmony, TrimSlice, Tamonten, Plutux, Tec,
-  and Whistler.
+RTC, timer, and TWD are configured via device tree.
 
-This pull request is based on tegra-for-3.8-soc.
+SPARSE_IRQ is enabled.
+
+Tegra's debug_ll options are simplified, and the macros brought into
+line with other multi-platform implementations, and moved to the new
+common location.
+
+Two headers still need to be eliminated in order to include Tegra in a
+multi-platform kernel/ <mach/{clk,powergate}.h>. A new common API needs
+to be invented to replace parts of clk.h. powergate.h might be replaced
+by regulators; this needs more investigation.
+
+This pull request is based on tegra-for-3.8-dt, followed by a merge of
+arm-soc's devel/debug_ll_init branch.
 
 ----------------------------------------------------------------
 
-The following changes since commit d1d3b978f67c2c000f9d91387cffa630e738d529:
+The following changes since commit 9a2ab3f1fa01a146a395197153af0ae586e6a682:
 
-  ARM: tegra: Add Tegra30 host1x clock support
+  Merge remote-tracking branch 'korg_arm-soc/devel/debug_ll_init' into for-3.8/single-zimage
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.8-dt
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.8-single-zimage
 
-for you to fetch changes up to 2658ef15b27e0fb166f4b7b997b027a223cd0793:
+for you to fetch changes up to 460678035247a9f72a4401dfeb6513ee495bf975:
 
-  ARM: tegra: whistler: enable HDMI port
+  ARM: tegra: move debug-macro.S to include/debug
 
 ----------------------------------------------------------------
 
-Laxman Dewangan (3):
-      ARM: tegra: dts: add slink controller dt entry
-      ARM: tegra: dts: cardhu: enable SLINK4
-      ARM: tegra: dts: add sflash controller dt entry
+Stephen Warren (11):
+      ARM: tegra: define DT bindings for and instantiate timer
+      ARM: tegra: define DT bindings for and instantiate RTC
+      ARM: tegra: add TWD to device tree
+      ARM: timer: fix checkpatch warnings
+      ARM: tegra: enhance timer.c to get IRQ info from device tree
+      ARM: tegra: enhance timer.c to get IO address from device tree
+      ARM: tegra: select SPARSE_IRQ
+      ARM: tegra: simplify DEBUG_LL UART selection options
+      ARM: tegra: decouple uncompress.h and debug-macro.S
+      ARM: tegra: don't include iomap.h from debug-macro.S
+      ARM: tegra: move debug-macro.S to include/debug
 
-Mark Zhang (1):
-      ARM: dt: tegra: ventana: define pinmux for ddc
-
-Stephen Warren (3):
-      ARM: tegra: trimslice: enable SPI flash
-      ARM: tegra: harmony: enable HDMI port
-      ARM: tegra: whistler: enable HDMI port
-
-Thierry Reding (11):
-      ARM: tegra: tamonten: Add DDC/PTA pinmux
-      ARM: tegra: tec: Remove redundant DT properties
-      ARM: tegra: harmony: Add ADT7641 temperature sensor
-      ARM: tegra: tamonten: Add NCT1008 temperature sensor
-      ARM: tegra: ventana: Add NCT1008 temperature sensor
-      ARM: tegra: Add Tegra20 host1x support
-      ARM: tegra: Add Tegra30 host1x support
-      ARM: tegra: trimslice: enable HDMI port
-      ARM: tegra: tamonten: Add host1x support
-      ARM: tegra: plutux: Enable HDMI output
-      ARM: tegra: tec: Enable HDMI output
-
-Wei Ni (3):
-      ARM: dt: t20 seaboard: turn on the power for wlan
-      ARM: dt: t20 ventana: set pinmux and power for wlan
-      ARM: dt: t30 cardhu: set pinmux and power for wlan
-
- .../devicetree/bindings/vendor-prefixes.txt     |    1 +
- arch/arm/boot/dts/tegra20-harmony.dts           |   25 ++-
- arch/arm/boot/dts/tegra20-plutux.dts            |    6 +
- arch/arm/boot/dts/tegra20-seaboard.dts          |    6 +
- arch/arm/boot/dts/tegra20-tamonten.dtsi         |   88 ++++++++++-
- arch/arm/boot/dts/tegra20-tec.dts               |    9 +-
- arch/arm/boot/dts/tegra20-trimslice.dts         |   54 ++++++-
- arch/arm/boot/dts/tegra20-ventana.dts           |   90 ++++++++++-
- arch/arm/boot/dts/tegra20-whistler.dts          |   21 ++-
- arch/arm/boot/dts/tegra20.dtsi                  |  137 ++++++++++++++++
- arch/arm/boot/dts/tegra30-cardhu-a02.dts        |    6 +
- arch/arm/boot/dts/tegra30-cardhu-a04.dts        |    6 +
- arch/arm/boot/dts/tegra30-cardhu.dtsi           |   37 +++++
- arch/arm/boot/dts/tegra30.dtsi                  |  147 ++++++++++++++++++
- 14 files changed, 607 insertions(+), 26 deletions(-)
+ .../bindings/rtc/nvidia,tegra20-rtc.txt         |   19 ++
+ .../bindings/timer/nvidia,tegra20-timer.txt     |   21 ++
+ .../bindings/timer/nvidia,tegra30-timer.txt     |   23 ++
+ arch/arm/Kconfig                                |    1 +
+ arch/arm/Kconfig.debug                          |   38 +++
+ arch/arm/boot/dts/tegra20.dtsi                  |   21 ++
+ arch/arm/boot/dts/tegra30.dtsi                  |   23 ++
+ arch/arm/include/debug/tegra.S                  |  223 ++++++++++++++++++
+ arch/arm/mach-tegra/Kconfig                     |   51 ----
+ arch/arm/mach-tegra/common.c                    |    9 +-
+ arch/arm/mach-tegra/include/mach/debug-macro.S  |  100 --------
+ arch/arm/mach-tegra/include/mach/irqs.h         |  182 --------------
+ arch/arm/mach-tegra/include/mach/uncompress.h   |   65 +----
+ arch/arm/mach-tegra/io.c                        |    1 +
+ arch/arm/mach-tegra/iomap.h                     |   14 --
+ arch/arm/mach-tegra/irammap.h                   |    9 -
+ arch/arm/mach-tegra/pcie.c                      |    3 +
+ arch/arm/mach-tegra/timer.c                     |   78 ++++--
+ 18 files changed, 435 insertions(+), 446 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/nvidia,tegra20-rtc.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/nvidia,tegra20-timer.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/nvidia,tegra30-timer.txt
+ create mode 100644 arch/arm/include/debug/tegra.S
+ delete mode 100644 arch/arm/mach-tegra/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/mach-tegra/include/mach/irqs.h
