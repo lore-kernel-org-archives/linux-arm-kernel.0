@@ -1,36 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 Nov 2012 09:13:33 -0800
-Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
-In-Reply-To: <20121116100550.GI3332@n2100.arm.linux.org.uk>
-References: <20121114202244.GE3332@n2100.arm.linux.org.uk>
- <20121114203221.GA6801@atomide.com> <50A413D4.7000405@gmail.com>
- <20121114222159.GB6801@atomide.com> <50A43D58.5030404@gmail.com>
- <20121115110137.GA25985@arm.com> <50A4FCC5.2080604@gmail.com>
- <20121115143714.GF25985@arm.com> <50A50C24.9010702@gmail.com>
- <20121116100550.GI3332@n2100.arm.linux.org.uk>
-Message-ID: <20121116171333.GL6801@atomide.com>
+From: i.mazanov@gmail.com (Igor Mazanov)
+Date: Fri, 16 Nov 2012 21:16:02 +0400
+Subject: [PATCH] Remove inline from clock framework function definitions
+ to build the kernel with GCC 4.7
+In-Reply-To: <alpine.DEB.2.00.1211151845050.18192@utopia.booyaka.com>
+References: <50A52134.2010502@gmail.com>
+ <alpine.DEB.2.00.1211151845050.18192@utopia.booyaka.com>
+Message-ID: <50A674D2.9080403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [121116 02:07]:
+Paul Walmsley wrote:
+> + Mike
 > 
-> So, we don't detect whether we're running in secure mode or not; as I've
-> already stated, we don't have a way to do that.  We instead only apply
-> work-arounds which aren't already enabled prior to the kernel booting.
-> So, even on a secure mode platform, we will avoid writing the bits if the
-> work-around has already been applied.
+> On Thu, 15 Nov 2012, Igor Mazanov wrote:
+> 
+>>  Remove inline from clock framework function definitions to
+>>  build the kernel with GCC 4.7
+> 
+> sparse warns about this also.
+> 
+>> Signed-off-by: Igor Mazanov <i.mazanov@gmail.com>
+> 
+> This one is for Mike to deal with as CCF maintainer; it's out of the hands 
+> of the OMAP folks.
 
-This all assumes that we can read the value of the diagnostic register,
-and on my 4430 blaze the read returns zero. I have no idea if this is
-the correct value for the register, or if reads always just returns 0.
+Thanks for comments, I'll bear in mind it for the future.
 
-If we can verify that the read of the diagnostic register returns the
-correct value, then we don't need to test for the secure mode like you
-are saying, and can require the bootrom or bootloader set the right bits.
-
-Can somebody confirm that reading of the diagnostic register without
-using SMI is supposed to return the correct value?
-
-Regards,
-
-Tony
+> 
+> Acked-by: Paul Walmsley <paul@pwsan.com>
+> 
+> 
+>> ---
+>>  include/linux/clk-provider.h |    4 ++--
+>>  1 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+>> index c127315..f9f5e9e 100644
+>> --- a/include/linux/clk-provider.h
+>> +++ b/include/linux/clk-provider.h
+>> @@ -335,8 +335,8 @@ const char *__clk_get_name(struct clk *clk);
+>>  struct clk_hw *__clk_get_hw(struct clk *clk);
+>>  u8 __clk_get_num_parents(struct clk *clk);
+>>  struct clk *__clk_get_parent(struct clk *clk);
+>> -inline int __clk_get_enable_count(struct clk *clk);
+>> -inline int __clk_get_prepare_count(struct clk *clk);
+>> +int __clk_get_enable_count(struct clk *clk);
+>> +int __clk_get_prepare_count(struct clk *clk);
+>>  unsigned long __clk_get_rate(struct clk *clk);
+>>  unsigned long __clk_get_flags(struct clk *clk);
+>>  int __clk_is_enabled(struct clk *clk);
+>> --
+>> 1.7.4.4
+>>
+> 
+> 
+> - Paul
