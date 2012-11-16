@@ -1,46 +1,50 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 16 Nov 2012 14:45:39 +0200
-Subject: [PATCH 6/9] usb: chipidea: add PTW and PTS handling
-In-Reply-To: <1352909950-32555-7-git-send-email-m.grzeschik@pengutronix.de>
-References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
- <1352909950-32555-7-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <87zk2h67ik.fsf@ashishki-desk.ger.corp.intel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 16 Nov 2012 13:48:23 +0100
+Subject: [PATCH 1/2] ARM: i.MX27: Add platform support for IRAM.
+In-Reply-To: <1352131185-12079-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1352131185-12079-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <20121116124823.GR10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
-
-> This patch makes it possible to configure the PTW and PTS bits inside
-> the portsc register for host and device mode before the driver starts
-> and the phy can be addressed as hardware implementation is designed.
->
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+On Mon, Nov 05, 2012 at 04:59:44PM +0100, Javier Martin wrote:
+> Add support for IRAM to i.MX27 non-DT platforms using
+> iram_init() function.
+> 
+> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 > ---
->  drivers/usb/chipidea/bits.h        |    3 +++
->  drivers/usb/chipidea/ci.h          |    2 ++
->  drivers/usb/chipidea/ci13xxx_imx.c |    1 +
->  drivers/usb/chipidea/core.c        |   47 ++++++++++++++++++++++++++++++++++++
->  drivers/usb/chipidea/host.c        |    4 +++
->  include/linux/usb/chipidea.h       |    9 +++++++
->  6 files changed, 66 insertions(+)
->
-> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-> index 4b6ae3e..3cded5f 100644
-> --- a/drivers/usb/chipidea/bits.h
-> +++ b/drivers/usb/chipidea/bits.h
-> @@ -48,6 +48,9 @@
->  #define PORTSC_SUSP           BIT(7)
->  #define PORTSC_HSP            BIT(9)
->  #define PORTSC_PTC            (0x0FUL << 16)
-> +#define PORTSC_PTS            (BIT(31) | BIT(30))
-> +#define PORTSC_PTW            BIT(28)
-> +#define PORTSC_STS            BIT(29)
+>  arch/arm/mach-imx/mm-imx27.c |    3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
+> index e7e24af..fd2416d 100644
+> --- a/arch/arm/mach-imx/mm-imx27.c
+> +++ b/arch/arm/mach-imx/mm-imx27.c
+> @@ -27,6 +27,7 @@
+>  #include <asm/pgtable.h>
+>  #include <asm/mach/map.h>
+>  #include <mach/iomux-v1.h>
+> +#include <mach/iram.h>
+>  
+>  /* MX27 memory map definition */
+>  static struct map_desc imx27_io_desc[] __initdata = {
+> @@ -94,4 +95,6 @@ void __init imx27_soc_init(void)
+>  	/* imx27 has the imx21 type audmux */
+>  	platform_device_register_simple("imx21-audmux", 0, imx27_audmux_res,
+>  					ARRAY_SIZE(imx27_audmux_res));
+> +	/* imx27 has an iram of 46080 bytes size */
+> +	iram_init(MX27_IRAM_BASE_ADDR, 46080);
 
-Hm, my spec says these are actually in DEVLC register and only have this
-meaning in device mode. And in portsc these bits fall in device address
-bitfield. Can you refer me to your spec?
+For this rather Philipps sram allocater patches should be used. This
+would also solve the problem that mach/iram.h cannot be accessed anymore
+in current -next. Fabio already sent a patch addressing this, but I
+think we should go for a proper fix rather than just moving iram.h
+to include/linux/
 
-Regards,
---
-Alex
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
