@@ -1,39 +1,50 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 16 Nov 2012 10:25:15 +0100
-Subject: [PATCH 2/4] ARM: imx: add imx5x usbmisc clock lookups
-In-Reply-To: <1352988014-14769-3-git-send-email-m.grzeschik@pengutronix.de>
-References: <1352988014-14769-1-git-send-email-m.grzeschik@pengutronix.de>
- <1352988014-14769-3-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <20121116092515.GM10369@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 16 Nov 2012 10:26:58 +0100
+Subject: [PATCH 0/6] Add basic support for Allwinner A1X SoCs
+In-Reply-To: <201211160751.18401.arnd@arndb.de>
+References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
+ <201211160751.18401.arnd@arndb.de>
+Message-ID: <50A606E2.2070508@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 03:00:12PM +0100, Michael Grzeschik wrote:
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c |    6 ++++++
->  1 file changed, 6 insertions(+)
+Hi Arnd,
+
+Le 16/11/2012 08:51, Arnd Bergmann a ?crit :
+> On Thursday 15 November 2012, Maxime Ripard wrote:
+>> You'll find in this patchset the initial support for Allwinner A10 and A13 SoCs
+>> from Allwinner. Since the internal name of these SoCs are sun4i and sun5i, the
+>> mach- directory is named sunxi.
+>>
+>> You can find these SoCs in the Cubieboard, the A13-olinuxino or the Melee
+>> A1000.
+>>
+>> Both SoCs should work fine, as the A13 is a trimmed down version of the A10,
+>> but it has only been tested on a A13-OlinuXino from Olimex.
+>>
+>> Support is quite minimal for now, since it only includes timer and IRQ
+>> controller drivers, so we can only boot to userspace through initramfs. Support
+>> for the other peripherals on these SoCs will come eventually.
 > 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index 3edd11c..33c3c9b 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -365,6 +365,9 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
->  	clk_register_clkdev(clk[usboh3_per_gate], "per", "73f80000.usb");
->  	clk_register_clkdev(clk[usboh3_gate], "ipg", "73f80000.usb");
->  	clk_register_clkdev(clk[usboh3_gate], "ahb", "73f80000.usb");
-> +	clk_register_clkdev(clk[usboh3_per_gate], "per", "73f80800.usbmisc");
-> +	clk_register_clkdev(clk[usboh3_gate], "ipg", "73f80800.usbmisc");
-> +	clk_register_clkdev(clk[usboh3_gate], "ahb", "73f80800.usbmisc");
+> Hi Maxime,
+> 
+> Thanks for sending these, I'm pretty excited we actually get this far
+> for 3.8. All patches look good for inclusion from my side, but I'll let
+> Stefan and others comment first and then take your second version. We
+> are getting closer to the merge window already, so I'd like to pull
+> it in rather soon and maybe add some fixups later.
 
-Shawn, do you have plans to move the clock lookups to devicetree like
-you did on i.MX6? It would be nice to get rid of patches like this.
+That's great. I'll do my best to send a v2 asap.
 
-Sascha
+> I've also ordered a Cubieboard myself now, so hopefully I'll also find
+> some time to play with this.
 
+Nice :)
+
+Maxime
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
