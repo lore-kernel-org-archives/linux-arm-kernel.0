@@ -1,98 +1,107 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 16 Nov 2012 16:27:01 +0200
-Subject: [PATCH] OMAP: board-files: fix i2c_bus for tfp410
-In-Reply-To: <20121116135155.GE18527@arwen.pp.htv.fi>
-References: <1353068553-26897-1-git-send-email-tomi.valkeinen@ti.com>
- <20121116135155.GE18527@arwen.pp.htv.fi>
-Message-ID: <50A64D35.9050109@ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 16 Nov 2012 15:32:21 +0100
+Subject: [PATCH 5/9] usb: add phy connection by phy-mode
+In-Reply-To: <20121116134116.GA18527@arwen.pp.htv.fi>
+References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352909950-32555-6-git-send-email-m.grzeschik@pengutronix.de>
+ <20121116113149.GC17793@arwen.pp.htv.fi> <50A62713.5070407@pengutronix.de>
+ <20121116134116.GA18527@arwen.pp.htv.fi>
+Message-ID: <50A64E75.4060209@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-16 15:51, Felipe Balbi wrote:
+On 11/16/2012 02:41 PM, Felipe Balbi wrote:
 > Hi,
 > 
-> On Fri, Nov 16, 2012 at 02:22:33PM +0200, Tomi Valkeinen wrote:
->> The i2c handling in tfp410 driver, which handles converting parallel RGB
->> to DVI, was changed in 958f2717b84e88bf833d996997fda8f73276f2af. The
-> 
-> commit summary should be added in () after commit hash. This would look
-> like:
-> 
-> 'was changed in 958f271 (OMAPDSS: TFP410: pdata rewrite).'
-
-Yep.
-
->> patch changed what value the driver considers as invalid/undefined.
->> Before the patch 0 was the invalid value, but as 0 is a valid bus
->                   ^
-> 		  missing comma (,) character here.
-
-Right.
-
->> number, the patch changed this to -1.
+> On Fri, Nov 16, 2012 at 12:44:19PM +0100, Marc Kleine-Budde wrote:
+>>>> diff --git a/drivers/of/of_usbphy.c b/drivers/of/of_usbphy.c
+>>>> new file mode 100644
+>>>> index 0000000..2e71f7b
+>>>> --- /dev/null
+>>>> +++ b/drivers/of/of_usbphy.c
+>>>> @@ -0,0 +1,49 @@
+>>>> +/*
+>>>> + * OF helpers for network devices.
+>>>> + *
+>>>> + * This file is released under the GPLv2
+>>>> + *
+>>>> + * Initially copied out of drivers/of/of_net.c
+>>>> + */
+>>>> +#include <linux/etherdevice.h>
+>>>> +#include <linux/kernel.h>
+>>>> +#include <linux/of_usbphy.h>
+>>>> +#include <linux/usb/phy.h>
+>>>> +#include <linux/export.h>
+>>>> +
+>>>> +/**
+>>>> + * It maps 'enum usb_phy_interface' found in include/linux/usb/phy.h
+>>>> + * into the device tree binding of 'phy-mode', so that USB
+>>>> + * device driver can get phy interface from device tree.
+>>>> + */
+>>>
+>>> provide proper kernel-doc
+>>>
+>>>> +static const char *usbphy_modes[] = {
+>>>> +	[USBPHY_INTERFACE_MODE_NA]	= "",
+>>>> +	[USBPHY_INTERFACE_MODE_UTMI]	= "utmi",
+>>>> +	[USBPHY_INTERFACE_MODE_UTMIW]	= "utmiw",
+>>>> +	[USBPHY_INTERFACE_MODE_ULPI]	= "ulpi",
+>>>> +	[USBPHY_INTERFACE_MODE_SERIAL]	= "fsls",
+>>>> +};
+>>>
+>>> In fact, these would be better off as constants:
+>>>
+>>> #define USBPHY_INTERFACE_MODE_UTMI	1
+>>> #define USBPHY_INTERFACE_MODE_UTMIW	2
+>>> ...
 >>
->> However, the fact was missed that many board files do not define the bus
->> number at all, thus it's left to 0. This causes the driver to fail to
->> get the i2c bus, exiting from the driver's probe with an error, meaning
->> that the DVI output does not work for those boards.
+>> Why are defines better than an enum? BTW: this code is a copy of the
+> 
+> because with enums can change value if you add another one in the middle
+> and it's really easy to miss that sort of thing during review and cause
+> regressions to many DTS files.
+
+Now I get it, you want to use integers instead of strings in the DT. Why
+do you want to have Integers in the DT? It seems to work with strings
+pretty well for the Ethernet phys, why invent a new concept here?
+
+>> ethernet phy of-helper code.
+> 
+> so ?
+
+reviewed core, proven to work, if the concept works for Ethernet phys it
+should work with USB phys, too.
+
+> 
+>>>> +/**
+>>>> + * of_get_phy_mode - Get phy mode for given device_node
+>>>> + * @np:	Pointer to the given device_node
+>>>> + *
+>>>> + * The function gets phy interface string from property 'phy-mode',
+>>>> + * and return its index in phy_modes table, or errno in error case.
+>>>> + */
+>>>
+>>> why do you pass a string instead of passing an Integer ? This makes no
+>>> sense to me.
 >>
->> This patch fixes the issue by changing the i2c_bus number field in the
->> driver's platform data from u16 to int, and setting the bus number to -1
->> in the board files for the boards that did not define the bus. The
->> exception is devkit8000, for which the bus is set to 1, which is the
->> correct bus for that board.
->>
->> The bug exists in v3.5+ kernels.
->>
->> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
->> Reported-by: Thomas Weber <thomas@tomweber.eu>
->> [for v3.5, v3.6 stable kernels]
->> Cc: stable at vger.kernel.org
+>> This code returns an integer or rather an enum....see header file below.
 > 
-> This format is peculiar. Usually people use:
-> 
-> Cc: stable at vger.kernel.org # v3.5 v3.6
+> I mean through DT, should've been more explicit. The dts files should
+> pass an integer, not a string. Then you don't need this silly conversion
+> helper.
 
-Yes, I tried that. But my git send-email (1.7.10.4) rejects that line. I
-don't know if it's my setup, that particular git version, or what...
+Marc
 
-> To be fair, the whole i2c_bus_num looks like a big hackery introduced by
-> the way panel drivers are written for OMAP DSS.
-> 
-> TFP410 is an I2C client, not an OMAPDSS client. After a quick look at
-> the driver, there's is no such thing as a DSS bus, so looks like you
-> should have an I2C driver for TFP410 and the whole DSS stuff should be
-> just a list of clients, but not a struct bus at all.
-> 
-> The fact that you have to pass the I2C bus number down to the panel
-> driver is already a big indication of how wrong this is, IMHO.
-
-Without going deeper in the dss device model problems, I would agree
-with you if this was about i2c panel, but this is not quite like that.
-
-A panel controlled via i2c would be an i2c device. But TFP410 is not
-controlled via i2c. It's not really controlled at all except via
-power-down gpio. TFP410 doesn't need the i2c to be functional at all.
-
-The i2c lines do not even touch TFP410 chip, so to be precise, the i2c
-lines should not be TFP410's concern. The i2c lines come from the
-monitor and go to OMAP's i2c pins. But TFP410 driver is a convenient
-place to manage them.
-
-(As a side note, TFP410 _could_ be controlled via i2c, if it would've
-been setup so in the board hardware. That would be totally different
-thing, though, than what's discussed here.).
-
-Anyway, this patch wasn't meant to fix dss device model problems. It's
-meant to fix a bug in the kernel.
-
- Tomi
-
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 897 bytes
+Size: 259 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/10ca9040/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/4a6c9851/attachment.sig>
