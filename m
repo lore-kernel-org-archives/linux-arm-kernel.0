@@ -1,59 +1,100 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 16 Nov 2012 11:38:05 +0100
-Subject: [PATCH 2/6] irqchip: sunxi: Add irq controller driver
-In-Reply-To: <50A6047A.8090609@free-electrons.com>
+Date: Fri, 16 Nov 2012 11:41:36 +0100
+Subject: [PATCH 4/6] ARM: sunxi: Add earlyprintk support
+In-Reply-To: <1353019586-21043-5-git-send-email-maxime.ripard@free-electrons.com>
 References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
- <1353019586-21043-3-git-send-email-maxime.ripard@free-electrons.com>
- <50A5ECBF.9060304@denx.de> <50A6047A.8090609@free-electrons.com>
-Message-ID: <20121116113805.053eb5fa@skate>
+ <1353019586-21043-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20121116114136.592dfa12@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Maxime Ripard,
 
-On Fri, 16 Nov 2012 10:16:42 +0100, Maxime Ripard wrote:
-> >> +asmlinkage void __exception_irq_entry sunxi_handle_irq(struct pt_regs *regs)
-> >> +{
-> >> +	u32 irq, reg;
-> >> +	int i;
-> >> +
-> >> +	for (i = 0; i < 3; i++) {
-> >> +		reg = readl(sunxi_irq_base + SUNXI_IRQ_PENDING_REG(i));
-> >> +		if (reg == 0)
-> >> +			continue;
-> >> +		irq = ilog2(reg);
-> >> +		break;
-> >> +	}
-> >> +	irq = irq_find_mapping(sunxi_irq_domain, irq);
-> >> +	handle_IRQ(irq, regs);
-> > 
-> > Why don't you use the interrupt-vector register to get the active
-> > interrupt source? Here is my version:
-> > 
-> > asmlinkage void __exception_irq_entry sunxi_handle_irq(struct pt_regs *regs)
-> > {
-> > 	u32 irq;
-> > 
-> > 	irq = readl(int_base + SW_INT_VECTOR_REG) >> 2;
-> > 	irq = irq_find_mapping(sunxi_vic_domain, irq);
-> > 	handle_IRQ(irq, regs);
-> > }
-> > 
-> > I suggest you give it a try.
+On Thu, 15 Nov 2012 23:46:23 +0100, Maxime Ripard wrote:
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/Kconfig.debug         |    8 ++++++++
+>  arch/arm/include/debug/sunxi.S |   22 ++++++++++++++++++++++
+>  2 files changed, 30 insertions(+)
+>  create mode 100644 arch/arm/include/debug/sunxi.S
 > 
-> It definitely looks nicer. I'll try that and update.
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index b0f3857..6672b02 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -345,6 +345,13 @@ choice
+>  		  Say Y here if you want kernel low-level debugging support
+>  		  on SOCFPGA based platforms.
+>  
+> +	config DEBUG_SUNXI_UART
 
-How does this SW_INT_VECTOR_REG behave when there are multiple
-interrupts pending? Shouldn't the code be something like:
+Should be DEBUG_SUNXI_UART1
 
-	do {
-		hwirq = readl(int_base + SW_INT_VECTOR_REG) >> 2;
-		irq = irq_find_mapping(sunxi_vic_domain, hwirq);
-		handle_IRQ(irq, regs);
-	} while(hwirq != 0);
+> +		bool "Kernel low-level debugging messages via sunXi UART"
 
-Or maybe the != 0 is not the good condition, but the idea is to handle
-all pending interrupts. That said, the original code from Maxime was
-not doing that as well.
+UART1.
+
+> +		depends on ARCH_SUNXI
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on Allwinner A1X based platforms.
+
+Say a few words about UART1 here.
+
+> +
+>  	config DEBUG_VEXPRESS_UART0_DETECT
+>  		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
+>  		depends on ARCH_VEXPRESS && CPU_CP15_MMU
+> @@ -416,6 +423,7 @@ config DEBUG_LL_INCLUDE
+>  	default "debug/mvebu.S" if DEBUG_MVEBU_UART
+>  	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
+>  	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
+> +	default "debug/sunxi.S" if DEBUG_SUNXI_UART
+
+UART1
+
+>  	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
+>  		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
+>  	default "mach/debug-macro.S"
+> diff --git a/arch/arm/include/debug/sunxi.S b/arch/arm/include/debug/sunxi.S
+> new file mode 100644
+> index 0000000..ffd101f
+> --- /dev/null
+> +++ b/arch/arm/include/debug/sunxi.S
+> @@ -0,0 +1,22 @@
+> +/*
+> + * Early serial output macro for Allwinner A1X SoCs
+> + *
+> + * Copyright (C) 2012 Maxime Ripard
+> + *
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#define SUNXI_UART1_PHYS_BASE	0x01c28400
+> +#define SUNXI_UART1_VIRT_BASE	0xf1c28400
+
+Maybe:
+
+#ifdef CONFIG_DEBUG_SUNXI_UART1
+#define SUNXI_UART_DEBUG_PHYS_BASE 0x01c28400
+#define SUNXI_UART_DEBUG_VIRT_BASE 0xf1c28400
+#endif
+
+> +	.macro	addruart, rp, rv, tmp
+> +	ldr	\rp, =SUNXI_UART1_PHYS_BASE
+> +	ldr	\rv, =SUNXI_UART1_VIRT_BASE
+
+And use SUNXI_UART_DEBUG_{VIRT,PHYS}_BASE here.
+
+So that people can come and add CONFIG_DEBUG_SUNXI_UART0 for the
+Cubieboard a bit more easily. Or you can even provision the code for
+the UART0 as well.
+
+Best regards,
 
 Thomas
 -- 
