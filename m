@@ -1,45 +1,80 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 16 Nov 2012 10:32:35 +0100
-Subject: [GIT PULL] Marvell board changes for 3.8, network related
-Message-ID: <1353058359-28102-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri, 16 Nov 2012 10:32:36 +0100
+Subject: [PATCH 1/4] arm: mvebu: add Ethernet controllers using mvneta driver
+ for Armada 370/XP
+In-Reply-To: <1353058359-28102-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1353058359-28102-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353058359-28102-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jason,
+The Armada 370 SoC has two network units, while the Armada XP has four
+network units. The first two network units are common to both the
+Armada XP and Armada 370, so they are added to armada-370-xp.dtsi,
+while the other two network units are specific to the Armada XP and
+therefore added to armada-xp.dtsi.
 
-Here is a pull request that should be pulled on top of the previous
-"[GIT PULL] Marvell board changes for the v3.8 merge window" that I
-sent on November, 14th. It adds support for the network interfaces on
-Armada 370/XP evaluation boards, on the OpenBlocks and Mirabox.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370-xp.dtsi |   21 +++++++++++++++++++++
+ arch/arm/boot/dts/armada-xp.dtsi     |   14 ++++++++++++++
+ 2 files changed, 35 insertions(+)
 
-Thanks!
-
-The following changes since commit e3e37bcab910a68616bc33145ed5c333825053ac:
-
-  arm: mvebu: support for the Globalscale Mirabox board (2012-11-14 16:32:29 +0100)
-
-are available in the git repository at:
-
-  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-boards-net-for-3.8
-
-for you to fetch changes up to 9f32cccc67590ccda30529bcbcea5c22d95c00a6:
-
-  arm: mvebu: enable Ethernet controllers on Mirabox platform (2012-11-16 10:17:48 +0100)
-
-----------------------------------------------------------------
-Marvell boards changes related to Ethernet, for 3.8
-
-----------------------------------------------------------------
-Thomas Petazzoni (4):
-      arm: mvebu: add Ethernet controllers using mvneta driver for Armada 370/XP
-      arm: mvebu: enable Ethernet controllers on Armada 370/XP eval boards
-      arm: mvebu: enable Ethernet controllers on OpenBlocks AX3-4 platform
-      arm: mvebu: enable Ethernet controllers on Mirabox platform
-
- arch/arm/boot/dts/armada-370-db.dts              |   23 ++++++++++++
- arch/arm/boot/dts/armada-370-mirabox.dts         |   21 +++++++++++
- arch/arm/boot/dts/armada-370-xp.dtsi             |   21 +++++++++++
- arch/arm/boot/dts/armada-xp-db.dts               |   43 ++++++++++++++++++++++
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |   43 ++++++++++++++++++++++
- arch/arm/boot/dts/armada-xp.dtsi                 |   14 +++++++
- 6 files changed, 165 insertions(+)
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 16cc82c..643101b 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -68,6 +68,27 @@
+ 			compatible = "marvell,armada-addr-decoding-controller";
+ 			reg = <0xd0020000 0x258>;
+ 		};
++
++		mdio {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "marvell,orion-mdio";
++			reg = <0xd0072004 0x4>;
++		};
++
++		ethernet at d0070000 {
++				compatible = "marvell,armada-370-neta";
++				reg = <0xd0070000 0x2500>;
++				interrupts = <8>;
++				status = "disabled";
++		};
++
++		ethernet at d0074000 {
++				compatible = "marvell,armada-370-neta";
++				reg = <0xd0074000 0x2500>;
++				interrupts = <10>;
++				status = "disabled";
++		};
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 71d6b5d..3bbbccf 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -51,5 +51,19 @@
+ 				compatible = "marvell,armada-370-xp-system-controller";
+ 				reg = <0xd0018200 0x500>;
+ 		};
++
++		ethernet at d0030000 {
++				compatible = "marvell,armada-370-neta";
++				reg = <0xd0030000 0x2500>;
++				interrupts = <12>;
++				status = "disabled";
++		};
++
++		ethernet at d0034000 {
++				compatible = "marvell,armada-370-neta";
++				reg = <0xd0034000 0x2500>;
++				interrupts = <14>;
++				status = "disabled";
++		};
+ 	};
+ };
+-- 
+1.7.9.5
