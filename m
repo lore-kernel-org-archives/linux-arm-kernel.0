@@ -1,56 +1,49 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 16 Nov 2012 09:19:47 -0500
-Subject: [PATCH v2 0/3] GPIO driver to turn power off
-In-Reply-To: <1352821485-10032-1-git-send-email-andrew@lunn.ch>
-References: <1352821485-10032-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20121116141947.GN22106@titan.lakedaemon.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 16 Nov 2012 15:19:57 +0100
+Subject: [PATCH 2/4] ARM: imx: add imx5x usbmisc clock lookups
+In-Reply-To: <20121116142846.GI2941@S2100-06.ap.freescale.net>
+References: <1352988014-14769-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352988014-14769-3-git-send-email-m.grzeschik@pengutronix.de>
+ <20121116092515.GM10369@pengutronix.de>
+ <20121116142846.GI2941@S2100-06.ap.freescale.net>
+Message-ID: <20121116141957.GT10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2012 at 04:44:42PM +0100, Andrew Lunn wrote:
-> A few of the Kirkwood systems use a GPIO line to turn the power off on
-> shutdown. They request the GPIO line in the board setup code,
-> optionally setting it as an output and driving it inactive. They then
-> register a function for pm_power_off. At the end of the shutdown, this
-> function is called. The GPIO line is configured as an output, if not
-> already so, and then driven active. In order to cover the use case of
-> edges rather then levels, triggering power off, the GPIO line is then
-> toggled active and later inactive. This should allow the driver to be
-> used by PXA which also has boards using the same scheme.
-> 
-> The driver code was initially developed by Jamie Lentin and extended
-> to cover the PXA case by Andrew Lunn.
-> 
-> v1 -> v2: Moved to drivers/power/reset
-> 
-> Andrew Lunn (2):
->   ARM: Kirkwood: Convert DNSKW to use gpio-poweroff.
->   ARM: Kirkwood: Convert IB62x0 to use gpio-poweroff.
-> 
-> Jamie Lentin (1):
->   power: Add simple poweroff-gpio driver
-> 
->  .../devicetree/bindings/gpio/gpio-poweroff.txt     |   22 ++++
->  arch/arm/boot/dts/kirkwood-dnskw.dtsi              |    5 +
->  arch/arm/boot/dts/kirkwood-ib62x0.dts              |    6 +
->  arch/arm/mach-kirkwood/Kconfig                     |    4 +
->  arch/arm/mach-kirkwood/board-dnskw.c               |   12 --
->  arch/arm/mach-kirkwood/board-ib62x0.c              |   13 --
->  drivers/power/Kconfig                              |    3 +
->  drivers/power/Makefile                             |    1 +
->  drivers/power/reset/Kconfig                        |   15 +++
->  drivers/power/reset/Makefile                       |    1 +
->  drivers/power/reset/gpio-poweroff.c                |  129 ++++++++++++++++++++
->  11 files changed, 186 insertions(+), 25 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
->  create mode 100644 drivers/power/reset/Kconfig
->  create mode 100644 drivers/power/reset/Makefile
->  create mode 100644 drivers/power/reset/gpio-poweroff.c
+On Fri, Nov 16, 2012 at 10:28:48PM +0800, Shawn Guo wrote:
+> On Fri, Nov 16, 2012 at 10:25:15AM +0100, Sascha Hauer wrote:
+> > On Thu, Nov 15, 2012 at 03:00:12PM +0100, Michael Grzeschik wrote:
+> > > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> > > ---
+> > >  arch/arm/mach-imx/clk-imx51-imx53.c |    6 ++++++
+> > >  1 file changed, 6 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+> > > index 3edd11c..33c3c9b 100644
+> > > --- a/arch/arm/mach-imx/clk-imx51-imx53.c
+> > > +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+> > > @@ -365,6 +365,9 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+> > >  	clk_register_clkdev(clk[usboh3_per_gate], "per", "73f80000.usb");
+> > >  	clk_register_clkdev(clk[usboh3_gate], "ipg", "73f80000.usb");
+> > >  	clk_register_clkdev(clk[usboh3_gate], "ahb", "73f80000.usb");
+> > > +	clk_register_clkdev(clk[usboh3_per_gate], "per", "73f80800.usbmisc");
+> > > +	clk_register_clkdev(clk[usboh3_gate], "ipg", "73f80800.usbmisc");
+> > > +	clk_register_clkdev(clk[usboh3_gate], "ahb", "73f80800.usbmisc");
+> > 
+> > Shawn, do you have plans to move the clock lookups to devicetree like
+> > you did on i.MX6? It would be nice to get rid of patches like this.
+> > 
+> Right.  But I will not be able to resume the IMX cleanup work like this
+> any soon, as I have some FSL internal stuff to sort out.  So please go
+> ahead to do it.
 
-Anton,
+I didn't have the intention to volunteer for this job ;)
+Anyway, I'll see if I find time for this.
 
-Is it ok if we take this through the arm-soc tree with your Ack?
+Sascha
 
-thx,
-
-Jason.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
