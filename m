@@ -1,70 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 16 Nov 2012 10:23:54 +0800
-Subject: [PATCH 01/10] ARM: imx6q: print silicon version on boot
-In-Reply-To: <72B629D8-8CD8-42E2-91A3-CF0532B15E5F@mentor.com>
-References: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
- <1351005779-30347-2-git-send-email-shawn.guo@linaro.org>
- <72B629D8-8CD8-42E2-91A3-CF0532B15E5F@mentor.com>
-Message-ID: <20121116022346.GA2941@S2100-06.ap.freescale.net>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 15 Nov 2012 18:04:34 -0800
+Subject: [PATCH v2 00/10] serial: sh-sci fixes - console PM, SCIFB, SMP
+ lockup, etc.
+In-Reply-To: <50A59B9B.2010501@renesas.com>
+References: <509A0658.1010503@renesas.com> <509A0B4E.1030801@renesas.com>
+ <20121116010107.GA6068@kroah.com> <50A59B9B.2010501@renesas.com>
+Message-ID: <20121116020434.GA15188@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 06:09:31PM +0000, Moseley, Drew wrote:
-> On Oct 23, 2012, at 11:22 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > i.MX6Q has 3 revisions 1.0, 1.1 and 1.2.  Print revision on boot.
+On Fri, Nov 16, 2012 at 10:49:15AM +0900, Shinya Kuribayashi wrote:
+> Hi Greg,
+> 
+> On 11/16/2012 10:01 AM, Greg KH wrote:> On Wed, Nov 07, 2012 at 04:18:38PM +0900, Shinya Kuribayashi wrote:
+> >> On 11/7/2012 3:57 PM, Shinya Kuribayashi wrote:
+> >>> Hi Paul and serial forks,
+> >> [...]
+> >>> Takashi YOSHII (4):
+> >>>       serial: sh-sci: fix condition test to set SCBRR
+> >>>       serial: sh-sci: support lower baud rate
+> >>>       serial: sh-sci: mask SCTFDR/RFDR according to fifosize
+> >>>       serial: sh-sci: fix common SCIFB regmap definition
+> >>>
+> >>> Teppei Kamijou (1):
+> >>>       serial: sh-sci: console runtime PM support (revisit)
+> >>>
+> >>>  drivers/tty/serial/sh-sci.c | 140 ++++++++++++++++++--------------------------
+> >>>  1 file changed, 56 insertions(+), 84 deletions(-)
+> >>
+> >> Oops, I forgot to append proper From: author lines in five commits
+> >> (patch 04/10 to 09/10).  Didn't mean to supersede your authoship.
+> >>
+> >> I'd respin the patchset later, waiting for some feedback.
 > > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> > arch/arm/mach-imx/mach-imx6q.c |   28 ++++++++++++++++++++++++++++
-> > 1 file changed, 28 insertions(+)
-> > 
+> > Can you please resend this with this fixed up if you want to get this
+> > into 3.8?
 > 
-> Hi Shawn,
-> 
-> An addition to this patch to add some error checking.  Thoughts?
-> 
-It looks good.  I just squashed the changes into the original patch
-with your sob added.  Thanks.
+> Thanks for your kind reminder.  Here's v2, providing From: authorship
+> lines in five patches (04 to 08).  No logical change in the patches.
 
-Note, the patch series will probably postponed to 3.9 due to the
-dependency on other tree and the fact that I wait for a TO1.2 hardware
-to test the power gating state.
+All now applied, thanks.
 
-Shawn
-
-> Drew
-> 
-> 
-> 
-> 
-> Add error checking to imx6q_revision()
-> 
-> Signed-off-by: Drew Moseley <drew_moseley@mentor.com>
-> ---
->  arch/arm/mach-imx/mach-imx6q.c | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> index 265c311..072e32a 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -54,9 +54,16 @@ static int imx6q_revision(void)
->  
->  	if (!rev) {
->  		np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
-> +		if (!np)
-> +			return IMX_CHIP_REVISION_UNKNOWN;
->  		base = of_iomap(np, 0);
-> +		if (!base) {
-> +			of_node_put(np);
-> +			return IMX_CHIP_REVISION_UNKNOWN;
-> +		}
->  		rev =  readl_relaxed(base + IMX6Q_ANALOG_DIGPROG);
->  		iounmap(base);
-> +		of_node_put(np);
->  	}
->  
->  	switch (rev & 0xff) {
-> -- 
-> 1.8.0
-> 
+greg k-h
