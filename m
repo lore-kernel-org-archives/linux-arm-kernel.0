@@ -1,45 +1,24 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 16 Nov 2012 16:32:14 +0100
-Subject: [GIT PULL] i.MX fixes for -rc
-Message-ID: <20121116153214.GW10369@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Nov 2012 15:34:21 +0000
+Subject: [PATCH 1/1] ARM: ux500: Describe UART platform registering issues
+ more accurately
+In-Reply-To: <50A65B5A.2090000@ti.com>
+References: <1352968401-6092-1-git-send-email-lee.jones@linaro.org>
+ <201211160936.59258.arnd@arndb.de> <50A65B5A.2090000@ti.com>
+Message-ID: <201211161534.22252.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday 16 November 2012, Jon Hunter wrote:
+> > is there anything you are waiting for still? Should Jon resend
+> > his latest patches to make sure we get them merged this time?
+> > 
+> > I have multiple people that want to send me patches for 3.8 based
+> > on that work, so we are running out of time now.
+> 
+> Vinod responded today saying it will be in for v3.8 [1].
+> 
 
-Hi Arnd, Olof,
+Ok, very good. Thanks everyone!
 
-Please pull the following i.MX fixes for -rc.
-
-Sascha
-
-The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
-
-  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-fixes-rc
-
-for you to fetch changes up to 3d5e2abe6e265acc5e1fda810301243e9bac92b2:
-
-  ARM: imx: ehci: fix host power mask bit (2012-11-16 15:55:05 +0100)
-
-----------------------------------------------------------------
-ARM i.MX fixes for 3.7-rc
-
-----------------------------------------------------------------
-Christoph Fritz (1):
-      ARM: imx: ehci: fix host power mask bit
-
-Wei Yongjun (1):
-      ARM i.MX: fix error-valued pointer dereference in clk_register_gate2()
-
- arch/arm/mach-imx/clk-gate2.c  |    2 +-
- arch/arm/mach-imx/ehci-imx25.c |    2 +-
- arch/arm/mach-imx/ehci-imx35.c |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
