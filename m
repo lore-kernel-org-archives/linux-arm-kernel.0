@@ -1,33 +1,106 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Fri, 16 Nov 2012 11:53:17 +0100
-Subject: ARM: imx: ehci-imx35: fix host power mask bit
-Message-ID: <1353063197.3647.27.camel@mars>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 16 Nov 2012 12:11:21 +0100
+Subject: [PATCH] ARM: dts: add board dts file for Exynos4412 based SMDK
+ board
+In-Reply-To: <CAJuYYwTRnjKPm7fopVOjBVtHEEV2TQhv6OFzQG6hqhHwq4BT+g@mail.gmail.com>
+References: <1351954172-13645-1-git-send-email-thomas.abraham@linaro.org>
+ <1629120.eNASZVgxGi@amdc1227>
+ <CAJuYYwTRnjKPm7fopVOjBVtHEEV2TQhv6OFzQG6hqhHwq4BT+g@mail.gmail.com>
+Message-ID: <3179451.csXCh8vt1v@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch sets HPM (Host power mask bit) to bit 16 according to i.MX35
-Reference Manual. Falsely it was set to bit 8, but this controls pull-up
-Impedance.
+On Thursday 15 of November 2012 13:48:55 Thomas Abraham wrote:
+> Hi Tomasz,
+> 
+> Thanks for your comments.
+> 
+> On 12 November 2012 19:37, Tomasz Figa <t.figa@samsung.com> wrote:
+> > Hi Thomas,
+> > 
+> > On Saturday 03 of November 2012 20:19:32 Thomas Abraham wrote:
+> >> Add a minimal board dts file for Samsung Exynos4412 based SMDK board.
+> >> 
+> >> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> >> ---
+> >> This patch depends the on the following patch posted by Tomasz Figa.
+> >> "ARM: dts: exynos4: Add support for Exynos4x12 SoCs"
+> >> 
+> >>  arch/arm/boot/dts/Makefile                |    1 +
+> >>  arch/arm/boot/dts/exynos4412-smdk4412.dts |   45
+> >> 
+> >> +++++++++++++++++++++++++++++ 2 files changed, 46 insertions(+), 0
+> >> deletions(-)
+> >> 
+> >>  create mode 100644 arch/arm/boot/dts/exynos4412-smdk4412.dts
+> >> 
+> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >> index f37cf9f..36488a5 100644
+> >> --- a/arch/arm/boot/dts/Makefile
+> >> +++ b/arch/arm/boot/dts/Makefile
+> >> @@ -23,6 +23,7 @@ dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
+> >> 
+> >>  dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+> >>  
+> >>       exynos4210-smdkv310.dtb \
+> >>       exynos4210-trats.dtb \
+> >> 
+> >> +     exynos4412-smdk4412.dtb \
+> >> 
+> >>       exynos5250-smdk5250.dtb
+> >>  
+> >>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
+> >>  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
+> >> 
+> >> diff --git a/arch/arm/boot/dts/exynos4412-smdk4412.dts
+> >> b/arch/arm/boot/dts/exynos4412-smdk4412.dts new file mode 100644
+> >> index 0000000..f05bf57
+> >> --- /dev/null
+> >> +++ b/arch/arm/boot/dts/exynos4412-smdk4412.dts
+> >> @@ -0,0 +1,45 @@
+> >> +/*
+> >> + * Samsung's Exynos4412 based SMDK board device tree source
+> >> + *
+> >> + * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+> >> + *           http://www.samsung.com
+> >> + *
+> >> + * Device tree source file for Samsung's SMDK4412 board which is
+> >> based
+> >> on + * Samsung's Exynos4412 SoC.
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or
+> >> modify + * it under the terms of the GNU General Public License
+> >> version 2 as + * published by the Free Software Foundation.
+> >> +*/
+> >> +
+> >> +/dts-v1/;
+> >> +/include/ "exynos4412.dtsi"
+> >> +
+> >> +/ {
+> >> +     model = "Samsung SMDK evaluation board based on Exynos4412";
+> >> +     compatible = "samsung,smdk4412", "samsung,exynos4412";
+> >> +
+> >> +     memory {
+> >> +             reg = <0x40000000 0x40000000>;
+> >> +     };
+> > 
+> > This will not boot, because section size limit is set to 256 MiB.
+> > 
+> > It might work with CONFIG_ARM_ATAG_DTB_COMPAT enabled, because the
+> > memory configuration from DT is ignored and values from ATAGs are
+> > taken instead.
+> > 
+> > I suggest you to change it to 4 banks of 256 MiB.
+> 
+> Thanks for pointing this out. So are there any existing exynos based
+> platforms that use sparse mem? If not, we should probably remove the
+> section length configuration itself for mach-exynos. I suspect this
+> setting might not help with the single kernel image support as well.
 
-Reported-by: Michael Burkey <mdburkey@gmail.com>
-Cc: Stable <stable@vger.kernel.org>
-Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
----
- arch/arm/mach-imx/ehci-imx35.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Isn't sparse memory the only configuration available for ARCH_EXYNOS?
 
-diff --git a/arch/arm/mach-imx/ehci-imx35.c b/arch/arm/mach-imx/ehci-imx35.c
-index a596f70..554e7cc 100644
---- a/arch/arm/mach-imx/ehci-imx35.c
-+++ b/arch/arm/mach-imx/ehci-imx35.c
-@@ -30,7 +30,7 @@
- #define MX35_H1_SIC_SHIFT	21
- #define MX35_H1_SIC_MASK	(0x3 << MX35_H1_SIC_SHIFT)
- #define MX35_H1_PP_BIT		(1 << 18)
--#define MX35_H1_PM_BIT		(1 << 8)
-+#define MX35_H1_PM_BIT		(1 << 16)
- #define MX35_H1_IPPUE_UP_BIT	(1 << 7)
- #define MX35_H1_IPPUE_DOWN_BIT	(1 << 6)
- #define MX35_H1_TLL_BIT		(1 << 5)
+Best regards,
 -- 
-1.7.10.4
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Linux Platform
