@@ -1,64 +1,83 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Nov 2012 23:51:14 +0100
-Subject: [GIT PULL] Integrator SoC bus patches
-Message-ID: <CACRpkdYKWLMMOa7+CV8yMNe5-EV1p5fYeVJ+bn55KLLFBZdD=A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 16 Nov 2012 23:56:50 +0100
+Subject: [GIT PULL] ARM: sunxi: Add basic support for Allwinner SoCs
+Message-ID: <1353106610-18681-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC guys,
+Arnd, Olof,
 
-could you please pull this Integrator patch set as previously circulated
-on the list, targetting the v3.8 merge window? The details are in the
-tag.
+Here is a pull request to add the basic support for Allwinner A1X SoCs.
 
-Please pull it in!
+Thanks,
+Maxime
 
-Yours,
-Linus Walleij
+The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
 
-
-The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
-
-  Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
+  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/integrator-socbus
+  git://github.com/mripard/linux.git tags/tags/sunxi-support-for-3.8
 
-for you to fetch changes up to 328ba305e3871d4256398a80f45517ec9c814999:
+for you to fetch changes up to 1b106699647b56313bac707e12e7ad67180cb147:
 
-  ARM: integrator: delete static UART1 mapping (2012-11-16 22:26:26 +0100)
-
-----------------------------------------------------------------
-This series will do the following:
-- Switch the Integrator/AP and /CP to use the SoC bus
-  when booting from device tree.
-- Group all devices on the SoC below this bus so as to
-  set a good example of how to do this. The bus was
-  invented by Lee Jones, let's show how it's to be used
-  on a DT:ed SoC.
-- Fetch the special system controller offsets from two
-  special device tree nodes for each case and replace
-  the static mappings with these at boot.
-- Move some static remaps to the ATAG-only code path
-  and delete some static maps that aren't used.
+  ARM: sunxi: Add entry to MAINTAINERS (2012-11-16 21:56:53 +0100)
 
 ----------------------------------------------------------------
-Linus Walleij (6):
-      ARM: integrator: hook the AP into the SoC bus
-      ARM: integrator: hook the CP into the SoC bus
-      ARM: integrator: remove static AP syscon mapping
-      ARM: integrator: remove static CP syscon mapping
-      ARM: integrator: delete SC mapping on the CP
-      ARM: integrator: delete static UART1 mapping
+Allwinner SoC support for 3.8
 
- Documentation/devicetree/bindings/arm/arm-boards |   4 +
- arch/arm/boot/dts/integratorap.dts               |   5 +
- arch/arm/boot/dts/integratorcp.dts               |   5 +
- arch/arm/mach-integrator/Kconfig                 |   2 +
- arch/arm/mach-integrator/common.h                |   1 +
- arch/arm/mach-integrator/core.c                  |  91 ++++++++++++++++++
- arch/arm/mach-integrator/integrator_ap.c         | 114 ++++++++++++++++++-----
- arch/arm/mach-integrator/integrator_cp.c         | 111 ++++++++++++++++------
- 8 files changed, 283 insertions(+), 50 deletions(-)
+----------------------------------------------------------------
+Maxime Ripard (7):
+      clk: sunxi: Add dummy fixed rate clock for Allwinner A1X SoCs
+      clocksource: sunxi: Add Allwinner A1X Timer Driver
+      irqchip: sunxi: Add irq controller driver
+      ARM: sunxi: Add basic support for Allwinner A1x SoCs
+      ARM: sunxi: Add earlyprintk support
+      ARM: sunxi: Add device tree for the A13 and the Olinuxino board
+      ARM: sunxi: Add entry to MAINTAINERS
+
+ Documentation/arm/sunxi/README                     |   19 +++
+ .../interrupt-controller/allwinner,sunxi-ic.txt    |  104 ++++++++++++
+ .../bindings/timer/allwinner,sunxi-timer.txt       |   17 ++
+ MAINTAINERS                                        |    6 +
+ arch/arm/Kconfig                                   |    2 +
+ arch/arm/Kconfig.debug                             |    8 +
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/sun5i-olinuxino.dts              |   26 +++
+ arch/arm/boot/dts/sun5i.dtsi                       |   74 +++++++++
+ arch/arm/include/debug/sunxi.S                     |   24 +++
+ arch/arm/mach-sunxi/Kconfig                        |    9 ++
+ arch/arm/mach-sunxi/Makefile                       |    1 +
+ arch/arm/mach-sunxi/Makefile.boot                  |    1 +
+ arch/arm/mach-sunxi/sunxi.c                        |   60 +++++++
+ arch/arm/mach-sunxi/sunxi.h                        |   20 +++
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/clk-sunxi.c                            |   30 ++++
+ drivers/clocksource/Kconfig                        |    3 +
+ drivers/clocksource/Makefile                       |    1 +
+ drivers/clocksource/sunxi_timer.c                  |  170 ++++++++++++++++++++
+ drivers/irqchip/Makefile                           |    1 +
+ drivers/irqchip/irq-sunxi.c                        |  150 +++++++++++++++++
+ include/linux/clk/sunxi.h                          |   22 +++
+ include/linux/irqchip/sunxi.h                      |   27 ++++
+ include/linux/sunxi_timer.h                        |   24 +++
+ 26 files changed, 802 insertions(+)
+ create mode 100644 Documentation/arm/sunxi/README
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-ic.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/allwinner,sunxi-timer.txt
+ create mode 100644 arch/arm/boot/dts/sun5i-olinuxino.dts
+ create mode 100644 arch/arm/boot/dts/sun5i.dtsi
+ create mode 100644 arch/arm/include/debug/sunxi.S
+ create mode 100644 arch/arm/mach-sunxi/Kconfig
+ create mode 100644 arch/arm/mach-sunxi/Makefile
+ create mode 100644 arch/arm/mach-sunxi/Makefile.boot
+ create mode 100644 arch/arm/mach-sunxi/sunxi.c
+ create mode 100644 arch/arm/mach-sunxi/sunxi.h
+ create mode 100644 drivers/clk/clk-sunxi.c
+ create mode 100644 drivers/clocksource/sunxi_timer.c
+ create mode 100644 drivers/irqchip/irq-sunxi.c
+ create mode 100644 include/linux/clk/sunxi.h
+ create mode 100644 include/linux/irqchip/sunxi.h
+ create mode 100644 include/linux/sunxi_timer.h
