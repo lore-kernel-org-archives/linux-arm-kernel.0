@@ -1,31 +1,24 @@
-From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
-Date: Fri, 16 Nov 2012 10:50:49 +0200
-Subject: [PATCH 1/8] mtd: diskonchip: don't warn about ARM architecture
-In-Reply-To: <1352238933-4886-2-git-send-email-arnd@arndb.de>
-References: <1352238933-4886-1-git-send-email-arnd@arndb.de>
- <1352238933-4886-2-git-send-email-arnd@arndb.de>
-Message-ID: <1353055849.20111.7.camel@sauron.fi.intel.com>
+From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
+Date: Fri, 16 Nov 2012 17:53:33 +0900
+Subject: [PATCH 0/5] i2c-sh_mobile non-urgent changes
+In-Reply-To: <20121116080704.GC8464@pengutronix.de>
+References: <5087C93F.6080601@renesas.com>
+ <20121116080704.GC8464@pengutronix.de>
+Message-ID: <50A5FF0D.4020502@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-11-06 at 22:55 +0100, Arnd Bergmann wrote:
-> Enabling the diskonchip drivers on most architectures results
-> in a pointless warning "#warning Unknown architecture for
-> DiskOnChip. No default probe locations defined". The driver
-> can in fact handle the default location already through the
-> CONFIG_MTD_DOCPROBE_ADDRESS, which gets set on the platforms
-> that need it, and we get a run-time error if this is not
-> set correctly.
+On 11/16/2012 5:07 PM, Wolfram Sang wrote:
+> Looks good to me, like the extensive patch descriptions. I am going to
+> apply it to for-next with patches 2+3 squashed, because after patch 2 we
+> would have a buggy state otherwise. Let me know if you are not okay with
+> that.
 
-Pushed patches 1, 2, and 3 to l2-mtd.git, thanks!
+It's not that buggy as you/we think, in most cases it work without
+problem.  What's more important for me is to record the issue and
+how to solve it.  So I'd like to have patch 2 and 3 separately.
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/77b59189/attachment.sig>
+Thank you for your offer anyway,
+--
+Shinya Kuribayashi
+Renesas Electronics
