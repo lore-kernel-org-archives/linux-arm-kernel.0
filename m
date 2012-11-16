@@ -1,83 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 16 Nov 2012 23:56:50 +0100
-Subject: [GIT PULL] ARM: sunxi: Add basic support for Allwinner SoCs
-Message-ID: <1353106610-18681-1-git-send-email-maxime.ripard@free-electrons.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 16 Nov 2012 23:57:42 +0100
+Subject: Final call for 3.8 arm-soc patches
+In-Reply-To: <201211162111.34615.arnd@arndb.de>
+References: <201211162111.34615.arnd@arndb.de>
+Message-ID: <50A6C4E6.2050700@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On 11/16/2012 10:11 PM, Arnd Bergmann :
+> Hi ARM subarch maintainers,
+> 
+> We are currently at linux-3.7-rc5, which means the merge window is coming
+> closer. We already have 759 changesets in arm-soc and I know of a few ones
+> coming (tegra, clps711x, bcm), but I don't know what the status for some
+> of the bigger ones (exynos/s5p/s3c, mvebu/orion, pxa/mmp). If you have
+> more patches coming, please send all remaining pull requests soon, or
+> let us know what is holding you up. I hope this way we can avoid having
+> to reject pull requests that come too late in the cycle.
 
-Here is a pull request to add the basic support for Allwinner A1X SoCs.
+Hi Arnd,
 
-Thanks,
-Maxime
+For AT91, we have 2 or 3 branches that contain each not much more than a
+handful of patches. So, nothing big for this release, but I am still
+waiting for some information to finish them.
+The beginning of next week should be ok for finishing the work and send
+you pull requests.
 
-The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
-
-  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
-
-are available in the git repository at:
-
-  git://github.com/mripard/linux.git tags/tags/sunxi-support-for-3.8
-
-for you to fetch changes up to 1b106699647b56313bac707e12e7ad67180cb147:
-
-  ARM: sunxi: Add entry to MAINTAINERS (2012-11-16 21:56:53 +0100)
-
-----------------------------------------------------------------
-Allwinner SoC support for 3.8
-
-----------------------------------------------------------------
-Maxime Ripard (7):
-      clk: sunxi: Add dummy fixed rate clock for Allwinner A1X SoCs
-      clocksource: sunxi: Add Allwinner A1X Timer Driver
-      irqchip: sunxi: Add irq controller driver
-      ARM: sunxi: Add basic support for Allwinner A1x SoCs
-      ARM: sunxi: Add earlyprintk support
-      ARM: sunxi: Add device tree for the A13 and the Olinuxino board
-      ARM: sunxi: Add entry to MAINTAINERS
-
- Documentation/arm/sunxi/README                     |   19 +++
- .../interrupt-controller/allwinner,sunxi-ic.txt    |  104 ++++++++++++
- .../bindings/timer/allwinner,sunxi-timer.txt       |   17 ++
- MAINTAINERS                                        |    6 +
- arch/arm/Kconfig                                   |    2 +
- arch/arm/Kconfig.debug                             |    8 +
- arch/arm/Makefile                                  |    1 +
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/sun5i-olinuxino.dts              |   26 +++
- arch/arm/boot/dts/sun5i.dtsi                       |   74 +++++++++
- arch/arm/include/debug/sunxi.S                     |   24 +++
- arch/arm/mach-sunxi/Kconfig                        |    9 ++
- arch/arm/mach-sunxi/Makefile                       |    1 +
- arch/arm/mach-sunxi/Makefile.boot                  |    1 +
- arch/arm/mach-sunxi/sunxi.c                        |   60 +++++++
- arch/arm/mach-sunxi/sunxi.h                        |   20 +++
- drivers/clk/Makefile                               |    1 +
- drivers/clk/clk-sunxi.c                            |   30 ++++
- drivers/clocksource/Kconfig                        |    3 +
- drivers/clocksource/Makefile                       |    1 +
- drivers/clocksource/sunxi_timer.c                  |  170 ++++++++++++++++++++
- drivers/irqchip/Makefile                           |    1 +
- drivers/irqchip/irq-sunxi.c                        |  150 +++++++++++++++++
- include/linux/clk/sunxi.h                          |   22 +++
- include/linux/irqchip/sunxi.h                      |   27 ++++
- include/linux/sunxi_timer.h                        |   24 +++
- 26 files changed, 802 insertions(+)
- create mode 100644 Documentation/arm/sunxi/README
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-ic.txt
- create mode 100644 Documentation/devicetree/bindings/timer/allwinner,sunxi-timer.txt
- create mode 100644 arch/arm/boot/dts/sun5i-olinuxino.dts
- create mode 100644 arch/arm/boot/dts/sun5i.dtsi
- create mode 100644 arch/arm/include/debug/sunxi.S
- create mode 100644 arch/arm/mach-sunxi/Kconfig
- create mode 100644 arch/arm/mach-sunxi/Makefile
- create mode 100644 arch/arm/mach-sunxi/Makefile.boot
- create mode 100644 arch/arm/mach-sunxi/sunxi.c
- create mode 100644 arch/arm/mach-sunxi/sunxi.h
- create mode 100644 drivers/clk/clk-sunxi.c
- create mode 100644 drivers/clocksource/sunxi_timer.c
- create mode 100644 drivers/irqchip/irq-sunxi.c
- create mode 100644 include/linux/clk/sunxi.h
- create mode 100644 include/linux/irqchip/sunxi.h
- create mode 100644 include/linux/sunxi_timer.h
+Best regards,
+-- 
+Nicolas Ferre
