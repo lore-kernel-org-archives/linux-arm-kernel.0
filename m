@@ -1,66 +1,35 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 16 Nov 2012 16:56:50 +0100
-Subject: [PATCH 1/3] ARM: tegra: tamonten: Add host1x support
+Date: Fri, 16 Nov 2012 16:56:51 +0100
+Subject: [PATCH 2/3] ARM: tegra: plutux: Enable HDMI output
 In-Reply-To: <1353081412-19448-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1353081412-19448-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1353081412-19448-2-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1353081412-19448-3-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hook up the required regulators, I2C DDC adapter and hotplug detect GPIO
-to the Tamonten HDMI output. Carrier boards still need to explicitly
-enable the output to use it.
+Enable the HDMI output found on Plutux boards.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
- arch/arm/boot/dts/tegra20-tamonten.dtsi | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/tegra20-plutux.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsi b/arch/arm/boot/dts/tegra20-tamonten.dtsi
-index 95df80e..a239ccd 100644
---- a/arch/arm/boot/dts/tegra20-tamonten.dtsi
-+++ b/arch/arm/boot/dts/tegra20-tamonten.dtsi
-@@ -8,6 +8,16 @@
- 		reg = <0x00000000 0x20000000>;
- 	};
+diff --git a/arch/arm/boot/dts/tegra20-plutux.dts b/arch/arm/boot/dts/tegra20-plutux.dts
+index 331a3ef..2894800 100644
+--- a/arch/arm/boot/dts/tegra20-plutux.dts
++++ b/arch/arm/boot/dts/tegra20-plutux.dts
+@@ -6,6 +6,12 @@
+ 	model = "Avionic Design Plutux board";
+ 	compatible = "ad,plutux", "ad,tamonten", "nvidia,tegra20";
  
 +	host1x {
 +		hdmi {
-+			vdd-supply = <&hdmi_vdd_reg>;
-+			pll-supply = <&hdmi_pll_reg>;
-+
-+			nvidia,ddc-i2c-bus = <&hdmi_ddc>;
-+			nvidia,hpd-gpio = <&gpio 111 0>; /* PN7 */
++			status = "okay";
 +		};
 +	};
 +
- 	pinmux {
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&state_default>;
-@@ -292,7 +302,7 @@
- 		pinctrl-1 = <&state_i2cmux_pta>;
- 		pinctrl-2 = <&state_i2cmux_idle>;
- 
--		i2c at 0 {
-+		hdmi_ddc: i2c at 0 {
- 			reg = <0>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -407,13 +417,13 @@
- 					regulator-max-microvolt = <2850000>;
- 				};
- 
--				ldo7 {
-+				hdmi_vdd_reg: ldo7 {
- 					regulator-name = "vdd_ldo7,avdd_hdmi";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 				};
- 
--				ldo8 {
-+				hdmi_pll_reg: ldo8 {
- 					regulator-name = "vdd_ldo8,avdd_hdmi_pll";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
+ 	i2c at 7000c000 {
+ 		wm8903: wm8903 at 1a {
+ 			compatible = "wlf,wm8903";
 -- 
 1.8.0
