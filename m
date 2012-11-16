@@ -1,47 +1,58 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 16 Nov 2012 11:28:18 +0200
-Subject: [RFC] fbdev: arm has __raw I/O accessors, use them in fb.h
-In-Reply-To: <1353057364-21214-1-git-send-email-archit@ti.com>
-References: <1353057364-21214-1-git-send-email-archit@ti.com>
-Message-ID: <50A60732.3050602@ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 16 Nov 2012 10:28:28 +0100
+Subject: [PATCH 4/4] ARM: dts: imx: add imx5x phy-mode entries
+In-Reply-To: <20121116071519.GE2941@S2100-06.ap.freescale.net>
+References: <1352988014-14769-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352988014-14769-5-git-send-email-m.grzeschik@pengutronix.de>
+ <20121116071519.GE2941@S2100-06.ap.freescale.net>
+Message-ID: <50A6073C.2010509@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-16 11:16, Archit Taneja wrote:
-> This removes the sparse warnings on arm platforms:
+On 11/16/2012 08:15 AM, Shawn Guo wrote:
+> On Thu, Nov 15, 2012 at 03:00:14PM +0100, Michael Grzeschik wrote:
+>> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+>> ---
+>>  arch/arm/boot/dts/imx51.dtsi |    2 ++
+>>  arch/arm/boot/dts/imx53.dtsi |    2 ++
+>>  2 files changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+>> index 366b8d3..ffc6bc8 100644
+>> --- a/arch/arm/boot/dts/imx51.dtsi
+>> +++ b/arch/arm/boot/dts/imx51.dtsi
+>> @@ -145,6 +145,7 @@
+>>  				compatible = "fsl,imx51-usb", "fsl,imx27-usb";
+>>  				reg = <0x73f80200 0x0200>;
+>>  				interrupts = <14>;
+>> +				phy-mode = "utmiw";
 > 
-> warning: cast removes address space of expression
-> 
-> Signed-off-by: Archit Taneja <archit@ti.com>
-> ---
->  include/linux/fb.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/include/linux/fb.h b/include/linux/fb.h
-> index c7a9571..7fce1e1 100644
-> --- a/include/linux/fb.h
-> +++ b/include/linux/fb.h
-> @@ -548,7 +548,7 @@ static inline struct apertures_struct *alloc_apertures(unsigned int max_num) {
->  #define fb_memcpy_fromfb sbus_memcpy_fromio
->  #define fb_memcpy_tofb sbus_memcpy_toio
->  
-> -#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__) || defined(__sh__) || defined(__powerpc__) || defined(__avr32__) || defined(__bfin__)
-> +#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__) || defined(__sh__) || defined(__powerpc__) || defined(__avr32__) || defined(__bfin__) || defined(__arm__)
->  
->  #define fb_readb __raw_readb
->  #define fb_readw __raw_readw
+> I tried to grep "phy-mode" and "utmiw" on linux-next and found nothing.
+> So it's not something we can take for 3.8, right?
 
-Looks good and works for me:
+But it wouldn't hurt, if we agree on a common usb phy-mode binding helper.
 
-Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> PS. Instead, I found something like phy_type = "utmi_wide" in
+> fsl-usb.txt and fsl-mph-dr-of.c.  Should these be consolidated into
+> a common binding?
 
- Tomi
+This is exactly what Michael is trying to do:
+http://permalink.gmane.org/gmane.linux.usb.general/74747
 
+If there already is "umti_wide" we should use that, instead of "umtiw".
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 897 bytes
+Size: 259 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/b7cd2ded/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/756d635d/attachment.sig>
