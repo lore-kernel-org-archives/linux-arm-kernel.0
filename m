@@ -1,39 +1,50 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 16 Nov 2012 16:39:45 +0100
-Subject: [PATCH 2/4] arm: orion5x: basic Device Tree support
+Date: Fri, 16 Nov 2012 16:39:46 +0100
+Subject: [PATCH 3/4] arm: orion5x: convert 'LaCie Ethernet Disk mini v2' to
+ Device Tree
 In-Reply-To: <1353080388-4091-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353080388-4091-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353080388-4091-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353080388-4091-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds basic DT support for the Orion5x SoC family. It adds
-an orion5x.dtsi description of the Orion5x SoC as well as the needed
-DT_MACHINE structure to support boards converted to DT in the future.
-
-So far, the Device Tree contains the interrupt controller, the GPIO
-bank, the UART controllers, the SPI controller, the watchdog, the SATA
-controller, the I2C controller and the cryptographic engine.
+This commit converts the 'LaCie Ethernet Disk mini v2' board to the
+Device Tree. All devices that have existing Device Tree bindings are
+converted over to the Device Tree, the other devices remain
+instantiated in the old way, until the respective drivers get the
+needed Device Tree bindings.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Tested by: Maxime Hadjinlian <mhadjinlian@lacie.com>
 ---
- arch/arm/boot/dts/orion5x.dtsi   |   98 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-orion5x/Kconfig    |    7 +++
- arch/arm/mach-orion5x/Makefile   |    2 +
- arch/arm/mach-orion5x/board-dt.c |   76 +++++++++++++++++++++++++++++
- arch/arm/mach-orion5x/common.c   |    4 +-
- arch/arm/mach-orion5x/common.h   |    2 +
- 6 files changed, 187 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/orion5x.dtsi
- create mode 100644 arch/arm/mach-orion5x/board-dt.c
+ arch/arm/boot/dts/Makefile                         |    1 +
+ .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    |   55 ++++++++++++
+ arch/arm/mach-orion5x/Kconfig                      |    7 +-
+ arch/arm/mach-orion5x/Makefile                     |    2 +-
+ arch/arm/mach-orion5x/board-dt.c                   |    3 +
+ arch/arm/mach-orion5x/common.h                     |    7 ++
+ arch/arm/mach-orion5x/edmini_v2-setup.c            |   88 +-------------------
+ 7 files changed, 72 insertions(+), 91 deletions(-)
+ create mode 100644 arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
 
-diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f37cf9f..6cb3b3c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -73,6 +73,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap5-evm.dtb \
+ 	am335x-evm.dtb \
+ 	am335x-bone.dtb
++dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
+ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
 new file mode 100644
-index 0000000..8aad00f
+index 0000000..5a3a58b
 --- /dev/null
-+++ b/arch/arm/boot/dts/orion5x.dtsi
-@@ -0,0 +1,98 @@
++++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+@@ -0,0 +1,55 @@
 +/*
 + * Copyright (C) 2012 Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 + *
@@ -42,240 +53,244 @@ index 0000000..8aad00f
 + * warranty of any kind, whether express or implied.
 + */
 +
-+/include/ "skeleton.dtsi"
++/dts-v1/;
++/include/ "orion5x.dtsi"
 +
 +/ {
-+	model = "Marvell Orion5x SoC";
-+	compatible = "marvell,orion5x";
-+	interrupt-parent = <&intc>;
++	model = "LaCie Ethernet Disk mini V2";
++	compatible = "lacie,ethernet-disk-mini-v2", "marvell-orion5x-88f5182", "marvell,orion5x";
 +
-+	intc: interrupt-controller {
-+		compatible = "marvell,orion-intc", "marvell,intc";
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+		reg = <0xf1020204 0x04>;
++	memory {
++		reg = <0x00000000 0x4000000>; /* 64 MB */
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200n8 earlyprintk";
 +	};
 +
 +	ocp at f1000000 {
-+		compatible = "simple-bus";
-+		ranges = <0x00000000 0xf1000000 0x4000000
-+		          0xf2200000 0xf2200000 0x0000800>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		gpio0: gpio at 10100 {
-+			compatible = "marvell,orion-gpio";
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			reg = <0x10100 0x40>;
-+			ngpio = <32>;
-+			interrupts = <6>, <7>, <8>, <9>;
-+		};
-+
 +		serial at 12000 {
-+			compatible = "ns16550a";
-+			reg = <0x12000 0x100>;
-+			reg-shift = <2>;
-+			interrupts = <3>;
-+			/* set clock-frequency in board dts */
-+			status = "disabled";
-+		};
-+
-+		serial at 12100 {
-+			compatible = "ns16550a";
-+			reg = <0x12100 0x100>;
-+			reg-shift = <2>;
-+			interrupts = <4>;
-+			/* set clock-frequency in board dts */
-+			status = "disabled";
-+		};
-+
-+		spi at 10600 {
-+			compatible = "marvell,orion-spi";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			cell-index = <0>;
-+			reg = <0x10600 0x28>;
-+			status = "disabled";
-+		};
-+
-+		wdt at 20300 {
-+			compatible = "marvell,orion-wdt";
-+			reg = <0x20300 0x28>;
++			clock-frequency = <166666667>;
 +			status = "okay";
 +		};
 +
 +		sata at 80000 {
-+			compatible = "marvell,orion-sata";
-+			reg = <0x80000 0x5000>;
-+			interrupts = <29>;
-+			status = "disabled";
-+		};
-+
-+		i2c at 11000 {
-+			compatible = "marvell,mv64xxx-i2c";
-+			reg = <0x11000 0x20>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <5>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
-+
-+		crypto at 90000 {
-+			compatible = "marvell,orion-crypto";
-+			reg = <0x90000 0x10000>,
-+			      <0xf2200000 0x800>;
-+			reg-names = "regs", "sram";
-+			interrupts = <22>;
 +			status = "okay";
++			nr-ports = <2>;
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		button at 1 {
++			label = "Power-on Switch";
++			linux,code = <116>; /* KEY_POWER */
++			gpios = <&gpio0 18 0>;
++		};
++	};
++
++	gpio_leds {
++		compatible = "gpio-leds";
++
++		led at 1 {
++			label = "power:blue";
++			gpios = <&gpio0 16 1>;
 +		};
 +	};
 +};
 diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
-index 0673f0c..0910c3b 100644
+index 0910c3b..2cb2f06 100644
 --- a/arch/arm/mach-orion5x/Kconfig
 +++ b/arch/arm/mach-orion5x/Kconfig
-@@ -2,6 +2,13 @@ if ARCH_ORION5X
+@@ -103,12 +103,13 @@ config MACH_MV2120
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  HP Media Vault mv2120 or mv5100.
  
- menu "Orion Implementations"
- 
-+config ARCH_ORION5X_DT
-+	bool "Marvell Orion5x Flattened Device Tree"
-+	select USE_OF
-+	help
-+	  Say 'Y' here if you want your kernel to support the
-+	  Marvell Orion5x using flattened device tree.
-+
- config MACH_DB88F5281
- 	bool "Marvell Orion-2 Development Board"
+-config MACH_EDMINI_V2
+-	bool "LaCie Ethernet Disk mini V2"
++config MACH_EDMINI_V2_DT
++	bool "LaCie Ethernet Disk mini V2 (Flattened Device Tree)"
  	select I2C_BOARDINFO
++	select ARCH_ORION5X_DT
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+-	  LaCie Ethernet Disk mini V2.
++	  LaCie Ethernet Disk mini V2 (Flattened Device Tree).
+ 
+ config MACH_D2NET
+ 	bool "LaCie d2 Network"
 diff --git a/arch/arm/mach-orion5x/Makefile b/arch/arm/mach-orion5x/Makefile
-index 7f18cda..843e6de 100644
+index 843e6de..9e809a7 100644
 --- a/arch/arm/mach-orion5x/Makefile
 +++ b/arch/arm/mach-orion5x/Makefile
-@@ -22,3 +22,5 @@ obj-$(CONFIG_MACH_RD88F5181L_GE)	+= rd88f5181l-ge-setup.o
- obj-$(CONFIG_MACH_RD88F5181L_FXO)	+= rd88f5181l-fxo-setup.o
- obj-$(CONFIG_MACH_RD88F6183AP_GE)	+= rd88f6183ap-ge-setup.o
+@@ -12,7 +12,6 @@ obj-$(CONFIG_MACH_TS409)	+= ts409-setup.o tsx09-common.o
+ obj-$(CONFIG_MACH_WRT350N_V2)	+= wrt350n-v2-setup.o
+ obj-$(CONFIG_MACH_TS78XX)	+= ts78xx-setup.o
+ obj-$(CONFIG_MACH_MV2120)	+= mv2120-setup.o
+-obj-$(CONFIG_MACH_EDMINI_V2)	+= edmini_v2-setup.o
+ obj-$(CONFIG_MACH_D2NET)	+= d2net-setup.o
+ obj-$(CONFIG_MACH_BIGDISK)	+= d2net-setup.o
+ obj-$(CONFIG_MACH_NET2BIG)	+= net2big-setup.o
+@@ -24,3 +23,4 @@ obj-$(CONFIG_MACH_RD88F6183AP_GE)	+= rd88f6183ap-ge-setup.o
  obj-$(CONFIG_MACH_LINKSTATION_LSCHL)	+= ls-chl-setup.o
-+
-+obj-$(CONFIG_ARCH_ORION5X_DT)		+= board-dt.o
+ 
+ obj-$(CONFIG_ARCH_ORION5X_DT)		+= board-dt.o
++obj-$(CONFIG_MACH_EDMINI_V2_DT)	+= edmini_v2-setup.o
 diff --git a/arch/arm/mach-orion5x/board-dt.c b/arch/arm/mach-orion5x/board-dt.c
-new file mode 100644
-index 0000000..a26397f
---- /dev/null
+index a26397f..32e5c21 100644
+--- a/arch/arm/mach-orion5x/board-dt.c
 +++ b/arch/arm/mach-orion5x/board-dt.c
-@@ -0,0 +1,76 @@
-+/*
-+ * Copyright 2012 (C), Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * arch/arm/mach-orion5x/board-dt.c
-+ *
-+ * Flattened Device Tree board initialization
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <asm/system_misc.h>
-+#include <asm/mach/arch.h>
-+#include <mach/orion5x.h>
-+#include <plat/irq.h>
-+#include "common.h"
-+
-+struct of_dev_auxdata orion5x_auxdata_lookup[] __initdata = {
-+	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
-+	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011000, "mv64xxx_i2c.0",
-+		       NULL),
-+	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
-+	OF_DEV_AUXDATA("marvell,orion-sata", 0xf1080000, "sata_mv.0", NULL),
-+	OF_DEV_AUXDATA("marvell,orion-crypto", 0xf1090000, "mv_crypto", NULL),
-+	{},
-+};
-+
-+static void __init orion5x_dt_init(void)
-+{
-+	char *dev_name;
-+	u32 dev, rev;
-+
-+	orion5x_id(&dev, &rev, &dev_name);
-+	printk(KERN_INFO "Orion ID: %s. TCLK=%d.\n", dev_name, orion5x_tclk);
-+
-+	/*
-+	 * Setup Orion address map
-+	 */
-+	orion5x_setup_cpu_mbus_bridge();
-+
-+	/* Setup root of clk tree */
-+	clk_init();
-+
-+	/*
-+	 * Don't issue "Wait for Interrupt" instruction if we are
-+	 * running on D0 5281 silicon.
-+	 */
-+	if (dev == MV88F5281_DEV_ID && rev == MV88F5281_REV_D0) {
-+		printk(KERN_INFO "Orion: Applying 5281 D0 WFI workaround.\n");
-+		disable_hlt();
-+	}
-+
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			     orion5x_auxdata_lookup, NULL);
-+}
-+
-+static const char *orion5x_dt_compat[] = {
-+	"marvell,orion5x",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(ORION5X_DT, "Marvell Orion5x (Flattened Device Tree)")
-+	/* Maintainer: Thomas Petazzoni <thomas.petazzoni@free-electrons.com> */
-+	.map_io		= orion5x_map_io,
-+	.init_early	= orion5x_init_early,
-+	.init_irq	= orion_dt_init_irq,
-+	.timer		= &orion5x_timer,
-+	.init_machine	= orion5x_dt_init,
-+	.restart	= orion5x_restart,
-+	.dt_compat	= orion5x_dt_compat,
-+MACHINE_END
-diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-index b3eb3da..550f923 100644
---- a/arch/arm/mach-orion5x/common.c
-+++ b/arch/arm/mach-orion5x/common.c
-@@ -65,7 +65,7 @@ void __init orion5x_map_io(void)
-  ****************************************************************************/
- static struct clk *tclk;
+@@ -55,6 +55,9 @@ static void __init orion5x_dt_init(void)
+ 		disable_hlt();
+ 	}
  
--static void __init clk_init(void)
-+void __init clk_init(void)
- {
- 	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, CLK_IS_ROOT,
- 				       orion5x_tclk);
-@@ -236,7 +236,7 @@ struct sys_timer orion5x_timer = {
- /*
-  * Identify device ID and rev from PCIe configuration header space '0'.
-  */
--static void __init orion5x_id(u32 *dev, u32 *rev, char **dev_name)
-+void __init orion5x_id(u32 *dev, u32 *rev, char **dev_name)
- {
- 	orion5x_pcie_id(dev, rev);
- 
++	if (of_machine_is_compatible("lacie,ethernet-disk-mini-v2"))
++		edmini_v2_init();
++
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			     orion5x_auxdata_lookup, NULL);
+ }
 diff --git a/arch/arm/mach-orion5x/common.h b/arch/arm/mach-orion5x/common.h
-index 31bab92..2033b79 100644
+index 2033b79..7db5cdd 100644
 --- a/arch/arm/mach-orion5x/common.h
 +++ b/arch/arm/mach-orion5x/common.h
-@@ -12,6 +12,8 @@ void orion5x_map_io(void);
- void orion5x_init_early(void);
- void orion5x_init_irq(void);
- void orion5x_init(void);
-+void orion5x_id(u32 *dev, u32 *rev, char **dev_name);
-+void clk_init(void);
- extern int orion5x_tclk;
- extern struct sys_timer orion5x_timer;
+@@ -56,6 +56,13 @@ int orion5x_pci_sys_setup(int nr, struct pci_sys_data *sys);
+ struct pci_bus *orion5x_pci_sys_scan_bus(int nr, struct pci_sys_data *sys);
+ int orion5x_pci_map_irq(const struct pci_dev *dev, u8 slot, u8 pin);
  
++/* board init functions for boards not fully converted to fdt */
++#ifdef CONFIG_MACH_EDMINI_V2_DT
++void edmini_v2_init(void);
++#else
++static inline void edmini_v2_init(void) {};
++#endif
++
+ struct meminfo;
+ struct tag;
+ extern void __init tag_fixup_mem32(struct tag *, char **, struct meminfo *);
+diff --git a/arch/arm/mach-orion5x/edmini_v2-setup.c b/arch/arm/mach-orion5x/edmini_v2-setup.c
+index 355e962..d675e72 100644
+--- a/arch/arm/mach-orion5x/edmini_v2-setup.c
++++ b/arch/arm/mach-orion5x/edmini_v2-setup.c
+@@ -115,69 +115,6 @@ static struct i2c_board_info __initdata edmini_v2_i2c_rtc = {
+ };
+ 
+ /*****************************************************************************
+- * Sata
+- ****************************************************************************/
+-
+-static struct mv_sata_platform_data edmini_v2_sata_data = {
+-	.n_ports	= 2,
+-};
+-
+-/*****************************************************************************
+- * GPIO LED (simple - doesn't use hardware blinking support)
+- ****************************************************************************/
+-
+-#define EDMINI_V2_GPIO_LED_POWER	16
+-
+-static struct gpio_led edmini_v2_leds[] = {
+-	{
+-		.name = "power:blue",
+-		.gpio = EDMINI_V2_GPIO_LED_POWER,
+-		.active_low = 1,
+-	},
+-};
+-
+-static struct gpio_led_platform_data edmini_v2_led_data = {
+-	.num_leds = ARRAY_SIZE(edmini_v2_leds),
+-	.leds = edmini_v2_leds,
+-};
+-
+-static struct platform_device edmini_v2_gpio_leds = {
+-	.name           = "leds-gpio",
+-	.id             = -1,
+-	.dev            = {
+-		.platform_data  = &edmini_v2_led_data,
+-	},
+-};
+-
+-/****************************************************************************
+- * GPIO key
+- ****************************************************************************/
+-
+-#define EDMINI_V2_GPIO_KEY_POWER	18
+-
+-static struct gpio_keys_button edmini_v2_buttons[] = {
+-	{
+-		.code		= KEY_POWER,
+-		.gpio		= EDMINI_V2_GPIO_KEY_POWER,
+-		.desc		= "Power Button",
+-		.active_low	= 0,
+-	},
+-};
+-
+-static struct gpio_keys_platform_data edmini_v2_button_data = {
+-	.buttons	= edmini_v2_buttons,
+-	.nbuttons	= ARRAY_SIZE(edmini_v2_buttons),
+-};
+-
+-static struct platform_device edmini_v2_gpio_buttons = {
+-	.name		= "gpio-keys",
+-	.id		= -1,
+-	.dev		= {
+-		.platform_data	= &edmini_v2_button_data,
+-	},
+-};
+-
+-/*****************************************************************************
+  * General Setup
+  ****************************************************************************/
+ static unsigned int edminiv2_mpp_modes[] __initdata = {
+@@ -207,13 +144,8 @@ static unsigned int edminiv2_mpp_modes[] __initdata = {
+ 	0,
+ };
+ 
+-static void __init edmini_v2_init(void)
++void __init edmini_v2_init(void)
+ {
+-	/*
+-	 * Setup basic Orion functions. Need to be called early.
+-	 */
+-	orion5x_init();
+-
+ 	orion5x_mpp_conf(edminiv2_mpp_modes);
+ 
+ 	/*
+@@ -221,15 +153,10 @@ static void __init edmini_v2_init(void)
+ 	 */
+ 	orion5x_ehci0_init();
+ 	orion5x_eth_init(&edmini_v2_eth_data);
+-	orion5x_i2c_init();
+-	orion5x_sata_init(&edmini_v2_sata_data);
+-	orion5x_uart0_init();
+ 
+ 	orion5x_setup_dev_boot_win(EDMINI_V2_NOR_BOOT_BASE,
+ 				EDMINI_V2_NOR_BOOT_SIZE);
+ 	platform_device_register(&edmini_v2_nor_flash);
+-	platform_device_register(&edmini_v2_gpio_leds);
+-	platform_device_register(&edmini_v2_gpio_buttons);
+ 
+ 	pr_notice("edmini_v2: USB device port, flash write and power-off "
+ 		  "are not yet supported.\n");
+@@ -247,16 +174,3 @@ static void __init edmini_v2_init(void)
+ 
+ 	i2c_register_board_info(0, &edmini_v2_i2c_rtc, 1);
+ }
+-
+-/* Warning: LaCie use a wrong mach-type (0x20e=526) in their bootloader. */
+-MACHINE_START(EDMINI_V2, "LaCie Ethernet Disk mini V2")
+-	/* Maintainer: Christopher Moore <moore@free.fr> */
+-	.atag_offset	= 0x100,
+-	.init_machine	= edmini_v2_init,
+-	.map_io		= orion5x_map_io,
+-	.init_early	= orion5x_init_early,
+-	.init_irq	= orion5x_init_irq,
+-	.timer		= &orion5x_timer,
+-	.fixup		= tag_fixup_mem32,
+-	.restart	= orion5x_restart,
+-MACHINE_END
 -- 
 1.7.9.5
