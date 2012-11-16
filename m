@@ -1,115 +1,48 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 16 Nov 2012 17:19:59 +0200
-Subject: [PATCH] OMAP: board-files: fix i2c_bus for tfp410
-In-Reply-To: <50A64D35.9050109@ti.com>
-References: <1353068553-26897-1-git-send-email-tomi.valkeinen@ti.com>
- <20121116135155.GE18527@arwen.pp.htv.fi> <50A64D35.9050109@ti.com>
-Message-ID: <20121116151959.GA19411@arwen.pp.htv.fi>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 16 Nov 2012 09:27:22 -0600
+Subject: [PATCH 1/1] ARM: ux500: Describe UART platform registering issues
+ more accurately
+In-Reply-To: <201211160936.59258.arnd@arndb.de>
+References: <1352968401-6092-1-git-send-email-lee.jones@linaro.org>
+ <201211151223.46989.arnd@arndb.de> <20121115123341.GA14476@gmail.com>
+ <201211160936.59258.arnd@arndb.de>
+Message-ID: <50A65B5A.2090000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Fri, Nov 16, 2012 at 04:27:01PM +0200, Tomi Valkeinen wrote:
-> On 2012-11-16 15:51, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Fri, Nov 16, 2012 at 02:22:33PM +0200, Tomi Valkeinen wrote:
-> >> The i2c handling in tfp410 driver, which handles converting parallel RGB
-> >> to DVI, was changed in 958f2717b84e88bf833d996997fda8f73276f2af. The
-> > 
-> > commit summary should be added in () after commit hash. This would look
-> > like:
-> > 
-> > 'was changed in 958f271 (OMAPDSS: TFP410: pdata rewrite).'
+On 11/16/2012 03:36 AM, Arnd Bergmann wrote:
+> On Thursday 15 November 2012, Lee Jones wrote:
+>> On Thu, 15 Nov 2012, Arnd Bergmann wrote:
+>>
+>>> On Thursday 15 November 2012, Lee Jones wrote:
+>>>> UARTs no longer require call-back information, since the reset
+>>>> call-back was removed in 43b5f0d69291374f602ad8e1817f329573a59010.
+>>>> The only AUXDATA dependencies remaining for UARTs are DMA settings.
+>>>>
+>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>>
+>>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>>
+>>> What is the state of the DMA binding now? We originally wanted to merge
+>>> it for 3.7, but that didn't work out, so I hope we can get it done for
+>>> 3.8.
+>>
+>> It's dead. The conversation has been stale for weeks.
+>>
+>> Perhaps you'd like to go and poke it? :)
+>>
 > 
-> Yep.
+> Vinod,
 > 
-> >> patch changed what value the driver considers as invalid/undefined.
-> >> Before the patch 0 was the invalid value, but as 0 is a valid bus
-> >                   ^
-> > 		  missing comma (,) character here.
+> is there anything you are waiting for still? Should Jon resend
+> his latest patches to make sure we get them merged this time?
 > 
-> Right.
-> 
-> >> number, the patch changed this to -1.
-> >>
-> >> However, the fact was missed that many board files do not define the bus
-> >> number at all, thus it's left to 0. This causes the driver to fail to
-> >> get the i2c bus, exiting from the driver's probe with an error, meaning
-> >> that the DVI output does not work for those boards.
-> >>
-> >> This patch fixes the issue by changing the i2c_bus number field in the
-> >> driver's platform data from u16 to int, and setting the bus number to -1
-> >> in the board files for the boards that did not define the bus. The
-> >> exception is devkit8000, for which the bus is set to 1, which is the
-> >> correct bus for that board.
-> >>
-> >> The bug exists in v3.5+ kernels.
-> >>
-> >> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> >> Reported-by: Thomas Weber <thomas@tomweber.eu>
-> >> [for v3.5, v3.6 stable kernels]
-> >> Cc: stable at vger.kernel.org
-> > 
-> > This format is peculiar. Usually people use:
-> > 
-> > Cc: stable at vger.kernel.org # v3.5 v3.6
-> 
-> Yes, I tried that. But my git send-email (1.7.10.4) rejects that line. I
-> don't know if it's my setup, that particular git version, or what...
+> I have multiple people that want to send me patches for 3.8 based
+> on that work, so we are running out of time now.
 
-weird... I never had that problem, since git 1.6.x, I have never seen
-that and I tend to upgrade rather frequently. I'm using 1.8.0 now and
-have sent a few patches to stable recently with no problems.
+Vinod responded today saying it will be in for v3.8 [1].
 
-> > To be fair, the whole i2c_bus_num looks like a big hackery introduced by
-> > the way panel drivers are written for OMAP DSS.
-> > 
-> > TFP410 is an I2C client, not an OMAPDSS client. After a quick look at
-> > the driver, there's is no such thing as a DSS bus, so looks like you
-> > should have an I2C driver for TFP410 and the whole DSS stuff should be
-> > just a list of clients, but not a struct bus at all.
-> > 
-> > The fact that you have to pass the I2C bus number down to the panel
-> > driver is already a big indication of how wrong this is, IMHO.
-> 
-> Without going deeper in the dss device model problems, I would agree
-> with you if this was about i2c panel, but this is not quite like that.
-> 
-> A panel controlled via i2c would be an i2c device. But TFP410 is not
-> controlled via i2c. It's not really controlled at all except via
-> power-down gpio. TFP410 doesn't need the i2c to be functional at all.
+Jon
 
-then why does it need the i2c adapter ? What is this power-down gpio ?
-Should that be hidden under gpiolib instead ?
-
-> The i2c lines do not even touch TFP410 chip, so to be precise, the i2c
-> lines should not be TFP410's concern. The i2c lines come from the
-> monitor and go to OMAP's i2c pins. But TFP410 driver is a convenient
-> place to manage them.
-
-fair enough... but who's actually using those i2c lines ? OMAP is the
-I2C master, who's the slave ? It's something in the monitor, I assume...
-
-IIUC, this I2C bus goes over the HDMI wire ?
-
-> (As a side note, TFP410 _could_ be controlled via i2c, if it would've
-> been setup so in the board hardware. That would be totally different
-> thing, though, than what's discussed here.).
-> 
-> Anyway, this patch wasn't meant to fix dss device model problems. It's
-> meant to fix a bug in the kernel.
-
-I understand... should've added that this part wasn't related to
-$SUBJECT.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/3b9aca52/attachment.sig>
+[1] http://article.gmane.org/gmane.linux.ports.arm.omap/89502
