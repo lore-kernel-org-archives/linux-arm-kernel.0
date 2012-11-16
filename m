@@ -1,55 +1,63 @@
-From: martin@ronetix.at (Martin Peevski)
-Date: Fri, 16 Nov 2012 12:26:47 +0200
-Subject: Configure the USB device/host on sam9g25 module
-In-Reply-To: <cc2fa961-1156-48b8-b805-6583df35e126@email.android.com>
-References: <50A51978.7040001@ronetix.at>
- <cc2fa961-1156-48b8-b805-6583df35e126@email.android.com>
-Message-ID: <50A614E7.9090308@ronetix.at>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 16 Nov 2012 11:59:47 +0100
+Subject: [GIT PULL] arm-soc: Xilinx zynq changes for v3.8
+In-Reply-To: <CAHTX3dLdGie9gtxbPq_gb8BLao7YYohqQWZFg3LzyNHxu=imdg@mail.gmail.com>
+References: <CAHTX3dLdGie9gtxbPq_gb8BLao7YYohqQWZFg3LzyNHxu=imdg@mail.gmail.com>
+Message-ID: <CAHTX3dLijLK45ddZQVYHcrs6QQbmdRmQbPmTKada9nXx3ZAe3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again!
-There were no problem, thank you for the time!
+Hi Arnd and Olof,
+
+I have 7 new follow up patches for zynq. They are based on previous patches
+(arm-soc zynq/cleanup branch).
+The branch is still based on rc3 but I have also tried to merged it
+with the v3.7-rc5 and there is no issue.
+
+It should be the last pull request for v3.8.
+
+Thanks for pulling.
+Michal
 
 
-On 15/11/12 18:56, Zhong Li wrote:
-> It is a hardware configuration problem. You must use a type-A mini USB 
-> cable.
->
-> Martin Peevski <martin@ronetix.at> wrote:
->
->            Hi,
->
->     I'm working with sam9g25 module placed on sam9x5-ek. sam9g25 has 2
->     host USB's and 1 device/host USB (on the micro USB of sam9x5-ek). Both
->     USB hosts accept mass storage devices and works correct. It was
->     impossible to do 2 things with the USB device/host (placed on the micro
->     USB of sam9x5-ek):
->
->     1. Put in it mass storage device - the kernel want not to
->     enumerate it and give it an name (for example sda, sdb, ...). What I
->     must do in the config file of kernel to be recognized the inserted mass
->     storage device?
->
->     2. Connect cable from the micro USB to any of the host USB's and
->     detect USB serial gadget.
->
->     I tryed to make some configs for both problems in the kernel but it
->     don't works. Can you, please, help me solve these problems?
->
->     ------------------------------------------------------------------------
->
->     linux-arm-kernel mailing list
->     linux-arm-kernel at lists.infradead.org
->     http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/71176673/attachment-0001.html>
+The following changes since commit f58007762f537ba13674a3138b3f4c20fff1cba9:
+  Josh Cartwright (1):
+        zynq: move static peripheral mappings
+
+are available in the git repository at:
+
+  git://git.xilinx.com/linux-xlnx.git arm-next
+
+Josh Cartwright (6):
+      ARM: zynq: move arm-specific sys_timer out of ttc
+      ARM: zynq: dts: add description of the second uart
+      ARM: zynq: dts: split up device tree
+      clk: Add support for fundamental zynq clks
+      ARM: zynq: use zynq clk bindings
+      ARM: zynq: add clk binding support to the ttc
+
+Nick Bowler (1):
+      ARM: zynq: Allow UART1 to be used as DEBUG_LL console.
+
+ .../devicetree/bindings/clock/zynq-7000.txt        |   55 +++
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/Kconfig.debug                             |   17 +
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/zynq-7000.dtsi                   |  166 +++++++++
+ arch/arm/boot/dts/zynq-ep107.dts                   |   63 ----
+ arch/arm/boot/dts/zynq-zc702.dts                   |   44 +++
+ arch/arm/mach-zynq/common.c                        |   33 ++-
+ arch/arm/mach-zynq/common.h                        |    4 +-
+ arch/arm/mach-zynq/include/mach/zynq_soc.h         |   16 +-
+ arch/arm/mach-zynq/timer.c                         |  297 +++++++++-------
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/clk-zynq.c                             |  383 ++++++++++++++++++++
+ include/linux/clk/zynq.h                           |   24 ++
+ 14 files changed, 899 insertions(+), 206 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/zynq-7000.txt
+ create mode 100644 arch/arm/boot/dts/zynq-7000.dtsi
+ delete mode 100644 arch/arm/boot/dts/zynq-ep107.dts
+ create mode 100644 arch/arm/boot/dts/zynq-zc702.dts
+ create mode 100644 drivers/clk/clk-zynq.c
+ create mode 100644 include/linux/clk/zynq.h
