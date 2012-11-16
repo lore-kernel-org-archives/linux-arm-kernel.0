@@ -1,66 +1,47 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Fri, 16 Nov 2012 09:39:00 -0800
-Subject: [PATCH] Remove inline from clock framework function definitions
- to build the kernel with GCC 4.7
-In-Reply-To: <50A674D2.9080403@gmail.com>
-References: <50A52134.2010502@gmail.com>
- <alpine.DEB.2.00.1211151845050.18192@utopia.booyaka.com>
- <50A674D2.9080403@gmail.com>
-Message-ID: <20121116173900.20639.18889@nucleus>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Nov 2012 17:42:05 +0000
+Subject: [PATCH] Documentation: correct argument list for
+ of_platform_populate correction to match of_platform.h prototype
+In-Reply-To: <60BA5429A0E1584BA3633194F6F993B501482A65@NA-MBX-02.mgc.mentorg.com>
+References: <60BA5429A0E1584BA3633194F6F993B501482A65@NA-MBX-02.mgc.mentorg.com>
+Message-ID: <201211161742.06140.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Igor Mazanov (2012-11-16 09:16:02)
-> Paul Walmsley wrote:
-> > + Mike
-> > 
-> > On Thu, 15 Nov 2012, Igor Mazanov wrote:
-> > 
-> >>  Remove inline from clock framework function definitions to
-> >>  build the kernel with GCC 4.7
-> > 
-> > sparse warns about this also.
-> > 
-> >> Signed-off-by: Igor Mazanov <i.mazanov@gmail.com>
-> > 
-> > This one is for Mike to deal with as CCF maintainer; it's out of the hands 
-> > of the OMAP folks.
-> 
-> Thanks for comments, I'll bear in mind it for the future.
-> 
+On Thursday 15 November 2012, Chaiken, Alison wrote:
+> From fd4450ac6bdcf62a84b0d029b36506e7fd567688 Mon Sep 17 00:00:00 2001
+> From: Alison Chaiken <alchaiken@gmail.com>
+> Date: Thu, 1 Nov 2012 01:12:38 -0700
+> Subject: [PATCH] Argument list for of_platform_populate correction to match of_platform.h prototype
+>  
+> Signed-off-by: Alison Chaiken <alison_chaiken@mentor.com>
 
-I forgot to reply to this thread yesterday.  A fixes request has been
-sent out, hopefully will be picked up for 3.7-rc6.
+Hi Alison,
 
-Thanks all,
-Mike
+Congratulations on your first patch on the arm mailing list!
 
-> > 
-> > Acked-by: Paul Walmsley <paul@pwsan.com>
-> > 
-> > 
-> >> ---
-> >>  include/linux/clk-provider.h |    4 ++--
-> >>  1 files changed, 2 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> >> index c127315..f9f5e9e 100644
-> >> --- a/include/linux/clk-provider.h
-> >> +++ b/include/linux/clk-provider.h
-> >> @@ -335,8 +335,8 @@ const char *__clk_get_name(struct clk *clk);
-> >>  struct clk_hw *__clk_get_hw(struct clk *clk);
-> >>  u8 __clk_get_num_parents(struct clk *clk);
-> >>  struct clk *__clk_get_parent(struct clk *clk);
-> >> -inline int __clk_get_enable_count(struct clk *clk);
-> >> -inline int __clk_get_prepare_count(struct clk *clk);
-> >> +int __clk_get_enable_count(struct clk *clk);
-> >> +int __clk_get_prepare_count(struct clk *clk);
-> >>  unsigned long __clk_get_rate(struct clk *clk);
-> >>  unsigned long __clk_get_flags(struct clk *clk);
-> >>  int __clk_is_enabled(struct clk *clk);
-> >> --
-> >> 1.7.4.4
-> >>
-> > 
-> > 
-> > - Paul
+The patch looks obviously correct to me, so
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+Sergei already mentioned that the email was whitespace broken
+and had extra lines on top, which can happen when you use 
+thunderbird for sending the patch. See Documentation/email-clients.txt
+for how to deal with this. My usual recommendation is to use
+git-send-email.
+
+It also helps to include all maintainers that might be responsible
+for picking up the patch. In this case, there are three maintainers:
+Grant Likely and Rob Herring (both doing device tree) and Rob Landley
+(for Documentation). There are also two mailing lists, 
+linux-doc at vger.kernel.org and devicetree-discuss at lists.ozlabs.org.
+
+Adding all of the above to Cc increases the chances of someone
+actually applying the patch. Unfortunately not all of us get to
+apply patches we receive as fast as we should, and patches like
+yours could get applied by any of the three people. In doubt,
+you can always Cc everyone that scripts/get_maintainer.pl
+suggests, but if you know the people well, you can also trim
+down that list.
+
+	Arnd
