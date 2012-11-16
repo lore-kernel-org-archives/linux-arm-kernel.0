@@ -1,46 +1,32 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 16 Nov 2012 11:41:44 +0000
-Subject: [RFC PATCH v2 1/2] ARM: kernel: add MIDR to per-CPU information data
-In-Reply-To: <1353066105-19486-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1353066105-19486-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1353066105-19486-2-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Fri, 16 Nov 2012 11:41:43 +0000
+Subject: [RFC PATCH v2 0/2] ARM: cpuinfo update for heterogeneous systems
+Message-ID: <1353066105-19486-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The advent of big.LITTLE ARM platforms requires the kernel to be able
-to identify the MIDRs of all online CPUs upon request. MIDRs are stashed
-at boot time so that kernel subsystems can detect the MIDR of online CPUs
-by simply retrieving per-CPU data updated by all booted CPUs.
+This patch series provides an update of the current information available
+in the kernel through /proc/cpuinfo file interface. It extends the current
+code so that the HW info of all online CPUs are printed at once when the file
+is read.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm/include/asm/cpu.h | 1 +
- arch/arm/kernel/smp.c      | 1 +
- 2 files changed, 2 insertions(+)
+v1 available here:
 
-diff --git a/arch/arm/include/asm/cpu.h b/arch/arm/include/asm/cpu.h
-index d797223..2744f06 100644
---- a/arch/arm/include/asm/cpu.h
-+++ b/arch/arm/include/asm/cpu.h
-@@ -15,6 +15,7 @@
- 
- struct cpuinfo_arm {
- 	struct cpu	cpu;
-+	u32		cpuid;
- #ifdef CONFIG_SMP
- 	unsigned int	loops_per_jiffy;
- #endif
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 9da08ce..eeb75e1 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -282,6 +282,7 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
- 	struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpuid);
- 
- 	cpu_info->loops_per_jiffy = loops_per_jiffy;
-+	cpu_info->cpuid = read_cpuid_id();
- 
- 	store_cpu_topology(cpuid);
- }
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/125905.html
+
+Changes in v2:
+
+- split the set in two logical patches since the stashing of MIDR can be
+  reused by other patchsets coming, and it is a change that stands on its own.
+
+Lorenzo Pieralisi (2):
+  ARM: kernel: add MIDR to per-CPU information data
+  ARM: kernel: update cpuinfo to print all online CPUs features
+
+ arch/arm/include/asm/cpu.h |  1 +
+ arch/arm/kernel/setup.c    | 66 +++++++++++++++++++++++-----------------------
+ arch/arm/kernel/smp.c      |  1 +
+ 3 files changed, 35 insertions(+), 33 deletions(-)
+
 -- 
 1.7.12
