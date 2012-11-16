@@ -1,221 +1,66 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 16 Nov 2012 14:54:27 +0100
-Subject: [PATCH 01/11] watchdog/at91sam9_wdt: remove the
- file_operations struct
-In-Reply-To: <1352877369-19740-2-git-send-email-wenyou.yang@atmel.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 16 Nov 2012 14:56:52 +0100
+Subject: [PATCH 09/11] watchdog/at91sam9_wdt: add support to device tree
+In-Reply-To: <1352877369-19740-10-git-send-email-wenyou.yang@atmel.com>
 References: <1352877369-19740-1-git-send-email-wenyou.yang@atmel.com>
- <1352877369-19740-2-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20121116135427.GJ4398@game.jcrosoft.org>
+ <1352877369-19740-10-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <50A64624.6010902@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:15 Wed 14 Nov     , Wenyou Yang wrote:
-> Remove the file_operations struct and miscdevice struct for future
-> add to use the watchdog framework.
-NACK
-
-you break the watchdog support
-
-you must not break the kernel suport except if it's impossible to do otherwise
-here it is no the case
-
-Best Regards,
-J.
-> 
+On 11/14/2012 08:16 AM, Wenyou Yang :
 > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+
+No. The work has already been done by Fabio Porcedda and he managed to
+sustain the discussion and reach a consensus at his v9 patch series: so
+please take into account his work and build yours on top of his patch
+series.
+
+Best regards,
+
+> Cc: grant.likely at secretlab.ca
+> Cc: rob.herring at calxeda.com
+> Cc: devicetree-discuss at lists.ozlabs.org
 > ---
->  drivers/watchdog/at91sam9_wdt.c |  131 ---------------------------------------
->  1 file changed, 131 deletions(-)
+>  drivers/watchdog/at91sam9_wdt.c |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
 > diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-> index 05e1be8..549c256 100644
+> index e7ce9ea..cba5c5d 100644
 > --- a/drivers/watchdog/at91sam9_wdt.c
 > +++ b/drivers/watchdog/at91sam9_wdt.c
-> @@ -18,11 +18,9 @@
->  #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
->  
->  #include <linux/errno.h>
-> -#include <linux/fs.h>
->  #include <linux/init.h>
->  #include <linux/io.h>
->  #include <linux/kernel.h>
-> -#include <linux/miscdevice.h>
->  #include <linux/module.h>
->  #include <linux/moduleparam.h>
->  #include <linux/platform_device.h>
-> @@ -31,7 +29,6 @@
+> @@ -32,6 +32,7 @@
 >  #include <linux/jiffies.h>
 >  #include <linux/timer.h>
 >  #include <linux/bitops.h>
-> -#include <linux/uaccess.h>
+> +#include <linux/of.h>
 >  
 >  #include "at91sam9_wdt.h"
 >  
-> @@ -102,35 +99,6 @@ static void at91_ping(unsigned long data)
+> @@ -251,12 +252,21 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
+>  	return 0;
 >  }
 >  
->  /*
-> - * Watchdog device is opened, and watchdog starts running.
-> - */
-> -static int at91_wdt_open(struct inode *inode, struct file *file)
-> -{
-> -	if (test_and_set_bit(0, &at91wdt_private.open))
-> -		return -EBUSY;
-> -
-> -	at91wdt_private.next_heartbeat = jiffies + heartbeat * HZ;
-> -	mod_timer(&at91wdt_private.timer, jiffies + WDT_TIMEOUT);
-> -
-> -	return nonseekable_open(inode, file);
-> -}
-> -
-> -/*
-> - * Close the watchdog device.
-> - */
-> -static int at91_wdt_close(struct inode *inode, struct file *file)
-> -{
-> -	clear_bit(0, &at91wdt_private.open);
-> -
-> -	/* stop internal ping */
-> -	if (!at91wdt_private.expect_close)
-> -		del_timer(&at91wdt_private.timer);
-> -
-> -	at91wdt_private.expect_close = 0;
-> -	return 0;
-> -}
-> -
-> -/*
->   * Set the watchdog time interval in 1/256Hz (write-once)
->   * Counter is 12 bit.
->   */
-> @@ -168,101 +136,11 @@ static const struct watchdog_info at91_wdt_info = {
->  						WDIOF_MAGICCLOSE,
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id at91wdt_match[] = {
+> +	{ .compatible = "atmel,at91sam-wdt" },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, at91wdt_match);
+> +#endif
+> +
+>  static struct platform_driver at91wdt_driver = {
+>  	.probe		= at91wdt_probe,
+>  	.remove		= __exit_p(at91wdt_remove),
+>  	.driver		= {
+>  		.name	= "at91_wdt",
+>  		.owner	= THIS_MODULE,
+> +		.of_match_table	= of_match_ptr(at91wdt_match),
+>  	},
 >  };
 >  
-> -/*
-> - * Handle commands from user-space.
-> - */
-> -static long at91_wdt_ioctl(struct file *file,
-> -		unsigned int cmd, unsigned long arg)
-> -{
-> -	void __user *argp = (void __user *)arg;
-> -	int __user *p = argp;
-> -	int new_value;
-> -
-> -	switch (cmd) {
-> -	case WDIOC_GETSUPPORT:
-> -		return copy_to_user(argp, &at91_wdt_info,
-> -				    sizeof(at91_wdt_info)) ? -EFAULT : 0;
-> -
-> -	case WDIOC_GETSTATUS:
-> -	case WDIOC_GETBOOTSTATUS:
-> -		return put_user(0, p);
-> -
-> -	case WDIOC_KEEPALIVE:
-> -		at91wdt_private.next_heartbeat = jiffies + heartbeat * HZ;
-> -		return 0;
-> -
-> -	case WDIOC_SETTIMEOUT:
-> -		if (get_user(new_value, p))
-> -			return -EFAULT;
-> -
-> -		heartbeat = new_value;
-> -		at91wdt_private.next_heartbeat = jiffies + heartbeat * HZ;
-> -
-> -		return put_user(new_value, p);  /* return current value */
-> -
-> -	case WDIOC_GETTIMEOUT:
-> -		return put_user(heartbeat, p);
-> -	}
-> -	return -ENOTTY;
-> -}
-> -
-> -/*
-> - * Pat the watchdog whenever device is written to.
-> - */
-> -static ssize_t at91_wdt_write(struct file *file, const char *data, size_t len,
-> -								loff_t *ppos)
-> -{
-> -	if (!len)
-> -		return 0;
-> -
-> -	/* Scan for magic character */
-> -	if (!nowayout) {
-> -		size_t i;
-> -
-> -		at91wdt_private.expect_close = 0;
-> -
-> -		for (i = 0; i < len; i++) {
-> -			char c;
-> -			if (get_user(c, data + i))
-> -				return -EFAULT;
-> -			if (c == 'V') {
-> -				at91wdt_private.expect_close = 42;
-> -				break;
-> -			}
-> -		}
-> -	}
-> -
-> -	at91wdt_private.next_heartbeat = jiffies + heartbeat * HZ;
-> -
-> -	return len;
-> -}
-> -
-> -/* ......................................................................... */
-> -
-> -static const struct file_operations at91wdt_fops = {
-> -	.owner			= THIS_MODULE,
-> -	.llseek			= no_llseek,
-> -	.unlocked_ioctl	= at91_wdt_ioctl,
-> -	.open			= at91_wdt_open,
-> -	.release		= at91_wdt_close,
-> -	.write			= at91_wdt_write,
-> -};
-> -
-> -static struct miscdevice at91wdt_miscdev = {
-> -	.minor		= WATCHDOG_MINOR,
-> -	.name		= "watchdog",
-> -	.fops		= &at91wdt_fops,
-> -};
-> -
->  static int __init at91wdt_probe(struct platform_device *pdev)
->  {
->  	struct resource	*r;
->  	int res;
->  
-> -	if (at91wdt_miscdev.parent)
-> -		return -EBUSY;
-> -	at91wdt_miscdev.parent = &pdev->dev;
-> -
->  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	if (!r)
->  		return -ENODEV;
-> @@ -277,10 +155,6 @@ static int __init at91wdt_probe(struct platform_device *pdev)
->  	if (res)
->  		return res;
->  
-> -	res = misc_register(&at91wdt_miscdev);
-> -	if (res)
-> -		return res;
-> -
->  	at91wdt_private.next_heartbeat = jiffies + heartbeat * HZ;
->  	setup_timer(&at91wdt_private.timer, at91_ping, 0);
->  	mod_timer(&at91wdt_private.timer, jiffies + WDT_TIMEOUT);
-> @@ -295,10 +169,6 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
->  {
->  	int res;
->  
-> -	res = misc_deregister(&at91wdt_miscdev);
-> -	if (!res)
-> -		at91wdt_miscdev.parent = NULL;
-> -
->  	return res;
->  }
->  
-> @@ -326,4 +196,3 @@ module_exit(at91sam_wdt_exit);
->  MODULE_AUTHOR("Renaud CERRATO <r.cerrato@til-technologies.fr>");
->  MODULE_DESCRIPTION("Watchdog driver for Atmel AT91SAM9x processors");
->  MODULE_LICENSE("GPL");
-> -MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
-> -- 
-> 1.7.9.5
 > 
+
+
+-- 
+Nicolas Ferre
