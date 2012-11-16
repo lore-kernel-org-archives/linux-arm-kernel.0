@@ -1,75 +1,75 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 16 Nov 2012 15:15:22 +0800
-Subject: [PATCH 4/4] ARM: dts: imx: add imx5x phy-mode entries
-In-Reply-To: <1352988014-14769-5-git-send-email-m.grzeschik@pengutronix.de>
-References: <1352988014-14769-1-git-send-email-m.grzeschik@pengutronix.de>
- <1352988014-14769-5-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <20121116071519.GE2941@S2100-06.ap.freescale.net>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Fri, 16 Nov 2012 14:59:25 +0800
+Subject: [Resend v6 PATCH 2/2] ASoC: atmel-ssc: add pinctrl consumer
+In-Reply-To: <20121116064113.GQ4387@opensource.wolfsonmicro.com>
+References: <1353045837-19474-1-git-send-email-voice.shen@atmel.com>
+ <1353045837-19474-2-git-send-email-voice.shen@atmel.com>
+ <20121116061250.GP4387@opensource.wolfsonmicro.com>
+ <50A5DE4E.80206@atmel.com>
+ <20121116064113.GQ4387@opensource.wolfsonmicro.com>
+Message-ID: <50A5E44D.6040501@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 03:00:14PM +0100, Michael Grzeschik wrote:
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx51.dtsi |    2 ++
->  arch/arm/boot/dts/imx53.dtsi |    2 ++
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> index 366b8d3..ffc6bc8 100644
-> --- a/arch/arm/boot/dts/imx51.dtsi
-> +++ b/arch/arm/boot/dts/imx51.dtsi
-> @@ -145,6 +145,7 @@
->  				compatible = "fsl,imx51-usb", "fsl,imx27-usb";
->  				reg = <0x73f80200 0x0200>;
->  				interrupts = <14>;
-> +				phy-mode = "utmiw";
+On 11/16/2012 14:41, Mark Brown wrote:
+> On Fri, Nov 16, 2012 at 02:33:50PM +0800, Bo Shen wrote:
+>> On 11/16/2012 14:12, Mark Brown wrote:
+>
+>>> No, this isn't what was meant - the idea is to send only the addition of
+>>> pinctrl data as one patch, based off the ASoC branch instead of -next.
+>
+>> What is the pinctrl data? (This patch can be applied on
+>
+> The data you're adding in the device tree!
+>
+>> sound/topic/atmel branch without any conflicts)
+>
+> That's not helpful to anyone doing bisection if there's nothing defining
+> the pin states, it means that the system won't be able to start the
+> driver as the API call will fail.
+>
+>> The other one add pinctrl nodes, must based on -next, or else I
+>> don't know where should I add the pinctrl nodes.
+>
+> What makes you say this?
 
-I tried to grep "phy-mode" and "utmiw" on linux-next and found nothing.
-So it's not something we can take for 3.8, right?
+For example, if I want to add pinctrl node
+---<8---
+  ssc0 {
+	pinctrl_ssc0_tx: ssc0_tx-0 {
+         	atmel,pins = <1 16 0x1 0x0   /* PB16 periph A */
+                 	      1 17 0x1 0x0   /* PB17 periph A */
+                       	      1 18 0x1 0x0>; /* PB18 periph A */
+         };
+--->8---
+This should be add into dtsi file as following
+---<8---
+ahb {
+	apb {
+		pinctrl {
+			ssc0 {
+				pinctrl_ssc0_tx
+			}
+		}
+	}
+}
+--->8---
 
-PS. Instead, I found something like phy_type = "utmi_wide" in
-fsl-usb.txt and fsl-mph-dr-of.c.  Should these be consolidated into
-a common binding?
+In the ASoC branch tree, I don't see any pinctrl related information. 
+So, I say I don't know where should I add the pinctrl nodes.
 
-Shawn
+May be I misunderstanding, do you mean I should only add as followign 
+based on ASoC tree? And the upper go into pinctrl tree?
+---<8---
+ssc0: ssc@fffbc000 {
+	compatible = "atmel,at91rm9200-ssc";
+         reg = <0xfffbc000 0x4000>;
+         interrupts = <14 4 5>;
++        pinctrl-names = "default";
++        pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+         status = "disable";
+};
+--->8---
 
->  				status = "disabled";
->  			};
->  
-> @@ -152,6 +153,7 @@
->  				compatible = "fsl,imx51-usb", "fsl,imx27-usb";
->  				reg = <0x73f80400 0x0200>;
->  				interrupts = <16>;
-> +				phy-mode = "utmi";
->  				status = "disabled";
->  			};
->  
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index 2faa193..1da8e12 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -143,6 +143,7 @@
->  				compatible = "fsl,imx53-usb", "fsl,imx27-usb";
->  				reg = <0x53f80000 0x0200>;
->  				interrupts = <18>;
-> +				phy-mode = "utmiw";
->  				status = "disabled";
->  			};
->  
-> @@ -150,6 +151,7 @@
->  				compatible = "fsl,imx53-usb", "fsl,imx27-usb";
->  				reg = <0x53f80200 0x0200>;
->  				interrupts = <14>;
-> +				phy-mode = "utmi";
->  				status = "disabled";
->  			};
->  
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Best Regards
+Bo Shen
