@@ -1,61 +1,33 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 16 Nov 2012 11:06:02 +0200
-Subject: [PATCH 0/5] OMAPFB: use dma_alloc instead of omap's vram
-In-Reply-To: <20121112225037.GU6801@atomide.com>
-References: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
- <20121112225037.GU6801@atomide.com>
-Message-ID: <50A601FA.5060401@ti.com>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Fri, 16 Nov 2012 17:12:33 +0800
+Subject: [PATCH RFT 1/2] pinctrl: dove: Fix dove_audio1_ctrl_set when
+ BIT(0|1|2|3) of config is clear
+In-Reply-To: <50A0C3C8.2020501@gmail.com>
+References: <1352641495.3113.1.camel@phoenix>
+	<50A0C3C8.2020501@gmail.com>
+Message-ID: <CAFRkauABcnqJSqewueY4rzVbm7uAqkZKitkR9ZmYjF0LhR26-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On 2012-11-13 00:50, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [121112 02:27]:
->> Hi,
+2012/11/12 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>:
+> On 11/11/2012 02:44 PM, Axel Lin wrote:
 >>
->> This series changes omapfb to use standard dma_alloc funcs instead of omap
->> specific vram allocator. This let's us remove the omap vram allocator, making
->> omapfb platform independent.
+>> Current implementation in dove_audio1_ctrl_set() does not clear
+>> corresponding
+>> register bit if BIT(0|1|2|3) of config is clear. Fix it.
 >>
->> However, note that using standard dma funcs causes the following downsides:
->>
->> 1) dma_alloc_attrs doesn't let us allocate at certain physical address.
->> However, this should not be a problem as this feature of vram allocator
->> is only used when reserving the framebuffer that was initialized by the
->> bootloader, and we don't currently support "passing" a framebuffer from
->> the bootloader to the kernel anyway.
->>
->> 2) dma_alloc_attrs, as of now, always ioremaps the allocated area, and
->> we don't need the ioremap when using VRFB. This patch uses
->> DMA_ATTR_NO_KERNEL_MAPPING for the allocation, but the flag is currently
->> not operational.
->>
->> 3) OMAPFB_GET_VRAM_INFO ioctl cannot return real values anymore. I
->> changed the ioctl to return 64M for all the values, which, I hope, the
->> applications will interpret as "there's enough vram".
->>
->> 4) "vram" kernel parameter to define how much ram to reserve for video use no
->> longer works. The user needs to enable CMA and use "cma" parameter.
-> 
-> Great, thanks for fixing these. Could you please queue these into
-> a separate branch against v3.7-rc5 that I can also merge into
-> omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3?
+>> Signed-off-by: Axel Lin<axel.lin@ingics.com>
+>
+>
+> Axel,
+>
+> thanks for the hint on not clearing the audio1 bits before setting them.
+> I will test this tonight and guess you should prepare a real patch for
+> this one.
 
-Should we enable CMA by default in omap2plus_defconfig? And perhaps on
-omap1 also?
+Hi Sebastian,
+Does this patch work for you?
+May I have your Acked-and-Tested-by if you think this patch is ok.
 
-I have to say I don't know the details of the dma allocation, but afaik
-there are no drawbacks with CMA. Although it is still marked
-EXPERIMENTAL in the kconfig...
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 897 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/7903ce26/attachment.sig>
+Thanks,
+Axel
