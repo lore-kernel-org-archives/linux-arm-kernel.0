@@ -1,130 +1,259 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 16 Nov 2012 12:29:44 -0500 (EST)
-Subject: [RFC PATCH v2 2/2] ARM: kernel: update cpuinfo to print all
- online CPUs features
-In-Reply-To: <1353066105-19486-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1353066105-19486-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1353066105-19486-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <alpine.LFD.2.02.1211161229190.1238@xanadu.home>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 16 Nov 2012 18:33:29 +0100
+Subject: [PATCH 7/7] ARM: Kirkwood: switch to DT clock providers
+In-Reply-To: <1353014906-31566-8-git-send-email-andrew@lunn.ch>
+References: <1353014906-31566-1-git-send-email-andrew@lunn.ch>
+ <1353014906-31566-8-git-send-email-andrew@lunn.ch>
+Message-ID: <50A678E9.3090904@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Nov 2012, Lorenzo Pieralisi wrote:
-
-> Currently, reading /proc/cpuinfo provides userspace with CPU ID of
-> the CPU carrying out the read from the file. This is fine as long as all
-> CPUs in the system are the same. With the advent of big.LITTLE and
-> heterogenous ARM systems this approach provides user space with incorrect
-> bits of information since CPU ids in the system might differ from the one
-> provided by the CPU reading the file.
+On 11/15/2012 10:28 PM, Andrew Lunn wrote:
+> With true DT clock providers available switch Kirkwood clock setup in
+> DT- enabled boards. While AUXDATA can be removed completely from bus
+> probing, some devices still don't know about DT. Therefore, some clkdev
+> aliases are created until these devices also move to DT.
 > 
-> This patch updates the cpuinfo show function so that a read from
-> /proc/cpuinfo prints HW information for all online CPUs at once, mirroring
->  x86 behaviour.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
->  arch/arm/kernel/setup.c | 66 ++++++++++++++++++++++++-------------------------
->  1 file changed, 33 insertions(+), 33 deletions(-)
+>  arch/arm/boot/dts/kirkwood.dtsi           |   22 +++++++++
+>  arch/arm/mach-kirkwood/Kconfig            |    2 +
+>  arch/arm/mach-kirkwood/board-dt.c         |   72 +++++++++++++++++++++++------
+>  arch/arm/plat-orion/include/plat/common.h |    1 +
+>  4 files changed, 84 insertions(+), 13 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 20c530b..948fff1 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -842,13 +842,15 @@ static const char *hwcap_str[] = {
+> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+> index 4e5b815..5c85a57 100644
+> --- a/arch/arm/boot/dts/kirkwood.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> @@ -19,6 +19,12 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
 >  
->  static int c_show(struct seq_file *m, void *v)
+> +		core_clk: core-clocks at 10030 {
+> +                	compatible = "marvell,kirkwood-core-clocks";
+> +			reg = <0x10030 0x4>;
+> +	        	#clock-cells = <1>;
+> +		};
+> +
+>  		gpio0: gpio at 10100 {
+>  			compatible = "marvell,orion-gpio";
+>  			#gpio-cells = <2>;
+> @@ -42,6 +48,7 @@
+>  			reg = <0x12000 0x100>;
+>  			reg-shift = <2>;
+>  			interrupts = <33>;
+> +			clocks = <&clk_gate 7>;
+>  			/* set clock-frequency in board dts */
+>  			status = "disabled";
+>  		};
+> @@ -51,6 +58,7 @@
+>  			reg = <0x12100 0x100>;
+>  			reg-shift = <2>;
+>  			interrupts = <34>;
+> +			clocks = <&clk_gate 7>;
+>  			/* set clock-frequency in board dts */
+>  			status = "disabled";
+>  		};
+> @@ -68,12 +76,21 @@
+>  			cell-index = <0>;
+>  			interrupts = <23>;
+>  			reg = <0x10600 0x28>;
+> +			clocks = <&clk_gate 7>;
+>  			status = "disabled";
+>  		};
+>  
+> +		clk_gate: clock-gating-control at 2011c {
+> +			compatible = "marvell,kirkwood-clock-gating";
+> +			reg = <0x2011c 0x4>;
+> +			clocks = <&core_clk 0>;
+> +			#clock-cells = <1>;
+> +		};
+> +
+>  		wdt at 20300 {
+>  			compatible = "marvell,orion-wdt";
+>  			reg = <0x20300 0x28>;
+> +			clocks = <&clk_gate 7>;
+>  			status = "okay";
+>  		};
+>  
+> @@ -81,6 +98,8 @@
+>  			compatible = "marvell,orion-sata";
+>  			reg = <0x80000 0x5000>;
+>  			interrupts = <21>;
+> +			clocks = <&clk_gate 14>, <&clk_gate 15>;
+> +			clock-names = "0", "1";
+>  			status = "disabled";
+>  		};
+>  
+> @@ -94,6 +113,7 @@
+>  			reg = <0x3000000 0x400>;
+>  			chip-delay = <25>;
+>  			/* set partition map and/or chip-delay in board dts */
+> +			clocks = <&clk_gate 7>;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -104,6 +124,7 @@
+>  			#size-cells = <0>;
+>  			interrupts = <29>;
+>  			clock-frequency = <100000>;
+> +			clocks = <&clk_gate 7>;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -113,6 +134,7 @@
+>  			      <0xf5000000 0x800>;
+>  			reg-names = "regs", "sram";
+>  			interrupts = <22>;
+> +			clocks = <&clk_gate 17>;
+>  			status = "okay";
+>  		};
+>  	};
+> diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+> index 50bca50..2833492 100644
+> --- a/arch/arm/mach-kirkwood/Kconfig
+> +++ b/arch/arm/mach-kirkwood/Kconfig
+> @@ -46,6 +46,8 @@ config MACH_GURUPLUG
+>  
+>  config ARCH_KIRKWOOD_DT
+>  	bool "Marvell Kirkwood Flattened Device Tree"
+> +	select MVEBU_CLK_CORE
+> +	select MVEBU_CLK_GATING
+>  	select USE_OF
+>  	help
+>  	  Say 'Y' here if you want your kernel to support the
+> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> index d94872f..0129cdc 100644
+> --- a/arch/arm/mach-kirkwood/board-dt.c
+> +++ b/arch/arm/mach-kirkwood/board-dt.c
+> @@ -14,11 +14,15 @@
+>  #include <linux/init.h>
+>  #include <linux/of.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/clk/mvebu.h>
+>  #include <linux/kexec.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+>  #include <mach/bridge-regs.h>
+> +#include <linux/platform_data/usb-ehci-orion.h>
+>  #include <plat/irq.h>
+> +#include <plat/common.h>
+>  #include "common.h"
+>  
+>  static struct of_device_id kirkwood_dt_match_table[] __initdata = {
+> @@ -26,16 +30,59 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
+>  	{ }
+>  };
+>  
+> -struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
+> -	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
+> -	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011000, "mv64xxx_i2c.0",
+> -		       NULL),
+> -	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
+> -	OF_DEV_AUXDATA("marvell,orion-sata", 0xf1080000, "sata_mv.0", NULL),
+> -	OF_DEV_AUXDATA("marvell,orion-nand", 0xf4000000, "orion_nand", NULL),
+> -	OF_DEV_AUXDATA("marvell,orion-crypto", 0xf1030000, "mv_crypto", NULL),
+> -	{},
+> -};
+> +/*
+> + * There are still devices that doesn't know about DT yet.  Get clock
+> + * gates here and add a clock lookup alias, so that old platform
+> + * devices still work.
+> +*/
+> +
+> +static void __init kirkwood_legacy_clk_init(void)
+> +{
+> +
+> +	struct device_node *np = of_find_compatible_node(NULL, NULL,
+> +							 "marvell,kirkwood-clock-gating");
+> +
+> +	struct of_phandle_args clkspec;
+> +
+> +	clkspec.np = np;
+> +	clkspec.args_count = 1;
+> +
+> +	clkspec.args[0] = CGC_BIT_GE0;
+> +	orion_clkdev_add(NULL, "mv643xx_eth_port.0",
+> +			 of_clk_get_from_provider(&clkspec));
+> +
+> +	clkspec.args[0] = CGC_BIT_PEX0;
+> +	orion_clkdev_add("0", "pcie",
+> +			 of_clk_get_from_provider(&clkspec));
+> +
+> +	clkspec.args[0] = CGC_BIT_USB0;
+> +	orion_clkdev_add(NULL, "orion-ehci.0",
+> +			 of_clk_get_from_provider(&clkspec));
+> +
+> +	clkspec.args[0] = CGC_BIT_XOR0;
+> +	orion_clkdev_add(NULL, "mv_xor_shared.0",
+> +			 of_clk_get_from_provider(&clkspec));
+> +
+> +	clkspec.args[0] = CGC_BIT_XOR1;
+> +	orion_clkdev_add(NULL, "mv_xor_shared.1",
+> +			 of_clk_get_from_provider(&clkspec));
+> +
+> +	clkspec.args[0] = CGC_BIT_PEX1;
+> +	orion_clkdev_add("1", "pcie",
+> +			 of_clk_get_from_provider(&clkspec));
+> +
+> +	clkspec.args[0] = CGC_BIT_GE1;
+> +	orion_clkdev_add(NULL, "mv643xx_eth_port.1",
+> +			 of_clk_get_from_provider(&clkspec));
+> +
+> +}
+> +
+> +static void __init kirkwood_of_clk_init(void)
+> +{
+> +	mvebu_clocks_init();
+> +	mvebu_clk_gating_init();
+
+What do you think about moving mvebu_clk_gating_init()
+inside mvebu_clocks_init ?
+It is what we have done for the cpu_clk.
+
+> +	kirkwood_legacy_clk_init();
+> +}
+>  
+>  static void __init kirkwood_dt_init(void)
 >  {
-> -	int i;
-> +	int i, j;
-> +	u32 cpuid;
+> @@ -54,7 +101,7 @@ static void __init kirkwood_dt_init(void)
+>  	kirkwood_l2_init();
 >  
-> -	seq_printf(m, "Processor\t: %s rev %d (%s)\n",
-> -		   cpu_name, read_cpuid_id() & 15, elf_platform);
-> +	for_each_online_cpu(i) {
-> +		cpuid = is_smp() ? per_cpu(cpu_data, i).cpuid : read_cpuid_id();
-> +		seq_printf(m, "Processor\t: %s rev %d (%s)\n",
-> +			   cpu_name, cpuid & 15, elf_platform);
+>  	/* Setup root of clk tree */
+> -	kirkwood_clk_init();
+> +	kirkwood_of_clk_init();
 >  
->  #if defined(CONFIG_SMP)
-> -	for_each_online_cpu(i) {
->  		/*
->  		 * glibc reads /proc/cpuinfo to determine the number of
->  		 * online processors, looking for lines beginning with
-> @@ -858,42 +860,40 @@ static int c_show(struct seq_file *m, void *v)
->  		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n\n",
->  			   per_cpu(cpu_data, i).loops_per_jiffy / (500000UL/HZ),
->  			   (per_cpu(cpu_data, i).loops_per_jiffy / (5000UL/HZ)) % 100);
-> -	}
-> -#else /* CONFIG_SMP */
-> -	seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
-> -		   loops_per_jiffy / (500000/HZ),
-> -		   (loops_per_jiffy / (5000/HZ)) % 100);
-> +#else
-> +		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
-> +			   loops_per_jiffy / (500000/HZ),
-> +			   (loops_per_jiffy / (5000/HZ)) % 100);
->  #endif
-> +		/* dump out the processor features */
-> +		seq_puts(m, "Features\t: ");
+>  	/* internal devices that every board has */
+>  	kirkwood_xor0_init();
+> @@ -94,8 +141,7 @@ static void __init kirkwood_dt_init(void)
+>  	if (of_machine_is_compatible("keymile,km_kirkwood"))
+>  		km_kirkwood_init();
 >  
-> -	/* dump out the processor features */
-> -	seq_puts(m, "Features\t: ");
-> +		for (j = 0; hwcap_str[j]; j++)
-> +			if (elf_hwcap & (1 << j))
-> +				seq_printf(m, "%s ", hwcap_str[j]);
+> -	of_platform_populate(NULL, kirkwood_dt_match_table,
+> -			     kirkwood_auxdata_lookup, NULL);
+> +	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
+>  }
 >  
-> -	for (i = 0; hwcap_str[i]; i++)
-> -		if (elf_hwcap & (1 << i))
-> -			seq_printf(m, "%s ", hwcap_str[i]);
-> +		seq_printf(m, "\nCPU implementer\t: 0x%02x\n", cpuid >> 24);
-> +		seq_printf(m, "CPU architecture: %s\n",
-> +			   proc_arch[cpu_architecture()]);
+>  static const char *kirkwood_dt_board_compat[] = {
+> diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
+> index 6bbc3fe..e06fc5f 100644
+> --- a/arch/arm/plat-orion/include/plat/common.h
+> +++ b/arch/arm/plat-orion/include/plat/common.h
+> @@ -12,6 +12,7 @@
+>  #include <linux/mv643xx_eth.h>
 >  
-> -	seq_printf(m, "\nCPU implementer\t: 0x%02x\n", read_cpuid_id() >> 24);
-> -	seq_printf(m, "CPU architecture: %s\n", proc_arch[cpu_architecture()]);
-> -
-> -	if ((read_cpuid_id() & 0x0008f000) == 0x00000000) {
-> -		/* pre-ARM7 */
-> -		seq_printf(m, "CPU part\t: %07x\n", read_cpuid_id() >> 4);
-> -	} else {
-> -		if ((read_cpuid_id() & 0x0008f000) == 0x00007000) {
-> -			/* ARM7 */
-> -			seq_printf(m, "CPU variant\t: 0x%02x\n",
-> -				   (read_cpuid_id() >> 16) & 127);
-> +		if ((cpuid & 0x0008f000) == 0x00000000) {
-> +			/* pre-ARM7 */
-> +			seq_printf(m, "CPU part\t: %07x\n", cpuid >> 4);
->  		} else {
-> -			/* post-ARM7 */
-> -			seq_printf(m, "CPU variant\t: 0x%x\n",
-> -				   (read_cpuid_id() >> 20) & 15);
-> +			if ((cpuid & 0x0008f000) == 0x00007000) {
-> +				/* ARM7 */
-> +				seq_printf(m, "CPU variant\t: 0x%02x\n",
-> +					   (cpuid >> 16) & 127);
-> +			} else {
-> +				/* post-ARM7 */
-> +				seq_printf(m, "CPU variant\t: 0x%x\n",
-> +					   (cpuid >> 20) & 15);
-> +			}
-> +			seq_printf(m, "CPU part\t: 0x%03x\n",
-> +				   (cpuid >> 4) & 0xfff);
->  		}
-> -		seq_printf(m, "CPU part\t: 0x%03x\n",
-> -			   (read_cpuid_id() >> 4) & 0xfff);
-> +		seq_printf(m, "CPU revision\t: %d\n\n", cpuid & 15);
->  	}
-> -	seq_printf(m, "CPU revision\t: %d\n", read_cpuid_id() & 15);
-> -
-> -	seq_puts(m, "\n");
+>  struct dsa_platform_data;
+> +struct mv_sata_platform_data;
 >  
->  	seq_printf(m, "Hardware\t: %s\n", machine_name);
->  	seq_printf(m, "Revision\t: %04x\n", system_rev);
-> -- 
-> 1.7.12
+>  void __init orion_uart0_init(void __iomem *membase,
+>  			     resource_size_t mapbase,
 > 
-> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
