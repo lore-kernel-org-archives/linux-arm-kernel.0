@@ -1,31 +1,85 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 16 Nov 2012 23:57:42 +0100
-Subject: Final call for 3.8 arm-soc patches
-In-Reply-To: <201211162111.34615.arnd@arndb.de>
-References: <201211162111.34615.arnd@arndb.de>
-Message-ID: <50A6C4E6.2050700@atmel.com>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Fri, 16 Nov 2012 23:04:12 +0000
+Subject: [PATCH v7 2/6] net: mvneta: driver for Marvell Armada 370/XP
+ network unit
+In-Reply-To: <1352905010-24172-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1352905010-24172-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1352905010-24172-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353107052.2743.65.camel@bwh-desktop.uk.solarflarecom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2012 10:11 PM, Arnd Bergmann :
-> Hi ARM subarch maintainers,
-> 
-> We are currently at linux-3.7-rc5, which means the merge window is coming
-> closer. We already have 759 changesets in arm-soc and I know of a few ones
-> coming (tegra, clps711x, bcm), but I don't know what the status for some
-> of the bigger ones (exynos/s5p/s3c, mvebu/orion, pxa/mmp). If you have
-> more patches coming, please send all remaining pull requests soon, or
-> let us know what is holding you up. I hope this way we can avoid having
-> to reject pull requests that come too late in the cycle.
+On Wed, 2012-11-14 at 15:56 +0100, Thomas Petazzoni wrote:
+[...]
+> --- /dev/null
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+[...]
+> +/* Set interrupt coalescing for ethtools */
+> +static int mvneta_ethtool_set_coalesce(struct net_device *dev,
+> +				       struct ethtool_coalesce *c)
+> +{
+> +	struct mvneta_port *pp = netdev_priv(dev);
+> +	int queue;
+> +
+> +	for (queue = 0; queue < rxq_number; queue++) {
+> +		struct mvneta_rx_queue *rxq = &pp->rxqs[queue];
+> +		rxq->time_coal = c->rx_coalesce_usecs;
+> +		rxq->pkts_coal = c->rx_max_coalesced_frames;
+> +		mvneta_rx_pkts_coal_set(pp, rxq, rxq->pkts_coal);
+> +		mvneta_rx_time_coal_set(pp, rxq, rxq->time_coal);
+> +	}
 
-Hi Arnd,
+Please check that c->rx_coalesce_usecs || c->rx_max_coalesced_frames
+(see the comments in <linux/ethtool.h>).  Also please check that the
+other fields, up to and including use_adaptive_tx_coalesce, are all set
+to 0.
 
-For AT91, we have 2 or 3 branches that contain each not much more than a
-handful of patches. So, nothing big for this release, but I am still
-waiting for some information to finish them.
-The beginning of next week should be ok for finishing the work and send
-you pull requests.
+> +	for (queue = 0; queue < txq_number; queue++) {
+> +		struct mvneta_tx_queue *txq = &pp->txqs[queue];
+> +		txq->done_pkts_coal = c->tx_max_coalesced_frames;
+> +		mvneta_tx_done_pkts_coal_set(pp, txq, txq->done_pkts_coal);
+> +	}
+> +
+> +	return 0;
+> +}
+[...]
+> +static int mvneta_ethtool_set_ringparam(struct net_device *dev,
+> +					struct ethtool_ringparam *ring)
+> +{
+> +	struct mvneta_port *pp = netdev_priv(dev);
+> +
+> +	if ((ring->rx_pending == 0) || (ring->tx_pending == 0))
+> +		return -EINVAL;
 
-Best regards,
+Please check that the other fields are all set to 0.
+
+> +	pp->rx_ring_size = ring->rx_pending < MVNETA_MAX_RXD ?
+> +		ring->rx_pending : MVNETA_MAX_RXD;
+> +	pp->tx_ring_size = ring->tx_pending < MVNETA_MAX_TXD ?
+> +		ring->tx_pending : MVNETA_MAX_TXD;
+> +
+> +	if (netif_running(dev)) {
+> +		mvneta_stop(dev);
+> +		if (mvneta_open(dev)) {
+> +			netdev_err(dev,
+> +				   "error on opening device after ring param change\n");
+> +			return -ENOMEM;
+> +		}
+
+This is nasty because the stack will still considers the interface to be
+up.  Ideally you would hold onto the old rings and revert to using them
+in case of failure.  If that's not possible then use dev_close() and
+dev_open() so that the stack knows the interface didn't come up again.
+
+Ben.
+
+> +	}
+> +
+> +	return 0;
+> +}
+[...]
+
 -- 
-Nicolas Ferre
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
