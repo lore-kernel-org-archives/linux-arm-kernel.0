@@ -1,67 +1,48 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Fri, 16 Nov 2012 10:47:29 +0000
-Subject: [PATCH 2/4] rtc: OMAP: Add system pm_power_off to rtc driver
-References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
- <1352108549-9341-3-git-send-email-anilkumar@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EC04226@DBDE01.ent.ti.com>  
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA6D62E@DBDE01.ent.ti.com>
+From: sr@denx.de (Stefan Roese)
+Date: Fri, 16 Nov 2012 11:47:41 +0100
+Subject: [PATCH 2/6] irqchip: sunxi: Add irq controller driver
+In-Reply-To: <20121116113805.053eb5fa@skate>
+References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1353019586-21043-3-git-send-email-maxime.ripard@free-electrons.com>
+ <50A5ECBF.9060304@denx.de> <50A6047A.8090609@free-electrons.com>
+ <20121116113805.053eb5fa@skate>
+Message-ID: <50A619CD.7020305@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2012 at 11:43:36, AnilKumar, Chimata wrote:
-> On Mon, Nov 12, 2012 at 15:17:48, AnilKumar, Chimata wrote:
-> > On Tue, Nov 06, 2012 at 11:15:34, Bedia, Vaibhav wrote:
-> > > On Mon, Nov 05, 2012 at 15:12:27, AnilKumar, Chimata wrote:
-> > > [...]
-> > > >  
-> > > > +#define SHUTDOWN_TIME_SEC		2
-> > > > +#define SECS_IN_MIN			60
-> > > > +#define WAIT_AFTER			(SECS_IN_MIN - SHUTDOWN_TIME_SEC)
-> > > > +#define WAIT_TIME_MS			(SHUTDOWN_TIME_SEC * 1000)
-> > > > +
-> > > >  static void __iomem	*rtc_base;
-> > > >  
-> > > [...]
-> > > > +
-> > > > +	/* Wait few seconds instead of rollover */
-> > > > +	do {
-> > > > +		omap_rtc_read_time(NULL, &tm);
-> > > > +		if (WAIT_AFTER <= tm.tm_sec)
-> > > > +			mdelay(WAIT_TIME_MS);
-> > > > +	} while (WAIT_AFTER <= tm.tm_sec);
-> > > 
-> > > This hardcoded wait for rollover doesn't look good. I see some
-> > > helper functions in rtc-lib.c which probably could be used for
-> > > converting the current time to elapsed seconds, add the delay and
-> > > then convert it back to the time to be programmed in RTC without
-> > > worrying about rollover. Why not use that?
-> > 
-> > I am not aware of those APIs, can you point some?
+On 11/16/2012 11:38 AM, Thomas Petazzoni wrote:
+>>> asmlinkage void __exception_irq_entry sunxi_handle_irq(struct pt_regs *regs)
+>>> {
+>>> 	u32 irq;
+>>>
+>>> 	irq = readl(int_base + SW_INT_VECTOR_REG) >> 2;
+>>> 	irq = irq_find_mapping(sunxi_vic_domain, irq);
+>>> 	handle_IRQ(irq, regs);
+>>> }
+>>>
+>>> I suggest you give it a try.
+>>
+>> It definitely looks nicer. I'll try that and update.
 > 
-> I have gone through rtc-lib.c, these are the API's I am seeing
-> in the library
-> 
-> 1. rtc_time_to_tm: Convert seconds since 01-01-1970 00:00:00 to
-> Gregorian date
-> 2. rtc_tm_to_time: Convert Gregorian date to seconds since
-> 01-01-1970 00:00:00
-> 
-> Steps I followed:-
-> ================
-> 1: unsigned long time;
-> 2: omap_rtc_read_time(NULL, &tm);
-> 3: rtc_tm_to_time(tm, &time);
-> 4: pr_info("Time 1 %lu\n", time);
-> 5: time += 2; /* (2sec) */
-> 6: rtc_time_to_tm(time, tm);
-> 7: rtc_tm_to_time(tm, &time); /* Only for printing time value */
-> 8: pr_info("Time 2 %lu\n", time); 
-> 
-> With the above steps I am seeing completely two different time
-> values at step4 and step8
-> 
+> How does this SW_INT_VECTOR_REG behave when there are multiple
+> interrupts pending?
 
-Nevermind it working now.
+Not 100% sure. Hard to guess with this sparse documentation. I would
+expect that multiple interrupts would be queued here.
 
-Thanks
-AnilKumar
+> Shouldn't the code be something like:
+> 
+> 	do {
+> 		hwirq = readl(int_base + SW_INT_VECTOR_REG) >> 2;
+> 		irq = irq_find_mapping(sunxi_vic_domain, hwirq);
+> 		handle_IRQ(irq, regs);
+> 	} while(hwirq != 0);
+> 
+> Or maybe the != 0 is not the good condition, but the idea is to handle
+> all pending interrupts. That said, the original code from Maxime was
+> not doing that as well.
+
+Yes, that would be a good change.
+
+Thanks,
+Stefan
