@@ -1,78 +1,70 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Fri, 16 Nov 2012 10:54:49 +0900
-Subject: [PATCH v2 10/10] serial: sh-sci: fix possible race cases on SCSCR
- register accesses
-In-Reply-To: <50A59B9B.2010501@renesas.com>
-References: <509A0658.1010503@renesas.com> <509A0B4E.1030801@renesas.com>
- <20121116010107.GA6068@kroah.com> <50A59B9B.2010501@renesas.com>
-Message-ID: <50A59CE9.5020104@renesas.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 16 Nov 2012 10:23:54 +0800
+Subject: [PATCH 01/10] ARM: imx6q: print silicon version on boot
+In-Reply-To: <72B629D8-8CD8-42E2-91A3-CF0532B15E5F@mentor.com>
+References: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
+ <1351005779-30347-2-git-send-email-shawn.guo@linaro.org>
+ <72B629D8-8CD8-42E2-91A3-CF0532B15E5F@mentor.com>
+Message-ID: <20121116022346.GA2941@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the previous commit, console write function (serial_console_write)
-is changed to disable SCI interrupts while printing console strings.
-This introduces possible race cases in the serial startup / shutdown
-functions on SMP systems.
+On Thu, Nov 15, 2012 at 06:09:31PM +0000, Moseley, Drew wrote:
+> On Oct 23, 2012, at 11:22 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > i.MX6Q has 3 revisions 1.0, 1.1 and 1.2.  Print revision on boot.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> > arch/arm/mach-imx/mach-imx6q.c |   28 ++++++++++++++++++++++++++++
+> > 1 file changed, 28 insertions(+)
+> > 
+> 
+> Hi Shawn,
+> 
+> An addition to this patch to add some error checking.  Thoughts?
+> 
+It looks good.  I just squashed the changes into the original patch
+with your sob added.  Thanks.
 
-This patch fixes the sh-sci in the same way as commit 9ec1882df2
-(tty: serial: imx: console write routing is unsafe on SMP, from
-Xinyu Chen <xinyu.chen@freescale.com>, 2012-08-27) did.
+Note, the patch series will probably postponed to 3.9 due to the
+dependency on other tree and the fact that I wait for a TO1.2 hardware
+to test the power gating state.
 
-There could be several consumers of the console,
-* the kernel printk
-* the init process using /dev/kmsg to call printk to show log
-* shell, which opens /dev/console and writes with sys_write()
+Shawn
 
-The shell goes into the normal UART open() and write() system calls,
-while the other two go into the console operations.  The open() call
-invokes serial startup function (sci_startup), which will write to
-the SCSCR register (to enable or disable SCI interrupts) without any
-locking.  This will conflict with the console serial function.
-
-Add spinlock protections in sci_startup() and sci_shutdown() properly.
-
-Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
----
- drivers/tty/serial/sh-sci.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-index 0b8d029..8e3c7f7 100644
---- a/drivers/tty/serial/sh-sci.c
-+++ b/drivers/tty/serial/sh-sci.c
-@@ -1742,6 +1742,7 @@ static inline void sci_free_dma(struct uart_port *port)
- static int sci_startup(struct uart_port *port)
- {
- 	struct sci_port *s = to_sci_port(port);
-+	unsigned long flags;
- 	int ret;
- 
- 	dev_dbg(port->dev, "%s(%d)\n", __func__, port->line);
-@@ -1752,8 +1753,10 @@ static int sci_startup(struct uart_port *port)
- 
- 	sci_request_dma(port);
- 
-+	spin_lock_irqsave(&port->lock, flags);
- 	sci_start_tx(port);
- 	sci_start_rx(port);
-+	spin_unlock_irqrestore(&port->lock, flags);
- 
- 	return 0;
- }
-@@ -1761,11 +1764,14 @@ static int sci_startup(struct uart_port *port)
- static void sci_shutdown(struct uart_port *port)
- {
- 	struct sci_port *s = to_sci_port(port);
-+	unsigned long flags;
- 
- 	dev_dbg(port->dev, "%s(%d)\n", __func__, port->line);
- 
-+	spin_lock_irqsave(&port->lock, flags);
- 	sci_stop_rx(port);
- 	sci_stop_tx(port);
-+	spin_unlock_irqrestore(&port->lock, flags);
- 
- 	sci_free_dma(port);
- 	sci_free_irq(s);
--- 
-1.7.12.4
+> Drew
+> 
+> 
+> 
+> 
+> Add error checking to imx6q_revision()
+> 
+> Signed-off-by: Drew Moseley <drew_moseley@mentor.com>
+> ---
+>  arch/arm/mach-imx/mach-imx6q.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 265c311..072e32a 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -54,9 +54,16 @@ static int imx6q_revision(void)
+>  
+>  	if (!rev) {
+>  		np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
+> +		if (!np)
+> +			return IMX_CHIP_REVISION_UNKNOWN;
+>  		base = of_iomap(np, 0);
+> +		if (!base) {
+> +			of_node_put(np);
+> +			return IMX_CHIP_REVISION_UNKNOWN;
+> +		}
+>  		rev =  readl_relaxed(base + IMX6Q_ANALOG_DIGPROG);
+>  		iounmap(base);
+> +		of_node_put(np);
+>  	}
+>  
+>  	switch (rev & 0xff) {
+> -- 
+> 1.8.0
+> 
