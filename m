@@ -1,83 +1,72 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 Nov 2012 12:43:54 -0700
-Subject: [GIT PULL 2/6] ARM: tegra: core SoC code enhancements
+Date: Fri, 16 Nov 2012 12:43:55 -0700
+Subject: [GIT PULL 3/6] ARM: tegra: cpuidle enhancements
 In-Reply-To: <1353095038-20031-1-git-send-email-swarren@wwwdotorg.org>
 References: <1353095038-20031-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1353095038-20031-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1353095038-20031-3-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Various small clock initialization table and driver changes to support
-WiFi modules, SPI controllers, and host1x (graphics/display hardware).
+A cpuidle state "LP2" is added, which power-gates the CPUs. Support for
+CPUs 1..n is essentially complete, although support for CPU0 could
+benefit from future use of coupled-cpuidle or similar techniques.
 
-Various AHB/APB-related clocks were added to the Tegra30 clock driver.
+A couple of very minor cleanups to cpuidle were included too.
 
-The level 2 cache initialization is now driven by data from device tree,
-and the cache configuration tweaked.
-
-AUXDATA is added to support SPI controllers and host1x.
-
-Code to decode Tegra's "speedo" process identification fuses is added.
-
-This pull request is based on tegra-for-3.8-cleanup.
+This pull request is based on tegra-for-3.8-soc.
 
 ----------------------------------------------------------------
 
-The following changes since commit bb1de8877c960b3b3e1c8337730df970b262fd44:
-
-  ARM: tegra: move irammap.h to mach-tegra
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.8-soc
-
-for you to fetch changes up to d1d3b978f67c2c000f9d91387cffa630e738d529:
+The following changes since commit d1d3b978f67c2c000f9d91387cffa630e738d529:
 
   ARM: tegra: Add Tegra30 host1x clock support
 
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.8-cpuidle
+
+for you to fetch changes up to 29a0e7beab8e05be53d5b9c050253a4dc417041e:
+
+  ARM: tegra: retain L2 content over CPU suspend/resume
+
 ----------------------------------------------------------------
 
-Danny Huang (3):
-      ARM: tegra: flexible spare fuse read function
-      ARM: tegra: Add speedo-based process identification
-      ARM: tegra: Tegra30 speedo-based process identification
+Joseph Lo (10):
+      ARM: tegra: cpuidle: replace LP3 with ARM_CPUIDLE_WFI_STATE
+      ARM: tegra: rename the file of "sleep-tXX" to "sleep-tegraXX"
+      ARM: tegra: cpuidle: separate cpuidle driver for different chips
+      ARM: tegra: cpuidle: add CPU resume function
+      ARM: tegra30: cpuidle: add powered-down state for secondary CPUs
+      ARM: tegra30: common: enable csite clock
+      ARM: tegra30: clocks: add CPU low-power function into tegra_cpu_car_ops
+      ARM: tegra30: flowctrl: add cpu_suspend_exter/exit function
+      ARM: tegra30: cpuidle: add powered-down state for CPU0
+      ARM: tegra: retain L2 content over CPU suspend/resume
 
-Joseph Lo (4):
-      ARM: tegra30: clocks: add AHB and APB clocks
-      ARM: tegra: dt: add L2 cache controller
-      ARM: tegra: common: using OF api for L2 cache init
-      ARM: tegra: enable data prefetch on L2
-
-Laxman Dewangan (2):
-      ARM: tegra: Add OF_DEV_AUXDATA for SLINK driver in board dt
-      ARM: tegra: Add OF_DEV_AUXDATA for sflash driver in board dt
-
-Peter De Schrijver (1):
-      ARM: tegra: Implement 6395/1 for Tegra
-
-Thierry Reding (4):
-      ARM: tegra: Add AUXDATA for Tegra20 host1x
-      ARM: tegra: Add Tegra20 host1x clock support
-      ARM: tegra: Add AUXDATA for Tegra30 host1x
-      ARM: tegra: Add Tegra30 host1x clock support
-
-Wei Ni (1):
-      ARM: tegra: set up wlan clocks for tegra dt
-
- arch/arm/boot/dts/tegra20.dtsi            |    9 +
- arch/arm/boot/dts/tegra30.dtsi            |    9 +
- arch/arm/mach-tegra/Makefile              |    2 +
- arch/arm/mach-tegra/board-dt-tegra20.c    |   23 ++
- arch/arm/mach-tegra/board-dt-tegra30.c    |   25 ++
- arch/arm/mach-tegra/common.c              |   17 +-
- arch/arm/mach-tegra/fuse.c                |   49 +++-
- arch/arm/mach-tegra/fuse.h                |   16 ++
- arch/arm/mach-tegra/tegra20_clocks_data.c |   11 +-
- arch/arm/mach-tegra/tegra20_speedo.c      |  109 +++++++++
- arch/arm/mach-tegra/tegra30_clocks.c      |  106 +++++++++
- arch/arm/mach-tegra/tegra30_clocks.h      |    1 +
- arch/arm/mach-tegra/tegra30_clocks_data.c |   51 ++++-
- arch/arm/mach-tegra/tegra30_speedo.c      |  292 ++++++++++++++++++++++++
- 14 files changed, 696 insertions(+), 24 deletions(-)
- create mode 100644 arch/arm/mach-tegra/tegra20_speedo.c
- create mode 100644 arch/arm/mach-tegra/tegra30_speedo.c
+ arch/arm/mach-tegra/Makefile                    |   11 +-
+ arch/arm/mach-tegra/common.c                    |    7 +-
+ arch/arm/mach-tegra/cpuidle-tegra20.c           |   66 ++++++
+ arch/arm/mach-tegra/cpuidle-tegra30.c           |  188 +++++++++++++++
+ arch/arm/mach-tegra/cpuidle.c                   |   83 ++-----
+ arch/arm/mach-tegra/cpuidle.h                   |   32 +++
+ arch/arm/mach-tegra/flowctrl.c                  |   47 ++++
+ arch/arm/mach-tegra/flowctrl.h                  |    8 +
+ arch/arm/mach-tegra/headsmp.S                   |   71 ++++++
+ arch/arm/mach-tegra/pm.c                        |  216 ++++++++++++++++++
+ arch/arm/mach-tegra/pm.h                        |   35 +++
+ arch/arm/mach-tegra/reset.c                     |    6 +
+ arch/arm/mach-tegra/reset.h                     |    9 +
+ .../mach-tegra/{sleep-t20.S => sleep-tegra20.S} |    0
+ .../mach-tegra/{sleep-t30.S => sleep-tegra30.S} |   66 ++++++
+ arch/arm/mach-tegra/sleep.S                     |   78 +++++++
+ arch/arm/mach-tegra/sleep.h                     |   37 +++
+ arch/arm/mach-tegra/tegra30_clocks.c            |  108 +++++++++
+ arch/arm/mach-tegra/tegra_cpu_car.h             |   37 +++
+ 19 files changed, 1032 insertions(+), 73 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/cpuidle-tegra20.c
+ create mode 100644 arch/arm/mach-tegra/cpuidle-tegra30.c
+ create mode 100644 arch/arm/mach-tegra/cpuidle.h
+ create mode 100644 arch/arm/mach-tegra/pm.c
+ create mode 100644 arch/arm/mach-tegra/pm.h
+ rename arch/arm/mach-tegra/{sleep-t20.S => sleep-tegra20.S} (100%)
+ rename arch/arm/mach-tegra/{sleep-t30.S => sleep-tegra30.S} (63%)
