@@ -1,46 +1,30 @@
-From: sr@denx.de (Stefan Roese)
-Date: Fri, 16 Nov 2012 10:00:50 +0100
-Subject: [PATCH 0/6] Add basic support for Allwinner A1X SoCs
-In-Reply-To: <201211160751.18401.arnd@arndb.de>
-References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
- <201211160751.18401.arnd@arndb.de>
-Message-ID: <50A600C2.8030006@denx.de>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 16 Nov 2012 11:02:00 +0200
+Subject: [PATCH 1/1] mtd: physmap_of: allow to specify the mtd name for
+ retro compatiblity
+In-Reply-To: <20121107153216.GF4576@game.jcrosoft.org>
+References: <20121107153216.GF4576@game.jcrosoft.org>
+Message-ID: <1353056520.20111.9.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 11/16/2012 08:51 AM, Arnd Bergmann wrote:
-> On Thursday 15 November 2012, Maxime Ripard wrote:
->> You'll find in this patchset the initial support for Allwinner A10 and A13 SoCs
->> from Allwinner. Since the internal name of these SoCs are sun4i and sun5i, the
->> mach- directory is named sunxi.
->>
->> You can find these SoCs in the Cubieboard, the A13-olinuxino or the Melee
->> A1000.
->>
->> Both SoCs should work fine, as the A13 is a trimmed down version of the A10,
->> but it has only been tested on a A13-OlinuXino from Olimex.
->>
->> Support is quite minimal for now, since it only includes timer and IRQ
->> controller drivers, so we can only boot to userspace through initramfs. Support
->> for the other peripherals on these SoCs will come eventually.
+On Wed, 2012-11-07 at 16:32 +0100, Jean-Christophe PLAGNIOL-VILLARD
+wrote:
+> linux,mtd-name allow to specify the mtd name for retro capability with
+> physmap-flash drivers as boot loader pass the mtd partition via the old
+> device name physmap-flash.
 > 
-> Hi Maxime,
-> 
-> Thanks for sending these, I'm pretty excited we actually get this far
-> for 3.8. All patches look good for inclusion from my side, but I'll let
-> Stefan and others comment first and then take your second version. We
-> are getting closer to the merge window already, so I'd like to pull
-> it in rather soon and maybe add some fixups later.
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Yes, that would be great. I can send some patches to add A10/cubieboard
-support in a few days.
+Pushed to l2-mtd.git, thanks!
 
-> I've also ordered a Cubieboard myself now, so hopefully I'll also find
-> some time to play with this.
-
-Nice.
-
-Thanks,
-Stefan
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/765035cd/attachment.sig>
