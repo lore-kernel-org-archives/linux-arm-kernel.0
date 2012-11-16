@@ -1,44 +1,34 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 15 Nov 2012 18:04:34 -0800
-Subject: [PATCH v2 00/10] serial: sh-sci fixes - console PM, SCIFB, SMP
- lockup, etc.
-In-Reply-To: <50A59B9B.2010501@renesas.com>
-References: <509A0658.1010503@renesas.com> <509A0B4E.1030801@renesas.com>
- <20121116010107.GA6068@kroah.com> <50A59B9B.2010501@renesas.com>
-Message-ID: <20121116020434.GA15188@kroah.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Fri, 16 Nov 2012 10:43:15 +0800
+Subject: [Patch v6 1/4] ARM: at91: atmel-ssc: add pinctrl support
+In-Reply-To: <20121116010310.GG4387@opensource.wolfsonmicro.com>
+References: <1352887751-21848-1-git-send-email-voice.shen@atmel.com>
+ <1352887751-21848-2-git-send-email-voice.shen@atmel.com>
+ <20121116010310.GG4387@opensource.wolfsonmicro.com>
+Message-ID: <50A5A843.2060902@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2012 at 10:49:15AM +0900, Shinya Kuribayashi wrote:
-> Hi Greg,
-> 
-> On 11/16/2012 10:01 AM, Greg KH wrote:> On Wed, Nov 07, 2012 at 04:18:38PM +0900, Shinya Kuribayashi wrote:
-> >> On 11/7/2012 3:57 PM, Shinya Kuribayashi wrote:
-> >>> Hi Paul and serial forks,
-> >> [...]
-> >>> Takashi YOSHII (4):
-> >>>       serial: sh-sci: fix condition test to set SCBRR
-> >>>       serial: sh-sci: support lower baud rate
-> >>>       serial: sh-sci: mask SCTFDR/RFDR according to fifosize
-> >>>       serial: sh-sci: fix common SCIFB regmap definition
-> >>>
-> >>> Teppei Kamijou (1):
-> >>>       serial: sh-sci: console runtime PM support (revisit)
-> >>>
-> >>>  drivers/tty/serial/sh-sci.c | 140 ++++++++++++++++++--------------------------
-> >>>  1 file changed, 56 insertions(+), 84 deletions(-)
-> >>
-> >> Oops, I forgot to append proper From: author lines in five commits
-> >> (patch 04/10 to 09/10).  Didn't mean to supersede your authoship.
-> >>
-> >> I'd respin the patchset later, waiting for some feedback.
-> > 
-> > Can you please resend this with this fixed up if you want to get this
-> > into 3.8?
-> 
-> Thanks for your kind reminder.  Here's v2, providing From: authorship
-> lines in five patches (04 to 08).  No logical change in the patches.
+Hi J,
 
-All now applied, thanks.
+On 11/16/2012 9:03, Mark Brown wrote:
+> On Wed, Nov 14, 2012 at 06:09:08PM +0800, Bo Shen wrote:
+>> Add pinctrl support for atmel ssc peripheral
+>>
+>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>
+> This generates lots of conflicts in the pinctrl stuff in the DTS - looks
+> like it was generated against -next.  Can you please regenerate against
+> my atmel branch with just the changes to add the pinmux information on
+> the SSC nodes?  Or possbily this can just be applied direct to the
+> pinctrl branch (we'll get an add/add conflict with the SSC nodes though
+> that should be simple to resolve, a cross merge might be helpful).
 
-greg k-h
+As Mark suggested, would this patch be split into 2 patches? One is for 
+atmel ssc add pinmux information go into ASoC tree, and the other add 
+ssc node into dts file go into pinctrl tree. Would this be ok?
+
+Thanks.
+
+Best Regards,
+Bo Shen
