@@ -1,61 +1,46 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 16 Nov 2012 16:39:43 +0100
-Subject: [GIT PULL] arm: orion5x: begin the DT conversion
-Message-ID: <1353080388-4091-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri, 16 Nov 2012 16:39:47 +0100
+Subject: [PATCH 4/4] arm: orion5x: add DT related options in defconfig
+In-Reply-To: <1353080388-4091-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1353080388-4091-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353080388-4091-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Andrew,
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Tested by: Maxime Hadjinlian <mhadjinlian@lacie.com>
+---
+ arch/arm/configs/orion5x_defconfig |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Here is a set of four patches that start the conversion of
-mach-orion5x to the Device Tree. It for now converts only one board,
-which has been tested by Maxime Hadjinlian from LaCie (thanks a lot!),
-but we intend to do more in the future (Maxime will get another
-Orion5x platform, and I have received another one this week). I have
-also started working on a pinctrl driver for the Orion5x platforms.
-
-I've put the four patches in the same branch: 2/4 is SoC related and
-3/4 board related, but 3/4 cannot live without 2/4. If you'd like to
-have this series split in several pull requests, do not hesitate to
-let me know how the split should be done.
-
-Thanks,
-
-Thomas
-
-The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
-
-  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
-
-are available in the git repository at:
-
-  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-orion-dt-3.8
-
-for you to fetch changes up to 559b1d157fddc02a68ea045df2a0c40cb713e292:
-
-  arm: orion5x: add DT related options in defconfig (2012-11-16 16:22:07 +0100)
-
-----------------------------------------------------------------
-Marvell Orion DT conversion for 3.8
-
-----------------------------------------------------------------
-Thomas Petazzoni (4):
-      arm: orion5x: mechanical defconfig update
-      arm: orion5x: basic Device Tree support
-      arm: orion5x: convert 'LaCie Ethernet Disk mini v2' to Device Tree
-      arm: orion5x: add DT related options in defconfig
-
- arch/arm/boot/dts/Makefile                         |    1 +
- .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    |   55 +++++++++++
- arch/arm/boot/dts/orion5x.dtsi                     |   98 ++++++++++++++++++++
- arch/arm/configs/orion5x_defconfig                 |   36 +++----
- arch/arm/mach-orion5x/Kconfig                      |   14 ++-
- arch/arm/mach-orion5x/Makefile                     |    4 +-
- arch/arm/mach-orion5x/board-dt.c                   |   79 ++++++++++++++++
- arch/arm/mach-orion5x/common.c                     |    4 +-
- arch/arm/mach-orion5x/common.h                     |    9 ++
- arch/arm/mach-orion5x/edmini_v2-setup.c            |   88 +-----------------
- 10 files changed, 270 insertions(+), 118 deletions(-)
- create mode 100644 arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
- create mode 100644 arch/arm/boot/dts/orion5x.dtsi
- create mode 100644 arch/arm/mach-orion5x/board-dt.c
+diff --git a/arch/arm/configs/orion5x_defconfig b/arch/arm/configs/orion5x_defconfig
+index d0875ce..952430d 100644
+--- a/arch/arm/configs/orion5x_defconfig
++++ b/arch/arm/configs/orion5x_defconfig
+@@ -27,7 +27,7 @@ CONFIG_MACH_TS409=y
+ CONFIG_MACH_WRT350N_V2=y
+ CONFIG_MACH_TS78XX=y
+ CONFIG_MACH_MV2120=y
+-CONFIG_MACH_EDMINI_V2=y
++CONFIG_MACH_EDMINI_V2_DT=y
+ CONFIG_MACH_D2NET=y
+ CONFIG_MACH_BIGDISK=y
+ CONFIG_MACH_NET2BIG=y
+@@ -40,6 +40,7 @@ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_FPE_NWFPE=y
+ CONFIG_VFP=y
+ CONFIG_NET=y
+@@ -94,6 +95,7 @@ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ # CONFIG_SERIAL_8250_PCI is not set
+ CONFIG_SERIAL_8250_RUNTIME_UARTS=2
++CONFIG_SERIAL_OF_PLATFORM=y
+ CONFIG_HW_RANDOM_TIMERIOMEM=m
+ CONFIG_I2C=y
+ # CONFIG_I2C_COMPAT is not set
+-- 
+1.7.9.5
