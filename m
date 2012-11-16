@@ -1,91 +1,39 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 16 Nov 2012 15:56:15 +0100
-Subject: [PATCH v9 RESEND 1/3] watchdog: at91sam9_wdt: add device tree
- support
-In-Reply-To: <1352709447-8306-2-git-send-email-fabio.porcedda@gmail.com>
-References: <1352709447-8306-1-git-send-email-fabio.porcedda@gmail.com>
- <1352709447-8306-2-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <50A6540F.9070308@atmel.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 16 Nov 2012 09:03:55 -0600
+Subject: [PATCH] ARM: OMAP2+: Fix compiler warning for 32k timer
+In-Reply-To: <20121116075258.GC15669@arwen.pp.htv.fi>
+References: <1353008644-24745-1-git-send-email-jon-hunter@ti.com>
+ <20121115204526.GC12466@arwen.pp.htv.fi> <50A56033.6080908@ti.com>
+ <20121116075258.GC15669@arwen.pp.htv.fi>
+Message-ID: <50A655DB.30504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2012 09:37 AM, Fabio Porcedda :
-> Tested on an at91sam9260 board (evk-pro3)
+
+On 11/16/2012 01:52 AM, Felipe Balbi wrote:
+> Hi,
 > 
-> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-(and to the whole patch series actually)
-
-Wim, can you tell me if it is possible to merge this part through
-arm-soc git tree with the rest of material for AT91? If yes, I would
-need your Acked-by...
-
-Thanks, best regards,
-
-> ---
->  Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 15 +++++++++++++++
->  drivers/watchdog/at91sam9_wdt.c                          | 11 +++++++++++
->  2 files changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
+> On Thu, Nov 15, 2012 at 03:35:47PM -0600, Jon Hunter wrote:
+>>
+>> On 11/15/2012 02:45 PM, Felipe Balbi wrote:
+>>> Hi,
+>>>
+>>> On Thu, Nov 15, 2012 at 01:44:04PM -0600, Jon Hunter wrote:
+>>>> +static struct of_device_id omap_counter_match[] __initdata = {
+>>>
+>>> not directly related to $SUBJECT, but shouldn't this be static const
+>>> __initconst ?
+>>
+>> Yes you are right. Looks like there are several other of_device_id
+>> structs in arch/arm/mach-omap2 that could be updated to const too.
 > 
-> diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> new file mode 100644
-> index 0000000..2957ebb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-> @@ -0,0 +1,15 @@
-> +* Atmel Watchdog Timers
-> +
-> +** at91sam9-wdt
-> +
-> +Required properties:
-> +- compatible: must be "atmel,at91sam9260-wdt".
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +
-> +Example:
-> +
-> +	watchdog at fffffd40 {
-> +		compatible = "atmel,at91sam9260-wdt";
-> +		reg = <0xfffffd40 0x10>;
-> +	};
-> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-> index 05e1be8..dc42e44 100644
-> --- a/drivers/watchdog/at91sam9_wdt.c
-> +++ b/drivers/watchdog/at91sam9_wdt.c
-> @@ -32,6 +32,7 @@
->  #include <linux/timer.h>
->  #include <linux/bitops.h>
->  #include <linux/uaccess.h>
-> +#include <linux/of.h>
->  
->  #include "at91sam9_wdt.h"
->  
-> @@ -302,11 +303,21 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
->  	return res;
->  }
->  
-> +#if defined(CONFIG_OF)
-> +static const struct of_device_id at91_wdt_dt_ids[] __initconst = {
-> +	{ .compatible = "atmel,at91sam9260-wdt" },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, at91_wdt_dt_ids);
-> +#endif
-> +
->  static struct platform_driver at91wdt_driver = {
->  	.remove		= __exit_p(at91wdt_remove),
->  	.driver		= {
->  		.name	= "at91_wdt",
->  		.owner	= THIS_MODULE,
-> +		.of_match_table = of_match_ptr(at91_wdt_dt_ids),
->  	},
->  };
->  
+> here's a quick sed substitution for you:
 > 
+> $ sed -i 's/static \(struct of_device_id\)\s\(\w\+\[\]\)\s\(__initdata\|\)/static const \1 \2 __initconst/' arch/arm/*omap*/*.c
+> 
+> It worked fine here.
 
+Thanks. Will fix this up in a subsequent patch.
 
--- 
-Nicolas Ferre
+Cheers
+Jon
