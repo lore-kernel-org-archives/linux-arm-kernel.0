@@ -1,202 +1,329 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 16 Nov 2012 22:20:25 +0100
-Subject: [PATCH 4/7] ARM: sunxi: Add basic support for Allwinner A1x SoCs
+Date: Fri, 16 Nov 2012 22:20:24 +0100
+Subject: [PATCH 3/7] irqchip: sunxi: Add irq controller driver
 In-Reply-To: <1353100828-9218-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1353100828-9218-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1353100828-9218-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1353100828-9218-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Stefan Roese <sr@denx.de>
+CC: Thomas Gleixner <tglx@linutronix.de>
 ---
- Documentation/arm/sunxi/README    |   19 ++++++++++++
- arch/arm/Kconfig                  |    2 ++
- arch/arm/Makefile                 |    1 +
- arch/arm/mach-sunxi/Kconfig       |    9 ++++++
- arch/arm/mach-sunxi/Makefile      |    1 +
- arch/arm/mach-sunxi/Makefile.boot |    1 +
- arch/arm/mach-sunxi/sunxi.c       |   60 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-sunxi/sunxi.h       |   20 +++++++++++++
- 8 files changed, 113 insertions(+)
- create mode 100644 Documentation/arm/sunxi/README
- create mode 100644 arch/arm/mach-sunxi/Kconfig
- create mode 100644 arch/arm/mach-sunxi/Makefile
- create mode 100644 arch/arm/mach-sunxi/Makefile.boot
- create mode 100644 arch/arm/mach-sunxi/sunxi.c
- create mode 100644 arch/arm/mach-sunxi/sunxi.h
+ .../interrupt-controller/allwinner,sunxi-ic.txt    |  104 ++++++++++++++
+ drivers/irqchip/Makefile                           |    1 +
+ drivers/irqchip/irq-sunxi.c                        |  150 ++++++++++++++++++++
+ include/linux/irqchip/sunxi.h                      |   27 ++++
+ 4 files changed, 282 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-ic.txt
+ create mode 100644 drivers/irqchip/irq-sunxi.c
+ create mode 100644 include/linux/irqchip/sunxi.h
 
-diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-ic.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-ic.txt
 new file mode 100644
-index 0000000..87a1e8f
+index 0000000..7f9fb85
 --- /dev/null
-+++ b/Documentation/arm/sunxi/README
-@@ -0,0 +1,19 @@
-+ARM Allwinner SoCs
-+==================
++++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-ic.txt
+@@ -0,0 +1,104 @@
++Allwinner Sunxi Interrupt Controller
 +
-+This document lists all the ARM Allwinner SoCs that are currently
-+supported in mainline by the Linux kernel. This document will also
-+provide links to documentation and or datasheet for these SoCs.
++Required properties:
 +
-+SunXi family
-+------------
++- compatible : should be "allwinner,sunxi-ic"
++- reg : Specifies base physical address and size of the registers.
++- interrupt-controller : Identifies the node as an interrupt controller
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. The value shall be 1.
 +
-+  Flavors:
-+        Allwinner A10 (sun4i)
-+                Datasheet       : http://dl.linux-sunxi.org/A10/A10%20Datasheet%20-%20v1.21%20%282012-04-06%29.pdf
++The interrupt sources are as follows:
 +
-+        Allwinner A13 (sun5i)
-+                Datasheet       : http://dl.linux-sunxi.org/A13/A13%20Datasheet%20-%20v1.12%20%282012-03-29%29.pdf
++0: ENMI
++1: UART0
++2: UART1
++3: UART2
++4: UART3
++5: IR0
++6: IR1
++7: I2C0
++8: I2C1
++9: I2C2
++10: SPI0
++11: SPI1
++12: SPI2
++13: SPDIF
++14: AC97
++15: TS
++16: I2S
++17: UART4
++18: UART5
++19: UART6
++20: UART7
++21: KEYPAD
++22: TIMER0
++23: TIMER1
++24: TIMER2
++25: TIMER3
++26: CAN
++27: DMA
++28: PIO
++29: TOUCH_PANEL
++30: AUDIO_CODEC
++31: LRADC
++32: SDMC0
++33: SDMC1
++34: SDMC2
++35: SDMC3
++36: MEMSTICK
++37: NAND
++38: USB0
++39: USB1
++40: USB2
++41: SCR
++42: CSI0
++43: CSI1
++44: LCDCTRL0
++45: LCDCTRL1
++46: MP
++47: DEFEBE0
++48: DEFEBE1
++49: PMU
++50: SPI3
++51: TZASC
++52: PATA
++53: VE
++54: SS
++55: EMAC
++56: SATA
++57: GPS
++58: HDMI
++59: TVE
++60: ACE
++61: TVD
++62: PS2_0
++63: PS2_1
++64: USB3
++65: USB4
++66: PLE_PFM
++67: TIMER4
++68: TIMER5
++69: GPU_GP
++70: GPU_GPMMU
++71: GPU_PP0
++72: GPU_PPMMU0
++73: GPU_PMU
++74: GPU_RSV0
++75: GPU_RSV1
++76: GPU_RSV2
++77: GPU_RSV3
++78: GPU_RSV4
++79: GPU_RSV5
++80: GPU_RSV6
++82: SYNC_TIMER0
++83: SYNC_TIMER1
 +
-+  Core: Cortex A8
-+  Linux kernel mach directory: arch/arm/mach-sunxi
-\ No newline at end of file
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ade7e92..1abb573 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1113,6 +1113,8 @@ source "arch/arm/mach-exynos/Kconfig"
- 
- source "arch/arm/mach-shmobile/Kconfig"
- 
-+source "arch/arm/mach-sunxi/Kconfig"
++Example:
 +
- source "arch/arm/mach-prima2/Kconfig"
- 
- source "arch/arm/mach-tegra/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 5f914fc..363320a 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -193,6 +193,7 @@ machine-$(CONFIG_ARCH_SPEAR13XX)	+= spear13xx
- machine-$(CONFIG_ARCH_SPEAR3XX)		+= spear3xx
- machine-$(CONFIG_MACH_SPEAR600)		+= spear6xx
- machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
-+machine-$(CONFIG_ARCH_SUNXI)		+= sunxi
- 
- # Platform directory name.  This list is sorted alphanumerically
- # by CONFIG_* macro name.
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
++intc: interrupt-controller {
++	compatible = "allwinner,sunxi-ic";
++	reg = <0x01c20400 0x400>;
++	interrupt-controller;
++	#interrupt-cells = <2>;
++};
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 054321d..2444d07 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_ARCH_BCM2835) += irq-bcm2835.o
++obj-$(CONFIG_ARCH_SUNXI)   += irq-sunxi.o
+diff --git a/drivers/irqchip/irq-sunxi.c b/drivers/irqchip/irq-sunxi.c
 new file mode 100644
-index 0000000..3fdd008
+index 0000000..eef41a4
 --- /dev/null
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -0,0 +1,9 @@
-+config ARCH_SUNXI
-+	bool "Allwinner A1X SOCs" if ARCH_MULTI_V7
-+	select CLKSRC_MMIO
-+	select COMMON_CLK
-+	select GENERIC_CLOCKEVENTS
-+	select GENERIC_IRQ_CHIP
-+	select PINCTRL
-+	select SPARSE_IRQ
-+	select SUNXI_TIMER
-diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
-new file mode 100644
-index 0000000..93bebfc
---- /dev/null
-+++ b/arch/arm/mach-sunxi/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
-diff --git a/arch/arm/mach-sunxi/Makefile.boot b/arch/arm/mach-sunxi/Makefile.boot
-new file mode 100644
-index 0000000..46d4cf0
---- /dev/null
-+++ b/arch/arm/mach-sunxi/Makefile.boot
-@@ -0,0 +1 @@
-+zreladdr-$(CONFIG_ARCH_SUNXI)	+= 0x40008000
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-new file mode 100644
-index 0000000..8f42df8
---- /dev/null
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -0,0 +1,60 @@
++++ b/drivers/irqchip/irq-sunxi.c
+@@ -0,0 +1,150 @@
 +/*
-+ * Device Tree support for Allwinner A1X SoCs
++ * Allwinner A1X SoCs IRQ chip driver.
 + *
 + * Copyright (C) 2012 Maxime Ripard
 + *
 + * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * Based on code from
++ * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
++ * Benn Huang <benn@allwinnertech.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2.  This program is licensed "as is" without any
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
 +#include <linux/io.h>
-+#include <linux/sunxi_timer.h>
++#include <linux/irq.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
 +
 +#include <linux/irqchip/sunxi.h>
 +
-+#include <asm/hardware/vic.h>
++#define SUNXI_IRQ_VECTOR_REG		0x00
++#define SUNXI_IRQ_PROTECTION_REG	0x08
++#define SUNXI_IRQ_NMI_CTRL_REG		0x0c
++#define SUNXI_IRQ_PENDING_REG(x)	(0x10 + 0x4 * x)
++#define SUNXI_IRQ_FIQ_PENDING_REG(x)	(0x20 + 0x4 * x)
++#define SUNXI_IRQ_ENABLE_REG(x)		(0x40 + 0x4 * x)
++#define SUNXI_IRQ_MASK_REG(x)		(0x50 + 0x4 * x)
 +
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
++static void __iomem *sunxi_irq_base;
++static struct irq_domain *sunxi_irq_domain;
 +
-+#include "sunxi.h"
-+
-+static struct map_desc sunxi_io_desc[] __initdata = {
-+	{
-+		.virtual	= (unsigned long) SUNXI_REGS_VIRT_BASE,
-+		.pfn		= __phys_to_pfn(SUNXI_REGS_PHYS_BASE),
-+		.length		= SUNXI_REGS_SIZE,
-+		.type		= MT_DEVICE,
-+	},
-+};
-+
-+void __init sunxi_map_io(void)
++void sunxi_irq_ack(struct irq_data *irqd)
 +{
-+	iotable_init(sunxi_io_desc, ARRAY_SIZE(sunxi_io_desc));
++	unsigned int irq = irqd_to_hwirq(irqd);
++	unsigned int irq_off = irq % 32;
++	int reg = irq / 32;
++	u32 val;
++
++	val = readl(sunxi_irq_base + SUNXI_IRQ_PENDING_REG(reg));
++	writel(val | (1 << irq_off),
++	       sunxi_irq_base + SUNXI_IRQ_PENDING_REG(reg));
 +}
 +
-+static void __init sunxi_dt_init(void)
++static void sunxi_irq_mask(struct irq_data *irqd)
 +{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	unsigned int irq = irqd_to_hwirq(irqd);
++	unsigned int irq_off = irq % 32;
++	int reg = irq / 32;
++	u32 val;
++
++	val = readl(sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(reg));
++	writel(val & ~(1 << irq_off),
++	       sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(reg));
 +}
 +
-+static const char * const sunxi_board_dt_compat[] = {
-+	"allwinner,sun5i",
-+	NULL,
++static void sunxi_irq_unmask(struct irq_data *irqd)
++{
++	unsigned int irq = irqd_to_hwirq(irqd);
++	unsigned int irq_off = irq % 32;
++	int reg = irq / 32;
++	u32 val;
++
++	val = readl(sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(reg));
++	writel(val | (1 << irq_off),
++	       sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(reg));
++}
++
++static struct irq_chip sunxi_irq_chip = {
++	.name		= "sunxi_irq",
++	.irq_ack	= sunxi_irq_ack,
++	.irq_mask	= sunxi_irq_mask,
++	.irq_unmask	= sunxi_irq_unmask,
 +};
 +
-+DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
-+	.init_machine	= sunxi_dt_init,
-+	.map_io		= sunxi_map_io,
-+	.init_irq	= sunxi_init_irq,
-+	.handle_irq	= sunxi_handle_irq,
-+	.timer		= &sunxi_timer,
-+	.dt_compat	= sunxi_board_dt_compat,
-+MACHINE_END
-diff --git a/arch/arm/mach-sunxi/sunxi.h b/arch/arm/mach-sunxi/sunxi.h
++static int sunxi_irq_map(struct irq_domain *d, unsigned int virq,
++			 irq_hw_number_t hw)
++{
++	irq_set_chip_and_handler(virq, &sunxi_irq_chip,
++				 handle_level_irq);
++	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
++
++	return 0;
++}
++
++static struct irq_domain_ops sunxi_irq_ops = {
++	.map = sunxi_irq_map,
++	.xlate = irq_domain_xlate_onecell,
++};
++
++static int __init sunxi_of_init(struct device_node *node,
++				struct device_node *parent)
++{
++	sunxi_irq_base = of_iomap(node, 0);
++	if (!sunxi_irq_base)
++		panic("%s: unable to map IC registers\n",
++			node->full_name);
++
++	/* Disable all interrupts */
++	writel(0, sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(0));
++	writel(0, sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(1));
++	writel(0, sunxi_irq_base + SUNXI_IRQ_ENABLE_REG(2));
++
++	/* Mask all the interrupts */
++	writel(0, sunxi_irq_base + SUNXI_IRQ_MASK_REG(0));
++	writel(0, sunxi_irq_base + SUNXI_IRQ_MASK_REG(1));
++	writel(0, sunxi_irq_base + SUNXI_IRQ_MASK_REG(2));
++
++	/* Clear all the pending interrupts */
++	writel(0xffffffff, sunxi_irq_base + SUNXI_IRQ_PENDING_REG(0));
++	writel(0xffffffff, sunxi_irq_base + SUNXI_IRQ_PENDING_REG(1));
++	writel(0xffffffff, sunxi_irq_base + SUNXI_IRQ_PENDING_REG(2));
++
++	/* Enable protection mode */
++	writel(0x01, sunxi_irq_base + SUNXI_IRQ_PROTECTION_REG);
++
++	/* Configure the external interrupt source type */
++	writel(0x00, sunxi_irq_base + SUNXI_IRQ_NMI_CTRL_REG);
++
++	sunxi_irq_domain = irq_domain_add_linear(node, 3 * 32,
++						 &sunxi_irq_ops, NULL);
++	if (!sunxi_irq_domain)
++		panic("%s: unable to create IRQ domain\n", node->full_name);
++
++	return 0;
++}
++
++static struct of_device_id sunxi_irq_dt_ids[] __initconst = {
++	{ .compatible = "allwinner,sunxi-ic", .data = sunxi_of_init }
++};
++
++void __init sunxi_init_irq(void)
++{
++	of_irq_init(sunxi_irq_dt_ids);
++}
++
++asmlinkage void __exception_irq_entry sunxi_handle_irq(struct pt_regs *regs)
++{
++	u32 irq, hwirq;
++
++	hwirq = readl(sunxi_irq_base + SUNXI_IRQ_VECTOR_REG) >> 2;
++	while (hwirq != 0) {
++		irq = irq_find_mapping(sunxi_irq_domain, hwirq);
++		handle_IRQ(irq, regs);
++		hwirq = readl(sunxi_irq_base + SUNXI_IRQ_VECTOR_REG) >> 2;
++	}
++}
+diff --git a/include/linux/irqchip/sunxi.h b/include/linux/irqchip/sunxi.h
 new file mode 100644
-index 0000000..33b5871
+index 0000000..1fe2c22
 --- /dev/null
-+++ b/arch/arm/mach-sunxi/sunxi.h
-@@ -0,0 +1,20 @@
++++ b/include/linux/irqchip/sunxi.h
+@@ -0,0 +1,27 @@
 +/*
-+ * Generic definitions for Allwinner SunXi SoCs
-+ *
-+ * Copyright (C) 2012 Maxime Ripard
++ * Copyright 2012 Maxime Ripard
 + *
 + * Maxime Ripard <maxime.ripard@free-electrons.com>
 + *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
-+#ifndef __MACH_SUNXI_H
-+#define __MACH_SUNXI_H
++#ifndef __LINUX_IRQCHIP_SUNXI_H
++#define __LINUX_IRQCHIP_SUNXI_H
 +
-+#define SUNXI_REGS_PHYS_BASE	0x01c00000
-+#define SUNXI_REGS_VIRT_BASE	IOMEM(0xf1c00000)
-+#define SUNXI_REGS_SIZE		(SZ_2M + SZ_1M)
++#include <asm/exception.h>
 +
-+#endif /* __MACH_SUNXI_H */
++extern void sunxi_init_irq(void);
++
++extern asmlinkage void __exception_irq_entry sunxi_handle_irq(
++	struct pt_regs *regs);
++
++#endif
 -- 
 1.7.9.5
