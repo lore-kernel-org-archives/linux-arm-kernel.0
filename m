@@ -1,42 +1,56 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 16 Nov 2012 15:09:43 +0100
-Subject: [PATCH 2/2] ARM: dts: cfa10049: Add the i2c muxer buses to the
- CFA-10049
-In-Reply-To: <20121116142530.GH2941@S2100-06.ap.freescale.net>
-References: <1351182234-22971-1-git-send-email-maxime.ripard@free-electrons.com>
- <1351182234-22971-3-git-send-email-maxime.ripard@free-electrons.com>
- <20121116083218.GE8464@pengutronix.de>
- <20121116142530.GH2941@S2100-06.ap.freescale.net>
-Message-ID: <20121116140943.GE7313@pengutronix.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 16 Nov 2012 09:19:47 -0500
+Subject: [PATCH v2 0/3] GPIO driver to turn power off
+In-Reply-To: <1352821485-10032-1-git-send-email-andrew@lunn.ch>
+References: <1352821485-10032-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20121116141947.GN22106@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2012 at 10:25:32PM +0800, Shawn Guo wrote:
-> On Fri, Nov 16, 2012 at 09:32:18AM +0100, Wolfram Sang wrote:
-> > On Thu, Oct 25, 2012 at 06:23:54PM +0200, Maxime Ripard wrote:
-> > > This will allow to add the 3 Nuvoton NAU7802 ADCs and the NXP PCA9555
-> > > GPIO expander eventually.
-> > > 
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > 
-> > Shawn, I pushed the needed code to my for-next now. So you could apply
-> > this patch for 3.8 or give an ack in case you want me to pick it via
-> > i2c.
-> > 
-> I have already sent mxs 3.8 stuff to arm-soc, so please have it go via
-> i2c tree.  Thanks.
+On Tue, Nov 13, 2012 at 04:44:42PM +0100, Andrew Lunn wrote:
+> A few of the Kirkwood systems use a GPIO line to turn the power off on
+> shutdown. They request the GPIO line in the board setup code,
+> optionally setting it as an output and driving it inactive. They then
+> register a function for pm_power_off. At the end of the shutdown, this
+> function is called. The GPIO line is configured as an output, if not
+> already so, and then driven active. In order to cover the use case of
+> edges rather then levels, triggering power off, the GPIO line is then
+> toggled active and later inactive. This should allow the driver to be
+> used by PXA which also has boards using the same scheme.
 > 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> The driver code was initially developed by Jamie Lentin and extended
+> to cover the PXA case by Andrew Lunn.
+> 
+> v1 -> v2: Moved to drivers/power/reset
+> 
+> Andrew Lunn (2):
+>   ARM: Kirkwood: Convert DNSKW to use gpio-poweroff.
+>   ARM: Kirkwood: Convert IB62x0 to use gpio-poweroff.
+> 
+> Jamie Lentin (1):
+>   power: Add simple poweroff-gpio driver
+> 
+>  .../devicetree/bindings/gpio/gpio-poweroff.txt     |   22 ++++
+>  arch/arm/boot/dts/kirkwood-dnskw.dtsi              |    5 +
+>  arch/arm/boot/dts/kirkwood-ib62x0.dts              |    6 +
+>  arch/arm/mach-kirkwood/Kconfig                     |    4 +
+>  arch/arm/mach-kirkwood/board-dnskw.c               |   12 --
+>  arch/arm/mach-kirkwood/board-ib62x0.c              |   13 --
+>  drivers/power/Kconfig                              |    3 +
+>  drivers/power/Makefile                             |    1 +
+>  drivers/power/reset/Kconfig                        |   15 +++
+>  drivers/power/reset/Makefile                       |    1 +
+>  drivers/power/reset/gpio-poweroff.c                |  129 ++++++++++++++++++++
+>  11 files changed, 186 insertions(+), 25 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
+>  create mode 100644 drivers/power/reset/Kconfig
+>  create mode 100644 drivers/power/reset/Makefile
+>  create mode 100644 drivers/power/reset/gpio-poweroff.c
 
-OK. Applied to my for-next, thanks!
+Anton,
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/a635c146/attachment.sig>
+Is it ok if we take this through the arm-soc tree with your Ack?
+
+thx,
+
+Jason.
