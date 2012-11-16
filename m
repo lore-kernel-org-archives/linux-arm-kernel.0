@@ -1,85 +1,29 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 16 Nov 2012 11:32:14 +0100
-Subject: [PATCH] ARM: at91/usbh: fix overcurrent gpio setup
-In-Reply-To: <1352891897-18708-1-git-send-email-jhovold@gmail.com>
-References: <1352891897-18708-1-git-send-email-jhovold@gmail.com>
-Message-ID: <50A6162E.1000502@atmel.com>
+Date: Fri, 16 Nov 2012 11:33:51 +0100
+Subject: [PATCH 1/5] ARM: AT91SAM9G45: fix crypto peripherals irq issue
+ due to sparse irq support.
+In-Reply-To: <20121107152729.GE4576@game.jcrosoft.org>
+References: <1352219463-30360-1-git-send-email-nicolas@eukrea.com>
+ <20121107152729.GE4576@game.jcrosoft.org>
+Message-ID: <50A6168F.90105@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2012 12:18 PM, Johan Hovold :
-> Use gpio_is_valid also for overcurrent pins (which are currently
-> negative in many board files).
+On 11/07/2012 04:27 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> On 17:31 Tue 06 Nov     , Nicolas Royer wrote:
+>> Spare irq support introduced by commit "8fe82a5 ARM: at91: sparse irq support"
+>> involves to add the NR_IRQS_LEGACY offset to irq number.
+>>
+>> Signed-off-by: Nicolas Royer <nicolas@eukrea.com>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Acked-by: Eric B?nard <eric@eukrea.com>
+>> Tested-by: Eric B?nard <eric@eukrea.com>
+>> Cc: stable at vger.kernel.org # 3.6
 > 
-> Signed-off-by: Johan Hovold <jhovold@gmail.com>
+> ok will see if we can have it for 3.7
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Queued in our at91-fixes pull request for 3.7-final.
 
-Queued in at91-fixes for 3.7-final.
-
-Thanks a lot. Best regards,
-
-> ---
->  arch/arm/mach-at91/at91rm9200_devices.c  | 2 +-
->  arch/arm/mach-at91/at91sam9260_devices.c | 2 +-
->  arch/arm/mach-at91/at91sam9261_devices.c | 2 +-
->  arch/arm/mach-at91/at91sam9263_devices.c | 2 +-
->  4 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-> index 1e122bc..3cee0e6 100644
-> --- a/arch/arm/mach-at91/at91rm9200_devices.c
-> +++ b/arch/arm/mach-at91/at91rm9200_devices.c
-> @@ -68,7 +68,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
->  
->  	/* Enable overcurrent notification */
->  	for (i = 0; i < data->ports; i++) {
-> -		if (data->overcurrent_pin[i])
-> +		if (gpio_is_valid(data->overcurrent_pin[i]))
->  			at91_set_gpio_input(data->overcurrent_pin[i], 1);
->  	}
->  
-> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-> index aa1e587..414bd85 100644
-> --- a/arch/arm/mach-at91/at91sam9260_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
-> @@ -72,7 +72,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
->  
->  	/* Enable overcurrent notification */
->  	for (i = 0; i < data->ports; i++) {
-> -		if (data->overcurrent_pin[i])
-> +		if (gpio_is_valid(data->overcurrent_pin[i]))
->  			at91_set_gpio_input(data->overcurrent_pin[i], 1);
->  	}
->  
-> diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-> index b948769..cd604aa 100644
-> --- a/arch/arm/mach-at91/at91sam9261_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9261_devices.c
-> @@ -72,7 +72,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
->  
->  	/* Enable overcurrent notification */
->  	for (i = 0; i < data->ports; i++) {
-> -		if (data->overcurrent_pin[i])
-> +		if (gpio_is_valid(data->overcurrent_pin[i]))
->  			at91_set_gpio_input(data->overcurrent_pin[i], 1);
->  	}
->  
-> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-> index cb85da2..9c61e59 100644
-> --- a/arch/arm/mach-at91/at91sam9263_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
-> @@ -78,7 +78,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
->  
->  	/* Enable overcurrent notification */
->  	for (i = 0; i < data->ports; i++) {
-> -		if (data->overcurrent_pin[i])
-> +		if (gpio_is_valid(data->overcurrent_pin[i]))
->  			at91_set_gpio_input(data->overcurrent_pin[i], 1);
->  	}
->  
-> 
-
-
+Thanks a lot, best regards,
 -- 
 Nicolas Ferre
