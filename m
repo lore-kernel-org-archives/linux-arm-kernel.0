@@ -1,61 +1,154 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 16 Nov 2012 10:44:59 +0100
-Subject: [PATCH V2 2/3] arm: plat-orion: Add coherency attribute when setup
- mbus target
-In-Reply-To: <1353059100-24022-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1353059100-24022-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1353059100-24022-3-git-send-email-gregory.clement@free-electrons.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 16 Nov 2012 10:53:52 +0100
+Subject: [RFC 3/3] ARM/AVR32: get rid of serial_at91.h
+In-Reply-To: <E1TEzfE-000780-1t@rmk-PC.arm.linux.org.uk>
+References: <20120921093530.GB31374@n2100.arm.linux.org.uk>
+ <E1TEzfE-000780-1t@rmk-PC.arm.linux.org.uk>
+Message-ID: <20121116095352.GF4398@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent SoC such as Armada 370/XP came with the possibility to deal
-with the I/O coherency by hardware. In this case the transaction
-attribute of the window must be flagged as "Shared transaction". Once
-this flag is set, then the transactions will be forced to be sent
-through the coherency block, in other case transaction is driven
-directly to DRAM.
+On 10:36 Fri 21 Sep     , Russell King wrote:
+> The definitions provided by serial_at91.h are only used by the
+> atmel_serial driver, and the function that uses it is never called
+> from anywhere in the kernel.  Therefore, these definitions are unused
+> and/or obsolete, and can be removed.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+personnaly I'm ok with it too
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Reviewed-by: Yehuda Yitschak <yehuday@marvell.com>
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/plat-orion/addr-map.c              |    4 ++++
- arch/arm/plat-orion/include/plat/addr-map.h |    1 +
- 2 files changed, 5 insertions(+)
+but Andrew seems use it so let him reply
 
-diff --git a/arch/arm/plat-orion/addr-map.c b/arch/arm/plat-orion/addr-map.c
-index a7b8060..febe386 100644
---- a/arch/arm/plat-orion/addr-map.c
-+++ b/arch/arm/plat-orion/addr-map.c
-@@ -42,6 +42,8 @@ EXPORT_SYMBOL_GPL(mv_mbus_dram_info);
- #define WIN_REMAP_LO_OFF	0x0008
- #define WIN_REMAP_HI_OFF	0x000c
- 
-+#define ATTR_HW_COHERENCY	(0x1 << 4)
-+
- /*
-  * Default implementation
-  */
-@@ -163,6 +165,8 @@ void __init orion_setup_cpu_mbus_target(const struct orion_addr_map_cfg *cfg,
- 			w = &orion_mbus_dram_info.cs[cs++];
- 			w->cs_index = i;
- 			w->mbus_attr = 0xf & ~(1 << i);
-+			if (cfg->hw_io_coherency)
-+				w->mbus_attr |= ATTR_HW_COHERENCY;
- 			w->base = base & 0xffff0000;
- 			w->size = (size | 0x0000ffff) + 1;
- 		}
-diff --git a/arch/arm/plat-orion/include/plat/addr-map.h b/arch/arm/plat-orion/include/plat/addr-map.h
-index ec63e4a..b76c065 100644
---- a/arch/arm/plat-orion/include/plat/addr-map.h
-+++ b/arch/arm/plat-orion/include/plat/addr-map.h
-@@ -17,6 +17,7 @@ struct orion_addr_map_cfg {
- 	const int num_wins;	/* Total number of windows */
- 	const int remappable_wins;
- 	void __iomem *bridge_virt_base;
-+	int hw_io_coherency;
- 
- 	/* If NULL, the default cpu_win_can_remap will be used, using
- 	   the value in remappable_wins */
--- 
-1.7.9.5
+Best Regards,
+J.
+> ---
+>  arch/arm/include/asm/mach/serial_at91.h   |   33 -----------------------------
+>  arch/avr32/include/asm/mach/serial_at91.h |   33 -----------------------------
+>  drivers/tty/serial/atmel_serial.c         |   18 ---------------
+>  3 files changed, 0 insertions(+), 84 deletions(-)
+>  delete mode 100644 arch/arm/include/asm/mach/serial_at91.h
+>  delete mode 100644 arch/avr32/include/asm/mach/serial_at91.h
+> 
+> diff --git a/arch/arm/include/asm/mach/serial_at91.h b/arch/arm/include/asm/mach/serial_at91.h
+> deleted file mode 100644
+> index ea6d063..0000000
+> --- a/arch/arm/include/asm/mach/serial_at91.h
+> +++ /dev/null
+> @@ -1,33 +0,0 @@
+> -/*
+> - *  arch/arm/include/asm/mach/serial_at91.h
+> - *
+> - *  Based on serial_sa1100.h  by Nicolas Pitre
+> - *
+> - *  Copyright (C) 2002 ATMEL Rousset
+> - *
+> - *  Low level machine dependent UART functions.
+> - */
+> -
+> -struct uart_port;
+> -
+> -/*
+> - * This is a temporary structure for registering these
+> - * functions; it is intended to be discarded after boot.
+> - */
+> -struct atmel_port_fns {
+> -	void	(*set_mctrl)(struct uart_port *, u_int);
+> -	u_int	(*get_mctrl)(struct uart_port *);
+> -	void	(*enable_ms)(struct uart_port *);
+> -	void	(*pm)(struct uart_port *, u_int, u_int);
+> -	int	(*set_wake)(struct uart_port *, u_int);
+> -	int	(*open)(struct uart_port *);
+> -	void	(*close)(struct uart_port *);
+> -};
+> -
+> -#if defined(CONFIG_SERIAL_ATMEL)
+> -void atmel_register_uart_fns(struct atmel_port_fns *fns);
+> -#else
+> -#define atmel_register_uart_fns(fns) do { } while (0)
+> -#endif
+> -
+> -
+> diff --git a/arch/avr32/include/asm/mach/serial_at91.h b/arch/avr32/include/asm/mach/serial_at91.h
+> deleted file mode 100644
+> index 55b317a..0000000
+> --- a/arch/avr32/include/asm/mach/serial_at91.h
+> +++ /dev/null
+> @@ -1,33 +0,0 @@
+> -/*
+> - *  linux/include/asm-arm/mach/serial_at91.h
+> - *
+> - *  Based on serial_sa1100.h  by Nicolas Pitre
+> - *
+> - *  Copyright (C) 2002 ATMEL Rousset
+> - *
+> - *  Low level machine dependent UART functions.
+> - */
+> -
+> -struct uart_port;
+> -
+> -/*
+> - * This is a temporary structure for registering these
+> - * functions; it is intended to be discarded after boot.
+> - */
+> -struct atmel_port_fns {
+> -	void	(*set_mctrl)(struct uart_port *, u_int);
+> -	u_int	(*get_mctrl)(struct uart_port *);
+> -	void	(*enable_ms)(struct uart_port *);
+> -	void	(*pm)(struct uart_port *, u_int, u_int);
+> -	int	(*set_wake)(struct uart_port *, u_int);
+> -	int	(*open)(struct uart_port *);
+> -	void	(*close)(struct uart_port *);
+> -};
+> -
+> -#if defined(CONFIG_SERIAL_ATMEL)
+> -void atmel_register_uart_fns(struct atmel_port_fns *fns);
+> -#else
+> -#define atmel_register_uart_fns(fns) do { } while (0)
+> -#endif
+> -
+> -
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 3d7e1ee..a6134c9 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -43,7 +43,6 @@
+>  #include <asm/io.h>
+>  #include <asm/ioctls.h>
+>  
+> -#include <asm/mach/serial_at91.h>
+>  #include <mach/board.h>
+>  
+>  #ifdef CONFIG_ARM
+> @@ -1513,23 +1512,6 @@ static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
+>  	}
+>  }
+>  
+> -/*
+> - * Register board-specific modem-control line handlers.
+> - */
+> -void __init atmel_register_uart_fns(struct atmel_port_fns *fns)
+> -{
+> -	if (fns->enable_ms)
+> -		atmel_pops.enable_ms = fns->enable_ms;
+> -	if (fns->get_mctrl)
+> -		atmel_pops.get_mctrl = fns->get_mctrl;
+> -	if (fns->set_mctrl)
+> -		atmel_pops.set_mctrl = fns->set_mctrl;
+> -	atmel_open_hook		= fns->open;
+> -	atmel_close_hook	= fns->close;
+> -	atmel_pops.pm		= fns->pm;
+> -	atmel_pops.set_wake	= fns->set_wake;
+> -}
+> -
+>  struct platform_device *atmel_default_console_device;	/* the serial console device */
+>  
+>  #ifdef CONFIG_SERIAL_ATMEL_CONSOLE
+> -- 
+> 1.7.4.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
