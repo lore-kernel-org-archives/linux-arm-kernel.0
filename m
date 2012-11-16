@@ -1,145 +1,75 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 16 Nov 2012 22:20:27 +0100
-Subject: [PATCH 6/7] ARM: sunxi: Add device tree for the A13 and the Olinuxino
- board
+Date: Fri, 16 Nov 2012 22:20:26 +0100
+Subject: [PATCH 5/7] ARM: sunxi: Add earlyprintk support
 In-Reply-To: <1353100828-9218-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1353100828-9218-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1353100828-9218-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1353100828-9218-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Stefan Roese <sr@denx.de>
 ---
- arch/arm/boot/dts/Makefile            |    1 +
- arch/arm/boot/dts/sun5i-olinuxino.dts |   26 ++++++++++++
- arch/arm/boot/dts/sun5i.dtsi          |   74 +++++++++++++++++++++++++++++++++
- 3 files changed, 101 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun5i-olinuxino.dts
- create mode 100644 arch/arm/boot/dts/sun5i.dtsi
+ arch/arm/Kconfig.debug         |    8 ++++++++
+ arch/arm/include/debug/sunxi.S |   24 ++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+)
+ create mode 100644 arch/arm/include/debug/sunxi.S
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f37cf9f..9b2d3f0 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -84,6 +84,7 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
- 	spear310-evb.dtb \
- 	spear320-evb.dtb
- dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun5i-olinuxino.dtb
- dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
- 	tegra20-medcom-wide.dtb \
- 	tegra20-paz00.dtb \
-diff --git a/arch/arm/boot/dts/sun5i-olinuxino.dts b/arch/arm/boot/dts/sun5i-olinuxino.dts
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b0f3857..f12bc3a 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -345,6 +345,13 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on SOCFPGA based platforms.
+ 
++	config DEBUG_SUNXI_UART1
++		bool "Kernel low-level debugging messages via sunXi UART1"
++		depends on ARCH_SUNXI
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Allwinner A1X based platforms on the UART1.
++
+ 	config DEBUG_VEXPRESS_UART0_DETECT
+ 		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
+ 		depends on ARCH_VEXPRESS && CPU_CP15_MMU
+@@ -416,6 +423,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/mvebu.S" if DEBUG_MVEBU_UART
+ 	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
+ 	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
++	default "debug/sunxi.S" if DEBUG_SUNXI_UART1
+ 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
+ 		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
+ 	default "mach/debug-macro.S"
+diff --git a/arch/arm/include/debug/sunxi.S b/arch/arm/include/debug/sunxi.S
 new file mode 100644
-index 0000000..3b1cce3
+index 0000000..3bf61ca
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun5i-olinuxino.dts
-@@ -0,0 +1,26 @@
++++ b/arch/arm/include/debug/sunxi.S
+@@ -0,0 +1,24 @@
 +/*
-+ * Copyright 2012 Maxime Ripard
++ * Early serial output macro for Allwinner A1X SoCs
++ *
++ * Copyright (C) 2012 Maxime Ripard
 + *
 + * Maxime Ripard <maxime.ripard@free-electrons.com>
 + *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
-+/dts-v1/;
-+/include/ "sun5i.dtsi"
++#ifdef CONFIG_DEBUG_SUNXI_UART1
++#define SUNXI_UART_DEBUG_PHYS_BASE 0x01c28400
++#define SUNXI_UART_DEBUG_VIRT_BASE 0xf1c28400
++#endif
 +
-+/ {
-+	model = "Olimex A13-Olinuxino";
-+	compatible = "olimex,a13-olinuxino", "allwinner,sun5i";
++	.macro	addruart, rp, rv, tmp
++	ldr	\rp, =SUNXI_UART_DEBUG_PHYS_BASE
++	ldr	\rv, =SUNXI_UART_DEBUG_VIRT_BASE
++	.endm
 +
-+	soc {
-+		duart: uart at 01c28400 {
-+			status = "okay";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-new file mode 100644
-index 0000000..4bedf3e
---- /dev/null
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -0,0 +1,74 @@
-+/*
-+ * Copyright 2012 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	interrupt-parent = <&intc>;
-+
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,cortex-a8";
-+		};
-+	};
-+
-+	chosen {
-+		bootargs = "earlyprintk console=ttyS0,115200";
-+	};
-+
-+	memory {
-+		reg = <0x40000000 0x20000000>;
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		osc: oscillator {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <24000000>;
-+		};
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x01c20000 0x300000>;
-+		ranges;
-+
-+		timer at 01c20c00 {
-+			compatible = "allwinner,sunxi-timer";
-+			reg = <0x01c20c00 0x400>;
-+			interrupts = <22>;
-+			clocks = <&osc>;
-+		};
-+
-+		intc: interrupt-controller at 01c20400 {
-+			compatible = "allwinner,sunxi-ic";
-+			reg = <0x01c20400 0x400>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		uart1: uart at 01c28400 {
-+			compatible = "ns8250";
-+			reg = <0x01c28400 0x400>;
-+			interrupts = <2>;
-+			reg-shift = <2>;
-+			clock-frequency = <24000000>;
-+			status = "disabled";
-+		};
-+	};
-+};
++#define UART_SHIFT	2
++#include <asm/hardware/debug-8250.S>
 -- 
 1.7.9.5
