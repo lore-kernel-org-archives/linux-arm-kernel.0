@@ -1,52 +1,67 @@
-From: matthieu.castet@parrot.com (Matthieu CASTET)
-Date: Fri, 16 Nov 2012 15:53:21 +0100
-Subject: [PATCH 7/9] usb: chipidea: udc: add force-full-speed option
-In-Reply-To: <87wqxl679k.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
- <1352909950-32555-8-git-send-email-m.grzeschik@pengutronix.de>
- <87wqxl679k.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <50A65361.5070209@parrot.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 16 Nov 2012 15:55:29 +0100
+Subject: [PATCH] ARM: imx: ehci: fix host power mask bit
+In-Reply-To: <1353076764.3647.35.camel@mars>
+References: <1353063197.3647.27.camel@mars> <20121116142531.228251f6@eb-e6520>
+ <1353076764.3647.35.camel@mars>
+Message-ID: <20121116145529.GU10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexander Shishkin a ?crit :
-> Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
+On Fri, Nov 16, 2012 at 03:39:24PM +0100, Christoph Fritz wrote:
+> This patch sets HPM (Host power mask bit) to bit 16 according to i.MX
+> Reference Manual. Falsely it was set to bit 8, but this controls pull-up
+> Impedance.
 > 
->> This patch makes it possible to set the chipidea udc
->> into full-speed only mode. It can be set by the oftree
->> property "force-full-speed".
->>
->> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
->> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->> ---
->>  drivers/usb/chipidea/bits.h  |    1 +
->>  drivers/usb/chipidea/core.c  |    5 +++++
->>  include/linux/usb/chipidea.h |    1 +
->>  3 files changed, 7 insertions(+)
->>
->> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
->> index 3cded5f..85b6b09 100644
->> --- a/drivers/usb/chipidea/bits.h
->> +++ b/drivers/usb/chipidea/bits.h
->> @@ -51,6 +51,7 @@
->>  #define PORTSC_PTS            (BIT(31) | BIT(30))
->>  #define PORTSC_PTW            BIT(28)
->>  #define PORTSC_STS            BIT(29)
->> +#define PORTSC_PFSC           BIT(24)
+> Reported-by: Michael Burkey <mdburkey@gmail.com>
+> Cc: Stable <stable@vger.kernel.org>
+> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+> Acked-by: Eric B?nard <eric@eukrea.com>
+
+Applied, thanks
+
+Sascha
+
+> ---
+>  arch/arm/mach-imx/ehci-imx25.c |    2 +-
+>  arch/arm/mach-imx/ehci-imx35.c |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> Same for this one, it's in DEVLC in my spec.
+> diff --git a/arch/arm/mach-imx/ehci-imx25.c b/arch/arm/mach-imx/ehci-imx25.c
+> index 27e40d1..134c190 100644
+> --- a/arch/arm/mach-imx/ehci-imx25.c
+> +++ b/arch/arm/mach-imx/ehci-imx25.c
+> @@ -30,7 +30,7 @@
+>  #define MX25_H1_SIC_SHIFT	21
+>  #define MX25_H1_SIC_MASK	(0x3 << MX25_H1_SIC_SHIFT)
+>  #define MX25_H1_PP_BIT		(1 << 18)
+> -#define MX25_H1_PM_BIT		(1 << 8)
+> +#define MX25_H1_PM_BIT		(1 << 16)
+>  #define MX25_H1_IPPUE_UP_BIT	(1 << 7)
+>  #define MX25_H1_IPPUE_DOWN_BIT	(1 << 6)
+>  #define MX25_H1_TLL_BIT		(1 << 5)
+> diff --git a/arch/arm/mach-imx/ehci-imx35.c b/arch/arm/mach-imx/ehci-imx35.c
+> index a596f70..554e7cc 100644
+> --- a/arch/arm/mach-imx/ehci-imx35.c
+> +++ b/arch/arm/mach-imx/ehci-imx35.c
+> @@ -30,7 +30,7 @@
+>  #define MX35_H1_SIC_SHIFT	21
+>  #define MX35_H1_SIC_MASK	(0x3 << MX35_H1_SIC_SHIFT)
+>  #define MX35_H1_PP_BIT		(1 << 18)
+> -#define MX35_H1_PM_BIT		(1 << 8)
+> +#define MX35_H1_PM_BIT		(1 << 16)
+>  #define MX35_H1_IPPUE_UP_BIT	(1 << 7)
+>  #define MX35_H1_IPPUE_DOWN_BIT	(1 << 6)
+>  #define MX35_H1_TLL_BIT		(1 << 5)
+> -- 
+> 1.7.10.4
 > 
-Yes it depends it device support lpm or not.
+> 
+> 
+> 
 
-We have the same problem with hw_port_is_high_speed [1]. Mapping is different
-according lpm support for some register.
-
-Matthieu
-
-[1]
-drivers/usb/chipidea/udc.c
-static int hw_port_is_high_speed(struct ci13xxx *ci)
-{
-    return ci->hw_bank.lpm ? hw_read(ci, OP_DEVLC, DEVLC_PSPD) :
-        hw_read(ci, OP_PORTSC, PORTSC_HSP);
-}
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
