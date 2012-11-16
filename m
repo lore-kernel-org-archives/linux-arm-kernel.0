@@ -1,48 +1,33 @@
-From: sr@denx.de (Stefan Roese)
-Date: Fri, 16 Nov 2012 11:47:41 +0100
-Subject: [PATCH 2/6] irqchip: sunxi: Add irq controller driver
-In-Reply-To: <20121116113805.053eb5fa@skate>
-References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
- <1353019586-21043-3-git-send-email-maxime.ripard@free-electrons.com>
- <50A5ECBF.9060304@denx.de> <50A6047A.8090609@free-electrons.com>
- <20121116113805.053eb5fa@skate>
-Message-ID: <50A619CD.7020305@denx.de>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Fri, 16 Nov 2012 11:53:17 +0100
+Subject: ARM: imx: ehci-imx35: fix host power mask bit
+Message-ID: <1353063197.3647.27.camel@mars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2012 11:38 AM, Thomas Petazzoni wrote:
->>> asmlinkage void __exception_irq_entry sunxi_handle_irq(struct pt_regs *regs)
->>> {
->>> 	u32 irq;
->>>
->>> 	irq = readl(int_base + SW_INT_VECTOR_REG) >> 2;
->>> 	irq = irq_find_mapping(sunxi_vic_domain, irq);
->>> 	handle_IRQ(irq, regs);
->>> }
->>>
->>> I suggest you give it a try.
->>
->> It definitely looks nicer. I'll try that and update.
-> 
-> How does this SW_INT_VECTOR_REG behave when there are multiple
-> interrupts pending?
+This patch sets HPM (Host power mask bit) to bit 16 according to i.MX35
+Reference Manual. Falsely it was set to bit 8, but this controls pull-up
+Impedance.
 
-Not 100% sure. Hard to guess with this sparse documentation. I would
-expect that multiple interrupts would be queued here.
+Reported-by: Michael Burkey <mdburkey@gmail.com>
+Cc: Stable <stable@vger.kernel.org>
+Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+---
+ arch/arm/mach-imx/ehci-imx35.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Shouldn't the code be something like:
-> 
-> 	do {
-> 		hwirq = readl(int_base + SW_INT_VECTOR_REG) >> 2;
-> 		irq = irq_find_mapping(sunxi_vic_domain, hwirq);
-> 		handle_IRQ(irq, regs);
-> 	} while(hwirq != 0);
-> 
-> Or maybe the != 0 is not the good condition, but the idea is to handle
-> all pending interrupts. That said, the original code from Maxime was
-> not doing that as well.
-
-Yes, that would be a good change.
-
-Thanks,
-Stefan
+diff --git a/arch/arm/mach-imx/ehci-imx35.c b/arch/arm/mach-imx/ehci-imx35.c
+index a596f70..554e7cc 100644
+--- a/arch/arm/mach-imx/ehci-imx35.c
++++ b/arch/arm/mach-imx/ehci-imx35.c
+@@ -30,7 +30,7 @@
+ #define MX35_H1_SIC_SHIFT	21
+ #define MX35_H1_SIC_MASK	(0x3 << MX35_H1_SIC_SHIFT)
+ #define MX35_H1_PP_BIT		(1 << 18)
+-#define MX35_H1_PM_BIT		(1 << 8)
++#define MX35_H1_PM_BIT		(1 << 16)
+ #define MX35_H1_IPPUE_UP_BIT	(1 << 7)
+ #define MX35_H1_IPPUE_DOWN_BIT	(1 << 6)
+ #define MX35_H1_TLL_BIT		(1 << 5)
+-- 
+1.7.10.4
