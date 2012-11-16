@@ -1,39 +1,71 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 16 Nov 2012 09:03:55 -0600
-Subject: [PATCH] ARM: OMAP2+: Fix compiler warning for 32k timer
-In-Reply-To: <20121116075258.GC15669@arwen.pp.htv.fi>
-References: <1353008644-24745-1-git-send-email-jon-hunter@ti.com>
- <20121115204526.GC12466@arwen.pp.htv.fi> <50A56033.6080908@ti.com>
- <20121116075258.GC15669@arwen.pp.htv.fi>
-Message-ID: <50A655DB.30504@ti.com>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Fri, 16 Nov 2012 17:08:14 +0200
+Subject: [PATCH v3 0/3] serial: mxs-auart: add DMA support for auart in
+ mx28
+In-Reply-To: <1353053034-10944-1-git-send-email-b32955@freescale.com>
+References: <1353053034-10944-1-git-send-email-b32955@freescale.com>
+Message-ID: <50A656DE.6080506@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Huang,
 
-On 11/16/2012 01:52 AM, Felipe Balbi wrote:
-> Hi,
-> 
-> On Thu, Nov 15, 2012 at 03:35:47PM -0600, Jon Hunter wrote:
->>
->> On 11/15/2012 02:45 PM, Felipe Balbi wrote:
->>> Hi,
->>>
->>> On Thu, Nov 15, 2012 at 01:44:04PM -0600, Jon Hunter wrote:
->>>> +static struct of_device_id omap_counter_match[] __initdata = {
->>>
->>> not directly related to $SUBJECT, but shouldn't this be static const
->>> __initconst ?
->>
->> Yes you are right. Looks like there are several other of_device_id
->> structs in arch/arm/mach-omap2 that could be updated to const too.
-> 
-> here's a quick sed substitution for you:
-> 
-> $ sed -i 's/static \(struct of_device_id\)\s\(\w\+\[\]\)\s\(__initdata\|\)/static const \1 \2 __initconst/' arch/arm/*omap*/*.c
-> 
-> It worked fine here.
+Thanks for new version. Now I don't get any errors and the CPU doesn't 
+freeze any more but:
 
-Thanks. Will fix this up in a subsequent patch.
+1) AUART corrupts data with baudrate over 1Mbits/s
 
-Cheers
-Jon
+2) We would need DMA support without flow control.
+
+By the way, how do you test drivers? Is there any standard tools for 
+uart data and throughput testing?
+
+Lauri
+
+On 11/16/2012 10:03 AM, Huang Shijie wrote:
+> This patch set adds the DMA support for auart in mx28.
+> patch 1:
+> 	In mx23, the DMA has a bug(see errata:2836). We can not add the
+> 	DMA support in mx23, but we can add DMA support to auart in mx28.
+> 	So in order to add the DMA support for the auart in mx28, we should add
+> 	the platform_device_id to distinguish the distinguish SOCs.
+>
+> patch 2: add the DMA support for mx28
+> 	Only we meet the following conditions, we can enable the DMA support
+> 	for auart:
+>          (1) We enable the DMA support in the dts file, such as
+>              arch/arm/boot/dts/imx28.dtsi.
+>          (2) We enable the hardware flow control.
+>          (3) We use the mx28, not the mx23. Due to hardware bug(see errata: 2836),
+>              we can not add the DMA support to mx23.
+>
+> patch 3: enable the DMA support in dts for mx28
+> 	You can use the /ttyAPP0 to test this patch set.
+> 	I tested this patch in mx28-evk board.
+>
+>
+> To Lauri: Please try this patch set. thanks.
+>
+>
+> v2 --> v3:
+> 	[1] fix a multi-open issue found by Lauri.
+>
+> v1 --> v2:
+> 	[1] use the inline function, not a macro, to distinguish the SOCs.
+> 	[2] remove the "inline" for mxs_auart_tx_chars().
+> 	[3] use the `pio`, not the `pio[1]` to fill the DMA descriptor.
+> 	[4] use bit operation to serialize the DMA TX.
+> 	[5] use the RX/TX DMA channel to enable the DMA support, remove the
+> 	    "fsl,auart-enable-dma".
+>
+> Huang Shijie (3):
+>    serial: mxs-auart: distinguish the different SOCs
+>    serial: mxs-auart: add the DMA support for mx28
+>    ARM: dts: enable dma support for auart0 in mx28
+>
+>   .../bindings/tty/serial/fsl-mxs-auart.txt          |    8 +
+>   arch/arm/boot/dts/imx28.dtsi                       |    1 +
+>   drivers/tty/serial/mxs-auart.c                     |  364 +++++++++++++++++++-
+>   3 files changed, 362 insertions(+), 11 deletions(-)
+>
+>
