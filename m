@@ -1,124 +1,151 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 16 Nov 2012 17:39:44 +0200
-Subject: [PATCH] OMAP: board-files: fix i2c_bus for tfp410
-In-Reply-To: <20121116151959.GA19411@arwen.pp.htv.fi>
-References: <1353068553-26897-1-git-send-email-tomi.valkeinen@ti.com>
- <20121116135155.GE18527@arwen.pp.htv.fi> <50A64D35.9050109@ti.com>
- <20121116151959.GA19411@arwen.pp.htv.fi>
-Message-ID: <50A65E40.9040208@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 16 Nov 2012 16:39:44 +0100
+Subject: [PATCH 1/4] arm: orion5x: mechanical defconfig update
+In-Reply-To: <1353080388-4091-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1353080388-4091-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353080388-4091-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-16 17:19, Felipe Balbi wrote:
-> Hi,
-> 
-> On Fri, Nov 16, 2012 at 04:27:01PM +0200, Tomi Valkeinen wrote:
->> On 2012-11-16 15:51, Felipe Balbi wrote:
->>> Hi,
->>>
->>> On Fri, Nov 16, 2012 at 02:22:33PM +0200, Tomi Valkeinen wrote:
->>>> The i2c handling in tfp410 driver, which handles converting parallel RGB
->>>> to DVI, was changed in 958f2717b84e88bf833d996997fda8f73276f2af. The
->>>
->>> commit summary should be added in () after commit hash. This would look
->>> like:
->>>
->>> 'was changed in 958f271 (OMAPDSS: TFP410: pdata rewrite).'
->>
->> Yep.
->>
->>>> patch changed what value the driver considers as invalid/undefined.
->>>> Before the patch 0 was the invalid value, but as 0 is a valid bus
->>>                   ^
->>> 		  missing comma (,) character here.
->>
->> Right.
->>
->>>> number, the patch changed this to -1.
->>>>
->>>> However, the fact was missed that many board files do not define the bus
->>>> number at all, thus it's left to 0. This causes the driver to fail to
->>>> get the i2c bus, exiting from the driver's probe with an error, meaning
->>>> that the DVI output does not work for those boards.
->>>>
->>>> This patch fixes the issue by changing the i2c_bus number field in the
->>>> driver's platform data from u16 to int, and setting the bus number to -1
->>>> in the board files for the boards that did not define the bus. The
->>>> exception is devkit8000, for which the bus is set to 1, which is the
->>>> correct bus for that board.
->>>>
->>>> The bug exists in v3.5+ kernels.
->>>>
->>>> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
->>>> Reported-by: Thomas Weber <thomas@tomweber.eu>
->>>> [for v3.5, v3.6 stable kernels]
->>>> Cc: stable at vger.kernel.org
->>>
->>> This format is peculiar. Usually people use:
->>>
->>> Cc: stable at vger.kernel.org # v3.5 v3.6
->>
->> Yes, I tried that. But my git send-email (1.7.10.4) rejects that line. I
->> don't know if it's my setup, that particular git version, or what...
-> 
-> weird... I never had that problem, since git 1.6.x, I have never seen
-> that and I tend to upgrade rather frequently. I'm using 1.8.0 now and
-> have sent a few patches to stable recently with no problems.
-> 
->>> To be fair, the whole i2c_bus_num looks like a big hackery introduced by
->>> the way panel drivers are written for OMAP DSS.
->>>
->>> TFP410 is an I2C client, not an OMAPDSS client. After a quick look at
->>> the driver, there's is no such thing as a DSS bus, so looks like you
->>> should have an I2C driver for TFP410 and the whole DSS stuff should be
->>> just a list of clients, but not a struct bus at all.
->>>
->>> The fact that you have to pass the I2C bus number down to the panel
->>> driver is already a big indication of how wrong this is, IMHO.
->>
->> Without going deeper in the dss device model problems, I would agree
->> with you if this was about i2c panel, but this is not quite like that.
->>
->> A panel controlled via i2c would be an i2c device. But TFP410 is not
->> controlled via i2c. It's not really controlled at all except via
->> power-down gpio. TFP410 doesn't need the i2c to be functional at all.
-> 
-> then why does it need the i2c adapter ? What is this power-down gpio ?
-> Should that be hidden under gpiolib instead ?
+This commit is a simple mechanical update of the orion5x_defconfig
+file to the current kernel (i.e, just 'make orion5x_defconfig; make
+savedefconfig'). Doing this update allows to more easily separate
+DT-related configuration changes in the following patches.
 
-For the i2c, see below. Power-down GPIO is used to power down and up the
-tfp410 chip.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Tested by: Maxime Hadjinlian <mhadjinlian@lacie.com>
+---
+ arch/arm/configs/orion5x_defconfig |   32 ++++++++------------------------
+ 1 file changed, 8 insertions(+), 24 deletions(-)
 
->> The i2c lines do not even touch TFP410 chip, so to be precise, the i2c
->> lines should not be TFP410's concern. The i2c lines come from the
->> monitor and go to OMAP's i2c pins. But TFP410 driver is a convenient
->> place to manage them.
-> 
-> fair enough... but who's actually using those i2c lines ? OMAP is the
-> I2C master, who's the slave ? It's something in the monitor, I assume...
-> 
-> IIUC, this I2C bus goes over the HDMI wire ?
-
-Yes, the i2c goes over HDMI wire. OMAP is the master, monitor is the
-slave. You can see some more info from
-http://en.wikipedia.org/wiki/Display_Data_Channel under DDC2 section.
-
-It is used to read the EDID
-(http://en.wikipedia.org/wiki/Extended_display_identification_data)
-information from the monitor, which tells things like supported video
-timings etc.
-
-As for why the tfp410 driver handles the i2c... We don't have a better
-place. There's no driver for the monitor. Although in the future with
-common panel framework perhaps we will.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 897 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/e1f3bd17/attachment-0001.sig>
+diff --git a/arch/arm/configs/orion5x_defconfig b/arch/arm/configs/orion5x_defconfig
+index cd5e6ba..d0875ce 100644
+--- a/arch/arm/configs/orion5x_defconfig
++++ b/arch/arm/configs/orion5x_defconfig
+@@ -1,7 +1,8 @@
+ CONFIG_EXPERIMENTAL=y
+ CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_SYSFS_DEPRECATED_V2=y
+ CONFIG_EXPERT=y
+ # CONFIG_SLUB_DEBUG is not set
+ CONFIG_PROFILING=y
+@@ -10,6 +11,8 @@ CONFIG_KPROBES=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
++CONFIG_PARTITION_ADVANCED=y
++CONFIG_BSD_DISKLABEL=y
+ CONFIG_ARCH_ORION5X=y
+ CONFIG_MACH_DB88F5281=y
+ CONFIG_MACH_RD88F5182=y
+@@ -33,17 +36,12 @@ CONFIG_MACH_WNR854T=y
+ CONFIG_MACH_RD88F5181L_GE=y
+ CONFIG_MACH_RD88F5181L_FXO=y
+ CONFIG_MACH_RD88F6183AP_GE=y
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+-CONFIG_LEDS=y
+-CONFIG_LEDS_CPU=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_FPE_NWFPE=y
+ CONFIG_VFP=y
+-# CONFIG_SUSPEND is not set
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+@@ -54,13 +52,10 @@ CONFIG_IP_PNP_DHCP=y
+ CONFIG_IP_PNP_BOOTP=y
+ # CONFIG_IPV6 is not set
+ CONFIG_NET_DSA=y
+-CONFIG_NET_DSA_MV88E6131=y
+-CONFIG_NET_DSA_MV88E6123_61_65=y
+ CONFIG_NET_PKTGEN=m
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ # CONFIG_FIRMWARE_IN_KERNEL is not set
+ CONFIG_MTD=y
+-CONFIG_MTD_PARTITIONS=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+@@ -82,12 +77,11 @@ CONFIG_CHR_DEV_SG=m
+ CONFIG_ATA=y
+ CONFIG_SATA_MV=y
+ CONFIG_NETDEVICES=y
+-CONFIG_MARVELL_PHY=y
+-CONFIG_NET_ETHERNET=y
+ CONFIG_MII=y
+-CONFIG_NET_PCI=y
++CONFIG_NET_DSA_MV88E6131=y
++CONFIG_NET_DSA_MV88E6123_61_65=y
+ CONFIG_MV643XX_ETH=y
+-# CONFIG_NETDEV_10000 is not set
++CONFIG_MARVELL_PHY=y
+ # CONFIG_INPUT_MOUSEDEV is not set
+ CONFIG_INPUT_EVDEV=y
+ # CONFIG_KEYBOARD_ATKBD is not set
+@@ -95,11 +89,11 @@ CONFIG_KEYBOARD_GPIO=y
+ # CONFIG_INPUT_MOUSE is not set
+ # CONFIG_SERIO is not set
+ # CONFIG_VT is not set
++CONFIG_LEGACY_PTY_COUNT=16
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ # CONFIG_SERIAL_8250_PCI is not set
+ CONFIG_SERIAL_8250_RUNTIME_UARTS=2
+-CONFIG_LEGACY_PTY_COUNT=16
+ CONFIG_HW_RANDOM_TIMERIOMEM=m
+ CONFIG_I2C=y
+ # CONFIG_I2C_COMPAT is not set
+@@ -109,10 +103,8 @@ CONFIG_GPIO_SYSFS=y
+ CONFIG_SENSORS_LM75=y
+ # CONFIG_VGA_ARB is not set
+ CONFIG_USB=y
+-CONFIG_USB_DEVICEFS=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_ROOT_HUB_TT=y
+-CONFIG_USB_EHCI_TT_NEWSCHED=y
+ CONFIG_USB_PRINTER=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_STORAGE_DATAFAB=y
+@@ -140,7 +132,6 @@ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ # CONFIG_EXT3_FS_XATTR is not set
+ CONFIG_EXT4_FS=m
+-CONFIG_INOTIFY=y
+ CONFIG_ISO9660_FS=m
+ CONFIG_JOLIET=y
+ CONFIG_UDF_FS=m
+@@ -150,25 +141,18 @@ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
+ CONFIG_CRAMFS=y
+ CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_ROOT_NFS=y
+-CONFIG_PARTITION_ADVANCED=y
+-CONFIG_BSD_DISKLABEL=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_CODEPAGE_850=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_NLS_ISO8859_2=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_FS=y
+-CONFIG_DEBUG_KERNEL=y
+ # CONFIG_DEBUG_BUGVERBOSE is not set
+ CONFIG_DEBUG_INFO=y
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+ CONFIG_LATENCYTOP=y
+-CONFIG_SYSCTL_SYSCALL_CHECK=y
+ # CONFIG_FTRACE is not set
+ CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_ERRORS=y
+ CONFIG_DEBUG_LL=y
+ CONFIG_CRYPTO_CBC=m
+ CONFIG_CRYPTO_ECB=m
+-- 
+1.7.9.5
