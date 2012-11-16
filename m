@@ -1,63 +1,28 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 16 Nov 2012 10:32:37 +0100
-Subject: [PATCH 2/4] arm: mvebu: enable Ethernet controllers on Armada 370/XP
- eval boards
+Date: Fri, 16 Nov 2012 10:32:38 +0100
+Subject: [PATCH 3/4] arm: mvebu: enable Ethernet controllers on OpenBlocks
+ AX3-4 platform
 In-Reply-To: <1353058359-28102-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353058359-28102-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353058359-28102-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353058359-28102-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the two network interfaces of the Armada 370
-official Marvell evaluation platform, and the four network interfaces
-of the Armada XP official Marvell evaluation platform.
+The PlatHome OpenBlocks AX3-4 platform has 4 Ethernet ports, connected
+to a single quad-port PHY through SGMII.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-db.dts |   23 +++++++++++++++++++
- arch/arm/boot/dts/armada-xp-db.dts  |   43 +++++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+)
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |   43 ++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index fffd5c2..76362f7 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -38,5 +38,28 @@
- 			clock-frequency = <600000000>;
- 			status = "okay";
- 		};
-+
-+		mdio {
-+			phy0: ethernet-phy at 0 {
-+				reg = <0>;
-+			};
-+
-+			phy1: ethernet-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+
-+		ethernet at d0070000 {
-+			clock-frequency = <200000000>;
-+			status = "okay";
-+			phy = <&phy0>;
-+			phy-mode = "rgmii-id";
-+		};
-+		ethernet at d0074000 {
-+			clock-frequency = <200000000>;
-+			status = "okay";
-+			phy = <&phy1>;
-+			phy-mode = "rgmii-id";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index b1fc728..b614bd0 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -46,5 +46,48 @@
- 			clock-frequency = <250000000>;
- 			status = "okay";
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index cb86853..bb8d83c 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -65,5 +65,48 @@
+ 				linux,default-trigger = "heartbeat";
+ 			};
  		};
 +
 +		mdio {
@@ -70,11 +35,11 @@ index b1fc728..b614bd0 100644
 +			};
 +
 +			phy2: ethernet-phy at 2 {
-+				reg = <25>;
++				reg = <2>;
 +			};
 +
 +			phy3: ethernet-phy at 3 {
-+				reg = <27>;
++				reg = <3>;
 +			};
 +		};
 +
@@ -82,13 +47,13 @@ index b1fc728..b614bd0 100644
 +			clock-frequency = <250000000>;
 +			status = "okay";
 +			phy = <&phy0>;
-+			phy-mode = "rgmii-id";
++			phy-mode = "sgmii";
 +		};
 +		ethernet at d0074000 {
 +			clock-frequency = <250000000>;
 +			status = "okay";
 +			phy = <&phy1>;
-+			phy-mode = "rgmii-id";
++			phy-mode = "sgmii";
 +		};
 +		ethernet at d0030000 {
 +			clock-frequency = <250000000>;
