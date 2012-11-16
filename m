@@ -1,64 +1,61 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 16 Nov 2012 15:31:54 +0800
-Subject: [GIT PULL] imx device tree changes for 3.8
-Message-ID: <20121116073152.GF2941@S2100-06.ap.freescale.net>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 16 Nov 2012 09:15:13 +0200
+Subject: [PATCH 0/5] OMAPFB: use dma_alloc instead of omap's vram
+In-Reply-To: <20121112225037.GU6801@atomide.com>
+References: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
+ <20121112225037.GU6801@atomide.com>
+Message-ID: <50A5E801.3000100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 68b25325a7fd290b5e472bba0df9cbe8c1a81d8f:
+On 2012-11-13 00:50, Tony Lindgren wrote:
+> * Tomi Valkeinen <tomi.valkeinen@ti.com> [121112 02:27]:
+>> Hi,
+>>
+>> This series changes omapfb to use standard dma_alloc funcs instead of omap
+>> specific vram allocator. This let's us remove the omap vram allocator, making
+>> omapfb platform independent.
+>>
+>> However, note that using standard dma funcs causes the following downsides:
+>>
+>> 1) dma_alloc_attrs doesn't let us allocate at certain physical address.
+>> However, this should not be a problem as this feature of vram allocator
+>> is only used when reserving the framebuffer that was initialized by the
+>> bootloader, and we don't currently support "passing" a framebuffer from
+>> the bootloader to the kernel anyway.
+>>
+>> 2) dma_alloc_attrs, as of now, always ioremaps the allocated area, and
+>> we don't need the ioremap when using VRFB. This patch uses
+>> DMA_ATTR_NO_KERNEL_MAPPING for the allocation, but the flag is currently
+>> not operational.
+>>
+>> 3) OMAPFB_GET_VRAM_INFO ioctl cannot return real values anymore. I
+>> changed the ioctl to return 64M for all the values, which, I hope, the
+>> applications will interpret as "there's enough vram".
+>>
+>> 4) "vram" kernel parameter to define how much ram to reserve for video use no
+>> longer works. The user needs to enable CMA and use "cma" parameter.
+> 
+> Great, thanks for fixing these. Could you please queue these into
+> a separate branch against v3.7-rc5 that I can also merge into
+> omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3?
+> 
+> Feel free to add my Acked-by: Tony Lindgren <tony@atomide.com> to the
+> arch/arm/*omap*/* parts.
 
-  ARM: imx: select HAVE_IMX_SRC when SMP is enabled (2012-10-23 15:37:51 +0800)
+I added your acks, and pushed:
 
-are available in the git repository at:
+git://gitorious.org/linux-omap-dss2/linux.git 3.8/vram-conversion
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-dt-3.8
+It's based on -rc4 as my other branches are based on that.
 
-for you to fetch changes up to 96efb44e471250592ee865ce5b870bc6f860921f:
+ Tomi
 
-  ARM: imx6q: select ARM and PL310 errata (2012-11-16 14:52:29 +0800)
 
-----------------------------------------------------------------
-It's based on imx/multiplatform branch.  Most of them are dts changes.
-There are also a few imx6 improvement patches in there.
-
-----------------------------------------------------------------
-Fabio Estevam (3):
-      ARM: dts: imx53-qsb: Use pinctrl for gpio-led
-      ARM: dts: imx53-qsb: Make DA9053 regulator functional
-      ARM: dts: imx6q-sabreauto: Add basic support
-
-Liu Ying (1):
-      ARM: dts: imx6q-sabresd: add volume up/down gpio keys
-
-Roland Stigge (1):
-      ARM: dts: imx53: pinctl update
-
-Sascha Hauer (2):
-      ARM i.MX dtsi: Add default bus-width property for esdhc controller
-      ARM i.MX dts: Consistently add labels to devicenodes
-
-Shawn Guo (5):
-      ARM: imx6q: let users input debug uart port number
-      ARM: dts: imx6q: enable snvs lp rtc
-      ARM: imx: enable cpufreq for imx6q
-      ARM: imx6q: print silicon version on boot
-      ARM: imx6q: select ARM and PL310 errata
-
- Documentation/devicetree/bindings/arm/fsl.txt |    4 +
- arch/arm/Kconfig.debug                        |   26 +++---
- arch/arm/boot/dts/Makefile                    |    1 +
- arch/arm/boot/dts/imx27.dtsi                  |    5 +-
- arch/arm/boot/dts/imx51.dtsi                  |   43 +++++-----
- arch/arm/boot/dts/imx53-qsb.dts               |   62 ++++++++++----
- arch/arm/boot/dts/imx53.dtsi                  |   92 +++++++++++++++-----
- arch/arm/boot/dts/imx6q-sabreauto.dts         |   64 ++++++++++++++
- arch/arm/boot/dts/imx6q-sabresd.dts           |   18 ++++
- arch/arm/boot/dts/imx6q.dtsi                  |  114 +++++++++++++++----------
- arch/arm/include/debug/imx.S                  |   20 ++++-
- arch/arm/mach-imx/Kconfig                     |   11 +++
- arch/arm/mach-imx/clk-imx6q.c                 |    1 +
- arch/arm/mach-imx/lluart.c                    |   28 +++---
- arch/arm/mach-imx/mach-imx6q.c                |   35 ++++++++
- arch/arm/mach-imx/mx6q.h                      |    4 -
- 16 files changed, 389 insertions(+), 139 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6q-sabreauto.dts
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 897 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/826d1247/attachment.sig>
