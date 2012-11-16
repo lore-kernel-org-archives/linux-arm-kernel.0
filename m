@@ -1,83 +1,45 @@
-From: sr@denx.de (Stefan Roese)
-Date: Fri, 16 Nov 2012 08:47:10 +0100
-Subject: [PATCH 4/6] ARM: sunxi: Add earlyprintk support
-In-Reply-To: <1353019586-21043-5-git-send-email-maxime.ripard@free-electrons.com>
-References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
- <1353019586-21043-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <50A5EF7E.6080801@denx.de>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 16 Nov 2012 08:47:55 +0100
+Subject: OMAP baseline test results for v3.7-rc5
+In-Reply-To: <50A26FC6.4070201@gmail.com>
+References: <alpine.DEB.2.00.1211121921160.12551@utopia.booyaka.com>
+ <50A26FC6.4070201@gmail.com>
+Message-ID: <20121116074754.GA25218@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2012 11:46 PM, Maxime Ripard wrote:
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/Kconfig.debug         |    8 ++++++++
->  arch/arm/include/debug/sunxi.S |   22 ++++++++++++++++++++++
->  2 files changed, 30 insertions(+)
->  create mode 100644 arch/arm/include/debug/sunxi.S
+On Tue, Nov 13, 2012 at 08:05:26PM +0400, Igor Mazanov wrote:
+> Paul Walmsley wrote:
+> >
+> >* AM335x Beaglebone: omap2plus_defconfig kernels don't boot
+> >  - May be fixed now, pending retest:
+> >    - http://marc.info/?l=linux-omap&m=135082257727502&w=2
+> >  - Not yet part of the automated test suite
+> >  * May be due to an old U-boot with FDT support problems used here?
+> >    Pending local investigation and re-test
 > 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index b0f3857..6672b02 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -345,6 +345,13 @@ choice
->  		  Say Y here if you want kernel low-level debugging support
->  		  on SOCFPGA based platforms.
->  
-> +	config DEBUG_SUNXI_UART
-> +		bool "Kernel low-level debugging messages via sunXi UART"
-> +		depends on ARCH_SUNXI
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on Allwinner A1X based platforms.
->
->  	config DEBUG_VEXPRESS_UART0_DETECT
->  		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
->  		depends on ARCH_VEXPRESS && CPU_CP15_MMU
-> @@ -416,6 +423,7 @@ config DEBUG_LL_INCLUDE
->  	default "debug/mvebu.S" if DEBUG_MVEBU_UART
->  	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
->  	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
-> +	default "debug/sunxi.S" if DEBUG_SUNXI_UART
->  	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
->  		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
->  	default "mach/debug-macro.S"
-> diff --git a/arch/arm/include/debug/sunxi.S b/arch/arm/include/debug/sunxi.S
-> new file mode 100644
-> index 0000000..ffd101f
-> --- /dev/null
-> +++ b/arch/arm/include/debug/sunxi.S
-> @@ -0,0 +1,22 @@
-> +/*
-> + * Early serial output macro for Allwinner A1X SoCs
-> + *
-> + * Copyright (C) 2012 Maxime Ripard
-> + *
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#define SUNXI_UART1_PHYS_BASE	0x01c28400
-> +#define SUNXI_UART1_VIRT_BASE	0xf1c28400
-> +
-> +	.macro	addruart, rp, rv, tmp
-> +	ldr	\rp, =SUNXI_UART1_PHYS_BASE
-> +	ldr	\rv, =SUNXI_UART1_VIRT_BASE
-> +	.endm
-> +
-> +#define UART_SHIFT	2
-> +#include <asm/hardware/debug-8250.S>
+> I have the same result with omap2plus_defconfig and kernel 3.7.0-rc5. I dumped
+> the kernel log buffer via JTAG and can send this log if it could be useful.
 
-A10 (cubieboard) has debug the UART on UART0 instead of UART1 as on A13.
-So we need support this here as well. I suggest that I add support debug
-on UART0 with my cubieboard patches.
+I just got my BeagleBone replaced via RMA, and so I could try a fresh
+build of 3.7.0-rc5 with omap2plus_defconfig. It works just fine for me.
 
-So:
+A few details:
 
-Acked-by: Stefan Roese <sr@denx.de>
+U-Boot SPL 2012.10-rc1-00148-g4668a08 (Sep 30 2012 - 09:35:20)
+U-Boot 2012.10-rc1-00148-g4668a08 (Sep 30 2012 - 09:35:20)
+
+ setenv ipaddr 192.168.0.77
+ setenv serverip 192.168.0.12
+ setenv netmask 255.255.255.0
+ setenv bootargs console=ttyO0,115200n8 mem=256M root=/dev/ram rw initrd=0x82000000,16MB ramdisk_size=16384 earlyprintk=serial
+ tftp 81000000 uImage
+ tftp 82000000 beaglebone-initrd.gz
+ tftp 80000000 am335x-bone.dtb
+ bootm 81000000 - 80000000
+
+So I guess just using a recent u-boot will fix whatever issues you are
+seeing.
 
 Thanks,
-Stefan
+Richard
