@@ -1,91 +1,88 @@
-From: mdburkey@gmail.com (Michael D. Burkey)
-Date: Fri, 16 Nov 2012 13:18:37 -0500
-Subject: [PATCH] ARM: imx: ehci: fix host power mask bit
-In-Reply-To: <20121116145529.GU10369@pengutronix.de>
-References: <1353063197.3647.27.camel@mars> <20121116142531.228251f6@eb-e6520>
- <1353076764.3647.35.camel@mars> <20121116145529.GU10369@pengutronix.de>
-Message-ID: <D86EF7D85AF34F96AEC436651EEBB180@Chronos>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 16 Nov 2012 20:21:46 +0200
+Subject: tfp410 and i2c_bus_num (was: Re: [PATCH] OMAP: board-files: fix
+ i2c_bus for tfp410)
+In-Reply-To: <50A65E40.9040208@ti.com>
+References: <1353068553-26897-1-git-send-email-tomi.valkeinen@ti.com>
+ <20121116135155.GE18527@arwen.pp.htv.fi> <50A64D35.9050109@ti.com>
+ <20121116151959.GA19411@arwen.pp.htv.fi> <50A65E40.9040208@ti.com>
+Message-ID: <20121116182146.GC20496@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Great!
+Hi,
 
-Also, be aware that this bug/fix needs to be applied to both the Linux 
-kernel and to BareBox as well.
+On Fri, Nov 16, 2012 at 05:39:44PM +0200, Tomi Valkeinen wrote:
+> >>> To be fair, the whole i2c_bus_num looks like a big hackery introduced by
+> >>> the way panel drivers are written for OMAP DSS.
+> >>>
+> >>> TFP410 is an I2C client, not an OMAPDSS client. After a quick look at
+> >>> the driver, there's is no such thing as a DSS bus, so looks like you
+> >>> should have an I2C driver for TFP410 and the whole DSS stuff should be
+> >>> just a list of clients, but not a struct bus at all.
+> >>>
+> >>> The fact that you have to pass the I2C bus number down to the panel
+> >>> driver is already a big indication of how wrong this is, IMHO.
+> >>
+> >> Without going deeper in the dss device model problems, I would agree
+> >> with you if this was about i2c panel, but this is not quite like that.
+> >>
+> >> A panel controlled via i2c would be an i2c device. But TFP410 is not
+> >> controlled via i2c. It's not really controlled at all except via
+> >> power-down gpio. TFP410 doesn't need the i2c to be functional at all.
+> > 
+> > then why does it need the i2c adapter ? What is this power-down gpio ?
+> > Should that be hidden under gpiolib instead ?
+> 
+> For the i2c, see below. Power-down GPIO is used to power down and up the
+> tfp410 chip.
 
-Thanks,
-Michael Burkey
+that much I guessed ;-) Should it be hidden under gpiolib ?
 
+> >> The i2c lines do not even touch TFP410 chip, so to be precise, the i2c
+> >> lines should not be TFP410's concern. The i2c lines come from the
+> >> monitor and go to OMAP's i2c pins. But TFP410 driver is a convenient
+> >> place to manage them.
+> > 
+> > fair enough... but who's actually using those i2c lines ? OMAP is the
+> > I2C master, who's the slave ? It's something in the monitor, I assume...
+> > 
+> > IIUC, this I2C bus goes over the HDMI wire ?
+> 
+> Yes, the i2c goes over HDMI wire. OMAP is the master, monitor is the
+> slave. You can see some more info from
+> http://en.wikipedia.org/wiki/Display_Data_Channel under DDC2 section.
+> 
+> It is used to read the EDID
+> (http://en.wikipedia.org/wiki/Extended_display_identification_data)
+> information from the monitor, which tells things like supported video
+> timings etc.
+> 
+> As for why the tfp410 driver handles the i2c... We don't have a better
+> place. There's no driver for the monitor. Although in the future with
 
------ Original Message ----- 
-From: "Sascha Hauer" <s.hauer@pengutronix.de>
-To: "Christoph Fritz" <chf.fritz@googlemail.com>
-Cc: "Eric B?nard" <eric@eukrea.com>; "Sascha Hauer" <kernel@pengutronix.de>; 
-"Fabio Estevam" <fabio.estevam@freescale.com>; "Michael Burkey" 
-<mdburkey@gmail.com>; "Greg Kroah-Hartman" <gregkh@linuxfoundation.org>; 
-"Stable" <stable@vger.kernel.org>; "Hans J. Koch" <hjk@hansjkoch.de>; 
-"Daniel Mack" <daniel@caiaq.de>; "Christian Hemp" <c.hemp@phytec.de>; 
-<linux-arm-kernel@lists.infradead.org>
-Sent: Friday, November 16, 2012 9:55 AM
-Subject: Re: [PATCH] ARM: imx: ehci: fix host power mask bit
+than that's wrong :-) If TFP410 isn't really using I2C it shouldn't need
+the whole i2c_bus_num logic. I'm far from fully understanding dss
+architecture but it looks like what you want is a generic 'i2c-edid.c'
+which just reads the edid structure during probe and caches the values
+and exposes them via sysfs ?!? (perhaps you also need a kernel API to
+read those values... I don't know; but that's also doable).
 
+If you have a generic i2c-edid.c simple driver, I guess X could be
+changes to read those values from sysfs and take actions based on those.
 
-> On Fri, Nov 16, 2012 at 03:39:24PM +0100, Christoph Fritz wrote:
->> This patch sets HPM (Host power mask bit) to bit 16 according to i.MX
->> Reference Manual. Falsely it was set to bit 8, but this controls pull-up
->> Impedance.
->>
->> Reported-by: Michael Burkey <mdburkey@gmail.com>
->> Cc: Stable <stable@vger.kernel.org>
->> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
->> Acked-by: Eric B?nard <eric@eukrea.com>
->
-> Applied, thanks
->
-> Sascha
->
->> ---
->>  arch/arm/mach-imx/ehci-imx25.c |    2 +-
->>  arch/arm/mach-imx/ehci-imx35.c |    2 +-
->>  2 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-imx/ehci-imx25.c 
->> b/arch/arm/mach-imx/ehci-imx25.c
->> index 27e40d1..134c190 100644
->> --- a/arch/arm/mach-imx/ehci-imx25.c
->> +++ b/arch/arm/mach-imx/ehci-imx25.c
->> @@ -30,7 +30,7 @@
->>  #define MX25_H1_SIC_SHIFT 21
->>  #define MX25_H1_SIC_MASK (0x3 << MX25_H1_SIC_SHIFT)
->>  #define MX25_H1_PP_BIT (1 << 18)
->> -#define MX25_H1_PM_BIT (1 << 8)
->> +#define MX25_H1_PM_BIT (1 << 16)
->>  #define MX25_H1_IPPUE_UP_BIT (1 << 7)
->>  #define MX25_H1_IPPUE_DOWN_BIT (1 << 6)
->>  #define MX25_H1_TLL_BIT (1 << 5)
->> diff --git a/arch/arm/mach-imx/ehci-imx35.c 
->> b/arch/arm/mach-imx/ehci-imx35.c
->> index a596f70..554e7cc 100644
->> --- a/arch/arm/mach-imx/ehci-imx35.c
->> +++ b/arch/arm/mach-imx/ehci-imx35.c
->> @@ -30,7 +30,7 @@
->>  #define MX35_H1_SIC_SHIFT 21
->>  #define MX35_H1_SIC_MASK (0x3 << MX35_H1_SIC_SHIFT)
->>  #define MX35_H1_PP_BIT (1 << 18)
->> -#define MX35_H1_PM_BIT (1 << 8)
->> +#define MX35_H1_PM_BIT (1 << 16)
->>  #define MX35_H1_IPPUE_UP_BIT (1 << 7)
->>  #define MX35_H1_IPPUE_DOWN_BIT (1 << 6)
->>  #define MX35_H1_TLL_BIT (1 << 5)
->> -- 
->> 1.7.10.4
->>
->>
->>
->>
->
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 | 
+Looks like even drm_edid.c should change, btw.
+
+> common panel framework perhaps we will.
+
+ok, good ;-)
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/5c18aeda/attachment-0001.sig>
