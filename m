@@ -1,16 +1,15 @@
 From: martin@ronetix.at (Martin Peevski)
-Date: Fri, 16 Nov 2012 09:25:51 +0200
+Date: Fri, 16 Nov 2012 12:26:47 +0200
 Subject: Configure the USB device/host on sam9g25 module
 In-Reply-To: <cc2fa961-1156-48b8-b805-6583df35e126@email.android.com>
 References: <50A51978.7040001@ronetix.at>
  <cc2fa961-1156-48b8-b805-6583df35e126@email.android.com>
-Message-ID: <50A5EA7F.1010304@ronetix.at>
+Message-ID: <50A614E7.9090308@ronetix.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-the evaluation kit sam9x5-ek is supplied with micro USB connector, I 
-think it's impossible to connect mini USB on that?
+Hi again!
+There were no problem, thank you for the time!
 
 
 On 15/11/12 18:56, Zhong Li wrote:
@@ -53,4 +52,4 @@ On 15/11/12 18:56, Zhong Li wrote:
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/704df9b1/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/71176673/attachment-0001.html>
