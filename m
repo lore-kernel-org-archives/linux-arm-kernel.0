@@ -1,39 +1,128 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 16 Nov 2012 15:41:15 +0900
-Subject: [Resend v6 PATCH 2/2] ASoC: atmel-ssc: add pinctrl consumer
-In-Reply-To: <50A5DE4E.80206@atmel.com>
-References: <1353045837-19474-1-git-send-email-voice.shen@atmel.com>
- <1353045837-19474-2-git-send-email-voice.shen@atmel.com>
- <20121116061250.GP4387@opensource.wolfsonmicro.com>
- <50A5DE4E.80206@atmel.com>
-Message-ID: <20121116064113.GQ4387@opensource.wolfsonmicro.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Fri, 16 Nov 2012 06:45:29 +0000
+Subject: [PATCH 17/17] mtd: m25p80: change the m25p80_read to reading
+ page to page
+In-Reply-To: <20121112091239.GA8518@sapphire.tkos.co.il>
+References: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
+ <1352710357-3265-18-git-send-email-wenyou.yang@atmel.com>
+ <20121112091239.GA8518@sapphire.tkos.co.il>
+Message-ID: <B256D81BAE5131468A838E5D7A24364139FA506F@penmbx02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2012 at 02:33:50PM +0800, Bo Shen wrote:
-> On 11/16/2012 14:12, Mark Brown wrote:
+Hi Baruch,
 
-> >No, this isn't what was meant - the idea is to send only the addition of
-> >pinctrl data as one patch, based off the ASoC branch instead of -next.
+Thanks a lot for your feedback.
+I looked through the drive code carefully again, I think I should fix this bug inside my driver.
+I will fix in the next version.
 
-> What is the pinctrl data? (This patch can be applied on
+Best Regards
+Wenyou Yang
 
-The data you're adding in the device tree!
-
-> sound/topic/atmel branch without any conflicts)
-
-That's not helpful to anyone doing bisection if there's nothing defining
-the pin states, it means that the system won't be able to start the
-driver as the API call will fail.
-
-> The other one add pinctrl nodes, must based on -next, or else I
-> don't know where should I add the pinctrl nodes.
-
-What makes you say this?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/60a95485/attachment.sig>
+> -----Original Message-----
+> From: Baruch Siach [mailto:baruch at tkos.co.il]
+> Sent: 2012?11?12? 17:13
+> To: Yang, Wenyou
+> Cc: linux-arm-kernel at lists.infradead.org; dwmw2 at infradead.org; Lin, JM; Ferre,
+> Nicolas; linux-mtd at lists.infradead.org
+> Subject: Re: [PATCH 17/17] mtd: m25p80: change the m25p80_read to reading page
+> to page
+> 
+> Hi Wenyou Yang,
+> 
+> On Mon, Nov 12, 2012 at 04:52:37PM +0800, Wenyou Yang wrote:
+> > When run "flashcp /bin/busybox /dev/mtdX", it arised a OOPS. changing to fix the
+> [BUG].
+> 
+> Please post the BUG printout, and include it with the commit log.
+> 
+> baruch
+> 
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > Cc: dwmw2 at infradead.org
+> > Cc: linux-mtd at lists.infradead.org
+> > ---
+> >  drivers/mtd/devices/m25p80.c |   44
+> +++++++++++++++++++++++++++++++++++++++---
+> >  1 file changed, 41 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+> > index 03838ba..73e5fea 100644
+> > --- a/drivers/mtd/devices/m25p80.c
+> > +++ b/drivers/mtd/devices/m25p80.c
+> > @@ -340,6 +340,7 @@ static int m25p80_read(struct mtd_info *mtd, loff_t from,
+> size_t len,
+> >  	size_t *retlen, u_char *buf)
+> >  {
+> >  	struct m25p *flash = mtd_to_m25p(mtd);
+> > +	u32 page_offset, page_size;
+> >  	struct spi_transfer t[2];
+> >  	struct spi_message m;
+> >
+> > @@ -358,7 +359,6 @@ static int m25p80_read(struct mtd_info *mtd, loff_t from,
+> size_t len,
+> >  	spi_message_add_tail(&t[0], &m);
+> >
+> >  	t[1].rx_buf = buf;
+> > -	t[1].len = len;
+> >  	spi_message_add_tail(&t[1], &m);
+> >
+> >  	mutex_lock(&flash->lock);
+> > @@ -379,9 +379,47 @@ static int m25p80_read(struct mtd_info *mtd, loff_t from,
+> size_t len,
+> >  	flash->command[0] = OPCODE_READ;
+> >  	m25p_addr2cmd(flash, from, flash->command);
+> >
+> > -	spi_sync(flash->spi, &m);
+> > +	page_offset = from & (flash->page_size - 1);
+> > +
+> > +	/* do all the bytes fit onto one page? */
+> > +	if (page_offset + len <= flash->page_size) {
+> > +		t[1].len = len;
+> > +
+> > +		spi_sync(flash->spi, &m);
+> > +
+> > +		*retlen = m.actual_length - m25p_cmdsz(flash)
+> > +					- FAST_READ_DUMMY_BYTE;
+> > +
+> > +	} else {
+> > +		u32 i;
+> > +
+> > +		/* the size of data remaining on the first page */
+> > +		page_size = flash->page_size - page_offset;
+> > +
+> > +		t[1].len = page_size;
+> > +		spi_sync(flash->spi, &m);
+> > +
+> > +		*retlen = m.actual_length - m25p_cmdsz(flash)
+> > +					- FAST_READ_DUMMY_BYTE;
+> > +
+> > +		/* write everything in flash->page_size chunks */
+> > +		for (i = page_size; i < len; i += page_size) {
+> > +			page_size = len - i;
+> > +			if (page_size > flash->page_size)
+> > +				page_size = flash->page_size;
+> > +
+> > +			/* write the next page to flash */
+> > +			m25p_addr2cmd(flash, from + i, flash->command);
+> > +
+> > +			t[1].rx_buf = buf + i;
+> > +			t[1].len = page_size;
+> > +
+> > +			spi_sync(flash->spi, &m);
+> >
+> > -	*retlen = m.actual_length - m25p_cmdsz(flash) - FAST_READ_DUMMY_BYTE;
+> > +			*retlen += m.actual_length - m25p_cmdsz(flash)
+> > +						- FAST_READ_DUMMY_BYTE;
+> > +		}
+> > +	}
+> >
+> >  	mutex_unlock(&flash->lock);
+> >
+> > --
+> > 1.7.9.5
+> 
+> --
+>      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+> =}------------------------------------------------ooO--U--Ooo------------{=
+>    - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
