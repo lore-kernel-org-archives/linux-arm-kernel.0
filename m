@@ -1,113 +1,31 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 16 Nov 2012 16:03:52 +0800
-Subject: [PATCH v3 1/3] serial: mxs-auart: distinguish the different SOCs
-In-Reply-To: <1353053034-10944-1-git-send-email-b32955@freescale.com>
-References: <1353053034-10944-1-git-send-email-b32955@freescale.com>
-Message-ID: <1353053034-10944-2-git-send-email-b32955@freescale.com>
+From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
+Date: Fri, 16 Nov 2012 10:50:49 +0200
+Subject: [PATCH 1/8] mtd: diskonchip: don't warn about ARM architecture
+In-Reply-To: <1352238933-4886-2-git-send-email-arnd@arndb.de>
+References: <1352238933-4886-1-git-send-email-arnd@arndb.de>
+ <1352238933-4886-2-git-send-email-arnd@arndb.de>
+Message-ID: <1353055849.20111.7.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current mxs-auart driver is used for both mx23 and mx28.
+On Tue, 2012-11-06 at 22:55 +0100, Arnd Bergmann wrote:
+> Enabling the diskonchip drivers on most architectures results
+> in a pointless warning "#warning Unknown architecture for
+> DiskOnChip. No default probe locations defined". The driver
+> can in fact handle the default location already through the
+> CONFIG_MTD_DOCPROBE_ADDRESS, which gets set on the platforms
+> that need it, and we get a run-time error if this is not
+> set correctly.
 
-But in mx23, the DMA has a bug(see errata:2836). We can not add the
-DMA support in mx23, but we can add DMA support to auart in mx28.
+Pushed patches 1, 2, and 3 to l2-mtd.git, thanks!
 
-So in order to add the DMA support for the auart in mx28, we should
-distinguish the distinguish SOCs.
-
-This patch adds a new platform_device_id table and a inline function
-is_imx28_auart() to distinguish the mx23 and mx28.
-
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- drivers/tty/serial/mxs-auart.c |   42 ++++++++++++++++++++++++++++++++++-----
- 1 files changed, 36 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 6db3baa..06d7271 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -114,11 +114,17 @@
- 
- static struct uart_driver auart_driver;
- 
-+enum mxs_auart_type {
-+	IMX23_AUART,
-+	IMX28_AUART,
-+};
-+
- struct mxs_auart_port {
- 	struct uart_port port;
- 
- 	unsigned int flags;
- 	unsigned int ctrl;
-+	enum mxs_auart_type devtype;
- 
- 	unsigned int irq;
- 
-@@ -126,6 +132,29 @@ struct mxs_auart_port {
- 	struct device *dev;
- };
- 
-+static struct platform_device_id mxs_auart_devtype[] = {
-+	{ .name = "mxs-auart-imx23", .driver_data = IMX23_AUART },
-+	{ .name = "mxs-auart-imx28", .driver_data = IMX28_AUART },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(platform, mxs_auart_devtype);
-+
-+static struct of_device_id mxs_auart_dt_ids[] = {
-+	{
-+		.compatible = "fsl,imx28-auart",
-+		.data = &mxs_auart_devtype[IMX28_AUART]
-+	}, {
-+		.compatible = "fsl,imx23-auart",
-+		.data = &mxs_auart_devtype[IMX23_AUART]
-+	}, { /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mxs_auart_dt_ids);
-+
-+static inline int is_imx28_auart(struct mxs_auart_port *s)
-+{
-+	return s->devtype == IMX28_AUART;
-+}
-+
- static void mxs_auart_stop_tx(struct uart_port *u);
- 
- #define to_auart_port(u) container_of(u, struct mxs_auart_port, port)
-@@ -706,6 +735,8 @@ static int serial_mxs_probe_dt(struct mxs_auart_port *s,
- 
- static int __devinit mxs_auart_probe(struct platform_device *pdev)
- {
-+	const struct of_device_id *of_id =
-+			of_match_device(mxs_auart_dt_ids, &pdev->dev);
- 	struct mxs_auart_port *s;
- 	u32 version;
- 	int ret = 0;
-@@ -730,6 +761,11 @@ static int __devinit mxs_auart_probe(struct platform_device *pdev)
- 		goto out_free;
- 	}
- 
-+	if (of_id) {
-+		pdev->id_entry = of_id->data;
-+		s->devtype = pdev->id_entry->driver_data;
-+	}
-+
- 	s->clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(s->clk)) {
- 		ret = PTR_ERR(s->clk);
-@@ -805,12 +841,6 @@ static int __devexit mxs_auart_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct of_device_id mxs_auart_dt_ids[] = {
--	{ .compatible = "fsl,imx23-auart", },
--	{ /* sentinel */ }
--};
--MODULE_DEVICE_TABLE(of, mxs_auart_dt_ids);
--
- static struct platform_driver mxs_auart_driver = {
- 	.probe = mxs_auart_probe,
- 	.remove = __devexit_p(mxs_auart_remove),
 -- 
-1.7.0.4
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/77b59189/attachment.sig>
