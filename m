@@ -1,26 +1,75 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 16 Nov 2012 15:48:56 -0200
-Subject: [PATCH 2/4] ARM: imx: add imx5x usbmisc clock lookups
-In-Reply-To: <20121116141957.GT10369@pengutronix.de>
-References: <1352988014-14769-1-git-send-email-m.grzeschik@pengutronix.de>
- <1352988014-14769-3-git-send-email-m.grzeschik@pengutronix.de>
- <20121116092515.GM10369@pengutronix.de>
- <20121116142846.GI2941@S2100-06.ap.freescale.net>
- <20121116141957.GT10369@pengutronix.de>
-Message-ID: <CAOMZO5A_MjumL8LnkYOxQ60mQ6wxUkVyw6P3qMbYESrU4CdBew@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 16 Nov 2012 10:54:25 -0700
+Subject: [PATCH] ARM: tegra: whistler: enable HDMI port
+Message-ID: <1353088465-25556-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha,
+From: Stephen Warren <swarren@nvidia.com>
 
-On Fri, Nov 16, 2012 at 12:19 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+Enable host1x, and the HDMI output. Whistler also has a DSI-based LCD,
+and a VGA output. tegradrm doesn't support either of those output types
+yet.
 
-> I didn't have the intention to volunteer for this job ;)
-> Anyway, I'll see if I find time for this.
+Based on work by Thierry Reding for TrimSlice.
 
-I sent a RFC patch for this conversion. Only built-tested, as I don't
-have access to any mx5 board now.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20-whistler.dts |   21 +++++++++++++++++++--
+ 1 file changed, 19 insertions(+), 2 deletions(-)
 
-Regards,
-
-Fabio Estevam
+diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
+index 94a71c9..20d576e 100644
+--- a/arch/arm/boot/dts/tegra20-whistler.dts
++++ b/arch/arm/boot/dts/tegra20-whistler.dts
+@@ -10,6 +10,18 @@
+ 		reg = <0x00000000 0x20000000>;
+ 	};
+ 
++	host1x {
++		hdmi {
++			status = "okay";
++
++			vdd-supply = <&hdmi_vdd_reg>;
++			pll-supply = <&hdmi_pll_reg>;
++
++			nvidia,ddc-i2c-bus = <&hdmi_ddc>;
++			nvidia,hpd-gpio = <&gpio 111 0>; /* PN7 */
++		};
++	};
++
+ 	pinmux {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&state_default>;
+@@ -246,6 +258,11 @@
+ 		clock-frequency = <216000000>;
+ 	};
+ 
++	hdmi_ddc: i2c at 7000c400 {
++		status = "okay";
++		clock-frequency = <100000>;
++	};
++
+ 	i2c at 7000d000 {
+ 		status = "okay";
+ 		clock-frequency = <100000>;
+@@ -356,7 +373,7 @@
+ 					regulator-always-on;
+ 				};
+ 
+-				ldo6 {
++				hdmi_pll_reg: ldo6 {
+ 					regulator-name = "nvvdd_ldo6,avdd_hdmi_pll";
+ 					regulator-min-microvolt = <1800000>;
+ 					regulator-max-microvolt = <1800000>;
+@@ -388,7 +405,7 @@
+ 					regulator-always-on;
+ 				};
+ 
+-				ldo11 {
++				hdmi_vdd_reg: ldo11 {
+ 					regulator-name = "nvvdd_ldo11,vddio_pex_clk,vcom_33,avdd_hdmi";
+ 					regulator-min-microvolt = <3300000>;
+ 					regulator-max-microvolt = <3300000>;
+-- 
+1.7.10.4
