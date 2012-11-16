@@ -1,22 +1,81 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 16 Nov 2012 10:28:04 +0900
-Subject: [Patch v6 4/4] ASoC: at91sam9g20ek-wm8731: convert to dt support
-In-Reply-To: <1352887751-21848-5-git-send-email-voice.shen@atmel.com>
-References: <1352887751-21848-1-git-send-email-voice.shen@atmel.com>
- <1352887751-21848-5-git-send-email-voice.shen@atmel.com>
-Message-ID: <20121116012802.GK4387@opensource.wolfsonmicro.com>
+From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
+Date: Fri, 16 Nov 2012 10:49:15 +0900
+Subject: [PATCH v2 00/10] serial: sh-sci fixes - console PM, SCIFB, SMP lockup,
+ etc.
+In-Reply-To: <20121116010107.GA6068@kroah.com>
+References: <509A0658.1010503@renesas.com> <509A0B4E.1030801@renesas.com>
+ <20121116010107.GA6068@kroah.com>
+Message-ID: <50A59B9B.2010501@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2012 at 06:09:11PM +0800, Bo Shen wrote:
-> convert at91sam9g20ek with wm8731 to device tree support
+Hi Greg,
 
-Applied, thanks.  Now I have a board with full DT enablement I can run
-(I think...)!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/941f9f50/attachment.sig>
+On 11/16/2012 10:01 AM, Greg KH wrote:> On Wed, Nov 07, 2012 at 04:18:38PM +0900, Shinya Kuribayashi wrote:
+>> On 11/7/2012 3:57 PM, Shinya Kuribayashi wrote:
+>>> Hi Paul and serial forks,
+>> [...]
+>>> Takashi YOSHII (4):
+>>>       serial: sh-sci: fix condition test to set SCBRR
+>>>       serial: sh-sci: support lower baud rate
+>>>       serial: sh-sci: mask SCTFDR/RFDR according to fifosize
+>>>       serial: sh-sci: fix common SCIFB regmap definition
+>>>
+>>> Teppei Kamijou (1):
+>>>       serial: sh-sci: console runtime PM support (revisit)
+>>>
+>>>  drivers/tty/serial/sh-sci.c | 140 ++++++++++++++++++--------------------------
+>>>  1 file changed, 56 insertions(+), 84 deletions(-)
+>>
+>> Oops, I forgot to append proper From: author lines in five commits
+>> (patch 04/10 to 09/10).  Didn't mean to supersede your authoship.
+>>
+>> I'd respin the patchset later, waiting for some feedback.
+> 
+> Can you please resend this with this fixed up if you want to get this
+> into 3.8?
+
+Thanks for your kind reminder.  Here's v2, providing From: authorship
+lines in five patches (04 to 08).  No logical change in the patches.
+
+--- 8< ---
+
+V2: provide missing authorship From: lines in five patches (04 to 08)
+
+Here are sh-sci serial driver fixes that have been cooking for months
+privately on my end:
+* rework console PM with the help of serial-core's uart_change_pm()
+* provide missing piece in SCIFB support (from Yoshii-san)
+* address console write function vs. SMP lockup issue
+
+and so on.  Comments and suggestions are welcome.
+
+Build tested with vanilla v3.6, but not boot- nor PM-tested with
+newer kernels after v3.4.  Anyone with can-sleep shmobile systems,
+please give it try.
+
+Thanks in advance,
+
+----------------------------------------------------------------
+Shinya Kuribayashi (5):
+      Revert "sh-sci / PM: Avoid deadlocking runtime PM"
+      Revert "sh-sci / PM: Use power.irq_safe"
+      Partially revert "serial: sh-sci: console Runtime PM support"
+      serial: sh-sci: add locking to console write function to avoid SMP lockup
+      serial: sh-sci: fix possible race cases on SCSCR register accesses
+
+Takashi YOSHII (4):
+      serial: sh-sci: fix condition test to set SCBRR
+      serial: sh-sci: support lower baud rate
+      serial: sh-sci: mask SCTFDR/RFDR according to fifosize
+      serial: sh-sci: fix common SCIFB regmap definition
+
+Teppei Kamijou (1):
+      serial: sh-sci: console runtime PM support (revisit)
+
+ drivers/tty/serial/sh-sci.c | 140 ++++++++++++++++++--------------------------
+ 1 file changed, 56 insertions(+), 84 deletions(-)
+
+-- 
+Shinya Kuribayashi
+Renesas Electronics
