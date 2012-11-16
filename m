@@ -1,103 +1,55 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 16 Nov 2012 10:39:33 +0100
-Subject: [PATCH RESEND 3/4] pinctrl: at91: Prevent NULL dereference if
- of_match_device returns NULL
-In-Reply-To: <50A5FB17.1050208@atmel.com>
-References: <1352955096.6793.1.camel@phoenix> <1352955266.6793.4.camel@phoenix>
- <1352955480.6793.8.camel@phoenix>
- <20121115100012.GA4398@game.jcrosoft.org>
- <50A5FB17.1050208@atmel.com>
-Message-ID: <20121116093933.GE4398@game.jcrosoft.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 16 Nov 2012 10:44:57 +0100
+Subject: [PATCH V2 0/3] Add hardware I/O coherency support for Armada 370/XP
+Message-ID: <1353059100-24022-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:36 Fri 16 Nov     , Nicolas Ferre wrote:
-> On 11/15/2012 11:00 AM, Jean-Christophe PLAGNIOL-VILLARD :
-> > On 12:58 Thu 15 Nov     , Axel Lin wrote:
-> >> of_match_device() may return NULL.
-> > this is not possible on at91
-> > 
-> > and I do a oups here as if we have a NULL pointer which means the driver is
-> > wrong
-> 
-> Well, okay, but it does not prevent from adding a supplementary check to
-> mimic every other pinctrl driver and use a common return path to the
-> of_match_device() function.
-> 
-> So I am not completely against this patch (that I why I added my Acked-by).
-here it's a silent warning a oops it clear we have a bug
+The purpose of this patch set is to add hardware I/O Coherency support
+for Armada 370 and Armada XP. Theses SoCs come with an unit called
+coherency fabric. A beginning of the support for this unit have been
+introduced with the SMP patch set. This series extend this support:
+the coherency fabric unit allows to use the Armada XP and the Armada
+370 as nearly coherent architectures.
 
-Best Regards,
-J.
-> 
-> 
-> >> Signed-off-by: Axel Lin <axel.lin@ingics.com>
-> >> ---
-> >> This resend CC Jean-Christophe.
-> >>
-> >>  drivers/pinctrl/pinctrl-at91.c |   17 +++++++++++++----
-> >>  1 file changed, 13 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> >> index 8490a55..32006c8 100644
-> >> --- a/drivers/pinctrl/pinctrl-at91.c
-> >> +++ b/drivers/pinctrl/pinctrl-at91.c
-> >> @@ -829,13 +829,18 @@ static int __devinit at91_pinctrl_probe_dt(struct platform_device *pdev,
-> >>  	uint32_t *tmp;
-> >>  	struct device_node *np = pdev->dev.of_node;
-> >>  	struct device_node *child;
-> >> +	const struct of_device_id *match;
-> >>  
-> >>  	if (!np)
-> >>  		return -ENODEV;
-> >>  
-> >> +	match = of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
-> >> +	if (!match)
-> >> +		return -ENODEV;
-> >> +
-> >>  	info->dev = &pdev->dev;
-> >> -	info->ops = (struct at91_pinctrl_mux_ops*)
-> >> -		of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
-> >> +	info->ops = (struct at91_pinctrl_mux_ops *) match->data;
-> >> +
-> >>  	at91_pinctrl_child_count(info, np);
-> >>  
-> >>  	if (info->nbanks < 1) {
-> >> @@ -1359,6 +1364,7 @@ static struct of_device_id at91_gpio_of_match[] __devinitdata = {
-> >>  static int __devinit at91_gpio_probe(struct platform_device *pdev)
-> >>  {
-> >>  	struct device_node *np = pdev->dev.of_node;
-> >> +	const struct of_device_id *match;
-> >>  	struct resource *res;
-> >>  	struct at91_gpio_chip *at91_chip = NULL;
-> >>  	struct gpio_chip *chip;
-> >> @@ -1399,8 +1405,11 @@ static int __devinit at91_gpio_probe(struct platform_device *pdev)
-> >>  		goto err;
-> >>  	}
-> >>  
-> >> -	at91_chip->ops = (struct at91_pinctrl_mux_ops*)
-> >> -		of_match_device(at91_gpio_of_match, &pdev->dev)->data;
-> >> +	match = of_match_device(at91_gpio_of_match, &pdev->dev);
-> >> +	if (!match)
-> >> +		return -ENODEV;
-> >> +
-> >> +	at91_chip->ops = (struct at91_pinctrl_mux_ops *) match->data;
-> >>  	at91_chip->pioc_virq = irq;
-> >>  	at91_chip->pioc_idx = alias_idx;
-> >>  
-> >> -- 
-> >> 1.7.9.5
-> >>
-> >>
-> >>
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
-> > 
-> 
-> 
-> -- 
-> Nicolas Ferre
+The third patches enables this new feature and register our own set
+of DMA ops, to benefit this hardware enhancement.
+
+The first patches exports dma operation functions needed by to
+register our own set of dma ops.
+
+The second patch introduces a new flag for the address decoding
+configuration in order to be able to set the memory windows as
+shared memory.
+
+This series depend on the SMP patch set (V3 was posted on Monday)
+
+The git branch called HWIOCC-for-3.8-V2 is also available at
+https://github.com/MISL-EBU-System-SW/mainline-public.git.
+
+Changelog:
+V1 -> V2:
+- Rebased on to v3.7-rc5
+- Added a new patch to exports the dma ops functions
+- Renamed the function for a more generic name mvebu_hwcc
+- removed the non SMP case during init
+- spelling and wording issues
+- updating the binding documentation for coherency fabric
+
+Gregory CLEMENT (3):
+  arm: dma mapping: Export dma ops functions
+  arm: plat-orion: Add coherency attribute when setup mbus target
+  arm: mvebu: Add hardware I/O Coherency support
+
+ .../devicetree/bindings/arm/coherency-fabric.txt   |    9 ++-
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    3 +-
+ arch/arm/include/asm/dma-mapping.h                 |   62 +++++++++++++++++
+ arch/arm/mach-mvebu/addr-map.c                     |    3 +
+ arch/arm/mach-mvebu/coherency.c                    |   73 ++++++++++++++++++++
+ arch/arm/mm/dma-mapping.c                          |   36 +++-------
+ arch/arm/plat-orion/addr-map.c                     |    4 ++
+ arch/arm/plat-orion/include/plat/addr-map.h        |    1 +
+ 8 files changed, 160 insertions(+), 31 deletions(-)
+
+-- 
+1.7.9.5
