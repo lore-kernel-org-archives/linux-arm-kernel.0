@@ -1,47 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Nov 2012 17:42:05 +0000
-Subject: [PATCH] Documentation: correct argument list for
- of_platform_populate correction to match of_platform.h prototype
-In-Reply-To: <60BA5429A0E1584BA3633194F6F993B501482A65@NA-MBX-02.mgc.mentorg.com>
-References: <60BA5429A0E1584BA3633194F6F993B501482A65@NA-MBX-02.mgc.mentorg.com>
-Message-ID: <201211161742.06140.arnd@arndb.de>
+Date: Fri, 16 Nov 2012 17:46:15 +0000
+Subject: [GIT PULL] arm-soc: Xilinx zynq changes for v3.8
+In-Reply-To: <52241ede-3d28-43fc-967d-36ab64d52592@CH1EHSMHS038.ehs.local>
+References: <CAHTX3dLdGie9gtxbPq_gb8BLao7YYohqQWZFg3LzyNHxu=imdg@mail.gmail.com>
+ <201211161654.23470.arnd@arndb.de>
+ <52241ede-3d28-43fc-967d-36ab64d52592@CH1EHSMHS038.ehs.local>
+Message-ID: <201211161746.15629.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 November 2012, Chaiken, Alison wrote:
-> From fd4450ac6bdcf62a84b0d029b36506e7fd567688 Mon Sep 17 00:00:00 2001
-> From: Alison Chaiken <alchaiken@gmail.com>
-> Date: Thu, 1 Nov 2012 01:12:38 -0700
-> Subject: [PATCH] Argument list for of_platform_populate correction to match of_platform.h prototype
->  
-> Signed-off-by: Alison Chaiken <alison_chaiken@mentor.com>
+On Friday 16 November 2012, Michal Simek wrote:
+> > * Please provide a description of the series that I can put into the merge
+> > changeset, either in the introductory mail or (better) into the signed tag that
+> > you send (git tag -s). Have a look at how Tony Lindgren does this, he writes the
+> > best descriptions.
+> 
+> No. Do you have a link?
 
-Hi Alison,
+See for example http://www.spinics.net/lists/arm-kernel/msg207098.html
 
-Congratulations on your first patch on the arm mailing list!
-
-The patch looks obviously correct to me, so
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-Sergei already mentioned that the email was whitespace broken
-and had extra lines on top, which can happen when you use 
-thunderbird for sending the patch. See Documentation/email-clients.txt
-for how to deal with this. My usual recommendation is to use
-git-send-email.
-
-It also helps to include all maintainers that might be responsible
-for picking up the patch. In this case, there are three maintainers:
-Grant Likely and Rob Herring (both doing device tree) and Rob Landley
-(for Documentation). There are also two mailing lists, 
-linux-doc at vger.kernel.org and devicetree-discuss at lists.ozlabs.org.
-
-Adding all of the above to Cc increases the chances of someone
-actually applying the patch. Unfortunately not all of us get to
-apply patches we receive as fast as we should, and patches like
-yours could get applied by any of the three people. In doubt,
-you can always Cc everyone that scripts/get_maintainer.pl
-suggests, but if you know the people well, you can also trim
-down that list.
+This is a particularly long explanation, it doesn't normally have to
+be that verbose, but I probably won't ever complain about a changeset
+text being too long rather than too short, independent of whether
+it's a patch or a pull request.
 
 	Arnd
