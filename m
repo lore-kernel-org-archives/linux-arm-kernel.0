@@ -1,104 +1,50 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 16 Nov 2012 11:41:36 +0100
-Subject: [PATCH 4/6] ARM: sunxi: Add earlyprintk support
-In-Reply-To: <1353019586-21043-5-git-send-email-maxime.ripard@free-electrons.com>
-References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
- <1353019586-21043-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20121116114136.592dfa12@skate>
+From: shiraz.hashim@st.com (Shiraz Hashim)
+Date: Fri, 16 Nov 2012 16:16:50 +0530
+Subject: [PATCH] Set bit 22 in the PL310 (cache controller) AuxCtlr
+ register
+In-Reply-To: <20121112105641.GC2346@mudshark.cambridge.arm.com>
+References: <1352433712-16364-1-git-send-email-shiraz.hashim@st.com>
+ <20121109095400.GC2357@mudshark.cambridge.arm.com>
+ <20121112064547.GN32313@localhost.localdomain>
+ <20121112105641.GC2346@mudshark.cambridge.arm.com>
+Message-ID: <20121116104650.GI19100@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Maxime Ripard,
+Hi Catalin,
 
-On Thu, 15 Nov 2012 23:46:23 +0100, Maxime Ripard wrote:
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/Kconfig.debug         |    8 ++++++++
->  arch/arm/include/debug/sunxi.S |   22 ++++++++++++++++++++++
->  2 files changed, 30 insertions(+)
->  create mode 100644 arch/arm/include/debug/sunxi.S
+On Mon, Nov 12, 2012 at 10:56:41AM +0000, Will Deacon wrote:
+> On Mon, Nov 12, 2012 at 06:45:47AM +0000, Shiraz Hashim wrote:
+> > On Fri, Nov 09, 2012 at 09:54:01AM +0000, Will Deacon wrote:
+> > > On Fri, Nov 09, 2012 at 04:01:52AM +0000, Shiraz Hashim wrote:
+> > > > From: Catalin Marinas <catalin.marinas@arm.com>
+> > > > 
+> > > > Clearing bit 22 in the PL310 Auxiliary Control register (shared
+> > > > attribute override enable) has the side effect of transforming Normal
+> > > > Shared Non-cacheable reads into Cacheable no-allocate reads.
+> > > > 
+> > > > Coherent DMA buffers in Linux always have a Cacheable alias via the
+> > > > kernel linear mapping and the processor can speculatively load cache
+> > > > lines into the PL310 controller. With bit 22 cleared, Non-cacheable
+> > > > reads would unexpectedly hit such cache lines leading to buffer
+> > > > corruption.
+> > > 
+> > > Is this still the case with recent kernels? I thought the dma-mapping/cma
+> > > work avoided the cacheable alias, but perhaps I'm mistaken.
+> > 
+> > I haven't used CMA but DMA mappings are still normal memory
+> > non-cacheable.
 > 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index b0f3857..6672b02 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -345,6 +345,13 @@ choice
->  		  Say Y here if you want kernel low-level debugging support
->  		  on SOCFPGA based platforms.
->  
-> +	config DEBUG_SUNXI_UART
+> Ok, so trawling through the list reveals we only have this issue for normal
+> DMA mappings and not with CMA:
+> 
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/124276.html
+> 
+> I wonder whether we shouldn't just fix that, rather than work around it with
+> a PL310-specific hack?
 
-Should be DEBUG_SUNXI_UART1
+What do you say?
 
-> +		bool "Kernel low-level debugging messages via sunXi UART"
-
-UART1.
-
-> +		depends on ARCH_SUNXI
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on Allwinner A1X based platforms.
-
-Say a few words about UART1 here.
-
-> +
->  	config DEBUG_VEXPRESS_UART0_DETECT
->  		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
->  		depends on ARCH_VEXPRESS && CPU_CP15_MMU
-> @@ -416,6 +423,7 @@ config DEBUG_LL_INCLUDE
->  	default "debug/mvebu.S" if DEBUG_MVEBU_UART
->  	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
->  	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
-> +	default "debug/sunxi.S" if DEBUG_SUNXI_UART
-
-UART1
-
->  	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
->  		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
->  	default "mach/debug-macro.S"
-> diff --git a/arch/arm/include/debug/sunxi.S b/arch/arm/include/debug/sunxi.S
-> new file mode 100644
-> index 0000000..ffd101f
-> --- /dev/null
-> +++ b/arch/arm/include/debug/sunxi.S
-> @@ -0,0 +1,22 @@
-> +/*
-> + * Early serial output macro for Allwinner A1X SoCs
-> + *
-> + * Copyright (C) 2012 Maxime Ripard
-> + *
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#define SUNXI_UART1_PHYS_BASE	0x01c28400
-> +#define SUNXI_UART1_VIRT_BASE	0xf1c28400
-
-Maybe:
-
-#ifdef CONFIG_DEBUG_SUNXI_UART1
-#define SUNXI_UART_DEBUG_PHYS_BASE 0x01c28400
-#define SUNXI_UART_DEBUG_VIRT_BASE 0xf1c28400
-#endif
-
-> +	.macro	addruart, rp, rv, tmp
-> +	ldr	\rp, =SUNXI_UART1_PHYS_BASE
-> +	ldr	\rv, =SUNXI_UART1_VIRT_BASE
-
-And use SUNXI_UART_DEBUG_{VIRT,PHYS}_BASE here.
-
-So that people can come and add CONFIG_DEBUG_SUNXI_UART0 for the
-Cubieboard a bit more easily. Or you can even provision the code for
-the UART0 as well.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+--
+regards
+Shiraz
