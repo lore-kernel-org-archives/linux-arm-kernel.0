@@ -1,45 +1,44 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 16 Nov 2012 09:07:04 +0100
-Subject: [PATCH 0/5] i2c-sh_mobile non-urgent changes
-In-Reply-To: <5087C93F.6080601@renesas.com>
-References: <5087C93F.6080601@renesas.com>
-Message-ID: <20121116080704.GC8464@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Nov 2012 08:16:50 +0000
+Subject: Additional updates for armsoc-3.8
+In-Reply-To: <1353033963.11943.2.camel@gitbox>
+References: <1353033963.11943.2.camel@gitbox>
+Message-ID: <201211160816.50271.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 07:55:59PM +0900, Shinya Kuribayashi wrote:
-> Hello,
+On Friday 16 November 2012, Tony Prisk wrote:
+> Quick question,
 > 
-> This is the first batch to fix the i2c-sh_mobile driver.  As a first
-> step, this comprises of the SCL optimization work and a simple fix to
-> annoying spurious WAIT interrupt issue; in other words, this does not
-> change tx/rx data handling logic.
+> If I want to send further patches to armsoc for 3.8, should I write them
+> on top of the already pulled patches, or start from clean 3.7-rc?
 > 
-> This driver has an architectural problem with send/receive procedures
-> and needs a fundamental overhaul.  I've been working on splitting into
-> logical chunks, but not yet completed.
-> 
-> Patches are prepared against the vanilla v3.6.  I don't have a chance
-> to give it a try with v3.6+ kernels myself, but tend to be optimistic
-> about that.  I have been cooking these patches over a year, and they
-> work perfectly fine with older kernels ..v3.4 so far.
+> I know you like to pull from a -rc, but these changes are to add the
+> WM8850 support, and will change the already changed files from the
+> previous pull.
 
-Looks good to me, like the extensive patch descriptions. I am going to
-apply it to for-next with patches 2+3 squashed, because after patch 2 we
-would have a buggy state otherwise. Let me know if you are not okay with
-that.
+(adding Cc to linux-arm-kernel, I hope you don't mind and this is probably
+of interest to other people as well)
 
-Thanks,
+If it's easy to do, you should start from a fresh -rc. In this case, it
+sounds like it makes sense to start from the previously pulled branch.
+No problem there in principle, just mind the ordering of topics:
 
-   Wolfram
+When you check out the arm-soc tree, you can find a file named
+arch/arm/arm-soc-for-next-contents.txt that lists all the next/*
+branches and what has been pulled into them. The branches are
+roughly in order and sometimes have dependencies between them
+that are documented.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/3d2de104/attachment-0001.sig>
+In this case, you have contents in two branches, next/cleanup and
+next/multiplatform. If you want to submit another branch on top of this,
+the main requirement is that it can't go into a branch that I want to
+submit first (which would be "fixes-non-critical" or "headers". Support
+for a new soc would likely go into the "soc" branch, which comes after
+"cleanup" and "multiplatform", so there is no problem here.
+
+The specific set of branches and their order is usually similar from
+one release to the next, but not always the same, because it depends on
+what kind of changes we get during the cycle.
+
+	Arnd
