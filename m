@@ -1,50 +1,173 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Nov 2012 12:36:33 +0100
-Subject: [PATCH] RFC: pinctrl: grab default handler with bus notifiers
-In-Reply-To: <50A53304.6040904@wwwdotorg.org>
-References: <1352636539-6318-1-git-send-email-linus.walleij@stericsson.com>
- <50A15A54.3090803@wwwdotorg.org>
- <20121113063546.GD18224@opensource.wolfsonmicro.com>
- <CACRpkdY-tye5LNOwxQ-XrjM-x9RffAvj-tPfsFQA3ZWOY8P-Vw@mail.gmail.com>
- <50A53304.6040904@wwwdotorg.org>
-Message-ID: <CACRpkdYd6B-fTfUg18q5BjZRbY7sUAUNXA_7VPBs9SQoug9Q4w@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 16 Nov 2012 13:31:49 +0200
+Subject: [PATCH 5/9] usb: add phy connection by phy-mode
+In-Reply-To: <1352909950-32555-6-git-send-email-m.grzeschik@pengutronix.de>
+References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352909950-32555-6-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <20121116113149.GC17793@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 7:23 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 11/15/2012 07:03 AM, Linus Walleij wrote:
+Hi,
 
->> OK I'll have to come up with a patch to the device core
->> instead... it'll be much simpler anyway and if both of you guys
->> can back it I guess Greg might be OK with it too.
->
-> I did have one thought here; how will this interact with hogs? If a
-> device's pinctrl configuration must be pinctrl_get()'d before the device
-> is probed, then a pinctrl device with hogs will never get probed because
-> it won't be registered to provide the pinctrl node parsing.
+On Wed, Nov 14, 2012 at 05:19:06PM +0100, Michael Grzeschik wrote:
+> This patch makes it possible to set the connection of the usbphy to the
+> soc. It is derived from the oftree bindings for the ethernetphy and adds
+> similar helperfunctions.
+> 
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> ---
+>  drivers/of/Kconfig        |    4 ++++
+>  drivers/of/Makefile       |    1 +
+>  drivers/of/of_usbphy.c    |   49 +++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_usbphy.h |   15 ++++++++++++++
+>  include/linux/usb/phy.h   |    8 ++++++++
+>  5 files changed, 77 insertions(+)
+>  create mode 100644 drivers/of/of_usbphy.c
+>  create mode 100644 include/linux/of_usbphy.h
+> 
+> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+> index dfba3e6..28f99fb 100644
+> --- a/drivers/of/Kconfig
+> +++ b/drivers/of/Kconfig
+> @@ -67,6 +67,10 @@ config OF_MDIO
+>  	help
+>  	  OpenFirmware MDIO bus (Ethernet PHY) accessors
+>  
+> +config OF_USBPHY
+> +	depends on USB
+> +	def_bool y
+> +
+>  config OF_PCI
+>  	def_tristate PCI
+>  	depends on PCI
+> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+> index e027f44..fdcaf51 100644
+> --- a/drivers/of/Makefile
+> +++ b/drivers/of/Makefile
+> @@ -6,6 +6,7 @@ obj-$(CONFIG_OF_IRQ)    += irq.o
+>  obj-$(CONFIG_OF_DEVICE) += device.o platform.o
+>  obj-$(CONFIG_OF_I2C)	+= of_i2c.o
+>  obj-$(CONFIG_OF_NET)	+= of_net.o
+> +obj-$(CONFIG_OF_USBPHY)	+= of_usbphy.o
+>  obj-$(CONFIG_OF_SELFTEST) += selftest.o
+>  obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
+>  obj-$(CONFIG_OF_PCI)	+= of_pci.o
+> diff --git a/drivers/of/of_usbphy.c b/drivers/of/of_usbphy.c
+> new file mode 100644
+> index 0000000..2e71f7b
+> --- /dev/null
+> +++ b/drivers/of/of_usbphy.c
+> @@ -0,0 +1,49 @@
+> +/*
+> + * OF helpers for network devices.
+> + *
+> + * This file is released under the GPLv2
+> + *
+> + * Initially copied out of drivers/of/of_net.c
+> + */
+> +#include <linux/etherdevice.h>
+> +#include <linux/kernel.h>
+> +#include <linux/of_usbphy.h>
+> +#include <linux/usb/phy.h>
+> +#include <linux/export.h>
+> +
+> +/**
+> + * It maps 'enum usb_phy_interface' found in include/linux/usb/phy.h
+> + * into the device tree binding of 'phy-mode', so that USB
+> + * device driver can get phy interface from device tree.
+> + */
 
-Catch 22 :-(
+provide proper kernel-doc
 
-Yeah we need to come up with something there.
+> +static const char *usbphy_modes[] = {
+> +	[USBPHY_INTERFACE_MODE_NA]	= "",
+> +	[USBPHY_INTERFACE_MODE_UTMI]	= "utmi",
+> +	[USBPHY_INTERFACE_MODE_UTMIW]	= "utmiw",
+> +	[USBPHY_INTERFACE_MODE_ULPI]	= "ulpi",
+> +	[USBPHY_INTERFACE_MODE_SERIAL]	= "fsls",
+> +};
 
-> Solutions might include:
->
-> a) Some special case where if the pinctrl driver only can't probe due to
-> missing pinctrl from its own node, don't defer the probe, but defer the
-> pinctrl_get().
->
-> b) Separate out DT node parsing from device instantiation, so that the
-> driver can always parse the DT, without needing the context of a
-> specific pinctrl device to do so.
+In fact, these would be better off as constants:
 
-But this mechanism can't be device tree-specific, we have some
-of olschool pdata users and ACPI probing around the corner.
+#define USBPHY_INTERFACE_MODE_UTMI	1
+#define USBPHY_INTERFACE_MODE_UTMIW	2
+...
 
-I will likely just cook up something like seeing if the
-dev_name() for provider and consumer is the same and
-in that case avoid deferral.
+> +/**
+> + * of_get_phy_mode - Get phy mode for given device_node
+> + * @np:	Pointer to the given device_node
+> + *
+> + * The function gets phy interface string from property 'phy-mode',
+> + * and return its index in phy_modes table, or errno in error case.
+> + */
 
-Oh well, I'll try to actually code this now...
+why do you pass a string instead of passing an Integer ? This makes no
+sense to me.
 
-Yours,
-Linus Walleij
+> +const int of_get_usbphy_mode(struct device_node *np)
+> +{
+> +	const char *pm;
+> +	int err, i;
+> +
+> +	err = of_property_read_string(np, "phy-mode", &pm);
+> +	if (err < 0)
+> +		return err;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(usbphy_modes); i++)
+> +		if (!strcasecmp(pm, usbphy_modes[i]))
+> +			return i;
+> +
+> +	return -ENODEV;
+> +}
+> +EXPORT_SYMBOL_GPL(of_get_usbphy_mode);
+> diff --git a/include/linux/of_usbphy.h b/include/linux/of_usbphy.h
+> new file mode 100644
+> index 0000000..9a4132d
+> --- /dev/null
+> +++ b/include/linux/of_usbphy.h
+> @@ -0,0 +1,15 @@
+> +/*
+> + * OF helpers for usb devices.
+> + *
+> + * This file is released under the GPLv2
+> + */
+> +
+> +#ifndef __LINUX_OF_USBPHY_H
+> +#define __LINUX_OF_USBPHY_H
+> +
+> +#ifdef CONFIG_OF_USBPHY
+> +#include <linux/of.h>
+> +extern const int of_get_usbphy_mode(struct device_node *np);
+> +#endif
+> +
+> +#endif /* __LINUX_OF_USBPHY_H */
+> diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+> index a29ae1e..150eb69 100644
+> --- a/include/linux/usb/phy.h
+> +++ b/include/linux/usb/phy.h
+> @@ -12,6 +12,14 @@
+>  #include <linux/notifier.h>
+>  #include <linux/usb.h>
+>  
+> +enum usb_phy_interface {
+> +	USBPHY_INTERFACE_MODE_NA,
+> +	USBPHY_INTERFACE_MODE_UTMI,
+> +	USBPHY_INTERFACE_MODE_UTMIW,
+> +	USBPHY_INTERFACE_MODE_ULPI,
+> +	USBPHY_INTERFACE_MODE_SERIAL,
+> +};
+
+no documentation at all here... What does UTMIW mean ? Why do you mean
+the NA mode ?
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/d3cecaa9/attachment.sig>
