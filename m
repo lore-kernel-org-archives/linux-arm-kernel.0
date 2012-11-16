@@ -1,93 +1,98 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 16 Nov 2012 22:20:21 +0100
-Subject: [PATCHv2 0/7] Add basic support for Allwinner A1X SoCs
-Message-ID: <1353100828-9218-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 16 Nov 2012 22:20:22 +0100
+Subject: [PATCH 1/7] clk: sunxi: Add dummy fixed rate clock for Allwinner A1X
+ SoCs
+In-Reply-To: <1353100828-9218-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1353100828-9218-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1353100828-9218-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-You'll find in this patchset the initial support for Allwinner A10 and A13 SoCs
-from Allwinner. Since the internal name of these SoCs are sun4i and sun5i, the
-mach- directory is named sunxi.
-
-You can find these SoCs in the Cubieboard, the A13-olinuxino or the Melee
-A1000.
-
-Both SoCs should work fine, as the A13 is a trimmed down version of the A10,
-but it has only been tested on a A13-OlinuXino from Olimex.
-
-Support is quite minimal for now, since it only includes timer and IRQ
-controller drivers, so we can only boot to userspace through initramfs. Support
-for the other peripherals on these SoCs will come eventually.
-
-Thanks,
-Maxime
-
-Changes from v1:
-  - Changed the earlyprintk support to add a more generic mechanism, since boards
-    can have both the debug UART on UART0 or UART1
-  - Small fixes in the dt: moved the memory node to the dtsi, fixed the memory
-    size on A13
-  - Simplified the irq controller driver as suggested by Stefan Roese
-  - Removed the hardcoded clock frequency in the timer to a fixed rate clock using
-    clk framework
-  - Added a README file to the documentation to mention the supported SoCs and the
-    related datasheet
-
-Maxime Ripard (7):
-  clk: sunxi: Add dummy fixed rate clock for Allwinner A1X SoCs
-  clocksource: sunxi: Add Allwinner A1X Timer Driver
-  irqchip: sunxi: Add irq controller driver
-  ARM: sunxi: Add basic support for Allwinner A1x SoCs
-  ARM: sunxi: Add earlyprintk support
-  ARM: sunxi: Add device tree for the A13 and the Olinuxino board
-  ARM: sunxi: Add entry to MAINTAINERS
-
- Documentation/arm/sunxi/README                     |   19 +++
- .../interrupt-controller/allwinner,sunxi-ic.txt    |  104 ++++++++++++
- .../bindings/timer/allwinner,sunxi-timer.txt       |   17 ++
- MAINTAINERS                                        |    6 +
- arch/arm/Kconfig                                   |    2 +
- arch/arm/Kconfig.debug                             |    8 +
- arch/arm/Makefile                                  |    1 +
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/sun5i-olinuxino.dts              |   26 +++
- arch/arm/boot/dts/sun5i.dtsi                       |   74 +++++++++
- arch/arm/include/debug/sunxi.S                     |   24 +++
- arch/arm/mach-sunxi/Kconfig                        |    9 ++
- arch/arm/mach-sunxi/Makefile                       |    1 +
- arch/arm/mach-sunxi/Makefile.boot                  |    1 +
- arch/arm/mach-sunxi/sunxi.c                        |   60 +++++++
- arch/arm/mach-sunxi/sunxi.h                        |   20 +++
- drivers/clk/Makefile                               |    1 +
- drivers/clk/clk-sunxi.c                            |   30 ++++
- drivers/clocksource/Kconfig                        |    3 +
- drivers/clocksource/Makefile                       |    1 +
- drivers/clocksource/sunxi_timer.c                  |  170 ++++++++++++++++++++
- drivers/irqchip/Makefile                           |    1 +
- drivers/irqchip/irq-sunxi.c                        |  150 +++++++++++++++++
- include/linux/clk/sunxi.h                          |   22 +++
- include/linux/irqchip/sunxi.h                      |   27 ++++
- include/linux/sunxi_timer.h                        |   24 +++
- 26 files changed, 802 insertions(+)
- create mode 100644 Documentation/arm/sunxi/README
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-ic.txt
- create mode 100644 Documentation/devicetree/bindings/timer/allwinner,sunxi-timer.txt
- create mode 100644 arch/arm/boot/dts/sun5i-olinuxino.dts
- create mode 100644 arch/arm/boot/dts/sun5i.dtsi
- create mode 100644 arch/arm/include/debug/sunxi.S
- create mode 100644 arch/arm/mach-sunxi/Kconfig
- create mode 100644 arch/arm/mach-sunxi/Makefile
- create mode 100644 arch/arm/mach-sunxi/Makefile.boot
- create mode 100644 arch/arm/mach-sunxi/sunxi.c
- create mode 100644 arch/arm/mach-sunxi/sunxi.h
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Mike Turquette <mturquette@ti.com>
+---
+ drivers/clk/Makefile      |    1 +
+ drivers/clk/clk-sunxi.c   |   30 ++++++++++++++++++++++++++++++
+ include/linux/clk/sunxi.h |   22 ++++++++++++++++++++++
+ 3 files changed, 53 insertions(+)
  create mode 100644 drivers/clk/clk-sunxi.c
- create mode 100644 drivers/clocksource/sunxi_timer.c
- create mode 100644 drivers/irqchip/irq-sunxi.c
  create mode 100644 include/linux/clk/sunxi.h
- create mode 100644 include/linux/irqchip/sunxi.h
- create mode 100644 include/linux/sunxi_timer.h
 
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 71a25b9..9c300a8 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -19,6 +19,7 @@ endif
+ obj-$(CONFIG_MACH_LOONGSON1)	+= clk-ls1x.o
+ obj-$(CONFIG_ARCH_U8500)	+= ux500/
+ obj-$(CONFIG_ARCH_VT8500)	+= clk-vt8500.o
++obj-$(CONFIG_ARCH_SUNXI)	+= clk-sunxi.o
+ 
+ # Chip specific
+ obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
+diff --git a/drivers/clk/clk-sunxi.c b/drivers/clk/clk-sunxi.c
+new file mode 100644
+index 0000000..0e831b5
+--- /dev/null
++++ b/drivers/clk/clk-sunxi.c
+@@ -0,0 +1,30 @@
++/*
++ * Copyright 2012 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/clk/sunxi.h>
++#include <linux/of.h>
++
++static const __initconst struct of_device_id clk_match[] = {
++	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
++	{}
++};
++
++void __init sunxi_init_clocks(void)
++{
++	of_clk_init(clk_match);
++}
+diff --git a/include/linux/clk/sunxi.h b/include/linux/clk/sunxi.h
+new file mode 100644
+index 0000000..e074fdd
+--- /dev/null
++++ b/include/linux/clk/sunxi.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright 2012 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __LINUX_CLK_SUNXI_H_
++#define __LINUX_CLK_SUNXI_H_
++
++void __init sunxi_init_clocks(void);
++
++#endif
 -- 
 1.7.9.5
