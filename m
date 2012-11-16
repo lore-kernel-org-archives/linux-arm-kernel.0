@@ -1,33 +1,30 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 16 Nov 2012 22:20:28 +0100
-Subject: [PATCH 7/7] ARM: sunxi: Add entry to MAINTAINERS
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Nov 2012 21:40:23 +0000
+Subject: [PATCHv2 0/7] Add basic support for Allwinner A1X SoCs
 In-Reply-To: <1353100828-9218-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1353100828-9218-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1353100828-9218-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <201211162140.24094.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- MAINTAINERS |    6 ++++++
- 1 file changed, 6 insertions(+)
+On Friday 16 November 2012, Maxime Ripard wrote:
+> You'll find in this patchset the initial support for Allwinner A10 and A13 SoCs
+> from Allwinner. Since the internal name of these SoCs are sun4i and sun5i, the
+> mach- directory is named sunxi.
+> 
+> You can find these SoCs in the Cubieboard, the A13-olinuxino or the Melee
+> A1000.
+> 
+> Both SoCs should work fine, as the A13 is a trimmed down version of the A10,
+> but it has only been tested on a A13-OlinuXino from Olimex.
+> 
+> Support is quite minimal for now, since it only includes timer and IRQ
+> controller drivers, so we can only boot to userspace through initramfs. Support
+> for the other peripherals on these SoCs will come eventually.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 59203e7..7dbfcb7 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -685,6 +685,12 @@ M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
-+ARM/Allwinner A1X SoC support
-+M:	Maxime Ripard <maxime.ripard@free-electrons.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	arch/arm/mach-sunxi/
-+
- ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
- M:	Andrew Victor <linux@maxim.org.za>
- M:	Nicolas Ferre <nicolas.ferre@atmel.com>
--- 
-1.7.9.5
+Looks all great!
+
+Are you planning to send a pull request, or should we apply the port from
+patches?
+
+	Arnd
