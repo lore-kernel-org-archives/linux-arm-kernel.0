@@ -1,36 +1,71 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 16 Nov 2012 13:05:35 +0100
-Subject: [PATCH 0/4] i2c-s3c2410: Fix a bug and optimize code
-In-Reply-To: <1352981613-2098-1-git-send-email-ch.naveen@samsung.com>
-References: <1352981613-2098-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <20121116120535.GG19028@pengutronix.de>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Fri, 16 Nov 2012 14:06:46 +0200
+Subject: [PATCH 3/9] usb: chipidea: ci13xxx-imx: create dynamic
+ platformdata
+In-Reply-To: <1352909950-32555-4-git-send-email-m.grzeschik@pengutronix.de>
+References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352909950-32555-4-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <8762557nvt.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 05:43:29PM +0530, Naveen Krishna Chatradhi wrote:
-> The following set of patches fixes a bug in i2c-s3c2410 driver
-> with respect to the functioning of dedicated HDMIPHY channel.
-> 1. Removing unwanted spinlock
-> 2. Correcting the Stop sequence
-> 3. Optimizing the wait loop for bus idle.
-> 4. Removing unnecessary HDMI special cases
-> Respectively.
-> 
-> Daniel Kurtz (4):
->   i2c-s3c2410: grab adapter lock while changing i2c clock
->   i2c-s3c2410: do not generate STOP for QUIRK_HDMIPHY
->   i2c-s3c2410: use exponential back off while polling for bus idle
->   i2c-s3c2410: do not special case HDMIPHY stuck bus detection
+Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
 
-Applied this series to for-next, thanks!
+> This patch removes the limitation of having only one instance of the
+> ci13xxx-imx platformdata and makes different configurations possible.
+>
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> ---
+>  drivers/usb/chipidea/ci13xxx_imx.c |   27 ++++++++++++++++-----------
+>  1 file changed, 16 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+> index 570aedf..7b99c96 100644
+> --- a/drivers/usb/chipidea/ci13xxx_imx.c
+> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
+> @@ -87,15 +87,6 @@ EXPORT_SYMBOL_GPL(usbmisc_get_init_data);
+>  
+>  /* End of common functions shared by usbmisc drivers*/
+>  
+> -static struct ci13xxx_platform_data ci13xxx_imx_platdata __devinitdata  = {
+> -	.name			= "ci13xxx_imx",
+> -	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
+> -				  CI13XXX_PULLUP_ON_VBUS |
+> -				  CI13XXX_DISABLE_STREAMING |
+> -				  CI13XXX_REGS_SHARED,
+> -	.capoffset		= DEF_CAPOFFSET,
+> -};
+> -
+>  static int ci13xxx_otg_set_vbus(struct usb_otg *otg, bool enabled)
+>  {
+>  
+> @@ -117,6 +108,7 @@ static int ci13xxx_otg_set_vbus(struct usb_otg *otg, bool enabled)
+>  static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+>  {
+>  	struct ci13xxx_imx_data *data;
+> +	struct ci13xxx_platform_data *pdata;
+>  	struct platform_device *plat_ci, *phy_pdev;
+>  	struct ci13xxx	*ci;
+>  	struct device_node *phy_np;
+> @@ -129,6 +121,19 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+>  		&& !usbmisc_ops)
+>  		return -EPROBE_DEFER;
+>  
+> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata) {
+> +		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX pdata!\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	pdata->name = "ci13xxx_imx";
+> +	pdata->capoffset = DEF_CAPOFFSET;
+> +	pdata->flags = CI13XXX_REQUIRE_TRANSCEIVER |
+> +		       CI13XXX_PULLUP_ON_VBUS |
+> +		       CI13XXX_DISABLE_STREAMING |
+> +		       CI13XXX_REGS_SHARED,
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/98493682/attachment.sig>
+Btw, I think you want to use semicolon instead of comma here.
+
+> +
+>  	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
