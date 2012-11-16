@@ -1,231 +1,174 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 16 Nov 2012 20:16:07 +0100
-Subject: [PATCH 1/2] pwm: lpc32xx - Add a driver for the motor PWM
-In-Reply-To: <1352897985-15419-2-git-send-email-alban.bedel@avionic-design.de>
-References: <1352897985-15419-1-git-send-email-alban.bedel@avionic-design.de>
- <1352897985-15419-2-git-send-email-alban.bedel@avionic-design.de>
-Message-ID: <20121116191606.GA21566@avionic-0098.mockup.avionic-design.de>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Fri, 16 Nov 2012 20:25:25 +0100
+Subject: [PATCH v2 1/3] power: Add simple poweroff-gpio driver
+In-Reply-To: <1352821485-10032-2-git-send-email-andrew@lunn.ch>
+References: <1352821485-10032-1-git-send-email-andrew@lunn.ch>
+ <1352821485-10032-2-git-send-email-andrew@lunn.ch>
+Message-ID: <20121116192525.GA25838@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2012 at 01:59:44PM +0100, Alban Bedel wrote:
-> Signed-off-by: Alban Bedel <alban.bedel@avionic-design.de>
+Hi Andrew,
 
-Hi Alban,
-
-This looks good. There could be some more informative commit message,
-maybe something similar to what the DT binding has in the first
-paragraph.
-
-I have some other comments inline below.
-
-> ---
->  .../devicetree/bindings/pwm/lpc32xx-motor-pwm.txt  |   24 +++
->  drivers/pwm/Kconfig                                |   10 +
->  drivers/pwm/Makefile                               |    1 +
->  drivers/pwm/pwm-lpc32xx-motor.c                    |  209 ++++++++++++++++++++
->  4 files changed, 244 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/pwm/lpc32xx-motor-pwm.txt
->  create mode 100644 drivers/pwm/pwm-lpc32xx-motor.c
+On Tue, Nov 13, 2012 at 04:44:43PM +0100, Andrew Lunn wrote:
+> From: Jamie Lentin <jm@lentin.co.uk>
 > 
-> diff --git a/Documentation/devicetree/bindings/pwm/lpc32xx-motor-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc32xx-motor-pwm.txt
+> Given appropriate devicetree bindings, this driver registers a
+> pm_power_off function to set a GPIO line high/low to power down
+> your board.
+> 
+> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  .../devicetree/bindings/gpio/gpio-poweroff.txt     |   22 ++++
+>  drivers/power/Kconfig                              |    3 +
+>  drivers/power/Makefile                             |    1 +
+>  drivers/power/reset/Kconfig                        |   15 +++
+>  drivers/power/reset/Makefile                       |    1 +
+>  drivers/power/reset/gpio-poweroff.c                |  129 ++++++++++++++++++++
+>  6 files changed, 171 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
+>  create mode 100644 drivers/power/reset/Kconfig
+>  create mode 100644 drivers/power/reset/Makefile
+>  create mode 100644 drivers/power/reset/gpio-poweroff.c
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt b/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
 > new file mode 100644
-> index 0000000..e19b0a4
+> index 0000000..558cdf3
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/lpc32xx-motor-pwm.txt
-> @@ -0,0 +1,24 @@
-> +LPC32XX Motor PWM controller
-> +
-> +The LPC32xx motor PWMs have two output pin, A and B, with B=!A.
-
-You use two different spellings: LPC32XX and LPC32xx. Can we settle on
-one, please? Also "two output pins".
-
-> +Per default the output A should be used, if the output B is used the
-
-"By default, output A..."
-
-> +PWM polarity should be inverted using the linux,polarity property.
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
+> @@ -0,0 +1,22 @@
+> +GPIO line that should be set high/low to power off a device
 > +
 > +Required properties:
-> +- compatible: should be "nxp,lpc3220-motor-pwm"
-> +- reg: physical base address and length of the controller's registers
+> +- compatible : should be "gpio-poweroff".
+> +- gpios : The GPIO to set high/low, see "gpios property" in
+> +  Documentation/devicetree/bindings/gpio/gpio.txt. If the pin should be
+> +  low to power down the board set it to "Active Low", otherwise set
+> +  gpio to "Active High".
 > +
-> +Optional properites:
-> +- linux,polarity: Bit mask of the polarity to use for each output,
-> +      a bit set to 0 indicate the default polarity, a bit set to 1
-> +      indicate an inverted polarity. In other word this set if output
-> +      A or output B has the correct polarity.
-
-Maybe this should state explicitly which bits are used for which
-outputs.
-
+> +Optional properties:
+> +- input : Initially configure the GPIO line as an input. Only reconfigure
+> +  it to an output when the pm_power_off function is called. If this optional
+> +  property is not specified, the GPIO is initialized as an output in its
+> +  inactive state.
+> +
 > +
 > +Examples:
 > +
-> +mpwm at 400e8000 {
-> +	compatible = "nxp,lpc3220-motor-pwm";
-> +	reg = <0x400E8000 0x78>;
-> +	linux,polarity = 5; /* Use outputs B0, A1 and B2 */
-
-Also since this is a bitmask it could make more sense to write it in
-hexadecimal. And you may want to add <> around for consistency.
-
-> +	#pwm-cells = <2>;
+> +gpio-poweroff {
+> +	compatible = "gpio-poweroff";
+> +	gpios = <&gpio 4 0>; /* GPIO 4 Active Low */
 > +};
-> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> index 90c5c73..90fc167 100644
-> --- a/drivers/pwm/Kconfig
-> +++ b/drivers/pwm/Kconfig
-> @@ -57,6 +57,16 @@ config PWM_LPC32XX
->  	  To compile this driver as a module, choose M here: the module
->  	  will be called pwm-lpc32xx.
+> diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
+> index 49a8939..b1d956d 100644
+> --- a/drivers/power/Kconfig
+> +++ b/drivers/power/Kconfig
+> @@ -335,6 +335,9 @@ config AB8500_BATTERY_THERM_ON_BATCTRL
+>  	help
+>  	  Say Y to enable battery temperature measurements using
+>  	  thermistor connected on BATCTRL ADC.
+> +
+> +source "drivers/power/reset/Kconfig"
+> +
+>  endif # POWER_SUPPLY
 >  
-> +config PWM_LPC32XX_MOTOR
-> +	tristate "LPC32XX Motor PWM support"
-
-Again the different spelling.
-
-> +	depends on ARCH_LPC32XX
+>  source "drivers/power/avs/Kconfig"
+> diff --git a/drivers/power/Makefile b/drivers/power/Makefile
+> index b949cf8..f1d99f4 100644
+> --- a/drivers/power/Makefile
+> +++ b/drivers/power/Makefile
+> @@ -49,3 +49,4 @@ obj-$(CONFIG_CHARGER_MAX8997)	+= max8997_charger.o
+>  obj-$(CONFIG_CHARGER_MAX8998)	+= max8998_charger.o
+>  obj-$(CONFIG_POWER_AVS)		+= avs/
+>  obj-$(CONFIG_CHARGER_SMB347)	+= smb347-charger.o
+> +obj-$(CONFIG_POWER_RESET)	+= reset/
+> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+> new file mode 100644
+> index 0000000..6461b48
+> --- /dev/null
+> +++ b/drivers/power/reset/Kconfig
+> @@ -0,0 +1,15 @@
+> +menuconfig POWER_RESET
+> +	bool "Board level reset or power off"
 > +	help
-> +	  Generic PWM framework driver for LPC32XX motor PWM. The LPC32XX SOC
-
-LPC32XX seems to be your preferred spelling.
-
-> +	  has one motor PWM controllers.
+> +	  Provides a number of drivers which either reset a complete board
+> +	  or shut it down, by manipulating the main power supply on the board.
 > +
-> +	  To compile this driver as a module, choose M here: the module
-> +	  will be called pwm-motor-lpc32xx.
-
-According to the Makefile, the module will be called pwm-lpc32xx-motor.
-
+> +	  Say Y here to enable board reset and power off
 > +
->  config PWM_MXS
->  	tristate "Freescale MXS PWM support"
->  	depends on ARCH_MXS && OF
-> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> index e4b2c89..510bad8 100644
-> --- a/drivers/pwm/Makefile
-> +++ b/drivers/pwm/Makefile
-> @@ -2,6 +2,7 @@ obj-$(CONFIG_PWM)		+= core.o
->  obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
->  obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
->  obj-$(CONFIG_PWM_LPC32XX)	+= pwm-lpc32xx.o
-> +obj-$(CONFIG_PWM_LPC32XX_MOTOR)	+= pwm-lpc32xx-motor.o
->  obj-$(CONFIG_PWM_MXS)		+= pwm-mxs.o
->  obj-$(CONFIG_PWM_PXA)		+= pwm-pxa.o
->  obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
-> diff --git a/drivers/pwm/pwm-lpc32xx-motor.c b/drivers/pwm/pwm-lpc32xx-motor.c
-[...]
-> +#define to_lpc32xx_motor_pwm_chip(_chip) \
-> +	container_of(_chip, struct lpc32xx_motor_pwm_chip, chip)
-
-That's an awfully long name for this macro. Maybe something like
-to_motor_pwm_chip() would be long enough already.
-
-> +#define PWM_EN_MASK(pwm)		BIT(0 + (pwm)->hwpwm*8)
-> +#define MCLIM_REG_OFFSET(pwm)		(LPC32XX_MCPWM_MCLIM0 + (pwm)->hwpwm*4)
-> +#define MCMAT_REG_OFFSET(pwm)		(LPC32XX_MCPWM_MCMAT0 + (pwm)->hwpwm*4)
-
-CodingStyle mandates that you put spaces around binary operators.
-
+> +config POWER_RESET_GPIO
+> +	bool "GPIO power-off driver"
+> +	depends on OF_GPIO && POWER_RESET
+> +	help
+> +	  This driver supports turning off your board via a GPIO line.
+> +	  If your board needs a GPIO high/low to power down, say Y and
+> +	  create a binding in your devicetree.
+> diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+> new file mode 100644
+> index 0000000..751488a
+> --- /dev/null
+> +++ b/drivers/power/reset/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
+> diff --git a/drivers/power/reset/gpio-poweroff.c b/drivers/power/reset/gpio-poweroff.c
+> new file mode 100644
+> index 0000000..101ad57
+> --- /dev/null
+> +++ b/drivers/power/reset/gpio-poweroff.c
+> @@ -0,0 +1,129 @@
+> +/*
+> + * Toggles a GPIO pin to power down a device
+> + *
+> + * Jamie Lentin <jm@lentin.co.uk>
+> + * Andrew Lunn <andrew@lunn.ch>
+> + *
+> + * Copyright (C) 2012 Jamie Lentin
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/delay.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/gpio.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/module.h>
 > +
-> +static int lpc32xx_motor_pwm_config(struct pwm_chip *chip,
-> +				    struct pwm_device *pwm,
-> +				    int duty_ns, int period_ns)
+> +/*
+> + * Hold configuration here, cannot be more than one instance of the driver
+> + * since pm_power_off itself is global.
+> + */
+> +static int gpio_num = -1;
+> +static int gpio_active_low;
+> +
+> +static void gpio_poweroff_do_poweroff(void)
 > +{
-> +	struct lpc32xx_motor_pwm_chip *lpc32xx =
-> +		to_lpc32xx_motor_pwm_chip(chip);
-
-If you make the macro name shorter this will actually fit on one line.
-=)
-
-> +	u64 rate, per, duty;
-
-Maybe rename per to period to make it explicit.
-
-> +static int lpc32xx_motor_pwm_probe(struct platform_device *pdev)
-[...]
-> +	/* Configure the pins polarity */
-> +	ret = of_property_read_u32(pdev->dev.of_node, "linux,polarity",
-> +				   &lpc32xx->pins);
-> +	if (!ret) {
-> +		u32 set = 0, clr = 0;
-> +		int i;
-
-This could use a blank line for readability.
-
-> +		for (i = 0 ; i < LPC32XX_MCPWM_COUNT ; i += 1)
-
-Can we make that i++?
-
-> +			if (lpc32xx->pins & BIT(i))
-> +				set |= BIT(2 + i*8);
-
-Spaces around '*'.
-
-> +			else
-> +				clr |= BIT(2 + i*8);
-
-And another blank line.
-
-> +		ret = clk_enable(lpc32xx->clk);
-> +		if (ret)
-> +			return ret;
-
-And here.
-
-> +static int __devexit lpc32xx_motor_pwm_remove(struct platform_device *pdev)
-
-__devexit is now officially obsolete.
-
-> +{
-> +	struct lpc32xx_motor_pwm_chip *lpc32xx = platform_get_drvdata(pdev);
-> +	int i;
+> +	BUG_ON(gpio_num == -1);
 > +
-> +	for (i = 0 ; i < lpc32xx->chip.npwm ; i += 1)
-
-Again, i++.
-
-> +		pwm_disable(&lpc32xx->chip.pwms[i]);
+> +	/* drive it active */
+> +	gpio_direction_output(gpio_num, !gpio_active_low);
+> +	mdelay(100);
+> +	/* rising edge or drive inactive */
+> +	gpio_set_value(gpio_num, gpio_active_low);
+> +	mdelay(100);
+> +	/* falling edge */
+> +	gpio_set_value(gpio_num, !gpio_active_low);
 > +
-> +	return pwmchip_remove(&lpc32xx->chip);
-> +}
+> +	/* give it some time */
+> +	mdelay(100);
+
+On the IB-NAS 6210 I need to increase this delay to a whopping 3000
+milliseconds to suppress the warning (2000 is not enough).  Is it
+acceptable to increase this to such a high value or do we need
+another solution?
+
 > +
-> +static const struct of_device_id lpc32xx_motor_pwm_dt_ids[] __devinitconst = {
+> +	WARN_ON(1);
+> ...
 
-__devinitconst is equally obsolete.
-
-> +	{ .compatible = "nxp,lpc3220-motor-pwm", },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, lpc32xx_motor_pwm_dt_ids);
-> +
-> +static struct platform_driver lpc32xx_motor_pwm_driver = {
-> +	.driver = {
-> +		.name = "lpc32xx-motor-pwm",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(lpc32xx_motor_pwm_dt_ids),
-> +	},
-> +	.probe = lpc32xx_motor_pwm_probe,
-> +	.remove = __devexit_p(lpc32xx_motor_pwm_remove),
-
-__devexit_p as well.
-
-> +};
-> +module_platform_driver(lpc32xx_motor_pwm_driver);
-> +
-> +MODULE_ALIAS("platform:lpc32xx-motor-pwm");
-> +MODULE_AUTHOR("Alban Bedel <alban.bedel@avionic-design.de>");
-> +MODULE_DESCRIPTION("LPC32XX Motor PWM Driver");
-
-And the spelling again.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/7d21b78d/attachment.sig>
+- Simon
