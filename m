@@ -1,54 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 Nov 2012 09:09:55 -0700
-Subject: [PATCH] RFC: pinctrl: grab default handler with bus notifiers
-In-Reply-To: <CACRpkdYd6B-fTfUg18q5BjZRbY7sUAUNXA_7VPBs9SQoug9Q4w@mail.gmail.com>
-References: <1352636539-6318-1-git-send-email-linus.walleij@stericsson.com>
- <50A15A54.3090803@wwwdotorg.org>
- <20121113063546.GD18224@opensource.wolfsonmicro.com>
- <CACRpkdY-tye5LNOwxQ-XrjM-x9RffAvj-tPfsFQA3ZWOY8P-Vw@mail.gmail.com>
- <50A53304.6040904@wwwdotorg.org>
- <CACRpkdYd6B-fTfUg18q5BjZRbY7sUAUNXA_7VPBs9SQoug9Q4w@mail.gmail.com>
-Message-ID: <50A66553.3050705@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Nov 2012 16:11:20 +0000
+Subject: [GIT PULL] i.MX SoC updates
+In-Reply-To: <20121116155000.GX10369@pengutronix.de>
+References: <20121116155000.GX10369@pengutronix.de>
+Message-ID: <201211161611.20312.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2012 04:36 AM, Linus Walleij wrote:
-> On Thu, Nov 15, 2012 at 7:23 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 11/15/2012 07:03 AM, Linus Walleij wrote:
+On Friday 16 November 2012, Sascha Hauer wrote:
+> Please pull the following i.MX SoC updates for next merge window.
 > 
->>> OK I'll have to come up with a patch to the device core
->>> instead... it'll be much simpler anyway and if both of you guys
->>> can back it I guess Greg might be OK with it too.
->>
->> I did have one thought here; how will this interact with hogs? If a
->> device's pinctrl configuration must be pinctrl_get()'d before the device
->> is probed, then a pinctrl device with hogs will never get probed because
->> it won't be registered to provide the pinctrl node parsing.
+> Sascha
 > 
-> Catch 22 :-(
+> The following changes since commit 89a4150331bc07014256714678ce8e9b238fc145:
 > 
-> Yeah we need to come up with something there.
+>   Merge remote-tracking branch 'arm-soc/imx/multiplatform' into x (2012-11-16 16:21:27 +0100)
 > 
->> Solutions might include:
->>
->> a) Some special case where if the pinctrl driver only can't probe due to
->> missing pinctrl from its own node, don't defer the probe, but defer the
->> pinctrl_get().
->>
->> b) Separate out DT node parsing from device instantiation, so that the
->> driver can always parse the DT, without needing the context of a
->> specific pinctrl device to do so.
+> are available in the git repository at:
 > 
-> But this mechanism can't be device tree-specific, we have some
-> of olschool pdata users and ACPI probing around the corner.
 > 
-> I will likely just cook up something like seeing if the
-> dev_name() for provider and consumer is the same and
-> in that case avoid deferral.
+>   git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-soc
+> 
+> for you to fetch changes up to d6aef84a48fa54ac606ae719fcd125199939f43d:
+> 
+>   ARM i.MX51 babbage: Add display support (2012-11-16 16:34:18 +0100)
+> 
 
-Well, the DT parsing is all about creating the mapping table from the
-DT. Without DT, this doesn't need to happen, since the board file
-already contains the complete mapping table. So, this isn't so much a
-special case for DT, but rather simply a step we don't need to take for
-DT, if you get what I mean (and that's all true irrespective of the
-change we're discussing here).
+Pulled, thanks!
+
+	Arnd
