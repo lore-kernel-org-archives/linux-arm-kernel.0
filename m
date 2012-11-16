@@ -1,44 +1,47 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 16 Nov 2012 16:34:05 +0400
-Subject: [PATCH] Documentation: correct argument list for
- of_platform_populate correction to match of_platform.h prototype
-In-Reply-To: <60BA5429A0E1584BA3633194F6F993B501482A65@NA-MBX-02.mgc.mentorg.com>
-References: <60BA5429A0E1584BA3633194F6F993B501482A65@NA-MBX-02.mgc.mentorg.com>
-Message-ID: <50A632BD.9060602@mvista.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Fri, 16 Nov 2012 18:41:26 +0530
+Subject: [PATCH] ARM: Exynos5: Remove i2c0 resource information and setting of
+ device names
+Message-ID: <1353071486-29905-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+All Exynos5 based platforms support only device tree based boot and so the
+unused non-dt code that sets i2c0 resource information and device names for
+sdhci and i2c platform devices are removed.
 
-On 16-11-2012 3:32, Chaiken, Alison wrote:
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+ arch/arm/mach-exynos/common.c |   17 -----------------
+ 1 files changed, 0 insertions(+), 17 deletions(-)
 
->  From fd4450ac6bdcf62a84b0d029b36506e7fd567688 Mon Sep 17 00:00:00 2001
-> From: Alison Chaiken <alchaiken@gmail.com>
-> Date: Thu, 1 Nov 2012 01:12:38 -0700
-> Subject: [PATCH] Argument list for of_platform_populate correction to match of_platform.h prototype
-
-    The above header is not needed.
-
-> Signed-off-by: Alison Chaiken <alison_chaiken@mentor.com>
-> ---
->   Documentation/devicetree/usage-model.txt |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
-
-> diff --git a/Documentation/devicetree/usage-model.txt b/Documentation/devicetree/usage-model.txt
-> index c5a8009..daa56a2 100644
-> --- a/Documentation/devicetree/usage-model.txt
-> +++ b/Documentation/devicetree/usage-model.txt
-> @@ -347,7 +347,7 @@ later), which will happily live at the base of the Linux /sys/devices
->   tree.  Therefore, if a DT node is at the root of the tree, then it
->   really probably is best registered as a platform_device.
->
-> -Linux board support code calls of_platform_populate(NULL, NULL, NULL)
-> +Linux board support code calls of_platform_populate(NULL, NULL, NULL, NULL)
->   to kick off discovery of devices at the root of the tree.  The
->   parameters are all NULL because when starting from the root of the
->   tree, there is no need to provide a starting node (the first NULL), a
-
-    Looks like the patch is whitespace spoiled, i.e. a space is added to each 
-line starting with a space.
-
-WBR, Sergei
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index d067ce7..1efcc6f 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -336,23 +336,6 @@ static void __init exynos4_map_io(void)
+ static void __init exynos5_map_io(void)
+ {
+ 	iotable_init(exynos5_iodesc, ARRAY_SIZE(exynos5_iodesc));
+-
+-	s3c_device_i2c0.resource[0].start = EXYNOS5_PA_IIC(0);
+-	s3c_device_i2c0.resource[0].end   = EXYNOS5_PA_IIC(0) + SZ_4K - 1;
+-	s3c_device_i2c0.resource[1].start = EXYNOS5_IRQ_IIC;
+-	s3c_device_i2c0.resource[1].end   = EXYNOS5_IRQ_IIC;
+-
+-	s3c_sdhci_setname(0, "exynos4-sdhci");
+-	s3c_sdhci_setname(1, "exynos4-sdhci");
+-	s3c_sdhci_setname(2, "exynos4-sdhci");
+-	s3c_sdhci_setname(3, "exynos4-sdhci");
+-
+-	/* The I2C bus controllers are directly compatible with s3c2440 */
+-	s3c_i2c0_setname("s3c2440-i2c");
+-	s3c_i2c1_setname("s3c2440-i2c");
+-	s3c_i2c2_setname("s3c2440-i2c");
+-
+-	s3c64xx_spi_setname("exynos4210-spi");
+ }
+ 
+ static void __init exynos4_init_clocks(int xtal)
+-- 
+1.6.6.rc2
