@@ -1,46 +1,96 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 16 Nov 2012 04:23:18 -0200
-Subject: [PATCH 7/8] ata: highbank: mark ahci_highbank_probe as __devinit
-In-Reply-To: <50A5C4C7.4090309@pobox.com>
-References: <1352238933-4886-1-git-send-email-arnd@arndb.de>
- <1352238933-4886-8-git-send-email-arnd@arndb.de>
- <50A5C4C7.4090309@pobox.com>
-Message-ID: <CAOMZO5A4YA85ZSXG2_D9yP3+TzW0FSCU1h9WjPDzJr_Er46SrA@mail.gmail.com>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Fri, 16 Nov 2012 07:25:30 +0100
+Subject: [PATCH 01/10] ARM: imx6q: print silicon version on boot
+In-Reply-To: <20121116022346.GA2941@S2100-06.ap.freescale.net>
+References: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
+ <1351005779-30347-2-git-send-email-shawn.guo@linaro.org>
+ <72B629D8-8CD8-42E2-91A3-CF0532B15E5F@mentor.com>
+ <20121116022346.GA2941@S2100-06.ap.freescale.net>
+Message-ID: <50A5DC5A.3040603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeff,
+Am 16.11.2012 03:23, schrieb Shawn Guo:
+> On Thu, Nov 15, 2012 at 06:09:31PM +0000, Moseley, Drew wrote:
+>> On Oct 23, 2012, at 11:22 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>>> i.MX6Q has 3 revisions 1.0, 1.1 and 1.2.  Print revision on boot.
+>>>
+>>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>>> ---
+>>> arch/arm/mach-imx/mach-imx6q.c |   28 ++++++++++++++++++++++++++++
+>>> 1 file changed, 28 insertions(+)
+>>>
+>>
+>> Hi Shawn,
+>>
+>> An addition to this patch to add some error checking.  Thoughts?
+>>
+> It looks good.  I just squashed the changes into the original patch
+> with your sob added.  Thanks.
 
-On Fri, Nov 16, 2012 at 2:44 AM, Jeff Garzik <jgarzik@pobox.com> wrote:
-> On 11/06/2012 04:55 PM, Arnd Bergmann wrote:
+Just a small note on the whole series:
+
+We picked the two patches
+
+ARM: imx6q: print silicon version on boot
+ARM: imx6q: select ARM and PL310 errata
+
+because they look generic and generally useful. Not only for the 
+cpuidle feature.
+
+Maybe it makes sense to apply these two patches independent from the 
+cpuidle series as general improvements?
+
+Best regards
+
+Dirk
+
+> Note, the patch series will probably postponed to 3.9 due to the
+> dependency on other tree and the fact that I wait for a TO1.2 hardware
+> to test the power gating state.
+>
+> Shawn
+>
+>> Drew
 >>
->> The ahci_highbank_probe function is incorrectly marked as __init,
->> which means it can get discarded at boot time, which might be
->> a problem if for some reason the device only becomes operational
->> after loading another module.
 >>
->> Using __devinit instead avoids seeing this warning for every build:
 >>
->> WARNING: vmlinux.o(.data+0xf7b0): Section mismatch in reference from the
->> variable ahci_highbank_driver to the function
->> .init.text:ahci_highbank_probe()
->> The variable ahci_highbank_driver references
->> the function __init ahci_highbank_probe()
->> If the reference is valid then annotate the
->> variable with __init* or __refdata (see linux/init.h) or name the
->> variable:
->> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
 >>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Cc: Jeff Garzik <jgarzik@redhat.com>
+>> Add error checking to imx6q_revision()
+>>
+>> Signed-off-by: Drew Moseley <drew_moseley@mentor.com>
 >> ---
->>   drivers/ata/sata_highbank.c |    2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>   arch/arm/mach-imx/mach-imx6q.c | 7 +++++++
+>>   1 file changed, 7 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+>> index 265c311..072e32a 100644
+>> --- a/arch/arm/mach-imx/mach-imx6q.c
+>> +++ b/arch/arm/mach-imx/mach-imx6q.c
+>> @@ -54,9 +54,16 @@ static int imx6q_revision(void)
+>>
+>>   	if (!rev) {
+>>   		np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
+>> +		if (!np)
+>> +			return IMX_CHIP_REVISION_UNKNOWN;
+>>   		base = of_iomap(np, 0);
+>> +		if (!base) {
+>> +			of_node_put(np);
+>> +			return IMX_CHIP_REVISION_UNKNOWN;
+>> +		}
+>>   		rev =  readl_relaxed(base + IMX6Q_ANALOG_DIGPROG);
+>>   		iounmap(base);
+>> +		of_node_put(np);
+>>   	}
+>>
+>>   	switch (rev & 0xff) {
+>> --
+>> 1.8.0
+>>
 >
 >
-> applied
-
-I have also sent the same fix:
-https://patchwork.kernel.org/patch/1562141/
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
