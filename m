@@ -1,171 +1,94 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 16 Nov 2012 11:12:46 +0100
-Subject: [RFC 3/3] ARM/AVR32: get rid of serial_at91.h
-In-Reply-To: <20121116095352.GF4398@game.jcrosoft.org>
-References: <20120921093530.GB31374@n2100.arm.linux.org.uk>
- <E1TEzfE-000780-1t@rmk-PC.arm.linux.org.uk>
- <20121116095352.GF4398@game.jcrosoft.org>
-Message-ID: <50A6119E.8010303@atmel.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Fri, 16 Nov 2012 12:14:43 +0200
+Subject: [PATCH 3/9] usb: chipidea: ci13xxx-imx: create dynamic
+ platformdata
+In-Reply-To: <1352909950-32555-4-git-send-email-m.grzeschik@pengutronix.de>
+References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352909950-32555-4-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <87ehjt7t2k.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2012 10:53 AM, Jean-Christophe PLAGNIOL-VILLARD :
-> On 10:36 Fri 21 Sep     , Russell King wrote:
->> The definitions provided by serial_at91.h are only used by the
->> atmel_serial driver, and the function that uses it is never called
->> from anywhere in the kernel.  Therefore, these definitions are unused
->> and/or obsolete, and can be removed.
->>
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> personnaly I'm ok with it too
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> 
-> but Andrew seems use it so let him reply
+Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
 
-Yes, during previous attempt to remove the files, Andrew said that it
-was used internally in his former company. I had no serious reason to
-remove it, so we kept it back then.
-But now it seems the situation has evolved and we must consider the move
-to a single kernel image and the will to clean the include/asm/mach
-directory.
+> This patch removes the limitation of having only one instance of the
+> ci13xxx-imx platformdata and makes different configurations possible.
 
-So, now, on my side:
+In more honest wording it should probably say: "makes using different
+phys possible", but this is fine too. :)
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
->> ---
->>  arch/arm/include/asm/mach/serial_at91.h   |   33 -----------------------------
->>  arch/avr32/include/asm/mach/serial_at91.h |   33 -----------------------------
->>  drivers/tty/serial/atmel_serial.c         |   18 ---------------
->>  3 files changed, 0 insertions(+), 84 deletions(-)
->>  delete mode 100644 arch/arm/include/asm/mach/serial_at91.h
->>  delete mode 100644 arch/avr32/include/asm/mach/serial_at91.h
->>
->> diff --git a/arch/arm/include/asm/mach/serial_at91.h b/arch/arm/include/asm/mach/serial_at91.h
->> deleted file mode 100644
->> index ea6d063..0000000
->> --- a/arch/arm/include/asm/mach/serial_at91.h
->> +++ /dev/null
->> @@ -1,33 +0,0 @@
->> -/*
->> - *  arch/arm/include/asm/mach/serial_at91.h
->> - *
->> - *  Based on serial_sa1100.h  by Nicolas Pitre
->> - *
->> - *  Copyright (C) 2002 ATMEL Rousset
->> - *
->> - *  Low level machine dependent UART functions.
->> - */
->> -
->> -struct uart_port;
->> -
->> -/*
->> - * This is a temporary structure for registering these
->> - * functions; it is intended to be discarded after boot.
->> - */
->> -struct atmel_port_fns {
->> -	void	(*set_mctrl)(struct uart_port *, u_int);
->> -	u_int	(*get_mctrl)(struct uart_port *);
->> -	void	(*enable_ms)(struct uart_port *);
->> -	void	(*pm)(struct uart_port *, u_int, u_int);
->> -	int	(*set_wake)(struct uart_port *, u_int);
->> -	int	(*open)(struct uart_port *);
->> -	void	(*close)(struct uart_port *);
->> -};
->> -
->> -#if defined(CONFIG_SERIAL_ATMEL)
->> -void atmel_register_uart_fns(struct atmel_port_fns *fns);
->> -#else
->> -#define atmel_register_uart_fns(fns) do { } while (0)
->> -#endif
->> -
->> -
->> diff --git a/arch/avr32/include/asm/mach/serial_at91.h b/arch/avr32/include/asm/mach/serial_at91.h
->> deleted file mode 100644
->> index 55b317a..0000000
->> --- a/arch/avr32/include/asm/mach/serial_at91.h
->> +++ /dev/null
->> @@ -1,33 +0,0 @@
->> -/*
->> - *  linux/include/asm-arm/mach/serial_at91.h
->> - *
->> - *  Based on serial_sa1100.h  by Nicolas Pitre
->> - *
->> - *  Copyright (C) 2002 ATMEL Rousset
->> - *
->> - *  Low level machine dependent UART functions.
->> - */
->> -
->> -struct uart_port;
->> -
->> -/*
->> - * This is a temporary structure for registering these
->> - * functions; it is intended to be discarded after boot.
->> - */
->> -struct atmel_port_fns {
->> -	void	(*set_mctrl)(struct uart_port *, u_int);
->> -	u_int	(*get_mctrl)(struct uart_port *);
->> -	void	(*enable_ms)(struct uart_port *);
->> -	void	(*pm)(struct uart_port *, u_int, u_int);
->> -	int	(*set_wake)(struct uart_port *, u_int);
->> -	int	(*open)(struct uart_port *);
->> -	void	(*close)(struct uart_port *);
->> -};
->> -
->> -#if defined(CONFIG_SERIAL_ATMEL)
->> -void atmel_register_uart_fns(struct atmel_port_fns *fns);
->> -#else
->> -#define atmel_register_uart_fns(fns) do { } while (0)
->> -#endif
->> -
->> -
->> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
->> index 3d7e1ee..a6134c9 100644
->> --- a/drivers/tty/serial/atmel_serial.c
->> +++ b/drivers/tty/serial/atmel_serial.c
->> @@ -43,7 +43,6 @@
->>  #include <asm/io.h>
->>  #include <asm/ioctls.h>
->>  
->> -#include <asm/mach/serial_at91.h>
->>  #include <mach/board.h>
->>  
->>  #ifdef CONFIG_ARM
->> @@ -1513,23 +1512,6 @@ static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
->>  	}
->>  }
->>  
->> -/*
->> - * Register board-specific modem-control line handlers.
->> - */
->> -void __init atmel_register_uart_fns(struct atmel_port_fns *fns)
->> -{
->> -	if (fns->enable_ms)
->> -		atmel_pops.enable_ms = fns->enable_ms;
->> -	if (fns->get_mctrl)
->> -		atmel_pops.get_mctrl = fns->get_mctrl;
->> -	if (fns->set_mctrl)
->> -		atmel_pops.set_mctrl = fns->set_mctrl;
->> -	atmel_open_hook		= fns->open;
->> -	atmel_close_hook	= fns->close;
->> -	atmel_pops.pm		= fns->pm;
->> -	atmel_pops.set_wake	= fns->set_wake;
->> -}
->> -
->>  struct platform_device *atmel_default_console_device;	/* the serial console device */
->>  
->>  #ifdef CONFIG_SERIAL_ATMEL_CONSOLE
->> -- 
->> 1.7.4.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-
-
--- 
-Nicolas Ferre
+>
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> ---
+>  drivers/usb/chipidea/ci13xxx_imx.c |   27 ++++++++++++++++-----------
+>  1 file changed, 16 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
+> index 570aedf..7b99c96 100644
+> --- a/drivers/usb/chipidea/ci13xxx_imx.c
+> +++ b/drivers/usb/chipidea/ci13xxx_imx.c
+> @@ -87,15 +87,6 @@ EXPORT_SYMBOL_GPL(usbmisc_get_init_data);
+>  
+>  /* End of common functions shared by usbmisc drivers*/
+>  
+> -static struct ci13xxx_platform_data ci13xxx_imx_platdata __devinitdata  = {
+> -	.name			= "ci13xxx_imx",
+> -	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
+> -				  CI13XXX_PULLUP_ON_VBUS |
+> -				  CI13XXX_DISABLE_STREAMING |
+> -				  CI13XXX_REGS_SHARED,
+> -	.capoffset		= DEF_CAPOFFSET,
+> -};
+> -
+>  static int ci13xxx_otg_set_vbus(struct usb_otg *otg, bool enabled)
+>  {
+>  
+> @@ -117,6 +108,7 @@ static int ci13xxx_otg_set_vbus(struct usb_otg *otg, bool enabled)
+>  static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+>  {
+>  	struct ci13xxx_imx_data *data;
+> +	struct ci13xxx_platform_data *pdata;
+>  	struct platform_device *plat_ci, *phy_pdev;
+>  	struct ci13xxx	*ci;
+>  	struct device_node *phy_np;
+> @@ -129,6 +121,19 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+>  		&& !usbmisc_ops)
+>  		return -EPROBE_DEFER;
+>  
+> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata) {
+> +		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX pdata!\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	pdata->name = "ci13xxx_imx";
+> +	pdata->capoffset = DEF_CAPOFFSET;
+> +	pdata->flags = CI13XXX_REQUIRE_TRANSCEIVER |
+> +		       CI13XXX_PULLUP_ON_VBUS |
+> +		       CI13XXX_DISABLE_STREAMING |
+> +		       CI13XXX_REGS_SHARED,
+> +
+>  	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+>  	if (!data) {
+>  		dev_err(&pdev->dev, "Failed to allocate CI13xxx-IMX data!\n");
+> @@ -209,7 +214,7 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+>  	else
+>  		reg_vbus = NULL;
+>  
+> -	ci13xxx_imx_platdata.phy = data->phy;
+> +	pdata->phy = data->phy;
+>  
+>  	if (!pdev->dev.dma_mask) {
+>  		pdev->dev.dma_mask = devm_kzalloc(&pdev->dev,
+> @@ -234,7 +239,7 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
+>  
+>  	plat_ci = ci13xxx_add_device(&pdev->dev,
+>  				pdev->resource, pdev->num_resources,
+> -				&ci13xxx_imx_platdata);
+> +				pdata);
+>  	if (IS_ERR(plat_ci)) {
+>  		ret = PTR_ERR(plat_ci);
+>  		dev_err(&pdev->dev,
+> -- 
+> 1.7.10.4
