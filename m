@@ -1,31 +1,31 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 Nov 2012 13:49:57 +0530
-Subject: [PATCH 01/16] gpio: SPEAr: add spi chipselect control driver
-In-Reply-To: <201211160819.04343.arnd@arndb.de>
-References: <4a92290e8a3b1a19c3a5e864edfa7badfc2af5d0.1352608333.git.viresh.kumar@linaro.org>
- <3702a1036f8e714e6d18e4726569bbb1eadd65bf.1353042873.git.viresh.kumar@linaro.org>
- <201211160819.04343.arnd@arndb.de>
-Message-ID: <CAKohpoms26Z=1394jubyGY=P=12qzLJSxE-h-K=UL4uQUm22yA@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 16 Nov 2012 09:30:05 +0100
+Subject: [PATCH 1/2] i2c: mux: Add dt support to i2c-mux-gpio driver
+In-Reply-To: <1351182234-22971-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1351182234-22971-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1351182234-22971-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20121116083004.GD8464@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 November 2012 13:49, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 16 November 2012, Viresh Kumar wrote:
->> From: Shiraz Hashim <shiraz.hashim@st.com>
->>
->> SPEAr platform provides a provision to control chipselects of ARM PL022
->> Prime Cell spi controller through its system registers, which otherwise
->> remains under PL022 control which some protocols do not want.
->>
->> This commit intends to provide the spi chipselect control in software over
->> gpiolib interface. spi chip drivers can use the exported gpiolib interface to
->> define their chipselect through DT or platform data.
->>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
->> Reviewed-by: Vipin Kumar <vipin.kumar@st.com>
->> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+On Thu, Oct 25, 2012 at 06:23:53PM +0200, Maxime Ripard wrote:
+> Allow the i2c-mux-gpio to be used by a device tree enabled device. The
+> bindings are inspired by the one found in the i2c-mux-pinctrl driver.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> Acked-by: Peter Korsgaard <peter.korsgaard@barco.com>
 
-You can apply this series now :)
+checkpatch found a whitespace error in line 115, please run it before
+submitting. Fixed that and pushed to for-next. Thanks.
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/e472467c/attachment.sig>
