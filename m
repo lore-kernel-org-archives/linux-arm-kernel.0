@@ -1,97 +1,41 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 16 Nov 2012 09:36:39 +0100
-Subject: [PATCH RESEND 3/4] pinctrl: at91: Prevent NULL dereference if
- of_match_device returns NULL
-In-Reply-To: <20121115100012.GA4398@game.jcrosoft.org>
-References: <1352955096.6793.1.camel@phoenix>
- <1352955266.6793.4.camel@phoenix> <1352955480.6793.8.camel@phoenix>
- <20121115100012.GA4398@game.jcrosoft.org>
-Message-ID: <50A5FB17.1050208@atmel.com>
+Date: Fri, 16 Nov 2012 09:39:31 +0100
+Subject: [PATCH V6 2/2] dmaengine: add helper function to request a slave
+ DMA channel
+In-Reply-To: <1353029876.7077.56.camel@vkoul-udesk3>
+References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
+ <1347662517-4210-3-git-send-email-jon-hunter@ti.com>
+ <1347852805.1943.130.camel@vkoul-udesk3> <201209171159.27359.arnd@arndb.de>
+ <20120917223619.GC12445@n2100.arm.linux.org.uk>
+ <1347938035.1943.162.camel@vkoul-udesk3> <5060DDEB.4000600@ti.com>
+ <1348547701.1943.190.camel@vkoul-udesk3>
+ <20121016024318.GF24393@S2101-09.ap.freescale.net>
+ <1350355144.1648.5259.camel@vkoul-udesk3> <509D6108.1060304@ti.com>
+ <1353029876.7077.56.camel@vkoul-udesk3>
+Message-ID: <50A5FBC3.4000302@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2012 11:00 AM, Jean-Christophe PLAGNIOL-VILLARD :
-> On 12:58 Thu 15 Nov     , Axel Lin wrote:
->> of_match_device() may return NULL.
-> this is not possible on at91
+On 11/16/2012 02:37 AM, Vinod Koul :
+> On Fri, 2012-11-09 at 14:01 -0600, Jon Hunter wrote:
+>> Hi Vinod,
+>>
+>> A few people have been asking me if getting device-tree support for DMA
+>> engine is plan for record for v3.8. I know that you were working through
+>> implementing a common interface and so I wanted to check how that is
+>> going. Do you have any insight to when device-tree support may get added?
+>>
+> I have not been able to do much work on this for last couple of weeks. I
+> hope to do it in by this weekend. If not I will merge yours and then
+> uppdate.
 > 
-> and I do a oups here as if we have a NULL pointer which means the driver is
-> wrong
+> Anyway, DT would be there in 3.8 with or without my changes.
 
-Well, okay, but it does not prevent from adding a supplementary check to
-mimic every other pinctrl driver and use a common return path to the
-of_match_device() function.
+Vinod,
 
-So I am not completely against this patch (that I why I added my Acked-by).
+So, can we imagine having this tree in linux-next rapidly (with or
+without your changes)?
 
-
->> Signed-off-by: Axel Lin <axel.lin@ingics.com>
->> ---
->> This resend CC Jean-Christophe.
->>
->>  drivers/pinctrl/pinctrl-at91.c |   17 +++++++++++++----
->>  1 file changed, 13 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
->> index 8490a55..32006c8 100644
->> --- a/drivers/pinctrl/pinctrl-at91.c
->> +++ b/drivers/pinctrl/pinctrl-at91.c
->> @@ -829,13 +829,18 @@ static int __devinit at91_pinctrl_probe_dt(struct platform_device *pdev,
->>  	uint32_t *tmp;
->>  	struct device_node *np = pdev->dev.of_node;
->>  	struct device_node *child;
->> +	const struct of_device_id *match;
->>  
->>  	if (!np)
->>  		return -ENODEV;
->>  
->> +	match = of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
->> +	if (!match)
->> +		return -ENODEV;
->> +
->>  	info->dev = &pdev->dev;
->> -	info->ops = (struct at91_pinctrl_mux_ops*)
->> -		of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
->> +	info->ops = (struct at91_pinctrl_mux_ops *) match->data;
->> +
->>  	at91_pinctrl_child_count(info, np);
->>  
->>  	if (info->nbanks < 1) {
->> @@ -1359,6 +1364,7 @@ static struct of_device_id at91_gpio_of_match[] __devinitdata = {
->>  static int __devinit at91_gpio_probe(struct platform_device *pdev)
->>  {
->>  	struct device_node *np = pdev->dev.of_node;
->> +	const struct of_device_id *match;
->>  	struct resource *res;
->>  	struct at91_gpio_chip *at91_chip = NULL;
->>  	struct gpio_chip *chip;
->> @@ -1399,8 +1405,11 @@ static int __devinit at91_gpio_probe(struct platform_device *pdev)
->>  		goto err;
->>  	}
->>  
->> -	at91_chip->ops = (struct at91_pinctrl_mux_ops*)
->> -		of_match_device(at91_gpio_of_match, &pdev->dev)->data;
->> +	match = of_match_device(at91_gpio_of_match, &pdev->dev);
->> +	if (!match)
->> +		return -ENODEV;
->> +
->> +	at91_chip->ops = (struct at91_pinctrl_mux_ops *) match->data;
->>  	at91_chip->pioc_virq = irq;
->>  	at91_chip->pioc_idx = alias_idx;
->>  
->> -- 
->> 1.7.9.5
->>
->>
->>
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-
-
+Thanks, best regards,
 -- 
 Nicolas Ferre
