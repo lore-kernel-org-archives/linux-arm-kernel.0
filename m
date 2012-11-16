@@ -1,48 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Nov 2012 10:05:50 +0000
-Subject: [PATCH] ARM: Fix errata 751472 handling on Cortex-A9 r1p*
-In-Reply-To: <50A50C24.9010702@gmail.com>
-References: <50A3EBCD.3040801@ti.com>
- <20121114202244.GE3332@n2100.arm.linux.org.uk>
- <20121114203221.GA6801@atomide.com> <50A413D4.7000405@gmail.com>
- <20121114222159.GB6801@atomide.com> <50A43D58.5030404@gmail.com>
- <20121115110137.GA25985@arm.com> <50A4FCC5.2080604@gmail.com>
- <20121115143714.GF25985@arm.com> <50A50C24.9010702@gmail.com>
-Message-ID: <20121116100550.GI3332@n2100.arm.linux.org.uk>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Fri, 16 Nov 2012 12:06:57 +0200
+Subject: [PATCH 1/9] usb: chipidea: pci: mark platformdata as static and
+ __devinitdata
+In-Reply-To: <1352909950-32555-2-git-send-email-m.grzeschik@pengutronix.de>
+References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352909950-32555-2-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <87haop7tfi.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 09:37:08AM -0600, Rob Herring wrote:
-> >> Does that work for Versatile Express CA9? It needs ARM_ERRATA_751472.
-> > 
-> > On VE Linux runs in secure mode, so it's fine.
-> 
-> WTF? You are contradicting yourself.
+Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
 
-No, it's already been explained; the problem is lack of understanding.
+> From: Marc Kleine-Budde <mkl@pengutronix.de>
+>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
 
-Versatile Express does indeed run in secure mode; it doesn't have any
-secure monitor present.  OMAP and many other platforms run in non-secure
-mode.
+static yes, __devinitdata -- probably not. These structs are used
+everywhere throughout the driver currently, not only at initialization
+time.
 
-The work-arounds are applied to secure mode registers which are sensitive
-to writes in the following manner:
-- we check the revision of the CPU to see whether the workaround is
-  applicable.  If it is, then...
-  - the register is read.
-  - the bit(s) are checked to see whether the work-around has already been
-    applied.
-  - the bit(s) is set to the appropriate state.
-  - the register is written _if_ the work-around has not already been applied.
-
-That means a platform running in secure mode gets the work-arounds applied
-as appropriate for the CPU.  It also means that a platform running in non-
-secure mode won't boot if the work-around has not already been applied.
-That is a good thing; some work-arounds fix data corrupting bugs, and we
-don't want an unsafe kernel running on such platforms.
-
-So, we don't detect whether we're running in secure mode or not; as I've
-already stated, we don't have a way to do that.  We instead only apply
-work-arounds which aren't already enabled prior to the kernel booting.
-So, even on a secure mode platform, we will avoid writing the bits if the
-work-around has already been applied.
+> ---
+>  drivers/usb/chipidea/ci13xxx_pci.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/usb/chipidea/ci13xxx_pci.c b/drivers/usb/chipidea/ci13xxx_pci.c
+> index 918e149..97d25c8 100644
+> --- a/drivers/usb/chipidea/ci13xxx_pci.c
+> +++ b/drivers/usb/chipidea/ci13xxx_pci.c
+> @@ -23,17 +23,17 @@
+>  /******************************************************************************
+>   * PCI block
+>   *****************************************************************************/
+> -struct ci13xxx_platform_data pci_platdata = {
+> +static struct ci13xxx_platform_data pci_platdata __devinitdata = {
+>  	.name		= UDC_DRIVER_NAME,
+>  	.capoffset	= DEF_CAPOFFSET,
+>  };
+>  
+> -struct ci13xxx_platform_data langwell_pci_platdata = {
+> +static struct ci13xxx_platform_data langwell_pci_platdata __devinitdata = {
+>  	.name		= UDC_DRIVER_NAME,
+>  	.capoffset	= 0,
+>  };
+>  
+> -struct ci13xxx_platform_data penwell_pci_platdata = {
+> +static struct ci13xxx_platform_data penwell_pci_platdata __devinitdata = {
+>  	.name		= UDC_DRIVER_NAME,
+>  	.capoffset	= 0,
+>  	.power_budget	= 200,
+> -- 
+> 1.7.10.4
