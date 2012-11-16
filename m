@@ -1,38 +1,111 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 Nov 2012 09:46:15 -0700
-Subject: [PATCH] ARM: dt: tegra: cardhu: Add drm components
-In-Reply-To: <1353042045-3182-1-git-send-email-markz@nvidia.com>
-References: <1353042045-3182-1-git-send-email-markz@nvidia.com>
-Message-ID: <50A66DD7.3030805@wwwdotorg.org>
+From: mporter@ti.com (Matt Porter)
+Date: Fri, 16 Nov 2012 11:49:30 -0500
+Subject: [RFC PATCH v3 02/16] ARM: davinci: move private EDMA API to
+ arm/common
+In-Reply-To: <508CEA05.8060200@ti.com>
+References: <1350566815-409-1-git-send-email-mporter@ti.com>
+ <1350566815-409-3-git-send-email-mporter@ti.com>
+ <508CEA05.8060200@ti.com>
+Message-ID: <20121116164930.GC20006@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2012 10:00 PM, Mark Zhang wrote:
-> This patch adds the rgb and hdmi nodes which are necessary for
-> tegra drm driver.
+On Sun, Oct 28, 2012 at 01:47:09PM +0530, Sekhar Nori wrote:
+> On 10/18/2012 6:56 PM, Matt Porter wrote:
+> > Move mach-davinci/dma.c to common/edma.c so it can be used
+> > by OMAP (specifically AM33xx) as well. This just moves the
+> > private EDMA API but does not support OMAP.
+> > 
+> > Signed-off-by: Matt Porter <mporter@ti.com>
+> > ---
+> 
+> > diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
+> > index 4c48a36..f45d591 100644
+> > --- a/arch/arm/mach-davinci/devices.c
+> > +++ b/arch/arm/mach-davinci/devices.c
+> > @@ -19,9 +19,10 @@
+> >  #include <mach/irqs.h>
+> >  #include <mach/cputype.h>
+> >  #include <mach/mux.h>
+> > -#include <mach/edma.h>
+> >  #include <linux/platform_data/mmc-davinci.h>
+> >  #include <mach/time.h>
+> > +#include <linux/platform_data/edma.h>
+> 
+> Can you please introduce a patch to clean this mixture of linux/ and
+> mach/ includes?
 
-> diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+Sure.
 
-> +	host1x {
-> +		dc at 54200000 {
-> +			rgb {
-> +				status = "okay";
-> +				nvidia,ddc-i2c-bus = <&rgbddc>;
-> +			};
-> +		};
-> +
-> +		hdmi {
-> +			status = "okay";
-...
-> +		};
-> +	};
+> 
+> > +
+> >  
+> >  #include "davinci.h"
+> >  #include "clock.h"
+> > @@ -141,10 +142,10 @@ static struct resource mmcsd0_resources[] = {
+> >  	},
+> >  	/* DMA channels: RX, then TX */
+> >  	{
+> > -		.start = EDMA_CTLR_CHAN(0, DAVINCI_DMA_MMCRXEVT),
+> > +		.start = EDMA_CTLR_CHAN(0, 26),
+> 
+> Instead of just replacing the event #defines with plain numbers, can you
+> introduce a mach-davinci local edma.h which can then be included in the
+> davinci platform files which refer to edma channel numbers?
 
-This patch enables both LCD (which will always get enabled, since
-there's no way to unplug it) and HDMI (which may optionally get enabled,
-depending on whether an HDMI device is plugged in). tegradrm currently
-has issues when two outputs are enabled at once (and I just validated
-this is still true with all the latest patches). As such, please can you
-repost with only the internal LCD enabled. We can enable the LCD port
-later once the tegradrm issues are fixed. Thanks.
+Yes.
 
-With no HDMI plugged in, I tested Cardhu's LCD and it works fine.
+> > diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+> > index 7cd56ed..153fab8 100644
+> > --- a/arch/arm/plat-omap/Kconfig
+> > +++ b/arch/arm/plat-omap/Kconfig
+> > @@ -28,6 +28,7 @@ config ARCH_OMAP2PLUS
+> >  	select OMAP_DM_TIMER
+> >  	select PROC_DEVICETREE if PROC_FS
+> >  	select SPARSE_IRQ
+> > +	select TI_PRIV_EDMA
+> 
+> This hunk does not seem to belong to subject of this patch.
+
+Yep, stray hunk..will move to the am335x enablement.
+
+> >  	select USE_OF
+> >  	help
+> >  	  "Systems based on OMAP2, OMAP3, OMAP4 or OMAP5"
+> 
+> > diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
+> > new file mode 100644
+> > index 0000000..7396f0b3
+> > --- /dev/null
+> > +++ b/include/linux/platform_data/edma.h
+> > @@ -0,0 +1,198 @@
+> > +/*
+> > + *  TI DAVINCI dma definitions
+> > + *
+> > + *  Copyright (C) 2006-2009 Texas Instruments.
+> > + *
+> > + *  This program is free software; you can redistribute  it and/or modify it
+> > + *  under  the terms of  the GNU General  Public License as published by the
+> > + *  Free Software Foundation;  either version 2 of the  License, or (at your
+> > + *  option) any later version.
+> > + *
+> > + *  THIS  SOFTWARE  IS PROVIDED   ``AS  IS'' AND   ANY  EXPRESS OR IMPLIED
+> > + *  WARRANTIES,   INCLUDING, BUT NOT  LIMITED  TO, THE IMPLIED WARRANTIES OF
+> > + *  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
+> > + *  NO  EVENT  SHALL   THE AUTHOR  BE    LIABLE FOR ANY   DIRECT, INDIRECT,
+> > + *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+> > + *  NOT LIMITED   TO, PROCUREMENT OF  SUBSTITUTE GOODS  OR SERVICES; LOSS OF
+> > + *  USE, DATA,  OR PROFITS; OR  BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+> > + *  ANY THEORY OF LIABILITY, WHETHER IN  CONTRACT, STRICT LIABILITY, OR TORT
+> > + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+> > + *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> 
+> > + *  You should have received a copy of the  GNU General Public License along
+> > + *  with this program; if not, write  to the Free Software Foundation, Inc.,
+> > + *  675 Mass Ave, Cambridge, MA 02139, USA.
+> 
+> This part can be dropped, I suppose ;-)
+
+Ok :)
+
+-Matt
