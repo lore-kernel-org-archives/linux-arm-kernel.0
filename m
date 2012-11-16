@@ -1,151 +1,61 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 16 Nov 2012 16:39:44 +0100
-Subject: [PATCH 1/4] arm: orion5x: mechanical defconfig update
-In-Reply-To: <1353080388-4091-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1353080388-4091-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353080388-4091-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri, 16 Nov 2012 16:39:43 +0100
+Subject: [GIT PULL] arm: orion5x: begin the DT conversion
+Message-ID: <1353080388-4091-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit is a simple mechanical update of the orion5x_defconfig
-file to the current kernel (i.e, just 'make orion5x_defconfig; make
-savedefconfig'). Doing this update allows to more easily separate
-DT-related configuration changes in the following patches.
+Jason, Andrew,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Tested by: Maxime Hadjinlian <mhadjinlian@lacie.com>
----
- arch/arm/configs/orion5x_defconfig |   32 ++++++++------------------------
- 1 file changed, 8 insertions(+), 24 deletions(-)
+Here is a set of four patches that start the conversion of
+mach-orion5x to the Device Tree. It for now converts only one board,
+which has been tested by Maxime Hadjinlian from LaCie (thanks a lot!),
+but we intend to do more in the future (Maxime will get another
+Orion5x platform, and I have received another one this week). I have
+also started working on a pinctrl driver for the Orion5x platforms.
 
-diff --git a/arch/arm/configs/orion5x_defconfig b/arch/arm/configs/orion5x_defconfig
-index cd5e6ba..d0875ce 100644
---- a/arch/arm/configs/orion5x_defconfig
-+++ b/arch/arm/configs/orion5x_defconfig
-@@ -1,7 +1,8 @@
- CONFIG_EXPERIMENTAL=y
- CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
- CONFIG_LOG_BUF_SHIFT=14
--CONFIG_SYSFS_DEPRECATED_V2=y
- CONFIG_EXPERT=y
- # CONFIG_SLUB_DEBUG is not set
- CONFIG_PROFILING=y
-@@ -10,6 +11,8 @@ CONFIG_KPROBES=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_BSD_DISKLABEL=y
- CONFIG_ARCH_ORION5X=y
- CONFIG_MACH_DB88F5281=y
- CONFIG_MACH_RD88F5182=y
-@@ -33,17 +36,12 @@ CONFIG_MACH_WNR854T=y
- CONFIG_MACH_RD88F5181L_GE=y
- CONFIG_MACH_RD88F5181L_FXO=y
- CONFIG_MACH_RD88F6183AP_GE=y
--CONFIG_NO_HZ=y
--CONFIG_HIGH_RES_TIMERS=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
--CONFIG_LEDS=y
--CONFIG_LEDS_CPU=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_FPE_NWFPE=y
- CONFIG_VFP=y
--# CONFIG_SUSPEND is not set
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -54,13 +52,10 @@ CONFIG_IP_PNP_DHCP=y
- CONFIG_IP_PNP_BOOTP=y
- # CONFIG_IPV6 is not set
- CONFIG_NET_DSA=y
--CONFIG_NET_DSA_MV88E6131=y
--CONFIG_NET_DSA_MV88E6123_61_65=y
- CONFIG_NET_PKTGEN=m
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- # CONFIG_FIRMWARE_IN_KERNEL is not set
- CONFIG_MTD=y
--CONFIG_MTD_PARTITIONS=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
-@@ -82,12 +77,11 @@ CONFIG_CHR_DEV_SG=m
- CONFIG_ATA=y
- CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
--CONFIG_MARVELL_PHY=y
--CONFIG_NET_ETHERNET=y
- CONFIG_MII=y
--CONFIG_NET_PCI=y
-+CONFIG_NET_DSA_MV88E6131=y
-+CONFIG_NET_DSA_MV88E6123_61_65=y
- CONFIG_MV643XX_ETH=y
--# CONFIG_NETDEV_10000 is not set
-+CONFIG_MARVELL_PHY=y
- # CONFIG_INPUT_MOUSEDEV is not set
- CONFIG_INPUT_EVDEV=y
- # CONFIG_KEYBOARD_ATKBD is not set
-@@ -95,11 +89,11 @@ CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
- # CONFIG_SERIO is not set
- # CONFIG_VT is not set
-+CONFIG_LEGACY_PTY_COUNT=16
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- # CONFIG_SERIAL_8250_PCI is not set
- CONFIG_SERIAL_8250_RUNTIME_UARTS=2
--CONFIG_LEGACY_PTY_COUNT=16
- CONFIG_HW_RANDOM_TIMERIOMEM=m
- CONFIG_I2C=y
- # CONFIG_I2C_COMPAT is not set
-@@ -109,10 +103,8 @@ CONFIG_GPIO_SYSFS=y
- CONFIG_SENSORS_LM75=y
- # CONFIG_VGA_ARB is not set
- CONFIG_USB=y
--CONFIG_USB_DEVICEFS=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_ROOT_HUB_TT=y
--CONFIG_USB_EHCI_TT_NEWSCHED=y
- CONFIG_USB_PRINTER=y
- CONFIG_USB_STORAGE=y
- CONFIG_USB_STORAGE_DATAFAB=y
-@@ -140,7 +132,6 @@ CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- # CONFIG_EXT3_FS_XATTR is not set
- CONFIG_EXT4_FS=m
--CONFIG_INOTIFY=y
- CONFIG_ISO9660_FS=m
- CONFIG_JOLIET=y
- CONFIG_UDF_FS=m
-@@ -150,25 +141,18 @@ CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
- CONFIG_CRAMFS=y
- CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
- CONFIG_ROOT_NFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_BSD_DISKLABEL=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_CODEPAGE_850=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_ISO8859_2=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_DEBUG_FS=y
--CONFIG_DEBUG_KERNEL=y
- # CONFIG_DEBUG_BUGVERBOSE is not set
- CONFIG_DEBUG_INFO=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
- CONFIG_LATENCYTOP=y
--CONFIG_SYSCTL_SYSCALL_CHECK=y
- # CONFIG_FTRACE is not set
- CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_ERRORS=y
- CONFIG_DEBUG_LL=y
- CONFIG_CRYPTO_CBC=m
- CONFIG_CRYPTO_ECB=m
--- 
-1.7.9.5
+I've put the four patches in the same branch: 2/4 is SoC related and
+3/4 board related, but 3/4 cannot live without 2/4. If you'd like to
+have this series split in several pull requests, do not hesitate to
+let me know how the split should be done.
+
+Thanks,
+
+Thomas
+
+The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
+
+  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
+
+are available in the git repository at:
+
+  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-orion-dt-3.8
+
+for you to fetch changes up to 559b1d157fddc02a68ea045df2a0c40cb713e292:
+
+  arm: orion5x: add DT related options in defconfig (2012-11-16 16:22:07 +0100)
+
+----------------------------------------------------------------
+Marvell Orion DT conversion for 3.8
+
+----------------------------------------------------------------
+Thomas Petazzoni (4):
+      arm: orion5x: mechanical defconfig update
+      arm: orion5x: basic Device Tree support
+      arm: orion5x: convert 'LaCie Ethernet Disk mini v2' to Device Tree
+      arm: orion5x: add DT related options in defconfig
+
+ arch/arm/boot/dts/Makefile                         |    1 +
+ .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    |   55 +++++++++++
+ arch/arm/boot/dts/orion5x.dtsi                     |   98 ++++++++++++++++++++
+ arch/arm/configs/orion5x_defconfig                 |   36 +++----
+ arch/arm/mach-orion5x/Kconfig                      |   14 ++-
+ arch/arm/mach-orion5x/Makefile                     |    4 +-
+ arch/arm/mach-orion5x/board-dt.c                   |   79 ++++++++++++++++
+ arch/arm/mach-orion5x/common.c                     |    4 +-
+ arch/arm/mach-orion5x/common.h                     |    9 ++
+ arch/arm/mach-orion5x/edmini_v2-setup.c            |   88 +-----------------
+ 10 files changed, 270 insertions(+), 118 deletions(-)
+ create mode 100644 arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+ create mode 100644 arch/arm/boot/dts/orion5x.dtsi
+ create mode 100644 arch/arm/mach-orion5x/board-dt.c
