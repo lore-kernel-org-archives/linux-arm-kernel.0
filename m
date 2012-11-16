@@ -1,54 +1,45 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 16 Nov 2012 15:22:34 +0200
-Subject: [PATCH v2 6/7] usb: chipidea: usbmisc: add mx53 support
-In-Reply-To: <1352981028-14312-7-git-send-email-m.grzeschik@pengutronix.de>
-References: <1352981028-14312-1-git-send-email-m.grzeschik@pengutronix.de>
- <1352981028-14312-7-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <87obix65t1.fsf@ashishki-desk.ger.corp.intel.com>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Fri, 16 Nov 2012 14:25:31 +0100
+Subject: ARM: imx: ehci-imx35: fix host power mask bit
+In-Reply-To: <1353063197.3647.27.camel@mars>
+References: <1353063197.3647.27.camel@mars>
+Message-ID: <20121116142531.228251f6@eb-e6520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
+Hi Christoph,
 
-> This adds mx53 as the next user of the usbmisc driver and makes it
-> possible to disable the overcurrent-detection of the internal phy.
->
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Le Fri, 16 Nov 2012 11:53:17 +0100,
+Christoph Fritz <chf.fritz@googlemail.com> a ?crit :
+
+> This patch sets HPM (Host power mask bit) to bit 16 according to i.MX35
+> Reference Manual. Falsely it was set to bit 8, but this controls pull-up
+> Impedance.
+> 
+> Reported-by: Michael Burkey <mdburkey@gmail.com>
+> Cc: Stable <stable@vger.kernel.org>
+> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+Acked-by: Eric B?nard <eric@eukrea.com>
+the same problem exists in arch/arm/mach-imx/ehci-imx25.c may you
+please also fix it in your patch at the same time ?
+
+Thanks
+Eric
+
 > ---
->  drivers/usb/chipidea/usbmisc_imx.c |   28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->
-> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-> index 913e414..9718500 100644
-> --- a/drivers/usb/chipidea/usbmisc_imx.c
-> +++ b/drivers/usb/chipidea/usbmisc_imx.c
-> @@ -54,6 +54,29 @@ static struct usbmisc_usb_device *get_usbdev(struct device *dev)
->  	return &usbmisc->usbdev[i];
->  }
->  
-> +static int usbmisc_imx53_init(struct device *dev)
-> +{
-> +	struct usbmisc_usb_device *usbdev;
-> +	void __iomem *reg;
-> +	unsigned long flags;
-> +	u32 val;
-> +
-> +	usbdev = get_usbdev(dev);
-> +	if (IS_ERR(usbdev))
-> +		return PTR_ERR(usbdev);
-> +
-> +	reg = usbmisc->base + usbdev->index * 8;
-> +
-> +	if (usbdev->disable_oc) {
-> +		spin_lock_irqsave(&usbmisc->lock, flags);
-> +		val = readl(reg);
-> +		writel(val | (1 << 5), reg);
-
-We know now that (1 << 5) probably means "disable overcurrent
-detection", but is there a definition for this register's bits
-somewhere?
-
-Regards,
---
-Alex
+>  arch/arm/mach-imx/ehci-imx35.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-imx/ehci-imx35.c b/arch/arm/mach-imx/ehci-imx35.c
+> index a596f70..554e7cc 100644
+> --- a/arch/arm/mach-imx/ehci-imx35.c
+> +++ b/arch/arm/mach-imx/ehci-imx35.c
+> @@ -30,7 +30,7 @@
+>  #define MX35_H1_SIC_SHIFT	21
+>  #define MX35_H1_SIC_MASK	(0x3 << MX35_H1_SIC_SHIFT)
+>  #define MX35_H1_PP_BIT		(1 << 18)
+> -#define MX35_H1_PM_BIT		(1 << 8)
+> +#define MX35_H1_PM_BIT		(1 << 16)
+>  #define MX35_H1_IPPUE_UP_BIT	(1 << 7)
+>  #define MX35_H1_IPPUE_DOWN_BIT	(1 << 6)
+>  #define MX35_H1_TLL_BIT		(1 << 5)
