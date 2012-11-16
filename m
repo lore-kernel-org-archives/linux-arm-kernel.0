@@ -1,50 +1,78 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 16 Nov 2012 13:48:23 +0100
-Subject: [PATCH 1/2] ARM: i.MX27: Add platform support for IRAM.
-In-Reply-To: <1352131185-12079-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1352131185-12079-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20121116124823.GR10369@pengutronix.de>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Fri, 16 Nov 2012 14:51:03 +0200
+Subject: [PATCH 7/9] usb: chipidea: udc: add force-full-speed option
+In-Reply-To: <1352909950-32555-8-git-send-email-m.grzeschik@pengutronix.de>
+References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352909950-32555-8-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <87wqxl679k.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2012 at 04:59:44PM +0100, Javier Martin wrote:
-> Add support for IRAM to i.MX27 non-DT platforms using
-> iram_init() function.
-> 
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
+
+> This patch makes it possible to set the chipidea udc
+> into full-speed only mode. It can be set by the oftree
+> property "force-full-speed".
+>
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 > ---
->  arch/arm/mach-imx/mm-imx27.c |    3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
-> index e7e24af..fd2416d 100644
-> --- a/arch/arm/mach-imx/mm-imx27.c
-> +++ b/arch/arm/mach-imx/mm-imx27.c
-> @@ -27,6 +27,7 @@
->  #include <asm/pgtable.h>
->  #include <asm/mach/map.h>
->  #include <mach/iomux-v1.h>
-> +#include <mach/iram.h>
+>  drivers/usb/chipidea/bits.h  |    1 +
+>  drivers/usb/chipidea/core.c  |    5 +++++
+>  include/linux/usb/chipidea.h |    1 +
+>  3 files changed, 7 insertions(+)
+>
+> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
+> index 3cded5f..85b6b09 100644
+> --- a/drivers/usb/chipidea/bits.h
+> +++ b/drivers/usb/chipidea/bits.h
+> @@ -51,6 +51,7 @@
+>  #define PORTSC_PTS            (BIT(31) | BIT(30))
+>  #define PORTSC_PTW            BIT(28)
+>  #define PORTSC_STS            BIT(29)
+> +#define PORTSC_PFSC           BIT(24)
+
+Same for this one, it's in DEVLC in my spec.
+
 >  
->  /* MX27 memory map definition */
->  static struct map_desc imx27_io_desc[] __initdata = {
-> @@ -94,4 +95,6 @@ void __init imx27_soc_init(void)
->  	/* imx27 has the imx21 type audmux */
->  	platform_device_register_simple("imx21-audmux", 0, imx27_audmux_res,
->  					ARRAY_SIZE(imx27_audmux_res));
-> +	/* imx27 has an iram of 46080 bytes size */
-> +	iram_init(MX27_IRAM_BASE_ADDR, 46080);
+>  /* DEVLC */
+>  #define DEVLC_PSPD            (0x03UL << 25)
+> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> index 7e80f1b..bc99cea 100644
+> --- a/drivers/usb/chipidea/core.c
+> +++ b/drivers/usb/chipidea/core.c
+> @@ -230,6 +230,9 @@ void hw_portsc_configure(struct ci13xxx *ci)
+>  		hw_write(ci, OP_PORTSC, PORTSC_PTS, 0x3 << ffs_nr(PORTSC_PTS));
+>  		hw_write(ci, OP_PORTSC, PORTSC_STS, 0x1 << ffs_nr(PORTSC_STS));
+>  	}
+> +
+> +	if (ci->platdata->flags & CI13XXX_PORTSC_PFSC)
+> +		hw_write(ci, OP_PORTSC, PORTSC_PFSC, 0x1 << ffs_nr(PORTSC_PFSC));
+>  }
+>  
+>  /**
+> @@ -566,6 +569,8 @@ void ci13xxx_get_dr_flags(struct device_node *of_node, struct ci13xxx_platform_d
+>  		pr_err("no phy interface defined\n");
+>  	}
+>  
+> +	if (of_find_property(of_node, "force-full-speed", NULL))
+> +		pdata->flags |= CI13XXX_PORTSC_PFSC;
+>  }
+>  EXPORT_SYMBOL_GPL(ci13xxx_get_dr_flags);
+>  
+> diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+> index cafca23..9ffe105 100644
+> --- a/include/linux/usb/chipidea.h
+> +++ b/include/linux/usb/chipidea.h
+> @@ -26,6 +26,7 @@ struct ci13xxx_platform_data {
+>  #define CI13XXX_PORTSC_PTS_UTMI		BIT(8)
+>  #define CI13XXX_PORTSC_PTS_ULPI		BIT(9)
+>  #define CI13XXX_PORTSC_PTS_FSLS		BIT(10)
+> +#define CI13XXX_PORTSC_PFSC		BIT(11)
 
-For this rather Philipps sram allocater patches should be used. This
-would also solve the problem that mach/iram.h cannot be accessed anymore
-in current -next. Fabio already sent a patch addressing this, but I
-think we should go for a proper fix rather than just moving iram.h
-to include/linux/
+Btw, these can be more descriptive and don't need _PORTSC_ prefix, like
+"CI13XXX_FORCE_FULLSPEED".
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+--
+Alex
