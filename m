@@ -1,50 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 16 Nov 2012 10:26:58 +0100
-Subject: [PATCH 0/6] Add basic support for Allwinner A1X SoCs
-In-Reply-To: <201211160751.18401.arnd@arndb.de>
-References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
- <201211160751.18401.arnd@arndb.de>
-Message-ID: <50A606E2.2070508@free-electrons.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 16 Nov 2012 11:28:18 +0200
+Subject: [RFC] fbdev: arm has __raw I/O accessors, use them in fb.h
+In-Reply-To: <1353057364-21214-1-git-send-email-archit@ti.com>
+References: <1353057364-21214-1-git-send-email-archit@ti.com>
+Message-ID: <50A60732.3050602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-Le 16/11/2012 08:51, Arnd Bergmann a ?crit :
-> On Thursday 15 November 2012, Maxime Ripard wrote:
->> You'll find in this patchset the initial support for Allwinner A10 and A13 SoCs
->> from Allwinner. Since the internal name of these SoCs are sun4i and sun5i, the
->> mach- directory is named sunxi.
->>
->> You can find these SoCs in the Cubieboard, the A13-olinuxino or the Melee
->> A1000.
->>
->> Both SoCs should work fine, as the A13 is a trimmed down version of the A10,
->> but it has only been tested on a A13-OlinuXino from Olimex.
->>
->> Support is quite minimal for now, since it only includes timer and IRQ
->> controller drivers, so we can only boot to userspace through initramfs. Support
->> for the other peripherals on these SoCs will come eventually.
+On 2012-11-16 11:16, Archit Taneja wrote:
+> This removes the sparse warnings on arm platforms:
 > 
-> Hi Maxime,
+> warning: cast removes address space of expression
 > 
-> Thanks for sending these, I'm pretty excited we actually get this far
-> for 3.8. All patches look good for inclusion from my side, but I'll let
-> Stefan and others comment first and then take your second version. We
-> are getting closer to the merge window already, so I'd like to pull
-> it in rather soon and maybe add some fixups later.
+> Signed-off-by: Archit Taneja <archit@ti.com>
+> ---
+>  include/linux/fb.h |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/include/linux/fb.h b/include/linux/fb.h
+> index c7a9571..7fce1e1 100644
+> --- a/include/linux/fb.h
+> +++ b/include/linux/fb.h
+> @@ -548,7 +548,7 @@ static inline struct apertures_struct *alloc_apertures(unsigned int max_num) {
+>  #define fb_memcpy_fromfb sbus_memcpy_fromio
+>  #define fb_memcpy_tofb sbus_memcpy_toio
+>  
+> -#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__) || defined(__sh__) || defined(__powerpc__) || defined(__avr32__) || defined(__bfin__)
+> +#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__) || defined(__sh__) || defined(__powerpc__) || defined(__avr32__) || defined(__bfin__) || defined(__arm__)
+>  
+>  #define fb_readb __raw_readb
+>  #define fb_readw __raw_readw
 
-That's great. I'll do my best to send a v2 asap.
+Looks good and works for me:
 
-> I've also ordered a Cubieboard myself now, so hopefully I'll also find
-> some time to play with this.
+Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
-Nice :)
+ Tomi
 
-Maxime
 
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 897 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/b7cd2ded/attachment.sig>
