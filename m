@@ -1,30 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Nov 2012 16:59:00 +0000
-Subject: [GIT PULL] imx device tree changes for 3.8
-In-Reply-To: <20121116073152.GF2941@S2100-06.ap.freescale.net>
-References: <20121116073152.GF2941@S2100-06.ap.freescale.net>
-Message-ID: <201211161659.00630.arnd@arndb.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 16 Nov 2012 18:05:14 +0100
+Subject: [PATCH v3 0/3] i2c: at91: add dma support
+In-Reply-To: <1352911493-6979-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1352911493-6979-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20121116170514.GA21903@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 November 2012, Shawn Guo wrote:
-> 
-> The following changes since commit 68b25325a7fd290b5e472bba0df9cbe8c1a81d8f:
-> 
->   ARM: imx: select HAVE_IMX_SRC when SMP is enabled (2012-10-23 15:37:51 +0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-dt-3.8
-> 
-> for you to fetch changes up to 96efb44e471250592ee865ce5b870bc6f860921f:
-> 
->   ARM: imx6q: select ARM and PL310 errata (2012-11-16 14:52:29 +0800)
-> 
-> ----------------------------------------------------------------
-> It's based on imx/multiplatform branch.  Most of them are dts changes.
-> There are also a few imx6 improvement patches in there.
+Hi Ludovic,
 
-Pulled into next/dt, thanks!
+> Here is the third version taking into account your feedback.
 
-	Arnd
+Thanks, looks mostly good. I have problems applying patch 3. What is
+this series based against?
+
+> Patch 1/3 should go into v3.7.
+
+No, not necessarily. It is not really a bugfix, and it is probably too
+late in the cycle for compiler silencing. Ah well, I decide later.
+
+BTW if you use --strict with checkpatch, it will tell you about the
+space after casts :)
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121116/a5fb9f95/attachment.sig>
