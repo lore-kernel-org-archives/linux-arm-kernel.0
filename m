@@ -1,36 +1,155 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Nov 2012 07:51:17 +0000
-Subject: [PATCH 0/6] Add basic support for Allwinner A1X SoCs
-In-Reply-To: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
+From: sr@denx.de (Stefan Roese)
+Date: Fri, 16 Nov 2012 08:57:24 +0100
+Subject: [PATCH 5/6] ARM: sunxi: Add device tree for the A13 and the
+ Olinuxino board
+In-Reply-To: <1353019586-21043-6-git-send-email-maxime.ripard@free-electrons.com>
 References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <201211160751.18401.arnd@arndb.de>
+ <1353019586-21043-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <50A5F1E4.10505@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 November 2012, Maxime Ripard wrote:
-> You'll find in this patchset the initial support for Allwinner A10 and A13 SoCs
-> from Allwinner. Since the internal name of these SoCs are sun4i and sun5i, the
-> mach- directory is named sunxi.
+On 11/15/2012 11:46 PM, Maxime Ripard wrote:
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/Makefile            |    1 +
+>  arch/arm/boot/dts/sun5i-olinuxino.dts |   30 +++++++++++++++++
+>  arch/arm/boot/dts/sun5i.dtsi          |   58 +++++++++++++++++++++++++++++++++
+>  3 files changed, 89 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun5i-olinuxino.dts
+>  create mode 100644 arch/arm/boot/dts/sun5i.dtsi
 > 
-> You can find these SoCs in the Cubieboard, the A13-olinuxino or the Melee
-> A1000.
-> 
-> Both SoCs should work fine, as the A13 is a trimmed down version of the A10,
-> but it has only been tested on a A13-OlinuXino from Olimex.
-> 
-> Support is quite minimal for now, since it only includes timer and IRQ
-> controller drivers, so we can only boot to userspace through initramfs. Support
-> for the other peripherals on these SoCs will come eventually.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index f37cf9f..9b2d3f0 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -84,6 +84,7 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
+>  	spear310-evb.dtb \
+>  	spear320-evb.dtb
+>  dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
+> +dtb-$(CONFIG_ARCH_SUNXI) += sun5i-olinuxino.dtb
+>  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+>  	tegra20-medcom-wide.dtb \
+>  	tegra20-paz00.dtb \
+> diff --git a/arch/arm/boot/dts/sun5i-olinuxino.dts b/arch/arm/boot/dts/sun5i-olinuxino.dts
+> new file mode 100644
+> index 0000000..add1e60
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun5i-olinuxino.dts
+> @@ -0,0 +1,30 @@
+> +/*
+> + * Copyright 2012 Maxime Ripard
+> + *
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "sun5i.dtsi"
+> +
+> +/ {
+> +	model = "Olimex A13-Olinuxino";
+> +	compatible = "olimex,a13-olinuxino", "allwinner,sun5i";
+> +
+> +	memory {
+> +		reg = <0x40000000 0x40000000>;
+> +	};
 
-Hi Maxime,
+Sure that the board support 1GiB of RAM? AFAIK A13 only supports 512MiB.
+Please re-check.
 
-Thanks for sending these, I'm pretty excited we actually get this far
-for 3.8. All patches look good for inclusion from my side, but I'll let
-Stefan and others comment first and then take your second version. We
-are getting closer to the merge window already, so I'd like to pull
-it in rather soon and maybe add some fixups later.
+> +	soc {
+> +		duart: uart at 01c28400 {
+> +			status = "okay";
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+> new file mode 100644
+> index 0000000..5797323
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun5i.dtsi
+> @@ -0,0 +1,58 @@
+> +/*
+> + * Copyright 2012 Maxime Ripard
+> + *
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	interrupt-parent = <&intc>;
+> +
+> +	cpus {
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a8";
+> +		};
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "earlyprintk console=ttyS0,115200";
+> +	};
 
-I've also ordered a Cubieboard myself now, so hopefully I'll also find
-some time to play with this.
+No memory node here? My experience is, that the soc.dtsi file should
+contain a memory node with the max possible memory size of the SoC.
+Which will be overwritten by the board dts file containing the max
+memory size of the board.
 
-	Arnd
+> +	soc {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0x01c20000 0x300000>;
+> +		ranges;
+> +
+> +		timer at 01c20c00 {
+> +			compatible = "allwinner,sunxi-timer";
+> +			reg = <0x01c20c00 0x400>;
+> +			interrupts = <22>;
+> +		};
+> +
+> +		intc: interrupt-controller at 01c20400 {
+> +			compatible = "allwinner,sunxi-ic";
+> +			reg = <0x01c20400 0x400>;
+> +			interrupt-controller;
+> +			#interrupt-cells = <1>;
+> +		};
+> +
+> +		uart1: uart at 01c28400 {
+> +			compatible = "ns8250";
+> +			reg = <0x01c28400 0x400>;
+> +			interrupts = <2>;
+> +			reg-shift = <2>;
+> +			clock-frequency = <24000000>;
+> +			status = "disabled";
+> +		};
+> +	};
+> +};
+
+Looks good so far. I suggest that with the A10/cubieboard support we
+move to the following dts/dtsi organization:
+
+sunxi.dtsi - Devices common to all Allwinner sunXi SoC's
+sun4i.dtsi - sun4i Devices, will include sunxi.dtsi
+sun5i.dtsi - sun5i Devices, will include sunxi.dtsi
+board.dts - will include either sun4i.dtsi or sun5i.dtsi
+
+If we agree on this, then I'll send a patch with this re-organization
+with the cubieboard patches.
+
+Thanks,
+Stefan
