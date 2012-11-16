@@ -1,85 +1,167 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 16 Nov 2012 10:20:35 +0100
-Subject: [PATCH 4/6] ARM: sunxi: Add earlyprintk support
-In-Reply-To: <50A5EF7E.6080801@denx.de>
+Date: Fri, 16 Nov 2012 10:24:00 +0100
+Subject: [PATCH 5/6] ARM: sunxi: Add device tree for the A13 and the
+ Olinuxino board
+In-Reply-To: <50A5F1E4.10505@denx.de>
 References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
- <1353019586-21043-5-git-send-email-maxime.ripard@free-electrons.com>
- <50A5EF7E.6080801@denx.de>
-Message-ID: <50A60563.2040602@free-electrons.com>
+ <1353019586-21043-6-git-send-email-maxime.ripard@free-electrons.com>
+ <50A5F1E4.10505@denx.de>
+Message-ID: <50A60630.4070803@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 16/11/2012 08:47, Stefan Roese a ?crit :
+Le 16/11/2012 08:57, Stefan Roese a ?crit :
 > On 11/15/2012 11:46 PM, Maxime Ripard wrote:
 >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 >> ---
->>  arch/arm/Kconfig.debug         |    8 ++++++++
->>  arch/arm/include/debug/sunxi.S |   22 ++++++++++++++++++++++
->>  2 files changed, 30 insertions(+)
->>  create mode 100644 arch/arm/include/debug/sunxi.S
+>>  arch/arm/boot/dts/Makefile            |    1 +
+>>  arch/arm/boot/dts/sun5i-olinuxino.dts |   30 +++++++++++++++++
+>>  arch/arm/boot/dts/sun5i.dtsi          |   58 +++++++++++++++++++++++++++++++++
+>>  3 files changed, 89 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/sun5i-olinuxino.dts
+>>  create mode 100644 arch/arm/boot/dts/sun5i.dtsi
 >>
->> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->> index b0f3857..6672b02 100644
->> --- a/arch/arm/Kconfig.debug
->> +++ b/arch/arm/Kconfig.debug
->> @@ -345,6 +345,13 @@ choice
->>  		  Say Y here if you want kernel low-level debugging support
->>  		  on SOCFPGA based platforms.
->>  
->> +	config DEBUG_SUNXI_UART
->> +		bool "Kernel low-level debugging messages via sunXi UART"
->> +		depends on ARCH_SUNXI
->> +		help
->> +		  Say Y here if you want kernel low-level debugging support
->> +		  on Allwinner A1X based platforms.
->>
->>  	config DEBUG_VEXPRESS_UART0_DETECT
->>  		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
->>  		depends on ARCH_VEXPRESS && CPU_CP15_MMU
->> @@ -416,6 +423,7 @@ config DEBUG_LL_INCLUDE
->>  	default "debug/mvebu.S" if DEBUG_MVEBU_UART
->>  	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
->>  	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
->> +	default "debug/sunxi.S" if DEBUG_SUNXI_UART
->>  	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
->>  		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
->>  	default "mach/debug-macro.S"
->> diff --git a/arch/arm/include/debug/sunxi.S b/arch/arm/include/debug/sunxi.S
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index f37cf9f..9b2d3f0 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -84,6 +84,7 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
+>>  	spear310-evb.dtb \
+>>  	spear320-evb.dtb
+>>  dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
+>> +dtb-$(CONFIG_ARCH_SUNXI) += sun5i-olinuxino.dtb
+>>  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+>>  	tegra20-medcom-wide.dtb \
+>>  	tegra20-paz00.dtb \
+>> diff --git a/arch/arm/boot/dts/sun5i-olinuxino.dts b/arch/arm/boot/dts/sun5i-olinuxino.dts
 >> new file mode 100644
->> index 0000000..ffd101f
+>> index 0000000..add1e60
 >> --- /dev/null
->> +++ b/arch/arm/include/debug/sunxi.S
->> @@ -0,0 +1,22 @@
+>> +++ b/arch/arm/boot/dts/sun5i-olinuxino.dts
+>> @@ -0,0 +1,30 @@
 >> +/*
->> + * Early serial output macro for Allwinner A1X SoCs
->> + *
->> + * Copyright (C) 2012 Maxime Ripard
+>> + * Copyright 2012 Maxime Ripard
 >> + *
 >> + * Maxime Ripard <maxime.ripard@free-electrons.com>
 >> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> +*/
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
 >> +
->> +#define SUNXI_UART1_PHYS_BASE	0x01c28400
->> +#define SUNXI_UART1_VIRT_BASE	0xf1c28400
+>> +/dts-v1/;
+>> +/include/ "sun5i.dtsi"
 >> +
->> +	.macro	addruart, rp, rv, tmp
->> +	ldr	\rp, =SUNXI_UART1_PHYS_BASE
->> +	ldr	\rv, =SUNXI_UART1_VIRT_BASE
->> +	.endm
+>> +/ {
+>> +	model = "Olimex A13-Olinuxino";
+>> +	compatible = "olimex,a13-olinuxino", "allwinner,sun5i";
 >> +
->> +#define UART_SHIFT	2
->> +#include <asm/hardware/debug-8250.S>
+>> +	memory {
+>> +		reg = <0x40000000 0x40000000>;
+>> +	};
 > 
-> A10 (cubieboard) has debug the UART on UART0 instead of UART1 as on A13.
-> So we need support this here as well. I suggest that I add support debug
-> on UART0 with my cubieboard patches.
+> Sure that the board support 1GiB of RAM? AFAIK A13 only supports 512MiB.
+> Please re-check.
 
-Ok, we'll do it that way then. Thanks!
+Ah, you're right. Good catch.
 
-Maxime
+>> +	soc {
+>> +		duart: uart at 01c28400 {
+>> +			status = "okay";
+>> +		};
+>> +	};
+>> +};
+>> diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+>> new file mode 100644
+>> index 0000000..5797323
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/sun5i.dtsi
+>> @@ -0,0 +1,58 @@
+>> +/*
+>> + * Copyright 2012 Maxime Ripard
+>> + *
+>> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+>> + *
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
+>> +
+>> +/include/ "skeleton.dtsi"
+>> +
+>> +/ {
+>> +	interrupt-parent = <&intc>;
+>> +
+>> +	cpus {
+>> +		cpu at 0 {
+>> +			compatible = "arm,cortex-a8";
+>> +		};
+>> +	};
+>> +
+>> +	chosen {
+>> +		bootargs = "earlyprintk console=ttyS0,115200";
+>> +	};
+> 
+> No memory node here? My experience is, that the soc.dtsi file should
+> contain a memory node with the max possible memory size of the SoC.
+> Which will be overwritten by the board dts file containing the max
+> memory size of the board.
+
+I've worked on boards that were not doing that, so I have a different
+experience here, but that looks reasonable.
+
+> 
+>> +	soc {
+>> +		compatible = "simple-bus";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		reg = <0x01c20000 0x300000>;
+>> +		ranges;
+>> +
+>> +		timer at 01c20c00 {
+>> +			compatible = "allwinner,sunxi-timer";
+>> +			reg = <0x01c20c00 0x400>;
+>> +			interrupts = <22>;
+>> +		};
+>> +
+>> +		intc: interrupt-controller at 01c20400 {
+>> +			compatible = "allwinner,sunxi-ic";
+>> +			reg = <0x01c20400 0x400>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <1>;
+>> +		};
+>> +
+>> +		uart1: uart at 01c28400 {
+>> +			compatible = "ns8250";
+>> +			reg = <0x01c28400 0x400>;
+>> +			interrupts = <2>;
+>> +			reg-shift = <2>;
+>> +			clock-frequency = <24000000>;
+>> +			status = "disabled";
+>> +		};
+>> +	};
+>> +};
+> 
+> Looks good so far. I suggest that with the A10/cubieboard support we
+> move to the following dts/dtsi organization:
+> 
+> sunxi.dtsi - Devices common to all Allwinner sunXi SoC's
+> sun4i.dtsi - sun4i Devices, will include sunxi.dtsi
+> sun5i.dtsi - sun5i Devices, will include sunxi.dtsi
+> board.dts - will include either sun4i.dtsi or sun5i.dtsi
+> 
+> If we agree on this, then I'll send a patch with this re-organization
+> with the cubieboard patches.
+
+Yes, that would make sense.
+
+Thanks!
 
 
 -- 
