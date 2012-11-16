@@ -1,54 +1,124 @@
 From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Fri, 16 Nov 2012 10:50:03 +0900
-Subject: [PATCH v2 01/10] Revert "sh-sci / PM: Avoid deadlocking runtime PM"
+Date: Fri, 16 Nov 2012 10:51:24 +0900
+Subject: [PATCH v2 03/10] Partially revert
+ "serial: sh-sci: console Runtime PM support"
 In-Reply-To: <50A59B9B.2010501@renesas.com>
 References: <509A0658.1010503@renesas.com> <509A0B4E.1030801@renesas.com>
  <20121116010107.GA6068@kroah.com> <50A59B9B.2010501@renesas.com>
-Message-ID: <50A59BCB.2040606@renesas.com>
+Message-ID: <50A59C1C.9020904@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 048be431e4 (sh-sci / PM: Avoid deadlocking runtime
-PM, from Rafael J. Wysocki <rjw@sisk.pl>, 2012-03-09).
+This partially reverts commit 1ba7622094 (serial: sh-sci: console
+Runtime PM support, from Magnus Damm <damm@opensource.se>, 2011-08-03).
 
-In order to get console PM work properly, we should implement uart_ops
-->pm() operation, rather than sprinkle band-ading runtime PM calls in
-the driver.
+The generic 'serial_core' can take care of console PM maintenance,
+so all (or at least the first thing) we have to do to get console PM
+work properly, is to implement uart_ops ->pm() operation in the sh-sci
+serial client driver.
+
+This patch partially reverts the commit above, but leaving sci_reset()
+change in place, because sci_reset() is already part of another commit
+(73c3d53f38 serial: sh-sci: Avoid FIFO clear for MCE toggle.).
+
+A revised version of console PM support follows next.
 
 Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
 ---
- drivers/tty/serial/sh-sci.c | 5 -----
- 1 file changed, 5 deletions(-)
+ drivers/tty/serial/sh-sci.c | 53 +--------------------------------------------
+ 1 file changed, 1 insertion(+), 52 deletions(-)
 
 diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-index 9be296c..526ad04 100644
+index 9abe977..e9e8883 100644
 --- a/drivers/tty/serial/sh-sci.c
 +++ b/drivers/tty/serial/sh-sci.c
-@@ -1752,8 +1752,6 @@ static int sci_startup(struct uart_port *port)
+@@ -99,12 +99,6 @@ struct sci_port {
+ #endif
  
- 	dev_dbg(port->dev, "%s(%d)\n", __func__, port->line);
- 
--	pm_runtime_put_noidle(port->dev);
+ 	struct notifier_block		freq_transition;
 -
- 	sci_port_enable(s);
+-#ifdef CONFIG_SERIAL_SH_SCI_CONSOLE
+-	unsigned short saved_smr;
+-	unsigned short saved_fcr;
+-	unsigned char saved_brr;
+-#endif
+ };
  
- 	ret = sci_request_irq(s);
-@@ -1781,8 +1779,6 @@ static void sci_shutdown(struct uart_port *port)
- 	sci_free_irq(s);
+ /* Function prototypes */
+@@ -2247,8 +2241,7 @@ static int __devinit serial_console_setup(struct console *co, char *options)
+ 	if (options)
+ 		uart_parse_options(options, &baud, &parity, &bits, &flow);
  
- 	sci_port_disable(s);
+-	sci_port_disable(sci_port);
 -
--	pm_runtime_get_noresume(port->dev);
++	/* TODO: disable clock */
+ 	return uart_set_options(port, co, baud, parity, bits, flow);
  }
  
- static unsigned int sci_scbrr_calc(unsigned int algo_id, unsigned int bps,
-@@ -2121,7 +2117,6 @@ static int __devinit sci_init_single(struct platform_device *dev,
- 		sci_init_gpios(sci_port);
+@@ -2291,46 +2284,6 @@ static int __devinit sci_probe_earlyprintk(struct platform_device *pdev)
+ 	return 0;
+ }
  
- 		pm_runtime_irq_safe(&dev->dev);
--		pm_runtime_get_noresume(&dev->dev);
- 		pm_runtime_enable(&dev->dev);
- 	}
+-#define uart_console(port)	((port)->cons->index == (port)->line)
+-
+-static int sci_runtime_suspend(struct device *dev)
+-{
+-	struct sci_port *sci_port = dev_get_drvdata(dev);
+-	struct uart_port *port = &sci_port->port;
+-
+-	if (uart_console(port)) {
+-		struct plat_sci_reg *reg;
+-
+-		sci_port->saved_smr = serial_port_in(port, SCSMR);
+-		sci_port->saved_brr = serial_port_in(port, SCBRR);
+-
+-		reg = sci_getreg(port, SCFCR);
+-		if (reg->size)
+-			sci_port->saved_fcr = serial_port_in(port, SCFCR);
+-		else
+-			sci_port->saved_fcr = 0;
+-	}
+-	return 0;
+-}
+-
+-static int sci_runtime_resume(struct device *dev)
+-{
+-	struct sci_port *sci_port = dev_get_drvdata(dev);
+-	struct uart_port *port = &sci_port->port;
+-
+-	if (uart_console(port)) {
+-		sci_reset(port);
+-		serial_port_out(port, SCSMR, sci_port->saved_smr);
+-		serial_port_out(port, SCBRR, sci_port->saved_brr);
+-
+-		if (sci_port->saved_fcr)
+-			serial_port_out(port, SCFCR, sci_port->saved_fcr);
+-
+-		serial_port_out(port, SCSCR, sci_port->cfg->scscr);
+-	}
+-	return 0;
+-}
+-
+ #define SCI_CONSOLE	(&serial_console)
  
+ #else
+@@ -2340,8 +2293,6 @@ static inline int __devinit sci_probe_earlyprintk(struct platform_device *pdev)
+ }
+ 
+ #define SCI_CONSOLE	NULL
+-#define sci_runtime_suspend	NULL
+-#define sci_runtime_resume	NULL
+ 
+ #endif /* CONFIG_SERIAL_SH_SCI_CONSOLE */
+ 
+@@ -2459,8 +2410,6 @@ static int sci_resume(struct device *dev)
+ }
+ 
+ static const struct dev_pm_ops sci_dev_pm_ops = {
+-	.runtime_suspend = sci_runtime_suspend,
+-	.runtime_resume = sci_runtime_resume,
+ 	.suspend	= sci_suspend,
+ 	.resume		= sci_resume,
+ };
 -- 
 1.7.12.4
