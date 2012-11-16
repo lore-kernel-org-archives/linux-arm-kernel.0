@@ -1,111 +1,41 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri, 16 Nov 2012 11:49:30 -0500
-Subject: [RFC PATCH v3 02/16] ARM: davinci: move private EDMA API to
- arm/common
-In-Reply-To: <508CEA05.8060200@ti.com>
-References: <1350566815-409-1-git-send-email-mporter@ti.com>
- <1350566815-409-3-git-send-email-mporter@ti.com>
- <508CEA05.8060200@ti.com>
-Message-ID: <20121116164930.GC20006@beef>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Nov 2012 16:54:23 +0000
+Subject: [GIT PULL] arm-soc: Xilinx zynq changes for v3.8
+In-Reply-To: <CAHTX3dLijLK45ddZQVYHcrs6QQbmdRmQbPmTKada9nXx3ZAe3w@mail.gmail.com>
+References: <CAHTX3dLdGie9gtxbPq_gb8BLao7YYohqQWZFg3LzyNHxu=imdg@mail.gmail.com>
+ <CAHTX3dLijLK45ddZQVYHcrs6QQbmdRmQbPmTKada9nXx3ZAe3w@mail.gmail.com>
+Message-ID: <201211161654.23470.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 28, 2012 at 01:47:09PM +0530, Sekhar Nori wrote:
-> On 10/18/2012 6:56 PM, Matt Porter wrote:
-> > Move mach-davinci/dma.c to common/edma.c so it can be used
-> > by OMAP (specifically AM33xx) as well. This just moves the
-> > private EDMA API but does not support OMAP.
-> > 
-> > Signed-off-by: Matt Porter <mporter@ti.com>
-> > ---
+On Friday 16 November 2012, Michal Simek wrote:
+> I have 7 new follow up patches for zynq. They are based on previous patches
+> (arm-soc zynq/cleanup branch).
+> The branch is still based on rc3 but I have also tried to merged it
+> with the v3.7-rc5 and there is no issue.
 > 
-> > diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
-> > index 4c48a36..f45d591 100644
-> > --- a/arch/arm/mach-davinci/devices.c
-> > +++ b/arch/arm/mach-davinci/devices.c
-> > @@ -19,9 +19,10 @@
-> >  #include <mach/irqs.h>
-> >  #include <mach/cputype.h>
-> >  #include <mach/mux.h>
-> > -#include <mach/edma.h>
-> >  #include <linux/platform_data/mmc-davinci.h>
-> >  #include <mach/time.h>
-> > +#include <linux/platform_data/edma.h>
+> It should be the last pull request for v3.8.
 > 
-> Can you please introduce a patch to clean this mixture of linux/ and
-> mach/ includes?
 
-Sure.
+Pulled into next/dt, thanks!
 
-> 
-> > +
-> >  
-> >  #include "davinci.h"
-> >  #include "clock.h"
-> > @@ -141,10 +142,10 @@ static struct resource mmcsd0_resources[] = {
-> >  	},
-> >  	/* DMA channels: RX, then TX */
-> >  	{
-> > -		.start = EDMA_CTLR_CHAN(0, DAVINCI_DMA_MMCRXEVT),
-> > +		.start = EDMA_CTLR_CHAN(0, 26),
-> 
-> Instead of just replacing the event #defines with plain numbers, can you
-> introduce a mach-davinci local edma.h which can then be included in the
-> davinci platform files which refer to edma channel numbers?
+This was a small set of patches and you're new to the job, so there is
+no problem with what you sent me, but I have a few comments for the
+future:
 
-Yes.
+* Please provide a description of the series that I can put into the
+merge changeset, either in the introductory mail or (better) into
+the signed tag that you send (git tag -s). Have a look at how
+Tony Lindgren does this, he writes the best descriptions.
 
-> > diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-> > index 7cd56ed..153fab8 100644
-> > --- a/arch/arm/plat-omap/Kconfig
-> > +++ b/arch/arm/plat-omap/Kconfig
-> > @@ -28,6 +28,7 @@ config ARCH_OMAP2PLUS
-> >  	select OMAP_DM_TIMER
-> >  	select PROC_DEVICETREE if PROC_FS
-> >  	select SPARSE_IRQ
-> > +	select TI_PRIV_EDMA
-> 
-> This hunk does not seem to belong to subject of this patch.
+* I've used the next/dt branch, since that is what most of the patches
+from this series best fit in. However, some of the patches would
+have made more sense in a different branch (clock, cleanup, ...).
+When you have things that are logically separate, just send separate
+pull requests. This takes some practice to get the dependencies
+right, so please ask if you are not sure how to do it.
 
-Yep, stray hunk..will move to the am335x enablement.
+* It seems the zynq multiplatform changes didn't make it for 3.8. I
+hope you can do this for 3.9, as this should not be too hard.
 
-> >  	select USE_OF
-> >  	help
-> >  	  "Systems based on OMAP2, OMAP3, OMAP4 or OMAP5"
-> 
-> > diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
-> > new file mode 100644
-> > index 0000000..7396f0b3
-> > --- /dev/null
-> > +++ b/include/linux/platform_data/edma.h
-> > @@ -0,0 +1,198 @@
-> > +/*
-> > + *  TI DAVINCI dma definitions
-> > + *
-> > + *  Copyright (C) 2006-2009 Texas Instruments.
-> > + *
-> > + *  This program is free software; you can redistribute  it and/or modify it
-> > + *  under  the terms of  the GNU General  Public License as published by the
-> > + *  Free Software Foundation;  either version 2 of the  License, or (at your
-> > + *  option) any later version.
-> > + *
-> > + *  THIS  SOFTWARE  IS PROVIDED   ``AS  IS'' AND   ANY  EXPRESS OR IMPLIED
-> > + *  WARRANTIES,   INCLUDING, BUT NOT  LIMITED  TO, THE IMPLIED WARRANTIES OF
-> > + *  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN
-> > + *  NO  EVENT  SHALL   THE AUTHOR  BE    LIABLE FOR ANY   DIRECT, INDIRECT,
-> > + *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-> > + *  NOT LIMITED   TO, PROCUREMENT OF  SUBSTITUTE GOODS  OR SERVICES; LOSS OF
-> > + *  USE, DATA,  OR PROFITS; OR  BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-> > + *  ANY THEORY OF LIABILITY, WHETHER IN  CONTRACT, STRICT LIABILITY, OR TORT
-> > + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
-> > + *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-> 
-> > + *  You should have received a copy of the  GNU General Public License along
-> > + *  with this program; if not, write  to the Free Software Foundation, Inc.,
-> > + *  675 Mass Ave, Cambridge, MA 02139, USA.
-> 
-> This part can be dropped, I suppose ;-)
-
-Ok :)
-
--Matt
+	Arnd
