@@ -1,33 +1,78 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Fri, 16 Nov 2012 07:07:56 +0530
-Subject: [PATCH V6 2/2] dmaengine: add helper function to request a
- slave DMA channel
-In-Reply-To: <509D6108.1060304@ti.com>
-References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
- <1347662517-4210-3-git-send-email-jon-hunter@ti.com>
- <1347852805.1943.130.camel@vkoul-udesk3> <201209171159.27359.arnd@arndb.de>
- <20120917223619.GC12445@n2100.arm.linux.org.uk>
- <1347938035.1943.162.camel@vkoul-udesk3> <5060DDEB.4000600@ti.com>
- <1348547701.1943.190.camel@vkoul-udesk3>
- <20121016024318.GF24393@S2101-09.ap.freescale.net>
- <1350355144.1648.5259.camel@vkoul-udesk3>  <509D6108.1060304@ti.com>
-Message-ID: <1353029876.7077.56.camel@vkoul-udesk3>
+From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
+Date: Fri, 16 Nov 2012 10:54:49 +0900
+Subject: [PATCH v2 10/10] serial: sh-sci: fix possible race cases on SCSCR
+ register accesses
+In-Reply-To: <50A59B9B.2010501@renesas.com>
+References: <509A0658.1010503@renesas.com> <509A0B4E.1030801@renesas.com>
+ <20121116010107.GA6068@kroah.com> <50A59B9B.2010501@renesas.com>
+Message-ID: <50A59CE9.5020104@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-11-09 at 14:01 -0600, Jon Hunter wrote:
-> Hi Vinod,
-> 
-> A few people have been asking me if getting device-tree support for DMA
-> engine is plan for record for v3.8. I know that you were working through
-> implementing a common interface and so I wanted to check how that is
-> going. Do you have any insight to when device-tree support may get added?
-> 
-I have not been able to do much work on this for last couple of weeks. I
-hope to do it in by this weekend. If not I will merge yours and then
-uppdate.
+In the previous commit, console write function (serial_console_write)
+is changed to disable SCI interrupts while printing console strings.
+This introduces possible race cases in the serial startup / shutdown
+functions on SMP systems.
 
-Anyway, DT would be there in 3.8 with or without my changes.
+This patch fixes the sh-sci in the same way as commit 9ec1882df2
+(tty: serial: imx: console write routing is unsafe on SMP, from
+Xinyu Chen <xinyu.chen@freescale.com>, 2012-08-27) did.
 
+There could be several consumers of the console,
+* the kernel printk
+* the init process using /dev/kmsg to call printk to show log
+* shell, which opens /dev/console and writes with sys_write()
+
+The shell goes into the normal UART open() and write() system calls,
+while the other two go into the console operations.  The open() call
+invokes serial startup function (sci_startup), which will write to
+the SCSCR register (to enable or disable SCI interrupts) without any
+locking.  This will conflict with the console serial function.
+
+Add spinlock protections in sci_startup() and sci_shutdown() properly.
+
+Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
+---
+ drivers/tty/serial/sh-sci.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
+index 0b8d029..8e3c7f7 100644
+--- a/drivers/tty/serial/sh-sci.c
++++ b/drivers/tty/serial/sh-sci.c
+@@ -1742,6 +1742,7 @@ static inline void sci_free_dma(struct uart_port *port)
+ static int sci_startup(struct uart_port *port)
+ {
+ 	struct sci_port *s = to_sci_port(port);
++	unsigned long flags;
+ 	int ret;
+ 
+ 	dev_dbg(port->dev, "%s(%d)\n", __func__, port->line);
+@@ -1752,8 +1753,10 @@ static int sci_startup(struct uart_port *port)
+ 
+ 	sci_request_dma(port);
+ 
++	spin_lock_irqsave(&port->lock, flags);
+ 	sci_start_tx(port);
+ 	sci_start_rx(port);
++	spin_unlock_irqrestore(&port->lock, flags);
+ 
+ 	return 0;
+ }
+@@ -1761,11 +1764,14 @@ static int sci_startup(struct uart_port *port)
+ static void sci_shutdown(struct uart_port *port)
+ {
+ 	struct sci_port *s = to_sci_port(port);
++	unsigned long flags;
+ 
+ 	dev_dbg(port->dev, "%s(%d)\n", __func__, port->line);
+ 
++	spin_lock_irqsave(&port->lock, flags);
+ 	sci_stop_rx(port);
+ 	sci_stop_tx(port);
++	spin_unlock_irqrestore(&port->lock, flags);
+ 
+ 	sci_free_dma(port);
+ 	sci_free_irq(s);
 -- 
-~Vinod
+1.7.12.4
