@@ -1,53 +1,171 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 16 Nov 2012 12:06:57 +0200
-Subject: [PATCH 1/9] usb: chipidea: pci: mark platformdata as static and
- __devinitdata
-In-Reply-To: <1352909950-32555-2-git-send-email-m.grzeschik@pengutronix.de>
-References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
- <1352909950-32555-2-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <87haop7tfi.fsf@ashishki-desk.ger.corp.intel.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 16 Nov 2012 11:12:46 +0100
+Subject: [RFC 3/3] ARM/AVR32: get rid of serial_at91.h
+In-Reply-To: <20121116095352.GF4398@game.jcrosoft.org>
+References: <20120921093530.GB31374@n2100.arm.linux.org.uk>
+ <E1TEzfE-000780-1t@rmk-PC.arm.linux.org.uk>
+ <20121116095352.GF4398@game.jcrosoft.org>
+Message-ID: <50A6119E.8010303@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
+On 11/16/2012 10:53 AM, Jean-Christophe PLAGNIOL-VILLARD :
+> On 10:36 Fri 21 Sep     , Russell King wrote:
+>> The definitions provided by serial_at91.h are only used by the
+>> atmel_serial driver, and the function that uses it is never called
+>> from anywhere in the kernel.  Therefore, these definitions are unused
+>> and/or obsolete, and can be removed.
+>>
+>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> personnaly I'm ok with it too
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> 
+> but Andrew seems use it so let him reply
 
-> From: Marc Kleine-Budde <mkl@pengutronix.de>
->
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+Yes, during previous attempt to remove the files, Andrew said that it
+was used internally in his former company. I had no serious reason to
+remove it, so we kept it back then.
+But now it seems the situation has evolved and we must consider the move
+to a single kernel image and the will to clean the include/asm/mach
+directory.
 
-static yes, __devinitdata -- probably not. These structs are used
-everywhere throughout the driver currently, not only at initialization
-time.
+So, now, on my side:
 
-> ---
->  drivers/usb/chipidea/ci13xxx_pci.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/usb/chipidea/ci13xxx_pci.c b/drivers/usb/chipidea/ci13xxx_pci.c
-> index 918e149..97d25c8 100644
-> --- a/drivers/usb/chipidea/ci13xxx_pci.c
-> +++ b/drivers/usb/chipidea/ci13xxx_pci.c
-> @@ -23,17 +23,17 @@
->  /******************************************************************************
->   * PCI block
->   *****************************************************************************/
-> -struct ci13xxx_platform_data pci_platdata = {
-> +static struct ci13xxx_platform_data pci_platdata __devinitdata = {
->  	.name		= UDC_DRIVER_NAME,
->  	.capoffset	= DEF_CAPOFFSET,
->  };
->  
-> -struct ci13xxx_platform_data langwell_pci_platdata = {
-> +static struct ci13xxx_platform_data langwell_pci_platdata __devinitdata = {
->  	.name		= UDC_DRIVER_NAME,
->  	.capoffset	= 0,
->  };
->  
-> -struct ci13xxx_platform_data penwell_pci_platdata = {
-> +static struct ci13xxx_platform_data penwell_pci_platdata __devinitdata = {
->  	.name		= UDC_DRIVER_NAME,
->  	.capoffset	= 0,
->  	.power_budget	= 200,
-> -- 
-> 1.7.10.4
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+>> ---
+>>  arch/arm/include/asm/mach/serial_at91.h   |   33 -----------------------------
+>>  arch/avr32/include/asm/mach/serial_at91.h |   33 -----------------------------
+>>  drivers/tty/serial/atmel_serial.c         |   18 ---------------
+>>  3 files changed, 0 insertions(+), 84 deletions(-)
+>>  delete mode 100644 arch/arm/include/asm/mach/serial_at91.h
+>>  delete mode 100644 arch/avr32/include/asm/mach/serial_at91.h
+>>
+>> diff --git a/arch/arm/include/asm/mach/serial_at91.h b/arch/arm/include/asm/mach/serial_at91.h
+>> deleted file mode 100644
+>> index ea6d063..0000000
+>> --- a/arch/arm/include/asm/mach/serial_at91.h
+>> +++ /dev/null
+>> @@ -1,33 +0,0 @@
+>> -/*
+>> - *  arch/arm/include/asm/mach/serial_at91.h
+>> - *
+>> - *  Based on serial_sa1100.h  by Nicolas Pitre
+>> - *
+>> - *  Copyright (C) 2002 ATMEL Rousset
+>> - *
+>> - *  Low level machine dependent UART functions.
+>> - */
+>> -
+>> -struct uart_port;
+>> -
+>> -/*
+>> - * This is a temporary structure for registering these
+>> - * functions; it is intended to be discarded after boot.
+>> - */
+>> -struct atmel_port_fns {
+>> -	void	(*set_mctrl)(struct uart_port *, u_int);
+>> -	u_int	(*get_mctrl)(struct uart_port *);
+>> -	void	(*enable_ms)(struct uart_port *);
+>> -	void	(*pm)(struct uart_port *, u_int, u_int);
+>> -	int	(*set_wake)(struct uart_port *, u_int);
+>> -	int	(*open)(struct uart_port *);
+>> -	void	(*close)(struct uart_port *);
+>> -};
+>> -
+>> -#if defined(CONFIG_SERIAL_ATMEL)
+>> -void atmel_register_uart_fns(struct atmel_port_fns *fns);
+>> -#else
+>> -#define atmel_register_uart_fns(fns) do { } while (0)
+>> -#endif
+>> -
+>> -
+>> diff --git a/arch/avr32/include/asm/mach/serial_at91.h b/arch/avr32/include/asm/mach/serial_at91.h
+>> deleted file mode 100644
+>> index 55b317a..0000000
+>> --- a/arch/avr32/include/asm/mach/serial_at91.h
+>> +++ /dev/null
+>> @@ -1,33 +0,0 @@
+>> -/*
+>> - *  linux/include/asm-arm/mach/serial_at91.h
+>> - *
+>> - *  Based on serial_sa1100.h  by Nicolas Pitre
+>> - *
+>> - *  Copyright (C) 2002 ATMEL Rousset
+>> - *
+>> - *  Low level machine dependent UART functions.
+>> - */
+>> -
+>> -struct uart_port;
+>> -
+>> -/*
+>> - * This is a temporary structure for registering these
+>> - * functions; it is intended to be discarded after boot.
+>> - */
+>> -struct atmel_port_fns {
+>> -	void	(*set_mctrl)(struct uart_port *, u_int);
+>> -	u_int	(*get_mctrl)(struct uart_port *);
+>> -	void	(*enable_ms)(struct uart_port *);
+>> -	void	(*pm)(struct uart_port *, u_int, u_int);
+>> -	int	(*set_wake)(struct uart_port *, u_int);
+>> -	int	(*open)(struct uart_port *);
+>> -	void	(*close)(struct uart_port *);
+>> -};
+>> -
+>> -#if defined(CONFIG_SERIAL_ATMEL)
+>> -void atmel_register_uart_fns(struct atmel_port_fns *fns);
+>> -#else
+>> -#define atmel_register_uart_fns(fns) do { } while (0)
+>> -#endif
+>> -
+>> -
+>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+>> index 3d7e1ee..a6134c9 100644
+>> --- a/drivers/tty/serial/atmel_serial.c
+>> +++ b/drivers/tty/serial/atmel_serial.c
+>> @@ -43,7 +43,6 @@
+>>  #include <asm/io.h>
+>>  #include <asm/ioctls.h>
+>>  
+>> -#include <asm/mach/serial_at91.h>
+>>  #include <mach/board.h>
+>>  
+>>  #ifdef CONFIG_ARM
+>> @@ -1513,23 +1512,6 @@ static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
+>>  	}
+>>  }
+>>  
+>> -/*
+>> - * Register board-specific modem-control line handlers.
+>> - */
+>> -void __init atmel_register_uart_fns(struct atmel_port_fns *fns)
+>> -{
+>> -	if (fns->enable_ms)
+>> -		atmel_pops.enable_ms = fns->enable_ms;
+>> -	if (fns->get_mctrl)
+>> -		atmel_pops.get_mctrl = fns->get_mctrl;
+>> -	if (fns->set_mctrl)
+>> -		atmel_pops.set_mctrl = fns->set_mctrl;
+>> -	atmel_open_hook		= fns->open;
+>> -	atmel_close_hook	= fns->close;
+>> -	atmel_pops.pm		= fns->pm;
+>> -	atmel_pops.set_wake	= fns->set_wake;
+>> -}
+>> -
+>>  struct platform_device *atmel_default_console_device;	/* the serial console device */
+>>  
+>>  #ifdef CONFIG_SERIAL_ATMEL_CONSOLE
+>> -- 
+>> 1.7.4.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+
+
+-- 
+Nicolas Ferre
