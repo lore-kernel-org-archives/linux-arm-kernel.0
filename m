@@ -1,45 +1,89 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 16 Nov 2012 10:17:42 +0100
-Subject: [PATCH 0/2] clk: ux500: Make mtu driver use apb_pclock
-In-Reply-To: <20121115185435.7155.53498@nucleus>
-References: <1351080821-18660-1-git-send-email-ulf.hansson@stericsson.com>
- <20121112183615.17970.20162@nucleus>
- <CACRpkdYmPvRLcEjSNwC51sZw+g3iH3a5r7+7USEWJONmR4q4JQ@mail.gmail.com>
- <201211151221.30217.arnd@arndb.de>
- <CACRpkdaFkS_8i=8FmVYujzm1cMe1+=SO6MJyUbFyFPX7xhz-YA@mail.gmail.com>
- <20121115185435.7155.53498@nucleus>
-Message-ID: <CAPDyKFq__PsZCZKnt=E8pS6RhZkQQ51VOhFUP80KXQHDNA6O7A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 16 Nov 2012 10:20:35 +0100
+Subject: [PATCH 4/6] ARM: sunxi: Add earlyprintk support
+In-Reply-To: <50A5EF7E.6080801@denx.de>
+References: <1353019586-21043-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1353019586-21043-5-git-send-email-maxime.ripard@free-electrons.com>
+ <50A5EF7E.6080801@denx.de>
+Message-ID: <50A60563.2040602@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 November 2012 19:54, Mike Turquette <mturquette@ti.com> wrote:
-> Quoting Linus Walleij (2012-11-15 05:29:32)
->> On Thu, Nov 15, 2012 at 1:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Le 16/11/2012 08:47, Stefan Roese a ?crit :
+> On 11/15/2012 11:46 PM, Maxime Ripard wrote:
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> ---
+>>  arch/arm/Kconfig.debug         |    8 ++++++++
+>>  arch/arm/include/debug/sunxi.S |   22 ++++++++++++++++++++++
+>>  2 files changed, 30 insertions(+)
+>>  create mode 100644 arch/arm/include/debug/sunxi.S
 >>
->> > If I understand the problem at hand correctly, the safe solution
->> > should be to base the ux500 clk changes on top of c3b9d1db23c4e,
->> > which is in the nomadik/plat-removal branch in arm-soc that got
->> > merged into next/multiplatform. I would prefer if you use that
->> > as a base instead of the larger next/multiplatform branch that
->> > also contains vt8500 and other changes.
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index b0f3857..6672b02 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -345,6 +345,13 @@ choice
+>>  		  Say Y here if you want kernel low-level debugging support
+>>  		  on SOCFPGA based platforms.
+>>  
+>> +	config DEBUG_SUNXI_UART
+>> +		bool "Kernel low-level debugging messages via sunXi UART"
+>> +		depends on ARCH_SUNXI
+>> +		help
+>> +		  Say Y here if you want kernel low-level debugging support
+>> +		  on Allwinner A1X based platforms.
 >>
->> OK I'll take a stab at this and see if I can fix it...
+>>  	config DEBUG_VEXPRESS_UART0_DETECT
+>>  		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
+>>  		depends on ARCH_VEXPRESS && CPU_CP15_MMU
+>> @@ -416,6 +423,7 @@ config DEBUG_LL_INCLUDE
+>>  	default "debug/mvebu.S" if DEBUG_MVEBU_UART
+>>  	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
+>>  	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
+>> +	default "debug/sunxi.S" if DEBUG_SUNXI_UART
+>>  	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
+>>  		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
+>>  	default "mach/debug-macro.S"
+>> diff --git a/arch/arm/include/debug/sunxi.S b/arch/arm/include/debug/sunxi.S
+>> new file mode 100644
+>> index 0000000..ffd101f
+>> --- /dev/null
+>> +++ b/arch/arm/include/debug/sunxi.S
+>> @@ -0,0 +1,22 @@
+>> +/*
+>> + * Early serial output macro for Allwinner A1X SoCs
+>> + *
+>> + * Copyright (C) 2012 Maxime Ripard
+>> + *
+>> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> +*/
+>> +
+>> +#define SUNXI_UART1_PHYS_BASE	0x01c28400
+>> +#define SUNXI_UART1_VIRT_BASE	0xf1c28400
+>> +
+>> +	.macro	addruart, rp, rv, tmp
+>> +	ldr	\rp, =SUNXI_UART1_PHYS_BASE
+>> +	ldr	\rv, =SUNXI_UART1_VIRT_BASE
+>> +	.endm
+>> +
+>> +#define UART_SHIFT	2
+>> +#include <asm/hardware/debug-8250.S>
+> 
+> A10 (cubieboard) has debug the UART on UART0 instead of UART1 as on A13.
+> So we need support this here as well. I suggest that I add support debug
+> on UART0 with my cubieboard patches.
 
-Thanks Linus!
+Ok, we'll do it that way then. Thanks!
 
->>
->
-> I've dropped both of these patches from clk-next.
->
-
-Thanks Mike!
-
-> Regards,
-> Mike
->
->> Yours,
->> Linus Walleij
+Maxime
 
 
-Kind regards
-Ulf Hansson
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
