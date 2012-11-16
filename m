@@ -1,22 +1,106 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Nov 2012 23:08:36 +0000
-Subject: [RFC 3/3] ARM/AVR32: get rid of serial_at91.h
-In-Reply-To: <CAGhQ9VzYc8qqvZxU=AB+NHa4nGKJFxPYR7grc8Ssn-kP1bfq3w@mail.gmail.com>
-References: <20120921093530.GB31374@n2100.arm.linux.org.uk>
- <E1TEzfE-000780-1t@rmk-PC.arm.linux.org.uk>
- <CAGhQ9VzYc8qqvZxU=AB+NHa4nGKJFxPYR7grc8Ssn-kP1bfq3w@mail.gmail.com>
-Message-ID: <20121116230835.GR3290@n2100.arm.linux.org.uk>
+From: mturquette@ti.com (Mike Turquette)
+Date: Fri, 16 Nov 2012 15:18:22 -0800
+Subject: [PATCH 1/7] clk: sunxi: Add dummy fixed rate clock for Allwinner
+ A1X SoCs
+In-Reply-To: <1353100828-9218-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1353100828-9218-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1353100828-9218-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20121116231822.21126.36803@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2012 at 11:08:47PM +0100, Joachim Eastwood wrote:
-> When the atmel_open_hook/atmel_open_close assignment is dropped, these
-> global variables will be useless so we should remove them as well.
-> There are also some other code that uses the variables that can be
-> dropped. Should shave another 22 lines of code off atmel_serial.c
+Quoting Maxime Ripard (2012-11-16 13:20:22)
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Mike Turquette <mturquette@ti.com>
+
+Acked-by: Mike Turquette <mturquette@linaro.or>
+
+Regards,
+Mike
+
+> ---
+>  drivers/clk/Makefile      |    1 +
+>  drivers/clk/clk-sunxi.c   |   30 ++++++++++++++++++++++++++++++
+>  include/linux/clk/sunxi.h |   22 ++++++++++++++++++++++
+>  3 files changed, 53 insertions(+)
+>  create mode 100644 drivers/clk/clk-sunxi.c
+>  create mode 100644 include/linux/clk/sunxi.h
 > 
-> I can send out a patch on top of yours if you prefer that.
-
-Yes please.
-
-Thanks.
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 71a25b9..9c300a8 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -19,6 +19,7 @@ endif
+>  obj-$(CONFIG_MACH_LOONGSON1)   += clk-ls1x.o
+>  obj-$(CONFIG_ARCH_U8500)       += ux500/
+>  obj-$(CONFIG_ARCH_VT8500)      += clk-vt8500.o
+> +obj-$(CONFIG_ARCH_SUNXI)       += clk-sunxi.o
+>  
+>  # Chip specific
+>  obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
+> diff --git a/drivers/clk/clk-sunxi.c b/drivers/clk/clk-sunxi.c
+> new file mode 100644
+> index 0000000..0e831b5
+> --- /dev/null
+> +++ b/drivers/clk/clk-sunxi.c
+> @@ -0,0 +1,30 @@
+> +/*
+> + * Copyright 2012 Maxime Ripard
+> + *
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/clk/sunxi.h>
+> +#include <linux/of.h>
+> +
+> +static const __initconst struct of_device_id clk_match[] = {
+> +       { .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
+> +       {}
+> +};
+> +
+> +void __init sunxi_init_clocks(void)
+> +{
+> +       of_clk_init(clk_match);
+> +}
+> diff --git a/include/linux/clk/sunxi.h b/include/linux/clk/sunxi.h
+> new file mode 100644
+> index 0000000..e074fdd
+> --- /dev/null
+> +++ b/include/linux/clk/sunxi.h
+> @@ -0,0 +1,22 @@
+> +/*
+> + * Copyright 2012 Maxime Ripard
+> + *
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef __LINUX_CLK_SUNXI_H_
+> +#define __LINUX_CLK_SUNXI_H_
+> +
+> +void __init sunxi_init_clocks(void);
+> +
+> +#endif
+> -- 
+> 1.7.9.5
