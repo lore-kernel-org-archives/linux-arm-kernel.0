@@ -1,132 +1,196 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 16 Nov 2012 13:58:55 +0100
-Subject: [PATCH] ARM: dts: add board dts file for Exynos4412 based SMDK
- board
-In-Reply-To: <CAJuYYwTo6MUUM3oN1XPpxuQ2ta67tEr-UqVjviXG=Yg6c3ywBg@mail.gmail.com>
-References: <1351954172-13645-1-git-send-email-thomas.abraham@linaro.org>
- <3179451.csXCh8vt1v@amdc1227>
- <CAJuYYwTo6MUUM3oN1XPpxuQ2ta67tEr-UqVjviXG=Yg6c3ywBg@mail.gmail.com>
-Message-ID: <1478784.noXcLYhIRL@amdc1227>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 16 Nov 2012 14:08:58 +0100
+Subject: [PATCH 1/1] arm: at91: add Ronetix pm9g45 board support
+In-Reply-To: <1350613168-22689-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1350613168-22689-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <50A63AEA.2000706@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 of November 2012 18:03:15 Thomas Abraham wrote:
-> On 16 November 2012 16:41, Tomasz Figa <t.figa@samsung.com> wrote:
-> > On Thursday 15 of November 2012 13:48:55 Thomas Abraham wrote:
-> >> Hi Tomasz,
-> >> 
-> >> Thanks for your comments.
-> >> 
-> >> On 12 November 2012 19:37, Tomasz Figa <t.figa@samsung.com> wrote:
-> >> > Hi Thomas,
-> >> > 
-> >> > On Saturday 03 of November 2012 20:19:32 Thomas Abraham wrote:
-> >> >> Add a minimal board dts file for Samsung Exynos4412 based SMDK
-> >> >> board.
-> >> >> 
-> >> >> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> >> >> ---
-> >> >> This patch depends the on the following patch posted by Tomasz
-> >> >> Figa.
-> >> >> "ARM: dts: exynos4: Add support for Exynos4x12 SoCs"
-> >> >> 
-> >> >>  arch/arm/boot/dts/Makefile                |    1 +
-> >> >>  arch/arm/boot/dts/exynos4412-smdk4412.dts |   45
-> >> >> 
-> >> >> +++++++++++++++++++++++++++++ 2 files changed, 46 insertions(+), 0
-> >> >> deletions(-)
-> >> >> 
-> >> >>  create mode 100644 arch/arm/boot/dts/exynos4412-smdk4412.dts
-> >> >> 
-> >> >> diff --git a/arch/arm/boot/dts/Makefile
-> >> >> b/arch/arm/boot/dts/Makefile
-> >> >> index f37cf9f..36488a5 100644
-> >> >> --- a/arch/arm/boot/dts/Makefile
-> >> >> +++ b/arch/arm/boot/dts/Makefile
-> >> >> @@ -23,6 +23,7 @@ dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
-> >> >> 
-> >> >>  dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
-> >> >>  
-> >> >>       exynos4210-smdkv310.dtb \
-> >> >>       exynos4210-trats.dtb \
-> >> >> 
-> >> >> +     exynos4412-smdk4412.dtb \
-> >> >> 
-> >> >>       exynos5250-smdk5250.dtb
-> >> >>  
-> >> >>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
-> >> >>  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
-> >> >> 
-> >> >> diff --git a/arch/arm/boot/dts/exynos4412-smdk4412.dts
-> >> >> b/arch/arm/boot/dts/exynos4412-smdk4412.dts new file mode 100644
-> >> >> index 0000000..f05bf57
-> >> >> --- /dev/null
-> >> >> +++ b/arch/arm/boot/dts/exynos4412-smdk4412.dts
-> >> >> @@ -0,0 +1,45 @@
-> >> >> +/*
-> >> >> + * Samsung's Exynos4412 based SMDK board device tree source
-> >> >> + *
-> >> >> + * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
-> >> >> + *           http://www.samsung.com
-> >> >> + *
-> >> >> + * Device tree source file for Samsung's SMDK4412 board which is
-> >> >> based
-> >> >> on + * Samsung's Exynos4412 SoC.
-> >> >> + *
-> >> >> + * This program is free software; you can redistribute it and/or
-> >> >> modify + * it under the terms of the GNU General Public License
-> >> >> version 2 as + * published by the Free Software Foundation.
-> >> >> +*/
-> >> >> +
-> >> >> +/dts-v1/;
-> >> >> +/include/ "exynos4412.dtsi"
-> >> >> +
-> >> >> +/ {
-> >> >> +     model = "Samsung SMDK evaluation board based on Exynos4412";
-> >> >> +     compatible = "samsung,smdk4412", "samsung,exynos4412";
-> >> >> +
-> >> >> +     memory {
-> >> >> +             reg = <0x40000000 0x40000000>;
-> >> >> +     };
-> >> > 
-> >> > This will not boot, because section size limit is set to 256 MiB.
-> >> > 
-> >> > It might work with CONFIG_ARM_ATAG_DTB_COMPAT enabled, because the
-> >> > memory configuration from DT is ignored and values from ATAGs are
-> >> > taken instead.
-> >> > 
-> >> > I suggest you to change it to 4 banks of 256 MiB.
-> >> 
-> >> Thanks for pointing this out. So are there any existing exynos based
-> >> platforms that use sparse mem? If not, we should probably remove the
-> >> section length configuration itself for mach-exynos. I suspect this
-> >> setting might not help with the single kernel image support as well.
-> > 
-> > Isn't sparse memory the only configuration available for ARCH_EXYNOS?
+On 10/19/2012 04:19 AM, Jean-Christophe PLAGNIOL-VILLARD :
+> CPU Module with ATMEL AT91SAM9G45
+> http://www.ronetix.at/pm9g45.html
 > 
-> Yes, true. Since sparsemem is choosen as default for Exynos, flatmem
-> option is not available. Theoretically, sparsemem could be used on
-> Exynos platforms, but if all existing exynos4/5 based boards have no
-> holes in memory, then why not use flatmem instead? If there are
-> performance benefits of using flatmem over sparesmem on systems
-> without any memory holes, then it is a compelling reason to stop using
-> sparsemem on Exynos. But then, what if there is a new Exynos4/5 based
-> board that comes up and that has a memory hole? Or, how about removing
-> sparsemem as default option for ARCH_EXYNOS and enabling sparsemem for
-> boards that need it.
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-I'm not sure about any significant performance benefits of FLATMEM over 
-SPARSEMEM. Some ancient benchmark from 2007 shows that overhead level of 
-both is similar.
+Ok, queued in at91-3.8-dt branch.
 
-You can find the benchmark here: 
-http://lkml.indiana.edu/hypermail/linux/kernel/0711.1/1239.html
+I had to modify the Makefile part of it to match current move to
+arch/arm/boot/dts/Makefile.
 
-I think we should leave it as is for the time being and just make sure 
-that sections of boards are defined according to section size limit.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Best regards,
+> ---
+>  arch/arm/boot/dts/Makefile   |    1 +
+>  arch/arm/boot/dts/pm9g45.dts |  144 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 145 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/pm9g45.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index a9b051a..627b6ad 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -19,6 +19,7 @@ dtb-$(CONFIG_ARCH_AT91) += tny_a9g20.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += usb_a9g20.dtb
+>  # sam9g45
+>  dtb-$(CONFIG_ARCH_AT91) += at91sam9m10g45ek.dtb
+> +dtb-$(CONFIG_ARCH_AT91) += pm9g45.dtb
+>  # sam9n12
+>  dtb-$(CONFIG_ARCH_AT91) += at91sam9n12ek.dtb
+>  # sam9x5
+> diff --git a/arch/arm/boot/dts/pm9g45.dts b/arch/arm/boot/dts/pm9g45.dts
+> new file mode 100644
+> index 0000000..b0c258d
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/pm9g45.dts
+> @@ -0,0 +1,144 @@
+> +/*
+> + * pm9g45.dts - Device Tree file for Ronetix pm9g45 board
+> + *
+> + *  Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> + *
+> + * Licensed under GPLv2.
+> + */
+> +/dts-v1/;
+> +/include/ "at91sam9g45.dtsi"
+> +
+> +/ {
+> +	model = "Ronetix pm9g45";
+> +	compatible = "ronetix,pm9g45", "atmel,at91sam9g45", "atmel,at91sam9";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200";
+> +	};
+> +
+> +	memory {
+> +		reg = <0x70000000 0x8000000>;
+> +	};
+> +
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		main_clock: clock at 0 {
+> +			compatible = "atmel,osc", "fixed-clock";
+> +			clock-frequency = <12000000>;
+> +		};
+> +	};
+> +
+> +	ahb {
+> +		apb {
+> +			dbgu: serial at ffffee00 {
+> +				status = "okay";
+> +			};
+> +
+> +			pinctrl at fffff200 {
+> +
+> +				board {
+> +					pinctrl_board_nand: nand0-board {
+> +						atmel,pins =
+> +							<3 3 0x0 0x1	/* PD3 gpio RDY pin pull_up*/
+> +							 2 14 0x0 0x1>;	/* PC14 gpio enable pin pull_up */
+> +					};
+> +				};
+> +			};
+> +
+> +			macb0: ethernet at fffbc000 {
+> +				phy-mode = "rmii";
+> +				status = "okay";
+> +			};
+> +		};
+> +
+> +		nand0: nand at 40000000 {
+> +			nand-bus-width = <8>;
+> +			nand-ecc-mode = "soft";
+> +			nand-on-flash-bbt;
+> +			pinctrl-0 = <&pinctrl_board_nand>;
+> +
+> +			gpios = <&pioD 3 0
+> +				 &pioC 14 0
+> +				 0
+> +				>;
+> +
+> +			status = "okay";
+> +
+> +			at91bootstrap at 0 {
+> +				label = "at91bootstrap";
+> +				reg = <0x0 0x20000>;
+> +			};
+> +
+> +			barebox at 20000 {
+> +				label = "barebox";
+> +				reg = <0x20000 0x40000>;
+> +			};
+> +
+> +			bareboxenv at 60000 {
+> +				label = "bareboxenv";
+> +				reg = <0x60000 0x1A0000>;
+> +			};
+> +
+> +			kernel at 200000 {
+> +				label = "bareboxenv2";
+> +				reg = <0x200000 0x300000>;
+> +			};
+> +
+> +			kernel at 500000 {
+> +				label = "root";
+> +				reg = <0x500000 0x400000>;
+> +			};
+> +
+> +			data at 900000 {
+> +				label = "data";
+> +				reg = <0x900000 0x8340000>;
+> +			};
+> +		};
+> +
+> +		usb0: ohci at 00700000 {
+> +			status = "okay";
+> +			num-ports = <2>;
+> +		};
+> +
+> +		usb1: ehci at 00800000 {
+> +			status = "okay";
+> +		};
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		led0 {
+> +			label = "led0";
+> +			gpios = <&pioD 0 1>;
+> +			linux,default-trigger = "nand-disk";
+> +		};
+> +
+> +		led1 {
+> +			label = "led1";
+> +			gpios = <&pioD 31 0>;
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		right {
+> +			label = "SW4";
+> +			gpios = <&pioE 7 1>;
+> +			linux,code = <106>;
+> +		};
+> +
+> +		up {
+> +			label = "SW3";
+> +			gpios = <&pioE 8 1>;
+> +			linux,code = <103>;
+> +		};
+> +	};
+> +};
+> 
+
+
 -- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Linux Platform
+Nicolas Ferre
