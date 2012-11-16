@@ -1,78 +1,131 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 16 Nov 2012 14:51:03 +0200
-Subject: [PATCH 7/9] usb: chipidea: udc: add force-full-speed option
-In-Reply-To: <1352909950-32555-8-git-send-email-m.grzeschik@pengutronix.de>
-References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
- <1352909950-32555-8-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <87wqxl679k.fsf@ashishki-desk.ger.corp.intel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 16 Nov 2012 13:51:31 +0100
+Subject: [PATCH 0/7] core, cpu and gated clocks for mvebu
+In-Reply-To: <1353014906-31566-1-git-send-email-andrew@lunn.ch>
+References: <1353014906-31566-1-git-send-email-andrew@lunn.ch>
+Message-ID: <50A636D3.40005@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
+On 11/15/2012 10:28 PM, Andrew Lunn wrote:
+> This patchset combines code from Gregory Clement, Sebastian
+> Hesselbarth and myself to implement core clks, cpu clock and gated
+> clocks on Marvel MVEBU SoCs.
+> 
+> The Armada 370/XP core clock code is a refactored version of the
+> already submitted and ACKed code from Gregory. It has been made to fit
+> inside a framework developed by Sebastian which can handle all MVEBU
+> SoCs. The Armarda 370/XP SoCs have more core clocks than the older SoCs, and
+> the framework needs to handle this. Rather than specify the clock
+> frequencies in DT, a Sample At Reset register is used, which describes
+> each core clock frequency.
+> 
+> Armarda XP is an SMP processor, with each CPU having its own
+> clock. Gregories code for this has been taken as is.
+> 
+> The Armarda 370/XP clock source has been converted to the common clock
+> framework.
+> 
+> Dove, Kirkword, and probably Armarda 370/XP have the ability to gate
+> clocks to various blocks. A clk-gate clock is created for each of the
+> gateable clocks on Dove and Kirkwood. Armarda 370/XP clock gates are
+> currently unimplemented. Dove and Kirkwood board-dt.c and DT
+> descriptions are then modified to make use of these clk gates.
+> 
+> This code has been tested on:
+> 
+> Kirkwood based QNAP TS219
+> Armarda 370 based mirabox
+> Armara XP based OpenBlocks
+> 
+> and by Sebastian on:
+> 
+> Dove based Cubox.
+> 
 
-> This patch makes it possible to set the chipidea udc
-> into full-speed only mode. It can be set by the oftree
-> property "force-full-speed".
->
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> ---
->  drivers/usb/chipidea/bits.h  |    1 +
->  drivers/usb/chipidea/core.c  |    5 +++++
->  include/linux/usb/chipidea.h |    1 +
->  3 files changed, 7 insertions(+)
->
-> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-> index 3cded5f..85b6b09 100644
-> --- a/drivers/usb/chipidea/bits.h
-> +++ b/drivers/usb/chipidea/bits.h
-> @@ -51,6 +51,7 @@
->  #define PORTSC_PTS            (BIT(31) | BIT(30))
->  #define PORTSC_PTW            BIT(28)
->  #define PORTSC_STS            BIT(29)
-> +#define PORTSC_PFSC           BIT(24)
+Hi Andrew,
+great job!
 
-Same for this one, it's in DEVLC in my spec.
+I have only few comments on the first patch.
 
->  
->  /* DEVLC */
->  #define DEVLC_PSPD            (0x03UL << 25)
-> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index 7e80f1b..bc99cea 100644
-> --- a/drivers/usb/chipidea/core.c
-> +++ b/drivers/usb/chipidea/core.c
-> @@ -230,6 +230,9 @@ void hw_portsc_configure(struct ci13xxx *ci)
->  		hw_write(ci, OP_PORTSC, PORTSC_PTS, 0x3 << ffs_nr(PORTSC_PTS));
->  		hw_write(ci, OP_PORTSC, PORTSC_STS, 0x1 << ffs_nr(PORTSC_STS));
->  	}
-> +
-> +	if (ci->platdata->flags & CI13XXX_PORTSC_PFSC)
-> +		hw_write(ci, OP_PORTSC, PORTSC_PFSC, 0x1 << ffs_nr(PORTSC_PFSC));
->  }
->  
->  /**
-> @@ -566,6 +569,8 @@ void ci13xxx_get_dr_flags(struct device_node *of_node, struct ci13xxx_platform_d
->  		pr_err("no phy interface defined\n");
->  	}
->  
-> +	if (of_find_property(of_node, "force-full-speed", NULL))
-> +		pdata->flags |= CI13XXX_PORTSC_PFSC;
->  }
->  EXPORT_SYMBOL_GPL(ci13xxx_get_dr_flags);
->  
-> diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-> index cafca23..9ffe105 100644
-> --- a/include/linux/usb/chipidea.h
-> +++ b/include/linux/usb/chipidea.h
-> @@ -26,6 +26,7 @@ struct ci13xxx_platform_data {
->  #define CI13XXX_PORTSC_PTS_UTMI		BIT(8)
->  #define CI13XXX_PORTSC_PTS_ULPI		BIT(9)
->  #define CI13XXX_PORTSC_PTS_FSLS		BIT(10)
-> +#define CI13XXX_PORTSC_PFSC		BIT(11)
+Besides this I have tested the whole series on my Armada 370 and
+Armada XP development boards.  With these boards I had the possibility
+to change the frequency configuration. I also enable to
+COMMON_CLK_DEBUG to check the clock rate value, and after having done
+the tests on few combination and I didn't see any regression.
 
-Btw, these can be more descriptive and don't need _PORTSC_ prefix, like
-"CI13XXX_FORCE_FULLSPEED".
+For the first 4 patches you can add my
+Tested-by Gregory CLEMENT <gregory.clement@free-electrons.com>.
 
-Regards,
---
-Alex
+Mike I hope you will be able to have a look on the next version. With
+the few incoming changes in the next version, this series will be at
+least as good as mine and the only notable difference for the first
+patches of this series is just adding new SoCs with more or less the
+same framework.
+
+Thanks
+
+
+> Andrew Lunn (1):
+>   ARM: Kirkwood: switch to DT clock providers
+> 
+> Gregory CLEMENT (3):
+>   clk: mvebu: add armada-370-xp CPU specific clocks
+>   clk: armada-370-xp: add support for clock framework
+>   clocksource: time-armada-370-xp converted to clk framework
+> 
+> Sebastian Hesselbarth (3):
+>   clk: mvebu: add mvebu core clocks.
+>   clk: mvebu: add clock gating control provider for DT
+>   ARM: dove: switch to DT clock providers
+> 
+>  .../devicetree/bindings/clock/mvebu-core-clock.txt |   47 ++
+>  .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   21 +
+>  .../bindings/clock/mvebu-gated-clock.txt           |   76 +++
+>  arch/arm/Kconfig                                   |    1 +
+>  arch/arm/boot/dts/armada-370-db.dts                |    4 -
+>  arch/arm/boot/dts/armada-370-xp.dtsi               |    1 +
+>  arch/arm/boot/dts/armada-370.dtsi                  |    7 +
+>  arch/arm/boot/dts/armada-xp.dtsi                   |   42 ++
+>  arch/arm/boot/dts/dove.dtsi                        |   20 +
+>  arch/arm/boot/dts/kirkwood.dtsi                    |   22 +
+>  arch/arm/mach-dove/Kconfig                         |    2 +
+>  arch/arm/mach-dove/common.c                        |   64 +-
+>  arch/arm/mach-kirkwood/Kconfig                     |    2 +
+>  arch/arm/mach-kirkwood/board-dt.c                  |   72 ++-
+>  arch/arm/mach-mvebu/Kconfig                        |    6 +
+>  arch/arm/mach-mvebu/armada-370-xp.c                |    9 +-
+>  arch/arm/plat-orion/include/plat/common.h          |    1 +
+>  drivers/clk/Kconfig                                |    2 +
+>  drivers/clk/Makefile                               |    1 +
+>  drivers/clk/mvebu/Kconfig                          |    8 +
+>  drivers/clk/mvebu/Makefile                         |    3 +
+>  drivers/clk/mvebu/clk-core.c                       |  675 ++++++++++++++++++++
+>  drivers/clk/mvebu/clk-core.h                       |   18 +
+>  drivers/clk/mvebu/clk-cpu.c                        |  155 +++++
+>  drivers/clk/mvebu/clk-cpu.h                        |   18 +
+>  drivers/clk/mvebu/clk-gating-ctrl.c                |  177 +++++
+>  drivers/clk/mvebu/clk.c                            |   37 ++
+>  drivers/clocksource/time-armada-370-xp.c           |   11 +-
+>  include/linux/clk/mvebu.h                          |   23 +
+>  29 files changed, 1487 insertions(+), 38 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+>  create mode 100644 drivers/clk/mvebu/Kconfig
+>  create mode 100644 drivers/clk/mvebu/Makefile
+>  create mode 100644 drivers/clk/mvebu/clk-core.c
+>  create mode 100644 drivers/clk/mvebu/clk-core.h
+>  create mode 100644 drivers/clk/mvebu/clk-cpu.c
+>  create mode 100644 drivers/clk/mvebu/clk-cpu.h
+>  create mode 100644 drivers/clk/mvebu/clk-gating-ctrl.c
+>  create mode 100644 drivers/clk/mvebu/clk.c
+>  create mode 100644 include/linux/clk/mvebu.h
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
