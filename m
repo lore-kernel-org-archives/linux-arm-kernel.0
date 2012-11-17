@@ -1,457 +1,258 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 17 Nov 2012 17:57:12 +0400
-Subject: [PATCH v3 06/18] ARM: clps711x: cdb89712: Special driver for handling
- memory is removed
+Date: Sat, 17 Nov 2012 17:57:14 +0400
+Subject: [PATCH v3 08/18] ARM: clps711x: Implement usage "MULTI_IRQ_HANDLER"
+ kernel option for a platform
 In-Reply-To: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
 References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1353160644-22446-7-git-send-email-shc_work@mail.ru>
+Message-ID: <1353160644-22446-9-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provide migration to using "physmap-flash" and "mtd-ram"
-drivers instead of using special driver for handling memory.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/cdb89712.c              |   84 +++++++
- arch/arm/mach-clps711x/include/mach/hardware.h |    3 +
- drivers/mtd/maps/Kconfig                       |    7 -
- drivers/mtd/maps/Makefile                      |    1 -
- drivers/mtd/maps/cdb89712.c                    |  278 ------------------------
- 5 files changed, 87 insertions(+), 286 deletions(-)
- delete mode 100644 drivers/mtd/maps/cdb89712.c
+ arch/arm/Kconfig                                  |    1 +
+ arch/arm/mach-clps711x/autcpu12.c                 |    1 +
+ arch/arm/mach-clps711x/cdb89712.c                 |    1 +
+ arch/arm/mach-clps711x/clep7312.c                 |    3 +-
+ arch/arm/mach-clps711x/common.c                   |   45 +++++++++++++++++--
+ arch/arm/mach-clps711x/common.h                   |    3 +-
+ arch/arm/mach-clps711x/edb7211.c                  |    1 +
+ arch/arm/mach-clps711x/fortunet.c                 |    1 +
+ arch/arm/mach-clps711x/include/mach/entry-macro.S |   51 ---------------------
+ arch/arm/mach-clps711x/p720t.c                    |    1 +
+ 10 files changed, 50 insertions(+), 58 deletions(-)
+ delete mode 100644 arch/arm/mach-clps711x/include/mach/entry-macro.S
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 896f6bb..f3f1dd3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -377,6 +377,7 @@ config ARCH_CLPS711X
+ 	select COMMON_CLK
+ 	select CPU_ARM720T
+ 	select GENERIC_CLOCKEVENTS
++	select MULTI_IRQ_HANDLER
+ 	select NEED_MACH_MEMORY_H
+ 	select SPARSE_IRQ
+ 	help
+diff --git a/arch/arm/mach-clps711x/autcpu12.c b/arch/arm/mach-clps711x/autcpu12.c
+index b90a316..3de1955 100644
+--- a/arch/arm/mach-clps711x/autcpu12.c
++++ b/arch/arm/mach-clps711x/autcpu12.c
+@@ -75,6 +75,7 @@ MACHINE_START(AUTCPU12, "autronix autcpu12")
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
+ 	.init_machine	= autcpu12_init,
++	.handle_irq	= clps711x_handle_irq,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+ 
 diff --git a/arch/arm/mach-clps711x/cdb89712.c b/arch/arm/mach-clps711x/cdb89712.c
-index 235e625..24f573b 100644
+index 133794c..60900dd 100644
 --- a/arch/arm/mach-clps711x/cdb89712.c
 +++ b/arch/arm/mach-clps711x/cdb89712.c
-@@ -26,6 +26,10 @@
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
+@@ -142,5 +142,6 @@ MACHINE_START(CDB89712, "Cirrus-CDB89712")
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
+ 	.init_machine	= cdb89712_init,
++	.handle_irq	= clps711x_handle_irq,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/clep7312.c b/arch/arm/mach-clps711x/clep7312.c
+index be776c5..0b32a48 100644
+--- a/arch/arm/mach-clps711x/clep7312.c
++++ b/arch/arm/mach-clps711x/clep7312.c
+@@ -33,7 +33,6 @@ fixup_clep7312(struct tag *tags, char **cmdline, struct meminfo *mi)
+ 	mi->bank[0].size = 0x01000000;
+ }
  
-+#include <linux/mtd/physmap.h>
-+#include <linux/mtd/plat-ram.h>
-+#include <linux/mtd/partitions.h>
-+
- #include <mach/hardware.h>
- #include <asm/pgtable.h>
- #include <asm/page.h>
-@@ -44,8 +48,88 @@ static struct resource cdb89712_cs8900_resource[] __initdata = {
- 	DEFINE_RES_IRQ(CDB89712_CS8900_IRQ),
+-
+ MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
+ 	/* Maintainer: Nobody */
+ 	.atag_offset	= 0x0100,
+@@ -42,6 +41,6 @@ MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
+ 	.map_io		= clps711x_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.handle_irq	= clps711x_handle_irq,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+-
+diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
+index 286d6e6..0842024 100644
+--- a/arch/arm/mach-clps711x/common.c
++++ b/arch/arm/mach-clps711x/common.c
+@@ -29,6 +29,7 @@
+ #include <linux/clockchips.h>
+ #include <linux/clk-provider.h>
+ 
++#include <asm/exception.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ #include <asm/system_misc.h>
+@@ -134,13 +135,11 @@ static struct irq_chip int2_chip = {
+ 	.irq_unmask	= int2_unmask,
  };
  
-+static struct mtd_partition cdb89712_flash_partitions[] __initdata = {
-+	{
-+		.name	= "Flash",
-+		.offset	= 0,
-+		.size	= MTDPART_SIZ_FULL,
-+	},
-+};
-+
-+static struct physmap_flash_data cdb89712_flash_pdata __initdata = {
-+	.width		= 4,
-+	.probe_type	= "map_rom",
-+	.parts		= cdb89712_flash_partitions,
-+	.nr_parts	= ARRAY_SIZE(cdb89712_flash_partitions),
-+};
-+
-+static struct resource cdb89712_flash_resources[] __initdata = {
-+	DEFINE_RES_MEM(CS0_PHYS_BASE, SZ_8M),
-+};
-+
-+static struct platform_device cdb89712_flash_pdev __initdata = {
-+	.name		= "physmap-flash",
-+	.id		= 0,
-+	.resource	= cdb89712_flash_resources,
-+	.num_resources	= ARRAY_SIZE(cdb89712_flash_resources),
-+	.dev	= {
-+		.platform_data	= &cdb89712_flash_pdata,
-+	},
-+};
-+
-+static struct mtd_partition cdb89712_bootrom_partitions[] __initdata = {
-+	{
-+		.name	= "BootROM",
-+		.offset	= 0,
-+		.size	= MTDPART_SIZ_FULL,
-+	},
-+};
-+
-+static struct physmap_flash_data cdb89712_bootrom_pdata __initdata = {
-+	.width		= 4,
-+	.probe_type	= "map_rom",
-+	.parts		= cdb89712_bootrom_partitions,
-+	.nr_parts	= ARRAY_SIZE(cdb89712_bootrom_partitions),
-+};
-+
-+static struct resource cdb89712_bootrom_resources[] __initdata = {
-+	DEFINE_RES_NAMED(CS7_PHYS_BASE, SZ_128, "BOOTROM", IORESOURCE_MEM |
-+			 IORESOURCE_CACHEABLE | IORESOURCE_READONLY),
-+};
-+
-+static struct platform_device cdb89712_bootrom_pdev __initdata = {
-+	.name		= "physmap-flash",
-+	.id		= 1,
-+	.resource	= cdb89712_bootrom_resources,
-+	.num_resources	= ARRAY_SIZE(cdb89712_bootrom_resources),
-+	.dev	= {
-+		.platform_data	= &cdb89712_bootrom_pdata,
-+	},
-+};
-+
-+static struct platdata_mtd_ram cdb89712_sram_pdata __initdata = {
-+	.bankwidth	= 4,
-+};
-+
-+static struct resource cdb89712_sram_resources[] __initdata = {
-+	DEFINE_RES_MEM(CLPS711X_SRAM_BASE, CLPS711X_SRAM_SIZE),
-+};
-+
-+static struct platform_device cdb89712_sram_pdev __initdata = {
-+	.name		= "mtd-ram",
-+	.id		= 0,
-+	.resource	= cdb89712_sram_resources,
-+	.num_resources	= ARRAY_SIZE(cdb89712_sram_resources),
-+	.dev	= {
-+		.platform_data	= &cdb89712_sram_pdata,
-+	},
-+};
-+
- static void __init cdb89712_init(void)
- {
-+	platform_device_register(&cdb89712_flash_pdev);
-+	platform_device_register(&cdb89712_bootrom_pdev);
-+	platform_device_register(&cdb89712_sram_pdev);
- 	platform_device_register_simple("cs89x0", 0, cdb89712_cs8900_resource,
- 					ARRAY_SIZE(cdb89712_cs8900_resource));
+-struct clps711x_irqdesc {
++static struct {
+ 	int			nr;
+ 	struct irq_chip		*chip;
+ 	irq_flow_handler_t	handle;
+-};
+-
+-static struct clps711x_irqdesc clps711x_irqdescs[] __initdata = {
++} clps711x_irqdescs[] __initdata = {
+ 	{ IRQ_CSINT,	&int1_chip,	handle_fasteoi_irq,	},
+ 	{ IRQ_EINT1,	&int1_chip,	handle_level_irq,	},
+ 	{ IRQ_EINT2,	&int1_chip,	handle_level_irq,	},
+@@ -191,6 +190,44 @@ void __init clps711x_init_irq(void)
+ 	}
  }
-diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
-index bd919e7..5a278cb 100644
---- a/arch/arm/mach-clps711x/include/mach/hardware.h
-+++ b/arch/arm/mach-clps711x/include/mach/hardware.h
-@@ -64,6 +64,9 @@
- #define CS7_PHYS_BASE		(0x00000000)
- #endif
  
-+#define CLPS711X_SRAM_BASE	CS6_PHYS_BASE
-+#define CLPS711X_SRAM_SIZE	(48 * 1024)
++inline u32 fls16(u32 x)
++{
++	u32 r = 15;
 +
- #if defined (CONFIG_ARCH_EDB7211)
++	if (!(x & 0xff00)) {
++		x <<= 8;
++		r -= 8;
++	}
++	if (!(x & 0xf000)) {
++		x <<= 4;
++		r -= 4;
++	}
++	if (!(x & 0xc000)) {
++		x <<= 2;
++		r -= 2;
++	}
++	if (!(x & 0x8000))
++		r--;
++
++	return r;
++}
++
++asmlinkage void __exception_irq_entry clps711x_handle_irq(struct pt_regs *regs)
++{
++	u32 irqstat;
++	void __iomem *base = CLPS711X_VIRT_BASE;
++
++	irqstat = readl_relaxed(base + INTSR1) & readl_relaxed(base + INTMR1);
++	if (irqstat) {
++		handle_IRQ(fls16(irqstat), regs);
++		return;
++	}
++
++	irqstat = readl_relaxed(base + INTSR2) & readl_relaxed(base + INTMR2);
++	if (likely(irqstat))
++		handle_IRQ(fls16(irqstat) + 16, regs);
++}
++
+ static void clps711x_clockevent_set_mode(enum clock_event_mode mode,
+ 					 struct clock_event_device *evt)
+ {
+diff --git a/arch/arm/mach-clps711x/common.h b/arch/arm/mach-clps711x/common.h
+index 28b1701..3c7f12c 100644
+--- a/arch/arm/mach-clps711x/common.h
++++ b/arch/arm/mach-clps711x/common.h
+@@ -12,5 +12,6 @@ struct sys_timer;
  
- /* The extra 8 lines of the keyboard matrix are wired to chip select 3 */
-diff --git a/drivers/mtd/maps/Kconfig b/drivers/mtd/maps/Kconfig
-index 2e47c2e..df30486 100644
---- a/drivers/mtd/maps/Kconfig
-+++ b/drivers/mtd/maps/Kconfig
-@@ -324,13 +324,6 @@ config MTD_SOLUTIONENGINE
- 	  This enables access to the flash chips on the Hitachi SolutionEngine and
- 	  similar boards. Say 'Y' if you are building a kernel for such a board.
- 
--config MTD_CDB89712
--	tristate "Cirrus CDB89712 evaluation board mappings"
--	depends on MTD_CFI && ARCH_CDB89712
--	help
--	  This enables access to the flash or ROM chips on the CDB89712 board.
--	  If you have such a board, say 'Y'.
--
- config MTD_SA1100
- 	tristate "CFI Flash device mapped on StrongARM SA11x0"
- 	depends on MTD_CFI && ARCH_SA1100
-diff --git a/drivers/mtd/maps/Makefile b/drivers/mtd/maps/Makefile
-index deb43e9..a0240ed 100644
---- a/drivers/mtd/maps/Makefile
-+++ b/drivers/mtd/maps/Makefile
-@@ -7,7 +7,6 @@ obj-$(CONFIG_MTD)		+= map_funcs.o
- endif
- 
- # Chip mappings
--obj-$(CONFIG_MTD_CDB89712)	+= cdb89712.o
- obj-$(CONFIG_MTD_CFI_FLAGADM)	+= cfi_flagadm.o
- obj-$(CONFIG_MTD_DC21285)	+= dc21285.o
- obj-$(CONFIG_MTD_DILNETPC)	+= dilnetpc.o
-diff --git a/drivers/mtd/maps/cdb89712.c b/drivers/mtd/maps/cdb89712.c
+ extern void clps711x_map_io(void);
+ extern void clps711x_init_irq(void);
+-extern struct sys_timer clps711x_timer;
++extern void clps711x_handle_irq(struct pt_regs *regs);
+ extern void clps711x_restart(char mode, const char *cmd);
++extern struct sys_timer clps711x_timer;
+diff --git a/arch/arm/mach-clps711x/edb7211.c b/arch/arm/mach-clps711x/edb7211.c
+index 7b161dd..cc32a65 100644
+--- a/arch/arm/mach-clps711x/edb7211.c
++++ b/arch/arm/mach-clps711x/edb7211.c
+@@ -98,5 +98,6 @@ MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
+ 	.init_machine	= edb7211_init,
++	.handle_irq	= clps711x_handle_irq,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/fortunet.c b/arch/arm/mach-clps711x/fortunet.c
+index a5c0816..7d01255 100644
+--- a/arch/arm/mach-clps711x/fortunet.c
++++ b/arch/arm/mach-clps711x/fortunet.c
+@@ -79,5 +79,6 @@ MACHINE_START(FORTUNET, "ARM-FortuNet")
+ 	.map_io		= clps711x_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.handle_irq	= clps711x_handle_irq,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/include/mach/entry-macro.S b/arch/arm/mach-clps711x/include/mach/entry-macro.S
 deleted file mode 100644
-index c29cbf8..0000000
---- a/drivers/mtd/maps/cdb89712.c
+index 56e5c2c..0000000
+--- a/arch/arm/mach-clps711x/include/mach/entry-macro.S
 +++ /dev/null
-@@ -1,278 +0,0 @@
+@@ -1,51 +0,0 @@
 -/*
-- * Flash on Cirrus CDB89712
+- * arch/arm/mach-clps711x/include/mach/entry-macro.S
 - *
+- * Low-level IRQ helper macros for CLPS711X-based platforms
+- *
+- * This file is licensed under  the terms of the GNU General Public
+- * License version 2. This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
 - */
--
--#include <linux/module.h>
--#include <linux/types.h>
--#include <linux/kernel.h>
--#include <linux/ioport.h>
--#include <linux/init.h>
--#include <asm/io.h>
 -#include <mach/hardware.h>
--#include <linux/mtd/mtd.h>
--#include <linux/mtd/map.h>
--#include <linux/mtd/partitions.h>
 -
--/* dynamic ioremap() areas */
--#define FLASH_START      0x00000000
--#define FLASH_SIZE       0x800000
--#define FLASH_WIDTH      4
+-		.macro	get_irqnr_preamble, base, tmp
+-		.endm
 -
--#define SRAM_START       0x60000000
--#define SRAM_SIZE        0xc000
--#define SRAM_WIDTH       4
+-#if (INTSR2 - INTSR1) != (INTMR2 - INTMR1)
+-#error INTSR stride != INTMR stride
+-#endif
 -
--#define BOOTROM_START    0x70000000
--#define BOOTROM_SIZE     0x80
--#define BOOTROM_WIDTH    4
+-		.macro	get_irqnr_and_base, irqnr, stat, base, mask
+-		mov	\base, #CLPS711X_VIRT_BASE
+-		ldr	\stat, [\base, #INTSR1]
+-		ldr	\mask, [\base, #INTMR1]
+-		mov	\irqnr, #4
+-		mov	\mask, \mask, lsl #16
+-		and	\stat, \stat, \mask, lsr #16
+-		movs	\stat, \stat, lsr #4
+-		bne	1001f
 -
+-		add	\base, \base, #INTSR2 - INTSR1
+-		ldr	\stat, [\base, #INTSR1]
+-		ldr	\mask, [\base, #INTMR1]
+-		mov	\irqnr, #16
+-		mov	\mask, \mask, lsl #16
+-		and	\stat, \stat, \mask, lsr #16
 -
--static struct mtd_info *flash_mtd;
--
--struct map_info cdb89712_flash_map = {
--	.name = "flash",
--	.size = FLASH_SIZE,
--	.bankwidth = FLASH_WIDTH,
--	.phys = FLASH_START,
--};
--
--struct resource cdb89712_flash_resource = {
--	.name =   "Flash",
--	.start =  FLASH_START,
--	.end =    FLASH_START + FLASH_SIZE - 1,
--	.flags =  IORESOURCE_IO | IORESOURCE_BUSY,
--};
--
--static int __init init_cdb89712_flash (void)
--{
--	int err;
--
--	if (request_resource (&ioport_resource, &cdb89712_flash_resource)) {
--		printk(KERN_NOTICE "Failed to reserve Cdb89712 FLASH space\n");
--		err = -EBUSY;
--		goto out;
--	}
--
--	cdb89712_flash_map.virt = ioremap(FLASH_START, FLASH_SIZE);
--	if (!cdb89712_flash_map.virt) {
--		printk(KERN_NOTICE "Failed to ioremap Cdb89712 FLASH space\n");
--		err = -EIO;
--		goto out_resource;
--	}
--	simple_map_init(&cdb89712_flash_map);
--	flash_mtd = do_map_probe("cfi_probe", &cdb89712_flash_map);
--	if (!flash_mtd) {
--		flash_mtd = do_map_probe("map_rom", &cdb89712_flash_map);
--		if (flash_mtd)
--			flash_mtd->erasesize = 0x10000;
--	}
--	if (!flash_mtd) {
--		printk("FLASH probe failed\n");
--		err = -ENXIO;
--		goto out_ioremap;
--	}
--
--	flash_mtd->owner = THIS_MODULE;
--
--	if (mtd_device_register(flash_mtd, NULL, 0)) {
--		printk("FLASH device addition failed\n");
--		err = -ENOMEM;
--		goto out_probe;
--	}
--
--	return 0;
--
--out_probe:
--	map_destroy(flash_mtd);
--	flash_mtd = 0;
--out_ioremap:
--	iounmap((void *)cdb89712_flash_map.virt);
--out_resource:
--	release_resource (&cdb89712_flash_resource);
--out:
--	return err;
--}
+-1001:		tst	\stat, #255
+-		addeq	\irqnr, \irqnr, #8
+-		moveq	\stat, \stat, lsr #8
+-		tst	\stat, #15
+-		addeq	\irqnr, \irqnr, #4
+-		moveq	\stat, \stat, lsr #4
+-		tst	\stat, #3
+-		addeq	\irqnr, \irqnr, #2
+-		moveq	\stat, \stat, lsr #2
+-		tst	\stat, #1
+-		addeq	\irqnr, \irqnr, #1
+-		moveq	\stat, \stat, lsr #1
+-		tst	\stat, #1			@ bit 0 should be set
+-		.endm
 -
 -
--
--
--
--static struct mtd_info *sram_mtd;
--
--struct map_info cdb89712_sram_map = {
--	.name = "SRAM",
--	.size = SRAM_SIZE,
--	.bankwidth = SRAM_WIDTH,
--	.phys = SRAM_START,
--};
--
--struct resource cdb89712_sram_resource = {
--	.name =   "SRAM",
--	.start =  SRAM_START,
--	.end =    SRAM_START + SRAM_SIZE - 1,
--	.flags =  IORESOURCE_IO | IORESOURCE_BUSY,
--};
--
--static int __init init_cdb89712_sram (void)
--{
--	int err;
--
--	if (request_resource (&ioport_resource, &cdb89712_sram_resource)) {
--		printk(KERN_NOTICE "Failed to reserve Cdb89712 SRAM space\n");
--		err = -EBUSY;
--		goto out;
--	}
--
--	cdb89712_sram_map.virt = ioremap(SRAM_START, SRAM_SIZE);
--	if (!cdb89712_sram_map.virt) {
--		printk(KERN_NOTICE "Failed to ioremap Cdb89712 SRAM space\n");
--		err = -EIO;
--		goto out_resource;
--	}
--	simple_map_init(&cdb89712_sram_map);
--	sram_mtd = do_map_probe("map_ram", &cdb89712_sram_map);
--	if (!sram_mtd) {
--		printk("SRAM probe failed\n");
--		err = -ENXIO;
--		goto out_ioremap;
--	}
--
--	sram_mtd->owner = THIS_MODULE;
--	sram_mtd->erasesize = 16;
--
--	if (mtd_device_register(sram_mtd, NULL, 0)) {
--		printk("SRAM device addition failed\n");
--		err = -ENOMEM;
--		goto out_probe;
--	}
--
--	return 0;
--
--out_probe:
--	map_destroy(sram_mtd);
--	sram_mtd = 0;
--out_ioremap:
--	iounmap((void *)cdb89712_sram_map.virt);
--out_resource:
--	release_resource (&cdb89712_sram_resource);
--out:
--	return err;
--}
--
--
--
--
--
--
--
--static struct mtd_info *bootrom_mtd;
--
--struct map_info cdb89712_bootrom_map = {
--	.name = "BootROM",
--	.size = BOOTROM_SIZE,
--	.bankwidth = BOOTROM_WIDTH,
--	.phys = BOOTROM_START,
--};
--
--struct resource cdb89712_bootrom_resource = {
--	.name =   "BootROM",
--	.start =  BOOTROM_START,
--	.end =    BOOTROM_START + BOOTROM_SIZE - 1,
--	.flags =  IORESOURCE_IO | IORESOURCE_BUSY,
--};
--
--static int __init init_cdb89712_bootrom (void)
--{
--	int err;
--
--	if (request_resource (&ioport_resource, &cdb89712_bootrom_resource)) {
--		printk(KERN_NOTICE "Failed to reserve Cdb89712 BOOTROM space\n");
--		err = -EBUSY;
--		goto out;
--	}
--
--	cdb89712_bootrom_map.virt = ioremap(BOOTROM_START, BOOTROM_SIZE);
--	if (!cdb89712_bootrom_map.virt) {
--		printk(KERN_NOTICE "Failed to ioremap Cdb89712 BootROM space\n");
--		err = -EIO;
--		goto out_resource;
--	}
--	simple_map_init(&cdb89712_bootrom_map);
--	bootrom_mtd = do_map_probe("map_rom", &cdb89712_bootrom_map);
--	if (!bootrom_mtd) {
--		printk("BootROM probe failed\n");
--		err = -ENXIO;
--		goto out_ioremap;
--	}
--
--	bootrom_mtd->owner = THIS_MODULE;
--	bootrom_mtd->erasesize = 0x10000;
--
--	if (mtd_device_register(bootrom_mtd, NULL, 0)) {
--		printk("BootROM device addition failed\n");
--		err = -ENOMEM;
--		goto out_probe;
--	}
--
--	return 0;
--
--out_probe:
--	map_destroy(bootrom_mtd);
--	bootrom_mtd = 0;
--out_ioremap:
--	iounmap((void *)cdb89712_bootrom_map.virt);
--out_resource:
--	release_resource (&cdb89712_bootrom_resource);
--out:
--	return err;
--}
--
--
--
--
--
--static int __init init_cdb89712_maps(void)
--{
--
--       	printk(KERN_INFO "Cirrus CDB89712 MTD mappings:\n  Flash 0x%x at 0x%x\n  SRAM 0x%x at 0x%x\n  BootROM 0x%x at 0x%x\n",
--	       FLASH_SIZE, FLASH_START, SRAM_SIZE, SRAM_START, BOOTROM_SIZE, BOOTROM_START);
--
--	init_cdb89712_flash();
--	init_cdb89712_sram();
--	init_cdb89712_bootrom();
--
--	return 0;
--}
--
--
--static void __exit cleanup_cdb89712_maps(void)
--{
--	if (sram_mtd) {
--		mtd_device_unregister(sram_mtd);
--		map_destroy(sram_mtd);
--		iounmap((void *)cdb89712_sram_map.virt);
--		release_resource (&cdb89712_sram_resource);
--	}
--
--	if (flash_mtd) {
--		mtd_device_unregister(flash_mtd);
--		map_destroy(flash_mtd);
--		iounmap((void *)cdb89712_flash_map.virt);
--		release_resource (&cdb89712_flash_resource);
--	}
--
--	if (bootrom_mtd) {
--		mtd_device_unregister(bootrom_mtd);
--		map_destroy(bootrom_mtd);
--		iounmap((void *)cdb89712_bootrom_map.virt);
--		release_resource (&cdb89712_bootrom_resource);
--	}
--}
--
--module_init(init_cdb89712_maps);
--module_exit(cleanup_cdb89712_maps);
--
--MODULE_AUTHOR("Ray L");
--MODULE_DESCRIPTION("ARM CDB89712 map driver");
--MODULE_LICENSE("GPL");
+diff --git a/arch/arm/mach-clps711x/p720t.c b/arch/arm/mach-clps711x/p720t.c
+index fbe7552..a58a058 100644
+--- a/arch/arm/mach-clps711x/p720t.c
++++ b/arch/arm/mach-clps711x/p720t.c
+@@ -142,5 +142,6 @@ MACHINE_START(P720T, "ARM-Prospector720T")
+ 	.timer		= &clps711x_timer,
+ 	.init_machine	= p720t_init,
+ 	.init_late	= p720t_init_late,
++	.handle_irq	= clps711x_handle_irq,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
 -- 
 1.7.8.6
