@@ -1,38 +1,317 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 17 Nov 2012 18:04:50 +0000
-Subject: [PATCH V3] Add support for generic BCM SoC chipsets
-In-Reply-To: <CAA-5wcAqcjA7VNVXRZ8AE2r5EFQsFa68Rqi_ptYDDR9XXHsUMg@mail.gmail.com>
-References: <1352843517-31328-1-git-send-email-csd@broadcom.com>
- <201211171721.15021.arnd@arndb.de>
- <CAA-5wcAqcjA7VNVXRZ8AE2r5EFQsFa68Rqi_ptYDDR9XXHsUMg@mail.gmail.com>
-Message-ID: <201211171804.50705.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 17 Nov 2012 19:37:13 +0100
+Subject: [PATCH] ARM: integrator: push down SC dependencies
+Message-ID: <1353177433-2447-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 17 November 2012, Christian Daudt wrote:
-> > At that point doesn't the 'oldest part' become the wildcard  ? I'm not
-> very attached to names, so I'm ok changing bcm281xx above to bcm11351,
-> which happens to be the first chip I'm submitting a board for. But then
-> bcm11351 will just become 'the chip name used to represent the family'
-> right ? I had followed the fact that omap does use omap5 in omap5.dtsi -
-> and afaik tegra2 and tegra3 are family names, not chip models, and are used
-> in dtsi. But then again a bunch of chip models are used to represent the
-> families too...
->  Let me know if you want me to submit a modified patchset. Shouldn't take
-> me more than 5 minutes anyways :)
+This pushes the dependencies on the Integrator/AP system
+controller (SC) down into the PCI V3 driver and the
+AP-specific board file.
 
-I think in a lot of cases, we just list all the possible parts specifically
-since we already know them, especially when supporting a new one requires
-changing code already.
+First, the platform data for the PL030 UART is moved into
+the integrator_ap.c board file, and the Integrator/CP is
+assigned with NULL pdata. This way the callback functions
+can reference the dynamically remapped AP syscon address
+in both the ATAG and DT boot path, and this remapping
+is localized to the board file.
 
-Using bcm11351 as the name for the family sounds reasonable to me when
-the other ones are derived from that, and the other option is to just
-list all the ones that are out there already in the source code match
-table. For future SoCs, you can then decide whether you want to change
-the code to add the new number or just list one of the existing parts
-as backwards compatible for the new device tree file if that allows
-you to support it without other code changes.
+Second the PCIv3 driver is making its own dynamic remapping
+of the SC for the few registers it is using. When we
+convert the PCIv3 driver over to using device tree having a
+dynamically assigned base address will be useful, but we
+will have to use the definition from <mach/platform.h> for
+now, the only improvement is that it's done dynamically.
 
-Please pick one of the two options and resubmit.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-integrator/common.h                |  7 +++-
+ arch/arm/mach-integrator/core.c                  | 50 ++----------------------
+ arch/arm/mach-integrator/include/mach/platform.h |  1 -
+ arch/arm/mach-integrator/integrator_ap.c         | 46 ++++++++++++++++++++--
+ arch/arm/mach-integrator/integrator_cp.c         |  4 +-
+ arch/arm/mach-integrator/pci_v3.c                | 23 ++++++-----
+ 6 files changed, 69 insertions(+), 62 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/mach-integrator/common.h b/arch/arm/mach-integrator/common.h
+index fc9f47d..79197d8 100644
+--- a/arch/arm/mach-integrator/common.h
++++ b/arch/arm/mach-integrator/common.h
+@@ -1,5 +1,10 @@
+ #include <linux/amba/serial.h>
+-extern struct amba_pl010_data integrator_uart_data;
++#ifdef CONFIG_ARCH_INTEGRATOR_AP
++extern struct amba_pl010_data ap_uart_data;
++#else
++/* Not used without Integrator/AP support anyway */
++struct amba_pl010_data ap_uart_data {};
++#endif
+ void integrator_init_early(void);
+ int integrator_init(bool is_cp);
+ void integrator_reserve(void);
+diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
+index 161fbf8..39c060f 100644
+--- a/arch/arm/mach-integrator/core.c
++++ b/arch/arm/mach-integrator/core.c
+@@ -18,7 +18,6 @@
+ #include <linux/memblock.h>
+ #include <linux/sched.h>
+ #include <linux/smp.h>
+-#include <linux/termios.h>
+ #include <linux/amba/bus.h>
+ #include <linux/amba/serial.h>
+ #include <linux/io.h>
+@@ -47,10 +46,10 @@ static AMBA_APB_DEVICE(rtc, "rtc", 0,
+ 	INTEGRATOR_RTC_BASE, INTEGRATOR_RTC_IRQ, NULL);
+ 
+ static AMBA_APB_DEVICE(uart0, "uart0", 0,
+-	INTEGRATOR_UART0_BASE, INTEGRATOR_UART0_IRQ, &integrator_uart_data);
++	INTEGRATOR_UART0_BASE, INTEGRATOR_UART0_IRQ, NULL);
+ 
+ static AMBA_APB_DEVICE(uart1, "uart1", 0,
+-	INTEGRATOR_UART1_BASE, INTEGRATOR_UART1_IRQ, &integrator_uart_data);
++	INTEGRATOR_UART1_BASE, INTEGRATOR_UART1_IRQ, NULL);
+ 
+ static AMBA_APB_DEVICE(kmi0, "kmi0", 0, KMI0_BASE, KMI0_IRQ, NULL);
+ static AMBA_APB_DEVICE(kmi1, "kmi1", 0, KMI1_BASE, KMI1_IRQ, NULL);
+@@ -78,6 +77,8 @@ int __init integrator_init(bool is_cp)
+ 		uart1_device.periphid	= 0x00041010;
+ 		kmi0_device.periphid	= 0x00041050;
+ 		kmi1_device.periphid	= 0x00041050;
++		uart0_device.dev.platform_data = &ap_uart_data;
++		uart1_device.dev.platform_data = &ap_uart_data;
+ 	}
+ 
+ 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
+@@ -90,49 +91,6 @@ int __init integrator_init(bool is_cp)
+ 
+ #endif
+ 
+-/*
+- * On the Integrator platform, the port RTS and DTR are provided by
+- * bits in the following SC_CTRLS register bits:
+- *        RTS  DTR
+- *  UART0  7    6
+- *  UART1  5    4
+- */
+-#define SC_CTRLC	__io_address(INTEGRATOR_SC_CTRLC)
+-#define SC_CTRLS	__io_address(INTEGRATOR_SC_CTRLS)
+-
+-static void integrator_uart_set_mctrl(struct amba_device *dev, void __iomem *base, unsigned int mctrl)
+-{
+-	unsigned int ctrls = 0, ctrlc = 0, rts_mask, dtr_mask;
+-	u32 phybase = dev->res.start;
+-
+-	if (phybase == INTEGRATOR_UART0_BASE) {
+-		/* UART0 */
+-		rts_mask = 1 << 4;
+-		dtr_mask = 1 << 5;
+-	} else {
+-		/* UART1 */
+-		rts_mask = 1 << 6;
+-		dtr_mask = 1 << 7;
+-	}
+-
+-	if (mctrl & TIOCM_RTS)
+-		ctrlc |= rts_mask;
+-	else
+-		ctrls |= rts_mask;
+-
+-	if (mctrl & TIOCM_DTR)
+-		ctrlc |= dtr_mask;
+-	else
+-		ctrls |= dtr_mask;
+-
+-	__raw_writel(ctrls, SC_CTRLS);
+-	__raw_writel(ctrlc, SC_CTRLC);
+-}
+-
+-struct amba_pl010_data integrator_uart_data = {
+-	.set_mctrl = integrator_uart_set_mctrl,
+-};
+-
+ static DEFINE_RAW_SPINLOCK(cm_lock);
+ 
+ /**
+diff --git a/arch/arm/mach-integrator/include/mach/platform.h b/arch/arm/mach-integrator/include/mach/platform.h
+index efeac5d..be5859e 100644
+--- a/arch/arm/mach-integrator/include/mach/platform.h
++++ b/arch/arm/mach-integrator/include/mach/platform.h
+@@ -190,7 +190,6 @@
+ #define INTEGRATOR_SC_CTRLC_OFFSET      0x0C
+ #define INTEGRATOR_SC_DEC_OFFSET        0x10
+ #define INTEGRATOR_SC_ARB_OFFSET        0x14
+-#define INTEGRATOR_SC_PCIENABLE_OFFSET  0x18
+ #define INTEGRATOR_SC_LOCK_OFFSET       0x1C
+ 
+ #define INTEGRATOR_SC_BASE              0x11000000
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 771cbe4..a0a7cbb 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -39,6 +39,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/stat.h>
+ #include <linux/sys_soc.h>
++#include <linux/termios.h>
+ #include <video/vga.h>
+ 
+ #include <mach/hardware.h>
+@@ -63,7 +64,7 @@
+ #include "common.h"
+ 
+ /* Base address to the AP system controller */
+-static void __iomem *ap_syscon_base;
++void __iomem *ap_syscon_base;
+ 
+ /*
+  * All IO addresses are mapped onto VA 0xFFFx.xxxx, where x.xxxx
+@@ -251,6 +252,45 @@ static struct physmap_flash_data ap_flash_data = {
+ };
+ 
+ /*
++ * For the PL010 found in the Integrator/AP some of the UART control is
++ * implemented in the system controller and accessed using a callback
++ * from the driver.
++ */
++static void integrator_uart_set_mctrl(struct amba_device *dev,
++				void __iomem *base, unsigned int mctrl)
++{
++	unsigned int ctrls = 0, ctrlc = 0, rts_mask, dtr_mask;
++	u32 phybase = dev->res.start;
++
++	if (phybase == INTEGRATOR_UART0_BASE) {
++		/* UART0 */
++		rts_mask = 1 << 4;
++		dtr_mask = 1 << 5;
++	} else {
++		/* UART1 */
++		rts_mask = 1 << 6;
++		dtr_mask = 1 << 7;
++	}
++
++	if (mctrl & TIOCM_RTS)
++		ctrlc |= rts_mask;
++	else
++		ctrls |= rts_mask;
++
++	if (mctrl & TIOCM_DTR)
++		ctrlc |= dtr_mask;
++	else
++		ctrls |= dtr_mask;
++
++	__raw_writel(ctrls, ap_syscon_base + INTEGRATOR_SC_CTRLS_OFFSET);
++	__raw_writel(ctrlc, ap_syscon_base + INTEGRATOR_SC_CTRLC_OFFSET);
++}
++
++struct amba_pl010_data ap_uart_data = {
++	.set_mctrl = integrator_uart_set_mctrl,
++};
++
++/*
+  * Where is the timer (VA)?
+  */
+ #define TIMER0_VA_BASE __io_address(INTEGRATOR_TIMER0_BASE)
+@@ -447,9 +487,9 @@ static struct of_dev_auxdata ap_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_RTC_BASE,
+ 		"rtc", NULL),
+ 	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_UART0_BASE,
+-		"uart0", &integrator_uart_data),
++		"uart0", &ap_uart_data),
+ 	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_UART1_BASE,
+-		"uart1", &integrator_uart_data),
++		"uart1", &ap_uart_data),
+ 	OF_DEV_AUXDATA("arm,primecell", KMI0_BASE,
+ 		"kmi0", NULL),
+ 	OF_DEV_AUXDATA("arm,primecell", KMI1_BASE,
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index c4b6af9..29df06b 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -306,9 +306,9 @@ static struct of_dev_auxdata intcp_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_RTC_BASE,
+ 		"rtc", NULL),
+ 	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_UART0_BASE,
+-		"uart0", &integrator_uart_data),
++		"uart0", NULL),
+ 	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_UART1_BASE,
+-		"uart1", &integrator_uart_data),
++		"uart1", NULL),
+ 	OF_DEV_AUXDATA("arm,primecell", KMI0_BASE,
+ 		"kmi0", NULL),
+ 	OF_DEV_AUXDATA("arm,primecell", KMI1_BASE,
+diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
+index bbeca59..000edcd 100644
+--- a/arch/arm/mach-integrator/pci_v3.c
++++ b/arch/arm/mach-integrator/pci_v3.c
+@@ -388,9 +388,10 @@ static int __init pci_v3_setup_resources(struct pci_sys_data *sys)
+  * means I can't get additional information on the reason for the pm2fb
+  * problems.  I suppose I'll just have to mind-meld with the machine. ;)
+  */
+-#define SC_PCI     __io_address(INTEGRATOR_SC_PCIENABLE)
+-#define SC_LBFADDR __io_address(INTEGRATOR_SC_BASE + 0x20)
+-#define SC_LBFCODE __io_address(INTEGRATOR_SC_BASE + 0x24)
++static void __iomem *ap_syscon_base;
++#define INTEGRATOR_SC_PCIENABLE_OFFSET	0x18
++#define INTEGRATOR_SC_LBFADDR_OFFSET	0x20
++#define INTEGRATOR_SC_LBFCODE_OFFSET	0x24
+ 
+ static int
+ v3_pci_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+@@ -401,13 +402,13 @@ v3_pci_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	char buf[128];
+ 
+ 	sprintf(buf, "V3 fault: addr 0x%08lx, FSR 0x%03x, PC 0x%08lx [%08lx] LBFADDR=%08x LBFCODE=%02x ISTAT=%02x\n",
+-		addr, fsr, pc, instr, __raw_readl(SC_LBFADDR), __raw_readl(SC_LBFCODE) & 255,
++		addr, fsr, pc, instr, __raw_readl(ap_syscon_base + INTEGRATOR_SC_LBFADDR_OFFSET), __raw_readl(ap_syscon_base + INTEGRATOR_SC_LBFCODE_OFFSET) & 255,
+ 		v3_readb(V3_LB_ISTAT));
+ 	printk(KERN_DEBUG "%s", buf);
+ #endif
+ 
+ 	v3_writeb(V3_LB_ISTAT, 0);
+-	__raw_writel(3, SC_PCI);
++	__raw_writel(3, ap_syscon_base + INTEGRATOR_SC_PCIENABLE_OFFSET);
+ 
+ 	/*
+ 	 * If the instruction being executed was a read,
+@@ -449,15 +450,15 @@ static irqreturn_t v3_irq(int dummy, void *devid)
+ 
+ 	sprintf(buf, "V3 int %d: pc=0x%08lx [%08lx] LBFADDR=%08x LBFCODE=%02x "
+ 		"ISTAT=%02x\n", IRQ_AP_V3INT, pc, instr,
+-		__raw_readl(SC_LBFADDR),
+-		__raw_readl(SC_LBFCODE) & 255,
++		__raw_readl(ap_syscon_base + INTEGRATOR_SC_LBFADDR_OFFSET),
++		__raw_readl(ap_syscon_base + INTEGRATOR_SC_LBFCODE_OFFSET) & 255,
+ 		v3_readb(V3_LB_ISTAT));
+ 	printascii(buf);
+ #endif
+ 
+ 	v3_writew(V3_PCI_STAT, 0xf000);
+ 	v3_writeb(V3_LB_ISTAT, 0);
+-	__raw_writel(3, SC_PCI);
++	__raw_writel(3, ap_syscon_base + INTEGRATOR_SC_PCIENABLE_OFFSET);
+ 
+ #ifdef CONFIG_DEBUG_LL
+ 	/*
+@@ -480,6 +481,10 @@ int __init pci_v3_setup(int nr, struct pci_sys_data *sys)
+ 	if (nr == 0) {
+ 		sys->mem_offset = PHYS_PCI_MEM_BASE;
+ 		ret = pci_v3_setup_resources(sys);
++		/* Remap the Integrator system controller */
++		ap_syscon_base = ioremap(INTEGRATOR_SC_BASE, 0x100);
++		if (!ap_syscon_base)
++			return -EINVAL;
+ 	}
+ 
+ 	return ret;
+@@ -568,7 +573,7 @@ void __init pci_v3_preinit(void)
+ 	v3_writeb(V3_LB_ISTAT, 0);
+ 	v3_writew(V3_LB_CFG, v3_readw(V3_LB_CFG) | (1 << 10));
+ 	v3_writeb(V3_LB_IMASK, 0x28);
+-	__raw_writel(3, SC_PCI);
++	__raw_writel(3, ap_syscon_base + INTEGRATOR_SC_PCIENABLE_OFFSET);
+ 
+ 	/*
+ 	 * Grab the PCI error interrupt.
+-- 
+1.7.11.7
