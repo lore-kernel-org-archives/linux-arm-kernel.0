@@ -1,201 +1,102 @@
-From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Fri, 16 Nov 2012 19:29:09 -0800
-Subject: [RFC] dt/platform: Use cell-index for device naming if available
-In-Reply-To: <20121115161020.3205E3E194B@localhost>
-References: <1352508532-19241-1-git-send-email-stepanm@codeaurora.org>
- <509F0E56.6080806@gmail.com>
- <CACxGe6s3gJ4fmhn9VBd1Fq8bH5S0_ejmE=KqVjYn20bT42wQ_Q@mail.gmail.com>
- <554191d69bc21a4b133fb876df84ff89.squirrel@www.codeaurora.org>
- <50A1B50B.4020509@codeaurora.org> <20121115161020.3205E3E194B@localhost>
-Message-ID: <50A70485.90302@codeaurora.org>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Sat, 17 Nov 2012 11:37:54 +0800
+Subject: [PATCH v3 0/3] serial: mxs-auart: add DMA support for auart in
+ mx28
+In-Reply-To: <50A656DE.6080506@bluegiga.com>
+References: <1353053034-10944-1-git-send-email-b32955@freescale.com>
+ <50A656DE.6080506@bluegiga.com>
+Message-ID: <CAMiH66E0QB9JwHqGyM_jDRU8zzULzqDNJzTJAHXTguAdXMgeWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2012 8:10 AM, Grant Likely wrote:
-> On Mon, 12 Nov 2012 18:48:43 -0800, Stepan Moskovchenko <stepanm@codeaurora.org> wrote:
->> On 11/11/2012 5:45 PM, Stepan Moskovchenko wrote:
->>>
->>>> On Sun, Nov 11, 2012 at 2:32 AM, Rob Herring <robherring2@gmail.com>
->>>> wrote:
->>>>> On 11/09/2012 06:48 PM, Stepan Moskovchenko wrote:
->>>>>> Use the cell-index property to construct names for platform
->>>>>> devices, falling back on the existing scheme of using the
->>>>>> device register address if cell-index is not specified.
->>>>>>
->>>>>> The cell-index property is a more useful device identifier,
->>>>>> especially in systems containing several numbered instances
->>>>>> of a particular hardware block, since it more easily
->>>>>> illustrates how devices relate to each other.
->>>>>>
->>>>>> Additionally, userspace software may rely on the classic
->>>>>> <name>.<id> naming scheme to access device attributes in
->>>>>> sysfs, without having to know the physical addresses of
->>>>>> that device on every platform the userspace software may
->>>>>> support. Using cell-index for device naming allows the
->>>>>> device addresses to be hidden from userspace and to be
->>>>>> exposed by logical device number without having to rely on
->>>>>> auxdata to perform name overrides. This allows userspace to
->>>>>> make assumptions about which sysfs nodes map to which
->>>>>> logical instance of a specific hardware block.
->>>>>>
->>>>>> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
->>>>>> ---
->>>>>> I had also considered using something like the linux,label property to
->>>>>> allow
->>>>>> custom names for platform devices without resorting to auxdata, but the
->>>>>> cell-index approach seems more in line with what cell-index was
->>>>>> intended for
->>>>>> and with what the pre-DT platform device naming scheme used to be.
->>>>>> Please let
->>>>>> me know if you think there is a better way to accomplish this.
->>>>>>
->>>>>> This is just being sent out as an RFC for now. If there are no
->>>>>> objections, I
->>>>>> will send this out as an official patch, along with (or combined with)
->>>>>> a patch
->>>>>> to fix up the device names in things like clock tables of any affected
->>>>>> platforms.
->>>>>
->>>>> cell-index is basically deprecated. This has been discussed multiple
->>>>> times in the past. You can use auxdata if you really need to have the
->>>>> old name.
->>>>
->>>> Actually, I think it would be fine to use an /aliases entry to set the
->>>> device name. That's the place to put global namespace information.
->>>>
->>>> g.
->>>>
->>>
->>> Ah, thank you. I would prefer to stay away from auxdata, since it involves
->>> placing more platform-specific data into the kernel, and it is my
->>> understanding that auxdata is intended as a temporary measure. The
->>> /aliases approach looks interesting, and I'll see what I can do with it -
->>> hopefully I can have an RFC / patch soon. It looks like we would want an
->>> "inverse" alias lookup- that is, we would need to know which alias
->>> corresponds to a given node. Is it possible for a node to have multiple
->>> aliases?
+On Fri, Nov 16, 2012 at 11:08 PM, Lauri Hintsala
+<lauri.hintsala@bluegiga.com> wrote:
+> Hi Huang,
 >
-> yes
+> Thanks for new version. Now I don't get any errors and the CPU doesn't
+> freeze any more but:
 >
->>> If so, which shall we use to create the device name? Anyway, I
->>> will further look into how these aliases work.
+> 1) AUART corrupts data with baudrate over 1Mbits/s
+The tranceivers, such as MAX3380E, will limit the speed.
+i ever removed it, and tested the AUART in 3M bits/s.
+
 >
-> Well, why exactly do you want to control the names of devices? Is it so
-> that devices match up with what they are, or is it to make things match
-> up with things like clocks and regulators. If it is the latter, then no,
-> don't do this. Use auxdata. When the kernel requires a specific name for
-> a device it is very much a kernel *internal* detail. It does not make
-> sense to encode that into the device tree when it isn't something part
-> of the binding.
+> 2) We would need DMA support without flow control.
+:)
+I really think it's not wise to support the DMA withou flow control.
+it will losts the data in some case.
+Even use the FREESCALE's bsp code, I also recomand to use the flow control.
+
+
+>
+> By the way, how do you test drivers? Is there any standard tools for uart
+> data and throughput testing?
+I tested the driver with our own small tool.
+If you want to test it too, I can send you the resource next monday.
+You can use it to test if you have received the right data.
+
+thanks
+Huang Shijie
+
+
+>
+> Lauri
 >
 >
->>>
->>> Steve
+> On 11/16/2012 10:03 AM, Huang Shijie wrote:
 >>
->> Hi Grant,
+>> This patch set adds the DMA support for auart in mx28.
+>> patch 1:
+>>         In mx23, the DMA has a bug(see errata:2836). We can not add the
+>>         DMA support in mx23, but we can add DMA support to auart in mx28.
+>>         So in order to add the DMA support for the auart in mx28, we
+>> should add
+>>         the platform_device_id to distinguish the distinguish SOCs.
 >>
->> Looking through the alias code, I see that the stem and the alias ID are
->> stored and parsed separately. For the current way of using aliases, this
->> makes sense. However, can you please clarify what you meant by using an
->> /aliases entry to set the device name?
+>> patch 2: add the DMA support for mx28
+>>         Only we meet the following conditions, we can enable the DMA
+>> support
+>>         for auart:
+>>          (1) We enable the DMA support in the dts file, such as
+>>              arch/arm/boot/dts/imx28.dtsi.
+>>          (2) We enable the hardware flow control.
+>>          (3) We use the mx28, not the mx23. Due to hardware bug(see
+>> errata: 2836),
+>>              we can not add the DMA support to mx23.
 >>
->> The first and most straightforward approach would be to use the entire
->> alias name as the device name, making no distinction between the alias
->> stem and ID. However, since it is possible to have multiple aliases to
->> the same device, which of the aliases shall we use to construct the
->> device name? Additionally, this may cause possible problems for legacy
->> software that expects names in the format of <name>.<ID>, since '.' is
->> not a valid character for alias names as defined by the DT spec,
->> although strictly speaking this approach would successfully solve the
->> problem of giving devices predictable and controllable names.
+>> patch 3: enable the DMA support in dts for mx28
+>>         You can use the /ttyAPP0 to test this patch set.
+>>         I tested this patch in mx28-evk board.
 >>
->> Another way an /aliases entry could be used to set the device name is to
->> have a <name>.<ID> naming scheme, where the name comes from node->name
->> (as is done in of_device_make_bus_id) and the ID gets queried using
->> of_alias_get_id(). We would need to create a new alias stem for this
->> purpose, and suppose that something like "platform" would work. The
->> name-setting code would then roughly look as follows:
 >>
->> +	alias_id = of_alias_get_id(node, "platform");
->> +	if (alias_id != -ENODEV) {
->> +		dev_set_name(dev, "%s.%d", node->name, alias_id);
->> +		return;
->> +	}
+>> To Lauri: Please try this patch set. thanks.
 >>
->> The downside to this approach is that it imposes the restriction that
->> device ID numbers now have to be unique throughout the system, whereas
->> before only the <name>.<ID> combinations had to be unique. This is the
->> result of only the ID number being present in the alias table, with each
->> such ID number having the "platform" stem, and the restriction that node
->> properties shall have unique names.
->
-> Again, this all looks like trying to manipulate names to keep the kernel
-> happy. Since the kernel has the restrictions on naming, that is where
-> the fixups should be made. Either by devres or by changing the expected
-> name in the clk/regulator tables.
->
->> A third possible solution is to use an alias stem prefix for defining
->> the device name. That is, the alias to set the device name would have
->> some prefix (such as "platform-" for example) and the aliases would look
->> something like platform-<name><ID>. The code to assign device names
->> would find the matching alias containing the "platform-" prefix, strip
->> the prefix, and use the resulting name and ID to construct the device
->> name. This approach would make it more obvious as to which of several
->> aliases is used to set the device name, but it imposes additional
->> structure on the stem names and causes any aliases starting with
->> "platform-" to become magical, which bothers me slightly.
->
-> And specific to the current Linux implementation details.
->
->> Do any of these describe what you intended when you suggested using the
->> /aliases node to set device names, or is there another approach that I
->> have missed? Can you please elaborate further?
->
-> Really, all I was thinking about was allowing the device that has an
-> alias "eth0" to be given a name with 'eth0' in it somewhere. Since names
-> like that are a global namespace, /aliases is the place to get them
-> because there is no chance of colision with that approach.
->
-> g.
->
-
-[I seem to have forgotten to add the CCed recipients in my last reply. 
-Adding them now.]
-
-Hi Grant,
-I realize that auxdata is the correct thing to use for keeping the 
-kernel happy (for things like clocks and regulator consumers) but this 
-is not the problem I am trying to solve. My goal is to try to keep 
-userspace happy by trying to create common and predictable names for 
-functionally equivalent devices across different hardware platforms.
-For instance, two similar SoCs may have an SDCC controller which may be 
-logically referred to as "the first SDCC device", though the physical 
-address of this device may be different on the two SoCs. And, due to the 
-<reg>.<name> naming convention, the sysfs entries associated with a 
-particular device will be a dependent on the physical address of the device.
-
-If userspace wants to touch the sysfs entries of what can logically be 
-described as "the first SDCC device", then userspace needs to know the 
-physical address of this device on each SoC variant it may be running 
-on, since the path to the sysfs entries for this device will be based on 
-the physical address of the device. By using a device naming scheme that 
-replaces the physical address with a logical device number, the 
-userspace-facing interface for each device (such as sysfs entries) could 
-be kept common across SoC variants even when device physical addresses 
-can move around but devices still have the same logical assignments.
-
-I realize that this problem can be solved by using auxdata to set the 
-device name, but in this case the only purpose of the auxdata would be 
-to keep userspace happy, since all the other in-kernel relationships 
-(for things like clocks and regulators) can already work without having 
-to rely on auxdata. So, introducing auxdata just for consistency of 
-userspace-facing names seems silly and, I am trying to come up with a 
-more appropriate solution.
-
-What do you think?
-
-Steve
-
--- 
-  The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-  hosted by The Linux Foundation
+>>
+>> v2 --> v3:
+>>         [1] fix a multi-open issue found by Lauri.
+>>
+>> v1 --> v2:
+>>         [1] use the inline function, not a macro, to distinguish the SOCs.
+>>         [2] remove the "inline" for mxs_auart_tx_chars().
+>>         [3] use the `pio`, not the `pio[1]` to fill the DMA descriptor.
+>>         [4] use bit operation to serialize the DMA TX.
+>>         [5] use the RX/TX DMA channel to enable the DMA support, remove
+>> the
+>>             "fsl,auart-enable-dma".
+>>
+>> Huang Shijie (3):
+>>    serial: mxs-auart: distinguish the different SOCs
+>>    serial: mxs-auart: add the DMA support for mx28
+>>    ARM: dts: enable dma support for auart0 in mx28
+>>
+>>   .../bindings/tty/serial/fsl-mxs-auart.txt          |    8 +
+>>   arch/arm/boot/dts/imx28.dtsi                       |    1 +
+>>   drivers/tty/serial/mxs-auart.c                     |  364
+>> +++++++++++++++++++-
+>>   3 files changed, 362 insertions(+), 11 deletions(-)
+>>
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
