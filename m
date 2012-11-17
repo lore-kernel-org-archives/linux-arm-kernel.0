@@ -1,332 +1,110 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 17 Nov 2012 17:57:19 +0400
-Subject: [PATCH v3 13/18] ARM: clps711x: p720t: Special driver for handling
- NAND memory is removed
+Date: Sat, 17 Nov 2012 17:57:23 +0400
+Subject: [PATCH v3 17/18] ARM: clps711x: Update defconfig due latest changes
+ and new kernel symbols
 In-Reply-To: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
 References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1353160644-22446-14-git-send-email-shc_work@mail.ru>
+Message-ID: <1353160644-22446-18-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provide migration to using "gpio-nand" driver instead of using
-special driver for handling NAND memory.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/include/mach/hardware.h |    3 +
- arch/arm/mach-clps711x/p720t.c                 |   50 +++++++-
- drivers/mtd/nand/Kconfig                       |    6 -
- drivers/mtd/nand/Makefile                      |    1 -
- drivers/mtd/nand/spia.c                        |  176 ------------------------
- 5 files changed, 51 insertions(+), 185 deletions(-)
- delete mode 100644 drivers/mtd/nand/spia.c
+ arch/arm/configs/clps711x_defconfig |   30 +++++++++++++++++++++---------
+ 1 files changed, 21 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
-index 4e273f2..6acf714 100644
---- a/arch/arm/mach-clps711x/include/mach/hardware.h
-+++ b/arch/arm/mach-clps711x/include/mach/hardware.h
-@@ -67,6 +67,9 @@
- #define CLPS711X_SRAM_BASE	CS6_PHYS_BASE
- #define CLPS711X_SRAM_SIZE	(48 * 1024)
- 
-+#define CLPS711X_SDRAM0_BASE	(0xc0000000)
-+#define CLPS711X_SDRAM1_BASE	(0xd0000000)
-+
- #if defined (CONFIG_ARCH_EDB7211)
- 
- /* The extra 8 lines of the keyboard matrix are wired to chip select 3 */
-diff --git a/arch/arm/mach-clps711x/p720t.c b/arch/arm/mach-clps711x/p720t.c
-index 34c8ee9..e25f10e 100644
---- a/arch/arm/mach-clps711x/p720t.c
-+++ b/arch/arm/mach-clps711x/p720t.c
-@@ -26,6 +26,8 @@
- #include <linux/slab.h>
- #include <linux/leds.h>
- #include <linux/platform_device.h>
-+#include <linux/mtd/partitions.h>
-+#include <linux/mtd/nand-gpio.h>
- 
- #include <mach/hardware.h>
- #include <asm/pgtable.h>
-@@ -41,7 +43,50 @@
- 
- #include "common.h"
- 
--#define GPIO_USERLED	CLPS711X_GPIO(3, 0)
-+#define P720T_USERLED		CLPS711X_GPIO(3, 0)
-+#define P720T_NAND_CLE		CLPS711X_GPIO(4, 0)
-+#define P720T_NAND_ALE		CLPS711X_GPIO(4, 1)
-+#define P720T_NAND_NCE		CLPS711X_GPIO(4, 2)
-+
-+#define P720T_NAND_BASE		(CLPS711X_SDRAM1_BASE)
-+
-+static struct resource p720t_nand_resource[] __initdata = {
-+	DEFINE_RES_MEM(P720T_NAND_BASE, SZ_4),
-+};
-+
-+static struct mtd_partition p720t_nand_parts[] __initdata = {
-+	{
-+		.name	= "Flash partition 1",
-+		.offset	= 0,
-+		.size	= SZ_2M,
-+	},
-+	{
-+		.name	= "Flash partition 2",
-+		.offset	= MTDPART_OFS_APPEND,
-+		.size	= MTDPART_SIZ_FULL,
-+	},
-+};
-+
-+static struct gpio_nand_platdata p720t_nand_pdata __initdata = {
-+	.gpio_rdy	= -1,
-+	.gpio_nce	= P720T_NAND_NCE,
-+	.gpio_ale	= P720T_NAND_ALE,
-+	.gpio_cle	= P720T_NAND_CLE,
-+	.gpio_nwp	= -1,
-+	.chip_delay	= 15,
-+	.parts		= p720t_nand_parts,
-+	.num_parts	= ARRAY_SIZE(p720t_nand_parts),
-+};
-+
-+static struct platform_device p720t_nand_pdev __initdata = {
-+	.name		= "gpio-nand",
-+	.id		= -1,
-+	.resource	= p720t_nand_resource,
-+	.num_resources	= ARRAY_SIZE(p720t_nand_resource),
-+	.dev		= {
-+		.platform_data = &p720t_nand_pdata,
-+	},
-+};
- 
- static void p720t_lcd_power_set(struct plat_lcd_data *pd, unsigned int power)
- {
-@@ -127,7 +172,7 @@ static struct gpio_led p720t_gpio_leds[] = {
- 	{
- 		.name			= "User LED",
- 		.default_trigger	= "heartbeat",
--		.gpio			= GPIO_USERLED,
-+		.gpio			= P720T_USERLED,
- 	},
- };
- 
-@@ -138,6 +183,7 @@ static struct gpio_led_platform_data p720t_gpio_led_pdata __initdata = {
- 
- static void __init p720t_init(void)
- {
-+	platform_device_register(&p720t_nand_pdev);
- 	platform_device_register_data(&platform_bus, "platform-lcd", 0,
- 				      &p720t_lcd_power_pdata,
- 				      sizeof(p720t_lcd_power_pdata));
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 582c283..721513e 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -93,12 +93,6 @@ config MTD_NAND_GPIO
- 	help
- 	  This enables a GPIO based NAND flash driver.
- 
--config MTD_NAND_SPIA
--	tristate "NAND Flash device on SPIA board"
--	depends on ARCH_P720T
--	help
--	  If you had to ask, you don't have one. Say 'N'.
--
- config MTD_NAND_AMS_DELTA
- 	tristate "NAND Flash device on Amstrad E3"
- 	depends on MACH_AMS_DELTA
-diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
-index d2bd10b..eb827a2 100644
---- a/drivers/mtd/nand/Makefile
-+++ b/drivers/mtd/nand/Makefile
-@@ -9,7 +9,6 @@ obj-$(CONFIG_MTD_NAND_IDS)		+= nand_ids.o
- obj-$(CONFIG_MTD_SM_COMMON) 		+= sm_common.o
- 
- obj-$(CONFIG_MTD_NAND_CAFE)		+= cafe_nand.o
--obj-$(CONFIG_MTD_NAND_SPIA)		+= spia.o
- obj-$(CONFIG_MTD_NAND_AMS_DELTA)	+= ams-delta.o
- obj-$(CONFIG_MTD_NAND_DENALI)		+= denali.o
- obj-$(CONFIG_MTD_NAND_DENALI_PCI)	+= denali_pci.o
-diff --git a/drivers/mtd/nand/spia.c b/drivers/mtd/nand/spia.c
-deleted file mode 100644
-index bef76cd..0000000
---- a/drivers/mtd/nand/spia.c
-+++ /dev/null
-@@ -1,176 +0,0 @@
--/*
-- *  drivers/mtd/nand/spia.c
-- *
-- *  Copyright (C) 2000 Steven J. Hill (sjhill at realitydiluted.com)
-- *
-- *
-- *	10-29-2001 TG	change to support hardwarespecific access
-- *			to controllines	(due to change in nand.c)
-- *			page_cache added
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- *  Overview:
-- *   This is a device driver for the NAND flash device found on the
-- *   SPIA board which utilizes the Toshiba TC58V64AFT part. This is
-- *   a 64Mibit (8MiB x 8 bits) NAND flash device.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/slab.h>
--#include <linux/module.h>
--#include <linux/mtd/mtd.h>
--#include <linux/mtd/nand.h>
--#include <linux/mtd/partitions.h>
--#include <asm/io.h>
--
--/*
-- * MTD structure for SPIA board
-- */
--static struct mtd_info *spia_mtd = NULL;
--
--/*
-- * Values specific to the SPIA board (used with EP7212 processor)
-- */
--#define SPIA_IO_BASE	0xd0000000	/* Start of EP7212 IO address space */
--#define SPIA_FIO_BASE	0xf0000000	/* Address where flash is mapped */
--#define SPIA_PEDR	0x0080	/*
--				 * IO offset to Port E data register
--				 * where the CLE, ALE and NCE pins
--				 * are wired to.
--				 */
--#define SPIA_PEDDR	0x00c0	/*
--				 * IO offset to Port E data direction
--				 * register so we can control the IO
--				 * lines.
--				 */
--
--/*
-- * Module stuff
-- */
--
--static int spia_io_base = SPIA_IO_BASE;
--static int spia_fio_base = SPIA_FIO_BASE;
--static int spia_pedr = SPIA_PEDR;
--static int spia_peddr = SPIA_PEDDR;
--
--module_param(spia_io_base, int, 0);
--module_param(spia_fio_base, int, 0);
--module_param(spia_pedr, int, 0);
--module_param(spia_peddr, int, 0);
--
--/*
-- * Define partitions for flash device
-- */
--static const struct mtd_partition partition_info[] = {
--	{
--	 .name = "SPIA flash partition 1",
--	 .offset = 0,
--	 .size = 2 * 1024 * 1024},
--	{
--	 .name = "SPIA flash partition 2",
--	 .offset = 2 * 1024 * 1024,
--	 .size = 6 * 1024 * 1024}
--};
--
--#define NUM_PARTITIONS 2
--
--/*
-- *	hardware specific access to control-lines
-- *
-- *	ctrl:
-- *	NAND_CNE: bit 0 -> bit 2
-- *	NAND_CLE: bit 1 -> bit 0
-- *	NAND_ALE: bit 2 -> bit 1
-- */
--static void spia_hwcontrol(struct mtd_info *mtd, int cmd)
--{
--	struct nand_chip *chip = mtd->priv;
--
--	if (ctrl & NAND_CTRL_CHANGE) {
--		void __iomem *addr = spia_io_base + spia_pedr;
--		unsigned char bits;
--
--		bits = (ctrl & NAND_CNE) << 2;
--		bits |= (ctrl & NAND_CLE | NAND_ALE) >> 1;
--		writeb((readb(addr) & ~0x7) | bits, addr);
--	}
--
--	if (cmd != NAND_CMD_NONE)
--		writeb(cmd, chip->IO_ADDR_W);
--}
--
--/*
-- * Main initialization routine
-- */
--static int __init spia_init(void)
--{
--	struct nand_chip *this;
--
--	/* Allocate memory for MTD device structure and private data */
--	spia_mtd = kmalloc(sizeof(struct mtd_info) + sizeof(struct nand_chip), GFP_KERNEL);
--	if (!spia_mtd) {
--		printk("Unable to allocate SPIA NAND MTD device structure.\n");
--		return -ENOMEM;
--	}
--
--	/* Get pointer to private data */
--	this = (struct nand_chip *)(&spia_mtd[1]);
--
--	/* Initialize structures */
--	memset(spia_mtd, 0, sizeof(struct mtd_info));
--	memset(this, 0, sizeof(struct nand_chip));
--
--	/* Link the private data with the MTD structure */
--	spia_mtd->priv = this;
--	spia_mtd->owner = THIS_MODULE;
--
--	/*
--	 * Set GPIO Port E control register so that the pins are configured
--	 * to be outputs for controlling the NAND flash.
--	 */
--	(*(volatile unsigned char *)(spia_io_base + spia_peddr)) = 0x07;
--
--	/* Set address of NAND IO lines */
--	this->IO_ADDR_R = (void __iomem *)spia_fio_base;
--	this->IO_ADDR_W = (void __iomem *)spia_fio_base;
--	/* Set address of hardware control function */
--	this->cmd_ctrl = spia_hwcontrol;
--	/* 15 us command delay time */
--	this->chip_delay = 15;
--
--	/* Scan to find existence of the device */
--	if (nand_scan(spia_mtd, 1)) {
--		kfree(spia_mtd);
--		return -ENXIO;
--	}
--
--	/* Register the partitions */
--	mtd_device_register(spia_mtd, partition_info, NUM_PARTITIONS);
--
--	/* Return happy */
--	return 0;
--}
--
--module_init(spia_init);
--
--/*
-- * Clean up routine
-- */
--static void __exit spia_cleanup(void)
--{
--	/* Release resources, unregister device */
--	nand_release(spia_mtd);
--
--	/* Free the MTD device structure */
--	kfree(spia_mtd);
--}
--
--module_exit(spia_cleanup);
--
--MODULE_LICENSE("GPL");
--MODULE_AUTHOR("Steven J. Hill <sjhill@realitydiluted.com");
--MODULE_DESCRIPTION("Board-specific glue layer for NAND flash on SPIA board");
+diff --git a/arch/arm/configs/clps711x_defconfig b/arch/arm/configs/clps711x_defconfig
+index 86209d1..1cd94c3 100644
+--- a/arch/arm/configs/clps711x_defconfig
++++ b/arch/arm/configs/clps711x_defconfig
+@@ -1,10 +1,14 @@
+-CONFIG_EXPERIMENTAL=y
++CONFIG_KERNEL_LZMA=y
+ CONFIG_SYSVIPC=y
+ CONFIG_LOG_BUF_SHIFT=14
+ CONFIG_BLK_DEV_INITRD=y
++CONFIG_RD_LZMA=y
+ CONFIG_EMBEDDED=y
++CONFIG_SLOB=y
++CONFIG_JUMP_LABEL=y
++# CONFIG_LBDAF is not set
+ CONFIG_PARTITION_ADVANCED=y
+-# CONFIG_MSDOS_PARTITION is not set
++# CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_CLPS711X=y
+ CONFIG_ARCH_AUTCPU12=y
+ CONFIG_ARCH_CDB89712=y
+@@ -12,8 +16,10 @@ CONFIG_ARCH_CLEP7312=y
+ CONFIG_ARCH_EDB7211=y
+ CONFIG_ARCH_P720T=y
+ CONFIG_ARCH_FORTUNET=y
++CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
++# CONFIG_COREDUMP is not set
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+@@ -22,6 +28,7 @@ CONFIG_INET=y
+ CONFIG_IRDA=y
+ CONFIG_IRTTY_SIR=y
+ CONFIG_EP7211_DONGLE=y
++# CONFIG_WIRELESS is not set
+ CONFIG_MTD=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_CHAR=y
+@@ -31,24 +38,21 @@ CONFIG_MTD_JEDECPROBE=y
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_CFI_AMDSTD=y
+ CONFIG_MTD_CFI_STAA=y
+-CONFIG_MTD_CDB89712=y
+ CONFIG_MTD_AUTCPU12=y
+ CONFIG_MTD_PLATRAM=y
+-CONFIG_BLK_DEV_RAM=y
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_GPIO=y
+ CONFIG_NETDEVICES=y
+-# CONFIG_NET_VENDOR_3COM is not set
+-# CONFIG_NET_VENDOR_AMD is not set
++# CONFIG_NET_CADENCE is not set
+ # CONFIG_NET_VENDOR_BROADCOM is not set
+ # CONFIG_NET_VENDOR_CHELSIO is not set
+ CONFIG_CS89x0=y
++CONFIG_CS89x0_PLATFORM=y
+ # CONFIG_NET_VENDOR_FARADAY is not set
+-# CONFIG_NET_VENDOR_FUJITSU is not set
+-# CONFIG_NET_VENDOR_HP is not set
+ # CONFIG_NET_VENDOR_INTEL is not set
+ # CONFIG_NET_VENDOR_MARVELL is not set
+ # CONFIG_NET_VENDOR_MICREL is not set
+ # CONFIG_NET_VENDOR_NATSEMI is not set
+-# CONFIG_NET_VENDOR_RACAL is not set
+ # CONFIG_NET_VENDOR_SEEQ is not set
+ # CONFIG_NET_VENDOR_SMSC is not set
+ # CONFIG_NET_VENDOR_STMICRO is not set
+@@ -59,14 +63,22 @@ CONFIG_CS89x0=y
+ # CONFIG_VT is not set
+ CONFIG_SERIAL_CLPS711X_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
++CONFIG_SPI=y
++CONFIG_GPIO_GENERIC_PLATFORM=y
+ # CONFIG_HWMON is not set
+ CONFIG_FB=y
+ CONFIG_FB_CLPS711X=y
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
++CONFIG_LCD_PLATFORM=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_EXT2_FS=y
++CONFIG_CRAMFS=y
+ CONFIG_MINIX_FS=y
+ # CONFIG_NETWORK_FILESYSTEMS is not set
+ # CONFIG_FTRACE is not set
 -- 
 1.7.8.6
