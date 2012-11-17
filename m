@@ -1,32 +1,48 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sat, 17 Nov 2012 17:07:39 +1300
-Subject: pwm_backlight/general pwm issue.
-Message-ID: <1353125259.18544.7.camel@gitbox>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 16 Nov 2012 21:10:06 -0700
+Subject: [PATCH V3] Add support for generic BCM SoC chipsets
+In-Reply-To: <1352843517-31328-1-git-send-email-csd@broadcom.com>
+References: <1352843517-31328-1-git-send-email-csd@broadcom.com>
+Message-ID: <50A70E1E.9070907@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On 11/13/2012 02:51 PM, Christian Daudt wrote:
+> In order to start upstreaming Broadcom SoC support, create
+> a starting hierarchy, arch and dts files.
+> The first support SoC family that is planned is the
+> BCM281XX (BCM11130/11140/11351/28145/28155) family of dual A9 mobile
+> SoC cores.
+> This code is just the skeleton code for get the machine upstreamed. It
+> has been made MULTIPLATFORM compatible.
 
-Looking a little feedback regarding a problem introduced with the pwm
-patch I sent converting the vt8500 pwm driver to devicetree.
+Sorry for the slow review...
 
-One of the recommendations you made was to enable/disable the pwm clock
-in pwm_enable/pwm_disable, rather than at driver probe, to reduce power
-usage. Unfortunately, when the last pwm is disabled, the clock is
-disabled which prevents the pwm module from responding to register
-read/writes. This would be fine if pwm_enable was called before any
-other functions.
+> diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm281xx.txt b/Documentation/devicetree/bindings/arm/bcm/bcm281xx.txt
 
-The pwm_backlight driver calls pwm_config before pwm_enable, which
-doesn't work because the pwm module has been disabled. I can appreciate
-that no one wants to enable a pwm before it's configured so I don't
-think this is particularly a driver issue.
+> +Required root node property:
+> +
+> +compatible = "bcm,bcm281xx";
 
+Hmm. I still tend to think we should list the specific SoC rather than
+the family here, but I guess if you're sure there won't be any SW
+compatibility between the different SoCs in the series, this is fine.
 
-My recommendation is the re-enable the previous behaviour which was to
-enable the clock during driver probe, and disable during driver unload.
+> diff --git a/arch/arm/boot/dts/bcm281xx.dtsi b/arch/arm/boot/dts/bcm281xx.dtsi
 
-Looking for your thoughts (or anyone else that wants to chime in).
+> +	uart at 3e000000 {
+> +		compatible = "snps,dw-apb-uart", "bcm,bcm281xx-sw-apb-uart";
 
-Regards
-Tony Prisk
+The most specific value should be first, so swap those two entries.
+
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+
+> +	help
+> +	  This enables support for system based on Broadcom SoCs.
+> +	  It currently supports the 'BCM281XX' family, which includes
+> +	  BCM11130, BCM1140, BCM11351, BCM28145 and
+
+Should that be 11140 rather than 1140?
+
+Aside from that,
+Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
