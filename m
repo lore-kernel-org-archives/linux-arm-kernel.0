@@ -1,205 +1,29 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Sat, 17 Nov 2012 03:38:50 -0800
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
-References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
- <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
-Message-ID: <20121117113849.GA5228@lizard>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Sat, 17 Nov 2012 13:10:21 +0100
+Subject: [PATCH v5 0/6] Move rest of omap-iommu to live in drivers/iommu
+In-Reply-To: <20121112220033.GO6801@atomide.com>
+References: <20121102192221.4253.34303.stgit@muffinssi.local>
+ <CAK=WgbYR8UMyDjySJLRC0tEbJO3FaFgjWxceNwMyVdMgEgwPig@mail.gmail.com>
+ <CALLhW=5WNg8X0nX8U+AExocyNKW=wJ7oS36xg4ENMnfyJkX8RQ@mail.gmail.com>
+ <20121112220033.GO6801@atomide.com>
+Message-ID: <20121117121021.GS25742@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 17, 2012 at 07:55:45PM +0900, Alexandre Courbot wrote:
-> Some device drivers (e.g. panel or backlights) need to follow precise
-> sequences for powering on and off, involving GPIOs, regulators, PWMs
-> and other power-related resources, with a defined powering order and
-> delays to respect between steps. These sequences are device-specific,
-> and do not belong to a particular driver - therefore they have been
-> performed by board-specific hook functions so far.
+On Mon, Nov 12, 2012 at 02:00:34PM -0800, Tony Lindgren wrote:
+> Assuming Joerg is OK with these changes, I can push them into
+> an immutable branch that Joerg can merge in as needed.
 > 
-> With the advent of the device tree and of ARM kernels that are not
-> board-tied, we cannot rely on these board-specific hooks anymore but
-> need a way to implement these sequences in a portable manner. This patch
-> introduces a simple interpreter that can execute such power sequences
-> encoded either as platform data or within the device tree. It also
-> introduces first support for regulator, GPIO and PWM resources.
-> 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
-> Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Tested-by: Thierry Reding <thierry.reding@avionic-design.de>
-> Tested-by: Stephen Warren <swarren@nvidia.com>
-> Acked-by: Thierry Reding <thierry.reding@avionic-design.de>
-> ---
+> Further patches on top of this series can then be queued by
+> Joerg as arch/arm/*omap* and me are then out of the way of
+> iommu development.
 
-This looks almost perfect!
+Okay, from my side:
 
-Just a few final notes, again mostly about the build system bits.
+Acked-by: Joerg Roedel <joro@8bytes.org>
 
-[...]
-> diff --git a/drivers/power/power_seq/Kconfig b/drivers/power/power_seq/Kconfig
-> new file mode 100644
-> index 0000000..0ece819
-> --- /dev/null
-> +++ b/drivers/power/power_seq/Kconfig
-> @@ -0,0 +1,2 @@
-> +config POWER_SEQ
-> +	tristate
+Please let me know which branch I need to pull into my tree when you
+merged these patches.
 
-This really needs a proper Kconfig description and a help text, shortly
-describing the purpose of the subsystem.
 
-> diff --git a/drivers/power/power_seq/Makefile b/drivers/power/power_seq/Makefile
-> new file mode 100644
-> index 0000000..964b91e
-> --- /dev/null
-> +++ b/drivers/power/power_seq/Makefile
-> @@ -0,0 +1,2 @@
-> +obj-$(CONFIG_POWER_SEQ)		+= power_seq.o
-> +power_seq-y			:= core.o delay.o regulator.o gpio.o pwm.o
-> diff --git a/drivers/power/power_seq/core.c b/drivers/power/power_seq/core.c
-> new file mode 100644
-> index 0000000..d51b9b8
-> --- /dev/null
-> +++ b/drivers/power/power_seq/core.c
-> @@ -0,0 +1,362 @@
-> +/*
-> + * core.c - power sequence interpreter for platform devices and device tree
-
-We usually don't write file names in the comments.
-
-> + *
-> + * Author: Alexandre Courbot <acourbot@nvidia.com>
-> + *
-[...]
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(power_seq_run);
-> +
-> +/* defined in power_seq_*.c files */
-
-Why not place the decls into the _priv.h file?.. I understand that this
-might be a temporary stuff until we have something better for ops
-registration, but still, I believe it belongs to the header file.
-
-> +extern const struct power_seq_res_ops power_seq_delay_ops;
-> +extern const struct power_seq_res_ops power_seq_gpio_ops;
-> +extern const struct power_seq_res_ops power_seq_regulator_ops;
-> +extern const struct power_seq_res_ops power_seq_pwm_ops;
-> +
-> +static const struct power_seq_res_ops *power_seq_ops[POWER_SEQ_NUM_TYPES] = {
-> +	[POWER_SEQ_DELAY] = &power_seq_delay_ops,
-> +	[POWER_SEQ_REGULATOR] = &power_seq_regulator_ops,
-> +	[POWER_SEQ_PWM] = &power_seq_gpio_ops,
-> +	[POWER_SEQ_GPIO] = &power_seq_pwm_ops,
-> +};
-> +
-> +MODULE_AUTHOR("Alexandre Courbot <acourbot@nvidia.com>");
-> +MODULE_DESCRIPTION("Runtime Interpreted Power Sequences");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/drivers/power/power_seq/delay.c b/drivers/power/power_seq/delay.c
-> new file mode 100644
-> index 0000000..de6810b
-> --- /dev/null
-> +++ b/drivers/power/power_seq/delay.c
-> @@ -0,0 +1,66 @@
-> +/*
-> + * Copyright (c) 2012 NVIDIA Corporation.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2 of the License.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + */
-> +
-> +#include "power_seq_priv.h"
-> +#include <linux/delay.h>
-
-Things should not depend on _priv.h's includes. I.e. I see this file uses
-of_ routines, so it should include <linux/of.h>. <linux/delay.h> for
-udelay_range(), etc.
-
-Also, usually we place "private" headers at the very end, not at the
-beginning.
-
-> +
-> +#ifdef CONFIG_OF
-> +static int of_power_seq_parse_delay(struct device_node *node,
-> +				    struct power_seq *seq,
-> +				    unsigned int step_nbr,
-> +				    struct power_seq_resource *res)
-> +{
-> +	struct power_seq_step *step = &seq->steps[step_nbr];
-> +	int err;
-> +
-> +	err = of_property_read_u32(node, "delay",
-> +				   &step->delay.delay);
-> +	if (err < 0)
-> +		power_seq_err(seq, step_nbr, "error reading delay property\n");
-> +
-> +	return err;
-> +}
-> +#else
-> +#define of_power_seq_parse_delay NULL
-> +#endif
-
-[...]
-> +#define power_seq_err(seq, step_nbr, format, ...)			\
-> +	dev_err(seq->set->dev, "%s[%d]: " format, seq->id, step_nbr,	\
-> +	##__VA_ARGS__);
-> +
-> +#ifdef CONFIG_OF
-> +int of_power_seq_parse_enable_properties(struct device_node *node,
-> +					 struct power_seq *seq,
-> +					 unsigned int step_nbr, bool *enable);
-
-Um, I believe you don't need CONFIG_OF here. (If it's about 'struct
-device_node', then as I see it in of.h, the header always declares it,
-even for the !OF case.)
-
-> +#endif
-> +
-> +/**
-[...]
-> +++ b/drivers/power/power_seq/regulator.c
-> @@ -0,0 +1,87 @@
-> +/*
-> + * Copyright (c) 2012 NVIDIA Corporation.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2 of the License.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + */
-> +
-> +#include "power_seq_priv.h"
-> +
-> +#ifdef CONFIG_REGULATOR
-
-Would be really great if you could get rid of the #ifdefs in the .c files.
-
-To do so, in the makefile you could write something like this:
-
-power_seq-$(CONFIG_REGULATOR) += regulator.o
-
-And in the header file (as explained above), you'd have
-
-#ifdef CONFIG_REGULATOR
-#define ...REGULATOR_OPS &power_seq_regulator_ops
-#else
-#define ...REGULATOR_OPS NULL
-#endif
-
-Or something along these lines...
-
-Thanks,
-Anton.
+	Joerg
