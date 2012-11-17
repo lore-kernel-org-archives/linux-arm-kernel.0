@@ -1,106 +1,79 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Fri, 16 Nov 2012 15:18:22 -0800
-Subject: [PATCH 1/7] clk: sunxi: Add dummy fixed rate clock for Allwinner
- A1X SoCs
-In-Reply-To: <1353100828-9218-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1353100828-9218-1-git-send-email-maxime.ripard@free-electrons.com>
- <1353100828-9218-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20121116231822.21126.36803@nucleus>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 17 Nov 2012 01:09:16 +0100
+Subject: [PATCH] serial: atmel_serial: remove atmel open/close hooks
+Message-ID: <1353110956-17541-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2012-11-16 13:20:22)
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Mike Turquette <mturquette@ti.com>
+After serial_at91.h was removed the atmel_open/close_hook
+code is now useless.
 
-Acked-by: Mike Turquette <mturquette@linaro.or>
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+Hi,
 
-Regards,
-Mike
+This patch depends on [RFC 3/3] ARM/AVR32: get rid of serial_at91.h
+patch from Russell King.
 
-> ---
->  drivers/clk/Makefile      |    1 +
->  drivers/clk/clk-sunxi.c   |   30 ++++++++++++++++++++++++++++++
->  include/linux/clk/sunxi.h |   22 ++++++++++++++++++++++
->  3 files changed, 53 insertions(+)
->  create mode 100644 drivers/clk/clk-sunxi.c
->  create mode 100644 include/linux/clk/sunxi.h
-> 
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index 71a25b9..9c300a8 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -19,6 +19,7 @@ endif
->  obj-$(CONFIG_MACH_LOONGSON1)   += clk-ls1x.o
->  obj-$(CONFIG_ARCH_U8500)       += ux500/
->  obj-$(CONFIG_ARCH_VT8500)      += clk-vt8500.o
-> +obj-$(CONFIG_ARCH_SUNXI)       += clk-sunxi.o
->  
->  # Chip specific
->  obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
-> diff --git a/drivers/clk/clk-sunxi.c b/drivers/clk/clk-sunxi.c
-> new file mode 100644
-> index 0000000..0e831b5
-> --- /dev/null
-> +++ b/drivers/clk/clk-sunxi.c
-> @@ -0,0 +1,30 @@
-> +/*
-> + * Copyright 2012 Maxime Ripard
-> + *
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/clkdev.h>
-> +#include <linux/clk/sunxi.h>
-> +#include <linux/of.h>
-> +
-> +static const __initconst struct of_device_id clk_match[] = {
-> +       { .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
-> +       {}
-> +};
-> +
-> +void __init sunxi_init_clocks(void)
-> +{
-> +       of_clk_init(clk_match);
-> +}
-> diff --git a/include/linux/clk/sunxi.h b/include/linux/clk/sunxi.h
-> new file mode 100644
-> index 0000000..e074fdd
-> --- /dev/null
-> +++ b/include/linux/clk/sunxi.h
-> @@ -0,0 +1,22 @@
-> +/*
-> + * Copyright 2012 Maxime Ripard
-> + *
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef __LINUX_CLK_SUNXI_H_
-> +#define __LINUX_CLK_SUNXI_H_
-> +
-> +void __init sunxi_init_clocks(void);
-> +
-> +#endif
-> -- 
-> 1.7.9.5
+Patch based on current linux-next with "[RFC 3/3] ARM/AVR32: get rid of serial_at91.h"
+patch on top. There is a small conflict with Russell's patch
+in next now due to another header change.
+
+If there is another tree this patch should be based on please
+let me know.
+
+regards
+Joachim Eastwood
+
+ drivers/tty/serial/atmel_serial.c | 22 ----------------------
+ 1 file changed, 22 deletions(-)
+
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 76e4c05..5c2337d 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -113,9 +113,6 @@ static void atmel_stop_rx(struct uart_port *port);
+ #define UART_PUT_TCR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_TCR)
+ #define UART_GET_TCR(port)	__raw_readl((port)->membase + ATMEL_PDC_TCR)
+ 
+-static int (*atmel_open_hook)(struct uart_port *);
+-static void (*atmel_close_hook)(struct uart_port *);
+-
+ struct atmel_dma_buffer {
+ 	unsigned char	*buf;
+ 	dma_addr_t	dma_addr;
+@@ -976,18 +973,6 @@ static int atmel_startup(struct uart_port *port)
+ 		pdc->ofs = 0;
+ 	}
+ 
+-	/*
+-	 * If there is a specific "open" function (to register
+-	 * control line interrupts)
+-	 */
+-	if (atmel_open_hook) {
+-		retval = atmel_open_hook(port);
+-		if (retval) {
+-			free_irq(port->irq, port);
+-			return retval;
+-		}
+-	}
+-
+ 	/* Save current CSR for comparison in atmel_tasklet_func() */
+ 	atmel_port->irq_status_prev = UART_GET_CSR(port);
+ 	atmel_port->irq_status = atmel_port->irq_status_prev;
+@@ -1062,13 +1047,6 @@ static void atmel_shutdown(struct uart_port *port)
+ 	 * Free the interrupt
+ 	 */
+ 	free_irq(port->irq, port);
+-
+-	/*
+-	 * If there is a specific "close" function (to unregister
+-	 * control line interrupts)
+-	 */
+-	if (atmel_close_hook)
+-		atmel_close_hook(port);
+ }
+ 
+ /*
+-- 
+1.8.0
