@@ -1,258 +1,229 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 17 Nov 2012 17:57:14 +0400
-Subject: [PATCH v3 08/18] ARM: clps711x: Implement usage "MULTI_IRQ_HANDLER"
- kernel option for a platform
+Date: Sat, 17 Nov 2012 17:57:18 +0400
+Subject: [PATCH v3 12/18] ARM: clps711x: Moving power management of
+ framebuffer driver to the board
 In-Reply-To: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
 References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1353160644-22446-9-git-send-email-shc_work@mail.ru>
+Message-ID: <1353160644-22446-13-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch moves the power management for clps711x-framebuffer driver
+to the board code. To control we use "platform-lcd" driver.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/Kconfig                                  |    1 +
- arch/arm/mach-clps711x/autcpu12.c                 |    1 +
- arch/arm/mach-clps711x/cdb89712.c                 |    1 +
- arch/arm/mach-clps711x/clep7312.c                 |    3 +-
- arch/arm/mach-clps711x/common.c                   |   45 +++++++++++++++++--
- arch/arm/mach-clps711x/common.h                   |    3 +-
- arch/arm/mach-clps711x/edb7211.c                  |    1 +
- arch/arm/mach-clps711x/fortunet.c                 |    1 +
- arch/arm/mach-clps711x/include/mach/entry-macro.S |   51 ---------------------
- arch/arm/mach-clps711x/p720t.c                    |    1 +
- 10 files changed, 50 insertions(+), 58 deletions(-)
- delete mode 100644 arch/arm/mach-clps711x/include/mach/entry-macro.S
+ arch/arm/mach-clps711x/edb7211.c               |   34 ++++++++++++++++++
+ arch/arm/mach-clps711x/include/mach/hardware.h |    2 -
+ arch/arm/mach-clps711x/p720t.c                 |   20 +++++++++++
+ drivers/video/clps711xfb.c                     |   44 +++--------------------
+ 4 files changed, 60 insertions(+), 40 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 896f6bb..f3f1dd3 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -377,6 +377,7 @@ config ARCH_CLPS711X
- 	select COMMON_CLK
- 	select CPU_ARM720T
- 	select GENERIC_CLOCKEVENTS
-+	select MULTI_IRQ_HANDLER
- 	select NEED_MACH_MEMORY_H
- 	select SPARSE_IRQ
- 	help
-diff --git a/arch/arm/mach-clps711x/autcpu12.c b/arch/arm/mach-clps711x/autcpu12.c
-index b90a316..3de1955 100644
---- a/arch/arm/mach-clps711x/autcpu12.c
-+++ b/arch/arm/mach-clps711x/autcpu12.c
-@@ -75,6 +75,7 @@ MACHINE_START(AUTCPU12, "autronix autcpu12")
- 	.init_irq	= clps711x_init_irq,
- 	.timer		= &clps711x_timer,
- 	.init_machine	= autcpu12_init,
-+	.handle_irq	= clps711x_handle_irq,
- 	.restart	= clps711x_restart,
- MACHINE_END
- 
-diff --git a/arch/arm/mach-clps711x/cdb89712.c b/arch/arm/mach-clps711x/cdb89712.c
-index 133794c..60900dd 100644
---- a/arch/arm/mach-clps711x/cdb89712.c
-+++ b/arch/arm/mach-clps711x/cdb89712.c
-@@ -142,5 +142,6 @@ MACHINE_START(CDB89712, "Cirrus-CDB89712")
- 	.init_irq	= clps711x_init_irq,
- 	.timer		= &clps711x_timer,
- 	.init_machine	= cdb89712_init,
-+	.handle_irq	= clps711x_handle_irq,
- 	.restart	= clps711x_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-clps711x/clep7312.c b/arch/arm/mach-clps711x/clep7312.c
-index be776c5..0b32a48 100644
---- a/arch/arm/mach-clps711x/clep7312.c
-+++ b/arch/arm/mach-clps711x/clep7312.c
-@@ -33,7 +33,6 @@ fixup_clep7312(struct tag *tags, char **cmdline, struct meminfo *mi)
- 	mi->bank[0].size = 0x01000000;
- }
- 
--
- MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
- 	/* Maintainer: Nobody */
- 	.atag_offset	= 0x0100,
-@@ -42,6 +41,6 @@ MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
- 	.map_io		= clps711x_map_io,
- 	.init_irq	= clps711x_init_irq,
- 	.timer		= &clps711x_timer,
-+	.handle_irq	= clps711x_handle_irq,
- 	.restart	= clps711x_restart,
- MACHINE_END
--
-diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
-index 286d6e6..0842024 100644
---- a/arch/arm/mach-clps711x/common.c
-+++ b/arch/arm/mach-clps711x/common.c
-@@ -29,6 +29,7 @@
- #include <linux/clockchips.h>
- #include <linux/clk-provider.h>
- 
-+#include <asm/exception.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- #include <asm/system_misc.h>
-@@ -134,13 +135,11 @@ static struct irq_chip int2_chip = {
- 	.irq_unmask	= int2_unmask,
- };
- 
--struct clps711x_irqdesc {
-+static struct {
- 	int			nr;
- 	struct irq_chip		*chip;
- 	irq_flow_handler_t	handle;
--};
--
--static struct clps711x_irqdesc clps711x_irqdescs[] __initdata = {
-+} clps711x_irqdescs[] __initdata = {
- 	{ IRQ_CSINT,	&int1_chip,	handle_fasteoi_irq,	},
- 	{ IRQ_EINT1,	&int1_chip,	handle_level_irq,	},
- 	{ IRQ_EINT2,	&int1_chip,	handle_level_irq,	},
-@@ -191,6 +190,44 @@ void __init clps711x_init_irq(void)
- 	}
- }
- 
-+inline u32 fls16(u32 x)
-+{
-+	u32 r = 15;
-+
-+	if (!(x & 0xff00)) {
-+		x <<= 8;
-+		r -= 8;
-+	}
-+	if (!(x & 0xf000)) {
-+		x <<= 4;
-+		r -= 4;
-+	}
-+	if (!(x & 0xc000)) {
-+		x <<= 2;
-+		r -= 2;
-+	}
-+	if (!(x & 0x8000))
-+		r--;
-+
-+	return r;
-+}
-+
-+asmlinkage void __exception_irq_entry clps711x_handle_irq(struct pt_regs *regs)
-+{
-+	u32 irqstat;
-+	void __iomem *base = CLPS711X_VIRT_BASE;
-+
-+	irqstat = readl_relaxed(base + INTSR1) & readl_relaxed(base + INTMR1);
-+	if (irqstat) {
-+		handle_IRQ(fls16(irqstat), regs);
-+		return;
-+	}
-+
-+	irqstat = readl_relaxed(base + INTSR2) & readl_relaxed(base + INTMR2);
-+	if (likely(irqstat))
-+		handle_IRQ(fls16(irqstat) + 16, regs);
-+}
-+
- static void clps711x_clockevent_set_mode(enum clock_event_mode mode,
- 					 struct clock_event_device *evt)
- {
-diff --git a/arch/arm/mach-clps711x/common.h b/arch/arm/mach-clps711x/common.h
-index 28b1701..3c7f12c 100644
---- a/arch/arm/mach-clps711x/common.h
-+++ b/arch/arm/mach-clps711x/common.h
-@@ -12,5 +12,6 @@ struct sys_timer;
- 
- extern void clps711x_map_io(void);
- extern void clps711x_init_irq(void);
--extern struct sys_timer clps711x_timer;
-+extern void clps711x_handle_irq(struct pt_regs *regs);
- extern void clps711x_restart(char mode, const char *cmd);
-+extern struct sys_timer clps711x_timer;
 diff --git a/arch/arm/mach-clps711x/edb7211.c b/arch/arm/mach-clps711x/edb7211.c
-index 7b161dd..cc32a65 100644
+index cc32a65..81cc683 100644
 --- a/arch/arm/mach-clps711x/edb7211.c
 +++ b/arch/arm/mach-clps711x/edb7211.c
-@@ -98,5 +98,6 @@ MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
- 	.init_irq	= clps711x_init_irq,
- 	.timer		= &clps711x_timer,
- 	.init_machine	= edb7211_init,
-+	.handle_irq	= clps711x_handle_irq,
- 	.restart	= clps711x_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-clps711x/fortunet.c b/arch/arm/mach-clps711x/fortunet.c
-index a5c0816..7d01255 100644
---- a/arch/arm/mach-clps711x/fortunet.c
-+++ b/arch/arm/mach-clps711x/fortunet.c
-@@ -79,5 +79,6 @@ MACHINE_START(FORTUNET, "ARM-FortuNet")
- 	.map_io		= clps711x_map_io,
- 	.init_irq	= clps711x_init_irq,
- 	.timer		= &clps711x_timer,
-+	.handle_irq	= clps711x_handle_irq,
- 	.restart	= clps711x_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-clps711x/include/mach/entry-macro.S b/arch/arm/mach-clps711x/include/mach/entry-macro.S
-deleted file mode 100644
-index 56e5c2c..0000000
---- a/arch/arm/mach-clps711x/include/mach/entry-macro.S
-+++ /dev/null
-@@ -1,51 +0,0 @@
--/*
-- * arch/arm/mach-clps711x/include/mach/entry-macro.S
-- *
-- * Low-level IRQ helper macros for CLPS711X-based platforms
-- *
-- * This file is licensed under  the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--#include <mach/hardware.h>
--
--		.macro	get_irqnr_preamble, base, tmp
--		.endm
--
--#if (INTSR2 - INTSR1) != (INTMR2 - INTMR1)
--#error INTSR stride != INTMR stride
--#endif
--
--		.macro	get_irqnr_and_base, irqnr, stat, base, mask
--		mov	\base, #CLPS711X_VIRT_BASE
--		ldr	\stat, [\base, #INTSR1]
--		ldr	\mask, [\base, #INTMR1]
--		mov	\irqnr, #4
--		mov	\mask, \mask, lsl #16
--		and	\stat, \stat, \mask, lsr #16
--		movs	\stat, \stat, lsr #4
--		bne	1001f
--
--		add	\base, \base, #INTSR2 - INTSR1
--		ldr	\stat, [\base, #INTSR1]
--		ldr	\mask, [\base, #INTMR1]
--		mov	\irqnr, #16
--		mov	\mask, \mask, lsl #16
--		and	\stat, \stat, \mask, lsr #16
--
--1001:		tst	\stat, #255
--		addeq	\irqnr, \irqnr, #8
--		moveq	\stat, \stat, lsr #8
--		tst	\stat, #15
--		addeq	\irqnr, \irqnr, #4
--		moveq	\stat, \stat, lsr #4
--		tst	\stat, #3
--		addeq	\irqnr, \irqnr, #2
--		moveq	\stat, \stat, lsr #2
--		tst	\stat, #1
--		addeq	\irqnr, \irqnr, #1
--		moveq	\stat, \stat, lsr #1
--		tst	\stat, #1			@ bit 0 should be set
--		.endm
--
--
+@@ -8,6 +8,8 @@
+  */
+ 
+ #include <linux/init.h>
++#include <linux/gpio.h>
++#include <linux/delay.h>
+ #include <linux/memblock.h>
+ #include <linux/types.h>
+ #include <linux/interrupt.h>
+@@ -18,12 +20,17 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+ 
++#include <video/platform_lcd.h>
++
+ #include <mach/hardware.h>
+ 
+ #include "common.h"
+ 
+ #define VIDEORAM_SIZE		SZ_128K
+ 
++#define EDB7211_LCD_DC_DC_EN	CLPS711X_GPIO(3, 1)
++#define EDB7211_LCDEN		CLPS711X_GPIO(3, 2)
++
+ #define EDB7211_CS8900_BASE	(CS2_PHYS_BASE + 0x300)
+ #define EDB7211_CS8900_IRQ	(IRQ_EINT3)
+ 
+@@ -32,6 +39,28 @@ static struct resource edb7211_cs8900_resource[] __initdata = {
+ 	DEFINE_RES_IRQ(EDB7211_CS8900_IRQ),
+ };
+ 
++static void edb7211_lcd_power_set(struct plat_lcd_data *pd, unsigned int power)
++{
++	if (power) {
++		gpio_set_value(EDB7211_LCDEN, 1);
++		udelay(100);
++		gpio_set_value(EDB7211_LCD_DC_DC_EN, 1);
++	} else {
++		gpio_set_value(EDB7211_LCD_DC_DC_EN, 0);
++		udelay(100);
++		gpio_set_value(EDB7211_LCDEN, 0);
++	}
++}
++
++static struct plat_lcd_data edb7211_lcd_power_pdata = {
++	.set_power	= edb7211_lcd_power_set,
++};
++
++static struct gpio edb7211_gpios[] __initconst = {
++	{ EDB7211_LCD_DC_DC_EN,	GPIOF_OUT_INIT_LOW,	"LCD DC-DC" },
++	{ EDB7211_LCDEN,	GPIOF_OUT_INIT_LOW,	"LCD POWER" },
++};
++
+ static struct map_desc edb7211_io_desc[] __initdata = {
+ 	{	/* Memory-mapped extra keyboard row */
+ 		.virtual	= IO_ADDRESS(EP7211_PHYS_EXTKBD),
+@@ -83,6 +112,11 @@ fixup_edb7211(struct tag *tags, char **cmdline, struct meminfo *mi)
+ 
+ static void __init edb7211_init(void)
+ {
++	gpio_request_array(edb7211_gpios, ARRAY_SIZE(edb7211_gpios));
++
++	platform_device_register_data(&platform_bus, "platform-lcd", 0,
++				      &edb7211_lcd_power_pdata,
++				      sizeof(edb7211_lcd_power_pdata));
+ 	platform_device_register_simple("video-clps711x", 0, NULL, 0);
+ 	platform_device_register_simple("cs89x0", 0, edb7211_cs8900_resource,
+ 					ARRAY_SIZE(edb7211_cs8900_resource));
+diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
+index 5a278cb..4e273f2 100644
+--- a/arch/arm/mach-clps711x/include/mach/hardware.h
++++ b/arch/arm/mach-clps711x/include/mach/hardware.h
+@@ -82,8 +82,6 @@
+  * Relevant bits in port D, which controls power to the various parts of
+  * the LCD on the EDB7211.
+  */
+-#define EDB_PD1_LCD_DC_DC_EN	(1<<1)
+-#define EDB_PD2_LCDEN		(1<<2)
+ #define EDB_PD3_LCDBL		(1<<3)
+ 
+ #endif
 diff --git a/arch/arm/mach-clps711x/p720t.c b/arch/arm/mach-clps711x/p720t.c
-index fbe7552..a58a058 100644
+index a58a058..34c8ee9 100644
 --- a/arch/arm/mach-clps711x/p720t.c
 +++ b/arch/arm/mach-clps711x/p720t.c
-@@ -142,5 +142,6 @@ MACHINE_START(P720T, "ARM-Prospector720T")
- 	.timer		= &clps711x_timer,
- 	.init_machine	= p720t_init,
- 	.init_late	= p720t_init_late,
-+	.handle_irq	= clps711x_handle_irq,
- 	.restart	= clps711x_restart,
- MACHINE_END
+@@ -37,10 +37,27 @@
+ #include <asm/mach/map.h>
+ #include <mach/syspld.h>
+ 
++#include <video/platform_lcd.h>
++
+ #include "common.h"
+ 
+ #define GPIO_USERLED	CLPS711X_GPIO(3, 0)
+ 
++static void p720t_lcd_power_set(struct plat_lcd_data *pd, unsigned int power)
++{
++	if (power) {
++		PLD_LCDEN = PLD_LCDEN_EN;
++		PLD_PWR |= PLD_S4_ON | PLD_S2_ON | PLD_S1_ON;
++	} else {
++		PLD_PWR &= ~(PLD_S4_ON | PLD_S2_ON | PLD_S1_ON);
++		PLD_LCDEN = 0;
++	}
++}
++
++static struct plat_lcd_data p720t_lcd_power_pdata = {
++	.set_power	= p720t_lcd_power_set,
++};
++
+ /*
+  * Map the P720T system PLD. It occupies two address spaces:
+  * 0x10000000 and 0x10400000. We map both regions as one.
+@@ -121,6 +138,9 @@ static struct gpio_led_platform_data p720t_gpio_led_pdata __initdata = {
+ 
+ static void __init p720t_init(void)
+ {
++	platform_device_register_data(&platform_bus, "platform-lcd", 0,
++				      &p720t_lcd_power_pdata,
++				      sizeof(p720t_lcd_power_pdata));
+ 	platform_device_register_simple("video-clps711x", 0, NULL, 0);
+ }
+ 
+diff --git a/drivers/video/clps711xfb.c b/drivers/video/clps711xfb.c
+index 2ccbb9b..1902551 100644
+--- a/drivers/video/clps711xfb.c
++++ b/drivers/video/clps711xfb.c
+@@ -167,35 +167,16 @@ static int clps7111fb_blank(int blank, struct fb_info *info)
+ 			/* Turn off the LCD backlight. */
+ 			clps_writeb(clps_readb(PDDR) & ~EDB_PD3_LCDBL, PDDR);
+ 
+-			/* Power off the LCD DC-DC converter. */
+-			clps_writeb(clps_readb(PDDR) & ~EDB_PD1_LCD_DC_DC_EN, PDDR);
+-
+-			/* Delay for a little while (half a second). */
+-			udelay(100);
+-
+-			/* Power off the LCD panel. */
+-			clps_writeb(clps_readb(PDDR) & ~EDB_PD2_LCDEN, PDDR);
+-
+-			/* Power off the LCD controller. */
++			/* Disable LCD controller. */
+ 			clps_writel(clps_readl(SYSCON1) & ~SYSCON1_LCDEN, 
+ 					SYSCON1);
+ 		}
+ 	} else {
+ 		if (machine_is_edb7211()) {
+-			/* Power up the LCD controller. */
++			/* Enable LCD controller. */
+ 			clps_writel(clps_readl(SYSCON1) | SYSCON1_LCDEN,
+ 					SYSCON1);
+ 
+-			/* Power up the LCD panel. */
+-			clps_writeb(clps_readb(PDDR) | EDB_PD2_LCDEN, PDDR);
+-
+-			/* Delay for a little while. */
+-			udelay(100);
+-
+-			/* Power up the LCD DC-DC converter. */
+-			clps_writeb(clps_readb(PDDR) | EDB_PD1_LCD_DC_DC_EN,
+-					PDDR);
+-
+ 			/* Turn on the LCD backlight. */
+ 			clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
+ 		}
+@@ -386,21 +367,10 @@ static int __devinit clps711x_fb_probe(struct platform_device *pdev)
+ 	/*
+ 	 * Power up the LCD
+ 	 */
+-	if (machine_is_p720t()) {
+-		PLD_LCDEN = PLD_LCDEN_EN;
+-		PLD_PWR |= (PLD_S4_ON|PLD_S3_ON|PLD_S2_ON|PLD_S1_ON);
+-	}
++	if (machine_is_p720t())
++		PLD_PWR |= PLD_S3_ON;
+ 
+ 	if (machine_is_edb7211()) {
+-		/* Power up the LCD panel. */
+-		clps_writeb(clps_readb(PDDR) | EDB_PD2_LCDEN, PDDR);
+-
+-		/* Delay for a little while. */
+-		udelay(100);
+-
+-		/* Power up the LCD DC-DC converter. */
+-		clps_writeb(clps_readb(PDDR) | EDB_PD1_LCD_DC_DC_EN, PDDR);
+-
+ 		/* Turn on the LCD backlight. */
+ 		clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
+ 	}
+@@ -418,10 +388,8 @@ static int __devexit clps711x_fb_remove(struct platform_device *pdev)
+ 	/*
+ 	 * Power down the LCD
+ 	 */
+-	if (machine_is_p720t()) {
+-		PLD_LCDEN = 0;
+-		PLD_PWR &= ~(PLD_S4_ON|PLD_S3_ON|PLD_S2_ON|PLD_S1_ON);
+-	}
++	if (machine_is_p720t())
++		PLD_PWR &= ~PLD_S3_ON;
+ 
+ 	return 0;
+ }
 -- 
 1.7.8.6
