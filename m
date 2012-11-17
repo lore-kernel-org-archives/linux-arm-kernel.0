@@ -1,9 +1,9 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 17 Nov 2012 17:00:56 +0100
-Subject: [PATCH v2 14/14] ARM: Kirkwood: Convert km_kirkwood to pinctrl
+Date: Sat, 17 Nov 2012 17:00:57 +0100
+Subject: [PATCH 14/14] ARM: Kirkwood: Convert the km_kirkwood board to pinctrl
 In-Reply-To: <1353168058-14043-1-git-send-email-andrew@lunn.ch>
 References: <1353168058-14043-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1353168058-14043-15-git-send-email-andrew@lunn.ch>
+Message-ID: <1353168058-14043-16-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
