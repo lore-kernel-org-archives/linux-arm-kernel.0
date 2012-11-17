@@ -1,40 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 17 Nov 2012 09:33:07 +0000
-Subject: OMAP* Latest build failures
-In-Reply-To: <20121114092643.GG3290@n2100.arm.linux.org.uk>
-References: <20121114092643.GG3290@n2100.arm.linux.org.uk>
-Message-ID: <20121117093307.GL3332@n2100.arm.linux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Sat, 17 Nov 2012 10:41:08 +0100
+Subject: [PATCH 1/2] clk: mvebu: armada 370/XP add clock gating control
+ provider for DT
+In-Reply-To: <20121117082602.GF24569@lunn.ch>
+References: <1353014906-31566-6-git-send-email-andrew@lunn.ch>
+ <1353088920-17458-1-git-send-email-gregory.clement@free-electrons.com>
+ <1353088920-17458-2-git-send-email-gregory.clement@free-electrons.com>
+ <20121117082602.GF24569@lunn.ch>
+Message-ID: <50A75BB4.4070003@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2012 at 09:26:43AM +0000, Russell King - ARM Linux wrote:
-> OMAP* allnoconfig fails:
+Hi Andrew
+
+On 11/17/2012 09:26 AM, Andrew Lunn wrote:
+> Hi Gregory
 > 
-> arch/arm/mach-omap2/built-in.o: In function `omap_dss_set_min_bus_tput':
-> twl-common.c:(.text+0x1e08): undefined reference to `omap_pm_set_min_bus_tput'
-> arch/arm/mach-omap2/built-in.o: In function `omap_hwmod_init_postsetup':
-> twl-common.c:(.init.text+0x8f8): undefined reference to `omap_pm_if_early_init'
-> arch/arm/mach-omap2/built-in.o: In function `omap_serial_init_port':
-> twl-common.c:(.init.text+0x1284): undefined reference to `omap_pm_get_dev_context_loss_count'
-> arch/arm/mach-omap2/built-in.o: In function `omap_timer_init':
-> twl-common.c:(.init.text+0x1544): undefined reference to `omap_pm_get_dev_context_loss_count'
-> arch/arm/mach-omap2/built-in.o: In function `omap2_common_pm_init':
-> twl-common.c:(.init.text+0x1af0): undefined reference to `omap_pm_if_init'
-> arch/arm/mach-omap2/built-in.o: In function `omap2_gpio_dev_init':
-> twl-common.c:(.init.text+0x2168): undefined reference to `omap_pm_get_dev_context_loss_count'
-> arch/arm/mach-omap2/built-in.o: In function `omap_display_init':
-> twl-common.c:(.init.text+0x25cc): undefined reference to `omap_pm_get_dev_context_loss_count'
+> Nice work
 
-These are now gone, but we have a new warning:
+Thanks!
 
-arch/arm/mach-omap2/timer.c:163:28: warning: 'omap_counter_match' defined but not used
+> 
+> On Fri, Nov 16, 2012 at 07:01:59PM +0100, Gregory CLEMENT wrote:
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  .../bindings/clock/mvebu-gated-clock.txt           |   43 ++++++++++++++
+>>  arch/arm/mach-mvebu/Kconfig                        |    1 +
+>>  drivers/clk/mvebu/clk-gating-ctrl.c                |   61 ++++++++++++++++++++
+>>  3 files changed, 105 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+>> index 7497cc0..9dbcdd9 100644
+>> --- a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+>> +++ b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+>> @@ -6,6 +6,49 @@ the clock ID in its "clocks" phandle cell. The clock ID is directly mapped to
+>>  the corresponding clock gating control bit in HW to ease manual clock lookup
+>>  in datasheet.
+>>  
+>> +The following is a list of provided IDs for Armada XP:
+> 
+> Should that the 370, not XP?
 
-And the randconfig found:
+Yes indeed, it was a wrong copy and paste.
 
-drivers/staging/omap-thermal/omap-bandgap.c: In function 'omap_bandgap_readl':
-drivers/staging/omap-thermal/omap-bandgap.c:46:2: error: implicit declaration of function 'readl'
-drivers/staging/omap-thermal/omap-bandgap.c: In function 'omap_bandgap_writel':
-drivers/staging/omap-thermal/omap-bandgap.c:51:2: error: implicit declaration of function 'writel'
+> 
+>> +ID	Clock	Peripheral
+>> +-----------------------------------
+>> +0	Audio	AC97 Cntrl
+>> +1	pex0_en	PCIe 0 Clock out
+>> +2	pex1_en	PCIe 1 Clock out
+>> +3	ge1	Gigabit Ethernet 1
+>> +4	ge0	Gigabit Ethernet 0
+>> +5	pex0	PCIe Cntrl 0
+>> +9	pex1	PCIe Cntrl 1
+>> +15	sata0	SATA Host 0
+>> +17	sdio	SDHCI Host
+>> +25	tdm	Time Division Mplx
+>> +28	ddr	DDR Cntrl
+>> +30	sata1	SATA Host 0
+> 
+> Not many clocks there. USB? XOR? Crypto?
 
-Which, as its in staging, maybe its not important but it's another source
-of unnecessary failure.
+Yes I was surprised too, but it was I found on the datasheet.
+For USB, for example you can turn the USB in low power mode but
+at the PHY level.
+
+
+> 
+> What is the ddr clock for? Does bad things happen if you turn it off?
+> Kirkwood has a similar clock, dunit, which i decided not to export,
+> since when you turn it off, the whole SoC locks up.
+
+Well of course if you code run in DDR then it could be a problem. But
+I think it could be useful to turn it off when going to suspend, it
+the DDR can do self-refresh. In this case it should be possible to run
+the code from SRAM or L2 Cache.
+
+Gregory
