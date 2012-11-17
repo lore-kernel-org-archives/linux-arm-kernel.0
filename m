@@ -1,31 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 17 Nov 2012 19:41:56 +0100
-Subject: [PATCH] ARM: integrator: use BUG_ON where possible
-In-Reply-To: <201211122044.13663.arnd@arndb.de>
-References: <1352406191-14303-1-git-send-email-sasha.levin@oracle.com>
- <1352406191-14303-6-git-send-email-sasha.levin@oracle.com>
- <201211122044.13663.arnd@arndb.de>
-Message-ID: <CACRpkdZeM_FBGSa+UcH6GTK-Q7ekHbZO7Az7wQibfuFYqLFFhA@mail.gmail.com>
+Date: Sat, 17 Nov 2012 19:43:45 +0100
+Subject: [GIT PULL] Integrator SoC bus patches
+In-Reply-To: <CACRpkdYKWLMMOa7+CV8yMNe5-EV1p5fYeVJ+bn55KLLFBZdD=A@mail.gmail.com>
+References: <CACRpkdYKWLMMOa7+CV8yMNe5-EV1p5fYeVJ+bn55KLLFBZdD=A@mail.gmail.com>
+Message-ID: <CACRpkdYKo2dwLw=aQSKzisiA2bK6V=XO9yB8SaFVPE8L6p9cVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2012 at 9:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Fri, Nov 16, 2012 at 11:51 PM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
 
->> Signed-off-by: Sasha Levin <sasha.levin@oracle.com>
+> Hi ARM SoC guys,
 >
-> Linus Walleij is doing most of the integrator work these days, maybe he
-> wants to apply the patch.
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> could you please pull this Integrator patch set as previously circulated
+> on the list, targetting the v3.8 merge window? The details are in the
+> tag.
 
-OK I'll apply it to my stash and submit a pull request to
-simplify things.
-
-I could split this into its own topic but with noone else changing
-anything orthogonally on the Integrator I don't know if it's really
-worth it, probably it's just better to take the stuff I sent yesterday
-and a patch I made this evening and request it all to be pulled
-at once.
+Bah since another Integrator patch just appeared and I made another
+patch myself tonight, let me iterate this request including both these
+patches as well...
 
 Yours,
 Linus Walleij
