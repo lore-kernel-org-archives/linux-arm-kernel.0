@@ -1,206 +1,123 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 17 Nov 2012 17:57:13 +0400
-Subject: [PATCH v3 07/18] ARM: clps711x: Implement usage "SPARSE_IRQ" kernel
- option for a platform
+Date: Sat, 17 Nov 2012 17:57:15 +0400
+Subject: [PATCH v3 09/18] ARM: clps711x: Add FIQ interrupt handling
 In-Reply-To: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
 References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1353160644-22446-8-git-send-email-shc_work@mail.ru>
+Message-ID: <1353160644-22446-10-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+CLPS711X-target CPU can have a several FIQ interrupts. With this patch
+we adds handling for a one which will be used for ALSA PCM later.
+Since FIQ have a separate handler we only add "mask" and "unmask" calls
+which will used for enable/disable_irq functions.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/Kconfig                               |    1 +
- arch/arm/mach-clps711x/autcpu12.c              |    1 +
- arch/arm/mach-clps711x/cdb89712.c              |    1 +
- arch/arm/mach-clps711x/clep7312.c              |    1 +
- arch/arm/mach-clps711x/common.h                |    1 +
- arch/arm/mach-clps711x/edb7211.c               |    1 +
- arch/arm/mach-clps711x/fortunet.c              |    1 +
- arch/arm/mach-clps711x/include/mach/clps711x.h |   21 +++++++++++
- arch/arm/mach-clps711x/include/mach/irqs.h     |   46 ------------------------
- arch/arm/mach-clps711x/p720t.c                 |    1 +
- 10 files changed, 29 insertions(+), 46 deletions(-)
- delete mode 100644 arch/arm/mach-clps711x/include/mach/irqs.h
+ arch/arm/mach-clps711x/common.c                |   37 ++++++++++++++++++++++-
+ arch/arm/mach-clps711x/common.h                |    2 +-
+ arch/arm/mach-clps711x/include/mach/clps711x.h |    3 ++
+ 3 files changed, 39 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5e9342b..896f6bb 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -378,6 +378,7 @@ config ARCH_CLPS711X
- 	select CPU_ARM720T
- 	select GENERIC_CLOCKEVENTS
- 	select NEED_MACH_MEMORY_H
-+	select SPARSE_IRQ
- 	help
- 	  Support for Cirrus Logic 711x/721x/731x based boards.
+diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
+index 0842024..fcdcd91 100644
+--- a/arch/arm/mach-clps711x/common.c
++++ b/arch/arm/mach-clps711x/common.c
+@@ -30,6 +30,7 @@
+ #include <linux/clk-provider.h>
  
-diff --git a/arch/arm/mach-clps711x/autcpu12.c b/arch/arm/mach-clps711x/autcpu12.c
-index c20043b..b90a316 100644
---- a/arch/arm/mach-clps711x/autcpu12.c
-+++ b/arch/arm/mach-clps711x/autcpu12.c
-@@ -70,6 +70,7 @@ static void __init autcpu12_init(void)
- MACHINE_START(AUTCPU12, "autronix autcpu12")
- 	/* Maintainer: Thomas Gleixner */
- 	.atag_offset	= 0x20000,
-+	.nr_irqs	= CLPS711X_NR_IRQS,
- 	.map_io		= clps711x_map_io,
- 	.init_irq	= clps711x_init_irq,
- 	.timer		= &clps711x_timer,
-diff --git a/arch/arm/mach-clps711x/cdb89712.c b/arch/arm/mach-clps711x/cdb89712.c
-index 24f573b..133794c 100644
---- a/arch/arm/mach-clps711x/cdb89712.c
-+++ b/arch/arm/mach-clps711x/cdb89712.c
-@@ -137,6 +137,7 @@ static void __init cdb89712_init(void)
- MACHINE_START(CDB89712, "Cirrus-CDB89712")
- 	/* Maintainer: Ray Lehtiniemi */
- 	.atag_offset	= 0x100,
-+	.nr_irqs	= CLPS711X_NR_IRQS,
- 	.map_io		= clps711x_map_io,
- 	.init_irq	= clps711x_init_irq,
- 	.timer		= &clps711x_timer,
-diff --git a/arch/arm/mach-clps711x/clep7312.c b/arch/arm/mach-clps711x/clep7312.c
-index dbc7842..be776c5 100644
---- a/arch/arm/mach-clps711x/clep7312.c
-+++ b/arch/arm/mach-clps711x/clep7312.c
-@@ -37,6 +37,7 @@ fixup_clep7312(struct tag *tags, char **cmdline, struct meminfo *mi)
- MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
- 	/* Maintainer: Nobody */
- 	.atag_offset	= 0x0100,
-+	.nr_irqs	= CLPS711X_NR_IRQS,
- 	.fixup		= fixup_clep7312,
- 	.map_io		= clps711x_map_io,
- 	.init_irq	= clps711x_init_irq,
+ #include <asm/exception.h>
++#include <asm/mach/irq.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ #include <asm/system_misc.h>
+@@ -91,7 +92,7 @@ static void int1_unmask(struct irq_data *d)
+ }
+ 
+ static struct irq_chip int1_chip = {
+-	.name		= "Interrupt Vector 1  ",
++	.name		= "Interrupt Vector 1",
+ 	.irq_ack	= int1_ack,
+ 	.irq_eoi	= int1_eoi,
+ 	.irq_mask	= int1_mask,
+@@ -128,13 +129,37 @@ static void int2_unmask(struct irq_data *d)
+ }
+ 
+ static struct irq_chip int2_chip = {
+-	.name		= "Interrupt Vector 2  ",
++	.name		= "Interrupt Vector 2",
+ 	.irq_ack	= int2_ack,
+ 	.irq_eoi	= int2_eoi,
+ 	.irq_mask	= int2_mask,
+ 	.irq_unmask	= int2_unmask,
+ };
+ 
++static void int3_mask(struct irq_data *d)
++{
++	u32 intmr3;
++
++	intmr3 = clps_readl(INTMR3);
++	intmr3 &= ~(1 << (d->irq - 32));
++	clps_writel(intmr3, INTMR3);
++}
++
++static void int3_unmask(struct irq_data *d)
++{
++	u32 intmr3;
++
++	intmr3 = clps_readl(INTMR3);
++	intmr3 |= 1 << (d->irq - 32);
++	clps_writel(intmr3, INTMR3);
++}
++
++static struct irq_chip int3_chip = {
++	.name		= "Interrupt Vector 3",
++	.irq_mask	= int3_mask,
++	.irq_unmask	= int3_unmask,
++};
++
+ static struct {
+ 	int			nr;
+ 	struct irq_chip		*chip;
+@@ -188,6 +213,14 @@ void __init clps711x_init_irq(void)
+ 		set_irq_flags(clps711x_irqdescs[i].nr,
+ 			      IRQF_VALID | IRQF_PROBE);
+ 	}
++
++	if (IS_ENABLED(CONFIG_FIQ)) {
++		init_FIQ(0);
++		irq_set_chip_and_handler(IRQ_DAIINT, &int3_chip,
++					 handle_bad_irq);
++		set_irq_flags(IRQ_DAIINT,
++			      IRQF_VALID | IRQF_PROBE | IRQF_NOAUTOEN);
++	}
+ }
+ 
+ inline u32 fls16(u32 x)
 diff --git a/arch/arm/mach-clps711x/common.h b/arch/arm/mach-clps711x/common.h
-index dc60cae..28b1701 100644
+index 3c7f12c..b7c0c75 100644
 --- a/arch/arm/mach-clps711x/common.h
 +++ b/arch/arm/mach-clps711x/common.h
-@@ -4,6 +4,7 @@
+@@ -4,7 +4,7 @@
   * Common bits.
   */
  
-+#define CLPS711X_NR_IRQS	(30)
+-#define CLPS711X_NR_IRQS	(30)
++#define CLPS711X_NR_IRQS	(33)
  #define CLPS711X_NR_GPIO	(4 * 8 + 3)
  #define CLPS711X_GPIO(prt, bit)	((prt) * 8 + (bit))
  
-diff --git a/arch/arm/mach-clps711x/edb7211.c b/arch/arm/mach-clps711x/edb7211.c
-index 59dec3b..7b161dd 100644
---- a/arch/arm/mach-clps711x/edb7211.c
-+++ b/arch/arm/mach-clps711x/edb7211.c
-@@ -91,6 +91,7 @@ static void __init edb7211_init(void)
- MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
- 	/* Maintainer: Jon McClintock */
- 	.atag_offset	= VIDEORAM_SIZE + 0x100,
-+	.nr_irqs	= CLPS711X_NR_IRQS,
- 	.fixup		= fixup_edb7211,
- 	.reserve	= edb7211_reserve,
- 	.map_io		= edb7211_map_io,
-diff --git a/arch/arm/mach-clps711x/fortunet.c b/arch/arm/mach-clps711x/fortunet.c
-index 3a3f0b7..a5c0816 100644
---- a/arch/arm/mach-clps711x/fortunet.c
-+++ b/arch/arm/mach-clps711x/fortunet.c
-@@ -74,6 +74,7 @@ fortunet_fixup(struct tag *tags, char **cmdline, struct meminfo *mi)
- 
- MACHINE_START(FORTUNET, "ARM-FortuNet")
- 	/* Maintainer: FortuNet Inc. */
-+	.nr_irqs	= CLPS711X_NR_IRQS,
- 	.fixup		= fortunet_fixup,
- 	.map_io		= clps711x_map_io,
- 	.init_irq	= clps711x_init_irq,
 diff --git a/arch/arm/mach-clps711x/include/mach/clps711x.h b/arch/arm/mach-clps711x/include/mach/clps711x.h
-index aee352c..1f4728d 100644
+index 1f4728d..01d1b95 100644
 --- a/arch/arm/mach-clps711x/include/mach/clps711x.h
 +++ b/arch/arm/mach-clps711x/include/mach/clps711x.h
-@@ -277,4 +277,25 @@
- #define MEMCFG_WAITSTATE_2_0	(14 << 2)
- #define MEMCFG_WAITSTATE_1_0	(15 << 2)
+@@ -298,4 +298,7 @@
+ #define IRQ_UTXINT2		(16 + 12)
+ #define IRQ_URXINT2		(16 + 13)
  
-+/* INTSR1 Interrupts */
-+#define IRQ_CSINT		(4)
-+#define IRQ_EINT1		(5)
-+#define IRQ_EINT2		(6)
-+#define IRQ_EINT3		(7)
-+#define IRQ_TC1OI		(8)
-+#define IRQ_TC2OI		(9)
-+#define IRQ_RTCMI		(10)
-+#define IRQ_TINT		(11)
-+#define IRQ_UTXINT1		(12)
-+#define IRQ_URXINT1		(13)
-+#define IRQ_UMSINT		(14)
-+#define IRQ_SSEOTI		(15)
-+
-+/* INTSR2 Interrupts */
-+#define IRQ_KBDINT		(16 + 0)
-+#define IRQ_SS2RX		(16 + 1)
-+#define IRQ_SS2TX		(16 + 2)
-+#define IRQ_UTXINT2		(16 + 12)
-+#define IRQ_URXINT2		(16 + 13)
++/* INTSR3 Interrupts */
++#define IRQ_DAIINT		(32 + 0)
 +
  #endif /* __MACH_CLPS711X_H */
-diff --git a/arch/arm/mach-clps711x/include/mach/irqs.h b/arch/arm/mach-clps711x/include/mach/irqs.h
-deleted file mode 100644
-index 1ea56db..0000000
---- a/arch/arm/mach-clps711x/include/mach/irqs.h
-+++ /dev/null
-@@ -1,46 +0,0 @@
--/*
-- *  arch/arm/mach-clps711x/include/mach/irqs.h
-- *
-- *  Copyright (C) 2000 Deep Blue Solutions Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--
--/*
-- * Interrupts from INTSR1
-- */
--#define IRQ_CSINT			4
--#define IRQ_EINT1			5
--#define IRQ_EINT2			6
--#define IRQ_EINT3			7
--#define IRQ_TC1OI			8
--#define IRQ_TC2OI			9
--#define IRQ_RTCMI			10
--#define IRQ_TINT			11
--#define IRQ_UTXINT1			12
--#define IRQ_URXINT1			13
--#define IRQ_UMSINT			14
--#define IRQ_SSEOTI			15
--
--/*
-- * Interrupts from INTSR2
-- */
--#define IRQ_KBDINT			(16+0)	/* bit 0 */
--#define IRQ_SS2RX			(16+1)	/* bit 1 */
--#define IRQ_SS2TX			(16+2)	/* bit 2 */
--#define IRQ_UTXINT2			(16+12)	/* bit 12 */
--#define IRQ_URXINT2			(16+13)	/* bit 13 */
--
--#define NR_IRQS				30
-diff --git a/arch/arm/mach-clps711x/p720t.c b/arch/arm/mach-clps711x/p720t.c
-index d95cb8a..fbe7552 100644
---- a/arch/arm/mach-clps711x/p720t.c
-+++ b/arch/arm/mach-clps711x/p720t.c
-@@ -134,6 +134,7 @@ static void __init p720t_init_late(void)
- MACHINE_START(P720T, "ARM-Prospector720T")
- 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
- 	.atag_offset	= 0x100,
-+	.nr_irqs	= CLPS711X_NR_IRQS,
- 	.fixup		= fixup_p720t,
- 	.map_io		= p720t_map_io,
- 	.init_early	= p720t_init_early,
 -- 
 1.7.8.6
