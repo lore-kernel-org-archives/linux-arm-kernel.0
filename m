@@ -1,30 +1,29 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 17 Nov 2012 15:46:14 +0100
-Subject: [PATCH 5/5] ARM: Kirkwood: Convert LSXL to use regulators
+Date: Sat, 17 Nov 2012 15:46:13 +0100
+Subject: [PATCH 4/5] ARM: Kirkwood: Convert GoFlexNet to use regulators
 In-Reply-To: <1353163574-6362-1-git-send-email-andrew@lunn.ch>
 References: <1353163574-6362-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1353163574-6362-6-git-send-email-andrew@lunn.ch>
+Message-ID: <1353163574-6362-5-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Control the power to USB and HDD using a fixed regulator.
+Control the power to USB using a fixed regulator.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Michael Walle <michael@walle.cc>
+Tested-by: Josh Coombs <josh.coombs@gmail.com>
 ---
- arch/arm/boot/dts/kirkwood-lsxl.dtsi |   29 +++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-lsxl.c  |    8 --------
- 2 files changed, 29 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/kirkwood-goflexnet.dts |   17 +++++++++++++++++
+ arch/arm/mach-kirkwood/board-goflexnet.c |    4 ----
+ 2 files changed, 17 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-index 8fea375..65a8c52 100644
---- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-@@ -94,4 +94,33 @@
- 			gpios = <&gpio1 16 1>;
+diff --git a/arch/arm/boot/dts/kirkwood-goflexnet.dts b/arch/arm/boot/dts/kirkwood-goflexnet.dts
+index 7c8238f..84de887 100644
+--- a/arch/arm/boot/dts/kirkwood-goflexnet.dts
++++ b/arch/arm/boot/dts/kirkwood-goflexnet.dts
+@@ -96,4 +96,21 @@
+ 			gpios = <&gpio1 9 0>;
  		};
  	};
-+
 +	regulators {
 +		compatible = "simple-bus";
 +		#address-cells = <1>;
@@ -39,53 +38,31 @@ index 8fea375..65a8c52 100644
 +			enable-active-high;
 +			regulator-always-on;
 +			regulator-boot-on;
-+			gpio = <&gpio0 11 0>;
-+		};
-+		hdd_power: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "HDD Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio0 10 0>;
++			gpio = <&gpio0 29 0>;
 +		};
 +	};
  };
-diff --git a/arch/arm/mach-kirkwood/board-lsxl.c b/arch/arm/mach-kirkwood/board-lsxl.c
-index 83d8975..b9845c0 100644
---- a/arch/arm/mach-kirkwood/board-lsxl.c
-+++ b/arch/arm/mach-kirkwood/board-lsxl.c
-@@ -19,7 +19,6 @@
- #include <linux/spi/flash.h>
- #include <linux/spi/spi.h>
- #include <linux/mv643xx_eth.h>
+diff --git a/arch/arm/mach-kirkwood/board-goflexnet.c b/arch/arm/mach-kirkwood/board-goflexnet.c
+index 001ca8c..7257a35 100644
+--- a/arch/arm/mach-kirkwood/board-goflexnet.c
++++ b/arch/arm/mach-kirkwood/board-goflexnet.c
+@@ -26,7 +26,6 @@
+ #include <linux/of_fdt.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
 -#include <linux/gpio.h>
- #include <linux/gpio-fan.h>
- #include <linux/input.h>
  #include <asm/mach-types.h>
-@@ -111,9 +110,6 @@ static void lsxl_power_off(void)
- 	kirkwood_restart('h', NULL);
- }
- 
--#define LSXL_GPIO_HDD_POWER 10
--#define LSXL_GPIO_USB_POWER 11
--
- void __init lsxl_init(void)
- {
- 	/*
-@@ -121,10 +117,6 @@ void __init lsxl_init(void)
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -62,9 +61,6 @@ void __init goflexnet_init(void)
  	 */
- 	kirkwood_mpp_conf(lsxl_mpp_config);
+ 	kirkwood_mpp_conf(goflexnet_mpp_config);
  
--	/* usb and sata power on */
--	gpio_set_value(LSXL_GPIO_USB_POWER, 1);
--	gpio_set_value(LSXL_GPIO_HDD_POWER, 1);
--
+-	if (gpio_request(29, "USB Power Enable") != 0 ||
+-	    gpio_direction_output(29, 1) != 0)
+-		pr_err("can't setup GPIO 29 (USB Power Enable)\n");
  	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&lsxl_ge00_data);
- 	kirkwood_ge01_init(&lsxl_ge01_data);
+ 
+ 	kirkwood_ge00_init(&goflexnet_ge00_data);
 -- 
 1.7.10.4
