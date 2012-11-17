@@ -1,36 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 Nov 2012 21:02:35 -0700
-Subject: [GIT PULL 1/3] ARM: bcm2835: cleanup
-Message-ID: <1353124957-23808-1-git-send-email-swarren@wwwdotorg.org>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sat, 17 Nov 2012 17:07:39 +1300
+Subject: pwm_backlight/general pwm issue.
+Message-ID: <1353125259.18544.7.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just a few minor/trivial cleanups.
+Hi Thierry,
 
-----------------------------------------------------------------
+Looking a little feedback regarding a problem introduced with the pwm
+patch I sent converting the vt8500 pwm driver to devicetree.
 
-The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
+One of the recommendations you made was to enable/disable the pwm clock
+in pwm_enable/pwm_disable, rather than at driver probe, to reduce power
+usage. Unfortunately, when the last pwm is disabled, the clock is
+disabled which prevents the pwm module from responding to register
+read/writes. This would be fine if pwm_enable was called before any
+other functions.
 
-  Linux 3.7-rc2
+The pwm_backlight driver calls pwm_config before pwm_enable, which
+doesn't work because the pwm module has been disabled. I can appreciate
+that no one wants to enable a pwm before it's configured so I don't
+think this is particularly a driver issue.
 
-are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git bcm2835-for-3.8-cleanup
+My recommendation is the re-enable the previous behaviour which was to
+enable the clock during driver probe, and disable during driver unload.
 
-for you to fetch changes up to 0bd1e3240ee49cba6fe243a317e07c8cc8e27334:
+Looking for your thoughts (or anyone else that wants to chime in).
 
-  ARM: bcm2835: remove useless variables from Makefile.boot
-
-----------------------------------------------------------------
-
-Domenico Andreoli (2):
-      ARM: bcm2835: Add missing static modifiers
-      ARM: bcm2835: Fix typo in the error message
-
-Thomas Petazzoni (1):
-      ARM: bcm2835: remove useless variables from Makefile.boot
-
- arch/arm/mach-bcm2835/Makefile.boot |    4 +---
- arch/arm/mach-bcm2835/bcm2835.c     |    4 ++--
- drivers/clk/clk-bcm2835.c           |    2 +-
- 3 files changed, 4 insertions(+), 6 deletions(-)
+Regards
+Tony Prisk
