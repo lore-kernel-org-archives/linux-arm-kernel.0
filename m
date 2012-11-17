@@ -1,22 +1,22 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 17 Nov 2012 17:00:54 +0100
-Subject: [PATCH v2 12/14] ARM: Kirkwood: Convert IX2-200 to pinctrl.
+Date: Sat, 17 Nov 2012 17:00:47 +0100
+Subject: [PATCH v2 05/14] ARM: Kirkwood: Convert iConnect to pinctrl.
 In-Reply-To: <1353168058-14043-1-git-send-email-andrew@lunn.ch>
 References: <1353168058-14043-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1353168058-14043-13-git-send-email-andrew@lunn.ch>
+Message-ID: <1353168058-14043-6-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts |   89 +++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-iomega_ix2_200.c |   24 -------
- 2 files changed, 89 insertions(+), 24 deletions(-)
+ arch/arm/boot/dts/kirkwood-iconnect.dts |   51 +++++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-iconnect.c |   17 -----------
+ 2 files changed, 51 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-index 865aeec..6cae459 100644
---- a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-+++ b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
+diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
+index d97cd9d..504f16b 100644
+--- a/arch/arm/boot/dts/kirkwood-iconnect.dts
++++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
 @@ -1,6 +1,7 @@
  /dts-v1/;
  
@@ -24,148 +24,98 @@ index 865aeec..6cae459 100644
 +/include/ "kirkwood-6281.dtsi"
  
  / {
- 	model = "Iomega StorCenter ix2-200";
-@@ -16,6 +17,94 @@
+ 	model = "Iomega Iconnect";
+@@ -18,6 +19,56 @@
  	};
  
  	ocp at f1000000 {
 +		pinctrl: pinctrl at 10000 {
 +
-+			pinctrl-0 = < &pmx_button_reset &pmx_button_power
-+				      &pmx_led_backup &pmx_led_power
-+				      &pmx_button_otb &pmx_led_rebuild
-+				      &pmx_led_health
-+				      &pmx_led_sata_brt_ctrl_1
-+				      &pmx_led_sata_brt_ctrl_2
-+				      &pmx_led_backup_brt_ctrl_1
-+				      &pmx_led_backup_brt_ctrl_2
-+				      &pmx_led_power_brt_ctrl_1
-+				      &pmx_led_power_brt_ctrl_2
-+				      &pmx_led_health_brt_ctrl_1
-+				      &pmx_led_health_brt_ctrl_2
-+				      &pmx_led_rebuild_brt_ctrl_1
-+				      &pmx_led_rebuild_brt_ctrl_2 >;
++			pinctrl-0 = < &pmx_gpio_12 &pmx_gpio_35
++				      &pmx_gpio_41 &pmx_gpio_42
++				      &pmx_gpio_43 &pmx_gpio_44
++				      &pmx_gpio_45 &pmx_gpio_46
++				      &pmx_gpio_47 &pmx_gpio_48 >;
 +			pinctrl-names = "default";
 +
-+			pmx_button_reset: pmx-button-reset {
++			pmx_gpio_12: pmx-gpio-12 {
 +				marvell,pins = "mpp12";
 +				marvell,function = "gpio";
 +			};
-+			pmx_button_power: pmx-button-power {
-+				marvell,pins = "mpp14";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_backup: pmx-led-backup {
-+				marvell,pins = "mpp15";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_power: pmx-led-power {
-+				marvell,pins = "mpp16";
-+				marvell,function = "gpio";
-+			};
-+			pmx_button_otb: pmx-button-otb {
++			pmx_gpio_35: pmx-gpio-35 {
 +				marvell,pins = "mpp35";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_rebuild: pmx-led-rebuild {
-+				marvell,pins = "mpp36";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_health: pmx-led_health {
-+				marvell,pins = "mpp37";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_sata_brt_ctrl_1: pmx-led-sata-brt-ctrl-1 {
-+				marvell,pins = "mpp38";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_sata_brt_ctrl_2: pmx-led-sata-brt-ctrl-2 {
-+				marvell,pins = "mpp39";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_backup_brt_ctrl_1: pmx-led-backup-brt-ctrl-1 {
-+				marvell,pins = "mpp40";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_backup_brt_ctrl_2: pmx-led-backup-brt-ctrl-2 {
++			pmx_gpio_41: pmx-gpio-41 {
 +				marvell,pins = "mpp41";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_power_brt_ctrl_1: pmx-led-power-brt-ctrl-1 {
++			pmx_gpio_42: pmx-gpio-42 {
 +				marvell,pins = "mpp42";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_power_brt_ctrl_2: pmx-led-power-brt-ctrl-2 {
++			pmx_gpio_43: pmx-gpio-43 {
 +				marvell,pins = "mpp43";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_health_brt_ctrl_1: pmx-led-health-brt-ctrl-1 {
++			pmx_gpio_44: pmx-gpio-44 {
 +				marvell,pins = "mpp44";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_health_brt_ctrl_2: pmx-led-health-brt-ctrl-2 {
++			pmx_gpio_45: pmx-gpio-45 {
 +				marvell,pins = "mpp45";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_rebuild_brt_ctrl_1: pmx-led-rebuild-brt-ctrl-1 {
-+				marvell,pins = "mpp44";
++			pmx_gpio_46: pmx-gpio-46 {
++				marvell,pins = "mpp46";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_rebuild_brt_ctrl_2: pmx-led-rebuild-brt-ctrl-2 {
-+				marvell,pins = "mpp45";
++			pmx_gpio_47: pmx-gpio-47 {
++				marvell,pins = "mpp47";
 +				marvell,function = "gpio";
 +			};
-+
++			pmx_gpio_48: pmx-gpio-48 {
++				marvell,pins = "mpp48";
++				marvell,function = "gpio";
++			};
 +		};
  		i2c at 11000 {
  			status = "okay";
  
-diff --git a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
-index 158fb97..c144712 100644
---- a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
-+++ b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
-@@ -15,7 +15,6 @@
- #include <linux/ethtool.h>
+diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
+index d084b1e..aeba479 100644
+--- a/arch/arm/mach-kirkwood/board-iconnect.c
++++ b/arch/arm/mach-kirkwood/board-iconnect.c
+@@ -21,30 +21,13 @@
+ #include <asm/mach/arch.h>
  #include <mach/kirkwood.h>
  #include "common.h"
 -#include "mpp.h"
  
- static struct mv643xx_eth_platform_data iomega_ix2_200_ge00_data = {
- 	.phy_addr       = MV643XX_ETH_PHY_NONE,
-@@ -23,34 +22,11 @@ static struct mv643xx_eth_platform_data iomega_ix2_200_ge00_data = {
- 	.duplex         = DUPLEX_FULL,
+ static struct mv643xx_eth_platform_data iconnect_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(11),
  };
  
--static unsigned int iomega_ix2_200_mpp_config[] __initdata = {
--	MPP12_GPIO,			/* Reset Button */
--	MPP14_GPIO,			/* Power Button */
--	MPP15_GPIO,			/* Backup LED (blue) */
--	MPP16_GPIO,			/* Power LED (white) */
--	MPP35_GPIO,			/* OTB Button */
--	MPP36_GPIO,			/* Rebuild LED (white) */
--	MPP37_GPIO,			/* Health LED (red) */
--	MPP38_GPIO,			/* SATA LED brightness control 1 */
--	MPP39_GPIO,			/* SATA LED brightness control 2 */
--	MPP40_GPIO,			/* Backup LED brightness control 1 */
--	MPP41_GPIO,			/* Backup LED brightness control 2 */
--	MPP42_GPIO,			/* Power LED brightness control 1 */
--	MPP43_GPIO,			/* Power LED brightness control 2 */
--	MPP44_GPIO,			/* Health LED brightness control 1 */
--	MPP45_GPIO,			/* Health LED brightness control 2 */
--	MPP46_GPIO,			/* Rebuild LED brightness control 1 */
--	MPP47_GPIO,			/* Rebuild LED brightness control 2 */
+-static unsigned int iconnect_mpp_config[] __initdata = {
+-	MPP12_GPIO,
+-	MPP35_GPIO,
+-	MPP41_GPIO,
+-	MPP42_GPIO,
+-	MPP43_GPIO,
+-	MPP44_GPIO,
+-	MPP45_GPIO,
+-	MPP46_GPIO,
+-	MPP47_GPIO,
+-	MPP48_GPIO,
 -	0
 -};
 -
- void __init iomega_ix2_200_init(void)
+ void __init iconnect_init(void)
  {
- 	/*
- 	 * Basic setup. Needs to be called early.
- 	 */
--	kirkwood_mpp_conf(iomega_ix2_200_mpp_config);
+-	kirkwood_mpp_conf(iconnect_mpp_config);
 -
  	kirkwood_ehci_init();
- 
- 	kirkwood_ge01_init(&iomega_ix2_200_ge00_data);
+ 	kirkwood_ge00_init(&iconnect_ge00_data);
+ }
 -- 
 1.7.10.4
