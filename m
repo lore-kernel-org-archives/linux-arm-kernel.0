@@ -1,38 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 18 Nov 2012 00:02:31 +0100
-Subject: [PATCH 01/16] gpio: SPEAr: add spi chipselect control driver
-In-Reply-To: <3702a1036f8e714e6d18e4726569bbb1eadd65bf.1353042873.git.viresh.kumar@linaro.org>
-References: <4a92290e8a3b1a19c3a5e864edfa7badfc2af5d0.1352608333.git.viresh.kumar@linaro.org>
- <3702a1036f8e714e6d18e4726569bbb1eadd65bf.1353042873.git.viresh.kumar@linaro.org>
-Message-ID: <CACRpkda89OGRwJ74QHvyKfdnufYdRn90A8YK5tf0Jc41RpUxJA@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Sun, 18 Nov 2012 00:27:11 +0100 (CET)
+Subject: [PATCH 0/5] i2c-sh_mobile non-urgent changes
+In-Reply-To: <50A5FF0D.4020502@renesas.com>
+References: <5087C93F.6080601@renesas.com>
+ <20121116080704.GC8464@pengutronix.de>
+ <50A5FF0D.4020502@renesas.com>
+Message-ID: <Pine.LNX.4.64.1211180022331.30062@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2012 at 6:15 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+On Fri, 16 Nov 2012, Shinya Kuribayashi wrote:
 
-> From: Shiraz Hashim <shiraz.hashim@st.com>
->
-> SPEAr platform provides a provision to control chipselects of ARM PL022
-> Prime Cell spi controller through its system registers, which otherwise
-> remains under PL022 control which some protocols do not want.
->
-> This commit intends to provide the spi chipselect control in software over
-> gpiolib interface. spi chip drivers can use the exported gpiolib interface to
-> define their chipselect through DT or platform data.
->
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
-> Reviewed-by: Vipin Kumar <vipin.kumar@st.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->
-> Hi Grant,
->
-> This patch was earlier sent as part of drivers/pinctrl/spear directory and after
-> some discussion over mainline it is moved to gpio now. It is already reviewed by
-> Linus and Arnd, though they haven't given their Reviewed-by's.
+> On 11/16/2012 5:07 PM, Wolfram Sang wrote:
+> > Looks good to me, like the extensive patch descriptions. I am going to
+> > apply it to for-next with patches 2+3 squashed, because after patch 2 we
+> > would have a buggy state otherwise. Let me know if you are not okay with
+> > that.
+> 
+> It's not that buggy as you/we think, in most cases it work without
+> problem.  What's more important for me is to record the issue and
+> how to solve it.  So I'd like to have patch 2 and 3 separately.
 
-I've applied it to my gpio tree with Arnd's ACK, thanks!
+I agree with Wolfram. For developers it can be important to know their own 
+development process, that's true. But for upstream it is an absolute 
+preference to avoid breakages. So, we should never commit patches, that 
+are known to contain problems. In this case it means, that patches 2 and 3 
+should be merged. It is good, that the problem has been detected and fixed 
+during development or testing, this gives us a chance to avoid breaking 
+the mainline, which we should certainly use.
 
-Yours,
-Linus Walleij
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
