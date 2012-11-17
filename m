@@ -1,467 +1,299 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 17 Nov 2012 17:57:17 +0400
-Subject: [PATCH v3 11/18] ARM: clps711x: autcpu12: Special driver for handling
- NAND memory is removed
+Date: Sat, 17 Nov 2012 17:57:20 +0400
+Subject: [PATCH v3 14/18] ARM: clps711x: Moving backlight controls of
+ framebuffer driver to the board
 In-Reply-To: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
 References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1353160644-22446-12-git-send-email-shc_work@mail.ru>
+Message-ID: <1353160644-22446-15-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provide migration to using "gpio-nand" and "basic-mmio-gpio"
-drivers instead of using special driver for handling NAND memory.
+This patch moves the backlight controls for clps711x-framebuffer driver
+to the board code. To control we use "generic-bl" driver.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/autcpu12.c              |   98 ++++++++++
- arch/arm/mach-clps711x/include/mach/autcpu12.h |   10 -
- drivers/mtd/nand/Kconfig                       |    7 -
- drivers/mtd/nand/Makefile                      |    1 -
- drivers/mtd/nand/autcpu12.c                    |  237 ------------------------
- 5 files changed, 98 insertions(+), 255 deletions(-)
- delete mode 100644 drivers/mtd/nand/autcpu12.c
+ arch/arm/mach-clps711x/edb7211.c               |   18 ++++
+ arch/arm/mach-clps711x/include/mach/hardware.h |    6 --
+ arch/arm/mach-clps711x/p720t.c                 |   21 +++++-
+ drivers/video/clps711xfb.c                     |  107 ++----------------------
+ 4 files changed, 44 insertions(+), 108 deletions(-)
 
-diff --git a/arch/arm/mach-clps711x/autcpu12.c b/arch/arm/mach-clps711x/autcpu12.c
-index 3de1955..3fbf43f 100644
---- a/arch/arm/mach-clps711x/autcpu12.c
-+++ b/arch/arm/mach-clps711x/autcpu12.c
-@@ -23,9 +23,13 @@
- #include <linux/string.h>
- #include <linux/mm.h>
- #include <linux/io.h>
-+#include <linux/gpio.h>
- #include <linux/ioport.h>
+diff --git a/arch/arm/mach-clps711x/edb7211.c b/arch/arm/mach-clps711x/edb7211.c
+index 81cc683..d5832b3 100644
+--- a/arch/arm/mach-clps711x/edb7211.c
++++ b/arch/arm/mach-clps711x/edb7211.c
+@@ -13,6 +13,7 @@
+ #include <linux/memblock.h>
+ #include <linux/types.h>
  #include <linux/interrupt.h>
-+#include <linux/mtd/partitions.h>
-+#include <linux/mtd/nand-gpio.h>
++#include <linux/backlight.h>
  #include <linux/platform_device.h>
-+#include <linux/basic_mmio_gpio.h>
  
- #include <mach/hardware.h>
- #include <asm/sizes.h>
-@@ -43,6 +47,15 @@
- #define AUTCPU12_CS8900_BASE	(CS2_PHYS_BASE + 0x300)
- #define AUTCPU12_CS8900_IRQ	(IRQ_EINT3)
+ #include <asm/setup.h>
+@@ -30,6 +31,7 @@
  
-+#define AUTCPU12_SMC_BASE	(CS1_PHYS_BASE + 0x06000000)
-+#define AUTCPU12_SMC_SEL_BASE	(AUTCPU12_SMC_BASE + 0x10)
-+
-+#define AUTCPU12_MMGPIO_BASE	(CLPS711X_NR_GPIO)
-+#define AUTCPU12_SMC_NCE	(AUTCPU12_MMGPIO_BASE + 0) /* Bit 0 */
-+#define AUTCPU12_SMC_RDY	CLPS711X_GPIO(1, 2)
-+#define AUTCPU12_SMC_ALE	CLPS711X_GPIO(1, 3)
-+#define AUTCPU12_SMC_CLE	CLPS711X_GPIO(1, 3)
-+
- static struct resource autcpu12_cs8900_resource[] __initdata = {
- 	DEFINE_RES_MEM(AUTCPU12_CS8900_BASE, SZ_1K),
- 	DEFINE_RES_IRQ(AUTCPU12_CS8900_IRQ),
-@@ -59,14 +72,98 @@ static struct platform_device autcpu12_nvram_pdev __initdata = {
- 	.num_resources	= ARRAY_SIZE(autcpu12_nvram_resource),
+ #define EDB7211_LCD_DC_DC_EN	CLPS711X_GPIO(3, 1)
+ #define EDB7211_LCDEN		CLPS711X_GPIO(3, 2)
++#define EDB7211_LCDBL		CLPS711X_GPIO(3, 3)
+ 
+ #define EDB7211_CS8900_BASE	(CS2_PHYS_BASE + 0x300)
+ #define EDB7211_CS8900_IRQ	(IRQ_EINT3)
+@@ -56,9 +58,22 @@ static struct plat_lcd_data edb7211_lcd_power_pdata = {
+ 	.set_power	= edb7211_lcd_power_set,
  };
  
-+static struct resource autcpu12_nand_resource[] __initdata = {
-+	DEFINE_RES_MEM(AUTCPU12_SMC_BASE, SZ_16),
-+};
-+
-+static struct mtd_partition autcpu12_nand_parts[] __initdata = {
-+	{
-+		.name	= "Flash partition 1",
-+		.offset	= 0,
-+		.size	= SZ_8M,
-+	},
-+	{
-+		.name	= "Flash partition 2",
-+		.offset	= MTDPART_OFS_APPEND,
-+		.size	= MTDPART_SIZ_FULL,
-+	},
-+};
-+
-+static void __init autcpu12_adjust_parts(struct gpio_nand_platdata *pdata,
-+					 size_t sz)
++static void edb7211_lcd_backlight_set_intensity(int intensity)
 +{
-+	switch (sz) {
-+	case SZ_16M:
-+	case SZ_32M:
-+		break;
-+	case SZ_64M:
-+	case SZ_128M:
-+		pdata->parts[0].size = SZ_16M;
-+		break;
-+	default:
-+		pr_warn("Unsupported SmartMedia device size %u\n", sz);
-+		break;
-+	}
++	gpio_set_value(EDB7211_LCDBL, intensity);
 +}
 +
-+static struct gpio_nand_platdata autcpu12_nand_pdata __initdata = {
-+	.gpio_rdy	= AUTCPU12_SMC_RDY,
-+	.gpio_nce	= AUTCPU12_SMC_NCE,
-+	.gpio_ale	= AUTCPU12_SMC_ALE,
-+	.gpio_cle	= AUTCPU12_SMC_CLE,
-+	.gpio_nwp	= -1,
-+	.chip_delay	= 20,
-+	.parts		= autcpu12_nand_parts,
-+	.num_parts	= ARRAY_SIZE(autcpu12_nand_parts),
-+	.adjust_parts	= autcpu12_adjust_parts,
++static struct generic_bl_info edb7211_lcd_backlight_pdata = {
++	.name			= "lcd-backlight.0",
++	.default_intensity	= 0x01,
++	.max_intensity		= 0x01,
++	.set_bl_intensity	= edb7211_lcd_backlight_set_intensity,
 +};
 +
-+static struct platform_device autcpu12_nand_pdev __initdata = {
-+	.name		= "gpio-nand",
-+	.id		= -1,
-+	.resource	= autcpu12_nand_resource,
-+	.num_resources	= ARRAY_SIZE(autcpu12_nand_resource),
-+	.dev		= {
-+		.platform_data = &autcpu12_nand_pdata,
-+	},
-+};
-+
-+static struct resource autcpu12_mmgpio_resource[] __initdata = {
-+	DEFINE_RES_MEM_NAMED(AUTCPU12_SMC_SEL_BASE, SZ_1, "dat"),
-+};
-+
-+static struct bgpio_pdata autcpu12_mmgpio_pdata __initdata = {
-+	.base	= AUTCPU12_MMGPIO_BASE,
-+	.ngpio	= 8,
-+};
-+
-+static struct platform_device autcpu12_mmgpio_pdev __initdata = {
-+	.name		= "basic-mmio-gpio",
-+	.id		= -1,
-+	.resource	= autcpu12_mmgpio_resource,
-+	.num_resources	= ARRAY_SIZE(autcpu12_mmgpio_resource),
-+	.dev		= {
-+		.platform_data = &autcpu12_mmgpio_pdata,
-+	},
-+};
-+
- static void __init autcpu12_init(void)
- {
+ static struct gpio edb7211_gpios[] __initconst = {
+ 	{ EDB7211_LCD_DC_DC_EN,	GPIOF_OUT_INIT_LOW,	"LCD DC-DC" },
+ 	{ EDB7211_LCDEN,	GPIOF_OUT_INIT_LOW,	"LCD POWER" },
++	{ EDB7211_LCDBL,	GPIOF_OUT_INIT_LOW,	"LCD BACKLIGHT" },
+ };
+ 
+ static struct map_desc edb7211_io_desc[] __initdata = {
+@@ -117,6 +132,9 @@ static void __init edb7211_init(void)
+ 	platform_device_register_data(&platform_bus, "platform-lcd", 0,
+ 				      &edb7211_lcd_power_pdata,
+ 				      sizeof(edb7211_lcd_power_pdata));
++	platform_device_register_data(&platform_bus, "generic-bl", 0,
++				      &edb7211_lcd_backlight_pdata,
++				      sizeof(edb7211_lcd_backlight_pdata));
  	platform_device_register_simple("video-clps711x", 0, NULL, 0);
- 	platform_device_register_simple("cs89x0", 0, autcpu12_cs8900_resource,
- 					ARRAY_SIZE(autcpu12_cs8900_resource));
-+	platform_device_register(&autcpu12_mmgpio_pdev);
- 	platform_device_register(&autcpu12_nvram_pdev);
+ 	platform_device_register_simple("cs89x0", 0, edb7211_cs8900_resource,
+ 					ARRAY_SIZE(edb7211_cs8900_resource));
+diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
+index 6acf714..1ebf7b9 100644
+--- a/arch/arm/mach-clps711x/include/mach/hardware.h
++++ b/arch/arm/mach-clps711x/include/mach/hardware.h
+@@ -81,10 +81,4 @@
+ 
+ #endif /* CONFIG_ARCH_EDB7211 */
+ 
+-/*
+- * Relevant bits in port D, which controls power to the various parts of
+- * the LCD on the EDB7211.
+- */
+-#define EDB_PD3_LCDBL		(1<<3)
+-
+ #endif
+diff --git a/arch/arm/mach-clps711x/p720t.c b/arch/arm/mach-clps711x/p720t.c
+index e25f10e..1518fc8 100644
+--- a/arch/arm/mach-clps711x/p720t.c
++++ b/arch/arm/mach-clps711x/p720t.c
+@@ -25,6 +25,8 @@
+ #include <linux/io.h>
+ #include <linux/slab.h>
+ #include <linux/leds.h>
++#include <linux/sizes.h>
++#include <linux/backlight.h>
+ #include <linux/platform_device.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/mtd/nand-gpio.h>
+@@ -33,7 +35,6 @@
+ #include <asm/pgtable.h>
+ #include <asm/page.h>
+ #include <asm/setup.h>
+-#include <asm/sizes.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -103,6 +104,21 @@ static struct plat_lcd_data p720t_lcd_power_pdata = {
+ 	.set_power	= p720t_lcd_power_set,
+ };
+ 
++static void p720t_lcd_backlight_set_intensity(int intensity)
++{
++	if (intensity)
++		PLD_PWR |= PLD_S3_ON;
++	else
++		PLD_PWR = 0;
++}
++
++static struct generic_bl_info p720t_lcd_backlight_pdata = {
++	.name			= "lcd-backlight.0",
++	.default_intensity	= 0x01,
++	.max_intensity		= 0x01,
++	.set_bl_intensity	= p720t_lcd_backlight_set_intensity,
++};
++
+ /*
+  * Map the P720T system PLD. It occupies two address spaces:
+  * 0x10000000 and 0x10400000. We map both regions as one.
+@@ -187,6 +203,9 @@ static void __init p720t_init(void)
+ 	platform_device_register_data(&platform_bus, "platform-lcd", 0,
+ 				      &p720t_lcd_power_pdata,
+ 				      sizeof(p720t_lcd_power_pdata));
++	platform_device_register_data(&platform_bus, "generic-bl", 0,
++				      &p720t_lcd_backlight_pdata,
++				      sizeof(p720t_lcd_backlight_pdata));
+ 	platform_device_register_simple("video-clps711x", 0, NULL, 0);
  }
  
-+static void __init autcpu12_init_late(void)
-+{
-+	if (IS_ENABLED(MTD_NAND_GPIO) && IS_ENABLED(GPIO_GENERIC_PLATFORM)) {
-+		/* We are need both drivers to handle NAND */
-+		platform_device_register(&autcpu12_nand_pdev);
-+	}
-+}
+diff --git a/drivers/video/clps711xfb.c b/drivers/video/clps711xfb.c
+index 1902551..037f4d9 100644
+--- a/drivers/video/clps711xfb.c
++++ b/drivers/video/clps711xfb.c
+@@ -22,19 +22,15 @@
+ #include <linux/mm.h>
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+-#include <linux/seq_file.h>
+ #include <linux/slab.h>
+ #include <linux/fb.h>
+ #include <linux/init.h>
+-#include <linux/proc_fs.h>
+ #include <linux/delay.h>
+ 
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+ #include <linux/uaccess.h>
+ 
+-#include <mach/syspld.h>
+-
+ struct fb_info	*cfb;
+ 
+ #define CMAP_MAX_SIZE	16
+@@ -162,25 +158,12 @@ clps7111fb_set_par(struct fb_info *info)
+ 
+ static int clps7111fb_blank(int blank, struct fb_info *info)
+ {
+-    	if (blank) {
+-		if (machine_is_edb7211()) {
+-			/* Turn off the LCD backlight. */
+-			clps_writeb(clps_readb(PDDR) & ~EDB_PD3_LCDBL, PDDR);
+-
+-			/* Disable LCD controller. */
+-			clps_writel(clps_readl(SYSCON1) & ~SYSCON1_LCDEN, 
+-					SYSCON1);
+-		}
+-	} else {
+-		if (machine_is_edb7211()) {
+-			/* Enable LCD controller. */
+-			clps_writel(clps_readl(SYSCON1) | SYSCON1_LCDEN,
+-					SYSCON1);
+-
+-			/* Turn on the LCD backlight. */
+-			clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
+-		}
+-	}
++	/* Enable/Disable LCD controller. */
++    	if (blank)
++		clps_writel(clps_readl(SYSCON1) & ~SYSCON1_LCDEN, SYSCON1);
++	else
++		clps_writel(clps_readl(SYSCON1) | SYSCON1_LCDEN, SYSCON1);
 +
- MACHINE_START(AUTCPU12, "autronix autcpu12")
- 	/* Maintainer: Thomas Gleixner */
- 	.atag_offset	= 0x20000,
-@@ -75,6 +172,7 @@ MACHINE_START(AUTCPU12, "autronix autcpu12")
- 	.init_irq	= clps711x_init_irq,
- 	.timer		= &clps711x_timer,
- 	.init_machine	= autcpu12_init,
-+	.init_late	= autcpu12_init_late,
- 	.handle_irq	= clps711x_handle_irq,
- 	.restart	= clps711x_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-clps711x/include/mach/autcpu12.h b/arch/arm/mach-clps711x/include/mach/autcpu12.h
-index b077abd..0452f5f 100644
---- a/arch/arm/mach-clps711x/include/mach/autcpu12.h
-+++ b/arch/arm/mach-clps711x/include/mach/autcpu12.h
-@@ -40,8 +40,6 @@
+ 	return 0;
+ }
  
- #define AUTCPU12_PHYS_CSAUX1           	CS1_PHYS_BASE +0x04000000  /* physical */
+@@ -195,62 +178,6 @@ static struct fb_ops clps7111fb_ops = {
+ 	.fb_imageblit	= cfb_imageblit,
+ };
  
--#define AUTCPU12_PHYS_SMC              	CS1_PHYS_BASE +0x06000000  /* physical */
--
- #define AUTCPU12_PHYS_CAN              	CS1_PHYS_BASE +0x08000000  /* physical */
- 
- #define AUTCPU12_PHYS_TOUCH            	CS1_PHYS_BASE +0x0A000000  /* physical */
-@@ -50,14 +48,6 @@
- 
- #define AUTCPU12_PHYS_LPT              	CS1_PHYS_BASE +0x0E000000  /* physical */
- 
--/* 
--* defines for smartmedia card access 
--*/
--#define AUTCPU12_SMC_RDY		(1<<2)
--#define AUTCPU12_SMC_ALE		(1<<3)
--#define AUTCPU12_SMC_CLE  		(1<<4)
--#define AUTCPU12_SMC_PORT_OFFSET	PBDR
--#define AUTCPU12_SMC_SELECT_OFFSET 	0x10
- /*
- * defines for lcd contrast 
- */
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 0ef0590..582c283 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -49,13 +49,6 @@ config MTD_NAND_MUSEUM_IDS
- 	  NAND chips (page size 256 byte, erase size 4-8KiB). The IDs
- 	  of these chips were reused by later, larger chips.
- 
--config MTD_NAND_AUTCPU12
--	tristate "SmartMediaCard on autronix autcpu12 board"
--	depends on ARCH_AUTCPU12
--	help
--	  This enables the driver for the autronix autcpu12 board to
--	  access the SmartMediaCard.
--
- config MTD_NAND_DENALI
-         tristate "Support Denali NAND controller"
-         help
-diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
-index 44fca05..d2bd10b 100644
---- a/drivers/mtd/nand/Makefile
-+++ b/drivers/mtd/nand/Makefile
-@@ -11,7 +11,6 @@ obj-$(CONFIG_MTD_SM_COMMON) 		+= sm_common.o
- obj-$(CONFIG_MTD_NAND_CAFE)		+= cafe_nand.o
- obj-$(CONFIG_MTD_NAND_SPIA)		+= spia.o
- obj-$(CONFIG_MTD_NAND_AMS_DELTA)	+= ams-delta.o
--obj-$(CONFIG_MTD_NAND_AUTCPU12)		+= autcpu12.o
- obj-$(CONFIG_MTD_NAND_DENALI)		+= denali.o
- obj-$(CONFIG_MTD_NAND_DENALI_PCI)	+= denali_pci.o
- obj-$(CONFIG_MTD_NAND_DENALI_DT)	+= denali_dt.o
-diff --git a/drivers/mtd/nand/autcpu12.c b/drivers/mtd/nand/autcpu12.c
-deleted file mode 100644
-index 04769a4..0000000
---- a/drivers/mtd/nand/autcpu12.c
-+++ /dev/null
-@@ -1,237 +0,0 @@
--/*
-- *  drivers/mtd/autcpu12.c
-- *
-- *  Copyright (c) 2002 Thomas Gleixner <tgxl@linutronix.de>
-- *
-- *  Derived from drivers/mtd/spia.c
-- *	 Copyright (C) 2000 Steven J. Hill (sjhill at realitydiluted.com)
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- *  Overview:
-- *   This is a device driver for the NAND flash device found on the
-- *   autronix autcpu12 board, which is a SmartMediaCard. It supports
-- *   16MiB, 32MiB and 64MiB cards.
-- *
-- *
-- *	02-12-2002 TG	Cleanup of module params
-- *
-- *	02-20-2002 TG	adjusted for different rd/wr address support
-- *			added support for read device ready/busy line
-- *			added page_cache
-- *
-- *	10-06-2002 TG	128K card support added
-- */
--
--#include <linux/slab.h>
--#include <linux/init.h>
--#include <linux/module.h>
--#include <linux/mtd/mtd.h>
--#include <linux/mtd/nand.h>
--#include <linux/mtd/partitions.h>
--#include <asm/io.h>
--#include <mach/hardware.h>
--#include <asm/sizes.h>
--#include <mach/autcpu12.h>
--
--/*
-- * MTD structure for AUTCPU12 board
-- */
--static struct mtd_info *autcpu12_mtd = NULL;
--static void __iomem *autcpu12_fio_base;
--
--/*
-- * Define partitions for flash devices
-- */
--static struct mtd_partition partition_info16k[] = {
--	{ .name		= "AUTCPU12 flash partition 1",
--	  .offset	= 0,
--	  .size		= 8 * SZ_1M },
--	{ .name		= "AUTCPU12 flash partition 2",
--	  .offset	= 8 * SZ_1M,
--	  .size		= 8 * SZ_1M },
--};
--
--static struct mtd_partition partition_info32k[] = {
--	{ .name		= "AUTCPU12 flash partition 1",
--	  .offset	= 0,
--	  .size		= 8 * SZ_1M },
--	{ .name		= "AUTCPU12 flash partition 2",
--	  .offset	= 8 * SZ_1M,
--	  .size		= 24 * SZ_1M },
--};
--
--static struct mtd_partition partition_info64k[] = {
--	{ .name		= "AUTCPU12 flash partition 1",
--	  .offset	= 0,
--	  .size		= 16 * SZ_1M },
--	{ .name		= "AUTCPU12 flash partition 2",
--	  .offset	= 16 * SZ_1M,
--	  .size		= 48 * SZ_1M },
--};
--
--static struct mtd_partition partition_info128k[] = {
--	{ .name		= "AUTCPU12 flash partition 1",
--	  .offset	= 0,
--	  .size		= 16 * SZ_1M },
--	{ .name		= "AUTCPU12 flash partition 2",
--	  .offset	= 16 * SZ_1M,
--	  .size		= 112 * SZ_1M },
--};
--
--#define NUM_PARTITIONS16K 2
--#define NUM_PARTITIONS32K 2
--#define NUM_PARTITIONS64K 2
--#define NUM_PARTITIONS128K 2
--/*
-- *	hardware specific access to control-lines
-- *
-- *	ALE bit 4 autcpu12_pedr
-- *	CLE bit 5 autcpu12_pedr
-- *	NCE bit 0 fio_ctrl
-- *
-- */
--static void autcpu12_hwcontrol(struct mtd_info *mtd, int cmd,
--			       unsigned int ctrl)
+-static int backlight_proc_show(struct seq_file *m, void *v)
 -{
--	struct nand_chip *chip = mtd->priv;
--
--	if (ctrl & NAND_CTRL_CHANGE) {
--		void __iomem *addr;
--		unsigned char bits;
--
--		bits = clps_readb(AUTCPU12_SMC_PORT_OFFSET) & ~0x30;
--		bits |= (ctrl & NAND_CLE) << 4;
--		bits |= (ctrl & NAND_ALE) << 2;
--		clps_writeb(bits, AUTCPU12_SMC_PORT_OFFSET);
--
--		addr = autcpu12_fio_base + AUTCPU12_SMC_SELECT_OFFSET;
--		writeb((readb(addr) & ~0x1) | (ctrl & NAND_NCE), addr);
+-	if (machine_is_edb7211()) {
+-		seq_printf(m, "%d\n",
+-				(clps_readb(PDDR) & EDB_PD3_LCDBL) ? 1 : 0);
 -	}
 -
--	if (cmd != NAND_CMD_NONE)
--		writeb(cmd, chip->IO_ADDR_W);
+-	return 0;
 -}
 -
--/*
-- *	read device ready pin
-- */
--int autcpu12_device_ready(struct mtd_info *mtd)
+-static int backlight_proc_open(struct inode *inode, struct file *file)
 -{
--	return clps_readb(AUTCPU12_SMC_PORT_OFFSET) & AUTCPU12_SMC_RDY;
+-	return single_open(file, backlight_proc_show, NULL);
 -}
 -
--/*
-- * Main initialization routine
-- */
--static int __init autcpu12_init(void)
+-static ssize_t backlight_proc_write(struct file *file, const char *buffer,
+-				    size_t count, loff_t *pos)
 -{
--	struct nand_chip *this;
--	int err = 0;
+-	unsigned char char_value;
+-	int value;
 -
--	/* Allocate memory for MTD device structure and private data */
--	autcpu12_mtd = kmalloc(sizeof(struct mtd_info) + sizeof(struct nand_chip),
--			       GFP_KERNEL);
--	if (!autcpu12_mtd) {
--		printk("Unable to allocate AUTCPU12 NAND MTD device structure.\n");
--		err = -ENOMEM;
--		goto out;
+-	if (count < 1) {
+-		return -EINVAL;
 -	}
 -
--	/* map physical address */
--	autcpu12_fio_base = ioremap(AUTCPU12_PHYS_SMC, SZ_1K);
--	if (!autcpu12_fio_base) {
--		printk("Ioremap autcpu12 SmartMedia Card failed\n");
--		err = -EIO;
--		goto out_mtd;
+-	if (copy_from_user(&char_value, buffer, 1)) 
+-		return -EFAULT;
+-
+-	value = char_value - '0';
+-
+-	if (machine_is_edb7211()) {
+-		unsigned char port_d;
+-
+-		port_d = clps_readb(PDDR);
+-
+-		if (value) {
+-			port_d |= EDB_PD3_LCDBL;
+-		} else {
+-			port_d &= ~EDB_PD3_LCDBL;
+-		}
+-
+-		clps_writeb(port_d, PDDR);
 -	}
 -
--	/* Get pointer to private data */
--	this = (struct nand_chip *)(&autcpu12_mtd[1]);
+-	return count;
+-}
 -
--	/* Initialize structures */
--	memset(autcpu12_mtd, 0, sizeof(struct mtd_info));
--	memset(this, 0, sizeof(struct nand_chip));
+-static const struct file_operations backlight_proc_fops = {
+-	.owner		= THIS_MODULE,
+-	.open		= backlight_proc_open,
+-	.read		= seq_read,
+-	.llseek		= seq_lseek,
+-	.release	= single_release,
+-	.write		= backlight_proc_write,
+-};
 -
--	/* Link the private data with the MTD structure */
--	autcpu12_mtd->priv = this;
--	autcpu12_mtd->owner = THIS_MODULE;
+ static void __devinit clps711x_guess_lcd_params(struct fb_info *info)
+ {
+ 	unsigned int lcdcon, syscon, size;
+@@ -359,22 +286,6 @@ static int __devinit clps711x_fb_probe(struct platform_device *pdev)
+ 
+ 	fb_alloc_cmap(&cfb->cmap, CMAP_MAX_SIZE, 0);
+ 
+-	if (!proc_create("backlight", 0444, NULL, &backlight_proc_fops)) {
+-		printk("Couldn't create the /proc entry for the backlight.\n");
+-		return -EINVAL;
+-	}
 -
--	/* Set address of NAND IO lines */
--	this->IO_ADDR_R = autcpu12_fio_base;
--	this->IO_ADDR_W = autcpu12_fio_base;
--	this->cmd_ctrl = autcpu12_hwcontrol;
--	this->dev_ready = autcpu12_device_ready;
--	/* 20 us command delay time */
--	this->chip_delay = 20;
--	this->ecc.mode = NAND_ECC_SOFT;
--
--	/* Enable the following for a flash based bad block table */
 -	/*
--	   this->bbt_options = NAND_BBT_USE_FLASH;
+-	 * Power up the LCD
 -	 */
--	this->bbt_options = NAND_BBT_USE_FLASH;
+-	if (machine_is_p720t())
+-		PLD_PWR |= PLD_S3_ON;
 -
--	/* Scan to find existence of the device */
--	if (nand_scan(autcpu12_mtd, 1)) {
--		err = -ENXIO;
--		goto out_ior;
+-	if (machine_is_edb7211()) {
+-		/* Turn on the LCD backlight. */
+-		clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
 -	}
 -
--	/* Register the partitions */
--	switch (autcpu12_mtd->size) {
--		case SZ_16M:
--			mtd_device_register(autcpu12_mtd, partition_info16k,
--					    NUM_PARTITIONS16K);
--			break;
--		case SZ_32M:
--			mtd_device_register(autcpu12_mtd, partition_info32k,
--					    NUM_PARTITIONS32K);
--			break;
--		case SZ_64M:
--			mtd_device_register(autcpu12_mtd, partition_info64k,
--					    NUM_PARTITIONS64K);
--			break;
--		case SZ_128M:
--			mtd_device_register(autcpu12_mtd, partition_info128k,
--					    NUM_PARTITIONS128K);
--			break;
--		default:
--			printk("Unsupported SmartMedia device\n");
--			err = -ENXIO;
--			goto out_ior;
--	}
--	goto out;
+ 	err = register_framebuffer(cfb);
+ 
+ out:	return err;
+@@ -385,12 +296,6 @@ static int __devexit clps711x_fb_remove(struct platform_device *pdev)
+ 	unregister_framebuffer(cfb);
+ 	kfree(cfb);
+ 
+-	/*
+-	 * Power down the LCD
+-	 */
+-	if (machine_is_p720t())
+-		PLD_PWR &= ~PLD_S3_ON;
 -
-- out_ior:
--	iounmap(autcpu12_fio_base);
-- out_mtd:
--	kfree(autcpu12_mtd);
-- out:
--	return err;
--}
--
--module_init(autcpu12_init);
--
--/*
-- * Clean up routine
-- */
--static void __exit autcpu12_cleanup(void)
--{
--	/* Release resources, unregister device */
--	nand_release(autcpu12_mtd);
--
--	/* unmap physical address */
--	iounmap(autcpu12_fio_base);
--
--	/* Free the MTD device structure */
--	kfree(autcpu12_mtd);
--}
--
--module_exit(autcpu12_cleanup);
--
--MODULE_LICENSE("GPL");
--MODULE_AUTHOR("Thomas Gleixner <tglx@linutronix.de>");
--MODULE_DESCRIPTION("Glue layer for SmartMediaCard on autronix autcpu12");
+ 	return 0;
+ }
+ 
 -- 
 1.7.8.6
