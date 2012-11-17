@@ -1,53 +1,26 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 17 Nov 2012 14:02:39 +0100
-Subject: [PULL REQUEST] GPIO driver to turn power off
-Message-ID: <20121117130239.GD11717@lunn.ch>
+Date: Sat, 17 Nov 2012 14:54:35 +0100
+Subject: [PATCH 1/2] clk: mvebu: armada 370/XP add clock gating control
+ provider for DT
+In-Reply-To: <50A75BB4.4070003@free-electrons.com>
+References: <1353014906-31566-6-git-send-email-andrew@lunn.ch>
+ <1353088920-17458-1-git-send-email-gregory.clement@free-electrons.com>
+ <1353088920-17458-2-git-send-email-gregory.clement@free-electrons.com>
+ <20121117082602.GF24569@lunn.ch>
+ <50A75BB4.4070003@free-electrons.com>
+Message-ID: <20121117135435.GA13479@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason
+> > What is the ddr clock for? Does bad things happen if you turn it off?
+> > Kirkwood has a similar clock, dunit, which i decided not to export,
+> > since when you turn it off, the whole SoC locks up.
+> 
+> Well of course if you code run in DDR then it could be a problem. But
+> I think it could be useful to turn it off when going to suspend, it
+> the DDR can do self-refresh. In this case it should be possible to run
+> the code from SRAM or L2 Cache.
 
-Here is a pull request for the GPIO power off driver.
+O.K. Just watch out for the lateinit call in the clock framework.
 
-Thanks
      Andrew
-
-The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
-
-  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
-
-are available in the git repository at:
-
-  git://github.com/lunn/linux.git tags/for-next-gpio-poweroff-v4
-
-for you to fetch changes up to 7125ab6492a33c2a669892cae6f6d5b9643d9672:
-
-  ARM: Kirkwood: Convert IB62x0 to use gpio-poweroff. (2012-11-17 13:37:51 +0100)
-
-----------------------------------------------------------------
-GPIO driver for turning board power off.
-
-----------------------------------------------------------------
-Andrew Lunn (2):
-      ARM: Kirkwood: Convert DNSKW to use gpio-poweroff.
-      ARM: Kirkwood: Convert IB62x0 to use gpio-poweroff.
-
-Jamie Lentin (1):
-      power: Add simple poweroff-gpio driver
-
- .../devicetree/bindings/gpio/gpio-poweroff.txt     |   22 ++++
- arch/arm/boot/dts/kirkwood-dnskw.dtsi              |    5 +
- arch/arm/boot/dts/kirkwood-ib62x0.dts              |    6 +
- arch/arm/mach-kirkwood/Kconfig                     |    4 +
- arch/arm/mach-kirkwood/board-dnskw.c               |   12 --
- arch/arm/mach-kirkwood/board-ib62x0.c              |   13 --
- drivers/power/Kconfig                              |    3 +
- drivers/power/Makefile                             |    1 +
- drivers/power/reset/Kconfig                        |   15 +++
- drivers/power/reset/Makefile                       |    1 +
- drivers/power/reset/gpio-poweroff.c                |  129 ++++++++++++++++++++
- 11 files changed, 186 insertions(+), 25 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
- create mode 100644 drivers/power/reset/Kconfig
- create mode 100644 drivers/power/reset/Makefile
- create mode 100644 drivers/power/reset/gpio-poweroff.c
