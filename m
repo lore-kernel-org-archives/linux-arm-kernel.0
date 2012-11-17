@@ -1,34 +1,44 @@
-From: sr@denx.de (Stefan Roese)
-Date: Sat, 17 Nov 2012 07:16:35 +0100
-Subject: [PATCHv2 0/7] Add basic support for Allwinner A1X SoCs
-In-Reply-To: <1353100828-9218-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1353100828-9218-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <50A72BC3.9030608@denx.de>
+From: w@1wt.eu (Willy Tarreau)
+Date: Sat, 17 Nov 2012 07:48:30 +0100
+Subject: [PATCH v7] Network driver for the Armada 370 and Armada XP ARM
+ Marvell SoCs
+In-Reply-To: <20121115090257.4b9e20c5@skate>
+References: <1352905010-24172-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121114.215922.1242337385782766449.davem@davemloft.net>
+ <20121115083319.76483256@skate>
+ <20121115.024213.1356436436054345008.davem@davemloft.net>
+ <20121115090257.4b9e20c5@skate>
+Message-ID: <20121117064830.GB647@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2012 10:20 PM, Maxime Ripard wrote:
-> Hi,
-> 
-> You'll find in this patchset the initial support for Allwinner A10 and A13 SoCs
-> from Allwinner. Since the internal name of these SoCs are sun4i and sun5i, the
-> mach- directory is named sunxi.
-> 
-> You can find these SoCs in the Cubieboard, the A13-olinuxino or the Melee
-> A1000.
-> 
-> Both SoCs should work fine, as the A13 is a trimmed down version of the A10,
-> but it has only been tested on a A13-OlinuXino from Olimex.
-> 
-> Support is quite minimal for now, since it only includes timer and IRQ
-> controller drivers, so we can only boot to userspace through initramfs. Support
-> for the other peripherals on these SoCs will come eventually.
+Hi Thomas,
 
-Nice work. Thanks. Whole series is:
+On Thu, Nov 15, 2012 at 09:02:57AM +0100, Thomas Petazzoni wrote:
+> David,
+> 
+> On Thu, 15 Nov 2012 02:42:13 -0500 (EST), David Miller wrote:
+> > From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Date: Thu, 15 Nov 2012 08:33:19 +0100
+> > 
+> > > Would you mind if we take, with your Ack, the network driver through
+> > > the arm-soc tree, so that we can carry the related patches modifying
+> > > the Device Tree and so on? If not, then I'll send you a pull request
+> > > with just the drivers/net changes, and we'll integrate the ARM-related
+> > > changes through the arm-soc tree, in which we will have the necessary
+> > > dependencies. I'm fine with any of those solutions.
+> > 
+> > Sure, no problem, take it via the ARM tree:
+> > 
+> > Acked-by: David S. Miller <davem@davemloft.net>
+> 
+> Excellent, thanks!
 
-Acked-by: Stefan Roese <sr@denx.de>
+Your patch set works fine on my mirabox, feel free to add my tested-by
+to the patch set if you want :
 
-I'll send some A10/cubieboard patches beginning next week.
+   Tested-By: Willy Tarreau <w@1wt.eu>
 
-Thanks,
-Stefan
+Nice work!
+
+Willy
