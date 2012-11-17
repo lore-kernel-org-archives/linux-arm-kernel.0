@@ -1,93 +1,199 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 17 Nov 2012 17:00:50 +0100
-Subject: [PATCH v2 08/14] ARM: Kirkwood: Convert dreamplug to pinctrl.
+Date: Sat, 17 Nov 2012 17:00:48 +0100
+Subject: [PATCH v2 06/14] ARM: Kirkwood: Convert dnskw to pinctrl
 In-Reply-To: <1353168058-14043-1-git-send-email-andrew@lunn.ch>
 References: <1353168058-14043-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1353168058-14043-9-git-send-email-andrew@lunn.ch>
+Message-ID: <1353168058-14043-7-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
 ---
- arch/arm/boot/dts/kirkwood-dreamplug.dts |   21 +++++++++++++++++++++
- arch/arm/mach-kirkwood/board-dreamplug.c |   14 --------------
- 2 files changed, 21 insertions(+), 14 deletions(-)
+ arch/arm/boot/dts/kirkwood-dnskw.dtsi |  105 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-dnskw.c  |   37 ------------
+ 2 files changed, 105 insertions(+), 37 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-index 26e281f..f2d386c 100644
---- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- 
+diff --git a/arch/arm/boot/dts/kirkwood-dnskw.dtsi b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
+index b6aeb4f..98f9664 100644
+--- a/arch/arm/boot/dts/kirkwood-dnskw.dtsi
++++ b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
+@@ -1,4 +1,5 @@
  /include/ "kirkwood.dtsi"
 +/include/ "kirkwood-6281.dtsi"
  
  / {
- 	model = "Globalscale Technologies Dreamplug";
-@@ -16,6 +17,26 @@
+ 	model = "D-Link DNS NASes (kirkwood-based)";
+@@ -41,6 +42,110 @@
  	};
  
  	ocp at f1000000 {
 +		pinctrl: pinctrl at 10000 {
 +
-+			pinctrl-0 = < &pmx_spi
-+				      &pmx_led_bluetooth &pmx_led_wifi
-+				      &pmx_led_wifi_ap >;
++			pinctrl-0 = < &pmx_nand &pmx_uart1
++				      &pmx_sata0 &pmx_sata1
++				      &pmx_led_power
++				      &pmx_led_red_right_hdd
++				      &pmx_led_red_left_hdd
++				      &pmx_led_red_usb_325
++				      &pmx_button_power
++				      &pmx_led_red_usb_320
++				      &pmx_power_off &pmx_power_back_on
++				      &pmx_power_sata0 &pmx_power_sata1
++				      &pmx_present_sata0 &pmx_present_sata1
++				      &pmx_led_white_usb &pmx_fan_tacho
++				      &pmx_fan_high_speed &pmx_fan_low_speed
++				      &pmx_button_unmount &pmx_button_reset
++				      &pmx_temp_alarm >;
 +			pinctrl-names = "default";
 +
-+			pmx_led_bluetooth: pmx-led-bluetooth {
++			pmx_sata0: pmx-sata0 {
++				marvell,pins = "mpp20";
++				marvell,function = "sata1";
++			};
++			pmx_sata1: pmx-sata1 {
++				marvell,pins = "mpp21";
++				marvell,function = "sata0";
++			};
++			pmx_led_power: pmx-led-power {
++				marvell,pins = "mpp26";
++				marvell,function = "gpio";
++			};
++			pmx_led_red_right_hdd: pmx-led-red-right-hdd {
++				marvell,pins = "mpp27";
++				marvell,function = "gpio";
++			};
++			pmx_led_red_left_hdd: pmx-led-red-left-hdd {
++				marvell,pins = "mpp28";
++				marvell,function = "gpio";
++			};
++			pmx_led_red_usb_325: pmx-led-red-usb-325 {
++				marvell,pins = "mpp29";
++				marvell,function = "gpio";
++			};
++			pmx_button_power: pmx-button-power {
++				marvell,pins = "mpp34";
++				marvell,function = "gpio";
++			};
++			pmx_led_red_usb_320: pmx-led-red-usb-320 {
++				marvell,pins = "mpp35";
++				marvell,function = "gpio";
++			};
++			pmx_power_off: pmx-power-off {
++				marvell,pins = "mpp36";
++				marvell,function = "gpio";
++			};
++			pmx_power_back_on: pmx-power-back-on {
++				marvell,pins = "mpp37";
++				marvell,function = "gpio";
++			};
++			pmx_power_sata0: pmx-power-sata0 {
++				marvell,pins = "mpp39";
++				marvell,function = "gpio";
++			};
++			pmx_power_sata1: pmx-power-sata1 {
++				marvell,pins = "mpp40";
++				marvell,function = "gpio";
++			};
++			pmx_present_sata0: pmx-present-sata0 {
++				marvell,pins = "mpp41";
++				marvell,function = "gpio";
++			};
++			pmx_present_sata1: pmx-present-sata1 {
++				marvell,pins = "mpp42";
++				marvell,function = "gpio";
++			};
++			pmx_led_white_usb: pmx-led-white-usb {
++				marvell,pins = "mpp43";
++				marvell,function = "gpio";
++			};
++			pmx_fan_tacho: pmx-fan-tacho {
++				marvell,pins = "mpp44";
++				marvell,function = "gpio";
++			};
++			pmx_fan_high_speed: pmx-fan-high-speed {
++				marvell,pins = "mpp45";
++				marvell,function = "gpio";
++			};
++			pmx_fan_low_speed: pmx-fan-low-speed {
++				marvell,pins = "mpp46";
++				marvell,function = "gpio";
++			};
++			pmx_button_unmount: pmx-button-unmount {
 +				marvell,pins = "mpp47";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_wifi: pmx-led-wifi {
++			pmx_button_reset: pmx-button-reset {
 +				marvell,pins = "mpp48";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_wifi_ap: pmx-led-wifi-ap {
++			pmx_temp_alarm: pmx-temp-alarm {
 +				marvell,pins = "mpp49";
 +				marvell,function = "gpio";
 +			};
 +		};
- 		serial at 12000 {
- 			clock-frequency = <200000000>;
- 			status = "ok";
-diff --git a/arch/arm/mach-kirkwood/board-dreamplug.c b/arch/arm/mach-kirkwood/board-dreamplug.c
-index 20af53a..db0c280 100644
---- a/arch/arm/mach-kirkwood/board-dreamplug.c
-+++ b/arch/arm/mach-kirkwood/board-dreamplug.c
-@@ -32,7 +32,6 @@
- #include <mach/bridge-regs.h>
- #include <linux/platform_data/mmc-mvsdio.h>
+ 		sata at 80000 {
+ 			status = "okay";
+ 			nr-ports = <2>;
+diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
+index 653bbbe..7f4b8af 100644
+--- a/arch/arm/mach-kirkwood/board-dnskw.c
++++ b/arch/arm/mach-kirkwood/board-dnskw.c
+@@ -17,46 +17,11 @@
+ #include <linux/mv643xx_eth.h>
+ #include <linux/gpio.h>
  #include "common.h"
 -#include "mpp.h"
  
- static struct mv643xx_eth_platform_data dreamplug_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
-@@ -46,24 +45,11 @@ static struct mvsdio_platform_data dreamplug_mvsdio_data = {
- 	/* unfortunately the CD signal has not been connected */
+ static struct mv643xx_eth_platform_data dnskw_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
  };
  
--static unsigned int dreamplug_mpp_config[] __initdata = {
--	MPP0_SPI_SCn,
--	MPP1_SPI_MOSI,
--	MPP2_SPI_SCK,
--	MPP3_SPI_MISO,
--	MPP47_GPIO,	/* Bluetooth LED */
--	MPP48_GPIO,	/* Wifi LED */
--	MPP49_GPIO,	/* Wifi AP LED */
+-static unsigned int dnskw_mpp_config[] __initdata = {
+-	MPP13_UART1_TXD,	/* Custom ... */
+-	MPP14_UART1_RXD,	/* ... Controller (DNS-320 only) */
+-	MPP20_SATA1_ACTn,	/* LED: White Right HDD */
+-	MPP21_SATA0_ACTn,	/* LED: White Left HDD */
+-	MPP24_GPIO,
+-	MPP25_GPIO,
+-	MPP26_GPIO,	/* LED: Power */
+-	MPP27_GPIO,	/* LED: Red Right HDD */
+-	MPP28_GPIO,	/* LED: Red Left HDD */
+-	MPP29_GPIO,	/* LED: Red USB (DNS-325 only) */
+-	MPP30_GPIO,
+-	MPP31_GPIO,
+-	MPP32_GPIO,
+-	MPP33_GPO,
+-	MPP34_GPIO,	/* Button: Front power */
+-	MPP35_GPIO,	/* LED: Red USB (DNS-320 only) */
+-	MPP36_GPIO,	/* Power: Turn off board */
+-	MPP37_GPIO,	/* Power: Turn back on after power failure */
+-	MPP38_GPIO,
+-	MPP39_GPIO,	/* Power: SATA0 */
+-	MPP40_GPIO,	/* Power: SATA1 */
+-	MPP41_GPIO,	/* SATA0 present */
+-	MPP42_GPIO,	/* SATA1 present */
+-	MPP43_GPIO,	/* LED: White USB */
+-	MPP44_GPIO,	/* Fan: Tachometer Pin */
+-	MPP45_GPIO,	/* Fan: high speed */
+-	MPP46_GPIO,	/* Fan: low speed */
+-	MPP47_GPIO,	/* Button: Back unmount */
+-	MPP48_GPIO,	/* Button: Back reset */
+-	MPP49_GPIO,	/* Temp Alarm (DNS-325) Pin of U5 (DNS-320) */
 -	0
 -};
 -
- void __init dreamplug_init(void)
+ /* Register any GPIO for output and set the value */
+ static void __init dnskw_gpio_register(unsigned gpio, char *name, int def)
  {
- 	/*
- 	 * Basic setup. Needs to be called early.
- 	 */
--	kirkwood_mpp_conf(dreamplug_mpp_config);
+@@ -71,8 +36,6 @@ static void __init dnskw_gpio_register(unsigned gpio, char *name, int def)
+ 
+ void __init dnskw_init(void)
+ {
+-	kirkwood_mpp_conf(dnskw_mpp_config);
 -
  	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&dreamplug_ge00_data);
- 	kirkwood_ge01_init(&dreamplug_ge01_data);
+ 	kirkwood_ge00_init(&dnskw_ge00_data);
+ 
 -- 
 1.7.10.4
