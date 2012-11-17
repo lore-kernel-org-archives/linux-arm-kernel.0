@@ -1,35 +1,66 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Sat, 17 Nov 2012 08:30:22 +0100
-Subject: [PATCH] ARM: tegra: seaboard: enable internal LCD
-In-Reply-To: <50A7020B.6070708@nvidia.com>
-References: <1353092114-18410-1-git-send-email-swarren@wwwdotorg.org>
- <50A7020B.6070708@nvidia.com>
-Message-ID: <20121117073022.GB26391@avionic-0098.mockup.avionic-design.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 17 Nov 2012 09:19:45 +0100
+Subject: [PATCH 1/1] ARM: kirkwood: Add support for the MPL CEC4
+In-Reply-To: <50A6946D.3030006@mpl.ch>
+References: <cover.1353055273.git.s.peter@mpl.ch>
+ <7f8832a749a9ebc378460f26d13ed524b7da18a8.1353055273.git.s.peter@mpl.ch>
+ <20121116151128.GO22106@titan.lakedaemon.net>
+ <50A6946D.3030006@mpl.ch>
+Message-ID: <20121117081945.GE24569@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 17, 2012 at 12:18:35PM +0900, Alex Courbot wrote:
-> On 11/17/2012 03:55 AM, Stephen Warren wrote:
-> >+	host1x {
-> >+		dc at 54200000 {
-> >+			rgb {
-> >+				status = "okay";
-> >+				nvidia,ddc-i2c-bus = <&lcd_ddc>;
-> >+				backlight = <&backlight>;
+> >> +static unsigned int mplcec4_mpp_config[] __initdata = {
+> >> +	MPP0_NF_IO2,
+> >> +	MPP1_NF_IO3,
+> >> +	MPP2_NF_IO4,
+> >> +	MPP3_NF_IO5,
+> >> +	MPP4_NF_IO6,
+> >> +	MPP5_NF_IO7,
+> >> +	MPP6_SYSRST_OUTn,
+> >> +	MPP7_GPO,	/* Status LED Green High Active */
+> >> +	MPP10_UART0_TXD,
+> >> +	MPP11_UART0_RXD,
+> >> +	MPP12_SD_CLK,
+> >> +	MPP13_SD_CMD,	/* Alt UART1_TXD */
+> >> +	MPP14_SD_D0,	/* Alt UART1_RXD */
+> >> +	MPP15_SD_D1,
+> >> +	MPP16_SD_D2,
+> >> +	MPP17_SD_D3,
+> >> +	MPP18_NF_IO0,
+> >> +	MPP19_NF_IO1,
+> >> +	MPP28_GPIO,	/* Input SYS_POR_DET (active High) */
+> >> +	MPP29_GPIO,	/* Input SYS_RTC_INT (active High) */
+> >> +	MPP34_SATA1_ACTn,
+> >> +	MPP35_SATA0_ACTn,
+> >> +	MPP40_GPIO,	/* LED User1 orange */
+> >> +	MPP41_GPIO,	/* LED User1 green */
+> >> +	MPP44_GPIO,	/* LED User0 orange */
+> >> +	MPP45_GPIO,	/* LED User0 green */
+> >> +	MPP46_GPIO,	/* Status LED Yellow High Active */
+> >> +	MPP47_GPIO,	/* SD_CD# (in/IRQ)*/
+> >> +	0
+> >> +};
+> > 
+> > We're this to DT during this merge window, but don't worry about
+> > changing it.  We'll be doing a cleanup patch to catch the new boards.
+> > If you could just keep an eye out for it and test, it would be
+> > appreciated.
 > 
-> I guess the remark Thierry made on my patch that the property should
-> be "nvidia,backlight" (and that it will not be supported for 3.8
-> anyway) also applies here.
+> 
+> If you can point me to the appropriate tree, I'd like to try to do this
+> myself. I could even rebase the CEC4 patch to this tree if you prefer.
 
-Yes, and the property should go into the rgb's display subnode.
-Eventually this will need to be hooked up to the panel framework once
-that's ready.
+You can take a look at 
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121117/4d19fdbd/attachment.sig>
+git://github.com/lunn/linux.git v3.7-rc2-pinctrl-v2
+
+These patches have been on the list once, maybe twice. I will be
+posting them again soon, maybe in a different order.
+
+Jason also has a patch from me which converts the ehci setup to device
+tree. With that patch in place, you just need to drop the
+kirkwood_ehci_init().
+
+
+	Andrew
