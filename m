@@ -1,66 +1,59 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 17 Nov 2012 09:19:45 +0100
-Subject: [PATCH 1/1] ARM: kirkwood: Add support for the MPL CEC4
-In-Reply-To: <50A6946D.3030006@mpl.ch>
-References: <cover.1353055273.git.s.peter@mpl.ch>
- <7f8832a749a9ebc378460f26d13ed524b7da18a8.1353055273.git.s.peter@mpl.ch>
- <20121116151128.GO22106@titan.lakedaemon.net>
- <50A6946D.3030006@mpl.ch>
-Message-ID: <20121117081945.GE24569@lunn.ch>
+Date: Sat, 17 Nov 2012 09:26:02 +0100
+Subject: [PATCH 1/2] clk: mvebu: armada 370/XP add clock gating control
+ provider for DT
+In-Reply-To: <1353088920-17458-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1353014906-31566-6-git-send-email-andrew@lunn.ch>
+ <1353088920-17458-1-git-send-email-gregory.clement@free-electrons.com>
+ <1353088920-17458-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20121117082602.GF24569@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> +static unsigned int mplcec4_mpp_config[] __initdata = {
-> >> +	MPP0_NF_IO2,
-> >> +	MPP1_NF_IO3,
-> >> +	MPP2_NF_IO4,
-> >> +	MPP3_NF_IO5,
-> >> +	MPP4_NF_IO6,
-> >> +	MPP5_NF_IO7,
-> >> +	MPP6_SYSRST_OUTn,
-> >> +	MPP7_GPO,	/* Status LED Green High Active */
-> >> +	MPP10_UART0_TXD,
-> >> +	MPP11_UART0_RXD,
-> >> +	MPP12_SD_CLK,
-> >> +	MPP13_SD_CMD,	/* Alt UART1_TXD */
-> >> +	MPP14_SD_D0,	/* Alt UART1_RXD */
-> >> +	MPP15_SD_D1,
-> >> +	MPP16_SD_D2,
-> >> +	MPP17_SD_D3,
-> >> +	MPP18_NF_IO0,
-> >> +	MPP19_NF_IO1,
-> >> +	MPP28_GPIO,	/* Input SYS_POR_DET (active High) */
-> >> +	MPP29_GPIO,	/* Input SYS_RTC_INT (active High) */
-> >> +	MPP34_SATA1_ACTn,
-> >> +	MPP35_SATA0_ACTn,
-> >> +	MPP40_GPIO,	/* LED User1 orange */
-> >> +	MPP41_GPIO,	/* LED User1 green */
-> >> +	MPP44_GPIO,	/* LED User0 orange */
-> >> +	MPP45_GPIO,	/* LED User0 green */
-> >> +	MPP46_GPIO,	/* Status LED Yellow High Active */
-> >> +	MPP47_GPIO,	/* SD_CD# (in/IRQ)*/
-> >> +	0
-> >> +};
-> > 
-> > We're this to DT during this merge window, but don't worry about
-> > changing it.  We'll be doing a cleanup patch to catch the new boards.
-> > If you could just keep an eye out for it and test, it would be
-> > appreciated.
+Hi Gregory
+
+Nice work
+
+On Fri, Nov 16, 2012 at 07:01:59PM +0100, Gregory CLEMENT wrote:
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  .../bindings/clock/mvebu-gated-clock.txt           |   43 ++++++++++++++
+>  arch/arm/mach-mvebu/Kconfig                        |    1 +
+>  drivers/clk/mvebu/clk-gating-ctrl.c                |   61 ++++++++++++++++++++
+>  3 files changed, 105 insertions(+)
 > 
-> 
-> If you can point me to the appropriate tree, I'd like to try to do this
-> myself. I could even rebase the CEC4 patch to this tree if you prefer.
+> diff --git a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+> index 7497cc0..9dbcdd9 100644
+> --- a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+> @@ -6,6 +6,49 @@ the clock ID in its "clocks" phandle cell. The clock ID is directly mapped to
+>  the corresponding clock gating control bit in HW to ease manual clock lookup
+>  in datasheet.
+>  
+> +The following is a list of provided IDs for Armada XP:
 
-You can take a look at 
+Should that the 370, not XP?
 
-git://github.com/lunn/linux.git v3.7-rc2-pinctrl-v2
+> +ID	Clock	Peripheral
+> +-----------------------------------
+> +0	Audio	AC97 Cntrl
+> +1	pex0_en	PCIe 0 Clock out
+> +2	pex1_en	PCIe 1 Clock out
+> +3	ge1	Gigabit Ethernet 1
+> +4	ge0	Gigabit Ethernet 0
+> +5	pex0	PCIe Cntrl 0
+> +9	pex1	PCIe Cntrl 1
+> +15	sata0	SATA Host 0
+> +17	sdio	SDHCI Host
+> +25	tdm	Time Division Mplx
+> +28	ddr	DDR Cntrl
+> +30	sata1	SATA Host 0
 
-These patches have been on the list once, maybe twice. I will be
-posting them again soon, maybe in a different order.
+Not many clocks there. USB? XOR? Crypto?
 
-Jason also has a patch from me which converts the ehci setup to device
-tree. With that patch in place, you just need to drop the
-kirkwood_ehci_init().
+What is the ddr clock for? Does bad things happen if you turn it off?
+Kirkwood has a similar clock, dunit, which i decided not to export,
+since when you turn it off, the whole SoC locks up.
 
-
-	Andrew
+Thanks
+      Andrew
