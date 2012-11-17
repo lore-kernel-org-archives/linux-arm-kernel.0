@@ -1,144 +1,171 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 17 Nov 2012 17:00:53 +0100
-Subject: [PATCH v2 11/14] ARM: Kirkwood: Convert lsxl boards to pinctrl.
+Date: Sat, 17 Nov 2012 17:00:54 +0100
+Subject: [PATCH v2 12/14] ARM: Kirkwood: Convert IX2-200 to pinctrl.
 In-Reply-To: <1353168058-14043-1-git-send-email-andrew@lunn.ch>
 References: <1353168058-14043-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1353168058-14043-12-git-send-email-andrew@lunn.ch>
+Message-ID: <1353168058-14043-13-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Michael Walle <michael@walle.cc>
 ---
- arch/arm/boot/dts/kirkwood-lsxl.dtsi |   66 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-lsxl.c  |   19 ----------
- 2 files changed, 66 insertions(+), 19 deletions(-)
+ arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts |   89 +++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-iomega_ix2_200.c |   24 -------
+ 2 files changed, 89 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-index 65a8c52..f5362c4 100644
---- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-@@ -1,4 +1,5 @@
+diff --git a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
+index 865aeec..6cae459 100644
+--- a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
++++ b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
+@@ -1,6 +1,7 @@
+ /dts-v1/;
+ 
  /include/ "kirkwood.dtsi"
 +/include/ "kirkwood-6281.dtsi"
  
  / {
- 	chosen {
-@@ -6,6 +7,71 @@
+ 	model = "Iomega StorCenter ix2-200";
+@@ -16,6 +17,94 @@
  	};
  
  	ocp at f1000000 {
 +		pinctrl: pinctrl at 10000 {
 +
-+			pinctrl-0 = < &pmx_power_hdd &pmx_usb_vbus
-+				      &pmx_fan_low &pmx_fan_high
-+				      &pmx_led_function_red &pmx_led_alarm
-+				      &pmx_led_info &pmx_led_power
-+				      &pmx_fan_lock &pmx_button_function
-+				      &pmx_power_switch &pmx_power_auto_switch
-+				      &pmx_led_function_blue >;
++			pinctrl-0 = < &pmx_button_reset &pmx_button_power
++				      &pmx_led_backup &pmx_led_power
++				      &pmx_button_otb &pmx_led_rebuild
++				      &pmx_led_health
++				      &pmx_led_sata_brt_ctrl_1
++				      &pmx_led_sata_brt_ctrl_2
++				      &pmx_led_backup_brt_ctrl_1
++				      &pmx_led_backup_brt_ctrl_2
++				      &pmx_led_power_brt_ctrl_1
++				      &pmx_led_power_brt_ctrl_2
++				      &pmx_led_health_brt_ctrl_1
++				      &pmx_led_health_brt_ctrl_2
++				      &pmx_led_rebuild_brt_ctrl_1
++				      &pmx_led_rebuild_brt_ctrl_2 >;
 +			pinctrl-names = "default";
 +
-+			pmx_power_hdd: pmx-power-hdd {
-+				marvell,pins = "mpp10";
-+				marvell,function = "gpo";
-+			};
-+			pmx_usb_vbus: pmx-usb-vbus {
-+				marvell,pins = "mpp11";
++			pmx_button_reset: pmx-button-reset {
++				marvell,pins = "mpp12";
 +				marvell,function = "gpio";
 +			};
-+			pmx_fan_high: pmx-fan-high {
-+				marvell,pins = "mpp18";
-+				marvell,function = "gpo";
-+			};
-+			pmx_fan_low: pmx-fan-low {
-+				marvell,pins = "mpp19";
-+				marvell,function = "gpo";
-+			};
-+			pmx_led_function_blue: pmx-led-function-blue {
-+				marvell,pins = "mpp36";
++			pmx_button_power: pmx-button-power {
++				marvell,pins = "mpp14";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_alarm: pmx-led-alarm {
-+				marvell,pins = "mpp37";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_info: pmx-led-info {
-+				marvell,pins = "mpp38";
++			pmx_led_backup: pmx-led-backup {
++				marvell,pins = "mpp15";
 +				marvell,function = "gpio";
 +			};
 +			pmx_led_power: pmx-led-power {
++				marvell,pins = "mpp16";
++				marvell,function = "gpio";
++			};
++			pmx_button_otb: pmx-button-otb {
++				marvell,pins = "mpp35";
++				marvell,function = "gpio";
++			};
++			pmx_led_rebuild: pmx-led-rebuild {
++				marvell,pins = "mpp36";
++				marvell,function = "gpio";
++			};
++			pmx_led_health: pmx-led_health {
++				marvell,pins = "mpp37";
++				marvell,function = "gpio";
++			};
++			pmx_led_sata_brt_ctrl_1: pmx-led-sata-brt-ctrl-1 {
++				marvell,pins = "mpp38";
++				marvell,function = "gpio";
++			};
++			pmx_led_sata_brt_ctrl_2: pmx-led-sata-brt-ctrl-2 {
 +				marvell,pins = "mpp39";
 +				marvell,function = "gpio";
 +			};
-+			pmx_fan_lock: pmx-fan-lock {
++			pmx_led_backup_brt_ctrl_1: pmx-led-backup-brt-ctrl-1 {
 +				marvell,pins = "mpp40";
 +				marvell,function = "gpio";
 +			};
-+			pmx_button_function: pmx-button-function {
++			pmx_led_backup_brt_ctrl_2: pmx-led-backup-brt-ctrl-2 {
 +				marvell,pins = "mpp41";
 +				marvell,function = "gpio";
 +			};
-+			pmx_power_switch: pmx-power-switch {
++			pmx_led_power_brt_ctrl_1: pmx-led-power-brt-ctrl-1 {
 +				marvell,pins = "mpp42";
 +				marvell,function = "gpio";
 +			};
-+			pmx_power_auto_switch: pmx-power-auto-switch {
++			pmx_led_power_brt_ctrl_2: pmx-led-power-brt-ctrl-2 {
 +				marvell,pins = "mpp43";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_function_red: pmx-led-function_red {
-+				marvell,pins = "mpp48";
++			pmx_led_health_brt_ctrl_1: pmx-led-health-brt-ctrl-1 {
++				marvell,pins = "mpp44";
++				marvell,function = "gpio";
++			};
++			pmx_led_health_brt_ctrl_2: pmx-led-health-brt-ctrl-2 {
++				marvell,pins = "mpp45";
++				marvell,function = "gpio";
++			};
++			pmx_led_rebuild_brt_ctrl_1: pmx-led-rebuild-brt-ctrl-1 {
++				marvell,pins = "mpp44";
++				marvell,function = "gpio";
++			};
++			pmx_led_rebuild_brt_ctrl_2: pmx-led-rebuild-brt-ctrl-2 {
++				marvell,pins = "mpp45";
 +				marvell,function = "gpio";
 +			};
 +
 +		};
- 		sata at 80000 {
+ 		i2c at 11000 {
  			status = "okay";
- 			nr-ports = <1>;
-diff --git a/arch/arm/mach-kirkwood/board-lsxl.c b/arch/arm/mach-kirkwood/board-lsxl.c
-index b9845c0..8346699 100644
---- a/arch/arm/mach-kirkwood/board-lsxl.c
-+++ b/arch/arm/mach-kirkwood/board-lsxl.c
-@@ -25,7 +25,6 @@
- #include <asm/mach/arch.h>
+ 
+diff --git a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
+index 158fb97..c144712 100644
+--- a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
++++ b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
+@@ -15,7 +15,6 @@
+ #include <linux/ethtool.h>
  #include <mach/kirkwood.h>
  #include "common.h"
 -#include "mpp.h"
  
- static struct mv643xx_eth_platform_data lsxl_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
-@@ -35,23 +34,6 @@ static struct mv643xx_eth_platform_data lsxl_ge01_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+ static struct mv643xx_eth_platform_data iomega_ix2_200_ge00_data = {
+ 	.phy_addr       = MV643XX_ETH_PHY_NONE,
+@@ -23,34 +22,11 @@ static struct mv643xx_eth_platform_data iomega_ix2_200_ge00_data = {
+ 	.duplex         = DUPLEX_FULL,
  };
  
--static unsigned int lsxl_mpp_config[] __initdata = {
--	MPP10_GPO,	/* HDD Power Enable */
--	MPP11_GPIO,	/* USB Vbus Enable */
--	MPP18_GPO,	/* FAN High Enable# */
--	MPP19_GPO,	/* FAN Low Enable# */
--	MPP36_GPIO,	/* Function Blue LED */
--	MPP37_GPIO,	/* Alarm LED */
--	MPP38_GPIO,	/* Info LED */
--	MPP39_GPIO,	/* Power LED */
--	MPP40_GPIO,	/* Fan Lock */
--	MPP41_GPIO,	/* Function Button */
--	MPP42_GPIO,	/* Power Switch */
--	MPP43_GPIO,	/* Power Auto Switch */
--	MPP48_GPIO,	/* Function Red LED */
+-static unsigned int iomega_ix2_200_mpp_config[] __initdata = {
+-	MPP12_GPIO,			/* Reset Button */
+-	MPP14_GPIO,			/* Power Button */
+-	MPP15_GPIO,			/* Backup LED (blue) */
+-	MPP16_GPIO,			/* Power LED (white) */
+-	MPP35_GPIO,			/* OTB Button */
+-	MPP36_GPIO,			/* Rebuild LED (white) */
+-	MPP37_GPIO,			/* Health LED (red) */
+-	MPP38_GPIO,			/* SATA LED brightness control 1 */
+-	MPP39_GPIO,			/* SATA LED brightness control 2 */
+-	MPP40_GPIO,			/* Backup LED brightness control 1 */
+-	MPP41_GPIO,			/* Backup LED brightness control 2 */
+-	MPP42_GPIO,			/* Power LED brightness control 1 */
+-	MPP43_GPIO,			/* Power LED brightness control 2 */
+-	MPP44_GPIO,			/* Health LED brightness control 1 */
+-	MPP45_GPIO,			/* Health LED brightness control 2 */
+-	MPP46_GPIO,			/* Rebuild LED brightness control 1 */
+-	MPP47_GPIO,			/* Rebuild LED brightness control 2 */
 -	0
 -};
 -
- #define LSXL_GPIO_FAN_HIGH	18
- #define LSXL_GPIO_FAN_LOW	19
- #define LSXL_GPIO_FAN_LOCK	40
-@@ -115,7 +97,6 @@ void __init lsxl_init(void)
+ void __init iomega_ix2_200_init(void)
+ {
  	/*
  	 * Basic setup. Needs to be called early.
  	 */
--	kirkwood_mpp_conf(lsxl_mpp_config);
- 
+-	kirkwood_mpp_conf(iomega_ix2_200_mpp_config);
+-
  	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&lsxl_ge00_data);
+ 
+ 	kirkwood_ge01_init(&iomega_ix2_200_ge00_data);
 -- 
 1.7.10.4
