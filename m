@@ -1,435 +1,83 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Sat, 17 Nov 2012 08:13:51 -0800
-Subject: [PATCH V4] Add support for generic BCM SoC chipsets
-Message-ID: <1353168831-11640-1-git-send-email-csd@broadcom.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 17 Nov 2012 18:15:01 +0100
+Subject: [PATCH] DMA: mv_xor: Add a device_control function
+Message-ID: <1353172501-499-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to start upstreaming Broadcom SoC support, create
-a starting hierarchy, arch and dts files.
-The first support SoC family that is planned is the
-BCM281XX (BCM11130/11140/11351/28145/28155) family of dual A9 mobile
-SoC cores.
-This code is just the skeleton code for get the machine upstreamed. It
-has been made MULTIPLATFORM compatible.
-Next steps
-----------
-Upstream a basic set of drivers - sufficient for a console boot to
-ramdisk. These will includer timer, gpio, i2c drivers.
-After this basic set, we will proceed with a more comprehensive set
-of drivers for the 281XX SoC family.
+The dmatest module for DMA engines calls
 
-v2 patch mods
---------
- - Remove l2x0_of_init call as there were problems with the code.
-   A separate patch will be submitted with cache init code
- - Rename capri files and refs to bcm281xx-based names
- - Add bcm281xx binding doc
- - various misc cleanups
+device_control(dtc->chan, DMA_TERMINATE_ALL, 0);
 
-v3 patch mods
--------------
- - Remove extra #include lines
- - Remove remaining references to capri
- - dt uart chipset string added
- - cleaned up chip # references
+after completing the tests. The documentation in
+include/linux/dmaengine.h suggests this function is optional and
+dma_async_device_register() also does not BUG_ON() when not passed a
+function. However, dmatest is not the only code in the kernel
+unconditionally calling device_control. So add an implementation
+indicating all operations are not implemented.
 
-v4 patch mods
--------------
- - swap order of compatible definitions for uart
- - fix typo
-
-Signed-off-by: Christian Daudt <csd@broadcom.com>
-Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- .../devicetree/bindings/arm/bcm/bcm281xx.txt       |    8 ++
- arch/arm/Kconfig                                   |    2 +
- arch/arm/Makefile                                  |    1 +
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/bcm11351-brt.dts                 |   30 +++++
- arch/arm/boot/dts/bcm281xx.dtsi                    |   50 +++++++++
- arch/arm/configs/bcm_defconfig                     |  114 ++++++++++++++++++++
- arch/arm/mach-bcm/Kconfig                          |   19 ++++
- arch/arm/mach-bcm/Makefile                         |   13 +++
- arch/arm/mach-bcm/board_bcm.c                      |   57 ++++++++++
- 10 files changed, 295 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/bcm281xx.txt
- create mode 100644 arch/arm/boot/dts/bcm11351-brt.dts
- create mode 100644 arch/arm/boot/dts/bcm281xx.dtsi
- create mode 100644 arch/arm/configs/bcm_defconfig
- create mode 100644 arch/arm/mach-bcm/Kconfig
- create mode 100644 arch/arm/mach-bcm/Makefile
- create mode 100644 arch/arm/mach-bcm/board_bcm.c
 
-diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm281xx.txt b/Documentation/devicetree/bindings/arm/bcm/bcm281xx.txt
-new file mode 100644
-index 0000000..c47200f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/bcm/bcm281xx.txt
-@@ -0,0 +1,8 @@
-+Broadcom BCM281XX device tree bindings
-+-------------------------------------------
-+
-+Boards with the bcm281xx SoC family shall have the following properties:
-+
-+Required root node property:
-+
-+compatible = "bcm,bcm281xx";
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ade7e92..3da77ba 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1022,6 +1022,8 @@ source "arch/arm/mach-mvebu/Kconfig"
+This patch applies on top of Thomas Petazzoni big code refactor.
+
+ drivers/dma/mv_xor.c |   16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index d645d43..c063aee 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -658,8 +658,6 @@ mv_xor_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+ 	dev_dbg(mv_chan_to_devp(mv_chan),
+ 		"%s dest: %x src %x len: %u flags: %ld\n",
+ 		__func__, dest, src, len, flags);
+-	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
+-		return NULL;
  
- source "arch/arm/mach-at91/Kconfig"
+ 	BUG_ON(len > MV_XOR_MAX_BYTE_COUNT);
  
-+source "arch/arm/mach-bcm/Kconfig"
-+
- source "arch/arm/mach-clps711x/Kconfig"
+@@ -697,8 +695,6 @@ mv_xor_prep_dma_memset(struct dma_chan *chan, dma_addr_t dest, int value,
+ 	dev_dbg(mv_chan_to_devp(mv_chan),
+ 		"%s dest: %x len: %u flags: %ld\n",
+ 		__func__, dest, len, flags);
+-	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
+-		return NULL;
  
- source "arch/arm/mach-cns3xxx/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 5f914fc..8523fdb 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -137,6 +137,7 @@ textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
- # Machine directory name.  This list is sorted alphanumerically
- # by CONFIG_* macro name.
- machine-$(CONFIG_ARCH_AT91)		+= at91
-+machine-$(CONFIG_ARCH_BCM)		+= bcm
- machine-$(CONFIG_ARCH_BCM2835)		+= bcm2835
- machine-$(CONFIG_ARCH_CLPS711X)		+= clps711x
- machine-$(CONFIG_ARCH_CNS3XXX)		+= cns3xxx
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f37cf9f..6b3392b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -17,6 +17,7 @@ dtb-$(CONFIG_ARCH_AT91) += aks-cdu.dtb \
- 	usb_a9263.dtb \
- 	usb_a9g20.dtb
- dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
-+dtb-$(CONFIG_ARCH_BCM) += bcm11351-brt.dtb
- dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
- 	dove-cubox.dtb \
- 	dove-dove-db.dtb
-diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
-new file mode 100644
-index 0000000..d9379d0
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm11351-brt.dts
-@@ -0,0 +1,30 @@
-+/*
-+ * Copyright (C) 2012 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+
-+/include/ "bcm281xx.dtsi"
-+
-+/ {
-+	model = "BCM11351 BRT board";
-+	compatible = "bcm,bcm11351-brt", "bcm,bcm281xx";
-+
-+	memory {
-+		reg = <0x80000000 0x40000000>; /* 1 GB */
-+	};
-+
-+	uart at 3e000000 {
-+		status = "okay";
-+	};
-+
-+};
-diff --git a/arch/arm/boot/dts/bcm281xx.dtsi b/arch/arm/boot/dts/bcm281xx.dtsi
-new file mode 100644
-index 0000000..649e48c
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm281xx.dtsi
-@@ -0,0 +1,50 @@
-+/*
-+ * Copyright (C) 2012 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	model = "BCM281xx SoC";
-+	compatible = "bcm,bcm281xx";
-+	interrupt-parent = <&gic>;
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8";
-+	};
-+
-+	gic: interrupt-controller at 3ff00100 {
-+		compatible = "arm,cortex-a9-gic";
-+		#interrupt-cells = <3>;
-+		#address-cells = <0>;
-+		interrupt-controller;
-+		reg = <0x3ff01000 0x1000>,
-+		      <0x3ff00100 0x100>;
-+	};
-+
-+	uart at 3e000000 {
-+		compatible = "bcm,bcm281xx-sw-apb-uart", "snps,dw-apb-uart";
-+		status = "disabled";
-+		reg = <0x3e000000 0x1000>;
-+		clock-frequency = <13000000>;
-+		interrupts = <0x0 67 0x4>;
-+		reg-shift = <2>;
-+		reg-io-width = <4>;
-+	};
-+
-+	L2: l2-cache {
-+		    compatible = "arm,pl310-cache";
-+		    reg = <0x3ff20000 0x1000>;
-+		    cache-unified;
-+		    cache-level = <2>;
-+	};
-+};
-diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
-new file mode 100644
-index 0000000..e3bf2d6
---- /dev/null
-+++ b/arch/arm/configs/bcm_defconfig
-@@ -0,0 +1,114 @@
-+CONFIG_EXPERIMENTAL=y
-+# CONFIG_LOCALVERSION_AUTO is not set
-+# CONFIG_SWAP is not set
-+CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+CONFIG_BSD_PROCESS_ACCT_V3=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=19
-+CONFIG_CGROUPS=y
-+CONFIG_CGROUP_FREEZER=y
-+CONFIG_CGROUP_DEVICE=y
-+CONFIG_CGROUP_CPUACCT=y
-+CONFIG_RESOURCE_COUNTERS=y
-+CONFIG_CGROUP_SCHED=y
-+CONFIG_BLK_CGROUP=y
-+CONFIG_NAMESPACES=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_EMBEDDED=y
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLK_DEV_BSG is not set
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_EFI_PARTITION=y
-+CONFIG_ARCH_BCM=y
-+CONFIG_ARM_THUMBEE=y
-+CONFIG_ARM_ERRATA_743622=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+# CONFIG_OABI_COMPAT is not set
-+# CONFIG_COMPACTION is not set
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_CMDLINE="console=ttyS0,115200n8 mem=128M"
-+CONFIG_CPU_IDLE=y
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_PM_RUNTIME=y
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_PROC_DEVICETREE=y
-+# CONFIG_BLK_DEV is not set
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_CHR_DEV_SG=y
-+CONFIG_SCSI_MULTI_LUN=y
-+CONFIG_SCSI_SCAN_ASYNC=y
-+CONFIG_INPUT_FF_MEMLESS=y
-+CONFIG_INPUT_JOYDEV=y
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_KEYBOARD_ATKBD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_UINPUT=y
-+# CONFIG_SERIO is not set
-+# CONFIG_LEGACY_PTYS is not set
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_EXTENDED=y
-+CONFIG_SERIAL_8250_MANY_PORTS=y
-+CONFIG_SERIAL_8250_SHARE_IRQ=y
-+CONFIG_SERIAL_8250_RSA=y
-+CONFIG_SERIAL_8250_DW=y
-+CONFIG_HW_RANDOM=y
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+# CONFIG_HWMON is not set
-+CONFIG_VIDEO_OUTPUT_CONTROL=y
-+CONFIG_FB=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_LCD_CLASS_DEVICE=y
-+CONFIG_BACKLIGHT_CLASS_DEVICE=y
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_TIMER=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-+CONFIG_EXT4_FS=y
-+CONFIG_EXT4_FS_POSIX_ACL=y
-+CONFIG_EXT4_FS_SECURITY=y
-+CONFIG_AUTOFS4_FS=y
-+CONFIG_FUSE_FS=y
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_TMPFS_POSIX_ACL=y
-+CONFIG_CONFIGFS_FS=y
-+# CONFIG_MISC_FILESYSTEMS is not set
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_DETECT_HUNG_TASK=y
-+CONFIG_DEFAULT_HUNG_TASK_TIMEOUT=110
-+CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
-+CONFIG_DEBUG_INFO=y
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_LL=y
-+CONFIG_CRC_CCITT=y
-+CONFIG_CRC_T10DIF=y
-+CONFIG_CRC_ITU_T=y
-+CONFIG_CRC7=y
-+CONFIG_XZ_DEC=y
-+CONFIG_AVERAGE=y
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-new file mode 100644
-index 0000000..48705c1
---- /dev/null
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -0,0 +1,19 @@
-+config ARCH_BCM
-+	bool "Broadcom SoC" if ARCH_MULTI_V7
-+	depends on MMU
-+	select ARCH_REQUIRE_GPIOLIB
-+	select ARM_ERRATA_754322
-+	select ARM_ERRATA_764369 if SMP
-+	select ARM_GIC
-+	select CPU_V7
-+	select GENERIC_CLOCKEVENTS
-+	select GENERIC_GPIO
-+	select GENERIC_TIME
-+	select GPIO_BCM
-+	select SPARSE_IRQ
-+	select TICK_ONESHOT
-+	help
-+	  This enables support for system based on Broadcom SoCs.
-+	  It currently supports the 'BCM281XX' family, which includes
-+	  BCM11130, BCM11140, BCM11351, BCM28145 and
-+	  BCM28155 variants.
-diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-new file mode 100644
-index 0000000..bbf4122
---- /dev/null
-+++ b/arch/arm/mach-bcm/Makefile
-@@ -0,0 +1,13 @@
-+#
-+# Copyright (C) 2012 Broadcom Corporation
-+#
-+# This program is free software; you can redistribute it and/or
-+# modify it under the terms of the GNU General Public License as
-+# published by the Free Software Foundation version 2.
-+#
-+# This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+# kind, whether express or implied; without even the implied warranty
-+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+# GNU General Public License for more details.
-+
-+obj-$(CONFIG_ARCH_BCM) := board_bcm.o
-diff --git a/arch/arm/mach-bcm/board_bcm.c b/arch/arm/mach-bcm/board_bcm.c
-new file mode 100644
-index 0000000..c303582
---- /dev/null
-+++ b/arch/arm/mach-bcm/board_bcm.c
-@@ -0,0 +1,57 @@
-+/*
-+ * Copyright (C) 2012 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <linux/init.h>
-+#include <linux/device.h>
-+#include <linux/platform_device.h>
-+
-+#include <asm/mach/arch.h>
-+#include <asm/hardware/gic.h>
-+
-+#include <asm/mach/time.h>
-+
-+static const struct of_device_id irq_match[] = {
-+	{.compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
-+	{}
-+};
-+
-+static void timer_init(void)
+ 	BUG_ON(len > MV_XOR_MAX_BYTE_COUNT);
+ 
+@@ -731,9 +727,6 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
+ 	struct mv_xor_desc_slot *sw_desc, *grp_start;
+ 	int slot_cnt;
+ 
+-	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
+-		return NULL;
+-
+ 	BUG_ON(len > MV_XOR_MAX_BYTE_COUNT);
+ 
+ 	dev_dbg(mv_chan_to_devp(mv_chan),
+@@ -1089,6 +1082,14 @@ static int __devexit mv_xor_channel_remove(struct mv_xor_chan *mv_chan)
+ 	return 0;
+ }
+ 
++/* This driver does not implement any of the optional DMA operations. */
++static int
++mv_xor_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
++	       unsigned long arg)
 +{
++	return -ENOSYS;
 +}
 +
-+static struct sys_timer timer = {
-+	.init = timer_init,
-+};
-+
-+static void __init init_irq(void)
-+{
-+	of_irq_init(irq_match);
-+}
-+
-+static void __init board_init(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL,
-+		&platform_bus);
-+}
-+
-+static const char * const bcm281xx_dt_compat[] = { "bcm,bcm281xx", NULL, };
-+
-+DT_MACHINE_START(BCM281XX_DT, "Broadcom Application Processor")
-+	.init_irq = init_irq,
-+	.timer = &timer,
-+	.init_machine = board_init,
-+	.dt_compat = bcm281xx_dt_compat,
-+	.handle_irq = gic_handle_irq,
-+MACHINE_END
+ static struct mv_xor_chan * __devinit
+ mv_xor_channel_add(struct mv_xor_device *xordev,
+ 		   struct platform_device *pdev,
+@@ -1129,6 +1130,7 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
+ 	dma_dev->device_free_chan_resources = mv_xor_free_chan_resources;
+ 	dma_dev->device_tx_status = mv_xor_status;
+ 	dma_dev->device_issue_pending = mv_xor_issue_pending;
++	dma_dev->device_control = mv_xor_control;
+ 	dma_dev->dev = &pdev->dev;
+ 
+ 	/* set prep routines based on capability */
 -- 
-1.7.1
+1.7.10.4
