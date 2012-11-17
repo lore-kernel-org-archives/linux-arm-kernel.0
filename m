@@ -1,45 +1,27 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 17 Nov 2012 16:00:08 +0100
-Subject: [PATCH 0/5] ARM: Kirkwood: Use fixed regulators
-In-Reply-To: <1353163574-6362-1-git-send-email-andrew@lunn.ch>
-References: <1353163574-6362-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20121117150008.GB13479@lunn.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 17 Nov 2012 15:14:09 +0000
+Subject: Final call for 3.8 arm-soc patches
+In-Reply-To: <20121117014547.GR6801@atomide.com>
+References: <201211162111.34615.arnd@arndb.de>
+ <20121117014547.GR6801@atomide.com>
+Message-ID: <201211171514.09787.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Folks
+On Saturday 17 November 2012, Tony Lindgren wrote:
+> So that's about eight patches left to before mach-omap2 is multiplatform
+> clean. These patches don't cause any functional changes and I should
+> have those ready to pull by Wednesday next week if that's not too late.
 
-Forgot to mention, these patches apply on top of the gpio-poweroff
-patches, which has been ACKed by the appropriate maintainer.
+Ok, very good. Don't worry about the timing, you have sent a lot of
+patches early enough that I wouldn't complain about a bunch of others
+coming after we're closed for everybody else. Same thing for LinusW
+and Simon who have been great at sending ux500 and shmobile patches
+early in the cycle.
 
-	Andrew
+By contrast, people who haven't sent a single patch yet will have
+a much harder time arguing why we should take a large number of
+patches at this point. Of course, bug fixes are completely exempt
+and can always come.
 
-On Sat, Nov 17, 2012 at 03:46:09PM +0100, Andrew Lunn wrote:
-> A few Kirkwood boards use a GPIO line to enable power to subsystems,
-> eg USB or SATA devices. Use the regulator framework to control these
-> GPIO lines, and describe them in DT rather than C code in the board
-> files.
-> 
-> Posted before as part of the bigger patchset.
-> 
-> Andrew Lunn (5):
->   ARM: Kirkwood: Enable regulator and fixed regulators.
->   ARM: Kirkwood: Convert DNSKW to use regulators
->   ARM: Kirkwood: Convert Dockstar to use regulators
->   ARM: Kirkwood: Convert GoFlexNet to use regulators
->   ARM: Kirkwood: Convert LSXL to use regulators
-> 
->  arch/arm/boot/dts/kirkwood-dnskw.dtsi    |   29 +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/kirkwood-dockstar.dts  |   17 +++++++++++++++++
->  arch/arm/boot/dts/kirkwood-goflexnet.dts |   17 +++++++++++++++++
->  arch/arm/boot/dts/kirkwood-lsxl.dtsi     |   29 +++++++++++++++++++++++++++++
->  arch/arm/mach-kirkwood/Kconfig           |    3 ++-
->  arch/arm/mach-kirkwood/board-dnskw.c     |    4 ----
->  arch/arm/mach-kirkwood/board-dockstar.c  |    4 ----
->  arch/arm/mach-kirkwood/board-goflexnet.c |    4 ----
->  arch/arm/mach-kirkwood/board-lsxl.c      |    8 --------
->  9 files changed, 94 insertions(+), 21 deletions(-)
-> 
-> -- 
-> 1.7.10.4
-> 
+	Arnd
