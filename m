@@ -1,50 +1,53 @@
-From: joro@8bytes.org ('Joerg Roedel')
-Date: Sat, 17 Nov 2012 13:49:18 +0100
-Subject: [PATCH 4/4] iommu/exynos: enhancements of System MMU driver with
- DT
-In-Reply-To: <002401cdc245$32dbf3e0$9893dba0$%cho@samsung.com>
-References: <002401cdc245$32dbf3e0$9893dba0$%cho@samsung.com>
-Message-ID: <20121117124918.GC11220@8bytes.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 17 Nov 2012 14:02:39 +0100
+Subject: [PULL REQUEST] GPIO driver to turn power off
+Message-ID: <20121117130239.GD11717@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2012 at 05:51:12PM +0900, Cho KyongHo wrote:
-> This commit enhances power management of System MMU and its client
-> devices with the following changes:
->  - Each System MMU device becomes the parent device of its client
->    device while probe(). Thus, exynos-iommu driver must be initialized
->    before client devices.
->  - System MMU driver does not pm_runtime_get/put() by itself and runtime
->    power gating is performed by client devices.
->  - System is safe when suspend/resume without any care by client device
->    drivers.
-> 
-> In addition, System MMUs can be seperate into several groups that are
-> belongs to a single client device like FIMC-IS block. If such blocks are
-> controlled by a single device descriptor, all System MMUs in the blocks
-> must be enabled/disabled by a single device descriptor. The problem is
-> that clock gating and power gating may be not the same among all System
-> MMUs in the blocks. Thus, System MMUs are grouped by clock gating and
-> power gating and they are chained by parent-child relationships.
-> 
-> exynos-iommu driver now also supports debugfs to identify the state of
-> each System MMU.
-> 
-> The last big change is to support DT. The desription of the properties
-> of DT nodes are described in the source file.
-> 
-> Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
-> ---
->  drivers/iommu/Kconfig        |   17 +-
->  drivers/iommu/exynos-iommu.c | 1420 +++++++++++++++++++++++++++++++-----------
->  2 files changed, 1077 insertions(+), 360 deletions(-)
+Hi Jason
 
-This patch does multiple things and is quite large. Please split it down
-into reasonable chunks and resubmit.
+Here is a pull request for the GPIO power off driver.
 
-Patches 1-3 look good to me and I do not mind taking them for 3.8.
-Please let me know if you prefer these patches standalone in 3.8 or
-together with this patch split up.
+Thanks
+     Andrew
 
+The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
 
-	Joerg
+  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
+
+are available in the git repository at:
+
+  git://github.com/lunn/linux.git tags/for-next-gpio-poweroff-v4
+
+for you to fetch changes up to 7125ab6492a33c2a669892cae6f6d5b9643d9672:
+
+  ARM: Kirkwood: Convert IB62x0 to use gpio-poweroff. (2012-11-17 13:37:51 +0100)
+
+----------------------------------------------------------------
+GPIO driver for turning board power off.
+
+----------------------------------------------------------------
+Andrew Lunn (2):
+      ARM: Kirkwood: Convert DNSKW to use gpio-poweroff.
+      ARM: Kirkwood: Convert IB62x0 to use gpio-poweroff.
+
+Jamie Lentin (1):
+      power: Add simple poweroff-gpio driver
+
+ .../devicetree/bindings/gpio/gpio-poweroff.txt     |   22 ++++
+ arch/arm/boot/dts/kirkwood-dnskw.dtsi              |    5 +
+ arch/arm/boot/dts/kirkwood-ib62x0.dts              |    6 +
+ arch/arm/mach-kirkwood/Kconfig                     |    4 +
+ arch/arm/mach-kirkwood/board-dnskw.c               |   12 --
+ arch/arm/mach-kirkwood/board-ib62x0.c              |   13 --
+ drivers/power/Kconfig                              |    3 +
+ drivers/power/Makefile                             |    1 +
+ drivers/power/reset/Kconfig                        |   15 +++
+ drivers/power/reset/Makefile                       |    1 +
+ drivers/power/reset/gpio-poweroff.c                |  129 ++++++++++++++++++++
+ 11 files changed, 186 insertions(+), 25 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
+ create mode 100644 drivers/power/reset/Kconfig
+ create mode 100644 drivers/power/reset/Makefile
+ create mode 100644 drivers/power/reset/gpio-poweroff.c
