@@ -1,44 +1,50 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Sat, 17 Nov 2012 07:48:30 +0100
-Subject: [PATCH v7] Network driver for the Armada 370 and Armada XP ARM
- Marvell SoCs
-In-Reply-To: <20121115090257.4b9e20c5@skate>
-References: <1352905010-24172-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121114.215922.1242337385782766449.davem@davemloft.net>
- <20121115083319.76483256@skate>
- <20121115.024213.1356436436054345008.davem@davemloft.net>
- <20121115090257.4b9e20c5@skate>
-Message-ID: <20121117064830.GB647@1wt.eu>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Sat, 17 Nov 2012 08:28:14 +0100
+Subject: pwm_backlight/general pwm issue.
+In-Reply-To: <1353125259.18544.7.camel@gitbox>
+References: <1353125259.18544.7.camel@gitbox>
+Message-ID: <20121117072814.GA26391@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On Thu, Nov 15, 2012 at 09:02:57AM +0100, Thomas Petazzoni wrote:
-> David,
+On Sat, Nov 17, 2012 at 05:07:39PM +1300, Tony Prisk wrote:
+> Hi Thierry,
 > 
-> On Thu, 15 Nov 2012 02:42:13 -0500 (EST), David Miller wrote:
-> > From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Date: Thu, 15 Nov 2012 08:33:19 +0100
-> > 
-> > > Would you mind if we take, with your Ack, the network driver through
-> > > the arm-soc tree, so that we can carry the related patches modifying
-> > > the Device Tree and so on? If not, then I'll send you a pull request
-> > > with just the drivers/net changes, and we'll integrate the ARM-related
-> > > changes through the arm-soc tree, in which we will have the necessary
-> > > dependencies. I'm fine with any of those solutions.
-> > 
-> > Sure, no problem, take it via the ARM tree:
-> > 
-> > Acked-by: David S. Miller <davem@davemloft.net>
+> Looking a little feedback regarding a problem introduced with the pwm
+> patch I sent converting the vt8500 pwm driver to devicetree.
 > 
-> Excellent, thanks!
+> One of the recommendations you made was to enable/disable the pwm clock
+> in pwm_enable/pwm_disable, rather than at driver probe, to reduce power
+> usage. Unfortunately, when the last pwm is disabled, the clock is
+> disabled which prevents the pwm module from responding to register
+> read/writes. This would be fine if pwm_enable was called before any
+> other functions.
+> 
+> The pwm_backlight driver calls pwm_config before pwm_enable, which
+> doesn't work because the pwm module has been disabled. I can appreciate
+> that no one wants to enable a pwm before it's configured so I don't
+> think this is particularly a driver issue.
+> 
+> 
+> My recommendation is the re-enable the previous behaviour which was to
+> enable the clock during driver probe, and disable during driver unload.
+> 
+> Looking for your thoughts (or anyone else that wants to chime in).
 
-Your patch set works fine on my mirabox, feel free to add my tested-by
-to the patch set if you want :
+What other drivers do is explicitly make sure that the clock is enabled
+before accessing registers if the hardware requires so. Does the driver
+work if you change it to do so?
 
-   Tested-By: Willy Tarreau <w@1wt.eu>
+In the end I'll leave it up to you how you want to handle this. If the
+power savings aren't an issue on vt8500 (and I suppose keeping the
+peripheral clock running all the time doesn't save you *that* much) I'm
+willing to take a patch that fixes things for you.
 
-Nice work!
-
-Willy
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121117/1d805f17/attachment.sig>
