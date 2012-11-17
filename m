@@ -1,65 +1,64 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 17 Nov 2012 23:02:59 +0100
-Subject: arm: at91: mach header cleanup
-In-Reply-To: <CAGhQ9VzCVqVPCDxgeaisPKscnpvqy4JSSWnVUzQQQG-AzD4hbw@mail.gmail.com>
+Date: Sat, 17 Nov 2012 23:05:06 +0100
+Subject: [PATCH 1/1] atmel: move ATMEL_MAX_UART to platform_data/atmel.h
+In-Reply-To: <20121107111235.GH20063@game.jcrosoft.org>
 References: <20121107111235.GH20063@game.jcrosoft.org>
- <201211122147.36510.arnd@arndb.de>
- <CAGhQ9VzCVqVPCDxgeaisPKscnpvqy4JSSWnVUzQQQG-AzD4hbw@mail.gmail.com>
-Message-ID: <20121117220259.GK4398@game.jcrosoft.org>
+Message-ID: <1353189906-1767-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:32 Sat 17 Nov     , Joachim Eastwood wrote:
-> On 12 November 2012 22:47, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 07 November 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >> The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
-> >>
-> >>   Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>   git://github.com/at91linux/linux-at91.git tags/for-3.8-at91_header_clean
-> >>
-> >> for you to fetch changes up to 75984df05d86956541795f01e62d7dc67bc522fd:
-> >>
-> >>   arm: at91: move at91rm9200 rtc header in drivers/rtc (2012-11-06 20:30:52 +0800)
-> >>
-> >> ----------------------------------------------------------------
-> >> arm: at91: mach header cleanup
-> >>
-> >> This first patch serie start the cleanup of the header in mach
-> >> by moving all the platform data to include/linux/platform_data
-> >>
-> >> and move the board header and drivers header next to them
-> >>
-> >> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >>
-> >
-> > Hi Jean-Christophe,
-> >
-> > Sorry for the delay, I've pulled it now into the next/cleanup branch.
-> >
-> 
-> Hi,
-> 
-> The changes to atmel_serial break compile on AVR32 with:
->   drivers/tty/serial/atmel_serial.c:162: error: 'ATMEL_MAX_UART'
-> undeclared here (not in a function)
->   make[3]: *** [drivers/tty/serial/atmel_serial.o] Error 1
-> 
-> This is because AVR32 defined ATMEL_MAX_UART in mach/board.h.
-> I wonder why this didn't break on AT91, though. On AT91 it's defined in
-> mach/hardware.h but I can't see that file being included anywhere here.
-> 
-> Unsure what the best fix is. Maybe we could move ATMEL_MAX_UART into
-> linux/platform_data/atmel.h.
-I already spot it too and fix it
+use 7 for it as the sam9260 or the sam9g25 have 7 of them DBGU included
 
-yes I move it to platform_data/atmel.h
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/include/mach/hardware.h  |    3 ---
+ arch/avr32/mach-at32ap/include/mach/board.h |    1 -
+ include/linux/platform_data/atmel.h         |    6 ++++++
+ 3 files changed, 6 insertions(+), 4 deletions(-)
 
-I does not break on at91 as hardware.h is inlcluded when you
-include/linux/io.h
-
-Best Regards,
-J.
+diff --git a/arch/arm/mach-at91/include/mach/hardware.h b/arch/arm/mach-at91/include/mach/hardware.h
+index 711a789..a832e07 100644
+--- a/arch/arm/mach-at91/include/mach/hardware.h
++++ b/arch/arm/mach-at91/include/mach/hardware.h
+@@ -90,9 +90,6 @@
+ #define AT91_SRAM_MAX		SZ_1M
+ #define AT91_VIRT_BASE		(AT91_IO_VIRT_BASE - AT91_SRAM_MAX)
+ 
+-/* Serial ports */
+-#define ATMEL_MAX_UART		7		/* 6 USART3's and one DBGU port (SAM9260) */
+-
+ /* External Memory Map */
+ #define AT91_CHIPSELECT_0	0x10000000
+ #define AT91_CHIPSELECT_1	0x20000000
+diff --git a/arch/avr32/mach-at32ap/include/mach/board.h b/arch/avr32/mach-at32ap/include/mach/board.h
+index dca9345..d485b03 100644
+--- a/arch/avr32/mach-at32ap/include/mach/board.h
++++ b/arch/avr32/mach-at32ap/include/mach/board.h
+@@ -26,7 +26,6 @@ static inline void __deprecated at32_add_system_devices(void)
+ 
+ }
+ 
+-#define ATMEL_MAX_UART	4
+ extern struct platform_device *atmel_default_console_device;
+ 
+ /* Flags for selecting USART extra pins */
+diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
+index dbd6d53..59fffa4 100644
+--- a/include/linux/platform_data/atmel.h
++++ b/include/linux/platform_data/atmel.h
+@@ -19,6 +19,12 @@
+ #include <linux/serial.h>
+ #include <linux/platform_data/macb.h>
+ 
++/*
++ * at91: 6 USART3's and one DBGU port (SAM9260)
++ * avr32: 4
++ */
++#define ATMEL_MAX_UART	7
++
+  /* USB Device */
+ struct at91_udc_data {
+ 	int	vbus_pin;		/* high == host powering us */
+-- 
+1.7.10.4
