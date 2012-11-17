@@ -1,155 +1,63 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 17 Nov 2012 17:00:46 +0100
-Subject: [PATCH v2 04/14] ARM: Kirkwood: Convert TS219 to pinctrl.
-In-Reply-To: <1353168058-14043-1-git-send-email-andrew@lunn.ch>
-References: <1353168058-14043-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1353168058-14043-5-git-send-email-andrew@lunn.ch>
+From: csd_b@daudt.org (Christian Daudt)
+Date: Sat, 17 Nov 2012 08:07:20 -0800
+Subject: [PATCH V3] Add support for generic BCM SoC chipsets
+In-Reply-To: <50A70E1E.9070907@wwwdotorg.org>
+References: <1352843517-31328-1-git-send-email-csd@broadcom.com>
+ <50A70E1E.9070907@wwwdotorg.org>
+Message-ID: <CAGFynZ-Ana17ngAvns=WgXErrqMcgD=JxrogqKZGAYpzsejE9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of the pinctrl driver for configuring all the pins, instead
-of using the Orion mpp code.
+On Fri, Nov 16, 2012 at 8:10 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 11/13/2012 02:51 PM, Christian Daudt wrote:
+>> In order to start upstreaming Broadcom SoC support, create
+>> a starting hierarchy, arch and dts files.
+>> The first support SoC family that is planned is the
+>> BCM281XX (BCM11130/11140/11351/28145/28155) family of dual A9 mobile
+>> SoC cores.
+>> This code is just the skeleton code for get the machine upstreamed. It
+>> has been made MULTIPLATFORM compatible.
+>
+> Sorry for the slow review...
+>
+no worries.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/boot/dts/kirkwood-ts219-6281.dts |   31 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-ts219-6282.dts |   31 +++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-ts219.c      |   25 -----------------------
- 3 files changed, 62 insertions(+), 25 deletions(-)
+>> diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm281xx.txt b/Documentation/devicetree/bindings/arm/bcm/bcm281xx.txt
+>
+>> +Required root node property:
+>> +
+>> +compatible = "bcm,bcm281xx";
+>
+> Hmm. I still tend to think we should list the specific SoC rather than
+> the family here, but I guess if you're sure there won't be any SW
+> compatibility between the different SoCs in the series, this is fine.
+>
 
-diff --git a/arch/arm/boot/dts/kirkwood-ts219-6281.dts b/arch/arm/boot/dts/kirkwood-ts219-6281.dts
-index ccbf327..8295c83 100644
---- a/arch/arm/boot/dts/kirkwood-ts219-6281.dts
-+++ b/arch/arm/boot/dts/kirkwood-ts219-6281.dts
-@@ -1,8 +1,39 @@
- /dts-v1/;
- 
- /include/ "kirkwood-ts219.dtsi"
-+/include/ "kirkwood-6281.dtsi"
- 
- / {
-+	ocp at f1000000 {
-+		pinctrl: pinctrl at 10000 {
-+
-+			pinctrl-0 = < &pmx_uart0 &pmx_uart1 &pmx_spi
-+				      &pmx_twsi0 &pmx_sata0 &pmx_sata1
-+				      &pmx_ram_size &pmx_reset_button
-+				      &pmx_USB_copy_button &pmx_board_id>;
-+			pinctrl-names = "default";
-+
-+			pmx_ram_size: pmx-ram-size {
-+				/* RAM: 0: 256 MB, 1: 512 MB */
-+				marvell,pins = "mpp36";
-+				marvell,function = "gpio";
-+			};
-+			pmx_USB_copy_button: pmx-USB-copy-button {
-+				marvell,pins = "mpp15";
-+				marvell,function = "gpio";
-+			};
-+			pmx_reset_button: pmx-reset-button {
-+				marvell,pins = "mpp16";
-+				marvell,function = "gpio";
-+			};
-+			pmx_board_id: pmx-board-id {
-+				/* 0: TS-11x, 1: TS-21x */
-+				marvell,pins = "mpp44";
-+				marvell,function = "gpio";
-+			};
-+		};
-+	};
-+
- 	gpio_keys {
- 		compatible = "gpio-keys";
- 		#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/kirkwood-ts219-6282.dts b/arch/arm/boot/dts/kirkwood-ts219-6282.dts
-index fbe9932..df3f95d 100644
---- a/arch/arm/boot/dts/kirkwood-ts219-6282.dts
-+++ b/arch/arm/boot/dts/kirkwood-ts219-6282.dts
-@@ -1,8 +1,39 @@
- /dts-v1/;
- 
- /include/ "kirkwood-ts219.dtsi"
-+/include/ "kirkwood-6282.dtsi"
- 
- / {
-+	ocp at f1000000 {
-+		pinctrl: pinctrl at 10000 {
-+
-+			pinctrl-0 = < &pmx_uart0 &pmx_uart1 &pmx_spi
-+				      &pmx_twsi0 &pmx_sata0 &pmx_sata1
-+				      &pmx_ram_size &pmx_reset_button
-+				      &pmx_USB_copy_button &pmx_board_id>;
-+			pinctrl-names = "default";
-+
-+			pmx_ram_size: pmx-ram-size {
-+				/* RAM: 0: 256 MB, 1: 512 MB */
-+				marvell,pins = "mpp36";
-+				marvell,function = "gpio";
-+			};
-+			pmx_reset_button: pmx-reset-button {
-+				marvell,pins = "mpp37";
-+				marvell,function = "gpio";
-+			};
-+			pmx_USB_copy_button: pmx-USB-copy-button {
-+				marvell,pins = "mpp43";
-+				marvell,function = "gpio";
-+			};
-+			pmx_board_id: pmx-board-id {
-+				/* 0: TS-11x, 1: TS-21x */
-+				marvell,pins = "mpp44";
-+				marvell,function = "gpio";
-+			};
-+		};
-+	};
-+
- 	gpio_keys {
- 		compatible = "gpio-keys";
- 		#address-cells = <1>;
-diff --git a/arch/arm/mach-kirkwood/board-ts219.c b/arch/arm/mach-kirkwood/board-ts219.c
-index 1750e68..47c8287 100644
---- a/arch/arm/mach-kirkwood/board-ts219.c
-+++ b/arch/arm/mach-kirkwood/board-ts219.c
-@@ -26,41 +26,16 @@
- #include <asm/mach/arch.h>
- #include <mach/kirkwood.h>
- #include "common.h"
--#include "mpp.h"
- #include "tsx1x-common.h"
- 
- static struct mv643xx_eth_platform_data qnap_ts219_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
- };
- 
--static unsigned int qnap_ts219_mpp_config[] __initdata = {
--	MPP0_SPI_SCn,
--	MPP1_SPI_MOSI,
--	MPP2_SPI_SCK,
--	MPP3_SPI_MISO,
--	MPP4_SATA1_ACTn,
--	MPP5_SATA0_ACTn,
--	MPP8_TW0_SDA,
--	MPP9_TW0_SCK,
--	MPP10_UART0_TXD,
--	MPP11_UART0_RXD,
--	MPP13_UART1_TXD,	/* PIC controller */
--	MPP14_UART1_RXD,	/* PIC controller */
--	MPP15_GPIO,		/* USB Copy button (on devices with 88F6281) */
--	MPP16_GPIO,		/* Reset button (on devices with 88F6281) */
--	MPP36_GPIO,		/* RAM: 0: 256 MB, 1: 512 MB */
--	MPP37_GPIO,		/* Reset button (on devices with 88F6282) */
--	MPP43_GPIO,		/* USB Copy button (on devices with 88F6282) */
--	MPP44_GPIO,		/* Board ID: 0: TS-11x, 1: TS-21x */
--	0
--};
--
- void __init qnap_dt_ts219_init(void)
- {
- 	u32 dev, rev;
- 
--	kirkwood_mpp_conf(qnap_ts219_mpp_config);
--
- 	kirkwood_pcie_id(&dev, &rev);
- 	if (dev == MV88F6282_DEV_ID)
- 		qnap_ts219_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
--- 
-1.7.10.4
+right now I expect to be able to use the family thoughout, so I'll stick to it.
+
+>> diff --git a/arch/arm/boot/dts/bcm281xx.dtsi b/arch/arm/boot/dts/bcm281xx.dtsi
+>
+>> +     uart at 3e000000 {
+>> +             compatible = "snps,dw-apb-uart", "bcm,bcm281xx-sw-apb-uart";
+>
+> The most specific value should be first, so swap those two entries.
+>
+ok. done
+
+>> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+>
+>> +     help
+>> +       This enables support for system based on Broadcom SoCs.
+>> +       It currently supports the 'BCM281XX' family, which includes
+>> +       BCM11130, BCM1140, BCM11351, BCM28145 and
+>
+> Should that be 11140 rather than 1140?
+yes. that's a typo. corrected.
+
+>
+> Aside from that,
+> Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
+
+thanks for reviewing it !
+
+ csd
