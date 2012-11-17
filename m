@@ -1,127 +1,206 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 17 Nov 2012 17:57:09 +0400
-Subject: [PATCH v3 03/18] ARM: clps711x: Transform clps711x-framebuffer to
- platform driver and use it
+Date: Sat, 17 Nov 2012 17:57:13 +0400
+Subject: [PATCH v3 07/18] ARM: clps711x: Implement usage "SPARSE_IRQ" kernel
+ option for a platform
 In-Reply-To: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
 References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1353160644-22446-4-git-send-email-shc_work@mail.ru>
+Message-ID: <1353160644-22446-8-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clps711x-framebuffer driver needs to be updated and this is a first step
-to make driver better. With this patch we are convert clps711x-framebuffer
-to platform device and load this driver from board code.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/autcpu12.c |    1 +
- arch/arm/mach-clps711x/edb7211.c  |    1 +
- arch/arm/mach-clps711x/p720t.c    |    6 ++++++
- drivers/video/clps711xfb.c        |   21 +++++++++++++++------
- 4 files changed, 23 insertions(+), 6 deletions(-)
+ arch/arm/Kconfig                               |    1 +
+ arch/arm/mach-clps711x/autcpu12.c              |    1 +
+ arch/arm/mach-clps711x/cdb89712.c              |    1 +
+ arch/arm/mach-clps711x/clep7312.c              |    1 +
+ arch/arm/mach-clps711x/common.h                |    1 +
+ arch/arm/mach-clps711x/edb7211.c               |    1 +
+ arch/arm/mach-clps711x/fortunet.c              |    1 +
+ arch/arm/mach-clps711x/include/mach/clps711x.h |   21 +++++++++++
+ arch/arm/mach-clps711x/include/mach/irqs.h     |   46 ------------------------
+ arch/arm/mach-clps711x/p720t.c                 |    1 +
+ 10 files changed, 29 insertions(+), 46 deletions(-)
+ delete mode 100644 arch/arm/mach-clps711x/include/mach/irqs.h
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5e9342b..896f6bb 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -378,6 +378,7 @@ config ARCH_CLPS711X
+ 	select CPU_ARM720T
+ 	select GENERIC_CLOCKEVENTS
+ 	select NEED_MACH_MEMORY_H
++	select SPARSE_IRQ
+ 	help
+ 	  Support for Cirrus Logic 711x/721x/731x based boards.
+ 
 diff --git a/arch/arm/mach-clps711x/autcpu12.c b/arch/arm/mach-clps711x/autcpu12.c
-index d9b7f94..c20043b 100644
+index c20043b..b90a316 100644
 --- a/arch/arm/mach-clps711x/autcpu12.c
 +++ b/arch/arm/mach-clps711x/autcpu12.c
-@@ -61,6 +61,7 @@ static struct platform_device autcpu12_nvram_pdev __initdata = {
- 
- static void __init autcpu12_init(void)
- {
-+	platform_device_register_simple("video-clps711x", 0, NULL, 0);
- 	platform_device_register_simple("cs89x0", 0, autcpu12_cs8900_resource,
- 					ARRAY_SIZE(autcpu12_cs8900_resource));
- 	platform_device_register(&autcpu12_nvram_pdev);
-diff --git a/arch/arm/mach-clps711x/edb7211.c b/arch/arm/mach-clps711x/edb7211.c
-index 7add9ad..59dec3b 100644
---- a/arch/arm/mach-clps711x/edb7211.c
-+++ b/arch/arm/mach-clps711x/edb7211.c
-@@ -83,6 +83,7 @@ fixup_edb7211(struct tag *tags, char **cmdline, struct meminfo *mi)
- 
- static void __init edb7211_init(void)
- {
-+	platform_device_register_simple("video-clps711x", 0, NULL, 0);
- 	platform_device_register_simple("cs89x0", 0, edb7211_cs8900_resource,
- 					ARRAY_SIZE(edb7211_cs8900_resource));
- }
-diff --git a/arch/arm/mach-clps711x/p720t.c b/arch/arm/mach-clps711x/p720t.c
-index 8fe33b3..d95cb8a 100644
---- a/arch/arm/mach-clps711x/p720t.c
-+++ b/arch/arm/mach-clps711x/p720t.c
-@@ -119,6 +119,11 @@ static struct gpio_led_platform_data p720t_gpio_led_pdata __initdata = {
- 	.num_leds	= ARRAY_SIZE(p720t_gpio_leds),
- };
- 
-+static void __init p720t_init(void)
-+{
-+	platform_device_register_simple("video-clps711x", 0, NULL, 0);
-+}
-+
- static void __init p720t_init_late(void)
- {
- 	platform_device_register_data(&platform_bus, "leds-gpio", 0,
-@@ -134,6 +139,7 @@ MACHINE_START(P720T, "ARM-Prospector720T")
- 	.init_early	= p720t_init_early,
+@@ -70,6 +70,7 @@ static void __init autcpu12_init(void)
+ MACHINE_START(AUTCPU12, "autronix autcpu12")
+ 	/* Maintainer: Thomas Gleixner */
+ 	.atag_offset	= 0x20000,
++	.nr_irqs	= CLPS711X_NR_IRQS,
+ 	.map_io		= clps711x_map_io,
  	.init_irq	= clps711x_init_irq,
  	.timer		= &clps711x_timer,
-+	.init_machine	= p720t_init,
- 	.init_late	= p720t_init_late,
- 	.restart	= clps711x_restart,
- MACHINE_END
-diff --git a/drivers/video/clps711xfb.c b/drivers/video/clps711xfb.c
-index f994c8b..2ccbb9b 100644
---- a/drivers/video/clps711xfb.c
-+++ b/drivers/video/clps711xfb.c
-@@ -270,7 +270,7 @@ static const struct file_operations backlight_proc_fops = {
- 	.write		= backlight_proc_write,
- };
+diff --git a/arch/arm/mach-clps711x/cdb89712.c b/arch/arm/mach-clps711x/cdb89712.c
+index 24f573b..133794c 100644
+--- a/arch/arm/mach-clps711x/cdb89712.c
++++ b/arch/arm/mach-clps711x/cdb89712.c
+@@ -137,6 +137,7 @@ static void __init cdb89712_init(void)
+ MACHINE_START(CDB89712, "Cirrus-CDB89712")
+ 	/* Maintainer: Ray Lehtiniemi */
+ 	.atag_offset	= 0x100,
++	.nr_irqs	= CLPS711X_NR_IRQS,
+ 	.map_io		= clps711x_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
+diff --git a/arch/arm/mach-clps711x/clep7312.c b/arch/arm/mach-clps711x/clep7312.c
+index dbc7842..be776c5 100644
+--- a/arch/arm/mach-clps711x/clep7312.c
++++ b/arch/arm/mach-clps711x/clep7312.c
+@@ -37,6 +37,7 @@ fixup_clep7312(struct tag *tags, char **cmdline, struct meminfo *mi)
+ MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
+ 	/* Maintainer: Nobody */
+ 	.atag_offset	= 0x0100,
++	.nr_irqs	= CLPS711X_NR_IRQS,
+ 	.fixup		= fixup_clep7312,
+ 	.map_io		= clps711x_map_io,
+ 	.init_irq	= clps711x_init_irq,
+diff --git a/arch/arm/mach-clps711x/common.h b/arch/arm/mach-clps711x/common.h
+index dc60cae..28b1701 100644
+--- a/arch/arm/mach-clps711x/common.h
++++ b/arch/arm/mach-clps711x/common.h
+@@ -4,6 +4,7 @@
+  * Common bits.
+  */
  
--static void __init clps711x_guess_lcd_params(struct fb_info *info)
-+static void __devinit clps711x_guess_lcd_params(struct fb_info *info)
- {
- 	unsigned int lcdcon, syscon, size;
- 	unsigned long phys_base = PAGE_OFFSET;
-@@ -358,7 +358,7 @@ static void __init clps711x_guess_lcd_params(struct fb_info *info)
- 	info->fix.type       = FB_TYPE_PACKED_PIXELS;
- }
++#define CLPS711X_NR_IRQS	(30)
+ #define CLPS711X_NR_GPIO	(4 * 8 + 3)
+ #define CLPS711X_GPIO(prt, bit)	((prt) * 8 + (bit))
  
--int __init clps711xfb_init(void)
-+static int __devinit clps711x_fb_probe(struct platform_device *pdev)
- {
- 	int err = -ENOMEM;
+diff --git a/arch/arm/mach-clps711x/edb7211.c b/arch/arm/mach-clps711x/edb7211.c
+index 59dec3b..7b161dd 100644
+--- a/arch/arm/mach-clps711x/edb7211.c
++++ b/arch/arm/mach-clps711x/edb7211.c
+@@ -91,6 +91,7 @@ static void __init edb7211_init(void)
+ MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
+ 	/* Maintainer: Jon McClintock */
+ 	.atag_offset	= VIDEORAM_SIZE + 0x100,
++	.nr_irqs	= CLPS711X_NR_IRQS,
+ 	.fixup		= fixup_edb7211,
+ 	.reserve	= edb7211_reserve,
+ 	.map_io		= edb7211_map_io,
+diff --git a/arch/arm/mach-clps711x/fortunet.c b/arch/arm/mach-clps711x/fortunet.c
+index 3a3f0b7..a5c0816 100644
+--- a/arch/arm/mach-clps711x/fortunet.c
++++ b/arch/arm/mach-clps711x/fortunet.c
+@@ -74,6 +74,7 @@ fortunet_fixup(struct tag *tags, char **cmdline, struct meminfo *mi)
  
-@@ -410,7 +410,7 @@ int __init clps711xfb_init(void)
- out:	return err;
- }
+ MACHINE_START(FORTUNET, "ARM-FortuNet")
+ 	/* Maintainer: FortuNet Inc. */
++	.nr_irqs	= CLPS711X_NR_IRQS,
+ 	.fixup		= fortunet_fixup,
+ 	.map_io		= clps711x_map_io,
+ 	.init_irq	= clps711x_init_irq,
+diff --git a/arch/arm/mach-clps711x/include/mach/clps711x.h b/arch/arm/mach-clps711x/include/mach/clps711x.h
+index aee352c..1f4728d 100644
+--- a/arch/arm/mach-clps711x/include/mach/clps711x.h
++++ b/arch/arm/mach-clps711x/include/mach/clps711x.h
+@@ -277,4 +277,25 @@
+ #define MEMCFG_WAITSTATE_2_0	(14 << 2)
+ #define MEMCFG_WAITSTATE_1_0	(15 << 2)
  
--static void __exit clps711xfb_exit(void)
-+static int __devexit clps711x_fb_remove(struct platform_device *pdev)
- {
- 	unregister_framebuffer(cfb);
- 	kfree(cfb);
-@@ -422,11 +422,20 @@ static void __exit clps711xfb_exit(void)
- 		PLD_LCDEN = 0;
- 		PLD_PWR &= ~(PLD_S4_ON|PLD_S3_ON|PLD_S2_ON|PLD_S1_ON);
- 	}
++/* INTSR1 Interrupts */
++#define IRQ_CSINT		(4)
++#define IRQ_EINT1		(5)
++#define IRQ_EINT2		(6)
++#define IRQ_EINT3		(7)
++#define IRQ_TC1OI		(8)
++#define IRQ_TC2OI		(9)
++#define IRQ_RTCMI		(10)
++#define IRQ_TINT		(11)
++#define IRQ_UTXINT1		(12)
++#define IRQ_URXINT1		(13)
++#define IRQ_UMSINT		(14)
++#define IRQ_SSEOTI		(15)
 +
-+	return 0;
- }
- 
--module_init(clps711xfb_init);
--module_exit(clps711xfb_exit);
-+static struct platform_driver clps711x_fb_driver = {
-+	.driver	= {
-+		.name	= "video-clps711x",
-+		.owner	= THIS_MODULE,
-+	},
-+	.probe	= clps711x_fb_probe,
-+	.remove	= __devexit_p(clps711x_fb_remove),
-+};
-+module_platform_driver(clps711x_fb_driver);
- 
- MODULE_AUTHOR("Russell King <rmk@arm.linux.org.uk>");
--MODULE_DESCRIPTION("CLPS711x framebuffer driver");
-+MODULE_DESCRIPTION("CLPS711X framebuffer driver");
- MODULE_LICENSE("GPL");
++/* INTSR2 Interrupts */
++#define IRQ_KBDINT		(16 + 0)
++#define IRQ_SS2RX		(16 + 1)
++#define IRQ_SS2TX		(16 + 2)
++#define IRQ_UTXINT2		(16 + 12)
++#define IRQ_URXINT2		(16 + 13)
++
+ #endif /* __MACH_CLPS711X_H */
+diff --git a/arch/arm/mach-clps711x/include/mach/irqs.h b/arch/arm/mach-clps711x/include/mach/irqs.h
+deleted file mode 100644
+index 1ea56db..0000000
+--- a/arch/arm/mach-clps711x/include/mach/irqs.h
++++ /dev/null
+@@ -1,46 +0,0 @@
+-/*
+- *  arch/arm/mach-clps711x/include/mach/irqs.h
+- *
+- *  Copyright (C) 2000 Deep Blue Solutions Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-/*
+- * Interrupts from INTSR1
+- */
+-#define IRQ_CSINT			4
+-#define IRQ_EINT1			5
+-#define IRQ_EINT2			6
+-#define IRQ_EINT3			7
+-#define IRQ_TC1OI			8
+-#define IRQ_TC2OI			9
+-#define IRQ_RTCMI			10
+-#define IRQ_TINT			11
+-#define IRQ_UTXINT1			12
+-#define IRQ_URXINT1			13
+-#define IRQ_UMSINT			14
+-#define IRQ_SSEOTI			15
+-
+-/*
+- * Interrupts from INTSR2
+- */
+-#define IRQ_KBDINT			(16+0)	/* bit 0 */
+-#define IRQ_SS2RX			(16+1)	/* bit 1 */
+-#define IRQ_SS2TX			(16+2)	/* bit 2 */
+-#define IRQ_UTXINT2			(16+12)	/* bit 12 */
+-#define IRQ_URXINT2			(16+13)	/* bit 13 */
+-
+-#define NR_IRQS				30
+diff --git a/arch/arm/mach-clps711x/p720t.c b/arch/arm/mach-clps711x/p720t.c
+index d95cb8a..fbe7552 100644
+--- a/arch/arm/mach-clps711x/p720t.c
++++ b/arch/arm/mach-clps711x/p720t.c
+@@ -134,6 +134,7 @@ static void __init p720t_init_late(void)
+ MACHINE_START(P720T, "ARM-Prospector720T")
+ 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
+ 	.atag_offset	= 0x100,
++	.nr_irqs	= CLPS711X_NR_IRQS,
+ 	.fixup		= fixup_p720t,
+ 	.map_io		= p720t_map_io,
+ 	.init_early	= p720t_init_early,
 -- 
 1.7.8.6
