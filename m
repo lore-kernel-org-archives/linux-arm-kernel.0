@@ -1,112 +1,144 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 17 Nov 2012 17:00:52 +0100
-Subject: [PATCH v2 10/14] ARM: Kirkwood: Convert ib62x0 to pinctrl.
+Date: Sat, 17 Nov 2012 17:00:53 +0100
+Subject: [PATCH v2 11/14] ARM: Kirkwood: Convert lsxl boards to pinctrl.
 In-Reply-To: <1353168058-14043-1-git-send-email-andrew@lunn.ch>
 References: <1353168058-14043-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1353168058-14043-11-git-send-email-andrew@lunn.ch>
+Message-ID: <1353168058-14043-12-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Simon Baatz <gmbnomis@gmail.com>
+Tested-by: Michael Walle <michael@walle.cc>
 ---
- arch/arm/boot/dts/kirkwood-ib62x0.dts |   34 +++++++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-ib62x0.c |   21 --------------------
- 2 files changed, 34 insertions(+), 21 deletions(-)
+ arch/arm/boot/dts/kirkwood-lsxl.dtsi |   66 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-lsxl.c  |   19 ----------
+ 2 files changed, 66 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-ib62x0.dts b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-index 6a9558d..71902da 100644
---- a/arch/arm/boot/dts/kirkwood-ib62x0.dts
-+++ b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- 
+diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+index 65a8c52..f5362c4 100644
+--- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
++++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+@@ -1,4 +1,5 @@
  /include/ "kirkwood.dtsi"
 +/include/ "kirkwood-6281.dtsi"
  
  / {
- 	model = "RaidSonic ICY BOX IB-NAS62x0 (Rev B)";
-@@ -16,6 +17,39 @@
+ 	chosen {
+@@ -6,6 +7,71 @@
  	};
  
  	ocp at f1000000 {
 +		pinctrl: pinctrl at 10000 {
 +
-+			pinctrl-0 = < &pmx_nand
-+				      &pmx_led_os_red &pmx_power_off
-+				      &pmx_led_os_green &pmx_led_usb_transfer
-+				      &pmx_button_reset &pmx_button_usb_copy >;
++			pinctrl-0 = < &pmx_power_hdd &pmx_usb_vbus
++				      &pmx_fan_low &pmx_fan_high
++				      &pmx_led_function_red &pmx_led_alarm
++				      &pmx_led_info &pmx_led_power
++				      &pmx_fan_lock &pmx_button_function
++				      &pmx_power_switch &pmx_power_auto_switch
++				      &pmx_led_function_blue >;
 +			pinctrl-names = "default";
 +
-+			pmx_led_os_red: pmx-led-os-red {
-+				marvell,pins = "mpp22";
++			pmx_power_hdd: pmx-power-hdd {
++				marvell,pins = "mpp10";
++				marvell,function = "gpo";
++			};
++			pmx_usb_vbus: pmx-usb-vbus {
++				marvell,pins = "mpp11";
 +				marvell,function = "gpio";
 +			};
-+			pmx_power_off: pmx-power-off {
-+				marvell,pins = "mpp24";
++			pmx_fan_high: pmx-fan-high {
++				marvell,pins = "mpp18";
++				marvell,function = "gpo";
++			};
++			pmx_fan_low: pmx-fan-low {
++				marvell,pins = "mpp19";
++				marvell,function = "gpo";
++			};
++			pmx_led_function_blue: pmx-led-function-blue {
++				marvell,pins = "mpp36";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_os_green: pmx-led-os-green {
-+				marvell,pins = "mpp25";
++			pmx_led_alarm: pmx-led-alarm {
++				marvell,pins = "mpp37";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_usb_transfer: pmx-led-usb-transfer {
-+				marvell,pins = "mpp27";
++			pmx_led_info: pmx-led-info {
++				marvell,pins = "mpp38";
 +				marvell,function = "gpio";
 +			};
-+			pmx_button_reset: pmx-button-reset {
-+				marvell,pins = "mpp28";
++			pmx_led_power: pmx-led-power {
++				marvell,pins = "mpp39";
 +				marvell,function = "gpio";
 +			};
-+			pmx_button_usb_copy: pmx-button-usb-copy {
-+				marvell,pins = "mpp29";
++			pmx_fan_lock: pmx-fan-lock {
++				marvell,pins = "mpp40";
 +				marvell,function = "gpio";
 +			};
++			pmx_button_function: pmx-button-function {
++				marvell,pins = "mpp41";
++				marvell,function = "gpio";
++			};
++			pmx_power_switch: pmx-power-switch {
++				marvell,pins = "mpp42";
++				marvell,function = "gpio";
++			};
++			pmx_power_auto_switch: pmx-power-auto-switch {
++				marvell,pins = "mpp43";
++				marvell,function = "gpio";
++			};
++			pmx_led_function_red: pmx-led-function_red {
++				marvell,pins = "mpp48";
++				marvell,function = "gpio";
++			};
++
 +		};
- 		serial at 12000 {
- 			clock-frequency = <200000000>;
+ 		sata at 80000 {
  			status = "okay";
-diff --git a/arch/arm/mach-kirkwood/board-ib62x0.c b/arch/arm/mach-kirkwood/board-ib62x0.c
-index 7b8adf5..3dc0fdf 100644
---- a/arch/arm/mach-kirkwood/board-ib62x0.c
-+++ b/arch/arm/mach-kirkwood/board-ib62x0.c
-@@ -22,37 +22,16 @@
+ 			nr-ports = <1>;
+diff --git a/arch/arm/mach-kirkwood/board-lsxl.c b/arch/arm/mach-kirkwood/board-lsxl.c
+index b9845c0..8346699 100644
+--- a/arch/arm/mach-kirkwood/board-lsxl.c
++++ b/arch/arm/mach-kirkwood/board-lsxl.c
+@@ -25,7 +25,6 @@
  #include <asm/mach/arch.h>
  #include <mach/kirkwood.h>
  #include "common.h"
 -#include "mpp.h"
  
- static struct mv643xx_eth_platform_data ib62x0_ge00_data = {
+ static struct mv643xx_eth_platform_data lsxl_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+@@ -35,23 +34,6 @@ static struct mv643xx_eth_platform_data lsxl_ge01_data = {
  	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
  };
  
--static unsigned int ib62x0_mpp_config[] __initdata = {
--	MPP0_NF_IO2,
--	MPP1_NF_IO3,
--	MPP2_NF_IO4,
--	MPP3_NF_IO5,
--	MPP4_NF_IO6,
--	MPP5_NF_IO7,
--	MPP18_NF_IO0,
--	MPP19_NF_IO1,
--	MPP22_GPIO,	/* OS LED red */
--	MPP24_GPIO,	/* Power off device */
--	MPP25_GPIO,	/* OS LED green */
--	MPP27_GPIO,	/* USB transfer LED */
--	MPP28_GPIO,	/* Reset button */
--	MPP29_GPIO,	/* USB Copy button */
+-static unsigned int lsxl_mpp_config[] __initdata = {
+-	MPP10_GPO,	/* HDD Power Enable */
+-	MPP11_GPIO,	/* USB Vbus Enable */
+-	MPP18_GPO,	/* FAN High Enable# */
+-	MPP19_GPO,	/* FAN Low Enable# */
+-	MPP36_GPIO,	/* Function Blue LED */
+-	MPP37_GPIO,	/* Alarm LED */
+-	MPP38_GPIO,	/* Info LED */
+-	MPP39_GPIO,	/* Power LED */
+-	MPP40_GPIO,	/* Fan Lock */
+-	MPP41_GPIO,	/* Function Button */
+-	MPP42_GPIO,	/* Power Switch */
+-	MPP43_GPIO,	/* Power Auto Switch */
+-	MPP48_GPIO,	/* Function Red LED */
 -	0
 -};
 -
- void __init ib62x0_init(void)
- {
+ #define LSXL_GPIO_FAN_HIGH	18
+ #define LSXL_GPIO_FAN_LOW	19
+ #define LSXL_GPIO_FAN_LOCK	40
+@@ -115,7 +97,6 @@ void __init lsxl_init(void)
  	/*
  	 * Basic setup. Needs to be called early.
  	 */
--	kirkwood_mpp_conf(ib62x0_mpp_config);
--
+-	kirkwood_mpp_conf(lsxl_mpp_config);
+ 
  	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&ib62x0_ge00_data);
- }
+ 	kirkwood_ge00_init(&lsxl_ge00_data);
 -- 
 1.7.10.4
