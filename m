@@ -1,41 +1,41 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 16 Nov 2012 12:43:58 -0700
-Subject: [GIT PULL 6/6] ARM: tegra: defconfig update
-In-Reply-To: <1353095038-20031-1-git-send-email-swarren@wwwdotorg.org>
-References: <1353095038-20031-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1353095038-20031-6-git-send-email-swarren@wwwdotorg.org>
+Date: Fri, 16 Nov 2012 21:02:36 -0700
+Subject: [GIT PULL 2/3] ARM: bcm2835: core SoC enhancements
+In-Reply-To: <1353124957-23808-1-git-send-email-swarren@wwwdotorg.org>
+References: <1353124957-23808-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1353124957-23808-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many new features are enabled in tegra_defconfig:
-
-* BRCMFMAC: wlan driver, enable as module.
-* MTD, MTD_CHAR, MTD_M25P80, SPI_TEGRA20_SLINK, CONFIG_SPI_TEGRA20_SFLASH
-  to enable serial flash on Cardhu and TrimSlice.
-* PWM/backlight features for use with tegradrm.
-* tegradrm; Tegra's new display driver.
-* CMA, so that tegradrm can allocate large buffers.
-* SquashFS, which is used as the root filesystem on boards based on
-  the Tamonten processor module.
+A machine restart/reboot implementation is added. The GPIO/pinmux
+controller is instantiated, and dummy gpio.h added.
 
 ----------------------------------------------------------------
 
-The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
+The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
 
-  Linux 3.7-rc4
+  Linux 3.7-rc2
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.8-defconfig
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git bcm2835-for-3.8-soc
 
-for you to fetch changes up to 6254f95b7c22264622b6bd6515b609d9cf88393f:
+for you to fetch changes up to 805504abdc73cfc745a5fee3d616cdb24bb2a68c:
 
-  ARM: tegra: defconfig updates
+  ARM: bcm2835: enable GPIO/pinctrl
 
 ----------------------------------------------------------------
 
-Stephen Warren (1):
-      ARM: tegra: defconfig updates
+Stephen Warren (2):
+      ARM: bcm2835: implement machine restart hook
+      ARM: bcm2835: enable GPIO/pinctrl
 
- arch/arm/configs/tegra_defconfig |   21 +++++++++++++++++++--
- 1 file changed, 19 insertions(+), 2 deletions(-)
+ .../bindings/watchdog/brcm,bcm2835-pm-wdog.txt     |   13 ++++
+ arch/arm/Kconfig                                   |    5 +-
+ arch/arm/boot/dts/bcm2835-rpi-b.dts                |   15 +++++
+ arch/arm/boot/dts/bcm2835.dtsi                     |   28 +++++++++
+ arch/arm/mach-bcm2835/bcm2835.c                    |   46 +++++++++++++++
+ arch/arm/mach-bcm2835/include/mach/gpio.h          |    1 +
+ 6 files changed, 107 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/brcm,bcm2835-pm-wdog.txt
+ create mode 100644 arch/arm/mach-bcm2835/include/mach/gpio.h
