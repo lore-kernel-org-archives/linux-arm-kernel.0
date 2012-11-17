@@ -1,79 +1,169 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat, 17 Nov 2012 01:09:16 +0100
-Subject: [PATCH] serial: atmel_serial: remove atmel open/close hooks
-Message-ID: <1353110956-17541-1-git-send-email-manabian@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 16 Nov 2012 16:43:13 -0800
+Subject: [PATCH v5 05/10] pinctrl: single: support pinconf generic
+In-Reply-To: <1352968600-15345-6-git-send-email-haojian.zhuang@gmail.com>
+References: <1352968600-15345-1-git-send-email-haojian.zhuang@gmail.com>
+ <1352968600-15345-6-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <20121117004313.GN6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After serial_at91.h was removed the atmel_open/close_hook
-code is now useless.
-
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
 Hi,
 
-This patch depends on [RFC 3/3] ARM/AVR32: get rid of serial_at91.h
-patch from Russell King.
+>  static int pcs_pinconf_get(struct pinctrl_dev *pctldev,
+>  				unsigned pin, unsigned long *config)
+>  {
+> -	return -ENOTSUPP;
+> +	struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
+> +	enum pin_config_param config_param = pinconf_to_config_param(*config);
+> +	union pcs_pinconf_argument_t arg;
+> +	u32 offset;
+> +	unsigned data;
+> +	int ret;
+> +
+> +	if (!pcs->conf.nconfs)
+> +		return -ENOTSUPP;
+> +
+> +	ret = pcs_pinconf_get_config(pctldev, pin, config_param);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	offset = pin * (pcs->width / BITS_PER_BYTE);
+> +	data = pcs->read(pcs->base + offset);
+> +
+> +	arg.data = pinconf_to_config_argument(ret);
+> +	data = (data >> arg.bits.shift) & arg.bits.mask;
 
-Patch based on current linux-next with "[RFC 3/3] ARM/AVR32: get rid of serial_at91.h"
-patch on top. There is a small conflict with Russell's patch
-in next now due to another header change.
+Shouldn't you just return data here?
 
-If there is another tree this patch should be based on please
-let me know.
+	*config = data;
 
-regards
-Joachim Eastwood
+	return 0;
 
- drivers/tty/serial/atmel_serial.c | 22 ----------------------
- 1 file changed, 22 deletions(-)
+> +	arg.bits.value = data;
+> +	*config = pinconf_to_config_packed(config_param, arg.data);
+> +	return 0;
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 76e4c05..5c2337d 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -113,9 +113,6 @@ static void atmel_stop_rx(struct uart_port *port);
- #define UART_PUT_TCR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_TCR)
- #define UART_GET_TCR(port)	__raw_readl((port)->membase + ATMEL_PDC_TCR)
- 
--static int (*atmel_open_hook)(struct uart_port *);
--static void (*atmel_close_hook)(struct uart_port *);
--
- struct atmel_dma_buffer {
- 	unsigned char	*buf;
- 	dma_addr_t	dma_addr;
-@@ -976,18 +973,6 @@ static int atmel_startup(struct uart_port *port)
- 		pdc->ofs = 0;
- 	}
- 
--	/*
--	 * If there is a specific "open" function (to register
--	 * control line interrupts)
--	 */
--	if (atmel_open_hook) {
--		retval = atmel_open_hook(port);
--		if (retval) {
--			free_irq(port->irq, port);
--			return retval;
--		}
--	}
--
- 	/* Save current CSR for comparison in atmel_tasklet_func() */
- 	atmel_port->irq_status_prev = UART_GET_CSR(port);
- 	atmel_port->irq_status = atmel_port->irq_status_prev;
-@@ -1062,13 +1047,6 @@ static void atmel_shutdown(struct uart_port *port)
- 	 * Free the interrupt
- 	 */
- 	free_irq(port->irq, port);
--
--	/*
--	 * If there is a specific "close" function (to unregister
--	 * control line interrupts)
--	 */
--	if (atmel_close_hook)
--		atmel_close_hook(port);
- }
- 
- /*
--- 
-1.8.0
+Instead of these? Or how else is the consumer driver supposed
+to use the value?
+
+>  }
+>  
+>  static int pcs_pinconf_set(struct pinctrl_dev *pctldev,
+>  				unsigned pin, unsigned long config)
+>  {
+> -	return -ENOTSUPP;
+> +	struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
+> +	enum pin_config_param config_param = pinconf_to_config_param(config);
+> +	union pcs_pinconf_argument_t arg;
+> +	u32 offset;
+> +	unsigned data;
+> +	int ret;
+> +
+> +	if (!pcs->conf.nconfs)
+> +		return -ENOTSUPP;
+> +
+> +	ret = pcs_pinconf_get_config(pctldev, pin, config_param);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	offset = pin * (pcs->width / BITS_PER_BYTE);
+> +	data = pcs->read(pcs->base + offset);
+> +
+> +	arg.data = pinconf_to_config_argument(config);
+> +	data = (data >> arg.bits.shift) & arg.bits.mask;
+> +	arg.bits.value = data;
+> +	data = pinconf_to_config_packed(config_param, arg.data);
+> +	pcs->write(data, pcs->base + offset);
+> +	return 0;
+>  }
+
+I need to look at this more to understand how this actually relates
+to what gets written to the register with my test case :)
+  
+> @@ -765,12 +958,82 @@ static int pcs_parse_one_pinctrl_entry(struct pcs_device *pcs,
+>  	if (res < 0)
+>  		goto free_function;
+>  
+> -	(*map)->type = PIN_MAP_TYPE_MUX_GROUP;
+> -	(*map)->data.mux.group = np->name;
+> -	(*map)->data.mux.function = np->name;
+> +	m->type = PIN_MAP_TYPE_MUX_GROUP;
+> +	m->data.mux.group = np->name;
+> +	m->data.mux.function = np->name;
+> +
+> +	if (!nconfs)
+> +		return 0;
+> +
+> +	conf = devm_kzalloc(pcs->dev, sizeof(*conf) * nconfs, GFP_KERNEL);
+> +	if (!conf) {
+> +		res = -ENOMEM;
+> +		goto free_pingroup;
+> +	}
+> +	i = 0;
+> +	if (!of_property_read_u32_array(np, "pinctrl-single,bias",
+> +					value, 5)) {
+> +		/* array: bias value, mask, disable, pull down, pull up */
+> +		data = value[0] & value[1];
+> +		arg.bits.shift = ffs(value[1]) - 1;
+> +		arg.bits.mask = value[1] >> arg.bits.shift;
+> +		if (pcs_config_match(data, value[2])) {
+> +			arg.bits.value = value[2] >> arg.bits.shift;
+> +			conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_BIAS_DISABLE,
+> +						    arg.data);
+> +		}
+> +		if (pcs_config_match(data, value[3])) {
+> +			arg.bits.value = value[3] >> arg.bits.shift;
+> +			conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_DOWN,
+> +						    arg.data);
+> +		}
+> +		if (pcs_config_match(data, value[4])) {
+> +			arg.bits.value = value[4] >> arg.bits.shift;
+> +			conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP,
+> +						    arg.data);
+> +		}
+> +	}
+
+Doesn't this mean you only get one of the above working? What happens
+if you initially need to set BIAS_DISABLE, but then the consumer driver
+wants to set BIAS_PULL_DOWN or something?
+
+Maybe we need separate pinctrl-single,bias-disable, pinctrl-single,bias-pull-down
+and pinctrl-single,bias-pull-up?
+
+> +	if (!of_property_read_u32_array(np, "pinctrl-single,power-source",
+> +					value, 2)) {
+> +		/* array: power source value, mask */
+> +		data = value[0] & value[1];
+> +		arg.bits.shift = ffs(value[1]) - 1;
+> +		arg.bits.mask = value[1] >> arg.bits.shift;
+> +		arg.bits.value = data >> arg.bits.shift;
+> +		conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_POWER_SOURCE, arg.data);
+> +	}
+> +	if (!of_property_read_u32_array(np, "pinctrl-single,input-schmitt",
+> +					value, 3)) {
+> +		/* array: input schmitt value, mask, disable */
+> +		data = value[0] & value[1];
+> +		arg.bits.shift = ffs(value[1]) - 1;
+> +		arg.bits.mask = value[1] >> arg.bits.shift;
+> +		if (pcs_config_match(data, value[2])) {
+> +			arg.bits.value = value[2] >> arg.bits.shift;
+> +			conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_INPUT_SCHMITT_DISABLE,
+> +						    arg.data);
+> +		} else {
+> +			arg.bits.value = data >> arg.bits.shift;
+> +			conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_INPUT_SCHMITT,
+> +						    arg.data);
+> +		}
+> +	}
+
+And I think this has a similar problem? What if the consumer driver wants
+to set INPUT_SCHMITT with pin_config_set() and the initial value is
+SCHMITT_DISABLE? Doesn't the consumer driver get -ENOTSUPP in that case?
+
+I'll look at this more early next week and try to get my testcase working
+with it.
+
+Regards,
+
+Tony
