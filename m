@@ -1,79 +1,99 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 17 Nov 2012 10:41:08 +0100
-Subject: [PATCH 1/2] clk: mvebu: armada 370/XP add clock gating control
- provider for DT
-In-Reply-To: <20121117082602.GF24569@lunn.ch>
-References: <1353014906-31566-6-git-send-email-andrew@lunn.ch>
- <1353088920-17458-1-git-send-email-gregory.clement@free-electrons.com>
- <1353088920-17458-2-git-send-email-gregory.clement@free-electrons.com>
- <20121117082602.GF24569@lunn.ch>
-Message-ID: <50A75BB4.4070003@free-electrons.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 17 Nov 2012 10:59:47 +0100
+Subject: [PATCH 0/6 v7] gpio: Add block GPIO
+Message-ID: <1353146393-19312-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew
+This set of patches adds:
 
-On 11/17/2012 09:26 AM, Andrew Lunn wrote:
-> Hi Gregory
-> 
-> Nice work
+* Block GPIO API to gpiolib
+* Sysfs support for GPIO API, to provide userland access
+* Device interface for userland access (alternative to sysfs)
+* Devicetree support to instantiate GPIO blocks via DT
+* Example implementations in several gpio drivers since they need
+  special accessor functions for block wise GPIO access
+* Fix for race condition in gpiolib on device creation
 
-Thanks!
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+--
 
-> 
-> On Fri, Nov 16, 2012 at 07:01:59PM +0100, Gregory CLEMENT wrote:
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  .../bindings/clock/mvebu-gated-clock.txt           |   43 ++++++++++++++
->>  arch/arm/mach-mvebu/Kconfig                        |    1 +
->>  drivers/clk/mvebu/clk-gating-ctrl.c                |   61 ++++++++++++++++++++
->>  3 files changed, 105 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
->> index 7497cc0..9dbcdd9 100644
->> --- a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
->> +++ b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
->> @@ -6,6 +6,49 @@ the clock ID in its "clocks" phandle cell. The clock ID is directly mapped to
->>  the corresponding clock gating control bit in HW to ease manual clock lookup
->>  in datasheet.
->>  
->> +The following is a list of provided IDs for Armada XP:
-> 
-> Should that the 370, not XP?
+Changes since v6:
+* Changed realloc to list handling
+* Added mask to kernel API
+* Added device interface as userspace API
+* Changed sizeof() to BITS_PER_LONG
+* Fixed multiline comment style
+* Documented direction setting by the user
+* Documented order of handled chips in case of multiple chips in one block
 
-Yes indeed, it was a wrong copy and paste.
+Changes since v5:
+* Documented sysfs: elaborated on "exported" and "values" attributes
+* Documented sysfs: gpiochip is a separate class now
+* Aggregated driver support patches for block gpio into one single patch
+* Added gpio block driver support for twl6040 and pch
 
-> 
->> +ID	Clock	Peripheral
->> +-----------------------------------
->> +0	Audio	AC97 Cntrl
->> +1	pex0_en	PCIe 0 Clock out
->> +2	pex1_en	PCIe 1 Clock out
->> +3	ge1	Gigabit Ethernet 1
->> +4	ge0	Gigabit Ethernet 0
->> +5	pex0	PCIe Cntrl 0
->> +9	pex1	PCIe Cntrl 1
->> +15	sata0	SATA Host 0
->> +17	sdio	SDHCI Host
->> +25	tdm	Time Division Mplx
->> +28	ddr	DDR Cntrl
->> +30	sata1	SATA Host 0
-> 
-> Not many clocks there. USB? XOR? Crypto?
+Changes since v4:
+* Documented word width
+* Bugfix: export/unexport on register/unregister
+* Using default dev_attrs for gpio_block_class
+* Fix gpiolib: race condition on device creation
+* Added driver support for ucb14500, vt8500, xilinx
 
-Yes I was surprised too, but it was I found on the datasheet.
-For USB, for example you can turn the USB in low power mode but
-at the PHY level.
+Changes since v3:
+* Added driver support for pca953x, em, pl061, max732x, pcf857x
+* Coding style improvements
+* Fixed krealloc memory leak in error case
+* sysfs: values in hex
+* Register blocks in a list
+* Narrowing lock scope
+* Use S_IWUSR and S_IRUGO instead of direct octal values
+* Use for_each_set_bit()
+* Change from unsigned to unsigned long for masks and values
 
+Changes since v2:
+* Added sysfs support
+* Added devicetree support
+* Added support for lpc32xx, generic
+* Added functions for GPIO block registration
+* Added more error checking
+* Bit remapping bugfix
 
-> 
-> What is the ddr clock for? Does bad things happen if you turn it off?
-> Kirkwood has a similar clock, dunit, which i decided not to export,
-> since when you turn it off, the whole SoC locks up.
+Changes since v1:
+* API change to 32/64 bit word, bit masks
 
-Well of course if you code run in DDR then it could be a problem. But
-I think it could be useful to turn it off when going to suspend, it
-the DDR can do self-refresh. In this case it should be possible to run
-the code from SRAM or L2 Cache.
+Thanks to Ryan Mallon, Linus Walleij, Stijn Devriendt, Jean-Christophe
+Plagniol-Villard, Mark Brown, Greg Kroah-Hartman and Grant Likely for
+reviewing!
 
-Gregory
+Roland Stigge (6):
+ gpio: Add a block GPIO API to gpiolib
+ gpio: Add sysfs support to block GPIO API
+ gpio: Add userland device interface to block GPIO
+ gpiolib: Fix default attributes for class
+ gpio: Add device tree support to block GPIO API
+ gpio: Add block gpio to several gpio drivers
+
+ Documentation/ABI/testing/dev-gpioblock               |   25 
+ Documentation/ABI/testing/sysfs-gpio                  |   29 
+ Documentation/devicetree/bindings/gpio/gpio-block.txt |   36 +
+ Documentation/gpio.txt                                |   57 +
+ drivers/gpio/Makefile                                 |    1 
+ drivers/gpio/gpio-em.c                                |   23 
+ drivers/gpio/gpio-generic.c                           |   56 +
+ drivers/gpio/gpio-lpc32xx.c                           |   82 ++
+ drivers/gpio/gpio-max730x.c                           |   61 +
+ drivers/gpio/gpio-max732x.c                           |   59 +
+ drivers/gpio/gpio-pca953x.c                           |   64 +
+ drivers/gpio/gpio-pcf857x.c                           |   24 
+ drivers/gpio/gpio-pch.c                               |   27 
+ drivers/gpio/gpio-pl061.c                             |   17 
+ drivers/gpio/gpio-twl6040.c                           |   32 
+ drivers/gpio/gpio-ucb1400.c                           |   23 
+ drivers/gpio/gpio-vt8500.c                            |   24 
+ drivers/gpio/gpio-xilinx.c                            |   44 +
+ drivers/gpio/gpioblock-of.c                           |   84 ++
+ drivers/gpio/gpiolib.c                                |  627 ++++++++++++++++--
+ include/asm-generic/gpio.h                            |   28 
+ include/linux/gpio.h                                  |  115 +++
+ 22 files changed, 1490 insertions(+), 48 deletions(-)
