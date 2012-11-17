@@ -1,117 +1,332 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 17 Nov 2012 17:57:21 +0400
-Subject: [PATCH v3 15/18] ARM: clps711x: edb7211: Add support for NOR-Flash
+Date: Sat, 17 Nov 2012 17:57:19 +0400
+Subject: [PATCH v3 13/18] ARM: clps711x: p720t: Special driver for handling
+ NAND memory is removed
 In-Reply-To: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
 References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1353160644-22446-16-git-send-email-shc_work@mail.ru>
+Message-ID: <1353160644-22446-14-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch provide migration to using "gpio-nand" driver instead of using
+special driver for handling NAND memory.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/edb7211.c               |   45 ++++++++++++++++++-----
- arch/arm/mach-clps711x/include/mach/hardware.h |    4 --
- 2 files changed, 35 insertions(+), 14 deletions(-)
+ arch/arm/mach-clps711x/include/mach/hardware.h |    3 +
+ arch/arm/mach-clps711x/p720t.c                 |   50 +++++++-
+ drivers/mtd/nand/Kconfig                       |    6 -
+ drivers/mtd/nand/Makefile                      |    1 -
+ drivers/mtd/nand/spia.c                        |  176 ------------------------
+ 5 files changed, 51 insertions(+), 185 deletions(-)
+ delete mode 100644 drivers/mtd/nand/spia.c
 
-diff --git a/arch/arm/mach-clps711x/edb7211.c b/arch/arm/mach-clps711x/edb7211.c
-index d5832b3..71aa5cf 100644
---- a/arch/arm/mach-clps711x/edb7211.c
-+++ b/arch/arm/mach-clps711x/edb7211.c
-@@ -16,6 +16,9 @@
- #include <linux/backlight.h>
- #include <linux/platform_device.h>
+diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
+index 4e273f2..6acf714 100644
+--- a/arch/arm/mach-clps711x/include/mach/hardware.h
++++ b/arch/arm/mach-clps711x/include/mach/hardware.h
+@@ -67,6 +67,9 @@
+ #define CLPS711X_SRAM_BASE	CS6_PHYS_BASE
+ #define CLPS711X_SRAM_SIZE	(48 * 1024)
  
-+#include <linux/mtd/physmap.h>
-+#include <linux/mtd/partitions.h>
++#define CLPS711X_SDRAM0_BASE	(0xc0000000)
++#define CLPS711X_SDRAM1_BASE	(0xd0000000)
 +
- #include <asm/setup.h>
- #include <asm/mach/map.h>
- #include <asm/mach/arch.h>
-@@ -33,6 +36,8 @@
- #define EDB7211_LCDEN		CLPS711X_GPIO(3, 2)
- #define EDB7211_LCDBL		CLPS711X_GPIO(3, 3)
+ #if defined (CONFIG_ARCH_EDB7211)
  
-+#define EDB7211_FLASH0_BASE	(CS0_PHYS_BASE)
-+#define EDB7211_FLASH1_BASE	(CS1_PHYS_BASE)
- #define EDB7211_CS8900_BASE	(CS2_PHYS_BASE + 0x300)
- #define EDB7211_CS8900_IRQ	(IRQ_EINT3)
+ /* The extra 8 lines of the keyboard matrix are wired to chip select 3 */
+diff --git a/arch/arm/mach-clps711x/p720t.c b/arch/arm/mach-clps711x/p720t.c
+index 34c8ee9..e25f10e 100644
+--- a/arch/arm/mach-clps711x/p720t.c
++++ b/arch/arm/mach-clps711x/p720t.c
+@@ -26,6 +26,8 @@
+ #include <linux/slab.h>
+ #include <linux/leds.h>
+ #include <linux/platform_device.h>
++#include <linux/mtd/partitions.h>
++#include <linux/mtd/nand-gpio.h>
  
-@@ -41,6 +46,35 @@ static struct resource edb7211_cs8900_resource[] __initdata = {
- 	DEFINE_RES_IRQ(EDB7211_CS8900_IRQ),
- };
+ #include <mach/hardware.h>
+ #include <asm/pgtable.h>
+@@ -41,7 +43,50 @@
  
-+static struct mtd_partition edb7211_flash_partitions[] __initdata = {
+ #include "common.h"
+ 
+-#define GPIO_USERLED	CLPS711X_GPIO(3, 0)
++#define P720T_USERLED		CLPS711X_GPIO(3, 0)
++#define P720T_NAND_CLE		CLPS711X_GPIO(4, 0)
++#define P720T_NAND_ALE		CLPS711X_GPIO(4, 1)
++#define P720T_NAND_NCE		CLPS711X_GPIO(4, 2)
++
++#define P720T_NAND_BASE		(CLPS711X_SDRAM1_BASE)
++
++static struct resource p720t_nand_resource[] __initdata = {
++	DEFINE_RES_MEM(P720T_NAND_BASE, SZ_4),
++};
++
++static struct mtd_partition p720t_nand_parts[] __initdata = {
 +	{
-+		.name	= "Flash",
++		.name	= "Flash partition 1",
 +		.offset	= 0,
++		.size	= SZ_2M,
++	},
++	{
++		.name	= "Flash partition 2",
++		.offset	= MTDPART_OFS_APPEND,
 +		.size	= MTDPART_SIZ_FULL,
 +	},
 +};
 +
-+static struct physmap_flash_data edb7211_flash_pdata __initdata = {
-+	.width		= 4,
-+	.parts		= edb7211_flash_partitions,
-+	.nr_parts	= ARRAY_SIZE(edb7211_flash_partitions),
++static struct gpio_nand_platdata p720t_nand_pdata __initdata = {
++	.gpio_rdy	= -1,
++	.gpio_nce	= P720T_NAND_NCE,
++	.gpio_ale	= P720T_NAND_ALE,
++	.gpio_cle	= P720T_NAND_CLE,
++	.gpio_nwp	= -1,
++	.chip_delay	= 15,
++	.parts		= p720t_nand_parts,
++	.num_parts	= ARRAY_SIZE(p720t_nand_parts),
 +};
 +
-+static struct resource edb7211_flash_resources[] __initdata = {
-+	DEFINE_RES_MEM(EDB7211_FLASH0_BASE, SZ_8M),
-+	DEFINE_RES_MEM(EDB7211_FLASH1_BASE, SZ_8M),
-+};
-+
-+static struct platform_device edb7211_flash_pdev __initdata = {
-+	.name		= "physmap-flash",
-+	.id		= 0,
-+	.resource	= edb7211_flash_resources,
-+	.num_resources	= ARRAY_SIZE(edb7211_flash_resources),
-+	.dev	= {
-+		.platform_data	= &edb7211_flash_pdata,
++static struct platform_device p720t_nand_pdev __initdata = {
++	.name		= "gpio-nand",
++	.id		= -1,
++	.resource	= p720t_nand_resource,
++	.num_resources	= ARRAY_SIZE(p720t_nand_resource),
++	.dev		= {
++		.platform_data = &p720t_nand_pdata,
 +	},
 +};
-+
- static void edb7211_lcd_power_set(struct plat_lcd_data *pd, unsigned int power)
+ 
+ static void p720t_lcd_power_set(struct plat_lcd_data *pd, unsigned int power)
  {
- 	if (power) {
-@@ -82,16 +116,6 @@ static struct map_desc edb7211_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(EP7211_PHYS_EXTKBD),
- 		.length		= SZ_1M,
- 		.type		= MT_DEVICE,
--	}, {	/* Flash bank 0 */
--		.virtual	= IO_ADDRESS(EP7211_PHYS_FLASH1),
--		.pfn		= __phys_to_pfn(EP7211_PHYS_FLASH1),
--		.length		= SZ_8M,
--		.type		= MT_DEVICE,
--	}, {	/* Flash bank 1 */
--		.virtual	= IO_ADDRESS(EP7211_PHYS_FLASH2),
--		.pfn		= __phys_to_pfn(EP7211_PHYS_FLASH2),
--		.length		= SZ_8M,
--		.type		= MT_DEVICE,
+@@ -127,7 +172,7 @@ static struct gpio_led p720t_gpio_leds[] = {
+ 	{
+ 		.name			= "User LED",
+ 		.default_trigger	= "heartbeat",
+-		.gpio			= GPIO_USERLED,
++		.gpio			= P720T_USERLED,
  	},
  };
  
-@@ -129,6 +153,7 @@ static void __init edb7211_init(void)
+@@ -138,6 +183,7 @@ static struct gpio_led_platform_data p720t_gpio_led_pdata __initdata = {
+ 
+ static void __init p720t_init(void)
  {
- 	gpio_request_array(edb7211_gpios, ARRAY_SIZE(edb7211_gpios));
- 
-+	platform_device_register(&edb7211_flash_pdev);
++	platform_device_register(&p720t_nand_pdev);
  	platform_device_register_data(&platform_bus, "platform-lcd", 0,
- 				      &edb7211_lcd_power_pdata,
- 				      sizeof(edb7211_lcd_power_pdata));
-diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
-index 1ebf7b9..2f23dd5 100644
---- a/arch/arm/mach-clps711x/include/mach/hardware.h
-+++ b/arch/arm/mach-clps711x/include/mach/hardware.h
-@@ -75,10 +75,6 @@
- /* The extra 8 lines of the keyboard matrix are wired to chip select 3 */
- #define EP7211_PHYS_EXTKBD	CS3_PHYS_BASE
+ 				      &p720t_lcd_power_pdata,
+ 				      sizeof(p720t_lcd_power_pdata));
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 582c283..721513e 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -93,12 +93,6 @@ config MTD_NAND_GPIO
+ 	help
+ 	  This enables a GPIO based NAND flash driver.
  
--/* The two flash banks are wired to chip selects 0 and 1 */
--#define EP7211_PHYS_FLASH1	CS0_PHYS_BASE
--#define EP7211_PHYS_FLASH2	CS1_PHYS_BASE
+-config MTD_NAND_SPIA
+-	tristate "NAND Flash device on SPIA board"
+-	depends on ARCH_P720T
+-	help
+-	  If you had to ask, you don't have one. Say 'N'.
 -
- #endif /* CONFIG_ARCH_EDB7211 */
+ config MTD_NAND_AMS_DELTA
+ 	tristate "NAND Flash device on Amstrad E3"
+ 	depends on MACH_AMS_DELTA
+diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
+index d2bd10b..eb827a2 100644
+--- a/drivers/mtd/nand/Makefile
++++ b/drivers/mtd/nand/Makefile
+@@ -9,7 +9,6 @@ obj-$(CONFIG_MTD_NAND_IDS)		+= nand_ids.o
+ obj-$(CONFIG_MTD_SM_COMMON) 		+= sm_common.o
  
- #endif
+ obj-$(CONFIG_MTD_NAND_CAFE)		+= cafe_nand.o
+-obj-$(CONFIG_MTD_NAND_SPIA)		+= spia.o
+ obj-$(CONFIG_MTD_NAND_AMS_DELTA)	+= ams-delta.o
+ obj-$(CONFIG_MTD_NAND_DENALI)		+= denali.o
+ obj-$(CONFIG_MTD_NAND_DENALI_PCI)	+= denali_pci.o
+diff --git a/drivers/mtd/nand/spia.c b/drivers/mtd/nand/spia.c
+deleted file mode 100644
+index bef76cd..0000000
+--- a/drivers/mtd/nand/spia.c
++++ /dev/null
+@@ -1,176 +0,0 @@
+-/*
+- *  drivers/mtd/nand/spia.c
+- *
+- *  Copyright (C) 2000 Steven J. Hill (sjhill at realitydiluted.com)
+- *
+- *
+- *	10-29-2001 TG	change to support hardwarespecific access
+- *			to controllines	(due to change in nand.c)
+- *			page_cache added
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- *  Overview:
+- *   This is a device driver for the NAND flash device found on the
+- *   SPIA board which utilizes the Toshiba TC58V64AFT part. This is
+- *   a 64Mibit (8MiB x 8 bits) NAND flash device.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/slab.h>
+-#include <linux/module.h>
+-#include <linux/mtd/mtd.h>
+-#include <linux/mtd/nand.h>
+-#include <linux/mtd/partitions.h>
+-#include <asm/io.h>
+-
+-/*
+- * MTD structure for SPIA board
+- */
+-static struct mtd_info *spia_mtd = NULL;
+-
+-/*
+- * Values specific to the SPIA board (used with EP7212 processor)
+- */
+-#define SPIA_IO_BASE	0xd0000000	/* Start of EP7212 IO address space */
+-#define SPIA_FIO_BASE	0xf0000000	/* Address where flash is mapped */
+-#define SPIA_PEDR	0x0080	/*
+-				 * IO offset to Port E data register
+-				 * where the CLE, ALE and NCE pins
+-				 * are wired to.
+-				 */
+-#define SPIA_PEDDR	0x00c0	/*
+-				 * IO offset to Port E data direction
+-				 * register so we can control the IO
+-				 * lines.
+-				 */
+-
+-/*
+- * Module stuff
+- */
+-
+-static int spia_io_base = SPIA_IO_BASE;
+-static int spia_fio_base = SPIA_FIO_BASE;
+-static int spia_pedr = SPIA_PEDR;
+-static int spia_peddr = SPIA_PEDDR;
+-
+-module_param(spia_io_base, int, 0);
+-module_param(spia_fio_base, int, 0);
+-module_param(spia_pedr, int, 0);
+-module_param(spia_peddr, int, 0);
+-
+-/*
+- * Define partitions for flash device
+- */
+-static const struct mtd_partition partition_info[] = {
+-	{
+-	 .name = "SPIA flash partition 1",
+-	 .offset = 0,
+-	 .size = 2 * 1024 * 1024},
+-	{
+-	 .name = "SPIA flash partition 2",
+-	 .offset = 2 * 1024 * 1024,
+-	 .size = 6 * 1024 * 1024}
+-};
+-
+-#define NUM_PARTITIONS 2
+-
+-/*
+- *	hardware specific access to control-lines
+- *
+- *	ctrl:
+- *	NAND_CNE: bit 0 -> bit 2
+- *	NAND_CLE: bit 1 -> bit 0
+- *	NAND_ALE: bit 2 -> bit 1
+- */
+-static void spia_hwcontrol(struct mtd_info *mtd, int cmd)
+-{
+-	struct nand_chip *chip = mtd->priv;
+-
+-	if (ctrl & NAND_CTRL_CHANGE) {
+-		void __iomem *addr = spia_io_base + spia_pedr;
+-		unsigned char bits;
+-
+-		bits = (ctrl & NAND_CNE) << 2;
+-		bits |= (ctrl & NAND_CLE | NAND_ALE) >> 1;
+-		writeb((readb(addr) & ~0x7) | bits, addr);
+-	}
+-
+-	if (cmd != NAND_CMD_NONE)
+-		writeb(cmd, chip->IO_ADDR_W);
+-}
+-
+-/*
+- * Main initialization routine
+- */
+-static int __init spia_init(void)
+-{
+-	struct nand_chip *this;
+-
+-	/* Allocate memory for MTD device structure and private data */
+-	spia_mtd = kmalloc(sizeof(struct mtd_info) + sizeof(struct nand_chip), GFP_KERNEL);
+-	if (!spia_mtd) {
+-		printk("Unable to allocate SPIA NAND MTD device structure.\n");
+-		return -ENOMEM;
+-	}
+-
+-	/* Get pointer to private data */
+-	this = (struct nand_chip *)(&spia_mtd[1]);
+-
+-	/* Initialize structures */
+-	memset(spia_mtd, 0, sizeof(struct mtd_info));
+-	memset(this, 0, sizeof(struct nand_chip));
+-
+-	/* Link the private data with the MTD structure */
+-	spia_mtd->priv = this;
+-	spia_mtd->owner = THIS_MODULE;
+-
+-	/*
+-	 * Set GPIO Port E control register so that the pins are configured
+-	 * to be outputs for controlling the NAND flash.
+-	 */
+-	(*(volatile unsigned char *)(spia_io_base + spia_peddr)) = 0x07;
+-
+-	/* Set address of NAND IO lines */
+-	this->IO_ADDR_R = (void __iomem *)spia_fio_base;
+-	this->IO_ADDR_W = (void __iomem *)spia_fio_base;
+-	/* Set address of hardware control function */
+-	this->cmd_ctrl = spia_hwcontrol;
+-	/* 15 us command delay time */
+-	this->chip_delay = 15;
+-
+-	/* Scan to find existence of the device */
+-	if (nand_scan(spia_mtd, 1)) {
+-		kfree(spia_mtd);
+-		return -ENXIO;
+-	}
+-
+-	/* Register the partitions */
+-	mtd_device_register(spia_mtd, partition_info, NUM_PARTITIONS);
+-
+-	/* Return happy */
+-	return 0;
+-}
+-
+-module_init(spia_init);
+-
+-/*
+- * Clean up routine
+- */
+-static void __exit spia_cleanup(void)
+-{
+-	/* Release resources, unregister device */
+-	nand_release(spia_mtd);
+-
+-	/* Free the MTD device structure */
+-	kfree(spia_mtd);
+-}
+-
+-module_exit(spia_cleanup);
+-
+-MODULE_LICENSE("GPL");
+-MODULE_AUTHOR("Steven J. Hill <sjhill@realitydiluted.com");
+-MODULE_DESCRIPTION("Board-specific glue layer for NAND flash on SPIA board");
 -- 
 1.7.8.6
