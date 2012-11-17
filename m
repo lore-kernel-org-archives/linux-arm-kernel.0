@@ -1,34 +1,266 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 17 Nov 2012 17:57:10 +0400
-Subject: [PATCH v3 04/18] ARM: clps711x: p720t: Unneeded inclusion of
- head-sa1100.S removed
+Date: Sat, 17 Nov 2012 17:57:07 +0400
+Subject: [PATCH v3 01/18] ARM: clps711x: Using platform_driver for ethernet
+ device
 In-Reply-To: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
 References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1353160644-22446-5-git-send-email-shc_work@mail.ru>
+Message-ID: <1353160644-22446-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch removes static mappings for ethernet devices. Now we will use
+platform_driver for ethernet devices.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/compressed/Makefile |    5 -----
- 1 files changed, 0 insertions(+), 5 deletions(-)
+ arch/arm/mach-clps711x/Kconfig                 |    2 -
+ arch/arm/mach-clps711x/autcpu12.c              |   27 +++++++++-------------
+ arch/arm/mach-clps711x/cdb89712.c              |   28 +++++++++++------------
+ arch/arm/mach-clps711x/edb7211.c               |   26 ++++++++++++++++------
+ arch/arm/mach-clps711x/include/mach/autcpu12.h |    3 --
+ arch/arm/mach-clps711x/include/mach/hardware.h |   11 ---------
+ 6 files changed, 43 insertions(+), 54 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 537208f..5cad8a6 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -45,11 +45,6 @@ ifeq ($(CONFIG_ARCH_SHARK),y)
- OBJS		+= head-shark.o ofw-shark.o
- endif
+diff --git a/arch/arm/mach-clps711x/Kconfig b/arch/arm/mach-clps711x/Kconfig
+index 263242d..2d00165 100644
+--- a/arch/arm/mach-clps711x/Kconfig
++++ b/arch/arm/mach-clps711x/Kconfig
+@@ -10,7 +10,6 @@ config ARCH_AUTCPU12
  
--ifeq ($(CONFIG_ARCH_P720T),y)
--# Borrow this code from SA1100
--OBJS		+= head-sa1100.o
--endif
+ config ARCH_CDB89712
+ 	bool "CDB89712"
+-	select ISA
+ 	help
+ 	  This is an evaluation board from Cirrus for the CS89712 processor.
+ 	  The board includes 2 serial ports, Ethernet, IRDA, and expansion
+@@ -25,7 +24,6 @@ config ARCH_EDB7211
+ 	bool "EDB7211"
+ 	select ARCH_SELECT_MEMORY_MODEL
+ 	select ARCH_SPARSEMEM_ENABLE
+-	select ISA
+ 	help
+ 	  Say Y here if you intend to run this kernel on a Cirrus Logic EDB-7211
+ 	  evaluation board.
+diff --git a/arch/arm/mach-clps711x/autcpu12.c b/arch/arm/mach-clps711x/autcpu12.c
+index 214547b..d9b7f94 100644
+--- a/arch/arm/mach-clps711x/autcpu12.c
++++ b/arch/arm/mach-clps711x/autcpu12.c
+@@ -24,6 +24,7 @@
+ #include <linux/mm.h>
+ #include <linux/io.h>
+ #include <linux/ioport.h>
++#include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ 
+ #include <mach/hardware.h>
+@@ -39,21 +40,13 @@
+ 
+ #include "common.h"
+ 
+-static struct map_desc autcpu12_io_desc[] __initdata = {
+-	/* Memory-mapped extra io and CS8900A Ethernet chip */
+-	{
+-		.virtual	= IO_ADDRESS(AUTCPU12_PHYS_CS8900A),
+-		.pfn		= __phys_to_pfn(AUTCPU12_PHYS_CS8900A),
+-		.length		= SZ_1M,
+-		.type		= MT_DEVICE
+-	}
+-};
++#define AUTCPU12_CS8900_BASE	(CS2_PHYS_BASE + 0x300)
++#define AUTCPU12_CS8900_IRQ	(IRQ_EINT3)
+ 
+-void __init autcpu12_map_io(void)
+-{
+-        clps711x_map_io();
+-        iotable_init(autcpu12_io_desc, ARRAY_SIZE(autcpu12_io_desc));
+-}
++static struct resource autcpu12_cs8900_resource[] __initdata = {
++	DEFINE_RES_MEM(AUTCPU12_CS8900_BASE, SZ_1K),
++	DEFINE_RES_IRQ(AUTCPU12_CS8900_IRQ),
++};
+ 
+ static struct resource autcpu12_nvram_resource[] __initdata = {
+ 	DEFINE_RES_MEM_NAMED(AUTCPU12_PHYS_NVRAM, SZ_128K, "SRAM"),
+@@ -68,16 +61,18 @@ static struct platform_device autcpu12_nvram_pdev __initdata = {
+ 
+ static void __init autcpu12_init(void)
+ {
++	platform_device_register_simple("cs89x0", 0, autcpu12_cs8900_resource,
++					ARRAY_SIZE(autcpu12_cs8900_resource));
+ 	platform_device_register(&autcpu12_nvram_pdev);
+ }
+ 
+ MACHINE_START(AUTCPU12, "autronix autcpu12")
+ 	/* Maintainer: Thomas Gleixner */
+ 	.atag_offset	= 0x20000,
+-	.init_machine	= autcpu12_init,
+-	.map_io		= autcpu12_map_io,
++	.map_io		= clps711x_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.init_machine	= autcpu12_init,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+ 
+diff --git a/arch/arm/mach-clps711x/cdb89712.c b/arch/arm/mach-clps711x/cdb89712.c
+index d90d25c..235e625 100644
+--- a/arch/arm/mach-clps711x/cdb89712.c
++++ b/arch/arm/mach-clps711x/cdb89712.c
+@@ -23,6 +23,8 @@
+ #include <linux/string.h>
+ #include <linux/mm.h>
+ #include <linux/io.h>
++#include <linux/interrupt.h>
++#include <linux/platform_device.h>
+ 
+ #include <mach/hardware.h>
+ #include <asm/pgtable.h>
+@@ -34,30 +36,26 @@
+ 
+ #include "common.h"
+ 
+-/*
+- * Map the CS89712 Ethernet port.  That should be moved to the
+- * ethernet driver, perhaps.
+- */
+-static struct map_desc cdb89712_io_desc[] __initdata = {
+-	{
+-		.virtual	= IO_ADDRESS(ETHER_PHYS_BASE),
+-		.pfn		= __phys_to_pfn(ETHER_PHYS_BASE),
+-		.length		= ETHER_SIZE,
+-		.type		= MT_DEVICE
+-	}
++#define CDB89712_CS8900_BASE	(CS2_PHYS_BASE + 0x300)
++#define CDB89712_CS8900_IRQ	(IRQ_EINT3)
++
++static struct resource cdb89712_cs8900_resource[] __initdata = {
++	DEFINE_RES_MEM(CDB89712_CS8900_BASE, SZ_1K),
++	DEFINE_RES_IRQ(CDB89712_CS8900_IRQ),
+ };
+ 
+-static void __init cdb89712_map_io(void)
++static void __init cdb89712_init(void)
+ {
+-	clps711x_map_io();
+-	iotable_init(cdb89712_io_desc, ARRAY_SIZE(cdb89712_io_desc));
++	platform_device_register_simple("cs89x0", 0, cdb89712_cs8900_resource,
++					ARRAY_SIZE(cdb89712_cs8900_resource));
+ }
+ 
+ MACHINE_START(CDB89712, "Cirrus-CDB89712")
+ 	/* Maintainer: Ray Lehtiniemi */
+ 	.atag_offset	= 0x100,
+-	.map_io		= cdb89712_map_io,
++	.map_io		= clps711x_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.init_machine	= cdb89712_init,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/edb7211.c b/arch/arm/mach-clps711x/edb7211.c
+index 88f4690..7add9ad 100644
+--- a/arch/arm/mach-clps711x/edb7211.c
++++ b/arch/arm/mach-clps711x/edb7211.c
+@@ -10,6 +10,8 @@
+ #include <linux/init.h>
+ #include <linux/memblock.h>
+ #include <linux/types.h>
++#include <linux/interrupt.h>
++#include <linux/platform_device.h>
+ 
+ #include <asm/setup.h>
+ #include <asm/mach/map.h>
+@@ -20,7 +22,15 @@
+ 
+ #include "common.h"
+ 
+-#define VIDEORAM_SIZE	SZ_128K
++#define VIDEORAM_SIZE		SZ_128K
++
++#define EDB7211_CS8900_BASE	(CS2_PHYS_BASE + 0x300)
++#define EDB7211_CS8900_IRQ	(IRQ_EINT3)
++
++static struct resource edb7211_cs8900_resource[] __initdata = {
++	DEFINE_RES_MEM(EDB7211_CS8900_BASE, SZ_1K),
++	DEFINE_RES_IRQ(EDB7211_CS8900_IRQ),
++};
+ 
+ static struct map_desc edb7211_io_desc[] __initdata = {
+ 	{	/* Memory-mapped extra keyboard row */
+@@ -28,11 +38,6 @@ static struct map_desc edb7211_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(EP7211_PHYS_EXTKBD),
+ 		.length		= SZ_1M,
+ 		.type		= MT_DEVICE,
+-	}, {	/* CS8900A Ethernet chip */
+-		.virtual	= IO_ADDRESS(EP7211_PHYS_CS8900A),
+-		.pfn		= __phys_to_pfn(EP7211_PHYS_CS8900A),
+-		.length		= SZ_1M,
+-		.type		= MT_DEVICE,
+ 	}, {	/* Flash bank 0 */
+ 		.virtual	= IO_ADDRESS(EP7211_PHYS_FLASH1),
+ 		.pfn		= __phys_to_pfn(EP7211_PHYS_FLASH1),
+@@ -76,13 +81,20 @@ fixup_edb7211(struct tag *tags, char **cmdline, struct meminfo *mi)
+ 	mi->nr_banks = 2;
+ }
+ 
++static void __init edb7211_init(void)
++{
++	platform_device_register_simple("cs89x0", 0, edb7211_cs8900_resource,
++					ARRAY_SIZE(edb7211_cs8900_resource));
++}
++
+ MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
+ 	/* Maintainer: Jon McClintock */
+ 	.atag_offset	= VIDEORAM_SIZE + 0x100,
+ 	.fixup		= fixup_edb7211,
+-	.map_io		= edb7211_map_io,
+ 	.reserve	= edb7211_reserve,
++	.map_io		= edb7211_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.init_machine	= edb7211_init,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/include/mach/autcpu12.h b/arch/arm/mach-clps711x/include/mach/autcpu12.h
+index f95ce6f..b077abd 100644
+--- a/arch/arm/mach-clps711x/include/mach/autcpu12.h
++++ b/arch/arm/mach-clps711x/include/mach/autcpu12.h
+@@ -20,9 +20,6 @@
+ #ifndef __ASM_ARCH_AUTCPU12_H
+ #define __ASM_ARCH_AUTCPU12_H
+ 
+-/* The CS8900A ethernet chip has its I/O registers wired to chip select 2 */
+-#define AUTCPU12_PHYS_CS8900A		CS2_PHYS_BASE
 -
- ifeq ($(CONFIG_ARCH_SA1100),y)
- OBJS		+= head-sa1100.o
- endif
+ /*
+  * The flash bank is wired to chip select 0
+  */
+diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
+index 0a3df25..bd919e7 100644
+--- a/arch/arm/mach-clps711x/include/mach/hardware.h
++++ b/arch/arm/mach-clps711x/include/mach/hardware.h
+@@ -64,22 +64,11 @@
+ #define CS7_PHYS_BASE		(0x00000000)
+ #endif
+ 
+-#if defined (CONFIG_ARCH_CDB89712)
+-
+-#define ETHER_PHYS_BASE		CS2_PHYS_BASE
+-#define ETHER_SIZE		0x1000
+-
+-#endif
+-
+-
+ #if defined (CONFIG_ARCH_EDB7211)
+ 
+ /* The extra 8 lines of the keyboard matrix are wired to chip select 3 */
+ #define EP7211_PHYS_EXTKBD	CS3_PHYS_BASE
+ 
+-/* The CS8900A ethernet chip has its I/O registers wired to chip select 2 */
+-#define EP7211_PHYS_CS8900A	CS2_PHYS_BASE
+-
+ /* The two flash banks are wired to chip selects 0 and 1 */
+ #define EP7211_PHYS_FLASH1	CS0_PHYS_BASE
+ #define EP7211_PHYS_FLASH2	CS1_PHYS_BASE
 -- 
 1.7.8.6
