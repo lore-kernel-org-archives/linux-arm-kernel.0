@@ -1,60 +1,457 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 17 Nov 2012 17:57:16 +0400
-Subject: [PATCH v3 10/18] ARM: clps711x: Unused empty "ACK" calls for
- IRQ-chips removed
+Date: Sat, 17 Nov 2012 17:57:12 +0400
+Subject: [PATCH v3 06/18] ARM: clps711x: cdb89712: Special driver for handling
+ memory is removed
 In-Reply-To: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
 References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1353160644-22446-11-git-send-email-shc_work@mail.ru>
+Message-ID: <1353160644-22446-7-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch provide migration to using "physmap-flash" and "mtd-ram"
+drivers instead of using special driver for handling memory.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/common.c |   10 ----------
- 1 files changed, 0 insertions(+), 10 deletions(-)
+ arch/arm/mach-clps711x/cdb89712.c              |   84 +++++++
+ arch/arm/mach-clps711x/include/mach/hardware.h |    3 +
+ drivers/mtd/maps/Kconfig                       |    7 -
+ drivers/mtd/maps/Makefile                      |    1 -
+ drivers/mtd/maps/cdb89712.c                    |  278 ------------------------
+ 5 files changed, 87 insertions(+), 286 deletions(-)
+ delete mode 100644 drivers/mtd/maps/cdb89712.c
 
-diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
-index fcdcd91..e046439 100644
---- a/arch/arm/mach-clps711x/common.c
-+++ b/arch/arm/mach-clps711x/common.c
-@@ -66,10 +66,6 @@ static void int1_mask(struct irq_data *d)
- 	clps_writel(intmr1, INTMR1);
- }
+diff --git a/arch/arm/mach-clps711x/cdb89712.c b/arch/arm/mach-clps711x/cdb89712.c
+index 235e625..24f573b 100644
+--- a/arch/arm/mach-clps711x/cdb89712.c
++++ b/arch/arm/mach-clps711x/cdb89712.c
+@@ -26,6 +26,10 @@
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
  
--static void int1_ack(struct irq_data *d)
++#include <linux/mtd/physmap.h>
++#include <linux/mtd/plat-ram.h>
++#include <linux/mtd/partitions.h>
++
+ #include <mach/hardware.h>
+ #include <asm/pgtable.h>
+ #include <asm/page.h>
+@@ -44,8 +48,88 @@ static struct resource cdb89712_cs8900_resource[] __initdata = {
+ 	DEFINE_RES_IRQ(CDB89712_CS8900_IRQ),
+ };
+ 
++static struct mtd_partition cdb89712_flash_partitions[] __initdata = {
++	{
++		.name	= "Flash",
++		.offset	= 0,
++		.size	= MTDPART_SIZ_FULL,
++	},
++};
++
++static struct physmap_flash_data cdb89712_flash_pdata __initdata = {
++	.width		= 4,
++	.probe_type	= "map_rom",
++	.parts		= cdb89712_flash_partitions,
++	.nr_parts	= ARRAY_SIZE(cdb89712_flash_partitions),
++};
++
++static struct resource cdb89712_flash_resources[] __initdata = {
++	DEFINE_RES_MEM(CS0_PHYS_BASE, SZ_8M),
++};
++
++static struct platform_device cdb89712_flash_pdev __initdata = {
++	.name		= "physmap-flash",
++	.id		= 0,
++	.resource	= cdb89712_flash_resources,
++	.num_resources	= ARRAY_SIZE(cdb89712_flash_resources),
++	.dev	= {
++		.platform_data	= &cdb89712_flash_pdata,
++	},
++};
++
++static struct mtd_partition cdb89712_bootrom_partitions[] __initdata = {
++	{
++		.name	= "BootROM",
++		.offset	= 0,
++		.size	= MTDPART_SIZ_FULL,
++	},
++};
++
++static struct physmap_flash_data cdb89712_bootrom_pdata __initdata = {
++	.width		= 4,
++	.probe_type	= "map_rom",
++	.parts		= cdb89712_bootrom_partitions,
++	.nr_parts	= ARRAY_SIZE(cdb89712_bootrom_partitions),
++};
++
++static struct resource cdb89712_bootrom_resources[] __initdata = {
++	DEFINE_RES_NAMED(CS7_PHYS_BASE, SZ_128, "BOOTROM", IORESOURCE_MEM |
++			 IORESOURCE_CACHEABLE | IORESOURCE_READONLY),
++};
++
++static struct platform_device cdb89712_bootrom_pdev __initdata = {
++	.name		= "physmap-flash",
++	.id		= 1,
++	.resource	= cdb89712_bootrom_resources,
++	.num_resources	= ARRAY_SIZE(cdb89712_bootrom_resources),
++	.dev	= {
++		.platform_data	= &cdb89712_bootrom_pdata,
++	},
++};
++
++static struct platdata_mtd_ram cdb89712_sram_pdata __initdata = {
++	.bankwidth	= 4,
++};
++
++static struct resource cdb89712_sram_resources[] __initdata = {
++	DEFINE_RES_MEM(CLPS711X_SRAM_BASE, CLPS711X_SRAM_SIZE),
++};
++
++static struct platform_device cdb89712_sram_pdev __initdata = {
++	.name		= "mtd-ram",
++	.id		= 0,
++	.resource	= cdb89712_sram_resources,
++	.num_resources	= ARRAY_SIZE(cdb89712_sram_resources),
++	.dev	= {
++		.platform_data	= &cdb89712_sram_pdata,
++	},
++};
++
+ static void __init cdb89712_init(void)
+ {
++	platform_device_register(&cdb89712_flash_pdev);
++	platform_device_register(&cdb89712_bootrom_pdev);
++	platform_device_register(&cdb89712_sram_pdev);
+ 	platform_device_register_simple("cs89x0", 0, cdb89712_cs8900_resource,
+ 					ARRAY_SIZE(cdb89712_cs8900_resource));
+ }
+diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
+index bd919e7..5a278cb 100644
+--- a/arch/arm/mach-clps711x/include/mach/hardware.h
++++ b/arch/arm/mach-clps711x/include/mach/hardware.h
+@@ -64,6 +64,9 @@
+ #define CS7_PHYS_BASE		(0x00000000)
+ #endif
+ 
++#define CLPS711X_SRAM_BASE	CS6_PHYS_BASE
++#define CLPS711X_SRAM_SIZE	(48 * 1024)
++
+ #if defined (CONFIG_ARCH_EDB7211)
+ 
+ /* The extra 8 lines of the keyboard matrix are wired to chip select 3 */
+diff --git a/drivers/mtd/maps/Kconfig b/drivers/mtd/maps/Kconfig
+index 2e47c2e..df30486 100644
+--- a/drivers/mtd/maps/Kconfig
++++ b/drivers/mtd/maps/Kconfig
+@@ -324,13 +324,6 @@ config MTD_SOLUTIONENGINE
+ 	  This enables access to the flash chips on the Hitachi SolutionEngine and
+ 	  similar boards. Say 'Y' if you are building a kernel for such a board.
+ 
+-config MTD_CDB89712
+-	tristate "Cirrus CDB89712 evaluation board mappings"
+-	depends on MTD_CFI && ARCH_CDB89712
+-	help
+-	  This enables access to the flash or ROM chips on the CDB89712 board.
+-	  If you have such a board, say 'Y'.
+-
+ config MTD_SA1100
+ 	tristate "CFI Flash device mapped on StrongARM SA11x0"
+ 	depends on MTD_CFI && ARCH_SA1100
+diff --git a/drivers/mtd/maps/Makefile b/drivers/mtd/maps/Makefile
+index deb43e9..a0240ed 100644
+--- a/drivers/mtd/maps/Makefile
++++ b/drivers/mtd/maps/Makefile
+@@ -7,7 +7,6 @@ obj-$(CONFIG_MTD)		+= map_funcs.o
+ endif
+ 
+ # Chip mappings
+-obj-$(CONFIG_MTD_CDB89712)	+= cdb89712.o
+ obj-$(CONFIG_MTD_CFI_FLAGADM)	+= cfi_flagadm.o
+ obj-$(CONFIG_MTD_DC21285)	+= dc21285.o
+ obj-$(CONFIG_MTD_DILNETPC)	+= dilnetpc.o
+diff --git a/drivers/mtd/maps/cdb89712.c b/drivers/mtd/maps/cdb89712.c
+deleted file mode 100644
+index c29cbf8..0000000
+--- a/drivers/mtd/maps/cdb89712.c
++++ /dev/null
+@@ -1,278 +0,0 @@
+-/*
+- * Flash on Cirrus CDB89712
+- *
+- */
+-
+-#include <linux/module.h>
+-#include <linux/types.h>
+-#include <linux/kernel.h>
+-#include <linux/ioport.h>
+-#include <linux/init.h>
+-#include <asm/io.h>
+-#include <mach/hardware.h>
+-#include <linux/mtd/mtd.h>
+-#include <linux/mtd/map.h>
+-#include <linux/mtd/partitions.h>
+-
+-/* dynamic ioremap() areas */
+-#define FLASH_START      0x00000000
+-#define FLASH_SIZE       0x800000
+-#define FLASH_WIDTH      4
+-
+-#define SRAM_START       0x60000000
+-#define SRAM_SIZE        0xc000
+-#define SRAM_WIDTH       4
+-
+-#define BOOTROM_START    0x70000000
+-#define BOOTROM_SIZE     0x80
+-#define BOOTROM_WIDTH    4
+-
+-
+-static struct mtd_info *flash_mtd;
+-
+-struct map_info cdb89712_flash_map = {
+-	.name = "flash",
+-	.size = FLASH_SIZE,
+-	.bankwidth = FLASH_WIDTH,
+-	.phys = FLASH_START,
+-};
+-
+-struct resource cdb89712_flash_resource = {
+-	.name =   "Flash",
+-	.start =  FLASH_START,
+-	.end =    FLASH_START + FLASH_SIZE - 1,
+-	.flags =  IORESOURCE_IO | IORESOURCE_BUSY,
+-};
+-
+-static int __init init_cdb89712_flash (void)
 -{
+-	int err;
+-
+-	if (request_resource (&ioport_resource, &cdb89712_flash_resource)) {
+-		printk(KERN_NOTICE "Failed to reserve Cdb89712 FLASH space\n");
+-		err = -EBUSY;
+-		goto out;
+-	}
+-
+-	cdb89712_flash_map.virt = ioremap(FLASH_START, FLASH_SIZE);
+-	if (!cdb89712_flash_map.virt) {
+-		printk(KERN_NOTICE "Failed to ioremap Cdb89712 FLASH space\n");
+-		err = -EIO;
+-		goto out_resource;
+-	}
+-	simple_map_init(&cdb89712_flash_map);
+-	flash_mtd = do_map_probe("cfi_probe", &cdb89712_flash_map);
+-	if (!flash_mtd) {
+-		flash_mtd = do_map_probe("map_rom", &cdb89712_flash_map);
+-		if (flash_mtd)
+-			flash_mtd->erasesize = 0x10000;
+-	}
+-	if (!flash_mtd) {
+-		printk("FLASH probe failed\n");
+-		err = -ENXIO;
+-		goto out_ioremap;
+-	}
+-
+-	flash_mtd->owner = THIS_MODULE;
+-
+-	if (mtd_device_register(flash_mtd, NULL, 0)) {
+-		printk("FLASH device addition failed\n");
+-		err = -ENOMEM;
+-		goto out_probe;
+-	}
+-
+-	return 0;
+-
+-out_probe:
+-	map_destroy(flash_mtd);
+-	flash_mtd = 0;
+-out_ioremap:
+-	iounmap((void *)cdb89712_flash_map.virt);
+-out_resource:
+-	release_resource (&cdb89712_flash_resource);
+-out:
+-	return err;
 -}
 -
- static void int1_eoi(struct irq_data *d)
- {
- 	switch (d->irq) {
-@@ -93,7 +89,6 @@ static void int1_unmask(struct irq_data *d)
- 
- static struct irq_chip int1_chip = {
- 	.name		= "Interrupt Vector 1",
--	.irq_ack	= int1_ack,
- 	.irq_eoi	= int1_eoi,
- 	.irq_mask	= int1_mask,
- 	.irq_unmask	= int1_unmask,
-@@ -108,10 +103,6 @@ static void int2_mask(struct irq_data *d)
- 	clps_writel(intmr2, INTMR2);
- }
- 
--static void int2_ack(struct irq_data *d)
+-
+-
+-
+-
+-static struct mtd_info *sram_mtd;
+-
+-struct map_info cdb89712_sram_map = {
+-	.name = "SRAM",
+-	.size = SRAM_SIZE,
+-	.bankwidth = SRAM_WIDTH,
+-	.phys = SRAM_START,
+-};
+-
+-struct resource cdb89712_sram_resource = {
+-	.name =   "SRAM",
+-	.start =  SRAM_START,
+-	.end =    SRAM_START + SRAM_SIZE - 1,
+-	.flags =  IORESOURCE_IO | IORESOURCE_BUSY,
+-};
+-
+-static int __init init_cdb89712_sram (void)
 -{
+-	int err;
+-
+-	if (request_resource (&ioport_resource, &cdb89712_sram_resource)) {
+-		printk(KERN_NOTICE "Failed to reserve Cdb89712 SRAM space\n");
+-		err = -EBUSY;
+-		goto out;
+-	}
+-
+-	cdb89712_sram_map.virt = ioremap(SRAM_START, SRAM_SIZE);
+-	if (!cdb89712_sram_map.virt) {
+-		printk(KERN_NOTICE "Failed to ioremap Cdb89712 SRAM space\n");
+-		err = -EIO;
+-		goto out_resource;
+-	}
+-	simple_map_init(&cdb89712_sram_map);
+-	sram_mtd = do_map_probe("map_ram", &cdb89712_sram_map);
+-	if (!sram_mtd) {
+-		printk("SRAM probe failed\n");
+-		err = -ENXIO;
+-		goto out_ioremap;
+-	}
+-
+-	sram_mtd->owner = THIS_MODULE;
+-	sram_mtd->erasesize = 16;
+-
+-	if (mtd_device_register(sram_mtd, NULL, 0)) {
+-		printk("SRAM device addition failed\n");
+-		err = -ENOMEM;
+-		goto out_probe;
+-	}
+-
+-	return 0;
+-
+-out_probe:
+-	map_destroy(sram_mtd);
+-	sram_mtd = 0;
+-out_ioremap:
+-	iounmap((void *)cdb89712_sram_map.virt);
+-out_resource:
+-	release_resource (&cdb89712_sram_resource);
+-out:
+-	return err;
 -}
 -
- static void int2_eoi(struct irq_data *d)
- {
- 	switch (d->irq) {
-@@ -130,7 +121,6 @@ static void int2_unmask(struct irq_data *d)
- 
- static struct irq_chip int2_chip = {
- 	.name		= "Interrupt Vector 2",
--	.irq_ack	= int2_ack,
- 	.irq_eoi	= int2_eoi,
- 	.irq_mask	= int2_mask,
- 	.irq_unmask	= int2_unmask,
+-
+-
+-
+-
+-
+-
+-static struct mtd_info *bootrom_mtd;
+-
+-struct map_info cdb89712_bootrom_map = {
+-	.name = "BootROM",
+-	.size = BOOTROM_SIZE,
+-	.bankwidth = BOOTROM_WIDTH,
+-	.phys = BOOTROM_START,
+-};
+-
+-struct resource cdb89712_bootrom_resource = {
+-	.name =   "BootROM",
+-	.start =  BOOTROM_START,
+-	.end =    BOOTROM_START + BOOTROM_SIZE - 1,
+-	.flags =  IORESOURCE_IO | IORESOURCE_BUSY,
+-};
+-
+-static int __init init_cdb89712_bootrom (void)
+-{
+-	int err;
+-
+-	if (request_resource (&ioport_resource, &cdb89712_bootrom_resource)) {
+-		printk(KERN_NOTICE "Failed to reserve Cdb89712 BOOTROM space\n");
+-		err = -EBUSY;
+-		goto out;
+-	}
+-
+-	cdb89712_bootrom_map.virt = ioremap(BOOTROM_START, BOOTROM_SIZE);
+-	if (!cdb89712_bootrom_map.virt) {
+-		printk(KERN_NOTICE "Failed to ioremap Cdb89712 BootROM space\n");
+-		err = -EIO;
+-		goto out_resource;
+-	}
+-	simple_map_init(&cdb89712_bootrom_map);
+-	bootrom_mtd = do_map_probe("map_rom", &cdb89712_bootrom_map);
+-	if (!bootrom_mtd) {
+-		printk("BootROM probe failed\n");
+-		err = -ENXIO;
+-		goto out_ioremap;
+-	}
+-
+-	bootrom_mtd->owner = THIS_MODULE;
+-	bootrom_mtd->erasesize = 0x10000;
+-
+-	if (mtd_device_register(bootrom_mtd, NULL, 0)) {
+-		printk("BootROM device addition failed\n");
+-		err = -ENOMEM;
+-		goto out_probe;
+-	}
+-
+-	return 0;
+-
+-out_probe:
+-	map_destroy(bootrom_mtd);
+-	bootrom_mtd = 0;
+-out_ioremap:
+-	iounmap((void *)cdb89712_bootrom_map.virt);
+-out_resource:
+-	release_resource (&cdb89712_bootrom_resource);
+-out:
+-	return err;
+-}
+-
+-
+-
+-
+-
+-static int __init init_cdb89712_maps(void)
+-{
+-
+-       	printk(KERN_INFO "Cirrus CDB89712 MTD mappings:\n  Flash 0x%x at 0x%x\n  SRAM 0x%x at 0x%x\n  BootROM 0x%x at 0x%x\n",
+-	       FLASH_SIZE, FLASH_START, SRAM_SIZE, SRAM_START, BOOTROM_SIZE, BOOTROM_START);
+-
+-	init_cdb89712_flash();
+-	init_cdb89712_sram();
+-	init_cdb89712_bootrom();
+-
+-	return 0;
+-}
+-
+-
+-static void __exit cleanup_cdb89712_maps(void)
+-{
+-	if (sram_mtd) {
+-		mtd_device_unregister(sram_mtd);
+-		map_destroy(sram_mtd);
+-		iounmap((void *)cdb89712_sram_map.virt);
+-		release_resource (&cdb89712_sram_resource);
+-	}
+-
+-	if (flash_mtd) {
+-		mtd_device_unregister(flash_mtd);
+-		map_destroy(flash_mtd);
+-		iounmap((void *)cdb89712_flash_map.virt);
+-		release_resource (&cdb89712_flash_resource);
+-	}
+-
+-	if (bootrom_mtd) {
+-		mtd_device_unregister(bootrom_mtd);
+-		map_destroy(bootrom_mtd);
+-		iounmap((void *)cdb89712_bootrom_map.virt);
+-		release_resource (&cdb89712_bootrom_resource);
+-	}
+-}
+-
+-module_init(init_cdb89712_maps);
+-module_exit(cleanup_cdb89712_maps);
+-
+-MODULE_AUTHOR("Ray L");
+-MODULE_DESCRIPTION("ARM CDB89712 map driver");
+-MODULE_LICENSE("GPL");
 -- 
 1.7.8.6
