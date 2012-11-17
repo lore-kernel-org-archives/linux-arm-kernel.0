@@ -1,75 +1,112 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 17 Nov 2012 17:00:42 +0100
-Subject: [PATCH v2 00/14] Convert Kirkwood DT boards to pinctrl
-Message-ID: <1353168058-14043-1-git-send-email-andrew@lunn.ch>
+Date: Sat, 17 Nov 2012 17:00:45 +0100
+Subject: [PATCH v2 03/14] ARM: Kirkwood: Add DTSI files for pinctrl
+In-Reply-To: <1353168058-14043-1-git-send-email-andrew@lunn.ch>
+References: <1353168058-14043-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1353168058-14043-4-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset converts all Kirkwood DT boards to pinctrl. The
-configuration of pins is moved into the board DT files. Since none of
-the kirkwood boards need to dynamically change pin configurations, pin
-hogs are specified.
+There are a couple of different variants of Kirkwood, which differ in
+the pin muxing. These DTSI files set the correct compatibility and
+define commonly used groups of pins, which board dbs files can
+reference.
 
-In order to support the 98DX412x family of network switches with
-embedded kirkwood CPUs, a new CPU variant is added to the kirkwood
-pinctrl driver.
-
-These patches apply on top of the conversion to using regulators.
-These patches also rely on three patches already accepted by Linus
-Walleij to the mvebu pinctrl driver.
-
-Andrew Lunn (12):
-  GPIO: mvebu: Allow all plat-orion platforms.
-  ARM: Kirkwood: Make use of mvebu pincltl and gpio drivers
-  ARM: Kirkwood: Add DTSI files for pinctrl
-  ARM: Kirkwood: Convert TS219 to pinctrl.
-  ARM: Kirkwood: Convert iConnect to pinctrl.
-  ARM: Kirkwood: Convert dnskw to pinctrl
-  ARM: Kirkwood: Convert dockstar to pinctrl.
-  ARM: Kirkwood: Convert dreamplug to pinctrl.
-  ARM: Kirkwood: Convert GoFlex Net to pinctrl.
-  ARM: Kirkwood: Convert ib62x0 to pinctrl.
-  ARM: Kirkwood: Convert lsxl boards to pinctrl.
-  ARM: Kirkwood: Convert IX2-200 to pinctrl.
-
-Valentin Longchamp (2):
-  ARM: Kirkwood: support 98DX412x kirkwoods with pinctrl
-  ARM: Kirkwood: Convert km_kirkwood to pinctrl
-
- .../bindings/pinctrl/marvell,kirkwood-pinctrl.txt  |   39 ++
- arch/arm/Kconfig                                   |    2 +
- arch/arm/boot/dts/kirkwood-6281.dtsi               |   39 ++
- arch/arm/boot/dts/kirkwood-6282.dtsi               |   35 ++
- arch/arm/boot/dts/kirkwood-98dx4122.dtsi           |   31 ++
- arch/arm/boot/dts/kirkwood-dnskw.dtsi              |  105 ++++
- arch/arm/boot/dts/kirkwood-dockstar.dts            |   20 +
- arch/arm/boot/dts/kirkwood-dreamplug.dts           |   21 +
- arch/arm/boot/dts/kirkwood-goflexnet.dts           |   56 ++
- arch/arm/boot/dts/kirkwood-ib62x0.dts              |   34 ++
- arch/arm/boot/dts/kirkwood-iconnect.dts            |   51 ++
- arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts      |   89 +++
- arch/arm/boot/dts/kirkwood-km_kirkwood.dts         |   17 +
- arch/arm/boot/dts/kirkwood-lsxl.dtsi               |   66 +++
- arch/arm/boot/dts/kirkwood-ts219-6281.dts          |   31 ++
- arch/arm/boot/dts/kirkwood-ts219-6282.dts          |   31 ++
- arch/arm/boot/dts/kirkwood.dtsi                    |   10 +-
- arch/arm/mach-kirkwood/board-dnskw.c               |   37 --
- arch/arm/mach-kirkwood/board-dockstar.c            |   10 -
- arch/arm/mach-kirkwood/board-dreamplug.c           |   14 -
- arch/arm/mach-kirkwood/board-goflexnet.c           |   18 -
- arch/arm/mach-kirkwood/board-ib62x0.c              |   21 -
- arch/arm/mach-kirkwood/board-iconnect.c            |   17 -
- arch/arm/mach-kirkwood/board-iomega_ix2_200.c      |   24 -
- arch/arm/mach-kirkwood/board-km_kirkwood.c         |   12 -
- arch/arm/mach-kirkwood/board-lsxl.c                |   19 -
- arch/arm/mach-kirkwood/board-ts219.c               |   25 -
- arch/arm/plat-orion/irq.c                          |    6 +-
- drivers/gpio/Kconfig                               |    2 +-
- drivers/pinctrl/mvebu/pinctrl-kirkwood.c           |  568 ++++++++++----------
- 30 files changed, 967 insertions(+), 483 deletions(-)
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/boot/dts/kirkwood-6281.dtsi |   39 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-6282.dtsi |   35 ++++++++++++++++++++++++++++++
+ 2 files changed, 74 insertions(+)
  create mode 100644 arch/arm/boot/dts/kirkwood-6281.dtsi
  create mode 100644 arch/arm/boot/dts/kirkwood-6282.dtsi
- create mode 100644 arch/arm/boot/dts/kirkwood-98dx4122.dtsi
 
+diff --git a/arch/arm/boot/dts/kirkwood-6281.dtsi b/arch/arm/boot/dts/kirkwood-6281.dtsi
+new file mode 100644
+index 0000000..b0fe682
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-6281.dtsi
+@@ -0,0 +1,39 @@
++/ {
++	ocp at f1000000 {
++		pinctrl: pinctrl at 10000 {
++			compatible = "marvell,88f6281-pinctrl";
++			reg = <0x10000 0x20>;
++
++			pmx_nand: pmx-nand {
++				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
++					       "mpp4", "mpp5", "mpp18",
++					       "mpp19";
++				marvell,function = "nand";
++			};
++			pmx_sata0: pmx-sata0 {
++				marvell,pins = "mpp5", "mpp21", "mpp23";
++				marvell,function = "sata0";
++			};
++			pmx_sata1: pmx-sata1 {
++				marvell,pins = "mpp4", "mpp20", "mpp22";
++				marvell,function = "sata1";
++			};
++			pmx_spi: pmx-spi {
++				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
++				marvell,function = "spi";
++			};
++			pmx_twsi0: pmx-twsi0 {
++				marvell,pins = "mpp8", "mpp9";
++				marvell,function = "twsi0";
++			};
++			pmx_uart0: pmx-uart0 {
++				marvell,pins = "mpp10", "mpp11";
++				marvell,function = "uart0";
++			};
++			pmx_uart1: pmx-uart1 {
++				marvell,pins = "mpp13", "mpp14";
++				marvell,function = "uart1";
++			};
++		};
++	};
++};
+\ No newline at end of file
+diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi b/arch/arm/boot/dts/kirkwood-6282.dtsi
+new file mode 100644
+index 0000000..d6a4145
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
+@@ -0,0 +1,35 @@
++/ {
++	ocp at f1000000 {
++
++		pinctrl: pinctrl at 10000 {
++			compatible = "marvell,88f6282-pinctrl";
++			reg = <0x10000 0x20>;
++
++			pmx_sata0: pmx-sata0 {
++				marvell,pins = "mpp5", "mpp21", "mpp23";
++				marvell,function = "sata0";
++			};
++			pmx_sata1: pmx-sata1 {
++				marvell,pins = "mpp4", "mpp20", "mpp22";
++				marvell,function = "sata1";
++			};
++			pmx_spi: pmx-spi {
++				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
++				marvell,function = "spi";
++			};
++			pmx_twsi0: pmx-twsi0 {
++				marvell,pins = "mpp8", "mpp9";
++				marvell,function = "twsi0";
++			};
++			pmx_uart0: pmx-uart0 {
++				marvell,pins = "mpp10", "mpp11";
++				marvell,function = "uart0";
++			};
++
++			pmx_uart1: pmx-uart1 {
++				marvell,pins = "mpp13", "mpp14";
++				marvell,function = "uart1";
++			};
++		};
++	};
++};
+\ No newline at end of file
 -- 
 1.7.10.4
