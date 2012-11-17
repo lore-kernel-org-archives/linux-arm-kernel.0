@@ -1,145 +1,94 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 17 Nov 2012 17:57:08 +0400
-Subject: [PATCH v3 02/18] ARM: clps711x: p720t: Using "leds-gpio" driver for
- LED control
-In-Reply-To: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
-References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1353160644-22446-3-git-send-email-shc_work@mail.ru>
+Date: Sat, 17 Nov 2012 17:57:06 +0400
+Subject: [PATCH v3 00/18] ARM: Patchset for CLPS711X
+Message-ID: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of manually create LED class device, we will use "leds-gpio"
-driver for LED control.
+Here is a v3 patchset for a CLPS711X-target.
+The main direction of this patchset - approaching the platform to the
+possibility of using configurations with multiple platforms in a single
+kernel. Added support of the majority of the necessary kernel symbol.
+Also part of the driver code used only for the platform was moved to the
+board code and converted to the use of standard drivers.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-clps711x/common.h |    3 ++
- arch/arm/mach-clps711x/p720t.c  |   74 ++++++++++----------------------------
- 2 files changed, 23 insertions(+), 54 deletions(-)
+Alexander Shiyan (18):
+  ARM: clps711x: Using platform_driver for ethernet device
+  ARM: clps711x: p720t: Using "leds-gpio" driver for LED control
+  ARM: clps711x: Transform clps711x-framebuffer to platform driver and
+    use it
+  ARM: clps711x: p720t: Unneeded inclusion of head-sa1100.S removed
+  ARM: clps711x: Always select AUTO_ZRELADDR for a platform
+  ARM: clps711x: cdb89712: Special driver for handling memory is
+    removed
+  ARM: clps711x: Implement usage "SPARSE_IRQ" kernel option for a
+    platform
+  ARM: clps711x: Implement usage "MULTI_IRQ_HANDLER" kernel option for
+    a platform
+  ARM: clps711x: Add FIQ interrupt handling
+  ARM: clps711x: Unused empty "ACK" calls for IRQ-chips removed
+  ARM: clps711x: autcpu12: Special driver for handling NAND memory is
+    removed
+  ARM: clps711x: Moving power management of framebuffer driver to the
+    board
+  ARM: clps711x: p720t: Special driver for handling NAND memory is
+    removed
+  ARM: clps711x: Moving backlight controls of framebuffer driver to the
+    board
+  ARM: clps711x: edb7211: Add support for NOR-Flash
+  ARM: clps711x: Rename board files to match functionality
+  ARM: clps711x: Update defconfig due latest changes and new kernel
+    symbols
+  MAINTAINERS: Add ARM CLPS711X entry
 
-diff --git a/arch/arm/mach-clps711x/common.h b/arch/arm/mach-clps711x/common.h
-index fc0f065..dc60cae 100644
---- a/arch/arm/mach-clps711x/common.h
-+++ b/arch/arm/mach-clps711x/common.h
-@@ -4,6 +4,9 @@
-  * Common bits.
-  */
- 
-+#define CLPS711X_NR_GPIO	(4 * 8 + 3)
-+#define CLPS711X_GPIO(prt, bit)	((prt) * 8 + (bit))
-+
- struct sys_timer;
- 
- extern void clps711x_map_io(void);
-diff --git a/arch/arm/mach-clps711x/p720t.c b/arch/arm/mach-clps711x/p720t.c
-index dd89950..8fe33b3 100644
---- a/arch/arm/mach-clps711x/p720t.c
-+++ b/arch/arm/mach-clps711x/p720t.c
-@@ -25,6 +25,7 @@
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/leds.h>
-+#include <linux/platform_device.h>
- 
- #include <mach/hardware.h>
- #include <asm/pgtable.h>
-@@ -38,6 +39,8 @@
- 
- #include "common.h"
- 
-+#define GPIO_USERLED	CLPS711X_GPIO(3, 0)
-+
- /*
-  * Map the P720T system PLD. It occupies two address spaces:
-  * 0x10000000 and 0x10400000. We map both regions as one.
-@@ -103,71 +106,34 @@ static void __init p720t_init_early(void)
- 	}
- }
- 
--/*
-- * LED controled by CPLD
-- */
--#if defined(CONFIG_NEW_LEDS) && defined(CONFIG_LEDS_CLASS)
--static void p720t_led_set(struct led_classdev *cdev,
--			      enum led_brightness b)
--{
--	u8 reg = clps_readb(PDDR);
--
--	if (b != LED_OFF)
--		reg |= 0x1;
--	else
--		reg &= ~0x1;
--
--	clps_writeb(reg, PDDR);
--}
--
--static enum led_brightness p720t_led_get(struct led_classdev *cdev)
--{
--	u8 reg = clps_readb(PDDR);
-+static struct gpio_led p720t_gpio_leds[] = {
-+	{
-+		.name			= "User LED",
-+		.default_trigger	= "heartbeat",
-+		.gpio			= GPIO_USERLED,
-+	},
-+};
- 
--	return (reg & 0x1) ? LED_FULL : LED_OFF;
--}
-+static struct gpio_led_platform_data p720t_gpio_led_pdata __initdata = {
-+	.leds		= p720t_gpio_leds,
-+	.num_leds	= ARRAY_SIZE(p720t_gpio_leds),
-+};
- 
--static int __init p720t_leds_init(void)
-+static void __init p720t_init_late(void)
- {
--
--	struct led_classdev *cdev;
--	int ret;
--
--	if (!machine_is_p720t())
--		return -ENODEV;
--
--	cdev = kzalloc(sizeof(*cdev), GFP_KERNEL);
--	if (!cdev)
--		return -ENOMEM;
--
--	cdev->name = "p720t:0";
--	cdev->brightness_set = p720t_led_set;
--	cdev->brightness_get = p720t_led_get;
--	cdev->default_trigger = "heartbeat";
--
--	ret = led_classdev_register(NULL, cdev);
--	if (ret	< 0) {
--		kfree(cdev);
--		return ret;
--	}
--
--	return 0;
-+	platform_device_register_data(&platform_bus, "leds-gpio", 0,
-+				      &p720t_gpio_led_pdata,
-+				      sizeof(p720t_gpio_led_pdata));
- }
- 
--/*
-- * Since we may have triggers on any subsystem, defer registration
-- * until after subsystem_init.
-- */
--fs_initcall(p720t_leds_init);
--#endif
--
- MACHINE_START(P720T, "ARM-Prospector720T")
- 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
- 	.atag_offset	= 0x100,
- 	.fixup		= fixup_p720t,
--	.init_early	= p720t_init_early,
- 	.map_io		= p720t_map_io,
-+	.init_early	= p720t_init_early,
- 	.init_irq	= clps711x_init_irq,
- 	.timer		= &clps711x_timer,
-+	.init_late	= p720t_init_late,
- 	.restart	= clps711x_restart,
- MACHINE_END
+ MAINTAINERS                                        |    6 +
+ arch/arm/Kconfig                                   |    3 +
+ arch/arm/boot/compressed/Makefile                  |    5 -
+ arch/arm/configs/clps711x_defconfig                |   30 ++-
+ arch/arm/mach-clps711x/Kconfig                     |    2 -
+ arch/arm/mach-clps711x/Makefile                    |   12 +-
+ arch/arm/mach-clps711x/Makefile.boot               |    1 -
+ arch/arm/mach-clps711x/autcpu12.c                  |   83 ------
+ arch/arm/mach-clps711x/board-autcpu12.c            |  179 +++++++++++++
+ arch/arm/mach-clps711x/board-cdb89712.c            |  147 +++++++++++
+ .../mach-clps711x/{clep7312.c => board-clep7312.c} |    4 +-
+ arch/arm/mach-clps711x/board-edb7211.c             |  180 +++++++++++++
+ .../mach-clps711x/{fortunet.c => board-fortunet.c} |    2 +
+ arch/arm/mach-clps711x/board-p720t.c               |  232 ++++++++++++++++
+ arch/arm/mach-clps711x/cdb89712.c                  |   63 -----
+ arch/arm/mach-clps711x/common.c                    |   92 ++++++--
+ arch/arm/mach-clps711x/common.h                    |    7 +-
+ arch/arm/mach-clps711x/edb7211.c                   |   88 ------
+ arch/arm/mach-clps711x/include/mach/autcpu12.h     |   13 -
+ arch/arm/mach-clps711x/include/mach/clps711x.h     |   24 ++
+ arch/arm/mach-clps711x/include/mach/entry-macro.S  |   51 ----
+ arch/arm/mach-clps711x/include/mach/hardware.h     |   25 +--
+ arch/arm/mach-clps711x/include/mach/irqs.h         |   46 ----
+ arch/arm/mach-clps711x/p720t.c                     |  173 ------------
+ drivers/mtd/maps/Kconfig                           |    7 -
+ drivers/mtd/maps/Makefile                          |    1 -
+ drivers/mtd/maps/cdb89712.c                        |  278 --------------------
+ drivers/mtd/nand/Kconfig                           |   13 -
+ drivers/mtd/nand/Makefile                          |    2 -
+ drivers/mtd/nand/autcpu12.c                        |  237 -----------------
+ drivers/mtd/nand/spia.c                            |  176 -------------
+ drivers/video/clps711xfb.c                         |  156 ++----------
+ 32 files changed, 907 insertions(+), 1431 deletions(-)
+ delete mode 100644 arch/arm/mach-clps711x/autcpu12.c
+ create mode 100644 arch/arm/mach-clps711x/board-autcpu12.c
+ create mode 100644 arch/arm/mach-clps711x/board-cdb89712.c
+ rename arch/arm/mach-clps711x/{clep7312.c => board-clep7312.c} (95%)
+ create mode 100644 arch/arm/mach-clps711x/board-edb7211.c
+ rename arch/arm/mach-clps711x/{fortunet.c => board-fortunet.c} (96%)
+ create mode 100644 arch/arm/mach-clps711x/board-p720t.c
+ delete mode 100644 arch/arm/mach-clps711x/cdb89712.c
+ delete mode 100644 arch/arm/mach-clps711x/edb7211.c
+ delete mode 100644 arch/arm/mach-clps711x/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-clps711x/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-clps711x/p720t.c
+ delete mode 100644 drivers/mtd/maps/cdb89712.c
+ delete mode 100644 drivers/mtd/nand/autcpu12.c
+ delete mode 100644 drivers/mtd/nand/spia.c
+
 -- 
 1.7.8.6
