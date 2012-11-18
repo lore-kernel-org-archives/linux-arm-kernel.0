@@ -1,52 +1,57 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Sun, 18 Nov 2012 15:10:56 -0500
+From: Larry.Finger@lwfinger.net (Larry Finger)
+Date: Sun, 18 Nov 2012 14:18:37 -0600
 Subject: [Patch v1 1/1] RTL8712 alignment bug in 3.6.5 on ARM
-In-Reply-To: <20121118182049.GE14643@lunn.ch>
+In-Reply-To: <20121118181140.GC14643@lunn.ch>
 References: <CAMW5UfYUi-Zz2r5K9GeVzShSub2rDJVuoWR56+89+ytaqo_uxQ@mail.gmail.com>
- <20121118174720.GX3290@n2100.arm.linux.org.uk>
- <CAMW5Ufb9D+BYGtZUWPBWKMtk11QMpR1N+2Q1yb4w_GdvV17p+w@mail.gmail.com>
- <20121118182049.GE14643@lunn.ch>
-Message-ID: <CAMW5UfYt6xPYEJwUcK9fqHNMPHfTSMM69cvc-un7LGooaFqyjQ@mail.gmail.com>
+ <20121118181140.GC14643@lunn.ch>
+Message-ID: <50A9429D.1010908@lwfinger.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Testing now, will re-submit in the correct format once I confirm it
-works as intended.
+On 11/18/2012 12:11 PM, Andrew Lunn wrote:
+>
+> Just to clarify the issue here:
+>
+> union pn48 {
+>          u64 val;
+> #if defined(__BIG_ENDIAN)
+>          struct {
+>                  u8 TSC7;
+>                  u8 TSC6;
+>
+> Any instance of pn48 needs to be 64 bit aligned when the val member of
+> the union is used. The structure sta_info contains two such pn48s, so
+> the code allocating the pool of these needs to ensure it allocated
+> them 64 bit aligned, not 32bit aligned as it currently is.
 
-On Sun, Nov 18, 2012 at 1:20 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->> >> diff -ruN a/drivers/staging/rtl8712/rtl871x_sta_mgt.c
->> >> b/drivers/staging/rtl8712/rtl871x_sta_mgt.c
->> >> --- a/drivers/staging/rtl8712/rtl871x_sta_mgt.c 2012-11-05
->> >> 03:57:06.000000000 -0500
->> >> +++ b/drivers/staging/rtl8712/rtl871x_sta_mgt.c 2012-11-13
->> >> 12:54:28.000000000 -0500
->> >> @@ -55,8 +55,8 @@
->> >>     NUM_STA + 4);
->> >>   if (pstapriv->pallocated_stainfo_buf == NULL)
->> >>   return _FAIL;
->> >> - pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 4 -
->> >> - ((addr_t)(pstapriv->pallocated_stainfo_buf) & 3);
->> >> + pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 8 -
->> >> + ((addr_t)(pstapriv->pallocated_stainfo_buf) & 7);
->> >
->> > Are you sure this is safe?  Is the allocated buffer large enough for
->> > those additional 4 bytes of alignment you're adding?
->>
->> I'm not certain on that, I bumped the allocations at Andrew's
->> suggestion, but don't know enough to certify the changes as 100%
->> correct.
->
-> Its not correct.
->
-> The original code is:
->
->         pstapriv->pallocated_stainfo_buf = _malloc(sizeof(struct sta_info) *
->                                                    NUM_STA + 4);
->         if (pstapriv->pallocated_stainfo_buf == NULL)
->                 return _FAIL;
->         pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 4 -
->                 ((addr_t)(pstapriv->pallocated_stainfo_buf) & 3);
->
-> The 4 in the _malloc() also needs increasing to 8.
->
->     Andrew
+Andrew,
+
+For my education, would the following patch ensure 64-bit alignment for the pn48 
+instances, or is more needed?
+
+Index: staging/drivers/staging/rtl8712/rtl871x_security.h
+===================================================================
+--- staging.orig/drivers/staging/rtl8712/rtl871x_security.h
++++ staging/drivers/staging/rtl8712/rtl871x_security.h
+@@ -89,6 +89,8 @@ struct RT_PMKID_LIST {
+  };
+
+  struct security_priv {
++       union pn48 Grptxpn;             /* PN48 used for Grp Key xmit. */
++       union pn48 Grprxpn;             /* PN48 used for Grp Key recv. */
+         u32 AuthAlgrthm;                /* 802.11 auth, could be open, shared,
+                                          * 8021x and authswitch */
+         u32 PrivacyAlgrthm;             /* This specify the privacy for shared
+@@ -104,8 +106,6 @@ struct security_priv {
+                                          * inx0 and inx1 */
+         union Keytype   XGrptxmickey[2];
+         union Keytype   XGrprxmickey[2];
+-       union pn48 Grptxpn;             /* PN48 used for Grp Key xmit. */
+-       union pn48 Grprxpn;             /* PN48 used for Grp Key recv. */
+         u8 wps_hw_pbc_pressed;/*for hw pbc pressed*/
+         u8 wps_phase;/*for wps*/
+         u8 wps_ie[MAX_WPA_IE_LEN<<2];
+
+Thanks,
+
+Larry
