@@ -1,53 +1,118 @@
-From: shiraz.linux.kernel@gmail.com (Shiraz Hashim)
-Date: Sun, 18 Nov 2012 09:44:54 +0530
-Subject: possibility of parent clock selection through DT
-In-Reply-To: <20121112212212.20034.78522@nucleus>
-References: <CAPub14-CPS48gQ1h8vvAYBpO_=egjheG_rMoZ894Y4XZ2CinUQ@mail.gmail.com>
- <CAPub148Bq=uwTuky25WzXn4yfCukJ+WacxkBvuyV5yTzGasGOQ@mail.gmail.com>
- <20121112212212.20034.78522@nucleus>
-Message-ID: <CAPub149DJ21zG27FSLC-MeQFdkYXtim4TbxnZx3Bg7gtxK9BiA@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 18 Nov 2012 04:21:32 +0000 (UTC)
+Subject: OMAP baseline test results for v3.7-rc6
+Message-ID: <alpine.DEB.2.00.1211180421180.22618@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
 
-On Tue, Nov 13, 2012 at 2:52 AM, Mike Turquette <mturquette@ti.com> wrote:
-> Quoting Shiraz Hashim (2012-11-06 22:36:10)
->> On Wed, Nov 7, 2012 at 11:42 AM, Shiraz Hashim
->> <shiraz.linux.kernel@gmail.com> wrote:
->> > Hi Mike, Rob,
->> >
->> > Devices in a SoC can have multiple possible clock sources which is
->> > perfectly captured through clk framework.
->> >
->> > But the device itself may not be aware of the complex hierarchy above it.
->> > In this case how do you suggest a board (through DT) should select its
->> > preference.
->> >
->> > Is there some work already going on in this direction ?
->>
->> Just to make it clear, I already have referred the clock DT bindings and
->> Shawn Guo patch on removing clk look up registration from kernel code.
->>
->> Here I am talking about possibility of selecting desired clock hierarchy
->> by the boards about which device nodes are not aware.
->>
->
-> One way to achieve this is to use clk_set_rate as a way to switch
-> parents at run-time.  The OMAP CCF code currently does this when
-> relocking PLLs and makes use of __clk_reparent to update the clock
-> framework's representation of the hierarchy dynamically.
->
-> Maybe something like the following is helpful to you:
-> http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=blob;f=arch/arm/mach-omap2/dpll3xxx.c;h=f72dedb4eee892ce4cd5bdf22cc8c22510f3d526;hb=clk-omap-3.8#l542
+Here are some basic OMAP test results for Linux v3.7-rc6.
+Logs and other details at:
 
-Thanks for the information.
+    http://www.pwsan.com/omap/testlogs/test_v3.7-rc6/20121117093152/
 
-So the generic SoC part can be handled through set_rate but
-what about boards preferences and restrictions. For e.g., it prefers
-to route a clock from a particular clk source only and wants its own
-fixed (as per its design) clk source selections.
 
--- 
-regards
-Shiraz Hashim
+Passing tests
+-------------
+
+Boot to userspace (9/11): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
+    3730beaglexm, 37xxevm, 4430es2panda, 5912osk, am335xbone
+  
+PM ret/off, suspend + dynamic idle (3/4): 3530es3beagle, 3730beaglexm,
+    37xxevm
+
+
+Failing tests: fixed by posted patches
+--------------------------------------
+
+Boot tests:
+
+* 3530ES3 Beagle: I2C timeouts during userspace init
+  - Intermittent, appears on 5 out of 6 boots here
+  - Aaro Koskinen observes this also on N900
+  - Appears to be caused by commit 3db11feffc1ad2ab9dea27789e6b5b3032827adc
+    - http://marc.info/?l=linux-arm-kernel&m=135071372426971&w=2
+    - http://marc.info/?l=linux-omap&m=135197877112220&w=2
+  - Revert posted, pending I2C maintainers:
+    - http://marc.info/?l=linux-arm-kernel&m=135221953727077&w=2
+
+Other:
+
+* 2420N800: powers down 30 seconds after boot
+  - Presumably due to missing CBUS patches for watchdog control
+  - http://lkml.org/lkml/2012/9/3/265
+  - http://marc.info/?l=linux-omap&m=135274739624125&w=2
+
+
+Failing tests: needing investigation
+------------------------------------
+
+Boot tests:
+
+* CM-T3517: L3 in-band error with IPSS during boot
+  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
+  - Longstanding issue; does not occur on the 3517EVM
+
+* 3517EVM & CM-T3517: boot hangs with NFS root
+  - Likely some Kconfig, board file, and PM issues with EMAC
+
+* CM-T3517: boot hangs with MMC root
+  - Due to missing MMC setup in board file
+
+Other:
+
+* 4430es2panda: omap_hwmod: l3_instr: _wait_target_disable failed
+  - Unknown cause; could be due to the lack of hierarchical enable/disable
+    in hwmod code
+  - Jon Hunter reports this does not appear with the same X-loader/bootloader
+    on his 4430ES2.3 Panda, so could be ES-level dependent
+
+
+Failing tests: needing local investigation (may be due to testbed issues)
+-------------------------------------------------------------------------
+
+Boot tests:
+
+* AM335x Beaglebone: omap2plus_defconfig kernels don't boot
+  - May be fixed now, pending retest:
+    - http://marc.info/?l=linux-omap&m=135082257727502&w=2
+  - Not yet part of the automated test suite
+  * May be due to an old U-boot with FDT support problems used here?
+    Pending local investigation and re-test
+
+* 4460pandaes: boot fails early
+  - Appears to be due to X-loader problems here
+  - Need to note the X-loader version so we know it's broken
+
+PM tests:
+
+* 3730 Beagle XM: does not serial wake from off-idle suspend when console
+  UART doesn't clock gate ("debug ignore_loglevel")
+  - Not shown in the current test logs; cause unknown
+  - Pending re-test
+
+
+
+vmlinux object size
+(delta in bytes from test_v3.7-rc5 (77b67063bb6bce6d475e910d3b886a606d0d91f7)):
+   text     data      bss    total  kernel
+  +1088       +8        0    +1096  am33xx_only
+  +4928        0        0    +4928  n800_multi_omap2xxx
+   +828       +8        0     +836  n800_only_a
+   +932      -24      +32     +940  omap1_defconfig
+   +932      -24      +32     +940  omap1_defconfig_1510innovator_only
+   +932       +8      +32     +972  omap1_defconfig_5912osk_only
+  +1044      +64        0    +1108  omap2plus_defconfig
+  +1016        0        0    +1016  omap2plus_defconfig_2430sdp_only
+  +1044     +128        0    +1172  omap2plus_defconfig_cpupm
+  +1044      +64        0    +1108  omap2plus_defconfig_no_pm
+  +1044      +64        0    +1108  omap2plus_defconfig_omap2_4_only
+  +1168     +112        0    +1280  omap2plus_defconfig_omap3_4_only
+   +760      +40     -396     +404  rmk_omap3430_ldp_allnoconfig
+   +984       +8        0     +992  rmk_omap3430_ldp_oldconfig
+   +760      +40     -396     +404  rmk_omap4430_sdp_allnoconfig
+   +976     +112        0    +1088  rmk_omap4430_sdp_oldconfig
+
+
+
+- Paul
