@@ -1,131 +1,101 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 18 Nov 2012 16:10:05 -0500
-Subject: [PATCH V3 2/2] ARM: Handle user space mapped pages in
- flush_kernel_dcache_page
-In-Reply-To: <20121008230733.GA17819@schnuecks.de>
-References: <1349609352-6408-1-git-send-email-gmbnomis@gmail.com>
- <1349609352-6408-3-git-send-email-gmbnomis@gmail.com>
- <20121008174428.GB3204@arm.com>
- <20121008200216.GA14167@schnuecks.de>
- <20121008202040.GC4625@n2100.arm.linux.org.uk>
- <20121008230733.GA17819@schnuecks.de>
-Message-ID: <20121118211005.GW22106@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 18 Nov 2012 22:31:25 +0000
+Subject: [PATCH] Dove: Fix irq_to_pmu()
+In-Reply-To: <20121118210229.GV22106@titan.lakedaemon.net>
+References: <20121118162944.GV3290@n2100.arm.linux.org.uk>
+ <20121118163932.GW3290@n2100.arm.linux.org.uk> <50A9304C.9010006@mvista.com>
+ <20121118203815.GY3290@n2100.arm.linux.org.uk>
+ <20121118210229.GV22106@titan.lakedaemon.net>
+Message-ID: <20121118223125.GZ3290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, Catalin, Simon,
-
-Any progress on this?  At worst, I'd like to see this in fixes for v3.8.
-Assuming, of course, we've gotten to the bottom of it.
-
-thx,
-
-Jason.
-
-On Tue, Oct 09, 2012 at 01:07:34AM +0200, Simon Baatz wrote:
-> Hi Russell,
-> 
-> On Mon, Oct 08, 2012 at 09:20:40PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Oct 08, 2012 at 10:02:16PM +0200, Simon Baatz wrote:
-> > > Hi Catalin,
-> > > 
-> > > On Mon, Oct 08, 2012 at 06:44:28PM +0100, Catalin Marinas wrote:
-> > > > On Sun, Oct 07, 2012 at 12:29:12PM +0100, Simon Baatz wrote:
-> > > > > Commit f8b63c1 made flush_kernel_dcache_page() a no-op assuming that
-> > > > > the pages it needs to handle are kernel mapped only.  However, for
-> > > > > example when doing direct I/O, pages with user space mappings may
-> > > > > occur.
-> > > > > 
-> > > > > Thus, do lazy flushing like in flush_dcache_page() if there are no user
-> > > > > space mappings.  Otherwise, flush the kernel cache lines directly.
-> > > > 
-> > > > Do you need to fix the VIPT non-aliasing case as well? Does
-> > > > flush_kernel_dcache_page() need to handle I-cache?
-> > > 
-> > > Good question. My previous version of the patch did not handle it,
-> > > but after our discussion on the arm64 case, I came to the conclusion
-> > > that we probably need to handle it.
-> > > 
-> > > flush_dcache_page() and flush_kernel_dcache_page() are both used when
-> > > a page was modified via its kernel mapping.  For example,
-> > > crypto/scatterwalk.c uses flush_dcache_page() whereas
-> > > lib/scatterlist.c uses flush_kernel_dcache_page().  
+On Sun, Nov 18, 2012 at 04:02:29PM -0500, Jason Cooper wrote:
+> On Sun, Nov 18, 2012 at 08:38:15PM +0000, Russell King - ARM Linux wrote:
+> > On Sun, Nov 18, 2012 at 11:00:28PM +0400, Sergei Shtylyov wrote:
+> > > Hello.
+> > >
+> > > On 18-11-2012 20:39, Russell King - ARM Linux wrote:
+> > >
+> > >> PMU interrupts start at IRQ_DOVE_PMU_START, not IRQ_DOVE_PMU_START + 1.
+> > >> Fix the condition.  (It may have been less likely to occur had the code
+> > >> been written "if (irq >= IRQ_DOVE_PMU_START" which imho is the easier
+> > >> to understand notation, and matches the normal way of thinking about
+> > >> these things.)
+> > >
+> > >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > >> --
+> > >
+> > >    Should be "---", or somebody (you?) will have to hand edit the patch 
+> > > when applying...
 > > 
-> > It's likely that this stuff is incredibly buggy - and where we suspect
-> > there's problems (like using the wrong flush_dcache_page() vs
-> > flush_kernel_dcache_page() call) that needs to be fixed.
-> > 
-> > I suspect crypto/scatterwalk.c was created long before
-> > flush_kernel_dcache_page() came into existence, and it probably needs
-> > to be fixed.
-> >
-> > > Thus, the reasoning is that if flush_dcache_page() needs to handle
-> > > I-cache in the case there is no hook later (already user-mapped page
-> > > cache page) then flush_kernel_dcache_page() needs to do the same. 
-> > 
-> > This sounds like we're heading in the direction that flush_kernel_dcache_page()
-> > and flush_dcache_page() end up being virtually identical.  This isn't
-> > supposed to be - they _are_ supposed to be different.  Again, maybe
-> > that's because the users have chosen the wrong function.
-> > ...
+> > Sorry, can never remember that...
 > 
-> Yes, it is a mess and may be incredibly buggy. 
-> 
-> According to documentation flush_kernel_dcache_page() is supposed to
-> handle user pages.  It can assume that potential user mappings have
-> been flushed.  However, the documentation does not mention the case
-> of page cache pages with no user mappings explicitly.
-> 
-> flush_dcache_page() is supposed to deal with the user and kernel
-> mappings. However, the documentation does explicitly state that it is
-> not supposed to handle anon pages (but the arm implementation does
-> flush the kernel mapping).
-> 
-> Now, what should crypto/scatterwalk.c do? In the write to page path,
-> it can see page cache pages with and without user mappings and anon
-> pages.  If there are user mappings, it can assume that they have been
-> flushed.  I would argue it should use flush_kernel_dcache_page(). 
-> But if so, our current implementation does not handle two of these
-> three cases at all.
-> 
-> And the proposed flush_kernel_dcache_page() is different. It only
-> flushes the kernel mapping in the relevant cases whereas
-> flush_dcache_page() needs to care about user mappings as well. 
-> According to documentation we could remove the anon page case in
-> flush_dcache_page(), but uses like in crypto/scatterwalk.c currently
-> prevent that.
-> 
-> > > With respect to clearing the flag in the VIPT non-aliasing case with
-> > > anon pages: Declaring the pages dirty by default may already be
-> > > sufficient in this case, at least that is what the current
-> > > implementation assumes.
-> > 
-> > PG_arch_1 has no meaning what so ever for anon pages.  Don't even try
-> > to make it have meaning there, it will cause lots of pain if you do.
-> > The reason is that anon pages have no mapping, and so trying to do the
-> > PG_arch_1 trick will result in most places deciding "there is no
-> > userspace mapping we can skip that".
-> 
-> Hmm, now that you say it, it's quite obvious. There is the following
-> in __sync_icache_dcache():
-> 
->         if (cache_is_vipt_aliasing())
->                 mapping = page_mapping(page);
->         else
->                 mapping = NULL;
-> 
->         if (!test_and_set_bit(PG_dcache_clean, &page->flags))
->                 __flush_dcache_page(mapping, page);
-> 
->         if (pte_exec(pteval))
->                 __flush_icache_all();
-> 
-> At least this looks strange to me given that PG_dcache_clean has no
-> meaning for anon pages.  Is this correct?
-> 
-> - Simon
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> No problem, I'll handle it when I pull it in.
+
+And there's yet another bug... this time in the kirkwood audio driver:
+
+static irqreturn_t kirkwood_dma_irq(int irq, void *dev_id)
+{
+        struct kirkwood_dma_priv *prdata = dev_id;
+        struct kirkwood_dma_data *priv = prdata->data;
+        unsigned long mask, status, cause;   
+        
+        mask = readl(priv->io + KIRKWOOD_INT_MASK);
+        status = readl(priv->io + KIRKWOOD_INT_CAUSE) & mask;
+
+        cause = readl(priv->io + KIRKWOOD_ERR_CAUSE);
+        if (unlikely(cause)) {
+                printk(KERN_WARNING "%s: got err interrupt 0x%lx\n",
+                                __func__, cause);
+                writel(cause, priv->io + KIRKWOOD_ERR_CAUSE);
+                return IRQ_HANDLED;
+        }
+
+What happens here if an underrun (0x20) interrupt happens?  Well, the
+kernel log looks something like this:
+
+kirkwood_dma_irq: got err interrupt 0x20
+kirkwood_dma_irq: got err interrupt 0x20
+kirkwood_dma_irq: got err interrupt 0x20
+kirkwood_dma_irq: got err interrupt 0x20
+kirkwood_dma_irq: got err interrupt 0x20
+kirkwood_dma_irq: got err interrupt 0x20
+...
+
+and the system spins doing nothing but that message.  It's not because the
+interrupt isn't being cleared (it's a sensible write-1-to-clear register).
+
+If you have (frigged) orion_wdt to work, then you'll get a reset after 25s,
+otherwise you'll have what appears to be a totally dead system with (due to
+the log buffer rewrite) no kernel message output, no interrupts, no nothing.
+
+It's taken a full day to track this bug down...
+
+As for what causes the underrun, that's a different (and as yet unanswered)
+question... but without the patch below which turns off the error reporting
+after the first (until it's re-opened) DVD quality MPEG2 decoding fails in
+less than one minute with ubuntu precise 12.10 userspace with the machine
+locking solid... doesn't matter if it's software or hardware decode.
+
+diff --git a/sound/soc/kirkwood/kirkwood-dma.c b/sound/soc/kirkwood/kirkwood-dma.c
+index 690260b..26a1d36 100644
+--- a/sound/soc/kirkwood/kirkwood-dma.c
++++ b/sound/soc/kirkwood/kirkwood-dma.c
+@@ -73,10 +73,12 @@ static irqreturn_t kirkwood_dma_irq(int irq, void *dev_id)
+ 	status = readl(priv->io + KIRKWOOD_INT_CAUSE) & mask;
+ 
+ 	cause = readl(priv->io + KIRKWOOD_ERR_CAUSE);
++	cause &= readl(priv->io + KIRKWOOD_ERR_MASK);
+ 	if (unlikely(cause)) {
+ 		printk(KERN_WARNING "%s: got err interrupt 0x%lx\n",
+ 				__func__, cause);
+ 		writel(cause, priv->io + KIRKWOOD_ERR_CAUSE);
++		writel(0, priv->io + KIRKWOOD_ERR_MASK);
+ 		return IRQ_HANDLED;
+ 	}
+ 
+
+Now I'm getting to the point of wondering how well tested any of this
+dove/kirkwood/orion code actually is... it all looks rather insanely
+fragile to me tonight.
