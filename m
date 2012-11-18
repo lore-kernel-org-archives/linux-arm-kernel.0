@@ -1,28 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 18 Nov 2012 20:38:15 +0000
-Subject: [PATCH] Dove: Fix irq_to_pmu()
-In-Reply-To: <50A9304C.9010006@mvista.com>
-References: <20121118162944.GV3290@n2100.arm.linux.org.uk>
- <20121118163932.GW3290@n2100.arm.linux.org.uk> <50A9304C.9010006@mvista.com>
-Message-ID: <20121118203815.GY3290@n2100.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 18 Nov 2012 21:55:15 +0100
+Subject: [Patch v1 1/1] RTL8712 alignment bug in 3.6.5 on ARM
+In-Reply-To: <50A9429D.1010908@lwfinger.net>
+References: <CAMW5UfYUi-Zz2r5K9GeVzShSub2rDJVuoWR56+89+ytaqo_uxQ@mail.gmail.com>
+ <20121118181140.GC14643@lunn.ch> <50A9429D.1010908@lwfinger.net>
+Message-ID: <20121118205515.GK11717@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 18, 2012 at 11:00:28PM +0400, Sergei Shtylyov wrote:
-> Hello.
->
-> On 18-11-2012 20:39, Russell King - ARM Linux wrote:
->
->> PMU interrupts start at IRQ_DOVE_PMU_START, not IRQ_DOVE_PMU_START + 1.
->> Fix the condition.  (It may have been less likely to occur had the code
->> been written "if (irq >= IRQ_DOVE_PMU_START" which imho is the easier
->> to understand notation, and matches the normal way of thinking about
->> these things.)
->
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> --
->
->    Should be "---", or somebody (you?) will have to hand edit the patch 
-> when applying...
+On Sun, Nov 18, 2012 at 02:18:37PM -0600, Larry Finger wrote:
+> On 11/18/2012 12:11 PM, Andrew Lunn wrote:
+> >
+> >Just to clarify the issue here:
+> >
+> >union pn48 {
+> >         u64 val;
+> >#if defined(__BIG_ENDIAN)
+> >         struct {
+> >                 u8 TSC7;
+> >                 u8 TSC6;
+> >
+> >Any instance of pn48 needs to be 64 bit aligned when the val member of
+> >the union is used. The structure sta_info contains two such pn48s, so
+> >the code allocating the pool of these needs to ensure it allocated
+> >them 64 bit aligned, not 32bit aligned as it currently is.
+> 
+> Andrew,
+> 
+> For my education, would the following patch ensure 64-bit alignment
+> for the pn48 instances, or is more needed?
 
-Sorry, can never remember that...
+This is not sufficient. In fact it makes no difference at all. The
+problem is not with the structure, but with the allocation of memory
+used to contain the structure.
+
+        pstapriv->pallocated_stainfo_buf = _malloc(sizeof(struct sta_info) *
+                                                   NUM_STA + 4);
+        if (pstapriv->pallocated_stainfo_buf == NULL)
+                return _FAIL;
+        pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 4 -
+                ((addr_t)(pstapriv->pallocated_stainfo_buf) & 3);
+
+kmalloc() guarantees that its alignment is correct for any type of
+structure. Thus all this code above is redundant in Linux, but maybe
+needed in some other OS. Worse still, this code actually breaks the
+alignment. kmalloc() gave out something which was 64 bit aligned. But
+by adding 4 and then masking off the lower 2 bits, it destroys the 64
+bit alignment and makes it only 32bit aligned.
+
+Removing the _malloc() wrapper, fixing the GFP_ATOMIC, and leaving the
+allocater to worry about alignment will be one of the steps to getting
+out of staging.
+
+    Andrew
