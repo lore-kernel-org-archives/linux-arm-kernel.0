@@ -1,55 +1,98 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 18 Nov 2012 11:44:56 +0100
-Subject: [PATCH v2 1/2] DMA: mv_xor: Add a device_control function
-Message-ID: <1353235498-22638-1-git-send-email-andrew@lunn.ch>
+Date: Sun, 18 Nov 2012 11:44:57 +0100
+Subject: [PATCH v2 2/2] ARM: Kirkwood: Convert XOR instantiation to DT.
+In-Reply-To: <1353235498-22638-1-git-send-email-andrew@lunn.ch>
+References: <1353235498-22638-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1353235498-22638-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dmatest module for DMA engines calls
-
-device_control(dtc->chan, DMA_TERMINATE_ALL, 0);
-
-after completing the tests. The documentation in
-include/linux/dmaengine.h suggests this function is optional and
-dma_async_device_register() also does not BUG_ON() when not passed a
-function. However, dmatest is not the only code in the kernel
-unconditionally calling device_control. So add an implementation
-indicating all operations are not implemented.
+Use DT to describe the two XOR DMA engines on Kirkwood. Remove the
+C code initialization.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
 
-This patch depends on the refactoring/DT patches from Thomas.
+These patches depend on the refactoring/DT patches from Thomas and NOT
+the clock patches from me. With the clock patches, a slight different
+patch is needed, specifying a clocks property in DT and no auxdata.
 
- drivers/dma/mv_xor.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/kirkwood.dtsi   |   38 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-dt.c |    6 ++----
+ 2 files changed, 40 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index d645d43..944d7fe 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -1089,6 +1089,14 @@ static int __devexit mv_xor_channel_remove(struct mv_xor_chan *mv_chan)
- 	return 0;
- }
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 4e5b815..e0ba79d 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -77,6 +77,44 @@
+ 			status = "okay";
+ 		};
  
-+/* This driver does not implement any of the optional DMA operations. */
-+static int
-+mv_xor_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-+	       unsigned long arg)
-+{
-+	return -ENOSYS;
-+}
++		xor at 60800 {
++			compatible = "marvell,orion-xor";
++			reg = <0x60800 0x100
++			       0x60A00 0x100>;
++			status = "okay";
 +
- static struct mv_xor_chan * __devinit
- mv_xor_channel_add(struct mv_xor_device *xordev,
- 		   struct platform_device *pdev,
-@@ -1129,6 +1137,7 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
- 	dma_dev->device_free_chan_resources = mv_xor_free_chan_resources;
- 	dma_dev->device_tx_status = mv_xor_status;
- 	dma_dev->device_issue_pending = mv_xor_issue_pending;
-+	dma_dev->device_control = mv_xor_control;
- 	dma_dev->dev = &pdev->dev;
++			xor00 {
++			      interrupts = <5>;
++			      dmacap,memcpy;
++			      dmacap,xor;
++			};
++			xor01 {
++			      interrupts = <6>;
++			      dmacap,memcpy;
++			      dmacap,xor;
++			      dmacap,memset;
++			};
++		};
++
++		xor at 60900 {
++			compatible = "marvell,orion-xor";
++			reg = <0x60900 0x100
++			       0xd0B00 0x100>;
++			status = "okay";
++
++			xor00 {
++			      interrupts = <7>;
++			      dmacap,memcpy;
++			      dmacap,xor;
++			};
++			xor01 {
++			      interrupts = <8>;
++			      dmacap,memcpy;
++			      dmacap,xor;
++			      dmacap,memset;
++			};
++		};
++
+ 		sata at 80000 {
+ 			compatible = "marvell,orion-sata";
+ 			reg = <0x80000 0x5000>;
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index d94872f..e62f10de 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -34,6 +34,8 @@ struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("marvell,orion-sata", 0xf1080000, "sata_mv.0", NULL),
+ 	OF_DEV_AUXDATA("marvell,orion-nand", 0xf4000000, "orion_nand", NULL),
+ 	OF_DEV_AUXDATA("marvell,orion-crypto", 0xf1030000, "mv_crypto", NULL),
++	OF_DEV_AUXDATA("marvell,orion-xor", 0xf1060800, "mv_xor.0", NULL),
++	OF_DEV_AUXDATA("marvell,orion-xor", 0xf1060900, "mv_xor.1", NULL),
+ 	{},
+ };
  
- 	/* set prep routines based on capability */
+@@ -56,10 +58,6 @@ static void __init kirkwood_dt_init(void)
+ 	/* Setup root of clk tree */
+ 	kirkwood_clk_init();
+ 
+-	/* internal devices that every board has */
+-	kirkwood_xor0_init();
+-	kirkwood_xor1_init();
+-
+ #ifdef CONFIG_KEXEC
+ 	kexec_reinit = kirkwood_enable_pcie;
+ #endif
 -- 
 1.7.10.4
