@@ -1,47 +1,56 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 18 Nov 2012 19:20:49 +0100
-Subject: [Patch v1 1/1] RTL8712 alignment bug in 3.6.5 on ARM
-In-Reply-To: <CAMW5Ufb9D+BYGtZUWPBWKMtk11QMpR1N+2Q1yb4w_GdvV17p+w@mail.gmail.com>
-References: <CAMW5UfYUi-Zz2r5K9GeVzShSub2rDJVuoWR56+89+ytaqo_uxQ@mail.gmail.com>
- <20121118174720.GX3290@n2100.arm.linux.org.uk>
- <CAMW5Ufb9D+BYGtZUWPBWKMtk11QMpR1N+2Q1yb4w_GdvV17p+w@mail.gmail.com>
-Message-ID: <20121118182049.GE14643@lunn.ch>
+Date: Sun, 18 Nov 2012 19:27:55 +0100
+Subject: [PATCH v2 2/2] ARM: Kirkwood: Convert XOR instantiation to DT.
+In-Reply-To: <20121118184032.6bb52037@skate>
+References: <1353235498-22638-1-git-send-email-andrew@lunn.ch>
+ <1353235498-22638-2-git-send-email-andrew@lunn.ch>
+ <20121118184032.6bb52037@skate>
+Message-ID: <20121118182755.GF14643@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> diff -ruN a/drivers/staging/rtl8712/rtl871x_sta_mgt.c
-> >> b/drivers/staging/rtl8712/rtl871x_sta_mgt.c
-> >> --- a/drivers/staging/rtl8712/rtl871x_sta_mgt.c 2012-11-05
-> >> 03:57:06.000000000 -0500
-> >> +++ b/drivers/staging/rtl8712/rtl871x_sta_mgt.c 2012-11-13
-> >> 12:54:28.000000000 -0500
-> >> @@ -55,8 +55,8 @@
-> >>     NUM_STA + 4);
-> >>   if (pstapriv->pallocated_stainfo_buf == NULL)
-> >>   return _FAIL;
-> >> - pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 4 -
-> >> - ((addr_t)(pstapriv->pallocated_stainfo_buf) & 3);
-> >> + pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 8 -
-> >> + ((addr_t)(pstapriv->pallocated_stainfo_buf) & 7);
-> >
-> > Are you sure this is safe?  Is the allocated buffer large enough for
-> > those additional 4 bytes of alignment you're adding?
+On Sun, Nov 18, 2012 at 06:40:32PM +0100, Thomas Petazzoni wrote:
+> Andrew,
 > 
-> I'm not certain on that, I bumped the allocations at Andrew's
-> suggestion, but don't know enough to certify the changes as 100%
-> correct.
+> On Sun, 18 Nov 2012 11:44:57 +0100, Andrew Lunn wrote:
+> > Use DT to describe the two XOR DMA engines on Kirkwood. Remove the
+> > C code initialization.
+> > 
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > ---
+> > 
+> > These patches depend on the refactoring/DT patches from Thomas and NOT
+> > the clock patches from me. With the clock patches, a slight different
+> > patch is needed, specifying a clocks property in DT and no auxdata.
+> 
+> My XOR patch set already depended on the previous clock series from
+> Gregory, so I'm going to rebase it on top of your clock series. Would
+> you mind sharing with me the version of this patch that works on top of
+> your clock patch set?
 
-Its not correct.
+Hi Thomas
 
-The original code is:
+I never create the patch for on top of my clock series.
 
-        pstapriv->pallocated_stainfo_buf = _malloc(sizeof(struct sta_info) *
-                                                   NUM_STA + 4);
-        if (pstapriv->pallocated_stainfo_buf == NULL)
-                return _FAIL;
-        pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 4 -
-                ((addr_t)(pstapriv->pallocated_stainfo_buf) & 3);
+> I guess it's just the removal of the auxdata, and addition of
+> 
+> 	clocks = <&gate_clk 8>;
+> 
+> for the first XOR engine, and:
+> 
+> 	clocks = <&gate_clk 16>;
+> 
+> for the second XOR engine.
 
-The 4 in the _malloc() also needs increasing to 8.
+Correct.
 
-    Andrew
+> 
+> If this is correct, I'll integrate your patch in my XOR patches so that
+> you'll get a complete pull request with all the related XOR changes.
+
+O.K.
+
+We probably need a new ACK from Mike Turquette for the updated clock
+patches.
+
+      Andrew
