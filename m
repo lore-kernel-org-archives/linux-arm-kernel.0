@@ -1,98 +1,66 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 18 Nov 2012 11:44:57 +0100
-Subject: [PATCH v2 2/2] ARM: Kirkwood: Convert XOR instantiation to DT.
-In-Reply-To: <1353235498-22638-1-git-send-email-andrew@lunn.ch>
-References: <1353235498-22638-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1353235498-22638-2-git-send-email-andrew@lunn.ch>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 18 Nov 2012 11:50:30 +0100
+Subject: [PATCH] Device Tree binding for the 'mv_xor' XOR engine DMA driver
+In-Reply-To: <20121118103626.GE11717@lunn.ch>
+References: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121118103626.GE11717@lunn.ch>
+Message-ID: <20121118115030.017857d0@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use DT to describe the two XOR DMA engines on Kirkwood. Remove the
-C code initialization.
+Dear Andrew Lunn,
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
+On Sun, 18 Nov 2012 11:36:26 +0100, Andrew Lunn wrote:
 
-These patches depend on the refactoring/DT patches from Thomas and NOT
-the clock patches from me. With the clock patches, a slight different
-patch is needed, specifying a clocks property in DT and no auxdata.
+> I tested on kirkwood, both old style and DT. I tested using the
+> dmatest kernel module. That shows up an old issue, pre-dating your
+> patchset. It dmatest dereferences a NULL pointer during cleanup, due
+> to a missing function in the driver. I will submit a patch for this
+> soon.
 
- arch/arm/boot/dts/kirkwood.dtsi   |   38 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-dt.c |    6 ++----
- 2 files changed, 40 insertions(+), 4 deletions(-)
+Ok.
 
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index 4e5b815..e0ba79d 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -77,6 +77,44 @@
- 			status = "okay";
- 		};
- 
-+		xor at 60800 {
-+			compatible = "marvell,orion-xor";
-+			reg = <0x60800 0x100
-+			       0x60A00 0x100>;
-+			status = "okay";
-+
-+			xor00 {
-+			      interrupts = <5>;
-+			      dmacap,memcpy;
-+			      dmacap,xor;
-+			};
-+			xor01 {
-+			      interrupts = <6>;
-+			      dmacap,memcpy;
-+			      dmacap,xor;
-+			      dmacap,memset;
-+			};
-+		};
-+
-+		xor at 60900 {
-+			compatible = "marvell,orion-xor";
-+			reg = <0x60900 0x100
-+			       0xd0B00 0x100>;
-+			status = "okay";
-+
-+			xor00 {
-+			      interrupts = <7>;
-+			      dmacap,memcpy;
-+			      dmacap,xor;
-+			};
-+			xor01 {
-+			      interrupts = <8>;
-+			      dmacap,memcpy;
-+			      dmacap,xor;
-+			      dmacap,memset;
-+			};
-+		};
-+
- 		sata at 80000 {
- 			compatible = "marvell,orion-sata";
- 			reg = <0x80000 0x5000>;
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index d94872f..e62f10de 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -34,6 +34,8 @@ struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("marvell,orion-sata", 0xf1080000, "sata_mv.0", NULL),
- 	OF_DEV_AUXDATA("marvell,orion-nand", 0xf4000000, "orion_nand", NULL),
- 	OF_DEV_AUXDATA("marvell,orion-crypto", 0xf1030000, "mv_crypto", NULL),
-+	OF_DEV_AUXDATA("marvell,orion-xor", 0xf1060800, "mv_xor.0", NULL),
-+	OF_DEV_AUXDATA("marvell,orion-xor", 0xf1060900, "mv_xor.1", NULL),
- 	{},
- };
- 
-@@ -56,10 +58,6 @@ static void __init kirkwood_dt_init(void)
- 	/* Setup root of clk tree */
- 	kirkwood_clk_init();
- 
--	/* internal devices that every board has */
--	kirkwood_xor0_init();
--	kirkwood_xor1_init();
--
- #ifdef CONFIG_KEXEC
- 	kexec_reinit = kirkwood_enable_pcie;
- #endif
+> The dmatest shows up a second issue:
+> 
+> root at qnap:~# insmod ./dmatest.ko iterations=100
+> dmatest: Started 2 threads using dma0chan0
+> dmatest: Started 2 threads using dma1chan0
+> dmatest: Started 2 threads using dma2chan0
+> dmatest: Started 2 threads using dma3chan0
+> dma3chan0-xor0: #3: prep error with src_off=0x13c2 dst_off=0x2c7c len=0x5d
+> dma1chan0-copy0: #16: prep error with src_off=0x1f50 dst_off=0x904 len=0x33
+> dma3chan0-copy0: #22: prep error with src_off=0x14c2 dst_off=0x389b len=0x6f
+> dma0chan0-copy0: #31: prep error with src_off=0x10b6 dst_off=0x323c len=0x2f
+> dma3chan0-copy0: #49: prep error with src_off=0x17b5 dst_off=0x3eca len=0x29
+> 
+> The driver refuses any operation where the buffer is less than 128
+> bytes. The datasheet for Kirkwood says the buffer length must be 8
+> bytes or more. So maybe we should reduce this 128 limit down to 8?
+> 
+> But is the driver allowed to refuse small copies? Is the caller
+> expected to fall back to software? Does the dma core implement this
+> fallback? Lots of questions i don't know the answers to.
+
+Thanks a lot for all this testing. I guess we can try to sort out those
+issues as follow-up patches. I'll add bug tracker entries for those
+items so that we remember to get to them at some point.
+
+> Anyway, you can add a 
+> 
+> Tested-by: Andrew Lunn <andrew@lunn.ch>
+> 
+> since with your patches it works just as well as before your patches.
+
+Excellent, thanks!
+
+I'll try to fix the few issues found by Sebastian tomorrow, integrate
+your two patches and send a formal pull request to Jason if you're OK.
+
+Best regards, 
+
+Thomas
 -- 
-1.7.10.4
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
