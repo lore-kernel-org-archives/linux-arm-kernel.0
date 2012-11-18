@@ -1,56 +1,74 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 18 Nov 2012 14:26:01 -0500
-Subject: Final call for 3.8 arm-soc patches
-In-Reply-To: <20121118115740.17857b53@skate>
-References: <201211162111.34615.arnd@arndb.de> <20121118115740.17857b53@skate>
-Message-ID: <20121118192601.GU22106@titan.lakedaemon.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 18 Nov 2012 20:52:35 +0100
+Subject: [GIT PULL] arm: orion5x: begin the DT conversion
+In-Reply-To: <1353080388-4091-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1353080388-4091-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20121118195235.GJ11717@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 18, 2012 at 11:57:40AM +0100, Thomas Petazzoni wrote:
-> Arnd,
+On Fri, Nov 16, 2012 at 04:39:43PM +0100, Thomas Petazzoni wrote:
+> Jason, Andrew,
 > 
-> On Fri, 16 Nov 2012 21:11:34 +0000, Arnd Bergmann wrote:
+> Here is a set of four patches that start the conversion of
+> mach-orion5x to the Device Tree. It for now converts only one board,
+> which has been tested by Maxime Hadjinlian from LaCie (thanks a lot!),
+> but we intend to do more in the future (Maxime will get another
+> Orion5x platform, and I have received another one this week). I have
+> also started working on a pinctrl driver for the Orion5x platforms.
 > 
-> > We are currently at linux-3.7-rc5, which means the merge window is coming
-> > closer. We already have 759 changesets in arm-soc and I know of a few ones
-> > coming (tegra, clps711x, bcm), but I don't know what the status for some
-> > of the bigger ones (exynos/s5p/s3c, mvebu/orion, pxa/mmp). If you have
-> > more patches coming, please send all remaining pull requests soon, or
-> > let us know what is holding you up. I hope this way we can avoid having
-> > to reject pull requests that come too late in the cycle.
-> 
-> We still have quite a lot of things to send from the Marvell side, at
-> least:
-> 
->  * A new network driver for Armada 370/XP, which has been ACKed by
->    David Miller
-> 
->  * Clock framework support for Kirkwood, Dove, Armada 370 and Armada XP.
-> 
->  * Support for the Globalscale Mirabox and PlatHome OpenBlocks
->    platforms.
-> 
->  * Rework of the XOR Marvell driver and addition of a Device Tree
->    binding to it.
-> 
->  * Conversion of Kirkwood boards to the pinctrl framework.
-> 
->  * Conversion of Kirkwood boards to the usage of regulators.
-> 
->  * L2 cache support for Armada 370/XP.
-> 
-> Even though quite a bit of this code as been around for some time,
-> Jason Cooper hasn't had the time until now to send the pull requests. I
-> hope Jason will manage to do the corresponding pull requests soon, or
-> I'll have to do them myself because we really don't want to miss the
-> 3.8 merge window for those changes. I'll try to see with Jason either
-> later today or tomorrow what are his plans.
+> I've put the four patches in the same branch: 2/4 is SoC related and
+> 3/4 board related, but 3/4 cannot live without 2/4. If you'd like to
+> have this series split in several pull requests, do not hesitate to
+> let me know how the split should be done.
 
-Yes, a lot of the hold up has been waiting for driver maintainer Acks,
-cache-l2x0 (rmk's part) to land, etc.  My time has also been short
-lately.  I'll pull this together over the next few days.
+Hi Thomas
 
-thx,
+I looked over the patches, compile tested them. Looks good to me.
 
-Jason.
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+
+	  Andrew
+
+> 
+> Thanks,
+> 
+> Thomas
+> 
+> The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
+> 
+>   Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-orion-dt-3.8
+> 
+> for you to fetch changes up to 559b1d157fddc02a68ea045df2a0c40cb713e292:
+> 
+>   arm: orion5x: add DT related options in defconfig (2012-11-16 16:22:07 +0100)
+> 
+> ----------------------------------------------------------------
+> Marvell Orion DT conversion for 3.8
+> 
+> ----------------------------------------------------------------
+> Thomas Petazzoni (4):
+>       arm: orion5x: mechanical defconfig update
+>       arm: orion5x: basic Device Tree support
+>       arm: orion5x: convert 'LaCie Ethernet Disk mini v2' to Device Tree
+>       arm: orion5x: add DT related options in defconfig
+> 
+>  arch/arm/boot/dts/Makefile                         |    1 +
+>  .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    |   55 +++++++++++
+>  arch/arm/boot/dts/orion5x.dtsi                     |   98 ++++++++++++++++++++
+>  arch/arm/configs/orion5x_defconfig                 |   36 +++----
+>  arch/arm/mach-orion5x/Kconfig                      |   14 ++-
+>  arch/arm/mach-orion5x/Makefile                     |    4 +-
+>  arch/arm/mach-orion5x/board-dt.c                   |   79 ++++++++++++++++
+>  arch/arm/mach-orion5x/common.c                     |    4 +-
+>  arch/arm/mach-orion5x/common.h                     |    9 ++
+>  arch/arm/mach-orion5x/edmini_v2-setup.c            |   88 +-----------------
+>  10 files changed, 270 insertions(+), 118 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+>  create mode 100644 arch/arm/boot/dts/orion5x.dtsi
+>  create mode 100644 arch/arm/mach-orion5x/board-dt.c
+> 
