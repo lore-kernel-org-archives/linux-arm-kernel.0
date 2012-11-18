@@ -1,40 +1,36 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sun, 18 Nov 2012 16:27:00 +0100
-Subject: [GIT PULL] arm-soc: lpc32xx: dts update
-Message-ID: <50A8FE44.3030401@antcom.de>
+From: s.peter@mpl.ch (Stefan Peter)
+Date: Sun, 18 Nov 2012 16:46:15 +0100
+Subject: [PATCH 0/1 V2] ARM: kirkwood: Add support for the MPL CEC4
+Message-ID: <cover.1353238973.git.s.peter@mpl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+The MPL CEC4 is a compact industrial computer for harsh environments. You
+can find out more about it at http://www.mpl.ch/t2640.html
 
-this pull request includes the dts updates for lpc32xx for 3.7. (Hoping that
-the signed tag works for you.)
+This patch adds basic board support using the device tree where possible.
 
-Thanks in advance,
+Changes since V1
+* Replaced the 'compatible' entry "mpl,mplcec4", with "mpl,cec4-10", 
+  "mpl,cec4" in kirkwood-mplcec4.dts
+* Removed unneeded clk headers in board-mplcec4.c
+* Fixed sorting order of the kirkwood-mplcec4.dts entry in
+  arm/boot/dts/Makefile
 
-Roland
+Stefan Peter (1):
+  Add support for the MPL CEC4
 
+ arch/arm/boot/dts/Makefile             |    1 +
+ arch/arm/boot/dts/kirkwood-mplcec4.dts |  119 ++++++++++++++++++++++++++++++++
+ arch/arm/configs/kirkwood_defconfig    |    1 +
+ arch/arm/mach-kirkwood/Kconfig         |    7 ++
+ arch/arm/mach-kirkwood/Makefile        |    1 +
+ arch/arm/mach-kirkwood/board-dt.c      |    4 ++
+ arch/arm/mach-kirkwood/board-mplcec4.c |   80 +++++++++++++++++++++
+ arch/arm/mach-kirkwood/common.h        |    6 ++
+ 8 files changed, 219 insertions(+)
+ create mode 100644 arch/arm/boot/dts/kirkwood-mplcec4.dts
+ create mode 100644 arch/arm/mach-kirkwood/board-mplcec4.c
 
-The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
-
-  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
-
-are available in the git repository at:
-
-  git://git.antcom.de/linux-2.6.git tags/lpc32xx-dts-for-3.7
-
-for you to fetch changes up to b7d41c937ed742b0995e4824ed2d0be085f80c1d:
-
-  ARM: LPC32xx: Add the motor PWM to base dts file (2012-11-14 15:41:18 +0100)
-
-----------------------------------------------------------------
-DTS updates for the LPC32xx Soc for 3.7
-
-This time, only one patch: Adding the motor PWM to lpc32xx.dtsi
-
-----------------------------------------------------------------
-Alban Bedel (1):
-      ARM: LPC32xx: Add the motor PWM to base dts file
-
- arch/arm/boot/dts/lpc32xx.dtsi |    7 +++++++
- 1 file changed, 7 insertions(+)
+-- 
+1.7.9.5
