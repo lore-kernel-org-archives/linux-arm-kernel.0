@@ -1,118 +1,210 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 18 Nov 2012 04:21:32 +0000 (UTC)
-Subject: OMAP baseline test results for v3.7-rc6
-Message-ID: <alpine.DEB.2.00.1211180421180.22618@utopia.booyaka.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sun, 18 Nov 2012 12:51:55 +0800
+Subject: [PATCH v5 05/10] pinctrl: single: support pinconf generic
+In-Reply-To: <20121117004313.GN6801@atomide.com>
+References: <1352968600-15345-1-git-send-email-haojian.zhuang@gmail.com>
+ <1352968600-15345-6-git-send-email-haojian.zhuang@gmail.com>
+ <20121117004313.GN6801@atomide.com>
+Message-ID: <CAN1soZxUr4uO3fheKpRU_oc-GjjYfo2ZY5YZ0hRgwB2ph+b-qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Nov 17, 2012 at 8:43 AM, Tony Lindgren <tony@atomide.com> wrote:
+> Hi,
+>
+>>  static int pcs_pinconf_get(struct pinctrl_dev *pctldev,
+>>                               unsigned pin, unsigned long *config)
+>>  {
+>> -     return -ENOTSUPP;
+>> +     struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
+>> +     enum pin_config_param config_param = pinconf_to_config_param(*config);
+>> +     union pcs_pinconf_argument_t arg;
+>> +     u32 offset;
+>> +     unsigned data;
+>> +     int ret;
+>> +
+>> +     if (!pcs->conf.nconfs)
+>> +             return -ENOTSUPP;
+>> +
+>> +     ret = pcs_pinconf_get_config(pctldev, pin, config_param);
+>> +     if (ret < 0)
+>> +             return ret;
+>> +
+>> +     offset = pin * (pcs->width / BITS_PER_BYTE);
+>> +     data = pcs->read(pcs->base + offset);
+>> +
+>> +     arg.data = pinconf_to_config_argument(ret);
+>> +     data = (data >> arg.bits.shift) & arg.bits.mask;
+>
+> Shouldn't you just return data here?
+>
+>         *config = data;
+>
+>         return 0;
+>
 
-Here are some basic OMAP test results for Linux v3.7-rc6.
-Logs and other details at:
+Since we're using pinconf-generic, let's review how
+pinconf_generic_dump_pin() works.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.7-rc6/20121117093152/
+pinconf_generic_dump_pin():
+        config = pinconf_to_config_packed(conf_items[i].param, 0);
+        The lower 16-bit values are parameters. and the upper 16-bit
+values are pre-set with 0 for argument.
 
+        ret = pin_config_get_for_pin(pctldev, pin, &config);
+        It'll invoke pcs_pinconf_get() that we're taking care. I want
+to return the value with both argument
+and parameters. Since the argument may be any location in 32-bit
+register, I organize them into packed
+structure. If I return the value field directly, it may conflict with
+the lower 16-bit config parameter.
 
-Passing tests
--------------
+        if (conf_items[i].format && pinconf_to_config_argument(config) != 0)
+            seq_printf(s, " (%u %s)",
+pinconf_to_config_argument(config), conf_items[i].format);
+        At here, it loads the upper 16-bit config argument. It also
+means that returning value field directly
+will break this.
 
-Boot to userspace (9/11): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
-    3730beaglexm, 37xxevm, 4430es2panda, 5912osk, am335xbone
-  
-PM ret/off, suspend + dynamic idle (3/4): 3530es3beagle, 3730beaglexm,
-    37xxevm
+        So how about change it in below.
+        if (conf_items[i].format)
+            seq_printf(s, " (%u %s)", config, conf_items[i].format);
 
+>> +     arg.bits.value = data;
+>> +     *config = pinconf_to_config_packed(config_param, arg.data);
+>> +     return 0;
+>
+> Instead of these? Or how else is the consumer driver supposed
+> to use the value?
+>
 
-Failing tests: fixed by posted patches
---------------------------------------
+I agree that returning data directly would be easy for the usage in
+device driver. Let's define it as "data >> shift".
+Is it OK?
 
-Boot tests:
+>>  }
+>>
+>>  static int pcs_pinconf_set(struct pinctrl_dev *pctldev,
+>>                               unsigned pin, unsigned long config)
+>>  {
+>> -     return -ENOTSUPP;
+>> +     struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
+>> +     enum pin_config_param config_param = pinconf_to_config_param(config);
+>> +     union pcs_pinconf_argument_t arg;
+>> +     u32 offset;
+>> +     unsigned data;
+>> +     int ret;
+>> +
+>> +     if (!pcs->conf.nconfs)
+>> +             return -ENOTSUPP;
+>> +
+>> +     ret = pcs_pinconf_get_config(pctldev, pin, config_param);
+>> +     if (ret < 0)
+>> +             return ret;
+>> +
+>> +     offset = pin * (pcs->width / BITS_PER_BYTE);
+>> +     data = pcs->read(pcs->base + offset);
+>> +
+>> +     arg.data = pinconf_to_config_argument(config);
+>> +     data = (data >> arg.bits.shift) & arg.bits.mask;
+>> +     arg.bits.value = data;
+>> +     data = pinconf_to_config_packed(config_param, arg.data);
+>> +     pcs->write(data, pcs->base + offset);
+>> +     return 0;
+>>  }
+>
+> I need to look at this more to understand how this actually relates
+> to what gets written to the register with my test case :)
 
-* 3530ES3 Beagle: I2C timeouts during userspace init
-  - Intermittent, appears on 5 out of 6 boots here
-  - Aaro Koskinen observes this also on N900
-  - Appears to be caused by commit 3db11feffc1ad2ab9dea27789e6b5b3032827adc
-    - http://marc.info/?l=linux-arm-kernel&m=135071372426971&w=2
-    - http://marc.info/?l=linux-omap&m=135197877112220&w=2
-  - Revert posted, pending I2C maintainers:
-    - http://marc.info/?l=linux-arm-kernel&m=135221953727077&w=2
+No problem.
+>
+>> @@ -765,12 +958,82 @@ static int pcs_parse_one_pinctrl_entry(struct pcs_device *pcs,
+>>       if (res < 0)
+>>               goto free_function;
+>>
+>> -     (*map)->type = PIN_MAP_TYPE_MUX_GROUP;
+>> -     (*map)->data.mux.group = np->name;
+>> -     (*map)->data.mux.function = np->name;
+>> +     m->type = PIN_MAP_TYPE_MUX_GROUP;
+>> +     m->data.mux.group = np->name;
+>> +     m->data.mux.function = np->name;
+>> +
+>> +     if (!nconfs)
+>> +             return 0;
+>> +
+>> +     conf = devm_kzalloc(pcs->dev, sizeof(*conf) * nconfs, GFP_KERNEL);
+>> +     if (!conf) {
+>> +             res = -ENOMEM;
+>> +             goto free_pingroup;
+>> +     }
+>> +     i = 0;
+>> +     if (!of_property_read_u32_array(np, "pinctrl-single,bias",
+>> +                                     value, 5)) {
+>> +             /* array: bias value, mask, disable, pull down, pull up */
+>> +             data = value[0] & value[1];
+>> +             arg.bits.shift = ffs(value[1]) - 1;
+>> +             arg.bits.mask = value[1] >> arg.bits.shift;
+>> +             if (pcs_config_match(data, value[2])) {
+>> +                     arg.bits.value = value[2] >> arg.bits.shift;
+>> +                     conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_BIAS_DISABLE,
+>> +                                                 arg.data);
+>> +             }
+>> +             if (pcs_config_match(data, value[3])) {
+>> +                     arg.bits.value = value[3] >> arg.bits.shift;
+>> +                     conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_DOWN,
+>> +                                                 arg.data);
+>> +             }
+>> +             if (pcs_config_match(data, value[4])) {
+>> +                     arg.bits.value = value[4] >> arg.bits.shift;
+>> +                     conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP,
+>> +                                                 arg.data);
+>> +             }
+>> +     }
+>
+> Doesn't this mean you only get one of the above working? What happens
+> if you initially need to set BIAS_DISABLE, but then the consumer driver
+> wants to set BIAS_PULL_DOWN or something?
+>
+> Maybe we need separate pinctrl-single,bias-disable, pinctrl-single,bias-pull-down
+> and pinctrl-single,bias-pull-up?
+>
+Good point. I'll separate them.
 
-Other:
+>> +     if (!of_property_read_u32_array(np, "pinctrl-single,power-source",
+>> +                                     value, 2)) {
+>> +             /* array: power source value, mask */
+>> +             data = value[0] & value[1];
+>> +             arg.bits.shift = ffs(value[1]) - 1;
+>> +             arg.bits.mask = value[1] >> arg.bits.shift;
+>> +             arg.bits.value = data >> arg.bits.shift;
+>> +             conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_POWER_SOURCE, arg.data);
+>> +     }
+>> +     if (!of_property_read_u32_array(np, "pinctrl-single,input-schmitt",
+>> +                                     value, 3)) {
+>> +             /* array: input schmitt value, mask, disable */
+>> +             data = value[0] & value[1];
+>> +             arg.bits.shift = ffs(value[1]) - 1;
+>> +             arg.bits.mask = value[1] >> arg.bits.shift;
+>> +             if (pcs_config_match(data, value[2])) {
+>> +                     arg.bits.value = value[2] >> arg.bits.shift;
+>> +                     conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_INPUT_SCHMITT_DISABLE,
+>> +                                                 arg.data);
+>> +             } else {
+>> +                     arg.bits.value = data >> arg.bits.shift;
+>> +                     conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_INPUT_SCHMITT,
+>> +                                                 arg.data);
+>> +             }
+>> +     }
+>
+> And I think this has a similar problem? What if the consumer driver wants
+> to set INPUT_SCHMITT with pin_config_set() and the initial value is
+> SCHMITT_DISABLE? Doesn't the consumer driver get -ENOTSUPP in that case?
+>
+OK. I'll update them.
 
-* 2420N800: powers down 30 seconds after boot
-  - Presumably due to missing CBUS patches for watchdog control
-  - http://lkml.org/lkml/2012/9/3/265
-  - http://marc.info/?l=linux-omap&m=135274739624125&w=2
-
-
-Failing tests: needing investigation
-------------------------------------
-
-Boot tests:
-
-* CM-T3517: L3 in-band error with IPSS during boot
-  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
-  - Longstanding issue; does not occur on the 3517EVM
-
-* 3517EVM & CM-T3517: boot hangs with NFS root
-  - Likely some Kconfig, board file, and PM issues with EMAC
-
-* CM-T3517: boot hangs with MMC root
-  - Due to missing MMC setup in board file
-
-Other:
-
-* 4430es2panda: omap_hwmod: l3_instr: _wait_target_disable failed
-  - Unknown cause; could be due to the lack of hierarchical enable/disable
-    in hwmod code
-  - Jon Hunter reports this does not appear with the same X-loader/bootloader
-    on his 4430ES2.3 Panda, so could be ES-level dependent
-
-
-Failing tests: needing local investigation (may be due to testbed issues)
--------------------------------------------------------------------------
-
-Boot tests:
-
-* AM335x Beaglebone: omap2plus_defconfig kernels don't boot
-  - May be fixed now, pending retest:
-    - http://marc.info/?l=linux-omap&m=135082257727502&w=2
-  - Not yet part of the automated test suite
-  * May be due to an old U-boot with FDT support problems used here?
-    Pending local investigation and re-test
-
-* 4460pandaes: boot fails early
-  - Appears to be due to X-loader problems here
-  - Need to note the X-loader version so we know it's broken
-
-PM tests:
-
-* 3730 Beagle XM: does not serial wake from off-idle suspend when console
-  UART doesn't clock gate ("debug ignore_loglevel")
-  - Not shown in the current test logs; cause unknown
-  - Pending re-test
-
-
-
-vmlinux object size
-(delta in bytes from test_v3.7-rc5 (77b67063bb6bce6d475e910d3b886a606d0d91f7)):
-   text     data      bss    total  kernel
-  +1088       +8        0    +1096  am33xx_only
-  +4928        0        0    +4928  n800_multi_omap2xxx
-   +828       +8        0     +836  n800_only_a
-   +932      -24      +32     +940  omap1_defconfig
-   +932      -24      +32     +940  omap1_defconfig_1510innovator_only
-   +932       +8      +32     +972  omap1_defconfig_5912osk_only
-  +1044      +64        0    +1108  omap2plus_defconfig
-  +1016        0        0    +1016  omap2plus_defconfig_2430sdp_only
-  +1044     +128        0    +1172  omap2plus_defconfig_cpupm
-  +1044      +64        0    +1108  omap2plus_defconfig_no_pm
-  +1044      +64        0    +1108  omap2plus_defconfig_omap2_4_only
-  +1168     +112        0    +1280  omap2plus_defconfig_omap3_4_only
-   +760      +40     -396     +404  rmk_omap3430_ldp_allnoconfig
-   +984       +8        0     +992  rmk_omap3430_ldp_oldconfig
-   +760      +40     -396     +404  rmk_omap4430_sdp_allnoconfig
-   +976     +112        0    +1088  rmk_omap4430_sdp_oldconfig
-
-
-
-- Paul
+> I'll look at this more early next week and try to get my testcase working
+> with it.
+>
+> Regards,
+>
+> Tony
