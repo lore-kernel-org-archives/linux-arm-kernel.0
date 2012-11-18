@@ -1,52 +1,55 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 18 Nov 2012 11:36:26 +0100
-Subject: [PATCH] Device Tree binding for the 'mv_xor' XOR engine DMA driver
-In-Reply-To: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20121118103626.GE11717@lunn.ch>
+Date: Sun, 18 Nov 2012 11:44:56 +0100
+Subject: [PATCH v2 1/2] DMA: mv_xor: Add a device_control function
+Message-ID: <1353235498-22638-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 06:20:05PM +0100, Thomas Petazzoni wrote:
-> Hello,
-> 
-> This patch set adds a Device Tree binding for the Marvell XOR engine
-> driver, which allows to support these XOR engines in the Armada 370
-> and Armada XP SoCs.
+The dmatest module for DMA engines calls
 
-Hi Thomas
+device_control(dtc->chan, DMA_TERMINATE_ALL, 0);
 
-I tested on kirkwood, both old style and DT. I tested using the
-dmatest kernel module. That shows up an old issue, pre-dating your
-patchset. It dmatest dereferences a NULL pointer during cleanup, due
-to a missing function in the driver. I will submit a patch for this
-soon.
+after completing the tests. The documentation in
+include/linux/dmaengine.h suggests this function is optional and
+dma_async_device_register() also does not BUG_ON() when not passed a
+function. However, dmatest is not the only code in the kernel
+unconditionally calling device_control. So add an implementation
+indicating all operations are not implemented.
 
-The dmatest shows up a second issue:
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
 
-root at qnap:~# insmod ./dmatest.ko iterations=100
-dmatest: Started 2 threads using dma0chan0
-dmatest: Started 2 threads using dma1chan0
-dmatest: Started 2 threads using dma2chan0
-dmatest: Started 2 threads using dma3chan0
-dma3chan0-xor0: #3: prep error with src_off=0x13c2 dst_off=0x2c7c len=0x5d
-dma1chan0-copy0: #16: prep error with src_off=0x1f50 dst_off=0x904 len=0x33
-dma3chan0-copy0: #22: prep error with src_off=0x14c2 dst_off=0x389b len=0x6f
-dma0chan0-copy0: #31: prep error with src_off=0x10b6 dst_off=0x323c len=0x2f
-dma3chan0-copy0: #49: prep error with src_off=0x17b5 dst_off=0x3eca len=0x29
+This patch depends on the refactoring/DT patches from Thomas.
 
-The driver refuses any operation where the buffer is less than 128
-bytes. The datasheet for Kirkwood says the buffer length must be 8
-bytes or more. So maybe we should reduce this 128 limit down to 8?
+ drivers/dma/mv_xor.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-But is the driver allowed to refuse small copies? Is the caller
-expected to fall back to software? Does the dma core implement this
-fallback? Lots of questions i don't know the answers to.
-
-Anyway, you can add a 
-
-Tested-by: Andrew Lunn <andrew@lunn.ch>
-
-since with your patches it works just as well as before your patches.
-
-      Andrew
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index d645d43..944d7fe 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -1089,6 +1089,14 @@ static int __devexit mv_xor_channel_remove(struct mv_xor_chan *mv_chan)
+ 	return 0;
+ }
+ 
++/* This driver does not implement any of the optional DMA operations. */
++static int
++mv_xor_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
++	       unsigned long arg)
++{
++	return -ENOSYS;
++}
++
+ static struct mv_xor_chan * __devinit
+ mv_xor_channel_add(struct mv_xor_device *xordev,
+ 		   struct platform_device *pdev,
+@@ -1129,6 +1137,7 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
+ 	dma_dev->device_free_chan_resources = mv_xor_free_chan_resources;
+ 	dma_dev->device_tx_status = mv_xor_status;
+ 	dma_dev->device_issue_pending = mv_xor_issue_pending;
++	dma_dev->device_control = mv_xor_control;
+ 	dma_dev->dev = &pdev->dev;
+ 
+ 	/* set prep routines based on capability */
+-- 
+1.7.10.4
