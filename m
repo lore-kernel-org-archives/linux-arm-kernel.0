@@ -1,44 +1,56 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun, 18 Nov 2012 14:56:40 +0400
-Subject: [PATCH v2] Misc: ARM_CHAR_LCD: Permit the use of a driver on any ARM
- machine
-Message-ID: <1353236200-11435-1-git-send-email-shc_work@mail.ru>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 18 Nov 2012 11:57:40 +0100
+Subject: Final call for 3.8 arm-soc patches
+In-Reply-To: <201211162111.34615.arnd@arndb.de>
+References: <201211162111.34615.arnd@arndb.de>
+Message-ID: <20121118115740.17857b53@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm-charlcd driver can be used on any ARM machine, so dependency of
-PLAT_VERSATILE is removed.
+Arnd,
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- drivers/misc/Kconfig |   15 ++++++++-------
- 1 files changed, 8 insertions(+), 7 deletions(-)
+On Fri, 16 Nov 2012 21:11:34 +0000, Arnd Bergmann wrote:
 
-diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-index b151b7c..ac67ce5 100644
---- a/drivers/misc/Kconfig
-+++ b/drivers/misc/Kconfig
-@@ -434,13 +434,14 @@ config VMWARE_BALLOON
- 
- config ARM_CHARLCD
- 	bool "ARM Ltd. Character LCD Driver"
--	depends on PLAT_VERSATILE
--	help
--	  This is a driver for the character LCD found on the ARM Ltd.
--	  Versatile and RealView Platform Baseboards. It doesn't do
--	  very much more than display the text "ARM Linux" on the first
--	  line and the Linux version on the second line, but that's
--	  still useful.
-+	depends on ARM
-+	help
-+	  This is a driver for the on-board character LCD found on some
-+	  ARM reference boards, for example on Versatile or RealView Platform
-+	  Baseboards. This is basically an Hitachi HD44780 LCD.
-+	  Driver doesn't do very much more than display the text "ARM Linux"
-+	  on the first line and the Linux version on the second line, but
-+	  that's still useful.
- 
- config BMP085
- 	bool
+> We are currently at linux-3.7-rc5, which means the merge window is coming
+> closer. We already have 759 changesets in arm-soc and I know of a few ones
+> coming (tegra, clps711x, bcm), but I don't know what the status for some
+> of the bigger ones (exynos/s5p/s3c, mvebu/orion, pxa/mmp). If you have
+> more patches coming, please send all remaining pull requests soon, or
+> let us know what is holding you up. I hope this way we can avoid having
+> to reject pull requests that come too late in the cycle.
+
+We still have quite a lot of things to send from the Marvell side, at
+least:
+
+ * A new network driver for Armada 370/XP, which has been ACKed by
+   David Miller
+
+ * Clock framework support for Kirkwood, Dove, Armada 370 and Armada XP.
+
+ * Support for the Globalscale Mirabox and PlatHome OpenBlocks
+   platforms.
+
+ * Rework of the XOR Marvell driver and addition of a Device Tree
+   binding to it.
+
+ * Conversion of Kirkwood boards to the pinctrl framework.
+
+ * Conversion of Kirkwood boards to the usage of regulators.
+
+ * L2 cache support for Armada 370/XP.
+
+Even though quite a bit of this code as been around for some time,
+Jason Cooper hasn't had the time until now to send the pull requests. I
+hope Jason will manage to do the corresponding pull requests soon, or
+I'll have to do them myself because we really don't want to miss the
+3.8 merge window for those changes. I'll try to see with Jason either
+later today or tomorrow what are his plans.
+
+Best regards,
+
+Thomas
 -- 
-1.7.8.6
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
