@@ -1,58 +1,69 @@
-From: csd_b@daudt.org (Christian Daudt)
-Date: Sat, 17 Nov 2012 16:02:41 -0800
-Subject: [PATCH V3] Add support for generic BCM SoC chipsets
-In-Reply-To: <CAA-5wcAyyh5VRySrNe5Efzbwb9n_4fDxHV4Jzz79H17NUHBtjA@mail.gmail.com>
-References: <1352843517-31328-1-git-send-email-csd@broadcom.com>
- <201211171721.15021.arnd@arndb.de>
- <CAA-5wcAqcjA7VNVXRZ8AE2r5EFQsFa68Rqi_ptYDDR9XXHsUMg@mail.gmail.com>
- <201211171804.50705.arnd@arndb.de>
- <CAA-5wcAyyh5VRySrNe5Efzbwb9n_4fDxHV4Jzz79H17NUHBtjA@mail.gmail.com>
-Message-ID: <CAGFynZ-C4ZZiBMT6rff0U7kBZ55qZD7wMar7mDs9mu5f0v6BRA@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Sun, 18 Nov 2012 01:51:00 +0100
+Subject: [PATCH 00/10] ARM: S3C24XX: rework irq handling for a later dt usage
+Message-ID: <201211180151.01029.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 17, 2012 at 3:39 PM, Christian Daudt <cdaudt@gmail.com> wrote:
->
->
-> On Sat, Nov 17, 2012 at 10:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>
->> On Saturday 17 November 2012, Christian Daudt wrote:
->> > > At that point doesn't the 'oldest part' become the wildcard  ? I'm not
->> > very attached to names, so I'm ok changing bcm281xx above to bcm11351,
->> > which happens to be the first chip I'm submitting a board for. But then
->> > bcm11351 will just become 'the chip name used to represent the family'
->> > right ? I had followed the fact that omap does use omap5 in omap5.dtsi -
->> > and afaik tegra2 and tegra3 are family names, not chip models, and are
->> > used
->> > in dtsi. But then again a bunch of chip models are used to represent the
->> > families too...
->> >  Let me know if you want me to submit a modified patchset. Shouldn't
->> > take
->> > me more than 5 minutes anyways :)
->>
->> I think in a lot of cases, we just list all the possible parts
->> specifically
->> since we already know them, especially when supporting a new one requires
->> changing code already.
->>
->> Using bcm11351 as the name for the family sounds reasonable to me when
->> the other ones are derived from that, and the other option is to just
->> list all the ones that are out there already in the source code match
->> table. For future SoCs, you can then decide whether you want to change
->> the code to add the new number or just list one of the existing parts
->> as backwards compatible for the new device tree file if that allows
->> you to support it without other code changes.
->>
->> Please pick one of the two options and resubmit.
->
-> ok. resubmitting shortly with bcm11351.
->
+All S3C24XX arches share the same interrupt registers and basic handling
+principles but the individual interrupts differ quite a lot between all
+the arches.
 
-On an administrative question: Stephen sent me a reviewed-by that
-effectively applied to V4 of the patch. I dropped it for V5 as this is
-not the exact patchset that he reviewed. Is the expected procedure
-that new versions of patches carry previous reviewed-by or not ? I
-could not find any reference to that in the submittingpatches doc
+This series therefore tries to unify this a bit by abstracting the irq
+handling and enabling the arches to simply provide a structure describing
+its individual interrupts.
 
- thanks,
-   csd
+With this declarative approach it should also be (hopefully) easy to
+move this to devicetree later.
+
+For the initial transformation (in patch 1) I gave up on trying to do
+this in individual steps, so the patch might be a bit bumpy to read,
+but the new irq code does provide the exactly same interrupts and
+handlers as the old code. This also means that the unconverted arches
+shouldn't feel any difference at all.
+
+I've only included the s3c2416 and s3c2443 interrupts for now, as the
+s3c2416 is my main development platform and the s3c2443 is so very
+similar. But the other arches use the same mechanics so conversion
+should be quite easy later.
+
+As it seems to be the policy for drivers/irqchip that drivers there
+should not contain platform-hooks or pollute the namespace with custom
+init functons, the irq code stays in plat-s3c24xx for now.
+
+Heiko Stuebner (10):
+  ARM: S3C24XX: transform irq handling into a declarative form
+  ARM: S3C24XX: move irq-pm code into main irq file
+  ARM: S3C24XX: cleanup irq-pm integration
+  ARM: S3C24XX: move s3c2416 irq init to common irq code
+  ARM: S3C24XX: modify s3c2416 irq init to initialize all irqs
+  ARM: S3C24XX: assimilate s3c2416 subirqs into new structure
+  ARM: S3C24XX: assimilate second s3c2416 interrupt into new structure
+  ARM: S3C24XX: move s3c2443 irq code to irq.c
+  ARM: S3C24XX: modify s3c2443 irq init to initialize all irqs
+  ARM: S3C24XX: assimilate s3c2443 subirqs into new structure
+
+ arch/arm/mach-s3c24xx/Makefile               |    6 +-
+ arch/arm/mach-s3c24xx/common.h               |    2 +
+ arch/arm/mach-s3c24xx/irq-pm.c               |   95 ---
+ arch/arm/mach-s3c24xx/irq-s3c2416.c          |  348 --------
+ arch/arm/mach-s3c24xx/irq-s3c2443.c          |  281 -------
+ arch/arm/mach-s3c24xx/mach-smdk2416.c        |    2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2443.c        |    2 +-
+ arch/arm/mach-s3c24xx/s3c2410.c              |    4 +-
+ arch/arm/mach-s3c24xx/s3c2412.c              |    4 +-
+ arch/arm/mach-s3c24xx/s3c2416.c              |    4 +-
+ arch/arm/mach-s3c24xx/s3c2440.c              |    4 +-
+ arch/arm/mach-s3c24xx/s3c2442.c              |    4 +-
+ arch/arm/plat-s3c24xx/Kconfig                |    1 +
+ arch/arm/plat-s3c24xx/irq.c                  | 1140 ++++++++++++++++----------
+ arch/arm/plat-samsung/include/plat/pm.h      |    6 -
+ arch/arm/plat-samsung/include/plat/s3c2416.h |    1 +
+ arch/arm/plat-samsung/include/plat/s3c2443.h |    2 +
+ 17 files changed, 737 insertions(+), 1169 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c24xx/irq-pm.c
+ delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2416.c
+ delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2443.c
+
+-- 
+1.7.2.3
