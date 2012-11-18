@@ -1,76 +1,251 @@
-From: alior@marvell.com (Lior Amsalem)
-Date: Sun, 18 Nov 2012 14:16:11 +0200
-Subject: [PATCH] Device Tree binding for the 'mv_xor' XOR engine DMA driver
-In-Reply-To: <20121118103626.GE11717@lunn.ch>
-References: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121118103626.GE11717@lunn.ch>
-Message-ID: <EE71107DF0D1F24FA2D95041E64AB9E801A56BA6A7E7@IL-MB01.marvell.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sun, 18 Nov 2012 22:23:05 +0800
+Subject: [PATCH v5 05/10] pinctrl: single: support pinconf generic
+In-Reply-To: <CAN1soZxUr4uO3fheKpRU_oc-GjjYfo2ZY5YZ0hRgwB2ph+b-qw@mail.gmail.com>
+References: <1352968600-15345-1-git-send-email-haojian.zhuang@gmail.com>
+ <1352968600-15345-6-git-send-email-haojian.zhuang@gmail.com>
+ <20121117004313.GN6801@atomide.com>
+ <CAN1soZxUr4uO3fheKpRU_oc-GjjYfo2ZY5YZ0hRgwB2ph+b-qw@mail.gmail.com>
+Message-ID: <CAN1soZzzET1tNVJVgaocDnbzjQZsD8AkA-P=q0YF=09SFy6wzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Andrew Lunn [mailto:andrew at lunn.ch]
-> Sent: Sunday, November 18, 2012 12:36 PM
-> To: Thomas Petazzoni
-> Cc: Vinod Koul; Dan Williams; Saeed Bishara; Jason Cooper; Andrew Lunn;
-> Gregory Clement; Lior Amsalem; Maen Suleiman; linux-arm-
-> kernel at lists.infradead.org; Sebastian Hesselbarth
-> Subject: Re: [PATCH] Device Tree binding for the 'mv_xor' XOR engine DMA
-> driver
-> 
-> On Thu, Nov 15, 2012 at 06:20:05PM +0100, Thomas Petazzoni wrote:
-> > Hello,
-> >
-> > This patch set adds a Device Tree binding for the Marvell XOR engine
-> > driver, which allows to support these XOR engines in the Armada 370
-> > and Armada XP SoCs.
-> 
-> Hi Thomas
-> 
-> I tested on kirkwood, both old style and DT. I tested using the dmatest kernel
-> module. That shows up an old issue, pre-dating your patchset. It dmatest
-> dereferences a NULL pointer during cleanup, due to a missing function in the
-> driver. I will submit a patch for this soon.
-> 
-> The dmatest shows up a second issue:
-> 
-> root at qnap:~# insmod ./dmatest.ko iterations=100
-> dmatest: Started 2 threads using dma0chan0
-> dmatest: Started 2 threads using dma1chan0
-> dmatest: Started 2 threads using dma2chan0
-> dmatest: Started 2 threads using dma3chan0
-> dma3chan0-xor0: #3: prep error with src_off=0x13c2 dst_off=0x2c7c
-> len=0x5d
-> dma1chan0-copy0: #16: prep error with src_off=0x1f50 dst_off=0x904
-> len=0x33
-> dma3chan0-copy0: #22: prep error with src_off=0x14c2 dst_off=0x389b
-> len=0x6f
-> dma0chan0-copy0: #31: prep error with src_off=0x10b6 dst_off=0x323c
-> len=0x2f
-> dma3chan0-copy0: #49: prep error with src_off=0x17b5 dst_off=0x3eca
-> len=0x29
-> 
-> The driver refuses any operation where the buffer is less than 128 bytes. The
-> datasheet for Kirkwood says the buffer length must be 8 bytes or more. So
-> maybe we should reduce this 128 limit down to 8?
+On Sun, Nov 18, 2012 at 12:51 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> On Sat, Nov 17, 2012 at 8:43 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> Hi,
+>>
+>>>  static int pcs_pinconf_get(struct pinctrl_dev *pctldev,
+>>>                               unsigned pin, unsigned long *config)
+>>>  {
+>>> -     return -ENOTSUPP;
+>>> +     struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
+>>> +     enum pin_config_param config_param = pinconf_to_config_param(*config);
+>>> +     union pcs_pinconf_argument_t arg;
+>>> +     u32 offset;
+>>> +     unsigned data;
+>>> +     int ret;
+>>> +
+>>> +     if (!pcs->conf.nconfs)
+>>> +             return -ENOTSUPP;
+>>> +
+>>> +     ret = pcs_pinconf_get_config(pctldev, pin, config_param);
+>>> +     if (ret < 0)
+>>> +             return ret;
+>>> +
+>>> +     offset = pin * (pcs->width / BITS_PER_BYTE);
+>>> +     data = pcs->read(pcs->base + offset);
+>>> +
+>>> +     arg.data = pinconf_to_config_argument(ret);
+>>> +     data = (data >> arg.bits.shift) & arg.bits.mask;
+>>
+>> Shouldn't you just return data here?
+>>
+>>         *config = data;
+>>
+>>         return 0;
+>>
+>
+> Since we're using pinconf-generic, let's review how
+> pinconf_generic_dump_pin() works.
+>
+> pinconf_generic_dump_pin():
+>         config = pinconf_to_config_packed(conf_items[i].param, 0);
+>         The lower 16-bit values are parameters. and the upper 16-bit
+> values are pre-set with 0 for argument.
+>
+>         ret = pin_config_get_for_pin(pctldev, pin, &config);
+>         It'll invoke pcs_pinconf_get() that we're taking care. I want
+> to return the value with both argument
+> and parameters. Since the argument may be any location in 32-bit
+> register, I organize them into packed
+> structure. If I return the value field directly, it may conflict with
+> the lower 16-bit config parameter.
+>
+>         if (conf_items[i].format && pinconf_to_config_argument(config) != 0)
+>             seq_printf(s, " (%u %s)",
+> pinconf_to_config_argument(config), conf_items[i].format);
+>         At here, it loads the upper 16-bit config argument. It also
+> means that returning value field directly
+> will break this.
+>
+>         So how about change it in below.
+>         if (conf_items[i].format)
+>             seq_printf(s, " (%u %s)", config, conf_items[i].format);
+>
 
-This limitation (128B) is only in memset operations (set in registers and not descriptors).
-If I recall correctly the limit is 16B and not 8B.
+Oh. I messed with something. Let's the usage case again.
 
-In any way, this 128 bytes seems like a good logical boundary for XOR HW enabling. (performance wise)
+pin_config_set() sets the config value into pinmux register. The upper 16-bit
+is config argument, and the lower 16-bit is config parameter. The
+pinmux register
+is 32-bit in Marvell's silicon. I think it's 32-bit value in most silicons.
 
-> 
-> But is the driver allowed to refuse small copies? Is the caller expected to fall
-> back to software? Does the dma core implement this fallback? Lots of
-> questions i don't know the answers to.
-> 
-> Anyway, you can add a
-> 
-> Tested-by: Andrew Lunn <andrew@lunn.ch>
-> 
-> since with your patches it works just as well as before your patches.
-> 
->       Andrew
+And real field value could be lower 16-bit. So I have to pack mask,
+shift, config value
+& config parameter into 32-bit data. The limitation is mask, shift,
+value are all 5-bit
+value. And this is also the reason that I define pinctrl_lookup_map()
+into consumer.h.
+How could consumer driver know mask & shift? It has to lookup map to
+get the real
+configuration.
 
-Regards,
-Lior Amsalem
+We also need to keep pin_config_get() compatible with pin_config_set(). I define
+the config data as packed mask, shift, config value & config parameter.
+
+The conclusion is that we have two choices.
+1. Use packed way. It's a little complex.
+2. Change the interface of pin_config_set()/pin_config_get(). We need
+to use the new
+interface in below.
+    pin_config_set(const char *dev_name, const char *name, unsigned
+long parameter,
+                          unsigned long config);
+    pin_config_get(const char *dev_name, const char *name, unsigned
+long parameter,
+                          unsigned long *config);
+    And the config should be "value >> shift".
+
+What's your opinion? I prefer the second method since it's easy to
+understand and maintain.
+Then I could hide pinctrl_lookup_map() in core.h.
+
+>>> +     arg.bits.value = data;
+>>> +     *config = pinconf_to_config_packed(config_param, arg.data);
+>>> +     return 0;
+>>
+>> Instead of these? Or how else is the consumer driver supposed
+>> to use the value?
+>>
+>
+> I agree that returning data directly would be easy for the usage in
+> device driver. Let's define it as "data >> shift".
+> Is it OK?
+>
+>>>  }
+>>>
+>>>  static int pcs_pinconf_set(struct pinctrl_dev *pctldev,
+>>>                               unsigned pin, unsigned long config)
+>>>  {
+>>> -     return -ENOTSUPP;
+>>> +     struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
+>>> +     enum pin_config_param config_param = pinconf_to_config_param(config);
+>>> +     union pcs_pinconf_argument_t arg;
+>>> +     u32 offset;
+>>> +     unsigned data;
+>>> +     int ret;
+>>> +
+>>> +     if (!pcs->conf.nconfs)
+>>> +             return -ENOTSUPP;
+>>> +
+>>> +     ret = pcs_pinconf_get_config(pctldev, pin, config_param);
+>>> +     if (ret < 0)
+>>> +             return ret;
+>>> +
+>>> +     offset = pin * (pcs->width / BITS_PER_BYTE);
+>>> +     data = pcs->read(pcs->base + offset);
+>>> +
+>>> +     arg.data = pinconf_to_config_argument(config);
+>>> +     data = (data >> arg.bits.shift) & arg.bits.mask;
+>>> +     arg.bits.value = data;
+>>> +     data = pinconf_to_config_packed(config_param, arg.data);
+>>> +     pcs->write(data, pcs->base + offset);
+>>> +     return 0;
+>>>  }
+>>
+>> I need to look at this more to understand how this actually relates
+>> to what gets written to the register with my test case :)
+>
+> No problem.
+>>
+>>> @@ -765,12 +958,82 @@ static int pcs_parse_one_pinctrl_entry(struct pcs_device *pcs,
+>>>       if (res < 0)
+>>>               goto free_function;
+>>>
+>>> -     (*map)->type = PIN_MAP_TYPE_MUX_GROUP;
+>>> -     (*map)->data.mux.group = np->name;
+>>> -     (*map)->data.mux.function = np->name;
+>>> +     m->type = PIN_MAP_TYPE_MUX_GROUP;
+>>> +     m->data.mux.group = np->name;
+>>> +     m->data.mux.function = np->name;
+>>> +
+>>> +     if (!nconfs)
+>>> +             return 0;
+>>> +
+>>> +     conf = devm_kzalloc(pcs->dev, sizeof(*conf) * nconfs, GFP_KERNEL);
+>>> +     if (!conf) {
+>>> +             res = -ENOMEM;
+>>> +             goto free_pingroup;
+>>> +     }
+>>> +     i = 0;
+>>> +     if (!of_property_read_u32_array(np, "pinctrl-single,bias",
+>>> +                                     value, 5)) {
+>>> +             /* array: bias value, mask, disable, pull down, pull up */
+>>> +             data = value[0] & value[1];
+>>> +             arg.bits.shift = ffs(value[1]) - 1;
+>>> +             arg.bits.mask = value[1] >> arg.bits.shift;
+>>> +             if (pcs_config_match(data, value[2])) {
+>>> +                     arg.bits.value = value[2] >> arg.bits.shift;
+>>> +                     conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_BIAS_DISABLE,
+>>> +                                                 arg.data);
+>>> +             }
+>>> +             if (pcs_config_match(data, value[3])) {
+>>> +                     arg.bits.value = value[3] >> arg.bits.shift;
+>>> +                     conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_DOWN,
+>>> +                                                 arg.data);
+>>> +             }
+>>> +             if (pcs_config_match(data, value[4])) {
+>>> +                     arg.bits.value = value[4] >> arg.bits.shift;
+>>> +                     conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP,
+>>> +                                                 arg.data);
+>>> +             }
+>>> +     }
+>>
+>> Doesn't this mean you only get one of the above working? What happens
+>> if you initially need to set BIAS_DISABLE, but then the consumer driver
+>> wants to set BIAS_PULL_DOWN or something?
+>>
+>> Maybe we need separate pinctrl-single,bias-disable, pinctrl-single,bias-pull-down
+>> and pinctrl-single,bias-pull-up?
+>>
+> Good point. I'll separate them.
+>
+>>> +     if (!of_property_read_u32_array(np, "pinctrl-single,power-source",
+>>> +                                     value, 2)) {
+>>> +             /* array: power source value, mask */
+>>> +             data = value[0] & value[1];
+>>> +             arg.bits.shift = ffs(value[1]) - 1;
+>>> +             arg.bits.mask = value[1] >> arg.bits.shift;
+>>> +             arg.bits.value = data >> arg.bits.shift;
+>>> +             conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_POWER_SOURCE, arg.data);
+>>> +     }
+>>> +     if (!of_property_read_u32_array(np, "pinctrl-single,input-schmitt",
+>>> +                                     value, 3)) {
+>>> +             /* array: input schmitt value, mask, disable */
+>>> +             data = value[0] & value[1];
+>>> +             arg.bits.shift = ffs(value[1]) - 1;
+>>> +             arg.bits.mask = value[1] >> arg.bits.shift;
+>>> +             if (pcs_config_match(data, value[2])) {
+>>> +                     arg.bits.value = value[2] >> arg.bits.shift;
+>>> +                     conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_INPUT_SCHMITT_DISABLE,
+>>> +                                                 arg.data);
+>>> +             } else {
+>>> +                     arg.bits.value = data >> arg.bits.shift;
+>>> +                     conf[i++] = PIN_CONF_PACKED(PIN_CONFIG_INPUT_SCHMITT,
+>>> +                                                 arg.data);
+>>> +             }
+>>> +     }
+>>
+>> And I think this has a similar problem? What if the consumer driver wants
+>> to set INPUT_SCHMITT with pin_config_set() and the initial value is
+>> SCHMITT_DISABLE? Doesn't the consumer driver get -ENOTSUPP in that case?
+>>
+> OK. I'll update them.
+>
+>> I'll look at this more early next week and try to get my testcase working
+>> with it.
+>>
+>> Regards,
+>>
+>> Tony
