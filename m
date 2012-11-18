@@ -1,60 +1,40 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 18 Nov 2012 17:06:41 +0200
-Subject: [PATCH 2/2] ARM: OMAP3: cm-t3517: use GPTIMER for system clock
-In-Reply-To: <1353251201-10990-1-git-send-email-grinberg@compulab.co.il>
-References: <1353251201-10990-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1353251201-10990-2-git-send-email-grinberg@compulab.co.il>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sun, 18 Nov 2012 16:27:00 +0100
+Subject: [GIT PULL] arm-soc: lpc32xx: dts update
+Message-ID: <50A8FE44.3030401@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cm-t3517 starting from revision 1.2 does not have the 32K oscilator
-wired to the AM3517 SoC.
-Therefore switch to use the GPTIMER for system clock.
+Hi Arnd and Olof,
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
----
- arch/arm/mach-omap2/board-cm-t3517.c |    2 +-
- arch/arm/mach-omap2/common.h         |    1 +
- arch/arm/mach-omap2/timer.c          |    3 +++
- 3 files changed, 5 insertions(+), 1 deletions(-)
+this pull request includes the dts updates for lpc32xx for 3.7. (Hoping that
+the signed tag works for you.)
 
-diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
-index 699caec..ebbc2ad 100644
---- a/arch/arm/mach-omap2/board-cm-t3517.c
-+++ b/arch/arm/mach-omap2/board-cm-t3517.c
-@@ -297,6 +297,6 @@ MACHINE_START(CM_T3517, "Compulab CM-T3517")
- 	.handle_irq	= omap3_intc_handle_irq,
- 	.init_machine	= cm_t3517_init,
- 	.init_late	= am35xx_init_late,
--	.timer		= &omap3_timer,
-+	.timer		= &omap3_gp_timer,
- 	.restart	= omap3xxx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index dae55d8..948bcaa 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -82,6 +82,7 @@ extern void omap2_init_common_infrastructure(void);
- extern struct sys_timer omap2_timer;
- extern struct sys_timer omap3_timer;
- extern struct sys_timer omap3_secure_timer;
-+extern struct sys_timer omap3_gp_timer;
- extern struct sys_timer omap3_am33xx_timer;
- extern struct sys_timer omap4_timer;
- extern struct sys_timer omap5_timer;
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 418753f..4bcf080 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -596,6 +596,9 @@ OMAP_SYS_TIMER(3, sync32k);
- OMAP_SYS_32K_TIMER_INIT(3_secure, 12, OMAP3_32K_SOURCE, "ti,timer-secure",
- 			2, OMAP3_MPU_SOURCE);
- OMAP_SYS_TIMER(3_secure, sync32k);
-+OMAP_SYS_GP_TIMER_INIT(3_gp, 1, OMAP3_MPU_SOURCE, "ti,timer-alwon",
-+		       2, OMAP3_MPU_SOURCE);
-+OMAP_SYS_TIMER(3_gp, gptimer);
- #endif /* CONFIG_ARCH_OMAP3 */
- 
- #ifdef CONFIG_SOC_AM33XX
--- 
-1.7.3.4
+Thanks in advance,
+
+Roland
+
+
+The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
+
+  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
+
+are available in the git repository at:
+
+  git://git.antcom.de/linux-2.6.git tags/lpc32xx-dts-for-3.7
+
+for you to fetch changes up to b7d41c937ed742b0995e4824ed2d0be085f80c1d:
+
+  ARM: LPC32xx: Add the motor PWM to base dts file (2012-11-14 15:41:18 +0100)
+
+----------------------------------------------------------------
+DTS updates for the LPC32xx Soc for 3.7
+
+This time, only one patch: Adding the motor PWM to lpc32xx.dtsi
+
+----------------------------------------------------------------
+Alban Bedel (1):
+      ARM: LPC32xx: Add the motor PWM to base dts file
+
+ arch/arm/boot/dts/lpc32xx.dtsi |    7 +++++++
+ 1 file changed, 7 insertions(+)
