@@ -1,69 +1,96 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 19 Nov 2012 12:07:05 -0200
-Subject: [PATCH v3 1/3] ARM: imx27_visstrim_m10: Do not reserve VPU DMA pool
- on board file
-Message-ID: <1353334027-30009-1-git-send-email-fabio.estevam@freescale.com>
+Date: Mon, 19 Nov 2012 12:07:07 -0200
+Subject: [PATCH v3 3/3] ARM: mx27: Add VPU support
+In-Reply-To: <1353334027-30009-1-git-send-email-fabio.estevam@freescale.com>
+References: <1353334027-30009-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1353334027-30009-3-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not reserve VPU DMA pool on board file as this can be done via CMA.
+mx27 has a VPU (Video Processing Unit) block that allows doing H264/MPEG4
+decoding and encoding in hardware.
 
-The motivation for doing this is to allow to register the VPU driver via a common
-SoC file instead of per board.
+Add support for it in a common SoC file instead of per board file.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
 Changes since v2:
-- No changes. Newly introduced on this series
+- Do not register VPU for mx27lite version
+Changes since v1:
+- Call imx27_add_coda() on a common mx27 location instead of pe
+ arch/arm/mach-imx/iim.h                     |    2 ++
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |    1 -
+ arch/arm/mach-imx/mm-imx27.c                |   21 ++++++++++++++++++++-
+ 3 files changed, 22 insertions(+), 2 deletions(-)
 
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   21 ++-------------------
- 1 file changed, 2 insertions(+), 19 deletions(-)
-
+diff --git a/arch/arm/mach-imx/iim.h b/arch/arm/mach-imx/iim.h
+index d1d6f35..afe4bc1 100644
+--- a/arch/arm/mach-imx/iim.h
++++ b/arch/arm/mach-imx/iim.h
+@@ -74,4 +74,6 @@
+ #define MXC_IIMHWV2_BP_SDMA             (0x1 << 6)
+ #define MXC_IIMHWV2_SCM_DCM             (0x1 << 5)
+ 
++#define MXC_IIM_CHIPANDMEDIA_DISABLE	(0x1 << 7)
++
+ #endif /* __ASM_ARCH_MXC_IIM_H__ */
 diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-index b744226..801b797 100644
+index 801b797..25303a8 100644
 --- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
 +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-@@ -264,7 +264,7 @@ static void __init visstrim_camera_init(void)
- static void __init visstrim_reserve(void)
- {
- 	/* reserve 4 MiB for mx2-camera */
--	mx2_camera_base = arm_memblock_steal(3 * MX2_CAMERA_BUF_SIZE,
-+	mx2_camera_base = arm_memblock_steal(2 * MX2_CAMERA_BUF_SIZE,
- 			MX2_CAMERA_BUF_SIZE);
- }
- 
-@@ -434,23 +434,6 @@ static const struct imx_ssi_platform_data visstrim_m10_ssi_pdata __initconst = {
- 	.flags			= IMX_SSI_DMA | IMX_SSI_SYN,
- };
- 
--/* coda */
--
--static void __init visstrim_coda_init(void)
--{
--	struct platform_device *pdev;
--	int dma;
--
--	pdev = imx27_add_coda();
--	dma = dma_declare_coherent_memory(&pdev->dev,
--					  mx2_camera_base + MX2_CAMERA_BUF_SIZE,
--					  mx2_camera_base + MX2_CAMERA_BUF_SIZE,
--					  MX2_CAMERA_BUF_SIZE,
--					  DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
--	if (!(dma & DMA_MEMORY_MAP))
--		return;
--}
--
- /* DMA deinterlace */
- static struct platform_device visstrim_deinterlace = {
- 	.name = "m2m-deinterlace",
-@@ -548,7 +531,7 @@ static void __init visstrim_m10_board_init(void)
+@@ -531,7 +531,6 @@ static void __init visstrim_m10_board_init(void)
  	gpio_led_register_device(0, &visstrim_m10_led_data);
  	visstrim_deinterlace_init();
  	visstrim_camera_init();
--	visstrim_coda_init();
-+	imx27_add_coda();
+-	imx27_add_coda();
  }
  
  static void __init visstrim_m10_timer_init(void)
+diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
+index 4f1be65..0a8b9d4 100644
+--- a/arch/arm/mach-imx/mm-imx27.c
++++ b/arch/arm/mach-imx/mm-imx27.c
+@@ -25,9 +25,10 @@
+ #include <asm/mach/map.h>
+ 
+ #include "common.h"
+-#include "devices/devices-common.h"
++#include "devices-imx27.h"
+ #include "hardware.h"
+ #include "iomux-v1.h"
++#include "iim.h"
+ 
+ /* MX27 memory map definition */
+ static struct map_desc imx27_io_desc[] __initdata = {
+@@ -80,6 +81,20 @@ static const struct resource imx27_audmux_res[] __initconst = {
+ 	DEFINE_RES_MEM(MX27_AUDMUX_BASE_ADDR, SZ_4K),
+ };
+ 
++static int cpu_is_mx27l(void)
++{
++	int fuse;
++	fuse = __raw_readl(MX27_IO_ADDRESS(MX27_IIM_BASE_ADDR +
++							MXC_IIMWORD3_BANK0));
++
++	fuse &= MXC_IIM_CHIPANDMEDIA_DISABLE;
++
++	if (fuse)
++		return 1;
++	else
++		return 0;
++}
++
+ void __init imx27_soc_init(void)
+ {
+ 	mxc_device_init();
+@@ -98,4 +113,8 @@ void __init imx27_soc_init(void)
+ 	/* imx27 has the imx21 type audmux */
+ 	platform_device_register_simple("imx21-audmux", 0, imx27_audmux_res,
+ 					ARRAY_SIZE(imx27_audmux_res));
++
++	/* MX27L variant does not have VPU, so do not register VPU for it */
++	if (!cpu_is_mx27l())
++		imx27_add_coda();
+ }
 -- 
 1.7.9.5
