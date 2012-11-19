@@ -1,29 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 15:23:59 +0100
-Subject: [PATCH 0/1] ARM: kirkwood: Convert the mplcec4 board to pinctrl
-In-Reply-To: <50AA2D8C.90902@mpl.ch>
-References: <cover.1353319919.git.s.peter@mpl.ch>
- <20121119111838.GH10259@lunn.ch> <50AA2118.7050700@mpl.ch>
- <20121119121833.GI10259@lunn.ch> <50AA2D8C.90902@mpl.ch>
-Message-ID: <20121119152359.13786aae@skate>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 19 Nov 2012 08:25:52 -0600
+Subject: [PATCH v4 02/14] ARM: Section based HYP idmap
+In-Reply-To: <20121110154224.2836.21775.stgit@chazy-air>
+References: <20121110154203.2836.46686.stgit@chazy-air>
+ <20121110154224.2836.21775.stgit@chazy-air>
+Message-ID: <50AA4170.7010905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Stefan Peter,
+On 11/10/2012 09:42 AM, Christoffer Dall wrote:
+> Add a method (hyp_idmap_setup) to populate a hyp pgd with an
+> identity mapping of the code contained in the .hyp.idmap.text
+> section.
+> 
+> Offer a method to drop this identity mapping through
+> hyp_idmap_teardown.
+> 
+> Make all the above depend on CONFIG_ARM_VIRT_EXT and CONFIG_ARM_LPAE.
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+> ---
+>  arch/arm/include/asm/idmap.h                |    5 ++
+>  arch/arm/include/asm/pgtable-3level-hwdef.h |    1 
+>  arch/arm/kernel/vmlinux.lds.S               |    6 ++
+>  arch/arm/mm/idmap.c                         |   74 +++++++++++++++++++++++----
+>  4 files changed, 73 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/idmap.h b/arch/arm/include/asm/idmap.h
+> index bf863ed..36708ba 100644
+> --- a/arch/arm/include/asm/idmap.h
+> +++ b/arch/arm/include/asm/idmap.h
+> @@ -11,4 +11,9 @@ extern pgd_t *idmap_pgd;
+>  
+>  void setup_mm_for_reboot(void);
+>  
+> +#ifdef CONFIG_ARM_VIRT_EXT
+> +void hyp_idmap_teardown(pgd_t *hyp_pgd);
+> +void hyp_idmap_setup(pgd_t *hyp_pgd);
+> +#endif
 
-On Mon, 19 Nov 2012 14:01:00 +0100, Stefan Peter wrote:
+Minor nit. You don't need ifdefs around declarations.
 
-> kirkwood-pinctrl f1010000.pinctrl: unknown pin mmp13
-
-It should be 'mpp13', not 'mmp13'.
-
-The problem is in your Device Tree as well :-)
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Rob
