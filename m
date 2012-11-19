@@ -1,163 +1,66 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 17:52:40 +0100
-Subject: [PATCH 4/7] arm: mvebu: move DT cpu clock nodes to the Armada XP
- specific .dtsi
+Date: Mon, 19 Nov 2012 17:52:39 +0100
+Subject: [PATCH 3/7] clk: mvebu: rename mvebu_clk_gating_init() to
+ mvebu_gating_clk_init()
 In-Reply-To: <1353343963-23034-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353343963-23034-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353343963-23034-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353343963-23034-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpu clock nodes have originally been added in
-armada-xp.dtsi. However, this .dtsi file is common to all SoCs in the
-Armada XP family: the MV78230, the MV78260 and the MV78460. Those SoCs
-differ in a number of ways, but one of the main difference is the
-number of CPUs: one CPU in the MV78230, two CPUs in the MV78260 and
-four CPUs in the MV78460.
+For consistency with mvebu_core_clk_init() and mvebu_cpu_clk_init(),
+rename mvebu_clk_gating_init() to mvebu_gating_clk_init(), so we have
+the nice sequence:
 
-Therefore, this patch moves the cpu clock DT nodes into the
-armada-xp-mv78230.dtsi, armada-xp-mv78260.dtsi and
-armada-xp-mv78460.dtsi files, instantiating the right number of CPUs
-and CPU clocks as needed.
+	mvebu_core_clk_init();
+	mvebu_gating_clk_init();
+	mvebu_cpu_clk_init();
+
+in mvebu_clocks_init().
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-mv78230.dtsi |   11 +++++++++++
- arch/arm/boot/dts/armada-xp-mv78260.dtsi |   17 +++++++++++++++++
- arch/arm/boot/dts/armada-xp-mv78460.dtsi |   30 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/armada-xp.dtsi         |   29 -----------------------------
- 4 files changed, 58 insertions(+), 29 deletions(-)
+ drivers/clk/mvebu/clk-gating-ctrl.c |    2 +-
+ drivers/clk/mvebu/clk-gating-ctrl.h |    2 +-
+ drivers/clk/mvebu/clk.c             |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-index ea35519..0be699b 100644
---- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-@@ -24,6 +24,17 @@
- 		gpio1 = &gpio1;
- 	};
+diff --git a/drivers/clk/mvebu/clk-gating-ctrl.c b/drivers/clk/mvebu/clk-gating-ctrl.c
+index e640d5c..745a908 100644
+--- a/drivers/clk/mvebu/clk-gating-ctrl.c
++++ b/drivers/clk/mvebu/clk-gating-ctrl.c
+@@ -225,7 +225,7 @@ static const __initdata struct of_device_id clk_gating_match[] = {
+ 	{ }
+ };
  
-+	cpus {
-+	    #address-cells = <1>;
-+	    #size-cells = <0>;
-+
-+	    cpu at 0 {
-+		compatible = "marvell,sheeva-v7";
-+		reg = <0>;
-+		clocks = <&cpuclk 0>;
-+	    };
-+	}
-+
- 	soc {
- 		pinctrl {
- 			compatible = "marvell,mv78230-pinctrl";
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index 2057863..4417b87 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -25,6 +25,23 @@
- 		gpio2 = &gpio2;
- 	};
+-void __init mvebu_clk_gating_init(void)
++void __init mvebu_gating_clk_init(void)
+ {
+ 	struct device_node *np;
  
-+	cpus {
-+	    #address-cells = <1>;
-+	    #size-cells = <0>;
-+
-+	    cpu at 0 {
-+		compatible = "marvell,sheeva-v7";
-+		reg = <0>;
-+		clocks = <&cpuclk 0>;
-+	    };
-+
-+	    cpu at 1 {
-+		compatible = "marvell,sheeva-v7";
-+		reg = <1>;
-+		clocks = <&cpuclk 1>;
-+	    };
-+	};
-+
- 	soc {
- 		pinctrl {
- 			compatible = "marvell,mv78260-pinctrl";
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index ffac983..1313c3e 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -25,6 +25,36 @@
- 		gpio2 = &gpio2;
- 	};
+diff --git a/drivers/clk/mvebu/clk-gating-ctrl.h b/drivers/clk/mvebu/clk-gating-ctrl.h
+index 20cc4ad..f9cde9b 100644
+--- a/drivers/clk/mvebu/clk-gating-ctrl.h
++++ b/drivers/clk/mvebu/clk-gating-ctrl.h
+@@ -13,6 +13,6 @@
+ #ifndef __MVEBU_CLK_GATING_H
+ #define __MVEBU_CLK_GATING_H
  
-+
-+	cpus {
-+	    #address-cells = <1>;
-+	    #size-cells = <0>;
-+
-+	    cpu at 0 {
-+		compatible = "marvell,sheeva-v7";
-+		reg = <0>;
-+		clocks = <&cpuclk 0>;
-+	    };
-+
-+	    cpu at 1 {
-+		compatible = "marvell,sheeva-v7";
-+		reg = <1>;
-+		clocks = <&cpuclk 1>;
-+	    };
-+
-+	    cpu at 2 {
-+		compatible = "marvell,sheeva-v7";
-+		reg = <2>;
-+		clocks = <&cpuclk 2>;
-+	    };
-+
-+	    cpu at 3 {
-+		compatible = "marvell,sheeva-v7";
-+		reg = <3>;
-+		clocks = <&cpuclk 3>;
-+	    };
-+	};
-+
- 	soc {
- 		pinctrl {
- 			compatible = "marvell,mv78460-pinctrl";
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 84cb87d..a3824ac 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -34,35 +34,6 @@
- 		    <0xd0021870 0x58>;
- 	};
+-void __init mvebu_clk_gating_init(void);
++void __init mvebu_gating_clk_init(void);
  
--	cpus {
--	    #address-cells = <1>;
--	    #size-cells = <0>;
--
--	    cpu at 0 {
--		compatible = "marvell,sheeva-v7";
--		reg = <0>;
--		clocks = <&cpuclk 0>;
--	    };
--
--	    cpu at 1 {
--		compatible = "marvell,sheeva-v7";
--		reg = <1>;
--		clocks = <&cpuclk 1>;
--	    };
--
--	    cpu at 2 {
--		compatible = "marvell,sheeva-v7";
--		reg = <2>;
--		clocks = <&cpuclk 2>;
--	    };
--
--	    cpu at 3 {
--		compatible = "marvell,sheeva-v7";
--		reg = <3>;
--		clocks = <&cpuclk 3>;
--	    };
--	};
--
- 	soc {
- 		serial at d0012200 {
- 				compatible = "ns16550";
+ #endif
+diff --git a/drivers/clk/mvebu/clk.c b/drivers/clk/mvebu/clk.c
+index e3bc036..855681b 100644
+--- a/drivers/clk/mvebu/clk.c
++++ b/drivers/clk/mvebu/clk.c
+@@ -22,6 +22,6 @@
+ void __init mvebu_clocks_init(void)
+ {
+ 	mvebu_core_clk_init();
+-	mvebu_clk_gating_init();
++	mvebu_gating_clk_init();
+ 	mvebu_cpu_clk_init();
+ }
 -- 
 1.7.9.5
