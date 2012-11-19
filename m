@@ -1,127 +1,62 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 19 Nov 2012 16:22:45 +0100
-Subject: [PATCH 3/4] ARM: sunxi: Add sun4i and cubieboard support
-In-Reply-To: <1353323383-11827-3-git-send-email-sr@denx.de>
-References: <1353323383-11827-1-git-send-email-sr@denx.de>
- <1353323383-11827-3-git-send-email-sr@denx.de>
-Message-ID: <50AA4EC5.3050702@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 19 Nov 2012 15:26:29 +0000
+Subject: [PATCH v4 07/14] KVM: ARM: Inject IRQs and FIQs from userspace
+In-Reply-To: <CANM98qJmkZZ2H+y8sdxBoT6WRgzcFSmKkTPWQnONDhezx5GEQQ@mail.gmail.com>
+References: <20121110154203.2836.46686.stgit@chazy-air>
+ <20121110154259.2836.49857.stgit@chazy-air>
+ <20121119145546.GZ3205@mudshark.cambridge.arm.com>
+ <CANM98qJmkZZ2H+y8sdxBoT6WRgzcFSmKkTPWQnONDhezx5GEQQ@mail.gmail.com>
+Message-ID: <20121119152629.GH3205@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 19/11/2012 12:09, Stefan Roese a ?crit :
-> This patch adds support for the Cubieboard based on the Allwinner
-> A10/sun4i SoC. Currently only UART is supported. Other devices
-> will eventually follow.
-> 
-> Signed-off-by: Stefan Roese <sr@denx.de>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/boot/dts/Makefile             |  3 ++-
->  arch/arm/boot/dts/sun4i-cubieboard.dts | 38 ++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/sunxi.dtsi           |  9 ++++++++
->  arch/arm/mach-sunxi/sunxi.c            |  1 +
->  4 files changed, 50 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/sun4i-cubieboard.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 9b2d3f0..4dd567b 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -84,7 +84,8 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
->  	spear310-evb.dtb \
->  	spear320-evb.dtb
->  dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
-> -dtb-$(CONFIG_ARCH_SUNXI) += sun5i-olinuxino.dtb
-> +dtb-$(CONFIG_ARCH_SUNXI) += sun4i-cubieboard.dtb \
-> +	sun5i-olinuxino.dtb
->  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
->  	tegra20-medcom-wide.dtb \
->  	tegra20-paz00.dtb \
-> diff --git a/arch/arm/boot/dts/sun4i-cubieboard.dts b/arch/arm/boot/dts/sun4i-cubieboard.dts
-> new file mode 100644
-> index 0000000..f4ca126
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun4i-cubieboard.dts
-> @@ -0,0 +1,38 @@
-> +/*
-> + * Copyright 2012 Stefan Roese
-> + * Stefan Roese <sr@denx.de>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "sun4i.dtsi"
-> +
-> +/ {
-> +	model = "Cubietech Cubieboard";
-> +	compatible = "cubietech,cubieboard", "allwinner,sun4i";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +		serial1 = &uart1;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "earlyprintk console=ttyS0,115200";
-> +	};
-> +
-> +	soc {
-> +		uart0: uart at 01c28000 {
-> +			status = "okay";
-> +		};
-> +
-> +		uart1: uart at 01c28400 {
-> +			status = "okay";
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
-> index 9e476de..8284fbd 100644
-> --- a/arch/arm/boot/dts/sunxi.dtsi
-> +++ b/arch/arm/boot/dts/sunxi.dtsi
-> @@ -54,6 +54,15 @@
->  			#interrupt-cells = <1>;
->  		};
->  
-> +		uart0: uart at 01c28000 {
-> +			compatible = "ns8250";
-> +			reg = <0x01c28000 0x400>;
-> +			interrupts = <1>;
-> +			reg-shift = <2>;
-> +			clock-frequency = <24000000>;
-> +			status = "disabled";
-> +		};
-> +
->  		uart1: uart at 01c28400 {
->  			compatible = "ns8250";
->  			reg = <0x01c28400 0x400>;
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index 8f42df8..13d4d96 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -46,6 +46,7 @@ static void __init sunxi_dt_init(void)
->  }
->  
->  static const char * const sunxi_board_dt_compat[] = {
-> +	"allwinner,sun4i",
->  	"allwinner,sun5i",
->  	NULL,
->  };
-> 
+On Mon, Nov 19, 2012 at 03:04:38PM +0000, Christoffer Dall wrote:
+> On Mon, Nov 19, 2012 at 9:55 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Sat, Nov 10, 2012 at 03:42:59PM +0000, Christoffer Dall wrote:
+> >> +int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level)
+> >> +{
+> >> +       u32 irq = irq_level->irq;
+> >> +       unsigned int irq_type, vcpu_idx, irq_num;
+> >> +       int nrcpus = atomic_read(&kvm->online_vcpus);
+> >> +       struct kvm_vcpu *vcpu = NULL;
+> >> +       bool level = irq_level->level;
+> >> +
+> >> +       irq_type = (irq >> KVM_ARM_IRQ_TYPE_SHIFT) & KVM_ARM_IRQ_TYPE_MASK;
+> >> +       vcpu_idx = (irq >> KVM_ARM_IRQ_VCPU_SHIFT) & KVM_ARM_IRQ_VCPU_MASK;
+> >> +       irq_num = (irq >> KVM_ARM_IRQ_NUM_SHIFT) & KVM_ARM_IRQ_NUM_MASK;
+> >> +
+> >> +       trace_kvm_irq_line(irq_type, vcpu_idx, irq_num, irq_level->level);
+> >> +
+> >> +       if (irq_type == KVM_ARM_IRQ_TYPE_CPU ||
+> >> +           irq_type == KVM_ARM_IRQ_TYPE_PPI) {
+> >> +               if (vcpu_idx >= nrcpus)
+> >> +                       return -EINVAL;
+> >> +
+> >> +               vcpu = kvm_get_vcpu(kvm, vcpu_idx);
+> >> +               if (!vcpu)
+> >> +                       return -EINVAL;
+> >> +       }
+> >> +
+> >> +       switch (irq_type) {
+> >> +       case KVM_ARM_IRQ_TYPE_CPU:
+> >> +               if (irq_num > KVM_ARM_IRQ_CPU_FIQ)
+> >> +                       return -EINVAL;
+> >> +
+> >> +               return vcpu_interrupt_line(vcpu, irq_num, level);
+> >> +       }
+> >> +
+> >> +       return -EINVAL;
+> >> +}
+> >
+> > Holy cyclomatic complexity Batman! Any way this can be cleaned up?
+> >
+> you mean the interface or the implementation of kvm_vm_ioctl_irq_line?
+> If the latter, there's just a lot of bits to decode here.
 
-Applied, thanks!
+I just think that this function is incredibly hard to read: different nested
+conditions under duplicate checks of the same variables which differ between
+an if(...) and a switch(...). I appreciate that it's a complex problem,
+which is why I helpfully didn't suggest an alternative! There must be
+*something* we can do though.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
