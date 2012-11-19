@@ -1,59 +1,96 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Mon, 19 Nov 2012 09:19:15 -0700
-Subject: [RFC] dmaengine: omap-dma: Allow DMA controller to prefetch data
-In-Reply-To: <50AA0388.4020803@ti.com>
-References: <20121018222046.GA28541@animalcreek.com> <50AA0388.4020803@ti.com>
-Message-ID: <20121119161915.GA9758@animalcreek.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 19 Nov 2012 16:21:22 +0000
+Subject: [PATCH v4 07/14] KVM: ARM: Inject IRQs and FIQs from userspace
+In-Reply-To: <CANM98q+ts0s1DJO8CxjSDorh1wztjKKU5WdkoAGeWRrSUNi9DA@mail.gmail.com>
+References: <20121110154203.2836.46686.stgit@chazy-air>
+ <20121110154259.2836.49857.stgit@chazy-air>
+ <20121119145546.GZ3205@mudshark.cambridge.arm.com>
+ <CANM98qJmkZZ2H+y8sdxBoT6WRgzcFSmKkTPWQnONDhezx5GEQQ@mail.gmail.com>
+ <20121119152629.GH3205@mudshark.cambridge.arm.com>
+ <CANM98q+ts0s1DJO8CxjSDorh1wztjKKU5WdkoAGeWRrSUNi9DA@mail.gmail.com>
+Message-ID: <20121119162122.GI3205@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 11:01:44AM +0100, Peter Ujfalusi wrote:
-> Hi,
-> 
-> On 10/19/2012 12:20 AM, Mark A. Greer wrote:
-> > Enable DMA prefetching by setting the 'OMAP_DMA_DST_SYNC_PREFETCH'
-> > flag whenever there is a destination synchronized DMA transfer.
-> > Prefetching is not allowed on source synchronized DMA transfers.
-> > 
-> > Enabling prefetch significantly improves DMA performance.
-> > For example, running 'modprobe tcrypt sec=2 mode=403' which
-> > exercises the omap-sham driver on an am37x EVM yeilds the
-> > following results:
-> 
-> >  drivers/dma/omap-dma.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-> > index bb2d8e7..aadddb2 100644
-> > --- a/drivers/dma/omap-dma.c
-> > +++ b/drivers/dma/omap-dma.c
-> > @@ -310,7 +310,7 @@ static struct dma_async_tx_descriptor *omap_dma_prep_slave_sg(
-> >  		dev_addr = c->cfg.dst_addr;
-> >  		dev_width = c->cfg.dst_addr_width;
-> >  		burst = c->cfg.dst_maxburst;
-> > -		sync_type = OMAP_DMA_DST_SYNC;
-> > +		sync_type = OMAP_DMA_DST_SYNC | OMAP_DMA_DST_SYNC_PREFETCH;
-> 
-> This should be:
->  -		sync_type = OMAP_DMA_DST_SYNC;
->  +		sync_type = OMAP_DMA_DST_SYNC_PREFETCH;
+On Mon, Nov 19, 2012 at 04:09:06PM +0000, Christoffer Dall wrote:
+> On Mon, Nov 19, 2012 at 10:26 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Mon, Nov 19, 2012 at 03:04:38PM +0000, Christoffer Dall wrote:
+> In all seriousness, I will unite myself with an alcoholic beverage one
+> of these evenings and try to see what I can do about it, maybe split
+> it up somehow, I'll give it a shot.
 
-Ah, right.  I will fix.
+So this might be to do with the way you've split up the patches (likely I'll
+have similar complaints against the vGIC code, but at least it will make
+sense there!)...
 
-> >  	} else {
-> >  		dev_err(chan->device->dev, "%s: bad direction?\n", __func__);
-> >  		return NULL;
-> > @@ -387,7 +387,7 @@ static struct dma_async_tx_descriptor *omap_dma_prep_dma_cyclic(
-> >  		dev_addr = c->cfg.dst_addr;
-> >  		dev_width = c->cfg.dst_addr_width;
-> >  		burst = c->cfg.dst_maxburst;
-> > -		sync_type = OMAP_DMA_DST_SYNC;
-> > +		sync_type = OMAP_DMA_DST_SYNC | OMAP_DMA_DST_SYNC_PREFETCH;
-> 
-> We should not enable the prefetch for cyclic right now. We will investigate it
-> more.
+> >> >> +int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level)
+> >> >> +{
+> >> >> +       u32 irq = irq_level->irq;
+> >> >> +       unsigned int irq_type, vcpu_idx, irq_num;
+> >> >> +       int nrcpus = atomic_read(&kvm->online_vcpus);
+> >> >> +       struct kvm_vcpu *vcpu = NULL;
+> >> >> +       bool level = irq_level->level;
+> >> >> +
+> >> >> +       irq_type = (irq >> KVM_ARM_IRQ_TYPE_SHIFT) & KVM_ARM_IRQ_TYPE_MASK;
+> >> >> +       vcpu_idx = (irq >> KVM_ARM_IRQ_VCPU_SHIFT) & KVM_ARM_IRQ_VCPU_MASK;
+> >> >> +       irq_num = (irq >> KVM_ARM_IRQ_NUM_SHIFT) & KVM_ARM_IRQ_NUM_MASK;
+> >> >> +
+> >> >> +       trace_kvm_irq_line(irq_type, vcpu_idx, irq_num, irq_level->level);
+> >> >> +
+> >> >> +       if (irq_type == KVM_ARM_IRQ_TYPE_CPU ||
+> >> >> +           irq_type == KVM_ARM_IRQ_TYPE_PPI) {
+> >> >> +               if (vcpu_idx >= nrcpus)
+> >> >> +                       return -EINVAL;
+> >> >> +
+> >> >> +               vcpu = kvm_get_vcpu(kvm, vcpu_idx);
+> >> >> +               if (!vcpu)
+> >> >> +                       return -EINVAL;
+> >> >> +       }
+> >> >> +
+> >> >> +       switch (irq_type) {
+> >> >> +       case KVM_ARM_IRQ_TYPE_CPU:
+> >> >> +               if (irq_num > KVM_ARM_IRQ_CPU_FIQ)
+> >> >> +                       return -EINVAL;
+> >> >> +
+> >> >> +               return vcpu_interrupt_line(vcpu, irq_num, level);
+> >> >> +       }
+> >> >> +
+> >> >> +       return -EINVAL;
+> >> >> +}
 
-OK.  I'll send a patch in a few minutes.
+This obviously doesn't handle PPIs, which is where the confusion lies. You
+can just as easily write it as:
 
-Mark
---
+int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level)
+{
+	u32 irq = irq_level->irq;
+	unsigned int irq_type, vcpu_idx, irq_num;
+	int nrcpus = atomic_read(&kvm->online_vcpus);
+	struct kvm_vcpu *vcpu = NULL;
+	bool level = irq_level->level;
+
+	irq_type = (irq >> KVM_ARM_IRQ_TYPE_SHIFT) & KVM_ARM_IRQ_TYPE_MASK;
+	vcpu_idx = (irq >> KVM_ARM_IRQ_VCPU_SHIFT) & KVM_ARM_IRQ_VCPU_MASK;
+	irq_num = (irq >> KVM_ARM_IRQ_NUM_SHIFT) & KVM_ARM_IRQ_NUM_MASK;
+
+	trace_kvm_irq_line(irq_type, vcpu_idx, irq_num, irq_level->level);
+
+	if (irq_type != KVM_ARM_IRQ_TYPE_CPU)
+		return -EINVAL;
+
+	if (vcpu_idx >= nrcpus)
+		return -EINVAL;
+
+	vcpu = kvm_get_vcpu(kvm, vcpu_idx);
+	if (!vcpu)
+		return -EINVAL;
+
+	if (irq_num > KVM_ARM_IRQ_CPU_FIQ)
+		return -EINVAL;
+
+	return vcpu_interrupt_line(vcpu, irq_num, level);
+}
+
+Then add all the IRQ complexity in a later patch!
+
+Will
