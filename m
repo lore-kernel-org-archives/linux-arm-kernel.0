@@ -1,50 +1,130 @@
 From: sr@denx.de (Stefan Roese)
-Date: Mon, 19 Nov 2012 12:09:42 +0100
-Subject: [PATCH 3/4] ARM: sunxi: Add sun4i and cubieboard support
-In-Reply-To: <1353323383-11827-1-git-send-email-sr@denx.de>
-References: <1353323383-11827-1-git-send-email-sr@denx.de>
-Message-ID: <1353323383-11827-3-git-send-email-sr@denx.de>
+Date: Mon, 19 Nov 2012 12:09:40 +0100
+Subject: [PATCH 1/4] ARM: sunxi: Restructure sunxi dts/dtsi files
+Message-ID: <1353323383-11827-1-git-send-email-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the Cubieboard based on the Allwinner
-A10/sun4i SoC. Currently only UART is supported. Other devices
-will eventually follow.
+For the new sun4i/Cubieboard (A10) support, lets re-strucure the
+sun5i dts files to make it more generic. Those are the new
+dts/dtsi files:
+
+sunxi.dtsi - Devices common to all Allwinner sunXi SoC's
+sun4i.dtsi - sun4i Devices, will include sunxi.dtsi
+sun5i.dtsi - sun5i Devices, will include sunxi.dtsi
+board.dts - will include either sun4i.dtsi or sun5i.dtsi
+
+Additionally the "duart" label in the olinuxino.dts is changed to
+"uart1".
 
 Signed-off-by: Stefan Roese <sr@denx.de>
 Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/boot/dts/Makefile             |  3 ++-
- arch/arm/boot/dts/sun4i-cubieboard.dts | 38 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/sunxi.dtsi           |  9 ++++++++
- arch/arm/mach-sunxi/sunxi.c            |  1 +
- 4 files changed, 50 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun4i-cubieboard.dts
+ arch/arm/boot/dts/sun5i-olinuxino.dts |  6 +++-
+ arch/arm/boot/dts/sun5i.dtsi          | 56 +----------------------------
+ arch/arm/boot/dts/sunxi.dtsi          | 66 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 72 insertions(+), 56 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sunxi.dtsi
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 9b2d3f0..4dd567b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -84,7 +84,8 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
- 	spear310-evb.dtb \
- 	spear320-evb.dtb
- dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
--dtb-$(CONFIG_ARCH_SUNXI) += sun5i-olinuxino.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun4i-cubieboard.dtb \
-+	sun5i-olinuxino.dtb
- dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
- 	tegra20-medcom-wide.dtb \
- 	tegra20-paz00.dtb \
-diff --git a/arch/arm/boot/dts/sun4i-cubieboard.dts b/arch/arm/boot/dts/sun4i-cubieboard.dts
+diff --git a/arch/arm/boot/dts/sun5i-olinuxino.dts b/arch/arm/boot/dts/sun5i-olinuxino.dts
+index 3b1cce3..d6ff889 100644
+--- a/arch/arm/boot/dts/sun5i-olinuxino.dts
++++ b/arch/arm/boot/dts/sun5i-olinuxino.dts
+@@ -18,8 +18,12 @@
+ 	model = "Olimex A13-Olinuxino";
+ 	compatible = "olimex,a13-olinuxino", "allwinner,sun5i";
+ 
++	chosen {
++		bootargs = "earlyprintk console=ttyS0,115200";
++	};
++
+ 	soc {
+-		duart: uart at 01c28400 {
++		uart1: uart at 01c28400 {
+ 			status = "okay";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 4bedf3e..59a2d26 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -11,64 +11,10 @@
+  * http://www.gnu.org/copyleft/gpl.html
+  */
+ 
+-/include/ "skeleton.dtsi"
++/include/ "sunxi.dtsi"
+ 
+ / {
+-	interrupt-parent = <&intc>;
+-
+-	cpus {
+-		cpu at 0 {
+-			compatible = "arm,cortex-a8";
+-		};
+-	};
+-
+-	chosen {
+-		bootargs = "earlyprintk console=ttyS0,115200";
+-	};
+-
+ 	memory {
+ 		reg = <0x40000000 0x20000000>;
+ 	};
+-
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		osc: oscillator {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <24000000>;
+-		};
+-	};
+-
+-	soc {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		reg = <0x01c20000 0x300000>;
+-		ranges;
+-
+-		timer at 01c20c00 {
+-			compatible = "allwinner,sunxi-timer";
+-			reg = <0x01c20c00 0x400>;
+-			interrupts = <22>;
+-			clocks = <&osc>;
+-		};
+-
+-		intc: interrupt-controller at 01c20400 {
+-			compatible = "allwinner,sunxi-ic";
+-			reg = <0x01c20400 0x400>;
+-			interrupt-controller;
+-			#interrupt-cells = <1>;
+-		};
+-
+-		uart1: uart at 01c28400 {
+-			compatible = "ns8250";
+-			reg = <0x01c28400 0x400>;
+-			interrupts = <2>;
+-			reg-shift = <2>;
+-			clock-frequency = <24000000>;
+-			status = "disabled";
+-		};
+-	};
+ };
+diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
 new file mode 100644
-index 0000000..f4ca126
+index 0000000..9e476de
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun4i-cubieboard.dts
-@@ -0,0 +1,38 @@
++++ b/arch/arm/boot/dts/sunxi.dtsi
+@@ -0,0 +1,66 @@
 +/*
-+ * Copyright 2012 Stefan Roese
-+ * Stefan Roese <sr@denx.de>
++ * Copyright 2012 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
 + *
 + * The code contained herein is licensed under the GNU General Public
 + * License. You may obtain a copy of the GNU General Public License
@@ -54,63 +134,58 @@ index 0000000..f4ca126
 + * http://www.gnu.org/copyleft/gpl.html
 + */
 +
-+/dts-v1/;
-+/include/ "sun4i.dtsi"
++/include/ "skeleton.dtsi"
 +
 +/ {
-+	model = "Cubietech Cubieboard";
-+	compatible = "cubietech,cubieboard", "allwinner,sun4i";
++	interrupt-parent = <&intc>;
 +
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
++	cpus {
++		cpu at 0 {
++			compatible = "arm,cortex-a8";
++		};
 +	};
 +
-+	chosen {
-+		bootargs = "earlyprintk console=ttyS0,115200";
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		osc: oscillator {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <24000000>;
++		};
 +	};
 +
 +	soc {
-+		uart0: uart at 01c28000 {
-+			status = "okay";
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x01c20000 0x300000>;
++		ranges;
++
++		timer at 01c20c00 {
++			compatible = "allwinner,sunxi-timer";
++			reg = <0x01c20c00 0x400>;
++			interrupts = <22>;
++			clocks = <&osc>;
++		};
++
++		intc: interrupt-controller at 01c20400 {
++			compatible = "allwinner,sunxi-ic";
++			reg = <0x01c20400 0x400>;
++			interrupt-controller;
++			#interrupt-cells = <1>;
 +		};
 +
 +		uart1: uart at 01c28400 {
-+			status = "okay";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
-index 9e476de..8284fbd 100644
---- a/arch/arm/boot/dts/sunxi.dtsi
-+++ b/arch/arm/boot/dts/sunxi.dtsi
-@@ -54,6 +54,15 @@
- 			#interrupt-cells = <1>;
- 		};
- 
-+		uart0: uart at 01c28000 {
 +			compatible = "ns8250";
-+			reg = <0x01c28000 0x400>;
-+			interrupts = <1>;
++			reg = <0x01c28400 0x400>;
++			interrupts = <2>;
 +			reg-shift = <2>;
 +			clock-frequency = <24000000>;
 +			status = "disabled";
 +		};
-+
- 		uart1: uart at 01c28400 {
- 			compatible = "ns8250";
- 			reg = <0x01c28400 0x400>;
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 8f42df8..13d4d96 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -46,6 +46,7 @@ static void __init sunxi_dt_init(void)
- }
- 
- static const char * const sunxi_board_dt_compat[] = {
-+	"allwinner,sun4i",
- 	"allwinner,sun5i",
- 	NULL,
- };
++	};
++};
 -- 
 1.8.0
