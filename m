@@ -1,48 +1,60 @@
-From: cdaudt@gmail.com (Christian Daudt)
-Date: Sat, 17 Nov 2012 15:39:00 -0800
-Subject: [PATCH V3] Add support for generic BCM SoC chipsets
-In-Reply-To: <201211171804.50705.arnd@arndb.de>
-References: <1352843517-31328-1-git-send-email-csd@broadcom.com>
- <201211171721.15021.arnd@arndb.de>
- <CAA-5wcAqcjA7VNVXRZ8AE2r5EFQsFa68Rqi_ptYDDR9XXHsUMg@mail.gmail.com>
- <201211171804.50705.arnd@arndb.de>
-Message-ID: <CAA-5wcAyyh5VRySrNe5Efzbwb9n_4fDxHV4Jzz79H17NUHBtjA@mail.gmail.com>
+From: aniyas15@gmail.com (niyas mydeen)
+Date: Mon, 19 Nov 2012 08:15:16 +0530
+Subject: Add PI/robust mutexes support for SMP kernels
+Message-ID: <CADoAD8LgrJsryfgktSVejO3mmQj_cZ1WtjR-CPFuZ-iwMS2B1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 17, 2012 at 10:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi,
 
-> On Saturday 17 November 2012, Christian Daudt wrote:
-> > > At that point doesn't the 'oldest part' become the wildcard  ? I'm not
-> > very attached to names, so I'm ok changing bcm281xx above to bcm11351,
-> > which happens to be the first chip I'm submitting a board for. But then
-> > bcm11351 will just become 'the chip name used to represent the family'
-> > right ? I had followed the fact that omap does use omap5 in omap5.dtsi -
-> > and afaik tegra2 and tegra3 are family names, not chip models, and are
-> used
-> > in dtsi. But then again a bunch of chip models are used to represent the
-> > families too...
-> >  Let me know if you want me to submit a modified patchset. Shouldn't take
-> > me more than 5 minutes anyways :)
->
-> I think in a lot of cases, we just list all the possible parts specifically
-> since we already know them, especially when supporting a new one requires
-> changing code already.
->
-> Using bcm11351 as the name for the family sounds reasonable to me when
-> the other ones are derived from that, and the other option is to just
-> list all the ones that are out there already in the source code match
-> table. For future SoCs, you can then decide whether you want to change
-> the code to add the new number or just list one of the existing parts
-> as backwards compatible for the new device tree file if that allows
-> you to support it without other code changes.
->
-> Please pick one of the two options and resubmit.
->
-ok. resubmitting shortly with bcm11351.
+We have Linux running on our ARM Cortex-a9 (SMP) based platform.
+Test setup : Linux-2.6.35
+GLIBC : 2.11.
 
- thanks,
-   csd
+Test Scenario : We observed with our User application that the system is
+getting hanged at some point of time while keep doing power reset (with
+some delay).
+
+1. Earlier we applied "Add PI/robust mutexes support for SMP kernels" to
+have PI-futex support on our kernel.
+http://lists.infradead.org/*pi*permail/linux-*arm*
+-kernel/2010-June/017374.html<http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017374.html>
+
+2. Found a problem while using pthread_mutex_lock, and it seems like at
+error occurrence, the status of mutex management data is getting corrupted.
+The error part of libpthread source
+(glibc-2.11/nptl/pthread_mutex_lock.c)is pasted below
+        /* Check whether we already hold the mutex.  */
+        if (__builtin_expect ((oldval & FUTEX_TID_MASK) == id, 0))
+          {
+            if (kind == PTHREAD_MUTEX_ERRORCHECK_NP)
+              {
+                THREAD_SETMEM (THREAD_SELF, robust_head.list_op_pending,
+NULL);
+
+
+IMA_RESETLOG(0xA0,oldval,id,mutex->__data.__owner,0x3)        //err point
+code 03
+                return EDEADLK;
+              }
+
+at this point the value of mutex->__data.__owner becomes 0 or some other
+value.
+
+ 3. So we decided to apply Catalin's patch ie "ARM: Remove the domain
+switching on ARMv6k/v7 CPUs"  from "
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/016997.html".
+But there is some confusion in using this patch as it is because our system
+has TLS_REG so the macro CPU_USE_DOMAIN automatically get disabled. And
+with this patch we observe different behavior of the system.
+
+4. Our concern here is do you have any patch related to User Ro Kernel Ro
+alone so that we can try it out that patch.
+
+Any valuable feedback will help us to solve this issue.
+
+Thanks & Regards,
+A. Mydeen.
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121117/43c83a77/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121119/573dd348/attachment-0001.html>
