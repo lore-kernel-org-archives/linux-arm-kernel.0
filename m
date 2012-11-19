@@ -1,69 +1,55 @@
-From: wfp5p@virginia.edu (Bill Pemberton)
-Date: Mon, 19 Nov 2012 13:25:13 -0500
-Subject: [PATCH 364/493] pinctrl: remove use of __devinitconst
-In-Reply-To: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
-Message-ID: <1353349642-3677-364-git-send-email-wfp5p@virginia.edu>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 19 Nov 2012 19:46:31 +0100
+Subject: arm: mvebu: Various mvebu clock fixes/improvements
+In-Reply-To: <20121119182701.GS14643@lunn.ch>
+References: <1353343963-23034-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121119182701.GS14643@lunn.ch>
+Message-ID: <20121119194631.4fb8a483@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_HOTPLUG is going away as an option so __devinitconst is no
-longer needed.
+Dear Andrew Lunn,
 
-Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-Cc: Stephen Warren <swarren@wwwdotorg.org> 
-Cc: Linus Walleij <linus.walleij@linaro.org> 
-Cc: Barry Song <baohua.song@csr.com> 
-Cc: linux-rpi-kernel at lists.infradead.org 
-Cc: linux-arm-kernel at lists.infradead.org 
----
- drivers/pinctrl/pinctrl-bcm2835.c | 6 +++---
- drivers/pinctrl/pinctrl-sirf.c    | 2 +-
- 2 files changed, 4 insertions(+), 4 deletions(-)
+On Mon, 19 Nov 2012 19:27:01 +0100, Andrew Lunn wrote:
+> On Mon, Nov 19, 2012 at 05:52:36PM +0100, Thomas Petazzoni wrote:
+> > Andrew,
+> > 
+> > You'll find enclosed seven patches brigging fixes and improvements to
+> > the CLK support on mvebu platforms. You can either squash them into
+> > your current clk series if you intend to send a new version of it to
+> > Jason, or forward the patches as follow-up patches to Jason after
+> > reviewing.
+> > 
+> > In summary:
+> > 
+> >  * Patch 1 fixes a real problem: the gating clocks are not registered
+> >    on Armada 370/XP.
+> > 
+> >  * Patch 2, 3, 5 and 6 are more cosmetic patches, but I think they are
+> >    good to have.
+> > 
+> >  * Patch 4 implements a fix that we've been discussing: moving the
+> >    Armada XP CPU clocks down to the individual armada-xp-mv78xxx.dtsi
+> >    files.
+> > 
+> >  * Patch 7 fixes the references to the SATA clocks on Armada
+> >    370/XP. Without this patch, Armada 370 currently hangs at boot when
+> >    trying to initialize SATA.
+> 
+> Hi Thomas
+> 
+> You probably want patch 1 last. Anybody bisecting this changeset if
+> going to have a hung 370/XP.
 
-diff --git a/drivers/pinctrl/pinctrl-bcm2835.c b/drivers/pinctrl/pinctrl-bcm2835.c
-index 98bc987..1ccef36 100644
---- a/drivers/pinctrl/pinctrl-bcm2835.c
-+++ b/drivers/pinctrl/pinctrl-bcm2835.c
-@@ -372,7 +372,7 @@ static int bcm2835_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
- 	return irq_linear_revmap(pc->irq_domain, offset);
- }
- 
--static struct gpio_chip bcm2835_gpio_chip __devinitconst = {
-+static struct gpio_chip bcm2835_gpio_chip = {
- 	.label = MODULE_NAME,
- 	.owner = THIS_MODULE,
- 	.request = bcm2835_gpio_request,
-@@ -931,7 +931,7 @@ static struct pinctrl_desc bcm2835_pinctrl_desc = {
- 	.owner = THIS_MODULE,
- };
- 
--static struct pinctrl_gpio_range bcm2835_pinctrl_gpio_range __devinitconst = {
-+static struct pinctrl_gpio_range bcm2835_pinctrl_gpio_range = {
- 	.name = MODULE_NAME,
- 	.npins = BCM2835_NUM_GPIOS,
- };
-@@ -1052,7 +1052,7 @@ static int __devexit bcm2835_pinctrl_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct of_device_id bcm2835_pinctrl_match[] __devinitconst = {
-+static struct of_device_id bcm2835_pinctrl_match[] = {
- 	{ .compatible = "brcm,bcm2835-gpio" },
- 	{}
- };
-diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
-index 290caa3..c776046 100644
---- a/drivers/pinctrl/pinctrl-sirf.c
-+++ b/drivers/pinctrl/pinctrl-sirf.c
-@@ -1305,7 +1305,7 @@ out_no_gpio_remap:
- 	return ret;
- }
- 
--static const struct of_device_id pinmux_ids[] __devinitconst = {
-+static const struct of_device_id pinmux_ids[] = {
- 	{ .compatible = "sirf,prima2-pinctrl" },
- 	{ .compatible = "sirf,marco-pinctrl" },
- 	{}
+Took me a while to figure out why: it's the fact that gating clocks are
+getting registered that I was seeing the SATA hang on Armada 370/XP.
+Sure, I'll put PATCH 1 last in the series then.
+
+Thanks!
+
+Thomas
 -- 
-1.8.0
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
