@@ -1,38 +1,55 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 19:50:14 +0100
-Subject: [PATCH 4/7] arm: mvebu: move DT cpu clock nodes to the Armada
- XP specific .dtsi
-In-Reply-To: <20121119183803.GT14643@lunn.ch>
-References: <1353343963-23034-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1353343963-23034-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121119183803.GT14643@lunn.ch>
-Message-ID: <20121119195014.07fed9f5@skate>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Mon, 19 Nov 2012 11:54:57 -0700
+Subject: [PATCH v4 4/8] ARM: OMAP2+: Remove unnecessary message when no SHA IP
+ is present
+In-Reply-To: <1353351301-6453-1-git-send-email-mgreer@animalcreek.com>
+References: <1353351301-6453-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1353351301-6453-5-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-On Mon, 19 Nov 2012 19:38:03 +0100, Andrew Lunn wrote:
+Remove the error message that prints when there is no SHA IP
+present to make it consistent with all the other IPs.
 
-> This is only part of the story:
-> 
-> void __init of_cpu_clk_setup(struct device_node *node)
+CC: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+---
+ arch/arm/mach-omap2/devices.c | 19 +++++++------------
+ 1 file changed, 7 insertions(+), 12 deletions(-)
 
-[...]
-
->         for (cpu = 0; cpu < MAX_CPU; cpu++) {
-
-[...]
-
-> You are still registering 4 clocks as far as i can see.
-
-Aah, correct. I'll fix this and resend!
-
-Thanks for the review,
-
-Thomas
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 015c259..7ecce5e 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -457,20 +457,15 @@ static void omap_init_rng(void)
+ 
+ static void __init omap_init_sham(void)
+ {
+-	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+-		struct omap_hwmod *oh;
+-		struct platform_device *pdev;
++	struct omap_hwmod *oh;
++	struct platform_device *pdev;
+ 
+-		oh = omap_hwmod_lookup("sham");
+-		if (!oh)
+-			return;
++	oh = omap_hwmod_lookup("sham");
++	if (!oh)
++		return;
+ 
+-		pdev = omap_device_build("omap-sham", -1, oh, NULL, 0, NULL,
+-					 0, 0);
+-		WARN(IS_ERR(pdev), "Can't build omap_device for omap-sham\n");
+-	} else {
+-		pr_err("%s: platform not supported\n", __func__);
+-	}
++	pdev = omap_device_build("omap-sham", -1, oh, NULL, 0, NULL, 0, 0);
++	WARN(IS_ERR(pdev), "Can't build omap_device for omap-sham\n");
+ }
+ 
+ #if defined(CONFIG_CRYPTO_DEV_OMAP_AES) || defined(CONFIG_CRYPTO_DEV_OMAP_AES_MODULE)
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.12
