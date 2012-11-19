@@ -1,96 +1,105 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 19 Nov 2012 12:07:07 -0200
-Subject: [PATCH v3 3/3] ARM: mx27: Add VPU support
-In-Reply-To: <1353334027-30009-1-git-send-email-fabio.estevam@freescale.com>
-References: <1353334027-30009-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1353334027-30009-3-git-send-email-fabio.estevam@freescale.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Mon, 19 Nov 2012 15:10:37 +0100
+Subject: [PATCH v5 2/8] watchdog: core: dt: add support for the timeout-sec dt
+ property
+In-Reply-To: <1353334243-16703-1-git-send-email-fabio.porcedda@gmail.com>
+References: <1353334243-16703-1-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1353334243-16703-3-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mx27 has a VPU (Video Processing Unit) block that allows doing H264/MPEG4
-decoding and encoding in hardware.
-
-Add support for it in a common SoC file instead of per board file.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
 ---
-Changes since v2:
-- Do not register VPU for mx27lite version
-Changes since v1:
-- Call imx27_add_coda() on a common mx27 location instead of pe
- arch/arm/mach-imx/iim.h                     |    2 ++
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c |    1 -
- arch/arm/mach-imx/mm-imx27.c                |   21 ++++++++++++++++++++-
- 3 files changed, 22 insertions(+), 2 deletions(-)
+ Documentation/watchdog/watchdog-kernel-api.txt | 10 +++++++
+ drivers/watchdog/watchdog_core.c               | 37 ++++++++++++++++++++++++++
+ include/linux/watchdog.h                       |  3 +++
+ 3 files changed, 50 insertions(+)
 
-diff --git a/arch/arm/mach-imx/iim.h b/arch/arm/mach-imx/iim.h
-index d1d6f35..afe4bc1 100644
---- a/arch/arm/mach-imx/iim.h
-+++ b/arch/arm/mach-imx/iim.h
-@@ -74,4 +74,6 @@
- #define MXC_IIMHWV2_BP_SDMA             (0x1 << 6)
- #define MXC_IIMHWV2_SCM_DCM             (0x1 << 5)
- 
-+#define MXC_IIM_CHIPANDMEDIA_DISABLE	(0x1 << 7)
+diff --git a/Documentation/watchdog/watchdog-kernel-api.txt b/Documentation/watchdog/watchdog-kernel-api.txt
+index 086638f..44098c2 100644
+--- a/Documentation/watchdog/watchdog-kernel-api.txt
++++ b/Documentation/watchdog/watchdog-kernel-api.txt
+@@ -212,3 +212,13 @@ driver specific data to and a pointer to the data itself.
+ The watchdog_get_drvdata function allows you to retrieve driver specific data.
+ The argument of this function is the watchdog device where you want to retrieve
+ data from. The function returns the pointer to the driver specific data.
 +
- #endif /* __ASM_ARCH_MXC_IIM_H__ */
-diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-index 801b797..25303a8 100644
---- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-+++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-@@ -531,7 +531,6 @@ static void __init visstrim_m10_board_init(void)
- 	gpio_led_register_device(0, &visstrim_m10_led_data);
- 	visstrim_deinterlace_init();
- 	visstrim_camera_init();
--	imx27_add_coda();
- }
++To initialize the timeout field use the following function:
++
++extern void watchdog_init_timeout(struct watchdog_device *wdd,
++                                  unsigned int parm_timeout,
++                                  struct device_node *node);
++
++The watchdog_init_timeout function allows you to initialize the timeout field
++using the module timeout parameter or retrieving the timeout-sec property from
++the device tree.
+diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
+index 3796434..37dde68 100644
+--- a/drivers/watchdog/watchdog_core.c
++++ b/drivers/watchdog/watchdog_core.c
+@@ -36,12 +36,49 @@
+ #include <linux/init.h>		/* For __init/__exit/... */
+ #include <linux/idr.h>		/* For ida_* macros */
+ #include <linux/err.h>		/* For IS_ERR macros */
++#include <linux/of.h>		/* For of_get_timeout_sec */
  
- static void __init visstrim_m10_timer_init(void)
-diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
-index 4f1be65..0a8b9d4 100644
---- a/arch/arm/mach-imx/mm-imx27.c
-+++ b/arch/arm/mach-imx/mm-imx27.c
-@@ -25,9 +25,10 @@
- #include <asm/mach/map.h>
+ #include "watchdog_core.h"	/* For watchdog_dev_register/... */
  
- #include "common.h"
--#include "devices/devices-common.h"
-+#include "devices-imx27.h"
- #include "hardware.h"
- #include "iomux-v1.h"
-+#include "iim.h"
+ static DEFINE_IDA(watchdog_ida);
+ static struct class *watchdog_class;
  
- /* MX27 memory map definition */
- static struct map_desc imx27_io_desc[] __initdata = {
-@@ -80,6 +81,20 @@ static const struct resource imx27_audmux_res[] __initconst = {
- 	DEFINE_RES_MEM(MX27_AUDMUX_BASE_ADDR, SZ_4K),
- };
- 
-+static int cpu_is_mx27l(void)
++static bool watchdog_is_valid_timeout(struct watchdog_device *wdd,
++				      unsigned int t)
++
 +{
-+	int fuse;
-+	fuse = __raw_readl(MX27_IO_ADDRESS(MX27_IIM_BASE_ADDR +
-+							MXC_IIMWORD3_BANK0));
-+
-+	fuse &= MXC_IIM_CHIPANDMEDIA_DISABLE;
-+
-+	if (fuse)
-+		return 1;
++	if (wdd->min_timeout < wdd->max_timeout)
++		return (wdd->min_timeout <= t) && (t <= wdd->max_timeout);
 +	else
-+		return 0;
++		return (t > 0);
 +}
 +
- void __init imx27_soc_init(void)
- {
- 	mxc_device_init();
-@@ -98,4 +113,8 @@ void __init imx27_soc_init(void)
- 	/* imx27 has the imx21 type audmux */
- 	platform_device_register_simple("imx21-audmux", 0, imx27_audmux_res,
- 					ARRAY_SIZE(imx27_audmux_res));
++/**
++ * watchdog_init_timeout() - initialize the timeout field
++ * @parm: timeout module parameter, it takes precedence over the
++ *        timeout-sec property.
++ * @node: Retrieve the timeout-sec property only if the parm_timeout
++ *        is out of bounds.
++ */
++void watchdog_init_timeout(struct watchdog_device *wdd, unsigned int parm,
++			   struct device_node *node)
++{
++	unsigned int t = 0;
 +
-+	/* MX27L variant does not have VPU, so do not register VPU for it */
-+	if (!cpu_is_mx27l())
-+		imx27_add_coda();
++	if (watchdog_is_valid_timeout(wdd, parm)) {
++		wdd->timeout = parm;
++		return;
++	}
++
++	/* try to get the timeout_sec property */
++	if (!node)
++		return;
++	of_get_timeout_sec(node, &t);
++	if (watchdog_is_valid_timeout(wdd, t))
++		wdd->timeout = t;
++}
++EXPORT_SYMBOL_GPL(watchdog_init_timeout);
++
+ /**
+  * watchdog_register_device() - register a watchdog device
+  * @wdd: watchdog device
+diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
+index b7f45d4..5cff9d6 100644
+--- a/include/linux/watchdog.h
++++ b/include/linux/watchdog.h
+@@ -130,6 +130,9 @@ static inline void *watchdog_get_drvdata(struct watchdog_device *wdd)
  }
+ 
+ /* drivers/watchdog/core/watchdog_core.c */
++extern void watchdog_init_timeout(struct watchdog_device *wdd,
++				  unsigned int parm_timeout,
++				  struct device_node *node);
+ extern int watchdog_register_device(struct watchdog_device *);
+ extern void watchdog_unregister_device(struct watchdog_device *);
+ 
 -- 
-1.7.9.5
+1.8.0
