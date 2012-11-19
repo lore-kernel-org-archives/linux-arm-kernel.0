@@ -1,263 +1,226 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 11:04:55 +0100
-Subject: [PATCH 17/30] dma: mv_xor: introduce a mv_chan_to_devp() helper
+Date: Mon, 19 Nov 2012 11:05:00 +0100
+Subject: [PATCH 22/30] dma: mv_xor: merge mv_xor_device and mv_xor_chan
 In-Reply-To: <1353319508-30566-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353319508-30566-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353319508-30566-18-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353319508-30566-23-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In many place, we need to get the 'struct device *' pointer from a
-'struct mv_chan *', so we add a helper that makes this a bit
-easier. It will also help reducing the change noise in further
-patches.
+Even though the DMA engine infrastructure has support for multiple
+channels per device, the mv_xor driver registers one DMA engine device
+for each channel, because the mv_xor channels inside the same XOR
+engine have different capabilities, and the DMA engine infrastructure
+only allows to express capabilities at the DMA engine device level.
+
+The mv_xor driver has therefore been registering one DMA engine device
+and one DMA engine channel for each XOR channel since its introduction
+in the kernel. However, it kept two separate internal structures,
+mv_xor_device and mv_xor_channel, which didn't make a lot of sense
+since there was a 1:1 mapping between those structures.
+
+This patch gets rid of this duplication, and merges everything into
+the mv_xor_chan structure.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor.c |   61 ++++++++++++++++++++++++++------------------------
- 1 file changed, 32 insertions(+), 29 deletions(-)
+ drivers/dma/mv_xor.c |   64 ++++++++++++++++++++++----------------------------
+ drivers/dma/mv_xor.h |   25 +++++---------------
+ 2 files changed, 34 insertions(+), 55 deletions(-)
 
 diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index b799d33..38dac0d 100644
+index 75a8051..3b81ee1 100644
 --- a/drivers/dma/mv_xor.c
 +++ b/drivers/dma/mv_xor.c
-@@ -39,6 +39,9 @@ static void mv_xor_issue_pending(struct dma_chan *chan);
- #define to_mv_xor_slot(tx)		\
+@@ -40,7 +40,7 @@ static void mv_xor_issue_pending(struct dma_chan *chan);
  	container_of(tx, struct mv_xor_desc_slot, async_tx)
  
-+#define mv_chan_to_devp(chan)           \
-+	((chan)->device->common.dev)
-+
+ #define mv_chan_to_devp(chan)           \
+-	((chan)->device->dmadev.dev)
++	((chan)->dmadev.dev)
+ 
  static void mv_desc_init(struct mv_xor_desc_slot *desc, unsigned long flags)
  {
- 	struct mv_xor_desc *hw_desc = desc->hw_desc;
-@@ -163,7 +166,7 @@ static int mv_is_err_intr(u32 intr_cause)
- static void mv_xor_device_clear_eoc_cause(struct mv_xor_chan *chan)
- {
- 	u32 val = ~(1 << (chan->idx * 16));
--	dev_dbg(chan->device->common.dev, "%s, val 0x%08x\n", __func__, val);
-+	dev_dbg(mv_chan_to_devp(chan), "%s, val 0x%08x\n", __func__, val);
- 	__raw_writel(val, XOR_INTR_CAUSE(chan));
+@@ -603,7 +603,7 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
+ 	int idx;
+ 	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
+ 	struct mv_xor_desc_slot *slot = NULL;
+-	int num_descs_in_pool = mv_chan->device->pool_size/MV_XOR_SLOT_SIZE;
++	int num_descs_in_pool = mv_chan->pool_size/MV_XOR_SLOT_SIZE;
+ 
+ 	/* Allocate descriptor slots */
+ 	idx = mv_chan->slots_allocated;
+@@ -614,7 +614,7 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
+ 				" %d descriptor slots", idx);
+ 			break;
+ 		}
+-		hw_desc = (char *) mv_chan->device->dma_desc_pool_virt;
++		hw_desc = (char *) mv_chan->dma_desc_pool_virt;
+ 		slot->hw_desc = (void *) &hw_desc[idx * MV_XOR_SLOT_SIZE];
+ 
+ 		dma_async_tx_descriptor_init(&slot->async_tx, chan);
+@@ -622,7 +622,7 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
+ 		INIT_LIST_HEAD(&slot->chain_node);
+ 		INIT_LIST_HEAD(&slot->slot_node);
+ 		INIT_LIST_HEAD(&slot->tx_list);
+-		hw_desc = (char *) mv_chan->device->dma_desc_pool;
++		hw_desc = (char *) mv_chan->dma_desc_pool;
+ 		slot->async_tx.phys =
+ 			(dma_addr_t) &hw_desc[idx * MV_XOR_SLOT_SIZE];
+ 		slot->idx = idx++;
+@@ -1067,58 +1067,58 @@ out:
+ 	return err;
  }
  
-@@ -203,7 +206,7 @@ static void mv_set_mode(struct mv_xor_chan *chan,
- 		op_mode = XOR_OPERATION_MODE_MEMSET;
- 		break;
- 	default:
--		dev_err(chan->device->common.dev,
-+		dev_err(mv_chan_to_devp(chan),
- 			"error: unsupported operation %d.\n",
- 			type);
- 		BUG();
-@@ -220,7 +223,7 @@ static void mv_chan_activate(struct mv_xor_chan *chan)
+-static int mv_xor_channel_remove(struct mv_xor_device *device)
++static int mv_xor_channel_remove(struct mv_xor_chan *mv_chan)
  {
- 	u32 activation;
+ 	struct dma_chan *chan, *_chan;
+-	struct mv_xor_chan *mv_chan;
+-	struct device *dev = device->dmadev.dev;
++	struct device *dev = mv_chan->dmadev.dev;
  
--	dev_dbg(chan->device->common.dev, " activate chan.\n");
-+	dev_dbg(mv_chan_to_devp(chan), " activate chan.\n");
- 	activation = __raw_readl(XOR_ACTIVATION(chan));
- 	activation |= 0x1;
- 	__raw_writel(activation, XOR_ACTIVATION(chan));
-@@ -248,7 +251,7 @@ static int mv_chan_xor_slot_count(size_t len, int src_cnt)
- static void mv_xor_free_slots(struct mv_xor_chan *mv_chan,
- 			      struct mv_xor_desc_slot *slot)
- {
--	dev_dbg(mv_chan->device->common.dev, "%s %d slot %p\n",
-+	dev_dbg(mv_chan_to_devp(mv_chan), "%s %d slot %p\n",
- 		__func__, __LINE__, slot);
+-	dma_async_device_unregister(&device->dmadev);
++	dma_async_device_unregister(&mv_chan->dmadev);
  
- 	slot->slots_per_op = 0;
-@@ -263,7 +266,7 @@ static void mv_xor_free_slots(struct mv_xor_chan *mv_chan,
- static void mv_xor_start_new_chain(struct mv_xor_chan *mv_chan,
- 				   struct mv_xor_desc_slot *sw_desc)
- {
--	dev_dbg(mv_chan->device->common.dev, "%s %d: sw_desc %p\n",
-+	dev_dbg(mv_chan_to_devp(mv_chan), "%s %d: sw_desc %p\n",
- 		__func__, __LINE__, sw_desc);
- 	if (sw_desc->type != mv_chan->current_type)
- 		mv_set_mode(mv_chan, sw_desc->type);
-@@ -350,7 +353,7 @@ mv_xor_clean_completed_slots(struct mv_xor_chan *mv_chan)
- {
- 	struct mv_xor_desc_slot *iter, *_iter;
+-	dma_free_coherent(dev, device->pool_size,
+-			  device->dma_desc_pool_virt, device->dma_desc_pool);
++	dma_free_coherent(dev, mv_chan->pool_size,
++			  mv_chan->dma_desc_pool_virt, mv_chan->dma_desc_pool);
  
--	dev_dbg(mv_chan->device->common.dev, "%s %d\n", __func__, __LINE__);
-+	dev_dbg(mv_chan_to_devp(mv_chan), "%s %d\n", __func__, __LINE__);
- 	list_for_each_entry_safe(iter, _iter, &mv_chan->completed_slots,
- 				 completed_node) {
- 
-@@ -366,7 +369,7 @@ static int
- mv_xor_clean_slot(struct mv_xor_desc_slot *desc,
- 	struct mv_xor_chan *mv_chan)
- {
--	dev_dbg(mv_chan->device->common.dev, "%s %d: desc %p flags %d\n",
-+	dev_dbg(mv_chan_to_devp(mv_chan), "%s %d: desc %p flags %d\n",
- 		__func__, __LINE__, desc, desc->async_tx.flags);
- 	list_del(&desc->chain_node);
- 	/* the client is allowed to attach dependent operations
-@@ -390,8 +393,8 @@ static void __mv_xor_slot_cleanup(struct mv_xor_chan *mv_chan)
- 	u32 current_desc = mv_chan_get_current_desc(mv_chan);
- 	int seen_current = 0;
- 
--	dev_dbg(mv_chan->device->common.dev, "%s %d\n", __func__, __LINE__);
--	dev_dbg(mv_chan->device->common.dev, "current_desc %x\n", current_desc);
-+	dev_dbg(mv_chan_to_devp(mv_chan), "%s %d\n", __func__, __LINE__);
-+	dev_dbg(mv_chan_to_devp(mv_chan), "current_desc %x\n", current_desc);
- 	mv_xor_clean_completed_slots(mv_chan);
- 
- 	/* free completed slots from the chain starting with
-@@ -544,7 +547,7 @@ mv_xor_tx_submit(struct dma_async_tx_descriptor *tx)
- 	dma_cookie_t cookie;
- 	int new_hw_chain = 1;
- 
--	dev_dbg(mv_chan->device->common.dev,
-+	dev_dbg(mv_chan_to_devp(mv_chan),
- 		"%s sw_desc %p: async_tx %p\n",
- 		__func__, sw_desc, &sw_desc->async_tx);
- 
-@@ -567,7 +570,7 @@ mv_xor_tx_submit(struct dma_async_tx_descriptor *tx)
- 		if (!mv_can_chain(grp_start))
- 			goto submit_done;
- 
--		dev_dbg(mv_chan->device->common.dev, "Append to last desc %x\n",
-+		dev_dbg(mv_chan_to_devp(mv_chan), "Append to last desc %x\n",
- 			old_chain_tail->async_tx.phys);
- 
- 		/* fix up the hardware chain */
-@@ -636,7 +639,7 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
- 					struct mv_xor_desc_slot,
- 					slot_node);
- 
--	dev_dbg(mv_chan->device->common.dev,
-+	dev_dbg(mv_chan_to_devp(mv_chan),
- 		"allocated %d descriptor slots last_used: %p\n",
- 		mv_chan->slots_allocated, mv_chan->last_used);
- 
-@@ -651,7 +654,7 @@ mv_xor_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
- 	struct mv_xor_desc_slot *sw_desc, *grp_start;
- 	int slot_cnt;
- 
--	dev_dbg(mv_chan->device->common.dev,
-+	dev_dbg(mv_chan_to_devp(mv_chan),
- 		"%s dest: %x src %x len: %u flags: %ld\n",
- 		__func__, dest, src, len, flags);
- 	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
-@@ -675,7 +678,7 @@ mv_xor_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+-	list_for_each_entry_safe(chan, _chan, &device->dmadev.channels,
++	list_for_each_entry_safe(chan, _chan, &mv_chan->dmadev.channels,
+ 				 device_node) {
+-		mv_chan = to_mv_xor_chan(chan);
+ 		list_del(&chan->device_node);
  	}
- 	spin_unlock_bh(&mv_chan->lock);
  
--	dev_dbg(mv_chan->device->common.dev,
-+	dev_dbg(mv_chan_to_devp(mv_chan),
- 		"%s sw_desc %p async_tx %p\n",
- 		__func__, sw_desc, sw_desc ? &sw_desc->async_tx : 0);
- 
-@@ -690,7 +693,7 @@ mv_xor_prep_dma_memset(struct dma_chan *chan, dma_addr_t dest, int value,
- 	struct mv_xor_desc_slot *sw_desc, *grp_start;
- 	int slot_cnt;
- 
--	dev_dbg(mv_chan->device->common.dev,
-+	dev_dbg(mv_chan_to_devp(mv_chan),
- 		"%s dest: %x len: %u flags: %ld\n",
- 		__func__, dest, len, flags);
- 	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
-@@ -713,7 +716,7 @@ mv_xor_prep_dma_memset(struct dma_chan *chan, dma_addr_t dest, int value,
- 		sw_desc->unmap_len = len;
- 	}
- 	spin_unlock_bh(&mv_chan->lock);
--	dev_dbg(mv_chan->device->common.dev,
-+	dev_dbg(mv_chan_to_devp(mv_chan),
- 		"%s sw_desc %p async_tx %p \n",
- 		__func__, sw_desc, &sw_desc->async_tx);
- 	return sw_desc ? &sw_desc->async_tx : NULL;
-@@ -732,7 +735,7 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
- 
- 	BUG_ON(len > MV_XOR_MAX_BYTE_COUNT);
- 
--	dev_dbg(mv_chan->device->common.dev,
-+	dev_dbg(mv_chan_to_devp(mv_chan),
- 		"%s src_cnt: %d len: dest %x %u flags: %ld\n",
- 		__func__, src_cnt, len, dest, flags);
- 
-@@ -753,7 +756,7 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
- 			mv_desc_set_src_addr(grp_start, src_cnt, src[src_cnt]);
- 	}
- 	spin_unlock_bh(&mv_chan->lock);
--	dev_dbg(mv_chan->device->common.dev,
-+	dev_dbg(mv_chan_to_devp(mv_chan),
- 		"%s sw_desc %p async_tx %p \n",
- 		__func__, sw_desc, &sw_desc->async_tx);
- 	return sw_desc ? &sw_desc->async_tx : NULL;
-@@ -786,12 +789,12 @@ static void mv_xor_free_chan_resources(struct dma_chan *chan)
- 	}
- 	mv_chan->last_used = NULL;
- 
--	dev_dbg(mv_chan->device->common.dev, "%s slots_allocated %d\n",
-+	dev_dbg(mv_chan_to_devp(mv_chan), "%s slots_allocated %d\n",
- 		__func__, mv_chan->slots_allocated);
- 	spin_unlock_bh(&mv_chan->lock);
- 
- 	if (in_use_descs)
--		dev_err(mv_chan->device->common.dev,
-+		dev_err(mv_chan_to_devp(mv_chan),
- 			"freeing %d in use descriptors!\n", in_use_descs);
+ 	return 0;
  }
  
-@@ -823,27 +826,27 @@ static void mv_dump_xor_regs(struct mv_xor_chan *chan)
- 	u32 val;
- 
- 	val = __raw_readl(XOR_CONFIG(chan));
--	dev_err(chan->device->common.dev,
-+	dev_err(mv_chan_to_devp(chan),
- 		"config       0x%08x.\n", val);
- 
- 	val = __raw_readl(XOR_ACTIVATION(chan));
--	dev_err(chan->device->common.dev,
-+	dev_err(mv_chan_to_devp(chan),
- 		"activation   0x%08x.\n", val);
- 
- 	val = __raw_readl(XOR_INTR_CAUSE(chan));
--	dev_err(chan->device->common.dev,
-+	dev_err(mv_chan_to_devp(chan),
- 		"intr cause   0x%08x.\n", val);
- 
- 	val = __raw_readl(XOR_INTR_MASK(chan));
--	dev_err(chan->device->common.dev,
-+	dev_err(mv_chan_to_devp(chan),
- 		"intr mask    0x%08x.\n", val);
- 
- 	val = __raw_readl(XOR_ERROR_CAUSE(chan));
--	dev_err(chan->device->common.dev,
-+	dev_err(mv_chan_to_devp(chan),
- 		"error cause  0x%08x.\n", val);
- 
- 	val = __raw_readl(XOR_ERROR_ADDR(chan));
--	dev_err(chan->device->common.dev,
-+	dev_err(mv_chan_to_devp(chan),
- 		"error addr   0x%08x.\n", val);
- }
- 
-@@ -851,12 +854,12 @@ static void mv_xor_err_interrupt_handler(struct mv_xor_chan *chan,
- 					 u32 intr_cause)
+-static struct mv_xor_device *
++static struct mv_xor_chan *
+ mv_xor_channel_add(struct mv_xor_private *msp,
+ 		   struct platform_device *pdev,
+ 		   int hw_id, dma_cap_mask_t cap_mask,
+ 		   size_t pool_size, int irq)
  {
- 	if (intr_cause & (1 << 4)) {
--	     dev_dbg(chan->device->common.dev,
-+	     dev_dbg(mv_chan_to_devp(chan),
- 		     "ignore this error\n");
- 	     return;
+ 	int ret = 0;
+-	struct mv_xor_device *adev;
+ 	struct mv_xor_chan *mv_chan;
+ 	struct dma_device *dma_dev;
+ 
+-	adev = devm_kzalloc(&pdev->dev, sizeof(*adev), GFP_KERNEL);
+-	if (!adev)
+-		return ERR_PTR(-ENOMEM);
++	mv_chan = devm_kzalloc(&pdev->dev, sizeof(*mv_chan), GFP_KERNEL);
++	if (!mv_chan) {
++		ret = -ENOMEM;
++		goto err_free_dma;
++	}
++
++	mv_chan->idx = hw_id;
+ 
+-	dma_dev = &adev->dmadev;
++	dma_dev = &mv_chan->dmadev;
+ 
+ 	/* allocate coherent memory for hardware descriptors
+ 	 * note: writecombine gives slightly better performance, but
+ 	 * requires that we explicitly flush the writes
+ 	 */
+-	adev->pool_size = pool_size;
+-	adev->dma_desc_pool_virt = dma_alloc_writecombine(&pdev->dev,
+-							  adev->pool_size,
+-							  &adev->dma_desc_pool,
+-							  GFP_KERNEL);
+-	if (!adev->dma_desc_pool_virt)
++	mv_chan->pool_size = pool_size;
++	mv_chan->dma_desc_pool_virt =
++	  dma_alloc_writecombine(&pdev->dev, mv_chan->pool_size,
++				 &mv_chan->dma_desc_pool, GFP_KERNEL);
++	if (!mv_chan->dma_desc_pool_virt)
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	/* discover transaction capabilites from the platform data */
+ 	dma_dev->cap_mask = cap_mask;
+-	adev->shared = msp;
++	mv_chan->shared = msp;
+ 
+ 	INIT_LIST_HEAD(&dma_dev->channels);
+ 
+@@ -1139,15 +1139,7 @@ mv_xor_channel_add(struct mv_xor_private *msp,
+ 		dma_dev->device_prep_dma_xor = mv_xor_prep_dma_xor;
  	}
  
--	dev_err(chan->device->common.dev,
-+	dev_err(mv_chan_to_devp(chan),
- 		"error on chan %d. intr cause 0x%08x.\n",
- 		chan->idx, intr_cause);
+-	mv_chan = devm_kzalloc(&pdev->dev, sizeof(*mv_chan), GFP_KERNEL);
+-	if (!mv_chan) {
+-		ret = -ENOMEM;
+-		goto err_free_dma;
+-	}
+-	mv_chan->device = adev;
+-	mv_chan->idx = hw_id;
+-	mv_chan->mmr_base = adev->shared->xor_base;
+-
++	mv_chan->mmr_base = msp->xor_base;
+ 	if (!mv_chan->mmr_base) {
+ 		ret = -ENOMEM;
+ 		goto err_free_dma;
+@@ -1199,11 +1191,11 @@ mv_xor_channel_add(struct mv_xor_private *msp,
+ 	  dma_has_cap(DMA_INTERRUPT, dma_dev->cap_mask) ? "intr " : "");
  
-@@ -869,7 +872,7 @@ static irqreturn_t mv_xor_interrupt_handler(int irq, void *data)
- 	struct mv_xor_chan *chan = data;
- 	u32 intr_cause = mv_chan_get_intr_cause(chan);
+ 	dma_async_device_register(dma_dev);
+-	return adev;
++	return mv_chan;
  
--	dev_dbg(chan->device->common.dev, "intr cause %x\n", intr_cause);
-+	dev_dbg(mv_chan_to_devp(chan), "intr cause %x\n", intr_cause);
+  err_free_dma:
+ 	dma_free_coherent(&pdev->dev, pool_size,
+-			adev->dma_desc_pool_virt, adev->dma_desc_pool);
++			  mv_chan->dma_desc_pool_virt, mv_chan->dma_desc_pool);
+ 	return ERR_PTR(ret);
+ }
  
- 	if (mv_is_err_intr(intr_cause))
- 		mv_xor_err_interrupt_handler(chan, intr_cause);
+diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
+index 84255e6..16de1f6 100644
+--- a/drivers/dma/mv_xor.h
++++ b/drivers/dma/mv_xor.h
+@@ -57,24 +57,7 @@ struct mv_xor_private {
+ 	void __iomem	     *xor_base;
+ 	void __iomem	     *xor_high_base;
+ 	struct clk	     *clk;
+-	struct mv_xor_device *channels[MV_XOR_MAX_CHANNELS];
+-};
+-
+-
+-/**
+- * struct mv_xor_device - internal representation of a XOR device
+- * @pdev: Platform device
+- * @id: HW XOR Device selector
+- * @dma_desc_pool: base of DMA descriptor region (DMA address)
+- * @dma_desc_pool_virt: base of DMA descriptor region (CPU address)
+- * @common: embedded struct dma_device
+- */
+-struct mv_xor_device {
+-	dma_addr_t			dma_desc_pool;
+-	void				*dma_desc_pool_virt;
+-	size_t                          pool_size;
+-	struct dma_device		dmadev;
+-	struct mv_xor_private	        *shared;
++	struct mv_xor_chan   *channels[MV_XOR_MAX_CHANNELS];
+ };
+ 
+ /**
+@@ -100,7 +83,11 @@ struct mv_xor_chan {
+ 	enum dma_transaction_type	current_type;
+ 	struct list_head	chain;
+ 	struct list_head	completed_slots;
+-	struct mv_xor_device	*device;
++	dma_addr_t		dma_desc_pool;
++	void			*dma_desc_pool_virt;
++	size_t                  pool_size;
++	struct dma_device	dmadev;
++	struct mv_xor_private	*shared;
+ 	struct dma_chan		dmachan;
+ 	struct mv_xor_desc_slot	*last_used;
+ 	struct list_head	all_slots;
 -- 
 1.7.9.5
