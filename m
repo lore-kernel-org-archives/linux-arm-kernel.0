@@ -1,878 +1,760 @@
 From: wfp5p@virginia.edu (Bill Pemberton)
-Date: Mon, 19 Nov 2012 13:21:34 -0500
-Subject: [PATCH 145/493] tty: serial: remove use of __devexit_p
+Date: Mon, 19 Nov 2012 13:25:53 -0500
+Subject: [PATCH 404/493] i2c: remove use of __devexit
 In-Reply-To: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
 References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
-Message-ID: <1353349642-3677-145-git-send-email-wfp5p@virginia.edu>
+Message-ID: <1353349642-3677-404-git-send-email-wfp5p@virginia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
-needed.
+CONFIG_HOTPLUG is going away as an option so __devexit is no
+longer needed.
 
 Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-Cc: Alan Cox <alan@linux.intel.com> 
-Cc: Tobias Klauser <tklauser@distanz.ch> 
-Cc: Lucas Tavares <lucaskt@linux.vnet.ibm.com> 
-Cc: "David S. Miller" <davem@davemloft.net> 
+Cc: Jean Delvare <khali@linux-fr.org> 
+Cc: Wolfram Sang <w.sang@pengutronix.de> 
+Cc: "Ben Dooks " <ben-linux@fluff.org> 
+Cc: Rudolf Marek <r.marek@assembler.cz> 
+Cc: Jochen Friedrich <jochen@scram.de> 
 Cc: Peter Korsgaard <jacmet@sunsite.dk> 
-Cc: Tony Prisk <linux@prisktech.co.nz> 
-Cc: linux-serial at vger.kernel.org 
-Cc: nios2-dev at sopc.et.ntust.edu.tw 
-Cc: uclinux-dist-devel at blackfin.uclinux.org 
-Cc: sparclinux at vger.kernel.org 
+Cc: Tony Lindgren <tony@atomide.com> 
+Cc: Olof Johansson <olof@lixom.net> 
+Cc: Vitaly Wool <vitalywool@gmail.com> 
+Cc: Guan Xuetao <gxt@mprc.pku.edu.cn> 
+Cc: Barry Song <baohua.song@csr.com> 
+Cc: "Mark M. Hoffman" <mhoffman@lightlink.com> 
+Cc: linux-i2c at vger.kernel.org 
+Cc: linuxppc-dev at lists.ozlabs.org 
+Cc: linux-omap at vger.kernel.org 
 Cc: linux-arm-kernel at lists.infradead.org 
 ---
- drivers/tty/serial/8250/8250.c       |  2 +-
- drivers/tty/serial/8250/8250_acorn.c |  2 +-
- drivers/tty/serial/8250/8250_dw.c    |  2 +-
- drivers/tty/serial/8250/8250_em.c    |  2 +-
- drivers/tty/serial/8250/8250_hp300.c |  2 +-
- drivers/tty/serial/8250/8250_pci.c   | 50 ++++++++++++++++++------------------
- drivers/tty/serial/8250/8250_pnp.c   |  2 +-
- drivers/tty/serial/altera_jtaguart.c |  2 +-
- drivers/tty/serial/altera_uart.c     |  2 +-
- drivers/tty/serial/ar933x_uart.c     |  2 +-
- drivers/tty/serial/arc_uart.c        |  2 +-
- drivers/tty/serial/atmel_serial.c    |  2 +-
- drivers/tty/serial/bcm63xx_uart.c    |  2 +-
- drivers/tty/serial/bfin_sport_uart.c |  2 +-
- drivers/tty/serial/bfin_uart.c       |  2 +-
- drivers/tty/serial/clps711x.c        |  2 +-
- drivers/tty/serial/efm32-uart.c      |  2 +-
- drivers/tty/serial/icom.c            |  2 +-
- drivers/tty/serial/ifx6x60.c         |  2 +-
- drivers/tty/serial/jsm/jsm_driver.c  |  2 +-
- drivers/tty/serial/lpc32xx_hs.c      |  2 +-
- drivers/tty/serial/max3100.c         |  2 +-
- drivers/tty/serial/max310x.c         |  2 +-
- drivers/tty/serial/mcf.c             |  2 +-
- drivers/tty/serial/mfd.c             |  2 +-
- drivers/tty/serial/mrst_max3110.c    |  2 +-
- drivers/tty/serial/msm_serial_hs.c   |  2 +-
- drivers/tty/serial/mux.c             |  4 +--
- drivers/tty/serial/mxs-auart.c       |  2 +-
- drivers/tty/serial/omap-serial.c     |  2 +-
- drivers/tty/serial/pch_uart.c        |  2 +-
- drivers/tty/serial/samsung.c         |  2 +-
- drivers/tty/serial/sc26xx.c          |  2 +-
- drivers/tty/serial/sccnxp.c          |  2 +-
- drivers/tty/serial/serial_txx9.c     |  4 +--
- drivers/tty/serial/sirfsoc_uart.c    |  2 +-
- drivers/tty/serial/sunhv.c           |  2 +-
- drivers/tty/serial/sunsab.c          |  2 +-
- drivers/tty/serial/sunsu.c           |  2 +-
- drivers/tty/serial/sunzilog.c        |  2 +-
- drivers/tty/serial/timbuart.c        |  2 +-
- drivers/tty/serial/uartlite.c        |  2 +-
- drivers/tty/serial/vr41xx_siu.c      |  2 +-
- drivers/tty/serial/vt8500_serial.c   |  2 +-
- 44 files changed, 70 insertions(+), 70 deletions(-)
+ drivers/i2c/busses/i2c-ali1535.c            | 2 +-
+ drivers/i2c/busses/i2c-ali1563.c            | 2 +-
+ drivers/i2c/busses/i2c-ali15x3.c            | 2 +-
+ drivers/i2c/busses/i2c-amd756.c             | 2 +-
+ drivers/i2c/busses/i2c-amd8111.c            | 2 +-
+ drivers/i2c/busses/i2c-at91.c               | 2 +-
+ drivers/i2c/busses/i2c-au1550.c             | 2 +-
+ drivers/i2c/busses/i2c-cpm.c                | 2 +-
+ drivers/i2c/busses/i2c-designware-pcidrv.c  | 2 +-
+ drivers/i2c/busses/i2c-designware-platdrv.c | 2 +-
+ drivers/i2c/busses/i2c-eg20t.c              | 2 +-
+ drivers/i2c/busses/i2c-elektor.c            | 2 +-
+ drivers/i2c/busses/i2c-gpio.c               | 2 +-
+ drivers/i2c/busses/i2c-highlander.c         | 2 +-
+ drivers/i2c/busses/i2c-hydra.c              | 2 +-
+ drivers/i2c/busses/i2c-i801.c               | 4 ++--
+ drivers/i2c/busses/i2c-ibm_iic.c            | 2 +-
+ drivers/i2c/busses/i2c-intel-mid.c          | 2 +-
+ drivers/i2c/busses/i2c-isch.c               | 2 +-
+ drivers/i2c/busses/i2c-mpc.c                | 2 +-
+ drivers/i2c/busses/i2c-mv64xxx.c            | 2 +-
+ drivers/i2c/busses/i2c-mxs.c                | 2 +-
+ drivers/i2c/busses/i2c-nforce2.c            | 2 +-
+ drivers/i2c/busses/i2c-nuc900.c             | 2 +-
+ drivers/i2c/busses/i2c-ocores.c             | 2 +-
+ drivers/i2c/busses/i2c-octeon.c             | 2 +-
+ drivers/i2c/busses/i2c-omap.c               | 2 +-
+ drivers/i2c/busses/i2c-parport-light.c      | 2 +-
+ drivers/i2c/busses/i2c-pasemi.c             | 2 +-
+ drivers/i2c/busses/i2c-pca-isa.c            | 2 +-
+ drivers/i2c/busses/i2c-pca-platform.c       | 2 +-
+ drivers/i2c/busses/i2c-piix4.c              | 4 ++--
+ drivers/i2c/busses/i2c-pmcmsp.c             | 2 +-
+ drivers/i2c/busses/i2c-pnx.c                | 2 +-
+ drivers/i2c/busses/i2c-powermac.c           | 2 +-
+ drivers/i2c/busses/i2c-puv3.c               | 2 +-
+ drivers/i2c/busses/i2c-pxa-pci.c            | 2 +-
+ drivers/i2c/busses/i2c-rcar.c               | 2 +-
+ drivers/i2c/busses/i2c-s6000.c              | 2 +-
+ drivers/i2c/busses/i2c-sh7760.c             | 2 +-
+ drivers/i2c/busses/i2c-sirf.c               | 2 +-
+ drivers/i2c/busses/i2c-sis630.c             | 2 +-
+ drivers/i2c/busses/i2c-sis96x.c             | 2 +-
+ drivers/i2c/busses/i2c-tegra.c              | 2 +-
+ drivers/i2c/busses/i2c-via.c                | 2 +-
+ drivers/i2c/busses/i2c-xiic.c               | 2 +-
+ drivers/i2c/busses/i2c-xlr.c                | 2 +-
+ drivers/i2c/busses/scx200_acb.c             | 4 ++--
+ drivers/i2c/muxes/i2c-mux-gpio.c            | 2 +-
+ drivers/i2c/muxes/i2c-mux-pinctrl.c         | 2 +-
+ 50 files changed, 53 insertions(+), 53 deletions(-)
 
-diff --git a/drivers/tty/serial/8250/8250.c b/drivers/tty/serial/8250/8250.c
-index 5ccbd90..870c5f2 100644
---- a/drivers/tty/serial/8250/8250.c
-+++ b/drivers/tty/serial/8250/8250.c
-@@ -3078,7 +3078,7 @@ static int serial8250_resume(struct platform_device *dev)
+diff --git a/drivers/i2c/busses/i2c-ali1535.c b/drivers/i2c/busses/i2c-ali1535.c
+index 9ee96f0..3f49181 100644
+--- a/drivers/i2c/busses/i2c-ali1535.c
++++ b/drivers/i2c/busses/i2c-ali1535.c
+@@ -518,7 +518,7 @@ static int ali1535_probe(struct pci_dev *dev, const struct pci_device_id *id)
+ 	return i2c_add_adapter(&ali1535_adapter);
+ }
  
- static struct platform_driver serial8250_isa_driver = {
- 	.probe		= serial8250_probe,
--	.remove		= __devexit_p(serial8250_remove),
-+	.remove		= serial8250_remove,
- 	.suspend	= serial8250_suspend,
- 	.resume		= serial8250_resume,
- 	.driver		= {
-diff --git a/drivers/tty/serial/8250/8250_acorn.c b/drivers/tty/serial/8250/8250_acorn.c
-index 8574983..b5e4b49 100644
---- a/drivers/tty/serial/8250/8250_acorn.c
-+++ b/drivers/tty/serial/8250/8250_acorn.c
-@@ -116,7 +116,7 @@ static const struct ecard_id serial_cids[] = {
+-static void __devexit ali1535_remove(struct pci_dev *dev)
++static void ali1535_remove(struct pci_dev *dev)
+ {
+ 	i2c_del_adapter(&ali1535_adapter);
+ 	release_region(ali1535_smba, ALI1535_SMB_IOSIZE);
+diff --git a/drivers/i2c/busses/i2c-ali1563.c b/drivers/i2c/busses/i2c-ali1563.c
+index 55c27b9..5b17c9f 100644
+--- a/drivers/i2c/busses/i2c-ali1563.c
++++ b/drivers/i2c/busses/i2c-ali1563.c
+@@ -411,7 +411,7 @@ exit:
+ 	return error;
+ }
  
- static struct ecard_driver serial_card_driver = {
- 	.probe		= serial_card_probe,
--	.remove 	= __devexit_p(serial_card_remove),
-+	.remove		= serial_card_remove,
- 	.id_table	= serial_cids,
- 	.drv = {
- 		.name	= "8250_acorn",
-diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
-index b19b8c5..2db80d0 100644
---- a/drivers/tty/serial/8250/8250_dw.c
-+++ b/drivers/tty/serial/8250/8250_dw.c
-@@ -197,7 +197,7 @@ static struct platform_driver dw8250_platform_driver = {
- 		.of_match_table	= dw8250_match,
- 	},
- 	.probe			= dw8250_probe,
--	.remove			= __devexit_p(dw8250_remove),
-+	.remove			= dw8250_remove,
- 	.suspend		= dw8250_suspend,
- 	.resume			= dw8250_resume,
- };
-diff --git a/drivers/tty/serial/8250/8250_em.c b/drivers/tty/serial/8250/8250_em.c
-index 3a0363e..80c0a62 100644
---- a/drivers/tty/serial/8250/8250_em.c
-+++ b/drivers/tty/serial/8250/8250_em.c
-@@ -176,7 +176,7 @@ static struct platform_driver serial8250_em_platform_driver = {
- 		.owner		= THIS_MODULE,
- 	},
- 	.probe			= serial8250_em_probe,
--	.remove			= __devexit_p(serial8250_em_remove),
-+	.remove			= serial8250_em_remove,
- };
+-static void __devexit ali1563_remove(struct pci_dev * dev)
++static void ali1563_remove(struct pci_dev * dev)
+ {
+ 	i2c_del_adapter(&ali1563_adapter);
+ 	ali1563_shutdown(dev);
+diff --git a/drivers/i2c/busses/i2c-ali15x3.c b/drivers/i2c/busses/i2c-ali15x3.c
+index 2d32690..26bcc61 100644
+--- a/drivers/i2c/busses/i2c-ali15x3.c
++++ b/drivers/i2c/busses/i2c-ali15x3.c
+@@ -500,7 +500,7 @@ static int ali15x3_probe(struct pci_dev *dev, const struct pci_device_id *id)
+ 	return i2c_add_adapter(&ali15x3_adapter);
+ }
  
- module_platform_driver(serial8250_em_platform_driver);
-diff --git a/drivers/tty/serial/8250/8250_hp300.c b/drivers/tty/serial/8250/8250_hp300.c
-index f3d0edf..89e8855 100644
---- a/drivers/tty/serial/8250/8250_hp300.c
-+++ b/drivers/tty/serial/8250/8250_hp300.c
-@@ -52,7 +52,7 @@ static struct dio_driver hpdca_driver = {
- 	.name      = "hpdca",
- 	.id_table  = hpdca_dio_tbl,
- 	.probe     = hpdca_init_one,
--	.remove    = __devexit_p(hpdca_remove_one),
-+	.remove    = hpdca_remove_one,
- };
+-static void __devexit ali15x3_remove(struct pci_dev *dev)
++static void ali15x3_remove(struct pci_dev *dev)
+ {
+ 	i2c_del_adapter(&ali15x3_adapter);
+ 	release_region(ali15x3_smba, ALI15X3_SMB_IOSIZE);
+diff --git a/drivers/i2c/busses/i2c-amd756.c b/drivers/i2c/busses/i2c-amd756.c
+index 46b2d5d..c98af91 100644
+--- a/drivers/i2c/busses/i2c-amd756.c
++++ b/drivers/i2c/busses/i2c-amd756.c
+@@ -397,7 +397,7 @@ static int amd756_probe(struct pci_dev *pdev,
+ 	return error;
+ }
  
- #endif
-diff --git a/drivers/tty/serial/8250/8250_pci.c b/drivers/tty/serial/8250/8250_pci.c
-index 508063b..c049cfa 100644
---- a/drivers/tty/serial/8250/8250_pci.c
-+++ b/drivers/tty/serial/8250/8250_pci.c
-@@ -1314,7 +1314,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_ite887x_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_ite887x_exit),
-+		.exit		= pci_ite887x_exit,
- 	},
- 	/*
- 	 * National Instruments
-@@ -1326,7 +1326,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_ni8420_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_ni8420_exit),
-+		.exit		= pci_ni8420_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_NI,
-@@ -1335,7 +1335,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_ni8420_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_ni8420_exit),
-+		.exit		= pci_ni8420_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_NI,
-@@ -1344,7 +1344,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_ni8420_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_ni8420_exit),
-+		.exit		= pci_ni8420_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_NI,
-@@ -1353,7 +1353,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_ni8420_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_ni8420_exit),
-+		.exit		= pci_ni8420_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_NI,
-@@ -1362,7 +1362,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_ni8420_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_ni8420_exit),
-+		.exit		= pci_ni8420_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_NI,
-@@ -1371,7 +1371,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_ni8420_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_ni8420_exit),
-+		.exit		= pci_ni8420_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_NI,
-@@ -1380,7 +1380,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_ni8420_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_ni8420_exit),
-+		.exit		= pci_ni8420_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_NI,
-@@ -1389,7 +1389,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_ni8420_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_ni8420_exit),
-+		.exit		= pci_ni8420_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_NI,
-@@ -1398,7 +1398,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_ni8420_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_ni8420_exit),
-+		.exit		= pci_ni8420_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_NI,
-@@ -1407,7 +1407,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_ni8420_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_ni8420_exit),
-+		.exit		= pci_ni8420_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_NI,
-@@ -1416,7 +1416,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_ni8420_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_ni8420_exit),
-+		.exit		= pci_ni8420_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_NI,
-@@ -1425,7 +1425,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_ni8420_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_ni8420_exit),
-+		.exit		= pci_ni8420_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_NI,
-@@ -1434,7 +1434,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_ni8430_init,
- 		.setup		= pci_ni8430_setup,
--		.exit		= __devexit_p(pci_ni8430_exit),
-+		.exit		= pci_ni8430_exit,
- 	},
- 	/*
- 	 * Panacom
-@@ -1446,7 +1446,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_plx9050_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_plx9050_exit),
-+		.exit		= pci_plx9050_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_PANACOM,
-@@ -1455,7 +1455,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_ANY_ID,
- 		.init		= pci_plx9050_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_plx9050_exit),
-+		.exit		= pci_plx9050_exit,
- 	},
- 	/*
- 	 * PLX
-@@ -1474,7 +1474,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_SUBDEVICE_ID_EXSYS_4055,
- 		.init		= pci_plx9050_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_plx9050_exit),
-+		.exit		= pci_plx9050_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_PLX,
-@@ -1483,7 +1483,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_SUBDEVICE_ID_KEYSPAN_SX2,
- 		.init		= pci_plx9050_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_plx9050_exit),
-+		.exit		= pci_plx9050_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_PLX,
-@@ -1492,7 +1492,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_SUBDEVICE_ID_UNKNOWN_0x1584,
- 		.init		= pci_plx9050_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_plx9050_exit),
-+		.exit		= pci_plx9050_exit,
- 	},
- 	{
- 		.vendor		= PCI_VENDOR_ID_PLX,
-@@ -1501,7 +1501,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_DEVICE_ID_PLX_ROMULUS,
- 		.init		= pci_plx9050_init,
- 		.setup		= pci_default_setup,
--		.exit		= __devexit_p(pci_plx9050_exit),
-+		.exit		= pci_plx9050_exit,
- 	},
- 	/*
- 	 * SBS Technologies, Inc., PMC-OCTALPRO 232
-@@ -1513,7 +1513,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_SUBDEVICE_ID_OCTPRO232,
- 		.init		= sbs_init,
- 		.setup		= sbs_setup,
--		.exit		= __devexit_p(sbs_exit),
-+		.exit		= sbs_exit,
- 	},
- 	/*
- 	 * SBS Technologies, Inc., PMC-OCTALPRO 422
-@@ -1525,7 +1525,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_SUBDEVICE_ID_OCTPRO422,
- 		.init		= sbs_init,
- 		.setup		= sbs_setup,
--		.exit		= __devexit_p(sbs_exit),
-+		.exit		= sbs_exit,
- 	},
- 	/*
- 	 * SBS Technologies, Inc., P-Octal 232
-@@ -1537,7 +1537,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_SUBDEVICE_ID_POCTAL232,
- 		.init		= sbs_init,
- 		.setup		= sbs_setup,
--		.exit		= __devexit_p(sbs_exit),
-+		.exit		= sbs_exit,
- 	},
- 	/*
- 	 * SBS Technologies, Inc., P-Octal 422
-@@ -1549,7 +1549,7 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
- 		.subdevice	= PCI_SUBDEVICE_ID_POCTAL422,
- 		.init		= sbs_init,
- 		.setup		= sbs_setup,
--		.exit		= __devexit_p(sbs_exit),
-+		.exit		= sbs_exit,
- 	},
- 	/*
- 	 * SIIG cards - these may be called via parport_serial
-@@ -4323,7 +4323,7 @@ static const struct pci_error_handlers serial8250_err_handler = {
- static struct pci_driver serial_pci_driver = {
- 	.name		= "serial",
- 	.probe		= pciserial_init_one,
--	.remove		= __devexit_p(pciserial_remove_one),
-+	.remove		= pciserial_remove_one,
- #ifdef CONFIG_PM
- 	.suspend	= pciserial_suspend_one,
- 	.resume		= pciserial_resume_one,
-diff --git a/drivers/tty/serial/8250/8250_pnp.c b/drivers/tty/serial/8250/8250_pnp.c
-index f8ee250..e566220 100644
---- a/drivers/tty/serial/8250/8250_pnp.c
-+++ b/drivers/tty/serial/8250/8250_pnp.c
-@@ -511,7 +511,7 @@ static int serial_pnp_resume(struct pnp_dev *dev)
- static struct pnp_driver serial_pnp_driver = {
- 	.name		= "serial",
- 	.probe		= serial_pnp_probe,
--	.remove		= __devexit_p(serial_pnp_remove),
-+	.remove		= serial_pnp_remove,
- 	.suspend	= serial_pnp_suspend,
- 	.resume		= serial_pnp_resume,
- 	.id_table	= pnp_dev_table,
-diff --git a/drivers/tty/serial/altera_jtaguart.c b/drivers/tty/serial/altera_jtaguart.c
-index 530181e..ef16b0a 100644
---- a/drivers/tty/serial/altera_jtaguart.c
-+++ b/drivers/tty/serial/altera_jtaguart.c
-@@ -477,7 +477,7 @@ MODULE_DEVICE_TABLE(of, altera_jtaguart_match);
+-static void __devexit amd756_remove(struct pci_dev *dev)
++static void amd756_remove(struct pci_dev *dev)
+ {
+ 	i2c_del_adapter(&amd756_smbus);
+ 	release_region(amd756_ioport, SMB_IOSIZE);
+diff --git a/drivers/i2c/busses/i2c-amd8111.c b/drivers/i2c/busses/i2c-amd8111.c
+index 1bfeb9b..b5c86c0 100644
+--- a/drivers/i2c/busses/i2c-amd8111.c
++++ b/drivers/i2c/busses/i2c-amd8111.c
+@@ -475,7 +475,7 @@ static int amd8111_probe(struct pci_dev *dev,
+ 	return error;
+ }
  
- static struct platform_driver altera_jtaguart_platform_driver = {
- 	.probe	= altera_jtaguart_probe,
--	.remove	= __devexit_p(altera_jtaguart_remove),
-+	.remove	= altera_jtaguart_remove,
- 	.driver	= {
- 		.name		= DRV_NAME,
- 		.owner		= THIS_MODULE,
-diff --git a/drivers/tty/serial/altera_uart.c b/drivers/tty/serial/altera_uart.c
-index 15d80b9..117ea2c 100644
---- a/drivers/tty/serial/altera_uart.c
-+++ b/drivers/tty/serial/altera_uart.c
-@@ -621,7 +621,7 @@ MODULE_DEVICE_TABLE(of, altera_uart_match);
+-static void __devexit amd8111_remove(struct pci_dev *dev)
++static void amd8111_remove(struct pci_dev *dev)
+ {
+ 	struct amd_smbus *smbus = pci_get_drvdata(dev);
  
- static struct platform_driver altera_uart_platform_driver = {
- 	.probe	= altera_uart_probe,
--	.remove	= __devexit_p(altera_uart_remove),
-+	.remove	= altera_uart_remove,
- 	.driver	= {
- 		.name		= DRV_NAME,
- 		.owner		= THIS_MODULE,
-diff --git a/drivers/tty/serial/ar933x_uart.c b/drivers/tty/serial/ar933x_uart.c
-index e4f60e2..33122f9 100644
---- a/drivers/tty/serial/ar933x_uart.c
-+++ b/drivers/tty/serial/ar933x_uart.c
-@@ -645,7 +645,7 @@ static int __devexit ar933x_uart_remove(struct platform_device *pdev)
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index af29e3e..f8292eb 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -489,7 +489,7 @@ static int at91_twi_probe(struct platform_device *pdev)
+ 	return 0;
+ }
  
- static struct platform_driver ar933x_uart_platform_driver = {
- 	.probe		= ar933x_uart_probe,
--	.remove		= __devexit_p(ar933x_uart_remove),
-+	.remove		= ar933x_uart_remove,
- 	.driver		= {
- 		.name		= DRIVER_NAME,
- 		.owner		= THIS_MODULE,
-diff --git a/drivers/tty/serial/arc_uart.c b/drivers/tty/serial/arc_uart.c
-index e9c61d1..d652569 100644
---- a/drivers/tty/serial/arc_uart.c
-+++ b/drivers/tty/serial/arc_uart.c
-@@ -697,7 +697,7 @@ static int __devexit arc_serial_remove(struct platform_device *pdev)
+-static int __devexit at91_twi_remove(struct platform_device *pdev)
++static int at91_twi_remove(struct platform_device *pdev)
+ {
+ 	struct at91_twi_dev *dev = platform_get_drvdata(pdev);
+ 	int rc;
+diff --git a/drivers/i2c/busses/i2c-au1550.c b/drivers/i2c/busses/i2c-au1550.c
+index 0e8595d..b278298 100644
+--- a/drivers/i2c/busses/i2c-au1550.c
++++ b/drivers/i2c/busses/i2c-au1550.c
+@@ -372,7 +372,7 @@ out:
+ 	return ret;
+ }
  
- static struct platform_driver arc_platform_driver = {
- 	.probe = arc_serial_probe,
--	.remove = __devexit_p(arc_serial_remove),
-+	.remove = arc_serial_remove,
- 	.driver = {
- 		.name = DRIVER_NAME,
- 		.owner = THIS_MODULE,
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 5608b6b..7f91d08 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1884,7 +1884,7 @@ static int __devexit atmel_serial_remove(struct platform_device *pdev)
+-static int __devexit i2c_au1550_remove(struct platform_device *pdev)
++static int i2c_au1550_remove(struct platform_device *pdev)
+ {
+ 	struct i2c_au1550_data *priv = platform_get_drvdata(pdev);
  
- static struct platform_driver atmel_serial_driver = {
- 	.probe		= atmel_serial_probe,
--	.remove		= __devexit_p(atmel_serial_remove),
-+	.remove		= atmel_serial_remove,
- 	.suspend	= atmel_serial_suspend,
- 	.resume		= atmel_serial_resume,
- 	.driver		= {
-diff --git a/drivers/tty/serial/bcm63xx_uart.c b/drivers/tty/serial/bcm63xx_uart.c
-index c0b68b9..7f631d4 100644
---- a/drivers/tty/serial/bcm63xx_uart.c
-+++ b/drivers/tty/serial/bcm63xx_uart.c
-@@ -865,7 +865,7 @@ static int __devexit bcm_uart_remove(struct platform_device *pdev)
+diff --git a/drivers/i2c/busses/i2c-cpm.c b/drivers/i2c/busses/i2c-cpm.c
+index a7ba41d..2e79c10 100644
+--- a/drivers/i2c/busses/i2c-cpm.c
++++ b/drivers/i2c/busses/i2c-cpm.c
+@@ -688,7 +688,7 @@ out_free:
+ 	return result;
+ }
+ 
+-static int __devexit cpm_i2c_remove(struct platform_device *ofdev)
++static int cpm_i2c_remove(struct platform_device *ofdev)
+ {
+ 	struct cpm_i2c *cpm = dev_get_drvdata(&ofdev->dev);
+ 
+diff --git a/drivers/i2c/busses/i2c-designware-pcidrv.c b/drivers/i2c/busses/i2c-designware-pcidrv.c
+index 1e14052..6add851 100644
+--- a/drivers/i2c/busses/i2c-designware-pcidrv.c
++++ b/drivers/i2c/busses/i2c-designware-pcidrv.c
+@@ -328,7 +328,7 @@ exit:
+ 	return r;
+ }
+ 
+-static void __devexit i2c_dw_pci_remove(struct pci_dev *pdev)
++static void i2c_dw_pci_remove(struct pci_dev *pdev)
+ {
+ 	struct dw_i2c_dev *dev = pci_get_drvdata(pdev);
+ 
+diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+index b6e477d..343357a 100644
+--- a/drivers/i2c/busses/i2c-designware-platdrv.c
++++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+@@ -169,7 +169,7 @@ err_release_region:
+ 	return r;
+ }
+ 
+-static int __devexit dw_i2c_remove(struct platform_device *pdev)
++static int dw_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
+ 	struct resource *mem;
+diff --git a/drivers/i2c/busses/i2c-eg20t.c b/drivers/i2c/busses/i2c-eg20t.c
+index 3a4d78e..5e7886e7 100644
+--- a/drivers/i2c/busses/i2c-eg20t.c
++++ b/drivers/i2c/busses/i2c-eg20t.c
+@@ -851,7 +851,7 @@ err_pci_enable:
+ 	return ret;
+ }
+ 
+-static void __devexit pch_i2c_remove(struct pci_dev *pdev)
++static void pch_i2c_remove(struct pci_dev *pdev)
+ {
+ 	int i;
+ 	struct adapter_info *adap_info = pci_get_drvdata(pdev);
+diff --git a/drivers/i2c/busses/i2c-elektor.c b/drivers/i2c/busses/i2c-elektor.c
+index c13d242..4854970 100644
+--- a/drivers/i2c/busses/i2c-elektor.c
++++ b/drivers/i2c/busses/i2c-elektor.c
+@@ -293,7 +293,7 @@ static int elektor_probe(struct device *dev, unsigned int id)
+ 	return -ENODEV;
+ }
+ 
+-static int __devexit elektor_remove(struct device *dev, unsigned int id)
++static int elektor_remove(struct device *dev, unsigned int id)
+ {
+ 	i2c_del_adapter(&pcf_isa_ops);
+ 
+diff --git a/drivers/i2c/busses/i2c-gpio.c b/drivers/i2c/busses/i2c-gpio.c
+index 5daac71..f3fa433 100644
+--- a/drivers/i2c/busses/i2c-gpio.c
++++ b/drivers/i2c/busses/i2c-gpio.c
+@@ -218,7 +218,7 @@ err_request_sda:
+ 	return ret;
+ }
+ 
+-static int __devexit i2c_gpio_remove(struct platform_device *pdev)
++static int i2c_gpio_remove(struct platform_device *pdev)
+ {
+ 	struct i2c_gpio_private_data *priv;
+ 	struct i2c_gpio_platform_data *pdata;
+diff --git a/drivers/i2c/busses/i2c-highlander.c b/drivers/i2c/busses/i2c-highlander.c
+index 6a9d788..3351cc7 100644
+--- a/drivers/i2c/busses/i2c-highlander.c
++++ b/drivers/i2c/busses/i2c-highlander.c
+@@ -441,7 +441,7 @@ err:
+ 	return ret;
+ }
+ 
+-static int __devexit highlander_i2c_remove(struct platform_device *pdev)
++static int highlander_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct highlander_i2c_dev *dev = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/i2c/busses/i2c-hydra.c b/drivers/i2c/busses/i2c-hydra.c
+index d836112..79c3d90 100644
+--- a/drivers/i2c/busses/i2c-hydra.c
++++ b/drivers/i2c/busses/i2c-hydra.c
+@@ -139,7 +139,7 @@ static int hydra_probe(struct pci_dev *dev,
+ 	return 0;
+ }
+ 
+-static void __devexit hydra_remove(struct pci_dev *dev)
++static void hydra_remove(struct pci_dev *dev)
+ {
+ 	pdregw(hydra_bit_data.data, 0);		/* clear SCLK_OE and SDAT_OE */
+ 	i2c_del_adapter(&hydra_adap);
+diff --git a/drivers/i2c/busses/i2c-i801.c b/drivers/i2c/busses/i2c-i801.c
+index 5971441..6c5a732 100644
+--- a/drivers/i2c/busses/i2c-i801.c
++++ b/drivers/i2c/busses/i2c-i801.c
+@@ -1048,7 +1048,7 @@ static int i801_add_mux(struct i801_priv *priv)
+ 	return 0;
+ }
+ 
+-static void __devexit i801_del_mux(struct i801_priv *priv)
++static void i801_del_mux(struct i801_priv *priv)
+ {
+ 	if (priv->mux_pdev)
+ 		platform_device_unregister(priv->mux_pdev);
+@@ -1226,7 +1226,7 @@ exit:
+ 	return err;
+ }
+ 
+-static void __devexit i801_remove(struct pci_dev *dev)
++static void i801_remove(struct pci_dev *dev)
+ {
+ 	struct i801_priv *priv = pci_get_drvdata(dev);
+ 
+diff --git a/drivers/i2c/busses/i2c-ibm_iic.c b/drivers/i2c/busses/i2c-ibm_iic.c
+index e3d3b54..33a2abb 100644
+--- a/drivers/i2c/busses/i2c-ibm_iic.c
++++ b/drivers/i2c/busses/i2c-ibm_iic.c
+@@ -781,7 +781,7 @@ error_cleanup:
+ /*
+  * Cleanup initialized IIC interface
   */
- static struct platform_driver bcm_uart_platform_driver = {
- 	.probe	= bcm_uart_probe,
--	.remove	= __devexit_p(bcm_uart_remove),
-+	.remove	= bcm_uart_remove,
- 	.driver	= {
- 		.owner = THIS_MODULE,
- 		.name  = "bcm63xx_uart",
-diff --git a/drivers/tty/serial/bfin_sport_uart.c b/drivers/tty/serial/bfin_sport_uart.c
-index 7fbc3a0..b4a18c7 100644
---- a/drivers/tty/serial/bfin_sport_uart.c
-+++ b/drivers/tty/serial/bfin_sport_uart.c
-@@ -871,7 +871,7 @@ static int __devexit sport_uart_remove(struct platform_device *pdev)
+-static int __devexit iic_remove(struct platform_device *ofdev)
++static int iic_remove(struct platform_device *ofdev)
+ {
+ 	struct ibm_iic_private *dev = dev_get_drvdata(&ofdev->dev);
  
- static struct platform_driver sport_uart_driver = {
- 	.probe		= sport_uart_probe,
--	.remove		= __devexit_p(sport_uart_remove),
-+	.remove		= sport_uart_remove,
- 	.driver		= {
- 		.name	= DRV_NAME,
- #ifdef CONFIG_PM
-diff --git a/drivers/tty/serial/bfin_uart.c b/drivers/tty/serial/bfin_uart.c
-index 9b11c3f..aa1f2f0f 100644
---- a/drivers/tty/serial/bfin_uart.c
-+++ b/drivers/tty/serial/bfin_uart.c
-@@ -1410,7 +1410,7 @@ static int __devexit bfin_serial_remove(struct platform_device *pdev)
+diff --git a/drivers/i2c/busses/i2c-intel-mid.c b/drivers/i2c/busses/i2c-intel-mid.c
+index e10e1e9..de3736b 100644
+--- a/drivers/i2c/busses/i2c-intel-mid.c
++++ b/drivers/i2c/busses/i2c-intel-mid.c
+@@ -1079,7 +1079,7 @@ exit:
+ 	return err;
+ }
  
- static struct platform_driver bfin_serial_driver = {
- 	.probe		= bfin_serial_probe,
--	.remove		= __devexit_p(bfin_serial_remove),
-+	.remove		= bfin_serial_remove,
- 	.suspend	= bfin_serial_suspend,
- 	.resume		= bfin_serial_resume,
- 	.driver		= {
-diff --git a/drivers/tty/serial/clps711x.c b/drivers/tty/serial/clps711x.c
-index a0a6db5..d631ef5 100644
---- a/drivers/tty/serial/clps711x.c
-+++ b/drivers/tty/serial/clps711x.c
-@@ -512,7 +512,7 @@ static struct platform_driver clps711x_uart_driver = {
- 		.owner	= THIS_MODULE,
- 	},
- 	.probe	= uart_clps711x_probe,
--	.remove	= __devexit_p(uart_clps711x_remove),
-+	.remove	= uart_clps711x_remove,
- };
- module_platform_driver(clps711x_uart_driver);
+-static void __devexit intel_mid_i2c_remove(struct pci_dev *dev)
++static void intel_mid_i2c_remove(struct pci_dev *dev)
+ {
+ 	struct intel_mid_i2c_private *mrst = pci_get_drvdata(dev);
+ 	intel_mid_i2c_disable(&mrst->adap);
+diff --git a/drivers/i2c/busses/i2c-isch.c b/drivers/i2c/busses/i2c-isch.c
+index 2b5b70e..4099f79 100644
+--- a/drivers/i2c/busses/i2c-isch.c
++++ b/drivers/i2c/busses/i2c-isch.c
+@@ -284,7 +284,7 @@ static int smbus_sch_probe(struct platform_device *dev)
+ 	return retval;
+ }
  
-diff --git a/drivers/tty/serial/efm32-uart.c b/drivers/tty/serial/efm32-uart.c
-index 615e464..1e8bacf 100644
---- a/drivers/tty/serial/efm32-uart.c
-+++ b/drivers/tty/serial/efm32-uart.c
-@@ -791,7 +791,7 @@ MODULE_DEVICE_TABLE(of, efm32_uart_dt_ids);
- 
- static struct platform_driver efm32_uart_driver = {
- 	.probe = efm32_uart_probe,
--	.remove = __devexit_p(efm32_uart_remove),
-+	.remove = efm32_uart_remove,
- 
- 	.driver = {
- 		.name = DRIVER_NAME,
-diff --git a/drivers/tty/serial/icom.c b/drivers/tty/serial/icom.c
-index 6131516..82671b5 100644
---- a/drivers/tty/serial/icom.c
-+++ b/drivers/tty/serial/icom.c
-@@ -1617,7 +1617,7 @@ static struct pci_driver icom_pci_driver = {
- 	.name = ICOM_DRIVER_NAME,
- 	.id_table = icom_pci_table,
- 	.probe = icom_probe,
--	.remove = __devexit_p(icom_remove),
-+	.remove = icom_remove,
+-static int __devexit smbus_sch_remove(struct platform_device *pdev)
++static int smbus_sch_remove(struct platform_device *pdev)
+ {
+ 	struct resource *res;
+ 	if (sch_smba) {
+diff --git a/drivers/i2c/busses/i2c-mpc.c b/drivers/i2c/busses/i2c-mpc.c
+index 4327dba..a69459e 100644
+--- a/drivers/i2c/busses/i2c-mpc.c
++++ b/drivers/i2c/busses/i2c-mpc.c
+@@ -706,7 +706,7 @@ static int fsl_i2c_probe(struct platform_device *op)
+ 	return result;
  };
  
- static int __init icom_init(void)
-diff --git a/drivers/tty/serial/ifx6x60.c b/drivers/tty/serial/ifx6x60.c
-index fbda374..658a263 100644
---- a/drivers/tty/serial/ifx6x60.c
-+++ b/drivers/tty/serial/ifx6x60.c
-@@ -1395,7 +1395,7 @@ static struct spi_driver ifx_spi_driver = {
- 		.owner = THIS_MODULE},
- 	.probe = ifx_spi_spi_probe,
- 	.shutdown = ifx_spi_spi_shutdown,
--	.remove = __devexit_p(ifx_spi_spi_remove),
-+	.remove = ifx_spi_spi_remove,
- 	.suspend = ifx_spi_spi_suspend,
- 	.resume = ifx_spi_spi_resume,
- 	.id_table = ifx_id_table
-diff --git a/drivers/tty/serial/jsm/jsm_driver.c b/drivers/tty/serial/jsm/jsm_driver.c
-index 8e05ce9..bbd4592 100644
---- a/drivers/tty/serial/jsm/jsm_driver.c
-+++ b/drivers/tty/serial/jsm/jsm_driver.c
-@@ -217,7 +217,7 @@ static struct pci_driver jsm_driver = {
- 	.name		= "jsm",
- 	.id_table	= jsm_pci_tbl,
- 	.probe		= jsm_probe_one,
--	.remove		= __devexit_p(jsm_remove_one),
-+	.remove		= jsm_remove_one,
- 	.err_handler    = &jsm_err_handler,
+-static int __devexit fsl_i2c_remove(struct platform_device *op)
++static int fsl_i2c_remove(struct platform_device *op)
+ {
+ 	struct mpc_i2c *i2c = dev_get_drvdata(&op->dev);
+ 
+diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+index 39a0a78..8b20ef8 100644
+--- a/drivers/i2c/busses/i2c-mv64xxx.c
++++ b/drivers/i2c/busses/i2c-mv64xxx.c
+@@ -697,7 +697,7 @@ mv64xxx_i2c_probe(struct platform_device *pd)
+ 	return rc;
+ }
+ 
+-static int __devexit
++static int
+ mv64xxx_i2c_remove(struct platform_device *dev)
+ {
+ 	struct mv64xxx_i2c_data		*drv_data = platform_get_drvdata(dev);
+diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
+index 3a83303..f113e68 100644
+--- a/drivers/i2c/busses/i2c-mxs.c
++++ b/drivers/i2c/busses/i2c-mxs.c
+@@ -513,7 +513,7 @@ static int mxs_i2c_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __devexit mxs_i2c_remove(struct platform_device *pdev)
++static int mxs_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct mxs_i2c_dev *i2c = platform_get_drvdata(pdev);
+ 	int ret;
+diff --git a/drivers/i2c/busses/i2c-nforce2.c b/drivers/i2c/busses/i2c-nforce2.c
+index 1012183..fbea3cf 100644
+--- a/drivers/i2c/busses/i2c-nforce2.c
++++ b/drivers/i2c/busses/i2c-nforce2.c
+@@ -430,7 +430,7 @@ static int nforce2_probe(struct pci_dev *dev, const struct pci_device_id *id)
+ }
+ 
+ 
+-static void __devexit nforce2_remove(struct pci_dev *dev)
++static void nforce2_remove(struct pci_dev *dev)
+ {
+ 	struct nforce2_smbus *smbuses = pci_get_drvdata(dev);
+ 
+diff --git a/drivers/i2c/busses/i2c-nuc900.c b/drivers/i2c/busses/i2c-nuc900.c
+index aae1605..b1206dc 100644
+--- a/drivers/i2c/busses/i2c-nuc900.c
++++ b/drivers/i2c/busses/i2c-nuc900.c
+@@ -663,7 +663,7 @@ static int nuc900_i2c_probe(struct platform_device *pdev)
+  * called when device is removed from the bus
+ */
+ 
+-static int __devexit nuc900_i2c_remove(struct platform_device *pdev)
++static int nuc900_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct nuc900_i2c *i2c = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/i2c/busses/i2c-ocores.c b/drivers/i2c/busses/i2c-ocores.c
+index 0ee58f2..7892257 100644
+--- a/drivers/i2c/busses/i2c-ocores.c
++++ b/drivers/i2c/busses/i2c-ocores.c
+@@ -336,7 +336,7 @@ static int ocores_i2c_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __devexit ocores_i2c_remove(struct platform_device *pdev)
++static int ocores_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct ocores_i2c *i2c = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/i2c/busses/i2c-octeon.c b/drivers/i2c/busses/i2c-octeon.c
+index 6986d66..484ca77 100644
+--- a/drivers/i2c/busses/i2c-octeon.c
++++ b/drivers/i2c/busses/i2c-octeon.c
+@@ -609,7 +609,7 @@ out:
+ 	return result;
  };
  
-diff --git a/drivers/tty/serial/lpc32xx_hs.c b/drivers/tty/serial/lpc32xx_hs.c
-index ba3af3b..7b0f5b4 100644
---- a/drivers/tty/serial/lpc32xx_hs.c
-+++ b/drivers/tty/serial/lpc32xx_hs.c
-@@ -783,7 +783,7 @@ MODULE_DEVICE_TABLE(of, serial_hs_lpc32xx_dt_ids);
+-static int __devexit octeon_i2c_remove(struct platform_device *pdev)
++static int octeon_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct octeon_i2c *i2c = platform_get_drvdata(pdev);
  
- static struct platform_driver serial_hs_lpc32xx_driver = {
- 	.probe		= serial_hs_lpc32xx_probe,
--	.remove		= __devexit_p(serial_hs_lpc32xx_remove),
-+	.remove		= serial_hs_lpc32xx_remove,
- 	.suspend	= serial_hs_lpc32xx_suspend,
- 	.resume		= serial_hs_lpc32xx_resume,
- 	.driver		= {
-diff --git a/drivers/tty/serial/max3100.c b/drivers/tty/serial/max3100.c
-index 0f24486..2ffd7f0 100644
---- a/drivers/tty/serial/max3100.c
-+++ b/drivers/tty/serial/max3100.c
-@@ -907,7 +907,7 @@ static struct spi_driver max3100_driver = {
- 	},
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index a872a35..9764ec0 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1267,7 +1267,7 @@ err_free_mem:
+ 	return r;
+ }
  
- 	.probe		= max3100_probe,
--	.remove		= __devexit_p(max3100_remove),
-+	.remove		= max3100_remove,
- 	.suspend	= max3100_suspend,
- 	.resume		= max3100_resume,
- };
-diff --git a/drivers/tty/serial/max310x.c b/drivers/tty/serial/max310x.c
-index 1ab1d2c..a332327 100644
---- a/drivers/tty/serial/max310x.c
-+++ b/drivers/tty/serial/max310x.c
-@@ -1249,7 +1249,7 @@ static struct spi_driver max310x_driver = {
- 		.owner	= THIS_MODULE,
- 	},
- 	.probe		= max310x_probe,
--	.remove		= __devexit_p(max310x_remove),
-+	.remove		= max310x_remove,
- 	.suspend	= max310x_suspend,
- 	.resume		= max310x_resume,
- 	.id_table	= max310x_id_table,
-diff --git a/drivers/tty/serial/mcf.c b/drivers/tty/serial/mcf.c
-index 9afca09..e3de785 100644
---- a/drivers/tty/serial/mcf.c
-+++ b/drivers/tty/serial/mcf.c
-@@ -617,7 +617,7 @@ static int __devexit mcf_remove(struct platform_device *pdev)
+-static int __devexit omap_i2c_remove(struct platform_device *pdev)
++static int omap_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
+ 	int ret;
+diff --git a/drivers/i2c/busses/i2c-parport-light.c b/drivers/i2c/busses/i2c-parport-light.c
+index b950d43..aa95778 100644
+--- a/drivers/i2c/busses/i2c-parport-light.c
++++ b/drivers/i2c/busses/i2c-parport-light.c
+@@ -169,7 +169,7 @@ static int i2c_parport_probe(struct platform_device *pdev)
+ 	return 0;
+ }
  
- static struct platform_driver mcf_platform_driver = {
- 	.probe		= mcf_probe,
--	.remove		= __devexit_p(mcf_remove),
-+	.remove		= mcf_remove,
- 	.driver		= {
- 		.name	= "mcfuart",
- 		.owner	= THIS_MODULE,
-diff --git a/drivers/tty/serial/mfd.c b/drivers/tty/serial/mfd.c
-index c4b50af..71c4c8e 100644
---- a/drivers/tty/serial/mfd.c
-+++ b/drivers/tty/serial/mfd.c
-@@ -1468,7 +1468,7 @@ static struct pci_driver hsu_pci_driver = {
- 	.name =		"HSU serial",
- 	.id_table =	pci_ids,
- 	.probe =	serial_hsu_probe,
--	.remove =	__devexit_p(serial_hsu_remove),
-+	.remove =	serial_hsu_remove,
- 	.suspend =	serial_hsu_suspend,
- 	.resume	=	serial_hsu_resume,
- 	.driver = {
-diff --git a/drivers/tty/serial/mrst_max3110.c b/drivers/tty/serial/mrst_max3110.c
-index df2a224..649ce12 100644
---- a/drivers/tty/serial/mrst_max3110.c
-+++ b/drivers/tty/serial/mrst_max3110.c
-@@ -879,7 +879,7 @@ static struct spi_driver uart_max3110_driver = {
- 			.owner	= THIS_MODULE,
- 	},
- 	.probe		= serial_m3110_probe,
--	.remove		= __devexit_p(serial_m3110_remove),
-+	.remove		= serial_m3110_remove,
- 	.suspend	= serial_m3110_suspend,
- 	.resume		= serial_m3110_resume,
- };
-diff --git a/drivers/tty/serial/msm_serial_hs.c b/drivers/tty/serial/msm_serial_hs.c
-index fca13dc..1361ad5 100644
---- a/drivers/tty/serial/msm_serial_hs.c
-+++ b/drivers/tty/serial/msm_serial_hs.c
-@@ -1838,7 +1838,7 @@ static const struct dev_pm_ops msm_hs_dev_pm_ops = {
+-static int __devexit i2c_parport_remove(struct platform_device *pdev)
++static int i2c_parport_remove(struct platform_device *pdev)
+ {
+ 	if (ara) {
+ 		line_set(0, &parport_ctrl_irq);
+diff --git a/drivers/i2c/busses/i2c-pasemi.c b/drivers/i2c/busses/i2c-pasemi.c
+index 1860252..615f632 100644
+--- a/drivers/i2c/busses/i2c-pasemi.c
++++ b/drivers/i2c/busses/i2c-pasemi.c
+@@ -392,7 +392,7 @@ static int pasemi_smb_probe(struct pci_dev *dev,
+ 	return error;
+ }
  
- static struct platform_driver msm_serial_hs_platform_driver = {
- 	.probe = msm_hs_probe,
--	.remove = __devexit_p(msm_hs_remove),
-+	.remove = msm_hs_remove,
- 	.driver = {
- 		.name = "msm_serial_hs",
- 		.owner = THIS_MODULE,
-diff --git a/drivers/tty/serial/mux.c b/drivers/tty/serial/mux.c
-index 7ea8a26..2783464 100644
---- a/drivers/tty/serial/mux.c
-+++ b/drivers/tty/serial/mux.c
-@@ -571,14 +571,14 @@ static struct parisc_driver builtin_serial_mux_driver = {
- 	.name =		"builtin_serial_mux",
- 	.id_table =	builtin_mux_tbl,
- 	.probe =	mux_probe,
--	.remove =       __devexit_p(mux_remove),
-+	.remove =       mux_remove,
- };
+-static void __devexit pasemi_smb_remove(struct pci_dev *dev)
++static void pasemi_smb_remove(struct pci_dev *dev)
+ {
+ 	struct pasemi_smbus *smbus = pci_get_drvdata(dev);
  
- static struct parisc_driver serial_mux_driver = {
- 	.name =		"serial_mux",
- 	.id_table =	mux_tbl,
- 	.probe =	mux_probe,
--	.remove =       __devexit_p(mux_remove),
-+	.remove =       mux_remove,
- };
+diff --git a/drivers/i2c/busses/i2c-pca-isa.c b/drivers/i2c/busses/i2c-pca-isa.c
+index 923f6e1..323f061 100644
+--- a/drivers/i2c/busses/i2c-pca-isa.c
++++ b/drivers/i2c/busses/i2c-pca-isa.c
+@@ -174,7 +174,7 @@ static int pca_isa_probe(struct device *dev, unsigned int id)
+ 	return -ENODEV;
+ }
  
- /**
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 6db3baa..7554045 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -813,7 +813,7 @@ MODULE_DEVICE_TABLE(of, mxs_auart_dt_ids);
+-static int __devexit pca_isa_remove(struct device *dev, unsigned int id)
++static int pca_isa_remove(struct device *dev, unsigned int id)
+ {
+ 	i2c_del_adapter(&pca_isa_ops);
  
- static struct platform_driver mxs_auart_driver = {
- 	.probe = mxs_auart_probe,
--	.remove = __devexit_p(mxs_auart_remove),
-+	.remove = mxs_auart_remove,
- 	.driver = {
- 		.name = "mxs-auart",
- 		.owner = THIS_MODULE,
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index d456321..624e6b5 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -1655,7 +1655,7 @@ MODULE_DEVICE_TABLE(of, omap_serial_of_match);
+diff --git a/drivers/i2c/busses/i2c-pca-platform.c b/drivers/i2c/busses/i2c-pca-platform.c
+index 6e1c71f..a30d2f6 100644
+--- a/drivers/i2c/busses/i2c-pca-platform.c
++++ b/drivers/i2c/busses/i2c-pca-platform.c
+@@ -257,7 +257,7 @@ e_print:
+ 	return ret;
+ }
  
- static struct platform_driver serial_omap_driver = {
- 	.probe          = serial_omap_probe,
--	.remove         = __devexit_p(serial_omap_remove),
-+	.remove         = serial_omap_remove,
- 	.driver		= {
- 		.name	= DRIVER_NAME,
- 		.pm	= &serial_omap_dev_pm_ops,
-diff --git a/drivers/tty/serial/pch_uart.c b/drivers/tty/serial/pch_uart.c
-index 4cd6c23..f5fb9bd 100644
---- a/drivers/tty/serial/pch_uart.c
-+++ b/drivers/tty/serial/pch_uart.c
-@@ -1869,7 +1869,7 @@ static struct pci_driver pch_uart_pci_driver = {
- 	.name = "pch_uart",
- 	.id_table = pch_uart_pci_id,
- 	.probe = pch_uart_pci_probe,
--	.remove = __devexit_p(pch_uart_pci_remove),
-+	.remove = pch_uart_pci_remove,
- 	.suspend = pch_uart_pci_suspend,
- 	.resume = pch_uart_pci_resume,
- };
-diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-index 740458c..6568beb 100644
---- a/drivers/tty/serial/samsung.c
-+++ b/drivers/tty/serial/samsung.c
-@@ -1712,7 +1712,7 @@ MODULE_DEVICE_TABLE(of, s3c24xx_uart_dt_match);
+-static int __devexit i2c_pca_pf_remove(struct platform_device *pdev)
++static int i2c_pca_pf_remove(struct platform_device *pdev)
+ {
+ 	struct i2c_pca_pf_data *i2c = platform_get_drvdata(pdev);
+ 	platform_set_drvdata(pdev, NULL);
+diff --git a/drivers/i2c/busses/i2c-piix4.c b/drivers/i2c/busses/i2c-piix4.c
+index 1cce916..80c5d9e 100644
+--- a/drivers/i2c/busses/i2c-piix4.c
++++ b/drivers/i2c/busses/i2c-piix4.c
+@@ -626,7 +626,7 @@ static int piix4_probe(struct pci_dev *dev,
+ 	return 0;
+ }
  
- static struct platform_driver samsung_serial_driver = {
- 	.probe		= s3c24xx_serial_probe,
--	.remove		= __devexit_p(s3c24xx_serial_remove),
-+	.remove		= s3c24xx_serial_remove,
- 	.id_table	= s3c24xx_serial_driver_ids,
- 	.driver		= {
- 		.name	= "samsung-uart",
-diff --git a/drivers/tty/serial/sc26xx.c b/drivers/tty/serial/sc26xx.c
-index 9d66424..9a40659 100644
---- a/drivers/tty/serial/sc26xx.c
-+++ b/drivers/tty/serial/sc26xx.c
-@@ -733,7 +733,7 @@ static int __exit sc26xx_driver_remove(struct platform_device *dev)
+-static void __devexit piix4_adap_remove(struct i2c_adapter *adap)
++static void piix4_adap_remove(struct i2c_adapter *adap)
+ {
+ 	struct i2c_piix4_adapdata *adapdata = i2c_get_adapdata(adap);
  
- static struct platform_driver sc26xx_driver = {
- 	.probe	= sc26xx_probe,
--	.remove	= __devexit_p(sc26xx_driver_remove),
-+	.remove	= sc26xx_driver_remove,
- 	.driver	= {
- 		.name	= "SC26xx",
- 		.owner	= THIS_MODULE,
-diff --git a/drivers/tty/serial/sccnxp.c b/drivers/tty/serial/sccnxp.c
-index e821068..810853f 100644
---- a/drivers/tty/serial/sccnxp.c
-+++ b/drivers/tty/serial/sccnxp.c
-@@ -981,7 +981,7 @@ static struct platform_driver sccnxp_uart_driver = {
- 		.owner	= THIS_MODULE,
- 	},
- 	.probe		= sccnxp_probe,
--	.remove		= __devexit_p(sccnxp_remove),
-+	.remove		= sccnxp_remove,
- 	.id_table	= sccnxp_id_table,
- };
- module_platform_driver(sccnxp_uart_driver);
-diff --git a/drivers/tty/serial/serial_txx9.c b/drivers/tty/serial/serial_txx9.c
-index 6ae2a58..9d979a9 100644
---- a/drivers/tty/serial/serial_txx9.c
-+++ b/drivers/tty/serial/serial_txx9.c
-@@ -1171,7 +1171,7 @@ static int serial_txx9_resume(struct platform_device *dev)
+@@ -638,7 +638,7 @@ static void __devexit piix4_adap_remove(struct i2c_adapter *adap)
+ 	}
+ }
  
- static struct platform_driver serial_txx9_plat_driver = {
- 	.probe		= serial_txx9_probe,
--	.remove		= __devexit_p(serial_txx9_remove),
-+	.remove		= serial_txx9_remove,
- #ifdef CONFIG_PM
- 	.suspend	= serial_txx9_suspend,
- 	.resume		= serial_txx9_resume,
-@@ -1261,7 +1261,7 @@ static const struct pci_device_id serial_txx9_pci_tbl[] = {
- static struct pci_driver serial_txx9_pci_driver = {
- 	.name		= "serial_txx9",
- 	.probe		= pciserial_txx9_init_one,
--	.remove		= __devexit_p(pciserial_txx9_remove_one),
-+	.remove		= pciserial_txx9_remove_one,
- #ifdef CONFIG_PM
- 	.suspend	= pciserial_txx9_suspend_one,
- 	.resume		= pciserial_txx9_resume_one,
-diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
-index a9e2bd1..4984984 100644
---- a/drivers/tty/serial/sirfsoc_uart.c
-+++ b/drivers/tty/serial/sirfsoc_uart.c
-@@ -735,7 +735,7 @@ MODULE_DEVICE_TABLE(of, sirfsoc_serial_of_match);
+-static void __devexit piix4_remove(struct pci_dev *dev)
++static void piix4_remove(struct pci_dev *dev)
+ {
+ 	if (piix4_main_adapter) {
+ 		piix4_adap_remove(piix4_main_adapter);
+diff --git a/drivers/i2c/busses/i2c-pmcmsp.c b/drivers/i2c/busses/i2c-pmcmsp.c
+index dce9667..083d68c 100644
+--- a/drivers/i2c/busses/i2c-pmcmsp.c
++++ b/drivers/i2c/busses/i2c-pmcmsp.c
+@@ -368,7 +368,7 @@ ret_err:
+ /*
+  * Release the device and return 0 if there is one.
+  */
+-static int __devexit pmcmsptwi_remove(struct platform_device *pldev)
++static int pmcmsptwi_remove(struct platform_device *pldev)
+ {
+ 	struct resource *res;
  
- static struct platform_driver sirfsoc_uart_driver = {
- 	.probe		= sirfsoc_uart_probe,
--	.remove		= __devexit_p(sirfsoc_uart_remove),
-+	.remove		= sirfsoc_uart_remove,
- 	.suspend	= sirfsoc_uart_suspend,
- 	.resume		= sirfsoc_uart_resume,
- 	.driver		= {
-diff --git a/drivers/tty/serial/sunhv.c b/drivers/tty/serial/sunhv.c
-index 505961c..949b2d3 100644
---- a/drivers/tty/serial/sunhv.c
-+++ b/drivers/tty/serial/sunhv.c
-@@ -636,7 +636,7 @@ static struct platform_driver hv_driver = {
- 		.of_match_table = hv_match,
- 	},
- 	.probe		= hv_probe,
--	.remove		= __devexit_p(hv_remove),
-+	.remove		= hv_remove,
+diff --git a/drivers/i2c/busses/i2c-pnx.c b/drivers/i2c/busses/i2c-pnx.c
+index 1c7844a..ce40970 100644
+--- a/drivers/i2c/busses/i2c-pnx.c
++++ b/drivers/i2c/busses/i2c-pnx.c
+@@ -765,7 +765,7 @@ err_kzalloc:
+ 	return ret;
+ }
+ 
+-static int __devexit i2c_pnx_remove(struct platform_device *pdev)
++static int i2c_pnx_remove(struct platform_device *pdev)
+ {
+ 	struct i2c_pnx_algo_data *alg_data = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/i2c/busses/i2c-powermac.c b/drivers/i2c/busses/i2c-powermac.c
+index c2538fb..0dd5b33 100644
+--- a/drivers/i2c/busses/i2c-powermac.c
++++ b/drivers/i2c/busses/i2c-powermac.c
+@@ -210,7 +210,7 @@ static const struct i2c_algorithm i2c_powermac_algorithm = {
  };
  
- static int __init sunhv_init(void)
-diff --git a/drivers/tty/serial/sunsab.c b/drivers/tty/serial/sunsab.c
-index f0d93eb..bbb07bc 100644
---- a/drivers/tty/serial/sunsab.c
-+++ b/drivers/tty/serial/sunsab.c
-@@ -1100,7 +1100,7 @@ static struct platform_driver sab_driver = {
- 		.of_match_table = sab_match,
- 	},
- 	.probe		= sab_probe,
--	.remove		= __devexit_p(sab_remove),
-+	.remove		= sab_remove,
- };
  
- static int __init sunsab_init(void)
-diff --git a/drivers/tty/serial/sunsu.c b/drivers/tty/serial/sunsu.c
-index b97913d..c0658f0 100644
---- a/drivers/tty/serial/sunsu.c
-+++ b/drivers/tty/serial/sunsu.c
-@@ -1556,7 +1556,7 @@ static struct platform_driver su_driver = {
- 		.of_match_table = su_match,
- 	},
- 	.probe		= su_probe,
--	.remove		= __devexit_p(su_remove),
-+	.remove		= su_remove,
- };
+-static int __devexit i2c_powermac_remove(struct platform_device *dev)
++static int i2c_powermac_remove(struct platform_device *dev)
+ {
+ 	struct i2c_adapter	*adapter = platform_get_drvdata(dev);
+ 	int			rc;
+diff --git a/drivers/i2c/busses/i2c-puv3.c b/drivers/i2c/busses/i2c-puv3.c
+index ec15a60..d7c512d 100644
+--- a/drivers/i2c/busses/i2c-puv3.c
++++ b/drivers/i2c/busses/i2c-puv3.c
+@@ -231,7 +231,7 @@ fail_nomem:
+ 	return rc;
+ }
  
- static int __init sunsu_init(void)
-diff --git a/drivers/tty/serial/sunzilog.c b/drivers/tty/serial/sunzilog.c
-index babd947..c2ef475 100644
---- a/drivers/tty/serial/sunzilog.c
-+++ b/drivers/tty/serial/sunzilog.c
-@@ -1548,7 +1548,7 @@ static struct platform_driver zs_driver = {
- 		.of_match_table = zs_match,
- 	},
- 	.probe		= zs_probe,
--	.remove		= __devexit_p(zs_remove),
-+	.remove		= zs_remove,
- };
+-static int __devexit puv3_i2c_remove(struct platform_device *pdev)
++static int puv3_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct i2c_adapter *adapter = platform_get_drvdata(pdev);
+ 	struct resource *mem;
+diff --git a/drivers/i2c/busses/i2c-pxa-pci.c b/drivers/i2c/busses/i2c-pxa-pci.c
+index 0a534c3..3d49856 100644
+--- a/drivers/i2c/busses/i2c-pxa-pci.c
++++ b/drivers/i2c/busses/i2c-pxa-pci.c
+@@ -135,7 +135,7 @@ err_mem:
+ 	return ret;
+ }
  
- static int __init sunzilog_init(void)
-diff --git a/drivers/tty/serial/timbuart.c b/drivers/tty/serial/timbuart.c
-index 70f9749..5fc11f2 100644
---- a/drivers/tty/serial/timbuart.c
-+++ b/drivers/tty/serial/timbuart.c
-@@ -510,7 +510,7 @@ static struct platform_driver timbuart_platform_driver = {
- 		.owner	= THIS_MODULE,
- 	},
- 	.probe		= timbuart_probe,
--	.remove		= __devexit_p(timbuart_remove),
-+	.remove		= timbuart_remove,
- };
+-static void __devexit ce4100_i2c_remove(struct pci_dev *dev)
++static void ce4100_i2c_remove(struct pci_dev *dev)
+ {
+ 	struct ce4100_devices *sds;
+ 	unsigned int i;
+diff --git a/drivers/i2c/busses/i2c-rcar.c b/drivers/i2c/busses/i2c-rcar.c
+index 77322b6..9bd4d73 100644
+--- a/drivers/i2c/busses/i2c-rcar.c
++++ b/drivers/i2c/busses/i2c-rcar.c
+@@ -682,7 +682,7 @@ static int rcar_i2c_probe(struct platform_device *pdev)
+ 	return 0;
+ }
  
- module_platform_driver(timbuart_platform_driver);
-diff --git a/drivers/tty/serial/uartlite.c b/drivers/tty/serial/uartlite.c
-index 6579ffd..1d44383 100644
---- a/drivers/tty/serial/uartlite.c
-+++ b/drivers/tty/serial/uartlite.c
-@@ -603,7 +603,7 @@ MODULE_ALIAS("platform:uartlite");
+-static int __devexit rcar_i2c_remove(struct platform_device *pdev)
++static int rcar_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct rcar_i2c_priv *priv = platform_get_drvdata(pdev);
+ 	struct device *dev = &pdev->dev;
+diff --git a/drivers/i2c/busses/i2c-s6000.c b/drivers/i2c/busses/i2c-s6000.c
+index 11332bb..0088364 100644
+--- a/drivers/i2c/busses/i2c-s6000.c
++++ b/drivers/i2c/busses/i2c-s6000.c
+@@ -361,7 +361,7 @@ err_out:
+ 	return rc;
+ }
  
- static struct platform_driver ulite_platform_driver = {
- 	.probe = ulite_probe,
--	.remove = __devexit_p(ulite_remove),
-+	.remove = ulite_remove,
- 	.driver = {
- 		.owner = THIS_MODULE,
- 		.name  = "uartlite",
-diff --git a/drivers/tty/serial/vr41xx_siu.c b/drivers/tty/serial/vr41xx_siu.c
-index cf0d948..9d3bf75 100644
---- a/drivers/tty/serial/vr41xx_siu.c
-+++ b/drivers/tty/serial/vr41xx_siu.c
-@@ -952,7 +952,7 @@ static int siu_resume(struct platform_device *dev)
+-static int __devexit s6i2c_remove(struct platform_device *pdev)
++static int s6i2c_remove(struct platform_device *pdev)
+ {
+ 	struct s6i2c_if *iface = platform_get_drvdata(pdev);
+ 	i2c_wr16(iface, S6_I2C_ENABLE, 0);
+diff --git a/drivers/i2c/busses/i2c-sh7760.c b/drivers/i2c/busses/i2c-sh7760.c
+index 75127148..3a2253e 100644
+--- a/drivers/i2c/busses/i2c-sh7760.c
++++ b/drivers/i2c/busses/i2c-sh7760.c
+@@ -536,7 +536,7 @@ out0:
+ 	return ret;
+ }
  
- static struct platform_driver siu_device_driver = {
- 	.probe		= siu_probe,
--	.remove		= __devexit_p(siu_remove),
-+	.remove		= siu_remove,
- 	.suspend	= siu_suspend,
- 	.resume		= siu_resume,
- 	.driver		= {
-diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
-index 4354fe5..dbcc909 100644
---- a/drivers/tty/serial/vt8500_serial.c
-+++ b/drivers/tty/serial/vt8500_serial.c
-@@ -652,7 +652,7 @@ static const struct of_device_id wmt_dt_ids[] = {
+-static int __devexit sh7760_i2c_remove(struct platform_device *pdev)
++static int sh7760_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct cami2c *id = platform_get_drvdata(pdev);
  
- static struct platform_driver vt8500_platform_driver = {
- 	.probe  = vt8500_serial_probe,
--	.remove = __devexit_p(vt8500_serial_remove),
-+	.remove = vt8500_serial_remove,
- 	.driver = {
- 		.name = "vt8500_serial",
- 		.owner = THIS_MODULE,
+diff --git a/drivers/i2c/busses/i2c-sirf.c b/drivers/i2c/busses/i2c-sirf.c
+index 65de4aa..3f1818b 100644
+--- a/drivers/i2c/busses/i2c-sirf.c
++++ b/drivers/i2c/busses/i2c-sirf.c
+@@ -385,7 +385,7 @@ err_get_clk:
+ 	return err;
+ }
+ 
+-static int __devexit i2c_sirfsoc_remove(struct platform_device *pdev)
++static int i2c_sirfsoc_remove(struct platform_device *pdev)
+ {
+ 	struct i2c_adapter *adapter = platform_get_drvdata(pdev);
+ 	struct sirfsoc_i2c *siic = adapter->algo_data;
+diff --git a/drivers/i2c/busses/i2c-sis630.c b/drivers/i2c/busses/i2c-sis630.c
+index 9b79d37..de6dddb 100644
+--- a/drivers/i2c/busses/i2c-sis630.c
++++ b/drivers/i2c/busses/i2c-sis630.c
+@@ -496,7 +496,7 @@ static int sis630_probe(struct pci_dev *dev, const struct pci_device_id *id)
+ 	return i2c_add_adapter(&sis630_adapter);
+ }
+ 
+-static void __devexit sis630_remove(struct pci_dev *dev)
++static void sis630_remove(struct pci_dev *dev)
+ {
+ 	if (acpi_base) {
+ 		i2c_del_adapter(&sis630_adapter);
+diff --git a/drivers/i2c/busses/i2c-sis96x.c b/drivers/i2c/busses/i2c-sis96x.c
+index 3ca3387..b9faf9b 100644
+--- a/drivers/i2c/busses/i2c-sis96x.c
++++ b/drivers/i2c/busses/i2c-sis96x.c
+@@ -308,7 +308,7 @@ static int sis96x_probe(struct pci_dev *dev,
+ 	return retval;
+ }
+ 
+-static void __devexit sis96x_remove(struct pci_dev *dev)
++static void sis96x_remove(struct pci_dev *dev)
+ {
+ 	if (sis96x_smbus_base) {
+ 		i2c_del_adapter(&sis96x_adapter);
+diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+index c658daa..7b38877 100644
+--- a/drivers/i2c/busses/i2c-tegra.c
++++ b/drivers/i2c/busses/i2c-tegra.c
+@@ -769,7 +769,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __devexit tegra_i2c_remove(struct platform_device *pdev)
++static int tegra_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct tegra_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
+ 	i2c_del_adapter(&i2c_dev->adapter);
+diff --git a/drivers/i2c/busses/i2c-via.c b/drivers/i2c/busses/i2c-via.c
+index 188ef6e..be66251 100644
+--- a/drivers/i2c/busses/i2c-via.c
++++ b/drivers/i2c/busses/i2c-via.c
+@@ -146,7 +146,7 @@ static int vt586b_probe(struct pci_dev *dev, const struct pci_device_id *id)
+ 	return 0;
+ }
+ 
+-static void __devexit vt586b_remove(struct pci_dev *dev)
++static void vt586b_remove(struct pci_dev *dev)
+ {
+ 	i2c_del_adapter(&vt586b_adapter);
+ 	release_region(I2C_DIR, IOSPACE);
+diff --git a/drivers/i2c/busses/i2c-xiic.c b/drivers/i2c/busses/i2c-xiic.c
+index bb72d00..9aa8837 100644
+--- a/drivers/i2c/busses/i2c-xiic.c
++++ b/drivers/i2c/busses/i2c-xiic.c
+@@ -774,7 +774,7 @@ resource_missing:
+ 	return -ENOENT;
+ }
+ 
+-static int __devexit xiic_i2c_remove(struct platform_device* pdev)
++static int xiic_i2c_remove(struct platform_device* pdev)
+ {
+ 	struct xiic_i2c *i2c = platform_get_drvdata(pdev);
+ 	struct resource *res;
+diff --git a/drivers/i2c/busses/i2c-xlr.c b/drivers/i2c/busses/i2c-xlr.c
+index 68aa402..a005265 100644
+--- a/drivers/i2c/busses/i2c-xlr.c
++++ b/drivers/i2c/busses/i2c-xlr.c
+@@ -251,7 +251,7 @@ static int xlr_i2c_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __devexit xlr_i2c_remove(struct platform_device *pdev)
++static int xlr_i2c_remove(struct platform_device *pdev)
+ {
+ 	struct xlr_i2c_private *priv;
+ 
+diff --git a/drivers/i2c/busses/scx200_acb.c b/drivers/i2c/busses/scx200_acb.c
+index 812a4c1..3862a95 100644
+--- a/drivers/i2c/busses/scx200_acb.c
++++ b/drivers/i2c/busses/scx200_acb.c
+@@ -530,14 +530,14 @@ static int scx200_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static void __devexit scx200_cleanup_iface(struct scx200_acb_iface *iface)
++static void scx200_cleanup_iface(struct scx200_acb_iface *iface)
+ {
+ 	i2c_del_adapter(&iface->adapter);
+ 	release_region(iface->base, 8);
+ 	kfree(iface);
+ }
+ 
+-static int __devexit scx200_remove(struct platform_device *pdev)
++static int scx200_remove(struct platform_device *pdev)
+ {
+ 	struct scx200_acb_iface *iface;
+ 
+diff --git a/drivers/i2c/muxes/i2c-mux-gpio.c b/drivers/i2c/muxes/i2c-mux-gpio.c
+index 4511c54..0f68f1f 100644
+--- a/drivers/i2c/muxes/i2c-mux-gpio.c
++++ b/drivers/i2c/muxes/i2c-mux-gpio.c
+@@ -163,7 +163,7 @@ alloc_failed:
+ 	return ret;
+ }
+ 
+-static int __devexit i2c_mux_gpio_remove(struct platform_device *pdev)
++static int i2c_mux_gpio_remove(struct platform_device *pdev)
+ {
+ 	struct gpiomux *mux = platform_get_drvdata(pdev);
+ 	int i;
+diff --git a/drivers/i2c/muxes/i2c-mux-pinctrl.c b/drivers/i2c/muxes/i2c-mux-pinctrl.c
+index c6b70b5..1e44d04 100644
+--- a/drivers/i2c/muxes/i2c-mux-pinctrl.c
++++ b/drivers/i2c/muxes/i2c-mux-pinctrl.c
+@@ -241,7 +241,7 @@ err:
+ 	return ret;
+ }
+ 
+-static int __devexit i2c_mux_pinctrl_remove(struct platform_device *pdev)
++static int i2c_mux_pinctrl_remove(struct platform_device *pdev)
+ {
+ 	struct i2c_mux_pinctrl *mux = platform_get_drvdata(pdev);
+ 	int i;
 -- 
 1.8.0
