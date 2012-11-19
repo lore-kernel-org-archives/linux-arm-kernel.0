@@ -1,49 +1,77 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 19 Nov 2012 10:04:11 +0100
-Subject: [PATCH 0/1 V2] ARM: kirkwood: Add support for the MPL CEC4
-In-Reply-To: <cover.1353238973.git.s.peter@mpl.ch>
-References: <cover.1353238973.git.s.peter@mpl.ch>
-Message-ID: <20121119090411.GC10259@lunn.ch>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 19 Nov 2012 10:09:52 +0100
+Subject: [PATCH 1/1] atmel: move ATMEL_MAX_UART to platform_data/atmel.h
+In-Reply-To: <1353189906-1767-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20121107111235.GH20063@game.jcrosoft.org>
+ <1353189906-1767-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <50A9F760.4050207@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 18, 2012 at 04:46:15PM +0100, Stefan Peter wrote:
-> The MPL CEC4 is a compact industrial computer for harsh environments. You
-> can find out more about it at http://www.mpl.ch/t2640.html
+On 11/17/2012 11:05 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> use 7 for it as the sam9260 or the sam9g25 have 7 of them DBGU included
 > 
-> This patch adds basic board support using the device tree where possible.
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  arch/arm/mach-at91/include/mach/hardware.h  |    3 ---
+>  arch/avr32/mach-at32ap/include/mach/board.h |    1 -
+>  include/linux/platform_data/atmel.h         |    6 ++++++
+>  3 files changed, 6 insertions(+), 4 deletions(-)
 > 
-> Changes since V1
-> * Replaced the 'compatible' entry "mpl,mplcec4", with "mpl,cec4-10", 
->   "mpl,cec4" in kirkwood-mplcec4.dts
-> * Removed unneeded clk headers in board-mplcec4.c
-> * Fixed sorting order of the kirkwood-mplcec4.dts entry in
->   arm/boot/dts/Makefile
+> diff --git a/arch/arm/mach-at91/include/mach/hardware.h b/arch/arm/mach-at91/include/mach/hardware.h
+> index 711a789..a832e07 100644
+> --- a/arch/arm/mach-at91/include/mach/hardware.h
+> +++ b/arch/arm/mach-at91/include/mach/hardware.h
+> @@ -90,9 +90,6 @@
+>  #define AT91_SRAM_MAX		SZ_1M
+>  #define AT91_VIRT_BASE		(AT91_IO_VIRT_BASE - AT91_SRAM_MAX)
+>  
+> -/* Serial ports */
+> -#define ATMEL_MAX_UART		7		/* 6 USART3's and one DBGU port (SAM9260) */
+> -
+>  /* External Memory Map */
+>  #define AT91_CHIPSELECT_0	0x10000000
+>  #define AT91_CHIPSELECT_1	0x20000000
+> diff --git a/arch/avr32/mach-at32ap/include/mach/board.h b/arch/avr32/mach-at32ap/include/mach/board.h
+> index dca9345..d485b03 100644
+> --- a/arch/avr32/mach-at32ap/include/mach/board.h
+> +++ b/arch/avr32/mach-at32ap/include/mach/board.h
+> @@ -26,7 +26,6 @@ static inline void __deprecated at32_add_system_devices(void)
+>  
+>  }
+>  
+> -#define ATMEL_MAX_UART	4
+>  extern struct platform_device *atmel_default_console_device;
+>  
+>  /* Flags for selecting USART extra pins */
+> diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
+> index dbd6d53..59fffa4 100644
+> --- a/include/linux/platform_data/atmel.h
+> +++ b/include/linux/platform_data/atmel.h
+> @@ -19,6 +19,12 @@
+>  #include <linux/serial.h>
+>  #include <linux/platform_data/macb.h>
+>  
+> +/*
+> + * at91: 6 USART3's and one DBGU port (SAM9260)
 
-Hi Stefan
+Why the "3"?
 
-Looks good. Thanks for making the changes.
+> + * avr32: 4
+> + */
+> +#define ATMEL_MAX_UART	7
+> +
+>   /* USB Device */
+>  struct at91_udc_data {
+>  	int	vbus_pin;		/* high == host powering us */
+> 
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Ok otherwise. Do not bother, I may change the typo while including it in
+at91-fixes pull request...
 
-Andrew
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-> 
-> Stefan Peter (1):
->   Add support for the MPL CEC4
-> 
->  arch/arm/boot/dts/Makefile             |    1 +
->  arch/arm/boot/dts/kirkwood-mplcec4.dts |  119 ++++++++++++++++++++++++++++++++
->  arch/arm/configs/kirkwood_defconfig    |    1 +
->  arch/arm/mach-kirkwood/Kconfig         |    7 ++
->  arch/arm/mach-kirkwood/Makefile        |    1 +
->  arch/arm/mach-kirkwood/board-dt.c      |    4 ++
->  arch/arm/mach-kirkwood/board-mplcec4.c |   80 +++++++++++++++++++++
->  arch/arm/mach-kirkwood/common.h        |    6 ++
->  8 files changed, 219 insertions(+)
->  create mode 100644 arch/arm/boot/dts/kirkwood-mplcec4.dts
->  create mode 100644 arch/arm/mach-kirkwood/board-mplcec4.c
-> 
-> -- 
-> 1.7.9.5
-> 
+Best regards,
+-- 
+Nicolas Ferre
