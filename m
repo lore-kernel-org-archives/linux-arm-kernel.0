@@ -1,42 +1,35 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 17:43:39 +0100
-Subject: [PATCH 1/2] clk: mvebu: armada 370/XP add clock gating control
- provider for DT
-In-Reply-To: <20121119155856.GL10259@lunn.ch>
-References: <1353014906-31566-6-git-send-email-andrew@lunn.ch>
- <1353088920-17458-1-git-send-email-gregory.clement@free-electrons.com>
- <1353088920-17458-2-git-send-email-gregory.clement@free-electrons.com>
- <20121117082602.GF24569@lunn.ch>
- <50A75BB4.4070003@free-electrons.com>
- <20121117135435.GA13479@lunn.ch> <20121119164611.2e754b64@skate>
- <20121119155856.GL10259@lunn.ch>
-Message-ID: <20121119174339.0ea43e5e@skate>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 19 Nov 2012 16:44:57 +0000
+Subject: [PATCH] ARM: Kconfig: Do not select ARCH_VEXPRESS on ARCH_MULTI_V7
+In-Reply-To: <1353343080-19220-1-git-send-email-fabio.estevam@freescale.com>
+References: <1353343080-19220-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1353343497.3303.34.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
-
-On Mon, 19 Nov 2012 16:58:56 +0100, Andrew Lunn wrote:
-
-> I don't think we are taking about the same clock. I mean the gate
-> clock:
+On Mon, 2012-11-19 at 16:38 +0000, Fabio Estevam wrote:
+> Booting a kernel on a mx53qsb board (built with imx_v6_v7_defconfig) leads to:
 > 
-> 28   ddr     DDR Cntrl
-> 
-> not the core clock.
+> Unable to handle kernel NULL pointer dereference at virtual address 00000008
+> pgd = 80004000
+> [00000008] *pgd=00000000
+> Internal error: Oops: 805 [#1] SMP ARM
+> Modules linked in:
+> CPU: 0    Not tainted  (3.7.0-rc5-next-20121115+ #715)
+> PC is at vexpress_sysreg_init_leds+0x30/0xb8
+> LR is at do_one_initcall+0x3c/0x190
+> pc : [<8065e170>]    lr : [<800086a0>]    psr: 60000153
+> sp : df855ef0  ip : df855f18  fp : df855f14
+> r10: 00000000  r9 : 8067eb5c  r8 : 8065e140
+> r7 : 80711cac  r6 : 806c2cc0  r5 : 00000000  r4 : 80673850
+> r3 : 00000000  r2 : 00000000  r1 : df854000  r0 : 8065e140
+> ...
 
-Right, after discussion with Gregory, I found out my misunderstanding.
-I'm looking now as to how this clock affects the system behavior. I
-indeed see this clock ->disable() hook being called, but it doesn't
-seem to cause any sort of problem on the system. It still works nicely.
-So not sure this clock is actually doing something, or at least maybe
-not what we think it does.
+It's a bug in vexpress-sysreg driver. 3 hours ago I've posted patch
+removing this code...
 
-Best regards,
+https://patchwork.kernel.org/patch/1764801/
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Apologies about causing the issue in the first place.
+
+Pawel
