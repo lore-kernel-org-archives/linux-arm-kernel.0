@@ -1,135 +1,116 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 19 Nov 2012 13:09:42 +0200
-Subject: tfp410 and i2c_bus_num
-In-Reply-To: <20121119092744.GB4211@arwen.pp.htv.fi>
-References: <1353068553-26897-1-git-send-email-tomi.valkeinen@ti.com>
- <20121116135155.GE18527@arwen.pp.htv.fi> <50A64D35.9050109@ti.com>
- <20121116151959.GA19411@arwen.pp.htv.fi> <50A65E40.9040208@ti.com>
- <20121116182146.GC20496@arwen.pp.htv.fi> <50A72390.3050509@ti.com>
- <20121118113437.GB30462@arwen.pp.htv.fi> <50A9D3DD.6040807@ti.com>
- <20121119092744.GB4211@arwen.pp.htv.fi>
-Message-ID: <50AA1376.6060801@ti.com>
+From: sr@denx.de (Stefan Roese)
+Date: Mon, 19 Nov 2012 12:09:42 +0100
+Subject: [PATCH 3/4] ARM: sunxi: Add sun4i and cubieboard support
+In-Reply-To: <1353323383-11827-1-git-send-email-sr@denx.de>
+References: <1353323383-11827-1-git-send-email-sr@denx.de>
+Message-ID: <1353323383-11827-3-git-send-email-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-19 11:27, Felipe Balbi wrote:
+This patch adds support for the Cubieboard based on the Allwinner
+A10/sun4i SoC. Currently only UART is supported. Other devices
+will eventually follow.
 
->> If we had a separate, independent i2c-edid driver, we'd have to somehow
->> link the i2c-edid driver and tfp410 (or whatever driver would handle the
->> video link in that particular case) so that the i2c-edid driver would
->> know about hotplug events. We would also need to link the drivers so
->> that the edid can be associated with the video pipeline the tfp410 chip
->> is part of, and to the particular slot in the pipeline where the tfp410 is.
-> 
-> that should all be doable, just look at how v4l2 handles pipelining the
-> video data (all in userland though) and you'll see it's definitely
-> possible.
+Signed-off-by: Stefan Roese <sr@denx.de>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/boot/dts/Makefile             |  3 ++-
+ arch/arm/boot/dts/sun4i-cubieboard.dts | 38 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sunxi.dtsi           |  9 ++++++++
+ arch/arm/mach-sunxi/sunxi.c            |  1 +
+ 4 files changed, 50 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/sun4i-cubieboard.dts
 
-Afaik, v4l2 handles only the pipeline for video. This i2c-edid would not
-be part of the video pipeline, so I don't see a connection to v4l2.
-
-And I'm not saying it's not possible, or that the current way is good or
-correct. I'm saying it's not easy, and definitely more complex than the
-current tfp410 implementation. The amount of code related to this
-feature would multiply.
-
-If we had 10 different tfp410 like drivers, then obviously there'd be
-more pressing reason to clean this up. But currently we have only one
-place where this code is used.
-
->> I haven't tried writing such a driver, but it sounds much more complex
->> to me than doing one or two i2c reads in the tfp410 driver.
-> 
-> until you have e.g. tfp999, tfp534, tfp678 (hypothetical device numbers,
-> they probably don't exist) which are all SW incompatible and you have to
-> duplicate i2c reads in all of them. Whereas if you had a dedicated
-> i2c-edid.c driver, you would only have to tell them where to get EDID
-> structure from.
-> 
-> Also, if you have systems with different panel interfaces, they will use
-> the same i2c-edid.c and just instantiate that class multiple times.
-
-Yep. Althought the same could be done with a common edid library,
-without an i2c-edid driver.
-
->>>> So we need a generic way to get the resolution information, and it makes
->>>> sense to have this in the components of the video path, not in a
->>>> separate driver which is not part of the video path as such.
->>>
->>> But the I2C bus isn't part of the video path anyway. It's a completely
->>> separate path which is dedicated to reading EDID. If you need a generic
->>
->> While reading EDID is totally separate from the video data itself, it is
->> not separate from the hotplug status of the cable. And the EDID needs to
->> be associated with the video path in question, of course.
-> 
-> yes, but that can't be done in another way right ? Try something like
-> having a EDID provider and an EDID consumer. The provider will be
-> i2c-edid.c or dvi-edid.c and the consumer will a generic layer which
-> tfp410 would use to request certain attributes from the EDID structure.
-
-TFP410 doesn't need the EDID for anything, it just provides it as raw
-data. Parsing the EDID is done in other layers. But as you said, instead
-of tfp410 fetching the EDID and providing it, tfp410 could get the EDID
-from the i2c-edid driver and pass it forward.
-
-> I think that would look a lot nicer as the underlying implementation for
-> requesting EDID would be completely encapsulated from its users.
-
-If with "users" you mean, for example, tfp410, then true. But tfp410
-doesn't use EDID for anything, it just provides it. For the actual users
-of the EDID data reading the EDID is encapsulated already.
-
->> No, reading edid is done via generic read_edid call. TFP410 uses i2c to
->> read edid, but it could do it in any way it wants.
-> 
-> it's not very well designed, then, if tfp410 still needs to fetch the
-> i2c adapter. It still has to know about the underlying bus for reading
-> EDID.
-
-Well, yes. TFP410 is a RGB to DVI chip. It knows that the underlying bus
-is DVI, and that there are i2c lines to read the EDID. There are no
-other option what the busses could be. So I don't see any problem with
-knowing the underlying bus.
-
->>> In fact current implementation is far worse than having an extra
->>> i2c-edid.c driver because it doesn't encapsulate EDID implementation
->>> from tfp410.
->>>
->>> Then moment you need to read EDID via DSI, you will likely have to pass
->>> a DSI handle to e.g. TFP410 so it can read EDID via DSI.
->>
->> TFP410 is a parallel RGB to DVI chip. It's not related to DSI. The DSI
->> case would be with some other chip.
-> 
-> it doesn't change what I said, however. Another chip will need to be
-> passed in a DVI handle.
-
-I'm sorry, but I don't understand what you're saying above...
-
-If we have a DSI-2-DVI chip, then reading the EDID would be done by
-sending a DSI command to the chip, which would return the EDID data.
-Which would be passed forward when someone requests it. There would not
-be anything in common with tfp410 and i2c implementation.
-
->> We could have a library with the code that does the one or two i2c
->> reads. And while I think it'd be good, we're talking about one or two
->> i2c reads. It wouldn't be a huge improvement.
-> 
-> fair enough... it looks like this is going nowhere, so best we come back
-> to this later. No reason to block your patch.
-
-Well, the patch is a fix for stable kernels, so even if we had a great
-idea how to rewrite the dss device handling, it wouldn't affect this
-patch =).
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 897 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121119/670e0ed9/attachment.sig>
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 9b2d3f0..4dd567b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -84,7 +84,8 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
+ 	spear310-evb.dtb \
+ 	spear320-evb.dtb
+ dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
+-dtb-$(CONFIG_ARCH_SUNXI) += sun5i-olinuxino.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun4i-cubieboard.dtb \
++	sun5i-olinuxino.dtb
+ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+ 	tegra20-medcom-wide.dtb \
+ 	tegra20-paz00.dtb \
+diff --git a/arch/arm/boot/dts/sun4i-cubieboard.dts b/arch/arm/boot/dts/sun4i-cubieboard.dts
+new file mode 100644
+index 0000000..f4ca126
+--- /dev/null
++++ b/arch/arm/boot/dts/sun4i-cubieboard.dts
+@@ -0,0 +1,38 @@
++/*
++ * Copyright 2012 Stefan Roese
++ * Stefan Roese <sr@denx.de>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "sun4i.dtsi"
++
++/ {
++	model = "Cubietech Cubieboard";
++	compatible = "cubietech,cubieboard", "allwinner,sun4i";
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++	};
++
++	chosen {
++		bootargs = "earlyprintk console=ttyS0,115200";
++	};
++
++	soc {
++		uart0: uart at 01c28000 {
++			status = "okay";
++		};
++
++		uart1: uart at 01c28400 {
++			status = "okay";
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
+index 9e476de..8284fbd 100644
+--- a/arch/arm/boot/dts/sunxi.dtsi
++++ b/arch/arm/boot/dts/sunxi.dtsi
+@@ -54,6 +54,15 @@
+ 			#interrupt-cells = <1>;
+ 		};
+ 
++		uart0: uart at 01c28000 {
++			compatible = "ns8250";
++			reg = <0x01c28000 0x400>;
++			interrupts = <1>;
++			reg-shift = <2>;
++			clock-frequency = <24000000>;
++			status = "disabled";
++		};
++
+ 		uart1: uart at 01c28400 {
+ 			compatible = "ns8250";
+ 			reg = <0x01c28400 0x400>;
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 8f42df8..13d4d96 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -46,6 +46,7 @@ static void __init sunxi_dt_init(void)
+ }
+ 
+ static const char * const sunxi_board_dt_compat[] = {
++	"allwinner,sun4i",
+ 	"allwinner,sun5i",
+ 	NULL,
+ };
+-- 
+1.8.0
