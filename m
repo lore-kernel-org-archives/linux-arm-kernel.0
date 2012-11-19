@@ -1,111 +1,91 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 19 Nov 2012 16:16:58 +0100
-Subject: [PATCH V3 4/5] arm: mm: Added support for PJ4B cpu and init
- routines
-In-Reply-To: <20121119145018.GD4122@arm.com>
-References: <1352931637-3405-1-git-send-email-gregory.clement@free-electrons.com>
- <1352931637-3405-5-git-send-email-gregory.clement@free-electrons.com>
- <CAHkRjk6BYB=OAFyQKwmA2vcpJ1w9MaYx6gRthEEy6F8GL48Kng@mail.gmail.com>
- <50AA2386.7080705@free-electrons.com> <20121119145018.GD4122@arm.com>
-Message-ID: <50AA4D6A.2000707@free-electrons.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 19 Nov 2012 16:17:24 +0100
+Subject: [PATCH] net/macb: move to circ_buf macros and fix initial condition
+Message-ID: <1353338244-11506-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2012 03:50 PM, Catalin Marinas wrote:
-> On Mon, Nov 19, 2012 at 12:18:14PM +0000, Gregory CLEMENT wrote:
->> On 11/19/2012 11:51 AM, Catalin Marinas wrote:
->>> On 14 November 2012 22:20, Gregory CLEMENT
->>> <gregory.clement@free-electrons.com> wrote:
->>>> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
->>>> index 846d279..a4c0ccf 100644
->>>> --- a/arch/arm/mm/proc-v7.S
->>>> +++ b/arch/arm/mm/proc-v7.S
->>>> @@ -169,6 +169,47 @@ __v7_ca15mp_setup:
->>>>         orreq   r0, r0, r10                     @ Enable CPU-specific SMP bits
->>>>         mcreq   p15, 0, r0, c1, c0, 1
->>>>  #endif
->>>> +
->>>> +__v7_pj4b_setup:
->>>> +#ifdef CONFIG_CPU_PJ4B
->>>> +
->>>> +#define SNOOP_DATA    (1 << 25) /* Dont interleave write and snoop data */
->>>> +#define CWF           (1 << 27) /* Disable Critical Word First feature */
->>>> +#define OUTSANDING_NC (1 << 29) /* Disable outstanding non cacheable request */
->>>> +#define L1_REP_RR     (1 << 30) /* L1 replacement - Strict round robin */
->>>> +
->>>> +#define AUX_DBG_CTRL2 (SNOOP_DATA | CWF | OUTSANDING_NC | L1_REP_RR)
->>>> +
->>>> +       /* Auxiliary Debug Modes Control 1 Register */
->>>> +       mrc     p15, 1, r0, c15, c1, 1
->>>> +       orr     r0, r0, #(1 << 16)     @ Disable data transfer for clean line.
->>>> +       orr     r0, r0, #(1 << 5)      @ Enable the back off of STREX instr
->>>> +       orr     r0, r0, #(1 << 8)      @ Disable Internal Parity Handling
->>>> +       bic     r0, r0, #(1 << 2)      @ Disable Static BP
->>>> +       mcr     p15, 1, r0, c15, c1, 1
->>>> +
->>>> +       /* Auxiliary Debug Modes Control 2 Register */
->>>> +       mrc     p15, 1, r0, c15, c1, 2
->>>> +       bic     r0, r0, #(1 << 23)   @ Enable fast LDR.
->>>> +       orr     r0, r0, #AUX_DBG_CTRL2
->>>> +       mcr     p15, 1, r0, c15, c1, 2
-> 
-> BTW, for some bits you defined macros while others are just immediate
-> values. Just a cosmetic inconsistency (I would have preferred to use
-> either macros or just immediate values).
+Move to circular buffers management macro and correct an error
+with circular buffer initial condition.
 
-Oh yes indeed: I made some change after Russell comments. But I should
-have review the whole code to notice it. If I didn't have time to change
-the code before the merge, I will fix it for the v3.8-rc1
+Without this patch, the macb_tx_ring_avail() function was
+not reporting the proper ring availability at startup:
+macb macb: eth0: BUG! Tx Ring full when queue awake!
+macb macb: eth0: tx_head = 0, tx_tail = 0
+And hanginig forever...
 
-> 
->>>> +
->>>> +       /* Auxiliary Functional Modes Control Register 0 */
->>>> +       mrc     p15, 1, r0, c15, c2, 0
->>>> +#ifdef CONFIG_SMP
->>>> +       orr     r0, r0, #(1 << 1)     @ Set SMP mode. Join the coherency fabric
->>>> +#endif
->>>> +       orr     r0, r0, #(1 << 2)     @ Support L1 parity checking
->>>> +       orr     r0, r0, #(1 << 8)     @ Broadcast Cache and TLB maintenance
->>>> +       mcr     p15, 1, r0, c15, c2, 0
->>>> +
->>>> +       /* Auxiliary Debug Modes Control 0 Register */
->>>> +       mrc     p15, 1, r0, c15, c1, 0
->>>> +       orr     r0, r0, #(1 << 22)   @ WFI/WFE - serve the DVM and back to idle
->>>> +       mcr     p15, 1, r0, c15, c1, 0
->>>
->>> Any chance that these could be set by the firmware prior to starting
->>> the kernel? We don't have any guidance for Linux here but longer term
->>> it seems to cause problems (i.e. you add some secure layer in a new
->>> CPU version).
->>
->> I will ask to Marvell engineers.
->>
->> However I hope it won't be show stopper for merging this code in 3.8.
->> This patch set was released 7 weeks ago, so would have though there was
->> a lot of time to raise the issue related to this code.
-> 
-> It shouldn't prevent the code being merged as we don't have clear
-> requirement in Linux for this. But it would be good practice to push
-> some sane defaults to the firmware. For example you set some option like
-> L1 replacement which is optimal for your platform. Later you put the
-> same CPU on a different SoC which may have different optimal value.
-> There is no way in proc-v7.S to detect the SoC.
-> 
+I remove the macb_tx_ring_avail() function and use the
+proven macros from circ_buf.h. CIRC_CNT() is used in the
+"consumer" part of the driver: macb_tx_interrupt() to match
+advice from Documentation/circular-buffers.txt.
 
-OK I see your point. At this stage that would imply to change the bootloader
-already deployed. I don't know how it will be easy to do it quickly. So
-I am not sure that we can change it immediately, but maybe for future release.
-However I still wait for more feedback on this subject for Marvell.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/net/ethernet/cadence/macb.c | 17 +++++++----------
+ 1 file changed, 7 insertions(+), 10 deletions(-)
 
-> Otherwise the patch looks fine to me.
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Thanks a lot!
-
-
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index edb2aba..27991dd 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -14,6 +14,7 @@
+ #include <linux/moduleparam.h>
+ #include <linux/kernel.h>
+ #include <linux/types.h>
++#include <linux/circ_buf.h>
+ #include <linux/slab.h>
+ #include <linux/init.h>
+ #include <linux/gpio.h>
+@@ -38,8 +39,8 @@
+ #define TX_RING_SIZE		128 /* must be power of 2 */
+ #define TX_RING_BYTES		(sizeof(struct macb_dma_desc) * TX_RING_SIZE)
+ 
+-/* minimum number of free TX descriptors before waking up TX process */
+-#define MACB_TX_WAKEUP_THRESH	(TX_RING_SIZE / 4)
++/* level of occupied TX descriptors under which we wake up TX process */
++#define MACB_TX_WAKEUP_THRESH	(3 * TX_RING_SIZE / 4)
+ 
+ #define MACB_RX_INT_FLAGS	(MACB_BIT(RCOMP) | MACB_BIT(RXUBR)	\
+ 				 | MACB_BIT(ISR_ROVR))
+@@ -60,11 +61,6 @@ static unsigned int macb_tx_ring_wrap(unsigned int index)
+ 	return index & (TX_RING_SIZE - 1);
+ }
+ 
+-static unsigned int macb_tx_ring_avail(struct macb *bp)
+-{
+-	return (bp->tx_tail - bp->tx_head) & (TX_RING_SIZE - 1);
+-}
+-
+ static struct macb_dma_desc *macb_tx_desc(struct macb *bp, unsigned int index)
+ {
+ 	return &bp->tx_ring[macb_tx_ring_wrap(index)];
+@@ -524,7 +520,8 @@ static void macb_tx_interrupt(struct macb *bp)
+ 
+ 	bp->tx_tail = tail;
+ 	if (netif_queue_stopped(bp->dev)
+-			&& macb_tx_ring_avail(bp) > MACB_TX_WAKEUP_THRESH)
++			&& CIRC_CNT(bp->tx_head, bp->tx_tail,
++				    TX_RING_SIZE) <= MACB_TX_WAKEUP_THRESH)
+ 		netif_wake_queue(bp->dev);
+ }
+ 
+@@ -818,7 +815,7 @@ static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 	spin_lock_irqsave(&bp->lock, flags);
+ 
+ 	/* This is a hard error, log it. */
+-	if (macb_tx_ring_avail(bp) < 1) {
++	if (CIRC_SPACE(bp->tx_head, bp->tx_tail, TX_RING_SIZE) < 1) {
+ 		netif_stop_queue(dev);
+ 		spin_unlock_irqrestore(&bp->lock, flags);
+ 		netdev_err(bp->dev, "BUG! Tx Ring full when queue awake!\n");
+@@ -855,7 +852,7 @@ static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 
+ 	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(TSTART));
+ 
+-	if (macb_tx_ring_avail(bp) < 1)
++	if (CIRC_SPACE(bp->tx_head, bp->tx_tail, TX_RING_SIZE) < 1)
+ 		netif_stop_queue(dev);
+ 
+ 	spin_unlock_irqrestore(&bp->lock, flags);
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.0
