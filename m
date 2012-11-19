@@ -1,51 +1,201 @@
-From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
-Date: Mon, 19 Nov 2012 17:18:47 +0200
-Subject: [PATCH] ARM: add get_user() support for 8 byte types
-In-Reply-To: <20121119144806.GO3332@n2100.arm.linux.org.uk>
-References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
- <201211151339.08016.arnd@arndb.de>
- <CAF6AEGuJReNtwUZX6HVZCE8GHuyEAyC8bM0GqZuVMV1=DrGJVw@mail.gmail.com>
- <201211151439.41393.arnd@arndb.de>
- <20121119143236.GA3296@intel.com>
- <20121119144806.GO3332@n2100.arm.linux.org.uk>
-Message-ID: <20121119151847.GB3296@intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 Nov 2012 16:22:08 +0100
+Subject: [PATCH 1/4] ARM: sunxi: Restructure sunxi dts/dtsi files
+In-Reply-To: <1353323383-11827-1-git-send-email-sr@denx.de>
+References: <1353323383-11827-1-git-send-email-sr@denx.de>
+Message-ID: <50AA4EA0.7080309@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 02:48:06PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 19, 2012 at 04:32:36PM +0200, Ville Syrj?l? wrote:
-> > On Thu, Nov 15, 2012 at 02:39:41PM +0000, Arnd Bergmann wrote:
-> > > On Thursday 15 November 2012, Rob Clark wrote:
-> > > > > I still haven't heard a conclusive argument why we need to use get_user()
-> > > > > rather than copy_from_user() in the DRM code. Is this about a fast path
-> > > > > where you want to shave off a few cycles for each call, or does this
-> > > > > simplify the code structure, or something else?
-> > > > 
-> > > > well, it is mostly because it seemed like a good idea to first try to
-> > > > solve the root issue, rather than having to fix things up in each
-> > > > driver when someone from x86-world introduces a 64b get_user()..
-> > > 
-> > > As pointed out by hpa earlier, x86-32 doesn't have a 64b get_user
-> > > either. I don't think we have a lot of drivers that are used only
-> > > on 64-bit x86 and on 32-bit ARM but not on 32-bit x86.
-> > 
-> > Ouch. I didn't realize that x86-32 doesn't have it. All the systems
-> > where I've run the new code are 64bit so I never noticed the problem.
-> > 
-> > I see there was a patch [1] posted a long time ago to implement 64bit
-> > get_user() on x86-32. I wonder what happened to it?
-> > 
-> > [1] https://lkml.org/lkml/2004/4/20/96
+Le 19/11/2012 12:09, Stefan Roese a ?crit :
+> For the new sun4i/Cubieboard (A10) support, lets re-strucure the
+> sun5i dts files to make it more generic. Those are the new
+> dts/dtsi files:
 > 
-> Wonderful lkml.org after four "Negotiating SSL connection..." messages
-> gives me under elinks...
-<snip> 
-> what a wonderful site... please choose another LKML archive, preferably
-> one which works.  Thanks.
+> sunxi.dtsi - Devices common to all Allwinner sunXi SoC's
+> sun4i.dtsi - sun4i Devices, will include sunxi.dtsi
+> sun5i.dtsi - sun5i Devices, will include sunxi.dtsi
+> board.dts - will include either sun4i.dtsi or sun5i.dtsi
+> 
+> Additionally the "duart" label in the olinuxino.dts is changed to
+> "uart1".
+> 
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/boot/dts/sun5i-olinuxino.dts |  6 +++-
+>  arch/arm/boot/dts/sun5i.dtsi          | 56 +----------------------------
+>  arch/arm/boot/dts/sunxi.dtsi          | 66 +++++++++++++++++++++++++++++++++++
+>  3 files changed, 72 insertions(+), 56 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/sunxi.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/sun5i-olinuxino.dts b/arch/arm/boot/dts/sun5i-olinuxino.dts
+> index 3b1cce3..d6ff889 100644
+> --- a/arch/arm/boot/dts/sun5i-olinuxino.dts
+> +++ b/arch/arm/boot/dts/sun5i-olinuxino.dts
+> @@ -18,8 +18,12 @@
+>  	model = "Olimex A13-Olinuxino";
+>  	compatible = "olimex,a13-olinuxino", "allwinner,sun5i";
+>  
+> +	chosen {
+> +		bootargs = "earlyprintk console=ttyS0,115200";
+> +	};
+> +
+>  	soc {
+> -		duart: uart at 01c28400 {
+> +		uart1: uart at 01c28400 {
+>  			status = "okay";
+>  		};
+>  	};
+> diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+> index 4bedf3e..59a2d26 100644
+> --- a/arch/arm/boot/dts/sun5i.dtsi
+> +++ b/arch/arm/boot/dts/sun5i.dtsi
+> @@ -11,64 +11,10 @@
+>   * http://www.gnu.org/copyleft/gpl.html
+>   */
+>  
+> -/include/ "skeleton.dtsi"
+> +/include/ "sunxi.dtsi"
+>  
+>  / {
+> -	interrupt-parent = <&intc>;
+> -
+> -	cpus {
+> -		cpu at 0 {
+> -			compatible = "arm,cortex-a8";
+> -		};
+> -	};
+> -
+> -	chosen {
+> -		bootargs = "earlyprintk console=ttyS0,115200";
+> -	};
+> -
+>  	memory {
+>  		reg = <0x40000000 0x20000000>;
+>  	};
+> -
+> -	clocks {
+> -		#address-cells = <1>;
+> -		#size-cells = <0>;
+> -
+> -		osc: oscillator {
+> -			#clock-cells = <0>;
+> -			compatible = "fixed-clock";
+> -			clock-frequency = <24000000>;
+> -		};
+> -	};
+> -
+> -	soc {
+> -		compatible = "simple-bus";
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+> -		reg = <0x01c20000 0x300000>;
+> -		ranges;
+> -
+> -		timer at 01c20c00 {
+> -			compatible = "allwinner,sunxi-timer";
+> -			reg = <0x01c20c00 0x400>;
+> -			interrupts = <22>;
+> -			clocks = <&osc>;
+> -		};
+> -
+> -		intc: interrupt-controller at 01c20400 {
+> -			compatible = "allwinner,sunxi-ic";
+> -			reg = <0x01c20400 0x400>;
+> -			interrupt-controller;
+> -			#interrupt-cells = <1>;
+> -		};
+> -
+> -		uart1: uart at 01c28400 {
+> -			compatible = "ns8250";
+> -			reg = <0x01c28400 0x400>;
+> -			interrupts = <2>;
+> -			reg-shift = <2>;
+> -			clock-frequency = <24000000>;
+> -			status = "disabled";
+> -		};
+> -	};
+>  };
+> diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
+> new file mode 100644
+> index 0000000..9e476de
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sunxi.dtsi
+> @@ -0,0 +1,66 @@
+> +/*
+> + * Copyright 2012 Maxime Ripard
+> + *
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	interrupt-parent = <&intc>;
+> +
+> +	cpus {
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a8";
+> +		};
+> +	};
+> +
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		osc: oscillator {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <24000000>;
+> +		};
+> +	};
+> +
+> +	soc {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0x01c20000 0x300000>;
+> +		ranges;
+> +
+> +		timer at 01c20c00 {
+> +			compatible = "allwinner,sunxi-timer";
+> +			reg = <0x01c20c00 0x400>;
+> +			interrupts = <22>;
+> +			clocks = <&osc>;
+> +		};
+> +
+> +		intc: interrupt-controller at 01c20400 {
+> +			compatible = "allwinner,sunxi-ic";
+> +			reg = <0x01c20400 0x400>;
+> +			interrupt-controller;
+> +			#interrupt-cells = <1>;
+> +		};
+> +
+> +		uart1: uart at 01c28400 {
+> +			compatible = "ns8250";
+> +			reg = <0x01c28400 0x400>;
+> +			interrupts = <2>;
+> +			reg-shift = <2>;
+> +			clock-frequency = <24000000>;
+> +			status = "disabled";
+> +		};
+> +	};
+> +};
+> 
 
-This one look like the same thing:
-http://article.gmane.org/gmane.linux.kernel/198823
+Applied, thanks!
 
 -- 
-Ville Syrj?l?
-Intel OTC
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
