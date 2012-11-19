@@ -1,271 +1,256 @@
 From: wfp5p@virginia.edu (Bill Pemberton)
-Date: Mon, 19 Nov 2012 13:22:54 -0500
-Subject: [PATCH 225/493] crypto: remove use of __devinit
+Date: Mon, 19 Nov 2012 13:27:13 -0500
+Subject: [PATCH 484/493] arm: remove use of __devexit
 In-Reply-To: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
 References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
-Message-ID: <1353349642-3677-225-git-send-email-wfp5p@virginia.edu>
+Message-ID: <1353349642-3677-484-git-send-email-wfp5p@virginia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_HOTPLUG is going away as an option so __devinit is no longer
-needed.
+CONFIG_HOTPLUG is going away as an option so __devexit is no
+longer needed.
 
 Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-Cc: Herbert Xu <herbert@gondor.apana.org.au> 
-Cc: "David S. Miller" <davem@davemloft.net> 
-Cc: linux-crypto at vger.kernel.org 
-Cc: linux-geode at lists.infradead.org 
+Cc: Russell King <linux@arm.linux.org.uk> 
+Cc: Eric Miao <eric.y.miao@gmail.com> 
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com> 
+Cc: Tony Lindgren <tony@atomide.com> 
+Cc: Ben Dooks <ben-linux@fluff.org> 
+Cc: Kukjin Kim <kgene.kim@samsung.com> 
 Cc: linux-arm-kernel at lists.infradead.org 
+Cc: davinci-linux-open-source at linux.davincidsp.com 
+Cc: linux-omap at vger.kernel.org 
+Cc: linux-samsung-soc at vger.kernel.org 
 ---
- drivers/crypto/atmel-aes.c        |  2 +-
- drivers/crypto/atmel-sha.c        |  2 +-
- drivers/crypto/atmel-tdes.c       |  2 +-
- drivers/crypto/bfin_crc.c         |  2 +-
- drivers/crypto/geode-aes.c        |  2 +-
- drivers/crypto/hifn_795x.c        |  2 +-
- drivers/crypto/n2_core.c          | 26 +++++++++++++-------------
- drivers/crypto/nx/nx.c            |  2 +-
- drivers/crypto/omap-sham.c        |  2 +-
- drivers/crypto/picoxcell_crypto.c |  2 +-
- 10 files changed, 22 insertions(+), 22 deletions(-)
+ arch/arm/common/scoop.c                  | 2 +-
+ arch/arm/mach-davinci/board-dm646x-evm.c | 2 +-
+ arch/arm/mach-davinci/cdce949.c          | 2 +-
+ arch/arm/mach-mmp/sram.c                 | 2 +-
+ arch/arm/mach-omap1/mailbox.c            | 2 +-
+ arch/arm/mach-omap2/gpmc.c               | 6 +++---
+ arch/arm/mach-omap2/mailbox.c            | 2 +-
+ arch/arm/mach-pxa/tosa-bt.c              | 2 +-
+ arch/arm/mach-s3c24xx/mach-osiris-dvs.c  | 2 +-
+ arch/arm/mach-sa1100/neponset.c          | 2 +-
+ arch/arm/mach-u300/dummyspichip.c        | 2 +-
+ arch/arm/plat-omap/dma.c                 | 2 +-
+ arch/arm/plat-omap/dmtimer.c             | 2 +-
+ arch/arm/plat-pxa/ssp.c                  | 2 +-
+ arch/arm/plat-samsung/adc.c              | 2 +-
+ 15 files changed, 17 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-index 3cfa548..931d436 100644
---- a/drivers/crypto/atmel-aes.c
-+++ b/drivers/crypto/atmel-aes.c
-@@ -1036,7 +1036,7 @@ err_aes_algs:
- 	return err;
+diff --git a/arch/arm/common/scoop.c b/arch/arm/common/scoop.c
+index 2b62571..a5c3dc3 100644
+--- a/arch/arm/common/scoop.c
++++ b/arch/arm/common/scoop.c
+@@ -243,7 +243,7 @@ err_ioremap:
+ 	return ret;
  }
  
--static int __devinit atmel_aes_probe(struct platform_device *pdev)
-+static int atmel_aes_probe(struct platform_device *pdev)
+-static int __devexit scoop_remove(struct platform_device *pdev)
++static int scoop_remove(struct platform_device *pdev)
  {
- 	struct atmel_aes_dev *aes_dd;
- 	struct aes_platform_data	*pdata;
-diff --git a/drivers/crypto/atmel-sha.c b/drivers/crypto/atmel-sha.c
-index 4fb07609..17f8862 100644
---- a/drivers/crypto/atmel-sha.c
-+++ b/drivers/crypto/atmel-sha.c
-@@ -964,7 +964,7 @@ err_sha_algs:
- 	return err;
- }
- 
--static int __devinit atmel_sha_probe(struct platform_device *pdev)
-+static int atmel_sha_probe(struct platform_device *pdev)
- {
- 	struct atmel_sha_dev *sha_dd;
- 	struct device *dev = &pdev->dev;
-diff --git a/drivers/crypto/atmel-tdes.c b/drivers/crypto/atmel-tdes.c
-index 530474f..f4b9907 100644
---- a/drivers/crypto/atmel-tdes.c
-+++ b/drivers/crypto/atmel-tdes.c
-@@ -1053,7 +1053,7 @@ err_tdes_algs:
- 	return err;
- }
- 
--static int __devinit atmel_tdes_probe(struct platform_device *pdev)
-+static int atmel_tdes_probe(struct platform_device *pdev)
- {
- 	struct atmel_tdes_dev *tdes_dd;
- 	struct device *dev = &pdev->dev;
-diff --git a/drivers/crypto/bfin_crc.c b/drivers/crypto/bfin_crc.c
-index eecaae2..904b646 100644
---- a/drivers/crypto/bfin_crc.c
-+++ b/drivers/crypto/bfin_crc.c
-@@ -586,7 +586,7 @@ static int bfin_crypto_crc_suspend(struct platform_device *pdev, pm_message_t st
-  *	bfin_crypto_crc_probe - Initialize module
-  *
-  */
--static int __devinit bfin_crypto_crc_probe(struct platform_device *pdev)
-+static int bfin_crypto_crc_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct resource *res;
-diff --git a/drivers/crypto/geode-aes.c b/drivers/crypto/geode-aes.c
-index 3217baf..f3793a2 100644
---- a/drivers/crypto/geode-aes.c
-+++ b/drivers/crypto/geode-aes.c
-@@ -513,7 +513,7 @@ geode_aes_remove(struct pci_dev *dev)
- }
- 
- 
--static int __devinit
-+static int
- geode_aes_probe(struct pci_dev *dev, const struct pci_device_id *id)
- {
+ 	struct scoop_dev *sdev = platform_get_drvdata(pdev);
  	int ret;
-diff --git a/drivers/crypto/hifn_795x.c b/drivers/crypto/hifn_795x.c
-index 4c2f467..f909d99 100644
---- a/drivers/crypto/hifn_795x.c
-+++ b/drivers/crypto/hifn_795x.c
-@@ -2561,7 +2561,7 @@ static void hifn_tasklet_callback(unsigned long data)
- 		hifn_process_queue(dev);
- }
- 
--static int __devinit hifn_probe(struct pci_dev *pdev, const struct pci_device_id *id)
-+static int hifn_probe(struct pci_dev *pdev, const struct pci_device_id *id)
- {
- 	int err, i;
- 	struct hifn_device *dev;
-diff --git a/drivers/crypto/n2_core.c b/drivers/crypto/n2_core.c
-index 2741ef5..ca62eab 100644
---- a/drivers/crypto/n2_core.c
-+++ b/drivers/crypto/n2_core.c
-@@ -1388,7 +1388,7 @@ static int n2_cipher_cra_init(struct crypto_tfm *tfm)
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index 9211e88..6e2f163 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -358,7 +358,7 @@ static int cpld_video_probe(struct i2c_client *client,
  	return 0;
  }
  
--static int __devinit __n2_register_one_cipher(const struct n2_cipher_tmpl *tmpl)
-+static int __n2_register_one_cipher(const struct n2_cipher_tmpl *tmpl)
+-static int __devexit cpld_video_remove(struct i2c_client *client)
++static int cpld_video_remove(struct i2c_client *client)
  {
- 	struct n2_cipher_alg *p = kzalloc(sizeof(*p), GFP_KERNEL);
- 	struct crypto_alg *alg;
-@@ -1424,7 +1424,7 @@ static int __devinit __n2_register_one_cipher(const struct n2_cipher_tmpl *tmpl)
- 	return err;
- }
- 
--static int __devinit __n2_register_one_hmac(struct n2_ahash_alg *n2ahash)
-+static int __n2_register_one_hmac(struct n2_ahash_alg *n2ahash)
- {
- 	struct n2_hmac_alg *p = kzalloc(sizeof(*p), GFP_KERNEL);
- 	struct ahash_alg *ahash;
-@@ -1462,7 +1462,7 @@ static int __devinit __n2_register_one_hmac(struct n2_ahash_alg *n2ahash)
- 	return err;
- }
- 
--static int __devinit __n2_register_one_ahash(const struct n2_hash_tmpl *tmpl)
-+static int __n2_register_one_ahash(const struct n2_hash_tmpl *tmpl)
- {
- 	struct n2_ahash_alg *p = kzalloc(sizeof(*p), GFP_KERNEL);
- 	struct hash_alg_common *halg;
-@@ -1517,7 +1517,7 @@ static int __devinit __n2_register_one_ahash(const struct n2_hash_tmpl *tmpl)
- 	return err;
- }
- 
--static int __devinit n2_register_algs(void)
-+static int n2_register_algs(void)
- {
- 	int i, err = 0;
- 
-@@ -1822,7 +1822,7 @@ static int spu_mdesc_scan(struct mdesc_handle *mdesc, struct platform_device *de
- 	return err;
- }
- 
--static int __devinit get_irq_props(struct mdesc_handle *mdesc, u64 node,
-+static int get_irq_props(struct mdesc_handle *mdesc, u64 node,
- 				   struct spu_mdesc_info *ip)
- {
- 	const u64 *ino;
-@@ -1851,7 +1851,7 @@ static int __devinit get_irq_props(struct mdesc_handle *mdesc, u64 node,
+ 	cpld_client = NULL;
+ 	return 0;
+diff --git a/arch/arm/mach-davinci/cdce949.c b/arch/arm/mach-davinci/cdce949.c
+index 5086cbc..abafb92 100644
+--- a/arch/arm/mach-davinci/cdce949.c
++++ b/arch/arm/mach-davinci/cdce949.c
+@@ -256,7 +256,7 @@ static int cdce_probe(struct i2c_client *client,
  	return 0;
  }
  
--static int __devinit grab_mdesc_irq_props(struct mdesc_handle *mdesc,
-+static int grab_mdesc_irq_props(struct mdesc_handle *mdesc,
- 					  struct platform_device *dev,
- 					  struct spu_mdesc_info *ip,
- 					  const char *node_name)
-@@ -1883,7 +1883,7 @@ static int __devinit grab_mdesc_irq_props(struct mdesc_handle *mdesc,
- static unsigned long n2_spu_hvapi_major;
- static unsigned long n2_spu_hvapi_minor;
- 
--static int __devinit n2_spu_hvapi_register(void)
-+static int n2_spu_hvapi_register(void)
+-static int __devexit cdce_remove(struct i2c_client *client)
++static int cdce_remove(struct i2c_client *client)
  {
- 	int err;
- 
-@@ -1909,7 +1909,7 @@ static void n2_spu_hvapi_unregister(void)
- 
- static int global_ref;
- 
--static int __devinit grab_global_resources(void)
-+static int grab_global_resources(void)
- {
- 	int err = 0;
- 
-@@ -1973,7 +1973,7 @@ static void release_global_resources(void)
- 	mutex_unlock(&spu_lock);
+ 	cdce_i2c_client = NULL;
+ 	return 0;
+diff --git a/arch/arm/mach-mmp/sram.c b/arch/arm/mach-mmp/sram.c
+index 7e5765b..bf5e649 100644
+--- a/arch/arm/mach-mmp/sram.c
++++ b/arch/arm/mach-mmp/sram.c
+@@ -125,7 +125,7 @@ out:
+ 	return ret;
  }
  
--static struct n2_crypto * __devinit alloc_n2cp(void)
-+static struct n2_crypto *alloc_n2cp(void)
+-static int __devexit sram_remove(struct platform_device *pdev)
++static int sram_remove(struct platform_device *pdev)
  {
- 	struct n2_crypto *np = kzalloc(sizeof(struct n2_crypto), GFP_KERNEL);
+ 	struct sram_bank_info *info;
  
-@@ -1993,7 +1993,7 @@ static void free_n2cp(struct n2_crypto *np)
- 	kfree(np);
- }
- 
--static void __devinit n2_spu_driver_version(void)
-+static void n2_spu_driver_version(void)
- {
- 	static int n2_spu_version_printed;
- 
-@@ -2001,7 +2001,7 @@ static void __devinit n2_spu_driver_version(void)
- 		pr_info("%s", version);
- }
- 
--static int __devinit n2_crypto_probe(struct platform_device *dev)
-+static int n2_crypto_probe(struct platform_device *dev)
- {
- 	struct mdesc_handle *mdesc;
- 	const char *full_name;
-@@ -2092,7 +2092,7 @@ static int __devexit n2_crypto_remove(struct platform_device *dev)
+diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
+index f2109dd..efc8f20 100644
+--- a/arch/arm/mach-omap1/mailbox.c
++++ b/arch/arm/mach-omap1/mailbox.c
+@@ -165,7 +165,7 @@ static int omap1_mbox_probe(struct platform_device *pdev)
  	return 0;
  }
  
--static struct n2_mau * __devinit alloc_ncp(void)
-+static struct n2_mau *alloc_ncp(void)
+-static int __devexit omap1_mbox_remove(struct platform_device *pdev)
++static int omap1_mbox_remove(struct platform_device *pdev)
  {
- 	struct n2_mau *mp = kzalloc(sizeof(struct n2_mau), GFP_KERNEL);
- 
-@@ -2112,7 +2112,7 @@ static void free_ncp(struct n2_mau *mp)
- 	kfree(mp);
+ 	omap_mbox_unregister();
+ 	iounmap(mbox_base);
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 2fc3dd4..e0d7982 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -684,7 +684,7 @@ static int gpmc_setup_irq(void)
+ 	return request_irq(gpmc_irq, gpmc_handle_irq, 0, "gpmc", NULL);
  }
  
--static int __devinit n2_mau_probe(struct platform_device *dev)
-+static int n2_mau_probe(struct platform_device *dev)
+-static __devexit int gpmc_free_irq(void)
++static int gpmc_free_irq(void)
  {
- 	struct mdesc_handle *mdesc;
- 	const char *full_name;
-diff --git a/drivers/crypto/nx/nx.c b/drivers/crypto/nx/nx.c
-index f7a8a16..6302c93 100644
---- a/drivers/crypto/nx/nx.c
-+++ b/drivers/crypto/nx/nx.c
-@@ -634,7 +634,7 @@ void nx_crypto_ctx_exit(struct crypto_tfm *tfm)
- 	nx_ctx->out_sg = NULL;
+ 	int i;
+ 
+@@ -702,7 +702,7 @@ static __devexit int gpmc_free_irq(void)
+ 	return 0;
  }
  
--static int __devinit nx_probe(struct vio_dev *viodev,
-+static int nx_probe(struct vio_dev *viodev,
- 			      const struct vio_device_id *id)
+-static void __devexit gpmc_mem_exit(void)
++static void gpmc_mem_exit(void)
  {
- 	dev_dbg(&viodev->dev, "driver probed: %s resource id: 0x%x\n",
-diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index d76fe06..fb037ff 100644
---- a/drivers/crypto/omap-sham.c
-+++ b/drivers/crypto/omap-sham.c
-@@ -1137,7 +1137,7 @@ static void omap_sham_dma_cleanup(struct omap_sham_dev *dd)
- 	}
+ 	int cs;
+ 
+@@ -804,7 +804,7 @@ static int gpmc_probe(struct platform_device *pdev)
+ 	return 0;
  }
  
--static int __devinit omap_sham_probe(struct platform_device *pdev)
-+static int omap_sham_probe(struct platform_device *pdev)
+-static __devexit int gpmc_remove(struct platform_device *pdev)
++static int gpmc_remove(struct platform_device *pdev)
  {
- 	struct omap_sham_dev *dd;
- 	struct device *dev = &pdev->dev;
-diff --git a/drivers/crypto/picoxcell_crypto.c b/drivers/crypto/picoxcell_crypto.c
-index a279f93..6eb91e6 100644
---- a/drivers/crypto/picoxcell_crypto.c
-+++ b/drivers/crypto/picoxcell_crypto.c
-@@ -1708,7 +1708,7 @@ static bool spacc_is_compatible(struct platform_device *pdev,
- 	return false;
+ 	gpmc_free_irq();
+ 	gpmc_mem_exit();
+diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+index 1e48d5e..0b08026 100644
+--- a/arch/arm/mach-omap2/mailbox.c
++++ b/arch/arm/mach-omap2/mailbox.c
+@@ -395,7 +395,7 @@ static int omap2_mbox_probe(struct platform_device *pdev)
+ 	return 0;
  }
  
--static int __devinit spacc_probe(struct platform_device *pdev)
-+static int spacc_probe(struct platform_device *pdev)
+-static int __devexit omap2_mbox_remove(struct platform_device *pdev)
++static int omap2_mbox_remove(struct platform_device *pdev)
  {
- 	int i, err, ret = -EINVAL;
- 	struct resource *mem, *irq;
+ 	omap_mbox_unregister();
+ 	iounmap(mbox_base);
+diff --git a/arch/arm/mach-pxa/tosa-bt.c b/arch/arm/mach-pxa/tosa-bt.c
+index 968f284..fc3646c 100644
+--- a/arch/arm/mach-pxa/tosa-bt.c
++++ b/arch/arm/mach-pxa/tosa-bt.c
+@@ -102,7 +102,7 @@ err_reset:
+ 	return rc;
+ }
+ 
+-static int __devexit tosa_bt_remove(struct platform_device *dev)
++static int tosa_bt_remove(struct platform_device *dev)
+ {
+ 	struct tosa_bt_data *data = dev->dev.platform_data;
+ 	struct rfkill *rfk = platform_get_drvdata(dev);
+diff --git a/arch/arm/mach-s3c24xx/mach-osiris-dvs.c b/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
+index 08bd8fc..45e7436 100644
+--- a/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
++++ b/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
+@@ -126,7 +126,7 @@ err_nogpio:
+ 	return ret;
+ }
+ 
+-static int __devexit osiris_dvs_remove(struct platform_device *pdev)
++static int osiris_dvs_remove(struct platform_device *pdev)
+ {
+ 	dev_info(&pdev->dev, "exiting\n");
+ 
+diff --git a/arch/arm/mach-sa1100/neponset.c b/arch/arm/mach-sa1100/neponset.c
+index 195d8bb..c229d25 100644
+--- a/arch/arm/mach-sa1100/neponset.c
++++ b/arch/arm/mach-sa1100/neponset.c
+@@ -368,7 +368,7 @@ static int neponset_probe(struct platform_device *dev)
+ 	return ret;
+ }
+ 
+-static int __devexit neponset_remove(struct platform_device *dev)
++static int neponset_remove(struct platform_device *dev)
+ {
+ 	struct neponset_drvdata *d = platform_get_drvdata(dev);
+ 	int irq = platform_get_irq(dev, 0);
+diff --git a/arch/arm/mach-u300/dummyspichip.c b/arch/arm/mach-u300/dummyspichip.c
+index f7a2a92..2785cb6 100644
+--- a/arch/arm/mach-u300/dummyspichip.c
++++ b/arch/arm/mach-u300/dummyspichip.c
+@@ -251,7 +251,7 @@ out_dev_create_looptest_failed:
+ 	return status;
+ }
+ 
+-static int __devexit pl022_dummy_remove(struct spi_device *spi)
++static int pl022_dummy_remove(struct spi_device *spi)
+ {
+ 	struct dummy *p_dummy = dev_get_drvdata(&spi->dev);
+ 
+diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+index d33e814..b7d78ba 100644
+--- a/arch/arm/plat-omap/dma.c
++++ b/arch/arm/plat-omap/dma.c
+@@ -2116,7 +2116,7 @@ exit_dma_lch_fail:
+ 	return ret;
+ }
+ 
+-static int __devexit omap_system_dma_remove(struct platform_device *pdev)
++static int omap_system_dma_remove(struct platform_device *pdev)
+ {
+ 	int dma_irq;
+ 
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index 97903e9..35acfab 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -762,7 +762,7 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
+  * In addition to freeing platform resources it also deletes the timer
+  * entry from the local list.
+  */
+-static int __devexit omap_dm_timer_remove(struct platform_device *pdev)
++static int omap_dm_timer_remove(struct platform_device *pdev)
+ {
+ 	struct omap_dm_timer *timer;
+ 	unsigned long flags;
+diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
+index caa33eb..8e11e96 100644
+--- a/arch/arm/plat-pxa/ssp.c
++++ b/arch/arm/plat-pxa/ssp.c
+@@ -164,7 +164,7 @@ err_free:
+ 	return ret;
+ }
+ 
+-static int __devexit pxa_ssp_remove(struct platform_device *pdev)
++static int pxa_ssp_remove(struct platform_device *pdev)
+ {
+ 	struct resource *res;
+ 	struct ssp_device *ssp;
+diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+index 010dde6..99ca1e6 100644
+--- a/arch/arm/plat-samsung/adc.c
++++ b/arch/arm/plat-samsung/adc.c
+@@ -433,7 +433,7 @@ static int s3c_adc_probe(struct platform_device *pdev)
+ 	return ret;
+ }
+ 
+-static int __devexit s3c_adc_remove(struct platform_device *pdev)
++static int s3c_adc_remove(struct platform_device *pdev)
+ {
+ 	struct adc_device *adc = platform_get_drvdata(pdev);
+ 
 -- 
 1.8.0
