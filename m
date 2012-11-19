@@ -1,53 +1,59 @@
-From: s.peter@mpl.ch (Stefan Peter)
-Date: Mon, 19 Nov 2012 14:01:00 +0100
-Subject: [PATCH 0/1] ARM: kirkwood: Convert the mplcec4 board to pinctrl
-In-Reply-To: <20121119121833.GI10259@lunn.ch>
-References: <cover.1353319919.git.s.peter@mpl.ch>
- <20121119111838.GH10259@lunn.ch> <50AA2118.7050700@mpl.ch>
- <20121119121833.GI10259@lunn.ch>
-Message-ID: <50AA2D8C.90902@mpl.ch>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Mon, 19 Nov 2012 14:01:50 +0100
+Subject: [PATCH v2 2/2] pwm: vt8500: Ensure pwm clock is enabled during
+ pwm_config
+In-Reply-To: <1353310254-21581-3-git-send-email-linux@prisktech.co.nz>
+References: <1353310254-21581-1-git-send-email-linux@prisktech.co.nz>
+ <1353310254-21581-3-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20121119130150.GA31093@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew
-
-Am 19.11.2012 13:18, schrieb Andrew Lunn:
+On Mon, Nov 19, 2012 at 08:30:54PM +1300, Tony Prisk wrote:
+> This patch corrects a bug reported by Peter Vasil.
 > 
-> Humm..
+> When all PWMs are disabled, PWM module may be disabled during
+> calls to pwm_config. This patch enables/disables the clock in
+> pwm_config to ensure the module is active before register read/
+> writes.
 > 
-> Try enabling CONFIG_DEBUG_PINCTRL. It prints out a lot of debug as the
-> driver loads.
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> Tested-by: Peter Vasil <petervasil@gmail.com>
+> ---
+>  drivers/pwm/pwm-vt8500.c |   12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pwm/pwm-vt8500.c b/drivers/pwm/pwm-vt8500.c
+> index 806f72c..9fdb70d 100644
+> --- a/drivers/pwm/pwm-vt8500.c
+> +++ b/drivers/pwm/pwm-vt8500.c
+> @@ -62,6 +62,13 @@ static int vt8500_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>  	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
+>  	unsigned long long c;
+>  	unsigned long period_cycles, prescale, pv, dc;
+> +	int err;
+> +
+> +	err = clk_enable(vt8500->clk);
+> +	if (err < 0) {
+> +		dev_err(chip->dev, "failed to enable clock in pwm_config()\n");
+> +		return err;
+> +	};
 
+I'm not entirely happy about this error message. What bugs me about it is
+that the clock doesn't fail to enable in pwm_config() but rather in
+vt8500_pwm_config(), so it might be slightly misleading. I'm not sure if
+the failure location is needed at all. "failed to enable clock" sounds
+useful enough. Furthermore I think that if it fails here it will likely
+also fail elsewhere.
 
-This is what I get
+If you really absolutely want to specify where clk_enable() failed, then
+I'd be slightly happier with "%s(): failed to enable clock", __func__.
 
-kirkwood-pinctrl f1010000.pinctrl: try to register 50 pins ...
-pinctrl core: registered pin 0 (PIN0) on f1010000.pinctrl
-pinctrl core: registered pin 1 (PIN1) on f1010000.pinctrl
-...
-pinctrl core: registered pin 12 (PIN12) on f1010000.pinctrl
-pinctrl core: registered pin 13 (PIN13) on f1010000.pinctrl
-pinctrl core: registered pin 14 (PIN14) on f1010000.pinctrl
-pinctrl core: registered pin 15 (PIN15) on f1010000.pinctrl
-pinctrl core: registered pin 16 (PIN16) on f1010000.pinctrl
-pinctrl core: registered pin 17 (PIN17) on f1010000.pinctrl
-...
-pinctrl core: add 8 pinmux maps
-pinctrl core: add 2 pinmux maps
-pinctrl core: add 1 pinmux maps
-kirkwood-pinctrl f1010000.pinctrl: unknown pin mmp13
-pinctrl core: add 6 pinmux maps
-pinctrl core: failed to register map default (5): invalid type given
-kirkwood-pinctrl f1010000.pinctrl: registered pinctrl driver
-
-I tried to get behind the reason for the "unknown pin mpp13" hoping that
-the subsequent errors regarding the maps are related, but it may be
-faster asking for your opinion.
-
-Regards
-
-Stefan Peter
-
--- 
-MPL AG, Switzerland                     http://www.mpl.ch
-Tel. +41 (0)56 483 34 34          Fax: +41(0)56 493 30 20
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121119/4bb0c7a6/attachment.sig>
