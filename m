@@ -1,48 +1,57 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Mon, 19 Nov 2012 12:03:45 -0700
-Subject: [PATCH 0/7] crypto: omap-aes updates
-Message-ID: <1353351832-6685-1-git-send-email-mgreer@animalcreek.com>
+Date: Mon, 19 Nov 2012 12:03:48 -0700
+Subject: [PATCH 3/7] ARM: OMAP2+: Remove unnecessary message when no AES IP is
+ present
+In-Reply-To: <1353351832-6685-1-git-send-email-mgreer@animalcreek.com>
+References: <1353351832-6685-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1353351832-6685-4-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-This series updates the crypto omap-aes driver and supporting
-infrastructure.
+Remove the error message that prints when there is no AES IP
+present to make it consistent with all the other IPs.
 
-Notes:
+CC: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+---
+ arch/arm/mach-omap2/devices.c | 23 +++++++++--------------
+ 1 file changed, 9 insertions(+), 14 deletions(-)
 
-a) Based on omap-sham patches recently submitted, XXX
-
-b) Since these patches will likely go though the OMAP tree (and not
-   through the crypto tree), it would be nice if the crypto guy(s)
-   would ACK or NACK patches 4-7 which modify the
-   drivers/crypto/omap-sham.c driver.
-
-c) These have only been tested on an omap2420 h4 and an am37x evm.
-
-d) Many thanks to Jon Hunter for testing on his omap2420 h4.
-
-Mark A. Greer (7):
-  ARM: OMAP2xxx: hwmod: Convert AES crypto devcie data to hwmod
-  ARM: OMAP3xxx: hwmod: Convert AES crypto device data to hwmod
-  ARM: OMAP2+: Remove unnecessary message when no AES IP is present
-  crypto: omap-aes: Remove cpu_is/omap_type check from driver
-  crypto: omap-aes: Convert to use pm_runtime API
-  crypto: omap-aes: Add code to use dmaengine API
-  crypto: omap-aes: Remove usage of private DMA API
-
- arch/arm/mach-omap2/clock2430_data.c               |   1 +
- arch/arm/mach-omap2/clock3xxx_data.c               |   1 +
- arch/arm/mach-omap2/devices.c                      |  75 +-------
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   1 +
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   1 +
- .../mach-omap2/omap_hwmod_2xxx_interconnect_data.c |  18 ++
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  38 ++++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  62 +++++++
- arch/arm/mach-omap2/omap_hwmod_common_data.h       |   2 +
- drivers/crypto/omap-aes.c                          | 202 ++++++++++++---------
- 10 files changed, 251 insertions(+), 150 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 6a9152a..03c1b3a 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -470,20 +470,15 @@ static void __init omap_init_sham(void)
+ 
+ static void __init omap_init_aes(void)
+ {
+-	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+-		struct omap_hwmod *oh;
+-		struct platform_device *pdev;
+-
+-		oh = omap_hwmod_lookup("aes");
+-		if (!oh)
+-			return;
+-
+-		pdev = omap_device_build("omap-aes", -1, oh, NULL, 0, NULL,
+-					 0, 0);
+-		WARN(IS_ERR(pdev), "Can't build omap_device for omap-aes\n");
+-	} else {
+-		pr_err("%s: platform not supported\n", __func__);
+-	}
++	struct omap_hwmod *oh;
++	struct platform_device *pdev;
++
++	oh = omap_hwmod_lookup("aes");
++	if (!oh)
++		return;
++
++	pdev = omap_device_build("omap-aes", -1, oh, NULL, 0, NULL, 0, 0);
++	WARN(IS_ERR(pdev), "Can't build omap_device for omap-aes\n");
+ }
+ 
+ /*-------------------------------------------------------------------------*/
 -- 
 1.7.12
