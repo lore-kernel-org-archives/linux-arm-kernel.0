@@ -1,25 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 19 Nov 2012 13:45:29 +0000
-Subject: [PATCH v4 3/7] ARM: kernel: smp_setup_processor_id() updates
-In-Reply-To: <1353329106-24084-4-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1353329106-24084-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1353329106-24084-4-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20121119134529.GS3205@mudshark.cambridge.arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 19 Nov 2012 07:52:36 -0600
+Subject: [PATCH v2 2/5] ARM: gic: remove direct use of gic_raise_softirq
+In-Reply-To: <20121119130718.025b7a2c@skate>
+References: <1351695517-5636-1-git-send-email-robherring2@gmail.com>
+ <1351695517-5636-3-git-send-email-robherring2@gmail.com>
+ <20121102124433.GA28213@bnru03> <20121119115021.GA19788@bnru10>
+ <20121119130718.025b7a2c@skate>
+Message-ID: <50AA39A4.1060006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 12:45:02PM +0000, Lorenzo Pieralisi wrote:
-> This patch applies some basic changes to the smp_setup_processor_id()
-> ARM implementation to make the code that builds cpu_logical_map more
-> uniform across the kernel.
+On 11/19/2012 06:07 AM, Thomas Petazzoni wrote:
 > 
-> The function now prints the full extent of the boot CPU MPIDR[23:0] and
-> initializes the cpu_logical_map for CPUs up to nr_cpu_ids.
+> On Mon, 19 Nov 2012 17:20:22 +0530, Srinidhi Kasagar wrote:
+>>>>         for (i = 0; i < ncores; i++)
+>>>>                 set_cpu_possible(i, true);
+>>>> -
+>>>> -       set_smp_cross_call(gic_raise_softirq);
+>>>
+>>> The ux500 changes looks ok too..
+>>>
+>>> However would you mind re-spinning your series on top of the below patch?
+>>
+>> ping??
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> ---
+> I have merged Linus Walleij patches into my irqchip branch with more
+> changes around the irqchip infrastructure. That said, it will not be
+> part of the 3.8 release cycle, so we will definitely take care of
+> re-spinning against the latest ux500 changes.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+I still hope to get some of the clean-up in for 3.8 if not the move
+itself. So I can include your patch. Is it in an arm-soc branch already?
 
-Will
+Rob
