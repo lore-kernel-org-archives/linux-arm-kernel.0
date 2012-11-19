@@ -1,77 +1,40 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 19 Nov 2012 10:09:52 +0100
-Subject: [PATCH 1/1] atmel: move ATMEL_MAX_UART to platform_data/atmel.h
-In-Reply-To: <1353189906-1767-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20121107111235.GH20063@game.jcrosoft.org>
- <1353189906-1767-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <50A9F760.4050207@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Nov 2012 09:19:12 +0000
+Subject: [PATCH V3 4/5] arm: mm: Added support for PJ4B cpu and init
+ routines
+In-Reply-To: <20121119031210.GD22106@titan.lakedaemon.net>
+References: <1352931637-3405-1-git-send-email-gregory.clement@free-electrons.com>
+ <1352931637-3405-5-git-send-email-gregory.clement@free-electrons.com>
+ <50A41BD3.9040509@free-electrons.com> <50A6B427.9080807@free-electrons.com>
+ <20121119031210.GD22106@titan.lakedaemon.net>
+Message-ID: <20121119091912.GC3290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/17/2012 11:05 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> use 7 for it as the sam9260 or the sam9g25 have 7 of them DBGU included
+On Sun, Nov 18, 2012 at 10:12:10PM -0500, Jason Cooper wrote:
+> On Fri, Nov 16, 2012 at 10:46:15PM +0100, Gregory CLEMENT wrote:
+> > On 11/14/2012 11:31 PM, Gregory CLEMENT wrote:
+> > > Hello Russell,
+> > > 
+> > > With the 2 changes I have done on according your comments
+> > > do you think you can give your acked-by for this patch?
+> > > 
+> > 
+> > Hello Russell,
+> > 
+> > I didn't have any feedback from you for this version.
+> > If you are fine with this, could you give your Acked-by?
+> > 
+> > 
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  arch/arm/mach-at91/include/mach/hardware.h  |    3 ---
->  arch/avr32/mach-at32ap/include/mach/board.h |    1 -
->  include/linux/platform_data/atmel.h         |    6 ++++++
->  3 files changed, 6 insertions(+), 4 deletions(-)
+> Gregory,
 > 
-> diff --git a/arch/arm/mach-at91/include/mach/hardware.h b/arch/arm/mach-at91/include/mach/hardware.h
-> index 711a789..a832e07 100644
-> --- a/arch/arm/mach-at91/include/mach/hardware.h
-> +++ b/arch/arm/mach-at91/include/mach/hardware.h
-> @@ -90,9 +90,6 @@
->  #define AT91_SRAM_MAX		SZ_1M
->  #define AT91_VIRT_BASE		(AT91_IO_VIRT_BASE - AT91_SRAM_MAX)
->  
-> -/* Serial ports */
-> -#define ATMEL_MAX_UART		7		/* 6 USART3's and one DBGU port (SAM9260) */
-> -
->  /* External Memory Map */
->  #define AT91_CHIPSELECT_0	0x10000000
->  #define AT91_CHIPSELECT_1	0x20000000
-> diff --git a/arch/avr32/mach-at32ap/include/mach/board.h b/arch/avr32/mach-at32ap/include/mach/board.h
-> index dca9345..d485b03 100644
-> --- a/arch/avr32/mach-at32ap/include/mach/board.h
-> +++ b/arch/avr32/mach-at32ap/include/mach/board.h
-> @@ -26,7 +26,6 @@ static inline void __deprecated at32_add_system_devices(void)
->  
->  }
->  
-> -#define ATMEL_MAX_UART	4
->  extern struct platform_device *atmel_default_console_device;
->  
->  /* Flags for selecting USART extra pins */
-> diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
-> index dbd6d53..59fffa4 100644
-> --- a/include/linux/platform_data/atmel.h
-> +++ b/include/linux/platform_data/atmel.h
-> @@ -19,6 +19,12 @@
->  #include <linux/serial.h>
->  #include <linux/platform_data/macb.h>
->  
-> +/*
-> + * at91: 6 USART3's and one DBGU port (SAM9260)
+> >From the looks of things, Russell has his head wrapped around buggy
+> sound driver code for the CuBox.  Perhaps Will Deacon or Catalin Marinas
+> would care to weigh in?  I'm reluctant to take the series without an
+> Acked-By from at least one of them.
 
-Why the "3"?
-
-> + * avr32: 4
-> + */
-> +#define ATMEL_MAX_UART	7
-> +
->   /* USB Device */
->  struct at91_udc_data {
->  	int	vbus_pin;		/* high == host powering us */
-> 
-
-Ok otherwise. Do not bother, I may change the typo while including it in
-at91-fixes pull request...
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Best regards,
--- 
-Nicolas Ferre
+Well, I would like to say - it should go through my tree, as it's generic
+ARM changes, and as very little (even generic stuff) seems to come through
+my tree anymore.  But that's going to make the remainder of your patches
+difficult to merge.
