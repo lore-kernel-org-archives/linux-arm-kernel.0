@@ -1,29 +1,43 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Mon, 19 Nov 2012 15:10:43 +0100
-Subject: [PATCH v5 8/8] watchdog: WatchDog Timer Driver Core - fix comment
+Date: Mon, 19 Nov 2012 15:10:42 +0100
+Subject: [PATCH v5 7/8] watchdog: orion_wdt: move the min_timeout
+ initialization
 In-Reply-To: <1353334243-16703-1-git-send-email-fabio.porcedda@gmail.com>
 References: <1353334243-16703-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1353334243-16703-9-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <1353334243-16703-8-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Move the min_timeout initialization inside the orion_wdt definition.
+
+Only compile tested.
+
 Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
 ---
- include/linux/watchdog.h | 2 +-
+ drivers/watchdog/orion_wdt.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
-index 5cff9d6..04ef8bd 100644
---- a/include/linux/watchdog.h
-+++ b/include/linux/watchdog.h
-@@ -129,7 +129,7 @@ static inline void *watchdog_get_drvdata(struct watchdog_device *wdd)
- 	return wdd->driver_data;
- }
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index 446a3e9..3b4e228 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -140,6 +140,7 @@ static const struct watchdog_ops orion_wdt_ops = {
+ static struct watchdog_device orion_wdt = {
+ 	.info = &orion_wdt_info,
+ 	.ops = &orion_wdt_ops,
++	.min_timeout = 1,
+ };
  
--/* drivers/watchdog/core/watchdog_core.c */
-+/* drivers/watchdog/watchdog_core.c */
- extern void watchdog_init_timeout(struct watchdog_device *wdd,
- 				  unsigned int parm_timeout,
- 				  struct device_node *node);
+ static int __devinit orion_wdt_probe(struct platform_device *pdev)
+@@ -162,7 +163,6 @@ static int __devinit orion_wdt_probe(struct platform_device *pdev)
+ 
+ 	wdt_max_duration = WDT_MAX_CYCLE_COUNT / wdt_tclk;
+ 
+-	orion_wdt.min_timeout = 1;
+ 	orion_wdt.timeout = wdt_max_duration;
+ 	orion_wdt.max_timeout = wdt_max_duration;
+ 	watchdog_init_timeout(&orion_wdt, heartbeat, pdev->dev.of_node);
 -- 
 1.8.0
