@@ -1,65 +1,28 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 19 Nov 2012 13:56:17 +0000
-Subject: [PATCH v3] video: Versatile Express DVI output driver
-In-Reply-To: <1351612732.6199.4.camel@hornet>
-References: <1350405036-17997-1-git-send-email-pawel.moll@arm.com>
- <1351612732.6199.4.camel@hornet>
-Message-ID: <1353333377.3303.7.camel@hornet>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 19 Nov 2012 14:56:12 +0100
+Subject: [PATCH v2 2/5] ARM: gic: remove direct use of gic_raise_softirq
+In-Reply-To: <50AA39A4.1060006@gmail.com>
+References: <1351695517-5636-1-git-send-email-robherring2@gmail.com>
+ <1351695517-5636-3-git-send-email-robherring2@gmail.com>
+ <20121102124433.GA28213@bnru03> <20121119115021.GA19788@bnru10>
+ <20121119130718.025b7a2c@skate> <50AA39A4.1060006@gmail.com>
+Message-ID: <CACRpkdZ=4Q8KakSSKdC8Nd2FntKUnH2pa87fprf5U_fFDrgX+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Mon, Nov 19, 2012 at 2:52 PM, Rob Herring <robherring2@gmail.com> wrote:
 
-One of the important parts of the VE update is the display muxer
-driver...
+>> I have merged Linus Walleij patches into my irqchip branch with more
+>> changes around the irqchip infrastructure. That said, it will not be
+>> part of the 3.8 release cycle, so we will definitely take care of
+>> re-spinning against the latest ux500 changes.
+>
+> I still hope to get some of the clean-up in for 3.8 if not the move
+> itself. So I can include your patch. Is it in an arm-soc branch already?
 
-On Tue, 2012-10-30 at 15:58 +0000, Pawel Moll wrote:
-> Hello again Florian,
-> 
-> On Tue, 2012-10-16 at 17:30 +0100, Pawel Moll wrote:
-> > Versatile Express' DVI video output can be connected to one the three
-> > sources - motherboard's CLCD controller or a video signal generated
-> > by one of the daughterboards.
-> > 
-> > This driver configures the muxer FPGA so the output displays content
-> > of one of the framebuffers in the system (0 by default, can be changed
-> > by user writing to the "fb" sysfs attribute of the muxfpga device).
-> > 
-> > It will also set up the display formatter mode and keep it up
-> > to date with mode changes requested by the user (eg. with fbset
-> > tool).
-> > 
-> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> 
-> It's just a polite a friendly nag regarding this patch - it's been 2
-> weeks since I posted this version (and 1.5 month since the first one)...
-> 
-> Does it look good enough or completely wrong?
+Please include this patch, I haven't seen it in ARM SoC, and
+I sure think Srinidhi's intention was to take it together with
+these patches.
 
-I've asked the framebuffer people 3 times about this but got no comment
-whatsoever:
-
-https://patchwork.kernel.org/patch/1473091/
-https://patchwork.kernel.org/patch/1601781/
-
-so I assume there is no problem with merging this code ;-) Therefore,
-would you be so kind to pull this single patch? Without it the 3.8
-kernel will not be able to show anything on VE's display...
-
-The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
-
-  Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/pawelmoll/linux.git vexpress-drivers2
-
-for you to fetch changes up to 357e174056d44c6614afec6c5ace1c2aea2ef0bb:
-
-  video: Versatile Express DVI output driver (2012-11-19 11:12:40 +0000)
-
-This is the very last thing for 3.8 merge window from me.
-
-Thanks and regards
-
-Pawe?
+Yours,
+Linus Walleij
