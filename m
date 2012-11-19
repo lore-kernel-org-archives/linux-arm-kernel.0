@@ -1,43 +1,46 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 19 Nov 2012 14:22:41 -0500 (EST)
-Subject: [PATCH v2] net/macb: move to circ_buf macros and fix initial
- condition
-In-Reply-To: <1353340821-12658-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1353338244-11506-1-git-send-email-nicolas.ferre@atmel.com>
- <1353340821-12658-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20121119.142241.1136499358405707363.davem@davemloft.net>
+From: mturquette@ti.com (Mike Turquette)
+Date: Mon, 19 Nov 2012 12:02:38 -0800
+Subject: [PATCH] clk: move IM-PD1 clocks to drivers/clk
+In-Reply-To: <1353350711-29916-1-git-send-email-linus.walleij@linaro.org>
+References: <1353350711-29916-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20121119200238.21126.61661@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
-Date: Mon, 19 Nov 2012 17:00:21 +0100
+Quoting Linus Walleij (2012-11-19 10:45:11)
+> diff --git a/drivers/clk/versatile/clk-impd1.c b/drivers/clk/versatile/clk-impd1.c
+> new file mode 100644
+> index 0000000..28ac702
+> --- /dev/null
+> +++ b/drivers/clk/versatile/clk-impd1.c
+> @@ -0,0 +1,96 @@
 
-> Move to circular buffers management macro and correct an error
-> with circular buffer initial condition.
-> 
-> Without this patch, the macb_tx_ring_avail() function was
-> not reporting the proper ring availability at startup:
-> macb macb: eth0: BUG! Tx Ring full when queue awake!
-> macb macb: eth0: tx_head = 0, tx_tail = 0
-> And hanginig forever...
-> 
-> I remove the macb_tx_ring_avail() function and use the
-> proven macros from circ_buf.h. CIRC_CNT() is used in the
-> "consumer" part of the driver: macb_tx_interrupt() to match
-> advice from Documentation/circular-buffers.txt.
-> 
-> Reported-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Tested-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+What is rule on GPL headers these days?  I notice that this file is
+missing as well as some of the other C files in drivers/clk/versatile/.
 
-Applied, thanks.
+I prefer to have GPL headers and also establishing a copyright owner,
+but maybe I'm out of touch with some new way of doing things?
 
-> ---
-> v2: - added tags from Jean-Christophe PLAGNIOL-VILLARD
+> +#include <linux/clk-provider.h>
+> +#include <linux/clk.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/platform_data/clk-integrator.h>
+> +
 
-Note that under normal circumstances, if the only change is the
-tags that people added in replies, you don't need to do this.
+<snip>
 
-Patchwork accumulates all of the signoffs, acks, tested-by,
-reviewed-by, etc. tags made in replies to the patch automatically for
-me, so when I apply the patch they will be there.
+> diff --git a/drivers/clk/versatile/clk-integrator.c b/drivers/clk/versatile/clk-integrator.c
+> index a505392..5aa6ab9 100644
+> --- a/drivers/clk/versatile/clk-integrator.c
+> +++ b/drivers/clk/versatile/clk-integrator.c
+> @@ -1,8 +1,9 @@
+
+Same here.  I guess I didn't catch this the first time around.
+
+Rest of the patch looks fine so once the header question is answered
+I'll either take it or you can respin with the headers.
+
+Regards,
+Mike
