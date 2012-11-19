@@ -1,68 +1,124 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 19 Nov 2012 16:22:23 +0100
-Subject: [PATCH 2/4] ARM: sunxi: Add earlyprintk support for UART0 (sun4i)
-In-Reply-To: <1353323383-11827-2-git-send-email-sr@denx.de>
+Date: Mon, 19 Nov 2012 16:22:45 +0100
+Subject: [PATCH 3/4] ARM: sunxi: Add sun4i and cubieboard support
+In-Reply-To: <1353323383-11827-3-git-send-email-sr@denx.de>
 References: <1353323383-11827-1-git-send-email-sr@denx.de>
- <1353323383-11827-2-git-send-email-sr@denx.de>
-Message-ID: <50AA4EAF.4090500@free-electrons.com>
+ <1353323383-11827-3-git-send-email-sr@denx.de>
+Message-ID: <50AA4EC5.3050702@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Le 19/11/2012 12:09, Stefan Roese a ?crit :
+> This patch adds support for the Cubieboard based on the Allwinner
+> A10/sun4i SoC. Currently only UART is supported. Other devices
+> will eventually follow.
+> 
 > Signed-off-by: Stefan Roese <sr@denx.de>
 > Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
 > Cc: Arnd Bergmann <arnd@arndb.de>
 > ---
->  arch/arm/Kconfig.debug         | 9 ++++++++-
->  arch/arm/include/debug/sunxi.S | 5 ++++-
->  2 files changed, 12 insertions(+), 2 deletions(-)
+>  arch/arm/boot/dts/Makefile             |  3 ++-
+>  arch/arm/boot/dts/sun4i-cubieboard.dts | 38 ++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/sunxi.dtsi           |  9 ++++++++
+>  arch/arm/mach-sunxi/sunxi.c            |  1 +
+>  4 files changed, 50 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/sun4i-cubieboard.dts
 > 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index f12bc3a..cc1ed35 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -345,6 +345,13 @@ choice
->  		  Say Y here if you want kernel low-level debugging support
->  		  on SOCFPGA based platforms.
->  
-> +	config DEBUG_SUNXI_UART0
-> +		bool "Kernel low-level debugging messages via sunXi UART0"
-> +		depends on ARCH_SUNXI
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on Allwinner A1X based platforms on the UART0.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 9b2d3f0..4dd567b 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -84,7 +84,8 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
+>  	spear310-evb.dtb \
+>  	spear320-evb.dtb
+>  dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
+> -dtb-$(CONFIG_ARCH_SUNXI) += sun5i-olinuxino.dtb
+> +dtb-$(CONFIG_ARCH_SUNXI) += sun4i-cubieboard.dtb \
+> +	sun5i-olinuxino.dtb
+>  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+>  	tegra20-medcom-wide.dtb \
+>  	tegra20-paz00.dtb \
+> diff --git a/arch/arm/boot/dts/sun4i-cubieboard.dts b/arch/arm/boot/dts/sun4i-cubieboard.dts
+> new file mode 100644
+> index 0000000..f4ca126
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun4i-cubieboard.dts
+> @@ -0,0 +1,38 @@
+> +/*
+> + * Copyright 2012 Stefan Roese
+> + * Stefan Roese <sr@denx.de>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
 > +
->  	config DEBUG_SUNXI_UART1
->  		bool "Kernel low-level debugging messages via sunXi UART1"
->  		depends on ARCH_SUNXI
-> @@ -423,7 +430,7 @@ config DEBUG_LL_INCLUDE
->  	default "debug/mvebu.S" if DEBUG_MVEBU_UART
->  	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
->  	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
-> -	default "debug/sunxi.S" if DEBUG_SUNXI_UART1
-> +	default "debug/sunxi.S" if DEBUG_SUNXI_UART0 || DEBUG_SUNXI_UART1
->  	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
->  		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
->  	default "mach/debug-macro.S"
-> diff --git a/arch/arm/include/debug/sunxi.S b/arch/arm/include/debug/sunxi.S
-> index 3bf61ca..04eb56d 100644
-> --- a/arch/arm/include/debug/sunxi.S
-> +++ b/arch/arm/include/debug/sunxi.S
-> @@ -10,7 +10,10 @@
->   * published by the Free Software Foundation.
->  */
+> +/dts-v1/;
+> +/include/ "sun4i.dtsi"
+> +
+> +/ {
+> +	model = "Cubietech Cubieboard";
+> +	compatible = "cubietech,cubieboard", "allwinner,sun4i";
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +		serial1 = &uart1;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "earlyprintk console=ttyS0,115200";
+> +	};
+> +
+> +	soc {
+> +		uart0: uart at 01c28000 {
+> +			status = "okay";
+> +		};
+> +
+> +		uart1: uart at 01c28400 {
+> +			status = "okay";
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
+> index 9e476de..8284fbd 100644
+> --- a/arch/arm/boot/dts/sunxi.dtsi
+> +++ b/arch/arm/boot/dts/sunxi.dtsi
+> @@ -54,6 +54,15 @@
+>  			#interrupt-cells = <1>;
+>  		};
 >  
-> -#ifdef CONFIG_DEBUG_SUNXI_UART1
-> +#if defined(CONFIG_DEBUG_SUNXI_UART0)
-> +#define SUNXI_UART_DEBUG_PHYS_BASE 0x01c28000
-> +#define SUNXI_UART_DEBUG_VIRT_BASE 0xf1c28000
-> +#elif defined(CONFIG_DEBUG_SUNXI_UART1)
->  #define SUNXI_UART_DEBUG_PHYS_BASE 0x01c28400
->  #define SUNXI_UART_DEBUG_VIRT_BASE 0xf1c28400
->  #endif
+> +		uart0: uart at 01c28000 {
+> +			compatible = "ns8250";
+> +			reg = <0x01c28000 0x400>;
+> +			interrupts = <1>;
+> +			reg-shift = <2>;
+> +			clock-frequency = <24000000>;
+> +			status = "disabled";
+> +		};
+> +
+>  		uart1: uart at 01c28400 {
+>  			compatible = "ns8250";
+>  			reg = <0x01c28400 0x400>;
+> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> index 8f42df8..13d4d96 100644
+> --- a/arch/arm/mach-sunxi/sunxi.c
+> +++ b/arch/arm/mach-sunxi/sunxi.c
+> @@ -46,6 +46,7 @@ static void __init sunxi_dt_init(void)
+>  }
+>  
+>  static const char * const sunxi_board_dt_compat[] = {
+> +	"allwinner,sun4i",
+>  	"allwinner,sun5i",
+>  	NULL,
+>  };
 > 
 
 Applied, thanks!
+
+Maxime
 
 -- 
 Maxime Ripard, Free Electrons
