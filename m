@@ -1,52 +1,97 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 19 Nov 2012 16:58:56 +0100
-Subject: [PATCH 1/2] clk: mvebu: armada 370/XP add clock gating control
- provider for DT
-In-Reply-To: <20121119164611.2e754b64@skate>
-References: <1353014906-31566-6-git-send-email-andrew@lunn.ch>
- <1353088920-17458-1-git-send-email-gregory.clement@free-electrons.com>
- <1353088920-17458-2-git-send-email-gregory.clement@free-electrons.com>
- <20121117082602.GF24569@lunn.ch>
- <50A75BB4.4070003@free-electrons.com>
- <20121117135435.GA13479@lunn.ch> <20121119164611.2e754b64@skate>
-Message-ID: <20121119155856.GL10259@lunn.ch>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 19 Nov 2012 17:00:21 +0100
+Subject: [PATCH v2] net/macb: move to circ_buf macros and fix initial condition
+In-Reply-To: <1353338244-11506-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1353338244-11506-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1353340821-12658-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 04:46:11PM +0100, Thomas Petazzoni wrote:
-> Dear Andrew Lunn,
-> 
-> On Sat, 17 Nov 2012 14:54:35 +0100, Andrew Lunn wrote:
-> > > > What is the ddr clock for? Does bad things happen if you turn it off?
-> > > > Kirkwood has a similar clock, dunit, which i decided not to export,
-> > > > since when you turn it off, the whole SoC locks up.
-> > > 
-> > > Well of course if you code run in DDR then it could be a problem. But
-> > > I think it could be useful to turn it off when going to suspend, it
-> > > the DDR can do self-refresh. In this case it should be possible to run
-> > > the code from SRAM or L2 Cache.
-> > 
-> > O.K. Just watch out for the lateinit call in the clock framework.
-> 
-> I don't think there is a problem with the dramclk and the lateinit call
-> of the clock framework. The dramclk is a fixed factor clock, and the
-> fixed factor clock driver does not implement the ->disable() operation.
-> And therefore, the clk_disable_unused() code executed as the lateinit
-> call will not be able to disable it:
-> 
-> 	if (__clk_is_enabled(clk) && clk->ops->disable)
-> 		clk->ops->disable(clk->hw);
-> 
-> So I think we're quite safe with fixed rate clocks and fixed factor
-> clocks in that no-one can disable them :-)
+Move to circular buffers management macro and correct an error
+with circular buffer initial condition.
 
-Hi Thomas
+Without this patch, the macb_tx_ring_avail() function was
+not reporting the proper ring availability at startup:
+macb macb: eth0: BUG! Tx Ring full when queue awake!
+macb macb: eth0: tx_head = 0, tx_tail = 0
+And hanginig forever...
 
-I don't think we are taking about the same clock. I mean the gate
-clock:
+I remove the macb_tx_ring_avail() function and use the
+proven macros from circ_buf.h. CIRC_CNT() is used in the
+"consumer" part of the driver: macb_tx_interrupt() to match
+advice from Documentation/circular-buffers.txt.
 
-28   ddr     DDR Cntrl
+Reported-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Tested-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+v2: - added tags from Jean-Christophe PLAGNIOL-VILLARD
 
-not the core clock.
+ drivers/net/ethernet/cadence/macb.c | 17 +++++++----------
+ 1 file changed, 7 insertions(+), 10 deletions(-)
 
-    Andrew
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index edb2aba..27991dd 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -14,6 +14,7 @@
+ #include <linux/moduleparam.h>
+ #include <linux/kernel.h>
+ #include <linux/types.h>
++#include <linux/circ_buf.h>
+ #include <linux/slab.h>
+ #include <linux/init.h>
+ #include <linux/gpio.h>
+@@ -38,8 +39,8 @@
+ #define TX_RING_SIZE		128 /* must be power of 2 */
+ #define TX_RING_BYTES		(sizeof(struct macb_dma_desc) * TX_RING_SIZE)
+ 
+-/* minimum number of free TX descriptors before waking up TX process */
+-#define MACB_TX_WAKEUP_THRESH	(TX_RING_SIZE / 4)
++/* level of occupied TX descriptors under which we wake up TX process */
++#define MACB_TX_WAKEUP_THRESH	(3 * TX_RING_SIZE / 4)
+ 
+ #define MACB_RX_INT_FLAGS	(MACB_BIT(RCOMP) | MACB_BIT(RXUBR)	\
+ 				 | MACB_BIT(ISR_ROVR))
+@@ -60,11 +61,6 @@ static unsigned int macb_tx_ring_wrap(unsigned int index)
+ 	return index & (TX_RING_SIZE - 1);
+ }
+ 
+-static unsigned int macb_tx_ring_avail(struct macb *bp)
+-{
+-	return (bp->tx_tail - bp->tx_head) & (TX_RING_SIZE - 1);
+-}
+-
+ static struct macb_dma_desc *macb_tx_desc(struct macb *bp, unsigned int index)
+ {
+ 	return &bp->tx_ring[macb_tx_ring_wrap(index)];
+@@ -524,7 +520,8 @@ static void macb_tx_interrupt(struct macb *bp)
+ 
+ 	bp->tx_tail = tail;
+ 	if (netif_queue_stopped(bp->dev)
+-			&& macb_tx_ring_avail(bp) > MACB_TX_WAKEUP_THRESH)
++			&& CIRC_CNT(bp->tx_head, bp->tx_tail,
++				    TX_RING_SIZE) <= MACB_TX_WAKEUP_THRESH)
+ 		netif_wake_queue(bp->dev);
+ }
+ 
+@@ -818,7 +815,7 @@ static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 	spin_lock_irqsave(&bp->lock, flags);
+ 
+ 	/* This is a hard error, log it. */
+-	if (macb_tx_ring_avail(bp) < 1) {
++	if (CIRC_SPACE(bp->tx_head, bp->tx_tail, TX_RING_SIZE) < 1) {
+ 		netif_stop_queue(dev);
+ 		spin_unlock_irqrestore(&bp->lock, flags);
+ 		netdev_err(bp->dev, "BUG! Tx Ring full when queue awake!\n");
+@@ -855,7 +852,7 @@ static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 
+ 	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(TSTART));
+ 
+-	if (macb_tx_ring_avail(bp) < 1)
++	if (CIRC_SPACE(bp->tx_head, bp->tx_tail, TX_RING_SIZE) < 1)
+ 		netif_stop_queue(dev);
+ 
+ 	spin_unlock_irqrestore(&bp->lock, flags);
+-- 
+1.8.0
