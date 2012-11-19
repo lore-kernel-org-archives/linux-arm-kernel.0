@@ -1,9 +1,9 @@
 From: wfp5p@virginia.edu (Bill Pemberton)
-Date: Mon, 19 Nov 2012 13:21:25 -0500
-Subject: [PATCH 136/493] ethernet: remove use of __devexit_p
+Date: Mon, 19 Nov 2012 13:21:21 -0500
+Subject: [PATCH 132/493] Input: remove use of __devexit_p
 In-Reply-To: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
 References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
-Message-ID: <1353349642-3677-136-git-send-email-wfp5p@virginia.edu>
+Message-ID: <1353349642-3677-132-git-send-email-wfp5p@virginia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,1896 +11,2003 @@ CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
 needed.
 
 Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-Cc: Steffen Klassert <klassert@mathematik.tu-chemnitz.de> 
-Cc: David Dillow <dave@thedillows.org> 
-Cc: Russell King <linux@arm.linux.org.uk> 
-Cc: Kristoffer Glembo <kristoffer@gaisler.com> 
-Cc: Jes Sorensen <jes@trained-monkey.org> 
-Cc: Don Fry <pcnet32@frontier.com> 
-Cc: Jay Cliburn <jcliburn@gmail.com> 
-Cc: Chris Snook <chris.snook@gmail.com> 
-Cc: Grant Grundler <grundler@parisc-linux.org> 
-Cc: Jaroslav Kysela <perex@perex.cz> 
-Cc: Francois Romieu <romieu@fr.zoreil.com> 
-Cc: Sorbica Shieh <sorbica@icplus.com.tw> 
-Cc: Guo-Fu Tseng <cooldavid@cooldavid.org> 
-Cc: Mirko Lindner <mlindner@marvell.com> 
-Cc: Stephen Hemminger <shemminger@vyatta.com> 
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com> 
 Cc: Wan ZongShun <mcuos.com@gmail.com> 
-Cc: Olof Johansson <olof@lixom.net> 
-Cc: Florian Fainelli <florian@openwrt.org> 
-Cc: Realtek linux nic maintainers <nic_swsd@realtek.com> 
-Cc: Ralf Baechle <ralf@linux-mips.org> 
-Cc: Daniele Venzano <venza@brownhat.org> 
-Cc: Steve Glendinning <steve.glendinning@shawell.net> 
-Cc: Samuel Chessman <chessman@tux.org> 
-Cc: Roger Luethi <rl@hellgate.ch> 
-Cc: Anirudha Sarangi <anirudh@xilinx.com> 
-Cc: John Linn <John.Linn@xilinx.com> 
-Cc: netdev at vger.kernel.org 
+Cc: Miloslav Trmac <mitr@volny.cz> 
+Cc: Russell King <linux@arm.linux.org.uk> 
+Cc: Javier Martinez Canillas <javier@dowhile0.org> 
+Cc: Pau Oliva Fora <pof@eslack.org> 
+Cc: Ben Dooks <ben-linux@fluff.org> 
+Cc: Kukjin Kim <kgene.kim@samsung.com> 
+Cc: linux-input at vger.kernel.org 
+Cc: device-drivers-devel at blackfin.uclinux.org 
 Cc: linux-arm-kernel at lists.infradead.org 
-Cc: uclinux-dist-devel at blackfin.uclinux.org 
-Cc: linux-acenic at sunsite.dk 
-Cc: e1000-devel at lists.sourceforge.net 
-Cc: linux-mips at linux-mips.org 
+Cc: patches at opensource.wolfsonmicro.com 
+Cc: linux-samsung-soc at vger.kernel.org 
 ---
- drivers/net/ethernet/3com/3c509.c                    | 6 +++---
- drivers/net/ethernet/3com/3c59x.c                    | 4 ++--
- drivers/net/ethernet/3com/typhoon.c                  | 2 +-
- drivers/net/ethernet/8390/etherh.c                   | 2 +-
- drivers/net/ethernet/8390/ne2k-pci.c                 | 2 +-
- drivers/net/ethernet/8390/ne3210.c                   | 2 +-
- drivers/net/ethernet/8390/zorro8390.c                | 2 +-
- drivers/net/ethernet/adaptec/starfire.c              | 2 +-
- drivers/net/ethernet/adi/bfin_mac.c                  | 4 ++--
- drivers/net/ethernet/aeroflex/greth.c                | 2 +-
- drivers/net/ethernet/alteon/acenic.c                 | 2 +-
- drivers/net/ethernet/amd/a2065.c                     | 2 +-
- drivers/net/ethernet/amd/amd8111e.c                  | 2 +-
- drivers/net/ethernet/amd/ariadne.c                   | 2 +-
- drivers/net/ethernet/amd/au1000_eth.c                | 2 +-
- drivers/net/ethernet/amd/depca.c                     | 4 ++--
- drivers/net/ethernet/amd/hplance.c                   | 2 +-
- drivers/net/ethernet/amd/pcnet32.c                   | 2 +-
- drivers/net/ethernet/amd/sunlance.c                  | 2 +-
- drivers/net/ethernet/apple/macmace.c                 | 2 +-
- drivers/net/ethernet/atheros/atl1c/atl1c_main.c      | 2 +-
- drivers/net/ethernet/atheros/atl1e/atl1e_main.c      | 2 +-
- drivers/net/ethernet/atheros/atlx/atl1.c             | 2 +-
- drivers/net/ethernet/atheros/atlx/atl2.c             | 2 +-
- drivers/net/ethernet/broadcom/b44.c                  | 2 +-
- drivers/net/ethernet/broadcom/bcm63xx_enet.c         | 4 ++--
- drivers/net/ethernet/broadcom/bnx2.c                 | 2 +-
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c     | 2 +-
- drivers/net/ethernet/broadcom/tg3.c                  | 2 +-
- drivers/net/ethernet/brocade/bna/bnad.c              | 2 +-
- drivers/net/ethernet/cadence/at91_ether.c            | 2 +-
- drivers/net/ethernet/chelsio/cxgb/cxgb2.c            | 2 +-
- drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c      | 2 +-
- drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c      | 2 +-
- drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c  | 4 ++--
- drivers/net/ethernet/cisco/enic/enic_main.c          | 2 +-
- drivers/net/ethernet/davicom/dm9000.c                | 2 +-
- drivers/net/ethernet/dec/tulip/de2104x.c             | 2 +-
- drivers/net/ethernet/dec/tulip/de4x5.c               | 4 ++--
- drivers/net/ethernet/dec/tulip/dmfe.c                | 2 +-
- drivers/net/ethernet/dec/tulip/tulip_core.c          | 2 +-
- drivers/net/ethernet/dec/tulip/uli526x.c             | 2 +-
- drivers/net/ethernet/dec/tulip/winbond-840.c         | 2 +-
- drivers/net/ethernet/dec/tulip/xircom_cb.c           | 2 +-
- drivers/net/ethernet/dlink/dl2k.c                    | 2 +-
- drivers/net/ethernet/dlink/sundance.c                | 2 +-
- drivers/net/ethernet/dnet.c                          | 2 +-
- drivers/net/ethernet/ethoc.c                         | 2 +-
- drivers/net/ethernet/fealnx.c                        | 2 +-
- drivers/net/ethernet/freescale/fec.c                 | 2 +-
- drivers/net/ethernet/hp/hp100.c                      | 4 ++--
- drivers/net/ethernet/i825xx/ether1.c                 | 2 +-
- drivers/net/ethernet/i825xx/lasi_82596.c             | 2 +-
- drivers/net/ethernet/i825xx/sni_82596.c              | 2 +-
- drivers/net/ethernet/icplus/ipg.c                    | 2 +-
- drivers/net/ethernet/intel/e100.c                    | 2 +-
- drivers/net/ethernet/intel/e1000/e1000_main.c        | 2 +-
- drivers/net/ethernet/intel/e1000e/netdev.c           | 2 +-
- drivers/net/ethernet/intel/igb/igb_main.c            | 2 +-
- drivers/net/ethernet/intel/igbvf/netdev.c            | 2 +-
- drivers/net/ethernet/intel/ixgb/ixgb_main.c          | 2 +-
- drivers/net/ethernet/intel/ixgbe/ixgbe_main.c        | 2 +-
- drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c    | 2 +-
- drivers/net/ethernet/jme.c                           | 2 +-
- drivers/net/ethernet/lantiq_etop.c                   | 2 +-
- drivers/net/ethernet/marvell/skge.c                  | 2 +-
- drivers/net/ethernet/marvell/sky2.c                  | 2 +-
- drivers/net/ethernet/mellanox/mlx4/main.c            | 2 +-
- drivers/net/ethernet/micrel/ks8695net.c              | 2 +-
- drivers/net/ethernet/micrel/ks8842.c                 | 2 +-
- drivers/net/ethernet/micrel/ks8851.c                 | 2 +-
- drivers/net/ethernet/micrel/ks8851_mll.c             | 2 +-
- drivers/net/ethernet/microchip/enc28j60.c            | 2 +-
- drivers/net/ethernet/natsemi/jazzsonic.c             | 2 +-
- drivers/net/ethernet/natsemi/macsonic.c              | 2 +-
- drivers/net/ethernet/natsemi/natsemi.c               | 2 +-
- drivers/net/ethernet/natsemi/ns83820.c               | 2 +-
- drivers/net/ethernet/natsemi/xtsonic.c               | 2 +-
- drivers/net/ethernet/neterion/s2io.c                 | 2 +-
- drivers/net/ethernet/neterion/vxge/vxge-main.c       | 2 +-
- drivers/net/ethernet/nuvoton/w90p910_ether.c         | 2 +-
- drivers/net/ethernet/nvidia/forcedeth.c              | 2 +-
- drivers/net/ethernet/nxp/lpc_eth.c                   | 2 +-
- drivers/net/ethernet/octeon/octeon_mgmt.c            | 2 +-
- drivers/net/ethernet/packetengines/hamachi.c         | 2 +-
- drivers/net/ethernet/packetengines/yellowfin.c       | 2 +-
- drivers/net/ethernet/pasemi/pasemi_mac.c             | 2 +-
- drivers/net/ethernet/qlogic/netxen/netxen_nic_main.c | 2 +-
- drivers/net/ethernet/qlogic/qla3xxx.c                | 2 +-
- drivers/net/ethernet/qlogic/qlcnic/qlcnic_main.c     | 2 +-
- drivers/net/ethernet/qlogic/qlge/qlge_main.c         | 2 +-
- drivers/net/ethernet/rdc/r6040.c                     | 2 +-
- drivers/net/ethernet/realtek/8139too.c               | 2 +-
- drivers/net/ethernet/realtek/r8169.c                 | 2 +-
- drivers/net/ethernet/s6gmac.c                        | 2 +-
- drivers/net/ethernet/seeq/ether3.c                   | 2 +-
- drivers/net/ethernet/sgi/ioc3-eth.c                  | 2 +-
- drivers/net/ethernet/silan/sc92031.c                 | 2 +-
- drivers/net/ethernet/sis/sis190.c                    | 2 +-
- drivers/net/ethernet/sis/sis900.c                    | 2 +-
- drivers/net/ethernet/smsc/epic100.c                  | 2 +-
- drivers/net/ethernet/smsc/smc911x.c                  | 2 +-
- drivers/net/ethernet/smsc/smc91x.c                   | 2 +-
- drivers/net/ethernet/smsc/smsc911x.c                 | 2 +-
- drivers/net/ethernet/smsc/smsc9420.c                 | 2 +-
- drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c     | 2 +-
- drivers/net/ethernet/sun/cassini.c                   | 2 +-
- drivers/net/ethernet/sun/niu.c                       | 4 ++--
- drivers/net/ethernet/sun/sunbmac.c                   | 2 +-
- drivers/net/ethernet/sun/sunhme.c                    | 4 ++--
- drivers/net/ethernet/sun/sunqe.c                     | 2 +-
- drivers/net/ethernet/tehuti/tehuti.c                 | 2 +-
- drivers/net/ethernet/ti/cpmac.c                      | 2 +-
- drivers/net/ethernet/ti/cpsw.c                       | 2 +-
- drivers/net/ethernet/ti/davinci_emac.c               | 2 +-
- drivers/net/ethernet/ti/davinci_mdio.c               | 2 +-
- drivers/net/ethernet/ti/tlan.c                       | 2 +-
- drivers/net/ethernet/toshiba/spider_net.c            | 2 +-
- drivers/net/ethernet/toshiba/tc35815.c               | 2 +-
- drivers/net/ethernet/via/via-rhine.c                 | 2 +-
- drivers/net/ethernet/via/via-velocity.c              | 2 +-
- drivers/net/ethernet/wiznet/w5100.c                  | 2 +-
- drivers/net/ethernet/wiznet/w5300.c                  | 2 +-
- drivers/net/ethernet/xilinx/ll_temac_main.c          | 2 +-
- drivers/net/ethernet/xilinx/xilinx_axienet_main.c    | 2 +-
- drivers/net/ethernet/xilinx/xilinx_emaclite.c        | 2 +-
- 126 files changed, 137 insertions(+), 137 deletions(-)
+ drivers/input/gameport/emu10k1-gp.c         | 2 +-
+ drivers/input/gameport/fm801-gp.c           | 2 +-
+ drivers/input/joystick/as5011.c             | 2 +-
+ drivers/input/joystick/maplecontrol.c       | 2 +-
+ drivers/input/keyboard/adp5520-keys.c       | 2 +-
+ drivers/input/keyboard/adp5588-keys.c       | 2 +-
+ drivers/input/keyboard/adp5589-keys.c       | 2 +-
+ drivers/input/keyboard/bf54x-keys.c         | 2 +-
+ drivers/input/keyboard/davinci_keyscan.c    | 2 +-
+ drivers/input/keyboard/ep93xx_keypad.c      | 2 +-
+ drivers/input/keyboard/gpio_keys.c          | 2 +-
+ drivers/input/keyboard/gpio_keys_polled.c   | 2 +-
+ drivers/input/keyboard/hilkbd.c             | 2 +-
+ drivers/input/keyboard/imx_keypad.c         | 2 +-
+ drivers/input/keyboard/jornada680_kbd.c     | 2 +-
+ drivers/input/keyboard/jornada720_kbd.c     | 2 +-
+ drivers/input/keyboard/lm8323.c             | 2 +-
+ drivers/input/keyboard/lm8333.c             | 2 +-
+ drivers/input/keyboard/locomokbd.c          | 2 +-
+ drivers/input/keyboard/lpc32xx-keys.c       | 2 +-
+ drivers/input/keyboard/matrix_keypad.c      | 2 +-
+ drivers/input/keyboard/max7359_keypad.c     | 2 +-
+ drivers/input/keyboard/mcs_touchkey.c       | 2 +-
+ drivers/input/keyboard/mpr121_touchkey.c    | 2 +-
+ drivers/input/keyboard/nomadik-ske-keypad.c | 2 +-
+ drivers/input/keyboard/omap-keypad.c        | 2 +-
+ drivers/input/keyboard/omap4-keypad.c       | 2 +-
+ drivers/input/keyboard/opencores-kbd.c      | 2 +-
+ drivers/input/keyboard/pmic8xxx-keypad.c    | 2 +-
+ drivers/input/keyboard/pxa27x_keypad.c      | 2 +-
+ drivers/input/keyboard/pxa930_rotary.c      | 2 +-
+ drivers/input/keyboard/qt1070.c             | 2 +-
+ drivers/input/keyboard/qt2160.c             | 2 +-
+ drivers/input/keyboard/samsung-keypad.c     | 2 +-
+ drivers/input/keyboard/sh_keysc.c           | 2 +-
+ drivers/input/keyboard/spear-keyboard.c     | 2 +-
+ drivers/input/keyboard/stmpe-keypad.c       | 2 +-
+ drivers/input/keyboard/tc3589x-keypad.c     | 2 +-
+ drivers/input/keyboard/tca6416-keypad.c     | 2 +-
+ drivers/input/keyboard/tca8418_keypad.c     | 2 +-
+ drivers/input/keyboard/tegra-kbc.c          | 2 +-
+ drivers/input/keyboard/tnetv107x-keypad.c   | 2 +-
+ drivers/input/keyboard/twl4030_keypad.c     | 2 +-
+ drivers/input/keyboard/w90p910_keypad.c     | 2 +-
+ drivers/input/misc/88pm80x_onkey.c          | 2 +-
+ drivers/input/misc/88pm860x_onkey.c         | 2 +-
+ drivers/input/misc/ab8500-ponkey.c          | 2 +-
+ drivers/input/misc/ad714x-i2c.c             | 2 +-
+ drivers/input/misc/ad714x-spi.c             | 2 +-
+ drivers/input/misc/adxl34x-i2c.c            | 2 +-
+ drivers/input/misc/adxl34x-spi.c            | 2 +-
+ drivers/input/misc/bfin_rotary.c            | 2 +-
+ drivers/input/misc/bma150.c                 | 2 +-
+ drivers/input/misc/cma3000_d0x_i2c.c        | 2 +-
+ drivers/input/misc/cobalt_btns.c            | 2 +-
+ drivers/input/misc/da9052_onkey.c           | 2 +-
+ drivers/input/misc/da9055_onkey.c           | 2 +-
+ drivers/input/misc/dm355evm_keys.c          | 2 +-
+ drivers/input/misc/gp2ap002a00f.c           | 2 +-
+ drivers/input/misc/gpio_tilt_polled.c       | 2 +-
+ drivers/input/misc/ixp4xx-beeper.c          | 2 +-
+ drivers/input/misc/kxtj9.c                  | 2 +-
+ drivers/input/misc/m68kspkr.c               | 2 +-
+ drivers/input/misc/max8925_onkey.c          | 2 +-
+ drivers/input/misc/max8997_haptic.c         | 2 +-
+ drivers/input/misc/mc13783-pwrbutton.c      | 2 +-
+ drivers/input/misc/mma8450.c                | 2 +-
+ drivers/input/misc/mpu3050.c                | 2 +-
+ drivers/input/misc/pcap_keys.c              | 2 +-
+ drivers/input/misc/pcf50633-input.c         | 2 +-
+ drivers/input/misc/pcf8574_keypad.c         | 2 +-
+ drivers/input/misc/pcspkr.c                 | 2 +-
+ drivers/input/misc/pm8xxx-vibrator.c        | 2 +-
+ drivers/input/misc/pmic8xxx-pwrkey.c        | 2 +-
+ drivers/input/misc/pwm-beeper.c             | 2 +-
+ drivers/input/misc/rb532_button.c           | 2 +-
+ drivers/input/misc/rotary_encoder.c         | 2 +-
+ drivers/input/misc/sgi_btns.c               | 2 +-
+ drivers/input/misc/sparcspkr.c              | 4 ++--
+ drivers/input/misc/twl4030-vibra.c          | 2 +-
+ drivers/input/misc/twl6040-vibra.c          | 2 +-
+ drivers/input/misc/wistron_btns.c           | 2 +-
+ drivers/input/misc/wm831x-on.c              | 2 +-
+ drivers/input/mouse/gpio_mouse.c            | 2 +-
+ drivers/input/mouse/maplemouse.c            | 2 +-
+ drivers/input/mouse/navpoint.c              | 2 +-
+ drivers/input/mouse/pxa930_trkball.c        | 2 +-
+ drivers/input/mouse/synaptics_i2c.c         | 2 +-
+ drivers/input/serio/altera_ps2.c            | 2 +-
+ drivers/input/serio/ambakmi.c               | 2 +-
+ drivers/input/serio/arc_ps2.c               | 2 +-
+ drivers/input/serio/ct82c710.c              | 2 +-
+ drivers/input/serio/gscps2.c                | 2 +-
+ drivers/input/serio/i8042-sparcio.h         | 2 +-
+ drivers/input/serio/i8042.c                 | 2 +-
+ drivers/input/serio/maceps2.c               | 2 +-
+ drivers/input/serio/pcips2.c                | 2 +-
+ drivers/input/serio/q40kbd.c                | 2 +-
+ drivers/input/serio/rpckbd.c                | 2 +-
+ drivers/input/serio/sa1111ps2.c             | 2 +-
+ drivers/input/serio/xilinx_ps2.c            | 2 +-
+ drivers/input/touchscreen/88pm860x-ts.c     | 2 +-
+ drivers/input/touchscreen/ad7877.c          | 2 +-
+ drivers/input/touchscreen/ad7879-i2c.c      | 2 +-
+ drivers/input/touchscreen/ad7879-spi.c      | 2 +-
+ drivers/input/touchscreen/ads7846.c         | 2 +-
+ drivers/input/touchscreen/atmel_mxt_ts.c    | 2 +-
+ drivers/input/touchscreen/atmel_tsadcc.c    | 2 +-
+ drivers/input/touchscreen/auo-pixcir-ts.c   | 2 +-
+ drivers/input/touchscreen/bu21013_ts.c      | 2 +-
+ drivers/input/touchscreen/cy8ctmg110_ts.c   | 2 +-
+ drivers/input/touchscreen/cyttsp_i2c.c      | 2 +-
+ drivers/input/touchscreen/cyttsp_spi.c      | 2 +-
+ drivers/input/touchscreen/da9034-ts.c       | 2 +-
+ drivers/input/touchscreen/da9052_tsi.c      | 2 +-
+ drivers/input/touchscreen/edt-ft5x06.c      | 2 +-
+ drivers/input/touchscreen/eeti_ts.c         | 2 +-
+ drivers/input/touchscreen/egalax_ts.c       | 2 +-
+ drivers/input/touchscreen/htcpen.c          | 2 +-
+ drivers/input/touchscreen/ili210x.c         | 2 +-
+ drivers/input/touchscreen/intel-mid-touch.c | 2 +-
+ drivers/input/touchscreen/jornada720_ts.c   | 2 +-
+ drivers/input/touchscreen/lpc32xx_ts.c      | 2 +-
+ drivers/input/touchscreen/max11801_ts.c     | 2 +-
+ drivers/input/touchscreen/mc13783_ts.c      | 2 +-
+ drivers/input/touchscreen/mcs5000_ts.c      | 2 +-
+ drivers/input/touchscreen/mms114.c          | 2 +-
+ drivers/input/touchscreen/pcap_ts.c         | 2 +-
+ drivers/input/touchscreen/pixcir_i2c_ts.c   | 2 +-
+ drivers/input/touchscreen/s3c2410_ts.c      | 2 +-
+ drivers/input/touchscreen/st1232.c          | 2 +-
+ drivers/input/touchscreen/stmpe-ts.c        | 2 +-
+ drivers/input/touchscreen/ti_am335x_tsc.c   | 2 +-
+ drivers/input/touchscreen/tnetv107x-ts.c    | 2 +-
+ drivers/input/touchscreen/tps6507x-ts.c     | 2 +-
+ drivers/input/touchscreen/tsc2005.c         | 2 +-
+ drivers/input/touchscreen/tsc2007.c         | 2 +-
+ drivers/input/touchscreen/ucb1400_ts.c      | 2 +-
+ drivers/input/touchscreen/w90p910_ts.c      | 2 +-
+ drivers/input/touchscreen/wacom_i2c.c       | 2 +-
+ drivers/input/touchscreen/wm831x-ts.c       | 2 +-
+ 141 files changed, 142 insertions(+), 142 deletions(-)
 
-diff --git a/drivers/net/ethernet/3com/3c509.c b/drivers/net/ethernet/3com/3c509.c
-index 1a8eef2..7d7cd67 100644
---- a/drivers/net/ethernet/3com/3c509.c
-+++ b/drivers/net/ethernet/3com/3c509.c
-@@ -382,7 +382,7 @@ static int el3_isa_resume(struct device *dev, unsigned int n)
- 
- static struct isa_driver el3_isa_driver = {
- 	.match		= el3_isa_match,
--	.remove		= __devexit_p(el3_isa_remove),
-+	.remove		= el3_isa_remove,
- #ifdef CONFIG_PM
- 	.suspend	= el3_isa_suspend,
- 	.resume		= el3_isa_resume,
-@@ -467,7 +467,7 @@ static struct pnp_driver el3_pnp_driver = {
- 	.name		= "3c509",
- 	.id_table	= el3_pnp_ids,
- 	.probe		= el3_pnp_probe,
--	.remove		= __devexit_p(el3_pnp_remove),
-+	.remove		= el3_pnp_remove,
- #ifdef CONFIG_PM
- 	.suspend	= el3_pnp_suspend,
- 	.resume		= el3_pnp_resume,
-@@ -496,7 +496,7 @@ static struct eisa_driver el3_eisa_driver = {
- 		.driver   = {
- 				.name    = "3c579",
- 				.probe   = el3_eisa_probe,
--				.remove  = __devexit_p (el3_device_remove),
-+				.remove  = el3_device_remove,
- 				.suspend = el3_suspend,
- 				.resume  = el3_resume,
- 		}
-diff --git a/drivers/net/ethernet/3com/3c59x.c b/drivers/net/ethernet/3com/3c59x.c
-index e463d10..7cff8b8 100644
---- a/drivers/net/ethernet/3com/3c59x.c
-+++ b/drivers/net/ethernet/3com/3c59x.c
-@@ -962,7 +962,7 @@ static struct eisa_driver vortex_eisa_driver = {
- 	.driver   = {
- 		.name    = "3c59x",
- 		.probe   = vortex_eisa_probe,
--		.remove  = __devexit_p(vortex_eisa_remove)
-+		.remove  = vortex_eisa_remove
- 	}
+diff --git a/drivers/input/gameport/emu10k1-gp.c b/drivers/input/gameport/emu10k1-gp.c
+index daceafe..c300089 100644
+--- a/drivers/input/gameport/emu10k1-gp.c
++++ b/drivers/input/gameport/emu10k1-gp.c
+@@ -122,7 +122,7 @@ static struct pci_driver emu_driver = {
+         .name =         "Emu10k1_gameport",
+         .id_table =     emu_tbl,
+         .probe =        emu_probe,
+-        .remove =       __devexit_p(emu_remove),
++	.remove =	emu_remove,
  };
  
-@@ -3265,7 +3265,7 @@ static void __devexit vortex_remove_one(struct pci_dev *pdev)
- static struct pci_driver vortex_driver = {
- 	.name		= "3c59x",
- 	.probe		= vortex_init_one,
--	.remove		= __devexit_p(vortex_remove_one),
-+	.remove		= vortex_remove_one,
- 	.id_table	= vortex_pci_tbl,
- 	.driver.pm	= VORTEX_PM_OPS,
+ module_pci_driver(emu_driver);
+diff --git a/drivers/input/gameport/fm801-gp.c b/drivers/input/gameport/fm801-gp.c
+index 48ad382..e3ab458 100644
+--- a/drivers/input/gameport/fm801-gp.c
++++ b/drivers/input/gameport/fm801-gp.c
+@@ -150,7 +150,7 @@ static struct pci_driver fm801_gp_driver = {
+ 	.name =		"FM801_gameport",
+ 	.id_table =	fm801_gp_id_table,
+ 	.probe =	fm801_gp_probe,
+-	.remove =	__devexit_p(fm801_gp_remove),
++	.remove =	fm801_gp_remove,
  };
-diff --git a/drivers/net/ethernet/3com/typhoon.c b/drivers/net/ethernet/3com/typhoon.c
-index bb9670f..e11b27f 100644
---- a/drivers/net/ethernet/3com/typhoon.c
-+++ b/drivers/net/ethernet/3com/typhoon.c
-@@ -2533,7 +2533,7 @@ static struct pci_driver typhoon_driver = {
- 	.name		= KBUILD_MODNAME,
- 	.id_table	= typhoon_pci_tbl,
- 	.probe		= typhoon_init_one,
--	.remove		= __devexit_p(typhoon_remove_one),
-+	.remove		= typhoon_remove_one,
- #ifdef CONFIG_PM
- 	.suspend	= typhoon_suspend,
- 	.resume		= typhoon_resume,
-diff --git a/drivers/net/ethernet/8390/etherh.c b/drivers/net/ethernet/8390/etherh.c
-index 8322c54..96ed50d 100644
---- a/drivers/net/ethernet/8390/etherh.c
-+++ b/drivers/net/ethernet/8390/etherh.c
-@@ -839,7 +839,7 @@ static const struct ecard_id etherh_ids[] = {
  
- static struct ecard_driver etherh_driver = {
- 	.probe		= etherh_probe,
--	.remove		= __devexit_p(etherh_remove),
-+	.remove		= etherh_remove,
- 	.id_table	= etherh_ids,
+ module_pci_driver(fm801_gp_driver);
+diff --git a/drivers/input/joystick/as5011.c b/drivers/input/joystick/as5011.c
+index 9d869e2..94f3327 100644
+--- a/drivers/input/joystick/as5011.c
++++ b/drivers/input/joystick/as5011.c
+@@ -366,7 +366,7 @@ static struct i2c_driver as5011_driver = {
+ 		.name = "as5011",
+ 	},
+ 	.probe		= as5011_probe,
+-	.remove		= __devexit_p(as5011_remove),
++	.remove		= as5011_remove,
+ 	.id_table	= as5011_id,
+ };
+ 
+diff --git a/drivers/input/joystick/maplecontrol.c b/drivers/input/joystick/maplecontrol.c
+index 77cfde57..c843457 100644
+--- a/drivers/input/joystick/maplecontrol.c
++++ b/drivers/input/joystick/maplecontrol.c
+@@ -175,7 +175,7 @@ static struct maple_driver dc_pad_driver = {
  	.drv = {
+ 		.name	= "Dreamcast_controller",
+ 		.probe	= probe_maple_controller,
+-		.remove	= __devexit_p(remove_maple_controller),
++		.remove	= remove_maple_controller,
+ 	},
+ };
+ 
+diff --git a/drivers/input/keyboard/adp5520-keys.c b/drivers/input/keyboard/adp5520-keys.c
+index e9e8674..46796b2 100644
+--- a/drivers/input/keyboard/adp5520-keys.c
++++ b/drivers/input/keyboard/adp5520-keys.c
+@@ -200,7 +200,7 @@ static struct platform_driver adp5520_keys_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= adp5520_keys_probe,
+-	.remove		= __devexit_p(adp5520_keys_remove),
++	.remove		= adp5520_keys_remove,
+ };
+ module_platform_driver(adp5520_keys_driver);
+ 
+diff --git a/drivers/input/keyboard/adp5588-keys.c b/drivers/input/keyboard/adp5588-keys.c
+index b083bf1..39c2a6d 100644
+--- a/drivers/input/keyboard/adp5588-keys.c
++++ b/drivers/input/keyboard/adp5588-keys.c
+@@ -650,7 +650,7 @@ static struct i2c_driver adp5588_driver = {
+ #endif
+ 	},
+ 	.probe    = adp5588_probe,
+-	.remove   = __devexit_p(adp5588_remove),
++	.remove   = adp5588_remove,
+ 	.id_table = adp5588_id,
+ };
+ 
+diff --git a/drivers/input/keyboard/adp5589-keys.c b/drivers/input/keyboard/adp5589-keys.c
+index 74e6032..6e0c2e3 100644
+--- a/drivers/input/keyboard/adp5589-keys.c
++++ b/drivers/input/keyboard/adp5589-keys.c
+@@ -1104,7 +1104,7 @@ static struct i2c_driver adp5589_driver = {
+ 		.pm = &adp5589_dev_pm_ops,
+ 	},
+ 	.probe = adp5589_probe,
+-	.remove = __devexit_p(adp5589_remove),
++	.remove = adp5589_remove,
+ 	.id_table = adp5589_id,
+ };
+ 
+diff --git a/drivers/input/keyboard/bf54x-keys.c b/drivers/input/keyboard/bf54x-keys.c
+index 8eb9116..8a7909a 100644
+--- a/drivers/input/keyboard/bf54x-keys.c
++++ b/drivers/input/keyboard/bf54x-keys.c
+@@ -390,7 +390,7 @@ static struct platform_driver bfin_kpad_device_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= bfin_kpad_probe,
+-	.remove		= __devexit_p(bfin_kpad_remove),
++	.remove		= bfin_kpad_remove,
+ 	.suspend	= bfin_kpad_suspend,
+ 	.resume		= bfin_kpad_resume,
+ };
+diff --git a/drivers/input/keyboard/davinci_keyscan.c b/drivers/input/keyboard/davinci_keyscan.c
+index d5bacbb..8e4b438 100644
+--- a/drivers/input/keyboard/davinci_keyscan.c
++++ b/drivers/input/keyboard/davinci_keyscan.c
+@@ -326,7 +326,7 @@ static struct platform_driver davinci_ks_driver = {
+ 		.name = "davinci_keyscan",
+ 		.owner = THIS_MODULE,
+ 	},
+-	.remove	= __devexit_p(davinci_ks_remove),
++	.remove	= davinci_ks_remove,
+ };
+ 
+ static int __init davinci_ks_init(void)
+diff --git a/drivers/input/keyboard/ep93xx_keypad.c b/drivers/input/keyboard/ep93xx_keypad.c
+index 7363402..bdf3261 100644
+--- a/drivers/input/keyboard/ep93xx_keypad.c
++++ b/drivers/input/keyboard/ep93xx_keypad.c
+@@ -380,7 +380,7 @@ static struct platform_driver ep93xx_keypad_driver = {
+ 		.pm	= &ep93xx_keypad_pm_ops,
+ 	},
+ 	.probe		= ep93xx_keypad_probe,
+-	.remove		= __devexit_p(ep93xx_keypad_remove),
++	.remove		= ep93xx_keypad_remove,
+ };
+ module_platform_driver(ep93xx_keypad_driver);
+ 
+diff --git a/drivers/input/keyboard/gpio_keys.c b/drivers/input/keyboard/gpio_keys.c
+index 6a68041..96b5ac5 100644
+--- a/drivers/input/keyboard/gpio_keys.c
++++ b/drivers/input/keyboard/gpio_keys.c
+@@ -824,7 +824,7 @@ static SIMPLE_DEV_PM_OPS(gpio_keys_pm_ops, gpio_keys_suspend, gpio_keys_resume);
+ 
+ static struct platform_driver gpio_keys_device_driver = {
+ 	.probe		= gpio_keys_probe,
+-	.remove		= __devexit_p(gpio_keys_remove),
++	.remove		= gpio_keys_remove,
+ 	.driver		= {
+ 		.name	= "gpio-keys",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/keyboard/gpio_keys_polled.c b/drivers/input/keyboard/gpio_keys_polled.c
+index f2142de..922cbbd 100644
+--- a/drivers/input/keyboard/gpio_keys_polled.c
++++ b/drivers/input/keyboard/gpio_keys_polled.c
+@@ -357,7 +357,7 @@ static int __devexit gpio_keys_polled_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver gpio_keys_polled_driver = {
+ 	.probe	= gpio_keys_polled_probe,
+-	.remove	= __devexit_p(gpio_keys_polled_remove),
++	.remove	= gpio_keys_polled_remove,
+ 	.driver	= {
  		.name	= DRV_NAME,
-diff --git a/drivers/net/ethernet/8390/ne2k-pci.c b/drivers/net/ethernet/8390/ne2k-pci.c
-index 5e8845f..8f09fd99 100644
---- a/drivers/net/ethernet/8390/ne2k-pci.c
-+++ b/drivers/net/ethernet/8390/ne2k-pci.c
-@@ -696,7 +696,7 @@ static int ne2k_pci_resume (struct pci_dev *pdev)
- static struct pci_driver ne2k_driver = {
- 	.name		= DRV_NAME,
- 	.probe		= ne2k_pci_init_one,
--	.remove		= __devexit_p(ne2k_pci_remove_one),
-+	.remove		= ne2k_pci_remove_one,
- 	.id_table	= ne2k_pci_tbl,
- #ifdef CONFIG_PM
- 	.suspend	= ne2k_pci_suspend,
-diff --git a/drivers/net/ethernet/8390/ne3210.c b/drivers/net/ethernet/8390/ne3210.c
-index e3f5742..8579e2f 100644
---- a/drivers/net/ethernet/8390/ne3210.c
-+++ b/drivers/net/ethernet/8390/ne3210.c
-@@ -324,7 +324,7 @@ static struct eisa_driver ne3210_eisa_driver = {
- 	.driver   = {
- 		.name   = "ne3210",
- 		.probe  = ne3210_eisa_probe,
--		.remove = __devexit_p (ne3210_eisa_remove),
-+		.remove = ne3210_eisa_remove,
- 	},
- };
- 
-diff --git a/drivers/net/ethernet/8390/zorro8390.c b/drivers/net/ethernet/8390/zorro8390.c
-index 7818e63..9a041a6 100644
---- a/drivers/net/ethernet/8390/zorro8390.c
-+++ b/drivers/net/ethernet/8390/zorro8390.c
-@@ -432,7 +432,7 @@ static struct zorro_driver zorro8390_driver = {
- 	.name		= "zorro8390",
- 	.id_table	= zorro8390_zorro_tbl,
- 	.probe		= zorro8390_init_one,
--	.remove		= __devexit_p(zorro8390_remove_one),
-+	.remove		= zorro8390_remove_one,
- };
- 
- static int __init zorro8390_init_module(void)
-diff --git a/drivers/net/ethernet/adaptec/starfire.c b/drivers/net/ethernet/adaptec/starfire.c
-index 5b65992c..e986818 100644
---- a/drivers/net/ethernet/adaptec/starfire.c
-+++ b/drivers/net/ethernet/adaptec/starfire.c
-@@ -2018,7 +2018,7 @@ static void __devexit starfire_remove_one (struct pci_dev *pdev)
- static struct pci_driver starfire_driver = {
- 	.name		= DRV_NAME,
- 	.probe		= starfire_init_one,
--	.remove		= __devexit_p(starfire_remove_one),
-+	.remove		= starfire_remove_one,
- #ifdef CONFIG_PM
- 	.suspend	= starfire_suspend,
- 	.resume		= starfire_resume,
-diff --git a/drivers/net/ethernet/adi/bfin_mac.c b/drivers/net/ethernet/adi/bfin_mac.c
-index f1c458d..cfcce5b 100644
---- a/drivers/net/ethernet/adi/bfin_mac.c
-+++ b/drivers/net/ethernet/adi/bfin_mac.c
-@@ -1881,7 +1881,7 @@ static int __devexit bfin_mii_bus_remove(struct platform_device *pdev)
- 
- static struct platform_driver bfin_mii_bus_driver = {
- 	.probe = bfin_mii_bus_probe,
--	.remove = __devexit_p(bfin_mii_bus_remove),
-+	.remove = bfin_mii_bus_remove,
- 	.driver = {
- 		.name = "bfin_mii_bus",
  		.owner	= THIS_MODULE,
-@@ -1890,7 +1890,7 @@ static struct platform_driver bfin_mii_bus_driver = {
+diff --git a/drivers/input/keyboard/hilkbd.c b/drivers/input/keyboard/hilkbd.c
+index 5f72440..97d3151 100644
+--- a/drivers/input/keyboard/hilkbd.c
++++ b/drivers/input/keyboard/hilkbd.c
+@@ -341,7 +341,7 @@ static struct parisc_driver hil_driver = {
+ 	.name		= "hil",
+ 	.id_table	= hil_tbl,
+ 	.probe		= hil_probe_chip,
+-	.remove		= __devexit_p(hil_remove_chip),
++	.remove		= hil_remove_chip,
+ };
  
- static struct platform_driver bfin_mac_driver = {
- 	.probe = bfin_mac_probe,
--	.remove = __devexit_p(bfin_mac_remove),
-+	.remove = bfin_mac_remove,
- 	.resume = bfin_mac_resume,
- 	.suspend = bfin_mac_suspend,
- 	.driver = {
-diff --git a/drivers/net/ethernet/aeroflex/greth.c b/drivers/net/ethernet/aeroflex/greth.c
-index 9c77c73..3629690 100644
---- a/drivers/net/ethernet/aeroflex/greth.c
-+++ b/drivers/net/ethernet/aeroflex/greth.c
-@@ -1619,7 +1619,7 @@ static struct platform_driver greth_of_driver = {
- 		.of_match_table = greth_of_match,
+ static int __init hil_init(void)
+diff --git a/drivers/input/keyboard/imx_keypad.c b/drivers/input/keyboard/imx_keypad.c
+index cdc2526..93c3441 100644
+--- a/drivers/input/keyboard/imx_keypad.c
++++ b/drivers/input/keyboard/imx_keypad.c
+@@ -632,7 +632,7 @@ static struct platform_driver imx_keypad_driver = {
+ 		.pm	= &imx_kbd_pm_ops,
  	},
- 	.probe = greth_of_probe,
--	.remove = __devexit_p(greth_of_remove),
-+	.remove = greth_of_remove,
+ 	.probe		= imx_keypad_probe,
+-	.remove		= __devexit_p(imx_keypad_remove),
++	.remove		= imx_keypad_remove,
  };
+ module_platform_driver(imx_keypad_driver);
  
- module_platform_driver(greth_of_driver);
-diff --git a/drivers/net/ethernet/alteon/acenic.c b/drivers/net/ethernet/alteon/acenic.c
-index 7219123..9cb94b3 100644
---- a/drivers/net/ethernet/alteon/acenic.c
-+++ b/drivers/net/ethernet/alteon/acenic.c
-@@ -699,7 +699,7 @@ static struct pci_driver acenic_pci_driver = {
- 	.name		= "acenic",
- 	.id_table	= acenic_pci_tbl,
- 	.probe		= acenic_probe_one,
--	.remove		= __devexit_p(acenic_remove_one),
-+	.remove		= acenic_remove_one,
- };
- 
- static int __init acenic_init(void)
-diff --git a/drivers/net/ethernet/amd/a2065.c b/drivers/net/ethernet/amd/a2065.c
-index 689dfca..2745c0a 100644
---- a/drivers/net/ethernet/amd/a2065.c
-+++ b/drivers/net/ethernet/amd/a2065.c
-@@ -656,7 +656,7 @@ static struct zorro_driver a2065_driver = {
- 	.name		= "a2065",
- 	.id_table	= a2065_zorro_tbl,
- 	.probe		= a2065_init_one,
--	.remove		= __devexit_p(a2065_remove_one),
-+	.remove		= a2065_remove_one,
- };
- 
- static const struct net_device_ops lance_netdev_ops = {
-diff --git a/drivers/net/ethernet/amd/amd8111e.c b/drivers/net/ethernet/amd/amd8111e.c
-index 3491d43..5891636 100644
---- a/drivers/net/ethernet/amd/amd8111e.c
-+++ b/drivers/net/ethernet/amd/amd8111e.c
-@@ -1976,7 +1976,7 @@ static struct pci_driver amd8111e_driver = {
- 	.name   	= MODULE_NAME,
- 	.id_table	= amd8111e_pci_tbl,
- 	.probe		= amd8111e_probe_one,
--	.remove		= __devexit_p(amd8111e_remove_one),
-+	.remove		= amd8111e_remove_one,
- 	.suspend	= amd8111e_suspend,
- 	.resume		= amd8111e_resume
- };
-diff --git a/drivers/net/ethernet/amd/ariadne.c b/drivers/net/ethernet/amd/ariadne.c
-index f2958df9..72b56a8 100644
---- a/drivers/net/ethernet/amd/ariadne.c
-+++ b/drivers/net/ethernet/amd/ariadne.c
-@@ -774,7 +774,7 @@ static struct zorro_driver ariadne_driver = {
- 	.name		= "ariadne",
- 	.id_table	= ariadne_zorro_tbl,
- 	.probe		= ariadne_init_one,
--	.remove		= __devexit_p(ariadne_remove_one),
-+	.remove		= ariadne_remove_one,
- };
- 
- static int __init ariadne_init_module(void)
-diff --git a/drivers/net/ethernet/amd/au1000_eth.c b/drivers/net/ethernet/amd/au1000_eth.c
-index f195acf..cbbfdc9 100644
---- a/drivers/net/ethernet/amd/au1000_eth.c
-+++ b/drivers/net/ethernet/amd/au1000_eth.c
-@@ -1340,7 +1340,7 @@ static int __devexit au1000_remove(struct platform_device *pdev)
- 
- static struct platform_driver au1000_eth_driver = {
- 	.probe  = au1000_probe,
--	.remove = __devexit_p(au1000_remove),
-+	.remove = au1000_remove,
- 	.driver = {
- 		.name   = "au1000-eth",
- 		.owner  = THIS_MODULE,
-diff --git a/drivers/net/ethernet/amd/depca.c b/drivers/net/ethernet/amd/depca.c
-index c771de7..8a86c06 100644
---- a/drivers/net/ethernet/amd/depca.c
-+++ b/drivers/net/ethernet/amd/depca.c
-@@ -338,7 +338,7 @@ static struct eisa_driver depca_eisa_driver = {
- 	.driver   = {
- 		.name    = depca_string,
- 		.probe   = depca_eisa_probe,
--		.remove  = __devexit_p (depca_device_remove)
-+		.remove  = depca_device_remove
- 	}
- };
- #endif
-@@ -352,7 +352,7 @@ static int __devexit depca_isa_remove(struct platform_device *pdev)
- 
- static struct platform_driver depca_isa_driver = {
- 	.probe  = depca_isa_probe,
--	.remove = __devexit_p(depca_isa_remove),
-+	.remove = depca_isa_remove,
- 	.driver	= {
- 		.name   = depca_string,
- 	},
-diff --git a/drivers/net/ethernet/amd/hplance.c b/drivers/net/ethernet/amd/hplance.c
-index 8baff4e..1b2d4a1 100644
---- a/drivers/net/ethernet/amd/hplance.c
-+++ b/drivers/net/ethernet/amd/hplance.c
-@@ -66,7 +66,7 @@ static struct dio_driver hplance_driver = {
- 	.name      = "hplance",
- 	.id_table  = hplance_dio_tbl,
- 	.probe     = hplance_init_one,
--	.remove    = __devexit_p(hplance_remove_one),
-+	.remove    = hplance_remove_one,
- };
- 
- static const struct net_device_ops hplance_netdev_ops = {
-diff --git a/drivers/net/ethernet/amd/pcnet32.c b/drivers/net/ethernet/amd/pcnet32.c
-index 86b6d8e..d16fcd8 100644
---- a/drivers/net/ethernet/amd/pcnet32.c
-+++ b/drivers/net/ethernet/amd/pcnet32.c
-@@ -2844,7 +2844,7 @@ static void __devexit pcnet32_remove_one(struct pci_dev *pdev)
- static struct pci_driver pcnet32_driver = {
- 	.name = DRV_NAME,
- 	.probe = pcnet32_probe_pci,
--	.remove = __devexit_p(pcnet32_remove_one),
-+	.remove = pcnet32_remove_one,
- 	.id_table = pcnet32_pci_tbl,
- 	.suspend = pcnet32_pm_suspend,
- 	.resume = pcnet32_pm_resume,
-diff --git a/drivers/net/ethernet/amd/sunlance.c b/drivers/net/ethernet/amd/sunlance.c
-index d7a3533..d794921 100644
---- a/drivers/net/ethernet/amd/sunlance.c
-+++ b/drivers/net/ethernet/amd/sunlance.c
-@@ -1536,7 +1536,7 @@ static struct platform_driver sunlance_sbus_driver = {
- 		.of_match_table = sunlance_sbus_match,
- 	},
- 	.probe		= sunlance_sbus_probe,
--	.remove		= __devexit_p(sunlance_sbus_remove),
-+	.remove		= sunlance_sbus_remove,
- };
- 
- module_platform_driver(sunlance_sbus_driver);
-diff --git a/drivers/net/ethernet/apple/macmace.c b/drivers/net/ethernet/apple/macmace.c
-index a92ddee7..c2e9ef6 100644
---- a/drivers/net/ethernet/apple/macmace.c
-+++ b/drivers/net/ethernet/apple/macmace.c
-@@ -768,7 +768,7 @@ static int __devexit mac_mace_device_remove (struct platform_device *pdev)
- 
- static struct platform_driver mac_mace_driver = {
- 	.probe  = mace_probe,
--	.remove = __devexit_p(mac_mace_device_remove),
-+	.remove = mac_mace_device_remove,
- 	.driver	= {
- 		.name	= mac_mace_string,
+diff --git a/drivers/input/keyboard/jornada680_kbd.c b/drivers/input/keyboard/jornada680_kbd.c
+index 24f3ea0..bd1a9c3 100644
+--- a/drivers/input/keyboard/jornada680_kbd.c
++++ b/drivers/input/keyboard/jornada680_kbd.c
+@@ -258,7 +258,7 @@ static struct platform_driver jornada680kbd_driver = {
  		.owner	= THIS_MODULE,
-diff --git a/drivers/net/ethernet/atheros/atl1c/atl1c_main.c b/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
-index d19f82f..edb5d6e 100644
---- a/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
-+++ b/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
-@@ -2697,7 +2697,7 @@ static struct pci_driver atl1c_driver = {
- 	.name     = atl1c_driver_name,
- 	.id_table = atl1c_pci_tbl,
- 	.probe    = atl1c_probe,
--	.remove   = __devexit_p(atl1c_remove),
-+	.remove   = atl1c_remove,
- 	.shutdown = atl1c_shutdown,
- 	.err_handler = &atl1c_err_handler,
- 	.driver.pm = &atl1c_pm_ops,
-diff --git a/drivers/net/ethernet/atheros/atl1e/atl1e_main.c b/drivers/net/ethernet/atheros/atl1e/atl1e_main.c
-index e213da2..eacf624 100644
---- a/drivers/net/ethernet/atheros/atl1e/atl1e_main.c
-+++ b/drivers/net/ethernet/atheros/atl1e/atl1e_main.c
-@@ -2499,7 +2499,7 @@ static struct pci_driver atl1e_driver = {
- 	.name     = atl1e_driver_name,
- 	.id_table = atl1e_pci_tbl,
- 	.probe    = atl1e_probe,
--	.remove   = __devexit_p(atl1e_remove),
-+	.remove   = atl1e_remove,
- 	/* Power Management Hooks */
- #ifdef CONFIG_PM
- 	.suspend  = atl1e_suspend,
-diff --git a/drivers/net/ethernet/atheros/atlx/atl1.c b/drivers/net/ethernet/atheros/atlx/atl1.c
-index 7bae2ad..b396907 100644
---- a/drivers/net/ethernet/atheros/atlx/atl1.c
-+++ b/drivers/net/ethernet/atheros/atlx/atl1.c
-@@ -3146,7 +3146,7 @@ static struct pci_driver atl1_driver = {
- 	.name = ATLX_DRIVER_NAME,
- 	.id_table = atl1_pci_tbl,
- 	.probe = atl1_probe,
--	.remove = __devexit_p(atl1_remove),
-+	.remove = atl1_remove,
- 	.shutdown = atl1_shutdown,
- 	.driver.pm = ATL1_PM_OPS,
+ 	},
+ 	.probe	= jornada680kbd_probe,
+-	.remove	= __devexit_p(jornada680kbd_remove),
++	.remove	= jornada680kbd_remove,
  };
-diff --git a/drivers/net/ethernet/atheros/atlx/atl2.c b/drivers/net/ethernet/atheros/atlx/atl2.c
-index 623dd86..0988200 100644
---- a/drivers/net/ethernet/atheros/atlx/atl2.c
-+++ b/drivers/net/ethernet/atheros/atlx/atl2.c
-@@ -1705,7 +1705,7 @@ static struct pci_driver atl2_driver = {
- 	.name     = atl2_driver_name,
- 	.id_table = atl2_pci_tbl,
- 	.probe    = atl2_probe,
--	.remove   = __devexit_p(atl2_remove),
-+	.remove   = atl2_remove,
- 	/* Power Management Hooks */
- 	.suspend  = atl2_suspend,
- #ifdef CONFIG_PM
-diff --git a/drivers/net/ethernet/broadcom/b44.c b/drivers/net/ethernet/broadcom/b44.c
-index 9786c0e..94fa5d8 100644
---- a/drivers/net/ethernet/broadcom/b44.c
-+++ b/drivers/net/ethernet/broadcom/b44.c
-@@ -2340,7 +2340,7 @@ static struct ssb_driver b44_ssb_driver = {
- 	.name		= DRV_MODULE_NAME,
- 	.id_table	= b44_ssb_tbl,
- 	.probe		= b44_init_one,
--	.remove		= __devexit_p(b44_remove_one),
-+	.remove		= b44_remove_one,
- 	.suspend	= b44_suspend,
- 	.resume		= b44_resume,
- };
-diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-index c7ca7ec..f062656 100644
---- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-+++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-@@ -1877,7 +1877,7 @@ static int __devexit bcm_enet_remove(struct platform_device *pdev)
+ module_platform_driver(jornada680kbd_driver);
  
- struct platform_driver bcm63xx_enet_driver = {
- 	.probe	= bcm_enet_probe,
--	.remove	= __devexit_p(bcm_enet_remove),
-+	.remove	= bcm_enet_remove,
- 	.driver	= {
- 		.name	= "bcm63xx_enet",
+diff --git a/drivers/input/keyboard/jornada720_kbd.c b/drivers/input/keyboard/jornada720_kbd.c
+index 9d639fa..9771db1 100644
+--- a/drivers/input/keyboard/jornada720_kbd.c
++++ b/drivers/input/keyboard/jornada720_kbd.c
+@@ -173,6 +173,6 @@ static struct platform_driver jornada720_kbd_driver = {
+ 		.owner	= THIS_MODULE,
+ 	 },
+ 	.probe   = jornada720_kbd_probe,
+-	.remove  = __devexit_p(jornada720_kbd_remove),
++	.remove  = jornada720_kbd_remove,
+ };
+ module_platform_driver(jornada720_kbd_driver);
+diff --git a/drivers/input/keyboard/lm8323.c b/drivers/input/keyboard/lm8323.c
+index 39ac278..8743285 100644
+--- a/drivers/input/keyboard/lm8323.c
++++ b/drivers/input/keyboard/lm8323.c
+@@ -846,7 +846,7 @@ static struct i2c_driver lm8323_i2c_driver = {
+ 		.pm	= &lm8323_pm_ops,
+ 	},
+ 	.probe		= lm8323_probe,
+-	.remove		= __devexit_p(lm8323_remove),
++	.remove		= lm8323_remove,
+ 	.id_table	= lm8323_id,
+ };
+ MODULE_DEVICE_TABLE(i2c, lm8323_id);
+diff --git a/drivers/input/keyboard/lm8333.c b/drivers/input/keyboard/lm8333.c
+index 081fd9e..c76e488 100644
+--- a/drivers/input/keyboard/lm8333.c
++++ b/drivers/input/keyboard/lm8333.c
+@@ -225,7 +225,7 @@ static struct i2c_driver lm8333_driver = {
+ 		.owner		= THIS_MODULE,
+ 	},
+ 	.probe		= lm8333_probe,
+-	.remove		= __devexit_p(lm8333_remove),
++	.remove		= lm8333_remove,
+ 	.id_table	= lm8333_id,
+ };
+ module_i2c_driver(lm8333_driver);
+diff --git a/drivers/input/keyboard/locomokbd.c b/drivers/input/keyboard/locomokbd.c
+index b1ab298..5f66272 100644
+--- a/drivers/input/keyboard/locomokbd.c
++++ b/drivers/input/keyboard/locomokbd.c
+@@ -345,7 +345,7 @@ static struct locomo_driver keyboard_driver = {
+ 	},
+ 	.devid	= LOCOMO_DEVID_KEYBOARD,
+ 	.probe	= locomokbd_probe,
+-	.remove	= __devexit_p(locomokbd_remove),
++	.remove	= locomokbd_remove,
+ };
+ 
+ static int __init locomokbd_init(void)
+diff --git a/drivers/input/keyboard/lpc32xx-keys.c b/drivers/input/keyboard/lpc32xx-keys.c
+index dd786c8..8872ce6 100644
+--- a/drivers/input/keyboard/lpc32xx-keys.c
++++ b/drivers/input/keyboard/lpc32xx-keys.c
+@@ -377,7 +377,7 @@ MODULE_DEVICE_TABLE(of, lpc32xx_kscan_match);
+ 
+ static struct platform_driver lpc32xx_kscan_driver = {
+ 	.probe		= lpc32xx_kscan_probe,
+-	.remove		= __devexit_p(lpc32xx_kscan_remove),
++	.remove		= lpc32xx_kscan_remove,
+ 	.driver		= {
+ 		.name	= DRV_NAME,
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/keyboard/matrix_keypad.c b/drivers/input/keyboard/matrix_keypad.c
+index 18b7237..3ca805f 100644
+--- a/drivers/input/keyboard/matrix_keypad.c
++++ b/drivers/input/keyboard/matrix_keypad.c
+@@ -490,7 +490,7 @@ static int __devexit matrix_keypad_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver matrix_keypad_driver = {
+ 	.probe		= matrix_keypad_probe,
+-	.remove		= __devexit_p(matrix_keypad_remove),
++	.remove		= matrix_keypad_remove,
+ 	.driver		= {
+ 		.name	= "matrix-keypad",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/keyboard/max7359_keypad.c b/drivers/input/keyboard/max7359_keypad.c
+index 8edada8..90478d1 100644
+--- a/drivers/input/keyboard/max7359_keypad.c
++++ b/drivers/input/keyboard/max7359_keypad.c
+@@ -312,7 +312,7 @@ static struct i2c_driver max7359_i2c_driver = {
+ 		.pm   = &max7359_pm,
+ 	},
+ 	.probe		= max7359_probe,
+-	.remove		= __devexit_p(max7359_remove),
++	.remove		= max7359_remove,
+ 	.id_table	= max7359_ids,
+ };
+ 
+diff --git a/drivers/input/keyboard/mcs_touchkey.c b/drivers/input/keyboard/mcs_touchkey.c
+index 0d77f6c..751b141 100644
+--- a/drivers/input/keyboard/mcs_touchkey.c
++++ b/drivers/input/keyboard/mcs_touchkey.c
+@@ -270,7 +270,7 @@ static struct i2c_driver mcs_touchkey_driver = {
+ 		.pm	= &mcs_touchkey_pm_ops,
+ 	},
+ 	.probe		= mcs_touchkey_probe,
+-	.remove		= __devexit_p(mcs_touchkey_remove),
++	.remove		= mcs_touchkey_remove,
+ 	.shutdown       = mcs_touchkey_shutdown,
+ 	.id_table	= mcs_touchkey_id,
+ };
+diff --git a/drivers/input/keyboard/mpr121_touchkey.c b/drivers/input/keyboard/mpr121_touchkey.c
+index 7613f1c..63b20d0 100644
+--- a/drivers/input/keyboard/mpr121_touchkey.c
++++ b/drivers/input/keyboard/mpr121_touchkey.c
+@@ -327,7 +327,7 @@ static struct i2c_driver mpr_touchkey_driver = {
+ 	},
+ 	.id_table	= mpr121_id,
+ 	.probe		= mpr_touchkey_probe,
+-	.remove		= __devexit_p(mpr_touchkey_remove),
++	.remove		= mpr_touchkey_remove,
+ };
+ 
+ module_i2c_driver(mpr_touchkey_driver);
+diff --git a/drivers/input/keyboard/nomadik-ske-keypad.c b/drivers/input/keyboard/nomadik-ske-keypad.c
+index a1a9375..2304a81 100644
+--- a/drivers/input/keyboard/nomadik-ske-keypad.c
++++ b/drivers/input/keyboard/nomadik-ske-keypad.c
+@@ -427,7 +427,7 @@ static struct platform_driver ske_keypad_driver = {
  		.owner  = THIS_MODULE,
-@@ -1924,7 +1924,7 @@ static int __devexit bcm_enet_shared_remove(struct platform_device *pdev)
+ 		.pm = &ske_keypad_dev_pm_ops,
+ 	},
+-	.remove = __devexit_p(ske_keypad_remove),
++	.remove = ske_keypad_remove,
+ };
+ 
+ static int __init ske_keypad_init(void)
+diff --git a/drivers/input/keyboard/omap-keypad.c b/drivers/input/keyboard/omap-keypad.c
+index 4a5fcc8..1d17d91 100644
+--- a/drivers/input/keyboard/omap-keypad.c
++++ b/drivers/input/keyboard/omap-keypad.c
+@@ -379,7 +379,7 @@ static int __devexit omap_kp_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver omap_kp_driver = {
+ 	.probe		= omap_kp_probe,
+-	.remove		= __devexit_p(omap_kp_remove),
++	.remove		= omap_kp_remove,
+ 	.suspend	= omap_kp_suspend,
+ 	.resume		= omap_kp_resume,
+ 	.driver		= {
+diff --git a/drivers/input/keyboard/omap4-keypad.c b/drivers/input/keyboard/omap4-keypad.c
+index c05f98c..7145ab3 100644
+--- a/drivers/input/keyboard/omap4-keypad.c
++++ b/drivers/input/keyboard/omap4-keypad.c
+@@ -440,7 +440,7 @@ MODULE_DEVICE_TABLE(of, omap_keypad_dt_match);
+ 
+ static struct platform_driver omap4_keypad_driver = {
+ 	.probe		= omap4_keypad_probe,
+-	.remove		= __devexit_p(omap4_keypad_remove),
++	.remove		= omap4_keypad_remove,
+ 	.driver		= {
+ 		.name	= "omap4-keypad",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/keyboard/opencores-kbd.c b/drivers/input/keyboard/opencores-kbd.c
+index abe728c..7914ede 100644
+--- a/drivers/input/keyboard/opencores-kbd.c
++++ b/drivers/input/keyboard/opencores-kbd.c
+@@ -158,7 +158,7 @@ static int __devexit opencores_kbd_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver opencores_kbd_device_driver = {
+ 	.probe    = opencores_kbd_probe,
+-	.remove   = __devexit_p(opencores_kbd_remove),
++	.remove   = opencores_kbd_remove,
+ 	.driver   = {
+ 		.name = "opencores-kbd",
+ 	},
+diff --git a/drivers/input/keyboard/pmic8xxx-keypad.c b/drivers/input/keyboard/pmic8xxx-keypad.c
+index 52c3465..d3623c5 100644
+--- a/drivers/input/keyboard/pmic8xxx-keypad.c
++++ b/drivers/input/keyboard/pmic8xxx-keypad.c
+@@ -773,7 +773,7 @@ static SIMPLE_DEV_PM_OPS(pm8xxx_kp_pm_ops,
+ 
+ static struct platform_driver pmic8xxx_kp_driver = {
+ 	.probe		= pmic8xxx_kp_probe,
+-	.remove		= __devexit_p(pmic8xxx_kp_remove),
++	.remove		= pmic8xxx_kp_remove,
+ 	.driver		= {
+ 		.name = PM8XXX_KEYPAD_DEV_NAME,
+ 		.owner = THIS_MODULE,
+diff --git a/drivers/input/keyboard/pxa27x_keypad.c b/drivers/input/keyboard/pxa27x_keypad.c
+index cad9d5d..a6bcd31 100644
+--- a/drivers/input/keyboard/pxa27x_keypad.c
++++ b/drivers/input/keyboard/pxa27x_keypad.c
+@@ -620,7 +620,7 @@ MODULE_ALIAS("platform:pxa27x-keypad");
+ 
+ static struct platform_driver pxa27x_keypad_driver = {
+ 	.probe		= pxa27x_keypad_probe,
+-	.remove		= __devexit_p(pxa27x_keypad_remove),
++	.remove		= pxa27x_keypad_remove,
+ 	.driver		= {
+ 		.name	= "pxa27x-keypad",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/keyboard/pxa930_rotary.c b/drivers/input/keyboard/pxa930_rotary.c
+index 41488f9..f8f89d1 100644
+--- a/drivers/input/keyboard/pxa930_rotary.c
++++ b/drivers/input/keyboard/pxa930_rotary.c
+@@ -193,7 +193,7 @@ static struct platform_driver pxa930_rotary_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= pxa930_rotary_probe,
+-	.remove		= __devexit_p(pxa930_rotary_remove),
++	.remove		= pxa930_rotary_remove,
+ };
+ module_platform_driver(pxa930_rotary_driver);
+ 
+diff --git a/drivers/input/keyboard/qt1070.c b/drivers/input/keyboard/qt1070.c
+index ca68f29..eb46405 100644
+--- a/drivers/input/keyboard/qt1070.c
++++ b/drivers/input/keyboard/qt1070.c
+@@ -256,7 +256,7 @@ static struct i2c_driver qt1070_driver = {
+ 	},
+ 	.id_table	= qt1070_id,
+ 	.probe		= qt1070_probe,
+-	.remove		= __devexit_p(qt1070_remove),
++	.remove		= qt1070_remove,
+ };
+ 
+ module_i2c_driver(qt1070_driver);
+diff --git a/drivers/input/keyboard/qt2160.c b/drivers/input/keyboard/qt2160.c
+index 031eed7..691fe92 100644
+--- a/drivers/input/keyboard/qt2160.c
++++ b/drivers/input/keyboard/qt2160.c
+@@ -366,7 +366,7 @@ static struct i2c_driver qt2160_driver = {
+ 
+ 	.id_table	= qt2160_idtable,
+ 	.probe		= qt2160_probe,
+-	.remove		= __devexit_p(qt2160_remove),
++	.remove		= qt2160_remove,
+ };
+ 
+ module_i2c_driver(qt2160_driver);
+diff --git a/drivers/input/keyboard/samsung-keypad.c b/drivers/input/keyboard/samsung-keypad.c
+index 9d7a111..f02772a 100644
+--- a/drivers/input/keyboard/samsung-keypad.c
++++ b/drivers/input/keyboard/samsung-keypad.c
+@@ -685,7 +685,7 @@ MODULE_DEVICE_TABLE(platform, samsung_keypad_driver_ids);
+ 
+ static struct platform_driver samsung_keypad_driver = {
+ 	.probe		= samsung_keypad_probe,
+-	.remove		= __devexit_p(samsung_keypad_remove),
++	.remove		= samsung_keypad_remove,
+ 	.driver		= {
+ 		.name	= "samsung-keypad",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/keyboard/sh_keysc.c b/drivers/input/keyboard/sh_keysc.c
+index da54ad5..07415a3 100644
+--- a/drivers/input/keyboard/sh_keysc.c
++++ b/drivers/input/keyboard/sh_keysc.c
+@@ -331,7 +331,7 @@ static SIMPLE_DEV_PM_OPS(sh_keysc_dev_pm_ops,
+ 
+ static struct platform_driver sh_keysc_device_driver = {
+ 	.probe		= sh_keysc_probe,
+-	.remove		= __devexit_p(sh_keysc_remove),
++	.remove		= sh_keysc_remove,
+ 	.driver		= {
+ 		.name	= "sh_keysc",
+ 		.pm	= &sh_keysc_dev_pm_ops,
+diff --git a/drivers/input/keyboard/spear-keyboard.c b/drivers/input/keyboard/spear-keyboard.c
+index da914fe..0c88623 100644
+--- a/drivers/input/keyboard/spear-keyboard.c
++++ b/drivers/input/keyboard/spear-keyboard.c
+@@ -381,7 +381,7 @@ MODULE_DEVICE_TABLE(of, spear_kbd_id_table);
+ 
+ static struct platform_driver spear_kbd_driver = {
+ 	.probe		= spear_kbd_probe,
+-	.remove		= __devexit_p(spear_kbd_remove),
++	.remove		= spear_kbd_remove,
+ 	.driver		= {
+ 		.name	= "keyboard",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/keyboard/stmpe-keypad.c b/drivers/input/keyboard/stmpe-keypad.c
+index d3d2eaa..286719f 100644
+--- a/drivers/input/keyboard/stmpe-keypad.c
++++ b/drivers/input/keyboard/stmpe-keypad.c
+@@ -348,7 +348,7 @@ static struct platform_driver stmpe_keypad_driver = {
+ 	.driver.name	= "stmpe-keypad",
+ 	.driver.owner	= THIS_MODULE,
+ 	.probe		= stmpe_keypad_probe,
+-	.remove		= __devexit_p(stmpe_keypad_remove),
++	.remove		= stmpe_keypad_remove,
+ };
+ module_platform_driver(stmpe_keypad_driver);
+ 
+diff --git a/drivers/input/keyboard/tc3589x-keypad.c b/drivers/input/keyboard/tc3589x-keypad.c
+index 7d498e6..75fa2b9 100644
+--- a/drivers/input/keyboard/tc3589x-keypad.c
++++ b/drivers/input/keyboard/tc3589x-keypad.c
+@@ -448,7 +448,7 @@ static struct platform_driver tc3589x_keypad_driver = {
+ 		.pm	= &tc3589x_keypad_dev_pm_ops,
+ 	},
+ 	.probe	= tc3589x_keypad_probe,
+-	.remove	= __devexit_p(tc3589x_keypad_remove),
++	.remove	= tc3589x_keypad_remove,
+ };
+ module_platform_driver(tc3589x_keypad_driver);
+ 
+diff --git a/drivers/input/keyboard/tca6416-keypad.c b/drivers/input/keyboard/tca6416-keypad.c
+index c355cdd..f5fa75a 100644
+--- a/drivers/input/keyboard/tca6416-keypad.c
++++ b/drivers/input/keyboard/tca6416-keypad.c
+@@ -361,7 +361,7 @@ static struct i2c_driver tca6416_keypad_driver = {
+ 		.pm	= &tca6416_keypad_dev_pm_ops,
+ 	},
+ 	.probe		= tca6416_keypad_probe,
+-	.remove		= __devexit_p(tca6416_keypad_remove),
++	.remove		= tca6416_keypad_remove,
+ 	.id_table	= tca6416_id,
+ };
+ 
+diff --git a/drivers/input/keyboard/tca8418_keypad.c b/drivers/input/keyboard/tca8418_keypad.c
+index 893869b..672b5f8 100644
+--- a/drivers/input/keyboard/tca8418_keypad.c
++++ b/drivers/input/keyboard/tca8418_keypad.c
+@@ -408,7 +408,7 @@ static struct i2c_driver tca8418_keypad_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= tca8418_keypad_probe,
+-	.remove		= __devexit_p(tca8418_keypad_remove),
++	.remove		= tca8418_keypad_remove,
+ 	.id_table	= tca8418_id,
+ };
+ 
+diff --git a/drivers/input/keyboard/tegra-kbc.c b/drivers/input/keyboard/tegra-kbc.c
+index 5faaf25..48ef283 100644
+--- a/drivers/input/keyboard/tegra-kbc.c
++++ b/drivers/input/keyboard/tegra-kbc.c
+@@ -954,7 +954,7 @@ MODULE_DEVICE_TABLE(of, tegra_kbc_of_match);
+ 
+ static struct platform_driver tegra_kbc_driver = {
+ 	.probe		= tegra_kbc_probe,
+-	.remove		= __devexit_p(tegra_kbc_remove),
++	.remove		= tegra_kbc_remove,
+ 	.driver	= {
+ 		.name	= "tegra-kbc",
+ 		.owner  = THIS_MODULE,
+diff --git a/drivers/input/keyboard/tnetv107x-keypad.c b/drivers/input/keyboard/tnetv107x-keypad.c
+index 4c34f21..05d923c 100644
+--- a/drivers/input/keyboard/tnetv107x-keypad.c
++++ b/drivers/input/keyboard/tnetv107x-keypad.c
+@@ -319,7 +319,7 @@ static int __devexit keypad_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver keypad_driver = {
+ 	.probe		= keypad_probe,
+-	.remove		= __devexit_p(keypad_remove),
++	.remove		= keypad_remove,
+ 	.driver.name	= "tnetv107x-keypad",
+ 	.driver.owner	= THIS_MODULE,
+ };
+diff --git a/drivers/input/keyboard/twl4030_keypad.c b/drivers/input/keyboard/twl4030_keypad.c
+index a2c6f79..ae25909 100644
+--- a/drivers/input/keyboard/twl4030_keypad.c
++++ b/drivers/input/keyboard/twl4030_keypad.c
+@@ -452,7 +452,7 @@ static int __devexit twl4030_kp_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver twl4030_kp_driver = {
+ 	.probe		= twl4030_kp_probe,
+-	.remove		= __devexit_p(twl4030_kp_remove),
++	.remove		= twl4030_kp_remove,
+ 	.driver		= {
+ 		.name	= "twl4030_keypad",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/keyboard/w90p910_keypad.c b/drivers/input/keyboard/w90p910_keypad.c
+index e0f6cd1..a90fdfc 100644
+--- a/drivers/input/keyboard/w90p910_keypad.c
++++ b/drivers/input/keyboard/w90p910_keypad.c
+@@ -257,7 +257,7 @@ static int __devexit w90p910_keypad_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver w90p910_keypad_driver = {
+ 	.probe		= w90p910_keypad_probe,
+-	.remove		= __devexit_p(w90p910_keypad_remove),
++	.remove		= w90p910_keypad_remove,
+ 	.driver		= {
+ 		.name	= "nuc900-kpi",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/misc/88pm80x_onkey.c b/drivers/input/misc/88pm80x_onkey.c
+index 7f26e7b..f775575 100644
+--- a/drivers/input/misc/88pm80x_onkey.c
++++ b/drivers/input/misc/88pm80x_onkey.c
+@@ -157,7 +157,7 @@ static struct platform_driver pm80x_onkey_driver = {
+ 		   .pm = &pm80x_onkey_pm_ops,
+ 		   },
+ 	.probe = pm80x_onkey_probe,
+-	.remove = __devexit_p(pm80x_onkey_remove),
++	.remove = pm80x_onkey_remove,
+ };
+ 
+ module_platform_driver(pm80x_onkey_driver);
+diff --git a/drivers/input/misc/88pm860x_onkey.c b/drivers/input/misc/88pm860x_onkey.c
+index f9ce183..8391a9d 100644
+--- a/drivers/input/misc/88pm860x_onkey.c
++++ b/drivers/input/misc/88pm860x_onkey.c
+@@ -161,7 +161,7 @@ static struct platform_driver pm860x_onkey_driver = {
+ 		.pm	= &pm860x_onkey_pm_ops,
+ 	},
+ 	.probe		= pm860x_onkey_probe,
+-	.remove		= __devexit_p(pm860x_onkey_remove),
++	.remove		= pm860x_onkey_remove,
+ };
+ module_platform_driver(pm860x_onkey_driver);
+ 
+diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
+index 84ec691..ae9c205 100644
+--- a/drivers/input/misc/ab8500-ponkey.c
++++ b/drivers/input/misc/ab8500-ponkey.c
+@@ -146,7 +146,7 @@ static struct platform_driver ab8500_ponkey_driver = {
+ 		.of_match_table = of_match_ptr(ab8500_ponkey_match),
+ 	},
+ 	.probe		= ab8500_ponkey_probe,
+-	.remove		= __devexit_p(ab8500_ponkey_remove),
++	.remove		= ab8500_ponkey_remove,
+ };
+ module_platform_driver(ab8500_ponkey_driver);
+ 
+diff --git a/drivers/input/misc/ad714x-i2c.c b/drivers/input/misc/ad714x-i2c.c
+index c8a7901..02e21d4 100644
+--- a/drivers/input/misc/ad714x-i2c.c
++++ b/drivers/input/misc/ad714x-i2c.c
+@@ -112,7 +112,7 @@ static struct i2c_driver ad714x_i2c_driver = {
+ 		.pm   = &ad714x_i2c_pm,
+ 	},
+ 	.probe    = ad714x_i2c_probe,
+-	.remove   = __devexit_p(ad714x_i2c_remove),
++	.remove   = ad714x_i2c_remove,
+ 	.id_table = ad714x_id,
+ };
+ 
+diff --git a/drivers/input/misc/ad714x-spi.c b/drivers/input/misc/ad714x-spi.c
+index 75f6136d..eee820b 100644
+--- a/drivers/input/misc/ad714x-spi.c
++++ b/drivers/input/misc/ad714x-spi.c
+@@ -120,7 +120,7 @@ static struct spi_driver ad714x_spi_driver = {
+ 		.pm	= &ad714x_spi_pm,
+ 	},
+ 	.probe		= ad714x_spi_probe,
+-	.remove		= __devexit_p(ad714x_spi_remove),
++	.remove		= ad714x_spi_remove,
+ };
+ 
+ module_spi_driver(ad714x_spi_driver);
+diff --git a/drivers/input/misc/adxl34x-i2c.c b/drivers/input/misc/adxl34x-i2c.c
+index dd1d1c1..09094ca 100644
+--- a/drivers/input/misc/adxl34x-i2c.c
++++ b/drivers/input/misc/adxl34x-i2c.c
+@@ -144,7 +144,7 @@ static struct i2c_driver adxl34x_driver = {
+ 		.pm = &adxl34x_i2c_pm,
+ 	},
+ 	.probe    = adxl34x_i2c_probe,
+-	.remove   = __devexit_p(adxl34x_i2c_remove),
++	.remove   = adxl34x_i2c_remove,
+ 	.id_table = adxl34x_id,
+ };
+ 
+diff --git a/drivers/input/misc/adxl34x-spi.c b/drivers/input/misc/adxl34x-spi.c
+index 820a802..756c899 100644
+--- a/drivers/input/misc/adxl34x-spi.c
++++ b/drivers/input/misc/adxl34x-spi.c
+@@ -126,7 +126,7 @@ static struct spi_driver adxl34x_driver = {
+ 		.pm = &adxl34x_spi_pm,
+ 	},
+ 	.probe   = adxl34x_spi_probe,
+-	.remove  = __devexit_p(adxl34x_spi_remove),
++	.remove  = adxl34x_spi_remove,
+ };
+ 
+ module_spi_driver(adxl34x_driver);
+diff --git a/drivers/input/misc/bfin_rotary.c b/drivers/input/misc/bfin_rotary.c
+index 1c4146f..6df3f88 100644
+--- a/drivers/input/misc/bfin_rotary.c
++++ b/drivers/input/misc/bfin_rotary.c
+@@ -255,7 +255,7 @@ static const struct dev_pm_ops bfin_rotary_pm_ops = {
+ 
+ static struct platform_driver bfin_rotary_device_driver = {
+ 	.probe		= bfin_rotary_probe,
+-	.remove		= __devexit_p(bfin_rotary_remove),
++	.remove		= bfin_rotary_remove,
+ 	.driver		= {
+ 		.name	= "bfin-rotary",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/misc/bma150.c b/drivers/input/misc/bma150.c
+index e2f1e9f..0788c94 100644
+--- a/drivers/input/misc/bma150.c
++++ b/drivers/input/misc/bma150.c
+@@ -670,7 +670,7 @@ static struct i2c_driver bma150_driver = {
+ 	.class		= I2C_CLASS_HWMON,
+ 	.id_table	= bma150_id,
+ 	.probe		= bma150_probe,
+-	.remove		= __devexit_p(bma150_remove),
++	.remove		= bma150_remove,
+ };
+ 
+ module_i2c_driver(bma150_driver);
+diff --git a/drivers/input/misc/cma3000_d0x_i2c.c b/drivers/input/misc/cma3000_d0x_i2c.c
+index fe9b85f..523b6aa 100644
+--- a/drivers/input/misc/cma3000_d0x_i2c.c
++++ b/drivers/input/misc/cma3000_d0x_i2c.c
+@@ -114,7 +114,7 @@ MODULE_DEVICE_TABLE(i2c, cma3000_i2c_id);
+ 
+ static struct i2c_driver cma3000_i2c_driver = {
+ 	.probe		= cma3000_i2c_probe,
+-	.remove		= __devexit_p(cma3000_i2c_remove),
++	.remove		= cma3000_i2c_remove,
+ 	.id_table	= cma3000_i2c_id,
+ 	.driver = {
+ 		.name	= "cma3000_i2c_accl",
+diff --git a/drivers/input/misc/cobalt_btns.c b/drivers/input/misc/cobalt_btns.c
+index 53e43d2..659f20d 100644
+--- a/drivers/input/misc/cobalt_btns.c
++++ b/drivers/input/misc/cobalt_btns.c
+@@ -157,7 +157,7 @@ MODULE_ALIAS("platform:Cobalt buttons");
+ 
+ static struct platform_driver cobalt_buttons_driver = {
+ 	.probe	= cobalt_buttons_probe,
+-	.remove	= __devexit_p(cobalt_buttons_remove),
++	.remove	= cobalt_buttons_remove,
+ 	.driver	= {
+ 		.name	= "Cobalt buttons",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/misc/da9052_onkey.c b/drivers/input/misc/da9052_onkey.c
+index 3c843cd..acd07e8 100644
+--- a/drivers/input/misc/da9052_onkey.c
++++ b/drivers/input/misc/da9052_onkey.c
+@@ -156,7 +156,7 @@ static int __devexit da9052_onkey_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver da9052_onkey_driver = {
+ 	.probe	= da9052_onkey_probe,
+-	.remove	= __devexit_p(da9052_onkey_remove),
++	.remove	= da9052_onkey_remove,
+ 	.driver = {
+ 		.name	= "da9052-onkey",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/misc/da9055_onkey.c b/drivers/input/misc/da9055_onkey.c
+index 10ebf15..fe434e0 100644
+--- a/drivers/input/misc/da9055_onkey.c
++++ b/drivers/input/misc/da9055_onkey.c
+@@ -156,7 +156,7 @@ static int __devexit da9055_onkey_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver da9055_onkey_driver = {
+ 	.probe	= da9055_onkey_probe,
+-	.remove	= __devexit_p(da9055_onkey_remove),
++	.remove	= da9055_onkey_remove,
+ 	.driver = {
+ 		.name	= "da9055-onkey",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/misc/dm355evm_keys.c b/drivers/input/misc/dm355evm_keys.c
+index c1313d8..1afb91c 100644
+--- a/drivers/input/misc/dm355evm_keys.c
++++ b/drivers/input/misc/dm355evm_keys.c
+@@ -262,7 +262,7 @@ static int __devexit dm355evm_keys_remove(struct platform_device *pdev)
   */
- struct platform_driver bcm63xx_enet_shared_driver = {
- 	.probe	= bcm_enet_shared_probe,
--	.remove	= __devexit_p(bcm_enet_shared_remove),
-+	.remove	= bcm_enet_shared_remove,
- 	.driver	= {
- 		.name	= "bcm63xx_enet_shared",
- 		.owner  = THIS_MODULE,
-diff --git a/drivers/net/ethernet/broadcom/bnx2.c b/drivers/net/ethernet/broadcom/bnx2.c
-index d431070..7b55f78 100644
---- a/drivers/net/ethernet/broadcom/bnx2.c
-+++ b/drivers/net/ethernet/broadcom/bnx2.c
-@@ -8752,7 +8752,7 @@ static struct pci_driver bnx2_pci_driver = {
- 	.name		= DRV_MODULE_NAME,
- 	.id_table	= bnx2_pci_tbl,
- 	.probe		= bnx2_init_one,
--	.remove		= __devexit_p(bnx2_remove_one),
-+	.remove		= bnx2_remove_one,
- 	.suspend	= bnx2_suspend,
- 	.resume		= bnx2_resume,
- 	.err_handler	= &bnx2_err_handler,
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-index 3519fed..d9e72fcb 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-@@ -12349,7 +12349,7 @@ static struct pci_driver bnx2x_pci_driver = {
- 	.name        = DRV_MODULE_NAME,
- 	.id_table    = bnx2x_pci_tbl,
- 	.probe       = bnx2x_init_one,
--	.remove      = __devexit_p(bnx2x_remove_one),
-+	.remove      = bnx2x_remove_one,
- 	.suspend     = bnx2x_suspend,
- 	.resume      = bnx2x_resume,
- 	.err_handler = &bnx2x_err_handler,
-diff --git a/drivers/net/ethernet/broadcom/tg3.c b/drivers/net/ethernet/broadcom/tg3.c
-index 038ce02..d752b10 100644
---- a/drivers/net/ethernet/broadcom/tg3.c
-+++ b/drivers/net/ethernet/broadcom/tg3.c
-@@ -16567,7 +16567,7 @@ static struct pci_driver tg3_driver = {
- 	.name		= DRV_MODULE_NAME,
- 	.id_table	= tg3_pci_tbl,
- 	.probe		= tg3_init_one,
--	.remove		= __devexit_p(tg3_remove_one),
-+	.remove		= tg3_remove_one,
- 	.err_handler	= &tg3_err_handler,
- 	.driver.pm	= TG3_PM_OPS,
- };
-diff --git a/drivers/net/ethernet/brocade/bna/bnad.c b/drivers/net/ethernet/brocade/bna/bnad.c
-index ce1eac5..7735469 100644
---- a/drivers/net/ethernet/brocade/bna/bnad.c
-+++ b/drivers/net/ethernet/brocade/bna/bnad.c
-@@ -3490,7 +3490,7 @@ static struct pci_driver bnad_pci_driver = {
- 	.name = BNAD_NAME,
- 	.id_table = bnad_pci_id_table,
- 	.probe = bnad_pci_probe,
--	.remove = __devexit_p(bnad_pci_remove),
-+	.remove = bnad_pci_remove,
- };
- 
- static int __init
-diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
-index e7a476c..fdf7985 100644
---- a/drivers/net/ethernet/cadence/at91_ether.c
-+++ b/drivers/net/ethernet/cadence/at91_ether.c
-@@ -512,7 +512,7 @@ static int at91ether_resume(struct platform_device *pdev)
- #endif
- 
- static struct platform_driver at91ether_driver = {
--	.remove		= __devexit_p(at91ether_remove),
-+	.remove		= at91ether_remove,
- 	.suspend	= at91ether_suspend,
- 	.resume		= at91ether_resume,
+ static struct platform_driver dm355evm_keys_driver = {
+ 	.probe		= dm355evm_keys_probe,
+-	.remove		= __devexit_p(dm355evm_keys_remove),
++	.remove		= dm355evm_keys_remove,
  	.driver		= {
-diff --git a/drivers/net/ethernet/chelsio/cxgb/cxgb2.c b/drivers/net/ethernet/chelsio/cxgb/cxgb2.c
-index 1d17c92..7cfa7bb 100644
---- a/drivers/net/ethernet/chelsio/cxgb/cxgb2.c
-+++ b/drivers/net/ethernet/chelsio/cxgb/cxgb2.c
-@@ -1361,7 +1361,7 @@ static struct pci_driver driver = {
- 	.name     = DRV_NAME,
- 	.id_table = t1_pci_tbl,
- 	.probe    = init_one,
--	.remove   = __devexit_p(remove_one),
-+	.remove   = remove_one,
- };
- 
- static int __init t1_init_module(void)
-diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
-index 9c9f326..a450f8d 100644
---- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
-+++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
-@@ -3425,7 +3425,7 @@ static struct pci_driver driver = {
- 	.name = DRV_NAME,
- 	.id_table = cxgb3_pci_tbl,
- 	.probe = init_one,
--	.remove = __devexit_p(remove_one),
-+	.remove = remove_one,
- 	.err_handler = &t3_err_handler,
- };
- 
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index 0df1284..f344190 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-@@ -4680,7 +4680,7 @@ static struct pci_driver cxgb4_driver = {
- 	.name     = KBUILD_MODNAME,
- 	.id_table = cxgb4_pci_tbl,
- 	.probe    = init_one,
--	.remove   = __devexit_p(remove_one),
-+	.remove   = remove_one,
- 	.err_handler = &cxgb4_eeh,
- };
- 
-diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c b/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c
-index 9dad561..1ccd28b 100644
---- a/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c
-@@ -2905,8 +2905,8 @@ static struct pci_driver cxgb4vf_driver = {
- 	.name		= KBUILD_MODNAME,
- 	.id_table	= cxgb4vf_pci_tbl,
- 	.probe		= cxgb4vf_pci_probe,
--	.remove		= __devexit_p(cxgb4vf_pci_remove),
--	.shutdown	= __devexit_p(cxgb4vf_pci_shutdown),
-+	.remove		= cxgb4vf_pci_remove,
-+	.shutdown	= cxgb4vf_pci_shutdown,
- };
- 
- /*
-diff --git a/drivers/net/ethernet/cisco/enic/enic_main.c b/drivers/net/ethernet/cisco/enic/enic_main.c
-index ad1468b..612438a 100644
---- a/drivers/net/ethernet/cisco/enic/enic_main.c
-+++ b/drivers/net/ethernet/cisco/enic/enic_main.c
-@@ -2584,7 +2584,7 @@ static struct pci_driver enic_driver = {
- 	.name = DRV_NAME,
- 	.id_table = enic_id_table,
- 	.probe = enic_probe,
--	.remove = __devexit_p(enic_remove),
-+	.remove = enic_remove,
- };
- 
- static int __init enic_init_module(void)
-diff --git a/drivers/net/ethernet/davicom/dm9000.c b/drivers/net/ethernet/davicom/dm9000.c
-index 36499d5..87d7c35 100644
---- a/drivers/net/ethernet/davicom/dm9000.c
-+++ b/drivers/net/ethernet/davicom/dm9000.c
-@@ -1683,7 +1683,7 @@ static struct platform_driver dm9000_driver = {
- 		.pm	 = &dm9000_drv_pm_ops,
- 	},
- 	.probe   = dm9000_probe,
--	.remove  = __devexit_p(dm9000_drv_remove),
-+	.remove  = dm9000_drv_remove,
- };
- 
- static int __init
-diff --git a/drivers/net/ethernet/dec/tulip/de2104x.c b/drivers/net/ethernet/dec/tulip/de2104x.c
-index 77335853..18fd028 100644
---- a/drivers/net/ethernet/dec/tulip/de2104x.c
-+++ b/drivers/net/ethernet/dec/tulip/de2104x.c
-@@ -2184,7 +2184,7 @@ static struct pci_driver de_driver = {
- 	.name		= DRV_NAME,
- 	.id_table	= de_pci_tbl,
- 	.probe		= de_init_one,
--	.remove		= __devexit_p(de_remove_one),
-+	.remove		= de_remove_one,
- #ifdef CONFIG_PM
- 	.suspend	= de_suspend,
- 	.resume		= de_resume,
-diff --git a/drivers/net/ethernet/dec/tulip/de4x5.c b/drivers/net/ethernet/dec/tulip/de4x5.c
-index f879e92..8a4264f 100644
---- a/drivers/net/ethernet/dec/tulip/de4x5.c
-+++ b/drivers/net/ethernet/dec/tulip/de4x5.c
-@@ -2104,7 +2104,7 @@ static struct eisa_driver de4x5_eisa_driver = {
-         .driver   = {
-                 .name    = "de4x5",
-                 .probe   = de4x5_eisa_probe,
--                .remove  = __devexit_p (de4x5_eisa_remove),
-+		.remove	 = de4x5_eisa_remove,
-         }
- };
- MODULE_DEVICE_TABLE(eisa, de4x5_eisa_ids);
-@@ -2344,7 +2344,7 @@ static struct pci_driver de4x5_pci_driver = {
-         .name           = "de4x5",
-         .id_table       = de4x5_pci_tbl,
-         .probe          = de4x5_pci_probe,
--	.remove         = __devexit_p (de4x5_pci_remove),
-+	.remove         = de4x5_pci_remove,
- };
- 
- #endif
-diff --git a/drivers/net/ethernet/dec/tulip/dmfe.c b/drivers/net/ethernet/dec/tulip/dmfe.c
-index d23755e..a631448 100644
---- a/drivers/net/ethernet/dec/tulip/dmfe.c
-+++ b/drivers/net/ethernet/dec/tulip/dmfe.c
-@@ -2187,7 +2187,7 @@ static struct pci_driver dmfe_driver = {
- 	.name		= "dmfe",
- 	.id_table	= dmfe_pci_tbl,
- 	.probe		= dmfe_init_one,
--	.remove		= __devexit_p(dmfe_remove_one),
-+	.remove		= dmfe_remove_one,
- 	.suspend        = dmfe_suspend,
- 	.resume         = dmfe_resume
- };
-diff --git a/drivers/net/ethernet/dec/tulip/tulip_core.c b/drivers/net/ethernet/dec/tulip/tulip_core.c
-index 885700a..2a3736e 100644
---- a/drivers/net/ethernet/dec/tulip/tulip_core.c
-+++ b/drivers/net/ethernet/dec/tulip/tulip_core.c
-@@ -1974,7 +1974,7 @@ static struct pci_driver tulip_driver = {
- 	.name		= DRV_NAME,
- 	.id_table	= tulip_pci_tbl,
- 	.probe		= tulip_init_one,
--	.remove		= __devexit_p(tulip_remove_one),
-+	.remove		= tulip_remove_one,
- #ifdef CONFIG_PM
- 	.suspend	= tulip_suspend,
- 	.resume		= tulip_resume,
-diff --git a/drivers/net/ethernet/dec/tulip/uli526x.c b/drivers/net/ethernet/dec/tulip/uli526x.c
-index 75d45f8..9c24c95 100644
---- a/drivers/net/ethernet/dec/tulip/uli526x.c
-+++ b/drivers/net/ethernet/dec/tulip/uli526x.c
-@@ -1788,7 +1788,7 @@ static struct pci_driver uli526x_driver = {
- 	.name		= "uli526x",
- 	.id_table	= uli526x_pci_tbl,
- 	.probe		= uli526x_init_one,
--	.remove		= __devexit_p(uli526x_remove_one),
-+	.remove		= uli526x_remove_one,
- 	.suspend	= uli526x_suspend,
- 	.resume		= uli526x_resume,
- };
-diff --git a/drivers/net/ethernet/dec/tulip/winbond-840.c b/drivers/net/ethernet/dec/tulip/winbond-840.c
-index 7c1ec4d..6c5db4f 100644
---- a/drivers/net/ethernet/dec/tulip/winbond-840.c
-+++ b/drivers/net/ethernet/dec/tulip/winbond-840.c
-@@ -1647,7 +1647,7 @@ static struct pci_driver w840_driver = {
- 	.name		= DRV_NAME,
- 	.id_table	= w840_pci_tbl,
- 	.probe		= w840_probe1,
--	.remove		= __devexit_p(w840_remove1),
-+	.remove		= w840_remove1,
- #ifdef CONFIG_PM
- 	.suspend	= w840_suspend,
- 	.resume		= w840_resume,
-diff --git a/drivers/net/ethernet/dec/tulip/xircom_cb.c b/drivers/net/ethernet/dec/tulip/xircom_cb.c
-index 138bf83..4310e97 100644
---- a/drivers/net/ethernet/dec/tulip/xircom_cb.c
-+++ b/drivers/net/ethernet/dec/tulip/xircom_cb.c
-@@ -148,7 +148,7 @@ static struct pci_driver xircom_ops = {
- 	.name		= "xircom_cb",
- 	.id_table	= xircom_pci_table,
- 	.probe		= xircom_probe,
--	.remove		= __devexit_p(xircom_remove),
-+	.remove		= xircom_remove,
- };
- 
- 
-diff --git a/drivers/net/ethernet/dlink/dl2k.c b/drivers/net/ethernet/dlink/dl2k.c
-index 2fb01bf..21db34c 100644
---- a/drivers/net/ethernet/dlink/dl2k.c
-+++ b/drivers/net/ethernet/dlink/dl2k.c
-@@ -1755,7 +1755,7 @@ static struct pci_driver rio_driver = {
- 	.name		= "dl2k",
- 	.id_table	= rio_pci_tbl,
- 	.probe		= rio_probe1,
--	.remove		= __devexit_p(rio_remove1),
-+	.remove		= rio_remove1,
- };
- 
- module_pci_driver(rio_driver);
-diff --git a/drivers/net/ethernet/dlink/sundance.c b/drivers/net/ethernet/dlink/sundance.c
-index 3b83588..65187b9 100644
---- a/drivers/net/ethernet/dlink/sundance.c
-+++ b/drivers/net/ethernet/dlink/sundance.c
-@@ -1910,7 +1910,7 @@ static struct pci_driver sundance_driver = {
- 	.name		= DRV_NAME,
- 	.id_table	= sundance_pci_tbl,
- 	.probe		= sundance_probe1,
--	.remove		= __devexit_p(sundance_remove1),
-+	.remove		= sundance_remove1,
- #ifdef CONFIG_PM
- 	.suspend	= sundance_suspend,
- 	.resume		= sundance_resume,
-diff --git a/drivers/net/ethernet/dnet.c b/drivers/net/ethernet/dnet.c
-index 290b26f..dfdf553 100644
---- a/drivers/net/ethernet/dnet.c
-+++ b/drivers/net/ethernet/dnet.c
-@@ -971,7 +971,7 @@ static int __devexit dnet_remove(struct platform_device *pdev)
- 
- static struct platform_driver dnet_driver = {
- 	.probe		= dnet_probe,
--	.remove		= __devexit_p(dnet_remove),
-+	.remove		= dnet_remove,
- 	.driver		= {
- 		.name		= "dnet",
- 	},
-diff --git a/drivers/net/ethernet/ethoc.c b/drivers/net/ethernet/ethoc.c
-index 94b7bfc..198d587 100644
---- a/drivers/net/ethernet/ethoc.c
-+++ b/drivers/net/ethernet/ethoc.c
-@@ -1190,7 +1190,7 @@ MODULE_DEVICE_TABLE(of, ethoc_match);
- 
- static struct platform_driver ethoc_driver = {
- 	.probe   = ethoc_probe,
--	.remove  = __devexit_p(ethoc_remove),
-+	.remove  = ethoc_remove,
- 	.suspend = ethoc_suspend,
- 	.resume  = ethoc_resume,
- 	.driver  = {
-diff --git a/drivers/net/ethernet/fealnx.c b/drivers/net/ethernet/fealnx.c
-index 0e4a0ac..fce1d35 100644
---- a/drivers/net/ethernet/fealnx.c
-+++ b/drivers/net/ethernet/fealnx.c
-@@ -1950,7 +1950,7 @@ static struct pci_driver fealnx_driver = {
- 	.name		= "fealnx",
- 	.id_table	= fealnx_pci_tbl,
- 	.probe		= fealnx_init_one,
--	.remove		= __devexit_p(fealnx_remove_one),
-+	.remove		= fealnx_remove_one,
- };
- 
- static int __init fealnx_init(void)
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index 2665162..3729996 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -1790,7 +1790,7 @@ static struct platform_driver fec_driver = {
- 	},
- 	.id_table = fec_devtype,
- 	.probe	= fec_probe,
--	.remove	= __devexit_p(fec_drv_remove),
-+	.remove	= fec_drv_remove,
- };
- 
- module_platform_driver(fec_driver);
-diff --git a/drivers/net/ethernet/hp/hp100.c b/drivers/net/ethernet/hp/hp100.c
-index 3f4391b..9aba3fb 100644
---- a/drivers/net/ethernet/hp/hp100.c
-+++ b/drivers/net/ethernet/hp/hp100.c
-@@ -2878,7 +2878,7 @@ static struct eisa_driver hp100_eisa_driver = {
-         .driver   = {
-                 .name    = "hp100",
-                 .probe   = hp100_eisa_probe,
--                .remove  = __devexit_p (hp100_eisa_remove),
-+		.remove	 = hp100_eisa_remove,
-         }
- };
- #endif
-@@ -2950,7 +2950,7 @@ static struct pci_driver hp100_pci_driver = {
- 	.name		= "hp100",
- 	.id_table	= hp100_pci_tbl,
- 	.probe		= hp100_pci_probe,
--	.remove		= __devexit_p(hp100_pci_remove),
-+	.remove		= hp100_pci_remove,
- };
- #endif
- 
-diff --git a/drivers/net/ethernet/i825xx/ether1.c b/drivers/net/ethernet/i825xx/ether1.c
-index 067db3f..75a1b57 100644
---- a/drivers/net/ethernet/i825xx/ether1.c
-+++ b/drivers/net/ethernet/i825xx/ether1.c
-@@ -1070,7 +1070,7 @@ static const struct ecard_id ether1_ids[] = {
- 
- static struct ecard_driver ether1_driver = {
- 	.probe		= ether1_probe,
--	.remove		= __devexit_p(ether1_remove),
-+	.remove		= ether1_remove,
- 	.id_table	= ether1_ids,
- 	.drv = {
- 		.name	= "ether1",
-diff --git a/drivers/net/ethernet/i825xx/lasi_82596.c b/drivers/net/ethernet/i825xx/lasi_82596.c
-index 6eba352..a79cc24 100644
---- a/drivers/net/ethernet/i825xx/lasi_82596.c
-+++ b/drivers/net/ethernet/i825xx/lasi_82596.c
-@@ -219,7 +219,7 @@ static struct parisc_driver lan_driver = {
- 	.name		= "lasi_82596",
- 	.id_table	= lan_tbl,
- 	.probe		= lan_init_chip,
--	.remove         = __devexit_p(lan_remove_chip),
-+	.remove         = lan_remove_chip,
- };
- 
- static int __devinit lasi_82596_init(void)
-diff --git a/drivers/net/ethernet/i825xx/sni_82596.c b/drivers/net/ethernet/i825xx/sni_82596.c
-index 6b2a888..4442c6e 100644
---- a/drivers/net/ethernet/i825xx/sni_82596.c
-+++ b/drivers/net/ethernet/i825xx/sni_82596.c
-@@ -163,7 +163,7 @@ static int __devexit sni_82596_driver_remove(struct platform_device *pdev)
- 
- static struct platform_driver sni_82596_driver = {
- 	.probe	= sni_82596_probe,
--	.remove	= __devexit_p(sni_82596_driver_remove),
-+	.remove	= sni_82596_driver_remove,
- 	.driver	= {
- 		.name	= sni_82596_string,
  		.owner	= THIS_MODULE,
-diff --git a/drivers/net/ethernet/icplus/ipg.c b/drivers/net/ethernet/icplus/ipg.c
-index 1b563bb..549de0e 100644
---- a/drivers/net/ethernet/icplus/ipg.c
-+++ b/drivers/net/ethernet/icplus/ipg.c
-@@ -2296,7 +2296,7 @@ static struct pci_driver ipg_pci_driver = {
- 	.name		= IPG_DRIVER_NAME,
- 	.id_table	= ipg_pci_tbl,
- 	.probe		= ipg_probe,
--	.remove		= __devexit_p(ipg_remove),
-+	.remove		= ipg_remove,
+ 		.name	= "dm355evm_keys",
+diff --git a/drivers/input/misc/gp2ap002a00f.c b/drivers/input/misc/gp2ap002a00f.c
+index b6664cf..99ec8d0 100644
+--- a/drivers/input/misc/gp2ap002a00f.c
++++ b/drivers/input/misc/gp2ap002a00f.c
+@@ -277,7 +277,7 @@ static struct i2c_driver gp2a_i2c_driver = {
+ 		.pm	= &gp2a_pm,
+ 	},
+ 	.probe		= gp2a_probe,
+-	.remove		= __devexit_p(gp2a_remove),
++	.remove		= gp2a_remove,
+ 	.id_table	= gp2a_i2c_id,
  };
  
- static int __init ipg_init_module(void)
-diff --git a/drivers/net/ethernet/intel/e100.c b/drivers/net/ethernet/intel/e100.c
-index 29ce9bd..f41eaed 100644
---- a/drivers/net/ethernet/intel/e100.c
-+++ b/drivers/net/ethernet/intel/e100.c
-@@ -3167,7 +3167,7 @@ static struct pci_driver e100_driver = {
- 	.name =         DRV_NAME,
- 	.id_table =     e100_id_table,
- 	.probe =        e100_probe,
--	.remove =       __devexit_p(e100_remove),
-+	.remove =       e100_remove,
- #ifdef CONFIG_PM
- 	/* Power Management hooks */
- 	.suspend =      e100_suspend,
-diff --git a/drivers/net/ethernet/intel/e1000/e1000_main.c b/drivers/net/ethernet/intel/e1000/e1000_main.c
-index 222bfaf..3ca5fd3 100644
---- a/drivers/net/ethernet/intel/e1000/e1000_main.c
-+++ b/drivers/net/ethernet/intel/e1000/e1000_main.c
-@@ -202,7 +202,7 @@ static struct pci_driver e1000_driver = {
- 	.name     = e1000_driver_name,
- 	.id_table = e1000_pci_tbl,
- 	.probe    = e1000_probe,
--	.remove   = __devexit_p(e1000_remove),
-+	.remove   = e1000_remove,
- #ifdef CONFIG_PM
- 	/* Power Management Hooks */
- 	.suspend  = e1000_suspend,
-diff --git a/drivers/net/ethernet/intel/e1000e/netdev.c b/drivers/net/ethernet/intel/e1000e/netdev.c
-index dadb13b..2f5bfd3 100644
---- a/drivers/net/ethernet/intel/e1000e/netdev.c
-+++ b/drivers/net/ethernet/intel/e1000e/netdev.c
-@@ -6589,7 +6589,7 @@ static struct pci_driver e1000_driver = {
- 	.name     = e1000e_driver_name,
- 	.id_table = e1000_pci_tbl,
- 	.probe    = e1000_probe,
--	.remove   = __devexit_p(e1000_remove),
-+	.remove   = e1000_remove,
- #ifdef CONFIG_PM
- 	.driver   = {
- 		.pm = &e1000_pm_ops,
-diff --git a/drivers/net/ethernet/intel/igb/igb_main.c b/drivers/net/ethernet/intel/igb/igb_main.c
-index 7044aaa..fdb2282 100644
---- a/drivers/net/ethernet/intel/igb/igb_main.c
-+++ b/drivers/net/ethernet/intel/igb/igb_main.c
-@@ -228,7 +228,7 @@ static struct pci_driver igb_driver = {
- 	.name     = igb_driver_name,
- 	.id_table = igb_pci_tbl,
- 	.probe    = igb_probe,
--	.remove   = __devexit_p(igb_remove),
-+	.remove   = igb_remove,
- #ifdef CONFIG_PM
- 	.driver.pm = &igb_pm_ops,
+diff --git a/drivers/input/misc/gpio_tilt_polled.c b/drivers/input/misc/gpio_tilt_polled.c
+index 277a057..bf97679 100644
+--- a/drivers/input/misc/gpio_tilt_polled.c
++++ b/drivers/input/misc/gpio_tilt_polled.c
+@@ -198,7 +198,7 @@ static int __devexit gpio_tilt_polled_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver gpio_tilt_polled_driver = {
+ 	.probe	= gpio_tilt_polled_probe,
+-	.remove	= __devexit_p(gpio_tilt_polled_remove),
++	.remove	= gpio_tilt_polled_remove,
+ 	.driver	= {
+ 		.name	= DRV_NAME,
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/misc/ixp4xx-beeper.c b/drivers/input/misc/ixp4xx-beeper.c
+index 50e2830..18a2970 100644
+--- a/drivers/input/misc/ixp4xx-beeper.c
++++ b/drivers/input/misc/ixp4xx-beeper.c
+@@ -165,7 +165,7 @@ static struct platform_driver ixp4xx_spkr_platform_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= ixp4xx_spkr_probe,
+-	.remove		= __devexit_p(ixp4xx_spkr_remove),
++	.remove		= ixp4xx_spkr_remove,
+ 	.shutdown	= ixp4xx_spkr_shutdown,
+ };
+ module_platform_driver(ixp4xx_spkr_platform_driver);
+diff --git a/drivers/input/misc/kxtj9.c b/drivers/input/misc/kxtj9.c
+index f46139f..8414ddb 100644
+--- a/drivers/input/misc/kxtj9.c
++++ b/drivers/input/misc/kxtj9.c
+@@ -663,7 +663,7 @@ static struct i2c_driver kxtj9_driver = {
+ 		.pm	= &kxtj9_pm_ops,
+ 	},
+ 	.probe		= kxtj9_probe,
+-	.remove		= __devexit_p(kxtj9_remove),
++	.remove		= kxtj9_remove,
+ 	.id_table	= kxtj9_id,
+ };
+ 
+diff --git a/drivers/input/misc/m68kspkr.c b/drivers/input/misc/m68kspkr.c
+index 0c64d9b..f3a3c5e 100644
+--- a/drivers/input/misc/m68kspkr.c
++++ b/drivers/input/misc/m68kspkr.c
+@@ -104,7 +104,7 @@ static struct platform_driver m68kspkr_platform_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= m68kspkr_probe,
+-	.remove		= __devexit_p(m68kspkr_remove),
++	.remove		= m68kspkr_remove,
+ 	.shutdown	= m68kspkr_shutdown,
+ };
+ 
+diff --git a/drivers/input/misc/max8925_onkey.c b/drivers/input/misc/max8925_onkey.c
+index 0a12b74..3c3db67 100644
+--- a/drivers/input/misc/max8925_onkey.c
++++ b/drivers/input/misc/max8925_onkey.c
+@@ -195,7 +195,7 @@ static struct platform_driver max8925_onkey_driver = {
+ 		.pm	= &max8925_onkey_pm_ops,
+ 	},
+ 	.probe		= max8925_onkey_probe,
+-	.remove		= __devexit_p(max8925_onkey_remove),
++	.remove		= max8925_onkey_remove,
+ };
+ module_platform_driver(max8925_onkey_driver);
+ 
+diff --git a/drivers/input/misc/max8997_haptic.c b/drivers/input/misc/max8997_haptic.c
+index 05b7b8b..8db64f6 100644
+--- a/drivers/input/misc/max8997_haptic.c
++++ b/drivers/input/misc/max8997_haptic.c
+@@ -396,7 +396,7 @@ static struct platform_driver max8997_haptic_driver = {
+ 		.pm	= &max8997_haptic_pm_ops,
+ 	},
+ 	.probe		= max8997_haptic_probe,
+-	.remove		= __devexit_p(max8997_haptic_remove),
++	.remove		= max8997_haptic_remove,
+ 	.id_table	= max8997_haptic_id,
+ };
+ module_platform_driver(max8997_haptic_driver);
+diff --git a/drivers/input/misc/mc13783-pwrbutton.c b/drivers/input/misc/mc13783-pwrbutton.c
+index 8428f1e..a0c35a05 100644
+--- a/drivers/input/misc/mc13783-pwrbutton.c
++++ b/drivers/input/misc/mc13783-pwrbutton.c
+@@ -257,7 +257,7 @@ static int __devexit mc13783_pwrbutton_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver mc13783_pwrbutton_driver = {
+ 	.probe		= mc13783_pwrbutton_probe,
+-	.remove		= __devexit_p(mc13783_pwrbutton_remove),
++	.remove		= mc13783_pwrbutton_remove,
+ 	.driver		= {
+ 		.name	= "mc13783-pwrbutton",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/misc/mma8450.c b/drivers/input/misc/mma8450.c
+index 873ebce..050a246 100644
+--- a/drivers/input/misc/mma8450.c
++++ b/drivers/input/misc/mma8450.c
+@@ -243,7 +243,7 @@ static struct i2c_driver mma8450_driver = {
+ 		.of_match_table = mma8450_dt_ids,
+ 	},
+ 	.probe		= mma8450_probe,
+-	.remove		= __devexit_p(mma8450_remove),
++	.remove		= mma8450_remove,
+ 	.id_table	= mma8450_id,
+ };
+ 
+diff --git a/drivers/input/misc/mpu3050.c b/drivers/input/misc/mpu3050.c
+index 306f84c..ab11409 100644
+--- a/drivers/input/misc/mpu3050.c
++++ b/drivers/input/misc/mpu3050.c
+@@ -471,7 +471,7 @@ static struct i2c_driver mpu3050_i2c_driver = {
+ 		.of_match_table = mpu3050_of_match,
+ 	},
+ 	.probe		= mpu3050_probe,
+-	.remove		= __devexit_p(mpu3050_remove),
++	.remove		= mpu3050_remove,
+ 	.id_table	= mpu3050_ids,
+ };
+ 
+diff --git a/drivers/input/misc/pcap_keys.c b/drivers/input/misc/pcap_keys.c
+index e09b4fe..afd3f5a 100644
+--- a/drivers/input/misc/pcap_keys.c
++++ b/drivers/input/misc/pcap_keys.c
+@@ -119,7 +119,7 @@ static int __devexit pcap_keys_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver pcap_keys_device_driver = {
+ 	.probe		= pcap_keys_probe,
+-	.remove		= __devexit_p(pcap_keys_remove),
++	.remove		= pcap_keys_remove,
+ 	.driver		= {
+ 		.name	= "pcap-keys",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/misc/pcf50633-input.c b/drivers/input/misc/pcf50633-input.c
+index 53891de..3896b0f 100644
+--- a/drivers/input/misc/pcf50633-input.c
++++ b/drivers/input/misc/pcf50633-input.c
+@@ -111,7 +111,7 @@ static struct platform_driver pcf50633_input_driver = {
+ 		.name = "pcf50633-input",
+ 	},
+ 	.probe = pcf50633_input_probe,
+-	.remove = __devexit_p(pcf50633_input_remove),
++	.remove = pcf50633_input_remove,
+ };
+ module_platform_driver(pcf50633_input_driver);
+ 
+diff --git a/drivers/input/misc/pcf8574_keypad.c b/drivers/input/misc/pcf8574_keypad.c
+index 544c663..6c480bf 100644
+--- a/drivers/input/misc/pcf8574_keypad.c
++++ b/drivers/input/misc/pcf8574_keypad.c
+@@ -212,7 +212,7 @@ static struct i2c_driver pcf8574_kp_driver = {
  #endif
-diff --git a/drivers/net/ethernet/intel/igbvf/netdev.c b/drivers/net/ethernet/intel/igbvf/netdev.c
-index 4051ec4..935173a 100644
---- a/drivers/net/ethernet/intel/igbvf/netdev.c
-+++ b/drivers/net/ethernet/intel/igbvf/netdev.c
-@@ -2864,7 +2864,7 @@ static struct pci_driver igbvf_driver = {
- 	.name     = igbvf_driver_name,
- 	.id_table = igbvf_pci_tbl,
- 	.probe    = igbvf_probe,
--	.remove   = __devexit_p(igbvf_remove),
-+	.remove   = igbvf_remove,
- #ifdef CONFIG_PM
- 	/* Power Management Hooks */
- 	.suspend  = igbvf_suspend,
-diff --git a/drivers/net/ethernet/intel/ixgb/ixgb_main.c b/drivers/net/ethernet/intel/ixgb/ixgb_main.c
-index d99a2d5..5b44d8a 100644
---- a/drivers/net/ethernet/intel/ixgb/ixgb_main.c
-+++ b/drivers/net/ethernet/intel/ixgb/ixgb_main.c
-@@ -125,7 +125,7 @@ static struct pci_driver ixgb_driver = {
- 	.name     = ixgb_driver_name,
- 	.id_table = ixgb_pci_tbl,
- 	.probe    = ixgb_probe,
--	.remove   = __devexit_p(ixgb_remove),
-+	.remove   = ixgb_remove,
- 	.err_handler = &ixgb_err_handler
+ 	},
+ 	.probe    = pcf8574_kp_probe,
+-	.remove   = __devexit_p(pcf8574_kp_remove),
++	.remove   = pcf8574_kp_remove,
+ 	.id_table = pcf8574_kp_id,
  };
  
-diff --git a/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c b/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
-index 38fc186..4258ffa 100644
---- a/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
-+++ b/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
-@@ -7818,7 +7818,7 @@ static struct pci_driver ixgbe_driver = {
- 	.name     = ixgbe_driver_name,
- 	.id_table = ixgbe_pci_tbl,
- 	.probe    = ixgbe_probe,
--	.remove   = __devexit_p(ixgbe_remove),
-+	.remove   = ixgbe_remove,
- #ifdef CONFIG_PM
- 	.suspend  = ixgbe_suspend,
- 	.resume   = ixgbe_resume,
-diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-index 9d88153..da8b116 100644
---- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-+++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-@@ -3557,7 +3557,7 @@ static struct pci_driver ixgbevf_driver = {
- 	.name     = ixgbevf_driver_name,
- 	.id_table = ixgbevf_pci_tbl,
- 	.probe    = ixgbevf_probe,
--	.remove   = __devexit_p(ixgbevf_remove),
-+	.remove   = ixgbevf_remove,
- #ifdef CONFIG_PM
- 	/* Power Management Hooks */
- 	.suspend  = ixgbevf_suspend,
-diff --git a/drivers/net/ethernet/jme.c b/drivers/net/ethernet/jme.c
-index 76a91f6..939cddc 100644
---- a/drivers/net/ethernet/jme.c
-+++ b/drivers/net/ethernet/jme.c
-@@ -3330,7 +3330,7 @@ static struct pci_driver jme_driver = {
- 	.name           = DRV_NAME,
- 	.id_table       = jme_pci_tbl,
- 	.probe          = jme_init_one,
--	.remove         = __devexit_p(jme_remove_one),
-+	.remove         = jme_remove_one,
- 	.shutdown       = jme_shutdown,
- 	.driver.pm	= JME_PM_OPS,
+diff --git a/drivers/input/misc/pcspkr.c b/drivers/input/misc/pcspkr.c
+index b2484aa..17d6555 100644
+--- a/drivers/input/misc/pcspkr.c
++++ b/drivers/input/misc/pcspkr.c
+@@ -131,7 +131,7 @@ static struct platform_driver pcspkr_platform_driver = {
+ 		.pm	= &pcspkr_pm_ops,
+ 	},
+ 	.probe		= pcspkr_probe,
+-	.remove		= __devexit_p(pcspkr_remove),
++	.remove		= pcspkr_remove,
+ 	.shutdown	= pcspkr_shutdown,
  };
-diff --git a/drivers/net/ethernet/lantiq_etop.c b/drivers/net/ethernet/lantiq_etop.c
-index 003c5bc..44d4d61 100644
---- a/drivers/net/ethernet/lantiq_etop.c
-+++ b/drivers/net/ethernet/lantiq_etop.c
-@@ -789,7 +789,7 @@ ltq_etop_remove(struct platform_device *pdev)
+ module_platform_driver(pcspkr_platform_driver);
+diff --git a/drivers/input/misc/pm8xxx-vibrator.c b/drivers/input/misc/pm8xxx-vibrator.c
+index dfbfb46..2e0a3bf 100644
+--- a/drivers/input/misc/pm8xxx-vibrator.c
++++ b/drivers/input/misc/pm8xxx-vibrator.c
+@@ -270,7 +270,7 @@ static SIMPLE_DEV_PM_OPS(pm8xxx_vib_pm_ops, pm8xxx_vib_suspend, NULL);
+ 
+ static struct platform_driver pm8xxx_vib_driver = {
+ 	.probe		= pm8xxx_vib_probe,
+-	.remove		= __devexit_p(pm8xxx_vib_remove),
++	.remove		= pm8xxx_vib_remove,
+ 	.driver		= {
+ 		.name	= "pm8xxx-vib",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
+index 0f83d0f..b2396e2 100644
+--- a/drivers/input/misc/pmic8xxx-pwrkey.c
++++ b/drivers/input/misc/pmic8xxx-pwrkey.c
+@@ -206,7 +206,7 @@ static int __devexit pmic8xxx_pwrkey_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver pmic8xxx_pwrkey_driver = {
+ 	.probe		= pmic8xxx_pwrkey_probe,
+-	.remove		= __devexit_p(pmic8xxx_pwrkey_remove),
++	.remove		= pmic8xxx_pwrkey_remove,
+ 	.driver		= {
+ 		.name	= PM8XXX_PWRKEY_DEV_NAME,
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/misc/pwm-beeper.c b/drivers/input/misc/pwm-beeper.c
+index 502544c..d40c2f6 100644
+--- a/drivers/input/misc/pwm-beeper.c
++++ b/drivers/input/misc/pwm-beeper.c
+@@ -184,7 +184,7 @@ static const struct of_device_id pwm_beeper_match[] = {
+ 
+ static struct platform_driver pwm_beeper_driver = {
+ 	.probe	= pwm_beeper_probe,
+-	.remove = __devexit_p(pwm_beeper_remove),
++	.remove = pwm_beeper_remove,
+ 	.driver = {
+ 		.name	= "pwm-beeper",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/misc/rb532_button.c b/drivers/input/misc/rb532_button.c
+index aeb02bc..718dd83 100644
+--- a/drivers/input/misc/rb532_button.c
++++ b/drivers/input/misc/rb532_button.c
+@@ -94,7 +94,7 @@ static int __devexit rb532_button_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver rb532_button_driver = {
+ 	.probe = rb532_button_probe,
+-	.remove = __devexit_p(rb532_button_remove),
++	.remove = rb532_button_remove,
+ 	.driver = {
+ 		.name = DRV_NAME,
+ 		.owner = THIS_MODULE,
+diff --git a/drivers/input/misc/rotary_encoder.c b/drivers/input/misc/rotary_encoder.c
+index 99a49e4..b183a0e 100644
+--- a/drivers/input/misc/rotary_encoder.c
++++ b/drivers/input/misc/rotary_encoder.c
+@@ -325,7 +325,7 @@ static int __devexit rotary_encoder_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver rotary_encoder_driver = {
+ 	.probe		= rotary_encoder_probe,
+-	.remove		= __devexit_p(rotary_encoder_remove),
++	.remove		= rotary_encoder_remove,
+ 	.driver		= {
+ 		.name	= DRV_NAME,
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/misc/sgi_btns.c b/drivers/input/misc/sgi_btns.c
+index 5d9fd55..fd731e8 100644
+--- a/drivers/input/misc/sgi_btns.c
++++ b/drivers/input/misc/sgi_btns.c
+@@ -158,7 +158,7 @@ static int __devexit sgi_buttons_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver sgi_buttons_driver = {
+ 	.probe	= sgi_buttons_probe,
+-	.remove	= __devexit_p(sgi_buttons_remove),
++	.remove	= sgi_buttons_remove,
+ 	.driver	= {
+ 		.name	= "sgibtns",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/misc/sparcspkr.c b/drivers/input/misc/sparcspkr.c
+index 0122f53..b9c8702 100644
+--- a/drivers/input/misc/sparcspkr.c
++++ b/drivers/input/misc/sparcspkr.c
+@@ -263,7 +263,7 @@ static struct platform_driver bbc_beep_driver = {
+ 		.of_match_table = bbc_beep_match,
+ 	},
+ 	.probe		= bbc_beep_probe,
+-	.remove		= __devexit_p(bbc_remove),
++	.remove		= bbc_remove,
+ 	.shutdown	= sparcspkr_shutdown,
+ };
+ 
+@@ -345,7 +345,7 @@ static struct platform_driver grover_beep_driver = {
+ 		.of_match_table = grover_beep_match,
+ 	},
+ 	.probe		= grover_beep_probe,
+-	.remove		= __devexit_p(grover_remove),
++	.remove		= grover_remove,
+ 	.shutdown	= sparcspkr_shutdown,
+ };
+ 
+diff --git a/drivers/input/misc/twl4030-vibra.c b/drivers/input/misc/twl4030-vibra.c
+index 2194a3c..29f2207 100644
+--- a/drivers/input/misc/twl4030-vibra.c
++++ b/drivers/input/misc/twl4030-vibra.c
+@@ -283,7 +283,7 @@ static int __devexit twl4030_vibra_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver twl4030_vibra_driver = {
+ 	.probe		= twl4030_vibra_probe,
+-	.remove		= __devexit_p(twl4030_vibra_remove),
++	.remove		= twl4030_vibra_remove,
+ 	.driver		= {
+ 		.name	= "twl4030-vibra",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/misc/twl6040-vibra.c b/drivers/input/misc/twl6040-vibra.c
+index c8a288a..463e963 100644
+--- a/drivers/input/misc/twl6040-vibra.c
++++ b/drivers/input/misc/twl6040-vibra.c
+@@ -433,7 +433,7 @@ static int __devexit twl6040_vibra_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver twl6040_vibra_driver = {
+ 	.probe		= twl6040_vibra_probe,
+-	.remove		= __devexit_p(twl6040_vibra_remove),
++	.remove		= twl6040_vibra_remove,
+ 	.driver		= {
+ 		.name	= "twl6040-vibra",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/misc/wistron_btns.c b/drivers/input/misc/wistron_btns.c
+index e2bdfd4..3f9ad23 100644
+--- a/drivers/input/misc/wistron_btns.c
++++ b/drivers/input/misc/wistron_btns.c
+@@ -1334,7 +1334,7 @@ static struct platform_driver wistron_driver = {
+ #endif
+ 	},
+ 	.probe		= wistron_probe,
+-	.remove		= __devexit_p(wistron_remove),
++	.remove		= wistron_remove,
+ };
+ 
+ static int __init wb_module_init(void)
+diff --git a/drivers/input/misc/wm831x-on.c b/drivers/input/misc/wm831x-on.c
+index fa8b390..3a12951 100644
+--- a/drivers/input/misc/wm831x-on.c
++++ b/drivers/input/misc/wm831x-on.c
+@@ -138,7 +138,7 @@ static int __devexit wm831x_on_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver wm831x_on_driver = {
+ 	.probe		= wm831x_on_probe,
+-	.remove		= __devexit_p(wm831x_on_remove),
++	.remove		= wm831x_on_remove,
+ 	.driver		= {
+ 		.name	= "wm831x-on",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/mouse/gpio_mouse.c b/drivers/input/mouse/gpio_mouse.c
+index 39fe9b7..b3a8aa9 100644
+--- a/drivers/input/mouse/gpio_mouse.c
++++ b/drivers/input/mouse/gpio_mouse.c
+@@ -172,7 +172,7 @@ static int __devexit gpio_mouse_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver gpio_mouse_device_driver = {
+ 	.probe		= gpio_mouse_probe,
+-	.remove		= __devexit_p(gpio_mouse_remove),
++	.remove		= gpio_mouse_remove,
+ 	.driver		= {
+ 		.name	= "gpio_mouse",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/mouse/maplemouse.c b/drivers/input/mouse/maplemouse.c
+index 5f27817..03ccf02 100644
+--- a/drivers/input/mouse/maplemouse.c
++++ b/drivers/input/mouse/maplemouse.c
+@@ -132,7 +132,7 @@ static struct maple_driver dc_mouse_driver = {
+ 	.drv = {
+ 		.name = "Dreamcast_mouse",
+ 		.probe = probe_maple_mouse,
+-		.remove = __devexit_p(remove_maple_mouse),
++		.remove = remove_maple_mouse,
+ 	},
+ };
+ 
+diff --git a/drivers/input/mouse/navpoint.c b/drivers/input/mouse/navpoint.c
+index c29ae76..ac4e077 100644
+--- a/drivers/input/mouse/navpoint.c
++++ b/drivers/input/mouse/navpoint.c
+@@ -353,7 +353,7 @@ static SIMPLE_DEV_PM_OPS(navpoint_pm_ops, navpoint_suspend, navpoint_resume);
+ 
+ static struct platform_driver navpoint_driver = {
+ 	.probe		= navpoint_probe,
+-	.remove		= __devexit_p(navpoint_remove),
++	.remove		= navpoint_remove,
+ 	.driver = {
+ 		.name	= "navpoint",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/mouse/pxa930_trkball.c b/drivers/input/mouse/pxa930_trkball.c
+index 4fe055f..953a048 100644
+--- a/drivers/input/mouse/pxa930_trkball.c
++++ b/drivers/input/mouse/pxa930_trkball.c
+@@ -248,7 +248,7 @@ static struct platform_driver pxa930_trkball_driver = {
+ 		.name	= "pxa930-trkball",
+ 	},
+ 	.probe		= pxa930_trkball_probe,
+-	.remove		= __devexit_p(pxa930_trkball_remove),
++	.remove		= pxa930_trkball_remove,
+ };
+ module_platform_driver(pxa930_trkball_driver);
+ 
+diff --git a/drivers/input/mouse/synaptics_i2c.c b/drivers/input/mouse/synaptics_i2c.c
+index 063a174..fa8f162 100644
+--- a/drivers/input/mouse/synaptics_i2c.c
++++ b/drivers/input/mouse/synaptics_i2c.c
+@@ -662,7 +662,7 @@ static struct i2c_driver synaptics_i2c_driver = {
+ 	},
+ 
+ 	.probe		= synaptics_i2c_probe,
+-	.remove		= __devexit_p(synaptics_i2c_remove),
++	.remove		= synaptics_i2c_remove,
+ 
+ 	.id_table	= synaptics_i2c_id_table,
+ };
+diff --git a/drivers/input/serio/altera_ps2.c b/drivers/input/serio/altera_ps2.c
+index cc11f4e..50da8e5 100644
+--- a/drivers/input/serio/altera_ps2.c
++++ b/drivers/input/serio/altera_ps2.c
+@@ -187,7 +187,7 @@ MODULE_DEVICE_TABLE(of, altera_ps2_match);
+  */
+ static struct platform_driver altera_ps2_driver = {
+ 	.probe		= altera_ps2_probe,
+-	.remove		= __devexit_p(altera_ps2_remove),
++	.remove		= altera_ps2_remove,
+ 	.driver	= {
+ 		.name	= DRV_NAME,
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/serio/ambakmi.c b/drivers/input/serio/ambakmi.c
+index 2e77246..beb0816 100644
+--- a/drivers/input/serio/ambakmi.c
++++ b/drivers/input/serio/ambakmi.c
+@@ -204,7 +204,7 @@ static struct amba_driver ambakmi_driver = {
+ 	},
+ 	.id_table	= amba_kmi_idtable,
+ 	.probe		= amba_kmi_probe,
+-	.remove		= __devexit_p(amba_kmi_remove),
++	.remove		= amba_kmi_remove,
+ 	.resume		= amba_kmi_resume,
+ };
+ 
+diff --git a/drivers/input/serio/arc_ps2.c b/drivers/input/serio/arc_ps2.c
+index 89ad763..72fda8f 100644
+--- a/drivers/input/serio/arc_ps2.c
++++ b/drivers/input/serio/arc_ps2.c
+@@ -264,7 +264,7 @@ static struct platform_driver arc_ps2_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe	= arc_ps2_probe,
+-	.remove	= __devexit_p(arc_ps2_remove),
++	.remove	= arc_ps2_remove,
+ };
+ 
+ module_platform_driver(arc_ps2_driver);
+diff --git a/drivers/input/serio/ct82c710.c b/drivers/input/serio/ct82c710.c
+index 8528165..64bcd15 100644
+--- a/drivers/input/serio/ct82c710.c
++++ b/drivers/input/serio/ct82c710.c
+@@ -212,7 +212,7 @@ static struct platform_driver ct82c710_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= ct82c710_probe,
+-	.remove		= __devexit_p(ct82c710_remove),
++	.remove		= ct82c710_remove,
+ };
+ 
+ 
+diff --git a/drivers/input/serio/gscps2.c b/drivers/input/serio/gscps2.c
+index 4225f5d..49cb7ca 100644
+--- a/drivers/input/serio/gscps2.c
++++ b/drivers/input/serio/gscps2.c
+@@ -444,7 +444,7 @@ static struct parisc_driver parisc_ps2_driver = {
+ 	.name		= "gsc_ps2",
+ 	.id_table	= gscps2_device_tbl,
+ 	.probe		= gscps2_probe,
+-	.remove		= __devexit_p(gscps2_remove),
++	.remove		= gscps2_remove,
+ };
+ 
+ static int __init gscps2_init(void)
+diff --git a/drivers/input/serio/i8042-sparcio.h b/drivers/input/serio/i8042-sparcio.h
+index 395a9af..3f6c835 100644
+--- a/drivers/input/serio/i8042-sparcio.h
++++ b/drivers/input/serio/i8042-sparcio.h
+@@ -102,7 +102,7 @@ static struct platform_driver sparc_i8042_driver = {
+ 		.of_match_table = sparc_i8042_match,
+ 	},
+ 	.probe		= sparc_i8042_probe,
+-	.remove		= __devexit_p(sparc_i8042_remove),
++	.remove		= sparc_i8042_remove,
+ };
+ 
+ static int __init i8042_platform_init(void)
+diff --git a/drivers/input/serio/i8042.c b/drivers/input/serio/i8042.c
+index 8656441..2539195 100644
+--- a/drivers/input/serio/i8042.c
++++ b/drivers/input/serio/i8042.c
+@@ -1455,7 +1455,7 @@ static struct platform_driver i8042_driver = {
+ 		.pm	= &i8042_pm_ops,
+ #endif
+ 	},
+-	.remove		= __devexit_p(i8042_remove),
++	.remove		= i8042_remove,
+ 	.shutdown	= i8042_shutdown,
+ };
+ 
+diff --git a/drivers/input/serio/maceps2.c b/drivers/input/serio/maceps2.c
+index 61da763..2226277 100644
+--- a/drivers/input/serio/maceps2.c
++++ b/drivers/input/serio/maceps2.c
+@@ -165,7 +165,7 @@ static struct platform_driver maceps2_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= maceps2_probe,
+-	.remove		= __devexit_p(maceps2_remove),
++	.remove		= maceps2_remove,
+ };
+ 
+ static int __init maceps2_init(void)
+diff --git a/drivers/input/serio/pcips2.c b/drivers/input/serio/pcips2.c
+index 0c42497..9809373 100644
+--- a/drivers/input/serio/pcips2.c
++++ b/drivers/input/serio/pcips2.c
+@@ -212,7 +212,7 @@ static struct pci_driver pcips2_driver = {
+ 	.name			= "pcips2",
+ 	.id_table		= pcips2_ids,
+ 	.probe			= pcips2_probe,
+-	.remove			= __devexit_p(pcips2_remove),
++	.remove			= pcips2_remove,
+ };
+ 
+ module_pci_driver(pcips2_driver);
+diff --git a/drivers/input/serio/q40kbd.c b/drivers/input/serio/q40kbd.c
+index 0c0df7f..5304880 100644
+--- a/drivers/input/serio/q40kbd.c
++++ b/drivers/input/serio/q40kbd.c
+@@ -190,7 +190,7 @@ static struct platform_driver q40kbd_driver = {
+ 		.name	= "q40kbd",
+ 		.owner	= THIS_MODULE,
+ 	},
+-	.remove		= __devexit_p(q40kbd_remove),
++	.remove		= q40kbd_remove,
+ };
+ 
+ static int __init q40kbd_init(void)
+diff --git a/drivers/input/serio/rpckbd.c b/drivers/input/serio/rpckbd.c
+index 2af5df6..a5100d4 100644
+--- a/drivers/input/serio/rpckbd.c
++++ b/drivers/input/serio/rpckbd.c
+@@ -166,7 +166,7 @@ static int __devexit rpckbd_remove(struct platform_device *dev)
+ 
+ static struct platform_driver rpckbd_driver = {
+ 	.probe		= rpckbd_probe,
+-	.remove		= __devexit_p(rpckbd_remove),
++	.remove		= rpckbd_remove,
+ 	.driver		= {
+ 		.name	= "kart",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/serio/sa1111ps2.c b/drivers/input/serio/sa1111ps2.c
+index 3897667..4aacf4f 100644
+--- a/drivers/input/serio/sa1111ps2.c
++++ b/drivers/input/serio/sa1111ps2.c
+@@ -357,7 +357,7 @@ static struct sa1111_driver ps2_driver = {
+ 	},
+ 	.devid		= SA1111_DEVID_PS2,
+ 	.probe		= ps2_probe,
+-	.remove		= __devexit_p(ps2_remove),
++	.remove		= ps2_remove,
+ };
+ 
+ static int __init ps2_init(void)
+diff --git a/drivers/input/serio/xilinx_ps2.c b/drivers/input/serio/xilinx_ps2.c
+index 1e983be..73f90dd8 100644
+--- a/drivers/input/serio/xilinx_ps2.c
++++ b/drivers/input/serio/xilinx_ps2.c
+@@ -368,7 +368,7 @@ static struct platform_driver xps2_of_driver = {
+ 		.of_match_table = xps2_of_match,
+ 	},
+ 	.probe		= xps2_of_probe,
+-	.remove		= __devexit_p(xps2_of_remove),
++	.remove		= xps2_of_remove,
+ };
+ module_platform_driver(xps2_of_driver);
+ 
+diff --git a/drivers/input/touchscreen/88pm860x-ts.c b/drivers/input/touchscreen/88pm860x-ts.c
+index 326218d..e609db8 100644
+--- a/drivers/input/touchscreen/88pm860x-ts.c
++++ b/drivers/input/touchscreen/88pm860x-ts.c
+@@ -310,7 +310,7 @@ static struct platform_driver pm860x_touch_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe	= pm860x_touch_probe,
+-	.remove	= __devexit_p(pm860x_touch_remove),
++	.remove	= pm860x_touch_remove,
+ };
+ module_platform_driver(pm860x_touch_driver);
+ 
+diff --git a/drivers/input/touchscreen/ad7877.c b/drivers/input/touchscreen/ad7877.c
+index 2c76921..d2df6a4 100644
+--- a/drivers/input/touchscreen/ad7877.c
++++ b/drivers/input/touchscreen/ad7877.c
+@@ -857,7 +857,7 @@ static struct spi_driver ad7877_driver = {
+ 		.pm	= &ad7877_pm,
+ 	},
+ 	.probe		= ad7877_probe,
+-	.remove		= __devexit_p(ad7877_remove),
++	.remove		= ad7877_remove,
+ };
+ 
+ module_spi_driver(ad7877_driver);
+diff --git a/drivers/input/touchscreen/ad7879-i2c.c b/drivers/input/touchscreen/ad7879-i2c.c
+index 3054354..850c95d 100644
+--- a/drivers/input/touchscreen/ad7879-i2c.c
++++ b/drivers/input/touchscreen/ad7879-i2c.c
+@@ -98,7 +98,7 @@ static struct i2c_driver ad7879_i2c_driver = {
+ 		.pm	= &ad7879_pm_ops,
+ 	},
+ 	.probe		= ad7879_i2c_probe,
+-	.remove		= __devexit_p(ad7879_i2c_remove),
++	.remove		= ad7879_i2c_remove,
+ 	.id_table	= ad7879_id,
+ };
+ 
+diff --git a/drivers/input/touchscreen/ad7879-spi.c b/drivers/input/touchscreen/ad7879-spi.c
+index db49abf..86b0fdb 100644
+--- a/drivers/input/touchscreen/ad7879-spi.c
++++ b/drivers/input/touchscreen/ad7879-spi.c
+@@ -154,7 +154,7 @@ static struct spi_driver ad7879_spi_driver = {
+ 		.pm	= &ad7879_pm_ops,
+ 	},
+ 	.probe		= ad7879_spi_probe,
+-	.remove		= __devexit_p(ad7879_spi_remove),
++	.remove		= ad7879_spi_remove,
+ };
+ 
+ module_spi_driver(ad7879_spi_driver);
+diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
+index f02028e..bf1ed8b 100644
+--- a/drivers/input/touchscreen/ads7846.c
++++ b/drivers/input/touchscreen/ads7846.c
+@@ -1430,7 +1430,7 @@ static struct spi_driver ads7846_driver = {
+ 		.pm	= &ads7846_pm,
+ 	},
+ 	.probe		= ads7846_probe,
+-	.remove		= __devexit_p(ads7846_remove),
++	.remove		= ads7846_remove,
+ };
+ 
+ module_spi_driver(ads7846_driver);
+diff --git a/drivers/input/touchscreen/atmel_mxt_ts.c b/drivers/input/touchscreen/atmel_mxt_ts.c
+index 1df2396..6199303 100644
+--- a/drivers/input/touchscreen/atmel_mxt_ts.c
++++ b/drivers/input/touchscreen/atmel_mxt_ts.c
+@@ -1270,7 +1270,7 @@ static struct i2c_driver mxt_driver = {
+ 		.pm	= &mxt_pm_ops,
+ 	},
+ 	.probe		= mxt_probe,
+-	.remove		= __devexit_p(mxt_remove),
++	.remove		= mxt_remove,
+ 	.id_table	= mxt_id,
+ };
+ 
+diff --git a/drivers/input/touchscreen/atmel_tsadcc.c b/drivers/input/touchscreen/atmel_tsadcc.c
+index ea392ee..ae254a0 100644
+--- a/drivers/input/touchscreen/atmel_tsadcc.c
++++ b/drivers/input/touchscreen/atmel_tsadcc.c
+@@ -346,7 +346,7 @@ static int __devexit atmel_tsadcc_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver atmel_tsadcc_driver = {
+ 	.probe		= atmel_tsadcc_probe,
+-	.remove		= __devexit_p(atmel_tsadcc_remove),
++	.remove		= atmel_tsadcc_remove,
+ 	.driver		= {
+ 		.name	= "atmel_tsadcc",
+ 	},
+diff --git a/drivers/input/touchscreen/auo-pixcir-ts.c b/drivers/input/touchscreen/auo-pixcir-ts.c
+index c7047b6..912926d 100644
+--- a/drivers/input/touchscreen/auo-pixcir-ts.c
++++ b/drivers/input/touchscreen/auo-pixcir-ts.c
+@@ -631,7 +631,7 @@ static struct i2c_driver auo_pixcir_driver = {
+ 		.pm	= &auo_pixcir_pm_ops,
+ 	},
+ 	.probe		= auo_pixcir_probe,
+-	.remove		= __devexit_p(auo_pixcir_remove),
++	.remove		= auo_pixcir_remove,
+ 	.id_table	= auo_pixcir_idtable,
+ };
+ 
+diff --git a/drivers/input/touchscreen/bu21013_ts.c b/drivers/input/touchscreen/bu21013_ts.c
+index 5c487d2..c2be1fe 100644
+--- a/drivers/input/touchscreen/bu21013_ts.c
++++ b/drivers/input/touchscreen/bu21013_ts.c
+@@ -649,7 +649,7 @@ static struct i2c_driver bu21013_driver = {
+ #endif
+ 	},
+ 	.probe		=	bu21013_probe,
+-	.remove		=	__devexit_p(bu21013_remove),
++	.remove		=	bu21013_remove,
+ 	.id_table	=	bu21013_id,
+ };
+ 
+diff --git a/drivers/input/touchscreen/cy8ctmg110_ts.c b/drivers/input/touchscreen/cy8ctmg110_ts.c
+index ad6a664..9a2044f 100644
+--- a/drivers/input/touchscreen/cy8ctmg110_ts.c
++++ b/drivers/input/touchscreen/cy8ctmg110_ts.c
+@@ -357,7 +357,7 @@ static struct i2c_driver cy8ctmg110_driver = {
+ 	},
+ 	.id_table	= cy8ctmg110_idtable,
+ 	.probe		= cy8ctmg110_probe,
+-	.remove		= __devexit_p(cy8ctmg110_remove),
++	.remove		= cy8ctmg110_remove,
+ };
+ 
+ module_i2c_driver(cy8ctmg110_driver);
+diff --git a/drivers/input/touchscreen/cyttsp_i2c.c b/drivers/input/touchscreen/cyttsp_i2c.c
+index 2af1d0c..1a7aca9 100644
+--- a/drivers/input/touchscreen/cyttsp_i2c.c
++++ b/drivers/input/touchscreen/cyttsp_i2c.c
+@@ -124,7 +124,7 @@ static struct i2c_driver cyttsp_i2c_driver = {
+ 		.pm	= &cyttsp_pm_ops,
+ 	},
+ 	.probe		= cyttsp_i2c_probe,
+-	.remove		= __devexit_p(cyttsp_i2c_remove),
++	.remove		= cyttsp_i2c_remove,
+ 	.id_table	= cyttsp_i2c_id,
+ };
+ 
+diff --git a/drivers/input/touchscreen/cyttsp_spi.c b/drivers/input/touchscreen/cyttsp_spi.c
+index 9f26341..915af4c 100644
+--- a/drivers/input/touchscreen/cyttsp_spi.c
++++ b/drivers/input/touchscreen/cyttsp_spi.c
+@@ -188,7 +188,7 @@ static struct spi_driver cyttsp_spi_driver = {
+ 		.pm	= &cyttsp_pm_ops,
+ 	},
+ 	.probe  = cyttsp_spi_probe,
+-	.remove = __devexit_p(cyttsp_spi_remove),
++	.remove = cyttsp_spi_remove,
+ };
+ 
+ module_spi_driver(cyttsp_spi_driver);
+diff --git a/drivers/input/touchscreen/da9034-ts.c b/drivers/input/touchscreen/da9034-ts.c
+index 36b65cf..ec156a6 100644
+--- a/drivers/input/touchscreen/da9034-ts.c
++++ b/drivers/input/touchscreen/da9034-ts.c
+@@ -377,7 +377,7 @@ static struct platform_driver da9034_touch_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= da9034_touch_probe,
+-	.remove		= __devexit_p(da9034_touch_remove),
++	.remove		= da9034_touch_remove,
+ };
+ module_platform_driver(da9034_touch_driver);
+ 
+diff --git a/drivers/input/touchscreen/da9052_tsi.c b/drivers/input/touchscreen/da9052_tsi.c
+index e8df341..5dfb39b 100644
+--- a/drivers/input/touchscreen/da9052_tsi.c
++++ b/drivers/input/touchscreen/da9052_tsi.c
+@@ -355,7 +355,7 @@ static int  __devexit da9052_ts_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver da9052_tsi_driver = {
+ 	.probe	= da9052_ts_probe,
+-	.remove	= __devexit_p(da9052_ts_remove),
++	.remove	= da9052_ts_remove,
+ 	.driver	= {
+ 		.name	= "da9052-tsi",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
+index d9c6007..65ed9d9 100644
+--- a/drivers/input/touchscreen/edt-ft5x06.c
++++ b/drivers/input/touchscreen/edt-ft5x06.c
+@@ -883,7 +883,7 @@ static struct i2c_driver edt_ft5x06_ts_driver = {
+ 	},
+ 	.id_table = edt_ft5x06_ts_id,
+ 	.probe    = edt_ft5x06_ts_probe,
+-	.remove   = __devexit_p(edt_ft5x06_ts_remove),
++	.remove   = edt_ft5x06_ts_remove,
+ };
+ 
+ module_i2c_driver(edt_ft5x06_ts_driver);
+diff --git a/drivers/input/touchscreen/eeti_ts.c b/drivers/input/touchscreen/eeti_ts.c
+index 908407e..a2d9a65 100644
+--- a/drivers/input/touchscreen/eeti_ts.c
++++ b/drivers/input/touchscreen/eeti_ts.c
+@@ -321,7 +321,7 @@ static struct i2c_driver eeti_ts_driver = {
+ #endif
+ 	},
+ 	.probe = eeti_ts_probe,
+-	.remove = __devexit_p(eeti_ts_remove),
++	.remove = eeti_ts_remove,
+ 	.id_table = eeti_ts_id,
+ };
+ 
+diff --git a/drivers/input/touchscreen/egalax_ts.c b/drivers/input/touchscreen/egalax_ts.c
+index 13fa62f..d85078d 100644
+--- a/drivers/input/touchscreen/egalax_ts.c
++++ b/drivers/input/touchscreen/egalax_ts.c
+@@ -301,7 +301,7 @@ static struct i2c_driver egalax_ts_driver = {
+ 	},
+ 	.id_table	= egalax_ts_id,
+ 	.probe		= egalax_ts_probe,
+-	.remove		= __devexit_p(egalax_ts_remove),
++	.remove		= egalax_ts_remove,
+ };
+ 
+ module_i2c_driver(egalax_ts_driver);
+diff --git a/drivers/input/touchscreen/htcpen.c b/drivers/input/touchscreen/htcpen.c
+index d13143b..5cc3240 100644
+--- a/drivers/input/touchscreen/htcpen.c
++++ b/drivers/input/touchscreen/htcpen.c
+@@ -210,7 +210,7 @@ static int htcpen_isa_resume(struct device *dev, unsigned int n)
+ 
+ static struct isa_driver htcpen_isa_driver = {
+ 	.probe		= htcpen_isa_probe,
+-	.remove		= __devexit_p(htcpen_isa_remove),
++	.remove		= htcpen_isa_remove,
+ #ifdef CONFIG_PM
+ 	.suspend	= htcpen_isa_suspend,
+ 	.resume		= htcpen_isa_resume,
+diff --git a/drivers/input/touchscreen/ili210x.c b/drivers/input/touchscreen/ili210x.c
+index 4ac6976..e8fd6c2 100644
+--- a/drivers/input/touchscreen/ili210x.c
++++ b/drivers/input/touchscreen/ili210x.c
+@@ -350,7 +350,7 @@ static struct i2c_driver ili210x_ts_driver = {
+ 	},
+ 	.id_table = ili210x_i2c_id,
+ 	.probe = ili210x_i2c_probe,
+-	.remove = __devexit_p(ili210x_i2c_remove),
++	.remove = ili210x_i2c_remove,
+ };
+ 
+ module_i2c_driver(ili210x_ts_driver);
+diff --git a/drivers/input/touchscreen/intel-mid-touch.c b/drivers/input/touchscreen/intel-mid-touch.c
+index cf29937..f27364f 100644
+--- a/drivers/input/touchscreen/intel-mid-touch.c
++++ b/drivers/input/touchscreen/intel-mid-touch.c
+@@ -662,7 +662,7 @@ static struct platform_driver mrstouch_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= mrstouch_probe,
+-	.remove		= __devexit_p(mrstouch_remove),
++	.remove		= mrstouch_remove,
+ };
+ module_platform_driver(mrstouch_driver);
+ 
+diff --git a/drivers/input/touchscreen/jornada720_ts.c b/drivers/input/touchscreen/jornada720_ts.c
+index 7f03d1bd..ad35c8c 100644
+--- a/drivers/input/touchscreen/jornada720_ts.c
++++ b/drivers/input/touchscreen/jornada720_ts.c
+@@ -168,7 +168,7 @@ MODULE_ALIAS("platform:jornada_ts");
+ 
+ static struct platform_driver jornada720_ts_driver = {
+ 	.probe		= jornada720_ts_probe,
+-	.remove		= __devexit_p(jornada720_ts_remove),
++	.remove		= jornada720_ts_remove,
+ 	.driver		= {
+ 		.name	= "jornada_ts",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/touchscreen/lpc32xx_ts.c b/drivers/input/touchscreen/lpc32xx_ts.c
+index 4c2b8ed..8134f61 100644
+--- a/drivers/input/touchscreen/lpc32xx_ts.c
++++ b/drivers/input/touchscreen/lpc32xx_ts.c
+@@ -394,7 +394,7 @@ MODULE_DEVICE_TABLE(of, lpc32xx_tsc_of_match);
+ 
+ static struct platform_driver lpc32xx_ts_driver = {
+ 	.probe		= lpc32xx_ts_probe,
+-	.remove		= __devexit_p(lpc32xx_ts_remove),
++	.remove		= lpc32xx_ts_remove,
+ 	.driver		= {
+ 		.name	= MOD_NAME,
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/input/touchscreen/max11801_ts.c b/drivers/input/touchscreen/max11801_ts.c
+index 4eab50b..e3e637f 100644
+--- a/drivers/input/touchscreen/max11801_ts.c
++++ b/drivers/input/touchscreen/max11801_ts.c
+@@ -252,7 +252,7 @@ static struct i2c_driver max11801_ts_driver = {
+ 	},
+ 	.id_table	= max11801_ts_id,
+ 	.probe		= max11801_ts_probe,
+-	.remove		= __devexit_p(max11801_ts_remove),
++	.remove		= max11801_ts_remove,
+ };
+ 
+ module_i2c_driver(max11801_ts_driver);
+diff --git a/drivers/input/touchscreen/mc13783_ts.c b/drivers/input/touchscreen/mc13783_ts.c
+index 48dc5b0..5c18c5c 100644
+--- a/drivers/input/touchscreen/mc13783_ts.c
++++ b/drivers/input/touchscreen/mc13783_ts.c
+@@ -243,7 +243,7 @@ static int __devexit mc13783_ts_remove(struct platform_device *pdev)
  }
  
- static struct platform_driver ltq_mii_driver = {
--	.remove = __devexit_p(ltq_etop_remove),
-+	.remove = ltq_etop_remove,
+ static struct platform_driver mc13783_ts_driver = {
+-	.remove		= __devexit_p(mc13783_ts_remove),
++	.remove		= mc13783_ts_remove,
+ 	.driver		= {
+ 		.owner	= THIS_MODULE,
+ 		.name	= MC13783_TS_NAME,
+diff --git a/drivers/input/touchscreen/mcs5000_ts.c b/drivers/input/touchscreen/mcs5000_ts.c
+index b528511..94a4ff6 100644
+--- a/drivers/input/touchscreen/mcs5000_ts.c
++++ b/drivers/input/touchscreen/mcs5000_ts.c
+@@ -292,7 +292,7 @@ MODULE_DEVICE_TABLE(i2c, mcs5000_ts_id);
+ 
+ static struct i2c_driver mcs5000_ts_driver = {
+ 	.probe		= mcs5000_ts_probe,
+-	.remove		= __devexit_p(mcs5000_ts_remove),
++	.remove		= mcs5000_ts_remove,
  	.driver = {
- 		.name = "ltq_etop",
- 		.owner = THIS_MODULE,
-diff --git a/drivers/net/ethernet/marvell/skge.c b/drivers/net/ethernet/marvell/skge.c
-index d19a143..0912768 100644
---- a/drivers/net/ethernet/marvell/skge.c
-+++ b/drivers/net/ethernet/marvell/skge.c
-@@ -4142,7 +4142,7 @@ static struct pci_driver skge_driver = {
- 	.name =         DRV_NAME,
- 	.id_table =     skge_id_table,
- 	.probe =        skge_probe,
--	.remove =       __devexit_p(skge_remove),
-+	.remove =       skge_remove,
- 	.shutdown =	skge_shutdown,
- 	.driver.pm =	SKGE_PM_OPS,
- };
-diff --git a/drivers/net/ethernet/marvell/sky2.c b/drivers/net/ethernet/marvell/sky2.c
-index 78946fe..3c6314f 100644
---- a/drivers/net/ethernet/marvell/sky2.c
-+++ b/drivers/net/ethernet/marvell/sky2.c
-@@ -5207,7 +5207,7 @@ static struct pci_driver sky2_driver = {
- 	.name = DRV_NAME,
- 	.id_table = sky2_id_table,
- 	.probe = sky2_probe,
--	.remove = __devexit_p(sky2_remove),
-+	.remove = sky2_remove,
- 	.shutdown = sky2_shutdown,
- 	.driver.pm = SKY2_PM_OPS,
- };
-diff --git a/drivers/net/ethernet/mellanox/mlx4/main.c b/drivers/net/ethernet/mellanox/mlx4/main.c
-index 2aa80af..877b74a 100644
---- a/drivers/net/ethernet/mellanox/mlx4/main.c
-+++ b/drivers/net/ethernet/mellanox/mlx4/main.c
-@@ -2391,7 +2391,7 @@ static struct pci_driver mlx4_driver = {
- 	.name		= DRV_NAME,
- 	.id_table	= mlx4_pci_table,
- 	.probe		= mlx4_init_one,
--	.remove		= __devexit_p(mlx4_remove_one),
-+	.remove		= mlx4_remove_one,
- 	.err_handler    = &mlx4_err_handler,
+ 		.name = "mcs5000_ts",
+ #ifdef CONFIG_PM
+diff --git a/drivers/input/touchscreen/mms114.c b/drivers/input/touchscreen/mms114.c
+index 3426d2e..f4c1bc8 100644
+--- a/drivers/input/touchscreen/mms114.c
++++ b/drivers/input/touchscreen/mms114.c
+@@ -590,7 +590,7 @@ static struct i2c_driver mms114_driver = {
+ 		.of_match_table = of_match_ptr(mms114_dt_match),
+ 	},
+ 	.probe		= mms114_probe,
+-	.remove		= __devexit_p(mms114_remove),
++	.remove		= mms114_remove,
+ 	.id_table	= mms114_id,
  };
  
-diff --git a/drivers/net/ethernet/micrel/ks8695net.c b/drivers/net/ethernet/micrel/ks8695net.c
-index dccae1d..786cc0f 100644
---- a/drivers/net/ethernet/micrel/ks8695net.c
-+++ b/drivers/net/ethernet/micrel/ks8695net.c
-@@ -1620,7 +1620,7 @@ static struct platform_driver ks8695_driver = {
+diff --git a/drivers/input/touchscreen/pcap_ts.c b/drivers/input/touchscreen/pcap_ts.c
+index f57aeb8..97f07ba 100644
+--- a/drivers/input/touchscreen/pcap_ts.c
++++ b/drivers/input/touchscreen/pcap_ts.c
+@@ -245,7 +245,7 @@ static const struct dev_pm_ops pcap_ts_pm_ops = {
+ 
+ static struct platform_driver pcap_ts_driver = {
+ 	.probe		= pcap_ts_probe,
+-	.remove		= __devexit_p(pcap_ts_remove),
++	.remove		= pcap_ts_remove,
+ 	.driver		= {
+ 		.name	= "pcap-ts",
  		.owner	= THIS_MODULE,
+diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
+index 953b4c10..4fcb63e 100644
+--- a/drivers/input/touchscreen/pixcir_i2c_ts.c
++++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
+@@ -218,7 +218,7 @@ static struct i2c_driver pixcir_i2c_ts_driver = {
+ 		.pm	= &pixcir_dev_pm_ops,
  	},
- 	.probe		= ks8695_probe,
--	.remove		= __devexit_p(ks8695_drv_remove),
-+	.remove		= ks8695_drv_remove,
- 	.suspend	= ks8695_drv_suspend,
- 	.resume		= ks8695_drv_resume,
- };
-diff --git a/drivers/net/ethernet/micrel/ks8842.c b/drivers/net/ethernet/micrel/ks8842.c
-index 24fb049..f84dd2d 100644
---- a/drivers/net/ethernet/micrel/ks8842.c
-+++ b/drivers/net/ethernet/micrel/ks8842.c
-@@ -1262,7 +1262,7 @@ static struct platform_driver ks8842_platform_driver = {
- 		.owner	= THIS_MODULE,
- 	},
- 	.probe		= ks8842_probe,
--	.remove		= __devexit_p(ks8842_remove),
-+	.remove		= ks8842_remove,
+ 	.probe		= pixcir_i2c_ts_probe,
+-	.remove		= __devexit_p(pixcir_i2c_ts_remove),
++	.remove		= pixcir_i2c_ts_remove,
+ 	.id_table	= pixcir_i2c_ts_id,
  };
  
- module_platform_driver(ks8842_platform_driver);
-diff --git a/drivers/net/ethernet/micrel/ks8851.c b/drivers/net/ethernet/micrel/ks8851.c
-index 1540ebe..a1f7d7d 100644
---- a/drivers/net/ethernet/micrel/ks8851.c
-+++ b/drivers/net/ethernet/micrel/ks8851.c
-@@ -1554,7 +1554,7 @@ static struct spi_driver ks8851_driver = {
- 		.owner = THIS_MODULE,
+diff --git a/drivers/input/touchscreen/s3c2410_ts.c b/drivers/input/touchscreen/s3c2410_ts.c
+index 549fa29..4dda765 100644
+--- a/drivers/input/touchscreen/s3c2410_ts.c
++++ b/drivers/input/touchscreen/s3c2410_ts.c
+@@ -430,7 +430,7 @@ static struct platform_driver s3c_ts_driver = {
  	},
- 	.probe = ks8851_probe,
--	.remove = __devexit_p(ks8851_remove),
-+	.remove = ks8851_remove,
- 	.suspend = ks8851_suspend,
- 	.resume = ks8851_resume,
+ 	.id_table	= s3cts_driver_ids,
+ 	.probe		= s3c2410ts_probe,
+-	.remove		= __devexit_p(s3c2410ts_remove),
++	.remove		= s3c2410ts_remove,
  };
-diff --git a/drivers/net/ethernet/micrel/ks8851_mll.c b/drivers/net/ethernet/micrel/ks8851_mll.c
-index 38529ed..80fe0b3 100644
---- a/drivers/net/ethernet/micrel/ks8851_mll.c
-+++ b/drivers/net/ethernet/micrel/ks8851_mll.c
-@@ -1663,7 +1663,7 @@ static struct platform_driver ks8851_platform_driver = {
- 		.owner = THIS_MODULE,
- 	},
- 	.probe = ks8851_probe,
--	.remove = __devexit_p(ks8851_remove),
-+	.remove = ks8851_remove,
- };
+ module_platform_driver(s3c_ts_driver);
  
- module_platform_driver(ks8851_platform_driver);
-diff --git a/drivers/net/ethernet/microchip/enc28j60.c b/drivers/net/ethernet/microchip/enc28j60.c
-index 6118bda..1373b02 100644
---- a/drivers/net/ethernet/microchip/enc28j60.c
-+++ b/drivers/net/ethernet/microchip/enc28j60.c
-@@ -1637,7 +1637,7 @@ static struct spi_driver enc28j60_driver = {
+diff --git a/drivers/input/touchscreen/st1232.c b/drivers/input/touchscreen/st1232.c
+index 6cb68a1..62a4b5d 100644
+--- a/drivers/input/touchscreen/st1232.c
++++ b/drivers/input/touchscreen/st1232.c
+@@ -264,7 +264,7 @@ MODULE_DEVICE_TABLE(of, st1232_ts_dt_ids);
+ 
+ static struct i2c_driver st1232_ts_driver = {
+ 	.probe		= st1232_ts_probe,
+-	.remove		= __devexit_p(st1232_ts_remove),
++	.remove		= st1232_ts_remove,
+ 	.id_table	= st1232_ts_id,
+ 	.driver = {
+ 		.name	= ST1232_TS_NAME,
+diff --git a/drivers/input/touchscreen/stmpe-ts.c b/drivers/input/touchscreen/stmpe-ts.c
+index b3f7503..fdcb43b 100644
+--- a/drivers/input/touchscreen/stmpe-ts.c
++++ b/drivers/input/touchscreen/stmpe-ts.c
+@@ -357,7 +357,7 @@ static struct platform_driver stmpe_ts_driver = {
  		   .owner = THIS_MODULE,
- 	 },
- 	.probe = enc28j60_probe,
--	.remove = __devexit_p(enc28j60_remove),
-+	.remove = enc28j60_remove,
+ 		   },
+ 	.probe = stmpe_input_probe,
+-	.remove = __devexit_p(stmpe_ts_remove),
++	.remove = stmpe_ts_remove,
  };
+ module_platform_driver(stmpe_ts_driver);
  
- static int __init enc28j60_init(void)
-diff --git a/drivers/net/ethernet/natsemi/jazzsonic.c b/drivers/net/ethernet/natsemi/jazzsonic.c
-index 95dd39f..1b2ed23 100644
---- a/drivers/net/ethernet/natsemi/jazzsonic.c
-+++ b/drivers/net/ethernet/natsemi/jazzsonic.c
-@@ -286,7 +286,7 @@ static int __devexit jazz_sonic_device_remove (struct platform_device *pdev)
+diff --git a/drivers/input/touchscreen/ti_am335x_tsc.c b/drivers/input/touchscreen/ti_am335x_tsc.c
+index 7a18a8a..68b8c46 100644
+--- a/drivers/input/touchscreen/ti_am335x_tsc.c
++++ b/drivers/input/touchscreen/ti_am335x_tsc.c
+@@ -384,7 +384,7 @@ static const struct dev_pm_ops titsc_pm_ops = {
  
- static struct platform_driver jazz_sonic_driver = {
- 	.probe	= jazz_sonic_probe,
--	.remove	= __devexit_p(jazz_sonic_device_remove),
-+	.remove	= jazz_sonic_device_remove,
+ static struct platform_driver ti_tsc_driver = {
+ 	.probe	= titsc_probe,
+-	.remove	= __devexit_p(titsc_remove),
++	.remove	= titsc_remove,
  	.driver	= {
- 		.name	= jazz_sonic_string,
+ 		.name   = "tsc",
  		.owner	= THIS_MODULE,
-diff --git a/drivers/net/ethernet/natsemi/macsonic.c b/drivers/net/ethernet/natsemi/macsonic.c
-index b9680ba..1d6a789 100644
---- a/drivers/net/ethernet/natsemi/macsonic.c
-+++ b/drivers/net/ethernet/natsemi/macsonic.c
-@@ -634,7 +634,7 @@ static int __devexit mac_sonic_device_remove (struct platform_device *pdev)
+diff --git a/drivers/input/touchscreen/tnetv107x-ts.c b/drivers/input/touchscreen/tnetv107x-ts.c
+index 368d2c6c..62d57e8 100644
+--- a/drivers/input/touchscreen/tnetv107x-ts.c
++++ b/drivers/input/touchscreen/tnetv107x-ts.c
+@@ -374,7 +374,7 @@ static int __devexit tsc_remove(struct platform_device *pdev)
  
- static struct platform_driver mac_sonic_driver = {
- 	.probe  = mac_sonic_probe,
--	.remove = __devexit_p(mac_sonic_device_remove),
-+	.remove = mac_sonic_device_remove,
+ static struct platform_driver tsc_driver = {
+ 	.probe		= tsc_probe,
+-	.remove		= __devexit_p(tsc_remove),
++	.remove		= tsc_remove,
+ 	.driver.name	= "tnetv107x-ts",
+ 	.driver.owner	= THIS_MODULE,
+ };
+diff --git a/drivers/input/touchscreen/tps6507x-ts.c b/drivers/input/touchscreen/tps6507x-ts.c
+index f7eda3d..e1ec9e0 100644
+--- a/drivers/input/touchscreen/tps6507x-ts.c
++++ b/drivers/input/touchscreen/tps6507x-ts.c
+@@ -367,7 +367,7 @@ static struct platform_driver tps6507x_ts_driver = {
+ 		.owner = THIS_MODULE,
+ 	},
+ 	.probe = tps6507x_ts_probe,
+-	.remove = __devexit_p(tps6507x_ts_remove),
++	.remove = tps6507x_ts_remove,
+ };
+ module_platform_driver(tps6507x_ts_driver);
+ 
+diff --git a/drivers/input/touchscreen/tsc2005.c b/drivers/input/touchscreen/tsc2005.c
+index 5ce3fa8..db472a8 100644
+--- a/drivers/input/touchscreen/tsc2005.c
++++ b/drivers/input/touchscreen/tsc2005.c
+@@ -745,7 +745,7 @@ static struct spi_driver tsc2005_driver = {
+ 		.pm	= &tsc2005_pm_ops,
+ 	},
+ 	.probe	= tsc2005_probe,
+-	.remove	= __devexit_p(tsc2005_remove),
++	.remove	= tsc2005_remove,
+ };
+ 
+ module_spi_driver(tsc2005_driver);
+diff --git a/drivers/input/touchscreen/tsc2007.c b/drivers/input/touchscreen/tsc2007.c
+index 1473d23..3b19583 100644
+--- a/drivers/input/touchscreen/tsc2007.c
++++ b/drivers/input/touchscreen/tsc2007.c
+@@ -396,7 +396,7 @@ static struct i2c_driver tsc2007_driver = {
+ 	},
+ 	.id_table	= tsc2007_idtable,
+ 	.probe		= tsc2007_probe,
+-	.remove		= __devexit_p(tsc2007_remove),
++	.remove		= tsc2007_remove,
+ };
+ 
+ module_i2c_driver(tsc2007_driver);
+diff --git a/drivers/input/touchscreen/ucb1400_ts.c b/drivers/input/touchscreen/ucb1400_ts.c
+index 46e83ad..780eda6 100644
+--- a/drivers/input/touchscreen/ucb1400_ts.c
++++ b/drivers/input/touchscreen/ucb1400_ts.c
+@@ -442,7 +442,7 @@ static SIMPLE_DEV_PM_OPS(ucb1400_ts_pm_ops,
+ 
+ static struct platform_driver ucb1400_ts_driver = {
+ 	.probe	= ucb1400_ts_probe,
+-	.remove	= __devexit_p(ucb1400_ts_remove),
++	.remove	= ucb1400_ts_remove,
  	.driver	= {
- 		.name	= mac_sonic_string,
+ 		.name	= "ucb1400_ts",
  		.owner	= THIS_MODULE,
-diff --git a/drivers/net/ethernet/natsemi/natsemi.c b/drivers/net/ethernet/natsemi/natsemi.c
-index dbaaa99..119930b 100644
---- a/drivers/net/ethernet/natsemi/natsemi.c
-+++ b/drivers/net/ethernet/natsemi/natsemi.c
-@@ -3353,7 +3353,7 @@ static struct pci_driver natsemi_driver = {
- 	.name		= DRV_NAME,
- 	.id_table	= natsemi_pci_tbl,
- 	.probe		= natsemi_probe1,
--	.remove		= __devexit_p(natsemi_remove1),
-+	.remove		= natsemi_remove1,
- #ifdef CONFIG_PM
- 	.suspend	= natsemi_suspend,
- 	.resume		= natsemi_resume,
-diff --git a/drivers/net/ethernet/natsemi/ns83820.c b/drivers/net/ethernet/natsemi/ns83820.c
-index d52728b..70ec426 100644
---- a/drivers/net/ethernet/natsemi/ns83820.c
-+++ b/drivers/net/ethernet/natsemi/ns83820.c
-@@ -2272,7 +2272,7 @@ static struct pci_driver driver = {
- 	.name		= "ns83820",
- 	.id_table	= ns83820_pci_tbl,
- 	.probe		= ns83820_init_one,
--	.remove		= __devexit_p(ns83820_remove_one),
-+	.remove		= ns83820_remove_one,
- #if 0	/* FIXME: implement */
- 	.suspend	= ,
- 	.resume		= ,
-diff --git a/drivers/net/ethernet/natsemi/xtsonic.c b/drivers/net/ethernet/natsemi/xtsonic.c
-index 7dfe883..9bc1fc7 100644
---- a/drivers/net/ethernet/natsemi/xtsonic.c
-+++ b/drivers/net/ethernet/natsemi/xtsonic.c
-@@ -314,7 +314,7 @@ static int __devexit xtsonic_device_remove (struct platform_device *pdev)
+diff --git a/drivers/input/touchscreen/w90p910_ts.c b/drivers/input/touchscreen/w90p910_ts.c
+index 9396b21..039e4ea 100644
+--- a/drivers/input/touchscreen/w90p910_ts.c
++++ b/drivers/input/touchscreen/w90p910_ts.c
+@@ -325,7 +325,7 @@ static int __devexit w90x900ts_remove(struct platform_device *pdev)
  
- static struct platform_driver xtsonic_driver = {
- 	.probe = xtsonic_probe,
--	.remove = __devexit_p(xtsonic_device_remove),
-+	.remove = xtsonic_device_remove,
- 	.driver = {
- 		.name = xtsonic_string,
- 	},
-diff --git a/drivers/net/ethernet/neterion/s2io.c b/drivers/net/ethernet/neterion/s2io.c
-index c98decb..0c8742a 100644
---- a/drivers/net/ethernet/neterion/s2io.c
-+++ b/drivers/net/ethernet/neterion/s2io.c
-@@ -494,7 +494,7 @@ static struct pci_driver s2io_driver = {
- 	.name = "S2IO",
- 	.id_table = s2io_tbl,
- 	.probe = s2io_init_nic,
--	.remove = __devexit_p(s2io_rem_nic),
-+	.remove = s2io_rem_nic,
- 	.err_handler = &s2io_err_handler,
- };
- 
-diff --git a/drivers/net/ethernet/neterion/vxge/vxge-main.c b/drivers/net/ethernet/neterion/vxge/vxge-main.c
-index 3e5b750..4af32a3 100644
---- a/drivers/net/ethernet/neterion/vxge/vxge-main.c
-+++ b/drivers/net/ethernet/neterion/vxge/vxge-main.c
-@@ -4809,7 +4809,7 @@ static struct pci_driver vxge_driver = {
- 	.name = VXGE_DRIVER_NAME,
- 	.id_table = vxge_id_table,
- 	.probe = vxge_probe,
--	.remove = __devexit_p(vxge_remove),
-+	.remove = vxge_remove,
- #ifdef CONFIG_PM
- 	.suspend = vxge_pm_suspend,
- 	.resume = vxge_pm_resume,
-diff --git a/drivers/net/ethernet/nuvoton/w90p910_ether.c b/drivers/net/ethernet/nuvoton/w90p910_ether.c
-index 6893a65..fceec55 100644
---- a/drivers/net/ethernet/nuvoton/w90p910_ether.c
-+++ b/drivers/net/ethernet/nuvoton/w90p910_ether.c
-@@ -1096,7 +1096,7 @@ static int __devexit w90p910_ether_remove(struct platform_device *pdev)
- 
- static struct platform_driver w90p910_ether_driver = {
- 	.probe		= w90p910_ether_probe,
--	.remove		= __devexit_p(w90p910_ether_remove),
-+	.remove		= w90p910_ether_remove,
+ static struct platform_driver w90x900ts_driver = {
+ 	.probe		= w90x900ts_probe,
+-	.remove		= __devexit_p(w90x900ts_remove),
++	.remove		= w90x900ts_remove,
  	.driver		= {
- 		.name	= "nuc900-emc",
+ 		.name	= "nuc900-ts",
  		.owner	= THIS_MODULE,
-diff --git a/drivers/net/ethernet/nvidia/forcedeth.c b/drivers/net/ethernet/nvidia/forcedeth.c
-index 876bece..7f89407 100644
---- a/drivers/net/ethernet/nvidia/forcedeth.c
-+++ b/drivers/net/ethernet/nvidia/forcedeth.c
-@@ -6271,7 +6271,7 @@ static struct pci_driver driver = {
- 	.name		= DRV_NAME,
- 	.id_table	= pci_tbl,
- 	.probe		= nv_probe,
--	.remove		= __devexit_p(nv_remove),
-+	.remove		= nv_remove,
- 	.shutdown	= nv_shutdown,
- 	.driver.pm	= NV_PM_OPS,
- };
-diff --git a/drivers/net/ethernet/nxp/lpc_eth.c b/drivers/net/ethernet/nxp/lpc_eth.c
-index af8b414..4638f6a 100644
---- a/drivers/net/ethernet/nxp/lpc_eth.c
-+++ b/drivers/net/ethernet/nxp/lpc_eth.c
-@@ -1597,7 +1597,7 @@ MODULE_DEVICE_TABLE(of, lpc_eth_match);
- 
- static struct platform_driver lpc_eth_driver = {
- 	.probe		= lpc_eth_drv_probe,
--	.remove		= __devexit_p(lpc_eth_drv_remove),
-+	.remove		= lpc_eth_drv_remove,
- #ifdef CONFIG_PM
- 	.suspend	= lpc_eth_drv_suspend,
- 	.resume		= lpc_eth_drv_resume,
-diff --git a/drivers/net/ethernet/octeon/octeon_mgmt.c b/drivers/net/ethernet/octeon/octeon_mgmt.c
-index f97719c..5fca4a2 100644
---- a/drivers/net/ethernet/octeon/octeon_mgmt.c
-+++ b/drivers/net/ethernet/octeon/octeon_mgmt.c
-@@ -1583,7 +1583,7 @@ static struct platform_driver octeon_mgmt_driver = {
- 		.of_match_table = octeon_mgmt_match,
+diff --git a/drivers/input/touchscreen/wacom_i2c.c b/drivers/input/touchscreen/wacom_i2c.c
+index 0c01657..0c033df 100644
+--- a/drivers/input/touchscreen/wacom_i2c.c
++++ b/drivers/input/touchscreen/wacom_i2c.c
+@@ -272,7 +272,7 @@ static struct i2c_driver wacom_i2c_driver = {
  	},
- 	.probe		= octeon_mgmt_probe,
--	.remove		= __devexit_p(octeon_mgmt_remove),
-+	.remove		= octeon_mgmt_remove,
+ 
+ 	.probe		= wacom_i2c_probe,
+-	.remove		= __devexit_p(wacom_i2c_remove),
++	.remove		= wacom_i2c_remove,
+ 	.id_table	= wacom_i2c_id,
  };
- 
- extern void octeon_mdiobus_force_mod_depencency(void);
-diff --git a/drivers/net/ethernet/packetengines/hamachi.c b/drivers/net/ethernet/packetengines/hamachi.c
-index c236715..9664732 100644
---- a/drivers/net/ethernet/packetengines/hamachi.c
-+++ b/drivers/net/ethernet/packetengines/hamachi.c
-@@ -1923,7 +1923,7 @@ static struct pci_driver hamachi_driver = {
- 	.name		= DRV_NAME,
- 	.id_table	= hamachi_pci_tbl,
- 	.probe		= hamachi_init_one,
--	.remove		= __devexit_p(hamachi_remove_one),
-+	.remove		= hamachi_remove_one,
- };
- 
- static int __init hamachi_init (void)
-diff --git a/drivers/net/ethernet/packetengines/yellowfin.c b/drivers/net/ethernet/packetengines/yellowfin.c
-index 04e622f..aec57c0 100644
---- a/drivers/net/ethernet/packetengines/yellowfin.c
-+++ b/drivers/net/ethernet/packetengines/yellowfin.c
-@@ -1399,7 +1399,7 @@ static struct pci_driver yellowfin_driver = {
- 	.name		= DRV_NAME,
- 	.id_table	= yellowfin_pci_tbl,
- 	.probe		= yellowfin_init_one,
--	.remove		= __devexit_p(yellowfin_remove_one),
-+	.remove		= yellowfin_remove_one,
- };
- 
- 
-diff --git a/drivers/net/ethernet/pasemi/pasemi_mac.c b/drivers/net/ethernet/pasemi/pasemi_mac.c
-index 6fa74d5..07943a3 100644
---- a/drivers/net/ethernet/pasemi/pasemi_mac.c
-+++ b/drivers/net/ethernet/pasemi/pasemi_mac.c
-@@ -1884,7 +1884,7 @@ static struct pci_driver pasemi_mac_driver = {
- 	.name		= "pasemi_mac",
- 	.id_table	= pasemi_mac_pci_tbl,
- 	.probe		= pasemi_mac_probe,
--	.remove		= __devexit_p(pasemi_mac_remove),
-+	.remove		= pasemi_mac_remove,
- };
- 
- static void __exit pasemi_mac_cleanup_module(void)
-diff --git a/drivers/net/ethernet/qlogic/netxen/netxen_nic_main.c b/drivers/net/ethernet/qlogic/netxen/netxen_nic_main.c
-index df45061..f0546b0 100644
---- a/drivers/net/ethernet/qlogic/netxen/netxen_nic_main.c
-+++ b/drivers/net/ethernet/qlogic/netxen/netxen_nic_main.c
-@@ -3350,7 +3350,7 @@ static struct pci_driver netxen_driver = {
- 	.name = netxen_nic_driver_name,
- 	.id_table = netxen_pci_tbl,
- 	.probe = netxen_nic_probe,
--	.remove = __devexit_p(netxen_nic_remove),
-+	.remove = netxen_nic_remove,
- #ifdef CONFIG_PM
- 	.suspend = netxen_nic_suspend,
- 	.resume = netxen_nic_resume,
-diff --git a/drivers/net/ethernet/qlogic/qla3xxx.c b/drivers/net/ethernet/qlogic/qla3xxx.c
-index 12d1f24..506c72f 100644
---- a/drivers/net/ethernet/qlogic/qla3xxx.c
-+++ b/drivers/net/ethernet/qlogic/qla3xxx.c
-@@ -3952,7 +3952,7 @@ static struct pci_driver ql3xxx_driver = {
- 	.name = DRV_NAME,
- 	.id_table = ql3xxx_pci_tbl,
- 	.probe = ql3xxx_probe,
--	.remove = __devexit_p(ql3xxx_remove),
-+	.remove = ql3xxx_remove,
- };
- 
- module_pci_driver(ql3xxx_driver);
-diff --git a/drivers/net/ethernet/qlogic/qlcnic/qlcnic_main.c b/drivers/net/ethernet/qlogic/qlcnic/qlcnic_main.c
-index 24ad17e..e553684 100644
---- a/drivers/net/ethernet/qlogic/qlcnic/qlcnic_main.c
-+++ b/drivers/net/ethernet/qlogic/qlcnic/qlcnic_main.c
-@@ -4533,7 +4533,7 @@ static struct pci_driver qlcnic_driver = {
- 	.name = qlcnic_driver_name,
- 	.id_table = qlcnic_pci_tbl,
- 	.probe = qlcnic_probe,
--	.remove = __devexit_p(qlcnic_remove),
-+	.remove = qlcnic_remove,
- #ifdef CONFIG_PM
- 	.suspend = qlcnic_suspend,
- 	.resume = qlcnic_resume,
-diff --git a/drivers/net/ethernet/qlogic/qlge/qlge_main.c b/drivers/net/ethernet/qlogic/qlge/qlge_main.c
-index b262d61..a576a8d2 100644
---- a/drivers/net/ethernet/qlogic/qlge/qlge_main.c
-+++ b/drivers/net/ethernet/qlogic/qlge/qlge_main.c
-@@ -4921,7 +4921,7 @@ static struct pci_driver qlge_driver = {
- 	.name = DRV_NAME,
- 	.id_table = qlge_pci_tbl,
- 	.probe = qlge_probe,
--	.remove = __devexit_p(qlge_remove),
-+	.remove = qlge_remove,
- #ifdef CONFIG_PM
- 	.suspend = qlge_suspend,
- 	.resume = qlge_resume,
-diff --git a/drivers/net/ethernet/rdc/r6040.c b/drivers/net/ethernet/rdc/r6040.c
-index 557a265..4e91e18 100644
---- a/drivers/net/ethernet/rdc/r6040.c
-+++ b/drivers/net/ethernet/rdc/r6040.c
-@@ -1274,7 +1274,7 @@ static struct pci_driver r6040_driver = {
- 	.name		= DRV_NAME,
- 	.id_table	= r6040_pci_tbl,
- 	.probe		= r6040_init_one,
--	.remove		= __devexit_p(r6040_remove_one),
-+	.remove		= r6040_remove_one,
- };
- 
- module_pci_driver(r6040_driver);
-diff --git a/drivers/net/ethernet/realtek/8139too.c b/drivers/net/ethernet/realtek/8139too.c
-index 3ed7add..59d8d70 100644
---- a/drivers/net/ethernet/realtek/8139too.c
-+++ b/drivers/net/ethernet/realtek/8139too.c
-@@ -2652,7 +2652,7 @@ static struct pci_driver rtl8139_pci_driver = {
- 	.name		= DRV_NAME,
- 	.id_table	= rtl8139_pci_tbl,
- 	.probe		= rtl8139_init_one,
--	.remove		= __devexit_p(rtl8139_remove_one),
-+	.remove		= rtl8139_remove_one,
- #ifdef CONFIG_PM
- 	.suspend	= rtl8139_suspend,
- 	.resume		= rtl8139_resume,
-diff --git a/drivers/net/ethernet/realtek/r8169.c b/drivers/net/ethernet/realtek/r8169.c
-index 248f883..1a01b9f 100644
---- a/drivers/net/ethernet/realtek/r8169.c
-+++ b/drivers/net/ethernet/realtek/r8169.c
-@@ -7028,7 +7028,7 @@ static struct pci_driver rtl8169_pci_driver = {
- 	.name		= MODULENAME,
- 	.id_table	= rtl8169_pci_tbl,
- 	.probe		= rtl_init_one,
--	.remove		= __devexit_p(rtl_remove_one),
-+	.remove		= rtl_remove_one,
- 	.shutdown	= rtl_shutdown,
- 	.driver.pm	= RTL8169_PM_OPS,
- };
-diff --git a/drivers/net/ethernet/s6gmac.c b/drivers/net/ethernet/s6gmac.c
-index 2ed3ab4..988e27d 100644
---- a/drivers/net/ethernet/s6gmac.c
-+++ b/drivers/net/ethernet/s6gmac.c
-@@ -1046,7 +1046,7 @@ static int __devexit s6gmac_remove(struct platform_device *pdev)
- 
- static struct platform_driver s6gmac_driver = {
- 	.probe = s6gmac_probe,
--	.remove = __devexit_p(s6gmac_remove),
-+	.remove = s6gmac_remove,
- 	.driver = {
- 		.name = "s6gmac",
+ module_i2c_driver(wacom_i2c_driver);
+diff --git a/drivers/input/touchscreen/wm831x-ts.c b/drivers/input/touchscreen/wm831x-ts.c
+index c7eee56..17f14b6 100644
+--- a/drivers/input/touchscreen/wm831x-ts.c
++++ b/drivers/input/touchscreen/wm831x-ts.c
+@@ -398,7 +398,7 @@ static struct platform_driver wm831x_ts_driver = {
  		.owner = THIS_MODULE,
-diff --git a/drivers/net/ethernet/seeq/ether3.c b/drivers/net/ethernet/seeq/ether3.c
-index 6a40dd0..0baae6a 100644
---- a/drivers/net/ethernet/seeq/ether3.c
-+++ b/drivers/net/ethernet/seeq/ether3.c
-@@ -894,7 +894,7 @@ static const struct ecard_id ether3_ids[] = {
- 
- static struct ecard_driver ether3_driver = {
- 	.probe		= ether3_probe,
--	.remove		= __devexit_p(ether3_remove),
-+	.remove		= ether3_remove,
- 	.id_table	= ether3_ids,
- 	.drv = {
- 		.name	= "ether3",
-diff --git a/drivers/net/ethernet/sgi/ioc3-eth.c b/drivers/net/ethernet/sgi/ioc3-eth.c
-index 3e5519a..8d6546d 100644
---- a/drivers/net/ethernet/sgi/ioc3-eth.c
-+++ b/drivers/net/ethernet/sgi/ioc3-eth.c
-@@ -1396,7 +1396,7 @@ static struct pci_driver ioc3_driver = {
- 	.name		= "ioc3-eth",
- 	.id_table	= ioc3_pci_tbl,
- 	.probe		= ioc3_probe,
--	.remove		= __devexit_p(ioc3_remove_one),
-+	.remove		= ioc3_remove_one,
- };
- 
- static int __init ioc3_init_module(void)
-diff --git a/drivers/net/ethernet/silan/sc92031.c b/drivers/net/ethernet/silan/sc92031.c
-index 32e5566..a0a2e76 100644
---- a/drivers/net/ethernet/silan/sc92031.c
-+++ b/drivers/net/ethernet/silan/sc92031.c
-@@ -1574,7 +1574,7 @@ static struct pci_driver sc92031_pci_driver = {
- 	.name		= SC92031_NAME,
- 	.id_table	= sc92031_pci_device_id_table,
- 	.probe		= sc92031_probe,
--	.remove		= __devexit_p(sc92031_remove),
-+	.remove		= sc92031_remove,
- 	.suspend	= sc92031_suspend,
- 	.resume		= sc92031_resume,
- };
-diff --git a/drivers/net/ethernet/sis/sis190.c b/drivers/net/ethernet/sis/sis190.c
-index d816601..67fbd4a 100644
---- a/drivers/net/ethernet/sis/sis190.c
-+++ b/drivers/net/ethernet/sis/sis190.c
-@@ -1932,7 +1932,7 @@ static struct pci_driver sis190_pci_driver = {
- 	.name		= DRV_NAME,
- 	.id_table	= sis190_pci_tbl,
- 	.probe		= sis190_init_one,
--	.remove		= __devexit_p(sis190_remove_one),
-+	.remove		= sis190_remove_one,
- };
- 
- static int __init sis190_init_module(void)
-diff --git a/drivers/net/ethernet/sis/sis900.c b/drivers/net/ethernet/sis/sis900.c
-index fb9f6b3..d068e2b 100644
---- a/drivers/net/ethernet/sis/sis900.c
-+++ b/drivers/net/ethernet/sis/sis900.c
-@@ -2496,7 +2496,7 @@ static struct pci_driver sis900_pci_driver = {
- 	.name		= SIS900_MODULE_NAME,
- 	.id_table	= sis900_pci_tbl,
- 	.probe		= sis900_probe,
--	.remove		= __devexit_p(sis900_remove),
-+	.remove		= sis900_remove,
- #ifdef CONFIG_PM
- 	.suspend	= sis900_suspend,
- 	.resume		= sis900_resume,
-diff --git a/drivers/net/ethernet/smsc/epic100.c b/drivers/net/ethernet/smsc/epic100.c
-index d01e59c..67e694b 100644
---- a/drivers/net/ethernet/smsc/epic100.c
-+++ b/drivers/net/ethernet/smsc/epic100.c
-@@ -1577,7 +1577,7 @@ static struct pci_driver epic_driver = {
- 	.name		= DRV_NAME,
- 	.id_table	= epic_pci_tbl,
- 	.probe		= epic_init_one,
--	.remove		= __devexit_p(epic_remove_one),
-+	.remove		= epic_remove_one,
- #ifdef CONFIG_PM
- 	.suspend	= epic_suspend,
- 	.resume		= epic_resume,
-diff --git a/drivers/net/ethernet/smsc/smc911x.c b/drivers/net/ethernet/smsc/smc911x.c
-index 8d15f7a..f19fba7 100644
---- a/drivers/net/ethernet/smsc/smc911x.c
-+++ b/drivers/net/ethernet/smsc/smc911x.c
-@@ -2186,7 +2186,7 @@ static int smc911x_drv_resume(struct platform_device *dev)
- 
- static struct platform_driver smc911x_driver = {
- 	.probe		 = smc911x_drv_probe,
--	.remove	 = __devexit_p(smc911x_drv_remove),
-+	.remove	 = smc911x_drv_remove,
- 	.suspend	 = smc911x_drv_suspend,
- 	.resume	 = smc911x_drv_resume,
- 	.driver	 = {
-diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
-index 318adc9..8d85cbd 100644
---- a/drivers/net/ethernet/smsc/smc91x.c
-+++ b/drivers/net/ethernet/smsc/smc91x.c
-@@ -2407,7 +2407,7 @@ static struct dev_pm_ops smc_drv_pm_ops = {
- 
- static struct platform_driver smc_driver = {
- 	.probe		= smc_drv_probe,
--	.remove		= __devexit_p(smc_drv_remove),
-+	.remove		= smc_drv_remove,
- 	.driver		= {
- 		.name	= CARDNAME,
- 		.owner	= THIS_MODULE,
-diff --git a/drivers/net/ethernet/smsc/smsc911x.c b/drivers/net/ethernet/smsc/smsc911x.c
-index 62d1baf..7d034fc 100644
---- a/drivers/net/ethernet/smsc/smsc911x.c
-+++ b/drivers/net/ethernet/smsc/smsc911x.c
-@@ -2576,7 +2576,7 @@ MODULE_DEVICE_TABLE(of, smsc911x_dt_ids);
- 
- static struct platform_driver smsc911x_driver = {
- 	.probe = smsc911x_drv_probe,
--	.remove = __devexit_p(smsc911x_drv_remove),
-+	.remove = smsc911x_drv_remove,
- 	.driver = {
- 		.name	= SMSC_CHIPNAME,
- 		.owner	= THIS_MODULE,
-diff --git a/drivers/net/ethernet/smsc/smsc9420.c b/drivers/net/ethernet/smsc/smsc9420.c
-index 1fcd914e..ed96967 100644
---- a/drivers/net/ethernet/smsc/smsc9420.c
-+++ b/drivers/net/ethernet/smsc/smsc9420.c
-@@ -1736,7 +1736,7 @@ static struct pci_driver smsc9420_driver = {
- 	.name = DRV_NAME,
- 	.id_table = smsc9420_id_table,
- 	.probe = smsc9420_probe,
--	.remove = __devexit_p(smsc9420_remove),
-+	.remove = smsc9420_remove,
- #ifdef CONFIG_PM
- 	.suspend = smsc9420_suspend,
- 	.resume = smsc9420_resume,
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c
-index 1f069b0..743ab67 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c
-@@ -182,7 +182,7 @@ struct pci_driver stmmac_pci_driver = {
- 	.name = STMMAC_RESOURCE_NAME,
- 	.id_table = stmmac_id_table,
- 	.probe = stmmac_pci_probe,
--	.remove = __devexit_p(stmmac_pci_remove),
-+	.remove = stmmac_pci_remove,
- #ifdef CONFIG_PM
- 	.suspend = stmmac_pci_suspend,
- 	.resume = stmmac_pci_resume,
-diff --git a/drivers/net/ethernet/sun/cassini.c b/drivers/net/ethernet/sun/cassini.c
-index c8251be..9d716c6 100644
---- a/drivers/net/ethernet/sun/cassini.c
-+++ b/drivers/net/ethernet/sun/cassini.c
-@@ -5273,7 +5273,7 @@ static struct pci_driver cas_driver = {
- 	.name		= DRV_MODULE_NAME,
- 	.id_table	= cas_pci_tbl,
- 	.probe		= cas_init_one,
--	.remove		= __devexit_p(cas_remove_one),
-+	.remove		= cas_remove_one,
- #ifdef CONFIG_PM
- 	.suspend	= cas_suspend,
- 	.resume		= cas_resume
-diff --git a/drivers/net/ethernet/sun/niu.c b/drivers/net/ethernet/sun/niu.c
-index 275b430..94b0085 100644
---- a/drivers/net/ethernet/sun/niu.c
-+++ b/drivers/net/ethernet/sun/niu.c
-@@ -9980,7 +9980,7 @@ static struct pci_driver niu_pci_driver = {
- 	.name		= DRV_MODULE_NAME,
- 	.id_table	= niu_pci_tbl,
- 	.probe		= niu_pci_init_one,
--	.remove		= __devexit_p(niu_pci_remove_one),
-+	.remove		= niu_pci_remove_one,
- 	.suspend	= niu_suspend,
- 	.resume		= niu_resume,
- };
-@@ -10211,7 +10211,7 @@ static struct platform_driver niu_of_driver = {
- 		.of_match_table = niu_match,
  	},
- 	.probe		= niu_of_probe,
--	.remove		= __devexit_p(niu_of_remove),
-+	.remove		= niu_of_remove,
+ 	.probe = wm831x_ts_probe,
+-	.remove = __devexit_p(wm831x_ts_remove),
++	.remove = wm831x_ts_remove,
  };
+ module_platform_driver(wm831x_ts_driver);
  
- #endif /* CONFIG_SPARC64 */
-diff --git a/drivers/net/ethernet/sun/sunbmac.c b/drivers/net/ethernet/sun/sunbmac.c
-index c9c977b..41609b8 100644
---- a/drivers/net/ethernet/sun/sunbmac.c
-+++ b/drivers/net/ethernet/sun/sunbmac.c
-@@ -1286,7 +1286,7 @@ static struct platform_driver bigmac_sbus_driver = {
- 		.of_match_table = bigmac_sbus_match,
- 	},
- 	.probe		= bigmac_sbus_probe,
--	.remove		= __devexit_p(bigmac_sbus_remove),
-+	.remove		= bigmac_sbus_remove,
- };
- 
- module_platform_driver(bigmac_sbus_driver);
-diff --git a/drivers/net/ethernet/sun/sunhme.c b/drivers/net/ethernet/sun/sunhme.c
-index 73f341b..61147c2 100644
---- a/drivers/net/ethernet/sun/sunhme.c
-+++ b/drivers/net/ethernet/sun/sunhme.c
-@@ -3190,7 +3190,7 @@ static struct pci_driver hme_pci_driver = {
- 	.name		= "hme",
- 	.id_table	= happymeal_pci_ids,
- 	.probe		= happy_meal_pci_probe,
--	.remove		= __devexit_p(happy_meal_pci_remove),
-+	.remove		= happy_meal_pci_remove,
- };
- 
- static int __init happy_meal_pci_init(void)
-@@ -3284,7 +3284,7 @@ static struct platform_driver hme_sbus_driver = {
- 		.of_match_table = hme_sbus_match,
- 	},
- 	.probe		= hme_sbus_probe,
--	.remove		= __devexit_p(hme_sbus_remove),
-+	.remove		= hme_sbus_remove,
- };
- 
- static int __init happy_meal_sbus_init(void)
-diff --git a/drivers/net/ethernet/sun/sunqe.c b/drivers/net/ethernet/sun/sunqe.c
-index aeded7f..10b0f50 100644
---- a/drivers/net/ethernet/sun/sunqe.c
-+++ b/drivers/net/ethernet/sun/sunqe.c
-@@ -971,7 +971,7 @@ static struct platform_driver qec_sbus_driver = {
- 		.of_match_table = qec_sbus_match,
- 	},
- 	.probe		= qec_sbus_probe,
--	.remove		= __devexit_p(qec_sbus_remove),
-+	.remove		= qec_sbus_remove,
- };
- 
- static int __init qec_init(void)
-diff --git a/drivers/net/ethernet/tehuti/tehuti.c b/drivers/net/ethernet/tehuti/tehuti.c
-index 6ce9edd..5f6d1f0 100644
---- a/drivers/net/ethernet/tehuti/tehuti.c
-+++ b/drivers/net/ethernet/tehuti/tehuti.c
-@@ -2458,7 +2458,7 @@ static struct pci_driver bdx_pci_driver = {
- 	.name = BDX_DRV_NAME,
- 	.id_table = bdx_pci_tbl,
- 	.probe = bdx_probe,
--	.remove = __devexit_p(bdx_remove),
-+	.remove = bdx_remove,
- };
- 
- /*
-diff --git a/drivers/net/ethernet/ti/cpmac.c b/drivers/net/ethernet/ti/cpmac.c
-index 860c252..723cba0 100644
---- a/drivers/net/ethernet/ti/cpmac.c
-+++ b/drivers/net/ethernet/ti/cpmac.c
-@@ -1216,7 +1216,7 @@ static struct platform_driver cpmac_driver = {
- 	.driver.name = "cpmac",
- 	.driver.owner = THIS_MODULE,
- 	.probe = cpmac_probe,
--	.remove = __devexit_p(cpmac_remove),
-+	.remove = cpmac_remove,
- };
- 
- int __devinit cpmac_init(void)
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index 7654a62..64ea9a9 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -1492,7 +1492,7 @@ static struct platform_driver cpsw_driver = {
- 		.of_match_table = of_match_ptr(cpsw_of_mtable),
- 	},
- 	.probe = cpsw_probe,
--	.remove = __devexit_p(cpsw_remove),
-+	.remove = cpsw_remove,
- };
- 
- static int __init cpsw_init(void)
-diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
-index fce89a0a..e6cbedc 100644
---- a/drivers/net/ethernet/ti/davinci_emac.c
-+++ b/drivers/net/ethernet/ti/davinci_emac.c
-@@ -2107,7 +2107,7 @@ static struct platform_driver davinci_emac_driver = {
- 		.of_match_table = of_match_ptr(davinci_emac_of_match),
- 	},
- 	.probe = davinci_emac_probe,
--	.remove = __devexit_p(davinci_emac_remove),
-+	.remove = davinci_emac_remove,
- };
- 
- /**
-diff --git a/drivers/net/ethernet/ti/davinci_mdio.c b/drivers/net/ethernet/ti/davinci_mdio.c
-index 51a96db..ca69af8 100644
---- a/drivers/net/ethernet/ti/davinci_mdio.c
-+++ b/drivers/net/ethernet/ti/davinci_mdio.c
-@@ -496,7 +496,7 @@ static struct platform_driver davinci_mdio_driver = {
- 		.of_match_table = of_match_ptr(davinci_mdio_of_mtable),
- 	},
- 	.probe = davinci_mdio_probe,
--	.remove = __devexit_p(davinci_mdio_remove),
-+	.remove = davinci_mdio_remove,
- };
- 
- static int __init davinci_mdio_init(void)
-diff --git a/drivers/net/ethernet/ti/tlan.c b/drivers/net/ethernet/ti/tlan.c
-index 3e6abf0f..9e326b2 100644
---- a/drivers/net/ethernet/ti/tlan.c
-+++ b/drivers/net/ethernet/ti/tlan.c
-@@ -392,7 +392,7 @@ static struct pci_driver tlan_driver = {
- 	.name		= "tlan",
- 	.id_table	= tlan_pci_tbl,
- 	.probe		= tlan_init_one,
--	.remove		= __devexit_p(tlan_remove_one),
-+	.remove		= tlan_remove_one,
- 	.suspend	= tlan_suspend,
- 	.resume		= tlan_resume,
- };
-diff --git a/drivers/net/ethernet/toshiba/spider_net.c b/drivers/net/ethernet/toshiba/spider_net.c
-index c1ebfe9..a89279f 100644
---- a/drivers/net/ethernet/toshiba/spider_net.c
-+++ b/drivers/net/ethernet/toshiba/spider_net.c
-@@ -2559,7 +2559,7 @@ static struct pci_driver spider_net_driver = {
- 	.name		= spider_net_driver_name,
- 	.id_table	= spider_net_pci_tbl,
- 	.probe		= spider_net_probe,
--	.remove		= __devexit_p(spider_net_remove)
-+	.remove		= spider_net_remove
- };
- 
- /**
-diff --git a/drivers/net/ethernet/toshiba/tc35815.c b/drivers/net/ethernet/toshiba/tc35815.c
-index 651a70c..6d6af5d 100644
---- a/drivers/net/ethernet/toshiba/tc35815.c
-+++ b/drivers/net/ethernet/toshiba/tc35815.c
-@@ -2198,7 +2198,7 @@ static struct pci_driver tc35815_pci_driver = {
- 	.name		= MODNAME,
- 	.id_table	= tc35815_pci_tbl,
- 	.probe		= tc35815_init_one,
--	.remove		= __devexit_p(tc35815_remove_one),
-+	.remove		= tc35815_remove_one,
- #ifdef CONFIG_PM
- 	.suspend	= tc35815_suspend,
- 	.resume		= tc35815_resume,
-diff --git a/drivers/net/ethernet/via/via-rhine.c b/drivers/net/ethernet/via/via-rhine.c
-index 0459c09..565f077 100644
---- a/drivers/net/ethernet/via/via-rhine.c
-+++ b/drivers/net/ethernet/via/via-rhine.c
-@@ -2359,7 +2359,7 @@ static struct pci_driver rhine_driver = {
- 	.name		= DRV_NAME,
- 	.id_table	= rhine_pci_tbl,
- 	.probe		= rhine_init_one,
--	.remove		= __devexit_p(rhine_remove_one),
-+	.remove		= rhine_remove_one,
- 	.shutdown	= rhine_shutdown,
- 	.driver.pm	= RHINE_PM_OPS,
- };
-diff --git a/drivers/net/ethernet/via/via-velocity.c b/drivers/net/ethernet/via/via-velocity.c
-index a46c198..44e2fa4 100644
---- a/drivers/net/ethernet/via/via-velocity.c
-+++ b/drivers/net/ethernet/via/via-velocity.c
-@@ -3108,7 +3108,7 @@ static struct pci_driver velocity_driver = {
- 	.name		= VELOCITY_NAME,
- 	.id_table	= velocity_id_table,
- 	.probe		= velocity_found1,
--	.remove		= __devexit_p(velocity_remove1),
-+	.remove		= velocity_remove1,
- #ifdef CONFIG_PM
- 	.suspend	= velocity_suspend,
- 	.resume		= velocity_resume,
-diff --git a/drivers/net/ethernet/wiznet/w5100.c b/drivers/net/ethernet/wiznet/w5100.c
-index 2c08bf6..82187f3 100644
---- a/drivers/net/ethernet/wiznet/w5100.c
-+++ b/drivers/net/ethernet/wiznet/w5100.c
-@@ -801,7 +801,7 @@ static struct platform_driver w5100_driver = {
- 		.pm	= &w5100_pm_ops,
- 	},
- 	.probe		= w5100_probe,
--	.remove		= __devexit_p(w5100_remove),
-+	.remove		= w5100_remove,
- };
- 
- module_platform_driver(w5100_driver);
-diff --git a/drivers/net/ethernet/wiznet/w5300.c b/drivers/net/ethernet/wiznet/w5300.c
-index 88943d9..48c182e 100644
---- a/drivers/net/ethernet/wiznet/w5300.c
-+++ b/drivers/net/ethernet/wiznet/w5300.c
-@@ -713,7 +713,7 @@ static struct platform_driver w5300_driver = {
- 		.pm	= &w5300_pm_ops,
- 	},
- 	.probe		= w5300_probe,
--	.remove		= __devexit_p(w5300_remove),
-+	.remove		= w5300_remove,
- };
- 
- module_platform_driver(w5300_driver);
-diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
-index f8e3518..6ac9e4c 100644
---- a/drivers/net/ethernet/xilinx/ll_temac_main.c
-+++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
-@@ -1174,7 +1174,7 @@ MODULE_DEVICE_TABLE(of, temac_of_match);
- 
- static struct platform_driver temac_of_driver = {
- 	.probe = temac_of_probe,
--	.remove = __devexit_p(temac_of_remove),
-+	.remove = temac_of_remove,
- 	.driver = {
- 		.owner = THIS_MODULE,
- 		.name = "xilinx_temac",
-diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-index 1d04754..6020244 100644
---- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-@@ -1654,7 +1654,7 @@ static int __devexit axienet_of_remove(struct platform_device *op)
- 
- static struct platform_driver axienet_of_driver = {
- 	.probe = axienet_of_probe,
--	.remove = __devexit_p(axienet_of_remove),
-+	.remove = axienet_of_remove,
- 	.driver = {
- 		 .owner = THIS_MODULE,
- 		 .name = "xilinx_axienet",
-diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-index 77cfe51..c4d7a80 100644
---- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-@@ -1298,7 +1298,7 @@ static struct platform_driver xemaclite_of_driver = {
- 		.of_match_table = xemaclite_of_match,
- 	},
- 	.probe		= xemaclite_of_probe,
--	.remove		= __devexit_p(xemaclite_of_remove),
-+	.remove		= xemaclite_of_remove,
- };
- 
- module_platform_driver(xemaclite_of_driver);
 -- 
 1.8.0
