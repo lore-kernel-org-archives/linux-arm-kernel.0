@@ -1,178 +1,302 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Nov 2012 17:27:17 -0700
-Subject: [PATCH V2 2/2] ARM: tegra: move timer.c to drivers/clocksource/
-In-Reply-To: <1353371237-2482-1-git-send-email-swarren@wwwdotorg.org>
-References: <1353371237-2482-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1353371237-2482-2-git-send-email-swarren@wwwdotorg.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 19 Nov 2012 15:46:41 -0500
+Subject: [PATCH] arm: orion5x: convert Netgear WNR854T to device tree
+In-Reply-To: <1353342451-27180-1-git-send-email-kaloz@openwrt.org>
+References: <1353342451-27180-1-git-send-email-kaloz@openwrt.org>
+Message-ID: <20121119204641.GK22106@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Mon, Nov 19, 2012 at 05:27:31PM +0100, Imre Kaloz wrote:
+> This commit converts the Netgear WNR854T to device tree
+> 
+> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+> ---
+>  arch/arm/boot/dts/Makefile                    |    3 +-
+>  arch/arm/boot/dts/orion5x-netgear-wnr854t.dts |   83 +++++++++++++++++++++++++
+>  arch/arm/mach-orion5x/Kconfig                 |    7 +-
+>  arch/arm/mach-orion5x/Makefile                |    2 +-
+>  arch/arm/mach-orion5x/board-dt.c              |    3 +
+>  arch/arm/mach-orion5x/common.h                |    5 ++
+>  arch/arm/mach-orion5x/wnr854t-setup.c         |   59 +-----------------
+>  7 files changed, 99 insertions(+), 63 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/orion5x-netgear-wnr854t.dts
 
-Move arch/arm/mach-tegra/timer.c to drivers/clocksource/tegra20_timer.c
-so that the code is co-located with other clocksource drivers, and to
-reduce the size of the mach-tegra directory.
+One last thing, could you use savedefconfig and update orion5x_defconfig
+to include your new board?  It can be a part of the same patch.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-v2: Rebase on ARM sys_timer rework, and addition of clocksource_of_init().
----
- arch/arm/Kconfig                                                 |    1 +
- arch/arm/mach-tegra/Makefile                                     |    1 -
- arch/arm/mach-tegra/board-dt-tegra20.c                           |    3 ++-
- arch/arm/mach-tegra/board-dt-tegra30.c                           |    3 ++-
- arch/arm/mach-tegra/board.h                                      |    1 -
- drivers/clocksource/Makefile                                     |    1 +
- drivers/clocksource/clksrc-of.c                                  |    4 ++++
- drivers/clocksource/clksrc-of.h                                  |    2 ++
- .../mach-tegra/timer.c => drivers/clocksource/tegra20_timer.c    |    6 ++----
- 9 files changed, 14 insertions(+), 8 deletions(-)
- rename arch/arm/mach-tegra/timer.c => drivers/clocksource/tegra20_timer.c (98%)
+thx,
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 14f8160..9eb54f6 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -633,6 +633,7 @@ config ARCH_TEGRA
- 	select ARCH_HAS_CPUFREQ
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
-+	select CLKSRC_OF
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_GPIO
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 6f224f7..6ab3ed5 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -2,7 +2,6 @@ obj-y                                   += common.o
- obj-y                                   += io.o
- obj-y                                   += irq.o
- obj-y                                   += clock.o
--obj-y                                   += timer.o
- obj-y					+= fuse.o
- obj-y					+= pmc.o
- obj-y					+= flowctrl.o
-diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
-index 794a7bf..0bee85a 100644
---- a/arch/arm/mach-tegra/board-dt-tegra20.c
-+++ b/arch/arm/mach-tegra/board-dt-tegra20.c
-@@ -15,6 +15,7 @@
-  *
-  */
- 
-+#include <linux/clocksource.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
-@@ -194,7 +195,7 @@ DT_MACHINE_START(TEGRA_DT, "nVidia Tegra20 (Flattened Device Tree)")
- 	.init_early	= tegra20_init_early,
- 	.init_irq	= tegra_dt_init_irq,
- 	.handle_irq	= gic_handle_irq,
--	.init_time	= tegra_init_timer,
-+	.init_time	= clocksource_of_init,
- 	.init_machine	= tegra_dt_init,
- 	.init_late	= tegra_dt_init_late,
- 	.restart	= tegra_assert_system_reset,
-diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
-index 08d3b19..a2b6cf1 100644
---- a/arch/arm/mach-tegra/board-dt-tegra30.c
-+++ b/arch/arm/mach-tegra/board-dt-tegra30.c
-@@ -23,6 +23,7 @@
-  *
-  */
- 
-+#include <linux/clocksource.h>
- #include <linux/kernel.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-@@ -104,7 +105,7 @@ DT_MACHINE_START(TEGRA30_DT, "NVIDIA Tegra30 (Flattened Device Tree)")
- 	.init_early	= tegra30_init_early,
- 	.init_irq	= tegra_dt_init_irq,
- 	.handle_irq	= gic_handle_irq,
--	.init_time	= tegra_init_timer,
-+	.init_time	= clocksource_of_init,
- 	.init_machine	= tegra30_dt_init,
- 	.init_late	= tegra_init_late,
- 	.restart	= tegra_assert_system_reset,
-diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
-index 744cdd2..da8f5a3 100644
---- a/arch/arm/mach-tegra/board.h
-+++ b/arch/arm/mach-tegra/board.h
-@@ -55,5 +55,4 @@ static inline int harmony_pcie_init(void) { return 0; }
- 
- void __init tegra_paz00_wifikill_init(void);
- 
--extern void tegra_init_timer(void);
- #endif
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 29017a3..ecf37f3 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -16,5 +16,6 @@ obj-$(CONFIG_CLKSRC_NOMADIK_MTU)	+= nomadik-mtu.o
- obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
- obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
- obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
-+obj-$(CONFIG_ARCH_TEGRA)	+= tegra20_timer.o
- 
- obj-$(CONFIG_CLKSRC_ARM_GENERIC)	+= arm_generic.o
-diff --git a/drivers/clocksource/clksrc-of.c b/drivers/clocksource/clksrc-of.c
-index aeec8d2..328d18f 100644
---- a/drivers/clocksource/clksrc-of.c
-+++ b/drivers/clocksource/clksrc-of.c
-@@ -20,6 +20,10 @@
- #include "clksrc-of.h"
- 
- static const struct of_device_id clksrc_of_match[] __initconst = {
-+	{
-+		.compatible = "nvidia,tegra20-timer",
-+		.data = tegra20_init_timer,
-+	},
- 	{ }
- };
- 
-diff --git a/drivers/clocksource/clksrc-of.h b/drivers/clocksource/clksrc-of.h
-index 4e2191a..386644d 100644
---- a/drivers/clocksource/clksrc-of.h
-+++ b/drivers/clocksource/clksrc-of.h
-@@ -17,4 +17,6 @@
- #ifndef _CLKSRC_OF_H
- #define _CLKSRC_OF_H
- 
-+void tegra20_init_timer(void);
-+
- #endif
-diff --git a/arch/arm/mach-tegra/timer.c b/drivers/clocksource/tegra20_timer.c
-similarity index 98%
-rename from arch/arm/mach-tegra/timer.c
-rename to drivers/clocksource/tegra20_timer.c
-index b0036e5..9d84096 100644
---- a/arch/arm/mach-tegra/timer.c
-+++ b/drivers/clocksource/tegra20_timer.c
-@@ -1,6 +1,4 @@
- /*
-- * arch/arch/mach-tegra/timer.c
-- *
-  * Copyright (C) 2010 Google, Inc.
-  *
-  * Author:
-@@ -33,7 +31,7 @@
- #include <asm/smp_twd.h>
- #include <asm/sched_clock.h>
- 
--#include "board.h"
-+#include "clksrc-of.h"
- 
- #define RTC_SECONDS            0x08
- #define RTC_SHADOW_SECONDS     0x0c
-@@ -168,7 +166,7 @@ static const struct of_device_id rtc_match[] __initconst = {
- 	{}
- };
- 
--void __init tegra_init_timer(void)
-+void __init tegra20_init_timer(void)
- {
- 	struct device_node *np;
- 	struct clk *clk;
--- 
-1.7.10.4
+Jason.
+
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 6cb3b3c..a6c8e9a 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -73,7 +73,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+>  	omap5-evm.dtb \
+>  	am335x-evm.dtb \
+>  	am335x-bone.dtb
+> -dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
+> +dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb \
+> +	orion5x-netgear-wnr854t.dtb
+>  dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+>  dtb-$(CONFIG_ARCH_U8500) += snowball.dtb
+>  dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+> diff --git a/arch/arm/boot/dts/orion5x-netgear-wnr854t.dts b/arch/arm/boot/dts/orion5x-netgear-wnr854t.dts
+> new file mode 100644
+> index 0000000..502ac49
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/orion5x-netgear-wnr854t.dts
+> @@ -0,0 +1,83 @@
+> +/*
+> + * Copyright (C) 2012 Imre Kaloz <kaloz@openwrt.org>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "orion5x.dtsi"
+> +
+> +/ {
+> +	model = "Netgear WNR854T";
+> +	compatible = "netgear,wnr854t", "marvell-orion5x-88f5180n", "marvell,orion5x";
+> +
+> +	memory {
+> +		reg = <0x00000000 0x2000000>; /* 32 MB */
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
+> +	};
+> +
+> +	ocp at f1000000 {
+> +		serial at 12000 {
+> +			clock-frequency = <166666667>;
+> +			status = "okay";
+> +		};
+> +	};
+> +
+> +	nor_flash at f4000000 {
+> +		compatible = "cfi-flash";
+> +		bank-width = <2>;
+> +		reg = <0xf4000000 0x800000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		partition at 0 {
+> +			label = "kernel";
+> +			reg = <0x0 0x100000>;
+> +			};
+> +
+> +		partition at 100000 {
+> +			label = "rootfs";
+> +			reg = <0x100000 0x660000>;
+> +			};
+> +
+> +		partition at 760000 {
+> +			label = "uboot_env";
+> +			reg = <0x760000 0x10000>;
+> +			};
+> +
+> +		partition at 770000 {
+> +			label = "uboot";
+> +			reg = <0x770000 0x90000>;
+> +			};
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		button at 1 {
+> +			label = "reset";
+> +			linux,code = <198>;
+> +			gpios = <&gpio0 1 0>;
+> +		};
+> +	};
+> +
+> +	gpio_leds {
+> +		compatible = "gpio-leds";
+> +
+> +		power {
+> +			label = "power:green";
+> +			gpios = <&gpio0 0 1>;
+> +		};
+> +
+> +		wan {
+> +			label = "wan:amber";
+> +			gpios = <&gpio0 3 0>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
+> index 2cb2f06..2c2dc79 100644
+> --- a/arch/arm/mach-orion5x/Kconfig
+> +++ b/arch/arm/mach-orion5x/Kconfig
+> @@ -138,11 +138,12 @@ config MACH_MSS2
+>  	  Say 'Y' here if you want your kernel to support the
+>  	  Maxtor Shared Storage II platform.
+>  
+> -config MACH_WNR854T
+> -	bool "Netgear WNR854T"
+> +config MACH_WNR854T_DT
+> +	bool "Netgear WNR854T (Flattened Device Tree)"
+> +	select ARCH_ORION5X_DT
+>  	help
+>  	  Say 'Y' here if you want your kernel to support the
+> -	  Netgear WNR854T platform.
+> +	  Netgear WNR854T platform (Flattened Device Tree).
+>  
+>  config MACH_RD88F5181L_GE
+>  	bool "Marvell Orion-VoIP GE Reference Design"
+> diff --git a/arch/arm/mach-orion5x/Makefile b/arch/arm/mach-orion5x/Makefile
+> index 9e809a7..391cacc 100644
+> --- a/arch/arm/mach-orion5x/Makefile
+> +++ b/arch/arm/mach-orion5x/Makefile
+> @@ -16,7 +16,6 @@ obj-$(CONFIG_MACH_D2NET)	+= d2net-setup.o
+>  obj-$(CONFIG_MACH_BIGDISK)	+= d2net-setup.o
+>  obj-$(CONFIG_MACH_NET2BIG)	+= net2big-setup.o
+>  obj-$(CONFIG_MACH_MSS2)		+= mss2-setup.o
+> -obj-$(CONFIG_MACH_WNR854T)	+= wnr854t-setup.o
+>  obj-$(CONFIG_MACH_RD88F5181L_GE)	+= rd88f5181l-ge-setup.o
+>  obj-$(CONFIG_MACH_RD88F5181L_FXO)	+= rd88f5181l-fxo-setup.o
+>  obj-$(CONFIG_MACH_RD88F6183AP_GE)	+= rd88f6183ap-ge-setup.o
+> @@ -24,3 +23,4 @@ obj-$(CONFIG_MACH_LINKSTATION_LSCHL)	+= ls-chl-setup.o
+>  
+>  obj-$(CONFIG_ARCH_ORION5X_DT)		+= board-dt.o
+>  obj-$(CONFIG_MACH_EDMINI_V2_DT)	+= edmini_v2-setup.o
+> +obj-$(CONFIG_MACH_WNR854T_DT)	+= wnr854t-setup.o
+> diff --git a/arch/arm/mach-orion5x/board-dt.c b/arch/arm/mach-orion5x/board-dt.c
+> index 32e5c21..70fd830 100644
+> --- a/arch/arm/mach-orion5x/board-dt.c
+> +++ b/arch/arm/mach-orion5x/board-dt.c
+> @@ -58,6 +58,9 @@ static void __init orion5x_dt_init(void)
+>  	if (of_machine_is_compatible("lacie,ethernet-disk-mini-v2"))
+>  		edmini_v2_init();
+>  
+> +	if (of_machine_is_compatible("netgear,wnr854t"))
+> +		wnr854t_init();
+> +
+>  	of_platform_populate(NULL, of_default_bus_match_table,
+>  			     orion5x_auxdata_lookup, NULL);
+>  }
+> diff --git a/arch/arm/mach-orion5x/common.h b/arch/arm/mach-orion5x/common.h
+> index 7db5cdd..e24e716 100644
+> --- a/arch/arm/mach-orion5x/common.h
+> +++ b/arch/arm/mach-orion5x/common.h
+> @@ -62,6 +62,11 @@ void edmini_v2_init(void);
+>  #else
+>  static inline void edmini_v2_init(void) {};
+>  #endif
+> +#ifdef CONFIG_MACH_WNR854T_DT
+> +void wnr854t_init(void);
+> +#else
+> +static inline void wnr854t_init(void) {};
+> +#endif
+>  
+>  struct meminfo;
+>  struct tag;
+> diff --git a/arch/arm/mach-orion5x/wnr854t-setup.c b/arch/arm/mach-orion5x/wnr854t-setup.c
+> index 754c12b..2009a6d 100644
+> --- a/arch/arm/mach-orion5x/wnr854t-setup.c
+> +++ b/arch/arm/mach-orion5x/wnr854t-setup.c
+> @@ -53,44 +53,6 @@ static unsigned int wnr854t_mpp_modes[] __initdata = {
+>  #define WNR854T_NOR_BOOT_BASE	0xf4000000
+>  #define WNR854T_NOR_BOOT_SIZE	SZ_8M
+>  
+> -static struct mtd_partition wnr854t_nor_flash_partitions[] = {
+> -	{
+> -		.name		= "kernel",
+> -		.offset		= 0x00000000,
+> -		.size		= 0x00100000,
+> -	}, {
+> -		.name		= "rootfs",
+> -		.offset		= 0x00100000,
+> -		.size		= 0x00660000,
+> -	}, {
+> -		.name		= "uboot",
+> -		.offset		= 0x00760000,
+> -		.size		= 0x00040000,
+> -	},
+> -};
+> -
+> -static struct physmap_flash_data wnr854t_nor_flash_data = {
+> -	.width		= 2,
+> -	.parts		= wnr854t_nor_flash_partitions,
+> -	.nr_parts	= ARRAY_SIZE(wnr854t_nor_flash_partitions),
+> -};
+> -
+> -static struct resource wnr854t_nor_flash_resource = {
+> -	.flags		= IORESOURCE_MEM,
+> -	.start		= WNR854T_NOR_BOOT_BASE,
+> -	.end		= WNR854T_NOR_BOOT_BASE + WNR854T_NOR_BOOT_SIZE - 1,
+> -};
+> -
+> -static struct platform_device wnr854t_nor_flash = {
+> -	.name			= "physmap-flash",
+> -	.id			= 0,
+> -	.dev		= {
+> -		.platform_data	= &wnr854t_nor_flash_data,
+> -	},
+> -	.num_resources		= 1,
+> -	.resource		= &wnr854t_nor_flash_resource,
+> -};
+> -
+>  static struct mv643xx_eth_platform_data wnr854t_eth_data = {
+>  	.phy_addr	= MV643XX_ETH_PHY_NONE,
+>  	.speed		= SPEED_1000,
+> @@ -111,13 +73,8 @@ static struct dsa_platform_data wnr854t_switch_plat_data = {
+>  	.chip		= &wnr854t_switch_chip_data,
+>  };
+>  
+> -static void __init wnr854t_init(void)
+> +void __init wnr854t_init(void)
+>  {
+> -	/*
+> -	 * Setup basic Orion functions. Need to be called early.
+> -	 */
+> -	orion5x_init();
+> -
+>  	orion5x_mpp_conf(wnr854t_mpp_modes);
+>  
+>  	/*
+> @@ -125,11 +82,9 @@ static void __init wnr854t_init(void)
+>  	 */
+>  	orion5x_eth_init(&wnr854t_eth_data);
+>  	orion5x_eth_switch_init(&wnr854t_switch_plat_data, NO_IRQ);
+> -	orion5x_uart0_init();
+>  
+>  	orion5x_setup_dev_boot_win(WNR854T_NOR_BOOT_BASE,
+>  				   WNR854T_NOR_BOOT_SIZE);
+> -	platform_device_register(&wnr854t_nor_flash);
+>  }
+>  
+>  static int __init wnr854t_pci_map_irq(const struct pci_dev *dev, u8 slot,
+> @@ -168,15 +123,3 @@ static int __init wnr854t_pci_init(void)
+>  	return 0;
+>  }
+>  subsys_initcall(wnr854t_pci_init);
+> -
+> -MACHINE_START(WNR854T, "Netgear WNR854T")
+> -	/* Maintainer: Imre Kaloz <kaloz@openwrt.org> */
+> -	.atag_offset	= 0x100,
+> -	.init_machine	= wnr854t_init,
+> -	.map_io		= orion5x_map_io,
+> -	.init_early	= orion5x_init_early,
+> -	.init_irq	= orion5x_init_irq,
+> -	.timer		= &orion5x_timer,
+> -	.fixup		= tag_fixup_mem32,
+> -	.restart	= orion5x_restart,
+> -MACHINE_END
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
