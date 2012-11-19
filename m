@@ -1,33 +1,37 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 19 Nov 2012 14:13:24 +0900
-Subject: [RFC 12/15] ARM: shmobile: r8a7740: Use DT initialisation of INTC
+Date: Mon, 19 Nov 2012 14:13:26 +0900
+Subject: [RFC 14/15] ARM: shmobile: Add DT table of GIC for sh73a0
 In-Reply-To: <1353302007-31045-1-git-send-email-horms@verge.net.au>
 References: <1353302007-31045-1-git-send-email-horms@verge.net.au>
-Message-ID: <1353302007-31045-13-git-send-email-horms@verge.net.au>
+Message-ID: <1353302007-31045-15-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-
 Cc: Magnus Damm <damm@opensource.se>
-Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Cc: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7740.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/sh73a0.dtsi |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 11bb1d9..a8e57ab 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -750,7 +750,7 @@ static const char *r8a7740_boards_compat_dt[] __initdata = {
- DT_MACHINE_START(SH7372_DT, "Generic R8A7740 (Flattened Device Tree)")
- 	.map_io		= r8a7740_map_io,
- 	.init_early	= r8a7740_add_early_devices_dt,
--	.init_irq	= r8a7740_init_irq,
-+	.init_irq	= r8a7740_init_irq_of,
- 	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_machine	= r8a7740_add_standard_devices_dt,
- 	.timer		= &shmobile_timer,
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 7d56345..d46b853 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -806,5 +806,14 @@
+ 				};
+ 			};
+ 		};
++
++		intc: interrupt-controller at f0001000 {
++			compatible = "arm,cortex-a9-gic";
++			#interrupt-cells = <3>;
++			#address-cells = <1>;
++			interrupt-controller;
++			reg = <0xf0001000 0x1000>,
++			      <0xf0000100 0x100>;
++		};
+ 	};
+ };
 -- 
 1.7.10.4
