@@ -1,112 +1,152 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 11:11:42 +0100
-Subject: [PATCH 2/3] arm: kirkwood: Convert XOR instantiation to DT.
-In-Reply-To: <1353319903-30855-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1353319903-30855-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353319903-30855-3-git-send-email-thomas.petazzoni@free-electrons.com>
+From: s.peter@mpl.ch (Stefan Peter)
+Date: Mon, 19 Nov 2012 11:26:45 +0100
+Subject: [PATCH 1/1] ARM: kirkwood: Convert mplcec4 board to pinctrl
+In-Reply-To: <cover.1353319919.git.s.peter@mpl.ch>
+References: <cover.1353319919.git.s.peter@mpl.ch>
+Message-ID: <6179db81ec8e8760511f776f460e9ed408a95390.1353319919.git.s.peter@mpl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Lunn <andrew@lunn.ch>
 
-Use DT to describe the two XOR DMA engines on Kirkwood. Remove the
-C code initialization.
-
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Stefan Peter <s.peter@mpl.ch>
 ---
- arch/arm/boot/dts/kirkwood.dtsi   |   40 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-dt.c |   13 ------------
- 2 files changed, 40 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index e5ebf42..83716ee 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -94,6 +94,46 @@
- 			status = "okay";
- 		};
+diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+index ac3c080..e692e90 100644
+--- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
++++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+@@ -1,6 +1,7 @@
+ /dts-v1/;
  
-+		xor at 60800 {
-+			compatible = "marvell,orion-xor";
-+			reg = <0x60800 0x100
-+			       0x60A00 0x100>;
-+			status = "okay";
-+			clocks = <&gate_clk 8>;
+ /include/ "kirkwood.dtsi"
++/include/ "kirkwood-6281.dtsi"
+ 
+ / {
+ 	model = "MPL CEC4";
+@@ -16,6 +17,69 @@
+         };
+ 
+ 	ocp at f1000000 {
++		pinctrl: pinctrl at 10000 {
 +
-+			xor00 {
-+			      interrupts = <5>;
-+			      dmacap,memcpy;
-+			      dmacap,xor;
++			pinctrl-0 = < &pmx_nand &pmx_uart0
++				      &pmx_led_health &pmx_sdio
++				      &pmx_sata0 &pmx_sata1
++				      &pmx_led_user1o
++				      &pmx_led_user1g &pmx_led_user0o
++				      &pmx_led_user0g &pmx_led_misc
++				      &pmx_sdio_cd
++				    >;
++			pinctrl-names = "default";
++
++			pmx_led_health: pmx-led-health {
++				marvell,pins = "mpp7";
++				marvell,function = "gpo";
 +			};
-+			xor01 {
-+			      interrupts = <6>;
-+			      dmacap,memcpy;
-+			      dmacap,xor;
-+			      dmacap,memset;
++
++			pmx_sdio: pmx-sdio {
++				marvell,pins = "mpp12", "mmp13", "mpp14",
++					       "mpp15", "mpp16", "mpp17";
++				marvell,function = "sdio";
++			};
++
++			pmx_sata1: pmx-sata1 {
++				marvell,pins = "mpp34";
++				marvell,function = "sata1";
++			};
++
++			pmx_sata0: pmx-sata0 {
++				marvell,pins = "mpp35";
++				marvell,function = "sata0";
++			};
++
++			pmx_led_user1o: pmx-led-user1o {
++				marvell,pins = "mpp40";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_user1g: pmx-led-user1g {
++				marvell,pins = "mpp41";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_user0o: pmx-led-user0o {
++				marvell,pins = "mpp44";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_user0g: pmx-led-user0g {
++				marvell,pins = "mpp45";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_misc: pmx-led-misc {
++				marvell,pins = "mpp46";
++				marvell,function = "gpio";
++			};
++
++			pmx_sdio_cd: pmx-sdio-cd {
++				marvell,pins = "mpp47";
++				marvell,function = "gpio";
 +			};
 +		};
-+
-+		xor at 60900 {
-+			compatible = "marvell,orion-xor";
-+			reg = <0x60900 0x100
-+			       0xd0B00 0x100>;
-+			status = "okay";
-+			clocks = <&gate_clk 16>;
-+
-+			xor00 {
-+			      interrupts = <7>;
-+			      dmacap,memcpy;
-+			      dmacap,xor;
-+			};
-+			xor01 {
-+			      interrupts = <8>;
-+			      dmacap,memcpy;
-+			      dmacap,xor;
-+			      dmacap,memset;
-+			};
-+		};
-+
- 		sata at 80000 {
- 			compatible = "marvell,orion-sata";
- 			reg = <0x80000 0x5000>;
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 994ce26..5cabdff 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -21,7 +21,6 @@
- #include <asm/mach/map.h>
- #include <mach/bridge-regs.h>
- #include <linux/platform_data/usb-ehci-orion.h>
--#include <linux/platform_data/dma-mv_xor.h>
- #include <plat/irq.h>
- #include <plat/common.h>
- #include "common.h"
-@@ -60,14 +59,6 @@ static void __init kirkwood_legacy_clk_init(void)
- 	orion_clkdev_add(NULL, "orion-ehci.0",
- 			 of_clk_get_from_provider(&clkspec));
+                 i2c at 11000 {
+                         status = "okay";
  
--	clkspec.args[0] = CGC_BIT_XOR0;
--	orion_clkdev_add(NULL, MV_XOR_NAME ".0",
--			 of_clk_get_from_provider(&clkspec));
--
--	clkspec.args[0] = CGC_BIT_XOR1;
--	orion_clkdev_add(NULL, MV_XOR_NAME ".1",
--			 of_clk_get_from_provider(&clkspec));
--
- 	clkspec.args[0] = CGC_BIT_PEX1;
- 	orion_clkdev_add("1", "pcie",
- 			 of_clk_get_from_provider(&clkspec));
-@@ -104,10 +95,6 @@ static void __init kirkwood_dt_init(void)
- 	/* Setup root of clk tree */
- 	kirkwood_of_clk_init();
+diff --git a/arch/arm/mach-kirkwood/board-mplcec4.c b/arch/arm/mach-kirkwood/board-mplcec4.c
+index e78a227..47e7181 100644
+--- a/arch/arm/mach-kirkwood/board-mplcec4.c
++++ b/arch/arm/mach-kirkwood/board-mplcec4.c
+@@ -24,51 +24,16 @@ static struct mv643xx_eth_platform_data mplcec4_ge01_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(2),
+ };
  
--	/* internal devices that every board has */
--	kirkwood_xor0_init();
--	kirkwood_xor1_init();
+-static unsigned int mplcec4_mpp_config[] __initdata = {
+-	MPP0_NF_IO2,
+-	MPP1_NF_IO3,
+-	MPP2_NF_IO4,
+-	MPP3_NF_IO5,
+-	MPP4_NF_IO6,
+-	MPP5_NF_IO7,
+-	MPP6_SYSRST_OUTn,
+-	MPP7_GPO,	/* Status LED Green High Active */
+-	MPP10_UART0_TXD,
+-	MPP11_UART0_RXD,
+-	MPP12_SD_CLK,
+-	MPP13_SD_CMD,	/* Alt UART1_TXD */
+-	MPP14_SD_D0,	/* Alt UART1_RXD */
+-	MPP15_SD_D1,
+-	MPP16_SD_D2,
+-	MPP17_SD_D3,
+-	MPP18_NF_IO0,
+-	MPP19_NF_IO1,
+-	MPP28_GPIO,	/* Input SYS_POR_DET (active High) */
+-	MPP29_GPIO,	/* Input SYS_RTC_INT (active High) */
+-	MPP34_SATA1_ACTn,
+-	MPP35_SATA0_ACTn,
+-	MPP40_GPIO,	/* LED User1 orange */
+-	MPP41_GPIO,	/* LED User1 green */
+-	MPP44_GPIO,	/* LED User0 orange */
+-	MPP45_GPIO,	/* LED User0 green */
+-	MPP46_GPIO,	/* Status LED Yellow High Active */
+-	MPP47_GPIO,	/* SD_CD# (in/IRQ)*/
+-	0
+-};
 -
- #ifdef CONFIG_KEXEC
- 	kexec_reinit = kirkwood_enable_pcie;
- #endif
+-
+ static struct mvsdio_platform_data mplcec4_mvsdio_data = {
+ 	.gpio_card_detect = 47,	/* MPP47 used as SD card detect */
+ };
+ 
+ 
+-
+ void __init mplcec4_init(void)
+ {
+ 	/*
+ 	 * Basic setup. Needs to be called early.
+ 	 */
+-	kirkwood_mpp_conf(mplcec4_mpp_config);
+ 	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&mplcec4_ge00_data);
+ 	kirkwood_ge01_init(&mplcec4_ge01_data);
 -- 
 1.7.9.5
