@@ -1,52 +1,93 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 19 Nov 2012 07:40:42 +0100
-Subject: [PATCH] Device Tree binding for the 'mv_xor' XOR engine DMA driver
-In-Reply-To: <EE71107DF0D1F24FA2D95041E64AB9E801A56BA6A7E7@IL-MB01.marvell.com>
-References: <1353000034-30567-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121118103626.GE11717@lunn.ch>
- <EE71107DF0D1F24FA2D95041E64AB9E801A56BA6A7E7@IL-MB01.marvell.com>
-Message-ID: <20121119064042.GO14643@lunn.ch>
+Date: Mon, 19 Nov 2012 07:41:43 +0100
+Subject: [PATCH v2 2/2] ARM: Kirkwood: Convert XOR instantiation to DT.
+In-Reply-To: <20121119063757.GJ22106@titan.lakedaemon.net>
+References: <1353235498-22638-1-git-send-email-andrew@lunn.ch>
+ <1353235498-22638-2-git-send-email-andrew@lunn.ch>
+ <20121119063757.GJ22106@titan.lakedaemon.net>
+Message-ID: <20121119064143.GP14643@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > The dmatest shows up a second issue:
+On Mon, Nov 19, 2012 at 01:37:57AM -0500, Jason Cooper wrote:
+> On Sun, Nov 18, 2012 at 11:44:57AM +0100, Andrew Lunn wrote:
+> > Use DT to describe the two XOR DMA engines on Kirkwood. Remove the
+> > C code initialization.
 > > 
-> > root at qnap:~# insmod ./dmatest.ko iterations=100
-> > dmatest: Started 2 threads using dma0chan0
-> > dmatest: Started 2 threads using dma1chan0
-> > dmatest: Started 2 threads using dma2chan0
-> > dmatest: Started 2 threads using dma3chan0
-> > dma3chan0-xor0: #3: prep error with src_off=0x13c2 dst_off=0x2c7c
-> > len=0x5d
-> > dma1chan0-copy0: #16: prep error with src_off=0x1f50 dst_off=0x904
-> > len=0x33
-> > dma3chan0-copy0: #22: prep error with src_off=0x14c2 dst_off=0x389b
-> > len=0x6f
-> > dma0chan0-copy0: #31: prep error with src_off=0x10b6 dst_off=0x323c
-> > len=0x2f
-> > dma3chan0-copy0: #49: prep error with src_off=0x17b5 dst_off=0x3eca
-> > len=0x29
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > ---
 > > 
-> > The driver refuses any operation where the buffer is less than 128 bytes. The
-> > datasheet for Kirkwood says the buffer length must be 8 bytes or more. So
-> > maybe we should reduce this 128 limit down to 8?
+> > These patches depend on the refactoring/DT patches from Thomas and NOT
+> > the clock patches from me. With the clock patches, a slight different
+> > patch is needed, specifying a clocks property in DT and no auxdata.
+> > 
+> >  arch/arm/boot/dts/kirkwood.dtsi   |   38 +++++++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-kirkwood/board-dt.c |    6 ++----
+> >  2 files changed, 40 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+> > index 4e5b815..e0ba79d 100644
+> > --- a/arch/arm/boot/dts/kirkwood.dtsi
+> > +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> > @@ -77,6 +77,44 @@
+> >  			status = "okay";
+> >  		};
+> >  
+> > +		xor at 60800 {
+> > +			compatible = "marvell,orion-xor";
+> > +			reg = <0x60800 0x100
+> > +			       0x60A00 0x100>;
+> > +			status = "okay";
+> > +
+> > +			xor00 {
+> > +			      interrupts = <5>;
+> > +			      dmacap,memcpy;
+> > +			      dmacap,xor;
+> > +			};
+> > +			xor01 {
+> > +			      interrupts = <6>;
+> > +			      dmacap,memcpy;
+> > +			      dmacap,xor;
+> > +			      dmacap,memset;
+> > +			};
+> > +		};
+> > +
+> > +		xor at 60900 {
+> > +			compatible = "marvell,orion-xor";
+> > +			reg = <0x60900 0x100
+> > +			       0xd0B00 0x100>;
+> > +			status = "okay";
+> > +
+> > +			xor00 {
+> > +			      interrupts = <7>;
+> > +			      dmacap,memcpy;
+> > +			      dmacap,xor;
+> > +			};
+> > +			xor01 {
+> > +			      interrupts = <8>;
+> > +			      dmacap,memcpy;
+> > +			      dmacap,xor;
+> > +			      dmacap,memset;
+> > +			};
+> > +		};
+> > +
+> >  		sata at 80000 {
+> >  			compatible = "marvell,orion-sata";
+> >  			reg = <0x80000 0x5000>;
+> > diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> > index d94872f..e62f10de 100644
+> > --- a/arch/arm/mach-kirkwood/board-dt.c
+> > +++ b/arch/arm/mach-kirkwood/board-dt.c
+> > @@ -34,6 +34,8 @@ struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
+> >  	OF_DEV_AUXDATA("marvell,orion-sata", 0xf1080000, "sata_mv.0", NULL),
+> >  	OF_DEV_AUXDATA("marvell,orion-nand", 0xf4000000, "orion_nand", NULL),
+> >  	OF_DEV_AUXDATA("marvell,orion-crypto", 0xf1030000, "mv_crypto", NULL),
+> > +	OF_DEV_AUXDATA("marvell,orion-xor", 0xf1060800, "mv_xor.0", NULL),
+> > +	OF_DEV_AUXDATA("marvell,orion-xor", 0xf1060900, "mv_xor.1", NULL),
 > 
-> This limitation (128B) is only in memset operations (set in registers and not descriptors).
-> If I recall correctly the limit is 16B and not 8B.
-> 
-> In any way, this 128 bytes seems like a good logical boundary for XOR HW enabling. (performance wise)
+> This conflicts with the earlier clock work.  I'll be pushing mvebu/dt in
+> a bit, could you please rebase these two patches against that?
 
-Hi Lior
+Thomas has a v2 in the works which should solve that and Sebastians comments.
 
-Agreed. Anything smaller than that, and you spend more time setting up
-the hardware and dealing with interrupts when its finished than doing
-it in software.
-
-I had quick look at some of the call sites. Users of the DMA API under
-the crypto directory all fall back to software operations when the DMA
-API returns an error. Also, raid uses the crypto API for memcpy and
-XOR. So raid seems O.K. I could not find any other users of the DMA
-API for _xor, _copy, or _memset. So it seems safe to return an error
-for inefficient usage.
-
-      Andrew
+       Andrew
