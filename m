@@ -1,163 +1,269 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 18 Nov 2012 22:12:10 -0500
-Subject: [PATCH V3 4/5] arm: mm: Added support for PJ4B cpu and init
- routines
-In-Reply-To: <50A6B427.9080807@free-electrons.com>
-References: <1352931637-3405-1-git-send-email-gregory.clement@free-electrons.com>
- <1352931637-3405-5-git-send-email-gregory.clement@free-electrons.com>
- <50A41BD3.9040509@free-electrons.com>
- <50A6B427.9080807@free-electrons.com>
-Message-ID: <20121119031210.GD22106@titan.lakedaemon.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sun, 18 Nov 2012 22:12:26 -0500 (EST)
+Subject: [PATCH v3 2/5] ARM: kernel: add device tree init map function
+In-Reply-To: <1352983614-22924-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1352983614-22924-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1352983614-22924-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <alpine.LFD.2.02.1211182211540.1182@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2012 at 10:46:15PM +0100, Gregory CLEMENT wrote:
-> On 11/14/2012 11:31 PM, Gregory CLEMENT wrote:
-> > Hello Russell,
-> > 
-> > With the 2 changes I have done on according your comments
-> > do you think you can give your acked-by for this patch?
-> > 
-> 
-> Hello Russell,
-> 
-> I didn't have any feedback from you for this version.
-> If you are fine with this, could you give your Acked-by?
-> 
-> 
+On Thu, 15 Nov 2012, Lorenzo Pieralisi wrote:
 
-Gregory,
-
->From the looks of things, Russell has his head wrapped around buggy
-sound driver code for the CuBox.  Perhaps Will Deacon or Catalin Marinas
-would care to weigh in?  I'm reluctant to take the series without an
-Acked-By from at least one of them.
-
-thx,
-
-Jason.
-
+> When booting through a device tree, the kernel cpu logical id map can be
+> initialized using device tree data passed by FW or through an embedded blob.
 > 
-> > On 11/14/2012 11:20 PM, Gregory CLEMENT wrote:
-> >> From: Yehuda Yitschak <yehuday@marvell.com>
-> >>
-> >> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
-> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >> ---
-> >>  arch/arm/mach-mvebu/Kconfig |    2 +-
-> >>  arch/arm/mm/Kconfig         |    4 ++++
-> >>  arch/arm/mm/proc-v7.S       |   51 +++++++++++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 56 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-> >> index 17d246b..9bfaa0c 100644
-> >> --- a/arch/arm/mach-mvebu/Kconfig
-> >> +++ b/arch/arm/mach-mvebu/Kconfig
-> >> @@ -22,7 +22,7 @@ config MVEBU_CLK_CPU
-> >>  config MACH_ARMADA_370_XP
-> >>  	bool
-> >>  	select ARMADA_370_XP_TIMER
-> >> -	select CPU_V7
-> >> +	select CPU_PJ4B
-> >>  
-> >>  config MACH_ARMADA_370
-> >>  	bool "Marvell Armada 370 boards"
-> >> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> >> index 94186b6..3fd629d 100644
-> >> --- a/arch/arm/mm/Kconfig
-> >> +++ b/arch/arm/mm/Kconfig
-> >> @@ -352,6 +352,10 @@ config CPU_PJ4
-> >>  	select ARM_THUMBEE
-> >>  	select CPU_V7
-> >>  
-> >> +config CPU_PJ4B
-> >> +	bool
-> >> +	select CPU_V7
-> >> +
-> >>  # ARMv6
-> >>  config CPU_V6
-> >>  	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
-> >> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> >> index 846d279..a4c0ccf 100644
-> >> --- a/arch/arm/mm/proc-v7.S
-> >> +++ b/arch/arm/mm/proc-v7.S
-> >> @@ -169,6 +169,47 @@ __v7_ca15mp_setup:
-> >>  	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
-> >>  	mcreq	p15, 0, r0, c1, c0, 1
-> >>  #endif
-> >> +
-> >> +__v7_pj4b_setup:
-> >> +#ifdef CONFIG_CPU_PJ4B
-> >> +
-> >> +#define SNOOP_DATA    (1 << 25) /* Dont interleave write and snoop data */
-> >> +#define CWF           (1 << 27) /* Disable Critical Word First feature */
-> >> +#define OUTSANDING_NC (1 << 29) /* Disable outstanding non cacheable request */
-> >> +#define L1_REP_RR     (1 << 30) /* L1 replacement - Strict round robin */
-> >> +
-> >> +#define AUX_DBG_CTRL2 (SNOOP_DATA | CWF | OUTSANDING_NC | L1_REP_RR)
-> >> +
-> >> +	/* Auxiliary Debug Modes Control 1 Register */
-> >> +	mrc	p15, 1,	r0, c15, c1, 1
-> >> +	orr     r0, r0, #(1 << 16)     @ Disable data transfer for clean line.
-> >> +	orr     r0, r0, #(1 << 5)      @ Enable the back off of STREX instr
-> >> +	orr     r0, r0, #(1 << 8)      @ Disable Internal Parity Handling
-> >> +	bic	r0, r0, #(1 << 2)      @ Disable Static BP
-> >> +	mcr	p15, 1,	r0, c15, c1, 1
-> >> +
-> >> +	/* Auxiliary Debug Modes Control 2 Register */
-> >> +	mrc	p15, 1,	r0, c15, c1, 2
-> >> +	bic	r0, r0, #(1 << 23)   @ Enable fast LDR.
-> >> +	orr	r0, r0, #AUX_DBG_CTRL2
-> >> +	mcr	p15, 1,	r0, c15, c1, 2
-> >> +
-> >> +	/* Auxiliary Functional Modes Control Register 0 */
-> >> +	mrc	p15, 1,	r0, c15, c2, 0
-> >> +#ifdef CONFIG_SMP
-> >> +	orr	r0, r0, #(1 << 1)     @ Set SMP mode. Join the coherency fabric
-> >> +#endif
-> >> +	orr	r0, r0, #(1 << 2)     @ Support L1 parity checking
-> >> +	orr	r0, r0, #(1 << 8)     @ Broadcast Cache and TLB maintenance
-> >> +	mcr	p15, 1,	r0, c15, c2, 0
-> >> +
-> >> +	/* Auxiliary Debug Modes Control 0 Register */
-> >> +	mrc	p15, 1,	r0, c15, c1, 0
-> >> +	orr	r0, r0, #(1 << 22)   @ WFI/WFE - serve the DVM and back to idle
-> >> +	mcr	p15, 1,	r0, c15, c1, 0
-> >> +
-> >> +#endif /* CONFIG_CPU_PJ4B */
-> >> +
-> >>  __v7_setup:
-> >>  	adr	r12, __v7_setup_stack		@ the local stack
-> >>  	stmia	r12, {r0-r5, r7, r9, r11, lr}
-> >> @@ -342,6 +383,16 @@ __v7_ca9mp_proc_info:
-> >>  	.long	0xff0ffff0
-> >>  	__v7_proc __v7_ca9mp_setup
-> >>  	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
-> >> +
-> >> +	/*
-> >> +	 * Marvell PJ4B processor.
-> >> +	 */
-> >> +	.type   __v7_pj4b_proc_info, #object
-> >> +__v7_pj4b_proc_info:
-> >> +	.long	0x562f5840
-> >> +	.long	0xfffffff0
-> >> +	__v7_proc __v7_pj4b_setup
-> >> +	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
-> >>  #endif	/* CONFIG_ARM_LPAE */
-> >>  
-> >>  	/*
-> >>
-> > 
-> > 
+> This patch adds a function that parses device tree "cpu" nodes and
+> retrieves the corresponding CPUs hardware identifiers (MPIDR).
+> It sets the possible cpus and the cpu logical map values according to
+> the number of CPUs defined in the device tree and respective properties.
 > 
+> The device tree HW identifiers are considered valid if all CPU nodes contain
+> a "reg" property, there are no duplicate "reg" entries and the DT defines a
+> CPU node whose "reg" property matches the MPIDR[23:0] of the boot CPU.
 > 
+> The primary CPU is assigned cpu logical number 0 to keep the current convention
+> valid.
+> 
+> Current bindings documentation is included in the patch:
+> 
+> Documentation/devicetree/bindings/arm/cpus.txt
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+> ---
+>  Documentation/devicetree/bindings/arm/cpus.txt | 78 ++++++++++++++++++++
+>  arch/arm/include/asm/prom.h                    |  2 +
+>  arch/arm/kernel/devtree.c                      | 99 ++++++++++++++++++++++++++
+>  3 files changed, 179 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> new file mode 100644
+> index 0000000..1fab07a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -0,0 +1,78 @@
+> +* ARM CPUs binding description
+> +
+> +The device tree allows to describe the layout of CPUs in a system through
+> +the "cpus" node, which in turn contains a number of subnodes (ie "cpu")
+> +defining properties for every cpu.
+> +
+> +Bindings for CPU nodes follow the ePAPR standard, available from:
+> +
+> +http://devicetree.org
+> +
+> +For the ARM architecture every CPU node must contain the following properties:
+> +
+> +- reg:		property matching the CPU MPIDR[23:0] register bits
+> +		reg[31:24] bits must be set to 0
+> +- compatible:	should be one of:
+> +		"arm,arm1020"
+> +		"arm,arm1020e"
+> +		"arm,arm1022"
+> +		"arm,arm1026"
+> +		"arm,arm720"
+> +		"arm,arm740"
+> +		"arm,arm7tdmi"
+> +		"arm,arm920"
+> +		"arm,arm922"
+> +		"arm,arm925"
+> +		"arm,arm926"
+> +		"arm,arm940"
+> +		"arm,arm946"
+> +		"arm,arm9tdmi"
+> +		"arm,cortex-a5"
+> +		"arm,cortex-a7"
+> +		"arm,cortex-a8"
+> +		"arm,cortex-a9"
+> +		"arm,cortex-a15"
+> +		"arm,arm1136"
+> +		"arm,arm1156"
+> +		"arm,arm1176"
+> +		"arm,arm11mpcore"
+> +		"faraday,fa526"
+> +		"intel,sa110"
+> +		"intel,sa1100"
+> +		"marvell,feroceon"
+> +		"marvell,mohawk"
+> +		"marvell,xsc3"
+> +		"marvell,xscale"
+> +
+> +Every cpu node is required to set its device_type to "cpu".
+> +
+> +Example:
+> +
+> +	cpus {
+> +		#size-cells = <0>;
+> +		#address-cells = <1>;
+> +
+> +		CPU0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = <arm, cortex-a15>;
+> +			reg = <0x0>;
+> +		};
+> +
+> +		CPU1: cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = <arm, cortex-a15>;
+> +			reg = <0x1>;
+> +		};
+> +
+> +		CPU2: cpu at 100 {
+> +			device_type = "cpu";
+> +			compatible = <arm, cortex-a7>;
+> +			reg = <0x100>;
+> +		};
+> +
+> +		CPU3: cpu at 101 {
+> +			device_type = "cpu";
+> +			compatible = <arm, cortex-a7>;
+> +			reg = <0x101>;
+> +		};
+> +	};
+> diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
+> index aeae9c6..8dd51dc 100644
+> --- a/arch/arm/include/asm/prom.h
+> +++ b/arch/arm/include/asm/prom.h
+> @@ -15,6 +15,7 @@
+>  
+>  extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
+>  extern void arm_dt_memblock_reserve(void);
+> +extern void __init arm_dt_init_cpu_maps(void);
+>  
+>  #else /* CONFIG_OF */
+>  
+> @@ -24,6 +25,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
+>  }
+>  
+>  static inline void arm_dt_memblock_reserve(void) { }
+> +static inline void arm_dt_init_cpu_maps(void) { }
+>  
+>  #endif /* CONFIG_OF */
+>  #endif /* ASMARM_PROM_H */
+> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> index bee7f9d..cf840b3 100644
+> --- a/arch/arm/kernel/devtree.c
+> +++ b/arch/arm/kernel/devtree.c
+> @@ -19,8 +19,10 @@
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  
+> +#include <asm/cputype.h>
+>  #include <asm/setup.h>
+>  #include <asm/page.h>
+> +#include <asm/smp_plat.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach-types.h>
+>  
+> @@ -61,6 +63,103 @@ void __init arm_dt_memblock_reserve(void)
+>  	}
+>  }
+>  
+> +/*
+> + * arm_dt_init_cpu_maps - Function retrieves cpu nodes from the device tree
+> + * and builds the cpu logical map array containing MPIDR values related to
+> + * logical cpus
+> + *
+> + * Updates the cpu possible mask with the number of parsed cpu nodes
+> + */
+> +void __init arm_dt_init_cpu_maps(void)
+> +{
+> +	/*
+> +	 * Temp logical map is initialized with UINT_MAX values that are
+> +	 * considered invalid logical map entries since the logical map must
+> +	 * contain a list of MPIDR[23:0] values where MPIDR[31:24] must
+> +	 * read as 0.
+> +	 */
+> +	struct device_node *cpu, *cpus;
+> +	u32 i, j, cpuidx = 1;
+> +	u32 mpidr = is_smp() ? read_cpuid_mpidr() & 0xffffff : 0;
+> +	u32 tmp_map[NR_CPUS] = { [0 ... NR_CPUS-1] = UINT_MAX };
+> +	bool bootcpu_valid = false;
+> +	cpus = of_find_node_by_path("/cpus");
+> +
+> +	if (!cpus)
+> +		return;
+> +
+> +	for_each_child_of_node(cpus, cpu) {
+> +		u32 hwid;
+> +
+> +		pr_debug(" * %s...\n", cpu->full_name);
+> +		/*
+> +		 * A device tree containing CPU nodes with missing "reg"
+> +		 * properties is considered invalid to build the
+> +		 * cpu_logical_map.
+> +		 */
+> +		if (of_property_read_u32(cpu, "reg", &hwid)) {
+> +			pr_debug(" * %s missing reg property\n",
+> +				     cpu->full_name);
+> +			return;
+> +		}
+> +
+> +		/*
+> +		 * 8 MSBs must be set to 0 in the DT since the reg property
+> +		 * defines the MPIDR[23:0].
+> +		 */
+> +		if (hwid & 0xff000000)
+> +			return;
+> +
+> +		/*
+> +		 * Duplicate MPIDRs are a recipe for disaster.
+> +		 * Scan all initialized entries and check for
+> +		 * duplicates. If any is found just bail out.
+> +		 * temp values were initialized to UINT_MAX
+> +		 * to avoid matching valid MPIDR[23:0] values.
+> +		 */
+> +		for (j = 0; j < cpuidx; j++)
+> +			if (WARN(tmp_map[j] == hwid, "Duplicate /cpu reg "
+> +						     "properties in the DT\n"))
+> +				return;
+> +
+> +		/*
+> +		 * Build a stashed array of MPIDR values. Numbering scheme
+> +		 * requires that if detected the boot CPU must be assigned
+> +		 * logical id 0. Other CPUs get sequential indexes starting
+> +		 * from 1. If a CPU node with a reg property matching the
+> +		 * boot CPU MPIDR is detected, this is recorded so that the
+> +		 * logical map built from DT is validated and can be used
+> +		 * to override the map created in smp_setup_processor_id().
+> +		 */
+> +		if (hwid == mpidr) {
+> +			i = 0;
+> +			bootcpu_valid = true;
+> +		} else {
+> +			i = cpuidx++;
+> +		}
+> +
+> +		tmp_map[i] = hwid;
+> +
+> +		if (cpuidx > nr_cpu_ids)
+> +			break;
+> +	}
+> +
+> +	if (WARN(!bootcpu_valid, "DT missing boot CPU MPIDR[23:0], "
+> +				 "fall back to default cpu_logical_map\n"))
+> +		return;
+> +
+> +	/*
+> +	 * Since the boot CPU node contains proper data, and all nodes have
+> +	 * a reg property, the DT CPU list can be considered valid and the
+> +	 * logical map created in smp_setup_processor_id() can be overridden
+> +	 */
+> +	for (i = 0; i < cpuidx; i++) {
+> +		set_cpu_possible(i, true);
+> +		cpu_logical_map(i) = tmp_map[i];
+> +		pr_debug("cpu logical map 0x%x\n", cpu_logical_map(i));
+> +	}
+> +}
+> +
+>  /**
+>   * setup_machine_fdt - Machine setup when an dtb was passed to the kernel
+>   * @dt_phys: physical address of dt blob
 > -- 
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+> 1.7.12
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
