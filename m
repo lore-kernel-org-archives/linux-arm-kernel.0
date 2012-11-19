@@ -1,195 +1,298 @@
 From: wfp5p@virginia.edu (Bill Pemberton)
-Date: Mon, 19 Nov 2012 13:25:46 -0500
-Subject: [PATCH 397/493] crypto: remove use of __devexit
+Date: Mon, 19 Nov 2012 13:24:27 -0500
+Subject: [PATCH 318/493] pinctrl: remove use of __devinitdata
 In-Reply-To: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
 References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
-Message-ID: <1353349642-3677-397-git-send-email-wfp5p@virginia.edu>
+Message-ID: <1353349642-3677-318-git-send-email-wfp5p@virginia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_HOTPLUG is going away as an option so __devexit is no
+CONFIG_HOTPLUG is going away as an option so __devinitdata is no
 longer needed.
 
 Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-Cc: Herbert Xu <herbert@gondor.apana.org.au> 
-Cc: "David S. Miller" <davem@davemloft.net> 
-Cc: linux-crypto at vger.kernel.org 
-Cc: linux-geode at lists.infradead.org 
+Cc: Linus Walleij <linus.walleij@linaro.org> 
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com> 
+Cc: Viresh Kumar <viresh.linux@gmail.com> 
 Cc: linux-arm-kernel at lists.infradead.org 
+Cc: spear-devel at list.st.com 
 ---
- drivers/crypto/atmel-aes.c        | 2 +-
- drivers/crypto/atmel-sha.c        | 2 +-
- drivers/crypto/atmel-tdes.c       | 2 +-
- drivers/crypto/bfin_crc.c         | 2 +-
- drivers/crypto/geode-aes.c        | 2 +-
- drivers/crypto/hifn_795x.c        | 2 +-
- drivers/crypto/n2_core.c          | 6 +++---
- drivers/crypto/nx/nx.c            | 2 +-
- drivers/crypto/omap-sham.c        | 2 +-
- drivers/crypto/picoxcell_crypto.c | 2 +-
- drivers/crypto/tegra-aes.c        | 2 +-
- 11 files changed, 13 insertions(+), 13 deletions(-)
+ drivers/pinctrl/mvebu/pinctrl-armada-370.c | 2 +-
+ drivers/pinctrl/mvebu/pinctrl-armada-xp.c  | 2 +-
+ drivers/pinctrl/mvebu/pinctrl-dove.c       | 2 +-
+ drivers/pinctrl/mvebu/pinctrl-kirkwood.c   | 2 +-
+ drivers/pinctrl/pinctrl-at91.c             | 4 ++--
+ drivers/pinctrl/pinctrl-imx23.c            | 2 +-
+ drivers/pinctrl/pinctrl-imx28.c            | 2 +-
+ drivers/pinctrl/pinctrl-imx35.c            | 2 +-
+ drivers/pinctrl/pinctrl-imx51.c            | 2 +-
+ drivers/pinctrl/pinctrl-imx53.c            | 2 +-
+ drivers/pinctrl/pinctrl-imx6q.c            | 2 +-
+ drivers/pinctrl/pinctrl-single.c           | 2 +-
+ drivers/pinctrl/pinctrl-tegra20.c          | 2 +-
+ drivers/pinctrl/pinctrl-tegra30.c          | 2 +-
+ drivers/pinctrl/spear/pinctrl-spear1310.c  | 2 +-
+ drivers/pinctrl/spear/pinctrl-spear1340.c  | 2 +-
+ drivers/pinctrl/spear/pinctrl-spear300.c   | 2 +-
+ drivers/pinctrl/spear/pinctrl-spear310.c   | 2 +-
+ drivers/pinctrl/spear/pinctrl-spear320.c   | 2 +-
+ 19 files changed, 20 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-index 931d436..c9d9d5c 100644
---- a/drivers/crypto/atmel-aes.c
-+++ b/drivers/crypto/atmel-aes.c
-@@ -1152,7 +1152,7 @@ aes_dd_err:
- 	return err;
- }
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-370.c b/drivers/pinctrl/mvebu/pinctrl-armada-370.c
+index 384ab9c..54a0cfc 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-370.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-370.c
+@@ -367,7 +367,7 @@ static struct mvebu_mpp_mode mv88f6710_mpp_modes[] = {
  
--static int __devexit atmel_aes_remove(struct platform_device *pdev)
-+static int atmel_aes_remove(struct platform_device *pdev)
- {
- 	static struct atmel_aes_dev *aes_dd;
+ static struct mvebu_pinctrl_soc_info armada_370_pinctrl_info;
  
-diff --git a/drivers/crypto/atmel-sha.c b/drivers/crypto/atmel-sha.c
-index 17f8862..4918e94 100644
---- a/drivers/crypto/atmel-sha.c
-+++ b/drivers/crypto/atmel-sha.c
-@@ -1063,7 +1063,7 @@ sha_dd_err:
- 	return err;
- }
+-static struct of_device_id armada_370_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id armada_370_pinctrl_of_match[] = {
+ 	{ .compatible = "marvell,mv88f6710-pinctrl" },
+ 	{ },
+ };
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
+index 02114b6..b99c823 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
+@@ -349,7 +349,7 @@ static struct mvebu_mpp_mode armada_xp_mpp_modes[] = {
  
--static int __devexit atmel_sha_remove(struct platform_device *pdev)
-+static int atmel_sha_remove(struct platform_device *pdev)
- {
- 	static struct atmel_sha_dev *sha_dd;
+ static struct mvebu_pinctrl_soc_info armada_xp_pinctrl_info;
  
-diff --git a/drivers/crypto/atmel-tdes.c b/drivers/crypto/atmel-tdes.c
-index f4b9907..7c73fbb 100644
---- a/drivers/crypto/atmel-tdes.c
-+++ b/drivers/crypto/atmel-tdes.c
-@@ -1162,7 +1162,7 @@ tdes_dd_err:
- 	return err;
- }
+-static struct of_device_id armada_xp_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id armada_xp_pinctrl_of_match[] = {
+ 	{
+ 		.compatible = "marvell,mv78230-pinctrl",
+ 		.data       = (void *) V_MV78230,
+diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
+index 608a9c6..3d98011 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-dove.c
++++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
+@@ -571,7 +571,7 @@ static struct mvebu_pinctrl_soc_info dove_pinctrl_info = {
  
--static int __devexit atmel_tdes_remove(struct platform_device *pdev)
-+static int atmel_tdes_remove(struct platform_device *pdev)
- {
- 	static struct atmel_tdes_dev *tdes_dd;
+ static struct clk *clk;
  
-diff --git a/drivers/crypto/bfin_crc.c b/drivers/crypto/bfin_crc.c
-index 904b646..a22f1a9 100644
---- a/drivers/crypto/bfin_crc.c
-+++ b/drivers/crypto/bfin_crc.c
-@@ -707,7 +707,7 @@ out_error_free_mem:
-  *	bfin_crypto_crc_remove - Initialize module
-  *
-  */
--static int __devexit bfin_crypto_crc_remove(struct platform_device *pdev)
-+static int bfin_crypto_crc_remove(struct platform_device *pdev)
- {
- 	struct bfin_crypto_crc *crc = platform_get_drvdata(pdev);
- 
-diff --git a/drivers/crypto/geode-aes.c b/drivers/crypto/geode-aes.c
-index f3793a2..6bde3ea 100644
---- a/drivers/crypto/geode-aes.c
-+++ b/drivers/crypto/geode-aes.c
-@@ -498,7 +498,7 @@ static struct crypto_alg geode_ecb_alg = {
- 	}
+-static struct of_device_id dove_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id dove_pinctrl_of_match[] = {
+ 	{ .compatible = "marvell,dove-pinctrl", .data = &dove_pinctrl_info },
+ 	{ }
+ };
+diff --git a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
+index 434ec8c..970d56b 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
++++ b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
+@@ -433,7 +433,7 @@ static struct mvebu_pinctrl_soc_info mv88f6282_info = {
+ 	.ngpioranges = ARRAY_SIZE(mv88f628x_gpio_ranges),
  };
  
--static void __devexit
-+static void
- geode_aes_remove(struct pci_dev *dev)
- {
- 	crypto_unregister_alg(&geode_alg);
-diff --git a/drivers/crypto/hifn_795x.c b/drivers/crypto/hifn_795x.c
-index f909d99..ebf130e 100644
---- a/drivers/crypto/hifn_795x.c
-+++ b/drivers/crypto/hifn_795x.c
-@@ -2696,7 +2696,7 @@ err_out_disable_pci_device:
- 	return err;
+-static struct of_device_id kirkwood_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id kirkwood_pinctrl_of_match[] = {
+ 	{ .compatible = "marvell,88f6180-pinctrl", .data = &mv88f6180_info },
+ 	{ .compatible = "marvell,88f6190-pinctrl", .data = &mv88f6190_info },
+ 	{ .compatible = "marvell,88f6192-pinctrl", .data = &mv88f6192_info },
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index 72b69a9..2cb1df6 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -815,7 +815,7 @@ static int at91_pinctrl_parse_functions(struct device_node *np,
+ 	return 0;
  }
  
--static void __devexit hifn_remove(struct pci_dev *pdev)
-+static void hifn_remove(struct pci_dev *pdev)
- {
- 	int i;
- 	struct hifn_device *dev;
-diff --git a/drivers/crypto/n2_core.c b/drivers/crypto/n2_core.c
-index 10e1033..0c286fc 100644
---- a/drivers/crypto/n2_core.c
-+++ b/drivers/crypto/n2_core.c
-@@ -1545,7 +1545,7 @@ out:
- 	return err;
+-static struct of_device_id at91_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id at91_pinctrl_of_match[] = {
+ 	{ .compatible = "atmel,at91sam9x5-pinctrl", .data = &at91sam9x5_ops },
+ 	{ .compatible = "atmel,at91rm9200-pinctrl", .data = &at91rm9200_ops },
+ 	{ /* sentinel */ }
+@@ -1350,7 +1350,7 @@ static void at91_gpio_probe_fixup(void)
+ 	}
  }
  
--static void __devexit n2_unregister_algs(void)
-+static void n2_unregister_algs(void)
- {
- 	mutex_lock(&spu_lock);
- 	if (!--algs_registered)
-@@ -2077,7 +2077,7 @@ out_free_n2cp:
- 	return err;
+-static struct of_device_id at91_gpio_of_match[] __devinitdata = {
++static struct of_device_id at91_gpio_of_match[] = {
+ 	{ .compatible = "atmel,at91sam9x5-gpio", .data = &at91sam9x5_ops, },
+ 	{ .compatible = "atmel,at91rm9200-gpio", .data = &at91rm9200_ops },
+ 	{ /* sentinel */ }
+diff --git a/drivers/pinctrl/pinctrl-imx23.c b/drivers/pinctrl/pinctrl-imx23.c
+index f445fa3..e76d75c 100644
+--- a/drivers/pinctrl/pinctrl-imx23.c
++++ b/drivers/pinctrl/pinctrl-imx23.c
+@@ -272,7 +272,7 @@ static int imx23_pinctrl_probe(struct platform_device *pdev)
+ 	return mxs_pinctrl_probe(pdev, &imx23_pinctrl_data);
  }
  
--static int __devexit n2_crypto_remove(struct platform_device *dev)
-+static int n2_crypto_remove(struct platform_device *dev)
- {
- 	struct n2_crypto *np = dev_get_drvdata(&dev->dev);
- 
-@@ -2179,7 +2179,7 @@ out_free_ncp:
- 	return err;
+-static struct of_device_id imx23_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id imx23_pinctrl_of_match[] = {
+ 	{ .compatible = "fsl,imx23-pinctrl", },
+ 	{ /* sentinel */ }
+ };
+diff --git a/drivers/pinctrl/pinctrl-imx28.c b/drivers/pinctrl/pinctrl-imx28.c
+index ef42677..79c9c8d 100644
+--- a/drivers/pinctrl/pinctrl-imx28.c
++++ b/drivers/pinctrl/pinctrl-imx28.c
+@@ -388,7 +388,7 @@ static int imx28_pinctrl_probe(struct platform_device *pdev)
+ 	return mxs_pinctrl_probe(pdev, &imx28_pinctrl_data);
  }
  
--static int __devexit n2_mau_remove(struct platform_device *dev)
-+static int n2_mau_remove(struct platform_device *dev)
- {
- 	struct n2_mau *mp = dev_get_drvdata(&dev->dev);
+-static struct of_device_id imx28_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id imx28_pinctrl_of_match[] = {
+ 	{ .compatible = "fsl,imx28-pinctrl", },
+ 	{ /* sentinel */ }
+ };
+diff --git a/drivers/pinctrl/pinctrl-imx35.c b/drivers/pinctrl/pinctrl-imx35.c
+index 4dfc88a..6e21411 100644
+--- a/drivers/pinctrl/pinctrl-imx35.c
++++ b/drivers/pinctrl/pinctrl-imx35.c
+@@ -1559,7 +1559,7 @@ static struct imx_pinctrl_soc_info imx35_pinctrl_info = {
+ 	.npin_regs = ARRAY_SIZE(imx35_pin_regs),
+ };
  
-diff --git a/drivers/crypto/nx/nx.c b/drivers/crypto/nx/nx.c
-index e19228e..17afbf9 100644
---- a/drivers/crypto/nx/nx.c
-+++ b/drivers/crypto/nx/nx.c
-@@ -653,7 +653,7 @@ static int nx_probe(struct vio_dev *viodev,
- 	return nx_register_algs();
+-static struct of_device_id imx35_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id imx35_pinctrl_of_match[] = {
+ 	{ .compatible = "fsl,imx35-iomuxc", },
+ 	{ /* sentinel */ }
+ };
+diff --git a/drivers/pinctrl/pinctrl-imx51.c b/drivers/pinctrl/pinctrl-imx51.c
+index 2455775..9a92aaa 100644
+--- a/drivers/pinctrl/pinctrl-imx51.c
++++ b/drivers/pinctrl/pinctrl-imx51.c
+@@ -1286,7 +1286,7 @@ static struct imx_pinctrl_soc_info imx51_pinctrl_info = {
+ 	.npin_regs = ARRAY_SIZE(imx51_pin_regs),
+ };
+ 
+-static struct of_device_id imx51_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id imx51_pinctrl_of_match[] = {
+ 	{ .compatible = "fsl,imx51-iomuxc", },
+ 	{ /* sentinel */ }
+ };
+diff --git a/drivers/pinctrl/pinctrl-imx53.c b/drivers/pinctrl/pinctrl-imx53.c
+index 2b75b60..bfe0ba8 100644
+--- a/drivers/pinctrl/pinctrl-imx53.c
++++ b/drivers/pinctrl/pinctrl-imx53.c
+@@ -1613,7 +1613,7 @@ static struct imx_pinctrl_soc_info imx53_pinctrl_info = {
+ 	.npin_regs = ARRAY_SIZE(imx53_pin_regs),
+ };
+ 
+-static struct of_device_id imx53_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id imx53_pinctrl_of_match[] = {
+ 	{ .compatible = "fsl,imx53-iomuxc", },
+ 	{ /* sentinel */ }
+ };
+diff --git a/drivers/pinctrl/pinctrl-imx6q.c b/drivers/pinctrl/pinctrl-imx6q.c
+index 7d4f249..663346b 100644
+--- a/drivers/pinctrl/pinctrl-imx6q.c
++++ b/drivers/pinctrl/pinctrl-imx6q.c
+@@ -2297,7 +2297,7 @@ static struct imx_pinctrl_soc_info imx6q_pinctrl_info = {
+ 	.npin_regs = ARRAY_SIZE(imx6q_pin_regs),
+ };
+ 
+-static struct of_device_id imx6q_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id imx6q_pinctrl_of_match[] = {
+ 	{ .compatible = "fsl,imx6q-iomuxc", },
+ 	{ /* sentinel */ }
+ };
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index 32272f2..0f2ee82 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -998,7 +998,7 @@ static int __devexit pcs_remove(struct platform_device *pdev)
+ 	return 0;
  }
  
--static int __devexit nx_remove(struct vio_dev *viodev)
-+static int nx_remove(struct vio_dev *viodev)
- {
- 	dev_dbg(&viodev->dev, "entering nx_remove for UA 0x%x\n",
- 		viodev->unit_address);
-diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index fb037ff..89fba10 100644
---- a/drivers/crypto/omap-sham.c
-+++ b/drivers/crypto/omap-sham.c
-@@ -1250,7 +1250,7 @@ data_err:
- 	return err;
+-static struct of_device_id pcs_of_match[] __devinitdata = {
++static struct of_device_id pcs_of_match[] = {
+ 	{ .compatible = DRIVER_NAME, },
+ 	{ },
+ };
+diff --git a/drivers/pinctrl/pinctrl-tegra20.c b/drivers/pinctrl/pinctrl-tegra20.c
+index 8bfecb4..e848189 100644
+--- a/drivers/pinctrl/pinctrl-tegra20.c
++++ b/drivers/pinctrl/pinctrl-tegra20.c
+@@ -2861,7 +2861,7 @@ static int tegra20_pinctrl_probe(struct platform_device *pdev)
+ 	return tegra_pinctrl_probe(pdev, &tegra20_pinctrl);
  }
  
--static int __devexit omap_sham_remove(struct platform_device *pdev)
-+static int omap_sham_remove(struct platform_device *pdev)
- {
- 	static struct omap_sham_dev *dd;
- 	int i;
-diff --git a/drivers/crypto/picoxcell_crypto.c b/drivers/crypto/picoxcell_crypto.c
-index 6eb91e6..2096d46 100644
---- a/drivers/crypto/picoxcell_crypto.c
-+++ b/drivers/crypto/picoxcell_crypto.c
-@@ -1841,7 +1841,7 @@ static int spacc_probe(struct platform_device *pdev)
- 	return ret;
+-static struct of_device_id tegra20_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id tegra20_pinctrl_of_match[] = {
+ 	{ .compatible = "nvidia,tegra20-pinmux", },
+ 	{ },
+ };
+diff --git a/drivers/pinctrl/pinctrl-tegra30.c b/drivers/pinctrl/pinctrl-tegra30.c
+index 6973b7b..9ad87ea 100644
+--- a/drivers/pinctrl/pinctrl-tegra30.c
++++ b/drivers/pinctrl/pinctrl-tegra30.c
+@@ -3727,7 +3727,7 @@ static int tegra30_pinctrl_probe(struct platform_device *pdev)
+ 	return tegra_pinctrl_probe(pdev, &tegra30_pinctrl);
  }
  
--static int __devexit spacc_remove(struct platform_device *pdev)
-+static int spacc_remove(struct platform_device *pdev)
- {
- 	struct spacc_alg *alg, *next;
- 	struct spacc_engine *engine = platform_get_drvdata(pdev);
-diff --git a/drivers/crypto/tegra-aes.c b/drivers/crypto/tegra-aes.c
-index 40eed65..85ea752 100644
---- a/drivers/crypto/tegra-aes.c
-+++ b/drivers/crypto/tegra-aes.c
-@@ -1047,7 +1047,7 @@ out:
- 	return err;
- }
+-static struct of_device_id tegra30_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id tegra30_pinctrl_of_match[] = {
+ 	{ .compatible = "nvidia,tegra30-pinmux", },
+ 	{ },
+ };
+diff --git a/drivers/pinctrl/spear/pinctrl-spear1310.c b/drivers/pinctrl/spear/pinctrl-spear1310.c
+index b742946..e53fd36 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear1310.c
++++ b/drivers/pinctrl/spear/pinctrl-spear1310.c
+@@ -2692,7 +2692,7 @@ static struct spear_pinctrl_machdata spear1310_machdata = {
+ 	.modes_supported = false,
+ };
  
--static int __devexit tegra_aes_remove(struct platform_device *pdev)
-+static int tegra_aes_remove(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct tegra_aes_dev *dd = platform_get_drvdata(pdev);
+-static struct of_device_id spear1310_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id spear1310_pinctrl_of_match[] = {
+ 	{
+ 		.compatible = "st,spear1310-pinmux",
+ 	},
+diff --git a/drivers/pinctrl/spear/pinctrl-spear1340.c b/drivers/pinctrl/spear/pinctrl-spear1340.c
+index 4bc052e..a5d7a5f 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear1340.c
++++ b/drivers/pinctrl/spear/pinctrl-spear1340.c
+@@ -2008,7 +2008,7 @@ static struct spear_pinctrl_machdata spear1340_machdata = {
+ 	.modes_supported = false,
+ };
+ 
+-static struct of_device_id spear1340_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id spear1340_pinctrl_of_match[] = {
+ 	{
+ 		.compatible = "st,spear1340-pinmux",
+ 	},
+diff --git a/drivers/pinctrl/spear/pinctrl-spear300.c b/drivers/pinctrl/spear/pinctrl-spear300.c
+index bdc2151..e9cd858 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear300.c
++++ b/drivers/pinctrl/spear/pinctrl-spear300.c
+@@ -646,7 +646,7 @@ static struct spear_function *spear300_functions[] = {
+ 	&gpio1_function,
+ };
+ 
+-static struct of_device_id spear300_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id spear300_pinctrl_of_match[] = {
+ 	{
+ 		.compatible = "st,spear300-pinmux",
+ 	},
+diff --git a/drivers/pinctrl/spear/pinctrl-spear310.c b/drivers/pinctrl/spear/pinctrl-spear310.c
+index b8376fd..7e0e23d 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear310.c
++++ b/drivers/pinctrl/spear/pinctrl-spear310.c
+@@ -371,7 +371,7 @@ static struct spear_function *spear310_functions[] = {
+ 	&tdm_function,
+ };
+ 
+-static struct of_device_id spear310_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id spear310_pinctrl_of_match[] = {
+ 	{
+ 		.compatible = "st,spear310-pinmux",
+ 	},
+diff --git a/drivers/pinctrl/spear/pinctrl-spear320.c b/drivers/pinctrl/spear/pinctrl-spear320.c
+index 818c88d..6b2b03c 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear320.c
++++ b/drivers/pinctrl/spear/pinctrl-spear320.c
+@@ -3410,7 +3410,7 @@ static struct spear_function *spear320_functions[] = {
+ 	&i2c2_function,
+ };
+ 
+-static struct of_device_id spear320_pinctrl_of_match[] __devinitdata = {
++static struct of_device_id spear320_pinctrl_of_match[] = {
+ 	{
+ 		.compatible = "st,spear320-pinmux",
+ 	},
 -- 
 1.8.0
