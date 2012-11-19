@@ -1,27 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Nov 2012 10:41:15 -0700
-Subject: [PATCH V5] Add support for generic BCM SoC chipsets
-In-Reply-To: <1353196298-19016-1-git-send-email-csd@broadcom.com>
-References: <1353196298-19016-1-git-send-email-csd@broadcom.com>
-Message-ID: <50AA6F3B.4010801@wwwdotorg.org>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Tue, 20 Nov 2012 06:44:44 +1300
+Subject: [PATCH v3 0/2] pwm fixes for 3.8
+Message-ID: <1353347086-4572-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/17/2012 04:51 PM, Christian Daudt wrote:
-> In order to start upstreaming Broadcom SoC support, create
-> a starting hierarchy, arch and dts files.
-> The first support SoC family that is planned is the
-> BCM281XX (BCM11130/11140/11351/28145/28155) family of dual A9 mobile
-> SoC cores.
-> This code is just the skeleton code for get the machine upstreamed. It
-> has been made MULTIPLATFORM compatible.
+Hi Theirry,
 
-> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+I felt the error message for clk_enable in vt8500_pwm_config() needed
+to somehow indicate that the clk_enable failed in this function otherwise
+if there is a problem, you can't tell which of the clk_enable's
+generated the fail message.
+If there is a clock error - as you pointed out - it will probably fail
+elsewhere as well so I've changed it to match the other error messages.
 
-> +	uart at 3e000000 {
-> +		compatible = "bcm,bcm11351-sw-apb-uart", "snps,dw-apb-uart";
+These should be applied on top of the original patch.
 
-s/-sw-/-dw-/ in the first compatible value?
+v2: Add error checking for clk_enable()
+v3: Remove superfluous ;'s. Error message style correction.
 
-Aside from that,
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
+Tony Prisk (2):
+  Fix build error in pwm-vt8500.c
+  pwm: vt8500: Ensure pwm clock is enabled during pwm_config
+
+ drivers/pwm/pwm-vt8500.c |   16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
+
+-- 
+1.7.9.5
