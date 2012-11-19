@@ -1,36 +1,68 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 17:44:54 +0100
-Subject: [PATCH] arm: orion5x: convert Netgear WNR854T to device tree
-In-Reply-To: <1353342451-27180-1-git-send-email-kaloz@openwrt.org>
-References: <1353342451-27180-1-git-send-email-kaloz@openwrt.org>
-Message-ID: <20121119174454.67ad1f25@skate>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 19 Nov 2012 10:48:23 -0600
+Subject: [PATCH v4 0/3] OMAP GPMC DT bindings
+In-Reply-To: <1353338956-19420-1-git-send-email-zonque@gmail.com>
+References: <1353338956-19420-1-git-send-email-zonque@gmail.com>
+Message-ID: <50AA62D7.2040308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Imre Kaloz,
 
-On Mon, 19 Nov 2012 17:27:31 +0100, Imre Kaloz wrote:
-> This commit converts the Netgear WNR854T to device tree
+On 11/19/2012 09:29 AM, Daniel Mack wrote:
+> This is a series of patches to support GPMC peripherals on OMAP boards.
 > 
-> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
-> ---
->  arch/arm/boot/dts/Makefile                    |    3 +-
->  arch/arm/boot/dts/orion5x-netgear-wnr854t.dts |   83 +++++++++++++++++++++++++
->  arch/arm/mach-orion5x/Kconfig                 |    7 +-
->  arch/arm/mach-orion5x/Makefile                |    2 +-
->  arch/arm/mach-orion5x/board-dt.c              |    3 +
->  arch/arm/mach-orion5x/common.h                |    5 ++
->  arch/arm/mach-orion5x/wnr854t-setup.c         |   59 +-----------------
->  7 files changed, 99 insertions(+), 63 deletions(-)
->  create mode 100644 arch/arm/boot/dts/orion5x-netgear-wnr854t.dts
+> Depends on Linus' master +
+> omap-next (branch omap-for-v3.8/cleanup-headers-gpmc)
+> 
+> The only supported peripheral for now is NAND, but other types would be
+> easy to add.
+> 
+> Version 2 addresses details pointed out by Jon Hunter, Afzal Mohammed
+> and Rob Herring:
+> 
+>  - add "reg" and "ti,hwmod" properties to Documentation
+>  - use generic of_mtd functions and the property names defined by them,
+>    namely "nand-bus-width" and "nand-ecc-mode"
+>  - reduce the default register space size in the Documentation to 8K,
+>    as found in the hwmod code
+>  - switch to a DT layout based on ranges and address translation.
+>    Although this property is not currently looked at as long as the
+>    handling code still uses the runtime calculation methods, we now
+>    have these values in the bindings, eventually allowing us to
+>    switch the implementation with less pain.
+> 
+> Version 3 includes fixes pointed out by Jon Hunter:
+> 
+>  - better documentation of the 'ranges' property to describe the
+>    fact that it's representing the CS lines
+>  - GPMC_CS_CONFIGx -> GPMC_CONFIGx in comments
+>  - drop interrupt-parent from example bindings
+>  - add of_node_put() at the end of the child iteration
+> 
+> Version 4 fixes compilation for !CONFIG_MTD_NAND and includes more
+> details from Jon Hunter and Avinash, Philip:
+> 
+>  - Add "num-cs" and "num-waitpins" properties, which will eventually
+>    be used to get rid of GPMC_CS_NUM
+>  - Better description of generic nand DT properties
+>  - Dropped patch 3/4 as an equivalent fix was already merged
+>  - Added ti,nand-ecc-use-elm property
+> 
+> Daniel Mack (3):
+>   mtd: omap-nand: pass device_node in platform data
+>   ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
+>   ARM: OMAP: gpmc: add DT bindings for GPMC timings and NAND
+> 
+>  .../devicetree/bindings/mtd/gpmc-nand.txt          |  84 ++++++++++
+>  arch/arm/mach-omap2/gpmc-nand.c                    |   9 +-
+>  arch/arm/mach-omap2/gpmc.c                         | 170 +++++++++++++++++++++
+>  drivers/mtd/nand/omap2.c                           |   4 +-
+>  include/linux/platform_data/mtd-nand-omap2.h       |   2 +
+>  5 files changed, 264 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nand.txt
 
-Thanks, looks good to me.
+Thanks for sending out the update. Am I missing something or did you
+drop the gpmc.txt binding documentation?
 
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Cheers
+Jon
