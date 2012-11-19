@@ -1,33 +1,61 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 19 Nov 2012 15:27:10 +0000
-Subject: [kvmarm] [PATCH v4 09/14] KVM: ARM: Emulation framework and CP15
- emulation
-In-Reply-To: <20121119150105.GB3205@mudshark.cambridge.arm.com>
-References: <20121110154203.2836.46686.stgit@chazy-air>
- <20121110154313.2836.2851.stgit@chazy-air>
- <20121119150105.GB3205@mudshark.cambridge.arm.com>
-Message-ID: <CAFEAcA_6DZ-rZu-hDJfKJBW7epVyuukPd042Ny1rOxuRF4hAVQ@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 19 Nov 2012 23:29:13 +0800
+Subject: [PATCH v4 0/3] OMAP GPMC DT bindings
+Message-ID: <1353338956-19420-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 November 2012 15:01, Will Deacon <will.deacon@arm.com> wrote:
-> On Sat, Nov 10, 2012 at 03:43:13PM +0000, Christoffer Dall wrote:
->> +/*
->> + * A15-specific CP15 registers.
->> + * Important: Must be sorted ascending by CRn, CRM, Op1, Op2
->> + */
->> +static const struct coproc_reg a15_regs[] = {
->> +       /* MPIDR: we use VMPIDR for guest access. */
->> +       { CRn( 0), CRm( 0), Op1( 0), Op2( 5), is32,
->> +                       NULL, reset_mpidr, c0_MPIDR },
->> +
->> +       /* SCTLR: swapped by interrupt.S. */
->> +       { CRn( 1), CRm( 0), Op1( 0), Op2( 0), is32,
->> +                       NULL, reset_val, c1_SCTLR, 0x00C50078 },
->
-> Why is the SCTLR included here as an A15-specific register?
+This is a series of patches to support GPMC peripherals on OMAP boards.
 
-Rusty might remember the exact answer, but probably because
-the SCTLR reset value is IMPDEF.
+Depends on Linus' master +
+omap-next (branch omap-for-v3.8/cleanup-headers-gpmc)
 
--- PMM
+The only supported peripheral for now is NAND, but other types would be
+easy to add.
+
+Version 2 addresses details pointed out by Jon Hunter, Afzal Mohammed
+and Rob Herring:
+
+ - add "reg" and "ti,hwmod" properties to Documentation
+ - use generic of_mtd functions and the property names defined by them,
+   namely "nand-bus-width" and "nand-ecc-mode"
+ - reduce the default register space size in the Documentation to 8K,
+   as found in the hwmod code
+ - switch to a DT layout based on ranges and address translation.
+   Although this property is not currently looked at as long as the
+   handling code still uses the runtime calculation methods, we now
+   have these values in the bindings, eventually allowing us to
+   switch the implementation with less pain.
+
+Version 3 includes fixes pointed out by Jon Hunter:
+
+ - better documentation of the 'ranges' property to describe the
+   fact that it's representing the CS lines
+ - GPMC_CS_CONFIGx -> GPMC_CONFIGx in comments
+ - drop interrupt-parent from example bindings
+ - add of_node_put() at the end of the child iteration
+
+Version 4 fixes compilation for !CONFIG_MTD_NAND and includes more
+details from Jon Hunter and Avinash, Philip:
+
+ - Add "num-cs" and "num-waitpins" properties, which will eventually
+   be used to get rid of GPMC_CS_NUM
+ - Better description of generic nand DT properties
+ - Dropped patch 3/4 as an equivalent fix was already merged
+ - Added ti,nand-ecc-use-elm property
+
+Daniel Mack (3):
+  mtd: omap-nand: pass device_node in platform data
+  ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
+  ARM: OMAP: gpmc: add DT bindings for GPMC timings and NAND
+
+ .../devicetree/bindings/mtd/gpmc-nand.txt          |  84 ++++++++++
+ arch/arm/mach-omap2/gpmc-nand.c                    |   9 +-
+ arch/arm/mach-omap2/gpmc.c                         | 170 +++++++++++++++++++++
+ drivers/mtd/nand/omap2.c                           |   4 +-
+ include/linux/platform_data/mtd-nand-omap2.h       |   2 +
+ 5 files changed, 264 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+
+-- 
+1.7.11.7
