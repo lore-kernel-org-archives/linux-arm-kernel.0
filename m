@@ -1,30 +1,36 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 19 Nov 2012 15:46:32 +0100
-Subject: [PATCH 0/4] ARM: dts: exynos4210-origen: Device tree fixes
-Message-ID: <1353336396-21161-1-git-send-email-t.figa@samsung.com>
+Date: Mon, 19 Nov 2012 15:46:33 +0100
+Subject: [PATCH 1/4] ARM: dts: exynos4210-origen: Split memory sections
+In-Reply-To: <1353336396-21161-1-git-send-email-t.figa@samsung.com>
+References: <1353336396-21161-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1353336396-21161-2-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series fixes device tree support for Origen board:
- - memory is defined using sections of maximum allowed size
- - any pin configuration is modified to use pinctrl
- - invalid properties in sdhci nodes are replaced according to current
-   mmc bindings
- - a fixed vmmc voltage regulator is added
+This patch changes memory configuration defined in dts file of Origen
+board from single 1 GiB section into four 256 MiB sections to match
+section size limit.
 
-Tested on Origen board.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/boot/dts/exynos4210-origen.dts | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Depends on:
-[PATCH v2 0/2] mmc: host: sdhci-s3c: Add support for pinctrl interface
-
-Tomasz Figa (4):
-  ARM: dts: exynos4210-origen: Split memory sections
-  ARM: dts: exynos4210-origen: Update for pinctrl-samsung driver
-  ARM: dts: exynos4210-origen: Update sdhci nodes for current bindings
-  ARM: dts: exynos4210-origen: Add vmmc fixed voltage regulator
-
- arch/arm/boot/dts/exynos4210-origen.dts | 54 ++++++++++++++++-----------------
- 1 file changed, 27 insertions(+), 27 deletions(-)
-
+diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+index f16c99f..392d9de 100644
+--- a/arch/arm/boot/dts/exynos4210-origen.dts
++++ b/arch/arm/boot/dts/exynos4210-origen.dts
+@@ -22,7 +22,10 @@
+ 	compatible = "insignal,origen", "samsung,exynos4210";
+ 
+ 	memory {
+-		reg = <0x40000000 0x40000000>;
++		reg =  <0x40000000 0x10000000
++			0x50000000 0x10000000
++			0x60000000 0x10000000
++			0x70000000 0x10000000>;
+ 	};
+ 
+ 	chosen {
 -- 
 1.8.0
