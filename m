@@ -1,144 +1,223 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 19 Nov 2012 12:45:06 +0000
-Subject: [PATCH v4 7/7] ARM: gic: use a private mapping for CPU target
- interfaces
-In-Reply-To: <1353329106-24084-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1353329106-24084-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1353329106-24084-8-git-send-email-lorenzo.pieralisi@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 19 Nov 2012 13:50:20 +0100
+Subject: [PATCH V2 3/3] arm: mvebu: Add hardware I/O Coherency support
+In-Reply-To: <1353059100-24022-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1353059100-24022-1-git-send-email-gregory.clement@free-electrons.com>
+ <1353059100-24022-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <50AA2B0C.7040508@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
+Hello,
 
-The GIC interface numbering does not necessarily follow the logical
-CPU numbering, especially for complex topologies such as multi-cluster
-systems.
+On 11/16/2012 10:45 AM, Gregory CLEMENT wrote:
+> Armada 370 and XP come with an unit called coherency fabric. This unit
+> allows to use the Armada 370/XP as a nearly coherent architecture. The
+> coherency mechanism uses snoop filters to ensure the coherency between
+> caches, DRAM and devices. This mechanism needs a synchronization
+> barrier which guarantees that all the memory writes initiated by the
+> devices have reached their target and do not reside in intermediate
+> write buffers. That's why the architecture is not totally coherent and
+> we need to provide our own functions for some DMA operations.
+>
+> Beside the use of the coherency fabric, the device units will have to
+> set the attribute flag of the decoding address window to select the
+> accurate coherency process for the memory transaction. This is done
+> each device driver programs the DRAM address windows. The value of the
+> attribute set by the driver is retrieved through the
+> orion_addr_map_cfg struct filled during the early initialization of
+> the platform.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Reviewed-by: Yehuda Yitschak <yehuday@marvell.com>
+> ---
+>   .../devicetree/bindings/arm/coherency-fabric.txt   |    9 ++-
+>   arch/arm/boot/dts/armada-370-xp.dtsi               |    3 +-
+>   arch/arm/mach-mvebu/addr-map.c                     |    3 +
+>   arch/arm/mach-mvebu/coherency.c                    |   73 ++++++++++++++++++++
+>   4 files changed, 85 insertions(+), 3 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+> index 2bfbf67..17d8cd1 100644
+> --- a/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+> +++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+> @@ -5,12 +5,17 @@ Available on Marvell SOCs: Armada 370 and Armada XP
+>   Required properties:
+>   
+>   - compatible: "marvell,coherency-fabric"
+> -- reg: Should contain,coherency fabric registers location and length.
+> +
+> +- reg: Should contain coherency fabric registers location and
+> +  length. First pair for the coherency fabric registers, second pair
+> +  for the per-CPU fabric registers registers.
+>   
+>   Example:
+>   
+>   coherency-fabric at d0020200 {
+>   	compatible = "marvell,coherency-fabric";
+> -	reg = <0xd0020200 0xb0>;
+> +	reg = <0xd0020200 0xb0>,
+> +		<0xd0021810 0x1c>;
+> +
+>   };
+>   
+> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> index b0d075b..98a6b26 100644
+> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> @@ -38,7 +38,8 @@
+>   
+>   	coherency-fabric at d0020200 {
+>   		compatible = "marvell,coherency-fabric";
+> -		reg = <0xd0020200 0xb0>;
+> +		reg = <0xd0020200 0xb0>,
+> +		      <0xd0021810 0x1c>;
+>   	};
+>   
+>   	soc {
+> diff --git a/arch/arm/mach-mvebu/addr-map.c b/arch/arm/mach-mvebu/addr-map.c
+> index fe454a4..595f6b7 100644
+> --- a/arch/arm/mach-mvebu/addr-map.c
+> +++ b/arch/arm/mach-mvebu/addr-map.c
+> @@ -108,6 +108,9 @@ static int __init armada_setup_cpu_mbus(void)
+>   
+>   	addr_map_cfg.bridge_virt_base = mbus_unit_addr_decoding_base;
+>   
+> +	if (of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric"))
+> +		addr_map_cfg.hw_io_coherency = 1;
+> +
+>   	/*
+>   	 * Disable, clear and configure windows.
+>   	 */
+> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+> index 20a0ccc..153fcfa 100644
+> --- a/arch/arm/mach-mvebu/coherency.c
+> +++ b/arch/arm/mach-mvebu/coherency.c
+> @@ -22,6 +22,8 @@
+>   #include <linux/of_address.h>
+>   #include <linux/io.h>
+>   #include <linux/smp.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/platform_device.h>
+>   #include <asm/smp_plat.h>
+>   #include "armada-370-xp.h"
+>   
+> @@ -32,11 +34,14 @@
+>    * value matching its virtual mapping
+>    */
+>   static void __iomem *coherency_base = ARMADA_370_XP_REGS_VIRT_BASE + 0x20200;
+> +static void __iomem *coherency_cpu_base;
+>   
+>   /* Coherency fabric registers */
+>   #define COHERENCY_FABRIC_CTL_OFFSET		   0x0
+>   #define COHERENCY_FABRIC_CFG_OFFSET		   0x4
+>   
+> +#define IO_SYNC_BARRIER_CTL_OFFSET		   0x0
+> +
+>   static struct of_device_id of_coherency_table[] = {
+>   	{.compatible = "marvell,coherency-fabric"},
+>   	{ /* end of list */ },
+> @@ -75,6 +80,70 @@ int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
+>   	return 0;
+>   }
+>   
+> +static inline void mvebu_hwcc_sync_io_barrier(void)
+> +{
+> +	writel(0x1, coherency_cpu_base + IO_SYNC_BARRIER_CTL_OFFSET);
+> +	while (readl(coherency_cpu_base + IO_SYNC_BARRIER_CTL_OFFSET) & 0x1);
+> +}
+> +
+> +static dma_addr_t mvebu_hwcc_dma_map_page(struct device *dev, struct page *page,
+> +				  unsigned long offset, size_t size,
+> +				  enum dma_data_direction dir,
+> +				  struct dma_attrs *attrs)
+> +{
+> +	if (dir != DMA_TO_DEVICE)
+> +		mvebu_hwcc_sync_io_barrier();
+> +	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
+> +}
+> +
+> +
+> +static void mvebu_hwcc_dma_unmap_page(struct device *dev, dma_addr_t dma_handle,
+> +			      size_t size, enum dma_data_direction dir,
+> +			      struct dma_attrs *attrs)
+> +{
+> +	if (dir != DMA_TO_DEVICE)
+> +		mvebu_hwcc_sync_io_barrier();
+> +}
+> +
+> +static void mvebu_hwcc_dma_sync(struct device *dev, dma_addr_t dma_handle,
+> +			size_t size, enum dma_data_direction dir)
+> +{
+> +	if (dir != DMA_TO_DEVICE)
+> +		mvebu_hwcc_sync_io_barrier();
+> +}
+> +
+> +static struct dma_map_ops mvebu_hwcc_dma_ops = {
+> +	.alloc			= arm_coherent_dma_alloc,
+> +	.free			= arm_coherent_dma_free,
 
-Fortunately we can easily probe the GIC to create a mapping as the
-Interrupt Processor Targets Registers for the first 32 interrupts are
-read-only, and each field returns a value that always corresponds to
-the processor reading the register.
+Are you sure that arm_coherent_dma_{alloc,free} are right functions for Your
+architecture? If I understand right, You need to do implicit synchronization
+(io barrier) between CPU transactions and device transactions.
 
-Initially all mappings target all CPUs in case an IPI is required to
-boot secondary CPUs.  It is refined as those CPUs discover what their
-actual mapping is.
+dma_alloc_coherent() provides memory which can be used simultaneously by 
+both
+CPU and devices, so without such barrier the memory won't be coherent.
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/common/gic.c | 45 ++++++++++++++++++++++++++++++++++++---------
- 1 file changed, 36 insertions(+), 9 deletions(-)
+IMHO You should use arm_dma_{alloc,free} functions as Your hardware is not
+truly coherent. Then Your mvebu_hwcc_dma_ops will look very similar to
+dmabounce_ops from arch/arm/common/dmabounce.c (custom functions only for
+map/unmap page and sync_single_for_cpu/device).
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 50c9eef..2203c92 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -70,6 +70,14 @@ struct gic_chip_data {
- static DEFINE_RAW_SPINLOCK(irq_controller_lock);
- 
- /*
-+ * The GIC mapping of CPU interfaces does not necessarily match
-+ * the logical CPU numbering.  Let's use a mapping as returned
-+ * by the GIC itself.
-+ */
-+#define NR_GIC_CPU_IF 8
-+static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
-+
-+/*
-  * Supported arch specific GIC irq extension.
-  * Default make them NULL.
-  */
-@@ -238,11 +246,11 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
- 	u32 val, mask, bit;
- 
--	if (cpu >= 8 || cpu >= nr_cpu_ids)
-+	if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
- 		return -EINVAL;
- 
- 	mask = 0xff << shift;
--	bit = 1 << (cpu_logical_map(cpu) + shift);
-+	bit = gic_cpu_map[cpu] << shift;
- 
- 	raw_spin_lock(&irq_controller_lock);
- 	val = readl_relaxed(reg) & ~mask;
-@@ -349,11 +357,6 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
- 	u32 cpumask;
- 	unsigned int gic_irqs = gic->gic_irqs;
- 	void __iomem *base = gic_data_dist_base(gic);
--	u32 cpu = cpu_logical_map(smp_processor_id());
--
--	cpumask = 1 << cpu;
--	cpumask |= cpumask << 8;
--	cpumask |= cpumask << 16;
- 
- 	writel_relaxed(0, base + GIC_DIST_CTRL);
- 
-@@ -366,6 +369,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
- 	/*
- 	 * Set all global interrupts to this CPU only.
- 	 */
-+	cpumask = readl_relaxed(base + GIC_DIST_TARGET + 0);
- 	for (i = 32; i < gic_irqs; i += 4)
- 		writel_relaxed(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
- 
-@@ -389,9 +393,25 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
- {
- 	void __iomem *dist_base = gic_data_dist_base(gic);
- 	void __iomem *base = gic_data_cpu_base(gic);
-+	unsigned int cpu_mask, cpu = smp_processor_id();
- 	int i;
- 
- 	/*
-+	 * Get what the GIC says our CPU mask is.
-+	 */
-+	BUG_ON(cpu >= NR_GIC_CPU_IF);
-+	cpu_mask = readl_relaxed(dist_base + GIC_DIST_TARGET + 0);
-+	gic_cpu_map[cpu] = cpu_mask;
-+
-+	/*
-+	 * Clear our mask from the other map entries in case they're
-+	 * still undefined.
-+	 */
-+	for (i = 0; i < NR_GIC_CPU_IF; i++)
-+		if (i != cpu)
-+			gic_cpu_map[i] &= ~cpu_mask;
-+
-+	/*
- 	 * Deal with the banked PPI and SGI interrupts - disable all
- 	 * PPI interrupts, ensure all SGI interrupts are enabled.
- 	 */
-@@ -654,7 +674,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- {
- 	irq_hw_number_t hwirq_base;
- 	struct gic_chip_data *gic;
--	int gic_irqs, irq_base;
-+	int gic_irqs, irq_base, i;
- 
- 	BUG_ON(gic_nr >= MAX_GIC_NR);
- 
-@@ -692,6 +712,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 	}
- 
- 	/*
-+	 * Initialize the CPU interface map to all CPUs.
-+	 * It will be refined as each CPU probes its ID.
-+	 */
-+	for (i = 0; i < NR_GIC_CPU_IF; i++)
-+		gic_cpu_map[i] = 0xff;
-+
-+	/*
- 	 * For primary GICs, skip over SGIs.
- 	 * For secondary GICs, skip over PPIs, too.
- 	 */
-@@ -746,7 +773,7 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 
- 	/* Convert our logical CPU mask into a physical one. */
- 	for_each_cpu(cpu, mask)
--		map |= 1 << cpu_logical_map(cpu);
-+		map |= gic_cpu_map[cpu];
- 
- 	/*
- 	 * Ensure that stores to Normal memory are visible to the
+> +	.mmap			= arm_dma_mmap,
+> +	.unmap_page		= mvebu_hwcc_dma_unmap_page,
+
+Please reorder entries to get map and unmap together.
+
+> +	.get_sgtable		= arm_dma_get_sgtable,
+> +	.map_page		= mvebu_hwcc_dma_map_page,
+> +	.map_sg			= arm_dma_map_sg,
+> +	.unmap_sg		= arm_dma_unmap_sg,
+> +	.sync_single_for_cpu	= mvebu_hwcc_dma_sync,
+> +	.sync_single_for_device	= mvebu_hwcc_dma_sync,
+> +	.sync_sg_for_cpu	= arm_dma_sync_sg_for_cpu,
+> +	.sync_sg_for_device	= arm_dma_sync_sg_for_device,
+> +	.set_dma_mask		= arm_dma_set_mask,
+> +};
+> +
+> +static int mvebu_hwcc_platform_notifier(struct notifier_block *nb,
+> +				       unsigned long event, void *__dev)
+> +{
+> +	struct device *dev = __dev;
+> +
+> +	if (event != BUS_NOTIFY_ADD_DEVICE)
+> +		return NOTIFY_DONE;
+> +	set_dma_ops(dev, &mvebu_hwcc_dma_ops);
+> +
+> +	return NOTIFY_OK;
+> +}
+> +
+> +static struct notifier_block mvebu_hwcc_platform_nb = {
+> +	.notifier_call = mvebu_hwcc_platform_notifier,
+> +};
+> +
+>   int __init coherency_init(void)
+>   {
+>   	struct device_node *np;
+> @@ -83,6 +152,10 @@ int __init coherency_init(void)
+>   	if (np) {
+>   		pr_info("Initializing Coherency fabric\n");
+>   		coherency_base = of_iomap(np, 0);
+> +		coherency_cpu_base = of_iomap(np, 1);
+> +		set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
+> +		bus_register_notifier(&platform_bus_type,
+> +					&mvebu_hwcc_platform_nb);
+>   	}
+>   
+>   	return 0;
+
+Best regards
 -- 
-1.7.12
+Marek Szyprowski
+Samsung Poland R&D Center
