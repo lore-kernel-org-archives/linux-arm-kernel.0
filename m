@@ -1,38 +1,29 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Sun, 18 Nov 2012 20:30:34 -0800
-Subject: [PATCH 1/2] clk: mvebu: armada 370/XP add clock gating control
- provider for DT
-In-Reply-To: <20121117135435.GA13479@lunn.ch>
-References: <1353014906-31566-6-git-send-email-andrew@lunn.ch>
- <1353088920-17458-1-git-send-email-gregory.clement@free-electrons.com>
- <1353088920-17458-2-git-send-email-gregory.clement@free-electrons.com>
- <20121117082602.GF24569@lunn.ch> <50A75BB4.4070003@free-electrons.com>
- <20121117135435.GA13479@lunn.ch>
-Message-ID: <20121119043034.21126.92888@nucleus>
+From: anton.vorontsov@linaro.org (Anton Vorontsov)
+Date: Sun, 18 Nov 2012 20:57:53 -0800
+Subject: [PATCH 0/4] Implement device tree support for ab8500 BM Devices
+In-Reply-To: <CAB4BAkvXZacDVZh2gzooH-Eq8Vnc8JLd=v8=9p-4mLfY0qWavw@mail.gmail.com>
+References: <1351698033-8980-1-git-send-email-rajanikanth.hv@linaro.org>
+ <20121119034600.GP29066@lizard.sbx05977.paloaca.wayport.net>
+ <CAB4BAkvXZacDVZh2gzooH-Eq8Vnc8JLd=v8=9p-4mLfY0qWavw@mail.gmail.com>
+Message-ID: <20121119045753.GA28159@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Andrew Lunn (2012-11-17 05:54:35)
-> > > What is the ddr clock for? Does bad things happen if you turn it off?
-> > > Kirkwood has a similar clock, dunit, which i decided not to export,
-> > > since when you turn it off, the whole SoC locks up.
-> > 
-> > Well of course if you code run in DDR then it could be a problem. But
-> > I think it could be useful to turn it off when going to suspend, it
-> > the DDR can do self-refresh. In this case it should be possible to run
-> > the code from SRAM or L2 Cache.
+On Mon, Nov 19, 2012 at 09:28:59AM +0530, Rajanikanth HV wrote:
+> > FWIW, I fixed these warnings.
+> >
+> >   CHECK   drivers/power/ab8500_bmdata.c
+> > drivers/power/ab8500_bmdata.c:146:23: warning: symbol 'temp_to_batres_tbl_thermistor' was not declared. Should it be static?
+> > drivers/power/ab8500_bmdata.c:160:23: warning: symbol 'temp_to_batres_tbl_ext_thermistor' was not declared. Should it be static?
+> > drivers/power/ab8500_bmdata.c:171:23: warning: symbol 'temp_to_batres_tbl_9100' was not declared. Should it be static?
+> > drivers/power/ab8500_bmdata.c:181:28: warning: symbol 'bat_type_thermistor' was not declared. Should it be static?
+> > drivers/power/ab8500_bmdata.c:267:28: warning: symbol 'bat_type_ext_thermistor' was not declared. Should it be static?
+> >
+> > Plus fixed a few stylistic issues.
 > 
-> O.K. Just watch out for the lateinit call in the clock framework.
-> 
+> thanks anton for validating my patch, you seems to have older version
+> of patch set,
+> i am rebasing  new version of patch set to 3.7-rc5, will communicate asap.
 
-CLK_IGNORE_UNUSED is the flag you want for this situation.
-
-Regards,
-Mike
-
->      Andrew
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Can you please rebase the new work on top of current battery tree (i.e. on
+top of the patches that you've sent)? Or that would be too much burden?
