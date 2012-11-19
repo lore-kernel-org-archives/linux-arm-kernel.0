@@ -1,40 +1,60 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 19 Nov 2012 11:00:15 +0100
+Date: Mon, 19 Nov 2012 11:01:44 +0100
 Subject: [RFC] dmaengine: omap-dma: Allow DMA controller to prefetch data
-In-Reply-To: <20121117113159.GM3332@n2100.arm.linux.org.uk>
+In-Reply-To: <20121018222046.GA28541@animalcreek.com>
 References: <20121018222046.GA28541@animalcreek.com>
- <20121018225540.GB28061@n2100.arm.linux.org.uk>
- <20121018232405.GA29064@animalcreek.com>
- <20121018233335.GC28061@n2100.arm.linux.org.uk> <50814B83.7090203@ti.com>
- <20121117113159.GM3332@n2100.arm.linux.org.uk>
-Message-ID: <50AA032F.1010102@ti.com>
+Message-ID: <50AA0388.4020803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/17/2012 12:31 PM, Russell King - ARM Linux wrote:
-> On Fri, Oct 19, 2012 at 02:45:55PM +0200, P?ter Ujfalusi wrote:
->> Hi,
->>
->> On 10/19/2012 01:33 AM, Russell King - ARM Linux wrote:
->>> I'm merely pointing out here that we need their feedback here before
->>> deciding if there's anything further that needs to happen.
->>
->> Thanks Russell, I'll take a look at the implication of the prefetch for audio.
+Hi,
+
+On 10/19/2012 12:20 AM, Mark A. Greer wrote:
+> Enable DMA prefetching by setting the 'OMAP_DMA_DST_SYNC_PREFETCH'
+> flag whenever there is a destination synchronized DMA transfer.
+> Prefetching is not allowed on source synchronized DMA transfers.
 > 
-> P?ter, any news?
+> Enabling prefetch significantly improves DMA performance.
+> For example, running 'modprobe tcrypt sec=2 mode=403' which
+> exercises the omap-sham driver on an am37x EVM yeilds the
+> following results:
 
-Sorry, I was carried away with other things...
-I did some testing with and without the dma prefetch for audio (on BeagleBoard
-with mplayer: -ao alsa/pulse).
-When we have prefetch enabled we tend to resume after pause from a slightly
-off place than when the prefetch is disabled.
-I also remember that in n9 we have had some issue with the DMA prefetch.
+>  drivers/dma/omap-dma.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+> index bb2d8e7..aadddb2 100644
+> --- a/drivers/dma/omap-dma.c
+> +++ b/drivers/dma/omap-dma.c
+> @@ -310,7 +310,7 @@ static struct dma_async_tx_descriptor *omap_dma_prep_slave_sg(
+>  		dev_addr = c->cfg.dst_addr;
+>  		dev_width = c->cfg.dst_addr_width;
+>  		burst = c->cfg.dst_maxburst;
+> -		sync_type = OMAP_DMA_DST_SYNC;
+> +		sync_type = OMAP_DMA_DST_SYNC | OMAP_DMA_DST_SYNC_PREFETCH;
 
-So I would for sure enable the prefetch for non cyclic DMA.
-For the cyclic I would not enable it for now. I need to dig a bit deeper in
-DMA/McBSP to have better view on the issue.
+This should be:
+ -		sync_type = OMAP_DMA_DST_SYNC;
+ +		sync_type = OMAP_DMA_DST_SYNC_PREFETCH;
 
-I have one comment to the patch itself as well.
+
+>  	} else {
+>  		dev_err(chan->device->dev, "%s: bad direction?\n", __func__);
+>  		return NULL;
+> @@ -387,7 +387,7 @@ static struct dma_async_tx_descriptor *omap_dma_prep_dma_cyclic(
+>  		dev_addr = c->cfg.dst_addr;
+>  		dev_width = c->cfg.dst_addr_width;
+>  		burst = c->cfg.dst_maxburst;
+> -		sync_type = OMAP_DMA_DST_SYNC;
+> +		sync_type = OMAP_DMA_DST_SYNC | OMAP_DMA_DST_SYNC_PREFETCH;
+
+We should not enable the prefetch for cyclic right now. We will investigate it
+more.
+
+>  	} else {
+>  		dev_err(chan->device->dev, "%s: bad direction?\n", __func__);
+>  		return NULL;
+> 
 
 -- 
 P?ter
