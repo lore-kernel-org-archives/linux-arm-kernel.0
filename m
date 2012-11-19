@@ -1,125 +1,104 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 19 Nov 2012 21:22:50 +0100
-Subject: [PATCHv2] ARM: sunxi: Add sunxi restart function via onchip watchdog
-Message-ID: <1353356570-25263-1-git-send-email-maxime.ripard@free-electrons.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 19 Nov 2012 22:17:31 +0200
+Subject: [PATCH 431/493] usb: remove use of __devexit
+In-Reply-To: <1353349642-3677-431-git-send-email-wfp5p@virginia.edu>
+References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
+ <1353349642-3677-431-git-send-email-wfp5p@virginia.edu>
+Message-ID: <20121119201731.GE24309@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- .../devicetree/bindings/watchdog/sunxi-wdt.txt     |   13 ++++++++
- arch/arm/boot/dts/sunxi.dtsi                       |    7 +++-
- arch/arm/mach-sunxi/sunxi.c                        |   34 ++++++++++++++++++++
- 3 files changed, 53 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
+Hi,
 
-diff --git a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-new file mode 100644
-index 0000000..0b27177
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-@@ -0,0 +1,13 @@
-+Allwinner sunXi Watchdog timer
-+
-+Required properties:
-+
-+- compatible : should be "allwinner,sunxi-wdt"
-+- reg : Specifies base physical address and size of the registers.
-+
-+Example:
-+
-+wdt: watchdog at 01c20c90 {
-+	compatible = "allwinner,sunxi-wdt";
-+	reg = <0x01c20c90 0x10>;
-+};
-diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
-index 8284fbd..8bbc2bf 100644
---- a/arch/arm/boot/dts/sunxi.dtsi
-+++ b/arch/arm/boot/dts/sunxi.dtsi
-@@ -42,11 +42,16 @@
- 
- 		timer at 01c20c00 {
- 			compatible = "allwinner,sunxi-timer";
--			reg = <0x01c20c00 0x400>;
-+			reg = <0x01c20c00 0x90>;
- 			interrupts = <22>;
- 			clocks = <&osc>;
- 		};
- 
-+		wdt: watchdog at 01c20c90 {
-+			compatible = "allwinner,sunxi-wdt";
-+			reg = <0x01c20c90 0x10>;
-+		};
-+
- 		intc: interrupt-controller at 01c20400 {
- 			compatible = "allwinner,sunxi-ic";
- 			reg = <0x01c20400 0x400>;
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 13d4d96..dc634ae 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -12,6 +12,7 @@
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/io.h>
-@@ -26,6 +27,36 @@
- 
- #include "sunxi.h"
- 
-+#define WATCHDOG_CTRL_REG	0x00
-+#define WATCHDOG_MODE_REG	0x04
-+
-+static void __iomem *wdt_base;
-+
-+static void sunxi_setup_restart(void)
-+{
-+	struct device_node *np = of_find_compatible_node(NULL, NULL,
-+						"allwinner,sunxi-wdt");
-+	if (WARN(!np, "unable to setup watchdog restart"))
-+		return;
-+
-+	wdt_base = of_iomap(np, 0);
-+	WARN(!wdt_base, "failed to map watchdog base address");
-+}
-+
-+static void sunxi_restart(char mode, const char *cmd)
-+{
-+	if (!wdt_base)
-+		return;
-+
-+	/* Enable timer and set reset bit in the watchdog */
-+	writel(3, wdt_base + WATCHDOG_MODE_REG);
-+	writel(0xa57 << 1 | 1, wdt_base + WATCHDOG_CTRL_REG);
-+	while(1) {
-+		mdelay(5);
-+		writel(3, wdt_base + WATCHDOG_MODE_REG);
-+	}
-+}
-+
- static struct map_desc sunxi_io_desc[] __initdata = {
- 	{
- 		.virtual	= (unsigned long) SUNXI_REGS_VIRT_BASE,
-@@ -42,6 +73,8 @@ void __init sunxi_map_io(void)
- 
- static void __init sunxi_dt_init(void)
- {
-+	sunxi_setup_restart();
-+
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-@@ -56,6 +89,7 @@ DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
- 	.map_io		= sunxi_map_io,
- 	.init_irq	= sunxi_init_irq,
- 	.handle_irq	= sunxi_handle_irq,
-+	.restart	= sunxi_restart,
- 	.timer		= &sunxi_timer,
- 	.dt_compat	= sunxi_board_dt_compat,
- MACHINE_END
+On Mon, Nov 19, 2012 at 01:26:20PM -0500, Bill Pemberton wrote:
+> CONFIG_HOTPLUG is going away as an option so __devexit is no
+> longer needed.
+> 
+> Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
+> Cc: Peter Korsgaard <jacmet@sunsite.dk> 
+> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com> 
+> Cc: Felipe Balbi <balbi@ti.com> 
+> Cc: Li Yang <leoli@freescale.com> 
+> Cc: Alan Stern <stern@rowland.harvard.edu> 
+> Cc: Wan ZongShun <mcuos.com@gmail.com> 
+> Cc: Ben Dooks <ben-linux@fluff.org> 
+> Cc: Kukjin Kim <kgene.kim@samsung.com> 
+> Cc: linux-usb at vger.kernel.org 
+> Cc: linux-omap at vger.kernel.org 
+> Cc: linuxppc-dev at lists.ozlabs.org 
+> Cc: linux-arm-kernel at lists.infradead.org 
+> Cc: linux-samsung-soc at vger.kernel.org 
+> ---
+>  drivers/usb/c67x00/c67x00-drv.c      |  2 +-
+>  drivers/usb/chipidea/ci13xxx_imx.c   |  2 +-
+>  drivers/usb/chipidea/ci13xxx_msm.c   |  2 +-
+>  drivers/usb/chipidea/ci13xxx_pci.c   |  2 +-
+>  drivers/usb/chipidea/core.c          |  2 +-
+>  drivers/usb/chipidea/usbmisc_imx6q.c |  2 +-
+>  drivers/usb/dwc3/core.c              |  2 +-
+>  drivers/usb/dwc3/debugfs.c           |  2 +-
+>  drivers/usb/dwc3/dwc3-exynos.c       |  2 +-
+>  drivers/usb/dwc3/dwc3-omap.c         |  2 +-
+>  drivers/usb/dwc3/dwc3-pci.c          |  2 +-
+>  drivers/usb/gadget/bcm63xx_udc.c     |  2 +-
+>  drivers/usb/gadget/fsl_qe_udc.c      |  2 +-
+>  drivers/usb/gadget/hid.c             |  2 +-
+>  drivers/usb/gadget/lpc32xx_udc.c     |  2 +-
+>  drivers/usb/gadget/mv_u3d_core.c     |  2 +-
+>  drivers/usb/gadget/mv_udc_core.c     |  2 +-
+>  drivers/usb/gadget/net2272.c         | 10 +++++-----
+>  drivers/usb/gadget/omap_udc.c        |  2 +-
+>  drivers/usb/gadget/s3c-hsotg.c       |  4 ++--
+>  drivers/usb/host/bcma-hcd.c          |  2 +-
+>  drivers/usb/host/ehci-atmel.c        |  2 +-
+>  drivers/usb/host/ehci-msm.c          |  2 +-
+>  drivers/usb/host/ehci-platform.c     |  2 +-
+>  drivers/usb/host/ehci-s5p.c          |  2 +-
+>  drivers/usb/host/ehci-w90x900.c      |  2 +-
+>  drivers/usb/host/fhci-hcd.c          |  4 ++--
+>  drivers/usb/host/fsl-mph-dr-of.c     |  4 ++--
+>  drivers/usb/host/isp1362-hcd.c       |  2 +-
+>  drivers/usb/host/isp1760-if.c        |  2 +-
+>  drivers/usb/host/ohci-at91.c         |  6 +++---
+>  drivers/usb/host/ohci-exynos.c       |  2 +-
+>  drivers/usb/host/ohci-jz4740.c       |  2 +-
+>  drivers/usb/host/ohci-omap3.c        |  2 +-
+>  drivers/usb/host/ohci-platform.c     |  2 +-
+>  drivers/usb/host/ohci-s3c2410.c      |  2 +-
+>  drivers/usb/host/ohci-tmio.c         |  2 +-
+>  drivers/usb/host/r8a66597-hcd.c      |  2 +-
+>  drivers/usb/host/sl811-hcd.c         |  2 +-
+>  drivers/usb/host/ssb-hcd.c           |  4 ++--
+>  drivers/usb/host/u132-hcd.c          |  2 +-
+>  drivers/usb/musb/am35x.c             |  2 +-
+>  drivers/usb/musb/blackfin.c          |  2 +-
+>  drivers/usb/musb/da8xx.c             |  2 +-
+>  drivers/usb/musb/davinci.c           |  2 +-
+>  drivers/usb/musb/musb_core.c         |  2 +-
+>  drivers/usb/musb/musb_dsps.c         |  2 +-
+>  drivers/usb/musb/omap2430.c          |  2 +-
+>  drivers/usb/musb/tusb6010.c          |  2 +-
+>  drivers/usb/musb/ux500.c             |  2 +-
+>  drivers/usb/otg/ab8500-usb.c         |  2 +-
+>  drivers/usb/otg/fsl_otg.c            |  2 +-
+>  drivers/usb/otg/msm_otg.c            |  2 +-
+>  drivers/usb/otg/mxs-phy.c            |  2 +-
+>  drivers/usb/otg/nop-usb-xceiv.c      |  2 +-
+>  drivers/usb/phy/omap-usb2.c          |  2 +-
+>  drivers/usb/phy/rcar-phy.c           |  2 +-
+>  drivers/usb/renesas_usbhs/common.c   |  2 +-
+
+For drivers/usb/gadget, drivers/usb/dwc3/, drivers/usb/musb/,
+drivers/usb/otg/, drivers/usb/phy, and drivers/usb/renesas_usbhs:
+
+Acked-by: Felipe Balbi <balbi@ti.com>
+
 -- 
-1.7.9.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121119/ce449069/attachment.sig>
