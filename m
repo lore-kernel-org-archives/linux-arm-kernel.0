@@ -1,118 +1,183 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Mon, 19 Nov 2012 12:03:50 -0700
-Subject: [PATCH 5/7] crypto: omap-aes: Convert to use pm_runtime API
+Date: Mon, 19 Nov 2012 12:03:47 -0700
+Subject: [PATCH 2/7] ARM: OMAP3xxx: hwmod: Convert AES crypto device data to
+ hwmod
 In-Reply-To: <1353351832-6685-1-git-send-email-mgreer@animalcreek.com>
 References: <1353351832-6685-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1353351832-6685-6-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1353351832-6685-3-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-Convert the omap-aes crypto driver to use the
-pm_runtime API instead of the clk API.
+Convert the device data for the OMAP3 AES crypto IP
+from explicit platform_data to hwmod.
 
-CC: Kevin Hilman <khilman@deeprootsystems.com>
 CC: Paul Walmsley <paul@pwsan.com>
-CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
 Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 ---
- drivers/crypto/omap-aes.c | 29 +++++++++++------------------
- 1 file changed, 11 insertions(+), 18 deletions(-)
+ arch/arm/mach-omap2/clock3xxx_data.c       |  1 +
+ arch/arm/mach-omap2/devices.c              | 42 +-------------------
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 62 ++++++++++++++++++++++++++++++
+ 3 files changed, 65 insertions(+), 40 deletions(-)
 
-diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index 628c3cc..75b842d 100644
---- a/drivers/crypto/omap-aes.c
-+++ b/drivers/crypto/omap-aes.c
-@@ -19,10 +19,10 @@
- #include <linux/init.h>
- #include <linux/errno.h>
- #include <linux/kernel.h>
--#include <linux/clk.h>
- #include <linux/platform_device.h>
- #include <linux/scatterlist.h>
- #include <linux/dma-mapping.h>
-+#include <linux/pm_runtime.h>
- #include <linux/io.h>
- #include <linux/crypto.h>
- #include <linux/interrupt.h>
-@@ -97,7 +97,6 @@ struct omap_aes_dev {
- 	struct list_head	list;
- 	unsigned long		phys_base;
- 	void __iomem		*io_base;
--	struct clk		*iclk;
- 	struct omap_aes_ctx	*ctx;
- 	struct device		*dev;
- 	unsigned long		flags;
-@@ -181,7 +180,7 @@ static int omap_aes_hw_init(struct omap_aes_dev *dd)
- 	 * It may be long delays between requests.
- 	 * Device might go to off mode to save power.
- 	 */
--	clk_enable(dd->iclk);
-+	pm_runtime_get_sync(dd->dev);
+diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
+index 6f14d9b..ceb4153 100644
+--- a/arch/arm/mach-omap2/clock3xxx_data.c
++++ b/arch/arm/mach-omap2/clock3xxx_data.c
+@@ -3341,6 +3341,7 @@ static struct omap_clk omap3xxx_clks[] = {
+ 	CLK(NULL,	"mmchs3_ick",	&mmchs3_ick,	CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+ 	CLK(NULL,	"icr_ick",	&icr_ick,	CK_34XX | CK_36XX),
+ 	CLK("omap-aes",	"ick",	&aes2_ick,	CK_34XX | CK_36XX),
++	CLK(NULL,	"aes2_ick",	&aes2_ick,	CK_34XX | CK_36XX),
+ 	CLK("omap-sham",	"ick",	&sha12_ick,	CK_34XX | CK_36XX),
+ 	CLK(NULL,	"sha12_ick",	&sha12_ick,	CK_34XX | CK_36XX),
+ 	CLK(NULL,	"des2_ick",	&des2_ick,	CK_34XX | CK_36XX),
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 58831e5..6a9152a 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -468,38 +468,9 @@ static void __init omap_init_sham(void)
+ 	WARN(IS_ERR(pdev), "Can't build omap_device for omap-sham\n");
+ }
  
- 	if (!(dd->flags & FLAGS_INIT)) {
- 		/* is it necessary to reset before every operation? */
-@@ -546,7 +545,7 @@ static void omap_aes_finish_req(struct omap_aes_dev *dd, int err)
- 
- 	pr_debug("err: %d\n", err);
- 
--	clk_disable(dd->iclk);
-+	pm_runtime_put_sync(dd->dev);
- 	dd->flags &= ~FLAGS_BUSY;
- 
- 	req->base.complete(&req->base, err);
-@@ -841,26 +840,21 @@ static int omap_aes_probe(struct platform_device *pdev)
- 	else
- 		dd->dma_in = res->start;
- 
--	/* Initializing the clock */
--	dd->iclk = clk_get(dev, "ick");
--	if (IS_ERR(dd->iclk)) {
--		dev_err(dev, "clock intialization failed.\n");
--		err = PTR_ERR(dd->iclk);
--		goto err_res;
--	}
+-#if defined(CONFIG_CRYPTO_DEV_OMAP_AES) || defined(CONFIG_CRYPTO_DEV_OMAP_AES_MODULE)
 -
- 	dd->io_base = ioremap(dd->phys_base, SZ_4K);
- 	if (!dd->io_base) {
- 		dev_err(dev, "can't ioremap\n");
- 		err = -ENOMEM;
--		goto err_io;
-+		goto err_res;
+-#ifdef CONFIG_ARCH_OMAP3
+-static struct resource omap3_aes_resources[] = {
+-	{
+-		.start	= OMAP34XX_SEC_AES_BASE,
+-		.end	= OMAP34XX_SEC_AES_BASE + 0x4C,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	{
+-		.start	= OMAP34XX_DMA_AES2_TX,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	{
+-		.start	= OMAP34XX_DMA_AES2_RX,
+-		.flags	= IORESOURCE_DMA,
+-	}
+-};
+-static int omap3_aes_resources_sz = ARRAY_SIZE(omap3_aes_resources);
+-#else
+-#define omap3_aes_resources		NULL
+-#define omap3_aes_resources_sz		0
+-#endif
+-
+-static struct platform_device aes_device = {
+-	.name		= "omap-aes",
+-	.id		= -1,
+-};
+-
+-static void omap_init_aes(void)
++static void __init omap_init_aes(void)
+ {
+-	if (cpu_is_omap24xx()) {
++	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+ 		struct omap_hwmod *oh;
+ 		struct platform_device *pdev;
+ 
+@@ -510,20 +481,11 @@ static void omap_init_aes(void)
+ 		pdev = omap_device_build("omap-aes", -1, oh, NULL, 0, NULL,
+ 					 0, 0);
+ 		WARN(IS_ERR(pdev), "Can't build omap_device for omap-aes\n");
+-	} else if (cpu_is_omap34xx()) {
+-		aes_device.resource = omap3_aes_resources;
+-		aes_device.num_resources = omap3_aes_resources_sz;
+-		platform_device_register(&aes_device);
+ 	} else {
+ 		pr_err("%s: platform not supported\n", __func__);
+-		return;
  	}
+ }
  
--	clk_enable(dd->iclk);
-+	pm_runtime_enable(dev);
-+	pm_runtime_get_sync(dev);
-+
- 	reg = omap_aes_read(dd, AES_REG_REV);
- 	dev_info(dev, "OMAP AES hw accel rev: %u.%u\n",
- 		 (reg & AES_REG_REV_MAJOR) >> 4, reg & AES_REG_REV_MINOR);
--	clk_disable(dd->iclk);
-+
-+	pm_runtime_put_sync(dev);
+-#else
+-static inline void omap_init_aes(void) { }
+-#endif
+-
+ /*-------------------------------------------------------------------------*/
  
- 	tasklet_init(&dd->done_task, omap_aes_done_task, (unsigned long)dd);
- 	tasklet_init(&dd->queue_task, omap_aes_queue_task, (unsigned long)dd);
-@@ -892,8 +886,7 @@ err_dma:
- 	tasklet_kill(&dd->done_task);
- 	tasklet_kill(&dd->queue_task);
- 	iounmap(dd->io_base);
--err_io:
--	clk_put(dd->iclk);
-+	pm_runtime_disable(dev);
- err_res:
- 	kfree(dd);
- 	dd = NULL;
-@@ -921,7 +914,7 @@ static int omap_aes_remove(struct platform_device *pdev)
- 	tasklet_kill(&dd->queue_task);
- 	omap_aes_dma_cleanup(dd);
- 	iounmap(dd->io_base);
--	clk_put(dd->iclk);
-+	pm_runtime_disable(dd->dev);
- 	kfree(dd);
- 	dd = NULL;
+ #if defined(CONFIG_VIDEO_OMAP2_VOUT) || \
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index a65972b..3b82304 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -3608,6 +3608,67 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__sham = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++/* l4_core -> AES */
++static struct omap_hwmod_sysc_fields omap3xxx_aes_sysc_fields = {
++	.sidle_shift	= 6,
++	.srst_shift	= 1,
++	.autoidle_shift	= 0,
++};
++
++static struct omap_hwmod_class_sysconfig omap3_aes_sysc = {
++	.rev_offs	= 0x44,
++	.sysc_offs	= 0x48,
++	.syss_offs	= 0x4c,
++	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
++			   SYSC_HAS_AUTOIDLE | SYSS_HAS_RESET_STATUS),
++	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
++	.sysc_fields	= &omap3xxx_aes_sysc_fields,
++};
++
++static struct omap_hwmod_class omap3xxx_aes_class = {
++	.name	= "aes",
++	.sysc	= &omap3_aes_sysc,
++};
++
++struct omap_hwmod_dma_info omap3_aes_sdma_reqs[] = {
++	{ .name = "tx", .dma_req = OMAP34XX_DMA_AES2_TX, },
++	{ .name = "rx", .dma_req = OMAP34XX_DMA_AES2_RX, },
++	{ .dma_req = -1 }
++};
++
++struct omap_hwmod omap3xxx_aes_hwmod = {
++	.name		= "aes",
++	.sdma_reqs	= omap3_aes_sdma_reqs,
++	.main_clk	= "aes2_ick",
++	.prcm		= {
++		.omap2 = {
++			.module_offs = CORE_MOD,
++			.prcm_reg_id = 1,
++			.module_bit = OMAP3430_EN_AES2_SHIFT,
++			.idlest_reg_id = 1,
++			.idlest_idle_bit = OMAP3430_ST_AES2_SHIFT,
++		},
++	},
++	.class		= &omap3xxx_aes_class,
++};
++
++static struct omap_hwmod_addr_space omap3xxx_aes_addrs[] = {
++	{
++		.pa_start	= 0x480c5000,
++		.pa_end		= 0x480c5000 + 0x50 - 1,
++		.flags		= ADDR_TYPE_RT
++	},
++	{ }
++};
++
++static struct omap_hwmod_ocp_if omap3xxx_l4_core__aes = {
++	.master		= &omap3xxx_l4_core_hwmod,
++	.slave		= &omap3xxx_aes_hwmod,
++	.clk		= "aes2_ick",
++	.addr		= omap3xxx_aes_addrs,
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
+ 	&omap3xxx_l3_main__l4_core,
+ 	&omap3xxx_l3_main__l4_per,
+@@ -3662,6 +3723,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
+ static struct omap_hwmod_ocp_if *omap3xxx_gp_hwmod_ocp_ifs[] __initdata = {
+ 	&omap3xxx_l4_sec__timer12,
+ 	&omap3xxx_l4_core__sham,
++	&omap3xxx_l4_core__aes,
+ 	NULL
+ };
  
 -- 
 1.7.12
