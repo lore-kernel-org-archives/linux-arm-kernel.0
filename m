@@ -1,37 +1,34 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 19 Nov 2012 16:26:16 +0000
-Subject: [PATCH v3] video: Versatile Express DVI output driver
-In-Reply-To: <201211191543.51923.arnd@arndb.de>
-References: <1350405036-17997-1-git-send-email-pawel.moll@arm.com>
- <1351612732.6199.4.camel@hornet> <1353333377.3303.7.camel@hornet>
- <201211191543.51923.arnd@arndb.de>
-Message-ID: <1353342376.3303.32.camel@hornet>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 19 Nov 2012 10:27:18 -0600
+Subject: [PATCH v2 1/2] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
+In-Reply-To: <1353251201-10990-1-git-send-email-grinberg@compulab.co.il>
+References: <1353251201-10990-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <50AA5DE6.4080700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-11-19 at 15:43 +0000, Arnd Bergmann wrote:
-> * vexpress_dvi_fb_select uses the 'fb' argument as an index into
->   the registered_fb array, but does not check for overflow against
->   FB_MAX. 
 
-Uh, right. Will fix in a second.
+On 11/18/2012 09:06 AM, Igor Grinberg wrote:
+> CONFIG_OMAP_32K_TIMER is kind of standing on the single zImage way.
+> Make OMAP2+ timer code independant from the CONFIG_OMAP_32K_TIMER
+> setting.
+> To remove the dependancy, several conversions/additions had to be done:
+> 1) Timer initialization functions are named by the platform
+>    name and the clock source in use.
+>    This also makes it possible to define and use the GPTIMER as the
+>    clock source instead of the 32K timer on platforms that do not have
+>    the 32K timer ip block or the 32K timer is not wired on the board.
+>    Cirrently, the the timer is chosen in the machine_desc structure on
 
-> I think you need to use get_fb_info().
+Nit ...
 
-I was considering this, but it's a static. And I don't want to change
-the fb core, as I'm planning to plug this driver into the "Generic
-Panel/Display Framework" [1] that Laurent is working on when it's
-available. Then I won't have to hack into the core at all...
+s/Cirrently/Currently
 
-[1] http://thread.gmane.org/gmane.linux.drivers.video-input-infrastructure/52565
+Otherwise ...
 
-> * There is no documentation for the newly introduced sysfs interface.
+Reviewed-by: Jon Hunter <jon-hunter@ti.com>
 
-Hm, I didn't want to do that, as it's currently just a debug feature -
-there is no class symlink to the device available
-(Documentation/ABI/testing/sysfs-devices) so there's no universal way of
-describing the path to the device.
+Thanks for updating this!
 
-I'll do my best and post v4 soon.
-
-Pawe?
+Cheers
+Jon
