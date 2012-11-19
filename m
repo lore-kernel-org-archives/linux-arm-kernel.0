@@ -1,123 +1,38 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 15:27:01 +0100
-Subject: [PATCH 2/2] arm: mvebu: remove 'clock-frequency' properties from
- Armada 370/XP Ethernet nodes
-In-Reply-To: <1353335221-26516-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1353335221-26516-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353335221-26516-3-git-send-email-thomas.petazzoni@free-electrons.com>
+From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Mon, 19 Nov 2012 16:32:36 +0200
+Subject: [PATCH] ARM: add get_user() support for 8 byte types
+In-Reply-To: <201211151439.41393.arnd@arndb.de>
+References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
+ <201211151339.08016.arnd@arndb.de>
+ <CAF6AEGuJReNtwUZX6HVZCE8GHuyEAyC8bM0GqZuVMV1=DrGJVw@mail.gmail.com>
+ <201211151439.41393.arnd@arndb.de>
+Message-ID: <20121119143236.GA3296@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvneta driver for the Marvell Armada 370/XP Ethernet devices has
-gained proper clock framework integration, and the corresponding
-Device Tree nodes now have a correct 'clocks' pointer.
+On Thu, Nov 15, 2012 at 02:39:41PM +0000, Arnd Bergmann wrote:
+> On Thursday 15 November 2012, Rob Clark wrote:
+> > > I still haven't heard a conclusive argument why we need to use get_user()
+> > > rather than copy_from_user() in the DRM code. Is this about a fast path
+> > > where you want to shave off a few cycles for each call, or does this
+> > > simplify the code structure, or something else?
+> > 
+> > well, it is mostly because it seemed like a good idea to first try to
+> > solve the root issue, rather than having to fix things up in each
+> > driver when someone from x86-world introduces a 64b get_user()..
+> 
+> As pointed out by hpa earlier, x86-32 doesn't have a 64b get_user
+> either. I don't think we have a lot of drivers that are used only
+> on 64-bit x86 and on 32-bit ARM but not on 32-bit x86.
 
-The 'clock-frequency' properties in the various .dts files for Armada
-370/XP boards have therefore become useless.
+Ouch. I didn't realize that x86-32 doesn't have it. All the systems
+where I've run the new code are 64bit so I never noticed the problem.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-db.dts              |    2 --
- arch/arm/boot/dts/armada-370-mirabox.dts         |    2 --
- arch/arm/boot/dts/armada-xp-db.dts               |    4 ----
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    4 ----
- 4 files changed, 12 deletions(-)
+I see there was a patch [1] posted a long time ago to implement 64bit
+get_user() on x86-32. I wonder what happened to it?
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index 1c04ecb..2b57f0c 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -46,13 +46,11 @@
- 		};
- 
- 		ethernet at d0070000 {
--			clock-frequency = <200000000>;
- 			status = "okay";
- 			phy = <&phy0>;
- 			phy-mode = "rgmii-id";
- 		};
- 		ethernet at d0074000 {
--			clock-frequency = <200000000>;
- 			status = "okay";
- 			phy = <&phy1>;
- 			phy-mode = "rgmii-id";
-diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-index 8554dbe..3b40713 100644
---- a/arch/arm/boot/dts/armada-370-mirabox.dts
-+++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-@@ -43,13 +43,11 @@
- 			};
- 		};
- 		ethernet at d0070000 {
--			clock-frequency = <200000000>;
- 			status = "okay";
- 			phy = <&phy0>;
- 			phy-mode = "rgmii-id";
- 		};
- 		ethernet at d0074000 {
--			clock-frequency = <200000000>;
- 			status = "okay";
- 			phy = <&phy1>;
- 			phy-mode = "rgmii-id";
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index 6663706..b335554 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -66,25 +66,21 @@
- 		};
- 
- 		ethernet at d0070000 {
--			clock-frequency = <250000000>;
- 			status = "okay";
- 			phy = <&phy0>;
- 			phy-mode = "rgmii-id";
- 		};
- 		ethernet at d0074000 {
--			clock-frequency = <250000000>;
- 			status = "okay";
- 			phy = <&phy1>;
- 			phy-mode = "rgmii-id";
- 		};
- 		ethernet at d0030000 {
--			clock-frequency = <250000000>;
- 			status = "okay";
- 			phy = <&phy2>;
- 			phy-mode = "sgmii";
- 		};
- 		ethernet at d0034000 {
--			clock-frequency = <250000000>;
- 			status = "okay";
- 			phy = <&phy3>;
- 			phy-mode = "sgmii";
-diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index c46a14f..158dd0e 100644
---- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -100,25 +100,21 @@
- 		};
- 
- 		ethernet at d0070000 {
--			clock-frequency = <250000000>;
- 			status = "okay";
- 			phy = <&phy0>;
- 			phy-mode = "sgmii";
- 		};
- 		ethernet at d0074000 {
--			clock-frequency = <250000000>;
- 			status = "okay";
- 			phy = <&phy1>;
- 			phy-mode = "sgmii";
- 		};
- 		ethernet at d0030000 {
--			clock-frequency = <250000000>;
- 			status = "okay";
- 			phy = <&phy2>;
- 			phy-mode = "sgmii";
- 		};
- 		ethernet at d0034000 {
--			clock-frequency = <250000000>;
- 			status = "okay";
- 			phy = <&phy3>;
- 			phy-mode = "sgmii";
+[1] https://lkml.org/lkml/2004/4/20/96
+
 -- 
-1.7.9.5
+Ville Syrj?l?
+Intel OTC
