@@ -1,96 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 19 Nov 2012 16:21:22 +0000
-Subject: [PATCH v4 07/14] KVM: ARM: Inject IRQs and FIQs from userspace
-In-Reply-To: <CANM98q+ts0s1DJO8CxjSDorh1wztjKKU5WdkoAGeWRrSUNi9DA@mail.gmail.com>
-References: <20121110154203.2836.46686.stgit@chazy-air>
- <20121110154259.2836.49857.stgit@chazy-air>
- <20121119145546.GZ3205@mudshark.cambridge.arm.com>
- <CANM98qJmkZZ2H+y8sdxBoT6WRgzcFSmKkTPWQnONDhezx5GEQQ@mail.gmail.com>
- <20121119152629.GH3205@mudshark.cambridge.arm.com>
- <CANM98q+ts0s1DJO8CxjSDorh1wztjKKU5WdkoAGeWRrSUNi9DA@mail.gmail.com>
-Message-ID: <20121119162122.GI3205@mudshark.cambridge.arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 19 Nov 2012 16:26:16 +0000
+Subject: [PATCH v3] video: Versatile Express DVI output driver
+In-Reply-To: <201211191543.51923.arnd@arndb.de>
+References: <1350405036-17997-1-git-send-email-pawel.moll@arm.com>
+ <1351612732.6199.4.camel@hornet> <1353333377.3303.7.camel@hornet>
+ <201211191543.51923.arnd@arndb.de>
+Message-ID: <1353342376.3303.32.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 04:09:06PM +0000, Christoffer Dall wrote:
-> On Mon, Nov 19, 2012 at 10:26 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Nov 19, 2012 at 03:04:38PM +0000, Christoffer Dall wrote:
-> In all seriousness, I will unite myself with an alcoholic beverage one
-> of these evenings and try to see what I can do about it, maybe split
-> it up somehow, I'll give it a shot.
+On Mon, 2012-11-19 at 15:43 +0000, Arnd Bergmann wrote:
+> * vexpress_dvi_fb_select uses the 'fb' argument as an index into
+>   the registered_fb array, but does not check for overflow against
+>   FB_MAX. 
 
-So this might be to do with the way you've split up the patches (likely I'll
-have similar complaints against the vGIC code, but at least it will make
-sense there!)...
+Uh, right. Will fix in a second.
 
-> >> >> +int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level)
-> >> >> +{
-> >> >> +       u32 irq = irq_level->irq;
-> >> >> +       unsigned int irq_type, vcpu_idx, irq_num;
-> >> >> +       int nrcpus = atomic_read(&kvm->online_vcpus);
-> >> >> +       struct kvm_vcpu *vcpu = NULL;
-> >> >> +       bool level = irq_level->level;
-> >> >> +
-> >> >> +       irq_type = (irq >> KVM_ARM_IRQ_TYPE_SHIFT) & KVM_ARM_IRQ_TYPE_MASK;
-> >> >> +       vcpu_idx = (irq >> KVM_ARM_IRQ_VCPU_SHIFT) & KVM_ARM_IRQ_VCPU_MASK;
-> >> >> +       irq_num = (irq >> KVM_ARM_IRQ_NUM_SHIFT) & KVM_ARM_IRQ_NUM_MASK;
-> >> >> +
-> >> >> +       trace_kvm_irq_line(irq_type, vcpu_idx, irq_num, irq_level->level);
-> >> >> +
-> >> >> +       if (irq_type == KVM_ARM_IRQ_TYPE_CPU ||
-> >> >> +           irq_type == KVM_ARM_IRQ_TYPE_PPI) {
-> >> >> +               if (vcpu_idx >= nrcpus)
-> >> >> +                       return -EINVAL;
-> >> >> +
-> >> >> +               vcpu = kvm_get_vcpu(kvm, vcpu_idx);
-> >> >> +               if (!vcpu)
-> >> >> +                       return -EINVAL;
-> >> >> +       }
-> >> >> +
-> >> >> +       switch (irq_type) {
-> >> >> +       case KVM_ARM_IRQ_TYPE_CPU:
-> >> >> +               if (irq_num > KVM_ARM_IRQ_CPU_FIQ)
-> >> >> +                       return -EINVAL;
-> >> >> +
-> >> >> +               return vcpu_interrupt_line(vcpu, irq_num, level);
-> >> >> +       }
-> >> >> +
-> >> >> +       return -EINVAL;
-> >> >> +}
+> I think you need to use get_fb_info().
 
-This obviously doesn't handle PPIs, which is where the confusion lies. You
-can just as easily write it as:
+I was considering this, but it's a static. And I don't want to change
+the fb core, as I'm planning to plug this driver into the "Generic
+Panel/Display Framework" [1] that Laurent is working on when it's
+available. Then I won't have to hack into the core at all...
 
-int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level)
-{
-	u32 irq = irq_level->irq;
-	unsigned int irq_type, vcpu_idx, irq_num;
-	int nrcpus = atomic_read(&kvm->online_vcpus);
-	struct kvm_vcpu *vcpu = NULL;
-	bool level = irq_level->level;
+[1] http://thread.gmane.org/gmane.linux.drivers.video-input-infrastructure/52565
 
-	irq_type = (irq >> KVM_ARM_IRQ_TYPE_SHIFT) & KVM_ARM_IRQ_TYPE_MASK;
-	vcpu_idx = (irq >> KVM_ARM_IRQ_VCPU_SHIFT) & KVM_ARM_IRQ_VCPU_MASK;
-	irq_num = (irq >> KVM_ARM_IRQ_NUM_SHIFT) & KVM_ARM_IRQ_NUM_MASK;
+> * There is no documentation for the newly introduced sysfs interface.
 
-	trace_kvm_irq_line(irq_type, vcpu_idx, irq_num, irq_level->level);
+Hm, I didn't want to do that, as it's currently just a debug feature -
+there is no class symlink to the device available
+(Documentation/ABI/testing/sysfs-devices) so there's no universal way of
+describing the path to the device.
 
-	if (irq_type != KVM_ARM_IRQ_TYPE_CPU)
-		return -EINVAL;
+I'll do my best and post v4 soon.
 
-	if (vcpu_idx >= nrcpus)
-		return -EINVAL;
-
-	vcpu = kvm_get_vcpu(kvm, vcpu_idx);
-	if (!vcpu)
-		return -EINVAL;
-
-	if (irq_num > KVM_ARM_IRQ_CPU_FIQ)
-		return -EINVAL;
-
-	return vcpu_interrupt_line(vcpu, irq_num, level);
-}
-
-Then add all the IRQ complexity in a later patch!
-
-Will
+Pawe?
