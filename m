@@ -1,40 +1,63 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 19 Nov 2012 17:59:04 +0100
-Subject: [GIT PULL] at91: header fix for 3.8
-Message-ID: <50AA6558.1060302@atmel.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 19 Nov 2012 19:01:13 +0200
+Subject: [PATCH v2 1/2] ads7846: enable pendown GPIO debounce time setting
+In-Reply-To: <1353341038-14381-2-git-send-email-grinberg@compulab.co.il>
+References: <1353341038-14381-2-git-send-email-grinberg@compulab.co.il>
+Message-ID: <1353344473-14753-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Some platforms need the pendown GPIO debounce time setting programmed.
+Since the pendown GPIO is handled by the driver, the debounce time
+should also be handled along with the pendown GPIO request.
 
-A little fix that goes on top of the modification of headers made
-by Jean-Christophe. Obviously, I have placed this one on top of your current
-at91/header branch.
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+---
+v2: fix the comment style
 
-The following changes since commit 75984df05d86956541795f01e62d7dc67bc522fd:
+ drivers/input/touchscreen/ads7846.c |    6 +++++-
+ include/linux/spi/ads7846.h         |    5 +++--
+ 2 files changed, 8 insertions(+), 3 deletions(-)
 
-  arm: at91: move at91rm9200 rtc header in drivers/rtc (2012-11-06 20:30:52 +0800)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-header
-
-for you to fetch changes up to 2abb74eaf6e73cb42e87bdc9e9c2535ce485e614:
-
-  atmel: move ATMEL_MAX_UART to platform_data/atmel.h (2012-11-19 17:44:54 +0100)
-
-----------------------------------------------------------------
-One fix related to UART for the "headers move" branch
-
-----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (1):
-      atmel: move ATMEL_MAX_UART to platform_data/atmel.h
-
- arch/arm/mach-at91/include/mach/hardware.h  | 3 ---
- arch/avr32/mach-at32ap/include/mach/board.h | 1 -
- include/linux/platform_data/atmel.h         | 6 ++++++
- 3 files changed, 6 insertions(+), 4 deletions(-)
-
-Thanks, best regards,
+diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
+index f02028e..78e5d9a 100644
+--- a/drivers/input/touchscreen/ads7846.c
++++ b/drivers/input/touchscreen/ads7846.c
+@@ -955,7 +955,8 @@ static int ads7846_resume(struct device *dev)
+ 
+ static SIMPLE_DEV_PM_OPS(ads7846_pm, ads7846_suspend, ads7846_resume);
+ 
+-static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads7846 *ts)
++static int __devinit ads7846_setup_pendown(struct spi_device *spi,
++					   struct ads7846 *ts)
+ {
+ 	struct ads7846_platform_data *pdata = spi->dev.platform_data;
+ 	int err;
+@@ -981,6 +982,9 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
+ 
+ 		ts->gpio_pendown = pdata->gpio_pendown;
+ 
++		if (pdata->gpio_pendown_debounce)
++			gpio_set_debounce(pdata->gpio_pendown,
++					  pdata->gpio_pendown_debounce);
+ 	} else {
+ 		dev_err(&spi->dev, "no get_pendown_state nor gpio_pendown?\n");
+ 		return -EINVAL;
+diff --git a/include/linux/spi/ads7846.h b/include/linux/spi/ads7846.h
+index c64de9d..2f694f3 100644
+--- a/include/linux/spi/ads7846.h
++++ b/include/linux/spi/ads7846.h
+@@ -46,8 +46,9 @@ struct ads7846_platform_data {
+ 	u16	debounce_rep;		/* additional consecutive good readings
+ 					 * required after the first two */
+ 	int	gpio_pendown;		/* the GPIO used to decide the pendown
+-					 * state if get_pendown_state == NULL
+-					 */
++					 * state if get_pendown_state == NULL */
++	int	gpio_pendown_debounce;	/* platform specific debounce time for
++					 * the gpio_pendown */
+ 	int	(*get_pendown_state)(void);
+ 	int	(*filter_init)	(const struct ads7846_platform_data *pdata,
+ 				 void **filter_data);
 -- 
-Nicolas Ferre
+1.7.3.4
