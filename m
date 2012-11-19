@@ -1,35 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 Nov 2012 08:53:42 -0800
-Subject: [GIT PULL] DaVinci fix for v3.7
-In-Reply-To: <50A9FEEB.50305@ti.com>
-References: <50A9FEEB.50305@ti.com>
-Message-ID: <CAOesGMjK_DXx_n7aL85SP7azqFsEOAJgfpTd-rpDCisvT_mysQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 19 Nov 2012 17:54:40 +0100
+Subject: [PATCH] ARM: Kconfig: Do not select ARCH_VEXPRESS on ARCH_MULTI_V7
+In-Reply-To: <1353343497.3303.34.camel@hornet>
+References: <1353343080-19220-1-git-send-email-fabio.estevam@freescale.com>
+ <1353343497.3303.34.camel@hornet>
+Message-ID: <20121119175440.1096f725@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 1:42 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> Hi Arnd, Olof,
->
-> Can you please pull the following DaVinci fix for v3.7? I know its pretty late,
-> I was out of office for most of the -rc cycle this time.
->
-> The change deserves a stable tag, I did not add it though since the patch
-> does not apply cleanly to any of the previous kernel releases. It will have
-> to be backported and send to the stable team once it makes it into mainline.
->
-> Thanks,
-> Sekhar
->
-> The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
->
->   Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
->
-> are available in the git repository at:
->
->   git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-fixes-for-v3.7
 
-Pulled, thanks. Gitorious wasn't horribly slow this morning so I'll
-take care of the remainder of your 3.8 pull requests too. :)
+On Mon, 19 Nov 2012 16:44:57 +0000, Pawel Moll wrote:
 
+> It's a bug in vexpress-sysreg driver. 3 hours ago I've posted patch
+> removing this code...
+> 
+> https://patchwork.kernel.org/patch/1764801/
+> 
+> Apologies about causing the issue in the first place.
 
--Olof
+But still, the patch that Fabio raises is interesting: why would
+ARCH_VEXPRESS be unconditionally enabled when building an ARM
+multiplatform kernel for v6/v7 ? I may want to build a kernel with
+several platforms, but not necessarily vexpress, no?
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
