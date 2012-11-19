@@ -1,63 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 15:27:00 +0100
-Subject: [PATCH 1/2] arm: mvebu: add 'clocks' property to Ethernet nodes for
- Armada 370/XP SoCs
-In-Reply-To: <1353335221-26516-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1353335221-26516-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353335221-26516-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: nareshgbhat@gmail.com (Naresh Bhat)
+Date: Mon, 19 Nov 2012 19:57:10 +0530
+Subject: KEXEC on ARM cortex-a15
+Message-ID: <CAJXQGfKpFfUwMeLGFAuTgQn5Yd2D9O271JM1VJ87Nio80tbwXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvneta driver now understands a standard 'clocks' clock pointer
-property in the Device Tree nodes for the Ethernet devices, so we add
-the right clock reference for the different Ethernet ports of the
-Armada 370/XP SoCs.
+Hi All,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-xp.dtsi |    2 ++
- arch/arm/boot/dts/armada-xp.dtsi     |    2 ++
- 2 files changed, 4 insertions(+)
+I am trying to test KEXEC feature on Cortex-a15 architecture.
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 08ec354..ee71143c 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -109,6 +109,7 @@
- 				compatible = "marvell,armada-370-neta";
- 				reg = <0xd0070000 0x2500>;
- 				interrupts = <8>;
-+				clocks = <&gateclk 4>;
- 				status = "disabled";
- 		};
- 
-@@ -116,6 +117,7 @@
- 				compatible = "marvell,armada-370-neta";
- 				reg = <0xd0074000 0x2500>;
- 				interrupts = <10>;
-+				clocks = <&gateclk 3>;
- 				status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 84cb87d..8e39cb7 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -112,6 +112,7 @@
- 				compatible = "marvell,armada-370-neta";
- 				reg = <0xd0030000 0x2500>;
- 				interrupts = <12>;
-+				clocks = <&gateclk 2>;
- 				status = "disabled";
- 		};
- 
-@@ -119,6 +120,7 @@
- 				compatible = "marvell,armada-370-neta";
- 				reg = <0xd0034000 0x2500>;
- 				interrupts = <14>;
-+				clocks = <&gateclk 1>;
- 				status = "disabled";
- 		};
- 	};
+I am using Kernel.org v3.4 kernel, and a u-boot boot loader on
+Daughterboard Site 1: V2P-CA15_A7 Cortex A15
+
+My question is do I need to pass any ATAG related information from
+u-boot to Kernel ?? If so what should I pass ??
+
+Please,  help me to overcome from below error message.
+
+Error Message:
+
+
+I can see the below question on dmesg "No ATAGs ?"
+...........
+...............
+CPU1: Unknown IPI message 0x1
+Brought up 2 CPUs
+SMP: Total of 2 processors activated (3981.31 BogoMIPS).
+NET: Registered protocol family 16
+No ATAGs?
+hw-breakpoint: found 5 (+1 reserved) breakpoint and 4 watchpoint registers.
+hw-breakpoint: maximum watchpoint size is 8 bytes.
+Serial: AMBA PL011 UART driver
+..........
+...............
+
+
+root at arm-cortex-a15:~#kexec -f /boot/uImage
+--command-line="root=/dev/nfs rw ip=dhcp mmci.fmax=6000000 -serial
+stdio console=ttyAMA0"
+Cannot open /proc/atags: No such file orStarting new kernel
+ directory
+Bye!
+Uncompressing Linux...
+
 -- 
-1.7.9.5
+"For things to change, we must change"
+-Naresh Bhat
