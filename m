@@ -1,24 +1,43 @@
 From: davem@davemloft.net (David Miller)
-Date: Mon, 19 Nov 2012 14:16:53 -0500 (EST)
-Subject: [GIT PULL] Marvell mvneta Ethernet/MDIO drivers checkpatch fixes
-In-Reply-To: <1353322834-16952-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1353322834-16952-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20121119.141653.1660827388689535803.davem@davemloft.net>
+Date: Mon, 19 Nov 2012 14:22:41 -0500 (EST)
+Subject: [PATCH v2] net/macb: move to circ_buf macros and fix initial
+ condition
+In-Reply-To: <1353340821-12658-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1353338244-11506-1-git-send-email-nicolas.ferre@atmel.com>
+ <1353340821-12658-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20121119.142241.1136499358405707363.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Date: Mon, 19 Nov 2012 12:00:31 +0100
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
+Date: Mon, 19 Nov 2012 17:00:21 +0100
 
-> Sebastian Hesselbarth noticed that the new mvmdio and mvneta drivers
-> produce a number of checkpatch warnings, related to the incluse of
-> <asm/delay.h> and to the style of multiline comments. The following
-> three patches fix those checkpatch warnings. Feel free to integrate
-> them either as follow-up patches of the network driver patches, or to
-> squash them into the driver patches as you prefer.
+> Move to circular buffers management macro and correct an error
+> with circular buffer initial condition.
 > 
-> David, are you OK with those patches and the fact that we carry them
-> through the arm-soc tree, as we agreed to do for the mvmdio and mvneta
-> drivers? Those patches are really simple/stupid fixes.
+> Without this patch, the macb_tx_ring_avail() function was
+> not reporting the proper ring availability at startup:
+> macb macb: eth0: BUG! Tx Ring full when queue awake!
+> macb macb: eth0: tx_head = 0, tx_tail = 0
+> And hanginig forever...
+> 
+> I remove the macb_tx_ring_avail() function and use the
+> proven macros from circ_buf.h. CIRC_CNT() is used in the
+> "consumer" part of the driver: macb_tx_interrupt() to match
+> advice from Documentation/circular-buffers.txt.
+> 
+> Reported-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Tested-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-No problem, thanks.
+Applied, thanks.
+
+> ---
+> v2: - added tags from Jean-Christophe PLAGNIOL-VILLARD
+
+Note that under normal circumstances, if the only change is the
+tags that people added in replies, you don't need to do this.
+
+Patchwork accumulates all of the signoffs, acks, tested-by,
+reviewed-by, etc. tags made in replies to the patch automatically for
+me, so when I apply the patch they will be there.
