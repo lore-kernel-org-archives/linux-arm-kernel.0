@@ -1,32 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Nov 2012 15:43:51 +0000
-Subject: [PATCH v3] video: Versatile Express DVI output driver
-In-Reply-To: <1353333377.3303.7.camel@hornet>
-References: <1350405036-17997-1-git-send-email-pawel.moll@arm.com>
- <1351612732.6199.4.camel@hornet> <1353333377.3303.7.camel@hornet>
-Message-ID: <201211191543.51923.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 19 Nov 2012 16:46:11 +0100
+Subject: [PATCH 1/2] clk: mvebu: armada 370/XP add clock gating control
+ provider for DT
+In-Reply-To: <20121117135435.GA13479@lunn.ch>
+References: <1353014906-31566-6-git-send-email-andrew@lunn.ch>
+ <1353088920-17458-1-git-send-email-gregory.clement@free-electrons.com>
+ <1353088920-17458-2-git-send-email-gregory.clement@free-electrons.com>
+ <20121117082602.GF24569@lunn.ch>
+ <50A75BB4.4070003@free-electrons.com>
+ <20121117135435.GA13479@lunn.ch>
+Message-ID: <20121119164611.2e754b64@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 November 2012, Pawel Moll wrote:
-> I've asked the framebuffer people 3 times about this but got no comment
-> whatsoever:
+Dear Andrew Lunn,
+
+On Sat, 17 Nov 2012 14:54:35 +0100, Andrew Lunn wrote:
+> > > What is the ddr clock for? Does bad things happen if you turn it off?
+> > > Kirkwood has a similar clock, dunit, which i decided not to export,
+> > > since when you turn it off, the whole SoC locks up.
+> > 
+> > Well of course if you code run in DDR then it could be a problem. But
+> > I think it could be useful to turn it off when going to suspend, it
+> > the DDR can do self-refresh. In this case it should be possible to run
+> > the code from SRAM or L2 Cache.
 > 
-> https://patchwork.kernel.org/patch/1473091/
-> https://patchwork.kernel.org/patch/1601781/
-> 
-> so I assume there is no problem with merging this code ;-) Therefore,
-> would you be so kind to pull this single patch? Without it the 3.8
-> kernel will not be able to show anything on VE's display...
+> O.K. Just watch out for the lateinit call in the clock framework.
 
-Hi Pawel,
+I don't think there is a problem with the dramclk and the lateinit call
+of the clock framework. The dramclk is a fixed factor clock, and the
+fixed factor clock driver does not implement the ->disable() operation.
+And therefore, the clk_disable_unused() code executed as the lateinit
+call will not be able to disable it:
 
-I have two comments for the patch that need to be fixed:
+	if (__clk_is_enabled(clk) && clk->ops->disable)
+		clk->ops->disable(clk->hw);
 
-* vexpress_dvi_fb_select uses the 'fb' argument as an index into
-  the registered_fb array, but does not check for overflow against
-  FB_MAX. I think you need to use get_fb_info().
+So I think we're quite safe with fixed rate clocks and fixed factor
+clocks in that no-one can disable them :-)
 
-* There is no documentation for the newly introduced sysfs interface.
+Best regards,
 
-	Arnd
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
