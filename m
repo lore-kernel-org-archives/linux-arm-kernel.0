@@ -1,60 +1,97 @@
-From: aniyas15@gmail.com (niyas mydeen)
-Date: Mon, 19 Nov 2012 08:15:16 +0530
-Subject: Add PI/robust mutexes support for SMP kernels
-Message-ID: <CADoAD8LgrJsryfgktSVejO3mmQj_cZ1WtjR-CPFuZ-iwMS2B1g@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 19 Nov 2012 14:13:14 +0900
+Subject: [RFC 02/15] SH: intc: Add support OF of IRQ
+In-Reply-To: <1353302007-31045-1-git-send-email-horms@verge.net.au>
+References: <1353302007-31045-1-git-send-email-horms@verge.net.au>
+Message-ID: <1353302007-31045-3-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 
-We have Linux running on our ARM Cortex-a9 (SMP) based platform.
-Test setup : Linux-2.6.35
-GLIBC : 2.11.
+Add information of device node to struct intc_desc.
 
-Test Scenario : We observed with our User application that the system is
-getting hanged at some point of time while keep doing power reset (with
-some delay).
+Cc: Magnus Damm <damm@opensource.se>
+Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
 
-1. Earlier we applied "Add PI/robust mutexes support for SMP kernels" to
-have PI-futex support on our kernel.
-http://lists.infradead.org/*pi*permail/linux-*arm*
--kernel/2010-June/017374.html<http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017374.html>
+---
 
-2. Found a problem while using pthread_mutex_lock, and it seems like at
-error occurrence, the status of mutex management data is getting corrupted.
-The error part of libpthread source
-(glibc-2.11/nptl/pthread_mutex_lock.c)is pasted below
-        /* Check whether we already hold the mutex.  */
-        if (__builtin_expect ((oldval & FUTEX_TID_MASK) == id, 0))
-          {
-            if (kind == PTHREAD_MUTEX_ERRORCHECK_NP)
-              {
-                THREAD_SETMEM (THREAD_SELF, robust_head.list_op_pending,
-NULL);
+v2 [Simon Horman]
+* fix typo in changelog, clean up whitespace
 
+v1 [Nobuhiro Iwamatsu]
+---
+ drivers/sh/intc/core.c      |    2 +-
+ drivers/sh/intc/internals.h |    3 ++-
+ drivers/sh/intc/irqdomain.c |    6 +++---
+ include/linux/sh_intc.h     |    1 +
+ 4 files changed, 7 insertions(+), 5 deletions(-)
 
-IMA_RESETLOG(0xA0,oldval,id,mutex->__data.__owner,0x3)        //err point
-code 03
-                return EDEADLK;
-              }
-
-at this point the value of mutex->__data.__owner becomes 0 or some other
-value.
-
- 3. So we decided to apply Catalin's patch ie "ARM: Remove the domain
-switching on ARMv6k/v7 CPUs"  from "
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/016997.html".
-But there is some confusion in using this patch as it is because our system
-has TLS_REG so the macro CPU_USE_DOMAIN automatically get disabled. And
-with this patch we observe different behavior of the system.
-
-4. Our concern here is do you have any patch related to User Ro Kernel Ro
-alone so that we can try it out that patch.
-
-Any valuable feedback will help us to solve this issue.
-
-Thanks & Regards,
-A. Mydeen.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121119/573dd348/attachment-0001.html>
+diff --git a/drivers/sh/intc/core.c b/drivers/sh/intc/core.c
+index 8f32a13..3963af3 100644
+--- a/drivers/sh/intc/core.c
++++ b/drivers/sh/intc/core.c
+@@ -311,7 +311,7 @@ int __init register_intc_controller(struct intc_desc *desc)
+ 
+ 	BUG_ON(k > 256); /* _INTC_ADDR_E() and _INTC_ADDR_D() are 8 bits */
+ 
+-	intc_irq_domain_init(d, hw);
++	intc_irq_domain_init(d, hw, desc->of_node);
+ 
+ 	/* register the vectors one by one */
+ 	for (i = 0; i < hw->nr_vectors; i++) {
+diff --git a/drivers/sh/intc/internals.h b/drivers/sh/intc/internals.h
+index 7dff08e..e6f64bf 100644
+--- a/drivers/sh/intc/internals.h
++++ b/drivers/sh/intc/internals.h
+@@ -190,7 +190,8 @@ void intc_enable_disable_enum(struct intc_desc *desc, struct intc_desc_int *d,
+ 			      intc_enum enum_id, int enable);
+ 
+ /* irqdomain.c */
+-void intc_irq_domain_init(struct intc_desc_int *d, struct intc_hw_desc *hw);
++void intc_irq_domain_init(struct intc_desc_int *d, struct intc_hw_desc *hw,
++				struct device_node *of_node);
+ 
+ /* virq.c */
+ void intc_subgroup_init(struct intc_desc *desc, struct intc_desc_int *d);
+diff --git a/drivers/sh/intc/irqdomain.c b/drivers/sh/intc/irqdomain.c
+index 3968f1c..22ab7af 100644
+--- a/drivers/sh/intc/irqdomain.c
++++ b/drivers/sh/intc/irqdomain.c
+@@ -42,7 +42,7 @@ static const struct irq_domain_ops intc_evt_ops = {
+ };
+ 
+ void __init intc_irq_domain_init(struct intc_desc_int *d,
+-				 struct intc_hw_desc *hw)
++				 struct intc_hw_desc *hw, struct device_node *np)
+ {
+ 	unsigned int irq_base, irq_end;
+ 
+@@ -59,10 +59,10 @@ void __init intc_irq_domain_init(struct intc_desc_int *d,
+ 	 * tree penalty for linear cases with non-zero hwirq bases.
+ 	 */
+ 	if (irq_base == 0 && irq_end == (irq_base + hw->nr_vectors - 1))
+-		d->domain = irq_domain_add_linear(NULL, hw->nr_vectors,
++		d->domain = irq_domain_add_linear(np, hw->nr_vectors,
+ 						  &intc_evt_ops, NULL);
+ 	else
+-		d->domain = irq_domain_add_tree(NULL, &intc_evt_ops, NULL);
++		d->domain = irq_domain_add_tree(np, &intc_evt_ops, NULL);
+ 
+ 	BUG_ON(!d->domain);
+ }
+diff --git a/include/linux/sh_intc.h b/include/linux/sh_intc.h
+index b0e7925..6603da6 100644
+--- a/include/linux/sh_intc.h
++++ b/include/linux/sh_intc.h
+@@ -118,6 +118,7 @@ struct intc_desc {
+ 	intc_enum force_disable;
+ 	bool skip_syscore_suspend;
+ 	struct intc_hw_desc hw;
++	struct device_node *of_node;
+ };
+ 
+ #define DECLARE_INTC_DESC(symbol, chipname, vectors, groups,		\
+-- 
+1.7.10.4
