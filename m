@@ -1,68 +1,61 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 18 Nov 2012 22:14:53 -0500 (EST)
-Subject: [PATCH v3 4/5] ARM: kernel: add logical mappings look-up
-In-Reply-To: <1352983614-22924-5-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1352983614-22924-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1352983614-22924-5-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <alpine.LFD.2.02.1211182214250.1182@xanadu.home>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Sun, 18 Nov 2012 22:37:58 -0500
+Subject: [Patch v1 1/1] RTL8712 alignment bug in 3.6.5 on ARM
+In-Reply-To: <20121118182049.GE14643@lunn.ch>
+References: <CAMW5UfYUi-Zz2r5K9GeVzShSub2rDJVuoWR56+89+ytaqo_uxQ@mail.gmail.com>
+ <20121118174720.GX3290@n2100.arm.linux.org.uk>
+ <CAMW5Ufb9D+BYGtZUWPBWKMtk11QMpR1N+2Q1yb4w_GdvV17p+w@mail.gmail.com>
+ <20121118182049.GE14643@lunn.ch>
+Message-ID: <CAMW5UfbzxaiRq_KVMYB3uY1H2bLeV_gkYG5a9AOB5bxJ5+smog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Nov 2012, Lorenzo Pieralisi wrote:
+With the _malloc() adjusted as suggested, I'm still not seeing
+scheduler bugs tracing back to the rtl8172 driver.  I am however
+seeing allocation errors occasionally now in cryptodev on my test
+system, so all is still not right.  This behavior was not present in
+3.6.4, I haven't seen it in the 3.7 release candidates, I'm going to
+see if I can nail down the exact commit that introduced this issue
+with git-bisect to see if there is something that was masking the
+problem that's been removed, or something unexpected, etc.  I'll
+report back once I have more info.
 
-> In ARM SMP systems the MPIDR register ([23:0] bits) is used to uniquely
-> identify CPUs.
-> 
-> In order to retrieve the logical CPU index corresponding to a given
-> MPIDR value and guarantee a consistent translation throughout the kernel,
-> this patch adds a look-up based on the MPIDR[23:0] so that kernel subsystems
-> can use it whenever the logical cpu index corresponding to a given MPIDR
-> value is needed.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
+Josh C
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-> ---
->  arch/arm/include/asm/smp_plat.h | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-> index 558d6c8..aaa61b6 100644
-> --- a/arch/arm/include/asm/smp_plat.h
-> +++ b/arch/arm/include/asm/smp_plat.h
-> @@ -5,6 +5,9 @@
->  #ifndef __ASMARM_SMP_PLAT_H
->  #define __ASMARM_SMP_PLAT_H
->  
-> +#include <linux/cpumask.h>
-> +#include <linux/err.h>
-> +
->  #include <asm/cputype.h>
->  
->  /*
-> @@ -48,5 +51,19 @@ static inline int cache_ops_need_broadcast(void)
->   */
->  extern int __cpu_logical_map[];
->  #define cpu_logical_map(cpu)	__cpu_logical_map[cpu]
-> +/*
-> + * Retrieve logical cpu index corresponding to a given MPIDR[23:0]
-> + *  - mpidr: MPIDR[23:0] to be used for the look-up
-> + *
-> + * Returns the cpu logical index or -EINVAL on look-up error
-> + */
-> +static inline int get_logical_index(u32 mpidr)
-> +{
-> +	int cpu;
-> +	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
-> +		if (cpu_logical_map(cpu) == mpidr)
-> +			return cpu;
-> +	return -EINVAL;
-> +}
->  
->  #endif
-> -- 
-> 1.7.12
-> 
-> 
+On Sun, Nov 18, 2012 at 1:20 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> >> diff -ruN a/drivers/staging/rtl8712/rtl871x_sta_mgt.c
+>> >> b/drivers/staging/rtl8712/rtl871x_sta_mgt.c
+>> >> --- a/drivers/staging/rtl8712/rtl871x_sta_mgt.c 2012-11-05
+>> >> 03:57:06.000000000 -0500
+>> >> +++ b/drivers/staging/rtl8712/rtl871x_sta_mgt.c 2012-11-13
+>> >> 12:54:28.000000000 -0500
+>> >> @@ -55,8 +55,8 @@
+>> >>     NUM_STA + 4);
+>> >>   if (pstapriv->pallocated_stainfo_buf == NULL)
+>> >>   return _FAIL;
+>> >> - pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 4 -
+>> >> - ((addr_t)(pstapriv->pallocated_stainfo_buf) & 3);
+>> >> + pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 8 -
+>> >> + ((addr_t)(pstapriv->pallocated_stainfo_buf) & 7);
+>> >
+>> > Are you sure this is safe?  Is the allocated buffer large enough for
+>> > those additional 4 bytes of alignment you're adding?
+>>
+>> I'm not certain on that, I bumped the allocations at Andrew's
+>> suggestion, but don't know enough to certify the changes as 100%
+>> correct.
+>
+> Its not correct.
+>
+> The original code is:
+>
+>         pstapriv->pallocated_stainfo_buf = _malloc(sizeof(struct sta_info) *
+>                                                    NUM_STA + 4);
+>         if (pstapriv->pallocated_stainfo_buf == NULL)
+>                 return _FAIL;
+>         pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 4 -
+>                 ((addr_t)(pstapriv->pallocated_stainfo_buf) & 3);
+>
+> The 4 in the _malloc() also needs increasing to 8.
+>
+>     Andrew
