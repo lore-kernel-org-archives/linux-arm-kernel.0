@@ -1,79 +1,68 @@
 From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Mon, 19 Nov 2012 15:10:39 +0100
-Subject: [PATCH v5 4/8] watchdog: pnx4008: add timeout-sec property binding
-In-Reply-To: <1353334243-16703-1-git-send-email-fabio.porcedda@gmail.com>
-References: <1353334243-16703-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1353334243-16703-5-git-send-email-fabio.porcedda@gmail.com>
+Date: Mon, 19 Nov 2012 15:10:35 +0100
+Subject: [PATCH v5 0/8] watchdog: dt: add support for the timeout-sec dt
+ property
+Message-ID: <1353334243-16703-1-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only compile tested.
 
-Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-Cc: Wim Van Sebroeck <wim@iguana.be>
-Cc: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Masanari Iida <standby24x7@gmail.com>
----
- Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt | 4 ++++
- drivers/watchdog/pnx4008_wdt.c                             | 7 +++----
- 2 files changed, 7 insertions(+), 4 deletions(-)
+Hi all,
+this patchset add the timeout-sec property to the watchdog core,
+to the at91sam9_wdt driver and on all framework enabled watchdog driver
+with dt support.
+This patchset depends on the patchset already sent:
+"[PATCH v9 0/3 RESEND] watchdog: at91sam9_wdt: add device tree support"
 
-diff --git a/Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt b/Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt
-index 7c7f688..556d06c 100644
---- a/Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/pnx4008-wdt.txt
-@@ -5,9 +5,13 @@ Required properties:
- - reg: physical base address of the controller and length of memory mapped
-   region.
- 
-+Optional properties:
-+- timeout-sec: contains the watchdog timeout in seconds.
-+
- Example:
- 
- 	watchdog at 4003C000 {
- 		compatible = "nxp,pnx4008-wdt";
- 		reg = <0x4003C000 0x1000>;
-+		timeout-sec = <10>;
- 	};
-diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
-index 87722e1..152e9fb 100644
---- a/drivers/watchdog/pnx4008_wdt.c
-+++ b/drivers/watchdog/pnx4008_wdt.c
-@@ -142,6 +142,7 @@ static const struct watchdog_ops pnx4008_wdt_ops = {
- static struct watchdog_device pnx4008_wdd = {
- 	.info = &pnx4008_wdt_ident,
- 	.ops = &pnx4008_wdt_ops,
-+	.timeout = DEFAULT_HEARTBEAT,
- 	.min_timeout = 1,
- 	.max_timeout = MAX_HEARTBEAT,
- };
-@@ -151,8 +152,7 @@ static int __devinit pnx4008_wdt_probe(struct platform_device *pdev)
- 	struct resource *r;
- 	int ret = 0;
- 
--	if (heartbeat < 1 || heartbeat > MAX_HEARTBEAT)
--		heartbeat = DEFAULT_HEARTBEAT;
-+	watchdog_init_timeout(&pnx4008_wdd, heartbeat, pdev->dev.of_node);
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	wdt_base = devm_request_and_ioremap(&pdev->dev, r);
-@@ -167,7 +167,6 @@ static int __devinit pnx4008_wdt_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto out;
- 
--	pnx4008_wdd.timeout = heartbeat;
- 	pnx4008_wdd.bootstatus = (readl(WDTIM_RES(wdt_base)) & WDOG_RESET) ?
- 			WDIOF_CARDRESET : 0;
- 	watchdog_set_nowayout(&pnx4008_wdd, nowayout);
-@@ -181,7 +180,7 @@ static int __devinit pnx4008_wdt_probe(struct platform_device *pdev)
- 	}
- 
- 	dev_info(&pdev->dev, "PNX4008 Watchdog Timer: heartbeat %d sec\n",
--			heartbeat);
-+		 pnx4008_wdd.timeout);
- 
- 	return 0;
- 
+The at91sam9_wdt is tested on evk-pr3,
+the other drivers are compile tested only.
+
+changes:
+v5:
+  - fix codestyle for compilance ti checkpatch.pl about
+    "ERROR: do not initialise statics to 0 or NULL"
+    for s3c2410_wdt.c:56 and at91sam9_wdt.c:63
+v4:
+  - add of_get_timeout_sec
+  - add s3c2410_wdt driver
+  - split driver patch
+  - fixed watchdog_init_timeout handling of min_timeout and max_timeout
+v3:
+  - rename watchdog_probe_dt_timeout ->  watchdog_init_timeout
+  - move the watchdog_init_timeout function from inline to watchdog_core.c
+  - add timeout parameter handling code to watchdog_init_timeout
+  - add timeout-sec property to the pnx4008-wdt driver
+  - add two small commit for fixup and cleanup
+v2:
+  - change "timeout" to "timeout-sec" as asked by Jean-Christophe
+  - at91sam9_wdt: use the new helper function
+  - at91sam9_wdt: add bounds checking
+  - watchdog.h: add bounds checking
+
+Fabio Porcedda (8):
+  dt: add helper inline for retrieving timeout-sec property
+  watchdog: core: dt: add support for the timeout-sec dt property
+  watchdog: orion_wdt: add timeout-sec property binding
+  watchdog: pnx4008: add timeout-sec property binding
+  watchdog: s3c2410_wdt: add timeout-sec property binding
+  watchdog: at91sam9_wdt: add timeout-sec property binding
+  watchdog: orion_wdt: move the min_timeout initialization
+  watchdog: WatchDog Timer Driver Core - fix comment
+
+ .../devicetree/bindings/watchdog/atmel-wdt.txt     |  4 +++
+ .../devicetree/bindings/watchdog/marvel.txt        |  5 +++
+ .../devicetree/bindings/watchdog/pnx4008-wdt.txt   |  4 +++
+ .../devicetree/bindings/watchdog/samsung-wdt.txt   |  3 ++
+ Documentation/watchdog/watchdog-kernel-api.txt     | 10 ++++++
+ drivers/watchdog/Kconfig                           |  1 +
+ drivers/watchdog/at91sam9_wdt.c                    | 16 ++++++++--
+ drivers/watchdog/orion_wdt.c                       | 10 +++---
+ drivers/watchdog/pnx4008_wdt.c                     |  7 ++--
+ drivers/watchdog/s3c2410_wdt.c                     |  6 ++--
+ drivers/watchdog/watchdog_core.c                   | 37 ++++++++++++++++++++++
+ include/linux/of.h                                 | 11 +++++++
+ include/linux/watchdog.h                           |  5 ++-
+ 13 files changed, 103 insertions(+), 16 deletions(-)
+
 -- 
 1.8.0
