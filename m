@@ -1,63 +1,74 @@
 From: wfp5p@virginia.edu (Bill Pemberton)
-Date: Mon, 19 Nov 2012 13:19:59 -0500
-Subject: [PATCH 050/493] clk: remove use of __devexit_p
+Date: Mon, 19 Nov 2012 13:19:31 -0500
+Subject: [PATCH 022/493] ARM: remove CONFIG_HOTPLUG ifdefs
 In-Reply-To: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
 References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
-Message-ID: <1353349642-3677-50-git-send-email-wfp5p@virginia.edu>
+Message-ID: <1353349642-3677-22-git-send-email-wfp5p@virginia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
-needed.
+Remove conditional code based on CONFIG_HOTPLUG being false.  It's
+always on now in preparation of it going away as an option.
 
 Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-Cc: Mike Turquette <mturquette@ti.com> 
+Cc: Russell King <linux@arm.linux.org.uk> 
+Cc: Arnd Bergmann <arnd@arndb.de> 
 Cc: linux-arm-kernel at lists.infradead.org 
-Cc: patches at opensource.wolfsonmicro.com 
+Cc: linux-arch at vger.kernel.org 
 ---
- drivers/clk/clk-max77686.c | 2 +-
- drivers/clk/clk-twl6040.c  | 2 +-
- drivers/clk/clk-wm831x.c   | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/kernel/bios32.c          | 4 ++--
+ arch/arm/kernel/vmlinux.lds.S     | 2 --
+ include/asm-generic/vmlinux.lds.h | 5 -----
+ 3 files changed, 2 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-index ac5f543..fff7e6f 100644
---- a/drivers/clk/clk-max77686.c
-+++ b/drivers/clk/clk-max77686.c
-@@ -223,7 +223,7 @@ static struct platform_driver max77686_clk_driver = {
- 		.owner = THIS_MODULE,
- 	},
- 	.probe = max77686_clk_probe,
--	.remove = __devexit_p(max77686_clk_remove),
-+	.remove = max77686_clk_remove,
- 	.id_table = max77686_clk_id,
- };
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 9b72261..f136307 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -361,9 +361,9 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ 	printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
+ 		bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
+ }
+-#ifdef CONFIG_HOTPLUG
++
+ EXPORT_SYMBOL(pcibios_fixup_bus);
+-#endif
++
  
-diff --git a/drivers/clk/clk-twl6040.c b/drivers/clk/clk-twl6040.c
-index f4a3389..5f2eb1f 100644
---- a/drivers/clk/clk-twl6040.c
-+++ b/drivers/clk/clk-twl6040.c
-@@ -115,7 +115,7 @@ static struct platform_driver twl6040_clk_driver = {
- 		.owner = THIS_MODULE,
- 	},
- 	.probe = twl6040_clk_probe,
--	.remove = __devexit_p(twl6040_clk_remove),
-+	.remove = twl6040_clk_remove,
- };
+ /*
+  * Swizzle the device pin each time we cross a bridge.  If a platform does
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index b9f38e3..38279fe 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -66,10 +66,8 @@ SECTIONS
+ 		ARM_EXIT_DISCARD(EXIT_TEXT)
+ 		ARM_EXIT_DISCARD(EXIT_DATA)
+ 		EXIT_CALL
+-#ifndef CONFIG_HOTPLUG
+ 		*(.ARM.exidx.devexit.text)
+ 		*(.ARM.extab.devexit.text)
+-#endif
+ #ifndef CONFIG_MMU
+ 		*(.fixup)
+ 		*(__ex_table)
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index d1ea7ce..856b58d 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -74,13 +74,8 @@
+  * are handled as text/data or they can be discarded (which
+  * often happens at runtime)
+  */
+-#ifdef CONFIG_HOTPLUG
+ #define DEV_KEEP(sec)    *(.dev##sec)
+ #define DEV_DISCARD(sec)
+-#else
+-#define DEV_KEEP(sec)
+-#define DEV_DISCARD(sec) *(.dev##sec)
+-#endif
  
- module_platform_driver(twl6040_clk_driver);
-diff --git a/drivers/clk/clk-wm831x.c b/drivers/clk/clk-wm831x.c
-index db4fbf2..6374dc4 100644
---- a/drivers/clk/clk-wm831x.c
-+++ b/drivers/clk/clk-wm831x.c
-@@ -396,7 +396,7 @@ static int __devexit wm831x_clk_remove(struct platform_device *pdev)
- 
- static struct platform_driver wm831x_clk_driver = {
- 	.probe = wm831x_clk_probe,
--	.remove = __devexit_p(wm831x_clk_remove),
-+	.remove = wm831x_clk_remove,
- 	.driver		= {
- 		.name	= "wm831x-clk",
- 		.owner	= THIS_MODULE,
+ #ifdef CONFIG_HOTPLUG_CPU
+ #define CPU_KEEP(sec)    *(.cpu##sec)
 -- 
 1.8.0
