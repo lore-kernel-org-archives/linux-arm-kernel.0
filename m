@@ -1,95 +1,163 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 17:52:38 +0100
-Subject: [PATCH 2/7] clk: mvebu: move clk-cpu compatible strings into the
- clk-cpu driver
+Date: Mon, 19 Nov 2012 17:52:40 +0100
+Subject: [PATCH 4/7] arm: mvebu: move DT cpu clock nodes to the Armada XP
+ specific .dtsi
 In-Reply-To: <1353343963-23034-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353343963-23034-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353343963-23034-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353343963-23034-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both the clk-core and clk-gating drivers define their compatible
-string in their own .c file and provide an initialization function to
-register the clock types. clk-cpu was not doing the same: it was
-defining its compatible string directly in clk.c, and calling
-of_clk_init() from here.
+The cpu clock nodes have originally been added in
+armada-xp.dtsi. However, this .dtsi file is common to all SoCs in the
+Armada XP family: the MV78230, the MV78260 and the MV78460. Those SoCs
+differ in a number of ways, but one of the main difference is the
+number of CPUs: one CPU in the MV78230, two CPUs in the MV78260 and
+four CPUs in the MV78460.
 
-For consistency reasons, this patch moves the clk-cpu compatible
-string in clk-cpu.c, and implements a proper mvebu_cpu_clk_init()
-function like the other two clock drivers.
+Therefore, this patch moves the cpu clock DT nodes into the
+armada-xp-mv78230.dtsi, armada-xp-mv78260.dtsi and
+armada-xp-mv78460.dtsi files, instantiating the right number of CPUs
+and CPU clocks as needed.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/clk/mvebu/clk-cpu.c |   15 +++++++++++++++
- drivers/clk/mvebu/clk-cpu.h |    6 +++++-
- drivers/clk/mvebu/clk.c     |   14 +-------------
- 3 files changed, 21 insertions(+), 14 deletions(-)
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi |   11 +++++++++++
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi |   17 +++++++++++++++++
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi |   30 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/armada-xp.dtsi         |   29 -----------------------------
+ 4 files changed, 58 insertions(+), 29 deletions(-)
 
-diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
-index 1df027a..3d7c9f1 100644
---- a/drivers/clk/mvebu/clk-cpu.c
-+++ b/drivers/clk/mvebu/clk-cpu.c
-@@ -153,3 +153,18 @@ bail_out:
- 	kfree(clks);
- 	kfree(cpuclk);
- }
+diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+index ea35519..0be699b 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+@@ -24,6 +24,17 @@
+ 		gpio1 = &gpio1;
+ 	};
+ 
++	cpus {
++	    #address-cells = <1>;
++	    #size-cells = <0>;
 +
-+static const __initconst struct of_device_id clk_cpu_match[] = {
-+	{
-+		.compatible = "marvell,armada-xp-cpu-clockctrl",
-+		.data = of_cpu_clk_setup,
-+	},
-+	{
-+		/* sentinel */
-+	},
-+};
++	    cpu at 0 {
++		compatible = "marvell,sheeva-v7";
++		reg = <0>;
++		clocks = <&cpuclk 0>;
++	    };
++	}
 +
-+void __init mvebu_cpu_clk_init(void)
-+{
-+	of_clk_init(clk_cpu_match);
-+}
-diff --git a/drivers/clk/mvebu/clk-cpu.h b/drivers/clk/mvebu/clk-cpu.h
-index e208336..08e2aff 100644
---- a/drivers/clk/mvebu/clk-cpu.h
-+++ b/drivers/clk/mvebu/clk-cpu.h
-@@ -13,6 +13,10 @@
- #ifndef __MVEBU_CLK_CPU_H
- #define __MVEBU_CLK_CPU_H
+ 	soc {
+ 		pinctrl {
+ 			compatible = "marvell,mv78230-pinctrl";
+diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+index 2057863..4417b87 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+@@ -25,6 +25,23 @@
+ 		gpio2 = &gpio2;
+ 	};
  
--void __init of_cpu_clk_setup(struct device_node *node);
-+#ifdef CONFIG_MVEBU_CLK_CPU
-+void __init mvebu_cpu_clk_init(void);
-+#else
-+static inline void mvebu_cpu_clk_init(void) {}
-+#endif
++	cpus {
++	    #address-cells = <1>;
++	    #size-cells = <0>;
++
++	    cpu at 0 {
++		compatible = "marvell,sheeva-v7";
++		reg = <0>;
++		clocks = <&cpuclk 0>;
++	    };
++
++	    cpu at 1 {
++		compatible = "marvell,sheeva-v7";
++		reg = <1>;
++		clocks = <&cpuclk 1>;
++	    };
++	};
++
+ 	soc {
+ 		pinctrl {
+ 			compatible = "marvell,mv78260-pinctrl";
+diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+index ffac983..1313c3e 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+@@ -25,6 +25,36 @@
+ 		gpio2 = &gpio2;
+ 	};
  
- #endif
-diff --git a/drivers/clk/mvebu/clk.c b/drivers/clk/mvebu/clk.c
-index 3f0e43e..e3bc036 100644
---- a/drivers/clk/mvebu/clk.c
-+++ b/drivers/clk/mvebu/clk.c
-@@ -19,21 +19,9 @@
- #include "clk-cpu.h"
- #include "clk-gating-ctrl.h"
++
++	cpus {
++	    #address-cells = <1>;
++	    #size-cells = <0>;
++
++	    cpu at 0 {
++		compatible = "marvell,sheeva-v7";
++		reg = <0>;
++		clocks = <&cpuclk 0>;
++	    };
++
++	    cpu at 1 {
++		compatible = "marvell,sheeva-v7";
++		reg = <1>;
++		clocks = <&cpuclk 1>;
++	    };
++
++	    cpu at 2 {
++		compatible = "marvell,sheeva-v7";
++		reg = <2>;
++		clocks = <&cpuclk 2>;
++	    };
++
++	    cpu at 3 {
++		compatible = "marvell,sheeva-v7";
++		reg = <3>;
++		clocks = <&cpuclk 3>;
++	    };
++	};
++
+ 	soc {
+ 		pinctrl {
+ 			compatible = "marvell,mv78460-pinctrl";
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 84cb87d..a3824ac 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -34,35 +34,6 @@
+ 		    <0xd0021870 0x58>;
+ 	};
  
--static const __initconst struct of_device_id clk_match[] = {
--#ifdef CONFIG_MVEBU_CLK_CPU
--	{
--		.compatible = "marvell,armada-xp-cpu-clockctrl",
--		.data = of_cpu_clk_setup,
--	},
--#endif
--	{
--		/* sentinel */
--	}
--};
+-	cpus {
+-	    #address-cells = <1>;
+-	    #size-cells = <0>;
 -
- void __init mvebu_clocks_init(void)
- {
- 	mvebu_core_clk_init();
- 	mvebu_clk_gating_init();
--	of_clk_init(clk_match);
-+	mvebu_cpu_clk_init();
- }
+-	    cpu at 0 {
+-		compatible = "marvell,sheeva-v7";
+-		reg = <0>;
+-		clocks = <&cpuclk 0>;
+-	    };
+-
+-	    cpu at 1 {
+-		compatible = "marvell,sheeva-v7";
+-		reg = <1>;
+-		clocks = <&cpuclk 1>;
+-	    };
+-
+-	    cpu at 2 {
+-		compatible = "marvell,sheeva-v7";
+-		reg = <2>;
+-		clocks = <&cpuclk 2>;
+-	    };
+-
+-	    cpu at 3 {
+-		compatible = "marvell,sheeva-v7";
+-		reg = <3>;
+-		clocks = <&cpuclk 3>;
+-	    };
+-	};
+-
+ 	soc {
+ 		serial at d0012200 {
+ 				compatible = "ns16550";
 -- 
 1.7.9.5
