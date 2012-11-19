@@ -1,129 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 19 Nov 2012 13:54:18 +0000
-Subject: [PATCH v4 4/7] ARM: kernel: add device tree init map function
-In-Reply-To: <1353329106-24084-5-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1353329106-24084-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1353329106-24084-5-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20121119135418.GB2816@e106331-lin.cambridge.arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 19 Nov 2012 13:56:17 +0000
+Subject: [PATCH v3] video: Versatile Express DVI output driver
+In-Reply-To: <1351612732.6199.4.camel@hornet>
+References: <1350405036-17997-1-git-send-email-pawel.moll@arm.com>
+ <1351612732.6199.4.camel@hornet>
+Message-ID: <1353333377.3303.7.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 12:45:03PM +0000, Lorenzo Pieralisi wrote:
-> When booting through a device tree, the kernel cpu logical id map can be
-> initialized using device tree data passed by FW or through an embedded blob.
-> 
-> This patch adds a function that parses device tree "cpu" nodes and
-> retrieves the corresponding CPUs hardware identifiers (MPIDR).
-> It sets the possible cpus and the cpu logical map values according to
-> the number of CPUs defined in the device tree and respective properties.
-> 
-> The device tree HW identifiers are considered valid if all CPU nodes contain
-> a "reg" property, there are no duplicate "reg" entries and the DT defines a
-> CPU node whose "reg" property matches the MPIDR[23:0] of the boot CPU.
-> 
-> The primary CPU is assigned cpu logical number 0 to keep the current convention
-> valid.
-> 
-> Current bindings documentation is included in the patch:
-> 
-> Documentation/devicetree/bindings/arm/cpus.txt
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> ---
->  Documentation/devicetree/bindings/arm/cpus.txt |  77 +++++++++++++++++++
->  arch/arm/include/asm/prom.h                    |   2 +
->  arch/arm/kernel/devtree.c                      | 100 +++++++++++++++++++++++++
->  3 files changed, 179 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> new file mode 100644
-> index 0000000..46c3589
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -0,0 +1,77 @@
-> +* ARM CPUs binding description
-> +
-> +The device tree allows to describe the layout of CPUs in a system through
-> +the "cpus" node, which in turn contains a number of subnodes (ie "cpu")
-> +defining properties for every cpu.
-> +
-> +Bindings for CPU nodes follow the ePAPR standard, available from:
-> +
-> +http://devicetree.org
-> +
-> +For the ARM architecture every CPU node must contain the following properties:
-> +
-> +- device_type:	must be "cpu"
-> +- reg:		property matching the CPU MPIDR[23:0] register bits
-> +		reg[31:24] bits must be set to 0
-> +- compatible:	should be one of:
-> +		"arm,arm1020"
-> +		"arm,arm1020e"
-> +		"arm,arm1022"
-> +		"arm,arm1026"
-> +		"arm,arm720"
-> +		"arm,arm740"
-> +		"arm,arm7tdmi"
-> +		"arm,arm920"
-> +		"arm,arm922"
-> +		"arm,arm925"
-> +		"arm,arm926"
-> +		"arm,arm940"
-> +		"arm,arm946"
-> +		"arm,arm9tdmi"
-> +		"arm,cortex-a5"
-> +		"arm,cortex-a7"
-> +		"arm,cortex-a8"
-> +		"arm,cortex-a9"
-> +		"arm,cortex-a15"
-> +		"arm,arm1136"
-> +		"arm,arm1156"
-> +		"arm,arm1176"
-> +		"arm,arm11mpcore"
-> +		"faraday,fa526"
-> +		"intel,sa110"
-> +		"intel,sa1100"
-> +		"marvell,feroceon"
-> +		"marvell,mohawk"
-> +		"marvell,xsc3"
-> +		"marvell,xscale"
-> +
-> +Example:
-> +
-> +	cpus {
-> +		#size-cells = <0>;
-> +		#address-cells = <1>;
-> +
-> +		CPU0: cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm, cortex-a15";
-> +			reg = <0x0>;
-> +		};
-> +
-> +		CPU1: cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm, cortex-a15";
-> +			reg = <0x1>;
-> +		};
-> +
-> +		CPU2: cpu at 100 {
-> +			device_type = "cpu";
-> +			compatible = "arm, cortex-a7";
-> +			reg = <0x100>;
-> +		};
-> +
-> +		CPU3: cpu at 101 {
-> +			device_type = "cpu";
-> +			compatible = "arm, cortex-a7";
-> +			reg = <0x101>;
-> +		};
-> +	};
+Hi Arnd, Olof,
 
-Those spaces in the compatible strings shouldn't be there.
+One of the important parts of the VE update is the display muxer
+driver...
 
-Otherwise, looks good to me.
+On Tue, 2012-10-30 at 15:58 +0000, Pawel Moll wrote:
+> Hello again Florian,
+> 
+> On Tue, 2012-10-16 at 17:30 +0100, Pawel Moll wrote:
+> > Versatile Express' DVI video output can be connected to one the three
+> > sources - motherboard's CLCD controller or a video signal generated
+> > by one of the daughterboards.
+> > 
+> > This driver configures the muxer FPGA so the output displays content
+> > of one of the framebuffers in the system (0 by default, can be changed
+> > by user writing to the "fb" sysfs attribute of the muxfpga device).
+> > 
+> > It will also set up the display formatter mode and keep it up
+> > to date with mode changes requested by the user (eg. with fbset
+> > tool).
+> > 
+> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> 
+> It's just a polite a friendly nag regarding this patch - it's been 2
+> weeks since I posted this version (and 1.5 month since the first one)...
+> 
+> Does it look good enough or completely wrong?
 
-Thanks,
-Mark
+I've asked the framebuffer people 3 times about this but got no comment
+whatsoever:
+
+https://patchwork.kernel.org/patch/1473091/
+https://patchwork.kernel.org/patch/1601781/
+
+so I assume there is no problem with merging this code ;-) Therefore,
+would you be so kind to pull this single patch? Without it the 3.8
+kernel will not be able to show anything on VE's display...
+
+The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
+
+  Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/pawelmoll/linux.git vexpress-drivers2
+
+for you to fetch changes up to 357e174056d44c6614afec6c5ace1c2aea2ef0bb:
+
+  video: Versatile Express DVI output driver (2012-11-19 11:12:40 +0000)
+
+This is the very last thing for 3.8 merge window from me.
+
+Thanks and regards
+
+Pawe?
