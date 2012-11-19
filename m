@@ -1,84 +1,58 @@
-From: s.peter@mpl.ch (Stefan Peter)
-Date: Mon, 19 Nov 2012 13:07:52 +0100
-Subject: [PATCH 0/1] ARM: kirkwood: Convert the mplcec4 board to pinctrl
-In-Reply-To: <20121119111838.GH10259@lunn.ch>
-References: <cover.1353319919.git.s.peter@mpl.ch>
- <20121119111838.GH10259@lunn.ch>
-Message-ID: <50AA2118.7050700@mpl.ch>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Mon, 19 Nov 2012 12:07:57 +0000
+Subject: [RFC PATCH 3.7.0-rc4] ARM:smp: introduce smp_notify_cpu_stop
+ to fix kexec smp case
+In-Reply-To: <20121119105848.GF3205@mudshark.cambridge.arm.com>
+References: <1353003478-22291-1-git-send-email-srinivas.kandagatla@st.com>
+ <20121115211833.GD13998@mudshark.cambridge.arm.com> <50A5FBB7.9040001@st.com>
+ <20121119105848.GF3205@mudshark.cambridge.arm.com>
+Message-ID: <50AA211D.20005@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andrew
+On 19/11/12 10:58, Will Deacon wrote:
+> On Fri, Nov 16, 2012 at 08:39:19AM +0000, Srinivas KANDAGATLA wrote:
+>> On 15/11/12 21:18, Will Deacon wrote:
+>>>  The bigger issue is co-ordinating with the
+>>> secondaries so you know when they're safely out of the way and you can
+>>> proceed with the kexec. Remember that you won't have working locks and you
+>>> can't cross-call a function because it won't actually return.
+>> Yes I agree and understand the limitation.
+>> The callback should simple and just relocate the secondary core to a
+>> safe place which in our case is a holding pen, which is safe and not in
+>> the system ram.
+>> After the callback, the secondary core will be spinning in the holding
+>> pen which will be released once they get a matching cpu-id.
+>> And this approach works perfectly ok on our chips and I guess should
+>> work for other chips aswell.
+> But how do you know when the callback is complete? That's the part that is
+> tricky as you need to avoid clobbering the kernel image before you know for
+> sure that all the secondaries are out of the way.
+Yes, there is a very small window of opportunity for the primary core to
+continue with new kernel image.
 
-Am 19.11.2012 12:18, schrieb Andrew Lunn:
-> On Mon, Nov 19, 2012 at 11:26:44AM +0100, Stefan Peter wrote:
->> Hello Andrew
->>
->> This is my try to convert the mplcec4 board to your pinctrl patches. The 
->> only problem I see is that I get an uart1 using mpp13 and mpp14 which
->> are used by the mvsdio driver
-> 
-> Hi Stefan
-> 
-> Interesting.
-> 
-> If you convert the dtb back to a dtc:
-> 
-> dtc -o mplcec4.dts -O dts arch/arm/boot/kirkwood-mplcec4.dtb
-> 
-> you see:
-> 
-> 		pinctrl at 10000 {
+We have two options here:
 
-> 		};
-> 	};
-> 
-> pmx-uart1 has no linux.phandle, and its not listed in 
-> 
-> pinctrl-0 = <0x2 0x3 0x4 0x5 0x6 0x7 0x8 0x9 0xa 0xb 0xc 0xd>;
-> 
-> so it should not be used as a pin hog.
+1> I think the existing infrastructure of cpu_kill can be re-used to
+know if the callback is complete and is very much specific to platform
+implementation.
+2> Add a is_cpu_stopped() in smp_operations and call it from primary
+core with cpu set to secondary cores, similar to smp_kill_cpus call.
+This is also specific to platform implementation.
 
-Exactly.
+Both of them will address the concern.
+???
 
-> 
-> So, during boot do you see:
-> 
-> f1012100.serial: ttyS1 at MMIO 0xf1012100 (irq = 34) is a 16550A
-> 
 
-No
-
-> 
-> What do you see in /debug/pinctrl/f1010000.pinctrl/pinmux-pins contain?
-> 
-> Since i have a second UART on my board i have:
-> 
-> pin 13 (PIN13): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function uart1 group mpp13
-> pin 14 (PIN14): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function uart1 group mpp14
-> 
-> but i would expect to see function sdio.
-
-No, I see
-
-pin 12 (PIN12): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 13 (PIN13): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 14 (PIN14): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 15 (PIN15): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 16 (PIN16): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 17 (PIN17): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-
-However, there is a phandle in pinctrl at 10000/pmx-sdio/
-
-> 
-> Thanks
-> 	Andrew
-> 
-
-Regards
-
-Stefan Peter
-
--- 
-MPL AG, Switzerland                     http://www.mpl.ch
-Tel. +41 (0)56 483 34 34          Fax: +41(0)56 493 30 20
+>  I think you either need
+> some horrible homebrew locking primitives or something in hardware to signal
+> back to the primary CPU.
+>
+>>> If you can solve the synchronisation problem then we can think about adding
+>>> these hooks.
+>> I think the call back code should not do anything complex other than few
+>> lines of assembly or jump to a holding pen, this way it does not need
+>> any synchronization calls or system infrastructure.
+> See above.
+>
+> Will
