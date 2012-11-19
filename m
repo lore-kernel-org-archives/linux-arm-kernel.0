@@ -1,191 +1,56 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 19 Nov 2012 11:27:44 +0200
-Subject: tfp410 and i2c_bus_num
-In-Reply-To: <50A9D3DD.6040807@ti.com>
-References: <1353068553-26897-1-git-send-email-tomi.valkeinen@ti.com>
- <20121116135155.GE18527@arwen.pp.htv.fi> <50A64D35.9050109@ti.com>
- <20121116151959.GA19411@arwen.pp.htv.fi> <50A65E40.9040208@ti.com>
- <20121116182146.GC20496@arwen.pp.htv.fi> <50A72390.3050509@ti.com>
- <20121118113437.GB30462@arwen.pp.htv.fi> <50A9D3DD.6040807@ti.com>
-Message-ID: <20121119092744.GB4211@arwen.pp.htv.fi>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 19 Nov 2012 11:36:24 +0200
+Subject: [RFC] fbdev: arm has __raw I/O accessors, use them in fb.h
+In-Reply-To: <20121119091504.GB3290@n2100.arm.linux.org.uk>
+References: <1353057364-21214-1-git-send-email-archit@ti.com>
+ <ADE657CA350FB648AAC2C43247A983F00206B2644F3F@AUSP01VMBX24.collaborationhost.net>
+ <50A9C1C4.5070907@ti.com> <20121119091504.GB3290@n2100.arm.linux.org.uk>
+Message-ID: <50A9FD98.1060105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
-
-On Mon, Nov 19, 2012 at 08:38:21AM +0200, Tomi Valkeinen wrote:
-> (dropping Tony and stable)
+On 2012-11-19 11:15, Russell King - ARM Linux wrote:
+> On Mon, Nov 19, 2012 at 10:51:08AM +0530, Archit Taneja wrote:
+>> On Friday 16 November 2012 10:14 PM, H Hartley Sweeten wrote:
+>>> On Friday, November 16, 2012 2:16 AM, Archit Taneja wrote:
+>>>>
+>>>> This removes the sparse warnings on arm platforms:
+>>>>
+>>>> warning: cast removes address space of expression
+>>>>
+>>>> Signed-off-by: Archit Taneja <archit@ti.com>
+>>>
+>>> I submitted the same patch around early March 2012. So FWIW:
+>>>
+>>> Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>>
+>> Thanks.
+>>
+>> Florian,
+>>
+>> Could you queue this for 3.8 merge window?
 > 
-> On 2012-11-18 13:34, Felipe Balbi wrote:
-> 
-> > how are you toggling the gpio ? You said tfp410 isn't controlled at all
-> > except for the power down gpio. Who provides the gpio ?
-> 
-> It's a normal OMAP GPIO, going to TFP410. I use gpio_set_value() to
-> set/unset it.
+> Actually no.  Has anyone checked whether this has any impact for the BE
+> ARM platforms?
 
-ok, fair enough.
+Probably not. I can't say anything to that matter, but I wonder if this
+patch is just going around the problem that we get sparse warnings when
+falling into the else ifdef block in fb.h.
 
-> >> Well, it's not that simple. TFP410 manages hot plug detection of the
-> >> HDMI cable (although not implemented currently), so the we'd need to
-> >> convey that information to the i2c-edid somehow. Which, of course, is
-> >> doable, but increases complexity.
-> > 
-> > I'd say it would decrease it since you would have a single copy of
-> > i2c-edid.c for DRM or DSS or any other panel/display framework.
-> 
-> Well. Reading EDID via i2c is one or two i2c reads. There's nothing else
-> to it.
+The macros in the else block are defined as:
 
-still avoids duplication :-)
+#define fb_readb(addr) (*(volatile u8 *) (addr))                                 
 
-> If we had a separate, independent i2c-edid driver, we'd have to somehow
-> link the i2c-edid driver and tfp410 (or whatever driver would handle the
-> video link in that particular case) so that the i2c-edid driver would
-> know about hotplug events. We would also need to link the drivers so
-> that the edid can be associated with the video pipeline the tfp410 chip
-> is part of, and to the particular slot in the pipeline where the tfp410 is.
+And fb code passes a pointer to __iomem. So shouldn't the cast be to
+(volatile u8 __iomem *)?
 
-that should all be doable, just look at how v4l2 handles pipelining the
-video data (all in userland though) and you'll see it's definitely
-possible.
+ Tomi
 
-> I haven't tried writing such a driver, but it sounds much more complex
-> to me than doing one or two i2c reads in the tfp410 driver.
 
-until you have e.g. tfp999, tfp534, tfp678 (hypothetical device numbers,
-they probably don't exist) which are all SW incompatible and you have to
-duplicate i2c reads in all of them. Whereas if you had a dedicated
-i2c-edid.c driver, you would only have to tell them where to get EDID
-structure from.
-
-Also, if you have systems with different panel interfaces, they will use
-the same i2c-edid.c and just instantiate that class multiple times.
-
-> >> Another thing is that even if in this case the i2c and EDID reading are
-> >> separate from the actual video path, that may not be the case for other
-> >> display solutions. We could have a DSI panel which reports its
-> >> resolution via DSI bus, or we could have an external DSI-to-HDMI chip,
-> >> which reads the EDID via i2c from the monitor, but reports them back to
-> >> the SoC via DSI bus.
-> > 
-> > In this last case we would see just the DSI, not the I2C bus, so it's
-> > like I2C bus doesn't exist, so in fact we would have two possibilities:
-> > 
-> > a) read EDID via I2C bus (standard HDMI)
-> > b) read EDID via DSI.
-> 
-> Right. And currently reading edid is done via read_edid call with
-> omapdss, and the caller doesn't care if read_edid uses i2c or DSI, so it
-> should just work.
-> 
-> > b) doesn't exist today so we need to care about it until something like
-> > what you say shows up in the market. Until then, we care for EDID over
-> > I2C IMHO.
-> 
-> There are chips such as I described, although not supported in the mainline.
-
-fair enough.
-
-> >> So we need a generic way to get the resolution information, and it makes
-> >> sense to have this in the components of the video path, not in a
-> >> separate driver which is not part of the video path as such.
-> > 
-> > But the I2C bus isn't part of the video path anyway. It's a completely
-> > separate path which is dedicated to reading EDID. If you need a generic
-> 
-> While reading EDID is totally separate from the video data itself, it is
-> not separate from the hotplug status of the cable. And the EDID needs to
-> be associated with the video path in question, of course.
-
-yes, but that can't be done in another way right ? Try something like
-having a EDID provider and an EDID consumer. The provider will be
-i2c-edid.c or dvi-edid.c and the consumer will a generic layer which
-tfp410 would use to request certain attributes from the EDID structure.
-
-I think that would look a lot nicer as the underlying implementation for
-requesting EDID would be completely encapsulated from its users.
-
-> > way for that case you wanna cope with other methods for reading EDID,
-> > then you need a generic layer which doesn't care if it's I2C or DSI.
-> > Currently implementation is hardcoded to I2C anyway.
-> 
-> No, reading edid is done via generic read_edid call. TFP410 uses i2c to
-> read edid, but it could do it in any way it wants.
-
-it's not very well designed, then, if tfp410 still needs to fetch the
-i2c adapter. It still has to know about the underlying bus for reading
-EDID.
-
-> > In fact current implementation is far worse than having an extra
-> > i2c-edid.c driver because it doesn't encapsulate EDID implementation
-> > from tfp410.
-> > 
-> > Then moment you need to read EDID via DSI, you will likely have to pass
-> > a DSI handle to e.g. TFP410 so it can read EDID via DSI.
-> 
-> TFP410 is a parallel RGB to DVI chip. It's not related to DSI. The DSI
-> case would be with some other chip.
-
-it doesn't change what I said, however. Another chip will need to be
-passed in a DVI handle.
-
-> > What I'm suggesting, however, is that you have a layer hiding all that.
-> > Make your i2c-edid.c driver read EDID and report it to this generic
-> > layer, if some other driver in kernel needs the information, you should
-> > be calling into this generic edid layer to get the cached values.
-> > 
-> > If you don't need that data in kernel, then just expose it through a set
-> > of standard sysfs files and teach Xorg about those.
-> 
-> We need the data in the kernel.
-> 
-> >> And while the above issues could perhaps be solved, all we do is read
-> >> one or two 128 byte datablocks from the i2c device. I'm not sure if the
-> >> extra complexity is worth it. At least it's not on the top of my todo
-> > 
-> > When you have EDID over DSI, what will you do ?
-> 
-> Write the code to read the EDID =). How that is done in practice depends
-> on the chip in question, using chip specific DSI commands.
-
-fair enough
-
-> >> list as long as the current solution works =).
-> > 
-> > that's your choice.
-> > 
-> >>> If you have a generic i2c-edid.c simple driver, I guess X could be
-> >>> changes to read those values from sysfs and take actions based on those.
-> >>
-> >> We handle the EDID inside the kernel, although I'm not sure if drm also
-> >> exposes the EDID to userspace.
-> > 
-> > I suppose it does, but haven't looked through the code.
-> > 
-> >>> Looks like even drm_edid.c should change, btw.
-> >>
-> >> Yes, DRM handles it in somewhat similar way.
-> > 
-> > another reason to make a generic i2c-edid.c. It make no sense to have
-> > two pieces of code doing exactly the same thing, which is reading edid
-> > over an I2C link.
-> 
-> We could have a library with the code that does the one or two i2c
-> reads. And while I think it'd be good, we're talking about one or two
-> i2c reads. It wouldn't be a huge improvement.
-
-fair enough... it looks like this is going nowhere, so best we come back
-to this later. No reason to block your patch.
-
-cheers
-
--- 
-balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121119/abb12fce/attachment.sig>
+Size: 897 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121119/c54a0a5f/attachment.sig>
