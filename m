@@ -1,96 +1,56 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 19 Nov 2012 18:03:58 +0200
-Subject: [PATCH 2/2] ARM: OMAP: ads7846: fix pendown debounce setting
-In-Reply-To: <1353341038-14381-1-git-send-email-grinberg@compulab.co.il>
-References: <1353341038-14381-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1353341038-14381-3-git-send-email-grinberg@compulab.co.il>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 19 Nov 2012 16:07:25 +0000
+Subject: [GIT PULL] ARM: multi-cluster aware boot protocol
+Message-ID: <20121119160725.GA25721@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 97ee9f01 (ARM: OMAP: fix the ads7846 init code) have enabled the
-pendown GPIO debounce time setting by the below sequence:
+Hi Russell,
 
-  gpio_request_one()
-  gpio_set_debounce()
-  gpio_free()
+please consider pulling this patch series that adds cluster awareness to
+the ARM cpu_logical_map, adds DT cpu bindings, introduces GIC autoprobing for
+CPU interfaces and cleans up the topology definitions based on the MPIDR
+register.
 
-It also revealed a bug in the OMAP GPIO handling code which prevented
-the GPIO debounce clock to be disabled and CORE transition to low power
-states.
+It is a small step, though pivotal, towards cluster awareness in the ARM kernel
+that allows us to generalize the MPIDR concept for future systems and prepare
+for some changes that have been on the backburner for a while (eg MPIDR
+linearization in cpu_{suspend}/{resume}).
 
-Commit c9c55d9 (gpio/omap: fix off-mode bug: clear debounce settings on
-free/reset) fixes the OMAP GPIO handling code by making sure that the
-GPIO debounce clock gets disabled if no GPIO is requested from current
-bank.
+Thank you very much indeed,
+Lorenzo
 
-While fixing the OMAP GPIO handling code (in the right way), the above
-commit makes the gpio_request->set_debounce->free sequence invalid as
-after freeing the GPIO, the debounce settings are lost.
+The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
 
-Fix the debounce settings by moving the debounce initialization to the
-actual GPIO requesting code - the ads7846 driver.
+  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Zumeng Chen <zumeng.chen@windriver.com>
----
- arch/arm/mach-omap2/common-board-devices.c |   34 ++++++++++++++++-----------
- 1 files changed, 20 insertions(+), 14 deletions(-)
+are available in the git repository at:
 
-diff --git a/arch/arm/mach-omap2/common-board-devices.c b/arch/arm/mach-omap2/common-board-devices.c
-index ad85609..d246efd 100644
---- a/arch/arm/mach-omap2/common-board-devices.c
-+++ b/arch/arm/mach-omap2/common-board-devices.c
-@@ -63,30 +63,36 @@ void __init omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
- 	struct spi_board_info *spi_bi = &ads7846_spi_board_info;
- 	int err;
- 
--	err = gpio_request_one(gpio_pendown, GPIOF_IN, "TSPenDown");
--	if (err) {
--		pr_err("Couldn't obtain gpio for TSPenDown: %d\n", err);
--		return;
--	}
-+	/*
-+	 * If a board defines get_pendown_state() function, request the pendown
-+	 * GPIO and set the GPIO debounce time.
-+	 * If a board does not define the get_pendown_state() function, then
-+	 * the ads7846 driver will setup the pendown GPIO itself.
-+	 */
-+	if (board_pdata && board_pdata->get_pendown_state) {
-+		err = gpio_request_one(gpio_pendown, GPIOF_IN, "TSPenDown");
-+		if (err) {
-+			pr_err("Couldn't obtain gpio for TSPenDown: %d\n", err);
-+			return;
-+		}
-+
-+		if (gpio_debounce)
-+			gpio_set_debounce(gpio_pendown, gpio_debounce);
- 
--	if (gpio_debounce)
--		gpio_set_debounce(gpio_pendown, gpio_debounce);
-+		gpio_export(gpio_pendown, 0);
-+	}
- 
- 	spi_bi->bus_num	= bus_num;
- 	spi_bi->irq	= gpio_to_irq(gpio_pendown);
- 
-+	ads7846_config.gpio_pendown = gpio_pendown;
-+
- 	if (board_pdata) {
- 		board_pdata->gpio_pendown = gpio_pendown;
-+		board_pdata->gpio_pendown_debounce = gpio_debounce;
- 		spi_bi->platform_data = board_pdata;
--		if (board_pdata->get_pendown_state)
--			gpio_export(gpio_pendown, 0);
--	} else {
--		ads7846_config.gpio_pendown = gpio_pendown;
- 	}
- 
--	if (!board_pdata || (board_pdata && !board_pdata->get_pendown_state))
--		gpio_free(gpio_pendown);
--
- 	spi_register_board_info(&ads7846_spi_board_info, 1);
- }
- #else
--- 
-1.7.3.4
+  git://linux-arm.org/linux-2.6-lp.git cluster-boot-protocol
+
+for you to fetch changes up to 384a290283fde63ba8dc671fca5420111cdac19a:
+
+  ARM: gic: use a private mapping for CPU target interfaces (2012-11-19 15:44:34 +0000)
+
+----------------------------------------------------------------
+Lorenzo Pieralisi (6):
+      ARM: kernel: enhance MPIDR macro definitions
+      ARM: kernel: update topology to use new MPIDR macros
+      ARM: kernel: smp_setup_processor_id() updates
+      ARM: kernel: add device tree init map function
+      ARM: kernel: add cpu logical map DT init in setup_arch
+      ARM: kernel: add logical mappings look-up
+
+Nicolas Pitre (1):
+      ARM: gic: use a private mapping for CPU target interfaces
+
+ Documentation/devicetree/bindings/arm/cpus.txt |  77 +++++++++++++++++++
+ arch/arm/common/gic.c                          |  45 ++++++++---
+ arch/arm/include/asm/cputype.h                 |  13 ++++
+ arch/arm/include/asm/prom.h                    |   2 +
+ arch/arm/include/asm/smp_plat.h                |  17 +++++
+ arch/arm/kernel/devtree.c                      | 100 +++++++++++++++++++++++++
+ arch/arm/kernel/setup.c                        |   8 +-
+ arch/arm/kernel/topology.c                     |  42 ++---------
+ 8 files changed, 256 insertions(+), 48 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
