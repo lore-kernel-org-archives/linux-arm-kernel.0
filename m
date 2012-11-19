@@ -1,29 +1,48 @@
-From: rajanikanth.hv@linaro.org (Rajanikanth HV)
-Date: Mon, 19 Nov 2012 09:28:59 +0530
-Subject: [PATCH 0/4] Implement device tree support for ab8500 BM Devices
-In-Reply-To: <20121119034600.GP29066@lizard.sbx05977.paloaca.wayport.net>
-References: <1351698033-8980-1-git-send-email-rajanikanth.hv@linaro.org>
- <20121119034600.GP29066@lizard.sbx05977.paloaca.wayport.net>
-Message-ID: <CAB4BAkvXZacDVZh2gzooH-Eq8Vnc8JLd=v8=9p-4mLfY0qWavw@mail.gmail.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Mon, 19 Nov 2012 04:14:52 +0000
+Subject: [PATCH v2 4/4] ARM: dts: AM33XX: Enable system power off
+ control in am335x-bone
+In-Reply-To: <87r4ntcqk3.fsf@deeprootsystems.com>
+References: <1353067706-29491-1-git-send-email-anilkumar@ti.com>
+ <1353067706-29491-5-git-send-email-anilkumar@ti.com>
+ <87r4ntcqk3.fsf@deeprootsystems.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA75BDF@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 19 November 2012 09:16, Anton Vorontsov <anton.vorontsov@linaro.org> wrote:
-> (But I'm bouncing the patches to Samuel and Mark anyway, jfyi.)
->
-> p.s.
->
-> FWIW, I fixed these warnings.
->
->   CHECK   drivers/power/ab8500_bmdata.c
-> drivers/power/ab8500_bmdata.c:146:23: warning: symbol 'temp_to_batres_tbl_thermistor' was not declared. Should it be static?
-> drivers/power/ab8500_bmdata.c:160:23: warning: symbol 'temp_to_batres_tbl_ext_thermistor' was not declared. Should it be static?
-> drivers/power/ab8500_bmdata.c:171:23: warning: symbol 'temp_to_batres_tbl_9100' was not declared. Should it be static?
-> drivers/power/ab8500_bmdata.c:181:28: warning: symbol 'bat_type_thermistor' was not declared. Should it be static?
-> drivers/power/ab8500_bmdata.c:267:28: warning: symbol 'bat_type_ext_thermistor' was not declared. Should it be static?
->
-> Plus fixed a few stylistic issues.
+On Sat, Nov 17, 2012 at 00:40:04, Kevin Hilman wrote:
+> AnilKumar Ch <anilkumar@ti.com> writes:
+> 
+> > Enable system power off control for BeagleBone in am335x-bone.dts file
+> > under rtc node. RTC is the incharge of controlling the system power.
+> > This flag is used by the driver to hook up the pm_power_off system call.
+> >
+> > Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> > ---
+> >  arch/arm/boot/dts/am335x-bone.dts |    4 ++++
+> >  1 file changed, 4 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+> > index 1d55190..206c3eb 100644
+> > --- a/arch/arm/boot/dts/am335x-bone.dts
+> > +++ b/arch/arm/boot/dts/am335x-bone.dts
+> > @@ -52,6 +52,10 @@
+> >  			};
+> >  
+> >  		};
+> > +
+> > +		rtc at 44e3e000 {
+> > +			ti,system-power-controller;
+> > +		};
+> >  	};
+> 
+> Also, I think this series is missing a patch that allows the RTC driver
+> to be compiled on AM335x.
+> 
 
-thanks anton for validating my patch, you seems to have older version
-of patch set,
-i am rebasing  new version of patch set to 3.7-rc5, will communicate asap.
+Hi Kevin,
+
+Yes I missed; I will submit that as a separate patch.
+
+Thanks
+AnilKumar
