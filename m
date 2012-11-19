@@ -1,53 +1,50 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 11:11:40 +0100
-Subject: [GIT PULL] Marvell XOR driver DT changes
-Message-ID: <1353319903-30855-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 19 Nov 2012 11:11:41 +0100
+Subject: [PATCH 1/3] arm: mvebu: add XOR engines to Armada 370/XP .dtsi
+In-Reply-To: <1353319903-30855-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1353319903-30855-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353319903-30855-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+This patch adds the necessary DT data in the Armada 370/XP Device
+Trees.
 
-Here is the DT/board changes related to the Marvell XOR driver.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370-xp.dtsi |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Compared to v1:
-
- * Addition of the Kirkwood and Dove integration, provided
-   respectively by Andrew Lunn and Sebastian Hesselbarth.
-
-This must be applied on top of the Marvell XOR driver cleanup and DT
-binding patch series, which itself applies on top of the clk work from
-Andrew Lunn.
-
-Thanks!
-
-The following changes since commit 7a008db916df99af0cd1d765badcb3e4261b4021:
-
-  dma: mv_xor: Add a device_control function (2012-11-19 10:53:30 +0100)
-
-are available in the git repository at:
-
-  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-xor-board-dt-changes-3.8
-
-for you to fetch changes up to 18731aa5e333017fae0b32f85156711300571328:
-
-  arm: dove: Convert Dove to DT XOR DMA engine (2012-11-19 10:53:32 +0100)
-
-----------------------------------------------------------------
-Marvell XOR driver DT/board changes for 3.8
-
-----------------------------------------------------------------
-Andrew Lunn (1):
-      arm: kirkwood: Convert XOR instantiation to DT.
-
-Sebastian Hesselbarth (1):
-      arm: dove: Convert Dove to DT XOR DMA engine
-
-Thomas Petazzoni (1):
-      arm: mvebu: add XOR engines to Armada 370/XP .dtsi
-
- arch/arm/boot/dts/armada-370-xp.dtsi |   20 ++++++++++++++++
- arch/arm/boot/dts/dove.dtsi          |   42 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/kirkwood.dtsi      |   40 ++++++++++++++++++++++++++++++++
- arch/arm/mach-dove/common.c          |   10 --------
- arch/arm/mach-kirkwood/board-dt.c    |   13 -----------
- 5 files changed, 102 insertions(+), 23 deletions(-)
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 94b4b9e..8a3d490 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -69,6 +69,26 @@
+ 			compatible = "marvell,armada-addr-decoding-controller";
+ 			reg = <0xd0020000 0x258>;
+ 		};
++
++		xor at d0060900 {
++			compatible = "marvell,orion-xor";
++			reg = <0xd0060900 0x100
++			       0xd0060b00 0x100>;
++			clocks = <&coreclk 0>;
++			status = "okay";
++
++			xor00 {
++			      interrupts = <51>;
++			      dmacap,memcpy;
++			      dmacap,xor;
++			};
++			xor01 {
++			      interrupts = <52>;
++			      dmacap,memcpy;
++			      dmacap,xor;
++			      dmacap,memset;
++			};
++		};
+ 	};
+ };
+ 
+-- 
+1.7.9.5
