@@ -1,36 +1,27 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 19 Nov 2012 18:38:24 +0100
-Subject: [GIT PULL] at91: tiny cleanup for 3.8
-Message-ID: <50AA6E90.5080006@atmel.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 19 Nov 2012 10:41:15 -0700
+Subject: [PATCH V5] Add support for generic BCM SoC chipsets
+In-Reply-To: <1353196298-19016-1-git-send-email-csd@broadcom.com>
+References: <1353196298-19016-1-git-send-email-csd@broadcom.com>
+Message-ID: <50AA6F3B.4010801@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On 11/17/2012 04:51 PM, Christian Daudt wrote:
+> In order to start upstreaming Broadcom SoC support, create
+> a starting hierarchy, arch and dts files.
+> The first support SoC family that is planned is the
+> BCM281XX (BCM11130/11140/11351/28145/28155) family of dual A9 mobile
+> SoC cores.
+> This code is just the skeleton code for get the machine upstreamed. It
+> has been made MULTIPLATFORM compatible.
 
-A very little cleanup single patch for AT91.
+> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
 
-The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
+> +	uart at 3e000000 {
+> +		compatible = "bcm,bcm11351-sw-apb-uart", "snps,dw-apb-uart";
 
-  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
+s/-sw-/-dw-/ in the first compatible value?
 
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-for-next-cleanup
-
-for you to fetch changes up to f7c9f47239e9bc2fdf30f51cf46249aeb79980d3:
-
-  ARM: at91/atmel-mci: remove unused setup_dma_addr() macro (2012-11-16 11:52:36 +0100)
-
-----------------------------------------------------------------
-Removing unneeded macro.
-
-----------------------------------------------------------------
-Nicolas Ferre (1):
-      ARM: at91/atmel-mci: remove unused setup_dma_addr() macro
-
- arch/arm/mach-at91/include/mach/atmel-mci.h | 7 -------
- 1 file changed, 7 deletions(-)
-
-Thanks, bye,
--- 
-Nicolas Ferre
+Aside from that,
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
