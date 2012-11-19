@@ -1,49 +1,41 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 19 Nov 2012 10:39:56 +0100
-Subject: [PATCH 4/4] ARM: Dove: Add CuBox pinhog for led
-In-Reply-To: <1353317996-20841-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1353317996-20841-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1353317996-20841-5-git-send-email-sebastian.hesselbarth@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 19 Nov 2012 15:12:03 +0530
+Subject: [GIT PULL] DaVinci fix for v3.7
+Message-ID: <50A9FEEB.50305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SolidRun CuBox has a led on a gpio pin. As there is now DT pinctrl
-support for Dove, make use of a pinhog to ensure the pin is set to
-gpio.
+Hi Arnd, Olof,
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: Axel Lin <axel.lin@ingics.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/dove-cubox.dts |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+Can you please pull the following DaVinci fix for v3.7? I know its pretty late,
+I was out of office for most of the -rc cycle this time.
 
-diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
-index 0adbd5a..fed7d3f 100644
---- a/arch/arm/boot/dts/dove-cubox.dts
-+++ b/arch/arm/boot/dts/dove-cubox.dts
-@@ -40,3 +40,13 @@
- 		reg = <0>;
- 	};
- };
-+
-+&pinctrl {
-+	pinctrl-0 = <&pmx_gpio_18>;
-+	pinctrl-names = "default";
-+
-+	pmx_gpio_18: pmx-gpio-18 {
-+		marvell,pins = "mpp18";
-+		marvell,function = "gpio";
-+	};
-+};
--- 
-1.7.10.4
+The change deserves a stable tag, I did not add it though since the patch
+does not apply cleanly to any of the previous kernel releases. It will have
+to be backported and send to the stable team once it makes it into mainline.
+
+Thanks,
+Sekhar
+
+The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
+
+  Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
+
+are available in the git repository at:
+
+  git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-fixes-for-v3.7
+
+for you to fetch changes up to e37212aa5df1937bc19c0d0982d216675020a7ca:
+
+  ARM: davinci: dm644x: fix out range signal for ED (2012-11-19 13:07:39 +0530)
+
+----------------------------------------------------------------
+Fixes an "signal out of range" error when using enhanced
+definition display with a DaVinci DM644x device.
+
+----------------------------------------------------------------
+Lad, Prabhakar (1):
+      ARM: davinci: dm644x: fix out range signal for ED
+
+ arch/arm/mach-davinci/dm644x.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
