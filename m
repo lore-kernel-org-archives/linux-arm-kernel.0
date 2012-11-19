@@ -1,480 +1,54 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 19 Nov 2012 15:52:37 +0100
-Subject: [PATCH] ARM: dts: exynos4: Use drive strength 3 for SD pins
-Message-ID: <21831256.UCkQ5RyKd5@amdc1227>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 19 Nov 2012 14:53:51 +0000
+Subject: [PATCH v4 06/14] KVM: ARM: Memory virtualization setup
+In-Reply-To: <20121110154252.2836.8720.stgit@chazy-air>
+References: <20121110154203.2836.46686.stgit@chazy-air>
+ <20121110154252.2836.8720.stgit@chazy-air>
+Message-ID: <20121119145351.GY3205@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies pin control groups of SD pins on Exynos4210 and
-Exynos4x12 to use drive strength 3, which corresponds to
-S5P_GPIO_DRVSTR_LV4 in legacy non-DT code.
+On Sat, Nov 10, 2012 at 03:42:52PM +0000, Christoffer Dall wrote:
+> This commit introduces the framework for guest memory management
+> through the use of 2nd stage translation. Each VM has a pointer
+> to a level-1 table (the pgd field in struct kvm_arch) which is
+> used for the 2nd stage translations. Entries are added when handling
+> guest faults (later patch) and the table itself can be allocated and
+> freed through the following functions implemented in
+> arch/arm/kvm/arm_mmu.c:
+>  - kvm_alloc_stage2_pgd(struct kvm *kvm);
+>  - kvm_free_stage2_pgd(struct kvm *kvm);
+> 
+> Each entry in TLBs and caches are tagged with a VMID identifier in
+> addition to ASIDs. The VMIDs are assigned consecutively to VMs in the
+> order that VMs are executed, and caches and tlbs are invalidated when
+> the VMID space has been used to allow for more than 255 simultaenously
+> running guests.
+> 
+> The 2nd stage pgd is allocated in kvm_arch_init_vm(). The table is
+> freed in kvm_arch_destroy_vm(). Both functions are called from the main
+> KVM code.
+> 
+> We pre-allocate page table memory to be able to synchronize using a
+> spinlock and be called under rcu_read_lock from the MMU notifiers.  We
+> steal the mmu_memory_cache implementation from x86 and adapt for our
+> specific usage.
+> 
+> We support MMU notifiers (thanks to Marc Zyngier) through
+> kvm_unmap_hva and kvm_set_spte_hva.
+> 
+> Finally, define kvm_phys_addr_ioremap() to map a device at a guest IPA,
+> which is used by VGIC support to map the virtual CPU interface registers
+> to the guest. This support is added by Marc Zyngier.
+> 
+> Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 
-This is needed at least on Origen board for sdhci2 to work.
+Modulo my other comments, this patch looks alright to me. I'll go through
+with acks for the next series. In the meantime, I'll just skip over the
+patches that look ok.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos4210-pinctrl.dtsi | 56 +++++++++++++++----------------
- arch/arm/boot/dts/exynos4x12-pinctrl.dtsi | 56 +++++++++++++++----------------
- 2 files changed, 56 insertions(+), 56 deletions(-)
+Cheers,
 
-diff --git a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
-index 6a4a1a0..55a2efb 100644
---- a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
-@@ -482,196 +482,196 @@
- 			samsung,pins = "gpk0-0";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd0_cmd: sd0-cmd {
- 			samsung,pins = "gpk0-1";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd0_cd: sd0-cd {
- 			samsung,pins = "gpk0-2";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd0_bus1: sd0-bus-width1 {
- 			samsung,pins = "gpk0-3";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd0_bus4: sd0-bus-width4 {
- 			samsung,pins = "gpk0-3", "gpk0-4", "gpk0-5", "gpk0-6";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd0_bus8: sd0-bus-width8 {
- 			samsung,pins = "gpk1-3", "gpk1-4", "gpk1-5", "gpk1-6";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd4_clk: sd4-clk {
- 			samsung,pins = "gpk0-0";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd4_cmd: sd4-cmd {
- 			samsung,pins = "gpk0-1";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd4_cd: sd4-cd {
- 			samsung,pins = "gpk0-2";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd4_bus1: sd4-bus-width1 {
- 			samsung,pins = "gpk0-3";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd4_bus4: sd4-bus-width4 {
- 			samsung,pins = "gpk0-3", "gpk0-4", "gpk0-5", "gpk0-6";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd4_bus8: sd4-bus-width8 {
- 			samsung,pins = "gpk1-3", "gpk1-4", "gpk1-5", "gpk1-6";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <4>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd1_clk: sd1-clk {
- 			samsung,pins = "gpk1-0";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd1_cmd: sd1-cmd {
- 			samsung,pins = "gpk1-1";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd1_cd: sd1-cd {
- 			samsung,pins = "gpk1-2";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd1_bus1: sd1-bus-width1 {
- 			samsung,pins = "gpk1-3";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd1_bus4: sd1-bus-width4 {
- 			samsung,pins = "gpk1-3", "gpk1-4", "gpk1-5", "gpk1-6";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd2_clk: sd2-clk {
- 			samsung,pins = "gpk2-0";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd2_cmd: sd2-cmd {
- 			samsung,pins = "gpk2-1";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd2_cd: sd2-cd {
- 			samsung,pins = "gpk2-2";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd2_bus1: sd2-bus-width1 {
- 			samsung,pins = "gpk2-3";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd2_bus4: sd2-bus-width4 {
- 			samsung,pins = "gpk2-3", "gpk2-4", "gpk2-5", "gpk2-6";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd2_bus8: sd2-bus-width8 {
- 			samsung,pins = "gpk3-3", "gpk3-4", "gpk3-5", "gpk3-6";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd3_clk: sd3-clk {
- 			samsung,pins = "gpk3-0";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd3_cmd: sd3-cmd {
- 			samsung,pins = "gpk3-1";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd3_cd: sd3-cd {
- 			samsung,pins = "gpk3-2";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd3_bus1: sd3-bus-width1 {
- 			samsung,pins = "gpk3-3";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd3_bus4: sd3-bus-width4 {
- 			samsung,pins = "gpk3-3", "gpk3-4", "gpk3-5", "gpk3-6";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		eint0: ext-int0 {
-diff --git a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-index 56f4669..8e6115a 100644
---- a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-@@ -586,196 +586,196 @@
- 			samsung,pins = "gpk0-0";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd0_cmd: sd0-cmd {
- 			samsung,pins = "gpk0-1";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd0_cd: sd0-cd {
- 			samsung,pins = "gpk0-2";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd0_bus1: sd0-bus-width1 {
- 			samsung,pins = "gpk0-3";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd0_bus4: sd0-bus-width4 {
- 			samsung,pins = "gpk0-3", "gpk0-4", "gpk0-5", "gpk0-6";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd0_bus8: sd0-bus-width8 {
- 			samsung,pins = "gpk1-3", "gpk1-4", "gpk1-5", "gpk1-6";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd4_clk: sd4-clk {
- 			samsung,pins = "gpk0-0";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd4_cmd: sd4-cmd {
- 			samsung,pins = "gpk0-1";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd4_cd: sd4-cd {
- 			samsung,pins = "gpk0-2";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd4_bus1: sd4-bus-width1 {
- 			samsung,pins = "gpk0-3";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd4_bus4: sd4-bus-width4 {
- 			samsung,pins = "gpk0-3", "gpk0-4", "gpk0-5", "gpk0-6";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd4_bus8: sd4-bus-width8 {
- 			samsung,pins = "gpk1-3", "gpk1-4", "gpk1-5", "gpk1-6";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <4>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd1_clk: sd1-clk {
- 			samsung,pins = "gpk1-0";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd1_cmd: sd1-cmd {
- 			samsung,pins = "gpk1-1";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd1_cd: sd1-cd {
- 			samsung,pins = "gpk1-2";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd1_bus1: sd1-bus-width1 {
- 			samsung,pins = "gpk1-3";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd1_bus4: sd1-bus-width4 {
- 			samsung,pins = "gpk1-3", "gpk1-4", "gpk1-5", "gpk1-6";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd2_clk: sd2-clk {
- 			samsung,pins = "gpk2-0";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd2_cmd: sd2-cmd {
- 			samsung,pins = "gpk2-1";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd2_cd: sd2-cd {
- 			samsung,pins = "gpk2-2";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd2_bus1: sd2-bus-width1 {
- 			samsung,pins = "gpk2-3";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd2_bus4: sd2-bus-width4 {
- 			samsung,pins = "gpk2-3", "gpk2-4", "gpk2-5", "gpk2-6";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd2_bus8: sd2-bus-width8 {
- 			samsung,pins = "gpk3-3", "gpk3-4", "gpk3-5", "gpk3-6";
- 			samsung,pin-function = <3>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd3_clk: sd3-clk {
- 			samsung,pins = "gpk3-0";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd3_cmd: sd3-cmd {
- 			samsung,pins = "gpk3-1";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd3_cd: sd3-cd {
- 			samsung,pins = "gpk3-2";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd3_bus1: sd3-bus-width1 {
- 			samsung,pins = "gpk3-3";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		sd3_bus4: sd3-bus-width4 {
- 			samsung,pins = "gpk3-3", "gpk3-4", "gpk3-5", "gpk3-6";
- 			samsung,pin-function = <2>;
- 			samsung,pin-pud = <3>;
--			samsung,pin-drv = <0>;
-+			samsung,pin-drv = <3>;
- 		};
- 
- 		keypad_col0: keypad-col0 {
--- 
-1.8.0
+Will
