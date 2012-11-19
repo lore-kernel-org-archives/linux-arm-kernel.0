@@ -1,46 +1,48 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 19 Nov 2012 12:45:02 +0000
-Subject: [PATCH v4 3/7] ARM: kernel: smp_setup_processor_id() updates
+Date: Mon, 19 Nov 2012 12:45:01 +0000
+Subject: [PATCH v4 2/7] ARM: kernel: update topology to use new MPIDR macros
 In-Reply-To: <1353329106-24084-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1353329106-24084-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1353329106-24084-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1353329106-24084-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch applies some basic changes to the smp_setup_processor_id()
-ARM implementation to make the code that builds cpu_logical_map more
-uniform across the kernel.
-
-The function now prints the full extent of the boot CPU MPIDR[23:0] and
-initializes the cpu_logical_map for CPUs up to nr_cpu_ids.
+This patch updates the topology initialization code to use the newly
+defined accessors to retrieve the MPIDR affinity levels.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/kernel/setup.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/kernel/topology.c | 15 +++++----------
+ 1 file changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index da1d1aa..4515bf6 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -426,13 +426,14 @@ int __cpu_logical_map[NR_CPUS];
- void __init smp_setup_processor_id(void)
- {
- 	int i;
--	u32 cpu = is_smp() ? read_cpuid_mpidr() & 0xff : 0;
-+	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;
-+	u32 cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 4642c7d..cba99bd 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -262,19 +262,14 @@ void store_cpu_topology(unsigned int cpuid)
  
- 	cpu_logical_map(0) = cpu;
--	for (i = 1; i < NR_CPUS; ++i)
-+	for (i = 1; i < nr_cpu_ids; ++i)
- 		cpu_logical_map(i) = i == cpu ? 0 : i;
- 
--	printk(KERN_INFO "Booting Linux on physical CPU %d\n", cpu);
-+	printk(KERN_INFO "Booting Linux on physical CPU 0x%x\n", mpidr);
- }
- 
- static void __init setup_processor(void)
+ 		if (mpidr & MPIDR_MT_BITMASK) {
+ 			/* core performance interdependency */
+-			cpuid_topo->thread_id = (mpidr >> MPIDR_LEVEL0_SHIFT)
+-				& MPIDR_LEVEL0_MASK;
+-			cpuid_topo->core_id = (mpidr >> MPIDR_LEVEL1_SHIFT)
+-				& MPIDR_LEVEL1_MASK;
+-			cpuid_topo->socket_id = (mpidr >> MPIDR_LEVEL2_SHIFT)
+-				& MPIDR_LEVEL2_MASK;
++			cpuid_topo->thread_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++			cpuid_topo->core_id = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++			cpuid_topo->socket_id = MPIDR_AFFINITY_LEVEL(mpidr, 2);
+ 		} else {
+ 			/* largely independent cores */
+ 			cpuid_topo->thread_id = -1;
+-			cpuid_topo->core_id = (mpidr >> MPIDR_LEVEL0_SHIFT)
+-				& MPIDR_LEVEL0_MASK;
+-			cpuid_topo->socket_id = (mpidr >> MPIDR_LEVEL1_SHIFT)
+-				& MPIDR_LEVEL1_MASK;
++			cpuid_topo->core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++			cpuid_topo->socket_id = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+ 		}
+ 	} else {
+ 		/*
 -- 
 1.7.12
