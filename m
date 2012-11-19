@@ -1,66 +1,53 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 13:56:09 +0100
-Subject: [PATCH 3/3] net: mvneta: adjust multiline comments to net/ style
-In-Reply-To: <50AA2AD4.6030007@mvista.com>
-References: <1353322834-16952-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1353322834-16952-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <50AA2AD4.6030007@mvista.com>
-Message-ID: <20121119135609.3808b1c7@skate>
+From: s.peter@mpl.ch (Stefan Peter)
+Date: Mon, 19 Nov 2012 14:01:00 +0100
+Subject: [PATCH 0/1] ARM: kirkwood: Convert the mplcec4 board to pinctrl
+In-Reply-To: <20121119121833.GI10259@lunn.ch>
+References: <cover.1353319919.git.s.peter@mpl.ch>
+ <20121119111838.GH10259@lunn.ch> <50AA2118.7050700@mpl.ch>
+ <20121119121833.GI10259@lunn.ch>
+Message-ID: <50AA2D8C.90902@mpl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sergei Shtylyov,
+Hi Andrew
 
-On Mon, 19 Nov 2012 16:49:24 +0400, Sergei Shtylyov wrote:
-
-> > -/*
-> > - * The two bytes Marvell header. Either contains a special value used
-> > +/* The two bytes Marvell header. Either contains a special value used
+Am 19.11.2012 13:18, schrieb Andrew Lunn:
 > 
->     Why the heck you're doing this? It's the preferred style, see 
-> Documentation/CodingStyle, chapter 8.
+> Humm..
+> 
+> Try enabling CONFIG_DEBUG_PINCTRL. It prints out a lot of debug as the
+> driver loads.
 
-No. Please read Documentation/CodingStyle, chapter 8 entirely:
 
-===============================================================
-The preferred style for long (multi-line) comments is:
+This is what I get
 
-        /*
-         * This is the preferred style for multi-line
-         * comments in the Linux kernel source code.
-         * Please use it consistently.
-         *
-         * Description:  A column of asterisks on the left side,
-         * with beginning and ending almost-blank lines.
-         */
+kirkwood-pinctrl f1010000.pinctrl: try to register 50 pins ...
+pinctrl core: registered pin 0 (PIN0) on f1010000.pinctrl
+pinctrl core: registered pin 1 (PIN1) on f1010000.pinctrl
+...
+pinctrl core: registered pin 12 (PIN12) on f1010000.pinctrl
+pinctrl core: registered pin 13 (PIN13) on f1010000.pinctrl
+pinctrl core: registered pin 14 (PIN14) on f1010000.pinctrl
+pinctrl core: registered pin 15 (PIN15) on f1010000.pinctrl
+pinctrl core: registered pin 16 (PIN16) on f1010000.pinctrl
+pinctrl core: registered pin 17 (PIN17) on f1010000.pinctrl
+...
+pinctrl core: add 8 pinmux maps
+pinctrl core: add 2 pinmux maps
+pinctrl core: add 1 pinmux maps
+kirkwood-pinctrl f1010000.pinctrl: unknown pin mmp13
+pinctrl core: add 6 pinmux maps
+pinctrl core: failed to register map default (5): invalid type given
+kirkwood-pinctrl f1010000.pinctrl: registered pinctrl driver
 
-For files in net/ and drivers/net/ the preferred style for long
-(multi-line) comments is a little different.
+I tried to get behind the reason for the "unknown pin mpp13" hoping that
+the subsequent errors regarding the maps are related, but it may be
+faster asking for your opinion.
 
-        /* The preferred comment style for files in net/ and drivers/net
-         * looks like this.
-         *
-         * It is nearly the same as the generally preferred comment style,
-         * but there is no initial almost-blank line.
-         */
-===============================================================
+Regards
 
-Seen the second part?
+Stefan Peter
 
-Please also see scripts/checkpatch.pl:
-
-                if ($realfile =~ m@^(drivers/net/|net/)@ &&
-                    $rawline =~ /^\+[ \t]*\/\*[ \t]*$/ &&
-                    $prevrawline =~ /^\+[ \t]*$/) {
-                        WARN("NETWORKING_BLOCK_COMMENT_STYLE",
-                             "networking block comments don't use an empty /* line, use /* Comment...\n" . $hereprev);
-                }
-
-Thanks,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+MPL AG, Switzerland                     http://www.mpl.ch
+Tel. +41 (0)56 483 34 34          Fax: +41(0)56 493 30 20
