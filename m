@@ -1,54 +1,51 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Mon, 19 Nov 2012 11:54:55 -0700
-Subject: [PATCH v4 2/8] ARM: OMAP2xxx: hwmod: Add DMA support for SHAM module
+Date: Mon, 19 Nov 2012 11:54:58 -0700
+Subject: [PATCH v4 5/8] crypto: omap-sham: Remove cpu_is/omap_type check from
+ driver
 In-Reply-To: <1353351301-6453-1-git-send-email-mgreer@animalcreek.com>
 References: <1353351301-6453-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1353351301-6453-3-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1353351301-6453-6-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-The current OMAP2 SHAM support doesn't enable DMA
-so add that support so it can use DMA just like OMAP3.
+The omap-sham driver should not check the CPU class or the
+type of OMAP device its on.  The platform code should do
+that instead.
 
 CC: Paul Walmsley <paul@pwsan.com>
+CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
 Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c | 2 +-
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c      | 6 ++++++
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ drivers/crypto/omap-sham.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c
-index bb314c5..4b4fd5f 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c
-@@ -405,5 +405,5 @@ struct omap_hwmod_ocp_if omap2xxx_l4_core__sham = {
- 	.slave		= &omap2xxx_sham_hwmod,
- 	.clk		= "sha_ick",
- 	.addr		= omap2xxx_sham_addrs,
--	.user		= OCP_USER_MPU,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-index a041670..703b269 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-@@ -873,9 +873,15 @@ struct omap_hwmod_irq_info omap2_sham_mpu_irqs[] = {
- 	{ .irq = -1 }
- };
+diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+index a3fd6fc..f50387c 100644
+--- a/drivers/crypto/omap-sham.c
++++ b/drivers/crypto/omap-sham.c
+@@ -37,7 +37,6 @@
+ #include <crypto/hash.h>
+ #include <crypto/internal/hash.h>
  
-+struct omap_hwmod_dma_info omap2_sham_sdma_chs[] = {
-+	{ .name = "rx", .dma_req = OMAP24XX_DMA_SHA1MD5_RX },
-+	{ .dma_req = -1 }
-+};
-+
- struct omap_hwmod omap2xxx_sham_hwmod = {
- 	.name		= "sham",
- 	.mpu_irqs	= omap2_sham_mpu_irqs,
-+	.sdma_reqs	= omap2_sham_sdma_chs,
- 	.main_clk	= "l4_ck",
- 	.prcm		= {
- 		.omap2 = {
+-#include <plat/cpu.h>
+ #include <plat/dma.h>
+ #include <mach/irqs.h>
+ 
+@@ -1289,13 +1288,6 @@ static int __init omap_sham_mod_init(void)
+ {
+ 	pr_info("loading %s driver\n", "omap-sham");
+ 
+-	if (!cpu_class_is_omap2() ||
+-		(omap_type() != OMAP2_DEVICE_TYPE_SEC &&
+-			omap_type() != OMAP2_DEVICE_TYPE_EMU)) {
+-		pr_err("Unsupported cpu\n");
+-		return -ENODEV;
+-	}
+-
+ 	return platform_driver_register(&omap_sham_driver);
+ }
+ 
 -- 
 1.7.12
