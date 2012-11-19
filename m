@@ -1,35 +1,36 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 19 Nov 2012 16:44:57 +0000
-Subject: [PATCH] ARM: Kconfig: Do not select ARCH_VEXPRESS on ARCH_MULTI_V7
-In-Reply-To: <1353343080-19220-1-git-send-email-fabio.estevam@freescale.com>
-References: <1353343080-19220-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1353343497.3303.34.camel@hornet>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 19 Nov 2012 17:44:54 +0100
+Subject: [PATCH] arm: orion5x: convert Netgear WNR854T to device tree
+In-Reply-To: <1353342451-27180-1-git-send-email-kaloz@openwrt.org>
+References: <1353342451-27180-1-git-send-email-kaloz@openwrt.org>
+Message-ID: <20121119174454.67ad1f25@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-11-19 at 16:38 +0000, Fabio Estevam wrote:
-> Booting a kernel on a mx53qsb board (built with imx_v6_v7_defconfig) leads to:
+Dear Imre Kaloz,
+
+On Mon, 19 Nov 2012 17:27:31 +0100, Imre Kaloz wrote:
+> This commit converts the Netgear WNR854T to device tree
 > 
-> Unable to handle kernel NULL pointer dereference at virtual address 00000008
-> pgd = 80004000
-> [00000008] *pgd=00000000
-> Internal error: Oops: 805 [#1] SMP ARM
-> Modules linked in:
-> CPU: 0    Not tainted  (3.7.0-rc5-next-20121115+ #715)
-> PC is at vexpress_sysreg_init_leds+0x30/0xb8
-> LR is at do_one_initcall+0x3c/0x190
-> pc : [<8065e170>]    lr : [<800086a0>]    psr: 60000153
-> sp : df855ef0  ip : df855f18  fp : df855f14
-> r10: 00000000  r9 : 8067eb5c  r8 : 8065e140
-> r7 : 80711cac  r6 : 806c2cc0  r5 : 00000000  r4 : 80673850
-> r3 : 00000000  r2 : 00000000  r1 : df854000  r0 : 8065e140
-> ...
+> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+> ---
+>  arch/arm/boot/dts/Makefile                    |    3 +-
+>  arch/arm/boot/dts/orion5x-netgear-wnr854t.dts |   83 +++++++++++++++++++++++++
+>  arch/arm/mach-orion5x/Kconfig                 |    7 +-
+>  arch/arm/mach-orion5x/Makefile                |    2 +-
+>  arch/arm/mach-orion5x/board-dt.c              |    3 +
+>  arch/arm/mach-orion5x/common.h                |    5 ++
+>  arch/arm/mach-orion5x/wnr854t-setup.c         |   59 +-----------------
+>  7 files changed, 99 insertions(+), 63 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/orion5x-netgear-wnr854t.dts
 
-It's a bug in vexpress-sysreg driver. 3 hours ago I've posted patch
-removing this code...
+Thanks, looks good to me.
 
-https://patchwork.kernel.org/patch/1764801/
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Apologies about causing the issue in the first place.
-
-Pawel
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
