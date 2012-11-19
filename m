@@ -1,31 +1,53 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Sun, 18 Nov 2012 18:32:52 -0800
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <8058793.mIXgB85Mso@percival>
-References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
- <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
- <20121117113849.GA5228@lizard> <8058793.mIXgB85Mso@percival>
-Message-ID: <20121119023251.GA2131@lizard>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sun, 18 Nov 2012 22:08:20 -0500 (EST)
+Subject: [PATCH v3 1/5] ARM: kernel: smp_setup_processor_id() updates
+In-Reply-To: <1352983614-22924-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1352983614-22924-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1352983614-22924-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <alpine.LFD.2.02.1211182151400.1182@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 11:29:05AM +0900, Alex Courbot wrote:
-> On Saturday 17 November 2012 19:38:50 Anton Vorontsov wrote:
-> > > +++ b/drivers/power/power_seq/Kconfig
-> > > @@ -0,0 +1,2 @@
-> > > +config POWER_SEQ
-> > > +	tristate
-> > 
-> > This really needs a proper Kconfig description and a help text, shortly
-> > describing the purpose of the subsystem.
+On Thu, 15 Nov 2012, Lorenzo Pieralisi wrote:
+
+> This patch applies some basic changes to the smp_setup_processor_id()
+> ARM implementation to make the code that builds cpu_logical_map more
+> uniform across the kernel.
 > 
-> Does it? The current state makes power seqs automatically selected by drivers 
-> that need it, and they do not appear in the configuration menu. If we add a 
-> description they will then become a visible item, so the logic would be to 
-> make it user-selectable.
+> The function now prints the full extent of the boot CPU MPIDR[23:0] and
+> initializes the cpu_logical_map for CPUs up to nr_cpu_ids.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Ah. OK, then yes, there is no need for the short description, but the help
-text would a good idea anyway.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Thanks,
-Anton.
+> ---
+>  arch/arm/kernel/setup.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index da1d1aa..d0df6c8 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -426,13 +426,14 @@ int __cpu_logical_map[NR_CPUS];
+>  void __init smp_setup_processor_id(void)
+>  {
+>  	int i;
+> -	u32 cpu = is_smp() ? read_cpuid_mpidr() & 0xff : 0;
+> +	u32 mpidr = is_smp() ? read_cpuid_mpidr() & 0xffffff : 0;
+> +	u32 cpu = mpidr & 0xff;
+>  
+>  	cpu_logical_map(0) = cpu;
+> -	for (i = 1; i < NR_CPUS; ++i)
+> +	for (i = 1; i < nr_cpu_ids; ++i)
+>  		cpu_logical_map(i) = i == cpu ? 0 : i;
+>  
+> -	printk(KERN_INFO "Booting Linux on physical CPU %d\n", cpu);
+> +	printk(KERN_INFO "Booting Linux on physical CPU 0x%x\n", mpidr);
+>  }
+>  
+>  static void __init setup_processor(void)
+> -- 
+> 1.7.12
+> 
+> 
