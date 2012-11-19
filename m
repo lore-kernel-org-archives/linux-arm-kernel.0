@@ -1,328 +1,102 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 19 Nov 2012 23:29:16 +0800
-Subject: [PATCH v4 3/3] ARM: OMAP: gpmc: add DT bindings for GPMC timings and
- NAND
-In-Reply-To: <1353338956-19420-1-git-send-email-zonque@gmail.com>
-References: <1353338956-19420-1-git-send-email-zonque@gmail.com>
-Message-ID: <1353338956-19420-4-git-send-email-zonque@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 19 Nov 2012 16:33:57 +0100
+Subject: [PATCH] net/macb: move to circ_buf macros and fix initial
+ condition
+In-Reply-To: <1353338244-11506-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1353338244-11506-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20121119153357.GM4398@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic DT bindings for OMAP GPMC.
+On 16:17 Mon 19 Nov     , Nicolas Ferre wrote:
+> Move to circular buffers management macro and correct an error
+> with circular buffer initial condition.
+> 
+> Without this patch, the macb_tx_ring_avail() function was
+> not reporting the proper ring availability at startup:
+> macb macb: eth0: BUG! Tx Ring full when queue awake!
+> macb macb: eth0: tx_head = 0, tx_tail = 0
+> And hanginig forever...
+> 
+> I remove the macb_tx_ring_avail() function and use the
+> proven macros from circ_buf.h. CIRC_CNT() is used in the
+> "consumer" part of the driver: macb_tx_interrupt() to match
+> advice from Documentation/circular-buffers.txt.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-The actual peripherals are instanciated from child nodes within the GPMC
-node, and the only type of device that is currently supported is NAND.
+Just tested on 9260
+Tested-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Code was added to parse the generic GPMC timing parameters and some
-documentation with examples on how to use them.
-
-Successfully tested on an AM33xx board.
-
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
- .../devicetree/bindings/mtd/gpmc-nand.txt          |  84 ++++++++++
- arch/arm/mach-omap2/gpmc.c                         | 170 +++++++++++++++++++++
- 2 files changed, 254 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nand.txt
-
-diff --git a/Documentation/devicetree/bindings/mtd/gpmc-nand.txt b/Documentation/devicetree/bindings/mtd/gpmc-nand.txt
-new file mode 100644
-index 0000000..20aa5b9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/gpmc-nand.txt
-@@ -0,0 +1,84 @@
-+Device tree bindings for GPMC connected NANDs
-+
-+GPMC connected NAND (found on OMAP boards) are represented as child nodes of
-+the GPMC controller with a name of "nand".
-+
-+All timing relevant properties as well as generic gpmc child properties are
-+explained in a separate documents - please refer to
-+Documentation/devicetree/bindings/bus/ti-gpmc.txt
-+
-+For NAND specific properties such as ECC modes or bus width, please refer to
-+Documentation/devicetree/bindings/mtd/nand.txt
-+
-+
-+Required properties:
-+
-+ - reg:		The CS line the peripheral is connected to
-+
-+Optional properties:
-+
-+ - nand-bus-width: 		Set this numeric value to 16 if the hardware
-+				is wired that way. If not specified, a bus
-+				width of 8 is assumed.
-+ - ti,nand-ecc-opt:		A string setting the ECC layout to use. One of:
-+
-+	Layouts for 1-bit ecc: stored at end of spare area:
-+
-+		"software"	Software method (default)
-+		"hw"		Hardware method (let gpmc do the error detection)
-+
-+	Layouts for 1-bit ecc: stored at beginning of spare area as romcode:
-+
-+		"hw-romcode"	gpmc method & romcode layout
-+		"bch4"		4-bit BCH ecc code
-+		"bch8"		8-bit BCH ecc code
-+
-+ - ti,nand-ecc-use-elm:		Property without value to specify that the
-+				hardware error correction mode should be used.
-+
-+For inline partiton table parsing (optional):
-+
-+ - #address-cells: should be set to 1
-+ - #size-cells: should be set to 1
-+
-+Example for an AM33xx board:
-+
-+	gpmc: gpmc at 50000000 {
-+		compatible = "ti,gpmc";
-+		ti,hwmods = "gpmc";
-+		reg = <0x50000000 0x1000000>;
-+		interrupts = <100>;
-+		num-cs = <8>;
-+		num-waitpins = <8>;
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0x08000000 0x10000000>;	/* CS0: NAND */
-+
-+		nand at 0,0 {
-+			reg = <0 0 0>; /* CS0, offset 0 */
-+			nand-bus-width = <16>;
-+			ti,nand-ecc-opt = "none";
-+			ti,nand-ecc-use-elm;
-+
-+			gpmc,sync-clk = <0>;
-+			gpmc,cs-on = <0>;
-+			gpmc,cs-rd-off = <44>;
-+			gpmc,cs-wr-off = <44>;
-+			gpmc,adv-on = <6>;
-+			gpmc,adv-rd-off = <34>;
-+			gpmc,adv-wr-off = <44>;
-+			gpmc,we-off = <40>;
-+			gpmc,oe-off = <54>;
-+			gpmc,access = <64>;
-+			gpmc,rd-cycle = <82>;
-+			gpmc,wr-cycle = <82>;
-+			gpmc,wr-access = <40>;
-+			gpmc,wr-data-mux-bus = <0>;
-+
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			/* partitions go here */
-+		};
-+	};
-+
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 7660a56..971a2bf 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -25,6 +25,10 @@
- #include <linux/module.h>
- #include <linux/interrupt.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_mtd.h>
-+#include <linux/of_device.h>
-+#include <linux/mtd/nand.h>
- 
- #include <linux/platform_data/mtd-nand-omap2.h>
- 
-@@ -34,6 +38,7 @@
- #include "common.h"
- #include "omap_device.h"
- #include "gpmc.h"
-+#include "gpmc-nand.h"
- 
- #define	DEVICE_NAME		"omap-gpmc"
- 
-@@ -748,6 +753,162 @@ static int __devinit gpmc_mem_init(void)
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static struct of_device_id gpmc_dt_ids[] = {
-+	{ .compatible = "ti,gpmc" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, gpmc_dt_ids);
-+
-+static void __maybe_unused gpmc_read_timings_dt(struct device_node *np,
-+						struct gpmc_timings *gpmc_t)
-+{
-+	u32 val;
-+
-+	memset(gpmc_t, 0, sizeof(*gpmc_t));
-+
-+	/* minimum clock period for syncronous mode */
-+	if (!of_property_read_u32(np, "gpmc,sync-clk", &val))
-+		gpmc_t->sync_clk = val;
-+
-+	/* chip select timtings */
-+	if (!of_property_read_u32(np, "gpmc,cs-on", &val))
-+		gpmc_t->cs_on = val;
-+
-+	if (!of_property_read_u32(np, "gpmc,cs-rd-off", &val))
-+		gpmc_t->cs_rd_off = val;
-+
-+	if (!of_property_read_u32(np, "gpmc,cs-wr-off", &val))
-+		gpmc_t->cs_wr_off = val;
-+
-+	/* ADV signal timings */
-+	if (!of_property_read_u32(np, "gpmc,adv-on", &val))
-+		gpmc_t->adv_on = val;
-+
-+	if (!of_property_read_u32(np, "gpmc,adv-rd-off", &val))
-+		gpmc_t->adv_rd_off = val;
-+
-+	if (!of_property_read_u32(np, "gpmc,adv-wr-off", &val))
-+		gpmc_t->adv_wr_off = val;
-+
-+	/* WE signal timings */
-+	if (!of_property_read_u32(np, "gpmc,we-on", &val))
-+		gpmc_t->we_on = val;
-+
-+	if (!of_property_read_u32(np, "gpmc,we-off", &val))
-+		gpmc_t->we_off = val;
-+
-+	/* OE signal timings */
-+	if (!of_property_read_u32(np, "gpmc,oe-on", &val))
-+		gpmc_t->oe_on = val;
-+
-+	if (!of_property_read_u32(np, "gpmc,oe-off", &val))
-+		gpmc_t->oe_off = val;
-+
-+	/* access and cycle timings */
-+	if (!of_property_read_u32(np, "gpmc,page-burst-access", &val))
-+		gpmc_t->page_burst_access = val;
-+
-+	if (!of_property_read_u32(np, "gpmc,access", &val))
-+		gpmc_t->access = val;
-+
-+	if (!of_property_read_u32(np, "gpmc,rd-cycle", &val))
-+		gpmc_t->rd_cycle = val;
-+
-+	if (!of_property_read_u32(np, "gpmc,wr-cycle", &val))
-+		gpmc_t->wr_cycle = val;
-+
-+	/* only for OMAP3430 */
-+	if (!of_property_read_u32(np, "gpmc,wr-access", &val))
-+		gpmc_t->wr_access = val;
-+
-+	if (!of_property_read_u32(np, "gpmc,wr-data-mux-bus", &val))
-+		gpmc_t->wr_data_mux_bus = val;
-+}
-+
-+#ifdef CONFIG_MTD_NAND
-+
-+static const char *nand_ecc_opts[] = {
-+	[OMAP_ECC_HAMMING_CODE_DEFAULT]		= "software",
-+	[OMAP_ECC_HAMMING_CODE_HW]		= "hw",
-+	[OMAP_ECC_HAMMING_CODE_HW_ROMCODE]	= "hw-romcode",
-+	[OMAP_ECC_BCH4_CODE_HW]			= "bch4",
-+	[OMAP_ECC_BCH8_CODE_HW]			= "bch8",
-+};
-+
-+static int __devinit gpmc_probe_nand_child(struct platform_device *pdev,
-+					   struct device_node *child)
-+{
-+	u32 val;
-+	const char *s;
-+	struct gpmc_timings gpmc_t;
-+	struct omap_nand_platform_data *gpmc_nand_data;
-+
-+	if (of_property_read_u32(child, "reg", &val) < 0) {
-+		dev_err(&pdev->dev, "%s has no 'reg' property\n",
-+			child->full_name);
-+		return -ENODEV;
-+	}
-+
-+	gpmc_nand_data = devm_kzalloc(&pdev->dev, sizeof(*gpmc_nand_data),
-+				      GFP_KERNEL);
-+	if (!gpmc_nand_data)
-+		return -ENOMEM;
-+
-+	gpmc_nand_data->cs = val;
-+	gpmc_nand_data->of_node = child;
-+
-+	if (!of_property_read_string(child, "ti,nand-ecc-opt", &s))
-+		for (val = 0; val < ARRAY_SIZE(nand_ecc_opts); val++)
-+			if (!strcasecmp(s, nand_ecc_opts[val]))
-+				gpmc_nand_data->ecc_opt = val;
-+
-+	if (of_get_property(child, "ti,nand-ecc-use-elm", NULL))
-+		gpmc_nand_data->is_elm_used = 1;
-+
-+	val = of_get_nand_bus_width(child);
-+	if (val == 16)
-+		gpmc_nand_data->devsize = NAND_BUSWIDTH_16;
-+
-+	gpmc_read_timings_dt(child, &gpmc_t);
-+	gpmc_nand_init(gpmc_nand_data, &gpmc_t);
-+
-+	return 0;
-+}
-+#else
-+static int __devinit gpmc_probe_nand_child(struct platform_device *pdev,
-+					   struct device_node *child)
-+{
-+	return 0;
-+}
-+#endif
-+
-+static int __devinit gpmc_probe_dt(struct platform_device *pdev)
-+{
-+	int ret;
-+	struct device_node *child;
-+	const struct of_device_id *of_id =
-+		of_match_device(gpmc_dt_ids, &pdev->dev);
-+
-+	if (!of_id)
-+		return 0;
-+
-+	for_each_node_by_name(child, "nand") {
-+		ret = gpmc_probe_nand_child(pdev, child);
-+		of_node_put(child);
-+		if (ret < 0)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+#else
-+static int __devinit gpmc_probe_dt(struct platform_device *pdev)
-+{
-+	return 0;
-+}
-+#endif
-+
- static __devinit int gpmc_probe(struct platform_device *pdev)
- {
- 	int rc;
-@@ -801,6 +962,14 @@ static __devinit int gpmc_probe(struct platform_device *pdev)
- 	if (IS_ERR_VALUE(gpmc_setup_irq()))
- 		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
- 
-+	rc = gpmc_probe_dt(pdev);
-+	if (rc < 0) {
-+		clk_disable_unprepare(gpmc_l3_clk);
-+		clk_put(gpmc_l3_clk);
-+		dev_err(gpmc_dev, "failed to probe DT parameters\n");
-+		return rc;
-+	}
-+
- 	return 0;
- }
- 
-@@ -818,6 +987,7 @@ static struct platform_driver gpmc_driver = {
- 	.driver		= {
- 		.name	= DEVICE_NAME,
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(gpmc_dt_ids),
- 	},
- };
- 
--- 
-1.7.11.7
+Best Regards,
+J.
+> ---
+>  drivers/net/ethernet/cadence/macb.c | 17 +++++++----------
+>  1 file changed, 7 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+> index edb2aba..27991dd 100644
+> --- a/drivers/net/ethernet/cadence/macb.c
+> +++ b/drivers/net/ethernet/cadence/macb.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/moduleparam.h>
+>  #include <linux/kernel.h>
+>  #include <linux/types.h>
+> +#include <linux/circ_buf.h>
+>  #include <linux/slab.h>
+>  #include <linux/init.h>
+>  #include <linux/gpio.h>
+> @@ -38,8 +39,8 @@
+>  #define TX_RING_SIZE		128 /* must be power of 2 */
+>  #define TX_RING_BYTES		(sizeof(struct macb_dma_desc) * TX_RING_SIZE)
+>  
+> -/* minimum number of free TX descriptors before waking up TX process */
+> -#define MACB_TX_WAKEUP_THRESH	(TX_RING_SIZE / 4)
+> +/* level of occupied TX descriptors under which we wake up TX process */
+> +#define MACB_TX_WAKEUP_THRESH	(3 * TX_RING_SIZE / 4)
+>  
+>  #define MACB_RX_INT_FLAGS	(MACB_BIT(RCOMP) | MACB_BIT(RXUBR)	\
+>  				 | MACB_BIT(ISR_ROVR))
+> @@ -60,11 +61,6 @@ static unsigned int macb_tx_ring_wrap(unsigned int index)
+>  	return index & (TX_RING_SIZE - 1);
+>  }
+>  
+> -static unsigned int macb_tx_ring_avail(struct macb *bp)
+> -{
+> -	return (bp->tx_tail - bp->tx_head) & (TX_RING_SIZE - 1);
+> -}
+> -
+>  static struct macb_dma_desc *macb_tx_desc(struct macb *bp, unsigned int index)
+>  {
+>  	return &bp->tx_ring[macb_tx_ring_wrap(index)];
+> @@ -524,7 +520,8 @@ static void macb_tx_interrupt(struct macb *bp)
+>  
+>  	bp->tx_tail = tail;
+>  	if (netif_queue_stopped(bp->dev)
+> -			&& macb_tx_ring_avail(bp) > MACB_TX_WAKEUP_THRESH)
+> +			&& CIRC_CNT(bp->tx_head, bp->tx_tail,
+> +				    TX_RING_SIZE) <= MACB_TX_WAKEUP_THRESH)
+>  		netif_wake_queue(bp->dev);
+>  }
+>  
+> @@ -818,7 +815,7 @@ static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
+>  	spin_lock_irqsave(&bp->lock, flags);
+>  
+>  	/* This is a hard error, log it. */
+> -	if (macb_tx_ring_avail(bp) < 1) {
+> +	if (CIRC_SPACE(bp->tx_head, bp->tx_tail, TX_RING_SIZE) < 1) {
+>  		netif_stop_queue(dev);
+>  		spin_unlock_irqrestore(&bp->lock, flags);
+>  		netdev_err(bp->dev, "BUG! Tx Ring full when queue awake!\n");
+> @@ -855,7 +852,7 @@ static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
+>  
+>  	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(TSTART));
+>  
+> -	if (macb_tx_ring_avail(bp) < 1)
+> +	if (CIRC_SPACE(bp->tx_head, bp->tx_tail, TX_RING_SIZE) < 1)
+>  		netif_stop_queue(dev);
+>  
+>  	spin_unlock_irqrestore(&bp->lock, flags);
+> -- 
+> 1.8.0
+> 
