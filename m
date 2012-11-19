@@ -1,41 +1,29 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 12:16:26 +0100
-Subject: [GIT PULL] Marvell mvebu defconfig updates for net and XOR
-Message-ID: <1353323788-17474-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 19 Nov 2012 12:16:28 +0100
+Subject: [PATCH 2/2] arm: mvebu: update defconfig to include XOR driver
+In-Reply-To: <1353323788-17474-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1353323788-17474-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353323788-17474-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/configs/mvebu_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Here are two simple patches that update mvebu_defconfig to enable by
-default the networking stack, the mvneta network driver and the XOR
-driver.
-
-They are to be applied on top of the existing defconfig changes that
-you have already queued for 3.8.
-
-Thanks!
-
-The following changes since commit 803b4905545039f97c7824bcab605e91ac20acbb:
-
-  Merge remote-tracking branch 'jcooper/mvebu/dt' into mvneta-fixes (2012-11-19 12:08:58 +0100)
-
-are available in the git repository at:
-
-
-  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-net-xor-defconfig-for-3.8
-
-for you to fetch changes up to a3c99ab8e7a56de106c4fa9829f36584af4bf89d:
-
-  arm: mvebu: update defconfig to include XOR driver (2012-11-19 12:10:54 +0100)
-
-----------------------------------------------------------------
-Marvell mvebu defconfig updates for 3.8
-
-----------------------------------------------------------------
-Thomas Petazzoni (2):
-      arm: mvebu: update defconfig to include network driver
-      arm: mvebu: update defconfig to include XOR driver
-
- arch/arm/configs/mvebu_defconfig |    7 +++++++
- 1 file changed, 7 insertions(+)
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index b9adce1..5c79474 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -39,6 +39,8 @@ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_DMADEVICES=y
++CONFIG_MV_XOR=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+-- 
+1.7.9.5
