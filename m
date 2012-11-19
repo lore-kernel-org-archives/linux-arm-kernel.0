@@ -1,74 +1,63 @@
-From: sr@denx.de (Stefan Roese)
-Date: Mon, 19 Nov 2012 12:09:43 +0100
-Subject: [PATCH 4/4] ARM: sunxi: Add sunxi restart function via onchip watchdog
-In-Reply-To: <1353323383-11827-1-git-send-email-sr@denx.de>
-References: <1353323383-11827-1-git-send-email-sr@denx.de>
-Message-ID: <1353323383-11827-4-git-send-email-sr@denx.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 19 Nov 2012 12:12:26 +0100
+Subject: [RFC] ARM: mx5: Replace clk_register_clkdev with clock DT lookup
+In-Reply-To: <1353087415-10442-1-git-send-email-festevam@gmail.com>
+References: <1353087415-10442-1-git-send-email-festevam@gmail.com>
+Message-ID: <1353323546.2697.22.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-sunxi/sunxi.c       |  1 +
- arch/arm/mach-sunxi/sunxi.h       |  2 ++
- drivers/clocksource/sunxi_timer.c | 14 ++++++++++++++
- 3 files changed, 17 insertions(+)
+Am Freitag, den 16.11.2012, 15:36 -0200 schrieb Fabio Estevam:
+> From: Fabio Estevam fabio.estevam at freescale.com>
+> 
+> Similarly as it was done for mx6q, use a DT lookup in order to make maintainance
+> task for the clock devices easier.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Shawn/Sascha,
+> 
+> I do not have access to any mx5 hardware at the moment to try it, so that's
+> why I marked it as RFC.
 
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 13d4d96..6b1186c 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -57,5 +57,6 @@ DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
- 	.init_irq	= sunxi_init_irq,
- 	.handle_irq	= sunxi_handle_irq,
- 	.timer		= &sunxi_timer,
-+	.restart	= sunxi_restart,
- 	.dt_compat	= sunxi_board_dt_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-sunxi/sunxi.h b/arch/arm/mach-sunxi/sunxi.h
-index 33b5871..806c5fd 100644
---- a/arch/arm/mach-sunxi/sunxi.h
-+++ b/arch/arm/mach-sunxi/sunxi.h
-@@ -17,4 +17,6 @@
- #define SUNXI_REGS_VIRT_BASE	IOMEM(0xf1c00000)
- #define SUNXI_REGS_SIZE		(SZ_2M + SZ_1M)
+Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+After adding the IPU clock lookups, as below, on top of Sascha's latest
+IPUv3 patches (in staging-next).
+
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index bcdfabc..3f86a5e 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -73,6 +73,8 @@
+ 			compatible = "fsl,imx53-ipu";
+ 			reg = <0x18000000 0x080000000>;
+ 			interrupts = <11 10>;
++			clocks = <&clks 59>, <&clks 120>, <&clks 61>;
++			clock-names = "bus", "di0", "di1";
+ 			reset = <&src 2>;
+ 		};
  
-+void sunxi_restart(char mode, const char *cmd);
-+
- #endif /* __MACH_SUNXI_H */
-diff --git a/drivers/clocksource/sunxi_timer.c b/drivers/clocksource/sunxi_timer.c
-index 3c46434..dfbf879 100644
---- a/drivers/clocksource/sunxi_timer.c
-+++ b/drivers/clocksource/sunxi_timer.c
-@@ -34,6 +34,8 @@
- #define TIMER0_CTL_ONESHOT		(1 << 7)
- #define TIMER0_INTVAL_REG	0x14
- #define TIMER0_CNTVAL_REG	0x18
-+#define WATCH_DOG_CTRL_REG	0x90
-+#define WATCH_DOG_MODE_REG	0x94
- 
- #define TIMER_SCAL		16
- 
-@@ -103,6 +105,18 @@ static struct of_device_id sunxi_timer_dt_ids[] = {
- 	{ .compatible = "allwinner,sunxi-timer" },
- };
- 
-+void sunxi_restart(char mode, const char *cmd)
-+{
-+	/* Use watchdog to reset system */
-+
-+	/* Enable timer and set reset bit */
-+	writel(3, timer_base + WATCH_DOG_MODE_REG);
-+	writel(0xa57 << 1 | 1, timer_base + WATCH_DOG_CTRL_REG);
-+
-+	while(1)
-+		;
-+}
-+
- static void __init sunxi_timer_init(void)
- {
- 	struct device_node *node;
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c
+b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 473bcdc..031c967 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -458,10 +458,6 @@ int __init mx53_clocks_init(unsigned long
+rate_ckil, unsigned long rate_osc,
+ 	clk_register_clkdev(clk[vpu_gate], NULL, "63ff4000.vpu");
+ 	clk_register_clkdev(clk[i2c3_gate], NULL, "imx-i2c.2");
+ 	clk_register_clkdev(clk[fec_gate], NULL, "imx25-fec.0");
+-	clk_register_clkdev(clk[ipu_gate], "bus", "18000000.ipu");
+-	clk_register_clkdev(clk[ipu_di0_gate], "di0", "18000000.ipu");
+-	clk_register_clkdev(clk[ipu_di1_gate], "di1", "18000000.ipu");
+-	clk_register_clkdev(clk[ipu_gate], "hsp", "18000000.ipu");
+ 	clk_register_clkdev(clk[usb_phy1_gate], "usb_phy1", "mxc-ehci.0");
+ 	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg",
+"sdhci-esdhc-imx53.0");
+ 	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx53.0");
 -- 
-1.8.0
+1.7.10.4
+
+regards
+Philipp
