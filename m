@@ -1,95 +1,305 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Mon, 19 Nov 2012 11:54:53 -0700
-Subject: [PATCH v4 0/8] crypto: omap-sham updates
-Message-ID: <1353351301-6453-1-git-send-email-mgreer@animalcreek.com>
+Date: Mon, 19 Nov 2012 11:55:01 -0700
+Subject: [PATCH v4 8/8] crypto: omap_sham: Remove usage of private DMA API
+In-Reply-To: <1353351301-6453-1-git-send-email-mgreer@animalcreek.com>
+References: <1353351301-6453-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1353351301-6453-9-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-Changes since v3:
-	- Added hwmod support for SIDLEMODE.  This requires adding
-	  a specific omap_hwmod_sysc_fields structure since there
-	  are not generic ones that have the correct offsets.
-	- Added patch to remove the cpu check from the omap-sham
-	  driver.  This can likely be ignored since there is a patch
-	  that already does this in Tony's branch.  I added it to
-	  make it easier for others to test while Tony's patch makes
-	  its way to the k.o.
+Remove usage of the private OMAP DMA API.
+The dmaengine API will be used instead.
 
-Changes since v2:
-	- Reworked pm_runtime calls to match where original clk_*
-	  calls were so provide better PM (as per Kevin Hilman's
-	  comments).
+CC: Russell King <rmk+kernel@arm.linux.org.uk>
+CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
+Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+---
+ drivers/crypto/omap-sham.c | 116 ---------------------------------------------
+ 1 file changed, 116 deletions(-)
 
-Changes since v1:
-	- Removed the check of CM_IDLEST to see if the module exists
-	  and instead add the hwmod data for all omap2's and omap3 GP's.
-	- Placed new sha_ick clk entries after the 'omap-sham' entry
-	  in the clockxxx_data.c files
-	- Removed cpu_is_xxx() checks in
-	  arch/arm/mach-omap2/devices.c:omap_init_sham()
-	- Rebased on the latest k.o. kernel
-
-
-This series updates the crypto omap-sham driver and supporting
-infrastructure.
-
-Notes:
-
-a) Based on 3587b1b (fanotify: fix FAN_Q_OVERFLOW case of fanotify_read()).
-
-b) Since these patches will likely go though the OMAP tree (and not
-   through the crypto tree), it would be nice if the crypto guy(s)
-   would ACK or NACK patches 5-7 which modify the
-   drivers/crypto/omap-sham.c driver.
-
-c) These have only been tested on an omap2420 h4 and an am37x evm.  If you
-   have different hardware available and a few minutes, please test them.
-   A quick and easy test is to enable tcrypt as a module
-   (CONFIG_CRYPTO_TEST=m), boot, then run 'modprobe tcrypt sec=2 mode=403'.
-   'CONFIG_CRYPTO_SHA1' and 'CONFIG_CRYPTO_DEV_OMAP_SHAM' also have to be
-   enabled.  A quick 'grep omap-sham /proc/interrupts' will tell you if
-   the omap-sham driver was really used.
-
-d) To test these patches, you will likely need...
-   i) The patch included here:
-	   http://marc.info/?l=kernel-janitors&m=134910841909057&w=2
-   ii) This patch from linux-omap/master:
-	   27615a9 (ARM: OMAP: Trivial driver changes to remove include
-			   plat/cpu.h)
-   iii) This patch from Paul Walmsley:
-	   http://www.spinics.net/lists/linux-omap/msg79436.html
-
-e) If you prefer, a version you can test is available at
-   git at github.com:mgreeraz/linux-mag.git wip/crypto/sham-v3+test
-
-f) There is a reduction in DMA performance after switching to dmaengine
-   (see http://www.spinics.net/lists/linux-omap/msg79855.html)
-
-g) Many thanks to Jon Hunter for testing on his omap2420 h4.
-
-Mark A. Greer (8):
-  ARM: OMAP2xxx: hwmod: Convert SHAM crypto device data to hwmod
-  ARM: OMAP2xxx: hwmod: Add DMA support for SHAM module
-  ARM: OMAP3xxx: hwmod: Convert SHAM crypto device data to hwmod
-  ARM: OMAP2+: Remove unnecessary message when no SHA IP is present
-  crypto: omap-sham: Remove cpu_is/omap_type check from driver
-  crypto: omap-sham: Convert to use pm_runtime API
-  crypto: omap-sham: Add code to use dmaengine API
-  crypto: omap_sham: Remove usage of private DMA API
-
- arch/arm/mach-omap2/clock2430_data.c               |   1 +
- arch/arm/mach-omap2/clock3xxx_data.c               |   1 +
- arch/arm/mach-omap2/devices.c                      |  73 ++------
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   1 +
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   1 +
- .../mach-omap2/omap_hwmod_2xxx_interconnect_data.c |  18 ++
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  43 +++++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  66 +++++++
- arch/arm/mach-omap2/omap_hwmod_common_data.h       |   2 +
- drivers/crypto/omap-sham.c                         | 202 +++++++++++----------
- 10 files changed, 251 insertions(+), 157 deletions(-)
-
+diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+index ba59bbe..14db042 100644
+--- a/drivers/crypto/omap-sham.c
++++ b/drivers/crypto/omap-sham.c
+@@ -13,8 +13,6 @@
+  * Some ideas are from old omap-sha1-md5.c driver.
+  */
+ 
+-#define OMAP_SHAM_DMA_PRIVATE
+-
+ #define pr_fmt(fmt) "%s: " fmt, __func__
+ 
+ #include <linux/err.h>
+@@ -29,10 +27,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/scatterlist.h>
+ #include <linux/dma-mapping.h>
+-#ifndef OMAP_SHAM_DMA_PRIVATE
+ #include <linux/dmaengine.h>
+ #include <linux/omap-dma.h>
+-#endif
+ #include <linux/pm_runtime.h>
+ #include <linux/delay.h>
+ #include <linux/crypto.h>
+@@ -43,11 +39,6 @@
+ #include <crypto/hash.h>
+ #include <crypto/internal/hash.h>
+ 
+-#ifdef OMAP_SHAM_DMA_PRIVATE
+-#include <plat/dma.h>
+-#include <mach/irqs.h>
+-#endif
+-
+ #define SHA_REG_DIGEST(x)		(0x00 + ((x) * 0x04))
+ #define SHA_REG_DIN(x)			(0x1C + ((x) * 0x04))
+ 
+@@ -119,9 +110,7 @@ struct omap_sham_reqctx {
+ 
+ 	/* walk state */
+ 	struct scatterlist	*sg;
+-#ifndef OMAP_SHAM_DMA_PRIVATE
+ 	struct scatterlist	sgl;
+-#endif
+ 	unsigned int		offset;	/* offset in current sg */
+ 	unsigned int		total;	/* total request */
+ 
+@@ -155,12 +144,7 @@ struct omap_sham_dev {
+ 	int			irq;
+ 	spinlock_t		lock;
+ 	int			err;
+-#ifdef OMAP_SHAM_DMA_PRIVATE
+-	int			dma;
+-	int			dma_lch;
+-#else
+ 	struct dma_chan		*dma_lch;
+-#endif
+ 	struct tasklet_struct	done_task;
+ 
+ 	unsigned long		flags;
+@@ -330,7 +314,6 @@ static int omap_sham_xmit_cpu(struct omap_sham_dev *dd, const u8 *buf,
+ 	return -EINPROGRESS;
+ }
+ 
+-#ifndef OMAP_SHAM_DMA_PRIVATE
+ static void omap_sham_dma_callback(void *param)
+ {
+ 	struct omap_sham_dev *dd = param;
+@@ -338,34 +321,18 @@ static void omap_sham_dma_callback(void *param)
+ 	set_bit(FLAGS_DMA_READY, &dd->flags);
+ 	tasklet_schedule(&dd->done_task);
+ }
+-#endif
+ 
+ static int omap_sham_xmit_dma(struct omap_sham_dev *dd, dma_addr_t dma_addr,
+ 			      size_t length, int final, int is_sg)
+ {
+ 	struct omap_sham_reqctx *ctx = ahash_request_ctx(dd->req);
+-#ifdef OMAP_SHAM_DMA_PRIVATE
+-	int len32;
+-#else
+ 	struct dma_async_tx_descriptor *tx;
+ 	struct dma_slave_config cfg;
+ 	int ret;
+-#endif
+ 
+ 	dev_dbg(dd->dev, "xmit_dma: digcnt: %d, length: %d, final: %d\n",
+ 						ctx->digcnt, length, final);
+ 
+-#ifdef OMAP_SHAM_DMA_PRIVATE
+-	len32 = DIV_ROUND_UP(length, sizeof(u32));
+-
+-	omap_set_dma_transfer_params(dd->dma_lch, OMAP_DMA_DATA_TYPE_S32, len32,
+-			1, OMAP_DMA_SYNC_PACKET, dd->dma,
+-				OMAP_DMA_DST_SYNC_PREFETCH);
+-
+-	omap_set_dma_src_params(dd->dma_lch, 0, OMAP_DMA_AMODE_POST_INC,
+-				dma_addr, 0, 0);
+-
+-#else
+ 	memset(&cfg, 0, sizeof(cfg));
+ 
+ 	cfg.dst_addr = dd->phys_base + SHA_REG_DIN(0);
+@@ -405,7 +372,6 @@ static int omap_sham_xmit_dma(struct omap_sham_dev *dd, dma_addr_t dma_addr,
+ 
+ 	tx->callback = omap_sham_dma_callback;
+ 	tx->callback_param = dd;
+-#endif
+ 
+ 	omap_sham_write_ctrl(dd, length, final, 1);
+ 
+@@ -416,12 +382,8 @@ static int omap_sham_xmit_dma(struct omap_sham_dev *dd, dma_addr_t dma_addr,
+ 
+ 	set_bit(FLAGS_DMA_ACTIVE, &dd->flags);
+ 
+-#ifdef OMAP_SHAM_DMA_PRIVATE
+-	omap_start_dma(dd->dma_lch);
+-#else
+ 	dmaengine_submit(tx);
+ 	dma_async_issue_pending(dd->dma_lch);
+-#endif
+ 
+ 	return -EINPROGRESS;
+ }
+@@ -527,7 +489,6 @@ static int omap_sham_update_dma_start(struct omap_sham_dev *dd)
+ 	if (ctx->bufcnt || ctx->offset)
+ 		return omap_sham_update_dma_slow(dd);
+ 
+-#ifndef OMAP_SHAM_DMA_PRIVATE
+ 	/*
+ 	 * Don't use the sg interface when the transfer size is less
+ 	 * than the number of elements in a DMA frame.  Otherwise,
+@@ -536,7 +497,6 @@ static int omap_sham_update_dma_start(struct omap_sham_dev *dd)
+ 	 */
+ 	if (ctx->total < (DST_MAXBURST * sizeof(u32)))
+ 		return omap_sham_update_dma_slow(dd);
+-#endif
+ 
+ 	dev_dbg(dd->dev, "fast: digcnt: %d, bufcnt: %u, total: %u\n",
+ 			ctx->digcnt, ctx->bufcnt, ctx->total);
+@@ -598,11 +558,7 @@ static int omap_sham_update_dma_stop(struct omap_sham_dev *dd)
+ {
+ 	struct omap_sham_reqctx *ctx = ahash_request_ctx(dd->req);
+ 
+-#ifdef OMAP_SHAM_DMA_PRIVATE
+-	omap_stop_dma(dd->dma_lch);
+-#else
+ 	dmaengine_terminate_all(dd->dma_lch);
+-#endif
+ 
+ 	if (ctx->flags & BIT(FLAGS_SG)) {
+ 		dma_unmap_sg(dd->dev, ctx->sg, 1, DMA_TO_DEVICE);
+@@ -806,18 +762,6 @@ static int omap_sham_handle_queue(struct omap_sham_dev *dd,
+ 	if (err)
+ 		goto err1;
+ 
+-#ifdef OMAP_SHAM_DMA_PRIVATE
+-	omap_set_dma_dest_params(dd->dma_lch, 0,
+-			OMAP_DMA_AMODE_CONSTANT,
+-			dd->phys_base + SHA_REG_DIN(0), 0, 16);
+-
+-	omap_set_dma_dest_burst_mode(dd->dma_lch,
+-			OMAP_DMA_DATA_BURST_16);
+-
+-	omap_set_dma_src_burst_mode(dd->dma_lch,
+-			OMAP_DMA_DATA_BURST_4);
+-#endif
+-
+ 	if (ctx->digcnt)
+ 		/* request has changed - restore hash */
+ 		omap_sham_copy_hash(req, 0);
+@@ -1208,55 +1152,13 @@ static irqreturn_t omap_sham_irq(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-#ifdef OMAP_SHAM_DMA_PRIVATE
+-static void omap_sham_dma_callback(int lch, u16 ch_status, void *data)
+-{
+-	struct omap_sham_dev *dd = data;
+-
+-	if (ch_status != OMAP_DMA_BLOCK_IRQ) {
+-		pr_err("omap-sham DMA error status: 0x%hx\n", ch_status);
+-		dd->err = -EIO;
+-		clear_bit(FLAGS_INIT, &dd->flags);/* request to re-initialize */
+-	}
+-
+-	set_bit(FLAGS_DMA_READY, &dd->flags);
+-	tasklet_schedule(&dd->done_task);
+-}
+-
+-static int omap_sham_dma_init(struct omap_sham_dev *dd)
+-{
+-	int err;
+-
+-	dd->dma_lch = -1;
+-
+-	err = omap_request_dma(dd->dma, dev_name(dd->dev),
+-			omap_sham_dma_callback, dd, &dd->dma_lch);
+-	if (err) {
+-		dev_err(dd->dev, "Unable to request DMA channel\n");
+-		return err;
+-	}
+-
+-	return 0;
+-}
+-
+-static void omap_sham_dma_cleanup(struct omap_sham_dev *dd)
+-{
+-	if (dd->dma_lch >= 0) {
+-		omap_free_dma(dd->dma_lch);
+-		dd->dma_lch = -1;
+-	}
+-}
+-#endif
+-
+ static int __devinit omap_sham_probe(struct platform_device *pdev)
+ {
+ 	struct omap_sham_dev *dd;
+ 	struct device *dev = &pdev->dev;
+ 	struct resource *res;
+-#ifndef OMAP_SHAM_DMA_PRIVATE
+ 	dma_cap_mask_t mask;
+ 	unsigned dma_chan;
+-#endif
+ 	int err, i, j;
+ 
+ 	dd = kzalloc(sizeof(struct omap_sham_dev), GFP_KERNEL);
+@@ -1291,11 +1193,7 @@ static int __devinit omap_sham_probe(struct platform_device *pdev)
+ 		err = -ENODEV;
+ 		goto res_err;
+ 	}
+-#ifdef OMAP_SHAM_DMA_PRIVATE
+-	dd->dma = res->start;
+-#else
+ 	dma_chan = res->start;
+-#endif
+ 
+ 	/* Get the IRQ */
+ 	dd->irq = platform_get_irq(pdev,  0);
+@@ -1312,11 +1210,6 @@ static int __devinit omap_sham_probe(struct platform_device *pdev)
+ 		goto res_err;
+ 	}
+ 
+-#ifdef OMAP_SHAM_DMA_PRIVATE
+-	err = omap_sham_dma_init(dd);
+-	if (err)
+-		goto dma_err;
+-#else
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(DMA_SLAVE, mask);
+ 
+@@ -1327,7 +1220,6 @@ static int __devinit omap_sham_probe(struct platform_device *pdev)
+ 		err = -ENXIO;
+ 		goto dma_err;
+ 	}
+-#endif
+ 
+ 	dd->io_base = ioremap(dd->phys_base, SZ_4K);
+ 	if (!dd->io_base) {
+@@ -1363,11 +1255,7 @@ err_algs:
+ 	iounmap(dd->io_base);
+ 	pm_runtime_disable(dev);
+ io_err:
+-#ifdef OMAP_SHAM_DMA_PRIVATE
+-	omap_sham_dma_cleanup(dd);
+-#else
+ 	dma_release_channel(dd->dma_lch);
+-#endif
+ dma_err:
+ 	if (dd->irq >= 0)
+ 		free_irq(dd->irq, dd);
+@@ -1396,11 +1284,7 @@ static int __devexit omap_sham_remove(struct platform_device *pdev)
+ 	tasklet_kill(&dd->done_task);
+ 	iounmap(dd->io_base);
+ 	pm_runtime_disable(&pdev->dev);
+-#ifdef OMAP_SHAM_DMA_PRIVATE
+-	omap_sham_dma_cleanup(dd);
+-#else
+ 	dma_release_channel(dd->dma_lch);
+-#endif
+ 	if (dd->irq >= 0)
+ 		free_irq(dd->irq, dd);
+ 	kfree(dd);
 -- 
 1.7.12
