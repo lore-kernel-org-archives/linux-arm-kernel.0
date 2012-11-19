@@ -1,103 +1,112 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 11:11:43 +0100
-Subject: [PATCH 3/3] arm: dove: Convert Dove to DT XOR DMA engine
+Date: Mon, 19 Nov 2012 11:11:42 +0100
+Subject: [PATCH 2/3] arm: kirkwood: Convert XOR instantiation to DT.
 In-Reply-To: <1353319903-30855-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353319903-30855-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353319903-30855-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353319903-30855-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+From: Andrew Lunn <andrew@lunn.ch>
 
-With DT support for Marvell XOR DMA engine, make use of it on Dove.
-Also remove the now redundant code in DT board init for xor engines.
+Use DT to describe the two XOR DMA engines on Kirkwood. Remove the
+C code initialization.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/dove.dtsi |   42 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-dove/common.c |   10 ----------
- 2 files changed, 42 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/kirkwood.dtsi   |   40 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-dt.c |   13 ------------
+ 2 files changed, 40 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 8c8ab621..ff56bff 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -174,5 +174,47 @@
- 			clocks = <&gate_clk 15>;
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index e5ebf42..83716ee 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -94,6 +94,46 @@
  			status = "okay";
  		};
-+
-+		xor0: dma-engine at 60800 {
+ 
++		xor at 60800 {
 +			compatible = "marvell,orion-xor";
 +			reg = <0x60800 0x100
-+			       0x60a00 0x100>;
-+			clocks = <&gate_clk 23>;
++			       0x60A00 0x100>;
 +			status = "okay";
++			clocks = <&gate_clk 8>;
 +
-+			channel0 {
-+				interrupts = <39>;
-+				dmacap,memcpy;
-+				dmacap,xor;
++			xor00 {
++			      interrupts = <5>;
++			      dmacap,memcpy;
++			      dmacap,xor;
 +			};
-+
-+			channel1 {
-+				interrupts = <40>;
-+				dmacap,memset;
-+				dmacap,memcpy;
-+				dmacap,xor;
++			xor01 {
++			      interrupts = <6>;
++			      dmacap,memcpy;
++			      dmacap,xor;
++			      dmacap,memset;
 +			};
 +		};
 +
-+		xor1: dma-engine at 60900 {
++		xor at 60900 {
 +			compatible = "marvell,orion-xor";
 +			reg = <0x60900 0x100
-+			       0x60b00 0x100>;
-+			clocks = <&gate_clk 24>;
++			       0xd0B00 0x100>;
 +			status = "okay";
++			clocks = <&gate_clk 16>;
 +
-+			channel0 {
-+				interrupts = <42>;
-+				dmacap,memcpy;
-+				dmacap,xor;
++			xor00 {
++			      interrupts = <7>;
++			      dmacap,memcpy;
++			      dmacap,xor;
 +			};
-+
-+			channel1 {
-+				interrupts = <43>;
-+				dmacap,memset;
-+				dmacap,memcpy;
-+				dmacap,xor;
++			xor01 {
++			      interrupts = <8>;
++			      dmacap,memcpy;
++			      dmacap,xor;
++			      dmacap,memset;
 +			};
 +		};
- 	};
- };
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index a209444..97a7abe 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -409,14 +409,6 @@ static void __init dove_legacy_clk_init(void)
- 	clkspec.args[0] = CLOCK_GATING_BIT_PCIE1;
- 	orion_clkdev_add("1", "pcie",
++
+ 		sata at 80000 {
+ 			compatible = "marvell,orion-sata";
+ 			reg = <0x80000 0x5000>;
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 994ce26..5cabdff 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -21,7 +21,6 @@
+ #include <asm/mach/map.h>
+ #include <mach/bridge-regs.h>
+ #include <linux/platform_data/usb-ehci-orion.h>
+-#include <linux/platform_data/dma-mv_xor.h>
+ #include <plat/irq.h>
+ #include <plat/common.h>
+ #include "common.h"
+@@ -60,14 +59,6 @@ static void __init kirkwood_legacy_clk_init(void)
+ 	orion_clkdev_add(NULL, "orion-ehci.0",
  			 of_clk_get_from_provider(&clkspec));
--
--	clkspec.args[0] = CLOCK_GATING_BIT_XOR0;
+ 
+-	clkspec.args[0] = CGC_BIT_XOR0;
 -	orion_clkdev_add(NULL, MV_XOR_NAME ".0",
 -			 of_clk_get_from_provider(&clkspec));
 -
--	clkspec.args[0] = CLOCK_GATING_BIT_XOR1;
+-	clkspec.args[0] = CGC_BIT_XOR1;
 -	orion_clkdev_add(NULL, MV_XOR_NAME ".1",
 -			 of_clk_get_from_provider(&clkspec));
- }
+-
+ 	clkspec.args[0] = CGC_BIT_PEX1;
+ 	orion_clkdev_add("1", "pcie",
+ 			 of_clk_get_from_provider(&clkspec));
+@@ -104,10 +95,6 @@ static void __init kirkwood_dt_init(void)
+ 	/* Setup root of clk tree */
+ 	kirkwood_of_clk_init();
  
- static void __init dove_of_clk_init(void)
-@@ -445,8 +437,6 @@ static void __init dove_dt_init(void)
- 
- 	/* Internal devices not ported to DT yet */
- 	dove_rtc_init();
--	dove_xor0_init();
--	dove_xor1_init();
- 
- 	dove_ge00_init(&dove_dt_ge00_data);
- 	dove_ehci0_init();
+-	/* internal devices that every board has */
+-	kirkwood_xor0_init();
+-	kirkwood_xor1_init();
+-
+ #ifdef CONFIG_KEXEC
+ 	kexec_reinit = kirkwood_enable_pcie;
+ #endif
 -- 
 1.7.9.5
