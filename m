@@ -1,9 +1,9 @@
 From: sr@denx.de (Stefan Roese)
-Date: Mon, 19 Nov 2012 12:09:41 +0100
-Subject: [PATCH 2/4] ARM: sunxi: Add earlyprintk support for UART0 (sun4i)
+Date: Mon, 19 Nov 2012 12:09:43 +0100
+Subject: [PATCH 4/4] ARM: sunxi: Add sunxi restart function via onchip watchdog
 In-Reply-To: <1353323383-11827-1-git-send-email-sr@denx.de>
 References: <1353323383-11827-1-git-send-email-sr@denx.de>
-Message-ID: <1353323383-11827-2-git-send-email-sr@denx.de>
+Message-ID: <1353323383-11827-4-git-send-email-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,52 +11,64 @@ Signed-off-by: Stefan Roese <sr@denx.de>
 Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Kconfig.debug         | 9 ++++++++-
- arch/arm/include/debug/sunxi.S | 5 ++++-
- 2 files changed, 12 insertions(+), 2 deletions(-)
+ arch/arm/mach-sunxi/sunxi.c       |  1 +
+ arch/arm/mach-sunxi/sunxi.h       |  2 ++
+ drivers/clocksource/sunxi_timer.c | 14 ++++++++++++++
+ 3 files changed, 17 insertions(+)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index f12bc3a..cc1ed35 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -345,6 +345,13 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on SOCFPGA based platforms.
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 13d4d96..6b1186c 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -57,5 +57,6 @@ DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
+ 	.init_irq	= sunxi_init_irq,
+ 	.handle_irq	= sunxi_handle_irq,
+ 	.timer		= &sunxi_timer,
++	.restart	= sunxi_restart,
+ 	.dt_compat	= sunxi_board_dt_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-sunxi/sunxi.h b/arch/arm/mach-sunxi/sunxi.h
+index 33b5871..806c5fd 100644
+--- a/arch/arm/mach-sunxi/sunxi.h
++++ b/arch/arm/mach-sunxi/sunxi.h
+@@ -17,4 +17,6 @@
+ #define SUNXI_REGS_VIRT_BASE	IOMEM(0xf1c00000)
+ #define SUNXI_REGS_SIZE		(SZ_2M + SZ_1M)
  
-+	config DEBUG_SUNXI_UART0
-+		bool "Kernel low-level debugging messages via sunXi UART0"
-+		depends on ARCH_SUNXI
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Allwinner A1X based platforms on the UART0.
++void sunxi_restart(char mode, const char *cmd);
 +
- 	config DEBUG_SUNXI_UART1
- 		bool "Kernel low-level debugging messages via sunXi UART1"
- 		depends on ARCH_SUNXI
-@@ -423,7 +430,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/mvebu.S" if DEBUG_MVEBU_UART
- 	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
- 	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
--	default "debug/sunxi.S" if DEBUG_SUNXI_UART1
-+	default "debug/sunxi.S" if DEBUG_SUNXI_UART0 || DEBUG_SUNXI_UART1
- 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
- 		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
- 	default "mach/debug-macro.S"
-diff --git a/arch/arm/include/debug/sunxi.S b/arch/arm/include/debug/sunxi.S
-index 3bf61ca..04eb56d 100644
---- a/arch/arm/include/debug/sunxi.S
-+++ b/arch/arm/include/debug/sunxi.S
-@@ -10,7 +10,10 @@
-  * published by the Free Software Foundation.
- */
+ #endif /* __MACH_SUNXI_H */
+diff --git a/drivers/clocksource/sunxi_timer.c b/drivers/clocksource/sunxi_timer.c
+index 3c46434..dfbf879 100644
+--- a/drivers/clocksource/sunxi_timer.c
++++ b/drivers/clocksource/sunxi_timer.c
+@@ -34,6 +34,8 @@
+ #define TIMER0_CTL_ONESHOT		(1 << 7)
+ #define TIMER0_INTVAL_REG	0x14
+ #define TIMER0_CNTVAL_REG	0x18
++#define WATCH_DOG_CTRL_REG	0x90
++#define WATCH_DOG_MODE_REG	0x94
  
--#ifdef CONFIG_DEBUG_SUNXI_UART1
-+#if defined(CONFIG_DEBUG_SUNXI_UART0)
-+#define SUNXI_UART_DEBUG_PHYS_BASE 0x01c28000
-+#define SUNXI_UART_DEBUG_VIRT_BASE 0xf1c28000
-+#elif defined(CONFIG_DEBUG_SUNXI_UART1)
- #define SUNXI_UART_DEBUG_PHYS_BASE 0x01c28400
- #define SUNXI_UART_DEBUG_VIRT_BASE 0xf1c28400
- #endif
+ #define TIMER_SCAL		16
+ 
+@@ -103,6 +105,18 @@ static struct of_device_id sunxi_timer_dt_ids[] = {
+ 	{ .compatible = "allwinner,sunxi-timer" },
+ };
+ 
++void sunxi_restart(char mode, const char *cmd)
++{
++	/* Use watchdog to reset system */
++
++	/* Enable timer and set reset bit */
++	writel(3, timer_base + WATCH_DOG_MODE_REG);
++	writel(0xa57 << 1 | 1, timer_base + WATCH_DOG_CTRL_REG);
++
++	while(1)
++		;
++}
++
+ static void __init sunxi_timer_init(void)
+ {
+ 	struct device_node *node;
 -- 
 1.8.0
