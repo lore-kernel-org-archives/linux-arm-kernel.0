@@ -1,33 +1,47 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 12:00:32 +0100
-Subject: [PATCH 1/3] net: mvmdio: use <linux/delay.h> instead of <asm/delay.h>
-In-Reply-To: <1353322834-16952-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1353322834-16952-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353322834-16952-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 19 Nov 2012 12:00:31 +0100
+Subject: [GIT PULL] Marvell mvneta Ethernet/MDIO drivers checkpatch fixes
+Message-ID: <1353322834-16952-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As suggested by checkpatch, using <linux/delay.h> instead of
-<asm/delay.h> is appropriate.
+Jason,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/net/ethernet/marvell/mvmdio.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Sebastian Hesselbarth noticed that the new mvmdio and mvneta drivers
+produce a number of checkpatch warnings, related to the incluse of
+<asm/delay.h> and to the style of multiline comments. The following
+three patches fix those checkpatch warnings. Feel free to integrate
+them either as follow-up patches of the network driver patches, or to
+squash them into the driver patches as you prefer.
 
-diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
-index 82fbd23..114a0f1 100644
---- a/drivers/net/ethernet/marvell/mvmdio.c
-+++ b/drivers/net/ethernet/marvell/mvmdio.c
-@@ -27,8 +27,7 @@
- #include <linux/of_address.h>
- #include <linux/of_mdio.h>
- #include <linux/platform_device.h>
--
--#include <asm/delay.h>
-+#include <linux/delay.h>
- 
- #define MVMDIO_SMI_DATA_SHIFT              0
- #define MVMDIO_SMI_PHY_ADDR_SHIFT          16
--- 
-1.7.9.5
+David, are you OK with those patches and the fact that we carry them
+through the arm-soc tree, as we agreed to do for the mvmdio and mvneta
+drivers? Those patches are really simple/stupid fixes.
+
+Thanks!
+
+The following changes since commit a7e7265b086fb12eb4472d0d216c6b787bb35eba:
+
+  Merge remote-tracking branch 'jcooper/mvebu/dt' into mvneta-fixes (2012-11-19 11:30:18 +0100)
+
+are available in the git repository at:
+
+
+  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-net-mdio-checkpatch-fixes-3.8
+
+for you to fetch changes up to e313b995bf8598f56c98377a750f968f9dd5ca78:
+
+  net: mvneta: adjust multiline comments to net/ style (2012-11-19 11:42:42 +0100)
+
+----------------------------------------------------------------
+Marvell network/MDIO driver checkpatch fixes
+
+----------------------------------------------------------------
+Thomas Petazzoni (3):
+      net: mvmdio: use <linux/delay.h> instead of <asm/delay.h>
+      net: mvmdio: adjust multiline comment to net/ style
+      net: mvneta: adjust multiline comments to net/ style
+
+ drivers/net/ethernet/marvell/mvmdio.c |    6 +--
+ drivers/net/ethernet/marvell/mvneta.c |   84 ++++++++++++++++-----------------
+ 2 files changed, 44 insertions(+), 46 deletions(-)
