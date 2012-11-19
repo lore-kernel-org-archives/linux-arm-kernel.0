@@ -1,42 +1,42 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 19 Nov 2012 15:45:29 +0100
-Subject: [PATCH 5/5] ARM: dts: exynos4210-trats: Add node for touchscreen
-In-Reply-To: <1353336329-20818-1-git-send-email-t.figa@samsung.com>
-References: <1353336329-20818-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1353336329-20818-6-git-send-email-t.figa@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 19 Nov 2012 08:45:53 -0600
+Subject: [GIT PULL] Calxeda cpuidle support
+Message-ID: <50AA4621.20509@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a device tree node for the Melfas MMS114-controlled
-touchscreen present on Samsung Trats board.
+Arnd, Olof,
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos4210-trats.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Please pull cpuidle support for highbank. This is the first driver in
+drivers/cpuidle. All the existing drivers for ARM are in arch/arm. I'm
+asking for you to pull since there seems to be a lack of maintainer for
+cpuidle drivers.
 
-diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-index 86ff800..4a4bbac 100644
---- a/arch/arm/boot/dts/exynos4210-trats.dts
-+++ b/arch/arm/boot/dts/exynos4210-trats.dts
-@@ -114,6 +114,17 @@
- 		pinctrl-0 = <&i2c3_bus>;
- 		pinctrl-names = "default";
- 		status = "okay";
-+
-+		mms114-touchscreen at 48 {
-+			compatible = "melfas,mms114";
-+			reg = <0x48>;
-+			interrupt-parent = <&gpx0>;
-+			interrupts = <4 2>;
-+			x-size = <720>;
-+			y-size = <1280>;
-+			avdd-supply = <&tsp_reg>;
-+			vdd-supply = <&tsp_reg>;
-+		};
- 	};
- 
- 	i2c at 138B0000 {
--- 
-1.8.0
+Regards,
+Rob
+
+The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
+
+  Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
+
+are available in the git repository at:
+
+  git://sources.calxeda.com/kernel/linux.git tags/highbank-cpuidle
+
+for you to fetch changes up to be6a98d3f00c292d347465d96acbec9d8c2783cf:
+
+  cpuidle: add Calxeda SOC idle support (2012-11-07 17:15:36 -0600)
+
+----------------------------------------------------------------
+Add cpuidle driver support for Calxeda Highbank SOC.
+
+----------------------------------------------------------------
+Rob Herring (1):
+      cpuidle: add Calxeda SOC idle support
+
+ drivers/cpuidle/Kconfig           |   10 +++
+ drivers/cpuidle/Makefile          |    2 +
+ drivers/cpuidle/cpuidle-calxeda.c |  161
++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 173 insertions(+)
+ create mode 100644 drivers/cpuidle/cpuidle-calxeda.c
