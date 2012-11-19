@@ -1,849 +1,976 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 19 Nov 2012 14:13:18 +0900
-Subject: [RFC 06/15] ARM: mach-shmobile: Add DT table of INTC for sh73a0
+Date: Mon, 19 Nov 2012 14:13:13 +0900
+Subject: [RFC 01/15] ARM: mach-shmobile: Add support OF for INTC of shmobile
 In-Reply-To: <1353302007-31045-1-git-send-email-horms@verge.net.au>
 References: <1353302007-31045-1-git-send-email-horms@verge.net.au>
-Message-ID: <1353302007-31045-7-git-send-email-horms@verge.net.au>
+Message-ID: <1353302007-31045-2-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 
+This provides OF support of SH/INTC.
+
+The SH/INTC driver is used by SuperH and ARM/SH-MOBILE.
+At the moment, SuperH does not have the plan corresponding to DT.
+DT of SH/INTC has taken the form where the table data of the C
+is managed by DT, in order to maintain compatibility.
+
 Cc: Magnus Damm <damm@opensource.se>
 Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 
---
+---
 
-v3
-* As suggested by Tetsuyuki Kobayashi
-  - Use arm,cortex-a9 for cpu at 0.compatible instead of
-    arm,cortex-a8.
+v4 [Magnus Damm]
+* Make of_sh_intc_get_intevtsa_vect() less verbose
+* Fix whitespace and spelling
+* Allow of_sh_intc_get_intc() to handle cases where groups are not needed
+
+v3 [Simon Horman]
+* Do not add OF_SH_INTC
 
 v2
 * No change
 
-fix
+v1 [Nobuhiro Iwamatsu]
 ---
- arch/arm/boot/dts/sh73a0.dtsi |  810 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 810 insertions(+)
- create mode 100644 arch/arm/boot/dts/sh73a0.dtsi
+ Documentation/devicetree/bindings/sh/intc.txt |  163 +++++++
+ drivers/sh/intc/Makefile                      |    1 +
+ drivers/sh/intc/of_intc.c                     |  646 +++++++++++++++++++++++++
+ include/linux/sh_intc.h                       |   83 ++++
+ 4 files changed, 893 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sh/intc.txt
+ create mode 100644 drivers/sh/intc/of_intc.c
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+diff --git a/Documentation/devicetree/bindings/sh/intc.txt b/Documentation/devicetree/bindings/sh/intc.txt
 new file mode 100644
-index 0000000..7d56345
+index 0000000..ebb2398
 --- /dev/null
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -0,0 +1,810 @@
-+/*
-+ * Device Tree Source for the SH73A0
-+ *
-+ * Copyright (C) 2012 Renesas Solutions Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
++++ b/Documentation/devicetree/bindings/sh/intc.txt
+@@ -0,0 +1,163 @@
++* Renesas SuperH / SH-MOBILE Interrupt Controller
 +
-+/include/ "skeleton.dtsi"
++The SH/INTC driver is used by SuperH and ARM/SH-MOBILE.
++At the moment, SuperH does not have the plan corresponding to DT.
++DT of SH/INTC has taken the form where the table data of the C
++is managed by DT, in order to maintain compatibility.
 +
-+/ {
-+	compatible = "renesas,sh73a0";
++Main node required properties:
 +
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,cortex-a9";
-+		};
-+	};
++- compatible : should be one of:
++	"renesas,sh_intca"
++	"renesas,sh_intcs"
++	"renesas,sh_intca_irq_pins"
 +
-+	soc {
-+		compatible = "simple-bus";
++- interrupt-controller : Identifies the node as an interrupt controller
++- #interrupt-cells	: Set already 1.
++- #address-cells	: Set already 1.
++- #size-cells	: Set already 1.
++- ranges        : Non value.
++- reg 			: Specifies base physical address(s) and size of the INTC
++				  registers.
++- intsrc*		: This sets up the vector for every device.
++
++- *_registers	: There are vector table, mask, priority, ack, and sense
++				  register in INTC.  In order to hold these data, it is
++				  necessary to set up the following contents.
++
++ -- intc_vectors: This needs to have vector_table.
++				  This specifies phandle which intsrc* defined.
++
++ -- intc_mask_registers	: This specifies the contents of the mask register.
++    This node required properties:
++	* address-cells	: Set already 1.
++	* size-cells 	: Set already 1.
++	* ranges		: Non value.
++	* intc_mask*	: This has regs and reginfo.
++	 ** reg	: This specifies the address of mask register. First specifies
++			  mask register, and 2nd specifies mask clear register.
++			  First cell is address, and 2nd sell is address size. 1 is 8bit.
++			  2 is 16bit, 4 is 32bit.
++	 ** reginfo: This specifies phandle of devices.
++
++ -- intc_prio_registers	: This sets up the contents of the priority register.
++    This node required properties:
++	* address-cells	: Set already 1.
++	* size-cells 	: Set already 1.
++	* ranges		: Non value.
++	* intc_prio*: This has regs and reginfo.
++	 ** reg	: This specifies the address of priority register. First specifies
++			  priority set register, and 2nd specifies priority clear register.
++			  If there is not priority clear register, specifies 0x00.
++			  First cell is address, and 2nd sell is address size. 1 is 8bit.
++			  2 is 16bit, 4 is 32bit.
++	 ** field-width : Bit size is specified for every device.
++	 ** reginfo: This specifies phandle of devices.
++
++ -- intc_sense_registers	: This sets up the contents of the sense register.
++    This node required properties:
++	* address-cells	: Set already 1.
++	* size-cells 	: Set already 1.
++	* ranges		: Non value.
++	* intc_sense*: This has regs and reginfo.
++	 ** reg	: This specifies the address of sense register.
++			  First cell is address, and 2nd sell is address size. 1 is 8bit.
++			  2 is 16bit, 4 is 32bit.
++	 ** field-width : Bit size is specified for every device.
++	 ** reginfo: This specifies phandle of devices.
++
++-- intc_ack_registers	: This sets up the contents of the ACK register.
++   This node required properties:
++	* address-cells	: Set already 1.
++	* size-cells 	: Set already 1.
++	* ranges		: Non value.
++	* intc_ack*: This has regs and reginfo.
++	 ** reg	: This specifies the address of ack register.
++			  First cell is address, and 2nd sell is address size. 1 is 8bit.
++			  2 is 16bit, 4 is 32bit.
++	 ** reginfo: This specifies phandle of devices.
++
++Optional:
++
++- group_size	: If this INTC register has Group, set up this value.
++- intc_group*	: This needs to have group, If INTC device have group.
++   This node required properties:
++    * group : This specifies the address phandle of group.
++	  For example, when TMU1 of priority regisdter is sharing with TMU1_0,
++	  TMU1_1 and TMU1_2, it describes like below.
++
++	     TMU1:   intc_group2 { group = <&TMU1_0 &TMU1_1 &TMU1_2>; };
++
++	  And the phandle is specified as priority regisdter.
++
++         intc_prio11 {
++             reg = <0xffd50030 2>, <0x0 0>;
++             field-width = <4>;
++			 reginfo = <&TMU1 0 0 0>;
++		 };
++
++- intc_intevtsa	: This set up the contents of INTEVTSA.
++	This node required properties:
++	  * vector : This specifies the address phandle of INTCS.
++
++Note:
++- "renesas,sh_intca" needs group_size, intc_group*, intc_vectors,
++  intc_mask_registers and intc_prio_registers.
++- "renesas,sh_intcs" needs group_size, intc_group*, intc_vectors,
++  intc_mask_registers, intc_prio_registers and  intc_intevtsa.
++- "renesas,sh_intca_irq_pins" needs intc_vectors, intc_mask_registers,
++  intc_prio_registers, intc_sense_registers and intc_ack_registers.
++
++Example:
++
++	intca: interrupt-controller at 0 {
++		compatible = "renesas,sh_intca";
++		interrupt-controller;
 +		#address-cells = <1>;
 +		#size-cells = <1>;
++		#interrupt-cells = <1>;
 +		ranges;
 +
-+		intcs: interrupt-controller at 0 {
-+			compatible = "renesas,sh_intcs";
-+			interrupt-controller;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			#interrupt-cells = <1>;
-+			ranges;
-+			group_size = <8>;
++		reg = <0xe6940000 0x200>, <0xe6950000 0x200>;
++		group_size = <19>;
 +
-+			reg = <0xffd20000 0x200>,
-+				<0xffd50000 0x200>,
-+				<0xffd60000 0x200>;
++		DIRC: intsrc1 { vector = <0x0560>; };
++		ATAPI: intsrc2 { vector = <0x05E0>; };
++		....
 +
-+			PINTCS_PINT1:	intsrc1{ vector = <0x3a00>; };
-+			PINTCS_PINT2:	intsrc2{ vector = <0x3a20>; };
-+			RTDMAC_0_DEI0:	intsrc3{ vector = <0x3c00>; };
-+			RTDMAC_0_DEI1:	intsrc4{ vector = <0x3c20>; };
-+			RTDMAC_0_DEI2:	intsrc5{ vector = <0x3c40>; };
-+			RTDMAC_0_DEI3:	intsrc6{ vector = <0x3c60>; };
-+			CEU:	intsrc7{ vector = <0x3c80>; };
-+			MFI:	intsrc8{ vector = <0x3d00>; };
-+			BBIF2:	intsrc9{ vector = <0x3d60>; };
-+			VPU:	intsrc10{ vector = <0x3d80>; };
-+			TSIF1:	intsrc11{ vector = <0x3da0>; };
-+			_3DG_SGX543:	intsrc12{ vector = <0x3de0>; };
-+			_2DDMAC_2DDM0:	intsrc13{ vector = <0x3e00>; };
-+			RTDMAC_1_DEI4:	intsrc14{ vector = <0x3f80>; };
-+			RTDMAC_1_DEI5:	intsrc15{ vector = <0x3fa0>; };
-+			RTDMAC_1_DADERR:	intsrc16{ vector = <0x3fc0>; };
-+			KEYSC_KEY:	intsrc17{ vector = <0x3fe0>; };
-+			VINT:	intsrc18{ vector = <0x4080>; };
-+			MSIOF:	intsrc19{ vector = <0x4120>; };
-+			TMU0_TUNI00:	intsrc20{ vector = <0x4280>; };
-+			TMU0_TUNI01:	intsrc21{ vector = <0x42a0>; };
-+			TMU0_TUNI02:	intsrc22{ vector = <0x42c0>; };
-+			CMT0:	intsrc23{ vector = <0x4300>; };
-+			TSIF0:	intsrc24{ vector = <0x4320>; };
-+			CMT2:	intsrc25{ vector = <0x4340>; };
-+			LMB:	intsrc26{ vector = <0x4360>; };
-+			MSUG:	intsrc27{ vector = <0x4380>; };
-+			MSU_MSU:	intsrc28{ vector = <0x43a0>; };
-+			MSU_MSU2:	intsrc29{ vector = <0x43c0>; };
-+			CTI:	intsrc30{ vector = <0x3800>; };
-+			RWDT0:	intsrc31{ vector = <0x3840>; };
-+			ICB:	intsrc32{ vector = <0x3880>; };
-+			PEP:	intsrc33{ vector = <0x38a0>; };
-+			ASA:	intsrc34{ vector = <0x38c0>; };
-+			JPU_JPEG:	intsrc35{ vector = <0x3960>; };
-+			LCDC:	intsrc36{ vector = <0x3980>; };
-+			LCRC:	intsrc37{ vector = <0x39a0>; };
-+			RTDMAC_2_DEI6:	intsrc38{ vector = <0x4700>; };
-+			RTDMAC_2_DEI7:	intsrc39{ vector = <0x4720>; };
-+			RTDMAC_2_DEI8:	intsrc40{ vector = <0x4740>; };
-+			RTDMAC_2_DEI9:	intsrc41{ vector = <0x4760>; };
-+			RTDMAC_3_DEI10:	intsrc42{ vector = <0x4780>; };
-+			RTDMAC_3_DEI11:	intsrc43{ vector = <0x47a0>; };
-+			FRC:	intsrc44{ vector = <0x4b00>; };
-+			GCU:	intsrc45{ vector = <0x4b60>; };
-+			LCDC1:	intsrc46{ vector = <0x4b80>; };
-+			CSIRX:	intsrc47{ vector = <0x4ba0>; };
-+			DSITX0_DSITX00:	intsrc48{ vector = <0x4bc0>; };
-+			DSITX0_DSITX01:	intsrc49{ vector = <0x4be0>; };
-+			SPU2_SPU0:	intsrc50{ vector = <0x4c00>; };
-+			SPU2_SPU1:	intsrc51{ vector = <0x4c20>; };
-+			FSI:	intsrc52{ vector = <0x4c40>; };
-+			TMU1_TUNI10:	intsrc53{ vector = <0x4d00>; };
-+			TMU1_TUNI11:	intsrc54{ vector = <0x4d20>; };
-+			TMU1_TUNI12:	intsrc55{ vector = <0x4d40>; };
-+			TSIF2:	intsrc56{ vector = <0x4d60>; };
-+			CMT4:	intsrc57{ vector = <0x4d80>; };
-+			MFIS2:	intsrc58{ vector = <0x4e00>; };
-+			CPORTS2R:	intsrc59{ vector = <0x4e20>; };
-+			TSG:	intsrc60{ vector = <0x4ee0>; };
-+			DMASCH1:	intsrc61{ vector = <0x4f00>; };
-+			SCUW:	intsrc62{ vector = <0x4f40>; };
-+			VIO60:	intsrc63{ vector = <0x4f60>; };
-+			VIO61:	intsrc64{ vector = <0x4f80>; };
-+			CEU21:	intsrc65{ vector = <0x4fa0>; };
-+			CSI21:	intsrc66{ vector = <0x4fe0>; };
-+			DSITX1_DSITX10:	intsrc67{ vector = <0x5000>; };
-+			DSITX1_DSITX11:	intsrc68{ vector = <0x5020>; };
-+			DISP:	intsrc69{ vector = <0x5040>; };
-+			DSRV:	intsrc70{ vector = <0x5060>; };
-+			EMUX2_EMUX20I:	intsrc71{ vector = <0x5080>; };
-+			EMUX2_EMUX21I:	intsrc72{ vector = <0x50a0>; };
-+			MSTIF0_MST00I:	intsrc73{ vector = <0x50c0>; };
-+			MSTIF0_MST01I:	intsrc74{ vector = <0x50e0>; };
-+			MSTIF1_MST10I:	intsrc75{ vector = <0x5100>; };
-+			MSTIF1_MST11I:	intsrc76{ vector = <0x5120>; };
-+			SPUV:	intsrc77 { vector = <0x5700>; };
-+
-+			/* group */
-+			RTDMAC_0: intc_group0 {
-+				group = <&RTDMAC_0_DEI0 &RTDMAC_0_DEI1
-+						&RTDMAC_0_DEI2 &RTDMAC_0_DEI3>;
-+			};
-+
-+			RTDMAC_1: intc_group1 {
-+				group = <&RTDMAC_1_DEI4 &RTDMAC_1_DEI5
-+						&RTDMAC_1_DADERR>;
-+			};
-+
-+			RTDMAC_2: intc_group2 {
-+				group = <&RTDMAC_2_DEI6 &RTDMAC_2_DEI7
-+						&RTDMAC_2_DEI8 &RTDMAC_2_DEI9>;
-+			};
-+
-+			RTDMAC_3: intc_group3 {
-+				group = <&RTDMAC_3_DEI10 &RTDMAC_3_DEI11>;
-+			};
-+
-+			TMU1: intc_group4 {
-+				group = <&TMU1_TUNI12 &TMU1_TUNI11 &TMU1_TUNI10>;
-+			};
-+
-+			DSITX0: intc_group5 {
-+				group = <&DSITX0_DSITX00 &DSITX0_DSITX01>;
-+			};
-+			SPU2: intc_group6 {
-+				group = <&SPU2_SPU0 &SPU2_SPU1>;
-+			};
-+			MSU: intc_group7 {
-+				group = <&MSU_MSU &MSU_MSU2>;
-+			};
-+
-+			intc_vectors {
-+				vector_table = <&PINTCS_PINT1 &PINTCS_PINT2 &RTDMAC_0_DEI0
-+						&RTDMAC_0_DEI1 &RTDMAC_0_DEI2 &RTDMAC_0_DEI3
-+						&CEU &MFI &BBIF2 &VPU &TSIF1 &_3DG_SGX543
-+						&_2DDMAC_2DDM0 &RTDMAC_1_DEI4 &RTDMAC_1_DEI5
-+						&RTDMAC_1_DADERR &KEYSC_KEY &VINT &MSIOF
-+						&TMU0_TUNI00 &TMU0_TUNI01 &TMU0_TUNI02
-+						&CMT0 &TSIF0 &CMT2 &LMB &MSUG &MSU_MSU &MSU_MSU2
-+						&CTI &RWDT0 &ICB &PEP &ASA &JPU_JPEG
-+						&LCDC &LCRC
-+						&RTDMAC_2_DEI6 &RTDMAC_2_DEI7 &RTDMAC_2_DEI8
-+						&RTDMAC_2_DEI9	&RTDMAC_3_DEI10 &RTDMAC_3_DEI11
-+						&FRC &GCU &LCDC1 &CSIRX &DSITX0_DSITX00
-+						&DSITX0_DSITX01 &SPU2_SPU0 &SPU2_SPU1 &FSI
-+						&TMU1_TUNI10 &TMU1_TUNI11 &TMU1_TUNI12 &TSIF2
-+						&CMT4 &MFIS2 &CPORTS2R &TSG &DMASCH1 &SCUW &VIO60
-+						&VIO61 &CEU21 &CSI21
-+						&DSITX1_DSITX10 &DSITX1_DSITX11 &DISP &DSRV
-+						&EMUX2_EMUX20I &EMUX2_EMUX21I &MSTIF0_MST00I
-+						&MSTIF0_MST01I &MSTIF1_MST10I &MSTIF1_MST11I
-+						&SPUV>;
-+			};
-+
-+			intc_mask_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_mask0 {
-+					reg = <0xffd20184 1>, <0xffd201c4 1>;
-+					reginfo = <0 0 0 &CEU 0 0 0 0>;
-+				};
-+
-+				intc_mask1 {
-+					reg = <0xffd20188 1>, <0xffd201c8 1>;
-+					reginfo = <0 0 0 &VPU &BBIF2 0 0 &MFI>;
-+				};
-+
-+				intc_mask2 {
-+					reg = <0xffd2018c 1>, <0xffd201cc 1>;
-+					reginfo = <0 0 0 &_2DDMAC_2DDM0 0 &ASA &PEP &ICB>;
-+				};
-+
-+				intc_mask3 {
-+					reg = <0xffd20190 1>, <0xffd201d0 1>;
-+					reginfo = <0 0 0 &CTI &JPU_JPEG 0 &LCRC &LCDC>;
-+				};
-+
-+				intc_mask4 {
-+					reg = <0xffd20194 1>, <0xffd201d4 1>;
-+					reginfo = <&KEYSC_KEY &RTDMAC_1_DADERR &RTDMAC_1_DEI5
-+							&RTDMAC_1_DEI4 &RTDMAC_0_DEI3 &RTDMAC_0_DEI2
-+							&RTDMAC_0_DEI1 &RTDMAC_0_DEI0>;
-+				};
-+
-+				intc_mask5 {
-+					reg = <0xffd20198 1>, <0xffd201d8 1>;
-+					reginfo = <0 0 &MSIOF 0 &_3DG_SGX543 0 0 0>;
-+				};
-+
-+				intc_mask6 {
-+					reg = <0xffd2019c 1>, <0xffd201dc 1>;
-+					reginfo = <0 &TMU0_TUNI02 &TMU0_TUNI01 &TMU0_TUNI00
-+							0 0 0 0>;
-+				};
-+
-+				intc_mask7 {
-+					reg = <0xffd201a0 1>, <0xffd201e0 1>;
-+					reginfo = <0 0 0 0 0 &MSU_MSU &MSU_MSU2 &MSUG>;
-+				};
-+
-+				intc_mask8 {
-+					reg = <0xffd201a4 1>, <0xffd201e4 1>;
-+					reginfo = <0 &RWDT0 &CMT2 &CMT0 0 0 0 0>;
-+				};
-+
-+				intc_mask9 {
-+					reg = <0xffd201ac 1>, <0xffd201ec 1>;
-+					reginfo = <0 0 0 0 0 &TSIF1 &LMB &TSIF0>;
-+				};
-+
-+				intc_mask10 {
-+					reg = <0xffd201b0 1>, <0xffd201f0 1>;
-+					reginfo = <0 0 0 0 0 0 &PINTCS_PINT2 &PINTCS_PINT1>;
-+				};
-+
-+				intc_mask11 {
-+					reg = <0xffd50180 1>, <0xffd501c0 1>;
-+					reginfo = <&RTDMAC_2_DEI6 &RTDMAC_2_DEI7 &RTDMAC_2_DEI8
-+							&RTDMAC_2_DEI9 &RTDMAC_3_DEI10 &RTDMAC_3_DEI11 0 0>;
-+				};
-+
-+				intc_mask12 {
-+					reg = <0xffd50190 1>, <0xffd501d0 1>;
-+					reginfo = <&FRC 0 0 &GCU &LCDC1 &CSIRX &DSITX0_DSITX00
-+							&DSITX0_DSITX01>;
-+				};
-+
-+				intc_mask13 {
-+					reg = <0xffd50194 1>, <0xffd501d4 1>;
-+					reginfo = <&SPU2_SPU0 &SPU2_SPU1 &FSI 0 0 0 0 0>;
-+				};
-+
-+				intc_mask14 {
-+					reg = <0xffd50198 1>, <0xffd501d8 1>;
-+					reginfo = <&TMU1_TUNI10 &TMU1_TUNI11 &TMU1_TUNI12 0
-+							&TSIF2 &CMT4 0 0>;
-+				};
-+
-+				intc_mask15 {
-+					reg = <0xffd5019c 1>, <0xffd501dc 1>;
-+					reginfo = <&MFIS2 &CPORTS2R 0 0 0 0 0 &TSG>;
-+				};
-+
-+				intc_mask16 {
-+					reg = <0xffd501a0 1>, <0xffd501e0 1>;
-+					reginfo = <&DMASCH1 0 &SCUW &VIO60 &VIO61 &CEU21 0 &CSI21>;
-+				};
-+
-+				intc_mask17 {
-+					reg = <0xffd501a4 1>, <0xffd501e4 1>;
-+					reginfo = <&DSITX1_DSITX10 &DSITX1_DSITX11 &DISP &DSRV
-+							&EMUX2_EMUX20I &EMUX2_EMUX21I &MSTIF0_MST00I
-+							&MSTIF0_MST01I>;
-+				};
-+
-+				intc_mask18 {
-+					reg = <0xffd501a8 1>, <0xffd501e8 1>;
-+					reginfo = <&MSTIF0_MST00I &MSTIF0_MST01I 0 0 0 0 0 0>;
-+				};
-+
-+				intc_mask19 {
-+					reg = <0xffd60180 1>, <0xffd601c0 1>;
-+					reginfo = <&SPUV 0 0 0 0 0 0 0>;
-+				};
-+			};
-+
-+			intc_prio_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_prio0 {
-+					reg = <0xffd20000 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&CTI 0 &_2DDMAC_2DDM0 &ICB>;
-+				};
-+
-+				intc_prio1 {
-+					reg = <0xffd20004 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&JPU_JPEG &LCDC 0 &LCRC>;
-+				};
-+
-+				intc_prio2 {
-+					reg = <0xffd20008 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&BBIF2 0 0 0>;
-+				};
-+
-+				intc_prio3 {
-+					reg = <0xffd2000c 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&PINTCS_PINT1 &PINTCS_PINT2 0 0>;
-+				};
-+
-+				intc_prio4 {
-+					reg = <0xffd20010 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&RTDMAC_0 &CEU &MFI &VPU>;
-+				};
-+
-+				intc_prio5 {
-+					reg = <0xffd20014 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&KEYSC_KEY &RTDMAC_1 &CMT2 &CMT0>;
-+				};
-+
-+				intc_prio6 {
-+					reg = <0xffd20018 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&TMU0_TUNI00 &TMU0_TUNI01 &TMU0_TUNI02 &TSIF1>;
-+				};
-+
-+				intc_prio7 {
-+					reg = <0xffd2001c 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&VINT 0 0 0>;
-+				};
-+
-+				intc_prio8 {
-+					reg = <0xffd20020 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <0 &MSIOF &TSIF0 0>;
-+				};
-+
-+				intc_prio9 {
-+					reg = <0xffd20024 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <0 &_3DG_SGX543 &MSUG &MSU>;
-+				};
-+
-+				intc_prio10 {
-+					reg = <0xffd20028 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <0 &ASA &LMB &PEP>;
-+				};
-+
-+				intc_prio11 {
-+					reg = <0xffd20030 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <0 0 0 &RWDT0>;
-+				};
-+
-+				intc_prio12 {
-+					reg = <0xffd50000 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&RTDMAC_2 0 0 0>;
-+				};
-+
-+				intc_prio13 {
-+					reg = <0xffd50004 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&RTDMAC_3 0 0 0>;
-+				};
-+
-+				intc_prio14 {
-+					reg = <0xffd50020 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&FRC 0 0 0>;
-+				};
-+
-+				intc_prio15 {
-+					reg = <0xffd50024 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&LCDC1 &CSIRX &DSITX0 0>;
-+				};
-+
-+				intc_prio16 {
-+					reg = <0xffd50028 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&SPU2 0 &FSI 0>;
-+				};
-+
-+				intc_prio17 {
-+					reg = <0xffd50030 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&TMU1 0 0 &TSIF2>;
-+				};
-+
-+				intc_prio18 {
-+					reg = <0xffd50034 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&CMT4 0 0 0>;
-+				};
-+
-+				intc_prio19 {
-+					reg = <0xffd50038 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&MFIS2 &CPORTS2R 0 0>;
-+				};
-+
-+				intc_prio20 {
-+					reg = <0xffd50040 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&DMASCH1 0 &SCUW &VIO60>;
-+				};
-+
-+				intc_prio21 {
-+					reg = <0xffd50044 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&VIO61 &CEU21 0 &CSI21>;
-+				};
-+
-+				intc_prio22 {
-+					reg = <0xffd50048 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&DSITX1_DSITX10 &DSITX1_DSITX11
-+							&DISP &DSRV>;
-+				};
-+
-+				intc_prio23 {
-+					reg = <0xffd5004c 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&EMUX2_EMUX20I &EMUX2_EMUX21I
-+							&MSTIF0_MST00I &MSTIF0_MST01I>;
-+				};
-+
-+				intc_prio24 {
-+					reg = <0xffd50050 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&MSTIF1_MST10I &MSTIF1_MST11I 0 0>;
-+				};
-+
-+				intc_prio25 {
-+					reg = <0xffd60000 2>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&SPUV 0 0 0>;
-+				};
-+			};
++		DMAC1_1: intc_group0 { group = <&DMAC1_1_DEI0 &DMAC1_1_DEI1
++				&DMAC1_1_DEI2 &DMAC1_1_DEI3>; };
++		DMAC1_2: intc_group1 { group = <&DMAC1_2_DEI4 &DMAC1_2_DEI5
++						 &DMAC1_2_DADERR>; };
++		....
++		intc_vectors {
++			vector_table = <&DIRC &ATAPI &IIC1_ALI &IIC1_TACKI &IIC1_WAITI,
++		....
 +		};
 +
-+		intca_irq_pins: interrupt-controller at 1 {
-+			compatible = "renesas,sh_intca_irq_pins";
-+			interrupt-controller;
++		intc_mask_registers {
 +			#address-cells = <1>;
 +			#size-cells = <1>;
 +			ranges;
 +
-+			reg = <0xe6900000 0x6c>;
-+
-+			IRQ0:	intsrc1 { vector = <0x4800>; };
-+			IRQ1:	intsrc2 { vector = <0x4820>; };
-+			IRQ2:	intsrc3 { vector = <0x4840>; };
-+			IRQ3:	intsrc4 { vector = <0x4860>; };
-+			IRQ4:	intsrc5 { vector = <0x4880>; };
-+			IRQ5:	intsrc6 { vector = <0x48a0>; };
-+			IRQ6:	intsrc7 { vector = <0x48c0>; };
-+			IRQ7:	intsrc8 { vector = <0x48e0>; };
-+			IRQ8:	intsrc9 { vector = <0x4900>; };
-+			IRQ9:	intsrc10 { vector = <0x4920>; };
-+			IRQ10:	intsrc11 { vector = <0x4940>; };
-+			IRQ11:	intsrc12 { vector = <0x4960>; };
-+			IRQ12:	intsrc13 { vector = <0x4980>; };
-+			IRQ13:	intsrc14 { vector = <0x49a0>; };
-+			IRQ14:	intsrc15 { vector = <0x49c0>; };
-+			IRQ15:	intsrc16 { vector = <0x49e0>; };
-+			IRQ16:	intsrc17 { vector = <0x7800>; };
-+			IRQ17:	intsrc18 { vector = <0x7820>; };
-+			IRQ18:	intsrc19 { vector = <0x7840>; };
-+			IRQ19:	intsrc20 { vector = <0x7860>; };
-+			IRQ20:	intsrc21 { vector = <0x7880>; };
-+			IRQ21:	intsrc22 { vector = <0x78a0>; };
-+			IRQ22:	intsrc23 { vector = <0x78c0>; };
-+			IRQ23:	intsrc24 { vector = <0x78e0>; };
-+			IRQ24:	intsrc25 { vector = <0x7900>; };
-+			IRQ25:	intsrc26 { vector = <0x7920>; };
-+			IRQ26:	intsrc27 { vector = <0x7940>; };
-+			IRQ27:	intsrc28 { vector = <0x7960>; };
-+			IRQ28:	intsrc29 { vector = <0x7980>; };
-+			IRQ29:	intsrc30 { vector = <0x79a0>; };
-+			IRQ30:	intsrc31 { vector = <0x79c0>; };
-+			IRQ31:	intsrc32 { vector = <0x79e0>; };
-+
-+			intc_vectors {
-+				vector_table = <&IRQ0 &IRQ1 &IRQ2 &IRQ3 &IRQ4 &IRQ5
-+								&IRQ6 &IRQ7 &IRQ8 &IRQ9 &IRQ10
-+								&IRQ11 &IRQ12 &IRQ13 &IRQ14 &IRQ15
-+								&IRQ16 &IRQ17 &IRQ18 &IRQ19 &IRQ20
-+								&IRQ21 &IRQ22 &IRQ23 &IRQ24 &IRQ25
-+								&IRQ26 &IRQ27 &IRQ28 &IRQ29 &IRQ30
-+								&IRQ31>;
++			intc_mask0 {
++				reg = <0xe6940080 1>, <0xe69400c0 1>;
++				reginfo = <&DMAC2_1_DEI3 &DMAC2_1_DEI2 &DMAC2_1_DEI1
++					&DMAC2_1_DEI0 0 0 &AP_ARM_COMMTX &AP_ARM_COMMRX>;
 +			};
-+
-+			intc_mask_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_mask0 {
-+					reg = <0xe6900040 1>, <0xe6900060 1>;
-+					reginfo = <&IRQ0 &IRQ1 &IRQ2 &IRQ3 &IRQ4
-+							&IRQ5 &IRQ6 &IRQ7>;
-+				};
-+
-+				intc_mask1 {
-+					reg = <0xe6900044 1>, <0xe6900064 1>;
-+					reginfo = <&IRQ8 &IRQ9 &IRQ10 &IRQ11
-+							&IRQ12 &IRQ13 &IRQ14 &IRQ15>;
-+				};
-+
-+				intc_mask2 {
-+					reg = <0xe6900048 1>, <0xe6900068 1>;
-+					reginfo = <&IRQ16 &IRQ17 &IRQ18 &IRQ19
-+							&IRQ20 &IRQ21 &IRQ22 &IRQ23>;
-+				};
-+
-+				intc_mask3 {
-+					reg = <0xe690004C 1>, <0xe690006C 1>;
-+					reginfo = <&IRQ24 &IRQ25 &IRQ26 &IRQ27
-+							&IRQ28 &IRQ29 &IRQ30 &IRQ31>;
-+				};
-+			};
-+
-+			intc_prio_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_prio0 {
-+					reg = <0xe6900010 4>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&IRQ0 &IRQ1 &IRQ2 &IRQ3 &IRQ4 &IRQ5 &IRQ6 &IRQ7>;
-+				};
-+
-+				intc_prio1 {
-+					reg = <0xe6900014 4>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&IRQ8 &IRQ9 &IRQ10 &IRQ11
-+							&IRQ12 &IRQ13 &IRQ14 &IRQ15>;
-+				};
-+
-+				intc_prio2 {
-+					reg = <0xe6900018 4>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&IRQ16 &IRQ17 &IRQ18 &IRQ19
-+							&IRQ20 &IRQ21 &IRQ22 &IRQ23>;
-+				};
-+
-+				intc_prio3 {
-+					reg = <0xe690001C 4>, <0x0 0>;
-+					field-width = <4>;
-+					reginfo = <&IRQ24 &IRQ25 &IRQ26 &IRQ27
-+							&IRQ28 &IRQ29 &IRQ30 &IRQ31>;
-+				};
-+			};
-+
-+			intc_sense_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_sense0 {
-+					reg = <0xe6900000 4>;
-+					field-width = <4>;
-+					reginfo = <&IRQ0 &IRQ1 &IRQ2 &IRQ3 &IRQ4 &IRQ5 &IRQ6 &IRQ7>;
-+				};
-+
-+				intc_sense1 {
-+					reg = <0xe6900004 4>;
-+					field-width = <4>;
-+					reginfo = <&IRQ8 &IRQ9 &IRQ10 &IRQ11
-+							&IRQ12 &IRQ13 &IRQ14 &IRQ15>;
-+				};
-+
-+				intc_sense2 {
-+					reg = <0xe6900008 4>;
-+					field-width = <4>;
-+					reginfo = <&IRQ16 &IRQ17 &IRQ18 &IRQ19
-+							&IRQ20 &IRQ21 &IRQ22 &IRQ23>;
-+				};
-+
-+				intc_sense3 {
-+					reg = <0xe690000C 4>;
-+					field-width = <4>;
-+					reginfo = <&IRQ24 &IRQ25 &IRQ26 &IRQ27
-+							&IRQ28 &IRQ29 &IRQ30 &IRQ31>;
-+				};
-+			};
-+
-+			intc_ack_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_ack0 {
-+					reg = <0xe6900020 1>, <0x0 0>;
-+					reginfo = <&IRQ0 &IRQ1 &IRQ2 &IRQ3 &IRQ4 &IRQ5 &IRQ6 &IRQ7>;
-+				};
-+
-+				intc_ack1 {
-+					reg = <0xe6900024 1>, <0x0 0>;
-+					reginfo = <&IRQ8 &IRQ9 &IRQ10 &IRQ11
-+							&IRQ12 &IRQ13 &IRQ14 &IRQ15>;
-+				};
-+
-+				intc_ack2 {
-+					reg = <0xe6900028 1>, <0x0 0>;
-+					reginfo = <&IRQ16 &IRQ17 &IRQ18 &IRQ19
-+							&IRQ20 &IRQ21 &IRQ22 &IRQ23>;
-+				};
-+
-+				intc_ack3 {
-+					reg = <0xe690002C 1>, <0x0 0>;
-+					reginfo = <&IRQ24 &IRQ25 &IRQ26 &IRQ27
-+							&IRQ28 &IRQ29 &IRQ30 &IRQ31>;
-+				};
-+			};
++			....
 +		};
 +
-+		intc_pint0: interrupt-controller at 2 {
-+			compatible = "renesas,sh_pint0";
-+			interrupt-controller;
++		intc_prio_registers {
 +			#address-cells = <1>;
 +			#size-cells = <1>;
 +			ranges;
 +
-+			reg = <0xe69000a0 0x20>;
-+
-+			PINTA0: intsrc1 { vector = <0x5980>; };
-+			PINTA1: intsrc2 { vector = <0x59a0>; };
-+			PINTA2: intsrc3 { vector = <0x59c0>; };
-+			PINTA3: intsrc4 { vector = <0x59e0>; };
-+			PINTA4: intsrc5 { vector = <0x5a00>; };
-+			PINTA5: intsrc6 { vector = <0x5a20>; };
-+			PINTA6: intsrc7 { vector = <0x5a40>; };
-+			PINTA7: intsrc8 { vector = <0x5a60>; };
-+			PINTB0: intsrc9 { vector = <0x5a80>; };
-+			PINTB1: intsrc10 { vector = <0x5aa0>; };
-+			PINTB2: intsrc11 { vector = <0x5ac0>; };
-+			PINTB3: intsrc12 { vector = <0x5ae0>; };
-+			PINTB4: intsrc13 { vector = <0x5b00>; };
-+			PINTB5: intsrc14 { vector = <0x5b20>; };
-+			PINTB6: intsrc15 { vector = <0x5b40>; };
-+			PINTB7: intsrc16 { vector = <0x5b60>; };
-+			PINTC0: intsrc17 { vector = <0x5b80>; };
-+			PINTC1: intsrc18 { vector = <0x5ba0>; };
-+			PINTC2: intsrc19 { vector = <0x5bc0>; };
-+			PINTC3: intsrc20 { vector = <0x5be0>; };
-+			PINTC4: intsrc21 { vector = <0x5c00>; };
-+			PINTC5: intsrc22 { vector = <0x5c20>; };
-+			PINTC6: intsrc23 { vector = <0x5c40>; };
-+			PINTC7: intsrc24 { vector = <0x5c60>; };
-+			PINTD0: intsrc25 { vector = <0x5c80>; };
-+			PINTD1: intsrc26 { vector = <0x5ca0>; };
-+			PINTD2: intsrc27 { vector = <0x5cc0>; };
-+			PINTD3: intsrc28 { vector = <0x5ce0>; };
-+			PINTD4: intsrc29 { vector = <0x5d00>; };
-+			PINTD5: intsrc30 { vector = <0x5d20>; };
-+			PINTD6: intsrc31 { vector = <0x5d40>; };
-+			PINTD7: intsrc32 { vector = <0x5d60>; };
-+
-+			intc_vectors {
-+				vector_table = <&PINTA0 &PINTA1 &PINTA2
-+					&PINTA3 &PINTA4 &PINTA5 &PINTA6
-+					&PINTA7 &PINTB0 &PINTB1 &PINTB2
-+					&PINTB3 &PINTB4 &PINTB5 &PINTB6
-+					&PINTB7 &PINTC0 &PINTC1 &PINTC2
-+					&PINTC3 &PINTC4 &PINTC5 &PINTC6
-+					&PINTC7 &PINTD0 &PINTD1 &PINTD2
-+					&PINTD3 &PINTD4 &PINTD5 &PINTD6
-+					&PINTD7>;
++			intc_prio0 {
++				reg = <0xe6940000 2>, <0x0 0>;
++				field-width = <4>;
++				reginfo = <&DMAC3_1 &DMAC3_2 &CMT2 &ICBS0>;
 +			};
-+
-+			intc_mask_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_mask0 {
-+					reg = <0xe69000a0 4>, <0x0 0>; /* FIXME */
-+					reginfo = <&PINTA0 &PINTA1 &PINTA2
-+						&PINTA3 &PINTA4 &PINTA5 &PINTA6
-+						&PINTA7 &PINTB0 &PINTB1 &PINTB2
-+						&PINTB3 &PINTB4 &PINTB5 &PINTB6
-+						&PINTB7 &PINTC0 &PINTC1 &PINTC2
-+						&PINTC3 &PINTC4 &PINTC5 &PINTC6
-+						&PINTC7 &PINTD0 &PINTD1 &PINTD2
-+						&PINTD3 &PINTD4 &PINTD5 &PINTD6
-+						&PINTD7>;
-+				};
-+			};
-+
-+			intc_sense_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_sense0 {
-+					reg = <0xe69000b0 2>, <0x0 0>;
-+					field-width = <2>;
-+					reginfo = <&PINTA0 &PINTA1 &PINTA2 &PINTA3
-+							&PINTA4 &PINTA5 &PINTA6 &PINTA7>;
-+				};
-+
-+				intc_sense1 {
-+					reg = <0xe69000b4 2>, <0x0 0>;
-+					field-width = <2>;
-+					reginfo = <&PINTB0 &PINTB1 &PINTB2 &PINTB3
-+							&PINTB4 &PINTB5 &PINTB6 &PINTB7>;
-+				};
-+
-+				intc_sense2 {
-+					reg = <0xe69000b8 2>, <0x0 0>;
-+					field-width = <2>;
-+					reginfo = <&PINTC0 &PINTC1 &PINTC2 &PINTC3
-+							&PINTC4 &PINTC5 &PINTC6 &PINTC7>;
-+				};
-+
-+				intc_sense3 {
-+					reg = <0xe69000bc 2>, <0x0 0>;
-+					field-width = <2>;
-+					reginfo = <&PINTD0 &PINTD1 &PINTD2 &PINTD3
-+							&PINTD4 &PINTD5 &PINTD6 &PINTD7>;
-+				};
-+			};
-+		};
-+
-+		intc_pint1: interrupt-controller at 3 {
-+			compatible = "renesas,sh_pint1";
-+			interrupt-controller;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			#interrupt-cells = <1>;
-+			ranges;
-+
-+			reg = <0xe69000a4 0x20>;
-+
-+			PINTE0: intsrc1 { vector = <0x5d80>; };
-+			PINTE1: intsrc2 { vector = <0x5da0>; };
-+			PINTE2: intsrc3 { vector = <0x5dc0>; };
-+			PINTE3: intsrc4 { vector = <0x5de0>; };
-+			PINTE4: intsrc5 { vector = <0x5e00>; };
-+			PINTE5: intsrc6 { vector = <0x5e20>; };
-+			PINTE6: intsrc7 { vector = <0x5e40>; };
-+			PINTE7: intsrc8 { vector = <0x5e60>; };
-+
-+			intc_vectors {
-+				vector_table = <&PINTE0 &PINTE1 &PINTE2
-+					&PINTE3 &PINTE4 &PINTE5 &PINTE6
-+					&PINTE7>;
-+			};
-+
-+			intc_mask_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_mask0 {
-+					reg = <0xe69000a4 4>, <0x0 0>; /* FIXME */
-+					reginfo = <&PINTE0 &PINTE1 &PINTE2 &PINTE3
-+						&PINTE4 &PINTE5 &PINTE6 &PINTE7>;
-+				};
-+			};
-+
-+			intc_sense_registers {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+
-+				intc_sense0 {
-+					reg = <0xe69000c0 2>, <0x0 0>;
-+					field-width = <2>;
-+					reginfo = <&PINTE0 &PINTE1 &PINTE2 &PINTE3
-+							&PINTE4 &PINTE5 &PINTE6 &PINTE7>;
-+				};
-+
-+				intc_sense1 {
-+					reg = <0xe69000c4 2>, <0x0 0>;
-+					field-width = <2>;
-+					reginfo = <0 0 0 0 0 0 0 0>;
-+				};
-+
-+				intc_sense2 {
-+					reg = <0xe69000c8 2>, <0x0 0>;
-+					field-width = <2>;
-+					reginfo = <0 0 0 0 0 0 0 0>;
-+				};
-+
-+				intc_sense3 {
-+					reg = <0xe69000cc 2>, <0x0 0>;
-+					field-width = <2>;
-+					reginfo = <0 0 0 0 0 0 0 0>;
-+				};
-+			};
++			....
 +		};
 +	};
-+};
+diff --git a/drivers/sh/intc/Makefile b/drivers/sh/intc/Makefile
+index 54ec2a0..b53ab7e 100644
+--- a/drivers/sh/intc/Makefile
++++ b/drivers/sh/intc/Makefile
+@@ -3,3 +3,4 @@ obj-y 	:= access.o chip.o core.o handle.o irqdomain.o virq.o
+ obj-$(CONFIG_INTC_BALANCING)		+= balancing.o
+ obj-$(CONFIG_INTC_USERIMASK)		+= userimask.o
+ obj-$(CONFIG_INTC_MAPPING_DEBUG)	+= virq-debugfs.o
++obj-$(CONFIG_OF)			+= of_intc.o
+diff --git a/drivers/sh/intc/of_intc.c b/drivers/sh/intc/of_intc.c
+new file mode 100644
+index 0000000..30b1090
+--- /dev/null
++++ b/drivers/sh/intc/of_intc.c
+@@ -0,0 +1,646 @@
++/*
++ * OF helpers for SH intc
++ *
++ * Copyright (C) 2012  Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
++ * Copyright (C) 2012  Renesas Solutions Corp.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/string.h>
++#include <linux/irq.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/sh_intc.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <linux/of_address.h>
++
++static void __init of_sh_intc_get_reg_addrs(struct device_node *np,
++				unsigned long *set_reg, unsigned long *clr_reg,
++				unsigned long *reg_width,
++				unsigned long *field_width)
++{
++	struct resource res;
++
++	if (set_reg) {
++		of_address_to_resource(np, 0, &res);
++		*set_reg = res.start;
++	}
++
++	if (resource_size(&res) && reg_width)
++		*reg_width = resource_size(&res) * 8; /* byte */
++
++	if (clr_reg) {
++		of_address_to_resource(np, 1, &res);
++		*clr_reg = res.start;
++	}
++
++	if (field_width) {
++		u32 width;
++		of_property_read_u32(np, "field-width", &width);
++		*field_width = width;
++	}
++}
++
++static int of_sh_intc_parse_vector(struct device_node *np, uint32_t *vect)
++{
++	return of_property_read_u32(np, "vector", vect);
++}
++
++static int of_sh_intc_parse_group(struct device_node *np,
++				struct intc_group *grp)
++{
++	const __be32 *list, *list_end;
++	int size, ret = 0, count = 0;
++	phandle phandle;
++
++	/* Retrieve the phandle list property */
++	list = of_get_property(np, "group", &size);
++	if (!list)
++		return -ENOENT;
++
++	list_end = list + size / sizeof(*list);
++
++	grp->enum_id = np->phandle;
++	/* Loop over the phandles until all the requested entry is found */
++	while (list < list_end) {
++		/* If phandle is 0, then it is an empty entry with
++		   no arguments. */
++		phandle = be32_to_cpup(list);
++		if (phandle)
++			grp->enum_ids[count] = phandle;
++		list++;
++		count++;
++	}
++
++	pr_debug("%d:[", grp->enum_id);
++	for (size = 0 ; size < count ; size++)
++		pr_debug(" %d ", grp->enum_ids[size]);
++
++	pr_debug("]\n");
++
++	return ret;
++}
++
++static int of_sh_intc_parse_vectortbl(struct device_node *np,
++				struct intc_vect **vect, int *tbl_size)
++{
++	const __be32 *list, *list_end;
++	int size, ret = 0, count = 0;
++	struct device_node *node = NULL;
++	phandle phandle;
++
++	/* Retrieve the phandle list property */
++	list = of_get_property(np, "vector_table", &size);
++	if (!list)
++		return -ENOENT;
++
++	*tbl_size = size / sizeof(*list);
++
++	pr_debug("vector table size: %d\n", *tbl_size);
++
++	*vect = kzalloc(sizeof(struct intc_vect) * *tbl_size,
++					GFP_KERNEL);
++	if (!*vect)
++		return -ENOMEM;
++
++	list_end = list + *tbl_size;
++
++	/* Loop over the phandles until all the requested entry is found */
++	while (list < list_end) {
++		/* If phandle is 0, then it is an empty entry with
++		   no arguments. */
++		phandle = be32_to_cpup(list);
++		if (phandle) {
++			uint32_t vector_id;
++
++			(*vect)[count].enum_id = phandle;
++			node = of_find_node_by_phandle(phandle);
++
++			ret = of_sh_intc_parse_vector(node, &vector_id);
++			if (ret)
++				return ret;
++
++			(*vect)[count].vect = vector_id;
++			pr_debug("id %d : vector 0x%x\n",
++				(*vect)[count].enum_id, (*vect)[count].vect);
++		} else {
++			ret = -EINVAL;
++			goto error;
++		}
++		list++;
++		count++;
++	}
++	return ret;
++
++error:
++	kfree(*vect);
++
++	return ret;
++}
++
++static int of_sh_intc_parse_reginfo(struct device_node *np,
++				struct intc_mask_reg *mask,
++				struct intc_prio_reg *prio,
++				struct intc_sense_reg *sense)
++{
++	const __be32 *list, *list_end;
++	int size, id, ret = 0, count = 0;
++	phandle phandle;
++
++	/* Retrieve the phandle list property */
++	list = of_get_property(np, "reginfo", &size);
++	if (!list)
++		return -ENOENT;
++
++	list_end = list + size / sizeof(*list);
++
++	/* Loop over the phandles until all the requested entry is found */
++	while (list < list_end) {
++		/* If phandle is 0, then it is an empty entry with
++		   no arguments. */
++		phandle = be32_to_cpup(list);
++		if (phandle)
++			id = phandle;
++		else
++			id = 0;
++
++		if (mask)
++			mask->enum_ids[count] = id;
++		if (prio)
++			prio->enum_ids[count] = id;
++		if (sense)
++			sense->enum_ids[count] = id;
++
++		pr_debug("reg: [%d] %d\n", count, id);
++		list++;
++		count++;
++	}
++
++	return ret;
++}
++
++static struct device_node *
++__init of_sh_intc_check_base_node(struct device_node *np,
++		const char *node_name, int *tbl_size)
++{
++	struct device_node *node;
++
++	node = of_find_node_by_name(np, node_name);
++	if (!node) {
++		pr_err("%s table not found\n", node_name);
++		return NULL;
++	}
++
++	pr_debug("%s\n", node->full_name);
++
++	*tbl_size = of_get_child_count(node);
++
++	pr_debug("Size of %s: %d\n", node_name, *tbl_size);
++
++	return node;
++}
++
++static int __init of_sh_intc_get_mask_ack(struct device_node *np,
++				struct intc_mask_reg **masks, int *tbl_size,
++				const char *base_name, const char *reg_name)
++{
++	struct device_node *intc_node, *reg_node;
++	int i, ret;
++	char node_name[13]; /* intc_mask + 999 */
++
++	intc_node = of_sh_intc_check_base_node(np, base_name, tbl_size);
++	if (!intc_node)
++		return -ENOENT;
++
++	*masks = kzalloc(sizeof(struct intc_mask_reg) * *tbl_size, GFP_KERNEL);
++	if (!*masks)
++		return -ENOMEM;
++
++	for (i = 0 ; i < *tbl_size; i++) {
++		memset(node_name, 0, sizeof(node_name));
++		snprintf(node_name, sizeof(node_name), "%s%d", reg_name, i);
++
++		pr_debug("intc node[%d]: name: %s\n", i, node_name);
++
++		reg_node = of_find_node_by_name(intc_node, node_name);
++		if (!reg_node) {
++			pr_warn("%s not found\n", node_name);
++			ret = -EINVAL;
++			goto error;
++		}
++
++		of_sh_intc_get_reg_addrs(reg_node, &(*masks)[i].set_reg,
++					&(*masks)[i].clr_reg,
++					&(*masks)[i].reg_width, NULL);
++
++#ifdef CONFIG_INTC_BALANCING
++		of_property_read_u32(reg_node, "dist_reg", &(*masks)[i].dist_reg);
++#endif
++#ifdef CONFIG_SMP
++		of_property_read_u32(reg_node, "smp", (u32*)&(*masks)[i].smp);
++#endif
++
++		pr_debug("set reg: 0x%lx clr reg: 0x%lx reg_width: %ld\n",
++				(*masks)[i].set_reg, (*masks)[i].clr_reg,
++				(*masks)[i].reg_width);
++
++		ret = of_sh_intc_parse_reginfo(reg_node, &(*masks)[i], NULL,
++						NULL);
++		if (ret)
++			goto error;
++	}
++
++	return ret;
++
++error:
++	kfree(*masks);
++	return ret;
++}
++
++static int __init of_sh_intc_get_vector(struct device_node *np,
++				struct intc_vect **vectors, int *tbl_size)
++{
++	struct device_node *intc_node;
++
++	/* Get INTCA vector register info */
++	intc_node = of_find_node_by_name(np, "intc_vectors");
++	if (!intc_node) {
++		pr_err("Get INTC vector table not found\n");
++		return -ENOENT;
++	}
++
++	return of_sh_intc_parse_vectortbl(intc_node, vectors, tbl_size);
++}
++
++static int __init of_sh_intc_get_prio(struct device_node *np,
++				struct intc_prio_reg **prios, int *tbl_size)
++{
++	struct device_node *intc_node, *reg_node;
++	int i, ret;
++	char node_name[13]; /* intc_prio + 999 */
++
++	intc_node = of_sh_intc_check_base_node(np, "intc_prio_registers",
++					tbl_size);
++	if (!intc_node)
++		return -ENOENT;
++
++	*prios = kzalloc(sizeof(struct intc_prio_reg) * *tbl_size, GFP_KERNEL);
++	if (!*prios)
++		return -ENOMEM;
++
++	/* Get INTC priority register info */
++	for (i = 0 ; i < *tbl_size; i++) {
++		memset(node_name, 0, sizeof(node_name));
++		snprintf(node_name, sizeof(node_name), "intc_prio%d", i);
++
++		pr_debug("INTC node name: %s\n", node_name);
++
++		reg_node = of_find_node_by_name(intc_node, node_name);
++
++		if (!intc_node) {
++			pr_err("INTC prio register not found\n");
++			ret = -EINVAL;
++			goto error;
++		}
++
++		of_sh_intc_get_reg_addrs(reg_node, &(*prios)[i].set_reg,
++				&(*prios)[i].clr_reg, &(*prios)[i].reg_width,
++				&(*prios)[i].field_width);
++
++		pr_debug("\tset reg: 0x%lx clr reg: 0x%lx\n"
++					, (*prios)[i].set_reg, (*prios)[i].clr_reg);
++		pr_debug("\treg_width: %ld field_width: %ld\n",
++				(*prios)[i].reg_width, (*prios)[i].field_width);
++
++		ret = of_sh_intc_parse_reginfo(reg_node, NULL, &(*prios)[i],
++						NULL);
++		if (ret)
++			goto error;
++	}
++
++	return ret;
++
++error:
++	kfree(*prios);
++	return ret;
++}
++
++static int __init of_sh_intc_get_sense(struct device_node *np,
++				struct intc_sense_reg **senses, int *tbl_size)
++{
++	struct device_node *intc_node, *reg_node;
++	int i, ret;
++	char node_name[14]; /* intc_sense + 999 */
++
++	intc_node = of_sh_intc_check_base_node(np, "intc_sense_registers",
++					tbl_size);
++	if (!intc_node)
++		return -ENOENT;
++
++	*senses = kzalloc(sizeof(struct intc_sense_reg) * *tbl_size,
++					GFP_KERNEL);
++	if (!*senses)
++		return -ENOMEM;
++
++	/* Get INTC priority register info */
++	for (i = 0 ; i < *tbl_size; i++) {
++		memset(node_name, 0, sizeof(node_name));
++		snprintf(node_name, sizeof(node_name), "intc_sense%d", i);
++
++		pr_debug("INTC node name: %s\n", node_name);
++
++		reg_node = of_find_node_by_name(intc_node, node_name);
++
++		if (!intc_node) {
++			pr_err("INTC senses register not found\n");
++			ret = -EINVAL;
++			goto error;
++		}
++
++		of_sh_intc_get_reg_addrs(reg_node, &(*senses)[i].reg, NULL,
++					&(*senses)[i].reg_width,
++					&(*senses)[i].field_width);
++
++		pr_debug("\tset reg: 0x%lx\n", (*senses)[i].reg);
++		pr_debug("\treg_width: %ld field_width: %ld\n",
++					(*senses)[i].reg_width,
++					(*senses)[i].field_width);
++
++		ret = of_sh_intc_parse_reginfo(reg_node, NULL, NULL,
++						&(*senses)[i]);
++		if (ret)
++			goto error;
++	}
++
++	return ret;
++
++error:
++	kfree(*senses);
++	return ret;
++}
++
++static int __init of_sh_intc_get_ack(struct device_node *np,
++				struct intc_mask_reg **masks, int *tbl_size)
++{
++	return of_sh_intc_get_mask_ack(np, masks, tbl_size,
++					"intc_ack_registers", "intc_ack");
++}
++
++static int __init of_sh_intc_get_mask(struct device_node *np,
++				struct intc_mask_reg **masks, int *tbl_size)
++{
++	return of_sh_intc_get_mask_ack(np, masks, tbl_size,
++					"intc_mask_registers", "intc_mask");
++}
++
++static int __init of_sh_intc_get_group(struct device_node *np,
++				struct intc_group **groups, int *tbl_size)
++{
++	int i, ret, size;
++	const __be32 *list;
++	struct device_node *grp_node;
++	char node_name[15]; /* intc_group@999 */
++
++	/* Get size of group */
++	if (of_property_read_u32(np, "group_size", tbl_size)) {
++		pr_debug("%s size infomation not found\n", node_name);
++		return -ENOENT;
++	}
++
++	pr_debug("Group size %d\n", *tbl_size);
++	pr_debug("%s\n", np->full_name);
++
++	*groups = kzalloc(sizeof(struct intc_group) * *tbl_size, GFP_KERNEL);
++	if (!*groups)
++		return -ENOMEM;
++
++	/* Get INTCA node info */
++	for (i = 0 ; i < *tbl_size; i++) {
++		memset(node_name, 0, sizeof(node_name));
++		snprintf(node_name, sizeof(node_name), "intc_group%d", i);
++
++		pr_debug("intc group[%d]: name: %s\n", i, node_name);
++
++		grp_node = of_find_node_by_name(np, node_name);
++		if (!grp_node) {
++			pr_warn("%s not found\n", node_name);
++			ret = -EINVAL;
++			goto error;
++		}
++
++		list = of_get_property(np, node_name, &size);
++		ret = of_sh_intc_parse_group(grp_node, &(*groups)[i]);
++		if (ret) {
++			pr_err("intc group not found\n");
++			goto error;
++		}
++	}
++
++	return ret;
++
++error:
++	kfree(*groups);
++	return ret;
++}
++
++int __init of_sh_intc_get_intevtsa_vect(struct device_node *np,
++				unsigned short *vect)
++{
++	int size;
++	const __be32 *list;
++	struct device_node *node;
++	phandle phandle;
++
++	node = of_find_node_by_name(np, "intc_intevtsa");
++	if (!node) {
++		return -ENOENT;
++	}
++
++	/* Retrieve the phandle list property */
++	list = of_get_property(node, "vector", &size);
++	if (!list)
++		return -ENOENT;
++
++	phandle = be32_to_cpup(list);
++	if (phandle) {
++		uint32_t tmp;
++		struct device_node *vect_node =
++				of_find_node_by_phandle(phandle);
++
++		if (!of_sh_intc_parse_vector(vect_node, &tmp))
++			*vect = tmp;
++		else
++			return -ENOENT;
++	} else {
++		pr_debug("intc_intevtsa data not found\n");
++		return -ENOENT;
++	}
++	return 0;
++}
++
++static int of_sh_intc_get_force_flags(struct device_node *np,
++				const char *node_name)
++{
++	int size;
++	const __be32 *list = of_get_property(np, node_name, &size);
++	if (list)
++		return be32_to_cpup(list);
++
++	return 0;
++}
++
++void __init of_sh_intc_get_force_enable(struct device_node *np,
++				struct intc_desc *d)
++{
++	d->force_enable =
++		of_sh_intc_get_force_flags(np, "force_enable");
++}
++
++void __init of_sh_intc_get_force_disable(struct device_node *np,
++				struct intc_desc *d)
++{
++	d->force_disable =
++		of_sh_intc_get_force_flags(np, "force_disable");
++}
++
++void __init of_sh_intc_get_skip_syscore_suspend(struct device_node *np,
++				struct intc_desc *d)
++{
++	if (of_find_property(np, "skip_syscore_suspend", NULL))
++		d->skip_syscore_suspend = true;
++	else
++		d->skip_syscore_suspend = false;
++}
++
++int __init of_sh_intc_get_meminfo(struct device_node *np,
++				struct resource *res, int res_no)
++{
++	int ret = 0, i;
++
++	for (i = 0 ; i < res_no ; i++) {
++		ret = of_address_to_resource(np, i, &res[i]);
++		if (ret) {
++			pr_err("could not determine device base address\n");
++			return ret;
++		}
++
++		pr_debug("%s: Address 0x%x, size %d\n",
++					__func__, res[i].start, resource_size(&res[i]));
++	}
++
++	return ret;
++}
++
++int __init of_sh_intc_get_pint(struct device_node *np, struct intc_desc *d)
++{
++	/* pint uses vector, mask and sence. */
++	int ret = of_sh_intc_get_vector(np, &d->hw.vectors,
++				&d->hw.nr_vectors);
++	if (ret)
++		return ret;
++
++	ret = of_sh_intc_get_mask(np, &d->hw.mask_regs,
++				&d->hw.nr_mask_regs);
++	if (ret)
++		return ret;
++
++	ret = of_sh_intc_get_sense(np, &d->hw.sense_regs,
++				&d->hw.nr_sense_regs);
++	/* INTC may not need Sence register. */
++	if (ret && ret != -ENOENT)
++		return ret;
++
++	d->of_node = np;
++
++	return 0;
++}
++
++int __init of_sh_intc_get_intc(struct device_node *np, struct intc_desc *d)
++{
++	int ret = of_sh_intc_get_vector(np, &d->hw.vectors,
++				&d->hw.nr_vectors);
++	if (ret)
++		return ret;
++
++	ret = of_sh_intc_get_group(np, &d->hw.groups,
++				&d->hw.nr_groups);
++	/* INTC may not need groups. */
++	if (ret && ret != -ENOENT)
++		return ret;
++
++	ret = of_sh_intc_get_mask(np, &d->hw.mask_regs,
++				&d->hw.nr_mask_regs);
++	if (ret)
++		return ret;
++
++	ret = of_sh_intc_get_prio(np, &d->hw.prio_regs,
++				&d->hw.nr_prio_regs);
++	if (ret)
++		return ret;
++
++	ret = of_sh_intc_get_sense(np, &d->hw.sense_regs,
++				&d->hw.nr_sense_regs);
++	/* INTC may not need Sense register. */
++	if (ret && ret != -ENOENT)
++		return ret;
++
++	ret = of_sh_intc_get_ack(np, &d->hw.ack_regs,
++				&d->hw.nr_ack_regs);
++	/* INTC may not need Ack register. */
++	if (ret && ret != -ENOENT)
++		return ret;
++
++	d->of_node = np;
++
++	return 0;
++}
++
++int __init of_sh_intc_get_intc_pins(struct device_node *np,
++				struct intc_desc *d)
++{
++	int ret = of_sh_intc_get_vector(np, &d->hw.vectors,
++				&d->hw.nr_vectors);
++	if (ret)
++		return ret;
++
++	ret = of_sh_intc_get_mask(np, &d->hw.mask_regs,
++				&d->hw.nr_mask_regs);
++	if (ret)
++		return ret;
++
++	ret = of_sh_intc_get_prio(np, &d->hw.prio_regs,
++				&d->hw.nr_prio_regs);
++	if (ret)
++		return ret;
++
++	ret = of_sh_intc_get_sense(np, &d->hw.sense_regs,
++				&d->hw.nr_sense_regs);
++	if (ret)
++		return ret;
++
++	ret = of_sh_intc_get_ack(np, &d->hw.ack_regs,
++				&d->hw.nr_ack_regs);
++	if (ret)
++		return ret;
++
++	d->of_node = np;
++
++	return 0;
++}
+diff --git a/include/linux/sh_intc.h b/include/linux/sh_intc.h
+index 3238328..b0e7925 100644
+--- a/include/linux/sh_intc.h
++++ b/include/linux/sh_intc.h
+@@ -2,6 +2,10 @@
+ #define __SH_INTC_H
+ 
+ #include <linux/ioport.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <linux/of_address.h>
+ 
+ #ifdef CONFIG_SUPERH
+ #define INTC_NR_IRQS	512
+@@ -146,4 +150,83 @@ static inline int register_intc_userimask(unsigned long addr)
+ }
+ #endif
+ 
++/*
++ * of_sh_initc_get_intc() - Get INTC table.
++ * @np:     device node to get INTC from
++ * @d:      a pointer of intc table
++ *
++ * Return: one of the errno value on the error condition
++ */
++int of_sh_intc_get_intc(struct device_node *np, struct intc_desc *d);
++
++/*
++ * of_sh_initc_get_intc_pins() - Get INTC Pins table.
++ * @np:     device node to get INTC from
++ * @d:      a pointer of intc pins table
++ *
++ * Return: one of the errno value on the error condition
++ */
++int of_sh_intc_get_intc_pins(struct device_node *np, struct intc_desc *d);
++
++/*
++ * of_sh_intc_get_meminfo() - Get and set INTC register of memory.
++ * @np:     device node to get INTC from
++ * @res_mem:   a pointer of resource
++ * @res_no:  resource number
++ *
++ * Return: one of the errno value on the error condition
++ */
++int of_sh_intc_get_meminfo(struct device_node *np,
++				struct resource *res_mem, int resno);
++
++/*
++ * of_sh_intc_get_force_enable - Get and set force_enable vector in
++ *                               struct intc_desc.
++ * @np:  device node to get INTC from
++ * @d:   a pointer of struct intc_desc
++ *
++ * Return: none
++ */
++void of_sh_intc_get_force_enable(struct device_node *np,
++				struct intc_desc *d);
++
++/*
++ * of_sh_intc_get_force_disable - Get and set force_disable vector in
++ *                                struct intc_desc.
++ * @np:  device node to get INTC from
++ * @d:   a pointer of struct intc_desc
++ *
++ * Return: none
++ */
++void of_sh_intc_get_force_disable(struct device_node *np,
++				struct intc_desc *d);
++
++/*
++ * of_sh_intc_get_skip_syscore_suspend - Get and set skip_syscore_suspend
++ *                                       flag in struct intc_desc.
++ * @np:  device node to get INTC from
++ * @d:   a pointer of struct intc_desc
++ *
++ * Return: none
++ */
++void of_sh_intc_get_skip_syscore_suspend(struct device_node *np,
++				struct intc_desc *d);
++
++/*
++ * of_sh_intc_get_intevtsa_vect  - Get using vector by intevtsa
++ * @np:  device node to get INTC from
++ * @vect:a pointer of value for vector
++ *
++ * Return: one of the errno value on the error condition
++ */
++int of_sh_intc_get_intevtsa_vect(struct device_node *np, unsigned short *vect);
++/*
++ * of_sh_initc_get_intc_pint() - Get INTC Pint table.
++ * @np:     device node to get INTC from
++ * @d:      a pointer of intc pint table
++ *
++ * Return: one of the errno value on the error condition
++ */
++int of_sh_intc_get_pint(struct device_node *np, struct intc_desc *d);
++
+ #endif /* __SH_INTC_H */
 -- 
 1.7.10.4
