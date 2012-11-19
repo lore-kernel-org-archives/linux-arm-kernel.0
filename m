@@ -1,38 +1,48 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Mon, 19 Nov 2012 09:37:27 -0700
-Subject: [PATCH] dmaengine: omap-dma: Allow DMA controller to prefetch data
-Message-ID: <20121119163727.GB9758@animalcreek.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 19 Nov 2012 14:38:00 -0200
+Subject: [PATCH] ARM: Kconfig: Do not select ARCH_VEXPRESS on ARCH_MULTI_V7
+Message-ID: <1353343080-19220-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Mark A. Greer" <mgreer@animalcreek.com>
+Booting a kernel on a mx53qsb board (built with imx_v6_v7_defconfig) leads to:
 
-Enable DMA prefetching for non-cyclic DMAs by setting the
-'OMAP_DMA_DST_SYNC_PREFETCH' flag when there is a destination
-synchronized DMA transfer.  Prefetching is not allowed on
-source synchronized DMA transfers.  It is not allowed on
-cyclic DMAs either since that can cause issues with some
-users (e.g., suspending/resuming audio).
+Unable to handle kernel NULL pointer dereference at virtual address 00000008
+pgd = 80004000
+[00000008] *pgd=00000000
+Internal error: Oops: 805 [#1] SMP ARM
+Modules linked in:
+CPU: 0    Not tainted  (3.7.0-rc5-next-20121115+ #715)
+PC is at vexpress_sysreg_init_leds+0x30/0xb8
+LR is at do_one_initcall+0x3c/0x190
+pc : [<8065e170>]    lr : [<800086a0>]    psr: 60000153
+sp : df855ef0  ip : df855f18  fp : df855f14
+r10: 00000000  r9 : 8067eb5c  r8 : 8065e140
+r7 : 80711cac  r6 : 806c2cc0  r5 : 00000000  r4 : 80673850
+r3 : 00000000  r2 : 00000000  r1 : df854000  r0 : 8065e140
+...
 
-CC: Russell King <rmk+kernel@arm.linux.org.uk>
-CC: P?ter Ujfalusi <peter.ujfalusi@ti.com>
-Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+Since commit c5a0d4977 (ARM: imx: enable multi-platform build), imx_v6_v7_defconfig
+selects CONFIG_ARCH_MULTI_V7=y, which in turn select ARCH_VEXPRESS.
+
+Do not select ARCH_VEXPRESS on ARCH_MULTI_V7.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- drivers/dma/omap-dma.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/Kconfig |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index bb2d8e7..3932eab 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -310,7 +310,7 @@ static struct dma_async_tx_descriptor *omap_dma_prep_slave_sg(
- 		dev_addr = c->cfg.dst_addr;
- 		dev_width = c->cfg.dst_addr_width;
- 		burst = c->cfg.dst_maxburst;
--		sync_type = OMAP_DMA_DST_SYNC;
-+		sync_type = OMAP_DMA_DST_SYNC_PREFETCH;
- 	} else {
- 		dev_err(chan->device->dev, "%s: bad direction?\n", __func__);
- 		return NULL;
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 14f8160..d40e9d3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1000,7 +1000,6 @@ config ARCH_MULTI_V7
+ 	bool "ARMv7 based platforms (Cortex-A, PJ4, Krait)"
+ 	default y
+ 	select ARCH_MULTI_V6_V7
+-	select ARCH_VEXPRESS
+ 	select CPU_V7
+ 
+ config ARCH_MULTI_V6_V7
 -- 
-1.7.12
+1.7.9.5
