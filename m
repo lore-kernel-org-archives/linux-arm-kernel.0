@@ -1,102 +1,93 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 19 Nov 2012 16:33:57 +0100
-Subject: [PATCH] net/macb: move to circ_buf macros and fix initial
- condition
-In-Reply-To: <1353338244-11506-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1353338244-11506-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20121119153357.GM4398@game.jcrosoft.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 19 Nov 2012 10:37:36 -0500 (EST)
+Subject: [PATCH v4 1/7] ARM: kernel: enhance MPIDR macro definitions
+In-Reply-To: <1353329106-24084-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1353329106-24084-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1353329106-24084-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <alpine.LFD.2.02.1211191037110.1182@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:17 Mon 19 Nov     , Nicolas Ferre wrote:
-> Move to circular buffers management macro and correct an error
-> with circular buffer initial condition.
-> 
-> Without this patch, the macb_tx_ring_avail() function was
-> not reporting the proper ring availability at startup:
-> macb macb: eth0: BUG! Tx Ring full when queue awake!
-> macb macb: eth0: tx_head = 0, tx_tail = 0
-> And hanginig forever...
-> 
-> I remove the macb_tx_ring_avail() function and use the
-> proven macros from circ_buf.h. CIRC_CNT() is used in the
-> "consumer" part of the driver: macb_tx_interrupt() to match
-> advice from Documentation/circular-buffers.txt.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Mon, 19 Nov 2012, Lorenzo Pieralisi wrote:
 
-Just tested on 9260
-Tested-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Kernel subsystems other than the topology layer need the MPIDR
+> mask definitions to access the MPIDR without relying on hardcoded
+> masks. This patch moves the MPIDR register masks definition to
+> a header file and defines a macro to simplify access to MPIDR bit fields
+> representing affinity levels.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Best Regards,
-J.
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
 > ---
->  drivers/net/ethernet/cadence/macb.c | 17 +++++++----------
->  1 file changed, 7 insertions(+), 10 deletions(-)
+>  arch/arm/include/asm/cputype.h | 13 +++++++++++++
+>  arch/arm/kernel/topology.c     | 27 +--------------------------
+>  2 files changed, 14 insertions(+), 26 deletions(-)
 > 
-> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-> index edb2aba..27991dd 100644
-> --- a/drivers/net/ethernet/cadence/macb.c
-> +++ b/drivers/net/ethernet/cadence/macb.c
-> @@ -14,6 +14,7 @@
->  #include <linux/moduleparam.h>
->  #include <linux/kernel.h>
->  #include <linux/types.h>
-> +#include <linux/circ_buf.h>
->  #include <linux/slab.h>
->  #include <linux/init.h>
->  #include <linux/gpio.h>
-> @@ -38,8 +39,8 @@
->  #define TX_RING_SIZE		128 /* must be power of 2 */
->  #define TX_RING_BYTES		(sizeof(struct macb_dma_desc) * TX_RING_SIZE)
+> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> index cb47d28..a59dcb5 100644
+> --- a/arch/arm/include/asm/cputype.h
+> +++ b/arch/arm/include/asm/cputype.h
+> @@ -25,6 +25,19 @@
+>  #define CPUID_EXT_ISAR4	"c2, 4"
+>  #define CPUID_EXT_ISAR5	"c2, 5"
 >  
-> -/* minimum number of free TX descriptors before waking up TX process */
-> -#define MACB_TX_WAKEUP_THRESH	(TX_RING_SIZE / 4)
-> +/* level of occupied TX descriptors under which we wake up TX process */
-> +#define MACB_TX_WAKEUP_THRESH	(3 * TX_RING_SIZE / 4)
+> +#define MPIDR_SMP_BITMASK (0x3 << 30)
+> +#define MPIDR_SMP_VALUE (0x2 << 30)
+> +
+> +#define MPIDR_MT_BITMASK (0x1 << 24)
+> +
+> +#define MPIDR_HWID_BITMASK 0xFFFFFF
+> +
+> +#define MPIDR_LEVEL_BITS 8
+> +#define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
+> +
+> +#define MPIDR_AFFINITY_LEVEL(mpidr, level) \
+> +	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
+> +
+>  extern unsigned int processor_id;
 >  
->  #define MACB_RX_INT_FLAGS	(MACB_BIT(RCOMP) | MACB_BIT(RXUBR)	\
->  				 | MACB_BIT(ISR_ROVR))
-> @@ -60,11 +61,6 @@ static unsigned int macb_tx_ring_wrap(unsigned int index)
->  	return index & (TX_RING_SIZE - 1);
->  }
+>  #ifdef CONFIG_CPU_CP15
+> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> index 317dac6..4642c7d 100644
+> --- a/arch/arm/kernel/topology.c
+> +++ b/arch/arm/kernel/topology.c
+> @@ -196,32 +196,7 @@ static inline void parse_dt_topology(void) {}
+>  static inline void update_cpu_power(unsigned int cpuid, unsigned int mpidr) {}
+>  #endif
 >  
-> -static unsigned int macb_tx_ring_avail(struct macb *bp)
-> -{
-> -	return (bp->tx_tail - bp->tx_head) & (TX_RING_SIZE - 1);
-> -}
 > -
->  static struct macb_dma_desc *macb_tx_desc(struct macb *bp, unsigned int index)
->  {
->  	return &bp->tx_ring[macb_tx_ring_wrap(index)];
-> @@ -524,7 +520,8 @@ static void macb_tx_interrupt(struct macb *bp)
->  
->  	bp->tx_tail = tail;
->  	if (netif_queue_stopped(bp->dev)
-> -			&& macb_tx_ring_avail(bp) > MACB_TX_WAKEUP_THRESH)
-> +			&& CIRC_CNT(bp->tx_head, bp->tx_tail,
-> +				    TX_RING_SIZE) <= MACB_TX_WAKEUP_THRESH)
->  		netif_wake_queue(bp->dev);
->  }
->  
-> @@ -818,7 +815,7 @@ static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
->  	spin_lock_irqsave(&bp->lock, flags);
->  
->  	/* This is a hard error, log it. */
-> -	if (macb_tx_ring_avail(bp) < 1) {
-> +	if (CIRC_SPACE(bp->tx_head, bp->tx_tail, TX_RING_SIZE) < 1) {
->  		netif_stop_queue(dev);
->  		spin_unlock_irqrestore(&bp->lock, flags);
->  		netdev_err(bp->dev, "BUG! Tx Ring full when queue awake!\n");
-> @@ -855,7 +852,7 @@ static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
->  
->  	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(TSTART));
->  
-> -	if (macb_tx_ring_avail(bp) < 1)
-> +	if (CIRC_SPACE(bp->tx_head, bp->tx_tail, TX_RING_SIZE) < 1)
->  		netif_stop_queue(dev);
->  
->  	spin_unlock_irqrestore(&bp->lock, flags);
+> -/*
+> - * cpu topology management
+> - */
+> -
+> -#define MPIDR_SMP_BITMASK (0x3 << 30)
+> -#define MPIDR_SMP_VALUE (0x2 << 30)
+> -
+> -#define MPIDR_MT_BITMASK (0x1 << 24)
+> -
+> -/*
+> - * These masks reflect the current use of the affinity levels.
+> - * The affinity level can be up to 16 bits according to ARM ARM
+> - */
+> -#define MPIDR_HWID_BITMASK 0xFFFFFF
+> -
+> -#define MPIDR_LEVEL0_MASK 0x3
+> -#define MPIDR_LEVEL0_SHIFT 0
+> -
+> -#define MPIDR_LEVEL1_MASK 0xF
+> -#define MPIDR_LEVEL1_SHIFT 8
+> -
+> -#define MPIDR_LEVEL2_MASK 0xFF
+> -#define MPIDR_LEVEL2_SHIFT 16
+> -
+> -/*
+> + /*
+>   * cpu topology table
+>   */
+>  struct cputopo_arm cpu_topology[NR_CPUS];
 > -- 
-> 1.8.0
+> 1.7.12
+> 
 > 
