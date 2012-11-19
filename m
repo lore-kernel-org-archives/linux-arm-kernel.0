@@ -1,51 +1,110 @@
-From: wfp5p@virginia.edu (Bill Pemberton)
-Date: Mon, 19 Nov 2012 13:25:52 -0500
-Subject: [PATCH 403/493] hwspinlock: remove use of __devexit
-In-Reply-To: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
-Message-ID: <1353349642-3677-403-git-send-email-wfp5p@virginia.edu>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 19 Nov 2012 11:31:01 -0700
+Subject: [PATCH V3 05/11] ARM: at91: convert timer suspend/resume to
+ clock_event_device
+In-Reply-To: <1353349867-28494-1-git-send-email-swarren@wwwdotorg.org>
+References: <1353349867-28494-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1353349867-28494-6-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_HOTPLUG is going away as an option so __devexit is no
-longer needed.
+From: Stephen Warren <swarren@nvidia.com>
 
-Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-Cc: Ohad Ben-Cohen <ohad@wizery.com> 
-Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> 
-Cc: Linus Walleij <linus.walleij@linaro.org> 
-Cc: linux-omap at vger.kernel.org 
-Cc: linux-arm-kernel at lists.infradead.org 
+Move at91's timer suspend/resume functions from struct sys_timer
+at91sam926x_timer into struct clock_event_device pit_clkevt. This
+will allow the sys_timer suspend/resume fields to be removed, and
+eventually lead to a complete removal of struct sys_timer.
+
+Cc: Andrew Victor <linux@maxim.org.za>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- drivers/hwspinlock/omap_hwspinlock.c | 2 +-
- drivers/hwspinlock/u8500_hsem.c      | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-at91/at91sam926x_time.c |   47 ++++++++++++++++++---------------
+ 1 file changed, 26 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/hwspinlock/omap_hwspinlock.c b/drivers/hwspinlock/omap_hwspinlock.c
-index f21b2ed..292869c 100644
---- a/drivers/hwspinlock/omap_hwspinlock.c
-+++ b/drivers/hwspinlock/omap_hwspinlock.c
-@@ -142,7 +142,7 @@ iounmap_base:
- 	return ret;
+diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+index 358412f..f7191e1 100644
+--- a/arch/arm/mach-at91/at91sam926x_time.c
++++ b/arch/arm/mach-at91/at91sam926x_time.c
+@@ -104,12 +104,38 @@ pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+ 	}
  }
  
--static int __devexit omap_hwspinlock_remove(struct platform_device *pdev)
-+static int omap_hwspinlock_remove(struct platform_device *pdev)
- {
- 	struct hwspinlock_device *bank = platform_get_drvdata(pdev);
- 	void __iomem *io_base = bank->lock[0].priv - LOCK_BASE_OFFSET;
-diff --git a/drivers/hwspinlock/u8500_hsem.c b/drivers/hwspinlock/u8500_hsem.c
-index 5a5b3f2..401c33b 100644
---- a/drivers/hwspinlock/u8500_hsem.c
-+++ b/drivers/hwspinlock/u8500_hsem.c
-@@ -148,7 +148,7 @@ iounmap_base:
- 	return ret;
++static void at91sam926x_pit_suspend(struct clock_event_device *cedev)
++{
++	/* Disable timer */
++	pit_write(AT91_PIT_MR, 0);
++}
++
++static void at91sam926x_pit_reset(void)
++{
++	/* Disable timer and irqs */
++	pit_write(AT91_PIT_MR, 0);
++
++	/* Clear any pending interrupts, wait for PIT to stop counting */
++	while (PIT_CPIV(pit_read(AT91_PIT_PIVR)) != 0)
++		cpu_relax();
++
++	/* Start PIT but don't enable IRQ */
++	pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
++}
++
++static void at91sam926x_pit_resume(struct clock_event_device *cedev)
++{
++	at91sam926x_pit_reset();
++}
++
+ static struct clock_event_device pit_clkevt = {
+ 	.name		= "pit",
+ 	.features	= CLOCK_EVT_FEAT_PERIODIC,
+ 	.shift		= 32,
+ 	.rating		= 100,
+ 	.set_mode	= pit_clkevt_mode,
++	.suspend	= at91sam926x_pit_suspend,
++	.resume		= at91sam926x_pit_resume,
+ };
+ 
+ 
+@@ -150,19 +176,6 @@ static struct irqaction at91sam926x_pit_irq = {
+ 	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
+ };
+ 
+-static void at91sam926x_pit_reset(void)
+-{
+-	/* Disable timer and irqs */
+-	pit_write(AT91_PIT_MR, 0);
+-
+-	/* Clear any pending interrupts, wait for PIT to stop counting */
+-	while (PIT_CPIV(pit_read(AT91_PIT_PIVR)) != 0)
+-		cpu_relax();
+-
+-	/* Start PIT but don't enable IRQ */
+-	pit_write(AT91_PIT_MR, (pit_cycle - 1) | AT91_PIT_PITEN);
+-}
+-
+ #ifdef CONFIG_OF
+ static struct of_device_id pit_timer_ids[] = {
+ 	{ .compatible = "atmel,at91sam9260-pit" },
+@@ -250,12 +263,6 @@ static void __init at91sam926x_pit_init(void)
+ 	clockevents_register_device(&pit_clkevt);
  }
  
--static int __devexit u8500_hsem_remove(struct platform_device *pdev)
-+static int u8500_hsem_remove(struct platform_device *pdev)
+-static void at91sam926x_pit_suspend(void)
+-{
+-	/* Disable timer */
+-	pit_write(AT91_PIT_MR, 0);
+-}
+-
+ void __init at91sam926x_ioremap_pit(u32 addr)
  {
- 	struct hwspinlock_device *bank = platform_get_drvdata(pdev);
- 	void __iomem *io_base = bank->lock[0].priv - HSEM_REGISTER_OFFSET;
+ #if defined(CONFIG_OF)
+@@ -275,6 +282,4 @@ void __init at91sam926x_ioremap_pit(u32 addr)
+ 
+ struct sys_timer at91sam926x_timer = {
+ 	.init		= at91sam926x_pit_init,
+-	.suspend	= at91sam926x_pit_suspend,
+-	.resume		= at91sam926x_pit_reset,
+ };
 -- 
-1.8.0
+1.7.10.4
