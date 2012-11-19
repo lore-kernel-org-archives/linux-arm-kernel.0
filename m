@@ -1,62 +1,65 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 19 Nov 2012 12:33:04 +0100
-Subject: [RFC] ARM: mx5: Replace clk_register_clkdev with clock DT lookup
-In-Reply-To: <1353087415-10442-1-git-send-email-festevam@gmail.com>
-References: <1353087415-10442-1-git-send-email-festevam@gmail.com>
-Message-ID: <20121119113304.GV10369@pengutronix.de>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Mon, 19 Nov 2012 11:36:57 +0000
+Subject: [PATCH v2 1/4] mfd: tps65217: Set PMIC to shutdowm on PWR_EN
+ toggle
+In-Reply-To: <87a9udn9xo.fsf@dell.be.48ers.dk>
+References: <1353067706-29491-1-git-send-email-anilkumar@ti.com>
+ <1353067706-29491-2-git-send-email-anilkumar@ti.com>
+ <87a9udn9xo.fsf@dell.be.48ers.dk>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA760FD@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-On Fri, Nov 16, 2012 at 03:36:55PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam fabio.estevam at freescale.com>
+On Mon, Nov 19, 2012 at 16:20:27, Peter Korsgaard wrote:
+> >>>>> "AnilKumar" == AnilKumar Ch <anilkumar@ti.com> writes:
 > 
-> Similarly as it was done for mx6q, use a DT lookup in order to make maintainance
-> task for the clock devices easier.
+> s/shutdowm/shutdown/ in the subject.
+
+I will change
+
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>  AnilKumar> From: Colin Foe-Parker <colin.foeparker@logicpd.com>
+>  AnilKumar> Set tps65217 PMIC status to OFF if power enable toggle is
+>  AnilKumar> supported. Also adds platform data flag, which should be
+>  AnilKumar> passed from board init data.
+> 
+> You're adding dt binding, not platform data.
 
-It's a good start. Thanks for working on this. However, before merging
-this we should add all clocks for all devices to the devicetree, so also
-the ones which have auxdata now:
+I will change
 
-static const struct of_dev_auxdata imx51_auxdata_lookup[] __initconst =
-{
-	OF_DEV_AUXDATA("fsl,imx51-uart", MX51_UART1_BASE_ADDR, "imx21-uart.0", NULL),
-	OF_DEV_AUXDATA("fsl,imx51-uart", MX51_UART2_BASE_ADDR, "imx21-uart.1", NULL),
-	OF_DEV_AUXDATA("fsl,imx51-uart", MX51_UART3_BASE_ADDR, "imx21-uart.2", NULL),
-	OF_DEV_AUXDATA("fsl,imx51-fec", MX51_FEC_BASE_ADDR, "imx27-fec.0", NULL),
-	OF_DEV_AUXDATA("fsl,imx51-esdhc", MX51_ESDHC1_BASE_ADDR, "sdhci-esdhc-imx51.0", NULL),
-	OF_DEV_AUXDATA("fsl,imx51-esdhc", MX51_ESDHC2_BASE_ADDR, "sdhci-esdhc-imx51.1", NULL),
-	OF_DEV_AUXDATA("fsl,imx51-esdhc", MX51_ESDHC3_BASE_ADDR, "sdhci-esdhc-imx51.2", NULL),
-	OF_DEV_AUXDATA("fsl,imx51-esdhc", MX51_ESDHC4_BASE_ADDR, "sdhci-esdhc-imx51.3", NULL),
-	OF_DEV_AUXDATA("fsl,imx51-ecspi", MX51_ECSPI1_BASE_ADDR, "imx51-ecspi.0", NULL),
-	OF_DEV_AUXDATA("fsl,imx51-ecspi", MX51_ECSPI2_BASE_ADDR, "imx51-ecspi.1", NULL),
-	OF_DEV_AUXDATA("fsl,imx51-cspi", MX51_CSPI_BASE_ADDR, "imx35-cspi.0", NULL),
-	OF_DEV_AUXDATA("fsl,imx51-i2c", MX51_I2C1_BASE_ADDR, "imx-i2c.0", NULL),
-	OF_DEV_AUXDATA("fsl,imx51-i2c", MX51_I2C2_BASE_ADDR, "imx-i2c.1", NULL),
-	OF_DEV_AUXDATA("fsl,imx51-sdma", MX51_SDMA_BASE_ADDR, "imx35-sdma", NULL),
-	OF_DEV_AUXDATA("fsl,imx51-wdt", MX51_WDOG1_BASE_ADDR, "imx2-wdt.0", NULL),
-	{ /* sentinel */ }
-};
+> 
+>  AnilKumar> Signed-off-by: Colin Foe-Parker <colin.foeparker@logicpd.com>
+>  AnilKumar> [anilkumar at ti.com: move the additions to tps65217 MFD driver]
+>  AnilKumar> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+>  AnilKumar> ---
+>  AnilKumar>  .../devicetree/bindings/regulator/tps65217.txt     |    4 ++++
+>  AnilKumar>  drivers/mfd/tps65217.c                             |   12 ++++++++++++
+>  AnilKumar>  2 files changed, 16 insertions(+)
+> 
+>  AnilKumar> diff --git a/Documentation/devicetree/bindings/regulator/tps65217.txt b/Documentation/devicetree/bindings/regulator/tps65217.txt
+>  AnilKumar> index d316fb8..4f05d20 100644
+>  AnilKumar> --- a/Documentation/devicetree/bindings/regulator/tps65217.txt
+>  AnilKumar> +++ b/Documentation/devicetree/bindings/regulator/tps65217.txt
+>  AnilKumar> @@ -11,6 +11,9 @@ Required properties:
+>  AnilKumar>    using the standard binding for regulators found at
+>  AnilKumar>    Documentation/devicetree/bindings/regulator/regulator.txt.
+>  
+>  AnilKumar> +Optional properties:
+>  AnilKumar> +- ti,pmic-shutdown-controller: Telling the PMIC to shutdown on PWR_EN toggle.
+> 
+> Ehh, I don't know the tps65217 particular well, but according to the
+> datasheet the REG_STATUS_OFF bit enables/disables the PB_IN pin, not
+> PWR_EN. It's also not only about powering down but also powering up
+> again.
+> 
+> I don't feel this property name is very clear. Perhaps something about
+> power button or push button monitor as it is called in the datasheet?
 
-> +* Clock bindings for Freescale i.MX5
-> +
-> +Required properties:
-> +- compatible: Should be "fsl,imx5-ccm"
+Here I am writing "TPS65217_STATUS_OFF" to status register, BIT(7).
+Description of this bit field: "OFF bit. Set this bit to 1 to enter OFF state
+when PWR_EN pin is pulled low. Bit is automatically reset to 0."
 
-The ccms on i.MX51 and i.MX53 differ, so compatible string should be
-51/53 specific.
+PWR_EN pin pull-down is doing by RTC module.
 
-This also means that we either must have two different clock/id lists
-or (imo better) only have a single one, but then we should add comments
-to the clock/ids which are specific to one the the two SoCs only.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+AnilKumar
