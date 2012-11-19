@@ -1,31 +1,32 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 19 Nov 2012 15:06:19 +1300
-Subject: [PATCH 1/2] Fix build error in pwm-vt8500.c
-In-Reply-To: <1353290780-19413-1-git-send-email-linux@prisktech.co.nz>
-References: <1353290780-19413-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1353290780-19413-2-git-send-email-linux@prisktech.co.nz>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Mon, 19 Nov 2012 11:29:05 +0900
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <20121117113849.GA5228@lizard>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
+ <20121117113849.GA5228@lizard>
+Message-ID: <8058793.mIXgB85Mso@percival>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A missing '{' causes a build error in pwm-vt8500.c
+On Saturday 17 November 2012 19:38:50 Anton Vorontsov wrote:
+> > +++ b/drivers/power/power_seq/Kconfig
+> > @@ -0,0 +1,2 @@
+> > +config POWER_SEQ
+> > +	tristate
+> 
+> This really needs a proper Kconfig description and a help text, shortly
+> describing the purpose of the subsystem.
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
- drivers/pwm/pwm-vt8500.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Does it? The current state makes power seqs automatically selected by drivers 
+that need it, and they do not appear in the configuration menu. If we add a 
+description they will then become a visible item, so the logic would be to 
+make it user-selectable.
 
-diff --git a/drivers/pwm/pwm-vt8500.c b/drivers/pwm/pwm-vt8500.c
-index 970b0c6..806f72c 100644
---- a/drivers/pwm/pwm-vt8500.c
-+++ b/drivers/pwm/pwm-vt8500.c
-@@ -100,7 +100,7 @@ static int vt8500_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- 	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
- 
- 	err = clk_enable(vt8500->clk);
--	if (err < 0)
-+	if (err < 0) {
- 		dev_err(chip->dev, "failed to enable clock\n");
- 		return err;
- 	};
--- 
-1.7.9.5
+If that approach is preferred, I will also have to change pwm-backlight so 
+that it compiles without power sequences. Not that I mind, but I liked the 
+idea of not adding yet-another-option to the config menu.
+
+Fixed the code according to all your other comments, thanks!
+
+Alex.
