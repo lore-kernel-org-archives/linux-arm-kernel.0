@@ -1,48 +1,38 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Mon, 19 Nov 2012 04:14:52 +0000
-Subject: [PATCH v2 4/4] ARM: dts: AM33XX: Enable system power off
- control in am335x-bone
-In-Reply-To: <87r4ntcqk3.fsf@deeprootsystems.com>
-References: <1353067706-29491-1-git-send-email-anilkumar@ti.com>
- <1353067706-29491-5-git-send-email-anilkumar@ti.com>
- <87r4ntcqk3.fsf@deeprootsystems.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA75BDF@DBDE01.ent.ti.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Sun, 18 Nov 2012 20:30:34 -0800
+Subject: [PATCH 1/2] clk: mvebu: armada 370/XP add clock gating control
+ provider for DT
+In-Reply-To: <20121117135435.GA13479@lunn.ch>
+References: <1353014906-31566-6-git-send-email-andrew@lunn.ch>
+ <1353088920-17458-1-git-send-email-gregory.clement@free-electrons.com>
+ <1353088920-17458-2-git-send-email-gregory.clement@free-electrons.com>
+ <20121117082602.GF24569@lunn.ch> <50A75BB4.4070003@free-electrons.com>
+ <20121117135435.GA13479@lunn.ch>
+Message-ID: <20121119043034.21126.92888@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 17, 2012 at 00:40:04, Kevin Hilman wrote:
-> AnilKumar Ch <anilkumar@ti.com> writes:
+Quoting Andrew Lunn (2012-11-17 05:54:35)
+> > > What is the ddr clock for? Does bad things happen if you turn it off?
+> > > Kirkwood has a similar clock, dunit, which i decided not to export,
+> > > since when you turn it off, the whole SoC locks up.
+> > 
+> > Well of course if you code run in DDR then it could be a problem. But
+> > I think it could be useful to turn it off when going to suspend, it
+> > the DDR can do self-refresh. In this case it should be possible to run
+> > the code from SRAM or L2 Cache.
 > 
-> > Enable system power off control for BeagleBone in am335x-bone.dts file
-> > under rtc node. RTC is the incharge of controlling the system power.
-> > This flag is used by the driver to hook up the pm_power_off system call.
-> >
-> > Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-> > ---
-> >  arch/arm/boot/dts/am335x-bone.dts |    4 ++++
-> >  1 file changed, 4 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-> > index 1d55190..206c3eb 100644
-> > --- a/arch/arm/boot/dts/am335x-bone.dts
-> > +++ b/arch/arm/boot/dts/am335x-bone.dts
-> > @@ -52,6 +52,10 @@
-> >  			};
-> >  
-> >  		};
-> > +
-> > +		rtc at 44e3e000 {
-> > +			ti,system-power-controller;
-> > +		};
-> >  	};
-> 
-> Also, I think this series is missing a patch that allows the RTC driver
-> to be compiled on AM335x.
+> O.K. Just watch out for the lateinit call in the clock framework.
 > 
 
-Hi Kevin,
+CLK_IGNORE_UNUSED is the flag you want for this situation.
 
-Yes I missed; I will submit that as a separate patch.
+Regards,
+Mike
 
-Thanks
-AnilKumar
+>      Andrew
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
