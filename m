@@ -1,91 +1,28 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 19 Nov 2012 16:17:24 +0100
-Subject: [PATCH] net/macb: move to circ_buf macros and fix initial condition
-Message-ID: <1353338244-11506-1-git-send-email-nicolas.ferre@atmel.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 19 Nov 2012 16:17:38 +0100
+Subject: [PATCH 0/1 V2] ARM: kirkwood: Convert the mplcec4 board to pinctrl
+In-Reply-To: <cover.1353336757.git.s.peter@mpl.ch>
+References: <cover.1353336757.git.s.peter@mpl.ch>
+Message-ID: <20121119151738.GK10259@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move to circular buffers management macro and correct an error
-with circular buffer initial condition.
+On Mon, Nov 19, 2012 at 04:00:01PM +0100, Stefan Peter wrote:
+> This patch converts the mplcec4 board to using the pinctrl patches.
+> 
+> Changes from V1
+> * moved sdio pinctrl definitions from mplcec4.dts to kirkwood-6281.dtsi for 
+>   usage by other boards
+> * fixed a typo in the sdio pinctrl definitions (/s/mmp13/mpp13/)
+> 
+> Stefan Peter (1):
+>   Convert mplcec4 board to pinctrl
+> 
+>  arch/arm/boot/dts/kirkwood-6281.dtsi   |    7 +++-
+>  arch/arm/boot/dts/kirkwood-mplcec4.dts |   59 ++++++++++++++++++++++++++++++++
+>  arch/arm/mach-kirkwood/board-mplcec4.c |   35 -------------------
+>  3 files changed, 65 insertions(+), 36 deletions(-)
 
-Without this patch, the macb_tx_ring_avail() function was
-not reporting the proper ring availability at startup:
-macb macb: eth0: BUG! Tx Ring full when queue awake!
-macb macb: eth0: tx_head = 0, tx_tail = 0
-And hanginig forever...
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-I remove the macb_tx_ring_avail() function and use the
-proven macros from circ_buf.h. CIRC_CNT() is used in the
-"consumer" part of the driver: macb_tx_interrupt() to match
-advice from Documentation/circular-buffers.txt.
-
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/net/ethernet/cadence/macb.c | 17 +++++++----------
- 1 file changed, 7 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index edb2aba..27991dd 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -14,6 +14,7 @@
- #include <linux/moduleparam.h>
- #include <linux/kernel.h>
- #include <linux/types.h>
-+#include <linux/circ_buf.h>
- #include <linux/slab.h>
- #include <linux/init.h>
- #include <linux/gpio.h>
-@@ -38,8 +39,8 @@
- #define TX_RING_SIZE		128 /* must be power of 2 */
- #define TX_RING_BYTES		(sizeof(struct macb_dma_desc) * TX_RING_SIZE)
- 
--/* minimum number of free TX descriptors before waking up TX process */
--#define MACB_TX_WAKEUP_THRESH	(TX_RING_SIZE / 4)
-+/* level of occupied TX descriptors under which we wake up TX process */
-+#define MACB_TX_WAKEUP_THRESH	(3 * TX_RING_SIZE / 4)
- 
- #define MACB_RX_INT_FLAGS	(MACB_BIT(RCOMP) | MACB_BIT(RXUBR)	\
- 				 | MACB_BIT(ISR_ROVR))
-@@ -60,11 +61,6 @@ static unsigned int macb_tx_ring_wrap(unsigned int index)
- 	return index & (TX_RING_SIZE - 1);
- }
- 
--static unsigned int macb_tx_ring_avail(struct macb *bp)
--{
--	return (bp->tx_tail - bp->tx_head) & (TX_RING_SIZE - 1);
--}
--
- static struct macb_dma_desc *macb_tx_desc(struct macb *bp, unsigned int index)
- {
- 	return &bp->tx_ring[macb_tx_ring_wrap(index)];
-@@ -524,7 +520,8 @@ static void macb_tx_interrupt(struct macb *bp)
- 
- 	bp->tx_tail = tail;
- 	if (netif_queue_stopped(bp->dev)
--			&& macb_tx_ring_avail(bp) > MACB_TX_WAKEUP_THRESH)
-+			&& CIRC_CNT(bp->tx_head, bp->tx_tail,
-+				    TX_RING_SIZE) <= MACB_TX_WAKEUP_THRESH)
- 		netif_wake_queue(bp->dev);
- }
- 
-@@ -818,7 +815,7 @@ static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
- 	spin_lock_irqsave(&bp->lock, flags);
- 
- 	/* This is a hard error, log it. */
--	if (macb_tx_ring_avail(bp) < 1) {
-+	if (CIRC_SPACE(bp->tx_head, bp->tx_tail, TX_RING_SIZE) < 1) {
- 		netif_stop_queue(dev);
- 		spin_unlock_irqrestore(&bp->lock, flags);
- 		netdev_err(bp->dev, "BUG! Tx Ring full when queue awake!\n");
-@@ -855,7 +852,7 @@ static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
- 
- 	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(TSTART));
- 
--	if (macb_tx_ring_avail(bp) < 1)
-+	if (CIRC_SPACE(bp->tx_head, bp->tx_tail, TX_RING_SIZE) < 1)
- 		netif_stop_queue(dev);
- 
- 	spin_unlock_irqrestore(&bp->lock, flags);
--- 
-1.8.0
+	  Andrewy
