@@ -1,29 +1,44 @@
-From: s.peter@mpl.ch (Stefan Peter)
-Date: Mon, 19 Nov 2012 11:26:44 +0100
-Subject: [PATCH 0/1] ARM: kirkwood: Convert the mplcec4 board to pinctrl
-Message-ID: <cover.1353319919.git.s.peter@mpl.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 19 Nov 2012 10:32:18 +0000
+Subject: [PATCH V2 1/5] arm: mvebu: Added support for coherency fabric in
+ mach-mvebu
+In-Reply-To: <50A69341.2090202@free-electrons.com>
+References: <20121105140258.GO3351@mudshark.cambridge.arm.com>
+ <50A15A33.60405@free-electrons.com>
+ <20121113104340.GD3940@mudshark.cambridge.arm.com>
+ <50A3F860.5010601@free-electrons.com>
+ <20121115101752.GA26453@mudshark.cambridge.arm.com>
+ <50A5103F.1040903@free-electrons.com>
+ <20121115162123.GC5885@mudshark.cambridge.arm.com>
+ <50A51D0D.4090009@free-electrons.com>
+ <20121116185610.GA1019@mudshark.cambridge.arm.com>
+ <50A69341.2090202@free-electrons.com>
+Message-ID: <20121119103218.GB3205@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andrew
+On Fri, Nov 16, 2012 at 07:25:53PM +0000, Gregory CLEMENT wrote:
+> On 11/16/2012 07:56 PM, Will Deacon wrote:
+> > 
+> > The code paths are fine, I would just like to see less duplication. Can you
+> > make the asm function PCS compliant and call it from C for the primary
+> > (setting the link register to secondary_startup for the secondary cores)?
+> 
+> Have you a pointer on how to do it (make the asm function PCS compliant)?
 
-This is my try to convert the mplcec4 board to your pinctrl patches. The 
-only problem I see is that I get an uart1 using mpp13 and mpp14 which
-are used by the mvsdio driver (and mentioned accordingly in the appropriate
-entry under /proc/device-tree/ocp at f00....). I did not find a way to get
-rid of this uart1 and because the SD card interface does work and no kernel
-errors or warnings are issued, it obviosely does no harm. However, I will
-rework this patch if you have some input in this respect.
+Take a look at the PCS document:
 
-Regards
-Stefan Peter
+  http://infocenter.arm.com/help/topic/com.arm.doc.ihi0042d/IHI0042D_aapcs.pdf
 
-Stefan Peter (1):
-  Convert mplcec4 board to pinctrl
+For your case it's really simple though as you don't need to use the stack:
+just take the base address in r0 and use a subset of r1-r3 for temporaries
+while setting up the control registers. Then mov pc, lr at the end.
 
- arch/arm/boot/dts/kirkwood-mplcec4.dts |   64 ++++++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-mplcec4.c |   35 -----------------
- 2 files changed, 64 insertions(+), 35 deletions(-)
+> I will also need to add a parameter, because the base address are not the
+> same between primary CPU and secondary CPUS. With the first we use virtual
+> address whereas with the second the physical address.
 
--- 
-1.7.9.5
+Should be simple enough to add a secondary entry point immediately before,
+which initialises r0 and lr.
+
+Will
