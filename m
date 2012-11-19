@@ -1,43 +1,33 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 11:04:52 +0100
-Subject: [PATCH 14/30] dma: mv_xor: remove unused id field in mv_xor_device
- structure
+Date: Mon, 19 Nov 2012 11:04:53 +0100
+Subject: [PATCH 15/30] dma: mv_xor: remove unused to_mv_xor_device() macro
 In-Reply-To: <1353319508-30566-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353319508-30566-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353319508-30566-15-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353319508-30566-16-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The to_mv_xor_device() macro is not being used by the driver, so we
+can get rid of it.
+
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor.c |    2 --
- drivers/dma/mv_xor.h |    1 -
- 2 files changed, 3 deletions(-)
+ drivers/dma/mv_xor.c |    3 ---
+ 1 file changed, 3 deletions(-)
 
 diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 49461b6..3a54213 100644
+index 3a54213..a999471 100644
 --- a/drivers/dma/mv_xor.c
 +++ b/drivers/dma/mv_xor.c
-@@ -1125,8 +1125,6 @@ mv_xor_channel_add(struct mv_xor_private *msp,
- 	if (!adev->dma_desc_pool_virt)
- 		return ERR_PTR(-ENOMEM);
+@@ -36,9 +36,6 @@ static void mv_xor_issue_pending(struct dma_chan *chan);
+ #define to_mv_xor_chan(chan)		\
+ 	container_of(chan, struct mv_xor_chan, common)
  
--	adev->id = hw_id;
+-#define to_mv_xor_device(dev)		\
+-	container_of(dev, struct mv_xor_device, common)
 -
- 	/* discover transaction capabilites from the platform data */
- 	dma_dev->cap_mask = cap_mask;
- 	adev->pdev = pdev;
-diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
-index 7812565..52ca617 100644
---- a/drivers/dma/mv_xor.h
-+++ b/drivers/dma/mv_xor.h
-@@ -71,7 +71,6 @@ struct mv_xor_private {
-  */
- struct mv_xor_device {
- 	struct platform_device		*pdev;
--	int				id;
- 	dma_addr_t			dma_desc_pool;
- 	void				*dma_desc_pool_virt;
- 	size_t                          pool_size;
+ #define to_mv_xor_slot(tx)		\
+ 	container_of(tx, struct mv_xor_desc_slot, async_tx)
+ 
 -- 
 1.7.9.5
