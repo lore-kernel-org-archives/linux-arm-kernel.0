@@ -1,157 +1,145 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 11:04:39 +0100
-Subject: [PATCH 01/30] dma: mv_xor: use dev_(err|info|notice) instead of
- dev_printk
+Date: Mon, 19 Nov 2012 11:04:43 +0100
+Subject: [PATCH 05/30] arm: plat-orion: convert the registration of the xor0
+ engine to the single driver
 In-Reply-To: <1353319508-30566-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353319508-30566-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353319508-30566-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353319508-30566-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The usage of dev_printk() is deprecated, and the dev_err(), dev_info()
-and dev_notice() functions should be used instead.
+Instead of registering one 'mv_xor_shared' device for the XOR engine,
+and then two 'mv_xor' devices for the XOR channels, pass the channels
+properties as platform_data for the main 'mv_xor_shared' device.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor.c |   60 +++++++++++++++++++++++++-------------------------
- 1 file changed, 30 insertions(+), 30 deletions(-)
+ arch/arm/plat-orion/common.c |   94 +++++++++++++++++++-----------------------
+ 1 file changed, 42 insertions(+), 52 deletions(-)
 
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index e362e2b..610d0b8 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -206,9 +206,9 @@ static void mv_set_mode(struct mv_xor_chan *chan,
- 		op_mode = XOR_OPERATION_MODE_MEMSET;
- 		break;
- 	default:
--		dev_printk(KERN_ERR, chan->device->common.dev,
--			   "error: unsupported operation %d.\n",
--			   type);
-+		dev_err(chan->device->common.dev,
-+			"error: unsupported operation %d.\n",
-+			type);
- 		BUG();
- 		return;
- 	}
-@@ -828,28 +828,28 @@ static void mv_dump_xor_regs(struct mv_xor_chan *chan)
- 	u32 val;
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index b8a688c..800af19 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -636,61 +636,43 @@ static struct resource orion_xor0_shared_resources[] = {
+ 	}, {
+ 		.name	= "xor 0 high",
+ 		.flags	= IORESOURCE_MEM,
++	}, {
++		.name   = "irq channel 0",
++		.flags  = IORESOURCE_IRQ,
++	}, {
++		.name   = "irq channel 1",
++		.flags  = IORESOURCE_IRQ,
+ 	},
+ };
  
- 	val = __raw_readl(XOR_CONFIG(chan));
--	dev_printk(KERN_ERR, chan->device->common.dev,
--		   "config       0x%08x.\n", val);
-+	dev_err(chan->device->common.dev,
-+		"config       0x%08x.\n", val);
+-static struct platform_device orion_xor0_shared = {
+-	.name		= MV_XOR_SHARED_NAME,
+-	.id		= 0,
+-	.num_resources	= ARRAY_SIZE(orion_xor0_shared_resources),
+-	.resource	= orion_xor0_shared_resources,
+-};
+-
+-static struct resource orion_xor00_resources[] = {
+-	[0] = {
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct mv_xor_platform_data orion_xor00_data = {
+-	.shared		= &orion_xor0_shared,
+-	.hw_id		= 0,
+-	.pool_size	= PAGE_SIZE,
+-};
++static struct platform_device orion_xor0_shared;
  
- 	val = __raw_readl(XOR_ACTIVATION(chan));
--	dev_printk(KERN_ERR, chan->device->common.dev,
--		   "activation   0x%08x.\n", val);
-+	dev_err(chan->device->common.dev,
-+		"activation   0x%08x.\n", val);
+-static struct platform_device orion_xor00_channel = {
+-	.name		= MV_XOR_NAME,
+-	.id		= 0,
+-	.num_resources	= ARRAY_SIZE(orion_xor00_resources),
+-	.resource	= orion_xor00_resources,
+-	.dev		= {
+-		.dma_mask		= &orion_xor_dmamask,
+-		.coherent_dma_mask	= DMA_BIT_MASK(64),
+-		.platform_data		= &orion_xor00_data,
++static struct mv_xor_platform_data orion_xor0_channels_pdata[2] = {
++	{
++		.shared		= &orion_xor0_shared,
++		.hw_id		= 0,
++		.pool_size	= PAGE_SIZE,
+ 	},
+-};
+-
+-static struct resource orion_xor01_resources[] = {
+-	[0] = {
+-		.flags	= IORESOURCE_IRQ,
++	{
++		.shared		= &orion_xor0_shared,
++		.hw_id		= 1,
++		.pool_size	= PAGE_SIZE,
+ 	},
+ };
  
- 	val = __raw_readl(XOR_INTR_CAUSE(chan));
--	dev_printk(KERN_ERR, chan->device->common.dev,
--		   "intr cause   0x%08x.\n", val);
-+	dev_err(chan->device->common.dev,
-+		"intr cause   0x%08x.\n", val);
+-static struct mv_xor_platform_data orion_xor01_data = {
+-	.shared		= &orion_xor0_shared,
+-	.hw_id		= 1,
+-	.pool_size	= PAGE_SIZE,
++static struct mv_xor_shared_platform_data orion_xor0_pdata = {
++	.channels = orion_xor0_channels_pdata,
+ };
  
- 	val = __raw_readl(XOR_INTR_MASK(chan));
--	dev_printk(KERN_ERR, chan->device->common.dev,
--		   "intr mask    0x%08x.\n", val);
-+	dev_err(chan->device->common.dev,
-+		"intr mask    0x%08x.\n", val);
+-static struct platform_device orion_xor01_channel = {
+-	.name		= MV_XOR_NAME,
+-	.id		= 1,
+-	.num_resources	= ARRAY_SIZE(orion_xor01_resources),
+-	.resource	= orion_xor01_resources,
+-	.dev		= {
+-		.dma_mask		= &orion_xor_dmamask,
+-		.coherent_dma_mask	= DMA_BIT_MASK(64),
+-		.platform_data		= &orion_xor01_data,
++static struct platform_device orion_xor0_shared = {
++	.name		= MV_XOR_SHARED_NAME,
++	.id		= 0,
++	.num_resources	= ARRAY_SIZE(orion_xor0_shared_resources),
++	.resource	= orion_xor0_shared_resources,
++	.dev            = {
++		.dma_mask               = &orion_xor_dmamask,
++		.coherent_dma_mask      = DMA_BIT_MASK(64),
++		.platform_data          = &orion_xor0_pdata,
+ 	},
+ };
  
- 	val = __raw_readl(XOR_ERROR_CAUSE(chan));
--	dev_printk(KERN_ERR, chan->device->common.dev,
--		   "error cause  0x%08x.\n", val);
-+	dev_err(chan->device->common.dev,
-+		"error cause  0x%08x.\n", val);
+@@ -704,15 +686,23 @@ void __init orion_xor0_init(unsigned long mapbase_low,
+ 	orion_xor0_shared_resources[1].start = mapbase_high;
+ 	orion_xor0_shared_resources[1].end = mapbase_high + 0xff;
  
- 	val = __raw_readl(XOR_ERROR_ADDR(chan));
--	dev_printk(KERN_ERR, chan->device->common.dev,
--		   "error addr   0x%08x.\n", val);
-+	dev_err(chan->device->common.dev,
-+		"error addr   0x%08x.\n", val);
+-	orion_xor00_resources[0].start = irq_0;
+-	orion_xor00_resources[0].end = irq_0;
+-	orion_xor01_resources[0].start = irq_1;
+-	orion_xor01_resources[0].end = irq_1;
++	orion_xor0_shared_resources[2].start = irq_0;
++	orion_xor0_shared_resources[2].end = irq_0;
++	orion_xor0_shared_resources[3].start = irq_1;
++	orion_xor0_shared_resources[3].end = irq_1;
+ 
+-	platform_device_register(&orion_xor0_shared);
++	/*
++	 * two engines can't do memset simultaneously, this limitation
++	 * satisfied by removing memset support from one of the engines.
++	 */
++	dma_cap_set(DMA_MEMCPY, orion_xor0_channels_pdata[0].cap_mask);
++	dma_cap_set(DMA_XOR, orion_xor0_channels_pdata[0].cap_mask);
+ 
+-	orion_xor_init_channels(&orion_xor00_data, &orion_xor00_channel,
+-				&orion_xor01_data, &orion_xor01_channel);
++	dma_cap_set(DMA_MEMSET, orion_xor0_channels_pdata[1].cap_mask);
++	dma_cap_set(DMA_MEMCPY, orion_xor0_channels_pdata[1].cap_mask);
++	dma_cap_set(DMA_XOR, orion_xor0_channels_pdata[1].cap_mask);
++
++	platform_device_register(&orion_xor0_shared);
  }
  
- static void mv_xor_err_interrupt_handler(struct mv_xor_chan *chan,
-@@ -861,9 +861,9 @@ static void mv_xor_err_interrupt_handler(struct mv_xor_chan *chan,
- 	     return;
- 	}
- 
--	dev_printk(KERN_ERR, chan->device->common.dev,
--		   "error on chan %d. intr cause 0x%08x.\n",
--		   chan->idx, intr_cause);
-+	dev_err(chan->device->common.dev,
-+		"error on chan %d. intr cause 0x%08x.\n",
-+		chan->idx, intr_cause);
- 
- 	mv_dump_xor_regs(chan);
- 	BUG();
-@@ -950,8 +950,8 @@ static int __devinit mv_xor_memcpy_self_test(struct mv_xor_device *device)
- 
- 	if (mv_xor_status(dma_chan, cookie, NULL) !=
- 	    DMA_SUCCESS) {
--		dev_printk(KERN_ERR, dma_chan->device->dev,
--			   "Self-test copy timed out, disabling\n");
-+		dev_err(dma_chan->device->dev,
-+			"Self-test copy timed out, disabling\n");
- 		err = -ENODEV;
- 		goto free_resources;
- 	}
-@@ -960,8 +960,8 @@ static int __devinit mv_xor_memcpy_self_test(struct mv_xor_device *device)
- 	dma_sync_single_for_cpu(&mv_chan->device->pdev->dev, dest_dma,
- 				MV_XOR_TEST_SIZE, DMA_FROM_DEVICE);
- 	if (memcmp(src, dest, MV_XOR_TEST_SIZE)) {
--		dev_printk(KERN_ERR, dma_chan->device->dev,
--			   "Self-test copy failed compare, disabling\n");
-+		dev_err(dma_chan->device->dev,
-+			"Self-test copy failed compare, disabling\n");
- 		err = -ENODEV;
- 		goto free_resources;
- 	}
-@@ -1048,8 +1048,8 @@ mv_xor_xor_self_test(struct mv_xor_device *device)
- 
- 	if (mv_xor_status(dma_chan, cookie, NULL) !=
- 	    DMA_SUCCESS) {
--		dev_printk(KERN_ERR, dma_chan->device->dev,
--			   "Self-test xor timed out, disabling\n");
-+		dev_err(dma_chan->device->dev,
-+			"Self-test xor timed out, disabling\n");
- 		err = -ENODEV;
- 		goto free_resources;
- 	}
-@@ -1060,10 +1060,10 @@ mv_xor_xor_self_test(struct mv_xor_device *device)
- 	for (i = 0; i < (PAGE_SIZE / sizeof(u32)); i++) {
- 		u32 *ptr = page_address(dest);
- 		if (ptr[i] != cmp_word) {
--			dev_printk(KERN_ERR, dma_chan->device->dev,
--				   "Self-test xor failed compare, disabling."
--				   " index %d, data %x, expected %x\n", i,
--				   ptr[i], cmp_word);
-+			dev_err(dma_chan->device->dev,
-+				"Self-test xor failed compare, disabling."
-+				" index %d, data %x, expected %x\n", i,
-+				ptr[i], cmp_word);
- 			err = -ENODEV;
- 			goto free_resources;
- 		}
-@@ -1212,7 +1212,7 @@ static int __devinit mv_xor_probe(struct platform_device *pdev)
- 			goto err_free_dma;
- 	}
- 
--	dev_printk(KERN_INFO, &pdev->dev, "Marvell XOR: "
-+	dev_info(&pdev->dev, "Marvell XOR: "
- 	  "( %s%s%s%s)\n",
- 	  dma_has_cap(DMA_XOR, dma_dev->cap_mask) ? "xor " : "",
- 	  dma_has_cap(DMA_MEMSET, dma_dev->cap_mask)  ? "fill " : "",
-@@ -1275,7 +1275,7 @@ static int mv_xor_shared_probe(struct platform_device *pdev)
- 	struct mv_xor_shared_private *msp;
- 	struct resource *res;
- 
--	dev_printk(KERN_NOTICE, &pdev->dev, "Marvell shared XOR driver\n");
-+	dev_notice(&pdev->dev, "Marvell shared XOR driver\n");
- 
- 	msp = devm_kzalloc(&pdev->dev, sizeof(*msp), GFP_KERNEL);
- 	if (!msp)
+ /*****************************************************************************
 -- 
 1.7.9.5
