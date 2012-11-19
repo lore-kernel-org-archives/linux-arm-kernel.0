@@ -1,29 +1,38 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 19 Nov 2012 16:30:59 +0400
-Subject: [PATCH] ARM: shmobile: mackerel: Add FLCTL IRQ resource
-In-Reply-To: <1353288254-6211-2-git-send-email-horms@verge.net.au>
-References: <1353288254-6211-1-git-send-email-horms@verge.net.au>
- <1353288254-6211-2-git-send-email-horms@verge.net.au>
-Message-ID: <50AA2683.1070502@mvista.com>
+Date: Mon, 19 Nov 2012 16:34:59 +0400
+Subject: [PATCH v2 1/2] Fix build error in pwm-vt8500.c
+In-Reply-To: <1353310254-21581-2-git-send-email-linux@prisktech.co.nz>
+References: <1353310254-21581-1-git-send-email-linux@prisktech.co.nz>
+ <1353310254-21581-2-git-send-email-linux@prisktech.co.nz>
+Message-ID: <50AA2773.9020805@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 19-11-2012 5:24, Simon Horman wrote:
+On 19-11-2012 11:30, Tony Prisk wrote:
 
-> From: Bastian Hecht <hechtb@gmail.com>
+> A missing '{' causes a build error in pwm-vt8500.c
 
-> Since commit 3c7ea4eccfd2e
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> ---
+>   drivers/pwm/pwm-vt8500.c |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 
-    Please also specify that commit summary in parens.
+> diff --git a/drivers/pwm/pwm-vt8500.c b/drivers/pwm/pwm-vt8500.c
+> index 970b0c6..806f72c 100644
+> --- a/drivers/pwm/pwm-vt8500.c
+> +++ b/drivers/pwm/pwm-vt8500.c
+> @@ -100,7 +100,7 @@ static int vt8500_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+>   	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
+>
+>   	err = clk_enable(vt8500->clk);
+> -	if (err < 0)
+> +	if (err < 0) {
+>   		dev_err(chip->dev, "failed to enable clock\n");
+>   		return err;
+>   	};
 
-> the sh_flctl driver requires the error IRQ line to
-> signal failed transactions between the flash controller and the NAND chip.
-> This information is mandatory - else the driver refuses to start up. We
-> provide it here for the board mackerel.
-
-> Signed-off-by: Bastian Hecht <hechtb@gmail.com>
-> Signed-off-by: Simon Horman <horms@verge.net.au>
+   Could as well remove the unneeded semicolon here.
 
 WBR, Sergei
