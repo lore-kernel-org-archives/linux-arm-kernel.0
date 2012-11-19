@@ -1,63 +1,29 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 19 Nov 2012 19:01:13 +0200
-Subject: [PATCH v2 1/2] ads7846: enable pendown GPIO debounce time setting
-In-Reply-To: <1353341038-14381-2-git-send-email-grinberg@compulab.co.il>
-References: <1353341038-14381-2-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1353344473-14753-1-git-send-email-grinberg@compulab.co.il>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 19 Nov 2012 18:07:56 +0100
+Subject: [PATCH] ARM: Kconfig: Do not select ARCH_VEXPRESS on ARCH_MULTI_V7
+In-Reply-To: <1353344339.3303.36.camel@hornet>
+References: <1353343080-19220-1-git-send-email-fabio.estevam@freescale.com>
+ <1353343497.3303.34.camel@hornet> <20121119175440.1096f725@skate>
+ <1353344339.3303.36.camel@hornet>
+Message-ID: <20121119180756.21c3ef6a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms need the pendown GPIO debounce time setting programmed.
-Since the pendown GPIO is handled by the driver, the debounce time
-should also be handled along with the pendown GPIO request.
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
----
-v2: fix the comment style
+On Mon, 19 Nov 2012 16:58:59 +0000, Pawel Moll wrote:
 
- drivers/input/touchscreen/ads7846.c |    6 +++++-
- include/linux/spi/ads7846.h         |    5 +++--
- 2 files changed, 8 insertions(+), 3 deletions(-)
+> I'm not arguing this. As far as I remember Rob wanted to make vexpress a
+> default for the multiplatform kernel, but you're right saying that
+> forcing it with the SELECT was probably a step too far.
 
-diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
-index f02028e..78e5d9a 100644
---- a/drivers/input/touchscreen/ads7846.c
-+++ b/drivers/input/touchscreen/ads7846.c
-@@ -955,7 +955,8 @@ static int ads7846_resume(struct device *dev)
- 
- static SIMPLE_DEV_PM_OPS(ads7846_pm, ads7846_suspend, ads7846_resume);
- 
--static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads7846 *ts)
-+static int __devinit ads7846_setup_pendown(struct spi_device *spi,
-+					   struct ads7846 *ts)
- {
- 	struct ads7846_platform_data *pdata = spi->dev.platform_data;
- 	int err;
-@@ -981,6 +982,9 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
- 
- 		ts->gpio_pendown = pdata->gpio_pendown;
- 
-+		if (pdata->gpio_pendown_debounce)
-+			gpio_set_debounce(pdata->gpio_pendown,
-+					  pdata->gpio_pendown_debounce);
- 	} else {
- 		dev_err(&spi->dev, "no get_pendown_state nor gpio_pendown?\n");
- 		return -EINVAL;
-diff --git a/include/linux/spi/ads7846.h b/include/linux/spi/ads7846.h
-index c64de9d..2f694f3 100644
---- a/include/linux/spi/ads7846.h
-+++ b/include/linux/spi/ads7846.h
-@@ -46,8 +46,9 @@ struct ads7846_platform_data {
- 	u16	debounce_rep;		/* additional consecutive good readings
- 					 * required after the first two */
- 	int	gpio_pendown;		/* the GPIO used to decide the pendown
--					 * state if get_pendown_state == NULL
--					 */
-+					 * state if get_pendown_state == NULL */
-+	int	gpio_pendown_debounce;	/* platform specific debounce time for
-+					 * the gpio_pendown */
- 	int	(*get_pendown_state)(void);
- 	int	(*filter_init)	(const struct ads7846_platform_data *pdata,
- 				 void **filter_data);
+IIRC, the problem is that we need at least one platform to be enabled,
+otherwise it doesn't build, but I might be wrong.
+
+Best regards,
+
+Thomas
 -- 
-1.7.3.4
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
