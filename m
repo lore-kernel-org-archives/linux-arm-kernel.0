@@ -1,9 +1,9 @@
 From: wfp5p@virginia.edu (Bill Pemberton)
-Date: Mon, 19 Nov 2012 13:21:12 -0500
-Subject: [PATCH 123/493] watchdog: remove use of __devexit_p
+Date: Mon, 19 Nov 2012 13:21:24 -0500
+Subject: =?UTF-8?q?=5BPATCH=20135/493=5D=20mtd=3A=20remove=20use=20of=20=5F=5Fdevexit=5Fp?=
 In-Reply-To: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
 References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
-Message-ID: <1353349642-3677-123-git-send-email-wfp5p@virginia.edu>
+Message-ID: <1353349642-3677-135-git-send-email-wfp5p@virginia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,717 +11,545 @@ CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
 needed.
 
 Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-Cc: Wim Van Sebroeck <wim@iguana.be> 
+Cc: David Woodhouse <dwmw2@infradead.org> 
 Cc: Wan ZongShun <mcuos.com@gmail.com> 
-Cc: Ben Dooks <ben-linux@fluff.org> 
-Cc: Kukjin Kim <kgene.kim@samsung.com> 
-Cc: linux-watchdog at vger.kernel.org 
-Cc: uclinux-dist-devel at blackfin.uclinux.org 
+Cc: Kyungmin Park <kyungmin.park@samsung.com> 
+Cc: linux-mtd at lists.infradead.org 
 Cc: linux-arm-kernel at lists.infradead.org 
-Cc: linux-samsung-soc at vger.kernel.org 
-Cc: patches at opensource.wolfsonmicro.com 
 ---
- drivers/watchdog/acquirewdt.c     | 2 +-
- drivers/watchdog/advantechwdt.c   | 2 +-
- drivers/watchdog/ar7_wdt.c        | 2 +-
- drivers/watchdog/at91rm9200_wdt.c | 2 +-
- drivers/watchdog/ath79_wdt.c      | 2 +-
- drivers/watchdog/bcm63xx_wdt.c    | 2 +-
- drivers/watchdog/bfin_wdt.c       | 2 +-
- drivers/watchdog/cpwd.c           | 2 +-
- drivers/watchdog/da9052_wdt.c     | 2 +-
- drivers/watchdog/davinci_wdt.c    | 2 +-
- drivers/watchdog/dw_wdt.c         | 2 +-
- drivers/watchdog/ep93xx_wdt.c     | 2 +-
- drivers/watchdog/geodewdt.c       | 2 +-
- drivers/watchdog/hpwdt.c          | 2 +-
- drivers/watchdog/i6300esb.c       | 2 +-
- drivers/watchdog/iTCO_wdt.c       | 2 +-
- drivers/watchdog/ib700wdt.c       | 2 +-
- drivers/watchdog/ie6xx_wdt.c      | 2 +-
- drivers/watchdog/jz4740_wdt.c     | 2 +-
- drivers/watchdog/ks8695_wdt.c     | 2 +-
- drivers/watchdog/lantiq_wdt.c     | 2 +-
- drivers/watchdog/max63xx_wdt.c    | 2 +-
- drivers/watchdog/mpc8xxx_wdt.c    | 2 +-
- drivers/watchdog/mpcore_wdt.c     | 2 +-
- drivers/watchdog/mtx-1_wdt.c      | 2 +-
- drivers/watchdog/mv64x60_wdt.c    | 2 +-
- drivers/watchdog/nuc900_wdt.c     | 2 +-
- drivers/watchdog/nv_tco.c         | 2 +-
- drivers/watchdog/of_xilinx_wdt.c  | 2 +-
- drivers/watchdog/omap_wdt.c       | 2 +-
- drivers/watchdog/orion_wdt.c      | 2 +-
- drivers/watchdog/pcwd.c           | 2 +-
- drivers/watchdog/pcwd_pci.c       | 2 +-
- drivers/watchdog/pnx4008_wdt.c    | 2 +-
- drivers/watchdog/rc32434_wdt.c    | 2 +-
- drivers/watchdog/rdc321x_wdt.c    | 2 +-
- drivers/watchdog/riowd.c          | 2 +-
- drivers/watchdog/s3c2410_wdt.c    | 2 +-
- drivers/watchdog/sch311x_wdt.c    | 2 +-
- drivers/watchdog/shwdt.c          | 2 +-
- drivers/watchdog/sp5100_tco.c     | 2 +-
- drivers/watchdog/sp805_wdt.c      | 2 +-
- drivers/watchdog/stmp3xxx_wdt.c   | 2 +-
- drivers/watchdog/ts72xx_wdt.c     | 2 +-
- drivers/watchdog/twl4030_wdt.c    | 2 +-
- drivers/watchdog/via_wdt.c        | 2 +-
- drivers/watchdog/wdt_pci.c        | 2 +-
- drivers/watchdog/wm831x_wdt.c     | 2 +-
- drivers/watchdog/wm8350_wdt.c     | 2 +-
- drivers/watchdog/xen_wdt.c        | 2 +-
- 50 files changed, 50 insertions(+), 50 deletions(-)
+ drivers/mtd/devices/bcm47xxsflash.c    | 2 +-
+ drivers/mtd/devices/m25p80.c           | 2 +-
+ drivers/mtd/devices/mtd_dataflash.c    | 2 +-
+ drivers/mtd/devices/spear_smi.c        | 2 +-
+ drivers/mtd/devices/sst25l.c           | 2 +-
+ drivers/mtd/maps/autcpu12-nvram.c      | 2 +-
+ drivers/mtd/maps/bfin-async-flash.c    | 2 +-
+ drivers/mtd/maps/gpio-addr-flash.c     | 2 +-
+ drivers/mtd/maps/intel_vr_nor.c        | 2 +-
+ drivers/mtd/maps/lantiq-flash.c        | 2 +-
+ drivers/mtd/maps/latch-addr-flash.c    | 2 +-
+ drivers/mtd/maps/pci.c                 | 2 +-
+ drivers/mtd/maps/pismo.c               | 2 +-
+ drivers/mtd/maps/pxa2xx-flash.c        | 2 +-
+ drivers/mtd/maps/scb2_flash.c          | 2 +-
+ drivers/mtd/maps/sun_uflash.c          | 2 +-
+ drivers/mtd/maps/vmu-flash.c           | 2 +-
+ drivers/mtd/nand/ams-delta.c           | 2 +-
+ drivers/mtd/nand/au1550nd.c            | 2 +-
+ drivers/mtd/nand/bf5xx_nand.c          | 2 +-
+ drivers/mtd/nand/cafe_nand.c           | 2 +-
+ drivers/mtd/nand/denali_dt.c           | 2 +-
+ drivers/mtd/nand/fsl_upm.c             | 2 +-
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 2 +-
+ drivers/mtd/nand/jz4740_nand.c         | 2 +-
+ drivers/mtd/nand/lpc32xx_mlc.c         | 2 +-
+ drivers/mtd/nand/lpc32xx_slc.c         | 2 +-
+ drivers/mtd/nand/mpc5121_nfc.c         | 2 +-
+ drivers/mtd/nand/mxc_nand.c            | 2 +-
+ drivers/mtd/nand/ndfc.c                | 2 +-
+ drivers/mtd/nand/nuc900_nand.c         | 2 +-
+ drivers/mtd/nand/orion_nand.c          | 2 +-
+ drivers/mtd/nand/plat_nand.c           | 2 +-
+ drivers/mtd/nand/sharpsl.c             | 2 +-
+ drivers/mtd/nand/socrates_nand.c       | 2 +-
+ drivers/mtd/onenand/generic.c          | 2 +-
+ drivers/mtd/onenand/omap2.c            | 2 +-
+ drivers/mtd/onenand/samsung.c          | 2 +-
+ 38 files changed, 38 insertions(+), 38 deletions(-)
 
-diff --git a/drivers/watchdog/acquirewdt.c b/drivers/watchdog/acquirewdt.c
-index 4397881..49e0b89 100644
---- a/drivers/watchdog/acquirewdt.c
-+++ b/drivers/watchdog/acquirewdt.c
-@@ -293,7 +293,7 @@ static void acq_shutdown(struct platform_device *dev)
- 
- static struct platform_driver acquirewdt_driver = {
- 	.probe		= acq_probe,
--	.remove		= __devexit_p(acq_remove),
-+	.remove		= acq_remove,
- 	.shutdown	= acq_shutdown,
- 	.driver		= {
- 		.owner	= THIS_MODULE,
-diff --git a/drivers/watchdog/advantechwdt.c b/drivers/watchdog/advantechwdt.c
-index 64ae9e9..9a74156 100644
---- a/drivers/watchdog/advantechwdt.c
-+++ b/drivers/watchdog/advantechwdt.c
-@@ -300,7 +300,7 @@ static void advwdt_shutdown(struct platform_device *dev)
- 
- static struct platform_driver advwdt_driver = {
- 	.probe		= advwdt_probe,
--	.remove		= __devexit_p(advwdt_remove),
-+	.remove		= advwdt_remove,
- 	.shutdown	= advwdt_shutdown,
- 	.driver		= {
- 		.owner	= THIS_MODULE,
-diff --git a/drivers/watchdog/ar7_wdt.c b/drivers/watchdog/ar7_wdt.c
-index dc30dbd..eb633d9 100644
---- a/drivers/watchdog/ar7_wdt.c
-+++ b/drivers/watchdog/ar7_wdt.c
-@@ -330,7 +330,7 @@ static void ar7_wdt_shutdown(struct platform_device *pdev)
- 
- static struct platform_driver ar7_wdt_driver = {
- 	.probe = ar7_wdt_probe,
--	.remove = __devexit_p(ar7_wdt_remove),
-+	.remove = ar7_wdt_remove,
- 	.shutdown = ar7_wdt_shutdown,
- 	.driver = {
- 		.owner = THIS_MODULE,
-diff --git a/drivers/watchdog/at91rm9200_wdt.c b/drivers/watchdog/at91rm9200_wdt.c
-index 7ef99a1..75f3a6b 100644
---- a/drivers/watchdog/at91rm9200_wdt.c
-+++ b/drivers/watchdog/at91rm9200_wdt.c
-@@ -254,7 +254,7 @@ static int at91wdt_resume(struct platform_device *pdev)
- 
- static struct platform_driver at91wdt_driver = {
- 	.probe		= at91wdt_probe,
--	.remove		= __devexit_p(at91wdt_remove),
-+	.remove		= at91wdt_remove,
- 	.shutdown	= at91wdt_shutdown,
- 	.suspend	= at91wdt_suspend,
- 	.resume		= at91wdt_resume,
-diff --git a/drivers/watchdog/ath79_wdt.c b/drivers/watchdog/ath79_wdt.c
-index 1f9371f..367ef5e 100644
---- a/drivers/watchdog/ath79_wdt.c
-+++ b/drivers/watchdog/ath79_wdt.c
-@@ -284,7 +284,7 @@ static void ath97_wdt_shutdown(struct platform_device *pdev)
+diff --git a/drivers/mtd/devices/bcm47xxsflash.c b/drivers/mtd/devices/bcm47xxsflash.c
+index 2dc5a6f..113aced 100644
+--- a/drivers/mtd/devices/bcm47xxsflash.c
++++ b/drivers/mtd/devices/bcm47xxsflash.c
+@@ -77,7 +77,7 @@ static int __devexit bcm47xxsflash_remove(struct platform_device *pdev)
  }
  
- static struct platform_driver ath79_wdt_driver = {
--	.remove		= __devexit_p(ath79_wdt_remove),
-+	.remove		= ath79_wdt_remove,
- 	.shutdown	= ath97_wdt_shutdown,
+ static struct platform_driver bcma_sflash_driver = {
+-	.remove = __devexit_p(bcm47xxsflash_remove),
++	.remove = bcm47xxsflash_remove,
+ 	.driver = {
+ 		.name = "bcma_sflash",
+ 		.owner = THIS_MODULE,
+diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+index 7e2d8f9..9ffd3c5 100644
+--- a/drivers/mtd/devices/m25p80.c
++++ b/drivers/mtd/devices/m25p80.c
+@@ -993,7 +993,7 @@ static struct spi_driver m25p80_driver = {
+ 	},
+ 	.id_table	= m25p_ids,
+ 	.probe	= m25p_probe,
+-	.remove	= __devexit_p(m25p_remove),
++	.remove	= m25p_remove,
+ 
+ 	/* REVISIT: many of these chips have deep power-down modes, which
+ 	 * should clearly be entered on suspend() to minimize power use.
+diff --git a/drivers/mtd/devices/mtd_dataflash.c b/drivers/mtd/devices/mtd_dataflash.c
+index 928fb0e..23ccc36 100644
+--- a/drivers/mtd/devices/mtd_dataflash.c
++++ b/drivers/mtd/devices/mtd_dataflash.c
+@@ -920,7 +920,7 @@ static struct spi_driver dataflash_driver = {
+ 	},
+ 
+ 	.probe		= dataflash_probe,
+-	.remove		= __devexit_p(dataflash_remove),
++	.remove		= dataflash_remove,
+ 
+ 	/* FIXME:  investigate suspend and resume... */
+ };
+diff --git a/drivers/mtd/devices/spear_smi.c b/drivers/mtd/devices/spear_smi.c
+index 39e9567..e27737c 100644
+--- a/drivers/mtd/devices/spear_smi.c
++++ b/drivers/mtd/devices/spear_smi.c
+@@ -1092,7 +1092,7 @@ static struct platform_driver spear_smi_driver = {
+ #endif
+ 	},
+ 	.probe = spear_smi_probe,
+-	.remove = __devexit_p(spear_smi_remove),
++	.remove = spear_smi_remove,
+ };
+ module_platform_driver(spear_smi_driver);
+ 
+diff --git a/drivers/mtd/devices/sst25l.c b/drivers/mtd/devices/sst25l.c
+index ab8a2f4..9ebf86d 100644
+--- a/drivers/mtd/devices/sst25l.c
++++ b/drivers/mtd/devices/sst25l.c
+@@ -428,7 +428,7 @@ static struct spi_driver sst25l_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= sst25l_probe,
+-	.remove		= __devexit_p(sst25l_remove),
++	.remove		= sst25l_remove,
+ };
+ 
+ module_spi_driver(sst25l_driver);
+diff --git a/drivers/mtd/maps/autcpu12-nvram.c b/drivers/mtd/maps/autcpu12-nvram.c
+index 76fb594..ca0313d 100644
+--- a/drivers/mtd/maps/autcpu12-nvram.c
++++ b/drivers/mtd/maps/autcpu12-nvram.c
+@@ -121,7 +121,7 @@ static struct platform_driver autcpu12_nvram_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= autcpu12_nvram_probe,
+-	.remove		= __devexit_p(autcpu12_nvram_remove),
++	.remove		= autcpu12_nvram_remove,
+ };
+ module_platform_driver(autcpu12_nvram_driver);
+ 
+diff --git a/drivers/mtd/maps/bfin-async-flash.c b/drivers/mtd/maps/bfin-async-flash.c
+index ef5cde8..340e8a2 100644
+--- a/drivers/mtd/maps/bfin-async-flash.c
++++ b/drivers/mtd/maps/bfin-async-flash.c
+@@ -184,7 +184,7 @@ static int __devexit bfin_flash_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver bfin_flash_driver = {
+ 	.probe		= bfin_flash_probe,
+-	.remove		= __devexit_p(bfin_flash_remove),
++	.remove		= bfin_flash_remove,
  	.driver		= {
  		.name	= DRIVER_NAME,
-diff --git a/drivers/watchdog/bcm63xx_wdt.c b/drivers/watchdog/bcm63xx_wdt.c
-index 551880b..e81b784 100644
---- a/drivers/watchdog/bcm63xx_wdt.c
-+++ b/drivers/watchdog/bcm63xx_wdt.c
-@@ -304,7 +304,7 @@ static void bcm63xx_wdt_shutdown(struct platform_device *pdev)
- 
- static struct platform_driver bcm63xx_wdt_driver = {
- 	.probe	= bcm63xx_wdt_probe,
--	.remove = __devexit_p(bcm63xx_wdt_remove),
-+	.remove = bcm63xx_wdt_remove,
- 	.shutdown = bcm63xx_wdt_shutdown,
- 	.driver = {
- 		.owner = THIS_MODULE,
-diff --git a/drivers/watchdog/bfin_wdt.c b/drivers/watchdog/bfin_wdt.c
-index 38bc383..4a85dbf 100644
---- a/drivers/watchdog/bfin_wdt.c
-+++ b/drivers/watchdog/bfin_wdt.c
-@@ -401,7 +401,7 @@ static struct platform_device *bfin_wdt_device;
- 
- static struct platform_driver bfin_wdt_driver = {
- 	.probe     = bfin_wdt_probe,
--	.remove    = __devexit_p(bfin_wdt_remove),
-+	.remove    = bfin_wdt_remove,
- 	.shutdown  = bfin_wdt_shutdown,
- 	.suspend   = bfin_wdt_suspend,
- 	.resume    = bfin_wdt_resume,
-diff --git a/drivers/watchdog/cpwd.c b/drivers/watchdog/cpwd.c
-index 95b1b95..ed7f434 100644
---- a/drivers/watchdog/cpwd.c
-+++ b/drivers/watchdog/cpwd.c
-@@ -684,7 +684,7 @@ static struct platform_driver cpwd_driver = {
- 		.of_match_table = cpwd_match,
  	},
- 	.probe		= cpwd_probe,
--	.remove		= __devexit_p(cpwd_remove),
-+	.remove		= cpwd_remove,
- };
+diff --git a/drivers/mtd/maps/gpio-addr-flash.c b/drivers/mtd/maps/gpio-addr-flash.c
+index e4de96b..670af9a 100644
+--- a/drivers/mtd/maps/gpio-addr-flash.c
++++ b/drivers/mtd/maps/gpio-addr-flash.c
+@@ -273,7 +273,7 @@ static int __devexit gpio_flash_remove(struct platform_device *pdev)
  
- module_platform_driver(cpwd_driver);
-diff --git a/drivers/watchdog/da9052_wdt.c b/drivers/watchdog/da9052_wdt.c
-index f7abbae..463e9e5 100644
---- a/drivers/watchdog/da9052_wdt.c
-+++ b/drivers/watchdog/da9052_wdt.c
-@@ -236,7 +236,7 @@ static int __devexit da9052_wdt_remove(struct platform_device *pdev)
- 
- static struct platform_driver da9052_wdt_driver = {
- 	.probe = da9052_wdt_probe,
--	.remove = __devexit_p(da9052_wdt_remove),
-+	.remove = da9052_wdt_remove,
- 	.driver = {
- 		.name	= "da9052-watchdog",
- 	},
-diff --git a/drivers/watchdog/davinci_wdt.c b/drivers/watchdog/davinci_wdt.c
-index eb44b03..00b509c 100644
---- a/drivers/watchdog/davinci_wdt.c
-+++ b/drivers/watchdog/davinci_wdt.c
-@@ -268,7 +268,7 @@ static struct platform_driver platform_wdt_driver = {
- 		.owner	= THIS_MODULE,
- 	},
- 	.probe = davinci_wdt_probe,
--	.remove = __devexit_p(davinci_wdt_remove),
-+	.remove = davinci_wdt_remove,
- };
- 
- module_platform_driver(platform_wdt_driver);
-diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
-index 06de121..6a8448d 100644
---- a/drivers/watchdog/dw_wdt.c
-+++ b/drivers/watchdog/dw_wdt.c
-@@ -345,7 +345,7 @@ static int __devexit dw_wdt_drv_remove(struct platform_device *pdev)
- 
- static struct platform_driver dw_wdt_driver = {
- 	.probe		= dw_wdt_drv_probe,
--	.remove		= __devexit_p(dw_wdt_drv_remove),
-+	.remove		= dw_wdt_drv_remove,
- 	.driver		= {
- 		.name	= "dw_wdt",
- 		.owner	= THIS_MODULE,
-diff --git a/drivers/watchdog/ep93xx_wdt.c b/drivers/watchdog/ep93xx_wdt.c
-index 7705003..91703a5 100644
---- a/drivers/watchdog/ep93xx_wdt.c
-+++ b/drivers/watchdog/ep93xx_wdt.c
-@@ -168,7 +168,7 @@ static struct platform_driver ep93xx_wdt_driver = {
- 		.name	= "ep93xx-wdt",
- 	},
- 	.probe		= ep93xx_wdt_probe,
--	.remove		= __devexit_p(ep93xx_wdt_remove),
-+	.remove		= ep93xx_wdt_remove,
- };
- 
- module_platform_driver(ep93xx_wdt_driver);
-diff --git a/drivers/watchdog/geodewdt.c b/drivers/watchdog/geodewdt.c
-index dc563b6..a340e04 100644
---- a/drivers/watchdog/geodewdt.c
-+++ b/drivers/watchdog/geodewdt.c
-@@ -256,7 +256,7 @@ static void geodewdt_shutdown(struct platform_device *dev)
- 
- static struct platform_driver geodewdt_driver = {
- 	.probe		= geodewdt_probe,
--	.remove		= __devexit_p(geodewdt_remove),
-+	.remove		= geodewdt_remove,
- 	.shutdown	= geodewdt_shutdown,
- 	.driver		= {
- 		.owner	= THIS_MODULE,
-diff --git a/drivers/watchdog/hpwdt.c b/drivers/watchdog/hpwdt.c
-index ae60406..03687bc 100644
---- a/drivers/watchdog/hpwdt.c
-+++ b/drivers/watchdog/hpwdt.c
-@@ -863,7 +863,7 @@ static struct pci_driver hpwdt_driver = {
- 	.name = "hpwdt",
- 	.id_table = hpwdt_devices,
- 	.probe = hpwdt_init_one,
--	.remove = __devexit_p(hpwdt_exit),
-+	.remove = hpwdt_exit,
- };
- 
- MODULE_AUTHOR("Tom Mingarelli");
-diff --git a/drivers/watchdog/i6300esb.c b/drivers/watchdog/i6300esb.c
-index 276877d..2574066 100644
---- a/drivers/watchdog/i6300esb.c
-+++ b/drivers/watchdog/i6300esb.c
-@@ -488,7 +488,7 @@ static struct pci_driver esb_driver = {
- 	.name		= ESB_MODULE_NAME,
- 	.id_table	= esb_pci_tbl,
- 	.probe          = esb_probe,
--	.remove         = __devexit_p(esb_remove),
-+	.remove         = esb_remove,
- 	.shutdown       = esb_shutdown,
- };
- 
-diff --git a/drivers/watchdog/iTCO_wdt.c b/drivers/watchdog/iTCO_wdt.c
-index 545d387..b83f935 100644
---- a/drivers/watchdog/iTCO_wdt.c
-+++ b/drivers/watchdog/iTCO_wdt.c
-@@ -548,7 +548,7 @@ static void iTCO_wdt_shutdown(struct platform_device *dev)
- 
- static struct platform_driver iTCO_wdt_driver = {
- 	.probe          = iTCO_wdt_probe,
--	.remove         = __devexit_p(iTCO_wdt_remove),
-+	.remove         = iTCO_wdt_remove,
- 	.shutdown       = iTCO_wdt_shutdown,
- 	.driver         = {
- 		.owner  = THIS_MODULE,
-diff --git a/drivers/watchdog/ib700wdt.c b/drivers/watchdog/ib700wdt.c
-index 184c0bf..4e992c8 100644
---- a/drivers/watchdog/ib700wdt.c
-+++ b/drivers/watchdog/ib700wdt.c
-@@ -337,7 +337,7 @@ static void ibwdt_shutdown(struct platform_device *dev)
- 
- static struct platform_driver ibwdt_driver = {
- 	.probe		= ibwdt_probe,
--	.remove		= __devexit_p(ibwdt_remove),
-+	.remove		= ibwdt_remove,
- 	.shutdown	= ibwdt_shutdown,
- 	.driver		= {
- 		.owner	= THIS_MODULE,
-diff --git a/drivers/watchdog/ie6xx_wdt.c b/drivers/watchdog/ie6xx_wdt.c
-index 8f541b9..93b2cda 100644
---- a/drivers/watchdog/ie6xx_wdt.c
-+++ b/drivers/watchdog/ie6xx_wdt.c
-@@ -311,7 +311,7 @@ static int __devexit ie6xx_wdt_remove(struct platform_device *pdev)
- 
- static struct platform_driver ie6xx_wdt_driver = {
- 	.probe		= ie6xx_wdt_probe,
--	.remove		= __devexit_p(ie6xx_wdt_remove),
-+	.remove		= ie6xx_wdt_remove,
+ static struct platform_driver gpio_flash_driver = {
+ 	.probe		= gpio_flash_probe,
+-	.remove		= __devexit_p(gpio_flash_remove),
++	.remove		= gpio_flash_remove,
  	.driver		= {
  		.name	= DRIVER_NAME,
- 		.owner	= THIS_MODULE,
-diff --git a/drivers/watchdog/jz4740_wdt.c b/drivers/watchdog/jz4740_wdt.c
-index 978615e..331a613 100644
---- a/drivers/watchdog/jz4740_wdt.c
-+++ b/drivers/watchdog/jz4740_wdt.c
-@@ -210,7 +210,7 @@ static int __devexit jz4740_wdt_remove(struct platform_device *pdev)
+ 	},
+diff --git a/drivers/mtd/maps/intel_vr_nor.c b/drivers/mtd/maps/intel_vr_nor.c
+index 93f0317..f6185d4 100644
+--- a/drivers/mtd/maps/intel_vr_nor.c
++++ b/drivers/mtd/maps/intel_vr_nor.c
+@@ -256,7 +256,7 @@ vr_nor_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
+ static struct pci_driver vr_nor_pci_driver = {
+ 	.name = DRV_NAME,
+ 	.probe = vr_nor_pci_probe,
+-	.remove = __devexit_p(vr_nor_pci_remove),
++	.remove = vr_nor_pci_remove,
+ 	.id_table = vr_nor_pci_ids,
+ };
  
- static struct platform_driver jz4740_wdt_driver = {
- 	.probe = jz4740_wdt_probe,
--	.remove = __devexit_p(jz4740_wdt_remove),
-+	.remove = jz4740_wdt_remove,
+diff --git a/drivers/mtd/maps/lantiq-flash.c b/drivers/mtd/maps/lantiq-flash.c
+index c03456f..4c032f1 100644
+--- a/drivers/mtd/maps/lantiq-flash.c
++++ b/drivers/mtd/maps/lantiq-flash.c
+@@ -209,7 +209,7 @@ MODULE_DEVICE_TABLE(of, ltq_mtd_match);
+ 
+ static struct platform_driver ltq_mtd_driver = {
+ 	.probe = ltq_mtd_probe,
+-	.remove = __devexit_p(ltq_mtd_remove),
++	.remove = ltq_mtd_remove,
  	.driver = {
- 		.name = "jz4740-wdt",
- 		.owner	= THIS_MODULE,
-diff --git a/drivers/watchdog/ks8695_wdt.c b/drivers/watchdog/ks8695_wdt.c
-index c1a4d3b..6ac9ff2 100644
---- a/drivers/watchdog/ks8695_wdt.c
-+++ b/drivers/watchdog/ks8695_wdt.c
-@@ -290,7 +290,7 @@ static int ks8695wdt_resume(struct platform_device *pdev)
- 
- static struct platform_driver ks8695wdt_driver = {
- 	.probe		= ks8695wdt_probe,
--	.remove		= __devexit_p(ks8695wdt_remove),
-+	.remove		= ks8695wdt_remove,
- 	.shutdown	= ks8695wdt_shutdown,
- 	.suspend	= ks8695wdt_suspend,
- 	.resume		= ks8695wdt_resume,
-diff --git a/drivers/watchdog/lantiq_wdt.c b/drivers/watchdog/lantiq_wdt.c
-index 2e74c3a..ce4df08 100644
---- a/drivers/watchdog/lantiq_wdt.c
-+++ b/drivers/watchdog/lantiq_wdt.c
-@@ -236,7 +236,7 @@ MODULE_DEVICE_TABLE(of, ltq_wdt_match);
- 
- static struct platform_driver ltq_wdt_driver = {
- 	.probe = ltq_wdt_probe,
--	.remove = __devexit_p(ltq_wdt_remove),
-+	.remove = ltq_wdt_remove,
- 	.driver = {
- 		.name = "wdt",
+ 		.name = "ltq-nor",
  		.owner = THIS_MODULE,
-diff --git a/drivers/watchdog/max63xx_wdt.c b/drivers/watchdog/max63xx_wdt.c
-index 8f4a74e..7e95221 100644
---- a/drivers/watchdog/max63xx_wdt.c
-+++ b/drivers/watchdog/max63xx_wdt.c
-@@ -228,7 +228,7 @@ MODULE_DEVICE_TABLE(platform, max63xx_id_table);
+diff --git a/drivers/mtd/maps/latch-addr-flash.c b/drivers/mtd/maps/latch-addr-flash.c
+index 3c7ad17..962a76a 100644
+--- a/drivers/mtd/maps/latch-addr-flash.c
++++ b/drivers/mtd/maps/latch-addr-flash.c
+@@ -218,7 +218,7 @@ done:
  
- static struct platform_driver max63xx_wdt_driver = {
- 	.probe		= max63xx_wdt_probe,
--	.remove		= __devexit_p(max63xx_wdt_remove),
-+	.remove		= max63xx_wdt_remove,
- 	.id_table	= max63xx_id_table,
+ static struct platform_driver latch_addr_flash_driver = {
+ 	.probe		= latch_addr_flash_probe,
+-	.remove		= __devexit_p(latch_addr_flash_remove),
++	.remove		= latch_addr_flash_remove,
  	.driver		= {
- 		.name	= "max63xx_wdt",
-diff --git a/drivers/watchdog/mpc8xxx_wdt.c b/drivers/watchdog/mpc8xxx_wdt.c
-index e6a038a..e44d6d9 100644
---- a/drivers/watchdog/mpc8xxx_wdt.c
-+++ b/drivers/watchdog/mpc8xxx_wdt.c
-@@ -281,7 +281,7 @@ MODULE_DEVICE_TABLE(of, mpc8xxx_wdt_match);
+ 		.name	= DRIVER_NAME,
+ 	},
+diff --git a/drivers/mtd/maps/pci.c b/drivers/mtd/maps/pci.c
+index 1c30c1a..ddc8c0c 100644
+--- a/drivers/mtd/maps/pci.c
++++ b/drivers/mtd/maps/pci.c
+@@ -326,7 +326,7 @@ mtd_pci_remove(struct pci_dev *dev)
+ static struct pci_driver mtd_pci_driver = {
+ 	.name =		"MTD PCI",
+ 	.probe =	mtd_pci_probe,
+-	.remove =	__devexit_p(mtd_pci_remove),
++	.remove =	mtd_pci_remove,
+ 	.id_table =	mtd_pci_ids,
+ };
  
- static struct platform_driver mpc8xxx_wdt_driver = {
- 	.probe		= mpc8xxx_wdt_probe,
--	.remove		= __devexit_p(mpc8xxx_wdt_remove),
-+	.remove		= mpc8xxx_wdt_remove,
+diff --git a/drivers/mtd/maps/pismo.c b/drivers/mtd/maps/pismo.c
+index 65bd1cd..9f4e594 100644
+--- a/drivers/mtd/maps/pismo.c
++++ b/drivers/mtd/maps/pismo.c
+@@ -267,7 +267,7 @@ static struct i2c_driver pismo_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= pismo_probe,
+-	.remove		= __devexit_p(pismo_remove),
++	.remove		= pismo_remove,
+ 	.id_table	= pismo_id,
+ };
+ 
+diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
+index 81884c2..f913a1c 100644
+--- a/drivers/mtd/maps/pxa2xx-flash.c
++++ b/drivers/mtd/maps/pxa2xx-flash.c
+@@ -139,7 +139,7 @@ static struct platform_driver pxa2xx_flash_driver = {
+ 		.owner		= THIS_MODULE,
+ 	},
+ 	.probe		= pxa2xx_flash_probe,
+-	.remove		= __devexit_p(pxa2xx_flash_remove),
++	.remove		= pxa2xx_flash_remove,
+ 	.shutdown	= pxa2xx_flash_shutdown,
+ };
+ 
+diff --git a/drivers/mtd/maps/scb2_flash.c b/drivers/mtd/maps/scb2_flash.c
+index 9dcbc68..d527608 100644
+--- a/drivers/mtd/maps/scb2_flash.c
++++ b/drivers/mtd/maps/scb2_flash.c
+@@ -231,7 +231,7 @@ static struct pci_driver scb2_flash_driver = {
+ 	.name =     "Intel SCB2 BIOS Flash",
+ 	.id_table = scb2_flash_pci_ids,
+ 	.probe =    scb2_flash_probe,
+-	.remove =   __devexit_p(scb2_flash_remove),
++	.remove =   scb2_flash_remove,
+ };
+ 
+ module_pci_driver(scb2_flash_driver);
+diff --git a/drivers/mtd/maps/sun_uflash.c b/drivers/mtd/maps/sun_uflash.c
+index 175e537..1c03ca7 100644
+--- a/drivers/mtd/maps/sun_uflash.c
++++ b/drivers/mtd/maps/sun_uflash.c
+@@ -155,7 +155,7 @@ static struct platform_driver uflash_driver = {
+ 		.of_match_table = uflash_match,
+ 	},
+ 	.probe		= uflash_probe,
+-	.remove		= __devexit_p(uflash_remove),
++	.remove		= uflash_remove,
+ };
+ 
+ module_platform_driver(uflash_driver);
+diff --git a/drivers/mtd/maps/vmu-flash.c b/drivers/mtd/maps/vmu-flash.c
+index 2e2b094..5a83a26 100644
+--- a/drivers/mtd/maps/vmu-flash.c
++++ b/drivers/mtd/maps/vmu-flash.c
+@@ -802,7 +802,7 @@ static struct maple_driver vmu_flash_driver = {
+ 	.drv = {
+ 		.name =		"Dreamcast_visual_memory",
+ 		.probe =	probe_maple_vmu,
+-		.remove = 	__devexit_p(remove_maple_vmu),
++		.remove =	remove_maple_vmu,
+ 	},
+ };
+ 
+diff --git a/drivers/mtd/nand/ams-delta.c b/drivers/mtd/nand/ams-delta.c
+index 9e7723a..51dba43 100644
+--- a/drivers/mtd/nand/ams-delta.c
++++ b/drivers/mtd/nand/ams-delta.c
+@@ -289,7 +289,7 @@ static int __devexit ams_delta_cleanup(struct platform_device *pdev)
+ 
+ static struct platform_driver ams_delta_nand_driver = {
+ 	.probe		= ams_delta_init,
+-	.remove		= __devexit_p(ams_delta_cleanup),
++	.remove		= ams_delta_cleanup,
+ 	.driver		= {
+ 		.name	= "ams-delta-nand",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/mtd/nand/au1550nd.c b/drivers/mtd/nand/au1550nd.c
+index 5c47b20..d84af46 100644
+--- a/drivers/mtd/nand/au1550nd.c
++++ b/drivers/mtd/nand/au1550nd.c
+@@ -509,7 +509,7 @@ static struct platform_driver au1550nd_driver = {
+ 		.owner	= THIS_MODULE,
+ 	},
+ 	.probe		= au1550nd_probe,
+-	.remove		= __devexit_p(au1550nd_remove),
++	.remove		= au1550nd_remove,
+ };
+ 
+ module_platform_driver(au1550nd_driver);
+diff --git a/drivers/mtd/nand/bf5xx_nand.c b/drivers/mtd/nand/bf5xx_nand.c
+index ab0caa7..0afd4ac 100644
+--- a/drivers/mtd/nand/bf5xx_nand.c
++++ b/drivers/mtd/nand/bf5xx_nand.c
+@@ -865,7 +865,7 @@ static int bf5xx_nand_resume(struct platform_device *dev)
+ /* driver device registration */
+ static struct platform_driver bf5xx_nand_driver = {
+ 	.probe		= bf5xx_nand_probe,
+-	.remove		= __devexit_p(bf5xx_nand_remove),
++	.remove		= bf5xx_nand_remove,
+ 	.suspend	= bf5xx_nand_suspend,
+ 	.resume		= bf5xx_nand_resume,
+ 	.driver		= {
+diff --git a/drivers/mtd/nand/cafe_nand.c b/drivers/mtd/nand/cafe_nand.c
+index 2bb7170..1b62f04 100644
+--- a/drivers/mtd/nand/cafe_nand.c
++++ b/drivers/mtd/nand/cafe_nand.c
+@@ -887,7 +887,7 @@ static struct pci_driver cafe_nand_pci_driver = {
+ 	.name = "CAF? NAND",
+ 	.id_table = cafe_nand_tbl,
+ 	.probe = cafe_nand_probe,
+-	.remove = __devexit_p(cafe_nand_remove),
++	.remove = cafe_nand_remove,
+ 	.resume = cafe_nand_resume,
+ };
+ 
+diff --git a/drivers/mtd/nand/denali_dt.c b/drivers/mtd/nand/denali_dt.c
+index fbabbaa..445de7c 100644
+--- a/drivers/mtd/nand/denali_dt.c
++++ b/drivers/mtd/nand/denali_dt.c
+@@ -142,7 +142,7 @@ static int __devexit denali_dt_remove(struct platform_device *ofdev)
+ 
+ static struct platform_driver denali_dt_driver = {
+ 	.probe		= denali_dt_probe,
+-	.remove		= __devexit_p(denali_dt_remove),
++	.remove		= denali_dt_remove,
+ 	.driver		= {
+ 		.name	= "denali-nand-dt",
+ 		.owner	= THIS_MODULE,
+diff --git a/drivers/mtd/nand/fsl_upm.c b/drivers/mtd/nand/fsl_upm.c
+index 45df542..b40661d 100644
+--- a/drivers/mtd/nand/fsl_upm.c
++++ b/drivers/mtd/nand/fsl_upm.c
+@@ -350,7 +350,7 @@ static struct platform_driver of_fun_driver = {
+ 		.of_match_table = of_fun_match,
+ 	},
+ 	.probe		= fun_probe,
+-	.remove		= __devexit_p(fun_remove),
++	.remove		= fun_remove,
+ };
+ 
+ module_platform_driver(of_fun_driver);
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index d376198..7ce6d01 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -1692,7 +1692,7 @@ static struct platform_driver gpmi_nand_driver = {
+ 		.of_match_table = gpmi_nand_id_table,
+ 	},
+ 	.probe   = gpmi_nand_probe,
+-	.remove  = __devexit_p(gpmi_nand_remove),
++	.remove  = gpmi_nand_remove,
+ 	.id_table = gpmi_ids,
+ };
+ module_platform_driver(gpmi_nand_driver);
+diff --git a/drivers/mtd/nand/jz4740_nand.c b/drivers/mtd/nand/jz4740_nand.c
+index 100b677..2552fe2 100644
+--- a/drivers/mtd/nand/jz4740_nand.c
++++ b/drivers/mtd/nand/jz4740_nand.c
+@@ -573,7 +573,7 @@ static int __devexit jz_nand_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver jz_nand_driver = {
+ 	.probe = jz_nand_probe,
+-	.remove = __devexit_p(jz_nand_remove),
++	.remove = jz_nand_remove,
  	.driver = {
- 		.name = "mpc8xxx_wdt",
+ 		.name = "jz4740-nand",
  		.owner = THIS_MODULE,
-diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-index 7c741dc..cf66cee 100644
---- a/drivers/watchdog/mpcore_wdt.c
-+++ b/drivers/watchdog/mpcore_wdt.c
-@@ -415,7 +415,7 @@ MODULE_ALIAS("platform:mpcore_wdt");
+diff --git a/drivers/mtd/nand/lpc32xx_mlc.c b/drivers/mtd/nand/lpc32xx_mlc.c
+index c29b7ac..3115642 100644
+--- a/drivers/mtd/nand/lpc32xx_mlc.c
++++ b/drivers/mtd/nand/lpc32xx_mlc.c
+@@ -907,7 +907,7 @@ MODULE_DEVICE_TABLE(of, lpc32xx_nand_match);
  
- static struct platform_driver mpcore_wdt_driver = {
- 	.probe		= mpcore_wdt_probe,
--	.remove		= __devexit_p(mpcore_wdt_remove),
-+	.remove		= mpcore_wdt_remove,
- 	.suspend	= mpcore_wdt_suspend,
- 	.resume		= mpcore_wdt_resume,
- 	.shutdown	= mpcore_wdt_shutdown,
-diff --git a/drivers/watchdog/mtx-1_wdt.c b/drivers/watchdog/mtx-1_wdt.c
-index c29e31d..5474a06 100644
---- a/drivers/watchdog/mtx-1_wdt.c
-+++ b/drivers/watchdog/mtx-1_wdt.c
-@@ -248,7 +248,7 @@ static int __devexit mtx1_wdt_remove(struct platform_device *pdev)
+ static struct platform_driver lpc32xx_nand_driver = {
+ 	.probe		= lpc32xx_nand_probe,
+-	.remove		= __devexit_p(lpc32xx_nand_remove),
++	.remove		= lpc32xx_nand_remove,
+ 	.resume		= lpc32xx_nand_resume,
+ 	.suspend	= lpc32xx_nand_suspend,
+ 	.driver		= {
+diff --git a/drivers/mtd/nand/lpc32xx_slc.c b/drivers/mtd/nand/lpc32xx_slc.c
+index 32409c4..9e291b7 100644
+--- a/drivers/mtd/nand/lpc32xx_slc.c
++++ b/drivers/mtd/nand/lpc32xx_slc.c
+@@ -1021,7 +1021,7 @@ MODULE_DEVICE_TABLE(of, lpc32xx_nand_match);
  
- static struct platform_driver mtx1_wdt_driver = {
- 	.probe = mtx1_wdt_probe,
--	.remove = __devexit_p(mtx1_wdt_remove),
-+	.remove = mtx1_wdt_remove,
- 	.driver.name = "mtx1-wdt",
- 	.driver.owner = THIS_MODULE,
- };
-diff --git a/drivers/watchdog/mv64x60_wdt.c b/drivers/watchdog/mv64x60_wdt.c
-index c53d025..7d37da5 100644
---- a/drivers/watchdog/mv64x60_wdt.c
-+++ b/drivers/watchdog/mv64x60_wdt.c
-@@ -300,7 +300,7 @@ static int __devexit mv64x60_wdt_remove(struct platform_device *dev)
+ static struct platform_driver lpc32xx_nand_driver = {
+ 	.probe		= lpc32xx_nand_probe,
+-	.remove		= __devexit_p(lpc32xx_nand_remove),
++	.remove		= lpc32xx_nand_remove,
+ 	.resume		= lpc32xx_nand_resume,
+ 	.suspend	= lpc32xx_nand_suspend,
+ 	.driver		= {
+diff --git a/drivers/mtd/nand/mpc5121_nfc.c b/drivers/mtd/nand/mpc5121_nfc.c
+index f776c85..17fe0c9 100644
+--- a/drivers/mtd/nand/mpc5121_nfc.c
++++ b/drivers/mtd/nand/mpc5121_nfc.c
+@@ -848,7 +848,7 @@ static struct of_device_id mpc5121_nfc_match[] __devinitdata = {
  
- static struct platform_driver mv64x60_wdt_driver = {
- 	.probe = mv64x60_wdt_probe,
--	.remove = __devexit_p(mv64x60_wdt_remove),
-+	.remove = mv64x60_wdt_remove,
- 	.driver = {
+ static struct platform_driver mpc5121_nfc_driver = {
+ 	.probe		= mpc5121_nfc_probe,
+-	.remove		= __devexit_p(mpc5121_nfc_remove),
++	.remove		= mpc5121_nfc_remove,
+ 	.driver		= {
+ 		.name = DRV_NAME,
  		.owner = THIS_MODULE,
- 		.name = MV64x60_WDT_NAME,
-diff --git a/drivers/watchdog/nuc900_wdt.c b/drivers/watchdog/nuc900_wdt.c
-index ea4c744..a77f690 100644
---- a/drivers/watchdog/nuc900_wdt.c
-+++ b/drivers/watchdog/nuc900_wdt.c
-@@ -328,7 +328,7 @@ static int __devexit nuc900wdt_remove(struct platform_device *pdev)
+diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+index 022dcdc..fbcb317 100644
+--- a/drivers/mtd/nand/mxc_nand.c
++++ b/drivers/mtd/nand/mxc_nand.c
+@@ -1580,7 +1580,7 @@ static struct platform_driver mxcnd_driver = {
+ 	},
+ 	.id_table = mxcnd_devtype,
+ 	.probe = mxcnd_probe,
+-	.remove = __devexit_p(mxcnd_remove),
++	.remove = mxcnd_remove,
+ };
+ module_platform_driver(mxcnd_driver);
  
- static struct platform_driver nuc900wdt_driver = {
- 	.probe		= nuc900wdt_probe,
--	.remove		= __devexit_p(nuc900wdt_remove),
-+	.remove		= nuc900wdt_remove,
+diff --git a/drivers/mtd/nand/ndfc.c b/drivers/mtd/nand/ndfc.c
+index 5fd3f01..32e6bef 100644
+--- a/drivers/mtd/nand/ndfc.c
++++ b/drivers/mtd/nand/ndfc.c
+@@ -279,7 +279,7 @@ static struct platform_driver ndfc_driver = {
+ 		.of_match_table = ndfc_match,
+ 	},
+ 	.probe = ndfc_probe,
+-	.remove = __devexit_p(ndfc_remove),
++	.remove = ndfc_remove,
+ };
+ 
+ module_platform_driver(ndfc_driver);
+diff --git a/drivers/mtd/nand/nuc900_nand.c b/drivers/mtd/nand/nuc900_nand.c
+index 94dc46bc..eed134c 100644
+--- a/drivers/mtd/nand/nuc900_nand.c
++++ b/drivers/mtd/nand/nuc900_nand.c
+@@ -340,7 +340,7 @@ static int __devexit nuc900_nand_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver nuc900_nand_driver = {
+ 	.probe		= nuc900_nand_probe,
+-	.remove		= __devexit_p(nuc900_nand_remove),
++	.remove		= nuc900_nand_remove,
  	.driver		= {
- 		.name	= "nuc900-wdt",
+ 		.name	= "nuc900-fmi",
  		.owner	= THIS_MODULE,
-diff --git a/drivers/watchdog/nv_tco.c b/drivers/watchdog/nv_tco.c
-index 6bbb9ef..e0d4496 100644
---- a/drivers/watchdog/nv_tco.c
-+++ b/drivers/watchdog/nv_tco.c
-@@ -468,7 +468,7 @@ static void nv_tco_shutdown(struct platform_device *dev)
+diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+index aefaf8c..e6b296d 100644
+--- a/drivers/mtd/nand/orion_nand.c
++++ b/drivers/mtd/nand/orion_nand.c
+@@ -223,7 +223,7 @@ static struct of_device_id orion_nand_of_match_table[] = {
+ #endif
  
- static struct platform_driver nv_tco_driver = {
- 	.probe		= nv_tco_init,
--	.remove		= __devexit_p(nv_tco_remove),
-+	.remove		= nv_tco_remove,
- 	.shutdown	= nv_tco_shutdown,
+ static struct platform_driver orion_nand_driver = {
+-	.remove		= __devexit_p(orion_nand_remove),
++	.remove		= orion_nand_remove,
  	.driver		= {
+ 		.name	= "orion_nand",
  		.owner	= THIS_MODULE,
-diff --git a/drivers/watchdog/of_xilinx_wdt.c b/drivers/watchdog/of_xilinx_wdt.c
-index 294fb4e..df8c5f3 100644
---- a/drivers/watchdog/of_xilinx_wdt.c
-+++ b/drivers/watchdog/of_xilinx_wdt.c
-@@ -401,7 +401,7 @@ MODULE_DEVICE_TABLE(of, xwdt_of_match);
+diff --git a/drivers/mtd/nand/plat_nand.c b/drivers/mtd/nand/plat_nand.c
+index a47ee68..95a1dba 100644
+--- a/drivers/mtd/nand/plat_nand.c
++++ b/drivers/mtd/nand/plat_nand.c
+@@ -160,7 +160,7 @@ MODULE_DEVICE_TABLE(of, plat_nand_match);
  
- static struct platform_driver xwdt_driver = {
- 	.probe       = xwdt_probe,
--	.remove      = __devexit_p(xwdt_remove),
-+	.remove      = xwdt_remove,
- 	.driver = {
- 		.owner = THIS_MODULE,
- 		.name  = WATCHDOG_NAME,
-diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
-index f5db18db..1596a5d 100644
---- a/drivers/watchdog/omap_wdt.c
-+++ b/drivers/watchdog/omap_wdt.c
-@@ -426,7 +426,7 @@ MODULE_DEVICE_TABLE(of, omap_wdt_of_match);
- 
- static struct platform_driver omap_wdt_driver = {
- 	.probe		= omap_wdt_probe,
--	.remove		= __devexit_p(omap_wdt_remove),
-+	.remove		= omap_wdt_remove,
- 	.shutdown	= omap_wdt_shutdown,
- 	.suspend	= omap_wdt_suspend,
- 	.resume		= omap_wdt_resume,
-diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-index c20f96b..33a0872 100644
---- a/drivers/watchdog/orion_wdt.c
-+++ b/drivers/watchdog/orion_wdt.c
-@@ -201,7 +201,7 @@ MODULE_DEVICE_TABLE(of, orion_wdt_of_match_table);
- 
- static struct platform_driver orion_wdt_driver = {
- 	.probe		= orion_wdt_probe,
--	.remove		= __devexit_p(orion_wdt_remove),
-+	.remove		= orion_wdt_remove,
- 	.shutdown	= orion_wdt_shutdown,
- 	.driver		= {
+ static struct platform_driver plat_nand_driver = {
+ 	.probe	= plat_nand_probe,
+-	.remove	= __devexit_p(plat_nand_remove),
++	.remove	= plat_nand_remove,
+ 	.driver	= {
+ 		.name		= "gen_nand",
+ 		.owner		= THIS_MODULE,
+diff --git a/drivers/mtd/nand/sharpsl.c b/drivers/mtd/nand/sharpsl.c
+index 3421e37..541fd51 100644
+--- a/drivers/mtd/nand/sharpsl.c
++++ b/drivers/mtd/nand/sharpsl.c
+@@ -228,7 +228,7 @@ static struct platform_driver sharpsl_nand_driver = {
  		.owner	= THIS_MODULE,
-diff --git a/drivers/watchdog/pcwd.c b/drivers/watchdog/pcwd.c
-index 75694cf..df454c9 100644
---- a/drivers/watchdog/pcwd.c
-+++ b/drivers/watchdog/pcwd.c
-@@ -984,7 +984,7 @@ static void pcwd_isa_shutdown(struct device *dev, unsigned int id)
- static struct isa_driver pcwd_isa_driver = {
- 	.match		= pcwd_isa_match,
- 	.probe		= pcwd_isa_probe,
--	.remove		= __devexit_p(pcwd_isa_remove),
-+	.remove		= pcwd_isa_remove,
- 	.shutdown	= pcwd_isa_shutdown,
+ 	},
+ 	.probe		= sharpsl_nand_probe,
+-	.remove		= __devexit_p(sharpsl_nand_remove),
++	.remove		= sharpsl_nand_remove,
+ };
+ 
+ module_platform_driver(sharpsl_nand_driver);
+diff --git a/drivers/mtd/nand/socrates_nand.c b/drivers/mtd/nand/socrates_nand.c
+index f3f28fa..78b1a04 100644
+--- a/drivers/mtd/nand/socrates_nand.c
++++ b/drivers/mtd/nand/socrates_nand.c
+@@ -251,7 +251,7 @@ static struct platform_driver socrates_nand_driver = {
+ 		.of_match_table = socrates_nand_match,
+ 	},
+ 	.probe		= socrates_nand_probe,
+-	.remove		= __devexit_p(socrates_nand_remove),
++	.remove		= socrates_nand_remove,
+ };
+ 
+ module_platform_driver(socrates_nand_driver);
+diff --git a/drivers/mtd/onenand/generic.c b/drivers/mtd/onenand/generic.c
+index 1c4f97c..27aa44a 100644
+--- a/drivers/mtd/onenand/generic.c
++++ b/drivers/mtd/onenand/generic.c
+@@ -112,7 +112,7 @@ static struct platform_driver generic_onenand_driver = {
+ 		.owner		= THIS_MODULE,
+ 	},
+ 	.probe		= generic_onenand_probe,
+-	.remove		= __devexit_p(generic_onenand_remove),
++	.remove		= generic_onenand_remove,
+ };
+ 
+ module_platform_driver(generic_onenand_driver);
+diff --git a/drivers/mtd/onenand/omap2.c b/drivers/mtd/onenand/omap2.c
+index 99f96e1..cb8ba6a 100644
+--- a/drivers/mtd/onenand/omap2.c
++++ b/drivers/mtd/onenand/omap2.c
+@@ -822,7 +822,7 @@ static int __devexit omap2_onenand_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver omap2_onenand_driver = {
+ 	.probe		= omap2_onenand_probe,
+-	.remove		= __devexit_p(omap2_onenand_remove),
++	.remove		= omap2_onenand_remove,
+ 	.shutdown	= omap2_onenand_shutdown,
  	.driver		= {
- 		.owner	= THIS_MODULE,
-diff --git a/drivers/watchdog/pcwd_pci.c b/drivers/watchdog/pcwd_pci.c
-index ee6900d..1407a6f 100644
---- a/drivers/watchdog/pcwd_pci.c
-+++ b/drivers/watchdog/pcwd_pci.c
-@@ -812,7 +812,7 @@ static struct pci_driver pcipcwd_driver = {
- 	.name		= WATCHDOG_NAME,
- 	.id_table	= pcipcwd_pci_tbl,
- 	.probe		= pcipcwd_card_init,
--	.remove		= __devexit_p(pcipcwd_card_exit),
-+	.remove		= pcipcwd_card_exit,
- };
- 
- module_pci_driver(pcipcwd_driver);
-diff --git a/drivers/watchdog/pnx4008_wdt.c b/drivers/watchdog/pnx4008_wdt.c
-index 87722e1..5c07fa4 100644
---- a/drivers/watchdog/pnx4008_wdt.c
-+++ b/drivers/watchdog/pnx4008_wdt.c
-@@ -217,7 +217,7 @@ static struct platform_driver platform_wdt_driver = {
- 		.of_match_table = of_match_ptr(pnx4008_wdt_match),
+ 		.name	= DRIVER_NAME,
+diff --git a/drivers/mtd/onenand/samsung.c b/drivers/mtd/onenand/samsung.c
+index 8e4b3f2..3d462cb 100644
+--- a/drivers/mtd/onenand/samsung.c
++++ b/drivers/mtd/onenand/samsung.c
+@@ -1130,7 +1130,7 @@ static struct platform_driver s3c_onenand_driver = {
  	},
- 	.probe = pnx4008_wdt_probe,
--	.remove = __devexit_p(pnx4008_wdt_remove),
-+	.remove = pnx4008_wdt_remove,
+ 	.id_table	= s3c_onenand_driver_ids,
+ 	.probe          = s3c_onenand_probe,
+-	.remove         = __devexit_p(s3c_onenand_remove),
++	.remove         = s3c_onenand_remove,
  };
  
- module_platform_driver(platform_wdt_driver);
-diff --git a/drivers/watchdog/rc32434_wdt.c b/drivers/watchdog/rc32434_wdt.c
-index 547353a..cf983d3 100644
---- a/drivers/watchdog/rc32434_wdt.c
-+++ b/drivers/watchdog/rc32434_wdt.c
-@@ -320,7 +320,7 @@ static void rc32434_wdt_shutdown(struct platform_device *pdev)
- 
- static struct platform_driver rc32434_wdt_driver = {
- 	.probe		= rc32434_wdt_probe,
--	.remove		= __devexit_p(rc32434_wdt_remove),
-+	.remove		= rc32434_wdt_remove,
- 	.shutdown	= rc32434_wdt_shutdown,
- 	.driver		= {
- 			.name = "rc32434_wdt",
-diff --git a/drivers/watchdog/rdc321x_wdt.c b/drivers/watchdog/rdc321x_wdt.c
-index 042ccc5..2768214 100644
---- a/drivers/watchdog/rdc321x_wdt.c
-+++ b/drivers/watchdog/rdc321x_wdt.c
-@@ -286,7 +286,7 @@ static int __devexit rdc321x_wdt_remove(struct platform_device *pdev)
- 
- static struct platform_driver rdc321x_wdt_driver = {
- 	.probe = rdc321x_wdt_probe,
--	.remove = __devexit_p(rdc321x_wdt_remove),
-+	.remove = rdc321x_wdt_remove,
- 	.driver = {
- 		.owner = THIS_MODULE,
- 		.name = "rdc321x-wdt",
-diff --git a/drivers/watchdog/riowd.c b/drivers/watchdog/riowd.c
-index 49e1b1c..65851f4 100644
---- a/drivers/watchdog/riowd.c
-+++ b/drivers/watchdog/riowd.c
-@@ -246,7 +246,7 @@ static struct platform_driver riowd_driver = {
- 		.of_match_table = riowd_match,
- 	},
- 	.probe		= riowd_probe,
--	.remove		= __devexit_p(riowd_remove),
-+	.remove		= riowd_remove,
- };
- 
- module_platform_driver(riowd_driver);
-diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-index 9245b4d..c317420 100644
---- a/drivers/watchdog/s3c2410_wdt.c
-+++ b/drivers/watchdog/s3c2410_wdt.c
-@@ -508,7 +508,7 @@ MODULE_DEVICE_TABLE(of, s3c2410_wdt_match);
- 
- static struct platform_driver s3c2410wdt_driver = {
- 	.probe		= s3c2410wdt_probe,
--	.remove		= __devexit_p(s3c2410wdt_remove),
-+	.remove		= s3c2410wdt_remove,
- 	.shutdown	= s3c2410wdt_shutdown,
- 	.suspend	= s3c2410wdt_suspend,
- 	.resume		= s3c2410wdt_resume,
-diff --git a/drivers/watchdog/sch311x_wdt.c b/drivers/watchdog/sch311x_wdt.c
-index 9681ada..766b132 100644
---- a/drivers/watchdog/sch311x_wdt.c
-+++ b/drivers/watchdog/sch311x_wdt.c
-@@ -451,7 +451,7 @@ static void sch311x_wdt_shutdown(struct platform_device *dev)
- 
- static struct platform_driver sch311x_wdt_driver = {
- 	.probe		= sch311x_wdt_probe,
--	.remove		= __devexit_p(sch311x_wdt_remove),
-+	.remove		= sch311x_wdt_remove,
- 	.shutdown	= sch311x_wdt_shutdown,
- 	.driver		= {
- 		.owner = THIS_MODULE,
-diff --git a/drivers/watchdog/shwdt.c b/drivers/watchdog/shwdt.c
-index e5b59be..ce1be6e 100644
---- a/drivers/watchdog/shwdt.c
-+++ b/drivers/watchdog/shwdt.c
-@@ -324,7 +324,7 @@ static struct platform_driver sh_wdt_driver = {
- 	},
- 
- 	.probe		= sh_wdt_probe,
--	.remove		= __devexit_p(sh_wdt_remove),
-+	.remove		= sh_wdt_remove,
- 	.shutdown	= sh_wdt_shutdown,
- };
- 
-diff --git a/drivers/watchdog/sp5100_tco.c b/drivers/watchdog/sp5100_tco.c
-index ae5e82c..066901b 100644
---- a/drivers/watchdog/sp5100_tco.c
-+++ b/drivers/watchdog/sp5100_tco.c
-@@ -439,7 +439,7 @@ static void sp5100_tco_shutdown(struct platform_device *dev)
- 
- static struct platform_driver sp5100_tco_driver = {
- 	.probe		= sp5100_tco_init,
--	.remove		= __devexit_p(sp5100_tco_remove),
-+	.remove		= sp5100_tco_remove,
- 	.shutdown	= sp5100_tco_shutdown,
- 	.driver		= {
- 		.owner	= THIS_MODULE,
-diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
-index dfddfbf..cd5812f 100644
---- a/drivers/watchdog/sp805_wdt.c
-+++ b/drivers/watchdog/sp805_wdt.c
-@@ -324,7 +324,7 @@ static struct amba_driver sp805_wdt_driver = {
- 	},
- 	.id_table	= sp805_wdt_ids,
- 	.probe		= sp805_wdt_probe,
--	.remove = __devexit_p(sp805_wdt_remove),
-+	.remove = sp805_wdt_remove,
- };
- 
- module_amba_driver(sp805_wdt_driver);
-diff --git a/drivers/watchdog/stmp3xxx_wdt.c b/drivers/watchdog/stmp3xxx_wdt.c
-index 21d96b9..4226250 100644
---- a/drivers/watchdog/stmp3xxx_wdt.c
-+++ b/drivers/watchdog/stmp3xxx_wdt.c
-@@ -269,7 +269,7 @@ static struct platform_driver platform_wdt_driver = {
- 		.name = "stmp3xxx_wdt",
- 	},
- 	.probe = stmp3xxx_wdt_probe,
--	.remove = __devexit_p(stmp3xxx_wdt_remove),
-+	.remove = stmp3xxx_wdt_remove,
- 	.suspend = stmp3xxx_wdt_suspend,
- 	.resume = stmp3xxx_wdt_resume,
- };
-diff --git a/drivers/watchdog/ts72xx_wdt.c b/drivers/watchdog/ts72xx_wdt.c
-index 8df050d..2acc1fe 100644
---- a/drivers/watchdog/ts72xx_wdt.c
-+++ b/drivers/watchdog/ts72xx_wdt.c
-@@ -499,7 +499,7 @@ static __devexit int ts72xx_wdt_remove(struct platform_device *pdev)
- 
- static struct platform_driver ts72xx_wdt_driver = {
- 	.probe		= ts72xx_wdt_probe,
--	.remove		= __devexit_p(ts72xx_wdt_remove),
-+	.remove		= ts72xx_wdt_remove,
- 	.driver		= {
- 		.name	= "ts72xx-wdt",
- 		.owner	= THIS_MODULE,
-diff --git a/drivers/watchdog/twl4030_wdt.c b/drivers/watchdog/twl4030_wdt.c
-index 249f113..cf59a38 100644
---- a/drivers/watchdog/twl4030_wdt.c
-+++ b/drivers/watchdog/twl4030_wdt.c
-@@ -247,7 +247,7 @@ static int twl4030_wdt_resume(struct platform_device *pdev)
- 
- static struct platform_driver twl4030_wdt_driver = {
- 	.probe		= twl4030_wdt_probe,
--	.remove		= __devexit_p(twl4030_wdt_remove),
-+	.remove		= twl4030_wdt_remove,
- 	.suspend	= twl4030_wdt_suspend,
- 	.resume		= twl4030_wdt_resume,
- 	.driver		= {
-diff --git a/drivers/watchdog/via_wdt.c b/drivers/watchdog/via_wdt.c
-index aa50da3..a9af1dd 100644
---- a/drivers/watchdog/via_wdt.c
-+++ b/drivers/watchdog/via_wdt.c
-@@ -250,7 +250,7 @@ static struct pci_driver wdt_driver = {
- 	.name		= "via_wdt",
- 	.id_table	= wdt_pci_table,
- 	.probe		= wdt_probe,
--	.remove		= __devexit_p(wdt_remove),
-+	.remove		= wdt_remove,
- };
- 
- module_pci_driver(wdt_driver);
-diff --git a/drivers/watchdog/wdt_pci.c b/drivers/watchdog/wdt_pci.c
-index e32654e..05c14e4 100644
---- a/drivers/watchdog/wdt_pci.c
-+++ b/drivers/watchdog/wdt_pci.c
-@@ -736,7 +736,7 @@ static struct pci_driver wdtpci_driver = {
- 	.name		= "wdt_pci",
- 	.id_table	= wdtpci_pci_tbl,
- 	.probe		= wdtpci_init_one,
--	.remove		= __devexit_p(wdtpci_remove_one),
-+	.remove		= wdtpci_remove_one,
- };
- 
- module_pci_driver(wdtpci_driver);
-diff --git a/drivers/watchdog/wm831x_wdt.c b/drivers/watchdog/wm831x_wdt.c
-index 87d66d2..f9c54fe 100644
---- a/drivers/watchdog/wm831x_wdt.c
-+++ b/drivers/watchdog/wm831x_wdt.c
-@@ -306,7 +306,7 @@ static int __devexit wm831x_wdt_remove(struct platform_device *pdev)
- 
- static struct platform_driver wm831x_wdt_driver = {
- 	.probe = wm831x_wdt_probe,
--	.remove = __devexit_p(wm831x_wdt_remove),
-+	.remove = wm831x_wdt_remove,
- 	.driver = {
- 		.name = "wm831x-watchdog",
- 	},
-diff --git a/drivers/watchdog/wm8350_wdt.c b/drivers/watchdog/wm8350_wdt.c
-index 3c76693..770b6da 100644
---- a/drivers/watchdog/wm8350_wdt.c
-+++ b/drivers/watchdog/wm8350_wdt.c
-@@ -166,7 +166,7 @@ static int __devexit wm8350_wdt_remove(struct platform_device *pdev)
- 
- static struct platform_driver wm8350_wdt_driver = {
- 	.probe = wm8350_wdt_probe,
--	.remove = __devexit_p(wm8350_wdt_remove),
-+	.remove = wm8350_wdt_remove,
- 	.driver = {
- 		.name = "wm8350-wdt",
- 	},
-diff --git a/drivers/watchdog/xen_wdt.c b/drivers/watchdog/xen_wdt.c
-index e4a25b5..99b956f 100644
---- a/drivers/watchdog/xen_wdt.c
-+++ b/drivers/watchdog/xen_wdt.c
-@@ -315,7 +315,7 @@ static int xen_wdt_resume(struct platform_device *dev)
- 
- static struct platform_driver xen_wdt_driver = {
- 	.probe          = xen_wdt_probe,
--	.remove         = __devexit_p(xen_wdt_remove),
-+	.remove         = xen_wdt_remove,
- 	.shutdown       = xen_wdt_shutdown,
- 	.suspend        = xen_wdt_suspend,
- 	.resume         = xen_wdt_resume,
+ module_platform_driver(s3c_onenand_driver);
 -- 
 1.8.0
