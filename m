@@ -1,26 +1,31 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 19 Nov 2012 20:30:52 +1300
-Subject: [PATCH v2 0/2] pwm fixes for 3.8
-Message-ID: <1353310254-21581-1-git-send-email-linux@prisktech.co.nz>
+Date: Mon, 19 Nov 2012 20:30:53 +1300
+Subject: [PATCH v2 1/2] Fix build error in pwm-vt8500.c
+In-Reply-To: <1353310254-21581-1-git-send-email-linux@prisktech.co.nz>
+References: <1353310254-21581-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1353310254-21581-2-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Theirry,
+A missing '{' causes a build error in pwm-vt8500.c
 
-As discussed, here is the patch to correct the issue created by enabling
-disabling the pwm clock during pwm_enable/_disable. A second patch is
-including which fixes a build error introduced in the same patch.
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ drivers/pwm/pwm-vt8500.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-These should be applied on top of the previous patch.
-
-v2: Add error checking for clk_enable()
-
-Tony Prisk (2):
-  Fix build error in pwm-vt8500.c
-  pwm: vt8500: Ensure pwm clock is enabled during pwm_config
-
- drivers/pwm/pwm-vt8500.c |   14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/pwm/pwm-vt8500.c b/drivers/pwm/pwm-vt8500.c
+index 970b0c6..806f72c 100644
+--- a/drivers/pwm/pwm-vt8500.c
++++ b/drivers/pwm/pwm-vt8500.c
+@@ -100,7 +100,7 @@ static int vt8500_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
+ 
+ 	err = clk_enable(vt8500->clk);
+-	if (err < 0)
++	if (err < 0) {
+ 		dev_err(chip->dev, "failed to enable clock\n");
+ 		return err;
+ 	};
 -- 
 1.7.9.5
