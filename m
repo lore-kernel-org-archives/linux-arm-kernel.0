@@ -1,62 +1,38 @@
-From: sr@denx.de (Stefan Roese)
-Date: Mon, 19 Nov 2012 17:13:27 +0100
-Subject: [PATCH 4/4] ARM: sunxi: Add sunxi restart function via onchip
- watchdog
-In-Reply-To: <50AA53A0.2040404@free-electrons.com>
-References: <1353323383-11827-1-git-send-email-sr@denx.de>
- <1353323383-11827-4-git-send-email-sr@denx.de>
- <50AA53A0.2040404@free-electrons.com>
-Message-ID: <50AA5AA7.9070705@denx.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 19 Nov 2012 16:15:26 +0000
+Subject: [GIT PULL] ARM: /proc/cpuinfo updates
+Message-ID: <20121119161525.GA26148@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2012 04:43 PM, Maxime Ripard wrote:
-> While I've taken the three other patches, I'm more concerned about this one.
-> 
-> On a general basis, I would rather see this code into the machine source
-> file, since it doesn't directly relate to the timer driver. If at some
-> point someone wants to write a proper watchdog driver alongside with the
-> timer driver, I'll be fine with moving the code there, but for now,
-> let's keep it simple.
+Hi Russell,
 
-I thought about that too. But it would either a) result in code
-duplication (finding and mapping this timer device node) or b) we would
-have to make this "timer_base" an ugly global variable so that we can
-reference it from the platform code. That's why I placed it the timer
-source.
+please consider pulling /proc/cpuinfo updates in preparation for forthcoming
+big.LITTLE heterogeneous multi-cluster systems on chip that will require
+HW information to be printed for all CPUs in the system not just the one
+reading the /proc/cpuinfo file.
 
-<snip>
+Thank you very much indeed,
+Lorenzo
 
->> +void sunxi_restart(char mode, const char *cmd)
->> +{
->> +	/* Use watchdog to reset system */
->> +
->> +	/* Enable timer and set reset bit */
->> +	writel(3, timer_base + WATCH_DOG_MODE_REG);
->> +	writel(0xa57 << 1 | 1, timer_base + WATCH_DOG_CTRL_REG);
->> +
->> +	while(1)
->> +		;
->> +}
-> 
-> Here, your code looks way more obscure and "complicated" than the one
-> from linux-sunxi found here:
-> https://github.com/linux-sunxi/linux-sunxi/blob/sunxi-3.4/arch/arm/mach-sun4i/core.c#L289
-> 
-> Why is that?
+The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
 
-"Way more obscure" sounds a bit exaggerated for 3 lines of code. ;)
+  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
 
-The delays have been removed as they are not necessary. So its even
-"cleaner" than the code that you referenced. And the code at linux-sunxi
-also has incorrect register definitions (CTRL_REG is not 0x94 but 0x90).
+are available in the git repository at:
 
-The main difference is the added write to the real CTRL_REG (0x90) to
-rearm the wdog. This has been suggested by Henrik Norstr?m, who has done
-most of the U-Boot work (preparing for mainlining as well).
+  git://linux-arm.org/linux-2.6-lp.git bl-cpuinfo
 
-So since Arnd seem to be fine with this patch, I suggest to leave it as
-is for now.
+for you to fetch changes up to b4b8f770eb10a1bccaf8aa0ec1956e2dd7ed1e0a:
 
-Thanks,
-Stefan
+  ARM: kernel: update cpuinfo to print all online CPUs features (2012-11-19 14:51:12 +0000)
+
+----------------------------------------------------------------
+Lorenzo Pieralisi (2):
+      ARM: kernel: add MIDR to per-CPU information data
+      ARM: kernel: update cpuinfo to print all online CPUs features
+
+ arch/arm/include/asm/cpu.h |  1 +
+ arch/arm/kernel/setup.c    | 70 +++++++++++++++++++++++-----------------------
+ arch/arm/kernel/smp.c      |  1 +
+ 3 files changed, 37 insertions(+), 35 deletions(-)
