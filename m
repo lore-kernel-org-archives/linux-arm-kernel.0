@@ -1,31 +1,36 @@
-From: i.mazanov@gmail.com (Igor Mazanov)
-Date: Mon, 19 Nov 2012 15:45:25 +0400
-Subject: [PATCH] OMAP2+: enable TPS65217 support in omap2plus_defconfig
-Message-ID: <50AA1BD5.1000002@gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 19 Nov 2012 11:44:52 +0000
+Subject: [PATCH 1/2] leds: Add generic support for memory mapped LEDs
+In-Reply-To: <1352388952.20549.12.camel@hornet>
+References: <1351792722-15250-1-git-send-email-pawel.moll@arm.com>
+ <1352388952.20549.12.camel@hornet>
+Message-ID: <1353325492.3303.0.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TPS65217 is described in arch/arm/boot/dts/am335x-bone.dts
-but doesn't enabled in arch/arm/configs/omap2plus_defconfig.
+On Thu, 2012-11-08 at 15:35 +0000, Pawel Moll wrote:
+> Hi Bryan, Richard,
+> 
+> On Thu, 2012-11-01 at 17:58 +0000, Pawel Moll wrote:
+> > LEDs are often controlled by writing to memory mapped
+> > register. This patch adds:
+> > 
+> > 1. Generic functions for platform code and drivers to create
+> >    class device for LEDs controlled by arbitrary bit masks.
+> >    The control register value is read, modified by logic AND
+> >    and OR operations with respective mask and written back.
+> > 
+> > 2. A platform driver for simple use case when one or more LED
+> >    are controlled by consecutive bits in a register pointed
+> >    at by the platform device's memory resource. It can be
+> >    particularly useful for MFD cells being part of an other
+> >    device.
+> > 
+> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> 
+> It's just a friendly and polite nag - any thoughts or feelings about
+> this?
 
-Enable TPS65217 support in omap2plus_defconfig.
+Ping again?
 
-Signed-off-by: Igor Mazanov <i.mazanov@gmail.com>
----
-  arch/arm/configs/omap2plus_defconfig |    3 +++
-  1 files changed, 3 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/configs/omap2plus_defconfig 
-b/arch/arm/configs/omap2plus_defconfig
-index 6230304..00f2ce3 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -240,3 +240,6 @@ CONFIG_CRC_ITU_T=y
-  CONFIG_CRC7=y
-  CONFIG_LIBCRC32C=y
-  CONFIG_SOC_OMAP5=y
-+CONFIG_MFD_CORE=y
-+CONFIG_MFD_TPS65217=y
-+CONFIG_REGULATOR_TPS65217=y
---
-1.7.4.4
+Pawe?
