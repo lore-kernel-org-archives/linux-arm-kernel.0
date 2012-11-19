@@ -1,165 +1,179 @@
-From: s.peter@mpl.ch (Stefan Peter)
-Date: Mon, 19 Nov 2012 16:00:02 +0100
-Subject: [PATCH 1/1 V2] ARM: kirkwood: Convert mplcec4 board to pinctrl
-In-Reply-To: <cover.1353336757.git.s.peter@mpl.ch>
-References: <cover.1353336757.git.s.peter@mpl.ch>
-Message-ID: <0ddf112860801817cde19017814c5ed97aa40339.1353336757.git.s.peter@mpl.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 19 Nov 2012 15:01:05 +0000
+Subject: [PATCH v4 09/14] KVM: ARM: Emulation framework and CP15 emulation
+In-Reply-To: <20121110154313.2836.2851.stgit@chazy-air>
+References: <20121110154203.2836.46686.stgit@chazy-air>
+ <20121110154313.2836.2851.stgit@chazy-air>
+Message-ID: <20121119150105.GB3205@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Nov 10, 2012 at 03:43:13PM +0000, Christoffer Dall wrote:
+> Adds a new important function in the main KVM/ARM code called
+> handle_exit() which is called from kvm_arch_vcpu_ioctl_run() on returns
+> from guest execution. This function examines the Hyp-Syndrome-Register
+> (HSR), which contains information telling KVM what caused the exit from
+> the guest.
+> 
+> Some of the reasons for an exit are CP15 accesses, which are
+> not allowed from the guest and this commit handles these exits by
+> emulating the intended operation in software and skipping the guest
+> instruction.
+> 
+> Minor notes about the coproc register reset:
+> 1) We reserve a value of 0 as an invalid cp15 offset, to catch bugs in our
+>    table, at cost of 4 bytes per vcpu.
+> 
+> 2) Added comments on the table indicating how we handle each register, for
+>    simplicity of understanding.
+> 
+> Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
+> Signed-off-by: Rusty Russell <rusty.russell@linaro.org>
+> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 
-Signed-off-by: Stefan Peter <s.peter@mpl.ch>
----
-diff --git a/arch/arm/boot/dts/kirkwood-6281.dtsi b/arch/arm/boot/dts/kirkwood-6281.dtsi
-index b0fe682..d6c9d65 100644
---- a/arch/arm/boot/dts/kirkwood-6281.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-6281.dtsi
-@@ -34,6 +34,11 @@
- 				marvell,pins = "mpp13", "mpp14";
- 				marvell,function = "uart1";
- 			};
-+			pmx_sdio: pmx-sdio {
-+				marvell,pins = "mpp12", "mpp13", "mpp14",
-+					       "mpp15", "mpp16", "mpp17";
-+				marvell,function = "sdio";
-+			};
- 		};
- 	};
--};
-\ No newline at end of file
-+};
-diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-index ac3c080..262c654 100644
---- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
-+++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- 
- /include/ "kirkwood.dtsi"
-+/include/ "kirkwood-6281.dtsi"
- 
- / {
- 	model = "MPL CEC4";
-@@ -16,6 +17,64 @@
-         };
- 
- 	ocp at f1000000 {
-+		pinctrl: pinctrl at 10000 {
-+
-+			pinctrl-0 = < &pmx_nand &pmx_uart0
-+				      &pmx_led_health &pmx_sdio
-+				      &pmx_sata0 &pmx_sata1
-+				      &pmx_led_user1o
-+				      &pmx_led_user1g &pmx_led_user0o
-+				      &pmx_led_user0g &pmx_led_misc
-+				      &pmx_sdio_cd
-+				    >;
-+			pinctrl-names = "default";
-+
-+			pmx_led_health: pmx-led-health {
-+				marvell,pins = "mpp7";
-+				marvell,function = "gpo";
-+			};
-+
-+			pmx_sata1: pmx-sata1 {
-+				marvell,pins = "mpp34";
-+				marvell,function = "sata1";
-+			};
-+
-+			pmx_sata0: pmx-sata0 {
-+				marvell,pins = "mpp35";
-+				marvell,function = "sata0";
-+			};
-+
-+			pmx_led_user1o: pmx-led-user1o {
-+				marvell,pins = "mpp40";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_user1g: pmx-led-user1g {
-+				marvell,pins = "mpp41";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_user0o: pmx-led-user0o {
-+				marvell,pins = "mpp44";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_user0g: pmx-led-user0g {
-+				marvell,pins = "mpp45";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_misc: pmx-led-misc {
-+				marvell,pins = "mpp46";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_sdio_cd: pmx-sdio-cd {
-+				marvell,pins = "mpp47";
-+				marvell,function = "gpio";
-+			};
-+		};
-+
-                 i2c at 11000 {
-                         status = "okay";
- 
-diff --git a/arch/arm/mach-kirkwood/board-mplcec4.c b/arch/arm/mach-kirkwood/board-mplcec4.c
-index e78a227..47e7181 100644
---- a/arch/arm/mach-kirkwood/board-mplcec4.c
-+++ b/arch/arm/mach-kirkwood/board-mplcec4.c
-@@ -24,51 +24,16 @@ static struct mv643xx_eth_platform_data mplcec4_ge01_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(2),
- };
- 
--static unsigned int mplcec4_mpp_config[] __initdata = {
--	MPP0_NF_IO2,
--	MPP1_NF_IO3,
--	MPP2_NF_IO4,
--	MPP3_NF_IO5,
--	MPP4_NF_IO6,
--	MPP5_NF_IO7,
--	MPP6_SYSRST_OUTn,
--	MPP7_GPO,	/* Status LED Green High Active */
--	MPP10_UART0_TXD,
--	MPP11_UART0_RXD,
--	MPP12_SD_CLK,
--	MPP13_SD_CMD,	/* Alt UART1_TXD */
--	MPP14_SD_D0,	/* Alt UART1_RXD */
--	MPP15_SD_D1,
--	MPP16_SD_D2,
--	MPP17_SD_D3,
--	MPP18_NF_IO0,
--	MPP19_NF_IO1,
--	MPP28_GPIO,	/* Input SYS_POR_DET (active High) */
--	MPP29_GPIO,	/* Input SYS_RTC_INT (active High) */
--	MPP34_SATA1_ACTn,
--	MPP35_SATA0_ACTn,
--	MPP40_GPIO,	/* LED User1 orange */
--	MPP41_GPIO,	/* LED User1 green */
--	MPP44_GPIO,	/* LED User0 orange */
--	MPP45_GPIO,	/* LED User0 green */
--	MPP46_GPIO,	/* Status LED Yellow High Active */
--	MPP47_GPIO,	/* SD_CD# (in/IRQ)*/
--	0
--};
--
--
- static struct mvsdio_platform_data mplcec4_mvsdio_data = {
- 	.gpio_card_detect = 47,	/* MPP47 used as SD card detect */
- };
- 
- 
--
- void __init mplcec4_init(void)
- {
- 	/*
- 	 * Basic setup. Needs to be called early.
- 	 */
--	kirkwood_mpp_conf(mplcec4_mpp_config);
- 	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&mplcec4_ge00_data);
- 	kirkwood_ge01_init(&mplcec4_ge01_data);
--- 
-1.7.9.5
+[...]
+
+> diff --git a/arch/arm/kvm/coproc_a15.c b/arch/arm/kvm/coproc_a15.c
+> new file mode 100644
+> index 0000000..55cb4a3
+> --- /dev/null
+> +++ b/arch/arm/kvm/coproc_a15.c
+> @@ -0,0 +1,164 @@
+> +/*
+> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
+> + * Authors: Rusty Russell <rusty@rustcorp.au>
+> + *          Christoffer Dall <c.dall@virtualopensystems.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License, version 2, as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+> + */
+> +#include <linux/kvm_host.h>
+> +#include <asm/cputype.h>
+> +#include <asm/kvm_arm.h>
+> +#include <asm/kvm_host.h>
+> +#include <asm/kvm_emulate.h>
+> +#include <asm/kvm_coproc.h>
+> +#include <linux/init.h>
+> +
+> +#define MPIDR_CPUID    0x3
+
+This should probably be 0xff and also use the macros that Lorenzo is
+introducing:
+
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/132977.html
+
+> +
+> +static void reset_mpidr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
+> +{
+> +       /*
+> +        * Compute guest MPIDR:
+> +        * (Even if we present only one VCPU to the guest on an SMP
+> +        * host we don't set the U bit in the MPIDR, or vice versa, as
+> +        * revealing the underlying hardware properties is likely to
+> +        * be the best choice).
+> +        */
+> +       vcpu->arch.cp15[c0_MPIDR] = (read_cpuid_mpidr() & ~MPIDR_CPUID)
+> +               | (vcpu->vcpu_id & MPIDR_CPUID);
+> +}
+> +
+> +#include "coproc.h"
+> +
+> +/* A15 TRM 4.3.28: RO WI */
+> +static bool access_actlr(struct kvm_vcpu *vcpu,
+> +                        const struct coproc_params *p,
+> +                        const struct coproc_reg *r)
+> +{
+> +       if (p->is_write)
+> +               return ignore_write(vcpu, p);
+> +
+> +       *vcpu_reg(vcpu, p->Rt1) = vcpu->arch.cp15[c1_ACTLR];
+> +       return true;
+> +}
+> +
+> +/* A15 TRM 4.3.60: R/O. */
+> +static bool access_cbar(struct kvm_vcpu *vcpu,
+> +                       const struct coproc_params *p,
+> +                       const struct coproc_reg *r)
+> +{
+> +       if (p->is_write)
+> +               return write_to_read_only(vcpu, p);
+> +       return read_zero(vcpu, p);
+> +}
+> +
+> +/* A15 TRM 4.3.48: R/O WI. */
+> +static bool access_l2ctlr(struct kvm_vcpu *vcpu,
+> +                         const struct coproc_params *p,
+> +                         const struct coproc_reg *r)
+> +{
+> +       if (p->is_write)
+> +               return ignore_write(vcpu, p);
+> +
+> +       *vcpu_reg(vcpu, p->Rt1) = vcpu->arch.cp15[c9_L2CTLR];
+> +       return true;
+> +}
+> +
+> +static void reset_l2ctlr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
+> +{
+> +       u32 l2ctlr, ncores;
+> +
+> +       asm volatile("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
+> +       l2ctlr &= ~(3 << 24);
+> +       ncores = atomic_read(&vcpu->kvm->online_vcpus) - 1;
+> +       l2ctlr |= (ncores & 3) << 24;
+> +
+> +       vcpu->arch.cp15[c9_L2CTLR] = l2ctlr;
+> +}
+> +
+> +static void reset_actlr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
+> +{
+> +       u32 actlr;
+> +
+> +       /* ACTLR contains SMP bit: make sure you create all cpus first! */
+> +       asm volatile("mrc p15, 0, %0, c1, c0, 1\n" : "=r" (actlr));
+> +       /* Make the SMP bit consistent with the guest configuration */
+> +       if (atomic_read(&vcpu->kvm->online_vcpus) > 1)
+> +               actlr |= 1U << 6;
+> +       else
+> +               actlr &= ~(1U << 6);
+> +
+> +       vcpu->arch.cp15[c1_ACTLR] = actlr;
+> +}
+> +
+> +/* A15 TRM 4.3.49: R/O WI (even if NSACR.NS_L2ERR, a write of 1 is ignored). */
+> +static bool access_l2ectlr(struct kvm_vcpu *vcpu,
+> +                          const struct coproc_params *p,
+> +                          const struct coproc_reg *r)
+> +{
+> +       if (p->is_write)
+> +               return ignore_write(vcpu, p);
+> +
+> +       *vcpu_reg(vcpu, p->Rt1) = 0;
+> +       return true;
+> +}
+> +
+> +/*
+> + * A15-specific CP15 registers.
+> + * Important: Must be sorted ascending by CRn, CRM, Op1, Op2
+> + */
+> +static const struct coproc_reg a15_regs[] = {
+> +       /* MPIDR: we use VMPIDR for guest access. */
+> +       { CRn( 0), CRm( 0), Op1( 0), Op2( 5), is32,
+> +                       NULL, reset_mpidr, c0_MPIDR },
+> +
+> +       /* SCTLR: swapped by interrupt.S. */
+> +       { CRn( 1), CRm( 0), Op1( 0), Op2( 0), is32,
+> +                       NULL, reset_val, c1_SCTLR, 0x00C50078 },
+
+Why is the SCTLR included here as an A15-specific register?
+
+Will
