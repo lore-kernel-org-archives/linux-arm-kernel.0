@@ -1,64 +1,77 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 11:04:54 +0100
-Subject: [PATCH 16/30] dma: mv_xor: simplify dma_sync_single_for_cpu() calls
+Date: Mon, 19 Nov 2012 11:04:56 +0100
+Subject: [PATCH 18/30] dma: mv_xor: get rid of the pdev pointer in
+ mv_xor_device
 In-Reply-To: <1353319508-30566-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353319508-30566-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353319508-30566-17-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353319508-30566-19-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In mv_xor_memcpy_self_test() and mv_xor_xor_self_test(), all DMA
-functions are called by passing dma_chan->device->dev as the 'device
-*', except the calls to dma_sync_single_for_cpu() which uselessly goes
-through mv_chan->device->pdev->dev.
-
-Simplify this by using dma_chan->device->dev direclty in
-dma_sync_single_for_cpu() calls.
+It was only used in places where we could get the 'struct device *'
+pointer through a different way.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor.c |    8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/dma/mv_xor.c |    9 ++++-----
+ drivers/dma/mv_xor.h |    1 -
+ 2 files changed, 4 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index a999471..b799d33 100644
+index 38dac0d..6e705ea 100644
 --- a/drivers/dma/mv_xor.c
 +++ b/drivers/dma/mv_xor.c
-@@ -905,7 +905,6 @@ static int __devinit mv_xor_memcpy_self_test(struct mv_xor_device *device)
- 	dma_cookie_t cookie;
- 	struct dma_async_tx_descriptor *tx;
- 	int err = 0;
--	struct mv_xor_chan *mv_chan;
+@@ -308,8 +308,7 @@ mv_xor_run_tx_complete_actions(struct mv_xor_desc_slot *desc,
+ 		 */
+ 		if (desc->group_head && desc->unmap_len) {
+ 			struct mv_xor_desc_slot *unmap = desc->group_head;
+-			struct device *dev =
+-				&mv_chan->device->pdev->dev;
++			struct device *dev = mv_chan_to_devp(mv_chan);
+ 			u32 len = unmap->unmap_len;
+ 			enum dma_ctrl_flags flags = desc->async_tx.flags;
+ 			u32 src_cnt;
+@@ -1077,10 +1076,11 @@ static int mv_xor_channel_remove(struct mv_xor_device *device)
+ {
+ 	struct dma_chan *chan, *_chan;
+ 	struct mv_xor_chan *mv_chan;
++	struct device *dev = device->common.dev;
  
- 	src = kmalloc(sizeof(u8) * MV_XOR_TEST_SIZE, GFP_KERNEL);
- 	if (!src)
-@@ -951,8 +950,7 @@ static int __devinit mv_xor_memcpy_self_test(struct mv_xor_device *device)
- 		goto free_resources;
- 	}
+ 	dma_async_device_unregister(&device->common);
  
--	mv_chan = to_mv_xor_chan(dma_chan);
--	dma_sync_single_for_cpu(&mv_chan->device->pdev->dev, dest_dma,
-+	dma_sync_single_for_cpu(dma_chan->device->dev, dest_dma,
- 				MV_XOR_TEST_SIZE, DMA_FROM_DEVICE);
- 	if (memcmp(src, dest, MV_XOR_TEST_SIZE)) {
- 		dev_err(dma_chan->device->dev,
-@@ -984,7 +982,6 @@ mv_xor_xor_self_test(struct mv_xor_device *device)
- 	u8 cmp_byte = 0;
- 	u32 cmp_word;
- 	int err = 0;
--	struct mv_xor_chan *mv_chan;
+-	dma_free_coherent(&device->pdev->dev, device->pool_size,
++	dma_free_coherent(dev, device->pool_size,
+ 			  device->dma_desc_pool_virt, device->dma_desc_pool);
  
- 	for (src_idx = 0; src_idx < MV_XOR_NUM_SRC_TEST; src_idx++) {
- 		xor_srcs[src_idx] = alloc_page(GFP_KERNEL);
-@@ -1049,8 +1046,7 @@ mv_xor_xor_self_test(struct mv_xor_device *device)
- 		goto free_resources;
- 	}
+ 	list_for_each_entry_safe(chan, _chan, &device->common.channels,
+@@ -1123,7 +1123,6 @@ mv_xor_channel_add(struct mv_xor_private *msp,
  
--	mv_chan = to_mv_xor_chan(dma_chan);
--	dma_sync_single_for_cpu(&mv_chan->device->pdev->dev, dest_dma,
-+	dma_sync_single_for_cpu(dma_chan->device->dev, dest_dma,
- 				PAGE_SIZE, DMA_FROM_DEVICE);
- 	for (i = 0; i < (PAGE_SIZE / sizeof(u32)); i++) {
- 		u32 *ptr = page_address(dest);
+ 	/* discover transaction capabilites from the platform data */
+ 	dma_dev->cap_mask = cap_mask;
+-	adev->pdev = pdev;
+ 	adev->shared = msp;
+ 
+ 	INIT_LIST_HEAD(&dma_dev->channels);
+@@ -1208,7 +1207,7 @@ mv_xor_channel_add(struct mv_xor_private *msp,
+ 	return adev;
+ 
+  err_free_dma:
+-	dma_free_coherent(&adev->pdev->dev, pool_size,
++	dma_free_coherent(&pdev->dev, pool_size,
+ 			adev->dma_desc_pool_virt, adev->dma_desc_pool);
+ 	return ERR_PTR(ret);
+ }
+diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
+index 52ca617..05add24 100644
+--- a/drivers/dma/mv_xor.h
++++ b/drivers/dma/mv_xor.h
+@@ -70,7 +70,6 @@ struct mv_xor_private {
+  * @common: embedded struct dma_device
+  */
+ struct mv_xor_device {
+-	struct platform_device		*pdev;
+ 	dma_addr_t			dma_desc_pool;
+ 	void				*dma_desc_pool_virt;
+ 	size_t                          pool_size;
 -- 
 1.7.9.5
