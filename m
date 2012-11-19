@@ -1,107 +1,51 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Mon, 19 Nov 2012 15:10:41 +0100
-Subject: [PATCH v5 6/8] watchdog: at91sam9_wdt: add timeout-sec property
- binding
-In-Reply-To: <1353334243-16703-1-git-send-email-fabio.porcedda@gmail.com>
-References: <1353334243-16703-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1353334243-16703-7-git-send-email-fabio.porcedda@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 19 Nov 2012 15:13:14 +0100
+Subject: [GIT PULL] Marvell Ethernet driver clk support + section mismatch fix
+Message-ID: <1353334396-26128-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on at91sam9260 board (evk-pro3).
+Jason,
 
-Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-Cc: Andrew Victor <linux@maxim.org.za>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
- Documentation/devicetree/bindings/watchdog/atmel-wdt.txt |  4 ++++
- drivers/watchdog/Kconfig                                 |  1 +
- drivers/watchdog/at91sam9_wdt.c                          | 16 +++++++++++++---
- 3 files changed, 18 insertions(+), 3 deletions(-)
+Here are two additional patches for the mvneta Ethernet driver
+(intended for your mvebu/driver branch):
 
-diff --git a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-index 2957ebb..fcdd48f 100644
---- a/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
-@@ -7,9 +7,13 @@ Required properties:
- - reg: physical base address of the controller and length of memory mapped
-   region.
- 
-+Optional properties:
-+- timeout-sec: contains the watchdog timeout in seconds.
-+
- Example:
- 
- 	watchdog at fffffd40 {
- 		compatible = "atmel,at91sam9260-wdt";
- 		reg = <0xfffffd40 0x10>;
-+		timeout-sec = <10>;
- 	};
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index ad1bb93..dda695f 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -114,6 +114,7 @@ config AT91RM9200_WATCHDOG
- config AT91SAM9X_WATCHDOG
- 	tristate "AT91SAM9X / AT91CAP9 watchdog"
- 	depends on ARCH_AT91 && !ARCH_AT91RM9200
-+	select WATCHDOG_CORE
- 	help
- 	  Watchdog timer embedded into AT91SAM9X and AT91CAP9 chips. This will
- 	  reboot your system when the timeout is reached.
-diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index dc42e44..d864dc4 100644
---- a/drivers/watchdog/at91sam9_wdt.c
-+++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -57,8 +57,10 @@
- #define WDT_TIMEOUT	(HZ/2)
- 
- /* User land timeout */
-+#define MIN_HEARTBEAT 1
-+#define MAX_HEARTBEAT 16
- #define WDT_HEARTBEAT 15
--static int heartbeat = WDT_HEARTBEAT;
-+static int heartbeat;
- module_param(heartbeat, int, 0);
- MODULE_PARM_DESC(heartbeat, "Watchdog heartbeats in seconds. "
- 	"(default = " __MODULE_STRING(WDT_HEARTBEAT) ")");
-@@ -255,6 +257,12 @@ static struct miscdevice at91wdt_miscdev = {
- 	.fops		= &at91wdt_fops,
- };
- 
-+static struct watchdog_device at91wdt_wdd __initdata = {
-+	.timeout = WDT_HEARTBEAT,
-+	.min_timeout = MIN_HEARTBEAT,
-+	.max_timeout = MAX_HEARTBEAT,
-+};
-+
- static int __init at91wdt_probe(struct platform_device *pdev)
- {
- 	struct resource	*r;
-@@ -273,6 +281,8 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
-+	watchdog_init_timeout(&at91wdt_wdd, heartbeat, pdev->dev.of_node);
-+
- 	/* Set watchdog */
- 	res = at91_wdt_settimeout(ms_to_ticks(WDT_HW_TIMEOUT * 1000));
- 	if (res)
-@@ -282,12 +292,12 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 	if (res)
- 		return res;
- 
--	at91wdt_private.next_heartbeat = jiffies + heartbeat * HZ;
-+	at91wdt_private.next_heartbeat = jiffies + at91wdt_wdd.timeout * HZ;
- 	setup_timer(&at91wdt_private.timer, at91_ping, 0);
- 	mod_timer(&at91wdt_private.timer, jiffies + WDT_TIMEOUT);
- 
- 	pr_info("enabled (heartbeat=%d sec, nowayout=%d)\n",
--		heartbeat, nowayout);
-+		at91wdt_wdd.timeout, nowayout);
- 
- 	return 0;
- }
--- 
-1.8.0
+ * One adding clk support. It's not a fix, but I think it's better if
+   we can get the Device Tree binding correct directly in 3.8. This
+   commit basically replaces the clock-frequency DT property by a
+   proper 'clocks' DT property that references a DT clock. If we don't
+   get this in 3.8, we'll have to support the legacy clock-frequency
+   DT property for ever as it will be part of the kernel-to-DT ABI. So
+   it would be nicer to get this patch in for 3.8.
+
+   The DT patches related to this one are coming into a separate pull
+   request.
+
+ * The second one fixes a section mismatch warning, so it is certainly
+   important.
+
+Thanks!
+
+The following changes since commit 803b4905545039f97c7824bcab605e91ac20acbb:
+
+  Merge remote-tracking branch 'jcooper/mvebu/dt' into mvneta-fixes (2012-11-19 12:08:58 +0100)
+
+are available in the git repository at:
+
+  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-mvneta-fix-and-clk-support-3.8
+
+for you to fetch changes up to 4b968e8f98603a422f35b18682c169fb706c0115:
+
+  net: mvneta: fix section mismatch warning caused by mvneta_deinit() (2012-11-19 14:45:25 +0100)
+
+----------------------------------------------------------------
+Marvell Ethernet driver fix + clk support
+
+----------------------------------------------------------------
+Thomas Petazzoni (2):
+      net: mvneta: add clk support
+      net: mvneta: fix section mismatch warning caused by mvneta_deinit()
+
+ .../bindings/net/marvell-armada-370-neta.txt       |    4 +--
+ drivers/net/ethernet/marvell/mvneta.c              |   33 +++++++++++++-------
+ 2 files changed, 23 insertions(+), 14 deletions(-)
