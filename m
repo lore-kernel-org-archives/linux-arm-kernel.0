@@ -1,55 +1,345 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 19 Nov 2012 09:13:05 +0100
-Subject: [PATCH V3 4/5] arm: mm: Added support for PJ4B cpu and init
- routines
-In-Reply-To: <20121119031210.GD22106@titan.lakedaemon.net>
-References: <1352931637-3405-1-git-send-email-gregory.clement@free-electrons.com>
- <1352931637-3405-5-git-send-email-gregory.clement@free-electrons.com>
- <50A41BD3.9040509@free-electrons.com> <50A6B427.9080807@free-electrons.com>
- <20121119031210.GD22106@titan.lakedaemon.net>
-Message-ID: <50A9EA11.7050409@free-electrons.com>
+From: sr@denx.de (Stefan Roese)
+Date: Mon, 19 Nov 2012 09:28:45 +0100
+Subject: [PATCH] ARM: sunxi: Add sun4i/cubieboard (A10) support
+Message-ID: <1353313725-27595-1-git-send-email-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2012 04:12 AM, Jason Cooper wrote:
-> On Fri, Nov 16, 2012 at 10:46:15PM +0100, Gregory CLEMENT wrote:
->> On 11/14/2012 11:31 PM, Gregory CLEMENT wrote:
->>> Hello Russell,
->>>
->>> With the 2 changes I have done on according your comments
->>> do you think you can give your acked-by for this patch?
->>>
->>
->> Hello Russell,
->>
->> I didn't have any feedback from you for this version.
->> If you are fine with this, could you give your Acked-by?
->>
->>
-> 
-> Gregory,
-> 
-> From the looks of things, Russell has his head wrapped around buggy
-> sound driver code for the CuBox.  Perhaps Will Deacon or Catalin Marinas
-> would care to weigh in?  I'm reluctant to take the series without an
-> Acked-By from at least one of them.
+This patch adds support for the sun4i (A10) SoC to the sunxi
+platforms which currently only supports sun5i devices (A13). Most
+sun4i boards use UART0 as console UART (instead of UART1 as done
+on sun5i). So this patch adds support for debug UART on UART0
+as well.
 
+Additionally the sunxi dtsi files are re-structured:
+sunxi.dtsi - Devices common to all Allwinner sunXi SoC's
+sun4i.dtsi - sun4i Devices, will include sunxi.dtsi
+sun5i.dtsi - sun5i Devices, will include sunxi.dtsi
+board.dts - will include either sun4i.dtsi or sun5i.dtsi
 
-I am fine with this as Will already have done the review.
+Signed-off-by: Stefan Roese <sr@denx.de>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/Kconfig.debug                 |  9 +++-
+ arch/arm/boot/dts/Makefile             |  3 +-
+ arch/arm/boot/dts/sun4i-cubieboard.dts | 29 +++++++++++
+ arch/arm/boot/dts/sun4i.dtsi           | 19 ++++++++
+ arch/arm/boot/dts/sun5i-olinuxino.dts  |  2 +-
+ arch/arm/boot/dts/sun5i.dtsi           | 56 +---------------------
+ arch/arm/boot/dts/sunxi.dtsi           | 88 ++++++++++++++++++++++++++++++++++
+ arch/arm/include/debug/sunxi.S         |  5 ++
+ arch/arm/mach-sunxi/sunxi.c            |  1 +
+ 9 files changed, 154 insertions(+), 58 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun4i-cubieboard.dts
+ create mode 100644 arch/arm/boot/dts/sun4i.dtsi
+ create mode 100644 arch/arm/boot/dts/sunxi.dtsi
 
-Arnd, Olof,
-Do you agree to get the pull from Jason with an acked-by from
-Will and/or Catalin instead of Russell?
-
-
-Catalin, Will,
-If Arnd and Olof agree, would you mind give your acked-by on this
-pacth?
-
-Russell,
-if you had a couple of minutes, the best would be to have your acked-by
-of course.
-
-Thanks all,
-
-Gregory
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index f12bc3a..cc1ed35 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -345,6 +345,13 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on SOCFPGA based platforms.
+ 
++	config DEBUG_SUNXI_UART0
++		bool "Kernel low-level debugging messages via sunXi UART0"
++		depends on ARCH_SUNXI
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Allwinner A1X based platforms on the UART0.
++
+ 	config DEBUG_SUNXI_UART1
+ 		bool "Kernel low-level debugging messages via sunXi UART1"
+ 		depends on ARCH_SUNXI
+@@ -423,7 +430,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/mvebu.S" if DEBUG_MVEBU_UART
+ 	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
+ 	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
+-	default "debug/sunxi.S" if DEBUG_SUNXI_UART1
++	default "debug/sunxi.S" if DEBUG_SUNXI_UART0 || DEBUG_SUNXI_UART1
+ 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
+ 		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
+ 	default "mach/debug-macro.S"
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 9b2d3f0..4dd567b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -84,7 +84,8 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
+ 	spear310-evb.dtb \
+ 	spear320-evb.dtb
+ dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
+-dtb-$(CONFIG_ARCH_SUNXI) += sun5i-olinuxino.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun4i-cubieboard.dtb \
++	sun5i-olinuxino.dtb
+ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+ 	tegra20-medcom-wide.dtb \
+ 	tegra20-paz00.dtb \
+diff --git a/arch/arm/boot/dts/sun4i-cubieboard.dts b/arch/arm/boot/dts/sun4i-cubieboard.dts
+new file mode 100644
+index 0000000..92e8ee9
+--- /dev/null
++++ b/arch/arm/boot/dts/sun4i-cubieboard.dts
+@@ -0,0 +1,29 @@
++/*
++ * Copyright 2012 Stefan Roese
++ * Stefan Roese <sr@denx.de>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "sun4i.dtsi"
++
++/ {
++	model = "Cubieboard";
++	compatible = "cubietech,cubieboard", "allwinner,sun4i";
++
++	soc {
++		uart0: uart at 01c28000 {
++			status = "okay";
++		};
++
++		uart1: uart at 01c28400 {
++			status = "okay";
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/sun4i.dtsi b/arch/arm/boot/dts/sun4i.dtsi
+new file mode 100644
+index 0000000..e61fdd4
+--- /dev/null
++++ b/arch/arm/boot/dts/sun4i.dtsi
+@@ -0,0 +1,19 @@
++/*
++ * Copyright 2012 Stefan Roese
++ * Stefan Roese <sr@denx.de>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/include/ "sunxi.dtsi"
++
++/ {
++	memory {
++		reg = <0x40000000 0x80000000>;
++	};
++};
+diff --git a/arch/arm/boot/dts/sun5i-olinuxino.dts b/arch/arm/boot/dts/sun5i-olinuxino.dts
+index 3b1cce3..50f3794 100644
+--- a/arch/arm/boot/dts/sun5i-olinuxino.dts
++++ b/arch/arm/boot/dts/sun5i-olinuxino.dts
+@@ -19,7 +19,7 @@
+ 	compatible = "olimex,a13-olinuxino", "allwinner,sun5i";
+ 
+ 	soc {
+-		duart: uart at 01c28400 {
++		uart1: uart at 01c28400 {
+ 			status = "okay";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 4bedf3e..59a2d26 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -11,64 +11,10 @@
+  * http://www.gnu.org/copyleft/gpl.html
+  */
+ 
+-/include/ "skeleton.dtsi"
++/include/ "sunxi.dtsi"
+ 
+ / {
+-	interrupt-parent = <&intc>;
+-
+-	cpus {
+-		cpu at 0 {
+-			compatible = "arm,cortex-a8";
+-		};
+-	};
+-
+-	chosen {
+-		bootargs = "earlyprintk console=ttyS0,115200";
+-	};
+-
+ 	memory {
+ 		reg = <0x40000000 0x20000000>;
+ 	};
+-
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		osc: oscillator {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <24000000>;
+-		};
+-	};
+-
+-	soc {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		reg = <0x01c20000 0x300000>;
+-		ranges;
+-
+-		timer at 01c20c00 {
+-			compatible = "allwinner,sunxi-timer";
+-			reg = <0x01c20c00 0x400>;
+-			interrupts = <22>;
+-			clocks = <&osc>;
+-		};
+-
+-		intc: interrupt-controller at 01c20400 {
+-			compatible = "allwinner,sunxi-ic";
+-			reg = <0x01c20400 0x400>;
+-			interrupt-controller;
+-			#interrupt-cells = <1>;
+-		};
+-
+-		uart1: uart at 01c28400 {
+-			compatible = "ns8250";
+-			reg = <0x01c28400 0x400>;
+-			interrupts = <2>;
+-			reg-shift = <2>;
+-			clock-frequency = <24000000>;
+-			status = "disabled";
+-		};
+-	};
+ };
+diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
+new file mode 100644
+index 0000000..7e05903
+--- /dev/null
++++ b/arch/arm/boot/dts/sunxi.dtsi
+@@ -0,0 +1,88 @@
++/*
++ * Copyright 2012 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/include/ "skeleton.dtsi"
++
++/ {
++	interrupt-parent = <&intc>;
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++	};
++
++	cpus {
++		cpu at 0 {
++			compatible = "arm,cortex-a8";
++		};
++	};
++
++	chosen {
++		bootargs = "earlyprintk console=ttyS0,115200";
++	};
++
++	memory {
++		reg = <0x40000000 0x20000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		osc: oscillator {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <24000000>;
++		};
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x01c20000 0x300000>;
++		ranges;
++
++		timer at 01c20c00 {
++			compatible = "allwinner,sunxi-timer";
++			reg = <0x01c20c00 0x400>;
++			interrupts = <22>;
++			clocks = <&osc>;
++		};
++
++		intc: interrupt-controller at 01c20400 {
++			compatible = "allwinner,sunxi-ic";
++			reg = <0x01c20400 0x400>;
++			interrupt-controller;
++			#interrupt-cells = <1>;
++		};
++
++		uart0: uart at 01c28000 {
++			compatible = "ns8250";
++			reg = <0x01c28000 0x400>;
++			interrupts = <1>;
++			reg-shift = <2>;
++			clock-frequency = <24000000>;
++			status = "disabled";
++		};
++
++		uart1: uart at 01c28400 {
++			compatible = "ns8250";
++			reg = <0x01c28400 0x400>;
++			interrupts = <2>;
++			reg-shift = <2>;
++			clock-frequency = <24000000>;
++			status = "disabled";
++		};
++	};
++};
+diff --git a/arch/arm/include/debug/sunxi.S b/arch/arm/include/debug/sunxi.S
+index 3bf61ca..39ef611 100644
+--- a/arch/arm/include/debug/sunxi.S
++++ b/arch/arm/include/debug/sunxi.S
+@@ -10,6 +10,11 @@
+  * published by the Free Software Foundation.
+ */
+ 
++#ifdef CONFIG_DEBUG_SUNXI_UART0
++#define SUNXI_UART_DEBUG_PHYS_BASE 0x01c28000
++#define SUNXI_UART_DEBUG_VIRT_BASE 0xf1c28000
++#endif
++
+ #ifdef CONFIG_DEBUG_SUNXI_UART1
+ #define SUNXI_UART_DEBUG_PHYS_BASE 0x01c28400
+ #define SUNXI_UART_DEBUG_VIRT_BASE 0xf1c28400
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 8f42df8..13d4d96 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -46,6 +46,7 @@ static void __init sunxi_dt_init(void)
+ }
+ 
+ static const char * const sunxi_board_dt_compat[] = {
++	"allwinner,sun4i",
+ 	"allwinner,sun5i",
+ 	NULL,
+ };
+-- 
+1.8.0
