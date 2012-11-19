@@ -1,45 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 19 Nov 2012 10:58:48 +0000
-Subject: [RFC PATCH 3.7.0-rc4] ARM:smp: introduce smp_notify_cpu_stop to
- fix kexec smp case
-In-Reply-To: <50A5FBB7.9040001@st.com>
-References: <1353003478-22291-1-git-send-email-srinivas.kandagatla@st.com>
- <20121115211833.GD13998@mudshark.cambridge.arm.com>
- <50A5FBB7.9040001@st.com>
-Message-ID: <20121119105848.GF3205@mudshark.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 19 Nov 2012 12:00:32 +0100
+Subject: [PATCH 1/3] net: mvmdio: use <linux/delay.h> instead of <asm/delay.h>
+In-Reply-To: <1353322834-16952-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1353322834-16952-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353322834-16952-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2012 at 08:39:19AM +0000, Srinivas KANDAGATLA wrote:
-> On 15/11/12 21:18, Will Deacon wrote:
-> >
-> >  The bigger issue is co-ordinating with the
-> > secondaries so you know when they're safely out of the way and you can
-> > proceed with the kexec. Remember that you won't have working locks and you
-> > can't cross-call a function because it won't actually return.
->
-> Yes I agree and understand the limitation.
-> The callback should simple and just relocate the secondary core to a
-> safe place which in our case is a holding pen, which is safe and not in
-> the system ram.
-> After the callback, the secondary core will be spinning in the holding
-> pen which will be released once they get a matching cpu-id.
-> And this approach works perfectly ok on our chips and I guess should
-> work for other chips aswell.
+As suggested by checkpatch, using <linux/delay.h> instead of
+<asm/delay.h> is appropriate.
 
-But how do you know when the callback is complete? That's the part that is
-tricky as you need to avoid clobbering the kernel image before you know for
-sure that all the secondaries are out of the way. I think you either need
-some horrible homebrew locking primitives or something in hardware to signal
-back to the primary CPU.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvmdio.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-> > If you can solve the synchronisation problem then we can think about adding
-> > these hooks.
->
-> I think the call back code should not do anything complex other than few
-> lines of assembly or jump to a holding pen, this way it does not need
-> any synchronization calls or system infrastructure.
-
-See above.
-
-Will
+diff --git a/drivers/net/ethernet/marvell/mvmdio.c b/drivers/net/ethernet/marvell/mvmdio.c
+index 82fbd23..114a0f1 100644
+--- a/drivers/net/ethernet/marvell/mvmdio.c
++++ b/drivers/net/ethernet/marvell/mvmdio.c
+@@ -27,8 +27,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_mdio.h>
+ #include <linux/platform_device.h>
+-
+-#include <asm/delay.h>
++#include <linux/delay.h>
+ 
+ #define MVMDIO_SMI_DATA_SHIFT              0
+ #define MVMDIO_SMI_PHY_ADDR_SHIFT          16
+-- 
+1.7.9.5
