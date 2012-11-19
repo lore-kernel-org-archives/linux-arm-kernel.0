@@ -1,44 +1,123 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 15:26:59 +0100
-Subject: [GIT PULL] Marvell DT updates for clk support in mvneta driver
-Message-ID: <1353335221-26516-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 19 Nov 2012 15:27:01 +0100
+Subject: [PATCH 2/2] arm: mvebu: remove 'clock-frequency' properties from
+ Armada 370/XP Ethernet nodes
+In-Reply-To: <1353335221-26516-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1353335221-26516-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353335221-26516-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+The mvneta driver for the Marvell Armada 370/XP Ethernet devices has
+gained proper clock framework integration, and the corresponding
+Device Tree nodes now have a correct 'clocks' pointer.
 
-As said in my previous pull request (containing the clk support for
-mvneta as well as the section mismatch fix), there are DT updates
-needed related to the clk support. The two patches in this pull
-request correspond to those DT updates, that should go in your
-'mvebu/dt' branch I guess.
+The 'clock-frequency' properties in the various .dts files for Armada
+370/XP boards have therefore become useless.
 
-Thanks!
-
-The following changes since commit 4b968e8f98603a422f35b18682c169fb706c0115:
-
-  net: mvneta: fix section mismatch warning caused by mvneta_deinit() (2012-11-19 14:45:25 +0100)
-
-are available in the git repository at:
-
-  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-neta-dt-clk-updates-3.8
-
-for you to fetch changes up to 8a5bdfa8d8f381f384a088da2f06b8a35fca2742:
-
-  arm: mvebu: remove 'clock-frequency' properties from Armada 370/XP Ethernet nodes (2012-11-19 14:45:26 +0100)
-
-----------------------------------------------------------------
-Marvell Ethernet DT update for clk support
-
-----------------------------------------------------------------
-Thomas Petazzoni (2):
-      arm: mvebu: add 'clocks' property to Ethernet nodes for Armada 370/XP SoCs
-      arm: mvebu: remove 'clock-frequency' properties from Armada 370/XP Ethernet nodes
-
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
  arch/arm/boot/dts/armada-370-db.dts              |    2 --
  arch/arm/boot/dts/armada-370-mirabox.dts         |    2 --
- arch/arm/boot/dts/armada-370-xp.dtsi             |    2 ++
  arch/arm/boot/dts/armada-xp-db.dts               |    4 ----
  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    4 ----
- arch/arm/boot/dts/armada-xp.dtsi                 |    2 ++
- 6 files changed, 4 insertions(+), 12 deletions(-)
+ 4 files changed, 12 deletions(-)
+
+diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+index 1c04ecb..2b57f0c 100644
+--- a/arch/arm/boot/dts/armada-370-db.dts
++++ b/arch/arm/boot/dts/armada-370-db.dts
+@@ -46,13 +46,11 @@
+ 		};
+ 
+ 		ethernet at d0070000 {
+-			clock-frequency = <200000000>;
+ 			status = "okay";
+ 			phy = <&phy0>;
+ 			phy-mode = "rgmii-id";
+ 		};
+ 		ethernet at d0074000 {
+-			clock-frequency = <200000000>;
+ 			status = "okay";
+ 			phy = <&phy1>;
+ 			phy-mode = "rgmii-id";
+diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+index 8554dbe..3b40713 100644
+--- a/arch/arm/boot/dts/armada-370-mirabox.dts
++++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+@@ -43,13 +43,11 @@
+ 			};
+ 		};
+ 		ethernet at d0070000 {
+-			clock-frequency = <200000000>;
+ 			status = "okay";
+ 			phy = <&phy0>;
+ 			phy-mode = "rgmii-id";
+ 		};
+ 		ethernet at d0074000 {
+-			clock-frequency = <200000000>;
+ 			status = "okay";
+ 			phy = <&phy1>;
+ 			phy-mode = "rgmii-id";
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index 6663706..b335554 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -66,25 +66,21 @@
+ 		};
+ 
+ 		ethernet at d0070000 {
+-			clock-frequency = <250000000>;
+ 			status = "okay";
+ 			phy = <&phy0>;
+ 			phy-mode = "rgmii-id";
+ 		};
+ 		ethernet at d0074000 {
+-			clock-frequency = <250000000>;
+ 			status = "okay";
+ 			phy = <&phy1>;
+ 			phy-mode = "rgmii-id";
+ 		};
+ 		ethernet at d0030000 {
+-			clock-frequency = <250000000>;
+ 			status = "okay";
+ 			phy = <&phy2>;
+ 			phy-mode = "sgmii";
+ 		};
+ 		ethernet at d0034000 {
+-			clock-frequency = <250000000>;
+ 			status = "okay";
+ 			phy = <&phy3>;
+ 			phy-mode = "sgmii";
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index c46a14f..158dd0e 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -100,25 +100,21 @@
+ 		};
+ 
+ 		ethernet at d0070000 {
+-			clock-frequency = <250000000>;
+ 			status = "okay";
+ 			phy = <&phy0>;
+ 			phy-mode = "sgmii";
+ 		};
+ 		ethernet at d0074000 {
+-			clock-frequency = <250000000>;
+ 			status = "okay";
+ 			phy = <&phy1>;
+ 			phy-mode = "sgmii";
+ 		};
+ 		ethernet at d0030000 {
+-			clock-frequency = <250000000>;
+ 			status = "okay";
+ 			phy = <&phy2>;
+ 			phy-mode = "sgmii";
+ 		};
+ 		ethernet at d0034000 {
+-			clock-frequency = <250000000>;
+ 			status = "okay";
+ 			phy = <&phy3>;
+ 			phy-mode = "sgmii";
+-- 
+1.7.9.5
