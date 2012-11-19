@@ -1,31 +1,78 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 19 Nov 2012 15:45:24 +0100
-Subject: [PATCH 0/5] ARM: dts: exynos4210-trats: Device tree extension
-Message-ID: <1353336329-20818-1-git-send-email-t.figa@samsung.com>
+Date: Mon, 19 Nov 2012 15:45:25 +0100
+Subject: [PATCH 1/5] ARM: dts: exynos4210-trats: Update for pinctrl-samsung
+ driver
+In-Reply-To: <1353336329-20818-1-git-send-email-t.figa@samsung.com>
+References: <1353336329-20818-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1353336329-20818-2-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series extends device tree support for Trats board.
+This patch updates all parts of Trats dts related to pin configuration
+to use new GPIO and pinctrl bindings, instead of (now unsupported on
+Exynos4) legacy gpio-samsung bindings.
 
-It adds support for pinctrl, GPIO keys and touchscreen to Trats dts file.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/boot/dts/exynos4210-trats.dts | 24 ++++++++----------------
+ 1 file changed, 8 insertions(+), 16 deletions(-)
 
-Tested on Trats board.
-
-Depends on:
-[PATCH] i2c: i2c-s3c2410: Add support for pinctrl
-[PATCH v2 0/2] mmc: host: sdhci-s3c: Add support for pinctrl interface
-
-Tomasz Figa (5):
-  ARM: dts: exynos4210-trats: Update for pinctrl-samsung driver
-  ARM: dts: exynos4210-trats: Add nodes for GPIO keys available on
-    Trats
-  ARM: dts: exynos4210-trats: Add node for i2c3 bus
-  ARM: dts: exynos4210-trats: Add node for touchscreen voltage
-    regulator
-  ARM: dts: exynos4210-trats: Add node for touchscreen
-
- arch/arm/boot/dts/exynos4210-trats.dts | 86 +++++++++++++++++++++++++++-------
- 1 file changed, 70 insertions(+), 16 deletions(-)
-
+diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
+index a21511c..661854b 100644
+--- a/arch/arm/boot/dts/exynos4210-trats.dts
++++ b/arch/arm/boot/dts/exynos4210-trats.dts
+@@ -35,7 +35,7 @@
+ 		regulator-name = "VMEM_VDD_2.8V";
+ 		regulator-min-microvolt = <2800000>;
+ 		regulator-max-microvolt = <2800000>;
+-		gpio = <&gpk0 2 1 0 0>;
++		gpio = <&gpk0 2 0>;
+ 		enable-active-high;
+ 	};
+ 
+@@ -43,16 +43,8 @@
+ 		bus-width = <8>;
+ 		non-removable;
+ 		broken-voltage;
+-		gpios = <&gpk0 0 2 0 3>,
+-			<&gpk0 1 2 0 3>,
+-			<&gpk0 3 2 2 3>,
+-			<&gpk0 4 2 2 3>,
+-			<&gpk0 5 2 2 3>,
+-			<&gpk0 6 2 2 3>,
+-			<&gpk1 3 3 3 3>,
+-			<&gpk1 4 3 3 3>,
+-			<&gpk1 5 3 3 3>,
+-			<&gpk1 6 3 3 3>;
++		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus8>;
++		pinctrl-names = "default";
+ 		vmmc-supply = <&vemmc_reg>;
+ 		status = "okay";
+ 	};
+@@ -77,8 +69,8 @@
+ 		samsung,i2c-sda-delay = <100>;
+ 		samsung,i2c-slave-addr = <0x10>;
+ 		samsung,i2c-max-bus-freq = <100000>;
+-		gpios = <&gpb 6 3 3 0>,
+-			<&gpb 7 3 3 0>;
++		pinctrl-0 = <&i2c5_bus>;
++		pinctrl-names = "default";
+ 		status = "okay";
+ 
+ 		max8997_pmic at 66 {
+@@ -93,9 +85,9 @@
+ 			max8997,pmic-ignore-gpiodvs-side-effect;
+ 			max8997,pmic-buck125-default-dvs-idx = <0>;
+ 
+-			max8997,pmic-buck125-dvs-gpios = <&gpx0 5 1 0 0>,
+-						         <&gpx0 6 1 0 0>,
+-							 <&gpl0 0 1 0 0>;
++			max8997,pmic-buck125-dvs-gpios = <&gpx0 5 0>,
++						         <&gpx0 6 0>,
++							 <&gpl0 0 0>;
+ 
+ 			max8997,pmic-buck1-dvs-voltage = <1350000>, <1300000>,
+ 							 <1250000>, <1200000>,
 -- 
 1.8.0
