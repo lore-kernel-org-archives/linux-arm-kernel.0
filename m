@@ -1,135 +1,76 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 19 Nov 2012 11:04:42 +0100
-Subject: [PATCH 04/30] dma: mv_xor: allow channels to be registered directly
- from the main device
+Date: Mon, 19 Nov 2012 11:04:40 +0100
+Subject: [PATCH 02/30] dma: mv_xor: do not use pool_size from platform_data
+ within the driver
 In-Reply-To: <1353319508-30566-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353319508-30566-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353319508-30566-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353319508-30566-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the XOR engine driver (currently called "mv_xor_shared") so
-that XOR channels can be passed in the platform_data structure, and be
-registered from there.
-
-This will allow the users of the driver to be converted to the single
-platform_driver variant of the mv_xor driver.
+The driver currently pokes into the platform_data structure during its
+normal operation to get the pool_size value. Poking into the
+platform_data structure is not nice when moving to the Device Tree, so
+this commit adds a new pool_size field in the mv_xor_device structure,
+which gets initialized at ->probe() time. The driver then uses this
+field instead of the platform_data.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/dma/mv_xor.c                     |   45 ++++++++++++++++++++++++++++++
- drivers/dma/mv_xor.h                     |    8 ++++--
- include/linux/platform_data/dma-mv_xor.h |    3 ++
- 3 files changed, 53 insertions(+), 3 deletions(-)
+ drivers/dma/mv_xor.c |   10 ++++------
+ drivers/dma/mv_xor.h |    1 +
+ 2 files changed, 5 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index f7b9919..6ed3162 100644
+index 610d0b8..7042772 100644
 --- a/drivers/dma/mv_xor.c
 +++ b/drivers/dma/mv_xor.c
-@@ -1292,7 +1292,9 @@ static int mv_xor_shared_probe(struct platform_device *pdev)
- {
- 	const struct mbus_dram_target_info *dram;
- 	struct mv_xor_shared_private *msp;
-+	struct mv_xor_shared_platform_data *pdata = pdev->dev.platform_data;
- 	struct resource *res;
-+	int i, ret;
+@@ -604,9 +604,7 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
+ 	int idx;
+ 	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
+ 	struct mv_xor_desc_slot *slot = NULL;
+-	struct mv_xor_platform_data *plat_data =
+-		mv_chan->device->pdev->dev.platform_data;
+-	int num_descs_in_pool = plat_data->pool_size/MV_XOR_SLOT_SIZE;
++	int num_descs_in_pool = mv_chan->device->pool_size/MV_XOR_SLOT_SIZE;
  
- 	dev_notice(&pdev->dev, "Marvell shared XOR driver\n");
+ 	/* Allocate descriptor slots */
+ 	idx = mv_chan->slots_allocated;
+@@ -1084,11 +1082,10 @@ static int __devexit mv_xor_remove(struct platform_device *dev)
+ 	struct mv_xor_device *device = platform_get_drvdata(dev);
+ 	struct dma_chan *chan, *_chan;
+ 	struct mv_xor_chan *mv_chan;
+-	struct mv_xor_platform_data *plat_data = dev->dev.platform_data;
  
-@@ -1334,12 +1336,55 @@ static int mv_xor_shared_probe(struct platform_device *pdev)
- 	if (!IS_ERR(msp->clk))
- 		clk_prepare_enable(msp->clk);
+ 	dma_async_device_unregister(&device->common);
  
-+	if (pdata && pdata->channels) {
-+		for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
-+			struct mv_xor_platform_data *cd;
-+			int irq;
-+
-+			cd = &pdata->channels[i];
-+			if (!cd) {
-+				ret = -ENODEV;
-+				goto err_channel_add;
-+			}
-+
-+			irq = platform_get_irq(pdev, i);
-+			if (irq < 0) {
-+				ret = irq;
-+				goto err_channel_add;
-+			}
-+
-+			msp->channels[i] =
-+				mv_xor_channel_add(msp, pdev, cd->hw_id,
-+						   cd->cap_mask,
-+						   cd->pool_size, irq);
-+			if (IS_ERR(msp->channels[i])) {
-+				ret = PTR_ERR(msp->channels[i]);
-+				goto err_channel_add;
-+			}
-+		}
-+	}
-+
- 	return 0;
-+
-+err_channel_add:
-+	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++)
-+		if (msp->channels[i])
-+			mv_xor_channel_remove(msp->channels[i]);
-+
-+	clk_disable_unprepare(msp->clk);
-+	clk_put(msp->clk);
-+	return ret;
- }
+-	dma_free_coherent(&dev->dev, plat_data->pool_size,
++	dma_free_coherent(&dev->dev, device->pool_size,
+ 			device->dma_desc_pool_virt, device->dma_desc_pool);
  
- static int mv_xor_shared_remove(struct platform_device *pdev)
- {
- 	struct mv_xor_shared_private *msp = platform_get_drvdata(pdev);
-+	int i;
-+
-+	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
-+		if (msp->channels[i])
-+			mv_xor_channel_remove(msp->channels[i]);
-+	}
- 
- 	if (!IS_ERR(msp->clk)) {
- 		clk_disable_unprepare(msp->clk);
+ 	list_for_each_entry_safe(chan, _chan, &device->common.channels,
+@@ -1120,8 +1117,9 @@ static int __devinit mv_xor_probe(struct platform_device *pdev)
+ 	 * note: writecombine gives slightly better performance, but
+ 	 * requires that we explicitly flush the writes
+ 	 */
++	adev->pool_size = plat_data->pool_size;
+ 	adev->dma_desc_pool_virt = dma_alloc_writecombine(&pdev->dev,
+-							  plat_data->pool_size,
++							  adev->pool_size,
+ 							  &adev->dma_desc_pool,
+ 							  GFP_KERNEL);
+ 	if (!adev->dma_desc_pool_virt)
 diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
-index a0641ae..686575f 100644
+index a5b422f..a0641ae 100644
 --- a/drivers/dma/mv_xor.h
 +++ b/drivers/dma/mv_xor.h
-@@ -26,6 +26,7 @@
- #define USE_TIMER
- #define MV_XOR_SLOT_SIZE		64
- #define MV_XOR_THRESHOLD		1
-+#define MV_XOR_MAX_CHANNELS             2
- 
- #define XOR_OPERATION_MODE_XOR		0
- #define XOR_OPERATION_MODE_MEMCPY	2
-@@ -53,9 +54,10 @@
- #define WINDOW_BAR_ENABLE(chan)	(0x240 + ((chan) << 2))
- 
- struct mv_xor_shared_private {
--	void __iomem	*xor_base;
--	void __iomem	*xor_high_base;
--	struct clk	*clk;
-+	void __iomem	     *xor_base;
-+	void __iomem	     *xor_high_base;
-+	struct clk	     *clk;
-+	struct mv_xor_device *channels[MV_XOR_MAX_CHANNELS];
+@@ -72,6 +72,7 @@ struct mv_xor_device {
+ 	int				id;
+ 	dma_addr_t			dma_desc_pool;
+ 	void				*dma_desc_pool_virt;
++	size_t                          pool_size;
+ 	struct dma_device		common;
+ 	struct mv_xor_shared_private	*shared;
  };
- 
- 
-diff --git a/include/linux/platform_data/dma-mv_xor.h b/include/linux/platform_data/dma-mv_xor.h
-index 2ba1f7d..f2aed97 100644
---- a/include/linux/platform_data/dma-mv_xor.h
-+++ b/include/linux/platform_data/dma-mv_xor.h
-@@ -20,5 +20,8 @@ struct mv_xor_platform_data {
- 	size_t				pool_size;
- };
- 
-+struct mv_xor_shared_platform_data {
-+	struct mv_xor_platform_data    *channels;
-+};
- 
- #endif
 -- 
 1.7.9.5
