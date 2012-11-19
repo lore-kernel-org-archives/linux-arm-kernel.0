@@ -1,653 +1,648 @@
 From: wfp5p@virginia.edu (Bill Pemberton)
-Date: Mon, 19 Nov 2012 13:26:16 -0500
-Subject: [PATCH 427/493] spi: remove use of __devexit
+Date: Mon, 19 Nov 2012 13:23:06 -0500
+Subject: =?UTF-8?q?=5BPATCH=20237/493=5D=20mmc=3A=20remove=20use=20of=20=5F=5Fdevinit?=
 In-Reply-To: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
 References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
-Message-ID: <1353349642-3677-427-git-send-email-wfp5p@virginia.edu>
+Message-ID: <1353349642-3677-237-git-send-email-wfp5p@virginia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_HOTPLUG is going away as an option so __devexit is no
-longer needed.
+CONFIG_HOTPLUG is going away as an option so __devinit is no longer
+needed.
 
 Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-Cc: Grant Likely <grant.likely@secretlab.ca> 
-Cc: Wan ZongShun <mcuos.com@gmail.com> 
-Cc: Eric Miao <eric.y.miao@gmail.com> 
-Cc: Russell King <linux@arm.linux.org.uk> 
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com> 
-Cc: Ben Dooks <ben-linux@fluff.org> 
-Cc: Kukjin Kim <kgene.kim@samsung.com> 
-Cc: Barry Song <baohua.song@csr.com> 
-Cc: spi-devel-general at lists.sourceforge.net 
+Cc: Ludovic Desroches <ludovic.desroches@atmel.com> 
+Cc: Chris Ball <cjb@laptop.org> 
+Cc: Manuel Lauss <manuel.lauss@gmail.com> 
+Cc: "Micha? Miros?aw" <mirq-linux@rere.qmqm.pl> 
+Cc: Jarkko Lavinen <jarkko.lavinen@nokia.com> 
+Cc: Venkatraman S <svenkatr@ti.com> 
+Cc: Viresh Kumar <viresh.linux@gmail.com> 
+Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de> 
+Cc: Ian Molton <ian@mnementh.co.uk> 
+Cc: Bruce Chang <brucechang@via.com.tw> 
+Cc: Harald Welte <HaraldWelte@viatech.com> 
+Cc: Pierre Ossman <pierre@ossman.eu> 
+Cc: linux-mmc at vger.kernel.org 
+Cc: uclinux-dist-devel at blackfin.uclinux.org 
+Cc: linux-omap at vger.kernel.org 
 Cc: linux-arm-kernel at lists.infradead.org 
-Cc: linux-samsung-soc at vger.kernel.org 
+Cc: spear-devel at list.st.com 
 ---
- drivers/spi/spi-altera.c         | 2 +-
- drivers/spi/spi-ath79.c          | 2 +-
- drivers/spi/spi-atmel.c          | 2 +-
- drivers/spi/spi-bcm63xx.c        | 2 +-
- drivers/spi/spi-bfin-sport.c     | 2 +-
- drivers/spi/spi-bfin5xx.c        | 2 +-
- drivers/spi/spi-coldfire-qspi.c  | 2 +-
- drivers/spi/spi-davinci.c        | 2 +-
- drivers/spi/spi-dw-mmio.c        | 2 +-
- drivers/spi/spi-dw-pci.c         | 2 +-
- drivers/spi/spi-dw.c             | 2 +-
- drivers/spi/spi-ep93xx.c         | 2 +-
- drivers/spi/spi-falcon.c         | 2 +-
- drivers/spi/spi-fsl-espi.c       | 2 +-
- drivers/spi/spi-fsl-lib.c        | 2 +-
- drivers/spi/spi-fsl-spi.c        | 4 ++--
- drivers/spi/spi-gpio.c           | 2 +-
- drivers/spi/spi-imx.c            | 2 +-
- drivers/spi/spi-mpc512x-psc.c    | 4 ++--
- drivers/spi/spi-mpc52xx-psc.c    | 2 +-
- drivers/spi/spi-mpc52xx.c        | 2 +-
- drivers/spi/spi-mxs.c            | 2 +-
- drivers/spi/spi-nuc900.c         | 2 +-
- drivers/spi/spi-oc-tiny.c        | 2 +-
- drivers/spi/spi-octeon.c         | 2 +-
- drivers/spi/spi-omap2-mcspi.c    | 2 +-
- drivers/spi/spi-pl022.c          | 2 +-
- drivers/spi/spi-pxa2xx-pci.c     | 2 +-
- drivers/spi/spi-rspi.c           | 4 ++--
- drivers/spi/spi-s3c24xx.c        | 2 +-
- drivers/spi/spi-sh-hspi.c        | 2 +-
- drivers/spi/spi-sh.c             | 2 +-
- drivers/spi/spi-sirf.c           | 2 +-
- drivers/spi/spi-stmp.c           | 2 +-
- drivers/spi/spi-tegra20-sflash.c | 2 +-
- drivers/spi/spi-tegra20-slink.c  | 2 +-
- drivers/spi/spi-ti-ssp.c         | 2 +-
- drivers/spi/spi-tle62x0.c        | 2 +-
- drivers/spi/spi-topcliff-pch.c   | 4 ++--
- drivers/spi/spi-xcomm.c          | 2 +-
- drivers/spi/spi-xilinx.c         | 2 +-
- drivers/spi/spidev.c             | 2 +-
- 42 files changed, 46 insertions(+), 46 deletions(-)
+ drivers/mmc/host/atmel-mci.c       |  2 +-
+ drivers/mmc/host/au1xmmc.c         |  2 +-
+ drivers/mmc/host/bfin_sdh.c        |  2 +-
+ drivers/mmc/host/cb710-mmc.c       |  2 +-
+ drivers/mmc/host/dw_mmc-pci.c      |  2 +-
+ drivers/mmc/host/dw_mmc-pltfm.c    |  2 +-
+ drivers/mmc/host/jz4740_mmc.c      |  8 ++++----
+ drivers/mmc/host/mmci.c            |  6 +++---
+ drivers/mmc/host/omap.c            |  4 ++--
+ drivers/mmc/host/omap_hsmmc.c      |  2 +-
+ drivers/mmc/host/pxamci.c          |  4 ++--
+ drivers/mmc/host/s3cmci.c          |  2 +-
+ drivers/mmc/host/sdhci-cns3xxx.c   |  2 +-
+ drivers/mmc/host/sdhci-dove.c      |  2 +-
+ drivers/mmc/host/sdhci-esdhc-imx.c |  4 ++--
+ drivers/mmc/host/sdhci-of-esdhc.c  |  2 +-
+ drivers/mmc/host/sdhci-of-hlwd.c   |  2 +-
+ drivers/mmc/host/sdhci-pci.c       |  6 +++---
+ drivers/mmc/host/sdhci-pxav2.c     |  2 +-
+ drivers/mmc/host/sdhci-pxav3.c     |  2 +-
+ drivers/mmc/host/sdhci-s3c.c       |  6 +++---
+ drivers/mmc/host/sdhci-spear.c     |  8 +++-----
+ drivers/mmc/host/sdhci-tegra.c     |  4 ++--
+ drivers/mmc/host/sh_mmcif.c        |  2 +-
+ drivers/mmc/host/sh_mobile_sdhi.c  |  2 +-
+ drivers/mmc/host/tmio_mmc.c        |  2 +-
+ drivers/mmc/host/tmio_mmc_pio.c    |  2 +-
+ drivers/mmc/host/via-sdmmc.c       |  2 +-
+ drivers/mmc/host/wbsd.c            | 18 +++++++++---------
+ 29 files changed, 52 insertions(+), 54 deletions(-)
 
-diff --git a/drivers/spi/spi-altera.c b/drivers/spi/spi-altera.c
-index a369d44..5e7314a 100644
---- a/drivers/spi/spi-altera.c
-+++ b/drivers/spi/spi-altera.c
-@@ -290,7 +290,7 @@ exit:
- 	return err;
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 8689989..722af1d 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -511,7 +511,7 @@ static const struct of_device_id atmci_dt_ids[] = {
+ 
+ MODULE_DEVICE_TABLE(of, atmci_dt_ids);
+ 
+-static struct mci_platform_data __devinit*
++static struct mci_platform_data*
+ atmci_of_init(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+diff --git a/drivers/mmc/host/au1xmmc.c b/drivers/mmc/host/au1xmmc.c
+index dbd0c8a..606c16a 100644
+--- a/drivers/mmc/host/au1xmmc.c
++++ b/drivers/mmc/host/au1xmmc.c
+@@ -943,7 +943,7 @@ static const struct mmc_host_ops au1xmmc_ops = {
+ 	.enable_sdio_irq = au1xmmc_enable_sdio_irq,
+ };
+ 
+-static int __devinit au1xmmc_probe(struct platform_device *pdev)
++static int au1xmmc_probe(struct platform_device *pdev)
+ {
+ 	struct mmc_host *mmc;
+ 	struct au1xmmc_host *host;
+diff --git a/drivers/mmc/host/bfin_sdh.c b/drivers/mmc/host/bfin_sdh.c
+index 156ebe7..4ef3901 100644
+--- a/drivers/mmc/host/bfin_sdh.c
++++ b/drivers/mmc/host/bfin_sdh.c
+@@ -522,7 +522,7 @@ static void sdh_reset(void)
+ 	SSYNC();
  }
  
--static int __devexit altera_spi_remove(struct platform_device *dev)
-+static int altera_spi_remove(struct platform_device *dev)
+-static int __devinit sdh_probe(struct platform_device *pdev)
++static int sdh_probe(struct platform_device *pdev)
  {
- 	struct altera_spi *hw = platform_get_drvdata(dev);
- 	struct spi_master *master = hw->bitbang.master;
-diff --git a/drivers/spi/spi-ath79.c b/drivers/spi/spi-ath79.c
-index 13e6866..9a5d779 100644
---- a/drivers/spi/spi-ath79.c
-+++ b/drivers/spi/spi-ath79.c
-@@ -251,7 +251,7 @@ err_put_master:
+ 	struct mmc_host *mmc;
+ 	struct sdh_host *host;
+diff --git a/drivers/mmc/host/cb710-mmc.c b/drivers/mmc/host/cb710-mmc.c
+index 39280b5..c12a561 100644
+--- a/drivers/mmc/host/cb710-mmc.c
++++ b/drivers/mmc/host/cb710-mmc.c
+@@ -690,7 +690,7 @@ static int cb710_mmc_resume(struct platform_device *pdev)
+ 
+ #endif /* CONFIG_PM */
+ 
+-static int __devinit cb710_mmc_init(struct platform_device *pdev)
++static int cb710_mmc_init(struct platform_device *pdev)
+ {
+ 	struct cb710_slot *slot = cb710_pdev_to_slot(pdev);
+ 	struct cb710_chip *chip = cb710_slot_to_chip(slot);
+diff --git a/drivers/mmc/host/dw_mmc-pci.c b/drivers/mmc/host/dw_mmc-pci.c
+index edb37e9..324c8bf 100644
+--- a/drivers/mmc/host/dw_mmc-pci.c
++++ b/drivers/mmc/host/dw_mmc-pci.c
+@@ -37,7 +37,7 @@ static struct dw_mci_board pci_board_data = {
+ 	.fifo_depth			= 32,
+ };
+ 
+-static int __devinit dw_mci_pci_probe(struct pci_dev *pdev,
++static int dw_mci_pci_probe(struct pci_dev *pdev,
+ 				  const struct pci_device_id *entries)
+ {
+ 	struct dw_mci *host;
+diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
+index 4c1b1df..ff73a87 100644
+--- a/drivers/mmc/host/dw_mmc-pltfm.c
++++ b/drivers/mmc/host/dw_mmc-pltfm.c
+@@ -62,7 +62,7 @@ int dw_mci_pltfm_register(struct platform_device *pdev,
+ }
+ EXPORT_SYMBOL_GPL(dw_mci_pltfm_register);
+ 
+-static int __devinit dw_mci_pltfm_probe(struct platform_device *pdev)
++static int dw_mci_pltfm_probe(struct platform_device *pdev)
+ {
+ 	return dw_mci_pltfm_register(pdev, NULL);
+ }
+diff --git a/drivers/mmc/host/jz4740_mmc.c b/drivers/mmc/host/jz4740_mmc.c
+index 31cf20f..81826be 100644
+--- a/drivers/mmc/host/jz4740_mmc.c
++++ b/drivers/mmc/host/jz4740_mmc.c
+@@ -702,7 +702,7 @@ static const struct jz_gpio_bulk_request jz4740_mmc_pins[] = {
+ 	JZ_GPIO_BULK_PIN(MSC_DATA3),
+ };
+ 
+-static int __devinit jz4740_mmc_request_gpio(struct device *dev, int gpio,
++static int jz4740_mmc_request_gpio(struct device *dev, int gpio,
+ 	const char *name, bool output, int value)
+ {
+ 	int ret;
+@@ -724,7 +724,7 @@ static int __devinit jz4740_mmc_request_gpio(struct device *dev, int gpio,
+ 	return 0;
+ }
+ 
+-static int __devinit jz4740_mmc_request_gpios(struct platform_device *pdev)
++static int jz4740_mmc_request_gpios(struct platform_device *pdev)
+ {
+ 	int ret;
+ 	struct jz4740_mmc_platform_data *pdata = pdev->dev.platform_data;
+@@ -759,7 +759,7 @@ err:
  	return ret;
  }
  
--static __devexit int ath79_spi_remove(struct platform_device *pdev)
-+static int ath79_spi_remove(struct platform_device *pdev)
+-static int __devinit jz4740_mmc_request_cd_irq(struct platform_device *pdev,
++static int jz4740_mmc_request_cd_irq(struct platform_device *pdev,
+ 	struct jz4740_mmc_host *host)
  {
- 	struct ath79_spi *sp = platform_get_drvdata(pdev);
- 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 6b19cca..75c0c4f 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -1003,7 +1003,7 @@ out_free:
- 	return ret;
+ 	struct jz4740_mmc_platform_data *pdata = pdev->dev.platform_data;
+@@ -802,7 +802,7 @@ static inline size_t jz4740_mmc_num_pins(struct jz4740_mmc_host *host)
+ 	return num_pins;
  }
  
--static int __devexit atmel_spi_remove(struct platform_device *pdev)
-+static int atmel_spi_remove(struct platform_device *pdev)
+-static int __devinit jz4740_mmc_probe(struct platform_device* pdev)
++static int jz4740_mmc_probe(struct platform_device* pdev)
  {
- 	struct spi_master	*master = platform_get_drvdata(pdev);
- 	struct atmel_spi	*as = spi_master_get_devdata(master);
-diff --git a/drivers/spi/spi-bcm63xx.c b/drivers/spi/spi-bcm63xx.c
-index 73385be..f44ab55 100644
---- a/drivers/spi/spi-bcm63xx.c
-+++ b/drivers/spi/spi-bcm63xx.c
-@@ -449,7 +449,7 @@ out:
- 	return ret;
- }
- 
--static int __devexit bcm63xx_spi_remove(struct platform_device *pdev)
-+static int bcm63xx_spi_remove(struct platform_device *pdev)
- {
- 	struct spi_master *master = spi_master_get(platform_get_drvdata(pdev));
- 	struct bcm63xx_spi *bs = spi_master_get_devdata(master);
-diff --git a/drivers/spi/spi-bfin-sport.c b/drivers/spi/spi-bfin-sport.c
-index 9b62c28..2a118de 100644
---- a/drivers/spi/spi-bfin-sport.c
-+++ b/drivers/spi/spi-bfin-sport.c
-@@ -863,7 +863,7 @@ bfin_sport_spi_probe(struct platform_device *pdev)
- }
- 
- /* stop hardware and remove the driver */
--static int __devexit
-+static int
- bfin_sport_spi_remove(struct platform_device *pdev)
- {
- 	struct bfin_sport_spi_master_data *drv_data = platform_get_drvdata(pdev);
-diff --git a/drivers/spi/spi-bfin5xx.c b/drivers/spi/spi-bfin5xx.c
-index 5c35826..0429d83 100644
---- a/drivers/spi/spi-bfin5xx.c
-+++ b/drivers/spi/spi-bfin5xx.c
-@@ -1387,7 +1387,7 @@ out_error_get_res:
- }
- 
- /* stop hardware and remove the driver */
--static int __devexit bfin_spi_remove(struct platform_device *pdev)
-+static int bfin_spi_remove(struct platform_device *pdev)
- {
- 	struct bfin_spi_master_data *drv_data = platform_get_drvdata(pdev);
- 	int status = 0;
-diff --git a/drivers/spi/spi-coldfire-qspi.c b/drivers/spi/spi-coldfire-qspi.c
-index f586b3b..58466b8 100644
---- a/drivers/spi/spi-coldfire-qspi.c
-+++ b/drivers/spi/spi-coldfire-qspi.c
-@@ -515,7 +515,7 @@ fail0:
- 	return status;
- }
- 
--static int __devexit mcfqspi_remove(struct platform_device *pdev)
-+static int mcfqspi_remove(struct platform_device *pdev)
- {
- 	struct spi_master *master = platform_get_drvdata(pdev);
- 	struct mcfqspi *mcfqspi = spi_master_get_devdata(master);
-diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-index c10be9f..13661e1 100644
---- a/drivers/spi/spi-davinci.c
-+++ b/drivers/spi/spi-davinci.c
-@@ -952,7 +952,7 @@ err:
-  * It will also call spi_bitbang_stop to destroy the work queue which was
-  * created by spi_bitbang_start.
+ 	int ret;
+ 	struct mmc_host *mmc;
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 705c3be..bf5f7a5 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -262,7 +262,7 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
+  * no custom DMA interfaces are supported.
   */
--static int __devexit davinci_spi_remove(struct platform_device *pdev)
-+static int davinci_spi_remove(struct platform_device *pdev)
+ #ifdef CONFIG_DMA_ENGINE
+-static void __devinit mmci_dma_setup(struct mmci_host *host)
++static void mmci_dma_setup(struct mmci_host *host)
  {
- 	struct davinci_spi *dspi;
- 	struct spi_master *master;
-diff --git a/drivers/spi/spi-dw-mmio.c b/drivers/spi/spi-dw-mmio.c
-index 9470c59..4a6d5c9 100644
---- a/drivers/spi/spi-dw-mmio.c
-+++ b/drivers/spi/spi-dw-mmio.c
-@@ -106,7 +106,7 @@ err_end:
- 	return ret;
+ 	struct mmci_platform_data *plat = host->plat;
+ 	const char *rxname, *txname;
+@@ -338,7 +338,7 @@ static void __devinit mmci_dma_setup(struct mmci_host *host)
  }
  
--static int __devexit dw_spi_mmio_remove(struct platform_device *pdev)
-+static int dw_spi_mmio_remove(struct platform_device *pdev)
+ /*
+- * This is used in __devinit or __devexit so inline it
++ * This is used in or __devexit so inline it
+  * so it can be discarded.
+  */
+ static inline void mmci_dma_release(struct mmci_host *host)
+@@ -1262,7 +1262,7 @@ static void mmci_dt_populate_generic_pdata(struct device_node *np,
+ }
+ #endif
+ 
+-static int __devinit mmci_probe(struct amba_device *dev,
++static int mmci_probe(struct amba_device *dev,
+ 	const struct amba_id *id)
  {
- 	struct dw_spi_mmio *dwsmmio = platform_get_drvdata(pdev);
- 	struct resource *mem;
-diff --git a/drivers/spi/spi-dw-pci.c b/drivers/spi/spi-dw-pci.c
-index d61d430..6055c8d 100644
---- a/drivers/spi/spi-dw-pci.c
-+++ b/drivers/spi/spi-dw-pci.c
-@@ -105,7 +105,7 @@ err_disable:
- 	return ret;
- }
+ 	struct mmci_platform_data *plat = dev->dev.platform_data;
+diff --git a/drivers/mmc/host/omap.c b/drivers/mmc/host/omap.c
+index f65ec26..5cd976a 100644
+--- a/drivers/mmc/host/omap.c
++++ b/drivers/mmc/host/omap.c
+@@ -1230,7 +1230,7 @@ static const struct mmc_host_ops mmc_omap_ops = {
+ 	.set_ios	= mmc_omap_set_ios,
+ };
  
--static void __devexit spi_pci_remove(struct pci_dev *pdev)
-+static void spi_pci_remove(struct pci_dev *pdev)
+-static int __devinit mmc_omap_new_slot(struct mmc_omap_host *host, int id)
++static int mmc_omap_new_slot(struct mmc_omap_host *host, int id)
  {
- 	struct dw_spi_pci *dwpci = pci_get_drvdata(pdev);
- 
-diff --git a/drivers/spi/spi-dw.c b/drivers/spi/spi-dw.c
-index 172b8b5..c1abc06 100644
---- a/drivers/spi/spi-dw.c
-+++ b/drivers/spi/spi-dw.c
-@@ -877,7 +877,7 @@ exit:
+ 	struct mmc_omap_slot *slot = NULL;
+ 	struct mmc_host *mmc;
+@@ -1325,7 +1325,7 @@ static void mmc_omap_remove_slot(struct mmc_omap_slot *slot)
+ 	mmc_free_host(mmc);
  }
- EXPORT_SYMBOL_GPL(dw_spi_add_host);
  
--void __devexit dw_spi_remove_host(struct dw_spi *dws)
-+void dw_spi_remove_host(struct dw_spi *dws)
+-static int __devinit mmc_omap_probe(struct platform_device *pdev)
++static int mmc_omap_probe(struct platform_device *pdev)
  {
- 	int status = 0;
- 
-diff --git a/drivers/spi/spi-ep93xx.c b/drivers/spi/spi-ep93xx.c
-index bb0eaf6..acb1e19 100644
---- a/drivers/spi/spi-ep93xx.c
-+++ b/drivers/spi/spi-ep93xx.c
-@@ -1138,7 +1138,7 @@ fail_release_master:
- 	return error;
+ 	struct omap_mmc_platform_data *pdata = pdev->dev.platform_data;
+ 	struct mmc_omap_host *host = NULL;
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 8f5c7e2..492d8cf 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -1717,7 +1717,7 @@ static inline struct omap_mmc_platform_data
  }
+ #endif
  
--static int __devexit ep93xx_spi_remove(struct platform_device *pdev)
-+static int ep93xx_spi_remove(struct platform_device *pdev)
+-static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
++static int omap_hsmmc_probe(struct platform_device *pdev)
  {
- 	struct spi_master *master = platform_get_drvdata(pdev);
- 	struct ep93xx_spi *espi = spi_master_get_devdata(master);
-diff --git a/drivers/spi/spi-falcon.c b/drivers/spi/spi-falcon.c
-index 891e91c..6a6f62e 100644
---- a/drivers/spi/spi-falcon.c
-+++ b/drivers/spi/spi-falcon.c
-@@ -438,7 +438,7 @@ static int falcon_sflash_probe(struct platform_device *pdev)
- 	return ret;
- }
+ 	struct omap_mmc_platform_data *pdata = pdev->dev.platform_data;
+ 	struct mmc_host *mmc;
+diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
+index 3f9d6d5..2b2f65a 100644
+--- a/drivers/mmc/host/pxamci.c
++++ b/drivers/mmc/host/pxamci.c
+@@ -584,7 +584,7 @@ static const struct of_device_id pxa_mmc_dt_ids[] = {
  
--static int __devexit falcon_sflash_remove(struct platform_device *pdev)
-+static int falcon_sflash_remove(struct platform_device *pdev)
+ MODULE_DEVICE_TABLE(of, pxa_mmc_dt_ids);
+ 
+-static int __devinit pxamci_of_init(struct platform_device *pdev)
++static int pxamci_of_init(struct platform_device *pdev)
  {
- 	struct falcon_sflash *priv = platform_get_drvdata(pdev);
- 
-diff --git a/drivers/spi/spi-fsl-espi.c b/drivers/spi/spi-fsl-espi.c
-index 498fff2..56e1002 100644
---- a/drivers/spi/spi-fsl-espi.c
-+++ b/drivers/spi/spi-fsl-espi.c
-@@ -725,7 +725,7 @@ err:
- 	return ret;
+         struct device_node *np = pdev->dev.of_node;
+         struct pxamci_platform_data *pdata;
+@@ -614,7 +614,7 @@ static int __devinit pxamci_of_init(struct platform_device *pdev)
+         return 0;
  }
- 
--static int __devexit of_fsl_espi_remove(struct platform_device *dev)
-+static int of_fsl_espi_remove(struct platform_device *dev)
+ #else
+-static int __devinit pxamci_of_init(struct platform_device *pdev)
++static int pxamci_of_init(struct platform_device *pdev)
  {
- 	return mpc8xxx_spi_remove(&dev->dev);
+         return 0;
  }
-diff --git a/drivers/spi/spi-fsl-lib.c b/drivers/spi/spi-fsl-lib.c
-index abf2a20..8ade675 100644
---- a/drivers/spi/spi-fsl-lib.c
-+++ b/drivers/spi/spi-fsl-lib.c
-@@ -169,7 +169,7 @@ err:
- 	return ret;
- }
+diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+index a5fe5b2..b846a97 100644
+--- a/drivers/mmc/host/s3cmci.c
++++ b/drivers/mmc/host/s3cmci.c
+@@ -1540,7 +1540,7 @@ static inline void s3cmci_debugfs_remove(struct s3cmci_host *host) { }
  
--int __devexit mpc8xxx_spi_remove(struct device *dev)
-+int mpc8xxx_spi_remove(struct device *dev)
+ #endif /* CONFIG_DEBUG_FS */
+ 
+-static int __devinit s3cmci_probe(struct platform_device *pdev)
++static int s3cmci_probe(struct platform_device *pdev)
  {
- 	struct mpc8xxx_spi *mpc8xxx_spi;
- 	struct spi_master *master;
-diff --git a/drivers/spi/spi-fsl-spi.c b/drivers/spi/spi-fsl-spi.c
-index a1e11f0..00aa65c 100644
---- a/drivers/spi/spi-fsl-spi.c
-+++ b/drivers/spi/spi-fsl-spi.c
-@@ -1081,7 +1081,7 @@ err:
- 	return ret;
+ 	struct s3cmci_host *host;
+ 	struct mmc_host	*mmc;
+diff --git a/drivers/mmc/host/sdhci-cns3xxx.c b/drivers/mmc/host/sdhci-cns3xxx.c
+index 9236fa9..ce959dcf 100644
+--- a/drivers/mmc/host/sdhci-cns3xxx.c
++++ b/drivers/mmc/host/sdhci-cns3xxx.c
+@@ -95,7 +95,7 @@ static struct sdhci_pltfm_data sdhci_cns3xxx_pdata = {
+ 		  SDHCI_QUIRK_NONSTANDARD_CLOCK,
+ };
+ 
+-static int __devinit sdhci_cns3xxx_probe(struct platform_device *pdev)
++static int sdhci_cns3xxx_probe(struct platform_device *pdev)
+ {
+ 	return sdhci_pltfm_register(pdev, &sdhci_cns3xxx_pdata);
+ }
+diff --git a/drivers/mmc/host/sdhci-dove.c b/drivers/mmc/host/sdhci-dove.c
+index 7ad1bb6..334ec5c 100644
+--- a/drivers/mmc/host/sdhci-dove.c
++++ b/drivers/mmc/host/sdhci-dove.c
+@@ -78,7 +78,7 @@ static struct sdhci_pltfm_data sdhci_dove_pdata = {
+ 		  SDHCI_QUIRK_NO_HISPD_BIT,
+ };
+ 
+-static int __devinit sdhci_dove_probe(struct platform_device *pdev)
++static int sdhci_dove_probe(struct platform_device *pdev)
+ {
+ 	struct sdhci_host *host;
+ 	struct sdhci_pltfm_host *pltfm_host;
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 6a4e98e..cd741bb 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -403,7 +403,7 @@ static irqreturn_t cd_irq(int irq, void *data)
+ };
+ 
+ #ifdef CONFIG_OF
+-static int __devinit
++static int
+ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+ 			 struct esdhc_platform_data *boarddata)
+ {
+@@ -440,7 +440,7 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+ }
+ #endif
+ 
+-static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
++static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *of_id =
+ 			of_match_device(imx_esdhc_dt_ids, &pdev->dev);
+diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
+index d7eb4ed..1aceed7 100644
+--- a/drivers/mmc/host/sdhci-of-esdhc.c
++++ b/drivers/mmc/host/sdhci-of-esdhc.c
+@@ -208,7 +208,7 @@ static struct sdhci_pltfm_data sdhci_esdhc_pdata = {
+ 	.ops = &sdhci_esdhc_ops,
+ };
+ 
+-static int __devinit sdhci_esdhc_probe(struct platform_device *pdev)
++static int sdhci_esdhc_probe(struct platform_device *pdev)
+ {
+ 	return sdhci_pltfm_register(pdev, &sdhci_esdhc_pdata);
+ }
+diff --git a/drivers/mmc/host/sdhci-of-hlwd.c b/drivers/mmc/host/sdhci-of-hlwd.c
+index 3b68069..aa78f3c 100644
+--- a/drivers/mmc/host/sdhci-of-hlwd.c
++++ b/drivers/mmc/host/sdhci-of-hlwd.c
+@@ -66,7 +66,7 @@ static struct sdhci_pltfm_data sdhci_hlwd_pdata = {
+ 	.ops = &sdhci_hlwd_ops,
+ };
+ 
+-static int __devinit sdhci_hlwd_probe(struct platform_device *pdev)
++static int sdhci_hlwd_probe(struct platform_device *pdev)
+ {
+ 	return sdhci_pltfm_register(pdev, &sdhci_hlwd_pdata);
+ }
+diff --git a/drivers/mmc/host/sdhci-pci.c b/drivers/mmc/host/sdhci-pci.c
+index 7bc2270..ff91651 100644
+--- a/drivers/mmc/host/sdhci-pci.c
++++ b/drivers/mmc/host/sdhci-pci.c
+@@ -1183,7 +1183,7 @@ static const struct dev_pm_ops sdhci_pci_pm_ops = {
+  *                                                                           *
+ \*****************************************************************************/
+ 
+-static struct sdhci_pci_slot * __devinit sdhci_pci_probe_slot(
++static struct sdhci_pci_slot *sdhci_pci_probe_slot(
+ 	struct pci_dev *pdev, struct sdhci_pci_chip *chip, int first_bar,
+ 	int slotno)
+ {
+@@ -1338,7 +1338,7 @@ static void sdhci_pci_remove_slot(struct sdhci_pci_slot *slot)
+ 	sdhci_free_host(slot->host);
  }
  
--static int __devexit of_fsl_spi_remove(struct platform_device *ofdev)
-+static int of_fsl_spi_remove(struct platform_device *ofdev)
+-static void __devinit sdhci_pci_runtime_pm_allow(struct device *dev)
++static void sdhci_pci_runtime_pm_allow(struct device *dev)
+ {
+ 	pm_runtime_put_noidle(dev);
+ 	pm_runtime_allow(dev);
+@@ -1353,7 +1353,7 @@ static void __devexit sdhci_pci_runtime_pm_forbid(struct device *dev)
+ 	pm_runtime_get_noresume(dev);
+ }
+ 
+-static int __devinit sdhci_pci_probe(struct pci_dev *pdev,
++static int sdhci_pci_probe(struct pci_dev *pdev,
+ 				     const struct pci_device_id *ent)
+ {
+ 	struct sdhci_pci_chip *chip;
+diff --git a/drivers/mmc/host/sdhci-pxav2.c b/drivers/mmc/host/sdhci-pxav2.c
+index 964fc6d..7d4dc19 100644
+--- a/drivers/mmc/host/sdhci-pxav2.c
++++ b/drivers/mmc/host/sdhci-pxav2.c
+@@ -166,7 +166,7 @@ static inline struct sdhci_pxa_platdata *pxav2_get_mmc_pdata(struct device *dev)
+ }
+ #endif
+ 
+-static int __devinit sdhci_pxav2_probe(struct platform_device *pdev)
++static int sdhci_pxav2_probe(struct platform_device *pdev)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host;
+ 	struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
+diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+index a46cb67..e89c809 100644
+--- a/drivers/mmc/host/sdhci-pxav3.c
++++ b/drivers/mmc/host/sdhci-pxav3.c
+@@ -214,7 +214,7 @@ static inline struct sdhci_pxa_platdata *pxav3_get_mmc_pdata(struct device *dev)
+ }
+ #endif
+ 
+-static int __devinit sdhci_pxav3_probe(struct platform_device *pdev)
++static int sdhci_pxav3_probe(struct platform_device *pdev)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host;
+ 	struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
+diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+index b62a0c1..f5dde9e 100644
+--- a/drivers/mmc/host/sdhci-s3c.c
++++ b/drivers/mmc/host/sdhci-s3c.c
+@@ -430,7 +430,7 @@ static void sdhci_s3c_setup_card_detect_gpio(struct sdhci_s3c *sc)
+ }
+ 
+ #ifdef CONFIG_OF
+-static int __devinit sdhci_s3c_parse_dt(struct device *dev,
++static int sdhci_s3c_parse_dt(struct device *dev,
+ 		struct sdhci_host *host, struct s3c_sdhci_platdata *pdata)
+ {
+ 	struct device_node *node = dev->of_node;
+@@ -525,7 +525,7 @@ static int __devinit sdhci_s3c_parse_dt(struct device *dev,
+ 	return -EINVAL;
+ }
+ #else
+-static int __devinit sdhci_s3c_parse_dt(struct device *dev,
++static int sdhci_s3c_parse_dt(struct device *dev,
+ 		struct sdhci_host *host, struct s3c_sdhci_platdata *pdata)
+ {
+ 	return -EINVAL;
+@@ -548,7 +548,7 @@ static inline struct sdhci_s3c_drv_data *sdhci_s3c_get_driver_data(
+ 			platform_get_device_id(pdev)->driver_data;
+ }
+ 
+-static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
++static int sdhci_s3c_probe(struct platform_device *pdev)
+ {
+ 	struct s3c_sdhci_platdata *pdata;
+ 	struct sdhci_s3c_drv_data *drv_data;
+diff --git a/drivers/mmc/host/sdhci-spear.c b/drivers/mmc/host/sdhci-spear.c
+index 3ba9479..3fd1896 100644
+--- a/drivers/mmc/host/sdhci-spear.c
++++ b/drivers/mmc/host/sdhci-spear.c
+@@ -71,8 +71,7 @@ static irqreturn_t sdhci_gpio_irq(int irq, void *dev_id)
+ }
+ 
+ #ifdef CONFIG_OF
+-static struct sdhci_plat_data * __devinit
+-sdhci_probe_config_dt(struct platform_device *pdev)
++static struct sdhci_plat_data *sdhci_probe_config_dt(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct sdhci_plat_data *pdata = NULL;
+@@ -96,14 +95,13 @@ sdhci_probe_config_dt(struct platform_device *pdev)
+ 	return pdata;
+ }
+ #else
+-static struct sdhci_plat_data * __devinit
+-sdhci_probe_config_dt(struct platform_device *pdev)
++static struct sdhci_plat_data *sdhci_probe_config_dt(struct platform_device *pdev)
+ {
+ 	return ERR_PTR(-ENOSYS);
+ }
+ #endif
+ 
+-static int __devinit sdhci_probe(struct platform_device *pdev)
++static int sdhci_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct sdhci_host *host;
+diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
+index f284354..339c41e 100644
+--- a/drivers/mmc/host/sdhci-tegra.c
++++ b/drivers/mmc/host/sdhci-tegra.c
+@@ -217,7 +217,7 @@ static const struct of_device_id sdhci_tegra_dt_match[] __devinitdata = {
+ };
+ MODULE_DEVICE_TABLE(of, sdhci_dt_ids);
+ 
+-static struct tegra_sdhci_platform_data * __devinit sdhci_tegra_dt_parse_pdata(
++static struct tegra_sdhci_platform_data *sdhci_tegra_dt_parse_pdata(
+ 						struct platform_device *pdev)
+ {
+ 	struct tegra_sdhci_platform_data *plat;
+@@ -244,7 +244,7 @@ static struct tegra_sdhci_platform_data * __devinit sdhci_tegra_dt_parse_pdata(
+ 	return plat;
+ }
+ 
+-static int __devinit sdhci_tegra_probe(struct platform_device *pdev)
++static int sdhci_tegra_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *match;
+ 	const struct sdhci_tegra_soc_data *soc_data;
+diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
+index d25bc97..9872b52 100644
+--- a/drivers/mmc/host/sh_mmcif.c
++++ b/drivers/mmc/host/sh_mmcif.c
+@@ -1302,7 +1302,7 @@ static void sh_mmcif_init_ocr(struct sh_mmcif_host *host)
+ 		dev_warn(mmc_dev(mmc), "Platform OCR mask is ignored\n");
+ }
+ 
+-static int __devinit sh_mmcif_probe(struct platform_device *pdev)
++static int sh_mmcif_probe(struct platform_device *pdev)
+ {
+ 	int ret = 0, irq[2];
+ 	struct mmc_host *mmc;
+diff --git a/drivers/mmc/host/sh_mobile_sdhi.c b/drivers/mmc/host/sh_mobile_sdhi.c
+index 6a9a625..9125684 100644
+--- a/drivers/mmc/host/sh_mobile_sdhi.c
++++ b/drivers/mmc/host/sh_mobile_sdhi.c
+@@ -117,7 +117,7 @@ static const struct sh_mobile_sdhi_ops sdhi_ops = {
+ 	.cd_wakeup = sh_mobile_sdhi_cd_wakeup,
+ };
+ 
+-static int __devinit sh_mobile_sdhi_probe(struct platform_device *pdev)
++static int sh_mobile_sdhi_probe(struct platform_device *pdev)
+ {
+ 	struct sh_mobile_sdhi *priv;
+ 	struct tmio_mmc_data *mmc_data;
+diff --git a/drivers/mmc/host/tmio_mmc.c b/drivers/mmc/host/tmio_mmc.c
+index 2f9bbdf..f415be8 100644
+--- a/drivers/mmc/host/tmio_mmc.c
++++ b/drivers/mmc/host/tmio_mmc.c
+@@ -57,7 +57,7 @@ static int tmio_mmc_resume(struct platform_device *dev)
+ #define tmio_mmc_resume NULL
+ #endif
+ 
+-static int __devinit tmio_mmc_probe(struct platform_device *pdev)
++static int tmio_mmc_probe(struct platform_device *pdev)
+ {
+ 	const struct mfd_cell *cell = mfd_get_cell(pdev);
+ 	struct tmio_mmc_data *pdata;
+diff --git a/drivers/mmc/host/tmio_mmc_pio.c b/drivers/mmc/host/tmio_mmc_pio.c
+index 0d8a9bb..50bf495 100644
+--- a/drivers/mmc/host/tmio_mmc_pio.c
++++ b/drivers/mmc/host/tmio_mmc_pio.c
+@@ -918,7 +918,7 @@ static void tmio_mmc_init_ocr(struct tmio_mmc_host *host)
+ 		dev_warn(mmc_dev(mmc), "Platform OCR mask is ignored\n");
+ }
+ 
+-int __devinit tmio_mmc_host_probe(struct tmio_mmc_host **host,
++int tmio_mmc_host_probe(struct tmio_mmc_host **host,
+ 				  struct platform_device *pdev,
+ 				  struct tmio_mmc_data *pdata)
+ {
+diff --git a/drivers/mmc/host/via-sdmmc.c b/drivers/mmc/host/via-sdmmc.c
+index d8f8a5e..1f1a252 100644
+--- a/drivers/mmc/host/via-sdmmc.c
++++ b/drivers/mmc/host/via-sdmmc.c
+@@ -1082,7 +1082,7 @@ static void via_init_mmc_host(struct via_crdr_mmc_host *host)
+ 	msleep(1);
+ }
+ 
+-static int __devinit via_sd_probe(struct pci_dev *pcidev,
++static int via_sd_probe(struct pci_dev *pcidev,
+ 				    const struct pci_device_id *id)
+ {
+ 	struct mmc_host *mmc;
+diff --git a/drivers/mmc/host/wbsd.c b/drivers/mmc/host/wbsd.c
+index 3c8ef59..d71358a 100644
+--- a/drivers/mmc/host/wbsd.c
++++ b/drivers/mmc/host/wbsd.c
+@@ -1196,7 +1196,7 @@ static irqreturn_t wbsd_irq(int irq, void *dev_id)
+  * Allocate/free MMC structure.
+  */
+ 
+-static int __devinit wbsd_alloc_mmc(struct device *dev)
++static int wbsd_alloc_mmc(struct device *dev)
+ {
+ 	struct mmc_host *mmc;
+ 	struct wbsd_host *host;
+@@ -1288,7 +1288,7 @@ static void wbsd_free_mmc(struct device *dev)
+  * Scan for known chip id:s
+  */
+ 
+-static int __devinit wbsd_scan(struct wbsd_host *host)
++static int wbsd_scan(struct wbsd_host *host)
+ {
+ 	int i, j, k;
+ 	int id;
+@@ -1344,7 +1344,7 @@ static int __devinit wbsd_scan(struct wbsd_host *host)
+  * Allocate/free io port ranges
+  */
+ 
+-static int __devinit wbsd_request_region(struct wbsd_host *host, int base)
++static int wbsd_request_region(struct wbsd_host *host, int base)
+ {
+ 	if (base & 0x7)
+ 		return -EINVAL;
+@@ -1374,7 +1374,7 @@ static void wbsd_release_regions(struct wbsd_host *host)
+  * Allocate/free DMA port and buffer
+  */
+ 
+-static void __devinit wbsd_request_dma(struct wbsd_host *host, int dma)
++static void wbsd_request_dma(struct wbsd_host *host, int dma)
+ {
+ 	if (dma < 0)
+ 		return;
+@@ -1452,7 +1452,7 @@ static void wbsd_release_dma(struct wbsd_host *host)
+  * Allocate/free IRQ.
+  */
+ 
+-static int __devinit wbsd_request_irq(struct wbsd_host *host, int irq)
++static int wbsd_request_irq(struct wbsd_host *host, int irq)
  {
  	int ret;
  
-@@ -1139,7 +1139,7 @@ static int plat_mpc8xxx_spi_probe(struct platform_device *pdev)
- 	return 0;
- }
+@@ -1502,7 +1502,7 @@ static void  wbsd_release_irq(struct wbsd_host *host)
+  * Allocate all resources for the host.
+  */
  
--static int __devexit plat_mpc8xxx_spi_remove(struct platform_device *pdev)
-+static int plat_mpc8xxx_spi_remove(struct platform_device *pdev)
+-static int __devinit wbsd_request_resources(struct wbsd_host *host,
++static int wbsd_request_resources(struct wbsd_host *host,
+ 	int base, int irq, int dma)
  {
- 	return mpc8xxx_spi_remove(&pdev->dev);
- }
-diff --git a/drivers/spi/spi-gpio.c b/drivers/spi/spi-gpio.c
-index f4251df..995f265 100644
---- a/drivers/spi/spi-gpio.c
-+++ b/drivers/spi/spi-gpio.c
-@@ -485,7 +485,7 @@ gpio_free:
- 	return status;
- }
+ 	int ret;
+@@ -1644,7 +1644,7 @@ static void wbsd_chip_poweroff(struct wbsd_host *host)
+  *                                                                           *
+ \*****************************************************************************/
  
--static int __devexit spi_gpio_remove(struct platform_device *pdev)
-+static int spi_gpio_remove(struct platform_device *pdev)
+-static int __devinit wbsd_init(struct device *dev, int base, int irq, int dma,
++static int wbsd_init(struct device *dev, int base, int irq, int dma,
+ 	int pnp)
  {
- 	struct spi_gpio			*spi_gpio;
- 	struct spi_gpio_platform_data	*pdata;
-diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index dc0f99a..9049132 100644
---- a/drivers/spi/spi-imx.c
-+++ b/drivers/spi/spi-imx.c
-@@ -906,7 +906,7 @@ out_gpio_free:
- 	return ret;
- }
+ 	struct wbsd_host *host = NULL;
+@@ -1762,7 +1762,7 @@ static void __devexit wbsd_shutdown(struct device *dev, int pnp)
+  * Non-PnP
+  */
  
--static int __devexit spi_imx_remove(struct platform_device *pdev)
-+static int spi_imx_remove(struct platform_device *pdev)
+-static int __devinit wbsd_probe(struct platform_device *dev)
++static int wbsd_probe(struct platform_device *dev)
  {
- 	struct spi_master *master = platform_get_drvdata(pdev);
- 	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-diff --git a/drivers/spi/spi-mpc512x-psc.c b/drivers/spi/spi-mpc512x-psc.c
-index 599f0e5..cb3a310 100644
---- a/drivers/spi/spi-mpc512x-psc.c
-+++ b/drivers/spi/spi-mpc512x-psc.c
-@@ -492,7 +492,7 @@ free_master:
- 	return ret;
- }
+ 	/* Use the module parameters for resources */
+ 	return wbsd_init(&dev->dev, param_io, param_irq, param_dma, 0);
+@@ -1781,7 +1781,7 @@ static int __devexit wbsd_remove(struct platform_device *dev)
  
--static int __devexit mpc512x_psc_spi_do_remove(struct device *dev)
-+static int mpc512x_psc_spi_do_remove(struct device *dev)
- {
- 	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
- 	struct mpc512x_psc_spi *mps = spi_master_get_devdata(master);
-@@ -539,7 +539,7 @@ static int mpc512x_psc_spi_of_probe(struct platform_device *op)
- 				irq_of_parse_and_map(op->dev.of_node, 0), id);
- }
+ #ifdef CONFIG_PNP
  
--static int __devexit mpc512x_psc_spi_of_remove(struct platform_device *op)
-+static int mpc512x_psc_spi_of_remove(struct platform_device *op)
- {
- 	return mpc512x_psc_spi_do_remove(&op->dev);
- }
-diff --git a/drivers/spi/spi-mpc52xx-psc.c b/drivers/spi/spi-mpc52xx-psc.c
-index 43c2d27..291120b 100644
---- a/drivers/spi/spi-mpc52xx-psc.c
-+++ b/drivers/spi/spi-mpc52xx-psc.c
-@@ -479,7 +479,7 @@ static int mpc52xx_psc_spi_of_probe(struct platform_device *op)
- 				irq_of_parse_and_map(op->dev.of_node, 0), id);
- }
- 
--static int __devexit mpc52xx_psc_spi_of_remove(struct platform_device *op)
-+static int mpc52xx_psc_spi_of_remove(struct platform_device *op)
- {
- 	struct spi_master *master = spi_master_get(dev_get_drvdata(&op->dev));
- 	struct mpc52xx_psc_spi *mps = spi_master_get_devdata(master);
-diff --git a/drivers/spi/spi-mpc52xx.c b/drivers/spi/spi-mpc52xx.c
-index 18c8865..29f7705 100644
---- a/drivers/spi/spi-mpc52xx.c
-+++ b/drivers/spi/spi-mpc52xx.c
-@@ -527,7 +527,7 @@ static int mpc52xx_spi_probe(struct platform_device *op)
- 	return rc;
- }
- 
--static int __devexit mpc52xx_spi_remove(struct platform_device *op)
-+static int mpc52xx_spi_remove(struct platform_device *op)
- {
- 	struct spi_master *master = spi_master_get(dev_get_drvdata(&op->dev));
- 	struct mpc52xx_spi *ms = spi_master_get_devdata(master);
-diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
-index 82b4424..a3ede24 100644
---- a/drivers/spi/spi-mxs.c
-+++ b/drivers/spi/spi-mxs.c
-@@ -636,7 +636,7 @@ out_master_free:
- 	return ret;
- }
- 
--static int __devexit mxs_spi_remove(struct platform_device *pdev)
-+static int mxs_spi_remove(struct platform_device *pdev)
- {
- 	struct spi_master *master;
- 	struct mxs_spi *spi;
-diff --git a/drivers/spi/spi-nuc900.c b/drivers/spi/spi-nuc900.c
-index b477317..b3f9ec8 100644
---- a/drivers/spi/spi-nuc900.c
-+++ b/drivers/spi/spi-nuc900.c
-@@ -453,7 +453,7 @@ err_nomem:
- 	return err;
- }
- 
--static int __devexit nuc900_spi_remove(struct platform_device *dev)
-+static int nuc900_spi_remove(struct platform_device *dev)
- {
- 	struct nuc900_spi *hw = platform_get_drvdata(dev);
- 
-diff --git a/drivers/spi/spi-oc-tiny.c b/drivers/spi/spi-oc-tiny.c
-index a10e2af..432e66e 100644
---- a/drivers/spi/spi-oc-tiny.c
-+++ b/drivers/spi/spi-oc-tiny.c
-@@ -373,7 +373,7 @@ exit:
- 	return err;
- }
- 
--static int __devexit tiny_spi_remove(struct platform_device *pdev)
-+static int tiny_spi_remove(struct platform_device *pdev)
- {
- 	struct tiny_spi *hw = platform_get_drvdata(pdev);
- 	struct spi_master *master = hw->bitbang.master;
-diff --git a/drivers/spi/spi-octeon.c b/drivers/spi/spi-octeon.c
-index 44847c8..24daf96 100644
---- a/drivers/spi/spi-octeon.c
-+++ b/drivers/spi/spi-octeon.c
-@@ -326,7 +326,7 @@ fail:
- 	return err;
- }
- 
--static int __devexit octeon_spi_remove(struct platform_device *pdev)
-+static int octeon_spi_remove(struct platform_device *pdev)
- {
- 	struct octeon_spi *p = platform_get_drvdata(pdev);
- 	u64 register_base = p->register_base;
-diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
-index e00c902..8f03860 100644
---- a/drivers/spi/spi-omap2-mcspi.c
-+++ b/drivers/spi/spi-omap2-mcspi.c
-@@ -1282,7 +1282,7 @@ free_master:
- 	return status;
- }
- 
--static int __devexit omap2_mcspi_remove(struct platform_device *pdev)
-+static int omap2_mcspi_remove(struct platform_device *pdev)
- {
- 	struct spi_master	*master;
- 	struct omap2_mcspi	*mcspi;
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index a797a1a..5733b28 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2275,7 +2275,7 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
- 	return status;
- }
- 
--static int __devexit
+-static int __devinit
 +static int
- pl022_remove(struct amba_device *adev)
+ wbsd_pnp_probe(struct pnp_dev *pnpdev, const struct pnp_device_id *dev_id)
  {
- 	struct pl022 *pl022 = amba_get_drvdata(adev);
-diff --git a/drivers/spi/spi-pxa2xx-pci.c b/drivers/spi/spi-pxa2xx-pci.c
-index 8e64f10..cf95587 100644
---- a/drivers/spi/spi-pxa2xx-pci.c
-+++ b/drivers/spi/spi-pxa2xx-pci.c
-@@ -129,7 +129,7 @@ err_nomem:
- 	return ret;
- }
- 
--static void __devexit ce4100_spi_remove(struct pci_dev *dev)
-+static void ce4100_spi_remove(struct pci_dev *dev)
- {
- 	struct ce4100_info *spi_info;
- 	struct ssp_device *ssp;
-diff --git a/drivers/spi/spi-rspi.c b/drivers/spi/spi-rspi.c
-index 6cdd25e..902f2fb 100644
---- a/drivers/spi/spi-rspi.c
-+++ b/drivers/spi/spi-rspi.c
-@@ -709,7 +709,7 @@ static int rspi_request_dma(struct rspi_data *rspi,
- 	return 0;
- }
- 
--static void __devexit rspi_release_dma(struct rspi_data *rspi)
-+static void rspi_release_dma(struct rspi_data *rspi)
- {
- 	if (rspi->chan_tx)
- 		dma_release_channel(rspi->chan_tx);
-@@ -717,7 +717,7 @@ static void __devexit rspi_release_dma(struct rspi_data *rspi)
- 		dma_release_channel(rspi->chan_rx);
- }
- 
--static int __devexit rspi_remove(struct platform_device *pdev)
-+static int rspi_remove(struct platform_device *pdev)
- {
- 	struct rspi_data *rspi = dev_get_drvdata(&pdev->dev);
- 
-diff --git a/drivers/spi/spi-s3c24xx.c b/drivers/spi/spi-s3c24xx.c
-index 5a9da14..02d6460 100644
---- a/drivers/spi/spi-s3c24xx.c
-+++ b/drivers/spi/spi-s3c24xx.c
-@@ -663,7 +663,7 @@ static int s3c24xx_spi_probe(struct platform_device *pdev)
- 	return err;
- }
- 
--static int __devexit s3c24xx_spi_remove(struct platform_device *dev)
-+static int s3c24xx_spi_remove(struct platform_device *dev)
- {
- 	struct s3c24xx_spi *hw = platform_get_drvdata(dev);
- 
-diff --git a/drivers/spi/spi-sh-hspi.c b/drivers/spi/spi-sh-hspi.c
-index f536c48..5a64b0d 100644
---- a/drivers/spi/spi-sh-hspi.c
-+++ b/drivers/spi/spi-sh-hspi.c
-@@ -300,7 +300,7 @@ static int hspi_probe(struct platform_device *pdev)
- 	return ret;
- }
- 
--static int __devexit hspi_remove(struct platform_device *pdev)
-+static int hspi_remove(struct platform_device *pdev)
- {
- 	struct hspi_priv *hspi = dev_get_drvdata(&pdev->dev);
- 
-diff --git a/drivers/spi/spi-sh.c b/drivers/spi/spi-sh.c
-index 3a22b1f..3c3600a 100644
---- a/drivers/spi/spi-sh.c
-+++ b/drivers/spi/spi-sh.c
-@@ -432,7 +432,7 @@ static irqreturn_t spi_sh_irq(int irq, void *_ss)
- 	return IRQ_HANDLED;
- }
- 
--static int __devexit spi_sh_remove(struct platform_device *pdev)
-+static int spi_sh_remove(struct platform_device *pdev)
- {
- 	struct spi_sh_data *ss = dev_get_drvdata(&pdev->dev);
- 
-diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
-index 3b8e1d1..e0f43a5 100644
---- a/drivers/spi/spi-sirf.c
-+++ b/drivers/spi/spi-sirf.c
-@@ -604,7 +604,7 @@ err_cs:
- 	return ret;
- }
- 
--static int  __devexit spi_sirfsoc_remove(struct platform_device *pdev)
-+static int  spi_sirfsoc_remove(struct platform_device *pdev)
- {
- 	struct spi_master *master;
- 	struct sirfsoc_spi *sspi;
-diff --git a/drivers/spi/spi-stmp.c b/drivers/spi/spi-stmp.c
-index 976d236..da57473 100644
---- a/drivers/spi/spi-stmp.c
-+++ b/drivers/spi/spi-stmp.c
-@@ -589,7 +589,7 @@ out0:
- 	return err;
- }
- 
--static int __devexit stmp_spi_remove(struct platform_device *dev)
-+static int stmp_spi_remove(struct platform_device *dev)
- {
- 	struct stmp_spi *ss;
- 	struct spi_master *master;
-diff --git a/drivers/spi/spi-tegra20-sflash.c b/drivers/spi/spi-tegra20-sflash.c
-index 30995bf..448a8cc 100644
---- a/drivers/spi/spi-tegra20-sflash.c
-+++ b/drivers/spi/spi-tegra20-sflash.c
-@@ -575,7 +575,7 @@ exit_free_master:
- 	return ret;
- }
- 
--static int __devexit tegra_sflash_remove(struct platform_device *pdev)
-+static int tegra_sflash_remove(struct platform_device *pdev)
- {
- 	struct spi_master *master = dev_get_drvdata(&pdev->dev);
- 	struct tegra_sflash_data	*tsd = spi_master_get_devdata(master);
-diff --git a/drivers/spi/spi-tegra20-slink.c b/drivers/spi/spi-tegra20-slink.c
-index cab1926..651167f 100644
---- a/drivers/spi/spi-tegra20-slink.c
-+++ b/drivers/spi/spi-tegra20-slink.c
-@@ -1261,7 +1261,7 @@ exit_free_master:
- 	return ret;
- }
- 
--static int __devexit tegra_slink_remove(struct platform_device *pdev)
-+static int tegra_slink_remove(struct platform_device *pdev)
- {
- 	struct spi_master *master = dev_get_drvdata(&pdev->dev);
- 	struct tegra_slink_data	*tspi = spi_master_get_devdata(master);
-diff --git a/drivers/spi/spi-ti-ssp.c b/drivers/spi/spi-ti-ssp.c
-index 295bc8f..46992ca 100644
---- a/drivers/spi/spi-ti-ssp.c
-+++ b/drivers/spi/spi-ti-ssp.c
-@@ -357,7 +357,7 @@ error_wq:
- 	return error;
- }
- 
--static int __devexit ti_ssp_spi_remove(struct platform_device *pdev)
-+static int ti_ssp_spi_remove(struct platform_device *pdev)
- {
- 	struct ti_ssp_spi *hw = platform_get_drvdata(pdev);
- 	int error;
-diff --git a/drivers/spi/spi-tle62x0.c b/drivers/spi/spi-tle62x0.c
-index 22f5ed8..6b0874d 100644
---- a/drivers/spi/spi-tle62x0.c
-+++ b/drivers/spi/spi-tle62x0.c
-@@ -294,7 +294,7 @@ static int tle62x0_probe(struct spi_device *spi)
- 	return ret;
- }
- 
--static int __devexit tle62x0_remove(struct spi_device *spi)
-+static int tle62x0_remove(struct spi_device *spi)
- {
- 	struct tle62x0_state *st = spi_get_drvdata(spi);
- 	int ptr;
-diff --git a/drivers/spi/spi-topcliff-pch.c b/drivers/spi/spi-topcliff-pch.c
-index 12b3977..f756481 100644
---- a/drivers/spi/spi-topcliff-pch.c
-+++ b/drivers/spi/spi-topcliff-pch.c
-@@ -1498,7 +1498,7 @@ err_pci_iomap:
- 	return ret;
- }
- 
--static int __devexit pch_spi_pd_remove(struct platform_device *plat_dev)
-+static int pch_spi_pd_remove(struct platform_device *plat_dev)
- {
- 	struct pch_spi_board_data *board_dat = dev_get_platdata(&plat_dev->dev);
- 	struct pch_spi_data *data = platform_get_drvdata(plat_dev);
-@@ -1705,7 +1705,7 @@ err_no_mem:
- 	return retval;
- }
- 
--static void __devexit pch_spi_remove(struct pci_dev *pdev)
-+static void pch_spi_remove(struct pci_dev *pdev)
- {
- 	int i;
- 	struct pch_pd_dev_save *pd_dev_save = pci_get_drvdata(pdev);
-diff --git a/drivers/spi/spi-xcomm.c b/drivers/spi/spi-xcomm.c
-index d17e04d..4d3ec8b 100644
---- a/drivers/spi/spi-xcomm.c
-+++ b/drivers/spi/spi-xcomm.c
-@@ -246,7 +246,7 @@ static int spi_xcomm_probe(struct i2c_client *i2c,
- 	return ret;
- }
- 
--static int __devexit spi_xcomm_remove(struct i2c_client *i2c)
-+static int spi_xcomm_remove(struct i2c_client *i2c)
- {
- 	struct spi_master *master = i2c_get_clientdata(i2c);
- 
-diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-index 7b6ff06..e1d7696 100644
---- a/drivers/spi/spi-xilinx.c
-+++ b/drivers/spi/spi-xilinx.c
-@@ -518,7 +518,7 @@ static int xilinx_spi_probe(struct platform_device *dev)
- 	return 0;
- }
- 
--static int __devexit xilinx_spi_remove(struct platform_device *dev)
-+static int xilinx_spi_remove(struct platform_device *dev)
- {
- 	xilinx_spi_deinit(platform_get_drvdata(dev));
- 	platform_set_drvdata(dev, 0);
-diff --git a/drivers/spi/spidev.c b/drivers/spi/spidev.c
-index e5e0214..2e0655d 100644
---- a/drivers/spi/spidev.c
-+++ b/drivers/spi/spidev.c
-@@ -622,7 +622,7 @@ static int spidev_probe(struct spi_device *spi)
- 	return status;
- }
- 
--static int __devexit spidev_remove(struct spi_device *spi)
-+static int spidev_remove(struct spi_device *spi)
- {
- 	struct spidev_data	*spidev = spi_get_drvdata(spi);
- 
+ 	int io, irq, dma;
 -- 
 1.8.0
