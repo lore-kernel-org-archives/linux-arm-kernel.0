@@ -1,42 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 19 Nov 2012 08:45:53 -0600
-Subject: [GIT PULL] Calxeda cpuidle support
-Message-ID: <50AA4621.20509@gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 19 Nov 2012 15:46:32 +0100
+Subject: [PATCH 0/4] ARM: dts: exynos4210-origen: Device tree fixes
+Message-ID: <1353336396-21161-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+This patch series fixes device tree support for Origen board:
+ - memory is defined using sections of maximum allowed size
+ - any pin configuration is modified to use pinctrl
+ - invalid properties in sdhci nodes are replaced according to current
+   mmc bindings
+ - a fixed vmmc voltage regulator is added
 
-Please pull cpuidle support for highbank. This is the first driver in
-drivers/cpuidle. All the existing drivers for ARM are in arch/arm. I'm
-asking for you to pull since there seems to be a lack of maintainer for
-cpuidle drivers.
+Tested on Origen board.
 
-Regards,
-Rob
+Depends on:
+[PATCH v2 0/2] mmc: host: sdhci-s3c: Add support for pinctrl interface
 
-The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
+Tomasz Figa (4):
+  ARM: dts: exynos4210-origen: Split memory sections
+  ARM: dts: exynos4210-origen: Update for pinctrl-samsung driver
+  ARM: dts: exynos4210-origen: Update sdhci nodes for current bindings
+  ARM: dts: exynos4210-origen: Add vmmc fixed voltage regulator
 
-  Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
+ arch/arm/boot/dts/exynos4210-origen.dts | 54 ++++++++++++++++-----------------
+ 1 file changed, 27 insertions(+), 27 deletions(-)
 
-are available in the git repository at:
-
-  git://sources.calxeda.com/kernel/linux.git tags/highbank-cpuidle
-
-for you to fetch changes up to be6a98d3f00c292d347465d96acbec9d8c2783cf:
-
-  cpuidle: add Calxeda SOC idle support (2012-11-07 17:15:36 -0600)
-
-----------------------------------------------------------------
-Add cpuidle driver support for Calxeda Highbank SOC.
-
-----------------------------------------------------------------
-Rob Herring (1):
-      cpuidle: add Calxeda SOC idle support
-
- drivers/cpuidle/Kconfig           |   10 +++
- drivers/cpuidle/Makefile          |    2 +
- drivers/cpuidle/cpuidle-calxeda.c |  161
-+++++++++++++++++++++++++++++++++++++
- 3 files changed, 173 insertions(+)
- create mode 100644 drivers/cpuidle/cpuidle-calxeda.c
+-- 
+1.8.0
