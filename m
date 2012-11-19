@@ -1,106 +1,77 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 18 Nov 2012 19:18:46 -0500
-Subject: [PATCH] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
+Date: Sun, 18 Nov 2012 19:20:47 -0500
+Subject: [PATCH] ARM: Orion: Remove redundent init_dma_coherent_pool_size()
+In-Reply-To: <1352655079-1005-1-git-send-email-andrew@lunn.ch>
 References: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20121119001846.GB22106@titan.lakedaemon.net>
+ <1352655079-1005-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20121119002047.GC22106@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek,
+On Sun, Nov 11, 2012 at 06:31:19PM +0100, Andrew Lunn wrote:
+> The patch:
+> 
+> mm: dmapool: use provided gfp flags for all dma_alloc_coherent() calls
+> 
+> makes these calls on Kirkword and Orion5x redundent. The drivers are
+> not making atomic requests for coherent memory and hence the default
+> pool size is now sufficient.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/mach-kirkwood/common.c |    7 -------
+>  arch/arm/mach-orion5x/common.c  |    7 -------
+>  2 files changed, 14 deletions(-)
 
-I've added the maintainers for mm/*.  Hopefully they can let us know if
-this is good for v3.8...
+Andrew,
+
+I'm going to hold onto this until we hear from the mm maintainers on the
+parent patch.  If it doesn't make v3.8, I know we'll have to extend this
+patch to remove the similar code from mach-mvebu...
 
 thx,
 
 Jason.
 
-On Thu, Nov 08, 2012 at 07:38:57AM +0100, Marek Szyprowski wrote:
-> dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag, regardless
-> the flags provided by the caller. This causes excessive pruning of
-> emergency memory pools without any good reason. This patch changes the code
-> to correctly use gfp flags provided by the dmapool caller. This should
-> solve the dmapool usage on ARM architecture, where GFP_ATOMIC DMA
-> allocations can be served only from the special, very limited memory pool.
 > 
-> Reported-by: Soren Moch <smoch@web.de>
-> Reported-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  mm/dmapool.c |   27 +++++++--------------------
->  1 file changed, 7 insertions(+), 20 deletions(-)
-> 
-> diff --git a/mm/dmapool.c b/mm/dmapool.c
-> index c5ab33b..86de9b2 100644
-> --- a/mm/dmapool.c
-> +++ b/mm/dmapool.c
-> @@ -62,8 +62,6 @@ struct dma_page {		/* cacheable header for 'allocation' bytes */
->  	unsigned int offset;
->  };
->  
-> -#define	POOL_TIMEOUT_JIFFIES	((100 /* msec */ * HZ) / 1000)
+> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+> index 2c6c218..8080ceb 100644
+> --- a/arch/arm/mach-kirkwood/common.c
+> +++ b/arch/arm/mach-kirkwood/common.c
+> @@ -505,13 +505,6 @@ void __init kirkwood_wdt_init(void)
+>  void __init kirkwood_init_early(void)
+>  {
+>  	orion_time_set_base(TIMER_VIRT_BASE);
 > -
->  static DEFINE_MUTEX(pools_lock);
->  
->  static ssize_t
-> @@ -227,7 +225,6 @@ static struct dma_page *pool_alloc_page(struct dma_pool *pool, gfp_t mem_flags)
->  		memset(page->vaddr, POOL_POISON_FREED, pool->allocation);
->  #endif
->  		pool_initialise_page(pool, page);
-> -		list_add(&page->page_list, &pool->page_list);
->  		page->in_use = 0;
->  		page->offset = 0;
->  	} else {
-> @@ -315,30 +312,21 @@ void *dma_pool_alloc(struct dma_pool *pool, gfp_t mem_flags,
->  	might_sleep_if(mem_flags & __GFP_WAIT);
->  
->  	spin_lock_irqsave(&pool->lock, flags);
-> - restart:
->  	list_for_each_entry(page, &pool->page_list, page_list) {
->  		if (page->offset < pool->allocation)
->  			goto ready;
->  	}
-> -	page = pool_alloc_page(pool, GFP_ATOMIC);
-> -	if (!page) {
-> -		if (mem_flags & __GFP_WAIT) {
-> -			DECLARE_WAITQUEUE(wait, current);
->  
-> -			__set_current_state(TASK_UNINTERRUPTIBLE);
-> -			__add_wait_queue(&pool->waitq, &wait);
-> -			spin_unlock_irqrestore(&pool->lock, flags);
-> +	/* pool_alloc_page() might sleep, so temporarily drop &pool->lock */
-> +	spin_unlock_irqrestore(&pool->lock, flags);
->  
-> -			schedule_timeout(POOL_TIMEOUT_JIFFIES);
-> +	page = pool_alloc_page(pool, mem_flags);
-> +	if (!page)
-> +		return NULL;
->  
-> -			spin_lock_irqsave(&pool->lock, flags);
-> -			__remove_wait_queue(&pool->waitq, &wait);
-> -			goto restart;
-> -		}
-> -		retval = NULL;
-> -		goto done;
-> -	}
-> +	spin_lock_irqsave(&pool->lock, flags);
->  
-> +	list_add(&page->page_list, &pool->page_list);
->   ready:
->  	page->in_use++;
->  	offset = page->offset;
-> @@ -348,7 +336,6 @@ void *dma_pool_alloc(struct dma_pool *pool, gfp_t mem_flags,
->  #ifdef	DMAPOOL_DEBUG
->  	memset(retval, POOL_POISON_ALLOCATED, pool->size);
->  #endif
-> - done:
->  	spin_unlock_irqrestore(&pool->lock, flags);
->  	return retval;
+> -	/*
+> -	 * Some Kirkwood devices allocate their coherent buffers from atomic
+> -	 * context. Increase size of atomic coherent pool to make sure such
+> -	 * the allocations won't fail.
+> -	 */
+> -	init_dma_coherent_pool_size(SZ_1M);
 >  }
+>  
+>  int kirkwood_tclk;
+> diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+> index b3eb3da..3e07f52 100644
+> --- a/arch/arm/mach-orion5x/common.c
+> +++ b/arch/arm/mach-orion5x/common.c
+> @@ -194,13 +194,6 @@ void __init orion5x_wdt_init(void)
+>  void __init orion5x_init_early(void)
+>  {
+>  	orion_time_set_base(TIMER_VIRT_BASE);
+> -
+> -	/*
+> -	 * Some Orion5x devices allocate their coherent buffers from atomic
+> -	 * context. Increase size of atomic coherent pool to make sure such
+> -	 * the allocations won't fail.
+> -	 */
+> -	init_dma_coherent_pool_size(SZ_1M);
+>  }
+>  
+>  int orion5x_tclk;
 > -- 
-> 1.7.9.5
+> 1.7.10.4
 > 
 > 
 > _______________________________________________
