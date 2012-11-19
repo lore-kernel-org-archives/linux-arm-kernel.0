@@ -1,9 +1,9 @@
 From: wfp5p@virginia.edu (Bill Pemberton)
-Date: Mon, 19 Nov 2012 13:22:27 -0500
-Subject: [PATCH 198/493] ethernet: remove use of __devinit
+Date: Mon, 19 Nov 2012 13:21:47 -0500
+Subject: [PATCH 158/493] video: remove use of __devinit
 In-Reply-To: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
 References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
-Message-ID: <1353349642-3677-198-git-send-email-wfp5p@virginia.edu>
+Message-ID: <1353349642-3677-158-git-send-email-wfp5p@virginia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,5518 +11,4546 @@ CONFIG_HOTPLUG is going away as an option so __devinit is no longer
 needed.
 
 Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-Cc: Steffen Klassert <klassert@mathematik.tu-chemnitz.de> 
-Cc: David Dillow <dave@thedillows.org> 
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de> 
+Cc: Jaya Kumar <jayalk@intworks.biz> 
+Cc: Paul Mackerras <paulus@samba.org> 
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org> 
 Cc: Russell King <linux@arm.linux.org.uk> 
-Cc: Kristoffer Glembo <kristoffer@gaisler.com> 
-Cc: Jes Sorensen <jes@trained-monkey.org> 
-Cc: Don Fry <pcnet32@frontier.com> 
-Cc: Jay Cliburn <jcliburn@gmail.com> 
-Cc: Chris Snook <chris.snook@gmail.com> 
-Cc: Grant Grundler <grundler@parisc-linux.org> 
-Cc: Pantelis Antoniou <pantelis.antoniou@gmail.com> 
-Cc: Vitaly Bordug <vbordug@ru.mvista.com> 
-Cc: Jaroslav Kysela <perex@perex.cz> 
-Cc: Thadeu Lima de Souza Cascardo <cascardo@linux.vnet.ibm.com> 
-Cc: Francois Romieu <romieu@fr.zoreil.com> 
-Cc: Sorbica Shieh <sorbica@icplus.com.tw> 
-Cc: Guo-Fu Tseng <cooldavid@cooldavid.org> 
-Cc: Mirko Lindner <mlindner@marvell.com> 
-Cc: Stephen Hemminger <shemminger@vyatta.com> 
+Cc: Jingoo Han <jg1.han@samsung.com> 
+Cc: Ferenc Bakonyi <fero@drama.obuda.kando.hu> 
+Cc: Antonino Daplas <adaplas@gmail.com> 
+Cc: Maik Broemme <mbroemme@plusserver.de> 
+Cc: David Brown <davidb@codeaurora.org> 
+Cc: Daniel Walker <dwalker@fifo99.com> 
+Cc: Bryan Huntsman <bryanh@codeaurora.org> 
 Cc: Wan ZongShun <mcuos.com@gmail.com> 
-Cc: Olof Johansson <olof@lixom.net> 
-Cc: Florian Fainelli <florian@openwrt.org> 
-Cc: Realtek linux nic maintainers <nic_swsd@realtek.com> 
-Cc: Ralf Baechle <ralf@linux-mips.org> 
-Cc: Daniele Venzano <venza@brownhat.org> 
-Cc: Steve Glendinning <steve.glendinning@shawell.net> 
-Cc: Samuel Chessman <chessman@tux.org> 
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com> 
 Cc: Geoff Levand <geoff@infradead.org> 
-Cc: Roger Luethi <rl@hellgate.ch> 
-Cc: Anirudha Sarangi <anirudh@xilinx.com> 
-Cc: John Linn <John.Linn@xilinx.com> 
-Cc: Krzysztof Halasa <khc@pm.waw.pl> 
-Cc: netdev at vger.kernel.org 
+Cc: Kristoffer Ericson <kristoffer.ericson@gmail.com> 
+Cc: Ben Dooks <ben-linux@fluff.org> 
+Cc: Kukjin Kim <kgene.kim@samsung.com> 
+Cc: Thomas Winischhofer <thomas@winischhofer.net> 
+Cc: Michal Januszewski <spock@gentoo.org> 
+Cc: Tony Prisk <linux@prisktech.co.nz> 
+Cc: linux-fbdev at vger.kernel.org 
 Cc: linux-arm-kernel at lists.infradead.org 
-Cc: uclinux-dist-devel at blackfin.uclinux.org 
-Cc: linux-acenic at sunsite.dk 
+Cc: linux-geode at lists.infradead.org 
+Cc: linux-nvidia at lists.surfsouth.com 
+Cc: linux-arm-msm at vger.kernel.org 
+Cc: linux-omap at vger.kernel.org 
 Cc: linuxppc-dev at lists.ozlabs.org 
-Cc: e1000-devel at lists.sourceforge.net 
-Cc: linux-mips at linux-mips.org 
 Cc: cbe-oss-dev at lists.ozlabs.org 
+Cc: linux-samsung-soc at vger.kernel.org 
+Cc: xen-devel at lists.xensource.com 
+Cc: virtualization at lists.linux-foundation.org 
 ---
- drivers/net/ethernet/3com/3c509.c                  | 10 +--
- drivers/net/ethernet/3com/3c59x.c                  |  4 +-
- drivers/net/ethernet/3com/typhoon.c                |  4 +-
- drivers/net/ethernet/8390/etherh.c                 |  4 +-
- drivers/net/ethernet/8390/hydra.c                  |  8 +-
- drivers/net/ethernet/8390/ne2k-pci.c               |  2 +-
- drivers/net/ethernet/8390/zorro8390.c              |  4 +-
- drivers/net/ethernet/adaptec/starfire.c            |  2 +-
- drivers/net/ethernet/adi/bfin_mac.c                |  4 +-
- drivers/net/ethernet/aeroflex/greth.c              |  2 +-
- drivers/net/ethernet/alteon/acenic.c               | 20 ++---
- drivers/net/ethernet/amd/a2065.c                   |  4 +-
- drivers/net/ethernet/amd/am79c961a.c               |  2 +-
- drivers/net/ethernet/amd/amd8111e.c                |  4 +-
- drivers/net/ethernet/amd/ariadne.c                 |  2 +-
- drivers/net/ethernet/amd/au1000_eth.c              |  2 +-
- drivers/net/ethernet/amd/declance.c                |  6 +-
- drivers/net/ethernet/amd/depca.c                   |  2 +-
- drivers/net/ethernet/amd/hplance.c                 |  8 +-
- drivers/net/ethernet/amd/pcnet32.c                 |  6 +-
- drivers/net/ethernet/amd/sunlance.c                |  4 +-
- drivers/net/ethernet/apple/bmac.c                  |  2 +-
- drivers/net/ethernet/apple/mace.c                  |  2 +-
- drivers/net/ethernet/apple/macmace.c               |  2 +-
- drivers/net/ethernet/atheros/atl1c/atl1c_main.c    |  8 +-
- drivers/net/ethernet/atheros/atl1e/atl1e_main.c    |  6 +-
- drivers/net/ethernet/atheros/atl1e/atl1e_param.c   |  4 +-
- drivers/net/ethernet/atheros/atlx/atl1.c           |  8 +-
- drivers/net/ethernet/atheros/atlx/atl2.c           |  8 +-
- drivers/net/ethernet/broadcom/b44.c                |  4 +-
- drivers/net/ethernet/broadcom/bcm63xx_enet.c       |  4 +-
- drivers/net/ethernet/broadcom/bnx2.c               | 13 ++--
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c    |  2 +-
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.h    |  2 +-
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c   | 56 +++++++-------
- drivers/net/ethernet/broadcom/sb1250-mac.c         |  2 +-
- drivers/net/ethernet/broadcom/tg3.c                | 86 +++++++++++-----------
- drivers/net/ethernet/brocade/bna/bnad.c            |  2 +-
- drivers/net/ethernet/cadence/macb.c                |  8 +-
- drivers/net/ethernet/chelsio/cxgb/cxgb2.c          |  2 +-
- drivers/net/ethernet/chelsio/cxgb/sge.c            |  2 +-
- drivers/net/ethernet/chelsio/cxgb/subr.c           |  8 +-
- drivers/net/ethernet/chelsio/cxgb/tp.c             |  2 +-
- drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c    |  8 +-
- drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c |  2 +-
- drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c    | 18 ++---
- drivers/net/ethernet/chelsio/cxgb4/t4_hw.c         | 12 +--
- .../net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c    | 12 +--
- drivers/net/ethernet/chelsio/cxgb4vf/t4vf_common.h |  4 +-
- drivers/net/ethernet/chelsio/cxgb4vf/t4vf_hw.c     |  6 +-
- drivers/net/ethernet/cisco/enic/enic_main.c        |  2 +-
- drivers/net/ethernet/davicom/dm9000.c              |  2 +-
- drivers/net/ethernet/dec/tulip/de2104x.c           | 10 +--
- drivers/net/ethernet/dec/tulip/de4x5.c             |  6 +-
- drivers/net/ethernet/dec/tulip/dmfe.c              |  2 +-
- drivers/net/ethernet/dec/tulip/eeprom.c            |  6 +-
- drivers/net/ethernet/dec/tulip/media.c             |  2 +-
- drivers/net/ethernet/dec/tulip/tulip_core.c        |  4 +-
- drivers/net/ethernet/dec/tulip/uli526x.c           |  2 +-
- drivers/net/ethernet/dec/tulip/winbond-840.c       |  2 +-
- drivers/net/ethernet/dec/tulip/xircom_cb.c         |  2 +-
- drivers/net/ethernet/dlink/dl2k.c                  |  2 +-
- drivers/net/ethernet/dlink/sundance.c              |  4 +-
- drivers/net/ethernet/dnet.c                        |  4 +-
- drivers/net/ethernet/emulex/benet/be_main.c        |  2 +-
- drivers/net/ethernet/ethoc.c                       |  4 +-
- drivers/net/ethernet/fealnx.c                      |  2 +-
- drivers/net/ethernet/freescale/fec.c               |  6 +-
- drivers/net/ethernet/freescale/fec_mpc52xx.c       |  2 +-
- .../net/ethernet/freescale/fs_enet/fs_enet-main.c  |  2 +-
- .../net/ethernet/freescale/fs_enet/mii-bitbang.c   |  4 +-
- drivers/net/ethernet/freescale/fs_enet/mii-fec.c   |  2 +-
- drivers/net/ethernet/freescale/xgmac_mdio.c        |  2 +-
- drivers/net/ethernet/hp/hp100.c                    |  6 +-
- drivers/net/ethernet/i825xx/ether1.c               |  8 +-
- drivers/net/ethernet/i825xx/lasi_82596.c           |  4 +-
- drivers/net/ethernet/i825xx/lib82596.c             |  2 +-
- drivers/net/ethernet/i825xx/sni_82596.c            |  4 +-
- drivers/net/ethernet/ibm/ehea/ehea_main.c          |  6 +-
- drivers/net/ethernet/ibm/emac/core.c               | 14 ++--
- drivers/net/ethernet/ibm/emac/mal.c                |  4 +-
- drivers/net/ethernet/ibm/emac/rgmii.c              |  4 +-
- drivers/net/ethernet/ibm/emac/tah.c                |  4 +-
- drivers/net/ethernet/ibm/emac/zmii.c               |  4 +-
- drivers/net/ethernet/ibm/ibmveth.c                 |  2 +-
- drivers/net/ethernet/icplus/ipg.c                  |  2 +-
- drivers/net/ethernet/intel/e100.c                  |  2 +-
- drivers/net/ethernet/intel/e1000/e1000_main.c      |  6 +-
- drivers/net/ethernet/intel/e1000/e1000_param.c     |  8 +-
- drivers/net/ethernet/intel/e1000e/netdev.c         |  6 +-
- drivers/net/ethernet/intel/e1000e/param.c          |  4 +-
- drivers/net/ethernet/intel/igb/igb_main.c          |  6 +-
- drivers/net/ethernet/intel/igbvf/netdev.c          |  6 +-
- drivers/net/ethernet/intel/ixgb/ixgb_main.c        |  4 +-
- drivers/net/ethernet/intel/ixgb/ixgb_param.c       |  4 +-
- drivers/net/ethernet/intel/ixgbe/ixgbe_main.c      |  4 +-
- drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c  |  4 +-
- drivers/net/ethernet/jme.c                         |  2 +-
- drivers/net/ethernet/marvell/skge.c                |  4 +-
- drivers/net/ethernet/marvell/sky2.c                | 12 +--
- drivers/net/ethernet/mellanox/mlx4/main.c          |  2 +-
- drivers/net/ethernet/micrel/ks8695net.c            |  6 +-
- drivers/net/ethernet/micrel/ks8842.c               |  2 +-
- drivers/net/ethernet/micrel/ks8851.c               |  2 +-
- drivers/net/ethernet/micrel/ks8851_mll.c           |  2 +-
- drivers/net/ethernet/micrel/ksz884x.c              |  2 +-
- drivers/net/ethernet/microchip/enc28j60.c          |  2 +-
- drivers/net/ethernet/natsemi/ibmlana.c             |  2 +-
- drivers/net/ethernet/natsemi/jazzsonic.c           |  4 +-
- drivers/net/ethernet/natsemi/macsonic.c            | 14 ++--
- drivers/net/ethernet/natsemi/natsemi.c             |  4 +-
- drivers/net/ethernet/natsemi/ns83820.c             |  2 +-
- drivers/net/ethernet/natsemi/xtsonic.c             |  2 +-
- drivers/net/ethernet/neterion/s2io.c               |  2 +-
- drivers/net/ethernet/neterion/s2io.h               |  2 +-
- drivers/net/ethernet/neterion/vxge/vxge-config.c   |  6 +-
- drivers/net/ethernet/neterion/vxge/vxge-config.h   |  6 +-
- drivers/net/ethernet/neterion/vxge/vxge-main.c     | 12 +--
- drivers/net/ethernet/nuvoton/w90p910_ether.c       |  2 +-
- drivers/net/ethernet/nvidia/forcedeth.c            |  2 +-
- drivers/net/ethernet/octeon/octeon_mgmt.c          |  2 +-
- drivers/net/ethernet/packetengines/hamachi.c       |  4 +-
- drivers/net/ethernet/packetengines/yellowfin.c     |  4 +-
- drivers/net/ethernet/pasemi/pasemi_mac.c           |  2 +-
- .../net/ethernet/qlogic/netxen/netxen_nic_main.c   |  4 +-
- drivers/net/ethernet/qlogic/qla3xxx.c              |  2 +-
- drivers/net/ethernet/qlogic/qlcnic/qlcnic_main.c   |  4 +-
- drivers/net/ethernet/qlogic/qlge/qlge_main.c       |  4 +-
- drivers/net/ethernet/rdc/r6040.c                   |  2 +-
- drivers/net/ethernet/realtek/8139too.c             |  6 +-
- drivers/net/ethernet/realtek/r8169.c               | 14 ++--
- drivers/net/ethernet/s6gmac.c                      |  2 +-
- drivers/net/ethernet/seeq/ether3.c                 | 10 +--
- drivers/net/ethernet/seeq/sgiseeq.c                |  2 +-
- drivers/net/ethernet/sfc/efx.c                     |  2 +-
- drivers/net/ethernet/sgi/ioc3-eth.c                |  6 +-
- drivers/net/ethernet/sgi/meth.c                    |  2 +-
- drivers/net/ethernet/silan/sc92031.c               |  2 +-
- drivers/net/ethernet/sis/sis190.c                  | 14 ++--
- drivers/net/ethernet/sis/sis900.c                  | 14 ++--
- drivers/net/ethernet/smsc/epic100.c                |  4 +-
- drivers/net/ethernet/smsc/smc911x.c                |  6 +-
- drivers/net/ethernet/smsc/smc91x.c                 |  6 +-
- drivers/net/ethernet/smsc/smsc911x.c               | 10 +--
- drivers/net/ethernet/smsc/smsc9420.c               |  2 +-
- drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c   |  2 +-
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  6 +-
- drivers/net/ethernet/sun/cassini.c                 |  4 +-
- drivers/net/ethernet/sun/niu.c                     | 78 ++++++++++----------
- drivers/net/ethernet/sun/sunbmac.c                 |  4 +-
- drivers/net/ethernet/sun/sungem.c                  |  4 +-
- drivers/net/ethernet/sun/sunhme.c                  | 10 +--
- drivers/net/ethernet/sun/sunqe.c                   |  8 +-
- drivers/net/ethernet/sun/sunvnet.c                 | 12 +--
- drivers/net/ethernet/tehuti/tehuti.c               |  2 +-
- drivers/net/ethernet/ti/cpmac.c                    |  4 +-
- drivers/net/ethernet/ti/cpsw.c                     |  2 +-
- drivers/net/ethernet/ti/davinci_emac.c             |  2 +-
- drivers/net/ethernet/ti/davinci_mdio.c             |  2 +-
- drivers/net/ethernet/ti/tlan.c                     |  4 +-
- drivers/net/ethernet/toshiba/ps3_gelic_net.c       | 14 ++--
- drivers/net/ethernet/toshiba/ps3_gelic_wireless.c  |  6 +-
- drivers/net/ethernet/toshiba/spider_net.c          |  2 +-
- drivers/net/ethernet/toshiba/tc35815.c             | 10 +--
- drivers/net/ethernet/via/via-rhine.c               |  6 +-
- drivers/net/ethernet/via/via-velocity.c            | 16 ++--
- drivers/net/ethernet/wiznet/w5100.c                |  4 +-
- drivers/net/ethernet/wiznet/w5300.c                |  4 +-
- drivers/net/ethernet/xilinx/ll_temac_main.c        |  2 +-
- drivers/net/ethernet/xilinx/xilinx_axienet_main.c  |  2 +-
- drivers/net/ethernet/xilinx/xilinx_emaclite.c      |  2 +-
- drivers/net/ethernet/xscale/ixp4xx_eth.c           |  2 +-
- 172 files changed, 516 insertions(+), 517 deletions(-)
+ drivers/video/acornfb.c                            | 14 ++--
+ drivers/video/arcfb.c                              |  2 +-
+ drivers/video/arkfb.c                              |  2 +-
+ drivers/video/asiliantfb.c                         |  6 +-
+ drivers/video/aty/aty128fb.c                       | 22 +++---
+ drivers/video/aty/atyfb_base.c                     | 22 +++---
+ drivers/video/aty/mach64_ct.c                      |  4 +-
+ drivers/video/aty/mach64_cursor.c                  |  2 +-
+ drivers/video/aty/radeon_base.c                    | 14 ++--
+ drivers/video/aty/radeon_monitor.c                 | 16 ++---
+ drivers/video/au1100fb.c                           |  2 +-
+ drivers/video/au1200fb.c                           |  2 +-
+ drivers/video/auo_k1900fb.c                        |  2 +-
+ drivers/video/auo_k1901fb.c                        |  2 +-
+ drivers/video/auo_k190x.c                          |  2 +-
+ drivers/video/bf537-lq035.c                        |  6 +-
+ drivers/video/bf54x-lq043fb.c                      |  2 +-
+ drivers/video/bfin-lq035q1-fb.c                    |  6 +-
+ drivers/video/bfin-t350mcqb-fb.c                   |  2 +-
+ drivers/video/bfin_adv7393fb.c                     |  2 +-
+ drivers/video/broadsheetfb.c                       |  8 +--
+ drivers/video/bw2.c                                |  6 +-
+ drivers/video/carminefb.c                          |  4 +-
+ drivers/video/cg14.c                               |  4 +-
+ drivers/video/cg3.c                                |  8 +--
+ drivers/video/cg6.c                                |  8 +--
+ drivers/video/chipsfb.c                            |  4 +-
+ drivers/video/cirrusfb.c                           | 10 +--
+ drivers/video/cobalt_lcdfb.c                       |  2 +-
+ drivers/video/console/sticore.c                    | 47 ++++++-------
+ drivers/video/cyber2000fb.c                        | 12 ++--
+ drivers/video/da8xx-fb.c                           |  2 +-
+ drivers/video/dnfb.c                               |  2 +-
+ drivers/video/ep93xx-fb.c                          |  4 +-
+ drivers/video/exynos/exynos_dp_core.c              |  2 +-
+ drivers/video/ffb.c                                |  2 +-
+ drivers/video/fm2fb.c                              |  4 +-
+ drivers/video/fsl-diu-fb.c                         |  4 +-
+ drivers/video/gbefb.c                              |  4 +-
+ drivers/video/geode/gx1fb_core.c                   |  6 +-
+ drivers/video/geode/gxfb_core.c                    | 10 +--
+ drivers/video/geode/lxfb_core.c                    | 10 +--
+ drivers/video/grvga.c                              |  4 +-
+ drivers/video/gxt4500.c                            |  4 +-
+ drivers/video/hecubafb.c                           |  2 +-
+ drivers/video/hgafb.c                              |  4 +-
+ drivers/video/hitfb.c                              |  2 +-
+ drivers/video/hpfb.c                               |  4 +-
+ drivers/video/i740fb.c                             |  4 +-
+ drivers/video/i810/i810_main.c                     | 26 +++----
+ drivers/video/i810/i810_main.h                     |  2 +-
+ drivers/video/imsttfb.c                            |  4 +-
+ drivers/video/intelfb/intelfbdrv.c                 | 16 ++---
+ drivers/video/jz4740_fb.c                          |  2 +-
+ drivers/video/kyro/fbdev.c                         |  2 +-
+ drivers/video/leo.c                                |  2 +-
+ drivers/video/mb862xx/mb862xxfbdrv.c               |  6 +-
+ drivers/video/mbx/mbxdebugfs.c                     |  2 +-
+ drivers/video/mbx/mbxfb.c                          | 10 +--
+ drivers/video/metronomefb.c                        | 12 ++--
+ drivers/video/msm/mddi.c                           |  6 +-
+ drivers/video/mxsfb.c                              |  6 +-
+ drivers/video/neofb.c                              | 12 ++--
+ drivers/video/nuc900fb.c                           |  4 +-
+ drivers/video/nvidia/nvidia.c                      | 12 ++--
+ .../omap2/displays/panel-lgphilips-lb035q02.c      |  2 +-
+ drivers/video/p9100.c                              |  2 +-
+ drivers/video/platinumfb.c                         |  6 +-
+ drivers/video/pm2fb.c                              |  2 +-
+ drivers/video/pm3fb.c                              |  4 +-
+ drivers/video/pmag-ba-fb.c                         |  2 +-
+ drivers/video/pmagb-b-fb.c                         |  6 +-
+ drivers/video/ps3fb.c                              |  2 +-
+ drivers/video/pvr2fb.c                             |  6 +-
+ drivers/video/pxa168fb.c                           |  4 +-
+ drivers/video/pxa3xx-gcu.c                         |  2 +-
+ drivers/video/pxafb.c                              | 20 +++---
+ drivers/video/q40fb.c                              |  2 +-
+ drivers/video/riva/fbdev.c                         | 20 +++---
+ drivers/video/riva/rivafb-i2c.c                    |  6 +-
+ drivers/video/s1d13xxxfb.c                         |  4 +-
+ drivers/video/s3c-fb.c                             |  6 +-
+ drivers/video/s3c2410fb.c                          |  8 +--
+ drivers/video/s3fb.c                               |  6 +-
+ drivers/video/sa1100fb.c                           |  6 +-
+ drivers/video/savage/savagefb_driver.c             |  8 +--
+ drivers/video/sgivwfb.c                            |  2 +-
+ drivers/video/sh7760fb.c                           |  2 +-
+ drivers/video/sh_mobile_lcdcfb.c                   | 16 ++---
+ drivers/video/sh_mobile_meram.c                    |  2 +-
+ drivers/video/sis/sis_main.c                       | 82 +++++++++++-----------
+ drivers/video/skeletonfb.c                         |  2 +-
+ drivers/video/sm501fb.c                            |  8 +--
+ drivers/video/sstfb.c                              | 18 ++---
+ drivers/video/sunxvr1000.c                         |  6 +-
+ drivers/video/sunxvr2500.c                         |  6 +-
+ drivers/video/sunxvr500.c                          |  6 +-
+ drivers/video/tcx.c                                |  2 +-
+ drivers/video/tdfxfb.c                             | 10 +--
+ drivers/video/tgafb.c                              | 16 ++---
+ drivers/video/tmiofb.c                             |  2 +-
+ drivers/video/tridentfb.c                          |  8 +--
+ drivers/video/uvesafb.c                            | 30 ++++----
+ drivers/video/vermilion/vermilion.c                |  2 +-
+ drivers/video/vfb.c                                |  2 +-
+ drivers/video/vga16fb.c                            |  2 +-
+ drivers/video/via/dvi.c                            |  8 +--
+ drivers/video/via/dvi.h                            |  4 +-
+ drivers/video/via/hw.c                             | 16 ++---
+ drivers/video/via/hw.h                             |  4 +-
+ drivers/video/via/lcd.c                            | 10 +--
+ drivers/video/via/lcd.h                            |  6 +-
+ drivers/video/via/via-core.c                       | 10 +--
+ drivers/video/via/via-gpio.c                       |  2 +-
+ drivers/video/via/viafbdev.c                       | 10 +--
+ drivers/video/vt8500lcdfb.c                        |  2 +-
+ drivers/video/vt8623fb.c                           |  2 +-
+ drivers/video/w100fb.c                             |  6 +-
+ drivers/video/wm8505fb.c                           |  2 +-
+ drivers/video/wmt_ge_rops.c                        |  2 +-
+ drivers/video/xen-fbfront.c                        |  4 +-
+ drivers/video/xilinxfb.c                           |  2 +-
+ 122 files changed, 438 insertions(+), 443 deletions(-)
 
-diff --git a/drivers/net/ethernet/3com/3c509.c b/drivers/net/ethernet/3com/3c509.c
-index 7d7cd67..7e6466c 100644
---- a/drivers/net/ethernet/3com/3c509.c
-+++ b/drivers/net/ethernet/3com/3c509.c
-@@ -184,7 +184,7 @@ static int max_interrupt_work = 10;
- static int nopnp;
- #endif
- 
--static int __devinit el3_common_init(struct net_device *dev);
-+static int el3_common_init(struct net_device *dev);
- static void el3_common_remove(struct net_device *dev);
- static ushort id_read_eeprom(int index);
- static ushort read_eeprom(int ioaddr, int index);
-@@ -270,7 +270,7 @@ static int el3_isa_id_sequence(__be16 *phys_addr)
- 
- }
- 
--static void __devinit el3_dev_fill(struct net_device *dev, __be16 *phys_addr,
-+static void el3_dev_fill(struct net_device *dev, __be16 *phys_addr,
- 				   int ioaddr, int irq, int if_port,
- 				   enum el3_cardtype type)
- {
-@@ -283,7 +283,7 @@ static void __devinit el3_dev_fill(struct net_device *dev, __be16 *phys_addr,
- 	lp->type = type;
- }
- 
--static int __devinit el3_isa_match(struct device *pdev,
-+static int el3_isa_match(struct device *pdev,
- 				   unsigned int ndev)
- {
- 	struct net_device *dev;
-@@ -406,7 +406,7 @@ static struct pnp_device_id el3_pnp_ids[] = {
- };
- MODULE_DEVICE_TABLE(pnp, el3_pnp_ids);
- 
--static int __devinit el3_pnp_probe(struct pnp_dev *pdev,
-+static int el3_pnp_probe(struct pnp_dev *pdev,
- 				    const struct pnp_device_id *id)
- {
- 	short i;
-@@ -519,7 +519,7 @@ static const struct net_device_ops netdev_ops = {
- #endif
+diff --git a/drivers/video/acornfb.c b/drivers/video/acornfb.c
+index b303f17..772f1ce 100644
+--- a/drivers/video/acornfb.c
++++ b/drivers/video/acornfb.c
+@@ -942,7 +942,7 @@ static struct fb_videomode acornfb_default_mode __devinitdata = {
+ 	.vmode =	FB_VMODE_NONINTERLACED
  };
  
--static int __devinit el3_common_init(struct net_device *dev)
-+static int el3_common_init(struct net_device *dev)
+-static void __devinit acornfb_init_fbinfo(void)
++static void acornfb_init_fbinfo(void)
  {
- 	struct el3_private *lp = netdev_priv(dev);
+ 	static int first = 1;
+ 
+@@ -1018,7 +1018,7 @@ static void __devinit acornfb_init_fbinfo(void)
+  *	size can optionally be followed by 'M' or 'K' for
+  *	MB or KB respectively.
+  */
+-static void __devinit acornfb_parse_mon(char *opt)
++static void acornfb_parse_mon(char *opt)
+ {
+ 	char *p = opt;
+ 
+@@ -1065,7 +1065,7 @@ bad:
+ 	current_par.montype = -1;
+ }
+ 
+-static void __devinit acornfb_parse_montype(char *opt)
++static void acornfb_parse_montype(char *opt)
+ {
+ 	current_par.montype = -2;
+ 
+@@ -1106,7 +1106,7 @@ static void __devinit acornfb_parse_montype(char *opt)
+ 	}
+ }
+ 
+-static void __devinit acornfb_parse_dram(char *opt)
++static void acornfb_parse_dram(char *opt)
+ {
+ 	unsigned int size;
+ 
+@@ -1138,7 +1138,7 @@ static struct options {
+ 	{ NULL, NULL }
+ };
+ 
+-static int __devinit acornfb_setup(char *options)
++static int acornfb_setup(char *options)
+ {
+ 	struct options *optp;
+ 	char *opt;
+@@ -1175,7 +1175,7 @@ static int __devinit acornfb_setup(char *options)
+  * Detect type of monitor connected
+  *  For now, we just assume SVGA
+  */
+-static int __devinit acornfb_detect_monitortype(void)
++static int acornfb_detect_monitortype(void)
+ {
+ 	return 4;
+ }
+@@ -1216,7 +1216,7 @@ free_unused_pages(unsigned int virtual_start, unsigned int virtual_end)
+ 	printk("acornfb: freed %dK memory\n", mb_freed);
+ }
+ 
+-static int __devinit acornfb_probe(struct platform_device *dev)
++static int acornfb_probe(struct platform_device *dev)
+ {
+ 	unsigned long size;
+ 	u_int h_sync, v_sync;
+diff --git a/drivers/video/arcfb.c b/drivers/video/arcfb.c
+index 00967d2..964431a 100644
+--- a/drivers/video/arcfb.c
++++ b/drivers/video/arcfb.c
+@@ -502,7 +502,7 @@ static struct fb_ops arcfb_ops = {
+ 	.fb_ioctl 	= arcfb_ioctl,
+ };
+ 
+-static int __devinit arcfb_probe(struct platform_device *dev)
++static int arcfb_probe(struct platform_device *dev)
+ {
+ 	struct fb_info *info;
+ 	int retval = -ENOMEM;
+diff --git a/drivers/video/arkfb.c b/drivers/video/arkfb.c
+index 6bcb6c1..750efbc 100644
+--- a/drivers/video/arkfb.c
++++ b/drivers/video/arkfb.c
+@@ -950,7 +950,7 @@ static struct fb_ops arkfb_ops = {
+ 
+ 
+ /* PCI probe */
+-static int __devinit ark_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
++static int ark_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
+ {
+ 	struct pci_bus_region bus_reg;
+ 	struct resource vga_res;
+diff --git a/drivers/video/asiliantfb.c b/drivers/video/asiliantfb.c
+index 640cc69..21744e9 100644
+--- a/drivers/video/asiliantfb.c
++++ b/drivers/video/asiliantfb.c
+@@ -451,7 +451,7 @@ static struct chips_init_reg chips_init_xr[] =
+ 	{0xd1, 0x01},
+ };
+ 
+-static void __devinit chips_hw_init(struct fb_info *p)
++static void chips_hw_init(struct fb_info *p)
+ {
+ 	int i;
+ 
+@@ -504,7 +504,7 @@ static struct fb_var_screeninfo asiliantfb_var __devinitdata = {
+ 	.vsync_len 	= 2,
+ };
+ 
+-static int __devinit init_asiliant(struct fb_info *p, unsigned long addr)
++static int init_asiliant(struct fb_info *p, unsigned long addr)
+ {
  	int err;
-diff --git a/drivers/net/ethernet/3com/3c59x.c b/drivers/net/ethernet/3com/3c59x.c
-index 7cff8b8..7e421f3 100644
---- a/drivers/net/ethernet/3com/3c59x.c
-+++ b/drivers/net/ethernet/3com/3c59x.c
-@@ -1000,7 +1000,7 @@ static int __init vortex_eisa_init(void)
- }
  
- /* returns count (>= 0), or negative on error */
--static int __devinit vortex_init_one(struct pci_dev *pdev,
-+static int vortex_init_one(struct pci_dev *pdev,
- 				      const struct pci_device_id *ent)
- {
- 	int rc, unit, pci_bar;
-@@ -1088,7 +1088,7 @@ static const struct net_device_ops vortex_netdev_ops = {
-  *
-  * NOTE: pdev can be NULL, for the case of a Compaq device
-  */
--static int __devinit vortex_probe1(struct device *gendev,
-+static int vortex_probe1(struct device *gendev,
- 				   void __iomem *ioaddr, int irq,
- 				   int chip_idx, int card_idx)
- {
-diff --git a/drivers/net/ethernet/3com/typhoon.c b/drivers/net/ethernet/3com/typhoon.c
-index e11b27f..6d2efdd 100644
---- a/drivers/net/ethernet/3com/typhoon.c
-+++ b/drivers/net/ethernet/3com/typhoon.c
-@@ -2200,7 +2200,7 @@ need_resume:
- }
- #endif
- 
--static int __devinit
-+static int
- typhoon_test_mmio(struct pci_dev *pdev)
- {
- 	void __iomem *ioaddr = pci_iomap(pdev, 1, 128);
-@@ -2258,7 +2258,7 @@ static const struct net_device_ops typhoon_netdev_ops = {
- 	.ndo_change_mtu		= eth_change_mtu,
- };
- 
--static int __devinit
-+static int
- typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
- {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/8390/etherh.c b/drivers/net/ethernet/8390/etherh.c
-index 96ed50d..38fc4fb 100644
---- a/drivers/net/ethernet/8390/etherh.c
-+++ b/drivers/net/ethernet/8390/etherh.c
-@@ -527,7 +527,7 @@ static void __init etherh_banner(void)
-  * Read the ethernet address string from the on board rom.
-  * This is an ascii string...
-  */
--static int __devinit etherh_addr(char *addr, struct expansion_card *ec)
-+static int etherh_addr(char *addr, struct expansion_card *ec)
- {
- 	struct in_chunk_dir cd;
- 	char *s;
-@@ -657,7 +657,7 @@ static const struct net_device_ops etherh_netdev_ops = {
- static u32 etherh_regoffsets[16];
- static u32 etherm_regoffsets[16];
- 
--static int __devinit
-+static int
- etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
- {
- 	const struct etherh_data *data = id->data;
-diff --git a/drivers/net/ethernet/8390/hydra.c b/drivers/net/ethernet/8390/hydra.c
-index dac977f..cf638ba 100644
---- a/drivers/net/ethernet/8390/hydra.c
-+++ b/drivers/net/ethernet/8390/hydra.c
-@@ -53,9 +53,9 @@ static const char version[] =
- #define WORDSWAP(a)     ((((a)>>8)&0xff) | ((a)<<8))
- 
- 
--static int __devinit hydra_init_one(struct zorro_dev *z,
-+static int hydra_init_one(struct zorro_dev *z,
- 				    const struct zorro_device_id *ent);
--static int __devinit hydra_init(struct zorro_dev *z);
-+static int hydra_init(struct zorro_dev *z);
- static int hydra_open(struct net_device *dev);
- static int hydra_close(struct net_device *dev);
- static void hydra_reset_8390(struct net_device *dev);
-@@ -80,7 +80,7 @@ static struct zorro_driver hydra_driver = {
- 	.remove   = hydra_remove_one,
- };
- 
--static int __devinit hydra_init_one(struct zorro_dev *z,
-+static int hydra_init_one(struct zorro_dev *z,
- 				    const struct zorro_device_id *ent)
- {
-     int err;
-@@ -110,7 +110,7 @@ static const struct net_device_ops hydra_netdev_ops = {
- #endif
- };
- 
--static int __devinit hydra_init(struct zorro_dev *z)
-+static int hydra_init(struct zorro_dev *z)
- {
-     struct net_device *dev;
-     unsigned long board = ZTWO_VADDR(z->resource.start);
-diff --git a/drivers/net/ethernet/8390/ne2k-pci.c b/drivers/net/ethernet/8390/ne2k-pci.c
-index 8f09fd99..cdea7e1 100644
---- a/drivers/net/ethernet/8390/ne2k-pci.c
-+++ b/drivers/net/ethernet/8390/ne2k-pci.c
-@@ -215,7 +215,7 @@ static const struct net_device_ops ne2k_netdev_ops = {
- #endif
- };
- 
--static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
-+static int ne2k_pci_init_one (struct pci_dev *pdev,
- 				     const struct pci_device_id *ent)
- {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/8390/zorro8390.c b/drivers/net/ethernet/8390/zorro8390.c
-index 9a041a6..3328eff 100644
---- a/drivers/net/ethernet/8390/zorro8390.c
-+++ b/drivers/net/ethernet/8390/zorro8390.c
-@@ -286,7 +286,7 @@ static const struct net_device_ops zorro8390_netdev_ops = {
- #endif
- };
- 
--static int __devinit zorro8390_init(struct net_device *dev,
-+static int zorro8390_init(struct net_device *dev,
- 				    unsigned long board, const char *name,
- 				    unsigned long ioaddr)
- {
-@@ -396,7 +396,7 @@ static int __devinit zorro8390_init(struct net_device *dev,
+@@ -535,7 +535,7 @@ static int __devinit init_asiliant(struct fb_info *p, unsigned long addr)
  	return 0;
  }
  
--static int __devinit zorro8390_init_one(struct zorro_dev *z,
-+static int zorro8390_init_one(struct zorro_dev *z,
- 					const struct zorro_device_id *ent)
- {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/adaptec/starfire.c b/drivers/net/ethernet/adaptec/starfire.c
-index e986818..7ec9115 100644
---- a/drivers/net/ethernet/adaptec/starfire.c
-+++ b/drivers/net/ethernet/adaptec/starfire.c
-@@ -641,7 +641,7 @@ static const struct net_device_ops netdev_ops = {
- #endif
- };
- 
--static int __devinit starfire_init_one(struct pci_dev *pdev,
-+static int starfire_init_one(struct pci_dev *pdev,
- 				       const struct pci_device_id *ent)
- {
- 	struct device *d = &pdev->dev;
-diff --git a/drivers/net/ethernet/adi/bfin_mac.c b/drivers/net/ethernet/adi/bfin_mac.c
-index cfcce5b..83a8e69 100644
---- a/drivers/net/ethernet/adi/bfin_mac.c
-+++ b/drivers/net/ethernet/adi/bfin_mac.c
-@@ -1603,7 +1603,7 @@ static const struct net_device_ops bfin_mac_netdev_ops = {
- #endif
- };
- 
--static int __devinit bfin_mac_probe(struct platform_device *pdev)
-+static int bfin_mac_probe(struct platform_device *pdev)
- {
- 	struct net_device *ndev;
- 	struct bfin_mac_local *lp;
-@@ -1786,7 +1786,7 @@ static int bfin_mac_resume(struct platform_device *pdev)
- #define bfin_mac_resume NULL
- #endif	/* CONFIG_PM */
- 
--static int __devinit bfin_mii_bus_probe(struct platform_device *pdev)
-+static int bfin_mii_bus_probe(struct platform_device *pdev)
- {
- 	struct mii_bus *miibus;
- 	struct bfin_mii_bus_platform_data *mii_bus_pd;
-diff --git a/drivers/net/ethernet/aeroflex/greth.c b/drivers/net/ethernet/aeroflex/greth.c
-index 3629690..6d99ebb 100644
---- a/drivers/net/ethernet/aeroflex/greth.c
-+++ b/drivers/net/ethernet/aeroflex/greth.c
-@@ -1376,7 +1376,7 @@ error:
- }
- 
- /* Initialize the GRETH MAC */
--static int __devinit greth_of_probe(struct platform_device *ofdev)
-+static int greth_of_probe(struct platform_device *ofdev)
- {
- 	struct net_device *dev;
- 	struct greth_private *greth;
-diff --git a/drivers/net/ethernet/alteon/acenic.c b/drivers/net/ethernet/alteon/acenic.c
-index 9cb94b3..dba93e3 100644
---- a/drivers/net/ethernet/alteon/acenic.c
-+++ b/drivers/net/ethernet/alteon/acenic.c
-@@ -454,7 +454,7 @@ static const struct net_device_ops ace_netdev_ops = {
- 	.ndo_change_mtu		= ace_change_mtu,
- };
- 
--static int __devinit acenic_probe_one(struct pci_dev *pdev,
-+static int acenic_probe_one(struct pci_dev *pdev,
- 		const struct pci_device_id *id)
- {
- 	struct net_device *dev;
-@@ -871,7 +871,7 @@ static inline void ace_issue_cmd(struct ace_regs __iomem *regs, struct cmd *cmd)
- }
- 
- 
--static int __devinit ace_init(struct net_device *dev)
-+static int ace_init(struct net_device *dev)
- {
- 	struct ace_private *ap;
- 	struct ace_regs __iomem *regs;
-@@ -2824,7 +2824,7 @@ static struct net_device_stats *ace_get_stats(struct net_device *dev)
- }
- 
- 
--static void __devinit ace_copy(struct ace_regs __iomem *regs, const __be32 *src,
-+static void ace_copy(struct ace_regs __iomem *regs, const __be32 *src,
- 			       u32 dest, int size)
- {
- 	void __iomem *tdest;
-@@ -2851,7 +2851,7 @@ static void __devinit ace_copy(struct ace_regs __iomem *regs, const __be32 *src,
- }
- 
- 
--static void __devinit ace_clear(struct ace_regs __iomem *regs, u32 dest, int size)
-+static void ace_clear(struct ace_regs __iomem *regs, u32 dest, int size)
- {
- 	void __iomem *tdest;
- 	short tsize = 0, i;
-@@ -2882,7 +2882,7 @@ static void __devinit ace_clear(struct ace_regs __iomem *regs, u32 dest, int siz
-  * This operation requires the NIC to be halted and is performed with
-  * interrupts disabled and with the spinlock hold.
-  */
--static int __devinit ace_load_firmware(struct net_device *dev)
-+static int ace_load_firmware(struct net_device *dev)
- {
- 	const struct firmware *fw;
- 	const char *fw_name = "acenic/tg2.bin";
-@@ -2962,7 +2962,7 @@ static int __devinit ace_load_firmware(struct net_device *dev)
-  * Thanks to Stevarino Webinski for helping tracking down the bugs in the
-  * code i2c readout code by beta testing all my hacks.
-  */
--static void __devinit eeprom_start(struct ace_regs __iomem *regs)
-+static void eeprom_start(struct ace_regs __iomem *regs)
- {
- 	u32 local;
- 
-@@ -2991,7 +2991,7 @@ static void __devinit eeprom_start(struct ace_regs __iomem *regs)
- }
- 
- 
--static void __devinit eeprom_prep(struct ace_regs __iomem *regs, u8 magic)
-+static void eeprom_prep(struct ace_regs __iomem *regs, u8 magic)
- {
- 	short i;
- 	u32 local;
-@@ -3028,7 +3028,7 @@ static void __devinit eeprom_prep(struct ace_regs __iomem *regs, u8 magic)
- }
- 
- 
--static int __devinit eeprom_check_ack(struct ace_regs __iomem *regs)
-+static int eeprom_check_ack(struct ace_regs __iomem *regs)
- {
- 	int state;
- 	u32 local;
-@@ -3056,7 +3056,7 @@ static int __devinit eeprom_check_ack(struct ace_regs __iomem *regs)
- }
- 
- 
--static void __devinit eeprom_stop(struct ace_regs __iomem *regs)
-+static void eeprom_stop(struct ace_regs __iomem *regs)
- {
- 	u32 local;
- 
-@@ -3091,7 +3091,7 @@ static void __devinit eeprom_stop(struct ace_regs __iomem *regs)
- /*
-  * Read a whole byte from the EEPROM.
-  */
--static int __devinit read_eeprom_byte(struct net_device *dev,
-+static int read_eeprom_byte(struct net_device *dev,
- 				   unsigned long offset)
- {
- 	struct ace_private *ap = netdev_priv(dev);
-diff --git a/drivers/net/ethernet/amd/a2065.c b/drivers/net/ethernet/amd/a2065.c
-index 2745c0a..51d917f 100644
---- a/drivers/net/ethernet/amd/a2065.c
-+++ b/drivers/net/ethernet/amd/a2065.c
-@@ -639,7 +639,7 @@ static void lance_set_multicast(struct net_device *dev)
- 	netif_wake_queue(dev);
- }
- 
--static int __devinit a2065_init_one(struct zorro_dev *z,
-+static int a2065_init_one(struct zorro_dev *z,
- 				    const struct zorro_device_id *ent);
- static void __devexit a2065_remove_one(struct zorro_dev *z);
- 
-@@ -670,7 +670,7 @@ static const struct net_device_ops lance_netdev_ops = {
- 	.ndo_set_mac_address	= eth_mac_addr,
- };
- 
--static int __devinit a2065_init_one(struct zorro_dev *z,
-+static int a2065_init_one(struct zorro_dev *z,
- 				    const struct zorro_device_id *ent)
- {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/amd/am79c961a.c b/drivers/net/ethernet/amd/am79c961a.c
-index e10ffad..60e2b701a 100644
---- a/drivers/net/ethernet/amd/am79c961a.c
-+++ b/drivers/net/ethernet/amd/am79c961a.c
-@@ -671,7 +671,7 @@ static const struct net_device_ops am79c961_netdev_ops = {
- #endif
- };
- 
--static int __devinit am79c961_probe(struct platform_device *pdev)
-+static int am79c961_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/amd/amd8111e.c b/drivers/net/ethernet/amd/amd8111e.c
-index 5891636..c66ae87 100644
---- a/drivers/net/ethernet/amd/amd8111e.c
-+++ b/drivers/net/ethernet/amd/amd8111e.c
-@@ -1774,7 +1774,7 @@ static void amd8111e_config_ipg(struct net_device* dev)
- 
- }
- 
--static void __devinit amd8111e_probe_ext_phy(struct net_device* dev)
-+static void amd8111e_probe_ext_phy(struct net_device* dev)
- {
- 	struct amd8111e_priv *lp = netdev_priv(dev);
- 	int i;
-@@ -1810,7 +1810,7 @@ static const struct net_device_ops amd8111e_netdev_ops = {
- #endif
- };
- 
--static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
-+static int amd8111e_probe_one(struct pci_dev *pdev,
- 				  const struct pci_device_id *ent)
- {
- 	int err,i,pm_cap;
-diff --git a/drivers/net/ethernet/amd/ariadne.c b/drivers/net/ethernet/amd/ariadne.c
-index 72b56a8..f9c43f4 100644
---- a/drivers/net/ethernet/amd/ariadne.c
-+++ b/drivers/net/ethernet/amd/ariadne.c
-@@ -710,7 +710,7 @@ static const struct net_device_ops ariadne_netdev_ops = {
- 	.ndo_set_mac_address	= eth_mac_addr,
- };
- 
--static int __devinit ariadne_init_one(struct zorro_dev *z,
-+static int ariadne_init_one(struct zorro_dev *z,
- 				      const struct zorro_device_id *ent)
- {
- 	unsigned long board = z->resource.start;
-diff --git a/drivers/net/ethernet/amd/au1000_eth.c b/drivers/net/ethernet/amd/au1000_eth.c
-index cbbfdc9..884ef9c 100644
---- a/drivers/net/ethernet/amd/au1000_eth.c
-+++ b/drivers/net/ethernet/amd/au1000_eth.c
-@@ -1016,7 +1016,7 @@ static const struct net_device_ops au1000_netdev_ops = {
- 	.ndo_change_mtu		= eth_change_mtu,
- };
- 
--static int __devinit au1000_probe(struct platform_device *pdev)
-+static int au1000_probe(struct platform_device *pdev)
- {
- 	static unsigned version_printed;
- 	struct au1000_private *aup = NULL;
-diff --git a/drivers/net/ethernet/amd/declance.c b/drivers/net/ethernet/amd/declance.c
-index 7203b52..a9380b9 100644
---- a/drivers/net/ethernet/amd/declance.c
-+++ b/drivers/net/ethernet/amd/declance.c
-@@ -1020,7 +1020,7 @@ static const struct net_device_ops lance_netdev_ops = {
- 	.ndo_set_mac_address	= eth_mac_addr,
- };
- 
--static int __devinit dec_lance_probe(struct device *bdev, const int type)
-+static int dec_lance_probe(struct device *bdev, const int type)
- {
- 	static unsigned version_printed;
- 	static const char fmt[] = "declance%d";
-@@ -1322,7 +1322,7 @@ static void __exit dec_lance_platform_remove(void)
- }
- 
- #ifdef CONFIG_TC
--static int __devinit dec_lance_tc_probe(struct device *dev);
-+static int dec_lance_tc_probe(struct device *dev);
- static int __exit dec_lance_tc_remove(struct device *dev);
- 
- static const struct tc_device_id dec_lance_tc_table[] = {
-@@ -1341,7 +1341,7 @@ static struct tc_driver dec_lance_tc_driver = {
- 	},
- };
- 
--static int __devinit dec_lance_tc_probe(struct device *dev)
-+static int dec_lance_tc_probe(struct device *dev)
- {
-         int status = dec_lance_probe(dev, PMAD_LANCE);
-         if (!status)
-diff --git a/drivers/net/ethernet/amd/depca.c b/drivers/net/ethernet/amd/depca.c
-index 8a86c06..34b6bf7 100644
---- a/drivers/net/ethernet/amd/depca.c
-+++ b/drivers/net/ethernet/amd/depca.c
-@@ -1320,7 +1320,7 @@ static enum depca_type __init depca_shmem_probe (ulong *mem_start)
- 	return adapter;
- }
- 
--static int __devinit depca_isa_probe (struct platform_device *device)
-+static int depca_isa_probe (struct platform_device *device)
- {
- 	struct net_device *dev;
- 	struct depca_private *lp;
-diff --git a/drivers/net/ethernet/amd/hplance.c b/drivers/net/ethernet/amd/hplance.c
-index 1b2d4a1..d90aa7b38 100644
---- a/drivers/net/ethernet/amd/hplance.c
-+++ b/drivers/net/ethernet/amd/hplance.c
-@@ -46,9 +46,9 @@ struct hplance_private {
-  * plus board-specific init, open and close actions.
-  * Oh, and we need to tell the generic code how to read and write LANCE registers...
-  */
--static int __devinit hplance_init_one(struct dio_dev *d,
-+static int hplance_init_one(struct dio_dev *d,
- 				const struct dio_device_id *ent);
--static void __devinit hplance_init(struct net_device *dev,
-+static void hplance_init(struct net_device *dev,
- 				struct dio_dev *d);
- static void __devexit hplance_remove_one(struct dio_dev *d);
- static void hplance_writerap(void *priv, unsigned short value);
-@@ -83,7 +83,7 @@ static const struct net_device_ops hplance_netdev_ops = {
- };
- 
- /* Find all the HP Lance boards and initialise them... */
--static int __devinit hplance_init_one(struct dio_dev *d,
-+static int hplance_init_one(struct dio_dev *d,
- 				const struct dio_device_id *ent)
- {
- 	struct net_device *dev;
-@@ -128,7 +128,7 @@ static void __devexit hplance_remove_one(struct dio_dev *d)
- }
- 
- /* Initialise a single lance board at the given DIO device */
--static void __devinit hplance_init(struct net_device *dev, struct dio_dev *d)
-+static void hplance_init(struct net_device *dev, struct dio_dev *d)
- {
-         unsigned long va = (d->resource.start + DIO_VIRADDRBASE);
-         struct hplance_private *lp;
-diff --git a/drivers/net/ethernet/amd/pcnet32.c b/drivers/net/ethernet/amd/pcnet32.c
-index d16fcd8..9771928 100644
---- a/drivers/net/ethernet/amd/pcnet32.c
-+++ b/drivers/net/ethernet/amd/pcnet32.c
-@@ -1443,7 +1443,7 @@ static const struct ethtool_ops pcnet32_ethtool_ops = {
- /* only probes for non-PCI devices, the rest are handled by
-  * pci_register_driver via pcnet32_probe_pci */
- 
--static void __devinit pcnet32_probe_vlbus(unsigned int *pcnet32_portlist)
-+static void pcnet32_probe_vlbus(unsigned int *pcnet32_portlist)
- {
- 	unsigned int *port, ioaddr;
- 
-@@ -1462,7 +1462,7 @@ static void __devinit pcnet32_probe_vlbus(unsigned int *pcnet32_portlist)
- 	}
- }
- 
 -static int __devinit
 +static int
- pcnet32_probe_pci(struct pci_dev *pdev, const struct pci_device_id *ent)
+ asiliantfb_pci_init(struct pci_dev *dp, const struct pci_device_id *ent)
  {
- 	unsigned long ioaddr;
-@@ -1521,7 +1521,7 @@ static const struct net_device_ops pcnet32_netdev_ops = {
-  *  Called from both pcnet32_probe_vlbus and pcnet_probe_pci.
-  *  pdev will be NULL when called from pcnet32_probe_vlbus.
-  */
--static int __devinit
-+static int
- pcnet32_probe1(unsigned long ioaddr, int shared, struct pci_dev *pdev)
- {
- 	struct pcnet32_private *lp;
-diff --git a/drivers/net/ethernet/amd/sunlance.c b/drivers/net/ethernet/amd/sunlance.c
-index d794921..3c5bf2b 100644
---- a/drivers/net/ethernet/amd/sunlance.c
-+++ b/drivers/net/ethernet/amd/sunlance.c
-@@ -1304,7 +1304,7 @@ static const struct net_device_ops sparc_lance_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- };
- 
--static int __devinit sparc_lance_probe_one(struct platform_device *op,
-+static int sparc_lance_probe_one(struct platform_device *op,
- 					   struct platform_device *ledma,
- 					   struct platform_device *lebuffer)
- {
-@@ -1488,7 +1488,7 @@ fail:
- 	return -ENODEV;
- }
- 
--static int __devinit sunlance_sbus_probe(struct platform_device *op)
-+static int sunlance_sbus_probe(struct platform_device *op)
- {
- 	struct platform_device *parent = to_platform_device(op->dev.parent);
- 	struct device_node *parent_dp = parent->dev.of_node;
-diff --git a/drivers/net/ethernet/apple/bmac.c b/drivers/net/ethernet/apple/bmac.c
-index 855bdaf..420a06e 100644
---- a/drivers/net/ethernet/apple/bmac.c
-+++ b/drivers/net/ethernet/apple/bmac.c
-@@ -1244,7 +1244,7 @@ static const struct net_device_ops bmac_netdev_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- };
- 
--static int __devinit bmac_probe(struct macio_dev *mdev, const struct of_device_id *match)
-+static int bmac_probe(struct macio_dev *mdev, const struct of_device_id *match)
- {
- 	int j, rev, ret;
- 	struct bmac_data *bp;
-diff --git a/drivers/net/ethernet/apple/mace.c b/drivers/net/ethernet/apple/mace.c
-index e1df4b7..21cf031 100644
---- a/drivers/net/ethernet/apple/mace.c
-+++ b/drivers/net/ethernet/apple/mace.c
-@@ -106,7 +106,7 @@ static const struct net_device_ops mace_netdev_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- };
- 
--static int __devinit mace_probe(struct macio_dev *mdev, const struct of_device_id *match)
-+static int mace_probe(struct macio_dev *mdev, const struct of_device_id *match)
- {
- 	struct device_node *mace = macio_get_of_node(mdev);
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/apple/macmace.c b/drivers/net/ethernet/apple/macmace.c
-index c2e9ef6..7decd85 100644
---- a/drivers/net/ethernet/apple/macmace.c
-+++ b/drivers/net/ethernet/apple/macmace.c
-@@ -195,7 +195,7 @@ static const struct net_device_ops mace_netdev_ops = {
-  * model of Macintrash has a MACE (AV macintoshes)
-  */
- 
--static int __devinit mace_probe(struct platform_device *pdev)
-+static int mace_probe(struct platform_device *pdev)
- {
- 	int j;
- 	struct mace_data *mp;
-diff --git a/drivers/net/ethernet/atheros/atl1c/atl1c_main.c b/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
-index edb5d6e..576fd4b 100644
---- a/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
-+++ b/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
-@@ -643,7 +643,7 @@ static int atl1c_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
-  * @adapter: board private structure to initialize
-  *
-  */
--static int __devinit atl1c_alloc_queues(struct atl1c_adapter *adapter)
-+static int atl1c_alloc_queues(struct atl1c_adapter *adapter)
- {
- 	return 0;
- }
-@@ -725,7 +725,7 @@ static const struct atl1c_platform_patch plats[] __devinitconst = {
- {0},
- };
- 
--static void __devinit atl1c_patch_assign(struct atl1c_hw *hw)
-+static void atl1c_patch_assign(struct atl1c_hw *hw)
- {
- 	struct pci_dev	*pdev = hw->adapter->pdev;
- 	u32 misc_ctrl;
-@@ -764,7 +764,7 @@ static void __devinit atl1c_patch_assign(struct atl1c_hw *hw)
-  * Fields are initialized based on PCI device information and
-  * OS network device settings (MTU size).
-  */
--static int __devinit atl1c_sw_init(struct atl1c_adapter *adapter)
-+static int atl1c_sw_init(struct atl1c_adapter *adapter)
- {
- 	struct atl1c_hw *hw   = &adapter->hw;
- 	struct pci_dev	*pdev = adapter->pdev;
-@@ -2442,7 +2442,7 @@ static int atl1c_init_netdev(struct net_device *netdev, struct pci_dev *pdev)
-  * The OS initialization, configuring of the adapter private structure,
-  * and a hardware reset occur.
-  */
--static int __devinit atl1c_probe(struct pci_dev *pdev,
-+static int atl1c_probe(struct pci_dev *pdev,
- 				 const struct pci_device_id *ent)
- {
- 	struct net_device *netdev;
-diff --git a/drivers/net/ethernet/atheros/atl1e/atl1e_main.c b/drivers/net/ethernet/atheros/atl1e/atl1e_main.c
-index eacf624..9fff8b9 100644
---- a/drivers/net/ethernet/atheros/atl1e/atl1e_main.c
-+++ b/drivers/net/ethernet/atheros/atl1e/atl1e_main.c
-@@ -534,7 +534,7 @@ static void atl1e_setup_pcicmd(struct pci_dev *pdev)
-  * @adapter: board private structure to initialize
-  *
-  */
--static int __devinit atl1e_alloc_queues(struct atl1e_adapter *adapter)
-+static int atl1e_alloc_queues(struct atl1e_adapter *adapter)
- {
- 	return 0;
- }
-@@ -547,7 +547,7 @@ static int __devinit atl1e_alloc_queues(struct atl1e_adapter *adapter)
-  * Fields are initialized based on PCI device information and
-  * OS network device settings (MTU size).
-  */
--static int __devinit atl1e_sw_init(struct atl1e_adapter *adapter)
-+static int atl1e_sw_init(struct atl1e_adapter *adapter)
- {
- 	struct atl1e_hw *hw   = &adapter->hw;
- 	struct pci_dev	*pdev = adapter->pdev;
-@@ -2235,7 +2235,7 @@ static int atl1e_init_netdev(struct net_device *netdev, struct pci_dev *pdev)
-  * The OS initialization, configuring of the adapter private structure,
-  * and a hardware reset occur.
-  */
--static int __devinit atl1e_probe(struct pci_dev *pdev,
-+static int atl1e_probe(struct pci_dev *pdev,
- 				 const struct pci_device_id *ent)
- {
- 	struct net_device *netdev;
-diff --git a/drivers/net/ethernet/atheros/atl1e/atl1e_param.c b/drivers/net/ethernet/atheros/atl1e/atl1e_param.c
-index b5086f1..b2d740a 100644
---- a/drivers/net/ethernet/atheros/atl1e/atl1e_param.c
-+++ b/drivers/net/ethernet/atheros/atl1e/atl1e_param.c
-@@ -116,7 +116,7 @@ struct atl1e_option {
- 	} arg;
- };
- 
--static int __devinit atl1e_validate_option(int *value, struct atl1e_option *opt, struct atl1e_adapter *adapter)
-+static int atl1e_validate_option(int *value, struct atl1e_option *opt, struct atl1e_adapter *adapter)
- {
- 	if (*value == OPTION_UNSET) {
- 		*value = opt->def;
-@@ -177,7 +177,7 @@ static int __devinit atl1e_validate_option(int *value, struct atl1e_option *opt,
-  * value exists, a default value is used.  The final value is stored
-  * in a variable in the adapter structure.
-  */
--void __devinit atl1e_check_options(struct atl1e_adapter *adapter)
-+void atl1e_check_options(struct atl1e_adapter *adapter)
- {
- 	int bd = adapter->bd_number;
- 
-diff --git a/drivers/net/ethernet/atheros/atlx/atl1.c b/drivers/net/ethernet/atheros/atlx/atl1.c
-index b396907..736c022 100644
---- a/drivers/net/ethernet/atheros/atlx/atl1.c
-+++ b/drivers/net/ethernet/atheros/atlx/atl1.c
-@@ -143,7 +143,7 @@ struct atl1_option {
- 	} arg;
- };
- 
--static int __devinit atl1_validate_option(int *value, struct atl1_option *opt,
-+static int atl1_validate_option(int *value, struct atl1_option *opt,
- 	struct pci_dev *pdev)
- {
- 	if (*value == OPTION_UNSET) {
-@@ -204,7 +204,7 @@ static int __devinit atl1_validate_option(int *value, struct atl1_option *opt,
-  * value exists, a default value is used.  The final value is stored
-  * in a variable in the adapter structure.
-  */
--static void __devinit atl1_check_options(struct atl1_adapter *adapter)
-+static void atl1_check_options(struct atl1_adapter *adapter)
- {
- 	struct pci_dev *pdev = adapter->pdev;
- 	int bd = adapter->bd_number;
-@@ -945,7 +945,7 @@ static void atl1_set_mac_addr(struct atl1_hw *hw)
-  * Fields are initialized based on PCI device information and
-  * OS network device settings (MTU size).
-  */
--static int __devinit atl1_sw_init(struct atl1_adapter *adapter)
-+static int atl1_sw_init(struct atl1_adapter *adapter)
- {
- 	struct atl1_hw *hw = &adapter->hw;
- 	struct net_device *netdev = adapter->netdev;
-@@ -2934,7 +2934,7 @@ static const struct net_device_ops atl1_netdev_ops = {
-  * The OS initialization, configuring of the adapter private structure,
-  * and a hardware reset occur.
-  */
--static int __devinit atl1_probe(struct pci_dev *pdev,
-+static int atl1_probe(struct pci_dev *pdev,
- 	const struct pci_device_id *ent)
- {
- 	struct net_device *netdev;
-diff --git a/drivers/net/ethernet/atheros/atlx/atl2.c b/drivers/net/ethernet/atheros/atlx/atl2.c
-index 0988200..2a5f117 100644
---- a/drivers/net/ethernet/atheros/atlx/atl2.c
-+++ b/drivers/net/ethernet/atheros/atlx/atl2.c
-@@ -83,7 +83,7 @@ static void atl2_check_options(struct atl2_adapter *adapter);
-  * Fields are initialized based on PCI device information and
-  * OS network device settings (MTU size).
-  */
--static int __devinit atl2_sw_init(struct atl2_adapter *adapter)
-+static int atl2_sw_init(struct atl2_adapter *adapter)
- {
- 	struct atl2_hw *hw = &adapter->hw;
- 	struct pci_dev *pdev = adapter->pdev;
-@@ -1338,7 +1338,7 @@ static const struct net_device_ops atl2_netdev_ops = {
-  * The OS initialization, configuring of the adapter private structure,
-  * and a hardware reset occur.
-  */
--static int __devinit atl2_probe(struct pci_dev *pdev,
-+static int atl2_probe(struct pci_dev *pdev,
- 	const struct pci_device_id *ent)
- {
- 	struct net_device *netdev;
-@@ -2934,7 +2934,7 @@ struct atl2_option {
- 	} arg;
- };
- 
--static int __devinit atl2_validate_option(int *value, struct atl2_option *opt)
-+static int atl2_validate_option(int *value, struct atl2_option *opt)
- {
- 	int i;
- 	struct atl2_opt_list *ent;
-@@ -2992,7 +2992,7 @@ static int __devinit atl2_validate_option(int *value, struct atl2_option *opt)
-  * value exists, a default value is used.  The final value is stored
-  * in a variable in the adapter structure.
-  */
--static void __devinit atl2_check_options(struct atl2_adapter *adapter)
-+static void atl2_check_options(struct atl2_adapter *adapter)
- {
- 	int val;
- 	struct atl2_option opt;
-diff --git a/drivers/net/ethernet/broadcom/b44.c b/drivers/net/ethernet/broadcom/b44.c
-index 94fa5d8..7fda109 100644
---- a/drivers/net/ethernet/broadcom/b44.c
-+++ b/drivers/net/ethernet/broadcom/b44.c
-@@ -2083,7 +2083,7 @@ out:
- 	return err;
- }
- 
--static int __devinit b44_get_invariants(struct b44 *bp)
-+static int b44_get_invariants(struct b44 *bp)
- {
- 	struct ssb_device *sdev = bp->sdev;
- 	int err = 0;
-@@ -2141,7 +2141,7 @@ static const struct net_device_ops b44_netdev_ops = {
+ 	unsigned long addr, size;
+diff --git a/drivers/video/aty/aty128fb.c b/drivers/video/aty/aty128fb.c
+index 426e3f2..d9f88cc 100644
+--- a/drivers/video/aty/aty128fb.c
++++ b/drivers/video/aty/aty128fb.c
+@@ -449,9 +449,9 @@ static int aty128_encode_var(struct fb_var_screeninfo *var,
+ static int aty128_decode_var(struct fb_var_screeninfo *var,
+                              struct aty128fb_par *par);
+ #if 0
+-static void __devinit aty128_get_pllinfo(struct aty128fb_par *par,
++static void aty128_get_pllinfo(struct aty128fb_par *par,
+ 					 void __iomem *bios);
+-static void __devinit __iomem *aty128_map_ROM(struct pci_dev *pdev,
++static void __iomem *aty128_map_ROM(struct pci_dev *pdev,
+ 					      const struct aty128fb_par *par);
  #endif
- };
- 
--static int __devinit b44_init_one(struct ssb_device *sdev,
-+static int b44_init_one(struct ssb_device *sdev,
- 				  const struct ssb_device_id *ent)
- {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-index f062656..1bdff26 100644
---- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-+++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-@@ -1612,7 +1612,7 @@ static const struct net_device_ops bcm_enet_ops = {
- /*
-  * allocate netdevice, request register memory and register device.
-  */
--static int __devinit bcm_enet_probe(struct platform_device *pdev)
-+static int bcm_enet_probe(struct platform_device *pdev)
- {
- 	struct bcm_enet_priv *priv;
- 	struct net_device *dev;
-@@ -1887,7 +1887,7 @@ struct platform_driver bcm63xx_enet_driver = {
- /*
-  * reserve & remap memory space shared between all macs
-  */
--static int __devinit bcm_enet_shared_probe(struct platform_device *pdev)
-+static int bcm_enet_shared_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
- 	unsigned int iomem_size;
-diff --git a/drivers/net/ethernet/broadcom/bnx2.c b/drivers/net/ethernet/broadcom/bnx2.c
-index 7b55f78..d9388a0 100644
---- a/drivers/net/ethernet/broadcom/bnx2.c
-+++ b/drivers/net/ethernet/broadcom/bnx2.c
-@@ -7896,7 +7896,7 @@ poll_bnx2(struct net_device *dev)
- }
- #endif
- 
--static void __devinit
-+static void
- bnx2_get_5709_media(struct bnx2 *bp)
- {
- 	u32 val = REG_RD(bp, BNX2_MISC_DUAL_MEDIA_CTRL);
-@@ -7934,7 +7934,7 @@ bnx2_get_5709_media(struct bnx2 *bp)
- 	}
- }
- 
--static void __devinit
-+static void
- bnx2_get_pci_speed(struct bnx2 *bp)
- {
- 	u32 reg;
-@@ -7986,7 +7986,7 @@ bnx2_get_pci_speed(struct bnx2 *bp)
- 
- }
- 
--static void __devinit
-+static void
- bnx2_read_vpd_fw_ver(struct bnx2 *bp)
- {
- 	int rc, i, j;
-@@ -8054,7 +8054,7 @@ vpd_done:
- 	kfree(data);
- }
- 
--static int __devinit
-+static int
- bnx2_init_board(struct pci_dev *pdev, struct net_device *dev)
- {
- 	struct bnx2 *bp;
-@@ -8439,8 +8439,7 @@ err_out:
- 	return rc;
- }
- 
--static char * __devinit
--bnx2_bus_string(struct bnx2 *bp, char *str)
-+static char *bnx2_bus_string(struct bnx2 *bp, char *str)
- {
- 	char *s = str;
- 
-@@ -8505,7 +8504,7 @@ static const struct net_device_ops bnx2_netdev_ops = {
- #endif
- };
- 
--static int __devinit
-+static int
- bnx2_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
- {
- 	static int version_printed = 0;
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c
-index 96f5a4e..85d358a 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c
-@@ -3868,7 +3868,7 @@ void bnx2x_free_mem_bp(struct bnx2x *bp)
- 	kfree(bp->ilt);
- }
- 
--int __devinit bnx2x_alloc_mem_bp(struct bnx2x *bp)
-+int bnx2x_alloc_mem_bp(struct bnx2x *bp)
- {
- 	struct bnx2x_fastpath *fp;
- 	struct msix_entry *tbl;
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.h b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.h
-index ad28074..7473fb5 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.h
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.h
-@@ -563,7 +563,7 @@ int bnx2x_poll(struct napi_struct *napi, int budget);
-  *
-  * @bp:		driver handle
-  */
--int __devinit bnx2x_alloc_mem_bp(struct bnx2x *bp);
-+int bnx2x_alloc_mem_bp(struct bnx2x *bp);
- 
- /**
-  * bnx2x_free_mem_bp - release memories outsize main driver structure
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-index d9e72fcb..0719c20 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-@@ -9395,7 +9395,7 @@ static inline void bnx2x_undi_int_disable(struct bnx2x *bp)
- 		bnx2x_undi_int_disable_e1h(bp);
- }
- 
--static void __devinit bnx2x_prev_unload_close_mac(struct bnx2x *bp)
-+static void bnx2x_prev_unload_close_mac(struct bnx2x *bp)
- {
- 	u32 val, base_addr, offset, mask, reset_reg;
- 	bool mac_stopped = false;
-@@ -9462,7 +9462,7 @@ static void __devinit bnx2x_prev_unload_close_mac(struct bnx2x *bp)
- #define BNX2X_PREV_UNDI_BD(val)		((val) >> 16 & 0xffff)
- #define BNX2X_PREV_UNDI_PROD(rcq, bd)	((bd) << 16 | (rcq))
- 
--static void __devinit bnx2x_prev_unload_undi_inc(struct bnx2x *bp, u8 port,
-+static void bnx2x_prev_unload_undi_inc(struct bnx2x *bp, u8 port,
- 						 u8 inc)
- {
- 	u16 rcq, bd;
-@@ -9478,7 +9478,7 @@ static void __devinit bnx2x_prev_unload_undi_inc(struct bnx2x *bp, u8 port,
- 		       port, bd, rcq);
- }
- 
--static int __devinit bnx2x_prev_mcp_done(struct bnx2x *bp)
-+static int bnx2x_prev_mcp_done(struct bnx2x *bp)
- {
- 	u32 rc = bnx2x_fw_command(bp, DRV_MSG_CODE_UNLOAD_DONE,
- 				  DRV_MSG_CODE_UNLOAD_SKIP_LINK_RESET);
-@@ -9490,7 +9490,7 @@ static int __devinit bnx2x_prev_mcp_done(struct bnx2x *bp)
- 	return 0;
- }
- 
--static bool __devinit bnx2x_prev_is_path_marked(struct bnx2x *bp)
-+static bool bnx2x_prev_is_path_marked(struct bnx2x *bp)
- {
- 	struct bnx2x_prev_path_list *tmp_list;
- 	int rc = false;
-@@ -9514,7 +9514,7 @@ static bool __devinit bnx2x_prev_is_path_marked(struct bnx2x *bp)
- 	return rc;
- }
- 
--static int __devinit bnx2x_prev_mark_path(struct bnx2x *bp)
-+static int bnx2x_prev_mark_path(struct bnx2x *bp)
- {
- 	struct bnx2x_prev_path_list *tmp_list;
- 	int rc;
-@@ -9543,7 +9543,7 @@ static int __devinit bnx2x_prev_mark_path(struct bnx2x *bp)
- 	return rc;
- }
- 
--static int __devinit bnx2x_do_flr(struct bnx2x *bp)
-+static int bnx2x_do_flr(struct bnx2x *bp)
- {
- 	int i;
- 	u16 status;
-@@ -9583,7 +9583,7 @@ clear:
- 	return 0;
- }
- 
--static int __devinit bnx2x_prev_unload_uncommon(struct bnx2x *bp)
-+static int bnx2x_prev_unload_uncommon(struct bnx2x *bp)
- {
- 	int rc;
- 
-@@ -9621,7 +9621,7 @@ static int __devinit bnx2x_prev_unload_uncommon(struct bnx2x *bp)
- 	return rc;
- }
- 
--static int __devinit bnx2x_prev_unload_common(struct bnx2x *bp)
-+static int bnx2x_prev_unload_common(struct bnx2x *bp)
- {
- 	u32 reset_reg, tmp_reg = 0, rc;
- 	/* It is possible a previous function received 'common' answer,
-@@ -9704,7 +9704,7 @@ static int __devinit bnx2x_prev_unload_common(struct bnx2x *bp)
-  * to clear the interrupt which detected this from the pglueb and the was done
-  * bit
-  */
--static void __devinit bnx2x_prev_interrupted_dmae(struct bnx2x *bp)
-+static void bnx2x_prev_interrupted_dmae(struct bnx2x *bp)
- {
- 	u32 val = REG_RD(bp, PGLUE_B_REG_PGLUE_B_INT_STS);
- 	if (val & PGLUE_B_PGLUE_B_INT_STS_REG_WAS_ERROR_ATTN) {
-@@ -9713,7 +9713,7 @@ static void __devinit bnx2x_prev_interrupted_dmae(struct bnx2x *bp)
- 	}
- }
- 
--static int __devinit bnx2x_prev_unload(struct bnx2x *bp)
-+static int bnx2x_prev_unload(struct bnx2x *bp)
- {
- 	int time_counter = 10;
- 	u32 rc, fw, hw_lock_reg, hw_lock_val;
-@@ -9780,7 +9780,7 @@ static int __devinit bnx2x_prev_unload(struct bnx2x *bp)
- 	return rc;
- }
- 
--static void __devinit bnx2x_get_common_hwinfo(struct bnx2x *bp)
-+static void bnx2x_get_common_hwinfo(struct bnx2x *bp)
- {
- 	u32 val, val2, val3, val4, id, boot_mode;
- 	u16 pmc;
-@@ -9950,7 +9950,7 @@ static void __devinit bnx2x_get_common_hwinfo(struct bnx2x *bp)
- #define IGU_FID(val)	GET_FIELD((val), IGU_REG_MAPPING_MEMORY_FID)
- #define IGU_VEC(val)	GET_FIELD((val), IGU_REG_MAPPING_MEMORY_VECTOR)
- 
--static void __devinit bnx2x_get_igu_cam_info(struct bnx2x *bp)
-+static void bnx2x_get_igu_cam_info(struct bnx2x *bp)
- {
- 	int pfid = BP_FUNC(bp);
- 	int igu_sb_id;
-@@ -10005,7 +10005,7 @@ static void __devinit bnx2x_get_igu_cam_info(struct bnx2x *bp)
- 		BNX2X_ERR("CAM configuration error\n");
- }
- 
--static void __devinit bnx2x_link_settings_supported(struct bnx2x *bp,
-+static void bnx2x_link_settings_supported(struct bnx2x *bp,
- 						    u32 switch_cfg)
- {
- 	int cfg_size = 0, idx, port = BP_PORT(bp);
-@@ -10104,7 +10104,7 @@ static void __devinit bnx2x_link_settings_supported(struct bnx2x *bp,
- 		       bp->port.supported[1]);
- }
- 
--static void __devinit bnx2x_link_settings_requested(struct bnx2x *bp)
-+static void bnx2x_link_settings_requested(struct bnx2x *bp)
- {
- 	u32 link_config, idx, cfg_size = 0;
- 	bp->port.advertising[0] = 0;
-@@ -10288,7 +10288,7 @@ static void __devinit bnx2x_link_settings_requested(struct bnx2x *bp)
- 	}
- }
- 
--static void __devinit bnx2x_set_mac_buf(u8 *mac_buf, u32 mac_lo, u16 mac_hi)
-+static void bnx2x_set_mac_buf(u8 *mac_buf, u32 mac_lo, u16 mac_hi)
- {
- 	mac_hi = cpu_to_be16(mac_hi);
- 	mac_lo = cpu_to_be32(mac_lo);
-@@ -10296,7 +10296,7 @@ static void __devinit bnx2x_set_mac_buf(u8 *mac_buf, u32 mac_lo, u16 mac_hi)
- 	memcpy(mac_buf + sizeof(mac_hi), &mac_lo, sizeof(mac_lo));
- }
- 
--static void __devinit bnx2x_get_port_hwinfo(struct bnx2x *bp)
-+static void bnx2x_get_port_hwinfo(struct bnx2x *bp)
- {
- 	int port = BP_PORT(bp);
- 	u32 config;
-@@ -10411,7 +10411,7 @@ void bnx2x_get_iscsi_info(struct bnx2x *bp)
- 
- }
- 
--static void __devinit bnx2x_get_ext_wwn_info(struct bnx2x *bp, int func)
-+static void bnx2x_get_ext_wwn_info(struct bnx2x *bp, int func)
- {
- 	/* Port info */
- 	bp->cnic_eth_dev.fcoe_wwn_port_name_hi =
-@@ -10425,7 +10425,7 @@ static void __devinit bnx2x_get_ext_wwn_info(struct bnx2x *bp, int func)
- 	bp->cnic_eth_dev.fcoe_wwn_node_name_lo =
- 		MF_CFG_RD(bp, func_ext_config[func].fcoe_wwn_node_name_lower);
- }
--static void __devinit bnx2x_get_fcoe_info(struct bnx2x *bp)
-+static void bnx2x_get_fcoe_info(struct bnx2x *bp)
- {
- 	int port = BP_PORT(bp);
- 	int func = BP_ABS_FUNC(bp);
-@@ -10484,7 +10484,7 @@ static void __devinit bnx2x_get_fcoe_info(struct bnx2x *bp)
- 		bp->flags |= NO_FCOE_FLAG;
- }
- 
--static void __devinit bnx2x_get_cnic_info(struct bnx2x *bp)
-+static void bnx2x_get_cnic_info(struct bnx2x *bp)
- {
- 	/*
- 	 * iSCSI may be dynamically disabled but reading
-@@ -10495,7 +10495,7 @@ static void __devinit bnx2x_get_cnic_info(struct bnx2x *bp)
- 	bnx2x_get_fcoe_info(bp);
- }
- 
--static void __devinit bnx2x_get_cnic_mac_hwinfo(struct bnx2x *bp)
-+static void bnx2x_get_cnic_mac_hwinfo(struct bnx2x *bp)
- {
- 	u32 val, val2;
- 	int func = BP_ABS_FUNC(bp);
-@@ -10589,7 +10589,7 @@ static void __devinit bnx2x_get_cnic_mac_hwinfo(struct bnx2x *bp)
- 	}
- }
- 
--static void __devinit bnx2x_get_mac_hwinfo(struct bnx2x *bp)
-+static void bnx2x_get_mac_hwinfo(struct bnx2x *bp)
- {
- 	u32 val, val2;
- 	int func = BP_ABS_FUNC(bp);
-@@ -10632,7 +10632,7 @@ static void __devinit bnx2x_get_mac_hwinfo(struct bnx2x *bp)
- 
- }
- 
--static int __devinit bnx2x_get_hwinfo(struct bnx2x *bp)
-+static int bnx2x_get_hwinfo(struct bnx2x *bp)
- {
- 	int /*abs*/func = BP_ABS_FUNC(bp);
- 	int vn;
-@@ -10855,7 +10855,7 @@ static int __devinit bnx2x_get_hwinfo(struct bnx2x *bp)
- 	return rc;
- }
- 
--static void __devinit bnx2x_read_fwinfo(struct bnx2x *bp)
-+static void bnx2x_read_fwinfo(struct bnx2x *bp)
- {
- 	int cnt, i, block_end, rodi;
- 	char vpd_start[BNX2X_VPD_LEN+1];
-@@ -10940,7 +10940,7 @@ out_not_found:
- 	return;
- }
- 
--static void __devinit bnx2x_set_modes_bitmap(struct bnx2x *bp)
-+static void bnx2x_set_modes_bitmap(struct bnx2x *bp)
- {
- 	u32 flags = 0;
- 
-@@ -10990,7 +10990,7 @@ static void __devinit bnx2x_set_modes_bitmap(struct bnx2x *bp)
- 	INIT_MODE_FLAGS(bp) = flags;
- }
- 
--static int __devinit bnx2x_init_bp(struct bnx2x *bp)
-+static int bnx2x_init_bp(struct bnx2x *bp)
- {
- 	int func;
- 	int rc;
-@@ -11466,7 +11466,7 @@ static int bnx2x_set_coherency_mask(struct bnx2x *bp)
- 	return 0;
- }
- 
--static int __devinit bnx2x_init_dev(struct pci_dev *pdev,
-+static int bnx2x_init_dev(struct pci_dev *pdev,
- 				    struct net_device *dev,
- 				    unsigned long board_type)
- {
-@@ -11640,7 +11640,7 @@ err_out:
- 	return rc;
- }
- 
--static void __devinit bnx2x_get_pcie_width_speed(struct bnx2x *bp,
-+static void bnx2x_get_pcie_width_speed(struct bnx2x *bp,
- 						 int *width, int *speed)
- {
- 	u32 val = REG_RD(bp, PCICFG_OFFSET + PCICFG_LINK_CONTROL);
-@@ -11945,7 +11945,7 @@ static int bnx2x_get_num_non_def_sbs(struct pci_dev *pdev,
- 	return control & PCI_MSIX_FLAGS_QSIZE;
- }
- 
--static int __devinit bnx2x_init_one(struct pci_dev *pdev,
-+static int bnx2x_init_one(struct pci_dev *pdev,
- 				    const struct pci_device_id *ent)
- {
- 	struct net_device *dev = NULL;
-diff --git a/drivers/net/ethernet/broadcom/sb1250-mac.c b/drivers/net/ethernet/broadcom/sb1250-mac.c
-index 49e7a25..3a1c8a3 100644
---- a/drivers/net/ethernet/broadcom/sb1250-mac.c
-+++ b/drivers/net/ethernet/broadcom/sb1250-mac.c
-@@ -2586,7 +2586,7 @@ static int sbmac_poll(struct napi_struct *napi, int budget)
- }
+ static void aty128_timings(struct aty128fb_par *par);
+@@ -582,7 +582,7 @@ static void aty_pll_writeupdate(const struct aty128fb_par *par)
  
  
--static int __devinit sbmac_probe(struct platform_device *pldev)
-+static int sbmac_probe(struct platform_device *pldev)
- {
- 	struct net_device *dev;
- 	struct sbmac_softc *sc;
-diff --git a/drivers/net/ethernet/broadcom/tg3.c b/drivers/net/ethernet/broadcom/tg3.c
-index d752b10..875887e 100644
---- a/drivers/net/ethernet/broadcom/tg3.c
-+++ b/drivers/net/ethernet/broadcom/tg3.c
-@@ -9891,7 +9891,7 @@ restart_timer:
- 	add_timer(&tp->timer);
- }
- 
--static void __devinit tg3_timer_init(struct tg3 *tp)
-+static void tg3_timer_init(struct tg3 *tp)
- {
- 	if (tg3_flag(tp, TAGGED_STATUS) &&
- 	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5717 &&
-@@ -12778,7 +12778,7 @@ static const struct net_device_ops tg3_netdev_ops = {
- #endif
- };
- 
--static void __devinit tg3_get_eeprom_size(struct tg3 *tp)
-+static void tg3_get_eeprom_size(struct tg3 *tp)
- {
- 	u32 cursize, val, magic;
- 
-@@ -12812,7 +12812,7 @@ static void __devinit tg3_get_eeprom_size(struct tg3 *tp)
- 	tp->nvram_size = cursize;
- }
- 
--static void __devinit tg3_get_nvram_size(struct tg3 *tp)
-+static void tg3_get_nvram_size(struct tg3 *tp)
+ /* write to the scratch register to test r/w functionality */
+-static int __devinit register_test(const struct aty128fb_par *par)
++static int register_test(const struct aty128fb_par *par)
  {
  	u32 val;
+ 	int flag = 0;
+@@ -781,7 +781,7 @@ static u32 depth_to_dst(u32 depth)
  
-@@ -12845,7 +12845,7 @@ static void __devinit tg3_get_nvram_size(struct tg3 *tp)
- 	tp->nvram_size = TG3_NVRAM_SIZE_512KB;
- }
  
--static void __devinit tg3_get_nvram_info(struct tg3 *tp)
-+static void tg3_get_nvram_info(struct tg3 *tp)
+ #ifndef __sparc__
+-static void __iomem * __devinit aty128_map_ROM(const struct aty128fb_par *par,
++static void __iomem *aty128_map_ROM(const struct aty128fb_par *par,
+ 					       struct pci_dev *dev)
  {
- 	u32 nvcfg1;
- 
-@@ -12896,7 +12896,7 @@ static void __devinit tg3_get_nvram_info(struct tg3 *tp)
- 	}
- }
- 
--static void __devinit tg3_nvram_get_pagesize(struct tg3 *tp, u32 nvmcfg1)
-+static void tg3_nvram_get_pagesize(struct tg3 *tp, u32 nvmcfg1)
- {
- 	switch (nvmcfg1 & NVRAM_CFG1_5752PAGE_SIZE_MASK) {
- 	case FLASH_5752PAGE_SIZE_256:
-@@ -12923,7 +12923,7 @@ static void __devinit tg3_nvram_get_pagesize(struct tg3 *tp, u32 nvmcfg1)
- 	}
- }
- 
--static void __devinit tg3_get_5752_nvram_info(struct tg3 *tp)
-+static void tg3_get_5752_nvram_info(struct tg3 *tp)
- {
- 	u32 nvcfg1;
- 
-@@ -12964,7 +12964,7 @@ static void __devinit tg3_get_5752_nvram_info(struct tg3 *tp)
- 	}
- }
- 
--static void __devinit tg3_get_5755_nvram_info(struct tg3 *tp)
-+static void tg3_get_5755_nvram_info(struct tg3 *tp)
- {
- 	u32 nvcfg1, protect = 0;
- 
-@@ -13020,7 +13020,7 @@ static void __devinit tg3_get_5755_nvram_info(struct tg3 *tp)
- 	}
- }
- 
--static void __devinit tg3_get_5787_nvram_info(struct tg3 *tp)
-+static void tg3_get_5787_nvram_info(struct tg3 *tp)
- {
- 	u32 nvcfg1;
- 
-@@ -13058,7 +13058,7 @@ static void __devinit tg3_get_5787_nvram_info(struct tg3 *tp)
- 	}
- }
- 
--static void __devinit tg3_get_5761_nvram_info(struct tg3 *tp)
-+static void tg3_get_5761_nvram_info(struct tg3 *tp)
- {
- 	u32 nvcfg1, protect = 0;
- 
-@@ -13133,14 +13133,14 @@ static void __devinit tg3_get_5761_nvram_info(struct tg3 *tp)
- 	}
- }
- 
--static void __devinit tg3_get_5906_nvram_info(struct tg3 *tp)
-+static void tg3_get_5906_nvram_info(struct tg3 *tp)
- {
- 	tp->nvram_jedecnum = JEDEC_ATMEL;
- 	tg3_flag_set(tp, NVRAM_BUFFERED);
- 	tp->nvram_pagesize = ATMEL_AT24C512_CHIP_SIZE;
- }
- 
--static void __devinit tg3_get_57780_nvram_info(struct tg3 *tp)
-+static void tg3_get_57780_nvram_info(struct tg3 *tp)
- {
- 	u32 nvcfg1;
- 
-@@ -13213,7 +13213,7 @@ static void __devinit tg3_get_57780_nvram_info(struct tg3 *tp)
- }
- 
- 
--static void __devinit tg3_get_5717_nvram_info(struct tg3 *tp)
-+static void tg3_get_5717_nvram_info(struct tg3 *tp)
- {
- 	u32 nvcfg1;
- 
-@@ -13291,7 +13291,7 @@ static void __devinit tg3_get_5717_nvram_info(struct tg3 *tp)
- 		tg3_flag_set(tp, NO_NVRAM_ADDR_TRANS);
- }
- 
--static void __devinit tg3_get_5720_nvram_info(struct tg3 *tp)
-+static void tg3_get_5720_nvram_info(struct tg3 *tp)
- {
- 	u32 nvcfg1, nvmpinstrp;
- 
-@@ -13404,7 +13404,7 @@ static void __devinit tg3_get_5720_nvram_info(struct tg3 *tp)
- }
- 
- /* Chips other than 5700/5701 use the NVRAM for fetching info. */
--static void __devinit tg3_nvram_init(struct tg3 *tp)
-+static void tg3_nvram_init(struct tg3 *tp)
- {
- 	tw32_f(GRC_EEPROM_ADDR,
- 	     (EEPROM_ADDR_FSM_RESET |
-@@ -13538,7 +13538,7 @@ static struct subsys_tbl_ent subsys_id_to_phy_id[] __devinitdata = {
- 	  TG3PCI_SUBDEVICE_ID_IBM_5703SAX2, 0 }
- };
- 
--static struct subsys_tbl_ent * __devinit tg3_lookup_by_subsys(struct tg3 *tp)
-+static struct subsys_tbl_ent *tg3_lookup_by_subsys(struct tg3 *tp)
- {
- 	int i;
- 
-@@ -13552,7 +13552,7 @@ static struct subsys_tbl_ent * __devinit tg3_lookup_by_subsys(struct tg3 *tp)
+ 	u16 dptr;
+@@ -868,7 +868,7 @@ static void __iomem * __devinit aty128_map_ROM(const struct aty128fb_par *par,
  	return NULL;
  }
  
--static void __devinit tg3_get_eeprom_hw_cfg(struct tg3 *tp)
-+static void tg3_get_eeprom_hw_cfg(struct tg3 *tp)
+-static void __devinit aty128_get_pllinfo(struct aty128fb_par *par,
++static void aty128_get_pllinfo(struct aty128fb_par *par,
+ 					 unsigned char __iomem *bios)
  {
- 	u32 val;
+ 	unsigned int bios_hdr;
+@@ -891,7 +891,7 @@ static void __devinit aty128_get_pllinfo(struct aty128fb_par *par,
+ }           
  
-@@ -13752,7 +13752,7 @@ done:
- 		device_set_wakeup_capable(&tp->pdev->dev, false);
+ #ifdef CONFIG_X86
+-static void __iomem *  __devinit aty128_find_mem_vbios(struct aty128fb_par *par)
++static void __iomem *aty128_find_mem_vbios(struct aty128fb_par *par)
+ {
+ 	/* I simplified this code as we used to miss the signatures in
+ 	 * a lot of case. It's now closer to XFree, we just don't check
+@@ -916,7 +916,7 @@ static void __iomem *  __devinit aty128_find_mem_vbios(struct aty128fb_par *par)
+ #endif /* ndef(__sparc__) */
+ 
+ /* fill in known card constants if pll_block is not available */
+-static void __devinit aty128_timings(struct aty128fb_par *par)
++static void aty128_timings(struct aty128fb_par *par)
+ {
+ #ifdef CONFIG_PPC_OF
+ 	/* instead of a table lookup, assume OF has properly
+@@ -1658,7 +1658,7 @@ static int aty128fb_sync(struct fb_info *info)
  }
  
--static int __devinit tg3_issue_otp_command(struct tg3 *tp, u32 cmd)
-+static int tg3_issue_otp_command(struct tg3 *tp, u32 cmd)
+ #ifndef MODULE
+-static int __devinit aty128fb_setup(char *options)
++static int aty128fb_setup(char *options)
  {
- 	int i;
- 	u32 val;
-@@ -13775,7 +13775,7 @@ static int __devinit tg3_issue_otp_command(struct tg3 *tp, u32 cmd)
-  * configuration is a 32-bit value that straddles the alignment boundary.
-  * We do two 32-bit reads and then shift and merge the results.
+ 	char *this_opt;
+ 
+@@ -1888,7 +1888,7 @@ static void aty128_early_resume(void *data)
+ }
+ #endif /* CONFIG_PPC_PMAC */
+ 
+-static int __devinit aty128_init(struct pci_dev *pdev,
++static int aty128_init(struct pci_dev *pdev,
+ 				 const struct pci_device_id *ent)
+ {
+ 	struct fb_info *info = pci_get_drvdata(pdev);
+@@ -2039,7 +2039,7 @@ static int __devinit aty128_init(struct pci_dev *pdev,
+ 
+ #ifdef CONFIG_PCI
+ /* register a card    ++ajoshi */
+-static int __devinit aty128_probe(struct pci_dev *pdev,
++static int aty128_probe(struct pci_dev *pdev,
+ 				  const struct pci_device_id *ent)
+ {
+ 	unsigned long fb_addr, reg_addr;
+@@ -2558,7 +2558,7 @@ static int aty128_pci_resume(struct pci_dev *pdev)
+ }
+ 
+ 
+-static int __devinit aty128fb_init(void)
++static int aty128fb_init(void)
+ {
+ #ifndef MODULE
+ 	char *option = NULL;
+diff --git a/drivers/video/aty/atyfb_base.c b/drivers/video/aty/atyfb_base.c
+index bab571b..ae75dd3 100644
+--- a/drivers/video/aty/atyfb_base.c
++++ b/drivers/video/aty/atyfb_base.c
+@@ -426,7 +426,7 @@ static struct {
+ #endif /* CONFIG_FB_ATY_CT */
+ };
+ 
+-static int __devinit correct_chipset(struct atyfb_par *par)
++static int correct_chipset(struct atyfb_par *par)
+ {
+ 	u8 rev;
+ 	u16 type;
+@@ -588,7 +588,7 @@ static u32 atyfb_get_pixclock(struct fb_var_screeninfo *var,
+  * Apple monitor sense
   */
--static u32 __devinit tg3_read_otp_phycfg(struct tg3 *tp)
-+static u32 tg3_read_otp_phycfg(struct tg3 *tp)
- {
- 	u32 bhalf_otp, thalf_otp;
  
-@@ -13801,7 +13801,7 @@ static u32 __devinit tg3_read_otp_phycfg(struct tg3 *tp)
- 	return ((thalf_otp & 0x0000ffff) << 16) | (bhalf_otp >> 16);
+-static int __devinit read_aty_sense(const struct atyfb_par *par)
++static int read_aty_sense(const struct atyfb_par *par)
+ {
+ 	int sense, i;
+ 
+@@ -2273,7 +2273,7 @@ static void aty_bl_exit(struct backlight_device *bd)
+ 
+ #endif /* CONFIG_FB_ATY_BACKLIGHT */
+ 
+-static void __devinit aty_calc_mem_refresh(struct atyfb_par *par, int xclk)
++static void aty_calc_mem_refresh(struct atyfb_par *par, int xclk)
+ {
+ 	const int ragepro_tbl[] = {
+ 		44, 50, 55, 66, 75, 80, 100
+@@ -2307,7 +2307,7 @@ static void __devinit aty_calc_mem_refresh(struct atyfb_par *par, int xclk)
+ static struct fb_info *fb_list = NULL;
+ 
+ #if defined(__i386__) && defined(CONFIG_FB_ATY_GENERIC_LCD)
+-static int __devinit atyfb_get_timings_from_lcd(struct atyfb_par *par,
++static int atyfb_get_timings_from_lcd(struct atyfb_par *par,
+ 						struct fb_var_screeninfo *var)
+ {
+ 	int ret = -EINVAL;
+@@ -2333,7 +2333,7 @@ static int __devinit atyfb_get_timings_from_lcd(struct atyfb_par *par,
+ }
+ #endif /* defined(__i386__) && defined(CONFIG_FB_ATY_GENERIC_LCD) */
+ 
+-static int __devinit aty_init(struct fb_info *info)
++static int aty_init(struct fb_info *info)
+ {
+ 	struct atyfb_par *par = (struct atyfb_par *) info->par;
+ 	const char *ramname = NULL, *xtal;
+@@ -2787,7 +2787,7 @@ aty_init_exit:
  }
  
--static void __devinit tg3_phy_init_link_config(struct tg3 *tp)
-+static void tg3_phy_init_link_config(struct tg3 *tp)
+ #if defined(CONFIG_ATARI) && !defined(MODULE)
+-static int __devinit store_video_par(char *video_str, unsigned char m64_num)
++static int store_video_par(char *video_str, unsigned char m64_num)
  {
- 	u32 adv = ADVERTISED_Autoneg;
+ 	char *p;
+ 	unsigned long vmembase, size, guiregbase;
+@@ -2961,7 +2961,7 @@ static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
  
-@@ -13828,7 +13828,7 @@ static void __devinit tg3_phy_init_link_config(struct tg3 *tp)
- 	tp->old_link = -1;
+ #ifdef __sparc__
+ 
+-static int __devinit atyfb_setup_sparc(struct pci_dev *pdev,
++static int atyfb_setup_sparc(struct pci_dev *pdev,
+ 				       struct fb_info *info,
+ 				       unsigned long addr)
+ {
+@@ -3161,7 +3161,7 @@ static int __devinit atyfb_setup_sparc(struct pci_dev *pdev,
+ 
+ #ifdef __i386__
+ #ifdef CONFIG_FB_ATY_GENERIC_LCD
+-static void __devinit aty_init_lcd(struct atyfb_par *par, u32 bios_base)
++static void aty_init_lcd(struct atyfb_par *par, u32 bios_base)
+ {
+ 	u32 driv_inf_tab, sig;
+ 	u16 lcd_ofs;
+@@ -3392,7 +3392,7 @@ static void __devinit aty_init_lcd(struct atyfb_par *par, u32 bios_base)
  }
+ #endif /* CONFIG_FB_ATY_GENERIC_LCD */
  
--static int __devinit tg3_phy_probe(struct tg3 *tp)
-+static int tg3_phy_probe(struct tg3 *tp)
+-static int __devinit init_from_bios(struct atyfb_par *par)
++static int init_from_bios(struct atyfb_par *par)
  {
- 	u32 hw_phy_id_1, hw_phy_id_2;
- 	u32 hw_phy_id, hw_phy_id_masked;
-@@ -13956,7 +13956,7 @@ skip_phy_reset:
- 	return err;
+ 	u32 bios_base, rom_addr;
+ 	int ret;
+@@ -3445,7 +3445,7 @@ static int __devinit init_from_bios(struct atyfb_par *par)
  }
+ #endif /* __i386__ */
  
--static void __devinit tg3_read_vpd(struct tg3 *tp)
-+static void tg3_read_vpd(struct tg3 *tp)
+-static int __devinit atyfb_setup_generic(struct pci_dev *pdev,
++static int atyfb_setup_generic(struct pci_dev *pdev,
+ 					 struct fb_info *info,
+ 					 unsigned long addr)
  {
- 	u8 *vpd_data;
- 	unsigned int block_end, rosize, len;
-@@ -14077,7 +14077,7 @@ nomatch:
- 	}
- }
+@@ -3525,7 +3525,7 @@ atyfb_setup_generic_fail:
  
--static int __devinit tg3_fw_img_is_valid(struct tg3 *tp, u32 offset)
-+static int tg3_fw_img_is_valid(struct tg3 *tp, u32 offset)
+ #endif /* !__sparc__ */
+ 
+-static int __devinit atyfb_pci_probe(struct pci_dev *pdev,
++static int atyfb_pci_probe(struct pci_dev *pdev,
+ 				     const struct pci_device_id *ent)
  {
- 	u32 val;
- 
-@@ -14090,7 +14090,7 @@ static int __devinit tg3_fw_img_is_valid(struct tg3 *tp, u32 offset)
- 	return 1;
- }
- 
--static void __devinit tg3_read_bc_ver(struct tg3 *tp)
-+static void tg3_read_bc_ver(struct tg3 *tp)
- {
- 	u32 val, offset, start, ver_offset;
- 	int i, dst_off;
-@@ -14142,7 +14142,7 @@ static void __devinit tg3_read_bc_ver(struct tg3 *tp)
- 	}
- }
- 
--static void __devinit tg3_read_hwsb_ver(struct tg3 *tp)
-+static void tg3_read_hwsb_ver(struct tg3 *tp)
- {
- 	u32 val, major, minor;
- 
-@@ -14158,7 +14158,7 @@ static void __devinit tg3_read_hwsb_ver(struct tg3 *tp)
- 	snprintf(&tp->fw_ver[0], 32, "sb v%d.%02d", major, minor);
- }
- 
--static void __devinit tg3_read_sb_ver(struct tg3 *tp, u32 val)
-+static void tg3_read_sb_ver(struct tg3 *tp, u32 val)
- {
- 	u32 offset, major, minor, build;
- 
-@@ -14213,7 +14213,7 @@ static void __devinit tg3_read_sb_ver(struct tg3 *tp, u32 val)
- 	}
- }
- 
--static void __devinit tg3_read_mgmtfw_ver(struct tg3 *tp)
-+static void tg3_read_mgmtfw_ver(struct tg3 *tp)
- {
- 	u32 val, offset, start;
- 	int i, vlen;
-@@ -14265,7 +14265,7 @@ static void __devinit tg3_read_mgmtfw_ver(struct tg3 *tp)
- 	}
- }
- 
--static void __devinit tg3_probe_ncsi(struct tg3 *tp)
-+static void tg3_probe_ncsi(struct tg3 *tp)
- {
- 	u32 apedata;
- 
-@@ -14281,7 +14281,7 @@ static void __devinit tg3_probe_ncsi(struct tg3 *tp)
- 		tg3_flag_set(tp, APE_HAS_NCSI);
- }
- 
--static void __devinit tg3_read_dash_ver(struct tg3 *tp)
-+static void tg3_read_dash_ver(struct tg3 *tp)
- {
- 	int vlen;
- 	u32 apedata;
-@@ -14304,7 +14304,7 @@ static void __devinit tg3_read_dash_ver(struct tg3 *tp)
- 		 (apedata & APE_FW_VERSION_BLDMSK));
- }
- 
--static void __devinit tg3_read_fw_ver(struct tg3 *tp)
-+static void tg3_read_fw_ver(struct tg3 *tp)
- {
- 	u32 val;
- 	bool vpd_vers = false;
-@@ -14357,7 +14357,7 @@ static DEFINE_PCI_DEVICE_TABLE(tg3_write_reorder_chipsets) = {
- 	{ },
- };
- 
--static struct pci_dev * __devinit tg3_find_peer(struct tg3 *tp)
-+static struct pci_dev *tg3_find_peer(struct tg3 *tp)
- {
- 	struct pci_dev *peer;
- 	unsigned int func, devnr = tp->pdev->devfn & ~7;
-@@ -14385,7 +14385,7 @@ static struct pci_dev * __devinit tg3_find_peer(struct tg3 *tp)
- 	return peer;
- }
- 
--static void __devinit tg3_detect_asic_rev(struct tg3 *tp, u32 misc_ctrl_reg)
-+static void tg3_detect_asic_rev(struct tg3 *tp, u32 misc_ctrl_reg)
- {
- 	tp->pci_chip_rev_id = misc_ctrl_reg >> MISC_HOST_CTRL_CHIPREV_SHIFT;
- 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_USE_PROD_ID_REG) {
-@@ -14466,7 +14466,7 @@ static void __devinit tg3_detect_asic_rev(struct tg3 *tp, u32 misc_ctrl_reg)
- 		tg3_flag_set(tp, 5705_PLUS);
- }
- 
--static int __devinit tg3_get_invariants(struct tg3 *tp)
-+static int tg3_get_invariants(struct tg3 *tp)
- {
- 	u32 misc_ctrl_reg;
- 	u32 pci_state_reg, grc_misc_cfg;
-@@ -15240,7 +15240,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
- }
- 
- #ifdef CONFIG_SPARC
--static int __devinit tg3_get_macaddr_sparc(struct tg3 *tp)
-+static int tg3_get_macaddr_sparc(struct tg3 *tp)
- {
- 	struct net_device *dev = tp->dev;
- 	struct pci_dev *pdev = tp->pdev;
-@@ -15257,7 +15257,7 @@ static int __devinit tg3_get_macaddr_sparc(struct tg3 *tp)
- 	return -ENODEV;
- }
- 
--static int __devinit tg3_get_default_macaddr_sparc(struct tg3 *tp)
-+static int tg3_get_default_macaddr_sparc(struct tg3 *tp)
- {
- 	struct net_device *dev = tp->dev;
- 
-@@ -15267,7 +15267,7 @@ static int __devinit tg3_get_default_macaddr_sparc(struct tg3 *tp)
- }
+ 	unsigned long addr, res_start, res_size;
+diff --git a/drivers/video/aty/mach64_ct.c b/drivers/video/aty/mach64_ct.c
+index 2745b85..31dd017 100644
+--- a/drivers/video/aty/mach64_ct.c
++++ b/drivers/video/aty/mach64_ct.c
+@@ -373,7 +373,7 @@ void aty_set_pll_ct(const struct fb_info *info, const union aty_pll *pll)
  #endif
- 
--static int __devinit tg3_get_device_address(struct tg3 *tp)
-+static int tg3_get_device_address(struct tg3 *tp)
- {
- 	struct net_device *dev = tp->dev;
- 	u32 hi, lo, mac_offset;
-@@ -15346,7 +15346,7 @@ static int __devinit tg3_get_device_address(struct tg3 *tp)
- #define BOUNDARY_SINGLE_CACHELINE	1
- #define BOUNDARY_MULTI_CACHELINE	2
- 
--static u32 __devinit tg3_calc_dma_bndry(struct tg3 *tp, u32 val)
-+static u32 tg3_calc_dma_bndry(struct tg3 *tp, u32 val)
- {
- 	int cacheline_size;
- 	u8 byte;
-@@ -15487,7 +15487,7 @@ out:
- 	return val;
  }
  
--static int __devinit tg3_do_test_dma(struct tg3 *tp, u32 *buf, dma_addr_t buf_dma, int size, int to_device)
-+static int tg3_do_test_dma(struct tg3 *tp, u32 *buf, dma_addr_t buf_dma, int size, int to_device)
+-static void __devinit aty_get_pll_ct(const struct fb_info *info,
++static void aty_get_pll_ct(const struct fb_info *info,
+ 				     union aty_pll *pll)
  {
- 	struct tg3_internal_buffer_desc test_desc;
- 	u32 sram_dma_descs;
-@@ -15574,7 +15574,7 @@ static DEFINE_PCI_DEVICE_TABLE(tg3_dma_wait_state_chipsets) = {
- 	{ },
+ 	struct atyfb_par *par = (struct atyfb_par *) info->par;
+@@ -397,7 +397,7 @@ static void __devinit aty_get_pll_ct(const struct fb_info *info,
+ 	}
+ }
+ 
+-static int __devinit aty_init_pll_ct(const struct fb_info *info,
++static int aty_init_pll_ct(const struct fb_info *info,
+ 				     union aty_pll *pll)
+ {
+ 	struct atyfb_par *par = (struct atyfb_par *) info->par;
+diff --git a/drivers/video/aty/mach64_cursor.c b/drivers/video/aty/mach64_cursor.c
+index 46f72ed..95ec042 100644
+--- a/drivers/video/aty/mach64_cursor.c
++++ b/drivers/video/aty/mach64_cursor.c
+@@ -183,7 +183,7 @@ static int atyfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
+ 	return 0;
+ }
+ 
+-int __devinit aty_init_cursor(struct fb_info *info)
++int aty_init_cursor(struct fb_info *info)
+ {
+ 	unsigned long addr;
+ 
+diff --git a/drivers/video/aty/radeon_base.c b/drivers/video/aty/radeon_base.c
+index dacaa4e..7687179 100644
+--- a/drivers/video/aty/radeon_base.c
++++ b/drivers/video/aty/radeon_base.c
+@@ -293,7 +293,7 @@ static void radeon_unmap_ROM(struct radeonfb_info *rinfo, struct pci_dev *dev)
+ 	pci_unmap_rom(dev, rinfo->bios_seg);
+ }
+ 
+-static int __devinit radeon_map_ROM(struct radeonfb_info *rinfo, struct pci_dev *dev)
++static int radeon_map_ROM(struct radeonfb_info *rinfo, struct pci_dev *dev)
+ {
+ 	void __iomem *rom;
+ 	u16 dptr;
+@@ -388,7 +388,7 @@ static int __devinit radeon_map_ROM(struct radeonfb_info *rinfo, struct pci_dev
+ }
+ 
+ #ifdef CONFIG_X86
+-static int  __devinit radeon_find_mem_vbios(struct radeonfb_info *rinfo)
++static int  radeon_find_mem_vbios(struct radeonfb_info *rinfo)
+ {
+ 	/* I simplified this code as we used to miss the signatures in
+ 	 * a lot of case. It's now closer to XFree, we just don't check
+@@ -423,7 +423,7 @@ static int  __devinit radeon_find_mem_vbios(struct radeonfb_info *rinfo)
+  * Read XTAL (ref clock), SCLK and MCLK from Open Firmware device
+  * tree. Hopefully, ATI OF driver is kind enough to fill these
+  */
+-static int __devinit radeon_read_xtal_OF (struct radeonfb_info *rinfo)
++static int radeon_read_xtal_OF (struct radeonfb_info *rinfo)
+ {
+ 	struct device_node *dp = rinfo->of_node;
+ 	const u32 *val;
+@@ -453,7 +453,7 @@ static int __devinit radeon_read_xtal_OF (struct radeonfb_info *rinfo)
+ /*
+  * Read PLL infos from chip registers
+  */
+-static int __devinit radeon_probe_pll_params(struct radeonfb_info *rinfo)
++static int radeon_probe_pll_params(struct radeonfb_info *rinfo)
+ {
+ 	unsigned char ppll_div_sel;
+ 	unsigned Ns, Nm, M;
+@@ -591,7 +591,7 @@ static int __devinit radeon_probe_pll_params(struct radeonfb_info *rinfo)
+ /*
+  * Retrieve PLL infos by different means (BIOS, Open Firmware, register probing...)
+  */
+-static void __devinit radeon_get_pllinfo(struct radeonfb_info *rinfo)
++static void radeon_get_pllinfo(struct radeonfb_info *rinfo)
+ {
+ 	/*
+ 	 * In the case nothing works, these are defaults; they are mostly
+@@ -1868,7 +1868,7 @@ static struct fb_ops radeonfb_ops = {
  };
  
--static int __devinit tg3_test_dma(struct tg3 *tp)
-+static int tg3_test_dma(struct tg3 *tp)
+ 
+-static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
++static int radeon_set_fbinfo (struct radeonfb_info *rinfo)
  {
- 	dma_addr_t buf_dma;
- 	u32 *buf, saved_dma_rwctrl;
-@@ -15764,7 +15764,7 @@ out_nofree:
+ 	struct fb_info *info = rinfo->info;
+ 
+@@ -2143,7 +2143,7 @@ static struct bin_attribute edid2_attr = {
+ };
+ 
+ 
+-static int __devinit radeonfb_pci_register (struct pci_dev *pdev,
++static int radeonfb_pci_register (struct pci_dev *pdev,
+ 				  const struct pci_device_id *ent)
+ {
+ 	struct fb_info *info;
+diff --git a/drivers/video/aty/radeon_monitor.c b/drivers/video/aty/radeon_monitor.c
+index 5c23eac..d6d861b 100644
+--- a/drivers/video/aty/radeon_monitor.c
++++ b/drivers/video/aty/radeon_monitor.c
+@@ -62,7 +62,7 @@ static char *radeon_get_mon_name(int type)
+  * models with broken OF probing by hard-coding known EDIDs for some Mac
+  * laptops internal LVDS panel. (XXX: not done yet)
+  */
+-static int __devinit radeon_parse_montype_prop(struct device_node *dp, u8 **out_EDID,
++static int radeon_parse_montype_prop(struct device_node *dp, u8 **out_EDID,
+ 					       int hdno)
+ {
+         static char *propnames[] = { "DFP,EDID", "LCD,EDID", "EDID",
+@@ -115,7 +115,7 @@ static int __devinit radeon_parse_montype_prop(struct device_node *dp, u8 **out_
+ 	return mt;
+ }
+ 
+-static int __devinit radeon_probe_OF_head(struct radeonfb_info *rinfo, int head_no,
++static int radeon_probe_OF_head(struct radeonfb_info *rinfo, int head_no,
+ 					  u8 **out_EDID)
+ {
+         struct device_node *dp;
+@@ -163,7 +163,7 @@ static int __devinit radeon_probe_OF_head(struct radeonfb_info *rinfo, int head_
+ #endif /* CONFIG_PPC_OF || CONFIG_SPARC */
+ 
+ 
+-static int __devinit radeon_get_panel_info_BIOS(struct radeonfb_info *rinfo)
++static int radeon_get_panel_info_BIOS(struct radeonfb_info *rinfo)
+ {
+ 	unsigned long tmp, tmp0;
+ 	char stmp[30];
+@@ -251,7 +251,7 @@ static int __devinit radeon_get_panel_info_BIOS(struct radeonfb_info *rinfo)
+  * doesn't quite work yet, but it's output is still useful for
+  * debugging
+  */
+-static void __devinit radeon_parse_connector_info(struct radeonfb_info *rinfo)
++static void radeon_parse_connector_info(struct radeonfb_info *rinfo)
+ {
+ 	int offset, chips, connectors, tmp, i, conn, type;
+ 
+@@ -297,7 +297,7 @@ static void __devinit radeon_parse_connector_info(struct radeonfb_info *rinfo)
+  * as well and currently is only implemented for the CRT DAC, the
+  * code for the TVDAC is commented out in XFree as "non working"
+  */
+-static int __devinit radeon_crt_is_connected(struct radeonfb_info *rinfo, int is_crt_dac)
++static int radeon_crt_is_connected(struct radeonfb_info *rinfo, int is_crt_dac)
+ {
+     int	          connected = 0;
+ 
+@@ -369,7 +369,7 @@ static int __devinit radeon_crt_is_connected(struct radeonfb_info *rinfo, int is
+  * Parse the "monitor_layout" string if any. This code is mostly
+  * copied from XFree's radeon driver
+  */
+-static int __devinit radeon_parse_monitor_layout(struct radeonfb_info *rinfo,
++static int radeon_parse_monitor_layout(struct radeonfb_info *rinfo,
+ 						 const char *monitor_layout)
+ {
+ 	char s1[5], s2[5];
+@@ -433,7 +433,7 @@ static int __devinit radeon_parse_monitor_layout(struct radeonfb_info *rinfo,
+  * try to retrieve EDID. The algorithm here comes from XFree's radeon
+  * driver
+  */
+-void __devinit radeon_probe_screens(struct radeonfb_info *rinfo,
++void radeon_probe_screens(struct radeonfb_info *rinfo,
+ 				    const char *monitor_layout, int ignore_edid)
+ {
+ #ifdef CONFIG_FB_RADEON_I2C
+@@ -753,7 +753,7 @@ static int is_powerblade(const char *model)
+  * Build the modedb for head 1 (head 2 will come later), check panel infos
+  * from either BIOS or EDID, and pick up the default mode
+  */
+-void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_option)
++void radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_option)
+ {
+ 	struct fb_info * info = rinfo->info;
+ 	int has_default_mode = 0;
+diff --git a/drivers/video/au1100fb.c b/drivers/video/au1100fb.c
+index fe3b6ec..b4b76dc 100644
+--- a/drivers/video/au1100fb.c
++++ b/drivers/video/au1100fb.c
+@@ -469,7 +469,7 @@ static int au1100fb_setup(struct au1100fb_device *fbdev)
+ 	return 0;
+ }
+ 
+-static int __devinit au1100fb_drv_probe(struct platform_device *dev)
++static int au1100fb_drv_probe(struct platform_device *dev)
+ {
+ 	struct au1100fb_device *fbdev = NULL;
+ 	struct resource *regs_res;
+diff --git a/drivers/video/au1200fb.c b/drivers/video/au1200fb.c
+index 4538b07..b270a5c 100644
+--- a/drivers/video/au1200fb.c
++++ b/drivers/video/au1200fb.c
+@@ -1673,7 +1673,7 @@ out:
+ }
+ 
+ /* AU1200 LCD controller device driver */
+-static int __devinit au1200fb_drv_probe(struct platform_device *dev)
++static int au1200fb_drv_probe(struct platform_device *dev)
+ {
+ 	struct au1200fb_device *fbdev;
+ 	struct au1200fb_platdata *pd;
+diff --git a/drivers/video/auo_k1900fb.c b/drivers/video/auo_k1900fb.c
+index 1581dbf..46ec47b 100644
+--- a/drivers/video/auo_k1900fb.c
++++ b/drivers/video/auo_k1900fb.c
+@@ -156,7 +156,7 @@ static bool auok1900fb_need_refresh(struct auok190xfb_par *par)
+ 	return (par->update_cnt > 10);
+ }
+ 
+-static int __devinit auok1900fb_probe(struct platform_device *pdev)
++static int auok1900fb_probe(struct platform_device *pdev)
+ {
+ 	struct auok190x_init_data init;
+ 	struct auok190x_board *board;
+diff --git a/drivers/video/auo_k1901fb.c b/drivers/video/auo_k1901fb.c
+index 94a0e01..9eb7eeb 100644
+--- a/drivers/video/auo_k1901fb.c
++++ b/drivers/video/auo_k1901fb.c
+@@ -209,7 +209,7 @@ static bool auok1901fb_need_refresh(struct auok190xfb_par *par)
+ 	return (par->update_cnt > 10);
+ }
+ 
+-static int __devinit auok1901fb_probe(struct platform_device *pdev)
++static int auok1901fb_probe(struct platform_device *pdev)
+ {
+ 	struct auok190x_init_data init;
+ 	struct auok190x_board *board;
+diff --git a/drivers/video/auo_k190x.c b/drivers/video/auo_k190x.c
+index c03ecdd..70aa5d4 100644
+--- a/drivers/video/auo_k190x.c
++++ b/drivers/video/auo_k190x.c
+@@ -773,7 +773,7 @@ EXPORT_SYMBOL_GPL(auok190x_pm);
+  * Common probe and remove code
+  */
+ 
+-int __devinit auok190x_common_probe(struct platform_device *pdev,
++int auok190x_common_probe(struct platform_device *pdev,
+ 				    struct auok190x_init_data *init)
+ {
+ 	struct auok190x_board *board = init->board;
+diff --git a/drivers/video/bf537-lq035.c b/drivers/video/bf537-lq035.c
+index 8081c7b..0b7c757 100644
+--- a/drivers/video/bf537-lq035.c
++++ b/drivers/video/bf537-lq035.c
+@@ -87,7 +87,7 @@ static void set_vcomm(void)
+ 		pr_err("i2c_smbus_write_byte_data fail: %d\n", nr);
+ }
+ 
+-static int __devinit ad5280_probe(struct i2c_client *client,
++static int ad5280_probe(struct i2c_client *client,
+ 				  const struct i2c_device_id *id)
+ {
+ 	int ret;
+@@ -360,7 +360,7 @@ static int config_dma(void)
+ 	return 0;
+ }
+ 
+-static int __devinit request_ports(void)
++static int request_ports(void)
+ {
+ 	u16 tmr_req[] = TIMERS;
+ 
+@@ -686,7 +686,7 @@ static struct lcd_ops bfin_lcd_ops = {
+ 
+ static struct lcd_device *lcd_dev;
+ 
+-static int __devinit bfin_lq035_probe(struct platform_device *pdev)
++static int bfin_lq035_probe(struct platform_device *pdev)
+ {
+ 	struct backlight_properties props;
+ 	dma_addr_t dma_handle;
+diff --git a/drivers/video/bf54x-lq043fb.c b/drivers/video/bf54x-lq043fb.c
+index aff8520..9f72580 100644
+--- a/drivers/video/bf54x-lq043fb.c
++++ b/drivers/video/bf54x-lq043fb.c
+@@ -497,7 +497,7 @@ static irqreturn_t bfin_bf54x_irq_error(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int __devinit bfin_bf54x_probe(struct platform_device *pdev)
++static int bfin_bf54x_probe(struct platform_device *pdev)
+ {
+ #ifndef NO_BL_SUPPORT
+ 	struct backlight_properties props;
+diff --git a/drivers/video/bfin-lq035q1-fb.c b/drivers/video/bfin-lq035q1-fb.c
+index acd438c..353fb7c 100644
+--- a/drivers/video/bfin-lq035q1-fb.c
++++ b/drivers/video/bfin-lq035q1-fb.c
+@@ -137,7 +137,7 @@ static int lq035q1_control(struct spi_device *spi, unsigned char reg, unsigned s
  	return ret;
  }
  
--static void __devinit tg3_init_bufmgr_config(struct tg3 *tp)
-+static void tg3_init_bufmgr_config(struct tg3 *tp)
+-static int __devinit lq035q1_spidev_probe(struct spi_device *spi)
++static int lq035q1_spidev_probe(struct spi_device *spi)
  {
- 	if (tg3_flag(tp, 57765_PLUS)) {
- 		tp->bufmgr_config.mbuf_read_dma_low_water =
-@@ -15820,7 +15820,7 @@ static void __devinit tg3_init_bufmgr_config(struct tg3 *tp)
- 	tp->bufmgr_config.dma_high_water = DEFAULT_DMA_HIGH_WATER;
+ 	int ret;
+ 	struct spi_control *ctl;
+@@ -358,7 +358,7 @@ static inline void bfin_lq035q1_free_ports(unsigned ppi16)
+ 		gpio_free(P_IDENT(P_PPI0_FS3));
  }
  
--static char * __devinit tg3_phy_string(struct tg3 *tp)
-+static char *tg3_phy_string(struct tg3 *tp)
+-static int __devinit bfin_lq035q1_request_ports(struct platform_device *pdev,
++static int bfin_lq035q1_request_ports(struct platform_device *pdev,
+ 						unsigned ppi16)
  {
- 	switch (tp->phy_id & TG3_PHY_ID_MASK) {
- 	case TG3_PHY_ID_BCM5400:	return "5400";
-@@ -15851,7 +15851,7 @@ static char * __devinit tg3_phy_string(struct tg3 *tp)
+ 	int ret;
+@@ -555,7 +555,7 @@ static irqreturn_t bfin_lq035q1_irq_error(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int __devinit bfin_lq035q1_probe(struct platform_device *pdev)
++static int bfin_lq035q1_probe(struct platform_device *pdev)
+ {
+ 	struct bfin_lq035q1fb_info *info;
+ 	struct fb_info *fbinfo;
+diff --git a/drivers/video/bfin-t350mcqb-fb.c b/drivers/video/bfin-t350mcqb-fb.c
+index c753abd..9456865 100644
+--- a/drivers/video/bfin-t350mcqb-fb.c
++++ b/drivers/video/bfin-t350mcqb-fb.c
+@@ -418,7 +418,7 @@ static irqreturn_t bfin_t350mcqb_irq_error(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int __devinit bfin_t350mcqb_probe(struct platform_device *pdev)
++static int bfin_t350mcqb_probe(struct platform_device *pdev)
+ {
+ #ifndef NO_BL_SUPPORT
+ 	struct backlight_properties props;
+diff --git a/drivers/video/bfin_adv7393fb.c b/drivers/video/bfin_adv7393fb.c
+index a32ef5a..85e9659 100644
+--- a/drivers/video/bfin_adv7393fb.c
++++ b/drivers/video/bfin_adv7393fb.c
+@@ -368,7 +368,7 @@ adv7393_write_proc(struct file *file, const char __user * buffer,
+ 	return count;
+ }
+ 
+-static int __devinit bfin_adv7393_fb_probe(struct i2c_client *client,
++static int bfin_adv7393_fb_probe(struct i2c_client *client,
+ 					   const struct i2c_device_id *id)
+ {
+ 	int ret = 0;
+diff --git a/drivers/video/broadsheetfb.c b/drivers/video/broadsheetfb.c
+index 377dde3..bd15a9b 100644
+--- a/drivers/video/broadsheetfb.c
++++ b/drivers/video/broadsheetfb.c
+@@ -774,7 +774,7 @@ static DEVICE_ATTR(loadstore_waveform, S_IWUSR, NULL,
+ 			broadsheet_loadstore_waveform);
+ 
+ /* upper level functions that manipulate the display and other stuff */
+-static void __devinit broadsheet_init_display(struct broadsheetfb_par *par)
++static void broadsheet_init_display(struct broadsheetfb_par *par)
+ {
+ 	u16 args[5];
+ 	int xres = par->info->var.xres;
+@@ -834,7 +834,7 @@ static void __devinit broadsheet_init_display(struct broadsheetfb_par *par)
+ 	par->board->wait_for_rdy(par);
+ }
+ 
+-static void __devinit broadsheet_identify(struct broadsheetfb_par *par)
++static void broadsheet_identify(struct broadsheetfb_par *par)
+ {
+ 	u16 rev, prc;
+ 	struct device *dev = par->info->device;
+@@ -849,7 +849,7 @@ static void __devinit broadsheet_identify(struct broadsheetfb_par *par)
+ 		dev_warn(dev, "Unrecognized Broadsheet Revision\n");
+ }
+ 
+-static void __devinit broadsheet_init(struct broadsheetfb_par *par)
++static void broadsheet_init(struct broadsheetfb_par *par)
+ {
+ 	broadsheet_send_command(par, BS_CMD_INIT_SYS_RUN);
+ 	/* the controller needs a second */
+@@ -1058,7 +1058,7 @@ static struct fb_deferred_io broadsheetfb_defio = {
+ 	.deferred_io	= broadsheetfb_dpy_deferred_io,
+ };
+ 
+-static int __devinit broadsheetfb_probe(struct platform_device *dev)
++static int broadsheetfb_probe(struct platform_device *dev)
+ {
+ 	struct fb_info *info;
+ 	struct broadsheet_board *board;
+diff --git a/drivers/video/bw2.c b/drivers/video/bw2.c
+index bc88682..21a8587 100644
+--- a/drivers/video/bw2.c
++++ b/drivers/video/bw2.c
+@@ -179,7 +179,7 @@ static int bw2_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
+  *  Initialisation
+  */
+ 
+-static void __devinit bw2_init_fix(struct fb_info *info, int linebytes)
++static void bw2_init_fix(struct fb_info *info, int linebytes)
+ {
+ 	strlcpy(info->fix.id, "bwtwo", sizeof(info->fix.id));
+ 
+@@ -226,7 +226,7 @@ static u8 bw2regs_66hz[] __devinitdata = {
+ 	0x10, 0x20,	0
+ };
+ 
+-static int __devinit bw2_do_default_mode(struct bw2_par *par,
++static int bw2_do_default_mode(struct bw2_par *par,
+ 					 struct fb_info *info,
+ 					 int *linebytes)
+ {
+@@ -273,7 +273,7 @@ static int __devinit bw2_do_default_mode(struct bw2_par *par,
+ 	return 0;
+ }
+ 
+-static int __devinit bw2_probe(struct platform_device *op)
++static int bw2_probe(struct platform_device *op)
+ {
+ 	struct device_node *dp = op->dev.of_node;
+ 	struct fb_info *info;
+diff --git a/drivers/video/carminefb.c b/drivers/video/carminefb.c
+index 27561cc..9d9eb08 100644
+--- a/drivers/video/carminefb.c
++++ b/drivers/video/carminefb.c
+@@ -537,7 +537,7 @@ static struct fb_ops carminefb_ops = {
+ 	.fb_setcolreg	= carmine_setcolreg,
+ };
+ 
+-static int __devinit alloc_carmine_fb(void __iomem *regs, void __iomem *smem_base,
++static int alloc_carmine_fb(void __iomem *regs, void __iomem *smem_base,
+ 		int smem_offset, struct device *device, struct fb_info **rinfo)
+ {
+ 	int ret;
+@@ -606,7 +606,7 @@ static void cleanup_fb_device(struct fb_info *info)
  	}
  }
  
--static char * __devinit tg3_bus_string(struct tg3 *tp, char *str)
-+static char *tg3_bus_string(struct tg3 *tp, char *str)
+-static int __devinit carminefb_probe(struct pci_dev *dev,
++static int carminefb_probe(struct pci_dev *dev,
+ 		const struct pci_device_id *ent)
  {
- 	if (tg3_flag(tp, PCI_EXPRESS)) {
- 		strcpy(str, "PCI Express");
-@@ -15887,7 +15887,7 @@ static char * __devinit tg3_bus_string(struct tg3 *tp, char *str)
- 	return str;
+ 	struct carmine_hw *hw;
+diff --git a/drivers/video/cg14.c b/drivers/video/cg14.c
+index 6889f0c..e9d80c1 100644
+--- a/drivers/video/cg14.c
++++ b/drivers/video/cg14.c
+@@ -352,7 +352,7 @@ static int cg14_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
+  *  Initialisation
+  */
+ 
+-static void __devinit cg14_init_fix(struct fb_info *info, int linebytes,
++static void cg14_init_fix(struct fb_info *info, int linebytes,
+ 				    struct device_node *dp)
+ {
+ 	const char *name = dp->name;
+@@ -463,7 +463,7 @@ static void cg14_unmap_regs(struct platform_device *op, struct fb_info *info,
+ 			   info->screen_base, info->fix.smem_len);
  }
  
--static void __devinit tg3_init_coal(struct tg3 *tp)
-+static void tg3_init_coal(struct tg3 *tp)
+-static int __devinit cg14_probe(struct platform_device *op)
++static int cg14_probe(struct platform_device *op)
  {
- 	struct ethtool_coalesce *ec = &tp->coal;
+ 	struct device_node *dp = op->dev.of_node;
+ 	struct fb_info *info;
+diff --git a/drivers/video/cg3.c b/drivers/video/cg3.c
+index 0bd94d4..6102d57 100644
+--- a/drivers/video/cg3.c
++++ b/drivers/video/cg3.c
+@@ -243,7 +243,7 @@ static int cg3_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
+  *  Initialisation
+  */
  
-@@ -15918,7 +15918,7 @@ static void __devinit tg3_init_coal(struct tg3 *tp)
- 	}
+-static void __devinit cg3_init_fix(struct fb_info *info, int linebytes,
++static void cg3_init_fix(struct fb_info *info, int linebytes,
+ 				   struct device_node *dp)
+ {
+ 	strlcpy(info->fix.id, dp->name, sizeof(info->fix.id));
+@@ -256,7 +256,7 @@ static void __devinit cg3_init_fix(struct fb_info *info, int linebytes,
+ 	info->fix.accel = FB_ACCEL_SUN_CGTHREE;
  }
  
--static int __devinit tg3_init_one(struct pci_dev *pdev,
-+static int tg3_init_one(struct pci_dev *pdev,
- 				  const struct pci_device_id *ent)
+-static void __devinit cg3_rdi_maybe_fixup_var(struct fb_var_screeninfo *var,
++static void cg3_rdi_maybe_fixup_var(struct fb_var_screeninfo *var,
+ 					      struct device_node *dp)
  {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/brocade/bna/bnad.c b/drivers/net/ethernet/brocade/bna/bnad.c
-index 7735469..45ec1c4 100644
---- a/drivers/net/ethernet/brocade/bna/bnad.c
-+++ b/drivers/net/ethernet/brocade/bna/bnad.c
-@@ -3226,7 +3226,7 @@ bnad_pci_uninit(struct pci_dev *pdev)
- 	pci_disable_device(pdev);
+ 	const char *params;
+@@ -308,7 +308,7 @@ static u_char cg3_dacvals[] __devinitdata = {
+ 	4, 0xff,	5, 0x00,	6, 0x70,	7, 0x00,	0
+ };
+ 
+-static int __devinit cg3_do_default_mode(struct cg3_par *par)
++static int cg3_do_default_mode(struct cg3_par *par)
+ {
+ 	enum cg3_type type;
+ 	u8 *p;
+@@ -346,7 +346,7 @@ static int __devinit cg3_do_default_mode(struct cg3_par *par)
+ 	return 0;
+ }
+ 
+-static int __devinit cg3_probe(struct platform_device *op)
++static int cg3_probe(struct platform_device *op)
+ {
+ 	struct device_node *dp = op->dev.of_node;
+ 	struct fb_info *info;
+diff --git a/drivers/video/cg6.c b/drivers/video/cg6.c
+index 70c7013..3204e5a 100644
+--- a/drivers/video/cg6.c
++++ b/drivers/video/cg6.c
+@@ -607,7 +607,7 @@ static int cg6_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
+  *  Initialisation
+  */
+ 
+-static void __devinit cg6_init_fix(struct fb_info *info, int linebytes)
++static void cg6_init_fix(struct fb_info *info, int linebytes)
+ {
+ 	struct cg6_par *par = (struct cg6_par *)info->par;
+ 	const char *cg6_cpu_name, *cg6_card_name;
+@@ -649,7 +649,7 @@ static void __devinit cg6_init_fix(struct fb_info *info, int linebytes)
+ }
+ 
+ /* Initialize Brooktree DAC */
+-static void __devinit cg6_bt_init(struct cg6_par *par)
++static void cg6_bt_init(struct cg6_par *par)
+ {
+ 	struct bt_regs __iomem *bt = par->bt;
+ 
+@@ -663,7 +663,7 @@ static void __devinit cg6_bt_init(struct cg6_par *par)
+ 	sbus_writel(0x00 << 24, &bt->control);
+ }
+ 
+-static void __devinit cg6_chip_init(struct fb_info *info)
++static void cg6_chip_init(struct fb_info *info)
+ {
+ 	struct cg6_par *par = (struct cg6_par *)info->par;
+ 	struct cg6_tec __iomem *tec = par->tec;
+@@ -737,7 +737,7 @@ static void cg6_unmap_regs(struct platform_device *op, struct fb_info *info,
+ 			   info->fix.smem_len);
+ }
+ 
+-static int __devinit cg6_probe(struct platform_device *op)
++static int cg6_probe(struct platform_device *op)
+ {
+ 	struct device_node *dp = op->dev.of_node;
+ 	struct fb_info *info;
+diff --git a/drivers/video/chipsfb.c b/drivers/video/chipsfb.c
+index 809857d..bf131f2 100644
+--- a/drivers/video/chipsfb.c
++++ b/drivers/video/chipsfb.c
+@@ -330,7 +330,7 @@ static struct fb_var_screeninfo chipsfb_var __devinitdata = {
+ 	.vsync_len = 8,
+ };
+ 
+-static void __devinit init_chips(struct fb_info *p, unsigned long addr)
++static void init_chips(struct fb_info *p, unsigned long addr)
+ {
+ 	memset(p->screen_base, 0, 0x100000);
+ 
+@@ -347,7 +347,7 @@ static void __devinit init_chips(struct fb_info *p, unsigned long addr)
+ 	chips_hw_init();
  }
  
 -static int __devinit
 +static int
- bnad_pci_probe(struct pci_dev *pdev,
- 		const struct pci_device_id *pcidev_id)
+ chipsfb_pci_init(struct pci_dev *dp, const struct pci_device_id *ent)
  {
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 1fac769..5efb8d2 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -1452,7 +1452,7 @@ static const struct of_device_id macb_dt_ids[] = {
- 
- MODULE_DEVICE_TABLE(of, macb_dt_ids);
- 
--static int __devinit macb_get_phy_mode_dt(struct platform_device *pdev)
-+static int macb_get_phy_mode_dt(struct platform_device *pdev)
+ 	struct fb_info *p;
+diff --git a/drivers/video/cirrusfb.c b/drivers/video/cirrusfb.c
+index 3ce6e55..0e73200 100644
+--- a/drivers/video/cirrusfb.c
++++ b/drivers/video/cirrusfb.c
+@@ -1892,7 +1892,7 @@ static int release_io_ports;
+  * based on the DRAM bandwidth bit and DRAM bank switching bit.  This
+  * works with 1MB, 2MB and 4MB configurations (which the Motorola boards
+  * seem to have. */
+-static unsigned int __devinit cirrusfb_get_memsize(struct fb_info *info,
++static unsigned int cirrusfb_get_memsize(struct fb_info *info,
+ 						   u8 __iomem *regbase)
  {
- 	struct device_node *np = pdev->dev.of_node;
+ 	unsigned long mem;
+@@ -2003,7 +2003,7 @@ static struct fb_ops cirrusfb_ops = {
+ 	.fb_imageblit	= cirrusfb_imageblit,
+ };
  
-@@ -1462,7 +1462,7 @@ static int __devinit macb_get_phy_mode_dt(struct platform_device *pdev)
- 	return -ENODEV;
+-static int __devinit cirrusfb_set_fbinfo(struct fb_info *info)
++static int cirrusfb_set_fbinfo(struct fb_info *info)
+ {
+ 	struct cirrusfb_info *cinfo = info->par;
+ 	struct fb_var_screeninfo *var = &info->var;
+@@ -2052,7 +2052,7 @@ static int __devinit cirrusfb_set_fbinfo(struct fb_info *info)
+ 	return 0;
  }
  
--static int __devinit macb_get_hwaddr_dt(struct macb *bp)
-+static int macb_get_hwaddr_dt(struct macb *bp)
+-static int __devinit cirrusfb_register(struct fb_info *info)
++static int cirrusfb_register(struct fb_info *info)
  {
- 	struct device_node *np = bp->pdev->dev.of_node;
- 	if (np) {
-@@ -1476,11 +1476,11 @@ static int __devinit macb_get_hwaddr_dt(struct macb *bp)
- 	return -ENODEV;
+ 	struct cirrusfb_info *cinfo = info->par;
+ 	int err;
+@@ -2109,7 +2109,7 @@ static void __devexit cirrusfb_cleanup(struct fb_info *info)
+ }
+ 
+ #ifdef CONFIG_PCI
+-static int __devinit cirrusfb_pci_register(struct pci_dev *pdev,
++static int cirrusfb_pci_register(struct pci_dev *pdev,
+ 					   const struct pci_device_id *ent)
+ {
+ 	struct cirrusfb_info *cinfo;
+@@ -2237,7 +2237,7 @@ static struct pci_driver cirrusfb_pci_driver = {
+ #endif /* CONFIG_PCI */
+ 
+ #ifdef CONFIG_ZORRO
+-static int __devinit cirrusfb_zorro_register(struct zorro_dev *z,
++static int cirrusfb_zorro_register(struct zorro_dev *z,
+ 					     const struct zorro_device_id *ent)
+ {
+ 	struct fb_info *info;
+diff --git a/drivers/video/cobalt_lcdfb.c b/drivers/video/cobalt_lcdfb.c
+index 9f2dc21..9e1e5d2 100644
+--- a/drivers/video/cobalt_lcdfb.c
++++ b/drivers/video/cobalt_lcdfb.c
+@@ -331,7 +331,7 @@ static struct fb_ops cobalt_lcd_fbops = {
+ 	.fb_cursor	= cobalt_lcdfb_cursor,
+ };
+ 
+-static int __devinit cobalt_lcdfb_probe(struct platform_device *dev)
++static int cobalt_lcdfb_probe(struct platform_device *dev)
+ {
+ 	struct fb_info *info;
+ 	struct resource *res;
+diff --git a/drivers/video/console/sticore.c b/drivers/video/console/sticore.c
+index 39571f9..0fbc03c 100644
+--- a/drivers/video/console/sticore.c
++++ b/drivers/video/console/sticore.c
+@@ -238,7 +238,7 @@ static void sti_flush(unsigned long start, unsigned long end)
+ 	flush_icache_range(start, end);
+ }
+ 
+-static void __devinit sti_rom_copy(unsigned long base, unsigned long count,
++static void sti_rom_copy(unsigned long base, unsigned long count,
+ 				   void *dest)
+ {
+ 	unsigned long dest_start = (unsigned long) dest;
+@@ -266,7 +266,7 @@ static void __devinit sti_rom_copy(unsigned long base, unsigned long count,
+ static char default_sti_path[21] __read_mostly;
+ 
+ #ifndef MODULE
+-static int __devinit sti_setup(char *str)
++static int sti_setup(char *str)
+ {
+ 	if (str)
+ 		strlcpy (default_sti_path, str, sizeof (default_sti_path));
+@@ -290,7 +290,7 @@ static int __devinitdata	font_index[MAX_STI_ROMS],
+ 				font_height[MAX_STI_ROMS],
+ 				font_width[MAX_STI_ROMS];
+ #ifndef MODULE
+-static int __devinit sti_font_setup(char *str)
++static int sti_font_setup(char *str)
+ {
+ 	char *x;
+ 	int i = 0;
+@@ -343,7 +343,7 @@ __setup("sti_font=", sti_font_setup);
+ 
+ 
+ 	
+-static void __devinit
++static void
+ sti_dump_globcfg(struct sti_glob_cfg *glob_cfg, unsigned int sti_mem_request)
+ {
+ 	struct sti_glob_cfg_ext *cfg;
+@@ -383,7 +383,7 @@ sti_dump_globcfg(struct sti_glob_cfg *glob_cfg, unsigned int sti_mem_request)
+ 		cfg->sti_mem_addr, sti_mem_request));
+ }
+ 
+-static void __devinit
++static void
+ sti_dump_outptr(struct sti_struct *sti)
+ {
+ 	DPRINTK((KERN_INFO
+@@ -397,7 +397,7 @@ sti_dump_outptr(struct sti_struct *sti)
+ 		 sti->outptr.attributes));
+ }
+ 
+-static int __devinit
++static int
+ sti_init_glob_cfg(struct sti_struct *sti,
+ 	    unsigned long rom_address, unsigned long hpa)
+ {
+@@ -479,7 +479,7 @@ sti_init_glob_cfg(struct sti_struct *sti,
+ }
+ 
+ #ifdef CONFIG_FB
+-static struct sti_cooked_font __devinit
++static struct sti_cooked_font
+ *sti_select_fbfont(struct sti_cooked_rom *cooked_rom, const char *fbfont_name)
+ {
+ 	const struct font_desc *fbfont;
+@@ -535,14 +535,14 @@ static struct sti_cooked_font __devinit
+ 	return cooked_font;
  }
  #else
--static int __devinit macb_get_phy_mode_dt(struct platform_device *pdev)
-+static int macb_get_phy_mode_dt(struct platform_device *pdev)
+-static struct sti_cooked_font __devinit
++static struct sti_cooked_font
+ *sti_select_fbfont(struct sti_cooked_rom *cooked_rom, const char *fbfont_name)
  {
- 	return -ENODEV;
+ 	return NULL;
  }
--static int __devinit macb_get_hwaddr_dt(struct macb *bp)
-+static int macb_get_hwaddr_dt(struct macb *bp)
- {
- 	return -ENODEV;
- }
-diff --git a/drivers/net/ethernet/chelsio/cxgb/cxgb2.c b/drivers/net/ethernet/chelsio/cxgb/cxgb2.c
-index 7cfa7bb..e5053ad 100644
---- a/drivers/net/ethernet/chelsio/cxgb/cxgb2.c
-+++ b/drivers/net/ethernet/chelsio/cxgb/cxgb2.c
-@@ -974,7 +974,7 @@ static const struct net_device_ops cxgb_netdev_ops = {
  #endif
- };
  
--static int __devinit init_one(struct pci_dev *pdev,
-+static int init_one(struct pci_dev *pdev,
- 			      const struct pci_device_id *ent)
+-static struct sti_cooked_font __devinit
++static struct sti_cooked_font
+ *sti_select_font(struct sti_cooked_rom *rom,
+ 		 int (*search_font_fnc)(struct sti_cooked_rom *, int, int))
  {
- 	static int version_printed;
-diff --git a/drivers/net/ethernet/chelsio/cxgb/sge.c b/drivers/net/ethernet/chelsio/cxgb/sge.c
-index 47a8435..9a0a858 100644
---- a/drivers/net/ethernet/chelsio/cxgb/sge.c
-+++ b/drivers/net/ethernet/chelsio/cxgb/sge.c
-@@ -2071,7 +2071,7 @@ static void espibug_workaround(unsigned long data)
- /*
-  * Creates a t1_sge structure and returns suggested resource parameters.
-  */
--struct sge * __devinit t1_sge_create(struct adapter *adapter,
-+struct sge *t1_sge_create(struct adapter *adapter,
- 				     struct sge_params *p)
- {
- 	struct sge *sge = kzalloc(sizeof(*sge), GFP_KERNEL);
-diff --git a/drivers/net/ethernet/chelsio/cxgb/subr.c b/drivers/net/ethernet/chelsio/cxgb/subr.c
-index 8a43c7e..9527dc1 100644
---- a/drivers/net/ethernet/chelsio/cxgb/subr.c
-+++ b/drivers/net/ethernet/chelsio/cxgb/subr.c
-@@ -892,7 +892,7 @@ static void power_sequence_xpak(adapter_t* adapter)
- 	}
+@@ -569,7 +569,7 @@ static struct sti_cooked_font __devinit
  }
  
--int __devinit t1_get_board_rev(adapter_t *adapter, const struct board_info *bi,
-+int t1_get_board_rev(adapter_t *adapter, const struct board_info *bi,
- 			       struct adapter_params *p)
+ 
+-static void __devinit
++static void
+ sti_dump_rom(struct sti_rom *rom)
  {
- 	p->chip_version = bi->chip_term;
-@@ -992,7 +992,7 @@ out_err:
- /*
-  * Determine a card's PCI mode.
-  */
--static void __devinit get_pci_mode(adapter_t *adapter, struct chelsio_pci_params *p)
-+static void get_pci_mode(adapter_t *adapter, struct chelsio_pci_params *p)
- {
- 	static const unsigned short speed_map[] = { 33, 66, 100, 133 };
- 	u32 pci_mode;
-@@ -1028,7 +1028,7 @@ void t1_free_sw_modules(adapter_t *adapter)
- 		t1_espi_destroy(adapter->espi);
+ 	printk(KERN_INFO "    id %04x-%04x, conforms to spec rev. %d.%02x\n",
+@@ -587,7 +587,7 @@ sti_dump_rom(struct sti_rom *rom)
  }
  
--static void __devinit init_link_config(struct link_config *lc,
-+static void init_link_config(struct link_config *lc,
- 				       const struct board_info *bi)
- {
- 	lc->supported = bi->caps;
-@@ -1049,7 +1049,7 @@ static void __devinit init_link_config(struct link_config *lc,
-  * Allocate and initialize the data structures that hold the SW state of
-  * the Terminator HW modules.
-  */
--int __devinit t1_init_sw_modules(adapter_t *adapter,
-+int t1_init_sw_modules(adapter_t *adapter,
- 				 const struct board_info *bi)
- {
- 	unsigned int i;
-diff --git a/drivers/net/ethernet/chelsio/cxgb/tp.c b/drivers/net/ethernet/chelsio/cxgb/tp.c
-index 8bed4a5..aa41cfe 100644
---- a/drivers/net/ethernet/chelsio/cxgb/tp.c
-+++ b/drivers/net/ethernet/chelsio/cxgb/tp.c
-@@ -55,7 +55,7 @@ void t1_tp_destroy(struct petp *tp)
- 	kfree(tp);
- }
  
--struct petp *__devinit t1_tp_create(adapter_t * adapter, struct tp_params *p)
-+struct petp *t1_tp_create(adapter_t * adapter, struct tp_params *p)
- {
- 	struct petp *tp = kzalloc(sizeof(*tp), GFP_KERNEL);
- 
-diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
-index a450f8d..9d09fcd 100644
---- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
-+++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
-@@ -3078,7 +3078,7 @@ static void set_nqsets(struct adapter *adap)
- 	}
- }
- 
--static int __devinit cxgb_enable_msix(struct adapter *adap)
-+static int cxgb_enable_msix(struct adapter *adap)
- {
- 	struct msix_entry entries[SGE_QSETS + 1];
- 	int vectors;
-@@ -3108,7 +3108,7 @@ static int __devinit cxgb_enable_msix(struct adapter *adap)
- 	return err;
- }
- 
--static void __devinit print_port_info(struct adapter *adap,
-+static void print_port_info(struct adapter *adap,
- 				      const struct adapter_info *ai)
- {
- 	static const char *pci_variant[] = {
-@@ -3165,7 +3165,7 @@ static const struct net_device_ops cxgb_netdev_ops = {
- #endif
- };
- 
--static void __devinit cxgb3_init_iscsi_mac(struct net_device *dev)
-+static void cxgb3_init_iscsi_mac(struct net_device *dev)
- {
- 	struct port_info *pi = netdev_priv(dev);
- 
-@@ -3176,7 +3176,7 @@ static void __devinit cxgb3_init_iscsi_mac(struct net_device *dev)
- #define TSO_FLAGS (NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_TSO_ECN)
- #define VLAN_FEAT (NETIF_F_SG | NETIF_F_IP_CSUM | TSO_FLAGS | \
- 			NETIF_F_IPV6_CSUM | NETIF_F_HIGHDMA)
--static int __devinit init_one(struct pci_dev *pdev,
-+static int init_one(struct pci_dev *pdev,
- 			      const struct pci_device_id *ent)
- {
- 	static int version_printed;
-diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
-index 2dbbcbb..67986cc 100644
---- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
-+++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
-@@ -1382,7 +1382,7 @@ static inline int adap2type(struct adapter *adapter)
- 	return type;
- }
- 
--void __devinit cxgb3_adapter_ofld(struct adapter *adapter)
-+void cxgb3_adapter_ofld(struct adapter *adapter)
- {
- 	struct t3cdev *tdev = &adapter->tdev;
- 
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index f344190..3321e1b 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-@@ -2148,7 +2148,7 @@ static const struct file_operations mem_debugfs_fops = {
- 	.llseek  = default_llseek,
- };
- 
--static void __devinit add_debugfs_mem(struct adapter *adap, const char *name,
-+static void add_debugfs_mem(struct adapter *adap, const char *name,
- 				      unsigned int idx, unsigned int size_mb)
- {
- 	struct dentry *de;
-@@ -2159,7 +2159,7 @@ static void __devinit add_debugfs_mem(struct adapter *adap, const char *name,
- 		de->d_inode->i_size = size_mb << 20;
- }
- 
--static int __devinit setup_debugfs(struct adapter *adap)
-+static int setup_debugfs(struct adapter *adap)
- {
- 	int i;
- 
-@@ -4173,7 +4173,7 @@ static inline void init_rspq(struct sge_rspq *q, u8 timer_idx, u8 pkt_cnt_idx,
-  * of ports we found and the number of available CPUs.  Most settings can be
-  * modified by the admin prior to actual use.
-  */
--static void __devinit cfg_queues(struct adapter *adap)
-+static void cfg_queues(struct adapter *adap)
- {
- 	struct sge *s = &adap->sge;
- 	int i, q10g = 0, n10g = 0, qidx = 0;
-@@ -4257,7 +4257,7 @@ static void __devinit cfg_queues(struct adapter *adap)
-  * Reduce the number of Ethernet queues across all ports to at most n.
-  * n provides at least one queue per port.
-  */
--static void __devinit reduce_ethqs(struct adapter *adap, int n)
-+static void reduce_ethqs(struct adapter *adap, int n)
- {
- 	int i;
- 	struct port_info *pi;
-@@ -4284,7 +4284,7 @@ static void __devinit reduce_ethqs(struct adapter *adap, int n)
- /* 2 MSI-X vectors needed for the FW queue and non-data interrupts */
- #define EXTRA_VECS 2
- 
--static int __devinit enable_msix(struct adapter *adap)
-+static int enable_msix(struct adapter *adap)
- {
- 	int ofld_need = 0;
- 	int i, err, want, need;
-@@ -4333,7 +4333,7 @@ static int __devinit enable_msix(struct adapter *adap)
- 
- #undef EXTRA_VECS
- 
--static int __devinit init_rss(struct adapter *adap)
-+static int init_rss(struct adapter *adap)
- {
- 	unsigned int i, j;
- 
-@@ -4349,7 +4349,7 @@ static int __devinit init_rss(struct adapter *adap)
- 	return 0;
- }
- 
--static void __devinit print_port_info(const struct net_device *dev)
-+static void print_port_info(const struct net_device *dev)
- {
- 	static const char *base[] = {
- 		"R XFI", "R XAUI", "T SGMII", "T XFI", "T XAUI", "KX4", "CX4",
-@@ -4386,7 +4386,7 @@ static void __devinit print_port_info(const struct net_device *dev)
- 		    adap->params.vpd.sn, adap->params.vpd.ec);
- }
- 
--static void __devinit enable_pcie_relaxed_ordering(struct pci_dev *dev)
-+static void enable_pcie_relaxed_ordering(struct pci_dev *dev)
- {
- 	pcie_capability_set_word(dev, PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_RELAX_EN);
- }
-@@ -4419,7 +4419,7 @@ static void free_some_resources(struct adapter *adapter)
- #define VLAN_FEAT (NETIF_F_SG | NETIF_F_IP_CSUM | TSO_FLAGS | \
- 		   NETIF_F_IPV6_CSUM | NETIF_F_HIGHDMA)
- 
--static int __devinit init_one(struct pci_dev *pdev,
-+static int init_one(struct pci_dev *pdev,
- 			      const struct pci_device_id *ent)
- {
- 	int func, i, err;
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
-index 730ae2c..8ea7736 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
-@@ -2003,7 +2003,7 @@ void t4_tp_wr_bits_indirect(struct adapter *adap, unsigned int addr,
-  *
-  *	Initialize the congestion control parameters.
-  */
--static void __devinit init_cong_ctrl(unsigned short *a, unsigned short *b)
-+static void init_cong_ctrl(unsigned short *a, unsigned short *b)
- {
- 	a[0] = a[1] = a[2] = a[3] = a[4] = a[5] = a[6] = a[7] = a[8] = 1;
- 	a[9] = 2;
-@@ -3440,7 +3440,7 @@ int t4_handle_fw_rpl(struct adapter *adap, const __be64 *rpl)
- 	return 0;
- }
- 
--static void __devinit get_pci_mode(struct adapter *adapter,
-+static void get_pci_mode(struct adapter *adapter,
- 				   struct pci_params *p)
- {
- 	u16 val;
-@@ -3460,7 +3460,7 @@ static void __devinit get_pci_mode(struct adapter *adapter,
-  *	Initializes the SW state maintained for each link, including the link's
-  *	capabilities and default speed/flow-control/autonegotiation settings.
-  */
--static void __devinit init_link_config(struct link_config *lc,
-+static void init_link_config(struct link_config *lc,
- 				       unsigned int caps)
- {
- 	lc->supported = caps;
-@@ -3485,7 +3485,7 @@ int t4_wait_dev_ready(struct adapter *adap)
- 	return t4_read_reg(adap, PL_WHOAMI) != 0xffffffff ? 0 : -EIO;
- }
- 
--static int __devinit get_flash_params(struct adapter *adap)
-+static int get_flash_params(struct adapter *adap)
- {
- 	int ret;
- 	u32 info;
-@@ -3521,7 +3521,7 @@ static int __devinit get_flash_params(struct adapter *adap)
-  *	values for some adapter tunables, take PHYs out of reset, and
-  *	initialize the MDIO interface.
-  */
--int __devinit t4_prep_adapter(struct adapter *adapter)
-+int t4_prep_adapter(struct adapter *adapter)
- {
- 	int ret;
- 
-@@ -3549,7 +3549,7 @@ int __devinit t4_prep_adapter(struct adapter *adapter)
- 	return 0;
- }
- 
--int __devinit t4_port_init(struct adapter *adap, int mbox, int pf, int vf)
-+int t4_port_init(struct adapter *adap, int mbox, int pf, int vf)
- {
- 	u8 addr[6];
- 	int ret, i, j = 0;
-diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c b/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c
-index 1ccd28b..5ffc34e 100644
---- a/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c
-@@ -2023,7 +2023,7 @@ static struct cxgb4vf_debugfs_entry debugfs_files[] = {
-  * Set up out /sys/kernel/debug/cxgb4vf sub-nodes.  We assume that the
-  * directory (debugfs_root) has already been set up.
-  */
--static int __devinit setup_debugfs(struct adapter *adapter)
-+static int setup_debugfs(struct adapter *adapter)
- {
- 	int i;
- 
-@@ -2064,7 +2064,7 @@ static void cleanup_debugfs(struct adapter *adapter)
-  * adapter parameters we're going to be using and initialize basic adapter
-  * hardware support.
-  */
--static int __devinit adap_init0(struct adapter *adapter)
-+static int adap_init0(struct adapter *adapter)
- {
- 	struct vf_resources *vfres = &adapter->params.vfres;
- 	struct sge_params *sge_params = &adapter->params.sge;
-@@ -2266,7 +2266,7 @@ static inline void init_rspq(struct sge_rspq *rspq, u8 timer_idx,
-  * be modified by the admin via ethtool and cxgbtool prior to the adapter
-  * being brought up for the first time.
-  */
--static void __devinit cfg_queues(struct adapter *adapter)
-+static void cfg_queues(struct adapter *adapter)
- {
- 	struct sge *s = &adapter->sge;
- 	int q10g, n10g, qidx, pidx, qs;
-@@ -2361,7 +2361,7 @@ static void __devinit cfg_queues(struct adapter *adapter)
-  * Reduce the number of Ethernet queues across all ports to at most n.
-  * n provides at least one queue per port.
-  */
--static void __devinit reduce_ethqs(struct adapter *adapter, int n)
-+static void reduce_ethqs(struct adapter *adapter, int n)
- {
- 	int i;
- 	struct port_info *pi;
-@@ -2400,7 +2400,7 @@ static void __devinit reduce_ethqs(struct adapter *adapter, int n)
-  * for our "extras".  Note that this process may lower the maximum number of
-  * allowed Queue Sets ...
-  */
--static int __devinit enable_msix(struct adapter *adapter)
-+static int enable_msix(struct adapter *adapter)
- {
- 	int i, err, want, need;
- 	struct msix_entry entries[MSIX_ENTRIES];
-@@ -2462,7 +2462,7 @@ static const struct net_device_ops cxgb4vf_netdev_ops	= {
-  * state needed to manage the device.  This routine is called "init_one" in
-  * the PF Driver ...
-  */
--static int __devinit cxgb4vf_pci_probe(struct pci_dev *pdev,
-+static int cxgb4vf_pci_probe(struct pci_dev *pdev,
- 				       const struct pci_device_id *ent)
- {
- 	static int version_printed;
-diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/t4vf_common.h b/drivers/net/ethernet/chelsio/cxgb4vf/t4vf_common.h
-index a65c80a..283f9d0 100644
---- a/drivers/net/ethernet/chelsio/cxgb4vf/t4vf_common.h
-+++ b/drivers/net/ethernet/chelsio/cxgb4vf/t4vf_common.h
-@@ -232,8 +232,8 @@ static inline int t4vf_wr_mbox_ns(struct adapter *adapter, const void *cmd,
- 	return t4vf_wr_mbox_core(adapter, cmd, size, rpl, false);
- }
- 
--int __devinit t4vf_wait_dev_ready(struct adapter *);
--int __devinit t4vf_port_init(struct adapter *, int);
-+int t4vf_wait_dev_ready(struct adapter *);
-+int t4vf_port_init(struct adapter *, int);
- 
- int t4vf_fw_reset(struct adapter *);
- int t4vf_query_params(struct adapter *, unsigned int, const u32 *, u32 *);
-diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/t4vf_hw.c b/drivers/net/ethernet/chelsio/cxgb4vf/t4vf_hw.c
-index fe3fd3d..9b70ccc 100644
---- a/drivers/net/ethernet/chelsio/cxgb4vf/t4vf_hw.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4vf/t4vf_hw.c
-@@ -46,7 +46,7 @@
-  * returning a value other than all 1's).  Return an error if it doesn't
-  * become ready ...
-  */
--int __devinit t4vf_wait_dev_ready(struct adapter *adapter)
-+int t4vf_wait_dev_ready(struct adapter *adapter)
- {
- 	const u32 whoami = T4VF_PL_BASE_ADDR + PL_VF_WHOAMI;
- 	const u32 notready1 = 0xffffffff;
-@@ -253,7 +253,7 @@ static int hash_mac_addr(const u8 *addr)
-  *	Initializes the SW state maintained for each link, including the link's
-  *	capabilities and default speed/flow-control/autonegotiation settings.
-  */
--static void __devinit init_link_config(struct link_config *lc,
-+static void init_link_config(struct link_config *lc,
- 				       unsigned int caps)
- {
- 	lc->supported = caps;
-@@ -275,7 +275,7 @@ static void __devinit init_link_config(struct link_config *lc,
-  *	@adapter: the adapter
-  *	@pidx: the adapter port index
-  */
--int __devinit t4vf_port_init(struct adapter *adapter, int pidx)
-+int t4vf_port_init(struct adapter *adapter, int pidx)
- {
- 	struct port_info *pi = adap2pinfo(adapter, pidx);
- 	struct fw_vi_cmd vi_cmd, vi_rpl;
-diff --git a/drivers/net/ethernet/cisco/enic/enic_main.c b/drivers/net/ethernet/cisco/enic/enic_main.c
-index 612438a..44525d2 100644
---- a/drivers/net/ethernet/cisco/enic/enic_main.c
-+++ b/drivers/net/ethernet/cisco/enic/enic_main.c
-@@ -2275,7 +2275,7 @@ static void enic_iounmap(struct enic *enic)
- 			iounmap(enic->bar[i].vaddr);
- }
- 
--static int __devinit enic_probe(struct pci_dev *pdev,
-+static int enic_probe(struct pci_dev *pdev,
- 	const struct pci_device_id *ent)
- {
- 	struct device *dev = &pdev->dev;
-diff --git a/drivers/net/ethernet/davicom/dm9000.c b/drivers/net/ethernet/davicom/dm9000.c
-index 87d7c35..d176ec5 100644
---- a/drivers/net/ethernet/davicom/dm9000.c
-+++ b/drivers/net/ethernet/davicom/dm9000.c
-@@ -1359,7 +1359,7 @@ static const struct net_device_ops dm9000_netdev_ops = {
- /*
-  * Search DM9000 board, allocate space and register it
-  */
 -static int __devinit
 +static int
- dm9000_probe(struct platform_device *pdev)
+ sti_cook_fonts(struct sti_cooked_rom *cooked_rom,
+ 			struct sti_rom *raw_rom)
  {
- 	struct dm9000_plat_data *pdata = pdev->dev.platform_data;
-diff --git a/drivers/net/ethernet/dec/tulip/de2104x.c b/drivers/net/ethernet/dec/tulip/de2104x.c
-index 18fd028..ae4d5f5 100644
---- a/drivers/net/ethernet/dec/tulip/de2104x.c
-+++ b/drivers/net/ethernet/dec/tulip/de2104x.c
-@@ -1700,7 +1700,7 @@ static const struct ethtool_ops de_ethtool_ops = {
- 	.get_regs		= de_get_regs,
- };
- 
--static void __devinit de21040_get_mac_address (struct de_private *de)
-+static void de21040_get_mac_address (struct de_private *de)
- {
- 	unsigned i;
- 
-@@ -1721,7 +1721,7 @@ static void __devinit de21040_get_mac_address (struct de_private *de)
- 	}
+@@ -622,7 +622,7 @@ sti_cook_fonts(struct sti_cooked_rom *cooked_rom,
  }
  
--static void __devinit de21040_get_media_info(struct de_private *de)
-+static void de21040_get_media_info(struct de_private *de)
- {
- 	unsigned int i;
  
-@@ -1748,7 +1748,7 @@ static void __devinit de21040_get_media_info(struct de_private *de)
+-static int __devinit
++static int
+ sti_search_font(struct sti_cooked_rom *rom, int height, int width)
+ {
+ 	struct sti_cooked_font *font;
+@@ -639,8 +639,7 @@ sti_search_font(struct sti_cooked_rom *rom, int height, int width)
+ #define BMODE_RELOCATE(offset)		offset = (offset) / 4;
+ #define BMODE_LAST_ADDR_OFFS		0x50
+ 
+-static void * __devinit
+-sti_bmode_font_raw(struct sti_cooked_font *f)
++static void *sti_bmode_font_raw(struct sti_cooked_font *f)
+ {
+ 	unsigned char *n, *p, *q;
+ 	int size = f->raw->bytes_per_char*256+sizeof(struct sti_rom_font);
+@@ -657,7 +656,7 @@ sti_bmode_font_raw(struct sti_cooked_font *f)
+ 	return n + 3;
  }
  
- /* Note: this routine returns extra data bits for size detection. */
--static unsigned __devinit tulip_read_eeprom(void __iomem *regs, int location, int addr_len)
-+static unsigned tulip_read_eeprom(void __iomem *regs, int location, int addr_len)
+-static void __devinit
++static void
+ sti_bmode_rom_copy(unsigned long base, unsigned long count, void *dest)
  {
- 	int i;
- 	unsigned retval = 0;
-@@ -1783,7 +1783,7 @@ static unsigned __devinit tulip_read_eeprom(void __iomem *regs, int location, in
+ 	unsigned long dest_start = (unsigned long) dest;
+@@ -672,8 +671,7 @@ sti_bmode_rom_copy(unsigned long base, unsigned long count, void *dest)
+ 	sti_flush(dest_start, (unsigned long)dest);
+ }
+ 
+-static struct sti_rom * __devinit
+-sti_get_bmode_rom (unsigned long address)
++static struct sti_rom *sti_get_bmode_rom (unsigned long address)
+ {
+ 	struct sti_rom *raw;
+ 	u32 size;
+@@ -708,7 +706,7 @@ sti_get_bmode_rom (unsigned long address)
+ 	return raw;
+ }
+ 
+-static struct sti_rom __devinit *sti_get_wmode_rom(unsigned long address)
++static struct sti_rom *sti_get_wmode_rom(unsigned long address)
+ {
+ 	struct sti_rom *raw;
+ 	unsigned long size;
+@@ -723,7 +721,7 @@ static struct sti_rom __devinit *sti_get_wmode_rom(unsigned long address)
+ 	return raw;
+ }
+ 
+-static int __devinit sti_read_rom(int wordmode, struct sti_struct *sti,
++static int sti_read_rom(int wordmode, struct sti_struct *sti,
+ 				  unsigned long address)
+ {
+ 	struct sti_cooked_rom *cooked;
+@@ -806,8 +804,7 @@ out_err:
+ 	return 0;
+ }
+ 
+-static struct sti_struct * __devinit
+-sti_try_rom_generic(unsigned long address, unsigned long hpa, struct pci_dev *pd)
++static struct sti_struct *sti_try_rom_generic(unsigned long address, unsigned long hpa, struct pci_dev *pd)
+ {
+ 	struct sti_struct *sti;
+ 	int ok;
+@@ -921,7 +918,7 @@ out_err:
+ 	return NULL;
+ }
+ 
+-static void __devinit sticore_check_for_default_sti(struct sti_struct *sti, char *path)
++static void sticore_check_for_default_sti(struct sti_struct *sti, char *path)
+ {
+ 	if (strcmp (path, default_sti_path) == 0)
+ 		default_sti = sti;
+@@ -932,7 +929,7 @@ static void __devinit sticore_check_for_default_sti(struct sti_struct *sti, char
+  * in the additional address field addr[1] while on
+  * older Systems the PDC stores it in page0->proc_sti 
+  */
+-static int __devinit sticore_pa_init(struct parisc_device *dev)
++static int sticore_pa_init(struct parisc_device *dev)
+ {
+ 	char pa_path[21];
+ 	struct sti_struct *sti = NULL;
+@@ -953,7 +950,7 @@ static int __devinit sticore_pa_init(struct parisc_device *dev)
+ }
+ 
+ 
+-static int __devinit sticore_pci_init(struct pci_dev *pd,
++static int sticore_pci_init(struct pci_dev *pd,
+ 		const struct pci_device_id *ent)
+ {
+ #ifdef CONFIG_PCI
+@@ -1043,7 +1040,7 @@ static struct parisc_driver pa_sti_driver = {
+ 
+ static int sticore_initialized __read_mostly;
+ 
+-static void __devinit sti_init_roms(void)
++static void sti_init_roms(void)
+ {
+ 	if (sticore_initialized)
+ 		return;
+diff --git a/drivers/video/cyber2000fb.c b/drivers/video/cyber2000fb.c
+index 9b75b29..78bb6be 100644
+--- a/drivers/video/cyber2000fb.c
++++ b/drivers/video/cyber2000fb.c
+@@ -1230,7 +1230,7 @@ static int cyber2000fb_ddc_getsda(void *data)
  	return retval;
  }
  
--static void __devinit de21041_get_srom_info (struct de_private *de)
-+static void de21041_get_srom_info (struct de_private *de)
+-static int __devinit cyber2000fb_setup_ddc_bus(struct cfb_info *cfb)
++static int cyber2000fb_setup_ddc_bus(struct cfb_info *cfb)
  {
- 	unsigned i, sa_offset = 0, ofs;
- 	u8 ee_data[DE_EEPROM_SIZE + 6] = {};
-@@ -1961,7 +1961,7 @@ static const struct net_device_ops de_netdev_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- };
- 
--static int __devinit de_init_one (struct pci_dev *pdev,
-+static int de_init_one (struct pci_dev *pdev,
- 				  const struct pci_device_id *ent)
- {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/dec/tulip/de4x5.c b/drivers/net/ethernet/dec/tulip/de4x5.c
-index 8a4264f..f809302 100644
---- a/drivers/net/ethernet/dec/tulip/de4x5.c
-+++ b/drivers/net/ethernet/dec/tulip/de4x5.c
-@@ -1092,7 +1092,7 @@ static const struct net_device_ops de4x5_netdev_ops = {
- };
- 
- 
--static int __devinit
-+static int
- de4x5_hw_init(struct net_device *dev, u_long iobase, struct device *gendev)
- {
-     char name[DE4X5_NAME_LENGTH + 1];
-@@ -2118,7 +2118,7 @@ MODULE_DEVICE_TABLE(eisa, de4x5_eisa_ids);
- ** DECchips, we can find the base SROM irrespective of the BIOS scan direction.
- ** For single port cards this is a time waster...
- */
--static void __devinit
-+static void
- srom_search(struct net_device *dev, struct pci_dev *pdev)
- {
-     u_char pb;
-@@ -2192,7 +2192,7 @@ srom_search(struct net_device *dev, struct pci_dev *pdev)
- ** kernels use the V0.535[n] drivers.
- */
- 
--static int __devinit de4x5_pci_probe (struct pci_dev *pdev,
-+static int de4x5_pci_probe (struct pci_dev *pdev,
- 				   const struct pci_device_id *ent)
- {
- 	u_char pb, pbus = 0, dev_num, dnum = 0, timer;
-diff --git a/drivers/net/ethernet/dec/tulip/dmfe.c b/drivers/net/ethernet/dec/tulip/dmfe.c
-index a631448..204da23 100644
---- a/drivers/net/ethernet/dec/tulip/dmfe.c
-+++ b/drivers/net/ethernet/dec/tulip/dmfe.c
-@@ -367,7 +367,7 @@ static const struct net_device_ops netdev_ops = {
-  *	Search DM910X board ,allocate space and register it
-  */
- 
--static int __devinit dmfe_init_one (struct pci_dev *pdev,
-+static int dmfe_init_one (struct pci_dev *pdev,
- 				    const struct pci_device_id *ent)
- {
- 	struct dmfe_board_info *db;	/* board information structure */
-diff --git a/drivers/net/ethernet/dec/tulip/eeprom.c b/drivers/net/ethernet/dec/tulip/eeprom.c
-index 44f7e8e..8692a72 100644
---- a/drivers/net/ethernet/dec/tulip/eeprom.c
-+++ b/drivers/net/ethernet/dec/tulip/eeprom.c
-@@ -102,7 +102,7 @@ static const char *const block_name[] __devinitconst = {
-  * #ifdef __hppa__ should completely optimize this function away for
-  * non-parisc hardware.
-  */
--static void __devinit tulip_build_fake_mediatable(struct tulip_private *tp)
-+static void tulip_build_fake_mediatable(struct tulip_private *tp)
- {
- #ifdef CONFIG_GSC
- 	if (tp->flags & NEEDS_FAKE_MEDIA_TABLE) {
-@@ -140,7 +140,7 @@ static void __devinit tulip_build_fake_mediatable(struct tulip_private *tp)
- #endif
- }
- 
--void __devinit tulip_parse_eeprom(struct net_device *dev)
-+void tulip_parse_eeprom(struct net_device *dev)
- {
- 	/*
- 	  dev is not registered at this point, so logging messages can't
-@@ -339,7 +339,7 @@ subsequent_board:
- #define EE_READ_CMD		(6)
- 
- /* Note: this routine returns extra data bits for size detection. */
--int __devinit tulip_read_eeprom(struct net_device *dev, int location, int addr_len)
-+int tulip_read_eeprom(struct net_device *dev, int location, int addr_len)
- {
- 	int i;
- 	unsigned retval = 0;
-diff --git a/drivers/net/ethernet/dec/tulip/media.c b/drivers/net/ethernet/dec/tulip/media.c
-index ae937c6..6ad755b 100644
---- a/drivers/net/ethernet/dec/tulip/media.c
-+++ b/drivers/net/ethernet/dec/tulip/media.c
-@@ -447,7 +447,7 @@ int tulip_check_duplex(struct net_device *dev)
- 	return 0;
- }
- 
--void __devinit tulip_find_mii (struct net_device *dev, int board_idx)
-+void tulip_find_mii (struct net_device *dev, int board_idx)
- {
- 	struct tulip_private *tp = netdev_priv(dev);
- 	int phyn, phy_idx = 0;
-diff --git a/drivers/net/ethernet/dec/tulip/tulip_core.c b/drivers/net/ethernet/dec/tulip/tulip_core.c
-index 2a3736e..4eb705f 100644
---- a/drivers/net/ethernet/dec/tulip/tulip_core.c
-+++ b/drivers/net/ethernet/dec/tulip/tulip_core.c
-@@ -1191,7 +1191,7 @@ static void set_rx_mode(struct net_device *dev)
- }
- 
- #ifdef CONFIG_TULIP_MWI
--static void __devinit tulip_mwi_config (struct pci_dev *pdev,
-+static void tulip_mwi_config (struct pci_dev *pdev,
- 					struct net_device *dev)
- {
- 	struct tulip_private *tp = netdev_priv(dev);
-@@ -1301,7 +1301,7 @@ DEFINE_PCI_DEVICE_TABLE(early_486_chipsets) = {
- 	{ },
- };
- 
--static int __devinit tulip_init_one (struct pci_dev *pdev,
-+static int tulip_init_one (struct pci_dev *pdev,
- 				     const struct pci_device_id *ent)
- {
- 	struct tulip_private *tp;
-diff --git a/drivers/net/ethernet/dec/tulip/uli526x.c b/drivers/net/ethernet/dec/tulip/uli526x.c
-index 9c24c95..b1aa454 100644
---- a/drivers/net/ethernet/dec/tulip/uli526x.c
-+++ b/drivers/net/ethernet/dec/tulip/uli526x.c
-@@ -281,7 +281,7 @@ static const struct net_device_ops netdev_ops = {
-  *	Search ULI526X board, allocate space and register it
-  */
- 
--static int __devinit uli526x_init_one (struct pci_dev *pdev,
-+static int uli526x_init_one (struct pci_dev *pdev,
- 				    const struct pci_device_id *ent)
- {
- 	struct uli526x_board_info *db;	/* board information structure */
-diff --git a/drivers/net/ethernet/dec/tulip/winbond-840.c b/drivers/net/ethernet/dec/tulip/winbond-840.c
-index 6c5db4f..a5865dd 100644
---- a/drivers/net/ethernet/dec/tulip/winbond-840.c
-+++ b/drivers/net/ethernet/dec/tulip/winbond-840.c
-@@ -358,7 +358,7 @@ static const struct net_device_ops netdev_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- };
- 
--static int __devinit w840_probe1 (struct pci_dev *pdev,
-+static int w840_probe1 (struct pci_dev *pdev,
- 				  const struct pci_device_id *ent)
- {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/dec/tulip/xircom_cb.c b/drivers/net/ethernet/dec/tulip/xircom_cb.c
-index 4310e97..8e1f8f6 100644
---- a/drivers/net/ethernet/dec/tulip/xircom_cb.c
-+++ b/drivers/net/ethernet/dec/tulip/xircom_cb.c
-@@ -190,7 +190,7 @@ static const struct net_device_ops netdev_ops = {
-          first two packets that get send, and pump hates that.
- 
-  */
--static int __devinit xircom_probe(struct pci_dev *pdev, const struct pci_device_id *id)
-+static int xircom_probe(struct pci_dev *pdev, const struct pci_device_id *id)
- {
- 	struct device *d = &pdev->dev;
- 	struct net_device *dev = NULL;
-diff --git a/drivers/net/ethernet/dlink/dl2k.c b/drivers/net/ethernet/dlink/dl2k.c
-index 21db34c..eba0822 100644
---- a/drivers/net/ethernet/dlink/dl2k.c
-+++ b/drivers/net/ethernet/dlink/dl2k.c
-@@ -110,7 +110,7 @@ static const struct net_device_ops netdev_ops = {
- 	.ndo_change_mtu		= change_mtu,
- };
- 
--static int __devinit
-+static int
- rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
- {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/dlink/sundance.c b/drivers/net/ethernet/dlink/sundance.c
-index 65187b9..618a314 100644
---- a/drivers/net/ethernet/dlink/sundance.c
-+++ b/drivers/net/ethernet/dlink/sundance.c
-@@ -472,7 +472,7 @@ static const struct net_device_ops netdev_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- };
- 
--static int __devinit sundance_probe1 (struct pci_dev *pdev,
-+static int sundance_probe1 (struct pci_dev *pdev,
- 				      const struct pci_device_id *ent)
- {
- 	struct net_device *dev;
-@@ -701,7 +701,7 @@ static int change_mtu(struct net_device *dev, int new_mtu)
- 
- #define eeprom_delay(ee_addr)	ioread32(ee_addr)
- /* Read the EEPROM and MII Management Data I/O (MDIO) interfaces. */
--static int __devinit eeprom_read(void __iomem *ioaddr, int location)
-+static int eeprom_read(void __iomem *ioaddr, int location)
- {
- 	int boguscnt = 10000;		/* Typical 1900 ticks. */
- 	iowrite16(0x0200 | (location & 0xff), ioaddr + EECtrl);
-diff --git a/drivers/net/ethernet/dnet.c b/drivers/net/ethernet/dnet.c
-index dfdf553..e409525 100644
---- a/drivers/net/ethernet/dnet.c
-+++ b/drivers/net/ethernet/dnet.c
-@@ -72,7 +72,7 @@ static void __dnet_set_hwaddr(struct dnet *bp)
- 	dnet_writew_mac(bp, DNET_INTERNAL_MAC_ADDR_2_REG, tmp);
- }
- 
--static void __devinit dnet_get_hwaddr(struct dnet *bp)
-+static void dnet_get_hwaddr(struct dnet *bp)
- {
- 	u16 tmp;
- 	u8 addr[6];
-@@ -829,7 +829,7 @@ static const struct net_device_ops dnet_netdev_ops = {
- 	.ndo_change_mtu		= eth_change_mtu,
- };
- 
--static int __devinit dnet_probe(struct platform_device *pdev)
-+static int dnet_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/emulex/benet/be_main.c b/drivers/net/ethernet/emulex/benet/be_main.c
-index c365722..92c2f5d 100644
---- a/drivers/net/ethernet/emulex/benet/be_main.c
-+++ b/drivers/net/ethernet/emulex/benet/be_main.c
-@@ -3999,7 +3999,7 @@ static inline char *func_name(struct be_adapter *adapter)
- 	return be_physfn(adapter) ? "PF" : "VF";
- }
- 
--static int __devinit be_probe(struct pci_dev *pdev,
-+static int be_probe(struct pci_dev *pdev,
- 			const struct pci_device_id *pdev_id)
- {
- 	int status = 0;
-diff --git a/drivers/net/ethernet/ethoc.c b/drivers/net/ethernet/ethoc.c
-index 198d587..78764bb 100644
---- a/drivers/net/ethernet/ethoc.c
-+++ b/drivers/net/ethernet/ethoc.c
-@@ -665,7 +665,7 @@ static void ethoc_mdio_poll(struct net_device *dev)
- {
- }
- 
--static int __devinit ethoc_mdio_probe(struct net_device *dev)
-+static int ethoc_mdio_probe(struct net_device *dev)
- {
- 	struct ethoc *priv = netdev_priv(dev);
- 	struct phy_device *phy;
-@@ -905,7 +905,7 @@ static const struct net_device_ops ethoc_netdev_ops = {
-  * ethoc_probe - initialize OpenCores ethernet MAC
-  * pdev:	platform device
-  */
--static int __devinit ethoc_probe(struct platform_device *pdev)
-+static int ethoc_probe(struct platform_device *pdev)
- {
- 	struct net_device *netdev = NULL;
- 	struct resource *res = NULL;
-diff --git a/drivers/net/ethernet/fealnx.c b/drivers/net/ethernet/fealnx.c
-index fce1d35..b1dcd1c 100644
---- a/drivers/net/ethernet/fealnx.c
-+++ b/drivers/net/ethernet/fealnx.c
-@@ -477,7 +477,7 @@ static const struct net_device_ops netdev_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- };
- 
--static int __devinit fealnx_init_one(struct pci_dev *pdev,
-+static int fealnx_init_one(struct pci_dev *pdev,
- 				     const struct pci_device_id *ent)
- {
- 	struct netdev_private *np;
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index 3729996..ae7ebd7 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -1484,7 +1484,7 @@ static int fec_enet_init(struct net_device *ndev)
- }
- 
- #ifdef CONFIG_OF
--static int __devinit fec_get_phy_mode_dt(struct platform_device *pdev)
-+static int fec_get_phy_mode_dt(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
- 
-@@ -1494,7 +1494,7 @@ static int __devinit fec_get_phy_mode_dt(struct platform_device *pdev)
- 	return -ENODEV;
- }
- 
--static void __devinit fec_reset_phy(struct platform_device *pdev)
-+static void fec_reset_phy(struct platform_device *pdev)
- {
- 	int err, phy_reset;
- 	int msec = 1;
-@@ -1533,7 +1533,7 @@ static inline void fec_reset_phy(struct platform_device *pdev)
- }
- #endif /* CONFIG_OF */
- 
--static int __devinit
-+static int
- fec_probe(struct platform_device *pdev)
- {
- 	struct fec_enet_private *fep;
-diff --git a/drivers/net/ethernet/freescale/fec_mpc52xx.c b/drivers/net/ethernet/freescale/fec_mpc52xx.c
-index 2933d08..817d081 100644
---- a/drivers/net/ethernet/freescale/fec_mpc52xx.c
-+++ b/drivers/net/ethernet/freescale/fec_mpc52xx.c
-@@ -845,7 +845,7 @@ static const struct net_device_ops mpc52xx_fec_netdev_ops = {
- /* OF Driver                                                                */
- /* ======================================================================== */
- 
--static int __devinit mpc52xx_fec_probe(struct platform_device *op)
-+static int mpc52xx_fec_probe(struct platform_device *op)
- {
- 	int rv;
- 	struct net_device *ndev;
-diff --git a/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c b/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c
-index 2b7633f..e9879c5 100644
---- a/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c
-+++ b/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c
-@@ -1004,7 +1004,7 @@ static const struct net_device_ops fs_enet_netdev_ops = {
- };
- 
- static struct of_device_id fs_enet_match[];
--static int __devinit fs_enet_probe(struct platform_device *ofdev)
-+static int fs_enet_probe(struct platform_device *ofdev)
- {
- 	const struct of_device_id *match;
- 	struct net_device *ndev;
-diff --git a/drivers/net/ethernet/freescale/fs_enet/mii-bitbang.c b/drivers/net/ethernet/freescale/fs_enet/mii-bitbang.c
-index 1514533..3f35b6a 100644
---- a/drivers/net/ethernet/freescale/fs_enet/mii-bitbang.c
-+++ b/drivers/net/ethernet/freescale/fs_enet/mii-bitbang.c
-@@ -108,7 +108,7 @@ static struct mdiobb_ops bb_ops = {
- 	.get_mdio_data = mdio_read,
- };
- 
--static int __devinit fs_mii_bitbang_init(struct mii_bus *bus,
-+static int fs_mii_bitbang_init(struct mii_bus *bus,
-                                          struct device_node *np)
- {
- 	struct resource res;
-@@ -150,7 +150,7 @@ static int __devinit fs_mii_bitbang_init(struct mii_bus *bus,
- 	return 0;
- }
- 
--static int __devinit fs_enet_mdio_probe(struct platform_device *ofdev)
-+static int fs_enet_mdio_probe(struct platform_device *ofdev)
- {
- 	struct mii_bus *new_bus;
- 	struct bb_info *bitbang;
-diff --git a/drivers/net/ethernet/freescale/fs_enet/mii-fec.c b/drivers/net/ethernet/freescale/fs_enet/mii-fec.c
-index cdf702a..18e8ef2 100644
---- a/drivers/net/ethernet/freescale/fs_enet/mii-fec.c
-+++ b/drivers/net/ethernet/freescale/fs_enet/mii-fec.c
-@@ -102,7 +102,7 @@ static int fs_enet_fec_mii_reset(struct mii_bus *bus)
- }
- 
- static struct of_device_id fs_enet_mdio_fec_match[];
--static int __devinit fs_enet_mdio_probe(struct platform_device *ofdev)
-+static int fs_enet_mdio_probe(struct platform_device *ofdev)
- {
- 	const struct of_device_id *match;
- 	struct resource res;
-diff --git a/drivers/net/ethernet/freescale/xgmac_mdio.c b/drivers/net/ethernet/freescale/xgmac_mdio.c
-index 1afb5ea..ac8378b 100644
---- a/drivers/net/ethernet/freescale/xgmac_mdio.c
-+++ b/drivers/net/ethernet/freescale/xgmac_mdio.c
-@@ -189,7 +189,7 @@ static int xgmac_mdio_reset(struct mii_bus *bus)
+ 	strlcpy(cfb->ddc_adapter.name, cfb->fb.fix.id,
+ 		sizeof(cfb->ddc_adapter.name));
+@@ -1305,7 +1305,7 @@ static int cyber2000fb_i2c_getscl(void *data)
  	return ret;
  }
  
--static int __devinit xgmac_mdio_probe(struct platform_device *pdev)
-+static int xgmac_mdio_probe(struct platform_device *pdev)
+-static int __devinit cyber2000fb_i2c_register(struct cfb_info *cfb)
++static int cyber2000fb_i2c_register(struct cfb_info *cfb)
  {
- 	struct device_node *np = pdev->dev.of_node;
- 	struct mii_bus *bus;
-diff --git a/drivers/net/ethernet/hp/hp100.c b/drivers/net/ethernet/hp/hp100.c
-index 9aba3fb..af986d6 100644
---- a/drivers/net/ethernet/hp/hp100.c
-+++ b/drivers/net/ethernet/hp/hp100.c
-@@ -308,7 +308,7 @@ static void wait(void)
-  * Read board id and convert to string.
-  * Effectively same code as decode_eisa_sig
+ 	strlcpy(cfb->i2c_adapter.name, cfb->fb.fix.id,
+ 		sizeof(cfb->i2c_adapter.name));
+@@ -1404,7 +1404,7 @@ static void cyberpro_init_hw(struct cfb_info *cfb)
+ 	}
+ }
+ 
+-static struct cfb_info __devinit *cyberpro_alloc_fb_info(unsigned int id,
++static struct cfb_info *cyberpro_alloc_fb_info(unsigned int id,
+ 							 char *name)
+ {
+ 	struct cfb_info *cfb;
+@@ -1524,7 +1524,7 @@ static int cyber2000fb_setup(char *options)
+  *  - memory mapped access to the registers
+  *  - initialised mem_ctl1 and mem_ctl2 appropriately.
   */
--static __devinit const char *hp100_read_id(int ioaddr)
-+static const char *hp100_read_id(int ioaddr)
+-static int __devinit cyberpro_common_probe(struct cfb_info *cfb)
++static int cyberpro_common_probe(struct cfb_info *cfb)
  {
- 	int i;
- 	static char str[HP100_SIG_LEN];
-@@ -447,7 +447,7 @@ static const struct net_device_ops hp100_netdev_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- };
+ 	u_long smem_size;
+ 	u_int h_sync, v_sync;
+@@ -1646,7 +1646,7 @@ static void cyberpro_common_resume(struct cfb_info *cfb)
  
--static int __devinit hp100_probe1(struct net_device *dev, int ioaddr,
-+static int hp100_probe1(struct net_device *dev, int ioaddr,
- 				  u_char bus, struct pci_dev *pci_dev)
- {
- 	int i;
-@@ -2884,7 +2884,7 @@ static struct eisa_driver hp100_eisa_driver = {
- #endif
+ #include <mach/framebuffer.h>
  
- #ifdef CONFIG_PCI
--static int __devinit hp100_pci_probe (struct pci_dev *pdev,
-+static int hp100_pci_probe (struct pci_dev *pdev,
- 				     const struct pci_device_id *ent)
+-static int __devinit cyberpro_vl_probe(void)
++static int cyberpro_vl_probe(void)
  {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/i825xx/ether1.c b/drivers/net/ethernet/i825xx/ether1.c
-index 75a1b57..d65dd24 100644
---- a/drivers/net/ethernet/i825xx/ether1.c
-+++ b/drivers/net/ethernet/i825xx/ether1.c
-@@ -250,7 +250,7 @@ ether1_readbuffer (struct net_device *dev, void *data, unsigned int start, unsig
- 	} while (thislen);
+ 	struct cfb_info *cfb;
+ 	int err = -ENOMEM;
+@@ -1780,7 +1780,7 @@ static int cyberpro_pci_enable_mmio(struct cfb_info *cfb)
+ 	return 0;
  }
  
 -static int __devinit
 +static int
- ether1_ramtest(struct net_device *dev, unsigned char byte)
+ cyberpro_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
  {
- 	unsigned char *buffer = kmalloc (BUFFER_SIZE, GFP_KERNEL);
-@@ -304,7 +304,7 @@ ether1_reset (struct net_device *dev)
- 	return BUS_16;
+ 	struct cfb_info *cfb;
+diff --git a/drivers/video/da8xx-fb.c b/drivers/video/da8xx-fb.c
+index b3aaf3b..1face18 100644
+--- a/drivers/video/da8xx-fb.c
++++ b/drivers/video/da8xx-fb.c
+@@ -1230,7 +1230,7 @@ static unsigned int da8xxfb_pixel_clk_period(struct da8xx_fb_par *par)
+ 	return pix_clk_period_picosec;
  }
  
--static int __devinit
-+static int
- ether1_init_2(struct net_device *dev)
+-static int __devinit fb_probe(struct platform_device *device)
++static int fb_probe(struct platform_device *device)
  {
- 	int i;
-@@ -972,7 +972,7 @@ ether1_setmulticastlist (struct net_device *dev)
+ 	struct da8xx_lcdc_platform_data *fb_pdata =
+ 						device->dev.platform_data;
+diff --git a/drivers/video/dnfb.c b/drivers/video/dnfb.c
+index 49e3dda..182b199 100644
+--- a/drivers/video/dnfb.c
++++ b/drivers/video/dnfb.c
+@@ -224,7 +224,7 @@ void dnfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
+  * Initialization
+  */
  
- /* ------------------------------------------------------------------------- */
- 
--static void __devinit ether1_banner(void)
-+static void ether1_banner(void)
+-static int __devinit dnfb_probe(struct platform_device *dev)
++static int dnfb_probe(struct platform_device *dev)
  {
- 	static unsigned int version_printed = 0;
- 
-@@ -991,7 +991,7 @@ static const struct net_device_ops ether1_netdev_ops = {
- 	.ndo_set_mac_address	= eth_mac_addr,
- };
- 
--static int __devinit
-+static int
- ether1_probe(struct expansion_card *ec, const struct ecard_id *id)
- {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/i825xx/lasi_82596.c b/drivers/net/ethernet/i825xx/lasi_82596.c
-index a79cc24..6bd7941 100644
---- a/drivers/net/ethernet/i825xx/lasi_82596.c
-+++ b/drivers/net/ethernet/i825xx/lasi_82596.c
-@@ -150,7 +150,7 @@ static void mpu_port(struct net_device *dev, int c, dma_addr_t x)
- 
- #define LAN_PROM_ADDR	0xF0810000
- 
--static int __devinit
-+static int
- lan_init_chip(struct parisc_device *dev)
- {
- 	struct	net_device *netdevice;
-@@ -222,7 +222,7 @@ static struct parisc_driver lan_driver = {
- 	.remove         = lan_remove_chip,
- };
- 
--static int __devinit lasi_82596_init(void)
-+static int lasi_82596_init(void)
- {
- 	printk(KERN_INFO LASI_82596_DRIVER_VERSION "\n");
- 	return register_parisc_driver(&lan_driver);
-diff --git a/drivers/net/ethernet/i825xx/lib82596.c b/drivers/net/ethernet/i825xx/lib82596.c
-index 3efbd8d..f045ea4 100644
---- a/drivers/net/ethernet/i825xx/lib82596.c
-+++ b/drivers/net/ethernet/i825xx/lib82596.c
-@@ -1048,7 +1048,7 @@ static const struct net_device_ops i596_netdev_ops = {
- #endif
- };
- 
--static int __devinit i82596_probe(struct net_device *dev)
-+static int i82596_probe(struct net_device *dev)
- {
- 	int i;
- 	struct i596_private *lp = netdev_priv(dev);
-diff --git a/drivers/net/ethernet/i825xx/sni_82596.c b/drivers/net/ethernet/i825xx/sni_82596.c
-index 4442c6e..349b5f9 100644
---- a/drivers/net/ethernet/i825xx/sni_82596.c
-+++ b/drivers/net/ethernet/i825xx/sni_82596.c
-@@ -75,7 +75,7 @@ static void mpu_port(struct net_device *dev, int c, dma_addr_t x)
+ 	struct fb_info *info;
+ 	int err = 0;
+diff --git a/drivers/video/ep93xx-fb.c b/drivers/video/ep93xx-fb.c
+index 2f08122..ef4ca55 100644
+--- a/drivers/video/ep93xx-fb.c
++++ b/drivers/video/ep93xx-fb.c
+@@ -484,7 +484,7 @@ static void ep93xxfb_dealloc_videomem(struct fb_info *info)
+ 				  info->screen_base, info->fix.smem_start);
  }
  
- 
--static int __devinit sni_82596_probe(struct platform_device *dev)
-+static int sni_82596_probe(struct platform_device *dev)
+-static int __devinit ep93xxfb_probe(struct platform_device *pdev)
++static int ep93xxfb_probe(struct platform_device *pdev)
  {
- 	struct	net_device *netdevice;
- 	struct i596_private *lp;
-@@ -170,7 +170,7 @@ static struct platform_driver sni_82596_driver = {
+ 	struct ep93xxfb_mach_info *mach_info = pdev->dev.platform_data;
+ 	struct fb_info *info;
+@@ -627,7 +627,7 @@ static struct platform_driver ep93xxfb_driver = {
  	},
  };
  
--static int __devinit sni_82596_init(void)
-+static int sni_82596_init(void)
+-static int __devinit ep93xxfb_init(void)
++static int ep93xxfb_init(void)
  {
- 	printk(KERN_INFO SNI_82596_DRIVER_VERSION "\n");
- 	return platform_driver_register(&sni_82596_driver);
-diff --git a/drivers/net/ethernet/ibm/ehea/ehea_main.c b/drivers/net/ethernet/ibm/ehea/ehea_main.c
-index f4d2da0..9fc453d 100644
---- a/drivers/net/ethernet/ibm/ehea/ehea_main.c
-+++ b/drivers/net/ethernet/ibm/ehea/ehea_main.c
-@@ -98,7 +98,7 @@ static struct ehea_fw_handle_array ehea_fw_handles;
- static struct ehea_bcmc_reg_array ehea_bcmc_regs;
- 
- 
--static int __devinit ehea_probe_adapter(struct platform_device *dev,
-+static int ehea_probe_adapter(struct platform_device *dev,
- 					const struct of_device_id *id);
- 
- static int __devexit ehea_remove(struct platform_device *dev);
-@@ -2909,7 +2909,7 @@ static ssize_t ehea_show_port_id(struct device *dev,
- static DEVICE_ATTR(log_port_id, S_IRUSR | S_IRGRP | S_IROTH, ehea_show_port_id,
- 		   NULL);
- 
--static void __devinit logical_port_release(struct device *dev)
-+static void logical_port_release(struct device *dev)
- {
- 	struct ehea_port *port = container_of(dev, struct ehea_port, ofdev.dev);
- 	of_node_put(port->ofdev.dev.of_node);
-@@ -3257,7 +3257,7 @@ static void ehea_remove_device_sysfs(struct platform_device *dev)
- 	device_remove_file(&dev->dev, &dev_attr_remove_port);
+ 	return platform_driver_register(&ep93xxfb_driver);
+ }
+diff --git a/drivers/video/exynos/exynos_dp_core.c b/drivers/video/exynos/exynos_dp_core.c
+index 07c0453..47f0448 100644
+--- a/drivers/video/exynos/exynos_dp_core.c
++++ b/drivers/video/exynos/exynos_dp_core.c
+@@ -856,7 +856,7 @@ static irqreturn_t exynos_dp_irq_handler(int irq, void *arg)
+ 	return IRQ_HANDLED;
  }
  
--static int __devinit ehea_probe_adapter(struct platform_device *dev,
-+static int ehea_probe_adapter(struct platform_device *dev,
- 					const struct of_device_id *id)
+-static int __devinit exynos_dp_probe(struct platform_device *pdev)
++static int exynos_dp_probe(struct platform_device *pdev)
  {
- 	struct ehea_adapter *adapter;
-diff --git a/drivers/net/ethernet/ibm/emac/core.c b/drivers/net/ethernet/ibm/emac/core.c
-index a0fe6e3..914413f 100644
---- a/drivers/net/ethernet/ibm/emac/core.c
-+++ b/drivers/net/ethernet/ibm/emac/core.c
-@@ -2261,7 +2261,7 @@ struct emac_depentry {
- #define	EMAC_DEP_PREV_IDX	5
- #define	EMAC_DEP_COUNT		6
- 
--static int __devinit emac_check_deps(struct emac_instance *dev,
-+static int emac_check_deps(struct emac_instance *dev,
- 				     struct emac_depentry *deps)
- {
- 	int i, there = 0;
-@@ -2314,7 +2314,7 @@ static void emac_put_deps(struct emac_instance *dev)
- 		of_dev_put(dev->tah_dev);
+ 	struct resource *res;
+ 	struct exynos_dp_device *dp;
+diff --git a/drivers/video/ffb.c b/drivers/video/ffb.c
+index d78dc9a..46aee0e 100644
+--- a/drivers/video/ffb.c
++++ b/drivers/video/ffb.c
+@@ -893,7 +893,7 @@ static void ffb_init_fix(struct fb_info *info)
+ 	info->fix.accel = FB_ACCEL_SUN_CREATOR;
  }
  
--static int __devinit emac_of_bus_notify(struct notifier_block *nb,
-+static int emac_of_bus_notify(struct notifier_block *nb,
- 					unsigned long action, void *data)
+-static int __devinit ffb_probe(struct platform_device *op)
++static int ffb_probe(struct platform_device *op)
  {
- 	/* We are only intereted in device addition */
-@@ -2327,7 +2327,7 @@ static struct notifier_block emac_of_bus_notifier __devinitdata = {
- 	.notifier_call = emac_of_bus_notify
+ 	struct device_node *dp = op->dev.of_node;
+ 	struct ffb_fbc __iomem *fbc;
+diff --git a/drivers/video/fm2fb.c b/drivers/video/fm2fb.c
+index d0533b7..a64c3ef 100644
+--- a/drivers/video/fm2fb.c
++++ b/drivers/video/fm2fb.c
+@@ -211,7 +211,7 @@ static int fm2fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+      *  Initialisation
+      */
+ 
+-static int __devinit fm2fb_probe(struct zorro_dev *z,
++static int fm2fb_probe(struct zorro_dev *z,
+ 				 const struct zorro_device_id *id);
+ 
+ static struct zorro_device_id fm2fb_devices[] __devinitdata = {
+@@ -227,7 +227,7 @@ static struct zorro_driver fm2fb_driver = {
+ 	.probe		= fm2fb_probe,
  };
  
--static int __devinit emac_wait_deps(struct emac_instance *dev)
-+static int emac_wait_deps(struct emac_instance *dev)
+-static int __devinit fm2fb_probe(struct zorro_dev *z,
++static int fm2fb_probe(struct zorro_dev *z,
+ 				 const struct zorro_device_id *id)
  {
- 	struct emac_depentry deps[EMAC_DEP_COUNT];
- 	int i, err;
-@@ -2367,7 +2367,7 @@ static int __devinit emac_wait_deps(struct emac_instance *dev)
- 	return err;
- }
- 
--static int __devinit emac_read_uint_prop(struct device_node *np, const char *name,
-+static int emac_read_uint_prop(struct device_node *np, const char *name,
- 					 u32 *val, int fatal)
- {
- 	int len;
-@@ -2382,7 +2382,7 @@ static int __devinit emac_read_uint_prop(struct device_node *np, const char *nam
- 	return 0;
- }
- 
--static int __devinit emac_init_phy(struct emac_instance *dev)
-+static int emac_init_phy(struct emac_instance *dev)
- {
- 	struct device_node *np = dev->ofdev->dev.of_node;
- 	struct net_device *ndev = dev->ndev;
-@@ -2518,7 +2518,7 @@ static int __devinit emac_init_phy(struct emac_instance *dev)
- 	return 0;
- }
- 
--static int __devinit emac_init_config(struct emac_instance *dev)
-+static int emac_init_config(struct emac_instance *dev)
- {
- 	struct device_node *np = dev->ofdev->dev.of_node;
- 	const void *p;
-@@ -2703,7 +2703,7 @@ static const struct net_device_ops emac_gige_netdev_ops = {
- 	.ndo_change_mtu		= emac_change_mtu,
+ 	struct fb_info *info;
+diff --git a/drivers/video/fsl-diu-fb.c b/drivers/video/fsl-diu-fb.c
+index ede9e55..6bdf805 100644
+--- a/drivers/video/fsl-diu-fb.c
++++ b/drivers/video/fsl-diu-fb.c
+@@ -1244,7 +1244,7 @@ static struct fb_ops fsl_diu_ops = {
+ 	.fb_release = fsl_diu_release,
  };
  
--static int __devinit emac_probe(struct platform_device *ofdev)
-+static int emac_probe(struct platform_device *ofdev)
- {
- 	struct net_device *ndev;
- 	struct emac_instance *dev;
-diff --git a/drivers/net/ethernet/ibm/emac/mal.c b/drivers/net/ethernet/ibm/emac/mal.c
-index 84c6b6c..a8fded5 100644
---- a/drivers/net/ethernet/ibm/emac/mal.c
-+++ b/drivers/net/ethernet/ibm/emac/mal.c
-@@ -33,7 +33,7 @@
- 
- static int mal_count;
- 
--int __devinit mal_register_commac(struct mal_instance	*mal,
-+int mal_register_commac(struct mal_instance	*mal,
- 				  struct mal_commac	*commac)
- {
- 	unsigned long flags;
-@@ -517,7 +517,7 @@ void *mal_dump_regs(struct mal_instance *mal, void *buf)
- 	return regs + 1;
- }
- 
--static int __devinit mal_probe(struct platform_device *ofdev)
-+static int mal_probe(struct platform_device *ofdev)
- {
- 	struct mal_instance *mal;
- 	int err = 0, i, bd_size;
-diff --git a/drivers/net/ethernet/ibm/emac/rgmii.c b/drivers/net/ethernet/ibm/emac/rgmii.c
-index d312328..8b1f02f 100644
---- a/drivers/net/ethernet/ibm/emac/rgmii.c
-+++ b/drivers/net/ethernet/ibm/emac/rgmii.c
-@@ -93,7 +93,7 @@ static inline u32 rgmii_mode_mask(int mode, int input)
- 	}
- }
- 
--int __devinit rgmii_attach(struct platform_device *ofdev, int input, int mode)
-+int rgmii_attach(struct platform_device *ofdev, int input, int mode)
- {
- 	struct rgmii_instance *dev = dev_get_drvdata(&ofdev->dev);
- 	struct rgmii_regs __iomem *p = dev->base;
-@@ -228,7 +228,7 @@ void *rgmii_dump_regs(struct platform_device *ofdev, void *buf)
- }
- 
- 
--static int __devinit rgmii_probe(struct platform_device *ofdev)
-+static int rgmii_probe(struct platform_device *ofdev)
- {
- 	struct device_node *np = ofdev->dev.of_node;
- 	struct rgmii_instance *dev;
-diff --git a/drivers/net/ethernet/ibm/emac/tah.c b/drivers/net/ethernet/ibm/emac/tah.c
-index 872912e..a6d3144 100644
---- a/drivers/net/ethernet/ibm/emac/tah.c
-+++ b/drivers/net/ethernet/ibm/emac/tah.c
-@@ -23,7 +23,7 @@
- #include "emac.h"
- #include "core.h"
- 
--int __devinit tah_attach(struct platform_device *ofdev, int channel)
-+int tah_attach(struct platform_device *ofdev, int channel)
- {
- 	struct tah_instance *dev = dev_get_drvdata(&ofdev->dev);
- 
-@@ -87,7 +87,7 @@ void *tah_dump_regs(struct platform_device *ofdev, void *buf)
- 	return regs + 1;
- }
- 
--static int __devinit tah_probe(struct platform_device *ofdev)
-+static int tah_probe(struct platform_device *ofdev)
- {
- 	struct device_node *np = ofdev->dev.of_node;
- 	struct tah_instance *dev;
-diff --git a/drivers/net/ethernet/ibm/emac/zmii.c b/drivers/net/ethernet/ibm/emac/zmii.c
-index 415e9b4..f958310 100644
---- a/drivers/net/ethernet/ibm/emac/zmii.c
-+++ b/drivers/net/ethernet/ibm/emac/zmii.c
-@@ -82,7 +82,7 @@ static inline u32 zmii_mode_mask(int mode, int input)
- 	}
- }
- 
--int __devinit zmii_attach(struct platform_device *ofdev, int input, int *mode)
-+int zmii_attach(struct platform_device *ofdev, int input, int *mode)
- {
- 	struct zmii_instance *dev = dev_get_drvdata(&ofdev->dev);
- 	struct zmii_regs __iomem *p = dev->base;
-@@ -231,7 +231,7 @@ void *zmii_dump_regs(struct platform_device *ofdev, void *buf)
- 	return regs + 1;
- }
- 
--static int __devinit zmii_probe(struct platform_device *ofdev)
-+static int zmii_probe(struct platform_device *ofdev)
- {
- 	struct device_node *np = ofdev->dev.of_node;
- 	struct zmii_instance *dev;
-diff --git a/drivers/net/ethernet/ibm/ibmveth.c b/drivers/net/ethernet/ibm/ibmveth.c
-index b68d28a..f9fa90b 100644
---- a/drivers/net/ethernet/ibm/ibmveth.c
-+++ b/drivers/net/ethernet/ibm/ibmveth.c
-@@ -1324,7 +1324,7 @@ static const struct net_device_ops ibmveth_netdev_ops = {
- #endif
- };
- 
--static int __devinit ibmveth_probe(struct vio_dev *dev,
-+static int ibmveth_probe(struct vio_dev *dev,
- 				   const struct vio_device_id *id)
- {
- 	int rc, i;
-diff --git a/drivers/net/ethernet/icplus/ipg.c b/drivers/net/ethernet/icplus/ipg.c
-index 549de0e..4558459 100644
---- a/drivers/net/ethernet/icplus/ipg.c
-+++ b/drivers/net/ethernet/icplus/ipg.c
-@@ -2199,7 +2199,7 @@ static const struct net_device_ops ipg_netdev_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- };
- 
--static int __devinit ipg_probe(struct pci_dev *pdev,
-+static int ipg_probe(struct pci_dev *pdev,
- 			       const struct pci_device_id *id)
- {
- 	unsigned int i = id->driver_data;
-diff --git a/drivers/net/ethernet/intel/e100.c b/drivers/net/ethernet/intel/e100.c
-index f41eaed..d0a4e2f 100644
---- a/drivers/net/ethernet/intel/e100.c
-+++ b/drivers/net/ethernet/intel/e100.c
-@@ -2829,7 +2829,7 @@ static const struct net_device_ops e100_netdev_ops = {
- 	.ndo_set_features	= e100_set_features,
- };
- 
--static int __devinit e100_probe(struct pci_dev *pdev,
-+static int e100_probe(struct pci_dev *pdev,
- 	const struct pci_device_id *ent)
- {
- 	struct net_device *netdev;
-diff --git a/drivers/net/ethernet/intel/e1000/e1000_main.c b/drivers/net/ethernet/intel/e1000/e1000_main.c
-index 3ca5fd3..77d8c0d 100644
---- a/drivers/net/ethernet/intel/e1000/e1000_main.c
-+++ b/drivers/net/ethernet/intel/e1000/e1000_main.c
-@@ -938,7 +938,7 @@ static int e1000_init_hw_struct(struct e1000_adapter *adapter,
-  * The OS initialization, configuring of the adapter private structure,
-  * and a hardware reset occur.
-  **/
--static int __devinit e1000_probe(struct pci_dev *pdev,
-+static int e1000_probe(struct pci_dev *pdev,
- 				 const struct pci_device_id *ent)
- {
- 	struct net_device *netdev;
-@@ -1309,7 +1309,7 @@ static void __devexit e1000_remove(struct pci_dev *pdev)
-  * e1000_init_hw_struct MUST be called before this function
-  **/
- 
--static int __devinit e1000_sw_init(struct e1000_adapter *adapter)
-+static int e1000_sw_init(struct e1000_adapter *adapter)
- {
- 	adapter->rx_buffer_len = MAXIMUM_ETHERNET_VLAN_SIZE;
- 
-@@ -1340,7 +1340,7 @@ static int __devinit e1000_sw_init(struct e1000_adapter *adapter)
-  * number of queues at compile-time.
-  **/
- 
--static int __devinit e1000_alloc_queues(struct e1000_adapter *adapter)
-+static int e1000_alloc_queues(struct e1000_adapter *adapter)
- {
- 	adapter->tx_ring = kcalloc(adapter->num_tx_queues,
- 	                           sizeof(struct e1000_tx_ring), GFP_KERNEL);
-diff --git a/drivers/net/ethernet/intel/e1000/e1000_param.c b/drivers/net/ethernet/intel/e1000/e1000_param.c
-index 1301eba..605a0f0 100644
---- a/drivers/net/ethernet/intel/e1000/e1000_param.c
-+++ b/drivers/net/ethernet/intel/e1000/e1000_param.c
-@@ -205,7 +205,7 @@ struct e1000_option {
- 	} arg;
- };
- 
--static int __devinit e1000_validate_option(unsigned int *value,
-+static int e1000_validate_option(unsigned int *value,
- 					   const struct e1000_option *opt,
- 					   struct e1000_adapter *adapter)
- {
-@@ -268,7 +268,7 @@ static void e1000_check_copper_options(struct e1000_adapter *adapter);
-  * in a variable in the adapter structure.
-  **/
- 
--void __devinit e1000_check_options(struct e1000_adapter *adapter)
-+void e1000_check_options(struct e1000_adapter *adapter)
- {
- 	struct e1000_option opt;
- 	int bd = adapter->bd_number;
-@@ -534,7 +534,7 @@ void __devinit e1000_check_options(struct e1000_adapter *adapter)
-  * Handles speed and duplex options on fiber adapters
-  **/
- 
--static void __devinit e1000_check_fiber_options(struct e1000_adapter *adapter)
-+static void e1000_check_fiber_options(struct e1000_adapter *adapter)
- {
- 	int bd = adapter->bd_number;
- 	if (num_Speed > bd) {
-@@ -560,7 +560,7 @@ static void __devinit e1000_check_fiber_options(struct e1000_adapter *adapter)
-  * Handles speed and duplex options on copper adapters
-  **/
- 
--static void __devinit e1000_check_copper_options(struct e1000_adapter *adapter)
-+static void e1000_check_copper_options(struct e1000_adapter *adapter)
- {
- 	struct e1000_option opt;
- 	unsigned int speed, dplx, an;
-diff --git a/drivers/net/ethernet/intel/e1000e/netdev.c b/drivers/net/ethernet/intel/e1000e/netdev.c
-index 2f5bfd3..5dc54df 100644
---- a/drivers/net/ethernet/intel/e1000e/netdev.c
-+++ b/drivers/net/ethernet/intel/e1000e/netdev.c
-@@ -2517,7 +2517,7 @@ void e1000e_write_itr(struct e1000_adapter *adapter, u32 itr)
-  * e1000_alloc_queues - Allocate memory for all rings
-  * @adapter: board private structure to initialize
-  **/
--static int __devinit e1000_alloc_queues(struct e1000_adapter *adapter)
-+static int e1000_alloc_queues(struct e1000_adapter *adapter)
- {
- 	int size = sizeof(struct e1000_ring);
- 
-@@ -3715,7 +3715,7 @@ void e1000e_reinit_locked(struct e1000_adapter *adapter)
-  * Fields are initialized based on PCI device information and
-  * OS network device settings (MTU size).
-  **/
--static int __devinit e1000_sw_init(struct e1000_adapter *adapter)
-+static int e1000_sw_init(struct e1000_adapter *adapter)
- {
- 	struct net_device *netdev = adapter->netdev;
- 
-@@ -6094,7 +6094,7 @@ static const struct net_device_ops e1000e_netdev_ops = {
-  * The OS initialization, configuring of the adapter private structure,
-  * and a hardware reset occur.
-  **/
--static int __devinit e1000_probe(struct pci_dev *pdev,
-+static int e1000_probe(struct pci_dev *pdev,
- 				 const struct pci_device_id *ent)
- {
- 	struct net_device *netdev;
-diff --git a/drivers/net/ethernet/intel/e1000e/param.c b/drivers/net/ethernet/intel/e1000e/param.c
-index dfbfa7f..62bf36c 100644
---- a/drivers/net/ethernet/intel/e1000e/param.c
-+++ b/drivers/net/ethernet/intel/e1000e/param.c
-@@ -186,7 +186,7 @@ struct e1000_option {
- 	} arg;
- };
- 
--static int __devinit e1000_validate_option(unsigned int *value,
-+static int e1000_validate_option(unsigned int *value,
- 					   const struct e1000_option *opt,
- 					   struct e1000_adapter *adapter)
- {
-@@ -249,7 +249,7 @@ static int __devinit e1000_validate_option(unsigned int *value,
-  * value exists, a default value is used.  The final value is stored
-  * in a variable in the adapter structure.
-  **/
--void __devinit e1000e_check_options(struct e1000_adapter *adapter)
-+void e1000e_check_options(struct e1000_adapter *adapter)
- {
- 	struct e1000_hw *hw = &adapter->hw;
- 	int bd = adapter->bd_number;
-diff --git a/drivers/net/ethernet/intel/igb/igb_main.c b/drivers/net/ethernet/intel/igb/igb_main.c
-index fdb2282..b5557cb 100644
---- a/drivers/net/ethernet/intel/igb/igb_main.c
-+++ b/drivers/net/ethernet/intel/igb/igb_main.c
-@@ -1825,7 +1825,7 @@ void igb_set_fw_version(struct igb_adapter *adapter)
-  * The OS initialization, configuring of the adapter private structure,
-  * and a hardware reset occur.
-  **/
--static int __devinit igb_probe(struct pci_dev *pdev,
-+static int igb_probe(struct pci_dev *pdev,
- 			       const struct pci_device_id *ent)
- {
- 	struct net_device *netdev;
-@@ -2266,7 +2266,7 @@ static void __devexit igb_remove(struct pci_dev *pdev)
-  * mor expensive time wise to disable SR-IOV than it is to allocate and free
-  * the memory for the VFs.
-  **/
--static void __devinit igb_probe_vfs(struct igb_adapter * adapter)
-+static void igb_probe_vfs(struct igb_adapter * adapter)
- {
- #ifdef CONFIG_PCI_IOV
- 	struct pci_dev *pdev = adapter->pdev;
-@@ -2327,7 +2327,7 @@ out:
-  * Fields are initialized based on PCI device information and
-  * OS network device settings (MTU size).
-  **/
--static int __devinit igb_sw_init(struct igb_adapter *adapter)
-+static int igb_sw_init(struct igb_adapter *adapter)
- {
- 	struct e1000_hw *hw = &adapter->hw;
- 	struct net_device *netdev = adapter->netdev;
-diff --git a/drivers/net/ethernet/intel/igbvf/netdev.c b/drivers/net/ethernet/intel/igbvf/netdev.c
-index 935173a..6124032 100644
---- a/drivers/net/ethernet/intel/igbvf/netdev.c
-+++ b/drivers/net/ethernet/intel/igbvf/netdev.c
-@@ -1091,7 +1091,7 @@ out:
-  * igbvf_alloc_queues - Allocate memory for all rings
-  * @adapter: board private structure to initialize
-  **/
--static int __devinit igbvf_alloc_queues(struct igbvf_adapter *adapter)
-+static int igbvf_alloc_queues(struct igbvf_adapter *adapter)
- {
- 	struct net_device *netdev = adapter->netdev;
- 
-@@ -1543,7 +1543,7 @@ void igbvf_reinit_locked(struct igbvf_adapter *adapter)
-  * Fields are initialized based on PCI device information and
-  * OS network device settings (MTU size).
-  **/
--static int __devinit igbvf_sw_init(struct igbvf_adapter *adapter)
-+static int igbvf_sw_init(struct igbvf_adapter *adapter)
- {
- 	struct net_device *netdev = adapter->netdev;
- 	s32 rc;
-@@ -2611,7 +2611,7 @@ static const struct net_device_ops igbvf_netdev_ops = {
-  * The OS initialization, configuring of the adapter private structure,
-  * and a hardware reset occur.
-  **/
--static int __devinit igbvf_probe(struct pci_dev *pdev,
-+static int igbvf_probe(struct pci_dev *pdev,
-                                  const struct pci_device_id *ent)
- {
- 	struct net_device *netdev;
-diff --git a/drivers/net/ethernet/intel/ixgb/ixgb_main.c b/drivers/net/ethernet/intel/ixgb/ixgb_main.c
-index 5b44d8a..407e226 100644
---- a/drivers/net/ethernet/intel/ixgb/ixgb_main.c
-+++ b/drivers/net/ethernet/intel/ixgb/ixgb_main.c
-@@ -391,7 +391,7 @@ static const struct net_device_ops ixgb_netdev_ops = {
-  * and a hardware reset occur.
-  **/
- 
--static int __devinit
-+static int
- ixgb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- {
- 	struct net_device *netdev = NULL;
-@@ -584,7 +584,7 @@ ixgb_remove(struct pci_dev *pdev)
-  * OS network device settings (MTU size).
-  **/
- 
--static int __devinit
-+static int
- ixgb_sw_init(struct ixgb_adapter *adapter)
- {
- 	struct ixgb_hw *hw = &adapter->hw;
-diff --git a/drivers/net/ethernet/intel/ixgb/ixgb_param.c b/drivers/net/ethernet/intel/ixgb/ixgb_param.c
-index 07d83ab..4f3a9aa 100644
---- a/drivers/net/ethernet/intel/ixgb/ixgb_param.c
-+++ b/drivers/net/ethernet/intel/ixgb/ixgb_param.c
-@@ -199,7 +199,7 @@ struct ixgb_option {
- 	} arg;
- };
- 
--static int __devinit
-+static int
- ixgb_validate_option(unsigned int *value, const struct ixgb_option *opt)
- {
- 	if (*value == OPTION_UNSET) {
-@@ -257,7 +257,7 @@ ixgb_validate_option(unsigned int *value, const struct ixgb_option *opt)
-  * in a variable in the adapter structure.
-  **/
- 
--void __devinit
-+void
- ixgb_check_options(struct ixgb_adapter *adapter)
- {
- 	int bd = adapter->bd_number;
-diff --git a/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c b/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
-index 4258ffa..0125ffa 100644
---- a/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
-+++ b/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
-@@ -4456,7 +4456,7 @@ static void ixgbe_tx_timeout(struct net_device *netdev)
-  * Fields are initialized based on PCI device information and
-  * OS network device settings (MTU size).
-  **/
--static int __devinit ixgbe_sw_init(struct ixgbe_adapter *adapter)
-+static int ixgbe_sw_init(struct ixgbe_adapter *adapter)
- {
- 	struct ixgbe_hw *hw = &adapter->hw;
- 	struct pci_dev *pdev = adapter->pdev;
-@@ -7171,7 +7171,7 @@ int ixgbe_wol_supported(struct ixgbe_adapter *adapter, u16 device_id,
-  * The OS initialization, configuring of the adapter private structure,
-  * and a hardware reset occur.
-  **/
--static int __devinit ixgbe_probe(struct pci_dev *pdev,
-+static int ixgbe_probe(struct pci_dev *pdev,
- 				 const struct pci_device_id *ent)
- {
- 	struct net_device *netdev;
-diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-index da8b116..b8fbdab 100644
---- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-+++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-@@ -2030,7 +2030,7 @@ static void ixgbevf_clear_interrupt_scheme(struct ixgbevf_adapter *adapter)
-  * Fields are initialized based on PCI device information and
-  * OS network device settings (MTU size).
-  **/
--static int __devinit ixgbevf_sw_init(struct ixgbevf_adapter *adapter)
-+static int ixgbevf_sw_init(struct ixgbevf_adapter *adapter)
- {
- 	struct ixgbe_hw *hw = &adapter->hw;
- 	struct pci_dev *pdev = adapter->pdev;
-@@ -3267,7 +3267,7 @@ static void ixgbevf_assign_netdev_ops(struct net_device *dev)
-  * The OS initialization, configuring of the adapter private structure,
-  * and a hardware reset occur.
-  **/
--static int __devinit ixgbevf_probe(struct pci_dev *pdev,
-+static int ixgbevf_probe(struct pci_dev *pdev,
- 				   const struct pci_device_id *ent)
- {
- 	struct net_device *netdev;
-diff --git a/drivers/net/ethernet/jme.c b/drivers/net/ethernet/jme.c
-index 939cddc..768023c 100644
---- a/drivers/net/ethernet/jme.c
-+++ b/drivers/net/ethernet/jme.c
-@@ -2961,7 +2961,7 @@ static const struct net_device_ops jme_netdev_ops = {
- #endif
- };
- 
--static int __devinit
-+static int
- jme_init_one(struct pci_dev *pdev,
- 	     const struct pci_device_id *ent)
- {
-diff --git a/drivers/net/ethernet/marvell/skge.c b/drivers/net/ethernet/marvell/skge.c
-index 0912768..79b7bbd 100644
---- a/drivers/net/ethernet/marvell/skge.c
-+++ b/drivers/net/ethernet/marvell/skge.c
-@@ -3860,7 +3860,7 @@ static struct net_device *skge_devinit(struct skge_hw *hw, int port,
- 	return dev;
- }
- 
--static void __devinit skge_show_addr(struct net_device *dev)
-+static void skge_show_addr(struct net_device *dev)
- {
- 	const struct skge_port *skge = netdev_priv(dev);
- 
-@@ -3869,7 +3869,7 @@ static void __devinit skge_show_addr(struct net_device *dev)
- 
- static int only_32bit_dma;
- 
--static int __devinit skge_probe(struct pci_dev *pdev,
-+static int skge_probe(struct pci_dev *pdev,
- 				const struct pci_device_id *ent)
- {
- 	struct net_device *dev, *dev1;
-diff --git a/drivers/net/ethernet/marvell/sky2.c b/drivers/net/ethernet/marvell/sky2.c
-index 3c6314f..07d195f 100644
---- a/drivers/net/ethernet/marvell/sky2.c
-+++ b/drivers/net/ethernet/marvell/sky2.c
-@@ -3140,7 +3140,7 @@ static inline u32 sky2_clk2us(const struct sky2_hw *hw, u32 clk)
- }
- 
- 
--static int __devinit sky2_init(struct sky2_hw *hw)
-+static int sky2_init(struct sky2_hw *hw)
- {
- 	u8 t8;
- 
-@@ -4741,7 +4741,7 @@ static const struct net_device_ops sky2_netdev_ops[2] = {
- };
- 
- /* Initialize network device */
--static __devinit struct net_device *sky2_init_netdev(struct sky2_hw *hw,
-+static struct net_device *sky2_init_netdev(struct sky2_hw *hw,
- 						     unsigned port,
- 						     int highmem, int wol)
- {
-@@ -4807,7 +4807,7 @@ static __devinit struct net_device *sky2_init_netdev(struct sky2_hw *hw,
- 	return dev;
- }
- 
--static void __devinit sky2_show_addr(struct net_device *dev)
-+static void sky2_show_addr(struct net_device *dev)
- {
- 	const struct sky2_port *sky2 = netdev_priv(dev);
- 
-@@ -4815,7 +4815,7 @@ static void __devinit sky2_show_addr(struct net_device *dev)
- }
- 
- /* Handle software interrupt used during MSI test */
--static irqreturn_t __devinit sky2_test_intr(int irq, void *dev_id)
-+static irqreturn_t sky2_test_intr(int irq, void *dev_id)
- {
- 	struct sky2_hw *hw = dev_id;
- 	u32 status = sky2_read32(hw, B0_Y2_SP_ISRC2);
-@@ -4834,7 +4834,7 @@ static irqreturn_t __devinit sky2_test_intr(int irq, void *dev_id)
- }
- 
- /* Test interrupt path by forcing a a software IRQ */
--static int __devinit sky2_test_msi(struct sky2_hw *hw)
-+static int sky2_test_msi(struct sky2_hw *hw)
- {
- 	struct pci_dev *pdev = hw->pdev;
- 	int err;
-@@ -4896,7 +4896,7 @@ static const char *sky2_name(u8 chipid, char *buf, int sz)
- 	return buf;
- }
- 
--static int __devinit sky2_probe(struct pci_dev *pdev,
-+static int sky2_probe(struct pci_dev *pdev,
- 				const struct pci_device_id *ent)
- {
- 	struct net_device *dev, *dev1;
-diff --git a/drivers/net/ethernet/mellanox/mlx4/main.c b/drivers/net/ethernet/mellanox/mlx4/main.c
-index 877b74a..8f744f0 100644
---- a/drivers/net/ethernet/mellanox/mlx4/main.c
-+++ b/drivers/net/ethernet/mellanox/mlx4/main.c
-@@ -2224,7 +2224,7 @@ err_disable_pdev:
- 	return err;
- }
- 
--static int __devinit mlx4_init_one(struct pci_dev *pdev,
-+static int mlx4_init_one(struct pci_dev *pdev,
- 				   const struct pci_device_id *id)
- {
- 	printk_once(KERN_INFO "%s", mlx4_version);
-diff --git a/drivers/net/ethernet/micrel/ks8695net.c b/drivers/net/ethernet/micrel/ks8695net.c
-index 786cc0f..7ac240d 100644
---- a/drivers/net/ethernet/micrel/ks8695net.c
-+++ b/drivers/net/ethernet/micrel/ks8695net.c
-@@ -1277,7 +1277,7 @@ ks8695_open(struct net_device *ndev)
-  *	This initialises the LAN switch in the KS8695 to a known-good
-  *	set of defaults.
-  */
--static void __devinit
-+static void
- ks8695_init_switch(struct ks8695_priv *ksp)
- {
- 	u32 ctrl;
-@@ -1305,7 +1305,7 @@ ks8695_init_switch(struct ks8695_priv *ksp)
-  *	This initialises a KS8695's WAN phy to sensible values for
-  *	autonegotiation etc.
-  */
--static void __devinit
-+static void
- ks8695_init_wan_phy(struct ks8695_priv *ksp)
- {
- 	u32 ctrl;
-@@ -1349,7 +1349,7 @@ static const struct net_device_ops ks8695_netdev_ops = {
-  *	wan ports, and an IORESOURCE_IRQ for the link IRQ for the wan
-  *	port.
-  */
--static int __devinit
-+static int
- ks8695_probe(struct platform_device *pdev)
- {
- 	struct ks8695_priv *ksp;
-diff --git a/drivers/net/ethernet/micrel/ks8842.c b/drivers/net/ethernet/micrel/ks8842.c
-index f84dd2d..a23b534 100644
---- a/drivers/net/ethernet/micrel/ks8842.c
-+++ b/drivers/net/ethernet/micrel/ks8842.c
-@@ -1141,7 +1141,7 @@ static const struct ethtool_ops ks8842_ethtool_ops = {
- 	.get_link		= ethtool_op_get_link,
- };
- 
--static int __devinit ks8842_probe(struct platform_device *pdev)
-+static int ks8842_probe(struct platform_device *pdev)
- {
- 	int err = -ENOMEM;
- 	struct resource *iomem;
-diff --git a/drivers/net/ethernet/micrel/ks8851.c b/drivers/net/ethernet/micrel/ks8851.c
-index a1f7d7d..dbd2ece 100644
---- a/drivers/net/ethernet/micrel/ks8851.c
-+++ b/drivers/net/ethernet/micrel/ks8851.c
-@@ -1415,7 +1415,7 @@ static int ks8851_resume(struct spi_device *spi)
- #define ks8851_resume NULL
- #endif
- 
--static int __devinit ks8851_probe(struct spi_device *spi)
-+static int ks8851_probe(struct spi_device *spi)
- {
- 	struct net_device *ndev;
- 	struct ks8851_net *ks;
-diff --git a/drivers/net/ethernet/micrel/ks8851_mll.c b/drivers/net/ethernet/micrel/ks8851_mll.c
-index 80fe0b3..2070af2 100644
---- a/drivers/net/ethernet/micrel/ks8851_mll.c
-+++ b/drivers/net/ethernet/micrel/ks8851_mll.c
-@@ -1506,7 +1506,7 @@ static int ks_hw_init(struct ks_net *ks)
- }
- 
- 
--static int __devinit ks8851_probe(struct platform_device *pdev)
-+static int ks8851_probe(struct platform_device *pdev)
- {
- 	int err = -ENOMEM;
- 	struct resource *io_d, *io_c;
-diff --git a/drivers/net/ethernet/micrel/ksz884x.c b/drivers/net/ethernet/micrel/ksz884x.c
-index e4ba868..2f4d051 100644
---- a/drivers/net/ethernet/micrel/ksz884x.c
-+++ b/drivers/net/ethernet/micrel/ksz884x.c
-@@ -6917,7 +6917,7 @@ static void read_other_addr(struct ksz_hw *hw)
- #define PCI_VENDOR_ID_MICREL_KS		0x16c6
- #endif
- 
--static int __devinit pcidev_init(struct pci_dev *pdev,
-+static int pcidev_init(struct pci_dev *pdev,
- 	const struct pci_device_id *id)
- {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/microchip/enc28j60.c b/drivers/net/ethernet/microchip/enc28j60.c
-index 1373b02..2851829 100644
---- a/drivers/net/ethernet/microchip/enc28j60.c
-+++ b/drivers/net/ethernet/microchip/enc28j60.c
-@@ -1541,7 +1541,7 @@ static const struct net_device_ops enc28j60_netdev_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- };
- 
--static int __devinit enc28j60_probe(struct spi_device *spi)
-+static int enc28j60_probe(struct spi_device *spi)
- {
- 	struct net_device *dev;
- 	struct enc28j60_net *priv;
-diff --git a/drivers/net/ethernet/natsemi/ibmlana.c b/drivers/net/ethernet/natsemi/ibmlana.c
-index 3f94ddb..076bc45 100644
---- a/drivers/net/ethernet/natsemi/ibmlana.c
-+++ b/drivers/net/ethernet/natsemi/ibmlana.c
-@@ -916,7 +916,7 @@ static const struct net_device_ops ibmlana_netdev_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- };
- 
--static int __devinit ibmlana_init_one(struct device *kdev)
-+static int ibmlana_init_one(struct device *kdev)
- {
- 	struct mca_device *mdev = to_mca_device(kdev);
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/natsemi/jazzsonic.c b/drivers/net/ethernet/natsemi/jazzsonic.c
-index 1b2ed23..90c6670 100644
---- a/drivers/net/ethernet/natsemi/jazzsonic.c
-+++ b/drivers/net/ethernet/natsemi/jazzsonic.c
-@@ -117,7 +117,7 @@ static const struct net_device_ops sonic_netdev_ops = {
- 	.ndo_set_mac_address	= eth_mac_addr,
- };
- 
--static int __devinit sonic_probe1(struct net_device *dev)
-+static int sonic_probe1(struct net_device *dev)
- {
- 	static unsigned version_printed;
- 	unsigned int silicon_revision;
-@@ -220,7 +220,7 @@ out:
-  * Probe for a SONIC ethernet controller on a Mips Jazz board.
-  * Actually probing is superfluous but we're paranoid.
-  */
--static int __devinit jazz_sonic_probe(struct platform_device *pdev)
-+static int jazz_sonic_probe(struct platform_device *pdev)
- {
- 	struct net_device *dev;
- 	struct sonic_local *lp;
-diff --git a/drivers/net/ethernet/natsemi/macsonic.c b/drivers/net/ethernet/natsemi/macsonic.c
-index 1d6a789..a7d07c4 100644
---- a/drivers/net/ethernet/natsemi/macsonic.c
-+++ b/drivers/net/ethernet/natsemi/macsonic.c
-@@ -196,7 +196,7 @@ static const struct net_device_ops macsonic_netdev_ops = {
- 	.ndo_set_mac_address	= eth_mac_addr,
- };
- 
--static int __devinit macsonic_init(struct net_device *dev)
-+static int macsonic_init(struct net_device *dev)
- {
- 	struct sonic_local* lp = netdev_priv(dev);
- 
-@@ -245,7 +245,7 @@ static int __devinit macsonic_init(struct net_device *dev)
-                           memcmp(mac, "\x00\x80\x19", 3) && \
-                           memcmp(mac, "\x00\x05\x02", 3))
- 
--static void __devinit mac_onboard_sonic_ethernet_addr(struct net_device *dev)
-+static void mac_onboard_sonic_ethernet_addr(struct net_device *dev)
- {
- 	struct sonic_local *lp = netdev_priv(dev);
- 	const int prom_addr = ONBOARD_SONIC_PROM_BASE;
-@@ -309,7 +309,7 @@ static void __devinit mac_onboard_sonic_ethernet_addr(struct net_device *dev)
- 	eth_hw_addr_random(dev);
- }
- 
--static int __devinit mac_onboard_sonic_probe(struct net_device *dev)
-+static int mac_onboard_sonic_probe(struct net_device *dev)
- {
- 	struct sonic_local* lp = netdev_priv(dev);
- 	int sr;
-@@ -420,7 +420,7 @@ static int __devinit mac_onboard_sonic_probe(struct net_device *dev)
- 	return macsonic_init(dev);
- }
- 
--static int __devinit mac_nubus_sonic_ethernet_addr(struct net_device *dev,
-+static int mac_nubus_sonic_ethernet_addr(struct net_device *dev,
- 						unsigned long prom_addr,
- 						int id)
- {
-@@ -435,7 +435,7 @@ static int __devinit mac_nubus_sonic_ethernet_addr(struct net_device *dev,
- 	return 0;
- }
- 
--static int __devinit macsonic_ident(struct nubus_dev *ndev)
-+static int macsonic_ident(struct nubus_dev *ndev)
- {
- 	if (ndev->dr_hw == NUBUS_DRHW_ASANTE_LC &&
- 	    ndev->dr_sw == NUBUS_DRSW_SONIC_LC)
-@@ -460,7 +460,7 @@ static int __devinit macsonic_ident(struct nubus_dev *ndev)
- 	return -1;
- }
- 
--static int __devinit mac_nubus_sonic_probe(struct net_device *dev)
-+static int mac_nubus_sonic_probe(struct net_device *dev)
- {
- 	static int slots;
- 	struct nubus_dev* ndev = NULL;
-@@ -573,7 +573,7 @@ static int __devinit mac_nubus_sonic_probe(struct net_device *dev)
- 	return macsonic_init(dev);
- }
- 
--static int __devinit mac_sonic_probe(struct platform_device *pdev)
-+static int mac_sonic_probe(struct platform_device *pdev)
- {
- 	struct net_device *dev;
- 	struct sonic_local *lp;
-diff --git a/drivers/net/ethernet/natsemi/natsemi.c b/drivers/net/ethernet/natsemi/natsemi.c
-index 119930b..63b94c3 100644
---- a/drivers/net/ethernet/natsemi/natsemi.c
-+++ b/drivers/net/ethernet/natsemi/natsemi.c
-@@ -742,7 +742,7 @@ static void move_int_phy(struct net_device *dev, int addr)
- 	udelay(1);
- }
- 
--static void __devinit natsemi_init_media (struct net_device *dev)
-+static void natsemi_init_media (struct net_device *dev)
- {
- 	struct netdev_private *np = netdev_priv(dev);
- 	u32 tmp;
-@@ -797,7 +797,7 @@ static const struct net_device_ops natsemi_netdev_ops = {
- #endif
- };
- 
--static int __devinit natsemi_probe1 (struct pci_dev *pdev,
-+static int natsemi_probe1 (struct pci_dev *pdev,
- 	const struct pci_device_id *ent)
- {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/natsemi/ns83820.c b/drivers/net/ethernet/natsemi/ns83820.c
-index 70ec426..0131b18 100644
---- a/drivers/net/ethernet/natsemi/ns83820.c
-+++ b/drivers/net/ethernet/natsemi/ns83820.c
-@@ -1941,7 +1941,7 @@ static const struct net_device_ops netdev_ops = {
- 	.ndo_tx_timeout		= ns83820_tx_timeout,
- };
- 
--static int __devinit ns83820_init_one(struct pci_dev *pci_dev,
-+static int ns83820_init_one(struct pci_dev *pci_dev,
- 				      const struct pci_device_id *id)
- {
- 	struct net_device *ndev;
-diff --git a/drivers/net/ethernet/natsemi/xtsonic.c b/drivers/net/ethernet/natsemi/xtsonic.c
-index 9bc1fc7..c265a5e 100644
---- a/drivers/net/ethernet/natsemi/xtsonic.c
-+++ b/drivers/net/ethernet/natsemi/xtsonic.c
-@@ -249,7 +249,7 @@ out:
-  * Actually probing is superfluous but we're paranoid.
-  */
- 
--int __devinit xtsonic_probe(struct platform_device *pdev)
-+int xtsonic_probe(struct platform_device *pdev)
- {
- 	struct net_device *dev;
- 	struct sonic_local *lp;
-diff --git a/drivers/net/ethernet/neterion/s2io.c b/drivers/net/ethernet/neterion/s2io.c
-index 0c8742a..1b70a92 100644
---- a/drivers/net/ethernet/neterion/s2io.c
-+++ b/drivers/net/ethernet/neterion/s2io.c
-@@ -7702,7 +7702,7 @@ static const struct net_device_ops s2io_netdev_ops = {
-  *  returns 0 on success and negative on failure.
-  */
- 
--static int __devinit
-+static int
- s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
- {
- 	struct s2io_nic *sp;
-diff --git a/drivers/net/ethernet/neterion/s2io.h b/drivers/net/ethernet/neterion/s2io.h
-index d559692..304124a61 100644
---- a/drivers/net/ethernet/neterion/s2io.h
-+++ b/drivers/net/ethernet/neterion/s2io.h
-@@ -1075,7 +1075,7 @@ static inline void SPECIAL_REG_WRITE(u64 val, void __iomem *addr, int order)
- /*
-  * Prototype declaration.
-  */
--static int __devinit s2io_init_nic(struct pci_dev *pdev,
-+static int s2io_init_nic(struct pci_dev *pdev,
- 				   const struct pci_device_id *pre);
- static void __devexit s2io_rem_nic(struct pci_dev *pdev);
- static int init_shared_mem(struct s2io_nic *sp);
-diff --git a/drivers/net/ethernet/neterion/vxge/vxge-config.c b/drivers/net/ethernet/neterion/vxge/vxge-config.c
-index c2e420a..fbe5363 100644
---- a/drivers/net/ethernet/neterion/vxge/vxge-config.c
-+++ b/drivers/net/ethernet/neterion/vxge/vxge-config.c
-@@ -993,7 +993,7 @@ exit:
-  * for the driver, FW version information, and the first mac address for
-  * each vpath
-  */
--enum vxge_hw_status __devinit
-+enum vxge_hw_status
- vxge_hw_device_hw_info_get(void __iomem *bar0,
- 			   struct vxge_hw_device_hw_info *hw_info)
- {
-@@ -1310,7 +1310,7 @@ __vxge_hw_device_config_check(struct vxge_hw_device_config *new_config)
-  * When done, the driver allocates sizeof(struct __vxge_hw_device) bytes for HW
-  * to enable the latter to perform Titan hardware initialization.
-  */
--enum vxge_hw_status __devinit
-+enum vxge_hw_status
- vxge_hw_device_initialize(
- 	struct __vxge_hw_device **devh,
- 	struct vxge_hw_device_attr *attr,
-@@ -2917,7 +2917,7 @@ exit:
-  * vxge_hw_device_config_default_get - Initialize device config with defaults.
-  * Initialize Titan device config with default values.
-  */
--enum vxge_hw_status __devinit
-+enum vxge_hw_status
- vxge_hw_device_config_default_get(struct vxge_hw_device_config *device_config)
- {
- 	u32 i;
-diff --git a/drivers/net/ethernet/neterion/vxge/vxge-config.h b/drivers/net/ethernet/neterion/vxge/vxge-config.h
-index 9e0c1ee..6ce4412 100644
---- a/drivers/net/ethernet/neterion/vxge/vxge-config.h
-+++ b/drivers/net/ethernet/neterion/vxge/vxge-config.h
-@@ -1846,11 +1846,11 @@ struct vxge_hw_vpath_attr {
- 	struct vxge_hw_fifo_attr	fifo_attr;
- };
- 
--enum vxge_hw_status __devinit vxge_hw_device_hw_info_get(
-+enum vxge_hw_status vxge_hw_device_hw_info_get(
- 	void __iomem *bar0,
- 	struct vxge_hw_device_hw_info *hw_info);
- 
--enum vxge_hw_status __devinit vxge_hw_device_config_default_get(
-+enum vxge_hw_status vxge_hw_device_config_default_get(
- 	struct vxge_hw_device_config *device_config);
- 
- /**
-@@ -1877,7 +1877,7 @@ u16 vxge_hw_device_link_width_get(struct __vxge_hw_device *devh);
- const u8 *
- vxge_hw_device_product_name_get(struct __vxge_hw_device *devh);
- 
--enum vxge_hw_status __devinit vxge_hw_device_initialize(
-+enum vxge_hw_status vxge_hw_device_initialize(
- 	struct __vxge_hw_device **devh,
- 	struct vxge_hw_device_attr *attr,
- 	struct vxge_hw_device_config *device_config);
-diff --git a/drivers/net/ethernet/neterion/vxge/vxge-main.c b/drivers/net/ethernet/neterion/vxge/vxge-main.c
-index 4af32a3..2e3a3f0 100644
---- a/drivers/net/ethernet/neterion/vxge/vxge-main.c
-+++ b/drivers/net/ethernet/neterion/vxge/vxge-main.c
-@@ -3371,7 +3371,7 @@ static const struct net_device_ops vxge_netdev_ops = {
- #endif
- };
- 
--static int __devinit vxge_device_register(struct __vxge_hw_device *hldev,
-+static int vxge_device_register(struct __vxge_hw_device *hldev,
- 					  struct vxge_config *config,
- 					  int high_dma, int no_of_vpath,
- 					  struct vxgedev **vdev_out)
-@@ -3672,7 +3672,7 @@ static void verify_bandwidth(void)
- /*
-  * Vpath configuration
-  */
--static int __devinit vxge_config_vpaths(
-+static int vxge_config_vpaths(
- 			struct vxge_hw_device_config *device_config,
- 			u64 vpath_mask, struct vxge_config *config_param)
- {
-@@ -3859,7 +3859,7 @@ static int __devinit vxge_config_vpaths(
- }
- 
- /* initialize device configuratrions */
--static void __devinit vxge_device_config_init(
-+static void vxge_device_config_init(
- 				struct vxge_hw_device_config *device_config,
- 				int *intr_type)
- {
-@@ -3912,7 +3912,7 @@ static void __devinit vxge_device_config_init(
- 			device_config->rth_it_type);
- }
- 
--static void __devinit vxge_print_parm(struct vxgedev *vdev, u64 vpath_mask)
-+static void vxge_print_parm(struct vxgedev *vdev, u64 vpath_mask)
- {
- 	int i;
- 
-@@ -4269,7 +4269,7 @@ static int vxge_probe_fw_update(struct vxgedev *vdev)
- 	return ret;
- }
- 
--static int __devinit is_sriov_initialized(struct pci_dev *pdev)
-+static int is_sriov_initialized(struct pci_dev *pdev)
- {
- 	int pos;
- 	u16 ctrl;
-@@ -4300,7 +4300,7 @@ static const struct vxge_hw_uld_cbs vxge_callbacks = {
-  * returns 0 on success and negative on failure.
-  *
-  */
--static int __devinit
-+static int
- vxge_probe(struct pci_dev *pdev, const struct pci_device_id *pre)
- {
- 	struct __vxge_hw_device *hldev;
-diff --git a/drivers/net/ethernet/nuvoton/w90p910_ether.c b/drivers/net/ethernet/nuvoton/w90p910_ether.c
-index fceec55..ea74f34 100644
---- a/drivers/net/ethernet/nuvoton/w90p910_ether.c
-+++ b/drivers/net/ethernet/nuvoton/w90p910_ether.c
-@@ -978,7 +978,7 @@ static int w90p910_ether_setup(struct net_device *dev)
- 	return 0;
- }
- 
--static int __devinit w90p910_ether_probe(struct platform_device *pdev)
-+static int w90p910_ether_probe(struct platform_device *pdev)
- {
- 	struct w90p910_ether *ether;
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/nvidia/forcedeth.c b/drivers/net/ethernet/nvidia/forcedeth.c
-index 7f89407..fb64c04 100644
---- a/drivers/net/ethernet/nvidia/forcedeth.c
-+++ b/drivers/net/ethernet/nvidia/forcedeth.c
-@@ -5520,7 +5520,7 @@ static const struct net_device_ops nv_netdev_ops_optimized = {
- #endif
- };
- 
--static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_id *id)
-+static int nv_probe(struct pci_dev *pci_dev, const struct pci_device_id *id)
- {
- 	struct net_device *dev;
- 	struct fe_priv *np;
-diff --git a/drivers/net/ethernet/octeon/octeon_mgmt.c b/drivers/net/ethernet/octeon/octeon_mgmt.c
-index 5fca4a2..ea88571 100644
---- a/drivers/net/ethernet/octeon/octeon_mgmt.c
-+++ b/drivers/net/ethernet/octeon/octeon_mgmt.c
-@@ -1419,7 +1419,7 @@ static const struct net_device_ops octeon_mgmt_ops = {
- #endif
- };
- 
--static int __devinit octeon_mgmt_probe(struct platform_device *pdev)
-+static int octeon_mgmt_probe(struct platform_device *pdev)
- {
- 	struct net_device *netdev;
- 	struct octeon_mgmt *p;
-diff --git a/drivers/net/ethernet/packetengines/hamachi.c b/drivers/net/ethernet/packetengines/hamachi.c
-index 9664732..628de39 100644
---- a/drivers/net/ethernet/packetengines/hamachi.c
-+++ b/drivers/net/ethernet/packetengines/hamachi.c
-@@ -576,7 +576,7 @@ static const struct net_device_ops hamachi_netdev_ops = {
- };
- 
- 
--static int __devinit hamachi_init_one (struct pci_dev *pdev,
-+static int hamachi_init_one (struct pci_dev *pdev,
- 				    const struct pci_device_id *ent)
- {
- 	struct hamachi_private *hmp;
-@@ -791,7 +791,7 @@ err_out:
- 	return ret;
- }
- 
--static int __devinit read_eeprom(void __iomem *ioaddr, int location)
-+static int read_eeprom(void __iomem *ioaddr, int location)
- {
- 	int bogus_cnt = 1000;
- 
-diff --git a/drivers/net/ethernet/packetengines/yellowfin.c b/drivers/net/ethernet/packetengines/yellowfin.c
-index aec57c0..3037a60 100644
---- a/drivers/net/ethernet/packetengines/yellowfin.c
-+++ b/drivers/net/ethernet/packetengines/yellowfin.c
-@@ -367,7 +367,7 @@ static const struct net_device_ops netdev_ops = {
- 	.ndo_tx_timeout 	= yellowfin_tx_timeout,
- };
- 
--static int __devinit yellowfin_init_one(struct pci_dev *pdev,
-+static int yellowfin_init_one(struct pci_dev *pdev,
- 					const struct pci_device_id *ent)
- {
- 	struct net_device *dev;
-@@ -522,7 +522,7 @@ err_out_free_netdev:
- 	return -ENODEV;
- }
- 
--static int __devinit read_eeprom(void __iomem *ioaddr, int location)
-+static int read_eeprom(void __iomem *ioaddr, int location)
- {
- 	int bogus_cnt = 10000;		/* Typical 33Mhz: 1050 ticks */
- 
-diff --git a/drivers/net/ethernet/pasemi/pasemi_mac.c b/drivers/net/ethernet/pasemi/pasemi_mac.c
-index 07943a3..7620755 100644
---- a/drivers/net/ethernet/pasemi/pasemi_mac.c
-+++ b/drivers/net/ethernet/pasemi/pasemi_mac.c
-@@ -1727,7 +1727,7 @@ static const struct net_device_ops pasemi_netdev_ops = {
- #endif
- };
- 
--static int __devinit
-+static int
- pasemi_mac_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/qlogic/netxen/netxen_nic_main.c b/drivers/net/ethernet/qlogic/netxen/netxen_nic_main.c
-index f0546b0..b36aa37 100644
---- a/drivers/net/ethernet/qlogic/netxen/netxen_nic_main.c
-+++ b/drivers/net/ethernet/qlogic/netxen/netxen_nic_main.c
-@@ -60,7 +60,7 @@ static int auto_fw_reset = AUTO_FW_RESET_ENABLED;
- module_param(auto_fw_reset, int, 0644);
- MODULE_PARM_DESC(auto_fw_reset,"Auto firmware reset (0=disabled, 1=enabled");
- 
--static int __devinit netxen_nic_probe(struct pci_dev *pdev,
-+static int netxen_nic_probe(struct pci_dev *pdev,
- 		const struct pci_device_id *ent);
- static void __devexit netxen_nic_remove(struct pci_dev *pdev);
- static int netxen_nic_open(struct net_device *netdev);
-@@ -1397,7 +1397,7 @@ static void netxen_mask_aer_correctable(struct netxen_adapter *adapter)
- }
- #endif
- 
--static int __devinit
-+static int
- netxen_nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- {
- 	struct net_device *netdev = NULL;
-diff --git a/drivers/net/ethernet/qlogic/qla3xxx.c b/drivers/net/ethernet/qlogic/qla3xxx.c
-index 506c72f..2528502 100644
---- a/drivers/net/ethernet/qlogic/qla3xxx.c
-+++ b/drivers/net/ethernet/qlogic/qla3xxx.c
-@@ -3769,7 +3769,7 @@ static const struct net_device_ops ql3xxx_netdev_ops = {
- 	.ndo_tx_timeout		= ql3xxx_tx_timeout,
- };
- 
--static int __devinit ql3xxx_probe(struct pci_dev *pdev,
-+static int ql3xxx_probe(struct pci_dev *pdev,
- 				  const struct pci_device_id *pci_entry)
- {
- 	struct net_device *ndev = NULL;
-diff --git a/drivers/net/ethernet/qlogic/qlcnic/qlcnic_main.c b/drivers/net/ethernet/qlogic/qlcnic/qlcnic_main.c
-index e553684..8d623aa 100644
---- a/drivers/net/ethernet/qlogic/qlcnic/qlcnic_main.c
-+++ b/drivers/net/ethernet/qlogic/qlcnic/qlcnic_main.c
-@@ -54,7 +54,7 @@ static int qlcnic_config_npars;
- module_param(qlcnic_config_npars, int, 0444);
- MODULE_PARM_DESC(qlcnic_config_npars, "Configure NPARs (0=disabled, 1=enabled");
- 
--static int __devinit qlcnic_probe(struct pci_dev *pdev,
-+static int qlcnic_probe(struct pci_dev *pdev,
- 		const struct pci_device_id *ent);
- static void __devexit qlcnic_remove(struct pci_dev *pdev);
- static int qlcnic_open(struct net_device *netdev);
-@@ -1559,7 +1559,7 @@ qlcnic_alloc_msix_entries(struct qlcnic_adapter *adapter, u16 count)
- 	return -ENOMEM;
- }
- 
--static int __devinit
-+static int
- qlcnic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- {
- 	struct net_device *netdev = NULL;
-diff --git a/drivers/net/ethernet/qlogic/qlge/qlge_main.c b/drivers/net/ethernet/qlogic/qlge/qlge_main.c
-index a576a8d2..372040d 100644
---- a/drivers/net/ethernet/qlogic/qlge/qlge_main.c
-+++ b/drivers/net/ethernet/qlogic/qlge/qlge_main.c
-@@ -4491,7 +4491,7 @@ static void ql_release_all(struct pci_dev *pdev)
- 	pci_set_drvdata(pdev, NULL);
- }
- 
--static int __devinit ql_init_device(struct pci_dev *pdev,
-+static int ql_init_device(struct pci_dev *pdev,
- 				    struct net_device *ndev, int cards_found)
- {
- 	struct ql_adapter *qdev = netdev_priv(ndev);
-@@ -4656,7 +4656,7 @@ static void ql_timer(unsigned long data)
- 	mod_timer(&qdev->timer, jiffies + (5*HZ));
- }
- 
--static int __devinit qlge_probe(struct pci_dev *pdev,
-+static int qlge_probe(struct pci_dev *pdev,
- 				const struct pci_device_id *pci_entry)
- {
- 	struct net_device *ndev = NULL;
-diff --git a/drivers/net/ethernet/rdc/r6040.c b/drivers/net/ethernet/rdc/r6040.c
-index 4e91e18..f0bba8c 100644
---- a/drivers/net/ethernet/rdc/r6040.c
-+++ b/drivers/net/ethernet/rdc/r6040.c
-@@ -1073,7 +1073,7 @@ static int r6040_mii_probe(struct net_device *dev)
- 	return 0;
- }
- 
--static int __devinit r6040_init_one(struct pci_dev *pdev,
-+static int r6040_init_one(struct pci_dev *pdev,
- 					 const struct pci_device_id *ent)
- {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/realtek/8139too.c b/drivers/net/ethernet/realtek/8139too.c
-index 59d8d70..ccae0d7 100644
---- a/drivers/net/ethernet/realtek/8139too.c
-+++ b/drivers/net/ethernet/realtek/8139too.c
-@@ -748,7 +748,7 @@ static void rtl8139_chip_reset (void __iomem *ioaddr)
- }
- 
- 
--static __devinit struct net_device * rtl8139_init_board (struct pci_dev *pdev)
-+static struct net_device * rtl8139_init_board (struct pci_dev *pdev)
- {
- 	struct device *d = &pdev->dev;
- 	void __iomem *ioaddr;
-@@ -935,7 +935,7 @@ static const struct net_device_ops rtl8139_netdev_ops = {
- 	.ndo_set_features	= rtl8139_set_features,
- };
- 
--static int __devinit rtl8139_init_one (struct pci_dev *pdev,
-+static int rtl8139_init_one (struct pci_dev *pdev,
- 				       const struct pci_device_id *ent)
- {
- 	struct net_device *dev = NULL;
-@@ -1141,7 +1141,7 @@ static void __devexit rtl8139_remove_one (struct pci_dev *pdev)
- #define EE_READ_CMD		(6)
- #define EE_ERASE_CMD	(7)
- 
--static int __devinit read_eeprom (void __iomem *ioaddr, int location, int addr_len)
-+static int read_eeprom (void __iomem *ioaddr, int location, int addr_len)
- {
- 	int i;
- 	unsigned retval = 0;
-diff --git a/drivers/net/ethernet/realtek/r8169.c b/drivers/net/ethernet/realtek/r8169.c
-index 1a01b9f..b8f2737 100644
---- a/drivers/net/ethernet/realtek/r8169.c
-+++ b/drivers/net/ethernet/realtek/r8169.c
-@@ -3828,7 +3828,7 @@ static void rtl_disable_msi(struct pci_dev *pdev, struct rtl8169_private *tp)
- 	}
- }
- 
--static void __devinit rtl_init_mdio_ops(struct rtl8169_private *tp)
-+static void rtl_init_mdio_ops(struct rtl8169_private *tp)
- {
- 	struct mdio_ops *ops = &tp->mdio_ops;
- 
-@@ -4080,7 +4080,7 @@ static void rtl_pll_power_up(struct rtl8169_private *tp)
- 	rtl_generic_op(tp, tp->pll_power_ops.up);
- }
- 
--static void __devinit rtl_init_pll_power_ops(struct rtl8169_private *tp)
-+static void rtl_init_pll_power_ops(struct rtl8169_private *tp)
- {
- 	struct pll_power_ops *ops = &tp->pll_power_ops;
- 
-@@ -4274,7 +4274,7 @@ static void r8168b_1_hw_jumbo_disable(struct rtl8169_private *tp)
- 	RTL_W8(Config4, RTL_R8(Config4) & ~(1 << 0));
- }
- 
--static void __devinit rtl_init_jumbo_ops(struct rtl8169_private *tp)
-+static void rtl_init_jumbo_ops(struct rtl8169_private *tp)
- {
- 	struct jumbo_ops *ops = &tp->jumbo_ops;
- 
-@@ -4715,7 +4715,7 @@ static u32 r8402_csi_read(struct rtl8169_private *tp, int addr)
- 		RTL_R32(CSIDR) : ~0;
- }
- 
--static void __devinit rtl_init_csi_ops(struct rtl8169_private *tp)
-+static void rtl_init_csi_ops(struct rtl8169_private *tp)
- {
- 	struct csi_ops *ops = &tp->csi_ops;
- 
-@@ -6730,7 +6730,7 @@ DECLARE_RTL_COND(rtl_rxtx_empty_cond)
- 	return (RTL_R8(MCU) & RXTX_EMPTY) == RXTX_EMPTY;
- }
- 
--static void __devinit rtl_hw_init_8168g(struct rtl8169_private *tp)
-+static void rtl_hw_init_8168g(struct rtl8169_private *tp)
- {
- 	void __iomem *ioaddr = tp->mmio_addr;
- 	u32 data;
-@@ -6764,7 +6764,7 @@ static void __devinit rtl_hw_init_8168g(struct rtl8169_private *tp)
- 		return;
- }
- 
--static void __devinit rtl_hw_initialize(struct rtl8169_private *tp)
-+static void rtl_hw_initialize(struct rtl8169_private *tp)
- {
- 	switch (tp->mac_version) {
- 	case RTL_GIGA_MAC_VER_40:
-@@ -6777,7 +6777,7 @@ static void __devinit rtl_hw_initialize(struct rtl8169_private *tp)
- 	}
- }
- 
--static int __devinit
-+static int
- rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
- {
- 	const struct rtl_cfg_info *cfg = rtl_cfg_infos + ent->driver_data;
-diff --git a/drivers/net/ethernet/s6gmac.c b/drivers/net/ethernet/s6gmac.c
-index 988e27d..2707d75 100644
---- a/drivers/net/ethernet/s6gmac.c
-+++ b/drivers/net/ethernet/s6gmac.c
-@@ -954,7 +954,7 @@ static struct net_device_stats *s6gmac_stats(struct net_device *dev)
- 	return st;
- }
- 
--static int __devinit s6gmac_probe(struct platform_device *pdev)
-+static int s6gmac_probe(struct platform_device *pdev)
- {
- 	struct net_device *dev;
- 	struct s6gmac *pd;
-diff --git a/drivers/net/ethernet/seeq/ether3.c b/drivers/net/ethernet/seeq/ether3.c
-index 0baae6a..d968f7b 100644
---- a/drivers/net/ethernet/seeq/ether3.c
-+++ b/drivers/net/ethernet/seeq/ether3.c
-@@ -194,7 +194,7 @@ static inline void ether3_ledon(struct net_device *dev)
-  * Read the ethernet address string from the on board rom.
-  * This is an ascii string!!!
-  */
--static int __devinit
-+static int
- ether3_addr(char *addr, struct expansion_card *ec)
- {
- 	struct in_chunk_dir cd;
-@@ -219,7 +219,7 @@ ether3_addr(char *addr, struct expansion_card *ec)
- 
- /* --------------------------------------------------------------------------- */
- 
--static int __devinit
-+static int
- ether3_ramtest(struct net_device *dev, unsigned char byte)
- {
- 	unsigned char *buffer = kmalloc(RX_END, GFP_KERNEL);
-@@ -268,7 +268,7 @@ ether3_ramtest(struct net_device *dev, unsigned char byte)
- 
- /* ------------------------------------------------------------------------------- */
- 
--static int __devinit ether3_init_2(struct net_device *dev)
-+static int ether3_init_2(struct net_device *dev)
- {
- 	int i;
- 
-@@ -748,7 +748,7 @@ static void ether3_tx(struct net_device *dev)
- 	}
- }
- 
--static void __devinit ether3_banner(void)
-+static void ether3_banner(void)
- {
- 	static unsigned version_printed = 0;
- 
-@@ -767,7 +767,7 @@ static const struct net_device_ops ether3_netdev_ops = {
- 	.ndo_set_mac_address	= eth_mac_addr,
- };
- 
--static int __devinit
-+static int
- ether3_probe(struct expansion_card *ec, const struct ecard_id *id)
- {
- 	const struct ether3_data *data = id->data;
-diff --git a/drivers/net/ethernet/seeq/sgiseeq.c b/drivers/net/ethernet/seeq/sgiseeq.c
-index 4d15bf4..0fde9ca 100644
---- a/drivers/net/ethernet/seeq/sgiseeq.c
-+++ b/drivers/net/ethernet/seeq/sgiseeq.c
-@@ -721,7 +721,7 @@ static const struct net_device_ops sgiseeq_netdev_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- };
- 
--static int __devinit sgiseeq_probe(struct platform_device *pdev)
-+static int sgiseeq_probe(struct platform_device *pdev)
- {
- 	struct sgiseeq_platform_data *pd = pdev->dev.platform_data;
- 	struct hpc3_regs *hpcregs = pd->hpc;
-diff --git a/drivers/net/ethernet/sfc/efx.c b/drivers/net/ethernet/sfc/efx.c
-index 4f86d0c..32745de 100644
---- a/drivers/net/ethernet/sfc/efx.c
-+++ b/drivers/net/ethernet/sfc/efx.c
-@@ -2669,7 +2669,7 @@ static int efx_pci_probe_main(struct efx_nic *efx)
-  * transmission; this is left to the first time one of the network
-  * interfaces is brought up (i.e. efx_net_open).
-  */
--static int __devinit efx_pci_probe(struct pci_dev *pci_dev,
-+static int efx_pci_probe(struct pci_dev *pci_dev,
- 				   const struct pci_device_id *entry)
- {
- 	struct net_device *net_dev;
-diff --git a/drivers/net/ethernet/sgi/ioc3-eth.c b/drivers/net/ethernet/sgi/ioc3-eth.c
-index 8d6546d..8f2975b 100644
---- a/drivers/net/ethernet/sgi/ioc3-eth.c
-+++ b/drivers/net/ethernet/sgi/ioc3-eth.c
-@@ -1143,7 +1143,7 @@ static int ioc3_is_menet(struct pci_dev *pdev)
-  * Can't use UPF_IOREMAP as the whole of IOC3 resources have already been
-  * registered.
-  */
--static void __devinit ioc3_8250_register(struct ioc3_uartregs __iomem *uart)
-+static void ioc3_8250_register(struct ioc3_uartregs __iomem *uart)
- {
- #define COSMISC_CONSTANT 6
- 
-@@ -1169,7 +1169,7 @@ static void __devinit ioc3_8250_register(struct ioc3_uartregs __iomem *uart)
- 	serial8250_register_8250_port(&port);
- }
- 
--static void __devinit ioc3_serial_probe(struct pci_dev *pdev, struct ioc3 *ioc3)
-+static void ioc3_serial_probe(struct pci_dev *pdev, struct ioc3 *ioc3)
- {
- 	/*
- 	 * We need to recognice and treat the fourth MENET serial as it
-@@ -1229,7 +1229,7 @@ static const struct net_device_ops ioc3_netdev_ops = {
- 	.ndo_change_mtu		= eth_change_mtu,
- };
- 
--static int __devinit ioc3_probe(struct pci_dev *pdev,
-+static int ioc3_probe(struct pci_dev *pdev,
- 	const struct pci_device_id *ent)
- {
- 	unsigned int sw_physid1, sw_physid2;
-diff --git a/drivers/net/ethernet/sgi/meth.c b/drivers/net/ethernet/sgi/meth.c
-index 53efe7c..79ad9c9 100644
---- a/drivers/net/ethernet/sgi/meth.c
-+++ b/drivers/net/ethernet/sgi/meth.c
-@@ -825,7 +825,7 @@ static const struct net_device_ops meth_netdev_ops = {
- /*
-  * The init function.
-  */
--static int __devinit meth_probe(struct platform_device *pdev)
-+static int meth_probe(struct platform_device *pdev)
- {
- 	struct net_device *dev;
- 	struct meth_private *priv;
-diff --git a/drivers/net/ethernet/silan/sc92031.c b/drivers/net/ethernet/silan/sc92031.c
-index a0a2e76..3a32673 100644
---- a/drivers/net/ethernet/silan/sc92031.c
-+++ b/drivers/net/ethernet/silan/sc92031.c
-@@ -1395,7 +1395,7 @@ static const struct net_device_ops sc92031_netdev_ops = {
- #endif
- };
- 
--static int __devinit sc92031_probe(struct pci_dev *pdev,
-+static int sc92031_probe(struct pci_dev *pdev,
- 		const struct pci_device_id *id)
- {
- 	int err;
-diff --git a/drivers/net/ethernet/sis/sis190.c b/drivers/net/ethernet/sis/sis190.c
-index 67fbd4a..7e81755 100644
---- a/drivers/net/ethernet/sis/sis190.c
-+++ b/drivers/net/ethernet/sis/sis190.c
-@@ -415,7 +415,7 @@ static u16 mdio_read_latched(void __iomem *ioaddr, int phy_id, int reg)
- 	return mdio_read(ioaddr, phy_id, reg);
- }
- 
--static u16 __devinit sis190_read_eeprom(void __iomem *ioaddr, u32 reg)
-+static u16 sis190_read_eeprom(void __iomem *ioaddr, u32 reg)
- {
- 	u16 data = 0xffff;
- 	unsigned int i;
-@@ -1379,7 +1379,7 @@ static void sis190_mii_probe_88e1111_fixup(struct sis190_private *tp)
-  *	Identify and set current phy if found one,
-  *	return error if it failed to found.
-  */
--static int __devinit sis190_mii_probe(struct net_device *dev)
-+static int sis190_mii_probe(struct net_device *dev)
- {
- 	struct sis190_private *tp = netdev_priv(dev);
- 	struct mii_if_info *mii_if = &tp->mii_if;
-@@ -1451,7 +1451,7 @@ static void sis190_release_board(struct pci_dev *pdev)
- 	free_netdev(dev);
- }
- 
--static struct net_device * __devinit sis190_init_board(struct pci_dev *pdev)
-+static struct net_device *sis190_init_board(struct pci_dev *pdev)
- {
- 	struct sis190_private *tp;
- 	struct net_device *dev;
-@@ -1573,7 +1573,7 @@ static void sis190_set_rgmii(struct sis190_private *tp, u8 reg)
- 	tp->features |= (reg & 0x80) ? F_HAS_RGMII : 0;
- }
- 
--static int __devinit sis190_get_mac_addr_from_eeprom(struct pci_dev *pdev,
-+static int sis190_get_mac_addr_from_eeprom(struct pci_dev *pdev,
- 						     struct net_device *dev)
- {
- 	struct sis190_private *tp = netdev_priv(dev);
-@@ -1615,7 +1615,7 @@ static int __devinit sis190_get_mac_addr_from_eeprom(struct pci_dev *pdev,
-  *	APC CMOS RAM is accessed through ISA bridge.
-  *	MAC address is read into @net_dev->dev_addr.
-  */
--static int __devinit sis190_get_mac_addr_from_apc(struct pci_dev *pdev,
-+static int sis190_get_mac_addr_from_apc(struct pci_dev *pdev,
- 						  struct net_device *dev)
- {
- 	static const u16 __devinitconst ids[] = { 0x0965, 0x0966, 0x0968 };
-@@ -1693,7 +1693,7 @@ static inline void sis190_init_rxfilter(struct net_device *dev)
- 	SIS_PCI_COMMIT();
- }
- 
--static int __devinit sis190_get_mac_addr(struct pci_dev *pdev,
-+static int sis190_get_mac_addr(struct pci_dev *pdev,
- 					 struct net_device *dev)
+-static int __devinit install_fb(struct fb_info *info)
++static int install_fb(struct fb_info *info)
  {
  	int rc;
-@@ -1845,7 +1845,7 @@ static const struct net_device_ops sis190_netdev_ops = {
- #endif
- };
- 
--static int __devinit sis190_init_one(struct pci_dev *pdev,
-+static int sis190_init_one(struct pci_dev *pdev,
- 				     const struct pci_device_id *ent)
- {
- 	static int printed_version = 0;
-diff --git a/drivers/net/ethernet/sis/sis900.c b/drivers/net/ethernet/sis/sis900.c
-index d068e2b..5a799c9 100644
---- a/drivers/net/ethernet/sis/sis900.c
-+++ b/drivers/net/ethernet/sis/sis900.c
-@@ -251,7 +251,7 @@ static const struct ethtool_ops sis900_ethtool_ops;
-  *	@net_dev->perm_addr.
-  */
- 
--static int __devinit sis900_get_mac_addr(struct pci_dev * pci_dev, struct net_device *net_dev)
-+static int sis900_get_mac_addr(struct pci_dev * pci_dev, struct net_device *net_dev)
- {
- 	struct sis900_private *sis_priv = netdev_priv(net_dev);
- 	void __iomem *ioaddr = sis_priv->ioaddr;
-@@ -287,7 +287,7 @@ static int __devinit sis900_get_mac_addr(struct pci_dev * pci_dev, struct net_de
-  *	@net_dev->perm_addr.
-  */
- 
--static int __devinit sis630e_get_mac_addr(struct pci_dev * pci_dev,
-+static int sis630e_get_mac_addr(struct pci_dev * pci_dev,
- 					struct net_device *net_dev)
- {
- 	struct pci_dev *isa_bridge = NULL;
-@@ -330,7 +330,7 @@ static int __devinit sis630e_get_mac_addr(struct pci_dev * pci_dev,
-  *	@net_dev->dev_addr and @net_dev->perm_addr.
-  */
- 
--static int __devinit sis635_get_mac_addr(struct pci_dev * pci_dev,
-+static int sis635_get_mac_addr(struct pci_dev * pci_dev,
- 					struct net_device *net_dev)
- {
- 	struct sis900_private *sis_priv = netdev_priv(net_dev);
-@@ -377,7 +377,7 @@ static int __devinit sis635_get_mac_addr(struct pci_dev * pci_dev,
-  *	MAC address is read into @net_dev->dev_addr and @net_dev->perm_addr.
-  */
- 
--static int __devinit sis96x_get_mac_addr(struct pci_dev * pci_dev,
-+static int sis96x_get_mac_addr(struct pci_dev * pci_dev,
- 					struct net_device *net_dev)
- {
- 	struct sis900_private *sis_priv = netdev_priv(net_dev);
-@@ -433,7 +433,7 @@ static const struct net_device_ops sis900_netdev_ops = {
-  *	ie: sis900_open(), sis900_start_xmit(), sis900_close(), etc.
-  */
- 
--static int __devinit sis900_probe(struct pci_dev *pci_dev,
-+static int sis900_probe(struct pci_dev *pci_dev,
- 				const struct pci_device_id *pci_id)
- {
- 	struct sis900_private *sis_priv;
-@@ -605,7 +605,7 @@ err_out_cleardev:
-  *	return error if it failed to found.
-  */
- 
--static int __devinit sis900_mii_probe(struct net_device * net_dev)
-+static int sis900_mii_probe(struct net_device * net_dev)
- {
- 	struct sis900_private *sis_priv = netdev_priv(net_dev);
- 	const char *dev_name = pci_name(sis_priv->pci_dev);
-@@ -824,7 +824,7 @@ static void sis900_set_capability(struct net_device *net_dev, struct mii_phy *ph
-  *	Note that location is in word (16 bits) unit
-  */
- 
--static u16 __devinit read_eeprom(void __iomem *ioaddr, int location)
-+static u16 read_eeprom(void __iomem *ioaddr, int location)
- {
- 	u32 read_cmd = location | EEread;
- 	int i;
-diff --git a/drivers/net/ethernet/smsc/epic100.c b/drivers/net/ethernet/smsc/epic100.c
-index 67e694b..d5ef36f 100644
---- a/drivers/net/ethernet/smsc/epic100.c
-+++ b/drivers/net/ethernet/smsc/epic100.c
-@@ -318,7 +318,7 @@ static const struct net_device_ops epic_netdev_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- };
- 
--static int __devinit epic_init_one(struct pci_dev *pdev,
-+static int epic_init_one(struct pci_dev *pdev,
- 				   const struct pci_device_id *ent)
- {
- 	static int card_idx = -1;
-@@ -569,7 +569,7 @@ static inline void epic_napi_irq_on(struct net_device *dev,
- 	ew32(INTMASK, ep->irq_mask | EpicNapiEvent);
- }
- 
--static int __devinit read_eeprom(struct epic_private *ep, int location)
-+static int read_eeprom(struct epic_private *ep, int location)
- {
- 	void __iomem *ioaddr = ep->ioaddr;
- 	int i;
-diff --git a/drivers/net/ethernet/smsc/smc911x.c b/drivers/net/ethernet/smsc/smc911x.c
-index f19fba7..d8ac9d2 100644
---- a/drivers/net/ethernet/smsc/smc911x.c
-+++ b/drivers/net/ethernet/smsc/smc911x.c
-@@ -1722,7 +1722,7 @@ static const struct ethtool_ops smc911x_ethtool_ops = {
-  * This routine has a simple purpose -- make the SMC chip generate an
-  * interrupt, so an auto-detect routine can detect it, and find the IRQ,
-  */
--static int __devinit smc911x_findirq(struct net_device *dev)
-+static int smc911x_findirq(struct net_device *dev)
- {
- 	struct smc911x_local *lp = netdev_priv(dev);
- 	int timeout = 20;
-@@ -1800,7 +1800,7 @@ static const struct net_device_ops smc911x_netdev_ops = {
-  * o  actually GRAB the irq.
-  * o  GRAB the region
-  */
--static int __devinit smc911x_probe(struct net_device *dev)
-+static int smc911x_probe(struct net_device *dev)
- {
- 	struct smc911x_local *lp = netdev_priv(dev);
- 	int i, retval;
-@@ -2040,7 +2040,7 @@ err_out:
-  *	 0 --> there is a device
-  *	 anything else, error
-  */
--static int __devinit smc911x_drv_probe(struct platform_device *pdev)
-+static int smc911x_drv_probe(struct platform_device *pdev)
- {
- 	struct net_device *ndev;
- 	struct resource *res;
-diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
-index 8d85cbd..3687de9 100644
---- a/drivers/net/ethernet/smsc/smc91x.c
-+++ b/drivers/net/ethernet/smsc/smc91x.c
-@@ -1789,7 +1789,7 @@ static const struct net_device_ops smc_netdev_ops = {
-  * I just deleted auto_irq.c, since it was never built...
-  *   --jgarzik
-  */
--static int __devinit smc_findirq(struct smc_local *lp)
-+static int smc_findirq(struct smc_local *lp)
- {
- 	void __iomem *ioaddr = lp->base;
- 	int timeout = 20;
-@@ -1863,7 +1863,7 @@ static int __devinit smc_findirq(struct smc_local *lp)
-  * o  actually GRAB the irq.
-  * o  GRAB the region
-  */
--static int __devinit smc_probe(struct net_device *dev, void __iomem *ioaddr,
-+static int smc_probe(struct net_device *dev, void __iomem *ioaddr,
- 			    unsigned long irq_flags)
- {
- 	struct smc_local *lp = netdev_priv(dev);
-@@ -2211,7 +2211,7 @@ static void smc_release_datacs(struct platform_device *pdev, struct net_device *
-  *	0 --> there is a device
-  *	anything else, error
-  */
--static int __devinit smc_drv_probe(struct platform_device *pdev)
-+static int smc_drv_probe(struct platform_device *pdev)
- {
- 	struct smc91x_platdata *pd = pdev->dev.platform_data;
- 	struct smc_local *lp;
-diff --git a/drivers/net/ethernet/smsc/smsc911x.c b/drivers/net/ethernet/smsc/smsc911x.c
-index 7d034fc..53980b5 100644
---- a/drivers/net/ethernet/smsc/smsc911x.c
-+++ b/drivers/net/ethernet/smsc/smsc911x.c
-@@ -1031,7 +1031,7 @@ static int smsc911x_mii_probe(struct net_device *dev)
+ 	struct mfb_info *mfbi = info->par;
+@@ -1491,7 +1491,7 @@ static ssize_t show_monitor(struct device *device,
  	return 0;
  }
  
--static int __devinit smsc911x_mii_init(struct platform_device *pdev,
-+static int smsc911x_mii_init(struct platform_device *pdev,
- 				       struct net_device *dev)
- {
- 	struct smsc911x_data *pdata = netdev_priv(dev);
-@@ -2092,7 +2092,7 @@ static const struct net_device_ops smsc911x_netdev_ops = {
- };
- 
- /* copies the current mac address from hardware to dev->dev_addr */
--static void __devinit smsc911x_read_mac_address(struct net_device *dev)
-+static void smsc911x_read_mac_address(struct net_device *dev)
- {
- 	struct smsc911x_data *pdata = netdev_priv(dev);
- 	u32 mac_high16 = smsc911x_mac_read(pdata, ADDRH);
-@@ -2107,7 +2107,7 @@ static void __devinit smsc911x_read_mac_address(struct net_device *dev)
- }
- 
- /* Initializing private device structures, only called from probe */
--static int __devinit smsc911x_init(struct net_device *dev)
-+static int smsc911x_init(struct net_device *dev)
- {
- 	struct smsc911x_data *pdata = netdev_priv(dev);
- 	unsigned int byte_test;
-@@ -2288,7 +2288,7 @@ static const struct smsc911x_ops shifted_smsc911x_ops = {
- };
- 
- #ifdef CONFIG_OF
--static int __devinit smsc911x_probe_config_dt(
-+static int smsc911x_probe_config_dt(
- 				struct smsc911x_platform_config *config,
- 				struct device_node *np)
- {
-@@ -2338,7 +2338,7 @@ static inline int smsc911x_probe_config_dt(
- }
- #endif /* CONFIG_OF */
- 
--static int __devinit smsc911x_drv_probe(struct platform_device *pdev)
-+static int smsc911x_drv_probe(struct platform_device *pdev)
+-static int __devinit fsl_diu_probe(struct platform_device *pdev)
++static int fsl_diu_probe(struct platform_device *pdev)
  {
  	struct device_node *np = pdev->dev.of_node;
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/smsc/smsc9420.c b/drivers/net/ethernet/smsc/smsc9420.c
-index ed96967..fa3ab62 100644
---- a/drivers/net/ethernet/smsc/smsc9420.c
-+++ b/drivers/net/ethernet/smsc/smsc9420.c
-@@ -1577,7 +1577,7 @@ static const struct net_device_ops smsc9420_netdev_ops = {
- #endif /* CONFIG_NET_POLL_CONTROLLER */
+ 	struct mfb_info *mfbi;
+diff --git a/drivers/video/gbefb.c b/drivers/video/gbefb.c
+index f19571b..2971511 100644
+--- a/drivers/video/gbefb.c
++++ b/drivers/video/gbefb.c
+@@ -1098,7 +1098,7 @@ static void gbefb_create_sysfs(struct device *dev)
+  * Initialization
+  */
+ 
+-static int __devinit gbefb_setup(char *options)
++static int gbefb_setup(char *options)
+ {
+ 	char *this_opt;
+ 
+@@ -1129,7 +1129,7 @@ static int __devinit gbefb_setup(char *options)
+ 	return 0;
+ }
+ 
+-static int __devinit gbefb_probe(struct platform_device *p_dev)
++static int gbefb_probe(struct platform_device *p_dev)
+ {
+ 	int i, ret = 0;
+ 	struct fb_info *info;
+diff --git a/drivers/video/geode/gx1fb_core.c b/drivers/video/geode/gx1fb_core.c
+index 094c352..4bdd47f 100644
+--- a/drivers/video/geode/gx1fb_core.c
++++ b/drivers/video/geode/gx1fb_core.c
+@@ -195,7 +195,7 @@ static int gx1fb_blank(int blank_mode, struct fb_info *info)
+ 	return par->vid_ops->blank_display(info, blank_mode);
+ }
+ 
+-static int __devinit gx1fb_map_video_memory(struct fb_info *info, struct pci_dev *dev)
++static int gx1fb_map_video_memory(struct fb_info *info, struct pci_dev *dev)
+ {
+ 	struct geodefb_par *par = info->par;
+ 	unsigned gx_base;
+@@ -268,7 +268,7 @@ static struct fb_ops gx1fb_ops = {
+ 	.fb_imageblit	= cfb_imageblit,
  };
+ 
+-static struct fb_info * __devinit gx1fb_init_fbinfo(struct device *dev)
++static struct fb_info *gx1fb_init_fbinfo(struct device *dev)
+ {
+ 	struct geodefb_par *par;
+ 	struct fb_info *info;
+@@ -318,7 +318,7 @@ static struct fb_info * __devinit gx1fb_init_fbinfo(struct device *dev)
+ 	return info;
+ }
+ 
+-static int __devinit gx1fb_probe(struct pci_dev *pdev, const struct pci_device_id *id)
++static int gx1fb_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+ {
+ 	struct geodefb_par *par;
+ 	struct fb_info *info;
+diff --git a/drivers/video/geode/gxfb_core.c b/drivers/video/geode/gxfb_core.c
+index b4f19db..d3ad1a0 100644
+--- a/drivers/video/geode/gxfb_core.c
++++ b/drivers/video/geode/gxfb_core.c
+@@ -117,7 +117,7 @@ static struct fb_videomode gx_dcon_modedb[] __devinitdata = {
+ 	  FB_VMODE_NONINTERLACED, 0 }
+ };
+ 
+-static void __devinit get_modedb(struct fb_videomode **modedb,
++static void get_modedb(struct fb_videomode **modedb,
+ 		unsigned int *size)
+ {
+ 	if (olpc_has_dcon()) {
+@@ -130,7 +130,7 @@ static void __devinit get_modedb(struct fb_videomode **modedb,
+ }
+ 
+ #else
+-static void __devinit get_modedb(struct fb_videomode **modedb,
++static void get_modedb(struct fb_videomode **modedb,
+ 		unsigned int *size)
+ {
+ 	*modedb = (struct fb_videomode *) gx_modedb;
+@@ -228,7 +228,7 @@ static int gxfb_blank(int blank_mode, struct fb_info *info)
+ 	return gx_blank_display(info, blank_mode);
+ }
+ 
+-static int __devinit gxfb_map_video_memory(struct fb_info *info,
++static int gxfb_map_video_memory(struct fb_info *info,
+ 		struct pci_dev *dev)
+ {
+ 	struct gxfb_par *par = info->par;
+@@ -293,7 +293,7 @@ static struct fb_ops gxfb_ops = {
+ 	.fb_imageblit	= cfb_imageblit,
+ };
+ 
+-static struct fb_info *__devinit gxfb_init_fbinfo(struct device *dev)
++static struct fb_info *gxfb_init_fbinfo(struct device *dev)
+ {
+ 	struct gxfb_par *par;
+ 	struct fb_info *info;
+@@ -374,7 +374,7 @@ static int gxfb_resume(struct pci_dev *pdev)
+ }
+ #endif
+ 
+-static int __devinit gxfb_probe(struct pci_dev *pdev,
++static int gxfb_probe(struct pci_dev *pdev,
+ 		const struct pci_device_id *id)
+ {
+ 	struct gxfb_par *par;
+diff --git a/drivers/video/geode/lxfb_core.c b/drivers/video/geode/lxfb_core.c
+index 416851c..7428366 100644
+--- a/drivers/video/geode/lxfb_core.c
++++ b/drivers/video/geode/lxfb_core.c
+@@ -226,7 +226,7 @@ static struct fb_videomode olpc_dcon_modedb[] __devinitdata = {
+ 	  FB_VMODE_NONINTERLACED, 0 }
+ };
+ 
+-static void __devinit get_modedb(struct fb_videomode **modedb,
++static void get_modedb(struct fb_videomode **modedb,
+ 		unsigned int *size)
+ {
+ 	if (olpc_has_dcon()) {
+@@ -239,7 +239,7 @@ static void __devinit get_modedb(struct fb_videomode **modedb,
+ }
+ 
+ #else
+-static void __devinit get_modedb(struct fb_videomode **modedb,
++static void get_modedb(struct fb_videomode **modedb,
+ 		unsigned int *size)
+ {
+ 	*modedb = (struct fb_videomode *) geode_modedb;
+@@ -336,7 +336,7 @@ static int lxfb_blank(int blank_mode, struct fb_info *info)
+ }
+ 
+ 
+-static int __devinit lxfb_map_video_memory(struct fb_info *info,
++static int lxfb_map_video_memory(struct fb_info *info,
+ 					struct pci_dev *dev)
+ {
+ 	struct lxfb_par *par = info->par;
+@@ -414,7 +414,7 @@ static struct fb_ops lxfb_ops = {
+ 	.fb_imageblit	= cfb_imageblit,
+ };
+ 
+-static struct fb_info * __devinit lxfb_init_fbinfo(struct device *dev)
++static struct fb_info *lxfb_init_fbinfo(struct device *dev)
+ {
+ 	struct lxfb_par *par;
+ 	struct fb_info *info;
+@@ -498,7 +498,7 @@ static int lxfb_resume(struct pci_dev *pdev)
+ #define lxfb_resume NULL
+ #endif
+ 
+-static int __devinit lxfb_probe(struct pci_dev *pdev,
++static int lxfb_probe(struct pci_dev *pdev,
+ 			     const struct pci_device_id *id)
+ {
+ 	struct lxfb_par *par;
+diff --git a/drivers/video/grvga.c b/drivers/video/grvga.c
+index 3ddf206..bf7ea95 100644
+--- a/drivers/video/grvga.c
++++ b/drivers/video/grvga.c
+@@ -267,7 +267,7 @@ static struct fb_ops grvga_ops = {
+ 	.fb_imageblit	= cfb_imageblit
+ };
+ 
+-static int __devinit grvga_parse_custom(char *options,
++static int grvga_parse_custom(char *options,
+ 				     struct fb_var_screeninfo *screendata)
+ {
+ 	char *this_opt;
+@@ -329,7 +329,7 @@ static int __devinit grvga_parse_custom(char *options,
+ 	return 0;
+ }
+ 
+-static int __devinit grvga_probe(struct platform_device *dev)
++static int grvga_probe(struct platform_device *dev)
+ {
+ 	struct fb_info *info;
+ 	int retval = -ENOMEM;
+diff --git a/drivers/video/gxt4500.c b/drivers/video/gxt4500.c
+index d4f103e..c0130a4 100644
+--- a/drivers/video/gxt4500.c
++++ b/drivers/video/gxt4500.c
+@@ -610,7 +610,7 @@ static struct fb_ops gxt4500_ops = {
+ };
+ 
+ /* PCI functions */
+-static int __devinit gxt4500_probe(struct pci_dev *pdev,
++static int gxt4500_probe(struct pci_dev *pdev,
+ 				   const struct pci_device_id *ent)
+ {
+ 	int err;
+@@ -761,7 +761,7 @@ static struct pci_driver gxt4500_driver = {
+ 	.remove = gxt4500_remove,
+ };
+ 
+-static int __devinit gxt4500_init(void)
++static int gxt4500_init(void)
+ {
+ #ifndef MODULE
+ 	if (fb_get_options("gxt4500", &mode_option))
+diff --git a/drivers/video/hecubafb.c b/drivers/video/hecubafb.c
+index b28a520..f8746a3f 100644
+--- a/drivers/video/hecubafb.c
++++ b/drivers/video/hecubafb.c
+@@ -211,7 +211,7 @@ static struct fb_deferred_io hecubafb_defio = {
+ 	.deferred_io	= hecubafb_dpy_deferred_io,
+ };
+ 
+-static int __devinit hecubafb_probe(struct platform_device *dev)
++static int hecubafb_probe(struct platform_device *dev)
+ {
+ 	struct fb_info *info;
+ 	struct hecuba_board *board;
+diff --git a/drivers/video/hgafb.c b/drivers/video/hgafb.c
+index f8a7036..20bbeb4 100644
+--- a/drivers/video/hgafb.c
++++ b/drivers/video/hgafb.c
+@@ -276,7 +276,7 @@ static void hga_blank(int blank_mode)
+ 	spin_unlock_irqrestore(&hga_reg_lock, flags);
+ }
+ 
+-static int __devinit hga_card_detect(void)
++static int hga_card_detect(void)
+ {
+ 	int count = 0;
+ 	void __iomem *p, *q;
+@@ -546,7 +546,7 @@ static struct fb_ops hgafb_ops = {
+ 	 *  Initialization
+ 	 */
+ 
+-static int __devinit hgafb_probe(struct platform_device *pdev)
++static int hgafb_probe(struct platform_device *pdev)
+ {
+ 	struct fb_info *info;
+ 
+diff --git a/drivers/video/hitfb.c b/drivers/video/hitfb.c
+index 4ceb978..20d8a56 100644
+--- a/drivers/video/hitfb.c
++++ b/drivers/video/hitfb.c
+@@ -324,7 +324,7 @@ static struct fb_ops hitfb_ops = {
+ 	.fb_imageblit	= cfb_imageblit,
+ };
+ 
+-static int __devinit hitfb_probe(struct platform_device *dev)
++static int hitfb_probe(struct platform_device *dev)
+ {
+ 	unsigned short lcdclor, ldr3, ldvndr;
+ 	struct fb_info *info;
+diff --git a/drivers/video/hpfb.c b/drivers/video/hpfb.c
+index 1f15523..aa2abe8 100644
+--- a/drivers/video/hpfb.c
++++ b/drivers/video/hpfb.c
+@@ -206,7 +206,7 @@ static struct fb_ops hpfb_ops = {
+ #define HPFB_FBOMSB	0x5d	/* Frame buffer offset		*/
+ #define HPFB_FBOLSB	0x5f
+ 
+-static int __devinit hpfb_init_one(unsigned long phys_base,
++static int hpfb_init_one(unsigned long phys_base,
+ 				   unsigned long virt_base)
+ {
+ 	unsigned long fboff, fb_width, fb_height, fb_start;
+@@ -327,7 +327,7 @@ unmap_screen_base:
+ /* 
+  * Initialise the framebuffer
+  */
+-static int __devinit hpfb_dio_probe(struct dio_dev * d, const struct dio_device_id * ent)
++static int hpfb_dio_probe(struct dio_dev * d, const struct dio_device_id * ent)
+ {
+ 	unsigned long paddr, vaddr;
+ 
+diff --git a/drivers/video/i740fb.c b/drivers/video/i740fb.c
+index 1d3c8ee..1109617 100644
+--- a/drivers/video/i740fb.c
++++ b/drivers/video/i740fb.c
+@@ -163,7 +163,7 @@ static int i740fb_ddc_getsda(void *data)
+ 	return !!(i740inreg(par, XRX, REG_DDC_STATE) & DDC_SDA);
+ }
+ 
+-static int __devinit i740fb_setup_ddc_bus(struct fb_info *info)
++static int i740fb_setup_ddc_bus(struct fb_info *info)
+ {
+ 	struct i740fb_par *par = info->par;
+ 
+@@ -1007,7 +1007,7 @@ static struct fb_ops i740fb_ops = {
+ 
+ /* ------------------------------------------------------------------------- */
+ 
+-static int __devinit i740fb_probe(struct pci_dev *dev,
++static int i740fb_probe(struct pci_dev *dev,
+ 				  const struct pci_device_id *ent)
+ {
+ 	struct fb_info *info;
+diff --git a/drivers/video/i810/i810_main.c b/drivers/video/i810/i810_main.c
+index 5c06781..8c50b96 100644
+--- a/drivers/video/i810/i810_main.c
++++ b/drivers/video/i810/i810_main.c
+@@ -78,7 +78,7 @@ static u32 v_offset_default __devinitdata; /* For 32 MiB Aper size, 8 should be
+ static u32 voffset          __devinitdata;
+ 
+ static int i810fb_cursor(struct fb_info *info, struct fb_cursor *cursor);
+-static int  __devinit i810fb_init_pci (struct pci_dev *dev,
++static int  i810fb_init_pci (struct pci_dev *dev,
+ 				       const struct pci_device_id *entry);
+ static void __exit i810fb_remove_pci(struct pci_dev *dev);
+ static int i810fb_resume(struct pci_dev *dev);
+@@ -1628,7 +1628,7 @@ fail:
+  *                  AGP resource allocation                            *
+  ***********************************************************************/
+   
+-static void __devinit i810_fix_pointers(struct i810fb_par *par)
++static void i810_fix_pointers(struct i810fb_par *par)
+ {
+       	par->fb.physical = par->aperture.physical+(par->fb.offset << 12);
+ 	par->fb.virtual = par->aperture.virtual+(par->fb.offset << 12);
+@@ -1640,7 +1640,7 @@ static void __devinit i810_fix_pointers(struct i810fb_par *par)
+ 		(par->cursor_heap.offset << 12);
+ }
+ 
+-static void __devinit i810_fix_offsets(struct i810fb_par *par)
++static void i810_fix_offsets(struct i810fb_par *par)
+ {
+ 	if (vram + 1 > par->aperture.size >> 20)
+ 		vram = (par->aperture.size >> 20) - 1;
+@@ -1660,7 +1660,7 @@ static void __devinit i810_fix_offsets(struct i810fb_par *par)
+ 	par->cursor_heap.size = 4096;
+ }
+ 
+-static int __devinit i810_alloc_agp_mem(struct fb_info *info)
++static int i810_alloc_agp_mem(struct fb_info *info)
+ {
+ 	struct i810fb_par *par = info->par;
+ 	int size;
+@@ -1723,7 +1723,7 @@ static int __devinit i810_alloc_agp_mem(struct fb_info *info)
+  * Sets the user monitor's horizontal and vertical
+  * frequency limits
+  */
+-static void __devinit i810_init_monspecs(struct fb_info *info)
++static void i810_init_monspecs(struct fb_info *info)
+ {
+ 	if (!hsync1)
+ 		hsync1 = HFMIN;
+@@ -1755,7 +1755,7 @@ static void __devinit i810_init_monspecs(struct fb_info *info)
+  * @par: pointer to i810fb_par structure
+  * @info: pointer to current fb_info structure
+  */
+-static void __devinit i810_init_defaults(struct i810fb_par *par, 
++static void i810_init_defaults(struct i810fb_par *par,
+ 				      struct fb_info *info)
+ {
+ 	mutex_init(&par->open_lock);
+@@ -1812,7 +1812,7 @@ static void __devinit i810_init_defaults(struct i810fb_par *par,
+  * i810_init_device - initialize device
+  * @par: pointer to i810fb_par structure
+  */
+-static void __devinit i810_init_device(struct i810fb_par *par)
++static void i810_init_device(struct i810fb_par *par)
+ {
+ 	u8 reg;
+ 	u8 __iomem *mmio = par->mmio_start_virtual;
+@@ -1833,7 +1833,7 @@ static void __devinit i810_init_device(struct i810fb_par *par)
+ 
+ }
+ 
+-static int __devinit 
++static int
+ i810_allocate_pci_resource(struct i810fb_par *par, 
+ 			   const struct pci_device_id *entry)
+ {
+@@ -1892,7 +1892,7 @@ i810_allocate_pci_resource(struct i810fb_par *par,
+ 	return 0;
+ }
+ 
+-static void __devinit i810fb_find_init_mode(struct fb_info *info)
++static void i810fb_find_init_mode(struct fb_info *info)
+ {
+ 	struct fb_videomode mode;
+ 	struct fb_var_screeninfo var;
+@@ -1956,7 +1956,7 @@ static void __devinit i810fb_find_init_mode(struct fb_info *info)
+ }
+ 
+ #ifndef MODULE
+-static int __devinit i810fb_setup(char *options)
++static int i810fb_setup(char *options)
+ {
+ 	char *this_opt, *suffix = NULL;
+ 
+@@ -2007,7 +2007,7 @@ static int __devinit i810fb_setup(char *options)
+ }
+ #endif
+ 
+-static int __devinit i810fb_init_pci (struct pci_dev *dev, 
++static int i810fb_init_pci (struct pci_dev *dev,
+ 				   const struct pci_device_id *entry)
+ {
+ 	struct fb_info    *info;
+@@ -2136,7 +2136,7 @@ static void __exit i810fb_remove_pci(struct pci_dev *dev)
+ }                                                	
+ 
+ #ifndef MODULE
+-static int __devinit i810fb_init(void)
++static int i810fb_init(void)
+ {
+ 	char *option = NULL;
+ 
+@@ -2154,7 +2154,7 @@ static int __devinit i810fb_init(void)
+ 
+ #ifdef MODULE
+ 
+-static int __devinit i810fb_init(void)
++static int i810fb_init(void)
+ {
+ 	hsync1 *= 1000;
+ 	hsync2 *= 1000;
+diff --git a/drivers/video/i810/i810_main.h b/drivers/video/i810/i810_main.h
+index 51d4f3d4..a25afaa 100644
+--- a/drivers/video/i810/i810_main.h
++++ b/drivers/video/i810/i810_main.h
+@@ -64,7 +64,7 @@ static inline void flush_cache(void)
+ 
+ #include <asm/mtrr.h>
+ 
+-static inline void __devinit set_mtrr(struct i810fb_par *par)
++static inline void set_mtrr(struct i810fb_par *par)
+ {
+ 	par->mtrr_reg = mtrr_add((u32) par->aperture.physical, 
+ 		 par->aperture.size, MTRR_TYPE_WRCOMB, 1);
+diff --git a/drivers/video/imsttfb.c b/drivers/video/imsttfb.c
+index 1bb3934..a7e8477 100644
+--- a/drivers/video/imsttfb.c
++++ b/drivers/video/imsttfb.c
+@@ -1349,7 +1349,7 @@ static struct fb_ops imsttfb_ops = {
+ 	.fb_ioctl 	= imsttfb_ioctl,
+ };
+ 
+-static void __devinit
++static void
+ init_imstt(struct fb_info *info)
+ {
+ 	struct imstt_par *par = info->par;
+@@ -1466,7 +1466,7 @@ init_imstt(struct fb_info *info)
+ 		info->node, info->fix.id, info->fix.smem_len >> 20, tmp);
+ }
  
 -static int __devinit
 +static int
- smsc9420_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+ imsttfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
  {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c
-index 743ab67..572702a 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c
-@@ -61,7 +61,7 @@ static void stmmac_default_data(void)
-  * matches the device. The probe functions returns zero when the driver choose
-  * to take "ownership" of the device or an error code(-ve no) otherwise.
-  */
--static int __devinit stmmac_pci_probe(struct pci_dev *pdev,
-+static int stmmac_pci_probe(struct pci_dev *pdev,
- 				      const struct pci_device_id *id)
+ 	unsigned long addr, size;
+diff --git a/drivers/video/intelfb/intelfbdrv.c b/drivers/video/intelfb/intelfbdrv.c
+index 971b5d0..860820c 100644
+--- a/drivers/video/intelfb/intelfbdrv.c
++++ b/drivers/video/intelfb/intelfbdrv.c
+@@ -132,7 +132,7 @@
+ #include "intelfbhw.h"
+ #include "../edid.h"
+ 
+-static void __devinit get_initial_mode(struct intelfb_info *dinfo);
++static void get_initial_mode(struct intelfb_info *dinfo);
+ static void update_dinfo(struct intelfb_info *dinfo,
+ 			 struct fb_var_screeninfo *var);
+ static int intelfb_open(struct fb_info *info, int user);
+@@ -162,10 +162,10 @@ static int intelfb_sync(struct fb_info *info);
+ static int intelfb_ioctl(struct fb_info *info,
+ 			 unsigned int cmd, unsigned long arg);
+ 
+-static int __devinit intelfb_pci_register(struct pci_dev *pdev,
++static int intelfb_pci_register(struct pci_dev *pdev,
+ 					  const struct pci_device_id *ent);
+ static void __devexit intelfb_pci_unregister(struct pci_dev *pdev);
+-static int __devinit intelfb_set_fbinfo(struct intelfb_info *dinfo);
++static int intelfb_set_fbinfo(struct intelfb_info *dinfo);
+ 
+ /*
+  * Limiting the class to PCI_CLASS_DISPLAY_VGA prevents function 1 of the
+@@ -415,7 +415,7 @@ module_exit(intelfb_exit);
+  ***************************************************************/
+ 
+ #ifdef CONFIG_MTRR
+-static inline void __devinit set_mtrr(struct intelfb_info *dinfo)
++static inline void set_mtrr(struct intelfb_info *dinfo)
  {
- 	int ret = 0;
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-index ed112b5..b77b913 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-@@ -29,7 +29,7 @@
- #include "stmmac.h"
+ 	dinfo->mtrr_reg = mtrr_add(dinfo->aperture.physical,
+ 				   dinfo->aperture.size, MTRR_TYPE_WRCOMB, 1);
+@@ -497,7 +497,7 @@ static void cleanup(struct intelfb_info *dinfo)
+ } while (0)
  
- #ifdef CONFIG_OF
--static int __devinit stmmac_probe_config_dt(struct platform_device *pdev,
-+static int stmmac_probe_config_dt(struct platform_device *pdev,
- 					    struct plat_stmmacenet_data *plat,
- 					    const char **mac)
- {
-@@ -59,7 +59,7 @@ static int __devinit stmmac_probe_config_dt(struct platform_device *pdev,
- 	return 0;
- }
- #else
--static int __devinit stmmac_probe_config_dt(struct platform_device *pdev,
-+static int stmmac_probe_config_dt(struct platform_device *pdev,
- 					    struct plat_stmmacenet_data *plat,
- 					    const char **mac)
- {
-@@ -74,7 +74,7 @@ static int __devinit stmmac_probe_config_dt(struct platform_device *pdev,
-  * the necessary resources and invokes the main to init
-  * the net device, register the mdio bus etc.
-  */
--static int __devinit stmmac_pltfr_probe(struct platform_device *pdev)
-+static int stmmac_pltfr_probe(struct platform_device *pdev)
- {
- 	int ret = 0;
- 	struct resource *res;
-diff --git a/drivers/net/ethernet/sun/cassini.c b/drivers/net/ethernet/sun/cassini.c
-index 9d716c6..9c7f797 100644
---- a/drivers/net/ethernet/sun/cassini.c
-+++ b/drivers/net/ethernet/sun/cassini.c
-@@ -4820,7 +4820,7 @@ static int cas_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
-  * only subordinate device and we can tweak the bridge settings to
-  * reflect that fact.
-  */
--static void __devinit cas_program_bridge(struct pci_dev *cas_pdev)
-+static void cas_program_bridge(struct pci_dev *cas_pdev)
- {
- 	struct pci_dev *pdev = cas_pdev->bus->self;
- 	u32 val;
-@@ -4916,7 +4916,7 @@ static const struct net_device_ops cas_netdev_ops = {
- #endif
- };
  
--static int __devinit cas_init_one(struct pci_dev *pdev,
-+static int cas_init_one(struct pci_dev *pdev,
- 				  const struct pci_device_id *ent)
- {
- 	static int cas_version_printed = 0;
-diff --git a/drivers/net/ethernet/sun/niu.c b/drivers/net/ethernet/sun/niu.c
-index 94b0085..926ed9f 100644
---- a/drivers/net/ethernet/sun/niu.c
-+++ b/drivers/net/ethernet/sun/niu.c
-@@ -7977,7 +7977,7 @@ static int niu_set_ldg_sid(struct niu *np, int ldg, int func, int vector)
- 	return 0;
- }
- 
--static int __devinit niu_pci_eeprom_read(struct niu *np, u32 addr)
-+static int niu_pci_eeprom_read(struct niu *np, u32 addr)
- {
- 	u64 frame, frame_base = (ESPC_PIO_STAT_READ_START |
- 				 (addr << ESPC_PIO_STAT_ADDR_SHIFT));
-@@ -8020,7 +8020,7 @@ static int __devinit niu_pci_eeprom_read(struct niu *np, u32 addr)
- 	return (frame & ESPC_PIO_STAT_DATA) >> ESPC_PIO_STAT_DATA_SHIFT;
- }
- 
--static int __devinit niu_pci_eeprom_read16(struct niu *np, u32 off)
-+static int niu_pci_eeprom_read16(struct niu *np, u32 off)
- {
- 	int err = niu_pci_eeprom_read(np, off);
- 	u16 val;
-@@ -8036,7 +8036,7 @@ static int __devinit niu_pci_eeprom_read16(struct niu *np, u32 off)
- 	return val;
- }
- 
--static int __devinit niu_pci_eeprom_read16_swp(struct niu *np, u32 off)
-+static int niu_pci_eeprom_read16_swp(struct niu *np, u32 off)
- {
- 	int err = niu_pci_eeprom_read(np, off);
- 	u16 val;
-@@ -8054,7 +8054,7 @@ static int __devinit niu_pci_eeprom_read16_swp(struct niu *np, u32 off)
- 	return val;
- }
- 
--static int __devinit niu_pci_vpd_get_propname(struct niu *np,
-+static int niu_pci_vpd_get_propname(struct niu *np,
- 					      u32 off,
- 					      char *namebuf,
- 					      int namebuf_len)
-@@ -8075,7 +8075,7 @@ static int __devinit niu_pci_vpd_get_propname(struct niu *np,
- 	return i + 1;
- }
- 
--static void __devinit niu_vpd_parse_version(struct niu *np)
-+static void niu_vpd_parse_version(struct niu *np)
- {
- 	struct niu_vpd *vpd = &np->vpd;
- 	int len = strlen(vpd->version) + 1;
-@@ -8102,7 +8102,7 @@ static void __devinit niu_vpd_parse_version(struct niu *np)
- }
- 
- /* ESPC_PIO_EN_ENABLE must be set */
--static int __devinit niu_pci_vpd_scan_props(struct niu *np,
-+static int niu_pci_vpd_scan_props(struct niu *np,
- 					    u32 start, u32 end)
- {
- 	unsigned int found_mask = 0;
-@@ -8189,7 +8189,7 @@ static int __devinit niu_pci_vpd_scan_props(struct niu *np,
- }
- 
- /* ESPC_PIO_EN_ENABLE must be set */
--static void __devinit niu_pci_vpd_fetch(struct niu *np, u32 start)
-+static void niu_pci_vpd_fetch(struct niu *np, u32 start)
- {
- 	u32 offset;
- 	int err;
-@@ -8224,7 +8224,7 @@ static void __devinit niu_pci_vpd_fetch(struct niu *np, u32 start)
- }
- 
- /* ESPC_PIO_EN_ENABLE must be set */
--static u32 __devinit niu_pci_vpd_offset(struct niu *np)
-+static u32 niu_pci_vpd_offset(struct niu *np)
- {
- 	u32 start = 0, end = ESPC_EEPROM_SIZE, ret;
- 	int err;
-@@ -8279,7 +8279,7 @@ static u32 __devinit niu_pci_vpd_offset(struct niu *np)
- 	return 0;
- }
- 
--static int __devinit niu_phy_type_prop_decode(struct niu *np,
-+static int niu_phy_type_prop_decode(struct niu *np,
- 					      const char *phy_prop)
- {
- 	if (!strcmp(phy_prop, "mif")) {
-@@ -8334,7 +8334,7 @@ static int niu_pci_vpd_get_nports(struct niu *np)
- 	return ports;
- }
- 
--static void __devinit niu_pci_vpd_validate(struct niu *np)
-+static void niu_pci_vpd_validate(struct niu *np)
- {
- 	struct net_device *dev = np->dev;
- 	struct niu_vpd *vpd = &np->vpd;
-@@ -8380,7 +8380,7 @@ static void __devinit niu_pci_vpd_validate(struct niu *np)
- 	memcpy(dev->dev_addr, dev->perm_addr, dev->addr_len);
- }
- 
--static int __devinit niu_pci_probe_sprom(struct niu *np)
-+static int niu_pci_probe_sprom(struct niu *np)
- {
- 	struct net_device *dev = np->dev;
- 	int len, i;
-@@ -8538,7 +8538,7 @@ static int __devinit niu_pci_probe_sprom(struct niu *np)
- 	return 0;
- }
- 
--static int __devinit niu_get_and_validate_port(struct niu *np)
-+static int niu_get_and_validate_port(struct niu *np)
- {
- 	struct niu_parent *parent = np->parent;
- 
-@@ -8572,7 +8572,7 @@ static int __devinit niu_get_and_validate_port(struct niu *np)
- 	return 0;
- }
- 
--static int __devinit phy_record(struct niu_parent *parent,
-+static int phy_record(struct niu_parent *parent,
- 				struct phy_probe_info *p,
- 				int dev_id_1, int dev_id_2, u8 phy_port,
- 				int type)
-@@ -8611,7 +8611,7 @@ static int __devinit phy_record(struct niu_parent *parent,
- 	return 0;
- }
- 
--static int __devinit port_has_10g(struct phy_probe_info *p, int port)
-+static int port_has_10g(struct phy_probe_info *p, int port)
- {
- 	int i;
- 
-@@ -8627,7 +8627,7 @@ static int __devinit port_has_10g(struct phy_probe_info *p, int port)
- 	return 0;
- }
- 
--static int __devinit count_10g_ports(struct phy_probe_info *p, int *lowest)
-+static int count_10g_ports(struct phy_probe_info *p, int *lowest)
- {
- 	int port, cnt;
- 
-@@ -8644,7 +8644,7 @@ static int __devinit count_10g_ports(struct phy_probe_info *p, int *lowest)
- 	return cnt;
- }
- 
--static int __devinit count_1g_ports(struct phy_probe_info *p, int *lowest)
-+static int count_1g_ports(struct phy_probe_info *p, int *lowest)
- {
- 	*lowest = 32;
- 	if (p->cur[PHY_TYPE_MII])
-@@ -8653,7 +8653,7 @@ static int __devinit count_1g_ports(struct phy_probe_info *p, int *lowest)
- 	return p->cur[PHY_TYPE_MII];
- }
- 
--static void __devinit niu_n2_divide_channels(struct niu_parent *parent)
-+static void niu_n2_divide_channels(struct niu_parent *parent)
- {
- 	int num_ports = parent->num_ports;
- 	int i;
-@@ -8669,7 +8669,7 @@ static void __devinit niu_n2_divide_channels(struct niu_parent *parent)
- 	}
- }
- 
--static void __devinit niu_divide_channels(struct niu_parent *parent,
-+static void niu_divide_channels(struct niu_parent *parent,
- 					  int num_10g, int num_1g)
- {
- 	int num_ports = parent->num_ports;
-@@ -8731,7 +8731,7 @@ static void __devinit niu_divide_channels(struct niu_parent *parent,
- 	}
- }
- 
--static void __devinit niu_divide_rdc_groups(struct niu_parent *parent,
-+static void niu_divide_rdc_groups(struct niu_parent *parent,
- 					    int num_10g, int num_1g)
- {
- 	int i, num_ports = parent->num_ports;
-@@ -8776,7 +8776,7 @@ static void __devinit niu_divide_rdc_groups(struct niu_parent *parent,
- 	}
- }
- 
--static int __devinit fill_phy_probe_info(struct niu *np,
-+static int fill_phy_probe_info(struct niu *np,
- 					 struct niu_parent *parent,
- 					 struct phy_probe_info *info)
- {
-@@ -8819,7 +8819,7 @@ static int __devinit fill_phy_probe_info(struct niu *np,
- 	return err;
- }
- 
--static int __devinit walk_phys(struct niu *np, struct niu_parent *parent)
-+static int walk_phys(struct niu *np, struct niu_parent *parent)
- {
- 	struct phy_probe_info *info = &parent->phy_probe_info;
- 	int lowest_10g, lowest_1g;
-@@ -8948,7 +8948,7 @@ unknown_vg_1g_port:
- 	return -EINVAL;
- }
- 
--static int __devinit niu_probe_ports(struct niu *np)
-+static int niu_probe_ports(struct niu *np)
- {
- 	struct niu_parent *parent = np->parent;
- 	int err, i;
-@@ -8969,7 +8969,7 @@ static int __devinit niu_probe_ports(struct niu *np)
- 	return 0;
- }
- 
--static int __devinit niu_classifier_swstate_init(struct niu *np)
-+static int niu_classifier_swstate_init(struct niu *np)
- {
- 	struct niu_classifier *cp = &np->clas;
- 
-@@ -8981,7 +8981,7 @@ static int __devinit niu_classifier_swstate_init(struct niu *np)
- 	return fflp_early_init(np);
- }
- 
--static void __devinit niu_link_config_init(struct niu *np)
-+static void niu_link_config_init(struct niu *np)
- {
- 	struct niu_link_config *lp = &np->link_config;
- 
-@@ -9006,7 +9006,7 @@ static void __devinit niu_link_config_init(struct niu *np)
- #endif
- }
- 
--static int __devinit niu_init_mac_ipp_pcs_base(struct niu *np)
-+static int niu_init_mac_ipp_pcs_base(struct niu *np)
- {
- 	switch (np->port) {
- 	case 0:
-@@ -9045,7 +9045,7 @@ static int __devinit niu_init_mac_ipp_pcs_base(struct niu *np)
- 	return 0;
- }
- 
--static void __devinit niu_try_msix(struct niu *np, u8 *ldg_num_map)
-+static void niu_try_msix(struct niu *np, u8 *ldg_num_map)
- {
- 	struct msix_entry msi_vec[NIU_NUM_LDG];
- 	struct niu_parent *parent = np->parent;
-@@ -9084,7 +9084,7 @@ retry:
- 	np->num_ldg = num_irqs;
- }
- 
--static int __devinit niu_n2_irq_init(struct niu *np, u8 *ldg_num_map)
-+static int niu_n2_irq_init(struct niu *np, u8 *ldg_num_map)
- {
- #ifdef CONFIG_SPARC64
- 	struct platform_device *op = np->op;
-@@ -9108,7 +9108,7 @@ static int __devinit niu_n2_irq_init(struct niu *np, u8 *ldg_num_map)
- #endif
- }
- 
--static int __devinit niu_ldg_init(struct niu *np)
-+static int niu_ldg_init(struct niu *np)
- {
- 	struct niu_parent *parent = np->parent;
- 	u8 ldg_num_map[NIU_NUM_LDG];
-@@ -9231,7 +9231,7 @@ static void __devexit niu_ldg_free(struct niu *np)
- 		pci_disable_msix(np->pdev);
- }
- 
--static int __devinit niu_get_of_props(struct niu *np)
-+static int niu_get_of_props(struct niu *np)
- {
- #ifdef CONFIG_SPARC64
- 	struct net_device *dev = np->dev;
-@@ -9300,7 +9300,7 @@ static int __devinit niu_get_of_props(struct niu *np)
- #endif
- }
- 
--static int __devinit niu_get_invariants(struct niu *np)
-+static int niu_get_invariants(struct niu *np)
- {
- 	int err, have_props;
- 	u32 offset;
-@@ -9479,7 +9479,7 @@ static struct device_attribute niu_parent_attributes[] = {
- 	{}
- };
- 
--static struct niu_parent * __devinit niu_new_parent(struct niu *np,
-+static struct niu_parent *niu_new_parent(struct niu *np,
- 						    union niu_parent_id *id,
- 						    u8 ptype)
- {
-@@ -9544,7 +9544,7 @@ fail_unregister:
- 	return NULL;
- }
- 
--static struct niu_parent * __devinit niu_get_parent(struct niu *np,
-+static struct niu_parent *niu_get_parent(struct niu *np,
- 						    union niu_parent_id *id,
- 						    u8 ptype)
- {
-@@ -9662,7 +9662,7 @@ static const struct niu_ops niu_pci_ops = {
- 	.unmap_single	= niu_pci_unmap_single,
- };
- 
--static void __devinit niu_driver_version(void)
-+static void niu_driver_version(void)
- {
- 	static int niu_version_printed;
- 
-@@ -9670,7 +9670,7 @@ static void __devinit niu_driver_version(void)
- 		pr_info("%s", version);
- }
- 
--static struct net_device * __devinit niu_alloc_and_init(
-+static struct net_device *niu_alloc_and_init(
- 	struct device *gen_dev, struct pci_dev *pdev,
- 	struct platform_device *op, const struct niu_ops *ops,
- 	u8 port)
-@@ -9714,14 +9714,14 @@ static const struct net_device_ops niu_netdev_ops = {
- 	.ndo_change_mtu		= niu_change_mtu,
- };
- 
--static void __devinit niu_assign_netdev_ops(struct net_device *dev)
-+static void niu_assign_netdev_ops(struct net_device *dev)
- {
- 	dev->netdev_ops = &niu_netdev_ops;
- 	dev->ethtool_ops = &niu_ethtool_ops;
- 	dev->watchdog_timeo = NIU_TX_TIMEOUT;
- }
- 
--static void __devinit niu_device_announce(struct niu *np)
-+static void niu_device_announce(struct niu *np)
- {
- 	struct net_device *dev = np->dev;
- 
-@@ -9750,13 +9750,13 @@ static void __devinit niu_device_announce(struct niu *np)
- 	}
- }
- 
--static void __devinit niu_set_basic_features(struct net_device *dev)
-+static void niu_set_basic_features(struct net_device *dev)
- {
- 	dev->hw_features = NETIF_F_SG | NETIF_F_HW_CSUM | NETIF_F_RXHASH;
- 	dev->features |= dev->hw_features | NETIF_F_RXCSUM;
- }
- 
--static int __devinit niu_pci_init_one(struct pci_dev *pdev,
-+static int niu_pci_init_one(struct pci_dev *pdev,
- 				      const struct pci_device_id *ent)
- {
- 	union niu_parent_id parent_id;
-@@ -10044,7 +10044,7 @@ static const struct niu_ops niu_phys_ops = {
- 	.unmap_single	= niu_phys_unmap_single,
- };
- 
--static int __devinit niu_of_probe(struct platform_device *op)
-+static int niu_of_probe(struct platform_device *op)
- {
- 	union niu_parent_id parent_id;
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/sun/sunbmac.c b/drivers/net/ethernet/sun/sunbmac.c
-index 41609b8..70d46b6 100644
---- a/drivers/net/ethernet/sun/sunbmac.c
-+++ b/drivers/net/ethernet/sun/sunbmac.c
-@@ -1074,7 +1074,7 @@ static const struct net_device_ops bigmac_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- };
- 
--static int __devinit bigmac_ether_init(struct platform_device *op,
-+static int bigmac_ether_init(struct platform_device *op,
- 				       struct platform_device *qec_op)
- {
- 	static int version_printed;
-@@ -1233,7 +1233,7 @@ fail_and_cleanup:
- /* QEC can be the parent of either QuadEthernet or a BigMAC.  We want
-  * the latter.
-  */
--static int __devinit bigmac_sbus_probe(struct platform_device *op)
-+static int bigmac_sbus_probe(struct platform_device *op)
- {
- 	struct device *parent = op->dev.parent;
- 	struct platform_device *qec_op;
-diff --git a/drivers/net/ethernet/sun/sungem.c b/drivers/net/ethernet/sun/sungem.c
-index 6c8695e..fd0e61d 100644
---- a/drivers/net/ethernet/sun/sungem.c
-+++ b/drivers/net/ethernet/sun/sungem.c
-@@ -2763,7 +2763,7 @@ static void get_gem_mac_nonobp(struct pci_dev *pdev, unsigned char *dev_addr)
- }
- #endif /* not Sparc and not PPC */
- 
--static int __devinit gem_get_device_address(struct gem *gp)
-+static int gem_get_device_address(struct gem *gp)
- {
- #if defined(CONFIG_SPARC) || defined(CONFIG_PPC_PMAC)
- 	struct net_device *dev = gp->dev;
-@@ -2827,7 +2827,7 @@ static const struct net_device_ops gem_netdev_ops = {
- #endif
- };
- 
--static int __devinit gem_init_one(struct pci_dev *pdev,
-+static int gem_init_one(struct pci_dev *pdev,
- 				  const struct pci_device_id *ent)
- {
- 	unsigned long gemreg_base, gemreg_len;
-diff --git a/drivers/net/ethernet/sun/sunhme.c b/drivers/net/ethernet/sun/sunhme.c
-index 61147c2..2454bd7 100644
---- a/drivers/net/ethernet/sun/sunhme.c
-+++ b/drivers/net/ethernet/sun/sunhme.c
-@@ -2499,7 +2499,7 @@ static int hme_version_printed;
-  *
-  * Return NULL on failure.
-  */
--static struct quattro * __devinit quattro_sbus_find(struct platform_device *child)
-+static struct quattro *quattro_sbus_find(struct platform_device *child)
- {
- 	struct device *parent = child->dev.parent;
- 	struct platform_device *op;
-@@ -2580,7 +2580,7 @@ static void quattro_sbus_free_irqs(void)
- #endif /* CONFIG_SBUS */
- 
- #ifdef CONFIG_PCI
--static struct quattro * __devinit quattro_pci_find(struct pci_dev *pdev)
-+static struct quattro *quattro_pci_find(struct pci_dev *pdev)
- {
- 	struct pci_dev *bdev = pdev->bus->self;
- 	struct quattro *qp;
-@@ -2623,7 +2623,7 @@ static const struct net_device_ops hme_netdev_ops = {
- };
- 
- #ifdef CONFIG_SBUS
--static int __devinit happy_meal_sbus_probe_one(struct platform_device *op, int is_qfe)
-+static int happy_meal_sbus_probe_one(struct platform_device *op, int is_qfe)
- {
- 	struct device_node *dp = op->dev.of_node, *sbus_dp;
- 	struct quattro *qp = NULL;
-@@ -2927,7 +2927,7 @@ static void get_hme_mac_nonsparc(struct pci_dev *pdev, unsigned char *dev_addr)
- }
- #endif /* !(CONFIG_SPARC) */
- 
--static int __devinit happy_meal_pci_probe(struct pci_dev *pdev,
-+static int happy_meal_pci_probe(struct pci_dev *pdev,
+-static int __devinit intelfb_pci_register(struct pci_dev *pdev,
++static int intelfb_pci_register(struct pci_dev *pdev,
  					  const struct pci_device_id *ent)
  {
- 	struct quattro *qp = NULL;
-@@ -3216,7 +3216,7 @@ static void happy_meal_pci_exit(void)
+ 	struct fb_info *info;
+@@ -970,7 +970,7 @@ static __inline__ int var_to_refresh(const struct fb_var_screeninfo *var)
+  *                Various intialisation functions              *
+  ***************************************************************/
  
- #ifdef CONFIG_SBUS
- static const struct of_device_id hme_sbus_match[];
--static int __devinit hme_sbus_probe(struct platform_device *op)
-+static int hme_sbus_probe(struct platform_device *op)
+-static void __devinit get_initial_mode(struct intelfb_info *dinfo)
++static void get_initial_mode(struct intelfb_info *dinfo)
  {
- 	const struct of_device_id *match;
- 	struct device_node *dp = op->dev.of_node;
-diff --git a/drivers/net/ethernet/sun/sunqe.c b/drivers/net/ethernet/sun/sunqe.c
-index 10b0f50..14e1523 100644
---- a/drivers/net/ethernet/sun/sunqe.c
-+++ b/drivers/net/ethernet/sun/sunqe.c
-@@ -744,7 +744,7 @@ static void qec_init_once(struct sunqec *qecp, struct platform_device *op)
- 		    qecp->gregs + GLOB_RSIZE);
- }
- 
--static u8 __devinit qec_get_burst(struct device_node *dp)
-+static u8 qec_get_burst(struct device_node *dp)
- {
- 	u8 bsizes, bsizes_more;
- 
-@@ -764,7 +764,7 @@ static u8 __devinit qec_get_burst(struct device_node *dp)
- 	return bsizes;
- }
- 
--static struct sunqec * __devinit get_qec(struct platform_device *child)
-+static struct sunqec *get_qec(struct platform_device *child)
- {
- 	struct platform_device *op = to_platform_device(child->dev.parent);
- 	struct sunqec *qecp;
-@@ -830,7 +830,7 @@ static const struct net_device_ops qec_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- };
- 
--static int __devinit qec_ether_init(struct platform_device *op)
-+static int qec_ether_init(struct platform_device *op)
- {
- 	static unsigned version_printed;
- 	struct net_device *dev;
-@@ -929,7 +929,7 @@ fail:
- 	return res;
- }
- 
--static int __devinit qec_sbus_probe(struct platform_device *op)
-+static int qec_sbus_probe(struct platform_device *op)
- {
- 	return qec_ether_init(op);
- }
-diff --git a/drivers/net/ethernet/sun/sunvnet.c b/drivers/net/ethernet/sun/sunvnet.c
-index a108db3..d94563b 100644
---- a/drivers/net/ethernet/sun/sunvnet.c
-+++ b/drivers/net/ethernet/sun/sunvnet.c
-@@ -937,7 +937,7 @@ static void vnet_port_free_tx_bufs(struct vnet_port *port)
+ 	struct fb_var_screeninfo *var;
+ 	int xtot, ytot;
+@@ -1037,7 +1037,7 @@ static void __devinit get_initial_mode(struct intelfb_info *dinfo)
  	}
  }
  
--static int __devinit vnet_port_alloc_tx_bufs(struct vnet_port *port)
-+static int vnet_port_alloc_tx_bufs(struct vnet_port *port)
+-static int __devinit intelfb_init_var(struct intelfb_info *dinfo)
++static int intelfb_init_var(struct intelfb_info *dinfo)
  {
- 	struct vio_dring_state *dr;
- 	unsigned long len;
-@@ -1019,7 +1019,7 @@ static const struct net_device_ops vnet_ops = {
- 	.ndo_start_xmit		= vnet_start_xmit,
- };
- 
--static struct vnet * __devinit vnet_new(const u64 *local_mac)
-+static struct vnet *vnet_new(const u64 *local_mac)
- {
- 	struct net_device *dev;
- 	struct vnet *vp;
-@@ -1067,7 +1067,7 @@ err_out_free_dev:
- 	return ERR_PTR(err);
+ 	struct fb_var_screeninfo *var;
+ 	int msrc = 0;
+@@ -1118,7 +1118,7 @@ static int __devinit intelfb_init_var(struct intelfb_info *dinfo)
+ 	return 0;
  }
  
--static struct vnet * __devinit vnet_find_or_create(const u64 *local_mac)
-+static struct vnet *vnet_find_or_create(const u64 *local_mac)
+-static int __devinit intelfb_set_fbinfo(struct intelfb_info *dinfo)
++static int intelfb_set_fbinfo(struct intelfb_info *dinfo)
  {
- 	struct vnet *iter, *vp;
+ 	struct fb_info *info = dinfo->info;
  
-@@ -1088,7 +1088,7 @@ static struct vnet * __devinit vnet_find_or_create(const u64 *local_mac)
- 
- static const char *local_mac_prop = "local-mac-address";
- 
--static struct vnet * __devinit vnet_find_parent(struct mdesc_handle *hp,
-+static struct vnet *vnet_find_parent(struct mdesc_handle *hp,
- 						u64 port_node)
- {
- 	const u64 *local_mac = NULL;
-@@ -1125,14 +1125,14 @@ static struct vio_driver_ops vnet_vio_ops = {
- 	.handshake_complete	= vnet_handshake_complete,
+diff --git a/drivers/video/jz4740_fb.c b/drivers/video/jz4740_fb.c
+index cb867b6..f5c645a 100644
+--- a/drivers/video/jz4740_fb.c
++++ b/drivers/video/jz4740_fb.c
+@@ -619,7 +619,7 @@ static struct  fb_ops jzfb_ops = {
+ 	.fb_setcolreg = jzfb_setcolreg,
  };
  
--static void __devinit print_version(void)
-+static void print_version(void)
+-static int __devinit jzfb_probe(struct platform_device *pdev)
++static int jzfb_probe(struct platform_device *pdev)
  {
- 	printk_once(KERN_INFO "%s", version);
+ 	int ret;
+ 	struct jzfb *jzfb;
+diff --git a/drivers/video/kyro/fbdev.c b/drivers/video/kyro/fbdev.c
+index 2293f6a..2c498d8 100644
+--- a/drivers/video/kyro/fbdev.c
++++ b/drivers/video/kyro/fbdev.c
+@@ -667,7 +667,7 @@ static struct fb_ops kyrofb_ops = {
+ 	.fb_imageblit	= cfb_imageblit,
+ };
+ 
+-static int __devinit kyrofb_probe(struct pci_dev *pdev,
++static int kyrofb_probe(struct pci_dev *pdev,
+ 				  const struct pci_device_id *ent)
+ {
+ 	struct fb_info *info;
+diff --git a/drivers/video/leo.c b/drivers/video/leo.c
+index 52a8678..8c64c79 100644
+--- a/drivers/video/leo.c
++++ b/drivers/video/leo.c
+@@ -547,7 +547,7 @@ static void leo_unmap_regs(struct platform_device *op, struct fb_info *info,
+ 		of_iounmap(&op->resource[0], info->screen_base, 0x800000);
  }
  
- const char *remote_macaddr_prop = "remote-mac-address";
- 
--static int __devinit vnet_port_probe(struct vio_dev *vdev,
-+static int vnet_port_probe(struct vio_dev *vdev,
- 				     const struct vio_device_id *id)
+-static int __devinit leo_probe(struct platform_device *op)
++static int leo_probe(struct platform_device *op)
  {
- 	struct mdesc_handle *hp;
-diff --git a/drivers/net/ethernet/tehuti/tehuti.c b/drivers/net/ethernet/tehuti/tehuti.c
-index 5f6d1f0..d6e1937 100644
---- a/drivers/net/ethernet/tehuti/tehuti.c
-+++ b/drivers/net/ethernet/tehuti/tehuti.c
-@@ -1914,7 +1914,7 @@ static const struct net_device_ops bdx_netdev_ops = {
+ 	struct device_node *dp = op->dev.of_node;
+ 	struct fb_info *info;
+diff --git a/drivers/video/mb862xx/mb862xxfbdrv.c b/drivers/video/mb862xx/mb862xxfbdrv.c
+index 3025cbb..9f88328 100644
+--- a/drivers/video/mb862xx/mb862xxfbdrv.c
++++ b/drivers/video/mb862xx/mb862xxfbdrv.c
+@@ -668,7 +668,7 @@ static int mb862xx_gdc_init(struct mb862xxfb_par *par)
+ 	return 0;
+ }
+ 
+-static int __devinit of_platform_mb862xx_probe(struct platform_device *ofdev)
++static int of_platform_mb862xx_probe(struct platform_device *ofdev)
+ {
+ 	struct device_node *np = ofdev->dev.of_node;
+ 	struct device *dev = &ofdev->dev;
+@@ -995,7 +995,7 @@ static struct pci_device_id mb862xx_pci_tbl[] __devinitdata = {
+ 
+ MODULE_DEVICE_TABLE(pci, mb862xx_pci_tbl);
+ 
+-static int __devinit mb862xx_pci_probe(struct pci_dev *pdev,
++static int mb862xx_pci_probe(struct pci_dev *pdev,
+ 				       const struct pci_device_id *ent)
+ {
+ 	struct mb862xxfb_par *par;
+@@ -1178,7 +1178,7 @@ static struct pci_driver mb862xxfb_pci_driver = {
+ };
+ #endif
+ 
+-static int __devinit mb862xxfb_init(void)
++static int mb862xxfb_init(void)
+ {
+ 	int ret = -ENODEV;
+ 
+diff --git a/drivers/video/mbx/mbxdebugfs.c b/drivers/video/mbx/mbxdebugfs.c
+index 12dec76..474f94f 100644
+--- a/drivers/video/mbx/mbxdebugfs.c
++++ b/drivers/video/mbx/mbxdebugfs.c
+@@ -213,7 +213,7 @@ static const struct file_operations misc_fops = {
+ 	.llseek = default_llseek,
+ };
+ 
+-static void __devinit mbxfb_debugfs_init(struct fb_info *fbi)
++static void mbxfb_debugfs_init(struct fb_info *fbi)
+ {
+ 	struct mbxfb_info *mfbi = fbi->par;
+ 	struct mbxfb_debugfs_data *dbg;
+diff --git a/drivers/video/mbx/mbxfb.c b/drivers/video/mbx/mbxfb.c
+index a8ba922..91bf913 100644
+--- a/drivers/video/mbx/mbxfb.c
++++ b/drivers/video/mbx/mbxfb.c
+@@ -687,7 +687,7 @@ static struct fb_ops mbxfb_ops = {
+   Enable external SDRAM controller. Assume that all clocks are active
+   by now.
+ */
+-static void __devinit setup_memc(struct fb_info *fbi)
++static void setup_memc(struct fb_info *fbi)
+ {
+ 	unsigned long tmp;
+ 	int i;
+@@ -747,7 +747,7 @@ static void enable_clocks(struct fb_info *fbi)
+ 	write_reg_dly(0x00000001, PIXCLKDIV);
+ }
+ 
+-static void __devinit setup_graphics(struct fb_info *fbi)
++static void setup_graphics(struct fb_info *fbi)
+ {
+ 	unsigned long gsctrl;
+ 	unsigned long vscadr;
+@@ -781,7 +781,7 @@ static void __devinit setup_graphics(struct fb_info *fbi)
+ 	write_reg_dly(vscadr, VSCADR);
+ }
+ 
+-static void __devinit setup_display(struct fb_info *fbi)
++static void setup_display(struct fb_info *fbi)
+ {
+ 	unsigned long dsctrl = 0;
+ 
+@@ -795,7 +795,7 @@ static void __devinit setup_display(struct fb_info *fbi)
+ 	write_reg_dly((readl(DSCTRL) | DSCTRL_SYNCGEN_EN), DSCTRL);
+ }
+ 
+-static void __devinit enable_controller(struct fb_info *fbi)
++static void enable_controller(struct fb_info *fbi)
+ {
+ 	u32 svctrl, shctrl;
+ 
+@@ -881,7 +881,7 @@ static int mbxfb_resume(struct platform_device *dev)
+ 
+ #define res_size(_r) (((_r)->end - (_r)->start) + 1)
+ 
+-static int __devinit mbxfb_probe(struct platform_device *dev)
++static int mbxfb_probe(struct platform_device *dev)
+ {
+ 	int ret;
+ 	struct fb_info *fbi;
+diff --git a/drivers/video/metronomefb.c b/drivers/video/metronomefb.c
+index c0c358c..d148067 100644
+--- a/drivers/video/metronomefb.c
++++ b/drivers/video/metronomefb.c
+@@ -167,7 +167,7 @@ static u16 calc_img_cksum(u16 *start, int length)
+ }
+ 
+ /* here we decode the incoming waveform file and populate metromem */
+-static int __devinit load_waveform(u8 *mem, size_t size, int m, int t,
++static int load_waveform(u8 *mem, size_t size, int m, int t,
+ 				struct metronomefb_par *par)
+ {
+ 	int tta;
+@@ -338,7 +338,7 @@ static int metronome_display_cmd(struct metronomefb_par *par)
+ 	return par->board->met_wait_event_intr(par);
+ }
+ 
+-static int __devinit metronome_powerup_cmd(struct metronomefb_par *par)
++static int metronome_powerup_cmd(struct metronomefb_par *par)
+ {
+ 	int i;
+ 	u16 cs;
+@@ -367,7 +367,7 @@ static int __devinit metronome_powerup_cmd(struct metronomefb_par *par)
+ 	return par->board->met_wait_event(par);
+ }
+ 
+-static int __devinit metronome_config_cmd(struct metronomefb_par *par)
++static int metronome_config_cmd(struct metronomefb_par *par)
+ {
+ 	/* setup config command
+ 	we can't immediately set the opcode since the controller
+@@ -385,7 +385,7 @@ static int __devinit metronome_config_cmd(struct metronomefb_par *par)
+ 	return par->board->met_wait_event(par);
+ }
+ 
+-static int __devinit metronome_init_cmd(struct metronomefb_par *par)
++static int metronome_init_cmd(struct metronomefb_par *par)
+ {
+ 	int i;
+ 	u16 cs;
+@@ -411,7 +411,7 @@ static int __devinit metronome_init_cmd(struct metronomefb_par *par)
+ 	return par->board->met_wait_event(par);
+ }
+ 
+-static int __devinit metronome_init_regs(struct metronomefb_par *par)
++static int metronome_init_regs(struct metronomefb_par *par)
+ {
+ 	int res;
+ 
+@@ -569,7 +569,7 @@ static struct fb_deferred_io metronomefb_defio = {
+ 	.deferred_io	= metronomefb_dpy_deferred_io,
+ };
+ 
+-static int __devinit metronomefb_probe(struct platform_device *dev)
++static int metronomefb_probe(struct platform_device *dev)
+ {
+ 	struct fb_info *info;
+ 	struct metronome_board *board;
+diff --git a/drivers/video/msm/mddi.c b/drivers/video/msm/mddi.c
+index 35ac9e8..88e9f41c 100644
+--- a/drivers/video/msm/mddi.c
++++ b/drivers/video/msm/mddi.c
+@@ -417,7 +417,7 @@ static void mddi_resume(struct msm_mddi_client_data *cdata)
+ 	mddi_set_auto_hibernate(&mddi->client_data, 1);
+ }
+ 
+-static int __devinit mddi_get_client_caps(struct mddi_info *mddi)
++static int mddi_get_client_caps(struct mddi_info *mddi)
+ {
+ 	int i, j;
+ 
+@@ -619,7 +619,7 @@ uint32_t mddi_remote_read(struct msm_mddi_client_data *cdata, uint32_t reg)
+ 
+ static struct mddi_info mddi_info[2];
+ 
+-static int __devinit mddi_clk_setup(struct platform_device *pdev,
++static int mddi_clk_setup(struct platform_device *pdev,
+ 				    struct mddi_info *mddi,
+ 				    unsigned long clk_rate)
+ {
+@@ -664,7 +664,7 @@ static int __init mddi_rev_data_setup(struct mddi_info *mddi)
+ 	return 0;
+ }
+ 
+-static int __devinit mddi_probe(struct platform_device *pdev)
++static int mddi_probe(struct platform_device *pdev)
+ {
+ 	struct msm_mddi_platform_data *pdata = pdev->dev.platform_data;
+ 	struct mddi_info *mddi = &mddi_info[pdev->id];
+diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+index ddac96d..be26b36 100644
+--- a/drivers/video/mxsfb.c
++++ b/drivers/video/mxsfb.c
+@@ -586,7 +586,7 @@ static struct fb_ops mxsfb_ops = {
+ 	.fb_imageblit = cfb_imageblit,
+ };
+ 
+-static int __devinit mxsfb_restore_mode(struct mxsfb_info *host)
++static int mxsfb_restore_mode(struct mxsfb_info *host)
+ {
+ 	struct fb_info *fb_info = &host->fb_info;
+ 	unsigned line_count;
+@@ -677,7 +677,7 @@ static int __devinit mxsfb_restore_mode(struct mxsfb_info *host)
+ 	return 0;
+ }
+ 
+-static int __devinit mxsfb_init_fbinfo(struct mxsfb_info *host)
++static int mxsfb_init_fbinfo(struct mxsfb_info *host)
+ {
+ 	struct fb_info *fb_info = &host->fb_info;
+ 	struct fb_var_screeninfo *var = &fb_info->var;
+@@ -772,7 +772,7 @@ static const struct of_device_id mxsfb_dt_ids[] = {
+ };
+ MODULE_DEVICE_TABLE(of, mxsfb_dt_ids);
+ 
+-static int __devinit mxsfb_probe(struct platform_device *pdev)
++static int mxsfb_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *of_id =
+ 			of_match_device(mxsfb_dt_ids, &pdev->dev);
+diff --git a/drivers/video/neofb.c b/drivers/video/neofb.c
+index 15c3bef..4cd9e6d 100644
+--- a/drivers/video/neofb.c
++++ b/drivers/video/neofb.c
+@@ -1646,7 +1646,7 @@ static struct fb_videomode __devinitdata mode800x480 = {
+ 	.vmode          = FB_VMODE_NONINTERLACED
+ };
+ 
+-static int __devinit neo_map_mmio(struct fb_info *info,
++static int neo_map_mmio(struct fb_info *info,
+ 				  struct pci_dev *dev)
+ {
+ 	struct neofb_par *par = info->par;
+@@ -1707,7 +1707,7 @@ static void neo_unmap_mmio(struct fb_info *info)
+ 			   info->fix.mmio_len);
+ }
+ 
+-static int __devinit neo_map_video(struct fb_info *info,
++static int neo_map_video(struct fb_info *info,
+ 				   struct pci_dev *dev, int video_len)
+ {
+ 	//unsigned long addr;
+@@ -1772,7 +1772,7 @@ static void neo_unmap_video(struct fb_info *info)
+ 			   info->fix.smem_len);
+ }
+ 
+-static int __devinit neo_scan_monitor(struct fb_info *info)
++static int neo_scan_monitor(struct fb_info *info)
+ {
+ 	struct neofb_par *par = info->par;
+ 	unsigned char type, display;
+@@ -1851,7 +1851,7 @@ static int __devinit neo_scan_monitor(struct fb_info *info)
+ 	return 0;
+ }
+ 
+-static int __devinit neo_init_hw(struct fb_info *info)
++static int neo_init_hw(struct fb_info *info)
+ {
+ 	struct neofb_par *par = info->par;
+ 	int videoRam = 896;
+@@ -1939,7 +1939,7 @@ static int __devinit neo_init_hw(struct fb_info *info)
+ }
+ 
+ 
+-static struct fb_info *__devinit neo_alloc_fb_info(struct pci_dev *dev, const struct
++static struct fb_info *neo_alloc_fb_info(struct pci_dev *dev, const struct
+ 						   pci_device_id *id)
+ {
+ 	struct fb_info *info;
+@@ -2038,7 +2038,7 @@ static void neo_free_fb_info(struct fb_info *info)
+ 
+ /* --------------------------------------------------------------------- */
+ 
+-static int __devinit neofb_probe(struct pci_dev *dev,
++static int neofb_probe(struct pci_dev *dev,
+ 				 const struct pci_device_id *id)
+ {
+ 	struct fb_info *info;
+diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
+index 475dfee..32581c7 100644
+--- a/drivers/video/nuc900fb.c
++++ b/drivers/video/nuc900fb.c
+@@ -387,7 +387,7 @@ static int nuc900fb_init_registers(struct fb_info *info)
+  *    The buffer should be a non-cached, non-buffered, memory region
+  *    to allow palette and pixel writes without flushing the cache.
   */
- 
- /* TBD: netif_msg should be checked and implemented. I disable it for now */
--static int __devinit
-+static int
- bdx_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+-static int __devinit nuc900fb_map_video_memory(struct fb_info *info)
++static int nuc900fb_map_video_memory(struct fb_info *info)
  {
- 	struct net_device *ndev;
-diff --git a/drivers/net/ethernet/ti/cpmac.c b/drivers/net/ethernet/ti/cpmac.c
-index 723cba0..74c7200 100644
---- a/drivers/net/ethernet/ti/cpmac.c
-+++ b/drivers/net/ethernet/ti/cpmac.c
-@@ -1110,7 +1110,7 @@ static const struct net_device_ops cpmac_netdev_ops = {
+ 	struct nuc900fb_info *fbi = info->par;
+ 	dma_addr_t map_dma;
+@@ -499,7 +499,7 @@ static inline void nuc900fb_cpufreq_deregister(struct nuc900fb_info *info)
  
- static int external_switch;
+ static char driver_name[] = "nuc900fb";
  
--static int __devinit cpmac_probe(struct platform_device *pdev)
-+static int cpmac_probe(struct platform_device *pdev)
+-static int __devinit nuc900fb_probe(struct platform_device *pdev)
++static int nuc900fb_probe(struct platform_device *pdev)
  {
- 	int rc, phy_id;
- 	char mdio_bus_id[MII_BUS_ID_SIZE];
-@@ -1219,7 +1219,7 @@ static struct platform_driver cpmac_driver = {
- 	.remove = cpmac_remove,
+ 	struct nuc900fb_info *fbi;
+ 	struct nuc900fb_display *display;
+diff --git a/drivers/video/nvidia/nvidia.c b/drivers/video/nvidia/nvidia.c
+index 0bbed28..ca8963c 100644
+--- a/drivers/video/nvidia/nvidia.c
++++ b/drivers/video/nvidia/nvidia.c
+@@ -1105,7 +1105,7 @@ fail:
+ #define nvidiafb_resume NULL
+ #endif
+ 
+-static int __devinit nvidia_set_fbinfo(struct fb_info *info)
++static int nvidia_set_fbinfo(struct fb_info *info)
+ {
+ 	struct fb_monspecs *specs = &info->monspecs;
+ 	struct fb_videomode modedb;
+@@ -1201,7 +1201,7 @@ static int __devinit nvidia_set_fbinfo(struct fb_info *info)
+ 	return nvidiafb_check_var(&info->var, info);
+ }
+ 
+-static u32 __devinit nvidia_get_chipset(struct fb_info *info)
++static u32 nvidia_get_chipset(struct fb_info *info)
+ {
+ 	struct nvidia_par *par = info->par;
+ 	u32 id = (par->pci_dev->vendor << 16) | par->pci_dev->device;
+@@ -1224,7 +1224,7 @@ static u32 __devinit nvidia_get_chipset(struct fb_info *info)
+ 	return id;
+ }
+ 
+-static u32 __devinit nvidia_get_arch(struct fb_info *info)
++static u32 nvidia_get_arch(struct fb_info *info)
+ {
+ 	struct nvidia_par *par = info->par;
+ 	u32 arch = 0;
+@@ -1276,7 +1276,7 @@ static u32 __devinit nvidia_get_arch(struct fb_info *info)
+ 	return arch;
+ }
+ 
+-static int __devinit nvidiafb_probe(struct pci_dev *pd,
++static int nvidiafb_probe(struct pci_dev *pd,
+ 				    const struct pci_device_id *ent)
+ {
+ 	struct nvidia_par *par;
+@@ -1473,7 +1473,7 @@ static void __devexit nvidiafb_remove(struct pci_dev *pd)
+  * ------------------------------------------------------------------------- */
+ 
+ #ifndef MODULE
+-static int __devinit nvidiafb_setup(char *options)
++static int nvidiafb_setup(char *options)
+ {
+ 	char *this_opt;
+ 
+@@ -1538,7 +1538,7 @@ static struct pci_driver nvidiafb_driver = {
+  *
+  * ------------------------------------------------------------------------- */
+ 
+-static int __devinit nvidiafb_init(void)
++static int nvidiafb_init(void)
+ {
+ #ifndef MODULE
+ 	char *option = NULL;
+diff --git a/drivers/video/omap2/displays/panel-lgphilips-lb035q02.c b/drivers/video/omap2/displays/panel-lgphilips-lb035q02.c
+index bae244f..4ed48af 100644
+--- a/drivers/video/omap2/displays/panel-lgphilips-lb035q02.c
++++ b/drivers/video/omap2/displays/panel-lgphilips-lb035q02.c
+@@ -250,7 +250,7 @@ static void init_lb035q02_panel(struct spi_device *spi)
+ 	lb035q02_write_reg(spi, 0x3b, 0x0806);
+ }
+ 
+-static int __devinit lb035q02_panel_spi_probe(struct spi_device *spi)
++static int lb035q02_panel_spi_probe(struct spi_device *spi)
+ {
+ 	init_lb035q02_panel(spi);
+ 	return omap_dss_register_driver(&lb035q02_driver);
+diff --git a/drivers/video/p9100.c b/drivers/video/p9100.c
+index f402a69..62d8339 100644
+--- a/drivers/video/p9100.c
++++ b/drivers/video/p9100.c
+@@ -249,7 +249,7 @@ static void p9100_init_fix(struct fb_info *info, int linebytes, struct device_no
+ 	info->fix.accel = FB_ACCEL_SUN_CGTHREE;
+ }
+ 
+-static int __devinit p9100_probe(struct platform_device *op)
++static int p9100_probe(struct platform_device *op)
+ {
+ 	struct device_node *dp = op->dev.of_node;
+ 	struct fb_info *info;
+diff --git a/drivers/video/platinumfb.c b/drivers/video/platinumfb.c
+index 6694923..f638002 100644
+--- a/drivers/video/platinumfb.c
++++ b/drivers/video/platinumfb.c
+@@ -313,7 +313,7 @@ static void platinum_set_hardware(struct fb_info_platinum *pinfo)
+ /*
+  * Set misc info vars for this driver
+  */
+-static void __devinit platinum_init_info(struct fb_info *info, struct fb_info_platinum *pinfo)
++static void platinum_init_info(struct fb_info *info, struct fb_info_platinum *pinfo)
+ {
+ 	/* Fill fb_info */
+ 	info->fbops = &platinumfb_ops;
+@@ -338,7 +338,7 @@ static void __devinit platinum_init_info(struct fb_info *info, struct fb_info_pl
+ }
+ 
+ 
+-static int __devinit platinum_init_fb(struct fb_info *info)
++static int platinum_init_fb(struct fb_info *info)
+ {
+ 	struct fb_info_platinum *pinfo = info->par;
+ 	struct fb_var_screeninfo var;
+@@ -533,7 +533,7 @@ static int __init platinumfb_setup(char *options)
+ #define invalidate_cache(addr)
+ #endif
+ 
+-static int __devinit platinumfb_probe(struct platform_device* odev)
++static int platinumfb_probe(struct platform_device* odev)
+ {
+ 	struct device_node	*dp = odev->dev.of_node;
+ 	struct fb_info		*info;
+diff --git a/drivers/video/pm2fb.c b/drivers/video/pm2fb.c
+index c4f639a..70192ba 100644
+--- a/drivers/video/pm2fb.c
++++ b/drivers/video/pm2fb.c
+@@ -1515,7 +1515,7 @@ static struct fb_ops pm2fb_ops = {
+  * @param	pdev	PCI device.
+  * @param	id	PCI device ID.
+  */
+-static int __devinit pm2fb_probe(struct pci_dev *pdev,
++static int pm2fb_probe(struct pci_dev *pdev,
+ 				 const struct pci_device_id *id)
+ {
+ 	struct pm2fb_par *default_par;
+diff --git a/drivers/video/pm3fb.c b/drivers/video/pm3fb.c
+index e9d8e23..1fdae1d 100644
+--- a/drivers/video/pm3fb.c
++++ b/drivers/video/pm3fb.c
+@@ -1229,7 +1229,7 @@ static struct fb_ops pm3fb_ops = {
+ 
+ /* mmio register are already mapped when this function is called */
+ /* the pm3fb_fix.smem_start is also set */
+-static unsigned long __devinit pm3fb_size_memory(struct pm3_par *par)
++static unsigned long pm3fb_size_memory(struct pm3_par *par)
+ {
+ 	unsigned long	memsize = 0;
+ 	unsigned long	tempBypass, i, temp1, temp2;
+@@ -1314,7 +1314,7 @@ static unsigned long __devinit pm3fb_size_memory(struct pm3_par *par)
+ 	return memsize;
+ }
+ 
+-static int __devinit pm3fb_probe(struct pci_dev *dev,
++static int pm3fb_probe(struct pci_dev *dev,
+ 				  const struct pci_device_id *ent)
+ {
+ 	struct fb_info *info;
+diff --git a/drivers/video/pmag-ba-fb.c b/drivers/video/pmag-ba-fb.c
+index 9b4a60b..e5d2994 100644
+--- a/drivers/video/pmag-ba-fb.c
++++ b/drivers/video/pmag-ba-fb.c
+@@ -141,7 +141,7 @@ static void __init pmagbafb_erase_cursor(struct fb_info *info)
+ }
+ 
+ 
+-static int __devinit pmagbafb_probe(struct device *dev)
++static int pmagbafb_probe(struct device *dev)
+ {
+ 	struct tc_dev *tdev = to_tc_dev(dev);
+ 	resource_size_t start, len;
+diff --git a/drivers/video/pmagb-b-fb.c b/drivers/video/pmagb-b-fb.c
+index 4e7a9c4..e731baf 100644
+--- a/drivers/video/pmagb-b-fb.c
++++ b/drivers/video/pmagb-b-fb.c
+@@ -147,7 +147,7 @@ static void __init pmagbbfb_erase_cursor(struct fb_info *info)
+ /*
+  * Set up screen parameters.
+  */
+-static void __devinit pmagbbfb_screen_setup(struct fb_info *info)
++static void pmagbbfb_screen_setup(struct fb_info *info)
+ {
+ 	struct pmagbbfb_par *par = info->par;
+ 
+@@ -179,7 +179,7 @@ static void __devinit pmagbbfb_screen_setup(struct fb_info *info)
+ /*
+  * Determine oscillator configuration.
+  */
+-static void __devinit pmagbbfb_osc_setup(struct fb_info *info)
++static void pmagbbfb_osc_setup(struct fb_info *info)
+ {
+ 	static unsigned int pmagbbfb_freqs[] __devinitdata = {
+ 		130808, 119843, 104000, 92980, 74370, 72800,
+@@ -246,7 +246,7 @@ static void __devinit pmagbbfb_osc_setup(struct fb_info *info)
  };
  
--int __devinit cpmac_init(void)
-+int cpmac_init(void)
+ 
+-static int __devinit pmagbbfb_probe(struct device *dev)
++static int pmagbbfb_probe(struct device *dev)
  {
- 	u32 mask;
- 	int i, res;
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index 64ea9a9..b9e6f39 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -1186,7 +1186,7 @@ error_ret:
+ 	struct tc_dev *tdev = to_tc_dev(dev);
+ 	resource_size_t start, len;
+diff --git a/drivers/video/ps3fb.c b/drivers/video/ps3fb.c
+index 0b340d6..536a098 100644
+--- a/drivers/video/ps3fb.c
++++ b/drivers/video/ps3fb.c
+@@ -965,7 +965,7 @@ static struct fb_fix_screeninfo ps3fb_fix __initdata = {
+ 	.accel =	FB_ACCEL_NONE,
+ };
+ 
+-static int __devinit ps3fb_probe(struct ps3_system_bus_device *dev)
++static int ps3fb_probe(struct ps3_system_bus_device *dev)
+ {
+ 	struct fb_info *info;
+ 	struct ps3fb_par *par;
+diff --git a/drivers/video/pvr2fb.c b/drivers/video/pvr2fb.c
+index 69fc2c3..1192343 100644
+--- a/drivers/video/pvr2fb.c
++++ b/drivers/video/pvr2fb.c
+@@ -763,7 +763,7 @@ out_unmap:
+  * in for flexibility anyways. Who knows, maybe someone has tv-out on a
+  * PCI-based version of these things ;-)
+  */
+-static int __devinit pvr2fb_common_init(void)
++static int pvr2fb_common_init(void)
+ {
+ 	struct pvr2fb_par *par = currentpar;
+ 	unsigned long modememused, rev;
+@@ -922,7 +922,7 @@ static void __exit pvr2fb_dc_exit(void)
+ #endif /* CONFIG_SH_DREAMCAST */
+ 
+ #ifdef CONFIG_PCI
+-static int __devinit pvr2fb_pci_probe(struct pci_dev *pdev,
++static int pvr2fb_pci_probe(struct pci_dev *pdev,
+ 				      const struct pci_device_id *ent)
+ {
+ 	int ret;
+@@ -993,7 +993,7 @@ static void __exit pvr2fb_pci_exit(void)
+ }
+ #endif /* CONFIG_PCI */
+ 
+-static int __devinit pvr2_get_param(const struct pvr2_params *p, const char *s,
++static int pvr2_get_param(const struct pvr2_params *p, const char *s,
+                                    int val, int size)
+ {
+ 	int i;
+diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
+index a8fd898..49af862 100644
+--- a/drivers/video/pxa168fb.c
++++ b/drivers/video/pxa168fb.c
+@@ -560,7 +560,7 @@ static struct fb_ops pxa168fb_ops = {
+ 	.fb_imageblit	= cfb_imageblit,
+ };
+ 
+-static int __devinit pxa168fb_init_mode(struct fb_info *info,
++static int pxa168fb_init_mode(struct fb_info *info,
+ 			      struct pxa168fb_mach_info *mi)
+ {
+ 	struct pxa168fb_info *fbi = info->par;
+@@ -600,7 +600,7 @@ static int __devinit pxa168fb_init_mode(struct fb_info *info,
  	return ret;
  }
  
--static int __devinit cpsw_probe(struct platform_device *pdev)
-+static int cpsw_probe(struct platform_device *pdev)
+-static int __devinit pxa168fb_probe(struct platform_device *pdev)
++static int pxa168fb_probe(struct platform_device *pdev)
  {
- 	struct cpsw_platform_data	*data = pdev->dev.platform_data;
- 	struct net_device		*ndev;
-diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
-index e6cbedc..9d143c9 100644
---- a/drivers/net/ethernet/ti/davinci_emac.c
-+++ b/drivers/net/ethernet/ti/davinci_emac.c
-@@ -1850,7 +1850,7 @@ static struct emac_platform_data
-  * resource information from platform init and register a network device
-  * and allocate resources necessary for driver to perform
-  */
--static int __devinit davinci_emac_probe(struct platform_device *pdev)
-+static int davinci_emac_probe(struct platform_device *pdev)
- {
- 	int rc = 0;
- 	struct resource *res;
-diff --git a/drivers/net/ethernet/ti/davinci_mdio.c b/drivers/net/ethernet/ti/davinci_mdio.c
-index ca69af8..0a2527c 100644
---- a/drivers/net/ethernet/ti/davinci_mdio.c
-+++ b/drivers/net/ethernet/ti/davinci_mdio.c
-@@ -310,7 +310,7 @@ static int davinci_mdio_probe_dt(struct mdio_platform_data *data,
+ 	struct pxa168fb_mach_info *mi;
+ 	struct fb_info *info = 0;
+diff --git a/drivers/video/pxa3xx-gcu.c b/drivers/video/pxa3xx-gcu.c
+index 4493a47..f163474 100644
+--- a/drivers/video/pxa3xx-gcu.c
++++ b/drivers/video/pxa3xx-gcu.c
+@@ -574,7 +574,7 @@ free_buffers(struct platform_device *dev,
+ 	priv->free = NULL;
  }
  
- 
--static int __devinit davinci_mdio_probe(struct platform_device *pdev)
-+static int davinci_mdio_probe(struct platform_device *pdev)
- {
- 	struct mdio_platform_data *pdata = pdev->dev.platform_data;
- 	struct device *dev = &pdev->dev;
-diff --git a/drivers/net/ethernet/ti/tlan.c b/drivers/net/ethernet/ti/tlan.c
-index 9e326b2..148e32f 100644
---- a/drivers/net/ethernet/ti/tlan.c
-+++ b/drivers/net/ethernet/ti/tlan.c
-@@ -434,7 +434,7 @@ err_out_pci_free:
- }
- 
- 
--static int __devinit tlan_init_one(struct pci_dev *pdev,
-+static int tlan_init_one(struct pci_dev *pdev,
- 				   const struct pci_device_id *ent)
- {
- 	return tlan_probe1(pdev, -1, -1, 0, ent);
-@@ -460,7 +460,7 @@ static int __devinit tlan_init_one(struct pci_dev *pdev,
- *
- **************************************************************/
- 
--static int __devinit tlan_probe1(struct pci_dev *pdev,
-+static int tlan_probe1(struct pci_dev *pdev,
- 				 long ioaddr, int irq, int rev,
- 				 const struct pci_device_id *ent)
- {
-diff --git a/drivers/net/ethernet/toshiba/ps3_gelic_net.c b/drivers/net/ethernet/toshiba/ps3_gelic_net.c
-index 5ee82a7..d7c8af7 100644
---- a/drivers/net/ethernet/toshiba/ps3_gelic_net.c
-+++ b/drivers/net/ethernet/toshiba/ps3_gelic_net.c
-@@ -234,7 +234,7 @@ static void gelic_card_free_chain(struct gelic_card *card,
-  *
-  * returns 0 on success, <0 on failure
-  */
--static int __devinit gelic_card_init_chain(struct gelic_card *card,
-+static int gelic_card_init_chain(struct gelic_card *card,
- 					   struct gelic_descr_chain *chain,
- 					   struct gelic_descr *start_descr,
- 					   int no)
-@@ -428,7 +428,7 @@ rewind:
-  *
-  * returns 0 on success, < 0 on failure
-  */
--static int __devinit gelic_card_alloc_rx_skbs(struct gelic_card *card)
-+static int gelic_card_alloc_rx_skbs(struct gelic_card *card)
- {
- 	struct gelic_descr_chain *chain;
- 	int ret;
-@@ -1468,7 +1468,7 @@ static const struct net_device_ops gelic_netdevice_ops = {
-  *
-  * fills out function pointers in the net_device structure
-  */
--static void __devinit gelic_ether_setup_netdev_ops(struct net_device *netdev,
-+static void gelic_ether_setup_netdev_ops(struct net_device *netdev,
- 						   struct napi_struct *napi)
- {
- 	netdev->watchdog_timeo = GELIC_NET_WATCHDOG_TIMEOUT;
-@@ -1489,7 +1489,7 @@ static void __devinit gelic_ether_setup_netdev_ops(struct net_device *netdev,
-  * gelic_ether_setup_netdev initializes the net_device structure
-  * and register it.
-  **/
--int __devinit gelic_net_setup_netdev(struct net_device *netdev,
-+int gelic_net_setup_netdev(struct net_device *netdev,
- 				     struct gelic_card *card)
- {
- 	int status;
-@@ -1542,7 +1542,7 @@ int __devinit gelic_net_setup_netdev(struct net_device *netdev,
-  * the card and net_device structures are linked to each other
-  */
- #define GELIC_ALIGN (32)
--static struct gelic_card * __devinit gelic_alloc_card_net(struct net_device **netdev)
-+static struct gelic_card *gelic_alloc_card_net(struct net_device **netdev)
- {
- 	struct gelic_card *card;
- 	struct gelic_port *port;
-@@ -1593,7 +1593,7 @@ static struct gelic_card * __devinit gelic_alloc_card_net(struct net_device **ne
- 	return card;
- }
- 
--static void __devinit gelic_card_get_vlan_info(struct gelic_card *card)
-+static void gelic_card_get_vlan_info(struct gelic_card *card)
- {
- 	u64 v1, v2;
- 	int status;
-@@ -1667,7 +1667,7 @@ static void __devinit gelic_card_get_vlan_info(struct gelic_card *card)
- /**
-  * ps3_gelic_driver_probe - add a device to the control of this driver
-  */
--static int __devinit ps3_gelic_driver_probe(struct ps3_system_bus_device *dev)
-+static int ps3_gelic_driver_probe(struct ps3_system_bus_device *dev)
- {
- 	struct gelic_card *card;
- 	struct net_device *netdev;
-diff --git a/drivers/net/ethernet/toshiba/ps3_gelic_wireless.c b/drivers/net/ethernet/toshiba/ps3_gelic_wireless.c
-index 72b775f..d568af1 100644
---- a/drivers/net/ethernet/toshiba/ps3_gelic_wireless.c
-+++ b/drivers/net/ethernet/toshiba/ps3_gelic_wireless.c
-@@ -2305,7 +2305,7 @@ static const struct iw_handler_def gelic_wl_wext_handler_def = {
- 	.get_wireless_stats	= gelic_wl_get_wireless_stats,
- };
- 
--static struct net_device * __devinit gelic_wl_alloc(struct gelic_card *card)
-+static struct net_device *gelic_wl_alloc(struct gelic_card *card)
- {
- 	struct net_device *netdev;
- 	struct gelic_port *port;
-@@ -2582,7 +2582,7 @@ static const struct ethtool_ops gelic_wl_ethtool_ops = {
- 	.get_link	= gelic_wl_get_link,
- };
- 
--static void __devinit gelic_wl_setup_netdev_ops(struct net_device *netdev)
-+static void gelic_wl_setup_netdev_ops(struct net_device *netdev)
- {
- 	struct gelic_wl_info *wl;
- 	wl = port_wl(netdev_priv(netdev));
-@@ -2598,7 +2598,7 @@ static void __devinit gelic_wl_setup_netdev_ops(struct net_device *netdev)
- /*
-  * driver probe/remove
-  */
--int __devinit gelic_wl_driver_probe(struct gelic_card *card)
-+int gelic_wl_driver_probe(struct gelic_card *card)
- {
- 	int ret;
- 	struct net_device *netdev;
-diff --git a/drivers/net/ethernet/toshiba/spider_net.c b/drivers/net/ethernet/toshiba/spider_net.c
-index a89279f..95195d2 100644
---- a/drivers/net/ethernet/toshiba/spider_net.c
-+++ b/drivers/net/ethernet/toshiba/spider_net.c
-@@ -2492,7 +2492,7 @@ out_disable_dev:
-  * spider_net_probe initializes pdev and registers a net_device
-  * structure for it. After that, the device can be ifconfig'ed up
-  **/
 -static int __devinit
 +static int
- spider_net_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ pxa3xx_gcu_probe(struct platform_device *dev)
  {
- 	int err = -EIO;
-diff --git a/drivers/net/ethernet/toshiba/tc35815.c b/drivers/net/ethernet/toshiba/tc35815.c
-index 6d6af5d..0dafa25 100644
---- a/drivers/net/ethernet/toshiba/tc35815.c
-+++ b/drivers/net/ethernet/toshiba/tc35815.c
-@@ -719,7 +719,7 @@ err_out:
-  * should provide a "tc35815-mac" device with a MAC address in its
-  * platform_data.
-  */
--static int __devinit tc35815_mac_match(struct device *dev, void *data)
-+static int tc35815_mac_match(struct device *dev, void *data)
- {
- 	struct platform_device *plat_dev = to_platform_device(dev);
- 	struct pci_dev *pci_dev = data;
-@@ -727,7 +727,7 @@ static int __devinit tc35815_mac_match(struct device *dev, void *data)
- 	return !strcmp(plat_dev->name, "tc35815-mac") && plat_dev->id == id;
- }
- 
--static int __devinit tc35815_read_plat_dev_addr(struct net_device *dev)
-+static int tc35815_read_plat_dev_addr(struct net_device *dev)
- {
- 	struct tc35815_local *lp = netdev_priv(dev);
- 	struct device *pd = bus_find_device(&platform_bus_type, NULL,
-@@ -741,13 +741,13 @@ static int __devinit tc35815_read_plat_dev_addr(struct net_device *dev)
- 	return -ENODEV;
- }
- #else
--static int __devinit tc35815_read_plat_dev_addr(struct net_device *dev)
-+static int tc35815_read_plat_dev_addr(struct net_device *dev)
- {
- 	return -ENODEV;
- }
- #endif
- 
--static int __devinit tc35815_init_dev_addr(struct net_device *dev)
-+static int tc35815_init_dev_addr(struct net_device *dev)
- {
- 	struct tc35815_regs __iomem *tr =
- 		(struct tc35815_regs __iomem *)dev->base_addr;
-@@ -785,7 +785,7 @@ static const struct net_device_ops tc35815_netdev_ops = {
- #endif
+ 	int i, ret, irq;
+diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
+index ffa62e2..1ff1a16 100644
+--- a/drivers/video/pxafb.c
++++ b/drivers/video/pxafb.c
+@@ -869,7 +869,7 @@ static struct fb_ops overlay_fb_ops = {
+ 	.fb_set_par		= overlayfb_set_par,
  };
  
--static int __devinit tc35815_init_one(struct pci_dev *pdev,
-+static int tc35815_init_one(struct pci_dev *pdev,
+-static void __devinit init_pxafb_overlay(struct pxafb_info *fbi,
++static void init_pxafb_overlay(struct pxafb_info *fbi,
+ 					 struct pxafb_layer *ofb, int id)
+ {
+ 	sprintf(ofb->fb.fix.id, "overlay%d", id + 1);
+@@ -903,7 +903,7 @@ static inline int pxafb_overlay_supported(void)
+ 	return 0;
+ }
+ 
+-static int __devinit pxafb_overlay_map_video_memory(struct pxafb_info *pxafb,
++static int pxafb_overlay_map_video_memory(struct pxafb_info *pxafb,
+ 	struct pxafb_layer *ofb)
+ {
+ 	/* We assume that user will use at most video_mem_size for overlay fb,
+@@ -927,7 +927,7 @@ static int __devinit pxafb_overlay_map_video_memory(struct pxafb_info *pxafb,
+ 	return 0;
+ }
+ 
+-static void __devinit pxafb_overlay_init(struct pxafb_info *fbi)
++static void pxafb_overlay_init(struct pxafb_info *fbi)
+ {
+ 	int i, ret;
+ 
+@@ -1706,7 +1706,7 @@ static const struct dev_pm_ops pxafb_pm_ops = {
+ };
+ #endif
+ 
+-static int __devinit pxafb_init_video_memory(struct pxafb_info *fbi)
++static int pxafb_init_video_memory(struct pxafb_info *fbi)
+ {
+ 	int size = PAGE_ALIGN(fbi->video_mem_size);
+ 
+@@ -1789,7 +1789,7 @@ decode_mode:
+ 		fbi->video_mem_size = video_mem_size;
+ }
+ 
+-static struct pxafb_info * __devinit pxafb_init_fbinfo(struct device *dev)
++static struct pxafb_info *pxafb_init_fbinfo(struct device *dev)
+ {
+ 	struct pxafb_info *fbi;
+ 	void *addr;
+@@ -1853,7 +1853,7 @@ static struct pxafb_info * __devinit pxafb_init_fbinfo(struct device *dev)
+ }
+ 
+ #ifdef CONFIG_FB_PXA_PARAMETERS
+-static int __devinit parse_opt_mode(struct device *dev, const char *this_opt)
++static int parse_opt_mode(struct device *dev, const char *this_opt)
+ {
+ 	struct pxafb_mach_info *inf = dev->platform_data;
+ 
+@@ -1912,7 +1912,7 @@ done:
+ 	return 0;
+ }
+ 
+-static int __devinit parse_opt(struct device *dev, char *this_opt)
++static int parse_opt(struct device *dev, char *this_opt)
+ {
+ 	struct pxafb_mach_info *inf = dev->platform_data;
+ 	struct pxafb_mode_info *mode = &inf->modes[0];
+@@ -2012,7 +2012,7 @@ static int __devinit parse_opt(struct device *dev, char *this_opt)
+ 	return 0;
+ }
+ 
+-static int __devinit pxafb_parse_options(struct device *dev, char *options)
++static int pxafb_parse_options(struct device *dev, char *options)
+ {
+ 	char *this_opt;
+ 	int ret;
+@@ -2061,7 +2061,7 @@ MODULE_PARM_DESC(options, "LCD parameters (see Documentation/fb/pxafb.txt)");
+ #ifdef DEBUG_VAR
+ /* Check for various illegal bit-combinations. Currently only
+  * a warning is given. */
+-static void __devinit pxafb_check_options(struct device *dev,
++static void pxafb_check_options(struct device *dev,
+ 					  struct pxafb_mach_info *inf)
+ {
+ 	if (inf->lcd_conn)
+@@ -2094,7 +2094,7 @@ static void __devinit pxafb_check_options(struct device *dev,
+ #define pxafb_check_options(...)	do {} while (0)
+ #endif
+ 
+-static int __devinit pxafb_probe(struct platform_device *dev)
++static int pxafb_probe(struct platform_device *dev)
+ {
+ 	struct pxafb_info *fbi;
+ 	struct pxafb_mach_info *inf;
+diff --git a/drivers/video/q40fb.c b/drivers/video/q40fb.c
+index a104e8c..d1a7529 100644
+--- a/drivers/video/q40fb.c
++++ b/drivers/video/q40fb.c
+@@ -83,7 +83,7 @@ static struct fb_ops q40fb_ops = {
+ 	.fb_imageblit	= cfb_imageblit,
+ };
+ 
+-static int __devinit q40fb_probe(struct platform_device *dev)
++static int q40fb_probe(struct platform_device *dev)
+ {
+ 	struct fb_info *info;
+ 
+diff --git a/drivers/video/riva/fbdev.c b/drivers/video/riva/fbdev.c
+index 693ed5e..49caea2 100644
+--- a/drivers/video/riva/fbdev.c
++++ b/drivers/video/riva/fbdev.c
+@@ -1709,7 +1709,7 @@ static struct fb_ops riva_fb_ops = {
+ 	.fb_sync 	= rivafb_sync,
+ };
+ 
+-static int __devinit riva_set_fbinfo(struct fb_info *info)
++static int riva_set_fbinfo(struct fb_info *info)
+ {
+ 	unsigned int cmap_len;
+ 	struct riva_par *par = info->par;
+@@ -1747,7 +1747,7 @@ static int __devinit riva_set_fbinfo(struct fb_info *info)
+ }
+ 
+ #ifdef CONFIG_PPC_OF
+-static int __devinit riva_get_EDID_OF(struct fb_info *info, struct pci_dev *pd)
++static int riva_get_EDID_OF(struct fb_info *info, struct pci_dev *pd)
+ {
+ 	struct riva_par *par = info->par;
+ 	struct device_node *dp;
+@@ -1780,7 +1780,7 @@ static int __devinit riva_get_EDID_OF(struct fb_info *info, struct pci_dev *pd)
+ #endif /* CONFIG_PPC_OF */
+ 
+ #if defined(CONFIG_FB_RIVA_I2C) && !defined(CONFIG_PPC_OF)
+-static int __devinit riva_get_EDID_i2c(struct fb_info *info)
++static int riva_get_EDID_i2c(struct fb_info *info)
+ {
+ 	struct riva_par *par = info->par;
+ 	struct fb_var_screeninfo var;
+@@ -1803,7 +1803,7 @@ static int __devinit riva_get_EDID_i2c(struct fb_info *info)
+ }
+ #endif /* CONFIG_FB_RIVA_I2C */
+ 
+-static void __devinit riva_update_default_var(struct fb_var_screeninfo *var,
++static void riva_update_default_var(struct fb_var_screeninfo *var,
+ 					      struct fb_info *info)
+ {
+ 	struct fb_monspecs *specs = &info->monspecs;
+@@ -1836,7 +1836,7 @@ static void __devinit riva_update_default_var(struct fb_var_screeninfo *var,
+ }
+ 
+ 
+-static void __devinit riva_get_EDID(struct fb_info *info, struct pci_dev *pdev)
++static void riva_get_EDID(struct fb_info *info, struct pci_dev *pdev)
+ {
+ 	NVTRACE_ENTER();
+ #ifdef CONFIG_PPC_OF
+@@ -1850,7 +1850,7 @@ static void __devinit riva_get_EDID(struct fb_info *info, struct pci_dev *pdev)
+ }
+ 
+ 
+-static void __devinit riva_get_edidinfo(struct fb_info *info)
++static void riva_get_edidinfo(struct fb_info *info)
+ {
+ 	struct fb_var_screeninfo *var = &rivafb_default_var;
+ 	struct riva_par *par = info->par;
+@@ -1871,7 +1871,7 @@ static void __devinit riva_get_edidinfo(struct fb_info *info)
+  *
+  * ------------------------------------------------------------------------- */
+ 
+-static u32 __devinit riva_get_arch(struct pci_dev *pd)
++static u32 riva_get_arch(struct pci_dev *pd)
+ {
+     	u32 arch = 0;
+ 
+@@ -1909,7 +1909,7 @@ static u32 __devinit riva_get_arch(struct pci_dev *pd)
+ 	return arch;
+ }
+ 
+-static int __devinit rivafb_probe(struct pci_dev *pd,
++static int rivafb_probe(struct pci_dev *pd,
+ 			     	const struct pci_device_id *ent)
+ {
+ 	struct riva_par *default_par;
+@@ -2145,7 +2145,7 @@ static void __devexit rivafb_remove(struct pci_dev *pd)
+  * ------------------------------------------------------------------------- */
+ 
+ #ifndef MODULE
+-static int __devinit rivafb_setup(char *options)
++static int rivafb_setup(char *options)
+ {
+ 	char *this_opt;
+ 
+@@ -2197,7 +2197,7 @@ static struct pci_driver rivafb_driver = {
+  *
+  * ------------------------------------------------------------------------- */
+ 
+-static int __devinit rivafb_init(void)
++static int rivafb_init(void)
+ {
+ #ifndef MODULE
+ 	char *option = NULL;
+diff --git a/drivers/video/riva/rivafb-i2c.c b/drivers/video/riva/rivafb-i2c.c
+index 167400e..db78ac8 100644
+--- a/drivers/video/riva/rivafb-i2c.c
++++ b/drivers/video/riva/rivafb-i2c.c
+@@ -86,7 +86,7 @@ static int riva_gpio_getsda(void* data)
+ 	return val;
+ }
+ 
+-static int __devinit riva_setup_i2c_bus(struct riva_i2c_chan *chan,
++static int riva_setup_i2c_bus(struct riva_i2c_chan *chan,
+ 					const char *name,
+ 					unsigned int i2c_class)
+ {
+@@ -124,7 +124,7 @@ static int __devinit riva_setup_i2c_bus(struct riva_i2c_chan *chan,
+ 	return rc;
+ }
+ 
+-void __devinit riva_create_i2c_busses(struct riva_par *par)
++void riva_create_i2c_busses(struct riva_par *par)
+ {
+ 	par->chan[0].par	= par;
+ 	par->chan[1].par	= par;
+@@ -150,7 +150,7 @@ void riva_delete_i2c_busses(struct riva_par *par)
+ 	}
+ }
+ 
+-int __devinit riva_probe_i2c_connector(struct riva_par *par, int conn, u8 **out_edid)
++int riva_probe_i2c_connector(struct riva_par *par, int conn, u8 **out_edid)
+ {
+ 	u8 *edid = NULL;
+ 
+diff --git a/drivers/video/s1d13xxxfb.c b/drivers/video/s1d13xxxfb.c
+index 28b1c6c..f7839e1 100644
+--- a/drivers/video/s1d13xxxfb.c
++++ b/drivers/video/s1d13xxxfb.c
+@@ -642,7 +642,7 @@ static int s1d13xxxfb_width_tab[2][4] __devinitdata = {
+  *	Note: some of the hardcoded values here might need some love to
+  *	work on various chips, and might need to no longer be hardcoded.
+  */
+-static void __devinit
++static void
+ s1d13xxxfb_fetch_hw_state(struct fb_info *info)
+ {
+ 	struct fb_var_screeninfo *var = &info->var;
+@@ -764,7 +764,7 @@ s1d13xxxfb_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __devinit
++static int
+ s1d13xxxfb_probe(struct platform_device *pdev)
+ {
+ 	struct s1d13xxxfb_par *default_par;
+diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+index 71981a5..141fefd 100644
+--- a/drivers/video/s3c-fb.c
++++ b/drivers/video/s3c-fb.c
+@@ -1079,7 +1079,7 @@ static void s3c_fb_missing_pixclock(struct fb_videomode *mode)
+  *
+  * Allocate memory for the given framebuffer.
+  */
+-static int __devinit s3c_fb_alloc_memory(struct s3c_fb *sfb,
++static int s3c_fb_alloc_memory(struct s3c_fb *sfb,
+ 					 struct s3c_fb_win *win)
+ {
+ 	struct s3c_fb_pd_win *windata = win->windata;
+@@ -1170,7 +1170,7 @@ static void s3c_fb_release_win(struct s3c_fb *sfb, struct s3c_fb_win *win)
+  * Allocate and do the basic initialisation for one of the hardware's graphics
+  * windows.
+  */
+-static int __devinit s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
++static int s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
+ 				      struct s3c_fb_win_variant *variant,
+ 				      struct s3c_fb_win **res)
+ {
+@@ -1358,7 +1358,7 @@ static void s3c_fb_clear_win(struct s3c_fb *sfb, int win)
+ 	}
+ }
+ 
+-static int __devinit s3c_fb_probe(struct platform_device *pdev)
++static int s3c_fb_probe(struct platform_device *pdev)
+ {
+ 	const struct platform_device_id *platid;
+ 	struct s3c_fb_driverdata *fbdrv;
+diff --git a/drivers/video/s3c2410fb.c b/drivers/video/s3c2410fb.c
+index fbf3cea..528cec6 100644
+--- a/drivers/video/s3c2410fb.c
++++ b/drivers/video/s3c2410fb.c
+@@ -637,7 +637,7 @@ static struct fb_ops s3c2410fb_ops = {
+  *	cache.  Once this area is remapped, all virtual memory
+  *	access to the video memory should occur at the new region.
+  */
+-static int __devinit s3c2410fb_map_video_memory(struct fb_info *info)
++static int s3c2410fb_map_video_memory(struct fb_info *info)
+ {
+ 	struct s3c2410fb_info *fbi = info->par;
+ 	dma_addr_t map_dma;
+@@ -819,7 +819,7 @@ static inline void s3c2410fb_cpufreq_deregister(struct s3c2410fb_info *info)
+ 
+ static const char driver_name[] = "s3c2410fb";
+ 
+-static int __devinit s3c24xxfb_probe(struct platform_device *pdev,
++static int s3c24xxfb_probe(struct platform_device *pdev,
+ 				  enum s3c_drv_type drv_type)
+ {
+ 	struct s3c2410fb_info *info;
+@@ -1010,12 +1010,12 @@ dealloc_fb:
+ 	return ret;
+ }
+ 
+-static int __devinit s3c2410fb_probe(struct platform_device *pdev)
++static int s3c2410fb_probe(struct platform_device *pdev)
+ {
+ 	return s3c24xxfb_probe(pdev, DRV_S3C2410);
+ }
+ 
+-static int __devinit s3c2412fb_probe(struct platform_device *pdev)
++static int s3c2412fb_probe(struct platform_device *pdev)
+ {
+ 	return s3c24xxfb_probe(pdev, DRV_S3C2412);
+ }
+diff --git a/drivers/video/s3fb.c b/drivers/video/s3fb.c
+index 1b4f146..e66ecbb 100644
+--- a/drivers/video/s3fb.c
++++ b/drivers/video/s3fb.c
+@@ -255,7 +255,7 @@ static int s3fb_ddc_getsda(void *data)
+ 	return !!(s3fb_ddc_read(par) & DDC_SDA_IN);
+ }
+ 
+-static int __devinit s3fb_setup_ddc_bus(struct fb_info *info)
++static int s3fb_setup_ddc_bus(struct fb_info *info)
+ {
+ 	struct s3fb_info *par = info->par;
+ 
+@@ -1066,7 +1066,7 @@ static struct fb_ops s3fb_ops = {
+ 
+ /* ------------------------------------------------------------------------- */
+ 
+-static int __devinit s3_identification(struct s3fb_info *par)
++static int s3_identification(struct s3fb_info *par)
+ {
+ 	int chip = par->chip;
+ 
+@@ -1122,7 +1122,7 @@ static int __devinit s3_identification(struct s3fb_info *par)
+ 
+ /* PCI probe */
+ 
+-static int __devinit s3_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
++static int s3_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
+ {
+ 	struct pci_bus_region bus_reg;
+ 	struct resource vga_res;
+diff --git a/drivers/video/sa1100fb.c b/drivers/video/sa1100fb.c
+index b632584..5e79fea 100644
+--- a/drivers/video/sa1100fb.c
++++ b/drivers/video/sa1100fb.c
+@@ -1090,7 +1090,7 @@ static int sa1100fb_resume(struct platform_device *dev)
+  *      cache.  Once this area is remapped, all virtual memory
+  *      access to the video memory should occur at the new region.
+  */
+-static int __devinit sa1100fb_map_video_memory(struct sa1100fb_info *fbi)
++static int sa1100fb_map_video_memory(struct sa1100fb_info *fbi)
+ {
+ 	/*
+ 	 * We reserve one page for the palette, plus the size
+@@ -1124,7 +1124,7 @@ static struct fb_monspecs monspecs __devinitdata = {
+ };
+ 
+ 
+-static struct sa1100fb_info * __devinit sa1100fb_init_fbinfo(struct device *dev)
++static struct sa1100fb_info *sa1100fb_init_fbinfo(struct device *dev)
+ {
+ 	struct sa1100fb_mach_info *inf = dev->platform_data;
+ 	struct sa1100fb_info *fbi;
+@@ -1205,7 +1205,7 @@ static struct sa1100fb_info * __devinit sa1100fb_init_fbinfo(struct device *dev)
+ 	return fbi;
+ }
+ 
+-static int __devinit sa1100fb_probe(struct platform_device *pdev)
++static int sa1100fb_probe(struct platform_device *pdev)
+ {
+ 	struct sa1100fb_info *fbi;
+ 	struct resource *res;
+diff --git a/drivers/video/savage/savagefb_driver.c b/drivers/video/savage/savagefb_driver.c
+index a1cc484..dbf8d62 100644
+--- a/drivers/video/savage/savagefb_driver.c
++++ b/drivers/video/savage/savagefb_driver.c
+@@ -1715,7 +1715,7 @@ static void savage_disable_mmio(struct savagefb_par *par)
+ }
+ 
+ 
+-static int __devinit savage_map_mmio(struct fb_info *info)
++static int savage_map_mmio(struct fb_info *info)
+ {
+ 	struct savagefb_par *par = info->par;
+ 	DBG("savage_map_mmio");
+@@ -1761,7 +1761,7 @@ static void savage_unmap_mmio(struct fb_info *info)
+ 	}
+ }
+ 
+-static int __devinit savage_map_video(struct fb_info *info,
++static int savage_map_video(struct fb_info *info,
+ 				      int video_len)
+ {
+ 	struct savagefb_par *par = info->par;
+@@ -2052,7 +2052,7 @@ static int savage_init_hw(struct savagefb_par *par)
+ 	return videoRambytes;
+ }
+ 
+-static int __devinit savage_init_fb_info(struct fb_info *info,
++static int savage_init_fb_info(struct fb_info *info,
+ 					 struct pci_dev *dev,
+ 					 const struct pci_device_id *id)
+ {
+@@ -2178,7 +2178,7 @@ static int __devinit savage_init_fb_info(struct fb_info *info,
+ 
+ /* --------------------------------------------------------------------- */
+ 
+-static int __devinit savagefb_probe(struct pci_dev* dev,
++static int savagefb_probe(struct pci_dev* dev,
+ 				    const struct pci_device_id* id)
+ {
+ 	struct fb_info *info;
+diff --git a/drivers/video/sgivwfb.c b/drivers/video/sgivwfb.c
+index b5c30b9..c65ab22 100644
+--- a/drivers/video/sgivwfb.c
++++ b/drivers/video/sgivwfb.c
+@@ -745,7 +745,7 @@ int __init sgivwfb_setup(char *options)
+ /*
+  *  Initialisation
+  */
+-static int __devinit sgivwfb_probe(struct platform_device *dev)
++static int sgivwfb_probe(struct platform_device *dev)
+ {
+ 	struct sgivw_par *par;
+ 	struct fb_info *info;
+diff --git a/drivers/video/sh7760fb.c b/drivers/video/sh7760fb.c
+index ff93339..0ad44d1 100644
+--- a/drivers/video/sh7760fb.c
++++ b/drivers/video/sh7760fb.c
+@@ -431,7 +431,7 @@ static int sh7760fb_alloc_mem(struct fb_info *info)
+ 	return 0;
+ }
+ 
+-static int __devinit sh7760fb_probe(struct platform_device *pdev)
++static int sh7760fb_probe(struct platform_device *pdev)
+ {
+ 	struct fb_info *info;
+ 	struct resource *res;
+diff --git a/drivers/video/sh_mobile_lcdcfb.c b/drivers/video/sh_mobile_lcdcfb.c
+index 699487c..d776bfe 100644
+--- a/drivers/video/sh_mobile_lcdcfb.c
++++ b/drivers/video/sh_mobile_lcdcfb.c
+@@ -1639,7 +1639,7 @@ sh_mobile_lcdc_overlay_fb_unregister(struct sh_mobile_lcdc_overlay *ovl)
+ 	unregister_framebuffer(ovl->info);
+ }
+ 
+-static int __devinit
++static int
+ sh_mobile_lcdc_overlay_fb_register(struct sh_mobile_lcdc_overlay *ovl)
+ {
+ 	struct sh_mobile_lcdc_priv *lcdc = ovl->channel->lcdc;
+@@ -1678,7 +1678,7 @@ sh_mobile_lcdc_overlay_fb_cleanup(struct sh_mobile_lcdc_overlay *ovl)
+ 	framebuffer_release(info);
+ }
+ 
+-static int __devinit
++static int
+ sh_mobile_lcdc_overlay_fb_init(struct sh_mobile_lcdc_overlay *ovl)
+ {
+ 	struct sh_mobile_lcdc_priv *priv = ovl->channel->lcdc;
+@@ -2117,7 +2117,7 @@ sh_mobile_lcdc_channel_fb_unregister(struct sh_mobile_lcdc_chan *ch)
+ 		unregister_framebuffer(ch->info);
+ }
+ 
+-static int __devinit
++static int
+ sh_mobile_lcdc_channel_fb_register(struct sh_mobile_lcdc_chan *ch)
+ {
+ 	struct fb_info *info = ch->info;
+@@ -2165,7 +2165,7 @@ sh_mobile_lcdc_channel_fb_cleanup(struct sh_mobile_lcdc_chan *ch)
+ 	framebuffer_release(info);
+ }
+ 
+-static int __devinit
++static int
+ sh_mobile_lcdc_channel_fb_init(struct sh_mobile_lcdc_chan *ch,
+ 			       const struct fb_videomode *mode,
+ 			       unsigned int num_modes)
+@@ -2475,7 +2475,7 @@ static int sh_mobile_lcdc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __devinit sh_mobile_lcdc_check_interface(struct sh_mobile_lcdc_chan *ch)
++static int sh_mobile_lcdc_check_interface(struct sh_mobile_lcdc_chan *ch)
+ {
+ 	int interface_type = ch->cfg->interface_type;
+ 
+@@ -2515,7 +2515,7 @@ static int __devinit sh_mobile_lcdc_check_interface(struct sh_mobile_lcdc_chan *
+ 	return 0;
+ }
+ 
+-static int __devinit
++static int
+ sh_mobile_lcdc_overlay_init(struct sh_mobile_lcdc_priv *priv,
+ 			  struct sh_mobile_lcdc_overlay *ovl)
+ {
+@@ -2570,7 +2570,7 @@ sh_mobile_lcdc_overlay_init(struct sh_mobile_lcdc_priv *priv,
+ 	return 0;
+ }
+ 
+-static int __devinit
++static int
+ sh_mobile_lcdc_channel_init(struct sh_mobile_lcdc_priv *priv,
+ 			    struct sh_mobile_lcdc_chan *ch)
+ {
+@@ -2675,7 +2675,7 @@ sh_mobile_lcdc_channel_init(struct sh_mobile_lcdc_priv *priv,
+ 	return sh_mobile_lcdc_channel_fb_init(ch, mode, num_modes);
+ }
+ 
+-static int __devinit sh_mobile_lcdc_probe(struct platform_device *pdev)
++static int sh_mobile_lcdc_probe(struct platform_device *pdev)
+ {
+ 	struct sh_mobile_lcdc_info *pdata = pdev->dev.platform_data;
+ 	struct sh_mobile_lcdc_priv *priv;
+diff --git a/drivers/video/sh_mobile_meram.c b/drivers/video/sh_mobile_meram.c
+index 7a0ba8b..e0f0985 100644
+--- a/drivers/video/sh_mobile_meram.c
++++ b/drivers/video/sh_mobile_meram.c
+@@ -620,7 +620,7 @@ static UNIVERSAL_DEV_PM_OPS(sh_mobile_meram_dev_pm_ops,
+  * Probe/remove and driver init/exit
+  */
+ 
+-static int __devinit sh_mobile_meram_probe(struct platform_device *pdev)
++static int sh_mobile_meram_probe(struct platform_device *pdev)
+ {
+ 	struct sh_mobile_meram_priv *priv;
+ 	struct sh_mobile_meram_info *pdata = pdev->dev.platform_data;
+diff --git a/drivers/video/sis/sis_main.c b/drivers/video/sis/sis_main.c
+index 5193138..820a002 100644
+--- a/drivers/video/sis/sis_main.c
++++ b/drivers/video/sis/sis_main.c
+@@ -106,7 +106,7 @@ sisfb_setdefaultparms(void)
+ 
+ /* ------------- Parameter parsing -------------- */
+ 
+-static void __devinit
++static void
+ sisfb_search_vesamode(unsigned int vesamode, bool quiet)
+ {
+ 	int i = 0, j = 0;
+@@ -146,7 +146,7 @@ sisfb_search_vesamode(unsigned int vesamode, bool quiet)
+ 		printk(KERN_ERR "sisfb: Invalid VESA mode 0x%x'\n", vesamode);
+ }
+ 
+-static void __devinit
++static void
+ sisfb_search_mode(char *name, bool quiet)
+ {
+ 	unsigned int j = 0, xres = 0, yres = 0, depth = 0, rate = 0;
+@@ -225,7 +225,7 @@ sisfb_search_mode(char *name, bool quiet)
+ }
+ 
+ #ifndef MODULE
+-static void __devinit
++static void
+ sisfb_get_vga_mode_from_kernel(void)
+ {
+ #ifdef CONFIG_X86
+@@ -345,7 +345,7 @@ sisfb_search_specialtiming(const char *name)
+ 
+ /* ----------- Various detection routines ----------- */
+ 
+-static void __devinit
++static void
+ sisfb_detect_custom_timing(struct sis_video_info *ivideo)
+ {
+ 	unsigned char *biosver = NULL;
+@@ -403,7 +403,7 @@ sisfb_detect_custom_timing(struct sis_video_info *ivideo)
+ 	} while(mycustomttable[i].chipID);
+ }
+ 
+-static bool __devinit
++static bool
+ sisfb_interpret_edid(struct sisfb_monitor *monitor, u8 *buffer)
+ {
+ 	int i, j, xres, yres, refresh, index;
+@@ -505,7 +505,7 @@ sisfb_interpret_edid(struct sisfb_monitor *monitor, u8 *buffer)
+ 	return monitor->datavalid;
+ }
+ 
+-static void __devinit
++static void
+ sisfb_handle_ddc(struct sis_video_info *ivideo, struct sisfb_monitor *monitor, int crtno)
+ {
+ 	unsigned short temp, i, realcrtno = crtno;
+@@ -1898,8 +1898,7 @@ static struct fb_ops sisfb_ops = {
+ 
+ /* ---------------- Chip generation dependent routines ---------------- */
+ 
+-static struct pci_dev * __devinit
+-sisfb_get_northbridge(int basechipid)
++static struct pci_dev *sisfb_get_northbridge(int basechipid)
+ {
+ 	struct pci_dev *pdev = NULL;
+ 	int nbridgenum, nbridgeidx, i;
+@@ -1938,7 +1937,7 @@ sisfb_get_northbridge(int basechipid)
+ 	return pdev;
+ }
+ 
+-static int __devinit
++static int
+ sisfb_get_dram_size(struct sis_video_info *ivideo)
+ {
+ #if defined(CONFIG_FB_SIS_300) || defined(CONFIG_FB_SIS_315)
+@@ -2038,7 +2037,7 @@ sisfb_get_dram_size(struct sis_video_info *ivideo)
+ 
+ /* -------------- video bridge device detection --------------- */
+ 
+-static void __devinit
++static void
+ sisfb_detect_VB_connect(struct sis_video_info *ivideo)
+ {
+ 	u8 cr32, temp;
+@@ -2164,7 +2163,7 @@ sisfb_detect_VB_connect(struct sis_video_info *ivideo)
+ 
+ /* ------------------ Sensing routines ------------------ */
+ 
+-static bool __devinit
++static bool
+ sisfb_test_DDC1(struct sis_video_info *ivideo)
+ {
+     unsigned short old;
+@@ -2177,7 +2176,7 @@ sisfb_test_DDC1(struct sis_video_info *ivideo)
+     return (count != -1);
+ }
+ 
+-static void __devinit
++static void
+ sisfb_sense_crt1(struct sis_video_info *ivideo)
+ {
+     bool mustwait = false;
+@@ -2259,7 +2258,7 @@ sisfb_sense_crt1(struct sis_video_info *ivideo)
+ }
+ 
+ /* Determine and detect attached devices on SiS30x */
+-static void __devinit
++static void
+ SiS_SenseLCD(struct sis_video_info *ivideo)
+ {
+ 	unsigned char buffer[256];
+@@ -2347,7 +2346,7 @@ SiS_SenseLCD(struct sis_video_info *ivideo)
+ 	ivideo->SiS_Pr.PanelSelfDetected = true;
+ }
+ 
+-static int __devinit
++static int
+ SISDoSense(struct sis_video_info *ivideo, u16 type, u16 test)
+ {
+     int temp, mytest, result, i, j;
+@@ -2377,7 +2376,7 @@ SISDoSense(struct sis_video_info *ivideo, u16 type, u16 test)
+     return result;
+ }
+ 
+-static void __devinit
++static void
+ SiS_Sense30x(struct sis_video_info *ivideo)
+ {
+     u8  backupP4_0d,backupP2_00,backupP2_4d,backupSR_1e,biosflag=0;
+@@ -2518,7 +2517,7 @@ SiS_Sense30x(struct sis_video_info *ivideo)
+ }
+ 
+ /* Determine and detect attached TV's on Chrontel */
+-static void __devinit
++static void
+ SiS_SenseCh(struct sis_video_info *ivideo)
+ {
+ #if defined(CONFIG_FB_SIS_300) || defined(CONFIG_FB_SIS_315)
+@@ -2643,7 +2642,7 @@ SiS_SenseCh(struct sis_video_info *ivideo)
+     }
+ }
+ 
+-static void __devinit
++static void
+ sisfb_get_VB_type(struct sis_video_info *ivideo)
+ {
+ 	char stdstr[]    = "sisfb: Detected";
+@@ -2906,7 +2905,7 @@ sisfb_engine_init(struct sis_video_info *ivideo)
+ 	ivideo->engineok = 1;
+ }
+ 
+-static void __devinit
++static void
+ sisfb_detect_lcd_type(struct sis_video_info *ivideo)
+ {
+ 	u8 reg;
+@@ -2962,7 +2961,7 @@ sisfb_detect_lcd_type(struct sis_video_info *ivideo)
+ 			ivideo->lcdxres, ivideo->lcdyres);
+ }
+ 
+-static void __devinit
++static void
+ sisfb_save_pdc_emi(struct sis_video_info *ivideo)
+ {
+ #ifdef CONFIG_FB_SIS_300
+@@ -3081,7 +3080,7 @@ sisfb_save_pdc_emi(struct sis_video_info *ivideo)
+ 
+ /* -------------------- Memory manager routines ---------------------- */
+ 
+-static u32 __devinit
++static u32
+ sisfb_getheapstart(struct sis_video_info *ivideo)
+ {
+ 	u32 ret = ivideo->sisfb_parm_mem * 1024;
+@@ -3128,7 +3127,7 @@ sisfb_getheapstart(struct sis_video_info *ivideo)
+ 	return ret;
+ }
+ 
+-static u32 __devinit
++static u32
+ sisfb_getheapsize(struct sis_video_info *ivideo)
+ {
+ 	u32 max = ivideo->video_size - ivideo->hwcursor_size - ivideo->cmdQueueSize;
+@@ -3154,7 +3153,7 @@ sisfb_getheapsize(struct sis_video_info *ivideo)
+ 	return ret;
+ }
+ 
+-static int __devinit
++static int
+ sisfb_heap_init(struct sis_video_info *ivideo)
+ {
+ 	struct SIS_OH *poh;
+@@ -4061,7 +4060,7 @@ static int __init sisfb_setup(char *options)
+ }
+ #endif
+ 
+-static int __devinit
++static int
+ sisfb_check_rom(void __iomem *rom_base, struct sis_video_info *ivideo)
+ {
+ 	void __iomem *rom;
+@@ -4089,8 +4088,7 @@ sisfb_check_rom(void __iomem *rom_base, struct sis_video_info *ivideo)
+ 	return 1;
+ }
+ 
+-static unsigned char * __devinit
+-sisfb_find_rom(struct pci_dev *pdev)
++static unsigned char *sisfb_find_rom(struct pci_dev *pdev)
+ {
+ 	struct sis_video_info *ivideo = pci_get_drvdata(pdev);
+ 	void __iomem *rom_base;
+@@ -4149,7 +4147,7 @@ sisfb_find_rom(struct pci_dev *pdev)
+ 	return myrombase;
+ }
+ 
+-static void __devinit
++static void
+ sisfb_post_map_vram(struct sis_video_info *ivideo, unsigned int *mapsize,
+ 			unsigned int min)
+ {
+@@ -4176,7 +4174,7 @@ sisfb_post_map_vram(struct sis_video_info *ivideo, unsigned int *mapsize,
+ }
+ 
+ #ifdef CONFIG_FB_SIS_300
+-static int __devinit
++static int
+ sisfb_post_300_buswidth(struct sis_video_info *ivideo)
+ {
+ 	void __iomem *FBAddress = ivideo->video_vbase;
+@@ -4242,7 +4240,7 @@ static const unsigned short __devinitconst SiS_DRAMType[17][5] = {
+ 	{0x09,0x08,0x01,0x01,0x00}
+ };
+ 
+-static int __devinit
++static int
+ sisfb_post_300_rwtest(struct sis_video_info *ivideo, int iteration, int buswidth,
+ 			int PseudoRankCapacity, int PseudoAdrPinCount,
+ 			unsigned int mapsize)
+@@ -4309,7 +4307,7 @@ sisfb_post_300_rwtest(struct sis_video_info *ivideo, int iteration, int buswidth
+ 	return 0;
+ }
+ 
+-static void __devinit
++static void
+ sisfb_post_300_ramsize(struct pci_dev *pdev, unsigned int mapsize)
+ {
+ 	struct	sis_video_info *ivideo = pci_get_drvdata(pdev);
+@@ -4335,7 +4333,7 @@ sisfb_post_300_ramsize(struct pci_dev *pdev, unsigned int mapsize)
+ 	}
+ }
+ 
+-static void __devinit
++static void
+ sisfb_post_sis300(struct pci_dev *pdev)
+ {
+ 	struct sis_video_info *ivideo = pci_get_drvdata(pdev);
+@@ -4547,7 +4545,7 @@ sisfb_post_sis300(struct pci_dev *pdev)
+ 
+ #ifdef CONFIG_FB_SIS_315
+ #if 0
+-static void __devinit
++static void
+ sisfb_post_sis315330(struct pci_dev *pdev)
+ {
+ 	/* TODO */
+@@ -4559,7 +4557,7 @@ static inline int sisfb_xgi_is21(struct sis_video_info *ivideo)
+ 	return ivideo->chip_real_id == XGI_21;
+ }
+ 
+-static void __devinit
++static void
+ sisfb_post_xgi_delay(struct sis_video_info *ivideo, int delay)
+ {
+ 	unsigned int i;
+@@ -4571,7 +4569,7 @@ sisfb_post_xgi_delay(struct sis_video_info *ivideo, int delay)
+ 	}
+ }
+ 
+-static int __devinit
++static int
+ sisfb_find_host_bridge(struct sis_video_info *ivideo, struct pci_dev *mypdev,
+ 				unsigned short pcivendor)
+ {
+@@ -4591,7 +4589,7 @@ sisfb_find_host_bridge(struct sis_video_info *ivideo, struct pci_dev *mypdev,
+ 	return ret;
+ }
+ 
+-static int __devinit
++static int
+ sisfb_post_xgi_rwtest(struct sis_video_info *ivideo, int starta,
+ 			unsigned int enda, unsigned int mapsize)
+ {
+@@ -4623,7 +4621,7 @@ sisfb_post_xgi_rwtest(struct sis_video_info *ivideo, int starta,
+ 	return 1;
+ }
+ 
+-static int __devinit
++static int
+ sisfb_post_xgi_ramsize(struct sis_video_info *ivideo)
+ {
+ 	unsigned int buswidth, ranksize, channelab, mapsize;
+@@ -4876,7 +4874,7 @@ bail_out:
+ 	return status;
+ }
+ 
+-static void __devinit
++static void
+ sisfb_post_xgi_setclocks(struct sis_video_info *ivideo, u8 regb)
+ {
+ 	u8 v1, v2, v3;
+@@ -4932,7 +4930,7 @@ sisfb_post_xgi_setclocks(struct sis_video_info *ivideo, u8 regb)
+ 	sisfb_post_xgi_delay(ivideo, 0x43);
+ }
+ 
+-static void __devinit
++static void
+ sisfb_post_xgi_ddr2_mrs_default(struct sis_video_info *ivideo, u8 regb)
+ {
+ 	unsigned char *bios = ivideo->bios_abase;
+@@ -4973,7 +4971,7 @@ sisfb_post_xgi_ddr2_mrs_default(struct sis_video_info *ivideo, u8 regb)
+ 	sisfb_post_xgi_delay(ivideo, 1);
+ }
+ 
+-static void __devinit
++static void
+ sisfb_post_xgi_ddr2_mrs_xg21(struct sis_video_info *ivideo)
+ {
+ 	sisfb_post_xgi_setclocks(ivideo, 1);
+@@ -5015,7 +5013,7 @@ sisfb_post_xgi_ddr2_mrs_xg21(struct sis_video_info *ivideo)
+ 	sisfb_post_xgi_delay(ivideo, 1);
+ }
+ 
+-static void __devinit
++static void
+ sisfb_post_xgi_ddr2(struct sis_video_info *ivideo, u8 regb)
+ {
+ 	unsigned char *bios = ivideo->bios_abase;
+@@ -5061,7 +5059,7 @@ sisfb_post_xgi_ddr2(struct sis_video_info *ivideo, u8 regb)
+ 		sisfb_post_xgi_ddr2_mrs_default(ivideo, regb);
+ }
+ 
+-static u8 __devinit
++static u8
+ sisfb_post_xgi_ramtype(struct sis_video_info *ivideo)
+ {
+ 	unsigned char *bios = ivideo->bios_abase;
+@@ -5101,7 +5099,7 @@ sisfb_post_xgi_ramtype(struct sis_video_info *ivideo)
+ 	return ramtype;
+ }
+ 
+-static int __devinit
++static int
+ sisfb_post_xgi(struct pci_dev *pdev)
+ {
+ 	struct sis_video_info *ivideo = pci_get_drvdata(pdev);
+@@ -5839,7 +5837,7 @@ sisfb_post_xgi(struct pci_dev *pdev)
+ }
+ #endif
+ 
+-static int __devinit
++static int
+ sisfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ {
+ 	struct sisfb_chip_info	*chipinfo = &sisfb_chip_info[ent->driver_data];
+diff --git a/drivers/video/skeletonfb.c b/drivers/video/skeletonfb.c
+index ce61d9d..28a38ba 100644
+--- a/drivers/video/skeletonfb.c
++++ b/drivers/video/skeletonfb.c
+@@ -678,7 +678,7 @@ static struct fb_ops xxxfb_ops = {
+      */
+ 
+ /* static int __init xxfb_probe (struct platform_device *pdev) -- for platform devs */
+-static int __devinit xxxfb_probe(struct pci_dev *dev,
++static int xxxfb_probe(struct pci_dev *dev,
+ 			      const struct pci_device_id *ent)
+ {
+     struct fb_info *info;
+diff --git a/drivers/video/sm501fb.c b/drivers/video/sm501fb.c
+index 3690eff..6703712 100644
+--- a/drivers/video/sm501fb.c
++++ b/drivers/video/sm501fb.c
+@@ -1664,7 +1664,7 @@ static void sm501fb_stop(struct sm501fb_info *info)
+ 			   resource_size(info->regs_res));
+ }
+ 
+-static int __devinit sm501fb_init_fb(struct fb_info *fb,
++static int sm501fb_init_fb(struct fb_info *fb,
+ 			   enum sm501_controller head,
+ 			   const char *fbname)
+ {
+@@ -1850,7 +1850,7 @@ static struct sm501_platdata_fb sm501fb_def_pdata = {
+ static char driver_name_crt[] = "sm501fb-crt";
+ static char driver_name_pnl[] = "sm501fb-panel";
+ 
+-static int __devinit sm501fb_probe_one(struct sm501fb_info *info,
++static int sm501fb_probe_one(struct sm501fb_info *info,
+ 				       enum sm501_controller head)
+ {
+ 	unsigned char *name = (head == HEAD_CRT) ? "crt" : "panel";
+@@ -1892,7 +1892,7 @@ static void sm501_free_init_fb(struct sm501fb_info *info,
+ 	fb_dealloc_cmap(&fbi->cmap);
+ }
+ 
+-static int __devinit sm501fb_start_one(struct sm501fb_info *info,
++static int sm501fb_start_one(struct sm501fb_info *info,
+ 				       enum sm501_controller head,
+ 				       const char *drvname)
+ {
+@@ -1922,7 +1922,7 @@ static int __devinit sm501fb_start_one(struct sm501fb_info *info,
+ 	return 0;
+ }
+ 
+-static int __devinit sm501fb_probe(struct platform_device *pdev)
++static int sm501fb_probe(struct platform_device *pdev)
+ {
+ 	struct sm501fb_info *info;
+ 	struct device *dev = &pdev->dev;
+diff --git a/drivers/video/sstfb.c b/drivers/video/sstfb.c
+index 871e074..c4ce3ef 100644
+--- a/drivers/video/sstfb.c
++++ b/drivers/video/sstfb.c
+@@ -822,7 +822,7 @@ static void sstfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
+ /* 
+  * get lfb size 
+  */
+-static int __devinit sst_get_memsize(struct fb_info *info, __u32 *memsize)
++static int sst_get_memsize(struct fb_info *info, __u32 *memsize)
+ {
+ 	u8 __iomem *fbbase_virt = info->screen_base;
+ 
+@@ -865,7 +865,7 @@ static int __devinit sst_get_memsize(struct fb_info *info, __u32 *memsize)
+ /* fbi should be idle, and fifo emty and mem disabled */
+ /* supposed to detect AT&T ATT20C409 and Ti TVP3409 ramdacs */
+ 
+-static int __devinit sst_detect_att(struct fb_info *info)
++static int sst_detect_att(struct fb_info *info)
+ {
+ 	struct sstfb_par *par = info->par;
+ 	int i, mir, dir;
+@@ -890,7 +890,7 @@ static int __devinit sst_detect_att(struct fb_info *info)
+ 	return 0;
+ }
+ 
+-static int __devinit sst_detect_ti(struct fb_info *info)
++static int sst_detect_ti(struct fb_info *info)
+ {
+ 	struct sstfb_par *par = info->par;
+ 	int i, mir, dir;
+@@ -926,7 +926,7 @@ static int __devinit sst_detect_ti(struct fb_info *info)
+  * touched...
+  * is it really safe ? how can i reset this ramdac ? geee...
+  */
+-static int __devinit sst_detect_ics(struct fb_info *info)
++static int sst_detect_ics(struct fb_info *info)
+ {
+ 	struct sstfb_par *par = info->par;
+ 	int m_clk0_1, m_clk0_7, m_clk1_b;
+@@ -1121,7 +1121,7 @@ static struct dac_switch dacs[] __devinitdata = {
+ 		.set_vidmod	= sst_set_vidmod_ics },
+ };
+ 
+-static int __devinit sst_detect_dactype(struct fb_info *info, struct sstfb_par *par)
++static int sst_detect_dactype(struct fb_info *info, struct sstfb_par *par)
+ {
+ 	int i, ret = 0;
+ 
+@@ -1140,7 +1140,7 @@ static int __devinit sst_detect_dactype(struct fb_info *info, struct sstfb_par *
+ /*
+  * Internal Routines
+  */
+-static int __devinit sst_init(struct fb_info *info, struct sstfb_par *par)
++static int sst_init(struct fb_info *info, struct sstfb_par *par)
+ {
+ 	u32 fbiinit0, fbiinit1, fbiinit4;
+ 	struct pci_dev *dev = par->dev;
+@@ -1271,7 +1271,7 @@ static void  __devexit sst_shutdown(struct fb_info *info)
+ /*
+  * Interface to the world
+  */
+-static int  __devinit sstfb_setup(char *options)
++static int  sstfb_setup(char *options)
+ {
+ 	char *this_opt;
+ 
+@@ -1317,7 +1317,7 @@ static struct fb_ops sstfb_ops = {
+ 	.fb_ioctl	= sstfb_ioctl,
+ };
+ 
+-static int __devinit sstfb_probe(struct pci_dev *pdev,
++static int sstfb_probe(struct pci_dev *pdev,
+ 			const struct pci_device_id *id)
+ {
+ 	struct fb_info *info;
+@@ -1494,7 +1494,7 @@ static struct pci_driver sstfb_driver = {
+ };
+ 
+ 
+-static int __devinit sstfb_init(void)
++static int sstfb_init(void)
+ {
+ 	char *option = NULL;
+ 
+diff --git a/drivers/video/sunxvr1000.c b/drivers/video/sunxvr1000.c
+index cc9bf5f..9e86e3c 100644
+--- a/drivers/video/sunxvr1000.c
++++ b/drivers/video/sunxvr1000.c
+@@ -25,7 +25,7 @@ struct gfb_info {
+ 	u32			pseudo_palette[16];
+ };
+ 
+-static int __devinit gfb_get_props(struct gfb_info *gp)
++static int gfb_get_props(struct gfb_info *gp)
+ {
+ 	gp->width = of_getintprop_default(gp->of_node, "width", 0);
+ 	gp->height = of_getintprop_default(gp->of_node, "height", 0);
+@@ -66,7 +66,7 @@ static struct fb_ops gfb_ops = {
+ 	.fb_imageblit		= cfb_imageblit,
+ };
+ 
+-static int __devinit gfb_set_fbinfo(struct gfb_info *gp)
++static int gfb_set_fbinfo(struct gfb_info *gp)
+ {
+ 	struct fb_info *info = gp->info;
+ 	struct fb_var_screeninfo *var = &info->var;
+@@ -111,7 +111,7 @@ static int __devinit gfb_set_fbinfo(struct gfb_info *gp)
+         return 0;
+ }
+ 
+-static int __devinit gfb_probe(struct platform_device *op)
++static int gfb_probe(struct platform_device *op)
+ {
+ 	struct device_node *dp = op->dev.of_node;
+ 	struct fb_info *info;
+diff --git a/drivers/video/sunxvr2500.c b/drivers/video/sunxvr2500.c
+index 49bd77a..b6a14d2 100644
+--- a/drivers/video/sunxvr2500.c
++++ b/drivers/video/sunxvr2500.c
+@@ -29,7 +29,7 @@ struct s3d_info {
+ 	u32			pseudo_palette[16];
+ };
+ 
+-static int __devinit s3d_get_props(struct s3d_info *sp)
++static int s3d_get_props(struct s3d_info *sp)
+ {
+ 	sp->width = of_getintprop_default(sp->of_node, "width", 0);
+ 	sp->height = of_getintprop_default(sp->of_node, "height", 0);
+@@ -70,7 +70,7 @@ static struct fb_ops s3d_ops = {
+ 	.fb_imageblit		= cfb_imageblit,
+ };
+ 
+-static int __devinit s3d_set_fbinfo(struct s3d_info *sp)
++static int s3d_set_fbinfo(struct s3d_info *sp)
+ {
+ 	struct fb_info *info = sp->info;
+ 	struct fb_var_screeninfo *var = &info->var;
+@@ -115,7 +115,7 @@ static int __devinit s3d_set_fbinfo(struct s3d_info *sp)
+         return 0;
+ }
+ 
+-static int __devinit s3d_pci_register(struct pci_dev *pdev,
++static int s3d_pci_register(struct pci_dev *pdev,
  				      const struct pci_device_id *ent)
  {
- 	void __iomem *ioaddr = NULL;
-diff --git a/drivers/net/ethernet/via/via-rhine.c b/drivers/net/ethernet/via/via-rhine.c
-index 565f077..f745825 100644
---- a/drivers/net/ethernet/via/via-rhine.c
-+++ b/drivers/net/ethernet/via/via-rhine.c
-@@ -657,7 +657,7 @@ static void enable_mmio(long pioaddr, u32 quirks)
-  * Loads bytes 0x00-0x05, 0x6E-0x6F, 0x78-0x7B from EEPROM
-  * (plus 0x6C for Rhine-I/II)
-  */
--static void __devinit rhine_reload_eeprom(long pioaddr, struct net_device *dev)
-+static void rhine_reload_eeprom(long pioaddr, struct net_device *dev)
- {
- 	struct rhine_private *rp = netdev_priv(dev);
- 	void __iomem *ioaddr = rp->base;
-@@ -823,7 +823,7 @@ static int rhine_napipoll(struct napi_struct *napi, int budget)
- 	return work_done;
- }
- 
--static void __devinit rhine_hw_init(struct net_device *dev, long pioaddr)
-+static void rhine_hw_init(struct net_device *dev, long pioaddr)
- {
- 	struct rhine_private *rp = netdev_priv(dev);
- 
-@@ -856,7 +856,7 @@ static const struct net_device_ops rhine_netdev_ops = {
- #endif
+ 	struct fb_info *info;
+diff --git a/drivers/video/sunxvr500.c b/drivers/video/sunxvr500.c
+index e94c799..afcdab1 100644
+--- a/drivers/video/sunxvr500.c
++++ b/drivers/video/sunxvr500.c
+@@ -51,7 +51,7 @@ struct e3d_info {
+ 	u32			pseudo_palette[16];
  };
  
--static int __devinit rhine_init_one(struct pci_dev *pdev,
-+static int rhine_init_one(struct pci_dev *pdev,
- 				    const struct pci_device_id *ent)
+-static int __devinit e3d_get_props(struct e3d_info *ep)
++static int e3d_get_props(struct e3d_info *ep)
  {
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/via/via-velocity.c b/drivers/net/ethernet/via/via-velocity.c
-index 44e2fa4..808368f 100644
---- a/drivers/net/ethernet/via/via-velocity.c
-+++ b/drivers/net/ethernet/via/via-velocity.c
-@@ -375,7 +375,7 @@ MODULE_DEVICE_TABLE(pci, velocity_id_table);
-  *	Given a chip identifier return a suitable description. Returns
-  *	a pointer a static string valid while the driver is loaded.
+ 	ep->width = of_getintprop_default(ep->of_node, "width", 0);
+ 	ep->height = of_getintprop_default(ep->of_node, "height", 0);
+@@ -193,7 +193,7 @@ static struct fb_ops e3d_ops = {
+ 	.fb_imageblit		= e3d_imageblit,
+ };
+ 
+-static int __devinit e3d_set_fbinfo(struct e3d_info *ep)
++static int e3d_set_fbinfo(struct e3d_info *ep)
+ {
+ 	struct fb_info *info = ep->info;
+ 	struct fb_var_screeninfo *var = &info->var;
+@@ -238,7 +238,7 @@ static int __devinit e3d_set_fbinfo(struct e3d_info *ep)
+         return 0;
+ }
+ 
+-static int __devinit e3d_pci_register(struct pci_dev *pdev,
++static int e3d_pci_register(struct pci_dev *pdev,
+ 				      const struct pci_device_id *ent)
+ {
+ 	struct device_node *of_node;
+diff --git a/drivers/video/tcx.c b/drivers/video/tcx.c
+index 9f57539..cfdc1bb 100644
+--- a/drivers/video/tcx.c
++++ b/drivers/video/tcx.c
+@@ -362,7 +362,7 @@ static void tcx_unmap_regs(struct platform_device *op, struct fb_info *info,
+ 			   info->screen_base, info->fix.smem_len);
+ }
+ 
+-static int __devinit tcx_probe(struct platform_device *op)
++static int tcx_probe(struct platform_device *op)
+ {
+ 	struct device_node *dp = op->dev.of_node;
+ 	struct fb_info *info;
+diff --git a/drivers/video/tdfxfb.c b/drivers/video/tdfxfb.c
+index bbb0d95..efbf5c9 100644
+--- a/drivers/video/tdfxfb.c
++++ b/drivers/video/tdfxfb.c
+@@ -135,7 +135,7 @@ static struct fb_var_screeninfo tdfx_var __devinitdata = {
+ /*
+  * PCI driver prototypes
   */
--static const char __devinit *get_chip_name(enum chip_type chip_id)
-+static const char *get_chip_name(enum chip_type chip_id)
+-static int __devinit tdfxfb_probe(struct pci_dev *pdev,
++static int tdfxfb_probe(struct pci_dev *pdev,
+ 				  const struct pci_device_id *id);
+ static void __devexit tdfxfb_remove(struct pci_dev *pdev);
+ 
+@@ -1279,7 +1279,7 @@ static int tdfxfb_ddc_getsda(void *data)
+ 	return (0 != (tdfx_inl(par, VIDSERPARPORT) & DDC_SDA_IN));
+ }
+ 
+-static int __devinit tdfxfb_setup_ddc_bus(struct tdfxfb_i2c_chan *chan,
++static int tdfxfb_setup_ddc_bus(struct tdfxfb_i2c_chan *chan,
+ 					  const char *name, struct device *dev)
+ {
+ 	int rc;
+@@ -1308,7 +1308,7 @@ static int __devinit tdfxfb_setup_ddc_bus(struct tdfxfb_i2c_chan *chan,
+ 	return rc;
+ }
+ 
+-static int __devinit tdfxfb_setup_i2c_bus(struct tdfxfb_i2c_chan *chan,
++static int tdfxfb_setup_i2c_bus(struct tdfxfb_i2c_chan *chan,
+ 					  const char *name, struct device *dev)
+ {
+ 	int rc;
+@@ -1336,7 +1336,7 @@ static int __devinit tdfxfb_setup_i2c_bus(struct tdfxfb_i2c_chan *chan,
+ 	return rc;
+ }
+ 
+-static void __devinit tdfxfb_create_i2c_busses(struct fb_info *info)
++static void tdfxfb_create_i2c_busses(struct fb_info *info)
+ {
+ 	struct tdfx_par *par = info->par;
+ 
+@@ -1388,7 +1388,7 @@ static int tdfxfb_probe_i2c_connector(struct tdfx_par *par,
+  *      Initializes and allocates resources for PCI device @pdev.
+  *
+  */
+-static int __devinit tdfxfb_probe(struct pci_dev *pdev,
++static int tdfxfb_probe(struct pci_dev *pdev,
+ 				  const struct pci_device_id *id)
+ {
+ 	struct tdfx_par *default_par;
+diff --git a/drivers/video/tgafb.c b/drivers/video/tgafb.c
+index 7333152..63fc5ba 100644
+--- a/drivers/video/tgafb.c
++++ b/drivers/video/tgafb.c
+@@ -61,7 +61,7 @@ static void tgafb_fillrect(struct fb_info *, const struct fb_fillrect *);
+ static void tgafb_copyarea(struct fb_info *, const struct fb_copyarea *);
+ static int tgafb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info);
+ 
+-static int __devinit tgafb_register(struct device *dev);
++static int tgafb_register(struct device *dev);
+ static void __devexit tgafb_unregister(struct device *dev);
+ 
+ static const char *mode_option;
+@@ -93,7 +93,7 @@ static struct fb_ops tgafb_ops = {
+ /*
+  *  PCI registration operations
+  */
+-static int __devinit tgafb_pci_register(struct pci_dev *,
++static int tgafb_pci_register(struct pci_dev *,
+ 					const struct pci_device_id *);
+ static void __devexit tgafb_pci_unregister(struct pci_dev *);
+ 
+@@ -110,7 +110,7 @@ static struct pci_driver tgafb_pci_driver = {
+ 	.remove			= tgafb_pci_unregister,
+ };
+ 
+-static int __devinit
++static int
+ tgafb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
+ {
+ 	return tgafb_register(&pdev->dev);
+@@ -127,7 +127,7 @@ tgafb_pci_unregister(struct pci_dev *pdev)
+ /*
+  *  TC registration operations
+  */
+-static int __devinit tgafb_tc_register(struct device *);
++static int tgafb_tc_register(struct device *);
+ static int __devexit tgafb_tc_unregister(struct device *);
+ 
+ static struct tc_device_id const tgafb_tc_table[] = {
+@@ -147,7 +147,7 @@ static struct tc_driver tgafb_tc_driver = {
+ 	},
+ };
+ 
+-static int __devinit
++static int
+ tgafb_tc_register(struct device *dev)
+ {
+ 	int status = tgafb_register(dev);
+@@ -1546,7 +1546,7 @@ static int tgafb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info
+ 	return 0;
+ }
+ 
+-static int __devinit
++static int
+ tgafb_register(struct device *dev)
+ {
+ 	static const struct fb_videomode modedb_tc = {
+@@ -1729,7 +1729,7 @@ tgafb_exit(void)
+ }
+ 
+ #ifndef MODULE
+-static int __devinit
++static int
+ tgafb_setup(char *arg)
+ {
+ 	char *this_opt;
+@@ -1751,7 +1751,7 @@ tgafb_setup(char *arg)
+ }
+ #endif /* !MODULE */
+ 
+-static int __devinit
++static int
+ tgafb_init(void)
+ {
+ 	int status;
+diff --git a/drivers/video/tmiofb.c b/drivers/video/tmiofb.c
+index 7c8133e..3f7527a 100644
+--- a/drivers/video/tmiofb.c
++++ b/drivers/video/tmiofb.c
+@@ -675,7 +675,7 @@ static struct fb_ops tmiofb_ops = {
+ 
+ /*--------------------------------------------------------------------------*/
+ 
+-static int __devinit tmiofb_probe(struct platform_device *dev)
++static int tmiofb_probe(struct platform_device *dev)
+ {
+ 	const struct mfd_cell *cell = mfd_get_cell(dev);
+ 	struct tmio_fb_data *data = dev->dev.platform_data;
+diff --git a/drivers/video/tridentfb.c b/drivers/video/tridentfb.c
+index a3f207b..f1a8495 100644
+--- a/drivers/video/tridentfb.c
++++ b/drivers/video/tridentfb.c
+@@ -637,7 +637,7 @@ static inline void crtc_unlock(struct tridentfb_par *par)
+ }
+ 
+ /*  Return flat panel's maximum x resolution */
+-static int __devinit get_nativex(struct tridentfb_par *par)
++static int get_nativex(struct tridentfb_par *par)
+ {
+ 	int x, y, tmp;
+ 
+@@ -771,7 +771,7 @@ static void set_number_of_lines(struct tridentfb_par *par, int lines)
+  * If we see that FP is active we assume we have one.
+  * Otherwise we have a CRT display. User can override.
+  */
+-static int __devinit is_flatpanel(struct tridentfb_par *par)
++static int is_flatpanel(struct tridentfb_par *par)
+ {
+ 	if (fp)
+ 		return 1;
+@@ -781,7 +781,7 @@ static int __devinit is_flatpanel(struct tridentfb_par *par)
+ }
+ 
+ /* Try detecting the video memory size */
+-static unsigned int __devinit get_memsize(struct tridentfb_par *par)
++static unsigned int get_memsize(struct tridentfb_par *par)
+ {
+ 	unsigned char tmp, tmp2;
+ 	unsigned int k;
+@@ -1331,7 +1331,7 @@ static struct fb_ops tridentfb_ops = {
+ 	.fb_sync = tridentfb_sync,
+ };
+ 
+-static int __devinit trident_pci_probe(struct pci_dev *dev,
++static int trident_pci_probe(struct pci_dev *dev,
+ 				       const struct pci_device_id *id)
+ {
+ 	int err;
+diff --git a/drivers/video/uvesafb.c b/drivers/video/uvesafb.c
+index 2f8f82d..a776c8e 100644
+--- a/drivers/video/uvesafb.c
++++ b/drivers/video/uvesafb.c
+@@ -418,7 +418,7 @@ static void uvesafb_vbe_state_restore(struct uvesafb_par *par, u8 *state_buf)
+ 	uvesafb_free(task);
+ }
+ 
+-static int __devinit uvesafb_vbe_getinfo(struct uvesafb_ktask *task,
++static int uvesafb_vbe_getinfo(struct uvesafb_ktask *task,
+ 		struct uvesafb_par *par)
+ {
+ 	int err;
+@@ -477,7 +477,7 @@ static int __devinit uvesafb_vbe_getinfo(struct uvesafb_ktask *task,
+ 	return 0;
+ }
+ 
+-static int __devinit uvesafb_vbe_getmodes(struct uvesafb_ktask *task,
++static int uvesafb_vbe_getmodes(struct uvesafb_ktask *task,
+ 		struct uvesafb_par *par)
+ {
+ 	int off = 0, err;
+@@ -556,7 +556,7 @@ static int __devinit uvesafb_vbe_getmodes(struct uvesafb_ktask *task,
+  * x86 and not x86_64.
+  */
+ #ifdef CONFIG_X86_32
+-static int __devinit uvesafb_vbe_getpmi(struct uvesafb_ktask *task,
++static int uvesafb_vbe_getpmi(struct uvesafb_ktask *task,
+ 		struct uvesafb_par *par)
+ {
+ 	int i, err;
+@@ -602,7 +602,7 @@ static int __devinit uvesafb_vbe_getpmi(struct uvesafb_ktask *task,
+  * Check whether a video mode is supported by the Video BIOS and is
+  * compatible with the monitor limits.
+  */
+-static int __devinit uvesafb_is_valid_mode(struct fb_videomode *mode,
++static int uvesafb_is_valid_mode(struct fb_videomode *mode,
+ 		struct fb_info *info)
+ {
+ 	if (info->monspecs.gtf) {
+@@ -618,7 +618,7 @@ static int __devinit uvesafb_is_valid_mode(struct fb_videomode *mode,
+ 	return 1;
+ }
+ 
+-static int __devinit uvesafb_vbe_getedid(struct uvesafb_ktask *task,
++static int uvesafb_vbe_getedid(struct uvesafb_ktask *task,
+ 		struct fb_info *info)
+ {
+ 	struct uvesafb_par *par = info->par;
+@@ -684,7 +684,7 @@ static int __devinit uvesafb_vbe_getedid(struct uvesafb_ktask *task,
+ 	return err;
+ }
+ 
+-static void __devinit uvesafb_vbe_getmonspecs(struct uvesafb_ktask *task,
++static void uvesafb_vbe_getmonspecs(struct uvesafb_ktask *task,
+ 		struct fb_info *info)
+ {
+ 	struct uvesafb_par *par = info->par;
+@@ -765,7 +765,7 @@ static void __devinit uvesafb_vbe_getmonspecs(struct uvesafb_ktask *task,
+ 	return;
+ }
+ 
+-static void __devinit uvesafb_vbe_getstatesize(struct uvesafb_ktask *task,
++static void uvesafb_vbe_getstatesize(struct uvesafb_ktask *task,
+ 		struct uvesafb_par *par)
+ {
+ 	int err;
+@@ -794,7 +794,7 @@ static void __devinit uvesafb_vbe_getstatesize(struct uvesafb_ktask *task,
+ 	par->vbe_state_size = 64 * (task->t.regs.ebx & 0xffff);
+ }
+ 
+-static int __devinit uvesafb_vbe_init(struct fb_info *info)
++static int uvesafb_vbe_init(struct fb_info *info)
+ {
+ 	struct uvesafb_ktask *task = NULL;
+ 	struct uvesafb_par *par = info->par;
+@@ -839,7 +839,7 @@ out:	uvesafb_free(task);
+ 	return err;
+ }
+ 
+-static int __devinit uvesafb_vbe_init_mode(struct fb_info *info)
++static int uvesafb_vbe_init_mode(struct fb_info *info)
+ {
+ 	struct list_head *pos;
+ 	struct fb_modelist *modelist;
+@@ -1444,7 +1444,7 @@ static struct fb_ops uvesafb_ops = {
+ 	.fb_set_par	= uvesafb_set_par,
+ };
+ 
+-static void __devinit uvesafb_init_info(struct fb_info *info,
++static void uvesafb_init_info(struct fb_info *info,
+ 		struct vbe_mode_ib *mode)
+ {
+ 	unsigned int size_vmode;
+@@ -1540,7 +1540,7 @@ static void __devinit uvesafb_init_info(struct fb_info *info,
+ 		info->fbops->fb_pan_display = NULL;
+ }
+ 
+-static void __devinit uvesafb_init_mtrr(struct fb_info *info)
++static void uvesafb_init_mtrr(struct fb_info *info)
+ {
+ #ifdef CONFIG_MTRR
+ 	if (mtrr && !(info->fix.smem_start & (PAGE_SIZE - 1))) {
+@@ -1582,7 +1582,7 @@ static void __devinit uvesafb_init_mtrr(struct fb_info *info)
+ #endif /* CONFIG_MTRR */
+ }
+ 
+-static void __devinit uvesafb_ioremap(struct fb_info *info)
++static void uvesafb_ioremap(struct fb_info *info)
+ {
+ #ifdef CONFIG_X86
+ 	switch (mtrr) {
+@@ -1738,7 +1738,7 @@ static struct attribute_group uvesafb_dev_attgrp = {
+ 	.attrs = uvesafb_dev_attrs,
+ };
+ 
+-static int __devinit uvesafb_probe(struct platform_device *dev)
++static int uvesafb_probe(struct platform_device *dev)
+ {
+ 	struct fb_info *info;
+ 	struct vbe_mode_ib *mode = NULL;
+@@ -1882,7 +1882,7 @@ static struct platform_driver uvesafb_driver = {
+ static struct platform_device *uvesafb_device;
+ 
+ #ifndef MODULE
+-static int __devinit uvesafb_setup(char *options)
++static int uvesafb_setup(char *options)
+ {
+ 	char *this_opt;
+ 
+@@ -1950,7 +1950,7 @@ static ssize_t store_v86d(struct device_driver *dev, const char *buf,
+ 
+ static DRIVER_ATTR(v86d, S_IRUGO | S_IWUSR, show_v86d, store_v86d);
+ 
+-static int __devinit uvesafb_init(void)
++static int uvesafb_init(void)
+ {
+ 	int err;
+ 
+diff --git a/drivers/video/vermilion/vermilion.c b/drivers/video/vermilion/vermilion.c
+index a2bacf8..3e92d0e 100644
+--- a/drivers/video/vermilion/vermilion.c
++++ b/drivers/video/vermilion/vermilion.c
+@@ -452,7 +452,7 @@ static void vmlfb_set_pref_pixel_format(struct fb_var_screeninfo *var)
+  * struct per pipe. Currently we have only one pipe.
+  */
+ 
+-static int __devinit vml_pci_probe(struct pci_dev *dev,
++static int vml_pci_probe(struct pci_dev *dev,
+ 				   const struct pci_device_id *id)
+ {
+ 	struct vml_info *vinfo;
+diff --git a/drivers/video/vfb.c b/drivers/video/vfb.c
+index c7f69252..f4cb015 100644
+--- a/drivers/video/vfb.c
++++ b/drivers/video/vfb.c
+@@ -477,7 +477,7 @@ static int __init vfb_setup(char *options)
+      *  Initialisation
+      */
+ 
+-static int __devinit vfb_probe(struct platform_device *dev)
++static int vfb_probe(struct platform_device *dev)
+ {
+ 	struct fb_info *info;
+ 	int retval = -ENOMEM;
+diff --git a/drivers/video/vga16fb.c b/drivers/video/vga16fb.c
+index 1ab146a..0e53f39 100644
+--- a/drivers/video/vga16fb.c
++++ b/drivers/video/vga16fb.c
+@@ -1303,7 +1303,7 @@ static int __init vga16fb_setup(char *options)
+ }
+ #endif
+ 
+-static int __devinit vga16fb_probe(struct platform_device *dev)
++static int vga16fb_probe(struct platform_device *dev)
+ {
+ 	struct fb_info *info;
+ 	struct vga16fb_par *par;
+diff --git a/drivers/video/via/dvi.c b/drivers/video/via/dvi.c
+index 6be72f0..1c9b68c 100644
+--- a/drivers/video/via/dvi.c
++++ b/drivers/video/via/dvi.c
+@@ -25,7 +25,7 @@
+ static void tmds_register_write(int index, u8 data);
+ static int tmds_register_read(int index);
+ static int tmds_register_read_bytes(int index, u8 *buff, int buff_len);
+-static void __devinit dvi_get_panel_size_from_DDCv1(
++static void dvi_get_panel_size_from_DDCv1(
+ 	struct tmds_chip_information *tmds_chip,
+ 	struct tmds_setting_information *tmds_setting);
+ static int viafb_dvi_query_EDID(void);
+@@ -35,7 +35,7 @@ static inline bool check_tmds_chip(int device_id_subaddr, int device_id)
+ 	return tmds_register_read(device_id_subaddr) == device_id;
+ }
+ 
+-void __devinit viafb_init_dvi_size(struct tmds_chip_information *tmds_chip,
++void viafb_init_dvi_size(struct tmds_chip_information *tmds_chip,
+ 	struct tmds_setting_information *tmds_setting)
+ {
+ 	DEBUG_MSG(KERN_INFO "viafb_init_dvi_size()\n");
+@@ -47,7 +47,7 @@ void __devinit viafb_init_dvi_size(struct tmds_chip_information *tmds_chip,
+ 	return;
+ }
+ 
+-bool __devinit viafb_tmds_trasmitter_identify(void)
++bool viafb_tmds_trasmitter_identify(void)
+ {
+ 	unsigned char sr2a = 0, sr1e = 0, sr3e = 0;
+ 
+@@ -285,7 +285,7 @@ static int viafb_dvi_query_EDID(void)
+ }
+ 
+ /* Get Panel Size Using EDID1 Table */
+-static void __devinit dvi_get_panel_size_from_DDCv1(
++static void dvi_get_panel_size_from_DDCv1(
+ 	struct tmds_chip_information *tmds_chip,
+ 	struct tmds_setting_information *tmds_setting)
+ {
+diff --git a/drivers/video/via/dvi.h b/drivers/video/via/dvi.h
+index db75785..4c6bfba 100644
+--- a/drivers/video/via/dvi.h
++++ b/drivers/video/via/dvi.h
+@@ -56,8 +56,8 @@
+ int viafb_dvi_sense(void);
+ void viafb_dvi_disable(void);
+ void viafb_dvi_enable(void);
+-bool __devinit viafb_tmds_trasmitter_identify(void);
+-void __devinit viafb_init_dvi_size(struct tmds_chip_information *tmds_chip,
++bool viafb_tmds_trasmitter_identify(void);
++void viafb_init_dvi_size(struct tmds_chip_information *tmds_chip,
+ 	struct tmds_setting_information *tmds_setting);
+ void viafb_dvi_set_mode(const struct fb_var_screeninfo *var,
+ 	u16 cxres, u16 cyres, int iga);
+diff --git a/drivers/video/via/hw.c b/drivers/video/via/hw.c
+index 898590d..80233da 100644
+--- a/drivers/video/via/hw.c
++++ b/drivers/video/via/hw.c
+@@ -465,9 +465,9 @@ static struct via_device_mapping device_mapping[] = {
+ static struct via_clock clock;
+ 
+ static void load_fix_bit_crtc_reg(void);
+-static void __devinit init_gfx_chip_info(int chip_type);
+-static void __devinit init_tmds_chip_info(void);
+-static void __devinit init_lvds_chip_info(void);
++static void init_gfx_chip_info(int chip_type);
++static void init_tmds_chip_info(void);
++static void init_lvds_chip_info(void);
+ static void device_screen_off(void);
+ static void device_screen_on(void);
+ static void set_display_channel(void);
+@@ -1507,7 +1507,7 @@ void viafb_fill_crtc_timing(const struct fb_var_screeninfo *var,
+ 	viafb_set_vclock(PICOS2KHZ(var->pixclock) * 1000, iga);
+ }
+ 
+-void __devinit viafb_init_chip_info(int chip_type)
++void viafb_init_chip_info(int chip_type)
+ {
+ 	via_clock_init(&clock, chip_type);
+ 	init_gfx_chip_info(chip_type);
+@@ -1540,7 +1540,7 @@ void viafb_update_device_setting(int hres, int vres, int bpp, int flag)
+ 	}
+ }
+ 
+-static void __devinit init_gfx_chip_info(int chip_type)
++static void init_gfx_chip_info(int chip_type)
+ {
+ 	u8 tmp;
+ 
+@@ -1593,7 +1593,7 @@ static void __devinit init_gfx_chip_info(int chip_type)
+ 	}
+ }
+ 
+-static void __devinit init_tmds_chip_info(void)
++static void init_tmds_chip_info(void)
+ {
+ 	viafb_tmds_trasmitter_identify();
+ 
+@@ -1638,7 +1638,7 @@ static void __devinit init_tmds_chip_info(void)
+ 		&viaparinfo->shared->tmds_setting_info);
+ }
+ 
+-static void __devinit init_lvds_chip_info(void)
++static void init_lvds_chip_info(void)
+ {
+ 	viafb_lvds_trasmitter_identify();
+ 	viafb_init_lcd_size();
+@@ -1672,7 +1672,7 @@ static void __devinit init_lvds_chip_info(void)
+ 		  viaparinfo->chip_info->lvds_chip_info.output_interface);
+ }
+ 
+-void __devinit viafb_init_dac(int set_iga)
++void viafb_init_dac(int set_iga)
  {
  	int i;
- 	for (i = 0; chip_info_table[i].name != NULL; i++)
-@@ -421,7 +421,7 @@ static void __devexit velocity_remove1(struct pci_dev *pdev)
-  *	all the verification and checking as well as reporting so that
-  *	we don't duplicate code for each option.
-  */
--static void __devinit velocity_set_int_opt(int *opt, int val, int min, int max, int def, char *name, const char *devname)
-+static void velocity_set_int_opt(int *opt, int val, int min, int max, int def, char *name, const char *devname)
- {
- 	if (val == -1)
- 		*opt = def;
-@@ -449,7 +449,7 @@ static void __devinit velocity_set_int_opt(int *opt, int val, int min, int max,
-  *	all the verification and checking as well as reporting so that
-  *	we don't duplicate code for each option.
-  */
--static void __devinit velocity_set_bool_opt(u32 *opt, int val, int def, u32 flag, char *name, const char *devname)
-+static void velocity_set_bool_opt(u32 *opt, int val, int def, u32 flag, char *name, const char *devname)
- {
- 	(*opt) &= (~flag);
- 	if (val == -1)
-@@ -474,7 +474,7 @@ static void __devinit velocity_set_bool_opt(u32 *opt, int val, int def, u32 flag
-  *	Turn the module and command options into a single structure
-  *	for the current device
-  */
--static void __devinit velocity_get_options(struct velocity_opt *opts, int index, const char *devname)
-+static void velocity_get_options(struct velocity_opt *opts, int index, const char *devname)
- {
+ 	u8 tmp;
+diff --git a/drivers/video/via/hw.h b/drivers/video/via/hw.h
+index 6be243c..a820575 100644
+--- a/drivers/video/via/hw.h
++++ b/drivers/video/via/hw.h
+@@ -663,8 +663,8 @@ void viafb_set_dpa_gfx(int output_interface, struct GFX_DPA_SETTING\
+ int viafb_setmode(void);
+ void viafb_fill_var_timing_info(struct fb_var_screeninfo *var,
+ 	const struct fb_videomode *mode);
+-void __devinit viafb_init_chip_info(int chip_type);
+-void __devinit viafb_init_dac(int set_iga);
++void viafb_init_chip_info(int chip_type);
++void viafb_init_dac(int set_iga);
+ int viafb_get_refresh(int hres, int vres, u32 float_refresh);
+ void viafb_update_device_setting(int hres, int vres, int bpp, int flag);
  
- 	velocity_set_int_opt(&opts->rx_thresh, rx_thresh[index], RX_THRESH_MIN, RX_THRESH_MAX, RX_THRESH_DEF, "rx_thresh", devname);
-@@ -2627,7 +2627,7 @@ static const struct net_device_ops velocity_netdev_ops = {
-  *	Set up the initial velocity_info struct for the device that has been
-  *	discovered.
-  */
--static void __devinit velocity_init_info(struct pci_dev *pdev,
-+static void velocity_init_info(struct pci_dev *pdev,
- 					 struct velocity_info *vptr,
- 					 const struct velocity_info_tbl *info)
- {
-@@ -2648,7 +2648,7 @@ static void __devinit velocity_init_info(struct pci_dev *pdev,
-  *	Retrieve the PCI configuration space data that interests us from
-  *	the kernel PCI layer
-  */
--static int __devinit velocity_get_pci_info(struct velocity_info *vptr, struct pci_dev *pdev)
-+static int velocity_get_pci_info(struct velocity_info *vptr, struct pci_dev *pdev)
- {
- 	vptr->rev_id = pdev->revision;
- 
-@@ -2685,7 +2685,7 @@ static int __devinit velocity_get_pci_info(struct velocity_info *vptr, struct pc
-  *	Print per driver data as the kernel driver finds Velocity
-  *	hardware
-  */
--static void __devinit velocity_print_info(struct velocity_info *vptr)
-+static void velocity_print_info(struct velocity_info *vptr)
- {
- 	struct net_device *dev = vptr->dev;
- 
-@@ -2709,7 +2709,7 @@ static u32 velocity_get_link(struct net_device *dev)
-  *	Configure a discovered adapter from scratch. Return a negative
-  *	errno error code on failure paths.
-  */
--static int __devinit velocity_found1(struct pci_dev *pdev, const struct pci_device_id *ent)
-+static int velocity_found1(struct pci_dev *pdev, const struct pci_device_id *ent)
- {
- 	static int first = 1;
- 	struct net_device *dev;
-diff --git a/drivers/net/ethernet/wiznet/w5100.c b/drivers/net/ethernet/wiznet/w5100.c
-index 82187f3..3babcfc 100644
---- a/drivers/net/ethernet/wiznet/w5100.c
-+++ b/drivers/net/ethernet/wiznet/w5100.c
-@@ -623,7 +623,7 @@ static const struct net_device_ops w5100_netdev_ops = {
- 	.ndo_change_mtu		= eth_change_mtu,
+diff --git a/drivers/video/via/lcd.c b/drivers/video/via/lcd.c
+index 1650379..980ee1b 100644
+--- a/drivers/video/via/lcd.c
++++ b/drivers/video/via/lcd.c
+@@ -49,7 +49,7 @@ static struct _lcd_scaling_factor lcd_scaling_factor_CLE = {
  };
  
--static int __devinit w5100_hw_probe(struct platform_device *pdev)
-+static int w5100_hw_probe(struct platform_device *pdev)
+ static bool lvds_identify_integratedlvds(void);
+-static void __devinit fp_id_to_vindex(int panel_id);
++static void fp_id_to_vindex(int panel_id);
+ static int lvds_register_read(int index);
+ static void load_lcd_scaling(int set_hres, int set_vres, int panel_hres,
+ 		      int panel_vres);
+@@ -81,7 +81,7 @@ static inline bool check_lvds_chip(int device_id_subaddr, int device_id)
+ 	return lvds_register_read(device_id_subaddr) == device_id;
+ }
+ 
+-void __devinit viafb_init_lcd_size(void)
++void viafb_init_lcd_size(void)
  {
- 	struct wiznet_platform_data *data = pdev->dev.platform_data;
- 	struct net_device *ndev = platform_get_drvdata(pdev);
-@@ -698,7 +698,7 @@ static int __devinit w5100_hw_probe(struct platform_device *pdev)
+ 	DEBUG_MSG(KERN_INFO "viafb_init_lcd_size()\n");
+ 
+@@ -139,7 +139,7 @@ static bool lvds_identify_integratedlvds(void)
+ 	return true;
+ }
+ 
+-bool __devinit viafb_lvds_trasmitter_identify(void)
++bool viafb_lvds_trasmitter_identify(void)
+ {
+ 	if (viafb_lvds_identify_vt1636(VIA_PORT_31)) {
+ 		viaparinfo->chip_info->lvds_chip_info.i2c_port = VIA_PORT_31;
+@@ -180,7 +180,7 @@ bool __devinit viafb_lvds_trasmitter_identify(void)
+ 	return false;
+ }
+ 
+-static void __devinit fp_id_to_vindex(int panel_id)
++static void fp_id_to_vindex(int panel_id)
+ {
+ 	DEBUG_MSG(KERN_INFO "fp_get_panel_id()\n");
+ 
+@@ -914,7 +914,7 @@ static void check_diport_of_integrated_lvds(
+ 		  plvds_chip_info->output_interface);
+ }
+ 
+-void __devinit viafb_init_lvds_output_interface(struct lvds_chip_information
++void viafb_init_lvds_output_interface(struct lvds_chip_information
+ 				*plvds_chip_info,
+ 				struct lvds_setting_information
+ 				*plvds_setting_info)
+diff --git a/drivers/video/via/lcd.h b/drivers/video/via/lcd.h
+index 8f3e4e0..5c988a0 100644
+--- a/drivers/video/via/lcd.h
++++ b/drivers/video/via/lcd.h
+@@ -71,15 +71,15 @@ void viafb_enable_lvds_vt1636(struct lvds_setting_information
+ 			struct lvds_chip_information *plvds_chip_info);
+ void viafb_lcd_disable(void);
+ void viafb_lcd_enable(void);
+-void __devinit viafb_init_lcd_size(void);
+-void __devinit viafb_init_lvds_output_interface(struct lvds_chip_information
++void viafb_init_lcd_size(void);
++void viafb_init_lvds_output_interface(struct lvds_chip_information
+ 				*plvds_chip_info,
+ 				struct lvds_setting_information
+ 				*plvds_setting_info);
+ void viafb_lcd_set_mode(const struct fb_var_screeninfo *var, u16 cxres,
+ 	u16 cyres, struct lvds_setting_information *plvds_setting_info,
+ 	struct lvds_chip_information *plvds_chip_info);
+-bool __devinit viafb_lvds_trasmitter_identify(void);
++bool viafb_lvds_trasmitter_identify(void);
+ void viafb_init_lvds_output_interface(struct lvds_chip_information
+ 				*plvds_chip_info,
+ 				struct lvds_setting_information
+diff --git a/drivers/video/via/via-core.c b/drivers/video/via/via-core.c
+index 29b3af8..abbcb1b 100644
+--- a/drivers/video/via/via-core.c
++++ b/drivers/video/via/via-core.c
+@@ -80,7 +80,7 @@ static inline int viafb_mmio_read(int reg)
+  */
+ static u32 viafb_enabled_ints;
+ 
+-static void __devinit viafb_int_init(void)
++static void viafb_int_init(void)
+ {
+ 	viafb_enabled_ints = 0;
+ 
+@@ -475,7 +475,7 @@ static int viafb_get_fb_size_from_pci(int chip_type)
+ /*
+  * Figure out and map our MMIO regions.
+  */
+-static int __devinit via_pci_setup_mmio(struct viafb_dev *vdev)
++static int via_pci_setup_mmio(struct viafb_dev *vdev)
+ {
+ 	int ret;
+ 	/*
+@@ -550,7 +550,7 @@ static struct viafb_subdev_info {
+ };
+ #define N_SUBDEVS ARRAY_SIZE(viafb_subdevs)
+ 
+-static int __devinit via_create_subdev(struct viafb_dev *vdev,
++static int via_create_subdev(struct viafb_dev *vdev,
+ 		struct viafb_subdev_info *info)
+ {
+ 	int ret;
+@@ -573,7 +573,7 @@ static int __devinit via_create_subdev(struct viafb_dev *vdev,
+ 	return ret;
+ }
+ 
+-static int __devinit via_setup_subdevs(struct viafb_dev *vdev)
++static int via_setup_subdevs(struct viafb_dev *vdev)
+ {
+ 	int i;
+ 
+@@ -671,7 +671,7 @@ static int via_resume(struct pci_dev *pdev)
+ }
+ #endif /* CONFIG_PM */
+ 
+-static int __devinit via_pci_probe(struct pci_dev *pdev,
++static int via_pci_probe(struct pci_dev *pdev,
+ 		const struct pci_device_id *ent)
+ {
+ 	int ret;
+diff --git a/drivers/video/via/via-gpio.c b/drivers/video/via/via-gpio.c
+index d69cfef..e408679 100644
+--- a/drivers/video/via/via-gpio.c
++++ b/drivers/video/via/via-gpio.c
+@@ -212,7 +212,7 @@ EXPORT_SYMBOL_GPL(viafb_gpio_lookup);
+ /*
+  * Platform device stuff.
+  */
+-static __devinit int viafb_gpio_probe(struct platform_device *platdev)
++static int viafb_gpio_probe(struct platform_device *platdev)
+ {
+ 	struct viafb_dev *vdev = platdev->dev.platform_data;
+ 	struct via_port_cfg *port_cfg = vdev->port_cfg;
+diff --git a/drivers/video/via/viafbdev.c b/drivers/video/via/viafbdev.c
+index c80e770..bb41017 100644
+--- a/drivers/video/via/viafbdev.c
++++ b/drivers/video/via/viafbdev.c
+@@ -1072,7 +1072,7 @@ static int __init parse_active_dev(void)
  	return 0;
  }
  
--static int __devinit w5100_probe(struct platform_device *pdev)
-+static int w5100_probe(struct platform_device *pdev)
+-static int __devinit parse_port(char *opt_str, int *output_interface)
++static int parse_port(char *opt_str, int *output_interface)
  {
- 	struct w5100_priv *priv;
- 	struct net_device *ndev;
-diff --git a/drivers/net/ethernet/wiznet/w5300.c b/drivers/net/ethernet/wiznet/w5300.c
-index 48c182e..3887747 100644
---- a/drivers/net/ethernet/wiznet/w5300.c
-+++ b/drivers/net/ethernet/wiznet/w5300.c
-@@ -543,7 +543,7 @@ static const struct net_device_ops w5300_netdev_ops = {
- 	.ndo_change_mtu		= eth_change_mtu,
- };
- 
--static int __devinit w5300_hw_probe(struct platform_device *pdev)
-+static int w5300_hw_probe(struct platform_device *pdev)
- {
- 	struct wiznet_platform_data *data = pdev->dev.platform_data;
- 	struct net_device *ndev = platform_get_drvdata(pdev);
-@@ -610,7 +610,7 @@ static int __devinit w5300_hw_probe(struct platform_device *pdev)
+ 	if (!strncmp(opt_str, "DVP0", 4))
+ 		*output_interface = INTERFACE_DVP0;
+@@ -1089,7 +1089,7 @@ static int __devinit parse_port(char *opt_str, int *output_interface)
  	return 0;
  }
  
--static int __devinit w5300_probe(struct platform_device *pdev)
-+static int w5300_probe(struct platform_device *pdev)
+-static void __devinit parse_lcd_port(void)
++static void parse_lcd_port(void)
  {
- 	struct w5300_priv *priv;
- 	struct net_device *ndev;
-diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
-index 6ac9e4c..c7375a8 100644
---- a/drivers/net/ethernet/xilinx/ll_temac_main.c
-+++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
-@@ -1002,7 +1002,7 @@ static const struct ethtool_ops temac_ethtool_ops = {
- 	.get_ts_info = ethtool_op_get_ts_info,
+ 	parse_port(viafb_lcd_port, &viaparinfo->chip_info->lvds_chip_info.
+ 		output_interface);
+@@ -1102,7 +1102,7 @@ static void __devinit parse_lcd_port(void)
+ 		  output_interface);
+ }
+ 
+-static void __devinit parse_dvi_port(void)
++static void parse_dvi_port(void)
+ {
+ 	parse_port(viafb_dvi_port, &viaparinfo->chip_info->tmds_chip_info.
+ 		output_interface);
+@@ -1727,7 +1727,7 @@ static struct viafb_pm_hooks viafb_fb_pm_hooks = {
+ 
+ #endif
+ 
+-static void __devinit i2c_bus_probe(struct viafb_shared *shared)
++static void i2c_bus_probe(struct viafb_shared *shared)
+ {
+ 	/* should be always CRT */
+ 	printk(KERN_INFO "viafb: Probing I2C bus 0x26\n");
+@@ -1753,7 +1753,7 @@ static void i2c_bus_free(struct viafb_shared *shared)
+ 	via_aux_free(shared->i2c_2C);
+ }
+ 
+-int __devinit via_fb_pci_probe(struct viafb_dev *vdev)
++int via_fb_pci_probe(struct viafb_dev *vdev)
+ {
+ 	u32 default_xres, default_yres;
+ 	struct fb_var_screeninfo default_var;
+diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
+index 22063bb..1b94610 100644
+--- a/drivers/video/vt8500lcdfb.c
++++ b/drivers/video/vt8500lcdfb.c
+@@ -273,7 +273,7 @@ static irqreturn_t vt8500lcd_handle_irq(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int __devinit vt8500lcd_probe(struct platform_device *pdev)
++static int vt8500lcd_probe(struct platform_device *pdev)
+ {
+ 	struct vt8500lcd_info *fbi;
+ 	struct resource *res;
+diff --git a/drivers/video/vt8623fb.c b/drivers/video/vt8623fb.c
+index f0bce7a..c23c8c7 100644
+--- a/drivers/video/vt8623fb.c
++++ b/drivers/video/vt8623fb.c
+@@ -660,7 +660,7 @@ static struct fb_ops vt8623fb_ops = {
+ 
+ /* PCI probe */
+ 
+-static int __devinit vt8623_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
++static int vt8623_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
+ {
+ 	struct pci_bus_region bus_reg;
+ 	struct resource vga_res;
+diff --git a/drivers/video/w100fb.c b/drivers/video/w100fb.c
+index 614e1bd..1c2eaf2 100644
+--- a/drivers/video/w100fb.c
++++ b/drivers/video/w100fb.c
+@@ -54,7 +54,7 @@ static void w100_update_enable(void);
+ static void w100_update_disable(void);
+ static void calc_hsync(struct w100fb_par *par);
+ static void w100_init_graphic_engine(struct w100fb_par *par);
+-struct w100_pll_info *w100_get_xtal_table(unsigned int freq) __devinit;
++struct w100_pll_info *w100_get_xtal_table(unsigned int freq);
+ 
+ /* Pseudo palette size */
+ #define MAX_PALETTES      16
+@@ -630,7 +630,7 @@ static int w100fb_resume(struct platform_device *dev)
+ #endif
+ 
+ 
+-int __devinit w100fb_probe(struct platform_device *pdev)
++int w100fb_probe(struct platform_device *pdev)
+ {
+ 	int err = -EIO;
+ 	struct w100fb_mach_info *inf;
+@@ -1021,7 +1021,7 @@ static struct pll_entries {
+ 	{ 0 },
  };
  
--static int __devinit temac_of_probe(struct platform_device *op)
-+static int temac_of_probe(struct platform_device *op)
+-struct w100_pll_info __devinit *w100_get_xtal_table(unsigned int freq)
++struct w100_pll_info *w100_get_xtal_table(unsigned int freq)
  {
- 	struct device_node *np;
- 	struct temac_local *lp;
-diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-index 6020244..b8c9a33 100644
---- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-@@ -1476,7 +1476,7 @@ static void axienet_dma_err_handler(unsigned long data)
-  * device. Parses through device tree and populates fields of
-  * axienet_local. It registers the Ethernet device.
-  */
--static int __devinit axienet_of_probe(struct platform_device *op)
-+static int axienet_of_probe(struct platform_device *op)
- {
- 	__be32 *p;
- 	int size, ret = 0;
-diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-index c4d7a80..8d4f32d 100644
---- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-@@ -1107,7 +1107,7 @@ static struct net_device_ops xemaclite_netdev_ops;
-  * Return:	0, if the driver is bound to the Emaclite device, or
-  *		a negative error if there is failure.
-  */
--static int __devinit xemaclite_of_probe(struct platform_device *ofdev)
-+static int xemaclite_of_probe(struct platform_device *ofdev)
- {
- 	struct resource r_irq; /* Interrupt resources */
- 	struct resource r_mem; /* IO mem resources */
-diff --git a/drivers/net/ethernet/xscale/ixp4xx_eth.c b/drivers/net/ethernet/xscale/ixp4xx_eth.c
-index 98934bd..09164c8 100644
---- a/drivers/net/ethernet/xscale/ixp4xx_eth.c
-+++ b/drivers/net/ethernet/xscale/ixp4xx_eth.c
-@@ -1377,7 +1377,7 @@ static const struct net_device_ops ixp4xx_netdev_ops = {
- 	.ndo_validate_addr = eth_validate_addr,
+ 	struct pll_entries *pll_entry = w100_pll_tables;
+ 
+diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
+index 5c126af..456694a 100644
+--- a/drivers/video/wm8505fb.c
++++ b/drivers/video/wm8505fb.c
+@@ -260,7 +260,7 @@ static struct fb_ops wm8505fb_ops = {
+ 	.fb_blank	= wm8505fb_blank,
  };
  
--static int __devinit eth_init_one(struct platform_device *pdev)
-+static int eth_init_one(struct platform_device *pdev)
+-static int __devinit wm8505fb_probe(struct platform_device *pdev)
++static int wm8505fb_probe(struct platform_device *pdev)
  {
- 	struct port *port;
- 	struct net_device *dev;
+ 	struct wm8505fb_info	*fbi;
+ 	struct resource		*res;
+diff --git a/drivers/video/wmt_ge_rops.c b/drivers/video/wmt_ge_rops.c
+index 46b7a09..e65361d 100644
+--- a/drivers/video/wmt_ge_rops.c
++++ b/drivers/video/wmt_ge_rops.c
+@@ -124,7 +124,7 @@ int wmt_ge_sync(struct fb_info *p)
+ }
+ EXPORT_SYMBOL_GPL(wmt_ge_sync);
+ 
+-static int __devinit wmt_ge_rops_probe(struct platform_device *pdev)
++static int wmt_ge_rops_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res;
+ 
+diff --git a/drivers/video/xen-fbfront.c b/drivers/video/xen-fbfront.c
+index 917bb56..ee44be8 100644
+--- a/drivers/video/xen-fbfront.c
++++ b/drivers/video/xen-fbfront.c
+@@ -358,7 +358,7 @@ static irqreturn_t xenfb_event_handler(int rq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int __devinit xenfb_probe(struct xenbus_device *dev,
++static int xenfb_probe(struct xenbus_device *dev,
+ 				 const struct xenbus_device_id *id)
+ {
+ 	struct xenfb_info *info;
+@@ -487,7 +487,7 @@ error:
+ 	return ret;
+ }
+ 
+-static __devinit void
++static void
+ xenfb_make_preferred_console(void)
+ {
+ 	struct console *c;
+diff --git a/drivers/video/xilinxfb.c b/drivers/video/xilinxfb.c
+index 20a7c0e..b5d317c 100644
+--- a/drivers/video/xilinxfb.c
++++ b/drivers/video/xilinxfb.c
+@@ -403,7 +403,7 @@ static int xilinxfb_release(struct device *dev)
+  * OF bus binding
+  */
+ 
+-static int __devinit xilinxfb_of_probe(struct platform_device *op)
++static int xilinxfb_of_probe(struct platform_device *op)
+ {
+ 	const u32 *prop;
+ 	u32 *p;
 -- 
 1.8.0
