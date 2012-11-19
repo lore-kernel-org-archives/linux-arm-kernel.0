@@ -1,46 +1,109 @@
-From: Larry.Finger@lwfinger.net (Larry Finger)
-Date: Sun, 18 Nov 2012 18:10:00 -0600
-Subject: [Patch v1 1/1] RTL8712 alignment bug in 3.6.5 on ARM
-In-Reply-To: <20121118205515.GK11717@lunn.ch>
-References: <CAMW5UfYUi-Zz2r5K9GeVzShSub2rDJVuoWR56+89+ytaqo_uxQ@mail.gmail.com>
- <20121118181140.GC14643@lunn.ch> <50A9429D.1010908@lwfinger.net>
- <20121118205515.GK11717@lunn.ch>
-Message-ID: <50A978D8.1060309@lwfinger.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 18 Nov 2012 19:18:46 -0500
+Subject: [PATCH] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
+References: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20121119001846.GB22106@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2012 02:55 PM, Andrew Lunn wrote:
+Marek,
 
-> This is not sufficient. In fact it makes no difference at all. The
-> problem is not with the structure, but with the allocation of memory
-> used to contain the structure.
->
->          pstapriv->pallocated_stainfo_buf = _malloc(sizeof(struct sta_info) *
->                                                     NUM_STA + 4);
->          if (pstapriv->pallocated_stainfo_buf == NULL)
->                  return _FAIL;
->          pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 4 -
->                  ((addr_t)(pstapriv->pallocated_stainfo_buf) & 3);
->
-> kmalloc() guarantees that its alignment is correct for any type of
-> structure. Thus all this code above is redundant in Linux, but maybe
-> needed in some other OS. Worse still, this code actually breaks the
-> alignment. kmalloc() gave out something which was 64 bit aligned. But
-> by adding 4 and then masking off the lower 2 bits, it destroys the 64
-> bit alignment and makes it only 32bit aligned.
->
-> Removing the _malloc() wrapper, fixing the GFP_ATOMIC, and leaving the
-> allocater to worry about alignment will be one of the steps to getting
-> out of staging.
+I've added the maintainers for mm/*.  Hopefully they can let us know if
+this is good for v3.8...
 
-As you surmised, the original driver was meant for several Windows systems as 
-well as Linux.
+thx,
 
-This driver will not make it out of staging until it supports the mac80211 
-stack. Work to accomplish this has started by modifying the rtl8192se code to 
-work with the USB interface. I will make certain that the alignment issues are 
-fixed there.
+Jason.
 
-Thanks for the lesson,
-
-Larry
+On Thu, Nov 08, 2012 at 07:38:57AM +0100, Marek Szyprowski wrote:
+> dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag, regardless
+> the flags provided by the caller. This causes excessive pruning of
+> emergency memory pools without any good reason. This patch changes the code
+> to correctly use gfp flags provided by the dmapool caller. This should
+> solve the dmapool usage on ARM architecture, where GFP_ATOMIC DMA
+> allocations can be served only from the special, very limited memory pool.
+> 
+> Reported-by: Soren Moch <smoch@web.de>
+> Reported-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  mm/dmapool.c |   27 +++++++--------------------
+>  1 file changed, 7 insertions(+), 20 deletions(-)
+> 
+> diff --git a/mm/dmapool.c b/mm/dmapool.c
+> index c5ab33b..86de9b2 100644
+> --- a/mm/dmapool.c
+> +++ b/mm/dmapool.c
+> @@ -62,8 +62,6 @@ struct dma_page {		/* cacheable header for 'allocation' bytes */
+>  	unsigned int offset;
+>  };
+>  
+> -#define	POOL_TIMEOUT_JIFFIES	((100 /* msec */ * HZ) / 1000)
+> -
+>  static DEFINE_MUTEX(pools_lock);
+>  
+>  static ssize_t
+> @@ -227,7 +225,6 @@ static struct dma_page *pool_alloc_page(struct dma_pool *pool, gfp_t mem_flags)
+>  		memset(page->vaddr, POOL_POISON_FREED, pool->allocation);
+>  #endif
+>  		pool_initialise_page(pool, page);
+> -		list_add(&page->page_list, &pool->page_list);
+>  		page->in_use = 0;
+>  		page->offset = 0;
+>  	} else {
+> @@ -315,30 +312,21 @@ void *dma_pool_alloc(struct dma_pool *pool, gfp_t mem_flags,
+>  	might_sleep_if(mem_flags & __GFP_WAIT);
+>  
+>  	spin_lock_irqsave(&pool->lock, flags);
+> - restart:
+>  	list_for_each_entry(page, &pool->page_list, page_list) {
+>  		if (page->offset < pool->allocation)
+>  			goto ready;
+>  	}
+> -	page = pool_alloc_page(pool, GFP_ATOMIC);
+> -	if (!page) {
+> -		if (mem_flags & __GFP_WAIT) {
+> -			DECLARE_WAITQUEUE(wait, current);
+>  
+> -			__set_current_state(TASK_UNINTERRUPTIBLE);
+> -			__add_wait_queue(&pool->waitq, &wait);
+> -			spin_unlock_irqrestore(&pool->lock, flags);
+> +	/* pool_alloc_page() might sleep, so temporarily drop &pool->lock */
+> +	spin_unlock_irqrestore(&pool->lock, flags);
+>  
+> -			schedule_timeout(POOL_TIMEOUT_JIFFIES);
+> +	page = pool_alloc_page(pool, mem_flags);
+> +	if (!page)
+> +		return NULL;
+>  
+> -			spin_lock_irqsave(&pool->lock, flags);
+> -			__remove_wait_queue(&pool->waitq, &wait);
+> -			goto restart;
+> -		}
+> -		retval = NULL;
+> -		goto done;
+> -	}
+> +	spin_lock_irqsave(&pool->lock, flags);
+>  
+> +	list_add(&page->page_list, &pool->page_list);
+>   ready:
+>  	page->in_use++;
+>  	offset = page->offset;
+> @@ -348,7 +336,6 @@ void *dma_pool_alloc(struct dma_pool *pool, gfp_t mem_flags,
+>  #ifdef	DMAPOOL_DEBUG
+>  	memset(retval, POOL_POISON_ALLOCATED, pool->size);
+>  #endif
+> - done:
+>  	spin_unlock_irqrestore(&pool->lock, flags);
+>  	return retval;
+>  }
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
