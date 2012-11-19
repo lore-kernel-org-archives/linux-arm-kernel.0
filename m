@@ -1,38 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Nov 2012 09:46:06 +0000
-Subject: [RFC] fbdev: arm has __raw I/O accessors, use them in fb.h
-In-Reply-To: <50A9FD98.1060105@ti.com>
-References: <1353057364-21214-1-git-send-email-archit@ti.com>
- <ADE657CA350FB648AAC2C43247A983F00206B2644F3F@AUSP01VMBX24.collaborationhost.net>
- <50A9C1C4.5070907@ti.com> <20121119091504.GB3290@n2100.arm.linux.org.uk>
- <50A9FD98.1060105@ti.com>
-Message-ID: <20121119094606.GF3290@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 19 Nov 2012 10:48:09 +0100
+Subject: [PATCH 1/4] pinctrl: mvebu: fix iomem pointer for dove pinctrl
+In-Reply-To: <1353317996-20841-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1353317996-20841-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1353317996-20841-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20121119104809.6e391917@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 11:36:24AM +0200, Tomi Valkeinen wrote:
-> Probably not. I can't say anything to that matter, but I wonder if this
-> patch is just going around the problem that we get sparse warnings when
-> falling into the else ifdef block in fb.h.
+Dear Sebastian Hesselbarth,
+
+On Mon, 19 Nov 2012 10:39:53 +0100, Sebastian Hesselbarth wrote:
+> There has been a change in readl/writel to require registers
+> addresses marked as IOMEM(). This patch takes care of this and
+> also replaces ORing address offsets with adding them.
 > 
-> The macros in the else block are defined as:
-> 
-> #define fb_readb(addr) (*(volatile u8 *) (addr))                                 
-> 
-> And fb code passes a pointer to __iomem. So shouldn't the cast be to
-> (volatile u8 __iomem *)?
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: Axel Lin <axel.lin@ingics.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/pinctrl/mvebu/pinctrl-dove.c |   14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
 
-No, because sparse won't let you directly dereference an __iomem pointer.
-
-Directly dereferencing an __iomem pointer is wrong, always has been.  It's
-marked with __iomem _because_ it's a separate cookied address space from
-the virtual address space.
-
-This is one of the situations which has been left because the warning is
-correct - and this is one of those situations where silencing them via
-casts et.al. is the wrong thing to do.  The right thing to do is to leave
-the warning in place.
-
-This is one of the hardest things that I seem to get people to understand:
-if the code is wrong then we _should_ get a warning for it and we should
-definitely not paper over the warning.
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
