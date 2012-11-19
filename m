@@ -1,38 +1,59 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 19 Nov 2012 16:15:26 +0000
-Subject: [GIT PULL] ARM: /proc/cpuinfo updates
-Message-ID: <20121119161525.GA26148@e102568-lin.cambridge.arm.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Mon, 19 Nov 2012 09:19:15 -0700
+Subject: [RFC] dmaengine: omap-dma: Allow DMA controller to prefetch data
+In-Reply-To: <50AA0388.4020803@ti.com>
+References: <20121018222046.GA28541@animalcreek.com> <50AA0388.4020803@ti.com>
+Message-ID: <20121119161915.GA9758@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Mon, Nov 19, 2012 at 11:01:44AM +0100, Peter Ujfalusi wrote:
+> Hi,
+> 
+> On 10/19/2012 12:20 AM, Mark A. Greer wrote:
+> > Enable DMA prefetching by setting the 'OMAP_DMA_DST_SYNC_PREFETCH'
+> > flag whenever there is a destination synchronized DMA transfer.
+> > Prefetching is not allowed on source synchronized DMA transfers.
+> > 
+> > Enabling prefetch significantly improves DMA performance.
+> > For example, running 'modprobe tcrypt sec=2 mode=403' which
+> > exercises the omap-sham driver on an am37x EVM yeilds the
+> > following results:
+> 
+> >  drivers/dma/omap-dma.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+> > index bb2d8e7..aadddb2 100644
+> > --- a/drivers/dma/omap-dma.c
+> > +++ b/drivers/dma/omap-dma.c
+> > @@ -310,7 +310,7 @@ static struct dma_async_tx_descriptor *omap_dma_prep_slave_sg(
+> >  		dev_addr = c->cfg.dst_addr;
+> >  		dev_width = c->cfg.dst_addr_width;
+> >  		burst = c->cfg.dst_maxburst;
+> > -		sync_type = OMAP_DMA_DST_SYNC;
+> > +		sync_type = OMAP_DMA_DST_SYNC | OMAP_DMA_DST_SYNC_PREFETCH;
+> 
+> This should be:
+>  -		sync_type = OMAP_DMA_DST_SYNC;
+>  +		sync_type = OMAP_DMA_DST_SYNC_PREFETCH;
 
-please consider pulling /proc/cpuinfo updates in preparation for forthcoming
-big.LITTLE heterogeneous multi-cluster systems on chip that will require
-HW information to be printed for all CPUs in the system not just the one
-reading the /proc/cpuinfo file.
+Ah, right.  I will fix.
 
-Thank you very much indeed,
-Lorenzo
+> >  	} else {
+> >  		dev_err(chan->device->dev, "%s: bad direction?\n", __func__);
+> >  		return NULL;
+> > @@ -387,7 +387,7 @@ static struct dma_async_tx_descriptor *omap_dma_prep_dma_cyclic(
+> >  		dev_addr = c->cfg.dst_addr;
+> >  		dev_width = c->cfg.dst_addr_width;
+> >  		burst = c->cfg.dst_maxburst;
+> > -		sync_type = OMAP_DMA_DST_SYNC;
+> > +		sync_type = OMAP_DMA_DST_SYNC | OMAP_DMA_DST_SYNC_PREFETCH;
+> 
+> We should not enable the prefetch for cyclic right now. We will investigate it
+> more.
 
-The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
+OK.  I'll send a patch in a few minutes.
 
-  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
-
-are available in the git repository at:
-
-  git://linux-arm.org/linux-2.6-lp.git bl-cpuinfo
-
-for you to fetch changes up to b4b8f770eb10a1bccaf8aa0ec1956e2dd7ed1e0a:
-
-  ARM: kernel: update cpuinfo to print all online CPUs features (2012-11-19 14:51:12 +0000)
-
-----------------------------------------------------------------
-Lorenzo Pieralisi (2):
-      ARM: kernel: add MIDR to per-CPU information data
-      ARM: kernel: update cpuinfo to print all online CPUs features
-
- arch/arm/include/asm/cpu.h |  1 +
- arch/arm/kernel/setup.c    | 70 +++++++++++++++++++++++-----------------------
- arch/arm/kernel/smp.c      |  1 +
- 3 files changed, 37 insertions(+), 35 deletions(-)
+Mark
+--
