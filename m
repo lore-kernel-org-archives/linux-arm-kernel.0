@@ -1,80 +1,36 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 18 Nov 2012 19:20:47 -0500
-Subject: [PATCH] ARM: Orion: Remove redundent init_dma_coherent_pool_size()
-In-Reply-To: <1352655079-1005-1-git-send-email-andrew@lunn.ch>
-References: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
- <1352655079-1005-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20121119002047.GC22106@titan.lakedaemon.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 19 Nov 2012 10:24:13 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC boards for v3.8 #3
+Message-ID: <1353288254-6211-1-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 11, 2012 at 06:31:19PM +0100, Andrew Lunn wrote:
-> The patch:
-> 
-> mm: dmapool: use provided gfp flags for all dma_alloc_coherent() calls
-> 
-> makes these calls on Kirkword and Orion5x redundent. The drivers are
-> not making atomic requests for coherent memory and hence the default
-> pool size is now sufficient.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  arch/arm/mach-kirkwood/common.c |    7 -------
->  arch/arm/mach-orion5x/common.c  |    7 -------
->  2 files changed, 14 deletions(-)
+Hi Olof, Hi Arnd,
 
-Andrew,
+Please consider the following board fix for 3.8.
 
-I'm going to hold onto this until we hear from the mm maintainers on the
-parent patch.  If it doesn't make v3.8, I know we'll have to extend this
-patch to remove the similar code from mach-mvebu...
+Also, please let me know if you would prefer me to supply
+this as a fixes branch as we are now in the 3.7-rc6 timeframe
+where I understand that non-fix commits are no longer allowed for 3.8.
 
-thx,
+This commit is based on the renesas/boards2 branch of the arm-soc tree.
 
-Jason.
+----------------------------------------------------------------
+The following changes since commit 12818d82ccad9868a820dbb193b4f9b797cd02d4:
 
-> 
-> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-> index 2c6c218..8080ceb 100644
-> --- a/arch/arm/mach-kirkwood/common.c
-> +++ b/arch/arm/mach-kirkwood/common.c
-> @@ -505,13 +505,6 @@ void __init kirkwood_wdt_init(void)
->  void __init kirkwood_init_early(void)
->  {
->  	orion_time_set_base(TIMER_VIRT_BASE);
-> -
-> -	/*
-> -	 * Some Kirkwood devices allocate their coherent buffers from atomic
-> -	 * context. Increase size of atomic coherent pool to make sure such
-> -	 * the allocations won't fail.
-> -	 */
-> -	init_dma_coherent_pool_size(SZ_1M);
->  }
->  
->  int kirkwood_tclk;
-> diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-> index b3eb3da..3e07f52 100644
-> --- a/arch/arm/mach-orion5x/common.c
-> +++ b/arch/arm/mach-orion5x/common.c
-> @@ -194,13 +194,6 @@ void __init orion5x_wdt_init(void)
->  void __init orion5x_init_early(void)
->  {
->  	orion_time_set_base(TIMER_VIRT_BASE);
-> -
-> -	/*
-> -	 * Some Orion5x devices allocate their coherent buffers from atomic
-> -	 * context. Increase size of atomic coherent pool to make sure such
-> -	 * the allocations won't fail.
-> -	 */
-> -	init_dma_coherent_pool_size(SZ_1M);
->  }
->  
->  int orion5x_tclk;
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+  ARM: shmobile: use FSI driver's audio clock on ap4evb (2012-11-08 17:52:05 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git boards3
+
+for you to fetch changes up to d01f4b82fbee516b4d3f03b086333fc4a127983c:
+
+  ARM: shmobile: mackerel: Add FLCTL IRQ resource (2012-11-19 10:08:20 +0900)
+
+----------------------------------------------------------------
+Bastian Hecht (1):
+      ARM: shmobile: mackerel: Add FLCTL IRQ resource
+
+ arch/arm/mach-shmobile/board-mackerel.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
