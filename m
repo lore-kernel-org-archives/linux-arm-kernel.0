@@ -1,56 +1,72 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 19 Nov 2012 16:07:25 +0000
-Subject: [GIT PULL] ARM: multi-cluster aware boot protocol
-Message-ID: <20121119160725.GA25721@e102568-lin.cambridge.arm.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Mon, 19 Nov 2012 11:09:06 -0500
+Subject: [PATCH v4 07/14] KVM: ARM: Inject IRQs and FIQs from userspace
+In-Reply-To: <20121119152629.GH3205@mudshark.cambridge.arm.com>
+References: <20121110154203.2836.46686.stgit@chazy-air>
+ <20121110154259.2836.49857.stgit@chazy-air>
+ <20121119145546.GZ3205@mudshark.cambridge.arm.com>
+ <CANM98qJmkZZ2H+y8sdxBoT6WRgzcFSmKkTPWQnONDhezx5GEQQ@mail.gmail.com>
+ <20121119152629.GH3205@mudshark.cambridge.arm.com>
+Message-ID: <CANM98q+ts0s1DJO8CxjSDorh1wztjKKU5WdkoAGeWRrSUNi9DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Mon, Nov 19, 2012 at 10:26 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Nov 19, 2012 at 03:04:38PM +0000, Christoffer Dall wrote:
+>> On Mon, Nov 19, 2012 at 9:55 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Sat, Nov 10, 2012 at 03:42:59PM +0000, Christoffer Dall wrote:
+>> >> +int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level)
+>> >> +{
+>> >> +       u32 irq = irq_level->irq;
+>> >> +       unsigned int irq_type, vcpu_idx, irq_num;
+>> >> +       int nrcpus = atomic_read(&kvm->online_vcpus);
+>> >> +       struct kvm_vcpu *vcpu = NULL;
+>> >> +       bool level = irq_level->level;
+>> >> +
+>> >> +       irq_type = (irq >> KVM_ARM_IRQ_TYPE_SHIFT) & KVM_ARM_IRQ_TYPE_MASK;
+>> >> +       vcpu_idx = (irq >> KVM_ARM_IRQ_VCPU_SHIFT) & KVM_ARM_IRQ_VCPU_MASK;
+>> >> +       irq_num = (irq >> KVM_ARM_IRQ_NUM_SHIFT) & KVM_ARM_IRQ_NUM_MASK;
+>> >> +
+>> >> +       trace_kvm_irq_line(irq_type, vcpu_idx, irq_num, irq_level->level);
+>> >> +
+>> >> +       if (irq_type == KVM_ARM_IRQ_TYPE_CPU ||
+>> >> +           irq_type == KVM_ARM_IRQ_TYPE_PPI) {
+>> >> +               if (vcpu_idx >= nrcpus)
+>> >> +                       return -EINVAL;
+>> >> +
+>> >> +               vcpu = kvm_get_vcpu(kvm, vcpu_idx);
+>> >> +               if (!vcpu)
+>> >> +                       return -EINVAL;
+>> >> +       }
+>> >> +
+>> >> +       switch (irq_type) {
+>> >> +       case KVM_ARM_IRQ_TYPE_CPU:
+>> >> +               if (irq_num > KVM_ARM_IRQ_CPU_FIQ)
+>> >> +                       return -EINVAL;
+>> >> +
+>> >> +               return vcpu_interrupt_line(vcpu, irq_num, level);
+>> >> +       }
+>> >> +
+>> >> +       return -EINVAL;
+>> >> +}
+>> >
+>> > Holy cyclomatic complexity Batman! Any way this can be cleaned up?
+>> >
+>> you mean the interface or the implementation of kvm_vm_ioctl_irq_line?
+>> If the latter, there's just a lot of bits to decode here.
+>
+> I just think that this function is incredibly hard to read: different nested
+> conditions under duplicate checks of the same variables which differ between
+> an if(...) and a switch(...). I appreciate that it's a complex problem,
+> which is why I helpfully didn't suggest an alternative! There must be
+> *something* we can do though.
+>
 
-please consider pulling this patch series that adds cluster awareness to
-the ARM cpu_logical_map, adds DT cpu bindings, introduces GIC autoprobing for
-CPU interfaces and cleans up the topology definitions based on the MPIDR
-register.
+It is indeed a bit hard to read, but then wait to see the vgic code ! :)
 
-It is a small step, though pivotal, towards cluster awareness in the ARM kernel
-that allows us to generalize the MPIDR concept for future systems and prepare
-for some changes that have been on the backburner for a while (eg MPIDR
-linearization in cpu_{suspend}/{resume}).
+In all seriousness, I will unite myself with an alcoholic beverage one
+of these evenings and try to see what I can do about it, maybe split
+it up somehow, I'll give it a shot.
 
-Thank you very much indeed,
-Lorenzo
-
-The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
-
-  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
-
-are available in the git repository at:
-
-  git://linux-arm.org/linux-2.6-lp.git cluster-boot-protocol
-
-for you to fetch changes up to 384a290283fde63ba8dc671fca5420111cdac19a:
-
-  ARM: gic: use a private mapping for CPU target interfaces (2012-11-19 15:44:34 +0000)
-
-----------------------------------------------------------------
-Lorenzo Pieralisi (6):
-      ARM: kernel: enhance MPIDR macro definitions
-      ARM: kernel: update topology to use new MPIDR macros
-      ARM: kernel: smp_setup_processor_id() updates
-      ARM: kernel: add device tree init map function
-      ARM: kernel: add cpu logical map DT init in setup_arch
-      ARM: kernel: add logical mappings look-up
-
-Nicolas Pitre (1):
-      ARM: gic: use a private mapping for CPU target interfaces
-
- Documentation/devicetree/bindings/arm/cpus.txt |  77 +++++++++++++++++++
- arch/arm/common/gic.c                          |  45 ++++++++---
- arch/arm/include/asm/cputype.h                 |  13 ++++
- arch/arm/include/asm/prom.h                    |   2 +
- arch/arm/include/asm/smp_plat.h                |  17 +++++
- arch/arm/kernel/devtree.c                      | 100 +++++++++++++++++++++++++
- arch/arm/kernel/setup.c                        |   8 +-
- arch/arm/kernel/topology.c                     |  42 ++---------
- 8 files changed, 256 insertions(+), 48 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
+Cheers,
+-Christoffer
