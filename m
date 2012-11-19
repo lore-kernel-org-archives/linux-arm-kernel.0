@@ -1,9 +1,9 @@
 From: wfp5p@virginia.edu (Bill Pemberton)
-Date: Mon, 19 Nov 2012 13:26:01 -0500
-Subject: [PATCH 412/493] mfd: remove use of __devexit
+Date: Mon, 19 Nov 2012 13:26:11 -0500
+Subject: [PATCH 422/493] rtc: remove use of __devexit
 In-Reply-To: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
 References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
-Message-ID: <1353349642-3677-412-git-send-email-wfp5p@virginia.edu>
+Message-ID: <1353349642-3677-422-git-send-email-wfp5p@virginia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,1014 +11,964 @@ CONFIG_HOTPLUG is going away as an option so __devexit is no
 longer needed.
 
 Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
+Cc: Alessandro Zummo <a.zummo@towertech.it> 
 Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> 
-Cc: Peter Tyser <ptyser@xes-inc.com> 
-Cc: David Brown <davidb@codeaurora.org> 
-Cc: Daniel Walker <dwalker@fifo99.com> 
-Cc: Bryan Huntsman <bryanh@codeaurora.org> 
+Cc: Linus Walleij <linus.walleij@linaro.org> 
+Cc: Wan ZongShun <mcuos.com@gmail.com> 
+Cc: Guan Xuetao <gxt@mprc.pku.edu.cn> 
+Cc: rtc-linux at googlegroups.com 
 Cc: linux-arm-kernel at lists.infradead.org 
-Cc: device-drivers-devel at blackfin.uclinux.org 
+Cc: uclinux-dist-devel at blackfin.uclinux.org 
 Cc: patches at opensource.wolfsonmicro.com 
-Cc: linux-arm-msm at vger.kernel.org 
 ---
- drivers/mfd/88pm800.c             | 2 +-
- drivers/mfd/88pm805.c             | 2 +-
- drivers/mfd/88pm860x-core.c       | 4 ++--
- drivers/mfd/ab3100-core.c         | 2 +-
- drivers/mfd/ab8500-core.c         | 2 +-
- drivers/mfd/ab8500-debugfs.c      | 2 +-
- drivers/mfd/ab8500-gpadc.c        | 2 +-
- drivers/mfd/ab8500-sysctrl.c      | 2 +-
- drivers/mfd/adp5520.c             | 2 +-
- drivers/mfd/arizona-core.c        | 2 +-
- drivers/mfd/arizona-i2c.c         | 2 +-
- drivers/mfd/arizona-spi.c         | 2 +-
- drivers/mfd/asic3.c               | 2 +-
- drivers/mfd/cs5535-mfd.c          | 2 +-
- drivers/mfd/da903x.c              | 2 +-
- drivers/mfd/da9052-i2c.c          | 2 +-
- drivers/mfd/da9052-spi.c          | 2 +-
- drivers/mfd/da9055-core.c         | 2 +-
- drivers/mfd/da9055-i2c.c          | 2 +-
- drivers/mfd/davinci_voicecodec.c  | 2 +-
- drivers/mfd/ezx-pcap.c            | 2 +-
- drivers/mfd/intel_msic.c          | 4 ++--
- drivers/mfd/janz-cmodio.c         | 2 +-
- drivers/mfd/jz4740-adc.c          | 2 +-
- drivers/mfd/lm3533-core.c         | 4 ++--
- drivers/mfd/lp8788.c              | 2 +-
- drivers/mfd/lpc_ich.c             | 2 +-
- drivers/mfd/lpc_sch.c             | 2 +-
- drivers/mfd/max8907.c             | 2 +-
- drivers/mfd/max8925-core.c        | 2 +-
- drivers/mfd/max8925-i2c.c         | 2 +-
- drivers/mfd/mc13xxx-i2c.c         | 2 +-
- drivers/mfd/mc13xxx-spi.c         | 2 +-
- drivers/mfd/omap-usb-host.c       | 2 +-
- drivers/mfd/omap-usb-tll.c        | 2 +-
- drivers/mfd/pcf50633-adc.c        | 2 +-
- drivers/mfd/pcf50633-core.c       | 2 +-
- drivers/mfd/pm8921-core.c         | 2 +-
- drivers/mfd/pm8xxx-irq.c          | 2 +-
- drivers/mfd/rc5t583.c             | 2 +-
- drivers/mfd/rdc321x-southbridge.c | 2 +-
- drivers/mfd/rtsx_pcr.c            | 2 +-
- drivers/mfd/sm501.c               | 2 +-
- drivers/mfd/sta2x11-mfd.c         | 2 +-
- drivers/mfd/stmpe-i2c.c           | 2 +-
- drivers/mfd/stmpe-spi.c           | 2 +-
- drivers/mfd/syscon.c              | 2 +-
- drivers/mfd/tc3589x.c             | 2 +-
- drivers/mfd/tc6387xb.c            | 2 +-
- drivers/mfd/tc6393xb.c            | 2 +-
- drivers/mfd/ti-ssp.c              | 2 +-
- drivers/mfd/ti_am335x_tscadc.c    | 2 +-
- drivers/mfd/timberdale.c          | 2 +-
- drivers/mfd/tps6105x.c            | 2 +-
- drivers/mfd/tps65090.c            | 2 +-
- drivers/mfd/tps65217.c            | 2 +-
- drivers/mfd/tps6586x.c            | 2 +-
- drivers/mfd/tps65910.c            | 2 +-
- drivers/mfd/tps65911-comparator.c | 2 +-
- drivers/mfd/tps65912-spi.c        | 2 +-
- drivers/mfd/twl4030-audio.c       | 2 +-
- drivers/mfd/twl4030-madc.c        | 2 +-
- drivers/mfd/twl6040.c             | 2 +-
- drivers/mfd/vx855.c               | 2 +-
- drivers/mfd/wm831x-spi.c          | 2 +-
- drivers/mfd/wm8994-core.c         | 4 ++--
- include/linux/mfd/abx500/ab8500.h | 2 +-
- include/linux/mfd/pm8xxx/irq.h    | 4 ++--
- 68 files changed, 73 insertions(+), 73 deletions(-)
+ drivers/rtc/rtc-88pm80x.c  | 2 +-
+ drivers/rtc/rtc-88pm860x.c | 2 +-
+ drivers/rtc/rtc-ab8500.c   | 2 +-
+ drivers/rtc/rtc-at91sam9.c | 2 +-
+ drivers/rtc/rtc-au1xxx.c   | 2 +-
+ drivers/rtc/rtc-bfin.c     | 2 +-
+ drivers/rtc/rtc-bq32k.c    | 2 +-
+ drivers/rtc/rtc-bq4802.c   | 2 +-
+ drivers/rtc/rtc-da9052.c   | 2 +-
+ drivers/rtc/rtc-davinci.c  | 2 +-
+ drivers/rtc/rtc-dm355evm.c | 2 +-
+ drivers/rtc/rtc-ds1286.c   | 2 +-
+ drivers/rtc/rtc-ds1302.c   | 2 +-
+ drivers/rtc/rtc-ds1305.c   | 2 +-
+ drivers/rtc/rtc-ds1307.c   | 2 +-
+ drivers/rtc/rtc-ds1374.c   | 2 +-
+ drivers/rtc/rtc-ds1390.c   | 2 +-
+ drivers/rtc/rtc-ds1511.c   | 2 +-
+ drivers/rtc/rtc-ds1553.c   | 2 +-
+ drivers/rtc/rtc-ds1742.c   | 2 +-
+ drivers/rtc/rtc-ds3232.c   | 2 +-
+ drivers/rtc/rtc-ds3234.c   | 2 +-
+ drivers/rtc/rtc-ep93xx.c   | 2 +-
+ drivers/rtc/rtc-fm3130.c   | 2 +-
+ drivers/rtc/rtc-imxdi.c    | 2 +-
+ drivers/rtc/rtc-jz4740.c   | 2 +-
+ drivers/rtc/rtc-lpc32xx.c  | 2 +-
+ drivers/rtc/rtc-ls1x.c     | 2 +-
+ drivers/rtc/rtc-m41t93.c   | 2 +-
+ drivers/rtc/rtc-m41t94.c   | 2 +-
+ drivers/rtc/rtc-m48t35.c   | 2 +-
+ drivers/rtc/rtc-m48t59.c   | 2 +-
+ drivers/rtc/rtc-m48t86.c   | 2 +-
+ drivers/rtc/rtc-max6902.c  | 2 +-
+ drivers/rtc/rtc-max8907.c  | 2 +-
+ drivers/rtc/rtc-max8925.c  | 2 +-
+ drivers/rtc/rtc-max8998.c  | 2 +-
+ drivers/rtc/rtc-mpc5121.c  | 2 +-
+ drivers/rtc/rtc-mrst.c     | 4 ++--
+ drivers/rtc/rtc-mxc.c      | 2 +-
+ drivers/rtc/rtc-nuc900.c   | 2 +-
+ drivers/rtc/rtc-pcap.c     | 2 +-
+ drivers/rtc/rtc-pcf2123.c  | 2 +-
+ drivers/rtc/rtc-pcf50633.c | 2 +-
+ drivers/rtc/rtc-pcf8583.c  | 2 +-
+ drivers/rtc/rtc-pm8xxx.c   | 2 +-
+ drivers/rtc/rtc-puv3.c     | 2 +-
+ drivers/rtc/rtc-r9701.c    | 2 +-
+ drivers/rtc/rtc-rc5t583.c  | 2 +-
+ drivers/rtc/rtc-rs5c313.c  | 2 +-
+ drivers/rtc/rtc-rs5c348.c  | 2 +-
+ drivers/rtc/rtc-rv3029c2.c | 2 +-
+ drivers/rtc/rtc-rx8025.c   | 2 +-
+ drivers/rtc/rtc-rx8581.c   | 2 +-
+ drivers/rtc/rtc-s3c.c      | 2 +-
+ drivers/rtc/rtc-snvs.c     | 2 +-
+ drivers/rtc/rtc-spear.c    | 2 +-
+ drivers/rtc/rtc-stk17ta8.c | 2 +-
+ drivers/rtc/rtc-tegra.c    | 2 +-
+ drivers/rtc/rtc-test.c     | 2 +-
+ drivers/rtc/rtc-tile.c     | 2 +-
+ drivers/rtc/rtc-tps65910.c | 2 +-
+ drivers/rtc/rtc-twl.c      | 2 +-
+ drivers/rtc/rtc-vr41xx.c   | 2 +-
+ drivers/rtc/rtc-vt8500.c   | 2 +-
+ drivers/rtc/rtc-wm831x.c   | 2 +-
+ drivers/rtc/rtc-wm8350.c   | 2 +-
+ 67 files changed, 68 insertions(+), 68 deletions(-)
 
-diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-index 6746ecd..391e23e 100644
---- a/drivers/mfd/88pm800.c
-+++ b/drivers/mfd/88pm800.c
-@@ -554,7 +554,7 @@ out_init:
+diff --git a/drivers/rtc/rtc-88pm80x.c b/drivers/rtc/rtc-88pm80x.c
+index 464488b..63b17eb 100644
+--- a/drivers/rtc/rtc-88pm80x.c
++++ b/drivers/rtc/rtc-88pm80x.c
+@@ -342,7 +342,7 @@ out:
  	return ret;
  }
  
--static int __devexit pm800_remove(struct i2c_client *client)
-+static int pm800_remove(struct i2c_client *client)
+-static int __devexit pm80x_rtc_remove(struct platform_device *pdev)
++static int pm80x_rtc_remove(struct platform_device *pdev)
  {
- 	struct pm80x_chip *chip = i2c_get_clientdata(client);
- 
-diff --git a/drivers/mfd/88pm805.c b/drivers/mfd/88pm805.c
-index 13c0994..e671230 100644
---- a/drivers/mfd/88pm805.c
-+++ b/drivers/mfd/88pm805.c
-@@ -262,7 +262,7 @@ out_init:
+ 	struct pm80x_rtc_info *info = platform_get_drvdata(pdev);
+ 	platform_set_drvdata(pdev, NULL);
+diff --git a/drivers/rtc/rtc-88pm860x.c b/drivers/rtc/rtc-88pm860x.c
+index 35ea7a4..c609a2a 100644
+--- a/drivers/rtc/rtc-88pm860x.c
++++ b/drivers/rtc/rtc-88pm860x.c
+@@ -412,7 +412,7 @@ out:
  	return ret;
  }
  
--static int __devexit pm805_remove(struct i2c_client *client)
-+static int pm805_remove(struct i2c_client *client)
+-static int __devexit pm860x_rtc_remove(struct platform_device *pdev)
++static int pm860x_rtc_remove(struct platform_device *pdev)
  {
- 	struct pm80x_chip *chip = i2c_get_clientdata(client);
+ 	struct pm860x_rtc_info *info = platform_get_drvdata(pdev);
  
-diff --git a/drivers/mfd/88pm860x-core.c b/drivers/mfd/88pm860x-core.c
-index 20dd0d4..893fc1b 100644
---- a/drivers/mfd/88pm860x-core.c
-+++ b/drivers/mfd/88pm860x-core.c
-@@ -1077,7 +1077,7 @@ static int pm860x_device_init(struct pm860x_chip *chip,
+diff --git a/drivers/rtc/rtc-ab8500.c b/drivers/rtc/rtc-ab8500.c
+index 2c18afc..57cde2b 100644
+--- a/drivers/rtc/rtc-ab8500.c
++++ b/drivers/rtc/rtc-ab8500.c
+@@ -448,7 +448,7 @@ static int ab8500_rtc_probe(struct platform_device *pdev)
  	return 0;
  }
  
--static void __devexit pm860x_device_exit(struct pm860x_chip *chip)
-+static void pm860x_device_exit(struct pm860x_chip *chip)
+-static int __devexit ab8500_rtc_remove(struct platform_device *pdev)
++static int ab8500_rtc_remove(struct platform_device *pdev)
  {
- 	device_irq_exit(chip);
- 	mfd_remove_devices(chip->dev);
-@@ -1200,7 +1200,7 @@ err:
+ 	struct rtc_device *rtc = platform_get_drvdata(pdev);
+ 	int irq = platform_get_irq_byname(pdev, "ALARM");
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index de4cc11..39cfd2e 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -387,7 +387,7 @@ fail:
+ /*
+  * Disable and remove the RTC driver
+  */
+-static int __devexit at91_rtc_remove(struct platform_device *pdev)
++static int at91_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct sam9_rtc	*rtc = platform_get_drvdata(pdev);
+ 	u32		mr = rtt_readl(rtc, MR);
+diff --git a/drivers/rtc/rtc-au1xxx.c b/drivers/rtc/rtc-au1xxx.c
+index 331a771..b309da4 100644
+--- a/drivers/rtc/rtc-au1xxx.c
++++ b/drivers/rtc/rtc-au1xxx.c
+@@ -116,7 +116,7 @@ out_err:
  	return ret;
  }
  
--static int __devexit pm860x_remove(struct i2c_client *client)
-+static int pm860x_remove(struct i2c_client *client)
+-static int __devexit au1xtoy_rtc_remove(struct platform_device *pdev)
++static int au1xtoy_rtc_remove(struct platform_device *pdev)
  {
- 	struct pm860x_chip *chip = i2c_get_clientdata(client);
+ 	struct rtc_device *rtcdev = platform_get_drvdata(pdev);
  
-diff --git a/drivers/mfd/ab3100-core.c b/drivers/mfd/ab3100-core.c
-index bf188bc..2ec7725 100644
---- a/drivers/mfd/ab3100-core.c
-+++ b/drivers/mfd/ab3100-core.c
-@@ -961,7 +961,7 @@ static int ab3100_probe(struct i2c_client *client,
+diff --git a/drivers/rtc/rtc-bfin.c b/drivers/rtc/rtc-bfin.c
+index 863eae7..4ec614b 100644
+--- a/drivers/rtc/rtc-bfin.c
++++ b/drivers/rtc/rtc-bfin.c
+@@ -388,7 +388,7 @@ err:
+ 	return ret;
+ }
+ 
+-static int __devexit bfin_rtc_remove(struct platform_device *pdev)
++static int bfin_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct bfin_rtc *rtc = platform_get_drvdata(pdev);
+ 	struct device *dev = &pdev->dev;
+diff --git a/drivers/rtc/rtc-bq32k.c b/drivers/rtc/rtc-bq32k.c
+index 1f02ba6..036cb89 100644
+--- a/drivers/rtc/rtc-bq32k.c
++++ b/drivers/rtc/rtc-bq32k.c
+@@ -163,7 +163,7 @@ static int bq32k_probe(struct i2c_client *client,
+ 	return 0;
+ }
+ 
+-static int __devexit bq32k_remove(struct i2c_client *client)
++static int bq32k_remove(struct i2c_client *client)
+ {
+ 	struct rtc_device *rtc = i2c_get_clientdata(client);
+ 
+diff --git a/drivers/rtc/rtc-bq4802.c b/drivers/rtc/rtc-bq4802.c
+index 3b40ff4..693be71 100644
+--- a/drivers/rtc/rtc-bq4802.c
++++ b/drivers/rtc/rtc-bq4802.c
+@@ -191,7 +191,7 @@ out_free:
+ 	goto out;
+ }
+ 
+-static int __devexit bq4802_remove(struct platform_device *pdev)
++static int bq4802_remove(struct platform_device *pdev)
+ {
+ 	struct bq4802 *p = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-da9052.c b/drivers/rtc/rtc-da9052.c
+index 7e1758a..60b826e 100644
+--- a/drivers/rtc/rtc-da9052.c
++++ b/drivers/rtc/rtc-da9052.c
+@@ -262,7 +262,7 @@ err_free_irq:
+ 	return ret;
+ }
+ 
+-static int __devexit da9052_rtc_remove(struct platform_device *pdev)
++static int da9052_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct da9052_rtc *rtc = pdev->dev.platform_data;
+ 
+diff --git a/drivers/rtc/rtc-davinci.c b/drivers/rtc/rtc-davinci.c
+index 7ffc240..3f4e8ba 100644
+--- a/drivers/rtc/rtc-davinci.c
++++ b/drivers/rtc/rtc-davinci.c
+@@ -572,7 +572,7 @@ fail1:
+ 	return ret;
+ }
+ 
+-static int __devexit davinci_rtc_remove(struct platform_device *pdev)
++static int davinci_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct davinci_rtc *davinci_rtc = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-dm355evm.c b/drivers/rtc/rtc-dm355evm.c
+index 2323ae7..b2ed2c9 100644
+--- a/drivers/rtc/rtc-dm355evm.c
++++ b/drivers/rtc/rtc-dm355evm.c
+@@ -139,7 +139,7 @@ static int dm355evm_rtc_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __devexit dm355evm_rtc_remove(struct platform_device *pdev)
++static int dm355evm_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct rtc_device *rtc = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-ds1286.c b/drivers/rtc/rtc-ds1286.c
+index f1c8681..d989412 100644
+--- a/drivers/rtc/rtc-ds1286.c
++++ b/drivers/rtc/rtc-ds1286.c
+@@ -376,7 +376,7 @@ out:
+ 	return ret;
+ }
+ 
+-static int __devexit ds1286_remove(struct platform_device *pdev)
++static int ds1286_remove(struct platform_device *pdev)
+ {
+ 	struct ds1286_priv *priv = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-ds1302.c b/drivers/rtc/rtc-ds1302.c
+index 1f4e186..fdbcdb2 100644
+--- a/drivers/rtc/rtc-ds1302.c
++++ b/drivers/rtc/rtc-ds1302.c
+@@ -234,7 +234,7 @@ static int __init ds1302_rtc_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __devexit ds1302_rtc_remove(struct platform_device *pdev)
++static int ds1302_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct rtc_device *rtc = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-ds1305.c b/drivers/rtc/rtc-ds1305.c
+index 62470f6..d578773 100644
+--- a/drivers/rtc/rtc-ds1305.c
++++ b/drivers/rtc/rtc-ds1305.c
+@@ -787,7 +787,7 @@ fail0:
+ 	return status;
+ }
+ 
+-static int __devexit ds1305_remove(struct spi_device *spi)
++static int ds1305_remove(struct spi_device *spi)
+ {
+ 	struct ds1305 *ds1305 = spi_get_drvdata(spi);
+ 
+diff --git a/drivers/rtc/rtc-ds1307.c b/drivers/rtc/rtc-ds1307.c
+index 00b0643..e77c4fc 100644
+--- a/drivers/rtc/rtc-ds1307.c
++++ b/drivers/rtc/rtc-ds1307.c
+@@ -938,7 +938,7 @@ exit_free:
  	return err;
  }
  
--static int __devexit ab3100_remove(struct i2c_client *client)
-+static int ab3100_remove(struct i2c_client *client)
+-static int __devexit ds1307_remove(struct i2c_client *client)
++static int ds1307_remove(struct i2c_client *client)
  {
- 	struct ab3100 *ab3100 = i2c_get_clientdata(client);
+ 	struct ds1307 *ds1307 = i2c_get_clientdata(client);
  
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index d02d9f9..280a5eb 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -1418,7 +1418,7 @@ static int ab8500_probe(struct platform_device *pdev)
+diff --git a/drivers/rtc/rtc-ds1374.c b/drivers/rtc/rtc-ds1374.c
+index 039a676..fef7686 100644
+--- a/drivers/rtc/rtc-ds1374.c
++++ b/drivers/rtc/rtc-ds1374.c
+@@ -391,7 +391,7 @@ out_free:
  	return ret;
  }
  
--static int __devexit ab8500_remove(struct platform_device *pdev)
-+static int ab8500_remove(struct platform_device *pdev)
+-static int __devexit ds1374_remove(struct i2c_client *client)
++static int ds1374_remove(struct i2c_client *client)
  {
- 	struct ab8500 *ab8500 = platform_get_drvdata(pdev);
+ 	struct ds1374 *ds1374 = i2c_get_clientdata(client);
  
-diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-index 4484368..5a8e707 100644
---- a/drivers/mfd/ab8500-debugfs.c
-+++ b/drivers/mfd/ab8500-debugfs.c
-@@ -597,7 +597,7 @@ exit_no_debugfs:
- 	return -ENOMEM;
+diff --git a/drivers/rtc/rtc-ds1390.c b/drivers/rtc/rtc-ds1390.c
+index 90b2c7c..f994257 100644
+--- a/drivers/rtc/rtc-ds1390.c
++++ b/drivers/rtc/rtc-ds1390.c
+@@ -156,7 +156,7 @@ static int ds1390_probe(struct spi_device *spi)
+ 	return res;
  }
  
--static int __devexit ab8500_debug_remove(struct platform_device *plf)
-+static int ab8500_debug_remove(struct platform_device *plf)
+-static int __devexit ds1390_remove(struct spi_device *spi)
++static int ds1390_remove(struct spi_device *spi)
  {
- 	debugfs_remove(ab8500_val_file);
- 	debugfs_remove(ab8500_address_file);
-diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
-index c5e168e..3fb1f40d 100644
---- a/drivers/mfd/ab8500-gpadc.c
-+++ b/drivers/mfd/ab8500-gpadc.c
-@@ -634,7 +634,7 @@ fail:
+ 	struct ds1390 *chip = spi_get_drvdata(spi);
+ 
+diff --git a/drivers/rtc/rtc-ds1511.c b/drivers/rtc/rtc-ds1511.c
+index 075578a..c9bf1fd 100644
+--- a/drivers/rtc/rtc-ds1511.c
++++ b/drivers/rtc/rtc-ds1511.c
+@@ -551,7 +551,7 @@ ds1511_rtc_probe(struct platform_device *pdev)
  	return ret;
  }
  
--static int __devexit ab8500_gpadc_remove(struct platform_device *pdev)
-+static int ab8500_gpadc_remove(struct platform_device *pdev)
+- static int __devexit
++ static int
+ ds1511_rtc_remove(struct platform_device *pdev)
  {
- 	struct ab8500_gpadc *gpadc = platform_get_drvdata(pdev);
+ 	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
+diff --git a/drivers/rtc/rtc-ds1553.c b/drivers/rtc/rtc-ds1553.c
+index 40a7464..25ce062 100644
+--- a/drivers/rtc/rtc-ds1553.c
++++ b/drivers/rtc/rtc-ds1553.c
+@@ -338,7 +338,7 @@ static int ds1553_rtc_probe(struct platform_device *pdev)
+ 	return ret;
+ }
  
-diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
-index 499263c..8a33b2c 100644
---- a/drivers/mfd/ab8500-sysctrl.c
-+++ b/drivers/mfd/ab8500-sysctrl.c
-@@ -55,7 +55,7 @@ static int ab8500_sysctrl_probe(struct platform_device *pdev)
+-static int __devexit ds1553_rtc_remove(struct platform_device *pdev)
++static int ds1553_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-ds1742.c b/drivers/rtc/rtc-ds1742.c
+index 392d387..609c870 100644
+--- a/drivers/rtc/rtc-ds1742.c
++++ b/drivers/rtc/rtc-ds1742.c
+@@ -222,7 +222,7 @@ static int ds1742_rtc_probe(struct platform_device *pdev)
+ 	return ret;
+ }
+ 
+-static int __devexit ds1742_rtc_remove(struct platform_device *pdev)
++static int ds1742_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-ds3232.c b/drivers/rtc/rtc-ds3232.c
+index 3af6d72..80df30b 100644
+--- a/drivers/rtc/rtc-ds3232.c
++++ b/drivers/rtc/rtc-ds3232.c
+@@ -439,7 +439,7 @@ out_free:
+ 	return ret;
+ }
+ 
+-static int __devexit ds3232_remove(struct i2c_client *client)
++static int ds3232_remove(struct i2c_client *client)
+ {
+ 	struct ds3232 *ds3232 = i2c_get_clientdata(client);
+ 
+diff --git a/drivers/rtc/rtc-ds3234.c b/drivers/rtc/rtc-ds3234.c
+index 6892e49..7a4495e 100644
+--- a/drivers/rtc/rtc-ds3234.c
++++ b/drivers/rtc/rtc-ds3234.c
+@@ -156,7 +156,7 @@ static int ds3234_probe(struct spi_device *spi)
  	return 0;
  }
  
--static int __devexit ab8500_sysctrl_remove(struct platform_device *pdev)
-+static int ab8500_sysctrl_remove(struct platform_device *pdev)
+-static int __devexit ds3234_remove(struct spi_device *spi)
++static int ds3234_remove(struct spi_device *spi)
  {
- 	sysctrl_dev = NULL;
- 	return 0;
-diff --git a/drivers/mfd/adp5520.c b/drivers/mfd/adp5520.c
-index f2f9d8f..210dd03 100644
---- a/drivers/mfd/adp5520.c
-+++ b/drivers/mfd/adp5520.c
-@@ -307,7 +307,7 @@ out_free_chip:
- 	return ret;
- }
+ 	struct rtc_device *rtc = spi_get_drvdata(spi);
  
--static int __devexit adp5520_remove(struct i2c_client *client)
-+static int adp5520_remove(struct i2c_client *client)
- {
- 	struct adp5520_chip *chip = dev_get_drvdata(&client->dev);
- 
-diff --git a/drivers/mfd/arizona-core.c b/drivers/mfd/arizona-core.c
-index 47e7116..12fdabf 100644
---- a/drivers/mfd/arizona-core.c
-+++ b/drivers/mfd/arizona-core.c
-@@ -553,7 +553,7 @@ err_early:
- }
- EXPORT_SYMBOL_GPL(arizona_dev_init);
- 
--int __devexit arizona_dev_exit(struct arizona *arizona)
-+int arizona_dev_exit(struct arizona *arizona)
- {
- 	mfd_remove_devices(arizona->dev);
- 	arizona_free_irq(arizona, ARIZONA_IRQ_UNDERCLOCKED, arizona);
-diff --git a/drivers/mfd/arizona-i2c.c b/drivers/mfd/arizona-i2c.c
-index aaf1a69..44a1bb9 100644
---- a/drivers/mfd/arizona-i2c.c
-+++ b/drivers/mfd/arizona-i2c.c
-@@ -65,7 +65,7 @@ static int arizona_i2c_probe(struct i2c_client *i2c,
- 	return arizona_dev_init(arizona);
- }
- 
--static int __devexit arizona_i2c_remove(struct i2c_client *i2c)
-+static int arizona_i2c_remove(struct i2c_client *i2c)
- {
- 	struct arizona *arizona = dev_get_drvdata(&i2c->dev);
- 	arizona_dev_exit(arizona);
-diff --git a/drivers/mfd/arizona-spi.c b/drivers/mfd/arizona-spi.c
-index 9663caf..1b9fdd6 100644
---- a/drivers/mfd/arizona-spi.c
-+++ b/drivers/mfd/arizona-spi.c
-@@ -65,7 +65,7 @@ static int arizona_spi_probe(struct spi_device *spi)
- 	return arizona_dev_init(arizona);
- }
- 
--static int __devexit arizona_spi_remove(struct spi_device *spi)
-+static int arizona_spi_remove(struct spi_device *spi)
- {
- 	struct arizona *arizona = dev_get_drvdata(&spi->dev);
- 	arizona_dev_exit(arizona);
-diff --git a/drivers/mfd/asic3.c b/drivers/mfd/asic3.c
-index b0720d7..1b15986 100644
---- a/drivers/mfd/asic3.c
-+++ b/drivers/mfd/asic3.c
-@@ -1039,7 +1039,7 @@ static int __init asic3_probe(struct platform_device *pdev)
- 	return ret;
- }
- 
--static int __devexit asic3_remove(struct platform_device *pdev)
-+static int asic3_remove(struct platform_device *pdev)
- {
- 	int ret;
- 	struct asic3 *asic = platform_get_drvdata(pdev);
-diff --git a/drivers/mfd/cs5535-mfd.c b/drivers/mfd/cs5535-mfd.c
-index d9dc87f..2e4752a 100644
---- a/drivers/mfd/cs5535-mfd.c
-+++ b/drivers/mfd/cs5535-mfd.c
-@@ -166,7 +166,7 @@ err_disable:
+diff --git a/drivers/rtc/rtc-ep93xx.c b/drivers/rtc/rtc-ep93xx.c
+index c86082a..1a4e5e4 100644
+--- a/drivers/rtc/rtc-ep93xx.c
++++ b/drivers/rtc/rtc-ep93xx.c
+@@ -174,7 +174,7 @@ exit:
  	return err;
  }
  
--static void __devexit cs5535_mfd_remove(struct pci_dev *pdev)
-+static void cs5535_mfd_remove(struct pci_dev *pdev)
+-static int __devexit ep93xx_rtc_remove(struct platform_device *pdev)
++static int ep93xx_rtc_remove(struct platform_device *pdev)
  {
- 	mfd_remove_devices(&pdev->dev);
- 	pci_disable_device(pdev);
-diff --git a/drivers/mfd/da903x.c b/drivers/mfd/da903x.c
-index 5fa1e91..05176cd 100644
---- a/drivers/mfd/da903x.c
-+++ b/drivers/mfd/da903x.c
-@@ -544,7 +544,7 @@ out_free_chip:
- 	return ret;
+ 	struct ep93xx_rtc *ep93xx_rtc = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-fm3130.c b/drivers/rtc/rtc-fm3130.c
+index 4b0befe..ee2c0b3 100644
+--- a/drivers/rtc/rtc-fm3130.c
++++ b/drivers/rtc/rtc-fm3130.c
+@@ -546,7 +546,7 @@ exit_free:
+ 	return err;
  }
  
--static int __devexit da903x_remove(struct i2c_client *client)
-+static int da903x_remove(struct i2c_client *client)
+-static int __devexit fm3130_remove(struct i2c_client *client)
++static int fm3130_remove(struct i2c_client *client)
  {
- 	struct da903x_chip *chip = i2c_get_clientdata(client);
+ 	struct fm3130 *fm3130 = i2c_get_clientdata(client);
  
-diff --git a/drivers/mfd/da9052-i2c.c b/drivers/mfd/da9052-i2c.c
-index 96f66ed..ac74a4d 100644
---- a/drivers/mfd/da9052-i2c.c
-+++ b/drivers/mfd/da9052-i2c.c
-@@ -121,7 +121,7 @@ static int da9052_i2c_probe(struct i2c_client *client,
- 	return 0;
- }
- 
--static int __devexit da9052_i2c_remove(struct i2c_client *client)
-+static int da9052_i2c_remove(struct i2c_client *client)
- {
- 	struct da9052 *da9052 = i2c_get_clientdata(client);
- 
-diff --git a/drivers/mfd/da9052-spi.c b/drivers/mfd/da9052-spi.c
-index 1ad3243..61d63b9 100644
---- a/drivers/mfd/da9052-spi.c
-+++ b/drivers/mfd/da9052-spi.c
-@@ -58,7 +58,7 @@ static int da9052_spi_probe(struct spi_device *spi)
- 	return 0;
- }
- 
--static int __devexit da9052_spi_remove(struct spi_device *spi)
-+static int da9052_spi_remove(struct spi_device *spi)
- {
- 	struct da9052 *da9052 = dev_get_drvdata(&spi->dev);
- 
-diff --git a/drivers/mfd/da9055-core.c b/drivers/mfd/da9055-core.c
-index 6f5a4984..f56a1a9 100644
---- a/drivers/mfd/da9055-core.c
-+++ b/drivers/mfd/da9055-core.c
-@@ -412,7 +412,7 @@ err:
- 	return ret;
- }
- 
--void __devexit da9055_device_exit(struct da9055 *da9055)
-+void da9055_device_exit(struct da9055 *da9055)
- {
- 	regmap_del_irq_chip(da9055->chip_irq, da9055->irq_data);
- 	mfd_remove_devices(da9055->dev);
-diff --git a/drivers/mfd/da9055-i2c.c b/drivers/mfd/da9055-i2c.c
-index 7778d04..607387f 100644
---- a/drivers/mfd/da9055-i2c.c
-+++ b/drivers/mfd/da9055-i2c.c
-@@ -44,7 +44,7 @@ static int da9055_i2c_probe(struct i2c_client *i2c,
- 	return da9055_device_init(da9055);
- }
- 
--static int __devexit da9055_i2c_remove(struct i2c_client *i2c)
-+static int da9055_i2c_remove(struct i2c_client *i2c)
- {
- 	struct da9055 *da9055 = i2c_get_clientdata(i2c);
- 
-diff --git a/drivers/mfd/davinci_voicecodec.c b/drivers/mfd/davinci_voicecodec.c
-index b2b0397..c0bcc87 100644
---- a/drivers/mfd/davinci_voicecodec.c
-+++ b/drivers/mfd/davinci_voicecodec.c
-@@ -151,7 +151,7 @@ fail1:
- 	return ret;
- }
- 
--static int __devexit davinci_vc_remove(struct platform_device *pdev)
-+static int davinci_vc_remove(struct platform_device *pdev)
- {
- 	struct davinci_vc *davinci_vc = platform_get_drvdata(pdev);
- 
-diff --git a/drivers/mfd/ezx-pcap.c b/drivers/mfd/ezx-pcap.c
-index d81505e..b7a61f0 100644
---- a/drivers/mfd/ezx-pcap.c
-+++ b/drivers/mfd/ezx-pcap.c
-@@ -391,7 +391,7 @@ static int pcap_add_subdev(struct pcap_chip *pcap,
- 	return ret;
- }
- 
--static int __devexit ezx_pcap_remove(struct spi_device *spi)
-+static int ezx_pcap_remove(struct spi_device *spi)
- {
- 	struct pcap_chip *pcap = dev_get_drvdata(&spi->dev);
- 	struct pcap_platform_data *pdata = spi->dev.platform_data;
-diff --git a/drivers/mfd/intel_msic.c b/drivers/mfd/intel_msic.c
-index 438ac3d..ab8d0b2 100644
---- a/drivers/mfd/intel_msic.c
-+++ b/drivers/mfd/intel_msic.c
-@@ -364,7 +364,7 @@ fail:
- 	return ret;
- }
- 
--static void __devexit intel_msic_remove_devices(struct intel_msic *msic)
-+static void intel_msic_remove_devices(struct intel_msic *msic)
- {
- 	struct platform_device *pdev = msic->pdev;
- 	struct intel_msic_platform_data *pdata = pdev->dev.platform_data;
-@@ -445,7 +445,7 @@ static int intel_msic_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int __devexit intel_msic_remove(struct platform_device *pdev)
-+static int intel_msic_remove(struct platform_device *pdev)
- {
- 	struct intel_msic *msic = platform_get_drvdata(pdev);
- 
-diff --git a/drivers/mfd/janz-cmodio.c b/drivers/mfd/janz-cmodio.c
-index 55c479e..45ece11 100644
---- a/drivers/mfd/janz-cmodio.c
-+++ b/drivers/mfd/janz-cmodio.c
-@@ -254,7 +254,7 @@ out_return:
- 	return ret;
- }
- 
--static void __devexit cmodio_pci_remove(struct pci_dev *dev)
-+static void cmodio_pci_remove(struct pci_dev *dev)
- {
- 	struct cmodio_device *priv = pci_get_drvdata(dev);
- 
-diff --git a/drivers/mfd/jz4740-adc.c b/drivers/mfd/jz4740-adc.c
-index c0d38c5..0b8b55b 100644
---- a/drivers/mfd/jz4740-adc.c
-+++ b/drivers/mfd/jz4740-adc.c
-@@ -307,7 +307,7 @@ err_free:
- 	return ret;
- }
- 
--static int __devexit jz4740_adc_remove(struct platform_device *pdev)
-+static int jz4740_adc_remove(struct platform_device *pdev)
- {
- 	struct jz4740_adc *adc = platform_get_drvdata(pdev);
- 
-diff --git a/drivers/mfd/lm3533-core.c b/drivers/mfd/lm3533-core.c
-index 2b74508..ceebf2c 100644
---- a/drivers/mfd/lm3533-core.c
-+++ b/drivers/mfd/lm3533-core.c
-@@ -534,7 +534,7 @@ err_disable:
- 	return ret;
- }
- 
--static void __devexit lm3533_device_exit(struct lm3533 *lm3533)
-+static void lm3533_device_exit(struct lm3533 *lm3533)
- {
- 	dev_dbg(lm3533->dev, "%s\n", __func__);
- 
-@@ -624,7 +624,7 @@ static int lm3533_i2c_probe(struct i2c_client *i2c,
- 	return 0;
- }
- 
--static int __devexit lm3533_i2c_remove(struct i2c_client *i2c)
-+static int lm3533_i2c_remove(struct i2c_client *i2c)
- {
- 	struct lm3533 *lm3533 = i2c_get_clientdata(i2c);
- 
-diff --git a/drivers/mfd/lp8788.c b/drivers/mfd/lp8788.c
-index e1d7c9f..c3d3c9b 100644
---- a/drivers/mfd/lp8788.c
-+++ b/drivers/mfd/lp8788.c
-@@ -203,7 +203,7 @@ static int lp8788_probe(struct i2c_client *cl, const struct i2c_device_id *id)
- 			       ARRAY_SIZE(lp8788_devs), NULL, 0, NULL);
- }
- 
--static int __devexit lp8788_remove(struct i2c_client *cl)
-+static int lp8788_remove(struct i2c_client *cl)
- {
- 	struct lp8788 *lp = i2c_get_clientdata(cl);
- 
-diff --git a/drivers/mfd/lpc_ich.c b/drivers/mfd/lpc_ich.c
-index 7c83e1b..2ad24ca 100644
---- a/drivers/mfd/lpc_ich.c
-+++ b/drivers/mfd/lpc_ich.c
-@@ -878,7 +878,7 @@ static int lpc_ich_probe(struct pci_dev *dev,
- 	return 0;
- }
- 
--static void __devexit lpc_ich_remove(struct pci_dev *dev)
-+static void lpc_ich_remove(struct pci_dev *dev)
- {
- 	mfd_remove_devices(&dev->dev);
- 	lpc_ich_restore_config_space(dev);
-diff --git a/drivers/mfd/lpc_sch.c b/drivers/mfd/lpc_sch.c
-index 5756a6a..5624fcb 100644
---- a/drivers/mfd/lpc_sch.c
-+++ b/drivers/mfd/lpc_sch.c
-@@ -164,7 +164,7 @@ out_dev:
- 	return ret;
- }
- 
--static void __devexit lpc_sch_remove(struct pci_dev *dev)
-+static void lpc_sch_remove(struct pci_dev *dev)
- {
- 	mfd_remove_devices(&dev->dev);
- }
-diff --git a/drivers/mfd/max8907.c b/drivers/mfd/max8907.c
-index 81ded7a..e9b1c93 100644
---- a/drivers/mfd/max8907.c
-+++ b/drivers/mfd/max8907.c
-@@ -288,7 +288,7 @@ err_alloc_drvdata:
- 	return ret;
- }
- 
--static __devexit int max8907_i2c_remove(struct i2c_client *i2c)
-+static int max8907_i2c_remove(struct i2c_client *i2c)
- {
- 	struct max8907 *max8907 = i2c_get_clientdata(i2c);
- 
-diff --git a/drivers/mfd/max8925-core.c b/drivers/mfd/max8925-core.c
-index 60325c4..e32466e 100644
---- a/drivers/mfd/max8925-core.c
-+++ b/drivers/mfd/max8925-core.c
-@@ -901,7 +901,7 @@ out:
- 	return ret;
- }
- 
--void __devexit max8925_device_exit(struct max8925_chip *chip)
-+void max8925_device_exit(struct max8925_chip *chip)
- {
- 	if (chip->core_irq)
- 		free_irq(chip->core_irq, chip);
-diff --git a/drivers/mfd/max8925-i2c.c b/drivers/mfd/max8925-i2c.c
-index 6e3d30a..00b5b45 100644
---- a/drivers/mfd/max8925-i2c.c
-+++ b/drivers/mfd/max8925-i2c.c
-@@ -168,7 +168,7 @@ static int max8925_probe(struct i2c_client *client,
- 	return 0;
- }
- 
--static int __devexit max8925_remove(struct i2c_client *client)
-+static int max8925_remove(struct i2c_client *client)
- {
- 	struct max8925_chip *chip = i2c_get_clientdata(client);
- 
-diff --git a/drivers/mfd/mc13xxx-i2c.c b/drivers/mfd/mc13xxx-i2c.c
-index 71e0386..f745e27 100644
---- a/drivers/mfd/mc13xxx-i2c.c
-+++ b/drivers/mfd/mc13xxx-i2c.c
-@@ -95,7 +95,7 @@ static int mc13xxx_i2c_probe(struct i2c_client *client,
- 	return ret;
- }
- 
--static int __devexit mc13xxx_i2c_remove(struct i2c_client *client)
-+static int mc13xxx_i2c_remove(struct i2c_client *client)
- {
- 	struct mc13xxx *mc13xxx = dev_get_drvdata(&client->dev);
- 
-diff --git a/drivers/mfd/mc13xxx-spi.c b/drivers/mfd/mc13xxx-spi.c
-index bfe72be..3032bae 100644
---- a/drivers/mfd/mc13xxx-spi.c
-+++ b/drivers/mfd/mc13xxx-spi.c
-@@ -162,7 +162,7 @@ static int mc13xxx_spi_probe(struct spi_device *spi)
- 	return mc13xxx_common_init(mc13xxx, pdata, spi->irq);
- }
- 
--static int __devexit mc13xxx_spi_remove(struct spi_device *spi)
-+static int mc13xxx_spi_remove(struct spi_device *spi)
- {
- 	struct mc13xxx *mc13xxx = dev_get_drvdata(&spi->dev);
- 
-diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index 46f7982..770a0d0 100644
---- a/drivers/mfd/omap-usb-host.c
-+++ b/drivers/mfd/omap-usb-host.c
-@@ -655,7 +655,7 @@ end_probe:
-  *
-  * Reverses the effect of usbhs_omap_probe().
-  */
--static int __devexit usbhs_omap_remove(struct platform_device *pdev)
-+static int usbhs_omap_remove(struct platform_device *pdev)
- {
- 	struct usbhs_hcd_omap *omap = platform_get_drvdata(pdev);
- 
-diff --git a/drivers/mfd/omap-usb-tll.c b/drivers/mfd/omap-usb-tll.c
-index d1332c7..eb86915 100644
---- a/drivers/mfd/omap-usb-tll.c
-+++ b/drivers/mfd/omap-usb-tll.c
-@@ -348,7 +348,7 @@ end:
-  *
-  * Reverses the effect of usbtll_omap_probe().
-  */
--static int __devexit usbtll_omap_remove(struct platform_device *pdev)
-+static int usbtll_omap_remove(struct platform_device *pdev)
- {
- 	struct usbtll_omap *tll = platform_get_drvdata(pdev);
- 
-diff --git a/drivers/mfd/pcf50633-adc.c b/drivers/mfd/pcf50633-adc.c
-index dbd2f0d..18b53cb 100644
---- a/drivers/mfd/pcf50633-adc.c
-+++ b/drivers/mfd/pcf50633-adc.c
-@@ -218,7 +218,7 @@ static int pcf50633_adc_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int __devexit pcf50633_adc_remove(struct platform_device *pdev)
-+static int pcf50633_adc_remove(struct platform_device *pdev)
- {
- 	struct pcf50633_adc *adc = platform_get_drvdata(pdev);
- 	int i, head;
-diff --git a/drivers/mfd/pcf50633-core.c b/drivers/mfd/pcf50633-core.c
-index fc47735..64803f1 100644
---- a/drivers/mfd/pcf50633-core.c
-+++ b/drivers/mfd/pcf50633-core.c
-@@ -275,7 +275,7 @@ static int pcf50633_probe(struct i2c_client *client,
- 	return 0;
- }
- 
--static int __devexit pcf50633_remove(struct i2c_client *client)
-+static int pcf50633_remove(struct i2c_client *client)
- {
- 	struct pcf50633 *pcf = i2c_get_clientdata(client);
- 	int i;
-diff --git a/drivers/mfd/pm8921-core.c b/drivers/mfd/pm8921-core.c
-index 4349134..d4b297c 100644
---- a/drivers/mfd/pm8921-core.c
-+++ b/drivers/mfd/pm8921-core.c
-@@ -165,7 +165,7 @@ err_read_rev:
+diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
+index d4e4fab..8b6c71b 100644
+--- a/drivers/rtc/rtc-imxdi.c
++++ b/drivers/rtc/rtc-imxdi.c
+@@ -479,7 +479,7 @@ err:
  	return rc;
  }
  
--static int __devexit pm8921_remove(struct platform_device *pdev)
-+static int pm8921_remove(struct platform_device *pdev)
+-static int __devexit dryice_rtc_remove(struct platform_device *pdev)
++static int dryice_rtc_remove(struct platform_device *pdev)
  {
- 	struct pm8xxx_drvdata *drvdata;
- 	struct pm8921 *pmic = NULL;
-diff --git a/drivers/mfd/pm8xxx-irq.c b/drivers/mfd/pm8xxx-irq.c
-index 59c20ea..1360e20 100644
---- a/drivers/mfd/pm8xxx-irq.c
-+++ b/drivers/mfd/pm8xxx-irq.c
-@@ -363,7 +363,7 @@ struct pm_irq_chip *  pm8xxx_irq_init(struct device *dev,
- 	return chip;
- }
+ 	struct imxdi_dev *imxdi = platform_get_drvdata(pdev);
  
--int __devexit pm8xxx_irq_exit(struct pm_irq_chip *chip)
-+int pm8xxx_irq_exit(struct pm_irq_chip *chip)
- {
- 	irq_set_chained_handler(chip->devirq, NULL);
- 	kfree(chip);
-diff --git a/drivers/mfd/rc5t583.c b/drivers/mfd/rc5t583.c
-index f721b13..14bdacc 100644
---- a/drivers/mfd/rc5t583.c
-+++ b/drivers/mfd/rc5t583.c
-@@ -303,7 +303,7 @@ err_add_devs:
+diff --git a/drivers/rtc/rtc-jz4740.c b/drivers/rtc/rtc-jz4740.c
+index d51b703..1e48686 100644
+--- a/drivers/rtc/rtc-jz4740.c
++++ b/drivers/rtc/rtc-jz4740.c
+@@ -297,7 +297,7 @@ err_free:
  	return ret;
  }
  
--static int  __devexit rc5t583_i2c_remove(struct i2c_client *i2c)
-+static int  rc5t583_i2c_remove(struct i2c_client *i2c)
+-static int __devexit jz4740_rtc_remove(struct platform_device *pdev)
++static int jz4740_rtc_remove(struct platform_device *pdev)
  {
- 	struct rc5t583 *rc5t583 = i2c_get_clientdata(i2c);
+ 	struct jz4740_rtc *rtc = platform_get_drvdata(pdev);
  
-diff --git a/drivers/mfd/rdc321x-southbridge.c b/drivers/mfd/rdc321x-southbridge.c
-index be46539..21b7bef 100644
---- a/drivers/mfd/rdc321x-southbridge.c
-+++ b/drivers/mfd/rdc321x-southbridge.c
-@@ -91,7 +91,7 @@ static int rdc321x_sb_probe(struct pci_dev *pdev,
- 			       NULL, 0, NULL);
- }
- 
--static void __devexit rdc321x_sb_remove(struct pci_dev *pdev)
-+static void rdc321x_sb_remove(struct pci_dev *pdev)
- {
- 	mfd_remove_devices(&pdev->dev);
- }
-diff --git a/drivers/mfd/rtsx_pcr.c b/drivers/mfd/rtsx_pcr.c
-index 7c3b635..801fbb3 100644
---- a/drivers/mfd/rtsx_pcr.c
-+++ b/drivers/mfd/rtsx_pcr.c
-@@ -1123,7 +1123,7 @@ disable:
- 	return ret;
- }
- 
--static void __devexit rtsx_pci_remove(struct pci_dev *pcidev)
-+static void rtsx_pci_remove(struct pci_dev *pcidev)
- {
- 	struct pcr_handle *handle = pci_get_drvdata(pcidev);
- 	struct rtsx_pcr *pcr = handle->pcr;
-diff --git a/drivers/mfd/sm501.c b/drivers/mfd/sm501.c
-index 9b53733..9816c23 100644
---- a/drivers/mfd/sm501.c
-+++ b/drivers/mfd/sm501.c
-@@ -1685,7 +1685,7 @@ static void sm501_dev_remove(struct sm501_devdata *sm)
- 	sm501_gpio_remove(sm);
- }
- 
--static void __devexit sm501_pci_remove(struct pci_dev *dev)
-+static void sm501_pci_remove(struct pci_dev *dev)
- {
- 	struct sm501_devdata *sm = pci_get_drvdata(dev);
- 
-diff --git a/drivers/mfd/sta2x11-mfd.c b/drivers/mfd/sta2x11-mfd.c
-index 57f3361..d6284cac 100644
---- a/drivers/mfd/sta2x11-mfd.c
-+++ b/drivers/mfd/sta2x11-mfd.c
-@@ -89,7 +89,7 @@ static int sta2x11_mfd_add(struct pci_dev *pdev, gfp_t flags)
+diff --git a/drivers/rtc/rtc-lpc32xx.c b/drivers/rtc/rtc-lpc32xx.c
+index 81fb32c..40a5983 100644
+--- a/drivers/rtc/rtc-lpc32xx.c
++++ b/drivers/rtc/rtc-lpc32xx.c
+@@ -299,7 +299,7 @@ static int lpc32xx_rtc_probe(struct platform_device *pdev)
  	return 0;
  }
  
--static int __devexit mfd_remove(struct pci_dev *pdev)
-+static int mfd_remove(struct pci_dev *pdev)
+-static int __devexit lpc32xx_rtc_remove(struct platform_device *pdev)
++static int lpc32xx_rtc_remove(struct platform_device *pdev)
  {
- 	struct sta2x11_mfd *mfd = sta2x11_mfd_find(pdev);
+ 	struct lpc32xx_rtc *rtc = platform_get_drvdata(pdev);
  
-diff --git a/drivers/mfd/stmpe-i2c.c b/drivers/mfd/stmpe-i2c.c
-index 8195ca2..36df187 100644
---- a/drivers/mfd/stmpe-i2c.c
-+++ b/drivers/mfd/stmpe-i2c.c
-@@ -63,7 +63,7 @@ stmpe_i2c_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
- 	return stmpe_probe(&i2c_ci, id->driver_data);
+diff --git a/drivers/rtc/rtc-ls1x.c b/drivers/rtc/rtc-ls1x.c
+index bf308fc..f59b634 100644
+--- a/drivers/rtc/rtc-ls1x.c
++++ b/drivers/rtc/rtc-ls1x.c
+@@ -185,7 +185,7 @@ err:
+ 	return ret;
  }
  
--static int __devexit stmpe_i2c_remove(struct i2c_client *i2c)
-+static int stmpe_i2c_remove(struct i2c_client *i2c)
+-static int __devexit ls1x_rtc_remove(struct platform_device *pdev)
++static int ls1x_rtc_remove(struct platform_device *pdev)
  {
- 	struct stmpe *stmpe = dev_get_drvdata(&i2c->dev);
+ 	struct rtc_device *rtcdev = platform_get_drvdata(pdev);
  
-diff --git a/drivers/mfd/stmpe-spi.c b/drivers/mfd/stmpe-spi.c
-index 5277433..973659f 100644
---- a/drivers/mfd/stmpe-spi.c
-+++ b/drivers/mfd/stmpe-spi.c
-@@ -101,7 +101,7 @@ stmpe_spi_probe(struct spi_device *spi)
- 	return stmpe_probe(&spi_ci, id->driver_data);
+diff --git a/drivers/rtc/rtc-m41t93.c b/drivers/rtc/rtc-m41t93.c
+index ae9203b..4916968 100644
+--- a/drivers/rtc/rtc-m41t93.c
++++ b/drivers/rtc/rtc-m41t93.c
+@@ -195,7 +195,7 @@ static int m41t93_probe(struct spi_device *spi)
  }
  
--static int __devexit stmpe_spi_remove(struct spi_device *spi)
-+static int stmpe_spi_remove(struct spi_device *spi)
- {
- 	struct stmpe *stmpe = dev_get_drvdata(&spi->dev);
  
-diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-index 3dbfe9a..3f10591 100644
---- a/drivers/mfd/syscon.c
-+++ b/drivers/mfd/syscon.c
-@@ -138,7 +138,7 @@ static int syscon_probe(struct platform_device *pdev)
+-static int __devexit m41t93_remove(struct spi_device *spi)
++static int m41t93_remove(struct spi_device *spi)
+ {
+ 	struct rtc_device *rtc = spi_get_drvdata(spi);
+ 
+diff --git a/drivers/rtc/rtc-m41t94.c b/drivers/rtc/rtc-m41t94.c
+index c2121cc..89266c6 100644
+--- a/drivers/rtc/rtc-m41t94.c
++++ b/drivers/rtc/rtc-m41t94.c
+@@ -134,7 +134,7 @@ static int m41t94_probe(struct spi_device *spi)
  	return 0;
  }
  
--static int __devexit syscon_remove(struct platform_device *pdev)
-+static int syscon_remove(struct platform_device *pdev)
+-static int __devexit m41t94_remove(struct spi_device *spi)
++static int m41t94_remove(struct spi_device *spi)
  {
- 	struct syscon *syscon;
+ 	struct rtc_device *rtc = spi_get_drvdata(spi);
  
-diff --git a/drivers/mfd/tc3589x.c b/drivers/mfd/tc3589x.c
-index 7e197f7..a06d66b 100644
---- a/drivers/mfd/tc3589x.c
-+++ b/drivers/mfd/tc3589x.c
-@@ -402,7 +402,7 @@ out_free:
+diff --git a/drivers/rtc/rtc-m48t35.c b/drivers/rtc/rtc-m48t35.c
+index d18e647..31c9190 100644
+--- a/drivers/rtc/rtc-m48t35.c
++++ b/drivers/rtc/rtc-m48t35.c
+@@ -194,7 +194,7 @@ out:
  	return ret;
  }
  
--static int __devexit tc3589x_remove(struct i2c_client *client)
-+static int tc3589x_remove(struct i2c_client *client)
+-static int __devexit m48t35_remove(struct platform_device *pdev)
++static int m48t35_remove(struct platform_device *pdev)
  {
- 	struct tc3589x *tc3589x = i2c_get_clientdata(client);
+ 	struct m48t35_priv *priv = platform_get_drvdata(pdev);
  
-diff --git a/drivers/mfd/tc6387xb.c b/drivers/mfd/tc6387xb.c
-index ca18f26..366f7b9 100644
---- a/drivers/mfd/tc6387xb.c
-+++ b/drivers/mfd/tc6387xb.c
-@@ -208,7 +208,7 @@ err_no_irq:
+diff --git a/drivers/rtc/rtc-m48t59.c b/drivers/rtc/rtc-m48t59.c
+index b4cc7e9..130f29a 100644
+--- a/drivers/rtc/rtc-m48t59.c
++++ b/drivers/rtc/rtc-m48t59.c
+@@ -501,7 +501,7 @@ out:
  	return ret;
  }
  
--static int __devexit tc6387xb_remove(struct platform_device *dev)
-+static int tc6387xb_remove(struct platform_device *dev)
+-static int __devexit m48t59_rtc_remove(struct platform_device *pdev)
++static int m48t59_rtc_remove(struct platform_device *pdev)
  {
- 	struct tc6387xb *tc6387xb = platform_get_drvdata(dev);
+ 	struct m48t59_private *m48t59 = platform_get_drvdata(pdev);
+ 	struct m48t59_plat_data *pdata = pdev->dev.platform_data;
+diff --git a/drivers/rtc/rtc-m48t86.c b/drivers/rtc/rtc-m48t86.c
+index 5f841b6..2ffbcac 100644
+--- a/drivers/rtc/rtc-m48t86.c
++++ b/drivers/rtc/rtc-m48t86.c
+@@ -164,7 +164,7 @@ static int m48t86_rtc_probe(struct platform_device *dev)
+ 	return 0;
+ }
  
-diff --git a/drivers/mfd/tc6393xb.c b/drivers/mfd/tc6393xb.c
-index 1ff8ed6..15e1463 100644
---- a/drivers/mfd/tc6393xb.c
-+++ b/drivers/mfd/tc6393xb.c
-@@ -731,7 +731,7 @@ err_kzalloc:
+-static int __devexit m48t86_rtc_remove(struct platform_device *dev)
++static int m48t86_rtc_remove(struct platform_device *dev)
+ {
+ 	struct rtc_device *rtc = platform_get_drvdata(dev);
+ 
+diff --git a/drivers/rtc/rtc-max6902.c b/drivers/rtc/rtc-max6902.c
+index 2f011cc..7d0bf69 100644
+--- a/drivers/rtc/rtc-max6902.c
++++ b/drivers/rtc/rtc-max6902.c
+@@ -143,7 +143,7 @@ static int max6902_probe(struct spi_device *spi)
+ 	return 0;
+ }
+ 
+-static int __devexit max6902_remove(struct spi_device *spi)
++static int max6902_remove(struct spi_device *spi)
+ {
+ 	struct rtc_device *rtc = dev_get_drvdata(&spi->dev);
+ 
+diff --git a/drivers/rtc/rtc-max8907.c b/drivers/rtc/rtc-max8907.c
+index f48a841..1d049da 100644
+--- a/drivers/rtc/rtc-max8907.c
++++ b/drivers/rtc/rtc-max8907.c
+@@ -220,7 +220,7 @@ err_unregister:
  	return ret;
  }
  
--static int __devexit tc6393xb_remove(struct platform_device *dev)
-+static int tc6393xb_remove(struct platform_device *dev)
+-static int __devexit max8907_rtc_remove(struct platform_device *pdev)
++static int max8907_rtc_remove(struct platform_device *pdev)
  {
- 	struct tc6393xb_platform_data *tcpd = dev->dev.platform_data;
- 	struct tc6393xb *tc6393xb = platform_get_drvdata(dev);
-diff --git a/drivers/mfd/ti-ssp.c b/drivers/mfd/ti-ssp.c
-index b177f96..09a14ce 100644
---- a/drivers/mfd/ti-ssp.c
-+++ b/drivers/mfd/ti-ssp.c
-@@ -433,7 +433,7 @@ error_res:
- 	return error;
+ 	struct max8907_rtc *rtc = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-max8925.c b/drivers/rtc/rtc-max8925.c
+index afb63fe..a0c8265 100644
+--- a/drivers/rtc/rtc-max8925.c
++++ b/drivers/rtc/rtc-max8925.c
+@@ -292,7 +292,7 @@ out_irq:
+ 	return ret;
  }
  
--static int __devexit ti_ssp_remove(struct platform_device *pdev)
-+static int ti_ssp_remove(struct platform_device *pdev)
+-static int __devexit max8925_rtc_remove(struct platform_device *pdev)
++static int max8925_rtc_remove(struct platform_device *pdev)
  {
- 	struct device *dev = &pdev->dev;
- 	struct ti_ssp *ssp = dev_get_drvdata(dev);
-diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
-index bc86fc9..b7f9d76 100644
---- a/drivers/mfd/ti_am335x_tscadc.c
-+++ b/drivers/mfd/ti_am335x_tscadc.c
-@@ -205,7 +205,7 @@ err:
+ 	struct max8925_rtc_info *info = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-max8998.c b/drivers/rtc/rtc-max8998.c
+index fd1eed5..8f234a0 100644
+--- a/drivers/rtc/rtc-max8998.c
++++ b/drivers/rtc/rtc-max8998.c
+@@ -298,7 +298,7 @@ out_rtc:
+ 	return ret;
+ }
+ 
+-static int __devexit max8998_rtc_remove(struct platform_device *pdev)
++static int max8998_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct max8998_rtc_info *info = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-mpc5121.c b/drivers/rtc/rtc-mpc5121.c
+index 4e44699..bec10be 100644
+--- a/drivers/rtc/rtc-mpc5121.c
++++ b/drivers/rtc/rtc-mpc5121.c
+@@ -382,7 +382,7 @@ out_free:
  	return err;
  }
  
--static int __devexit ti_tscadc_remove(struct platform_device *pdev)
-+static int ti_tscadc_remove(struct platform_device *pdev)
+-static int __devexit mpc5121_rtc_remove(struct platform_device *op)
++static int mpc5121_rtc_remove(struct platform_device *op)
  {
- 	struct ti_tscadc_dev	*tscadc = platform_get_drvdata(pdev);
- 
-diff --git a/drivers/mfd/timberdale.c b/drivers/mfd/timberdale.c
-index a305ac1..59e0ee2 100644
---- a/drivers/mfd/timberdale.c
-+++ b/drivers/mfd/timberdale.c
-@@ -840,7 +840,7 @@ err_enable:
- 	return -ENODEV;
+ 	struct mpc5121_rtc_data *rtc = dev_get_drvdata(&op->dev);
+ 	struct mpc5121_rtc_regs __iomem *regs = rtc->regs;
+diff --git a/drivers/rtc/rtc-mrst.c b/drivers/rtc/rtc-mrst.c
+index 68cb66e..82541ae 100644
+--- a/drivers/rtc/rtc-mrst.c
++++ b/drivers/rtc/rtc-mrst.c
+@@ -394,7 +394,7 @@ static void rtc_mrst_do_shutdown(void)
+ 	spin_unlock_irq(&rtc_lock);
  }
  
--static void __devexit timb_remove(struct pci_dev *dev)
-+static void timb_remove(struct pci_dev *dev)
+-static void __devexit rtc_mrst_do_remove(struct device *dev)
++static void rtc_mrst_do_remove(struct device *dev)
  {
- 	struct timberdale_device *priv = pci_get_drvdata(dev);
+ 	struct mrst_rtc	*mrst = dev_get_drvdata(dev);
+ 	struct resource *iomem;
+@@ -510,7 +510,7 @@ static int vinit vrtc_mrst_platform_probe(struct platform_device *pdev)
+ 			platform_get_irq(pdev, 0));
+ }
  
-diff --git a/drivers/mfd/tps6105x.c b/drivers/mfd/tps6105x.c
-index 75a84ac..1d302f5 100644
---- a/drivers/mfd/tps6105x.c
-+++ b/drivers/mfd/tps6105x.c
-@@ -199,7 +199,7 @@ fail:
+-static int __devexit vrtc_mrst_platform_remove(struct platform_device *pdev)
++static int vrtc_mrst_platform_remove(struct platform_device *pdev)
+ {
+ 	rtc_mrst_do_remove(&pdev->dev);
+ 	return 0;
+diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
+index cf20379..1c3ef72 100644
+--- a/drivers/rtc/rtc-mxc.c
++++ b/drivers/rtc/rtc-mxc.c
+@@ -460,7 +460,7 @@ exit_free_pdata:
  	return ret;
  }
  
--static int __devexit tps6105x_remove(struct i2c_client *client)
-+static int tps6105x_remove(struct i2c_client *client)
+-static int __devexit mxc_rtc_remove(struct platform_device *pdev)
++static int mxc_rtc_remove(struct platform_device *pdev)
  {
- 	struct tps6105x *tps6105x = i2c_get_clientdata(client);
+ 	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
  
-diff --git a/drivers/mfd/tps65090.c b/drivers/mfd/tps65090.c
-index 0c446eb..382a857 100644
---- a/drivers/mfd/tps65090.c
-+++ b/drivers/mfd/tps65090.c
-@@ -308,7 +308,7 @@ err_exit:
+diff --git a/drivers/rtc/rtc-nuc900.c b/drivers/rtc/rtc-nuc900.c
+index b3f418d..a636808 100644
+--- a/drivers/rtc/rtc-nuc900.c
++++ b/drivers/rtc/rtc-nuc900.c
+@@ -284,7 +284,7 @@ fail1:	kfree(nuc900_rtc);
+ 	return err;
+ }
+ 
+-static int __devexit nuc900_rtc_remove(struct platform_device *pdev)
++static int nuc900_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct nuc900_rtc *nuc900_rtc = platform_get_drvdata(pdev);
+ 	struct resource *res;
+diff --git a/drivers/rtc/rtc-pcap.c b/drivers/rtc/rtc-pcap.c
+index e33b94b6..e0019cd 100644
+--- a/drivers/rtc/rtc-pcap.c
++++ b/drivers/rtc/rtc-pcap.c
+@@ -183,7 +183,7 @@ fail_rtc:
+ 	return err;
+ }
+ 
+-static int __devexit pcap_rtc_remove(struct platform_device *pdev)
++static int pcap_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct pcap_rtc *pcap_rtc = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-pcf2123.c b/drivers/rtc/rtc-pcf2123.c
+index 3d39070..02b742a 100644
+--- a/drivers/rtc/rtc-pcf2123.c
++++ b/drivers/rtc/rtc-pcf2123.c
+@@ -319,7 +319,7 @@ kfree_exit:
  	return ret;
  }
  
--static int __devexit tps65090_i2c_remove(struct i2c_client *client)
-+static int tps65090_i2c_remove(struct i2c_client *client)
+-static int __devexit pcf2123_remove(struct spi_device *spi)
++static int pcf2123_remove(struct spi_device *spi)
  {
- 	struct tps65090 *tps65090 = i2c_get_clientdata(client);
- 
-diff --git a/drivers/mfd/tps65217.c b/drivers/mfd/tps65217.c
-index 8cba757..e14e252 100644
---- a/drivers/mfd/tps65217.c
-+++ b/drivers/mfd/tps65217.c
-@@ -214,7 +214,7 @@ static int tps65217_probe(struct i2c_client *client,
+ 	struct pcf2123_plat_data *pdata = spi->dev.platform_data;
+ 	int i;
+diff --git a/drivers/rtc/rtc-pcf50633.c b/drivers/rtc/rtc-pcf50633.c
+index 78ffaaa..e9f3135 100644
+--- a/drivers/rtc/rtc-pcf50633.c
++++ b/drivers/rtc/rtc-pcf50633.c
+@@ -272,7 +272,7 @@ static int pcf50633_rtc_probe(struct platform_device *pdev)
  	return 0;
  }
  
--static int __devexit tps65217_remove(struct i2c_client *client)
-+static int tps65217_remove(struct i2c_client *client)
+-static int __devexit pcf50633_rtc_remove(struct platform_device *pdev)
++static int pcf50633_rtc_remove(struct platform_device *pdev)
  {
- 	struct tps65217 *tps = i2c_get_clientdata(client);
+ 	struct pcf50633_rtc *rtc;
  
-diff --git a/drivers/mfd/tps6586x.c b/drivers/mfd/tps6586x.c
-index 0c5870b..232ae36 100644
---- a/drivers/mfd/tps6586x.c
-+++ b/drivers/mfd/tps6586x.c
-@@ -599,7 +599,7 @@ err_mfd_add:
+diff --git a/drivers/rtc/rtc-pcf8583.c b/drivers/rtc/rtc-pcf8583.c
+index 55c9766..3415b8f 100644
+--- a/drivers/rtc/rtc-pcf8583.c
++++ b/drivers/rtc/rtc-pcf8583.c
+@@ -294,7 +294,7 @@ exit_kfree:
+ 	return err;
+ }
+ 
+-static int __devexit pcf8583_remove(struct i2c_client *client)
++static int pcf8583_remove(struct i2c_client *client)
+ {
+ 	struct pcf8583 *pcf8583 = i2c_get_clientdata(client);
+ 
+diff --git a/drivers/rtc/rtc-pm8xxx.c b/drivers/rtc/rtc-pm8xxx.c
+index 39afdf0..f1a6557 100644
+--- a/drivers/rtc/rtc-pm8xxx.c
++++ b/drivers/rtc/rtc-pm8xxx.c
+@@ -485,7 +485,7 @@ fail_rtc_enable:
+ 	return rc;
+ }
+ 
+-static int __devexit pm8xxx_rtc_remove(struct platform_device *pdev)
++static int pm8xxx_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct pm8xxx_rtc *rtc_dd = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-puv3.c b/drivers/rtc/rtc-puv3.c
+index 619287d..0407e13 100644
+--- a/drivers/rtc/rtc-puv3.c
++++ b/drivers/rtc/rtc-puv3.c
+@@ -220,7 +220,7 @@ static void puv3_rtc_enable(struct platform_device *pdev, int en)
+ 	}
+ }
+ 
+-static int __devexit puv3_rtc_remove(struct platform_device *dev)
++static int puv3_rtc_remove(struct platform_device *dev)
+ {
+ 	struct rtc_device *rtc = platform_get_drvdata(dev);
+ 
+diff --git a/drivers/rtc/rtc-r9701.c b/drivers/rtc/rtc-r9701.c
+index cf856e7..7726f4a 100644
+--- a/drivers/rtc/rtc-r9701.c
++++ b/drivers/rtc/rtc-r9701.c
+@@ -164,7 +164,7 @@ static int r9701_probe(struct spi_device *spi)
+ 	return 0;
+ }
+ 
+-static int __devexit r9701_remove(struct spi_device *spi)
++static int r9701_remove(struct spi_device *spi)
+ {
+ 	struct rtc_device *rtc = dev_get_drvdata(&spi->dev);
+ 
+diff --git a/drivers/rtc/rtc-rc5t583.c b/drivers/rtc/rtc-rc5t583.c
+index 69e8287..eb3194d 100644
+--- a/drivers/rtc/rtc-rc5t583.c
++++ b/drivers/rtc/rtc-rc5t583.c
+@@ -271,7 +271,7 @@ static int rc5t583_rtc_probe(struct platform_device *pdev)
+  * Disable rc5t583 RTC interrupts.
+  * Sets status flag to free.
+  */
+-static int __devexit rc5t583_rtc_remove(struct platform_device *pdev)
++static int rc5t583_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct rc5t583_rtc *rc5t583_rtc = dev_get_drvdata(&pdev->dev);
+ 
+diff --git a/drivers/rtc/rtc-rs5c313.c b/drivers/rtc/rtc-rs5c313.c
+index ae3f9fd..37f488e 100644
+--- a/drivers/rtc/rtc-rs5c313.c
++++ b/drivers/rtc/rtc-rs5c313.c
+@@ -377,7 +377,7 @@ static int rs5c313_rtc_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __devexit rs5c313_rtc_remove(struct platform_device *pdev)
++static int rs5c313_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct rtc_device *rtc = platform_get_drvdata( pdev );
+ 
+diff --git a/drivers/rtc/rtc-rs5c348.c b/drivers/rtc/rtc-rs5c348.c
+index 40a5e05..72ef10b 100644
+--- a/drivers/rtc/rtc-rs5c348.c
++++ b/drivers/rtc/rtc-rs5c348.c
+@@ -218,7 +218,7 @@ static int rs5c348_probe(struct spi_device *spi)
  	return ret;
  }
  
--static int __devexit tps6586x_i2c_remove(struct i2c_client *client)
-+static int tps6586x_i2c_remove(struct i2c_client *client)
+-static int __devexit rs5c348_remove(struct spi_device *spi)
++static int rs5c348_remove(struct spi_device *spi)
  {
- 	struct tps6586x *tps6586x = i2c_get_clientdata(client);
+ 	struct rs5c348_plat_data *pdata = spi->dev.platform_data;
+ 	struct rtc_device *rtc = pdata->rtc;
+diff --git a/drivers/rtc/rtc-rv3029c2.c b/drivers/rtc/rtc-rv3029c2.c
+index 52d87e8..93d07e5 100644
+--- a/drivers/rtc/rtc-rv3029c2.c
++++ b/drivers/rtc/rtc-rv3029c2.c
+@@ -418,7 +418,7 @@ exit_unregister:
+ 	return rc;
+ }
  
-diff --git a/drivers/mfd/tps65910.c b/drivers/mfd/tps65910.c
-index 3a34022..ce05465 100644
---- a/drivers/mfd/tps65910.c
-+++ b/drivers/mfd/tps65910.c
-@@ -302,7 +302,7 @@ static int tps65910_i2c_probe(struct i2c_client *i2c,
+-static int __devexit rv3029c2_remove(struct i2c_client *client)
++static int rv3029c2_remove(struct i2c_client *client)
+ {
+ 	struct rtc_device *rtc = i2c_get_clientdata(client);
+ 
+diff --git a/drivers/rtc/rtc-rx8025.c b/drivers/rtc/rtc-rx8025.c
+index 5de60a3..dcee700 100644
+--- a/drivers/rtc/rtc-rx8025.c
++++ b/drivers/rtc/rtc-rx8025.c
+@@ -614,7 +614,7 @@ errout:
+ 	return err;
+ }
+ 
+-static int __devexit rx8025_remove(struct i2c_client *client)
++static int rx8025_remove(struct i2c_client *client)
+ {
+ 	struct rx8025_data *rx8025 = i2c_get_clientdata(client);
+ 	struct mutex *lock = &rx8025->rtc->ops_lock;
+diff --git a/drivers/rtc/rtc-rx8581.c b/drivers/rtc/rtc-rx8581.c
+index 2062458..370b31f 100644
+--- a/drivers/rtc/rtc-rx8581.c
++++ b/drivers/rtc/rtc-rx8581.c
+@@ -251,7 +251,7 @@ static int rx8581_probe(struct i2c_client *client,
+ 	return 0;
+ }
+ 
+-static int __devexit rx8581_remove(struct i2c_client *client)
++static int rx8581_remove(struct i2c_client *client)
+ {
+ 	struct rtc_device *rtc = i2c_get_clientdata(client);
+ 
+diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+index 44bebef..53b9546 100644
+--- a/drivers/rtc/rtc-s3c.c
++++ b/drivers/rtc/rtc-s3c.c
+@@ -423,7 +423,7 @@ static void s3c_rtc_enable(struct platform_device *pdev, int en)
+ 	clk_disable(rtc_clk);
+ }
+ 
+-static int __devexit s3c_rtc_remove(struct platform_device *dev)
++static int s3c_rtc_remove(struct platform_device *dev)
+ {
+ 	struct rtc_device *rtc = platform_get_drvdata(dev);
+ 
+diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
+index bc3671a..d5ec785 100644
+--- a/drivers/rtc/rtc-snvs.c
++++ b/drivers/rtc/rtc-snvs.c
+@@ -294,7 +294,7 @@ static int snvs_rtc_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __devexit snvs_rtc_remove(struct platform_device *pdev)
++static int snvs_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct snvs_rtc_data *data = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-spear.c b/drivers/rtc/rtc-spear.c
+index c71cc09..c2121b5 100644
+--- a/drivers/rtc/rtc-spear.c
++++ b/drivers/rtc/rtc-spear.c
+@@ -425,7 +425,7 @@ err_disable_clock:
+ 	return status;
+ }
+ 
+-static int __devexit spear_rtc_remove(struct platform_device *pdev)
++static int spear_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct spear_rtc_config *config = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-stk17ta8.c b/drivers/rtc/rtc-stk17ta8.c
+index 63deb9c..7e4a6f6 100644
+--- a/drivers/rtc/rtc-stk17ta8.c
++++ b/drivers/rtc/rtc-stk17ta8.c
+@@ -347,7 +347,7 @@ static int stk17ta8_rtc_probe(struct platform_device *pdev)
  	return ret;
  }
  
--static __devexit int tps65910_i2c_remove(struct i2c_client *i2c)
-+static int tps65910_i2c_remove(struct i2c_client *i2c)
+-static int __devexit stk17ta8_rtc_remove(struct platform_device *pdev)
++static int stk17ta8_rtc_remove(struct platform_device *pdev)
  {
- 	struct tps65910 *tps65910 = i2c_get_clientdata(i2c);
+ 	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
  
-diff --git a/drivers/mfd/tps65911-comparator.c b/drivers/mfd/tps65911-comparator.c
-index b3d268f..c0816eb 100644
---- a/drivers/mfd/tps65911-comparator.c
-+++ b/drivers/mfd/tps65911-comparator.c
-@@ -152,7 +152,7 @@ static int tps65911_comparator_probe(struct platform_device *pdev)
+diff --git a/drivers/rtc/rtc-tegra.c b/drivers/rtc/rtc-tegra.c
+index 2b1a7bd..5ba2f75 100644
+--- a/drivers/rtc/rtc-tegra.c
++++ b/drivers/rtc/rtc-tegra.c
+@@ -375,7 +375,7 @@ err_dev_unreg:
  	return ret;
  }
  
--static __devexit int tps65911_comparator_remove(struct platform_device *pdev)
-+static int tps65911_comparator_remove(struct platform_device *pdev)
+-static int __devexit tegra_rtc_remove(struct platform_device *pdev)
++static int tegra_rtc_remove(struct platform_device *pdev)
  {
- 	struct tps65910 *tps65910;
+ 	struct tegra_rtc_info *info = platform_get_drvdata(pdev);
  
-diff --git a/drivers/mfd/tps65912-spi.c b/drivers/mfd/tps65912-spi.c
-index 6366576..b45f460 100644
---- a/drivers/mfd/tps65912-spi.c
-+++ b/drivers/mfd/tps65912-spi.c
-@@ -99,7 +99,7 @@ static int tps65912_spi_probe(struct spi_device *spi)
- 	return tps65912_device_init(tps65912);
+diff --git a/drivers/rtc/rtc-test.c b/drivers/rtc/rtc-test.c
+index 9b23e9f..b92e0f6 100644
+--- a/drivers/rtc/rtc-test.c
++++ b/drivers/rtc/rtc-test.c
+@@ -119,7 +119,7 @@ err:
+ 	return err;
  }
  
--static int __devexit tps65912_spi_remove(struct spi_device *spi)
-+static int tps65912_spi_remove(struct spi_device *spi)
+-static int __devexit test_remove(struct platform_device *plat_dev)
++static int test_remove(struct platform_device *plat_dev)
  {
- 	struct tps65912 *tps65912 = spi_get_drvdata(spi);
+ 	struct rtc_device *rtc = platform_get_drvdata(plat_dev);
  
-diff --git a/drivers/mfd/twl4030-audio.c b/drivers/mfd/twl4030-audio.c
-index aacccdc..e16edca 100644
---- a/drivers/mfd/twl4030-audio.c
-+++ b/drivers/mfd/twl4030-audio.c
-@@ -269,7 +269,7 @@ static int twl4030_audio_probe(struct platform_device *pdev)
+diff --git a/drivers/rtc/rtc-tile.c b/drivers/rtc/rtc-tile.c
+index f051430..62db484 100644
+--- a/drivers/rtc/rtc-tile.c
++++ b/drivers/rtc/rtc-tile.c
+@@ -94,7 +94,7 @@ static int tile_rtc_probe(struct platform_device *dev)
+ /*
+  * Device cleanup routine.
+  */
+-static int __devexit tile_rtc_remove(struct platform_device *dev)
++static int tile_rtc_remove(struct platform_device *dev)
+ {
+ 	struct rtc_device *rtc = platform_get_drvdata(dev);
+ 
+diff --git a/drivers/rtc/rtc-tps65910.c b/drivers/rtc/rtc-tps65910.c
+index dee057d..23bdf9d 100644
+--- a/drivers/rtc/rtc-tps65910.c
++++ b/drivers/rtc/rtc-tps65910.c
+@@ -285,7 +285,7 @@ static int tps65910_rtc_probe(struct platform_device *pdev)
+  * Disable tps65910 RTC interrupts.
+  * Sets status flag to free.
+  */
+-static int __devexit tps65910_rtc_remove(struct platform_device *pdev)
++static int tps65910_rtc_remove(struct platform_device *pdev)
+ {
+ 	/* leave rtc running, but disable irqs */
+ 	struct rtc_device *rtc = platform_get_drvdata(pdev);
+diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
+index 0eda428..4dbe68c 100644
+--- a/drivers/rtc/rtc-twl.c
++++ b/drivers/rtc/rtc-twl.c
+@@ -535,7 +535,7 @@ out1:
+  * Disable all TWL RTC module interrupts.
+  * Sets status flag to free.
+  */
+-static int __devexit twl_rtc_remove(struct platform_device *pdev)
++static int twl_rtc_remove(struct platform_device *pdev)
+ {
+ 	/* leave rtc running, but disable irqs */
+ 	struct rtc_device *rtc = platform_get_drvdata(pdev);
+diff --git a/drivers/rtc/rtc-vr41xx.c b/drivers/rtc/rtc-vr41xx.c
+index 12c6e55..6c3774c 100644
+--- a/drivers/rtc/rtc-vr41xx.c
++++ b/drivers/rtc/rtc-vr41xx.c
+@@ -373,7 +373,7 @@ err_rtc1_iounmap:
+ 	return retval;
+ }
+ 
+-static int __devexit rtc_remove(struct platform_device *pdev)
++static int rtc_remove(struct platform_device *pdev)
+ {
+ 	struct rtc_device *rtc;
+ 
+diff --git a/drivers/rtc/rtc-vt8500.c b/drivers/rtc/rtc-vt8500.c
+index dfed697..fd14187 100644
+--- a/drivers/rtc/rtc-vt8500.c
++++ b/drivers/rtc/rtc-vt8500.c
+@@ -279,7 +279,7 @@ err_release:
  	return ret;
  }
  
--static int __devexit twl4030_audio_remove(struct platform_device *pdev)
-+static int twl4030_audio_remove(struct platform_device *pdev)
+-static int __devexit vt8500_rtc_remove(struct platform_device *pdev)
++static int vt8500_rtc_remove(struct platform_device *pdev)
  {
- 	mfd_remove_devices(&pdev->dev);
- 	platform_set_drvdata(pdev, NULL);
-diff --git a/drivers/mfd/twl4030-madc.c b/drivers/mfd/twl4030-madc.c
-index 228d5aa..a39dcf3 100644
---- a/drivers/mfd/twl4030-madc.c
-+++ b/drivers/mfd/twl4030-madc.c
-@@ -785,7 +785,7 @@ err_power:
+ 	struct vt8500_rtc *vt8500_rtc = platform_get_drvdata(pdev);
+ 
+diff --git a/drivers/rtc/rtc-wm831x.c b/drivers/rtc/rtc-wm831x.c
+index f5955bb..1b0affb 100644
+--- a/drivers/rtc/rtc-wm831x.c
++++ b/drivers/rtc/rtc-wm831x.c
+@@ -459,7 +459,7 @@ err:
  	return ret;
  }
  
--static int __devexit twl4030_madc_remove(struct platform_device *pdev)
-+static int twl4030_madc_remove(struct platform_device *pdev)
+-static int __devexit wm831x_rtc_remove(struct platform_device *pdev)
++static int wm831x_rtc_remove(struct platform_device *pdev)
  {
- 	struct twl4030_madc_data *madc = platform_get_drvdata(pdev);
- 
-diff --git a/drivers/mfd/twl6040.c b/drivers/mfd/twl6040.c
-index c7a1b13..545d3aa 100644
---- a/drivers/mfd/twl6040.c
-+++ b/drivers/mfd/twl6040.c
-@@ -700,7 +700,7 @@ err:
- 	return ret;
+ 	struct wm831x_rtc *wm831x_rtc = platform_get_drvdata(pdev);
+ 	int alm_irq = platform_get_irq_byname(pdev, "ALM");
+diff --git a/drivers/rtc/rtc-wm8350.c b/drivers/rtc/rtc-wm8350.c
+index c7ac9e2..8ad86ae 100644
+--- a/drivers/rtc/rtc-wm8350.c
++++ b/drivers/rtc/rtc-wm8350.c
+@@ -459,7 +459,7 @@ static int wm8350_rtc_probe(struct platform_device *pdev)
+ 	return 0;
  }
  
--static int __devexit twl6040_remove(struct i2c_client *client)
-+static int twl6040_remove(struct i2c_client *client)
+-static int __devexit wm8350_rtc_remove(struct platform_device *pdev)
++static int wm8350_rtc_remove(struct platform_device *pdev)
  {
- 	struct twl6040 *twl6040 = i2c_get_clientdata(client);
- 
-diff --git a/drivers/mfd/vx855.c b/drivers/mfd/vx855.c
-index 66ef03b..757ecc6 100644
---- a/drivers/mfd/vx855.c
-+++ b/drivers/mfd/vx855.c
-@@ -112,7 +112,7 @@ out:
- 	return ret;
- }
- 
--static void __devexit vx855_remove(struct pci_dev *pdev)
-+static void vx855_remove(struct pci_dev *pdev)
- {
- 	mfd_remove_devices(&pdev->dev);
- 	pci_disable_device(pdev);
-diff --git a/drivers/mfd/wm831x-spi.c b/drivers/mfd/wm831x-spi.c
-index 4c7225a..4e70e15 100644
---- a/drivers/mfd/wm831x-spi.c
-+++ b/drivers/mfd/wm831x-spi.c
-@@ -51,7 +51,7 @@ static int wm831x_spi_probe(struct spi_device *spi)
- 	return wm831x_device_init(wm831x, type, spi->irq);
- }
- 
--static int __devexit wm831x_spi_remove(struct spi_device *spi)
-+static int wm831x_spi_remove(struct spi_device *spi)
- {
- 	struct wm831x *wm831x = dev_get_drvdata(&spi->dev);
- 
-diff --git a/drivers/mfd/wm8994-core.c b/drivers/mfd/wm8994-core.c
-index 4e2432d..c7f62ac 100644
---- a/drivers/mfd/wm8994-core.c
-+++ b/drivers/mfd/wm8994-core.c
-@@ -671,7 +671,7 @@ err:
- 	return ret;
- }
- 
--static __devexit void wm8994_device_exit(struct wm8994 *wm8994)
-+static void wm8994_device_exit(struct wm8994 *wm8994)
- {
- 	pm_runtime_disable(wm8994->dev);
- 	mfd_remove_devices(wm8994->dev);
-@@ -715,7 +715,7 @@ static int wm8994_i2c_probe(struct i2c_client *i2c,
- 	return wm8994_device_init(wm8994, i2c->irq);
- }
- 
--static __devexit int wm8994_i2c_remove(struct i2c_client *i2c)
-+static int wm8994_i2c_remove(struct i2c_client *i2c)
- {
- 	struct wm8994 *wm8994 = i2c_get_clientdata(i2c);
- 
-diff --git a/include/linux/mfd/abx500/ab8500.h b/include/linux/mfd/abx500/ab8500.h
-index 83f0bdc..1cb5698 100644
---- a/include/linux/mfd/abx500/ab8500.h
-+++ b/include/linux/mfd/abx500/ab8500.h
-@@ -293,7 +293,7 @@ struct ab8500_platform_data {
- 
- extern int ab8500_init(struct ab8500 *ab8500,
- 				 enum ab8500_version version);
--extern int __devexit ab8500_exit(struct ab8500 *ab8500);
-+extern int ab8500_exit(struct ab8500 *ab8500);
- 
- extern int ab8500_suspend(struct ab8500 *ab8500);
- 
-diff --git a/include/linux/mfd/pm8xxx/irq.h b/include/linux/mfd/pm8xxx/irq.h
-index ddaa7f5..f83d6b4 100644
---- a/include/linux/mfd/pm8xxx/irq.h
-+++ b/include/linux/mfd/pm8xxx/irq.h
-@@ -39,7 +39,7 @@ struct pm_irq_chip;
- int pm8xxx_get_irq_stat(struct pm_irq_chip *chip, int irq);
- struct pm_irq_chip *pm8xxx_irq_init(struct device *dev,
- 				const struct pm8xxx_irq_platform_data *pdata);
--int __devexit pm8xxx_irq_exit(struct pm_irq_chip *chip);
-+int pm8xxx_irq_exit(struct pm_irq_chip *chip);
- #else
- static inline int pm8xxx_get_irq_stat(struct pm_irq_chip *chip, int irq)
- {
-@@ -51,7 +51,7 @@ static inline struct pm_irq_chip *pm8xxx_irq_init(
- {
- 	return ERR_PTR(-ENXIO);
- }
--static inline int __devexit pm8xxx_irq_exit(struct pm_irq_chip *chip)
-+static inline int pm8xxx_irq_exit(struct pm_irq_chip *chip)
- {
- 	return -ENXIO;
- }
+ 	struct wm8350 *wm8350 = platform_get_drvdata(pdev);
+ 	struct wm8350_rtc *wm_rtc = &wm8350->rtc;
 -- 
 1.8.0
