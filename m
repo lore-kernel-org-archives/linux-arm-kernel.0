@@ -1,41 +1,69 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 19 Nov 2012 12:07:06 -0200
-Subject: [PATCH v3 2/3] ARM: mx27: Align IIM registers with Reference Manual
-In-Reply-To: <1353334027-30009-1-git-send-email-fabio.estevam@freescale.com>
-References: <1353334027-30009-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1353334027-30009-2-git-send-email-fabio.estevam@freescale.com>
+Date: Mon, 19 Nov 2012 12:07:05 -0200
+Subject: [PATCH v3 1/3] ARM: imx27_visstrim_m10: Do not reserve VPU DMA pool
+ on board file
+Message-ID: <1353334027-30009-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Align IIM registers with mx27 Reference Manual.
+Do not reserve VPU DMA pool on board file as this can be done via CMA.
+
+The motivation for doing this is to allow to register the VPU driver via a common
+SoC file instead of per board.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
 Changes since v2:
 - No changes. Newly introduced on this series
- arch/arm/mach-imx/iim.h |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-imx/iim.h b/arch/arm/mach-imx/iim.h
-index 315bffa..d1d6f35 100644
---- a/arch/arm/mach-imx/iim.h
-+++ b/arch/arm/mach-imx/iim.h
-@@ -36,11 +36,11 @@
- #define MXC_IIMSCS1             0x0030
- #define MXC_IIMSCS2             0x0034
- #define MXC_IIMSCS3             0x0038
--#define MXC_IIMFBAC0            0x0800
--#define MXC_IIMJAC              0x0804
--#define MXC_IIMHWV1             0x0808
--#define MXC_IIMHWV2             0x080C
--#define MXC_IIMHAB0             0x0810
-+#define MXC_IIMFBAC0            0x003C
-+#define MXC_IIMWORD1_BANK0	0x0804
-+#define MXC_IIMWORD2_BANK0	0x0808
-+#define MXC_IIMWORD3_BANK0	0x080C
-+#define MXC_IIMWORD4_BANK0	0x0810
- #define MXC_IIMHAB1             0x0814
- /* Definitions for i.MX27 TO2 */
- #define MXC_IIMMAC              0x0814
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   21 ++-------------------
+ 1 file changed, 2 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+index b744226..801b797 100644
+--- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
++++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+@@ -264,7 +264,7 @@ static void __init visstrim_camera_init(void)
+ static void __init visstrim_reserve(void)
+ {
+ 	/* reserve 4 MiB for mx2-camera */
+-	mx2_camera_base = arm_memblock_steal(3 * MX2_CAMERA_BUF_SIZE,
++	mx2_camera_base = arm_memblock_steal(2 * MX2_CAMERA_BUF_SIZE,
+ 			MX2_CAMERA_BUF_SIZE);
+ }
+ 
+@@ -434,23 +434,6 @@ static const struct imx_ssi_platform_data visstrim_m10_ssi_pdata __initconst = {
+ 	.flags			= IMX_SSI_DMA | IMX_SSI_SYN,
+ };
+ 
+-/* coda */
+-
+-static void __init visstrim_coda_init(void)
+-{
+-	struct platform_device *pdev;
+-	int dma;
+-
+-	pdev = imx27_add_coda();
+-	dma = dma_declare_coherent_memory(&pdev->dev,
+-					  mx2_camera_base + MX2_CAMERA_BUF_SIZE,
+-					  mx2_camera_base + MX2_CAMERA_BUF_SIZE,
+-					  MX2_CAMERA_BUF_SIZE,
+-					  DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+-	if (!(dma & DMA_MEMORY_MAP))
+-		return;
+-}
+-
+ /* DMA deinterlace */
+ static struct platform_device visstrim_deinterlace = {
+ 	.name = "m2m-deinterlace",
+@@ -548,7 +531,7 @@ static void __init visstrim_m10_board_init(void)
+ 	gpio_led_register_device(0, &visstrim_m10_led_data);
+ 	visstrim_deinterlace_init();
+ 	visstrim_camera_init();
+-	visstrim_coda_init();
++	imx27_add_coda();
+ }
+ 
+ static void __init visstrim_m10_timer_init(void)
 -- 
 1.7.9.5
