@@ -1,33 +1,34 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Nov 2012 23:01:05 +0100
-Subject: [PATCH 14/16] arm: vic: don't expose vic_of_init() anymore
+Date: Tue, 20 Nov 2012 23:01:06 +0100
+Subject: [PATCH 15/16] irqchip: vic: mark vic_of_init() as static
 In-Reply-To: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353448867-15008-15-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353448867-15008-16-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All users of vic_of_init() have been converted to the irqchip
-infrastructure, and all future users should go through this new
-infrastructure. Therefore, we no longer expose the vic_of_init()
-function through the vic.h header.
+With all vic_of_init() users converted to the irqchip infrastructure,
+there is no longer a reason for this function to be
+exported. Therefore, mark it as static.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/include/asm/hardware/vic.h |    1 -
- 1 file changed, 1 deletion(-)
+ drivers/irqchip/irq-vic.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/hardware/vic.h b/arch/arm/include/asm/hardware/vic.h
-index e14af1a..3b2e881 100644
---- a/arch/arm/include/asm/hardware/vic.h
-+++ b/arch/arm/include/asm/hardware/vic.h
-@@ -50,7 +50,6 @@ struct pt_regs;
- void __vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources,
- 		u32 resume_sources, struct device_node *node);
- void vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources, u32 resume_sources);
--int vic_of_init(struct device_node *node, struct device_node *parent);
- void vic_handle_irq(struct pt_regs *regs);
+diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
+index 98a0708..c8c8cab 100644
+--- a/drivers/irqchip/irq-vic.c
++++ b/drivers/irqchip/irq-vic.c
+@@ -440,7 +440,8 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
+ }
  
- #endif /* __ASSEMBLY__ */
+ #ifdef CONFIG_OF
+-int __init vic_of_init(struct device_node *node, struct device_node *parent)
++static int __init vic_of_init(struct device_node *node,
++			      struct device_node *parent)
+ {
+ 	void __iomem *regs;
+ 	int irq_base;
 -- 
 1.7.9.5
