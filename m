@@ -1,111 +1,85 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 20 Nov 2012 12:45:53 +0100
-Subject: [PATCH] gpiolib: let gpiochip_add_pin_range() specify offset
-Message-ID: <1353411953-27423-1-git-send-email-linus.walleij@stericsson.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 20 Nov 2012 20:51:54 +0900
+Subject: [PATCH 00/10] ARM: S3C24XX: rework irq handling for a later dt
+ usage
+In-Reply-To: <201211180151.01029.heiko@sntech.de>
+References: <201211180151.01029.heiko@sntech.de>
+Message-ID: <0c8b01cdc715$6feff590$4fcfe0b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Heiko St?bner wrote:
+> 
+> All S3C24XX arches share the same interrupt registers and basic handling
+> principles but the individual interrupts differ quite a lot between all
+> the arches.
+> 
+> This series therefore tries to unify this a bit by abstracting the irq
+> handling and enabling the arches to simply provide a structure describing
+> its individual interrupts.
+> 
+> With this declarative approach it should also be (hopefully) easy to
+> move this to devicetree later.
+> 
+> For the initial transformation (in patch 1) I gave up on trying to do
+> this in individual steps, so the patch might be a bit bumpy to read,
+> but the new irq code does provide the exactly same interrupts and
+> handlers as the old code. This also means that the unconverted arches
+> shouldn't feel any difference at all.
+> 
+> I've only included the s3c2416 and s3c2443 interrupts for now, as the
+> s3c2416 is my main development platform and the s3c2443 is so very
+> similar. But the other arches use the same mechanics so conversion
+> should be quite easy later.
+> 
+> As it seems to be the policy for drivers/irqchip that drivers there
+> should not contain platform-hooks or pollute the namespace with custom
+> init functons, the irq code stays in plat-s3c24xx for now.
+> 
+> Heiko Stuebner (10):
+>   ARM: S3C24XX: transform irq handling into a declarative form
+>   ARM: S3C24XX: move irq-pm code into main irq file
+>   ARM: S3C24XX: cleanup irq-pm integration
+>   ARM: S3C24XX: move s3c2416 irq init to common irq code
+>   ARM: S3C24XX: modify s3c2416 irq init to initialize all irqs
+>   ARM: S3C24XX: assimilate s3c2416 subirqs into new structure
+>   ARM: S3C24XX: assimilate second s3c2416 interrupt into new structure
+>   ARM: S3C24XX: move s3c2443 irq code to irq.c
+>   ARM: S3C24XX: modify s3c2443 irq init to initialize all irqs
+>   ARM: S3C24XX: assimilate s3c2443 subirqs into new structure
+> 
+>  arch/arm/mach-s3c24xx/Makefile               |    6 +-
+>  arch/arm/mach-s3c24xx/common.h               |    2 +
+>  arch/arm/mach-s3c24xx/irq-pm.c               |   95 ---
+>  arch/arm/mach-s3c24xx/irq-s3c2416.c          |  348 --------
+>  arch/arm/mach-s3c24xx/irq-s3c2443.c          |  281 -------
+>  arch/arm/mach-s3c24xx/mach-smdk2416.c        |    2 +-
+>  arch/arm/mach-s3c24xx/mach-smdk2443.c        |    2 +-
+>  arch/arm/mach-s3c24xx/s3c2410.c              |    4 +-
+>  arch/arm/mach-s3c24xx/s3c2412.c              |    4 +-
+>  arch/arm/mach-s3c24xx/s3c2416.c              |    4 +-
+>  arch/arm/mach-s3c24xx/s3c2440.c              |    4 +-
+>  arch/arm/mach-s3c24xx/s3c2442.c              |    4 +-
+>  arch/arm/plat-s3c24xx/Kconfig                |    1 +
+>  arch/arm/plat-s3c24xx/irq.c                  | 1140 ++++++++++++++++---------
+> -
+>  arch/arm/plat-samsung/include/plat/pm.h      |    6 -
+>  arch/arm/plat-samsung/include/plat/s3c2416.h |    1 +
+>  arch/arm/plat-samsung/include/plat/s3c2443.h |    2 +
+>  17 files changed, 737 insertions(+), 1169 deletions(-)
+>  delete mode 100644 arch/arm/mach-s3c24xx/irq-pm.c
+>  delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2416.c
+>  delete mode 100644 arch/arm/mach-s3c24xx/irq-s3c2443.c
+> 
+> --
+> 1.7.2.3
 
-Like with commit 3c739ad0df5eb41cd7adad879eda6aa09879eb76
-it is not always enough to specify all the pins of a gpio_chip
-from offset zero to be added to a pin map range, since the
-mapping from GPIO to pin controller may not be linear at all,
-but need to be broken into a few consecutive sub-ranges or
-1-pin entries for complicated cases. The ranges may also be
-sparse.
+Good job, but I need more time to look at this whole series...I will try to do before this weekend ;-)
 
-This alters the signature of the function to accept offsets
-into both the GPIO-chip local pinspace and the pin controller
-local pinspace.
+Thanks.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/gpio/gpiolib.c     | 18 ++++++++++++++++--
- include/asm-generic/gpio.h |  6 ++++--
- include/linux/gpio.h       |  3 ++-
- 3 files changed, 22 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index c5f6500..0b08d27 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -1187,8 +1187,18 @@ EXPORT_SYMBOL_GPL(gpiochip_find);
- 
- #ifdef CONFIG_PINCTRL
- 
-+/**
-+ * gpiochip_add_pin_range() - add a range for GPIO <-> pin mapping
-+ * @chip: the gpiochip to add the range for
-+ * @pinctrl_name: the dev_name() of the pin controller to map to
-+ * @offset: the start offset in the current gpio_chip number space
-+ * @pin_base: the start offset in the pin controller number space
-+ * @npins: the number of pins from the offset of each pin space (GPIO and
-+ *	pin controller) to accumulate in this range
-+ */
- int gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
--			   unsigned int pin_base, unsigned int npins)
-+			   unsigned int offset, unsigned int pin_base,
-+			   unsigned int npins)
- {
- 	struct gpio_pin_range *pin_range;
- 
-@@ -1200,7 +1210,7 @@ int gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
- 	}
- 
- 	pin_range->range.name = chip->label;
--	pin_range->range.base = chip->base;
-+	pin_range->range.base = chip->base + offset;
- 	pin_range->range.pin_base = pin_base;
- 	pin_range->range.npins = npins;
- 	pin_range->pctldev = find_pinctrl_and_add_gpio_range(pinctl_name,
-@@ -1212,6 +1222,10 @@ int gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
- }
- EXPORT_SYMBOL_GPL(gpiochip_add_pin_range);
- 
-+/**
-+ * gpiochip_remove_pin_ranges() - remove all the GPIO <-> pin mappings
-+ * @chip: the chip to remove all the mappings for
-+ */
- void gpiochip_remove_pin_ranges(struct gpio_chip *chip)
- {
- 	struct gpio_pin_range *pin_range, *tmp;
-diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
-index 2b84fc3..ec58fdb 100644
---- a/include/asm-generic/gpio.h
-+++ b/include/asm-generic/gpio.h
-@@ -283,14 +283,16 @@ struct gpio_pin_range {
- };
- 
- int gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
--			   unsigned int pin_base, unsigned int npins);
-+			   unsigned int offset, unsigned int pin_base,
-+			   unsigned int npins);
- void gpiochip_remove_pin_ranges(struct gpio_chip *chip);
- 
- #else
- 
- static inline int
- gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
--		       unsigned int pin_base, unsigned int npins)
-+		       unsigned int offset, unsigned int pin_base,
-+		       unsigned int npins)
- {
- 	return 0;
- }
-diff --git a/include/linux/gpio.h b/include/linux/gpio.h
-index 7ba2762..99861c6 100644
---- a/include/linux/gpio.h
-+++ b/include/linux/gpio.h
-@@ -233,7 +233,8 @@ static inline int irq_to_gpio(unsigned irq)
- 
- static inline int
- gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
--		       unsigned int pin_base, unsigned int npins)
-+		       unsigned int offset, unsigned int pin_base,
-+		       unsigned int npins)
- {
- 	WARN_ON(1);
- 	return -EINVAL;
--- 
-1.7.11.3
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
