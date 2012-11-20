@@ -1,74 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 20 Nov 2012 16:55:17 +0000
-Subject: [PATCH 1/1] ARM: oprofile: add A5/A7/A15 entries in op_perf_name
-In-Reply-To: <20121120163158.GO2504@rric.localhost>
-References: <1351853016-4476-1-git-send-email-jgq516@gmail.com>
- <20121105113102.GF3351@mudshark.cambridge.arm.com>
- <20121120121747.GJ2504@rric.localhost>
- <20121120155717.GD26475@mudshark.cambridge.arm.com>
- <20121120163158.GO2504@rric.localhost>
-Message-ID: <20121120165517.GC27765@mudshark.cambridge.arm.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 20 Nov 2012 08:56:24 -0800
+Subject: [PATCH 075/493] mfd: remove use of __devexit_p
+In-Reply-To: <1353349642-3677-75-git-send-email-wfp5p@virginia.edu>
+References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
+ <1353349642-3677-75-git-send-email-wfp5p@virginia.edu>
+Message-ID: <20121120165624.GA21706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 04:31:58PM +0000, Robert Richter wrote:
-> On 20.11.12 15:57:17, Will Deacon wrote:
-> > On Tue, Nov 20, 2012 at 12:17:47PM +0000, Robert Richter wrote:
-> > > 
-> > > since this is just an update of cpu detection I would be willing to
-> > > include this into kernel code anyway.
-> > 
-> > Perhaps, but one day we might like to remove this compatibility layer as
-> > tools move over to the perf system call, so adding new CPUs here is actively
-> > going against that.
+On Mon, Nov 19, 2012 at 01:20:24PM -0500, Bill Pemberton wrote:
+> CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
+> needed.
 > 
-> This would help people to use oprofile as they did before with legacy
-> oprofile tools. There is not much effort to keep oprofile kernel
-> support for these tools if in-kernel perf_event support exists for new
-> hardware. As this is not much effort to maintain, we could keep
-> supporting this.  Forcing users to use operf since this is the only
-> way to connect to newer hardware might not be what they want.
+> Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
+> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> 
+> Cc: Peter Tyser <ptyser@xes-inc.com> 
+> Cc: David Brown <davidb@codeaurora.org> 
+> Cc: Daniel Walker <dwalker@fifo99.com> 
+> Cc: Bryan Huntsman <bryanh@codeaurora.org> 
+> Cc: linux-arm-kernel at lists.infradead.org 
+> Cc: device-drivers-devel at blackfin.uclinux.org 
+> Cc: patches at opensource.wolfsonmicro.com 
+> Cc: linux-arm-msm at vger.kernel.org 
+> ---
+>  drivers/mfd/pm8921-core.c         | 2 +-
 
-For arch/arm/, yes, it's not a lot of work but I'm thinking more of things
-like heterogeneous multi-core (big/little) and arm64, which we definitely
-don't want to deal with in the old tools.
+Acked-by: David Brown <davidb@codeaurora.org>
 
-I think newer hardware really will require operf.
-
-> > > We could further move the cpu detection to userspace if perf_event
-> > > exists. We let the kernel enable oprofile with cpu_type="unknown".
-> > > User space then could either bind mount the file (user could do this
-> > > manually) or we implement to write to cpu_type. Doing so oprofile
-> > > could use in-kernel perf_events if it exists always as fallback.
-> > 
-> > Not sure I follow you... operf already does the CPU detection from
-> > userspace, so I guess that code could simply be re-used. What does the bind
-> > mount involve?
-> 
-> I am thinking of the following:
-> 
->  # cat /root/cpu_type
->  arm/armv7-ca5
->  # cat /dev/oprofile/cpu_type
->  unknown
->  # mount --bind /root/cpu_type /dev/oprofile/cpu_type
->  # cat /dev/oprofile/cpu_type
->  arm/armv7-ca5
-> 
-> From here legacy oprofile tools work as expected using oprofilefs. (I
-> think. Did not test it.) We need to change the kernel for this a bit
-> to return 'unknown'. The mount could be done by the oprofile tools
-> using existing cpu detection code. This is only one way to setup
-> cpu_type from userland, there could be other ways too.
-
-Ok, this is functionally equivalent to the patch that was submitted at the
-start of this thread: it solves the problem of mapping a single ARM core to
-a oprofile's CPU ID string. Technically, I don't mind doing that in the
-kernel (at least, it means you don't need to do your trick above) but going
-forward it *will* fall apart and people will have to move to newer tools.
-
-So the question is: do we want to migrate users now or later?
-
-Cheers,
-
-Will
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
