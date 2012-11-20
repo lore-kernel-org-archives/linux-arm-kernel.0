@@ -1,53 +1,54 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Nov 2012 16:48:44 +0100
-Subject: [PATCH] ARM: mx5: Replace clk_register_clkdev with clock DT lookup
-In-Reply-To: <50ABA25C.7050304@pengutronix.de>
-References: <1353350425-1075-1-git-send-email-fabio.estevam@freescale.com>
- <20121120152836.GM10369@pengutronix.de>
- <50ABA25C.7050304@pengutronix.de>
-Message-ID: <20121120154844.GN10369@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Nov 2012 15:57:17 +0000
+Subject: [PATCH 1/1] ARM: oprofile: add A5/A7/A15 entries in op_perf_name
+In-Reply-To: <20121120121747.GJ2504@rric.localhost>
+References: <1351853016-4476-1-git-send-email-jgq516@gmail.com>
+ <20121105113102.GF3351@mudshark.cambridge.arm.com>
+ <20121120121747.GJ2504@rric.localhost>
+Message-ID: <20121120155717.GD26475@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 04:31:40PM +0100, Marc Kleine-Budde wrote:
-> On 11/20/2012 04:28 PM, Sascha Hauer wrote:
-> > On Mon, Nov 19, 2012 at 04:40:25PM -0200, Fabio Estevam wrote:
-> >> Similarly as it was done for mx6q, use a DT lookup in order to make maintainance
-> >> task for the clock devices easier.
-> >>
-> >> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> >> ---
-> >>  .../devicetree/bindings/clock/imx5-clock.txt       |  197 ++++++++++++++++++++
-> >>  arch/arm/boot/dts/imx51.dtsi                       |   39 ++++
-> >>  arch/arm/boot/dts/imx53.dtsi                       |   48 +++++
-> >>  arch/arm/mach-imx/clk-imx51-imx53.c                |   26 +--
-> >>  arch/arm/mach-imx/imx51-dt.c                       |   28 +--
-> >>  arch/arm/mach-imx/mach-imx53.c                     |   31 +--
-> >>  6 files changed, 299 insertions(+), 70 deletions(-)
-> >>  create mode 100644 Documentation/devicetree/bindings/clock/imx5-clock.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/clock/imx5-clock.txt b/Documentation/devicetree/bindings/clock/imx5-clock.txt
-> >> new file mode 100644
-> >> index 0000000..a6fb29e
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/clock/imx5-clock.txt
-> >> @@ -0,0 +1,197 @@
-> >> +* Clock bindings for Freescale i.MX5
-> >> +
-> >> +Required properties:
-> >> +- compatible: Should be "fsl,<soc>-ccm" , where <soc> can be mx51 or mx53
-> > 
-> > s/mx51/imx51/
-> > s/mx53/iMX53/
->          ^^^^^
-> imx53?
+On Tue, Nov 20, 2012 at 12:17:47PM +0000, Robert Richter wrote:
+> Will,
+> 
+> On 05.11.12 11:31:03, Will Deacon wrote:
+> > > diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+> > > index 99c63d4b..ec10db1 100644
+> > > --- a/arch/arm/oprofile/common.c
+> > > +++ b/arch/arm/oprofile/common.c
+> > > @@ -37,8 +37,11 @@ static struct op_perf_name {
+> > >  	{ "xscale1",		"arm/xscale2"	},
+> > >  	{ "v6",			"arm/armv6"	},
+> > >  	{ "v6mpcore",		"arm/mpcore"	},
+> > > +	{ "ARMv7 Cortex-A5",	"arm/armv7-ca5"	},
+> > > +	{ "ARMv7 Cortex-A7",	"arm/armv7-ca7"	},
+> > >  	{ "ARMv7 Cortex-A8",	"arm/armv7"	},
+> > >  	{ "ARMv7 Cortex-A9",	"arm/armv7-ca9"	},
+> > > +	{ "ARMv7 Cortex-A15",	"arm/armv7-ca15" },
+> > >  };
+> 
+> > I'd rather not go down this route now that we have the operf tool as part of
+> > oprofile, which can use the perf syscall directly and doesn't need this
+> > string translation.
+> 
+> since this is just an update of cpu detection I would be willing to
+> include this into kernel code anyway.
 
-even better ;)
+Perhaps, but one day we might like to remove this compatibility layer as
+tools move over to the perf system call, so adding new CPUs here is actively
+going against that.
 
-Sascha
+> We could further move the cpu detection to userspace if perf_event
+> exists. We let the kernel enable oprofile with cpu_type="unknown".
+> User space then could either bind mount the file (user could do this
+> manually) or we implement to write to cpu_type. Doing so oprofile
+> could use in-kernel perf_events if it exists always as fallback.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Not sure I follow you... operf already does the CPU detection from
+userspace, so I guess that code could simply be re-used. What does the bind
+mount involve?
+
+Cheers,
+
+Will
