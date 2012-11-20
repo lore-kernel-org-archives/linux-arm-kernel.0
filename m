@@ -1,38 +1,46 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 20 Nov 2012 15:10:06 +0530
-Subject: [PATCH 1/3] CLK: uninline clk_prepare() and clk_unprepare()
-In-Reply-To: <20121120093242.GK3290@n2100.arm.linux.org.uk>
-References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
- <1353403339-11679-2-git-send-email-dmitry.torokhov@gmail.com>
- <20121120093242.GK3290@n2100.arm.linux.org.uk>
-Message-ID: <CAKohponif3xf8ymtZ4-vv8TEj74C=9_Me5osMV4dcwSfUjPZAQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 20 Nov 2012 10:40:42 +0100
+Subject: arm: mvebu: Various mvebu clock fixes/improvements
+In-Reply-To: <20121119182701.GS14643@lunn.ch>
+References: <1353343963-23034-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121119182701.GS14643@lunn.ch>
+Message-ID: <20121120104042.224e51a5@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 November 2012 15:02, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Nov 20, 2012 at 01:22:17AM -0800, Dmitry Torokhov wrote:
->> We'll need to invoke clk_unprepare() via a pointer in our devm_*
->> conversion so let's uninline the pair.
->
-> NAK.  This breaks non-common clock using implementations.
+Andrew,
 
-Hi Russell,
+On Mon, 19 Nov 2012 19:27:01 +0100, Andrew Lunn wrote:
 
-Dummy routines for non-common clock are still there. Sorry, couldn't get
-why this will break those platforms:
+> > In summary:
+> > 
+> >  * Patch 1 fixes a real problem: the gating clocks are not registered
+> >    on Armada 370/XP.
+> > 
+> >  * Patch 2, 3, 5 and 6 are more cosmetic patches, but I think they are
+> >    good to have.
+> > 
+> >  * Patch 4 implements a fix that we've been discussing: moving the
+> >    Armada XP CPU clocks down to the individual armada-xp-mv78xxx.dtsi
+> >    files.
+> > 
+> >  * Patch 7 fixes the references to the SATA clocks on Armada
+> >    370/XP. Without this patch, Armada 370 currently hangs at boot when
+> >    trying to initialize SATA.
+> 
+> Hi Thomas
+> 
+> You probably want patch 1 last. Anybody bisecting this changeset if
+> going to have a hung 370/XP.
 
-+static inline int clk_prepare(struct clk *clk)
-+{
-+       might_sleep();
-+       return 0;
-+}
-+
-+static inline void clk_unprepare(struct clk *clk)
-+{
-+       might_sleep();
-+}
-+
+Unfortunately, I don't think putting patch 1 last will work either: in
+patch 7, I change the SATA clocks to point to the gating clocks. So if
+patch 1 is not there, those clocks do not exist and the driver fails to
+clk_get() those clocks.
 
---
-viresh
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
