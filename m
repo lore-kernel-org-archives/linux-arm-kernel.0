@@ -1,39 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 20 Nov 2012 17:01:27 +0000
-Subject: [PATCH V4 5/5] arm: mvebu: Added SMP support for Armada XP
-In-Reply-To: <50ABB499.6090508@free-electrons.com>
-References: <1353357360-7242-1-git-send-email-gregory.clement@free-electrons.com>
- <1353357360-7242-6-git-send-email-gregory.clement@free-electrons.com>
- <20121120164058.GB27765@mudshark.cambridge.arm.com>
- <50ABB499.6090508@free-electrons.com>
-Message-ID: <20121120170127.GE27765@mudshark.cambridge.arm.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 20 Nov 2012 09:03:15 -0800
+Subject: [PATCH 235/493] mfd: remove use of __devinit
+In-Reply-To: <1353349642-3677-235-git-send-email-wfp5p@virginia.edu>
+References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
+ <1353349642-3677-235-git-send-email-wfp5p@virginia.edu>
+Message-ID: <20121120170315.GC21706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 04:49:29PM +0000, Gregory CLEMENT wrote:
-> On 11/20/2012 05:40 PM, Will Deacon wrote:
-> > 
-> > ENTRY(armada_xp_secondary_startup)
-> > 	ldr     r0, =ARMADA_XP_CFB_BASE
-> > 	mrc     p15, 0, r1, c0, c0, 5
-> > 	and     r1, r1, #0xF
-> > 	adr	lr, BSYM(secondary_startup)
-> > 
-> > 	/* Fallthrough */
-> > 
-> > ENTRY(ll_set_cpu_coherent)
-> > ...
-> > ENDPROC(ll_set_cpu_coherent)
-> > ENDPROC(armada_xp_secondary_startup)
-> > 
-> > what do you think?
-> > 
+On Mon, Nov 19, 2012 at 01:23:04PM -0500, Bill Pemberton wrote:
+> CONFIG_HOTPLUG is going away as an option so __devinit is no longer
+> needed.
 > 
-> I prefer to keep them separate, as we can use coherency without SMP.
-> That's why I create the coherency_ll.S file instead of putting everything
-> in this file.
+> Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
+> ---
+>  drivers/mfd/pm8921-core.c         |  4 ++--
+>  drivers/mfd/pm8xxx-irq.c          |  2 +-
+>  include/linux/mfd/pm8xxx/irq.h    |  4 ++--
 
-Hmm, can you elaborate a bit more on coherency without SMP please? Do these
-controls also affect IO coherency?
+Acked-by: David Brown <davidb@codeaurora.org>
 
-Will
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
