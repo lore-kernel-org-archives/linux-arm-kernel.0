@@ -1,144 +1,178 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 20 Nov 2012 02:00:21 +0000 (GMT)
-Subject: [PATCH 446/493] video: remove use of __devexit
-Message-ID: <4955271.678781353376811686.JavaMail.weblogic@epml04>
+From: chlrbgh0@gmail.com (Kyuho Choi)
+Date: Tue, 20 Nov 2012 13:29:56 +0900
+Subject: [PATCH] ARM: EXYNOS: Add support for ORIGEN4QUAD board
+In-Reply-To: <50AB0048.60302@linaro.org>
+References: <1353345846-31355-1-git-send-email-kh.choi@insignal.co.kr>
+ <50AB0048.60302@linaro.org>
+Message-ID: <CAP2JTQLOGMy+S0vd1yzQR4B5B_Z7B26D=VSbEXn=85T+ekt+2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 20, 2012 3:27 AM, Bill Pemberton wrote
-> 
-> CONFIG_HOTPLUG is going away as an option so __devexit is no
-> longer needed.
-> 
-> Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-> Cc: Jaya Kumar <jayalk@intworks.biz>
-> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> Cc: Inki Dae <inki.dae@samsung.com>
-> Cc: Donghwa Lee <dh09.lee@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Ferenc Bakonyi <fero@drama.obuda.kando.hu>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Maik Broemme <mbroemme@plusserver.de>
-> Cc: Antonino Daplas <adaplas@gmail.com>
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Thomas Winischhofer <thomas@winischhofer.net>
-> Cc: Michal Januszewski <spock@gentoo.org>
-> Cc: Tony Prisk <linux@prisktech.co.nz>
-> Cc: linux-fbdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-geode at lists.infradead.org
-> Cc: linux-nvidia at lists.surfsouth.com
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> ---
->  drivers/video/arcfb.c                                   |  2 +-
->  drivers/video/arkfb.c                                   |  2 +-
->  drivers/video/asiliantfb.c                              |  2 +-
->  drivers/video/aty/aty128fb.c                            |  2 +-
->  drivers/video/aty/atyfb_base.c                          |  4 ++--
->  drivers/video/aty/radeon_base.c                         |  2 +-
->  drivers/video/au1200fb.c                                |  2 +-
->  drivers/video/auo_k1900fb.c                             |  2 +-
->  drivers/video/auo_k1901fb.c                             |  2 +-
->  drivers/video/auo_k190x.c                               |  2 +-
->  drivers/video/bf537-lq035.c                             |  4 ++--
->  drivers/video/bf54x-lq043fb.c                           |  2 +-
->  drivers/video/bfin-lq035q1-fb.c                         |  2 +-
->  drivers/video/bfin-t350mcqb-fb.c                        |  2 +-
->  drivers/video/bfin_adv7393fb.c                          |  2 +-
->  drivers/video/broadsheetfb.c                            |  2 +-
->  drivers/video/bw2.c                                     |  2 +-
->  drivers/video/carminefb.c                               |  2 +-
->  drivers/video/cg14.c                                    |  2 +-
->  drivers/video/cg3.c                                     |  2 +-
->  drivers/video/cg6.c                                     |  2 +-
->  drivers/video/chipsfb.c                                 |  2 +-
->  drivers/video/cirrusfb.c                                |  6 +++---
->  drivers/video/cobalt_lcdfb.c                            |  2 +-
->  drivers/video/console/sticore.c                         |  2 +-
->  drivers/video/cyber2000fb.c                             |  4 ++--
->  drivers/video/da8xx-fb.c                                |  2 +-
->  drivers/video/ep93xx-fb.c                               |  2 +-
->  drivers/video/exynos/exynos_dp_core.c                   |  2 +-
->  drivers/video/exynos/exynos_mipi_dsi.c                  |  2 +-
->  drivers/video/ffb.c                                     |  2 +-
->  drivers/video/gbefb.c                                   |  4 ++--
->  drivers/video/geode/gx1fb_core.c                        |  4 ++--
->  drivers/video/geode/gxfb_core.c                         |  2 +-
->  drivers/video/geode/lxfb_core.c                         |  2 +-
->  drivers/video/grvga.c                                   |  2 +-
->  drivers/video/gxt4500.c                                 |  2 +-
->  drivers/video/hecubafb.c                                |  2 +-
->  drivers/video/hgafb.c                                   |  2 +-
->  drivers/video/hitfb.c                                   |  2 +-
->  drivers/video/hpfb.c                                    |  2 +-
->  drivers/video/i740fb.c                                  |  2 +-
->  drivers/video/imsttfb.c                                 |  2 +-
->  drivers/video/imxfb.c                                   |  2 +-
->  drivers/video/intelfb/intelfbdrv.c                      |  4 ++--
->  drivers/video/jz4740_fb.c                               |  2 +-
->  drivers/video/kyro/fbdev.c                              |  2 +-
->  drivers/video/leo.c                                     |  2 +-
->  drivers/video/mb862xx/mb862xxfbdrv.c                    |  4 ++--
->  drivers/video/mbx/mbxdebugfs.c                          |  2 +-
->  drivers/video/mbx/mbxfb.c                               |  2 +-
->  drivers/video/metronomefb.c                             |  2 +-
->  drivers/video/mxsfb.c                                   |  4 ++--
->  drivers/video/neofb.c                                   |  2 +-
->  drivers/video/nvidia/nvidia.c                           |  2 +-
->  drivers/video/omap2/displays/panel-lgphilips-lb035q02.c |  2 +-
->  drivers/video/omap2/displays/panel-tpo-td043mtea1.c     |  2 +-
->  drivers/video/p9100.c                                   |  2 +-
->  drivers/video/platinumfb.c                              |  2 +-
->  drivers/video/pm2fb.c                                   |  2 +-
->  drivers/video/pm3fb.c                                   |  2 +-
->  drivers/video/pvr2fb.c                                  |  2 +-
->  drivers/video/pxa168fb.c                                |  2 +-
->  drivers/video/pxa3xx-gcu.c                              |  2 +-
->  drivers/video/pxafb.c                                   |  4 ++--
->  drivers/video/riva/fbdev.c                              |  2 +-
->  drivers/video/s3c-fb.c                                  |  2 +-
->  drivers/video/s3c2410fb.c                               |  2 +-
->  drivers/video/s3fb.c                                    |  2 +-
->  drivers/video/savage/savagefb_driver.c                  |  2 +-
->  drivers/video/sgivwfb.c                                 |  2 +-
->  drivers/video/sh7760fb.c                                |  2 +-
->  drivers/video/sh_mipi_dsi.c                             |  2 +-
->  drivers/video/sis/sis_main.c                            |  2 +-
->  drivers/video/skeletonfb.c                              |  4 ++--
->  drivers/video/sstfb.c                                   |  6 +++---
->  drivers/video/sunxvr1000.c                              |  2 +-
->  drivers/video/sunxvr2500.c                              |  2 +-
->  drivers/video/sunxvr500.c                               |  2 +-
->  drivers/video/tcx.c                                     |  2 +-
->  drivers/video/tdfxfb.c                                  |  4 ++--
->  drivers/video/tgafb.c                                   | 14 +++++++-------
->  drivers/video/tmiofb.c                                  |  2 +-
->  drivers/video/tridentfb.c                               |  2 +-
->  drivers/video/uvesafb.c                                 |  2 +-
->  drivers/video/vermilion/vermilion.c                     |  2 +-
->  drivers/video/vga16fb.c                                 |  2 +-
->  drivers/video/via/via-core.c                            |  2 +-
->  drivers/video/via/viafbdev.c                            |  2 +-
->  drivers/video/vt8500lcdfb.c                             |  2 +-
->  drivers/video/vt8623fb.c                                |  2 +-
->  drivers/video/w100fb.c                                  |  2 +-
->  drivers/video/wm8505fb.c                                |  2 +-
->  drivers/video/wmt_ge_rops.c                             |  2 +-
->  drivers/video/xilinxfb.c                                |  2 +-
->  95 files changed, 116 insertions(+), 116 deletions(-)
-> 
+Thanks for your interest. :)
 
-For drivers/video/s3c-fb.c, drivers/video/exynos/exynos_dp_core.c
+2012/11/20 Tushar Behera <tushar.behera@linaro.org>
 
-Acked-by: Jingoo Han <jg1.han@samsung.com>
+> On 11/19/2012 10:54 PM, chlrbgh0 at gmail.com wrote:
+> > From: Kyuho Choi <kh.choi@insignal.co.kr>
+> >
+> > This patch add support for Insignal ORIGEN4QUAD board.
+> > ORIGEN4QUAD board based on Samsung Exynos4412 SoC.
+> >
+> > Signed-off-by: Kyuho Choi <kh.choi@insignal.co.kr>
+> > ---
+> >  arch/arm/mach-exynos/Kconfig       |    1 +
+> >  arch/arm/mach-exynos/mach-origen.c |   74
+> +++++++++++++++++++++++++++--------
+> >  2 files changed, 58 insertions(+), 17 deletions(-)
+> >
+>
+> Since Origen and Origen4Quad boards have different peripherals
+> (different pmic chip, touch/audio on different I2C bus etc.), how do you
+> plan to add them to mach-origen.c?
+>
+> As your mentioned, PMIC setup code will be added for Origen4Quad board.
 
+IMHO, Origen and Origen4Quad board has differential form SoC type.
+Thus I modified machine initial code from "mach-origen.c" source. It
+separate Origenboard and Origen4Quad board from SoC type.
 
-Best regards,
-Jingoo Han
+- Common initialize features(Origen and Origen4Quad shared features)
+- Origenboard dependant features
+- Origen4Quad board dependant features
+
+So, code to initialize the peripherals will be added to each area.
+
+>
+> > diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> > index bb3b09a..0b8ccd3 100644
+> > --- a/arch/arm/mach-exynos/Kconfig
+> > +++ b/arch/arm/mach-exynos/Kconfig
+> > @@ -324,6 +324,7 @@ config MACH_NURI
+> >  config MACH_ORIGEN
+> >       bool "ORIGEN"
+> >       select CPU_EXYNOS4210
+> > +     select SOC_EXYNOS4412
+> >       select EXYNOS4_DEV_USB_OHCI
+> >       select EXYNOS4_SETUP_FIMD0
+> >       select EXYNOS4_SETUP_SDHCI
+> > diff --git a/arch/arm/mach-exynos/mach-origen.c
+> b/arch/arm/mach-exynos/mach-origen.c
+> > index e6f4191..2839724 100644
+> > --- a/arch/arm/mach-exynos/mach-origen.c
+> > +++ b/arch/arm/mach-exynos/mach-origen.c
+> > @@ -1,6 +1,6 @@
+> >  /* linux/arch/arm/mach-exynos4/mach-origen.c
+> >   *
+> > - * Copyright (c) 2011 Insignal Co., Ltd.
+> > + * Copyright (c) 2011-2012 Insignal Co., Ltd.
+> >   *           http://www.insignal.co.kr/
+> >   *
+> >   * This program is free software; you can redistribute it and/or modify
+> > @@ -771,19 +771,36 @@ static void __init origen_reserve(void)
+> >       s5p_mfc_reserve_mem(0x43000000, 8 << 20, 0x51000000, 8 << 20);
+> >  }
+> >
+> > -static void __init origen_machine_init(void)
+> > +static int __init origen4quad_i2c_init(void)
+> >  {
+> > -     origen_power_init();
+> > +     /*
+> > +      * Origen4Quad has weaknees drive strength in i2c channel 3.
+> > +      * thus here setup i2c3's drvstr for Origen4Quad.
+> > +      */
+> > +     s5p_gpio_set_drvstr(EXYNOS4_GPA1(2), 3);
+> > +     s5p_gpio_set_drvstr(EXYNOS4_GPA1(3), 3);
+> > +     return 0;
+> > +}
+> >
+> > -     s3c_i2c0_set_platdata(NULL);
+> > -     i2c_register_board_info(0, i2c0_devs, ARRAY_SIZE(i2c0_devs));
+> > +static int __init origen4quad_usb_init(void)
+> > +{
+> > +     /* USB HUB controller's hub reset pin setup for Origen4Quad. */
+> > +     gpio_request(EXYNOS4_GPX3(5), "GPX3");
+> > +     gpio_direction_output(EXYNOS4_GPX3(5), 1);
+> > +     gpio_set_value(EXYNOS4_GPX3(5), S3C_GPIO_PULL_UP);
+> > +     gpio_free(EXYNOS4_GPX3(5));
+> > +     return 0;
+> > +}
+> >
+> > +static void __init origen_machine_init(void)
+> > +{
+> >       /*
+> > -      * Since sdhci instance 2 can contain a bootable media,
+> > -      * sdhci instance 0 is registered after instance 2.
+> > +      * Common initialize code for ORIGEN and Origen4Quad.
+> >        */
+> > +     s3c_i2c0_set_platdata(NULL);
+> > +     i2c_register_board_info(0, i2c0_devs, ARRAY_SIZE(i2c0_devs));
+> > +
+> >       s3c_sdhci2_set_platdata(&origen_hsmmc2_pdata);
+> > -     s3c_sdhci0_set_platdata(&origen_hsmmc0_pdata);
+> >
+> >       origen_ehci_init();
+> >       origen_ohci_init();
+> > @@ -793,22 +810,45 @@ static void __init origen_machine_init(void)
+> >       s5p_i2c_hdmiphy_set_platdata(NULL);
+> >       s5p_hdmi_set_platdata(&hdmiphy_info, NULL, 0);
+> >
+> > -#ifdef CONFIG_DRM_EXYNOS
+> > -     s5p_device_fimd0.dev.platform_data = &drm_fimd_pdata;
+> > -     exynos4_fimd0_gpio_setup_24bpp();
+> > -#else
+> > -     s5p_fimd0_set_platdata(&origen_lcd_pdata);
+> > -#endif
+> > +     pwm_add_table(origen_pwm_lookup, ARRAY_SIZE(origen_pwm_lookup));
+> >
+> >       platform_add_devices(origen_devices, ARRAY_SIZE(origen_devices));
+> >
+> > -     pwm_add_table(origen_pwm_lookup, ARRAY_SIZE(origen_pwm_lookup));
+> > -     samsung_bl_set(&origen_bl_gpio_info, &origen_bl_data);
+> > +     if (!soc_is_exynos4210()) {
+> > +             /*
+> > +              * In case of soc_is_4210(),
+> > +              * Machine initialize for Origen.
+> > +              */
+> >
+> > -     origen_bt_setup();
+> > +             origen_power_init();
+> > +
+> > +             /*
+> > +              * Since sdhci instance 2 can contain a bootable media,
+> > +              * sdhci instance 0 is registered after instance 2.
+> > +              */
+> > +             s3c_sdhci0_set_platdata(&origen_hsmmc0_pdata);
+> > +
+> > +#ifdef CONFIG_DRM_EXYNOS
+> > +             s5p_device_fimd0.dev.platform_data = &drm_fimd_pdata;
+> > +             exynos4_fimd0_gpio_setup_24bpp();
+> > +#else
+> > +             s5p_fimd0_set_platdata(&origen_lcd_pdata);
+> > +#endif
+> > +             samsung_bl_set(&origen_bl_gpio_info, &origen_bl_data);
+> > +
+> > +             origen_bt_setup();
+> > +     } else{
+> > +             /*
+> > +              * In case of soc_is_4412(),
+> > +              * Machine initialize for Origen4Quad.
+> > +              */
+> > +             origen4quad_i2c_init();
+> > +             origen4quad_usb_init();
+> > +     }
+> >  }
+> >
+> >  MACHINE_START(ORIGEN, "ORIGEN")
+> > +     /* Maintainer: Kyuho Choi <kh.choi@insignal.co.kr> */
+> >       /* Maintainer: JeongHyeon Kim <jhkim@insignal.co.kr> */
+> >       .atag_offset    = 0x100,
+> >       .smp            = smp_ops(exynos_smp_ops),
+> >
+>
+>
+> --
+> Tushar Behera
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/bc359c4c/attachment-0001.html>
