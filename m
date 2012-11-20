@@ -1,30 +1,36 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 20 Nov 2012 11:52:22 -0800
-Subject: [PATCH] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <50AB600C.5010801@samsung.com>
-References: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
- <20121119001846.GB22106@titan.lakedaemon.net>
- <20121119144826.f59667b2.akpm@linux-foundation.org>
- <50AB600C.5010801@samsung.com>
-Message-ID: <20121120115222.9b674d86.akpm@linux-foundation.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Nov 2012 12:00:53 -0800
+Subject: [PATCH v5 0/6] Move rest of omap-iommu to live in drivers/iommu
+In-Reply-To: <20121117121021.GS25742@8bytes.org>
+References: <20121102192221.4253.34303.stgit@muffinssi.local>
+ <CAK=WgbYR8UMyDjySJLRC0tEbJO3FaFgjWxceNwMyVdMgEgwPig@mail.gmail.com>
+ <CALLhW=5WNg8X0nX8U+AExocyNKW=wJ7oS36xg4ENMnfyJkX8RQ@mail.gmail.com>
+ <20121112220033.GO6801@atomide.com>
+ <20121117121021.GS25742@8bytes.org>
+Message-ID: <20121120200051.GN18567@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Nov 2012 11:48:44 +0100
-Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-
-> > As this patch is already in -next and is stuck there for two more
-> > weeks I can't (or at least won't) merge this patch, so I can't help
-> > with any of the above.
+* Joerg Roedel <joro@8bytes.org> [121117 04:12]:
+> On Mon, Nov 12, 2012 at 02:00:34PM -0800, Tony Lindgren wrote:
+> > Assuming Joerg is OK with these changes, I can push them into
+> > an immutable branch that Joerg can merge in as needed.
+> > 
+> > Further patches on top of this series can then be queued by
+> > Joerg as arch/arm/*omap* and me are then out of the way of
+> > iommu development.
 > 
-> I will fix both issues in the next version of the patch. Would like to
-> merge it to your tree or should I keep it in my dma-mapping tree?
+> Okay, from my side:
+> 
+> Acked-by: Joerg Roedel <joro@8bytes.org>
+> 
+> Please let me know which branch I need to pull into my tree when you
+> merged these patches.
 
-The patch looks OK to me now (still wondering about the -stable
-question though).
+Thanks, I've pushed it out to omap-for-v3.8/cleanup-headers-iommu at
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+so you can merge it into the iommu tree.
 
-It would be a bit of a pain for me to carry a patch which conflicts
-with one in linux-next, and this patch doesn't appear to conflict with
-the other pending dmapool.c patches in -mm so you may as well keep it
-in the dma-mapping tree now.
+Regards,
+
+Tony
