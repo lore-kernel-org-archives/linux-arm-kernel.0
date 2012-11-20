@@ -1,42 +1,53 @@
-From: rric@kernel.org (Robert Richter)
-Date: Tue, 20 Nov 2012 18:06:01 +0100
-Subject: [PATCH 1/1] ARM: oprofile: add A5/A7/A15 entries in op_perf_name
-In-Reply-To: <20121120165517.GC27765@mudshark.cambridge.arm.com>
-References: <1351853016-4476-1-git-send-email-jgq516@gmail.com>
- <20121105113102.GF3351@mudshark.cambridge.arm.com>
- <20121120121747.GJ2504@rric.localhost>
- <20121120155717.GD26475@mudshark.cambridge.arm.com>
- <20121120163158.GO2504@rric.localhost>
- <20121120165517.GC27765@mudshark.cambridge.arm.com>
-Message-ID: <20121120170601.GR2504@rric.localhost>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 20 Nov 2012 18:06:00 +0100
+Subject: [PATCH V4 5/5] arm: mvebu: Added SMP support for Armada XP
+In-Reply-To: <20121120170127.GE27765@mudshark.cambridge.arm.com>
+References: <1353357360-7242-1-git-send-email-gregory.clement@free-electrons.com>
+ <1353357360-7242-6-git-send-email-gregory.clement@free-electrons.com>
+ <20121120164058.GB27765@mudshark.cambridge.arm.com>
+ <50ABB499.6090508@free-electrons.com>
+ <20121120170127.GE27765@mudshark.cambridge.arm.com>
+Message-ID: <50ABB878.1040804@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.11.12 16:55:17, Will Deacon wrote:
-> On Tue, Nov 20, 2012 at 04:31:58PM +0000, Robert Richter wrote:
-> > I am thinking of the following:
-> > 
-> >  # cat /root/cpu_type
-> >  arm/armv7-ca5
-> >  # cat /dev/oprofile/cpu_type
-> >  unknown
-> >  # mount --bind /root/cpu_type /dev/oprofile/cpu_type
-> >  # cat /dev/oprofile/cpu_type
-> >  arm/armv7-ca5
-> > 
-> > From here legacy oprofile tools work as expected using oprofilefs. (I
-> > think. Did not test it.) We need to change the kernel for this a bit
-> > to return 'unknown'. The mount could be done by the oprofile tools
-> > using existing cpu detection code. This is only one way to setup
-> > cpu_type from userland, there could be other ways too.
+On 11/20/2012 06:01 PM, Will Deacon wrote:
+> On Tue, Nov 20, 2012 at 04:49:29PM +0000, Gregory CLEMENT wrote:
+>> On 11/20/2012 05:40 PM, Will Deacon wrote:
+>>>
+>>> ENTRY(armada_xp_secondary_startup)
+>>> 	ldr     r0, =ARMADA_XP_CFB_BASE
+>>> 	mrc     p15, 0, r1, c0, c0, 5
+>>> 	and     r1, r1, #0xF
+>>> 	adr	lr, BSYM(secondary_startup)
+>>>
+>>> 	/* Fallthrough */
+>>>
+>>> ENTRY(ll_set_cpu_coherent)
+>>> ...
+>>> ENDPROC(ll_set_cpu_coherent)
+>>> ENDPROC(armada_xp_secondary_startup)
+>>>
+>>> what do you think?
+>>>
+>>
+>> I prefer to keep them separate, as we can use coherency without SMP.
+>> That's why I create the coherency_ll.S file instead of putting everything
+>> in this file.
 > 
-> Ok, this is functionally equivalent to the patch that was submitted at the
-> start of this thread: it solves the problem of mapping a single ARM core to
-> a oprofile's CPU ID string. Technically, I don't mind doing that in the
-> kernel (at least, it means you don't need to do your trick above)
+> Hmm, can you elaborate a bit more on coherency without SMP please? Do these
+> controls also affect IO coherency?
 
-The advantage of a solution where userland updates cpu_type is that we
-never need to update the kernel anymore. This means, cpu detection can
-be part of the tools.
+I meant Hardware IO coherency which is the purpose on the other patch set:
+"Add hardware I/O coherency support for Armada 370/XP"
 
--Robert
+> 
+> Will
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
