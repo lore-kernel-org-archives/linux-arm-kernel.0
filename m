@@ -1,338 +1,106 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Nov 2012 23:01:04 +0100
-Subject: [PATCH 2/3 v3] clk: make ICST driver handle the VCO registers
-Message-ID: <1353448864-13253-1-git-send-email-linus.walleij@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 20 Nov 2012 23:00:51 +0100
+Subject: [PATCH v4] Introduce irqchip infrastructure
+Message-ID: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It turns out that all platforms using the ICST VCO are really
-just touching two registers, and in the same way as well: one
-register with the VCO configuration as such, and one lock register
-that makes it possible to write to the VCO.
+Hello,
 
-Factor this register read/write into the ICST driver so we can
-reuse it in the IM-PD1 driver.
+Here is a set of patches that introduces a small irqchip
+infrastructure that allows the registration of irqchip drivers without
+having each of those drivers to expose a public API and header in
+include/linux/irqchip/, and moves a number of existing irqchip
+controller to this infrastructure.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v2->v3:
-- Actually SQUASH the freaking patches too, so we convert all
-  users of the ICST VCO in this patch. Since the commit
-  message was somehow preserved I must have been messing with
-  my git in some strange way.
----
- drivers/clk/versatile/clk-icst.c       | 60 +++++++++++++++++++++++++++++-----
- drivers/clk/versatile/clk-icst.h       | 14 ++++++--
- drivers/clk/versatile/clk-integrator.c | 45 +++----------------------
- drivers/clk/versatile/clk-realview.c   | 57 ++++++++------------------------
- 4 files changed, 81 insertions(+), 95 deletions(-)
+This new version (detailed changelog below) provides a number of
+improvements: usage of a special link section to avoid the central
+registration in irqchip.{c,h} of all irqchip drivers, and addition of
+the GIC, VIC and Versatile FPGA IRQ drivers move, thanks to Rob
+Herring and Linus Walleij.
 
-diff --git a/drivers/clk/versatile/clk-icst.c b/drivers/clk/versatile/clk-icst.c
-index 23d2d7e..67ccf4a 100644
---- a/drivers/clk/versatile/clk-icst.c
-+++ b/drivers/clk/versatile/clk-icst.c
-@@ -17,33 +17,74 @@
- #include <linux/clkdev.h>
- #include <linux/err.h>
- #include <linux/clk-provider.h>
-+#include <linux/io.h>
- 
- #include "clk-icst.h"
- 
- /**
-  * struct clk_icst - ICST VCO clock wrapper
-  * @hw: corresponding clock hardware entry
-+ * @vcoreg: VCO register address
-+ * @lockreg: VCO lock register address
-  * @params: parameters for this ICST instance
-  * @rate: current rate
-- * @setvco: function to commit ICST settings to hardware
-  */
- struct clk_icst {
- 	struct clk_hw hw;
-+	void __iomem *vcoreg;
-+	void __iomem *lockreg;
- 	const struct icst_params *params;
- 	unsigned long rate;
--	struct icst_vco (*getvco)(void);
--	void (*setvco)(struct icst_vco);
- };
- 
- #define to_icst(_hw) container_of(_hw, struct clk_icst, hw)
- 
-+/**
-+ * vco_get() - get ICST VCO settings from a certain register
-+ * @vcoreg: register containing the VCO settings
-+ */
-+static struct icst_vco vco_get(void __iomem *vcoreg)
-+{
-+	u32 val;
-+	struct icst_vco vco;
-+
-+	val = readl(vcoreg);
-+	vco.v = val & 0x1ff;
-+	vco.r = (val >> 9) & 0x7f;
-+	vco.s = (val >> 16) & 03;
-+	return vco;
-+}
-+
-+/**
-+ * vco_set() - commit changes to an ICST VCO
-+ * @locreg: register to poke to unlock the VCO for writing
-+ * @vcoreg: register containing the VCO settings
-+ * @vco: ICST VCO parameters to commit
-+ */
-+static void vco_set(void __iomem *lockreg,
-+			void __iomem *vcoreg,
-+			struct icst_vco vco)
-+{
-+	u32 val;
-+
-+	val = readl(vcoreg) & ~0x7ffff;
-+	val |= vco.v | (vco.r << 9) | (vco.s << 16);
-+
-+	/* This magic unlocks the VCO so it can be controlled */
-+	writel(0xa05f, lockreg);
-+	writel(val, vcoreg);
-+	/* This locks the VCO again */
-+	writel(0, lockreg);
-+}
-+
-+
- static unsigned long icst_recalc_rate(struct clk_hw *hw,
- 				      unsigned long parent_rate)
- {
- 	struct clk_icst *icst = to_icst(hw);
- 	struct icst_vco vco;
- 
--	vco = icst->getvco();
-+	vco = vco_get(icst->vcoreg);
- 	icst->rate = icst_hz(icst->params, vco);
- 	return icst->rate;
- }
-@@ -66,7 +107,7 @@ static int icst_set_rate(struct clk_hw *hw, unsigned long rate,
- 
- 	vco = icst_hz_to_vco(icst->params, rate);
- 	icst->rate = icst_hz(icst->params, vco);
--	icst->setvco(vco);
-+	vco_set(icst->vcoreg, icst->lockreg, vco);
- 	return 0;
- }
- 
-@@ -76,8 +117,9 @@ static const struct clk_ops icst_ops = {
- 	.set_rate = icst_set_rate,
- };
- 
--struct clk * __init icst_clk_register(struct device *dev,
--				      const struct clk_icst_desc *desc)
-+struct clk *icst_clk_register(struct device *dev,
-+			const struct clk_icst_desc *desc,
-+			void __iomem *base)
- {
- 	struct clk *clk;
- 	struct clk_icst *icst;
-@@ -95,8 +137,8 @@ struct clk * __init icst_clk_register(struct device *dev,
- 	init.num_parents = 0;
- 	icst->hw.init = &init;
- 	icst->params = desc->params;
--	icst->getvco = desc->getvco;
--	icst->setvco = desc->setvco;
-+	icst->vcoreg = base + desc->vco_offset;
-+	icst->lockreg = base + desc->lock_offset;
- 
- 	clk = clk_register(dev, &icst->hw);
- 	if (IS_ERR(clk))
-diff --git a/drivers/clk/versatile/clk-icst.h b/drivers/clk/versatile/clk-icst.h
-index 71b4c56..dad51b6 100644
---- a/drivers/clk/versatile/clk-icst.h
-+++ b/drivers/clk/versatile/clk-icst.h
-@@ -1,10 +1,18 @@
- #include <asm/hardware/icst.h>
- 
-+/**
-+ * struct clk_icst_desc - descriptor for the ICST VCO
-+ * @params: ICST parameters
-+ * @vco_offset: offset to the ICST VCO from the provided memory base
-+ * @lock_offset: offset to the ICST VCO locking register from the provided
-+ *	memory base
-+ */
- struct clk_icst_desc {
- 	const struct icst_params *params;
--	struct icst_vco (*getvco)(void);
--	void (*setvco)(struct icst_vco);
-+	u32 vco_offset;
-+	u32 lock_offset;
- };
- 
- struct clk *icst_clk_register(struct device *dev,
--			      const struct clk_icst_desc *desc);
-+			      const struct clk_icst_desc *desc,
-+			      void __iomem *base);
-diff --git a/drivers/clk/versatile/clk-integrator.c b/drivers/clk/versatile/clk-integrator.c
-index 3c816ae..08593b4 100644
---- a/drivers/clk/versatile/clk-integrator.c
-+++ b/drivers/clk/versatile/clk-integrator.c
-@@ -10,7 +10,7 @@
- #include <linux/clk.h>
- #include <linux/clkdev.h>
- #include <linux/err.h>
--#include <linux/io.h>
-+#include <linux/platform_data/clk-integrator.h>
- 
- #include <mach/hardware.h>
- #include <mach/platform.h>
-@@ -22,42 +22,6 @@
-  * Inspired by portions of:
-  * plat-versatile/clock.c and plat-versatile/include/plat/clock.h
-  */
--#define CM_LOCK		(__io_address(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_LOCK_OFFSET)
--#define CM_AUXOSC	(__io_address(INTEGRATOR_HDR_BASE)+0x1c)
--
--/**
-- * cp_auxvco_get() - get ICST VCO settings for the Integrator/CP
-- * @vco: ICST VCO parameters to update with hardware status
-- */
--static struct icst_vco cp_auxvco_get(void)
--{
--	u32 val;
--	struct icst_vco vco;
--
--	val = readl(CM_AUXOSC);
--	vco.v = val & 0x1ff;
--	vco.r = (val >> 9) & 0x7f;
--	vco.s = (val >> 16) & 03;
--	return vco;
--}
--
--/**
-- * cp_auxvco_set() - commit changes to Integrator/CP ICST VCO
-- * @vco: ICST VCO parameters to commit
-- */
--static void cp_auxvco_set(struct icst_vco vco)
--{
--	u32 val;
--
--	val = readl(CM_AUXOSC) & ~0x7ffff;
--	val |= vco.v | (vco.r << 9) | (vco.s << 16);
--
--	/* This magic unlocks the CM VCO so it can be controlled */
--	writel(0xa05f, CM_LOCK);
--	writel(val, CM_AUXOSC);
--	/* This locks the CM again */
--	writel(0, CM_LOCK);
--}
- 
- static const struct icst_params cp_auxvco_params = {
- 	.ref		= 24000000,
-@@ -73,8 +37,8 @@ static const struct icst_params cp_auxvco_params = {
- 
- static const struct clk_icst_desc __initdata cp_icst_desc = {
- 	.params = &cp_auxvco_params,
--	.getvco = cp_auxvco_get,
--	.setvco = cp_auxvco_set,
-+	.vco_offset = 0x1c,
-+	.lock_offset = INTEGRATOR_HDR_LOCK_OFFSET,
- };
- 
- /*
-@@ -114,6 +78,7 @@ void __init integrator_clk_init(bool is_cp)
- 	clk_register_clkdev(clk, NULL, "sp804");
- 
- 	/* ICST VCO clock used on the Integrator/CP CLCD */
--	clk = icst_clk_register(NULL, &cp_icst_desc);
-+	clk = icst_clk_register(NULL, &cp_icst_desc,
-+				__io_address(INTEGRATOR_HDR_BASE));
- 	clk_register_clkdev(clk, NULL, "clcd");
- }
-diff --git a/drivers/clk/versatile/clk-realview.c b/drivers/clk/versatile/clk-realview.c
-index fd2dbdb..cda07e7 100644
---- a/drivers/clk/versatile/clk-realview.c
-+++ b/drivers/clk/versatile/clk-realview.c
-@@ -21,38 +21,6 @@
-  * Implementation of the ARM RealView clock trees.
-  */
- 
--static void __iomem *sys_lock;
--static void __iomem *sys_vcoreg;
--
--/**
-- * realview_oscvco_get() - get ICST OSC settings for the RealView
-- */
--static struct icst_vco realview_oscvco_get(void)
--{
--	u32 val;
--	struct icst_vco vco;
--
--	val = readl(sys_vcoreg);
--	vco.v = val & 0x1ff;
--	vco.r = (val >> 9) & 0x7f;
--	vco.s = (val >> 16) & 03;
--	return vco;
--}
--
--static void realview_oscvco_set(struct icst_vco vco)
--{
--	u32 val;
--
--	val = readl(sys_vcoreg) & ~0x7ffff;
--	val |= vco.v | (vco.r << 9) | (vco.s << 16);
--
--	/* This magic unlocks the CM VCO so it can be controlled */
--	writel(0xa05f, sys_lock);
--	writel(val, sys_vcoreg);
--	/* This locks the CM again */
--	writel(0, sys_lock);
--}
--
- static const struct icst_params realview_oscvco_params = {
- 	.ref		= 24000000,
- 	.vco_max	= ICST307_VCO_MAX,
-@@ -65,10 +33,16 @@ static const struct icst_params realview_oscvco_params = {
- 	.idx2s		= icst307_idx2s,
- };
- 
--static const struct clk_icst_desc __initdata realview_icst_desc = {
-+static const struct clk_icst_desc __initdata realview_osc0_desc = {
- 	.params = &realview_oscvco_params,
--	.getvco = realview_oscvco_get,
--	.setvco = realview_oscvco_set,
-+	.vco_offset = REALVIEW_SYS_OSC0_OFFSET,
-+	.lock_offset = REALVIEW_SYS_LOCK_OFFSET,
-+};
-+
-+static const struct clk_icst_desc __initdata realview_osc4_desc = {
-+	.params = &realview_oscvco_params,
-+	.vco_offset = REALVIEW_SYS_OSC4_OFFSET,
-+	.lock_offset = REALVIEW_SYS_LOCK_OFFSET,
- };
- 
- /*
-@@ -78,13 +52,6 @@ void __init realview_clk_init(void __iomem *sysbase, bool is_pb1176)
- {
- 	struct clk *clk;
- 
--	sys_lock = sysbase + REALVIEW_SYS_LOCK_OFFSET;
--	if (is_pb1176)
--		sys_vcoreg = sysbase + REALVIEW_SYS_OSC0_OFFSET;
--	else
--		sys_vcoreg = sysbase + REALVIEW_SYS_OSC4_OFFSET;
--
--
- 	/* APB clock dummy */
- 	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT, 0);
- 	clk_register_clkdev(clk, "apb_pclk", NULL);
-@@ -116,7 +83,11 @@ void __init realview_clk_init(void __iomem *sysbase, bool is_pb1176)
- 	clk_register_clkdev(clk, NULL, "sp804");
- 
- 	/* ICST VCO clock */
--	clk = icst_clk_register(NULL, &realview_icst_desc);
-+	if (is_pb1176)
-+		clk = icst_clk_register(NULL, &realview_osc0_desc, sysbase);
-+	else
-+		clk = icst_clk_register(NULL, &realview_osc4_desc, sysbase);
-+
- 	clk_register_clkdev(clk, NULL, "dev:clcd");
- 	clk_register_clkdev(clk, NULL, "issp:clcd");
- }
--- 
-1.7.11.7
+Remaining issues to solve:
+
+ * Russell would like arch/arm/include/asm/hardware/vic.h and
+   arch/arm/include/asm/hardware/gic.h to move elsewhere, since the
+   corresponding code is no longer in arch/arm/. I can move them in
+   <linux/irqchip>, but that will cause a fairly large change as there
+   are a big number of users of those headers in arch/arm.
+
+ * The arch/arm/include/asm/hardware/vic.h has a few offset macros
+   that should move into the .c file of the irqchip driver, but some
+   of those offsets are bizarrely used in some other pieces of code in
+   arch/arm/.
+
+ * How to get rid entirely of the headers in <linux/irqchip/>. The
+   remaining problematic functions are <foo>_handle_irq() and
+   <foo>_irq_init() that are used by non-DT platforms. And the special
+   case of gic_cascade_irq().
+
+ * Move all the users of gic_of_init() to the irqchip mechanism
+   (Exynos, i.MX 6, MSM, OMAP, SH Mobile, socfpga, spear13xx, tegra,
+   ux500, vexpress) so that gic_of_init() no longer has to be
+   exported.
+
+Of course, I don't expect any of this to go in 3.8, it is 3.9 material
+if we manage to reach a consensus on the remaining issues to solve
+(and the other issues that will certainly show up or be raised by
+other people).
+
+This series has been built and boot tested for BCM2835 and Armada
+XP. It has been built tested on Versatile with OF and without OF,
+spear3xx, spear6xx and a multi_v6_v7 configuration with all possible
+architectures enabled (therefore including picoxcell).
+
+Changes since v3:
+
+ * Switch to a link-trick based registration of the irqchip drivers,
+   using the IRQCHIP_DECLARE() macro.
+
+ * Integrate Rob Herring's patches to move the GIC and VIC irq
+   controller drivers in drivers/irqchip/.
+
+ * Migrate picoxcell, spear3xx and spear6xx to using the irqchip
+   platform, so that no direct user of vic_of_init() remains.
+
+ * Don't export vic_of_init() anymore: all users go through
+   irqchip_init() now.
+
+ * Integrate Linus Walleij patch that moves the Versatile FPGA irq
+   controller driver to drivers/irqchip.
+
+ * A set_handle_irq() ARM function was added to properly set the
+   handle_arch_irq pointer to the right handler of the parent IRQ
+   controller.
+
+Changes since v2:
+
+ * Fixed the entry in the MAINTAINERS file. Noticed by Rob Herring.
+
+ * Simplified the Kconfig logic by making the IRQCHIP option enabled
+   by default as soon as OF_IRQ is enabled. The individual ARCH_<foo>
+   Kconfig options no longer have to select IRQCHIP. Also, the option
+   was renamed from USE_IRQCHIP to just IRQCHIP. Suggested by Rob
+   Herring.
+
+ * Added Reviewed-by tags given by Rob Herring.
+
+Changes since v1:
+
+ * Add a new patch mentionning the drivers/irqchip in the list of
+   directories part of the IRQ subsystem maintained by Thomas Gleixner
+   in the MAINTAINERS file. Requested by Arnd Bergmann.
+
+ * Reduce the amount of code movement in the irq-bcm2835.c and
+   irq-armada-370-xp.c files by using one forward declaration for the
+   IRQ handling entry point. Requested by Stephen Warren.
+
+ * Rename the armctrl_of_init() function to bcm2835_irqchip_init() as
+   requested by Stephen Warren.
+
+ * Added the formal Acked-by and Reviewed-by received from Stephen
+   Warren.
+
+Thanks,
+
+Thomas
