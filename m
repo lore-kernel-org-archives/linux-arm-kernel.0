@@ -1,145 +1,76 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 20 Nov 2012 21:18:17 +0900
-Subject: [PATCH] ARM: EXYNOS5: Add arm down clock support
-In-Reply-To: <1352463254-28423-1-git-send-email-a.kesavan@samsung.com>
-References: <1352463254-28423-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <0c9f01cdc719$1f5b2830$5e117890$@org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 20 Nov 2012 21:23:27 +0900
+Subject: [PATCH 2/4] ARM: EXYNOS: PL330 MDMA1 fix for revision 0 of
+ Exynos4210 SOC
+In-Reply-To: <201211081054.41649.b.zolnierkie@samsung.com>
+References: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
+ <201210300956.23102.b.zolnierkie@samsung.com>
+ <0cea01cdbd6c$7ace7200$706b5600$%kim@samsung.com>
+ <201211081054.41649.b.zolnierkie@samsung.com>
+Message-ID: <0ca001cdc719$d82e5f80$888b1e80$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash Kesavan wrote:
+Bartlomiej Zolnierkiewicz wrote:
 > 
-> In idle state down clocking the arm cores can result in power
-> savings. Program the power control registers to achieve this and
-> save these registers across a suspend/resume cycle.
+> From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Subject: [PATCH v2] ARM: EXYNOS: PL330 MDMA1 fix for revision 0 of
+> Exynos4210 SOC
 > 
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> Commit 8214513 ("ARM: EXYNOS: fix address for EXYNOS4 MDMA1")
+> changed EXYNOS specific setup of PL330 DMA engine to use 'non-secure'
+> mdma1 address instead of 'secure' one (from 0x12840000 to 0x12850000)
+> to fix issue with some Exynos4212 SOCs.  Unfortunately it brakes
+> PL330 setup for revision 0 of Exynos4210 SOC (mdma1 device cannot
+> be found at 'non-secure' address):
+> 
+> [    0.566245] dma-pl330 dma-pl330.2: PERIPH_ID 0x0, PCELL_ID 0x0 !
+> [    0.566278] dma-pl330: probe of dma-pl330.2 failed with error -22
+> 
+> Fix it by using 'secure' mdma1 address on Exynos4210 revision 0 SOC.
+> 
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/mach-exynos/clock-exynos5.c           |    2 +
->  arch/arm/mach-exynos/cpuidle.c                 |   36
-++++++++++++++++++++++++
->  arch/arm/mach-exynos/include/mach/regs-clock.h |   19 ++++++++++++
->  3 files changed, 57 insertions(+), 0 deletions(-)
+>  arch/arm/mach-exynos/dma.c              |    3 +++
+>  arch/arm/mach-exynos/include/mach/map.h |    1 +
+>  2 files changed, 4 insertions(+)
 > 
-> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-
-> exynos/clock-exynos5.c
-> index a88e0d9..9bb6567 100644
-> --- a/arch/arm/mach-exynos/clock-exynos5.c
-> +++ b/arch/arm/mach-exynos/clock-exynos5.c
-> @@ -80,6 +80,8 @@ static struct sleep_save exynos5_clock_save[] = {
->  	SAVE_ITEM(EXYNOS5_VPLL_CON0),
->  	SAVE_ITEM(EXYNOS5_VPLL_CON1),
->  	SAVE_ITEM(EXYNOS5_VPLL_CON2),
-> +	SAVE_ITEM(EXYNOS5_PWR_CTRL1),
-> +	SAVE_ITEM(EXYNOS5_PWR_CTRL2),
->  };
->  #endif
-> 
-> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-
-> exynos/cpuidle.c
-> index cff0595..4ddda91 100644
-> --- a/arch/arm/mach-exynos/cpuidle.c
-> +++ b/arch/arm/mach-exynos/cpuidle.c
-> @@ -21,6 +21,7 @@
->  #include <asm/suspend.h>
->  #include <asm/unified.h>
->  #include <asm/cpuidle.h>
-> +#include <mach/regs-clock.h>
->  #include <mach/regs-pmu.h>
->  #include <mach/pmu.h>
-> 
-> @@ -156,12 +157,47 @@ static int exynos4_enter_lowpower(struct
-> cpuidle_device *dev,
->  		return exynos4_enter_core0_aftr(dev, drv, new_index);
->  }
-> 
-> +static void __init exynos5_core_down_clk(void)
-> +{
-> +	unsigned int tmp;
+> Index: b/arch/arm/mach-exynos/dma.c
+> ===================================================================
+> --- a/arch/arm/mach-exynos/dma.c	2012-11-07 18:20:36.561743865 +0100
+> +++ b/arch/arm/mach-exynos/dma.c	2012-11-08 10:48:23.445067606 +0100
+> @@ -275,6 +275,9 @@ static int __init exynos_dma_init(void)
+>  		exynos_pdma1_pdata.nr_valid_peri =
+>  			ARRAY_SIZE(exynos4210_pdma1_peri);
+>  		exynos_pdma1_pdata.peri_id = exynos4210_pdma1_peri;
 > +
-> +	/*
-> +	 * Enable arm clock down (in idle) and set arm divider
-> +	 * ratios in WFI/WFE state.
-> +	 */
-> +	tmp = PWR_CTRL1_CORE2_DOWN_RATIO | \
-> +	      PWR_CTRL1_CORE1_DOWN_RATIO | \
-> +	      PWR_CTRL1_DIV2_DOWN_EN	 | \
-> +	      PWR_CTRL1_DIV1_DOWN_EN	 | \
-> +	      PWR_CTRL1_USE_CORE1_WFE	 | \
-> +	      PWR_CTRL1_USE_CORE0_WFE	 | \
-> +	      PWR_CTRL1_USE_CORE1_WFI	 | \
-> +	      PWR_CTRL1_USE_CORE0_WFI;
-> +	__raw_writel(tmp, EXYNOS5_PWR_CTRL1);
-> +
-> +	/*
-> +	 * Enable arm clock up (on exiting idle). Set arm divider
-> +	 * ratios when not in idle along with the standby duration
-> +	 * ratios.
-> +	 */
-> +	tmp = PWR_CTRL2_DIV2_UP_EN	 | \
-> +	      PWR_CTRL2_DIV1_UP_EN	 | \
-> +	      PWR_CTRL2_DUR_STANDBY2_VAL | \
-> +	      PWR_CTRL2_DUR_STANDBY1_VAL | \
-> +	      PWR_CTRL2_CORE2_UP_RATIO	 | \
-> +	      PWR_CTRL2_CORE1_UP_RATIO;
-> +	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
-> +}
-> +
->  static int __init exynos4_init_cpuidle(void)
->  {
->  	int i, max_cpuidle_state, cpu_id;
->  	struct cpuidle_device *device;
->  	struct cpuidle_driver *drv = &exynos4_idle_driver;
+> +		if (samsung_rev() == EXYNOS4210_REV_0)
+> +			exynos_mdma1_device.res.start = EXYNOS4_PA_S_MDMA1;
+>  	} else if (soc_is_exynos4212() || soc_is_exynos4412()) {
+>  		exynos_pdma0_pdata.nr_valid_peri =
+>  			ARRAY_SIZE(exynos4212_pdma0_peri);
+> Index: b/arch/arm/mach-exynos/include/mach/map.h
+> ===================================================================
+> --- a/arch/arm/mach-exynos/include/mach/map.h	2012-11-07
+> 18:20:44.801743862 +0100
+> +++ b/arch/arm/mach-exynos/include/mach/map.h	2012-11-08
+> 10:48:40.597067605 +0100
+> @@ -92,6 +92,7 @@
 > 
-> +	if (soc_is_exynos5250())
-> +		exynos5_core_down_clk();
-> +
->  	/* Setup cpuidle driver */
->  	drv->state_count = (sizeof(exynos4_cpuidle_set) /
->  				       sizeof(struct cpuidle_state));
-> diff --git a/arch/arm/mach-exynos/include/mach/regs-clock.h
-> b/arch/arm/mach-exynos/include/mach/regs-clock.h
-> index 8c9b38c..d36ad76 100644
-> --- a/arch/arm/mach-exynos/include/mach/regs-clock.h
-> +++ b/arch/arm/mach-exynos/include/mach/regs-clock.h
-> @@ -267,6 +267,9 @@
->  #define EXYNOS5_CLKDIV_STATCPU0
-EXYNOS_CLKREG(0x00600)
->  #define EXYNOS5_CLKDIV_STATCPU1
-EXYNOS_CLKREG(0x00604)
-> 
-> +#define EXYNOS5_PWR_CTRL1			EXYNOS_CLKREG(0x01020)
-> +#define EXYNOS5_PWR_CTRL2			EXYNOS_CLKREG(0x01024)
-> +
->  #define EXYNOS5_MPLL_CON0			EXYNOS_CLKREG(0x04100)
->  #define EXYNOS5_CLKSRC_CORE1			EXYNOS_CLKREG(0x04204)
-> 
-> @@ -344,6 +347,22 @@
-> 
->  #define EXYNOS5_EPLLCON0_LOCKED_SHIFT		(29)
-> 
-> +#define PWR_CTRL1_CORE2_DOWN_RATIO		(7 << 28)
-> +#define PWR_CTRL1_CORE1_DOWN_RATIO		(7 << 16)
-> +#define PWR_CTRL1_DIV2_DOWN_EN			(1 << 9)
-> +#define PWR_CTRL1_DIV1_DOWN_EN			(1 << 8)
-> +#define PWR_CTRL1_USE_CORE1_WFE			(1 << 5)
-> +#define PWR_CTRL1_USE_CORE0_WFE			(1 << 4)
-> +#define PWR_CTRL1_USE_CORE1_WFI			(1 << 1)
-> +#define PWR_CTRL1_USE_CORE0_WFI			(1 << 0)
-> +
-> +#define PWR_CTRL2_DIV2_UP_EN			(1 << 25)
-> +#define PWR_CTRL2_DIV1_UP_EN			(1 << 24)
-> +#define PWR_CTRL2_DUR_STANDBY2_VAL		(1 << 16)
-> +#define PWR_CTRL2_DUR_STANDBY1_VAL		(1 << 8)
-> +#define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
-> +#define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
-> +
->  /* Compatibility defines and inclusion */
-> 
->  #include <mach/regs-pmu.h>
-> --
-> 1.6.6.1
+>  #define EXYNOS4_PA_MDMA0		0x10810000
+>  #define EXYNOS4_PA_MDMA1		0x12850000
+> +#define EXYNOS4_PA_S_MDMA1		0x12840000
+>  #define EXYNOS4_PA_PDMA0		0x12680000
+>  #define EXYNOS4_PA_PDMA1		0x12690000
+>  #define EXYNOS5_PA_MDMA0		0x10800000
 
 Applied, thanks.
 
-K-Gene <kgene@kernel.org>
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
