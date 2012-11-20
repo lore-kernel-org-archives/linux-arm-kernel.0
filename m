@@ -1,58 +1,87 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Tue, 20 Nov 2012 14:37:43 +0100
-Subject: [PATCH 207/493] i2c: remove use of __devinit
-In-Reply-To: <20121120132342.GP3332@n2100.arm.linux.org.uk>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-207-git-send-email-wfp5p@virginia.edu>
- <20121120092046.24496415@endymion.delvare>
- <20121120132342.GP3332@n2100.arm.linux.org.uk>
-Message-ID: <20121120143743.3f54a3cb@endymion.delvare>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 20 Nov 2012 07:58:34 -0500
+Subject: [PATCH v5 3/8] watchdog: orion_wdt: add timeout-sec property
+ binding
+In-Reply-To: <CAHkwnC-2MXtNODnqjOvFuHt7ToqvMqeDjnqdGyGfMacKBWzoLw@mail.gmail.com>
+References: <1353334243-16703-1-git-send-email-fabio.porcedda@gmail.com>
+ <1353334243-16703-4-git-send-email-fabio.porcedda@gmail.com>
+ <20121119160643.GI22106@titan.lakedaemon.net>
+ <CAHkwnC-2MXtNODnqjOvFuHt7ToqvMqeDjnqdGyGfMacKBWzoLw@mail.gmail.com>
+Message-ID: <20121120125834.GU22106@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Nov 2012 13:23:42 +0000, Russell King - ARM Linux wrote:
-> On Tue, Nov 20, 2012 at 09:20:46AM +0100, Jean Delvare wrote:
-> > Hi Bill,
-> > 
-> > On Mon, 19 Nov 2012 13:22:36 -0500, Bill Pemberton wrote:
-> > > CONFIG_HOTPLUG is going away as an option so __devinit is no longer
-> > > needed.
-> > 
-> > Can you please point me/us to the discussion explaining the rationale
-> > behind this move, and the explanation of what will be done exactly?
-> > While I can easily understand that we want to drop CONFIG_HOTPLUG and
-> > always enable hot-plug support, I don't see where we are going with
-> > removing __devinit annotations and the like.
+On Tue, Nov 20, 2012 at 01:50:46PM +0100, Fabio Porcedda wrote:
+> On Mon, Nov 19, 2012 at 5:06 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> > On Mon, Nov 19, 2012 at 03:10:38PM +0100, Fabio Porcedda wrote:
+> >> Only compile tested.
+> >>
+> >> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+> >> Cc: Jason Cooper <jason@lakedaemon.net>
+> >> Cc: Andrew Lunn <andrew@lunn.ch>
+> >> ---
+> >>  Documentation/devicetree/bindings/watchdog/marvel.txt | 5 +++++
+> >>  drivers/watchdog/orion_wdt.c                          | 8 +++-----
+> >>  2 files changed, 8 insertions(+), 5 deletions(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/watchdog/marvel.txt b/Documentation/devicetree/bindings/watchdog/marvel.txt
+> >> index 0b2503a..5dc8d30 100644
+> >> --- a/Documentation/devicetree/bindings/watchdog/marvel.txt
+> >> +++ b/Documentation/devicetree/bindings/watchdog/marvel.txt
+> >> @@ -5,10 +5,15 @@ Required Properties:
+> >>  - Compatibility : "marvell,orion-wdt"
+> >>  - reg                : Address of the timer registers
+> >>
+> >> +Optional properties:
+> >> +
+> >> +- timeout-sec        : Contains the watchdog timeout in seconds
+> >> +
+> >>  Example:
+> >>
+> >>       wdt at 20300 {
+> >>               compatible = "marvell,orion-wdt";
+> >>               reg = <0x20300 0x28>;
+> >> +             timeout-sec = <10>;
+> >>               status = "okay";
+> >>       };
+> >> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+> >> index c20f96b..446a3e9 100644
+> >> --- a/drivers/watchdog/orion_wdt.c
+> >> +++ b/drivers/watchdog/orion_wdt.c
+> >> @@ -162,12 +162,10 @@ static int __devinit orion_wdt_probe(struct platform_device *pdev)
+> >>
+> >>       wdt_max_duration = WDT_MAX_CYCLE_COUNT / wdt_tclk;
+> >>
+> >> -     if ((heartbeat < 1) || (heartbeat > wdt_max_duration))
+> >> -             heartbeat = wdt_max_duration;
+> >> -
+> >> -     orion_wdt.timeout = heartbeat;
+> >>       orion_wdt.min_timeout = 1;
+> >> +     orion_wdt.timeout = wdt_max_duration;
+> >>       orion_wdt.max_timeout = wdt_max_duration;
+> >> +     watchdog_init_timeout(&orion_wdt, heartbeat, pdev->dev.of_node);
+> >
+> > Hi Fabio,
+> >
+> > There are many boards using pdata, !CONFIG_OF.  Have you compile-tested
+> > this without CONFIG_OF?
 > 
-> It's actually very simple to understand.
+> Hi Jason,
 > 
-> 1. CONFIG_HOTPLUG is going away; it's already defined to always be 'Y'.
-> 2. This means that the the devinit sections will not be discarded anymore.
-> 3. As a result, there's no point the devinit sections existing anymore.
-> 4. As there's no devinit sections, the __devinit marker is entirely
->    redundant and useless.
+> I've tested with and without the CONFIG_OF define.
+> 
+> The first time I?ve used the kirkwood_defconfig without modifications,
+> the second time I?ve enabled only the CONFIG_MACH_SHEEVAPLUG and
+> disabled USE_OF.
+> 
+> In both cases the orion_wdt driver compile without any warning.
+> 
+> Thanks for the review.
 
-Ah, yes, very simple indeed. Not sure how I managed to not understand
-it earlier today. Thanks for explaining.
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-> The reason this is being done is because the benefit to cost ratio of this
-> is far too high; it's well proven that people constantly get these markings
-> wrong, and with most kernels having had hotplug enabled anyway, it's not
-> providing much in the way of space saving benefit over the number of section
-> conflicts it causes.  So, it's been decided a few years ago that this is
+for the orion_wdt bits.
 
-Yes, I completely agree.
+thx,
 
-> going to happen, with that justification, and it's been accepted by 300
-> odd kernel developers in at least one kernel summit when it was talked
-
-Probably that was one I didn't attend to, as I can't remember this
-discussion.
-
-> about... and it's been mentioned on mailing lists several times.
-
-Maybe LKML, which I don't read. So I wasn't aware of the plan before
-seeing Bill's patches.
-
--- 
-Jean Delvare
+Jason.
