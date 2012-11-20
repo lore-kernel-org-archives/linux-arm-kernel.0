@@ -1,97 +1,54 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 20 Nov 2012 16:19:57 +0000
-Subject: [RFC] dt/platform: Use cell-index for device naming if available
-In-Reply-To: <50A70485.90302@codeaurora.org>
-References: <1352508532-19241-1-git-send-email-stepanm@codeaurora.org>
- <509F0E56.6080806@gmail.com>
- <CACxGe6s3gJ4fmhn9VBd1Fq8bH5S0_ejmE=KqVjYn20bT42wQ_Q@mail.gmail.com>
- <554191d69bc21a4b133fb876df84ff89.squirrel@www.codeaurora.org>
- <50A1B50B.4020509@codeaurora.org> <20121115161020.3205E3E194B@localhost>
- <50A70485.90302@codeaurora.org>
-Message-ID: <20121120161957.7CE973E102F@localhost>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 20 Nov 2012 17:22:16 +0100
+Subject: arm: mvebu: Various mvebu clock fixes/improvements
+In-Reply-To: <20121119182701.GS14643@lunn.ch>
+References: <1353343963-23034-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121119182701.GS14643@lunn.ch>
+Message-ID: <20121120172216.7a613162@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Nov 2012 19:29:09 -0800, Stepan Moskovchenko <stepanm@codeaurora.org> wrote:
-> On 11/15/2012 8:10 AM, Grant Likely wrote:
-> > On Mon, 12 Nov 2012 18:48:43 -0800, Stepan Moskovchenko <stepanm@codeaurora.org> wrote:
-> >
-> > Well, why exactly do you want to control the names of devices? Is it so
-> > that devices match up with what they are, or is it to make things match
-> > up with things like clocks and regulators. If it is the latter, then no,
-> > don't do this. Use auxdata. When the kernel requires a specific name for
-> > a device it is very much a kernel *internal* detail. It does not make
-> > sense to encode that into the device tree when it isn't something part
-> > of the binding.
+Andrew,
+
+On Mon, 19 Nov 2012 19:27:01 +0100, Andrew Lunn wrote:
+
+> >  * Patch 1 fixes a real problem: the gating clocks are not
+> > registered on Armada 370/XP.
+> > 
+> >  * Patch 2, 3, 5 and 6 are more cosmetic patches, but I think they
+> > are good to have.
+> > 
+> >  * Patch 4 implements a fix that we've been discussing: moving the
+> >    Armada XP CPU clocks down to the individual
+> > armada-xp-mv78xxx.dtsi files.
+> > 
+> >  * Patch 7 fixes the references to the SATA clocks on Armada
+> >    370/XP. Without this patch, Armada 370 currently hangs at boot
+> > when trying to initialize SATA.
 > 
-> Hi Grant,
-> I realize that auxdata is the correct thing to use for keeping the 
-> kernel happy (for things like clocks and regulator consumers) but this 
-> is not the problem I am trying to solve. My goal is to try to keep 
-> userspace happy by trying to create common and predictable names for 
-> functionally equivalent devices across different hardware platforms.
-> For instance, two similar SoCs may have an SDCC controller which may be 
-> logically referred to as "the first SDCC device", though the physical 
-> address of this device may be different on the two SoCs. And, due to the 
-> <reg>.<name> naming convention, the sysfs entries associated with a 
-> particular device will be a dependent on the physical address of the device.
+> Hi Thomas
 > 
-> If userspace wants to touch the sysfs entries of what can logically be 
-> described as "the first SDCC device", then userspace needs to know the 
-> physical address of this device on each SoC variant it may be running 
-> on, since the path to the sysfs entries for this device will be based on 
-> the physical address of the device. By using a device naming scheme that 
-> replaces the physical address with a logical device number, the 
-> userspace-facing interface for each device (such as sysfs entries) could 
-> be kept common across SoC variants even when device physical addresses 
-> can move around but devices still have the same logical assignments.
+> You probably want patch 1 last. Anybody bisecting this changeset if
+> going to have a hung 370/XP.
 
-Okay, so the thinking is that if the generated name of a device can be
-manipulated, say as 'serial0', then userspace can easily find the
-device. Correct? If so, then be careful. Userspace is not supposed to
-ever rely on a particular path to a device. Instead, userspace is
-supposed to wait for a uevent to announce a device's existence, and then
-use the data in the uevent attribute.
+In the end, here is how I fixed this:
 
-We /could/ use a device tree alias to manipulate the name of the device,
-but as several people have pointed out there can be more than one alias
-to a node. Which one do we use? I know I suggested using aliases a
-couple of weeks ago, but I now think it is a bad idea after mulling it
-over a bit.
+ * The clk patches are going to be pulled first by Jason. It enables
+   gating clocks on all platforms, and it boots fine on Armada 370,
+   Armada XP and Kirkwood.
 
-What if instead we added something like OF_ALIASES to the uevent
-attribute? Then userspace would have access to all the aliases for a
-device. Heck, even a shell script can parse the uevent attribute. There
-is also precedence for exporting OF data using a uevent. This is from
-the versatile device tree support:
+ * The entire Armada 370/XP SATA patches are going to be pulled by
+   Jason *after* the clk patches. So the SATA DT entries will from the
+   beginning have the correct 'clocks' property, so that when you boot
+   clk + sata, it works ok on Armada 370 and Armada XP.
 
-# cat /sys/devices/amba.0/uevent 
-OF_NAME=amba
-OF_FULLNAME=/amba
-OF_COMPATIBLE_0=arm,amba-bus
-OF_COMPATIBLE_N=1
-MODALIAS=of:NambaT<NULL>Carm,amba-bus
+I hope that's ok for you.
 
+Thanks!
 
-> I realize that this problem can be solved by using auxdata to set the 
-> device name, but in this case the only purpose of the auxdata would be 
-> to keep userspace happy, since all the other in-kernel relationships 
-> (for things like clocks and regulators) can already work without having 
-> to rely on auxdata. So, introducing auxdata just for consistency of 
-> userspace-facing names seems silly and, I am trying to come up with a 
-> more appropriate solution.
-
-Yeah, auxdata is completely inappropriate for this.
-
-> 
-> What do you think?
-> 
-> Steve
-> 
-> -- 
->   The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
->   hosted by The Linux Foundation
-
+Thomas
 -- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
