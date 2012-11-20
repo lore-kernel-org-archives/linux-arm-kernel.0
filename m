@@ -1,30 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 20 Nov 2012 10:11:18 -0700
-Subject: [PATCH v3 1/3] power: Add simple poweroff-gpio driver
-In-Reply-To: <20121120083749.GM10259@lunn.ch>
-References: <1353142266-1289-1-git-send-email-andrew@lunn.ch>
- <1353142266-1289-2-git-send-email-andrew@lunn.ch>
- <50AA6E7E.5060501@wwwdotorg.org> <20121120083749.GM10259@lunn.ch>
-Message-ID: <50ABB9B6.1010506@wwwdotorg.org>
+From: nareshgbhat@gmail.com (Naresh Bhat)
+Date: Tue, 20 Nov 2012 22:44:07 +0530
+Subject: KEXEC on ARM cortex-a15
+In-Reply-To: <20121120160219.GF26475@mudshark.cambridge.arm.com>
+References: <CAJXQGfKpFfUwMeLGFAuTgQn5Yd2D9O271JM1VJ87Nio80tbwXw@mail.gmail.com>
+ <20121119144417.GH3290@n2100.arm.linux.org.uk>
+ <20121119151327.GG3205@mudshark.cambridge.arm.com>
+ <CAJXQGf+BQ18GhR3emhK-ejTivqx_o=gtaO3-FjTiE3BMGydgsw@mail.gmail.com>
+ <CAJXQGf+wfXGZ=PWN585dJDMX1nH+sRexf6UZujyjKM6rJeDiXQ@mail.gmail.com>
+ <20121120160219.GF26475@mudshark.cambridge.arm.com>
+Message-ID: <CAJXQGfKneStLD5iGhybANWcokVvoL4bLHQi1U=rsBXcDgvj21w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2012 01:37 AM, Andrew Lunn wrote:
-> Hi Jason
-> 
-> These are good comments from Stephan that i want to address. However,
-> i also don't want to delay the pull-requests direction arm-soc, the
-> merge window is getting close. Both Linus and Anton have Acked the
-> current version, so please go with what you have and i will produce a
-> patch over the top. If its available before Arnd pulls, you can squash
-> it, otherwise send it upstream as a standalone patch.
+Hi Will Deacon,
 
-I'm not sure I agree here; the comments I made re: the delays and
-pulse-vs-level may affect the definition of the DT binding, and that's
-something that should be correct from the start.
+> Your platform probably doesn't park the secondary CPUs correctly. Try
+> booting the kexec host kernel with 'nosmp' on the command line.
 
-The implementation of gpio_poweroff_do_poweroff() really doesn't seem to
-make sense; related to the above.
+Do you mean I need to boot the
 
-Also, probe deferral doesn't work, which will likely make this code
-completely ineffective.
+STEP1:
+
+Daughterboard Site 1: V2P-CA15_A7 Cortex A15
+
+I should boot with "nosmp" in command line
+
+STEP2:
+run the kexec on the above booted target ?
+
+--Thanks and Regards
+"For things to change, we must change"
+-Naresh Bhat
