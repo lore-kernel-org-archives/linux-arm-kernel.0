@@ -1,41 +1,52 @@
 From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Mon, 19 Nov 2012 19:05:48 -0600
-Subject: [PATCH v5 1/5] iommu/omap: remove redundant clock handling on ISR
+Date: Mon, 19 Nov 2012 19:05:49 -0600
+Subject: [PATCH v5 2/5] iommu/omap: keep mmu enabled when requested
 In-Reply-To: <1353373552-16039-1-git-send-email-omar.luna@linaro.org>
 References: <1353373552-16039-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <1353373552-16039-2-git-send-email-omar.luna@linaro.org>
+Message-ID: <1353373552-16039-3-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the interrupt to be generated, the mmu clock should be already
-enabled while translating a virtual address, so, this call to clock
-handling is just increasing/decreasing the counter.
+The purpose of the mmu is to handle the memory accesses requested by
+its users. Typically, the mmu is bundled with the processing unit in
+a single IP block, which makes them to share the same clock to be
+functional.
 
-This works now, because its users need the same clock and they
-indirectly power the mmu, in this interrupt context the handling of
-clocks inside the ISR doesn't seem to be needed nor helping.
+Currently, iommu code assumes that its user will be indirectly
+clocking it, but being a separate mmu driver, it should handle
+its own clocks, so as long as the mmu is requested it will be
+powered ON and once detached it will be powered OFF.
 
-Next patch should also correct the dependency on clients to handle
-iommu clocks.
+The remaining clock handling out of iommu_enable and iommu_disable
+corresponds to paths that can be accessed through debugfs, some of
+them doesn't work if the module is not enabled first, but in future
+if the mmu is idled withouth freeing, these are needed to debug.
 
 Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
 ---
- drivers/iommu/omap-iommu.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+ drivers/iommu/omap-iommu.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-index badc17c..6b1288c 100644
+index 6b1288c..f8082da 100644
 --- a/drivers/iommu/omap-iommu.c
 +++ b/drivers/iommu/omap-iommu.c
-@@ -807,9 +807,7 @@ static irqreturn_t iommu_fault_handler(int irq, void *data)
- 	if (!obj->refcount)
- 		return IRQ_NONE;
+@@ -154,7 +154,6 @@ static int iommu_enable(struct omap_iommu *obj)
+ 
+ 	err = arch_iommu->enable(obj);
+ 
+-	clk_disable(obj->clk);
+ 	return err;
+ }
+ 
+@@ -163,8 +162,6 @@ static void iommu_disable(struct omap_iommu *obj)
+ 	if (!obj)
+ 		return;
  
 -	clk_enable(obj->clk);
- 	errs = iommu_report_fault(obj, &da);
--	clk_disable(obj->clk);
- 	if (errs == 0)
- 		return IRQ_HANDLED;
+-
+ 	arch_iommu->disable(obj);
  
+ 	clk_disable(obj->clk);
 -- 
 1.7.4.1
