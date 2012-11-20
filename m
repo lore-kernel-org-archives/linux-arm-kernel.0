@@ -1,53 +1,24 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 20 Nov 2012 18:06:00 +0100
-Subject: [PATCH V4 5/5] arm: mvebu: Added SMP support for Armada XP
-In-Reply-To: <20121120170127.GE27765@mudshark.cambridge.arm.com>
-References: <1353357360-7242-1-git-send-email-gregory.clement@free-electrons.com>
- <1353357360-7242-6-git-send-email-gregory.clement@free-electrons.com>
- <20121120164058.GB27765@mudshark.cambridge.arm.com>
- <50ABB499.6090508@free-electrons.com>
- <20121120170127.GE27765@mudshark.cambridge.arm.com>
-Message-ID: <50ABB878.1040804@free-electrons.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 20 Nov 2012 09:06:25 -0800
+Subject: [PATCH 429/493] tty: remove use of __devexit
+In-Reply-To: <1353349642-3677-429-git-send-email-wfp5p@virginia.edu>
+References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
+ <1353349642-3677-429-git-send-email-wfp5p@virginia.edu>
+Message-ID: <20121120170624.GF21706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2012 06:01 PM, Will Deacon wrote:
-> On Tue, Nov 20, 2012 at 04:49:29PM +0000, Gregory CLEMENT wrote:
->> On 11/20/2012 05:40 PM, Will Deacon wrote:
->>>
->>> ENTRY(armada_xp_secondary_startup)
->>> 	ldr     r0, =ARMADA_XP_CFB_BASE
->>> 	mrc     p15, 0, r1, c0, c0, 5
->>> 	and     r1, r1, #0xF
->>> 	adr	lr, BSYM(secondary_startup)
->>>
->>> 	/* Fallthrough */
->>>
->>> ENTRY(ll_set_cpu_coherent)
->>> ...
->>> ENDPROC(ll_set_cpu_coherent)
->>> ENDPROC(armada_xp_secondary_startup)
->>>
->>> what do you think?
->>>
->>
->> I prefer to keep them separate, as we can use coherency without SMP.
->> That's why I create the coherency_ll.S file instead of putting everything
->> in this file.
+On Mon, Nov 19, 2012 at 01:26:18PM -0500, Bill Pemberton wrote:
+> CONFIG_HOTPLUG is going away as an option so __devexit is no
+> longer needed.
 > 
-> Hmm, can you elaborate a bit more on coherency without SMP please? Do these
-> controls also affect IO coherency?
+> Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
+> ---
+>  drivers/tty/serial/msm_serial.c             |  2 +-
+>  drivers/tty/serial/msm_serial_hs.c          |  2 +-
 
-I meant Hardware IO coherency which is the purpose on the other patch set:
-"Add hardware I/O coherency support for Armada 370/XP"
-
-> 
-> Will
-> 
-
+Acked-by: David Brown <davidb@codeaurora.org>
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
