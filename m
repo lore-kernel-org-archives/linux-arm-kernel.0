@@ -1,149 +1,133 @@
 From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 20 Nov 2012 01:22:17 -0800
-Subject: [PATCH 1/3] CLK: uninline clk_prepare() and clk_unprepare()
+Date: Tue, 20 Nov 2012 01:22:18 -0800
+Subject: [PATCH 2/3] CLK: uninline clk_prepare_enable() and
+ clk_disable_unprepare()
 In-Reply-To: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
 References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
-Message-ID: <1353403339-11679-2-git-send-email-dmitry.torokhov@gmail.com>
+Message-ID: <1353403339-11679-3-git-send-email-dmitry.torokhov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We'll need to invoke clk_unprepare() via a pointer in our devm_*
+We'll need to invoke clk_disable_unprepare() via a pointer in our devm_*
 conversion so let's uninline the pair.
 
 Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 ---
- drivers/clk/clk.c   |  4 ++++
- include/linux/clk.h | 68 +++++++++++++++++++++++++----------------------------
- 2 files changed, 36 insertions(+), 36 deletions(-)
+ drivers/clk/clk.c   | 23 +++++++++++++++++++++++
+ include/linux/clk.h | 53 +++++++++++++++++++++++++++++++----------------------
+ 2 files changed, 54 insertions(+), 22 deletions(-)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 56e4495e..1b642f2 100644
+index 1b642f2..69dc7ba 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -374,6 +374,7 @@ struct clk *__clk_lookup(const char *name)
- 
- void __clk_unprepare(struct clk *clk)
- {
-+#ifdef CONFIG_HAVE_CLK_PREPARE
- 	if (!clk)
- 		return;
- 
-@@ -389,6 +390,7 @@ void __clk_unprepare(struct clk *clk)
- 		clk->ops->unprepare(clk->hw);
- 
- 	__clk_unprepare(clk->parent);
-+#endif
+@@ -561,6 +561,29 @@ int clk_enable(struct clk *clk)
  }
+ EXPORT_SYMBOL_GPL(clk_enable);
  
++int clk_prepare_enable(struct clk *clk)
++{
++	int ret;
++
++	ret = clk_prepare(clk);
++	if (ret)
++		return ret;
++
++	ret = clk_enable(clk);
++	if (ret)
++		clk_unprepare(clk);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(clk_prepare_enable);
++
++void clk_disable_unprepare(struct clk *clk)
++{
++	clk_disable(clk);
++	clk_unprepare(clk);
++}
++EXPORT_SYMBOL_GPL(clk_disable_unprepare);
++
  /**
-@@ -412,6 +414,7 @@ EXPORT_SYMBOL_GPL(clk_unprepare);
- 
- int __clk_prepare(struct clk *clk)
- {
-+#ifdef CONFIG_HAVE_CLK_PREPARE
- 	int ret = 0;
- 
- 	if (!clk)
-@@ -432,6 +435,7 @@ int __clk_prepare(struct clk *clk)
- 	}
- 
- 	clk->prepare_count++;
-+#endif
- 
- 	return 0;
- }
+  * __clk_round_rate - round the given rate for a clk
+  * @clk: round the rate of this clock
 diff --git a/include/linux/clk.h b/include/linux/clk.h
-index b3ac22d..f8204c3 100644
+index f8204c3..8bf149e 100644
 --- a/include/linux/clk.h
 +++ b/include/linux/clk.h
-@@ -84,42 +84,6 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
- 
- #endif
- 
--/**
-- * clk_prepare - prepare a clock source
-- * @clk: clock source
-- *
-- * This prepares the clock source for use.
-- *
-- * Must not be called from within atomic context.
-- */
--#ifdef CONFIG_HAVE_CLK_PREPARE
--int clk_prepare(struct clk *clk);
--#else
--static inline int clk_prepare(struct clk *clk)
--{
--	might_sleep();
--	return 0;
--}
--#endif
--
--/**
-- * clk_unprepare - undo preparation of a clock source
-- * @clk: clock source
-- *
-- * This undoes a previously prepared clock.  The caller must balance
-- * the number of prepare and unprepare calls.
-- *
-- * Must not be called from within atomic context.
-- */
--#ifdef CONFIG_HAVE_CLK_PREPARE
--void clk_unprepare(struct clk *clk);
--#else
--static inline void clk_unprepare(struct clk *clk)
--{
--	might_sleep();
--}
--#endif
--
- #ifdef CONFIG_HAVE_CLK
- /**
-  * clk_get - lookup and obtain a reference to a clock producer.
-@@ -159,6 +123,27 @@ struct clk *clk_get(struct device *dev, const char *id);
- struct clk *devm_clk_get(struct device *dev, const char *id);
+@@ -172,6 +172,26 @@ int clk_enable(struct clk *clk);
+ void clk_disable(struct clk *clk);
  
  /**
-+ * clk_prepare - prepare a clock source
++ * clk_prepare_enable - prepare and enable a clock source
 + * @clk: clock source
 + *
-+ * This prepares the clock source for use.
++ * This prepares the clock source for use and enables it.
 + *
 + * Must not be called from within atomic context.
 + */
-+int clk_prepare(struct clk *clk);
++int clk_prepare_enable(struct clk *clk);
 +
 +/**
-+ * clk_unprepare - undo preparation of a clock source
++ * clk_disable_unprepare - disable and undo preparation of a clock source
 + * @clk: clock source
 + *
-+ * This undoes a previously prepared clock.  The caller must balance
-+ * the number of prepare and unprepare calls.
++ * This disables and undoes a previously prepared clock.
 + *
 + * Must not be called from within atomic context.
 + */
-+void clk_unprepare(struct clk *clk);
++void clk_disable_unprepare(struct clk *clk);
 +
 +/**
-  * clk_enable - inform the system when the clock source should be running.
+  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
+  *		  This is only valid once the clock source has been enabled.
   * @clk: clock source
-  *
-@@ -292,6 +277,17 @@ static inline void clk_put(struct clk *clk) {}
+@@ -295,6 +315,17 @@ static inline int clk_enable(struct clk *clk)
  
- static inline void devm_clk_put(struct device *dev, struct clk *clk) {}
+ static inline void clk_disable(struct clk *clk) {}
  
-+static inline int clk_prepare(struct clk *clk)
++static inline int clk_prepare_enable(struct clk *clk)
 +{
 +	might_sleep();
 +	return 0;
 +}
 +
-+static inline void clk_unprepare(struct clk *clk)
++static inline void clk_disable_unprepare(struct clk *clk)
 +{
 +	might_sleep();
 +}
 +
- static inline int clk_enable(struct clk *clk)
+ static inline unsigned long clk_get_rate(struct clk *clk)
  {
  	return 0;
+@@ -322,28 +353,6 @@ static inline struct clk *clk_get_parent(struct clk *clk)
+ 
+ #endif
+ 
+-/* clk_prepare_enable helps cases using clk_enable in non-atomic context. */
+-static inline int clk_prepare_enable(struct clk *clk)
+-{
+-	int ret;
+-
+-	ret = clk_prepare(clk);
+-	if (ret)
+-		return ret;
+-	ret = clk_enable(clk);
+-	if (ret)
+-		clk_unprepare(clk);
+-
+-	return ret;
+-}
+-
+-/* clk_disable_unprepare helps cases using clk_disable in non-atomic context. */
+-static inline void clk_disable_unprepare(struct clk *clk)
+-{
+-	clk_disable(clk);
+-	clk_unprepare(clk);
+-}
+-
+ /**
+  * clk_add_alias - add a new clock alias
+  * @alias: name for clock alias
 -- 
 1.7.11.7
