@@ -1,38 +1,65 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 20 Nov 2012 19:27:38 +0900
-Subject: [Resend v6 PATCH 2/2] ASoC: atmel-ssc: add pinctrl consumer
-In-Reply-To: <50AB4DEA.3090100@atmel.com>
-References: <1353045837-19474-1-git-send-email-voice.shen@atmel.com>
- <1353045837-19474-2-git-send-email-voice.shen@atmel.com>
- <20121116061250.GP4387@opensource.wolfsonmicro.com>
- <50A5DE4E.80206@atmel.com>
- <20121116064113.GQ4387@opensource.wolfsonmicro.com>
- <50A5E44D.6040501@atmel.com> <50AB4DEA.3090100@atmel.com>
-Message-ID: <20121120102712.GF10560@opensource.wolfsonmicro.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 20 Nov 2012 11:48:44 +0100
+Subject: [PATCH] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <20121119144826.f59667b2.akpm@linux-foundation.org>
+References: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
+ <20121119001846.GB22106@titan.lakedaemon.net>
+ <20121119144826.f59667b2.akpm@linux-foundation.org>
+Message-ID: <50AB600C.5010801@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 05:31:22PM +0800, Bo Shen wrote:
+Hello,
 
-> >based on ASoC tree? And the upper go into pinctrl tree?
-> >---<8---
-> >ssc0: ssc at fffbc000 {
-> >     compatible = "atmel,at91rm9200-ssc";
-> >         reg = <0xfffbc000 0x4000>;
-> >         interrupts = <14 4 5>;
-> >+        pinctrl-names = "default";
-> >+        pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
-> >         status = "disable";
-> >};
-> >--->8---
+On 11/19/2012 11:48 PM, Andrew Morton wrote:
+> On Sun, 18 Nov 2012 19:18:46 -0500
+> Jason Cooper <jason@lakedaemon.net> wrote:
+>
+> > I've added the maintainers for mm/*.  Hopefully they can let us know if
+> > this is good for v3.8...
+>
+> As Marek has inexplicably put this patch into linux-next via his tree,
+> we don't appear to be getting a say in the matter!
 
-> Any suggestion for this? what should I do with this patch for next?
+I've just put this patch to linux-next via my dma-mapping tree to give it
+some testing asap to check if other changes to arm dma-mapping are required
+or not.
 
-Send it to pinctrl and we'll deal with the add/add.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/243220af/attachment-0001.sig>
+> The patch looks good to me.  That open-coded wait loop predates the
+> creation of bitkeeper tree(!) but doesn't appear to be needed.  There
+> will perhaps be some behavioural changes observable for GFP_KERNEL
+> callers as dma_pool_alloc() will no longer dip into page reserves but I
+> see nothing special about dma_pool_alloc() which justifies doing that
+> anyway.
+>
+> The patch makes pool->waitq and its manipulation obsolete, but it
+> failed to remove all that stuff.
+
+Right, I missed that part, I will update it asap.
+
+> The changelog failed to describe the problem which Soren reported.
+> That should be included, and as the problem sounds fairly serious we
+> might decide to backport the fix into -stable kernels.
+
+Ok, I will extend the changelog.
+
+> dma_pool_alloc()'s use of a local "struct dma_page *page" is
+> distressing - MM developers very much expect a local called "page" to
+> have type "struct page *".  But that's a separate issue.
+
+I will prepare a separate patch cleaning it. I was also a bit surprised
+by such naming scheme, but it is probably related to the fact that this
+come has not been touched much since a very ancient times.
+
+> As this patch is already in -next and is stuck there for two more
+> weeks I can't (or at least won't) merge this patch, so I can't help
+> with any of the above.
+
+I will fix both issues in the next version of the patch. Would like to
+merge it to your tree or should I keep it in my dma-mapping tree?
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
