@@ -1,24 +1,16 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Nov 2012 09:34:45 +0000
-Subject: [RFC/PATCH 0/3] CLK: add more devm_* APIs
-In-Reply-To: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
+Date: Tue, 20 Nov 2012 09:35:23 +0000
+Subject: [PATCH 2/3] CLK: uninline clk_prepare_enable() and
+ clk_disable_unprepare()
+In-Reply-To: <1353403339-11679-3-git-send-email-dmitry.torokhov@gmail.com>
 References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
-Message-ID: <20121120093445.GL3290@n2100.arm.linux.org.uk>
+ <1353403339-11679-3-git-send-email-dmitry.torokhov@gmail.com>
+Message-ID: <20121120093522.GM3290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 01:22:16AM -0800, Dmitry Torokhov wrote:
-> Hi,
-> 
-> When looking at recent driver conversions to managed resources (devm_*) there
-> is no devm_clk_prepare() and similar functions, which forces mixing of 2
-> resource management styles (managed/classic) in the same driver, which is not
-> great.
-> 
-> This patch series adds more devm_* managed APIs to the CLK subsystem so that
-> driver conversions can be "pure".
+On Tue, Nov 20, 2012 at 01:22:18AM -0800, Dmitry Torokhov wrote:
+> We'll need to invoke clk_disable_unprepare() via a pointer in our devm_*
+> conversion so let's uninline the pair.
 
-So, how do you ensure the correct ordering between clk_unprepare() and
-clk_put(), or even clk_disable() and clk_unprepare() ?  I see nothing
-here which makes any guarantees as to the ordering of those operations
-upon cleanup.
+Again, what about stuff not using drivers/clk/clk.c ?
