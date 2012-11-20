@@ -1,223 +1,99 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Nov 2012 15:31:13 +0100
-Subject: [PATCH 5/8] clk: armada-370-xp: add support for clock framework
+Date: Tue, 20 Nov 2012 15:31:14 +0100
+Subject: [PATCH 6/8] clocksource: convert time-armada-370-xp to clk framework
 In-Reply-To: <1353421876-13759-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353421876-13759-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353421876-13759-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353421876-13759-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Tested-by Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370.dtsi        |   15 +++++++++++++
- arch/arm/boot/dts/armada-xp-mv78230.dtsi |   12 +++++++++++
- arch/arm/boot/dts/armada-xp-mv78260.dtsi |   19 +++++++++++++++++
- arch/arm/boot/dts/armada-xp-mv78460.dtsi |   34 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/armada-xp.dtsi         |   20 ++++++++++++++++++
- arch/arm/mach-mvebu/Kconfig              |    4 ++++
- arch/arm/mach-mvebu/armada-370-xp.c      |    9 +++++++-
- 7 files changed, 112 insertions(+), 1 deletion(-)
+ .../bindings/arm/armada-370-xp-timer.txt           |    1 +
+ arch/arm/boot/dts/armada-370-db.dts                |    4 ----
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    1 +
+ drivers/clocksource/time-armada-370-xp.c           |   11 ++++++-----
+ 4 files changed, 8 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 2069151..175df28 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -75,5 +75,20 @@
- 			#interrupts-cells = <2>;
- 			interrupts = <91>;
+diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt
+index 8b6ea22..6483011 100644
+--- a/Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt
++++ b/Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt
+@@ -5,6 +5,7 @@ Required properties:
+ - compatible: Should be "marvell,armada-370-xp-timer"
+ - interrupts: Should contain the list of Global Timer interrupts
+ - reg: Should contain the base address of the Global Timer registers
++- clocks: clock driving the timer hardware
+ 
+ Optional properties:
+ - marvell,timer-25Mhz: Tells whether the Global timer supports the 25
+diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+index fffd5c2..4a31b03 100644
+--- a/arch/arm/boot/dts/armada-370-db.dts
++++ b/arch/arm/boot/dts/armada-370-db.dts
+@@ -34,9 +34,5 @@
+ 			clock-frequency = <200000000>;
+ 			status = "okay";
  		};
-+
-+		coreclk: mvebu-sar at d0018230 {
-+			compatible = "marvell,armada-370-core-clock";
-+			reg = <0xd0018230 0x08>;
-+			#clock-cells = <1>;
-+		};
-+
-+		gateclk: clock-gating-control at d0018220 {
-+			compatible = "marvell,armada-370-gating-clock";
-+			reg = <0xd0018220 0x4>;
-+			clocks = <&coreclk 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+
+-		timer at d0020300 {
+-			clock-frequency = <600000000>;
+-			status = "okay";
+-		};
  	};
  };
-diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-index ea35519..c45c7b4 100644
---- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-@@ -24,6 +24,18 @@
- 		gpio1 = &gpio1;
- 	};
- 
-+	cpus {
-+	    #address-cells = <1>;
-+	    #size-cells = <0>;
-+
-+	    cpu at 0 {
-+		device_type = "cpu";
-+		compatible = "marvell,sheeva-v7";
-+		reg = <0>;
-+		clocks = <&cpuclk 0>;
-+	    };
-+	}
-+
- 	soc {
- 		pinctrl {
- 			compatible = "marvell,mv78230-pinctrl";
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index 2057863..a2aee57 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -25,6 +25,25 @@
- 		gpio2 = &gpio2;
- 	};
- 
-+	cpus {
-+	    #address-cells = <1>;
-+	    #size-cells = <0>;
-+
-+	    cpu at 0 {
-+		device_type = "cpu";
-+		compatible = "marvell,sheeva-v7";
-+		reg = <0>;
-+		clocks = <&cpuclk 0>;
-+	    };
-+
-+	    cpu at 1 {
-+		device_type = "cpu";
-+		compatible = "marvell,sheeva-v7";
-+		reg = <1>;
-+		clocks = <&cpuclk 1>;
-+	    };
-+	};
-+
- 	soc {
- 		pinctrl {
- 			compatible = "marvell,mv78260-pinctrl";
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index ffac983..da03a12 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -25,6 +25,40 @@
- 		gpio2 = &gpio2;
- 	};
- 
-+
-+	cpus {
-+	    #address-cells = <1>;
-+	    #size-cells = <0>;
-+
-+	    cpu at 0 {
-+		device_type = "cpu";
-+		compatible = "marvell,sheeva-v7";
-+		reg = <0>;
-+		clocks = <&cpuclk 0>;
-+	    };
-+
-+	    cpu at 1 {
-+		device_type = "cpu";
-+		compatible = "marvell,sheeva-v7";
-+		reg = <1>;
-+		clocks = <&cpuclk 1>;
-+	    };
-+
-+	    cpu at 2 {
-+		device_type = "cpu";
-+		compatible = "marvell,sheeva-v7";
-+		reg = <2>;
-+		clocks = <&cpuclk 2>;
-+	    };
-+
-+	    cpu at 3 {
-+		device_type = "cpu";
-+		compatible = "marvell,sheeva-v7";
-+		reg = <3>;
-+		clocks = <&cpuclk 3>;
-+	    };
-+	};
-+
- 	soc {
- 		pinctrl {
- 			compatible = "marvell,mv78460-pinctrl";
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 71d6b5d..f51554e 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -47,6 +47,26 @@
- 				marvell,timer-25Mhz;
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 16cc82c..94b4b9e 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -62,6 +62,7 @@
+ 			       compatible = "marvell,armada-370-xp-timer";
+ 			       reg = <0xd0020300 0x30>;
+ 			       interrupts = <37>, <38>, <39>, <40>;
++			       clocks = <&coreclk 2>;
  		};
  
-+		coreclk: mvebu-sar at d0018230 {
-+			compatible = "marvell,armada-xp-core-clock";
-+			reg = <0xd0018230 0x08>;
-+			#clock-cells = <1>;
-+		};
-+
-+		cpuclk: clock-complex at d0018700 {
-+			#clock-cells = <1>;
-+			compatible = "marvell,armada-xp-cpu-clock";
-+			reg = <0xd0018700 0xA0>;
-+			clocks = <&coreclk 1>;
-+		};
-+
-+		gateclk: clock-gating-control at d0018220 {
-+			compatible = "marvell,armada-xp-gating-clock";
-+			reg = <0xd0018220 0x4>;
-+			clocks = <&coreclk 0>;
-+			#clock-cells = <1>;
-+		};
-+
- 		system-controller at d0018200 {
- 				compatible = "marvell,armada-370-xp-system-controller";
- 				reg = <0xd0018200 0x500>;
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 416d46e..79299cd 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -9,6 +9,10 @@ config ARCH_MVEBU
- 	select PINCTRL
- 	select PLAT_ORION
- 	select SPARSE_IRQ
-+	select CLKDEV_LOOKUP
-+	select MVEBU_CLK_CORE
-+	select MVEBU_CLK_CPU
-+	select MVEBU_CLK_GATING
+ 		addr-decoding at d0020000 {
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index 4674f94..a4605fd 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -18,6 +18,7 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/kernel.h>
++#include <linux/clk.h>
+ #include <linux/timer.h>
+ #include <linux/clockchips.h>
+ #include <linux/interrupt.h>
+@@ -167,7 +168,6 @@ void __init armada_370_xp_timer_init(void)
+ 	u32 u;
+ 	struct device_node *np;
+ 	unsigned int timer_clk;
+-	int ret;
+ 	np = of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-timer");
+ 	timer_base = of_iomap(np, 0);
+ 	WARN_ON(!timer_base);
+@@ -179,13 +179,14 @@ void __init armada_370_xp_timer_init(void)
+ 		       timer_base + TIMER_CTRL_OFF);
+ 		timer_clk = 25000000;
+ 	} else {
+-		u32 clk = 0;
+-		ret = of_property_read_u32(np, "clock-frequency", &clk);
+-		WARN_ON(!clk || ret < 0);
++		unsigned long rate = 0;
++		struct clk *clk = of_clk_get(np, 0);
++		WARN_ON(IS_ERR(clk));
++		rate =  clk_get_rate(clk);
+ 		u = readl(timer_base + TIMER_CTRL_OFF);
+ 		writel(u & ~(TIMER0_25MHZ | TIMER1_25MHZ),
+ 		       timer_base + TIMER_CTRL_OFF);
+-		timer_clk = clk / TIMER_DIVIDER;
++		timer_clk = rate / TIMER_DIVIDER;
+ 	}
  
- if ARCH_MVEBU
- 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index 49d7915..3292d6d 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -17,6 +17,7 @@
- #include <linux/of_platform.h>
- #include <linux/io.h>
- #include <linux/time-armada-370-xp.h>
-+#include <linux/clk/mvebu.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
-@@ -37,8 +38,14 @@ void __init armada_370_xp_map_io(void)
- 	iotable_init(armada_370_xp_io_desc, ARRAY_SIZE(armada_370_xp_io_desc));
- }
- 
-+void __init armada_370_xp_timer_and_clk_init(void)
-+{
-+	mvebu_clocks_init();
-+	armada_370_xp_timer_init();
-+}
-+
- struct sys_timer armada_370_xp_timer = {
--	.init		= armada_370_xp_timer_init,
-+	.init		= armada_370_xp_timer_and_clk_init,
- };
- 
- static void __init armada_370_xp_dt_init(void)
+ 	/* We use timer 0 as clocksource, and timer 1 for
 -- 
 1.7.9.5
