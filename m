@@ -1,34 +1,25 @@
 From: viresh.kumar@linaro.org (viresh kumar)
-Date: Tue, 20 Nov 2012 08:37:41 +0530
-Subject: [PATCH 077/493] mmc: remove use of __devexit_p
-In-Reply-To: <1353349642-3677-77-git-send-email-wfp5p@virginia.edu>
+Date: Tue, 20 Nov 2012 08:37:54 +0530
+Subject: [PATCH 226/493] dma: remove use of __devinit
+In-Reply-To: <1353349642-3677-226-git-send-email-wfp5p@virginia.edu>
 References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-77-git-send-email-wfp5p@virginia.edu>
-Message-ID: <CAOh2x==BTFZ8McBtF4-hHb=X9vMKG+NokrWUAgvPr8tgr1rXtQ@mail.gmail.com>
+ <1353349642-3677-226-git-send-email-wfp5p@virginia.edu>
+Message-ID: <CAOh2x=mM5E4+cmgaO4PZjyCp3EDixev5A+rNGw0WJ2G5WRVJ4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 11:50 PM, Bill Pemberton <wfp5p@virginia.edu> wrote:
-> CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
+On Mon, Nov 19, 2012 at 11:52 PM, Bill Pemberton <wfp5p@virginia.edu> wrote:
+> CONFIG_HOTPLUG is going away as an option so __devinit is no longer
 > needed.
 >
 > Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: "Micha? Miros?aw" <mirq-linux@rere.qmqm.pl>
-> Cc: Jarkko Lavinen <jarkko.lavinen@nokia.com>
-> Cc: Venkatraman S <svenkatr@ti.com>
 > Cc: Viresh Kumar <viresh.linux@gmail.com>
-> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> Cc: Ian Molton <ian@mnementh.co.uk>
-> Cc: Bruce Chang <brucechang@via.com.tw>
-> Cc: Harald Welte <HaraldWelte@viatech.com>
-> Cc: Pierre Ossman <pierre@ossman.eu>
-> Cc: uclinux-dist-devel at blackfin.uclinux.org
-> Cc: linux-mmc at vger.kernel.org
-> Cc: linux-omap at vger.kernel.org
+> Cc: Li Yang <leoli@freescale.com>
+> Cc: Zhang Wei <zw@zh-kernel.org>
+> Cc: Barry Song <baohua.song@csr.com>
+> Cc: linuxppc-dev at lists.ozlabs.org
 > Cc: linux-arm-kernel at lists.infradead.org
-> Cc: spear-devel at list.st.com
 > ---
->  drivers/mmc/host/sdhci-spear.c     | 2 +-
+>  drivers/dma/dw_dmac.c         | 4 ++--
 
 Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
