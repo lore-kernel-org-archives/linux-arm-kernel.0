@@ -1,28 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 20 Nov 2012 18:24:35 +0900
-Subject: [PATCH 2/2] ASoC: atmel-pcm: add dma support
-In-Reply-To: <50AB4BBB.7050308@atmel.com>
-References: <1353400698-19384-1-git-send-email-voice.shen@atmel.com>
- <1353400698-19384-2-git-send-email-voice.shen@atmel.com>
- <20121120085728.GX10560@opensource.wolfsonmicro.com>
- <50AB4BBB.7050308@atmel.com>
-Message-ID: <20121120092433.GB10560@opensource.wolfsonmicro.com>
+From: const@MakeLinux.com (Constantine Shulyupin)
+Date: Tue, 20 Nov 2012 11:25:53 +0200
+Subject: [PATCH] fix compilation error in cm_common.c
+Message-ID: <1353403553-13525-1-git-send-email-const@MakeLinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 05:22:03PM +0800, Bo Shen wrote:
-> On 11/20/2012 16:57, Mark Brown wrote:
+From: Constantine Shulyupin <const@MakeLinux.com>
 
-> >If you're using dmaengine you really need a *very* good reason not to
-> >use the core dmaengine support...
+Added required linux/errno.h
 
-> You mean I should using the soc-dmaengine-pcm, am I right?
+Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
+---
+ arch/arm/mach-omap2/cm_common.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-Yes, that's right.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/471926f8/attachment.sig>
+diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
+index 3246cef..3fafc27 100644
+--- a/arch/arm/mach-omap2/cm_common.c
++++ b/arch/arm/mach-omap2/cm_common.c
+@@ -13,6 +13,7 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/errno.h>
+ 
+ #include "cm2xxx.h"
+ #include "cm3xxx.h"
+-- 
+1.7.9.5
