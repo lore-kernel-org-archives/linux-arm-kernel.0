@@ -1,49 +1,41 @@
 From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Mon, 19 Nov 2012 19:05:47 -0600
-Subject: [PATCH v5 0/5] OMAP: iommu: hwmod, reset handling and runtime PM
-Message-ID: <1353373552-16039-1-git-send-email-omar.luna@linaro.org>
+Date: Mon, 19 Nov 2012 19:05:48 -0600
+Subject: [PATCH v5 1/5] iommu/omap: remove redundant clock handling on ISR
+In-Reply-To: <1353373552-16039-1-git-send-email-omar.luna@linaro.org>
+References: <1353373552-16039-1-git-send-email-omar.luna@linaro.org>
+Message-ID: <1353373552-16039-2-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches are needed for remoteproc to work on OMAP4.
+For the interrupt to be generated, the mmu clock should be already
+enabled while translating a virtual address, so, this call to clock
+handling is just increasing/decreasing the counter.
 
-Introduced iommu hwmod support for OMAP3 (iva, isp) and
-OMAP4 (ipu, dsp), along with the corresponding runtime PM
-and routines to deassert reset lines, enable/disable clocks
-and configure sysc registers.
+This works now, because its users need the same clock and they
+indirectly power the mmu, in this interrupt context the handling of
+clocks inside the ISR doesn't seem to be needed nor helping.
 
-A couple of patches were added (first two) to be clearer on
-the reasons for such changes, they were previosuly bundled as part
-of runtime PM changes. The last patch corresponds to a change in the
-leaf clocks used and it depends on this series to work properly.
+Next patch should also correct the dependency on clients to handle
+iommu clocks.
 
-Due to single Image support, I rebased these on top of k3.7-rc5 and
-DEPEND on:
+Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+---
+ drivers/iommu/omap-iommu.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-[PATCH v5 0/6] Move rest of omap-iommu to live in drivers/iommu
-http://thread.gmane.org/gmane.linux.kernel/1387788
-
-Minor rebasing might be needed if these are included on top of
-linux-omap, since they are affected by changes on headers being
-moved to include/linux/platform_data and arch/arm/mach-omap2.
-
-Omar Ramirez Luna (5):
-  iommu/omap: remove redundant clock handling on ISR
-  iommu/omap: keep mmu enabled when requested
-  iommu/omap: migrate to hwmod framework
-  iommu/omap: adapt to runtime pm
-  ARM: OMAP4: hwmod data: ipu and dsp to use parent clocks instead of
-    leaf clocks
-
- arch/arm/mach-omap2/clock44xx_data.c       |   22 ----
- arch/arm/mach-omap2/devices.c              |    2 +-
- arch/arm/mach-omap2/omap-iommu.c           |  167 ++++++---------------------
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    4 +-
- drivers/iommu/omap-iommu.c                 |   68 ++++++-----
- drivers/iommu/omap-iommu.h                 |    3 -
- drivers/iommu/omap-iommu2.c                |   36 ------
- include/linux/platform_data/iommu-omap.h   |    9 +-
- 8 files changed, 84 insertions(+), 227 deletions(-)
-
+diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+index badc17c..6b1288c 100644
+--- a/drivers/iommu/omap-iommu.c
++++ b/drivers/iommu/omap-iommu.c
+@@ -807,9 +807,7 @@ static irqreturn_t iommu_fault_handler(int irq, void *data)
+ 	if (!obj->refcount)
+ 		return IRQ_NONE;
+ 
+-	clk_enable(obj->clk);
+ 	errs = iommu_report_fault(obj, &da);
+-	clk_disable(obj->clk);
+ 	if (errs == 0)
+ 		return IRQ_HANDLED;
+ 
 -- 
 1.7.4.1
