@@ -1,53 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Nov 2012 07:57:11 +0900
-Subject: [PATCH 2/2] ARM: dts: snow: Add board dts file for Snow board (ARM
- Chromebook)
-In-Reply-To: <CAOesGMiGZHAw0zOZFZcYJ9YngbcMsTJrzhG+DQ5sP9Sq+CyzDQ@mail.gmail.com>
-References: <1353432158-22999-1-git-send-email-dianders@chromium.org>
- <1353432158-22999-2-git-send-email-dianders@chromium.org>
- <CAOesGMiGZHAw0zOZFZcYJ9YngbcMsTJrzhG+DQ5sP9Sq+CyzDQ@mail.gmail.com>
-Message-ID: <0d5301cdc772$605a4420$210ecc60$%kim@samsung.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 20 Nov 2012 17:00:19 -0600
+Subject: OMAP* Latest build failures
+In-Reply-To: <20121120175733.GH18567@atomide.com>
+References: <20121114092643.GG3290@n2100.arm.linux.org.uk>
+ <20121117093307.GL3332@n2100.arm.linux.org.uk>
+ <20121120175733.GH18567@atomide.com>
+Message-ID: <50AC0B83.9070704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
-> 
-> On Tue, Nov 20, 2012 at 9:22 AM, Doug Anderson <dianders@chromium.org>
-> wrote:
-> > This dts file is based on the Snow dts file in the Chromium OS kernel
-> > tree with the following changes:
-> > * Some details have been updated to match the exynos5250-smdk5250.dts
-> >   file from linux-next (as of
-> >   c11068538994430547722dc9fb515a0ceefd5cb9).
-> > * This file doesn't include references to hardware whose upstream
-> >   support isn't quite there yet.  That includes most i2c devices.
-> >   Note that most i2c busses have been included with no devices.
-> >
-> > The Snow dts file is mostly just an include of the "cros5250" dts file
-> > which describes a class of similar boards.  Support for other boards
-> > has not yet been send upstream.
-> >
-> > With this file and a change to use UART3 for serial output I can:
-> > * Boot to a command line using either SD or EMMC as a root filesystem
-> > * See the power button and lid switch using evtest.
-> >
-> > Signed-off-by: Doug Anderson <dianders@chromium.org>
-> 
-> Acked-by: Olof Johansson <olof@lixom.net>
-> 
-> Kukjin, since your pull requests came in today, can you ack this and
-> I'll just apply it on top of your branches?
-> 
-Hi Olof, yeah, I sent pull-request but there are some patches for dt and
-exynos5440 stuff in my tree not sent yet. If you're ok, let me take this
-with your ack.
 
-Note, I will try to send out remained Samsung stuff before release -rc7 ;-)
+On 11/20/2012 11:57 AM, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [121117 01:35]:
+>> On Wed, Nov 14, 2012 at 09:26:43AM +0000, Russell King - ARM Linux wrote:
+>>> OMAP* allnoconfig fails:
+>>>
+>>> arch/arm/mach-omap2/built-in.o: In function `omap_dss_set_min_bus_tput':
+>>> twl-common.c:(.text+0x1e08): undefined reference to `omap_pm_set_min_bus_tput'
+>>> arch/arm/mach-omap2/built-in.o: In function `omap_hwmod_init_postsetup':
+>>> twl-common.c:(.init.text+0x8f8): undefined reference to `omap_pm_if_early_init'
+>>> arch/arm/mach-omap2/built-in.o: In function `omap_serial_init_port':
+>>> twl-common.c:(.init.text+0x1284): undefined reference to `omap_pm_get_dev_context_loss_count'
+>>> arch/arm/mach-omap2/built-in.o: In function `omap_timer_init':
+>>> twl-common.c:(.init.text+0x1544): undefined reference to `omap_pm_get_dev_context_loss_count'
+>>> arch/arm/mach-omap2/built-in.o: In function `omap2_common_pm_init':
+>>> twl-common.c:(.init.text+0x1af0): undefined reference to `omap_pm_if_init'
+>>> arch/arm/mach-omap2/built-in.o: In function `omap2_gpio_dev_init':
+>>> twl-common.c:(.init.text+0x2168): undefined reference to `omap_pm_get_dev_context_loss_count'
+>>> arch/arm/mach-omap2/built-in.o: In function `omap_display_init':
+>>> twl-common.c:(.init.text+0x25cc): undefined reference to `omap_pm_get_dev_context_loss_count'
+>>
+>> These are now gone, but we have a new warning:
+>>
+>> arch/arm/mach-omap2/timer.c:163:28: warning: 'omap_counter_match' defined but not used
+> 
+> Jon, care to fix this one?
 
-Thanks.
+Fix already available here [1]. I actually included this in my latest
+pull request with some other timer clean-ups [2]. Let me know if you are
+ok with this being part of this pull request or if you want to handle
+this separately.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Cheers
+Jon
+
+[1] http://marc.info/?l=linux-omap&m=135300866115036&w=2
+[2] http://marc.info/?l=linux-omap&m=135308624321232&w=2
