@@ -1,36 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Nov 2012 09:17:11 +0100
-Subject: [PATCH V2 2/2] ARM: tegra: move timer.c to drivers/clocksource/
-In-Reply-To: <20121120005036.GA6280@kryptos>
-References: <1353371237-2482-1-git-send-email-swarren@wwwdotorg.org>
- <1353371237-2482-2-git-send-email-swarren@wwwdotorg.org>
- <20121120005036.GA6280@kryptos>
-Message-ID: <20121120091711.2609af06@skate>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 20 Nov 2012 00:21:36 -0800
+Subject: [PATCH 0/2] ARM: OMAP: ads7846: fix pendown debounce setting
+In-Reply-To: <1353341038-14381-1-git-send-email-grinberg@compulab.co.il>
+References: <1353341038-14381-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <20121120082136.GB28115@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Josh,
-
-On Mon, 19 Nov 2012 18:50:36 -0600, Josh Cartwright wrote:
-
-> I had suggested this with Thomas Petazzoni's consolidated irq_chip patch
-> as well:
+On Mon, Nov 19, 2012 at 06:03:56PM +0200, Igor Grinberg wrote:
+> Commit 97ee9f01 (ARM: OMAP: fix the ads7846 init code) have enabled the
+> pendown GPIO debounce time setting by the below sequence:
 > 
-> It seems like it would be a bit cleaner/easier to maintain if we relied
-> on the linker to stitch together a clksrc_of_match table, based on what
-> clocksources are being built into the image.  With that approach, at
-> least, a public initialization header wouldn't have to be exposed, and
-> this central table wouldn't have to be maintained (as more clocksrcs are
-> added, I forsee [admittedly trivial] merge conflicts).
+>   gpio_request_one()
+>   gpio_set_debounce()
+>   gpio_free()
+> 
+> It also revealed a bug in the OMAP GPIO handling code which prevented
+> the GPIO debounce clock to be disabled and CORE transition to low power
+> states.
+> 
+> Commit c9c55d9 (gpio/omap: fix off-mode bug: clear debounce settings on
+> free/reset) fixes the OMAP GPIO handling code by making sure that the
+> GPIO debounce clock gets disabled if no GPIO is requested from current
+> bank.
+> 
+> While fixing the OMAP GPIO handling code (in the right way), the above
+> commit makes the gpio_request->set_debounce->free sequence invalid as
+> after freeing the GPIO, the debounce settings are lost.
+> 
+> This patch set:
+> 1) Adds the pendown GPIO debounce time setting to the platform data
+>    structure of the ads7846 driver.
+> 2) Fixes the OMAP platform code to pass the debounce time value
+>    to the driver instead of handling it by itself.
+> 
+> Igor Grinberg (2):
+>   ads7846: enable pendown GPIO debounce time setting
+>   ARM: OMAP: ads7846: fix pendown debounce setting
+> 
 
-... and I indeed have a new version of my irqchip patches that indeed
-use the linker to merge together the of_device_id entries!
+Makes sense to me. Tony, I have some stuff to push for 3.7 final, mind
+if I pick OMAP change as well?
 
-Best regards,
+Thanks.
 
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Dmitry
