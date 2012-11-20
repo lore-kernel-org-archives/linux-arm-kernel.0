@@ -1,31 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 19 Nov 2012 21:57:00 -0700
-Subject: [PATCH 2/2] ARM: mmp: support pinctrl single in brownstone
-In-Reply-To: <CAN1soZyTad0QVt-oKM24XiHYruyFx5MTiu2+ytGL5RNv-Pqonw@mail.gmail.com>
-References: <1353049345-6954-1-git-send-email-haojian.zhuang@gmail.com>
- <1353049345-6954-2-git-send-email-haojian.zhuang@gmail.com>
- <50AAA7B1.7060404@wwwdotorg.org>
- <CAN1soZyTad0QVt-oKM24XiHYruyFx5MTiu2+ytGL5RNv-Pqonw@mail.gmail.com>
-Message-ID: <50AB0D9C.5060101@wwwdotorg.org>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Tue, 20 Nov 2012 05:00:15 +0000
+Subject: [PATCH 0/3] can: Add D_CAN raminit support to am335x-evm
+In-Reply-To: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
+References: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA75C73@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2012 05:52 PM, Haojian Zhuang wrote:
-> On Tue, Nov 20, 2012 at 5:42 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 11/16/2012 12:02 AM, Haojian Zhuang wrote:
->>> Support pinctrl-single driver in brownstone platform with DT.
->>
->>> diff --git a/arch/arm/boot/dts/mmp2-brownstone.dts b/arch/arm/boot/dts/mmp2-brownstone.dts
->>
->>>       chosen {
->>> -             bootargs = "console=ttyS2,38400 root=/dev/nfs nfsroot=192.168.1.100:/nfsroot/ ip=192.168.1.101:192.168.1.100::255.255.255.0::eth0:on";
->>> +             bootargs = "console=ttyS2,38400 root=/dev/nfs nfsroot=192.168.1.100:/nfsroot/ ip=192.168.1.101:192.168.1.100::255.255.255.0::eth0:on earlyprintk";
->>
->> That seems unrelated.
->>
-> But it's helpful on debug. Should I remove this? I prefer that I could
-> keep this.
+On Wed, Nov 14, 2012 at 23:38:22, AnilKumar, Chimata wrote:
+> This patch series adds d_can raminit support to c_can/d_can driver,
+> which is required to init/de-init D_CAN message RAM (holds message
+> objects). Added corresponding DT changes to get resource of RAMINIT
+> register and device instance.
 > 
-> Since I want to watch the whole log before console is enabled.
+> These patches were tested on AM335x-EVM along with pinctrl data addition
+> patch, which is not added to am335x-evm.dts (only supports CPLD profile#0)
+> because d_can1 is supported under CPLD profile#1.
 
-It should be a separate patch at least.
+Hi Mark,
+
+Gentle remainder to this series
+
+Thanks
+AnilKumar
+ 
+> AnilKumar Ch (3):
+>   can: c_can: Add d_can raminit support
+>   ARM: dts: AM33XX: Add d_can instances to aliases
+>   ARM: dts: AM33XX: Add memory resource to d_can node
+> 
+>  arch/arm/boot/dts/am33xx.dtsi          |    8 ++++++--
+>  drivers/net/can/c_can/c_can.c          |   12 +++++++++++
+>  drivers/net/can/c_can/c_can.h          |    3 +++
+>  drivers/net/can/c_can/c_can_platform.c |   34 +++++++++++++++++++++++++++++++-
+>  4 files changed, 54 insertions(+), 3 deletions(-)
+> 
+> -- 
+> 1.7.9.5
+> 
+> 
