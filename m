@@ -1,47 +1,85 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 20 Nov 2012 13:42:33 +0100
-Subject: [PATCH 3/3] ARM: zynq: add support for ARCH_MULTIPLATFORM
-In-Reply-To: <9bdc33093c6a5c22b180ef45b486edb575f87da3.1353349191.git.josh.cartwright@ni.com>
-References: <cover.1353349191.git.josh.cartwright@ni.com>
- <9bdc33093c6a5c22b180ef45b486edb575f87da3.1353349191.git.josh.cartwright@ni.com>
-Message-ID: <CAHTX3d+UEdgHVALa9a7pqKPpKbZdoPOWzMPcTXpJ0TY7YofzRw@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 20 Nov 2012 21:43:14 +0900
+Subject: [PATCH v2 1/6] ARM: EXYNOS5: Clock settings for SATA and SATA PHY
+References: <1351612897-14923-1-git-send-email-vasanthananthan@gmail.com>
+ <1351612897-14923-2-git-send-email-vasanthananthan@gmail.com>
+Message-ID: <0cab01cdc71c$9b52d0c0$d1f87240$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/11/19 Josh Cartwright <josh.cartwright@ni.com>:
-> The majority of changes are necessary to remove dependencies on header
-> files within arch/arm/mach-zynq/include/mach:
->
->   uncompress.h
->     - Deleted. It is unused for ARCH_MULTIPLATFORM builds.
->
->   uart.h:
->     - Move uart definitions out of uart.h into debug/zynq.S, which is
->       now the only user
->
->   zynq_soc.h:
->     - Move SCU address definitions into common.c.
->     - Other #defines, such as PERIPHERAL_CLOCK_RATE, TTC0_BASE, etc, are
->       unused and can be dropped
->
-> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
-> ---
->  arch/arm/Kconfig                             | 14 ++------
->  arch/arm/include/debug/zynq.S                | 20 +++++++++--
->  arch/arm/mach-zynq/Kconfig                   | 13 +++++++
->  arch/arm/mach-zynq/common.c                  |  8 ++---
->  arch/arm/mach-zynq/include/mach/uart.h       | 25 --------------
->  arch/arm/mach-zynq/include/mach/uncompress.h | 51 ----------------------------
->  arch/arm/mach-zynq/include/mach/zynq_soc.h   | 49 --------------------------
->  7 files changed, 37 insertions(+), 143 deletions(-)
->  create mode 100644 arch/arm/mach-zynq/Kconfig
->  delete mode 100644 arch/arm/mach-zynq/include/mach/uart.h
->  delete mode 100644 arch/arm/mach-zynq/include/mach/uncompress.h
->  delete mode 100644 arch/arm/mach-zynq/include/mach/zynq_soc.h
+Kukjin Kim wrote:
+> 
+> Vasanth Ananthan wrote:
+> >
+> > This patch adds neccessary clock entries for SATA, SATA PHY and
+> > I2C_SATAPHY
+> >
+> > Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos/clock-exynos5.c |   21 ++++++++++++++++++---
+> >  1 files changed, 18 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-
+> > exynos/clock-exynos5.c
+> > index c44ca1e..124c54f 100644
+> > --- a/arch/arm/mach-exynos/clock-exynos5.c
+> > +++ b/arch/arm/mach-exynos/clock-exynos5.c
+> > @@ -651,15 +651,20 @@ static struct clk exynos5_init_clocks_off[] = {
+> >  		.ctrlbit	= (1 << 15),
+> >  	}, {
+> >  		.name		= "sata",
+> > -		.devname	= "ahci",
+> > +		.devname	= "exynos5-sata",
+> > +		.parent         = &exynos5_clk_aclk_200.clk,
+> >  		.enable		= exynos5_clk_ip_fsys_ctrl,
+> >  		.ctrlbit	= (1 << 6),
+> >  	}, {
+> > -		.name		= "sata_phy",
+> > +		.name		= "sata-phy",
+> > +		.devname	= "exynos5-sata-phy",
+> > +		.parent         = &exynos5_clk_aclk_200.clk,
+> >  		.enable		= exynos5_clk_ip_fsys_ctrl,
+> >  		.ctrlbit	= (1 << 24),
+> >  	}, {
+> > -		.name		= "sata_phy_i2c",
+> > +		.name		= "i2c",
+> > +		.devname	= "exynos5-sata-phy-i2c",
+> > +		.parent         = &exynos5_clk_aclk_200.clk,
+> >  		.enable		= exynos5_clk_ip_fsys_ctrl,
+> >  		.ctrlbit	= (1 << 25),
+> >  	}, {
+> > @@ -1226,6 +1231,16 @@ static struct clksrc_clk exynos5_clksrcs[] = {
+> >  		.reg_div = { .reg = EXYNOS5_CLKDIV_TOP0, .shift = 24, .size
+> > = 3 },
+> >  	}, {
+> >  		.clk	= {
+> > +			.name		= "sclk_sata",
+> > +			.devname	= "exynos5-sata",
+> > +			.enable		= exynos5_clksrc_mask_fsys_ctrl,
+> > +			.ctrlbit	= (1 << 24),
+> > +		},
+> > +		.sources = &exynos5_clkset_aclk,
+> > +		.reg_src = { .reg = EXYNOS5_CLKSRC_FSYS, .shift = 24, .size
+> > = 1 },
+> > +		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS0, .shift = 20, .size
+> > = 4 },
+> > +	}, {
+> > +		.clk	= {
+> >  			.name		= "sclk_gscl_wrap",
+> >  			.devname	= "s5p-mipi-csis.0",
+> >  			.enable		= exynos5_clksrc_mask_gscl_ctrl,
+> > --
+> > 1.7.4.1
+> 
+> Looks OK to me, need to think again about naming though?, anyway, this can
+> be handled separate from this series.
+> 
+> Let me take this into Samsung tree, if any problems, please let me know.
+> 
+Applied, thanks.
 
-Tested-by: Michal Simek <michal.simek@xilinx.com>
-
-Applied to xilinx arm-next branch.
-
-Thanks,
-Michal
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
