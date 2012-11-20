@@ -1,51 +1,73 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 20 Nov 2012 13:45:20 +0100
-Subject: [RFC 09/15] ARM: shmobile: Include DTSI of r8a7740 to
- armadillo800eva
-In-Reply-To: <1353302007-31045-10-git-send-email-horms@verge.net.au>
-References: <1353302007-31045-1-git-send-email-horms@verge.net.au>
- <1353302007-31045-10-git-send-email-horms@verge.net.au>
-Message-ID: <2217502.K9pLuGzWaC@avalon>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 20 Nov 2012 21:46:46 +0900
+Subject: [PATCH v2 2/6] ARM: EXYNOS5: DT Support for SATA and SATA PHY
+References: <1351612897-14923-1-git-send-email-vasanthananthan@gmail.com>
+ <1351612897-14923-3-git-send-email-vasanthananthan@gmail.com>
+Message-ID: <0cb001cdc71d$19e59df0$4db0d9d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-Thank you for the patch.
-
-On Monday 19 November 2012 14:13:21 Simon Horman wrote:
-> From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Kukjin Kim wrote:
 > 
-> Cc: Magnus Damm <damm@opensource.se>
-> Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-> Signed-off-by: Simon Horman <horms@verge.net.au>
-
-I came up today with pretty much the same patch :-)
-
-> ---
->  arch/arm/boot/dts/r8a7740-armadillo800eva.dts |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Vasanth Ananthan wrote:
+> >
+> > This patch adds Device Nodes for SATA and SATA PHY device.
+> >
 > 
-> diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-> b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts index a7505a9..a8e7bd9
-> 100644
-> --- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-> +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-> @@ -9,7 +9,7 @@
->   */
+> [...]
 > 
->  /dts-v1/;
-> -/include/ "skeleton.dtsi"
-> +/include/ "r8a7740.dtsi"
+> > @@ -188,6 +188,9 @@
+> >  #define EXYNOS4_PA_SATA			0x12560000
+> >  #define EXYNOS4_PA_SATAPHY		0x125D0000
+> >  #define EXYNOS4_PA_SATAPHY_CTRL		0x126B0000
+> > +#define EXYNOS5_PA_SATA_PHY_CTRL	0x12170000
+> > +#define EXYNOS5_PA_SATA_PHY_I2C		0x121D0000
+> > +#define EXYNOS5_PA_SATA_BASE		0x122F0000
+> >
+> >  #define EXYNOS4_PA_SROMC		0x12570000
+> >  #define EXYNOS5_PA_SROMC		0x12250000
+> > diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-
+> > exynos/mach-exynos5-dt.c
+> > index db1cd8e..7dbd4cc 100644
+> > --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+> > +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> > @@ -61,6 +61,12 @@ static const struct of_dev_auxdata
+> > exynos5250_auxdata_lookup[] __initconst = {
+> >  				"exynos4210-spi.1", NULL),
+> >  	OF_DEV_AUXDATA("samsung,exynos4210-spi", EXYNOS5_PA_SPI2,
+> >  				"exynos4210-spi.2", NULL),
+> > +	OF_DEV_AUXDATA("samsung,exynos5-sata-ahci", EXYNOS5_PA_SATA_BASE,
+> > +				"exynos5-sata", NULL),
+> > +	OF_DEV_AUXDATA("samsung,exynos5-sata-phy", EXYNOS5_PA_SATA_PHY_CTRL,
+> > +				"exynos5-sata-phy", NULL),
+> > +	OF_DEV_AUXDATA("samsung,exynos5-sata-phy-i2c",
+> > EXYNOS5_PA_SATA_PHY_I2C,
+> > +				"exynos5-sata-phy-i2c", NULL),
+> >  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA0, "dma-pl330.0", NULL),
+> >  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA1, "dma-pl330.1", NULL),
+> >  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA1, "dma-pl330.2", NULL),
+> > --
+> > 1.7.4.1
 > 
->  / {
->  	model = "armadillo 800 eva";
+> Just following is enough? Because we don't need the definitions only for
+> here...
+> 
+> 8<-------
+> +	OF_DEV_AUXDATA("samsung,exynos5-sata-ahci", 0x122F0000,
+> +				"exynos5-sata", NULL),
+> +	OF_DEV_AUXDATA("samsung,exynos5-sata-phy", 0x126B0000,
+> +				"exynos5-sata-phy", NULL),
+> +	OF_DEV_AUXDATA("samsung,exynos5-sata-phy-i2c", 0x121D0000,
+> +				"exynos5-sata-phy-i2c", NULL),
+> 8<-------
+> 
 
-Shouldn't the compatible property be modified to the following values ?
+Applied with above changes.
 
-	compatible = "renesas,armadillo800eva", "renesas,r8a7740";
+Thanks.
 
--- 
-Regards,
-
-Laurent Pinchart
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
