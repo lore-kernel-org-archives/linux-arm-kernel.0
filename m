@@ -1,32 +1,49 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 20 Nov 2012 13:04:30 +0530
-Subject: [PATCH 0/8] CLK: SPEAr: Fixes & updates
-In-Reply-To: <cover.1352529508.git.viresh.kumar@linaro.org>
-References: <cover.1352529508.git.viresh.kumar@linaro.org>
-Message-ID: <CAKohpokjVoNJDPw3xKoaxg3X+7DCycZQjYCNxy-wpq_Y96qYtw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 20 Nov 2012 13:37:17 +0530
+Subject: [GIT PULL 4/6] DaVinci DT updates for v3.8
+In-Reply-To: <20121120062816.GA11997@quad.lixom.net>
+References: <1351620701-16516-1-git-send-email-nsekhar@ti.com>
+ <1351620701-16516-4-git-send-email-nsekhar@ti.com>
+ <20121120062816.GA11997@quad.lixom.net>
+Message-ID: <50AB3A35.8070208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 November 2012 12:13, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> Hi Mike,
->
-> These are fixes for SPEAr clock stuff. Most of them are fixes, but we don't mind
-> getting them in 3.8.
->
-> Deepak Sikri (2):
->   CLK: SPEAr1340: Update clock rate table
->   CLK: SPEAr: Correct index scanning done for clock synths
->
-> Rajeev Kumar (1):
->   CLK: SPEAr: Fix dev_id & con_id for multiple clocks
->
-> Shiraz Hashim (2):
->   CLK: SPEAr13xx: Fix mux clock names
->   CLK: SPEAr13xx: fix parent names of multiple clocks
->
-> Vipul Kumar Samar (3):
->   CLK: SPEAr: Set CLK_SET_RATE_PARENT for few clocks
->   CLK: SPEAr: Add missing clocks
->   CLK: SPEAr: Remove unused dummy apb_pclk
+On 11/20/2012 11:58 AM, Olof Johansson wrote:
+> Hi,
+> 
+> On Tue, Oct 30, 2012 at 11:41:39PM +0530, Sekhar Nori wrote:
+>> The following changes since commit 8e0d72d2c7a6955692ba0a21bbf5ca86e8061777:
+>>
+>>   ARM: davinci: da8xx: add DA850 PRUSS support (2012-10-27 16:28:36 +0530)
+>>
+>> are available in the git repository at:
+>>
+>>   git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-for-v3.8/dt
+>>
+>> for you to fetch changes up to 3a373904b88a73445f7a78249cf60efabbf1a9f3:
+>>
+>>   ARM: davinci: da850: generate dtbs for da850 boards (2012-10-29 15:44:26 +0530)
+>>
+>> ----------------------------------------------------------------
+>> These changes add DT boot support to DaVinci DA850
+>> SoC.
+>>
+>> ----------------------------------------------------------------
+>> Heiko Schocher (2):
+>>       ARM: davinci: da850: add SoC DT data
+>>       ARM: davinci: add support for am1808 based EnBW CMC board
+>>
+>> Sekhar Nori (3):
+>>       ARM: davinci: da850: add DT boot support
+>>       ARM: davinci: da850 evm: add DT data
+>>       ARM: davinci: da850: generate dtbs for da850 boards
+> 
+> The dtb targets now live in arch/arm/boot/dts/Makefile, they were moved there
+> for 3.7. I've applied a local patch in arm-soc (next/dt) on top of this branch
+> that moves them over.
 
-Ping!!
+Thanks for fixing it up.
+
+Regards,
+Sekhar
