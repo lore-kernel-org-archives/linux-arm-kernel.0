@@ -1,133 +1,74 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 20 Nov 2012 15:31:45 +0100
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <20121119144826.f59667b2.akpm@linux-foundation.org>
-References: <20121119144826.f59667b2.akpm@linux-foundation.org>
-Message-ID: <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 20 Nov 2012 15:33:35 +0100
+Subject: [PATCHv2] ARM: dts: cfa10049: Add PCA9555 GPIO expander to the device
+ tree
+In-Reply-To: <20121120144322.GE4882@S2100-06.ap.freescale.net>
+References: <20121120144322.GE4882@S2100-06.ap.freescale.net>
+Message-ID: <1353422015-4790-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag,
-regardless the flags provided by the caller. This causes excessive
-pruning of emergency memory pools without any good reason. Additionaly,
-on ARM architecture any driver which is using dmapools will sooner or
-later  trigger the following error: 
-"ERROR: 256 KiB atomic DMA coherent pool is too small!
-Please increase it with coherent_pool= kernel parameter!".
-Increasing the coherent pool size usually doesn't help much and only
-delays such error, because all GFP_ATOMIC DMA allocations are always
-served from the special, very limited memory pool.
+Add the GPIO expander found on the i2c1 bus, behind the muxer to the
+device tree.
 
-This patch changes the dmapool code to correctly use gfp flags provided
-by the dmapool caller.
+This gpio expander will be used to get tachymeters values and data ready
+interruptions from the nuvoton NAU7802 ADCs.
 
-Reported-by: Soeren Moch <smoch@web.de>
-Reported-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Tested-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Soeren Moch <smoch@web.de>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
+ arch/arm/boot/dts/imx28-cfa10049.dts |   26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
 
-changelog
-v2:
- - removed all waitq related stuff
- - extended commit message
-
- mm/dmapool.c |   31 +++++++------------------------
- 1 file changed, 7 insertions(+), 24 deletions(-)
-
-diff --git a/mm/dmapool.c b/mm/dmapool.c
-index c5ab33b..da1b0f0 100644
---- a/mm/dmapool.c
-+++ b/mm/dmapool.c
-@@ -50,7 +50,6 @@ struct dma_pool {		/* the pool */
- 	size_t allocation;
- 	size_t boundary;
- 	char name[32];
--	wait_queue_head_t waitq;
- 	struct list_head pools;
- };
+diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+index bdc80a4..7890acc 100644
+--- a/arch/arm/boot/dts/imx28-cfa10049.dts
++++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+@@ -23,7 +23,8 @@
+ 		apbh at 80000000 {
+ 			pinctrl at 80018000 {
+ 				pinctrl-names = "default", "default";
+-				pinctrl-1 = <&hog_pins_cfa10049>;
++				pinctrl-1 = <&hog_pins_cfa10049
++					&hog_pins_cfa10049_pullup>;
  
-@@ -62,8 +61,6 @@ struct dma_page {		/* cacheable header for 'allocation' bytes */
- 	unsigned int offset;
- };
+ 				hog_pins_cfa10049: hog-10049 at 0 {
+ 					reg = <0>;
+@@ -38,6 +39,16 @@
+ 					fsl,pull-up = <0>;
+ 				};
  
--#define	POOL_TIMEOUT_JIFFIES	((100 /* msec */ * HZ) / 1000)
--
- static DEFINE_MUTEX(pools_lock);
++				hog_pins_cfa10049_pullup: hog-10049-pullup at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x2133 /* MX28_PAD_SSP2_D3__GPIO_2_19 */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
++
+ 				spi3_pins_cfa10049: spi3-cfa10049 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+@@ -113,6 +124,19 @@
  
- static ssize_t
-@@ -172,7 +169,6 @@ struct dma_pool *dma_pool_create(const char *name, struct device *dev,
- 	retval->size = size;
- 	retval->boundary = boundary;
- 	retval->allocation = allocation;
--	init_waitqueue_head(&retval->waitq);
+ 				i2c@3 {
+ 					reg = <3>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					pca9555: pca9555 at 20 {
++						compatible = "nxp,pca9555";
++						interrupt-parent = <&gpio2>;
++						interrupts = <19 0x2>;
++						gpio-controller;
++						#gpio-cells = <2>;
++						interrupt-controller;
++						#interrupt-cells = <2>;
++						reg = <0x20>;
++					};
+ 				};
+ 			};
  
- 	if (dev) {
- 		int ret;
-@@ -227,7 +223,6 @@ static struct dma_page *pool_alloc_page(struct dma_pool *pool, gfp_t mem_flags)
- 		memset(page->vaddr, POOL_POISON_FREED, pool->allocation);
- #endif
- 		pool_initialise_page(pool, page);
--		list_add(&page->page_list, &pool->page_list);
- 		page->in_use = 0;
- 		page->offset = 0;
- 	} else {
-@@ -315,30 +310,21 @@ void *dma_pool_alloc(struct dma_pool *pool, gfp_t mem_flags,
- 	might_sleep_if(mem_flags & __GFP_WAIT);
- 
- 	spin_lock_irqsave(&pool->lock, flags);
-- restart:
- 	list_for_each_entry(page, &pool->page_list, page_list) {
- 		if (page->offset < pool->allocation)
- 			goto ready;
- 	}
--	page = pool_alloc_page(pool, GFP_ATOMIC);
--	if (!page) {
--		if (mem_flags & __GFP_WAIT) {
--			DECLARE_WAITQUEUE(wait, current);
- 
--			__set_current_state(TASK_UNINTERRUPTIBLE);
--			__add_wait_queue(&pool->waitq, &wait);
--			spin_unlock_irqrestore(&pool->lock, flags);
-+	/* pool_alloc_page() might sleep, so temporarily drop &pool->lock */
-+	spin_unlock_irqrestore(&pool->lock, flags);
- 
--			schedule_timeout(POOL_TIMEOUT_JIFFIES);
-+	page = pool_alloc_page(pool, mem_flags);
-+	if (!page)
-+		return NULL;
- 
--			spin_lock_irqsave(&pool->lock, flags);
--			__remove_wait_queue(&pool->waitq, &wait);
--			goto restart;
--		}
--		retval = NULL;
--		goto done;
--	}
-+	spin_lock_irqsave(&pool->lock, flags);
- 
-+	list_add(&page->page_list, &pool->page_list);
-  ready:
- 	page->in_use++;
- 	offset = page->offset;
-@@ -348,7 +334,6 @@ void *dma_pool_alloc(struct dma_pool *pool, gfp_t mem_flags,
- #ifdef	DMAPOOL_DEBUG
- 	memset(retval, POOL_POISON_ALLOCATED, pool->size);
- #endif
-- done:
- 	spin_unlock_irqrestore(&pool->lock, flags);
- 	return retval;
- }
-@@ -435,8 +420,6 @@ void dma_pool_free(struct dma_pool *pool, void *vaddr, dma_addr_t dma)
- 	page->in_use--;
- 	*(int *)vaddr = page->offset;
- 	page->offset = offset;
--	if (waitqueue_active(&pool->waitq))
--		wake_up_locked(&pool->waitq);
- 	/*
- 	 * Resist a temptation to do
- 	 *    if (!is_page_busy(page)) pool_free_page(pool, page);
 -- 
 1.7.9.5
