@@ -1,48 +1,55 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 20 Nov 2012 21:00:35 +0900
-Subject: [PATCH] ARM: dts: exynos4210-trats: Remove broken-voltage property
- from sdhci node
-In-Reply-To: <1604189.yDsqlPMQyl@amdc1227>
-References: <1604189.yDsqlPMQyl@amdc1227>
-Message-ID: <0c9901cdc716$a6284f80$f278ee80$%kim@samsung.com>
+From: dmitry.kasatkin@intel.com (Kasatkin, Dmitry)
+Date: Tue, 20 Nov 2012 14:08:26 +0200
+Subject: [PATCH 0/7] crypto: omap-aes updates
+In-Reply-To: <1353351832-6685-1-git-send-email-mgreer@animalcreek.com>
+References: <1353351832-6685-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <CALLzPKZ20iQXGw9k4sxiVW0VOTdV5pw6Gz8W8V4SRpe=qVY+4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> The broken voltage property has been replaced with auto detection based
-> on voltages available on vmmc voltage regulator, so there is no use for
-> it now.
-> 
-> This patch removes the now unused property from Trats Device Tree
-> sources.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4210-trats.dts | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4210-trats.dts
-> b/arch/arm/boot/dts/exynos4210-trats.dts
-> index a21511c..9d5d27a 100644
-> --- a/arch/arm/boot/dts/exynos4210-trats.dts
-> +++ b/arch/arm/boot/dts/exynos4210-trats.dts
-> @@ -42,7 +42,6 @@
->  	sdhci_emmc: sdhci at 12510000 {
->  		bus-width = <8>;
->  		non-removable;
-> -		broken-voltage;
->  		gpios = <&gpk0 0 2 0 3>,
->  			<&gpk0 1 2 0 3>,
->  			<&gpk0 3 2 2 3>,
+Great. You also worked on AES...
+Will take a loos asap.
+
+On Mon, Nov 19, 2012 at 9:03 PM, Mark A. Greer <mgreer@animalcreek.com> wrote:
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
+>
+> This series updates the crypto omap-aes driver and supporting
+> infrastructure.
+>
+> Notes:
+>
+> a) Based on omap-sham patches recently submitted, XXX
+>
+> b) Since these patches will likely go though the OMAP tree (and not
+>    through the crypto tree), it would be nice if the crypto guy(s)
+>    would ACK or NACK patches 4-7 which modify the
+>    drivers/crypto/omap-sham.c driver.
+>
+> c) These have only been tested on an omap2420 h4 and an am37x evm.
+>
+> d) Many thanks to Jon Hunter for testing on his omap2420 h4.
+>
+> Mark A. Greer (7):
+>   ARM: OMAP2xxx: hwmod: Convert AES crypto devcie data to hwmod
+>   ARM: OMAP3xxx: hwmod: Convert AES crypto device data to hwmod
+>   ARM: OMAP2+: Remove unnecessary message when no AES IP is present
+>   crypto: omap-aes: Remove cpu_is/omap_type check from driver
+>   crypto: omap-aes: Convert to use pm_runtime API
+>   crypto: omap-aes: Add code to use dmaengine API
+>   crypto: omap-aes: Remove usage of private DMA API
+>
+>  arch/arm/mach-omap2/clock2430_data.c               |   1 +
+>  arch/arm/mach-omap2/clock3xxx_data.c               |   1 +
+>  arch/arm/mach-omap2/devices.c                      |  75 +-------
+>  arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   1 +
+>  arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   1 +
+>  .../mach-omap2/omap_hwmod_2xxx_interconnect_data.c |  18 ++
+>  arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  38 ++++
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  62 +++++++
+>  arch/arm/mach-omap2/omap_hwmod_common_data.h       |   2 +
+>  drivers/crypto/omap-aes.c                          | 202 ++++++++++++---------
+>  10 files changed, 251 insertions(+), 150 deletions(-)
+>
 > --
-> 1.8.0
-
-Applied, thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> 1.7.12
+>
