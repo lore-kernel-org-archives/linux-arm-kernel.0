@@ -1,46 +1,22 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 20 Nov 2012 18:19:06 +0900
-Subject: [PATCH 0/5] ARM: dts: exynos4210-trats: Device tree extension
-In-Reply-To: <1353336329-20818-1-git-send-email-t.figa@samsung.com>
-References: <1353336329-20818-1-git-send-email-t.figa@samsung.com>
-Message-ID: <0c3101cdc700$1736b0c0$45a41240$%kim@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 20 Nov 2012 18:21:30 +0900
+Subject: [PATCH 1/2] ASoC: atmel-ssc: add phybase in device structure
+In-Reply-To: <1353400698-19384-1-git-send-email-voice.shen@atmel.com>
+References: <1353400698-19384-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <20121120092128.GA10560@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+On Tue, Nov 20, 2012 at 04:38:17PM +0800, Bo Shen wrote:
+> From: Nicolas Ferre <nicolas.ferre@atmel.com>
 > 
-> This patch series extends device tree support for Trats board.
-> 
-> It adds support for pinctrl, GPIO keys and touchscreen to Trats dts file.
-> 
-> Tested on Trats board.
-> 
-> Depends on:
-> [PATCH] i2c: i2c-s3c2410: Add support for pinctrl
-> [PATCH v2 0/2] mmc: host: sdhci-s3c: Add support for pinctrl interface
-> 
-> Tomasz Figa (5):
->   ARM: dts: exynos4210-trats: Update for pinctrl-samsung driver
->   ARM: dts: exynos4210-trats: Add nodes for GPIO keys available on
->     Trats
->   ARM: dts: exynos4210-trats: Add node for i2c3 bus
->   ARM: dts: exynos4210-trats: Add node for touchscreen voltage
->     regulator
->   ARM: dts: exynos4210-trats: Add node for touchscreen
-> 
->  arch/arm/boot/dts/exynos4210-trats.dts | 86 +++++++++++++++++++++++++++--
-> -----
->  1 file changed, 70 insertions(+), 16 deletions(-)
-> 
-> --
-> 1.8.0
+> Useful for future dmaengine use.
 
-Looks good to me, applied this whole series.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/2348ecc6/attachment.sig>
