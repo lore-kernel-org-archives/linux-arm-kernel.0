@@ -1,57 +1,48 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 20 Nov 2012 16:31:40 +0100
-Subject: [PATCH] ARM: mx5: Replace clk_register_clkdev with clock DT lookup
-In-Reply-To: <20121120152836.GM10369@pengutronix.de>
-References: <1353350425-1075-1-git-send-email-fabio.estevam@freescale.com>
- <20121120152836.GM10369@pengutronix.de>
-Message-ID: <50ABA25C.7050304@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 20 Nov 2012 13:34:58 -0200
+Subject: [PATCH] ARM: Kconfig: Do not force selection of ARCH_VEXPRESS by
+ ARCH_MULTI_V7
+Message-ID: <1353425698-14415-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2012 04:28 PM, Sascha Hauer wrote:
-> On Mon, Nov 19, 2012 at 04:40:25PM -0200, Fabio Estevam wrote:
->> Similarly as it was done for mx6q, use a DT lookup in order to make maintainance
->> task for the clock devices easier.
->>
->> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->> ---
->>  .../devicetree/bindings/clock/imx5-clock.txt       |  197 ++++++++++++++++++++
->>  arch/arm/boot/dts/imx51.dtsi                       |   39 ++++
->>  arch/arm/boot/dts/imx53.dtsi                       |   48 +++++
->>  arch/arm/mach-imx/clk-imx51-imx53.c                |   26 +--
->>  arch/arm/mach-imx/imx51-dt.c                       |   28 +--
->>  arch/arm/mach-imx/mach-imx53.c                     |   31 +--
->>  6 files changed, 299 insertions(+), 70 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/clock/imx5-clock.txt
->>
->> diff --git a/Documentation/devicetree/bindings/clock/imx5-clock.txt b/Documentation/devicetree/bindings/clock/imx5-clock.txt
->> new file mode 100644
->> index 0000000..a6fb29e
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/imx5-clock.txt
->> @@ -0,0 +1,197 @@
->> +* Clock bindings for Freescale i.MX5
->> +
->> +Required properties:
->> +- compatible: Should be "fsl,<soc>-ccm" , where <soc> can be mx51 or mx53
-> 
-> s/mx51/imx51/
-> s/mx53/iMX53/
-         ^^^^^
-imx53?
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Marc
+When building a kernel using imx_v6_v7_defconfig, it is not possible to unselect
+ARCH_VEXPRESS due to the fact that it is automatically selected by ARCH_MULTI_V7.
 
+This is not good when someone wants to create a minimal kernel build, so let 
+multi_v7_defconfig select ARCH_VEXPRESS instead.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/Kconfig                    |    1 -
+ arch/arm/configs/multi_v7_defconfig |    1 +
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 14f8160..d40e9d3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1000,7 +1000,6 @@ config ARCH_MULTI_V7
+ 	bool "ARMv7 based platforms (Cortex-A, PJ4, Krait)"
+ 	default y
+ 	select ARCH_MULTI_V6_V7
+-	select ARCH_VEXPRESS
+ 	select CPU_V7
+ 
+ config ARCH_MULTI_V6_V7
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 159f75f..531c538 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -6,6 +6,7 @@ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_ARCH_HIGHBANK=y
+ CONFIG_ARCH_SOCFPGA=y
++CONFIG_ARCH_VEXPRESS=y
+ # CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
+ CONFIG_ARM_ERRATA_754322=y
+ CONFIG_SMP=y
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 261 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/06a9d932/attachment.sig>
+1.7.9.5
