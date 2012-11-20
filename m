@@ -1,41 +1,44 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 20 Nov 2012 13:16:03 +0100
-Subject: [PATCH v3 0/2] pwm fixes for 3.8
-In-Reply-To: <1353347086-4572-1-git-send-email-linux@prisktech.co.nz>
-References: <1353347086-4572-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20121120121603.GA16752@avionic-0098.adnet.avionic-design.de>
+From: rric@kernel.org (Robert Richter)
+Date: Tue, 20 Nov 2012 13:17:47 +0100
+Subject: [PATCH 1/1] ARM: oprofile: add A5/A7/A15 entries in op_perf_name
+In-Reply-To: <20121105113102.GF3351@mudshark.cambridge.arm.com>
+References: <1351853016-4476-1-git-send-email-jgq516@gmail.com>
+ <20121105113102.GF3351@mudshark.cambridge.arm.com>
+Message-ID: <20121120121747.GJ2504@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 06:44:44AM +1300, Tony Prisk wrote:
-> Hi Theirry,
-> 
-> I felt the error message for clk_enable in vt8500_pwm_config() needed
-> to somehow indicate that the clk_enable failed in this function otherwise
-> if there is a problem, you can't tell which of the clk_enable's
-> generated the fail message.
-> If there is a clock error - as you pointed out - it will probably fail
-> elsewhere as well so I've changed it to match the other error messages.
-> 
-> These should be applied on top of the original patch.
-> 
-> v2: Add error checking for clk_enable()
-> v3: Remove superfluous ;'s. Error message style correction.
-> 
-> Tony Prisk (2):
->   Fix build error in pwm-vt8500.c
->   pwm: vt8500: Ensure pwm clock is enabled during pwm_config
-> 
->  drivers/pwm/pwm-vt8500.c |   16 +++++++++++++---
->  1 file changed, 13 insertions(+), 3 deletions(-)
+Will,
 
-Applied with minor stylistic fixups to the commit message, thanks.
+On 05.11.12 11:31:03, Will Deacon wrote:
+> > diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+> > index 99c63d4b..ec10db1 100644
+> > --- a/arch/arm/oprofile/common.c
+> > +++ b/arch/arm/oprofile/common.c
+> > @@ -37,8 +37,11 @@ static struct op_perf_name {
+> >  	{ "xscale1",		"arm/xscale2"	},
+> >  	{ "v6",			"arm/armv6"	},
+> >  	{ "v6mpcore",		"arm/mpcore"	},
+> > +	{ "ARMv7 Cortex-A5",	"arm/armv7-ca5"	},
+> > +	{ "ARMv7 Cortex-A7",	"arm/armv7-ca7"	},
+> >  	{ "ARMv7 Cortex-A8",	"arm/armv7"	},
+> >  	{ "ARMv7 Cortex-A9",	"arm/armv7-ca9"	},
+> > +	{ "ARMv7 Cortex-A15",	"arm/armv7-ca15" },
+> >  };
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/b20f607e/attachment.sig>
+> I'd rather not go down this route now that we have the operf tool as part of
+> oprofile, which can use the perf syscall directly and doesn't need this
+> string translation.
+
+since this is just an update of cpu detection I would be willing to
+include this into kernel code anyway.
+
+We could further move the cpu detection to userspace if perf_event
+exists. We let the kernel enable oprofile with cpu_type="unknown".
+User space then could either bind mount the file (user could do this
+manually) or we implement to write to cpu_type. Doing so oprofile
+could use in-kernel perf_events if it exists always as fallback.
+
+Any thoughts?
+
+-Robert
