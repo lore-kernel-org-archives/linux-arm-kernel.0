@@ -1,66 +1,103 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Nov 2012 16:14:21 +0100
-Subject: [PATCH 4/4] arm: mvebu: add XOR engines to Armada XP .dtsi
+Date: Tue, 20 Nov 2012 16:14:19 +0100
+Subject: [PATCH 2/4] arm: dove: Convert Dove to DT XOR DMA engine
 In-Reply-To: <1353424461-25421-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353424461-25421-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353424461-25421-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353424461-25421-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+With DT support for Marvell XOR DMA engine, make use of it on Dove.
+Also remove the now redundant code in DT board init for xor engines.
+
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp.dtsi |   40 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ arch/arm/boot/dts/dove.dtsi |   42 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-dove/common.c |   10 ----------
+ 2 files changed, 42 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index f51554e..a099985 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -71,5 +71,45 @@
- 				compatible = "marvell,armada-370-xp-system-controller";
- 				reg = <0xd0018200 0x500>;
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index b524ee3..b1cfa52 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -174,5 +174,47 @@
+ 			clocks = <&gate_clk 15>;
+ 			status = "okay";
  		};
 +
-+		xor at d0060900 {
++		xor0: dma-engine at 60800 {
 +			compatible = "marvell,orion-xor";
-+			reg = <0xd0060900 0x100
-+			       0xd0060b00 0x100>;
-+			clocks = <&gateclk 22>;
++			reg = <0x60800 0x100
++			       0x60a00 0x100>;
++			clocks = <&gate_clk 23>;
 +			status = "okay";
 +
-+			xor10 {
-+				interrupts = <51>;
++			channel0 {
++				interrupts = <39>;
 +				dmacap,memcpy;
 +				dmacap,xor;
 +			};
-+			xor11 {
-+				interrupts = <52>;
++
++			channel1 {
++				interrupts = <40>;
++				dmacap,memset;
 +				dmacap,memcpy;
 +				dmacap,xor;
-+				dmacap,memset;
 +			};
 +		};
 +
-+		xor at d00f0900 {
++		xor1: dma-engine at 60900 {
 +			compatible = "marvell,orion-xor";
-+			reg = <0xd00F0900 0x100
-+			       0xd00F0B00 0x100>;
-+			clocks = <&gateclk 28>;
++			reg = <0x60900 0x100
++			       0x60b00 0x100>;
++			clocks = <&gate_clk 24>;
 +			status = "okay";
 +
-+			xor00 {
-+				interrupts = <94>;
++			channel0 {
++				interrupts = <42>;
 +				dmacap,memcpy;
 +				dmacap,xor;
 +			};
-+			xor01 {
-+				interrupts = <95>;
++
++			channel1 {
++				interrupts = <43>;
++				dmacap,memset;
 +				dmacap,memcpy;
 +				dmacap,xor;
-+				dmacap,memset;
 +			};
 +		};
  	};
  };
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index f4ac5b0..89f4f99 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -409,14 +409,6 @@ static void __init dove_legacy_clk_init(void)
+ 	clkspec.args[0] = CLOCK_GATING_BIT_PCIE1;
+ 	orion_clkdev_add("1", "pcie",
+ 			 of_clk_get_from_provider(&clkspec));
+-
+-	clkspec.args[0] = CLOCK_GATING_BIT_XOR0;
+-	orion_clkdev_add(NULL, MV_XOR_NAME ".0",
+-			 of_clk_get_from_provider(&clkspec));
+-
+-	clkspec.args[0] = CLOCK_GATING_BIT_XOR1;
+-	orion_clkdev_add(NULL, MV_XOR_NAME ".1",
+-			 of_clk_get_from_provider(&clkspec));
+ }
+ 
+ static void __init dove_of_clk_init(void)
+@@ -444,8 +436,6 @@ static void __init dove_dt_init(void)
+ 
+ 	/* Internal devices not ported to DT yet */
+ 	dove_rtc_init();
+-	dove_xor0_init();
+-	dove_xor1_init();
+ 
+ 	dove_ge00_init(&dove_dt_ge00_data);
+ 	dove_ehci0_init();
 -- 
 1.7.9.5
