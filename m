@@ -1,64 +1,20 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Tue, 20 Nov 2012 10:15:03 +0000
-Subject: [PATCH] OMAP2+: enable TPS65217 support in omap2plus_defconfig
-In-Reply-To: <50AA1BD5.1000002@gmail.com>
-References: <50AA1BD5.1000002@gmail.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA76FDB@DBDE01.ent.ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 20 Nov 2012 15:48:37 +0530
+Subject: [PATCH 2/3] CLK: uninline clk_prepare_enable() and
+ clk_disable_unprepare()
+In-Reply-To: <1353403339-11679-3-git-send-email-dmitry.torokhov@gmail.com>
+References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
+ <1353403339-11679-3-git-send-email-dmitry.torokhov@gmail.com>
+Message-ID: <CAKohpo=doVLTRj7WqPmYOxrscZbHjm1+dUSiZoHAcHUHdthLeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 17:15:25, Igor Mazanov wrote:
-> TPS65217 is described in arch/arm/boot/dts/am335x-bone.dts
-> but doesn't enabled in arch/arm/configs/omap2plus_defconfig.
-> 
-> Enable TPS65217 support in omap2plus_defconfig.
-> 
-> Signed-off-by: Igor Mazanov <i.mazanov@gmail.com>
-> ---
->   arch/arm/configs/omap2plus_defconfig |    3 +++
->   1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/configs/omap2plus_defconfig 
-> b/arch/arm/configs/omap2plus_defconfig
-> index 6230304..00f2ce3 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -240,3 +240,6 @@ CONFIG_CRC_ITU_T=y
->   CONFIG_CRC7=y
->   CONFIG_LIBCRC32C=y
->   CONFIG_SOC_OMAP5=y
-> +CONFIG_MFD_CORE=y
-> +CONFIG_MFD_TPS65217=y
-> +CONFIG_REGULATOR_TPS65217=y
+On 20 November 2012 14:52, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+> We'll need to invoke clk_disable_unprepare() via a pointer in our devm_*
+> conversion so let's uninline the pair.
+>
+> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-Hi Igor,
+This one matches its expectations :)
 
-Can you try this, MFD_CORE is selected by default and note that
-remaining flags should be added at appropriate places.
-
-Author: AnilKumar Ch <anilkumar@ti.com>
-Date:   Tue Nov 20 15:34:51 2012 +0530
-
-    Custom: ARM: OMAP2+: omap2plus_defconfig: Add tps65217 support
-    
-    Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 6230304..69ddbf7 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -132,9 +132,11 @@ CONFIG_POWER_SUPPLY=y
- CONFIG_WATCHDOG=y
- CONFIG_OMAP_WATCHDOG=y
- CONFIG_TWL4030_WATCHDOG=y
-+CONFIG_MFD_TPS65217=y
- CONFIG_REGULATOR_TWL4030=y
- CONFIG_REGULATOR_TPS65023=y
- CONFIG_REGULATOR_TPS6507X=y
-+CONFIG_REGULATOR_TPS65217=y
- CONFIG_FB=y
- CONFIG_FIRMWARE_EDID=y
- CONFIG_FB_MODE_HELPERS=y
-
-Thanks
-AnilKumar
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
