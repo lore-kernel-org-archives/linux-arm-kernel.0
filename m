@@ -1,23 +1,41 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 20 Nov 2012 18:18:44 +0900
-Subject: [PATCH] ARM: dts: exynos4: Use drive strength 3 for SD pins
-In-Reply-To: <21831256.UCkQ5RyKd5@amdc1227>
-References: <21831256.UCkQ5RyKd5@amdc1227>
-Message-ID: <0c2f01cdc700$09c204d0$1d460e70$%kim@samsung.com>
+Date: Tue, 20 Nov 2012 18:19:06 +0900
+Subject: [PATCH 0/5] ARM: dts: exynos4210-trats: Device tree extension
+In-Reply-To: <1353336329-20818-1-git-send-email-t.figa@samsung.com>
+References: <1353336329-20818-1-git-send-email-t.figa@samsung.com>
+Message-ID: <0c3101cdc700$1736b0c0$45a41240$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Tomasz Figa wrote:
 > 
-> This patch modifies pin control groups of SD pins on Exynos4210 and
-> Exynos4x12 to use drive strength 3, which corresponds to
-> S5P_GPIO_DRVSTR_LV4 in legacy non-DT code.
+> This patch series extends device tree support for Trats board.
 > 
-Well, the value of drive strength depends on board not SoC. So if required,
-it should be moved to board DT stuff.
+> It adds support for pinctrl, GPIO keys and touchscreen to Trats dts file.
+> 
+> Tested on Trats board.
+> 
+> Depends on:
+> [PATCH] i2c: i2c-s3c2410: Add support for pinctrl
+> [PATCH v2 0/2] mmc: host: sdhci-s3c: Add support for pinctrl interface
+> 
+> Tomasz Figa (5):
+>   ARM: dts: exynos4210-trats: Update for pinctrl-samsung driver
+>   ARM: dts: exynos4210-trats: Add nodes for GPIO keys available on
+>     Trats
+>   ARM: dts: exynos4210-trats: Add node for i2c3 bus
+>   ARM: dts: exynos4210-trats: Add node for touchscreen voltage
+>     regulator
+>   ARM: dts: exynos4210-trats: Add node for touchscreen
+> 
+>  arch/arm/boot/dts/exynos4210-trats.dts | 86 +++++++++++++++++++++++++++--
+> -----
+>  1 file changed, 70 insertions(+), 16 deletions(-)
+> 
+> --
+> 1.8.0
 
-BTW, we can use the value as a default...I need to think about that again
-for exynos4210 and 4x12.
+Looks good to me, applied this whole series.
 
 Thanks.
 
@@ -26,15 +44,3 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-
-> This is needed at least on Origen board for sdhci2 to work.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4210-pinctrl.dtsi | 56 +++++++++++++++-----------
-> -----
->  arch/arm/boot/dts/exynos4x12-pinctrl.dtsi | 56 +++++++++++++++-----------
-> -----
->  2 files changed, 56 insertions(+), 56 deletions(-)
