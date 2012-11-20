@@ -1,94 +1,71 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 20 Nov 2012 17:35:17 -0600
-Subject: [PATCH 06/16] ARM: gic: move register definitions into .c file
-In-Reply-To: <1353448867-15008-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 20 Nov 2012 17:42:47 -0600
+Subject: [PATCH 02/16] arm: add set_handle_irq() to register the parent
+ IRQ controller handler function
+In-Reply-To: <1353448867-15008-3-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1353448867-15008-7-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <50AC13B5.9030900@gmail.com>
+ <1353448867-15008-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <50AC1577.4080007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 11/20/2012 04:00 PM, Thomas Petazzoni wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+> In order to allow irqchip drivers to register their IRQ handling
+> function as the parent IRQ controller handler function, we provide a
+> convenience function. This will avoid poking directly into the global
+> handle_arch_irq variable, and ensures that the user gets warned if
+> we're trying to register a second IRQ controller as the parent one.
 > 
-> There's only 1 user of gic registers outside of gic.c, so move the
-> register definitions into gic.c. For now, keep GIC_DIST_CNT as Tegra
-> uses it.
+> Suggested by Arnd Bergmann.
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  arch/arm/common/gic.c               |   21 ++++++++++++++++++++-
->  arch/arm/include/asm/hardware/gic.h |   18 ------------------
->  2 files changed, 20 insertions(+), 19 deletions(-)
+>  arch/arm/include/asm/mach/irq.h |    1 +
+>  arch/arm/kernel/irq.c           |   10 ++++++++++
+>  2 files changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
+> index 15cb035..18c8830 100644
+> --- a/arch/arm/include/asm/mach/irq.h
+> +++ b/arch/arm/include/asm/mach/irq.h
+> @@ -22,6 +22,7 @@ extern int show_fiq_list(struct seq_file *, int);
+>  
+>  #ifdef CONFIG_MULTI_IRQ_HANDLER
+>  extern void (*handle_arch_irq)(struct pt_regs *);
+> +extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+>  #endif
+>  
+>  /*
+> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+> index 8961650..f135dab 100644
+> --- a/arch/arm/kernel/irq.c
+> +++ b/arch/arm/kernel/irq.c
+> @@ -117,6 +117,16 @@ void __init init_IRQ(void)
+>  	machine_desc->init_irq();
+>  }
+>  
+> +#ifdef CONFIG_MULTI_IRQ_HANDLER
+> +void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
+> +{
+> +	if (WARN_ON(handle_arch_irq))
+> +		return;
 
-We need to drop this patch as Marc Zyngier pointed out to me that KVM
-will need the distributor register definitions as part of the GIC
-distributor emulation. It probably doesn't make sense to move only the
-cpu interface registers.
+I wonder if we should just return silently without warning and rely on
+the top level controller being initialized 1st. For the DT case, this is
+guaranteed. In the non-DT case, we don't really know if we are the
+top-level controller at least in a consistent way. AFAIK, it happens
+that the 1st instance of the VIC or GIC is always the top level and we
+can use that (i.e. gic_nr == 0). However, theoretically you could have a
+VIC connected to a top-level GIC or even vice-versa.
 
 Rob
 
-> 
-> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> index aa52699..55ea0d7 100644
-> --- a/arch/arm/common/gic.c
-> +++ b/arch/arm/common/gic.c
-> @@ -43,7 +43,26 @@
->  #include <asm/exception.h>
->  #include <asm/smp_plat.h>
->  #include <asm/mach/irq.h>
-> -#include <asm/hardware/gic.h>
 > +
-> +#define GIC_CPU_CTRL			0x00
-> +#define GIC_CPU_PRIMASK			0x04
-> +#define GIC_CPU_BINPOINT		0x08
-> +#define GIC_CPU_INTACK			0x0c
-> +#define GIC_CPU_EOI			0x10
-> +#define GIC_CPU_RUNNINGPRI		0x14
-> +#define GIC_CPU_HIGHPRI			0x18
+> +	handle_arch_irq = handle_irq;
+> +}
+> +#endif
 > +
-> +#define GIC_DIST_CTRL			0x000
-> +#define GIC_DIST_CTR			0x004
-> +#define GIC_DIST_ENABLE_SET		0x100
-> +#define GIC_DIST_ENABLE_CLEAR		0x180
-> +#define GIC_DIST_PENDING_SET		0x200
-> +#define GIC_DIST_PENDING_CLEAR		0x280
-> +#define GIC_DIST_ACTIVE_BIT		0x300
-> +#define GIC_DIST_PRI			0x400
-> +#define GIC_DIST_TARGET			0x800
-> +#define GIC_DIST_CONFIG			0xc00
-> +#define GIC_DIST_SOFTINT		0xf00
->  
->  union gic_base {
->  	void __iomem *common_base;
-> diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
-> index 4b1ce6c..8073dce 100644
-> --- a/arch/arm/include/asm/hardware/gic.h
-> +++ b/arch/arm/include/asm/hardware/gic.h
-> @@ -12,25 +12,7 @@
->  
->  #include <linux/compiler.h>
->  
-> -#define GIC_CPU_CTRL			0x00
-> -#define GIC_CPU_PRIMASK			0x04
-> -#define GIC_CPU_BINPOINT		0x08
-> -#define GIC_CPU_INTACK			0x0c
-> -#define GIC_CPU_EOI			0x10
-> -#define GIC_CPU_RUNNINGPRI		0x14
-> -#define GIC_CPU_HIGHPRI			0x18
-> -
-> -#define GIC_DIST_CTRL			0x000
->  #define GIC_DIST_CTR			0x004
-> -#define GIC_DIST_ENABLE_SET		0x100
-> -#define GIC_DIST_ENABLE_CLEAR		0x180
-> -#define GIC_DIST_PENDING_SET		0x200
-> -#define GIC_DIST_PENDING_CLEAR		0x280
-> -#define GIC_DIST_ACTIVE_BIT		0x300
-> -#define GIC_DIST_PRI			0x400
-> -#define GIC_DIST_TARGET			0x800
-> -#define GIC_DIST_CONFIG			0xc00
-> -#define GIC_DIST_SOFTINT		0xf00
->  
->  #ifndef __ASSEMBLY__
->  #include <linux/irqdomain.h>
+>  #ifdef CONFIG_SPARSE_IRQ
+>  int __init arch_probe_nr_irqs(void)
+>  {
 > 
