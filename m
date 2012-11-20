@@ -1,85 +1,37 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 20 Nov 2012 15:05:07 +0100
-Subject: [PATCH 7/7] pinctrl/u300/coh901: stop spawning pinctrl from GPIO
-Message-ID: <1353420307-18204-1-git-send-email-linus.walleij@stericsson.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 20 Nov 2012 22:33:54 +0800
+Subject: [PATCH] ARM: mxs: Add SchulerControl SPS1 DTS file
+In-Reply-To: <1353272909-11360-1-git-send-email-marex@denx.de>
+References: <1353272909-11360-1-git-send-email-marex@denx.de>
+Message-ID: <20121120143353.GD4882@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Sun, Nov 18, 2012 at 10:08:29PM +0100, Marek Vasut wrote:
+> Add DTS file for this custom board.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/boot/dts/imx28-sps1.dts |  169 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mxs/mach-mxs.c     |    7 ++
+>  2 files changed, 176 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx28-sps1.dts
+> 
+Applied with the following change amended.
 
-Let's stop spawning the pinctrl driver from the GPIO driver,
-we have these two mechanisms broken apart now, and they can
-each probe in isolation. If the GPIO driver cannot find its
-pin controller (pinctrl-u300), the pin controller core will
-tell it to defer probing.
+Shawn
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-u300/core.c                    | 2 +-
- drivers/pinctrl/pinctrl-coh901.c             | 6 ------
- include/linux/platform_data/pinctrl-coh901.h | 2 --
- 3 files changed, 1 insertion(+), 9 deletions(-)
-
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index ce2de0d..ece8a2d 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -1445,7 +1445,6 @@ static struct platform_device pinctrl_device = {
- static struct u300_gpio_platform u300_gpio_plat = {
- 	.ports = 7,
- 	.gpio_base = 0,
--	.pinctrl_device = &pinctrl_device,
- };
- 
- static struct platform_device gpio_device = {
-@@ -1589,6 +1588,7 @@ static struct platform_device *platform_devs[] __initdata = {
- 	&i2c1_device,
- 	&keypad_device,
- 	&rtc_device,
-+	&pinctrl_device,
- 	&gpio_device,
- 	&nand_device,
- 	&wdog_device,
-diff --git a/drivers/pinctrl/pinctrl-coh901.c b/drivers/pinctrl/pinctrl-coh901.c
-index 0457430..fbb3715 100644
---- a/drivers/pinctrl/pinctrl-coh901.c
-+++ b/drivers/pinctrl/pinctrl-coh901.c
-@@ -816,11 +816,6 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
- 		goto err_no_chip;
- 	}
- 
--	/* Spawn pin controller device as child of the GPIO */
--	err = platform_device_register(plat->pinctrl_device);
--	if (err)
--		goto err_no_pinctrl;
--
- 	/*
- 	 * Add pinctrl pin ranges, the pin controller must be registered
- 	 * at this point
-@@ -839,7 +834,6 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_no_range:
--err_no_pinctrl:
- 	err = gpiochip_remove(&gpio->chip);
- err_no_chip:
- err_no_domain:
-diff --git a/include/linux/platform_data/pinctrl-coh901.h b/include/linux/platform_data/pinctrl-coh901.h
-index 27a23b3..dfbc65d 100644
---- a/include/linux/platform_data/pinctrl-coh901.h
-+++ b/include/linux/platform_data/pinctrl-coh901.h
-@@ -13,12 +13,10 @@
-  * struct u300_gpio_platform - U300 GPIO platform data
-  * @ports: number of GPIO block ports
-  * @gpio_base: first GPIO number for this block (use a free range)
-- * @pinctrl_device: pin control device to spawn as child
-  */
- struct u300_gpio_platform {
- 	u8 ports;
- 	int gpio_base;
--	struct platform_device *pinctrl_device;
- };
- 
- #endif /* __MACH_U300_GPIO_U300_H */
--- 
-1.7.11.3
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b451a79..73f0a61 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -61,6 +61,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+        imx28-cfa10049.dtb \
+        imx28-evk.dtb \
+        imx28-m28evk.dtb \
++       imx28-sps1.dtb \
+        imx28-tx28.dtb
+ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+        omap3-beagle-xm.dtb \
