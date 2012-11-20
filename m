@@ -1,77 +1,91 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 20 Nov 2012 16:48:18 +0200
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
-References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
- <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
-Message-ID: <50AB9832.90709@ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 20 Nov 2012 14:49:34 +0000
+Subject: [PATCH] ARM: decompressor: Enable unaligned memory access for v6
+ and above
+In-Reply-To: <1352205711-15787-1-git-send-email-dave.martin@linaro.org>
+References: <1352205711-15787-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <20121120144934.GA1969@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Nov 06, 2012 at 12:41:51PM +0000, Dave Martin wrote:
+> Modern GCC can generate code which makes use of the CPU's native
+> unaligned memory access capabilities.  This is useful for the C
+> decompressor implementations used for unpacking compressed kernels.
+> 
+> This patch disables alignment faults and enables the v6 unaligned
+> access model on CPUs which support these features (i.e., v6 and
+> later), allowing full unaligned access support for C code in the
+> decompressor.
+> 
+> The decompressor C code must not be built to assume that unaligned
+> access works if support for v5 or older platforms is included in
+> the kernel.
+> 
+> For correct code generation, C decompressor code must always use
+> the get_unaligned and put_unaligned accessors when dealing with
+> unaligned pointers, regardless of this patch.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
 
-On 2012-11-17 12:55, Alexandre Courbot wrote:
+Does anyone have any further comments on this before I send it to the
+patch system?
 
-A few questions after looking at the documentation:
+Cheers
+---Dave
 
-> +Example
-> +-------
-> +Here are example sequences declared within a backlight device that use all the
-> +supported resources types:
+> ---
+> This is the same as the previous post, with an additional comment
+> in the commit message regarding the use of {get,put}_unaligned,
+> as suggested by Nico.
+> 
+> Tested on ARM1136JF-S (Integrator/CP) and ARM1176JZF-S (RealView
+> PB1176JZF-S).  ARM1176 is like v7 regarding the MIDR and SCTLR
+> alignment control bits, so this tests the v7 code path.
+> 
+>  arch/arm/boot/compressed/head.S |   14 +++++++++++++-
+>  1 files changed, 13 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 90275f0..49ca86e 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -652,6 +652,15 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
+>  		mov	pc, lr
+>  ENDPROC(__setup_mmu)
+>  
+> +@ Enable unaligned access on v6, to allow better code generation
+> +@ for the decompressor C code:
+> +__armv6_mmu_cache_on:
+> +		mrc	p15, 0, r0, c1, c0, 0	@ read SCTLR
+> +		bic	r0, r0, #2		@ A (no unaligned access fault)
+> +		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
+> +		mcr	p15, 0, r0, c1, c0, 0	@ write SCTLR
+> +		b	__armv4_mmu_cache_on
 > +
-> +	backlight {
-> +		compatible = "pwm-backlight";
-> +		...
-> +
-> +		/* resources used by the power sequences */
-> +		pwms = <&pwm 2 5000000>;
-> +		pwm-names = "backlight";
-> +		power-supply = <&backlight_reg>;
-> +
-> +		power-sequences {
-> +			power-on {
-> +				step0 {
-> +					type = "regulator";
-> +					id = "power";
-> +					enable;
-> +				};
-> +				step1 {
-> +					type = "delay";
-> +					delay = <10000>;
-> +				};
-> +				step2 {
-> +					type = "pwm";
-> +					id = "backlight";
-> +					enable;
-> +				};
-> +				step3 {
-> +					type = "gpio";
-> +					gpio = <&gpio 28 0>;
-> +					value = <1>;
-> +				};
-> +			};
-
-I guess there's a reason, but the above looks a bit inconsistent. For
-gpio you define the gpio resource inside the step. For power and pwm the
-resource is defined before the steps. Why wouldn't "pwm = <&pwm 2
-5000000>;" work in step2?
-
-> +When a power sequence is run, its steps is executed one after the other until
-> +one step fails or the end of the sequence is reached.
-
-The document doesn't give any hint of what the driver should do if
-running the power sequence fails. Run the "opposite" power sequence?
-Will that work for all resources? I'm mainly thinking of a case where
-each enable of the resource should be matched by a disable, i.e. you
-can't call disable if no enable was called.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 897 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/95e3ac2a/attachment.sig>
+>  __arm926ejs_mmu_cache_on:
+>  #ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+>  		mov	r0, #4			@ put dcache in WT mode
+> @@ -694,6 +703,9 @@ __armv7_mmu_cache_on:
+>  		bic	r0, r0, #1 << 28	@ clear SCTLR.TRE
+>  		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
+>  		orr	r0, r0, #0x003c		@ write buffer
+> +		bic	r0, r0, #2		@ A (no unaligned access fault)
+> +		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
+> +						@ (needed for ARM1176)
+>  #ifdef CONFIG_MMU
+>  #ifdef CONFIG_CPU_ENDIAN_BE8
+>  		orr	r0, r0, #1 << 25	@ big-endian page tables
+> @@ -914,7 +926,7 @@ proc_types:
+>  
+>  		.word	0x0007b000		@ ARMv6
+>  		.word	0x000ff000
+> -		W(b)	__armv4_mmu_cache_on
+> +		W(b)	__armv6_mmu_cache_on
+>  		W(b)	__armv4_mmu_cache_off
+>  		W(b)	__armv6_mmu_cache_flush
+>  
+> -- 
+> 1.7.4.1
+> 
