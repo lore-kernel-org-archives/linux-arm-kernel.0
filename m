@@ -1,97 +1,94 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Nov 2012 00:12:39 +0100
-Subject: [PATCH v4] Introduce irqchip infrastructure
-In-Reply-To: <50AC065C.7000305@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 20 Nov 2012 17:35:17 -0600
+Subject: [PATCH 06/16] ARM: gic: move register definitions into .c file
+In-Reply-To: <1353448867-15008-7-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <50AC065C.7000305@gmail.com>
-Message-ID: <20121121001239.3ca7a87d@skate>
+ <1353448867-15008-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <50AC13B5.9030900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
-
-On Tue, 20 Nov 2012 16:38:20 -0600, Rob Herring wrote:
-
-> > Remaining issues to solve:
-> > 
-> >  * Russell would like arch/arm/include/asm/hardware/vic.h and
-> >    arch/arm/include/asm/hardware/gic.h to move elsewhere, since the
-> >    corresponding code is no longer in arch/arm/. I can move them in
-> >    <linux/irqchip>, but that will cause a fairly large change as there
-> >    are a big number of users of those headers in arch/arm.
+On 11/20/2012 04:00 PM, Thomas Petazzoni wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> We need to do this. KVM will need the header as well, so we can't move
-> the register definitions out either.
-
-Which register definitions are you talking about? The one from vic.h ?
-
-> >  * The arch/arm/include/asm/hardware/vic.h has a few offset macros
-> >    that should move into the .c file of the irqchip driver, but some
-> >    of those offsets are bizarrely used in some other pieces of code in
-> >    arch/arm/.
+> There's only 1 user of gic registers outside of gic.c, so move the
+> register definitions into gic.c. For now, keep GIC_DIST_CNT as Tegra
+> uses it.
 > 
-> Not really a good solution that I can see there. We could punt on doing
-> the VIC for now.
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  arch/arm/common/gic.c               |   21 ++++++++++++++++++++-
+>  arch/arm/include/asm/hardware/gic.h |   18 ------------------
+>  2 files changed, 20 insertions(+), 19 deletions(-)
 
-Well, most of the VIC macro users are strange. Most of them probably
-need their own macro definition instead of shamelessly borrowing the
-VIC definitions.
+We need to drop this patch as Marc Zyngier pointed out to me that KVM
+will need the distributor register definitions as part of the GIC
+distributor emulation. It probably doesn't make sense to move only the
+cpu interface registers.
 
-> >  * How to get rid entirely of the headers in <linux/irqchip/>. The
-> >    remaining problematic functions are <foo>_handle_irq() and
-> >    <foo>_irq_init() that are used by non-DT platforms. And the special
-> >    case of gic_cascade_irq().
+Rob
+
 > 
-> I have patches for removing vic/gic_handle_irq. It is going to take a
-> while for the others, so I don't think we should wait for that. KVM
-> needs the GIC header anyway.
-
-What is your approach to remove vic/gic_handle_irq? I'll see in your
-patches I guess.
-
-That said, I think that having <linux/irqchip/gic.h> and
-<linux/irqchip/vic.h> for now is not a big problem. What we want to
-avoid is to have gazillions of headers here, but as new platforms are
-DT-capable, those platforms shouldn't need to add a header in
-<linux/irqchip/>, so I think we could live with
-<linux/irqchip/{gic,vic}.h> for a while, and progressively clean
-up/improve what needs to be done. Doing the perfect migration as an
-unique step is going to be difficult.
-
-> >  * Move all the users of gic_of_init() to the irqchip mechanism
-> >    (Exynos, i.MX 6, MSM, OMAP, SH Mobile, socfpga, spear13xx, tegra,
-> >    ux500, vexpress) so that gic_of_init() no longer has to be
-> >    exported.
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index aa52699..55ea0d7 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -43,7 +43,26 @@
+>  #include <asm/exception.h>
+>  #include <asm/smp_plat.h>
+>  #include <asm/mach/irq.h>
+> -#include <asm/hardware/gic.h>
+> +
+> +#define GIC_CPU_CTRL			0x00
+> +#define GIC_CPU_PRIMASK			0x04
+> +#define GIC_CPU_BINPOINT		0x08
+> +#define GIC_CPU_INTACK			0x0c
+> +#define GIC_CPU_EOI			0x10
+> +#define GIC_CPU_RUNNINGPRI		0x14
+> +#define GIC_CPU_HIGHPRI			0x18
+> +
+> +#define GIC_DIST_CTRL			0x000
+> +#define GIC_DIST_CTR			0x004
+> +#define GIC_DIST_ENABLE_SET		0x100
+> +#define GIC_DIST_ENABLE_CLEAR		0x180
+> +#define GIC_DIST_PENDING_SET		0x200
+> +#define GIC_DIST_PENDING_CLEAR		0x280
+> +#define GIC_DIST_ACTIVE_BIT		0x300
+> +#define GIC_DIST_PRI			0x400
+> +#define GIC_DIST_TARGET			0x800
+> +#define GIC_DIST_CONFIG			0xc00
+> +#define GIC_DIST_SOFTINT		0xf00
+>  
+>  union gic_base {
+>  	void __iomem *common_base;
+> diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
+> index 4b1ce6c..8073dce 100644
+> --- a/arch/arm/include/asm/hardware/gic.h
+> +++ b/arch/arm/include/asm/hardware/gic.h
+> @@ -12,25 +12,7 @@
+>  
+>  #include <linux/compiler.h>
+>  
+> -#define GIC_CPU_CTRL			0x00
+> -#define GIC_CPU_PRIMASK			0x04
+> -#define GIC_CPU_BINPOINT		0x08
+> -#define GIC_CPU_INTACK			0x0c
+> -#define GIC_CPU_EOI			0x10
+> -#define GIC_CPU_RUNNINGPRI		0x14
+> -#define GIC_CPU_HIGHPRI			0x18
+> -
+> -#define GIC_DIST_CTRL			0x000
+>  #define GIC_DIST_CTR			0x004
+> -#define GIC_DIST_ENABLE_SET		0x100
+> -#define GIC_DIST_ENABLE_CLEAR		0x180
+> -#define GIC_DIST_PENDING_SET		0x200
+> -#define GIC_DIST_PENDING_CLEAR		0x280
+> -#define GIC_DIST_ACTIVE_BIT		0x300
+> -#define GIC_DIST_PRI			0x400
+> -#define GIC_DIST_TARGET			0x800
+> -#define GIC_DIST_CONFIG			0xc00
+> -#define GIC_DIST_SOFTINT		0xf00
+>  
+>  #ifndef __ASSEMBLY__
+>  #include <linux/irqdomain.h>
 > 
-> I have a patch doing this. I will try to get this sent out today. I've
-> split this into clean-up and then the move, so the clean-up could go in
-> for 3.8. It is only dependent on patch 2.
-
-Ok.
-
-> > Of course, I don't expect any of this to go in 3.8, it is 3.9 material
-> > if we manage to reach a consensus on the remaining issues to solve
-> > (and the other issues that will certainly show up or be raised by
-> > other people).
-> 
-> I still would like to try to get this in for 3.8. If not the move, some
-> of the clean-up.
-
-So the cleanup series for 3.8 would contain:
-
- [PATCH 02/16], needed for the clean up you will send later today
- [PATCH 06/16]
- [PATCH 07/16]
-
-I think all the other ones are directly related to the introduction of
-the irqchip infrastructure, so they most likely cannot be part of 3.8.
-
-So, I can prepare a pull request with 2, 6, 7 and your upcoming clean
-up patch, if you want.
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
