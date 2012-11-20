@@ -1,28 +1,54 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 20 Nov 2012 11:33:25 -0800
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
-References: <20121119144826.f59667b2.akpm@linux-foundation.org>
- <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20121120113325.dde266ed.akpm@linux-foundation.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 20 Nov 2012 12:45:51 -0700
+Subject: [PATCH V3 1/2] clocksource: add common of_clksrc_init() function
+In-Reply-To: <20121120203105.3c54e49f@skate>
+References: <1353439206-1654-1-git-send-email-swarren@wwwdotorg.org>
+ <20121120203105.3c54e49f@skate>
+Message-ID: <50ABDDEF.10403@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Nov 2012 15:31:45 +0100
-Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-
-> dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag,
-> regardless the flags provided by the caller. This causes excessive
-> pruning of emergency memory pools without any good reason. Additionaly,
-> on ARM architecture any driver which is using dmapools will sooner or
-> later  trigger the following error: 
-> "ERROR: 256 KiB atomic DMA coherent pool is too small!
-> Please increase it with coherent_pool= kernel parameter!".
-> Increasing the coherent pool size usually doesn't help much and only
-> delays such error, because all GFP_ATOMIC DMA allocations are always
-> served from the special, very limited memory pool.
+On 11/20/2012 12:31 PM, Thomas Petazzoni wrote:
+> Stephen,
 > 
+> On Tue, 20 Nov 2012 12:20:05 -0700, Stephen Warren wrote:
+> 
+>> It is desirable to move all clocksource drivers to drivers/clocksource,
+>> yet each requires its own initialization function. We'd rather not
+>> pollute <linux/> with a header for each function. Instead, create a
+>> single of_clksrc_init() function which will determine which clocksource
+>> driver to initialize based on device tree.
+...
+> The way I did things for irqchip is a bit different: I used the
+> standard of_irq_init(), which requires a table that is terminated by a
+> sentinel. In order to guarantee that I have a sentinel, I did:
+> 
+> #define IRQCHIP_DECLARE(compstr,fn)                             \
+>         static const struct of_device_id irqchip_of_match       \
+>         __used __section(.init.irqchip)                         \
+>         = { .compatible = compstr, .data = fn }
+> 
+> which is used to declare all irq drivers. But then in the main
+> irqchip.c file, I did:
+> 
+> static const struct of_device_id
+> irqchip_of_match_end __used __section(.init.irqchip.end);
+> 
+> and my linker script looks like:
+> 
+>         .init.irqchip : {
+>                 __irqchip_begin = .;
+>                 *(.init.irqchip)
+>                 *(.init.irqchip.end)
+>         }
+> 
+> So I gather all the of_device_id definitions and then the special
+> sentinel of_device_id. I don't know if it is better than your solution,
+> or even if my solution is good at all.
 
-Is this problem serious enough to justify merging the patch into 3.7? 
-And into -stable kernels?
+That does have the advantage of constructing a single table for all
+irqchips, rather than the approach in my patch was to construct an array
+of pointers to those tables. Your approach is one less loop at runtime,
+and one less sentinel and pointer data item per irqchip. Perhaps I
+should convert mine to do the same thing, unless anyone gives feedback
+against it.
