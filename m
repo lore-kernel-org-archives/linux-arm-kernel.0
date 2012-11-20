@@ -1,43 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 20 Nov 2012 04:49:00 +0000
-Subject: [PATCH 3/4] i2c-s3c2410: use exponential back off while
- polling for bus idle
-In-Reply-To: <1352981613-2098-4-git-send-email-ch.naveen@samsung.com>
-References: <1352981613-2098-1-git-send-email-ch.naveen@samsung.com>
- <1352981613-2098-4-git-send-email-ch.naveen@samsung.com>
-Message-ID: <20121120044859.GA10154@sirena.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 20 Nov 2012 13:53:20 +0900
+Subject: [PATCH v3 0/4] ARM: EXYNOS: Power domain DT support extension
+In-Reply-To: <1552856.8ocEO5iISn@amdc1227>
+References: <1352811115-1198-1-git-send-email-t.figa@samsung.com>
+ <1552856.8ocEO5iISn@amdc1227>
+Message-ID: <0b6e01cdc6da$f6b723e0$e4256ba0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 05:43:32PM +0530, Naveen Krishna Chatradhi wrote:
+Tomasz Figa wrote:
+> 
+> Hi,
+> 
+> On Tuesday 13 of November 2012 13:51:51 Tomasz Figa wrote:
+> > This patch series fixes two issues with existing DT support for Exynos
+> > power domains and extends it with the ability of binding devices to
+> > domains, basically making it possible to use power domains with DT.
+> >
+> > Based on for-next branch of Kgene's tree.
+> >
+> > Changes since v2:
+> >  - Rebased to for-next of Kgene's tree.
+> > Changes since v1:
+> >  - Added "samsung," prefix to "power-domain" property.
+> >  - Added power domain nodes to Exynos4 device tree sources.
+> >
+> > Tomasz Figa (4):
+> >   ARM: EXYNOS: pm_domain: Detect domain state on registration from DT
+> >   ARM: EXYNOS: pm_domain: Fix power domain name initialization
+> >   ARM: EXYNOS: pm_domain: Bind devices to power domains using DT
+> >   ARM: dts: exynos4: Set up power domains
+> >
+> >  .../bindings/arm/exynos/power_domain.txt           | 15 +++-
+> >  arch/arm/boot/dts/exynos4.dtsi                     | 30 +++++++
+> >  arch/arm/boot/dts/exynos4210.dtsi                  |  5 ++
+> >  arch/arm/mach-exynos/pm_domains.c                  | 93
+> > +++++++++++++++++++++- 4 files changed, 135 insertions(+), 8
+> > deletions(-)
+> 
+> Sorry, please disregard this series, as I have sent wrong version by
+> mistake.
+> 
+> I will send correct one later.
+> 
+OK.
 
-> +	iicstat = readl(i2c->regs + S3C2410_IICSTAT);
-> +	delay = 1;
-> +	while ((iicstat & S3C2410_IICSTAT_START) &&
-> +	       ktime_us_delta(now, start) < S3C2410_IDLE_TIMEOUT) {
-> +		usleep_range(delay, 2 * delay);
-> +		if (delay < S3C2410_IDLE_TIMEOUT / 10)
-> +			delay <<= 1;
-> +		now = ktime_get();
-> +		iicstat = readl(i2c->regs + S3C2410_IICSTAT);
-> +	}
+Thanks.
 
-> -	/* first, try busy waiting briefly */
-> -	do {
-> -		cpu_relax();
-> -		iicstat = readl(i2c->regs + S3C2410_IICSTAT);
-> -	} while ((iicstat & S3C2410_IICSTAT_START) && --spins);
-
-On the hardware I was using when I wrote the original code here we were
-hitting 1-2 spins often enough to be interesting - starting off with a
-direct busy wait was definitely useful when doing large batches of I/O,
-especially compared to sleeps which might cause us to schedule.
-
-> -	/* if that timed out sleep */
-> -	if (!spins) {
-> -		msleep(1);
-> -		iicstat = readl(i2c->regs + S3C2410_IICSTAT);
-> -	}
-
-It seems like it'd be better to do the exponential backoff bit here
-instead of removing the busy wait completely.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
