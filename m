@@ -1,40 +1,17 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Nov 2012 13:23:42 +0000
-Subject: [PATCH 207/493] i2c: remove use of __devinit
-In-Reply-To: <20121120092046.24496415@endymion.delvare>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-207-git-send-email-wfp5p@virginia.edu>
- <20121120092046.24496415@endymion.delvare>
-Message-ID: <20121120132342.GP3332@n2100.arm.linux.org.uk>
+From: bevenson@melinkcorp.com (Bryan Evenson)
+Date: Tue, 20 Nov 2012 08:37:20 -0500
+Subject: Help building 3.x kernel for AT91SAM9x5
+Message-ID: <91586D499ADFD74FBCFB8425266A5DE40137631A48C0@pluto.melinkcorp.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 09:20:46AM +0100, Jean Delvare wrote:
-> Hi Bill,
-> 
-> On Mon, 19 Nov 2012 13:22:36 -0500, Bill Pemberton wrote:
-> > CONFIG_HOTPLUG is going away as an option so __devinit is no longer
-> > needed.
-> 
-> Can you please point me/us to the discussion explaining the rationale
-> behind this move, and the explanation of what will be done exactly?
-> While I can easily understand that we want to drop CONFIG_HOTPLUG and
-> always enable hot-plug support, I don't see where we are going with
-> removing __devinit annotations and the like.
+All,
 
-It's actually very simple to understand.
+I have a AT91SAM9G25 board that I have been using with the 2.6.39 kernel and the Atmel supported patches for this kernel using the classic Open Embedded development tree.  I need to move to a 3.x kernel to incorporate the AT91 ADC driver and the bug fixes for the RS-485 interface (so I would probably need 3.5 or later).  However, all attempts I have made at building a 3.x kernel for the AT91SAM9G25 have failed to produce a bootable kernel image.  I have tried modifying the OE kernel recipe to utilize a 3.x kernel and I have tried using the Yocto Project tools to build a custom BSP, both of which have failed no matter how I tweak the setup.  Each attempt ends in the same results; U-Boot unpacks the kernel, jumps to the start of the kernel and then the system hangs.  I am looking for assistance in getting a 3.x kernel booting on this device.  I have tried getting help from the Atmel Linux forums and the Yocto Project forums and have not yet had success, so I decided to move closer to the source.
 
-1. CONFIG_HOTPLUG is going away; it's already defined to always be 'Y'.
-2. This means that the the devinit sections will not be discarded anymore.
-3. As a result, there's no point the devinit sections existing anymore.
-4. As there's no devinit sections, the __devinit marker is entirely
-   redundant and useless.
+If anyone can offer assistance in getting a bootable 3.x kernel for the AT91SAM9G25 I would greatly appreciate it.  I would prefer pointers in how to modify a Bitbake kernel recipe for use with OE or the Yocto Project, but instructions on how to build this kernel with CodeSourcery would also be helpful.
 
-The reason this is being done is because the benefit to cost ratio of this
-is far too high; it's well proven that people constantly get these markings
-wrong, and with most kernels having had hotplug enabled anyway, it's not
-providing much in the way of space saving benefit over the number of section
-conflicts it causes.  So, it's been decided a few years ago that this is
-going to happen, with that justification, and it's been accepted by 300
-odd kernel developers in at least one kernel summit when it was talked
-about... and it's been mentioned on mailing lists several times.
+Once I get my system up and running, if there SAM9x5 kernel features that need to be tested I would gladly help with testing.
+
+Thanks,
+Bryan Evenson
