@@ -1,60 +1,33 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Nov 2012 23:01:04 +0100
-Subject: [PATCH 13/16] ARM: spear6xx: use common irqchip_init
+Date: Tue, 20 Nov 2012 23:01:05 +0100
+Subject: [PATCH 14/16] arm: vic: don't expose vic_of_init() anymore
 In-Reply-To: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353448867-15008-14-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353448867-15008-15-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a common irqchip infrastructure, use it on the
-spear6xx platform:
-
- * Use irqchip_init() as the ->irq_init() machine function. The
-   irqchip infrastructure already knows about the compatible strings
-   for the VIC IRQ controller driver.
-
- * No longer needed to set ->handle_irq() in the machine structure, as
-   it will be set by the VIC IRQ controller driver.
+All users of vic_of_init() have been converted to the irqchip
+infrastructure, and all future users should go through this new
+infrastructure. Therefore, we no longer expose the vic_of_init()
+function through the vic.h header.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-spear6xx/spear6xx.c |   14 ++------------
- 1 file changed, 2 insertions(+), 12 deletions(-)
+ arch/arm/include/asm/hardware/vic.h |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index 5a5a52d..1892b64 100644
---- a/arch/arm/mach-spear6xx/spear6xx.c
-+++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -16,6 +16,7 @@
- #include <linux/amba/pl08x.h>
- #include <linux/clk.h>
- #include <linux/err.h>
-+#include <linux/irqchip.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-@@ -425,20 +426,9 @@ static const char *spear600_dt_board_compat[] = {
- 	NULL
- };
+diff --git a/arch/arm/include/asm/hardware/vic.h b/arch/arm/include/asm/hardware/vic.h
+index e14af1a..3b2e881 100644
+--- a/arch/arm/include/asm/hardware/vic.h
++++ b/arch/arm/include/asm/hardware/vic.h
+@@ -50,7 +50,6 @@ struct pt_regs;
+ void __vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources,
+ 		u32 resume_sources, struct device_node *node);
+ void vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources, u32 resume_sources);
+-int vic_of_init(struct device_node *node, struct device_node *parent);
+ void vic_handle_irq(struct pt_regs *regs);
  
--static const struct of_device_id vic_of_match[] __initconst = {
--	{ .compatible = "arm,pl190-vic", .data = vic_of_init, },
--	{ /* Sentinel */ }
--};
--
--static void __init spear6xx_dt_init_irq(void)
--{
--	of_irq_init(vic_of_match);
--}
--
- DT_MACHINE_START(SPEAR600_DT, "ST SPEAr600 (Flattened Device Tree)")
- 	.map_io		=	spear6xx_map_io,
--	.init_irq	=	spear6xx_dt_init_irq,
--	.handle_irq	=	vic_handle_irq,
-+	.init_irq	=	irqchip_init,
- 	.timer		=	&spear6xx_timer,
- 	.init_machine	=	spear600_dt_init,
- 	.restart	=	spear_restart,
+ #endif /* __ASSEMBLY__ */
 -- 
 1.7.9.5
