@@ -1,39 +1,49 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 20 Nov 2012 09:43:06 +0900
-Subject: [GIT PULL v2] Renesas ARM-based SoC boards for v3.8 #3
-Message-ID: <1353372187-2903-1-git-send-email-horms@verge.net.au>
+From: josh.cartwright@gmail.com (Josh Cartwright)
+Date: Mon, 19 Nov 2012 18:50:36 -0600
+Subject: [PATCH V2 2/2] ARM: tegra: move timer.c to drivers/clocksource/
+In-Reply-To: <1353371237-2482-2-git-send-email-swarren@wwwdotorg.org>
+References: <1353371237-2482-1-git-send-email-swarren@wwwdotorg.org>
+ <1353371237-2482-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20121120005036.GA6280@kryptos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+On Mon, Nov 19, 2012 at 05:27:17PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Move arch/arm/mach-tegra/timer.c to drivers/clocksource/tegra20_timer.c
+> so that the code is co-located with other clocksource drivers, and to
+> reduce the size of the mach-tegra directory.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> v2: Rebase on ARM sys_timer rework, and addition of clocksource_of_init().
+[..]
+> diff --git a/drivers/clocksource/clksrc-of.c b/drivers/clocksource/clksrc-of.c
+> index aeec8d2..328d18f 100644
+> --- a/drivers/clocksource/clksrc-of.c
+> +++ b/drivers/clocksource/clksrc-of.c
+> @@ -20,6 +20,10 @@
+>  #include "clksrc-of.h"
+>  
+>  static const struct of_device_id clksrc_of_match[] __initconst = {
+> +	{
+> +		.compatible = "nvidia,tegra20-timer",
+> +		.data = tegra20_init_timer,
+> +	},
 
-Please consider the following board fix for 3.8.
+Shouldn't this be wrapped in #if ARCH_TEGRA?
 
-The commit message for the patch has been revised since yesterday's
-pull-request.
+I had suggested this with Thomas Petazzoni's consolidated irq_chip patch
+as well:
 
-Also, please let me know if you would prefer me to supply
-this as a fixes branch as we are now in the 3.7-rc6 timeframe
-where I understand that non-fix commits are no longer allowed for 3.8.
+It seems like it would be a bit cleaner/easier to maintain if we relied
+on the linker to stitch together a clksrc_of_match table, based on what
+clocksources are being built into the image.  With that approach, at
+least, a public initialization header wouldn't have to be exposed, and
+this central table wouldn't have to be maintained (as more clocksrcs are
+added, I forsee [admittedly trivial] merge conflicts).
 
-This commit is based on the renesas/boards2 branch of the arm-soc tree.
+Thoughts?
 
-----------------------------------------------------------------
-The following changes since commit 12818d82ccad9868a820dbb193b4f9b797cd02d4:
-
-  ARM: shmobile: use FSI driver's audio clock on ap4evb (2012-11-08 17:52:05 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git boards3
-
-for you to fetch changes up to 3042ac5731e6db441dfce85612da4aa3913dab3b:
-
-  ARM: shmobile: mackerel: Add FLCTL IRQ resource (2012-11-20 09:14:43 +0900)
-
-----------------------------------------------------------------
-Bastian Hecht (1):
-      ARM: shmobile: mackerel: Add FLCTL IRQ resource
-
- arch/arm/mach-shmobile/board-mackerel.c |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+   Josh
