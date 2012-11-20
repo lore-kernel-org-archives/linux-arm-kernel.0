@@ -1,87 +1,76 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 20 Nov 2012 07:58:34 -0500
-Subject: [PATCH v5 3/8] watchdog: orion_wdt: add timeout-sec property
- binding
-In-Reply-To: <CAHkwnC-2MXtNODnqjOvFuHt7ToqvMqeDjnqdGyGfMacKBWzoLw@mail.gmail.com>
-References: <1353334243-16703-1-git-send-email-fabio.porcedda@gmail.com>
- <1353334243-16703-4-git-send-email-fabio.porcedda@gmail.com>
- <20121119160643.GI22106@titan.lakedaemon.net>
- <CAHkwnC-2MXtNODnqjOvFuHt7ToqvMqeDjnqdGyGfMacKBWzoLw@mail.gmail.com>
-Message-ID: <20121120125834.GU22106@titan.lakedaemon.net>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 20 Nov 2012 14:46:04 +0100
+Subject: [PATCH 1/3] can: c_can: Add d_can raminit support
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA771E9@DBDE01.ent.ti.com>
+References: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
+ <1352916505-12343-2-git-send-email-anilkumar@ti.com>
+ <50AB6081.9060701@pengutronix.de>
+ <331ABD5ECB02734CA317220B2BBEABC13EA771E9@DBDE01.ent.ti.com>
+Message-ID: <50AB899C.3040701@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 01:50:46PM +0100, Fabio Porcedda wrote:
-> On Mon, Nov 19, 2012 at 5:06 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > On Mon, Nov 19, 2012 at 03:10:38PM +0100, Fabio Porcedda wrote:
-> >> Only compile tested.
-> >>
-> >> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
-> >> Cc: Jason Cooper <jason@lakedaemon.net>
-> >> Cc: Andrew Lunn <andrew@lunn.ch>
-> >> ---
-> >>  Documentation/devicetree/bindings/watchdog/marvel.txt | 5 +++++
-> >>  drivers/watchdog/orion_wdt.c                          | 8 +++-----
-> >>  2 files changed, 8 insertions(+), 5 deletions(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/watchdog/marvel.txt b/Documentation/devicetree/bindings/watchdog/marvel.txt
-> >> index 0b2503a..5dc8d30 100644
-> >> --- a/Documentation/devicetree/bindings/watchdog/marvel.txt
-> >> +++ b/Documentation/devicetree/bindings/watchdog/marvel.txt
-> >> @@ -5,10 +5,15 @@ Required Properties:
-> >>  - Compatibility : "marvell,orion-wdt"
-> >>  - reg                : Address of the timer registers
-> >>
-> >> +Optional properties:
-> >> +
-> >> +- timeout-sec        : Contains the watchdog timeout in seconds
-> >> +
-> >>  Example:
-> >>
-> >>       wdt at 20300 {
-> >>               compatible = "marvell,orion-wdt";
-> >>               reg = <0x20300 0x28>;
-> >> +             timeout-sec = <10>;
-> >>               status = "okay";
-> >>       };
-> >> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-> >> index c20f96b..446a3e9 100644
-> >> --- a/drivers/watchdog/orion_wdt.c
-> >> +++ b/drivers/watchdog/orion_wdt.c
-> >> @@ -162,12 +162,10 @@ static int __devinit orion_wdt_probe(struct platform_device *pdev)
-> >>
-> >>       wdt_max_duration = WDT_MAX_CYCLE_COUNT / wdt_tclk;
-> >>
-> >> -     if ((heartbeat < 1) || (heartbeat > wdt_max_duration))
-> >> -             heartbeat = wdt_max_duration;
-> >> -
-> >> -     orion_wdt.timeout = heartbeat;
-> >>       orion_wdt.min_timeout = 1;
-> >> +     orion_wdt.timeout = wdt_max_duration;
-> >>       orion_wdt.max_timeout = wdt_max_duration;
-> >> +     watchdog_init_timeout(&orion_wdt, heartbeat, pdev->dev.of_node);
-> >
-> > Hi Fabio,
-> >
-> > There are many boards using pdata, !CONFIG_OF.  Have you compile-tested
-> > this without CONFIG_OF?
-> 
-> Hi Jason,
-> 
-> I've tested with and without the CONFIG_OF define.
-> 
-> The first time I?ve used the kirkwood_defconfig without modifications,
-> the second time I?ve enabled only the CONFIG_MACH_SHEEVAPLUG and
-> disabled USE_OF.
-> 
-> In both cases the orion_wdt driver compile without any warning.
-> 
-> Thanks for the review.
+On 11/20/2012 02:05 PM, AnilKumar, Chimata wrote:
+[...]
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+>>>  static struct platform_device_id c_can_id_table[] = {
+>>>  	[BOSCH_C_CAN_PLATFORM] = {
+>>>  		.name = KBUILD_MODNAME,
+>>> @@ -99,7 +119,7 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
+>>>  	const struct of_device_id *match;
+>>>  	const struct platform_device_id *id;
+>>>  	struct pinctrl *pinctrl;
+>>> -	struct resource *mem;
+>>> +	struct resource *mem, *res;
+>>>  	int irq;
+>>>  	struct clk *clk;
+>>>  
+>>> @@ -178,6 +198,18 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
+>>>  		priv->can.ctrlmode_supported |= CAN_CTRLMODE_3_SAMPLES;
+>>>  		priv->read_reg = c_can_plat_read_reg_aligned_to_16bit;
+>>>  		priv->write_reg = c_can_plat_write_reg_aligned_to_16bit;
+>>> +
+>>> +		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+>>> +		priv->raminit_ctrlreg =
+>>> +				devm_request_and_ioremap(&pdev->dev, res);
+>>
+>> What happens if there isn't a second IORESOURCE_MEM region? devm_request
+>> will print an error in this case and any other error, too [1]. Do we
+>> need streamlining here?
+>>
+>> [1] http://lxr.free-electrons.com/source/drivers/base/platform.c#L59
+> 
+> I did not get what the point is.
+> 
+> In most of the cases above two API's returns NULL. Even res is NULL
+> nothing to worry, first condition in devm_request_and_ioremap() is
+> NULL pointer check of res. If "res" is NULL then devm_xx will return
+> NULL which result into printing of below warning.
+> 
+>>
+>>> +		if (!priv->raminit_ctrlreg)
+>>> +			dev_warn(&pdev->dev, "failed to obtain control memory\n");
+> 
+> I will change this warning to info
+> 
+> if (!priv->raminit_ctrlreg)
+> 	dev_info(&pdev->dev, "control memory is not used for raminit\n");
 
-for the orion_wdt bits.
+That's more descriptive, good.
 
-thx,
+Marc
 
-Jason.
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/3669f037/attachment.sig>
