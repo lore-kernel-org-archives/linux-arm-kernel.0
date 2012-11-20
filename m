@@ -1,38 +1,76 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 20 Nov 2012 13:41:16 +0100
-Subject: [PATCH 1/3] ARM: zynq: remove TTC early mapping
-In-Reply-To: <1443f143846f22125e3d6631cf3a2fdf75d925d3.1353349191.git.josh.cartwright@ni.com>
-References: <cover.1353349191.git.josh.cartwright@ni.com>
- <1443f143846f22125e3d6631cf3a2fdf75d925d3.1353349191.git.josh.cartwright@ni.com>
-Message-ID: <CAHTX3dK2AEGh72XMuPSyBCV1sdM6jDvdiyPdh5VGXhTnwOqWTA@mail.gmail.com>
+From: prakash.pm@ti.com (Manjunathappa)
+Date: Tue, 20 Nov 2012 18:11:01 +0530
+Subject: [PATCH] video: da8xx-fb: clk_get on connection id fck
+Message-ID: <1353415261-30080-1-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/11/19 Josh Cartwright <josh.cartwright@ni.com>:
-> Now that the TTC driver has proper support for DT bindings, it is not
-> necessary for the registers to be mapped early.  They will be mapped
-> during clock initialization using of_iomap().  Remove the early mapping.
->
-> In addition, remove the extraneous zynq_soc.h include from the timer
-> driver.
->
-> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
-> ---
->  arch/arm/mach-zynq/common.c                | 5 -----
->  arch/arm/mach-zynq/include/mach/zynq_soc.h | 6 +-----
->  arch/arm/mach-zynq/timer.c                 | 1 -
->  3 files changed, 1 insertion(+), 11 deletions(-)
+do clk_get on connection id "fck" to support OMAP based
+platforms having multiple clocks for module. Without this
+driver change clk_get fails on am335x.
 
-Tested-by: Michal Simek <michal.simek@xilinx.com>
+This patch is based on the discussion in community
+http://marc.info/?l=linux-kernel&m=135166018907827&w=2
 
-Applied to xilinx arm-next branch.
+Signed-off-by: Manjunathappa <prakash.pm@ti.com>
+Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+---
+ arch/arm/mach-davinci/da830.c     |    2 +-
+ arch/arm/mach-davinci/da850.c     |    2 +-
+ arch/arm/mach-davinci/pm_domain.c |    1 +
+ drivers/video/da8xx-fb.c          |    2 +-
+ 4 files changed, 4 insertions(+), 3 deletions(-)
 
-Thanks,
-Michal
-
-
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index deee5c2..ee8504f 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -408,7 +408,7 @@ static struct clk_lookup da830_clks[] = {
+ 	CLK(NULL,		"pwm2",		&pwm2_clk),
+ 	CLK("eqep.0",		NULL,		&eqep0_clk),
+ 	CLK("eqep.1",		NULL,		&eqep1_clk),
+-	CLK("da8xx_lcdc.0",	NULL,		&lcdc_clk),
++	CLK("da8xx_lcdc.0",	"fck",		&lcdc_clk),
+ 	CLK("davinci-mcasp.0",	NULL,		&mcasp0_clk),
+ 	CLK("davinci-mcasp.1",	NULL,		&mcasp1_clk),
+ 	CLK("davinci-mcasp.2",	NULL,		&mcasp2_clk),
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index b44dc84..bc75bdd 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -389,7 +389,7 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK(NULL,		"rmii",		&rmii_clk),
+ 	CLK("davinci_emac.1",	NULL,		&emac_clk),
+ 	CLK("davinci-mcasp.0",	NULL,		&mcasp_clk),
+-	CLK("da8xx_lcdc.0",	NULL,		&lcdc_clk),
++	CLK("da8xx_lcdc.0",	"fck",		&lcdc_clk),
+ 	CLK("davinci_mmc.0",	NULL,		&mmcsd0_clk),
+ 	CLK("davinci_mmc.1",	NULL,		&mmcsd1_clk),
+ 	CLK(NULL,		"aemif",	&aemif_clk),
+diff --git a/arch/arm/mach-davinci/pm_domain.c b/arch/arm/mach-davinci/pm_domain.c
+index 00946e2..c90250e 100644
+--- a/arch/arm/mach-davinci/pm_domain.c
++++ b/arch/arm/mach-davinci/pm_domain.c
+@@ -53,6 +53,7 @@ static struct dev_pm_domain davinci_pm_domain = {
+ 
+ static struct pm_clk_notifier_block platform_bus_notifier = {
+ 	.pm_domain = &davinci_pm_domain,
++	.con_ids = { "fck", NULL, },
+ };
+ 
+ static int __init davinci_pm_runtime_init(void)
+diff --git a/drivers/video/da8xx-fb.c b/drivers/video/da8xx-fb.c
+index f0f21c8..bb68533 100644
+--- a/drivers/video/da8xx-fb.c
++++ b/drivers/video/da8xx-fb.c
+@@ -1248,7 +1248,7 @@ static int __devinit fb_probe(struct platform_device *device)
+ 		goto err_request_mem;
+ 	}
+ 
+-	fb_clk = clk_get(&device->dev, NULL);
++	fb_clk = clk_get(&device->dev, "fck");
+ 	if (IS_ERR(fb_clk)) {
+ 		dev_err(&device->dev, "Can not get device clock\n");
+ 		ret = -ENODEV;
 -- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+1.7.9.5
