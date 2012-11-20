@@ -1,131 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 20 Nov 2012 16:38:20 -0600
-Subject: [PATCH v4] Introduce irqchip infrastructure
-In-Reply-To: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <50AC065C.7000305@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 20 Nov 2012 23:39:09 +0100
+Subject: [PATCH 075/493] mfd: remove use of __devexit_p
+In-Reply-To: <1353349642-3677-75-git-send-email-wfp5p@virginia.edu>
+References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
+ <1353349642-3677-75-git-send-email-wfp5p@virginia.edu>
+Message-ID: <CACRpkdbzOUAwt4SB5DSKaCpWOMx1FJc8M8Ej-adpu+jzH3dO9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2012 04:00 PM, Thomas Petazzoni wrote:
-> Hello,
-> 
-> Here is a set of patches that introduces a small irqchip
-> infrastructure that allows the registration of irqchip drivers without
-> having each of those drivers to expose a public API and header in
-> include/linux/irqchip/, and moves a number of existing irqchip
-> controller to this infrastructure.
-> 
-> This new version (detailed changelog below) provides a number of
-> improvements: usage of a special link section to avoid the central
-> registration in irqchip.{c,h} of all irqchip drivers, and addition of
-> the GIC, VIC and Versatile FPGA IRQ drivers move, thanks to Rob
-> Herring and Linus Walleij.
-> 
-> Remaining issues to solve:
-> 
->  * Russell would like arch/arm/include/asm/hardware/vic.h and
->    arch/arm/include/asm/hardware/gic.h to move elsewhere, since the
->    corresponding code is no longer in arch/arm/. I can move them in
->    <linux/irqchip>, but that will cause a fairly large change as there
->    are a big number of users of those headers in arch/arm.
+On Mon, Nov 19, 2012 at 7:20 PM, Bill Pemberton <wfp5p@virginia.edu> wrote:
 
-We need to do this. KVM will need the header as well, so we can't move
-the register definitions out either.
+> CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
+> needed.
+>
+> Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
+> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> Cc: Peter Tyser <ptyser@xes-inc.com>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: device-drivers-devel at blackfin.uclinux.org
+> Cc: patches at opensource.wolfsonmicro.com
+> Cc: linux-arm-msm at vger.kernel.org
 
->  * The arch/arm/include/asm/hardware/vic.h has a few offset macros
->    that should move into the .c file of the irqchip driver, but some
->    of those offsets are bizarrely used in some other pieces of code in
->    arch/arm/.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Not really a good solution that I can see there. We could punt on doing
-the VIC for now.
-
-> 
->  * How to get rid entirely of the headers in <linux/irqchip/>. The
->    remaining problematic functions are <foo>_handle_irq() and
->    <foo>_irq_init() that are used by non-DT platforms. And the special
->    case of gic_cascade_irq().
-
-I have patches for removing vic/gic_handle_irq. It is going to take a
-while for the others, so I don't think we should wait for that. KVM
-needs the GIC header anyway.
-
->  * Move all the users of gic_of_init() to the irqchip mechanism
->    (Exynos, i.MX 6, MSM, OMAP, SH Mobile, socfpga, spear13xx, tegra,
->    ux500, vexpress) so that gic_of_init() no longer has to be
->    exported.
-
-I have a patch doing this. I will try to get this sent out today. I've
-split this into clean-up and then the move, so the clean-up could go in
-for 3.8. It is only dependent on patch 2.
-
-> Of course, I don't expect any of this to go in 3.8, it is 3.9 material
-> if we manage to reach a consensus on the remaining issues to solve
-> (and the other issues that will certainly show up or be raised by
-> other people).
-
-I still would like to try to get this in for 3.8. If not the move, some
-of the clean-up.
-
-Rob
-
-> 
-> This series has been built and boot tested for BCM2835 and Armada
-> XP. It has been built tested on Versatile with OF and without OF,
-> spear3xx, spear6xx and a multi_v6_v7 configuration with all possible
-> architectures enabled (therefore including picoxcell).
-> 
-> Changes since v3:
-> 
->  * Switch to a link-trick based registration of the irqchip drivers,
->    using the IRQCHIP_DECLARE() macro.
-> 
->  * Integrate Rob Herring's patches to move the GIC and VIC irq
->    controller drivers in drivers/irqchip/.
-> 
->  * Migrate picoxcell, spear3xx and spear6xx to using the irqchip
->    platform, so that no direct user of vic_of_init() remains.
-> 
->  * Don't export vic_of_init() anymore: all users go through
->    irqchip_init() now.
-> 
->  * Integrate Linus Walleij patch that moves the Versatile FPGA irq
->    controller driver to drivers/irqchip.
-> 
->  * A set_handle_irq() ARM function was added to properly set the
->    handle_arch_irq pointer to the right handler of the parent IRQ
->    controller.
-> 
-> Changes since v2:
-> 
->  * Fixed the entry in the MAINTAINERS file. Noticed by Rob Herring.
-> 
->  * Simplified the Kconfig logic by making the IRQCHIP option enabled
->    by default as soon as OF_IRQ is enabled. The individual ARCH_<foo>
->    Kconfig options no longer have to select IRQCHIP. Also, the option
->    was renamed from USE_IRQCHIP to just IRQCHIP. Suggested by Rob
->    Herring.
-> 
->  * Added Reviewed-by tags given by Rob Herring.
-> 
-> Changes since v1:
-> 
->  * Add a new patch mentionning the drivers/irqchip in the list of
->    directories part of the IRQ subsystem maintained by Thomas Gleixner
->    in the MAINTAINERS file. Requested by Arnd Bergmann.
-> 
->  * Reduce the amount of code movement in the irq-bcm2835.c and
->    irq-armada-370-xp.c files by using one forward declaration for the
->    IRQ handling entry point. Requested by Stephen Warren.
-> 
->  * Rename the armctrl_of_init() function to bcm2835_irqchip_init() as
->    requested by Stephen Warren.
-> 
->  * Added the formal Acked-by and Reviewed-by received from Stephen
->    Warren.
-> 
-> Thanks,
-> 
-> Thomas
-> 
+Yours,
+Linus Walleij
