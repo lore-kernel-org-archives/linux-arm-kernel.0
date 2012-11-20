@@ -1,227 +1,247 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Nov 2012 15:31:15 +0100
-Subject: [PATCH 7/8] ARM: dove: switch to DT clock providers
+Date: Tue, 20 Nov 2012 15:31:16 +0100
+Subject: [PATCH 8/8] ARM: Kirkwood: switch to DT clock providers
 In-Reply-To: <1353421876-13759-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353421876-13759-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353421876-13759-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353421876-13759-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+From: Andrew Lunn <andrew@lunn.ch>
 
-With true DT clock providers available switch Dove clock setup in DT-
-enabled boards. While AUXDATA can be removed completely from bus probing,
-some devices still don't know about DT at all. Therefore, some clock
-aliases are created until the devices also move to DT.
+With true DT clock providers available switch Kirkwood clock setup in
+DT- enabled boards. While AUXDATA can be removed completely from bus
+probing, some devices still don't know about DT. Therefore, some clkdev
+aliases are created until these devices also move to DT.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/Kconfig            |    1 +
- arch/arm/boot/dts/dove.dtsi |   20 ++++++++++++++
- arch/arm/mach-dove/Kconfig  |    2 ++
- arch/arm/mach-dove/common.c |   63 ++++++++++++++++++++++++++++++++-----------
- 4 files changed, 71 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/kirkwood.dtsi           |   22 +++++++++
+ arch/arm/mach-kirkwood/Kconfig            |    2 +
+ arch/arm/mach-kirkwood/board-dt.c         |   71 +++++++++++++++++++++++------
+ arch/arm/plat-orion/include/plat/common.h |    1 +
+ 4 files changed, 83 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ade7e92..0590099 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -533,6 +533,7 @@ config ARCH_IXP4XX
- config ARCH_DOVE
- 	bool "Marvell Dove"
- 	select ARCH_REQUIRE_GPIOLIB
-+	select COMMON_CLK_DOVE
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select MIGHT_HAVE_PCI
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 5a00022..b524ee3 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -31,6 +31,19 @@
- 			reg = <0x20204 0x04>, <0x20214 0x04>;
- 		};
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 4e5b815..7a9fac0 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -19,6 +19,12 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
  
-+		core_clk: core-clocks at d0214 {
-+			compatible = "marvell,dove-core-clock";
-+			reg = <0xd0214 0x4>;
-+			#clock-cells = <1>;
++		core_clk: core-clocks at 10030 {
++			compatible = "marvell,kirkwood-core-clock";
++			reg = <0x10030 0x4>;
++	        	#clock-cells = <1>;
 +		};
 +
-+		gate_clk: clock-gating-control at d0038 {
-+			compatible = "marvell,dove-gating-clock";
-+			reg = <0xd0038 0x4>;
-+			clocks = <&core_clk 0>;
-+			#clock-cells = <1>;
-+		};
-+
- 		uart0: serial at 12000 {
- 			compatible = "ns16550a";
+ 		gpio0: gpio at 10100 {
+ 			compatible = "marvell,orion-gpio";
+ 			#gpio-cells = <2>;
+@@ -42,6 +48,7 @@
  			reg = <0x12000 0x100>;
-@@ -100,6 +113,7 @@
+ 			reg-shift = <2>;
+ 			interrupts = <33>;
++			clocks = <&gate_clk 7>;
+ 			/* set clock-frequency in board dts */
+ 			status = "disabled";
+ 		};
+@@ -51,6 +58,7 @@
+ 			reg = <0x12100 0x100>;
+ 			reg-shift = <2>;
+ 			interrupts = <34>;
++			clocks = <&gate_clk 7>;
+ 			/* set clock-frequency in board dts */
+ 			status = "disabled";
+ 		};
+@@ -68,12 +76,21 @@
  			cell-index = <0>;
- 			interrupts = <6>;
+ 			interrupts = <23>;
  			reg = <0x10600 0x28>;
++			clocks = <&gate_clk 7>;
+ 			status = "disabled";
+ 		};
+ 
++		gate_clk: clock-gating-control at 2011c {
++			compatible = "marvell,kirkwood-gating-clock";
++			reg = <0x2011c 0x4>;
 +			clocks = <&core_clk 0>;
- 			status = "disabled";
++			#clock-cells = <1>;
++		};
++
+ 		wdt at 20300 {
+ 			compatible = "marvell,orion-wdt";
+ 			reg = <0x20300 0x28>;
++			clocks = <&gate_clk 7>;
+ 			status = "okay";
  		};
  
-@@ -110,6 +124,7 @@
- 			cell-index = <1>;
- 			interrupts = <5>;
- 			reg = <0x14600 0x28>;
-+			clocks = <&core_clk 0>;
- 			status = "disabled";
- 		};
- 
-@@ -121,6 +136,7 @@
- 			interrupts = <11>;
- 			clock-frequency = <400000>;
- 			timeout-ms = <1000>;
-+			clocks = <&core_clk 0>;
- 			status = "disabled";
- 		};
- 
-@@ -128,6 +144,7 @@
- 			compatible = "marvell,dove-sdhci";
- 			reg = <0x92000 0x100>;
- 			interrupts = <35>, <37>;
-+			clocks = <&gate_clk 8>;
- 			status = "disabled";
- 		};
- 
-@@ -135,6 +152,7 @@
- 			compatible = "marvell,dove-sdhci";
- 			reg = <0x90000 0x100>;
- 			interrupts = <36>, <38>;
-+			clocks = <&gate_clk 9>;
- 			status = "disabled";
- 		};
- 
-@@ -142,6 +160,7 @@
+@@ -81,6 +98,8 @@
  			compatible = "marvell,orion-sata";
- 			reg = <0xa0000 0x2400>;
- 			interrupts = <62>;
-+			clocks = <&gate_clk 3>;
- 			nr-ports = <1>;
+ 			reg = <0x80000 0x5000>;
+ 			interrupts = <21>;
++			clocks = <&gate_clk 14>, <&gate_clk 15>;
++			clock-names = "0", "1";
  			status = "disabled";
  		};
-@@ -152,6 +171,7 @@
- 			      <0xc8000000 0x800>;
+ 
+@@ -94,6 +113,7 @@
+ 			reg = <0x3000000 0x400>;
+ 			chip-delay = <25>;
+ 			/* set partition map and/or chip-delay in board dts */
++			clocks = <&gate_clk 7>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -104,6 +124,7 @@
+ 			#size-cells = <0>;
+ 			interrupts = <29>;
+ 			clock-frequency = <100000>;
++			clocks = <&gate_clk 7>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -113,6 +134,7 @@
+ 			      <0xf5000000 0x800>;
  			reg-names = "regs", "sram";
- 			interrupts = <31>;
-+			clocks = <&gate_clk 15>;
+ 			interrupts = <22>;
++			clocks = <&gate_clk 17>;
  			status = "okay";
  		};
  	};
-diff --git a/arch/arm/mach-dove/Kconfig b/arch/arm/mach-dove/Kconfig
-index 00154e7..603c5fd 100644
---- a/arch/arm/mach-dove/Kconfig
-+++ b/arch/arm/mach-dove/Kconfig
-@@ -17,6 +17,8 @@ config MACH_CM_A510
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index 50bca50..2833492 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -46,6 +46,8 @@ config MACH_GURUPLUG
  
- config MACH_DOVE_DT
- 	bool "Marvell Dove Flattened Device Tree"
+ config ARCH_KIRKWOOD_DT
+ 	bool "Marvell Kirkwood Flattened Device Tree"
 +	select MVEBU_CLK_CORE
 +	select MVEBU_CLK_GATING
  	select USE_OF
  	help
  	  Say 'Y' here if you want your kernel to support the
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index f723fe1..6a2c4dc 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -14,6 +14,7 @@
- #include <linux/platform_device.h>
- #include <linux/pci.h>
- #include <linux/clk-provider.h>
-+#include <linux/clk/mvebu.h>
- #include <linux/ata_platform.h>
- #include <linux/gpio.h>
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index d94872f..8bdfaa4 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -14,11 +14,15 @@
+ #include <linux/init.h>
  #include <linux/of.h>
-@@ -376,19 +377,52 @@ void dove_restart(char mode, const char *cmd)
+ #include <linux/of_platform.h>
++#include <linux/clk-provider.h>
++#include <linux/clk/mvebu.h>
+ #include <linux/kexec.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <mach/bridge-regs.h>
++#include <linux/platform_data/usb-ehci-orion.h>
+ #include <plat/irq.h>
++#include <plat/common.h>
+ #include "common.h"
  
- #if defined(CONFIG_MACH_DOVE_DT)
- /*
-- * Auxdata required until real OF clock provider
-+ * There are still devices that doesn't even know about DT,
-+ * get clock gates here and add a clock lookup.
-  */
--struct of_dev_auxdata dove_auxdata_lookup[] __initdata = {
+ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
+@@ -26,16 +30,58 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
+ 	{ }
+ };
+ 
+-struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
 -	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
--	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1014600, "orion_spi.1", NULL),
--	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
 -	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011000, "mv64xxx_i2c.0",
 -		       NULL),
--	OF_DEV_AUXDATA("marvell,orion-sata", 0xf10a0000, "sata_mv.0", NULL),
--	OF_DEV_AUXDATA("marvell,dove-sdhci", 0xf1092000, "sdhci-dove.0", NULL),
--	OF_DEV_AUXDATA("marvell,dove-sdhci", 0xf1090000, "sdhci-dove.1", NULL),
+-	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
+-	OF_DEV_AUXDATA("marvell,orion-sata", 0xf1080000, "sata_mv.0", NULL),
+-	OF_DEV_AUXDATA("marvell,orion-nand", 0xf4000000, "orion_nand", NULL),
+-	OF_DEV_AUXDATA("marvell,orion-crypto", 0xf1030000, "mv_crypto", NULL),
 -	{},
 -};
-+static void __init dove_legacy_clk_init(void)
++/*
++ * There are still devices that doesn't know about DT yet.  Get clock
++ * gates here and add a clock lookup alias, so that old platform
++ * devices still work.
++*/
++
++static void __init kirkwood_legacy_clk_init(void)
 +{
-+	struct device_node *np = of_find_compatible_node(NULL, NULL,
-+					 "marvell,dove-gating-clock");
++
++	struct device_node *np = of_find_compatible_node(
++		NULL, NULL, "marvell,kirkwood-gating-clock");
++
 +	struct of_phandle_args clkspec;
 +
 +	clkspec.np = np;
 +	clkspec.args_count = 1;
 +
-+	clkspec.args[0] = CLOCK_GATING_BIT_USB0;
-+	orion_clkdev_add(NULL, "orion-ehci.0",
-+			 of_clk_get_from_provider(&clkspec));
-+
-+	clkspec.args[0] = CLOCK_GATING_BIT_USB1;
-+	orion_clkdev_add(NULL, "orion-ehci.1",
-+			 of_clk_get_from_provider(&clkspec));
-+
-+	clkspec.args[0] = CLOCK_GATING_BIT_GBE;
++	clkspec.args[0] = CGC_BIT_GE0;
 +	orion_clkdev_add(NULL, "mv643xx_eth_port.0",
 +			 of_clk_get_from_provider(&clkspec));
 +
-+	clkspec.args[0] = CLOCK_GATING_BIT_PCIE0;
++	clkspec.args[0] = CGC_BIT_PEX0;
 +	orion_clkdev_add("0", "pcie",
 +			 of_clk_get_from_provider(&clkspec));
 +
-+	clkspec.args[0] = CLOCK_GATING_BIT_PCIE1;
-+	orion_clkdev_add("1", "pcie",
++	clkspec.args[0] = CGC_BIT_USB0;
++	orion_clkdev_add(NULL, "orion-ehci.0",
 +			 of_clk_get_from_provider(&clkspec));
 +
-+	clkspec.args[0] = CLOCK_GATING_BIT_XOR0;
++	clkspec.args[0] = CGC_BIT_XOR0;
 +	orion_clkdev_add(NULL, "mv_xor_shared.0",
 +			 of_clk_get_from_provider(&clkspec));
 +
-+	clkspec.args[0] = CLOCK_GATING_BIT_XOR1;
++	clkspec.args[0] = CGC_BIT_XOR1;
 +	orion_clkdev_add(NULL, "mv_xor_shared.1",
 +			 of_clk_get_from_provider(&clkspec));
++
++	clkspec.args[0] = CGC_BIT_PEX1;
++	orion_clkdev_add("1", "pcie",
++			 of_clk_get_from_provider(&clkspec));
++
++	clkspec.args[0] = CGC_BIT_GE1;
++	orion_clkdev_add(NULL, "mv643xx_eth_port.1",
++			 of_clk_get_from_provider(&clkspec));
++
 +}
 +
-+static void __init dove_of_clk_init(void)
++static void __init kirkwood_of_clk_init(void)
 +{
 +	mvebu_clocks_init();
-+	dove_legacy_clk_init();
++	kirkwood_legacy_clk_init();
 +}
  
- static struct mv643xx_eth_platform_data dove_dt_ge00_data = {
- 	.phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT,
-@@ -405,7 +439,7 @@ static void __init dove_dt_init(void)
- 	dove_setup_cpu_mbus();
+ static void __init kirkwood_dt_init(void)
+ {
+@@ -54,7 +100,7 @@ static void __init kirkwood_dt_init(void)
+ 	kirkwood_l2_init();
  
  	/* Setup root of clk tree */
--	dove_clk_init();
-+	dove_of_clk_init();
+-	kirkwood_clk_init();
++	kirkwood_of_clk_init();
  
- 	/* Internal devices not ported to DT yet */
- 	dove_rtc_init();
-@@ -417,8 +451,7 @@ static void __init dove_dt_init(void)
- 	dove_ehci1_init();
- 	dove_pcie_init(1, 1);
+ 	/* internal devices that every board has */
+ 	kirkwood_xor0_init();
+@@ -94,8 +140,7 @@ static void __init kirkwood_dt_init(void)
+ 	if (of_machine_is_compatible("keymile,km_kirkwood"))
+ 		km_kirkwood_init();
  
--	of_platform_populate(NULL, of_default_bus_match_table,
--			     dove_auxdata_lookup, NULL);
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-	of_platform_populate(NULL, kirkwood_dt_match_table,
+-			     kirkwood_auxdata_lookup, NULL);
++	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
  }
  
- static const char * const dove_dt_board_compat[] = {
+ static const char *kirkwood_dt_board_compat[] = {
+diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
+index 6bbc3fe..e06fc5f 100644
+--- a/arch/arm/plat-orion/include/plat/common.h
++++ b/arch/arm/plat-orion/include/plat/common.h
+@@ -12,6 +12,7 @@
+ #include <linux/mv643xx_eth.h>
+ 
+ struct dsa_platform_data;
++struct mv_sata_platform_data;
+ 
+ void __init orion_uart0_init(void __iomem *membase,
+ 			     resource_size_t mapbase,
 -- 
 1.7.9.5
