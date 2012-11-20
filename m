@@ -1,73 +1,107 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 20 Nov 2012 21:46:46 +0900
-Subject: [PATCH v2 2/6] ARM: EXYNOS5: DT Support for SATA and SATA PHY
-References: <1351612897-14923-1-git-send-email-vasanthananthan@gmail.com>
- <1351612897-14923-3-git-send-email-vasanthananthan@gmail.com>
-Message-ID: <0cb001cdc71d$19e59df0$4db0d9d0$%kim@samsung.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Tue, 20 Nov 2012 13:50:46 +0100
+Subject: [PATCH v5 3/8] watchdog: orion_wdt: add timeout-sec property
+ binding
+In-Reply-To: <20121119160643.GI22106@titan.lakedaemon.net>
+References: <1353334243-16703-1-git-send-email-fabio.porcedda@gmail.com>
+ <1353334243-16703-4-git-send-email-fabio.porcedda@gmail.com>
+ <20121119160643.GI22106@titan.lakedaemon.net>
+Message-ID: <CAHkwnC-2MXtNODnqjOvFuHt7ToqvMqeDjnqdGyGfMacKBWzoLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> Vasanth Ananthan wrote:
-> >
-> > This patch adds Device Nodes for SATA and SATA PHY device.
-> >
-> 
-> [...]
-> 
-> > @@ -188,6 +188,9 @@
-> >  #define EXYNOS4_PA_SATA			0x12560000
-> >  #define EXYNOS4_PA_SATAPHY		0x125D0000
-> >  #define EXYNOS4_PA_SATAPHY_CTRL		0x126B0000
-> > +#define EXYNOS5_PA_SATA_PHY_CTRL	0x12170000
-> > +#define EXYNOS5_PA_SATA_PHY_I2C		0x121D0000
-> > +#define EXYNOS5_PA_SATA_BASE		0x122F0000
-> >
-> >  #define EXYNOS4_PA_SROMC		0x12570000
-> >  #define EXYNOS5_PA_SROMC		0x12250000
-> > diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-
-> > exynos/mach-exynos5-dt.c
-> > index db1cd8e..7dbd4cc 100644
-> > --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-> > +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> > @@ -61,6 +61,12 @@ static const struct of_dev_auxdata
-> > exynos5250_auxdata_lookup[] __initconst = {
-> >  				"exynos4210-spi.1", NULL),
-> >  	OF_DEV_AUXDATA("samsung,exynos4210-spi", EXYNOS5_PA_SPI2,
-> >  				"exynos4210-spi.2", NULL),
-> > +	OF_DEV_AUXDATA("samsung,exynos5-sata-ahci", EXYNOS5_PA_SATA_BASE,
-> > +				"exynos5-sata", NULL),
-> > +	OF_DEV_AUXDATA("samsung,exynos5-sata-phy", EXYNOS5_PA_SATA_PHY_CTRL,
-> > +				"exynos5-sata-phy", NULL),
-> > +	OF_DEV_AUXDATA("samsung,exynos5-sata-phy-i2c",
-> > EXYNOS5_PA_SATA_PHY_I2C,
-> > +				"exynos5-sata-phy-i2c", NULL),
-> >  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA0, "dma-pl330.0", NULL),
-> >  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA1, "dma-pl330.1", NULL),
-> >  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA1, "dma-pl330.2", NULL),
-> > --
-> > 1.7.4.1
-> 
-> Just following is enough? Because we don't need the definitions only for
-> here...
-> 
-> 8<-------
-> +	OF_DEV_AUXDATA("samsung,exynos5-sata-ahci", 0x122F0000,
-> +				"exynos5-sata", NULL),
-> +	OF_DEV_AUXDATA("samsung,exynos5-sata-phy", 0x126B0000,
-> +				"exynos5-sata-phy", NULL),
-> +	OF_DEV_AUXDATA("samsung,exynos5-sata-phy-i2c", 0x121D0000,
-> +				"exynos5-sata-phy-i2c", NULL),
-> 8<-------
-> 
+On Mon, Nov 19, 2012 at 5:06 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Mon, Nov 19, 2012 at 03:10:38PM +0100, Fabio Porcedda wrote:
+>> Only compile tested.
+>>
+>> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> Cc: Andrew Lunn <andrew@lunn.ch>
+>> ---
+>>  Documentation/devicetree/bindings/watchdog/marvel.txt | 5 +++++
+>>  drivers/watchdog/orion_wdt.c                          | 8 +++-----
+>>  2 files changed, 8 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/watchdog/marvel.txt b/Documentation/devicetree/bindings/watchdog/marvel.txt
+>> index 0b2503a..5dc8d30 100644
+>> --- a/Documentation/devicetree/bindings/watchdog/marvel.txt
+>> +++ b/Documentation/devicetree/bindings/watchdog/marvel.txt
+>> @@ -5,10 +5,15 @@ Required Properties:
+>>  - Compatibility : "marvell,orion-wdt"
+>>  - reg                : Address of the timer registers
+>>
+>> +Optional properties:
+>> +
+>> +- timeout-sec        : Contains the watchdog timeout in seconds
+>> +
+>>  Example:
+>>
+>>       wdt at 20300 {
+>>               compatible = "marvell,orion-wdt";
+>>               reg = <0x20300 0x28>;
+>> +             timeout-sec = <10>;
+>>               status = "okay";
+>>       };
+>> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+>> index c20f96b..446a3e9 100644
+>> --- a/drivers/watchdog/orion_wdt.c
+>> +++ b/drivers/watchdog/orion_wdt.c
+>> @@ -162,12 +162,10 @@ static int __devinit orion_wdt_probe(struct platform_device *pdev)
+>>
+>>       wdt_max_duration = WDT_MAX_CYCLE_COUNT / wdt_tclk;
+>>
+>> -     if ((heartbeat < 1) || (heartbeat > wdt_max_duration))
+>> -             heartbeat = wdt_max_duration;
+>> -
+>> -     orion_wdt.timeout = heartbeat;
+>>       orion_wdt.min_timeout = 1;
+>> +     orion_wdt.timeout = wdt_max_duration;
+>>       orion_wdt.max_timeout = wdt_max_duration;
+>> +     watchdog_init_timeout(&orion_wdt, heartbeat, pdev->dev.of_node);
+>
+> Hi Fabio,
+>
+> There are many boards using pdata, !CONFIG_OF.  Have you compile-tested
+> this without CONFIG_OF?
 
-Applied with above changes.
+Hi Jason,
 
-Thanks.
+I've tested with and without the CONFIG_OF define.
 
-Best regards,
-Kgene.
+The first time I?ve used the kirkwood_defconfig without modifications,
+the second time I?ve enabled only the CONFIG_MACH_SHEEVAPLUG and
+disabled USE_OF.
+
+In both cases the orion_wdt driver compile without any warning.
+
+Thanks for the review.
+
+Best regards
+
+> thx,
+>
+> Jason.
+>
+>>
+>>       watchdog_set_nowayout(&orion_wdt, nowayout);
+>>       ret = watchdog_register_device(&orion_wdt);
+>> @@ -177,7 +175,7 @@ static int __devinit orion_wdt_probe(struct platform_device *pdev)
+>>       }
+>>
+>>       pr_info("Initial timeout %d sec%s\n",
+>> -             heartbeat, nowayout ? ", nowayout" : "");
+>> +             orion_wdt.timeout, nowayout ? ", nowayout" : "");
+>>       return 0;
+>>  }
+>>
+>> --
+>> 1.8.0
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 --
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Fabio Porcedda
