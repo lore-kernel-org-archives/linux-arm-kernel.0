@@ -1,40 +1,62 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 20 Nov 2012 10:52:55 +0100
-Subject: [PATCH] fix compilation error in cm_common.c
-In-Reply-To: <1353403553-13525-1-git-send-email-const@MakeLinux.com>
-References: <1353403553-13525-1-git-send-email-const@MakeLinux.com>
-Message-ID: <50AB52F7.9000301@ti.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 20 Nov 2012 01:53:21 -0800
+Subject: [RFC/PATCH 0/3] CLK: add more devm_* APIs
+In-Reply-To: <20121120093445.GL3290@n2100.arm.linux.org.uk>
+References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
+ <20121120093445.GL3290@n2100.arm.linux.org.uk>
+Message-ID: <20121120095321.GA11732@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2012 10:25 AM, Constantine Shulyupin wrote:
-> From: Constantine Shulyupin <const@MakeLinux.com>
+On Tue, Nov 20, 2012 at 09:34:45AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Nov 20, 2012 at 01:22:16AM -0800, Dmitry Torokhov wrote:
+> > Hi,
+> > 
+> > When looking at recent driver conversions to managed resources (devm_*) there
+> > is no devm_clk_prepare() and similar functions, which forces mixing of 2
+> > resource management styles (managed/classic) in the same driver, which is not
+> > great.
+> > 
+> > This patch series adds more devm_* managed APIs to the CLK subsystem so that
+> > driver conversions can be "pure".
 > 
-> Added required linux/errno.h
-> 
-> Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
+> So, how do you ensure the correct ordering between clk_unprepare() and
+> clk_put(), or even clk_disable() and clk_unprepare() ?  I see nothing
+> here which makes any guarantees as to the ordering of those operations
+> upon cleanup.
 
-This supposed to be already fixed:
-https://patchwork.kernel.org/patch/1728521/
+devm_* calls form a stack so if you have
 
-> ---
->  arch/arm/mach-omap2/cm_common.c |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
-> index 3246cef..3fafc27 100644
-> --- a/arch/arm/mach-omap2/cm_common.c
-> +++ b/arch/arm/mach-omap2/cm_common.c
-> @@ -13,6 +13,7 @@
->  
->  #include <linux/kernel.h>
->  #include <linux/init.h>
-> +#include <linux/errno.h>
->  
->  #include "cm2xxx.h"
->  #include "cm3xxx.h"
-> 
+static void xxx_probe()
+{
+	input = devm_input_allocate_device();
 
+	devm_request_irq();
+	...
+	devm_clk_prepare()
+	...
+	devm_clk_enable()
+	... 
+	input_register_device();
+	return 0;
+}
+
+and
+
+static int xxx_remove()
+{
+	return 0;
+}
+
+then upon remove we'll execute:
+
+	input_unregister_device();
+	devm_clk_disable();
+	devm_clk_unprepare();
+	devm_free_irq();
+	input_free_device();
+
+Thanks.
 
 -- 
-P?ter
+Dmitry
