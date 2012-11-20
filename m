@@ -1,160 +1,151 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Nov 2012 23:00:54 +0100
-Subject: [PATCH 03/16] arm: bcm2835: convert to the irqchip infrastructure
+Date: Tue, 20 Nov 2012 23:00:55 +0100
+Subject: [PATCH 04/16] arm: mvebu: move irq controller driver to
+ drivers/irqchip
 In-Reply-To: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353448867-15008-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353448867-15008-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the irq controller driver in the main
-drivers/irqchip/irqchip.c file, and make sure that the initialization
-function of the driver sets handle_arch_irq() appropriately. This
-requires a bit of movement in the driver since the
-bcm2835_handle_irq() must move before the armctrl_of_init() function
-to avoid a forward declaration.
-
-On the arch/arm side, use irqchip_init() as the ->init_irq() callback,
-and remove the definition of ->handle_irq() since this is now done by
-the irq controller driver.
+Now that the drivers/irqchip/ directory has a minimal infrastructure
+to support the addition of irq controller driver, we move the irq
+controller driver for Armada 370 and Armada XP ARM SoCs from the
+arch/arm/mach-mvebu/ directory to the drivers/irqchip/ directory and
+update the irqchip infrastructure to take into account this new
+driver.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
 Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-bcm2835/bcm2835.c |    5 ++---
- drivers/irqchip/irq-bcm2835.c   |   27 ++++++++++++++-------------
- include/linux/irqchip/bcm2835.h |   29 -----------------------------
- 3 files changed, 16 insertions(+), 45 deletions(-)
- delete mode 100644 include/linux/irqchip/bcm2835.h
+ arch/arm/mach-mvebu/Makefile                       |    2 +-
+ arch/arm/mach-mvebu/armada-370-xp.c                |    4 +--
+ arch/arm/mach-mvebu/common.h                       |    3 ---
+ drivers/irqchip/Makefile                           |    1 +
+ .../irqchip}/irq-armada-370-xp.c                   |   28 +++++++++++---------
+ 5 files changed, 19 insertions(+), 19 deletions(-)
+ rename {arch/arm/mach-mvebu => drivers/irqchip}/irq-armada-370-xp.c (87%)
 
-diff --git a/arch/arm/mach-bcm2835/bcm2835.c b/arch/arm/mach-bcm2835/bcm2835.c
-index f6fea49..ab1bccd 100644
---- a/arch/arm/mach-bcm2835/bcm2835.c
-+++ b/arch/arm/mach-bcm2835/bcm2835.c
-@@ -13,10 +13,10 @@
-  */
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index 57f996b..7f4e9f4 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -2,4 +2,4 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+ 	-I$(srctree)/arch/arm/plat-orion/include
  
+ obj-y += system-controller.o
+-obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o
++obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o addr-map.o
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+index a2f5bbc..5e90401 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.c
++++ b/arch/arm/mach-mvebu/armada-370-xp.c
+@@ -16,6 +16,7 @@
  #include <linux/init.h>
--#include <linux/irqchip/bcm2835.h>
  #include <linux/of_platform.h>
- #include <linux/bcm2835_timer.h>
- #include <linux/clk/bcm2835.h>
+ #include <linux/io.h>
 +#include <linux/irqchip.h>
- 
+ #include <linux/time-armada-370-xp.h>
  #include <asm/mach/arch.h>
  #include <asm/mach/map.h>
-@@ -56,8 +56,7 @@ static const char * const bcm2835_compat[] = {
+@@ -54,8 +55,7 @@ static const char * const armada_370_xp_dt_compat[] = {
+ DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada 370/XP (Device Tree)")
+ 	.init_machine	= armada_370_xp_dt_init,
+ 	.map_io		= armada_370_xp_map_io,
+-	.init_irq	= armada_370_xp_init_irq,
+-	.handle_irq     = armada_370_xp_handle_irq,
++	.init_irq	= irqchip_init,
+ 	.timer		= &armada_370_xp_timer,
+ 	.restart	= mvebu_restart,
+ 	.dt_compat	= armada_370_xp_dt_compat,
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+index 02f89ea..f0eaa21 100644
+--- a/arch/arm/mach-mvebu/common.h
++++ b/arch/arm/mach-mvebu/common.h
+@@ -17,7 +17,4 @@
  
- DT_MACHINE_START(BCM2835, "BCM2835")
- 	.map_io = bcm2835_map_io,
--	.init_irq = bcm2835_init_irq,
--	.handle_irq = bcm2835_handle_irq,
-+	.init_irq = irqchip_init,
- 	.init_machine = bcm2835_init,
- 	.timer = &bcm2835_timer,
- 	.dt_compat = bcm2835_compat
-diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
-index dc670cc..c2ca9b0 100644
---- a/drivers/irqchip/irq-bcm2835.c
-+++ b/drivers/irqchip/irq-bcm2835.c
-@@ -49,9 +49,11 @@
- #include <linux/of_address.h>
+ void mvebu_restart(char mode, const char *cmd);
+ 
+-void armada_370_xp_init_irq(void);
+-void armada_370_xp_handle_irq(struct pt_regs *regs);
+-
+ #endif
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 6b5a6e0..5148ffd 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_IRQCHIP) += irqchip.o
+ obj-$(CONFIG_ARCH_BCM2835) += irq-bcm2835.o
++obj-$(CONFIG_ARCH_MVEBU)   += irq-armada-370-xp.o
+diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+similarity index 87%
+rename from arch/arm/mach-mvebu/irq-armada-370-xp.c
+rename to drivers/irqchip/irq-armada-370-xp.c
+index 5f5f939..09fad6c 100644
+--- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -23,8 +23,11 @@
  #include <linux/of_irq.h>
  #include <linux/irqdomain.h>
--#include <linux/irqchip/bcm2835.h>
- 
- #include <asm/exception.h>
+ #include <asm/mach/arch.h>
 +#include <asm/mach/irq.h>
-+
-+#include "irqchip.h"
+ #include <asm/exception.h>
  
- /* Put the bank and irq (32 bits) into the hwirq */
- #define MAKE_HWIRQ(b, n)	((b << 5) | (n))
-@@ -135,8 +137,10 @@ static struct irq_domain_ops armctrl_ops = {
- 	.xlate = armctrl_xlate
++#include "irqchip.h"
++
+ /* Interrupt Controller Registers Map */
+ #define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
+ #define ARMADA_370_XP_INT_CLEAR_MASK_OFFS	(0x4C)
+@@ -77,8 +80,12 @@ static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
+ 	.xlate = irq_domain_xlate_onecell,
  };
  
--static int __init armctrl_of_init(struct device_node *node,
--	struct device_node *parent)
-+static asmlinkage void bcm2835_handle_irq(struct pt_regs *regs);
+-static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+-					     struct device_node *parent)
++static asmlinkage void
++armada_370_xp_handle_irq(struct pt_regs *regs);
 +
-+static int __init bcm2835_irqchip_init(struct device_node *node,
-+				       struct device_node *parent)
++static int __init
++armada_370_xp_mpic_of_init(struct device_node *node,
++			   struct device_node *parent)
  {
- 	void __iomem *base;
- 	int irq, b, i;
-@@ -164,16 +168,10 @@ static int __init armctrl_of_init(struct device_node *node,
- 			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
- 		}
- 	}
--	return 0;
--}
+ 	u32 control;
  
--static struct of_device_id irq_of_match[] __initconst = {
--	{ .compatible = "brcm,bcm2835-armctrl-ic", .data = armctrl_of_init }
--};
-+	set_handle_irq(bcm2835_handle_irq);
+@@ -98,11 +105,14 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 		panic("Unable to add Armada_370_Xp MPIC irq domain (DT)\n");
  
--void __init bcm2835_init_irq(void)
--{
--	of_irq_init(irq_of_match);
-+	return 0;
+ 	irq_set_default_host(armada_370_xp_mpic_domain);
++
++	set_handle_irq(armada_370_xp_handle_irq);
++
+ 	return 0;
  }
  
- /*
-@@ -199,8 +197,8 @@ static void armctrl_handle_shortcut(int bank, struct pt_regs *regs,
- 	handle_IRQ(irq_linear_revmap(intc.domain, irq), regs);
- }
- 
--asmlinkage void __exception_irq_entry bcm2835_handle_irq(
--	struct pt_regs *regs)
+-asmlinkage void __exception_irq_entry armada_370_xp_handle_irq(struct pt_regs
+-							       *regs)
 +static asmlinkage void __exception_irq_entry
-+bcm2835_handle_irq(struct pt_regs *regs)
++armada_370_xp_handle_irq(struct pt_regs *regs)
  {
- 	u32 stat, irq;
+ 	u32 irqstat, irqnr;
  
-@@ -221,3 +219,6 @@ asmlinkage void __exception_irq_entry bcm2835_handle_irq(
- 		}
- 	}
+@@ -122,12 +132,4 @@ asmlinkage void __exception_irq_entry armada_370_xp_handle_irq(struct pt_regs
+ 	} while (1);
  }
-+
-+IRQCHIP_DECLARE(bcm2835_armctrl_ic, "brcm,bcm2835-armctrl-ic",
-+		bcm2835_irqchip_init);
-diff --git a/include/linux/irqchip/bcm2835.h b/include/linux/irqchip/bcm2835.h
-deleted file mode 100644
-index 48a859b..0000000
---- a/include/linux/irqchip/bcm2835.h
-+++ /dev/null
-@@ -1,29 +0,0 @@
--/*
-- * Copyright (C) 2010 Broadcom
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
+ 
+-static const struct of_device_id mpic_of_match[] __initconst = {
+-	{.compatible = "marvell,mpic", .data = armada_370_xp_mpic_of_init},
+-	{},
+-};
 -
--#ifndef __LINUX_IRQCHIP_BCM2835_H_
--#define __LINUX_IRQCHIP_BCM2835_H_
--
--#include <asm/exception.h>
--
--extern void bcm2835_init_irq(void);
--
--extern asmlinkage void __exception_irq_entry bcm2835_handle_irq(
--	struct pt_regs *regs);
--
--#endif
+-void __init armada_370_xp_init_irq(void)
+-{
+-	of_irq_init(mpic_of_match);
+-}
++IRQCHIP_DECLARE(mpic, "marvell,mpic", armada_370_xp_mpic_of_init);
 -- 
 1.7.9.5
