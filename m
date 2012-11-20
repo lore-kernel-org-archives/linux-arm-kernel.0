@@ -1,27 +1,56 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 20 Nov 2012 18:00:00 +0530
-Subject: [PATCH v3 6/6] ARM: davinci: remoteproc driver support for
- OMAP-L138 DSP
-In-Reply-To: <1352853207-20602-6-git-send-email-rtivy@ti.com>
-References: <1352853207-20602-1-git-send-email-rtivy@ti.com>
- <1352853207-20602-6-git-send-email-rtivy@ti.com>
-Message-ID: <50AB77C8.5090309@ti.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 20 Nov 2012 13:30:58 +0100
+Subject: [PATCH 0/3] ARM: zynq: ARCH_MULTIPLATFORM support
+In-Reply-To: <cover.1353349191.git.josh.cartwright@ni.com>
+References: <cover.1353349191.git.josh.cartwright@ni.com>
+Message-ID: <CAHTX3d+YE7mtsQOdrBV4B=zp_CHSTrWbbXgjkBBkTeenv_4DHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Josh, Arnd and Olof,
 
+2012/11/19 Josh Cartwright <josh.cartwright@ni.com>:
+> Michal-
+>
+> Here's an attempt at supporting ARCH_MULTIPLATFORM on Zynq.  I've gotten
+> a multiplatform kernel building and booting on the zc702, although I
+> haven't tried to boot the same image on another non-Zynq board, due to
+> lack of available hardware.
+>
+> It would be super awesome if this set could land in 3.8, but I know
+> we're running out of time there.  I wouldn't be too heartbroken if it
+> didn't make it.
+>
+> This patchset is on top of your arm-next branch and with the
+> debug_ll_init support patch @ arm-soc/devel/debug_ll_init.
+>
+> Patch 1 drops the early TTC mapping.  It is not necessary, since the TTC
+> driver now supports pulling mapping info from the device tree.
+>
+> Patch 2 converts zynq to use the debug_ll_init() infrastructure slated
+> to go into 3.8.
+>
+> Patch 3 is the bulk of the set, moving around logic around within
+> mach-zynq/include, and setting up the necessary build magic to get Zynq
+> building w/ CONFIG_ARCH_MULTIPLATFORM.
+>
 
-On 11/14/2012 6:03 AM, Robert Tivy wrote:
-> Signed-off-by: Robert Tivy <rtivy@ti.com>
-> 
-> ---
->  drivers/remoteproc/Kconfig              |   41 +++++
->  drivers/remoteproc/Makefile             |    1 +
->  drivers/remoteproc/davinci_remoteproc.c |  292 +++++++++++++++++++++++++++++++
+I wanted to look at it too today. You were faster!
+I have tested your patches and all works for me.
+I have also added them to my arm-next branch.
 
-scripts/get_maintainer.pl tells me that Ohad Ben-Cohen needs to take
-this driver or at least say he is happy with it. Please CC him and LKML
-on your next post.
+I don't have others ARM boards to test but it shouldn't be big problem
+because others will test it.
+
+We are out of merge window that's why we should wait to the next one.
+Anyway Arnd/Olof if there is any option to get this to v3.8, please let me know.
 
 Thanks,
-Sekhar
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
+Microblaze U-BOOT custodian
