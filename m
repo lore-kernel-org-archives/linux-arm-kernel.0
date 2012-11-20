@@ -1,41 +1,39 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 19 Nov 2012 16:49:27 -0600
-Subject: [PATCH 1/2] of: Add vendor prefix for Asahi Kasei Corp.
-In-Reply-To: <1353364484-5741-1-git-send-email-swarren@wwwdotorg.org>
-References: <1353364484-5741-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <50AAB777.7060105@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 20 Nov 2012 09:03:55 +0900
+Subject: [PATCH] ARM: shmobile: mackerel: Add FLCTL IRQ resource
+In-Reply-To: <50AA2683.1070502@mvista.com>
+References: <1353288254-6211-1-git-send-email-horms@verge.net.au>
+ <1353288254-6211-2-git-send-email-horms@verge.net.au>
+ <50AA2683.1070502@mvista.com>
+Message-ID: <20121120000355.GB13829@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2012 04:34 PM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Mon, Nov 19, 2012 at 04:30:59PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Their stock ticker is 3407.T which wouldn't make a good DT vendor
-> prefix. Use the company name initials instead.
+> On 19-11-2012 5:24, Simon Horman wrote:
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Both patches ought to merge through the DT tree OK. If not, patch 2
-> could be taken through arm-soc.
+> >From: Bastian Hecht <hechtb@gmail.com>
+> 
+> >Since commit 3c7ea4eccfd2e
+> 
+>    Please also specify that commit summary in parens.
 
-Applied both for 3.8.
+Thanks, I will fix this and re-post.
 
-Rob
-
+> >the sh_flctl driver requires the error IRQ line to
+> >signal failed transactions between the flash controller and the NAND chip.
+> >This information is mandatory - else the driver refuses to start up. We
+> >provide it here for the board mackerel.
 > 
->  Documentation/devicetree/bindings/vendor-prefixes.txt |    1 +
->  1 file changed, 1 insertion(+)
+> >Signed-off-by: Bastian Hecht <hechtb@gmail.com>
+> >Signed-off-by: Simon Horman <horms@verge.net.au>
 > 
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index deba8d0..05dc8eb 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -5,6 +5,7 @@ using them to avoid name-space collisions.
->  
->  ad	Avionic Design GmbH
->  adi	Analog Devices, Inc.
-> +ak	Asahi Kasei Corp.
->  amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
->  apm	Applied Micro Circuits Corporation (APM)
->  arm	ARM Ltd.
+> WBR, Sergei
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
