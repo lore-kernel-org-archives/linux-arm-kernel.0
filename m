@@ -1,151 +1,85 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Nov 2012 23:00:55 +0100
-Subject: [PATCH 04/16] arm: mvebu: move irq controller driver to
- drivers/irqchip
+Date: Tue, 20 Nov 2012 23:00:57 +0100
+Subject: [PATCH 06/16] ARM: gic: move register definitions into .c file
 In-Reply-To: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353448867-15008-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353448867-15008-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the drivers/irqchip/ directory has a minimal infrastructure
-to support the addition of irq controller driver, we move the irq
-controller driver for Armada 370 and Armada XP ARM SoCs from the
-arch/arm/mach-mvebu/ directory to the drivers/irqchip/ directory and
-update the irqchip infrastructure to take into account this new
-driver.
+From: Rob Herring <rob.herring@calxeda.com>
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
-Reviewed-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
+There's only 1 user of gic registers outside of gic.c, so move the
+register definitions into gic.c. For now, keep GIC_DIST_CNT as Tegra
+uses it.
+
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/mach-mvebu/Makefile                       |    2 +-
- arch/arm/mach-mvebu/armada-370-xp.c                |    4 +--
- arch/arm/mach-mvebu/common.h                       |    3 ---
- drivers/irqchip/Makefile                           |    1 +
- .../irqchip}/irq-armada-370-xp.c                   |   28 +++++++++++---------
- 5 files changed, 19 insertions(+), 19 deletions(-)
- rename {arch/arm/mach-mvebu => drivers/irqchip}/irq-armada-370-xp.c (87%)
+ arch/arm/common/gic.c               |   21 ++++++++++++++++++++-
+ arch/arm/include/asm/hardware/gic.h |   18 ------------------
+ 2 files changed, 20 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 57f996b..7f4e9f4 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -2,4 +2,4 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
- 	-I$(srctree)/arch/arm/plat-orion/include
- 
- obj-y += system-controller.o
--obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o
-+obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o addr-map.o
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index a2f5bbc..5e90401 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -16,6 +16,7 @@
- #include <linux/init.h>
- #include <linux/of_platform.h>
- #include <linux/io.h>
-+#include <linux/irqchip.h>
- #include <linux/time-armada-370-xp.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -54,8 +55,7 @@ static const char * const armada_370_xp_dt_compat[] = {
- DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada 370/XP (Device Tree)")
- 	.init_machine	= armada_370_xp_dt_init,
- 	.map_io		= armada_370_xp_map_io,
--	.init_irq	= armada_370_xp_init_irq,
--	.handle_irq     = armada_370_xp_handle_irq,
-+	.init_irq	= irqchip_init,
- 	.timer		= &armada_370_xp_timer,
- 	.restart	= mvebu_restart,
- 	.dt_compat	= armada_370_xp_dt_compat,
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index 02f89ea..f0eaa21 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -17,7 +17,4 @@
- 
- void mvebu_restart(char mode, const char *cmd);
- 
--void armada_370_xp_init_irq(void);
--void armada_370_xp_handle_irq(struct pt_regs *regs);
--
- #endif
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 6b5a6e0..5148ffd 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_IRQCHIP) += irqchip.o
- obj-$(CONFIG_ARCH_BCM2835) += irq-bcm2835.o
-+obj-$(CONFIG_ARCH_MVEBU)   += irq-armada-370-xp.o
-diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-similarity index 87%
-rename from arch/arm/mach-mvebu/irq-armada-370-xp.c
-rename to drivers/irqchip/irq-armada-370-xp.c
-index 5f5f939..09fad6c 100644
---- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -23,8 +23,11 @@
- #include <linux/of_irq.h>
- #include <linux/irqdomain.h>
- #include <asm/mach/arch.h>
-+#include <asm/mach/irq.h>
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index aa52699..55ea0d7 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -43,7 +43,26 @@
  #include <asm/exception.h>
- 
-+#include "irqchip.h"
+ #include <asm/smp_plat.h>
+ #include <asm/mach/irq.h>
+-#include <asm/hardware/gic.h>
 +
- /* Interrupt Controller Registers Map */
- #define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
- #define ARMADA_370_XP_INT_CLEAR_MASK_OFFS	(0x4C)
-@@ -77,8 +80,12 @@ static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
- 	.xlate = irq_domain_xlate_onecell,
- };
- 
--static int __init armada_370_xp_mpic_of_init(struct device_node *node,
--					     struct device_node *parent)
-+static asmlinkage void
-+armada_370_xp_handle_irq(struct pt_regs *regs);
++#define GIC_CPU_CTRL			0x00
++#define GIC_CPU_PRIMASK			0x04
++#define GIC_CPU_BINPOINT		0x08
++#define GIC_CPU_INTACK			0x0c
++#define GIC_CPU_EOI			0x10
++#define GIC_CPU_RUNNINGPRI		0x14
++#define GIC_CPU_HIGHPRI			0x18
 +
-+static int __init
-+armada_370_xp_mpic_of_init(struct device_node *node,
-+			   struct device_node *parent)
- {
- 	u32 control;
++#define GIC_DIST_CTRL			0x000
++#define GIC_DIST_CTR			0x004
++#define GIC_DIST_ENABLE_SET		0x100
++#define GIC_DIST_ENABLE_CLEAR		0x180
++#define GIC_DIST_PENDING_SET		0x200
++#define GIC_DIST_PENDING_CLEAR		0x280
++#define GIC_DIST_ACTIVE_BIT		0x300
++#define GIC_DIST_PRI			0x400
++#define GIC_DIST_TARGET			0x800
++#define GIC_DIST_CONFIG			0xc00
++#define GIC_DIST_SOFTINT		0xf00
  
-@@ -98,11 +105,14 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 		panic("Unable to add Armada_370_Xp MPIC irq domain (DT)\n");
+ union gic_base {
+ 	void __iomem *common_base;
+diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
+index 4b1ce6c..8073dce 100644
+--- a/arch/arm/include/asm/hardware/gic.h
++++ b/arch/arm/include/asm/hardware/gic.h
+@@ -12,25 +12,7 @@
  
- 	irq_set_default_host(armada_370_xp_mpic_domain);
-+
-+	set_handle_irq(armada_370_xp_handle_irq);
-+
- 	return 0;
- }
+ #include <linux/compiler.h>
  
--asmlinkage void __exception_irq_entry armada_370_xp_handle_irq(struct pt_regs
--							       *regs)
-+static asmlinkage void __exception_irq_entry
-+armada_370_xp_handle_irq(struct pt_regs *regs)
- {
- 	u32 irqstat, irqnr;
- 
-@@ -122,12 +132,4 @@ asmlinkage void __exception_irq_entry armada_370_xp_handle_irq(struct pt_regs
- 	} while (1);
- }
- 
--static const struct of_device_id mpic_of_match[] __initconst = {
--	{.compatible = "marvell,mpic", .data = armada_370_xp_mpic_of_init},
--	{},
--};
+-#define GIC_CPU_CTRL			0x00
+-#define GIC_CPU_PRIMASK			0x04
+-#define GIC_CPU_BINPOINT		0x08
+-#define GIC_CPU_INTACK			0x0c
+-#define GIC_CPU_EOI			0x10
+-#define GIC_CPU_RUNNINGPRI		0x14
+-#define GIC_CPU_HIGHPRI			0x18
 -
--void __init armada_370_xp_init_irq(void)
--{
--	of_irq_init(mpic_of_match);
--}
-+IRQCHIP_DECLARE(mpic, "marvell,mpic", armada_370_xp_mpic_of_init);
+-#define GIC_DIST_CTRL			0x000
+ #define GIC_DIST_CTR			0x004
+-#define GIC_DIST_ENABLE_SET		0x100
+-#define GIC_DIST_ENABLE_CLEAR		0x180
+-#define GIC_DIST_PENDING_SET		0x200
+-#define GIC_DIST_PENDING_CLEAR		0x280
+-#define GIC_DIST_ACTIVE_BIT		0x300
+-#define GIC_DIST_PRI			0x400
+-#define GIC_DIST_TARGET			0x800
+-#define GIC_DIST_CONFIG			0xc00
+-#define GIC_DIST_SOFTINT		0xf00
+ 
+ #ifndef __ASSEMBLY__
+ #include <linux/irqdomain.h>
 -- 
 1.7.9.5
