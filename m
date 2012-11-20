@@ -1,54 +1,49 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 20 Nov 2012 13:53:20 +0900
-Subject: [PATCH v3 0/4] ARM: EXYNOS: Power domain DT support extension
-In-Reply-To: <1552856.8ocEO5iISn@amdc1227>
-References: <1352811115-1198-1-git-send-email-t.figa@samsung.com>
- <1552856.8ocEO5iISn@amdc1227>
-Message-ID: <0b6e01cdc6da$f6b723e0$e4256ba0$%kim@samsung.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 20 Nov 2012 13:54:01 +0900
+Subject: [PATCH v3] ARM: S3C24XX: Add WIZnet W5300E01-ARM board support
+References: <1346653236-19728-1-git-send-email-kth3321@gmail.com>
+ <1346905640.2573.14.camel@taehun-desktop>
+Message-ID: <0b6f01cdc6db$0ed72290$2c8567b0$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+Kukjin Kim wrote:
 > 
-> Hi,
-> 
-> On Tuesday 13 of November 2012 13:51:51 Tomasz Figa wrote:
-> > This patch series fixes two issues with existing DT support for Exynos
-> > power domains and extends it with the ability of binding devices to
-> > domains, basically making it possible to use power domains with DT.
+> Taehun Kim wrote:
 > >
-> > Based on for-next branch of Kgene's tree.
+> > - The gpio routines are changed to use the gpio_request() functions from
+> >   comments of Vasily and Sylwester.
+> > - The mistake of adding a character by my email client automatically is
+> > fixed.
 > >
-> > Changes since v2:
-> >  - Rebased to for-next of Kgene's tree.
-> > Changes since v1:
-> >  - Added "samsung," prefix to "power-domain" property.
-> >  - Added power domain nodes to Exynos4 device tree sources.
+> > Please review this patch and apply it if do not have any problems.
 > >
-> > Tomasz Figa (4):
-> >   ARM: EXYNOS: pm_domain: Detect domain state on registration from DT
-> >   ARM: EXYNOS: pm_domain: Fix power domain name initialization
-> >   ARM: EXYNOS: pm_domain: Bind devices to power domains using DT
-> >   ARM: dts: exynos4: Set up power domains
-> >
-> >  .../bindings/arm/exynos/power_domain.txt           | 15 +++-
-> >  arch/arm/boot/dts/exynos4.dtsi                     | 30 +++++++
-> >  arch/arm/boot/dts/exynos4210.dtsi                  |  5 ++
-> >  arch/arm/mach-exynos/pm_domains.c                  | 93
-> > +++++++++++++++++++++- 4 files changed, 135 insertions(+), 8
-> > deletions(-)
 > 
-> Sorry, please disregard this series, as I have sent wrong version by
-> mistake.
+> Taehun,
 > 
-> I will send correct one later.
+> Above area is for adding comments like 'This patch adds WIZnet W5300E01
+> board' because it will be remained in its git log and nobody want to see
+> your old request in there. If any comments which are not related to
+> changes just put it after '---' around your sign. It doesn't hurt your
+> patch.
 > 
-OK.
+> And you need to update this against on for-next of my tree because some
+> S3C2410 gpio APIs have been gone.(See the Sylwester's comments) Please re-
+> send this.
+> 
+Any updates on this?
 
-Thanks.
+K-Gene <kgene@kernel.org>
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> 
+> 
+> > Signed-off-by: Taehun Kim <kth3321@gmail.com>
+> > ---
+> >  arch/arm/mach-s3c24xx/Kconfig         |    5 +
+> >  arch/arm/mach-s3c24xx/Makefile        |    1 +
+> >  arch/arm/mach-s3c24xx/mach-w5300e01.c |  193
+> > +++++++++++++++++++++++++++++++++
+> >  3 files changed, 199 insertions(+)
+> >  create mode 100644 arch/arm/mach-s3c24xx/mach-w5300e01.c
+> >
+> [snip]
