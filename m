@@ -1,76 +1,241 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Nov 2012 22:39:31 +0100
-Subject: [PATCH 1/3] clk: add GPLv2 headers to the Versatile clock files
-Message-ID: <1353447571-12876-1-git-send-email-linus.walleij@linaro.org>
+Date: Tue, 20 Nov 2012 22:39:41 +0100
+Subject: [PATCH 2/3] clk: make ICST driver handle the VCO registers
+Message-ID: <1353447581-12914-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPLv2 headers were missing and the subsystem maintainer likes
-them so put them in. I am the copyright holder, so explicitly
-licensing these under the GPLv2.
+It turns out that all platforms using the ICST VCO are really
+just touching two registers, and in the same way as well: one
+register with the VCO configuration as such, and one lock register
+that makes it possible to write to the VCO.
 
-Reported-by: Mike Turquette <mturquette@ti.com>
+Factor this register read/write into the ICST driver so we can
+reuse it in the IM-PD1 driver.
+
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/clk/versatile/clk-icst.c       |  6 ++++++
- drivers/clk/versatile/clk-integrator.c | 10 +++++++++-
- drivers/clk/versatile/clk-realview.c   |  8 ++++++++
- 3 files changed, 23 insertions(+), 1 deletion(-)
+ drivers/clk/versatile/clk-icst.c       | 60 +++++++++++++++++++++++++++++-----
+ drivers/clk/versatile/clk-icst.h       | 14 ++++++--
+ drivers/clk/versatile/clk-integrator.c | 45 +++----------------------
+ 3 files changed, 67 insertions(+), 52 deletions(-)
 
 diff --git a/drivers/clk/versatile/clk-icst.c b/drivers/clk/versatile/clk-icst.c
-index f555b50..23d2d7e 100644
+index 23d2d7e..67ccf4a 100644
 --- a/drivers/clk/versatile/clk-icst.c
 +++ b/drivers/clk/versatile/clk-icst.c
-@@ -3,6 +3,12 @@
-  * We wrap the custom interface from <asm/hardware/icst.h> into the generic
-  * clock framework.
-  *
-+ * Copyright (C) 2012 Linus Walleij
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-  * TODO: when all ARM reference designs are migrated to generic clocks, the
-  * ICST clock code from the ARM tree should probably be merged into this
-  * file.
+@@ -17,33 +17,74 @@
+ #include <linux/clkdev.h>
+ #include <linux/err.h>
+ #include <linux/clk-provider.h>
++#include <linux/io.h>
+ 
+ #include "clk-icst.h"
+ 
+ /**
+  * struct clk_icst - ICST VCO clock wrapper
+  * @hw: corresponding clock hardware entry
++ * @vcoreg: VCO register address
++ * @lockreg: VCO lock register address
+  * @params: parameters for this ICST instance
+  * @rate: current rate
+- * @setvco: function to commit ICST settings to hardware
+  */
+ struct clk_icst {
+ 	struct clk_hw hw;
++	void __iomem *vcoreg;
++	void __iomem *lockreg;
+ 	const struct icst_params *params;
+ 	unsigned long rate;
+-	struct icst_vco (*getvco)(void);
+-	void (*setvco)(struct icst_vco);
+ };
+ 
+ #define to_icst(_hw) container_of(_hw, struct clk_icst, hw)
+ 
++/**
++ * vco_get() - get ICST VCO settings from a certain register
++ * @vcoreg: register containing the VCO settings
++ */
++static struct icst_vco vco_get(void __iomem *vcoreg)
++{
++	u32 val;
++	struct icst_vco vco;
++
++	val = readl(vcoreg);
++	vco.v = val & 0x1ff;
++	vco.r = (val >> 9) & 0x7f;
++	vco.s = (val >> 16) & 03;
++	return vco;
++}
++
++/**
++ * vco_set() - commit changes to an ICST VCO
++ * @locreg: register to poke to unlock the VCO for writing
++ * @vcoreg: register containing the VCO settings
++ * @vco: ICST VCO parameters to commit
++ */
++static void vco_set(void __iomem *lockreg,
++			void __iomem *vcoreg,
++			struct icst_vco vco)
++{
++	u32 val;
++
++	val = readl(vcoreg) & ~0x7ffff;
++	val |= vco.v | (vco.r << 9) | (vco.s << 16);
++
++	/* This magic unlocks the VCO so it can be controlled */
++	writel(0xa05f, lockreg);
++	writel(val, vcoreg);
++	/* This locks the VCO again */
++	writel(0, lockreg);
++}
++
++
+ static unsigned long icst_recalc_rate(struct clk_hw *hw,
+ 				      unsigned long parent_rate)
+ {
+ 	struct clk_icst *icst = to_icst(hw);
+ 	struct icst_vco vco;
+ 
+-	vco = icst->getvco();
++	vco = vco_get(icst->vcoreg);
+ 	icst->rate = icst_hz(icst->params, vco);
+ 	return icst->rate;
+ }
+@@ -66,7 +107,7 @@ static int icst_set_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 	vco = icst_hz_to_vco(icst->params, rate);
+ 	icst->rate = icst_hz(icst->params, vco);
+-	icst->setvco(vco);
++	vco_set(icst->vcoreg, icst->lockreg, vco);
+ 	return 0;
+ }
+ 
+@@ -76,8 +117,9 @@ static const struct clk_ops icst_ops = {
+ 	.set_rate = icst_set_rate,
+ };
+ 
+-struct clk * __init icst_clk_register(struct device *dev,
+-				      const struct clk_icst_desc *desc)
++struct clk *icst_clk_register(struct device *dev,
++			const struct clk_icst_desc *desc,
++			void __iomem *base)
+ {
+ 	struct clk *clk;
+ 	struct clk_icst *icst;
+@@ -95,8 +137,8 @@ struct clk * __init icst_clk_register(struct device *dev,
+ 	init.num_parents = 0;
+ 	icst->hw.init = &init;
+ 	icst->params = desc->params;
+-	icst->getvco = desc->getvco;
+-	icst->setvco = desc->setvco;
++	icst->vcoreg = base + desc->vco_offset;
++	icst->lockreg = base + desc->lock_offset;
+ 
+ 	clk = clk_register(dev, &icst->hw);
+ 	if (IS_ERR(clk))
+diff --git a/drivers/clk/versatile/clk-icst.h b/drivers/clk/versatile/clk-icst.h
+index 71b4c56..dad51b6 100644
+--- a/drivers/clk/versatile/clk-icst.h
++++ b/drivers/clk/versatile/clk-icst.h
+@@ -1,10 +1,18 @@
+ #include <asm/hardware/icst.h>
+ 
++/**
++ * struct clk_icst_desc - descriptor for the ICST VCO
++ * @params: ICST parameters
++ * @vco_offset: offset to the ICST VCO from the provided memory base
++ * @lock_offset: offset to the ICST VCO locking register from the provided
++ *	memory base
++ */
+ struct clk_icst_desc {
+ 	const struct icst_params *params;
+-	struct icst_vco (*getvco)(void);
+-	void (*setvco)(struct icst_vco);
++	u32 vco_offset;
++	u32 lock_offset;
+ };
+ 
+ struct clk *icst_clk_register(struct device *dev,
+-			      const struct clk_icst_desc *desc);
++			      const struct clk_icst_desc *desc,
++			      void __iomem *base);
 diff --git a/drivers/clk/versatile/clk-integrator.c b/drivers/clk/versatile/clk-integrator.c
-index a505392..3c816ae 100644
+index 3c816ae..08593b4 100644
 --- a/drivers/clk/versatile/clk-integrator.c
 +++ b/drivers/clk/versatile/clk-integrator.c
-@@ -1,8 +1,16 @@
-+/*
-+ * Clock driver for the ARM Integrator/AP and Integrator/CP boards
-+ * Copyright (C) 2012 Linus Walleij
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/clk-provider.h>
+@@ -10,7 +10,7 @@
  #include <linux/clk.h>
  #include <linux/clkdev.h>
  #include <linux/err.h>
- #include <linux/io.h>
--#include <linux/clk-provider.h>
+-#include <linux/io.h>
++#include <linux/platform_data/clk-integrator.h>
  
  #include <mach/hardware.h>
  #include <mach/platform.h>
-diff --git a/drivers/clk/versatile/clk-realview.c b/drivers/clk/versatile/clk-realview.c
-index e21a99c..fd2dbdb 100644
---- a/drivers/clk/versatile/clk-realview.c
-+++ b/drivers/clk/versatile/clk-realview.c
-@@ -1,3 +1,11 @@
-+/*
-+ * Clock driver for the ARM RealView boards
-+ * Copyright (C) 2012 Linus Walleij
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
- #include <linux/clk.h>
- #include <linux/clkdev.h>
- #include <linux/err.h>
+@@ -22,42 +22,6 @@
+  * Inspired by portions of:
+  * plat-versatile/clock.c and plat-versatile/include/plat/clock.h
+  */
+-#define CM_LOCK		(__io_address(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_LOCK_OFFSET)
+-#define CM_AUXOSC	(__io_address(INTEGRATOR_HDR_BASE)+0x1c)
+-
+-/**
+- * cp_auxvco_get() - get ICST VCO settings for the Integrator/CP
+- * @vco: ICST VCO parameters to update with hardware status
+- */
+-static struct icst_vco cp_auxvco_get(void)
+-{
+-	u32 val;
+-	struct icst_vco vco;
+-
+-	val = readl(CM_AUXOSC);
+-	vco.v = val & 0x1ff;
+-	vco.r = (val >> 9) & 0x7f;
+-	vco.s = (val >> 16) & 03;
+-	return vco;
+-}
+-
+-/**
+- * cp_auxvco_set() - commit changes to Integrator/CP ICST VCO
+- * @vco: ICST VCO parameters to commit
+- */
+-static void cp_auxvco_set(struct icst_vco vco)
+-{
+-	u32 val;
+-
+-	val = readl(CM_AUXOSC) & ~0x7ffff;
+-	val |= vco.v | (vco.r << 9) | (vco.s << 16);
+-
+-	/* This magic unlocks the CM VCO so it can be controlled */
+-	writel(0xa05f, CM_LOCK);
+-	writel(val, CM_AUXOSC);
+-	/* This locks the CM again */
+-	writel(0, CM_LOCK);
+-}
+ 
+ static const struct icst_params cp_auxvco_params = {
+ 	.ref		= 24000000,
+@@ -73,8 +37,8 @@ static const struct icst_params cp_auxvco_params = {
+ 
+ static const struct clk_icst_desc __initdata cp_icst_desc = {
+ 	.params = &cp_auxvco_params,
+-	.getvco = cp_auxvco_get,
+-	.setvco = cp_auxvco_set,
++	.vco_offset = 0x1c,
++	.lock_offset = INTEGRATOR_HDR_LOCK_OFFSET,
+ };
+ 
+ /*
+@@ -114,6 +78,7 @@ void __init integrator_clk_init(bool is_cp)
+ 	clk_register_clkdev(clk, NULL, "sp804");
+ 
+ 	/* ICST VCO clock used on the Integrator/CP CLCD */
+-	clk = icst_clk_register(NULL, &cp_icst_desc);
++	clk = icst_clk_register(NULL, &cp_icst_desc,
++				__io_address(INTEGRATOR_HDR_BASE));
+ 	clk_register_clkdev(clk, NULL, "clcd");
+ }
 -- 
 1.7.11.7
