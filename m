@@ -1,33 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Nov 2012 15:44:35 +0100
-Subject: [PATCH v5 02/10] pinctrl: single: support gpio request and free
-In-Reply-To: <1352968600-15345-3-git-send-email-haojian.zhuang@gmail.com>
-References: <1352968600-15345-1-git-send-email-haojian.zhuang@gmail.com>
- <1352968600-15345-3-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <CACRpkdZQ3D+KFEWqptZNbnw_eqwWFqBejwAgmXLHa0MHNNsy_w@mail.gmail.com>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Tue, 20 Nov 2012 15:44:55 +0100
+Subject: [PATCH v2 6/7] usb: chipidea: usbmisc: add mx53 support
+In-Reply-To: <87obix65t1.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1352981028-14312-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352981028-14312-7-git-send-email-m.grzeschik@pengutronix.de>
+ <87obix65t1.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20121120144455.GA9846@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2012 at 9:36 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
+On Fri, Nov 16, 2012 at 03:22:34PM +0200, Alexander Shishkin wrote:
+> Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
+> 
+> > This adds mx53 as the next user of the usbmisc driver and makes it
+> > possible to disable the overcurrent-detection of the internal phy.
+> >
+> > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> > Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> > ---
+> >  drivers/usb/chipidea/usbmisc_imx.c |   28 ++++++++++++++++++++++++++++
+> >  1 file changed, 28 insertions(+)
+> >
+> > diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+> > index 913e414..9718500 100644
+> > --- a/drivers/usb/chipidea/usbmisc_imx.c
+> > +++ b/drivers/usb/chipidea/usbmisc_imx.c
+> > @@ -54,6 +54,29 @@ static struct usbmisc_usb_device *get_usbdev(struct device *dev)
+> >  	return &usbmisc->usbdev[i];
+> >  }
+> >  
+> > +static int usbmisc_imx53_init(struct device *dev)
+> > +{
+> > +	struct usbmisc_usb_device *usbdev;
+> > +	void __iomem *reg;
+> > +	unsigned long flags;
+> > +	u32 val;
+> > +
+> > +	usbdev = get_usbdev(dev);
+> > +	if (IS_ERR(usbdev))
+> > +		return PTR_ERR(usbdev);
+> > +
+> > +	reg = usbmisc->base + usbdev->index * 8;
+> > +
+> > +	if (usbdev->disable_oc) {
+> > +		spin_lock_irqsave(&usbmisc->lock, flags);
+> > +		val = readl(reg);
+> > +		writel(val | (1 << 5), reg);
+> 
+> We know now that (1 << 5) probably means "disable overcurrent
+> detection", but is there a definition for this register's bits
+> somewhere?
 
-> Marvell's PXA/MMP silicon also match the behavior of pinctrl-single.
-> Each pin binds to one register. A lot of pins could be configured
-> as gpio.
->
-> GPIO range is defined as a child node of pinmux in .dtsi file. If those
-> pins are with the same gpio function configuration in the pinmux
-> register, they could be defined in the same GPIO range. For this new
-> child node, two properties are used.
->
-> reg = <the start of pinmux register in range, size of range>
->
-> pinctrl-single,gpio: <gpio base in range, the gpio function of the range
->                 in the pinmux register>
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+Will add defines for the magic numbers used.
 
-Patch applied with Tony's ACK.
+Thanks,
+Michael
 
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
