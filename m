@@ -1,310 +1,178 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Nov 2012 15:31:10 +0100
-Subject: [PATCH 2/8] clk: mvebu: add armada-370-xp CPU specific clocks
+Date: Tue, 20 Nov 2012 15:31:12 +0100
+Subject: [PATCH 4/8] clk: mvebu: armada 370/XP add clock gating control
+ provider for DT
 In-Reply-To: <1353421876-13759-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353421876-13759-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353421876-13759-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353421876-13759-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Add Armada 370/XP specific CPU clocks
-
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   21 +++
- drivers/clk/mvebu/Kconfig                          |    3 +
- drivers/clk/mvebu/Makefile                         |    1 +
- drivers/clk/mvebu/clk-cpu.c                        |  186 ++++++++++++++++++++
- drivers/clk/mvebu/clk-cpu.h                        |   22 +++
- drivers/clk/mvebu/clk.c                            |    2 +
- 6 files changed, 235 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
- create mode 100644 drivers/clk/mvebu/clk-cpu.c
- create mode 100644 drivers/clk/mvebu/clk-cpu.h
+ .../bindings/clock/mvebu-gated-clock.txt           |   43 ++++++++++++
+ drivers/clk/mvebu/clk-gating-ctrl.c                |   74 +++++++++++++++++++-
+ 2 files changed, 116 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
-new file mode 100644
-index 0000000..feb8301
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
-@@ -0,0 +1,21 @@
-+Device Tree Clock bindings for cpu clock of Marvell EBU platforms
-+
-+Required properties:
-+- compatible : shall be one of the following:
-+	"marvell,armada-xp-cpu-clock" - cpu clocks for Armada XP
-+- reg : Address and length of the clock complex register set
-+- #clock-cells : should be set to 1.
-+- clocks : shall be the input parent clock phandle for the clock.
-+
-+cpuclk: clock-complex at d0018700 {
-+	#clock-cells = <1>;
-+	compatible = "marvell,armada-xp-cpu-clock";
-+	reg = <0xd0018700 0xA0>;
-+	clocks = <&coreclk 1>;
-+}
-+
-+cpu at 0 {
-+	compatible = "marvell,sheeva-v7";
-+	reg = <0>;
-+	clocks = <&cpuclk 0>;
-+};
-diff --git a/drivers/clk/mvebu/Kconfig b/drivers/clk/mvebu/Kconfig
-index fd7bf97..1dd93ad 100644
---- a/drivers/clk/mvebu/Kconfig
-+++ b/drivers/clk/mvebu/Kconfig
-@@ -1,3 +1,6 @@
- config MVEBU_CLK_CORE
-        bool
+diff --git a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+index 4ad8ccd..7337005 100644
+--- a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
++++ b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+@@ -6,6 +6,49 @@ the clock ID in its "clocks" phandle cell. The clock ID is directly mapped to
+ the corresponding clock gating control bit in HW to ease manual clock lookup
+ in datasheet.
  
-+config MVEBU_CLK_CPU
-+       bool
++The following is a list of provided IDs for Armada 370:
++ID	Clock	Peripheral
++-----------------------------------
++0	Audio	AC97 Cntrl
++1	pex0_en	PCIe 0 Clock out
++2	pex1_en	PCIe 1 Clock out
++3	ge1	Gigabit Ethernet 1
++4	ge0	Gigabit Ethernet 0
++5	pex0	PCIe Cntrl 0
++9	pex1	PCIe Cntrl 1
++15	sata0	SATA Host 0
++17	sdio	SDHCI Host
++25	tdm	Time Division Mplx
++28	ddr	DDR Cntrl
++30	sata1	SATA Host 0
 +
-diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
-index de1d961..93da083 100644
---- a/drivers/clk/mvebu/Makefile
-+++ b/drivers/clk/mvebu/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_MVEBU_CLK_CORE) 	+= clk.o clk-core.o
-+obj-$(CONFIG_MVEBU_CLK_CPU) 	+= clk-cpu.o
-diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
-new file mode 100644
-index 0000000..ff004578
---- /dev/null
-+++ b/drivers/clk/mvebu/clk-cpu.c
-@@ -0,0 +1,186 @@
-+/*
-+ * Marvell MVEBU CPU clock handling.
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/clkdev.h>
-+#include <linux/clk-provider.h>
-+#include <linux/of_address.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/delay.h>
-+#include "clk-cpu.h"
++The following is a list of provided IDs for Armada XP:
++ID	Clock	Peripheral
++-----------------------------------
++0	audio	Audio Cntrl
++1	ge3	Gigabit Ethernet 3
++2	ge2	Gigabit Ethernet 2
++3	ge1	Gigabit Ethernet 1
++4	ge0	Gigabit Ethernet 0
++5	pex0	PCIe Cntrl 0
++6	pex1	PCIe Cntrl 1
++7	pex2	PCIe Cntrl 2
++8	pex3	PCIe Cntrl 3
++13	bp
++14	sata0lnk
++15	sata0	SATA Host 0
++16	lcd	LCD Cntrl
++17	sdio	SDHCI Host
++18	usb0	USB Host 0
++19	usb1	USB Host 1
++20	usb2	USB Host 2
++22	xor0	XOR DMA 0
++23	crypto	CESA engine
++25	tdm	Time Division Mplx
++28	xor1	XOR DMA 1
++29	sata1lnk
++30	sata1	SATA Host 0
 +
-+#define SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET    0x0
-+#define SYS_CTRL_CLK_DIVIDER_VALUE_OFFSET   0xC
-+#define SYS_CTRL_CLK_DIVIDER_MASK	    0x3F
+ The following is a list of provided IDs for Dove:
+ ID	Clock	Peripheral
+ -----------------------------------
+diff --git a/drivers/clk/mvebu/clk-gating-ctrl.c b/drivers/clk/mvebu/clk-gating-ctrl.c
+index fa69f87..c6d3c26 100644
+--- a/drivers/clk/mvebu/clk-gating-ctrl.c
++++ b/drivers/clk/mvebu/clk-gating-ctrl.c
+@@ -88,10 +88,21 @@ static void __init mvebu_clk_gating_setup(
+ 	}
+ 
+ 	for (n = 0; n < ctrl->num_gates; n++) {
++		u8 flags = 0;
+ 		const char *parent =
+ 			(descr[n].parent) ? descr[n].parent : default_parent;
 +
-+#define MAX_CPU	    4
-+struct cpu_clk {
-+	struct clk_hw hw;
-+	int cpu;
-+	const char *clk_name;
-+	const char *parent_name;
-+	void __iomem *reg_base;
++		/*
++		 * On Armada 370, the DDR clock is a special case: it
++		 * isn't taken by any driver, but should anyway be
++		 * kept enabled, so we mark it as IGNORE_UNUSED for
++		 * now.
++		 */
++		if (!strcmp(descr[n].name, "ddr"))
++			flags |= CLK_IGNORE_UNUSED;
++
+ 		ctrl->gates[n] = clk_register_gate(NULL, descr[n].name, parent,
+-				   0, base, descr[n].bit_idx, 0, &ctrl->lock);
++				   flags, base, descr[n].bit_idx, 0, &ctrl->lock);
+ 		WARN_ON(IS_ERR(ctrl->gates[n]));
+ 	}
+ 	of_clk_add_provider(np, mvebu_clk_gating_get_src, ctrl);
+@@ -101,6 +112,53 @@ static void __init mvebu_clk_gating_setup(
+  * SoC specific clock gating control
+  */
+ 
++#ifdef CONFIG_MACH_ARMADA_370
++static const struct mvebu_soc_descr __initconst armada_370_gating_descr[] = {
++	{ "audio", NULL, 0 },
++	{ "pex0_en", NULL, 1 },
++	{ "pex1_en", NULL,  2 },
++	{ "ge1", NULL, 3 },
++	{ "ge0", NULL, 4 },
++	{ "pex0", NULL, 5 },
++	{ "pex1", NULL, 9 },
++	{ "sata0", NULL, 15 },
++	{ "sdio", NULL, 17 },
++	{ "tdm", NULL, 25 },
++	{ "ddr", NULL, 28 },
++	{ "sata1", NULL, 30 },
++	{ }
 +};
-+
-+static struct clk **clks;
-+
-+static struct clk_onecell_data clk_data;
-+
-+#define to_cpu_clk(p) container_of(p, struct cpu_clk, hw)
-+
-+static unsigned long clk_cpu_recalc_rate(struct clk_hw *hwclk,
-+					 unsigned long parent_rate)
-+{
-+	struct cpu_clk *cpuclk = to_cpu_clk(hwclk);
-+	u32 reg, div;
-+
-+	reg = readl(cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_VALUE_OFFSET);
-+	div = (reg >> (cpuclk->cpu * 8)) & SYS_CTRL_CLK_DIVIDER_MASK;
-+	return parent_rate / div;
-+}
-+
-+static long clk_cpu_round_rate(struct clk_hw *hwclk, unsigned long rate,
-+			       unsigned long *parent_rate)
-+{
-+	/* Valid ratio are 1:1, 1:2 and 1:3 */
-+	u32 div;
-+
-+	div = *parent_rate / rate;
-+	if (div == 0)
-+		div = 1;
-+	else if (div > 3)
-+		div = 3;
-+
-+	return *parent_rate / div;
-+}
-+
-+static int clk_cpu_set_rate(struct clk_hw *hwclk, unsigned long rate,
-+			    unsigned long parent_rate)
-+{
-+	struct cpu_clk *cpuclk = to_cpu_clk(hwclk);
-+	u32 reg, div;
-+	u32 reload_mask;
-+
-+	div = parent_rate / rate;
-+	reg = (readl(cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_VALUE_OFFSET)
-+		& (~(SYS_CTRL_CLK_DIVIDER_MASK << (cpuclk->cpu * 8))))
-+		| (div << (cpuclk->cpu * 8));
-+	writel(reg, cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_VALUE_OFFSET);
-+	/* Set clock divider reload smooth bit mask */
-+	reload_mask = 1 << (20 + cpuclk->cpu);
-+
-+	reg = readl(cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET)
-+	    | reload_mask;
-+	writel(reg, cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET);
-+
-+	/* Now trigger the clock update */
-+	reg = readl(cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET)
-+	    | 1 << 24;
-+	writel(reg, cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET);
-+
-+	/* Wait for clocks to settle down then clear reload request */
-+	udelay(1000);
-+	reg &= ~(reload_mask | 1 << 24);
-+	writel(reg, cpuclk->reg_base + SYS_CTRL_CLK_DIVIDER_CTRL_OFFSET);
-+	udelay(1000);
-+
-+	return 0;
-+}
-+
-+static const struct clk_ops cpu_ops = {
-+	.recalc_rate = clk_cpu_recalc_rate,
-+	.round_rate = clk_cpu_round_rate,
-+	.set_rate = clk_cpu_set_rate,
-+};
-+
-+void __init of_cpu_clk_setup(struct device_node *node)
-+{
-+	struct cpu_clk *cpuclk;
-+	void __iomem *clock_complex_base = of_iomap(node, 0);
-+	int ncpus = 0;
-+	struct device_node *dn;
-+
-+	if (clock_complex_base == NULL) {
-+		pr_err("%s: clock-complex base register not set\n",
-+			__func__);
-+		return;
-+	}
-+
-+	for_each_node_by_type(dn, "cpu")
-+		ncpus++;
-+
-+	cpuclk = kzalloc(ncpus * sizeof(*cpuclk), GFP_KERNEL);
-+	if (WARN_ON(!cpuclk))
-+		return;
-+
-+	clks = kzalloc(ncpus * sizeof(*clks), GFP_KERNEL);
-+	if (WARN_ON(!clks))
-+		return;
-+
-+	for_each_node_by_type(dn, "cpu") {
-+		struct clk_init_data init;
-+		struct clk *clk;
-+		struct clk *parent_clk;
-+		char *clk_name = kzalloc(5, GFP_KERNEL);
-+		int cpu, err;
-+
-+		if (WARN_ON(!clk_name))
-+			return;
-+
-+		err = of_property_read_u32(dn, "reg", &cpu);
-+		if (WARN_ON(err))
-+			return;
-+
-+		sprintf(clk_name, "cpu%d", cpu);
-+		parent_clk = of_clk_get(node, 0);
-+
-+		cpuclk[cpu].parent_name = __clk_get_name(parent_clk);
-+		cpuclk[cpu].clk_name = clk_name;
-+		cpuclk[cpu].cpu = cpu;
-+		cpuclk[cpu].reg_base = clock_complex_base;
-+		cpuclk[cpu].hw.init = &init;
-+
-+		init.name = cpuclk[cpu].clk_name;
-+		init.ops = &cpu_ops;
-+		init.flags = 0;
-+		init.parent_names = &cpuclk[cpu].parent_name;
-+		init.num_parents = 1;
-+
-+		clk = clk_register(NULL, &cpuclk[cpu].hw);
-+		if (WARN_ON(IS_ERR(clk)))
-+			goto bail_out;
-+		clks[cpu] = clk;
-+	}
-+	clk_data.clk_num = MAX_CPU;
-+	clk_data.clks = clks;
-+	of_clk_add_provider(node, of_clk_src_onecell_get, &clk_data);
-+
-+	return;
-+bail_out:
-+	kfree(clks);
-+	kfree(cpuclk);
-+}
-+
-+static const __initconst struct of_device_id clk_cpu_match[] = {
-+	{
-+		.compatible = "marvell,armada-xp-cpu-clock",
-+		.data = of_cpu_clk_setup,
-+	},
-+	{
-+		/* sentinel */
-+	},
-+};
-+
-+void __init mvebu_cpu_clk_init(void)
-+{
-+	of_clk_init(clk_cpu_match);
-+}
-diff --git a/drivers/clk/mvebu/clk-cpu.h b/drivers/clk/mvebu/clk-cpu.h
-new file mode 100644
-index 0000000..08e2aff
---- /dev/null
-+++ b/drivers/clk/mvebu/clk-cpu.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Marvell MVEBU CPU clock handling.
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __MVEBU_CLK_CPU_H
-+#define __MVEBU_CLK_CPU_H
-+
-+#ifdef CONFIG_MVEBU_CLK_CPU
-+void __init mvebu_cpu_clk_init(void);
-+#else
-+static inline void mvebu_cpu_clk_init(void) {}
 +#endif
 +
++#ifdef CONFIG_MACH_ARMADA_XP
++static const struct mvebu_soc_descr __initconst armada_xp_gating_descr[] = {
++	{ "audio", NULL, 0 },
++	{ "ge3", NULL, 1 },
++	{ "ge2", NULL,  2 },
++	{ "ge1", NULL, 3 },
++	{ "ge0", NULL, 4 },
++	{ "pex0", NULL, 5 },
++	{ "pex1", NULL, 6 },
++	{ "pex2", NULL, 7 },
++	{ "pex3", NULL, 8 },
++	{ "bp", NULL, 13 },
++	{ "sata0lnk", NULL, 14 },
++	{ "sata0", "sata0lnk", 15 },
++	{ "lcd", NULL, 16 },
++	{ "sdio", NULL, 17 },
++	{ "usb0", NULL, 18 },
++	{ "usb1", NULL, 19 },
++	{ "usb2", NULL, 20 },
++	{ "xor0", NULL, 22 },
++	{ "crypto", NULL, 23 },
++	{ "tdm", NULL, 25 },
++	{ "xor1", NULL, 28 },
++	{ "sata1lnk", NULL, 29 },
++	{ "sata1", "sata1lnk", 30 },
++	{ }
++};
 +#endif
-diff --git a/drivers/clk/mvebu/clk.c b/drivers/clk/mvebu/clk.c
-index e6742ac..e3d4d7a 100644
---- a/drivers/clk/mvebu/clk.c
-+++ b/drivers/clk/mvebu/clk.c
-@@ -16,8 +16,10 @@
- #include <linux/clk/mvebu.h>
- #include <linux/of.h>
- #include "clk-core.h"
-+#include "clk-cpu.h"
++
+ #ifdef CONFIG_ARCH_DOVE
+ static const struct mvebu_soc_descr __initconst dove_gating_descr[] = {
+ 	{ "usb0", NULL, 0 },
+@@ -147,6 +205,20 @@ static const struct mvebu_soc_descr __initconst kirkwood_gating_descr[] = {
+ #endif
  
- void __init mvebu_clocks_init(void)
- {
- 	mvebu_core_clk_init();
-+	mvebu_cpu_clk_init();
- }
+ static const __initdata struct of_device_id clk_gating_match[] = {
++#ifdef CONFIG_MACH_ARMADA_370
++	{
++		.compatible = "marvell,armada-370-gating-clock",
++		.data = armada_370_gating_descr,
++	},
++#endif
++
++#ifdef CONFIG_MACH_ARMADA_XP
++	{
++		.compatible = "marvell,armada-xp-gating-clock",
++		.data = armada_xp_gating_descr,
++	},
++#endif
++
+ #ifdef CONFIG_ARCH_DOVE
+ 	{
+ 		.compatible = "marvell,dove-gating-clock",
 -- 
 1.7.9.5
