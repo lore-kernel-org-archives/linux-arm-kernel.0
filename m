@@ -1,17 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Nov 2012 09:59:49 -0800
-Subject: [PATCH 032/493] arm: remove use of __devexit_p
-In-Reply-To: <1353349642-3677-32-git-send-email-wfp5p@virginia.edu>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-32-git-send-email-wfp5p@virginia.edu>
-Message-ID: <20121120175949.GI18567@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 20 Nov 2012 10:43:57 -0800
+Subject: [PATCH 2/2] ARM: dts: snow: Add board dts file for Snow board
+ (ARM Chromebook)
+In-Reply-To: <1353432158-22999-2-git-send-email-dianders@chromium.org>
+References: <1353432158-22999-1-git-send-email-dianders@chromium.org>
+ <1353432158-22999-2-git-send-email-dianders@chromium.org>
+Message-ID: <CAOesGMiGZHAw0zOZFZcYJ9YngbcMsTJrzhG+DQ5sP9Sq+CyzDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Bill Pemberton <wfp5p@virginia.edu> [121119 10:29]:
-> CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
-> needed.
+On Tue, Nov 20, 2012 at 9:22 AM, Doug Anderson <dianders@chromium.org> wrote:
+> This dts file is based on the Snow dts file in the Chromium OS kernel
+> tree with the following changes:
+> * Some details have been updated to match the exynos5250-smdk5250.dts
+>   file from linux-next (as of
+>   c11068538994430547722dc9fb515a0ceefd5cb9).
+> * This file doesn't include references to hardware whose upstream
+>   support isn't quite there yet.  That includes most i2c devices.
+>   Note that most i2c busses have been included with no devices.
+>
+> The Snow dts file is mostly just an include of the "cros5250" dts file
+> which describes a class of similar boards.  Support for other boards
+> has not yet been send upstream.
+>
+> With this file and a change to use UART3 for serial output I can:
+> * Boot to a command line using either SD or EMMC as a root filesystem
+> * See the power button and lid switch using evtest.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-For the arch/arm/*omap*/* touching patches:
+Acked-by: Olof Johansson <olof@lixom.net>
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Kukjin, since your pull requests came in today, can you ack this and
+I'll just apply it on top of your branches?
+
+
+Thanks,
+
+-Olof
