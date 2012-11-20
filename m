@@ -1,63 +1,42 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Nov 2012 15:57:02 +0100
-Subject: [PATCH 1/4] arm: mvebu: increase atomic coherent pool size for armada
+Date: Tue, 20 Nov 2012 15:57:03 +0100
+Subject: [PATCH 2/4] arm: mvebu: SATA support: SoC-level DT data for Armada
  370/XP
 In-Reply-To: <1353423425-20574-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353423425-20574-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353423425-20574-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353423425-20574-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-For Armada 370/XP we have the same problem that for the commit
-cb01b63, so we applied the same solution: "The default 256 KiB
-coherent pool may be too small for some of the Kirkwood devices, so
-increase it to make sure that devices will be able to allocate their
-buffers with GFP_ATOMIC flag"
-
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Lior Amsalem <alior@marvell.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/armada-370-xp.c |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/armada-370-xp.dtsi |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index 3292d6d..cd6eac1 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -18,6 +18,7 @@
- #include <linux/io.h>
- #include <linux/time-armada-370-xp.h>
- #include <linux/clk/mvebu.h>
-+#include <linux/dma-mapping.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
-@@ -44,6 +45,16 @@ void __init armada_370_xp_timer_and_clk_init(void)
- 	armada_370_xp_timer_init();
- }
- 
-+void __init armada_370_xp_init_early(void)
-+{
-+	/*
-+	 * Some Armada 370/XP devices allocate their coherent buffers
-+	 * from atomic context. Increase size of atomic coherent pool
-+	 * to make sure such the allocations won't fail.
-+	 */
-+	init_dma_coherent_pool_size(SZ_1M);
-+}
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 94b4b9e..0abc8a1 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -69,6 +69,16 @@
+ 			compatible = "marvell,armada-addr-decoding-controller";
+ 			reg = <0xd0020000 0x258>;
+ 		};
 +
- struct sys_timer armada_370_xp_timer = {
- 	.init		= armada_370_xp_timer_and_clk_init,
++		sata at d00a0000 {
++			compatible = "marvell,orion-sata";
++			reg = <0xd00a0000 0x2400>;
++			interrupts = <55>;
++			clocks = <&gateclk 15>, <&gateclk 30>;
++			clock-names = "0", "1";
++			status = "disabled";
++		};
++
+ 	};
  };
-@@ -62,6 +73,7 @@ static const char * const armada_370_xp_dt_board_dt_compat[] = {
- DT_MACHINE_START(ARMADA_XP_DT, "Marvell Aramada 370/XP (Device Tree)")
- 	.init_machine	= armada_370_xp_dt_init,
- 	.map_io		= armada_370_xp_map_io,
-+	.init_early	= armada_370_xp_init_early,
- 	.init_irq	= armada_370_xp_init_irq,
- 	.handle_irq     = armada_370_xp_handle_irq,
- 	.timer		= &armada_370_xp_timer,
+ 
 -- 
 1.7.9.5
