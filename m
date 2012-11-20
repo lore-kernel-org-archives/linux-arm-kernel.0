@@ -1,38 +1,40 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Nov 2012 11:50:54 +0100
-Subject: arm: mvebu: Various mvebu clock fixes/improvements
-In-Reply-To: <20121120110636.7306b00e@skate>
-References: <1353343963-23034-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121119182701.GS14643@lunn.ch> <20121120104042.224e51a5@skate>
- <20121120094345.GO10259@lunn.ch> <20121120110636.7306b00e@skate>
-Message-ID: <20121120115054.6425563a@skate>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 20 Nov 2012 11:51:42 +0100
+Subject: [PATCH 2/3] ARM: dts: AM33XX: Add d_can instances to aliases
+In-Reply-To: <1352916505-12343-3-git-send-email-anilkumar@ti.com>
+References: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
+ <1352916505-12343-3-git-send-email-anilkumar@ti.com>
+Message-ID: <50AB60BE.1080002@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Tue, 20 Nov 2012 11:06:36 +0100, Thomas Petazzoni wrote:
-
-> Hum, I will check this. But I think that the point that lead me to look
-> into the clocks is that when I added:
+On 11/14/2012 07:08 PM, AnilKumar Ch wrote:
+> Add d_can instances to aliases node to get the D_CAN instance number
+> from the driver. To initialize D_CAN message RAM, corresponding instance
+> number is required.
 > 
-> 	clocks = <&gate_clk xx>;
+> To initialize instance 0 message RAM then 0x1 should be written and for
+> instance 1 message RAM, 0x2 should be written to control module register.
 > 
-> to my Ethernet DT nodes, then clk_get() was returning an error, until I
-> enabled the gating clocks. But I'll double check that.
+> With device-tree framework ip instance number is "-1" by default for all
+> instances. To get device id/instance number then modules should be added
+> to DT "aliases" node. of_alias_get_id() gives the device id number based
+> on number of alias nodes present in "aliases node".
+> 
+> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 
-It is indeed not fatal with SATA because the driver tries to get the
-clock, and if it can't, the driver just gives up.
+Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
 
-However, with the mvneta driver, it really wants the clock (the driver
-needs at some point to do a clk_get_rate(), so we have to have a
-clock), and in this case, not having the gating clocks is an issue.
-
-That said, since the mvneta driver is new, I don't mind if it is
-non-functional up to the point where the gating clocks are enabled.
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/7f5902dc/attachment.sig>
