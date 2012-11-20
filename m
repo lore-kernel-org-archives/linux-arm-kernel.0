@@ -1,77 +1,91 @@
-From: rric@kernel.org (Robert Richter)
-Date: Tue, 20 Nov 2012 17:31:58 +0100
-Subject: [PATCH 1/1] ARM: oprofile: add A5/A7/A15 entries in op_perf_name
-In-Reply-To: <20121120155717.GD26475@mudshark.cambridge.arm.com>
-References: <1351853016-4476-1-git-send-email-jgq516@gmail.com>
- <20121105113102.GF3351@mudshark.cambridge.arm.com>
- <20121120121747.GJ2504@rric.localhost>
- <20121120155717.GD26475@mudshark.cambridge.arm.com>
-Message-ID: <20121120163158.GO2504@rric.localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Nov 2012 16:32:43 +0000
+Subject: [PATCH V4 1/5] arm: mvebu: Added support for coherency fabric in
+ mach-mvebu
+In-Reply-To: <1353357360-7242-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1353357360-7242-1-git-send-email-gregory.clement@free-electrons.com>
+ <1353357360-7242-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20121120163243.GA27765@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.11.12 15:57:17, Will Deacon wrote:
-> On Tue, Nov 20, 2012 at 12:17:47PM +0000, Robert Richter wrote:
-> > Will,
-> > 
-> > On 05.11.12 11:31:03, Will Deacon wrote:
-> > > > diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> > > > index 99c63d4b..ec10db1 100644
-> > > > --- a/arch/arm/oprofile/common.c
-> > > > +++ b/arch/arm/oprofile/common.c
-> > > > @@ -37,8 +37,11 @@ static struct op_perf_name {
-> > > >  	{ "xscale1",		"arm/xscale2"	},
-> > > >  	{ "v6",			"arm/armv6"	},
-> > > >  	{ "v6mpcore",		"arm/mpcore"	},
-> > > > +	{ "ARMv7 Cortex-A5",	"arm/armv7-ca5"	},
-> > > > +	{ "ARMv7 Cortex-A7",	"arm/armv7-ca7"	},
-> > > >  	{ "ARMv7 Cortex-A8",	"arm/armv7"	},
-> > > >  	{ "ARMv7 Cortex-A9",	"arm/armv7-ca9"	},
-> > > > +	{ "ARMv7 Cortex-A15",	"arm/armv7-ca15" },
-> > > >  };
-> > 
-> > > I'd rather not go down this route now that we have the operf tool as part of
-> > > oprofile, which can use the perf syscall directly and doesn't need this
-> > > string translation.
-> > 
-> > since this is just an update of cpu detection I would be willing to
-> > include this into kernel code anyway.
+Hi Gregory,
+
+Thanks for turning this around so quickly! I still have a few comments on
+your assembly, but you've got the right idea:
+
+On Mon, Nov 19, 2012 at 08:35:55PM +0000, Gregory CLEMENT wrote:
+> From: Yehuda Yitschak <yehuday@marvell.com>
 > 
-> Perhaps, but one day we might like to remove this compatibility layer as
-> tools move over to the perf system call, so adding new CPUs here is actively
-> going against that.
+> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-This would help people to use oprofile as they did before with legacy
-oprofile tools. There is not much effort to keep oprofile kernel
-support for these tools if in-kernel perf_event support exists for new
-hardware. As this is not much effort to maintain, we could keep
-supporting this.  Forcing users to use operf since this is the only
-way to connect to newer hardware might not be what they want.
+[...]
 
-> > We could further move the cpu detection to userspace if perf_event
-> > exists. We let the kernel enable oprofile with cpu_type="unknown".
-> > User space then could either bind mount the file (user could do this
-> > manually) or we implement to write to cpu_type. Doing so oprofile
-> > could use in-kernel perf_events if it exists always as fallback.
-> 
-> Not sure I follow you... operf already does the CPU detection from
-> userspace, so I guess that code could simply be re-used. What does the bind
-> mount involve?
+> +/* Function defined in coherncy_ll.S */
+> +extern void ll_set_cpu_coherent(void __iomem *base_addr,
+> +				unsigned int hw_cpu_id);
+> +
+> +int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
+> +{
+> +	if (!coherency_base) {
+> +		pr_warn("Can't make CPU %d cache coherent.\n", hw_cpu_id);
+> +		pr_warn("Coherency fabric is not initialized\n");
+> +		return 1;
+> +	}
+> +	ll_set_cpu_coherent(coherency_base, hw_cpu_id);
+> +	return 0;
+> +}
 
-I am thinking of the following:
+Yup, something like this is neater I reckon. You could even make
+ll_set_cpu_coherent return 0 if you wanted, but it's up to you.
 
- # cat /root/cpu_type
- arm/armv7-ca5
- # cat /dev/oprofile/cpu_type
- unknown
- # mount --bind /root/cpu_type /dev/oprofile/cpu_type
- # cat /dev/oprofile/cpu_type
- arm/armv7-ca5
+> +#include <linux/linkage.h>
+> +#define ARMADA_XP_CFB_CTL_REG_OFFSET 0x0
+> +#define ARMADA_XP_CFB_CFG_REG_OFFSET 0x4
+> +
+> +	.text
+> +/*
+> + * r0: CFB base adresse register
 
->From here legacy oprofile tools work as expected using oprofilefs. (I
-think. Did not test it.) We need to change the kernel for this a bit
-to return 'unknown'. The mount could be done by the oprofile tools
-using existing cpu detection code. This is only one way to setup
-cpu_type from userland, there could be other ways too.
+address
 
--Robert
+> + * r1: HW CPU id
+> + */
+> +ENTRY(ll_set_cpu_coherent)
+> +	/* Create bit by cpu index */
+> +	add     r1,r1,#24
+> +	mov     r3, #1
+
+Can you instead mov r3, #(1 << 24) and get rid of these two instructions?
+
+> +	lsl     r1, r3, r1
+> +
+> +
+> +	/* Add CPU to SMP group - Atomic */
+> +	 orr	r0, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
+
+An add might be clearer here, despite the address alignment.
+
+> +	ldr     r4, [r0]
+> +	orr     r4 , r4, r1
+> +	str	r4,[r0]
+
+You haven't saved r4, so you can't use it here. It looks like you have r2
+spare -- why not use that instead?
+
+> +	/* Enable coherency on CPU - Atomic*/
+> +	orr	r0, r0, #ARMADA_XP_CFB_CFG_REG_OFFSET
+
+add
+
+> +	ldr     r4, [r0]
+> +	orr     r4 , r4, r1
+> +	str     r4,[r0]
+
+mov	r0, #0 here if you want to return 0.
+
+> +	mov	pc, lr
+> +ENDPROC(ll_set_cpu_coherent)
+
+Will
