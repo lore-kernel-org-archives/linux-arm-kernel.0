@@ -1,99 +1,227 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Nov 2012 15:31:14 +0100
-Subject: [PATCH 6/8] clocksource: convert time-armada-370-xp to clk framework
+Date: Tue, 20 Nov 2012 15:31:15 +0100
+Subject: [PATCH 7/8] ARM: dove: switch to DT clock providers
 In-Reply-To: <1353421876-13759-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353421876-13759-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353421876-13759-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353421876-13759-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Tested-by Gregory CLEMENT <gregory.clement@free-electrons.com>
+With true DT clock providers available switch Dove clock setup in DT-
+enabled boards. While AUXDATA can be removed completely from bus probing,
+some devices still don't know about DT at all. Therefore, some clock
+aliases are created until the devices also move to DT.
+
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- .../bindings/arm/armada-370-xp-timer.txt           |    1 +
- arch/arm/boot/dts/armada-370-db.dts                |    4 ----
- arch/arm/boot/dts/armada-370-xp.dtsi               |    1 +
- drivers/clocksource/time-armada-370-xp.c           |   11 ++++++-----
- 4 files changed, 8 insertions(+), 9 deletions(-)
+ arch/arm/Kconfig            |    1 +
+ arch/arm/boot/dts/dove.dtsi |   20 ++++++++++++++
+ arch/arm/mach-dove/Kconfig  |    2 ++
+ arch/arm/mach-dove/common.c |   63 ++++++++++++++++++++++++++++++++-----------
+ 4 files changed, 71 insertions(+), 15 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt
-index 8b6ea22..6483011 100644
---- a/Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt
-+++ b/Documentation/devicetree/bindings/arm/armada-370-xp-timer.txt
-@@ -5,6 +5,7 @@ Required properties:
- - compatible: Should be "marvell,armada-370-xp-timer"
- - interrupts: Should contain the list of Global Timer interrupts
- - reg: Should contain the base address of the Global Timer registers
-+- clocks: clock driving the timer hardware
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ade7e92..0590099 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -533,6 +533,7 @@ config ARCH_IXP4XX
+ config ARCH_DOVE
+ 	bool "Marvell Dove"
+ 	select ARCH_REQUIRE_GPIOLIB
++	select COMMON_CLK_DOVE
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
+ 	select MIGHT_HAVE_PCI
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 5a00022..b524ee3 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -31,6 +31,19 @@
+ 			reg = <0x20204 0x04>, <0x20214 0x04>;
+ 		};
  
- Optional properties:
- - marvell,timer-25Mhz: Tells whether the Global timer supports the 25
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index fffd5c2..4a31b03 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -34,9 +34,5 @@
- 			clock-frequency = <200000000>;
++		core_clk: core-clocks at d0214 {
++			compatible = "marvell,dove-core-clock";
++			reg = <0xd0214 0x4>;
++			#clock-cells = <1>;
++		};
++
++		gate_clk: clock-gating-control at d0038 {
++			compatible = "marvell,dove-gating-clock";
++			reg = <0xd0038 0x4>;
++			clocks = <&core_clk 0>;
++			#clock-cells = <1>;
++		};
++
+ 		uart0: serial at 12000 {
+ 			compatible = "ns16550a";
+ 			reg = <0x12000 0x100>;
+@@ -100,6 +113,7 @@
+ 			cell-index = <0>;
+ 			interrupts = <6>;
+ 			reg = <0x10600 0x28>;
++			clocks = <&core_clk 0>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -110,6 +124,7 @@
+ 			cell-index = <1>;
+ 			interrupts = <5>;
+ 			reg = <0x14600 0x28>;
++			clocks = <&core_clk 0>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -121,6 +136,7 @@
+ 			interrupts = <11>;
+ 			clock-frequency = <400000>;
+ 			timeout-ms = <1000>;
++			clocks = <&core_clk 0>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -128,6 +144,7 @@
+ 			compatible = "marvell,dove-sdhci";
+ 			reg = <0x92000 0x100>;
+ 			interrupts = <35>, <37>;
++			clocks = <&gate_clk 8>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -135,6 +152,7 @@
+ 			compatible = "marvell,dove-sdhci";
+ 			reg = <0x90000 0x100>;
+ 			interrupts = <36>, <38>;
++			clocks = <&gate_clk 9>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -142,6 +160,7 @@
+ 			compatible = "marvell,orion-sata";
+ 			reg = <0xa0000 0x2400>;
+ 			interrupts = <62>;
++			clocks = <&gate_clk 3>;
+ 			nr-ports = <1>;
+ 			status = "disabled";
+ 		};
+@@ -152,6 +171,7 @@
+ 			      <0xc8000000 0x800>;
+ 			reg-names = "regs", "sram";
+ 			interrupts = <31>;
++			clocks = <&gate_clk 15>;
  			status = "okay";
  		};
--		timer at d0020300 {
--			clock-frequency = <600000000>;
--			status = "okay";
--		};
  	};
- };
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 16cc82c..94b4b9e 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -62,6 +62,7 @@
- 			       compatible = "marvell,armada-370-xp-timer";
- 			       reg = <0xd0020300 0x30>;
- 			       interrupts = <37>, <38>, <39>, <40>;
-+			       clocks = <&coreclk 2>;
- 		};
+diff --git a/arch/arm/mach-dove/Kconfig b/arch/arm/mach-dove/Kconfig
+index 00154e7..603c5fd 100644
+--- a/arch/arm/mach-dove/Kconfig
++++ b/arch/arm/mach-dove/Kconfig
+@@ -17,6 +17,8 @@ config MACH_CM_A510
  
- 		addr-decoding at d0020000 {
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index 4674f94..a4605fd 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -18,6 +18,7 @@
- #include <linux/init.h>
+ config MACH_DOVE_DT
+ 	bool "Marvell Dove Flattened Device Tree"
++	select MVEBU_CLK_CORE
++	select MVEBU_CLK_GATING
+ 	select USE_OF
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index f723fe1..6a2c4dc 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -14,6 +14,7 @@
  #include <linux/platform_device.h>
- #include <linux/kernel.h>
-+#include <linux/clk.h>
- #include <linux/timer.h>
- #include <linux/clockchips.h>
- #include <linux/interrupt.h>
-@@ -167,7 +168,6 @@ void __init armada_370_xp_timer_init(void)
- 	u32 u;
- 	struct device_node *np;
- 	unsigned int timer_clk;
--	int ret;
- 	np = of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-timer");
- 	timer_base = of_iomap(np, 0);
- 	WARN_ON(!timer_base);
-@@ -179,13 +179,14 @@ void __init armada_370_xp_timer_init(void)
- 		       timer_base + TIMER_CTRL_OFF);
- 		timer_clk = 25000000;
- 	} else {
--		u32 clk = 0;
--		ret = of_property_read_u32(np, "clock-frequency", &clk);
--		WARN_ON(!clk || ret < 0);
-+		unsigned long rate = 0;
-+		struct clk *clk = of_clk_get(np, 0);
-+		WARN_ON(IS_ERR(clk));
-+		rate =  clk_get_rate(clk);
- 		u = readl(timer_base + TIMER_CTRL_OFF);
- 		writel(u & ~(TIMER0_25MHZ | TIMER1_25MHZ),
- 		       timer_base + TIMER_CTRL_OFF);
--		timer_clk = clk / TIMER_DIVIDER;
-+		timer_clk = rate / TIMER_DIVIDER;
- 	}
+ #include <linux/pci.h>
+ #include <linux/clk-provider.h>
++#include <linux/clk/mvebu.h>
+ #include <linux/ata_platform.h>
+ #include <linux/gpio.h>
+ #include <linux/of.h>
+@@ -376,19 +377,52 @@ void dove_restart(char mode, const char *cmd)
  
- 	/* We use timer 0 as clocksource, and timer 1 for
+ #if defined(CONFIG_MACH_DOVE_DT)
+ /*
+- * Auxdata required until real OF clock provider
++ * There are still devices that doesn't even know about DT,
++ * get clock gates here and add a clock lookup.
+  */
+-struct of_dev_auxdata dove_auxdata_lookup[] __initdata = {
+-	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
+-	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1014600, "orion_spi.1", NULL),
+-	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
+-	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011000, "mv64xxx_i2c.0",
+-		       NULL),
+-	OF_DEV_AUXDATA("marvell,orion-sata", 0xf10a0000, "sata_mv.0", NULL),
+-	OF_DEV_AUXDATA("marvell,dove-sdhci", 0xf1092000, "sdhci-dove.0", NULL),
+-	OF_DEV_AUXDATA("marvell,dove-sdhci", 0xf1090000, "sdhci-dove.1", NULL),
+-	{},
+-};
++static void __init dove_legacy_clk_init(void)
++{
++	struct device_node *np = of_find_compatible_node(NULL, NULL,
++					 "marvell,dove-gating-clock");
++	struct of_phandle_args clkspec;
++
++	clkspec.np = np;
++	clkspec.args_count = 1;
++
++	clkspec.args[0] = CLOCK_GATING_BIT_USB0;
++	orion_clkdev_add(NULL, "orion-ehci.0",
++			 of_clk_get_from_provider(&clkspec));
++
++	clkspec.args[0] = CLOCK_GATING_BIT_USB1;
++	orion_clkdev_add(NULL, "orion-ehci.1",
++			 of_clk_get_from_provider(&clkspec));
++
++	clkspec.args[0] = CLOCK_GATING_BIT_GBE;
++	orion_clkdev_add(NULL, "mv643xx_eth_port.0",
++			 of_clk_get_from_provider(&clkspec));
++
++	clkspec.args[0] = CLOCK_GATING_BIT_PCIE0;
++	orion_clkdev_add("0", "pcie",
++			 of_clk_get_from_provider(&clkspec));
++
++	clkspec.args[0] = CLOCK_GATING_BIT_PCIE1;
++	orion_clkdev_add("1", "pcie",
++			 of_clk_get_from_provider(&clkspec));
++
++	clkspec.args[0] = CLOCK_GATING_BIT_XOR0;
++	orion_clkdev_add(NULL, "mv_xor_shared.0",
++			 of_clk_get_from_provider(&clkspec));
++
++	clkspec.args[0] = CLOCK_GATING_BIT_XOR1;
++	orion_clkdev_add(NULL, "mv_xor_shared.1",
++			 of_clk_get_from_provider(&clkspec));
++}
++
++static void __init dove_of_clk_init(void)
++{
++	mvebu_clocks_init();
++	dove_legacy_clk_init();
++}
+ 
+ static struct mv643xx_eth_platform_data dove_dt_ge00_data = {
+ 	.phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT,
+@@ -405,7 +439,7 @@ static void __init dove_dt_init(void)
+ 	dove_setup_cpu_mbus();
+ 
+ 	/* Setup root of clk tree */
+-	dove_clk_init();
++	dove_of_clk_init();
+ 
+ 	/* Internal devices not ported to DT yet */
+ 	dove_rtc_init();
+@@ -417,8 +451,7 @@ static void __init dove_dt_init(void)
+ 	dove_ehci1_init();
+ 	dove_pcie_init(1, 1);
+ 
+-	of_platform_populate(NULL, of_default_bus_match_table,
+-			     dove_auxdata_lookup, NULL);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+ static const char * const dove_dt_board_compat[] = {
 -- 
 1.7.9.5
