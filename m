@@ -1,56 +1,77 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 20 Nov 2012 14:48:58 -0800
-Subject: [PATCH] ARM: exynos: add UART3 to DEBUG_LL ports
-Message-ID: <1353451739-6317-1-git-send-email-dianders@chromium.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 20 Nov 2012 23:54:54 +0100
+Subject: [PATCH 01/16] irqchip: add basic infrastructure
+In-Reply-To: <50AC06F0.5070402@wwwdotorg.org>
+References: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1353448867-15008-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <50AC06F0.5070402@wwwdotorg.org>
+Message-ID: <20121120235454.78fb7065@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Olof Johansson <olof@lixom.net>
+Stephen,
 
-UART3 is used for debugging on exynos5250-snow.
+On Tue, 20 Nov 2012 15:40:48 -0700, Stephen Warren wrote:
 
-[dianders: cleaned commit message.]
+> > Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
+> 
+> That still stands as:
+> 
+> Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> 
+> ... although I think in this case the implementation changed enough it
+> probably shouldn't have been kept in v4.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
-Signed-off-by: Doug Anderson <dianders@chromium.org>
+Indeed, my apologies. I was seeing some interest in this irqchip thing
+in the recent days, and I wanted to show some of the progress but have
+been quite busy with the mvebu development. So I was quite certainly a
+bit too quick.
 
----
- arch/arm/Kconfig.debug        |   11 +++++++++++
- arch/arm/plat-samsung/Kconfig |    1 +
- 2 files changed, 12 insertions(+), 0 deletions(-)
+> > diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> 
+> > +config IRQCHIP
+> 
+> I wonder if it should be IRQCHIP_OF, since it's OF-specific?
+> 
+> > +	def_bool y
+> > +	depends on OF_IRQ
+> 
+> For the drivers/clocksource patch I created, I required the
+> architecture/machine config option to select it rather than making it a
+> def_bool. Would that be better? I suppose if it's going to be selected
+> in a lot of places anyway, and since the code will just be dropped if it
+> isn't used, then making it default to on is reasonable though.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 33a8930..35ba7dc 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -355,6 +355,17 @@ choice
- 		  The uncompressor code port configuration is now handled
- 		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
- 
-+	config DEBUG_S3C_UART3
-+		depends on PLAT_SAMSUNG
-+		bool "Use S3C UART 3 for low-level debug"
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to UART 3. The port must have been initialised
-+		  by the boot-loader before use.
-+
-+		  The uncompressor code port configuration is now handled
-+		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
-+
- 	config DEBUG_SOCFPGA_UART
- 		depends on ARCH_SOCFPGA
- 		bool "Use SOCFPGA UART for low-level debug"
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 59401e1..d342ed0 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -502,5 +502,6 @@ config DEBUG_S3C_UART
- 	default "0" if DEBUG_S3C_UART0
- 	default "1" if DEBUG_S3C_UART1
- 	default "2" if DEBUG_S3C_UART2
-+	default "3" if DEBUG_S3C_UART3
- 
- endif
+Well, Rob Herring suggesting this def_bool y originally, I think it
+makes sense as all new DT platforms will most likely this mechanism for
+their IRQ driver. But if people feel like having a per-platform
+'select IRQCHIP', I'm fine as well.
+
+> > diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+> 
+> > @@ -493,7 +502,8 @@
+> >  	DEV_DISCARD(init.rodata)					\
+> >  	CPU_DISCARD(init.rodata)					\
+> >  	MEM_DISCARD(init.rodata)					\
+> > -	KERNEL_DTB()
+> > +	KERNEL_DTB()							\
+> > +	IRQCHIP_OF_MATCH_TABLE()
+> 
+> Does it make sense to put that before KERNEL_DTB()? I did in my
+> drivers/clocksource patch just in case anything depended on KERNEL_DTB
+> being last along the lines of APPENDED_DTB. That said, now that I think
+> about it, nothing really should depend on the order...
+
+I haven't thought about this, and I actually booted an APPENDED_DTB
+kernel with this IRQCHIP_OF_MATCH_TABLE thing on Armada XP, and it
+worked. I admit I haven't looked in details at what this KERNEL_DTB()
+thing was.
+
+Thanks!
+
+Thomas
 -- 
-1.7.7.3
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
