@@ -1,54 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 20 Nov 2012 12:45:51 -0700
-Subject: [PATCH V3 1/2] clocksource: add common of_clksrc_init() function
-In-Reply-To: <20121120203105.3c54e49f@skate>
-References: <1353439206-1654-1-git-send-email-swarren@wwwdotorg.org>
- <20121120203105.3c54e49f@skate>
-Message-ID: <50ABDDEF.10403@wwwdotorg.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 20 Nov 2012 11:52:22 -0800
+Subject: [PATCH] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <50AB600C.5010801@samsung.com>
+References: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
+ <20121119001846.GB22106@titan.lakedaemon.net>
+ <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <50AB600C.5010801@samsung.com>
+Message-ID: <20121120115222.9b674d86.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2012 12:31 PM, Thomas Petazzoni wrote:
-> Stephen,
-> 
-> On Tue, 20 Nov 2012 12:20:05 -0700, Stephen Warren wrote:
-> 
->> It is desirable to move all clocksource drivers to drivers/clocksource,
->> yet each requires its own initialization function. We'd rather not
->> pollute <linux/> with a header for each function. Instead, create a
->> single of_clksrc_init() function which will determine which clocksource
->> driver to initialize based on device tree.
-...
-> The way I did things for irqchip is a bit different: I used the
-> standard of_irq_init(), which requires a table that is terminated by a
-> sentinel. In order to guarantee that I have a sentinel, I did:
-> 
-> #define IRQCHIP_DECLARE(compstr,fn)                             \
->         static const struct of_device_id irqchip_of_match       \
->         __used __section(.init.irqchip)                         \
->         = { .compatible = compstr, .data = fn }
-> 
-> which is used to declare all irq drivers. But then in the main
-> irqchip.c file, I did:
-> 
-> static const struct of_device_id
-> irqchip_of_match_end __used __section(.init.irqchip.end);
-> 
-> and my linker script looks like:
-> 
->         .init.irqchip : {
->                 __irqchip_begin = .;
->                 *(.init.irqchip)
->                 *(.init.irqchip.end)
->         }
-> 
-> So I gather all the of_device_id definitions and then the special
-> sentinel of_device_id. I don't know if it is better than your solution,
-> or even if my solution is good at all.
+On Tue, 20 Nov 2012 11:48:44 +0100
+Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 
-That does have the advantage of constructing a single table for all
-irqchips, rather than the approach in my patch was to construct an array
-of pointers to those tables. Your approach is one less loop at runtime,
-and one less sentinel and pointer data item per irqchip. Perhaps I
-should convert mine to do the same thing, unless anyone gives feedback
-against it.
+> > As this patch is already in -next and is stuck there for two more
+> > weeks I can't (or at least won't) merge this patch, so I can't help
+> > with any of the above.
+> 
+> I will fix both issues in the next version of the patch. Would like to
+> merge it to your tree or should I keep it in my dma-mapping tree?
+
+The patch looks OK to me now (still wondering about the -stable
+question though).
+
+It would be a bit of a pain for me to carry a patch which conflicts
+with one in linux-next, and this patch doesn't appear to conflict with
+the other pending dmapool.c patches in -mm so you may as well keep it
+in the dma-mapping tree now.
