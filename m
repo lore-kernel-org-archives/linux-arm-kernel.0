@@ -1,34 +1,46 @@
-From: tklauser@distanz.ch (Tobias Klauser)
-Date: Tue, 20 Nov 2012 10:44:49 +0100
-Subject: [PATCH 161/493] tty: remove use of __devinit
-In-Reply-To: <1353349642-3677-161-git-send-email-wfp5p@virginia.edu>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-161-git-send-email-wfp5p@virginia.edu>
-Message-ID: <20121120094449.GG25445@distanz.ch>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Tue, 20 Nov 2012 10:23:57 +0000
+Subject: [PATCH 3/3] ARM: dts: AM33XX: Add memory resource to d_can node
+In-Reply-To: <50AB57B0.7040502@pengutronix.de>
+References: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
+ <1352916505-12343-4-git-send-email-anilkumar@ti.com>
+ <50AB57B0.7040502@pengutronix.de>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA7701D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-19 at 19:21:50 +0100, Bill Pemberton <wfp5p@virginia.edu> wrote:
-> CONFIG_HOTPLUG is going away as an option so __devinit is no longer
-> needed.
+On Tue, Nov 20, 2012 at 15:43:04, Marc Kleine-Budde wrote:
+> On 11/14/2012 07:08 PM, AnilKumar Ch wrote:
+> > Add a new address space/memory resource to d_can device tree node. D_CAN
+> > RAM initialization is achieved through RAMINIT register which is part of
+> > AM33XX control module address space. D_CAN RAM init or de-init should be
+> > done by writing instance corresponding value to control module register.
+> > 
+> > Till we have a separate control module driver to write to control module,
+> > d_can driver will handle the register writes to control module by itself.
+> > So a new address space to represent this control module register is added
+> > to d_can driver.
+> > 
+> > Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 > 
-> Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-> Cc: Jiri Slaby <jirislaby@gmail.com> 
-> Cc: Alan Cox <alan@linux.intel.com> 
-> Cc: Tobias Klauser <tklauser@distanz.ch> 
-> Cc: Lucas Tavares <lucaskt@linux.vnet.ibm.com> 
-> Cc: "David S. Miller" <davem@davemloft.net> 
-> Cc: Peter Korsgaard <jacmet@sunsite.dk> 
-> Cc: Tony Prisk <linux@prisktech.co.nz> 
-> Cc: linuxppc-dev at lists.ozlabs.org 
-> Cc: linux-serial at vger.kernel.org 
-> Cc: nios2-dev at sopc.et.ntust.edu.tw 
-> Cc: linux-ia64 at vger.kernel.org 
-> Cc: sparclinux at vger.kernel.org 
-> Cc: linux-arm-kernel at lists.infradead.org 
-> ---
-[...]
->  drivers/tty/serial/altera_jtaguart.c        |  2 +-
->  drivers/tty/serial/altera_uart.c            |  2 +-
+> This does not apply to net-next/master:
+> 
+> Applying: ARM: dts: AM33XX: Add memory resource to d_can node
+> error: patch failed: arch/arm/boot/dts/am33xx.dtsi:227
+> error: arch/arm/boot/dts/am33xx.dtsi: patch does not apply
+> Patch failed at 0003 ARM: dts: AM33XX: Add memory resource to d_can node
+> 
 
-Acked-by: Tobias Klauser <tklauser@distanz.ch>
+Marc,
+
+Sorry about this DT changes are present in linux-omap.
+
+Could you please take the driver changes only and ACK on remaining will
+help.
+
+Tony/Benoit,
+
+Could you please take dt patches in this series to linux-omap?
+
+Thanks
+AnilKumar
