@@ -1,66 +1,43 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 20 Nov 2012 16:07:55 +0100
-Subject: [PATCH v2] pwm: Device tree support for PWM polarity.
-In-Reply-To: <1353347472-26863-1-git-send-email-avinashphilip@ti.com>
-References: <1353347472-26863-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <20121120150755.GB24545@avionic-0098.adnet.avionic-design.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 20 Nov 2012 17:09:10 +0200
+Subject: [PATCH 0/5] OMAPFB: use dma_alloc instead of omap's vram
+In-Reply-To: <20121119220443.GD18567@atomide.com>
+References: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
+ <20121112225037.GU6801@atomide.com> <50A601FA.5060401@ti.com>
+ <20121119220443.GD18567@atomide.com>
+Message-ID: <50AB9D16.3010309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 11:21:12PM +0530, Philip, Avinash wrote:
-[...]
-> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-> index 112b314..70756f2 100644
-> --- a/include/linux/pwm.h
-> +++ b/include/linux/pwm.h
-> @@ -78,6 +78,10 @@ enum {
->  	PWMF_ENABLED = 1 << 1,
->  };
->  
-> +/* flags in the third cell of the DT PWM specifier */
-> +#define PWM_SPEC_POLARITY	(1 << 0)
-> +
-> +
+On 2012-11-20 00:04, Tony Lindgren wrote:
 
-This doesn't belong in this header. It should go into core.c in
-drivers/pwm.
+>> Should we enable CMA by default in omap2plus_defconfig? And perhaps on
+>> omap1 also?
+> 
+> Yes if that's now needed for DSS.
 
->  struct pwm_device {
->  	const char		*label;
->  	unsigned long		flags;
-> @@ -176,6 +180,8 @@ void pwm_put(struct pwm_device *pwm);
->  
->  struct pwm_device *devm_pwm_get(struct device *dev, const char *consumer);
->  void devm_pwm_put(struct device *dev, struct pwm_device *pwm);
-> +struct pwm_device *of_pwm_xlate_with_flags(struct pwm_chip *pc,
-> +		const struct of_phandle_args *args);
+DSS works fine without CMA, at least for small displays, and when fb
+allocation is done at boot time. So it's not a strict "need".
 
-The placement of this prototype is odd. I think a better place would be
-between pwm_request_from_chip() and pwm_get(), separated by blank lines
-to make it stand out as an OF specific function.
+I'm not sure how easily FB allocations start to fail without CMA, and
+how much CMA helps.
 
->  #else
->  static inline int pwm_set_chip_data(struct pwm_device *pwm, void *data)
->  {
-> @@ -223,6 +229,12 @@ static inline struct pwm_device *devm_pwm_get(struct device *dev,
->  static inline void devm_pwm_put(struct device *dev, struct pwm_device *pwm)
->  {
->  }
-> +
-> +static inline struct pwm_device *of_pwm_xlate_with_flags(struct pwm_chip *pc,
-> +		const struct of_phandle_args *args)
-> +{
-> +	return ERR_PTR(-ENODEV);
-> +}
+I'm not even sure what's the default DMA pool size on OMAP... If it's
+the one set with "coherent_pool" kernel parameter, then the default
+seems to be 256K, which is quite small for video use. For CMA the
+default global area is 16M. Both can, of course, be changed with boot
+params or kernel config (at least for CMA).
 
-This function should only be used by PWM drivers and therefore doesn't
-need to have a dummy implementation such as this.
+But I think it makes sense to have CMA by default even if non-CMA kernel
+would work.
 
-Thierry
+ Tomi
+
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/f6a3ad4a/attachment.sig>
+Size: 897 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/85fa6eaa/attachment.sig>
