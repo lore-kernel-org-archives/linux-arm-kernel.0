@@ -1,147 +1,48 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 20 Nov 2012 14:40:22 +0530
-Subject: [PATCH] davinci: vpbe: pass different platform names to handle
- different ip's
-In-Reply-To: <1353331080-26056-1-git-send-email-prabhakar.lad@ti.com>
-References: <1353331080-26056-1-git-send-email-prabhakar.lad@ti.com>
-Message-ID: <50AB48FE.1090101@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 20 Nov 2012 18:10:59 +0900
+Subject: [PATCH 3/4] i2c-s3c2410: use exponential back off while polling
+ for bus idle
+In-Reply-To: <CAGS+omCKm+aN9ZXApmQJh1OrST-t2sA8WP7NyDOzKnv-xqJ5vg@mail.gmail.com>
+References: <1352981613-2098-1-git-send-email-ch.naveen@samsung.com>
+ <1352981613-2098-4-git-send-email-ch.naveen@samsung.com>
+ <20121120044859.GA10154@sirena.org.uk>
+ <CAGS+omCKm+aN9ZXApmQJh1OrST-t2sA8WP7NyDOzKnv-xqJ5vg@mail.gmail.com>
+Message-ID: <20121120091056.GZ10560@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 20, 2012 at 04:57:16PM +0800, Daniel Kurtz wrote:
+> On Tue, Nov 20, 2012 at 12:49 PM, Mark Brown
 
-On 11/19/2012 6:48 PM, Prabhakar Lad wrote:
-> From: Lad, Prabhakar <prabhakar.lad@ti.com>
-> 
-> The vpbe driver can handle different platforms DM644X, DM36X and
-> DM355. To differentiate between this platforms venc_type/vpbe_type
-> was passed as part of platform data which was incorrect. The correct
-> way to differentiate to handle this case is by passing different
-> platform names.
-> 
-> This patch creates platform_device_id[] array supporting different
-> platforms and assigns id_table to the platform driver, and finally
-> in the probe gets the actual device by using platform_get_device_id()
-> and gets the appropriate driver data for that platform.
-> 
-> Taking this approach will also make the DT transition easier.
-> 
-> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
-> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> > On the hardware I was using when I wrote the original code here we were
+> > hitting 1-2 spins often enough to be interesting - starting off with a
+> > direct busy wait was definitely useful when doing large batches of I/O,
+> > especially compared to sleeps which might cause us to schedule.
 
-Looks good to me except some comments below. After addressing those,
-please feel free to add my:
+> We check the status first to avoid any sleep()/schedule() in the case,
+> that the CPU is slower than I2C transaction.
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+Right, but this only works if we hit this on the very first spin.
 
-I assume you want to merge this from media tree to manage dependencies?
+> Remember, this loop only happens after the event_wait loop has been
+> woken up by the i2c irq.
 
-> ---
->  arch/arm/mach-davinci/board-dm644x-evm.c      |    8 ++--
->  arch/arm/mach-davinci/dm644x.c                |    7 +--
->  drivers/media/platform/davinci/vpbe.c         |    9 +++-
->  drivers/media/platform/davinci/vpbe_display.c |    4 +-
->  drivers/media/platform/davinci/vpbe_osd.c     |   27 +++++++++-
->  drivers/media/platform/davinci/vpbe_venc.c    |   67 +++++++++++++++++--------
->  include/media/davinci/vpbe_osd.h              |    5 +-
->  include/media/davinci/vpbe_venc.h             |    5 +-
->  8 files changed, 94 insertions(+), 38 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-> index f22572ce..b00ade4 100644
-> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
-> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-> @@ -689,7 +689,7 @@ static struct vpbe_output dm644xevm_vpbe_outputs[] = {
->  			.std		= VENC_STD_ALL,
->  			.capabilities	= V4L2_OUT_CAP_STD,
->  		},
-> -		.subdev_name	= VPBE_VENC_SUBDEV_NAME,
-> +		.subdev_name	= DM644X_VPBE_VENC_SUBDEV_NAME,
->  		.default_mode	= "ntsc",
->  		.num_modes	= ARRAY_SIZE(dm644xevm_enc_std_timing),
->  		.modes		= dm644xevm_enc_std_timing,
-> @@ -701,7 +701,7 @@ static struct vpbe_output dm644xevm_vpbe_outputs[] = {
->  			.type		= V4L2_OUTPUT_TYPE_ANALOG,
->  			.capabilities	= V4L2_OUT_CAP_DV_TIMINGS,
->  		},
-> -		.subdev_name	= VPBE_VENC_SUBDEV_NAME,
-> +		.subdev_name	= DM644X_VPBE_VENC_SUBDEV_NAME,
->  		.default_mode	= "480p59_94",
->  		.num_modes	= ARRAY_SIZE(dm644xevm_enc_preset_timing),
->  		.modes		= dm644xevm_enc_preset_timing,
-> @@ -712,10 +712,10 @@ static struct vpbe_config dm644xevm_display_cfg = {
->  	.module_name	= "dm644x-vpbe-display",
->  	.i2c_adapter_id	= 1,
->  	.osd		= {
-> -		.module_name	= VPBE_OSD_SUBDEV_NAME,
-> +		.module_name	= DM644X_VPBE_OSD_SUBDEV_NAME,
->  	},
->  	.venc		= {
-> -		.module_name	= VPBE_VENC_SUBDEV_NAME,
-> +		.module_name	= DM644X_VPBE_VENC_SUBDEV_NAME,
->  	},
->  	.num_outputs	= ARRAY_SIZE(dm644xevm_vpbe_outputs),
->  	.outputs	= dm644xevm_vpbe_outputs,
-> diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-> index cd0c8b1..7b785ec 100644
-> --- a/arch/arm/mach-davinci/dm644x.c
-> +++ b/arch/arm/mach-davinci/dm644x.c
-> @@ -670,11 +670,11 @@ static struct resource dm644x_osd_resources[] = {
->  };
->  
->  static struct osd_platform_data dm644x_osd_data = {
-> -	.vpbe_type     = VPBE_VERSION_1,
-> +	.field_inv_wa_enable = 0,
+Duh.
 
-Stray change in the patch? You anyway do not need to zero initialize.
+> Since you are talking about hitting a tiny window of time at some
+> arbitrary point after an irq, the CPU time to this point & I2C
+> finishing would have to be very precisely aligned for the 1-2 loops
+> (at CPU clock rate) to matter.
 
->  };
->  
->  static struct platform_device dm644x_osd_dev = {
-> -	.name		= VPBE_OSD_SUBDEV_NAME,
-> +	.name		= DM644X_VPBE_OSD_SUBDEV_NAME,
->  	.id		= -1,
->  	.num_resources	= ARRAY_SIZE(dm644x_osd_resources),
->  	.resource	= dm644x_osd_resources,
-> @@ -752,12 +752,11 @@ static struct platform_device dm644x_vpbe_display = {
->  };
->  
->  static struct venc_platform_data dm644x_venc_pdata = {
-> -	.venc_type	= VPBE_VERSION_1,
->  	.setup_clock	= dm644x_venc_setup_clock,
->  };
->  
->  static struct platform_device dm644x_venc_dev = {
-> -	.name		= VPBE_VENC_SUBDEV_NAME,
-> +	.name		= DM644X_VPBE_VENC_SUBDEV_NAME,
->  	.id		= -1,
->  	.num_resources	= ARRAY_SIZE(dm644x_venc_resources),
->  	.resource	= dm644x_venc_resources,
-> diff --git a/drivers/media/platform/davinci/vpbe.c b/drivers/media/platform/davinci/vpbe.c
-> index 7f5cf9b..0dd3c62 100644
-> --- a/drivers/media/platform/davinci/vpbe.c
-> +++ b/drivers/media/platform/davinci/vpbe.c
-> @@ -558,9 +558,14 @@ static int platform_device_get(struct device *dev, void *data)
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct vpbe_device *vpbe_dev = data;
->  
-> -	if (strcmp("vpbe-osd", pdev->name) == 0)
-> +	if (!strcmp(DM644X_VPBE_OSD_SUBDEV_NAME, pdev->name) ||
-> +	    !strcmp(DM365_VPBE_OSD_SUBDEV_NAME, pdev->name) ||
-> +	    !strcmp(DM355_VPBE_OSD_SUBDEV_NAME, pdev->name))
-
-How about using strstr("vpbe-osd", pdev->name) != NULL instead? Here and
-in multiple other places in the patch.
-
-> @@ -341,8 +356,8 @@ static int venc_set_576p50(struct v4l2_subdev *sd)
->  
->  	v4l2_dbg(debug, 2, sd, "venc_set_576p50\n");
->  
-> -	if ((pdata->venc_type != VPBE_VERSION_1) &&
-> -	  (pdata->venc_type != VPBE_VERSION_2))
-> +	if ((venc->venc_type != VPBE_VERSION_1) &&
-> +	  (venc->venc_type != VPBE_VERSION_2))
-
-The broken line should be aligned correctly.
-
-Thanks,
-Sekhar
+On some systems that can happen enormously reliably, finger in the air
+it's your fast case on the A15s you're playing with scaled down to a
+much slower CPU.  The 20 spins I was setting the loop to was a massive
+overestimate for conservativism but more than 1 was common enough, IIRC
+spinning 5 times would have covered essentially everything.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/8c42a44d/attachment-0001.sig>
