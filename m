@@ -1,29 +1,30 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 20 Nov 2012 17:00:48 +0400
-Subject: [PATCH] ARM: gic: Fix sparse warning
-In-Reply-To: <50AAF84E.5080900@linaro.org>
-References: <1353322736-2747-1-git-send-email-tushar.behera@linaro.org>
- <50AA293C.9010908@mvista.com> <50AAF84E.5080900@linaro.org>
-Message-ID: <50AB7F00.4010105@mvista.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 20 Nov 2012 18:32:54 +0530
+Subject: [PATCH] video: da8xx-fb: clk_get on connection id fck
+In-Reply-To: <1353415261-30080-1-git-send-email-prakash.pm@ti.com>
+References: <1353415261-30080-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <50AB7F7E.1070400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20-11-2012 7:26, Tushar Behera wrote:
+On 11/20/2012 6:11 PM, Manjunathappa wrote:
+> do clk_get on connection id "fck" to support OMAP based
+> platforms having multiple clocks for module. Without this
+> driver change clk_get fails on am335x.
+> 
+> This patch is based on the discussion in community
+> http://marc.info/?l=linux-kernel&m=135166018907827&w=2
+> 
+> Signed-off-by: Manjunathappa <prakash.pm@ti.com>
+> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
 
->>> gic_irq_domain_ops is only used in this file, so should be marked as
->>> static.
+For the mach-davinci changes:
 
->>> Fixes following compilation warning.
+Acked-by: Sekhar Nori <nsekhar@ti.com>
 
->>    This is sparse's warning, not compiler's, if I don't mistake.
+Florian,
 
-> My mistake. It is indeed sparse warning.
+I assume you will want to take this through your tree?
 
-    And I didn't read your subject, where it's called correctly. :-)
-
->>> arch/arm/common/gic.c:638:29: warning: symbol 'gic_irq_domain_ops' was
->>> not declared. Should it be static?
-
->>> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-
-WBR, Sergei
+Thanks,
+Sekhar
