@@ -1,40 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Nov 2012 13:57:27 +0100
-Subject: [PATCH] gpiolib: let gpiochip_add_pin_range() specify offset
-In-Reply-To: <CAKohpo=u=8PbJ3886tcRrVujyYpPwe+QoRh5Gqk-=uxvMwYfRA@mail.gmail.com>
-References: <1353411953-27423-1-git-send-email-linus.walleij@stericsson.com>
- <CAKohpo=u=8PbJ3886tcRrVujyYpPwe+QoRh5Gqk-=uxvMwYfRA@mail.gmail.com>
-Message-ID: <CACRpkdbQAzv4c1d0hg1qwbr-h1nWzQBxC7k25Tn41sVSxeVBYQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 20 Nov 2012 07:59:16 -0500
+Subject: [PATCH v5 7/8] watchdog: orion_wdt: move the min_timeout
+ initialization
+In-Reply-To: <1353334243-16703-8-git-send-email-fabio.porcedda@gmail.com>
+References: <1353334243-16703-1-git-send-email-fabio.porcedda@gmail.com>
+ <1353334243-16703-8-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <20121120125916.GV22106@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 1:55 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 20 November 2012 17:15, Linus Walleij <linus.walleij@stericsson.com> wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> Like with commit 3c739ad0df5eb41cd7adad879eda6aa09879eb76
->> it is not always enough to specify all the pins of a gpio_chip
->> from offset zero to be added to a pin map range, since the
->> mapping from GPIO to pin controller may not be linear at all,
->> but need to be broken into a few consecutive sub-ranges or
->> 1-pin entries for complicated cases. The ranges may also be
->> sparse.
->>
->> This alters the signature of the function to accept offsets
->> into both the GPIO-chip local pinspace and the pin controller
->> local pinspace.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
->
-> Aren't there any users of this routine?
+On Mon, Nov 19, 2012 at 03:10:42PM +0100, Fabio Porcedda wrote:
+> Move the min_timeout initialization inside the orion_wdt definition.
+> 
+> Only compile tested.
+> 
+> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
 
-No so I'm trying to use it right now and have to fix it up :-)
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-I just only got Shiraz to create it to handle non-DT devices...
+thx,
 
-Will spin a V2 by the way..
+Jason.
 
-Yours,
-Linus Walleij
+> ---
+>  drivers/watchdog/orion_wdt.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+> index 446a3e9..3b4e228 100644
+> --- a/drivers/watchdog/orion_wdt.c
+> +++ b/drivers/watchdog/orion_wdt.c
+> @@ -140,6 +140,7 @@ static const struct watchdog_ops orion_wdt_ops = {
+>  static struct watchdog_device orion_wdt = {
+>  	.info = &orion_wdt_info,
+>  	.ops = &orion_wdt_ops,
+> +	.min_timeout = 1,
+>  };
+>  
+>  static int __devinit orion_wdt_probe(struct platform_device *pdev)
+> @@ -162,7 +163,6 @@ static int __devinit orion_wdt_probe(struct platform_device *pdev)
+>  
+>  	wdt_max_duration = WDT_MAX_CYCLE_COUNT / wdt_tclk;
+>  
+> -	orion_wdt.min_timeout = 1;
+>  	orion_wdt.timeout = wdt_max_duration;
+>  	orion_wdt.max_timeout = wdt_max_duration;
+>  	watchdog_init_timeout(&orion_wdt, heartbeat, pdev->dev.of_node);
+> -- 
+> 1.8.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
