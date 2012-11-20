@@ -1,63 +1,77 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Tue, 20 Nov 2012 15:44:55 +0100
-Subject: [PATCH v2 6/7] usb: chipidea: usbmisc: add mx53 support
-In-Reply-To: <87obix65t1.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1352981028-14312-1-git-send-email-m.grzeschik@pengutronix.de>
- <1352981028-14312-7-git-send-email-m.grzeschik@pengutronix.de>
- <87obix65t1.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20121120144455.GA9846@pengutronix.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 20 Nov 2012 16:48:18 +0200
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
+Message-ID: <50AB9832.90709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2012 at 03:22:34PM +0200, Alexander Shishkin wrote:
-> Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
-> 
-> > This adds mx53 as the next user of the usbmisc driver and makes it
-> > possible to disable the overcurrent-detection of the internal phy.
-> >
-> > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> > Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> > ---
-> >  drivers/usb/chipidea/usbmisc_imx.c |   28 ++++++++++++++++++++++++++++
-> >  1 file changed, 28 insertions(+)
-> >
-> > diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-> > index 913e414..9718500 100644
-> > --- a/drivers/usb/chipidea/usbmisc_imx.c
-> > +++ b/drivers/usb/chipidea/usbmisc_imx.c
-> > @@ -54,6 +54,29 @@ static struct usbmisc_usb_device *get_usbdev(struct device *dev)
-> >  	return &usbmisc->usbdev[i];
-> >  }
-> >  
-> > +static int usbmisc_imx53_init(struct device *dev)
-> > +{
-> > +	struct usbmisc_usb_device *usbdev;
-> > +	void __iomem *reg;
-> > +	unsigned long flags;
-> > +	u32 val;
-> > +
-> > +	usbdev = get_usbdev(dev);
-> > +	if (IS_ERR(usbdev))
-> > +		return PTR_ERR(usbdev);
-> > +
-> > +	reg = usbmisc->base + usbdev->index * 8;
-> > +
-> > +	if (usbdev->disable_oc) {
-> > +		spin_lock_irqsave(&usbmisc->lock, flags);
-> > +		val = readl(reg);
-> > +		writel(val | (1 << 5), reg);
-> 
-> We know now that (1 << 5) probably means "disable overcurrent
-> detection", but is there a definition for this register's bits
-> somewhere?
+Hi,
 
-Will add defines for the magic numbers used.
+On 2012-11-17 12:55, Alexandre Courbot wrote:
 
-Thanks,
-Michael
+A few questions after looking at the documentation:
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> +Example
+> +-------
+> +Here are example sequences declared within a backlight device that use all the
+> +supported resources types:
+> +
+> +	backlight {
+> +		compatible = "pwm-backlight";
+> +		...
+> +
+> +		/* resources used by the power sequences */
+> +		pwms = <&pwm 2 5000000>;
+> +		pwm-names = "backlight";
+> +		power-supply = <&backlight_reg>;
+> +
+> +		power-sequences {
+> +			power-on {
+> +				step0 {
+> +					type = "regulator";
+> +					id = "power";
+> +					enable;
+> +				};
+> +				step1 {
+> +					type = "delay";
+> +					delay = <10000>;
+> +				};
+> +				step2 {
+> +					type = "pwm";
+> +					id = "backlight";
+> +					enable;
+> +				};
+> +				step3 {
+> +					type = "gpio";
+> +					gpio = <&gpio 28 0>;
+> +					value = <1>;
+> +				};
+> +			};
+
+I guess there's a reason, but the above looks a bit inconsistent. For
+gpio you define the gpio resource inside the step. For power and pwm the
+resource is defined before the steps. Why wouldn't "pwm = <&pwm 2
+5000000>;" work in step2?
+
+> +When a power sequence is run, its steps is executed one after the other until
+> +one step fails or the end of the sequence is reached.
+
+The document doesn't give any hint of what the driver should do if
+running the power sequence fails. Run the "opposite" power sequence?
+Will that work for all resources? I'm mainly thinking of a case where
+each enable of the resource should be matched by a disable, i.e. you
+can't call disable if no enable was called.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 897 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/95e3ac2a/attachment.sig>
