@@ -1,55 +1,41 @@
-From: dmitry.kasatkin@intel.com (Kasatkin, Dmitry)
-Date: Tue, 20 Nov 2012 14:08:26 +0200
-Subject: [PATCH 0/7] crypto: omap-aes updates
-In-Reply-To: <1353351832-6685-1-git-send-email-mgreer@animalcreek.com>
-References: <1353351832-6685-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <CALLzPKZ20iQXGw9k4sxiVW0VOTdV5pw6Gz8W8V4SRpe=qVY+4w@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 20 Nov 2012 13:16:03 +0100
+Subject: [PATCH v3 0/2] pwm fixes for 3.8
+In-Reply-To: <1353347086-4572-1-git-send-email-linux@prisktech.co.nz>
+References: <1353347086-4572-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20121120121603.GA16752@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Great. You also worked on AES...
-Will take a loos asap.
+On Tue, Nov 20, 2012 at 06:44:44AM +1300, Tony Prisk wrote:
+> Hi Theirry,
+> 
+> I felt the error message for clk_enable in vt8500_pwm_config() needed
+> to somehow indicate that the clk_enable failed in this function otherwise
+> if there is a problem, you can't tell which of the clk_enable's
+> generated the fail message.
+> If there is a clock error - as you pointed out - it will probably fail
+> elsewhere as well so I've changed it to match the other error messages.
+> 
+> These should be applied on top of the original patch.
+> 
+> v2: Add error checking for clk_enable()
+> v3: Remove superfluous ;'s. Error message style correction.
+> 
+> Tony Prisk (2):
+>   Fix build error in pwm-vt8500.c
+>   pwm: vt8500: Ensure pwm clock is enabled during pwm_config
+> 
+>  drivers/pwm/pwm-vt8500.c |   16 +++++++++++++---
+>  1 file changed, 13 insertions(+), 3 deletions(-)
 
-On Mon, Nov 19, 2012 at 9:03 PM, Mark A. Greer <mgreer@animalcreek.com> wrote:
-> From: "Mark A. Greer" <mgreer@animalcreek.com>
->
-> This series updates the crypto omap-aes driver and supporting
-> infrastructure.
->
-> Notes:
->
-> a) Based on omap-sham patches recently submitted, XXX
->
-> b) Since these patches will likely go though the OMAP tree (and not
->    through the crypto tree), it would be nice if the crypto guy(s)
->    would ACK or NACK patches 4-7 which modify the
->    drivers/crypto/omap-sham.c driver.
->
-> c) These have only been tested on an omap2420 h4 and an am37x evm.
->
-> d) Many thanks to Jon Hunter for testing on his omap2420 h4.
->
-> Mark A. Greer (7):
->   ARM: OMAP2xxx: hwmod: Convert AES crypto devcie data to hwmod
->   ARM: OMAP3xxx: hwmod: Convert AES crypto device data to hwmod
->   ARM: OMAP2+: Remove unnecessary message when no AES IP is present
->   crypto: omap-aes: Remove cpu_is/omap_type check from driver
->   crypto: omap-aes: Convert to use pm_runtime API
->   crypto: omap-aes: Add code to use dmaengine API
->   crypto: omap-aes: Remove usage of private DMA API
->
->  arch/arm/mach-omap2/clock2430_data.c               |   1 +
->  arch/arm/mach-omap2/clock3xxx_data.c               |   1 +
->  arch/arm/mach-omap2/devices.c                      |  75 +-------
->  arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   1 +
->  arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   1 +
->  .../mach-omap2/omap_hwmod_2xxx_interconnect_data.c |  18 ++
->  arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  38 ++++
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  62 +++++++
->  arch/arm/mach-omap2/omap_hwmod_common_data.h       |   2 +
->  drivers/crypto/omap-aes.c                          | 202 ++++++++++++---------
->  10 files changed, 251 insertions(+), 150 deletions(-)
->
-> --
-> 1.7.12
->
+Applied with minor stylistic fixups to the commit message, thanks.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/b20f607e/attachment.sig>
