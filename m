@@ -1,70 +1,41 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 20 Nov 2012 17:49:29 +0100
-Subject: [PATCH V4 5/5] arm: mvebu: Added SMP support for Armada XP
-In-Reply-To: <20121120164058.GB27765@mudshark.cambridge.arm.com>
-References: <1353357360-7242-1-git-send-email-gregory.clement@free-electrons.com>
- <1353357360-7242-6-git-send-email-gregory.clement@free-electrons.com>
- <20121120164058.GB27765@mudshark.cambridge.arm.com>
-Message-ID: <50ABB499.6090508@free-electrons.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 20 Nov 2012 16:51:56 +0000
+Subject: [PATCH 1/3] OF: Add helper for matching against linux, stdout-path
+In-Reply-To: <20121119095202.GL4398@game.jcrosoft.org>
+References: <1352971866-540-1-git-send-email-s.hauer@pengutronix.de>
+ <1352971866-540-2-git-send-email-s.hauer@pengutronix.de>
+ <20121119095202.GL4398@game.jcrosoft.org>
+Message-ID: <20121120165156.395713E102F@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2012 05:40 PM, Will Deacon wrote:
-> On Mon, Nov 19, 2012 at 08:35:59PM +0000, Gregory CLEMENT wrote:
->> +/*
->> + * Armada XP specific entry point for secondary CPUs.
->> + * We add the CPU to the coherency fabric and then jump to secondary
->> + * startup
->> + */
->> +ENTRY(armada_xp_secondary_startup)
->> +
->> +	/* Read CPU id */
->> + 	mrc     p15, 0, r1, c0, c0, 5
->> +	and     r1, r1, #0xF
->> +
->> +	/* Add CPU to coherency fabric */
->> +
->> +	ldr     r0, = ARMADA_XP_CFB_BASE
->> +	mov	lr, pc
->> +	b	ll_set_cpu_coherent
->> +	b	secondary_startup
+On Mon, 19 Nov 2012 10:52:02 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> On 10:31 Thu 15 Nov     , Sascha Hauer wrote:
+> > devicetrees may have a linux,stdout-path property in the chosen
+> > node describing the console device. This adds a helper function
+> > to match a device against this property so a driver can call
+> > add_preferred_console for a matching device.
 > 
-> adr	lr, BSYM(secondary_startup)
-> bl	ll_set_cpu_coherent
+> I like it but I've an issue with it I cannot specify the option for
+> 
+> as example I need to set the uart at 38400n8 or 115200n8 regarless of wath the
+> booloader did
 
-I will try it.
+Right. stdout-path can have a set of arguments appended for things like
+serial speed.  ePAPR says this about stdout-path:
 
-> 
-> should let you get rid of the mov, b, b, although I think you could do
-> better than that by making this function a prefix of ll_set_cpu_coherent:
-> 
-> ENTRY(armada_xp_secondary_startup)
-> 	ldr     r0, =ARMADA_XP_CFB_BASE
-> 	mrc     p15, 0, r1, c0, c0, 5
-> 	and     r1, r1, #0xF
-> 	adr	lr, BSYM(secondary_startup)
-> 
-> 	/* Fallthrough */
-> 
-> ENTRY(ll_set_cpu_coherent)
-> ...
-> ENDPROC(ll_set_cpu_coherent)
-> ENDPROC(armada_xp_secondary_startup)
-> 
-> what do you think?
-> 
+A string that specifies the full path to the node representing the
+device to be used for boot console output. If the character ":" is
+present in the value it terminates the path. The value may be an alias.
 
-I prefer to keep them separate, as we can use coherency without SMP.
-That's why I create the coherency_ll.S file instead of putting everything
-in this file.
+If the stdin-path property is not specified, stdout-path should be
+assumed to define the input device.
 
+So, this function needs to do three more things:
+- also look for 'stdout-path' (in addition to 'linux,stdout-path')
+- Parse for a ':' in the path and trim that off so it can be used for
+  arguments. (Bonus: return the arguments to the caller)
+- make sure that it can handle the path containing an alias (I've just
+  not checked if the current code will handle this)
 
-> Will
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+g.
