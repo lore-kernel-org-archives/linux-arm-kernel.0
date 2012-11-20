@@ -1,49 +1,36 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 20 Nov 2012 13:37:17 +0530
-Subject: [GIT PULL 4/6] DaVinci DT updates for v3.8
-In-Reply-To: <20121120062816.GA11997@quad.lixom.net>
-References: <1351620701-16516-1-git-send-email-nsekhar@ti.com>
- <1351620701-16516-4-git-send-email-nsekhar@ti.com>
- <20121120062816.GA11997@quad.lixom.net>
-Message-ID: <50AB3A35.8070208@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 20 Nov 2012 09:17:11 +0100
+Subject: [PATCH V2 2/2] ARM: tegra: move timer.c to drivers/clocksource/
+In-Reply-To: <20121120005036.GA6280@kryptos>
+References: <1353371237-2482-1-git-send-email-swarren@wwwdotorg.org>
+ <1353371237-2482-2-git-send-email-swarren@wwwdotorg.org>
+ <20121120005036.GA6280@kryptos>
+Message-ID: <20121120091711.2609af06@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2012 11:58 AM, Olof Johansson wrote:
-> Hi,
-> 
-> On Tue, Oct 30, 2012 at 11:41:39PM +0530, Sekhar Nori wrote:
->> The following changes since commit 8e0d72d2c7a6955692ba0a21bbf5ca86e8061777:
->>
->>   ARM: davinci: da8xx: add DA850 PRUSS support (2012-10-27 16:28:36 +0530)
->>
->> are available in the git repository at:
->>
->>   git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-for-v3.8/dt
->>
->> for you to fetch changes up to 3a373904b88a73445f7a78249cf60efabbf1a9f3:
->>
->>   ARM: davinci: da850: generate dtbs for da850 boards (2012-10-29 15:44:26 +0530)
->>
->> ----------------------------------------------------------------
->> These changes add DT boot support to DaVinci DA850
->> SoC.
->>
->> ----------------------------------------------------------------
->> Heiko Schocher (2):
->>       ARM: davinci: da850: add SoC DT data
->>       ARM: davinci: add support for am1808 based EnBW CMC board
->>
->> Sekhar Nori (3):
->>       ARM: davinci: da850: add DT boot support
->>       ARM: davinci: da850 evm: add DT data
->>       ARM: davinci: da850: generate dtbs for da850 boards
-> 
-> The dtb targets now live in arch/arm/boot/dts/Makefile, they were moved there
-> for 3.7. I've applied a local patch in arm-soc (next/dt) on top of this branch
-> that moves them over.
+Josh,
 
-Thanks for fixing it up.
+On Mon, 19 Nov 2012 18:50:36 -0600, Josh Cartwright wrote:
 
-Regards,
-Sekhar
+> I had suggested this with Thomas Petazzoni's consolidated irq_chip patch
+> as well:
+> 
+> It seems like it would be a bit cleaner/easier to maintain if we relied
+> on the linker to stitch together a clksrc_of_match table, based on what
+> clocksources are being built into the image.  With that approach, at
+> least, a public initialization header wouldn't have to be exposed, and
+> this central table wouldn't have to be maintained (as more clocksrcs are
+> added, I forsee [admittedly trivial] merge conflicts).
+
+... and I indeed have a new version of my irqchip patches that indeed
+use the linker to merge together the of_device_id entries!
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
