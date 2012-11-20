@@ -1,38 +1,23 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Tue, 20 Nov 2012 08:21:22 +0100
-Subject: [PATCH] arm: orion5x: convert Netgear WNR854T to device tree
-In-Reply-To: <20121119204641.GK22106@titan.lakedaemon.net>
-References: <1353342451-27180-1-git-send-email-kaloz@openwrt.org>
- <20121119204641.GK22106@titan.lakedaemon.net>
-Message-ID: <op.wn19dwpw2s3iss@ecaz>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 20 Nov 2012 15:22:51 +0800
+Subject: [PATCH 270/493] arm: remove use of __devinit
+In-Reply-To: <1353349642-3677-270-git-send-email-wfp5p@virginia.edu>
+References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
+ <1353349642-3677-270-git-send-email-wfp5p@virginia.edu>
+Message-ID: <CAMPhdO_rOTj4Y7uc7z2OUhgrQebQ=2mp7vNrrhGLbxPt+WCtfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
-
-On Mon, 19 Nov 2012 21:46:41 +0100, Jason Cooper <jason@lakedaemon.net> wrote:
-
-> On Mon, Nov 19, 2012 at 05:27:31PM +0100, Imre Kaloz wrote:
->> This commit converts the Netgear WNR854T to device tree
->>
->> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
->> ---
->>  arch/arm/boot/dts/Makefile                    |    3 +-
->>  arch/arm/boot/dts/orion5x-netgear-wnr854t.dts |   83 +++++++++++++++++++++++++
->>  arch/arm/mach-orion5x/Kconfig                 |    7 +-
->>  arch/arm/mach-orion5x/Makefile                |    2 +-
->>  arch/arm/mach-orion5x/board-dt.c              |    3 +
->>  arch/arm/mach-orion5x/common.h                |    5 ++
->>  arch/arm/mach-orion5x/wnr854t-setup.c         |   59 +-----------------
->>  7 files changed, 99 insertions(+), 63 deletions(-)
->>  create mode 100644 arch/arm/boot/dts/orion5x-netgear-wnr854t.dts
+On Tue, Nov 20, 2012 at 2:23 AM, Bill Pemberton <wfp5p@virginia.edu> wrote:
+> CONFIG_HOTPLUG is going away as an option so __devinit is no longer
+> needed.
 >
-> One last thing, could you use savedefconfig and update orion5x_defconfig
-> to include your new board?  It can be a part of the same patch.
+> Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
 
-Would you prefer it to be included in this one or in a later patch if I'm done adding some more boards?
-
-
-Thanks,
-
-Imre
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
