@@ -1,19 +1,25 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 20 Nov 2012 22:12:52 +0800
-Subject: [PATCH] ARM: imx23-olinuxino Add spi support
-In-Reply-To: <1353189152-18715-1-git-send-email-f.koliqi@gmail.com>
-References: <1353189152-18715-1-git-send-email-f.koliqi@gmail.com>
-Message-ID: <20121120141250.GB4882@S2100-06.ap.freescale.net>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Tue, 20 Nov 2012 14:46:21 +0100
+Subject: [PATCH 065/493] i2c: remove use of __devexit_p
+In-Reply-To: <1353349642-3677-65-git-send-email-wfp5p@virginia.edu>
+References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
+ <1353349642-3677-65-git-send-email-wfp5p@virginia.edu>
+Message-ID: <20121120144621.5d2c213a@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 17, 2012 at 04:52:32PM -0500, Fadil Berisha wrote:
-> From: Fadil Berisha <f.koliqi@gmail.com>
-> 
-> imx23-olinuxino board has spi pins exposed on external connector.
-> This patch add spi support.
-> 
-> Signed-off-by: Fadil Berisha <f.koliqi@gmail.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Mon, 19 Nov 2012 13:20:14 -0500, Bill Pemberton wrote:
+> CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
+> needed.
 
-Applied, thanks.
+As mentioned on the lm-sensors list for hwmon patches already, I think
+it would be much clearer to not split __devexit, __devexit_p, __devinit
+etc. removal into separate patches. One patch per subsystem would be
+easier to review and apply. If patches grow too large then you'd rather
+split in a different direction, for example drivers/i2c/muxes vs.
+drivers/i2c/busses or even grouped by related bus drivers (see entries
+"I2C OVER PARALLEL PORT" and "I2C/SMBUS CONTROLLER DRIVERS FOR PC" in
+MAINTAINERS for examples of meaningful groups.)
+
+-- 
+Jean Delvare
