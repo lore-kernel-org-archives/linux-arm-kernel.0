@@ -1,26 +1,22 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 Nov 2012 22:32:47 -0800
-Subject: [GIT PULL 6/6] DaVinci defconfig updates for v3.8
-In-Reply-To: <1351620701-16516-6-git-send-email-nsekhar@ti.com>
-References: <1351620701-16516-1-git-send-email-nsekhar@ti.com>
- <1351620701-16516-6-git-send-email-nsekhar@ti.com>
-Message-ID: <20121120063247.GB11997@quad.lixom.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 20 Nov 2012 15:35:53 +0900
+Subject: [PATCH 075/493] mfd: remove use of __devexit_p
+In-Reply-To: <1353349642-3677-75-git-send-email-wfp5p@virginia.edu>
+References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
+ <1353349642-3677-75-git-send-email-wfp5p@virginia.edu>
+Message-ID: <20121120063550.GG10560@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 11:41:41PM +0530, Sekhar Nori wrote:
-> The following changes since commit 3a373904b88a73445f7a78249cf60efabbf1a9f3:
-> 
->   ARM: davinci: da850: generate dtbs for da850 boards (2012-10-29 15:44:26 +0530)
-> 
-> are available in the git repository at:
-> 
->   git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-for-v3.8/defconfig
+On Mon, Nov 19, 2012 at 01:20:24PM -0500, Bill Pemberton wrote:
+> CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
+> needed.
 
-Pulled (together with the other branches). Thanks!
-
-I merged this one into next/boards together with the board branch since
-we don't separate out defconfig updates in a specific branch any more.
-
-
--Olof
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/cca33b1e/attachment.sig>
