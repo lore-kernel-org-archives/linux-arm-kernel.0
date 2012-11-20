@@ -1,72 +1,119 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 20 Nov 2012 15:18:38 -0200
-Subject: [PATCH v2] ARM: Kconfig: Do not force selection of ARCH_VEXPRESS by
- ARCH_MULTI_V7
-Message-ID: <1353431918-9326-1-git-send-email-festevam@gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 20 Nov 2012 09:22:30 -0800
+Subject: [PATCH 1/2] ARM: dts: exynos: Move the dwmmc aliases from smdk5250
+ dts to exynos
+Message-ID: <1353432158-22999-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+The aliases for dwmmc were placed in the SMDK5250 dts file but really
+should be common for all exynos5250 boards.  Move it to the common CPU
+file.
 
-When building a kernel using imx_v6_v7_defconfig, it is not possible to unselect
-ARCH_VEXPRESS due to the fact that it is automatically selected by ARCH_MULTI_V7.
+Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-This is not good when someone wants to create a minimal kernel build, so let 
-multi_v7_defconfig select ARCH_VEXPRESS instead.
-
-Also avoid build breakage when randconfig selects no platform.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
-Changes since v1:
-- Avoid build breakage on randconfig for the case that no platform is selected.
- arch/arm/Kconfig                    |    2 +-
- arch/arm/configs/multi_v7_defconfig |    1 +
- arch/arm/kernel/vmlinux.lds.S       |    2 ++
- 3 files changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |   12 ++++--------
+ arch/arm/boot/dts/exynos5250.dtsi         |   12 ++++++++----
+ 2 files changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 14f8160..372cb4e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -267,6 +267,7 @@ choice
- config ARCH_MULTIPLATFORM
- 	bool "Allow multiple platforms to be selected"
- 	depends on MMU
-+	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_PATCH_PHYS_VIRT
- 	select AUTO_ZRELADDR
- 	select COMMON_CLK
-@@ -1000,7 +1001,6 @@ config ARCH_MULTI_V7
- 	bool "ARMv7 based platforms (Cortex-A, PJ4, Krait)"
- 	default y
- 	select ARCH_MULTI_V6_V7
--	select ARCH_VEXPRESS
- 	select CPU_V7
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 405009c..541fe39 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -17,10 +17,6 @@
+ 	compatible = "samsung,smdk5250", "samsung,exynos5250";
  
- config ARCH_MULTI_V6_V7
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 159f75f..531c538 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -6,6 +6,7 @@ CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_XP=y
- CONFIG_ARCH_HIGHBANK=y
- CONFIG_ARCH_SOCFPGA=y
-+CONFIG_ARCH_VEXPRESS=y
- # CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
- CONFIG_ARM_ERRATA_754322=y
- CONFIG_SMP=y
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index b9f38e3..aa46be8 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -310,4 +310,6 @@ SECTIONS
-  * binutils is too old (for other reasons as well)
-  */
- ASSERT((__proc_info_end - __proc_info_begin), "missing CPU support")
-+#ifndef CONFIG_ARCH_MULTIPLATFORM
- ASSERT((__arch_info_end - __arch_info_begin), "no machine record defined")
-+#endif
+ 	aliases {
+-		mshc0 = &dwmmc_0;
+-		mshc1 = &dwmmc_1;
+-		mshc2 = &dwmmc_2;
+-		mshc3 = &dwmmc_3;
+ 	};
+ 
+ 	memory {
+@@ -97,7 +93,7 @@
+ 		};
+ 	};
+ 
+-	dwmmc_0: dwmmc0 at 12200000 {
++	dwmmc0 at 12200000 {
+ 		num-slots = <1>;
+ 		supports-highspeed;
+ 		broken-cd;
+@@ -118,11 +114,11 @@
+ 		};
+ 	};
+ 
+-	dwmmc_1: dwmmc1 at 12210000 {
++	dwmmc1 at 12210000 {
+ 		status = "disabled";
+ 	};
+ 
+-	dwmmc_2: dwmmc2 at 12220000 {
++	dwmmc2 at 12220000 {
+ 		num-slots = <1>;
+ 		supports-highspeed;
+ 		fifo-depth = <0x80>;
+@@ -143,7 +139,7 @@
+ 		};
+ 	};
+ 
+-	dwmmc_3: dwmmc3 at 12230000 {
++	dwmmc3 at 12230000 {
+ 		status = "disabled";
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index cf6a02d..7c5664b 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -31,6 +31,10 @@
+ 		gsc1 = &gsc_1;
+ 		gsc2 = &gsc_2;
+ 		gsc3 = &gsc_3;
++		mshc0 = &dwmmc_0;
++		mshc1 = &dwmmc_1;
++		mshc2 = &dwmmc_2;
++		mshc3 = &dwmmc_3;
+ 	};
+ 
+ 	gic:interrupt-controller at 10481000 {
+@@ -206,7 +210,7 @@
+ 		#size-cells = <0>;
+ 	};
+ 
+-	dwmmc0 at 12200000 {
++	dwmmc_0: dwmmc0 at 12200000 {
+ 		compatible = "samsung,exynos5250-dw-mshc";
+ 		reg = <0x12200000 0x1000>;
+ 		interrupts = <0 75 0>;
+@@ -214,7 +218,7 @@
+ 		#size-cells = <0>;
+ 	};
+ 
+-	dwmmc1 at 12210000 {
++	dwmmc_1: dwmmc1 at 12210000 {
+ 		compatible = "samsung,exynos5250-dw-mshc";
+ 		reg = <0x12210000 0x1000>;
+ 		interrupts = <0 76 0>;
+@@ -222,7 +226,7 @@
+ 		#size-cells = <0>;
+ 	};
+ 
+-	dwmmc2 at 12220000 {
++	dwmmc_2: dwmmc2 at 12220000 {
+ 		compatible = "samsung,exynos5250-dw-mshc";
+ 		reg = <0x12220000 0x1000>;
+ 		interrupts = <0 77 0>;
+@@ -230,7 +234,7 @@
+ 		#size-cells = <0>;
+ 	};
+ 
+-	dwmmc3 at 12230000 {
++	dwmmc_3: dwmmc3 at 12230000 {
+ 		compatible = "samsung,exynos5250-dw-mshc";
+ 		reg = <0x12230000 0x1000>;
+ 		interrupts = <0 78 0>;
 -- 
-1.7.9.5
+1.7.7.3
