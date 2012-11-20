@@ -1,26 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Nov 2012 23:45:20 +0100
-Subject: [PATCH 403/493] hwspinlock: remove use of __devexit
-In-Reply-To: <1353349642-3677-403-git-send-email-wfp5p@virginia.edu>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-403-git-send-email-wfp5p@virginia.edu>
-Message-ID: <CACRpkdZCy_RwSTp+jm_sBmEroVn8YS3CAzvxvoN3uXoLDPWH=w@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 20 Nov 2012 14:48:58 -0800
+Subject: [PATCH] ARM: exynos: add UART3 to DEBUG_LL ports
+Message-ID: <1353451739-6317-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 7:25 PM, Bill Pemberton <wfp5p@virginia.edu> wrote:
+From: Olof Johansson <olof@lixom.net>
 
-> CONFIG_HOTPLUG is going away as an option so __devexit is no
-> longer needed.
->
-> Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-> Cc: Ohad Ben-Cohen <ohad@wizery.com>
-> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
+UART3 is used for debugging on exynos5250-snow.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+[dianders: cleaned commit message.]
 
-Yours,
-Linus Walleij
+Signed-off-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+
+---
+ arch/arm/Kconfig.debug        |   11 +++++++++++
+ arch/arm/plat-samsung/Kconfig |    1 +
+ 2 files changed, 12 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 33a8930..35ba7dc 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -355,6 +355,17 @@ choice
+ 		  The uncompressor code port configuration is now handled
+ 		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
+ 
++	config DEBUG_S3C_UART3
++		depends on PLAT_SAMSUNG
++		bool "Use S3C UART 3 for low-level debug"
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to UART 3. The port must have been initialised
++		  by the boot-loader before use.
++
++		  The uncompressor code port configuration is now handled
++		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
++
+ 	config DEBUG_SOCFPGA_UART
+ 		depends on ARCH_SOCFPGA
+ 		bool "Use SOCFPGA UART for low-level debug"
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 59401e1..d342ed0 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -502,5 +502,6 @@ config DEBUG_S3C_UART
+ 	default "0" if DEBUG_S3C_UART0
+ 	default "1" if DEBUG_S3C_UART1
+ 	default "2" if DEBUG_S3C_UART2
++	default "3" if DEBUG_S3C_UART3
+ 
+ endif
+-- 
+1.7.7.3
