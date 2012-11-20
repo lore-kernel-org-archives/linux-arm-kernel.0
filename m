@@ -1,10 +1,9 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 20 Nov 2012 22:15:46 +0100
-Subject: [PATCH V5 2/5] arm: mvebu: Added initial support for power
- managmement service unit
+Date: Tue, 20 Nov 2012 22:15:48 +0100
+Subject: [PATCH V5 4/5] arm: mm: Added support for PJ4B cpu and init routines
 In-Reply-To: <1353446150-10088-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1353446150-10088-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1353446150-10088-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1353446150-10088-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,183 +11,125 @@ From: Yehuda Yitschak <yehuday@marvell.com>
 
 Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- .../devicetree/bindings/arm/armada-370-xp-pmsu.txt |   20 ++++++
- arch/arm/boot/dts/armada-xp.dtsi                   |    6 ++
- arch/arm/mach-mvebu/Makefile                       |    2 +-
- arch/arm/mach-mvebu/common.h                       |    1 +
- arch/arm/mach-mvebu/pmsu.c                         |   75 ++++++++++++++++++++
- arch/arm/mach-mvebu/pmsu.h                         |   16 +++++
- 6 files changed, 119 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
- create mode 100644 arch/arm/mach-mvebu/pmsu.c
- create mode 100644 arch/arm/mach-mvebu/pmsu.h
+ arch/arm/mach-mvebu/Kconfig |    2 +-
+ arch/arm/mm/Kconfig         |    4 +++
+ arch/arm/mm/proc-v7.S       |   66 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 71 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-new file mode 100644
-index 0000000..926b4d6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-@@ -0,0 +1,20 @@
-+Power Management Service Unit(PMSU)
-+-----------------------------------
-+Available on Marvell SOCs: Armada 370 and Armada XP
-+
-+Required properties:
-+
-+- compatible: "marvell,armada-370-xp-pmsu"
-+
-+- reg: Should contain PMSU registers location and length. First pair
-+  for the per-CPU SW Reset Control registers, second pair for the
-+  Power Management Service Unit.
-+
-+Example:
-+
-+armada-370-xp-pmsu at d0022000 {
-+	compatible = "marvell,armada-370-xp-pmsu";
-+	reg = <0xd0022100 0x430>,
-+	      <0xd0020800 0x20>;
-+};
-+
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index f51554e..1f95e22 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -27,6 +27,12 @@
- 		    <0xd0021870 0x58>;
- 	};
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 79299cd..f4c3bf8 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -21,7 +21,7 @@ menu "Marvell SOC with device tree"
+ config MACH_ARMADA_370_XP
+ 	bool
+ 	select ARMADA_370_XP_TIMER
+-	select CPU_V7
++	select CPU_PJ4B
  
-+	armada-370-xp-pmsu at d0022000 {
-+		compatible = "marvell,armada-370-xp-pmsu";
-+		reg = <0xd0022100 0x430>,
-+		      <0xd0020800 0x20>;
-+	};
+ config MACH_ARMADA_370
+ 	bool "Marvell Armada 370 boards"
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 94186b6..3fd629d 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -352,6 +352,10 @@ config CPU_PJ4
+ 	select ARM_THUMBEE
+ 	select CPU_V7
+ 
++config CPU_PJ4B
++	bool
++	select CPU_V7
 +
- 	soc {
- 		serial at d0012200 {
- 				compatible = "ns16550";
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 5ce4b42..2e3ec11 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -2,4 +2,4 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
- 	-I$(srctree)/arch/arm/plat-orion/include
- 
- obj-y += system-controller.o
--obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o coherency.o coherency_ll.o
-+obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o coherency.o coherency_ll.o pmsu.o
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index 9aaa449..b5cd7e7 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -22,4 +22,5 @@ void armada_370_xp_handle_irq(struct pt_regs *regs);
- 
- 
- int armada_370_xp_coherency_init(void);
-+int armada_370_xp_pmsu_init(void);
+ # ARMv6
+ config CPU_V6
+ 	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 846d279..90f4c08 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -169,6 +169,62 @@ __v7_ca15mp_setup:
+ 	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
+ 	mcreq	p15, 0, r0, c1, c0, 1
  #endif
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-new file mode 100644
-index 0000000..3cc4bef
---- /dev/null
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -0,0 +1,75 @@
-+/*
-+ * Power Management Service Unit(PMSU) support for Armada 370/XP platforms.
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Yehuda Yitschak <yehuday@marvell.com>
-+ * Gregory Clement <gregory.clement@free-electrons.com>
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * The Armada 370 and Armada XP SOCs have a power management service
-+ * unit which is responsible for powering down and waking up CPUs and
-+ * other SOC units
-+ */
 +
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/of_address.h>
-+#include <linux/io.h>
-+#include <linux/smp.h>
-+#include <asm/smp_plat.h>
++__v7_pj4b_setup:
++#ifdef CONFIG_CPU_PJ4B
 +
-+static void __iomem *pmsu_mp_base;
-+static void __iomem *pmsu_reset_base;
++/* Auxiliary Debug Modes Control 1 Register */
++#define STATIC_BP     (1 << 2) /* Enable Static BP */
++#define INTER_PARITY  (1 << 8) /* Disable Internal Parity Handling */
++#define BCK_OFF_STREX (1 << 5) /* Enable the back off of STREX instr */
++#define CLEAN_LINE    (1 << 16) /* Disable data transfer for clean line */
 +
-+#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
-+#define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
++/* Auxiliary Debug Modes Control 2 Register */
++#define FAST_LDR      (1 << 23) /* Disable fast LDR */
++#define SNOOP_DATA    (1 << 25) /* Do not interleave write and snoop data */
++#define CWF           (1 << 27) /* Disable Critical Word First feature */
++#define OUTSANDING_NC (1 << 29) /* Disable outstanding non cacheable request */
++#define L1_REP_RR     (1 << 30) /* L1 replacement - Strict round robin */
++#define AUX_DBG_CTRL2 (SNOOP_DATA | CWF | OUTSANDING_NC | L1_REP_RR)
 +
-+static struct of_device_id of_pmsu_table[] = {
-+	{.compatible = "marvell,armada-370-xp-pmsu"},
-+	{ /* end of list */ },
-+};
++/* Auxiliary Functional Modes Control Register 0 */
++#define SMP_CFB         (1 << 1) /* Set SMP mode. Join the coherency fabric*/
++#define L1_PAR_CHK      (1 << 2) /* Support L1 parity checking */
++#define BROADCAST_CACHE (1 << 8) /* Broadcast Cache and TLB maintenance */
 +
++/* Auxiliary Debug Modes Control 0 Register */
++#define WFI_WFE         (1 << 22) /* WFI/WFE - serve the DVM and back to idle*/
++
++	/* Auxiliary Debug Modes Control 1 Register */
++	mrc	p15, 1,	r0, c15, c1, 1
++	orr     r0, r0, #CLEAN_LINE
++	orr     r0, r0, #BCK_OFF_STREX
++	orr     r0, r0, #INTER_PARITY
++	bic	r0, r0, #STATIC_BP
++	mcr	p15, 1,	r0, c15, c1, 1
++
++	/* Auxiliary Debug Modes Control 2 Register */
++	mrc	p15, 1,	r0, c15, c1, 2
++	bic	r0, r0, #FAST_LDR
++	orr	r0, r0, #AUX_DBG_CTRL2
++	mcr	p15, 1,	r0, c15, c1, 2
++
++	/* Auxiliary Functional Modes Control Register 0 */
++	mrc	p15, 1,	r0, c15, c2, 0
 +#ifdef CONFIG_SMP
-+int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
-+{
-+	int reg, hw_cpu;
-+
-+	if (!pmsu_mp_base || !pmsu_reset_base) {
-+		pr_warn("Can't boot CPU. PMSU is uninitialized\n");
-+		return 1;
-+	}
-+
-+	hw_cpu = cpu_logical_map(cpu_id);
-+
-+	writel(virt_to_phys(boot_addr), pmsu_mp_base +
-+			PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
-+
-+	/* Release CPU from reset by clearing reset bit*/
-+	reg = readl(pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
-+	reg &= (~0x1);
-+	writel(reg, pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
-+
-+	return 0;
-+}
++	orr	r0, r0, #SMP_CFB
 +#endif
++	orr	r0, r0, #L1_PAR_CHK
++	orr	r0, r0, #BROADCAST_CACHE
++	mcr	p15, 1,	r0, c15, c2, 0
 +
-+int __init armada_370_xp_pmsu_init(void)
-+{
-+	struct device_node *np;
++	/* Auxiliary Debug Modes Control 0 Register */
++	mrc	p15, 1,	r0, c15, c1, 0
++	orr	r0, r0, #WFI_WFE
++	mcr	p15, 1,	r0, c15, c1, 0
 +
-+	np = of_find_matching_node(NULL, of_pmsu_table);
-+	if (np) {
-+		pr_info("Initializing Power Management Service Unit\n");
-+		pmsu_mp_base = of_iomap(np, 0);
-+		pmsu_reset_base = of_iomap(np, 1);
-+	}
++#endif /* CONFIG_CPU_PJ4B */
 +
-+	return 0;
-+}
+ __v7_setup:
+ 	adr	r12, __v7_setup_stack		@ the local stack
+ 	stmia	r12, {r0-r5, r7, r9, r11, lr}
+@@ -342,6 +398,16 @@ __v7_ca9mp_proc_info:
+ 	.long	0xff0ffff0
+ 	__v7_proc __v7_ca9mp_setup
+ 	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
 +
-+early_initcall(armada_370_xp_pmsu_init);
-diff --git a/arch/arm/mach-mvebu/pmsu.h b/arch/arm/mach-mvebu/pmsu.h
-new file mode 100644
-index 0000000..07a737c
---- /dev/null
-+++ b/arch/arm/mach-mvebu/pmsu.h
-@@ -0,0 +1,16 @@
-+/*
-+ * Power Management Service Unit (PMSU) support for Armada 370/XP platforms.
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __MACH_MVEBU_PMSU_H
-+#define __MACH_MVEBU_PMSU_H
-+
-+int armada_xp_boot_cpu(unsigned int cpu_id, void *phys_addr);
-+
-+#endif	/* __MACH_370_XP_PMSU_H */
++	/*
++	 * Marvell PJ4B processor.
++	 */
++	.type   __v7_pj4b_proc_info, #object
++__v7_pj4b_proc_info:
++	.long	0x562f5840
++	.long	0xfffffff0
++	__v7_proc __v7_pj4b_setup
++	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
+ #endif	/* CONFIG_ARM_LPAE */
+ 
+ 	/*
 -- 
 1.7.9.5
