@@ -1,41 +1,71 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 20 Nov 2012 10:41:00 +0530
-Subject: [GIT PULL] DaVinci fix for v3.7
-In-Reply-To: <CAOesGMjK_DXx_n7aL85SP7azqFsEOAJgfpTd-rpDCisvT_mysQ@mail.gmail.com>
-References: <50A9FEEB.50305@ti.com>
- <CAOesGMjK_DXx_n7aL85SP7azqFsEOAJgfpTd-rpDCisvT_mysQ@mail.gmail.com>
-Message-ID: <50AB10E4.9080806@ti.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Tue, 20 Nov 2012 10:33:41 +0530
+Subject: [PATCH v3 00/10] Support for AM33xx PWM Subsystem
+Message-ID: <1353387831-31538-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2012 10:23 PM, Olof Johansson wrote:
-> On Mon, Nov 19, 2012 at 1:42 AM, Sekhar Nori <nsekhar@ti.com> wrote:
->> Hi Arnd, Olof,
->>
->> Can you please pull the following DaVinci fix for v3.7? I know its pretty late,
->> I was out of office for most of the -rc cycle this time.
->>
->> The change deserves a stable tag, I did not add it though since the patch
->> does not apply cleanly to any of the previous kernel releases. It will have
->> to be backported and send to the stable team once it makes it into mainline.
->>
->> Thanks,
->> Sekhar
->>
->> The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
->>
->>   Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
->>
->> are available in the git repository at:
->>
->>   git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-fixes-for-v3.7
-> 
-> Pulled, thanks. Gitorious wasn't horribly slow this morning so I'll
-> take care of the remainder of your 3.8 pull requests too. :)
+In AM33xx PWM sub modules like ECAP, EHRPWM & EQEP are  integrated to
+PWM subsystem. All these submodules shares the resources (clock) & has
+a clock gating register in PWM Subsystem. This patch series creates a
+parent PWM Subsystem driver to handle access synchronization of shared
+resources & clock gating from PWM Subsystem configuration space.
+Also Device tree nodes populated to support parent child relation
+between PWMSS, ECAP & EHRPWM submodules.
+In addition EHRPWM module requires explicit clock gating from control
+module & is handled by patch #2 & 8.
 
-Thanks! I had requested a k.o account earlier but got no response. That
-was before k.o was hacked. I will request again, but I guess I will be
-rejected since my PGP key is signed by just one kernel developer (I
-guess I need to start traveling and meeting people more often).
+Patch #4 & 6 submitted is a second revision as suggested by  Thierry
+for handling clock gating with a global function . This requires config
+space handling done independent from driver and is done at parent driver.
+So the parent<->child relation adopted to handle
+1. pm runtime synchronization
+2. PWM subsystem common config space clock gating for PWM submodules.
 
-Sekhar
+Patches supports
+- Driver support for parent child relation handled patch #1
+- Optional EHRPWM tb clock in patch #2
+- Parent child in HWMOD handled at patch #3
+- Device tree binding support handled in patch #4, 6 &8
+- pinctrl support in patch #5 & 7.
+- DT node populated in patch #9 & 10.
+
+This patch series based on linux-next/20121115 and tested on AM33xx.
+It depends on [1]
+
+1. https://lkml.org/lkml/2012/11/19/338
+pwm: Device tree support for PWM polarity
+
+Philip, Avinash (10):
+  PWMSS: Add PWM Subsystem driver for parent<->child relationship
+  ARM: am33xx: clk: Add optional clock for EHRPWM
+  ARM: OMAP: AM33xx hwmod: Add parent-child relationship for PWM
+    subsystem
+  pwm: pwm-tiecap: Add device-tree binding support for APWM driver
+  pwm: pwm-tiecap: pinctrl support
+  pwm: pwm-tiehrpwm: Add device-tree binding support for EHRPWM driver
+  pwm: pwm-tiehrpwm: pinctrl support
+  pwm: pwm-tiehrpwm: Adding TBCLK gating support.
+  ARM: dts: AM33XX: Add PWMSS device tree nodes
+  ARM: dts: AM33XX: Add PWM backlight DT data to am335x-evm
+
+ .../devicetree/bindings/pwm/pwm-tiecap.txt         |   23 ++
+ .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |   23 ++
+ .../devicetree/bindings/pwm/pwm-tipwmss.txt        |   32 ++
+ arch/arm/boot/dts/am335x-evm.dts                   |   21 +
+ arch/arm/boot/dts/am33xx.dtsi                      |   84 ++++
+ arch/arm/mach-omap2/clock33xx_data.c               |   37 ++
+ arch/arm/mach-omap2/control.h                      |    8 +
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  419 +++++++++++++-------
+ drivers/pwm/Kconfig                                |   11 +
+ drivers/pwm/Makefile                               |    1 +
+ drivers/pwm/pwm-tiecap.c                           |   50 +++-
+ drivers/pwm/pwm-tiehrpwm.c                         |   65 +++-
+ drivers/pwm/pwm-tipwmss.c                          |  143 +++++++
+ drivers/pwm/tipwmss.h                              |   39 ++
+ 14 files changed, 811 insertions(+), 145 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
+ create mode 100644 drivers/pwm/pwm-tipwmss.c
+ create mode 100644 drivers/pwm/tipwmss.h
