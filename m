@@ -1,66 +1,112 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 20 Nov 2012 16:14:17 +0100
-Subject: [GIT PULL v2] Marvell XOR driver DT changes
-Message-ID: <1353424461-25421-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 20 Nov 2012 16:14:18 +0100
+Subject: [PATCH 1/4] arm: kirkwood: Convert XOR instantiation to DT.
+In-Reply-To: <1353424461-25421-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1353424461-25421-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353424461-25421-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+From: Andrew Lunn <andrew@lunn.ch>
 
-Here is a new version of the "Marvell XOR driver DT changes" pull
-request. Compared to the previous version, this v2:
+Use DT to describe the two XOR DMA engines on Kirkwood. Remove the
+C code initialization.
 
- * Adds support for both XOR engines on Armada 370 and Armada XP. In
-   the previous version, only one engine was listed in the
-   DT. However, it turns out that XOR engines have different addresses
-   on Armada 370 and Armada XP, so the DT bits have moved from
-   armada-370-xp.dtsi to armada-370.dtsi and armada-xp.dtsi. I have
-   therefore separated these additions in two patches, one for 370,
-   one for XP.
-
- * Adds the correct 'clocks' property for Armada 370/XP so that the
-   gatable XOR clocks are properly enabled as needed.
-
-This pull request should be applied on top of:
-
- * The clk pull request "[GIT PULL v3] core, cpu and gated clocks for
-   mvebu"
-
- * The XOR cleanup + DT binding pull request "[GIT PULL] Marvell XOR
-   driver cleanup and DT binding".
-
-Thanks!
-
-The following changes since commit 34c93c8657935d30649e777c4aa05f74f16aa418:
-
-  dma: mv_xor: Add a device_control function (2012-11-20 15:59:01 +0100)
-
-are available in the git repository at:
-
-  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-xor-board-dt-changes-3.8-v2
-
-for you to fetch changes up to a1d53dab4f5b37c800d7a20c56e84a96180a8ea6:
-
-  arm: mvebu: add XOR engines to Armada XP .dtsi (2012-11-20 16:03:37 +0100)
-
-----------------------------------------------------------------
-Marvell XOR driver DT changes for 3.8
-
-----------------------------------------------------------------
-Andrew Lunn (1):
-      arm: kirkwood: Convert XOR instantiation to DT.
-
-Sebastian Hesselbarth (1):
-      arm: dove: Convert Dove to DT XOR DMA engine
-
-Thomas Petazzoni (2):
-      arm: mvebu: add XOR engines to Armada 370 .dtsi
-      arm: mvebu: add XOR engines to Armada XP .dtsi
-
- arch/arm/boot/dts/armada-370.dtsi |   36 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/armada-xp.dtsi  |   40 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/dove.dtsi       |   42 +++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/kirkwood.dtsi   |   40 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-dove/common.c       |   10 ---------
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/kirkwood.dtsi   |   40 +++++++++++++++++++++++++++++++++++++
  arch/arm/mach-kirkwood/board-dt.c |   13 ------------
- 6 files changed, 158 insertions(+), 23 deletions(-)
+ 2 files changed, 40 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 7a9fac0..2388f99 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -94,6 +94,46 @@
+ 			status = "okay";
+ 		};
+ 
++		xor at 60800 {
++			compatible = "marvell,orion-xor";
++			reg = <0x60800 0x100
++			       0x60A00 0x100>;
++			status = "okay";
++			clocks = <&gate_clk 8>;
++
++			xor00 {
++			      interrupts = <5>;
++			      dmacap,memcpy;
++			      dmacap,xor;
++			};
++			xor01 {
++			      interrupts = <6>;
++			      dmacap,memcpy;
++			      dmacap,xor;
++			      dmacap,memset;
++			};
++		};
++
++		xor at 60900 {
++			compatible = "marvell,orion-xor";
++			reg = <0x60900 0x100
++			       0xd0B00 0x100>;
++			status = "okay";
++			clocks = <&gate_clk 16>;
++
++			xor00 {
++			      interrupts = <7>;
++			      dmacap,memcpy;
++			      dmacap,xor;
++			};
++			xor01 {
++			      interrupts = <8>;
++			      dmacap,memcpy;
++			      dmacap,xor;
++			      dmacap,memset;
++			};
++		};
++
+ 		sata at 80000 {
+ 			compatible = "marvell,orion-sata";
+ 			reg = <0x80000 0x5000>;
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 294ad5a..9826904 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -21,7 +21,6 @@
+ #include <asm/mach/map.h>
+ #include <mach/bridge-regs.h>
+ #include <linux/platform_data/usb-ehci-orion.h>
+-#include <linux/platform_data/dma-mv_xor.h>
+ #include <plat/irq.h>
+ #include <plat/common.h>
+ #include "common.h"
+@@ -60,14 +59,6 @@ static void __init kirkwood_legacy_clk_init(void)
+ 	orion_clkdev_add(NULL, "orion-ehci.0",
+ 			 of_clk_get_from_provider(&clkspec));
+ 
+-	clkspec.args[0] = CGC_BIT_XOR0;
+-	orion_clkdev_add(NULL, MV_XOR_NAME ".0",
+-			 of_clk_get_from_provider(&clkspec));
+-
+-	clkspec.args[0] = CGC_BIT_XOR1;
+-	orion_clkdev_add(NULL, MV_XOR_NAME ".1",
+-			 of_clk_get_from_provider(&clkspec));
+-
+ 	clkspec.args[0] = CGC_BIT_PEX1;
+ 	orion_clkdev_add("1", "pcie",
+ 			 of_clk_get_from_provider(&clkspec));
+@@ -103,10 +94,6 @@ static void __init kirkwood_dt_init(void)
+ 	/* Setup root of clk tree */
+ 	kirkwood_of_clk_init();
+ 
+-	/* internal devices that every board has */
+-	kirkwood_xor0_init();
+-	kirkwood_xor1_init();
+-
+ #ifdef CONFIG_KEXEC
+ 	kexec_reinit = kirkwood_enable_pcie;
+ #endif
+-- 
+1.7.9.5
