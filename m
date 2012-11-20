@@ -1,140 +1,38 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 20 Nov 2012 21:34:34 +0900
-Subject: [PATCH] ARM: SAMSUNG: use devm_ functions for ADC driver
-In-Reply-To: <001701cdad02$2d511200$87f33600$@com>
-References: <001701cdad02$2d511200$87f33600$@com>
-Message-ID: <0caa01cdc71b$6583bff0$308b3fd0$@org>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 20 Nov 2012 13:41:16 +0100
+Subject: [PATCH 1/3] ARM: zynq: remove TTC early mapping
+In-Reply-To: <1443f143846f22125e3d6631cf3a2fdf75d925d3.1353349191.git.josh.cartwright@ni.com>
+References: <cover.1353349191.git.josh.cartwright@ni.com>
+ <1443f143846f22125e3d6631cf3a2fdf75d925d3.1353349191.git.josh.cartwright@ni.com>
+Message-ID: <CAHTX3dK2AEGh72XMuPSyBCV1sdM6jDvdiyPdh5VGXhTnwOqWTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eunki Kim wrote:
-> 
-> This patch uses devm_* functions for probe function in ADC driver.
-> It reduces code size and simplifies the code.
-> 
-> Signed-off-by: Eunki Kim <eunki_kim@samsung.com>
+2012/11/19 Josh Cartwright <josh.cartwright@ni.com>:
+> Now that the TTC driver has proper support for DT bindings, it is not
+> necessary for the registers to be mapped early.  They will be mapped
+> during clock initialization using of_iomap().  Remove the early mapping.
+>
+> In addition, remove the extraneous zynq_soc.h include from the timer
+> driver.
+>
+> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
 > ---
->  arch/arm/plat-samsung/adc.c |   48
-+++++++++++----------------------------
-> ---
->  1 files changed, 13 insertions(+), 35 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-> index b1e05cc..37542c2 100644
-> --- a/arch/arm/plat-samsung/adc.c
-> +++ b/arch/arm/plat-samsung/adc.c
-> @@ -344,7 +344,7 @@ static int s3c_adc_probe(struct platform_device *pdev)
->  	int ret;
->  	unsigned tmp;
-> 
-> -	adc = kzalloc(sizeof(struct adc_device), GFP_KERNEL);
-> +	adc = devm_kzalloc(dev, sizeof(struct adc_device), GFP_KERNEL);
->  	if (adc == NULL) {
->  		dev_err(dev, "failed to allocate adc_device\n");
->  		return -ENOMEM;
-> @@ -355,50 +355,46 @@ static int s3c_adc_probe(struct platform_device
-> *pdev)
->  	adc->pdev = pdev;
->  	adc->prescale = S3C2410_ADCCON_PRSCVL(49);
-> 
-> -	adc->vdd = regulator_get(dev, "vdd");
-> +	adc->vdd = devm_regulator_get(dev, "vdd");
->  	if (IS_ERR(adc->vdd)) {
->  		dev_err(dev, "operating without regulator \"vdd\" .\n");
-> -		ret = PTR_ERR(adc->vdd);
-> -		goto err_alloc;
-> +		return PTR_ERR(adc->vdd);
->  	}
-> 
->  	adc->irq = platform_get_irq(pdev, 1);
->  	if (adc->irq <= 0) {
->  		dev_err(dev, "failed to get adc irq\n");
-> -		ret = -ENOENT;
-> -		goto err_reg;
-> +		return -ENOENT;
->  	}
-> 
-> -	ret = request_irq(adc->irq, s3c_adc_irq, 0, dev_name(dev), adc);
-> +	ret = devm_request_irq(dev, adc->irq, s3c_adc_irq, 0, dev_name(dev),
-> +				adc);
->  	if (ret < 0) {
->  		dev_err(dev, "failed to attach adc irq\n");
-> -		goto err_reg;
-> +		return ret;
->  	}
-> 
-> -	adc->clk = clk_get(dev, "adc");
-> +	adc->clk = devm_clk_get(dev, "adc");
->  	if (IS_ERR(adc->clk)) {
->  		dev_err(dev, "failed to get adc clock\n");
-> -		ret = PTR_ERR(adc->clk);
-> -		goto err_irq;
-> +		return PTR_ERR(adc->clk);
->  	}
-> 
->  	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	if (!regs) {
->  		dev_err(dev, "failed to find registers\n");
-> -		ret = -ENXIO;
-> -		goto err_clk;
-> +		return -ENXIO;
->  	}
-> 
-> -	adc->regs = ioremap(regs->start, resource_size(regs));
-> +	adc->regs = devm_request_and_ioremap(dev, regs);
->  	if (!adc->regs) {
->  		dev_err(dev, "failed to map registers\n");
-> -		ret = -ENXIO;
-> -		goto err_clk;
-> +		return -ENXIO;
->  	}
-> 
->  	ret = regulator_enable(adc->vdd);
->  	if (ret)
-> -		goto err_ioremap;
-> +		return ret;
-> 
->  	clk_enable(adc->clk);
-> 
-> @@ -418,32 +414,14 @@ static int s3c_adc_probe(struct platform_device
-> *pdev)
->  	adc_dev = adc;
-> 
->  	return 0;
-> -
-> - err_ioremap:
-> -	iounmap(adc->regs);
-> - err_clk:
-> -	clk_put(adc->clk);
-> -
-> - err_irq:
-> -	free_irq(adc->irq, adc);
-> - err_reg:
-> -	regulator_put(adc->vdd);
-> - err_alloc:
-> -	kfree(adc);
-> -	return ret;
->  }
-> 
->  static int __devexit s3c_adc_remove(struct platform_device *pdev)
->  {
->  	struct adc_device *adc = platform_get_drvdata(pdev);
-> 
-> -	iounmap(adc->regs);
-> -	free_irq(adc->irq, adc);
->  	clk_disable(adc->clk);
->  	regulator_disable(adc->vdd);
-> -	regulator_put(adc->vdd);
-> -	clk_put(adc->clk);
-> -	kfree(adc);
-> 
->  	return 0;
->  }
-> --
-> 1.7.1
+>  arch/arm/mach-zynq/common.c                | 5 -----
+>  arch/arm/mach-zynq/include/mach/zynq_soc.h | 6 +-----
+>  arch/arm/mach-zynq/timer.c                 | 1 -
+>  3 files changed, 1 insertion(+), 11 deletions(-)
 
-Looks ok to me, applied.
+Tested-by: Michal Simek <michal.simek@xilinx.com>
 
-Thanks.
+Applied to xilinx arm-next branch.
 
-K-Gene <kgene@kernel.org>
+Thanks,
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
+Microblaze U-BOOT custodian
