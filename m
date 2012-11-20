@@ -1,344 +1,198 @@
-From: Morten.Rasmussen@arm.com (Morten Rasmussen)
-Date: Tue, 20 Nov 2012 14:28:54 +0000
-Subject: [RFC 3/6] sched: pack small tasks
-In-Reply-To: <CAKfTPtBf3b2DdLHGHaJP0_mZO2mgH6dH3bcZR=ppputyMAGLqQ@mail.gmail.com>
-References: <1349595838-31274-1-git-send-email-vincent.guittot@linaro.org>
- <1349595838-31274-4-git-send-email-vincent.guittot@linaro.org>
- <20121109171344.GB16082@e103034-lin>
- <CAKfTPtBf3b2DdLHGHaJP0_mZO2mgH6dH3bcZR=ppputyMAGLqQ@mail.gmail.com>
-Message-ID: <20121120142854.GB4619@e103034-lin>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 20 Nov 2012 15:31:08 +0100
+Subject: [GIT PULL v3] core, cpu and gated clocks for mvebu
+Message-ID: <1353421876-13759-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
+Mike, Jason,
 
-On Mon, Nov 12, 2012 at 01:51:00PM +0000, Vincent Guittot wrote:
-> On 9 November 2012 18:13, Morten Rasmussen <Morten.Rasmussen@arm.com> wrote:
-> > Hi Vincent,
-> >
-> > I have experienced suboptimal buddy selection on a dual cluster setup
-> > (ARM TC2) if SD_SHARE_POWERLINE is enabled at MC level and disabled at
-> > CPU level. This seems to be the correct flag settings for a system with
-> > only cluster level power gating.
-> >
-> > To me it looks like update_packing_domain() is not doing the right
-> > thing. See inline comments below.
-> 
-> Hi Morten,
-> 
-> Thanks for testing the patches.
-> 
-> It seems that I have too optimized the loop and remove some use cases.
-> 
-> >
-> > On Sun, Oct 07, 2012 at 08:43:55AM +0100, Vincent Guittot wrote:
-> >> During sched_domain creation, we define a pack buddy CPU if available.
-> >>
-> >> On a system that share the powerline at all level, the buddy is set to -1
-> >>
-> >> On a dual clusters / dual cores system which can powergate each core and
-> >> cluster independantly, the buddy configuration will be :
-> >>       | CPU0 | CPU1 | CPU2 | CPU3 |
-> >> -----------------------------------
-> >> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
-> >>
-> >> Small tasks tend to slip out of the periodic load balance.
-> >> The best place to choose to migrate them is at their wake up.
-> >>
-> >> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> >> ---
-> >>  kernel/sched/core.c  |    1 +
-> >>  kernel/sched/fair.c  |  109 ++++++++++++++++++++++++++++++++++++++++++++++++++
-> >>  kernel/sched/sched.h |    1 +
-> >>  3 files changed, 111 insertions(+)
-> >>
-> >> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-> >> index dab7908..70cadbe 100644
-> >> --- a/kernel/sched/core.c
-> >> +++ b/kernel/sched/core.c
-> >> @@ -6131,6 +6131,7 @@ cpu_attach_domain(struct sched_domain *sd, struct root_domain *rd, int cpu)
-> >>       rcu_assign_pointer(rq->sd, sd);
-> >>       destroy_sched_domains(tmp, cpu);
-> >>
-> >> +     update_packing_domain(cpu);
-> >>       update_top_cache_domain(cpu);
-> >>  }
-> >>
-> >> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> >> index 4f4a4f6..8c9d3ed 100644
-> >> --- a/kernel/sched/fair.c
-> >> +++ b/kernel/sched/fair.c
-> >> @@ -157,6 +157,63 @@ void sched_init_granularity(void)
-> >>       update_sysctl();
-> >>  }
-> >>
-> >> +
-> >> +/*
-> >> + * Save the id of the optimal CPU that should be used to pack small tasks
-> >> + * The value -1 is used when no buddy has been found
-> >> + */
-> >> +DEFINE_PER_CPU(int, sd_pack_buddy);
-> >> +
-> >> +/* Look for the best buddy CPU that can be used to pack small tasks
-> >> + * We make the assumption that it doesn't wort to pack on CPU that share the
-> >> + * same powerline. We looks for the 1st sched_domain without the
-> >> + * SD_SHARE_POWERLINE flag. Then We look for the sched_group witht the lowest
-> >> + * power per core based on the assumption that their power efficiency is
-> >> + * better */
-> >> +void update_packing_domain(int cpu)
-> >> +{
-> >> +     struct sched_domain *sd;
-> >> +     int id = -1;
-> >> +
-> >> +     sd = highest_flag_domain(cpu, SD_SHARE_POWERLINE);
-> >> +     if (!sd)
-> >> +             sd = rcu_dereference_check_sched_domain(cpu_rq(cpu)->sd);
-> >> +     else
-> >> +             sd = sd->parent;
-> > sd is the highest level where SD_SHARE_POWERLINE is enabled so the sched
-> > groups of the parent level would represent the power domains. If get it
-> > right, we want to pack inside the cluster first and only let first cpu
-> 
-> You probably wanted to use sched_group instead of cluster because
-> cluster is only a special use case, didn't you ?
-> 
-> > of the cluster do packing on another cluster. So all cpus - except the
-> > first one - in the current sched domain should find its buddy within the
-> > domain and only the first one should go to the parent sched domain to
-> > find its buddy.
-> 
-> We don't want to pack in the current sched_domain because it shares
-> power domain. We want to pack at the parent level
-> 
+Mike, this should hopefully be the final version of the clk
+patches. We would therefore need your comments on it, or if everything
+goes well, your formal Acked-by. We would however like to carry those
+patches through the Marvell maintainers tree, as we have many other
+patches that depend on the clk support.
 
-Yes. I think we mean the same thing. The packing takes place at the
-parent sched_domain but the sched_group that we are looking at only
-contains the cpus of the level below.
+Jason, if Mike is OK with those patches, then this pull request should
+replace the current clk patches you have in your tree.
 
-> >
-> > I propose the following fix:
-> >
-> > -               sd = sd->parent;
-> > +               if (cpumask_first(sched_domain_span(sd)) == cpu
-> > +                       || !sd->parent)
-> > +                       sd = sd->parent;
-> 
-> We always look for the buddy in the parent level whatever the cpu
-> position in the mask is.
-> 
-> >
-> >
-> >> +
-> >> +     while (sd) {
-> >> +             struct sched_group *sg = sd->groups;
-> >> +             struct sched_group *pack = sg;
-> >> +             struct sched_group *tmp = sg->next;
-> >> +
-> >> +             /* 1st CPU of the sched domain is a good candidate */
-> >> +             if (id == -1)
-> >> +                     id = cpumask_first(sched_domain_span(sd));
-> >
-> > There is no guarantee that id is in the sched group pointed to by
-> > sd->groups, which is implicitly assumed later in the search loop. We
-> > need to find the sched group that contains id and point sg to that
-> > instead. I haven't found an elegant way to find that group, but the fix
-> > below should at least give the right result.
-> >
-> > +               /* Find sched group of candidate */
-> > +               tmp = sd->groups;
-> > +               do {
-> > +                       if (cpumask_test_cpu(id, sched_group_cpus(tmp)))
-> > +                       {
-> > +                               sg = tmp;
-> > +                               break;
-> > +                       }
-> > +               } while (tmp = tmp->next, tmp != sd->groups);
-> > +
-> > +               pack = sg;
-> > +               tmp = sg->next;
-> 
-> 
-> I have a new loop which solves your issue and others. I will use it
-> for the next version
-> 
-> +	while (sd) {
-> +		struct sched_group *sg = sd->groups;
-> +		struct sched_group *pack = sg;
-> +		struct sched_group *tmp;
-> +
-> +		/* The 1st CPU of the local group is a good candidate */
-> +		id = cpumask_first(sched_group_cpus(pack));
+This patchset combines code from Gregory Clement, Sebastian
+Hesselbarth, Andrew Lunn and several fixes from me to implement core
+clks, cpu clock and gated clocks on Marvel MVEBU SoCs.
 
-You make the assumption that the first sched_group in the list always contains
-the current cpu. I think that is always the case, but I haven't verified
-it. Maybe a comment about this would help people to understand the code
-easier.
+The Armada 370/XP core clock code is a refactored version of the
+already submitted and ACKed code from Gregory. It has been made to fit
+inside a framework developed by Sebastian which can handle all MVEBU
+SoCs. The Armada 370/XP SoCs have more core clocks than the older SoCs, and
+the framework needs to handle this. Rather than specify the clock
+frequencies in DT, a Sample At Reset register is used, which describes
+each core clock frequency.
 
-> +
-> +		/* loop the sched groups to find the best one */
-> +		for (tmp = sg->next; tmp != sg; tmp = tmp->next) {
-> +			if (tmp->sgp->power * pack->group_weight >
-> +					pack->sgp->power * tmp->group_weight)
-> +				continue;
-> +
-> +			if ((tmp->sgp->power * pack->group_weight ==
-> +					pack->sgp->power * tmp->group_weight)
-> +			 && (cpumask_first(sched_group_cpus(tmp)) >= id))
-> +				continue;
-> +
-> +			/* we have found a better group */
-> +			pack = tmp;
-> +
-> +			/* Take the 1st CPU of the new group */
-> +			id = cpumask_first(sched_group_cpus(pack));
-> +		}
-> +
+Armada XP is an SMP processor, with each CPU having its own
+clock. Gregory's code for this has been taken as is.
 
-Works great on my setup.
+The Armada 370/XP clock source has been converted to the common clock
+framework.
 
-> +		/* Look for another CPU than itself */
-> +		if ((id != cpu)
-> +		 || ((sd->parent) && !(sd->parent->flags && SD_LOAD_BALANCE)))
-> +			break;
+Dove, Kirkword, and Armada 370/XP have the ability to gate
+clocks to various blocks. A clk-gate clock is created for each of the
+gateable clocks on Dove and Kirkwood and Armada 370/XP.
 
-If I understand correctly the last part of this check should avoid
-selecting a buddy in a sched_group that is not load balanced with the
-current one. In that case, I think that this check (or a similar check)
-should be done before the loop as well. As it is, the first iteration of
-the loop will always search all the groups of the first domain where
-SD_SHARE_POWERLINE is disabled regardless of the state of
-SD_LOAD_BALANCE flag. So if they are both disabled at the same level
-packing will happen across groups that are not supposed to be
-load-balanced.
+Here is a summary of what the different patches are doing:
 
-Regards,
-Morten
+ * Patch 1 introduces a clk-core clock driver, that works for all
+   MVEBU SoCs. It determines the core clock frequency by reading a
+   Sample-at-Reset register, and provides a few core fixed-rate core
+   clocks based on those values.
 
-> +
-> +		sd = sd->parent;
-> +	}
-> 
-> Regards,
-> Vincent
-> 
-> >
-> > Regards,
-> > Morten
-> >
-> >> +
-> >> +             /* loop the sched groups to find the best one */
-> >> +             while (tmp != sg) {
-> >> +                     if (tmp->sgp->power * sg->group_weight <
-> >> +                                     sg->sgp->power * tmp->group_weight)
-> >> +                             pack = tmp;
-> >> +                     tmp = tmp->next;
-> >> +             }
-> >> +
-> >> +             /* we have found a better group */
-> >> +             if (pack != sg)
-> >> +                     id = cpumask_first(sched_group_cpus(pack));
-> >> +
-> >> +             /* Look for another CPU than itself */
-> >> +             if ((id != cpu)
-> >> +              || ((sd->parent) && !(sd->parent->flags && SD_LOAD_BALANCE)))
-> >> +                     break;
-> >> +
-> >> +             sd = sd->parent;
-> >> +     }
-> >> +
-> >> +     pr_info(KERN_INFO "CPU%d packing on CPU%d\n", cpu, id);
-> >> +     per_cpu(sd_pack_buddy, cpu) = id;
-> >> +}
-> >> +
-> >>  #if BITS_PER_LONG == 32
-> >>  # define WMULT_CONST (~0UL)
-> >>  #else
-> >> @@ -3073,6 +3130,55 @@ static int select_idle_sibling(struct task_struct *p, int target)
-> >>       return target;
-> >>  }
-> >>
-> >> +static inline bool is_buddy_busy(int cpu)
-> >> +{
-> >> +     struct rq *rq = cpu_rq(cpu);
-> >> +
-> >> +     /*
-> >> +      * A busy buddy is a CPU with a high load or a small load with a lot of
-> >> +      * running tasks.
-> >> +      */
-> >> +     return ((rq->avg.usage_avg_sum << rq->nr_running) >
-> >> +                     rq->avg.runnable_avg_period);
-> >> +}
-> >> +
-> >> +static inline bool is_light_task(struct task_struct *p)
-> >> +{
-> >> +     /* A light task runs less than 25% in average */
-> >> +     return ((p->se.avg.usage_avg_sum << 2) < p->se.avg.runnable_avg_period);
-> >> +}
-> >> +
-> >> +static int check_pack_buddy(int cpu, struct task_struct *p)
-> >> +{
-> >> +     int buddy = per_cpu(sd_pack_buddy, cpu);
-> >> +
-> >> +     /* No pack buddy for this CPU */
-> >> +     if (buddy == -1)
-> >> +             return false;
-> >> +
-> >> +     /*
-> >> +      * If a task is waiting for running on the CPU which is its own buddy,
-> >> +      * let the default behavior to look for a better CPU if available
-> >> +      * The threshold has been set to 37.5%
-> >> +      */
-> >> +     if ((buddy == cpu)
-> >> +      && ((p->se.avg.usage_avg_sum << 3) < (p->se.avg.runnable_avg_sum * 5)))
-> >> +             return false;
-> >> +
-> >> +     /* buddy is not an allowed CPU */
-> >> +     if (!cpumask_test_cpu(buddy, tsk_cpus_allowed(p)))
-> >> +             return false;
-> >> +
-> >> +     /*
-> >> +      * If the task is a small one and the buddy is not overloaded,
-> >> +      * we use buddy cpu
-> >> +      */
-> >> +      if (!is_light_task(p) || is_buddy_busy(buddy))
-> >> +             return false;
-> >> +
-> >> +     return true;
-> >> +}
-> >> +
-> >>  /*
-> >>   * sched_balance_self: balance the current task (running on cpu) in domains
-> >>   * that have the 'flag' flag set. In practice, this is SD_BALANCE_FORK and
-> >> @@ -3098,6 +3204,9 @@ select_task_rq_fair(struct task_struct *p, int sd_flag, int wake_flags)
-> >>       if (p->nr_cpus_allowed == 1)
-> >>               return prev_cpu;
-> >>
-> >> +     if (check_pack_buddy(cpu, p))
-> >> +             return per_cpu(sd_pack_buddy, cpu);
-> >> +
-> >>       if (sd_flag & SD_BALANCE_WAKE) {
-> >>               if (cpumask_test_cpu(cpu, tsk_cpus_allowed(p)))
-> >>                       want_affine = 1;
-> >> diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
-> >> index a95d5c1..086d8bf 100644
-> >> --- a/kernel/sched/sched.h
-> >> +++ b/kernel/sched/sched.h
-> >> @@ -875,6 +875,7 @@ static inline void idle_balance(int cpu, struct rq *rq)
-> >>
-> >>  extern void sysrq_sched_debug_show(void);
-> >>  extern void sched_init_granularity(void);
-> >> +extern void update_packing_domain(int cpu);
-> >>  extern void update_max_interval(void);
-> >>  extern void update_group_power(struct sched_domain *sd, int cpu);
-> >>  extern int update_runtime(struct notifier_block *nfb, unsigned long action, void *hcpu);
-> >> --
-> >> 1.7.9.5
-> >>
-> >>
-> >> _______________________________________________
-> >> linaro-dev mailing list
-> >> linaro-dev at lists.linaro.org
-> >> http://lists.linaro.org/mailman/listinfo/linaro-dev
-> >>
-> >
-> 
+ * Patch 2 introduces a clk-cpu clock driver, which is specific to the
+   multi-core Armada XP SoCs. This driver allows to control the
+   individiual clock of each CPU.
+
+ * Patch 3 introduces a clk-gating-ctrl driver, which allows to control
+   the gatable clocks available on MVEBU SoCs. This patch only
+   introduces support for the Dove and Kirkwood SoCs.
+
+ * Patch 4 is an extension of the clk-gating-ctrl driver to support
+   the Armada 370 and Armada XP SoCs.
+
+ * Patch 5 integrates the clk framework into Marvell Armada 370/XP by
+   adding the needed information in the SoC Device Tree, as well as
+   selecting the appropriate Kconfig options.
+
+ * Patch 6 converts the Armada 370/XP clock source driver to use the
+   clk framework.
+
+ * Patch 7 integrates the clk framework into Marvell Dove by adding
+   the needed information in the SoC Device Tree, as well as selecting
+   the appropriate Kconfig options.
+
+ * Patch 8 integrates the clk framework into Marvell Kirkwood by
+   adding the needed information in the SoC Device Tree, as well as
+   selecting the appropriate Kconfig options.
+
+This code has been tested on:
+
+Kirkwood based evaluation board
+Armada 370 based evaluation board
+Armada XP based evaluation board
+
+v2 -> v3
+
+  Fix the gating clock driver registration so that it also gets
+  registered on Armada 370/XP.
+
+  Refactor a bit the clk-cpu driver by moving the compatible strings
+  list into the driver itself, making it more consistent with clk-core
+  and clk-gating-ctrl.
+
+  Rename the compatible strings of the clk-core and clk-cpu drivers in
+  order to have consistency between all drivers: they all expose a
+  '<something>-clock' DT compatible string.
+
+  Rename mvebu_clk_gating_init() to mvebu_gating_clk_init() for
+  consistency.
+
+  Fix the clk-cpu driver so that it registers only the clocks for the
+  CPUs described in the Device Tree. The Armada XP has 1 core, 2 cores
+  and 4 cores variants, and therefore the driver must take this into
+  account. The Device Tree data have also been adapted accordingly.
+
+  On Armada XP, ensure that the sata and satalnk gatable clocks have a
+  parent->child relationship to make sure that they both get enabled
+  when the SATA driver claims the sata clock.
+
+  On Armada 370, mark the gatable 'ddr' clock with the
+  CLK_IGNORE_UNUSED flag to ensure that this clock doesn't get
+  disabled even if no driver is claiming it.
+
+  The patch set has also been slightly re-organized (order of patches,
+  old PATCH 8/9 has been squashed into PATCH 5/8).
+
+v1 -> v2
+  Moved some patch hunks into the correct patch
+  Added armada_ prefix to a number of symbols
+  renamed clk_gate to gate_clk
+  renamed *-clock-gating to *-gating-clock
+  Add gating-clock implementation for Armada 370/XP
+  Add Tested-by from Gregory
+  Documented required clock property in armada-370-xp-timer.txt
+
+The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
+
+  Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
+
+are available in the git repository at:
+
+  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-mvebu-clk-3.8
+
+for you to fetch changes up to 1611f872513735ac7105535689c0dd668fbf1c04:
+
+  ARM: Kirkwood: switch to DT clock providers (2012-11-20 14:46:50 +0100)
+
+----------------------------------------------------------------
+Marvell MVEBU clk support, for 3.8
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: Kirkwood: switch to DT clock providers
+
+Gregory CLEMENT (4):
+      clk: mvebu: add armada-370-xp CPU specific clocks
+      clk: mvebu: armada 370/XP add clock gating control provider for DT
+      clk: armada-370-xp: add support for clock framework
+      clocksource: convert time-armada-370-xp to clk framework
+
+Sebastian Hesselbarth (3):
+      clk: mvebu: add mvebu core clocks.
+      clk: mvebu: add clock gating control provider for DT
+      ARM: dove: switch to DT clock providers
+
+ .../bindings/arm/armada-370-xp-timer.txt           |    1 +
+ .../devicetree/bindings/clock/mvebu-core-clock.txt |   47 ++
+ .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   21 +
+ .../bindings/clock/mvebu-gated-clock.txt           |  119 ++++
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/armada-370-db.dts                |    4 -
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    1 +
+ arch/arm/boot/dts/armada-370.dtsi                  |   15 +
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi           |   12 +
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi           |   19 +
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi           |   34 +
+ arch/arm/boot/dts/armada-xp.dtsi                   |   20 +
+ arch/arm/boot/dts/dove.dtsi                        |   20 +
+ arch/arm/boot/dts/kirkwood.dtsi                    |   22 +
+ arch/arm/mach-dove/Kconfig                         |    2 +
+ arch/arm/mach-dove/common.c                        |   63 +-
+ arch/arm/mach-kirkwood/Kconfig                     |    2 +
+ arch/arm/mach-kirkwood/board-dt.c                  |   71 +-
+ arch/arm/mach-mvebu/Kconfig                        |    4 +
+ arch/arm/mach-mvebu/armada-370-xp.c                |    9 +-
+ arch/arm/plat-orion/include/plat/common.h          |    1 +
+ drivers/clk/Kconfig                                |    2 +
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/mvebu/Kconfig                          |    8 +
+ drivers/clk/mvebu/Makefile                         |    3 +
+ drivers/clk/mvebu/clk-core.c                       |  675 ++++++++++++++++++++
+ drivers/clk/mvebu/clk-core.h                       |   18 +
+ drivers/clk/mvebu/clk-cpu.c                        |  186 ++++++
+ drivers/clk/mvebu/clk-cpu.h                        |   22 +
+ drivers/clk/mvebu/clk-gating-ctrl.c                |  249 ++++++++
+ drivers/clk/mvebu/clk-gating-ctrl.h                |   22 +
+ drivers/clk/mvebu/clk.c                            |   27 +
+ drivers/clocksource/time-armada-370-xp.c           |   11 +-
+ include/linux/clk/mvebu.h                          |   22 +
+ 34 files changed, 1696 insertions(+), 38 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+ create mode 100644 drivers/clk/mvebu/Kconfig
+ create mode 100644 drivers/clk/mvebu/Makefile
+ create mode 100644 drivers/clk/mvebu/clk-core.c
+ create mode 100644 drivers/clk/mvebu/clk-core.h
+ create mode 100644 drivers/clk/mvebu/clk-cpu.c
+ create mode 100644 drivers/clk/mvebu/clk-cpu.h
+ create mode 100644 drivers/clk/mvebu/clk-gating-ctrl.c
+ create mode 100644 drivers/clk/mvebu/clk-gating-ctrl.h
+ create mode 100644 drivers/clk/mvebu/clk.c
+ create mode 100644 include/linux/clk/mvebu.h
