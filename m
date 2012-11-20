@@ -1,17 +1,17 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Nov 2012 23:39:09 +0100
-Subject: [PATCH 075/493] mfd: remove use of __devexit_p
-In-Reply-To: <1353349642-3677-75-git-send-email-wfp5p@virginia.edu>
+Date: Tue, 20 Nov 2012 23:40:06 +0100
+Subject: [PATCH 412/493] mfd: remove use of __devexit
+In-Reply-To: <1353349642-3677-412-git-send-email-wfp5p@virginia.edu>
 References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-75-git-send-email-wfp5p@virginia.edu>
-Message-ID: <CACRpkdbzOUAwt4SB5DSKaCpWOMx1FJc8M8Ej-adpu+jzH3dO9Q@mail.gmail.com>
+ <1353349642-3677-412-git-send-email-wfp5p@virginia.edu>
+Message-ID: <CACRpkdZ0FccH7iDGYoF-hJ99wb9zgNGeYj+LS259LamVjCjHpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 7:20 PM, Bill Pemberton <wfp5p@virginia.edu> wrote:
+On Mon, Nov 19, 2012 at 7:26 PM, Bill Pemberton <wfp5p@virginia.edu> wrote:
 
-> CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
-> needed.
+> CONFIG_HOTPLUG is going away as an option so __devexit is no
+> longer needed.
 >
 > Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
 > Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
