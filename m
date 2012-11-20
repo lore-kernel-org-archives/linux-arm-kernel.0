@@ -1,54 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 20 Nov 2012 15:57:17 +0000
-Subject: [PATCH 1/1] ARM: oprofile: add A5/A7/A15 entries in op_perf_name
-In-Reply-To: <20121120121747.GJ2504@rric.localhost>
-References: <1351853016-4476-1-git-send-email-jgq516@gmail.com>
- <20121105113102.GF3351@mudshark.cambridge.arm.com>
- <20121120121747.GJ2504@rric.localhost>
-Message-ID: <20121120155717.GD26475@mudshark.cambridge.arm.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Tue, 20 Nov 2012 16:59:48 +0100
+Subject: [PATCH v3 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <509EA360.2050504@gmail.com> (Daniel Mack's message of "Sat, 10
+ Nov 2012 19:56:32 +0100")
+References: <1351869956-2787-1-git-send-email-zonque@gmail.com>
+ <1351869956-2787-5-git-send-email-zonque@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9DA81F@DBDE01.ent.ti.com>
+ <5097B7EE.3000508@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9DC1F1@DBDE01.ent.ti.com>
+ <509A2E75.5060307@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9DE420@DBDE01.ent.ti.com>
+ <509EA360.2050504@gmail.com>
+Message-ID: <87mwycjmdn.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 12:17:47PM +0000, Robert Richter wrote:
-> Will,
-> 
-> On 05.11.12 11:31:03, Will Deacon wrote:
-> > > diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> > > index 99c63d4b..ec10db1 100644
-> > > --- a/arch/arm/oprofile/common.c
-> > > +++ b/arch/arm/oprofile/common.c
-> > > @@ -37,8 +37,11 @@ static struct op_perf_name {
-> > >  	{ "xscale1",		"arm/xscale2"	},
-> > >  	{ "v6",			"arm/armv6"	},
-> > >  	{ "v6mpcore",		"arm/mpcore"	},
-> > > +	{ "ARMv7 Cortex-A5",	"arm/armv7-ca5"	},
-> > > +	{ "ARMv7 Cortex-A7",	"arm/armv7-ca7"	},
-> > >  	{ "ARMv7 Cortex-A8",	"arm/armv7"	},
-> > >  	{ "ARMv7 Cortex-A9",	"arm/armv7-ca9"	},
-> > > +	{ "ARMv7 Cortex-A15",	"arm/armv7-ca15" },
-> > >  };
-> 
-> > I'd rather not go down this route now that we have the operf tool as part of
-> > oprofile, which can use the perf syscall directly and doesn't need this
-> > string translation.
-> 
-> since this is just an update of cpu detection I would be willing to
-> include this into kernel code anyway.
+>>>>> "Daniel" == Daniel Mack <zonque@gmail.com> writes:
 
-Perhaps, but one day we might like to remove this compatibility layer as
-tools move over to the perf system call, so adding new CPUs here is actively
-going against that.
+Hi,
 
-> We could further move the cpu detection to userspace if perf_event
-> exists. We let the kernel enable oprofile with cpu_type="unknown".
-> User space then could either bind mount the file (user could do this
-> manually) or we implement to write to cpu_type. Doing so oprofile
-> could use in-kernel perf_events if it exists always as fallback.
+ >>>> In omap2 driver NAND_ECC_HW ecc mode supports 3 ecc layout
+ >>>> OMAP_ECC_HAMMING_CODE_HW_ROMCODE
+ >>>> OMAP_ECC_BCH4_CODE_HW
+ >>>> OMAP_ECC_BCH8_CODE_HW
+ >>>> 
+ >>>> So selection of ecc layout data should come from DT not ecc mode.
+ >>> 
+ >>> Ok, I see. I would still like to set them by string rather than magic
+ >>> numbers that map to enum entries. Valid values would be "none", "hw",
+ >>> "hw-romcode", "bch4" and "bch8". Are you ok with that?
+ >> 
+ >> Ok, that's nice. Better use ecc_opt instead of ecc_mode.
 
-Not sure I follow you... operf already does the CPU detection from
-userspace, so I guess that code could simply be re-used. What does the bind
-mount involve?
+ Daniel> I did some more extensive tests that include reading the same
+ Daniel> nand pages from both U-Boot and the kernel with BCH8 ECC, and
+ Daniel> it turns out that -> is_elm_used needs to be set in the pdata
+ Daniel> in order to make this work.
 
-Cheers,
+So what you're saying is that the choice of ELM or not is not just an
+optimization, it really changes the ECC layout? Perhaps it should be
+treated as a seperate layout (E.G. bch8-elm) then?
 
-Will
+-- 
+Bye, Peter Korsgaard
