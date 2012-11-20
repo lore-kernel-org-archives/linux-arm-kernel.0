@@ -1,27 +1,49 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 20 Nov 2012 08:52:03 +0800
-Subject: [PATCH 2/2] ARM: mmp: support pinctrl single in brownstone
-In-Reply-To: <50AAA7B1.7060404@wwwdotorg.org>
-References: <1353049345-6954-1-git-send-email-haojian.zhuang@gmail.com>
- <1353049345-6954-2-git-send-email-haojian.zhuang@gmail.com>
- <50AAA7B1.7060404@wwwdotorg.org>
-Message-ID: <CAN1soZyTad0QVt-oKM24XiHYruyFx5MTiu2+ytGL5RNv-Pqonw@mail.gmail.com>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Mon, 19 Nov 2012 19:05:47 -0600
+Subject: [PATCH v5 0/5] OMAP: iommu: hwmod, reset handling and runtime PM
+Message-ID: <1353373552-16039-1-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 5:42 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 11/16/2012 12:02 AM, Haojian Zhuang wrote:
->> Support pinctrl-single driver in brownstone platform with DT.
->
->> diff --git a/arch/arm/boot/dts/mmp2-brownstone.dts b/arch/arm/boot/dts/mmp2-brownstone.dts
->
->>       chosen {
->> -             bootargs = "console=ttyS2,38400 root=/dev/nfs nfsroot=192.168.1.100:/nfsroot/ ip=192.168.1.101:192.168.1.100::255.255.255.0::eth0:on";
->> +             bootargs = "console=ttyS2,38400 root=/dev/nfs nfsroot=192.168.1.100:/nfsroot/ ip=192.168.1.101:192.168.1.100::255.255.255.0::eth0:on earlyprintk";
->
-> That seems unrelated.
->
-But it's helpful on debug. Should I remove this? I prefer that I could
-keep this.
+These patches are needed for remoteproc to work on OMAP4.
 
-Since I want to watch the whole log before console is enabled.
+Introduced iommu hwmod support for OMAP3 (iva, isp) and
+OMAP4 (ipu, dsp), along with the corresponding runtime PM
+and routines to deassert reset lines, enable/disable clocks
+and configure sysc registers.
+
+A couple of patches were added (first two) to be clearer on
+the reasons for such changes, they were previosuly bundled as part
+of runtime PM changes. The last patch corresponds to a change in the
+leaf clocks used and it depends on this series to work properly.
+
+Due to single Image support, I rebased these on top of k3.7-rc5 and
+DEPEND on:
+
+[PATCH v5 0/6] Move rest of omap-iommu to live in drivers/iommu
+http://thread.gmane.org/gmane.linux.kernel/1387788
+
+Minor rebasing might be needed if these are included on top of
+linux-omap, since they are affected by changes on headers being
+moved to include/linux/platform_data and arch/arm/mach-omap2.
+
+Omar Ramirez Luna (5):
+  iommu/omap: remove redundant clock handling on ISR
+  iommu/omap: keep mmu enabled when requested
+  iommu/omap: migrate to hwmod framework
+  iommu/omap: adapt to runtime pm
+  ARM: OMAP4: hwmod data: ipu and dsp to use parent clocks instead of
+    leaf clocks
+
+ arch/arm/mach-omap2/clock44xx_data.c       |   22 ----
+ arch/arm/mach-omap2/devices.c              |    2 +-
+ arch/arm/mach-omap2/omap-iommu.c           |  167 ++++++---------------------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    4 +-
+ drivers/iommu/omap-iommu.c                 |   68 ++++++-----
+ drivers/iommu/omap-iommu.h                 |    3 -
+ drivers/iommu/omap-iommu2.c                |   36 ------
+ include/linux/platform_data/iommu-omap.h   |    9 +-
+ 8 files changed, 84 insertions(+), 227 deletions(-)
+
+-- 
+1.7.4.1
