@@ -1,55 +1,70 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 20 Nov 2012 11:58:38 -0700
-Subject: [PATCH V2 2/2] ARM: tegra: move timer.c to drivers/clocksource/
-In-Reply-To: <20121120005036.GA6280@kryptos>
-References: <1353371237-2482-1-git-send-email-swarren@wwwdotorg.org>
- <1353371237-2482-2-git-send-email-swarren@wwwdotorg.org>
- <20121120005036.GA6280@kryptos>
-Message-ID: <50ABD2DE.6010601@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 20 Nov 2012 20:01:11 +0100
+Subject: [PATCH] clk: add GPLv2 headers to the Versatile clock files
+Message-ID: <1353438071-27079-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2012 05:50 PM, Josh Cartwright wrote:
-> On Mon, Nov 19, 2012 at 05:27:17PM -0700, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> Move arch/arm/mach-tegra/timer.c to drivers/clocksource/tegra20_timer.c
->> so that the code is co-located with other clocksource drivers, and to
->> reduce the size of the mach-tegra directory.
->>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->> v2: Rebase on ARM sys_timer rework, and addition of clocksource_of_init().
-> [..]
->> diff --git a/drivers/clocksource/clksrc-of.c b/drivers/clocksource/clksrc-of.c
->> index aeec8d2..328d18f 100644
->> --- a/drivers/clocksource/clksrc-of.c
->> +++ b/drivers/clocksource/clksrc-of.c
->> @@ -20,6 +20,10 @@
->>  #include "clksrc-of.h"
->>  
->>  static const struct of_device_id clksrc_of_match[] __initconst = {
->> +	{
->> +		.compatible = "nvidia,tegra20-timer",
->> +		.data = tegra20_init_timer,
->> +	},
-> 
-> Shouldn't this be wrapped in #if ARCH_TEGRA?
+The GPLv2 headers were missing and the subsystem maintainer likes
+them so put them in. I am the copyright holder, so explicitly
+licensing these under the GPLv2.
 
-Yes.
+Reported-by: Mike Turquette <mturquette@ti.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/clk/versatile/clk-icst.c       | 6 ++++++
+ drivers/clk/versatile/clk-integrator.c | 8 ++++++++
+ drivers/clk/versatile/clk-realview.c   | 8 ++++++++
+ 3 files changed, 22 insertions(+)
 
-> I had suggested this with Thomas Petazzoni's consolidated irq_chip patch
-> as well:
-> 
-> It seems like it would be a bit cleaner/easier to maintain if we relied
-> on the linker to stitch together a clksrc_of_match table, based on what
-> clocksources are being built into the image.  With that approach, at
-> least, a public initialization header wouldn't have to be exposed, and
-> this central table wouldn't have to be maintained (as more clocksrcs are
-> added, I forsee [admittedly trivial] merge conflicts).
-> 
-> Thoughts?
-
-I thought I'd wait for Thomas' revised patch and copy that, but it
-turned out to be easier that I figured to implement. So, new revision
-coming soon!
+diff --git a/drivers/clk/versatile/clk-icst.c b/drivers/clk/versatile/clk-icst.c
+index f555b50..23d2d7e 100644
+--- a/drivers/clk/versatile/clk-icst.c
++++ b/drivers/clk/versatile/clk-icst.c
+@@ -3,6 +3,12 @@
+  * We wrap the custom interface from <asm/hardware/icst.h> into the generic
+  * clock framework.
+  *
++ * Copyright (C) 2012 Linus Walleij
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
+  * TODO: when all ARM reference designs are migrated to generic clocks, the
+  * ICST clock code from the ARM tree should probably be merged into this
+  * file.
+diff --git a/drivers/clk/versatile/clk-integrator.c b/drivers/clk/versatile/clk-integrator.c
+index 5aa6ab9..d7cf1ba 100644
+--- a/drivers/clk/versatile/clk-integrator.c
++++ b/drivers/clk/versatile/clk-integrator.c
+@@ -1,3 +1,11 @@
++/*
++ * Clock driver for the ARM Integrator/AP and Integrator/CP boards
++ * Copyright (C) 2012 Linus Walleij
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
+ #include <linux/clk-provider.h>
+ #include <linux/clk.h>
+ #include <linux/clkdev.h>
+diff --git a/drivers/clk/versatile/clk-realview.c b/drivers/clk/versatile/clk-realview.c
+index e21a99c..fd2dbdb 100644
+--- a/drivers/clk/versatile/clk-realview.c
++++ b/drivers/clk/versatile/clk-realview.c
+@@ -1,3 +1,11 @@
++/*
++ * Clock driver for the ARM RealView boards
++ * Copyright (C) 2012 Linus Walleij
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
+ #include <linux/clk.h>
+ #include <linux/clkdev.h>
+ #include <linux/err.h>
+-- 
+1.7.11.7
