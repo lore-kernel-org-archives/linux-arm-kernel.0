@@ -1,91 +1,49 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 20 Nov 2012 14:49:34 +0000
-Subject: [PATCH] ARM: decompressor: Enable unaligned memory access for v6
- and above
-In-Reply-To: <1352205711-15787-1-git-send-email-dave.martin@linaro.org>
-References: <1352205711-15787-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <20121120144934.GA1969@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 20 Nov 2012 15:57:01 +0100
+Subject: [GIT PULL v3] Adding SATA support for Armada 370/XP
+Message-ID: <1353423425-20574-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 12:41:51PM +0000, Dave Martin wrote:
-> Modern GCC can generate code which makes use of the CPU's native
-> unaligned memory access capabilities.  This is useful for the C
-> decompressor implementations used for unpacking compressed kernels.
-> 
-> This patch disables alignment faults and enables the v6 unaligned
-> access model on CPUs which support these features (i.e., v6 and
-> later), allowing full unaligned access support for C code in the
-> decompressor.
-> 
-> The decompressor C code must not be built to assume that unaligned
-> access works if support for v5 or older platforms is included in
-> the kernel.
-> 
-> For correct code generation, C decompressor code must always use
-> the get_unaligned and put_unaligned accessors when dealing with
-> unaligned pointers, regardless of this patch.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> Acked-by: Nicolas Pitre <nico@linaro.org>
+Jason,
 
-Does anyone have any further comments on this before I send it to the
-patch system?
+Here is a pull request of SATA support patches for Armada 370/XP. It
+depends on the clk series of patches, and replace the previous SATA
+patches you had.
 
-Cheers
----Dave
+Changes since v2:
+ * Use the proper gating clocks as SATA clocks;
+ * Use tabs instead of spaces in the .dtsi/.dts files
+ * Slightly reword the title of patch 2, 3, 4
 
-> ---
-> This is the same as the previous post, with an additional comment
-> in the commit message regarding the use of {get,put}_unaligned,
-> as suggested by Nico.
-> 
-> Tested on ARM1136JF-S (Integrator/CP) and ARM1176JZF-S (RealView
-> PB1176JZF-S).  ARM1176 is like v7 regarding the MIDR and SCTLR
-> alignment control bits, so this tests the v7 code path.
-> 
->  arch/arm/boot/compressed/head.S |   14 +++++++++++++-
->  1 files changed, 13 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 90275f0..49ca86e 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -652,6 +652,15 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
->  		mov	pc, lr
->  ENDPROC(__setup_mmu)
->  
-> +@ Enable unaligned access on v6, to allow better code generation
-> +@ for the decompressor C code:
-> +__armv6_mmu_cache_on:
-> +		mrc	p15, 0, r0, c1, c0, 0	@ read SCTLR
-> +		bic	r0, r0, #2		@ A (no unaligned access fault)
-> +		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
-> +		mcr	p15, 0, r0, c1, c0, 0	@ write SCTLR
-> +		b	__armv4_mmu_cache_on
-> +
->  __arm926ejs_mmu_cache_on:
->  #ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
->  		mov	r0, #4			@ put dcache in WT mode
-> @@ -694,6 +703,9 @@ __armv7_mmu_cache_on:
->  		bic	r0, r0, #1 << 28	@ clear SCTLR.TRE
->  		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
->  		orr	r0, r0, #0x003c		@ write buffer
-> +		bic	r0, r0, #2		@ A (no unaligned access fault)
-> +		orr	r0, r0, #1 << 22	@ U (v6 unaligned access model)
-> +						@ (needed for ARM1176)
->  #ifdef CONFIG_MMU
->  #ifdef CONFIG_CPU_ENDIAN_BE8
->  		orr	r0, r0, #1 << 25	@ big-endian page tables
-> @@ -914,7 +926,7 @@ proc_types:
->  
->  		.word	0x0007b000		@ ARMv6
->  		.word	0x000ff000
-> -		W(b)	__armv4_mmu_cache_on
-> +		W(b)	__armv6_mmu_cache_on
->  		W(b)	__armv4_mmu_cache_off
->  		W(b)	__armv6_mmu_cache_flush
->  
-> -- 
-> 1.7.4.1
-> 
+Thanks!
+
+The following changes since commit 1611f872513735ac7105535689c0dd668fbf1c04:
+
+  ARM: Kirkwood: switch to DT clock providers (2012-11-20 14:46:50 +0100)
+
+are available in the git repository at:
+
+  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-sata-3.8
+
+for you to fetch changes up to 3d82daaaa6c7b91a534a54c7d123fe419155bf98:
+
+  arm: mvebu: SATA support: board-level DT data for Armada 370/XP boards (2012-11-20 15:42:07 +0100)
+
+----------------------------------------------------------------
+Marvell Armada 370/XP support for 3.8
+
+----------------------------------------------------------------
+Gregory CLEMENT (4):
+      arm: mvebu: increase atomic coherent pool size for armada 370/XP
+      arm: mvebu: SATA support: SoC-level DT data for Armada 370/XP
+      arm: mvebu: SATA support: mvebu_defconfig update
+      arm: mvebu: SATA support: board-level DT data for Armada 370/XP boards
+
+ arch/arm/boot/dts/armada-370-db.dts  |    4 ++++
+ arch/arm/boot/dts/armada-370-xp.dtsi |   10 ++++++++++
+ arch/arm/boot/dts/armada-xp-db.dts   |    4 ++++
+ arch/arm/configs/multi_v7_defconfig  |    2 ++
+ arch/arm/configs/mvebu_defconfig     |    3 +++
+ arch/arm/mach-mvebu/armada-370-xp.c  |   12 ++++++++++++
+ 6 files changed, 35 insertions(+)
