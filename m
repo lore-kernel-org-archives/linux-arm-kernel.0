@@ -1,44 +1,145 @@
-From: rric@kernel.org (Robert Richter)
-Date: Tue, 20 Nov 2012 13:17:47 +0100
-Subject: [PATCH 1/1] ARM: oprofile: add A5/A7/A15 entries in op_perf_name
-In-Reply-To: <20121105113102.GF3351@mudshark.cambridge.arm.com>
-References: <1351853016-4476-1-git-send-email-jgq516@gmail.com>
- <20121105113102.GF3351@mudshark.cambridge.arm.com>
-Message-ID: <20121120121747.GJ2504@rric.localhost>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 20 Nov 2012 21:18:17 +0900
+Subject: [PATCH] ARM: EXYNOS5: Add arm down clock support
+In-Reply-To: <1352463254-28423-1-git-send-email-a.kesavan@samsung.com>
+References: <1352463254-28423-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <0c9f01cdc719$1f5b2830$5e117890$@org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+Abhilash Kesavan wrote:
+> 
+> In idle state down clocking the arm cores can result in power
+> savings. Program the power control registers to achieve this and
+> save these registers across a suspend/resume cycle.
+> 
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> ---
+>  arch/arm/mach-exynos/clock-exynos5.c           |    2 +
+>  arch/arm/mach-exynos/cpuidle.c                 |   36
+++++++++++++++++++++++++
+>  arch/arm/mach-exynos/include/mach/regs-clock.h |   19 ++++++++++++
+>  3 files changed, 57 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-
+> exynos/clock-exynos5.c
+> index a88e0d9..9bb6567 100644
+> --- a/arch/arm/mach-exynos/clock-exynos5.c
+> +++ b/arch/arm/mach-exynos/clock-exynos5.c
+> @@ -80,6 +80,8 @@ static struct sleep_save exynos5_clock_save[] = {
+>  	SAVE_ITEM(EXYNOS5_VPLL_CON0),
+>  	SAVE_ITEM(EXYNOS5_VPLL_CON1),
+>  	SAVE_ITEM(EXYNOS5_VPLL_CON2),
+> +	SAVE_ITEM(EXYNOS5_PWR_CTRL1),
+> +	SAVE_ITEM(EXYNOS5_PWR_CTRL2),
+>  };
+>  #endif
+> 
+> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-
+> exynos/cpuidle.c
+> index cff0595..4ddda91 100644
+> --- a/arch/arm/mach-exynos/cpuidle.c
+> +++ b/arch/arm/mach-exynos/cpuidle.c
+> @@ -21,6 +21,7 @@
+>  #include <asm/suspend.h>
+>  #include <asm/unified.h>
+>  #include <asm/cpuidle.h>
+> +#include <mach/regs-clock.h>
+>  #include <mach/regs-pmu.h>
+>  #include <mach/pmu.h>
+> 
+> @@ -156,12 +157,47 @@ static int exynos4_enter_lowpower(struct
+> cpuidle_device *dev,
+>  		return exynos4_enter_core0_aftr(dev, drv, new_index);
+>  }
+> 
+> +static void __init exynos5_core_down_clk(void)
+> +{
+> +	unsigned int tmp;
+> +
+> +	/*
+> +	 * Enable arm clock down (in idle) and set arm divider
+> +	 * ratios in WFI/WFE state.
+> +	 */
+> +	tmp = PWR_CTRL1_CORE2_DOWN_RATIO | \
+> +	      PWR_CTRL1_CORE1_DOWN_RATIO | \
+> +	      PWR_CTRL1_DIV2_DOWN_EN	 | \
+> +	      PWR_CTRL1_DIV1_DOWN_EN	 | \
+> +	      PWR_CTRL1_USE_CORE1_WFE	 | \
+> +	      PWR_CTRL1_USE_CORE0_WFE	 | \
+> +	      PWR_CTRL1_USE_CORE1_WFI	 | \
+> +	      PWR_CTRL1_USE_CORE0_WFI;
+> +	__raw_writel(tmp, EXYNOS5_PWR_CTRL1);
+> +
+> +	/*
+> +	 * Enable arm clock up (on exiting idle). Set arm divider
+> +	 * ratios when not in idle along with the standby duration
+> +	 * ratios.
+> +	 */
+> +	tmp = PWR_CTRL2_DIV2_UP_EN	 | \
+> +	      PWR_CTRL2_DIV1_UP_EN	 | \
+> +	      PWR_CTRL2_DUR_STANDBY2_VAL | \
+> +	      PWR_CTRL2_DUR_STANDBY1_VAL | \
+> +	      PWR_CTRL2_CORE2_UP_RATIO	 | \
+> +	      PWR_CTRL2_CORE1_UP_RATIO;
+> +	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
+> +}
+> +
+>  static int __init exynos4_init_cpuidle(void)
+>  {
+>  	int i, max_cpuidle_state, cpu_id;
+>  	struct cpuidle_device *device;
+>  	struct cpuidle_driver *drv = &exynos4_idle_driver;
+> 
+> +	if (soc_is_exynos5250())
+> +		exynos5_core_down_clk();
+> +
+>  	/* Setup cpuidle driver */
+>  	drv->state_count = (sizeof(exynos4_cpuidle_set) /
+>  				       sizeof(struct cpuidle_state));
+> diff --git a/arch/arm/mach-exynos/include/mach/regs-clock.h
+> b/arch/arm/mach-exynos/include/mach/regs-clock.h
+> index 8c9b38c..d36ad76 100644
+> --- a/arch/arm/mach-exynos/include/mach/regs-clock.h
+> +++ b/arch/arm/mach-exynos/include/mach/regs-clock.h
+> @@ -267,6 +267,9 @@
+>  #define EXYNOS5_CLKDIV_STATCPU0
+EXYNOS_CLKREG(0x00600)
+>  #define EXYNOS5_CLKDIV_STATCPU1
+EXYNOS_CLKREG(0x00604)
+> 
+> +#define EXYNOS5_PWR_CTRL1			EXYNOS_CLKREG(0x01020)
+> +#define EXYNOS5_PWR_CTRL2			EXYNOS_CLKREG(0x01024)
+> +
+>  #define EXYNOS5_MPLL_CON0			EXYNOS_CLKREG(0x04100)
+>  #define EXYNOS5_CLKSRC_CORE1			EXYNOS_CLKREG(0x04204)
+> 
+> @@ -344,6 +347,22 @@
+> 
+>  #define EXYNOS5_EPLLCON0_LOCKED_SHIFT		(29)
+> 
+> +#define PWR_CTRL1_CORE2_DOWN_RATIO		(7 << 28)
+> +#define PWR_CTRL1_CORE1_DOWN_RATIO		(7 << 16)
+> +#define PWR_CTRL1_DIV2_DOWN_EN			(1 << 9)
+> +#define PWR_CTRL1_DIV1_DOWN_EN			(1 << 8)
+> +#define PWR_CTRL1_USE_CORE1_WFE			(1 << 5)
+> +#define PWR_CTRL1_USE_CORE0_WFE			(1 << 4)
+> +#define PWR_CTRL1_USE_CORE1_WFI			(1 << 1)
+> +#define PWR_CTRL1_USE_CORE0_WFI			(1 << 0)
+> +
+> +#define PWR_CTRL2_DIV2_UP_EN			(1 << 25)
+> +#define PWR_CTRL2_DIV1_UP_EN			(1 << 24)
+> +#define PWR_CTRL2_DUR_STANDBY2_VAL		(1 << 16)
+> +#define PWR_CTRL2_DUR_STANDBY1_VAL		(1 << 8)
+> +#define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
+> +#define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
+> +
+>  /* Compatibility defines and inclusion */
+> 
+>  #include <mach/regs-pmu.h>
+> --
+> 1.6.6.1
 
-On 05.11.12 11:31:03, Will Deacon wrote:
-> > diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> > index 99c63d4b..ec10db1 100644
-> > --- a/arch/arm/oprofile/common.c
-> > +++ b/arch/arm/oprofile/common.c
-> > @@ -37,8 +37,11 @@ static struct op_perf_name {
-> >  	{ "xscale1",		"arm/xscale2"	},
-> >  	{ "v6",			"arm/armv6"	},
-> >  	{ "v6mpcore",		"arm/mpcore"	},
-> > +	{ "ARMv7 Cortex-A5",	"arm/armv7-ca5"	},
-> > +	{ "ARMv7 Cortex-A7",	"arm/armv7-ca7"	},
-> >  	{ "ARMv7 Cortex-A8",	"arm/armv7"	},
-> >  	{ "ARMv7 Cortex-A9",	"arm/armv7-ca9"	},
-> > +	{ "ARMv7 Cortex-A15",	"arm/armv7-ca15" },
-> >  };
+Applied, thanks.
 
-> I'd rather not go down this route now that we have the operf tool as part of
-> oprofile, which can use the perf syscall directly and doesn't need this
-> string translation.
-
-since this is just an update of cpu detection I would be willing to
-include this into kernel code anyway.
-
-We could further move the cpu detection to userspace if perf_event
-exists. We let the kernel enable oprofile with cpu_type="unknown".
-User space then could either bind mount the file (user could do this
-manually) or we implement to write to cpu_type. Doing so oprofile
-could use in-kernel perf_events if it exists always as fallback.
-
-Any thoughts?
-
--Robert
+K-Gene <kgene@kernel.org>
