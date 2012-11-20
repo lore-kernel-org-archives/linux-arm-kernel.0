@@ -1,84 +1,113 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 20 Nov 2012 23:23:43 +0100
-Subject: [GIT PULL] SMP support for Armada XP
-Message-ID: <50AC02EF.20809@free-electrons.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 20 Nov 2012 14:27:03 -0800
+Subject: [PATCH 1/2] ARM: EXYNOS: Add aliases for i2c controller for exynos4
+Message-ID: <1353450428-2615-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+This is similar to a recent commit for exynos5250 titled:
+  ARM: EXYNOS: Add aliases for i2c controller
 
-here it is the patch set for the Armada XP SMP support.
-The 4th pacth received the acked-by from Catalin Marinas and the
-reviewed-by from Will Deacon.
+Adding aliases will be useful to prevent warnings in a future
+change.  See:
+  i2c: s3c2410: Get the i2c bus number from alias id
 
-Thanks
+Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-The following changes since commit 1611f872513735ac7105535689c0dd668fbf1c04:
+---
+ arch/arm/boot/dts/exynos4.dtsi |   24 ++++++++++++++++--------
+ 1 files changed, 16 insertions(+), 8 deletions(-)
 
-  ARM: Kirkwood: switch to DT clock providers (2012-11-20 14:46:50 +0100)
-
-are available in the git repository at:
-
-  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-armadaxp-smp-for-3.8
-
-for you to fetch changes up to e09155559cf88116436c82057a40a9bc64d88c81:
-
-  arm: mvebu: Added SMP support for Armada XP (2012-11-20 18:58:28 +0100)
-
-----------------------------------------------------------------
-SMP support for Armada XP
-
-The purpose of this series is to add the SMP support for the Armada XP
-SoCs. Beside the SMP support itself brought by the last 3 commits,
-this series also adds the support for the coherency fabric unit and
-the power management service unit.
-
-The coherency fabric is responsible for ensuring hardware coherency
-between all CPUs and between CPUs and I/O masters. This unit is also
-available for Armada 370 and will be used in an incoming patch set
-for hardware I/O cache coherency.
-
-The power management service unit is responsible for powering down and
-waking up CPUs and other SOC units.
-
-----------------------------------------------------------------
-Yehuda Yitschak (5):
-      arm: mvebu: Added support for coherency fabric in mach-mvebu
-      arm: mvebu: Added initial support for power managmement service unit
-      arm: mvebu: Added IPI support via doorbells
-      arm: mm: Added support for PJ4B cpu and init routines
-      arm: mvebu: Added SMP support for Armada XP
-
- .../devicetree/bindings/arm/armada-370-xp-mpic.txt |   12 +-
- .../devicetree/bindings/arm/armada-370-xp-pmsu.txt |   20 ++++
- .../devicetree/bindings/arm/coherency-fabric.txt   |   16 +++
- arch/arm/boot/dts/armada-370-xp.dtsi               |    5 +
- arch/arm/boot/dts/armada-xp.dtsi                   |    8 +-
- arch/arm/configs/mvebu_defconfig                   |    3 +
- arch/arm/mach-mvebu/Kconfig                        |    3 +-
- arch/arm/mach-mvebu/Makefile                       |    4 +-
- arch/arm/mach-mvebu/armada-370-xp.c                |    3 +
- arch/arm/mach-mvebu/armada-370-xp.h                |    7 ++
- arch/arm/mach-mvebu/coherency.c                    |   80 +++++++++++++
- arch/arm/mach-mvebu/coherency.h                    |   24 ++++
- arch/arm/mach-mvebu/coherency_ll.S                 |   47 ++++++++
- arch/arm/mach-mvebu/common.h                       |    6 +
- arch/arm/mach-mvebu/headsmp.S                      |   50 ++++++++
- arch/arm/mach-mvebu/hotplug.c                      |   30 +++++
- arch/arm/mach-mvebu/irq-armada-370-xp.c            |   92 ++++++++++++++-
- arch/arm/mach-mvebu/platsmp.c                      |  121 ++++++++++++++++++++
- arch/arm/mach-mvebu/pmsu.c                         |   75 ++++++++++++
- arch/arm/mach-mvebu/pmsu.h                         |   16 +++
- arch/arm/mm/Kconfig                                |    4 +
- arch/arm/mm/proc-v7.S                              |   66 +++++++++++
- 22 files changed, 680 insertions(+), 12 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
- create mode 100644 Documentation/devicetree/bindings/arm/coherency-fabric.txt
- create mode 100644 arch/arm/mach-mvebu/coherency.c
- create mode 100644 arch/arm/mach-mvebu/coherency.h
- create mode 100644 arch/arm/mach-mvebu/coherency_ll.S
- create mode 100644 arch/arm/mach-mvebu/headsmp.S
- create mode 100644 arch/arm/mach-mvebu/hotplug.c
- create mode 100644 arch/arm/mach-mvebu/platsmp.c
- create mode 100644 arch/arm/mach-mvebu/pmsu.c
- create mode 100644 arch/arm/mach-mvebu/pmsu.h
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index a26c3dd..824d362 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -28,6 +28,14 @@
+ 		spi0 = &spi_0;
+ 		spi1 = &spi_1;
+ 		spi2 = &spi_2;
++		i2c0 = &i2c_0;
++		i2c1 = &i2c_1;
++		i2c2 = &i2c_2;
++		i2c3 = &i2c_3;
++		i2c4 = &i2c_4;
++		i2c5 = &i2c_5;
++		i2c6 = &i2c_6;
++		i2c7 = &i2c_7;
+ 	};
+ 
+ 	gic:interrupt-controller at 10490000 {
+@@ -121,7 +129,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	i2c at 13860000 {
++	i2c_0: i2c at 13860000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+@@ -130,7 +138,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	i2c at 13870000 {
++	i2c_1: i2c at 13870000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+@@ -139,7 +147,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	i2c at 13880000 {
++	i2c_2: i2c at 13880000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+@@ -148,7 +156,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	i2c at 13890000 {
++	i2c_3: i2c at 13890000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+@@ -157,7 +165,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	i2c at 138A0000 {
++	i2c_4: i2c at 138A0000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+@@ -166,7 +174,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	i2c at 138B0000 {
++	i2c_5: i2c at 138B0000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+@@ -175,7 +183,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	i2c at 138C0000 {
++	i2c_6: i2c at 138C0000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+@@ -184,7 +192,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	i2c at 138D0000 {
++	i2c_7: i2c at 138D0000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+-- 
+1.7.7.3
