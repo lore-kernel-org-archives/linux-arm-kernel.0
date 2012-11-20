@@ -1,40 +1,47 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 20 Nov 2012 11:51:42 +0100
-Subject: [PATCH 2/3] ARM: dts: AM33XX: Add d_can instances to aliases
-In-Reply-To: <1352916505-12343-3-git-send-email-anilkumar@ti.com>
-References: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
- <1352916505-12343-3-git-send-email-anilkumar@ti.com>
-Message-ID: <50AB60BE.1080002@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 20 Nov 2012 20:10:25 +0900
+Subject: [PATCH] ARM: dts: exynos4: Use drive strength 3 for SD pins
+In-Reply-To: <1961860.xzxk1Exu2U@amdc1227>
+References: <21831256.UCkQ5RyKd5@amdc1227>
+ <0c2f01cdc700$09c204d0$1d460e70$%kim@samsung.com>
+ <1961860.xzxk1Exu2U@amdc1227>
+Message-ID: <0c8201cdc70f$a430a260$ec91e720$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2012 07:08 PM, AnilKumar Ch wrote:
-> Add d_can instances to aliases node to get the D_CAN instance number
-> from the driver. To initialize D_CAN message RAM, corresponding instance
-> number is required.
+Tomasz Figa wrote:
 > 
-> To initialize instance 0 message RAM then 0x1 should be written and for
-> instance 1 message RAM, 0x2 should be written to control module register.
+> Hi Kgene,
 > 
-> With device-tree framework ip instance number is "-1" by default for all
-> instances. To get device id/instance number then modules should be added
-> to DT "aliases" node. of_alias_get_id() gives the device id number based
-> on number of alias nodes present in "aliases node".
+> On Tuesday 20 of November 2012 18:18:44 Kukjin Kim wrote:
+> > Tomasz Figa wrote:
+> > > This patch modifies pin control groups of SD pins on Exynos4210 and
+> > > Exynos4x12 to use drive strength 3, which corresponds to
+> > > S5P_GPIO_DRVSTR_LV4 in legacy non-DT code.
+> >
+> > Well, the value of drive strength depends on board not SoC. So if
+> > required, it should be moved to board DT stuff.
 > 
-> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> Yes, I fully agree.
+> 
+> I've been thinking whether to change the defaults or just override them
+> for Origen, but I came to a conclusion that 3 (LV4) was the default in
+> non-DT code, so it probably should be also the default in DT variant.
+> 
+OK.
 
-Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> > BTW, we can use the value as a default...I need to think about that
+> > again for exynos4210 and 4x12.
+> 
+> I wonder which default value is more appropriate, 0 or 3?
+> 
+In this case, yes, '3' is more useful...so can you re-submit this patch with
+editing commit?
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Thanks.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 261 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/7f5902dc/attachment.sig>
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
