@@ -1,85 +1,40 @@
-From: anilkumar@ti.com (AnilKumar Ch)
-Date: Tue, 20 Nov 2012 15:18:44 +0530
-Subject: [PATCH v3 2/5] mfd: tps65217: Set PMIC to shutdown on PWR_EN toggle
-In-Reply-To: <1353404927-14412-1-git-send-email-anilkumar@ti.com>
-References: <1353404927-14412-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1353404927-14412-3-git-send-email-anilkumar@ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 20 Nov 2012 10:52:55 +0100
+Subject: [PATCH] fix compilation error in cm_common.c
+In-Reply-To: <1353403553-13525-1-git-send-email-const@MakeLinux.com>
+References: <1353403553-13525-1-git-send-email-const@MakeLinux.com>
+Message-ID: <50AB52F7.9000301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Foe-Parker <colin.foeparker@logicpd.com>
+On 11/20/2012 10:25 AM, Constantine Shulyupin wrote:
+> From: Constantine Shulyupin <const@MakeLinux.com>
+> 
+> Added required linux/errno.h
+> 
+> Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
 
-Set tps65217 PMIC status to OFF if power enable toggle is supported.
-By setting this bit to 1 to enter PMIC to OFF state when PWR_EN pin
-is pulled low. Also adds a DT flag to specify that device pmic
-supports shutdown control or not.
+This supposed to be already fixed:
+https://patchwork.kernel.org/patch/1728521/
 
-Signed-off-by: Colin Foe-Parker <colin.foeparker@logicpd.com>
-[anilkumar at ti.com: move the additions to tps65217 MFD driver]
-Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
----
- .../devicetree/bindings/regulator/tps65217.txt     |    4 ++++
- drivers/mfd/tps65217.c                             |   12 ++++++++++++
- 2 files changed, 16 insertions(+)
+> ---
+>  arch/arm/mach-omap2/cm_common.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
+> index 3246cef..3fafc27 100644
+> --- a/arch/arm/mach-omap2/cm_common.c
+> +++ b/arch/arm/mach-omap2/cm_common.c
+> @@ -13,6 +13,7 @@
+>  
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+> +#include <linux/errno.h>
+>  
+>  #include "cm2xxx.h"
+>  #include "cm3xxx.h"
+> 
 
-diff --git a/Documentation/devicetree/bindings/regulator/tps65217.txt b/Documentation/devicetree/bindings/regulator/tps65217.txt
-index d316fb8..4f05d20 100644
---- a/Documentation/devicetree/bindings/regulator/tps65217.txt
-+++ b/Documentation/devicetree/bindings/regulator/tps65217.txt
-@@ -11,6 +11,9 @@ Required properties:
-   using the standard binding for regulators found at
-   Documentation/devicetree/bindings/regulator/regulator.txt.
- 
-+Optional properties:
-+- ti,pmic-shutdown-controller: Telling the PMIC to shutdown on PWR_EN toggle.
-+
-   The valid names for regulators are:
-   tps65217: dcdc1, dcdc2, dcdc3, ldo1, ldo2, ldo3 and ldo4
- 
-@@ -20,6 +23,7 @@ Example:
- 
- 	tps: tps at 24 {
- 		compatible = "ti,tps65217";
-+		ti,pmic-shutdown-controller;
- 
- 		regulators {
- 			dcdc1_reg: dcdc1 {
-diff --git a/drivers/mfd/tps65217.c b/drivers/mfd/tps65217.c
-index 3fb32e6..c7f17d8 100644
---- a/drivers/mfd/tps65217.c
-+++ b/drivers/mfd/tps65217.c
-@@ -160,6 +160,7 @@ static int __devinit tps65217_probe(struct i2c_client *client,
- 	unsigned int version;
- 	unsigned int chip_id = ids->driver_data;
- 	const struct of_device_id *match;
-+	bool status_off = false;
- 	int ret;
- 
- 	if (client->dev.of_node) {
-@@ -170,6 +171,8 @@ static int __devinit tps65217_probe(struct i2c_client *client,
- 			return -EINVAL;
- 		}
- 		chip_id = (unsigned int)match->data;
-+		status_off = of_property_read_bool(client->dev.of_node,
-+					"ti,pmic-shutdown-controller");
- 	}
- 
- 	if (!chip_id) {
-@@ -207,6 +210,15 @@ static int __devinit tps65217_probe(struct i2c_client *client,
- 		return ret;
- 	}
- 
-+	/* Set the PMIC to shutdown on PWR_EN toggle */
-+	if (status_off) {
-+		ret = tps65217_set_bits(tps, TPS65217_REG_STATUS,
-+				TPS65217_STATUS_OFF, TPS65217_STATUS_OFF,
-+				TPS65217_PROTECT_NONE);
-+		if (ret)
-+			dev_warn(tps->dev, "unable to set the status OFF\n");
-+	}
-+
- 	dev_info(tps->dev, "TPS65217 ID %#x version 1.%d\n",
- 			(version & TPS65217_CHIPID_CHIP_MASK) >> 4,
- 			version & TPS65217_CHIPID_REV_MASK);
+
 -- 
-1.7.9.5
+P?ter
