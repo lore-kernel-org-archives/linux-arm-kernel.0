@@ -1,74 +1,187 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 20 Nov 2012 15:04:50 +0100
-Subject: [PATCH 5/7] pinctrl: add function to retrieve range from pin
-Message-ID: <1353420290-18103-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 20 Nov 2012 15:04:58 +0100
+Subject: [PATCH 6/7] pinctrl/u300/coh901: let the gpio_chip register the range
+Message-ID: <1353420298-18139-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-This adds a function to the pinctrl core to retrieve the GPIO
-range associated with a certain pin for a certain controller.
-This is needed when a pinctrl driver want to look up the
-corresponding struct gpio_chip for a certain pin. As the
-GPIO drivers can now create these ranges themselves, the
-pinctrl driver no longer knows about all its associated GPIO
-chips.
+Instead of having the pinctrl driver register the GPIO range
+for the gpio_chip, making it necessary to instantiate the
+pin controller from the GPIO driver and pass the GPIO chip as
+platform data, now let the GPIO chip driver register it's own
+ranges and have the pinctrl driver look up the GPIO chip from
+the pinctrl core as necessary.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/core.c          | 24 ++++++++++++++++++++++++
- include/linux/pinctrl/pinctrl.h |  3 +++
- 2 files changed, 27 insertions(+)
+ drivers/pinctrl/pinctrl-coh901.c | 47 ++++++++++++++++++++++++++++++++--
+ drivers/pinctrl/pinctrl-u300.c   | 55 +++-------------------------------------
+ 2 files changed, 49 insertions(+), 53 deletions(-)
 
-diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
-index 33af811..5cdee86 100644
---- a/drivers/pinctrl/core.c
-+++ b/drivers/pinctrl/core.c
-@@ -364,6 +364,30 @@ struct pinctrl_dev *pinctrl_find_and_add_gpio_range(const char *devname,
- EXPORT_SYMBOL_GPL(pinctrl_find_and_add_gpio_range);
+diff --git a/drivers/pinctrl/pinctrl-coh901.c b/drivers/pinctrl/pinctrl-coh901.c
+index 1144dcd..0457430 100644
+--- a/drivers/pinctrl/pinctrl-coh901.c
++++ b/drivers/pinctrl/pinctrl-coh901.c
+@@ -658,6 +658,36 @@ static inline void u300_gpio_free_ports(struct u300_gpio *gpio)
+ 	}
+ }
  
- /**
-+ * pinctrl_find_gpio_range_from_pin() - locate the GPIO range for a pin
-+ * @pctldev: the pin controller device to look in
-+ * @pin: a controller-local number to find the range for
++/*
++ * Here we map a GPIO in the local gpio_chip pin space to a pin in
++ * the local pinctrl pin space. The pin controller used is
++ * pinctrl-u300.
 + */
-+struct pinctrl_gpio_range *
-+pinctrl_find_gpio_range_from_pin(struct pinctrl_dev *pctldev,
-+				 unsigned int pin)
-+{
-+	struct pinctrl_gpio_range *range = NULL;
++struct coh901_pinpair {
++	unsigned int offset;
++	unsigned int pin_base;
++};
 +
-+	/* Loop over the ranges */
-+	list_for_each_entry(range, &pctldev->gpio_ranges, node) {
-+		/* Check if we're in the valid range */
-+		if (pin >= range->pin_base &&
-+		    pin < range->pin_base + range->npins) {
-+			return range;
-+		}
++#define COH901_PINRANGE(a, b) { .offset = a, .pin_base = b }
++
++static struct coh901_pinpair coh901_pintable[] = {
++	COH901_PINRANGE(10, 426),
++	COH901_PINRANGE(11, 180),
++	COH901_PINRANGE(12, 165), /* MS/MMC card insertion */
++	COH901_PINRANGE(13, 179),
++	COH901_PINRANGE(14, 178),
++	COH901_PINRANGE(16, 194),
++	COH901_PINRANGE(17, 193),
++	COH901_PINRANGE(18, 192),
++	COH901_PINRANGE(19, 191),
++	COH901_PINRANGE(20, 186),
++	COH901_PINRANGE(21, 185),
++	COH901_PINRANGE(22, 184),
++	COH901_PINRANGE(23, 183),
++	COH901_PINRANGE(24, 182),
++	COH901_PINRANGE(25, 181),
++};
++
+ static int __init u300_gpio_probe(struct platform_device *pdev)
+ {
+ 	struct u300_gpio_platform *plat = dev_get_platdata(&pdev->dev);
+@@ -786,16 +816,29 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
+ 		goto err_no_chip;
+ 	}
+ 
+-	/* Spawn pin controller device as child of the GPIO, pass gpio chip */
+-	plat->pinctrl_device->dev.platform_data = &gpio->chip;
++	/* Spawn pin controller device as child of the GPIO */
+ 	err = platform_device_register(plat->pinctrl_device);
+ 	if (err)
+ 		goto err_no_pinctrl;
+ 
++	/*
++	 * Add pinctrl pin ranges, the pin controller must be registered
++	 * at this point
++	 */
++	for (i = 0; i < ARRAY_SIZE(coh901_pintable); i++) {
++		struct coh901_pinpair *p = &coh901_pintable[i];
++
++		err = gpiochip_add_pin_range(&gpio->chip, "pinctrl-u300",
++					     p->offset, p->pin_base, 1);
++		if (err)
++			goto err_no_range;
 +	}
 +
-+	return NULL;
-+}
-+EXPORT_SYMBOL_GPL(pinctrl_find_gpio_range_from_pin);
-+
-+/**
-  * pinctrl_remove_gpio_range() - remove a range of GPIOs fro a pin controller
-  * @pctldev: pin controller device to remove the range from
-  * @range: the GPIO range to remove
-diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
-index 7dee9ac..04d6700 100644
---- a/include/linux/pinctrl/pinctrl.h
-+++ b/include/linux/pinctrl/pinctrl.h
-@@ -139,6 +139,9 @@ extern void pinctrl_remove_gpio_range(struct pinctrl_dev *pctldev,
+ 	platform_set_drvdata(pdev, gpio);
  
- extern struct pinctrl_dev *pinctrl_find_and_add_gpio_range(const char *devname,
- 		struct pinctrl_gpio_range *range);
-+extern struct pinctrl_gpio_range *
-+pinctrl_find_gpio_range_from_pin(struct pinctrl_dev *pctldev,
-+				 unsigned int pin);
+ 	return 0;
  
- #ifdef CONFIG_OF
- extern struct pinctrl_dev *of_pinctrl_get(struct device_node *np);
++err_no_range:
+ err_no_pinctrl:
+ 	err = gpiochip_remove(&gpio->chip);
+ err_no_chip:
+diff --git a/drivers/pinctrl/pinctrl-u300.c b/drivers/pinctrl/pinctrl-u300.c
+index d756cce..b84de03 100644
+--- a/drivers/pinctrl/pinctrl-u300.c
++++ b/drivers/pinctrl/pinctrl-u300.c
+@@ -1011,51 +1011,11 @@ static struct pinmux_ops u300_pmx_ops = {
+ 	.disable = u300_pmx_disable,
+ };
+ 
+-/*
+- * GPIO ranges handled by the application-side COH901XXX GPIO controller
+- * Very many pins can be converted into GPIO pins, but we only list those
+- * that are useful in practice to cut down on tables.
+- */
+-#define U300_GPIO_RANGE(a, b, c) { .name = "COH901XXX", .id = a, .base= a, \
+-			.pin_base = b, .npins = c }
+-
+-static struct pinctrl_gpio_range u300_gpio_ranges[] = {
+-	U300_GPIO_RANGE(10, 426, 1),
+-	U300_GPIO_RANGE(11, 180, 1),
+-	U300_GPIO_RANGE(12, 165, 1), /* MS/MMC card insertion */
+-	U300_GPIO_RANGE(13, 179, 1),
+-	U300_GPIO_RANGE(14, 178, 1),
+-	U300_GPIO_RANGE(16, 194, 1),
+-	U300_GPIO_RANGE(17, 193, 1),
+-	U300_GPIO_RANGE(18, 192, 1),
+-	U300_GPIO_RANGE(19, 191, 1),
+-	U300_GPIO_RANGE(20, 186, 1),
+-	U300_GPIO_RANGE(21, 185, 1),
+-	U300_GPIO_RANGE(22, 184, 1),
+-	U300_GPIO_RANGE(23, 183, 1),
+-	U300_GPIO_RANGE(24, 182, 1),
+-	U300_GPIO_RANGE(25, 181, 1),
+-};
+-
+-static struct pinctrl_gpio_range *u300_match_gpio_range(unsigned pin)
+-{
+-	int i;
+-
+-	for (i = 0; i < ARRAY_SIZE(u300_gpio_ranges); i++) {
+-		struct pinctrl_gpio_range *range;
+-
+-		range = &u300_gpio_ranges[i];
+-		if (pin >= range->pin_base &&
+-		    pin <= (range->pin_base + range->npins - 1))
+-			return range;
+-	}
+-	return NULL;
+-}
+-
+ static int u300_pin_config_get(struct pinctrl_dev *pctldev, unsigned pin,
+ 			       unsigned long *config)
+ {
+-	struct pinctrl_gpio_range *range = u300_match_gpio_range(pin);
++	struct pinctrl_gpio_range *range =
++		pinctrl_find_gpio_range_from_pin(pctldev, pin);
+ 
+ 	/* We get config for those pins we CAN get it for and that's it */
+ 	if (!range)
+@@ -1069,7 +1029,8 @@ static int u300_pin_config_get(struct pinctrl_dev *pctldev, unsigned pin,
+ static int u300_pin_config_set(struct pinctrl_dev *pctldev, unsigned pin,
+ 			       unsigned long config)
+ {
+-	struct pinctrl_gpio_range *range = u300_match_gpio_range(pin);
++	struct pinctrl_gpio_range *range =
++		pinctrl_find_gpio_range_from_pin(pctldev, pin);
+ 	int ret;
+ 
+ 	if (!range)
+@@ -1105,8 +1066,6 @@ static int __devinit u300_pmx_probe(struct platform_device *pdev)
+ {
+ 	struct u300_pmx *upmx;
+ 	struct resource *res;
+-	struct gpio_chip *gpio_chip = dev_get_platdata(&pdev->dev);
+-	int i;
+ 
+ 	/* Create state holders etc for this driver */
+ 	upmx = devm_kzalloc(&pdev->dev, sizeof(*upmx), GFP_KERNEL);
+@@ -1129,12 +1088,6 @@ static int __devinit u300_pmx_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	/* We will handle a range of GPIO pins */
+-	for (i = 0; i < ARRAY_SIZE(u300_gpio_ranges); i++) {
+-		u300_gpio_ranges[i].gc = gpio_chip;
+-		pinctrl_add_gpio_range(upmx->pctl, &u300_gpio_ranges[i]);
+-	}
+-
+ 	platform_set_drvdata(pdev, upmx);
+ 
+ 	dev_info(&pdev->dev, "initialized U300 pin control driver\n");
 -- 
 1.7.11.3
