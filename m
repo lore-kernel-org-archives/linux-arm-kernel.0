@@ -1,76 +1,335 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 20 Nov 2012 22:44:24 +0100
-Subject: [PULL pinctrl-for 3.8] at91 update
-Message-ID: <20121120214424.GP4398@game.jcrosoft.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 20 Nov 2012 22:54:10 +0100
+Subject: [PATCH 2/3 v2] clk: make ICST driver handle the VCO registers
+Message-ID: <1353448450-13133-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+It turns out that all platforms using the ICST VCO are really
+just touching two registers, and in the same way as well: one
+register with the VCO configuration as such, and one lock register
+that makes it possible to write to the VCO.
 
-	this pull go over the pinctrl at91 branch
+Factor this register read/write into the ICST driver so we can
+reuse it in the IM-PD1 driver.
 
-	This contain pinctrl ond dt that depends on
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Also switch over the RealView (I should pay more attention).
+---
+ drivers/clk/versatile/clk-icst.c       | 60 +++++++++++++++++++++++++++++-----
+ drivers/clk/versatile/clk-icst.h       | 14 ++++++--
+ drivers/clk/versatile/clk-integrator.c | 45 +++----------------------
+ drivers/clk/versatile/clk-realview.c   | 57 ++++++++------------------------
+ 4 files changed, 81 insertions(+), 95 deletions(-)
 
-The following changes since commit f6f94f6660dbe34039e5c86a46c7845589e7ee0c:
-
-  pinctrl: at91: Staticize non-exported symbols (2012-11-05 14:30:45 +0100)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git delivery/pinctrl-at91-3.8
-
-for you to fetch changes up to ad8a15d99cf2c8ab8ac1ab28402c49ec2548358d:
-
-  ARM: at91: add Somfy Animeo IP board support (2012-11-19 07:51:11 +0800)
-
-----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (7):
-      pinctrl: at91: provide gpio names
-      pinctrl: at91 add deglitch, debounce, pull down and schmitt trigger mux option support
-      ARM: at91sam9: add macb pinctrl support
-      ARM: at91: fix usart/uart namimg in pinctrl
-      ARM: at91: dt: at91sam9260: split rts and cts pinctrl not
-      ARM: at91: add Ronetix pm9g45 board support
-      ARM: at91: add Somfy Animeo IP board support
-
-Joachim Eastwood (6):
-      ARM: AT91: Fix build failure on board-dt
-      ARM: AT91: Add DT support to AT91RM9200 System Timer
-      ARM: AT91: Add usart/tc/pio/ohci DT clock lookup to AT91RM9200
-      ARM: AT91: Add AT91RM9200 DT board
-      ARM: AT91: Add AT91RM9200 device tree
-      ARM: AT91: Add AT91RM9200EK board device tree
-
- Documentation/devicetree/bindings/arm/atmel-at91.txt             |    6 +++
- Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt |    9 +++-
- arch/arm/boot/dts/Makefile                                       |    4 ++
- arch/arm/boot/dts/animeo_ip.dts                                  |  166 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91rm9200.dtsi                                |  349 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91rm9200ek.dts                               |   79 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9260.dtsi                               |  132 +++++++++++++++++++++++++++++++++++++++++-----------------
- arch/arm/boot/dts/at91sam9263.dtsi                               |   78 +++++++++++++++++++++++++++--------
- arch/arm/boot/dts/at91sam9263ek.dts                              |    5 ++-
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi                      |   11 ++---
- arch/arm/boot/dts/at91sam9g45.dtsi                               |   92 ++++++++++++++++++++++++++++++-----------
- arch/arm/boot/dts/at91sam9m10g45ek.dts                           |    5 ++-
- arch/arm/boot/dts/at91sam9n12.dtsi                               |   62 +++++++++++++++++-----------
- arch/arm/boot/dts/at91sam9x25.dtsi                               |   21 ++++++++++
- arch/arm/boot/dts/at91sam9x5.dtsi                                |  100 ++++++++++++++++++++++++++++++++------------
- arch/arm/boot/dts/pm9g45.dts                                     |  144 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/Kconfig                                       |    9 ++++
- arch/arm/mach-at91/Makefile                                      |    1 +
- arch/arm/mach-at91/at91rm9200.c                                  |   18 ++++++++
- arch/arm/mach-at91/at91rm9200_time.c                             |   63 +++++++++++++++++++++++++++-
- arch/arm/mach-at91/board-rm9200-dt.c                             |   57 +++++++++++++++++++++++++
- arch/arm/mach-at91/generic.h                                     |    1 +
- arch/arm/mach-at91/setup.c                                       |   14 +++++++
- drivers/pinctrl/pinctrl-at91.c                                   |  126 +++++++++++++++++++++++++++++++++++++++++++++++++++++++-
- 24 files changed, 1410 insertions(+), 142 deletions(-)
- create mode 100644 arch/arm/boot/dts/animeo_ip.dts
- create mode 100644 arch/arm/boot/dts/at91rm9200.dtsi
- create mode 100644 arch/arm/boot/dts/at91rm9200ek.dts
- create mode 100644 arch/arm/boot/dts/pm9g45.dts
- create mode 100644 arch/arm/mach-at91/board-rm9200-dt.c
-
-Best Regards,
-J.
+diff --git a/drivers/clk/versatile/clk-icst.c b/drivers/clk/versatile/clk-icst.c
+index 23d2d7e..67ccf4a 100644
+--- a/drivers/clk/versatile/clk-icst.c
++++ b/drivers/clk/versatile/clk-icst.c
+@@ -17,33 +17,74 @@
+ #include <linux/clkdev.h>
+ #include <linux/err.h>
+ #include <linux/clk-provider.h>
++#include <linux/io.h>
+ 
+ #include "clk-icst.h"
+ 
+ /**
+  * struct clk_icst - ICST VCO clock wrapper
+  * @hw: corresponding clock hardware entry
++ * @vcoreg: VCO register address
++ * @lockreg: VCO lock register address
+  * @params: parameters for this ICST instance
+  * @rate: current rate
+- * @setvco: function to commit ICST settings to hardware
+  */
+ struct clk_icst {
+ 	struct clk_hw hw;
++	void __iomem *vcoreg;
++	void __iomem *lockreg;
+ 	const struct icst_params *params;
+ 	unsigned long rate;
+-	struct icst_vco (*getvco)(void);
+-	void (*setvco)(struct icst_vco);
+ };
+ 
+ #define to_icst(_hw) container_of(_hw, struct clk_icst, hw)
+ 
++/**
++ * vco_get() - get ICST VCO settings from a certain register
++ * @vcoreg: register containing the VCO settings
++ */
++static struct icst_vco vco_get(void __iomem *vcoreg)
++{
++	u32 val;
++	struct icst_vco vco;
++
++	val = readl(vcoreg);
++	vco.v = val & 0x1ff;
++	vco.r = (val >> 9) & 0x7f;
++	vco.s = (val >> 16) & 03;
++	return vco;
++}
++
++/**
++ * vco_set() - commit changes to an ICST VCO
++ * @locreg: register to poke to unlock the VCO for writing
++ * @vcoreg: register containing the VCO settings
++ * @vco: ICST VCO parameters to commit
++ */
++static void vco_set(void __iomem *lockreg,
++			void __iomem *vcoreg,
++			struct icst_vco vco)
++{
++	u32 val;
++
++	val = readl(vcoreg) & ~0x7ffff;
++	val |= vco.v | (vco.r << 9) | (vco.s << 16);
++
++	/* This magic unlocks the VCO so it can be controlled */
++	writel(0xa05f, lockreg);
++	writel(val, vcoreg);
++	/* This locks the VCO again */
++	writel(0, lockreg);
++}
++
++
+ static unsigned long icst_recalc_rate(struct clk_hw *hw,
+ 				      unsigned long parent_rate)
+ {
+ 	struct clk_icst *icst = to_icst(hw);
+ 	struct icst_vco vco;
+ 
+-	vco = icst->getvco();
++	vco = vco_get(icst->vcoreg);
+ 	icst->rate = icst_hz(icst->params, vco);
+ 	return icst->rate;
+ }
+@@ -66,7 +107,7 @@ static int icst_set_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 	vco = icst_hz_to_vco(icst->params, rate);
+ 	icst->rate = icst_hz(icst->params, vco);
+-	icst->setvco(vco);
++	vco_set(icst->vcoreg, icst->lockreg, vco);
+ 	return 0;
+ }
+ 
+@@ -76,8 +117,9 @@ static const struct clk_ops icst_ops = {
+ 	.set_rate = icst_set_rate,
+ };
+ 
+-struct clk * __init icst_clk_register(struct device *dev,
+-				      const struct clk_icst_desc *desc)
++struct clk *icst_clk_register(struct device *dev,
++			const struct clk_icst_desc *desc,
++			void __iomem *base)
+ {
+ 	struct clk *clk;
+ 	struct clk_icst *icst;
+@@ -95,8 +137,8 @@ struct clk * __init icst_clk_register(struct device *dev,
+ 	init.num_parents = 0;
+ 	icst->hw.init = &init;
+ 	icst->params = desc->params;
+-	icst->getvco = desc->getvco;
+-	icst->setvco = desc->setvco;
++	icst->vcoreg = base + desc->vco_offset;
++	icst->lockreg = base + desc->lock_offset;
+ 
+ 	clk = clk_register(dev, &icst->hw);
+ 	if (IS_ERR(clk))
+diff --git a/drivers/clk/versatile/clk-icst.h b/drivers/clk/versatile/clk-icst.h
+index 71b4c56..dad51b6 100644
+--- a/drivers/clk/versatile/clk-icst.h
++++ b/drivers/clk/versatile/clk-icst.h
+@@ -1,10 +1,18 @@
+ #include <asm/hardware/icst.h>
+ 
++/**
++ * struct clk_icst_desc - descriptor for the ICST VCO
++ * @params: ICST parameters
++ * @vco_offset: offset to the ICST VCO from the provided memory base
++ * @lock_offset: offset to the ICST VCO locking register from the provided
++ *	memory base
++ */
+ struct clk_icst_desc {
+ 	const struct icst_params *params;
+-	struct icst_vco (*getvco)(void);
+-	void (*setvco)(struct icst_vco);
++	u32 vco_offset;
++	u32 lock_offset;
+ };
+ 
+ struct clk *icst_clk_register(struct device *dev,
+-			      const struct clk_icst_desc *desc);
++			      const struct clk_icst_desc *desc,
++			      void __iomem *base);
+diff --git a/drivers/clk/versatile/clk-integrator.c b/drivers/clk/versatile/clk-integrator.c
+index 3c816ae..08593b4 100644
+--- a/drivers/clk/versatile/clk-integrator.c
++++ b/drivers/clk/versatile/clk-integrator.c
+@@ -10,7 +10,7 @@
+ #include <linux/clk.h>
+ #include <linux/clkdev.h>
+ #include <linux/err.h>
+-#include <linux/io.h>
++#include <linux/platform_data/clk-integrator.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+@@ -22,42 +22,6 @@
+  * Inspired by portions of:
+  * plat-versatile/clock.c and plat-versatile/include/plat/clock.h
+  */
+-#define CM_LOCK		(__io_address(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_LOCK_OFFSET)
+-#define CM_AUXOSC	(__io_address(INTEGRATOR_HDR_BASE)+0x1c)
+-
+-/**
+- * cp_auxvco_get() - get ICST VCO settings for the Integrator/CP
+- * @vco: ICST VCO parameters to update with hardware status
+- */
+-static struct icst_vco cp_auxvco_get(void)
+-{
+-	u32 val;
+-	struct icst_vco vco;
+-
+-	val = readl(CM_AUXOSC);
+-	vco.v = val & 0x1ff;
+-	vco.r = (val >> 9) & 0x7f;
+-	vco.s = (val >> 16) & 03;
+-	return vco;
+-}
+-
+-/**
+- * cp_auxvco_set() - commit changes to Integrator/CP ICST VCO
+- * @vco: ICST VCO parameters to commit
+- */
+-static void cp_auxvco_set(struct icst_vco vco)
+-{
+-	u32 val;
+-
+-	val = readl(CM_AUXOSC) & ~0x7ffff;
+-	val |= vco.v | (vco.r << 9) | (vco.s << 16);
+-
+-	/* This magic unlocks the CM VCO so it can be controlled */
+-	writel(0xa05f, CM_LOCK);
+-	writel(val, CM_AUXOSC);
+-	/* This locks the CM again */
+-	writel(0, CM_LOCK);
+-}
+ 
+ static const struct icst_params cp_auxvco_params = {
+ 	.ref		= 24000000,
+@@ -73,8 +37,8 @@ static const struct icst_params cp_auxvco_params = {
+ 
+ static const struct clk_icst_desc __initdata cp_icst_desc = {
+ 	.params = &cp_auxvco_params,
+-	.getvco = cp_auxvco_get,
+-	.setvco = cp_auxvco_set,
++	.vco_offset = 0x1c,
++	.lock_offset = INTEGRATOR_HDR_LOCK_OFFSET,
+ };
+ 
+ /*
+@@ -114,6 +78,7 @@ void __init integrator_clk_init(bool is_cp)
+ 	clk_register_clkdev(clk, NULL, "sp804");
+ 
+ 	/* ICST VCO clock used on the Integrator/CP CLCD */
+-	clk = icst_clk_register(NULL, &cp_icst_desc);
++	clk = icst_clk_register(NULL, &cp_icst_desc,
++				__io_address(INTEGRATOR_HDR_BASE));
+ 	clk_register_clkdev(clk, NULL, "clcd");
+ }
+diff --git a/drivers/clk/versatile/clk-realview.c b/drivers/clk/versatile/clk-realview.c
+index fd2dbdb..cda07e7 100644
+--- a/drivers/clk/versatile/clk-realview.c
++++ b/drivers/clk/versatile/clk-realview.c
+@@ -21,38 +21,6 @@
+  * Implementation of the ARM RealView clock trees.
+  */
+ 
+-static void __iomem *sys_lock;
+-static void __iomem *sys_vcoreg;
+-
+-/**
+- * realview_oscvco_get() - get ICST OSC settings for the RealView
+- */
+-static struct icst_vco realview_oscvco_get(void)
+-{
+-	u32 val;
+-	struct icst_vco vco;
+-
+-	val = readl(sys_vcoreg);
+-	vco.v = val & 0x1ff;
+-	vco.r = (val >> 9) & 0x7f;
+-	vco.s = (val >> 16) & 03;
+-	return vco;
+-}
+-
+-static void realview_oscvco_set(struct icst_vco vco)
+-{
+-	u32 val;
+-
+-	val = readl(sys_vcoreg) & ~0x7ffff;
+-	val |= vco.v | (vco.r << 9) | (vco.s << 16);
+-
+-	/* This magic unlocks the CM VCO so it can be controlled */
+-	writel(0xa05f, sys_lock);
+-	writel(val, sys_vcoreg);
+-	/* This locks the CM again */
+-	writel(0, sys_lock);
+-}
+-
+ static const struct icst_params realview_oscvco_params = {
+ 	.ref		= 24000000,
+ 	.vco_max	= ICST307_VCO_MAX,
+@@ -65,10 +33,16 @@ static const struct icst_params realview_oscvco_params = {
+ 	.idx2s		= icst307_idx2s,
+ };
+ 
+-static const struct clk_icst_desc __initdata realview_icst_desc = {
++static const struct clk_icst_desc __initdata realview_osc0_desc = {
+ 	.params = &realview_oscvco_params,
+-	.getvco = realview_oscvco_get,
+-	.setvco = realview_oscvco_set,
++	.vco_offset = REALVIEW_SYS_OSC0_OFFSET,
++	.lock_offset = REALVIEW_SYS_LOCK_OFFSET,
++};
++
++static const struct clk_icst_desc __initdata realview_osc4_desc = {
++	.params = &realview_oscvco_params,
++	.vco_offset = REALVIEW_SYS_OSC4_OFFSET,
++	.lock_offset = REALVIEW_SYS_LOCK_OFFSET,
+ };
+ 
+ /*
+@@ -78,13 +52,6 @@ void __init realview_clk_init(void __iomem *sysbase, bool is_pb1176)
+ {
+ 	struct clk *clk;
+ 
+-	sys_lock = sysbase + REALVIEW_SYS_LOCK_OFFSET;
+-	if (is_pb1176)
+-		sys_vcoreg = sysbase + REALVIEW_SYS_OSC0_OFFSET;
+-	else
+-		sys_vcoreg = sysbase + REALVIEW_SYS_OSC4_OFFSET;
+-
+-
+ 	/* APB clock dummy */
+ 	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT, 0);
+ 	clk_register_clkdev(clk, "apb_pclk", NULL);
+@@ -116,7 +83,11 @@ void __init realview_clk_init(void __iomem *sysbase, bool is_pb1176)
+ 	clk_register_clkdev(clk, NULL, "sp804");
+ 
+ 	/* ICST VCO clock */
+-	clk = icst_clk_register(NULL, &realview_icst_desc);
++	if (is_pb1176)
++		clk = icst_clk_register(NULL, &realview_osc0_desc, sysbase);
++	else
++		clk = icst_clk_register(NULL, &realview_osc4_desc, sysbase);
++
+ 	clk_register_clkdev(clk, NULL, "dev:clcd");
+ 	clk_register_clkdev(clk, NULL, "issp:clcd");
+ }
+-- 
+1.7.11.7
