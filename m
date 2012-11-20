@@ -1,73 +1,30 @@
-From: i.mazanov@gmail.com (Igor Mazanov)
-Date: Tue, 20 Nov 2012 20:10:04 +0300
-Subject: [PATCH] OMAP2+: enable TPS65217 support in omap2plus_defconfig
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA76FDB@DBDE01.ent.ti.com>
-References: <50AA1BD5.1000002@gmail.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA76FDB@DBDE01.ent.ti.com>
-Message-ID: <CAK0ocyD+N7t5Tm38p3Qt6fNSUEHuL-=_Pw7twDVPbDJ81K3-Xg@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 20 Nov 2012 10:11:18 -0700
+Subject: [PATCH v3 1/3] power: Add simple poweroff-gpio driver
+In-Reply-To: <20121120083749.GM10259@lunn.ch>
+References: <1353142266-1289-1-git-send-email-andrew@lunn.ch>
+ <1353142266-1289-2-git-send-email-andrew@lunn.ch>
+ <50AA6E7E.5060501@wwwdotorg.org> <20121120083749.GM10259@lunn.ch>
+Message-ID: <50ABB9B6.1010506@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 2:15 PM, AnilKumar, Chimata <anilkumar@ti.com> wrote:
-> On Mon, Nov 19, 2012 at 17:15:25, Igor Mazanov wrote:
->> TPS65217 is described in arch/arm/boot/dts/am335x-bone.dts
->> but doesn't enabled in arch/arm/configs/omap2plus_defconfig.
->>
->> Enable TPS65217 support in omap2plus_defconfig.
->>
->> Signed-off-by: Igor Mazanov <i.mazanov@gmail.com>
->> ---
->>   arch/arm/configs/omap2plus_defconfig |    3 +++
->>   1 files changed, 3 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/configs/omap2plus_defconfig
->> b/arch/arm/configs/omap2plus_defconfig
->> index 6230304..00f2ce3 100644
->> --- a/arch/arm/configs/omap2plus_defconfig
->> +++ b/arch/arm/configs/omap2plus_defconfig
->> @@ -240,3 +240,6 @@ CONFIG_CRC_ITU_T=y
->>   CONFIG_CRC7=y
->>   CONFIG_LIBCRC32C=y
->>   CONFIG_SOC_OMAP5=y
->> +CONFIG_MFD_CORE=y
->> +CONFIG_MFD_TPS65217=y
->> +CONFIG_REGULATOR_TPS65217=y
->
-> Hi Igor,
->
-> Can you try this, MFD_CORE is selected by default and note that
-> remaining flags should be added at appropriate places.
->
-> Author: AnilKumar Ch <anilkumar@ti.com>
-> Date:   Tue Nov 20 15:34:51 2012 +0530
->
->     Custom: ARM: OMAP2+: omap2plus_defconfig: Add tps65217 support
->
->     Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
->
-> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> index 6230304..69ddbf7 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -132,9 +132,11 @@ CONFIG_POWER_SUPPLY=y
->  CONFIG_WATCHDOG=y
->  CONFIG_OMAP_WATCHDOG=y
->  CONFIG_TWL4030_WATCHDOG=y
-> +CONFIG_MFD_TPS65217=y
->  CONFIG_REGULATOR_TWL4030=y
->  CONFIG_REGULATOR_TPS65023=y
->  CONFIG_REGULATOR_TPS6507X=y
-> +CONFIG_REGULATOR_TPS65217=y
->  CONFIG_FB=y
->  CONFIG_FIRMWARE_EDID=y
->  CONFIG_FB_MODE_HELPERS=y
->
+On 11/20/2012 01:37 AM, Andrew Lunn wrote:
+> Hi Jason
+> 
+> These are good comments from Stephan that i want to address. However,
+> i also don't want to delay the pull-requests direction arm-soc, the
+> merge window is getting close. Both Linus and Anton have Acked the
+> current version, so please go with what you have and i will produce a
+> patch over the top. If its available before Arnd pulls, you can squash
+> it, otherwise send it upstream as a standalone patch.
 
-OK, I made changes as you say and it works. Thanks for a tip about
-default selection of CONFIG_MFD.
+I'm not sure I agree here; the comments I made re: the delays and
+pulse-vs-level may affect the definition of the DT binding, and that's
+something that should be correct from the start.
 
-Regards,
-Igor.
+The implementation of gpio_poweroff_do_poweroff() really doesn't seem to
+make sense; related to the above.
 
-> Thanks
-> AnilKumar
+Also, probe deferral doesn't work, which will likely make this code
+completely ineffective.
