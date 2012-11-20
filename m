@@ -1,335 +1,189 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Nov 2012 22:54:10 +0100
-Subject: [PATCH 2/3 v2] clk: make ICST driver handle the VCO registers
-Message-ID: <1353448450-13133-1-git-send-email-linus.walleij@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 20 Nov 2012 21:54:29 +0000
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
+Message-ID: <20121120215429.B621F3E1821@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It turns out that all platforms using the ICST VCO are really
-just touching two registers, and in the same way as well: one
-register with the VCO configuration as such, and one lock register
-that makes it possible to write to the VCO.
+On Sat, 17 Nov 2012 19:55:45 +0900, Alexandre Courbot <acourbot@nvidia.com> wrote:
+> Some device drivers (e.g. panel or backlights) need to follow precise
+> sequences for powering on and off, involving GPIOs, regulators, PWMs
+> and other power-related resources, with a defined powering order and
+> delays to respect between steps. These sequences are device-specific,
+> and do not belong to a particular driver - therefore they have been
+> performed by board-specific hook functions so far.
 
-Factor this register read/write into the ICST driver so we can
-reuse it in the IM-PD1 driver.
+I must be honest, this series really makes me nervous...
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Also switch over the RealView (I should pay more attention).
----
- drivers/clk/versatile/clk-icst.c       | 60 +++++++++++++++++++++++++++++-----
- drivers/clk/versatile/clk-icst.h       | 14 ++++++--
- drivers/clk/versatile/clk-integrator.c | 45 +++----------------------
- drivers/clk/versatile/clk-realview.c   | 57 ++++++++------------------------
- 4 files changed, 81 insertions(+), 95 deletions(-)
+> With the advent of the device tree and of ARM kernels that are not
+> board-tied, we cannot rely on these board-specific hooks anymore but
 
-diff --git a/drivers/clk/versatile/clk-icst.c b/drivers/clk/versatile/clk-icst.c
-index 23d2d7e..67ccf4a 100644
---- a/drivers/clk/versatile/clk-icst.c
-+++ b/drivers/clk/versatile/clk-icst.c
-@@ -17,33 +17,74 @@
- #include <linux/clkdev.h>
- #include <linux/err.h>
- #include <linux/clk-provider.h>
-+#include <linux/io.h>
- 
- #include "clk-icst.h"
- 
- /**
-  * struct clk_icst - ICST VCO clock wrapper
-  * @hw: corresponding clock hardware entry
-+ * @vcoreg: VCO register address
-+ * @lockreg: VCO lock register address
-  * @params: parameters for this ICST instance
-  * @rate: current rate
-- * @setvco: function to commit ICST settings to hardware
-  */
- struct clk_icst {
- 	struct clk_hw hw;
-+	void __iomem *vcoreg;
-+	void __iomem *lockreg;
- 	const struct icst_params *params;
- 	unsigned long rate;
--	struct icst_vco (*getvco)(void);
--	void (*setvco)(struct icst_vco);
- };
- 
- #define to_icst(_hw) container_of(_hw, struct clk_icst, hw)
- 
-+/**
-+ * vco_get() - get ICST VCO settings from a certain register
-+ * @vcoreg: register containing the VCO settings
-+ */
-+static struct icst_vco vco_get(void __iomem *vcoreg)
-+{
-+	u32 val;
-+	struct icst_vco vco;
-+
-+	val = readl(vcoreg);
-+	vco.v = val & 0x1ff;
-+	vco.r = (val >> 9) & 0x7f;
-+	vco.s = (val >> 16) & 03;
-+	return vco;
-+}
-+
-+/**
-+ * vco_set() - commit changes to an ICST VCO
-+ * @locreg: register to poke to unlock the VCO for writing
-+ * @vcoreg: register containing the VCO settings
-+ * @vco: ICST VCO parameters to commit
-+ */
-+static void vco_set(void __iomem *lockreg,
-+			void __iomem *vcoreg,
-+			struct icst_vco vco)
-+{
-+	u32 val;
-+
-+	val = readl(vcoreg) & ~0x7ffff;
-+	val |= vco.v | (vco.r << 9) | (vco.s << 16);
-+
-+	/* This magic unlocks the VCO so it can be controlled */
-+	writel(0xa05f, lockreg);
-+	writel(val, vcoreg);
-+	/* This locks the VCO again */
-+	writel(0, lockreg);
-+}
-+
-+
- static unsigned long icst_recalc_rate(struct clk_hw *hw,
- 				      unsigned long parent_rate)
- {
- 	struct clk_icst *icst = to_icst(hw);
- 	struct icst_vco vco;
- 
--	vco = icst->getvco();
-+	vco = vco_get(icst->vcoreg);
- 	icst->rate = icst_hz(icst->params, vco);
- 	return icst->rate;
- }
-@@ -66,7 +107,7 @@ static int icst_set_rate(struct clk_hw *hw, unsigned long rate,
- 
- 	vco = icst_hz_to_vco(icst->params, rate);
- 	icst->rate = icst_hz(icst->params, vco);
--	icst->setvco(vco);
-+	vco_set(icst->vcoreg, icst->lockreg, vco);
- 	return 0;
- }
- 
-@@ -76,8 +117,9 @@ static const struct clk_ops icst_ops = {
- 	.set_rate = icst_set_rate,
- };
- 
--struct clk * __init icst_clk_register(struct device *dev,
--				      const struct clk_icst_desc *desc)
-+struct clk *icst_clk_register(struct device *dev,
-+			const struct clk_icst_desc *desc,
-+			void __iomem *base)
- {
- 	struct clk *clk;
- 	struct clk_icst *icst;
-@@ -95,8 +137,8 @@ struct clk * __init icst_clk_register(struct device *dev,
- 	init.num_parents = 0;
- 	icst->hw.init = &init;
- 	icst->params = desc->params;
--	icst->getvco = desc->getvco;
--	icst->setvco = desc->setvco;
-+	icst->vcoreg = base + desc->vco_offset;
-+	icst->lockreg = base + desc->lock_offset;
- 
- 	clk = clk_register(dev, &icst->hw);
- 	if (IS_ERR(clk))
-diff --git a/drivers/clk/versatile/clk-icst.h b/drivers/clk/versatile/clk-icst.h
-index 71b4c56..dad51b6 100644
---- a/drivers/clk/versatile/clk-icst.h
-+++ b/drivers/clk/versatile/clk-icst.h
-@@ -1,10 +1,18 @@
- #include <asm/hardware/icst.h>
- 
-+/**
-+ * struct clk_icst_desc - descriptor for the ICST VCO
-+ * @params: ICST parameters
-+ * @vco_offset: offset to the ICST VCO from the provided memory base
-+ * @lock_offset: offset to the ICST VCO locking register from the provided
-+ *	memory base
-+ */
- struct clk_icst_desc {
- 	const struct icst_params *params;
--	struct icst_vco (*getvco)(void);
--	void (*setvco)(struct icst_vco);
-+	u32 vco_offset;
-+	u32 lock_offset;
- };
- 
- struct clk *icst_clk_register(struct device *dev,
--			      const struct clk_icst_desc *desc);
-+			      const struct clk_icst_desc *desc,
-+			      void __iomem *base);
-diff --git a/drivers/clk/versatile/clk-integrator.c b/drivers/clk/versatile/clk-integrator.c
-index 3c816ae..08593b4 100644
---- a/drivers/clk/versatile/clk-integrator.c
-+++ b/drivers/clk/versatile/clk-integrator.c
-@@ -10,7 +10,7 @@
- #include <linux/clk.h>
- #include <linux/clkdev.h>
- #include <linux/err.h>
--#include <linux/io.h>
-+#include <linux/platform_data/clk-integrator.h>
- 
- #include <mach/hardware.h>
- #include <mach/platform.h>
-@@ -22,42 +22,6 @@
-  * Inspired by portions of:
-  * plat-versatile/clock.c and plat-versatile/include/plat/clock.h
-  */
--#define CM_LOCK		(__io_address(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_LOCK_OFFSET)
--#define CM_AUXOSC	(__io_address(INTEGRATOR_HDR_BASE)+0x1c)
--
--/**
-- * cp_auxvco_get() - get ICST VCO settings for the Integrator/CP
-- * @vco: ICST VCO parameters to update with hardware status
-- */
--static struct icst_vco cp_auxvco_get(void)
--{
--	u32 val;
--	struct icst_vco vco;
--
--	val = readl(CM_AUXOSC);
--	vco.v = val & 0x1ff;
--	vco.r = (val >> 9) & 0x7f;
--	vco.s = (val >> 16) & 03;
--	return vco;
--}
--
--/**
-- * cp_auxvco_set() - commit changes to Integrator/CP ICST VCO
-- * @vco: ICST VCO parameters to commit
-- */
--static void cp_auxvco_set(struct icst_vco vco)
--{
--	u32 val;
--
--	val = readl(CM_AUXOSC) & ~0x7ffff;
--	val |= vco.v | (vco.r << 9) | (vco.s << 16);
--
--	/* This magic unlocks the CM VCO so it can be controlled */
--	writel(0xa05f, CM_LOCK);
--	writel(val, CM_AUXOSC);
--	/* This locks the CM again */
--	writel(0, CM_LOCK);
--}
- 
- static const struct icst_params cp_auxvco_params = {
- 	.ref		= 24000000,
-@@ -73,8 +37,8 @@ static const struct icst_params cp_auxvco_params = {
- 
- static const struct clk_icst_desc __initdata cp_icst_desc = {
- 	.params = &cp_auxvco_params,
--	.getvco = cp_auxvco_get,
--	.setvco = cp_auxvco_set,
-+	.vco_offset = 0x1c,
-+	.lock_offset = INTEGRATOR_HDR_LOCK_OFFSET,
- };
- 
- /*
-@@ -114,6 +78,7 @@ void __init integrator_clk_init(bool is_cp)
- 	clk_register_clkdev(clk, NULL, "sp804");
- 
- 	/* ICST VCO clock used on the Integrator/CP CLCD */
--	clk = icst_clk_register(NULL, &cp_icst_desc);
-+	clk = icst_clk_register(NULL, &cp_icst_desc,
-+				__io_address(INTEGRATOR_HDR_BASE));
- 	clk_register_clkdev(clk, NULL, "clcd");
- }
-diff --git a/drivers/clk/versatile/clk-realview.c b/drivers/clk/versatile/clk-realview.c
-index fd2dbdb..cda07e7 100644
---- a/drivers/clk/versatile/clk-realview.c
-+++ b/drivers/clk/versatile/clk-realview.c
-@@ -21,38 +21,6 @@
-  * Implementation of the ARM RealView clock trees.
-  */
- 
--static void __iomem *sys_lock;
--static void __iomem *sys_vcoreg;
--
--/**
-- * realview_oscvco_get() - get ICST OSC settings for the RealView
-- */
--static struct icst_vco realview_oscvco_get(void)
--{
--	u32 val;
--	struct icst_vco vco;
--
--	val = readl(sys_vcoreg);
--	vco.v = val & 0x1ff;
--	vco.r = (val >> 9) & 0x7f;
--	vco.s = (val >> 16) & 03;
--	return vco;
--}
--
--static void realview_oscvco_set(struct icst_vco vco)
--{
--	u32 val;
--
--	val = readl(sys_vcoreg) & ~0x7ffff;
--	val |= vco.v | (vco.r << 9) | (vco.s << 16);
--
--	/* This magic unlocks the CM VCO so it can be controlled */
--	writel(0xa05f, sys_lock);
--	writel(val, sys_vcoreg);
--	/* This locks the CM again */
--	writel(0, sys_lock);
--}
--
- static const struct icst_params realview_oscvco_params = {
- 	.ref		= 24000000,
- 	.vco_max	= ICST307_VCO_MAX,
-@@ -65,10 +33,16 @@ static const struct icst_params realview_oscvco_params = {
- 	.idx2s		= icst307_idx2s,
- };
- 
--static const struct clk_icst_desc __initdata realview_icst_desc = {
-+static const struct clk_icst_desc __initdata realview_osc0_desc = {
- 	.params = &realview_oscvco_params,
--	.getvco = realview_oscvco_get,
--	.setvco = realview_oscvco_set,
-+	.vco_offset = REALVIEW_SYS_OSC0_OFFSET,
-+	.lock_offset = REALVIEW_SYS_LOCK_OFFSET,
-+};
-+
-+static const struct clk_icst_desc __initdata realview_osc4_desc = {
-+	.params = &realview_oscvco_params,
-+	.vco_offset = REALVIEW_SYS_OSC4_OFFSET,
-+	.lock_offset = REALVIEW_SYS_LOCK_OFFSET,
- };
- 
- /*
-@@ -78,13 +52,6 @@ void __init realview_clk_init(void __iomem *sysbase, bool is_pb1176)
- {
- 	struct clk *clk;
- 
--	sys_lock = sysbase + REALVIEW_SYS_LOCK_OFFSET;
--	if (is_pb1176)
--		sys_vcoreg = sysbase + REALVIEW_SYS_OSC0_OFFSET;
--	else
--		sys_vcoreg = sysbase + REALVIEW_SYS_OSC4_OFFSET;
--
--
- 	/* APB clock dummy */
- 	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT, 0);
- 	clk_register_clkdev(clk, "apb_pclk", NULL);
-@@ -116,7 +83,11 @@ void __init realview_clk_init(void __iomem *sysbase, bool is_pb1176)
- 	clk_register_clkdev(clk, NULL, "sp804");
- 
- 	/* ICST VCO clock */
--	clk = icst_clk_register(NULL, &realview_icst_desc);
-+	if (is_pb1176)
-+		clk = icst_clk_register(NULL, &realview_osc0_desc, sysbase);
-+	else
-+		clk = icst_clk_register(NULL, &realview_osc4_desc, sysbase);
-+
- 	clk_register_clkdev(clk, NULL, "dev:clcd");
- 	clk_register_clkdev(clk, NULL, "issp:clcd");
- }
--- 
-1.7.11.7
+This isn't strictly true. It is still perfectly fine to have board
+specific code when necessary. However, there is strong encouragement to
+enable that code in device drivers as much as possible and new board
+files need to have very strong justification.
+
+> need a way to implement these sequences in a portable manner. This patch
+> introduces a simple interpreter that can execute such power sequences
+> encoded either as platform data or within the device tree. It also
+> introduces first support for regulator, GPIO and PWM resources.
+
+This is where I start getting nervous. Up to now I've strongly resisted
+adding any kind of interpreted code to the device tree. The model is to
+identify hardware, but require the driver to know how to control it. (as
+compared to ACPI which is entirely designed around executable
+bytecode).
+
+While the power sequences described here certainly cannot be confused
+with a Turing complete bytecode, it is a step in that direction. Plus,
+there will always be that new use case that needs just a "little new
+feature" to make this work for that too. Without thinking about how to
+handle that ahead of time is just asking for something to turn into a
+maintenance nightmare. It's just as important to specify what the limits
+of this approach are and when to punt to real driver code to handle a
+device.
+
+> +Power Sequences Steps
+> +---------------------
+> +Steps of a sequence describe an action to be performed on a resource. They
+> +always include a "type" property which indicates what kind of resource this
+> +step works on. Depending on the resource type, additional properties are defined
+> +to control the action to be performed.
+> +
+> +"delay" type required properties:
+> +  - delay: delay to wait (in microseconds)
+> +
+> +"regulator" type required properties:
+> +  - id: name of the regulator to use.
+> +  - enable / disable: one of these two empty properties must be present to
+> +                      enable or disable the resource
+> +
+> +"pwm" type required properties:
+> +  - id: name of the PWM to use.
+> +  - enable / disable: one of these two empty properties must be present to
+> +                      enable or disable the resource
+> +
+> +"gpio" type required properties:
+> +  - gpio: phandle of the GPIO to use.
+> +  - value: value this GPIO should take. Must be 0 or 1.
+> +
+> +Example
+> +-------
+> +Here are example sequences declared within a backlight device that use all the
+> +supported resources types:
+> +
+> +	backlight {
+> +		compatible = "pwm-backlight";
+> +		...
+> +
+> +		/* resources used by the power sequences */
+> +		pwms = <&pwm 2 5000000>;
+> +		pwm-names = "backlight";
+> +		power-supply = <&backlight_reg>;
+> +
+> +		power-sequences {
+> +			power-on {
+> +				step0 {
+> +					type = "regulator";
+> +					id = "power";
+> +					enable;
+> +				};
+> +				step1 {
+> +					type = "delay";
+> +					delay = <10000>;
+> +				};
+> +				step2 {
+> +					type = "pwm";
+> +					id = "backlight";
+> +					enable;
+> +				};
+> +				step3 {
+> +					type = "gpio";
+> +					gpio = <&gpio 28 0>;
+> +					value = <1>;
+> +				};
+> +			};
+> +
+> +			power-off {
+> +				step0 {
+> +					type = "gpio";
+> +					gpio = <&gpio 28 0>;
+> +					value = <0>;
+> +				};
+> +				step1 {
+> +					type = "pwm";
+> +					id = "backlight";
+> +					disable;
+> +				};
+> +				step2 {
+> +					type = "delay";
+> +					delay = <10000>;
+> +				};
+> +				step3 {
+> +					type = "regulator";
+> +					id = "power";
+> +					disable;
+> +				};
+> +			};
+> +		};
+> +	};
+
+I think this will get very verbose in a hurry. Already this simple
+example is 45 lines long. Using the device tree structure to encode the
+language doesn't look like a very good fit. Not to mention that the
+order of operations is entirely based on the node name. Want to insert
+an operation between step0 and step1? Need to rename step1, step2, and
+step3 to do so.
+
+This implementation also isn't very consistent. The gpio is referenced
+with a phandle in step3/step0, but the regulator and pwm are referenced
+by id.
+
+As an alternative, what about something like the following?
+
+	backlight {
+		compatible = "pwm-backlight";
+		...
+
+		/* resources used by the power sequences */
+		pwms = <&pwm 2 5000000>;
+		pwm-names = "backlight";
+		regulators = <&backlight_reg>;
+		gpios = <&gpio 28 0>;
+
+		power-on-sequence = "r0e;d10000m;p0e;g0s";
+		power-off-sequence = "g0c;p0d;d10000m;r0d";
+	};
+
+I'm thinking about the scripts as trivial-to-parse ascii strings that
+have a very simple set of commands. The commands use resources already
+defined in the node. ie. 'g0' refers to the first entry in the gpios
+property. 'r0' for the regulator, 'p0' for the pwms, 'd' means delay. By
+no means take this as the format to use, it is just an example off the
+top of my head, but it is already way easier to work with than putting
+each command into a node.
+
+The trick is still to define a syntax that doesn't fall apart when it
+needs to be extended. I would also like to get opinions on whether or
+not conditionals or loops should be supported (ie. loop waiting for a
+status to change). If they should then we need to be a lot more careful
+about the design (and due to my aforementioned nervousness, somebody may
+need to get me therapy).
+
+(Mitch, I'll let you make the argument for using Forth here. To be
+honest, I'm not keen on defining any kind of new language, however
+simple, but neither am I keen to pull in Forth).
+
+> +Platform Data Format
+> +--------------------
+> +All relevant data structures for declaring power sequences are located in
+> +include/linux/power_seq.h.
+
+Hmm... If sequences are switched to a string instead, then platform_data
+should also use it. The power sequence data structures can be created at
+runtime by parsing the string.
+
+g.
