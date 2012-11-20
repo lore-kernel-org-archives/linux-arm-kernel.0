@@ -1,41 +1,41 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Tue, 20 Nov 2012 05:00:15 +0000
-Subject: [PATCH 0/3] can: Add D_CAN raminit support to am335x-evm
-In-Reply-To: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
-References: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA75C73@DBDE01.ent.ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 20 Nov 2012 10:41:00 +0530
+Subject: [GIT PULL] DaVinci fix for v3.7
+In-Reply-To: <CAOesGMjK_DXx_n7aL85SP7azqFsEOAJgfpTd-rpDCisvT_mysQ@mail.gmail.com>
+References: <50A9FEEB.50305@ti.com>
+ <CAOesGMjK_DXx_n7aL85SP7azqFsEOAJgfpTd-rpDCisvT_mysQ@mail.gmail.com>
+Message-ID: <50AB10E4.9080806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2012 at 23:38:22, AnilKumar, Chimata wrote:
-> This patch series adds d_can raminit support to c_can/d_can driver,
-> which is required to init/de-init D_CAN message RAM (holds message
-> objects). Added corresponding DT changes to get resource of RAMINIT
-> register and device instance.
+On 11/19/2012 10:23 PM, Olof Johansson wrote:
+> On Mon, Nov 19, 2012 at 1:42 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+>> Hi Arnd, Olof,
+>>
+>> Can you please pull the following DaVinci fix for v3.7? I know its pretty late,
+>> I was out of office for most of the -rc cycle this time.
+>>
+>> The change deserves a stable tag, I did not add it though since the patch
+>> does not apply cleanly to any of the previous kernel releases. It will have
+>> to be backported and send to the stable team once it makes it into mainline.
+>>
+>> Thanks,
+>> Sekhar
+>>
+>> The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
+>>
+>>   Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-fixes-for-v3.7
 > 
-> These patches were tested on AM335x-EVM along with pinctrl data addition
-> patch, which is not added to am335x-evm.dts (only supports CPLD profile#0)
-> because d_can1 is supported under CPLD profile#1.
+> Pulled, thanks. Gitorious wasn't horribly slow this morning so I'll
+> take care of the remainder of your 3.8 pull requests too. :)
 
-Hi Mark,
+Thanks! I had requested a k.o account earlier but got no response. That
+was before k.o was hacked. I will request again, but I guess I will be
+rejected since my PGP key is signed by just one kernel developer (I
+guess I need to start traveling and meeting people more often).
 
-Gentle remainder to this series
-
-Thanks
-AnilKumar
- 
-> AnilKumar Ch (3):
->   can: c_can: Add d_can raminit support
->   ARM: dts: AM33XX: Add d_can instances to aliases
->   ARM: dts: AM33XX: Add memory resource to d_can node
-> 
->  arch/arm/boot/dts/am33xx.dtsi          |    8 ++++++--
->  drivers/net/can/c_can/c_can.c          |   12 +++++++++++
->  drivers/net/can/c_can/c_can.h          |    3 +++
->  drivers/net/can/c_can/c_can_platform.c |   34 +++++++++++++++++++++++++++++++-
->  4 files changed, 54 insertions(+), 3 deletions(-)
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
+Sekhar
