@@ -1,49 +1,66 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Nov 2012 16:09:34 +0100
-Subject: [PATCH v2 5/7] usb: chipidea: usbmisc: add support for ahb, ipg
- and per clock
-In-Reply-To: <87r4nt6610.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1352981028-14312-1-git-send-email-m.grzeschik@pengutronix.de>
- <1352981028-14312-6-git-send-email-m.grzeschik@pengutronix.de>
- <87r4nt6610.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20121120150934.GF24458@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 20 Nov 2012 16:14:17 +0100
+Subject: [GIT PULL v2] Marvell XOR driver DT changes
+Message-ID: <1353424461-25421-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2012 at 03:17:47PM +0200, Alexander Shishkin wrote:
-> Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
-> 
-> > From: Marc Kleine-Budde <mkl@pengutronix.de>
-> >
-> > This patch adds support for a second and third clock to the usbmisc driver. On
-> > modern freescale ARM cores like the imx51, imx53 and imx6q three clocks ("ahb",
-> > "ipg" and "per") must be enabled in order to access the USB core.
-> >
-> > ahb - AMBA High-Performance Bus clock domain
-> > ipg - IP-Bus Gate clock domain
-> > per - Peripheral clock domain
-> 
-> Looks like usbmisc_imx and ci13xxx_imx are growing more and more common
-> code.
-> Btw, shouldn't there be a way to specify platform's clock tree
-> configuration via devicetree or whatnot so that each platform driver
-> didn't have to request platform specific clocks?
+Jason,
 
-In theory that is the case. The clocks should be modeled after the input
-clocks of the device (ci13xxx). Every SoC should have them, but on some
-SoCs some of them may not be software controllable, so they have to
-provide dummy clocks for these.
-So when everyting is done correctly in the driver, the calls to clk_get
-could be in the core instead of ci13xxx_imx. That said, we do not have
-good insights into the SoC, so we do not know exactly which clock inputs
-the ci13xx has and where they are connected in the SoCs clock module.
-There are some guesses in there.
+Here is a new version of the "Marvell XOR driver DT changes" pull
+request. Compared to the previous version, this v2:
 
-Sascha
+ * Adds support for both XOR engines on Armada 370 and Armada XP. In
+   the previous version, only one engine was listed in the
+   DT. However, it turns out that XOR engines have different addresses
+   on Armada 370 and Armada XP, so the DT bits have moved from
+   armada-370-xp.dtsi to armada-370.dtsi and armada-xp.dtsi. I have
+   therefore separated these additions in two patches, one for 370,
+   one for XP.
 
+ * Adds the correct 'clocks' property for Armada 370/XP so that the
+   gatable XOR clocks are properly enabled as needed.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+This pull request should be applied on top of:
+
+ * The clk pull request "[GIT PULL v3] core, cpu and gated clocks for
+   mvebu"
+
+ * The XOR cleanup + DT binding pull request "[GIT PULL] Marvell XOR
+   driver cleanup and DT binding".
+
+Thanks!
+
+The following changes since commit 34c93c8657935d30649e777c4aa05f74f16aa418:
+
+  dma: mv_xor: Add a device_control function (2012-11-20 15:59:01 +0100)
+
+are available in the git repository at:
+
+  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/marvell-xor-board-dt-changes-3.8-v2
+
+for you to fetch changes up to a1d53dab4f5b37c800d7a20c56e84a96180a8ea6:
+
+  arm: mvebu: add XOR engines to Armada XP .dtsi (2012-11-20 16:03:37 +0100)
+
+----------------------------------------------------------------
+Marvell XOR driver DT changes for 3.8
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      arm: kirkwood: Convert XOR instantiation to DT.
+
+Sebastian Hesselbarth (1):
+      arm: dove: Convert Dove to DT XOR DMA engine
+
+Thomas Petazzoni (2):
+      arm: mvebu: add XOR engines to Armada 370 .dtsi
+      arm: mvebu: add XOR engines to Armada XP .dtsi
+
+ arch/arm/boot/dts/armada-370.dtsi |   36 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/armada-xp.dtsi  |   40 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/dove.dtsi       |   42 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood.dtsi   |   40 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-dove/common.c       |   10 ---------
+ arch/arm/mach-kirkwood/board-dt.c |   13 ------------
+ 6 files changed, 158 insertions(+), 23 deletions(-)
