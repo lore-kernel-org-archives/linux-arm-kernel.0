@@ -1,65 +1,207 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 20 Nov 2012 11:48:44 +0100
-Subject: [PATCH] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <20121119144826.f59667b2.akpm@linux-foundation.org>
-References: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
- <20121119001846.GB22106@titan.lakedaemon.net>
- <20121119144826.f59667b2.akpm@linux-foundation.org>
-Message-ID: <50AB600C.5010801@samsung.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 20 Nov 2012 11:50:41 +0100
+Subject: [PATCH 1/3] can: c_can: Add d_can raminit support
+In-Reply-To: <1352916505-12343-2-git-send-email-anilkumar@ti.com>
+References: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
+ <1352916505-12343-2-git-send-email-anilkumar@ti.com>
+Message-ID: <50AB6081.9060701@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 11/14/2012 07:08 PM, AnilKumar Ch wrote:
+> Add D_CAN raminit support to C_CAN driver to enable D_CAN RAM,
+> which holds all the message objects during transmission or
+> receiving of data. This initialization/de-initialization should
+> be done in synchronous with D_CAN clock.
+> 
+> In case of AM335X-EVM (active user of D_CAN driver) message RAM is
+> controlled through control module register for both instances. So
+> control module register details is required to initialization or
+> de-initialization of message RAM according to instance number.
+> 
+> Control module memory resource is obtained from D_CAN dt node and
+> instance number obtained from device tree aliases node.
+> 
+> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 
-On 11/19/2012 11:48 PM, Andrew Morton wrote:
-> On Sun, 18 Nov 2012 19:18:46 -0500
-> Jason Cooper <jason@lakedaemon.net> wrote:
->
-> > I've added the maintainers for mm/*.  Hopefully they can let us know if
-> > this is good for v3.8...
->
-> As Marek has inexplicably put this patch into linux-next via his tree,
-> we don't appear to be getting a say in the matter!
+Some nitpicks inline.
 
-I've just put this patch to linux-next via my dma-mapping tree to give it
-some testing asap to check if other changes to arm dma-mapping are required
-or not.
+Marc
 
-> The patch looks good to me.  That open-coded wait loop predates the
-> creation of bitkeeper tree(!) but doesn't appear to be needed.  There
-> will perhaps be some behavioural changes observable for GFP_KERNEL
-> callers as dma_pool_alloc() will no longer dip into page reserves but I
-> see nothing special about dma_pool_alloc() which justifies doing that
-> anyway.
->
-> The patch makes pool->waitq and its manipulation obsolete, but it
-> failed to remove all that stuff.
+> ---
+>  drivers/net/can/c_can/c_can.c          |   12 +++++++++++
+>  drivers/net/can/c_can/c_can.h          |    3 +++
+>  drivers/net/can/c_can/c_can_platform.c |   34 +++++++++++++++++++++++++++++++-
+>  3 files changed, 48 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/can/c_can/c_can.c b/drivers/net/can/c_can/c_can.c
+> index e5180df..c15830c 100644
+> --- a/drivers/net/can/c_can/c_can.c
+> +++ b/drivers/net/can/c_can/c_can.c
+> @@ -233,6 +233,12 @@ static inline void c_can_pm_runtime_put_sync(const struct c_can_priv *priv)
+>  		pm_runtime_put_sync(priv->device);
+>  }
+>  
+> +static inline void c_can_reset_ram(const struct c_can_priv *priv, bool enable)
+> +{
+> +	if (priv->ram_init)
+> +		priv->ram_init(priv, enable);
+> +}
+> +
+>  static inline int get_tx_next_msg_obj(const struct c_can_priv *priv)
+>  {
+>  	return (priv->tx_next & C_CAN_NEXT_MSG_OBJ_MASK) +
+> @@ -1090,6 +1096,7 @@ static int c_can_open(struct net_device *dev)
+>  	struct c_can_priv *priv = netdev_priv(dev);
+>  
+>  	c_can_pm_runtime_get_sync(priv);
+> +	c_can_reset_ram(priv, true);
+>  
+>  	/* open the can device */
+>  	err = open_candev(dev);
+> @@ -1118,6 +1125,7 @@ static int c_can_open(struct net_device *dev)
+>  exit_irq_fail:
+>  	close_candev(dev);
+>  exit_open_fail:
+> +	c_can_reset_ram(priv, false);
+>  	c_can_pm_runtime_put_sync(priv);
+>  	return err;
+>  }
+> @@ -1131,6 +1139,8 @@ static int c_can_close(struct net_device *dev)
+>  	c_can_stop(dev);
+>  	free_irq(dev->irq, dev);
+>  	close_candev(dev);
+> +
+> +	c_can_reset_ram(priv, false);
+>  	c_can_pm_runtime_put_sync(priv);
+>  
+>  	return 0;
+> @@ -1188,6 +1198,7 @@ int c_can_power_down(struct net_device *dev)
+>  
+>  	c_can_stop(dev);
+>  
+> +	c_can_reset_ram(priv, false);
+>  	c_can_pm_runtime_put_sync(priv);
+>  
+>  	return 0;
+> @@ -1206,6 +1217,7 @@ int c_can_power_up(struct net_device *dev)
+>  	WARN_ON(priv->type != BOSCH_D_CAN);
+>  
+>  	c_can_pm_runtime_get_sync(priv);
+> +	c_can_reset_ram(priv, true);
+>  
+>  	/* Clear PDR and INIT bits */
+>  	val = priv->read_reg(priv, C_CAN_CTRL_EX_REG);
+> diff --git a/drivers/net/can/c_can/c_can.h b/drivers/net/can/c_can/c_can.h
+> index e5ed41d..419de5c 100644
+> --- a/drivers/net/can/c_can/c_can.h
+> +++ b/drivers/net/can/c_can/c_can.h
+> @@ -169,6 +169,9 @@ struct c_can_priv {
+>  	void *priv;		/* for board-specific data */
+>  	u16 irqstatus;
+>  	enum c_can_dev_id type;
+> +	u32 __iomem *raminit_ctrlreg;
+> +	unsigned int instance;
+> +	void (*ram_init) (const struct c_can_priv *priv, bool enable);
+>  };
+>  
+>  struct net_device *alloc_c_can_dev(void);
+> diff --git a/drivers/net/can/c_can/c_can_platform.c b/drivers/net/can/c_can/c_can_platform.c
+> index ee141613..2e61d69 100644
+> --- a/drivers/net/can/c_can/c_can_platform.c
+> +++ b/drivers/net/can/c_can/c_can_platform.c
+> @@ -38,6 +38,8 @@
+>  
+>  #include "c_can.h"
+>  
+> +#define CAN_RAMINIT_START_MASK(i)	(1 << (i))
+> +
+>  /*
+>   * 16-bit c_can registers can be arranged differently in the memory
+>   * architecture of different implementations. For example: 16-bit
+> @@ -68,6 +70,24 @@ static void c_can_plat_write_reg_aligned_to_32bit(struct c_can_priv *priv,
+>  	writew(val, priv->base + 2 * priv->regs[index]);
+>  }
+>  
+> +static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
+> +{
+> +	u32 val;
+> +
+> +	if (!priv->raminit_ctrlreg || (priv->instance < 0))
+> +		return;
 
-Right, I missed that part, I will update it asap.
+Can you move this sanity check to the probe function and only assign
+priv->ram_init if the above is true?
 
-> The changelog failed to describe the problem which Soren reported.
-> That should be included, and as the problem sounds fairly serious we
-> might decide to backport the fix into -stable kernels.
+> +
+> +	val = readl(priv->raminit_ctrlreg);
+> +	if (enable) {
+> +		val &= ~CAN_RAMINIT_START_MASK(priv->instance);
+> +		val |= CAN_RAMINIT_START_MASK(priv->instance);
+> +		writel(val, priv->raminit_ctrlreg);
+> +	} else {
+> +		val &= ~CAN_RAMINIT_START_MASK(priv->instance);
+> +		writel(val, priv->raminit_ctrlreg);
+> +	}
+> +}
+> +
+>  static struct platform_device_id c_can_id_table[] = {
+>  	[BOSCH_C_CAN_PLATFORM] = {
+>  		.name = KBUILD_MODNAME,
+> @@ -99,7 +119,7 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
+>  	const struct of_device_id *match;
+>  	const struct platform_device_id *id;
+>  	struct pinctrl *pinctrl;
+> -	struct resource *mem;
+> +	struct resource *mem, *res;
+>  	int irq;
+>  	struct clk *clk;
+>  
+> @@ -178,6 +198,18 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
+>  		priv->can.ctrlmode_supported |= CAN_CTRLMODE_3_SAMPLES;
+>  		priv->read_reg = c_can_plat_read_reg_aligned_to_16bit;
+>  		priv->write_reg = c_can_plat_write_reg_aligned_to_16bit;
+> +
+> +		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +		priv->raminit_ctrlreg =
+> +				devm_request_and_ioremap(&pdev->dev, res);
 
-Ok, I will extend the changelog.
+What happens if there isn't a second IORESOURCE_MEM region? devm_request
+will print an error in this case and any other error, too [1]. Do we
+need streamlining here?
 
-> dma_pool_alloc()'s use of a local "struct dma_page *page" is
-> distressing - MM developers very much expect a local called "page" to
-> have type "struct page *".  But that's a separate issue.
+[1] http://lxr.free-electrons.com/source/drivers/base/platform.c#L59
 
-I will prepare a separate patch cleaning it. I was also a bit surprised
-by such naming scheme, but it is probably related to the fact that this
-come has not been touched much since a very ancient times.
+> +		if (!priv->raminit_ctrlreg)
+> +			dev_warn(&pdev->dev, "failed to obtain control memory\n");
+> +
+> +		if (pdev->dev.of_node)
+> +			pdev->id = of_alias_get_id(pdev->dev.of_node, "d_can");
+> +
+> +		priv->instance = pdev->id;
 
-> As this patch is already in -next and is stuck there for two more
-> weeks I can't (or at least won't) merge this patch, so I can't help
-> with any of the above.
+Please do not modify the pdev, better you use something like this:
 
-I will fix both issues in the next version of the patch. Would like to
-merge it to your tree or should I keep it in my dma-mapping tree?
+    pdev->id < 0 ? of_alias_get_id(pdev->dev.of_node, "d_can") :
+        pdev->id;
 
-Best regards
+> +		priv->ram_init = c_can_hw_raminit;
+>  		break;
+>  	default:
+>  		ret = -EINVAL;
+> 
+
+Marc
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121120/a6744195/attachment.sig>
