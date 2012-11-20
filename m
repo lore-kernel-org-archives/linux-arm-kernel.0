@@ -1,38 +1,35 @@
-From: tklauser@distanz.ch (Tobias Klauser)
-Date: Tue, 20 Nov 2012 10:45:33 +0100
-Subject: [PATCH 429/493] tty: remove use of __devexit
-In-Reply-To: <1353349642-3677-429-git-send-email-wfp5p@virginia.edu>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-429-git-send-email-wfp5p@virginia.edu>
-Message-ID: <20121120094533.GH25445@distanz.ch>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 20 Nov 2012 19:12:01 +0900
+Subject: [PATCH 0/3] Legacy I2C controller fixes for exynos5
+In-Reply-To: <1352285220-31544-1-git-send-email-a.kesavan@samsung.com>
+References: <1352285220-31544-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <0c5601cdc707$7b55a000$7200e000$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-19 at 19:26:18 +0100, Bill Pemberton <wfp5p@virginia.edu> wrote:
-> CONFIG_HOTPLUG is going away as an option so __devexit is no
-> longer needed.
+Abhilash Kesavan wrote:
 > 
-> Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-> Cc: Jiri Slaby <jirislaby@gmail.com> 
-> Cc: Alan Cox <alan@linux.intel.com> 
-> Cc: Tobias Klauser <tklauser@distanz.ch> 
-> Cc: Lucas Tavares <lucaskt@linux.vnet.ibm.com> 
-> Cc: David Brown <davidb@codeaurora.org> 
-> Cc: Daniel Walker <dwalker@fifo99.com> 
-> Cc: Bryan Huntsman <bryanh@codeaurora.org> 
-> Cc: "David S. Miller" <davem@davemloft.net> 
-> Cc: Peter Korsgaard <jacmet@sunsite.dk> 
-> Cc: Tony Prisk <linux@prisktech.co.nz> 
-> Cc: linuxppc-dev at lists.ozlabs.org 
-> Cc: linux-serial at vger.kernel.org 
-> Cc: nios2-dev at sopc.et.ntust.edu.tw 
-> Cc: uclinux-dist-devel at blackfin.uclinux.org 
-> Cc: linux-arm-msm at vger.kernel.org 
-> Cc: sparclinux at vger.kernel.org 
-> Cc: linux-arm-kernel at lists.infradead.org 
-> ---
-[...]
->  drivers/tty/serial/altera_jtaguart.c        |  2 +-
->  drivers/tty/serial/altera_uart.c            |  2 +-
+> This patchset comprises fixes to enable the legacy I2C controller on
+> exynos5.
+> Based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-
+> samsung.git
+> for-next branch.
+> 
+> Abhilash Kesavan (3):
+>   ARM: EXYNOS5: Setup legacy i2c controller interrupts on SMDK5250
+>   ARM: EXYNOS5: Add aliases for i2c controller
+>   ARM: EXYNOS5: Fix i2c suspend/resume for legacy controller
+> 
+>  arch/arm/boot/dts/exynos5250.dtsi            |   27
++++++++++++++++++--------
+>  arch/arm/mach-exynos/include/mach/regs-pmu.h |    2 +
+>  arch/arm/mach-exynos/mach-exynos5-dt.c       |   24
++++++++++++++++++++++++
+>  arch/arm/mach-exynos/pm.c                    |    9 ++++++++
+>  4 files changed, 53 insertions(+), 9 deletions(-)
 
-Acked-by: Tobias Klauser <tklauser@distanz.ch>
+Applied this whole series.
+
+Thanks.
+
+K-Gene <kgene@kernel.org>
