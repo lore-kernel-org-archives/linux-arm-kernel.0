@@ -1,49 +1,31 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 20 Nov 2012 13:54:01 +0900
-Subject: [PATCH v3] ARM: S3C24XX: Add WIZnet W5300E01-ARM board support
-References: <1346653236-19728-1-git-send-email-kth3321@gmail.com>
- <1346905640.2573.14.camel@taehun-desktop>
-Message-ID: <0b6f01cdc6db$0ed72290$2c8567b0$@org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 19 Nov 2012 21:57:00 -0700
+Subject: [PATCH 2/2] ARM: mmp: support pinctrl single in brownstone
+In-Reply-To: <CAN1soZyTad0QVt-oKM24XiHYruyFx5MTiu2+ytGL5RNv-Pqonw@mail.gmail.com>
+References: <1353049345-6954-1-git-send-email-haojian.zhuang@gmail.com>
+ <1353049345-6954-2-git-send-email-haojian.zhuang@gmail.com>
+ <50AAA7B1.7060404@wwwdotorg.org>
+ <CAN1soZyTad0QVt-oKM24XiHYruyFx5MTiu2+ytGL5RNv-Pqonw@mail.gmail.com>
+Message-ID: <50AB0D9C.5060101@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+On 11/19/2012 05:52 PM, Haojian Zhuang wrote:
+> On Tue, Nov 20, 2012 at 5:42 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 11/16/2012 12:02 AM, Haojian Zhuang wrote:
+>>> Support pinctrl-single driver in brownstone platform with DT.
+>>
+>>> diff --git a/arch/arm/boot/dts/mmp2-brownstone.dts b/arch/arm/boot/dts/mmp2-brownstone.dts
+>>
+>>>       chosen {
+>>> -             bootargs = "console=ttyS2,38400 root=/dev/nfs nfsroot=192.168.1.100:/nfsroot/ ip=192.168.1.101:192.168.1.100::255.255.255.0::eth0:on";
+>>> +             bootargs = "console=ttyS2,38400 root=/dev/nfs nfsroot=192.168.1.100:/nfsroot/ ip=192.168.1.101:192.168.1.100::255.255.255.0::eth0:on earlyprintk";
+>>
+>> That seems unrelated.
+>>
+> But it's helpful on debug. Should I remove this? I prefer that I could
+> keep this.
 > 
-> Taehun Kim wrote:
-> >
-> > - The gpio routines are changed to use the gpio_request() functions from
-> >   comments of Vasily and Sylwester.
-> > - The mistake of adding a character by my email client automatically is
-> > fixed.
-> >
-> > Please review this patch and apply it if do not have any problems.
-> >
-> 
-> Taehun,
-> 
-> Above area is for adding comments like 'This patch adds WIZnet W5300E01
-> board' because it will be remained in its git log and nobody want to see
-> your old request in there. If any comments which are not related to
-> changes just put it after '---' around your sign. It doesn't hurt your
-> patch.
-> 
-> And you need to update this against on for-next of my tree because some
-> S3C2410 gpio APIs have been gone.(See the Sylwester's comments) Please re-
-> send this.
-> 
-Any updates on this?
+> Since I want to watch the whole log before console is enabled.
 
-K-Gene <kgene@kernel.org>
-
-> 
-> 
-> > Signed-off-by: Taehun Kim <kth3321@gmail.com>
-> > ---
-> >  arch/arm/mach-s3c24xx/Kconfig         |    5 +
-> >  arch/arm/mach-s3c24xx/Makefile        |    1 +
-> >  arch/arm/mach-s3c24xx/mach-w5300e01.c |  193
-> > +++++++++++++++++++++++++++++++++
-> >  3 files changed, 199 insertions(+)
-> >  create mode 100644 arch/arm/mach-s3c24xx/mach-w5300e01.c
-> >
-> [snip]
+It should be a separate patch at least.
