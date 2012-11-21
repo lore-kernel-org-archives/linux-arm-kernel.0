@@ -1,42 +1,53 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 21 Nov 2012 11:47:54 -0700
-Subject: [PATCH] ARM: Kirkwood: Support basic hotplug for PCI-E
-In-Reply-To: <20121121183527.GC15800@titan.lakedaemon.net>
-References: <20121121182528.GA12715@obsidianresearch.com>
- <20121121183527.GC15800@titan.lakedaemon.net>
-Message-ID: <20121121184754.GB12822@obsidianresearch.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 Nov 2012 10:50:03 -0800
+Subject: [PATCH v5 4/5] iommu/omap: adapt to runtime pm
+In-Reply-To: <1353373552-16039-5-git-send-email-omar.luna@linaro.org>
+References: <1353373552-16039-1-git-send-email-omar.luna@linaro.org>
+ <1353373552-16039-5-git-send-email-omar.luna@linaro.org>
+Message-ID: <20121121185002.GB18567@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 01:35:27PM -0500, Jason Cooper wrote:
-> On Wed, Nov 21, 2012 at 11:25:28AM -0700, Jason Gunthorpe wrote:
-> > Unconditionally register the PCI-E bus, even if the link is currently
-> > down. 
+* Omar Ramirez Luna <omar.luna@linaro.org> [121119 17:08]:
+> Use runtime PM functionality interfaced with hwmod enable/idle
+> functions, to replace direct clock operations and sysconfig
+> handling.
 > 
-> How does this affect clock gating on boards without PCI-E devices?  Will
-> the SoC then power this unconditionally?
+> Due to reset sequence, pm_runtime_[get|put]_sync must be used, to
+> avoid possible operations with the module under reset. Because of
+> this and given that the driver uses spin_locks to protect their
+> critical sections, we must use pm_runtime_irq_safe in order for the
+> runtime ops to be happy, otherwise might_sleep_if checks in runtime
+> framework will complain.
+> 
+> The remaining pm_runtime out of iommu_enable and iommu_disable
+> corresponds to paths that can be accessed through debugfs, some of
+> them doesn't work if the module is not enabled first, but in future
+> if the mmu is idled withouth freeing, these are needed to debug.
+> 
+> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+> ---
+>  arch/arm/mach-omap2/omap-iommu.c         |    1 -
+>  drivers/iommu/omap-iommu.c               |   40 ++++++++++++++---------------
+>  drivers/iommu/omap-iommu.h               |    3 --
+>  drivers/iommu/omap-iommu2.c              |   17 ------------
+>  include/linux/platform_data/iommu-omap.h |    1 -
+>  5 files changed, 19 insertions(+), 43 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
+> index 02726a6..7642fc4 100644
+> --- a/arch/arm/mach-omap2/omap-iommu.c
+> +++ b/arch/arm/mach-omap2/omap-iommu.c
+> @@ -31,7 +31,6 @@ static int __init omap_iommu_dev_init(struct omap_hwmod *oh, void *unused)
+>  		return -ENOMEM;
+>  
+>  	pdata->name = oh->name;
+> -	pdata->clk_name = oh->main_clk;
+>  	pdata->nr_tlb_entries = a->nr_tlb_entries;
+>  	pdata->da_start = a->da_start;
+>  	pdata->da_end = a->da_end;
 
-Hmm, interesting question.. This will definitely hold the clock lock
-on the PCI-E ports even if they are down at boot, and they will surely
-consume more power than if they were switched off.
+The runtime PM related changes would be good to be checked
+by Kevin, added him to cc. For the arch/arm/mach-omap2/ change above:
 
-However, if a board has no possible PCI-E devices, then it shouldn't
-be calling kirkwood_pcie_init, which will let things gate.
-
-So the only case is boards that have pluggable PCI-E devices, where no
-device is in the plug? That sounds like eval cards, is this a big
-deal?
-
-I guess another way to deal with this is to make the stuff in
-kirkwood/pcie.c an actual platform driver and hot attach the entire
-driver rather than using just using pci/rescan, but that is a fairly
-extensive change.. And I worry that powering down the interface in the
-interm will require re-initializing all the registers, which linux
-doesn't have the code to do at all.
-
-How about fixing this up to have a DT binding and make it a DT
-controlled option - that seems like a simple middle ground..
-
-What do you think?
-
-Jason
+Acked-by: Tony Lindgren <tony@atomide.com>
