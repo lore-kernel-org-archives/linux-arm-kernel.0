@@ -1,66 +1,64 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 21 Nov 2012 02:03:02 +0100
-Subject: [RFC 09/15] ARM: shmobile: Include DTSI of r8a7740 to
- armadillo800eva
-In-Reply-To: <20121121001457.GG20120@verge.net.au>
-References: <1353302007-31045-1-git-send-email-horms@verge.net.au>
- <2217502.K9pLuGzWaC@avalon> <20121121001457.GG20120@verge.net.au>
-Message-ID: <19065301.iqf7oYnrtW@avalon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Nov 2012 17:02:58 -0800
+Subject: [PATCH v4 5/8] crypto: omap-sham: Remove cpu_is/omap_type
+ check from driver
+In-Reply-To: <1353351301-6453-6-git-send-email-mgreer@animalcreek.com>
+References: <1353351301-6453-1-git-send-email-mgreer@animalcreek.com>
+ <1353351301-6453-6-git-send-email-mgreer@animalcreek.com>
+Message-ID: <20121121010257.GR18567@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Wednesday 21 November 2012 09:14:57 Simon Horman wrote:
-> On Tue, Nov 20, 2012 at 01:45:20PM +0100, Laurent Pinchart wrote:
-> > Hi Simon,
-> > 
-> > Thank you for the patch.
-> > 
-> > On Monday 19 November 2012 14:13:21 Simon Horman wrote:
-> > > From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-> > > 
-> > > Cc: Magnus Damm <damm@opensource.se>
-> > > Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-> > > Signed-off-by: Simon Horman <horms@verge.net.au>
-> > 
-> > I came up today with pretty much the same patch :-)
-> > 
-> > > ---
-> > > 
-> > >  arch/arm/boot/dts/r8a7740-armadillo800eva.dts |    2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-> > > b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts index a7505a9..a8e7bd9
-> > > 100644
-> > > --- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-> > > +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-> > > @@ -9,7 +9,7 @@
-> > > 
-> > >   */
-> > >  
-> > >  /dts-v1/;
-> > > 
-> > > -/include/ "skeleton.dtsi"
-> > > +/include/ "r8a7740.dtsi"
-> > > 
-> > >  / {
-> > >  
-> > >  	model = "armadillo 800 eva";
-> > 
-> > Shouldn't the compatible property be modified to the following values ?
-> > 
-> > 	compatible = "renesas,armadillo800eva", "renesas,r8a7740";
+* Mark A. Greer <mgreer@animalcreek.com> [121119 10:58]:
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
 > 
-> To be honest, I'm not sure.
-> But as this is a dts file for a board "renesas,r8a7740" seems strange to me.
+> The omap-sham driver should not check the CPU class or the
+> type of OMAP device its on.  The platform code should do
+> that instead.
 
-If I understand DT correctly, the goal is to get rid of the board file at some 
-point and only keep the generic r8a7740 board code. Shouldn't we then match on 
-"renesas,r8a7740" ?
+I think I already have a similar patch queued in linux next.
 
--- 
 Regards,
 
-Laurent Pinchart
+Tony
+ 
+> CC: Paul Walmsley <paul@pwsan.com>
+> CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
+> Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> ---
+>  drivers/crypto/omap-sham.c | 8 --------
+>  1 file changed, 8 deletions(-)
+> 
+> diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+> index a3fd6fc..f50387c 100644
+> --- a/drivers/crypto/omap-sham.c
+> +++ b/drivers/crypto/omap-sham.c
+> @@ -37,7 +37,6 @@
+>  #include <crypto/hash.h>
+>  #include <crypto/internal/hash.h>
+>  
+> -#include <plat/cpu.h>
+>  #include <plat/dma.h>
+>  #include <mach/irqs.h>
+>  
+> @@ -1289,13 +1288,6 @@ static int __init omap_sham_mod_init(void)
+>  {
+>  	pr_info("loading %s driver\n", "omap-sham");
+>  
+> -	if (!cpu_class_is_omap2() ||
+> -		(omap_type() != OMAP2_DEVICE_TYPE_SEC &&
+> -			omap_type() != OMAP2_DEVICE_TYPE_EMU)) {
+> -		pr_err("Unsupported cpu\n");
+> -		return -ENODEV;
+> -	}
+> -
+>  	return platform_driver_register(&omap_sham_driver);
+>  }
+>  
+> -- 
+> 1.7.12
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
