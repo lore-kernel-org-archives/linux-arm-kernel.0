@@ -1,44 +1,60 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 21 Nov 2012 11:11:56 +0100
-Subject: [PULL pinctrl-for 3.8] at91 update
-In-Reply-To: <CACRpkdbyEtwM+O3aw8rAC2r+4z4SYC9MH-B0PGHcnnR46V5hig@mail.gmail.com>
-References: <20121120214424.GP4398@game.jcrosoft.org>
- <CACRpkdbyEtwM+O3aw8rAC2r+4z4SYC9MH-B0PGHcnnR46V5hig@mail.gmail.com>
-Message-ID: <50ACA8EC.5090400@atmel.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 21 Nov 2012 11:12:53 +0100
+Subject: [PATCH v3] can: c_can: Add d_can raminit support
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA77E29@DBDE01.ent.ti.com>
+References: <1353490282-10853-1-git-send-email-mkl@pengutronix.de>
+ <331ABD5ECB02734CA317220B2BBEABC13EA77E29@DBDE01.ent.ti.com>
+Message-ID: <50ACA925.60900@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2012 10:53 AM, Linus Walleij :
-> On Tue, Nov 20, 2012 at 10:44 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
+On 11/21/2012 11:07 AM, AnilKumar, Chimata wrote:
+> On Wed, Nov 21, 2012 at 15:01:22, Marc Kleine-Budde wrote:
+>> From: AnilKumar Ch <anilkumar@ti.com>
+>>
+>> Add D_CAN raminit support to C_CAN driver to enable D_CAN RAM,
+>> which holds all the message objects during transmission or
+>> receiving of data. This initialization/de-initialization should
+>> be done in synchronous with D_CAN clock.
+>>
+>> In case of AM335X-EVM (current user of D_CAN driver) message RAM is
+>> controlled through control module register for both instances. So
+>> control module register details is required to initialization or
+>> de-initialization of message RAM according to instance number.
+>>
+>> Control module memory resource is obtained from D_CAN dt node and
+>> instance number obtained from device tree aliases node.
+>>
+>> This patch was tested on AM335x-EVM along with pinctrl data addition
+>> patch, d_can dt aliases addition and control module data addition.
+>> pinctrl data addition is not added to am335x-evm.dts (only supports
+>> CPLD profile#0) because d_can1 is supported under CPLD profile#1.
+>>
+>> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+>> [mkl: fix instance for non DT in probe, cleaned up raminit]
+>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+>> ---
+>> Hello,
+>>
+>> compile time tested only - please test on real HW.
 > 
->> Hi Linus,
->>
->>         this pull go over the pinctrl at91 branch
->>
->>         This contain pinctrl ond dt that depends on
->>
->> The following changes since commit f6f94f6660dbe34039e5c86a46c7845589e7ee0c:
->>
->>   pinctrl: at91: Staticize non-exported symbols (2012-11-05 14:30:45 +0100)
->>
->> are available in the git repository at:
->>
->>   git://github.com/at91linux/linux-at91.git delivery/pinctrl-at91-3.8
+> Hi Marc,
 > 
-> OK I branched off my earlier at91 branch merge, pulled this in
-> (no conflicts) and then merged that new at91 branch into
-> my devel HEAD, and magically it just works, thanks
-> Jean-Christophe!
-> 
-> (I guess Nicolas is fine with me merging these patches too, else
-> he gets to say it now :-)
+> I tested this patch, its working.
 
-Absolutely, Jean-Christophe told me about his plans to merge some
-DT/boards code through your tree.
+Tnx, pushed to linux-can-next/master
 
-Thanks for your help with this big step for us (AT91 folks)!
-
-Bye Linus,
+Marc
 -- 
-Nicolas Ferre
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121121/f29a9e0a/attachment-0001.sig>
