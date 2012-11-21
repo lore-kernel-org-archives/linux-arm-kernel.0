@@ -1,64 +1,54 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 21 Nov 2012 14:52:26 +0100
-Subject: [PATCH] cpufreq: exynos: Broadcast frequency change notifications
- for all cores
-In-Reply-To: <1887364.fvxYYNb7Mm@amdc1227>
-References: <1887364.fvxYYNb7Mm@amdc1227>
-Message-ID: <1758658.Qt0SyRnJmS@amdc1227>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 21 Nov 2012 13:20:23 +0000
+Subject: [PATCH 1/3] gpio: Add simple poweroff-gpio driver
+In-Reply-To: <CACxGe6tgNVH9zeafMRKXcRUZmQjQXrAy_QtvhxpTT74200Hnxg@mail.gmail.com>
+References: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
+ <1352650891-18356-2-git-send-email-andrew@lunn.ch>
+ <20121115180557.924713E197F@localhost>
+ <alpine.DEB.2.00.1211151810050.25381@marmot.wormnet.eu>
+ <CACxGe6tgNVH9zeafMRKXcRUZmQjQXrAy_QtvhxpTT74200Hnxg@mail.gmail.com>
+Message-ID: <20121121132023.3DB5F3E0A01@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 of November 2012 10:26:12 Tomasz Figa wrote:
-> On Exynos SoCs all cores share the same frequency setting, so changing
-> frequency of one core will affect rest of cores.
+On Thu, 15 Nov 2012 18:21:20 +0000, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Thu, Nov 15, 2012 at 6:11 PM, Jamie Lentin <jm@lentin.co.uk> wrote:
+> > On Thu, 15 Nov 2012, Grant Likely wrote:
+> >
+> >> On Sun, 11 Nov 2012 17:21:29 +0100, Andrew Lunn <andrew@lunn.ch> wrote:
+> >>>
+> >>> From: Jamie Lentin <jm@lentin.co.uk>
+> >>>
+> >>> Given appropriate devicetree bindings, this driver registers a
+> >>> pm_power_off function to set a GPIO line high/low to power down
+> >>> your board.
+> >>>
+> >>> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> >>> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> >>> ---
+> >>>  .../devicetree/bindings/gpio/gpio-poweroff.txt     |   22 ++++
+> >>>  drivers/gpio/Kconfig                               |   10 ++
+> >>>  drivers/gpio/Makefile                              |    2 +
+> >>>  drivers/gpio/gpio-poweroff.c                       |  129
+> >>> ++++++++++++++++++++
+> >>
+> >>
+> >> This isn't a gpio controller driver. Don't put it into drivers/gpio
+> >
+> >
+> > There's a v2 which puts it in drivers/power/reset/gpio-poweroff.c
 > 
-> This patch modifies the exynos-cpufreq driver to inform cpufreq core
-> about this behavior and broadcast frequency change notifications for all
-> cores.
+> Okay, thanks.
 > 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/cpufreq/exynos-cpufreq.c | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/exynos-cpufreq.c
-> b/drivers/cpufreq/exynos-cpufreq.c index af2d81e..c0d54a8 100644
-> --- a/drivers/cpufreq/exynos-cpufreq.c
-> +++ b/drivers/cpufreq/exynos-cpufreq.c
-> @@ -100,7 +100,8 @@ static int exynos_target(struct cpufreq_policy
-> *policy, }
->  	arm_volt = volt_table[index];
-> 
-> -	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-> +	for_each_cpu(freqs.cpu, policy->cpus)
-> +		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-> 
->  	/* When the new frequency is higher than current frequency */
->  	if ((freqs.new > freqs.old) && !safe_arm_volt) {
-> @@ -115,7 +116,8 @@ static int exynos_target(struct cpufreq_policy
-> *policy, if (freqs.new != freqs.old)
->  		exynos_info->set_freq(old_index, index);
-> 
-> -	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-> +	for_each_cpu(freqs.cpu, policy->cpus)
-> +		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-> 
->  	/* When the new frequency is lower than current frequency */
->  	if ((freqs.new < freqs.old) ||
-> @@ -235,6 +237,7 @@ static int exynos_cpufreq_cpu_init(struct
-> cpufreq_policy *policy) cpumask_copy(policy->related_cpus,
-> cpu_possible_mask);
->  		cpumask_copy(policy->cpus, cpu_online_mask);
->  	} else {
-> +		policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
->  		cpumask_setall(policy->cpus);
->  	}
+> g.
 
-Ping.
+So... I just read the power sequence proposal patch series which is
+remarkably like a superset of what is needed here. Does it make sense to
+use a power sequence for doing generic power off instead of this
+interface?
 
-Best regards,
+g.
+
 -- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Linux Platform
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
