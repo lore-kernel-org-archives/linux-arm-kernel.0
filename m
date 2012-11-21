@@ -1,42 +1,31 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 22 Nov 2012 00:46:29 +0900
-Subject: [PATCH v3 01/12] ARM: EXYNOS: remove system mmu initialization
- from exynos tree
-In-Reply-To: <002701cdc7a5$756dbdf0$604939d0$%cho@samsung.com>
-References: <002701cdc7a5$756dbdf0$604939d0$%cho@samsung.com>
-Message-ID: <50ACF755.9000706@samsung.com>
+Date: Thu, 22 Nov 2012 00:50:31 +0900
+Subject: [PATCH v3 02/12] ARM: EXYNOS: Add clk_ops for gating clocks of
+ System MMU
+In-Reply-To: <002801cdc7a5$8535f6d0$8fa1e470$%cho@samsung.com>
+References: <002801cdc7a5$8535f6d0$8fa1e470$%cho@samsung.com>
+Message-ID: <50ACF847.3070709@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/12 14:02, Cho KyongHo wrote:
-> This removes System MMU initialization from arch/arm/mach-exynos/
-
-Basically, looks OK to me, but I think, this removing change should be 
-done after 03/12 patch :-)
-
-> to move them to DT and the exynos-iommu driver except gating clock
-> definitions.
+On 11/21/12 14:03, Cho KyongHo wrote:
+> Touching some System MMU needs its master devices' clock to be enabled
+> before. This commit adds clk_ops.set_parent of gating clocks of System
+> MMU to ensure gating clocks of System MMU's mater devices are enabled
+> when enabling gating clocks of System MMU.
 >
-> Change-Id: Ie29f587c01c645f28fc0e0b94eb3631a0170ebf5
+> Change-Id: Icd58b12f599e92692c032516331a444f4703ba6b
 
-No need 'Change-Id' here.
+Same here, we don't need this :-)
 
 > Signed-off-by: KyongHo Cho<pullip.cho@samsung.com>
 > ---
->   arch/arm/mach-exynos/Kconfig               |   5 -
->   arch/arm/mach-exynos/Makefile              |   1 -
->   arch/arm/mach-exynos/clock-exynos4.c       |  41 +++--
->   arch/arm/mach-exynos/clock-exynos4210.c    |   9 +-
->   arch/arm/mach-exynos/clock-exynos4212.c    |  23 ++-
->   arch/arm/mach-exynos/clock-exynos5.c       |  62 ++++---
->   arch/arm/mach-exynos/dev-sysmmu.c          | 274 -----------------------------
->   arch/arm/mach-exynos/include/mach/sysmmu.h |  66 -------
->   arch/arm/mach-exynos/mach-exynos4-dt.c     |  34 ++++
->   arch/arm/mach-exynos/mach-exynos5-dt.c     |  30 ++++
->   10 files changed, 137 insertions(+), 408 deletions(-)
->   delete mode 100644 arch/arm/mach-exynos/dev-sysmmu.c
->   delete mode 100644 arch/arm/mach-exynos/include/mach/sysmmu.h
+>   arch/arm/mach-exynos/clock-exynos5.c | 25 +++++++++++++++++++++++++
+>   1 file changed, 25 insertions(+)
+>
 
+Looks good to me, and I think, this can be applied independently from 
+this series. Will apply with removing 'Change-Id'.
 
 Thanks.
 
