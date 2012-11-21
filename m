@@ -1,73 +1,65 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 21 Nov 2012 23:16:40 +0300
-Subject: [PATCH 1/1] asix: use ramdom hw addr if the one read is not valid
-In-Reply-To: <1353493362-30418-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1353493362-30418-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <50AD36A8.6000702@mvista.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 21 Nov 2012 11:17:11 -0800
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <50AC9CC7.8010103@samsung.com>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
+ <20121120113325.dde266ed.akpm@linux-foundation.org>
+ <50AC8C14.5050204@samsung.com>
+ <20121121003643.97febbdb.akpm@linux-foundation.org>
+ <50AC9CC7.8010103@samsung.com>
+Message-ID: <20121121111711.fe915265.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, 21 Nov 2012 10:20:07 +0100
+Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 
-On 11/21/2012 01:22 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> Hello,
+> 
+> On 11/21/2012 9:36 AM, Andrew Morton wrote:
+> > On Wed, 21 Nov 2012 09:08:52 +0100 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> >
+> > > Hello,
+> > >
+> > > On 11/20/2012 8:33 PM, Andrew Morton wrote:
+> > > > On Tue, 20 Nov 2012 15:31:45 +0100
+> > > > Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > > >
+> > > > > dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag,
+> > > > > regardless the flags provided by the caller. This causes excessive
+> > > > > pruning of emergency memory pools without any good reason. Additionaly,
+> > > > > on ARM architecture any driver which is using dmapools will sooner or
+> > > > > later  trigger the following error:
+> > > > > "ERROR: 256 KiB atomic DMA coherent pool is too small!
+> > > > > Please increase it with coherent_pool= kernel parameter!".
+> > > > > Increasing the coherent pool size usually doesn't help much and only
+> > > > > delays such error, because all GFP_ATOMIC DMA allocations are always
+> > > > > served from the special, very limited memory pool.
+> > > > >
+> > > >
+> > > > Is this problem serious enough to justify merging the patch into 3.7?
+> > > > And into -stable kernels?
+> > >
+> > > I wonder if it is a good idea to merge such change at the end of current
+> > > -rc period.
+> >
+> > I'm not sure what you mean by this.
+> >
+> > But what we do sometimes if we think a patch needs a bit more
+> > real-world testing before backporting is to merge it into -rc1 in the
+> > normal merge window, and tag it for -stable backporting.  That way it
+> > gets a few weeks(?) testing in mainline before getting backported.
+> 
+> I just wondered that if it gets merged to v3.7-rc7 there won't be much time
+> for real-world testing before final v3.7 release. This patch is in
+> linux-next for over a week and I'm not aware of any issues, but -rc releases
+> gets much more attention and testing than linux-next tree.
+> 
+> If You think it's fine to put such change to v3.7-rc7 I will send a pull
+> request and tag it for stable asap.
+> 
 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: linux-usb at vger.kernel.org
-> Cc: netdev at vger.kernel.org
-> ---
->  drivers/net/usb/asix_devices.c |   24 +++++++++++++++++++++---
->  1 file changed, 21 insertions(+), 3 deletions(-)
-
-> diff --git a/drivers/net/usb/asix_devices.c b/drivers/net/usb/asix_devices.c
-> index 33ab824..7ebec5b 100644
-> --- a/drivers/net/usb/asix_devices.c
-> +++ b/drivers/net/usb/asix_devices.c
-> @@ -225,7 +225,13 @@ static int ax88172_bind(struct usbnet *dev, struct usb_interface *intf)
->  			   ret);
->  		goto out;
->  	}
-> -	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
-> +
-> +	if (is_valid_ether_addr(buf)) {
-> +		memcpy(dev->net->dev_addr, buf, ETH_ALEN);
-> +	} else {
-> +		netdev_info(dev->net, "invalid hw address, using random\n");
-> +		eth_hw_addr_random(dev->net);
-> +	}
->  
->  	/* Initialize MII structure */
->  	dev->mii.dev = dev->net;
-> @@ -423,7 +429,13 @@ static int ax88772_bind(struct usbnet *dev, struct usb_interface *intf)
->  		netdev_dbg(dev->net, "Failed to read MAC address: %d\n", ret);
->  		return ret;
->  	}
-> -	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
-> +
-> +	if (is_valid_ether_addr(buf)) {
-> +		memcpy(dev->net->dev_addr, buf, ETH_ALEN);
-> +	} else {
-> +		netdev_info(dev->net, "invalid hw address, using random\n");
-> +		eth_hw_addr_random(dev->net);
-> +	}
->  
->  	/* Initialize MII structure */
->  	dev->mii.dev = dev->net;
-> @@ -777,7 +789,13 @@ static int ax88178_bind(struct usbnet *dev, struct usb_interface *intf)
->  		netdev_dbg(dev->net, "Failed to read MAC address: %d\n", ret);
->  		return ret;
->  	}
-> -	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
-> +
-> +	if (is_valid_ether_addr(buf)) {
-> +		memcpy(dev->net->dev_addr, buf, ETH_ALEN);
-> +	} else {
-> +		netdev_info(dev->net, "invalid hw address, using random\n");
-> +		eth_hw_addr_random(dev->net);
-> +	}
->  
->  	/* Initialize MII structure */
->  	dev->mii.dev = dev->net;
-
-   Repeated thrice, this asks to be put into subroutine...
-
-WBR, Sergei
+What I'm suggesting is that it be merged for 3.8-rc1 with a -stable
+tag, then it will be backported into 3.7.x later on.
