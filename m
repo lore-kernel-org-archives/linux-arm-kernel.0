@@ -1,65 +1,122 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 21 Nov 2012 18:41:00 +0100
-Subject: [PATCH] ARM: Kirkwood: Use hw_pci.ops instead of hw_pci.scan
-In-Reply-To: <20121121071511.GE19837@obsidianresearch.com>
-References: <20121121071511.GE19837@obsidianresearch.com>
-Message-ID: <20121121174100.GA9177@lunn.ch>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 Nov 2012 09:42:19 -0800
+Subject: [PATCH 0/5] remaining omap multiplatform patches for v3.8 merge window
+Message-ID: <20121121174201.25576.61961.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 12:15:11AM -0700, Jason Gunthorpe wrote:
-> The kirkwood_pcie_scan_bus function duplicates the common code in
-> bios32.c, passing ops in will use the common code..
-> 
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> ---
->  arch/arm/mach-kirkwood/pcie.c |   18 +-----------------
->  1 files changed, 1 insertions(+), 17 deletions(-)
-> 
-> Just a little clean up I found while reviewing the PCI-E code.
+Hi all,
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Here are the remaining patches to be able to build omap2+
+with multiplatform enabled. Booting requires disabling
+ARM_ERRATA_751472 as discussed earlier. And then the
+OMAP4_ERRATA_I688 can't be used currently.
 
-	  Andrew
+These patches are based on a merge of the following branches
+that are needed to keep things compiling:
+     
+- omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3
+- omap-for-v3.8/clock
+- omap-for-v3.8/cleanup-headers-iommu
+- omap-for-v3.8/pm-part2
+- Tomi's branch 3.8/vram-conversion
+- Russell's branch omap-serial
 
-> 
-> diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
-> index ec54491..d5aedf6 100644
-> --- a/arch/arm/mach-kirkwood/pcie.c
-> +++ b/arch/arm/mach-kirkwood/pcie.c
-> @@ -224,22 +224,6 @@ static void __devinit rc_pci_fixup(struct pci_dev *dev)
->  }
->  DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MARVELL, PCI_ANY_ID, rc_pci_fixup);
->  
-> -static struct pci_bus __init *
-> -kirkwood_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-> -{
-> -	struct pci_bus *bus;
-> -
-> -	if (nr < num_pcie_ports) {
-> -		bus = pci_scan_root_bus(NULL, sys->busnr, &pcie_ops, sys,
-> -					&sys->resources);
-> -	} else {
-> -		bus = NULL;
-> -		BUG();
-> -	}
-> -
-> -	return bus;
-> -}
-> -
->  static int __init kirkwood_pcie_map_irq(const struct pci_dev *dev, u8 slot,
->  	u8 pin)
->  {
-> @@ -251,8 +235,8 @@ static int __init kirkwood_pcie_map_irq(const struct pci_dev *dev, u8 slot,
->  
->  static struct hw_pci kirkwood_pci __initdata = {
->  	.setup		= kirkwood_pcie_setup,
-> -	.scan		= kirkwood_pcie_scan_bus,
->  	.map_irq	= kirkwood_pcie_map_irq,
-> +	.ops            = &pcie_ops,
->  };
->  
->  static void __init add_pcie_port(int index, void __iomem *base)
-> -- 
-> 1.7.4.1
-> 
+There are few drivers still breaking because of their
+use of plat/cpu.h and cpu_is_omap macros. The following
+already have patches queued in linux next:
+
+- drivers/staging/omapdrm/omap_drv.c
+- drivers/staging/omapdrm/omap_dmm_tiler.h
+
+The fixes to following have been already posted:
+
+- drivers/crypto/omap-sham.c
+
+And the following should have patches coming:
+
+- drivers/mfd/omap-usb-host.c
+- drivers/media/platform/omap/omap_voutlib.c
+- drivers/media/platform/omap3isp/isp.c
+
+But for now, the last patch in this series is for
+testing only.
+
+Regards,
+
+Tony
+
+
+---
+
+Tony Lindgren (5):
+      watchdog: OMAP: fixup for ARM multiplatform support
+      ASoC: OMAP: mcbsp fixes for enabling ARM multiplatform support
+      ARM: OMAP: Move plat/omap-serial.h to include/linux/platform_data/serial-omap.h
+      ARM: OMAP: Move plat-omap/dma-omap.h to include/linux/omap-dma.h
+      RFC: ARM: OMAP: Prepare Kconfig and Makefiles for enabling ARCH_MULTIPLATFORM
+
+
+ arch/arm/Kconfig                                   |   13 +
+ arch/arm/configs/omap2plus_defconfig               |    2 
+ arch/arm/mach-omap1/board-h2.c                     |    2 
+ arch/arm/mach-omap1/board-h3.c                     |    2 
+ arch/arm/mach-omap1/board-palmte.c                 |    2 
+ arch/arm/mach-omap1/board-palmtt.c                 |    2 
+ arch/arm/mach-omap1/board-palmz71.c                |    2 
+ arch/arm/mach-omap1/board-sx1.c                    |    2 
+ arch/arm/mach-omap1/dma.c                          |    2 
+ arch/arm/mach-omap1/io.c                           |    2 
+ arch/arm/mach-omap1/lcd_dma.c                      |    2 
+ arch/arm/mach-omap1/mcbsp.c                        |    2 
+ arch/arm/mach-omap1/pm.c                           |    2 
+ arch/arm/mach-omap2/Kconfig                        |   23 +
+ arch/arm/mach-omap2/Makefile                       |    3 
+ arch/arm/mach-omap2/board-3430sdp.c                |    2 
+ arch/arm/mach-omap2/board-h4.c                     |    2 
+ arch/arm/mach-omap2/board-rx51-peripherals.c       |    2 
+ arch/arm/mach-omap2/board-rx51.c                   |    2 
+ arch/arm/mach-omap2/devices.c                      |    2 
+ arch/arm/mach-omap2/dma.c                          |    2 
+ arch/arm/mach-omap2/io.c                           |    2 
+ arch/arm/mach-omap2/mcbsp.c                        |    2 
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |    2 
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |    2 
+ .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    3 
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    2 
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    2 
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    2 
+ arch/arm/mach-omap2/pm24xx.c                       |    2 
+ arch/arm/mach-omap2/pm34xx.c                       |    3 
+ arch/arm/mach-omap2/serial.c                       |    4 
+ arch/arm/plat-omap/Kconfig                         |   30 --
+ arch/arm/plat-omap/Makefile                        |    2 
+ arch/arm/plat-omap/dma.c                           |    2 
+ arch/arm/plat-omap/include/plat-omap/dma-omap.h    |  377 --------------------
+ drivers/crypto/omap-aes.c                          |    2 
+ drivers/crypto/omap-sham.c                         |    2 
+ drivers/dma/omap-dma.c                             |    2 
+ drivers/media/platform/omap/omap_vout.c            |    2 
+ drivers/media/platform/omap/omap_vout_vrfb.c       |    2 
+ drivers/media/platform/omap3isp/ispstat.h          |    2 
+ drivers/media/platform/soc_camera/omap1_camera.c   |    2 
+ drivers/mtd/nand/omap2.c                           |    1 
+ drivers/mtd/onenand/omap2.c                        |    2 
+ drivers/tty/serial/omap-serial.c                   |    3 
+ drivers/usb/gadget/omap_udc.c                      |    2 
+ drivers/usb/musb/tusb6010_omap.c                   |    2 
+ drivers/video/omap/lcdc.c                          |    2 
+ drivers/video/omap/omapfb_main.c                   |    2 
+ drivers/video/omap/sossi.c                         |    2 
+ drivers/watchdog/omap_wdt.c                        |    2 
+ include/linux/omap-dma.h                           |  366 +++++++++++++++++++
+ include/linux/platform_data/serial-omap.h          |    0 
+ sound/soc/omap/mcbsp.c                             |    4 
+ sound/soc/omap/mcbsp.h                             |    6 
+ sound/soc/omap/omap-mcbsp.c                        |    5 
+ 57 files changed, 457 insertions(+), 468 deletions(-)
+ delete mode 100644 arch/arm/plat-omap/include/plat-omap/dma-omap.h
+ rename arch/arm/plat-omap/include/plat/omap-serial.h => include/linux/platform_data/serial-omap.h (100%)
+
+-- 
+Signature
