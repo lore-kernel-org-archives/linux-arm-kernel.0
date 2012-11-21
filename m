@@ -1,29 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Nov 2012 10:53:48 -0800
-Subject: [GIT PULL] ARM: sunxi: support for sun4i (A10) SoCs
-In-Reply-To: <1353489133-25814-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1353489133-25814-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20121121185348.GB15213@quad.lixom.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 21 Nov 2012 13:56:52 -0500
+Subject: [PATCH] ARM: Kirkwood: Support basic hotplug for PCI-E
+In-Reply-To: <20121121184754.GB12822@obsidianresearch.com>
+References: <20121121182528.GA12715@obsidianresearch.com>
+ <20121121183527.GC15800@titan.lakedaemon.net>
+ <20121121184754.GB12822@obsidianresearch.com>
+Message-ID: <20121121185652.GD15800@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 10:12:13AM +0100, Maxime Ripard wrote:
-> Arnd, Olof,
+On Wed, Nov 21, 2012 at 11:47:54AM -0700, Jason Gunthorpe wrote:
+> On Wed, Nov 21, 2012 at 01:35:27PM -0500, Jason Cooper wrote:
+> > On Wed, Nov 21, 2012 at 11:25:28AM -0700, Jason Gunthorpe wrote:
+> > > Unconditionally register the PCI-E bus, even if the link is currently
+> > > down. 
+> > 
+> > How does this affect clock gating on boards without PCI-E devices?  Will
+> > the SoC then power this unconditionally?
 > 
-> Here is a pull request to add the support for Allwinner A10 SoCs.
+> Hmm, interesting question.. This will definitely hold the clock lock
+> on the PCI-E ports even if they are down at boot, and they will surely
+> consume more power than if they were switched off.
 > 
-> Thanks,
-> Maxime
-> 
-> The following changes since commit 1b106699647b56313bac707e12e7ad67180cb147:
-> 
->   ARM: sunxi: Add entry to MAINTAINERS (2012-11-16 21:56:53 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/mripard/linux.git tags/tags/sun4i-support-for-3.8
+> However, if a board has no possible PCI-E devices, then it shouldn't
+> be calling kirkwood_pcie_init, which will let things gate.
 
-Thanks, pulled!
+Ok, that's the good short-term answer.
 
+> I guess another way to deal with this is to make the stuff in
+> kirkwood/pcie.c an actual platform driver and hot attach the entire
+> driver rather than using just using pci/rescan, but that is a fairly
+> extensive change.. And I worry that powering down the interface in the
+> interm will require re-initializing all the registers, which linux
+> doesn't have the code to do at all.
 
--Olof
+The goal is to remove everything from mach-kirkwood/, mach-dove/, etc.
+which means pcie will eventually become a real driver under drivers/.
+We just aren't there yet.
+
+I'll pull this in as is.  Thanks for the patch!
+
+thx,
+
+Jason.
