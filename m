@@ -1,60 +1,62 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 21 Nov 2012 12:20:59 +0100
-Subject: [PATCH 3/3] ARM i.MX6: Add pwm support
-In-Reply-To: <1353496859-29164-1-git-send-email-s.hauer@pengutronix.de>
-References: <1353496859-29164-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1353496859-29164-4-git-send-email-s.hauer@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 21 Nov 2012 12:25:42 +0100
+Subject: [GIT PULL v2] at91: fixes for 3.7-rc7
+In-Reply-To: <20121121070303.GD7615@quad.lixom.net>
+References: <50AA5ED5.8090901@atmel.com>
+ <CAOesGMjAYtEkmEYnzCQ4G821BWG9D6LHvgt5aOMJgus_hzFkRA@mail.gmail.com>
+ <50AA6C76.3000606@atmel.com> <50AB466F.5010500@atmel.com>
+ <20121121070303.GD7615@quad.lixom.net>
+Message-ID: <50ACBA36.4030101@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/boot/dts/imx6q.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+On 11/21/2012 08:03 AM, Olof Johansson :
+> Hi,
+> 
+> 
+> On Tue, Nov 20, 2012 at 09:59:27AM +0100, Nicolas Ferre wrote:
+>> Arnd, Olof,
+>>
+>> Just for the record, I do not want to put pressure at a such late time in
+>> the 3.7-rc process. So, I just reworked that pull-request because the previous
+>> one was wrong:
+>> - wrong patch content (DT nodes with wrong size)
+>> - not all tags in patches (Jean-Christophe and Arnd tags were missing...)
+>>
+>> Just to start from a sane base if I have to rebase this work for 3.8, I let you know
+>> that I have updated this tag...
+>>
+>> The following changes since commit 641f3ce64b050961d454a0716bb6dbf528315aac:
+>>
+>>   ARM: at91/usbh: fix overcurrent gpio setup (2012-11-16 10:46:29 +0100)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/at91linux/linux-at91.git tags/at91-fixes
+> 
+> The new patches seem to belong in an at91/dt branch, not in a fixes one.
+> 
+> I can pull in the previous fixes branch as an at91/fixes-non-critical for 3.8
+> if you want. There's no need to rebase them for this, is there? What is the
+> pinctrl dependency that you are talking about, are some of these patches needed
+> as prerequisites for pinctrl changes or the other way around?
+> 
+> Sorry if I've missed more elaborate emails on this and are asking repeat
+> questions. ;)
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 69fe8f4..d907d06 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -268,23 +268,39 @@
- 			};
- 
- 			pwm at 02080000 { /* PWM1 */
-+				#pwm-cells = <2>;
-+				compatible = "fsl,imx6q-pwm", "fsl,imx27-pwm";
- 				reg = <0x02080000 0x4000>;
- 				interrupts = <0 83 0x04>;
-+				clocks = <&clks 62>, <&clks 145>;
-+				clock-names = "ipg", "per";
- 			};
- 
- 			pwm at 02084000 { /* PWM2 */
-+				#pwm-cells = <2>;
-+				compatible = "fsl,imx6q-pwm", "fsl,imx27-pwm";
- 				reg = <0x02084000 0x4000>;
- 				interrupts = <0 84 0x04>;
-+				clocks = <&clks 62>, <&clks 146>;
-+				clock-names = "ipg", "per";
- 			};
- 
- 			pwm at 02088000 { /* PWM3 */
-+				#pwm-cells = <2>;
-+				compatible = "fsl,imx6q-pwm", "fsl,imx27-pwm";
- 				reg = <0x02088000 0x4000>;
- 				interrupts = <0 85 0x04>;
-+				clocks = <&clks 62>, <&clks 147>;
-+				clock-names = "ipg", "per";
- 			};
- 
- 			pwm at 0208c000 { /* PWM4 */
-+				#pwm-cells = <2>;
-+				compatible = "fsl,imx6q-pwm", "fsl,imx27-pwm";
- 				reg = <0x0208c000 0x4000>;
- 				interrupts = <0 86 0x04>;
-+				clocks = <&clks 62>, <&clks 148>;
-+				clock-names = "ipg", "per";
- 			};
- 
- 			flexcan at 02090000 { /* CAN1 */
+No worries Olof, I might have been more precise in the subject of my
+email: I have made up my mind and consider this material for 3.8.
+
+As for the relation with pinctrl, we have made big modification to the
+layout of some dtsi/dts there and it would make everyones' life easier
+if we queue these dt/mmc changes on top of the current pinctrl tree...
+Moreover, Jean-Christophe plans to add the pinctrl part of these
+additions on top of the modification present in this pull-request: one
+more reason to queue them in pinctrl git tree.
+
+So, in brief: forget this pull-request (and the one that it replaces
+obviously).
+
+Thanks, bye,
 -- 
-1.7.10.4
+Nicolas Ferre
