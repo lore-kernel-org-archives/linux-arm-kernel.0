@@ -1,45 +1,60 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 21 Nov 2012 12:20:58 +0100
-Subject: [PATCH 2/3] ARM i.MX51: Add pwm support
+Date: Wed, 21 Nov 2012 12:20:59 +0100
+Subject: [PATCH 3/3] ARM i.MX6: Add pwm support
 In-Reply-To: <1353496859-29164-1-git-send-email-s.hauer@pengutronix.de>
 References: <1353496859-29164-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1353496859-29164-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1353496859-29164-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/imx51.dtsi |   18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/boot/dts/imx6q.dtsi |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 8cf69c7..2781e47 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -409,6 +409,24 @@
- 				};
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 69fe8f4..d907d06 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -268,23 +268,39 @@
  			};
  
-+			pwm1: pwm at 73fb4000 {
+ 			pwm at 02080000 { /* PWM1 */
 +				#pwm-cells = <2>;
-+				compatible = "fsl,imx51-pwm", "fsl,imx27-pwm";
-+				reg = <0x73fb4000 0x4000>;
-+				clocks = <&clks 37>, <&clks 38>;
++				compatible = "fsl,imx6q-pwm", "fsl,imx27-pwm";
+ 				reg = <0x02080000 0x4000>;
+ 				interrupts = <0 83 0x04>;
++				clocks = <&clks 62>, <&clks 145>;
 +				clock-names = "ipg", "per";
-+				interrupts = <61>;
-+			};
-+
-+			pwm2: pwm at 73fb8000 {
+ 			};
+ 
+ 			pwm at 02084000 { /* PWM2 */
 +				#pwm-cells = <2>;
-+				compatible = "fsl,imx51-pwm", "fsl,imx27-pwm";
-+				reg = <0x73fb8000 0x4000>;
-+				clocks = <&clks 39>, <&clks 40>;
++				compatible = "fsl,imx6q-pwm", "fsl,imx27-pwm";
+ 				reg = <0x02084000 0x4000>;
+ 				interrupts = <0 84 0x04>;
++				clocks = <&clks 62>, <&clks 146>;
 +				clock-names = "ipg", "per";
-+				interrupts = <94>;
-+			};
-+
- 			uart1: serial at 73fbc000 {
- 				compatible = "fsl,imx51-uart", "fsl,imx21-uart";
- 				reg = <0x73fbc000 0x4000>;
+ 			};
+ 
+ 			pwm at 02088000 { /* PWM3 */
++				#pwm-cells = <2>;
++				compatible = "fsl,imx6q-pwm", "fsl,imx27-pwm";
+ 				reg = <0x02088000 0x4000>;
+ 				interrupts = <0 85 0x04>;
++				clocks = <&clks 62>, <&clks 147>;
++				clock-names = "ipg", "per";
+ 			};
+ 
+ 			pwm at 0208c000 { /* PWM4 */
++				#pwm-cells = <2>;
++				compatible = "fsl,imx6q-pwm", "fsl,imx27-pwm";
+ 				reg = <0x0208c000 0x4000>;
+ 				interrupts = <0 86 0x04>;
++				clocks = <&clks 62>, <&clks 148>;
++				clock-names = "ipg", "per";
+ 			};
+ 
+ 			flexcan at 02090000 { /* CAN1 */
 -- 
 1.7.10.4
