@@ -1,85 +1,51 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 21 Nov 2012 11:08:52 -0800
-Subject: [PATCH 1/3] clk: add GPLv2 headers to the Versatile clock files
-In-Reply-To: <1353447571-12876-1-git-send-email-linus.walleij@linaro.org>
-References: <1353447571-12876-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20121121190852.21126.46977@nucleus>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 Nov 2012 11:09:30 -0800
+Subject: [PATCH 0/2] ARM: OMAP: ads7846: fix pendown debounce setting
+In-Reply-To: <20121120082136.GB28115@core.coreip.homeip.net>
+References: <1353341038-14381-1-git-send-email-grinberg@compulab.co.il>
+ <20121120082136.GB28115@core.coreip.homeip.net>
+Message-ID: <20121121190929.GF18567@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Linus Walleij (2012-11-20 13:39:31)
-> The GPLv2 headers were missing and the subsystem maintainer likes
-> them so put them in. I am the copyright holder, so explicitly
-> licensing these under the GPLv2.
+* Dmitry Torokhov <dmitry.torokhov@gmail.com> [121120 00:23]:
+> On Mon, Nov 19, 2012 at 06:03:56PM +0200, Igor Grinberg wrote:
+> > Commit 97ee9f01 (ARM: OMAP: fix the ads7846 init code) have enabled the
+> > pendown GPIO debounce time setting by the below sequence:
+> > 
+> >   gpio_request_one()
+> >   gpio_set_debounce()
+> >   gpio_free()
+> > 
+> > It also revealed a bug in the OMAP GPIO handling code which prevented
+> > the GPIO debounce clock to be disabled and CORE transition to low power
+> > states.
+> > 
+> > Commit c9c55d9 (gpio/omap: fix off-mode bug: clear debounce settings on
+> > free/reset) fixes the OMAP GPIO handling code by making sure that the
+> > GPIO debounce clock gets disabled if no GPIO is requested from current
+> > bank.
+> > 
+> > While fixing the OMAP GPIO handling code (in the right way), the above
+> > commit makes the gpio_request->set_debounce->free sequence invalid as
+> > after freeing the GPIO, the debounce settings are lost.
+> > 
+> > This patch set:
+> > 1) Adds the pendown GPIO debounce time setting to the platform data
+> >    structure of the ads7846 driver.
+> > 2) Fixes the OMAP platform code to pass the debounce time value
+> >    to the driver instead of handling it by itself.
+> > 
+> > Igor Grinberg (2):
+> >   ads7846: enable pendown GPIO debounce time setting
+> >   ARM: OMAP: ads7846: fix pendown debounce setting
+> > 
 > 
-> Reported-by: Mike Turquette <mturquette@ti.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Makes sense to me. Tony, I have some stuff to push for 3.7 final, mind
+> if I pick OMAP change as well?
 
-Taken into clk-next.
+No please go ahead, I just acked the related patch.
 
-Thanks,
-Mike
+Regards,
 
-> ---
->  drivers/clk/versatile/clk-icst.c       |  6 ++++++
->  drivers/clk/versatile/clk-integrator.c | 10 +++++++++-
->  drivers/clk/versatile/clk-realview.c   |  8 ++++++++
->  3 files changed, 23 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/versatile/clk-icst.c b/drivers/clk/versatile/clk-icst.c
-> index f555b50..23d2d7e 100644
-> --- a/drivers/clk/versatile/clk-icst.c
-> +++ b/drivers/clk/versatile/clk-icst.c
-> @@ -3,6 +3,12 @@
->   * We wrap the custom interface from <asm/hardware/icst.h> into the generic
->   * clock framework.
->   *
-> + * Copyright (C) 2012 Linus Walleij
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
->   * TODO: when all ARM reference designs are migrated to generic clocks, the
->   * ICST clock code from the ARM tree should probably be merged into this
->   * file.
-> diff --git a/drivers/clk/versatile/clk-integrator.c b/drivers/clk/versatile/clk-integrator.c
-> index a505392..3c816ae 100644
-> --- a/drivers/clk/versatile/clk-integrator.c
-> +++ b/drivers/clk/versatile/clk-integrator.c
-> @@ -1,8 +1,16 @@
-> +/*
-> + * Clock driver for the ARM Integrator/AP and Integrator/CP boards
-> + * Copyright (C) 2012 Linus Walleij
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#include <linux/clk-provider.h>
->  #include <linux/clk.h>
->  #include <linux/clkdev.h>
->  #include <linux/err.h>
->  #include <linux/io.h>
-> -#include <linux/clk-provider.h>
->  
->  #include <mach/hardware.h>
->  #include <mach/platform.h>
-> diff --git a/drivers/clk/versatile/clk-realview.c b/drivers/clk/versatile/clk-realview.c
-> index e21a99c..fd2dbdb 100644
-> --- a/drivers/clk/versatile/clk-realview.c
-> +++ b/drivers/clk/versatile/clk-realview.c
-> @@ -1,3 +1,11 @@
-> +/*
-> + * Clock driver for the ARM RealView boards
-> + * Copyright (C) 2012 Linus Walleij
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
->  #include <linux/clk.h>
->  #include <linux/clkdev.h>
->  #include <linux/err.h>
-> -- 
-> 1.7.11.7
+Tony
