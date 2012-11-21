@@ -1,71 +1,71 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 21 Nov 2012 13:49:37 -0800
-Subject: [PATCH 394/493] clk: remove use of __devexit
-In-Reply-To: <1353349642-3677-394-git-send-email-wfp5p@virginia.edu>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-394-git-send-email-wfp5p@virginia.edu>
-Message-ID: <20121121214937.21126.57991@nucleus>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 Nov 2012 13:51:00 -0800
+Subject: [GIT PULL] omap iommu clean-up dependency branch for v3.8 merge window
+Message-ID: <20121121215059.GA5279@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Bill Pemberton (2012-11-19 10:25:43)
-> CONFIG_HOTPLUG is going away as an option so __devexit is no
-> longer needed.
-> 
-> Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-> Cc: Mike Turquette <mturquette@ti.com> 
-> Cc: linux-arm-kernel at lists.infradead.org 
-> Cc: patches at opensource.wolfsonmicro.com 
+The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
 
-Regards,
-Mike
+are available in the git repository at:
 
-> ---
->  drivers/clk/clk-max77686.c | 2 +-
->  drivers/clk/clk-twl6040.c  | 2 +-
->  drivers/clk/clk-wm831x.c   | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-> index fe449c2..d098f72 100644
-> --- a/drivers/clk/clk-max77686.c
-> +++ b/drivers/clk/clk-max77686.c
-> @@ -199,7 +199,7 @@ out:
->         return ret;
->  }
->  
-> -static int __devexit max77686_clk_remove(struct platform_device *pdev)
-> +static int max77686_clk_remove(struct platform_device *pdev)
->  {
->         struct max77686_clk **max77686_clks = platform_get_drvdata(pdev);
->         int i;
-> diff --git a/drivers/clk/clk-twl6040.c b/drivers/clk/clk-twl6040.c
-> index 93dd975..42bbbb1 100644
-> --- a/drivers/clk/clk-twl6040.c
-> +++ b/drivers/clk/clk-twl6040.c
-> @@ -100,7 +100,7 @@ static int twl6040_clk_probe(struct platform_device *pdev)
->         return 0;
->  }
->  
-> -static int __devexit twl6040_clk_remove(struct platform_device *pdev)
-> +static int twl6040_clk_remove(struct platform_device *pdev)
->  {
->         struct twl6040_clk *clkdata = dev_get_drvdata(&pdev->dev);
->  
-> diff --git a/drivers/clk/clk-wm831x.c b/drivers/clk/clk-wm831x.c
-> index f31a642..16ed068 100644
-> --- a/drivers/clk/clk-wm831x.c
-> +++ b/drivers/clk/clk-wm831x.c
-> @@ -389,7 +389,7 @@ static int wm831x_clk_probe(struct platform_device *pdev)
->         return 0;
->  }
->  
-> -static int __devexit wm831x_clk_remove(struct platform_device *pdev)
-> +static int wm831x_clk_remove(struct platform_device *pdev)
->  {
->         return 0;
->  }
-> -- 
-> 1.8.0
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/cleanup-headers-iommu-signed
+
+for you to fetch changes up to 2ab7c84815cffd5fe4946a472fc67fefa8ac3c29:
+
+  ARM: OMAP2+: Move iommu/iovmm headers to platform_data (2012-11-20 10:05:01 -0800)
+
+----------------------------------------------------------------
+Move most of remaining omap iommu code to drivers/iommu.
+This is needed for the multiplatform kernels as the plat
+and mach headers cannot be included.
+
+These changes were agreed to be merged via the arm-soc
+tree by Joerg and Ohad as these will cause some merge
+conflicts with the other related clean-up branches.
+
+So omap-for-v3.8/cleanup-headers-iommu should be added
+as one of the depends branches for arm-soc.
+
+----------------------------------------------------------------
+Ido Yariv (3):
+      ARM: OMAP: Merge iommu2.h into iommu.h
+      ARM: OMAP2+: Move iopgtable header to drivers/iommu/
+      ARM: OMAP2+: Make some definitions local
+
+Tony Lindgren (3):
+      ARM: OMAP2+: Move plat/iovmm.h to include/linux/omap-iommu.h
+      ARM: OMAP2+: Move iommu2 to drivers/iommu/omap-iommu2.c
+      ARM: OMAP2+: Move iommu/iovmm headers to platform_data
+
+ arch/arm/mach-omap2/Makefile                       |   2 -
+ arch/arm/mach-omap2/devices.c                      |   2 +-
+ arch/arm/mach-omap2/omap-iommu.c                   |   2 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   2 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   2 +-
+ arch/arm/plat-omap/include/plat/iommu2.h           |  96 ---------------
+ arch/arm/plat-omap/include/plat/iovmm.h            |  89 --------------
+ drivers/iommu/Makefile                             |   1 +
+ drivers/iommu/omap-iommu-debug.c                   |   8 +-
+ drivers/iommu/omap-iommu.c                         |  39 +++++-
+ .../plat/iommu.h => drivers/iommu/omap-iommu.h     | 133 +++++++++++----------
+ .../iommu2.c => drivers/iommu/omap-iommu2.c        |  11 +-
+ .../iopgtable.h => drivers/iommu/omap-iopgtable.h  |  22 ----
+ drivers/iommu/omap-iovmm.c                         |  50 +++++++-
+ drivers/media/platform/omap3isp/isp.c              |   1 +
+ drivers/media/platform/omap3isp/isp.h              |   4 +-
+ drivers/media/platform/omap3isp/ispccdc.c          |   1 +
+ drivers/media/platform/omap3isp/ispstat.c          |   1 +
+ drivers/media/platform/omap3isp/ispvideo.c         |   3 +-
+ include/linux/omap-iommu.h                         |  52 ++++++++
+ include/linux/platform_data/iommu-omap.h           |  49 ++++++++
+ 21 files changed, 279 insertions(+), 291 deletions(-)
+ delete mode 100644 arch/arm/plat-omap/include/plat/iommu2.h
+ delete mode 100644 arch/arm/plat-omap/include/plat/iovmm.h
+ rename arch/arm/plat-omap/include/plat/iommu.h => drivers/iommu/omap-iommu.h (69%)
+ rename arch/arm/mach-omap2/iommu2.c => drivers/iommu/omap-iommu2.c (96%)
+ rename arch/arm/plat-omap/include/plat/iopgtable.h => drivers/iommu/omap-iopgtable.h (85%)
+ create mode 100644 include/linux/omap-iommu.h
+ create mode 100644 include/linux/platform_data/iommu-omap.h
