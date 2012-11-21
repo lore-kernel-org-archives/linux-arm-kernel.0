@@ -1,31 +1,26 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 21 Nov 2012 10:06:16 +0000
-Subject: [PATCH V4 1/3] of: introduce for_each_matching_node_and_match()
-In-Reply-To: <201211210953.20552.arnd@arndb.de>
-References: <1353453142-4973-1-git-send-email-swarren@wwwdotorg.org>
- <201211210953.20552.arnd@arndb.de>
-Message-ID: <CACxGe6u5UBqVPrBqwn9rhjuBx4uCuuHKU=FcvSp0GJ2G8ogSNQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 21 Nov 2012 11:06:28 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: Add ARCH_SUNXI
+Message-ID: <1353492388-29421-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 9:53 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 20 November 2012, Stephen Warren wrote:
->> However, this results in iterating over table twice; the second time
->> inside of_match_node(). The implementation of for_each_matching_node()
->> already found the match, so this is redundant. Invent new function
->> of_find_matching_node_and_match() and macro
->> for_each_matching_node_and_match() to remove the double iteration,
->> thus transforming the above code to:
->>
->>     for_each_matching_node_and_match(np, table, &match)
->>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->
-> This look useful, but I wonder if the interface would make more sense if you
-> make the last argument to the macro a normal pointer, rather than a
-> pointer-to-pointer. You can take the reference as part of the macro.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/configs/multi_v7_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-To me that makes for harder to understand code. It *looks* like an
-argument to a normal function call, but it gets changed by the caller.
-
-g.
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 159f75f..d5a06dc 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -6,6 +6,7 @@ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_ARCH_HIGHBANK=y
+ CONFIG_ARCH_SOCFPGA=y
++CONFIG_ARCH_SUNXI=y
+ # CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
+ CONFIG_ARM_ERRATA_754322=y
+ CONFIG_SMP=y
+-- 
+1.7.9.5
