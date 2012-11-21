@@ -1,36 +1,29 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 21 Nov 2012 11:17:26 +0100
-Subject: [PULL pinctrl-for 3.8] at91 update
-In-Reply-To: <CACRpkdbyEtwM+O3aw8rAC2r+4z4SYC9MH-B0PGHcnnR46V5hig@mail.gmail.com>
-References: <20121120214424.GP4398@game.jcrosoft.org>
- <CACRpkdbyEtwM+O3aw8rAC2r+4z4SYC9MH-B0PGHcnnR46V5hig@mail.gmail.com>
-Message-ID: <20121121101726.GS4398@game.jcrosoft.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 21 Nov 2012 11:20:37 +0100
+Subject: [PATCH 0/4] Dove pinctrl fixes and DT enabling
+In-Reply-To: <CACRpkdYAnNCFDCjA67r0h_CSHMifb1Z83YJfYGQV3abPB8uQZg@mail.gmail.com>
+References: <1353317996-20841-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CACRpkdYAnNCFDCjA67r0h_CSHMifb1Z83YJfYGQV3abPB8uQZg@mail.gmail.com>
+Message-ID: <50ACAAF5.2030002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:53 Wed 21 Nov     , Linus Walleij wrote:
-> On Tue, Nov 20, 2012 at 10:44 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> 
-> > Hi Linus,
-> >
-> >         this pull go over the pinctrl at91 branch
-> >
-> >         This contain pinctrl ond dt that depends on
-> >
-> > The following changes since commit f6f94f6660dbe34039e5c86a46c7845589e7ee0c:
-> >
-> >   pinctrl: at91: Staticize non-exported symbols (2012-11-05 14:30:45 +0100)
-> >
-> > are available in the git repository at:
-> >
-> >   git://github.com/at91linux/linux-at91.git delivery/pinctrl-at91-3.8
-> 
-> OK I branched off my earlier at91 branch merge, pulled this in
-> (no conflicts) and then merged that new at91 branch into
-> my devel HEAD, and magically it just works, thanks
-> Jean-Christophe!
-your welcome and tks
+On 11/21/2012 10:59 AM, Linus Walleij wrote:
+> On Mon, Nov 19, 2012 at 10:39 AM, Sebastian Hesselbarth
+> <sebastian.hesselbarth@gmail.com>  wrote:
+>> This patch relies on a patch set for mvebu pinctrl taken through
+>> Linus' pinctrl branch. As there is no other platform than Dove
+>> involved, I suggest to take it though Jason's tree to avoid any
+>> further conflicts.
+>
+> Sounds like a plan. So you have some commit history pulled
+> in from the pinctrl tree in the MVEBU tree?
 
-Best Regards,
-J.
+Linus,
+
+I am referring to patches for a pinctrl/mvebu subfolder. IIRC Thomas
+posted that patch a while ago. Jason is currently sorting things out
+for mvebu pull requests. I guess both can comment on your question,
+as I don't fully understand it.
+
+Sebastian
