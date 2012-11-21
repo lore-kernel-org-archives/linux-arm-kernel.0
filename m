@@ -1,67 +1,129 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Nov 2012 21:04:29 +0900
-Subject: [PATCH 9/9] ARM: remove mach .handle_irq for VIC users
-In-Reply-To: <1353466713-18967-10-git-send-email-robherring2@gmail.com>
-References: <1353466713-18967-1-git-send-email-robherring2@gmail.com>
- <1353466713-18967-10-git-send-email-robherring2@gmail.com>
-Message-ID: <0e6b01cdc7e0$5c2eb8e0$148c2aa0$%kim@samsung.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 21 Nov 2012 14:04:17 +0200
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <20121121114018.GA31576@avionic-0098.adnet.avionic-design.de>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
+ <20121120215429.B621F3E1821@localhost> <13540495.epaCf4JVn9@percival>
+ <50ACB59B.4090404@iki.fi>
+ <20121121114018.GA31576@avionic-0098.adnet.avionic-design.de>
+Message-ID: <50ACC341.3090204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring wrote:
+On 2012-11-21 13:40, Thierry Reding wrote:
+> On Wed, Nov 21, 2012 at 01:06:03PM +0200, Tomi Valkeinen wrote:
+
+(sorry for bouncing back and forth with my private and my @ti addresses.
+I can't find an option in thunderbird to only use one sender address,
+and I always forget to change it when responding...)
+
+>> My suggestion would be to go forward with an in-driver solution, and
+>> look at the DT based solution later if we are seeing an increasing bloat
+>> in the drivers.
 > 
-> From: Rob Herring <rob.herring@calxeda.com>
+> Assuming we go with your approach, what's the plan? We're actually
+> facing this problem right now for Tegra. Basically we have a DRM driver
+> that can drive the panel, but we're still missing a way to hook up the
+> backlight and panel enabling code. So we effectively can't support any
+> of the LVDS devices out there without this series.
+
+Could you describe the hardware setup you have related to the LCD and
+backlight? Is it a public board with public schematics?
+
+I've understood that you don't have anything special in your board, just
+an LCD and a backlight, and the power sequences are related to powering
+up the LCD and the backlight, without anything board specific. If so,
+there's no need for board specific code, but just improving the panel
+and backlight drivers to support the models you use.
+
+> As I understand it, what you propose is similar to what ASoC does. For a
+> specific board, you'd have to write a driver, presumably for the new
+> panel/display framework, that provides code to power the panel on and
+> off. That means we'll have to have a driver for each panel out there
+> basically, or we'd need to write generic drivers that can be configured
+> to some degree (via platform data or DT). This is similar to how ASoC
+> works, where we have a driver that provides support for a specific codec
+> connected to the Tegra SoC. For the display framework things could be
+> done in a similar way I suppose, so that Tegra could have one display
+> driver to handle all aspects of powering on and off the various panels
+> for the various boards out there.
+
+I think we should only need the board drivers for very special cases. If
+there's just a panel and a backlight, without any special dynamic muxing
+or other trickery needed, I don't see a need for a board driver. I
+presume this is the case for most of the boards.
+
+> Obviously, a lot of the code will be similar for other SoCs, but maybe
+> that's just the way things are if we choose that approach. There's also
+> the potential for factoring out large chunks of common code later on
+> once we start to see common patterns.
 > 
-> Now that the VIC initialization sets up the handle_arch_irq pointer, we
-> can remove it for all machines and make it static.
+> One thing that's not very clear is how the backlight subsystem should be
+> wired up with the display framework. I have a patch on top of the Tegra
+> DRM driver which adds some ad-hoc display support using this power
+> sequences series and the pwm-backlight.
+
+I think that's a separate issue: how to associate the lcd device and
+backlight device together. I don't have a clear answer to this.
+
+There are many ways the backlight may be handled. In some cases the
+panel and the backlight are truly independent, and you can use the other
+without using the other (not very practical, though =).
+
+But then with some LCDs the backlight may be controlled by sending
+commands to the panel, and in this case the two may be quite linked.
+Changing the backlight requires the panel driver to be up and running,
+and sometimes the sending the backlight commands may need to be (say,
+DSI display, with backlight commands going over the DSI bus).
+
+So my feeling is that the panel driver should know about the related
+backlight device. In the first case the panel driver would just call
+enable/disable in the backlight device when the panel is turned on.
+
+In the second case of the DSI panel... I'm not sure. I've implemented it
+so that the panel driver creates the backlight device, and implements
+the backlight callbacks. It then sends the DSI commands from those
+callbacks.
+
+> From reading the proposal for the panel/display framework, it sounds
+> like a lot more is planned than just enabling or disabling panels, but
+> it also seems like a lot of code needs to be written to support things
+> like DSI, DBI or other control busses.
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Hubert Feurstein <hubert.feurstein@contec.at>
-> Cc: Alessandro Rubini <rubini@unipv.it>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
-> Cc: Jamie Iles <jamie@jamieiles.com>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Viresh Kumar <viresh.linux@gmail.com>
-> Cc: Shiraz Hashim <shiraz.hashim@st.com>
-> Cc: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> ---
+> At least for Tegra, and I think the same holds for a wide variety of
+> other SoCs, dumb panels would be enough for a start. In the interest of
+> getting a working solution for those setups, maybe we can start small
+> and add just enough framework to register dumb panel drivers to along
+> with code to wire up a backlight to light up the display. Then we could
+> possibly still make it to have a proper solution to support the various
+> LVDS panels for Tegra with 3.9.
 
-[...]
+Yes, we (Laurent and me) both agree that we should start simple.
 
->  arch/arm/mach-s3c64xx/mach-anw6410.c   |    1 -
->  arch/arm/mach-s3c64xx/mach-crag6410.c  |    1 -
->  arch/arm/mach-s3c64xx/mach-hmt.c       |    1 -
->  arch/arm/mach-s3c64xx/mach-mini6410.c  |    1 -
->  arch/arm/mach-s3c64xx/mach-ncp.c       |    1 -
->  arch/arm/mach-s3c64xx/mach-real6410.c  |    1 -
->  arch/arm/mach-s3c64xx/mach-smartq5.c   |    1 -
->  arch/arm/mach-s3c64xx/mach-smartq7.c   |    1 -
->  arch/arm/mach-s3c64xx/mach-smdk6400.c  |    1 -
->  arch/arm/mach-s3c64xx/mach-smdk6410.c  |    1 -
->  arch/arm/mach-s5p64x0/mach-smdk6440.c  |    1 -
->  arch/arm/mach-s5p64x0/mach-smdk6450.c  |    1 -
->  arch/arm/mach-s5pc100/mach-smdkc100.c  |    1 -
->  arch/arm/mach-s5pv210/mach-aquila.c    |    1 -
->  arch/arm/mach-s5pv210/mach-goni.c      |    1 -
->  arch/arm/mach-s5pv210/mach-smdkc110.c  |    1 -
->  arch/arm/mach-s5pv210/mach-smdkv210.c  |    1 -
->  arch/arm/mach-s5pv210/mach-torbreck.c  |    1 -
+However, the common panel framework is not strictly needed for this. I'm
+not sure of the current architecture for Tegra, but for OMAP we already
+have panel drivers (omap specific ones, though). The panel drivers may
+support multiple models, (for example,
+drivers/video/omap2/displays/panel-generic-dpi.c).
 
-For above s3c64xx, s5p64x0, s5pc100 and s5pv210,
+I don't see any problem with adding small Tegra specific panel drivers
+for the time being, with the intention of converting to common panel
+framework when that's available.
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Of course, the DT side is an issue. If you now create DT bindings for a
+temporary model, and need to change it again later, you'll have some
+headaches trying managing that without breaking the old bindings... This
+is why I haven't pushed DT bindings for OMAP, as I know I have to change
+them in the near future.
 
-Thanks.
+ Tomi
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 897 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121121/a2eab090/attachment.sig>
