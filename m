@@ -1,96 +1,96 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Wed, 21 Nov 2012 16:57:23 +0100
-Subject: [PATCH 6/9] usb: chipidea: add PTW and PTS handling
-In-Reply-To: <87fw495zgh.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
- <1352909950-32555-7-git-send-email-m.grzeschik@pengutronix.de>
- <87zk2h67ik.fsf@ashishki-desk.ger.corp.intel.com>
- <20121116131628.GA21447@pengutronix.de>
- <87lie1659c.fsf@ashishki-desk.ger.corp.intel.com>
- <20121116135743.GB21447@pengutronix.de>
- <87ip9563r8.fsf@ashishki-desk.ger.corp.intel.com>
- <50A651E1.5030001@parrot.com>
- <87fw495zgh.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20121121155723.GA16409@pengutronix.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 21 Nov 2012 16:57:06 +0100
+Subject: [PATCH 2/4] serial: i.MX: Make console support non optional
+In-Reply-To: <1353513428-25697-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20121121155312.GX4398@game.jcrosoft.org>
+ <1353513428-25697-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1353513428-25697-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2012 at 05:39:42PM +0200, Alexander Shishkin wrote:
-> Matthieu CASTET <matthieu.castet@parrot.com> writes:
-> 
-> > Alexander Shishkin a ?crit :
-> >> Michael Grzeschik <mgr@pengutronix.de> writes:
-> >> 
-> >>> On Fri, Nov 16, 2012 at 03:34:23PM +0200, Alexander Shishkin wrote:
-> >>>> Michael Grzeschik <mgr@pengutronix.de> writes:
-> >>>>
-> >>>>> On Fri, Nov 16, 2012 at 02:45:39PM +0200, Alexander Shishkin wrote:
-> >>>>>> Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
-> >>>>>>
-> >>>>>>> This patch makes it possible to configure the PTW and PTS bits inside
-> >>>>>>> the portsc register for host and device mode before the driver starts
-> >>>>>>> and the phy can be addressed as hardware implementation is designed.
-> >>>>>>>
-> >>>>>>> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> >>>>>>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> >>>>>>> ---
-> >>>>>>>  drivers/usb/chipidea/bits.h        |    3 +++
-> >>>>>>>  drivers/usb/chipidea/ci.h          |    2 ++
-> >>>>>>>  drivers/usb/chipidea/ci13xxx_imx.c |    1 +
-> >>>>>>>  drivers/usb/chipidea/core.c        |   47 ++++++++++++++++++++++++++++++++++++
-> >>>>>>>  drivers/usb/chipidea/host.c        |    4 +++
-> >>>>>>>  include/linux/usb/chipidea.h       |    9 +++++++
-> >>>>>>>  6 files changed, 66 insertions(+)
-> >>>>>>>
-> >>>>>>> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-> >>>>>>> index 4b6ae3e..3cded5f 100644
-> >>>>>>> --- a/drivers/usb/chipidea/bits.h
-> >>>>>>> +++ b/drivers/usb/chipidea/bits.h
-> >>>>>>> @@ -48,6 +48,9 @@
-> >>>>>>>  #define PORTSC_SUSP           BIT(7)
-> >>>>>>>  #define PORTSC_HSP            BIT(9)
-> >>>>>>>  #define PORTSC_PTC            (0x0FUL << 16)
-> >>>>>>> +#define PORTSC_PTS            (BIT(31) | BIT(30))
-> >>>>>>> +#define PORTSC_PTW            BIT(28)
-> >>>>>>> +#define PORTSC_STS            BIT(29)
-> >>>>>> Hm, my spec says these are actually in DEVLC register and only have this
-> >>>>>> meaning in device mode. And in portsc these bits fall in device address
-> >>>>>> bitfield. Can you refer me to your spec?
-> >>>>> You can find it here:
-> >>>>> http://cache.freescale.com/files/32bit/doc/ref_manual/iMX53RM.pdf?fpsp=1
-> >>>>> Page 4947
-> >>>> Oh, but see, the offset is 0x184, which in chipidea spec (the version
-> >>>> that I have) corresponds to DEVLC and not PORTSC. So in this driver's
-> >>>> terminology it's DEVLC too, at least currently.
-> >>>>
-> >>>> So have you tested this code and did it make any difference?
-> >>> Yes, i have tested this code with MX25, MX28, MX35 and MX53. In every
-> >>> SoCs Datasheet the PORTSC register is defined on PORTBASE+0x184. Without
-> >>> this proper configuration its not possible to communicate with the PHY.
-> >> 
-> >> No, I mean, you're writing DEVLC (using present driver's terminology)
-> >> bits to PORTSC register. It *shouldn't* work. I suppose, it does
-> >> something, but not exactly what you intended.
-> >> 
-> > I confirm in our datasheet we have PTW, PTS, STS in this register  PORTSCx with
-> > this mapping.
-> >
-> > In later design that support lpm, these bits have to move in another register
-> > because ehci 1.1 use them [1].
-> 
-> Ahh, I didn't realize imxes were nolpm. Now it makes more sense. This
-> means that, as you suggested in the other mail, these portsc/devlc
-> accesses should be done conditionally based on ci->hw_bank.lpm.
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-To handle lpm devices in this patch, we need some register layout of the
-lpm core. Probably only te DEVLC register. Is there some documentation
-available?
+Traditionally console support is optional for serial drivers. This
+makes it non optional for the i.MX driver since it's not worth
+asking questions for a feature virtually every user of this driver
+wants to have.
 
-Regards,
-Michael
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: linux-serial at vger.kernel.org
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: kernel at pengutronix.de
+Cc: Alan Cox <alan@linux.intel.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/tty/serial/Kconfig |   16 +---------------
+ drivers/tty/serial/imx.c   |    8 +-------
+ 2 files changed, 2 insertions(+), 22 deletions(-)
 
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index b176801..10e5eec 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -541,26 +541,12 @@ config SERIAL_IMX
+ 	bool "IMX serial port support"
+ 	depends on ARCH_MXC
+ 	select SERIAL_CORE
++	select SERIAL_CORE_CONSOLE
+ 	select RATIONAL
+ 	help
+ 	  If you have a machine based on a Motorola IMX CPU you
+ 	  can enable its onboard serial port by enabling this option.
+ 
+-config SERIAL_IMX_CONSOLE
+-	bool "Console on IMX serial port"
+-	depends on SERIAL_IMX
+-	select SERIAL_CORE_CONSOLE
+-	help
+-	  If you have enabled the serial port on the Motorola IMX
+-	  CPU you can make it the console by answering Y to this option.
+-
+-	  Even if you say Y here, the currently visible virtual console
+-	  (/dev/tty0) will still be used as the system console by default, but
+-	  you can alter that using a kernel command line option such as
+-	  "console=ttySA0". (Try "man bootparam" or see the documentation of
+-	  your boot loader (lilo or loadlin) about how to pass options to the
+-	  kernel at boot time.)
+-
+ config SERIAL_UARTLITE
+ 	tristate "Xilinx uartlite serial port support"
+ 	depends on PPC32 || MICROBLAZE || MFD_TIMBERDALE
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 5981912..07a8ca1 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -1192,7 +1192,6 @@ static struct uart_ops imx_pops = {
+ 
+ static struct imx_port *imx_ports[UART_NR];
+ 
+-#ifdef CONFIG_SERIAL_IMX_CONSOLE
+ static void imx_console_putchar(struct uart_port *port, int ch)
+ {
+ 	struct imx_port *sport = (struct imx_port *)port;
+@@ -1348,11 +1347,6 @@ static struct console imx_console = {
+ 	.data		= &imx_reg,
+ };
+ 
+-#define IMX_CONSOLE	&imx_console
+-#else
+-#define IMX_CONSOLE	NULL
+-#endif
+-
+ static struct uart_driver imx_reg = {
+ 	.owner          = THIS_MODULE,
+ 	.driver_name    = DRIVER_NAME,
+@@ -1360,7 +1354,7 @@ static struct uart_driver imx_reg = {
+ 	.major          = SERIAL_IMX_MAJOR,
+ 	.minor          = MINOR_START,
+ 	.nr             = ARRAY_SIZE(imx_ports),
+-	.cons           = IMX_CONSOLE,
++	.cons           = &imx_console,
+ };
+ 
+ static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.10.4
