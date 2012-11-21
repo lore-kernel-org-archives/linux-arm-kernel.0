@@ -1,55 +1,72 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 21 Nov 2012 16:42:56 +0000
-Subject: [PATCH] ARM: kernel: fix nr_cpu_ids check in DT logical map init
-Message-ID: <1353516176-12929-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 21 Nov 2012 16:44:04 +0000
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <20121121013133.GE4673@opensource.wolfsonmicro.com>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
+ <20121120215429.B621F3E1821@localhost>
+ <20121121013133.GE4673@opensource.wolfsonmicro.com>
+Message-ID: <20121121164404.E04EF3E0AE2@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a kernel is configured with a DT containing more /cpu nodes than
-nr_cpu_ids, the number of cpus must be capped in the DT parsing
-code. Current code carries out the check, but fails to cap the
-value and the check is executed after the cpu logical index is used,
-which can lead to memory corruption due to index overflow.
+On Wed, 21 Nov 2012 10:31:34 +0900, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Nov 20, 2012 at 09:54:29PM +0000, Grant Likely wrote:
+> > On Sat, 17 Nov 2012 19:55:45 +0900, Alexandre Courbot <acourbot@nvidia.com> wrote:
+> 
+> > > With the advent of the device tree and of ARM kernels that are not
+> > > board-tied, we cannot rely on these board-specific hooks anymore but
+> 
+> > This isn't strictly true. It is still perfectly fine to have board
+> > specific code when necessary. However, there is strong encouragement to
+> > enable that code in device drivers as much as possible and new board
+> > files need to have very strong justification.
+> 
+> This isn't the message that's gone over, and even for device drivers
+> everyone seems to be taking the whole device tree thing as a move to
+> pull all data out of the kernel.  In some cases there are some real
+> practical advantages to doing this but a lot of the people making these
+> changes seem to view having things in DT as a goal in itself.
 
-This patch refactors the check against nr_cpu_ids and move it before
-any computed index is used in the parsing code.
+I know, and I do apologize for my part in not communicating and
+shepherding enough. For anyone reading; please be pragmatic on putting
+things into the DT. If a binding starts to look really complex, ask
+whether or not it helps things.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Reported-by: Mark Rutland <mark.rutland@arm.com>
----
-Russell,
+> > I'm thinking about the scripts as trivial-to-parse ascii strings that
+> > have a very simple set of commands. The commands use resources already
+> > defined in the node. ie. 'g0' refers to the first entry in the gpios
+> > property. 'r0' for the regulator, 'p0' for the pwms, 'd' means delay. By
+> > no means take this as the format to use, it is just an example off the
+> > top of my head, but it is already way easier to work with than putting
+> > each command into a node.
+> 
+> It does appear to have some legibility challenges, especially with using
+> the indexes into the arrays of resources.  On the other hand the arrays
+> should be fairly small.
 
-while refactoring the DT loop over nodes, I unfortunately missed this niggle
-in the parsing loop that Mark reported. Here is the fix, sorry for the
-additional commit, if it is ok for you I will add it to your patch system.
+This is merely an example off the top of my head. I'm in no way wed to
+the syntax.
 
-Apologies and thanks,
-Lorenzo
+> > > +Platform Data Format
+> > > +--------------------
+> > > +All relevant data structures for declaring power sequences are located in
+> > > +include/linux/power_seq.h.
+> 
+> > Hmm... If sequences are switched to a string instead, then platform_data
+> > should also use it. The power sequence data structures can be created at
+> > runtime by parsing the string.
+> 
+> Seems like a step backwards to me - why not let people store the more
+> parsed version of the data?  It's going to be less convenient for users
+> on non-DT systems.
+> 
+> As I said in my earlier reviews I think this is a useful thing to have
+> as a utility library for drivers independantly of the DT bindings, it
+> would allow drivers to become more data driven.  Perhaps we can rework
+> the series so that the DT bindings are added as a final patch?  All the
+> rest of the code seems OK.
 
- arch/arm/kernel/devtree.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+I'm fine with that if the bindings don't get merged yet.
 
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index aaf9add..70f1bde 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -139,10 +139,14 @@ void __init arm_dt_init_cpu_maps(void)
- 			i = cpuidx++;
- 		}
- 
--		tmp_map[i] = hwid;
--
--		if (cpuidx > nr_cpu_ids)
-+		if (WARN(cpuidx > nr_cpu_ids, "DT /cpu %u nodes greater than "
-+					       "max cores %u, capping them\n",
-+					       cpuidx, nr_cpu_ids)) {
-+			cpuidx = nr_cpu_ids;
- 			break;
-+		}
-+
-+		tmp_map[i] = hwid;
- 	}
- 
- 	if (WARN(!bootcpu_valid, "DT missing boot CPU MPIDR[23:0], "
--- 
-1.7.12
+g.
