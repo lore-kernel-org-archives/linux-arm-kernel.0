@@ -1,26 +1,65 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 21 Nov 2012 10:33:57 -0700
-Subject: [PATCH] ARM: Kirkwood: Update PCI-E fixup
-In-Reply-To: <20121121160555.0710e048@skate>
-References: <20121121071906.GF19837@obsidianresearch.com>
- <20121121160555.0710e048@skate>
-Message-ID: <20121121173357.GC6406@obsidianresearch.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 21 Nov 2012 18:41:00 +0100
+Subject: [PATCH] ARM: Kirkwood: Use hw_pci.ops instead of hw_pci.scan
+In-Reply-To: <20121121071511.GE19837@obsidianresearch.com>
+References: <20121121071511.GE19837@obsidianresearch.com>
+Message-ID: <20121121174100.GA9177@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 04:05:55PM +0100, Thomas Petazzoni wrote:
-> Dear Jason Gunthorpe,
+On Wed, Nov 21, 2012 at 12:15:11AM -0700, Jason Gunthorpe wrote:
+> The kirkwood_pcie_scan_bus function duplicates the common code in
+> bios32.c, passing ops in will use the common code..
 > 
-> On Wed, 21 Nov 2012 00:19:06 -0700, Jason Gunthorpe wrote:
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> ---
+>  arch/arm/mach-kirkwood/pcie.c |   18 +-----------------
+>  1 files changed, 1 insertions(+), 17 deletions(-)
 > 
-> > +/* The root complex has a hardwired class of PCI_CLASS_MEMORY_OTHER, when it
-> > +   is operating as a root complex this needs to be switched to
-> > +   PCI_CLASS_BRIDGE_HOST or Linux will errantly try to process the BAR's on
-> > +   the device. Decoding setup is handled by the orion code. */
-> 
-> Sorry for this unique silly review comment, but this comment does not
-> comply with the kernel CodingStyle for multicomments. It should be:
+> Just a little clean up I found while reviewing the PCI-E code.
 
-Ok! Though I'm surprised checkpatch didn't complain?
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Jason
+	  Andrew
+
+> 
+> diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
+> index ec54491..d5aedf6 100644
+> --- a/arch/arm/mach-kirkwood/pcie.c
+> +++ b/arch/arm/mach-kirkwood/pcie.c
+> @@ -224,22 +224,6 @@ static void __devinit rc_pci_fixup(struct pci_dev *dev)
+>  }
+>  DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MARVELL, PCI_ANY_ID, rc_pci_fixup);
+>  
+> -static struct pci_bus __init *
+> -kirkwood_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+> -{
+> -	struct pci_bus *bus;
+> -
+> -	if (nr < num_pcie_ports) {
+> -		bus = pci_scan_root_bus(NULL, sys->busnr, &pcie_ops, sys,
+> -					&sys->resources);
+> -	} else {
+> -		bus = NULL;
+> -		BUG();
+> -	}
+> -
+> -	return bus;
+> -}
+> -
+>  static int __init kirkwood_pcie_map_irq(const struct pci_dev *dev, u8 slot,
+>  	u8 pin)
+>  {
+> @@ -251,8 +235,8 @@ static int __init kirkwood_pcie_map_irq(const struct pci_dev *dev, u8 slot,
+>  
+>  static struct hw_pci kirkwood_pci __initdata = {
+>  	.setup		= kirkwood_pcie_setup,
+> -	.scan		= kirkwood_pcie_scan_bus,
+>  	.map_irq	= kirkwood_pcie_map_irq,
+> +	.ops            = &pcie_ops,
+>  };
+>  
+>  static void __init add_pcie_port(int index, void __iomem *base)
+> -- 
+> 1.7.4.1
+> 
