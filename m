@@ -1,39 +1,124 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Nov 2012 08:39:39 +0100
-Subject: [PATCH] gpiolib: let gpiochip_add_pin_range() specify offset
-In-Reply-To: <50ABBCD7.3000006@wwwdotorg.org>
-References: <1353411953-27423-1-git-send-email-linus.walleij@stericsson.com>
- <50ABBCD7.3000006@wwwdotorg.org>
-Message-ID: <CACRpkdZmeCKxXaEkf1GPP9ivNZmGc4TNz4-k1pDBAGpnTxhJGA@mail.gmail.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Wed, 21 Nov 2012 13:10:44 +0530
+Subject: [PATCH v3] pwm: Device tree support for PWM polarity.
+Message-ID: <1353483644-32711-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 6:24 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 11/20/2012 04:45 AM, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> Like with commit 3c739ad0df5eb41cd7adad879eda6aa09879eb76
->> it is not always enough to specify all the pins of a gpio_chip
->> from offset zero to be added to a pin map range, since the
->> mapping from GPIO to pin controller may not be linear at all,
->> but need to be broken into a few consecutive sub-ranges or
->> 1-pin entries for complicated cases. The ranges may also be
->> sparse.
->>
->> This alters the signature of the function to accept offsets
->> into both the GPIO-chip local pinspace and the pin controller
->> local pinspace.
->
-> Reviewed-by: Stephen Warren <swarren@nvidia.com>
->
-> Although perhaps rename the new "offset" parameter to "gpio_base" or
-> "gpio_offset", just like the existing "pin_base" rather than
-> pin/base/offset?
+Add support for encoding PWM properties in bit encoded form with
+of_pwm_xlate_with_flags() function support. Platforms require platform
+specific PWM properties has to populate in 3rd cell of the pwm-specifier
+and PWM driver should also set .of_xlate support with this function.
+Currently PWM property polarity encoded in bit position 0 of the third
+cell in pwm-specifier.
 
-OK I'll rename it...
+Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
+---
+Changes since v2:
+	- Move PWM_SPEC_POLARITY to core.c
+	- Remove dummy function
 
-I've also made a fat notice that this isn't currently covered
-by the OF GPIO range bindings as a follow-on patch.
+Changes since v1:
+	- of_pwm_xlate_with_flags function support added.
+	- Documentation update
 
-Thanks,
-Linus Walleij
+:100644 100644 73ec962... 04b0dc4... M	Documentation/devicetree/bindings/pwm/pwm.txt
+:100644 100644 f5acdaa... 780cb6b... M	drivers/pwm/core.c
+:100644 100644 112b314... 6d661f3... M	include/linux/pwm.h
+ Documentation/devicetree/bindings/pwm/pwm.txt |   18 +++++++++++++--
+ drivers/pwm/core.c                            |   28 +++++++++++++++++++++++++
+ include/linux/pwm.h                           |    3 ++
+ 3 files changed, 46 insertions(+), 3 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/pwm/pwm.txt b/Documentation/devicetree/bindings/pwm/pwm.txt
+index 73ec962..04b0dc4 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm.txt
+@@ -37,10 +37,22 @@ device:
+ 		pwm-names = "backlight";
+ 	};
+ 
++Note that in the example above, specifying the "pwm-names" is redundant
++because the name "backlight" would be used as fallback anyway.
++
+ pwm-specifier typically encodes the chip-relative PWM number and the PWM
+-period in nanoseconds. Note that in the example above, specifying the
+-"pwm-names" is redundant because the name "backlight" would be used as
+-fallback anyway.
++period in nanoseconds.
++
++Optionally, the pwm-specifier can encode a number of flags in a third cell:
++- bit 0: PWM signal polarity (0: normal polarity, 1: inverse polarity)
++
++Example with optional PWM specifier for inverse polarity
++
++	bl: backlight {
++		pwms = <&pwm 0 5000000 1>;
++		pwm-names = "backlight";
++	};
++
+ 
+ 2) PWM controller nodes
+ -----------------------
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index f5acdaa..780cb6b 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -32,6 +32,9 @@
+ 
+ #define MAX_PWMS 1024
+ 
++/* flags in the third cell of the DT PWM specifier */
++#define PWM_SPEC_POLARITY	(1 << 0)
++
+ static DEFINE_MUTEX(pwm_lookup_lock);
+ static LIST_HEAD(pwm_lookup_list);
+ static DEFINE_MUTEX(pwm_lock);
+@@ -129,6 +132,31 @@ static int pwm_device_request(struct pwm_device *pwm, const char *label)
+ 	return 0;
+ }
+ 
++struct pwm_device *
++of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
++{
++	struct pwm_device *pwm;
++
++	if (pc->of_pwm_n_cells < 3)
++		return ERR_PTR(-EINVAL);
++
++	if (args->args[0] >= pc->npwm)
++		return ERR_PTR(-EINVAL);
++
++	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
++	if (IS_ERR(pwm))
++		return pwm;
++
++	pwm_set_period(pwm, args->args[1]);
++
++	if (args->args[2] & PWM_SPEC_POLARITY)
++		pwm_set_polarity(pwm, PWM_POLARITY_INVERSED);
++	else
++		pwm_set_polarity(pwm, PWM_POLARITY_NORMAL);
++
++	return pwm;
++}
++
+ static struct pwm_device *
+ of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
+ {
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index 112b314..6d661f3 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -171,6 +171,9 @@ struct pwm_device *pwm_request_from_chip(struct pwm_chip *chip,
+ 					 unsigned int index,
+ 					 const char *label);
+ 
++struct pwm_device *of_pwm_xlate_with_flags(struct pwm_chip *pc,
++		const struct of_phandle_args *args);
++
+ struct pwm_device *pwm_get(struct device *dev, const char *consumer);
+ void pwm_put(struct pwm_device *pwm);
+ 
+-- 
+1.7.0.4
