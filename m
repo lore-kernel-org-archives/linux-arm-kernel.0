@@ -1,79 +1,29 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 21 Nov 2012 09:48:56 +0100
-Subject: [PATCH v2] can: c_can: Add d_can raminit support
-In-Reply-To: <1353476650-24398-1-git-send-email-anilkumar@ti.com>
-References: <1353476650-24398-1-git-send-email-anilkumar@ti.com>
-Message-ID: <50AC9578.4030505@pengutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Nov 2012 00:50:56 -0800
+Subject: [GIT PULL 1/3] ARM: bcm2835: cleanup
+In-Reply-To: <1353124957-23808-1-git-send-email-swarren@wwwdotorg.org>
+References: <1353124957-23808-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20121121085056.GP7615@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2012 06:44 AM, AnilKumar Ch wrote:
-> Add D_CAN raminit support to C_CAN driver to enable D_CAN RAM,
-> which holds all the message objects during transmission or
-> receiving of data. This initialization/de-initialization should
-> be done in synchronous with D_CAN clock.
+On Fri, Nov 16, 2012 at 09:02:35PM -0700, Stephen Warren wrote:
+> Just a few minor/trivial cleanups.
 > 
-> In case of AM335X-EVM (current user of D_CAN driver) message RAM is
-> controlled through control module register for both instances. So
-> control module register details is required to initialization or
-> de-initialization of message RAM according to instance number.
+> ----------------------------------------------------------------
 > 
-> Control module memory resource is obtained from D_CAN dt node and
-> instance number obtained from device tree aliases node.
+> The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
 > 
-> This patch was tested on AM335x-EVM along with pinctrl data addition
-> patch, d_can dt aliases addition and control module data addition.
-> pinctrl data addition is not added to am335x-evm.dts (only supports
-> CPLD profile#0) because d_can1 is supported under CPLD profile#1.
+>   Linux 3.7-rc2
 > 
-> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-> ---
-
-[...]
-
-> @@ -178,6 +195,20 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
->  		priv->can.ctrlmode_supported |= CAN_CTRLMODE_3_SAMPLES;
->  		priv->read_reg = c_can_plat_read_reg_aligned_to_16bit;
->  		priv->write_reg = c_can_plat_write_reg_aligned_to_16bit;
-> +
-> +		if (pdev->dev.of_node)
-> +			priv->instance = pdev->id < 0 ?
-> +				of_alias_get_id(pdev->dev.of_node, "d_can") :
-> +				pdev->id;
-
-This wouldn't work with non DT kernels, what about:
-
-if (pdev->dev.of_node)
-	priv->instance = of_alias_get_id(pdev->dev.of_node, "d_can");
-else
-	priv->instance = pdev->id;
-
-Marc
-> +
-> +		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +		priv->raminit_ctrlreg =
-> +				devm_request_and_ioremap(&pdev->dev, res);
-> +		if (!priv->raminit_ctrlreg || priv->instance < 0) {
-> +			dev_info(&pdev->dev, "control memory is not used for raminit\n");
-> +			break;
-> +		}
-> +		priv->ram_init = c_can_hw_raminit;
->  		break;
->  	default:
->  		ret = -EINVAL;
+> are available in the git repository at:
 > 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git bcm2835-for-3.8-cleanup
+
+I think you meant linux-rpi.git here, at least that's where I found the tags in
+question.
+
+Pulled 1-3 from there though. Thanks!
 
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 261 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121121/54fc9e3c/attachment.sig>
+-Olof
