@@ -1,54 +1,47 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 21 Nov 2012 12:55:24 -0800
-Subject: [PATCH 0/2] ARM: OMAP: ads7846: fix pendown debounce setting
-In-Reply-To: <20121121190929.GF18567@atomide.com>
-References: <1353341038-14381-1-git-send-email-grinberg@compulab.co.il>
- <20121120082136.GB28115@core.coreip.homeip.net>
- <20121121190929.GF18567@atomide.com>
-Message-ID: <20121121205524.GB25470@core.coreip.homeip.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 21 Nov 2012 16:06:33 -0500
+Subject: [PATCH] arm: orion5x: convert Netgear WNR854T to device tree
+In-Reply-To: <20121120122828.GO22106@titan.lakedaemon.net>
+References: <1353342451-27180-1-git-send-email-kaloz@openwrt.org>
+ <20121119204641.GK22106@titan.lakedaemon.net>
+ <op.wn19dwpw2s3iss@ecaz>
+ <20121120122828.GO22106@titan.lakedaemon.net>
+Message-ID: <20121121210633.GF15800@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 11:09:30AM -0800, Tony Lindgren wrote:
-> * Dmitry Torokhov <dmitry.torokhov@gmail.com> [121120 00:23]:
-> > On Mon, Nov 19, 2012 at 06:03:56PM +0200, Igor Grinberg wrote:
-> > > Commit 97ee9f01 (ARM: OMAP: fix the ads7846 init code) have enabled the
-> > > pendown GPIO debounce time setting by the below sequence:
-> > > 
-> > >   gpio_request_one()
-> > >   gpio_set_debounce()
-> > >   gpio_free()
-> > > 
-> > > It also revealed a bug in the OMAP GPIO handling code which prevented
-> > > the GPIO debounce clock to be disabled and CORE transition to low power
-> > > states.
-> > > 
-> > > Commit c9c55d9 (gpio/omap: fix off-mode bug: clear debounce settings on
-> > > free/reset) fixes the OMAP GPIO handling code by making sure that the
-> > > GPIO debounce clock gets disabled if no GPIO is requested from current
-> > > bank.
-> > > 
-> > > While fixing the OMAP GPIO handling code (in the right way), the above
-> > > commit makes the gpio_request->set_debounce->free sequence invalid as
-> > > after freeing the GPIO, the debounce settings are lost.
-> > > 
-> > > This patch set:
-> > > 1) Adds the pendown GPIO debounce time setting to the platform data
-> > >    structure of the ads7846 driver.
-> > > 2) Fixes the OMAP platform code to pass the debounce time value
-> > >    to the driver instead of handling it by itself.
-> > > 
-> > > Igor Grinberg (2):
-> > >   ads7846: enable pendown GPIO debounce time setting
-> > >   ARM: OMAP: ads7846: fix pendown debounce setting
-> > > 
+On Tue, Nov 20, 2012 at 07:28:28AM -0500, Jason Cooper wrote:
+> On Tue, Nov 20, 2012 at 08:21:22AM +0100, Imre Kaloz wrote:
+> > Jason,
 > > 
-> > Makes sense to me. Tony, I have some stuff to push for 3.7 final, mind
-> > if I pick OMAP change as well?
+> > On Mon, 19 Nov 2012 21:46:41 +0100, Jason Cooper <jason@lakedaemon.net> wrote:
+> > 
+> > >On Mon, Nov 19, 2012 at 05:27:31PM +0100, Imre Kaloz wrote:
+> > >>This commit converts the Netgear WNR854T to device tree
+> > >>
+> > >>Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+> > >>---
+> > >> arch/arm/boot/dts/Makefile                    |    3 +-
+> > >> arch/arm/boot/dts/orion5x-netgear-wnr854t.dts |   83 +++++++++++++++++++++++++
+> > >> arch/arm/mach-orion5x/Kconfig                 |    7 +-
+> > >> arch/arm/mach-orion5x/Makefile                |    2 +-
+> > >> arch/arm/mach-orion5x/board-dt.c              |    3 +
+> > >> arch/arm/mach-orion5x/common.h                |    5 ++
+> > >> arch/arm/mach-orion5x/wnr854t-setup.c         |   59 +-----------------
+> > >> 7 files changed, 99 insertions(+), 63 deletions(-)
+> > >> create mode 100644 arch/arm/boot/dts/orion5x-netgear-wnr854t.dts
+> > >
+> > >One last thing, could you use savedefconfig and update orion5x_defconfig
+> > >to include your new board?  It can be a part of the same patch.
+> > 
+> > Would you prefer it to be included in this one or in a later patch if I'm done adding some more boards?
 > 
-> No please go ahead, I just acked the related patch.
+> All in one.  It prevents chicken-egg merge conflicts on my end. :)
 
-Thanks Tony.
+Sorry, I should have read more carefully.  I meant you should do one
+patch per board, and each patch should include updating defconfig for
+that board.
 
--- 
-Dmitry
+thx,
+
+Jason.
