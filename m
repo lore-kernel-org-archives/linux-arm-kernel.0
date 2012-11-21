@@ -1,50 +1,51 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 20 Nov 2012 15:27:27 -0500
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <20121120113325.dde266ed.akpm@linux-foundation.org>
-References: <20121119144826.f59667b2.akpm@linux-foundation.org>
- <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
- <20121120113325.dde266ed.akpm@linux-foundation.org>
-Message-ID: <20121120202727.GE22106@titan.lakedaemon.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 21 Nov 2012 09:14:57 +0900
+Subject: [RFC 09/15] ARM: shmobile: Include DTSI of r8a7740 to
+ armadillo800eva
+In-Reply-To: <2217502.K9pLuGzWaC@avalon>
+References: <1353302007-31045-1-git-send-email-horms@verge.net.au>
+ <1353302007-31045-10-git-send-email-horms@verge.net.au>
+ <2217502.K9pLuGzWaC@avalon>
+Message-ID: <20121121001457.GG20120@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 11:33:25AM -0800, Andrew Morton wrote:
-> On Tue, 20 Nov 2012 15:31:45 +0100
-> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+On Tue, Nov 20, 2012 at 01:45:20PM +0100, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> > dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag,
-> > regardless the flags provided by the caller. This causes excessive
-> > pruning of emergency memory pools without any good reason. Additionaly,
-> > on ARM architecture any driver which is using dmapools will sooner or
-> > later  trigger the following error: 
-> > "ERROR: 256 KiB atomic DMA coherent pool is too small!
-> > Please increase it with coherent_pool= kernel parameter!".
-> > Increasing the coherent pool size usually doesn't help much and only
-> > delays such error, because all GFP_ATOMIC DMA allocations are always
-> > served from the special, very limited memory pool.
+> Thank you for the patch.
+> 
+> On Monday 19 November 2012 14:13:21 Simon Horman wrote:
+> > From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 > > 
+> > Cc: Magnus Damm <damm@opensource.se>
+> > Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+> > Signed-off-by: Simon Horman <horms@verge.net.au>
 > 
-> Is this problem serious enough to justify merging the patch into 3.7? 
-> And into -stable kernels?
+> I came up today with pretty much the same patch :-)
+> 
+> > ---
+> >  arch/arm/boot/dts/r8a7740-armadillo800eva.dts |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+> > b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts index a7505a9..a8e7bd9
+> > 100644
+> > --- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+> > +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+> > @@ -9,7 +9,7 @@
+> >   */
+> > 
+> >  /dts-v1/;
+> > -/include/ "skeleton.dtsi"
+> > +/include/ "r8a7740.dtsi"
+> > 
+> >  / {
+> >  	model = "armadillo 800 eva";
+> 
+> Shouldn't the compatible property be modified to the following values ?
+> 
+> 	compatible = "renesas,armadillo800eva", "renesas,r8a7740";
 
-kirkwood and orion5x currently have the following code in their early
-init:
-
-/*
- * Some Kirkwood devices allocate their coherent buffers from atomic
- * context. Increase size of atomic coherent pool to make sure such the
- * allocations won't fail.
- */
-init_dma_coherent_pool_size(SZ_1M);
-
-We have a pending patch to do the same for mvebu (new armv7 Marvell
-SoCs).  There is at least one reported real world case where even the
-above isn't sufficient [1].
-
-thx,
-
-Jason.
-
-[1] http://www.spinics.net/lists/arm-kernel/msg205495.html
+To be honest, I'm not sure.
+But as this is a dts file for a board "renesas,r8a7740" seems strange to me.
