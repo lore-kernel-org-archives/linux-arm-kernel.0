@@ -1,41 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Nov 2012 11:09:08 +0100
-Subject: [PATCH V4 1/3] of: introduce for_each_matching_node_and_match()
-In-Reply-To: <CACxGe6u5UBqVPrBqwn9rhjuBx4uCuuHKU=FcvSp0GJ2G8ogSNQ@mail.gmail.com>
-References: <1353453142-4973-1-git-send-email-swarren@wwwdotorg.org>
- <201211210953.20552.arnd@arndb.de>
- <CACxGe6u5UBqVPrBqwn9rhjuBx4uCuuHKU=FcvSp0GJ2G8ogSNQ@mail.gmail.com>
-Message-ID: <20121121110908.64bc74cd@skate>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 21 Nov 2012 11:11:56 +0100
+Subject: [PULL pinctrl-for 3.8] at91 update
+In-Reply-To: <CACRpkdbyEtwM+O3aw8rAC2r+4z4SYC9MH-B0PGHcnnR46V5hig@mail.gmail.com>
+References: <20121120214424.GP4398@game.jcrosoft.org>
+ <CACRpkdbyEtwM+O3aw8rAC2r+4z4SYC9MH-B0PGHcnnR46V5hig@mail.gmail.com>
+Message-ID: <50ACA8EC.5090400@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Wed, 21 Nov 2012 10:06:16 +0000, Grant Likely wrote:
-> On Wed, Nov 21, 2012 at 9:53 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 20 November 2012, Stephen Warren wrote:
-> >> However, this results in iterating over table twice; the second time
-> >> inside of_match_node(). The implementation of for_each_matching_node()
-> >> already found the match, so this is redundant. Invent new function
-> >> of_find_matching_node_and_match() and macro
-> >> for_each_matching_node_and_match() to remove the double iteration,
-> >> thus transforming the above code to:
-> >>
-> >>     for_each_matching_node_and_match(np, table, &match)
-> >>
-> >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> >
-> > This look useful, but I wonder if the interface would make more sense if you
-> > make the last argument to the macro a normal pointer, rather than a
-> > pointer-to-pointer. You can take the reference as part of the macro.
+On 11/21/2012 10:53 AM, Linus Walleij :
+> On Tue, Nov 20, 2012 at 10:44 PM, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
 > 
-> To me that makes for harder to understand code. It *looks* like an
-> argument to a normal function call, but it gets changed by the caller.
+>> Hi Linus,
+>>
+>>         this pull go over the pinctrl at91 branch
+>>
+>>         This contain pinctrl ond dt that depends on
+>>
+>> The following changes since commit f6f94f6660dbe34039e5c86a46c7845589e7ee0c:
+>>
+>>   pinctrl: at91: Staticize non-exported symbols (2012-11-05 14:30:45 +0100)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/at91linux/linux-at91.git delivery/pinctrl-at91-3.8
+> 
+> OK I branched off my earlier at91 branch merge, pulled this in
+> (no conflicts) and then merged that new at91 branch into
+> my devel HEAD, and magically it just works, thanks
+> Jean-Christophe!
+> 
+> (I guess Nicolas is fine with me merging these patches too, else
+> he gets to say it now :-)
 
-Agreed. Too much magic is too much.
+Absolutely, Jean-Christophe told me about his plans to merge some
+DT/boards code through your tree.
 
-Thomas
+Thanks for your help with this big step for us (AT91 folks)!
+
+Bye Linus,
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Nicolas Ferre
