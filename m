@@ -1,46 +1,20 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 21 Nov 2012 16:57:08 +0100
-Subject: [PATCH 4/4] tty: Atmel serial: add linux,stdout-path support
-In-Reply-To: <1353513428-25697-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20121121155312.GX4398@game.jcrosoft.org>
- <1353513428-25697-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1353513428-25697-4-git-send-email-plagnioj@jcrosoft.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 21 Nov 2012 16:59:46 +0100
+Subject: [PATCH] Dove: Attempt to fix PMU/RTC interrupts
+In-Reply-To: <20121118162944.GV3290@n2100.arm.linux.org.uk>
+References: <20121118162944.GV3290@n2100.arm.linux.org.uk>
+Message-ID: <20121121155946.GU10259@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: linux-serial at vger.kernel.org
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: kernel at pengutronix.de
-Cc: Alan Cox <alan@linux.intel.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/tty/serial/atmel_serial.c |    5 +++++
- 1 file changed, 5 insertions(+)
+On Sun, Nov 18, 2012 at 04:29:44PM +0000, Russell King - ARM Linux wrote:
+> Fix the acknowledgement of PMU interrupts on Dove: some Dove hardware
+> has not been sensibly designed so that interrupts can be handled in a
+> race free manner.  The PMU is one such instance.
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 5608b6b..f62a3c3 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1427,6 +1427,7 @@ static struct uart_ops atmel_pops = {
- static void __devinit atmel_of_init_port(struct atmel_uart_port *atmel_port,
- 					 struct device_node *np)
- {
-+	char *option = NULL;
- 	u32 rs485_delay[2];
- 
- 	/* DMA/PDC usage specification */
-@@ -1453,6 +1454,10 @@ static void __devinit atmel_of_init_port(struct atmel_uart_port *atmel_port,
- 
- 		if (of_get_property(np, "linux,rs485-enabled-at-boot-time", NULL))
- 			rs485conf->flags |= SER_RS485_ENABLED;
-+	} else if (of_device_is_stdout_path(np, &option)) {
-+		pr_info("add preferred console %s%d option=%s\n",
-+			ATMEL_DEVICENAME, atmel_port->uart.line, option);
-+		add_preferred_console(ATMEL_DEVICENAME, atmel_port->uart.line, option);
- 	}
- }
- 
--- 
-1.7.10.4
+Hi Russel
+
+I checked with Marvell. They confirmed there is no race free way to
+clear these interrupts :-(
+
+   Andrew
