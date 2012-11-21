@@ -1,57 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 21 Nov 2012 09:58:27 +0100
-Subject: [PATCH 2/2] ARM: dts: mxs: add oled support for the cfa-10036
-In-Reply-To: <1351674774-2891-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1351674774-2891-1-git-send-email-maxime.ripard@free-electrons.com>
- <1351674774-2891-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <50AC97B3.5070709@free-electrons.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 21 Nov 2012 10:02:31 +0100
+Subject: [PATCH] ARM: Kirkwood: Use hw_pci.ops instead of hw_pci.scan
+In-Reply-To: <20121121071511.GE19837@obsidianresearch.com>
+References: <20121121071511.GE19837@obsidianresearch.com>
+Message-ID: <20121121090231.GT10259@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
-
-Hi Shawn,
-
-Le 31/10/2012 10:12, Maxime Ripard a ?crit :
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com> Cc:
-> Brian Lilly <brian@crystalfontz.com> --- 
-> arch/arm/boot/dts/imx28-cfa10036.dts |   19 +++++++++++++++++++ 1
-> file changed, 19 insertions(+)
+On Wed, Nov 21, 2012 at 12:15:11AM -0700, Jason Gunthorpe wrote:
+> The kirkwood_pcie_scan_bus function duplicates the common code in
+> bios32.c, passing ops in will use the common code..
 > 
-> diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts
-> b/arch/arm/boot/dts/imx28-cfa10036.dts index c03a577..816cae9
-> 100644 --- a/arch/arm/boot/dts/imx28-cfa10036.dts +++
-> b/arch/arm/boot/dts/imx28-cfa10036.dts @@ -33,11 +33,30 @@ };
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> ---
+>  arch/arm/mach-kirkwood/pcie.c |   18 +-----------------
+>  1 files changed, 1 insertions(+), 17 deletions(-)
 > 
-> apbx at 80040000 { +			pwm: pwm at 80064000 { +				pinctrl-names =
-> "default"; +				pinctrl-0 = <&pwm4_pins_a>; +				status = "okay"; +
-> }; + duart: serial at 80074000 { pinctrl-names = "default"; pinctrl-0
-> = <&duart_pins_b>; status = "okay"; }; + +			i2c0: i2c at 80058000 { +
-> pinctrl-names = "default"; +				pinctrl-0 = <&i2c0_pins_b>; +
-> status = "okay"; + +				ssd1307: oled at 3c { +					compatible =
-> "solomon,ssd1307fb-i2c"; +					reg = <0x3c>; +					pwms = <&pwm 4
-> 3000>; +					reset-gpios = <&gpio2 7 0>; +				}; +			}; }; };
+> Just a little clean up I found while reviewing the PCI-E code.
 
+Hi Jason
 
-Would you consider merging this patch?
-Andrew Morton merged the driver into its tree
-(http://marc.info/?l=linux-fbdev&m=135336761530731&w=2)
+Have you tested this on a kirkwood platform? Its hard for me to test,
+i don't have a kirkwood with a used PICE slot.
 
-Thanks,
-Maxime
+  Thanks
+	Andrew
 
-
-- -- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.11 (GNU/Linux)
-Comment: Using GnuPG with Mozilla - http://www.enigmail.net/
-
-iEYEARECAAYFAlCsl7MACgkQGxsu9jQV9nZtJwCfR9c2SnwK1hzAU2F+xptFqg9x
-2+0An3YrhNMXSZaPwPcJwc3Bnwy+FSqe
-=mjpV
------END PGP SIGNATURE-----
+> 
+> diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
+> index ec54491..d5aedf6 100644
+> --- a/arch/arm/mach-kirkwood/pcie.c
+> +++ b/arch/arm/mach-kirkwood/pcie.c
+> @@ -224,22 +224,6 @@ static void __devinit rc_pci_fixup(struct pci_dev *dev)
+>  }
+>  DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MARVELL, PCI_ANY_ID, rc_pci_fixup);
+>  
+> -static struct pci_bus __init *
+> -kirkwood_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+> -{
+> -	struct pci_bus *bus;
+> -
+> -	if (nr < num_pcie_ports) {
+> -		bus = pci_scan_root_bus(NULL, sys->busnr, &pcie_ops, sys,
+> -					&sys->resources);
+> -	} else {
+> -		bus = NULL;
+> -		BUG();
+> -	}
+> -
+> -	return bus;
+> -}
+> -
+>  static int __init kirkwood_pcie_map_irq(const struct pci_dev *dev, u8 slot,
+>  	u8 pin)
+>  {
+> @@ -251,8 +235,8 @@ static int __init kirkwood_pcie_map_irq(const struct pci_dev *dev, u8 slot,
+>  
+>  static struct hw_pci kirkwood_pci __initdata = {
+>  	.setup		= kirkwood_pcie_setup,
+> -	.scan		= kirkwood_pcie_scan_bus,
+>  	.map_irq	= kirkwood_pcie_map_irq,
+> +	.ops            = &pcie_ops,
+>  };
+>  
+>  static void __init add_pcie_port(int index, void __iomem *base)
+> -- 
+> 1.7.4.1
+> 
