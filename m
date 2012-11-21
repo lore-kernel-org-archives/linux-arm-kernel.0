@@ -1,46 +1,38 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Nov 2012 09:17:26 +0100
-Subject: [PATCH V3 1/3] arm: dma mapping: Export dma ops functions
-In-Reply-To: <50AC8D09.6050104@samsung.com>
-References: <1353448587-2937-1-git-send-email-gregory.clement@free-electrons.com>
- <1353448587-2937-2-git-send-email-gregory.clement@free-electrons.com>
- <50AC7D59.1020000@samsung.com> <50AC8B41.7080009@free-electrons.com>
- <50AC8D09.6050104@samsung.com>
-Message-ID: <50AC8E16.3020006@free-electrons.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 21 Nov 2012 09:20:26 +0100
+Subject: [PATCH 3/3] ARM: dts: AM33XX: Add memory resource to d_can node
+In-Reply-To: <1352916505-12343-4-git-send-email-anilkumar@ti.com>
+References: <1352916505-12343-1-git-send-email-anilkumar@ti.com>
+ <1352916505-12343-4-git-send-email-anilkumar@ti.com>
+Message-ID: <50AC8ECA.1020906@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2012 09:12 AM, Marek Szyprowski wrote:
-> Hello,
+On 11/14/2012 07:08 PM, AnilKumar Ch wrote:
+> Add a new address space/memory resource to d_can device tree node. D_CAN
+> RAM initialization is achieved through RAMINIT register which is part of
+> AM33XX control module address space. D_CAN RAM init or de-init should be
+> done by writing instance corresponding value to control module register.
 > 
-> On 11/21/2012 9:05 AM, Gregory CLEMENT wrote:
->> On 11/21/2012 08:06 AM, Marek Szyprowski wrote:
->>> On 11/20/2012 10:56 PM, Gregory CLEMENT wrote:
->>>> Expose the DMA operations functions. Until now only the dma_ops
->>>> structs in a whole or some dma operation were exposed. This patch
->>>> exposes all the dma coherents operations. They can be reused when an
->>>> architecture or a driver need to create its own set of dma_operation.
->>>>
->>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>>
->>> Besides arm_dma_set_mask() function I see no reason to export the other
->>> arm dma related functions.
->>
->> The idea was to let other people use the arm dma related functions,
->> for their own dma ops. But for the mvebu machines we only need
->> arm_dma_set_mask() indeed.
->>
->> So you prefer that I only expose arm_dma_set_mask() and let future
->> user expose other function if they need it, right?
+> Till we have a separate control module driver to write to control module,
+> d_can driver will handle the register writes to control module by itself.
+> So a new address space to represent this control module register is added
+> to d_can driver.
 > 
-> I would prefer to avoid exporting functions which are not used anywhere
-> else. This improves readability of the code and simply forces others to
-> think twice before they use some static function and check if their use
-> case is really correct.
+> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 
-OK so I will send a new version in a few minutes.
+Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
 
-Do  you think these last changes will be enough for getting your Acked-by?
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Thanks,
-Greogry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121121/9f7108bb/attachment.sig>
