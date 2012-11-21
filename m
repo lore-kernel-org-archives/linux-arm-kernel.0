@@ -1,102 +1,85 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Nov 2012 11:08:47 -0800
-Subject: [PATCH 2/2] ARM: OMAP: ads7846: fix pendown debounce setting
-In-Reply-To: <1353341038-14381-3-git-send-email-grinberg@compulab.co.il>
-References: <1353341038-14381-1-git-send-email-grinberg@compulab.co.il>
- <1353341038-14381-3-git-send-email-grinberg@compulab.co.il>
-Message-ID: <20121121190847.GE18567@atomide.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Wed, 21 Nov 2012 11:08:52 -0800
+Subject: [PATCH 1/3] clk: add GPLv2 headers to the Versatile clock files
+In-Reply-To: <1353447571-12876-1-git-send-email-linus.walleij@linaro.org>
+References: <1353447571-12876-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20121121190852.21126.46977@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Igor Grinberg <grinberg@compulab.co.il> [121119 08:06]:
-> Commit 97ee9f01 (ARM: OMAP: fix the ads7846 init code) have enabled the
-> pendown GPIO debounce time setting by the below sequence:
+Quoting Linus Walleij (2012-11-20 13:39:31)
+> The GPLv2 headers were missing and the subsystem maintainer likes
+> them so put them in. I am the copyright holder, so explicitly
+> licensing these under the GPLv2.
 > 
->   gpio_request_one()
->   gpio_set_debounce()
->   gpio_free()
-> 
-> It also revealed a bug in the OMAP GPIO handling code which prevented
-> the GPIO debounce clock to be disabled and CORE transition to low power
-> states.
-> 
-> Commit c9c55d9 (gpio/omap: fix off-mode bug: clear debounce settings on
-> free/reset) fixes the OMAP GPIO handling code by making sure that the
-> GPIO debounce clock gets disabled if no GPIO is requested from current
-> bank.
-> 
-> While fixing the OMAP GPIO handling code (in the right way), the above
-> commit makes the gpio_request->set_debounce->free sequence invalid as
-> after freeing the GPIO, the debounce settings are lost.
-> 
-> Fix the debounce settings by moving the debounce initialization to the
-> actual GPIO requesting code - the ads7846 driver.
-> 
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Zumeng Chen <zumeng.chen@windriver.com>
+> Reported-by: Mike Turquette <mturquette@ti.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Taken into clk-next.
+
+Thanks,
+Mike
 
 > ---
->  arch/arm/mach-omap2/common-board-devices.c |   34 ++++++++++++++++-----------
->  1 files changed, 20 insertions(+), 14 deletions(-)
+>  drivers/clk/versatile/clk-icst.c       |  6 ++++++
+>  drivers/clk/versatile/clk-integrator.c | 10 +++++++++-
+>  drivers/clk/versatile/clk-realview.c   |  8 ++++++++
+>  3 files changed, 23 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-omap2/common-board-devices.c b/arch/arm/mach-omap2/common-board-devices.c
-> index ad85609..d246efd 100644
-> --- a/arch/arm/mach-omap2/common-board-devices.c
-> +++ b/arch/arm/mach-omap2/common-board-devices.c
-> @@ -63,30 +63,36 @@ void __init omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
->  	struct spi_board_info *spi_bi = &ads7846_spi_board_info;
->  	int err;
+> diff --git a/drivers/clk/versatile/clk-icst.c b/drivers/clk/versatile/clk-icst.c
+> index f555b50..23d2d7e 100644
+> --- a/drivers/clk/versatile/clk-icst.c
+> +++ b/drivers/clk/versatile/clk-icst.c
+> @@ -3,6 +3,12 @@
+>   * We wrap the custom interface from <asm/hardware/icst.h> into the generic
+>   * clock framework.
+>   *
+> + * Copyright (C) 2012 Linus Walleij
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+>   * TODO: when all ARM reference designs are migrated to generic clocks, the
+>   * ICST clock code from the ARM tree should probably be merged into this
+>   * file.
+> diff --git a/drivers/clk/versatile/clk-integrator.c b/drivers/clk/versatile/clk-integrator.c
+> index a505392..3c816ae 100644
+> --- a/drivers/clk/versatile/clk-integrator.c
+> +++ b/drivers/clk/versatile/clk-integrator.c
+> @@ -1,8 +1,16 @@
+> +/*
+> + * Clock driver for the ARM Integrator/AP and Integrator/CP boards
+> + * Copyright (C) 2012 Linus Walleij
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#include <linux/clk-provider.h>
+>  #include <linux/clk.h>
+>  #include <linux/clkdev.h>
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+> -#include <linux/clk-provider.h>
 >  
-> -	err = gpio_request_one(gpio_pendown, GPIOF_IN, "TSPenDown");
-> -	if (err) {
-> -		pr_err("Couldn't obtain gpio for TSPenDown: %d\n", err);
-> -		return;
-> -	}
-> +	/*
-> +	 * If a board defines get_pendown_state() function, request the pendown
-> +	 * GPIO and set the GPIO debounce time.
-> +	 * If a board does not define the get_pendown_state() function, then
-> +	 * the ads7846 driver will setup the pendown GPIO itself.
-> +	 */
-> +	if (board_pdata && board_pdata->get_pendown_state) {
-> +		err = gpio_request_one(gpio_pendown, GPIOF_IN, "TSPenDown");
-> +		if (err) {
-> +			pr_err("Couldn't obtain gpio for TSPenDown: %d\n", err);
-> +			return;
-> +		}
-> +
-> +		if (gpio_debounce)
-> +			gpio_set_debounce(gpio_pendown, gpio_debounce);
->  
-> -	if (gpio_debounce)
-> -		gpio_set_debounce(gpio_pendown, gpio_debounce);
-> +		gpio_export(gpio_pendown, 0);
-> +	}
->  
->  	spi_bi->bus_num	= bus_num;
->  	spi_bi->irq	= gpio_to_irq(gpio_pendown);
->  
-> +	ads7846_config.gpio_pendown = gpio_pendown;
-> +
->  	if (board_pdata) {
->  		board_pdata->gpio_pendown = gpio_pendown;
-> +		board_pdata->gpio_pendown_debounce = gpio_debounce;
->  		spi_bi->platform_data = board_pdata;
-> -		if (board_pdata->get_pendown_state)
-> -			gpio_export(gpio_pendown, 0);
-> -	} else {
-> -		ads7846_config.gpio_pendown = gpio_pendown;
->  	}
->  
-> -	if (!board_pdata || (board_pdata && !board_pdata->get_pendown_state))
-> -		gpio_free(gpio_pendown);
-> -
->  	spi_register_board_info(&ads7846_spi_board_info, 1);
->  }
->  #else
+>  #include <mach/hardware.h>
+>  #include <mach/platform.h>
+> diff --git a/drivers/clk/versatile/clk-realview.c b/drivers/clk/versatile/clk-realview.c
+> index e21a99c..fd2dbdb 100644
+> --- a/drivers/clk/versatile/clk-realview.c
+> +++ b/drivers/clk/versatile/clk-realview.c
+> @@ -1,3 +1,11 @@
+> +/*
+> + * Clock driver for the ARM RealView boards
+> + * Copyright (C) 2012 Linus Walleij
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+>  #include <linux/clk.h>
+>  #include <linux/clkdev.h>
+>  #include <linux/err.h>
 > -- 
-> 1.7.3.4
-> 
+> 1.7.11.7
