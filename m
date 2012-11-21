@@ -1,29 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 21 Nov 2012 12:26:10 +0000
-Subject: [PATCH V5 5/5] arm: mvebu: Added SMP support for Armada XP
-In-Reply-To: <20121121122251.GI11990@mudshark.cambridge.arm.com>
-References: <1353446150-10088-1-git-send-email-gregory.clement@free-electrons.com>
- <1353446150-10088-6-git-send-email-gregory.clement@free-electrons.com>
- <20121121104132.GD11990@mudshark.cambridge.arm.com>
- <50ACC198.5030300@free-electrons.com>
- <20121121122251.GI11990@mudshark.cambridge.arm.com>
-Message-ID: <20121121122610.GM3290@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 21 Nov 2012 13:35:45 +0100
+Subject: [GIT PULL] Marvell Ethernet driver clk support + section
+ mismatch fix
+In-Reply-To: <1353334396-26128-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1353334396-26128-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20121121133545.1a45263c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 12:22:51PM +0000, Will Deacon wrote:
-> Sorry, my mistake (I was thinking on my feet) since secondary_startup is
-> declared in a C file, right? How about:
+David,
+
+On Mon, 19 Nov 2012 15:13:14 +0100, Thomas Petazzoni wrote:
+
+>  * One adding clk support. It's not a fix, but I think it's better if
+>    we can get the Device Tree binding correct directly in 3.8. This
+>    commit basically replaces the clock-frequency DT property by a
+>    proper 'clocks' DT property that references a DT clock. If we don't
+>    get this in 3.8, we'll have to support the legacy clock-frequency
+>    DT property for ever as it will be part of the kernel-to-DT ABI. So
+>    it would be nicer to get this patch in for 3.8.
 > 
-> 	ldr	lr, =secondary_startup
-> 	b	ll_set_cpu_coherent
+>    The DT patches related to this one are coming into a separate pull
+>    request.
+> 
+>  * The second one fixes a section mismatch warning, so it is certainly
+>    important.
 
-Why?  Do we really want LR to be the _virtual_ address?  No we don't,
-because secondary_startup expects to be called with the MMU off.
+Do you agree with those two changes? If so, shall we carry them with
+the rest of the mvneta driver through arm-soc with your Acked-by?
 
-So I go back to my original comment.  What's wrong with:
+Thanks!
 
-	bl	ll_set_cpu_coherent
-	b	secondary_startup
-
-?
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
