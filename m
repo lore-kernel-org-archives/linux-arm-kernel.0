@@ -1,248 +1,278 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 21 Nov 2012 15:56:40 +0100
-Subject: [PATCH 2/4] ARM: at91: dt: add mmc pinctrl for Atmel reference boards
-In-Reply-To: <1353509802-20445-1-git-send-email-plagnioj@jcrosoft.com>
+Date: Wed, 21 Nov 2012 15:56:39 +0100
+Subject: [PATCH 1/4] ARM: at91: dt: at91sam9: add mmc pinctrl support
+In-Reply-To: <20121121145552.GW4398@game.jcrosoft.org>
 References: <20121121145552.GW4398@game.jcrosoft.org>
- <1353509802-20445-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1353509802-20445-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1353509802-20445-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- arch/arm/boot/dts/at91sam9263ek.dts         |   15 +++++++++++++++
- arch/arm/boot/dts/at91sam9g20ek_2mmc.dts    |   14 ++++++++++++++
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   14 ++++++++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts      |   25 +++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9n12ek.dts         |   13 +++++++++++++
- arch/arm/boot/dts/at91sam9x5ek.dtsi         |   24 ++++++++++++++++++++++++
- 6 files changed, 105 insertions(+)
+ arch/arm/boot/dts/at91sam9260.dtsi |   33 ++++++++++++++++++
+ arch/arm/boot/dts/at91sam9263.dtsi |   66 ++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi |   48 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9n12.dtsi |   24 +++++++++++++
+ arch/arm/boot/dts/at91sam9x5.dtsi  |   32 +++++++++++++++++
+ 5 files changed, 203 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
-index 8e319bb..1eb0872 100644
---- a/arch/arm/boot/dts/at91sam9263ek.dts
-+++ b/arch/arm/boot/dts/at91sam9263ek.dts
-@@ -56,6 +56,11 @@
- 			};
- 
- 			mmc0: mmc at fff80000 {
-+				pinctrl-0 = <
-+					&pinctrl_board_mmc0
-+					&pinctrl_mmc0_clk
-+					&pinctrl_mmc0_slot0_cmd_dat0
-+					&pinctrl_mmc0_slot0_dat1_3>;
- 				status = "okay";
- 				slot at 0 {
- 					reg = <0>;
-@@ -64,6 +69,16 @@
- 					wp-gpios = <&pioE 19 0>;
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index d7296d5..b1d3fab 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -272,6 +272,39 @@
+ 					};
  				};
- 			};
-+
-+			pinctrl at fffff200 {
+ 
 +				mmc0 {
-+					pinctrl_board_mmc0: mmc0-board {
++					pinctrl_mmc0_clk: mmc0_clk-0 {
 +						atmel,pins =
-+							<5 18 0x0 0x5	/* PE18 gpio CD pin pull up and deglitch */
-+							 5 19 0x0 0x1>;	/* PE19 gpio WP pin pull up */
++							<0 8 0x1 0x0>;	/* PA8 periph A */
++					};
++
++					pinctrl_mmc0_slot0_cmd_dat0: mmc0_slot0_cmd_dat0-0 {
++						atmel,pins =
++							<0 7 0x1 0x1	/* PA7 periph A with pullup */
++							 0 6 0x1 0x1>;	/* PA6 periph A with pullup */
++					};
++
++					pinctrl_mmc0_slot0_dat1_3: mmc0_slot0_dat1_3-0 {
++						atmel,pins =
++							<0 9 0x1 0x1	/* PA9 periph A with pullup */
++							 0 10 0x1 0x1	/* PA10 periph A with pullup */
++							 0 11 0x1 0x1>;	/* PA11 periph A with pullup */
++					};
++
++					pinctrl_mmc0_slot1_cmd_dat0: mmc0_slot1_cmd_dat0-0 {
++						atmel,pins =
++							<0 1 0x2 0x1	/* PA1 periph B with pullup */
++							 0 0 0x2 0x1>;	/* PA0 periph B with pullup */
++					};
++
++					pinctrl_mmc0_slot1_dat1_3: mmc0_slot1_dat1_3-0 {
++						atmel,pins =
++							<0 5 0x2 0x1	/* PA5 periph B with pullup */
++							 0 4 0x2 0x1	/* PA4 periph B with pullup */
++							 0 3 0x2 0x1>;	/* PA3 periph B with pullup */
 +					};
 +				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts b/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
-index 684b229..66467b1 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
-+++ b/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
-@@ -15,12 +15,26 @@
- 	ahb {
- 		apb{
- 			mmc0: mmc at fffa8000 {
-+				/* clk already mux wuth slot0 */
-+				pinctrl-0 = <
-+					&pinctrl_board_mmc0_slot0
-+					&pinctrl_mmc0_slot0_cmd_dat0
-+					&pinctrl_mmc0_slot0_dat1_3>;
- 				slot at 0 {
- 					reg = <0>;
- 					bus-width = <4>;
- 					cd-gpios = <&pioC 2 0>;
- 				};
- 			};
 +
-+			pinctrl at fffff400 {
-+				mmc0_slot0 {
-+					pinctrl_board_mmc0_slot0: mmc0_slot0-board {
-+						atmel,pins =
-+							<2 2 0x0 0x5>;	/* PC2 gpio CD pin pull up and deglitch */
-+					};
-+				};
-+			};
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-index 0090015..32a500a 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-@@ -60,6 +60,11 @@
- 			};
- 
- 			mmc0: mmc at fffa8000 {
-+				pinctrl-0 = <
-+					&pinctrl_board_mmc0_slot1
-+					&pinctrl_mmc0_clk
-+					&pinctrl_mmc0_slot1_cmd_dat0
-+					&pinctrl_mmc0_slot1_dat1_3>;
- 				status = "okay";
- 				slot at 1 {
- 					reg = <1>;
-@@ -67,6 +72,15 @@
- 					cd-gpios = <&pioC 9 0>;
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index eae6d16..66106ee 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -203,6 +203,72 @@
+ 					};
  				};
- 			};
-+
-+			pinctrl at fffff400 {
-+				mmc0_slot1 {
-+					pinctrl_board_mmc0_slot1: mmc0_slot1-board {
-+						atmel,pins =
-+							<2 9 0x0 0x5>;	/* PC9 gpio CD pin pull up and deglitch */
-+					};
-+				};
-+			};
- 		};
  
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index 1fc299f..20c3191 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -60,6 +60,10 @@
- 			};
- 
- 			mmc0: mmc at fff80000 {
-+				pinctrl-0 = <
-+					&pinctrl_board_mmc0
-+					&pinctrl_mmc0_slot0_clk_cmd_dat0
-+					&pinctrl_mmc0_slot0_dat1_3>;
- 				status = "okay";
- 				slot at 0 {
- 					reg = <0>;
-@@ -69,6 +73,10 @@
- 			};
- 
- 			mmc1: mmc at fffd0000 {
-+				pinctrl-0 = <
-+					&pinctrl_board_mmc1
-+					&pinctrl_mmc1_slot0_clk_cmd_dat0
-+					&pinctrl_mmc1_slot0_dat1_3>;
- 				status = "okay";
- 				slot at 0 {
- 					reg = <0>;
-@@ -77,6 +85,23 @@
- 					wp-gpios = <&pioD 29 0>;
- 				};
- 			};
-+
-+			pinctrl at fffff200 {
 +				mmc0 {
-+					pinctrl_board_mmc0: mmc0-board {
++					pinctrl_mmc0_clk: mmc0_clk-0 {
 +						atmel,pins =
-+							<3 10 0x0 0x5>;	/* PD10 gpio CD pin pull up and deglitch */
++							<0 12 0x1 0x0>;	/* PA12 periph A */
++					};
++
++					pinctrl_mmc0_slot0_cmd_dat0: mmc0_slot0_cmd_dat0-0 {
++						atmel,pins =
++							<0 1 0x1 0x1	/* PA1 periph A with pullup */
++							 0 0 0x1 0x1>;	/* PA0 periph A with pullup */
++					};
++
++					pinctrl_mmc0_slot0_dat1_3: mmc0_slot0_dat1_3-0 {
++						atmel,pins =
++							<0 3 0x1 0x1	/* PA3 periph A with pullup */
++							 0 4 0x1 0x1	/* PA4 periph A with pullup */
++							 0 5 0x1 0x1>;	/* PA5 periph A with pullup */
++					};
++
++					pinctrl_mmc0_slot1_cmd_dat0: mmc0_slot1_cmd_dat0-0 {
++						atmel,pins =
++							<0 16 0x1 0x1	/* PA16 periph A with pullup */
++							 0 17 0x1 0x1>;	/* PA17 periph A with pullup */
++					};
++
++					pinctrl_mmc0_slot1_dat1_3: mmc0_slot1_dat1_3-0 {
++						atmel,pins =
++							<0 18 0x1 0x1	/* PA18 periph A with pullup */
++							 0 19 0x1 0x1	/* PA19 periph A with pullup */
++							 0 20 0x1 0x1>;	/* PA20 periph A with pullup */
 +					};
 +				};
 +
 +				mmc1 {
-+					pinctrl_board_mmc1: mmc1-board {
++					pinctrl_mmc1_clk: mmc1_clk-0 {
 +						atmel,pins =
-+							<3 11 0x0 0x5	/* PD11 gpio CD pin pull up and deglitch */
-+							 3 29 0x0 0x1>;	/* PD29 gpio WP pin pull up */
++							<0 6 0x1 0x0>;	/* PA6 periph A */
++					};
++
++					pinctrl_mmc1_slot0_cmd_dat0: mmc1_slot0_cmd_dat0-0 {
++						atmel,pins =
++							<0 7 0x1 0x1	/* PA7 periph A with pullup */
++							 0 8 0x1 0x1>;	/* PA8 periph A with pullup */
++					};
++
++					pinctrl_mmc1_slot0_dat1_3: mmc1_slot0_dat1_3-0 {
++						atmel,pins =
++							<0 9 0x1 0x1	/* PA9 periph A with pullup */
++							 0 10 0x1 0x1	/* PA10 periph A with pullup */
++							 0 11 0x1 0x1>;	/* PA11 periph A with pullup */
++					};
++
++					pinctrl_mmc1_slot1_cmd_dat0: mmc1_slot1_cmd_dat0-0 {
++						atmel,pins =
++							<0 21 0x1 0x1	/* PA21 periph A with pullup */
++							 0 22 0x1 0x1>;	/* PA22 periph A with pullup */
++					};
++
++					pinctrl_mmc1_slot1_dat1_3: mmc1_slot1_dat1_3-0 {
++						atmel,pins =
++							<0 23 0x1 0x1	/* PA23 periph A with pullup */
++							 0 24 0x1 0x1	/* PA24 periph A with pullup */
++							 0 25 0x1 0x1>;	/* PA25 periph A with pullup */
 +					};
 +				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index 3d165bc..0376bf4 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -47,6 +47,10 @@
- 			};
- 
- 			mmc0: mmc at f0008000 {
-+				pinctrl-0 = <
-+					&pinctrl_board_mmc0
-+					&pinctrl_mmc0_slot0_clk_cmd_dat0
-+					&pinctrl_mmc0_slot0_dat1_3>;
- 				status = "okay";
- 				slot at 0 {
- 					reg = <0>;
-@@ -54,6 +58,15 @@
- 					cd-gpios = <&pioA 7 0>;
++
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff200 0x200>;
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index 91607d2..0741cae 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -240,6 +240,54 @@
+ 					};
  				};
- 			};
-+
-+			pinctrl at fffff400 {
+ 
 +				mmc0 {
-+					pinctrl_board_mmc0: mmc0-board {
++					pinctrl_mmc0_slot0_clk_cmd_dat0: mmc0_slot0_clk_cmd_dat0-0 {
 +						atmel,pins =
-+							<0 7 0x0 0x5>;	/* PA7 gpio CD pin pull up and deglitch */
++							<0 0 0x1 0x0	/* PA0 periph A */
++							 0 1 0x1 0x1	/* PA1 periph A with pullup */
++							 0 2 0x1 0x1>;	/* PA2 periph A with pullup */
 +					};
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-index e042b5e..8a7cf1d 100644
---- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-@@ -19,6 +19,10 @@
- 	ahb {
- 		apb {
- 			mmc0: mmc at f0008000 {
-+				pinctrl-0 = <
-+					&pinctrl_board_mmc0
-+					&pinctrl_mmc0_slot0_clk_cmd_dat0
-+					&pinctrl_mmc0_slot0_dat1_3>;
- 				status = "okay";
- 				slot at 0 {
- 					reg = <0>;
-@@ -28,6 +32,10 @@
- 			};
- 
- 			mmc1: mmc at f000c000 {
-+				pinctrl-0 = <
-+					&pinctrl_board_mmc1
-+					&pinctrl_mmc1_slot0_clk_cmd_dat0
-+					&pinctrl_mmc1_slot0_dat1_3>;
- 				status = "okay";
- 				slot at 0 {
- 					reg = <0>;
-@@ -60,6 +68,22 @@
- 			i2c2: i2c at f8018000 {
- 				status = "okay";
- 			};
 +
-+			pinctrl at fffff400 {
-+				mmc0 {
-+					pinctrl_board_mmc0: mmc0-board {
++					pinctrl_mmc0_slot0_dat1_3: mmc0_slot0_dat1_3-0 {
 +						atmel,pins =
-+							<3 15 0x0 0x5>;	/* PD15 gpio CD pin pull up and deglitch */
++							<0 3 0x1 0x1	/* PA3 periph A with pullup */
++							 0 4 0x1 0x1	/* PA4 periph A with pullup */
++							 0 5 0x1 0x1>;	/* PA5 periph A with pullup */
++					};
++
++					pinctrl_mmc0_slot0_dat4_7: mmc0_slot0_dat4_7-0 {
++						atmel,pins =
++							<0 6 0x1 0x1	/* PA6 periph A with pullup */
++							 0 7 0x1 0x1	/* PA7 periph A with pullup */
++							 0 8 0x1 0x1	/* PA8 periph A with pullup */
++							 0 9 0x1 0x1>;	/* PA9 periph A with pullup */
 +					};
 +				};
 +
 +				mmc1 {
-+					pinctrl_board_mmc1: mmc1-board {
++					pinctrl_mmc1_slot0_clk_cmd_dat0: mmc1_slot0_clk_cmd_dat0-0 {
 +						atmel,pins =
-+							<3 14 0x0 0x5>;	/* PD14 gpio CD pin pull up and deglitch */
++							<0 31 0x1 0x0	/* PA31 periph A */
++							 0 22 0x1 0x1	/* PA22 periph A with pullup */
++							 0 23 0x1 0x1>;	/* PA23 periph A with pullup */
++					};
++
++					pinctrl_mmc1_slot0_dat1_3: mmc1_slot0_dat1_3-0 {
++						atmel,pins =
++							<0 24 0x1 0x1	/* PA24 periph A with pullup */
++							 0 25 0x1 0x1	/* PA25 periph A with pullup */
++							 0 26 0x1 0x1>;	/* PA26 periph A with pullup */
++					};
++
++					pinctrl_mmc1_slot0_dat4_7: mmc1_slot0_dat4_7-0 {
++						atmel,pins =
++							<0 27 0x1 0x1	/* PA27 periph A with pullup */
++							 0 28 0x1 0x1	/* PA28 periph A with pullup */
++							 0 29 0x1 0x1	/* PA29 periph A with pullup */
++							 0 20 0x1 0x1>;	/* PA30 periph A with pullup */
 +					};
 +				};
-+			};
- 		};
++
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff200 0x200>;
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index 8d1fdfa..e9efb34 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -220,6 +220,30 @@
+ 					};
+ 				};
  
- 		usb0: ohci at 00600000 {
++				mmc0 {
++					pinctrl_mmc0_slot0_clk_cmd_dat0: mmc0_slot0_clk_cmd_dat0-0 {
++						atmel,pins =
++							<0 17 0x1 0x0	/* PA17 periph A */
++							 0 16 0x1 0x1	/* PA16 periph A with pullup */
++							 0 15 0x1 0x1>;	/* PA15 periph A with pullup */
++					};
++
++					pinctrl_mmc0_slot0_dat1_3: mmc0_slot0_dat1_3-0 {
++						atmel,pins =
++							<0 18 0x1 0x1	/* PA18 periph A with pullup */
++							 0 19 0x1 0x1	/* PA19 periph A with pullup */
++							 0 20 0x1 0x1>;	/* PA20 periph A with pullup */
++					};
++
++					pinctrl_mmc0_slot0_dat4_7: mmc0_slot0_dat4_7-0 {
++						atmel,pins =
++							<0 11 0x2 0x1	/* PA11 periph B with pullup */
++							 0 12 0x2 0x1	/* PA12 periph B with pullup */
++							 0 13 0x2 0x1	/* PA13 periph B with pullup */
++							 0 14 0x2 0x1>;	/* PA14 periph B with pullup */
++					};
++				};
++
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 7f56b07..7ee49e8 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -250,6 +250,38 @@
+ 					};
+ 				};
+ 
++				mmc0 {
++					pinctrl_mmc0_slot0_clk_cmd_dat0: mmc0_slot0_clk_cmd_dat0-0 {
++						atmel,pins =
++							<0 17 0x1 0x0	/* PA17 periph A */
++							 0 16 0x1 0x1	/* PA16 periph A with pullup */
++							 0 15 0x1 0x1>;	/* PA15 periph A with pullup */
++					};
++
++					pinctrl_mmc0_slot0_dat1_3: mmc0_slot0_dat1_3-0 {
++						atmel,pins =
++							<0 18 0x1 0x1	/* PA18 periph A with pullup */
++							 0 19 0x1 0x1	/* PA19 periph A with pullup */
++							 0 20 0x1 0x1>;	/* PA20 periph A with pullup */
++					};
++				};
++
++				mmc1 {
++					pinctrl_mmc1_slot0_clk_cmd_dat0: mmc1_slot0_clk_cmd_dat0-0 {
++						atmel,pins =
++							<0 13 0x2 0x0	/* PA13 periph B */
++							 0 12 0x2 0x1	/* PA12 periph B with pullup */
++							 0 11 0x2 0x1>;	/* PA11 periph B with pullup */
++					};
++
++					pinctrl_mmc1_slot0_dat1_3: mmc1_slot0_dat1_3-0 {
++						atmel,pins =
++							<0 2 0x2 0x1	/* PA2 periph B with pullup */
++							 0 3 0x2 0x1	/* PA3 periph B with pullup */
++							 0 4 0x2 0x1>;	/* PA4 periph B with pullup */
++					};
++				};
++
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
 -- 
 1.7.10.4
