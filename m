@@ -1,22 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Nov 2012 10:59:39 +0100
-Subject: [PATCH 0/4] Dove pinctrl fixes and DT enabling
-In-Reply-To: <1353317996-20841-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Wed, 21 Nov 2012 11:00:23 +0100
+Subject: [PATCH 1/4] pinctrl: mvebu: fix iomem pointer for dove pinctrl
+In-Reply-To: <1353317996-20841-2-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1353317996-20841-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CACRpkdYAnNCFDCjA67r0h_CSHMifb1Z83YJfYGQV3abPB8uQZg@mail.gmail.com>
+ <1353317996-20841-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CACRpkda=wxmHPk_9uUajYqhbcxxK8bjnYfc-VeLGFif0WUd99Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Nov 19, 2012 at 10:39 AM, Sebastian Hesselbarth
 <sebastian.hesselbarth@gmail.com> wrote:
 
-> This patch relies on a patch set for mvebu pinctrl taken through
-> Linus' pinctrl branch. As there is no other platform than Dove
-> involved, I suggest to take it though Jason's tree to avoid any
-> further conflicts.
+> There has been a change in readl/writel to require registers
+> addresses marked as IOMEM(). This patch takes care of this and
+> also replaces ORing address offsets with adding them.
+>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-Sounds like a plan. So you have some commit history pulled
-in from the pinctrl tree in the MVEBU tree?
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
