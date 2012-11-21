@@ -1,22 +1,55 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 21 Nov 2012 13:13:50 +0100 (CET)
-Subject: =?UTF-8?q?=5BPATCH=20192/493=5D=20scsi=3A=20remove=20use=20of=20=5F=5Fdevinit?=
-In-Reply-To: <1353349642-3677-192-git-send-email-wfp5p@virginia.edu>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-192-git-send-email-wfp5p@virginia.edu>
-Message-ID: <Pine.LNX.4.64.1211211311530.842@axis700.grange>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 21 Nov 2012 21:15:43 +0900
+Subject: [PATCH v3 RESEND 0/4] ARM: EXYNOS: Power domain DT support
+ extension
+In-Reply-To: <3937720.DSR9HIu3D4@amdc1227>
+References: <1352812107-8777-1-git-send-email-t.figa@samsung.com>
+ <3937720.DSR9HIu3D4@amdc1227>
+Message-ID: <0e7b01cdc7e1$edbb5a60$c9320f20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Nov 2012, Bill Pemberton wrote:
+Tomasz Figa wrote:
+> 
+> Hi Kgene,
+> 
+> On Tuesday 13 of November 2012 14:08:23 Tomasz Figa wrote:
+> > This patch series fixes two issues with existing DT support for Exynos
+> > power domains and extends it with the ability of binding devices to
+> > domains, basically making it possible to use power domains with DT.
+> >
+> > Based on for-next branch of Kgene's tree.
+> >
+> > Changes since v2:
+> >  - Rebased to for-next of Kgene's tree.
+> > Changes since v1:
+> >  - Added "samsung," prefix to "power-domain" property.
+> >  - Added power domain nodes to Exynos4 device tree sources.
+> >
+> > Tomasz Figa (4):
+> >   ARM: EXYNOS: pm_domain: Detect domain state on registration from DT
+> >   ARM: EXYNOS: pm_domain: Fix power domain name initialization
+> >   ARM: EXYNOS: pm_domain: Bind devices to power domains using DT
+> >   ARM: dts: exynos4: Set up power domains
+> >
+> >  .../bindings/arm/exynos/power_domain.txt           | 15 +++-
+> >  arch/arm/boot/dts/exynos4.dtsi                     | 30 +++++++
+> >  arch/arm/boot/dts/exynos4210.dtsi                  |  5 ++
+> >  arch/arm/mach-exynos/pm_domains.c                  | 93
+> > +++++++++++++++++++++- 4 files changed, 135 insertions(+), 8
+> > deletions(-)
+> 
+> Since this version is just a rebase to your for-next and there are no
+> remaining comments, could you still take it for 3.8?
+> 
+Well, I'm not sure 'S5P_INT_LOCAL_PWR_EN' in [1/4] patch is available on all
+of exynos and it can support multiple platform. But at this moment, looks OK
+to me. If any modification is required, we can do it later.
 
->  drivers/scsi/tmscsim.c                    | 16 +++---
+Will apply, thanks.
 
-Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
