@@ -1,56 +1,62 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 21 Nov 2012 00:15:11 -0700
-Subject: [PATCH] ARM: Kirkwood: Use hw_pci.ops instead of hw_pci.scan
-Message-ID: <20121121071511.GE19837@obsidianresearch.com>
+Date: Wed, 21 Nov 2012 00:19:06 -0700
+Subject: [PATCH] ARM: Kirkwood: Update PCI-E fixup
+Message-ID: <20121121071906.GF19837@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kirkwood_pcie_scan_bus function duplicates the common code in
-bios32.c, passing ops in will use the common code..
+- The code relies on rc_pci_fixup being called, which only happens
+  when CONFIG_PCI_QUIRKS is enabled, so add that to Kconfig. Omitting
+  this causes a booting failure with a non-obvious cause.
+- Update rc_pci_fixup to set the class properly, copying the
+  more modern style from other places
+- Correct the rc_pci_fixup comment
 
 Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 ---
- arch/arm/mach-kirkwood/pcie.c |   18 +-----------------
- 1 files changed, 1 insertions(+), 17 deletions(-)
+ arch/arm/Kconfig              |    1 +
+ arch/arm/mach-kirkwood/pcie.c |    9 ++++++---
+ 2 files changed, 7 insertions(+), 3 deletions(-)
 
-Just a little clean up I found while reviewing the PCI-E code.
+Another cleanup.. It took a fair while to figure out that things
+were not working properly because PCI_QUIRKS was not set :|
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ade7e92..9759fec 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -547,6 +547,7 @@ config ARCH_KIRKWOOD
+ 	select CPU_FEROCEON
+ 	select GENERIC_CLOCKEVENTS
+ 	select PCI
++	select PCI_QUIRKS
+ 	select PLAT_ORION_LEGACY
+ 	help
+ 	  Support for the following Marvell Kirkwood series SoCs:
 diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
-index ec54491..d5aedf6 100644
+index d5aedf6..59c97fe 100644
 --- a/arch/arm/mach-kirkwood/pcie.c
 +++ b/arch/arm/mach-kirkwood/pcie.c
-@@ -224,22 +224,6 @@ static void __devinit rc_pci_fixup(struct pci_dev *dev)
+@@ -207,14 +207,17 @@ static int __init kirkwood_pcie_setup(int nr, struct pci_sys_data *sys)
+ 	return 1;
  }
- DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MARVELL, PCI_ANY_ID, rc_pci_fixup);
  
--static struct pci_bus __init *
--kirkwood_pcie_scan_bus(int nr, struct pci_sys_data *sys)
--{
--	struct pci_bus *bus;
--
--	if (nr < num_pcie_ports) {
--		bus = pci_scan_root_bus(NULL, sys->busnr, &pcie_ops, sys,
--					&sys->resources);
--	} else {
--		bus = NULL;
--		BUG();
--	}
--
--	return bus;
--}
--
- static int __init kirkwood_pcie_map_irq(const struct pci_dev *dev, u8 slot,
- 	u8 pin)
++/* The root complex has a hardwired class of PCI_CLASS_MEMORY_OTHER, when it
++   is operating as a root complex this needs to be switched to
++   PCI_CLASS_BRIDGE_HOST or Linux will errantly try to process the BAR's on
++   the device. Decoding setup is handled by the orion code. */
+ static void __devinit rc_pci_fixup(struct pci_dev *dev)
  {
-@@ -251,8 +235,8 @@ static int __init kirkwood_pcie_map_irq(const struct pci_dev *dev, u8 slot,
+-	/*
+-	 * Prevent enumeration of root complex.
+-	 */
+ 	if (dev->bus->parent == NULL && dev->devfn == 0) {
+ 		int i;
  
- static struct hw_pci kirkwood_pci __initdata = {
- 	.setup		= kirkwood_pcie_setup,
--	.scan		= kirkwood_pcie_scan_bus,
- 	.map_irq	= kirkwood_pcie_map_irq,
-+	.ops            = &pcie_ops,
- };
- 
- static void __init add_pcie_port(int index, void __iomem *base)
++		dev->class &= 0xff;
++		dev->class |= PCI_CLASS_BRIDGE_HOST << 8;
+ 		for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
+ 			dev->resource[i].start = 0;
+ 			dev->resource[i].end   = 0;
 -- 
 1.7.4.1
