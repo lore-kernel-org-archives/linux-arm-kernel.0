@@ -1,75 +1,31 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 21 Nov 2012 10:13:47 +0200
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <4316169.5QXVzv7peZ@percival>
-References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
- <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
- <50AB9832.90709@ti.com> <4316169.5QXVzv7peZ@percival>
-Message-ID: <50AC8D3B.6040300@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 21 Nov 2012 09:14:22 +0100
+Subject: [PATCH V3 08/11] ARM: ux500: convert timer suspend/resume to
+ clock_event_device
+In-Reply-To: <1353349867-28494-9-git-send-email-swarren@wwwdotorg.org>
+References: <1353349867-28494-1-git-send-email-swarren@wwwdotorg.org>
+ <1353349867-28494-9-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CACRpkdacsHS42S=vbb0NOoTj=odxUVAoDu+E4RRULWwh1McKrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-21 03:56, Alex Courbot wrote:
-> Hi Tomi,
-> 
-> On Tuesday 20 November 2012 22:48:18 Tomi Valkeinen wrote:
->> I guess there's a reason, but the above looks a bit inconsistent. For
->> gpio you define the gpio resource inside the step. For power and pwm the
->> resource is defined before the steps. Why wouldn't "pwm = <&pwm 2
->> 5000000>;" work in step2?
-> 
-> That's mostly a framework issue. Most frameworks do not export a function that 
-> allow to dereference a phandle - they expect resources to be declared right 
-> under the device node and accessed by name through foo_get(device, name). So 
-> using phandles in power sequences would require to export these additional 
+On Mon, Nov 19, 2012 at 7:31 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 
-Right, I expected something like that.
+> From: Stephen Warren <swarren@nvidia.com>
+>
+> Move ux500's timer suspend/resume functions from struct sys_timer
+> ux500_timer into struct clock_event_device nmdk_clkevt. This
+> will allow the sys_timer suspend/resume fields to be removed, and
+> eventually lead to a complete removal of struct sys_timer.
+>
+> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-> functions and also opens the door to some inconsistencies - for instance, your 
-> PWM phandle could be referenced a second time in the sequence with a different 
-> period - how do you know that these are actually referring the same PWM 
-> device?
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-This I didn't understand. Doesn't "<&pwm 2 xyz>" point to a single
-device, no matter where and how many times it's used?
+We have a comment on the .resume member but I'll find
+the right patch and comment there.
 
->>> +When a power sequence is run, its steps is executed one after the other
->>> until +one step fails or the end of the sequence is reached.
->>
->> The document doesn't give any hint of what the driver should do if
->> running the power sequence fails. Run the "opposite" power sequence?
->> Will that work for all resources? I'm mainly thinking of a case where
->> each enable of the resource should be matched by a disable, i.e. you
->> can't call disable if no enable was called.
-> 
-> We discussed that issue already (around v5 I think) and the conclusion was 
-> that it should be up to the driver. When we simply enable/disable resources it 
-> is easy to revert, but in the future non-boolean properties will likely be 
-> introduced, and these cannot easily be reverted. Moreover some drivers might 
-> have more complex recovery needs. This deserves more discussion I think, as 
-> I'd like to have some "generic" recovery mechanism that covers most of the 
-> cases.
-
-Ok. I'll need to dig up the conversation. Did you consider any examples
-of how some driver could handle the error cases?
-
-What I'm worried about is that, as far as I understand, the power
-sequence is kinda like black box to the driver. The driver just does
-"power-up", without knowing what really goes on in there.
-
-And if it doesn't know what goes on in there, nor what's in "power-down"
-sequence, how can it do anything when an error happens? The only option
-I see is that the driver doesn't do anything, which will leave some
-resources enabled, or it can run the power-down sequence, which may or
-may not work.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 897 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121121/9af56ea9/attachment.sig>
+Yours,
+Linus Walleij
