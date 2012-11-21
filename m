@@ -1,80 +1,31 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 21 Nov 2012 11:05:24 +0100
-Subject: [PATCH] MTD: at91: atmel_nand: return bit flips for the PMECC
- read_page()
-In-Reply-To: <1353474863-28430-1-git-send-email-josh.wu@atmel.com>
-References: <1353474863-28430-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <50ACA764.3030002@atmel.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 21 Nov 2012 10:06:16 +0000
+Subject: [PATCH V4 1/3] of: introduce for_each_matching_node_and_match()
+In-Reply-To: <201211210953.20552.arnd@arndb.de>
+References: <1353453142-4973-1-git-send-email-swarren@wwwdotorg.org>
+ <201211210953.20552.arnd@arndb.de>
+Message-ID: <CACxGe6u5UBqVPrBqwn9rhjuBx4uCuuHKU=FcvSp0GJ2G8ogSNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2012 06:14 AM, Josh Wu :
-> 
-> 
+On Wed, Nov 21, 2012 at 9:53 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 20 November 2012, Stephen Warren wrote:
+>> However, this results in iterating over table twice; the second time
+>> inside of_match_node(). The implementation of for_each_matching_node()
+>> already found the match, so this is redundant. Invent new function
+>> of_find_matching_node_and_match() and macro
+>> for_each_matching_node_and_match() to remove the double iteration,
+>> thus transforming the above code to:
+>>
+>>     for_each_matching_node_and_match(np, table, &match)
+>>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>
+> This look useful, but I wonder if the interface would make more sense if you
+> make the last argument to the macro a normal pointer, rather than a
+> pointer-to-pointer. You can take the reference as part of the macro.
 
-Can we have more comment to figure out why it is needed please?
+To me that makes for harder to understand code. It *looks* like an
+argument to a normal function call, but it gets changed by the caller.
 
-Best regards,
-
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
->  drivers/mtd/nand/atmel_nand.c |   13 +++++++++----
->  1 file changed, 9 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index 9144557..860dd36 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -723,6 +723,7 @@ static int pmecc_correction(struct mtd_info *mtd, u32 pmecc_stat, uint8_t *buf,
->  	struct atmel_nand_host *host = nand_chip->priv;
->  	int i, err_nbr, eccbytes;
->  	uint8_t *buf_pos;
-> +	int total_err = 0;
->  
->  	eccbytes = nand_chip->ecc.bytes;
->  	for (i = 0; i < eccbytes; i++)
-> @@ -750,12 +751,13 @@ normal_check:
->  				pmecc_correct_data(mtd, buf_pos, ecc, i,
->  					host->pmecc_bytes_per_sector, err_nbr);
->  				mtd->ecc_stats.corrected += err_nbr;
-> +				total_err += err_nbr;
->  			}
->  		}
->  		pmecc_stat >>= 1;
->  	}
->  
-> -	return 0;
-> +	return total_err;
->  }
->  
->  static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
-> @@ -767,6 +769,7 @@ static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
->  	uint32_t *eccpos = chip->ecc.layout->eccpos;
->  	uint32_t stat;
->  	unsigned long end_time;
-> +	int bitflips = 0;
->  
->  	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_RST);
->  	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
-> @@ -789,11 +792,13 @@ static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
->  	}
->  
->  	stat = pmecc_readl_relaxed(host->ecc, ISR);
-> -	if (stat != 0)
-> -		if (pmecc_correction(mtd, stat, buf, &oob[eccpos[0]]) != 0)
-> +	if (stat != 0) {
-> +		bitflips = pmecc_correction(mtd, stat, buf, &oob[eccpos[0]]);
-> +		if (bitflips < 0)
->  			return -EIO;
-> +	}
->  
-> -	return 0;
-> +	return bitflips;
->  }
->  
->  static int atmel_nand_pmecc_write_page(struct mtd_info *mtd,
-> 
-
-
--- 
-Nicolas Ferre
+g.
