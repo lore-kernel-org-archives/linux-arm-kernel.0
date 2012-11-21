@@ -1,32 +1,53 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 20 Nov 2012 23:21:08 -0800
-Subject: [GIT PULL v2] Renesas ARM-based SoC boards for v3.8 #3
-In-Reply-To: <1353372187-2903-1-git-send-email-horms@verge.net.au>
-References: <1353372187-2903-1-git-send-email-horms@verge.net.au>
-Message-ID: <20121121072108.GH7615@quad.lixom.net>
+Date: Tue, 20 Nov 2012 23:23:00 -0800
+Subject: [PATCH 0/3] ARM: zynq: ARCH_MULTIPLATFORM support
+In-Reply-To: <CAHTX3d+YE7mtsQOdrBV4B=zp_CHSTrWbbXgjkBBkTeenv_4DHg@mail.gmail.com>
+References: <cover.1353349191.git.josh.cartwright@ni.com>
+ <CAHTX3d+YE7mtsQOdrBV4B=zp_CHSTrWbbXgjkBBkTeenv_4DHg@mail.gmail.com>
+Message-ID: <20121121072300.GI7615@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 09:43:06AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
+On Tue, Nov 20, 2012 at 01:30:58PM +0100, Michal Simek wrote:
+> Hi Josh, Arnd and Olof,
 > 
-> Please consider the following board fix for 3.8.
+> 2012/11/19 Josh Cartwright <josh.cartwright@ni.com>:
+> > Michal-
+> >
+> > Here's an attempt at supporting ARCH_MULTIPLATFORM on Zynq.  I've gotten
+> > a multiplatform kernel building and booting on the zc702, although I
+> > haven't tried to boot the same image on another non-Zynq board, due to
+> > lack of available hardware.
+> >
+> > It would be super awesome if this set could land in 3.8, but I know
+> > we're running out of time there.  I wouldn't be too heartbroken if it
+> > didn't make it.
+> >
+> > This patchset is on top of your arm-next branch and with the
+> > debug_ll_init support patch @ arm-soc/devel/debug_ll_init.
+> >
+> > Patch 1 drops the early TTC mapping.  It is not necessary, since the TTC
+> > driver now supports pulling mapping info from the device tree.
+> >
+> > Patch 2 converts zynq to use the debug_ll_init() infrastructure slated
+> > to go into 3.8.
+> >
+> > Patch 3 is the bulk of the set, moving around logic around within
+> > mach-zynq/include, and setting up the necessary build magic to get Zynq
+> > building w/ CONFIG_ARCH_MULTIPLATFORM.
+> >
 > 
-> The commit message for the patch has been revised since yesterday's
-> pull-request.
+> I wanted to look at it too today. You were faster!
+> I have tested your patches and all works for me.
+> I have also added them to my arm-next branch.
 > 
-> Also, please let me know if you would prefer me to supply
-> this as a fixes branch as we are now in the 3.7-rc6 timeframe
-> where I understand that non-fix commits are no longer allowed for 3.8.
->
-> This commit is based on the renesas/boards2 branch of the arm-soc tree.
+> I don't have others ARM boards to test but it shouldn't be big problem
+> because others will test it.
+> 
+> We are out of merge window that's why we should wait to the next one.
+> Anyway Arnd/Olof if there is any option to get this to v3.8, please let me know.
 
-It's not super-strictly "fixes only" at this point in the tree, but we really
-want to make sure that we don't get any large pull requests from here on out.
-
-For an update like this (adding one more patch on top of a previous branch),
-this format is perfect since it allows us to just pull the same branch again,
-really. So I've pulled this on top of the previous contents into next/boards2.
+Feel free to post a pull request, if things look clean we can probably pick it up.
 
 
--Olof
+-Olof (playing good cop for once :-)
