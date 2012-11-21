@@ -1,99 +1,95 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 21 Nov 2012 11:27:10 +0100
-Subject: [PATCH 1/1] net: add micrel KSZ8873MLL switch support
-Message-ID: <1353493630-30867-1-git-send-email-plagnioj@jcrosoft.com>
+Date: Wed, 21 Nov 2012 11:29:22 +0100
+Subject: [PATCH 1/1] mmc:atmel-mci: use devm_gpio_request/free and configure
+ the pin corrently
+Message-ID: <1353493762-31137-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this will allow to detect the link between the switch and the soc
+as on DT we do not configure the pin via AT91 custom pinmux as before
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: netdev at vger.kernel.org
+Cc: linux-mmc at vger.kernel.org
+Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- drivers/net/phy/micrel.c   |   44 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/micrel_phy.h |    1 +
- 2 files changed, 45 insertions(+)
 
-diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
-index 2165d5f..38d7034 100644
---- a/drivers/net/phy/micrel.c
-+++ b/drivers/net/phy/micrel.c
-@@ -127,6 +127,39 @@ static int ks8051_config_init(struct phy_device *phydev)
- 	return 0;
- }
- 
-+#define KSZ8873MLL_GLOBAL_CONTROL_4	0x06
-+#define KSZ8873MLL_GLOBAL_CONTROL_4_DUPLEX	(1 << 6)
-+#define KSZ8873MLL_GLOBAL_CONTROL_4_SPEED	(1 << 4)
-+int ksz8873mll_read_status(struct phy_device *phydev)
-+{
-+	int regval;
-+
-+	/* dummy read */
-+	regval = phy_read(phydev, KSZ8873MLL_GLOBAL_CONTROL_4);
-+
-+	regval = phy_read(phydev, KSZ8873MLL_GLOBAL_CONTROL_4);
-+
-+	if (regval & KSZ8873MLL_GLOBAL_CONTROL_4_DUPLEX)
-+		phydev->duplex = DUPLEX_HALF;
-+	else
-+		phydev->duplex = DUPLEX_FULL;
-+
-+	if (regval & KSZ8873MLL_GLOBAL_CONTROL_4_SPEED)
-+		phydev->speed = SPEED_10;
-+	else
-+		phydev->speed = SPEED_100;
-+
-+	phydev->link = 1;
-+	phydev->pause = phydev->asym_pause = 0;
-+
-+	return 0;
-+}
-+
-+static int ksz8873mll_config_aneg(struct phy_device *phydev)
-+{
-+	return 0;
-+}
-+
- static struct phy_driver ksphy_driver[] = {
+based on next-20121115
+
+Best Regards,
+J.
+ drivers/mmc/host/atmel-mci.c |   39 ++++++++++++++++++++++++++++-----------
+ 1 file changed, 28 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 767706b..d97771d 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -2108,6 +2108,7 @@ static int __init atmci_init_slot(struct atmel_mci *host,
  {
- 	.phy_id		= PHY_ID_KS8737,
-@@ -204,6 +237,16 @@ static struct phy_driver ksphy_driver[] = {
- 	.ack_interrupt	= kszphy_ack_interrupt,
- 	.config_intr	= ksz9021_config_intr,
- 	.driver		= { .owner = THIS_MODULE, },
-+}, {
-+	.phy_id		= PHY_ID_KSZ8873MLL,
-+	.phy_id_mask	= 0x00fffff0,
-+	.name		= "Micrel KSZ8873MLL Swithch",
-+	.features	= (SUPPORTED_Pause | SUPPORTED_Asym_Pause),
-+	.flags		= PHY_HAS_MAGICANEG,
-+	.config_init	= kszphy_config_init,
-+	.config_aneg	= ksz8873mll_config_aneg,
-+	.read_status	= ksz8873mll_read_status,
-+	.driver		= { .owner = THIS_MODULE, },
- } };
+ 	struct mmc_host			*mmc;
+ 	struct atmel_mci_slot		*slot;
++	int ret;
  
- static int __init ksphy_init(void)
-@@ -232,6 +275,7 @@ static struct mdio_device_id __maybe_unused micrel_tbl[] = {
- 	{ PHY_ID_KSZ8021, 0x00ffffff },
- 	{ PHY_ID_KSZ8041, 0x00fffff0 },
- 	{ PHY_ID_KSZ8051, 0x00fffff0 },
-+	{ PHY_ID_KSZ8873MLL, 0x00fffff0 },
- 	{ }
- };
+ 	mmc = mmc_alloc_host(sizeof(struct atmel_mci_slot), &host->pdev->dev);
+ 	if (!mmc)
+@@ -2161,12 +2162,20 @@ static int __init atmci_init_slot(struct atmel_mci *host,
+ 	/* Assume card is present initially */
+ 	set_bit(ATMCI_CARD_PRESENT, &slot->flags);
+ 	if (gpio_is_valid(slot->detect_pin)) {
+-		if (gpio_request(slot->detect_pin, "mmc_detect")) {
+-			dev_dbg(&mmc->class_dev, "no detect pin available\n");
+-			slot->detect_pin = -EBUSY;
+-		} else if (gpio_get_value(slot->detect_pin) ^
+-				slot->detect_is_active_high) {
+-			clear_bit(ATMCI_CARD_PRESENT, &slot->flags);
++		ret = devm_gpio_request(&mmc->class_dev, slot->detect_pin, "mmc_detect");
++		if (ret) {
++			dev_warn(&mmc->class_dev, "can't request detect pin\n");
++			slot->detect_pin = ret;
++		} else {
++			ret = gpio_direction_input(slot->detect_pin);
++			if (ret) {
++				dev_err(&mmc->class_dev, "can't set detect pin direction\n");
++				devm_gpio_free(&mmc->class_dev, slot->detect_pin);
++				slot->detect_pin = -ret;
++			} else if (gpio_get_value(slot->detect_pin) ^
++					slot->detect_is_active_high) {
++				clear_bit(ATMCI_CARD_PRESENT, &slot->flags);
++			}
+ 		}
+ 	}
  
-diff --git a/include/linux/micrel_phy.h b/include/linux/micrel_phy.h
-index de20120..adfe8c0 100644
---- a/include/linux/micrel_phy.h
-+++ b/include/linux/micrel_phy.h
-@@ -15,6 +15,7 @@
+@@ -2174,9 +2183,17 @@ static int __init atmci_init_slot(struct atmel_mci *host,
+ 		mmc->caps |= MMC_CAP_NEEDS_POLL;
  
- #define MICREL_PHY_ID_MASK	0x00fffff0
+ 	if (gpio_is_valid(slot->wp_pin)) {
+-		if (gpio_request(slot->wp_pin, "mmc_wp")) {
+-			dev_dbg(&mmc->class_dev, "no WP pin available\n");
+-			slot->wp_pin = -EBUSY;
++		ret = devm_gpio_request(&mmc->class_dev, slot->wp_pin, "mmc_wp");
++		if (ret) {
++			dev_warn(&mmc->class_dev, "no WP pin available\n");
++			slot->wp_pin = ret;
++		} else {
++			ret = gpio_direction_output(slot->wp_pin, 0);
++			if (ret) {
++				dev_err(&mmc->class_dev, "can't set WP pin direction\n");
++				devm_gpio_free(&mmc->class_dev, slot->wp_pin);
++				slot->wp_pin = ret;
++			}
+ 		}
+ 	}
  
-+#define PHY_ID_KSZ8873MLL	0x000e7237
- #define PHY_ID_KSZ9021		0x00221610
- #define PHY_ID_KS8737		0x00221720
- #define PHY_ID_KSZ8021		0x00221555
+@@ -2197,8 +2214,8 @@ static int __init atmci_init_slot(struct atmel_mci *host,
+ 			dev_dbg(&mmc->class_dev,
+ 				"could not request IRQ %d for detect pin\n",
+ 				gpio_to_irq(slot->detect_pin));
+-			gpio_free(slot->detect_pin);
+-			slot->detect_pin = -EBUSY;
++			devm_gpio_free(&mmc->class_dev, slot->detect_pin);
++			slot->detect_pin = ret;
+ 		}
+ 	}
+ 
 -- 
 1.7.10.4
