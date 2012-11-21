@@ -1,50 +1,91 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Nov 2012 15:28:54 -0800
-Subject: [GIT PULL] ARM: SoC fixes for 3.7
-Message-ID: <20121121232854.GB18134@quad.lixom.net>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Thu, 22 Nov 2012 00:41:21 +0100
+Subject: [PATCH] cpufreq: exynos: Broadcast frequency change notifications
+ for all cores
+In-Reply-To: <3562672.u4N3XIHFEC@flatron>
+References: <1887364.fvxYYNb7Mm@amdc1227> <4440154.l7bQzsqNex@vostro.rjw.lan>
+ <3562672.u4N3XIHFEC@flatron>
+Message-ID: <1516506.6Tpvy1mpz1@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wednesday, November 21, 2012 10:23:02 PM Tomasz Figa wrote:
+> Hi Rafael,
+> 
+> On Wednesday 21 of November 2012 21:47:42 Rafael J. Wysocki wrote:
+> > On Wednesday, November 21, 2012 02:52:26 PM Tomasz Figa wrote:
+> > > On Tuesday 13 of November 2012 10:26:12 Tomasz Figa wrote:
+> > > > On Exynos SoCs all cores share the same frequency setting, so
+> > > > changing
+> > > > frequency of one core will affect rest of cores.
+> > > > 
+> > > > This patch modifies the exynos-cpufreq driver to inform cpufreq core
+> > > > about this behavior and broadcast frequency change notifications for
+> > > > all cores.
+> > > > 
+> > > > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > > > ---
+> > > > 
+> > > >  drivers/cpufreq/exynos-cpufreq.c | 7 +++++--
+> > > >  1 file changed, 5 insertions(+), 2 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/cpufreq/exynos-cpufreq.c
+> > > > b/drivers/cpufreq/exynos-cpufreq.c index af2d81e..c0d54a8 100644
+> > > > --- a/drivers/cpufreq/exynos-cpufreq.c
+> > > > +++ b/drivers/cpufreq/exynos-cpufreq.c
+> > > > @@ -100,7 +100,8 @@ static int exynos_target(struct cpufreq_policy
+> > > > *policy, }
+> > > > 
+> > > >  	arm_volt = volt_table[index];
+> > > > 
+> > > > -	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> > > > +	for_each_cpu(freqs.cpu, policy->cpus)
+> > > > +		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> > > > 
+> > > >  	/* When the new frequency is higher than current frequency */
+> > > >  	if ((freqs.new > freqs.old) && !safe_arm_volt) {
+> > > > 
+> > > > @@ -115,7 +116,8 @@ static int exynos_target(struct cpufreq_policy
+> > > > *policy, if (freqs.new != freqs.old)
+> > > > 
+> > > >  		exynos_info->set_freq(old_index, index);
+> > > > 
+> > > > -	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> > > > +	for_each_cpu(freqs.cpu, policy->cpus)
+> > > > +		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> > > > 
+> > > >  	/* When the new frequency is lower than current frequency */
+> > > >  	if ((freqs.new < freqs.old) ||
+> > > > 
+> > > > @@ -235,6 +237,7 @@ static int exynos_cpufreq_cpu_init(struct
+> > > > cpufreq_policy *policy) cpumask_copy(policy->related_cpus,
+> > > > cpu_possible_mask);
+> > > > 
+> > > >  		cpumask_copy(policy->cpus, cpu_online_mask);
+> > > >  	
+> > > >  	} else {
+> > > > 
+> > > > +		policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
+> > > > 
+> > > >  		cpumask_setall(policy->cpus);
+> > > >  	
+> > > >  	}
+> > > 
+> > > Ping.
+> > 
+> > Am I supposed to handle this?
+> 
+> I guess. Would be really nice if you could apply this patch for 3.8.
 
-The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
+OK
 
-  Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
+Applied to linux-pm.git/linux-next as v3.8 material.
 
-are available in the git repository at:
+Thanks,
+Rafael
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 
-for you to fetch changes up to 65546ab097b023886a60df4cbc931d4cc362b98e:
-
-  Merge tag 'omap-for-v3.7-rc5/fixes-signed' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2012-11-21 13:56:36 -0800)
-
-----------------------------------------------------------------
-
-ARM: SoC fixes for 3.7
-
-A few more fixes for final 3.7. Two dealing with pinmux setup on OMAP, and
-one dealing with TV output on DaVinci. And one small MAINTAINER update.
-
-----------------------------------------------------------------
-Anders Hedlund (1):
-      ARM: OMAP3: igep0020: Set WIFI/BT GPIO pins in correct mux mode
-
-Javier Martinez Canillas (1):
-      ARM: OMAP: Add maintainer entry for IGEP machines
-
-Kevin Hilman (1):
-      ARM: OMAP4: TWL: mux sys_drm_msecure as output for PMIC
-
-Lad, Prabhakar (1):
-      ARM: davinci: dm644x: fix out range signal for ED
-
-Olof Johansson (2):
-      Merge tag 'davinci-fixes-for-v3.7' of git://gitorious.org/linux-davinci/linux-davinci into fixes
-      Merge tag 'omap-for-v3.7-rc5/fixes-signed' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-
- MAINTAINERS                          | 8 ++++++++
- arch/arm/mach-davinci/dm644x.c       | 3 +--
- arch/arm/mach-omap2/board-igep0020.c | 5 +++++
- arch/arm/mach-omap2/twl-common.c     | 1 +
- 4 files changed, 15 insertions(+), 2 deletions(-)
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
