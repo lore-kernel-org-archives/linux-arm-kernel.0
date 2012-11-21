@@ -1,30 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Nov 2012 01:14:11 -0800
-Subject: [GIT PULL] Highbank DEBUG_LL clean-up
-In-Reply-To: <50AA455F.2040909@gmail.com>
-References: <50AA455F.2040909@gmail.com>
-Message-ID: <20121121091411.GS7615@quad.lixom.net>
+Date: Wed, 21 Nov 2012 01:16:15 -0800
+Subject: [GIT PULL] Calxeda cpuidle support
+In-Reply-To: <50AA4621.20509@gmail.com>
+References: <50AA4621.20509@gmail.com>
+Message-ID: <20121121091615.GT7615@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 08:42:39AM -0600, Rob Herring wrote:
+On Mon, Nov 19, 2012 at 08:45:53AM -0600, Rob Herring wrote:
 > Arnd, Olof,
 > 
-> Please pull DEBUG_LL clean-up for highbank. This is based on a merge of
-> calxeda/ecx-2000 and devel/debug_ll_init arm-soc branches. It was more
-> that just a trivial merge conflict. One hunk is dependent on
-> calxeda/ecx-2000 changes.
+> Please pull cpuidle support for highbank. This is the first driver in
+> drivers/cpuidle. All the existing drivers for ARM are in arch/arm. I'm
+> asking for you to pull since there seems to be a lack of maintainer for
+> cpuidle drivers.
 > 
+> Regards,
 > Rob
 > 
-> The following changes since commit d3ad4a60a1b1448e59914eebefe1ccc8e64f9e2f:
+> The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
 > 
->   Merge remote-tracking branch 'arm-soc/devel/debug_ll_init' into debug_ll (2012-11-07 17:59:14 -0600)
+>   Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
 > 
 > are available in the git repository at:
 > 
-> 
->   git://sources.calxeda.com/kernel/linux.git tags/highbank-debugll-cleanup
+>   git://sources.calxeda.com/kernel/linux.git tags/highbank-cpuidle
 
 Thanks, pulled into next/soc.
 
