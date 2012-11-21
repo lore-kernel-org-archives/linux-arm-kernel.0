@@ -1,60 +1,36 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 21 Nov 2012 11:12:53 +0100
-Subject: [PATCH v3] can: c_can: Add d_can raminit support
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA77E29@DBDE01.ent.ti.com>
-References: <1353490282-10853-1-git-send-email-mkl@pengutronix.de>
- <331ABD5ECB02734CA317220B2BBEABC13EA77E29@DBDE01.ent.ti.com>
-Message-ID: <50ACA925.60900@pengutronix.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 21 Nov 2012 11:12:59 +0100
+Subject: [PATCH 0/2] gpio: dt: add gpio-export support
+Message-ID: <20121121101259.GQ4398@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2012 11:07 AM, AnilKumar, Chimata wrote:
-> On Wed, Nov 21, 2012 at 15:01:22, Marc Kleine-Budde wrote:
->> From: AnilKumar Ch <anilkumar@ti.com>
->>
->> Add D_CAN raminit support to C_CAN driver to enable D_CAN RAM,
->> which holds all the message objects during transmission or
->> receiving of data. This initialization/de-initialization should
->> be done in synchronous with D_CAN clock.
->>
->> In case of AM335X-EVM (current user of D_CAN driver) message RAM is
->> controlled through control module register for both instances. So
->> control module register details is required to initialization or
->> de-initialization of message RAM according to instance number.
->>
->> Control module memory resource is obtained from D_CAN dt node and
->> instance number obtained from device tree aliases node.
->>
->> This patch was tested on AM335x-EVM along with pinctrl data addition
->> patch, d_can dt aliases addition and control module data addition.
->> pinctrl data addition is not added to am335x-evm.dts (only supports
->> CPLD profile#0) because d_can1 is supported under CPLD profile#1.
->>
->> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
->> [mkl: fix instance for non DT in probe, cleaned up raminit]
->> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->> ---
->> Hello,
->>
->> compile time tested only - please test on real HW.
-> 
-> Hi Marc,
-> 
-> I tested this patch, its working.
+HI,
 
-Tnx, pushed to linux-can-next/master
+	This patch serie add the support of gpio-export to DT
 
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+	This also extend to gpio_export with the possibility to specify a name
+	for the gpio.
+	When you support different hardware you do not need to knwon which gpio
+	is used at application level just you have it
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 261 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121121/f29a9e0a/attachment-0001.sig>
+	based on next-20121115 tested on AT91 Animeo IP
+
+  gpiolib-of: ad gpio-export support (2012-11-19 20:36:03 +0800)
+
+----------------------------------------------------------------
+Jean-Christophe PLAGNIOL-VILLARD (2):
+      gpiolib: add gpio_export_with_name
+      gpiolib-of: ad gpio-export support
+
+ Documentation/devicetree/bindings/gpio/gpio.txt |   60 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/mips/include/asm/mach-au1x00/gpio-au1000.h |    3 ++-
+ arch/mips/include/asm/mach-au1x00/gpio-au1300.h |    3 ++-
+ drivers/gpio/gpiolib-of.c                       |   61 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/gpio/gpiolib.c                          |   12 +++++++-----
+ include/asm-generic/gpio.h                      |    6 ++++--
+ include/linux/gpio.h                            |   23 ++++++++++++++++++++++-
+ 7 files changed, 158 insertions(+), 10 deletions(-)
+
+Best Regards,
+J.
