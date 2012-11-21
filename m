@@ -1,27 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Nov 2012 13:57:53 -0800
-Subject: [GIT PULL] few omap regression fixes for v3.7-rc5
-In-Reply-To: <20121121214622.GH18567@atomide.com>
-References: <20121121214622.GH18567@atomide.com>
-Message-ID: <20121121215753.GA18134@quad.lixom.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 21 Nov 2012 22:59:38 +0100
+Subject: [GIT PULL v3] core, cpu and gated clocks for mvebu
+In-Reply-To: <20121121214228.21126.36736@nucleus>
+References: <1353421876-13759-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121121214228.21126.36736@nucleus>
+Message-ID: <20121121225938.0ebcd8d7@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 01:46:22PM -0800, Tony Lindgren wrote:
-> The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
-> 
->   Linux 3.7-rc4 (2012-11-04 11:07:39 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.7-rc5/fixes-signed
-> 
-> for you to fetch changes up to 1ef43369c681bf30a980a4ba42df20514b15fdda:
-> 
->   ARM: OMAP4: TWL: mux sys_drm_msecure as output for PMIC (2012-11-12 14:11:47 -0800)
+Mike,
 
+On Wed, 21 Nov 2012 13:42:28 -0800, Mike Turquette wrote:
+> Quoting Thomas Petazzoni (2012-11-20 06:31:08)
+> > Mike, Jason,
+> > 
+> > Mike, this should hopefully be the final version of the clk
+> > patches. We would therefore need your comments on it, or if everything
+> > goes well, your formal Acked-by. We would however like to carry those
+> > patches through the Marvell maintainers tree, as we have many other
+> > patches that depend on the clk support.
+> > 
+> 
+> Hi Thomas,
+> 
+> For the drivers/clk/ parts (patches 1-4) you have my:
+> Acked-by: Mike Turquette <mturquette@linaro.org>
 
-Pulled, thanks.
+Thanks a lot!
 
-
--Olof
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
