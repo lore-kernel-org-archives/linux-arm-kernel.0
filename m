@@ -1,368 +1,148 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 21 Nov 2012 23:05:23 +0000 (UTC)
-Subject: [PATCHv9 1/8] ARM: OMAP: hwmod: Add support for per hwmod/module
- context lost count
-In-Reply-To: <1350552010-28760-2-git-send-email-t-kristo@ti.com>
-References: <1350552010-28760-1-git-send-email-t-kristo@ti.com>
- <1350552010-28760-2-git-send-email-t-kristo@ti.com>
-Message-ID: <alpine.DEB.2.00.1211212259150.9132@utopia.booyaka.com>
+Date: Wed, 21 Nov 2012 23:07:17 +0000 (UTC)
+Subject: [PATCH v2 1/2] ARM: OMAP: hwmod: Add possibility to count hwmod
+ resources based on type
+In-Reply-To: <1351596296-13825-2-git-send-email-peter.ujfalusi@ti.com>
+References: <1351596296-13825-1-git-send-email-peter.ujfalusi@ti.com>
+ <1351596296-13825-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <alpine.DEB.2.00.1211212306340.32242@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Oct 2012, Tero Kristo wrote:
+On Tue, 30 Oct 2012, Peter Ujfalusi wrote:
 
-> From: Rajendra Nayak <rnayak@ti.com>
+> Add flags parameter for omap_hwmod_count_resources() so users can tell which
+> type of resources they are interested when counting them in hwmod database.
 > 
-> OMAP4 has module specific context lost registers which makes it now
-> possible to have module level context loss count, instead of relying
-> on the powerdomain level context count.
-> 
-> Add 2 private hwmod api's to update/clear the hwmod/module specific
-> context lost counters/register.
-> 
-> Update the module specific context_lost_counter and clear the hardware
-> bits just after enabling the module.
-> 
-> omap_hwmod_get_context_loss_count() now returns the hwmod context loss
-> count them on platforms where they exist (OMAP4), else fall back on
-> the pwrdm level counters for older platforms.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> [paul at pwsan.com: added function kerneldoc, fixed structure kerneldoc,
->  rearranged structure to avoid memory waste, marked fns as OMAP4-specific,
->  prevent fn entry on non-OMAP4 chips, reduced indentation, merged update
->  and clear, merged patches]
-> [t-kristo at ti.com: added support for arch specific hwmod ops, and changed
->  the no context offset indicator to USHRT_MAX]
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> [paul at pwsan.com: use NO_CONTEXT_LOSS_BIT flag rather than USHRT_MAX;
->  convert unsigned context lost counter to int to match the return type;
->  get rid of hwmod_ops in favor of the existing soc_ops mechanism]
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-Here's an updated version of this one with the low-level PRM accesses 
-moved out to the PRM code.
+Here's this one, updated to apply after the various cleanups.
 
 
 - Paul
 
-From: Rajendra Nayak <rnayak@ti.com>
-Date: Wed, 21 Nov 2012 11:48:46 -0700
-Subject: [PATCH] ARM: OMAP2+: hwmod: Add support for per hwmod/module context
- lost count
+From: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Date: Wed, 21 Nov 2012 11:50:12 -0700
+Subject: [PATCH 1/2] ARM: OMAP2+: hwmod: Add possibility to count hwmod
+ resources based on type
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
-OMAP4 has module specific context lost registers which makes it now
-possible to have module level context loss count, instead of relying
-on the powerdomain level context count.
+Add flags parameter for omap_hwmod_count_resources() so users can tell which
+type of resources they are interested when counting them in hwmod database.
 
-Add 2 private hwmod api's to update/clear the hwmod/module specific
-context lost counters/register.
-
-Update the module specific context_lost_counter and clear the hardware
-bits just after enabling the module.
-
-omap_hwmod_get_context_loss_count() now returns the hwmod context loss
-count them on platforms where they exist (OMAP4), else fall back on
-the pwrdm level counters for older platforms.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-[paul at pwsan.com: added function kerneldoc, fixed structure kerneldoc,
- rearranged structure to avoid memory waste, marked fns as OMAP4-specific,
- prevent fn entry on non-OMAP4 chips, reduced indentation, merged update
- and clear, merged patches]
-[t-kristo at ti.com: added support for arch specific hwmod ops, and changed
- the no context offset indicator to USHRT_MAX]
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-[paul at pwsan.com: use NO_CONTEXT_LOSS_BIT flag rather than USHRT_MAX;
- convert unsigned context lost counter to int to match the return type;
- get rid of hwmod_ops in favor of the existing soc_ops mechanism;
- move context loss low-level accesses to the PRM code]
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Acked-by: Beno?t Cousson <b-cousson@ti.com>
+[paul at pwsan.com: updated to apply]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   55 +++++++++++++++++++++++++++++++++++---
- arch/arm/mach-omap2/omap_hwmod.h |   10 ++++---
- arch/arm/mach-omap2/prm.h        |   11 +++++++-
- arch/arm/mach-omap2/prm44xx.c    |   33 +++++++++++++++++++++++
- arch/arm/mach-omap2/prm_common.c |   45 +++++++++++++++++++++++++++++++
- 5 files changed, 146 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap2/omap_device.c |   11 ++++++++---
+ arch/arm/mach-omap2/omap_hwmod.c  |   27 ++++++++++++++++-----------
+ arch/arm/mach-omap2/omap_hwmod.h  |    2 +-
+ 3 files changed, 25 insertions(+), 15 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index 0ef934f..8917a08 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -441,19 +441,21 @@ int omap_device_get_context_loss_count(struct platform_device *pdev)
+ /**
+  * omap_device_count_resources - count number of struct resource entries needed
+  * @od: struct omap_device *
++ * @flags: Type of resources to include when counting (IRQ/DMA/MEM)
+  *
+  * Count the number of struct resource entries needed for this
+  * omap_device @od.  Used by omap_device_build_ss() to determine how
+  * much memory to allocate before calling
+  * omap_device_fill_resources().  Returns the count.
+  */
+-static int omap_device_count_resources(struct omap_device *od)
++static int omap_device_count_resources(struct omap_device *od,
++				       unsigned long flags)
+ {
+ 	int c = 0;
+ 	int i;
+ 
+ 	for (i = 0; i < od->hwmods_cnt; i++)
+-		c += omap_hwmod_count_resources(od->hwmods[i]);
++		c += omap_hwmod_count_resources(od->hwmods[i], flags);
+ 
+ 	pr_debug("omap_device: %s: counted %d total resources across %d hwmods\n",
+ 		 od->pdev->name, c, od->hwmods_cnt);
+@@ -557,7 +559,10 @@ struct omap_device *omap_device_alloc(struct platform_device *pdev,
+ 	od->hwmods = hwmods;
+ 	od->pdev = pdev;
+ 
+-	res_count = omap_device_count_resources(od);
++	/* Count all resources for the device */
++	res_count = omap_device_count_resources(od, IORESOURCE_IRQ |
++						    IORESOURCE_DMA |
++						    IORESOURCE_MEM);
+ 	/*
+ 	 * DT Boot:
+ 	 *   OF framework will construct the resource structure (currently
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 68616b2..083adbe 100644
+index 083adbe..a809090 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -187,6 +187,8 @@ struct omap_hwmod_soc_ops {
- 	int (*is_hardreset_asserted)(struct omap_hwmod *oh,
- 				     struct omap_hwmod_rst_info *ohri);
- 	int (*init_clkdm)(struct omap_hwmod *oh);
-+	void (*update_context_lost)(struct omap_hwmod *oh);
-+	int (*get_context_lost)(struct omap_hwmod *oh);
- };
- 
- /* soc_ops: adapts the omap_hwmod code to the currently-booted SoC */
-@@ -1983,6 +1985,42 @@ static void _reconfigure_io_chain(void)
- }
- 
+@@ -3427,7 +3427,7 @@ int omap_hwmod_reset(struct omap_hwmod *oh)
  /**
-+ * _omap4_update_context_lost - increment hwmod context loss counter if
-+ * hwmod context was lost, and clear hardware context loss reg
-+ * @oh: hwmod to check for context loss
-+ *
-+ * If the PRCM indicates that the hwmod @oh lost context, increment
-+ * our in-memory context loss counter, and clear the RM_*_CONTEXT
-+ * bits. No return value.
-+ */
-+static void _omap4_update_context_lost(struct omap_hwmod *oh)
-+{
-+	if (oh->prcm.omap4.flags & HWMOD_OMAP4_NO_CONTEXT_LOSS_BIT)
-+		return;
-+
-+	if (!prm_was_any_context_lost_old(oh->clkdm->pwrdm.ptr->prcm_partition,
-+					  oh->clkdm->pwrdm.ptr->prcm_offs,
-+					  oh->prcm.omap4.context_offs))
-+		return;
-+
-+	oh->prcm.omap4.context_lost_counter++;
-+	prm_clear_context_loss_flags_old(oh->clkdm->pwrdm.ptr->prcm_partition,
-+					 oh->clkdm->pwrdm.ptr->prcm_offs,
-+					 oh->prcm.omap4.context_offs);
-+}
-+
-+/**
-+ * _omap4_get_context_lost - get context loss counter for a hwmod
-+ * @oh: hwmod to get context loss counter for
-+ *
-+ * Returns the in-memory context loss counter for a hwmod.
-+ */
-+static int _omap4_get_context_lost(struct omap_hwmod *oh)
-+{
-+	return oh->prcm.omap4.context_lost_counter;
-+}
-+
-+/**
-  * _enable - enable an omap_hwmod
+  * omap_hwmod_count_resources - count number of struct resources needed by hwmod
   * @oh: struct omap_hwmod *
+- * @res: pointer to the first element of an array of struct resource to fill
++ * @flags: Type of resources to include when counting (IRQ/DMA/MEM)
   *
-@@ -2065,6 +2103,9 @@ static int _enable(struct omap_hwmod *oh)
- 	if (soc_ops.enable_module)
- 		soc_ops.enable_module(oh);
- 
-+	if (soc_ops.update_context_lost)
-+		soc_ops.update_context_lost(oh);
-+
- 	r = (soc_ops.wait_target_ready) ? soc_ops.wait_target_ready(oh) :
- 		-EINVAL;
- 	if (!r) {
-@@ -3907,17 +3948,21 @@ ohsps_unlock:
-  * omap_hwmod_get_context_loss_count - get lost context count
-  * @oh: struct omap_hwmod *
+  * Count the number of struct resource array elements necessary to
+  * contain omap_hwmod @oh resources.  Intended to be called by code
+@@ -3440,20 +3440,25 @@ int omap_hwmod_reset(struct omap_hwmod *oh)
+  * resource IDs.
   *
-- * Query the powerdomain of of @oh to get the context loss
-- * count for this device.
-+ * Returns the context loss count of associated @oh
-+ * upon success, or zero if no context loss data is available.
-  *
-- * Returns the context loss count of the powerdomain assocated with @oh
-- * upon success, or zero if no powerdomain exists for @oh.
-+ * On OMAP4, this queries the per-hwmod context loss register,
-+ * assuming one exists.  If not, or on OMAP2/3, this queries the
-+ * enclosing powerdomain context loss count.
   */
- int omap_hwmod_get_context_loss_count(struct omap_hwmod *oh)
+-int omap_hwmod_count_resources(struct omap_hwmod *oh)
++int omap_hwmod_count_resources(struct omap_hwmod *oh, unsigned long flags)
  {
- 	struct powerdomain *pwrdm;
- 	int ret = 0;
+-	struct omap_hwmod_ocp_if *os;
+-	struct list_head *p;
+-	int ret;
+-	int i = 0;
++	int ret = 0;
  
-+	if (soc_ops.get_context_lost)
-+		return soc_ops.get_context_lost(oh);
+-	ret = _count_mpu_irqs(oh) + _count_sdma_reqs(oh);
++	if (flags & IORESOURCE_IRQ)
++		ret += _count_mpu_irqs(oh);
+ 
+-	p = oh->slave_ports.next;
++	if (flags & IORESOURCE_DMA)
++		ret += _count_sdma_reqs(oh);
+ 
+-	while (i < oh->slaves_cnt) {
+-		os = _fetch_next_ocp_if(&p, &i);
+-		ret += _count_ocp_if_addr_spaces(os);
++	if (flags & IORESOURCE_MEM) {
++		int i = 0;
++		struct omap_hwmod_ocp_if *os;
++		struct list_head *p = oh->slave_ports.next;
 +
- 	pwrdm = omap_hwmod_get_pwrdm(oh);
- 	if (pwrdm)
- 		ret = pwrdm_get_context_loss_count(pwrdm);
-@@ -4032,6 +4077,8 @@ void __init omap_hwmod_init(void)
- 		soc_ops.deassert_hardreset = _omap4_deassert_hardreset;
- 		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
- 		soc_ops.init_clkdm = _init_clkdm;
-+		soc_ops.update_context_lost = _omap4_update_context_lost;
-+		soc_ops.get_context_lost = _omap4_get_context_lost;
- 	} else if (soc_is_am33xx()) {
- 		soc_ops.enable_module = _am33xx_enable_module;
- 		soc_ops.disable_module = _am33xx_disable_module;
++		while (i < oh->slaves_cnt) {
++			os = _fetch_next_ocp_if(&p, &i);
++			ret += _count_ocp_if_addr_spaces(os);
++		}
+ 	}
+ 
+ 	return ret;
 diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
-index 87b59b4..421ff65 100644
+index 421ff65..86b7414 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.h
 +++ b/arch/arm/mach-omap2/omap_hwmod.h
-@@ -2,7 +2,7 @@
-  * omap_hwmod macros, structures
-  *
-  * Copyright (C) 2009-2011 Nokia Corporation
-- * Copyright (C) 2012 Texas Instruments, Inc.
-+ * Copyright (C) 2011-2012 Texas Instruments, Inc.
-  * Paul Walmsley
-  *
-  * Created in collaboration with (alphabetical order): Beno?t Cousson,
-@@ -394,12 +394,15 @@ struct omap_hwmod_omap2_prcm {
+@@ -631,7 +631,7 @@ void omap_hwmod_write(u32 v, struct omap_hwmod *oh, u16 reg_offs);
+ u32 omap_hwmod_read(struct omap_hwmod *oh, u16 reg_offs);
+ int omap_hwmod_softreset(struct omap_hwmod *oh);
  
- /**
-  * struct omap_hwmod_omap4_prcm - OMAP4-specific PRCM data
-- * @clkctrl_reg: PRCM address of the clock control register
-- * @rstctrl_reg: address of the XXX_RSTCTRL register located in the PRM
-+ * @clkctrl_offs: offset of the PRCM clock control register
-+ * @rstctrl_offs: offset of the XXX_RSTCTRL register located in the PRM
-+ * @context_offs: offset of the RM_*_CONTEXT register
-  * @lostcontext_mask: bitmask for selecting bits from RM_*_CONTEXT register
-  * @rstst_reg: (AM33XX only) address of the XXX_RSTST register in the PRM
-  * @submodule_wkdep_bit: bit shift of the WKDEP range
-  * @flags: PRCM register capabilities for this IP block
-+ * @modulemode: allowable modulemodes
-+ * @context_lost_counter: Count of module level context lost
-  *
-  * If @lostcontext_mask is not defined, context loss check code uses
-  * whole register without masking. @lostcontext_mask should only be
-@@ -415,6 +418,7 @@ struct omap_hwmod_omap4_prcm {
- 	u8		submodule_wkdep_bit;
- 	u8		modulemode;
- 	u8		flags;
-+	int		context_lost_counter;
- };
- 
- 
-diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
-index a1a266c..ac25ae6 100644
---- a/arch/arm/mach-omap2/prm.h
-+++ b/arch/arm/mach-omap2/prm.h
-@@ -114,16 +114,25 @@ struct prm_reset_src_map {
- 
- /**
-  * struct prm_ll_data - fn ptrs to per-SoC PRM function implementations
-- * @read_reset_sources: ptr to the Soc PRM-specific get_reset_source impl
-+ * @read_reset_sources: ptr to the SoC PRM-specific get_reset_source impl
-+ * @was_any_context_lost_old: ptr to the SoC PRM context loss test fn
-+ * @clear_context_loss_flags_old: ptr to the SoC PRM context loss flag clear fn
-+ *
-+ * XXX @was_any_context_lost_old and @clear_context_loss_flags_old are
-+ * deprecated.
-  */
- struct prm_ll_data {
- 	u32 (*read_reset_sources)(void);
-+	bool (*was_any_context_lost_old)(u8 part, s16 inst, u16 idx);
-+	void (*clear_context_loss_flags_old)(u8 part, s16 inst, u16 idx);
- };
- 
- extern int prm_register(struct prm_ll_data *pld);
- extern int prm_unregister(struct prm_ll_data *pld);
- 
- extern u32 prm_read_reset_sources(void);
-+extern bool prm_was_any_context_lost_old(u8 part, s16 inst, u16 idx);
-+extern void prm_clear_context_loss_flags_old(u8 part, s16 inst, u16 idx);
- 
- #endif
- 
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index 9db1bd2..7498bc7 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -346,6 +346,37 @@ static u32 omap44xx_prm_read_reset_sources(void)
- 	return r;
- }
- 
-+/**
-+ * omap44xx_prm_was_any_context_lost_old - was module hardware context lost?
-+ * @part: PRM partition ID (e.g., OMAP4430_PRM_PARTITION)
-+ * @inst: PRM instance offset (e.g., OMAP4430_PRM_MPU_INST)
-+ * @idx: CONTEXT register offset
-+ *
-+ * Return 1 if any bits were set in the *_CONTEXT_* register
-+ * identified by (@part, @inst, @idx), which means that some context
-+ * was lost for that module; otherwise, return 0.
-+ */
-+static bool omap44xx_prm_was_any_context_lost_old(u8 part, s16 inst, u16 idx)
-+{
-+	return (omap4_prminst_read_inst_reg(part, inst, idx)) ? 1 : 0;
-+}
-+
-+/**
-+ * omap44xx_prm_clear_context_lost_flags_old - clear context loss flags
-+ * @part: PRM partition ID (e.g., OMAP4430_PRM_PARTITION)
-+ * @inst: PRM instance offset (e.g., OMAP4430_PRM_MPU_INST)
-+ * @idx: CONTEXT register offset
-+ *
-+ * Clear hardware context loss bits for the module identified by
-+ * (@part, @inst, @idx).  No return value.  XXX Writes to reserved bits;
-+ * is there a way to avoid this?
-+ */
-+static void omap44xx_prm_clear_context_loss_flags_old(u8 part, s16 inst,
-+						      u16 idx)
-+{
-+	omap4_prminst_write_inst_reg(0xffffffff, part, inst, idx);
-+}
-+
- /* Powerdomain low-level functions */
- 
- static int omap4_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
-@@ -613,6 +644,8 @@ struct pwrdm_ops omap4_pwrdm_operations = {
-  */
- static struct prm_ll_data omap44xx_prm_ll_data = {
- 	.read_reset_sources = &omap44xx_prm_read_reset_sources,
-+	.was_any_context_lost_old = &omap44xx_prm_was_any_context_lost_old,
-+	.clear_context_loss_flags_old = &omap44xx_prm_clear_context_loss_flags_old,
- };
- 
- int __init omap44xx_prm_init(void)
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index d2e0798..c6ae53c 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -367,6 +367,51 @@ u32 prm_read_reset_sources(void)
- }
- 
- /**
-+ * prm_was_any_context_lost_old - was device context lost? (old API)
-+ * @part: PRM partition ID (e.g., OMAP4430_PRM_PARTITION)
-+ * @inst: PRM instance offset (e.g., OMAP4430_PRM_MPU_INST)
-+ * @idx: CONTEXT register offset
-+ *
-+ * Return 1 if any bits were set in the *_CONTEXT_* register
-+ * identified by (@part, @inst, @idx), which means that some context
-+ * was lost for that module; otherwise, return 0.  XXX Deprecated;
-+ * callers need to use a less-SoC-dependent way to identify hardware
-+ * IP blocks.
-+ */
-+bool prm_was_any_context_lost_old(u8 part, s16 inst, u16 idx)
-+{
-+	bool ret = true;
-+
-+	if (prm_ll_data->was_any_context_lost_old)
-+		ret = prm_ll_data->was_any_context_lost_old(part, inst, idx);
-+	else
-+		WARN_ONCE(1, "prm: %s: no mapping function defined\n",
-+			  __func__);
-+
-+	return ret;
-+}
-+
-+/**
-+ * prm_clear_context_lost_flags_old - clear context loss flags (old API)
-+ * @part: PRM partition ID (e.g., OMAP4430_PRM_PARTITION)
-+ * @inst: PRM instance offset (e.g., OMAP4430_PRM_MPU_INST)
-+ * @idx: CONTEXT register offset
-+ *
-+ * Clear hardware context loss bits for the module identified by
-+ * (@part, @inst, @idx).  No return value.  XXX Deprecated; callers
-+ * need to use a less-SoC-dependent way to identify hardware IP
-+ * blocks.
-+ */
-+void prm_clear_context_loss_flags_old(u8 part, s16 inst, u16 idx)
-+{
-+	if (prm_ll_data->clear_context_loss_flags_old)
-+		prm_ll_data->clear_context_loss_flags_old(part, inst, idx);
-+	else
-+		WARN_ONCE(1, "prm: %s: no mapping function defined\n",
-+			  __func__);
-+}
-+
-+/**
-  * prm_register - register per-SoC low-level data with the PRM
-  * @pld: low-level per-SoC OMAP PRM data & function pointers to register
-  *
+-int omap_hwmod_count_resources(struct omap_hwmod *oh);
++int omap_hwmod_count_resources(struct omap_hwmod *oh, unsigned long flags);
+ int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res);
+ int omap_hwmod_fill_dma_resources(struct omap_hwmod *oh, struct resource *res);
+ int omap_hwmod_get_resource_byname(struct omap_hwmod *oh, unsigned int type,
 -- 
 1.7.10.4
