@@ -1,62 +1,42 @@
-From: nareshgbhat@gmail.com (Naresh Bhat)
-Date: Thu, 22 Nov 2012 00:17:21 +0530
-Subject: KEXEC on ARM cortex-a15
-In-Reply-To: <20121121102244.GA11990@mudshark.cambridge.arm.com>
-References: <CAJXQGfKpFfUwMeLGFAuTgQn5Yd2D9O271JM1VJ87Nio80tbwXw@mail.gmail.com>
- <20121119144417.GH3290@n2100.arm.linux.org.uk>
- <20121119151327.GG3205@mudshark.cambridge.arm.com>
- <CAJXQGf+BQ18GhR3emhK-ejTivqx_o=gtaO3-FjTiE3BMGydgsw@mail.gmail.com>
- <CAJXQGf+wfXGZ=PWN585dJDMX1nH+sRexf6UZujyjKM6rJeDiXQ@mail.gmail.com>
- <20121120160219.GF26475@mudshark.cambridge.arm.com>
- <CAJXQGfL4PRW9=MQO1XbogA40sHUzXorbFMe1WkiJ751Ej-h7=g@mail.gmail.com>
- <20121121102244.GA11990@mudshark.cambridge.arm.com>
-Message-ID: <CAJXQGfKh=yWzxBLMcw6yPh4tDKmuegtX3fqegEa6Cr9woRxwZQ@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 21 Nov 2012 11:47:54 -0700
+Subject: [PATCH] ARM: Kirkwood: Support basic hotplug for PCI-E
+In-Reply-To: <20121121183527.GC15800@titan.lakedaemon.net>
+References: <20121121182528.GA12715@obsidianresearch.com>
+ <20121121183527.GC15800@titan.lakedaemon.net>
+Message-ID: <20121121184754.GB12822@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 21, 2012 at 01:35:27PM -0500, Jason Cooper wrote:
+> On Wed, Nov 21, 2012 at 11:25:28AM -0700, Jason Gunthorpe wrote:
+> > Unconditionally register the PCI-E bus, even if the link is currently
+> > down. 
+> 
+> How does this affect clock gating on boards without PCI-E devices?  Will
+> the SoC then power this unconditionally?
 
-Can somebody suggest me which JTAG I should purchase for V2P-CA15_A7
-Cortex A15 target ?
+Hmm, interesting question.. This will definitely hold the clock lock
+on the PCI-E ports even if they are down at boot, and they will surely
+consume more power than if they were switched off.
 
-I would be great if you provide me a web link.  I will appreciate your help.
+However, if a board has no possible PCI-E devices, then it shouldn't
+be calling kirkwood_pcie_init, which will let things gate.
 
-Thanks and Regards
--Naresh Bhat
+So the only case is boards that have pluggable PCI-E devices, where no
+device is in the plug? That sounds like eval cards, is this a big
+deal?
 
-On Wed, Nov 21, 2012 at 3:52 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Nov 21, 2012 at 08:21:21AM +0000, Naresh Bhat wrote:
->> Hi Will,
->>
->> I have disabled the SMP on host kernel.  But still I am facing the
->> issue as below
->>
->> bash-4.2# ls
->> uImage  vexpress.dtb
->> bash-4.2#
->> bash-4.2# kexec -f uImage --dtb=vexpress.dtb --command-line="console=ttyS0"
->
-> Can you try using a zImage instead and also specifying the console as
-> ttyAMA0, as it looks like you're using a vexpress?
->
->> Starting new kernel
->> Bye!
->> Uncompressing Linux...
->
-> This isn't really very helpful -- some more debugging on your part would be
-> appreciated to get an insight as to what's going wrong. You could either use
-> JTAG or put some early prints in the decompressor to work out where it goes
-> awry.
->
-> Useful things to know would be: the state of the CPU when the new kernel
-> image is entered (if you have JTAG, you could also look at the dtb in memory
-> to see that it looks sane) and also at which point in the decompressor it
-> goes wrong / takes an abort (usually it's when we enable the MMU).
->
-> Will
+I guess another way to deal with this is to make the stuff in
+kirkwood/pcie.c an actual platform driver and hot attach the entire
+driver rather than using just using pci/rescan, but that is a fairly
+extensive change.. And I worry that powering down the interface in the
+interm will require re-initializing all the registers, which linux
+doesn't have the code to do at all.
 
+How about fixing this up to have a DT binding and make it a DT
+controlled option - that seems like a simple middle ground..
 
+What do you think?
 
--- 
-"For things to change, we must change"
--Naresh Bhat
+Jason
