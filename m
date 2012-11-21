@@ -1,33 +1,74 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 21 Nov 2012 13:27:59 +0800
-Subject: [GIT PULL][for 3.8] pull request from arch-pxa tree on armsoc/fix
- branch
-Message-ID: <CAN1soZzOq=2mKNbuFgD8HynciW=j7MX1ZRMpc_nzbP0Kx+APdw@mail.gmail.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Wed, 21 Nov 2012 05:38:56 +0000
+Subject: [PATCH v2] pwm: Device tree support for PWM polarity.
+In-Reply-To: <20121120150755.GB24545@avionic-0098.adnet.avionic-design.de>
+References: <1353347472-26863-1-git-send-email-avinashphilip@ti.com>
+ <20121120150755.GB24545@avionic-0098.adnet.avionic-design.de>
+Message-ID: <518397C60809E147AF5323E0420B992E3E9EC650@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof & Arnd,
+On Tue, Nov 20, 2012 at 20:37:55, Thierry Reding wrote:
+> On Mon, Nov 19, 2012 at 11:21:12PM +0530, Philip, Avinash wrote:
+> [...]
+> > diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+> > index 112b314..70756f2 100644
+> > --- a/include/linux/pwm.h
+> > +++ b/include/linux/pwm.h
+> > @@ -78,6 +78,10 @@ enum {
+> >  	PWMF_ENABLED = 1 << 1,
+> >  };
+> >  
+> > +/* flags in the third cell of the DT PWM specifier */
+> > +#define PWM_SPEC_POLARITY	(1 << 0)
+> > +
+> > +
+> 
+> This doesn't belong in this header. It should go into core.c in
+> drivers/pwm.
 
-Please help to merge armsoc/fix branch in arch-pxa git tree.
+I will move.
 
-Regards
-Haojian
+> 
+> >  struct pwm_device {
+> >  	const char		*label;
+> >  	unsigned long		flags;
+> > @@ -176,6 +180,8 @@ void pwm_put(struct pwm_device *pwm);
+> >  
+> >  struct pwm_device *devm_pwm_get(struct device *dev, const char *consumer);
+> >  void devm_pwm_put(struct device *dev, struct pwm_device *pwm);
+> > +struct pwm_device *of_pwm_xlate_with_flags(struct pwm_chip *pc,
+> > +		const struct of_phandle_args *args);
+> 
+> The placement of this prototype is odd. I think a better place would be
+> between pwm_request_from_chip() and pwm_get(), separated by blank lines
+> to make it stand out as an OF specific function.
 
-The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
+Ok I will move to between pwm_request_from_chip() and pwm_get().
 
-  Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
+> 
+> >  #else
+> >  static inline int pwm_set_chip_data(struct pwm_device *pwm, void *data)
+> >  {
+> > @@ -223,6 +229,12 @@ static inline struct pwm_device *devm_pwm_get(struct device *dev,
+> >  static inline void devm_pwm_put(struct device *dev, struct pwm_device *pwm)
+> >  {
+> >  }
+> > +
+> > +static inline struct pwm_device *of_pwm_xlate_with_flags(struct pwm_chip *pc,
+> > +		const struct of_phandle_args *args)
+> > +{
+> > +	return ERR_PTR(-ENODEV);
+> > +}
+> 
+> This function should only be used by PWM drivers and therefore doesn't
+> need to have a dummy implementation such as this.
 
-are available in the git repository at:
+Ok I will remove.
 
-  git://github.com/hzhuang1/linux.git armsoc/fix
+Thanks
+Avinash
 
-for you to fetch changes up to 8757e168190a6ed2cd4aa23fc59bf86b0091b596:
-
-  ARM: pxa: fix pxa25x gpio wakeup setting (2012-11-21 13:14:42 +0800)
-
-----------------------------------------------------------------
-Andrea Adami (1):
-      ARM: pxa: fix pxa25x gpio wakeup setting
-
- arch/arm/mach-pxa/pxa25x.c |    5 +++++
- 1 file changed, 5 insertions(+)
+> 
+> Thierry
+> 
