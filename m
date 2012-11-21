@@ -1,34 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Nov 2012 16:20:01 +0100
-Subject: [PATCH 15/16] irqchip: vic: mark vic_of_init() as static
-In-Reply-To: <50ACEE4F.3030409@gmail.com>
-References: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1353448867-15008-16-git-send-email-thomas.petazzoni@free-electrons.com>
- <CACRpkdazuvjXuuNP9TrsYsPQWMc=VV_-nu0oNWFPs+GzLmmw2g@mail.gmail.com>
- <20121121135357.5c963404@skate>
- <CACRpkdYU+tt=_xqVjoBnca-V8psRmZhU+UWUm-6i777vP5BChA@mail.gmail.com>
- <20121121154641.718c7b69@skate> <50ACEE4F.3030409@gmail.com>
-Message-ID: <20121121162001.1889e9bf@skate>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 21 Nov 2012 16:22:37 +0100
+Subject: [PATCH] mmc: mmci: Fixup and cleanup code for DMA handling
+In-Reply-To: <CAPDyKFqfjaDcj361eoMtp3BwQMAW5JcUcyoovFPzXdL0a3dzUg@mail.gmail.com>
+References: <1350056012-18625-1-git-send-email-ulf.hansson@stericsson.com>
+ <CACRpkdZqe3uB9wGM5g5LUJuZEtzeBW=Hs5RF=5_CKU0CBWJRyA@mail.gmail.com>
+ <CAPDyKFr=aN+MN+VCvbAqNa7mu+fxTTeHdcA1oCv8QWqpdT8MGQ@mail.gmail.com>
+ <CACRpkdZPbrvfk0QNB7x8YZ+DVibPJMTLsLDSf310CcBEeOTuww@mail.gmail.com>
+ <CAPDyKFqfjaDcj361eoMtp3BwQMAW5JcUcyoovFPzXdL0a3dzUg@mail.gmail.com>
+Message-ID: <CAPDyKFqt-yaA9LNAMEH0bE+109bceAuO94B+W5UbMmGUsVWFKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
+On 16 October 2012 13:44, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 16 October 2012 10:17, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Tue, Oct 16, 2012 at 9:16 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>
+>>> This code has not been tested on a "legacy" ARM PL180 but only for
+>>> ux500 boards. Even if it should affect DMA handling we should test
+>>> this properly. Would be great if you were able to help out, I guess
+>>> you still have available hardware for these tests?
+>>
+>> I can test the Integrator/CP and Realview in IRQ/PIO mode and
+>> the U300 in DMA mode.
+>
+> Great!
+>
+>>
+>> I need some help to provoke errorpath in DMA mode though,
+>> so any hints are welcome...
+>
+> One good option could be to stress test card insert/removal sequences,
+> while at the same time doing read/write requests.
+>
+>>
+>> Yours,
+>> Linus Walleij
+>
+> Kind regards
+> Ulf Hansson
 
-On Wed, 21 Nov 2012 09:07:59 -0600, Rob Herring wrote:
+Just a kind reminder for Linus; did you manage to do some tests for
+these patches?
 
-> > Yes. I personally haven't yet thought of this part of the problem, but
-> > I think Rob has a plan, and if not, we can certainly think of one
-> > without too much problems.
-> 
-> While we can trim down the headers, I don't think we will get rid of
-> them in all cases. My only plan was everything gets converted to DT.
-> Then we can remove gic_init, gic_cascade_irq, and vic_init.
-
-Sounds like a good plan :-)
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Kind regards
+Ulf Hansson
