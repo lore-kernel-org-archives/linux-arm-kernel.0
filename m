@@ -1,31 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Nov 2012 09:14:22 +0100
-Subject: [PATCH V3 08/11] ARM: ux500: convert timer suspend/resume to
- clock_event_device
-In-Reply-To: <1353349867-28494-9-git-send-email-swarren@wwwdotorg.org>
-References: <1353349867-28494-1-git-send-email-swarren@wwwdotorg.org>
- <1353349867-28494-9-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CACRpkdacsHS42S=vbb0NOoTj=odxUVAoDu+E4RRULWwh1McKrg@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 21 Nov 2012 09:17:26 +0100
+Subject: [PATCH V3 1/3] arm: dma mapping: Export dma ops functions
+In-Reply-To: <50AC8D09.6050104@samsung.com>
+References: <1353448587-2937-1-git-send-email-gregory.clement@free-electrons.com>
+ <1353448587-2937-2-git-send-email-gregory.clement@free-electrons.com>
+ <50AC7D59.1020000@samsung.com> <50AC8B41.7080009@free-electrons.com>
+ <50AC8D09.6050104@samsung.com>
+Message-ID: <50AC8E16.3020006@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 7:31 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On 11/21/2012 09:12 AM, Marek Szyprowski wrote:
+> Hello,
+> 
+> On 11/21/2012 9:05 AM, Gregory CLEMENT wrote:
+>> On 11/21/2012 08:06 AM, Marek Szyprowski wrote:
+>>> On 11/20/2012 10:56 PM, Gregory CLEMENT wrote:
+>>>> Expose the DMA operations functions. Until now only the dma_ops
+>>>> structs in a whole or some dma operation were exposed. This patch
+>>>> exposes all the dma coherents operations. They can be reused when an
+>>>> architecture or a driver need to create its own set of dma_operation.
+>>>>
+>>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>>
+>>> Besides arm_dma_set_mask() function I see no reason to export the other
+>>> arm dma related functions.
+>>
+>> The idea was to let other people use the arm dma related functions,
+>> for their own dma ops. But for the mvebu machines we only need
+>> arm_dma_set_mask() indeed.
+>>
+>> So you prefer that I only expose arm_dma_set_mask() and let future
+>> user expose other function if they need it, right?
+> 
+> I would prefer to avoid exporting functions which are not used anywhere
+> else. This improves readability of the code and simply forces others to
+> think twice before they use some static function and check if their use
+> case is really correct.
 
-> From: Stephen Warren <swarren@nvidia.com>
->
-> Move ux500's timer suspend/resume functions from struct sys_timer
-> ux500_timer into struct clock_event_device nmdk_clkevt. This
-> will allow the sys_timer suspend/resume fields to be removed, and
-> eventually lead to a complete removal of struct sys_timer.
->
-> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+OK so I will send a new version in a few minutes.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Do  you think these last changes will be enough for getting your Acked-by?
 
-We have a comment on the .resume member but I'll find
-the right patch and comment there.
-
-Yours,
-Linus Walleij
+Thanks,
+Greogry
