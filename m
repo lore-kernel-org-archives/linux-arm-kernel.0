@@ -1,56 +1,42 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Wed, 21 Nov 2012 20:58:11 +0100
-Subject: [PATCH v3 6/7] usb: chipidea: usbmisc: add mx53 support
-In-Reply-To: <50AD3974.4000608@mvista.com>
-References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
- <1353506793-8354-7-git-send-email-m.grzeschik@pengutronix.de>
- <50AD3974.4000608@mvista.com>
-Message-ID: <20121121195811.GB16409@pengutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Nov 2012 12:01:44 -0800
+Subject: [GIT PULL] arm-soc: Xilinx zynq multiplatform changes for v3.8
+In-Reply-To: <CAHTX3d+bqMnsWxQp3GAmprSDzNB18otT3SrPi5MkA+d8006Aww@mail.gmail.com>
+References: <CAHTX3d+bqMnsWxQp3GAmprSDzNB18otT3SrPi5MkA+d8006Aww@mail.gmail.com>
+Message-ID: <20121121200144.GD15213@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 11:28:36PM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 11/21/2012 05:06 PM, Michael Grzeschik wrote:
-> 
-> > This adds mx53 as the next user of the usbmisc driver and makes it
-> > possible to disable the overcurrent-detection of the internal phy.
-> 
-> > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> > Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> > ---
-> > Changes since v2:
-> > * added defines for register offsets and bitmasks
-> > * fixed disable_oc option for all ports
-> 
-> >  drivers/usb/chipidea/usbmisc_imx.c |   51 ++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 51 insertions(+)
-> 
-> > diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-> > index e090e0f..b1811df 100644
-> > --- a/drivers/usb/chipidea/usbmisc_imx.c
-> > +++ b/drivers/usb/chipidea/usbmisc_imx.c
-> > @@ -19,6 +19,13 @@
-> >  
-> >  #define USB_DEV_MAX 4
-> >  
-> > +#define MX53_USB_OTG_PHY_CTRL_0_OFFSET	0x08;
-> > +#define MX53_USB_UH2_CTRL_OFFSET	0x14;
-> > +#define MX53_USB_UH3_CTRL_OFFSET	0x18;
-> 
->    Semicolons here? This can't be right.
+Hi,
 
-You're right. Its compiling without errors, because its only used at the
-end of an assignement. So this will result in two Semicolons.
+On Wed, Nov 21, 2012 at 04:51:07PM +0100, Michal Simek wrote:
+> Hi Olof and Arnd,
+> 
+> based on my chat with Olof today I have created new branch
+> with 4 patches which move zynq to multiplatform.
+> 
+> This branch depends on arm-soc devel/debug_ll_init branch because
+> we needed Rob's "ARM: implement debug_ll_io_init()"
+> (sha1: afaee03511ba8002b26a9c6b1fe7d6baf33eac86)
+> patch.
+> 
+> This branch also depends on zynq/dt branch because of previous major
+> zynq changes.
+> zynq/cleanup branch is subset of zynq/dt.
+> 
+> That's why I have merged devel/debug_ll_init branch with zynq/dt and
+> add 4 patches
+> on the top of it.
 
-I will fix that.
+Nice work.
 
-Thanks,
-Michael
+This looks quite reasonable, is small and self-contained and doesn't really
+affect anyone outside of zynq. So I've pulled into next/multiplatform for 3.8.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+As part of this, the next/* branches have been somewhat reordered, since
+multiplatform now includes next/dt contents I've moved it down below there. It
+shouldn't affect much since no other branch pulls in next/multiplatform
+contents.
+
+
+-Olof
