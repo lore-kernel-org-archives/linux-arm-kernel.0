@@ -1,234 +1,265 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Nov 2012 17:00:14 +0100
-Subject: [PATCH V7 3/5] arm: mvebu: Add IPI support via doorbells
+Date: Wed, 21 Nov 2012 17:00:12 +0100
+Subject: [PATCH V7 1/5] arm: mvebu: Add support for coherency fabric in
+ mach-mvebu
 In-Reply-To: <1353513616-10139-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1353513616-10139-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1353513616-10139-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1353513616-10139-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enhances the IRQ controller driver to add support for
-Inter-Processor-Interrupts that are needed to enable SMP support.
+The Armada 370 and Armada XP SOCs have a coherency fabric unit which
+is responsible for ensuring hardware coherency between all CPUs and
+between CPUs and I/O masters. This patch provides the basic support
+needed for SMP.
 
 Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- .../devicetree/bindings/arm/armada-370-xp-mpic.txt |   12 ++-
- arch/arm/boot/dts/armada-xp.dtsi                   |    2 +-
- arch/arm/mach-mvebu/armada-370-xp.h                |    7 ++
- arch/arm/mach-mvebu/irq-armada-370-xp.c            |   92 ++++++++++++++++++--
- 4 files changed, 103 insertions(+), 10 deletions(-)
+ .../devicetree/bindings/arm/coherency-fabric.txt   |   16 ++++
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    5 ++
+ arch/arm/mach-mvebu/Makefile                       |    2 +-
+ arch/arm/mach-mvebu/coherency.c                    |   82 ++++++++++++++++++++
+ arch/arm/mach-mvebu/coherency.h                    |   24 ++++++
+ arch/arm/mach-mvebu/coherency_ll.S                 |   49 ++++++++++++
+ arch/arm/mach-mvebu/common.h                       |    1 +
+ 7 files changed, 178 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/coherency-fabric.txt
+ create mode 100644 arch/arm/mach-mvebu/coherency.c
+ create mode 100644 arch/arm/mach-mvebu/coherency.h
+ create mode 100644 arch/arm/mach-mvebu/coherency_ll.S
 
-diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt
-index 70c0dc5..61df564 100644
---- a/Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt
-+++ b/Documentation/devicetree/bindings/arm/armada-370-xp-mpic.txt
-@@ -6,9 +6,15 @@ Required properties:
- - interrupt-controller: Identifies the node as an interrupt controller.
- - #interrupt-cells: The number of cells to define the interrupts. Should be 1.
-   The cell is the IRQ number
+diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+new file mode 100644
+index 0000000..2bfbf67
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+@@ -0,0 +1,16 @@
++Coherency fabric
++----------------
++Available on Marvell SOCs: Armada 370 and Armada XP
 +
- - reg: Should contain PMIC registers location and length. First pair
-   for the main interrupt registers, second pair for the per-CPU
--  interrupt registers
-+  interrupt registers. For this last pair, to be compliant with SMP
-+  support, the "virtual" must be use (For the record, these registers
-+  automatically map to the interrupt controller registers of the
-+  current CPU)
++Required properties:
 +
++- compatible: "marvell,coherency-fabric"
++- reg: Should contain,coherency fabric registers location and length.
 +
- 
- Example:
- 
-@@ -18,6 +24,6 @@ Example:
-               #address-cells = <1>;
-               #size-cells = <1>;
-               interrupt-controller;
--              reg = <0xd0020000 0x1000>,
--                    <0xd0021000 0x1000>;
-+              reg = <0xd0020a00 0x1d0>,
-+                    <0xd0021070 0x58>;
-         };
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 1f95e22..e6db2b7 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -24,7 +24,7 @@
- 
- 	mpic: interrupt-controller at d0020000 {
- 	      reg = <0xd0020a00 0x1d0>,
--		    <0xd0021870 0x58>;
-+		    <0xd0021070 0x58>;
++Example:
++
++coherency-fabric at d0020200 {
++	compatible = "marvell,coherency-fabric";
++	reg = <0xd0020200 0xb0>;
++};
++
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 94b4b9e..b0d075b 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -36,6 +36,11 @@
+ 	      interrupt-controller;
  	};
  
- 	armada-370-xp-pmsu at d0022000 {
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
-index aac9beb..c6a7d74 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.h
-+++ b/arch/arm/mach-mvebu/armada-370-xp.h
-@@ -19,4 +19,11 @@
- #define ARMADA_370_XP_REGS_VIRT_BASE	IOMEM(0xfeb00000)
- #define ARMADA_370_XP_REGS_SIZE		SZ_1M
- 
-+#ifdef CONFIG_SMP
-+#include <linux/cpumask.h>
++	coherency-fabric at d0020200 {
++		compatible = "marvell,coherency-fabric";
++		reg = <0xd0020200 0xb0>;
++	};
 +
-+void armada_mpic_send_doorbell(const struct cpumask *mask, unsigned int irq);
-+void armada_xp_mpic_smp_cpu_init(void);
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index 57f996b..5ce4b42 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -2,4 +2,4 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+ 	-I$(srctree)/arch/arm/plat-orion/include
+ 
+ obj-y += system-controller.o
+-obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o
++obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o coherency.o coherency_ll.o
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+new file mode 100644
+index 0000000..596ee66
+--- /dev/null
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -0,0 +1,82 @@
++/*
++ * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Yehuda Yitschak <yehuday@marvell.com>
++ * Gregory Clement <gregory.clement@free-electrons.com>
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * The Armada 370 and Armada XP SOCs have a coherency fabric which is
++ * responsible for ensuring hardware coherency between all CPUs and between
++ * CPUs and I/O masters. This file initializes the coherency fabric and
++ * supplies basic routines for configuring and controlling hardware coherency
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/of_address.h>
++#include <linux/io.h>
++#include <linux/smp.h>
++#include <asm/smp_plat.h>
++#include "armada-370-xp.h"
++
++/*
++ * Some functions in this file are called very early during SMP
++ * initialization. At that time the device tree framework is not yet
++ * ready, and it is not possible to get the register address to
++ * ioremap it. That's why the pointer below is given with an initial
++ * value matching its virtual mapping
++ */
++static void __iomem *coherency_base = ARMADA_370_XP_REGS_VIRT_BASE + 0x20200;
++
++/* Coherency fabric registers */
++#define COHERENCY_FABRIC_CFG_OFFSET		   0x4
++
++static struct of_device_id of_coherency_table[] = {
++	{.compatible = "marvell,coherency-fabric"},
++	{ /* end of list */ },
++};
++
++#ifdef CONFIG_SMP
++int coherency_get_cpu_count(void)
++{
++	int reg, cnt;
++
++	reg = readl(coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
++	cnt = (reg & 0xF) + 1;
++
++	return cnt;
++}
 +#endif
 +
- #endif /* __MACH_ARMADA_370_XP_H */
-diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-index 5f5f939..549b684 100644
---- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-@@ -24,6 +24,7 @@
- #include <linux/irqdomain.h>
- #include <asm/mach/arch.h>
- #include <asm/exception.h>
-+#include <asm/smp_plat.h>
- 
- /* Interrupt Controller Registers Map */
- #define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
-@@ -35,6 +36,12 @@
- 
- #define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
- 
-+#define ARMADA_370_XP_SW_TRIG_INT_OFFS           (0x4)
-+#define ARMADA_370_XP_IN_DRBEL_MSK_OFFS          (0xc)
-+#define ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS        (0x8)
++/* Function defined in coherency_ll.S */
++int ll_set_cpu_coherent(void __iomem *base_addr, unsigned int hw_cpu_id);
 +
-+#define ACTIVE_DOORBELLS			(8)
-+
- static void __iomem *per_cpu_int_base;
- static void __iomem *main_int_base;
- static struct irq_domain *armada_370_xp_mpic_domain;
-@@ -51,11 +58,22 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
- 	       per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
- }
- 
-+#ifdef CONFIG_SMP
-+static int armada_xp_set_affinity(struct irq_data *d,
-+				  const struct cpumask *mask_val, bool force)
++int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
 +{
++	if (!coherency_base) {
++		pr_warn("Can't make CPU %d cache coherent.\n", hw_cpu_id);
++		pr_warn("Coherency fabric is not initialized\n");
++		return 1;
++	}
++
++	return ll_set_cpu_coherent(coherency_base, hw_cpu_id);
++}
++
++int __init coherency_init(void)
++{
++	struct device_node *np;
++
++	np = of_find_matching_node(NULL, of_coherency_table);
++	if (np) {
++		pr_info("Initializing Coherency fabric\n");
++		coherency_base = of_iomap(np, 0);
++	}
++
 +	return 0;
 +}
-+#endif
+diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
+new file mode 100644
+index 0000000..2f42813
+--- /dev/null
++++ b/arch/arm/mach-mvebu/coherency.h
+@@ -0,0 +1,24 @@
++/*
++ * arch/arm/mach-mvebu/include/mach/coherency.h
++ *
++ *
++ * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
- static struct irq_chip armada_370_xp_irq_chip = {
- 	.name		= "armada_370_xp_irq",
- 	.irq_mask       = armada_370_xp_irq_mask,
- 	.irq_mask_ack   = armada_370_xp_irq_mask,
- 	.irq_unmask     = armada_370_xp_irq_unmask,
-+#ifdef CONFIG_SMP
-+	.irq_set_affinity = armada_xp_set_affinity,
-+#endif
- };
- 
- static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
-@@ -72,6 +90,41 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
- 	return 0;
- }
- 
-+#ifdef CONFIG_SMP
-+void armada_mpic_send_doorbell(const struct cpumask *mask, unsigned int irq)
-+{
-+	int cpu;
-+	unsigned long map = 0;
-+
-+	/* Convert our logical CPU mask into a physical one. */
-+	for_each_cpu(cpu, mask)
-+		map |= 1 << cpu_logical_map(cpu);
-+
-+	/*
-+	 * Ensure that stores to Normal memory are visible to the
-+	 * other CPUs before issuing the IPI.
-+	 */
-+	dsb();
-+
-+	/* submit softirq */
-+	writel((map << 8) | irq, main_int_base +
-+		ARMADA_370_XP_SW_TRIG_INT_OFFS);
-+}
-+
-+void armada_xp_mpic_smp_cpu_init(void)
-+{
-+	/* Clear pending IPIs */
-+	writel(0, per_cpu_int_base + ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
-+
-+	/* Enable first 8 IPIs */
-+	writel((1 << ACTIVE_DOORBELLS) - 1, per_cpu_int_base +
-+		ARMADA_370_XP_IN_DRBEL_MSK_OFFS);
-+
-+	/* Unmask IPI interrupt */
-+	writel(0, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-+}
-+#endif /* CONFIG_SMP */
-+
- static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
- 	.map = armada_370_xp_mpic_irq_map,
- 	.xlate = irq_domain_xlate_onecell,
-@@ -91,13 +144,18 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
- 
- 	armada_370_xp_mpic_domain =
--	    irq_domain_add_linear(node, (control >> 2) & 0x3ff,
--				  &armada_370_xp_mpic_irq_ops, NULL);
-+		irq_domain_add_linear(node, (control >> 2) & 0x3ff,
-+				&armada_370_xp_mpic_irq_ops, NULL);
- 
- 	if (!armada_370_xp_mpic_domain)
- 		panic("Unable to add Armada_370_Xp MPIC irq domain (DT)\n");
- 
- 	irq_set_default_host(armada_370_xp_mpic_domain);
++#ifndef __MACH_370_XP_COHERENCY_H
++#define __MACH_370_XP_COHERENCY_H
 +
 +#ifdef CONFIG_SMP
-+	armada_xp_mpic_smp_cpu_init();
++int coherency_get_cpu_count(void);
 +#endif
 +
- 	return 0;
- }
- 
-@@ -111,14 +169,36 @@ asmlinkage void __exception_irq_entry armada_370_xp_handle_irq(struct pt_regs
- 					ARMADA_370_XP_CPU_INTACK_OFFS);
- 		irqnr = irqstat & 0x3FF;
- 
--		if (irqnr < 1023) {
--			irqnr =
--			    irq_find_mapping(armada_370_xp_mpic_domain, irqnr);
-+		if (irqnr > 1022)
-+			break;
++int set_cpu_coherent(int cpu_id, int smp_group_id);
++int coherency_init(void);
 +
-+		if (irqnr >= 8) {
-+			irqnr =	irq_find_mapping(armada_370_xp_mpic_domain,
-+					irqnr);
- 			handle_IRQ(irqnr, regs);
- 			continue;
- 		}
-+#ifdef CONFIG_SMP
-+		/* IPI Handling */
-+		if (irqnr == 0) {
-+			u32 ipimask, ipinr;
++#endif	/* __MACH_370_XP_COHERENCY_H */
+diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+new file mode 100644
+index 0000000..53e8391
+--- /dev/null
++++ b/arch/arm/mach-mvebu/coherency_ll.S
+@@ -0,0 +1,49 @@
++/*
++ * Coherency fabric: low level functions
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * This file implements the assembly function to add a CPU to the
++ * coherency fabric. This function is called by each of the secondary
++ * CPUs during their early boot in an SMP kernel, this why this
++ * function have to callable from assembly. It can also be called by a
++ * primary CPU from C code during its boot.
++ */
 +
-+			ipimask = readl_relaxed(per_cpu_int_base +
-+						ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS)
-+				& 0xFF;
++#include <linux/linkage.h>
++#define ARMADA_XP_CFB_CTL_REG_OFFSET 0x0
++#define ARMADA_XP_CFB_CFG_REG_OFFSET 0x4
 +
-+			writel(0x0, per_cpu_int_base +
-+				ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
++	.text
++/*
++ * r0: Coherency fabric base register address
++ * r1: HW CPU id
++ */
++ENTRY(ll_set_cpu_coherent)
++	/* Create bit by cpu index */
++	mov	r3, #(1 << 24)
++	lsl	r1, r3, r1
 +
-+			/* Handle all pending doorbells */
-+			for (ipinr = 0; ipinr < ACTIVE_DOORBELLS; ipinr++) {
-+				if (ipimask & (0x1 << ipinr))
-+					handle_IPI(ipinr, regs);
-+			}
-+			continue;
-+		}
-+#endif
++	/* Add CPU to SMP group - Atomic */
++	add	r3, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
++	ldr	r2, [r3]
++	orr	r2, r2, r1
++	str	r2, [r3]
++
++	/* Enable coherency on CPU - Atomic */
++	add	r3, r0, #ARMADA_XP_CFB_CFG_REG_OFFSET
++	ldr	r2, [r3]
++	orr	r2, r2, r1
++	str	r2, [r3]
++
++	dsb
++
++	mov	r0, #0
++	mov	pc, lr
++ENDPROC(ll_set_cpu_coherent)
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+index 02f89ea..ba6b62a 100644
+--- a/arch/arm/mach-mvebu/common.h
++++ b/arch/arm/mach-mvebu/common.h
+@@ -20,4 +20,5 @@ void mvebu_restart(char mode, const char *cmd);
+ void armada_370_xp_init_irq(void);
+ void armada_370_xp_handle_irq(struct pt_regs *regs);
  
--		break;
- 	} while (1);
- }
- 
++int armada_370_xp_coherency_init(void);
+ #endif
 -- 
 1.7.9.5
