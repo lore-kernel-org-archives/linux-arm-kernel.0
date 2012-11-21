@@ -1,115 +1,80 @@
-From: tomba@iki.fi (Tomi Valkeinen)
-Date: Wed, 21 Nov 2012 13:06:03 +0200
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <13540495.epaCf4JVn9@percival>
-References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
- <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
- <20121120215429.B621F3E1821@localhost> <13540495.epaCf4JVn9@percival>
-Message-ID: <50ACB59B.4090404@iki.fi>
+From: nareshgbhat@gmail.com (Naresh Bhat)
+Date: Wed, 21 Nov 2012 16:50:29 +0530
+Subject: KEXEC on ARM cortex-a15
+In-Reply-To: <20121121102244.GA11990@mudshark.cambridge.arm.com>
+References: <CAJXQGfKpFfUwMeLGFAuTgQn5Yd2D9O271JM1VJ87Nio80tbwXw@mail.gmail.com>
+ <20121119144417.GH3290@n2100.arm.linux.org.uk>
+ <20121119151327.GG3205@mudshark.cambridge.arm.com>
+ <CAJXQGf+BQ18GhR3emhK-ejTivqx_o=gtaO3-FjTiE3BMGydgsw@mail.gmail.com>
+ <CAJXQGf+wfXGZ=PWN585dJDMX1nH+sRexf6UZujyjKM6rJeDiXQ@mail.gmail.com>
+ <20121120160219.GF26475@mudshark.cambridge.arm.com>
+ <CAJXQGfL4PRW9=MQO1XbogA40sHUzXorbFMe1WkiJ751Ej-h7=g@mail.gmail.com>
+ <20121121102244.GA11990@mudshark.cambridge.arm.com>
+Message-ID: <CAJXQGfLA+SVfWPjXdbH=R0jF0xaLke1oK56HhsgYr1za15t1xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-21 06:23, Alex Courbot wrote:
-> Hi Grant,
-> 
-> On Wednesday 21 November 2012 05:54:29 Grant Likely wrote:
->>> With the advent of the device tree and of ARM kernels that are not
->>> board-tied, we cannot rely on these board-specific hooks anymore but
+Hi Will,
+
+Thank you very much.
+
+Yes, I am using Versatile express target at Daughterboard Site 1:
+V2P-CA15_A7 Cortex A15
+
+1. I do not have the JTAG.  I will definitely try to order and get one.
+2. I have tried with the following command line options
+root at arm-cortex-a15:~# kexec -f zImage --dtb=vexpress.dtb
+--append="root=/dev/nfs rw ip=dhcp
+nfsroot=<Host-IP>:/mnt/sda3/nfs/cortexa15/core-image
+console=ttyAMA0,38400n8 nosmp"
+Starting new kernel
+Bye!
+Uncompressing Linux...
+
+I will try to put some more printk and get more debug information.
+vexpress.dtb is generated from vexpress-v2p-ca15_a7.dts file.
+
+1. Is it possible to print the state of the CPU when the new kernel
+image is entered (using printk) ?
+2. Is it possible to use ATAGs for kexec feature as a temporary
+solution on V2P-CA15_A7 Cortex A15 target ?
+
+Thanks and Regards
+-Naresh Bhat
+
+On Wed, Nov 21, 2012 at 3:52 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Nov 21, 2012 at 08:21:21AM +0000, Naresh Bhat wrote:
+>> Hi Will,
 >>
->> This isn't strictly true. It is still perfectly fine to have board
->> specific code when necessary. However, there is strong encouragement to
->> enable that code in device drivers as much as possible and new board
->> files need to have very strong justification.
-> 
-> But doesn't introducing board-specific code into the kernel just defeats the 
-> purpose of the DT? If we extend this logic, we are heading straight back to 
-> board-definition files. To a lesser extent than before I agree, but the problem 
-> is fundamentally the same.
-
-I don't think so. I'll reiterate my opinion on this subject, as a
-summary and for those who haven't read the discussions of the earlier
-versions of the series. And perhaps I'll even manage to say something
-new =).
-
-
-First about the board specific code. I think we may need some board
-specific code, even if this series was merged. Let's call them board
-drivers. These board drivers would only exist for boards with some weird
-setups that cannot be expressed or managed with DT and normal drivers.
-
-I think these cases would be quite rare, as I can't even come up with a
-very good example. I guess most likely these cases would involve some
-small trivial chips for muxing or such, for which it doesn't really make
-sense to have a real driver.
-
-Say, perhaps a board with two LCDs connected to one video output, and
-only one LCD can be enabled at a time, and you need to set some mux chip
-to route the signals to the correct LCD. In this case I'd see we should
-have hotplug support in the display framework, and the board driver
-would act on user input (sysfs file, perhaps), plugging in/out the LCD
-device depending on the user input.
+>> I have disabled the SMP on host kernel.  But still I am facing the
+>> issue as below
+>>
+>> bash-4.2# ls
+>> uImage  vexpress.dtb
+>> bash-4.2#
+>> bash-4.2# kexec -f uImage --dtb=vexpress.dtb --command-line="console=ttyS0"
+>
+> Can you try using a zImage instead and also specifying the console as
+> ttyAMA0, as it looks like you're using a vexpress?
+>
+>> Starting new kernel
+>> Bye!
+>> Uncompressing Linux...
+>
+> This isn't really very helpful -- some more debugging on your part would be
+> appreciated to get an insight as to what's going wrong. You could either use
+> JTAG or put some early prints in the decompressor to work out where it goes
+> awry.
+>
+> Useful things to know would be: the state of the CPU when the new kernel
+> image is entered (if you have JTAG, you could also look at the dtb in memory
+> to see that it looks sane) and also at which point in the decompressor it
+> goes wrong / takes an abort (usually it's when we enable the MMU).
+>
+> Will
 
 
-As for expressing device internal details in the DT data, as done in
-this series, I don't like it very much. I think the DT data or the board
-file should just describe which device is the one in question, and how
-it's connected to other components on the board. The driver for the
-device should handle everything else.
 
-As Alex pointed out, there may be lots of devices that work the same way
-when enabled, but require slightly different power-on/off sequences. We
-could have these sequences in the driver itself, either as plain code,
-or in a table of some sort, possibly using the power sequence framework
-presented in this series. The correct code or sequence would be ran
-depending on the particular model of the device.
-
-I think this approach is correct in the sense that this is what drivers
-are supposed to do: handle all the device internal matters. But this
-raises the problem of bloating the kernel with possibly lots of
-different power sequences, of which only a few would be used by a board,
-and all the rest would just be waste of memory.
-
-Regarding this problem I have the following questions, to which I don't
-have clear answers:
-
-- How much of this device specific data is too much? If a driver
-supports 10 different models, and the sequences for each model take 100
-bytes, this 1000 bytes doesn't sound too much. But where's the limit?
-And even if one driver only has 1kB of this data, what if we have lots
-of similar drivers?
-
-- How many bytes does a power sequence presented in this series take, if
-the sequence contains, say, 5 steps, with gpio, delay, pwm, delay and
-regulator?
-
-- How likely is it that we'll get lots of different models? A hundred
-different models for a backlight PWM with different power-on/off
-sequences already sounds a really big number. If we're only going to
-have each driver supporting, say, no more than 10 models, perhaps the
-problem is not even an issue in practice.
-
-- Are there ways to limit this bloat in the driver? One obvious way
-would be to discard the unused sequences after driver probe, but that
-only works for platform devices. Although, I guess these sequences would
-mostly be used by platform drivers? If so, then the problem could be
-solved by discarding the data after probe. Another would be to load the
-sequences from a file as firmware, but that feels quite an awful
-solution. Anybody have other ideas?
-
-One clear positive side with in-driver approach is that it's totally
-inside the kernel, and can be easily reworked in the future, or even
-changed to a DT-based approach as presented in this series if that seems
-like a better solution. The DT based approach, on the other hand, will
-be more or less written to stone after it's merged.
-
-
-So, I like the framework of expressing the sequences presented in this
-series (except there's a problem with error cases, as I pointed out in
-another post), as it can be used inside the drivers. But I'm not so
-enthusiastic about presenting the sequences in DT.
-
-My suggestion would be to go forward with an in-driver solution, and
-look at the DT based solution later if we are seeing an increasing bloat
-in the drivers.
-
- Tomi
+-- 
+"For things to change, we must change"
+-Naresh Bhat
