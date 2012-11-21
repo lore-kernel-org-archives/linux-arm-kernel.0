@@ -1,27 +1,50 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 20 Nov 2012 23:36:46 -0800
-Subject: [PATCH v3 0/9] GIC and VIC clean-ups
-In-Reply-To: <1353466713-18967-1-git-send-email-robherring2@gmail.com>
-References: <1353466713-18967-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20121121073646.GL7615@quad.lixom.net>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 21 Nov 2012 08:37:45 +0100
+Subject: [PATCH] gpiolib: fix bug and clarify OF use of ranges
+Message-ID: <1353483465-25961-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 08:58:24PM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> This series is in preparation to move gic and vic to drivers/irqchip.
-> I dropped the actual move to drivers/irqchip as the infrastructure is
-> still being flushed out and I'd like to get the clean-ups at least into
-> 3.8.
-> 
-> This series is available here:
-> git://sources.calxeda.com/kernel/linux.git irqchip-cleanup
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Series as a whole:
-Acked-by: Olof Johansson <olof@lixom.net>
+In commit c905165f5946f56dca195871641bd4e488eca24a
+"gpiolib: let gpiochip_add_pin_range() specify offset"
+I forgot to update the OF use of the function
+gpiochip_add_pin_range().
 
-(I did notice you lack your signed-off-by on the two patches you didn't
-write, btw).
+It turns out that this reveal a weakness in the
+OF range mappings: ranges cannot currently be sparse.
+So put in a comment so we can fix this later.
 
--Olof
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/gpio/gpiolib-of.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+index a40cd84..d542a14 100644
+--- a/drivers/gpio/gpiolib-of.c
++++ b/drivers/gpio/gpiolib-of.c
+@@ -238,8 +238,20 @@ static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
+ 		if (!pctldev)
+ 			break;
+ 
++		/*
++		 * This assumes that the n GPIO pins are consecutive in the
++		 * GPIO number space, and that the pins are also consecutive
++		 * in their local number space. Currently it is not possible
++		 * to add different ranges for one and the same GPIO chip,
++		 * as the code assumes that we have one consecutive range
++		 * on both, mapping 1-to-1.
++		 *
++		 * TODO: make the OF bindings handle multiple sparse ranges
++		 * on the same GPIO chip.
++		 */
+ 		ret = gpiochip_add_pin_range(chip,
+ 					     pinctrl_dev_get_name(pctldev),
++					     0, /* offset in gpiochip */
+ 					     pinspec.args[0],
+ 					     pinspec.args[1]);
+ 
+-- 
+1.7.11.3
