@@ -1,46 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Nov 2012 01:04:37 -0800
-Subject: [PATCH] mfd: vexpress-sysreg: Remove LEDs code
-In-Reply-To: <20121121085539.GR7615@quad.lixom.net>
-References: <1353332344-16754-1-git-send-email-pawel.moll@arm.com>
- <20121121085539.GR7615@quad.lixom.net>
-Message-ID: <CAOesGMgJqPCXNxfEA+=NVE_yMtSKS_vnzNkT9Of9bqw0t5iMww@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 21 Nov 2012 10:12:13 +0100
+Subject: [GIT PULL] ARM: sunxi: support for sun4i (A10) SoCs
+Message-ID: <1353489133-25814-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 12:55 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Mon, Nov 19, 2012 at 01:39:04PM +0000, Pawel Moll wrote:
->> As the current LEDs code breaks other platform, remove it.
->>
->> It shall be replaced by a generic "MMIO LEDs" driver.
->>
->> Reported-by: Stephen Warren <swarren@wwwdotorg.org>
->> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
->> ---
->>  drivers/mfd/vexpress-sysreg.c |   77 -----------------------------------------
->>  1 file changed, 77 deletions(-)
->>
->> Hi Arnd,
->>
->> As I haven't managed to get any feedback on the generic MMIO
->> LEDs driver so far, I have to postpone it till next cycle and
->> completely remove the LED-related code from the vexpress-sysreg
->> driver, as it breaks other platforms today.
->>
->> Would you be so kind to apply this patch, please? Alternatively
->> you can pull it from here:
->>
->>   git://git.linaro.org/people/pawelmoll/linux.git vexpress-soc2
->>
->> (this branch is based on the vexpress-soc you already have)
->
-> Applied the patch on top of vexpress/soc, and merged in that branch into
-> next/soc again (it had been reverted due to the issues)
+Arnd, Olof,
 
-Actually, I replaced our current vexpress/soc with the latest one you
-had sent a pull request from before, since it had the appropriate
-dependencies with the clock tree sorted out
-(git://git.linaro.org/people/pawelmoll/linux.git vexpress-clk-soc).
+Here is a pull request to add the support for Allwinner A10 SoCs.
 
+Thanks,
+Maxime
 
--Olof
+The following changes since commit 1b106699647b56313bac707e12e7ad67180cb147:
+
+  ARM: sunxi: Add entry to MAINTAINERS (2012-11-16 21:56:53 +0100)
+
+are available in the git repository at:
+
+  git://github.com/mripard/linux.git tags/tags/sun4i-support-for-3.8
+
+for you to fetch changes up to 67bea88dd842deb3ed8327ad101970dbd615ddcb:
+
+  ARM: sunxi: Add sunxi restart function via onchip watchdog (2012-11-21 09:25:25 +0100)
+
+----------------------------------------------------------------
+Add support for sun4i (A10) SoCs and the cubieboard
+
+----------------------------------------------------------------
+Maxime Ripard (1):
+      ARM: sunxi: Add sunxi restart function via onchip watchdog
+
+Stefan Roese (3):
+      ARM: sunxi: Restructure sunxi dts/dtsi files
+      ARM: sunxi: Add earlyprintk support for UART0 (sun4i)
+      ARM: sunxi: Add sun4i and cubieboard support
+
+ .../devicetree/bindings/watchdog/sunxi-wdt.txt     |   13 ++++
+ arch/arm/Kconfig.debug                             |    9 ++-
+ arch/arm/boot/dts/Makefile                         |    3 +-
+ arch/arm/boot/dts/sun4i-cubieboard.dts             |   38 ++++++++++
+ arch/arm/boot/dts/sun5i-olinuxino.dts              |    6 +-
+ arch/arm/boot/dts/sun5i.dtsi                       |   56 +-------------
+ arch/arm/boot/dts/sunxi.dtsi                       |   80 ++++++++++++++++++++
+ arch/arm/include/debug/sunxi.S                     |    5 +-
+ arch/arm/mach-sunxi/sunxi.c                        |   35 +++++++++
+ 9 files changed, 186 insertions(+), 59 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
+ create mode 100644 arch/arm/boot/dts/sun4i-cubieboard.dts
+ create mode 100644 arch/arm/boot/dts/sunxi.dtsi
