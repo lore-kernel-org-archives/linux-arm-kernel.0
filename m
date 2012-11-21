@@ -1,36 +1,33 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Wed, 21 Nov 2012 12:29:23 +0530
-Subject: [PATCH 7/7] ARM: OMAP2+: omap2plus_defconfig: Enable DCAN controller
+Date: Wed, 21 Nov 2012 12:29:20 +0530
+Subject: [PATCH 4/7] ARM: OMAP2+: omap2plus_defconfig: Enable matrix keypad
+ driver
 In-Reply-To: <1353481163-29462-1-git-send-email-anilkumar@ti.com>
 References: <1353481163-29462-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1353481163-29462-8-git-send-email-anilkumar@ti.com>
+Message-ID: <1353481163-29462-5-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM335X-EVM has BOSCH DCAN controller, one has to manually enable
-this support to use of DCAN controller. So this patch enables DCAN
+AM335X-EVM device have 3x2 matrix keypad, one has to manually enable
+this support to use matrix keypad. So this patch enables matrix keypad
 driver in omap2plus_defconfig.
 
 Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
- arch/arm/configs/omap2plus_defconfig |    5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/configs/omap2plus_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 5e1a763..d79f9c3 100644
+index cf08365..9f9a637 100644
 --- a/arch/arm/configs/omap2plus_defconfig
 +++ b/arch/arm/configs/omap2plus_defconfig
-@@ -54,6 +54,11 @@ CONFIG_IP_PNP_RARP=y
- # CONFIG_INET_LRO is not set
- # CONFIG_IPV6 is not set
- CONFIG_NETFILTER=y
-+CONFIG_CAN=y
-+CONFIG_CAN_RAW=y
-+CONFIG_CAN_BCM=y
-+CONFIG_CAN_C_CAN=y
-+CONFIG_CAN_C_CAN_PLATFORM=y
- CONFIG_BT=m
- CONFIG_BT_HCIUART=m
- CONFIG_BT_HCIUART_H4=y
+@@ -111,6 +111,7 @@ CONFIG_USB_KC2190=y
+ CONFIG_INPUT_JOYDEV=y
+ CONFIG_INPUT_EVDEV=y
+ CONFIG_KEYBOARD_GPIO=y
++CONFIG_KEYBOARD_MATRIX=y
+ CONFIG_KEYBOARD_TWL4030=y
+ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_TOUCHSCREEN_ADS7846=y
 -- 
 1.7.9.5
