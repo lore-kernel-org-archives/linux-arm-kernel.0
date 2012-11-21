@@ -1,55 +1,43 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 21 Nov 2012 11:15:23 +0100
-Subject: [PATCH v3 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <87mwycjmdn.fsf@dell.be.48ers.dk>
-References: <1351869956-2787-1-git-send-email-zonque@gmail.com>
- <1351869956-2787-5-git-send-email-zonque@gmail.com>
- <518397C60809E147AF5323E0420B992E3E9DA81F@DBDE01.ent.ti.com>
- <5097B7EE.3000508@gmail.com>
- <518397C60809E147AF5323E0420B992E3E9DC1F1@DBDE01.ent.ti.com>
- <509A2E75.5060307@gmail.com>
- <518397C60809E147AF5323E0420B992E3E9DE420@DBDE01.ent.ti.com>
- <509EA360.2050504@gmail.com> <87mwycjmdn.fsf@dell.be.48ers.dk>
-Message-ID: <50ACA9BB.7090106@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Nov 2012 02:18:11 -0800
+Subject: [PATCH v3 00/18] ARM: Patchset for CLPS711X
+In-Reply-To: <20121121063602.GA7615@quad.lixom.net>
+References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
+ <201211171545.22154.arnd@arndb.de>
+ <20121121063602.GA7615@quad.lixom.net>
+Message-ID: <CAOesGMj57uJkwz6qJZ1fsBubxxLFWRMdi8kP-gBzt8mR5R5oaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.11.2012 16:59, Peter Korsgaard wrote:
->>>>>> "Daniel" == Daniel Mack <zonque@gmail.com> writes:
-> 
-> Hi,
-> 
->  >>>> In omap2 driver NAND_ECC_HW ecc mode supports 3 ecc layout
->  >>>> OMAP_ECC_HAMMING_CODE_HW_ROMCODE
->  >>>> OMAP_ECC_BCH4_CODE_HW
->  >>>> OMAP_ECC_BCH8_CODE_HW
->  >>>> 
->  >>>> So selection of ecc layout data should come from DT not ecc mode.
->  >>> 
->  >>> Ok, I see. I would still like to set them by string rather than magic
->  >>> numbers that map to enum entries. Valid values would be "none", "hw",
->  >>> "hw-romcode", "bch4" and "bch8". Are you ok with that?
->  >> 
->  >> Ok, that's nice. Better use ecc_opt instead of ecc_mode.
-> 
->  Daniel> I did some more extensive tests that include reading the same
->  Daniel> nand pages from both U-Boot and the kernel with BCH8 ECC, and
->  Daniel> it turns out that -> is_elm_used needs to be set in the pdata
->  Daniel> in order to make this work.
-> 
-> So what you're saying is that the choice of ELM or not is not just an
-> optimization, it really changes the ECC layout? Perhaps it should be
-> treated as a seperate layout (E.G. bch8-elm) then?
+On Tue, Nov 20, 2012 at 10:36 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Sat, Nov 17, 2012 at 03:45:21PM +0000, Arnd Bergmann wrote:
+>> On Saturday 17 November 2012, Alexander Shiyan wrote:
+>> > Here is a v3 patchset for a CLPS711X-target.
+>> > The main direction of this patchset - approaching the platform to the
+>> > possibility of using configurations with multiple platforms in a single
+>> > kernel. Added support of the majority of the necessary kernel symbol.
+>> > Also part of the driver code used only for the platform was moved to the
+>> > board code and converted to the use of standard drivers.
+>> >
+>>
+>> (+Linus Walleij)
+>>
+>> Thanks for sending the new version, as discussed on IRC. It's important
+>> to mention here that the series depends on patches that Linus applied into
+>> the gpio tree. Olof, if you merge these before I get to it, please apply
+>> them on top of an appropriate branch from the GPIO tree. Linus, is
+>> 2cad6a8a4c an appropriate commit to base on? I think that is the
+>> olders one that can be used as a base here.
+>
+> Thanks, I've applied this on top of the pinctrl commit mentioned (based on
+> Linus' reply), as well as the previous clps711x branch, since that seems to be
+> what the series was based on. It sits in clpx711x/soc2 as a separate branch,
+> but I'll pull it into next/soc with the other one.
 
-That is what I experienced, yes. The kernel was unable to parse NAND
-pages that were written from U-Boot with bch8 hardware mode when the elm
-module was not active. Maybe someone from TI can explain that? Giving it
-a dedicated name would also solve the problem with the extra DT property.
+Something really odd is going on.
 
-I'll wait until this is decided before I resend a new set that also
-fixes the issue with the errornousely forgotten Documentation file.
+The 2cad6a8a4c commit is not in any pinctrl branch at the moment. So
+I'll drop this branch until we get this sorted out.
 
 
-Thanks,
-Daniel
+-Olof
