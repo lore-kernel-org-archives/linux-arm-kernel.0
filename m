@@ -1,26 +1,52 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Nov 2012 18:43:15 +0900
-Subject: [PATCH 2/2] i2c: s3c2410: Get the i2c bus number from alias id
-In-Reply-To: <1353450428-2615-2-git-send-email-dianders@chromium.org>
-References: <1353450428-2615-1-git-send-email-dianders@chromium.org>
- <1353450428-2615-2-git-send-email-dianders@chromium.org>
-Message-ID: <0dfd01cdc7cc$a10b98c0$e322ca40$%kim@samsung.com>
+Date: Wed, 21 Nov 2012 18:43:22 +0900
+Subject: [PATCH] ARM: exynos: dt: add all i2c busses to auxdata
+In-Reply-To: <1353450155-1663-1-git-send-email-dianders@chromium.org>
+References: <1353450155-1663-1-git-send-email-dianders@chromium.org>
+Message-ID: <0dfe01cdc7cc$a5585da0$f00918e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Doug Anderson wrote:
 > 
-> From: Padmavathi Venna <padma.v@samsung.com>
+> From: Olof Johansson <olof@lixom.net>
 > 
-> Get the i2c bus number that the device is connected to using the alias
-> id.  This makes debugging / grokking of kernel messages much easier.
+> Needed to match device ids for clocks, etc.
 > 
-> [dianders: slight patch cleanup from Padmavathi's original.]
-> 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 > Signed-off-by: Doug Anderson <dianders@chromium.org>
+> 
+> ---
+>  arch/arm/mach-exynos/mach-exynos5-dt.c |   10 ++++++++++
+>  1 files changed, 10 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-
+> exynos/mach-exynos5-dt.c
+> index ed37273..e1491f7 100644
+> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> @@ -52,6 +52,16 @@ static const struct of_dev_auxdata
+> exynos5250_auxdata_lookup[] __initconst = {
+>  				"s3c2440-i2c.1", NULL),
+>  	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS5_PA_IIC(2),
+>  				"s3c2440-i2c.2", NULL),
+> +	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS5_PA_IIC(3),
+> +				"s3c2440-i2c.3", NULL),
+> +	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS5_PA_IIC(4),
+> +				"s3c2440-i2c.4", NULL),
+> +	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS5_PA_IIC(5),
+> +				"s3c2440-i2c.5", NULL),
+> +	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS5_PA_IIC(6),
+> +				"s3c2440-i2c.6", NULL),
+> +	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS5_PA_IIC(7),
+> +				"s3c2440-i2c.7", NULL),
+>  	OF_DEV_AUXDATA("samsung,s3c2440-hdmiphy-i2c", EXYNOS5_PA_IIC(8),
+>  				"s3c2440-hdmiphy-i2c", NULL),
+>  	OF_DEV_AUXDATA("samsung,exynos5250-dw-mshc", EXYNOS5_PA_DWMCI0,
+> --
+> 1.7.7.3
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Looks ok to me, applied.
 
 Thanks.
 
@@ -29,38 +55,3 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> ---
->  drivers/i2c/busses/i2c-s3c2410.c |   10 +++++++++-
->  1 files changed, 9 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-
-> s3c2410.c
-> index 3e0335f..ca43590 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> @@ -899,11 +899,19 @@ static void
->  s3c24xx_i2c_parse_dt(struct device_node *np, struct s3c24xx_i2c *i2c)
->  {
->  	struct s3c2410_platform_i2c *pdata = i2c->pdata;
-> +	int id;
-> 
->  	if (!np)
->  		return;
-> 
-> -	pdata->bus_num = -1; /* i2c bus number is dynamically assigned */
-> +	id = of_alias_get_id(np, "i2c");
-> +	if (id < 0) {
-> +		dev_warn(i2c->dev, "failed to get alias id:%d\n", id);
-> +		pdata->bus_num = -1;
-> +	} else {
-> +		/* i2c bus number is statically assigned from alias */
-> +		pdata->bus_num = id;
-> +	}
->  	of_property_read_u32(np, "samsung,i2c-sda-delay", &pdata-
-> >sda_delay);
->  	of_property_read_u32(np, "samsung,i2c-slave-addr", &pdata-
-> >slave_addr);
->  	of_property_read_u32(np, "samsung,i2c-max-bus-freq",
-> --
-> 1.7.7.3
