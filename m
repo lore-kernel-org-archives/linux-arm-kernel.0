@@ -1,27 +1,99 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Nov 2012 02:27:17 -0800
-Subject: [PATCH v3 00/18] ARM: Patchset for CLPS711X
-In-Reply-To: <CAOesGMj57uJkwz6qJZ1fsBubxxLFWRMdi8kP-gBzt8mR5R5oaw@mail.gmail.com>
-References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
- <201211171545.22154.arnd@arndb.de>
- <20121121063602.GA7615@quad.lixom.net>
- <CAOesGMj57uJkwz6qJZ1fsBubxxLFWRMdi8kP-gBzt8mR5R5oaw@mail.gmail.com>
-Message-ID: <CAOesGMjwOoyWh=W0fiKgAO8qdY9au_VWmy545EnWVM7eYc3ctw@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 21 Nov 2012 11:27:10 +0100
+Subject: [PATCH 1/1] net: add micrel KSZ8873MLL switch support
+Message-ID: <1353493630-30867-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 2:18 AM, Olof Johansson <olof@lixom.net> wrote:
+this will allow to detect the link between the switch and the soc
 
-> Something really odd is going on.
->
-> The 2cad6a8a4c commit is not in any pinctrl branch at the moment. So
-> I'll drop this branch until we get this sorted out.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: netdev at vger.kernel.org
+---
+ drivers/net/phy/micrel.c   |   44 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/micrel_phy.h |    1 +
+ 2 files changed, 45 insertions(+)
 
-Sorry, replying to myself way too much tonight. The confusion was
-caused by me looking at the pinctrl tree instead of the gpio tree.
-
-I'll re-integrate this branch again tomorrow, after I double-check
-things once more. :)
-
-
--Olof
+diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
+index 2165d5f..38d7034 100644
+--- a/drivers/net/phy/micrel.c
++++ b/drivers/net/phy/micrel.c
+@@ -127,6 +127,39 @@ static int ks8051_config_init(struct phy_device *phydev)
+ 	return 0;
+ }
+ 
++#define KSZ8873MLL_GLOBAL_CONTROL_4	0x06
++#define KSZ8873MLL_GLOBAL_CONTROL_4_DUPLEX	(1 << 6)
++#define KSZ8873MLL_GLOBAL_CONTROL_4_SPEED	(1 << 4)
++int ksz8873mll_read_status(struct phy_device *phydev)
++{
++	int regval;
++
++	/* dummy read */
++	regval = phy_read(phydev, KSZ8873MLL_GLOBAL_CONTROL_4);
++
++	regval = phy_read(phydev, KSZ8873MLL_GLOBAL_CONTROL_4);
++
++	if (regval & KSZ8873MLL_GLOBAL_CONTROL_4_DUPLEX)
++		phydev->duplex = DUPLEX_HALF;
++	else
++		phydev->duplex = DUPLEX_FULL;
++
++	if (regval & KSZ8873MLL_GLOBAL_CONTROL_4_SPEED)
++		phydev->speed = SPEED_10;
++	else
++		phydev->speed = SPEED_100;
++
++	phydev->link = 1;
++	phydev->pause = phydev->asym_pause = 0;
++
++	return 0;
++}
++
++static int ksz8873mll_config_aneg(struct phy_device *phydev)
++{
++	return 0;
++}
++
+ static struct phy_driver ksphy_driver[] = {
+ {
+ 	.phy_id		= PHY_ID_KS8737,
+@@ -204,6 +237,16 @@ static struct phy_driver ksphy_driver[] = {
+ 	.ack_interrupt	= kszphy_ack_interrupt,
+ 	.config_intr	= ksz9021_config_intr,
+ 	.driver		= { .owner = THIS_MODULE, },
++}, {
++	.phy_id		= PHY_ID_KSZ8873MLL,
++	.phy_id_mask	= 0x00fffff0,
++	.name		= "Micrel KSZ8873MLL Swithch",
++	.features	= (SUPPORTED_Pause | SUPPORTED_Asym_Pause),
++	.flags		= PHY_HAS_MAGICANEG,
++	.config_init	= kszphy_config_init,
++	.config_aneg	= ksz8873mll_config_aneg,
++	.read_status	= ksz8873mll_read_status,
++	.driver		= { .owner = THIS_MODULE, },
+ } };
+ 
+ static int __init ksphy_init(void)
+@@ -232,6 +275,7 @@ static struct mdio_device_id __maybe_unused micrel_tbl[] = {
+ 	{ PHY_ID_KSZ8021, 0x00ffffff },
+ 	{ PHY_ID_KSZ8041, 0x00fffff0 },
+ 	{ PHY_ID_KSZ8051, 0x00fffff0 },
++	{ PHY_ID_KSZ8873MLL, 0x00fffff0 },
+ 	{ }
+ };
+ 
+diff --git a/include/linux/micrel_phy.h b/include/linux/micrel_phy.h
+index de20120..adfe8c0 100644
+--- a/include/linux/micrel_phy.h
++++ b/include/linux/micrel_phy.h
+@@ -15,6 +15,7 @@
+ 
+ #define MICREL_PHY_ID_MASK	0x00fffff0
+ 
++#define PHY_ID_KSZ8873MLL	0x000e7237
+ #define PHY_ID_KSZ9021		0x00221610
+ #define PHY_ID_KS8737		0x00221720
+ #define PHY_ID_KSZ8021		0x00221555
+-- 
+1.7.10.4
