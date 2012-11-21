@@ -1,23 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Nov 2012 00:52:51 -0800
-Subject: [GIT PULL] arm-soc: lpc32xx: dts update
-In-Reply-To: <50A8FE44.3030401@antcom.de>
-References: <50A8FE44.3030401@antcom.de>
-Message-ID: <20121121085251.GQ7615@quad.lixom.net>
+Date: Wed, 21 Nov 2012 00:55:39 -0800
+Subject: [PATCH] mfd: vexpress-sysreg: Remove LEDs code
+In-Reply-To: <1353332344-16754-1-git-send-email-pawel.moll@arm.com>
+References: <1353332344-16754-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <20121121085539.GR7615@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 18, 2012 at 04:27:00PM +0100, Roland Stigge wrote:
-> Hi Arnd and Olof,
+On Mon, Nov 19, 2012 at 01:39:04PM +0000, Pawel Moll wrote:
+> As the current LEDs code breaks other platform, remove it.
 > 
-> this pull request includes the dts updates for lpc32xx for 3.7. (Hoping that
-> the signed tag works for you.)
+> It shall be replaced by a generic "MMIO LEDs" driver.
+> 
+> Reported-by: Stephen Warren <swarren@wwwdotorg.org>
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+>  drivers/mfd/vexpress-sysreg.c |   77 -----------------------------------------
+>  1 file changed, 77 deletions(-)
+> 
+> Hi Arnd,
+> 
+> As I haven't managed to get any feedback on the generic MMIO
+> LEDs driver so far, I have to postpone it till next cycle and
+> completely remove the LED-related code from the vexpress-sysreg
+> driver, as it breaks other platforms today.
+> 
+> Would you be so kind to apply this patch, please? Alternatively
+> you can pull it from here:
+> 
+>   git://git.linaro.org/people/pawelmoll/linux.git vexpress-soc2
+> 
+> (this branch is based on the vexpress-soc you already have)
 
-Hi,
+Applied the patch on top of vexpress/soc, and merged in that branch into
+next/soc again (it had been reverted due to the issues)
 
-I'm guessing you want this for 3.8, right? I've queued it under lpc32xx/dt for
-3.8 merge window now at least. :)
-
-Thanks!
 
 -Olof
