@@ -1,71 +1,39 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Wed, 21 Nov 2012 11:53:06 +0100
-Subject: [PATCH v5 1/8] dt: add helper inline for retrieving timeout-sec
- property
-In-Reply-To: <50ABB93F.5070109@gmail.com>
-References: <1353334243-16703-1-git-send-email-fabio.porcedda@gmail.com>
- <1353334243-16703-2-git-send-email-fabio.porcedda@gmail.com>
- <50ABB93F.5070109@gmail.com>
-Message-ID: <CAHkwnC98qT8k5TaW8Sw2F1KbwfoHhq7J-8_oJjpWp7h3rzs7Aw@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 21 Nov 2012 18:53:50 +0800
+Subject: [PATCH 270/493] arm: remove use of __devinit
+In-Reply-To: <1353349642-3677-270-git-send-email-wfp5p@virginia.edu>
+References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
+ <1353349642-3677-270-git-send-email-wfp5p@virginia.edu>
+Message-ID: <CAGsJ_4y2+o7HBH-TQWaanUs9ZgZHhXg3YpEUzd5-VoeZ9+wiMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 6:09 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 11/19/2012 08:10 AM, Fabio Porcedda wrote:
->> The first user of this function is the watchdog framework.
+2012/11/20 Bill Pemberton <wfp5p@virginia.edu>:
+> CONFIG_HOTPLUG is going away as an option so __devinit is no longer
+> needed.
 >
-> I still have issues with this. In addition to questionable usefulness
-> outside the watchdog framework, I'm not even sure this is right for
-> watchdog framework. Watchdog timeout is not a description of h/w, but
-> user configuration. I think the existing mechanisms of module param or
-> kernel cmdline is the right way to handle this.
+> Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Barry Song <baohua.song@csr.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-arm-msm at vger.kernel.org
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: patches at opensource.wolfsonmicro.com
+> Cc: linux-tegra at vger.kernel.org
+> ---
 
-Hi Rob,
-thanks for the review.
-
-If it's fine I will send a v6 version without the of_get_timeout_sec function,
-I hope it's fine for Jean-Christophe too, he asked me to add that function.
-
-About the right way to handle this parameter,
-obviously I was thinking that was a good idea to add this binding,
-Even some maintainers have suggested that was a good idea.
-
-Regards
-
->
-> Rob
->
->> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> ---
->>  include/linux/of.h | 11 +++++++++++
->>  1 file changed, 11 insertions(+)
->>
->> diff --git a/include/linux/of.h b/include/linux/of.h
->> index b4e50d5..d60fde9 100644
->> --- a/include/linux/of.h
->> +++ b/include/linux/of.h
->> @@ -477,4 +477,15 @@ static inline int of_property_read_u32(const struct device_node *np,
->>       return of_property_read_u32_array(np, propname, out_value, 1);
->>  }
->>
->> +/**
->> + * of_get_timeout_sec() - Helper to read the timeout_sec property
->> + * @np:              device node from which the property value is to be read.
->> + * @timeout: adress of the output value
->> + */
->> +static inline int of_get_timeout_sec(const struct device_node *np,
->> +                                  u32 *timeout)
->> +{
->> +     return of_property_read_u32(np, "timeout-sec", timeout);
->> +}
->> +
->>  #endif /* _LINUX_OF_H */
->>
->
-
---
-Fabio Porcedda
-Software Developer - R&D Cagliari
-Telit Communications S.p.A.
+Acked-by: Barry Song <baohua.song@csr.com>
