@@ -1,53 +1,26 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Nov 2012 13:47:25 +0100
-Subject: [PATCH 16/16] ARM: plat-versatile: move FPGA irq driver to
- drivers/irqchip
-In-Reply-To: <CACRpkdai62ox=fJ31viCOVfNc1skEEr+7356PEf0y1j6jzDrdw@mail.gmail.com>
-References: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1353448867-15008-17-git-send-email-thomas.petazzoni@free-electrons.com>
- <CACRpkdai62ox=fJ31viCOVfNc1skEEr+7356PEf0y1j6jzDrdw@mail.gmail.com>
-Message-ID: <20121121134725.69b4e8e8@skate>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Wed, 21 Nov 2012 13:47:59 +0100
+Subject: [PATCH RESEND] ARM: dts: AM33XX: Rename I2C and GPIO nodes
+In-Reply-To: <1353498737-21174-1-git-send-email-anilkumar@ti.com> (AnilKumar
+ Ch's message of "Wed, 21 Nov 2012 17:22:17 +0530")
+References: <1353498737-21174-1-git-send-email-anilkumar@ti.com>
+Message-ID: <871ufni0lc.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+>>>>> "A" == AnilKumar Ch <anilkumar@ti.com> writes:
 
-On Wed, 21 Nov 2012 13:22:27 +0100, Linus Walleij wrote:
+ A> Rename I2C and GPIO nodes according to AM33XX TRM. According to
+ A> AM33XX TRM device instances are starting from "0" like i2c0, i2c1
+ A> and i2c3.
 
-> > This moves the Versatile FPGA interrupt controller driver, used in
-> > the Integrator/AP, Integrator/CP and some Versatile boards, out
-> > of arch/arm/plat-versatile and down to drivers/irqchip where we
-> > have consensus that such drivers belong. The header file is
-> > consequently moved to <linux/platform_data/irq-versatile-fpga.h>.
-> >
-> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> It appears you have modified my commit so this is not the
-> whole story right?
-> 
-> This doesn't look like I wrote it:
-> +IRQCHIP_DECLARE(versatile_fpga_irq, "arm,versatile-fpga-irq",
-> +               fpga_irq_of_init);
-> +
+ A> Signed-off-by: Pantelis Antoniou <panto@antoniou-consulting.com>
+ A> [panto at antoniou-consulting.com: initial patch by pantelis's]
+ A> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 
-Right, sorry. As I said earlier, this v4 is not intended for merging,
-but only to show the current state, and define together what remains to
-be fixed/changed.
+Thanks!
 
-> Is it possible to do your changes on top of my commit
-> instead?
+Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
 
-Not if we want to keep bisectability.
-
-> Atleast add your Signed-off-by please...
-
-Will do, thanks for the notice.
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Bye, Peter Korsgaard
