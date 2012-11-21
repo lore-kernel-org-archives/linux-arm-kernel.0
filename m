@@ -1,65 +1,27 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 21 Nov 2012 11:22:42 +0100
-Subject: [PATCH 1/1] asix: use ramdom hw addr if the one read is not valid
-Message-ID: <1353493362-30418-1-git-send-email-plagnioj@jcrosoft.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 21 Nov 2012 02:27:17 -0800
+Subject: [PATCH v3 00/18] ARM: Patchset for CLPS711X
+In-Reply-To: <CAOesGMj57uJkwz6qJZ1fsBubxxLFWRMdi8kP-gBzt8mR5R5oaw@mail.gmail.com>
+References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
+ <201211171545.22154.arnd@arndb.de>
+ <20121121063602.GA7615@quad.lixom.net>
+ <CAOesGMj57uJkwz6qJZ1fsBubxxLFWRMdi8kP-gBzt8mR5R5oaw@mail.gmail.com>
+Message-ID: <CAOesGMjwOoyWh=W0fiKgAO8qdY9au_VWmy545EnWVM7eYc3ctw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: linux-usb at vger.kernel.org
-Cc: netdev at vger.kernel.org
----
- drivers/net/usb/asix_devices.c |   24 +++++++++++++++++++++---
- 1 file changed, 21 insertions(+), 3 deletions(-)
+On Wed, Nov 21, 2012 at 2:18 AM, Olof Johansson <olof@lixom.net> wrote:
 
-diff --git a/drivers/net/usb/asix_devices.c b/drivers/net/usb/asix_devices.c
-index 33ab824..7ebec5b 100644
---- a/drivers/net/usb/asix_devices.c
-+++ b/drivers/net/usb/asix_devices.c
-@@ -225,7 +225,13 @@ static int ax88172_bind(struct usbnet *dev, struct usb_interface *intf)
- 			   ret);
- 		goto out;
- 	}
--	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
-+
-+	if (is_valid_ether_addr(buf)) {
-+		memcpy(dev->net->dev_addr, buf, ETH_ALEN);
-+	} else {
-+		netdev_info(dev->net, "invalid hw address, using random\n");
-+		eth_hw_addr_random(dev->net);
-+	}
- 
- 	/* Initialize MII structure */
- 	dev->mii.dev = dev->net;
-@@ -423,7 +429,13 @@ static int ax88772_bind(struct usbnet *dev, struct usb_interface *intf)
- 		netdev_dbg(dev->net, "Failed to read MAC address: %d\n", ret);
- 		return ret;
- 	}
--	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
-+
-+	if (is_valid_ether_addr(buf)) {
-+		memcpy(dev->net->dev_addr, buf, ETH_ALEN);
-+	} else {
-+		netdev_info(dev->net, "invalid hw address, using random\n");
-+		eth_hw_addr_random(dev->net);
-+	}
- 
- 	/* Initialize MII structure */
- 	dev->mii.dev = dev->net;
-@@ -777,7 +789,13 @@ static int ax88178_bind(struct usbnet *dev, struct usb_interface *intf)
- 		netdev_dbg(dev->net, "Failed to read MAC address: %d\n", ret);
- 		return ret;
- 	}
--	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
-+
-+	if (is_valid_ether_addr(buf)) {
-+		memcpy(dev->net->dev_addr, buf, ETH_ALEN);
-+	} else {
-+		netdev_info(dev->net, "invalid hw address, using random\n");
-+		eth_hw_addr_random(dev->net);
-+	}
- 
- 	/* Initialize MII structure */
- 	dev->mii.dev = dev->net;
--- 
-1.7.10.4
+> Something really odd is going on.
+>
+> The 2cad6a8a4c commit is not in any pinctrl branch at the moment. So
+> I'll drop this branch until we get this sorted out.
+
+Sorry, replying to myself way too much tonight. The confusion was
+caused by me looking at the pinctrl tree instead of the gpio tree.
+
+I'll re-integrate this branch again tomorrow, after I double-check
+things once more. :)
+
+
+-Olof
