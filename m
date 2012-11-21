@@ -1,36 +1,56 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 21 Nov 2012 10:33:40 -0800
-Subject: [PATCH 2/2] i2c: s3c2410: Get the i2c bus number from alias id
-In-Reply-To: <20121121040913.GA13280@sirena.org.uk>
-References: <1353450428-2615-1-git-send-email-dianders@chromium.org>
- <1353450428-2615-2-git-send-email-dianders@chromium.org>
- <20121121040913.GA13280@sirena.org.uk>
-Message-ID: <CAD=FV=V-59u-J40G3x9oK5phUX-5pa9xJLN9QnGJCRqGfc_2ow@mail.gmail.com>
+From: wfp5p@viridian.itc.virginia.edu (Bill Pemberton)
+Date: Wed, 21 Nov 2012 13:35:25 -0500
+Subject: [PATCH 022/493] ARM: remove CONFIG_HOTPLUG ifdefs
+In-Reply-To: <20121121114419.GB3290@n2100.arm.linux.org.uk>
+Message-ID: <20121121183525.BF1118013C@viridian.itc.virginia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 8:09 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Nov 20, 2012 at 02:27:04PM -0800, Doug Anderson wrote:
->> From: Padmavathi Venna <padma.v@samsung.com>
->>
->> Get the i2c bus number that the device is connected to using the alias
->> id.  This makes debugging / grokking of kernel messages much easier.
->
-> This doesn't look like a s3c2410 specific change - it's a generic device
-> tree issue.  This suggests that it sohuld be implemented in the
-> framework so that all I2C controllers with DT can use it.
+Russell King - ARM Linux writes:
+> 
+> > diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+> > index b9f38e3..38279fe 100644
+> > --- a/arch/arm/kernel/vmlinux.lds.S
+> > +++ b/arch/arm/kernel/vmlinux.lds.S
+> > @@ -66,10 +66,8 @@ SECTIONS
+> >  		ARM_EXIT_DISCARD(EXIT_TEXT)
+> >  		ARM_EXIT_DISCARD(EXIT_DATA)
+> >  		EXIT_CALL
+> > -#ifndef CONFIG_HOTPLUG
+> >  		*(.ARM.exidx.devexit.text)
+> >  		*(.ARM.extab.devexit.text)
+> > -#endif
+> 
+> This to me looks wrong.  Do we want to unconditionally discard devexit
+> debugging?
+> 
 
-Good suggestion.  I have posted a series with the title "Add automatic
-bus number support for i2c busses with device tree".  It contains the
-i2c-core patch as well as a patch removing similar code from the pxa
-i2c driver.
+Whoa, yeah, that's not right.  I got it backwards.
 
-Kukjin: please consider this patch abandoned and superseded by the new
-i2c-core patch.  As Olof said, the patch for adding aliases for
-exynos4 should still be fine to apply.
+The right fix gets rid of all those devexit lines as devexit will be
+going away.
+
+Should I just redo this patch or send an additional one that removes
+those 2 lines?
 
 
-Thanks!
+> > diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+> > index d1ea7ce..856b58d 100644
+> > --- a/include/asm-generic/vmlinux.lds.h
+> > +++ b/include/asm-generic/vmlinux.lds.h
+> > @@ -74,13 +74,8 @@
+> >   * are handled as text/data or they can be discarded (which
+> >   * often happens at runtime)
+> >   */
+> > -#ifdef CONFIG_HOTPLUG
+> >  #define DEV_KEEP(sec)    *(.dev##sec)
+> >  #define DEV_DISCARD(sec)
+> 
+> I hope there will be a follow-on patch to remove the DEV_KEEP() and
+> DEV_DISCARD() stuff entirely?
+> 
 
--Doug
+Yes, once hotplug is truly gone these can also go away.
+
+-- 
+Bill
