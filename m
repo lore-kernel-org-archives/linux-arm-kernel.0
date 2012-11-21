@@ -1,39 +1,32 @@
-From: mike.turquette@linaro.org (Mike Turquette)
-Date: Wed, 21 Nov 2012 12:21:04 -0800
-Subject: [PATCH 0/8] CLK: SPEAr: Fixes & updates
-In-Reply-To: <CAKohpokjVoNJDPw3xKoaxg3X+7DCycZQjYCNxy-wpq_Y96qYtw@mail.gmail.com>
-References: <cover.1352529508.git.viresh.kumar@linaro.org>
- <CAKohpokjVoNJDPw3xKoaxg3X+7DCycZQjYCNxy-wpq_Y96qYtw@mail.gmail.com>
-Message-ID: <20121121202104.21126.70266@nucleus>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 21 Nov 2012 12:21:14 -0800
+Subject: [PATCH] Revert "serial: omap: fix software flow control"
+In-Reply-To: <509A306B.10409@gmail.com>
+References: <1350396562-32579-1-git-send-email-balbi@ti.com>
+ <509A306B.10409@gmail.com>
+Message-ID: <20121121202114.GC30682@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Viresh Kumar (2012-11-19 23:34:30)
-> On 10 November 2012 12:13, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> > Hi Mike,
-> >
-> > These are fixes for SPEAr clock stuff. Most of them are fixes, but we don't mind
-> > getting them in 3.8.
-> >
-> > Deepak Sikri (2):
-> >   CLK: SPEAr1340: Update clock rate table
-> >   CLK: SPEAr: Correct index scanning done for clock synths
-> >
-> > Rajeev Kumar (1):
-> >   CLK: SPEAr: Fix dev_id & con_id for multiple clocks
-> >
-> > Shiraz Hashim (2):
-> >   CLK: SPEAr13xx: Fix mux clock names
-> >   CLK: SPEAr13xx: fix parent names of multiple clocks
-> >
-> > Vipul Kumar Samar (3):
-> >   CLK: SPEAr: Set CLK_SET_RATE_PARENT for few clocks
-> >   CLK: SPEAr: Add missing clocks
-> >   CLK: SPEAr: Remove unused dummy apb_pclk
+On Wed, Nov 07, 2012 at 10:56:59AM +0100, Andreas Bie?mann wrote:
+> On 16.10.2012 16:09, Felipe Balbi wrote:
+> > This reverts commit 957ee7270d632245b43f6feb0e70d9a5e9ea6cf6
+> > (serial: omap: fix software flow control).
+> > 
+> > As Russell has pointed out, that commit isn't fixing
+> > Software Flow Control at all, and it actually makes
+> > it even more broken.
+> > 
+> > It was agreed to revert this commit and use Russell's
+> > latest UART patches instead.
+> > 
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
 > 
-> Ping!!
+> since 957ee7270d632245b43f6feb0e70d9a5e9ea6cf6 made it into stable (at
+> least 3.4) I think it would be good decision to also apply this revert
+> to stable until a working solution exists.
 
-Thanks for the re-ping.  I've taken this series into clk-next.
+Now queued up for the stable releases, thanks.
 
-Regards,
-Mike
+greg k-h
