@@ -1,55 +1,79 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 21 Nov 2012 10:48:45 +0200
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <1699753.ZQsWMHINxd@percival>
-References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
- <4316169.5QXVzv7peZ@percival> <50AC8D3B.6040300@ti.com>
- <1699753.ZQsWMHINxd@percival>
-Message-ID: <50AC956D.7020303@ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 21 Nov 2012 09:48:56 +0100
+Subject: [PATCH v2] can: c_can: Add d_can raminit support
+In-Reply-To: <1353476650-24398-1-git-send-email-anilkumar@ti.com>
+References: <1353476650-24398-1-git-send-email-anilkumar@ti.com>
+Message-ID: <50AC9578.4030505@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-21 10:32, Alex Courbot wrote:
-
->> Ok. I'll need to dig up the conversation
+On 11/21/2012 06:44 AM, AnilKumar Ch wrote:
+> Add D_CAN raminit support to C_CAN driver to enable D_CAN RAM,
+> which holds all the message objects during transmission or
+> receiving of data. This initialization/de-initialization should
+> be done in synchronous with D_CAN clock.
 > 
-> IIRC it was somewhere around here:
+> In case of AM335X-EVM (current user of D_CAN driver) message RAM is
+> controlled through control module register for both instances. So
+> control module register details is required to initialization or
+> de-initialization of message RAM according to instance number.
 > 
-> https://lkml.org/lkml/2012/9/7/662
+> Control module memory resource is obtained from D_CAN dt node and
+> instance number obtained from device tree aliases node.
 > 
-> See the parent messages too.
-
-Thanks.
-
->> Did you consider any examples
->> of how some driver could handle the error cases?
+> This patch was tested on AM335x-EVM along with pinctrl data addition
+> patch, d_can dt aliases addition and control module data addition.
+> pinctrl data addition is not added to am335x-evm.dts (only supports
+> CPLD profile#0) because d_can1 is supported under CPLD profile#1.
 > 
-> For all the (limited) use cases I considered, playing the power-off sequence 
-> when power-on fails just works. If power-off also fails you are potentially in 
-> more trouble though. Maybe we could have another "run" function that does not 
-> stop on errors for handling such cases where you want to "stop everything you 
-> can".
+> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> ---
 
-If the power-off sequence disables a regulator that was supposed to be
-enabled by the power-on sequence (but wasn't enabled because of an
-error), the regulator_disable is still called when the driver runs the
-power-off sequence, isn't it? Regulator enables and disables are ref
-counted, and the enables should match the disables.
+[...]
 
-> Failures might be better handled if sequences have some "recovery policy" 
-> about what to do when they fail, as mentioned in the link above. As you 
-> pointed out, the driver might not always know enough about the resources 
-> involved to do the right thing.
+> @@ -178,6 +195,20 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
+>  		priv->can.ctrlmode_supported |= CAN_CTRLMODE_3_SAMPLES;
+>  		priv->read_reg = c_can_plat_read_reg_aligned_to_16bit;
+>  		priv->write_reg = c_can_plat_write_reg_aligned_to_16bit;
+> +
+> +		if (pdev->dev.of_node)
+> +			priv->instance = pdev->id < 0 ?
+> +				of_alias_get_id(pdev->dev.of_node, "d_can") :
+> +				pdev->id;
 
-Yes, I think such recovery policy would be needed.
+This wouldn't work with non DT kernels, what about:
 
- Tomi
+if (pdev->dev.of_node)
+	priv->instance = of_alias_get_id(pdev->dev.of_node, "d_can");
+else
+	priv->instance = pdev->id;
 
+Marc
+> +
+> +		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +		priv->raminit_ctrlreg =
+> +				devm_request_and_ioremap(&pdev->dev, res);
+> +		if (!priv->raminit_ctrlreg || priv->instance < 0) {
+> +			dev_info(&pdev->dev, "control memory is not used for raminit\n");
+> +			break;
+> +		}
+> +		priv->ram_init = c_can_hw_raminit;
+>  		break;
+>  	default:
+>  		ret = -EINVAL;
+> 
+
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 897 bytes
+Size: 261 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121121/80b35acd/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121121/54fc9e3c/attachment.sig>
