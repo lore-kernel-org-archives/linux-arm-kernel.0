@@ -1,138 +1,329 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Nov 2012 15:59:29 +0100
-Subject: [PATCH V6 4/5] arm: mm: Add support for PJ4B cpu and init routines
+Date: Wed, 21 Nov 2012 15:59:30 +0100
+Subject: [PATCH V6 5/5] arm: mvebu: Add SMP support for Armada XP
 In-Reply-To: <1353509970-5237-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1353509970-5237-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1353509970-5237-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1353509970-5237-6-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PJ4B is an implementation of the ARMv7 (such as the Cortex A9 for
-example) released by Marvell. This CPU is currently found in
-Armada 370 and Armada XP SoCs. This patch provides a support for the
-specific initialization of this CPU.
+This enables SMP support on the Armada XP processor. It adds the
+mandatory functions to support SMP such as: the SMP initialization
+functions in platsmp.c, the secondary CPU entry point in headsmp.S and
+the CPU hotplug initial support in hotplug.c.
 
 Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/mach-mvebu/Kconfig |    2 +-
- arch/arm/mm/Kconfig         |    4 +++
- arch/arm/mm/proc-v7.S       |   66 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 71 insertions(+), 1 deletion(-)
+ arch/arm/configs/mvebu_defconfig    |    3 +
+ arch/arm/mach-mvebu/Kconfig         |    1 +
+ arch/arm/mach-mvebu/Makefile        |    2 +
+ arch/arm/mach-mvebu/armada-370-xp.c |    3 +
+ arch/arm/mach-mvebu/common.h        |    3 +
+ arch/arm/mach-mvebu/headsmp.S       |   49 ++++++++++++++
+ arch/arm/mach-mvebu/hotplug.c       |   30 +++++++++
+ arch/arm/mach-mvebu/platsmp.c       |  122 +++++++++++++++++++++++++++++++++++
+ 8 files changed, 213 insertions(+)
+ create mode 100644 arch/arm/mach-mvebu/headsmp.S
+ create mode 100644 arch/arm/mach-mvebu/hotplug.c
+ create mode 100644 arch/arm/mach-mvebu/platsmp.c
 
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index 3458752..da598d3 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -12,6 +12,9 @@ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_XP=y
+ # CONFIG_CACHE_L2X0 is not set
++# CONFIG_SWP_EMULATE is not set
++CONFIG_SMP=y
++# CONFIG_LOCAL_TIMERS is not set
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ # CONFIG_COMPACTION is not set
 diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 79299cd..f4c3bf8 100644
+index f4c3bf8..c934e1d 100644
 --- a/arch/arm/mach-mvebu/Kconfig
 +++ b/arch/arm/mach-mvebu/Kconfig
-@@ -21,7 +21,7 @@ menu "Marvell SOC with device tree"
+@@ -21,6 +21,7 @@ menu "Marvell SOC with device tree"
  config MACH_ARMADA_370_XP
  	bool
  	select ARMADA_370_XP_TIMER
--	select CPU_V7
-+	select CPU_PJ4B
++	select HAVE_SMP
+ 	select CPU_PJ4B
  
  config MACH_ARMADA_370
- 	bool "Marvell Armada 370 boards"
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 94186b6..3fd629d 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -352,6 +352,10 @@ config CPU_PJ4
- 	select ARM_THUMBEE
- 	select CPU_V7
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index 2e3ec11..5dcb369 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -3,3 +3,5 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
  
-+config CPU_PJ4B
-+	bool
-+	select CPU_V7
-+
- # ARMv6
- config CPU_V6
- 	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 846d279..1aa3891 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -169,6 +169,62 @@ __v7_ca15mp_setup:
- 	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
- 	mcreq	p15, 0, r0, c1, c0, 1
+ obj-y += system-controller.o
+ obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o coherency.o coherency_ll.o pmsu.o
++obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
++obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+index 3292d6d..472e70f 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.c
++++ b/arch/arm/mach-mvebu/armada-370-xp.c
+@@ -23,6 +23,7 @@
+ #include <asm/mach/time.h>
+ #include "armada-370-xp.h"
+ #include "common.h"
++#include "coherency.h"
+ 
+ static struct map_desc armada_370_xp_io_desc[] __initdata = {
+ 	{
+@@ -51,6 +52,7 @@ struct sys_timer armada_370_xp_timer = {
+ static void __init armada_370_xp_dt_init(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	coherency_init();
+ }
+ 
+ static const char * const armada_370_xp_dt_board_dt_compat[] = {
+@@ -60,6 +62,7 @@ static const char * const armada_370_xp_dt_board_dt_compat[] = {
+ };
+ 
+ DT_MACHINE_START(ARMADA_XP_DT, "Marvell Aramada 370/XP (Device Tree)")
++	.smp		= smp_ops(armada_xp_smp_ops),
+ 	.init_machine	= armada_370_xp_dt_init,
+ 	.map_io		= armada_370_xp_map_io,
+ 	.init_irq	= armada_370_xp_init_irq,
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+index 9285d04..aa27bc2 100644
+--- a/arch/arm/mach-mvebu/common.h
++++ b/arch/arm/mach-mvebu/common.h
+@@ -20,6 +20,9 @@ void mvebu_restart(char mode, const char *cmd);
+ void armada_370_xp_init_irq(void);
+ void armada_370_xp_handle_irq(struct pt_regs *regs);
+ 
++void armada_xp_cpu_die(unsigned int cpu);
+ int armada_370_xp_coherency_init(void);
+ int armada_370_xp_pmsu_init(void);
++void armada_xp_secondary_startup(void);
++extern struct smp_operations armada_xp_smp_ops;
  #endif
+diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
+new file mode 100644
+index 0000000..a06e0ed
+--- /dev/null
++++ b/arch/arm/mach-mvebu/headsmp.S
+@@ -0,0 +1,49 @@
++/*
++ * SMP support: Entry point for secondary CPUs
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Yehuda Yitschak <yehuday@marvell.com>
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * This file implements the assembly entry point for secondary CPUs in
++ * an SMP kernel. The only thing we need to do is to add the CPU to
++ * the coherency fabric by writing to 2 registers. Currently the base
++ * register addresses are hard coded due to the early initialisation
++ * problems.
++ */
 +
-+__v7_pj4b_setup:
-+#ifdef CONFIG_CPU_PJ4B
++#include <linux/linkage.h>
++#include <linux/init.h>
 +
-+/* Auxiliary Debug Modes Control 1 Register */
-+#define STATIC_BP     (1 << 2) /* Enable Static BP */
-+#define INTER_PARITY  (1 << 8) /* Disable Internal Parity Handling */
-+#define BCK_OFF_STREX (1 << 5) /* Enable the back off of STREX instr */
-+#define CLEAN_LINE    (1 << 16) /* Disable data transfer for clean line */
++/*
++ * At this stage the secondary CPUs don't have acces yet to the MMU, so
++ * we have to provide physical addresses
++ */
++#define ARMADA_XP_CFB_BASE	     0xD0020200
 +
-+/* Auxiliary Debug Modes Control 2 Register */
-+#define FAST_LDR      (1 << 23) /* Disable fast LDR */
-+#define SNOOP_DATA    (1 << 25) /* Do not interleave write and snoop data */
-+#define CWF           (1 << 27) /* Disable Critical Word First feature */
-+#define OUTSANDING_NC (1 << 29) /* Disable outstanding non cacheable request */
-+#define L1_REP_RR     (1 << 30) /* L1 replacement - Strict round robin */
-+#define AUX_DBG_CTRL2 (SNOOP_DATA | CWF | OUTSANDING_NC | L1_REP_RR)
++	__CPUINIT
 +
-+/* Auxiliary Functional Modes Control Register 0 */
-+#define SMP_CFB         (1 << 1) /* Set SMP mode. Join the coherency fabric */
-+#define L1_PAR_CHK      (1 << 2) /* Support L1 parity checking */
-+#define BROADCAST_CACHE (1 << 8) /* Broadcast Cache and TLB maintenance */
++/*
++ * Armada XP specific entry point for secondary CPUs.
++ * We add the CPU to the coherency fabric and then jump to secondary
++ * startup
++ */
++ENTRY(armada_xp_secondary_startup)
 +
-+/* Auxiliary Debug Modes Control 0 Register */
-+#define WFI_WFE         (1 << 22) /* WFI/WFE - serve the DVM and back to idle */
++	/* Read CPU id */
++	mrc     p15, 0, r1, c0, c0, 5
++	and     r1, r1, #0xF
 +
-+	/* Auxiliary Debug Modes Control 1 Register */
-+	mrc	p15, 1,	r0, c15, c1, 1
-+	orr     r0, r0, #CLEAN_LINE
-+	orr     r0, r0, #BCK_OFF_STREX
-+	orr     r0, r0, #INTER_PARITY
-+	bic	r0, r0, #STATIC_BP
-+	mcr	p15, 1,	r0, c15, c1, 1
++	/* Add CPU to coherency fabric */
++	ldr     r0, =ARMADA_XP_CFB_BASE
 +
-+	/* Auxiliary Debug Modes Control 2 Register */
-+	mrc	p15, 1,	r0, c15, c1, 2
-+	bic	r0, r0, #FAST_LDR
-+	orr	r0, r0, #AUX_DBG_CTRL2
-+	mcr	p15, 1,	r0, c15, c1, 2
++	bl	ll_set_cpu_coherent
++	b	secondary_startup
 +
-+	/* Auxiliary Functional Modes Control Register 0 */
-+	mrc	p15, 1,	r0, c15, c2, 0
-+#ifdef CONFIG_SMP
-+	orr	r0, r0, #SMP_CFB
++ENDPROC(armada_xp_secondary_startup)
+diff --git a/arch/arm/mach-mvebu/hotplug.c b/arch/arm/mach-mvebu/hotplug.c
+new file mode 100644
+index 0000000..b228b6a
+--- /dev/null
++++ b/arch/arm/mach-mvebu/hotplug.c
+@@ -0,0 +1,30 @@
++/*
++ * Symmetric Multi Processing (SMP) support for Armada XP
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Lior Amsalem <alior@marvell.com>
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++#include <linux/kernel.h>
++#include <linux/errno.h>
++#include <linux/smp.h>
++#include <asm/proc-fns.h>
++
++/*
++ * platform-specific code to shutdown a CPU
++ *
++ * Called with IRQs disabled
++ */
++void __ref armada_xp_cpu_die(unsigned int cpu)
++{
++	cpu_do_idle();
++
++	/* We should never return from idle */
++	panic("mvebu: cpu %d unexpectedly exit from shutdown\n", cpu);
++}
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+new file mode 100644
+index 0000000..fe16aaf
+--- /dev/null
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -0,0 +1,122 @@
++/*
++ * Symmetric Multi Processing (SMP) support for Armada XP
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Lior Amsalem <alior@marvell.com>
++ * Yehuda Yitschak <yehuday@marvell.com>
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * The Armada XP SoC has 4 ARMv7 PJ4B CPUs running in full HW coherency
++ * This file implements the routines for preparing the SMP infrastructure
++ * and waking up the secondary CPUs
++ */
++
++#include <linux/init.h>
++#include <linux/smp.h>
++#include <linux/clk.h>
++#include <linux/of.h>
++#include <asm/cacheflush.h>
++#include <asm/smp_plat.h>
++#include "common.h"
++#include "armada-370-xp.h"
++#include "pmsu.h"
++#include "coherency.h"
++
++void __init set_secondary_cpus_clock(void)
++{
++	int thiscpu;
++	unsigned long rate;
++	struct clk *cpu_clk = NULL;
++	struct device_node *np = NULL;
++
++	thiscpu = smp_processor_id();
++	for_each_node_by_type(np, "cpu") {
++		int err;
++		int cpu;
++
++		err = of_property_read_u32(np, "reg", &cpu);
++		if (WARN_ON(err))
++			return;
++
++		if (cpu == thiscpu) {
++			cpu_clk = of_clk_get(np, 0);
++			break;
++		}
++	}
++	if (WARN_ON(IS_ERR(cpu_clk)))
++		return;
++	clk_prepare_enable(cpu_clk);
++	rate = clk_get_rate(cpu_clk);
++
++	/* set all the other CPU clk to the same rate than the boot CPU */
++	for_each_node_by_type(np, "cpu") {
++		int err;
++		int cpu;
++
++		err = of_property_read_u32(np, "reg", &cpu);
++		if (WARN_ON(err))
++			return;
++
++		if (cpu != thiscpu) {
++			cpu_clk = of_clk_get(np, 0);
++			clk_set_rate(cpu_clk, rate);
++		}
++	}
++}
++
++static void __cpuinit armada_xp_secondary_init(unsigned int cpu)
++{
++	armada_xp_mpic_smp_cpu_init();
++}
++
++static int __cpuinit armada_xp_boot_secondary(unsigned int cpu,
++					      struct task_struct *idle)
++{
++	pr_info("Booting CPU %d\n", cpu);
++
++	armada_xp_boot_cpu(cpu, armada_xp_secondary_startup);
++
++	return 0;
++}
++
++static void __init armada_xp_smp_init_cpus(void)
++{
++	unsigned int i, ncores;
++	ncores = coherency_get_cpu_count();
++
++	/* Limit possible CPUs to defconfig */
++	if (ncores > nr_cpu_ids) {
++		pr_warn("SMP: %d CPUs physically present. Only %d configured.",
++			ncores, nr_cpu_ids);
++		pr_warn("Clipping CPU count to %d\n", nr_cpu_ids);
++		ncores = nr_cpu_ids;
++	}
++
++	for (i = 0; i < ncores; i++)
++		set_cpu_possible(i, true);
++
++	set_smp_cross_call(armada_mpic_send_doorbell);
++}
++
++void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
++{
++	set_secondary_cpus_clock();
++	flush_cache_all();
++	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
++}
++
++struct smp_operations armada_xp_smp_ops __initdata = {
++	.smp_init_cpus		= armada_xp_smp_init_cpus,
++	.smp_prepare_cpus	= armada_xp_smp_prepare_cpus,
++	.smp_secondary_init	= armada_xp_secondary_init,
++	.smp_boot_secondary	= armada_xp_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_die		= armada_xp_cpu_die,
 +#endif
-+	orr	r0, r0, #L1_PAR_CHK
-+	orr	r0, r0, #BROADCAST_CACHE
-+	mcr	p15, 1,	r0, c15, c2, 0
-+
-+	/* Auxiliary Debug Modes Control 0 Register */
-+	mrc	p15, 1,	r0, c15, c1, 0
-+	orr	r0, r0, #WFI_WFE
-+	mcr	p15, 1,	r0, c15, c1, 0
-+
-+#endif /* CONFIG_CPU_PJ4B */
-+
- __v7_setup:
- 	adr	r12, __v7_setup_stack		@ the local stack
- 	stmia	r12, {r0-r5, r7, r9, r11, lr}
-@@ -342,6 +398,16 @@ __v7_ca9mp_proc_info:
- 	.long	0xff0ffff0
- 	__v7_proc __v7_ca9mp_setup
- 	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
-+
-+	/*
-+	 * Marvell PJ4B processor.
-+	 */
-+	.type   __v7_pj4b_proc_info, #object
-+__v7_pj4b_proc_info:
-+	.long	0x562f5840
-+	.long	0xfffffff0
-+	__v7_proc __v7_pj4b_setup
-+	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
- #endif	/* CONFIG_ARM_LPAE */
- 
- 	/*
++};
 -- 
 1.7.9.5
