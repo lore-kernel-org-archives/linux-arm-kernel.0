@@ -1,62 +1,32 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 21 Nov 2012 00:19:06 -0700
-Subject: [PATCH] ARM: Kirkwood: Update PCI-E fixup
-Message-ID: <20121121071906.GF19837@obsidianresearch.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 20 Nov 2012 23:21:08 -0800
+Subject: [GIT PULL v2] Renesas ARM-based SoC boards for v3.8 #3
+In-Reply-To: <1353372187-2903-1-git-send-email-horms@verge.net.au>
+References: <1353372187-2903-1-git-send-email-horms@verge.net.au>
+Message-ID: <20121121072108.GH7615@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- The code relies on rc_pci_fixup being called, which only happens
-  when CONFIG_PCI_QUIRKS is enabled, so add that to Kconfig. Omitting
-  this causes a booting failure with a non-obvious cause.
-- Update rc_pci_fixup to set the class properly, copying the
-  more modern style from other places
-- Correct the rc_pci_fixup comment
+On Tue, Nov 20, 2012 at 09:43:06AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
+> 
+> Please consider the following board fix for 3.8.
+> 
+> The commit message for the patch has been revised since yesterday's
+> pull-request.
+> 
+> Also, please let me know if you would prefer me to supply
+> this as a fixes branch as we are now in the 3.7-rc6 timeframe
+> where I understand that non-fix commits are no longer allowed for 3.8.
+>
+> This commit is based on the renesas/boards2 branch of the arm-soc tree.
 
-Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
----
- arch/arm/Kconfig              |    1 +
- arch/arm/mach-kirkwood/pcie.c |    9 ++++++---
- 2 files changed, 7 insertions(+), 3 deletions(-)
+It's not super-strictly "fixes only" at this point in the tree, but we really
+want to make sure that we don't get any large pull requests from here on out.
 
-Another cleanup.. It took a fair while to figure out that things
-were not working properly because PCI_QUIRKS was not set :|
+For an update like this (adding one more patch on top of a previous branch),
+this format is perfect since it allows us to just pull the same branch again,
+really. So I've pulled this on top of the previous contents into next/boards2.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ade7e92..9759fec 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -547,6 +547,7 @@ config ARCH_KIRKWOOD
- 	select CPU_FEROCEON
- 	select GENERIC_CLOCKEVENTS
- 	select PCI
-+	select PCI_QUIRKS
- 	select PLAT_ORION_LEGACY
- 	help
- 	  Support for the following Marvell Kirkwood series SoCs:
-diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
-index d5aedf6..59c97fe 100644
---- a/arch/arm/mach-kirkwood/pcie.c
-+++ b/arch/arm/mach-kirkwood/pcie.c
-@@ -207,14 +207,17 @@ static int __init kirkwood_pcie_setup(int nr, struct pci_sys_data *sys)
- 	return 1;
- }
- 
-+/* The root complex has a hardwired class of PCI_CLASS_MEMORY_OTHER, when it
-+   is operating as a root complex this needs to be switched to
-+   PCI_CLASS_BRIDGE_HOST or Linux will errantly try to process the BAR's on
-+   the device. Decoding setup is handled by the orion code. */
- static void __devinit rc_pci_fixup(struct pci_dev *dev)
- {
--	/*
--	 * Prevent enumeration of root complex.
--	 */
- 	if (dev->bus->parent == NULL && dev->devfn == 0) {
- 		int i;
- 
-+		dev->class &= 0xff;
-+		dev->class |= PCI_CLASS_BRIDGE_HOST << 8;
- 		for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
- 			dev->resource[i].start = 0;
- 			dev->resource[i].end   = 0;
--- 
-1.7.4.1
+
+-Olof
