@@ -1,20 +1,80 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 21 Nov 2012 09:57:18 +0100
-Subject: [GIT PULL] arm-soc: lpc32xx: dts update
-In-Reply-To: <20121121085251.GQ7615@quad.lixom.net>
-References: <50A8FE44.3030401@antcom.de> <20121121085251.GQ7615@quad.lixom.net>
-Message-ID: <50AC976E.60402@antcom.de>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Wed, 21 Nov 2012 08:58:03 +0000
+Subject: [PATCH v2] can: c_can: Add d_can raminit support
+In-Reply-To: <50AC9578.4030505@pengutronix.de>
+References: <1353476650-24398-1-git-send-email-anilkumar@ti.com>
+ <50AC9578.4030505@pengutronix.de>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA77D25@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2012 09:52 AM, Olof Johansson wrote:
-> On Sun, Nov 18, 2012 at 04:27:00PM +0100, Roland Stigge wrote:
->> this pull request includes the dts updates for lpc32xx for 3.7. (Hoping that
->> the signed tag works for you.)
+On Wed, Nov 21, 2012 at 14:18:56, Marc Kleine-Budde wrote:
+> On 11/21/2012 06:44 AM, AnilKumar Ch wrote:
+> > Add D_CAN raminit support to C_CAN driver to enable D_CAN RAM,
+> > which holds all the message objects during transmission or
+> > receiving of data. This initialization/de-initialization should
+> > be done in synchronous with D_CAN clock.
+> > 
+> > In case of AM335X-EVM (current user of D_CAN driver) message RAM is
+> > controlled through control module register for both instances. So
+> > control module register details is required to initialization or
+> > de-initialization of message RAM according to instance number.
+> > 
+> > Control module memory resource is obtained from D_CAN dt node and
+> > instance number obtained from device tree aliases node.
+> > 
+> > This patch was tested on AM335x-EVM along with pinctrl data addition
+> > patch, d_can dt aliases addition and control module data addition.
+> > pinctrl data addition is not added to am335x-evm.dts (only supports
+> > CPLD profile#0) because d_can1 is supported under CPLD profile#1.
+> > 
+> > Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> > ---
 > 
-> I'm guessing you want this for 3.8, right? I've queued it under lpc32xx/dt for
-> 3.8 merge window now at least. :)
+> [...]
+> 
+> > @@ -178,6 +195,20 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
+> >  		priv->can.ctrlmode_supported |= CAN_CTRLMODE_3_SAMPLES;
+> >  		priv->read_reg = c_can_plat_read_reg_aligned_to_16bit;
+> >  		priv->write_reg = c_can_plat_write_reg_aligned_to_16bit;
+> > +
+> > +		if (pdev->dev.of_node)
+> > +			priv->instance = pdev->id < 0 ?
+> > +				of_alias_get_id(pdev->dev.of_node, "d_can") :
+> > +				pdev->id;
+> 
+> This wouldn't work with non DT kernels, what about:
+> 
+> if (pdev->dev.of_node)
+> 	priv->instance = of_alias_get_id(pdev->dev.of_node, "d_can");
+> else
+> 	priv->instance = pdev->id;
+> 
 
-Yes, completely right! Sorry for the confusion.
+I completely forgot this case, yes this is the correct way of doing it.
 
-Roland
+Thanks
+AnilKumar
+
+> > +
+> > +		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> > +		priv->raminit_ctrlreg =
+> > +				devm_request_and_ioremap(&pdev->dev, res);
+> > +		if (!priv->raminit_ctrlreg || priv->instance < 0) {
+> > +			dev_info(&pdev->dev, "control memory is not used for raminit\n");
+> > +			break;
+> > +		}
+> > +		priv->ram_init = c_can_hw_raminit;
+> >  		break;
+> >  	default:
+> >  		ret = -EINVAL;
+> > 
+> 
+> 
+> -- 
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> 
+> 
