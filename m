@@ -1,37 +1,64 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 21 Nov 2012 14:47:58 +0100
-Subject: [PATCH v3 2/5] mfd: tps65217: Set PMIC to shutdown on PWR_EN
- toggle
-In-Reply-To: <1353404927-14412-3-git-send-email-anilkumar@ti.com>
-References: <1353404927-14412-1-git-send-email-anilkumar@ti.com>
- <1353404927-14412-3-git-send-email-anilkumar@ti.com>
-Message-ID: <20121121134758.GS18738@sortiz-mobl>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 21 Nov 2012 14:52:26 +0100
+Subject: [PATCH] cpufreq: exynos: Broadcast frequency change notifications
+ for all cores
+In-Reply-To: <1887364.fvxYYNb7Mm@amdc1227>
+References: <1887364.fvxYYNb7Mm@amdc1227>
+Message-ID: <1758658.Qt0SyRnJmS@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anilkumar,
-
-On Tue, Nov 20, 2012 at 03:18:44PM +0530, AnilKumar Ch wrote:
-> From: Colin Foe-Parker <colin.foeparker@logicpd.com>
+On Tuesday 13 of November 2012 10:26:12 Tomasz Figa wrote:
+> On Exynos SoCs all cores share the same frequency setting, so changing
+> frequency of one core will affect rest of cores.
 > 
-> Set tps65217 PMIC status to OFF if power enable toggle is supported.
-> By setting this bit to 1 to enter PMIC to OFF state when PWR_EN pin
-> is pulled low. Also adds a DT flag to specify that device pmic
-> supports shutdown control or not.
+> This patch modifies the exynos-cpufreq driver to inform cpufreq core
+> about this behavior and broadcast frequency change notifications for all
+> cores.
 > 
-> Signed-off-by: Colin Foe-Parker <colin.foeparker@logicpd.com>
-> [anilkumar at ti.com: move the additions to tps65217 MFD driver]
-> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  .../devicetree/bindings/regulator/tps65217.txt     |    4 ++++
->  drivers/mfd/tps65217.c                             |   12 ++++++++++++
->  2 files changed, 16 insertions(+)
-Applied, thanks.
-I suppose you're not expecting the whole patchset to go through one tree ?
+>  drivers/cpufreq/exynos-cpufreq.c | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/exynos-cpufreq.c
+> b/drivers/cpufreq/exynos-cpufreq.c index af2d81e..c0d54a8 100644
+> --- a/drivers/cpufreq/exynos-cpufreq.c
+> +++ b/drivers/cpufreq/exynos-cpufreq.c
+> @@ -100,7 +100,8 @@ static int exynos_target(struct cpufreq_policy
+> *policy, }
+>  	arm_volt = volt_table[index];
+> 
+> -	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> +	for_each_cpu(freqs.cpu, policy->cpus)
+> +		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> 
+>  	/* When the new frequency is higher than current frequency */
+>  	if ((freqs.new > freqs.old) && !safe_arm_volt) {
+> @@ -115,7 +116,8 @@ static int exynos_target(struct cpufreq_policy
+> *policy, if (freqs.new != freqs.old)
+>  		exynos_info->set_freq(old_index, index);
+> 
+> -	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> +	for_each_cpu(freqs.cpu, policy->cpus)
+> +		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> 
+>  	/* When the new frequency is lower than current frequency */
+>  	if ((freqs.new < freqs.old) ||
+> @@ -235,6 +237,7 @@ static int exynos_cpufreq_cpu_init(struct
+> cpufreq_policy *policy) cpumask_copy(policy->related_cpus,
+> cpu_possible_mask);
+>  		cpumask_copy(policy->cpus, cpu_online_mask);
+>  	} else {
+> +		policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
+>  		cpumask_setall(policy->cpus);
+>  	}
 
-Cheers,
-Samuel.
+Ping.
 
+Best regards,
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Linux Platform
