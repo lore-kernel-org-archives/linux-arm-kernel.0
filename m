@@ -1,29 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 20 Nov 2012 22:16:25 -0800
-Subject: [GIT PULL] ARM: sunxi: Add basic support for Allwinner SoCs
-In-Reply-To: <1353106610-18681-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1353106610-18681-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20121121061625.GA4870@quad.lixom.net>
+Date: Tue, 20 Nov 2012 22:36:02 -0800
+Subject: [PATCH v3 00/18] ARM: Patchset for CLPS711X
+In-Reply-To: <201211171545.22154.arnd@arndb.de>
+References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
+ <201211171545.22154.arnd@arndb.de>
+Message-ID: <20121121063602.GA7615@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2012 at 11:56:50PM +0100, Maxime Ripard wrote:
-> Arnd, Olof,
+On Sat, Nov 17, 2012 at 03:45:21PM +0000, Arnd Bergmann wrote:
+> On Saturday 17 November 2012, Alexander Shiyan wrote:
+> > Here is a v3 patchset for a CLPS711X-target.
+> > The main direction of this patchset - approaching the platform to the
+> > possibility of using configurations with multiple platforms in a single
+> > kernel. Added support of the majority of the necessary kernel symbol.
+> > Also part of the driver code used only for the platform was moved to the
+> > board code and converted to the use of standard drivers.
+> > 
 > 
-> Here is a pull request to add the basic support for Allwinner A1X SoCs.
+> (+Linus Walleij)
 > 
-> Thanks,
-> Maxime
-> 
-> The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
-> 
->   Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/mripard/linux.git tags/tags/sunxi-support-for-3.8
+> Thanks for sending the new version, as discussed on IRC. It's important
+> to mention here that the series depends on patches that Linus applied into
+> the gpio tree. Olof, if you merge these before I get to it, please apply
+> them on top of an appropriate branch from the GPIO tree. Linus, is
+> 2cad6a8a4c an appropriate commit to base on? I think that is the
+> olders one that can be used as a base here.
 
-Thanks, pulled into sunxi/soc (next/soc).
+Thanks, I've applied this on top of the pinctrl commit mentioned (based on
+Linus' reply), as well as the previous clps711x branch, since that seems to be
+what the series was based on. It sits in clpx711x/soc2 as a separate branch,
+but I'll pull it into next/soc with the other one.
+
+Most patches applied 100% fine, just a couple of minor context fuzz. Separate
+comment on one patch where I fixued up whitespace when I applied.
 
 
 -Olof
