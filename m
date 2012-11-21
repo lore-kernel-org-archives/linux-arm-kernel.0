@@ -1,44 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 21 Nov 2012 10:22:44 +0000
-Subject: KEXEC on ARM cortex-a15
-In-Reply-To: <CAJXQGfL4PRW9=MQO1XbogA40sHUzXorbFMe1WkiJ751Ej-h7=g@mail.gmail.com>
-References: <CAJXQGfKpFfUwMeLGFAuTgQn5Yd2D9O271JM1VJ87Nio80tbwXw@mail.gmail.com>
- <20121119144417.GH3290@n2100.arm.linux.org.uk>
- <20121119151327.GG3205@mudshark.cambridge.arm.com>
- <CAJXQGf+BQ18GhR3emhK-ejTivqx_o=gtaO3-FjTiE3BMGydgsw@mail.gmail.com>
- <CAJXQGf+wfXGZ=PWN585dJDMX1nH+sRexf6UZujyjKM6rJeDiXQ@mail.gmail.com>
- <20121120160219.GF26475@mudshark.cambridge.arm.com>
- <CAJXQGfL4PRW9=MQO1XbogA40sHUzXorbFMe1WkiJ751Ej-h7=g@mail.gmail.com>
-Message-ID: <20121121102244.GA11990@mudshark.cambridge.arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 21 Nov 2012 11:22:42 +0100
+Subject: [PATCH 1/1] asix: use ramdom hw addr if the one read is not valid
+Message-ID: <1353493362-30418-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 08:21:21AM +0000, Naresh Bhat wrote:
-> Hi Will,
-> 
-> I have disabled the SMP on host kernel.  But still I am facing the
-> issue as below
-> 
-> bash-4.2# ls
-> uImage  vexpress.dtb
-> bash-4.2#
-> bash-4.2# kexec -f uImage --dtb=vexpress.dtb --command-line="console=ttyS0"
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: linux-usb at vger.kernel.org
+Cc: netdev at vger.kernel.org
+---
+ drivers/net/usb/asix_devices.c |   24 +++++++++++++++++++++---
+ 1 file changed, 21 insertions(+), 3 deletions(-)
 
-Can you try using a zImage instead and also specifying the console as
-ttyAMA0, as it looks like you're using a vexpress?
-
-> Starting new kernel
-> Bye!
-> Uncompressing Linux...
-
-This isn't really very helpful -- some more debugging on your part would be
-appreciated to get an insight as to what's going wrong. You could either use
-JTAG or put some early prints in the decompressor to work out where it goes
-awry.
-
-Useful things to know would be: the state of the CPU when the new kernel
-image is entered (if you have JTAG, you could also look at the dtb in memory
-to see that it looks sane) and also at which point in the decompressor it
-goes wrong / takes an abort (usually it's when we enable the MMU).
-
-Will
+diff --git a/drivers/net/usb/asix_devices.c b/drivers/net/usb/asix_devices.c
+index 33ab824..7ebec5b 100644
+--- a/drivers/net/usb/asix_devices.c
++++ b/drivers/net/usb/asix_devices.c
+@@ -225,7 +225,13 @@ static int ax88172_bind(struct usbnet *dev, struct usb_interface *intf)
+ 			   ret);
+ 		goto out;
+ 	}
+-	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
++
++	if (is_valid_ether_addr(buf)) {
++		memcpy(dev->net->dev_addr, buf, ETH_ALEN);
++	} else {
++		netdev_info(dev->net, "invalid hw address, using random\n");
++		eth_hw_addr_random(dev->net);
++	}
+ 
+ 	/* Initialize MII structure */
+ 	dev->mii.dev = dev->net;
+@@ -423,7 +429,13 @@ static int ax88772_bind(struct usbnet *dev, struct usb_interface *intf)
+ 		netdev_dbg(dev->net, "Failed to read MAC address: %d\n", ret);
+ 		return ret;
+ 	}
+-	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
++
++	if (is_valid_ether_addr(buf)) {
++		memcpy(dev->net->dev_addr, buf, ETH_ALEN);
++	} else {
++		netdev_info(dev->net, "invalid hw address, using random\n");
++		eth_hw_addr_random(dev->net);
++	}
+ 
+ 	/* Initialize MII structure */
+ 	dev->mii.dev = dev->net;
+@@ -777,7 +789,13 @@ static int ax88178_bind(struct usbnet *dev, struct usb_interface *intf)
+ 		netdev_dbg(dev->net, "Failed to read MAC address: %d\n", ret);
+ 		return ret;
+ 	}
+-	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
++
++	if (is_valid_ether_addr(buf)) {
++		memcpy(dev->net->dev_addr, buf, ETH_ALEN);
++	} else {
++		netdev_info(dev->net, "invalid hw address, using random\n");
++		eth_hw_addr_random(dev->net);
++	}
+ 
+ 	/* Initialize MII structure */
+ 	dev->mii.dev = dev->net;
+-- 
+1.7.10.4
