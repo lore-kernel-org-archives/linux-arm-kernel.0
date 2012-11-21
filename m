@@ -1,44 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 21 Nov 2012 10:52:08 -0500
-Subject: [PATCH 0/4] Dove pinctrl fixes and DT enabling
-In-Reply-To: <CACRpkdYzQuv8sPk57CvqiwMmV0z007cGqVkGOENmr_aYAN14=Q@mail.gmail.com>
-References: <1353317996-20841-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <CACRpkdYAnNCFDCjA67r0h_CSHMifb1Z83YJfYGQV3abPB8uQZg@mail.gmail.com>
- <50ACAAF5.2030002@gmail.com>
- <CACRpkdYzQuv8sPk57CvqiwMmV0z007cGqVkGOENmr_aYAN14=Q@mail.gmail.com>
-Message-ID: <20121121155208.GF22106@titan.lakedaemon.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 21 Nov 2012 16:53:12 +0100
+Subject: [PATCH v5] linux,stdout-path helper
+Message-ID: <20121121155312.GX4398@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+The following adds a helper for matching the linux,stdout-path property
+in the chosen node and makes use of it in the i.MX serial and Atmel serial driver.
 
-On Wed, Nov 21, 2012 at 03:45:42PM +0100, Linus Walleij wrote:
-> On Wed, Nov 21, 2012 at 11:20 AM, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
-> > On 11/21/2012 10:59 AM, Linus Walleij wrote:
-> >> On Mon, Nov 19, 2012 at 10:39 AM, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>  wrote:
-> >>> This patch relies on a patch set for mvebu pinctrl taken through
-> >>> Linus' pinctrl branch. As there is no other platform than Dove
-> >>> involved, I suggest to take it though Jason's tree to avoid any
-> >>> further conflicts.
-> >>
-> >> Sounds like a plan. So you have some commit history pulled
-> >> in from the pinctrl tree in the MVEBU tree?
-> >
-> > I am referring to patches for a pinctrl/mvebu subfolder. IIRC Thomas
-> > posted that patch a while ago. Jason is currently sorting things out
-> > for mvebu pull requests. I guess both can comment on your question,
-> > as I don't fully understand it.
-> 
-> So what I mean is that the patches creating pinctrl/mvebu is in the
-> pinctrl tree, so if patches in the MVEBU tree depend on these,
-> then it must have pulled in a branch from pinctrl or applied the
-> same patches in that tree too (which is OK *sometimes*).
+changes since v4:
 
-Yes, Thomas and Gregory informed me of the pinctrl dependency and said
-they were using for-next from the pinctrl tree.  I've used that branch
-to merge and build successfully.  Is that ok in practice or is there a
-more specific branch I should pull in as a dependency?
+ - add option support and check stdout-path too
 
-thx,
+changes since v3:
 
-Jason.
+- move code from separate files to drivers/of/base.c and include/linux/of.h
+
+changes since v2:
+
+- move helper to OF core and make it independent of serial devices
+
+changes since v1:
+
+- move it out of the i.MX serial driver and make it generic for serial
+  devices.
+
+_______________________________________________
+devicetree-discuss mailing list
+devicetree-discuss at lists.ozlabs.org
+https://lists.ozlabs.org/listinfo/devicetree-discuss
