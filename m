@@ -1,53 +1,45 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 21 Nov 2012 09:35:16 +0100
-Subject: [PATCH V3 1/3] arm: dma mapping: Export dma ops functions
-In-Reply-To: <50AC8E16.3020006@free-electrons.com>
-References: <1353448587-2937-1-git-send-email-gregory.clement@free-electrons.com>
- <1353448587-2937-2-git-send-email-gregory.clement@free-electrons.com>
- <50AC7D59.1020000@samsung.com> <50AC8B41.7080009@free-electrons.com>
- <50AC8D09.6050104@samsung.com> <50AC8E16.3020006@free-electrons.com>
-Message-ID: <50AC9244.4030300@samsung.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 21 Nov 2012 00:36:43 -0800
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <50AC8C14.5050204@samsung.com>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
+ <20121120113325.dde266ed.akpm@linux-foundation.org>
+ <50AC8C14.5050204@samsung.com>
+Message-ID: <20121121003643.97febbdb.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, 21 Nov 2012 09:08:52 +0100 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 
-On 11/21/2012 9:17 AM, Gregory CLEMENT wrote:
-> On 11/21/2012 09:12 AM, Marek Szyprowski wrote:
-> > Hello,
+> Hello,
+> 
+> On 11/20/2012 8:33 PM, Andrew Morton wrote:
+> > On Tue, 20 Nov 2012 15:31:45 +0100
+> > Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 > >
-> > On 11/21/2012 9:05 AM, Gregory CLEMENT wrote:
-> >> On 11/21/2012 08:06 AM, Marek Szyprowski wrote:
-> >>> On 11/20/2012 10:56 PM, Gregory CLEMENT wrote:
-> >>>> Expose the DMA operations functions. Until now only the dma_ops
-> >>>> structs in a whole or some dma operation were exposed. This patch
-> >>>> exposes all the dma coherents operations. They can be reused when an
-> >>>> architecture or a driver need to create its own set of dma_operation.
-> >>>>
-> >>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >>>
-> >>> Besides arm_dma_set_mask() function I see no reason to export the other
-> >>> arm dma related functions.
-> >>
-> >> The idea was to let other people use the arm dma related functions,
-> >> for their own dma ops. But for the mvebu machines we only need
-> >> arm_dma_set_mask() indeed.
-> >>
-> >> So you prefer that I only expose arm_dma_set_mask() and let future
-> >> user expose other function if they need it, right?
+> > > dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag,
+> > > regardless the flags provided by the caller. This causes excessive
+> > > pruning of emergency memory pools without any good reason. Additionaly,
+> > > on ARM architecture any driver which is using dmapools will sooner or
+> > > later  trigger the following error:
+> > > "ERROR: 256 KiB atomic DMA coherent pool is too small!
+> > > Please increase it with coherent_pool= kernel parameter!".
+> > > Increasing the coherent pool size usually doesn't help much and only
+> > > delays such error, because all GFP_ATOMIC DMA allocations are always
+> > > served from the special, very limited memory pool.
+> > >
 > >
-> > I would prefer to avoid exporting functions which are not used anywhere
-> > else. This improves readability of the code and simply forces others to
-> > think twice before they use some static function and check if their use
-> > case is really correct.
->
-> OK so I will send a new version in a few minutes.
->
-> Do  you think these last changes will be enough for getting your Acked-by?
+> > Is this problem serious enough to justify merging the patch into 3.7?
+> > And into -stable kernels?
+> 
+> I wonder if it is a good idea to merge such change at the end of current
+> -rc period.
 
-Yes, I see no other issues right now.
+I'm not sure what you mean by this.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+But what we do sometimes if we think a patch needs a bit more
+real-world testing before backporting is to merge it into -rc1 in the
+normal merge window, and tag it for -stable backporting.  That way it
+gets a few weeks(?) testing in mainline before getting backported.
