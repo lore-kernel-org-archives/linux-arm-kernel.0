@@ -1,68 +1,137 @@
-From: per.lkml@gmail.com (Per Forlin)
-Date: Wed, 21 Nov 2012 17:13:55 +0100
-Subject: [PATCH] mmc: mmci: Support non-power-of-two block sizes for
- ux500v2 variant
-In-Reply-To: <20121121153811.GN3290@n2100.arm.linux.org.uk>
-References: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
- <20121121153811.GN3290@n2100.arm.linux.org.uk>
-Message-ID: <CAFEEs1kzJUgsvnzgWwU4i7o1jkE=8iTq5+NJ_t1jdiHEm7b-RQ@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 21 Nov 2012 16:32:46 +0000
+Subject: [PATCH v3] pwm: Device tree support for PWM polarity.
+In-Reply-To: <1353483644-32711-1-git-send-email-avinashphilip@ti.com>
+References: <1353483644-32711-1-git-send-email-avinashphilip@ti.com>
+Message-ID: <20121121163246.B20163E0AE2@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 4:38 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Oct 12, 2012 at 04:02:02PM +0200, Ulf Hansson wrote:
->>  /*
->> + * Validate mmc prerequisites
->> + */
->> +static int mmci_validate_data(struct mmci_host *host,
->> +                           struct mmc_data *data)
->> +{
->> +     if (!data)
->> +             return 0;
->> +
->> +     if (!host->variant->non_power_of_2_blksize &&
->> +         !is_power_of_2(data->blksz)) {
->> +             dev_err(mmc_dev(host->mmc),
->> +                     "unsupported block size (%d bytes)\n", data->blksz);
->> +             return -EINVAL;
->> +     }
->> +
->> +     if (data->sg->offset & 3) {
->> +             dev_err(mmc_dev(host->mmc),
->> +                     "unsupported alginment (0x%x)\n", data->sg->offset);
->> +             return -EINVAL;
->> +     }
->
-> Why?  What's the reasoning behind this suddenly introduced restriction?
-> readsl()/writesl() copes just fine with non-aligned pointers.  It may be
-> that your DMA engine can not, but that's no business interfering with
-> non-DMA transfers, and no reason to fail such transfers.
->
-> If your DMA engine can't do that then its your DMA engine code which
-> should refuse to prepare the transfer.
->
-> Yes, that means problems with the way things are ordered - or it needs a
-> proper API where DMA engine can export these kinds of properties.
-The alignment constraint is related to PIO, sg_miter and that FIFO
-access must be done with 4 bytes.
+On Wed, 21 Nov 2012 13:10:44 +0530, "Philip, Avinash" <avinashphilip@ti.com> wrote:
+> Add support for encoding PWM properties in bit encoded form with
+> of_pwm_xlate_with_flags() function support. Platforms require platform
+> specific PWM properties has to populate in 3rd cell of the pwm-specifier
+> and PWM driver should also set .of_xlate support with this function.
+> Currently PWM property polarity encoded in bit position 0 of the third
+> cell in pwm-specifier.
+> 
+> Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
 
-For a 8k buffer sg miter may return 3 buffer
-1. 7 bytes
-2. 4096
-3. 4089
+Looks okay to me.
 
-DMA can handle this because it will treat this a one buffer being 8 k.
-PIO will do three transfer due to sg_miter (7, 4096, 4089).
-One could change the driver to not use sg_miter and just access the 8k
-buffer directly to avoid the issue.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-BR
-Per
+> ---
+> Changes since v2:
+> 	- Move PWM_SPEC_POLARITY to core.c
+> 	- Remove dummy function
+> 
+> Changes since v1:
+> 	- of_pwm_xlate_with_flags function support added.
+> 	- Documentation update
+> 
+> :100644 100644 73ec962... 04b0dc4... M	Documentation/devicetree/bindings/pwm/pwm.txt
+> :100644 100644 f5acdaa... 780cb6b... M	drivers/pwm/core.c
+> :100644 100644 112b314... 6d661f3... M	include/linux/pwm.h
+>  Documentation/devicetree/bindings/pwm/pwm.txt |   18 +++++++++++++--
+>  drivers/pwm/core.c                            |   28 +++++++++++++++++++++++++
+>  include/linux/pwm.h                           |    3 ++
+>  3 files changed, 46 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm.txt b/Documentation/devicetree/bindings/pwm/pwm.txt
+> index 73ec962..04b0dc4 100644
+> --- a/Documentation/devicetree/bindings/pwm/pwm.txt
+> +++ b/Documentation/devicetree/bindings/pwm/pwm.txt
+> @@ -37,10 +37,22 @@ device:
+>  		pwm-names = "backlight";
+>  	};
+>  
+> +Note that in the example above, specifying the "pwm-names" is redundant
+> +because the name "backlight" would be used as fallback anyway.
+> +
+>  pwm-specifier typically encodes the chip-relative PWM number and the PWM
+> -period in nanoseconds. Note that in the example above, specifying the
+> -"pwm-names" is redundant because the name "backlight" would be used as
+> -fallback anyway.
+> +period in nanoseconds.
+> +
+> +Optionally, the pwm-specifier can encode a number of flags in a third cell:
+> +- bit 0: PWM signal polarity (0: normal polarity, 1: inverse polarity)
+> +
+> +Example with optional PWM specifier for inverse polarity
+> +
+> +	bl: backlight {
+> +		pwms = <&pwm 0 5000000 1>;
+> +		pwm-names = "backlight";
+> +	};
+> +
+>  
+>  2) PWM controller nodes
+>  -----------------------
+> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+> index f5acdaa..780cb6b 100644
+> --- a/drivers/pwm/core.c
+> +++ b/drivers/pwm/core.c
+> @@ -32,6 +32,9 @@
+>  
+>  #define MAX_PWMS 1024
+>  
+> +/* flags in the third cell of the DT PWM specifier */
+> +#define PWM_SPEC_POLARITY	(1 << 0)
+> +
+>  static DEFINE_MUTEX(pwm_lookup_lock);
+>  static LIST_HEAD(pwm_lookup_list);
+>  static DEFINE_MUTEX(pwm_lock);
+> @@ -129,6 +132,31 @@ static int pwm_device_request(struct pwm_device *pwm, const char *label)
+>  	return 0;
+>  }
+>  
+> +struct pwm_device *
+> +of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
+> +{
+> +	struct pwm_device *pwm;
+> +
+> +	if (pc->of_pwm_n_cells < 3)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	if (args->args[0] >= pc->npwm)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
+> +	if (IS_ERR(pwm))
+> +		return pwm;
+> +
+> +	pwm_set_period(pwm, args->args[1]);
+> +
+> +	if (args->args[2] & PWM_SPEC_POLARITY)
+> +		pwm_set_polarity(pwm, PWM_POLARITY_INVERSED);
+> +	else
+> +		pwm_set_polarity(pwm, PWM_POLARITY_NORMAL);
+> +
+> +	return pwm;
+> +}
+> +
+>  static struct pwm_device *
+>  of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
+>  {
+> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+> index 112b314..6d661f3 100644
+> --- a/include/linux/pwm.h
+> +++ b/include/linux/pwm.h
+> @@ -171,6 +171,9 @@ struct pwm_device *pwm_request_from_chip(struct pwm_chip *chip,
+>  					 unsigned int index,
+>  					 const char *label);
+>  
+> +struct pwm_device *of_pwm_xlate_with_flags(struct pwm_chip *pc,
+> +		const struct of_phandle_args *args);
+> +
+>  struct pwm_device *pwm_get(struct device *dev, const char *consumer);
+>  void pwm_put(struct pwm_device *pwm);
+>  
+> -- 
+> 1.7.0.4
+> 
 
-
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
