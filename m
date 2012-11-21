@@ -1,180 +1,213 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 21 Nov 2012 23:07:59 +0000 (UTC)
-Subject: [PATCH v2 2/2] ARM: OMAP: omap_device: Correct resource handling
- for DT boot
-In-Reply-To: <1351596296-13825-3-git-send-email-peter.ujfalusi@ti.com>
-References: <1351596296-13825-1-git-send-email-peter.ujfalusi@ti.com>
- <1351596296-13825-3-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <alpine.DEB.2.00.1211212307200.32242@utopia.booyaka.com>
+Date: Wed, 21 Nov 2012 23:09:34 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: PRM: initialize some PRM functions early
+Message-ID: <alpine.DEB.2.00.1211212308210.32242@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Oct 2012, Peter Ujfalusi wrote:
 
-> When booting with DT the OF core can fill up the resources provided within
-> the DT blob.
-> The current way of handling the DT boot prevents us from removing hwmod data
-> for platforms only suppose to boot with DT (OMAP5 for example) since we need
-> to keep the whole hwmod database intact in order to have more resources in
-> hwmod than in DT (to be able to append the DMA resource from hwmod).
-> 
-> To fix this issue we just examine the OF provided resources:
-> If we do not have resources we use hwmod to fill them.
-> If we have resources we check if we already able to recive DMA resource, if
-> no we only append the DMA resurce from hwmod to the OF provided ones.
-> 
-> In this way we can start removing hwmod data for devices which have their
-> resources correctly configured in DT without regressions.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Some PRM functions will need to be called by the hwmod code early in
+kernel init.  To handle this, split the PRM initialization code into
+early and late phases.  The early init is handled via mach-omap2/io.c,
+while the late init is handled by subsys_initcall().
 
-Here's this one, updated to apply after the v3.8 cleanups.
-
-
-- Paul
-
->From 65e57fff87781b60e9406888e0ae803cb0df41cc Mon Sep 17 00:00:00 2001
-From: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Date: Wed, 21 Nov 2012 11:50:46 -0700
-Subject: [PATCH 2/2] ARM: OMAP2+: omap_device: Correct resource handling for
- DT boot
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-When booting with DT the OF core can fill up the resources provided within
-the DT blob.
-The current way of handling the DT boot prevents us from removing hwmod data
-for platforms only suppose to boot with DT (OMAP5 for example) since we need
-to keep the whole hwmod database intact in order to have more resources in
-hwmod than in DT (to be able to append the DMA resource from hwmod).
-
-To fix this issue we just examine the OF provided resources:
-If we do not have resources we use hwmod to fill them.
-If we have resources we check if we already able to recive DMA resource, if
-no we only append the DMA resurce from hwmod to the OF provided ones.
-
-In this way we can start removing hwmod data for devices which have their
-resources correctly configured in DT without regressions.
-
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Acked-by: Beno?t Cousson <b-cousson@ti.com>
-[paul at pwsan.com: fixed checkpatch problem; updated to apply]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/omap_device.c |   84 ++++++++++++++++++++++---------------
- 1 file changed, 51 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index 8917a08..e065daa 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -559,55 +559,73 @@ struct omap_device *omap_device_alloc(struct platform_device *pdev,
- 	od->hwmods = hwmods;
- 	od->pdev = pdev;
+This one is needed in order for the updated version of "ARM: OMAP: hwmod: 
+Add support for per hwmod/module context lost count" to work correctly.
+
+ arch/arm/mach-omap2/io.c      |    8 ++++++++
+ arch/arm/mach-omap2/prm2xxx.c |    3 +--
+ arch/arm/mach-omap2/prm2xxx.h |    3 +--
+ arch/arm/mach-omap2/prm3xxx.c |   17 ++++++++++-------
+ arch/arm/mach-omap2/prm3xxx.h |    1 +
+ arch/arm/mach-omap2/prm44xx.c |   16 +++++++++-------
+ arch/arm/mach-omap2/prm44xx.h |    1 +
+ 7 files changed, 31 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 924bf24..007dc4d 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -51,6 +51,10 @@
+ #include "prcm_mpu44xx.h"
+ #include "prminst44xx.h"
+ #include "cminst44xx.h"
++#include "prm2xxx.h"
++#include "prm3xxx.h"
++#include "prm44xx.h"
++
+ /*
+  * The machine specific code may provide the extra mapping besides the
+  * default mapping provided here.
+@@ -392,6 +396,7 @@ void __init omap2420_init_early(void)
+ 	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP2420_PRM_BASE));
+ 	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP2420_CM_BASE), NULL);
+ 	omap2xxx_check_revision();
++	omap2xxx_prm_init();
+ 	omap2xxx_cm_init();
+ 	omap_common_init_early();
+ 	omap2xxx_voltagedomains_init();
+@@ -422,6 +427,7 @@ void __init omap2430_init_early(void)
+ 	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP2430_PRM_BASE));
+ 	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP2430_CM_BASE), NULL);
+ 	omap2xxx_check_revision();
++	omap2xxx_prm_init();
+ 	omap2xxx_cm_init();
+ 	omap_common_init_early();
+ 	omap2xxx_voltagedomains_init();
+@@ -457,6 +463,7 @@ void __init omap3_init_early(void)
+ 	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP3430_CM_BASE), NULL);
+ 	omap3xxx_check_revision();
+ 	omap3xxx_check_features();
++	omap3xxx_prm_init();
+ 	omap3xxx_cm_init();
+ 	omap_common_init_early();
+ 	omap3xxx_voltagedomains_init();
+@@ -591,6 +598,7 @@ void __init omap4430_init_early(void)
+ 	omap_cm_base_init();
+ 	omap4xxx_check_revision();
+ 	omap4xxx_check_features();
++	omap44xx_prm_init();
+ 	omap_common_init_early();
+ 	omap44xx_voltagedomains_init();
+ 	omap44xx_powerdomains_init();
+diff --git a/arch/arm/mach-omap2/prm2xxx.c b/arch/arm/mach-omap2/prm2xxx.c
+index bf24fc4..faeab18 100644
+--- a/arch/arm/mach-omap2/prm2xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx.c
+@@ -118,14 +118,13 @@ static struct prm_ll_data omap2xxx_prm_ll_data = {
+ 	.read_reset_sources = &omap2xxx_prm_read_reset_sources,
+ };
  
--	/* Count all resources for the device */
--	res_count = omap_device_count_resources(od, IORESOURCE_IRQ |
--						    IORESOURCE_DMA |
--						    IORESOURCE_MEM);
- 	/*
-+	 * Non-DT Boot:
-+	 *   Here, pdev->num_resources = 0, and we should get all the
-+	 *   resources from hwmod.
-+	 *
- 	 * DT Boot:
- 	 *   OF framework will construct the resource structure (currently
- 	 *   does for MEM & IRQ resource) and we should respect/use these
- 	 *   resources, killing hwmod dependency.
- 	 *   If pdev->num_resources > 0, we assume that MEM & IRQ resources
- 	 *   have been allocated by OF layer already (through DTB).
--	 *
--	 * Non-DT Boot:
--	 *   Here, pdev->num_resources = 0, and we should get all the
--	 *   resources from hwmod.
-+	 *   As preparation for the future we examine the OF provided resources
-+	 *   to see if we have DMA resources provided already. In this case
-+	 *   there is no need to update the resources for the device, we use the
-+	 *   OF provided ones.
- 	 *
- 	 * TODO: Once DMA resource is available from OF layer, we should
- 	 *   kill filling any resources from hwmod.
- 	 */
--	if (res_count > pdev->num_resources) {
--		/* Allocate resources memory to account for new resources */
--		res = kzalloc(sizeof(struct resource) * res_count, GFP_KERNEL);
--		if (!res)
--			goto oda_exit3;
+-static int __init omap2xxx_prm_init(void)
++int __init omap2xxx_prm_init(void)
+ {
+ 	if (!cpu_is_omap24xx())
+ 		return 0;
+ 
+ 	return prm_register(&omap2xxx_prm_ll_data);
+ }
+-subsys_initcall(omap2xxx_prm_init);
+ 
+ static void __exit omap2xxx_prm_exit(void)
+ {
+diff --git a/arch/arm/mach-omap2/prm2xxx.h b/arch/arm/mach-omap2/prm2xxx.h
+index fe8a14f..3194dd8 100644
+--- a/arch/arm/mach-omap2/prm2xxx.h
++++ b/arch/arm/mach-omap2/prm2xxx.h
+@@ -126,8 +126,7 @@ extern int omap2xxx_clkdm_wakeup(struct clockdomain *clkdm);
+ 
+ extern void omap2xxx_prm_dpll_reset(void);
+ 
+-extern int __init prm2xxx_init(void);
+-extern int __exit prm2xxx_exit(void);
++extern int __init omap2xxx_prm_init(void);
+ 
+ #endif
+ 
+diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
+index b86116c..db198d0 100644
+--- a/arch/arm/mach-omap2/prm3xxx.c
++++ b/arch/arm/mach-omap2/prm3xxx.c
+@@ -383,27 +383,30 @@ static struct prm_ll_data omap3xxx_prm_ll_data = {
+ 	.read_reset_sources = &omap3xxx_prm_read_reset_sources,
+ };
+ 
+-static int __init omap3xxx_prm_init(void)
++int __init omap3xxx_prm_init(void)
++{
++	if (!cpu_is_omap34xx())
++		return 0;
++
++	return prm_register(&omap3xxx_prm_ll_data);
++}
++
++static int __init omap3xxx_prm_late_init(void)
+ {
+ 	int ret;
+ 
+ 	if (!cpu_is_omap34xx())
+ 		return 0;
+ 
+-	ret = prm_register(&omap3xxx_prm_ll_data);
+-	if (ret)
+-		return ret;
 -
--		/*
--		 * If pdev->num_resources > 0, then assume that,
--		 * MEM and IRQ resources will only come from DT and only
--		 * fill DMA resource from hwmod layer.
--		 */
--		if (pdev->num_resources && pdev->resource) {
--			dev_dbg(&pdev->dev, "%s(): resources already allocated %d\n",
--				__func__, res_count);
--			memcpy(res, pdev->resource,
--			       sizeof(struct resource) * pdev->num_resources);
--			_od_fill_dma_resources(od, &res[pdev->num_resources]);
--		} else {
--			dev_dbg(&pdev->dev, "%s(): using resources from hwmod %d\n",
--				__func__, res_count);
--			omap_device_fill_resources(od, res);
-+	if (!pdev->num_resources) {
-+		/* Count all resources for the device */
-+		res_count = omap_device_count_resources(od, IORESOURCE_IRQ |
-+							    IORESOURCE_DMA |
-+							    IORESOURCE_MEM);
-+	} else {
-+		/* Take a look if we already have DMA resource via DT */
-+		for (i = 0; i < pdev->num_resources; i++) {
-+			struct resource *r = &pdev->resource[i];
-+
-+			/* We have it, no need to touch the resources */
-+			if (r->flags == IORESOURCE_DMA)
-+				goto have_everything;
- 		}
-+		/* Count only DMA resources for the device */
-+		res_count = omap_device_count_resources(od, IORESOURCE_DMA);
-+		/* The device has no DMA resource, no need for update */
-+		if (!res_count)
-+			goto have_everything;
+ 	omap3xxx_prm_enable_io_wakeup();
+ 	ret = omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
+ 	if (!ret)
+ 		irq_set_status_flags(omap_prcm_event_to_irq("io"),
+ 				     IRQ_NOAUTOEN);
  
--		ret = platform_device_add_resources(pdev, res, res_count);
--		kfree(res);
-+		res_count += pdev->num_resources;
-+	}
+-
+ 	return ret;
+ }
+-subsys_initcall(omap3xxx_prm_init);
++subsys_initcall(omap3xxx_prm_late_init);
  
--		if (ret)
--			goto oda_exit3;
-+	/* Allocate resources memory to account for new resources */
-+	res = kzalloc(sizeof(struct resource) * res_count, GFP_KERNEL);
-+	if (!res)
-+		goto oda_exit3;
-+
-+	if (!pdev->num_resources) {
-+		dev_dbg(&pdev->dev, "%s: using %d resources from hwmod\n",
-+			__func__, res_count);
-+		omap_device_fill_resources(od, res);
-+	} else {
-+		dev_dbg(&pdev->dev,
-+			"%s: appending %d DMA resources from hwmod\n",
-+			__func__, res_count - pdev->num_resources);
-+		memcpy(res, pdev->resource,
-+		       sizeof(struct resource) * pdev->num_resources);
-+		_od_fill_dma_resources(od, &res[pdev->num_resources]);
- 	}
+ static void __exit omap3xxx_prm_exit(void)
+ {
+diff --git a/arch/arm/mach-omap2/prm3xxx.h b/arch/arm/mach-omap2/prm3xxx.h
+index 10cd41a..277f717 100644
+--- a/arch/arm/mach-omap2/prm3xxx.h
++++ b/arch/arm/mach-omap2/prm3xxx.h
+@@ -154,6 +154,7 @@ extern void omap3xxx_prm_restore_irqen(u32 *saved_mask);
  
-+	ret = platform_device_add_resources(pdev, res, res_count);
-+	kfree(res);
+ extern void omap3xxx_prm_dpll3_reset(void);
+ 
++extern int __init omap3xxx_prm_init(void);
+ extern u32 omap3xxx_prm_get_reset_sources(void);
+ 
+ #endif /* __ASSEMBLER */
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index 6d3467a..9db1bd2 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -615,22 +615,24 @@ static struct prm_ll_data omap44xx_prm_ll_data = {
+ 	.read_reset_sources = &omap44xx_prm_read_reset_sources,
+ };
+ 
+-static int __init omap44xx_prm_init(void)
++int __init omap44xx_prm_init(void)
+ {
+-	int ret;
+-
+ 	if (!cpu_is_omap44xx())
+ 		return 0;
+ 
+-	ret = prm_register(&omap44xx_prm_ll_data);
+-	if (ret)
+-		return ret;
++	return prm_register(&omap44xx_prm_ll_data);
++}
 +
-+	if (ret)
-+		goto oda_exit3;
-+
-+have_everything:
- 	if (!pm_lats) {
- 		pm_lats = omap_default_latency;
- 		pm_lats_cnt = ARRAY_SIZE(omap_default_latency);
++static int __init omap44xx_prm_late_init(void)
++{
++	if (!cpu_is_omap44xx())
++		return 0;
+ 
+ 	omap44xx_prm_enable_io_wakeup();
+ 
+ 	return omap_prcm_register_chain_handler(&omap4_prcm_irq_setup);
+ }
+-subsys_initcall(omap44xx_prm_init);
++subsys_initcall(omap44xx_prm_late_init);
+ 
+ static void __exit omap44xx_prm_exit(void)
+ {
+diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
+index c8e1acc..22b0979 100644
+--- a/arch/arm/mach-omap2/prm44xx.h
++++ b/arch/arm/mach-omap2/prm44xx.h
+@@ -771,6 +771,7 @@ extern void omap44xx_prm_ocp_barrier(void);
+ extern void omap44xx_prm_save_and_clear_irqen(u32 *saved_mask);
+ extern void omap44xx_prm_restore_irqen(u32 *saved_mask);
+ 
++extern int __init omap44xx_prm_init(void);
+ extern u32 omap44xx_prm_get_reset_sources(void);
+ 
+ # endif
 -- 
 1.7.10.4
