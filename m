@@ -1,22 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Nov 2012 10:46:00 +0100
-Subject: [PATCH v3 00/18] ARM: Patchset for CLPS711X
-In-Reply-To: <20121121063602.GA7615@quad.lixom.net>
-References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
- <201211171545.22154.arnd@arndb.de>
- <20121121063602.GA7615@quad.lixom.net>
-Message-ID: <CAKnu2MoFmig35Y82f1R9YZEDtT44hF=nU+DHH43+2rq-fcM0-Q@mail.gmail.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches)
+Date: Wed, 21 Nov 2012 10:45:56 +0100
+Subject: [PATCH v3 0/3] i2c: at91: add dma support
+In-Reply-To: <20121116170514.GA21903@pengutronix.de>
+References: <1352911493-6979-1-git-send-email-ludovic.desroches@atmel.com>
+ <20121116170514.GA21903@pengutronix.de>
+Message-ID: <50ACA2D4.9040904@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/11/21 Olof Johansson <olof@lixom.net>:
+Hi Wolfram,
 
-> Thanks, I've applied this on top of the pinctrl commit mentioned (based on
-> Linus' reply),
+Sorry for the delay, I have realized that my answer was not sent 
+correctly since I don't see it into the i2c archives.
 
-Thanks that should work fine, I was worried that the HEAD of
-my devel branch would be used, but this is far down the stack and
-should work just fine.
+Le 11/16/2012 06:05 PM, Wolfram Sang a ?crit :
+> Hi Ludovic,
+>
+>> Here is the third version taking into account your feedback.
+>
+> Thanks, looks mostly good. I have problems applying patch 3. What is
+> this series based against?
+>
 
-Yours,
-Linus Walleij
+It was based against v3.7-rc4. Do you want me to rebase it against an
+over version?
+
+>> Patch 1/3 should go into v3.7.
+>
+> No, not necessarily. It is not really a bugfix, and it is probably too
+> late in the cycle for compiler silencing. Ah well, I decide later.
+>
+> BTW if you use --strict with checkpatch, it will tell you about the
+> space after casts :)
+>
+
+Ok, thanks for the tips.
+
+Regards
+
+Ludovic
+
+> Regards,
+>
+>     Wolfram
+>
