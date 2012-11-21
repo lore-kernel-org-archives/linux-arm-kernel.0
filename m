@@ -1,127 +1,79 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 21 Nov 2012 17:19:38 -0200
-Subject: [PATCH v2] ARM: dts: mx27: Fix the AIPI bus for FEC
-Message-ID: <1353525578-20309-1-git-send-email-fabio.estevam@freescale.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 21 Nov 2012 12:23:35 -0700
+Subject: [PATCH] ARM: Kirkwood: Add SPI_CHPA and SPI_CPOL support to spi-orion
+Message-ID: <20121121192335.GA14868@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FEC controller is connected to AIPI2 bus.
+Support these transfer modes from the SPI layer by setting
+the appropriate register bits before doing the transfer.
 
-Also fix the AIPI1 address range.
+This was tested on the Marvell kirkwood SOC that uses this driver.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Reviewed-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+Signed-off-by: Rolf Manderscheid <rvm@obsidianresearch.com>
 ---
-Changes since v1:
-- Remove ethernet from aipi1 bus on phytec board.
+ drivers/spi/spi-orion.c |   25 ++++++++++++++++++++++++-
+ 1 files changed, 24 insertions(+), 1 deletions(-)
 
- arch/arm/boot/dts/imx27-3ds.dts            |    8 ++++----
- arch/arm/boot/dts/imx27-phytec-phycore.dts |   13 +++++++------
- arch/arm/boot/dts/imx27.dtsi               |   12 +++++++++++-
- 3 files changed, 22 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx27-3ds.dts b/arch/arm/boot/dts/imx27-3ds.dts
-index 0a8978a..b1a6df2 100644
---- a/arch/arm/boot/dts/imx27-3ds.dts
-+++ b/arch/arm/boot/dts/imx27-3ds.dts
-@@ -21,8 +21,7 @@
- 	};
+diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
+index b17c09c..011186d 100644
+--- a/drivers/spi/spi-orion.c
++++ b/drivers/spi/spi-orion.c
+@@ -32,8 +32,12 @@
+ #define ORION_SPI_DATA_IN_REG		0x0c
+ #define ORION_SPI_INT_CAUSE_REG		0x10
  
- 	soc {
--		aipi at 10000000 { /* aipi */
--
-+		aipi at 10000000 { /* aipi1 */
- 			wdog at 10002000 {
- 				status = "okay";
- 			};
-@@ -31,11 +30,12 @@
- 				fsl,uart-has-rtscts;
- 				status = "okay";
- 			};
-+		};
++#define ORION_SPI_MODE_CPOL		(1 << 11)
++#define ORION_SPI_MODE_CPHA		(1 << 12)
+ #define ORION_SPI_IF_8_16_BIT_MODE	(1 << 5)
+ #define ORION_SPI_CLK_PRESCALE_MASK	0x1F
++#define ORION_SPI_MODE_MASK		(ORION_SPI_MODE_CPOL | \
++					 ORION_SPI_MODE_CPHA)
  
--			fec at 1002b000 {
-+		aipi at 10020000 { /* aipi2 */
-+			ethernet at 1002b000 {
- 				status = "okay";
- 			};
- 		};
- 	};
--
- };
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore.dts b/arch/arm/boot/dts/imx27-phytec-phycore.dts
-index af50469..53b0ec0 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore.dts
-@@ -21,8 +21,7 @@
- 	};
+ struct orion_spi {
+ 	struct spi_master	*master;
+@@ -123,6 +127,23 @@ static int orion_spi_baudrate_set(struct spi_device *spi, unsigned int speed)
+ 	return 0;
+ }
  
- 	soc {
--		aipi at 10000000 { /* aipi */
--
-+		aipi at 10000000 { /* aipi1 */
- 			serial at 1000a000 {
- 				fsl,uart-has-rtscts;
- 				status = "okay";
-@@ -38,10 +37,6 @@
- 				status = "okay";
- 			};
- 
--			ethernet at 1002b000 {
--				status = "okay";
--			};
--
- 			i2c at 1001d000 {
- 				clock-frequency = <400000>;
- 				status = "okay";
-@@ -60,6 +55,12 @@
- 				};
- 			};
- 		};
++static void
++orion_spi_mode_set(struct spi_device *spi)
++{
++	u32 reg;
++	struct orion_spi *orion_spi;
 +
-+		aipi at 10020000 { /* aipi2 */
-+			ethernet at 1002b000 {
-+				status = "okay";
-+			};
-+		};
- 	};
- 
- 	nor_flash at c0000000 {
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 3e54f14..8676152 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -55,7 +55,7 @@
- 			compatible = "fsl,aipi-bus", "simple-bus";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
--			reg = <0x10000000 0x10000000>;
-+			reg = <0x10000000 0x20000>;
- 			ranges;
- 
- 			wdog at 10002000 {
-@@ -211,6 +211,15 @@
- 				status = "disabled";
- 			};
- 
-+		};
++	orion_spi = spi_master_get_devdata(spi->master);
 +
-+		aipi at 10020000 { /* AIPI2 */
-+			compatible = "fsl,aipi-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x10020000 0x20000>;
-+			ranges;
++	reg = readl(spi_reg(orion_spi, ORION_SPI_IF_CONFIG_REG));
++	reg &= ~ORION_SPI_MODE_MASK;
++	if (spi->mode & SPI_CPOL)
++		reg |= ORION_SPI_MODE_CPOL;
++	if (spi->mode & SPI_CPHA)
++		reg |= ORION_SPI_MODE_CPHA;
++	writel(reg, spi_reg(orion_spi, ORION_SPI_IF_CONFIG_REG));
++}
 +
- 			fec: ethernet at 1002b000 {
- 				compatible = "fsl,imx27-fec";
- 				reg = <0x1002b000 0x4000>;
-@@ -218,6 +227,7 @@
- 				status = "disabled";
- 			};
- 		};
+ /*
+  * called only when no transfer is active on the bus
+  */
+@@ -142,6 +163,8 @@ orion_spi_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
+ 	if ((t != NULL) && t->bits_per_word)
+ 		bits_per_word = t->bits_per_word;
+ 
++	orion_spi_mode_set(spi);
 +
- 		nand at d8000000 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
+ 	rc = orion_spi_baudrate_set(spi, speed);
+ 	if (rc)
+ 		return rc;
+@@ -399,7 +422,7 @@ static int __init orion_spi_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* we support only mode 0, and no options */
+-	master->mode_bits = 0;
++	master->mode_bits = SPI_CPHA | SPI_CPOL;
+ 
+ 	master->setup = orion_spi_setup;
+ 	master->transfer_one_message = orion_spi_transfer_one_message;
 -- 
-1.7.9.5
+1.7.5.4
