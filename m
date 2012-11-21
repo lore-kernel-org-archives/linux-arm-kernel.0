@@ -1,71 +1,44 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 21 Nov 2012 11:00:19 +0100
-Subject: [PATCH V4 1/3] arm: dma mapping: Export a dma ops function
- arm_dma_set_mask
-In-Reply-To: <1353490783-23101-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1353490783-23101-1-git-send-email-gregory.clement@free-electrons.com>
- <1353490783-23101-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <50ACA633.7020207@samsung.com>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Wed, 21 Nov 2012 19:00:32 +0900
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <50AC956D.7020303@ti.com>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <1699753.ZQsWMHINxd@percival> <50AC956D.7020303@ti.com>
+Message-ID: <4275468.QAmZy3xUK6@percival>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wednesday 21 November 2012 16:48:45 Tomi Valkeinen wrote:
+> If the power-off sequence disables a regulator that was supposed to be
+> enabled by the power-on sequence (but wasn't enabled because of an
+> error), the regulator_disable is still called when the driver runs the
+> power-off sequence, isn't it? Regulator enables and disables are ref
+> counted, and the enables should match the disables.
 
-On 11/21/2012 10:39 AM, Gregory CLEMENT wrote:
-> Expose another DMA operations function: arm_dma_set_mask. This
-> function will be added to a custom DMA ops for Armada 370/XP.
-> Depending of its configuration Armada 370/XP can be set as a "nearly"
-> coherent architecture. In this case the DMA ops is made of:
-> - specific functions for this architecture
-> - already exposed arm DMA related functions
-> - the arm_dma_set_mask which was not exposed yet.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+And there collapses my theory.
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Failures might be better handled if sequences have some "recovery policy"
+> > about what to do when they fail, as mentioned in the link above. As you
+> > pointed out, the driver might not always know enough about the resources
+> > involved to do the right thing.
+> 
+> Yes, I think such recovery policy would be needed.
 
-> ---
->   arch/arm/include/asm/dma-mapping.h |    2 ++
->   arch/arm/mm/dma-mapping.c          |    4 +---
->   2 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index 2300484..98d4dab 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -111,6 +111,8 @@ static inline void dma_free_noncoherent(struct device *dev, size_t size,
->   
->   extern int dma_supported(struct device *dev, u64 mask);
->   
-> +extern int arm_dma_set_mask(struct device *dev, u64 dma_mask);
-> +
->   /**
->    * arm_dma_alloc - allocate consistent memory for DMA
->    * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 58bc3e4..5383bc0 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -124,8 +124,6 @@ static void arm_dma_sync_single_for_device(struct device *dev,
->   	__dma_page_cpu_to_dev(page, offset, size, dir);
->   }
->   
-> -static int arm_dma_set_mask(struct device *dev, u64 dma_mask);
-> -
->   struct dma_map_ops arm_dma_ops = {
->   	.alloc			= arm_dma_alloc,
->   	.free			= arm_dma_free,
-> @@ -971,7 +969,7 @@ int dma_supported(struct device *dev, u64 mask)
->   }
->   EXPORT_SYMBOL(dma_supported);
->   
-> -static int arm_dma_set_mask(struct device *dev, u64 dma_mask)
-> +int arm_dma_set_mask(struct device *dev, u64 dma_mask)
->   {
->   	if (!dev->dma_mask || !dma_supported(dev, dma_mask))
->   		return -EIO;
+Indeed, from your last paragraph this makes even more sense now.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Oh, and I noticed I forgot to reply to this:
+
+> This I didn't understand. Doesn't "<&pwm 2 xyz>" point to a single
+> device, no matter where and how many times it's used?
+
+That's true - however when dereferencing the phandle, the underlying framework 
+will try to acquire the PWM, which will result in failure if the same resource 
+is referenced several times.
+
+One could compare the phandles to avoid this, but in your example you must 
+know that for PWMs the "xyz" part is not relevant for comparison.
+
+This makes referencing of resources by name much easier to implement and more 
+elegant with respect to frameworks leveraging.
+
+Alex.
