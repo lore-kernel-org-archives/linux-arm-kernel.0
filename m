@@ -1,164 +1,55 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 21 Nov 2012 11:14:09 +0100
-Subject: [PATCH 2/2] gpiolib-of: ad gpio-export support
-In-Reply-To: <1353492849-29397-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20121121101259.GQ4398@game.jcrosoft.org>
- <1353492849-29397-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1353492849-29397-2-git-send-email-plagnioj@jcrosoft.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 21 Nov 2012 11:15:23 +0100
+Subject: [PATCH v3 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <87mwycjmdn.fsf@dell.be.48ers.dk>
+References: <1351869956-2787-1-git-send-email-zonque@gmail.com>
+ <1351869956-2787-5-git-send-email-zonque@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9DA81F@DBDE01.ent.ti.com>
+ <5097B7EE.3000508@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9DC1F1@DBDE01.ent.ti.com>
+ <509A2E75.5060307@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9DE420@DBDE01.ent.ti.com>
+ <509EA360.2050504@gmail.com> <87mwycjmdn.fsf@dell.be.48ers.dk>
+Message-ID: <50ACA9BB.7090106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow to export gpios with or without names
+On 20.11.2012 16:59, Peter Korsgaard wrote:
+>>>>>> "Daniel" == Daniel Mack <zonque@gmail.com> writes:
+> 
+> Hi,
+> 
+>  >>>> In omap2 driver NAND_ECC_HW ecc mode supports 3 ecc layout
+>  >>>> OMAP_ECC_HAMMING_CODE_HW_ROMCODE
+>  >>>> OMAP_ECC_BCH4_CODE_HW
+>  >>>> OMAP_ECC_BCH8_CODE_HW
+>  >>>> 
+>  >>>> So selection of ecc layout data should come from DT not ecc mode.
+>  >>> 
+>  >>> Ok, I see. I would still like to set them by string rather than magic
+>  >>> numbers that map to enum entries. Valid values would be "none", "hw",
+>  >>> "hw-romcode", "bch4" and "bch8". Are you ok with that?
+>  >> 
+>  >> Ok, that's nice. Better use ecc_opt instead of ecc_mode.
+> 
+>  Daniel> I did some more extensive tests that include reading the same
+>  Daniel> nand pages from both U-Boot and the kernel with BCH8 ECC, and
+>  Daniel> it turns out that -> is_elm_used needs to be set in the pdata
+>  Daniel> in order to make this work.
+> 
+> So what you're saying is that the choice of ELM or not is not just an
+> optimization, it really changes the ECC layout? Perhaps it should be
+> treated as a seperate layout (E.G. bch8-elm) then?
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
- Documentation/devicetree/bindings/gpio/gpio.txt |   60 ++++++++++++++++++++++
- drivers/gpio/gpiolib-of.c                       |   61 +++++++++++++++++++++++
- 2 files changed, 121 insertions(+)
+That is what I experienced, yes. The kernel was unable to parse NAND
+pages that were written from U-Boot with bch8 hardware mode when the elm
+module was not active. Maybe someone from TI can explain that? Giving it
+a dedicated name would also solve the problem with the extra DT property.
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio.txt b/Documentation/devicetree/bindings/gpio/gpio.txt
-index a336287..c2a9024 100644
---- a/Documentation/devicetree/bindings/gpio/gpio.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio.txt
-@@ -112,3 +112,63 @@ where,
- 
- The pinctrl node must have "#gpio-range-cells" property to show number of
- arguments to pass with phandle from gpio controllers node.
-+
-+3) gpio-export
-+--------------
-+
-+gpio-export will allow you to automatically export gpio
-+
-+required properties:
-+- compatible: Should be "gpio-export"
-+
-+in each child node will reprensent a gpio or if no name is specified
-+a list of gpio to export
-+
-+required properties:
-+- gpios: gpio to export
-+
-+optional properties:
-+ - gpio-export,name: export name
-+ - gpio-export,output: to set the as output with default value
-+ 		       if no present gpio as input
-+ - pio-export,direction_may_change: boolean to allow the direction to be controllable
-+
-+Example:
-+
-+
-+gpio_export {
-+	compatible = "gpio-export";
-+	#size-cells = <0>;
-+
-+	in {
-+		gpio-export,name = "in";
-+		gpios = <&pioC 20 0>;
-+	};
-+
-+	out {
-+		gpio-export,name = "out";
-+		gpio-export,output = <1>;
-+		gpio-export,direction_may_change;
-+		gpios = <&pioC 21 0>;
-+	};
-+
-+	in_out {
-+		gpio-export,name = "in_out";
-+		gpio-export,direction_may_change;
-+		gpios = <&pioC 21 0>;
-+	};
-+
-+	gpios_in {
-+		gpios = <&pioB 0 0
-+			 &pioB 3 0
-+			 &pioC 4 0>;
-+		gpio-export,direction_may_change;
-+	};
-+
-+	gpios_out {
-+		gpios = <&pioB 1 0
-+			 &pioB 2 0
-+			 &pioC 3 0>;
-+		gpio-export,output = <1>;
-+	};
-+};
-diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-index a40cd84..0ab9be4 100644
---- a/drivers/gpio/gpiolib-of.c
-+++ b/drivers/gpio/gpiolib-of.c
-@@ -21,6 +21,8 @@
- #include <linux/of_gpio.h>
- #include <linux/pinctrl/pinctrl.h>
- #include <linux/slab.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
- 
- /* Private data structure for of_gpiochip_find_and_xlate */
- struct gg_data {
-@@ -277,3 +279,62 @@ void of_gpiochip_remove(struct gpio_chip *chip)
- 	if (chip->of_node)
- 		of_node_put(chip->of_node);
- }
-+
-+static struct of_device_id gpio_export_ids[] = {
-+	{ .compatible = "gpio-export" },
-+	{ /* sentinel */ }
-+};
-+
-+static int __init of_gpio_export_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *cnp;
-+	u32 val;
-+	int nb = 0;
-+
-+	for_each_child_of_node(np, cnp) {
-+		const char *name = NULL;
-+		int gpio;
-+		bool dmc;
-+		int max_gpio = 1;
-+		int i;
-+
-+		of_property_read_string(cnp, "gpio-export,name", &name);
-+
-+		if (!name)
-+			max_gpio = of_gpio_count(cnp);
-+
-+		for (i = 0; i < max_gpio; i++) {
-+			gpio = of_get_gpio(cnp, i);
-+			if (devm_gpio_request(&pdev->dev, gpio, name ? name : of_node_full_name(np)))
-+				continue;
-+
-+			if (!of_property_read_u32(cnp, "gpio-export,output", &val))
-+				gpio_direction_output(gpio, val);
-+			else
-+				gpio_direction_input(gpio);
-+
-+			dmc = of_property_read_bool(np, "gpio-export,direction_may_change");
-+			gpio_export_with_name(gpio, dmc, name);
-+			nb++;
-+		}
-+	}
-+
-+	dev_info(&pdev->dev, "%d gpio(s) exported\n", nb);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver gpio_export_driver = {
-+	.driver		= {
-+		.name		= "gpio-export",
-+		.owner	= THIS_MODULE,
-+		.of_match_table	= of_match_ptr(gpio_export_ids),
-+	},
-+};
-+
-+static int __init of_gpio_export_init(void)
-+{
-+	return platform_driver_probe(&gpio_export_driver, of_gpio_export_probe);
-+}
-+device_initcall(of_gpio_export_init);
--- 
-1.7.10.4
+I'll wait until this is decided before I resend a new set that also
+fixes the issue with the errornousely forgotten Documentation file.
+
+
+Thanks,
+Daniel
