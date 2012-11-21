@@ -1,329 +1,134 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Nov 2012 15:59:30 +0100
-Subject: [PATCH V6 5/5] arm: mvebu: Add SMP support for Armada XP
-In-Reply-To: <1353509970-5237-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1353509970-5237-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1353509970-5237-6-git-send-email-gregory.clement@free-electrons.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Thu, 22 Nov 2012 00:02:47 +0900
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <50ACD7DC.5060405@ti.com>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
+ <20121120215429.B621F3E1821@localhost>
+ <13540495.epaCf4JVn9@percival> <50ACB59B.4090404@iki.fi>
+ <20121121114018.GA31576@avionic-0098.adnet.avionic-design.de>
+ <50ACC341.3090204@ti.com>
+ <20121121130039.GA12191@avionic-0098.adnet.avionic-design.de>
+ <50ACD7DC.5060405@ti.com>
+Message-ID: <CAAVeFuJofYwj926=3v0ApBCq_vNhCdC1PnzDc-B3d=LL_L40Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables SMP support on the Armada XP processor. It adds the
-mandatory functions to support SMP such as: the SMP initialization
-functions in platsmp.c, the secondary CPU entry point in headsmp.S and
-the CPU hotplug initial support in hotplug.c.
+Mmmm so maybe I am misinterpreting things, but it looks like we
+have just buried the power sequences here, haven't we?
 
-Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/configs/mvebu_defconfig    |    3 +
- arch/arm/mach-mvebu/Kconfig         |    1 +
- arch/arm/mach-mvebu/Makefile        |    2 +
- arch/arm/mach-mvebu/armada-370-xp.c |    3 +
- arch/arm/mach-mvebu/common.h        |    3 +
- arch/arm/mach-mvebu/headsmp.S       |   49 ++++++++++++++
- arch/arm/mach-mvebu/hotplug.c       |   30 +++++++++
- arch/arm/mach-mvebu/platsmp.c       |  122 +++++++++++++++++++++++++++++++++++
- 8 files changed, 213 insertions(+)
- create mode 100644 arch/arm/mach-mvebu/headsmp.S
- create mode 100644 arch/arm/mach-mvebu/hotplug.c
- create mode 100644 arch/arm/mach-mvebu/platsmp.c
+Alex.
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 3458752..da598d3 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -12,6 +12,9 @@ CONFIG_ARCH_MVEBU=y
- CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_XP=y
- # CONFIG_CACHE_L2X0 is not set
-+# CONFIG_SWP_EMULATE is not set
-+CONFIG_SMP=y
-+# CONFIG_LOCAL_TIMERS is not set
- CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
- # CONFIG_COMPACTION is not set
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index f4c3bf8..c934e1d 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -21,6 +21,7 @@ menu "Marvell SOC with device tree"
- config MACH_ARMADA_370_XP
- 	bool
- 	select ARMADA_370_XP_TIMER
-+	select HAVE_SMP
- 	select CPU_PJ4B
- 
- config MACH_ARMADA_370
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 2e3ec11..5dcb369 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -3,3 +3,5 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
- 
- obj-y += system-controller.o
- obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o coherency.o coherency_ll.o pmsu.o
-+obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
-+obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index 3292d6d..472e70f 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -23,6 +23,7 @@
- #include <asm/mach/time.h>
- #include "armada-370-xp.h"
- #include "common.h"
-+#include "coherency.h"
- 
- static struct map_desc armada_370_xp_io_desc[] __initdata = {
- 	{
-@@ -51,6 +52,7 @@ struct sys_timer armada_370_xp_timer = {
- static void __init armada_370_xp_dt_init(void)
- {
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	coherency_init();
- }
- 
- static const char * const armada_370_xp_dt_board_dt_compat[] = {
-@@ -60,6 +62,7 @@ static const char * const armada_370_xp_dt_board_dt_compat[] = {
- };
- 
- DT_MACHINE_START(ARMADA_XP_DT, "Marvell Aramada 370/XP (Device Tree)")
-+	.smp		= smp_ops(armada_xp_smp_ops),
- 	.init_machine	= armada_370_xp_dt_init,
- 	.map_io		= armada_370_xp_map_io,
- 	.init_irq	= armada_370_xp_init_irq,
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index 9285d04..aa27bc2 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -20,6 +20,9 @@ void mvebu_restart(char mode, const char *cmd);
- void armada_370_xp_init_irq(void);
- void armada_370_xp_handle_irq(struct pt_regs *regs);
- 
-+void armada_xp_cpu_die(unsigned int cpu);
- int armada_370_xp_coherency_init(void);
- int armada_370_xp_pmsu_init(void);
-+void armada_xp_secondary_startup(void);
-+extern struct smp_operations armada_xp_smp_ops;
- #endif
-diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
-new file mode 100644
-index 0000000..a06e0ed
---- /dev/null
-+++ b/arch/arm/mach-mvebu/headsmp.S
-@@ -0,0 +1,49 @@
-+/*
-+ * SMP support: Entry point for secondary CPUs
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Yehuda Yitschak <yehuday@marvell.com>
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * This file implements the assembly entry point for secondary CPUs in
-+ * an SMP kernel. The only thing we need to do is to add the CPU to
-+ * the coherency fabric by writing to 2 registers. Currently the base
-+ * register addresses are hard coded due to the early initialisation
-+ * problems.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+
-+/*
-+ * At this stage the secondary CPUs don't have acces yet to the MMU, so
-+ * we have to provide physical addresses
-+ */
-+#define ARMADA_XP_CFB_BASE	     0xD0020200
-+
-+	__CPUINIT
-+
-+/*
-+ * Armada XP specific entry point for secondary CPUs.
-+ * We add the CPU to the coherency fabric and then jump to secondary
-+ * startup
-+ */
-+ENTRY(armada_xp_secondary_startup)
-+
-+	/* Read CPU id */
-+	mrc     p15, 0, r1, c0, c0, 5
-+	and     r1, r1, #0xF
-+
-+	/* Add CPU to coherency fabric */
-+	ldr     r0, =ARMADA_XP_CFB_BASE
-+
-+	bl	ll_set_cpu_coherent
-+	b	secondary_startup
-+
-+ENDPROC(armada_xp_secondary_startup)
-diff --git a/arch/arm/mach-mvebu/hotplug.c b/arch/arm/mach-mvebu/hotplug.c
-new file mode 100644
-index 0000000..b228b6a
---- /dev/null
-+++ b/arch/arm/mach-mvebu/hotplug.c
-@@ -0,0 +1,30 @@
-+/*
-+ * Symmetric Multi Processing (SMP) support for Armada XP
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Lior Amsalem <alior@marvell.com>
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/smp.h>
-+#include <asm/proc-fns.h>
-+
-+/*
-+ * platform-specific code to shutdown a CPU
-+ *
-+ * Called with IRQs disabled
-+ */
-+void __ref armada_xp_cpu_die(unsigned int cpu)
-+{
-+	cpu_do_idle();
-+
-+	/* We should never return from idle */
-+	panic("mvebu: cpu %d unexpectedly exit from shutdown\n", cpu);
-+}
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-new file mode 100644
-index 0000000..fe16aaf
---- /dev/null
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -0,0 +1,122 @@
-+/*
-+ * Symmetric Multi Processing (SMP) support for Armada XP
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Lior Amsalem <alior@marvell.com>
-+ * Yehuda Yitschak <yehuday@marvell.com>
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * The Armada XP SoC has 4 ARMv7 PJ4B CPUs running in full HW coherency
-+ * This file implements the routines for preparing the SMP infrastructure
-+ * and waking up the secondary CPUs
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/smp.h>
-+#include <linux/clk.h>
-+#include <linux/of.h>
-+#include <asm/cacheflush.h>
-+#include <asm/smp_plat.h>
-+#include "common.h"
-+#include "armada-370-xp.h"
-+#include "pmsu.h"
-+#include "coherency.h"
-+
-+void __init set_secondary_cpus_clock(void)
-+{
-+	int thiscpu;
-+	unsigned long rate;
-+	struct clk *cpu_clk = NULL;
-+	struct device_node *np = NULL;
-+
-+	thiscpu = smp_processor_id();
-+	for_each_node_by_type(np, "cpu") {
-+		int err;
-+		int cpu;
-+
-+		err = of_property_read_u32(np, "reg", &cpu);
-+		if (WARN_ON(err))
-+			return;
-+
-+		if (cpu == thiscpu) {
-+			cpu_clk = of_clk_get(np, 0);
-+			break;
-+		}
-+	}
-+	if (WARN_ON(IS_ERR(cpu_clk)))
-+		return;
-+	clk_prepare_enable(cpu_clk);
-+	rate = clk_get_rate(cpu_clk);
-+
-+	/* set all the other CPU clk to the same rate than the boot CPU */
-+	for_each_node_by_type(np, "cpu") {
-+		int err;
-+		int cpu;
-+
-+		err = of_property_read_u32(np, "reg", &cpu);
-+		if (WARN_ON(err))
-+			return;
-+
-+		if (cpu != thiscpu) {
-+			cpu_clk = of_clk_get(np, 0);
-+			clk_set_rate(cpu_clk, rate);
-+		}
-+	}
-+}
-+
-+static void __cpuinit armada_xp_secondary_init(unsigned int cpu)
-+{
-+	armada_xp_mpic_smp_cpu_init();
-+}
-+
-+static int __cpuinit armada_xp_boot_secondary(unsigned int cpu,
-+					      struct task_struct *idle)
-+{
-+	pr_info("Booting CPU %d\n", cpu);
-+
-+	armada_xp_boot_cpu(cpu, armada_xp_secondary_startup);
-+
-+	return 0;
-+}
-+
-+static void __init armada_xp_smp_init_cpus(void)
-+{
-+	unsigned int i, ncores;
-+	ncores = coherency_get_cpu_count();
-+
-+	/* Limit possible CPUs to defconfig */
-+	if (ncores > nr_cpu_ids) {
-+		pr_warn("SMP: %d CPUs physically present. Only %d configured.",
-+			ncores, nr_cpu_ids);
-+		pr_warn("Clipping CPU count to %d\n", nr_cpu_ids);
-+		ncores = nr_cpu_ids;
-+	}
-+
-+	for (i = 0; i < ncores; i++)
-+		set_cpu_possible(i, true);
-+
-+	set_smp_cross_call(armada_mpic_send_doorbell);
-+}
-+
-+void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	set_secondary_cpus_clock();
-+	flush_cache_all();
-+	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
-+}
-+
-+struct smp_operations armada_xp_smp_ops __initdata = {
-+	.smp_init_cpus		= armada_xp_smp_init_cpus,
-+	.smp_prepare_cpus	= armada_xp_smp_prepare_cpus,
-+	.smp_secondary_init	= armada_xp_secondary_init,
-+	.smp_boot_secondary	= armada_xp_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= armada_xp_cpu_die,
-+#endif
-+};
--- 
-1.7.9.5
+On Wed, Nov 21, 2012 at 10:32 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> On 2012-11-21 15:00, Thierry Reding wrote:
+>> On Wed, Nov 21, 2012 at 02:04:17PM +0200, Tomi Valkeinen wrote:
+>>> On 2012-11-21 13:40, Thierry Reding wrote:
+>>>> On Wed, Nov 21, 2012 at 01:06:03PM +0200, Tomi Valkeinen wrote:
+>>>
+>>> (sorry for bouncing back and forth with my private and my @ti addresses.
+>>> I can't find an option in thunderbird to only use one sender address,
+>>> and I always forget to change it when responding...)
+>>>
+>>>>> My suggestion would be to go forward with an in-driver solution, and
+>>>>> look at the DT based solution later if we are seeing an increasing bloat
+>>>>> in the drivers.
+>>>>
+>>>> Assuming we go with your approach, what's the plan? We're actually
+>>>> facing this problem right now for Tegra. Basically we have a DRM driver
+>>>> that can drive the panel, but we're still missing a way to hook up the
+>>>> backlight and panel enabling code. So we effectively can't support any
+>>>> of the LVDS devices out there without this series.
+>>>
+>>> Could you describe the hardware setup you have related to the LCD and
+>>> backlight? Is it a public board with public schematics?
+>>
+>> I don't think any of the schematics are public. The Tamonten Evaluation
+>> Carrier is available publicly from our website and the schematics are
+>> available on demand as well. If required I can probably arrange to send
+>> you a copy.
+>
+> No need, I think your answer below is enough.
+>
+>>> I've understood that you don't have anything special in your board, just
+>>> an LCD and a backlight, and the power sequences are related to powering
+>>> up the LCD and the backlight, without anything board specific. If so,
+>>> there's no need for board specific code, but just improving the panel
+>>> and backlight drivers to support the models you use.
+>>
+>> Correct. Basically we have two GPIOs that each enable the panel or the
+>> backlight respectively and one PWM to control the brightness. Are the
+>
+> The panel GPIO goes to the panel hardware device, and enables the panel?
+> And similarly for the PWM GPIO, it goes to the PWM hardware device? Just
+> making sure there are no other components involved.
+>
+>> panel drivers that you refer to those in drivers/video? I'm not sure if
+>> adding more ad-hoc drivers there just to move them to a generic
+>> framework in the next cycle is a good idea. I'd rather spend some time
+>> on helping to get the framework right and have drivers for that instead.
+>
+> We have panel drivers for omap in drivers/video/omap2/displays/. I'm not
+> sure if other platforms have their own versions of panel drivers, but
+> probably adding a simple panel driver system for a platform would not be
+> too difficult. It could even be quite hardcoded, i.e. embedded directly
+> into the display subsystem driver, just to get something working until
+> the common panel framework is available.
+>
+> Yes, I agree it's not good idea to add more platform specific panel
+> drivers. But it's unclear when CPF will be merged, so if you need to get
+> the panel working now, I don't see a simple ad-hoc driver as too
+> horrible. But, of course, I'm not the one making the decision whether to
+> merge or not =).
+>
+>> From what I understand by looking at the OMAP display drivers, they also
+>> provide the timings for the displays. Steffen's videomode helpers can be
+>> used to represent these easily in DT, but I suppose if all of those per-
+>
+> Right. Note that I didn't present omap panel drivers as perfect
+> examples, just examples =).
+>
+>> panel specifics are represented in the drivers then that won't be needed
+>> anymore either.
+>
+> Yes, for most panels with just one native mode and nothing else, the
+> panel driver can contain the timings.
+>
+> However, this subject has been discussed earlier a few times. If the
+> panel in question doesn't need any special power-on/off sequences, just,
+> perhaps, one gpio or such, we could still use DT video modes. This would
+> simplify the cases where you have lots of different very simple panels.
+>
+> Obviously the same questions apply to DT video modes than to the power
+> sequences, and while I do think it's better to handle the timings inside
+> the driver, I'm not too much against video timings in DT. The reason
+> being that the video modes are quite clear, simple and stable data,
+> versus the much more complex and open-ended power sequences.
+>
+>>> I don't see any problem with adding small Tegra specific panel drivers
+>>> for the time being, with the intention of converting to common panel
+>>> framework when that's available.
+>>
+>> I can take a look at how such a driver could be implemented, but again,
+>
+> Don't look at the mainline omap panel drivers, at least not too closely
+> =). They contain hackery that will be cleaned up with CPF.
+>
+> I think there are two methods to implements simple panel drivers:
+>
+> The hardcoded one, where the display subsystem driver manages a few
+> different panel models. This is obviously not very expandable or
+> "correct", but should probably work just fine for a few models, until
+> CPF is usable.
+>
+> Something like CPF will have: have the panel device/driver as a platform
+> device/driver, which will register itself to the display subsystem. And
+> with "itself" I mean some kind of struct panel_entity, with a few ops
+> implemented by the panel driver.
+>
+> Well, this goes a bit out of subject. If you want to discuss panel
+> drivers more, please start a new thread. Laurent's upcoming CPF v2
+> should give you good ideas what the model will be.
+>
+>  Tomi
+>
+>
