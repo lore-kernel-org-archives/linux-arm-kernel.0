@@ -1,32 +1,46 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 21 Nov 2012 11:36:49 +0100
-Subject: [PATCH 138/493] pinctrl: remove use of __devexit_p
-In-Reply-To: <1353349642-3677-138-git-send-email-wfp5p@virginia.edu>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-138-git-send-email-wfp5p@virginia.edu>
-Message-ID: <20121121103649.GV4398@game.jcrosoft.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 21 Nov 2012 12:40:14 +0200
+Subject: [PATCH 1/1] net: add micrel KSZ8873MLL switch support
+In-Reply-To: <1353493630-30867-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1353493630-30867-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20121121104014.GC28785@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13:21 Mon 19 Nov     , Bill Pemberton wrote:
-> CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
-> needed.
+Hi Jean-Christophe,
+
+On Wed, Nov 21, 2012 at 11:27:10AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> this will allow to detect the link between the switch and the soc
 > 
-> Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-> Cc: Linus Walleij <linus.walleij@linaro.org> 
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com> 
-> Cc: Viresh Kumar <viresh.linux@gmail.com> 
-> Cc: linux-arm-kernel at lists.infradead.org 
-> Cc: spear-devel at list.st.com 
-> ---
->  drivers/pinctrl/mvebu/pinctrl-armada-370.c | 2 +-
->  drivers/pinctrl/mvebu/pinctrl-armada-xp.c  | 2 +-
->  drivers/pinctrl/mvebu/pinctrl-dove.c       | 2 +-
->  drivers/pinctrl/mvebu/pinctrl-kirkwood.c   | 2 +-
->  drivers/pinctrl/pinctrl-at91.c             | 2 +-
-for at91
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: netdev at vger.kernel.org
 
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+[...]
 
-Best Regards,
-J.
+> @@ -204,6 +237,16 @@ static struct phy_driver ksphy_driver[] = {
+>  	.ack_interrupt	= kszphy_ack_interrupt,
+>  	.config_intr	= ksz9021_config_intr,
+>  	.driver		= { .owner = THIS_MODULE, },
+> +}, {
+> +	.phy_id		= PHY_ID_KSZ8873MLL,
+> +	.phy_id_mask	= 0x00fffff0,
+> +	.name		= "Micrel KSZ8873MLL Swithch",
+
+s/Swithch/Switch/
+
+> +	.features	= (SUPPORTED_Pause | SUPPORTED_Asym_Pause),
+> +	.flags		= PHY_HAS_MAGICANEG,
+> +	.config_init	= kszphy_config_init,
+> +	.config_aneg	= ksz8873mll_config_aneg,
+> +	.read_status	= ksz8873mll_read_status,
+> +	.driver		= { .owner = THIS_MODULE, },
+>  } };
+>  
+>  static int __init ksphy_init(void)
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
