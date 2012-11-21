@@ -1,264 +1,138 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Nov 2012 15:59:26 +0100
-Subject: [PATCH V6 1/5] arm: mvebu: Add support for coherency fabric in
- mach-mvebu
+Date: Wed, 21 Nov 2012 15:59:29 +0100
+Subject: [PATCH V6 4/5] arm: mm: Add support for PJ4B cpu and init routines
 In-Reply-To: <1353509970-5237-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1353509970-5237-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1353509970-5237-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1353509970-5237-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 370 and Armada XP SOCs have a coherency fabric unit which
-is responsible for ensuring hardware coherency between all CPUs and
-between CPUs and I/O masters. This patch provides the basic support
-needed for SMP.
+PJ4B is an implementation of the ARMv7 (such as the Cortex A9 for
+example) released by Marvell. This CPU is currently found in
+Armada 370 and Armada XP SoCs. This patch provides a support for the
+specific initialization of this CPU.
 
 Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- .../devicetree/bindings/arm/coherency-fabric.txt   |   16 ++++
- arch/arm/boot/dts/armada-370-xp.dtsi               |    5 ++
- arch/arm/mach-mvebu/Makefile                       |    2 +-
- arch/arm/mach-mvebu/coherency.c                    |   82 ++++++++++++++++++++
- arch/arm/mach-mvebu/coherency.h                    |   24 ++++++
- arch/arm/mach-mvebu/coherency_ll.S                 |   49 ++++++++++++
- arch/arm/mach-mvebu/common.h                       |    1 +
- 7 files changed, 178 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/coherency-fabric.txt
- create mode 100644 arch/arm/mach-mvebu/coherency.c
- create mode 100644 arch/arm/mach-mvebu/coherency.h
- create mode 100644 arch/arm/mach-mvebu/coherency_ll.S
+ arch/arm/mach-mvebu/Kconfig |    2 +-
+ arch/arm/mm/Kconfig         |    4 +++
+ arch/arm/mm/proc-v7.S       |   66 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 71 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-new file mode 100644
-index 0000000..2bfbf67
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-@@ -0,0 +1,16 @@
-+Coherency fabric
-+----------------
-+Available on Marvell SOCs: Armada 370 and Armada XP
-+
-+Required properties:
-+
-+- compatible: "marvell,coherency-fabric"
-+- reg: Should contain,coherency fabric registers location and length.
-+
-+Example:
-+
-+coherency-fabric at d0020200 {
-+	compatible = "marvell,coherency-fabric";
-+	reg = <0xd0020200 0xb0>;
-+};
-+
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 94b4b9e..b0d075b 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -36,6 +36,11 @@
- 	      interrupt-controller;
- 	};
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 79299cd..f4c3bf8 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -21,7 +21,7 @@ menu "Marvell SOC with device tree"
+ config MACH_ARMADA_370_XP
+ 	bool
+ 	select ARMADA_370_XP_TIMER
+-	select CPU_V7
++	select CPU_PJ4B
  
-+	coherency-fabric at d0020200 {
-+		compatible = "marvell,coherency-fabric";
-+		reg = <0xd0020200 0xb0>;
-+	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 57f996b..5ce4b42 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -2,4 +2,4 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
- 	-I$(srctree)/arch/arm/plat-orion/include
+ config MACH_ARMADA_370
+ 	bool "Marvell Armada 370 boards"
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 94186b6..3fd629d 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -352,6 +352,10 @@ config CPU_PJ4
+ 	select ARM_THUMBEE
+ 	select CPU_V7
  
- obj-y += system-controller.o
--obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o
-+obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o coherency.o coherency_ll.o
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-new file mode 100644
-index 0000000..596ee66
---- /dev/null
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -0,0 +1,82 @@
-+/*
-+ * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Yehuda Yitschak <yehuday@marvell.com>
-+ * Gregory Clement <gregory.clement@free-electrons.com>
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * The Armada 370 and Armada XP SOCs have a coherency fabric which is
-+ * responsible for ensuring hardware coherency between all CPUs and between
-+ * CPUs and I/O masters. This file initializes the coherency fabric and
-+ * supplies basic routines for configuring and controlling hardware coherency
-+ */
++config CPU_PJ4B
++	bool
++	select CPU_V7
 +
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/of_address.h>
-+#include <linux/io.h>
-+#include <linux/smp.h>
-+#include <asm/smp_plat.h>
-+#include "armada-370-xp.h"
-+
-+/*
-+ * Some functions in this file are called very early during SMP
-+ * initialization. At that time the device tree framework is not yet
-+ * ready, and it is not possible to get the register address to
-+ * ioremap it. That's why the pointer below is given with an initial
-+ * value matching its virtual mapping
-+ */
-+static void __iomem *coherency_base = ARMADA_370_XP_REGS_VIRT_BASE + 0x20200;
-+
-+/* Coherency fabric registers */
-+#define COHERENCY_FABRIC_CFG_OFFSET		   0x4
-+
-+static struct of_device_id of_coherency_table[] = {
-+	{.compatible = "marvell,coherency-fabric"},
-+	{ /* end of list */ },
-+};
-+
-+#ifdef CONFIG_SMP
-+int coherency_get_cpu_count(void)
-+{
-+	int reg, cnt;
-+
-+	reg = readl(coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
-+	cnt = (reg & 0xF) + 1;
-+
-+	return cnt;
-+}
-+#endif
-+
-+/* Function defined in coherency_ll.S */
-+int ll_set_cpu_coherent(void __iomem *base_addr, unsigned int hw_cpu_id);
-+
-+int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
-+{
-+	if (!coherency_base) {
-+		pr_warn("Can't make CPU %d cache coherent.\n", hw_cpu_id);
-+		pr_warn("Coherency fabric is not initialized\n");
-+		return 1;
-+	}
-+
-+	return ll_set_cpu_coherent(coherency_base, hw_cpu_id);
-+}
-+
-+int __init coherency_init(void)
-+{
-+	struct device_node *np;
-+
-+	np = of_find_matching_node(NULL, of_coherency_table);
-+	if (np) {
-+		pr_info("Initializing Coherency fabric\n");
-+		coherency_base = of_iomap(np, 0);
-+	}
-+
-+	return 0;
-+}
-diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
-new file mode 100644
-index 0000000..2f42813
---- /dev/null
-+++ b/arch/arm/mach-mvebu/coherency.h
-@@ -0,0 +1,24 @@
-+/*
-+ * arch/arm/mach-mvebu/include/mach/coherency.h
-+ *
-+ *
-+ * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __MACH_370_XP_COHERENCY_H
-+#define __MACH_370_XP_COHERENCY_H
-+
-+#ifdef CONFIG_SMP
-+int coherency_get_cpu_count(void);
-+#endif
-+
-+int set_cpu_coherent(int cpu_id, int smp_group_id);
-+int coherency_init(void);
-+
-+#endif	/* __MACH_370_XP_COHERENCY_H */
-diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
-new file mode 100644
-index 0000000..74272b6
---- /dev/null
-+++ b/arch/arm/mach-mvebu/coherency_ll.S
-@@ -0,0 +1,49 @@
-+/*
-+ * Coherency fabric: low level functions
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * This file implements the assembly function to add a CPU to the
-+ * coherency fabric. This function is called by each of the secondary
-+ * CPUs during their early boot in an SMP kernel, this why this
-+ * function have to callable from assembly. It can also be called by a
-+ * primary CPU from C code during its boot.
-+ */
-+
-+#include <linux/linkage.h>
-+#define ARMADA_XP_CFB_CTL_REG_OFFSET 0x0
-+#define ARMADA_XP_CFB_CFG_REG_OFFSET 0x4
-+
-+	.text
-+/*
-+ * r0: Coherency fabric base register address
-+ * r1: HW CPU id
-+ */
-+ENTRY(ll_set_cpu_coherent)
-+	/* Create bit by cpu index */
-+	mov	r3, #(1 << 24)
-+	lsl     r1, r3, r1
-+
-+	/* Add CPU to SMP group - Atomic */
-+	add	r3, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
-+	ldr     r2, [r3]
-+	orr     r2, r2, r1
-+	str	r2, [r0]
-+
-+	/* Enable coherency on CPU - Atomic */
-+	add	r3, r0, #ARMADA_XP_CFB_CFG_REG_OFFSET
-+	ldr     r2, [r3]
-+	orr     r2, r2, r1
-+	str     r2, [r3]
-+
-+	dsb
-+
-+	mov	r0, #0
-+	mov	pc, lr
-+ENDPROC(ll_set_cpu_coherent)
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index 02f89ea..ba6b62a 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -20,4 +20,5 @@ void mvebu_restart(char mode, const char *cmd);
- void armada_370_xp_init_irq(void);
- void armada_370_xp_handle_irq(struct pt_regs *regs);
- 
-+int armada_370_xp_coherency_init(void);
+ # ARMv6
+ config CPU_V6
+ 	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 846d279..1aa3891 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -169,6 +169,62 @@ __v7_ca15mp_setup:
+ 	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
+ 	mcreq	p15, 0, r0, c1, c0, 1
  #endif
++
++__v7_pj4b_setup:
++#ifdef CONFIG_CPU_PJ4B
++
++/* Auxiliary Debug Modes Control 1 Register */
++#define STATIC_BP     (1 << 2) /* Enable Static BP */
++#define INTER_PARITY  (1 << 8) /* Disable Internal Parity Handling */
++#define BCK_OFF_STREX (1 << 5) /* Enable the back off of STREX instr */
++#define CLEAN_LINE    (1 << 16) /* Disable data transfer for clean line */
++
++/* Auxiliary Debug Modes Control 2 Register */
++#define FAST_LDR      (1 << 23) /* Disable fast LDR */
++#define SNOOP_DATA    (1 << 25) /* Do not interleave write and snoop data */
++#define CWF           (1 << 27) /* Disable Critical Word First feature */
++#define OUTSANDING_NC (1 << 29) /* Disable outstanding non cacheable request */
++#define L1_REP_RR     (1 << 30) /* L1 replacement - Strict round robin */
++#define AUX_DBG_CTRL2 (SNOOP_DATA | CWF | OUTSANDING_NC | L1_REP_RR)
++
++/* Auxiliary Functional Modes Control Register 0 */
++#define SMP_CFB         (1 << 1) /* Set SMP mode. Join the coherency fabric */
++#define L1_PAR_CHK      (1 << 2) /* Support L1 parity checking */
++#define BROADCAST_CACHE (1 << 8) /* Broadcast Cache and TLB maintenance */
++
++/* Auxiliary Debug Modes Control 0 Register */
++#define WFI_WFE         (1 << 22) /* WFI/WFE - serve the DVM and back to idle */
++
++	/* Auxiliary Debug Modes Control 1 Register */
++	mrc	p15, 1,	r0, c15, c1, 1
++	orr     r0, r0, #CLEAN_LINE
++	orr     r0, r0, #BCK_OFF_STREX
++	orr     r0, r0, #INTER_PARITY
++	bic	r0, r0, #STATIC_BP
++	mcr	p15, 1,	r0, c15, c1, 1
++
++	/* Auxiliary Debug Modes Control 2 Register */
++	mrc	p15, 1,	r0, c15, c1, 2
++	bic	r0, r0, #FAST_LDR
++	orr	r0, r0, #AUX_DBG_CTRL2
++	mcr	p15, 1,	r0, c15, c1, 2
++
++	/* Auxiliary Functional Modes Control Register 0 */
++	mrc	p15, 1,	r0, c15, c2, 0
++#ifdef CONFIG_SMP
++	orr	r0, r0, #SMP_CFB
++#endif
++	orr	r0, r0, #L1_PAR_CHK
++	orr	r0, r0, #BROADCAST_CACHE
++	mcr	p15, 1,	r0, c15, c2, 0
++
++	/* Auxiliary Debug Modes Control 0 Register */
++	mrc	p15, 1,	r0, c15, c1, 0
++	orr	r0, r0, #WFI_WFE
++	mcr	p15, 1,	r0, c15, c1, 0
++
++#endif /* CONFIG_CPU_PJ4B */
++
+ __v7_setup:
+ 	adr	r12, __v7_setup_stack		@ the local stack
+ 	stmia	r12, {r0-r5, r7, r9, r11, lr}
+@@ -342,6 +398,16 @@ __v7_ca9mp_proc_info:
+ 	.long	0xff0ffff0
+ 	__v7_proc __v7_ca9mp_setup
+ 	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
++
++	/*
++	 * Marvell PJ4B processor.
++	 */
++	.type   __v7_pj4b_proc_info, #object
++__v7_pj4b_proc_info:
++	.long	0x562f5840
++	.long	0xfffffff0
++	__v7_proc __v7_pj4b_setup
++	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
+ #endif	/* CONFIG_ARM_LPAE */
+ 
+ 	/*
 -- 
 1.7.9.5
