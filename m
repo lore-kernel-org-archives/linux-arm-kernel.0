@@ -1,89 +1,115 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 21 Nov 2012 19:02:28 +0800
-Subject: [PATCH 207/493] i2c: remove use of __devinit
-In-Reply-To: <1353349642-3677-207-git-send-email-wfp5p@virginia.edu>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-207-git-send-email-wfp5p@virginia.edu>
-Message-ID: <CAGsJ_4y7zFmTZ4c6VsKbzyVsbivFQGXM4uv87obMXyrqfg5HLg@mail.gmail.com>
+From: tomba@iki.fi (Tomi Valkeinen)
+Date: Wed, 21 Nov 2012 13:06:03 +0200
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <13540495.epaCf4JVn9@percival>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
+ <20121120215429.B621F3E1821@localhost> <13540495.epaCf4JVn9@percival>
+Message-ID: <50ACB59B.4090404@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/11/20 Bill Pemberton <wfp5p@virginia.edu>:
-> CONFIG_HOTPLUG is going away as an option so __devinit is no longer
-> needed.
->
-> Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-> Cc: Jean Delvare <khali@linux-fr.org>
-> Cc: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: "Ben Dooks " <ben-linux@fluff.org>
-> Cc: Rudolf Marek <r.marek@assembler.cz>
-> Cc: Jochen Friedrich <jochen@scram.de>
-> Cc: Peter Korsgaard <jacmet@sunsite.dk>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Vitaly Wool <vitalywool@gmail.com>
-> Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
-> Cc: Barry Song <baohua.song@csr.com>
-> Cc: "Mark M. Hoffman" <mhoffman@lightlink.com>
-> Cc: linux-i2c at vger.kernel.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
+On 2012-11-21 06:23, Alex Courbot wrote:
+> Hi Grant,
+> 
+> On Wednesday 21 November 2012 05:54:29 Grant Likely wrote:
+>>> With the advent of the device tree and of ARM kernels that are not
+>>> board-tied, we cannot rely on these board-specific hooks anymore but
+>>
+>> This isn't strictly true. It is still perfectly fine to have board
+>> specific code when necessary. However, there is strong encouragement to
+>> enable that code in device drivers as much as possible and new board
+>> files need to have very strong justification.
+> 
+> But doesn't introducing board-specific code into the kernel just defeats the 
+> purpose of the DT? If we extend this logic, we are heading straight back to 
+> board-definition files. To a lesser extent than before I agree, but the problem 
+> is fundamentally the same.
 
-Acked-by: Barry Song <baohua.song@csr.com>
+I don't think so. I'll reiterate my opinion on this subject, as a
+summary and for those who haven't read the discussions of the earlier
+versions of the series. And perhaps I'll even manage to say something
+new =).
 
->  drivers/i2c/busses/i2c-ali1535.c            |  4 ++--
->  drivers/i2c/busses/i2c-ali1563.c            |  4 ++--
->  drivers/i2c/busses/i2c-ali15x3.c            |  4 ++--
->  drivers/i2c/busses/i2c-amd756.c             |  2 +-
->  drivers/i2c/busses/i2c-amd8111.c            |  2 +-
->  drivers/i2c/busses/i2c-at91.c               |  6 +++---
->  drivers/i2c/busses/i2c-au1550.c             |  2 +-
->  drivers/i2c/busses/i2c-cpm.c                |  4 ++--
->  drivers/i2c/busses/i2c-designware-pcidrv.c  |  2 +-
->  drivers/i2c/busses/i2c-designware-platdrv.c |  2 +-
->  drivers/i2c/busses/i2c-eg20t.c              |  2 +-
->  drivers/i2c/busses/i2c-elektor.c            |  4 ++--
->  drivers/i2c/busses/i2c-gpio.c               |  4 ++--
->  drivers/i2c/busses/i2c-highlander.c         |  2 +-
->  drivers/i2c/busses/i2c-hydra.c              |  2 +-
->  drivers/i2c/busses/i2c-i801.c               | 14 +++++++-------
->  drivers/i2c/busses/i2c-ibm_iic.c            |  4 ++--
->  drivers/i2c/busses/i2c-intel-mid.c          |  2 +-
->  drivers/i2c/busses/i2c-isch.c               |  2 +-
->  drivers/i2c/busses/i2c-mpc.c                | 20 ++++++++++----------
->  drivers/i2c/busses/i2c-mv64xxx.c            | 12 ++++++------
->  drivers/i2c/busses/i2c-mxs.c                |  2 +-
->  drivers/i2c/busses/i2c-nforce2.c            |  4 ++--
->  drivers/i2c/busses/i2c-nuc900.c             |  2 +-
->  drivers/i2c/busses/i2c-ocores.c             |  2 +-
->  drivers/i2c/busses/i2c-octeon.c             |  6 +++---
->  drivers/i2c/busses/i2c-omap.c               |  2 +-
->  drivers/i2c/busses/i2c-parport-light.c      |  2 +-
->  drivers/i2c/busses/i2c-pasemi.c             |  2 +-
->  drivers/i2c/busses/i2c-pca-isa.c            |  4 ++--
->  drivers/i2c/busses/i2c-pca-platform.c       |  2 +-
->  drivers/i2c/busses/i2c-piix4.c              | 10 +++++-----
->  drivers/i2c/busses/i2c-pmcmsp.c             |  2 +-
->  drivers/i2c/busses/i2c-pnx.c                |  2 +-
->  drivers/i2c/busses/i2c-powermac.c           | 12 ++++++------
->  drivers/i2c/busses/i2c-puv3.c               |  2 +-
->  drivers/i2c/busses/i2c-pxa-pci.c            |  2 +-
->  drivers/i2c/busses/i2c-rcar.c               |  2 +-
->  drivers/i2c/busses/i2c-s6000.c              |  4 ++--
->  drivers/i2c/busses/i2c-sh7760.c             |  4 ++--
->  drivers/i2c/busses/i2c-sirf.c               |  2 +-
->  drivers/i2c/busses/i2c-sis5595.c            |  4 ++--
->  drivers/i2c/busses/i2c-sis630.c             |  4 ++--
->  drivers/i2c/busses/i2c-sis96x.c             |  2 +-
->  drivers/i2c/busses/i2c-tegra.c              |  2 +-
->  drivers/i2c/busses/i2c-via.c                |  2 +-
->  drivers/i2c/busses/i2c-viapro.c             |  2 +-
->  drivers/i2c/busses/i2c-xiic.c               |  2 +-
->  drivers/i2c/busses/i2c-xlr.c                |  2 +-
->  drivers/i2c/busses/scx200_acb.c             | 10 +++++-----
->  drivers/i2c/muxes/i2c-mux-gpio.c            |  4 ++--
->  drivers/i2c/muxes/i2c-mux-pinctrl.c         |  2 +-
->  52 files changed, 103 insertions(+), 103 deletions(-)
->
+
+First about the board specific code. I think we may need some board
+specific code, even if this series was merged. Let's call them board
+drivers. These board drivers would only exist for boards with some weird
+setups that cannot be expressed or managed with DT and normal drivers.
+
+I think these cases would be quite rare, as I can't even come up with a
+very good example. I guess most likely these cases would involve some
+small trivial chips for muxing or such, for which it doesn't really make
+sense to have a real driver.
+
+Say, perhaps a board with two LCDs connected to one video output, and
+only one LCD can be enabled at a time, and you need to set some mux chip
+to route the signals to the correct LCD. In this case I'd see we should
+have hotplug support in the display framework, and the board driver
+would act on user input (sysfs file, perhaps), plugging in/out the LCD
+device depending on the user input.
+
+
+As for expressing device internal details in the DT data, as done in
+this series, I don't like it very much. I think the DT data or the board
+file should just describe which device is the one in question, and how
+it's connected to other components on the board. The driver for the
+device should handle everything else.
+
+As Alex pointed out, there may be lots of devices that work the same way
+when enabled, but require slightly different power-on/off sequences. We
+could have these sequences in the driver itself, either as plain code,
+or in a table of some sort, possibly using the power sequence framework
+presented in this series. The correct code or sequence would be ran
+depending on the particular model of the device.
+
+I think this approach is correct in the sense that this is what drivers
+are supposed to do: handle all the device internal matters. But this
+raises the problem of bloating the kernel with possibly lots of
+different power sequences, of which only a few would be used by a board,
+and all the rest would just be waste of memory.
+
+Regarding this problem I have the following questions, to which I don't
+have clear answers:
+
+- How much of this device specific data is too much? If a driver
+supports 10 different models, and the sequences for each model take 100
+bytes, this 1000 bytes doesn't sound too much. But where's the limit?
+And even if one driver only has 1kB of this data, what if we have lots
+of similar drivers?
+
+- How many bytes does a power sequence presented in this series take, if
+the sequence contains, say, 5 steps, with gpio, delay, pwm, delay and
+regulator?
+
+- How likely is it that we'll get lots of different models? A hundred
+different models for a backlight PWM with different power-on/off
+sequences already sounds a really big number. If we're only going to
+have each driver supporting, say, no more than 10 models, perhaps the
+problem is not even an issue in practice.
+
+- Are there ways to limit this bloat in the driver? One obvious way
+would be to discard the unused sequences after driver probe, but that
+only works for platform devices. Although, I guess these sequences would
+mostly be used by platform drivers? If so, then the problem could be
+solved by discarding the data after probe. Another would be to load the
+sequences from a file as firmware, but that feels quite an awful
+solution. Anybody have other ideas?
+
+One clear positive side with in-driver approach is that it's totally
+inside the kernel, and can be easily reworked in the future, or even
+changed to a DT-based approach as presented in this series if that seems
+like a better solution. The DT based approach, on the other hand, will
+be more or less written to stone after it's merged.
+
+
+So, I like the framework of expressing the sequences presented in this
+series (except there's a problem with error cases, as I pointed out in
+another post), as it can be used inside the drivers. But I'm not so
+enthusiastic about presenting the sequences in DT.
+
+My suggestion would be to go forward with an in-driver solution, and
+look at the DT based solution later if we are seeing an increasing bloat
+in the drivers.
+
+ Tomi
