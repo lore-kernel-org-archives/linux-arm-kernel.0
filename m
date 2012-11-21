@@ -1,49 +1,37 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Nov 2012 15:46:41 +0100
-Subject: [PATCH 15/16] irqchip: vic: mark vic_of_init() as static
-In-Reply-To: <CACRpkdYU+tt=_xqVjoBnca-V8psRmZhU+UWUm-6i777vP5BChA@mail.gmail.com>
-References: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1353448867-15008-16-git-send-email-thomas.petazzoni@free-electrons.com>
- <CACRpkdazuvjXuuNP9TrsYsPQWMc=VV_-nu0oNWFPs+GzLmmw2g@mail.gmail.com>
- <20121121135357.5c963404@skate>
- <CACRpkdYU+tt=_xqVjoBnca-V8psRmZhU+UWUm-6i777vP5BChA@mail.gmail.com>
-Message-ID: <20121121154641.718c7b69@skate>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 21 Nov 2012 14:53:30 +0000
+Subject: IRQ code inconsistencies across platforms
+In-Reply-To: <53814.210.54.1.170.1349825180.squirrel@server.prisktech.co.nz>
+References: <53814.210.54.1.170.1349825180.squirrel@server.prisktech.co.nz>
+Message-ID: <20121121145330.3CCF53E0A47@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
-
-On Wed, 21 Nov 2012 15:40:02 +0100, Linus Walleij wrote:
-> On Wed, Nov 21, 2012 at 1:53 PM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> > On Wed, 21 Nov 2012 13:40:57 +0100, Linus Walleij wrote:
+On Wed, 10 Oct 2012 12:26:20 +1300 (NZDT), linux at prisktech.co.nz wrote:
+> In arch/arm/common.gic.c:
 > 
-> >> It may be that I have missed some patches, but are really all VIC
-> >> users converted in this patch series?
-> >
-> > In this patch series, I'm making vic_of_init() static. vic_init() used
-> > by non-DT platforms is kept as is, with no change, so I'm not sure why
-> > you're worried about vic_init() being a problem.
+> static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+> urq_hw_number_t hw)
+> {
+> ...
+>   irq_set_chip_and_handler(irq, &gic_chip, handle_fasteoi_irq);
+>   set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+> }
 > 
-> Probably because I didn't parse the _of_ part :-/
+> but in arch/arm/mach-pxa/irq.c:
 > 
-> Sorry about the fuzz!
+> static int pxa_irq_map(struct irq_domain *d, unsigned int virq, urq_hw_number_t hw)
+> {
+> ...
+>   irq_set_chip_and_handler(hw, &pxa_internal_irq_chip, handle_level_irq);
+>   set_irq_flags(hw, IRQF_VALID);
+> }
+> 
+> Is it correct to use irq/virq or hw for irq_set_chip_and_handler/set_irq_flags?
+> 
+> Both platforms are adding legacy domains, so while they both presumably work,
+> one is slightly incorrect.
 
-No problem :)
+It should be irq. The mach-pxa code looks incorrect.
 
-> But the idea is to use the same convenient mechanism for
-> the non-DT platforms later, so we get rid of all the incldue
-> headers I guess?
-
-Yes. I personally haven't yet thought of this part of the problem, but
-I think Rob has a plan, and if not, we can certainly think of one
-without too much problems.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+g.
