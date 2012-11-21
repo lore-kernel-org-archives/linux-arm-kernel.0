@@ -1,65 +1,65 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 21 Nov 2012 10:29:53 +0900
-Subject: [RFC 09/15] ARM: shmobile: Include DTSI of r8a7740 to
- armadillo800eva
-In-Reply-To: <19065301.iqf7oYnrtW@avalon>
-References: <1353302007-31045-1-git-send-email-horms@verge.net.au>
- <2217502.K9pLuGzWaC@avalon> <20121121001457.GG20120@verge.net.au>
- <19065301.iqf7oYnrtW@avalon>
-Message-ID: <20121121012953.GB2897@verge.net.au>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 21 Nov 2012 10:31:34 +0900
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <20121120215429.B621F3E1821@localhost>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
+ <20121120215429.B621F3E1821@localhost>
+Message-ID: <20121121013133.GE4673@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 02:03:02AM +0100, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> On Wednesday 21 November 2012 09:14:57 Simon Horman wrote:
-> > On Tue, Nov 20, 2012 at 01:45:20PM +0100, Laurent Pinchart wrote:
-> > > Hi Simon,
-> > > 
-> > > Thank you for the patch.
-> > > 
-> > > On Monday 19 November 2012 14:13:21 Simon Horman wrote:
-> > > > From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-> > > > 
-> > > > Cc: Magnus Damm <damm@opensource.se>
-> > > > Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-> > > > Signed-off-by: Simon Horman <horms@verge.net.au>
-> > > 
-> > > I came up today with pretty much the same patch :-)
-> > > 
-> > > > ---
-> > > > 
-> > > >  arch/arm/boot/dts/r8a7740-armadillo800eva.dts |    2 +-
-> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-> > > > b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts index a7505a9..a8e7bd9
-> > > > 100644
-> > > > --- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-> > > > +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-> > > > @@ -9,7 +9,7 @@
-> > > > 
-> > > >   */
-> > > >  
-> > > >  /dts-v1/;
-> > > > 
-> > > > -/include/ "skeleton.dtsi"
-> > > > +/include/ "r8a7740.dtsi"
-> > > > 
-> > > >  / {
-> > > >  
-> > > >  	model = "armadillo 800 eva";
-> > > 
-> > > Shouldn't the compatible property be modified to the following values ?
-> > > 
-> > > 	compatible = "renesas,armadillo800eva", "renesas,r8a7740";
-> > 
-> > To be honest, I'm not sure.
-> > But as this is a dts file for a board "renesas,r8a7740" seems strange to me.
-> 
-> If I understand DT correctly, the goal is to get rid of the board file at
-> some point and only keep the generic r8a7740 board code. Shouldn't we
-> then match on "renesas,r8a7740" ?
+On Tue, Nov 20, 2012 at 09:54:29PM +0000, Grant Likely wrote:
+> On Sat, 17 Nov 2012 19:55:45 +0900, Alexandre Courbot <acourbot@nvidia.com> wrote:
 
-Yes, I think that makes sense.
+> > With the advent of the device tree and of ARM kernels that are not
+> > board-tied, we cannot rely on these board-specific hooks anymore but
+
+> This isn't strictly true. It is still perfectly fine to have board
+> specific code when necessary. However, there is strong encouragement to
+> enable that code in device drivers as much as possible and new board
+> files need to have very strong justification.
+
+This isn't the message that's gone over, and even for device drivers
+everyone seems to be taking the whole device tree thing as a move to
+pull all data out of the kernel.  In some cases there are some real
+practical advantages to doing this but a lot of the people making these
+changes seem to view having things in DT as a goal in itself.
+
+> I'm thinking about the scripts as trivial-to-parse ascii strings that
+> have a very simple set of commands. The commands use resources already
+> defined in the node. ie. 'g0' refers to the first entry in the gpios
+> property. 'r0' for the regulator, 'p0' for the pwms, 'd' means delay. By
+> no means take this as the format to use, it is just an example off the
+> top of my head, but it is already way easier to work with than putting
+> each command into a node.
+
+It does appear to have some legibility challenges, especially with using
+the indexes into the arrays of resources.  On the other hand the arrays
+should be fairly small.
+
+> > +Platform Data Format
+> > +--------------------
+> > +All relevant data structures for declaring power sequences are located in
+> > +include/linux/power_seq.h.
+
+> Hmm... If sequences are switched to a string instead, then platform_data
+> should also use it. The power sequence data structures can be created at
+> runtime by parsing the string.
+
+Seems like a step backwards to me - why not let people store the more
+parsed version of the data?  It's going to be less convenient for users
+on non-DT systems.
+
+As I said in my earlier reviews I think this is a useful thing to have
+as a utility library for drivers independantly of the DT bindings, it
+would allow drivers to become more data driven.  Perhaps we can rework
+the series so that the DT bindings are added as a final patch?  All the
+rest of the code seems OK.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121121/da33be77/attachment-0001.sig>
