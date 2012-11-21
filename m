@@ -1,46 +1,37 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 20 Nov 2012 22:37:11 -0800
-Subject: [PATCH v3 14/18] ARM: clps711x: Moving backlight controls of
- framebuffer driver to the board
-In-Reply-To: <1353160644-22446-15-git-send-email-shc_work@mail.ru>
-References: <1353160644-22446-1-git-send-email-shc_work@mail.ru>
- <1353160644-22446-15-git-send-email-shc_work@mail.ru>
-Message-ID: <20121121063711.GB7615@quad.lixom.net>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Wed, 21 Nov 2012 12:29:17 +0530
+Subject: [PATCH 1/7] ARM: OMAP2+: omap2plus_defconfig: Enable tps65910 PMIC
+In-Reply-To: <1353481163-29462-1-git-send-email-anilkumar@ti.com>
+References: <1353481163-29462-1-git-send-email-anilkumar@ti.com>
+Message-ID: <1353481163-29462-2-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+AM335X-EVM and AM335X-EVMSK devices have tps65910 PMIC regulator, one
+has to manually enable this support to use regulators. So this patch
+enables tps65910 mfd and regulator driver in omap2plus_defconfig.
 
-On Sat, Nov 17, 2012 at 05:57:20PM +0400, Alexander Shiyan wrote:
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ arch/arm/configs/omap2plus_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-> @@ -162,25 +158,12 @@ clps7111fb_set_par(struct fb_info *info)
->  
->  static int clps7111fb_blank(int blank, struct fb_info *info)
->  {
-> -    	if (blank) {
-> -		if (machine_is_edb7211()) {
-> -			/* Turn off the LCD backlight. */
-> -			clps_writeb(clps_readb(PDDR) & ~EDB_PD3_LCDBL, PDDR);
-> -
-> -			/* Disable LCD controller. */
-> -			clps_writel(clps_readl(SYSCON1) & ~SYSCON1_LCDEN, 
-> -					SYSCON1);
-> -		}
-> -	} else {
-> -		if (machine_is_edb7211()) {
-> -			/* Enable LCD controller. */
-> -			clps_writel(clps_readl(SYSCON1) | SYSCON1_LCDEN,
-> -					SYSCON1);
-> -
-> -			/* Turn on the LCD backlight. */
-> -			clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
-> -		}
-> -	}
-> +	/* Enable/Disable LCD controller. */
-> +    	if (blank)
-> +		clps_writel(clps_readl(SYSCON1) & ~SYSCON1_LCDEN, SYSCON1);
-
-I fixed up spaces-before-tabs on the line above when I applied the patch.
-
-
--Olof
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index b0563dc..2cf6d0e 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -135,10 +135,12 @@ CONFIG_WATCHDOG=y
+ CONFIG_OMAP_WATCHDOG=y
+ CONFIG_TWL4030_WATCHDOG=y
+ CONFIG_MFD_TPS65217=y
++CONFIG_MFD_TPS65910=y
+ CONFIG_REGULATOR_TWL4030=y
+ CONFIG_REGULATOR_TPS65023=y
+ CONFIG_REGULATOR_TPS6507X=y
+ CONFIG_REGULATOR_TPS65217=y
++CONFIG_REGULATOR_TPS65910=y
+ CONFIG_FB=y
+ CONFIG_FIRMWARE_EDID=y
+ CONFIG_FB_MODE_HELPERS=y
+-- 
+1.7.9.5
