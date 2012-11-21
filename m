@@ -1,42 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Nov 2012 15:45:42 +0100
-Subject: [PATCH 0/4] Dove pinctrl fixes and DT enabling
-In-Reply-To: <50ACAAF5.2030002@gmail.com>
-References: <1353317996-20841-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <CACRpkdYAnNCFDCjA67r0h_CSHMifb1Z83YJfYGQV3abPB8uQZg@mail.gmail.com>
- <50ACAAF5.2030002@gmail.com>
-Message-ID: <CACRpkdYzQuv8sPk57CvqiwMmV0z007cGqVkGOENmr_aYAN14=Q@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 21 Nov 2012 15:46:41 +0100
+Subject: [PATCH 15/16] irqchip: vic: mark vic_of_init() as static
+In-Reply-To: <CACRpkdYU+tt=_xqVjoBnca-V8psRmZhU+UWUm-6i777vP5BChA@mail.gmail.com>
+References: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1353448867-15008-16-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CACRpkdazuvjXuuNP9TrsYsPQWMc=VV_-nu0oNWFPs+GzLmmw2g@mail.gmail.com>
+ <20121121135357.5c963404@skate>
+ <CACRpkdYU+tt=_xqVjoBnca-V8psRmZhU+UWUm-6i777vP5BChA@mail.gmail.com>
+Message-ID: <20121121154641.718c7b69@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 11:20 AM, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
-> On 11/21/2012 10:59 AM, Linus Walleij wrote:
->>
->> On Mon, Nov 19, 2012 at 10:39 AM, Sebastian Hesselbarth
->> <sebastian.hesselbarth@gmail.com>  wrote:
->>>
->>> This patch relies on a patch set for mvebu pinctrl taken through
->>> Linus' pinctrl branch. As there is no other platform than Dove
->>> involved, I suggest to take it though Jason's tree to avoid any
->>> further conflicts.
->>
->>
->> Sounds like a plan. So you have some commit history pulled
->> in from the pinctrl tree in the MVEBU tree?
->
->
-> Linus,
->
-> I am referring to patches for a pinctrl/mvebu subfolder. IIRC Thomas
-> posted that patch a while ago. Jason is currently sorting things out
-> for mvebu pull requests. I guess both can comment on your question,
-> as I don't fully understand it.
+Linus,
 
-So what I mean is that the patches creating pinctrl/mvebu is in the
-pinctrl tree, so if patches in the MVEBU tree depend on these,
-then it must have pulled in a branch from pinctrl or applied the
-same patches in that tree too (which is OK *sometimes*).
+On Wed, 21 Nov 2012 15:40:02 +0100, Linus Walleij wrote:
+> On Wed, Nov 21, 2012 at 1:53 PM, Thomas Petazzoni
+> <thomas.petazzoni@free-electrons.com> wrote:
+> > On Wed, 21 Nov 2012 13:40:57 +0100, Linus Walleij wrote:
+> 
+> >> It may be that I have missed some patches, but are really all VIC
+> >> users converted in this patch series?
+> >
+> > In this patch series, I'm making vic_of_init() static. vic_init() used
+> > by non-DT platforms is kept as is, with no change, so I'm not sure why
+> > you're worried about vic_init() being a problem.
+> 
+> Probably because I didn't parse the _of_ part :-/
+> 
+> Sorry about the fuzz!
 
-Yours,
-Linus Walleij
+No problem :)
+
+> But the idea is to use the same convenient mechanism for
+> the non-DT platforms later, so we get rid of all the incldue
+> headers I guess?
+
+Yes. I personally haven't yet thought of this part of the problem, but
+I think Rob has a plan, and if not, we can certainly think of one
+without too much problems.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
