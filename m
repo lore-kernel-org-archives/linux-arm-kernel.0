@@ -1,52 +1,30 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 21 Nov 2012 11:25:28 -0700
-Subject: [PATCH] ARM: Kirkwood: Support basic hotplug for PCI-E
-Message-ID: <20121121182528.GA12715@obsidianresearch.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 21 Nov 2012 10:26:00 -0800
+Subject: [PATCH 0/2] Add automatic bus number support for i2c busses with
+ device tree
+In-Reply-To: <1353450428-2615-2-git-send-email-dianders@chromium.org>
+References: <1353450428-2615-2-git-send-email-dianders@chromium.org>
+Message-ID: <1353522362-25519-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unconditionally register the PCI-E bus, even if the link is currently
-down. When the link is brought up the bus can be scanned through
-/sys/bus/pci/rescan or otherwise. Since the HW has no interrupt for
-link up, userspace will have to take care of the timing.
+This was suggested by Mark Brown in response to a patch for adding
+this functionality only for the s3c2410 bus:
+  https://lkml.org/lkml/2012/11/20/681
 
-An earlier version of this was contingent on CONFIG_HOTPLUG, but
-that is being removed from the kernel.
+I have also modified the i2c-pxa driver to use this new functionality
+but have no good way to test that patch.  Hopefully someone else can
+test and ack.  The patch adding the generic functionality could go in
+even if the i2c-pxa patch needs changes.
 
-This also fixes printing the link up/down message to be displayed
-on one line (structured logging broke this?)
 
-Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
----
- arch/arm/mach-kirkwood/pcie.c |   10 +++-------
- 1 files changed, 3 insertions(+), 7 deletions(-)
+Doug Anderson (2):
+  i2c-core: dt: Pick i2c bus number from i2c alias if present
+  i2c: pxa: Use i2c-core to get bus number now
 
-All PCI-E ports are required to support hot plug at the link training
-level. Our systems support it electrically, and userspace sequences
-everything to work properly. But the PCI-E root port needs to be
-registered with the kernel to initiate a rescan via sysfs when things
-are ready.
+ drivers/i2c/busses/i2c-pxa.c |    8 +---
+ drivers/i2c/i2c-core.c       |  105 ++++++++++++++++++++++++++++++-----------
+ 2 files changed, 78 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
-index 59c97fe..80fd4f2 100644
---- a/arch/arm/mach-kirkwood/pcie.c
-+++ b/arch/arm/mach-kirkwood/pcie.c
-@@ -244,13 +244,9 @@ static struct hw_pci kirkwood_pci __initdata = {
- 
- static void __init add_pcie_port(int index, void __iomem *base)
- {
--	printk(KERN_INFO "Kirkwood PCIe port %d: ", index);
--
--	if (orion_pcie_link_up(base)) {
--		printk(KERN_INFO "link up\n");
--		pcie_port_map[num_pcie_ports++] = index;
--	} else
--		printk(KERN_INFO "link down, ignoring\n");
-+	pcie_port_map[num_pcie_ports++] = index;
-+	pr_info("Kirkwood PCIe port %d: link %s\n", index,
-+		orion_pcie_link_up(base) ? "up" : "down");
- }
- 
- void __init kirkwood_pcie_init(unsigned int portmask)
 -- 
-1.7.5.4
+1.7.7.3
