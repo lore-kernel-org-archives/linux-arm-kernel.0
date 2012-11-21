@@ -1,29 +1,23 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Nov 2012 00:50:56 -0800
-Subject: [GIT PULL 1/3] ARM: bcm2835: cleanup
-In-Reply-To: <1353124957-23808-1-git-send-email-swarren@wwwdotorg.org>
-References: <1353124957-23808-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20121121085056.GP7615@quad.lixom.net>
+Date: Wed, 21 Nov 2012 00:52:51 -0800
+Subject: [GIT PULL] arm-soc: lpc32xx: dts update
+In-Reply-To: <50A8FE44.3030401@antcom.de>
+References: <50A8FE44.3030401@antcom.de>
+Message-ID: <20121121085251.GQ7615@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2012 at 09:02:35PM -0700, Stephen Warren wrote:
-> Just a few minor/trivial cleanups.
+On Sun, Nov 18, 2012 at 04:27:00PM +0100, Roland Stigge wrote:
+> Hi Arnd and Olof,
 > 
-> ----------------------------------------------------------------
-> 
-> The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
-> 
->   Linux 3.7-rc2
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git bcm2835-for-3.8-cleanup
+> this pull request includes the dts updates for lpc32xx for 3.7. (Hoping that
+> the signed tag works for you.)
 
-I think you meant linux-rpi.git here, at least that's where I found the tags in
-question.
+Hi,
 
-Pulled 1-3 from there though. Thanks!
+I'm guessing you want this for 3.8, right? I've queued it under lpc32xx/dt for
+3.8 merge window now at least. :)
 
+Thanks!
 
 -Olof
