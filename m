@@ -1,347 +1,271 @@
 From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 21 Nov 2012 11:09:22 -0800
-Subject: [PATCH 2/3 v3] clk: make ICST driver handle the VCO registers
-In-Reply-To: <1353448864-13253-1-git-send-email-linus.walleij@linaro.org>
-References: <1353448864-13253-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20121121190922.21126.7846@nucleus>
+Date: Wed, 21 Nov 2012 11:10:10 -0800
+Subject: [PATCH 3/3 v3] clk: move IM-PD1 clocks to drivers/clk
+In-Reply-To: <1353447589-12947-1-git-send-email-linus.walleij@linaro.org>
+References: <1353447589-12947-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20121121191010.21126.91932@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Linus Walleij (2012-11-20 14:01:04)
-> It turns out that all platforms using the ICST VCO are really
-> just touching two registers, and in the same way as well: one
-> register with the VCO configuration as such, and one lock register
-> that makes it possible to write to the VCO.
-> 
-> Factor this register read/write into the ICST driver so we can
-> reuse it in the IM-PD1 driver.
+Quoting Linus Walleij (2012-11-20 13:39:49)
+> The ARM IM-PD1 add-on module has a few clock of its own, let's
+> move also these down to the drivers/clk/versatile driver dir
+> and get rid of any remaining oldschool Integrator clocks.
 > 
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Taken into clk-next.
+I replaced the v2 version in clk-next with this one.  Thanks for the
+quick updates.
 
-Thanks,
+Regards,
 Mike
 
 > ---
-> ChangeLog v2->v3:
-> - Actually SQUASH the freaking patches too, so we convert all
->   users of the ICST VCO in this patch. Since the commit
->   message was somehow preserved I must have been messing with
->   my git in some strange way.
+> ChangeLog v1->v2:
+> - add GPL header
+> ChangeLov v2->v3:
+> - Provide exitpath, provide handling of multiple LMs
+>   use new ICST VCO infrastructure.
 > ---
->  drivers/clk/versatile/clk-icst.c       | 60 +++++++++++++++++++++++++++++-----
->  drivers/clk/versatile/clk-icst.h       | 14 ++++++--
->  drivers/clk/versatile/clk-integrator.c | 45 +++----------------------
->  drivers/clk/versatile/clk-realview.c   | 57 ++++++++------------------------
->  4 files changed, 81 insertions(+), 95 deletions(-)
+>  arch/arm/mach-integrator/impd1.c             | 69 +-------------------
+>  drivers/clk/versatile/Makefile               |  1 +
+>  drivers/clk/versatile/clk-impd1.c            | 97 ++++++++++++++++++++++++++++
+>  include/linux/platform_data/clk-integrator.h |  2 +
+>  4 files changed, 103 insertions(+), 66 deletions(-)
+>  create mode 100644 drivers/clk/versatile/clk-impd1.c
 > 
-> diff --git a/drivers/clk/versatile/clk-icst.c b/drivers/clk/versatile/clk-icst.c
-> index 23d2d7e..67ccf4a 100644
-> --- a/drivers/clk/versatile/clk-icst.c
-> +++ b/drivers/clk/versatile/clk-icst.c
-> @@ -17,33 +17,74 @@
->  #include <linux/clkdev.h>
->  #include <linux/err.h>
->  #include <linux/clk-provider.h>
-> +#include <linux/io.h>
->  
->  #include "clk-icst.h"
->  
->  /**
->   * struct clk_icst - ICST VCO clock wrapper
->   * @hw: corresponding clock hardware entry
-> + * @vcoreg: VCO register address
-> + * @lockreg: VCO lock register address
->   * @params: parameters for this ICST instance
->   * @rate: current rate
-> - * @setvco: function to commit ICST settings to hardware
->   */
->  struct clk_icst {
->         struct clk_hw hw;
-> +       void __iomem *vcoreg;
-> +       void __iomem *lockreg;
->         const struct icst_params *params;
->         unsigned long rate;
-> -       struct icst_vco (*getvco)(void);
-> -       void (*setvco)(struct icst_vco);
->  };
->  
->  #define to_icst(_hw) container_of(_hw, struct clk_icst, hw)
->  
-> +/**
-> + * vco_get() - get ICST VCO settings from a certain register
-> + * @vcoreg: register containing the VCO settings
-> + */
-> +static struct icst_vco vco_get(void __iomem *vcoreg)
-> +{
-> +       u32 val;
-> +       struct icst_vco vco;
-> +
-> +       val = readl(vcoreg);
-> +       vco.v = val & 0x1ff;
-> +       vco.r = (val >> 9) & 0x7f;
-> +       vco.s = (val >> 16) & 03;
-> +       return vco;
-> +}
-> +
-> +/**
-> + * vco_set() - commit changes to an ICST VCO
-> + * @locreg: register to poke to unlock the VCO for writing
-> + * @vcoreg: register containing the VCO settings
-> + * @vco: ICST VCO parameters to commit
-> + */
-> +static void vco_set(void __iomem *lockreg,
-> +                       void __iomem *vcoreg,
-> +                       struct icst_vco vco)
-> +{
-> +       u32 val;
-> +
-> +       val = readl(vcoreg) & ~0x7ffff;
-> +       val |= vco.v | (vco.r << 9) | (vco.s << 16);
-> +
-> +       /* This magic unlocks the VCO so it can be controlled */
-> +       writel(0xa05f, lockreg);
-> +       writel(val, vcoreg);
-> +       /* This locks the VCO again */
-> +       writel(0, lockreg);
-> +}
-> +
-> +
->  static unsigned long icst_recalc_rate(struct clk_hw *hw,
->                                       unsigned long parent_rate)
->  {
->         struct clk_icst *icst = to_icst(hw);
->         struct icst_vco vco;
->  
-> -       vco = icst->getvco();
-> +       vco = vco_get(icst->vcoreg);
->         icst->rate = icst_hz(icst->params, vco);
->         return icst->rate;
->  }
-> @@ -66,7 +107,7 @@ static int icst_set_rate(struct clk_hw *hw, unsigned long rate,
->  
->         vco = icst_hz_to_vco(icst->params, rate);
->         icst->rate = icst_hz(icst->params, vco);
-> -       icst->setvco(vco);
-> +       vco_set(icst->vcoreg, icst->lockreg, vco);
->         return 0;
->  }
->  
-> @@ -76,8 +117,9 @@ static const struct clk_ops icst_ops = {
->         .set_rate = icst_set_rate,
->  };
->  
-> -struct clk * __init icst_clk_register(struct device *dev,
-> -                                     const struct clk_icst_desc *desc)
-> +struct clk *icst_clk_register(struct device *dev,
-> +                       const struct clk_icst_desc *desc,
-> +                       void __iomem *base)
->  {
->         struct clk *clk;
->         struct clk_icst *icst;
-> @@ -95,8 +137,8 @@ struct clk * __init icst_clk_register(struct device *dev,
->         init.num_parents = 0;
->         icst->hw.init = &init;
->         icst->params = desc->params;
-> -       icst->getvco = desc->getvco;
-> -       icst->setvco = desc->setvco;
-> +       icst->vcoreg = base + desc->vco_offset;
-> +       icst->lockreg = base + desc->lock_offset;
->  
->         clk = clk_register(dev, &icst->hw);
->         if (IS_ERR(clk))
-> diff --git a/drivers/clk/versatile/clk-icst.h b/drivers/clk/versatile/clk-icst.h
-> index 71b4c56..dad51b6 100644
-> --- a/drivers/clk/versatile/clk-icst.h
-> +++ b/drivers/clk/versatile/clk-icst.h
-> @@ -1,10 +1,18 @@
->  #include <asm/hardware/icst.h>
->  
-> +/**
-> + * struct clk_icst_desc - descriptor for the ICST VCO
-> + * @params: ICST parameters
-> + * @vco_offset: offset to the ICST VCO from the provided memory base
-> + * @lock_offset: offset to the ICST VCO locking register from the provided
-> + *     memory base
-> + */
->  struct clk_icst_desc {
->         const struct icst_params *params;
-> -       struct icst_vco (*getvco)(void);
-> -       void (*setvco)(struct icst_vco);
-> +       u32 vco_offset;
-> +       u32 lock_offset;
->  };
->  
->  struct clk *icst_clk_register(struct device *dev,
-> -                             const struct clk_icst_desc *desc);
-> +                             const struct clk_icst_desc *desc,
-> +                             void __iomem *base);
-> diff --git a/drivers/clk/versatile/clk-integrator.c b/drivers/clk/versatile/clk-integrator.c
-> index 3c816ae..08593b4 100644
-> --- a/drivers/clk/versatile/clk-integrator.c
-> +++ b/drivers/clk/versatile/clk-integrator.c
-> @@ -10,7 +10,7 @@
->  #include <linux/clk.h>
->  #include <linux/clkdev.h>
->  #include <linux/err.h>
-> -#include <linux/io.h>
+> diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
+> index e428f3a..b3d86d7 100644
+> --- a/arch/arm/mach-integrator/impd1.c
+> +++ b/arch/arm/mach-integrator/impd1.c
+> @@ -21,10 +21,9 @@
+>  #include <linux/amba/bus.h>
+>  #include <linux/amba/clcd.h>
+>  #include <linux/io.h>
 > +#include <linux/platform_data/clk-integrator.h>
+>  #include <linux/slab.h>
+> -#include <linux/clkdev.h>
 >  
->  #include <mach/hardware.h>
->  #include <mach/platform.h>
-> @@ -22,42 +22,6 @@
->   * Inspired by portions of:
->   * plat-versatile/clock.c and plat-versatile/include/plat/clock.h
->   */
-> -#define CM_LOCK                (__io_address(INTEGRATOR_HDR_BASE)+INTEGRATOR_HDR_LOCK_OFFSET)
-> -#define CM_AUXOSC      (__io_address(INTEGRATOR_HDR_BASE)+0x1c)
+> -#include <asm/hardware/icst.h>
+>  #include <mach/lm.h>
+>  #include <mach/impd1.h>
+>  #include <asm/sizes.h>
+> @@ -36,45 +35,6 @@ MODULE_PARM_DESC(lmid, "logic module stack position");
+>  
+>  struct impd1_module {
+>         void __iomem    *base;
+> -       struct clk      vcos[2];
+> -       struct clk_lookup *clks[3];
+> -};
 > -
-> -/**
-> - * cp_auxvco_get() - get ICST VCO settings for the Integrator/CP
-> - * @vco: ICST VCO parameters to update with hardware status
-> - */
-> -static struct icst_vco cp_auxvco_get(void)
+> -static const struct icst_params impd1_vco_params = {
+> -       .ref            = 24000000,     /* 24 MHz */
+> -       .vco_max        = ICST525_VCO_MAX_3V,
+> -       .vco_min        = ICST525_VCO_MIN,
+> -       .vd_min         = 12,
+> -       .vd_max         = 519,
+> -       .rd_min         = 3,
+> -       .rd_max         = 120,
+> -       .s2div          = icst525_s2div,
+> -       .idx2s          = icst525_idx2s,
+> -};
+> -
+> -static void impd1_setvco(struct clk *clk, struct icst_vco vco)
 > -{
-> -       u32 val;
-> -       struct icst_vco vco;
+> -       struct impd1_module *impd1 = clk->data;
+> -       u32 val = vco.v | (vco.r << 9) | (vco.s << 16);
 > -
-> -       val = readl(CM_AUXOSC);
+> -       writel(0xa05f, impd1->base + IMPD1_LOCK);
+> -       writel(val, clk->vcoreg);
+> -       writel(0, impd1->base + IMPD1_LOCK);
+> -
+> -#ifdef DEBUG
 > -       vco.v = val & 0x1ff;
 > -       vco.r = (val >> 9) & 0x7f;
-> -       vco.s = (val >> 16) & 03;
-> -       return vco;
+> -       vco.s = (val >> 16) & 7;
+> -
+> -       pr_debug("IM-PD1: VCO%d clock is %ld Hz\n",
+> -                vconr, icst525_hz(&impd1_vco_params, vco));
+> -#endif
 > -}
 > -
-> -/**
-> - * cp_auxvco_set() - commit changes to Integrator/CP ICST VCO
-> - * @vco: ICST VCO parameters to commit
-> - */
-> -static void cp_auxvco_set(struct icst_vco vco)
-> -{
-> -       u32 val;
-> -
-> -       val = readl(CM_AUXOSC) & ~0x7ffff;
-> -       val |= vco.v | (vco.r << 9) | (vco.s << 16);
-> -
-> -       /* This magic unlocks the CM VCO so it can be controlled */
-> -       writel(0xa05f, CM_LOCK);
-> -       writel(val, CM_AUXOSC);
-> -       /* This locks the CM again */
-> -       writel(0, CM_LOCK);
-> -}
->  
->  static const struct icst_params cp_auxvco_params = {
->         .ref            = 24000000,
-> @@ -73,8 +37,8 @@ static const struct icst_params cp_auxvco_params = {
->  
->  static const struct clk_icst_desc __initdata cp_icst_desc = {
->         .params = &cp_auxvco_params,
-> -       .getvco = cp_auxvco_get,
-> -       .setvco = cp_auxvco_set,
-> +       .vco_offset = 0x1c,
-> +       .lock_offset = INTEGRATOR_HDR_LOCK_OFFSET,
+> -static const struct clk_ops impd1_clk_ops = {
+> -       .round  = icst_clk_round,
+> -       .set    = icst_clk_set,
+> -       .setvco = impd1_setvco,
 >  };
 >  
->  /*
-> @@ -114,6 +78,7 @@ void __init integrator_clk_init(bool is_cp)
->         clk_register_clkdev(clk, NULL, "sp804");
->  
->         /* ICST VCO clock used on the Integrator/CP CLCD */
-> -       clk = icst_clk_register(NULL, &cp_icst_desc);
-> +       clk = icst_clk_register(NULL, &cp_icst_desc,
-> +                               __io_address(INTEGRATOR_HDR_BASE));
->         clk_register_clkdev(clk, NULL, "clcd");
->  }
-> diff --git a/drivers/clk/versatile/clk-realview.c b/drivers/clk/versatile/clk-realview.c
-> index fd2dbdb..cda07e7 100644
-> --- a/drivers/clk/versatile/clk-realview.c
-> +++ b/drivers/clk/versatile/clk-realview.c
-> @@ -21,38 +21,6 @@
->   * Implementation of the ARM RealView clock trees.
->   */
->  
-> -static void __iomem *sys_lock;
-> -static void __iomem *sys_vcoreg;
-> -
-> -/**
-> - * realview_oscvco_get() - get ICST OSC settings for the RealView
-> - */
-> -static struct icst_vco realview_oscvco_get(void)
-> -{
-> -       u32 val;
-> -       struct icst_vco vco;
-> -
-> -       val = readl(sys_vcoreg);
-> -       vco.v = val & 0x1ff;
-> -       vco.r = (val >> 9) & 0x7f;
-> -       vco.s = (val >> 16) & 03;
-> -       return vco;
-> -}
-> -
-> -static void realview_oscvco_set(struct icst_vco vco)
-> -{
-> -       u32 val;
-> -
-> -       val = readl(sys_vcoreg) & ~0x7ffff;
-> -       val |= vco.v | (vco.r << 9) | (vco.s << 16);
-> -
-> -       /* This magic unlocks the CM VCO so it can be controlled */
-> -       writel(0xa05f, sys_lock);
-> -       writel(val, sys_vcoreg);
-> -       /* This locks the CM again */
-> -       writel(0, sys_lock);
-> -}
-> -
->  static const struct icst_params realview_oscvco_params = {
->         .ref            = 24000000,
->         .vco_max        = ICST307_VCO_MAX,
-> @@ -65,10 +33,16 @@ static const struct icst_params realview_oscvco_params = {
->         .idx2s          = icst307_idx2s,
+>  void impd1_tweak_control(struct device *dev, u32 mask, u32 val)
+> @@ -344,10 +304,6 @@ static struct impd1_device impd1_devs[] = {
+>         }
 >  };
 >  
-> -static const struct clk_icst_desc __initdata realview_icst_desc = {
-> +static const struct clk_icst_desc __initdata realview_osc0_desc = {
->         .params = &realview_oscvco_params,
-> -       .getvco = realview_oscvco_get,
-> -       .setvco = realview_oscvco_set,
-> +       .vco_offset = REALVIEW_SYS_OSC0_OFFSET,
-> +       .lock_offset = REALVIEW_SYS_LOCK_OFFSET,
+> -static struct clk fixed_14745600 = {
+> -       .rate = 14745600,
+> -};
+> -
+>  static int impd1_probe(struct lm_device *dev)
+>  {
+>         struct impd1_module *impd1;
+> @@ -376,23 +332,7 @@ static int impd1_probe(struct lm_device *dev)
+>         printk("IM-PD1 found at 0x%08lx\n",
+>                 (unsigned long)dev->resource.start);
+>  
+> -       for (i = 0; i < ARRAY_SIZE(impd1->vcos); i++) {
+> -               impd1->vcos[i].ops = &impd1_clk_ops,
+> -               impd1->vcos[i].owner = THIS_MODULE,
+> -               impd1->vcos[i].params = &impd1_vco_params,
+> -               impd1->vcos[i].data = impd1;
+> -       }
+> -       impd1->vcos[0].vcoreg = impd1->base + IMPD1_OSC1;
+> -       impd1->vcos[1].vcoreg = impd1->base + IMPD1_OSC2;
+> -
+> -       impd1->clks[0] = clkdev_alloc(&impd1->vcos[0], NULL, "lm%x:01000",
+> -                                       dev->id);
+> -       impd1->clks[1] = clkdev_alloc(&fixed_14745600, NULL, "lm%x:00100",
+> -                                       dev->id);
+> -       impd1->clks[2] = clkdev_alloc(&fixed_14745600, NULL, "lm%x:00200",
+> -                                       dev->id);
+> -       for (i = 0; i < ARRAY_SIZE(impd1->clks); i++)
+> -               clkdev_add(impd1->clks[i]);
+> +       integrator_impd1_clk_init(impd1->base, dev->id);
+>  
+>         for (i = 0; i < ARRAY_SIZE(impd1_devs); i++) {
+>                 struct impd1_device *idev = impd1_devs + i;
+> @@ -431,12 +371,9 @@ static int impd1_remove_one(struct device *dev, void *data)
+>  static void impd1_remove(struct lm_device *dev)
+>  {
+>         struct impd1_module *impd1 = lm_get_drvdata(dev);
+> -       int i;
+>  
+>         device_for_each_child(&dev->dev, NULL, impd1_remove_one);
+> -
+> -       for (i = 0; i < ARRAY_SIZE(impd1->clks); i++)
+> -               clkdev_drop(impd1->clks[i]);
+> +       integrator_impd1_clk_exit(dev->id);
+>  
+>         lm_set_drvdata(dev, NULL);
+>  
+> diff --git a/drivers/clk/versatile/Makefile b/drivers/clk/versatile/Makefile
+> index c0a0f64..884e362 100644
+> --- a/drivers/clk/versatile/Makefile
+> +++ b/drivers/clk/versatile/Makefile
+> @@ -1,4 +1,5 @@
+>  # Makefile for Versatile-specific clocks
+>  obj-$(CONFIG_ICST)             += clk-icst.o
+>  obj-$(CONFIG_ARCH_INTEGRATOR)  += clk-integrator.o
+> +obj-$(CONFIG_INTEGRATOR_IMPD1) += clk-impd1.o
+>  obj-$(CONFIG_ARCH_REALVIEW)    += clk-realview.o
+> diff --git a/drivers/clk/versatile/clk-impd1.c b/drivers/clk/versatile/clk-impd1.c
+> new file mode 100644
+> index 0000000..369139a
+> --- /dev/null
+> +++ b/drivers/clk/versatile/clk-impd1.c
+> @@ -0,0 +1,97 @@
+> +/*
+> + * Clock driver for the ARM Integrator/IM-PD1 board
+> + * Copyright (C) 2012 Linus Walleij
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#include <linux/clk-provider.h>
+> +#include <linux/clk.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/platform_data/clk-integrator.h>
+> +
+> +#include <mach/impd1.h>
+> +
+> +#include "clk-icst.h"
+> +
+> +struct impd1_clk {
+> +       struct clk *vcoclk;
+> +       struct clk *uartclk;
+> +       struct clk_lookup *clks[3];
 > +};
 > +
-> +static const struct clk_icst_desc __initdata realview_osc4_desc = {
-> +       .params = &realview_oscvco_params,
-> +       .vco_offset = REALVIEW_SYS_OSC4_OFFSET,
-> +       .lock_offset = REALVIEW_SYS_LOCK_OFFSET,
->  };
->  
->  /*
-> @@ -78,13 +52,6 @@ void __init realview_clk_init(void __iomem *sysbase, bool is_pb1176)
->  {
->         struct clk *clk;
->  
-> -       sys_lock = sysbase + REALVIEW_SYS_LOCK_OFFSET;
-> -       if (is_pb1176)
-> -               sys_vcoreg = sysbase + REALVIEW_SYS_OSC0_OFFSET;
-> -       else
-> -               sys_vcoreg = sysbase + REALVIEW_SYS_OSC4_OFFSET;
-> -
-> -
->         /* APB clock dummy */
->         clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT, 0);
->         clk_register_clkdev(clk, "apb_pclk", NULL);
-> @@ -116,7 +83,11 @@ void __init realview_clk_init(void __iomem *sysbase, bool is_pb1176)
->         clk_register_clkdev(clk, NULL, "sp804");
->  
->         /* ICST VCO clock */
-> -       clk = icst_clk_register(NULL, &realview_icst_desc);
-> +       if (is_pb1176)
-> +               clk = icst_clk_register(NULL, &realview_osc0_desc, sysbase);
-> +       else
-> +               clk = icst_clk_register(NULL, &realview_osc4_desc, sysbase);
+> +static struct impd1_clk impd1_clks[4];
 > +
->         clk_register_clkdev(clk, NULL, "dev:clcd");
->         clk_register_clkdev(clk, NULL, "issp:clcd");
->  }
+> +/*
+> + * There are two VCO's on the IM-PD1 but only one is used by the
+> + * kernel, that is why we are only implementing the control of
+> + * IMPD1_OSC1 here.
+> + */
+> +
+> +static const struct icst_params impd1_vco_params = {
+> +       .ref            = 24000000,     /* 24 MHz */
+> +       .vco_max        = ICST525_VCO_MAX_3V,
+> +       .vco_min        = ICST525_VCO_MIN,
+> +       .vd_min         = 12,
+> +       .vd_max         = 519,
+> +       .rd_min         = 3,
+> +       .rd_max         = 120,
+> +       .s2div          = icst525_s2div,
+> +       .idx2s          = icst525_idx2s,
+> +};
+> +
+> +static const struct clk_icst_desc impd1_icst1_desc = {
+> +       .params = &impd1_vco_params,
+> +       .vco_offset = IMPD1_OSC1,
+> +       .lock_offset = IMPD1_LOCK,
+> +};
+> +
+> +/**
+> + * integrator_impd1_clk_init() - set up the integrator clock tree
+> + * @base: base address of the logic module (LM)
+> + * @id: the ID of this LM
+> + */
+> +void integrator_impd1_clk_init(void __iomem *base, unsigned int id)
+> +{
+> +       struct impd1_clk *imc;
+> +       struct clk *clk;
+> +       int i;
+> +
+> +       if (id > 3) {
+> +               pr_crit("no more than 4 LMs can be attached\n");
+> +               return;
+> +       }
+> +       imc = &impd1_clks[id];
+> +
+> +       clk = icst_clk_register(NULL, &impd1_icst1_desc, base);
+> +       imc->vcoclk = clk;
+> +       imc->clks[0] = clkdev_alloc(clk, NULL, "lm%x:01000", id);
+> +
+> +       /* UART reference clock */
+> +       clk = clk_register_fixed_rate(NULL, "uartclk", NULL, CLK_IS_ROOT,
+> +                               14745600);
+> +       imc->uartclk = clk;
+> +       imc->clks[1] = clkdev_alloc(clk, NULL, "lm%x:00100", id);
+> +       imc->clks[2] = clkdev_alloc(clk, NULL, "lm%x:00200", id);
+> +
+> +       for (i = 0; i < ARRAY_SIZE(imc->clks); i++)
+> +               clkdev_add(imc->clks[i]);
+> +}
+> +
+> +void integrator_impd1_clk_exit(unsigned int id)
+> +{
+> +       int i;
+> +       struct impd1_clk *imc;
+> +
+> +       if (id > 3)
+> +               return;
+> +       imc = &impd1_clks[id];
+> +
+> +       for (i = 0; i < ARRAY_SIZE(imc->clks); i++)
+> +               clkdev_drop(imc->clks[i]);
+> +       clk_unregister(imc->uartclk);
+> +       clk_unregister(imc->vcoclk);
+> +}
+> diff --git a/include/linux/platform_data/clk-integrator.h b/include/linux/platform_data/clk-integrator.h
+> index 83fe9c2..280edac 100644
+> --- a/include/linux/platform_data/clk-integrator.h
+> +++ b/include/linux/platform_data/clk-integrator.h
+> @@ -1 +1,3 @@
+>  void integrator_clk_init(bool is_cp);
+> +void integrator_impd1_clk_init(void __iomem *base, unsigned int id);
+> +void integrator_impd1_clk_exit(unsigned int id);
 > -- 
 > 1.7.11.7
