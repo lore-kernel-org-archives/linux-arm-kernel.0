@@ -1,42 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Nov 2012 13:40:57 +0100
-Subject: [PATCH 15/16] irqchip: vic: mark vic_of_init() as static
-In-Reply-To: <1353448867-15008-16-git-send-email-thomas.petazzoni@free-electrons.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 21 Nov 2012 13:47:25 +0100
+Subject: [PATCH 16/16] ARM: plat-versatile: move FPGA irq driver to
+ drivers/irqchip
+In-Reply-To: <CACRpkdai62ox=fJ31viCOVfNc1skEEr+7356PEf0y1j6jzDrdw@mail.gmail.com>
 References: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1353448867-15008-16-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CACRpkdazuvjXuuNP9TrsYsPQWMc=VV_-nu0oNWFPs+GzLmmw2g@mail.gmail.com>
+ <1353448867-15008-17-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CACRpkdai62ox=fJ31viCOVfNc1skEEr+7356PEf0y1j6jzDrdw@mail.gmail.com>
+Message-ID: <20121121134725.69b4e8e8@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 11:01 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
+Linus,
 
-> With all vic_of_init() users converted to the irqchip infrastructure,
-> there is no longer a reason for this function to be
-> exported. Therefore, mark it as static.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Wed, 21 Nov 2012 13:22:27 +0100, Linus Walleij wrote:
 
-It may be that I have missed some patches, but are really all VIC
-users converted in this patch series?
+> > This moves the Versatile FPGA interrupt controller driver, used in
+> > the Integrator/AP, Integrator/CP and some Versatile boards, out
+> > of arch/arm/plat-versatile and down to drivers/irqchip where we
+> > have consensus that such drivers belong. The header file is
+> > consequently moved to <linux/platform_data/irq-versatile-fpga.h>.
+> >
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> It appears you have modified my commit so this is not the
+> whole story right?
+> 
+> This doesn't look like I wrote it:
+> +IRQCHIP_DECLARE(versatile_fpga_irq, "arm,versatile-fpga-irq",
+> +               fpga_irq_of_init);
+> +
 
-In arch/arm/mach-u300/core.c I have this:
-        vic_init((void __iomem *) U300_INTCON0_VBASE, IRQ_U300_INTCON0_START,
-                 mask[0], mask[0]);
-        vic_init((void __iomem *) U300_INTCON1_VBASE, IRQ_U300_INTCON1_START,
-                 mask[1], mask[1]);
+Right, sorry. As I said earlier, this v4 is not intended for merging,
+but only to show the current state, and define together what remains to
+be fixed/changed.
 
-arch/arm/mach-nomadik/cpu-8815.c:
+> Is it possible to do your changes on top of my commit
+> instead?
 
-        /* This modified VIC cell has two register blocks, at 0 and 0x20 */
-        vic_init(io_p2v(NOMADIK_IC_BASE + 0x00), IRQ_VIC_START +  0, ~0, 0);
-        vic_init(io_p2v(NOMADIK_IC_BASE + 0x20), IRQ_VIC_START + 32, ~0, 0);
+Not if we want to keep bisectability.
 
-And there are more still I think? I didn't see those converted so
-I guess I must have missed some patches or something?
+> Atleast add your Signed-off-by please...
 
-PS please make sure u300_defconfig and nhk8815_defconfig builds, or
-I will be a sad puppy ...
+Will do, thanks for the notice.
 
-Yours,
-Linus Walleij
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
