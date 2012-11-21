@@ -1,39 +1,35 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 21 Nov 2012 15:17:12 +0000
-Subject: [PATCH 1/1 v2] of_spi: add generic binding support to specify cs
- gpio
-In-Reply-To: <1353007197-31491-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20121115165048.543FE3E194B@localhost>
- <1353007197-31491-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20121121151713.1F8873E0A47@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 21 Nov 2012 15:17:20 +0000
+Subject: [PATCH V6 5/5] arm: mvebu: Add SMP support for Armada XP
+In-Reply-To: <1353509970-5237-6-git-send-email-gregory.clement@free-electrons.com>
+References: <1353509970-5237-1-git-send-email-gregory.clement@free-electrons.com>
+ <1353509970-5237-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20121121151720.GP11990@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Nov 2012 20:19:57 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> This will allow to use gpio for chip select with no modification in the
-> driver binding
+On Wed, Nov 21, 2012 at 02:59:30PM +0000, Gregory CLEMENT wrote:
+> This enables SMP support on the Armada XP processor. It adds the
+> mandatory functions to support SMP such as: the SMP initialization
+> functions in platsmp.c, the secondary CPU entry point in headsmp.S and
+> the CPU hotplug initial support in hotplug.c.
 > 
-> When use the cs-gpios, the gpio number will be passed via the cs_gpio field
-> and the number of chip select will automatically increased with max(hw cs, gpio cs).
-> 
-> So if for example the controller has 2 CS lines, and the cs-gpios
-> property looks like this:
-> 
-> cs-gpios = <&gpio1 0 0> <0> <&gpio1 1 0> <&gpio1 2 0>;
-> 
-> Then it should be configured so that num_chipselect = 4 with the
-> following mapping:
-> 
-> cs0 : &gpio1 0 0
-> cs1 : native
-> cs2 : &gpio1 1 0
-> cs3 : &gpio1 2 0
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: spi-devel-general at lists.sourceforge.net
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/configs/mvebu_defconfig    |    3 +
+>  arch/arm/mach-mvebu/Kconfig         |    1 +
+>  arch/arm/mach-mvebu/Makefile        |    2 +
+>  arch/arm/mach-mvebu/armada-370-xp.c |    3 +
+>  arch/arm/mach-mvebu/common.h        |    3 +
+>  arch/arm/mach-mvebu/headsmp.S       |   49 ++++++++++++++
+>  arch/arm/mach-mvebu/hotplug.c       |   30 +++++++++
+>  arch/arm/mach-mvebu/platsmp.c       |  122 +++++++++++++++++++++++++++++++++++
+>  8 files changed, 213 insertions(+)
+>  create mode 100644 arch/arm/mach-mvebu/headsmp.S
+>  create mode 100644 arch/arm/mach-mvebu/hotplug.c
+>  create mode 100644 arch/arm/mach-mvebu/platsmp.c
 
-Applied, thanks.
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-g.
+Will
