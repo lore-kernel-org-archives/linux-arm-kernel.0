@@ -1,62 +1,92 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 21 Nov 2012 08:54:25 -0800
-Subject: [PATCH v2] ARM: exynos: add UART3 to DEBUG_LL ports
-In-Reply-To: <1353451739-6317-1-git-send-email-dianders@chromium.org>
-References: <1353451739-6317-1-git-send-email-dianders@chromium.org>
-Message-ID: <1353516865-2502-1-git-send-email-dianders@chromium.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 21 Nov 2012 18:26:31 +0100
+Subject: [PATCH 1/4] OF: Add helper for matching against linux, stdout-path
+In-Reply-To: <1353513428-25697-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20121121155312.GX4398@game.jcrosoft.org>
+ <1353513428-25697-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20121121172631.GV10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Olof Johansson <olof@lixom.net>
+On Wed, Nov 21, 2012 at 04:57:05PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> From: Sascha Hauer <s.hauer@pengutronix.de>
+> 
+> devicetrees may have a linux,stdout-path or stdout-path property
+> in the chosen node describing the console device. This adds a helper
+> function to match a device against this property and retrieve the options
+> so a driver can call add_preferred_console for a matching device.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: linux-serial at vger.kernel.org
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: kernel at pengutronix.de
+> Cc: Alan Cox <alan@linux.intel.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  drivers/of/base.c  |   46 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of.h |    7 +++++++
+>  2 files changed, 53 insertions(+)
+> 
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index f2f63c8..72c49ce 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -1470,3 +1470,49 @@ const char *of_prop_next_string(struct property *prop, const char *cur)
+>  	return curv;
+>  }
+>  EXPORT_SYMBOL_GPL(of_prop_next_string);
+> +
+> +/**
+> + * of_device_is_stdout_path - check if a device node matches the
+> + *			      linux,stdout-path property
+> + * @np:		Pointer to the given device_node
+> + * @option:	parsed option
+> + *
+> + * Check if this device node matches the linux,stdout-path property
+> + * in the chosen node. return true if yes, false otherwise.
+> + */
+> +int of_device_is_stdout_path(struct device_node *dn, char **option)
+> +{
+> +	const char *name;
+> +	struct device_node *dn_stdout;
+> +	bool is_stdout = 0;
+> +	const char *tmp;
+> +	const char *tmp_option;
+> +
+> +	name = of_get_property(of_chosen, "linux,stdout-path", NULL);
+> +	if (name == NULL)
+> +		name = of_get_property(of_chosen, "stdout-path", NULL);
+> +
+> +	if (name == NULL)
+> +		return 0;
+> +
+> +	tmp_option = strchr(name, ':');
+> +
+> +	tmp = kstrndup(name, strlen(name) - strlen(tmp_option), GFP_KERNEL);
 
-Add support for using UART3 for DEBUG_LL on exynos.
+tmp_option may be NULL.
 
-[dianders: added depend on ARCH_EXYNOS.]
+> +	if (!tmp)
+> +		return 0;
+> +
+> +	dn_stdout = of_find_node_by_path(tmp);
+> +
+> +	if (dn_stdout && dn_stdout == dn) {
+> +		is_stdout = 1;
+> +		tmp_option++;
+> +		*option = kstrdup(tmp_option, GFP_KERNEL);
+> +	}
+> +
+> +	of_node_put(dn_stdout);
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
-Signed-off-by: Doug Anderson <dianders@chromium.org>
+dn_stdout may be NULL aswell.
 
----
-Changes in v2:
-- Matched Olof's commit message.
-- Added ARCH_EXYNOS to depend list.
+Sascha
 
- arch/arm/Kconfig.debug        |   11 +++++++++++
- arch/arm/plat-samsung/Kconfig |    1 +
- 2 files changed, 12 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 33a8930..f54f170 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -355,6 +355,17 @@ choice
- 		  The uncompressor code port configuration is now handled
- 		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
- 
-+	config DEBUG_S3C_UART3
-+		depends on PLAT_SAMSUNG && ARCH_EXYNOS
-+		bool "Use S3C UART 3 for low-level debug"
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to UART 3. The port must have been initialised
-+		  by the boot-loader before use.
-+
-+		  The uncompressor code port configuration is now handled
-+		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
-+
- 	config DEBUG_SOCFPGA_UART
- 		depends on ARCH_SOCFPGA
- 		bool "Use SOCFPGA UART for low-level debug"
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 59401e1..d342ed0 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -502,5 +502,6 @@ config DEBUG_S3C_UART
- 	default "0" if DEBUG_S3C_UART0
- 	default "1" if DEBUG_S3C_UART1
- 	default "2" if DEBUG_S3C_UART2
-+	default "3" if DEBUG_S3C_UART3
- 
- endif
 -- 
-1.7.7.3
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
