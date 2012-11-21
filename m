@@ -1,330 +1,108 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Nov 2012 17:00:16 +0100
-Subject: [PATCH V7 5/5] arm: mvebu: Add SMP support for Armada XP
-In-Reply-To: <1353513616-10139-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1353513616-10139-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1353513616-10139-6-git-send-email-gregory.clement@free-electrons.com>
+From: matthieu.castet@parrot.com (Matthieu CASTET)
+Date: Wed, 21 Nov 2012 17:06:26 +0100
+Subject: [PATCH 6/9] usb: chipidea: add PTW and PTS handling
+In-Reply-To: <20121121155723.GA16409@pengutronix.de>
+References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352909950-32555-7-git-send-email-m.grzeschik@pengutronix.de>
+ <87zk2h67ik.fsf@ashishki-desk.ger.corp.intel.com>
+ <20121116131628.GA21447@pengutronix.de>
+ <87lie1659c.fsf@ashishki-desk.ger.corp.intel.com>
+ <20121116135743.GB21447@pengutronix.de>
+ <87ip9563r8.fsf@ashishki-desk.ger.corp.intel.com>
+ <50A651E1.5030001@parrot.com>
+ <87fw495zgh.fsf@ashishki-desk.ger.corp.intel.com>
+ <20121121155723.GA16409@pengutronix.de>
+Message-ID: <50ACFC02.9010805@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables SMP support on the Armada XP processor. It adds the
-mandatory functions to support SMP such as: the SMP initialization
-functions in platsmp.c, the secondary CPU entry point in headsmp.S and
-the CPU hotplug initial support in hotplug.c.
+Michael Grzeschik a ?crit :
+> On Fri, Nov 16, 2012 at 05:39:42PM +0200, Alexander Shishkin wrote:
+>> Matthieu CASTET <matthieu.castet@parrot.com> writes:
+>>
+>>> Alexander Shishkin a ?crit :
+>>>> Michael Grzeschik <mgr@pengutronix.de> writes:
+>>>>
+>>>>> On Fri, Nov 16, 2012 at 03:34:23PM +0200, Alexander Shishkin wrote:
+>>>>>> Michael Grzeschik <mgr@pengutronix.de> writes:
+>>>>>>
+>>>>>>> On Fri, Nov 16, 2012 at 02:45:39PM +0200, Alexander Shishkin wrote:
+>>>>>>>> Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
+>>>>>>>>
+>>>>>>>>> This patch makes it possible to configure the PTW and PTS bits inside
+>>>>>>>>> the portsc register for host and device mode before the driver starts
+>>>>>>>>> and the phy can be addressed as hardware implementation is designed.
+>>>>>>>>>
+>>>>>>>>> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+>>>>>>>>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+>>>>>>>>> ---
+>>>>>>>>>  drivers/usb/chipidea/bits.h        |    3 +++
+>>>>>>>>>  drivers/usb/chipidea/ci.h          |    2 ++
+>>>>>>>>>  drivers/usb/chipidea/ci13xxx_imx.c |    1 +
+>>>>>>>>>  drivers/usb/chipidea/core.c        |   47 ++++++++++++++++++++++++++++++++++++
+>>>>>>>>>  drivers/usb/chipidea/host.c        |    4 +++
+>>>>>>>>>  include/linux/usb/chipidea.h       |    9 +++++++
+>>>>>>>>>  6 files changed, 66 insertions(+)
+>>>>>>>>>
+>>>>>>>>> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
+>>>>>>>>> index 4b6ae3e..3cded5f 100644
+>>>>>>>>> --- a/drivers/usb/chipidea/bits.h
+>>>>>>>>> +++ b/drivers/usb/chipidea/bits.h
+>>>>>>>>> @@ -48,6 +48,9 @@
+>>>>>>>>>  #define PORTSC_SUSP           BIT(7)
+>>>>>>>>>  #define PORTSC_HSP            BIT(9)
+>>>>>>>>>  #define PORTSC_PTC            (0x0FUL << 16)
+>>>>>>>>> +#define PORTSC_PTS            (BIT(31) | BIT(30))
+>>>>>>>>> +#define PORTSC_PTW            BIT(28)
+>>>>>>>>> +#define PORTSC_STS            BIT(29)
+>>>>>>>> Hm, my spec says these are actually in DEVLC register and only have this
+>>>>>>>> meaning in device mode. And in portsc these bits fall in device address
+>>>>>>>> bitfield. Can you refer me to your spec?
+>>>>>>> You can find it here:
+>>>>>>> http://cache.freescale.com/files/32bit/doc/ref_manual/iMX53RM.pdf?fpsp=1
+>>>>>>> Page 4947
+>>>>>> Oh, but see, the offset is 0x184, which in chipidea spec (the version
+>>>>>> that I have) corresponds to DEVLC and not PORTSC. So in this driver's
+>>>>>> terminology it's DEVLC too, at least currently.
+>>>>>>
+>>>>>> So have you tested this code and did it make any difference?
+>>>>> Yes, i have tested this code with MX25, MX28, MX35 and MX53. In every
+>>>>> SoCs Datasheet the PORTSC register is defined on PORTBASE+0x184. Without
+>>>>> this proper configuration its not possible to communicate with the PHY.
+>>>> No, I mean, you're writing DEVLC (using present driver's terminology)
+>>>> bits to PORTSC register. It *shouldn't* work. I suppose, it does
+>>>> something, but not exactly what you intended.
+>>>>
+>>> I confirm in our datasheet we have PTW, PTS, STS in this register  PORTSCx with
+>>> this mapping.
+>>>
+>>> In later design that support lpm, these bits have to move in another register
+>>> because ehci 1.1 use them [1].
+>> Ahh, I didn't realize imxes were nolpm. Now it makes more sense. This
+>> means that, as you suggested in the other mail, these portsc/devlc
+>> accesses should be done conditionally based on ci->hw_bank.lpm.
+> 
+> To handle lpm devices in this patch, we need some register layout of the
+> lpm core. Probably only te DEVLC register. Is there some documentation
+> available?
 
-Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/configs/mvebu_defconfig    |    3 +
- arch/arm/mach-mvebu/Kconfig         |    1 +
- arch/arm/mach-mvebu/Makefile        |    2 +
- arch/arm/mach-mvebu/armada-370-xp.c |    3 +
- arch/arm/mach-mvebu/common.h        |    3 +
- arch/arm/mach-mvebu/headsmp.S       |   49 ++++++++++++++
- arch/arm/mach-mvebu/hotplug.c       |   30 +++++++++
- arch/arm/mach-mvebu/platsmp.c       |  122 +++++++++++++++++++++++++++++++++++
- 8 files changed, 213 insertions(+)
- create mode 100644 arch/arm/mach-mvebu/headsmp.S
- create mode 100644 arch/arm/mach-mvebu/hotplug.c
- create mode 100644 arch/arm/mach-mvebu/platsmp.c
+In include/linux/usb/langwell_udc.h before it was removed, you could find the
+mapping :
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 3458752..da598d3 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -12,6 +12,9 @@ CONFIG_ARCH_MVEBU=y
- CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_XP=y
- # CONFIG_CACHE_L2X0 is not set
-+# CONFIG_SWP_EMULATE is not set
-+CONFIG_SMP=y
-+# CONFIG_LOCAL_TIMERS is not set
- CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
- # CONFIG_COMPACTION is not set
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index f4c3bf8..c934e1d 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -21,6 +21,7 @@ menu "Marvell SOC with device tree"
- config MACH_ARMADA_370_XP
- 	bool
- 	select ARMADA_370_XP_TIMER
-+	select HAVE_SMP
- 	select CPU_PJ4B
- 
- config MACH_ARMADA_370
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 2e3ec11..5dcb369 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -3,3 +3,5 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
- 
- obj-y += system-controller.o
- obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o coherency.o coherency_ll.o pmsu.o
-+obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
-+obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index 3292d6d..472e70f 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -23,6 +23,7 @@
- #include <asm/mach/time.h>
- #include "armada-370-xp.h"
- #include "common.h"
-+#include "coherency.h"
- 
- static struct map_desc armada_370_xp_io_desc[] __initdata = {
- 	{
-@@ -51,6 +52,7 @@ struct sys_timer armada_370_xp_timer = {
- static void __init armada_370_xp_dt_init(void)
- {
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	coherency_init();
- }
- 
- static const char * const armada_370_xp_dt_board_dt_compat[] = {
-@@ -60,6 +62,7 @@ static const char * const armada_370_xp_dt_board_dt_compat[] = {
- };
- 
- DT_MACHINE_START(ARMADA_XP_DT, "Marvell Aramada 370/XP (Device Tree)")
-+	.smp		= smp_ops(armada_xp_smp_ops),
- 	.init_machine	= armada_370_xp_dt_init,
- 	.map_io		= armada_370_xp_map_io,
- 	.init_irq	= armada_370_xp_init_irq,
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index 9285d04..aa27bc2 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -20,6 +20,9 @@ void mvebu_restart(char mode, const char *cmd);
- void armada_370_xp_init_irq(void);
- void armada_370_xp_handle_irq(struct pt_regs *regs);
- 
-+void armada_xp_cpu_die(unsigned int cpu);
- int armada_370_xp_coherency_init(void);
- int armada_370_xp_pmsu_init(void);
-+void armada_xp_secondary_startup(void);
-+extern struct smp_operations armada_xp_smp_ops;
- #endif
-diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
-new file mode 100644
-index 0000000..a06e0ed
---- /dev/null
-+++ b/arch/arm/mach-mvebu/headsmp.S
-@@ -0,0 +1,49 @@
-+/*
-+ * SMP support: Entry point for secondary CPUs
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Yehuda Yitschak <yehuday@marvell.com>
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * This file implements the assembly entry point for secondary CPUs in
-+ * an SMP kernel. The only thing we need to do is to add the CPU to
-+ * the coherency fabric by writing to 2 registers. Currently the base
-+ * register addresses are hard coded due to the early initialisation
-+ * problems.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+
-+/*
-+ * At this stage the secondary CPUs don't have acces yet to the MMU, so
-+ * we have to provide physical addresses
-+ */
-+#define ARMADA_XP_CFB_BASE	     0xD0020200
-+
-+	__CPUINIT
-+
-+/*
-+ * Armada XP specific entry point for secondary CPUs.
-+ * We add the CPU to the coherency fabric and then jump to secondary
-+ * startup
-+ */
-+ENTRY(armada_xp_secondary_startup)
-+
-+	/* Read CPU id */
-+	mrc     p15, 0, r1, c0, c0, 5
-+	and     r1, r1, #0xF
-+
-+	/* Add CPU to coherency fabric */
-+	ldr     r0, =ARMADA_XP_CFB_BASE
-+
-+	bl	ll_set_cpu_coherent
-+	b	secondary_startup
-+
-+ENDPROC(armada_xp_secondary_startup)
-diff --git a/arch/arm/mach-mvebu/hotplug.c b/arch/arm/mach-mvebu/hotplug.c
-new file mode 100644
-index 0000000..b228b6a
---- /dev/null
-+++ b/arch/arm/mach-mvebu/hotplug.c
-@@ -0,0 +1,30 @@
-+/*
-+ * Symmetric Multi Processing (SMP) support for Armada XP
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Lior Amsalem <alior@marvell.com>
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/smp.h>
-+#include <asm/proc-fns.h>
-+
-+/*
-+ * platform-specific code to shutdown a CPU
-+ *
-+ * Called with IRQs disabled
-+ */
-+void __ref armada_xp_cpu_die(unsigned int cpu)
-+{
-+	cpu_do_idle();
-+
-+	/* We should never return from idle */
-+	panic("mvebu: cpu %d unexpectedly exit from shutdown\n", cpu);
-+}
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-new file mode 100644
-index 0000000..fe16aaf
---- /dev/null
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -0,0 +1,122 @@
-+/*
-+ * Symmetric Multi Processing (SMP) support for Armada XP
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Lior Amsalem <alior@marvell.com>
-+ * Yehuda Yitschak <yehuday@marvell.com>
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * The Armada XP SoC has 4 ARMv7 PJ4B CPUs running in full HW coherency
-+ * This file implements the routines for preparing the SMP infrastructure
-+ * and waking up the secondary CPUs
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/smp.h>
-+#include <linux/clk.h>
-+#include <linux/of.h>
-+#include <asm/cacheflush.h>
-+#include <asm/smp_plat.h>
-+#include "common.h"
-+#include "armada-370-xp.h"
-+#include "pmsu.h"
-+#include "coherency.h"
-+
-+void __init set_secondary_cpus_clock(void)
-+{
-+	int thiscpu;
-+	unsigned long rate;
-+	struct clk *cpu_clk = NULL;
-+	struct device_node *np = NULL;
-+
-+	thiscpu = smp_processor_id();
-+	for_each_node_by_type(np, "cpu") {
-+		int err;
-+		int cpu;
-+
-+		err = of_property_read_u32(np, "reg", &cpu);
-+		if (WARN_ON(err))
-+			return;
-+
-+		if (cpu == thiscpu) {
-+			cpu_clk = of_clk_get(np, 0);
-+			break;
-+		}
-+	}
-+	if (WARN_ON(IS_ERR(cpu_clk)))
-+		return;
-+	clk_prepare_enable(cpu_clk);
-+	rate = clk_get_rate(cpu_clk);
-+
-+	/* set all the other CPU clk to the same rate than the boot CPU */
-+	for_each_node_by_type(np, "cpu") {
-+		int err;
-+		int cpu;
-+
-+		err = of_property_read_u32(np, "reg", &cpu);
-+		if (WARN_ON(err))
-+			return;
-+
-+		if (cpu != thiscpu) {
-+			cpu_clk = of_clk_get(np, 0);
-+			clk_set_rate(cpu_clk, rate);
-+		}
-+	}
-+}
-+
-+static void __cpuinit armada_xp_secondary_init(unsigned int cpu)
-+{
-+	armada_xp_mpic_smp_cpu_init();
-+}
-+
-+static int __cpuinit armada_xp_boot_secondary(unsigned int cpu,
-+					      struct task_struct *idle)
-+{
-+	pr_info("Booting CPU %d\n", cpu);
-+
-+	armada_xp_boot_cpu(cpu, armada_xp_secondary_startup);
-+
-+	return 0;
-+}
-+
-+static void __init armada_xp_smp_init_cpus(void)
-+{
-+	unsigned int i, ncores;
-+	ncores = coherency_get_cpu_count();
-+
-+	/* Limit possible CPUs to defconfig */
-+	if (ncores > nr_cpu_ids) {
-+		pr_warn("SMP: %d CPUs physically present. Only %d configured.",
-+			ncores, nr_cpu_ids);
-+		pr_warn("Clipping CPU count to %d\n", nr_cpu_ids);
-+		ncores = nr_cpu_ids;
-+	}
-+
-+	for (i = 0; i < ncores; i++)
-+		set_cpu_possible(i, true);
-+
-+	set_smp_cross_call(armada_mpic_send_doorbell);
-+}
-+
-+void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	set_secondary_cpus_clock();
-+	flush_cache_all();
-+	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
-+}
-+
-+struct smp_operations armada_xp_smp_ops __initdata = {
-+	.smp_init_cpus		= armada_xp_smp_init_cpus,
-+	.smp_prepare_cpus	= armada_xp_smp_prepare_cpus,
-+	.smp_secondary_init	= armada_xp_secondary_init,
-+	.smp_boot_secondary	= armada_xp_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= armada_xp_cpu_die,
-+#endif
-+};
--- 
-1.7.9.5
+    u32 devlc;      /* control LPM and each USB port behavior */
+/* bits 31:29, parallel transceiver select */
+#define LPM_PTS(d)  (((d)>>29)&7)
+#define LPM_STS     BIT(28) /* serial transceiver select */
+#define LPM_PTW     BIT(27) /* parallel transceiver width */
+#define LPM_PSPD(d) (((d)>>25)&3)   /* bits 26:25, port speed */
+#define LPM_PSPD_MASK   (BIT(26) | BIT(25))
+#define LPM_SPEED_FULL  0
+#define LPM_SPEED_LOW   1
+#define LPM_SPEED_HIGH  2
+#define LPM_SRT     BIT(24) /* shorten reset time */
+#define LPM_PFSC    BIT(23) /* port force full speed connect */
+#define LPM_PHCD    BIT(22) /* PHY low power suspend clock disable */
+#define LPM_STL     BIT(16) /* STALL reply to LPM token */
+#define LPM_BA(d)   \
+    (((d)>>1)&0x7ff)    /* bits 11:1, BmAttributes */
+#define LPM_NYT_ACK BIT(0)  /* NYET/ACK reply to LPM token */
