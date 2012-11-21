@@ -1,42 +1,68 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 21 Nov 2012 13:29:56 -0700
-Subject: [PATCH] ARM: Kirkwood: Add SPI_CHPA and SPI_CPOL support to
- spi-orion
-In-Reply-To: <20121121193552.GE15800@titan.lakedaemon.net>
-References: <20121121192335.GA14868@obsidianresearch.com>
- <20121121193552.GE15800@titan.lakedaemon.net>
-Message-ID: <20121121202956.GA15020@obsidianresearch.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 21 Nov 2012 21:47:42 +0100
+Subject: [PATCH] cpufreq: exynos: Broadcast frequency change notifications
+ for all cores
+In-Reply-To: <1758658.Qt0SyRnJmS@amdc1227>
+References: <1887364.fvxYYNb7Mm@amdc1227> <1758658.Qt0SyRnJmS@amdc1227>
+Message-ID: <4440154.l7bQzsqNex@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 02:35:52PM -0500, Jason Cooper wrote:
-
-> >  	/* we support only mode 0, and no options */
-> > -	master->mode_bits = 0;
-> > +	master->mode_bits = SPI_CPHA | SPI_CPOL;
+On Wednesday, November 21, 2012 02:52:26 PM Tomasz Figa wrote:
+> On Tuesday 13 of November 2012 10:26:12 Tomasz Figa wrote:
+> > On Exynos SoCs all cores share the same frequency setting, so changing
+> > frequency of one core will affect rest of cores.
+> > 
+> > This patch modifies the exynos-cpufreq driver to inform cpufreq core
+> > about this behavior and broadcast frequency change notifications for all
+> > cores.
+> > 
+> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  drivers/cpufreq/exynos-cpufreq.c | 7 +++++--
+> >  1 file changed, 5 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/cpufreq/exynos-cpufreq.c
+> > b/drivers/cpufreq/exynos-cpufreq.c index af2d81e..c0d54a8 100644
+> > --- a/drivers/cpufreq/exynos-cpufreq.c
+> > +++ b/drivers/cpufreq/exynos-cpufreq.c
+> > @@ -100,7 +100,8 @@ static int exynos_target(struct cpufreq_policy
+> > *policy, }
+> >  	arm_volt = volt_table[index];
+> > 
+> > -	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> > +	for_each_cpu(freqs.cpu, policy->cpus)
+> > +		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> > 
+> >  	/* When the new frequency is higher than current frequency */
+> >  	if ((freqs.new > freqs.old) && !safe_arm_volt) {
+> > @@ -115,7 +116,8 @@ static int exynos_target(struct cpufreq_policy
+> > *policy, if (freqs.new != freqs.old)
+> >  		exynos_info->set_freq(old_index, index);
+> > 
+> > -	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> > +	for_each_cpu(freqs.cpu, policy->cpus)
+> > +		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> > 
+> >  	/* When the new frequency is lower than current frequency */
+> >  	if ((freqs.new < freqs.old) ||
+> > @@ -235,6 +237,7 @@ static int exynos_cpufreq_cpu_init(struct
+> > cpufreq_policy *policy) cpumask_copy(policy->related_cpus,
+> > cpu_possible_mask);
+> >  		cpumask_copy(policy->cpus, cpu_online_mask);
+> >  	} else {
+> > +		policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
+> >  		cpumask_setall(policy->cpus);
+> >  	}
 > 
-> The comment no longer seems valid.  ;-)  Also, you are unconditionally
-> enabling these modes.  Do all users of this driver support this?
+> Ping.
 
-Right on the comment.. Not sure about your second query?
+Am I supposed to handle this?
 
- * @mode_bits: flags understood by this controller driver
+Rafael
 
-The mode_bits need to be set so the mid layer will allow consumers to
-pass them down through spi->mode when it calls into
-orion_spi_setup_transfer. So that looks correct..
 
-Now, it seems a fair question what mode the driver will run in by
-default now.. Previously, the driver didn't change the CPOL and CPHA
-bits, so whatever the boot firmware left them at will be the mode it
-uses.
-
-If SPI consumers are not properly requesting the proper CPOL/CPHA
-operation and instead relying on the boot firmware to leave the proper
-bit settings then things will break for those users (they will need to
-update their board's DT file, or otherwise) - but I don't see any way
-to address that and implement proper programmable support?
-
-This could affect at least dove, dreamplug, ts219 and lsxl.
-
-Jason
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
