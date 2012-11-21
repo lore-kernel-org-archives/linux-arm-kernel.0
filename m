@@ -1,105 +1,48 @@
 From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Wed, 21 Nov 2012 15:06:32 +0100
-Subject: [PATCH v3 6/7] usb: chipidea: usbmisc: add mx53 support
+Date: Wed, 21 Nov 2012 15:06:29 +0100
+Subject: [PATCH v3 3/7] usb: chipidea: usbmisc: fix a potential race condition
 In-Reply-To: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
 References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1353506793-8354-7-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <1353506793-8354-4-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds mx53 as the next user of the usbmisc driver and makes it
-possible to disable the overcurrent-detection of the internal phy.
+From: Marc Kleine-Budde <mkl@pengutronix.de>
 
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+This fixes a potential race condition where the ci13xxx_imx glue code
+could be fast enough to call one of the usbmisc_ops before he got a
+valid value on the static usbmisc pointer. To fix that we first set
+usbmisc, then call usbmisc_set_ops().
+
 Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
 ---
-Changes since v2:
-* added defines for register offsets and bitmasks
-* fixed disable_oc option for all ports
+Changes since v1:
+* split previous patch into two seperate.
 
- drivers/usb/chipidea/usbmisc_imx.c |   51 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+ drivers/usb/chipidea/usbmisc_imx.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-index e090e0f..b1811df 100644
+index 552c63f..9145e04 100644
 --- a/drivers/usb/chipidea/usbmisc_imx.c
 +++ b/drivers/usb/chipidea/usbmisc_imx.c
-@@ -19,6 +19,13 @@
+@@ -116,14 +116,14 @@ static int __devinit usbmisc_imx_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
  
- #define USB_DEV_MAX 4
++	usbmisc = data;
+ 	ret = usbmisc_set_ops(&imx6q_usbmisc_ops);
+ 	if (ret) {
++		usbmisc = NULL;
+ 		clk_disable_unprepare(data->clk);
+ 		return ret;
+ 	}
  
-+#define MX53_USB_OTG_PHY_CTRL_0_OFFSET	0x08;
-+#define MX53_USB_UH2_CTRL_OFFSET	0x14;
-+#define MX53_USB_UH3_CTRL_OFFSET	0x18;
-+#define MX53_BM_OVER_CUR_DIS_H1		BIT(5)
-+#define MX53_BM_OVER_CUR_DIS_OTG	BIT(8)
-+#define MX53_BM_OVER_CUR_DIS_UHx	BIT(30)
-+
- #define MX6_BM_OVER_CUR_DIS		BIT(7)
- 
- struct imx_usbmisc {
-@@ -54,6 +61,45 @@ static struct usbmisc_usb_device *get_usbdev(struct device *dev)
- 	return &usbmisc->usbdev[i];
- }
- 
-+static int usbmisc_imx53_init(struct device *dev)
-+{
-+	struct usbmisc_usb_device *usbdev;
-+	void __iomem *reg;
-+	unsigned long flags;
-+	u32 val;
-+
-+	usbdev = get_usbdev(dev);
-+	if (IS_ERR(usbdev))
-+		return PTR_ERR(usbdev);
-+
-+	if (usbdev->disable_oc) {
-+		spin_lock_irqsave(&usbmisc->lock, flags);
-+		switch (usbdev->index) {
-+		case 0:
-+			reg = usbmisc->base + MX53_USB_OTG_PHY_CTRL_0_OFFSET;
-+			val = readl(reg) | MX53_BM_OVER_CUR_DIS_OTG;
-+			break;
-+		case 1:
-+			reg = usbmisc->base + MX53_USB_OTG_PHY_CTRL_0_OFFSET;
-+			val = readl(reg) | MX53_BM_OVER_CUR_DIS_H1;
-+			break;
-+		case 2:
-+			reg = usbmisc->base + MX53_USB_UH2_CTRL_OFFSET;
-+			val = readl(reg) | MX53_BM_OVER_CUR_DIS_UHx;
-+			break;
-+		case 3:
-+			reg = usbmisc->base + MX53_USB_UH3_CTRL_OFFSET;
-+			val = readl(reg) | MX53_BM_OVER_CUR_DIS_UHx;
-+			break;
-+		}
-+		if (reg && val)
-+			writel(val, reg);
-+		spin_unlock_irqrestore(&usbmisc->lock, flags);
-+	}
-+
-+	return 0;
-+}
-+
- static int usbmisc_imx6q_init(struct device *dev)
- {
- 
-@@ -76,11 +122,16 @@ static int usbmisc_imx6q_init(struct device *dev)
+-	usbmisc = data;
+-
  	return 0;
  }
  
-+static const struct usbmisc_ops imx53_usbmisc_ops = {
-+	.init = usbmisc_imx53_init,
-+};
-+
- static const struct usbmisc_ops imx6q_usbmisc_ops = {
- 	.init = usbmisc_imx6q_init,
- };
- 
- static const struct of_device_id usbmisc_imx_dt_ids[] = {
-+	{ .compatible = "fsl,imx53-usbmisc", .data = (void *)&imx53_usbmisc_ops },
- 	{ .compatible = "fsl,imx6q-usbmisc", .data = (void *)&imx6q_usbmisc_ops },
- 	{ /* sentinel */ }
- };
 -- 
 1.7.10.4
