@@ -1,72 +1,69 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 21 Nov 2012 16:44:04 +0000
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <20121121013133.GE4673@opensource.wolfsonmicro.com>
-References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
- <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
- <20121120215429.B621F3E1821@localhost>
- <20121121013133.GE4673@opensource.wolfsonmicro.com>
-Message-ID: <20121121164404.E04EF3E0AE2@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 21 Nov 2012 16:50:48 +0000
+Subject: [PATCH] mmc: mmci: Support non-power-of-two block sizes for
+ ux500v2 variant
+In-Reply-To: <CAFEEs1kzJUgsvnzgWwU4i7o1jkE=8iTq5+NJ_t1jdiHEm7b-RQ@mail.gmail.com>
+References: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121121153811.GN3290@n2100.arm.linux.org.uk>
+ <CAFEEs1kzJUgsvnzgWwU4i7o1jkE=8iTq5+NJ_t1jdiHEm7b-RQ@mail.gmail.com>
+Message-ID: <20121121165048.GO3290@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Nov 2012 10:31:34 +0900, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Nov 20, 2012 at 09:54:29PM +0000, Grant Likely wrote:
-> > On Sat, 17 Nov 2012 19:55:45 +0900, Alexandre Courbot <acourbot@nvidia.com> wrote:
-> 
-> > > With the advent of the device tree and of ARM kernels that are not
-> > > board-tied, we cannot rely on these board-specific hooks anymore but
-> 
-> > This isn't strictly true. It is still perfectly fine to have board
-> > specific code when necessary. However, there is strong encouragement to
-> > enable that code in device drivers as much as possible and new board
-> > files need to have very strong justification.
-> 
-> This isn't the message that's gone over, and even for device drivers
-> everyone seems to be taking the whole device tree thing as a move to
-> pull all data out of the kernel.  In some cases there are some real
-> practical advantages to doing this but a lot of the people making these
-> changes seem to view having things in DT as a goal in itself.
+On Wed, Nov 21, 2012 at 05:13:55PM +0100, Per Forlin wrote:
+> On Wed, Nov 21, 2012 at 4:38 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Oct 12, 2012 at 04:02:02PM +0200, Ulf Hansson wrote:
+> >>  /*
+> >> + * Validate mmc prerequisites
+> >> + */
+> >> +static int mmci_validate_data(struct mmci_host *host,
+> >> +                           struct mmc_data *data)
+> >> +{
+> >> +     if (!data)
+> >> +             return 0;
+> >> +
+> >> +     if (!host->variant->non_power_of_2_blksize &&
+> >> +         !is_power_of_2(data->blksz)) {
+> >> +             dev_err(mmc_dev(host->mmc),
+> >> +                     "unsupported block size (%d bytes)\n", data->blksz);
+> >> +             return -EINVAL;
+> >> +     }
+> >> +
+> >> +     if (data->sg->offset & 3) {
+> >> +             dev_err(mmc_dev(host->mmc),
+> >> +                     "unsupported alginment (0x%x)\n", data->sg->offset);
+> >> +             return -EINVAL;
+> >> +     }
+> >
+> > Why?  What's the reasoning behind this suddenly introduced restriction?
+> > readsl()/writesl() copes just fine with non-aligned pointers.  It may be
+> > that your DMA engine can not, but that's no business interfering with
+> > non-DMA transfers, and no reason to fail such transfers.
+> >
+> > If your DMA engine can't do that then its your DMA engine code which
+> > should refuse to prepare the transfer.
+> >
+> > Yes, that means problems with the way things are ordered - or it needs a
+> > proper API where DMA engine can export these kinds of properties.
+> The alignment constraint is related to PIO, sg_miter and that FIFO
+> access must be done with 4 bytes.
 
-I know, and I do apologize for my part in not communicating and
-shepherding enough. For anyone reading; please be pragmatic on putting
-things into the DT. If a binding starts to look really complex, ask
-whether or not it helps things.
+Total claptrap.  No it isn't.
 
-> > I'm thinking about the scripts as trivial-to-parse ascii strings that
-> > have a very simple set of commands. The commands use resources already
-> > defined in the node. ie. 'g0' refers to the first entry in the gpios
-> > property. 'r0' for the regulator, 'p0' for the pwms, 'd' means delay. By
-> > no means take this as the format to use, it is just an example off the
-> > top of my head, but it is already way easier to work with than putting
-> > each command into a node.
-> 
-> It does appear to have some legibility challenges, especially with using
-> the indexes into the arrays of resources.  On the other hand the arrays
-> should be fairly small.
+- sg_miter just deals with bytes, and number of bytes transferred; there
+  is no word assumptions in that code.  Indeed many ATA disks transfer
+  by half-word accesses so such a restriction would be insane.
 
-This is merely an example off the top of my head. I'm in no way wed to
-the syntax.
+- the FIFO access itself needs to be 32-bit words, so readsl or writesl
+  (or their io* equivalents must be used).
 
-> > > +Platform Data Format
-> > > +--------------------
-> > > +All relevant data structures for declaring power sequences are located in
-> > > +include/linux/power_seq.h.
-> 
-> > Hmm... If sequences are switched to a string instead, then platform_data
-> > should also use it. The power sequence data structures can be created at
-> > runtime by parsing the string.
-> 
-> Seems like a step backwards to me - why not let people store the more
-> parsed version of the data?  It's going to be less convenient for users
-> on non-DT systems.
-> 
-> As I said in my earlier reviews I think this is a useful thing to have
-> as a utility library for drivers independantly of the DT bindings, it
-> would allow drivers to become more data driven.  Perhaps we can rework
-> the series so that the DT bindings are added as a final patch?  All the
-> rest of the code seems OK.
+- but - and this is the killer item to your argument as I said above -
+  readsl and writesl _can_ take misaligned pointers and cope with them
+  fine.
 
-I'm fine with that if the bindings don't get merged yet.
+The actual alignment of the buffer address is totally irrelevant here.
 
-g.
+What isn't irrelevant is the _number_ of bytes to be transferred, but
+that's something totally different and completely unrelated from
+data->sg->offset.
