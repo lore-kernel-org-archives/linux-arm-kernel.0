@@ -1,57 +1,90 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Nov 2012 09:28:12 +0100
-Subject: [PATCH V3 10/11] ARM: remove struct sys_timer suspend and resume
- fields
-In-Reply-To: <1353349867-28494-11-git-send-email-swarren@wwwdotorg.org>
-References: <1353349867-28494-1-git-send-email-swarren@wwwdotorg.org>
- <1353349867-28494-11-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CACRpkdb-cmwTH_7EJO02m2+CCZrJ2ycgtGpf8stoiFKSm8jqww@mail.gmail.com>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Wed, 21 Nov 2012 17:32:12 +0900
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <50AC8D3B.6040300@ti.com>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <4316169.5QXVzv7peZ@percival> <50AC8D3B.6040300@ti.com>
+Message-ID: <1699753.ZQsWMHINxd@percival>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oh and there was this comment/TODO:
+On Wednesday 21 November 2012 16:13:47 Tomi Valkeinen wrote:
+> * PGP Signed by an unknown key
+> 
+> On 2012-11-21 03:56, Alex Courbot wrote:
+> > Hi Tomi,
+> > 
+> > On Tuesday 20 November 2012 22:48:18 Tomi Valkeinen wrote:
+> >> I guess there's a reason, but the above looks a bit inconsistent. For
+> >> gpio you define the gpio resource inside the step. For power and pwm the
+> >> resource is defined before the steps. Why wouldn't "pwm = <&pwm 2
+> >> 5000000>;" work in step2?
+> > 
+> > That's mostly a framework issue. Most frameworks do not export a function
+> > that allow to dereference a phandle - they expect resources to be
+> > declared right under the device node and accessed by name through
+> > foo_get(device, name). So using phandles in power sequences would require
+> > to export these additional
+> Right, I expected something like that.
+> 
+> > functions and also opens the door to some inconsistencies - for instance,
+> > your PWM phandle could be referenced a second time in the sequence with a
+> > different period - how do you know that these are actually referring the
+> > same PWM device?
+> 
+> This I didn't understand. Doesn't "<&pwm 2 xyz>" point to a single
+> device, no matter where and how many times it's used?
+> 
+> >>> +When a power sequence is run, its steps is executed one after the other
+> >>> until +one step fails or the end of the sequence is reached.
+> >> 
+> >> The document doesn't give any hint of what the driver should do if
+> >> running the power sequence fails. Run the "opposite" power sequence?
+> >> Will that work for all resources? I'm mainly thinking of a case where
+> >> each enable of the resource should be matched by a disable, i.e. you
+> >> can't call disable if no enable was called.
+> > 
+> > We discussed that issue already (around v5 I think) and the conclusion was
+> > that it should be up to the driver. When we simply enable/disable
+> > resources it is easy to revert, but in the future non-boolean properties
+> > will likely be introduced, and these cannot easily be reverted. Moreover
+> > some drivers might have more complex recovery needs. This deserves more
+> > discussion I think, as I'd like to have some "generic" recovery mechanism
+> > that covers most of the cases.
+> 
+> Ok. I'll need to dig up the conversation
 
-On Mon, Nov 19, 2012 at 7:31 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+IIRC it was somewhere around here:
 
-> @@ -17,15 +17,6 @@
->   *   Initialise the kernels jiffy timer source, claim interrupt
->   *   using setup_irq.  This is called early on during initialisation
->   *   while interrupts are still disabled on the local CPU.
-> - * - suspend
-> - *   Suspend the kernel jiffy timer source, if necessary.  This
-> - *   is called with interrupts disabled, after all normal devices
-> - *   have been suspended.  If no action is required, set this to
-> - *   NULL.
-> - * - resume
-> - *   Resume the kernel jiffy timer source, if necessary.  This
-> - *   is called with interrupts disabled before any normal devices
-> - *   are resumed.  If no action is required, set this to NULL.
->   * - offset
->   *   Return the timer offset in microseconds since the last timer
->   *   interrupt.  Note: this must take account of any unprocessed
-> @@ -33,8 +24,6 @@
->   */
->  struct sys_timer {
->         void                    (*init)(void);
-> -       void                    (*suspend)(void);
-> -       void                    (*resume)(void);
->  };
+https://lkml.org/lkml/2012/9/7/662
 
-So from the above it is quite clear that the sys_timer is breaking
-the suspend_noirq/resume_noirq naming convention from
-runtime PM as IRQs are disabled on these paths.
+See the parent messages too.
 
-The same goes for struct clock_event_device ...
+> Did you consider any examples
+> of how some driver could handle the error cases?
 
-So while this looks just as bad after as before the patch,
-we should take a mental notice to rename the .suspend
-and .resume hooks in the clock_event_device to
-.suspend_noirq and .resume_noirq at some point.
+For all the (limited) use cases I considered, playing the power-off sequence 
+when power-on fails just works. If power-off also fails you are potentially in 
+more trouble though. Maybe we could have another "run" function that does not 
+stop on errors for handling such cases where you want to "stop everything you 
+can".
 
-I was thinking that if your patch set is introducing a
-plethora of new users of these hooks we should maybe
-stick a patch at the beginning of the series renaming the
-hooks to *_noirq, but if it's a major obstacle it can surely wait.
+> What I'm worried about is that, as far as I understand, the power
+> sequence is kinda like black box to the driver. The driver just does
+> "power-up", without knowing what really goes on in there.
 
-Yours,
-Linus Walleij
+The driver could always inspect the sequence, but you are right in that this 
+is not how it is intended to be done.
+
+> And if it doesn't know what goes on in there, nor what's in "power-down"
+> sequence, how can it do anything when an error happens? The only option
+> I see is that the driver doesn't do anything, which will leave some
+> resources enabled, or it can run the power-down sequence, which may or
+> may not work.
+
+Failures might be better handled if sequences have some "recovery policy" 
+about what to do when they fail, as mentioned in the link above. As you 
+pointed out, the driver might not always know enough about the resources 
+involved to do the right thing.
+
+Alex.
