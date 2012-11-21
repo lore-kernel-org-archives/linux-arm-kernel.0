@@ -1,39 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 21 Nov 2012 13:35:45 +0100
-Subject: [GIT PULL] Marvell Ethernet driver clk support + section
- mismatch fix
-In-Reply-To: <1353334396-26128-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1353334396-26128-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20121121133545.1a45263c@skate>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 21 Nov 2012 13:40:57 +0100
+Subject: [PATCH 15/16] irqchip: vic: mark vic_of_init() as static
+In-Reply-To: <1353448867-15008-16-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1353448867-15008-16-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CACRpkdazuvjXuuNP9TrsYsPQWMc=VV_-nu0oNWFPs+GzLmmw2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David,
+On Tue, Nov 20, 2012 at 11:01 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
 
-On Mon, 19 Nov 2012 15:13:14 +0100, Thomas Petazzoni wrote:
+> With all vic_of_init() users converted to the irqchip infrastructure,
+> there is no longer a reason for this function to be
+> exported. Therefore, mark it as static.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
->  * One adding clk support. It's not a fix, but I think it's better if
->    we can get the Device Tree binding correct directly in 3.8. This
->    commit basically replaces the clock-frequency DT property by a
->    proper 'clocks' DT property that references a DT clock. If we don't
->    get this in 3.8, we'll have to support the legacy clock-frequency
->    DT property for ever as it will be part of the kernel-to-DT ABI. So
->    it would be nicer to get this patch in for 3.8.
-> 
->    The DT patches related to this one are coming into a separate pull
->    request.
-> 
->  * The second one fixes a section mismatch warning, so it is certainly
->    important.
+It may be that I have missed some patches, but are really all VIC
+users converted in this patch series?
 
-Do you agree with those two changes? If so, shall we carry them with
-the rest of the mvneta driver through arm-soc with your Acked-by?
+In arch/arm/mach-u300/core.c I have this:
+        vic_init((void __iomem *) U300_INTCON0_VBASE, IRQ_U300_INTCON0_START,
+                 mask[0], mask[0]);
+        vic_init((void __iomem *) U300_INTCON1_VBASE, IRQ_U300_INTCON1_START,
+                 mask[1], mask[1]);
 
-Thanks!
+arch/arm/mach-nomadik/cpu-8815.c:
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+        /* This modified VIC cell has two register blocks, at 0 and 0x20 */
+        vic_init(io_p2v(NOMADIK_IC_BASE + 0x00), IRQ_VIC_START +  0, ~0, 0);
+        vic_init(io_p2v(NOMADIK_IC_BASE + 0x20), IRQ_VIC_START + 32, ~0, 0);
+
+And there are more still I think? I didn't see those converted so
+I guess I must have missed some patches or something?
+
+PS please make sure u300_defconfig and nhk8815_defconfig builds, or
+I will be a sad puppy ...
+
+Yours,
+Linus Walleij
