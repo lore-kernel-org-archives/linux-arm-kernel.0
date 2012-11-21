@@ -1,11 +1,10 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Nov 2012 21:15:43 +0900
-Subject: [PATCH v3 RESEND 0/4] ARM: EXYNOS: Power domain DT support
- extension
-In-Reply-To: <3937720.DSR9HIu3D4@amdc1227>
-References: <1352812107-8777-1-git-send-email-t.figa@samsung.com>
- <3937720.DSR9HIu3D4@amdc1227>
-Message-ID: <0e7b01cdc7e1$edbb5a60$c9320f20$%kim@samsung.com>
+Date: Wed, 21 Nov 2012 21:18:00 +0900
+Subject: [PATCH 0/4] ARM: dts: exynos4210-origen: Device tree fixes
+In-Reply-To: <1803002.oscJKykDTC@amdc1227>
+References: <1353336396-21161-1-git-send-email-t.figa@samsung.com>
+ <1803002.oscJKykDTC@amdc1227>
+Message-ID: <0e7c01cdc7e2$3fc71380$bf553a80$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,38 +12,33 @@ Tomasz Figa wrote:
 > 
 > Hi Kgene,
 > 
-> On Tuesday 13 of November 2012 14:08:23 Tomasz Figa wrote:
-> > This patch series fixes two issues with existing DT support for Exynos
-> > power domains and extends it with the ability of binding devices to
-> > domains, basically making it possible to use power domains with DT.
+> On Monday 19 of November 2012 15:46:32 Tomasz Figa wrote:
+> > This patch series fixes device tree support for Origen board:
+> >  - memory is defined using sections of maximum allowed size
+> >  - any pin configuration is modified to use pinctrl
+> >  - invalid properties in sdhci nodes are replaced according to current
+> >    mmc bindings
+> >  - a fixed vmmc voltage regulator is added
 > >
-> > Based on for-next branch of Kgene's tree.
+> > Tested on Origen board.
 > >
-> > Changes since v2:
-> >  - Rebased to for-next of Kgene's tree.
-> > Changes since v1:
-> >  - Added "samsung," prefix to "power-domain" property.
-> >  - Added power domain nodes to Exynos4 device tree sources.
+> > Depends on:
+> > [PATCH v2 0/2] mmc: host: sdhci-s3c: Add support for pinctrl interface
 > >
 > > Tomasz Figa (4):
-> >   ARM: EXYNOS: pm_domain: Detect domain state on registration from DT
-> >   ARM: EXYNOS: pm_domain: Fix power domain name initialization
-> >   ARM: EXYNOS: pm_domain: Bind devices to power domains using DT
-> >   ARM: dts: exynos4: Set up power domains
+> >   ARM: dts: exynos4210-origen: Split memory sections
+> >   ARM: dts: exynos4210-origen: Update for pinctrl-samsung driver
+> >   ARM: dts: exynos4210-origen: Update sdhci nodes for current bindings
+> >   ARM: dts: exynos4210-origen: Add vmmc fixed voltage regulator
 > >
-> >  .../bindings/arm/exynos/power_domain.txt           | 15 +++-
-> >  arch/arm/boot/dts/exynos4.dtsi                     | 30 +++++++
-> >  arch/arm/boot/dts/exynos4210.dtsi                  |  5 ++
-> >  arch/arm/mach-exynos/pm_domains.c                  | 93
-> > +++++++++++++++++++++- 4 files changed, 135 insertions(+), 8
+> >  arch/arm/boot/dts/exynos4210-origen.dts | 54
+> > ++++++++++++++++----------------- 1 file changed, 27 insertions(+), 27
 > > deletions(-)
 > 
-> Since this version is just a rebase to your for-next and there are no
-> remaining comments, could you still take it for 3.8?
+> Could you still pick these patches up for 3.8?
 > 
-Well, I'm not sure 'S5P_INT_LOCAL_PWR_EN' in [1/4] patch is available on all
-of exynos and it can support multiple platform. But at this moment, looks OK
-to me. If any modification is required, we can do it later.
+Looks OK to me, I want to test 1st patch on origen board with current my
+u-boot though.
 
 Will apply, thanks.
 
