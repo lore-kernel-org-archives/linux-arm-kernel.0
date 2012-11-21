@@ -1,42 +1,75 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 21 Nov 2012 09:12:57 +0100
-Subject: [PATCH V3 1/3] arm: dma mapping: Export dma ops functions
-In-Reply-To: <50AC8B41.7080009@free-electrons.com>
-References: <1353448587-2937-1-git-send-email-gregory.clement@free-electrons.com>
- <1353448587-2937-2-git-send-email-gregory.clement@free-electrons.com>
- <50AC7D59.1020000@samsung.com> <50AC8B41.7080009@free-electrons.com>
-Message-ID: <50AC8D09.6050104@samsung.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 21 Nov 2012 10:13:47 +0200
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <4316169.5QXVzv7peZ@percival>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
+ <50AB9832.90709@ti.com> <4316169.5QXVzv7peZ@percival>
+Message-ID: <50AC8D3B.6040300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 2012-11-21 03:56, Alex Courbot wrote:
+> Hi Tomi,
+> 
+> On Tuesday 20 November 2012 22:48:18 Tomi Valkeinen wrote:
+>> I guess there's a reason, but the above looks a bit inconsistent. For
+>> gpio you define the gpio resource inside the step. For power and pwm the
+>> resource is defined before the steps. Why wouldn't "pwm = <&pwm 2
+>> 5000000>;" work in step2?
+> 
+> That's mostly a framework issue. Most frameworks do not export a function that 
+> allow to dereference a phandle - they expect resources to be declared right 
+> under the device node and accessed by name through foo_get(device, name). So 
+> using phandles in power sequences would require to export these additional 
 
-On 11/21/2012 9:05 AM, Gregory CLEMENT wrote:
-> On 11/21/2012 08:06 AM, Marek Szyprowski wrote:
-> > On 11/20/2012 10:56 PM, Gregory CLEMENT wrote:
-> >> Expose the DMA operations functions. Until now only the dma_ops
-> >> structs in a whole or some dma operation were exposed. This patch
-> >> exposes all the dma coherents operations. They can be reused when an
-> >> architecture or a driver need to create its own set of dma_operation.
-> >>
-> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >
-> > Besides arm_dma_set_mask() function I see no reason to export the other
-> > arm dma related functions.
->
-> The idea was to let other people use the arm dma related functions,
-> for their own dma ops. But for the mvebu machines we only need
-> arm_dma_set_mask() indeed.
->
-> So you prefer that I only expose arm_dma_set_mask() and let future
-> user expose other function if they need it, right?
+Right, I expected something like that.
 
-I would prefer to avoid exporting functions which are not used anywhere
-else. This improves readability of the code and simply forces others to
-think twice before they use some static function and check if their use
-case is really correct.
+> functions and also opens the door to some inconsistencies - for instance, your 
+> PWM phandle could be referenced a second time in the sequence with a different 
+> period - how do you know that these are actually referring the same PWM 
+> device?
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+This I didn't understand. Doesn't "<&pwm 2 xyz>" point to a single
+device, no matter where and how many times it's used?
+
+>>> +When a power sequence is run, its steps is executed one after the other
+>>> until +one step fails or the end of the sequence is reached.
+>>
+>> The document doesn't give any hint of what the driver should do if
+>> running the power sequence fails. Run the "opposite" power sequence?
+>> Will that work for all resources? I'm mainly thinking of a case where
+>> each enable of the resource should be matched by a disable, i.e. you
+>> can't call disable if no enable was called.
+> 
+> We discussed that issue already (around v5 I think) and the conclusion was 
+> that it should be up to the driver. When we simply enable/disable resources it 
+> is easy to revert, but in the future non-boolean properties will likely be 
+> introduced, and these cannot easily be reverted. Moreover some drivers might 
+> have more complex recovery needs. This deserves more discussion I think, as 
+> I'd like to have some "generic" recovery mechanism that covers most of the 
+> cases.
+
+Ok. I'll need to dig up the conversation. Did you consider any examples
+of how some driver could handle the error cases?
+
+What I'm worried about is that, as far as I understand, the power
+sequence is kinda like black box to the driver. The driver just does
+"power-up", without knowing what really goes on in there.
+
+And if it doesn't know what goes on in there, nor what's in "power-down"
+sequence, how can it do anything when an error happens? The only option
+I see is that the driver doesn't do anything, which will leave some
+resources enabled, or it can run the power-down sequence, which may or
+may not work.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 897 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121121/9af56ea9/attachment.sig>
