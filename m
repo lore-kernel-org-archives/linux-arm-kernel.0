@@ -1,265 +1,330 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Nov 2012 17:00:12 +0100
-Subject: [PATCH V7 1/5] arm: mvebu: Add support for coherency fabric in
- mach-mvebu
+Date: Wed, 21 Nov 2012 17:00:16 +0100
+Subject: [PATCH V7 5/5] arm: mvebu: Add SMP support for Armada XP
 In-Reply-To: <1353513616-10139-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1353513616-10139-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1353513616-10139-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1353513616-10139-6-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 370 and Armada XP SOCs have a coherency fabric unit which
-is responsible for ensuring hardware coherency between all CPUs and
-between CPUs and I/O masters. This patch provides the basic support
-needed for SMP.
+This enables SMP support on the Armada XP processor. It adds the
+mandatory functions to support SMP such as: the SMP initialization
+functions in platsmp.c, the secondary CPU entry point in headsmp.S and
+the CPU hotplug initial support in hotplug.c.
 
 Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- .../devicetree/bindings/arm/coherency-fabric.txt   |   16 ++++
- arch/arm/boot/dts/armada-370-xp.dtsi               |    5 ++
- arch/arm/mach-mvebu/Makefile                       |    2 +-
- arch/arm/mach-mvebu/coherency.c                    |   82 ++++++++++++++++++++
- arch/arm/mach-mvebu/coherency.h                    |   24 ++++++
- arch/arm/mach-mvebu/coherency_ll.S                 |   49 ++++++++++++
- arch/arm/mach-mvebu/common.h                       |    1 +
- 7 files changed, 178 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/coherency-fabric.txt
- create mode 100644 arch/arm/mach-mvebu/coherency.c
- create mode 100644 arch/arm/mach-mvebu/coherency.h
- create mode 100644 arch/arm/mach-mvebu/coherency_ll.S
+ arch/arm/configs/mvebu_defconfig    |    3 +
+ arch/arm/mach-mvebu/Kconfig         |    1 +
+ arch/arm/mach-mvebu/Makefile        |    2 +
+ arch/arm/mach-mvebu/armada-370-xp.c |    3 +
+ arch/arm/mach-mvebu/common.h        |    3 +
+ arch/arm/mach-mvebu/headsmp.S       |   49 ++++++++++++++
+ arch/arm/mach-mvebu/hotplug.c       |   30 +++++++++
+ arch/arm/mach-mvebu/platsmp.c       |  122 +++++++++++++++++++++++++++++++++++
+ 8 files changed, 213 insertions(+)
+ create mode 100644 arch/arm/mach-mvebu/headsmp.S
+ create mode 100644 arch/arm/mach-mvebu/hotplug.c
+ create mode 100644 arch/arm/mach-mvebu/platsmp.c
 
-diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-new file mode 100644
-index 0000000..2bfbf67
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-@@ -0,0 +1,16 @@
-+Coherency fabric
-+----------------
-+Available on Marvell SOCs: Armada 370 and Armada XP
-+
-+Required properties:
-+
-+- compatible: "marvell,coherency-fabric"
-+- reg: Should contain,coherency fabric registers location and length.
-+
-+Example:
-+
-+coherency-fabric at d0020200 {
-+	compatible = "marvell,coherency-fabric";
-+	reg = <0xd0020200 0xb0>;
-+};
-+
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 94b4b9e..b0d075b 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -36,6 +36,11 @@
- 	      interrupt-controller;
- 	};
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index 3458752..da598d3 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -12,6 +12,9 @@ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_XP=y
+ # CONFIG_CACHE_L2X0 is not set
++# CONFIG_SWP_EMULATE is not set
++CONFIG_SMP=y
++# CONFIG_LOCAL_TIMERS is not set
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ # CONFIG_COMPACTION is not set
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index f4c3bf8..c934e1d 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -21,6 +21,7 @@ menu "Marvell SOC with device tree"
+ config MACH_ARMADA_370_XP
+ 	bool
+ 	select ARMADA_370_XP_TIMER
++	select HAVE_SMP
+ 	select CPU_PJ4B
  
-+	coherency-fabric at d0020200 {
-+		compatible = "marvell,coherency-fabric";
-+		reg = <0xd0020200 0xb0>;
-+	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
+ config MACH_ARMADA_370
 diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 57f996b..5ce4b42 100644
+index 2e3ec11..5dcb369 100644
 --- a/arch/arm/mach-mvebu/Makefile
 +++ b/arch/arm/mach-mvebu/Makefile
-@@ -2,4 +2,4 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
- 	-I$(srctree)/arch/arm/plat-orion/include
+@@ -3,3 +3,5 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
  
  obj-y += system-controller.o
--obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o
-+obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o coherency.o coherency_ll.o
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+ obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o coherency.o coherency_ll.o pmsu.o
++obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
++obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+index 3292d6d..472e70f 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.c
++++ b/arch/arm/mach-mvebu/armada-370-xp.c
+@@ -23,6 +23,7 @@
+ #include <asm/mach/time.h>
+ #include "armada-370-xp.h"
+ #include "common.h"
++#include "coherency.h"
+ 
+ static struct map_desc armada_370_xp_io_desc[] __initdata = {
+ 	{
+@@ -51,6 +52,7 @@ struct sys_timer armada_370_xp_timer = {
+ static void __init armada_370_xp_dt_init(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	coherency_init();
+ }
+ 
+ static const char * const armada_370_xp_dt_board_dt_compat[] = {
+@@ -60,6 +62,7 @@ static const char * const armada_370_xp_dt_board_dt_compat[] = {
+ };
+ 
+ DT_MACHINE_START(ARMADA_XP_DT, "Marvell Aramada 370/XP (Device Tree)")
++	.smp		= smp_ops(armada_xp_smp_ops),
+ 	.init_machine	= armada_370_xp_dt_init,
+ 	.map_io		= armada_370_xp_map_io,
+ 	.init_irq	= armada_370_xp_init_irq,
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+index 9285d04..aa27bc2 100644
+--- a/arch/arm/mach-mvebu/common.h
++++ b/arch/arm/mach-mvebu/common.h
+@@ -20,6 +20,9 @@ void mvebu_restart(char mode, const char *cmd);
+ void armada_370_xp_init_irq(void);
+ void armada_370_xp_handle_irq(struct pt_regs *regs);
+ 
++void armada_xp_cpu_die(unsigned int cpu);
+ int armada_370_xp_coherency_init(void);
+ int armada_370_xp_pmsu_init(void);
++void armada_xp_secondary_startup(void);
++extern struct smp_operations armada_xp_smp_ops;
+ #endif
+diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
 new file mode 100644
-index 0000000..596ee66
+index 0000000..a06e0ed
 --- /dev/null
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -0,0 +1,82 @@
++++ b/arch/arm/mach-mvebu/headsmp.S
+@@ -0,0 +1,49 @@
 +/*
-+ * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
++ * SMP support: Entry point for secondary CPUs
 + *
 + * Copyright (C) 2012 Marvell
 + *
 + * Yehuda Yitschak <yehuday@marvell.com>
-+ * Gregory Clement <gregory.clement@free-electrons.com>
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
 + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2.  This program is licensed "as is" without any
 + * warranty of any kind, whether express or implied.
 + *
-+ * The Armada 370 and Armada XP SOCs have a coherency fabric which is
-+ * responsible for ensuring hardware coherency between all CPUs and between
-+ * CPUs and I/O masters. This file initializes the coherency fabric and
-+ * supplies basic routines for configuring and controlling hardware coherency
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/of_address.h>
-+#include <linux/io.h>
-+#include <linux/smp.h>
-+#include <asm/smp_plat.h>
-+#include "armada-370-xp.h"
-+
-+/*
-+ * Some functions in this file are called very early during SMP
-+ * initialization. At that time the device tree framework is not yet
-+ * ready, and it is not possible to get the register address to
-+ * ioremap it. That's why the pointer below is given with an initial
-+ * value matching its virtual mapping
-+ */
-+static void __iomem *coherency_base = ARMADA_370_XP_REGS_VIRT_BASE + 0x20200;
-+
-+/* Coherency fabric registers */
-+#define COHERENCY_FABRIC_CFG_OFFSET		   0x4
-+
-+static struct of_device_id of_coherency_table[] = {
-+	{.compatible = "marvell,coherency-fabric"},
-+	{ /* end of list */ },
-+};
-+
-+#ifdef CONFIG_SMP
-+int coherency_get_cpu_count(void)
-+{
-+	int reg, cnt;
-+
-+	reg = readl(coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
-+	cnt = (reg & 0xF) + 1;
-+
-+	return cnt;
-+}
-+#endif
-+
-+/* Function defined in coherency_ll.S */
-+int ll_set_cpu_coherent(void __iomem *base_addr, unsigned int hw_cpu_id);
-+
-+int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
-+{
-+	if (!coherency_base) {
-+		pr_warn("Can't make CPU %d cache coherent.\n", hw_cpu_id);
-+		pr_warn("Coherency fabric is not initialized\n");
-+		return 1;
-+	}
-+
-+	return ll_set_cpu_coherent(coherency_base, hw_cpu_id);
-+}
-+
-+int __init coherency_init(void)
-+{
-+	struct device_node *np;
-+
-+	np = of_find_matching_node(NULL, of_coherency_table);
-+	if (np) {
-+		pr_info("Initializing Coherency fabric\n");
-+		coherency_base = of_iomap(np, 0);
-+	}
-+
-+	return 0;
-+}
-diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
-new file mode 100644
-index 0000000..2f42813
---- /dev/null
-+++ b/arch/arm/mach-mvebu/coherency.h
-@@ -0,0 +1,24 @@
-+/*
-+ * arch/arm/mach-mvebu/include/mach/coherency.h
-+ *
-+ *
-+ * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __MACH_370_XP_COHERENCY_H
-+#define __MACH_370_XP_COHERENCY_H
-+
-+#ifdef CONFIG_SMP
-+int coherency_get_cpu_count(void);
-+#endif
-+
-+int set_cpu_coherent(int cpu_id, int smp_group_id);
-+int coherency_init(void);
-+
-+#endif	/* __MACH_370_XP_COHERENCY_H */
-diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
-new file mode 100644
-index 0000000..53e8391
---- /dev/null
-+++ b/arch/arm/mach-mvebu/coherency_ll.S
-@@ -0,0 +1,49 @@
-+/*
-+ * Coherency fabric: low level functions
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * This file implements the assembly function to add a CPU to the
-+ * coherency fabric. This function is called by each of the secondary
-+ * CPUs during their early boot in an SMP kernel, this why this
-+ * function have to callable from assembly. It can also be called by a
-+ * primary CPU from C code during its boot.
++ * This file implements the assembly entry point for secondary CPUs in
++ * an SMP kernel. The only thing we need to do is to add the CPU to
++ * the coherency fabric by writing to 2 registers. Currently the base
++ * register addresses are hard coded due to the early initialisation
++ * problems.
 + */
 +
 +#include <linux/linkage.h>
-+#define ARMADA_XP_CFB_CTL_REG_OFFSET 0x0
-+#define ARMADA_XP_CFB_CFG_REG_OFFSET 0x4
++#include <linux/init.h>
 +
-+	.text
 +/*
-+ * r0: Coherency fabric base register address
-+ * r1: HW CPU id
++ * At this stage the secondary CPUs don't have acces yet to the MMU, so
++ * we have to provide physical addresses
 + */
-+ENTRY(ll_set_cpu_coherent)
-+	/* Create bit by cpu index */
-+	mov	r3, #(1 << 24)
-+	lsl	r1, r3, r1
++#define ARMADA_XP_CFB_BASE	     0xD0020200
 +
-+	/* Add CPU to SMP group - Atomic */
-+	add	r3, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
-+	ldr	r2, [r3]
-+	orr	r2, r2, r1
-+	str	r2, [r3]
++	__CPUINIT
 +
-+	/* Enable coherency on CPU - Atomic */
-+	add	r3, r0, #ARMADA_XP_CFB_CFG_REG_OFFSET
-+	ldr	r2, [r3]
-+	orr	r2, r2, r1
-+	str	r2, [r3]
++/*
++ * Armada XP specific entry point for secondary CPUs.
++ * We add the CPU to the coherency fabric and then jump to secondary
++ * startup
++ */
++ENTRY(armada_xp_secondary_startup)
 +
-+	dsb
++	/* Read CPU id */
++	mrc     p15, 0, r1, c0, c0, 5
++	and     r1, r1, #0xF
 +
-+	mov	r0, #0
-+	mov	pc, lr
-+ENDPROC(ll_set_cpu_coherent)
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index 02f89ea..ba6b62a 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -20,4 +20,5 @@ void mvebu_restart(char mode, const char *cmd);
- void armada_370_xp_init_irq(void);
- void armada_370_xp_handle_irq(struct pt_regs *regs);
- 
-+int armada_370_xp_coherency_init(void);
- #endif
++	/* Add CPU to coherency fabric */
++	ldr     r0, =ARMADA_XP_CFB_BASE
++
++	bl	ll_set_cpu_coherent
++	b	secondary_startup
++
++ENDPROC(armada_xp_secondary_startup)
+diff --git a/arch/arm/mach-mvebu/hotplug.c b/arch/arm/mach-mvebu/hotplug.c
+new file mode 100644
+index 0000000..b228b6a
+--- /dev/null
++++ b/arch/arm/mach-mvebu/hotplug.c
+@@ -0,0 +1,30 @@
++/*
++ * Symmetric Multi Processing (SMP) support for Armada XP
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Lior Amsalem <alior@marvell.com>
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++#include <linux/kernel.h>
++#include <linux/errno.h>
++#include <linux/smp.h>
++#include <asm/proc-fns.h>
++
++/*
++ * platform-specific code to shutdown a CPU
++ *
++ * Called with IRQs disabled
++ */
++void __ref armada_xp_cpu_die(unsigned int cpu)
++{
++	cpu_do_idle();
++
++	/* We should never return from idle */
++	panic("mvebu: cpu %d unexpectedly exit from shutdown\n", cpu);
++}
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+new file mode 100644
+index 0000000..fe16aaf
+--- /dev/null
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -0,0 +1,122 @@
++/*
++ * Symmetric Multi Processing (SMP) support for Armada XP
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Lior Amsalem <alior@marvell.com>
++ * Yehuda Yitschak <yehuday@marvell.com>
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * The Armada XP SoC has 4 ARMv7 PJ4B CPUs running in full HW coherency
++ * This file implements the routines for preparing the SMP infrastructure
++ * and waking up the secondary CPUs
++ */
++
++#include <linux/init.h>
++#include <linux/smp.h>
++#include <linux/clk.h>
++#include <linux/of.h>
++#include <asm/cacheflush.h>
++#include <asm/smp_plat.h>
++#include "common.h"
++#include "armada-370-xp.h"
++#include "pmsu.h"
++#include "coherency.h"
++
++void __init set_secondary_cpus_clock(void)
++{
++	int thiscpu;
++	unsigned long rate;
++	struct clk *cpu_clk = NULL;
++	struct device_node *np = NULL;
++
++	thiscpu = smp_processor_id();
++	for_each_node_by_type(np, "cpu") {
++		int err;
++		int cpu;
++
++		err = of_property_read_u32(np, "reg", &cpu);
++		if (WARN_ON(err))
++			return;
++
++		if (cpu == thiscpu) {
++			cpu_clk = of_clk_get(np, 0);
++			break;
++		}
++	}
++	if (WARN_ON(IS_ERR(cpu_clk)))
++		return;
++	clk_prepare_enable(cpu_clk);
++	rate = clk_get_rate(cpu_clk);
++
++	/* set all the other CPU clk to the same rate than the boot CPU */
++	for_each_node_by_type(np, "cpu") {
++		int err;
++		int cpu;
++
++		err = of_property_read_u32(np, "reg", &cpu);
++		if (WARN_ON(err))
++			return;
++
++		if (cpu != thiscpu) {
++			cpu_clk = of_clk_get(np, 0);
++			clk_set_rate(cpu_clk, rate);
++		}
++	}
++}
++
++static void __cpuinit armada_xp_secondary_init(unsigned int cpu)
++{
++	armada_xp_mpic_smp_cpu_init();
++}
++
++static int __cpuinit armada_xp_boot_secondary(unsigned int cpu,
++					      struct task_struct *idle)
++{
++	pr_info("Booting CPU %d\n", cpu);
++
++	armada_xp_boot_cpu(cpu, armada_xp_secondary_startup);
++
++	return 0;
++}
++
++static void __init armada_xp_smp_init_cpus(void)
++{
++	unsigned int i, ncores;
++	ncores = coherency_get_cpu_count();
++
++	/* Limit possible CPUs to defconfig */
++	if (ncores > nr_cpu_ids) {
++		pr_warn("SMP: %d CPUs physically present. Only %d configured.",
++			ncores, nr_cpu_ids);
++		pr_warn("Clipping CPU count to %d\n", nr_cpu_ids);
++		ncores = nr_cpu_ids;
++	}
++
++	for (i = 0; i < ncores; i++)
++		set_cpu_possible(i, true);
++
++	set_smp_cross_call(armada_mpic_send_doorbell);
++}
++
++void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
++{
++	set_secondary_cpus_clock();
++	flush_cache_all();
++	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
++}
++
++struct smp_operations armada_xp_smp_ops __initdata = {
++	.smp_init_cpus		= armada_xp_smp_init_cpus,
++	.smp_prepare_cpus	= armada_xp_smp_prepare_cpus,
++	.smp_secondary_init	= armada_xp_secondary_init,
++	.smp_boot_secondary	= armada_xp_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_die		= armada_xp_cpu_die,
++#endif
++};
 -- 
 1.7.9.5
