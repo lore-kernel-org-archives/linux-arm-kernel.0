@@ -1,63 +1,127 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 21 Nov 2012 13:17:04 +0000
-Subject: [PATCH 1/3] gpio: Add simple poweroff-gpio driver
-In-Reply-To: <CACRpkdZ_4C2XA1c2U_E8GnbfiXZk67MYR7JzgwXf1iVwHCde2Q@mail.gmail.com>
-References: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
- <1352650891-18356-2-git-send-email-andrew@lunn.ch>
- <50A020C5.4070506@wwwdotorg.org> <20121112082546.GU22029@lunn.ch>
- <50A1212C.2080601@wwwdotorg.org> <20121112181947.GS24583@lunn.ch>
- <20121112184340.GA15643@lizard> <50A146E7.2040608@wwwdotorg.org>
- <CACRpkdb=ra9NwqEneyMoM5YnOFTVQoBxPATjUN6anooXVLiCjw@mail.gmail.com>
- <20121115105954.GA17119@lizard>
- <CACRpkdZ_4C2XA1c2U_E8GnbfiXZk67MYR7JzgwXf1iVwHCde2Q@mail.gmail.com>
-Message-ID: <20121121131704.D81703E096D@localhost>
+From: m.grzeschik@pengutronix.de (Michael Grzeschik)
+Date: Wed, 21 Nov 2012 15:06:31 +0100
+Subject: [PATCH v3 5/7] usb: chipidea: usbmisc: add support for ahb,
+ ipg and per clock
+In-Reply-To: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
+References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <1353506793-8354-6-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Nov 2012 12:10:59 +0100, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Nov 15, 2012 at 11:59 AM, Anton Vorontsov
-> <anton.vorontsov@linaro.org> wrote:
-> > On Thu, Nov 15, 2012 at 11:35:36AM +0100, Linus Walleij wrote:
-> >> On Mon, Nov 12, 2012 at 7:58 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> >> > On 11/12/2012 11:43 AM, Anton Vorontsov wrote:
-> >>
-> >> >> Should the gpio driver fix its bindings then?.. Polarity is a quite
-> >> >> generic concept of a GPIO, and flags are there for a reason. I'd rather
-> >> >> prefer having
-> >> >
-> >> > There is no "GPIO driver" to fix; each GPIO driver has its own bindings,
-> >> > and unfortunately, some of the GPIO binding authors chose not to include
-> >> > any flags cell in the GPIO specifier (e.g. Samsung ARM SoCs IIRC, but
-> >> > there are probably more).
-> >>
-> >> So can I read this something like we have been too liberal with the
-> >> GPIO DT bindings and they are now a bit messy and need to be shaped
-> >> up? I don't know how to achieve that :-(
-> >
-> > I guess there's really no reason to panic. :)
-> >
-> > 'git grep gpio-cells Documentation/' shows just mrvl-gpio.txt and
-> > twl6040.txt having the wrong gpio-cells (i.e. 1).
-> >
-> > But even these can use one cells for both flags and pin number (unless you
-> > really have 4294967295 GPIOs per controller).
-> >
-> > FWIW, current Samsung SOCs use 3 and even 4 cells for a GPIO specifier,
-> > which is absolutely fine. Plus, the Samsung bindings do specify the
-> > inversion flag. So, unless we have a lot of other [undocumented] bindings,
-> > I don't see a big mess. And everything I currently see is fixable.
-> 
-> I agree it's not that big a mess...
-> 
-> I was more thinking about how to convince the people who can
-> test this to fix it up.
+From: Marc Kleine-Budde <mkl@pengutronix.de>
 
-+1. Most drivers use the same definitions for flags. New drivers should
-be pushed to do the same. And the few that don't can be fixed up
-individually.
+This patch adds support for a second and third clock to the usbmisc driver. On
+modern freescale ARM cores like the imx51, imx53 and imx6q three clocks ("ahb",
+"ipg" and "per") must be enabled in order to access the USB core.
 
-g.
+ahb - AMBA High-Performance Bus clock domain
+ipg - IP-Bus Gate clock domain
+per - Peripheral clock domain
 
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+---
+Changes since v1:
+* changed patch description
+
+ drivers/usb/chipidea/usbmisc_imx.c |   60 +++++++++++++++++++++++++++---------
+ 1 file changed, 45 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+index d0c7a03..e090e0f 100644
+--- a/drivers/usb/chipidea/usbmisc_imx.c
++++ b/drivers/usb/chipidea/usbmisc_imx.c
+@@ -24,7 +24,9 @@
+ struct imx_usbmisc {
+ 	void __iomem *base;
+ 	spinlock_t lock;
+-	struct clk *clk;
++	struct clk *clk_ahb;
++	struct clk *clk_ipg;
++	struct clk *clk_per;
+ 	struct usbmisc_usb_device usbdev[USB_DEV_MAX];
+ 	const struct usbmisc_ops *ops;
+ };
+@@ -104,38 +106,66 @@ static int __devinit usbmisc_imx_probe(struct platform_device *pdev)
+ 	if (!data->base)
+ 		return -EADDRNOTAVAIL;
+ 
+-	data->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(data->clk)) {
++	data->clk_ahb = devm_clk_get(&pdev->dev, "ahb");
++	if (IS_ERR(data->clk_ahb)) {
+ 		dev_err(&pdev->dev,
+-			"failed to get clock, err=%ld\n", PTR_ERR(data->clk));
+-		return PTR_ERR(data->clk);
++			"failed to get ahb clock, err=%ld\n", PTR_ERR(data->clk_ahb));
++		return PTR_ERR(data->clk_ahb);
+ 	}
+ 
+-	ret = clk_prepare_enable(data->clk);
+-	if (ret) {
++	data->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
++	if (IS_ERR(data->clk_ipg)) {
+ 		dev_err(&pdev->dev,
+-			"clk_prepare_enable failed, err=%d\n", ret);
+-		return ret;
++			"failed to get ipg clock, err=%ld\n", PTR_ERR(data->clk_ipg));
++		return PTR_ERR(data->clk_ipg);
+ 	}
+ 
++	data->clk_per = devm_clk_get(&pdev->dev, "per");
++	if (IS_ERR(data->clk_per)) {
++		dev_err(&pdev->dev,
++			"failed to get per clock, err=%ld\n", PTR_ERR(data->clk_per));
++		return PTR_ERR(data->clk_per);
++	}
++
++	ret = clk_prepare_enable(data->clk_ahb);
++	if (ret)
++		return ret;
++
++	ret = clk_prepare_enable(data->clk_ipg);
++	if (ret)
++		goto err_ipg_failed;
++
++	ret = clk_prepare_enable(data->clk_per);
++	if (ret)
++		goto err_per_failed;
++
+ 	tmp_dev = (struct of_device_id *)
+ 		of_match_device(usbmisc_imx_dt_ids, &pdev->dev);
+ 	data->ops = (const struct usbmisc_ops *)tmp_dev->data;
+ 	usbmisc = data;
+ 	ret = usbmisc_set_ops(data->ops);
+-	if (ret) {
+-		usbmisc = NULL;
+-		clk_disable_unprepare(data->clk);
+-		return ret;
+-	}
++	if (ret)
++		goto err_set_ops_failed;
+ 
+ 	return 0;
++
++ err_set_ops_failed:
++	usbmisc = NULL;
++	clk_disable_unprepare(data->clk_per);
++ err_per_failed:
++	clk_disable_unprepare(data->clk_ipg);
++ err_ipg_failed:
++	clk_disable_unprepare(data->clk_ahb);
++
++	return ret;
+ }
+ 
+ static int __devexit usbmisc_imx_remove(struct platform_device *pdev)
+ {
+ 	usbmisc_unset_ops(usbmisc->ops);
+-	clk_disable_unprepare(usbmisc->clk);
++	clk_disable_unprepare(usbmisc->clk_per);
++	clk_disable_unprepare(usbmisc->clk_ipg);
++	clk_disable_unprepare(usbmisc->clk_ahb);
+ 	usbmisc = NULL;
+ 	return 0;
+ }
 -- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+1.7.10.4
