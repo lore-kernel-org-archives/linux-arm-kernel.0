@@ -1,272 +1,284 @@
-From: anilkumar@ti.com (AnilKumar Ch)
-Date: Wed, 21 Nov 2012 17:22:17 +0530
-Subject: [PATCH RESEND] ARM: dts: AM33XX: Rename I2C and GPIO nodes
-Message-ID: <1353498737-21174-1-git-send-email-anilkumar@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 21 Nov 2012 12:53:14 +0100
+Subject: [PATCH V5 1/5] arm: mvebu: Added support for coherency fabric
+ in mach-mvebu
+In-Reply-To: <20121121103622.GC11990@mudshark.cambridge.arm.com>
+References: <1353446150-10088-1-git-send-email-gregory.clement@free-electrons.com>
+ <1353446150-10088-2-git-send-email-gregory.clement@free-electrons.com>
+ <20121121103622.GC11990@mudshark.cambridge.arm.com>
+Message-ID: <50ACC0AA.7060009@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename I2C and GPIO nodes according to AM33XX TRM. According to
-AM33XX TRM device instances are starting from "0" like i2c0, i2c1
-and i2c3.
+On 11/21/2012 11:36 AM, Will Deacon wrote:
+> On Tue, Nov 20, 2012 at 09:15:45PM +0000, Gregory CLEMENT wrote:
+>> From: Yehuda Yitschak <yehuday@marvell.com>
+> 
+> <insert commit log here>
+> 
+> Also -- is the author attribution still correct?
 
-Signed-off-by: Pantelis Antoniou <panto@antoniou-consulting.com>
-[panto at antoniou-consulting.com: initial patch by pantelis's]
-Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
----
-Changes from first version:
-	- Updated pantelis's patch
-	  * Modified based on linux-omap/master
-	  * Added GPIO nodes renaming as well
+I don't know: the code is based on Yehuda work, but version
+by version I modified it. So I don't know what is the rule
+for this.
 
- arch/arm/boot/dts/am335x-bone.dts  |   10 +++++-----
- arch/arm/boot/dts/am335x-evm.dts   |   18 +++++++++---------
- arch/arm/boot/dts/am335x-evmsk.dts |   18 +++++++++---------
- arch/arm/boot/dts/am33xx.dtsi      |   14 +++++++-------
- 4 files changed, 30 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index 2c33888..77b4352 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -43,7 +43,7 @@
- 			status = "okay";
- 		};
- 
--		i2c1: i2c at 44e0b000 {
-+		i2c0: i2c at 44e0b000 {
- 			status = "okay";
- 			clock-frequency = <400000>;
- 
-@@ -59,27 +59,27 @@
- 
- 		led at 2 {
- 			label = "beaglebone:green:heartbeat";
--			gpios = <&gpio2 21 0>;
-+			gpios = <&gpio1 21 0>;
- 			linux,default-trigger = "heartbeat";
- 			default-state = "off";
- 		};
- 
- 		led at 3 {
- 			label = "beaglebone:green:mmc0";
--			gpios = <&gpio2 22 0>;
-+			gpios = <&gpio1 22 0>;
- 			linux,default-trigger = "mmc0";
- 			default-state = "off";
- 		};
- 
- 		led at 4 {
- 			label = "beaglebone:green:usr2";
--			gpios = <&gpio2 23 0>;
-+			gpios = <&gpio1 23 0>;
- 			default-state = "off";
- 		};
- 
- 		led at 5 {
- 			label = "beaglebone:green:usr3";
--			gpios = <&gpio2 24 0>;
-+			gpios = <&gpio1 24 0>;
- 			default-state = "off";
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 9f65f17..705a9c5 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -51,7 +51,7 @@
- 			status = "okay";
- 		};
- 
--		i2c1: i2c at 44e0b000 {
-+		i2c0: i2c at 44e0b000 {
- 			status = "okay";
- 			clock-frequency = <400000>;
- 
-@@ -60,7 +60,7 @@
- 			};
- 		};
- 
--		i2c2: i2c at 4802a000 {
-+		i2c1: i2c at 4802a000 {
- 			status = "okay";
- 			clock-frequency = <100000>;
- 
-@@ -123,12 +123,12 @@
- 		debounce-delay-ms = <5>;
- 		col-scan-delay-us = <2>;
- 
--		row-gpios = <&gpio2 25 0	/* Bank1, pin25 */
--			     &gpio2 26 0	/* Bank1, pin26 */
--			     &gpio2 27 0>;	/* Bank1, pin27 */
-+		row-gpios = <&gpio1 25 0	/* Bank1, pin25 */
-+			     &gpio1 26 0	/* Bank1, pin26 */
-+			     &gpio1 27 0>;	/* Bank1, pin27 */
- 
--		col-gpios = <&gpio2 21 0	/* Bank1, pin21 */
--			     &gpio2 22 0>;	/* Bank1, pin22 */
-+		col-gpios = <&gpio1 21 0	/* Bank1, pin21 */
-+			     &gpio1 22 0>;	/* Bank1, pin22 */
- 
- 		linux,keymap = <0x0000008b	/* MENU */
- 				0x0100009e	/* BACK */
-@@ -147,14 +147,14 @@
- 		switch@9 {
- 			label = "volume-up";
- 			linux,code = <115>;
--			gpios = <&gpio1 2 1>;
-+			gpios = <&gpio0 2 1>;
- 			gpio-key,wakeup;
- 		};
- 
- 		switch at 10 {
- 			label = "volume-down";
- 			linux,code = <114>;
--			gpios = <&gpio1 3 1>;
-+			gpios = <&gpio0 3 1>;
- 			gpio-key,wakeup;
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index f5a6162..f67c360 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -58,7 +58,7 @@
- 			status = "okay";
- 		};
- 
--		i2c1: i2c at 44e0b000 {
-+		i2c0: i2c at 44e0b000 {
- 			status = "okay";
- 			clock-frequency = <400000>;
- 
-@@ -115,26 +115,26 @@
- 
- 		led at 1 {
- 			label = "evmsk:green:usr0";
--			gpios = <&gpio2 4 0>;
-+			gpios = <&gpio1 4 0>;
- 			default-state = "off";
- 		};
- 
- 		led at 2 {
- 			label = "evmsk:green:usr1";
--			gpios = <&gpio2 5 0>;
-+			gpios = <&gpio1 5 0>;
- 			default-state = "off";
- 		};
- 
- 		led at 3 {
- 			label = "evmsk:green:mmc0";
--			gpios = <&gpio2 6 0>;
-+			gpios = <&gpio1 6 0>;
- 			linux,default-trigger = "mmc0";
- 			default-state = "off";
- 		};
- 
- 		led at 4 {
- 			label = "evmsk:green:heartbeat";
--			gpios = <&gpio2 7 0>;
-+			gpios = <&gpio1 7 0>;
- 			linux,default-trigger = "heartbeat";
- 			default-state = "off";
- 		};
-@@ -148,26 +148,26 @@
- 		switch at 1 {
- 			label = "button0";
- 			linux,code = <0x100>;
--			gpios = <&gpio3 3 0>;
-+			gpios = <&gpio2 3 0>;
- 		};
- 
- 		switch at 2 {
- 			label = "button1";
- 			linux,code = <0x101>;
--			gpios = <&gpio3 2 0>;
-+			gpios = <&gpio2 2 0>;
- 		};
- 
- 		switch at 3 {
- 			label = "button2";
- 			linux,code = <0x102>;
--			gpios = <&gpio1 30 0>;
-+			gpios = <&gpio0 30 0>;
- 			gpio-key,wakeup;
- 		};
- 
- 		switch at 4 {
- 			label = "button3";
- 			linux,code = <0x103>;
--			gpios = <&gpio3 5 0>;
-+			gpios = <&gpio2 5 0>;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 5dfd682..2ad01c7 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -87,7 +87,7 @@
- 			reg = <0x48200000 0x1000>;
- 		};
- 
--		gpio1: gpio at 44e07000 {
-+		gpio0: gpio at 44e07000 {
- 			compatible = "ti,omap4-gpio";
- 			ti,hwmods = "gpio1";
- 			gpio-controller;
-@@ -98,7 +98,7 @@
- 			interrupts = <96>;
- 		};
- 
--		gpio2: gpio at 4804c000 {
-+		gpio1: gpio at 4804c000 {
- 			compatible = "ti,omap4-gpio";
- 			ti,hwmods = "gpio2";
- 			gpio-controller;
-@@ -109,7 +109,7 @@
- 			interrupts = <98>;
- 		};
- 
--		gpio3: gpio at 481ac000 {
-+		gpio2: gpio at 481ac000 {
- 			compatible = "ti,omap4-gpio";
- 			ti,hwmods = "gpio3";
- 			gpio-controller;
-@@ -120,7 +120,7 @@
- 			interrupts = <32>;
- 		};
- 
--		gpio4: gpio at 481ae000 {
-+		gpio3: gpio at 481ae000 {
- 			compatible = "ti,omap4-gpio";
- 			ti,hwmods = "gpio4";
- 			gpio-controller;
-@@ -185,7 +185,7 @@
- 			status = "disabled";
- 		};
- 
--		i2c1: i2c at 44e0b000 {
-+		i2c0: i2c at 44e0b000 {
- 			compatible = "ti,omap4-i2c";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -195,7 +195,7 @@
- 			status = "disabled";
- 		};
- 
--		i2c2: i2c at 4802a000 {
-+		i2c1: i2c at 4802a000 {
- 			compatible = "ti,omap4-i2c";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -205,7 +205,7 @@
- 			status = "disabled";
- 		};
- 
--		i2c3: i2c at 4819c000 {
-+		i2c2: i2c at 4819c000 {
- 			compatible = "ti,omap4-i2c";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+> 
+>> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  .../devicetree/bindings/arm/coherency-fabric.txt   |   16 ++++
+>>  arch/arm/boot/dts/armada-370-xp.dtsi               |    5 ++
+>>  arch/arm/mach-mvebu/Makefile                       |    2 +-
+>>  arch/arm/mach-mvebu/coherency.c                    |   80 ++++++++++++++++++++
+>>  arch/arm/mach-mvebu/coherency.h                    |   24 ++++++
+>>  arch/arm/mach-mvebu/coherency_ll.S                 |   47 ++++++++++++
+>>  arch/arm/mach-mvebu/common.h                       |    2 +
+>>  7 files changed, 175 insertions(+), 1 deletion(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/coherency-fabric.txt
+>>  create mode 100644 arch/arm/mach-mvebu/coherency.c
+>>  create mode 100644 arch/arm/mach-mvebu/coherency.h
+>>  create mode 100644 arch/arm/mach-mvebu/coherency_ll.S
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+>> new file mode 100644
+>> index 0000000..2bfbf67
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+>> @@ -0,0 +1,16 @@
+>> +Coherency fabric
+>> +----------------
+>> +Available on Marvell SOCs: Armada 370 and Armada XP
+>> +
+>> +Required properties:
+>> +
+>> +- compatible: "marvell,coherency-fabric"
+>> +- reg: Should contain,coherency fabric registers location and length.
+>> +
+>> +Example:
+>> +
+>> +coherency-fabric at d0020200 {
+>> +	compatible = "marvell,coherency-fabric";
+>> +	reg = <0xd0020200 0xb0>;
+>> +};
+>> +
+>> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+>> index 94b4b9e..b0d075b 100644
+>> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+>> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+>> @@ -36,6 +36,11 @@
+>>  	      interrupt-controller;
+>>  	};
+>>  
+>> +	coherency-fabric at d0020200 {
+>> +		compatible = "marvell,coherency-fabric";
+>> +		reg = <0xd0020200 0xb0>;
+>> +	};
+>> +
+>>  	soc {
+>>  		#address-cells = <1>;
+>>  		#size-cells = <1>;
+>> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+>> index 57f996b..5ce4b42 100644
+>> --- a/arch/arm/mach-mvebu/Makefile
+>> +++ b/arch/arm/mach-mvebu/Makefile
+>> @@ -2,4 +2,4 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+>>  	-I$(srctree)/arch/arm/plat-orion/include
+>>  
+>>  obj-y += system-controller.o
+>> -obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o
+>> +obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o coherency.o coherency_ll.o
+>> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+>> new file mode 100644
+>> index 0000000..1bc02d0
+>> --- /dev/null
+>> +++ b/arch/arm/mach-mvebu/coherency.c
+>> @@ -0,0 +1,80 @@
+>> +/*
+>> + * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
+>> + *
+>> + * Copyright (C) 2012 Marvell
+>> + *
+>> + * Yehuda Yitschak <yehuday@marvell.com>
+>> + * Gregory Clement <gregory.clement@free-electrons.com>
+>> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2.  This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + *
+>> + * The Armada 370 and Armada XP SOCs have a coherency fabric which is
+>> + * responsible for ensuring hardware coherency between all CPUs and between
+>> + * CPUs and I/O masters. This file initializes the coherency fabric and
+>> + * supplies basic routines for configuring and controlling hardware coherency
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/init.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/io.h>
+>> +#include <linux/smp.h>
+>> +#include <asm/smp_plat.h>
+>> +#include "armada-370-xp.h"
+>> +
+>> +/* Some functions in this file are called very early during SMP
+>> + * initialization. At that time the device tree framework is not yet
+>> + * ready, and it is not possible to get the register address to
+>> + * ioremap it. That's why the pointer below is given with an initial
+>> + * value matching its virtual mapping
+>> + */
+>> +static void __iomem *coherency_base = ARMADA_370_XP_REGS_VIRT_BASE + 0x20200;
+>> +
+>> +/* Coherency fabric registers */
+>> +#define COHERENCY_FABRIC_CFG_OFFSET		   0x4
+>> +
+>> +static struct of_device_id of_coherency_table[] = {
+>> +	{.compatible = "marvell,coherency-fabric"},
+>> +	{ /* end of list */ },
+>> +};
+>> +#ifdef CONFIG_SMP
+>> +int coherency_get_cpu_count(void)
+>> +{
+>> +	int reg, cnt;
+>> +
+>> +	reg = readl(coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
+>> +	cnt = (reg & 0xF) + 1;
+>> +
+>> +	return cnt;
+>> +}
+>> +#endif
+>> +/* Function defined in coherncy_ll.S */
+> 
+> coherency_ll.S
+
+I knew I have to fix it, and I forgot
+
+> 
+>> +extern void ll_set_cpu_coherent(void __iomem *base_addr,
+>> +				unsigned int hw_cpu_id);
+>> +
+>> +int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
+>> +{
+>> +	if (!coherency_base) {
+>> +		pr_warn("Can't make CPU %d cache coherent.\n", hw_cpu_id);
+>> +		pr_warn("Coherency fabric is not initialized\n");
+>> +		return 1;
+>> +	}
+>> +	ll_set_cpu_coherent(coherency_base, hw_cpu_id);
+>> +	return 0;
+> 
+> You can just do return ll_set_cpu_coherent(...) now.
+
+Yes of course that was the plan.
+
+> 
+>> +}
+>> +
+>> +int __init coherency_init(void)
+>> +{
+>> +	struct device_node *np;
+>> +
+>> +	np = of_find_matching_node(NULL, of_coherency_table);
+>> +	if (np) {
+>> +		pr_info("Initializing Coherency fabric\n");
+>> +		coherency_base = of_iomap(np, 0);
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
+>> new file mode 100644
+>> index 0000000..2f42813
+>> --- /dev/null
+>> +++ b/arch/arm/mach-mvebu/coherency.h
+>> @@ -0,0 +1,24 @@
+>> +/*
+>> + * arch/arm/mach-mvebu/include/mach/coherency.h
+>> + *
+>> + *
+>> + * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
+>> + *
+>> + * Copyright (C) 2012 Marvell
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2.  This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#ifndef __MACH_370_XP_COHERENCY_H
+>> +#define __MACH_370_XP_COHERENCY_H
+>> +
+>> +#ifdef CONFIG_SMP
+>> +int coherency_get_cpu_count(void);
+>> +#endif
+>> +
+>> +int set_cpu_coherent(int cpu_id, int smp_group_id);
+>> +int coherency_init(void);
+>> +
+>> +#endif	/* __MACH_370_XP_COHERENCY_H */
+>> diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+>> new file mode 100644
+>> index 0000000..ae48730
+>> --- /dev/null
+>> +++ b/arch/arm/mach-mvebu/coherency_ll.S
+>> @@ -0,0 +1,47 @@
+>> +/*
+>> + * Coherency fabric: low level functions
+>> + *
+>> + * Copyright (C) 2012 Marvell
+>> + *
+>> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2.  This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + *
+>> + * This file implements the assembly function to add a CPU to the
+>> + * coherency fabric. This function is called by each of the secondary
+>> + * CPUs during their early boot in an SMP kernel, this why this
+>> + * function have to callable from assembly. It can also be called by a
+>> + * primary CPU from C code during its boot.
+>> + */
+>> +
+>> +#include <linux/linkage.h>
+>> +#define ARMADA_XP_CFB_CTL_REG_OFFSET 0x0
+>> +#define ARMADA_XP_CFB_CFG_REG_OFFSET 0x4
+>> +
+>> +	.text
+>> +/*
+>> + * r0: Coherency fabric base register address
+>> + * r1: HW CPU id
+>> + */
+>> +ENTRY(ll_set_cpu_coherent)
+>> +	/* Create bit by cpu index */
+>> +	mov	r3, #(1 << 24)
+>> +	lsl     r1, r3, r1
+>> +
+>> +	/* Add CPU to SMP group - Atomic */
+>> +	add	r3, r0, #ARMADA_XP_CFB_CTL_REG_OFFSET
+>> +	ldr     r2, [r3]
+>> +	orr     r2, r2, r1
+>> +	str	r2, [r0]
+>> +
+>> +	/* Enable coherency on CPU - Atomic */
+>> +	add	r3, r0, #ARMADA_XP_CFB_CFG_REG_OFFSET
+>> +	ldr     r2, [r3]
+>> +	orr     r2, r2, r1
+>> +	str     r2, [r3]
+> 
+> I forgot to mention this before, but do you need a dsb or something here?
+> 
+> Will
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
 -- 
-1.7.9.5
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
