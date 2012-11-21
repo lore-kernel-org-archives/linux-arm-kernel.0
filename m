@@ -1,28 +1,45 @@
-From: anilkumar@ti.com (AnilKumar Ch)
-Date: Wed, 21 Nov 2012 12:29:16 +0530
-Subject: [PATCH 0/7] ARM: OMAP2+: AM33XX: Enable few drivers in
- omap2plus_defconfig
-Message-ID: <1353481163-29462-1-git-send-email-anilkumar@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 20 Nov 2012 23:03:03 -0800
+Subject: [GIT PULL v2] at91: fixes for 3.7-rc7
+In-Reply-To: <50AB466F.5010500@atmel.com>
+References: <50AA5ED5.8090901@atmel.com>
+ <CAOesGMjAYtEkmEYnzCQ4G821BWG9D6LHvgt5aOMJgus_hzFkRA@mail.gmail.com>
+ <50AA6C76.3000606@atmel.com> <50AB466F.5010500@atmel.com>
+Message-ID: <20121121070303.GD7615@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enable tps65910, lis3lv02d accelerometer, tsl2550
-ambient light sensor, matrix keypad, tmp275 temperature sensor, gpio
-leds and D_CAN drivers in omap2plus_defconfig.
+Hi,
 
-These are the peripherals present in AM33XX family of devices.
 
-AnilKumar Ch (7):
-  ARM: OMAP2+: omap2plus_defconfig: Enable tps65910 PMIC
-  ARM: OMAP2+: omap2plus_defconfig: Enable lis3lv02d accelerometer
-  ARM: OMAP2+: omap2plus_defconfig: Enable tsl2550 ambient light sensor
-  ARM: OMAP2+: omap2plus_defconfig: Enable matrix keypad driver
-  ARM: OMAP2+: omap2plus_defconfig: Enable tmp275 sensor
-  ARM: OMAP2+: omap2plus_defconfig: Enable leds-gpio driver
-  ARM: OMAP2+: omap2plus_defconfig: Enable DCAN controller
+On Tue, Nov 20, 2012 at 09:59:27AM +0100, Nicolas Ferre wrote:
+> Arnd, Olof,
+> 
+> Just for the record, I do not want to put pressure at a such late time in
+> the 3.7-rc process. So, I just reworked that pull-request because the previous
+> one was wrong:
+> - wrong patch content (DT nodes with wrong size)
+> - not all tags in patches (Jean-Christophe and Arnd tags were missing...)
+> 
+> Just to start from a sane base if I have to rebase this work for 3.8, I let you know
+> that I have updated this tag...
+> 
+> The following changes since commit 641f3ce64b050961d454a0716bb6dbf528315aac:
+> 
+>   ARM: at91/usbh: fix overcurrent gpio setup (2012-11-16 10:46:29 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-fixes
 
- arch/arm/configs/omap2plus_defconfig |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+The new patches seem to belong in an at91/dt branch, not in a fixes one.
 
--- 
-1.7.9.5
+I can pull in the previous fixes branch as an at91/fixes-non-critical for 3.8
+if you want. There's no need to rebase them for this, is there? What is the
+pinctrl dependency that you are talking about, are some of these patches needed
+as prerequisites for pinctrl changes or the other way around?
+
+Sorry if I've missed more elaborate emails on this and are asking repeat
+questions. ;)
+
+-Olof
