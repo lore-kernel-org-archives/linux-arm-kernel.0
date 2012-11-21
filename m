@@ -1,32 +1,80 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 21 Nov 2012 12:44:07 -0500
-Subject: [PATCH] ARM: Kirkwood: Update PCI-E fixup
-In-Reply-To: <20121121173357.GC6406@obsidianresearch.com>
-References: <20121121071906.GF19837@obsidianresearch.com>
- <20121121160555.0710e048@skate>
- <20121121173357.GC6406@obsidianresearch.com>
-Message-ID: <20121121174407.GB15800@titan.lakedaemon.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 21 Nov 2012 19:38:10 +0200
+Subject: [PATCH 3/5] ARM: OMAP: Move plat/omap-serial.h to
+ include/linux/platform_data/serial-omap.h
+In-Reply-To: <20121121174230.25576.64507.stgit@muffinssi.local>
+References: <20121121174201.25576.61961.stgit@muffinssi.local>
+ <20121121174230.25576.64507.stgit@muffinssi.local>
+Message-ID: <20121121173740.GA13262@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 10:33:57AM -0700, Jason Gunthorpe wrote:
-> On Wed, Nov 21, 2012 at 04:05:55PM +0100, Thomas Petazzoni wrote:
-> > Dear Jason Gunthorpe,
-> > 
-> > On Wed, 21 Nov 2012 00:19:06 -0700, Jason Gunthorpe wrote:
-> > 
-> > > +/* The root complex has a hardwired class of PCI_CLASS_MEMORY_OTHER, when it
-> > > +   is operating as a root complex this needs to be switched to
-> > > +   PCI_CLASS_BRIDGE_HOST or Linux will errantly try to process the BAR's on
-> > > +   the device. Decoding setup is handled by the orion code. */
-> > 
-> > Sorry for this unique silly review comment, but this comment does not
-> > comply with the kernel CodingStyle for multicomments. It should be:
+On Wed, Nov 21, 2012 at 09:42:30AM -0800, Tony Lindgren wrote:
+> We need to move this file to allow ARM multiplatform configurations
+> to build for omap2+. This can now be done as this file now only
+> contains platform_data.
 > 
-> Ok! Though I'm surprised checkpatch didn't complain?
+> cc: Russell King <linux@arm.linux.org.uk>
+> cc: Alan Cox <alan@linux.intel.com>
+> cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> cc: Govindraj.R <govindraj.raja@ti.com>
+> cc: Kevin Hilman <khilman@ti.com>
+> cc: Felipe Balbi <balbi@ti.com>
+> cc: linux-serial at vger.kernel.org
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-I'll fix this up as I'm merging it in the next few minutes.
+nice, thanks :-)
 
-thx,
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-Jason.
+> ---
+>  arch/arm/mach-omap2/serial.c                  |    4 +---
+>  drivers/tty/serial/omap-serial.c              |    3 +--
+>  include/linux/platform_data/serial-omap.h     |    0 
+>  3 files changed, 2 insertions(+), 5 deletions(-)
+>  rename arch/arm/plat-omap/include/plat/omap-serial.h => include/linux/platform_data/serial-omap.h (100%)
+> 
+> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+> index aa30a3c..25c799b 100644
+> --- a/arch/arm/mach-omap2/serial.c
+> +++ b/arch/arm/mach-omap2/serial.c
+> @@ -26,9 +26,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/console.h>
+> -
+> -#include <plat/omap-serial.h>
+> -#include <plat-omap/dma-omap.h>
+> +#include <linux/platform_data/serial-omap.h>
+>  
+>  #include "common.h"
+>  #include "omap_hwmod.h"
+> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> index 17babde..0240aa8 100644
+> --- a/drivers/tty/serial/omap-serial.c
+> +++ b/drivers/tty/serial/omap-serial.c
+> @@ -41,8 +41,7 @@
+>  #include <linux/of.h>
+>  #include <linux/gpio.h>
+>  #include <linux/pinctrl/consumer.h>
+> -
+> -#include <plat/omap-serial.h>
+> +#include <linux/platform_data/serial-omap.h>
+>  
+>  #define OMAP_MAX_HSUART_PORTS	6
+>  
+> diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/include/linux/platform_data/serial-omap.h
+> similarity index 100%
+> rename from arch/arm/plat-omap/include/plat/omap-serial.h
+> rename to include/linux/platform_data/serial-omap.h
+> 
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121121/b25f07c4/attachment.sig>
