@@ -1,56 +1,65 @@
-From: wfp5p@viridian.itc.virginia.edu (Bill Pemberton)
-Date: Wed, 21 Nov 2012 13:35:25 -0500
-Subject: [PATCH 022/493] ARM: remove CONFIG_HOTPLUG ifdefs
-In-Reply-To: <20121121114419.GB3290@n2100.arm.linux.org.uk>
-Message-ID: <20121121183525.BF1118013C@viridian.itc.virginia.edu>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 21 Nov 2012 13:35:27 -0500
+Subject: [PATCH] ARM: Kirkwood: Support basic hotplug for PCI-E
+In-Reply-To: <20121121182528.GA12715@obsidianresearch.com>
+References: <20121121182528.GA12715@obsidianresearch.com>
+Message-ID: <20121121183527.GC15800@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux writes:
+On Wed, Nov 21, 2012 at 11:25:28AM -0700, Jason Gunthorpe wrote:
+> Unconditionally register the PCI-E bus, even if the link is currently
+> down. 
+
+How does this affect clock gating on boards without PCI-E devices?  Will
+the SoC then power this unconditionally?
+
+thx,
+
+Jason.
+
+> When the link is brought up the bus can be scanned through
+> /sys/bus/pci/rescan or otherwise. Since the HW has no interrupt for
+> link up, userspace will have to take care of the timing.
 > 
-> > diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> > index b9f38e3..38279fe 100644
-> > --- a/arch/arm/kernel/vmlinux.lds.S
-> > +++ b/arch/arm/kernel/vmlinux.lds.S
-> > @@ -66,10 +66,8 @@ SECTIONS
-> >  		ARM_EXIT_DISCARD(EXIT_TEXT)
-> >  		ARM_EXIT_DISCARD(EXIT_DATA)
-> >  		EXIT_CALL
-> > -#ifndef CONFIG_HOTPLUG
-> >  		*(.ARM.exidx.devexit.text)
-> >  		*(.ARM.extab.devexit.text)
-> > -#endif
+> An earlier version of this was contingent on CONFIG_HOTPLUG, but
+> that is being removed from the kernel.
 > 
-> This to me looks wrong.  Do we want to unconditionally discard devexit
-> debugging?
+> This also fixes printing the link up/down message to be displayed
+> on one line (structured logging broke this?)
 > 
-
-Whoa, yeah, that's not right.  I got it backwards.
-
-The right fix gets rid of all those devexit lines as devexit will be
-going away.
-
-Should I just redo this patch or send an additional one that removes
-those 2 lines?
-
-
-> > diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-> > index d1ea7ce..856b58d 100644
-> > --- a/include/asm-generic/vmlinux.lds.h
-> > +++ b/include/asm-generic/vmlinux.lds.h
-> > @@ -74,13 +74,8 @@
-> >   * are handled as text/data or they can be discarded (which
-> >   * often happens at runtime)
-> >   */
-> > -#ifdef CONFIG_HOTPLUG
-> >  #define DEV_KEEP(sec)    *(.dev##sec)
-> >  #define DEV_DISCARD(sec)
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> ---
+>  arch/arm/mach-kirkwood/pcie.c |   10 +++-------
+>  1 files changed, 3 insertions(+), 7 deletions(-)
 > 
-> I hope there will be a follow-on patch to remove the DEV_KEEP() and
-> DEV_DISCARD() stuff entirely?
+> All PCI-E ports are required to support hot plug at the link training
+> level. Our systems support it electrically, and userspace sequences
+> everything to work properly. But the PCI-E root port needs to be
+> registered with the kernel to initiate a rescan via sysfs when things
+> are ready.
 > 
-
-Yes, once hotplug is truly gone these can also go away.
-
--- 
-Bill
+> diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
+> index 59c97fe..80fd4f2 100644
+> --- a/arch/arm/mach-kirkwood/pcie.c
+> +++ b/arch/arm/mach-kirkwood/pcie.c
+> @@ -244,13 +244,9 @@ static struct hw_pci kirkwood_pci __initdata = {
+>  
+>  static void __init add_pcie_port(int index, void __iomem *base)
+>  {
+> -	printk(KERN_INFO "Kirkwood PCIe port %d: ", index);
+> -
+> -	if (orion_pcie_link_up(base)) {
+> -		printk(KERN_INFO "link up\n");
+> -		pcie_port_map[num_pcie_ports++] = index;
+> -	} else
+> -		printk(KERN_INFO "link down, ignoring\n");
+> +	pcie_port_map[num_pcie_ports++] = index;
+> +	pr_info("Kirkwood PCIe port %d: link %s\n", index,
+> +		orion_pcie_link_up(base) ? "up" : "down");
+>  }
+>  
+>  void __init kirkwood_pcie_init(unsigned int portmask)
+> -- 
+> 1.7.5.4
+> 
