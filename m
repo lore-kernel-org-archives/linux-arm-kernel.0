@@ -1,92 +1,108 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 21 Nov 2012 14:35:52 -0500
-Subject: [PATCH] ARM: Kirkwood: Add SPI_CHPA and SPI_CPOL support to
- spi-orion
-In-Reply-To: <20121121192335.GA14868@obsidianresearch.com>
-References: <20121121192335.GA14868@obsidianresearch.com>
-Message-ID: <20121121193552.GE15800@titan.lakedaemon.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 21 Nov 2012 20:46:30 +0100
+Subject: [PATCH v8 3/3] ARM: EXYNOS: Enabling samsung-usbphy driver for
+ EXYNOS4210
+In-Reply-To: <1352889938-17311-4-git-send-email-p.paneri@samsung.com>
+References: <1352889938-17311-1-git-send-email-p.paneri@samsung.com>
+ <1352889938-17311-4-git-send-email-p.paneri@samsung.com>
+Message-ID: <27075802.CQr6a3IPJm@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 12:23:35PM -0700, Jason Gunthorpe wrote:
-> Support these transfer modes from the SPI layer by setting
-> the appropriate register bits before doing the transfer.
+Hi Praveen,
+
+On Wednesday 14 of November 2012 16:15:38 Praveen Paneri wrote:
+> Adding usbphy node for Exynos4210 along with the platform data.
 > 
-> This was tested on the Marvell kirkwood SOC that uses this driver.
-> 
-> Reviewed-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> Signed-off-by: Rolf Manderscheid <rvm@obsidianresearch.com>
+> Signed-off-by: Praveen Paneri <p.paneri@samsung.com>
 > ---
->  drivers/spi/spi-orion.c |   25 ++++++++++++++++++++++++-
->  1 files changed, 24 insertions(+), 1 deletions(-)
+>  arch/arm/boot/dts/exynos4210-smdkv310.dts |    5 +++++
+>  arch/arm/mach-exynos/Kconfig              |    1 +
+>  arch/arm/mach-exynos/include/mach/map.h   |    1 +
+>  arch/arm/mach-exynos/mach-exynos4-dt.c    |    8 ++++++++
+>  arch/arm/mach-exynos/setup-usb-phy.c      |   13 +++++++++++++
+>  5 files changed, 28 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-> index b17c09c..011186d 100644
-> --- a/drivers/spi/spi-orion.c
-> +++ b/drivers/spi/spi-orion.c
-> @@ -32,8 +32,12 @@
->  #define ORION_SPI_DATA_IN_REG		0x0c
->  #define ORION_SPI_INT_CAUSE_REG		0x10
->  
-> +#define ORION_SPI_MODE_CPOL		(1 << 11)
-> +#define ORION_SPI_MODE_CPHA		(1 << 12)
->  #define ORION_SPI_IF_8_16_BIT_MODE	(1 << 5)
->  #define ORION_SPI_CLK_PRESCALE_MASK	0x1F
-> +#define ORION_SPI_MODE_MASK		(ORION_SPI_MODE_CPOL | \
-> +					 ORION_SPI_MODE_CPHA)
->  
->  struct orion_spi {
->  	struct spi_master	*master;
-> @@ -123,6 +127,23 @@ static int orion_spi_baudrate_set(struct spi_device *spi, unsigned int speed)
->  	return 0;
->  }
->  
-> +static void
-> +orion_spi_mode_set(struct spi_device *spi)
-> +{
-> +	u32 reg;
-> +	struct orion_spi *orion_spi;
+> diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts
+> b/arch/arm/boot/dts/exynos4210-smdkv310.dts index 9b23a82..550903a
+> 100644
+> --- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
+> +++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+> @@ -59,6 +59,11 @@
+>  		status = "okay";
+>  	};
+> 
+> +	usbphy at 125B0000 {
+> +		compatible = "samsung,exynos4210-usbphy";
+> +		reg = <0x125B0000 0x100>;
+> +	};
 > +
-> +	orion_spi = spi_master_get_devdata(spi->master);
-> +
-> +	reg = readl(spi_reg(orion_spi, ORION_SPI_IF_CONFIG_REG));
-> +	reg &= ~ORION_SPI_MODE_MASK;
-> +	if (spi->mode & SPI_CPOL)
-> +		reg |= ORION_SPI_MODE_CPOL;
-> +	if (spi->mode & SPI_CPHA)
-> +		reg |= ORION_SPI_MODE_CPHA;
-> +	writel(reg, spi_reg(orion_spi, ORION_SPI_IF_CONFIG_REG));
-> +}
+>  	keypad at 100A0000 {
+>  		samsung,keypad-num-rows = <2>;
+>  		samsung,keypad-num-columns = <8>;
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index bb3b09a..315308c 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -410,6 +410,7 @@ config MACH_EXYNOS4_DT
+>  	select PINCTRL
+>  	select PINCTRL_EXYNOS4
+>  	select USE_OF
+> +	select EXYNOS4_SETUP_USB_PHY
+>  	help
+>  	  Machine support for Samsung Exynos4 machine with device tree
+> enabled. Select this if a fdt blob is available for the Exynos4 SoC
+> based board. diff --git a/arch/arm/mach-exynos/include/mach/map.h
+> b/arch/arm/mach-exynos/include/mach/map.h index ef4958b..e64fe1c 100644
+> --- a/arch/arm/mach-exynos/include/mach/map.h
+> +++ b/arch/arm/mach-exynos/include/mach/map.h
+> @@ -244,6 +244,7 @@
+>  #define S3C_PA_SPI1			EXYNOS4_PA_SPI1
+>  #define S3C_PA_SPI2			EXYNOS4_PA_SPI2
+>  #define S3C_PA_USB_HSOTG		EXYNOS4_PA_HSOTG
+> +#define S3C_PA_USB_PHY			EXYNOS4_PA_HSPHY
+> 
+>  #define S5P_PA_EHCI			EXYNOS4_PA_EHCI
+>  #define S5P_PA_FIMC0			EXYNOS4_PA_FIMC0
+> diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c
+> b/arch/arm/mach-exynos/mach-exynos4-dt.c index 8858068..f7887e5 100644
+> --- a/arch/arm/mach-exynos/mach-exynos4-dt.c
+> +++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
+> @@ -13,6 +13,7 @@
+> 
+>  #include <linux/of_platform.h>
+>  #include <linux/serial_core.h>
+> +#include <linux/platform_data/samsung-usbphy.h>
+> 
+>  #include <asm/mach/arch.h>
+>  #include <asm/hardware/gic.h>
+> @@ -20,9 +21,14 @@
+> 
+>  #include <plat/cpu.h>
+>  #include <plat/regs-serial.h>
+> +#include <plat/usb-phy.h>
+> 
+>  #include "common.h"
+> 
+> +static struct samsung_usbphy_data exynos4_usbphy_pdata = {
+> +	.pmu_isolation = s5p_usb_phy_pmu_isolation,
+> +};
 > +
 >  /*
->   * called only when no transfer is active on the bus
->   */
-> @@ -142,6 +163,8 @@ orion_spi_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
->  	if ((t != NULL) && t->bits_per_word)
->  		bits_per_word = t->bits_per_word;
->  
-> +	orion_spi_mode_set(spi);
-> +
->  	rc = orion_spi_baudrate_set(spi, speed);
->  	if (rc)
->  		return rc;
-> @@ -399,7 +422,7 @@ static int __init orion_spi_probe(struct platform_device *pdev)
->  	}
->  
->  	/* we support only mode 0, and no options */
-> -	master->mode_bits = 0;
-> +	master->mode_bits = SPI_CPHA | SPI_CPOL;
+>   * The following lookup table is used to override device names when
+> devices * are registered from device tree. This is temporarily added to
+> enable @@ -79,6 +85,8 @@ static const struct of_dev_auxdata
+> exynos4_auxdata_lookup[] __initconst = { OF_DEV_AUXDATA("arm,pl330",
+> EXYNOS4_PA_PDMA1, "dma-pl330.1", NULL),
+> OF_DEV_AUXDATA("samsung,exynos4210-tmu", EXYNOS4_PA_TMU,
+>  				"exynos-tmu", NULL),
+> +	OF_DEV_AUXDATA("samsung,exynos4210-usbphy", EXYNOS4_PA_HSPHY,
+> +			"s3c-usbphy", &exynos4_usbphy_pdata),
 
-The comment no longer seems valid.  ;-)  Also, you are unconditionally
-enabling these modes.  Do all users of this driver support this?
+You should consider reworking the usb phy driver to avoid the need to 
+specify platform data through of auxdata, because auxdata array in mach-
+exynos4-dt is going to be removed after including common clock framework 
+support for Exynos4.
 
-thx,
-
-Jason.
-
->  
->  	master->setup = orion_spi_setup;
->  	master->transfer_one_message = orion_spi_transfer_one_message;
-> -- 
-> 1.7.5.4
-> 
+Best regards,
+Tomasz Figa
