@@ -1,65 +1,25 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 21 Nov 2012 13:35:27 -0500
-Subject: [PATCH] ARM: Kirkwood: Support basic hotplug for PCI-E
-In-Reply-To: <20121121182528.GA12715@obsidianresearch.com>
-References: <20121121182528.GA12715@obsidianresearch.com>
-Message-ID: <20121121183527.GC15800@titan.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 Nov 2012 10:41:32 -0800
+Subject: [PATCH 3/5] ARM: OMAP: Move plat/omap-serial.h to
+ include/linux/platform_data/serial-omap.h
+In-Reply-To: <20121121174230.25576.64507.stgit@muffinssi.local>
+References: <20121121174201.25576.61961.stgit@muffinssi.local>
+ <20121121174230.25576.64507.stgit@muffinssi.local>
+Message-ID: <20121121184131.GA18567@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 11:25:28AM -0700, Jason Gunthorpe wrote:
-> Unconditionally register the PCI-E bus, even if the link is currently
-> down. 
+* Tony Lindgren <tony@atomide.com> [121121 09:44]:
+> We need to move this file to allow ARM multiplatform configurations
+> to build for omap2+. This can now be done as this file now only
+> contains platform_data.
 
-How does this affect clock gating on boards without PCI-E devices?  Will
-the SoC then power this unconditionally?
+Russell, this one depends on your commit fd9980c7 (SERIAL: omap:
+remove OMAP_UART_SYSC_RESET and OMAP_UART_FIFO_CLR).
 
-thx,
+Is that commit immutable and OK to merge as a dependency to my
+branch?
 
-Jason.
+Regards,
 
-> When the link is brought up the bus can be scanned through
-> /sys/bus/pci/rescan or otherwise. Since the HW has no interrupt for
-> link up, userspace will have to take care of the timing.
-> 
-> An earlier version of this was contingent on CONFIG_HOTPLUG, but
-> that is being removed from the kernel.
-> 
-> This also fixes printing the link up/down message to be displayed
-> on one line (structured logging broke this?)
-> 
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> ---
->  arch/arm/mach-kirkwood/pcie.c |   10 +++-------
->  1 files changed, 3 insertions(+), 7 deletions(-)
-> 
-> All PCI-E ports are required to support hot plug at the link training
-> level. Our systems support it electrically, and userspace sequences
-> everything to work properly. But the PCI-E root port needs to be
-> registered with the kernel to initiate a rescan via sysfs when things
-> are ready.
-> 
-> diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
-> index 59c97fe..80fd4f2 100644
-> --- a/arch/arm/mach-kirkwood/pcie.c
-> +++ b/arch/arm/mach-kirkwood/pcie.c
-> @@ -244,13 +244,9 @@ static struct hw_pci kirkwood_pci __initdata = {
->  
->  static void __init add_pcie_port(int index, void __iomem *base)
->  {
-> -	printk(KERN_INFO "Kirkwood PCIe port %d: ", index);
-> -
-> -	if (orion_pcie_link_up(base)) {
-> -		printk(KERN_INFO "link up\n");
-> -		pcie_port_map[num_pcie_ports++] = index;
-> -	} else
-> -		printk(KERN_INFO "link down, ignoring\n");
-> +	pcie_port_map[num_pcie_ports++] = index;
-> +	pr_info("Kirkwood PCIe port %d: link %s\n", index,
-> +		orion_pcie_link_up(base) ? "up" : "down");
->  }
->  
->  void __init kirkwood_pcie_init(unsigned int portmask)
-> -- 
-> 1.7.5.4
-> 
+Tony
