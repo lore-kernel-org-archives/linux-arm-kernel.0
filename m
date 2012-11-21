@@ -1,43 +1,107 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 21 Nov 2012 15:38:11 +0000
-Subject: [PATCH] mmc: mmci: Support non-power-of-two block sizes for
- ux500v2 variant
-In-Reply-To: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20121121153811.GN3290@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 21 Nov 2012 16:38:07 +0100
+Subject: [PATCH 1/1 v2] net: add micrel KSZ8873MLL switch support
+In-Reply-To: <1353493630-30867-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1353493630-30867-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1353512287-24048-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 04:02:02PM +0200, Ulf Hansson wrote:
->  /*
-> + * Validate mmc prerequisites
-> + */
-> +static int mmci_validate_data(struct mmci_host *host,
-> +			      struct mmc_data *data)
-> +{
-> +	if (!data)
-> +		return 0;
-> +
-> +	if (!host->variant->non_power_of_2_blksize &&
-> +	    !is_power_of_2(data->blksz)) {
-> +		dev_err(mmc_dev(host->mmc),
-> +			"unsupported block size (%d bytes)\n", data->blksz);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (data->sg->offset & 3) {
-> +		dev_err(mmc_dev(host->mmc),
-> +			"unsupported alginment (0x%x)\n", data->sg->offset);
-> +		return -EINVAL;
-> +	}
+this will allow to detect the link between the switch and the soc
 
-Why?  What's the reasoning behind this suddenly introduced restriction?
-readsl()/writesl() copes just fine with non-aligned pointers.  It may be
-that your DMA engine can not, but that's no business interfering with
-non-DMA transfers, and no reason to fail such transfers.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: netdev at vger.kernel.org
+---
+v2:
 
-If your DMA engine can't do that then its your DMA engine code which
-should refuse to prepare the transfer.
+	fix typo in the phy_driver name
 
-Yes, that means problems with the way things are ordered - or it needs a
-proper API where DMA engine can export these kinds of properties.
+Best Regards,
+J.
+ drivers/net/phy/micrel.c   |   44 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/micrel_phy.h |    1 +
+ 2 files changed, 45 insertions(+)
+
+diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
+index 2165d5f..b983596 100644
+--- a/drivers/net/phy/micrel.c
++++ b/drivers/net/phy/micrel.c
+@@ -127,6 +127,39 @@ static int ks8051_config_init(struct phy_device *phydev)
+ 	return 0;
+ }
+ 
++#define KSZ8873MLL_GLOBAL_CONTROL_4	0x06
++#define KSZ8873MLL_GLOBAL_CONTROL_4_DUPLEX	(1 << 6)
++#define KSZ8873MLL_GLOBAL_CONTROL_4_SPEED	(1 << 4)
++int ksz8873mll_read_status(struct phy_device *phydev)
++{
++	int regval;
++
++	/* dummy read */
++	regval = phy_read(phydev, KSZ8873MLL_GLOBAL_CONTROL_4);
++
++	regval = phy_read(phydev, KSZ8873MLL_GLOBAL_CONTROL_4);
++
++	if (regval & KSZ8873MLL_GLOBAL_CONTROL_4_DUPLEX)
++		phydev->duplex = DUPLEX_HALF;
++	else
++		phydev->duplex = DUPLEX_FULL;
++
++	if (regval & KSZ8873MLL_GLOBAL_CONTROL_4_SPEED)
++		phydev->speed = SPEED_10;
++	else
++		phydev->speed = SPEED_100;
++
++	phydev->link = 1;
++	phydev->pause = phydev->asym_pause = 0;
++
++	return 0;
++}
++
++static int ksz8873mll_config_aneg(struct phy_device *phydev)
++{
++	return 0;
++}
++
+ static struct phy_driver ksphy_driver[] = {
+ {
+ 	.phy_id		= PHY_ID_KS8737,
+@@ -204,6 +237,16 @@ static struct phy_driver ksphy_driver[] = {
+ 	.ack_interrupt	= kszphy_ack_interrupt,
+ 	.config_intr	= ksz9021_config_intr,
+ 	.driver		= { .owner = THIS_MODULE, },
++}, {
++	.phy_id		= PHY_ID_KSZ8873MLL,
++	.phy_id_mask	= 0x00fffff0,
++	.name		= "Micrel KSZ8873MLL Switch",
++	.features	= (SUPPORTED_Pause | SUPPORTED_Asym_Pause),
++	.flags		= PHY_HAS_MAGICANEG,
++	.config_init	= kszphy_config_init,
++	.config_aneg	= ksz8873mll_config_aneg,
++	.read_status	= ksz8873mll_read_status,
++	.driver		= { .owner = THIS_MODULE, },
+ } };
+ 
+ static int __init ksphy_init(void)
+@@ -232,6 +275,7 @@ static struct mdio_device_id __maybe_unused micrel_tbl[] = {
+ 	{ PHY_ID_KSZ8021, 0x00ffffff },
+ 	{ PHY_ID_KSZ8041, 0x00fffff0 },
+ 	{ PHY_ID_KSZ8051, 0x00fffff0 },
++	{ PHY_ID_KSZ8873MLL, 0x00fffff0 },
+ 	{ }
+ };
+ 
+diff --git a/include/linux/micrel_phy.h b/include/linux/micrel_phy.h
+index de20120..adfe8c0 100644
+--- a/include/linux/micrel_phy.h
++++ b/include/linux/micrel_phy.h
+@@ -15,6 +15,7 @@
+ 
+ #define MICREL_PHY_ID_MASK	0x00fffff0
+ 
++#define PHY_ID_KSZ8873MLL	0x000e7237
+ #define PHY_ID_KSZ9021		0x00221610
+ #define PHY_ID_KS8737		0x00221720
+ #define PHY_ID_KSZ8021		0x00221555
+-- 
+1.7.10.4
