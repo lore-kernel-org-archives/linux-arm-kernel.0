@@ -1,44 +1,26 @@
-From: acourbot@nvidia.com (Alex Courbot)
-Date: Wed, 21 Nov 2012 19:00:32 +0900
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <50AC956D.7020303@ti.com>
-References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
- <1699753.ZQsWMHINxd@percival> <50AC956D.7020303@ti.com>
-Message-ID: <4275468.QAmZy3xUK6@percival>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 21 Nov 2012 11:00:53 +0100
+Subject: [PATCH 2/4] pinctrl: mvebu: Fix dove_audio1_ctrl_set function
+In-Reply-To: <1353317996-20841-3-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1353317996-20841-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1353317996-20841-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CACRpkdZy86OAYbszTZDrs+bdkkEmS9+8z450U1qX+AF4sp5C5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 November 2012 16:48:45 Tomi Valkeinen wrote:
-> If the power-off sequence disables a regulator that was supposed to be
-> enabled by the power-on sequence (but wasn't enabled because of an
-> error), the regulator_disable is still called when the driver runs the
-> power-off sequence, isn't it? Regulator enables and disables are ref
-> counted, and the enables should match the disables.
+On Mon, Nov 19, 2012 at 10:39 AM, Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com> wrote:
 
-And there collapses my theory.
+> From: Axel Lin <axel.lin@ingics.com>
+>
+> When setting audio1 pinmux the bits in the corresponding registers
+> are not cleared. This fix first clears all bits and then sets the
+> required bits according to the selected function.
+>
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-> > Failures might be better handled if sequences have some "recovery policy"
-> > about what to do when they fail, as mentioned in the link above. As you
-> > pointed out, the driver might not always know enough about the resources
-> > involved to do the right thing.
-> 
-> Yes, I think such recovery policy would be needed.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Indeed, from your last paragraph this makes even more sense now.
-
-Oh, and I noticed I forgot to reply to this:
-
-> This I didn't understand. Doesn't "<&pwm 2 xyz>" point to a single
-> device, no matter where and how many times it's used?
-
-That's true - however when dereferencing the phandle, the underlying framework 
-will try to acquire the PWM, which will result in failure if the same resource 
-is referenced several times.
-
-One could compare the phandles to avoid this, but in your example you must 
-know that for PWMs the "xyz" part is not relevant for comparison.
-
-This makes referencing of resources by name much easier to implement and more 
-elegant with respect to frameworks leveraging.
-
-Alex.
+Yours,
+Linus Walleij
