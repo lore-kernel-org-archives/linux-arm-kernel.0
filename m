@@ -1,108 +1,68 @@
-From: matthieu.castet@parrot.com (Matthieu CASTET)
-Date: Wed, 21 Nov 2012 17:06:26 +0100
-Subject: [PATCH 6/9] usb: chipidea: add PTW and PTS handling
-In-Reply-To: <20121121155723.GA16409@pengutronix.de>
-References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
- <1352909950-32555-7-git-send-email-m.grzeschik@pengutronix.de>
- <87zk2h67ik.fsf@ashishki-desk.ger.corp.intel.com>
- <20121116131628.GA21447@pengutronix.de>
- <87lie1659c.fsf@ashishki-desk.ger.corp.intel.com>
- <20121116135743.GB21447@pengutronix.de>
- <87ip9563r8.fsf@ashishki-desk.ger.corp.intel.com>
- <50A651E1.5030001@parrot.com>
- <87fw495zgh.fsf@ashishki-desk.ger.corp.intel.com>
- <20121121155723.GA16409@pengutronix.de>
-Message-ID: <50ACFC02.9010805@parrot.com>
+From: per.lkml@gmail.com (Per Forlin)
+Date: Wed, 21 Nov 2012 17:13:55 +0100
+Subject: [PATCH] mmc: mmci: Support non-power-of-two block sizes for
+ ux500v2 variant
+In-Reply-To: <20121121153811.GN3290@n2100.arm.linux.org.uk>
+References: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121121153811.GN3290@n2100.arm.linux.org.uk>
+Message-ID: <CAFEEs1kzJUgsvnzgWwU4i7o1jkE=8iTq5+NJ_t1jdiHEm7b-RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Grzeschik a ?crit :
-> On Fri, Nov 16, 2012 at 05:39:42PM +0200, Alexander Shishkin wrote:
->> Matthieu CASTET <matthieu.castet@parrot.com> writes:
->>
->>> Alexander Shishkin a ?crit :
->>>> Michael Grzeschik <mgr@pengutronix.de> writes:
->>>>
->>>>> On Fri, Nov 16, 2012 at 03:34:23PM +0200, Alexander Shishkin wrote:
->>>>>> Michael Grzeschik <mgr@pengutronix.de> writes:
->>>>>>
->>>>>>> On Fri, Nov 16, 2012 at 02:45:39PM +0200, Alexander Shishkin wrote:
->>>>>>>> Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
->>>>>>>>
->>>>>>>>> This patch makes it possible to configure the PTW and PTS bits inside
->>>>>>>>> the portsc register for host and device mode before the driver starts
->>>>>>>>> and the phy can be addressed as hardware implementation is designed.
->>>>>>>>>
->>>>>>>>> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
->>>>>>>>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->>>>>>>>> ---
->>>>>>>>>  drivers/usb/chipidea/bits.h        |    3 +++
->>>>>>>>>  drivers/usb/chipidea/ci.h          |    2 ++
->>>>>>>>>  drivers/usb/chipidea/ci13xxx_imx.c |    1 +
->>>>>>>>>  drivers/usb/chipidea/core.c        |   47 ++++++++++++++++++++++++++++++++++++
->>>>>>>>>  drivers/usb/chipidea/host.c        |    4 +++
->>>>>>>>>  include/linux/usb/chipidea.h       |    9 +++++++
->>>>>>>>>  6 files changed, 66 insertions(+)
->>>>>>>>>
->>>>>>>>> diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
->>>>>>>>> index 4b6ae3e..3cded5f 100644
->>>>>>>>> --- a/drivers/usb/chipidea/bits.h
->>>>>>>>> +++ b/drivers/usb/chipidea/bits.h
->>>>>>>>> @@ -48,6 +48,9 @@
->>>>>>>>>  #define PORTSC_SUSP           BIT(7)
->>>>>>>>>  #define PORTSC_HSP            BIT(9)
->>>>>>>>>  #define PORTSC_PTC            (0x0FUL << 16)
->>>>>>>>> +#define PORTSC_PTS            (BIT(31) | BIT(30))
->>>>>>>>> +#define PORTSC_PTW            BIT(28)
->>>>>>>>> +#define PORTSC_STS            BIT(29)
->>>>>>>> Hm, my spec says these are actually in DEVLC register and only have this
->>>>>>>> meaning in device mode. And in portsc these bits fall in device address
->>>>>>>> bitfield. Can you refer me to your spec?
->>>>>>> You can find it here:
->>>>>>> http://cache.freescale.com/files/32bit/doc/ref_manual/iMX53RM.pdf?fpsp=1
->>>>>>> Page 4947
->>>>>> Oh, but see, the offset is 0x184, which in chipidea spec (the version
->>>>>> that I have) corresponds to DEVLC and not PORTSC. So in this driver's
->>>>>> terminology it's DEVLC too, at least currently.
->>>>>>
->>>>>> So have you tested this code and did it make any difference?
->>>>> Yes, i have tested this code with MX25, MX28, MX35 and MX53. In every
->>>>> SoCs Datasheet the PORTSC register is defined on PORTBASE+0x184. Without
->>>>> this proper configuration its not possible to communicate with the PHY.
->>>> No, I mean, you're writing DEVLC (using present driver's terminology)
->>>> bits to PORTSC register. It *shouldn't* work. I suppose, it does
->>>> something, but not exactly what you intended.
->>>>
->>> I confirm in our datasheet we have PTW, PTS, STS in this register  PORTSCx with
->>> this mapping.
->>>
->>> In later design that support lpm, these bits have to move in another register
->>> because ehci 1.1 use them [1].
->> Ahh, I didn't realize imxes were nolpm. Now it makes more sense. This
->> means that, as you suggested in the other mail, these portsc/devlc
->> accesses should be done conditionally based on ci->hw_bank.lpm.
-> 
-> To handle lpm devices in this patch, we need some register layout of the
-> lpm core. Probably only te DEVLC register. Is there some documentation
-> available?
+On Wed, Nov 21, 2012 at 4:38 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Oct 12, 2012 at 04:02:02PM +0200, Ulf Hansson wrote:
+>>  /*
+>> + * Validate mmc prerequisites
+>> + */
+>> +static int mmci_validate_data(struct mmci_host *host,
+>> +                           struct mmc_data *data)
+>> +{
+>> +     if (!data)
+>> +             return 0;
+>> +
+>> +     if (!host->variant->non_power_of_2_blksize &&
+>> +         !is_power_of_2(data->blksz)) {
+>> +             dev_err(mmc_dev(host->mmc),
+>> +                     "unsupported block size (%d bytes)\n", data->blksz);
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     if (data->sg->offset & 3) {
+>> +             dev_err(mmc_dev(host->mmc),
+>> +                     "unsupported alginment (0x%x)\n", data->sg->offset);
+>> +             return -EINVAL;
+>> +     }
+>
+> Why?  What's the reasoning behind this suddenly introduced restriction?
+> readsl()/writesl() copes just fine with non-aligned pointers.  It may be
+> that your DMA engine can not, but that's no business interfering with
+> non-DMA transfers, and no reason to fail such transfers.
+>
+> If your DMA engine can't do that then its your DMA engine code which
+> should refuse to prepare the transfer.
+>
+> Yes, that means problems with the way things are ordered - or it needs a
+> proper API where DMA engine can export these kinds of properties.
+The alignment constraint is related to PIO, sg_miter and that FIFO
+access must be done with 4 bytes.
 
-In include/linux/usb/langwell_udc.h before it was removed, you could find the
-mapping :
+For a 8k buffer sg miter may return 3 buffer
+1. 7 bytes
+2. 4096
+3. 4089
 
-    u32 devlc;      /* control LPM and each USB port behavior */
-/* bits 31:29, parallel transceiver select */
-#define LPM_PTS(d)  (((d)>>29)&7)
-#define LPM_STS     BIT(28) /* serial transceiver select */
-#define LPM_PTW     BIT(27) /* parallel transceiver width */
-#define LPM_PSPD(d) (((d)>>25)&3)   /* bits 26:25, port speed */
-#define LPM_PSPD_MASK   (BIT(26) | BIT(25))
-#define LPM_SPEED_FULL  0
-#define LPM_SPEED_LOW   1
-#define LPM_SPEED_HIGH  2
-#define LPM_SRT     BIT(24) /* shorten reset time */
-#define LPM_PFSC    BIT(23) /* port force full speed connect */
-#define LPM_PHCD    BIT(22) /* PHY low power suspend clock disable */
-#define LPM_STL     BIT(16) /* STALL reply to LPM token */
-#define LPM_BA(d)   \
-    (((d)>>1)&0x7ff)    /* bits 11:1, BmAttributes */
-#define LPM_NYT_ACK BIT(0)  /* NYET/ACK reply to LPM token */
+DMA can handle this because it will treat this a one buffer being 8 k.
+PIO will do three transfer due to sg_miter (7, 4096, 4089).
+One could change the driver to not use sg_miter and just access the 8k
+buffer directly to avoid the issue.
+
+BR
+Per
+
+
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
