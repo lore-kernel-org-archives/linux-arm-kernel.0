@@ -1,74 +1,181 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Wed, 21 Nov 2012 05:38:56 +0000
-Subject: [PATCH v2] pwm: Device tree support for PWM polarity.
-In-Reply-To: <20121120150755.GB24545@avionic-0098.adnet.avionic-design.de>
-References: <1353347472-26863-1-git-send-email-avinashphilip@ti.com>
- <20121120150755.GB24545@avionic-0098.adnet.avionic-design.de>
-Message-ID: <518397C60809E147AF5323E0420B992E3E9EC650@DBDE01.ent.ti.com>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Wed, 21 Nov 2012 11:14:10 +0530
+Subject: [PATCH v2] can: c_can: Add d_can raminit support
+Message-ID: <1353476650-24398-1-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 20:37:55, Thierry Reding wrote:
-> On Mon, Nov 19, 2012 at 11:21:12PM +0530, Philip, Avinash wrote:
-> [...]
-> > diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-> > index 112b314..70756f2 100644
-> > --- a/include/linux/pwm.h
-> > +++ b/include/linux/pwm.h
-> > @@ -78,6 +78,10 @@ enum {
-> >  	PWMF_ENABLED = 1 << 1,
-> >  };
-> >  
-> > +/* flags in the third cell of the DT PWM specifier */
-> > +#define PWM_SPEC_POLARITY	(1 << 0)
-> > +
-> > +
-> 
-> This doesn't belong in this header. It should go into core.c in
-> drivers/pwm.
+Add D_CAN raminit support to C_CAN driver to enable D_CAN RAM,
+which holds all the message objects during transmission or
+receiving of data. This initialization/de-initialization should
+be done in synchronous with D_CAN clock.
 
-I will move.
+In case of AM335X-EVM (current user of D_CAN driver) message RAM is
+controlled through control module register for both instances. So
+control module register details is required to initialization or
+de-initialization of message RAM according to instance number.
 
-> 
-> >  struct pwm_device {
-> >  	const char		*label;
-> >  	unsigned long		flags;
-> > @@ -176,6 +180,8 @@ void pwm_put(struct pwm_device *pwm);
-> >  
-> >  struct pwm_device *devm_pwm_get(struct device *dev, const char *consumer);
-> >  void devm_pwm_put(struct device *dev, struct pwm_device *pwm);
-> > +struct pwm_device *of_pwm_xlate_with_flags(struct pwm_chip *pc,
-> > +		const struct of_phandle_args *args);
-> 
-> The placement of this prototype is odd. I think a better place would be
-> between pwm_request_from_chip() and pwm_get(), separated by blank lines
-> to make it stand out as an OF specific function.
+Control module memory resource is obtained from D_CAN dt node and
+instance number obtained from device tree aliases node.
 
-Ok I will move to between pwm_request_from_chip() and pwm_get().
+This patch was tested on AM335x-EVM along with pinctrl data addition
+patch, d_can dt aliases addition and control module data addition.
+pinctrl data addition is not added to am335x-evm.dts (only supports
+CPLD profile#0) because d_can1 is supported under CPLD profile#1.
 
-> 
-> >  #else
-> >  static inline int pwm_set_chip_data(struct pwm_device *pwm, void *data)
-> >  {
-> > @@ -223,6 +229,12 @@ static inline struct pwm_device *devm_pwm_get(struct device *dev,
-> >  static inline void devm_pwm_put(struct device *dev, struct pwm_device *pwm)
-> >  {
-> >  }
-> > +
-> > +static inline struct pwm_device *of_pwm_xlate_with_flags(struct pwm_chip *pc,
-> > +		const struct of_phandle_args *args)
-> > +{
-> > +	return ERR_PTR(-ENODEV);
-> > +}
-> 
-> This function should only be used by PWM drivers and therefore doesn't
-> need to have a dummy implementation such as this.
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+Changes from v1:
+	- Incorporated Marc's comments on v1
+	  * sanity check moved to c_can_probe() from c_can_hw_raminit()
+	  * device instance is assigned using conditional operator
+	  * Changed warning to info to tell control module is not
+	    used for raminit if there is no second IORESOURCE_MEM
+	- Dropped dt patches
+	  * No changes from v1
+	  * Those will go to linux-omap/master
 
-Ok I will remove.
+ drivers/net/can/c_can/c_can.c          |   12 ++++++++++++
+ drivers/net/can/c_can/c_can.h          |    3 +++
+ drivers/net/can/c_can/c_can_platform.c |   33 +++++++++++++++++++++++++++++++-
+ 3 files changed, 47 insertions(+), 1 deletion(-)
 
-Thanks
-Avinash
-
-> 
-> Thierry
-> 
+diff --git a/drivers/net/can/c_can/c_can.c b/drivers/net/can/c_can/c_can.c
+index e5180df..c15830c 100644
+--- a/drivers/net/can/c_can/c_can.c
++++ b/drivers/net/can/c_can/c_can.c
+@@ -233,6 +233,12 @@ static inline void c_can_pm_runtime_put_sync(const struct c_can_priv *priv)
+ 		pm_runtime_put_sync(priv->device);
+ }
+ 
++static inline void c_can_reset_ram(const struct c_can_priv *priv, bool enable)
++{
++	if (priv->ram_init)
++		priv->ram_init(priv, enable);
++}
++
+ static inline int get_tx_next_msg_obj(const struct c_can_priv *priv)
+ {
+ 	return (priv->tx_next & C_CAN_NEXT_MSG_OBJ_MASK) +
+@@ -1090,6 +1096,7 @@ static int c_can_open(struct net_device *dev)
+ 	struct c_can_priv *priv = netdev_priv(dev);
+ 
+ 	c_can_pm_runtime_get_sync(priv);
++	c_can_reset_ram(priv, true);
+ 
+ 	/* open the can device */
+ 	err = open_candev(dev);
+@@ -1118,6 +1125,7 @@ static int c_can_open(struct net_device *dev)
+ exit_irq_fail:
+ 	close_candev(dev);
+ exit_open_fail:
++	c_can_reset_ram(priv, false);
+ 	c_can_pm_runtime_put_sync(priv);
+ 	return err;
+ }
+@@ -1131,6 +1139,8 @@ static int c_can_close(struct net_device *dev)
+ 	c_can_stop(dev);
+ 	free_irq(dev->irq, dev);
+ 	close_candev(dev);
++
++	c_can_reset_ram(priv, false);
+ 	c_can_pm_runtime_put_sync(priv);
+ 
+ 	return 0;
+@@ -1188,6 +1198,7 @@ int c_can_power_down(struct net_device *dev)
+ 
+ 	c_can_stop(dev);
+ 
++	c_can_reset_ram(priv, false);
+ 	c_can_pm_runtime_put_sync(priv);
+ 
+ 	return 0;
+@@ -1206,6 +1217,7 @@ int c_can_power_up(struct net_device *dev)
+ 	WARN_ON(priv->type != BOSCH_D_CAN);
+ 
+ 	c_can_pm_runtime_get_sync(priv);
++	c_can_reset_ram(priv, true);
+ 
+ 	/* Clear PDR and INIT bits */
+ 	val = priv->read_reg(priv, C_CAN_CTRL_EX_REG);
+diff --git a/drivers/net/can/c_can/c_can.h b/drivers/net/can/c_can/c_can.h
+index e5ed41d..419de5c 100644
+--- a/drivers/net/can/c_can/c_can.h
++++ b/drivers/net/can/c_can/c_can.h
+@@ -169,6 +169,9 @@ struct c_can_priv {
+ 	void *priv;		/* for board-specific data */
+ 	u16 irqstatus;
+ 	enum c_can_dev_id type;
++	u32 __iomem *raminit_ctrlreg;
++	unsigned int instance;
++	void (*ram_init) (const struct c_can_priv *priv, bool enable);
+ };
+ 
+ struct net_device *alloc_c_can_dev(void);
+diff --git a/drivers/net/can/c_can/c_can_platform.c b/drivers/net/can/c_can/c_can_platform.c
+index ee141613..d1c31c8 100644
+--- a/drivers/net/can/c_can/c_can_platform.c
++++ b/drivers/net/can/c_can/c_can_platform.c
+@@ -38,6 +38,8 @@
+ 
+ #include "c_can.h"
+ 
++#define CAN_RAMINIT_START_MASK(i)	(1 << (i))
++
+ /*
+  * 16-bit c_can registers can be arranged differently in the memory
+  * architecture of different implementations. For example: 16-bit
+@@ -68,6 +70,21 @@ static void c_can_plat_write_reg_aligned_to_32bit(struct c_can_priv *priv,
+ 	writew(val, priv->base + 2 * priv->regs[index]);
+ }
+ 
++static void c_can_hw_raminit(const struct c_can_priv *priv, bool enable)
++{
++	u32 val;
++
++	val = readl(priv->raminit_ctrlreg);
++	if (enable) {
++		val &= ~CAN_RAMINIT_START_MASK(priv->instance);
++		val |= CAN_RAMINIT_START_MASK(priv->instance);
++		writel(val, priv->raminit_ctrlreg);
++	} else {
++		val &= ~CAN_RAMINIT_START_MASK(priv->instance);
++		writel(val, priv->raminit_ctrlreg);
++	}
++}
++
+ static struct platform_device_id c_can_id_table[] = {
+ 	[BOSCH_C_CAN_PLATFORM] = {
+ 		.name = KBUILD_MODNAME,
+@@ -99,7 +116,7 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
+ 	const struct of_device_id *match;
+ 	const struct platform_device_id *id;
+ 	struct pinctrl *pinctrl;
+-	struct resource *mem;
++	struct resource *mem, *res;
+ 	int irq;
+ 	struct clk *clk;
+ 
+@@ -178,6 +195,20 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
+ 		priv->can.ctrlmode_supported |= CAN_CTRLMODE_3_SAMPLES;
+ 		priv->read_reg = c_can_plat_read_reg_aligned_to_16bit;
+ 		priv->write_reg = c_can_plat_write_reg_aligned_to_16bit;
++
++		if (pdev->dev.of_node)
++			priv->instance = pdev->id < 0 ?
++				of_alias_get_id(pdev->dev.of_node, "d_can") :
++				pdev->id;
++
++		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++		priv->raminit_ctrlreg =
++				devm_request_and_ioremap(&pdev->dev, res);
++		if (!priv->raminit_ctrlreg || priv->instance < 0) {
++			dev_info(&pdev->dev, "control memory is not used for raminit\n");
++			break;
++		}
++		priv->ram_init = c_can_hw_raminit;
+ 		break;
+ 	default:
+ 		ret = -EINVAL;
+-- 
+1.7.9.5
