@@ -1,13 +1,53 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Nov 2012 00:33:30 -0800
-Subject: [GIT PULL 1/6] ARM: tegra: cleanup for 3.8
-In-Reply-To: <1353095038-20031-1-git-send-email-swarren@wwwdotorg.org>
-References: <1353095038-20031-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20121121083330.GO7615@quad.lixom.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 21 Nov 2012 09:35:16 +0100
+Subject: [PATCH V3 1/3] arm: dma mapping: Export dma ops functions
+In-Reply-To: <50AC8E16.3020006@free-electrons.com>
+References: <1353448587-2937-1-git-send-email-gregory.clement@free-electrons.com>
+ <1353448587-2937-2-git-send-email-gregory.clement@free-electrons.com>
+ <50AC7D59.1020000@samsung.com> <50AC8B41.7080009@free-electrons.com>
+ <50AC8D09.6050104@samsung.com> <50AC8E16.3020006@free-electrons.com>
+Message-ID: <50AC9244.4030300@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have pulled in all 6 branches. Thanks!
+Hello,
 
+On 11/21/2012 9:17 AM, Gregory CLEMENT wrote:
+> On 11/21/2012 09:12 AM, Marek Szyprowski wrote:
+> > Hello,
+> >
+> > On 11/21/2012 9:05 AM, Gregory CLEMENT wrote:
+> >> On 11/21/2012 08:06 AM, Marek Szyprowski wrote:
+> >>> On 11/20/2012 10:56 PM, Gregory CLEMENT wrote:
+> >>>> Expose the DMA operations functions. Until now only the dma_ops
+> >>>> structs in a whole or some dma operation were exposed. This patch
+> >>>> exposes all the dma coherents operations. They can be reused when an
+> >>>> architecture or a driver need to create its own set of dma_operation.
+> >>>>
+> >>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >>>
+> >>> Besides arm_dma_set_mask() function I see no reason to export the other
+> >>> arm dma related functions.
+> >>
+> >> The idea was to let other people use the arm dma related functions,
+> >> for their own dma ops. But for the mvebu machines we only need
+> >> arm_dma_set_mask() indeed.
+> >>
+> >> So you prefer that I only expose arm_dma_set_mask() and let future
+> >> user expose other function if they need it, right?
+> >
+> > I would prefer to avoid exporting functions which are not used anywhere
+> > else. This improves readability of the code and simply forces others to
+> > think twice before they use some static function and check if their use
+> > case is really correct.
+>
+> OK so I will send a new version in a few minutes.
+>
+> Do  you think these last changes will be enough for getting your Acked-by?
 
--Olof
+Yes, I see no other issues right now.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
