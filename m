@@ -1,31 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Nov 2012 00:08:16 -0800
-Subject: [GIT PULL][for 3.8] pull request from arch-pxa tree on
- armsoc/board branch
-In-Reply-To: <CAN1soZyds9zq_WyH4n+bPO2GzWD7ux2G9c8Ag0sksTtuoUagxg@mail.gmail.com>
-References: <CAN1soZyds9zq_WyH4n+bPO2GzWD7ux2G9c8Ag0sksTtuoUagxg@mail.gmail.com>
-Message-ID: <20121121080816.GN7615@quad.lixom.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 21 Nov 2012 09:08:52 +0100
+Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <20121120113325.dde266ed.akpm@linux-foundation.org>
+References: <20121119144826.f59667b2.akpm@linux-foundation.org>
+ <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
+ <20121120113325.dde266ed.akpm@linux-foundation.org>
+Message-ID: <50AC8C14.5050204@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 01:21:20PM +0800, Haojian Zhuang wrote:
-> Hi Olof & Arnd,
-> 
-> Please help to merge armsoc/board branch from arch-pxa git tree.
-> 
-> Regards
-> Haojian
-> 
-> The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
-> 
->   Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/hzhuang1/linux.git armsoc/board
+Hello,
 
+On 11/20/2012 8:33 PM, Andrew Morton wrote:
+> On Tue, 20 Nov 2012 15:31:45 +0100
+> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>
+> > dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag,
+> > regardless the flags provided by the caller. This causes excessive
+> > pruning of emergency memory pools without any good reason. Additionaly,
+> > on ARM architecture any driver which is using dmapools will sooner or
+> > later  trigger the following error:
+> > "ERROR: 256 KiB atomic DMA coherent pool is too small!
+> > Please increase it with coherent_pool= kernel parameter!".
+> > Increasing the coherent pool size usually doesn't help much and only
+> > delays such error, because all GFP_ATOMIC DMA allocations are always
+> > served from the special, very limited memory pool.
+> >
+>
+> Is this problem serious enough to justify merging the patch into 3.7?
+> And into -stable kernels?
 
-Pulled into next/boards. Thanks!
+I wonder if it is a good idea to merge such change at the end of current
+-rc period. It changes the behavior of dma pool allocations and I bet there
+might be some drivers which don't care much about passed gfp flags, as for
+ages it simply worked for them, even if the allocations were done from
+atomic context. What do You think? Technically it is also not a pure bugfix,
+so imho it shouldn't be considered for -stable.
 
+On the other hand at least for ARM users of sata_mv driver (which is just
+an innocent client of dma pool, correctly passing GFP_KERNEL flag) it would
+solve the issues related to shortage of atomic pool for dma allocations what
+might justify pushing it to 3.7.
 
--Olof
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
