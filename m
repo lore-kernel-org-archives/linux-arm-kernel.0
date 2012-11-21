@@ -1,29 +1,44 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 21 Nov 2012 11:20:37 +0100
-Subject: [PATCH 0/4] Dove pinctrl fixes and DT enabling
-In-Reply-To: <CACRpkdYAnNCFDCjA67r0h_CSHMifb1Z83YJfYGQV3abPB8uQZg@mail.gmail.com>
-References: <1353317996-20841-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <CACRpkdYAnNCFDCjA67r0h_CSHMifb1Z83YJfYGQV3abPB8uQZg@mail.gmail.com>
-Message-ID: <50ACAAF5.2030002@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 21 Nov 2012 10:22:44 +0000
+Subject: KEXEC on ARM cortex-a15
+In-Reply-To: <CAJXQGfL4PRW9=MQO1XbogA40sHUzXorbFMe1WkiJ751Ej-h7=g@mail.gmail.com>
+References: <CAJXQGfKpFfUwMeLGFAuTgQn5Yd2D9O271JM1VJ87Nio80tbwXw@mail.gmail.com>
+ <20121119144417.GH3290@n2100.arm.linux.org.uk>
+ <20121119151327.GG3205@mudshark.cambridge.arm.com>
+ <CAJXQGf+BQ18GhR3emhK-ejTivqx_o=gtaO3-FjTiE3BMGydgsw@mail.gmail.com>
+ <CAJXQGf+wfXGZ=PWN585dJDMX1nH+sRexf6UZujyjKM6rJeDiXQ@mail.gmail.com>
+ <20121120160219.GF26475@mudshark.cambridge.arm.com>
+ <CAJXQGfL4PRW9=MQO1XbogA40sHUzXorbFMe1WkiJ751Ej-h7=g@mail.gmail.com>
+Message-ID: <20121121102244.GA11990@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2012 10:59 AM, Linus Walleij wrote:
-> On Mon, Nov 19, 2012 at 10:39 AM, Sebastian Hesselbarth
-> <sebastian.hesselbarth@gmail.com>  wrote:
->> This patch relies on a patch set for mvebu pinctrl taken through
->> Linus' pinctrl branch. As there is no other platform than Dove
->> involved, I suggest to take it though Jason's tree to avoid any
->> further conflicts.
->
-> Sounds like a plan. So you have some commit history pulled
-> in from the pinctrl tree in the MVEBU tree?
+On Wed, Nov 21, 2012 at 08:21:21AM +0000, Naresh Bhat wrote:
+> Hi Will,
+> 
+> I have disabled the SMP on host kernel.  But still I am facing the
+> issue as below
+> 
+> bash-4.2# ls
+> uImage  vexpress.dtb
+> bash-4.2#
+> bash-4.2# kexec -f uImage --dtb=vexpress.dtb --command-line="console=ttyS0"
 
-Linus,
+Can you try using a zImage instead and also specifying the console as
+ttyAMA0, as it looks like you're using a vexpress?
 
-I am referring to patches for a pinctrl/mvebu subfolder. IIRC Thomas
-posted that patch a while ago. Jason is currently sorting things out
-for mvebu pull requests. I guess both can comment on your question,
-as I don't fully understand it.
+> Starting new kernel
+> Bye!
+> Uncompressing Linux...
 
-Sebastian
+This isn't really very helpful -- some more debugging on your part would be
+appreciated to get an insight as to what's going wrong. You could either use
+JTAG or put some early prints in the decompressor to work out where it goes
+awry.
+
+Useful things to know would be: the state of the CPU when the new kernel
+image is entered (if you have JTAG, you could also look at the dtb in memory
+to see that it looks sane) and also at which point in the decompressor it
+goes wrong / takes an abort (usually it's when we enable the MMU).
+
+Will
