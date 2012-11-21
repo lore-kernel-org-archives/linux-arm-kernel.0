@@ -1,61 +1,50 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 20 Nov 2012 20:58:25 -0600
-Subject: [PATCH 1/9] arm: add set_handle_irq() to register the parent IRQ
- controller handler function
+Date: Tue, 20 Nov 2012 20:58:27 -0600
+Subject: [PATCH 3/9] ARM: GIC: remove assembly ifdefs from gic.h
 In-Reply-To: <1353466713-18967-1-git-send-email-robherring2@gmail.com>
 References: <1353466713-18967-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1353466713-18967-2-git-send-email-robherring2@gmail.com>
+Message-ID: <1353466713-18967-4-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+From: Rob Herring <rob.herring@calxeda.com>
 
-In order to allow irqchip drivers to register their IRQ handling
-function as the parent IRQ controller handler function, we provide a
-convenience function. This will avoid poking directly into the global
-handle_arch_irq variable.
+With multi irq handler and all GIC users converted to it, we don't need
+asm/hardware/gic.h to be included in assembly. Clean-up ifdefs and
+unnecessary includes.
 
-Suggested by Arnd Bergmann.
-
-[Rob Herring: remove warning. 1st one to initialize wins.]
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/include/asm/mach/irq.h |    1 +
- arch/arm/kernel/irq.c           |   10 ++++++++++
- 2 files changed, 11 insertions(+)
+ arch/arm/include/asm/hardware/gic.h |    6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
-index 15cb035..18c8830 100644
---- a/arch/arm/include/asm/mach/irq.h
-+++ b/arch/arm/include/asm/mach/irq.h
-@@ -22,6 +22,7 @@ extern int show_fiq_list(struct seq_file *, int);
+diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
+index 4b1ce6c..fc59698 100644
+--- a/arch/arm/include/asm/hardware/gic.h
++++ b/arch/arm/include/asm/hardware/gic.h
+@@ -10,8 +10,6 @@
+ #ifndef __ASM_ARM_HARDWARE_GIC_H
+ #define __ASM_ARM_HARDWARE_GIC_H
  
- #ifdef CONFIG_MULTI_IRQ_HANDLER
- extern void (*handle_arch_irq)(struct pt_regs *);
-+extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
- #endif
+-#include <linux/compiler.h>
+-
+ #define GIC_CPU_CTRL			0x00
+ #define GIC_CPU_PRIMASK			0x04
+ #define GIC_CPU_BINPOINT		0x08
+@@ -32,8 +30,6 @@
+ #define GIC_DIST_CONFIG			0xc00
+ #define GIC_DIST_SOFTINT		0xf00
  
- /*
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 8961650..8e4ef4c 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -117,6 +117,16 @@ void __init init_IRQ(void)
- 	machine_desc->init_irq();
+-#ifndef __ASSEMBLY__
+-#include <linux/irqdomain.h>
+ struct device_node;
+ 
+ extern struct irq_chip gic_arch_extn;
+@@ -53,5 +49,3 @@ static inline void gic_init(unsigned int nr, int start,
  }
  
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
-+{
-+	if (handle_arch_irq)
-+		return;
-+
-+	handle_arch_irq = handle_irq;
-+}
-+#endif
-+
- #ifdef CONFIG_SPARSE_IRQ
- int __init arch_probe_nr_irqs(void)
- {
+ #endif
+-
+-#endif
 -- 
 1.7.10.4
