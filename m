@@ -1,38 +1,34 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 22 Nov 2012 08:56:04 +0530
+Date: Thu, 22 Nov 2012 09:04:18 +0530
 Subject: [PATCH 1/3] CLK: uninline clk_prepare() and clk_unprepare()
-In-Reply-To: <20121122031117.GE25470@core.coreip.homeip.net>
+In-Reply-To: <20121121204324.21126.99677@nucleus>
 References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
  <1353403339-11679-2-git-send-email-dmitry.torokhov@gmail.com>
  <CAKohpo=B_7rVwePziyNe0rTMokcib_FgEN28cy4nByAzbUyaqg@mail.gmail.com>
  <20121121204324.21126.99677@nucleus>
- <20121121205424.GA25470@core.coreip.homeip.net>
- <20121121223859.GQ3290@n2100.arm.linux.org.uk>
- <20121122021750.GD25470@core.coreip.homeip.net>
- <20121122031117.GE25470@core.coreip.homeip.net>
-Message-ID: <CAKohpo=emfJgjm8cg0yS+qoaB-kmxHP1to9B-Krn0+_pyrWf_w@mail.gmail.com>
+Message-ID: <CAKohpo=fNxADu4z9y6R7XBJEvr7ksOOY0LqZ9MfHnBgmDFgBvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 November 2012 08:41, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+On 22 November 2012 02:13, Mike Turquette <mturquette@ti.com> wrote:
+> HAVE_CLK logically wraps HAVE_CLK_PREPARE.  There is no point in
+> selecting HAVE_CLK_PREPARE without HAVE_CLK.
+>
+> Looking through the code I see that this used to be the case.  Commit
+> 93abe8e "clk: add non CONFIG_HAVE_CLK routines" moved the
+> clk_(un)prepare declarations outside of #ifdef CONFIG_HAVE_CLK.  That
+> commit was authored by you.  Can you elaborate on why that aspect of the
+> patch was needed?
 
-> CLK: get rid of HAVE_CLK_PREPARE
->
-> From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->
-> HAVE_CLK_PREPARE is automatically selected by COMMON_CLK and the only
-> platform that explicitly selects HAVE_CLK_PREPARE is MXS which has been
-> switched to common clk framework, so we can delete this option now.
->
-> As part of this change we move declarations of clk_prepare() and
-> clk_unprepare() under HAVE_CLK and provide stubs if this option is not
-> enabled.
->
-> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> ---
->  drivers/clk/Kconfig |    4 ---
->  include/linux/clk.h |   68 ++++++++++++++++++++++++---------------------------
+Haha... Caught red handed :(
 
-Fix imx select line as pointed out by Mike and add:
+Before this commit, nothing was enclosed within CONFIG_HAVE_CLK and
+this patch only introduced it. I am not really sure, why i kept
+prepare/unprepare
+out of it though :(
 
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+Maybe because some platform at that time is using it directly, without
+CONFIG_HAVE_CLK. Not sure.
+
+--
+viresh
