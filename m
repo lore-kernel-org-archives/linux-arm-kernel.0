@@ -1,38 +1,35 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 22 Nov 2012 12:23:28 +0200
-Subject: Possible regression in arm/io.h
-In-Reply-To: <20121122101915.GA3113@mudshark.cambridge.arm.com>
-References: <CABYn4syj0GZAsDYVQfXg_qKAFkbrxPLoZWpKRzwf3gfRkMGZkQ@mail.gmail.com>
- <20121024105223.GC23775@mudshark.cambridge.arm.com>
- <CABYn4swp9JBEHgGTOkoe=tOh3Mf1dq5WYr=2xuKNpTmLX5LcFQ@mail.gmail.com>
- <20121024130957.GB7339@mudshark.cambridge.arm.com>
- <CABYn4sz4v7Uf07am=MtPAKAvvAjwt+-bTRaLrBjoiRuyR9cfZw@mail.gmail.com>
- <20121024135854.GD7339@mudshark.cambridge.arm.com>
- <CABYn4sxnwzj8KFfELzCLzQMcAjiqS3_Vr2kStkm-na8G1noPHA@mail.gmail.com>
- <20121024152730.GH7339@mudshark.cambridge.arm.com>
- <1353571055.2701.21.camel@sauron.fi.intel.com>
- <20121122101915.GA3113@mudshark.cambridge.arm.com>
-Message-ID: <1353579808.2701.28.camel@sauron.fi.intel.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 22 Nov 2012 11:26:27 +0100
+Subject: [PATCH] ARM: OMAP2+: omap_twl: Change TWL4030_MODULE_PM_RECEIVER
+ to TWL_MODULE_PM_RECEIVER
+In-Reply-To: <20121121215234.GB5279@atomide.com>
+References: <1352799152-20980-1-git-send-email-peter.ujfalusi@ti.com>
+ <50A4A376.3020703@ti.com> <20121121215234.GB5279@atomide.com>
+Message-ID: <50ADFDD3.1080508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-11-22 at 10:19 +0000, Will Deacon wrote:
-> > Any progress with this? Do we end up with gcc 4.6+ - uncompilable MTD
-> > drivers in 3.7?
+Hi Tony,
+
+On 11/21/2012 10:52 PM, Tony Lindgren wrote:
+> * Peter Ujfalusi <peter.ujfalusi@ti.com> [121115 00:12]:
+>> Hi Tony,
+>>
+>> On 11/13/2012 10:32 AM, Peter Ujfalusi wrote:
+>>> To facilitate upcoming cleanup in twl stack.
+>>> No functional change.
+>>
+>> Would you please consider this patch for 3.8? It would shorten the time I'll
+>> need to progress on the cleanup regarding to twl-core greatly.
 > 
-> I fixed it in 7629a9f661f7 ("ARM: 7567/1: io: avoid GCC's offsettable
-> addressing modes for halfword accesses").
+> Please go ahead and merge this with your other patches:
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> 
+> Or let me know if I still need to queue it.
 
-Ah, this is in v3.7-rc5, I am using -rc4 and this is why I did not
-notice this. Thanks!
+This patch has no dependencies on other patches. It is better to go via
+linux-omap.
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/2e31cd37/attachment.sig>
+Thank you,
+P?ter
