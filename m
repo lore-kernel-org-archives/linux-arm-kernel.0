@@ -1,77 +1,87 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 22 Nov 2012 17:05:39 +0000
-Subject: [PATCH] ARM: kernel: fix nr_cpu_ids check in DT logical map init
-In-Reply-To: <20121122153337.083D73E129E@localhost>
-References: <1353516176-12929-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20121122120843.GA16972@e102568-lin.cambridge.arm.com>
- <20121122153337.083D73E129E@localhost>
-Message-ID: <20121122170538.GF16972@e102568-lin.cambridge.arm.com>
+From: per.lkml@gmail.com (Per Forlin)
+Date: Thu, 22 Nov 2012 18:28:30 +0100
+Subject: [PATCH] mmc: mmci: Support non-power-of-two block sizes for
+ ux500v2 variant
+In-Reply-To: <20121121165048.GO3290@n2100.arm.linux.org.uk>
+References: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121121153811.GN3290@n2100.arm.linux.org.uk>
+ <CAFEEs1kzJUgsvnzgWwU4i7o1jkE=8iTq5+NJ_t1jdiHEm7b-RQ@mail.gmail.com>
+ <20121121165048.GO3290@n2100.arm.linux.org.uk>
+Message-ID: <CAFEEs1nb+UD+8_jsKvGKhyFqGDogN5wsmV30PnELqahTMDyRVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 03:33:36PM +0000, Grant Likely wrote:
-> On Thu, 22 Nov 2012 12:08:43 +0000, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> > Hi Russell,
-> > 
-> > On Wed, Nov 21, 2012 at 04:42:56PM +0000, Lorenzo Pieralisi wrote:
-> > > If a kernel is configured with a DT containing more /cpu nodes than
-> > > nr_cpu_ids, the number of cpus must be capped in the DT parsing
-> > > code. Current code carries out the check, but fails to cap the
-> > > value and the check is executed after the cpu logical index is used,
-> > > which can lead to memory corruption due to index overflow.
-> > > 
-> > > This patch refactors the check against nr_cpu_ids and move it before
-> > > any computed index is used in the parsing code.
-> > > 
-> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > Reported-by: Mark Rutland <mark.rutland@arm.com>
-> > > ---
-> > > Russell,
-> > > 
-> > > while refactoring the DT loop over nodes, I unfortunately missed this niggle
-> > > in the parsing loop that Mark reported. Here is the fix, sorry for the
-> > > additional commit, if it is ok for you I will add it to your patch system.
-> > > 
-> > > Apologies and thanks,
-> > > Lorenzo
-> > > 
-> > >  arch/arm/kernel/devtree.c | 10 +++++++---
-> > >  1 file changed, 7 insertions(+), 3 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> > > index aaf9add..70f1bde 100644
-> > > --- a/arch/arm/kernel/devtree.c
-> > > +++ b/arch/arm/kernel/devtree.c
-> > > @@ -139,10 +139,14 @@ void __init arm_dt_init_cpu_maps(void)
-> > >  			i = cpuidx++;
-> > >  		}
-> > >  
-> > > -		tmp_map[i] = hwid;
-> > > -
-> > > -		if (cpuidx > nr_cpu_ids)
-> > > +		if (WARN(cpuidx > nr_cpu_ids, "DT /cpu %u nodes greater than "
-> > > +					       "max cores %u, capping them\n",
-> > > +					       cpuidx, nr_cpu_ids)) {
-> > > +			cpuidx = nr_cpu_ids;
-> > >  			break;
-> > > +		}
-> > > +
-> > > +		tmp_map[i] = hwid;
-> > >  	}
-> > >  
-> > >  	if (WARN(!bootcpu_valid, "DT missing boot CPU MPIDR[23:0], "
-> > 
-> > If it looks fine to you, can I queue this simple fix in your patch
-> > system please ?
-> > 
-> > Thanks and apologies for the extra commit,
-> > Lorenzo
-> 
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+On Wed, Nov 21, 2012 at 5:50 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Nov 21, 2012 at 05:13:55PM +0100, Per Forlin wrote:
+>> On Wed, Nov 21, 2012 at 4:38 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Fri, Oct 12, 2012 at 04:02:02PM +0200, Ulf Hansson wrote:
+>> >>  /*
+>> >> + * Validate mmc prerequisites
+>> >> + */
+>> >> +static int mmci_validate_data(struct mmci_host *host,
+>> >> +                           struct mmc_data *data)
+>> >> +{
+>> >> +     if (!data)
+>> >> +             return 0;
+>> >> +
+>> >> +     if (!host->variant->non_power_of_2_blksize &&
+>> >> +         !is_power_of_2(data->blksz)) {
+>> >> +             dev_err(mmc_dev(host->mmc),
+>> >> +                     "unsupported block size (%d bytes)\n", data->blksz);
+>> >> +             return -EINVAL;
+>> >> +     }
+>> >> +
+>> >> +     if (data->sg->offset & 3) {
+>> >> +             dev_err(mmc_dev(host->mmc),
+>> >> +                     "unsupported alginment (0x%x)\n", data->sg->offset);
+>> >> +             return -EINVAL;
+>> >> +     }
+>> >
+>> > Why?  What's the reasoning behind this suddenly introduced restriction?
+>> > readsl()/writesl() copes just fine with non-aligned pointers.  It may be
+>> > that your DMA engine can not, but that's no business interfering with
+>> > non-DMA transfers, and no reason to fail such transfers.
+>> >
+>> > If your DMA engine can't do that then its your DMA engine code which
+>> > should refuse to prepare the transfer.
+>> >
+>> > Yes, that means problems with the way things are ordered - or it needs a
+>> > proper API where DMA engine can export these kinds of properties.
+>> The alignment constraint is related to PIO, sg_miter and that FIFO
+>> access must be done with 4 bytes.
+>
+> Total claptrap.  No it isn't.
+>
+> - sg_miter just deals with bytes, and number of bytes transferred; there
+>   is no word assumptions in that code.  Indeed many ATA disks transfer
+>   by half-word accesses so such a restriction would be insane.
+>
+> - the FIFO access itself needs to be 32-bit words, so readsl or writesl
+>   (or their io* equivalents must be used).
+>
+> - but - and this is the killer item to your argument as I said above -
+>   readsl and writesl _can_ take misaligned pointers and cope with them
+>   fine.
+>
+> The actual alignment of the buffer address is totally irrelevant here.
+>
+> What isn't irrelevant is the _number_ of bytes to be transferred, but
+> that's something totally different and completely unrelated from
+> data->sg->offset.
+Let's try again :)
 
-Thanks a lot Grant.
+Keep in mind that the mmc -block layer is aligned so from that aspect
+everything is fine.
+SDIO may have any length or alignment but sg-len is always 1.
 
-Queued with ID: 7585/1
+There is just one sg-element and one continues buffer.
 
-Thanks,
-Lorenzo
+sg-miter splits the continues buffer in chunks that may not be aligned
+with 4 byte size. It depends on the start address alignment of the
+buffer.
+
+Is it more clear now?
+BR
+Per
