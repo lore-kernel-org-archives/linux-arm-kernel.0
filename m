@@ -1,63 +1,82 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 22 Nov 2012 18:32:21 +0100
-Subject: [PATCH 1/5] arm: mvebu: fix address decoding armada_cfg_base()
- function
+Date: Thu, 22 Nov 2012 18:32:23 +0100
+Subject: [PATCH 3/5] dma: mv_xor: use request_irq() instead of
+ devm_request_irq()
 In-Reply-To: <1353605545-7091-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1353605545-7091-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1353605545-7091-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1353605545-7091-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The armada_cfg_base() function returns the base address of the
-registers that allow to configure the decoding for a particular
-address window. On Armada 370/XP, the lower windows have more
-configuration registers (4 registers) than the higher windows (2
-registers). This armada_cfg_base() takes this into account by doing a
-different offset calculation depending on the window number, but this
-offset calculation was wrong for the higher windows.
+Even through the usage of devm_*() functions is generally recommended
+over their classic variants, in the case of devm_request_irq()
+combined with irq_of_parse_and_map(), it doesn't work nicely.
 
-Even though we were not using high window numbers until now (only
-window 0 is used to map the BootROM, needed for SMP), we use this
-function at boot time to disable all windows to ensure that nothing
-remains intialized from what the bootloader has done.
+We have the following scenario:
 
-Unfortunately, the U-Boot on the OpenBlocks AX3-4 uses a window with a
-high number (above 8) to remap the BootROM. And then when the kernel
-boots, it remaps the BootROM in window 0. Normally, this is not a
-problem, because all windows have previously been disabled. Except
-that due to our wrong offset calculation, the windows with high
-numbers were not properly disabled, leading to the BootROM being
-mapped twice. The visible result of this bug was that the kernel was
-unable to get the second CPU started on the OpenBlocks AX3-4
-platform. With this fix, all windows are properly cleared at boot
-time, the BootROM is remapped only once in window 0, and the second
-CPU boots fine.
+ irq_of_parse_and_map(...)
+ devm_request_irq(...)
 
-Thanks a lot to Lior Amsamlen <alior@marvell.com> for his help in
-debugging this problem.
+For some reason, the driver initialization fails at a later
+point. Since irq_of_parse_and_map() is no device-managed, we do a:
+
+ irq_dispose_mapping(...)
+
+Unfortunately, this doesn't work, because the free_irq() must be done
+prior to calling irq_dispose_mapping(). But with the devm mechanism,
+the automatic free_irq() would happen only after we get out of the
+->probe() function.
+
+So basically, we revert to using request_irq() with traditional error
+handling, so that in case of error, free_irq() gets called before
+irq_dispose_mapping().
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
-Strictly speaking, this bug was introduced in 3.7, but since the only
-platforms supported in 3.7 were Armada 370 and Armada XP, and there
-was anyway no SMP support at this time, it isn't really worth the
-effort to push this patch in 3.7.
----
- arch/arm/mach-mvebu/addr-map.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/dma/mv_xor.c |   11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/addr-map.c b/arch/arm/mach-mvebu/addr-map.c
-index fe454a4..b20fc75 100644
---- a/arch/arm/mach-mvebu/addr-map.c
-+++ b/arch/arm/mach-mvebu/addr-map.c
-@@ -78,7 +78,7 @@ armada_cfg_base(const struct orion_addr_map_cfg *cfg, int win)
- 	if (win < 8)
- 		offset = (win << 4);
- 	else
--		offset = ARMADA_WINDOW_8_PLUS_OFFSET + (win << 3);
-+		offset = ARMADA_WINDOW_8_PLUS_OFFSET + ((win - 8) << 3);
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index 2c69b89..0d4c24e 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -1162,9 +1162,8 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
+ 	/* clear errors before enabling interrupts */
+ 	mv_xor_device_clear_err_status(mv_chan);
  
- 	return cfg->bridge_virt_base + offset;
- }
+-	ret = devm_request_irq(&pdev->dev, mv_chan->irq,
+-			       mv_xor_interrupt_handler,
+-			       0, dev_name(&pdev->dev), mv_chan);
++	ret = request_irq(mv_chan->irq, mv_xor_interrupt_handler,
++			  0, dev_name(&pdev->dev), mv_chan);
+ 	if (ret)
+ 		goto err_free_dma;
+ 
+@@ -1185,14 +1184,14 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
+ 		ret = mv_xor_memcpy_self_test(mv_chan);
+ 		dev_dbg(&pdev->dev, "memcpy self test returned %d\n", ret);
+ 		if (ret)
+-			goto err_free_dma;
++			goto err_free_irq;
+ 	}
+ 
+ 	if (dma_has_cap(DMA_XOR, dma_dev->cap_mask)) {
+ 		ret = mv_xor_xor_self_test(mv_chan);
+ 		dev_dbg(&pdev->dev, "xor self test returned %d\n", ret);
+ 		if (ret)
+-			goto err_free_dma;
++			goto err_free_irq;
+ 	}
+ 
+ 	dev_info(&pdev->dev, "Marvell XOR: "
+@@ -1205,6 +1204,8 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
+ 	dma_async_device_register(dma_dev);
+ 	return mv_chan;
+ 
++err_free_irq:
++	free_irq(mv_chan->irq, mv_chan);
+  err_free_dma:
+ 	dma_free_coherent(&pdev->dev, MV_XOR_POOL_SIZE,
+ 			  mv_chan->dma_desc_pool_virt, mv_chan->dma_desc_pool);
 -- 
 1.7.9.5
