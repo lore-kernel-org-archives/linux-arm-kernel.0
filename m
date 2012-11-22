@@ -1,77 +1,70 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 22 Nov 2012 08:57:27 +0100
-Subject: [RFC] ARM: mx27: Replace clk_register_clkdev with clock DT lookup
-In-Reply-To: <1353532526-12897-1-git-send-email-festevam@gmail.com>
-References: <1353532526-12897-1-git-send-email-festevam@gmail.com>
-Message-ID: <20121122075727.GX10369@pengutronix.de>
+From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
+Date: Thu, 22 Nov 2012 16:59:57 +0900
+Subject: [PATCH v5 00/15] shmobile DT initialisation of INTC and GIC
+Message-ID: <1353571213-26006-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 07:15:26PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Similarly as it was done for mx6q, use a DT lookup in order to make maintainance
-> task for the clock devices easier.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Sascha/Shawn,
-> 
-> Trying the same approach from mx6/mx5 does not work on mx27.
-> This patch causes the console to be messed up.
-> 
-> Any suggestion as to what should be different for mx27?
-> 
-> Thanks
-> 
->  .../devicetree/bindings/clock/imx27-clock.txt      |  111 ++++++++++++++++++++
->  arch/arm/boot/dts/imx27.dtsi                       |    8 ++
->  arch/arm/mach-imx/clk-imx27.c                      |    9 ++
->  arch/arm/mach-imx/imx27-dt.c                       |    3 +-
->  4 files changed, 129 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/imx27-clock.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/imx27-clock.txt b/Documentation/devicetree/bindings/clock/imx27-clock.txt
-> new file mode 100644
-> index 0000000..e874a36
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/imx27-clock.txt
-> @@ -0,0 +1,111 @@
-> +* Clock bindings for Freescale i.MX27
-> +
-> +Required properties:
-> +- compatible: Should be "fsl,imx27-ccm"
-> +- reg: Address and length of the register set
-> +- #clock-cells: Should be <1>
-> +
-> +The clock consumer should specify the desired clock by having the clock
-> +ID in its "clocks" phandle cell.  The following is a full list of i.MX27
-> +clocks and IDs.
-> +
-> +	Clock			ID
-> +	---------------------------
-> +	dummy			0 
-> +	ckih			1
-> +	ckil			2
-> +	mpll			3
-> +	spll			4
-> +	mpll_main2		5
-> +	ahb ipg			6
-        ^^^^^^^
+Hi, simon and Magnus.
 
-You could add the following to the clock code, this makes
-generating the lists less error prone:
+I updated patch series for shmobile DT support.
+This version fixes definition of interrupt-controller. By this, I fixed
+external interrupt issuse on sh7372.
+And update r8a7740 and sh73a0 DT INTC init code to reduce the number of #ifdefs.
 
-	for (i = 0; i < ARRAY_SIZE(clk); i++)
-		pr_err("%-20s %d\n", IS_ERR(clk[i]) ? "-----" : __clk_get_name(clk[i]), i);
+---
 
-BTW you should base this on the imx/soc branch of the arm-soc tree.
-There are some changes in the numbering in there.
+The aims of this series are:
 
-Sascha
+* Adding DT support to INTC
+* Allowing relevant ARM shmobile SoCs to use DT to initialise INTC
+* Allowing relevant ARM shmobile boards to use DT to initialise INTC
+* Allowing the sh73a0 SoC use DT to initialise GIC
+* Allowing the sh73a0 SoC use DT to initialise GIC, which in
+  turn allows the kzm9g board to use DT to initialise GIC
+
+Nobuhiro Iwamatsu (12):
+  ARM: mach-shmobile: Add support OF for INTC of shmobile
+  SH: intc: Add support OF of IRQ
+  ARM: mach-shmobile: Add support OF of INTC for r8a7740
+  ARM: mach-shmobile: Add support OF of INTC for sh73a0
+  ARM: mach-shmobile: Add support OF of INTC for sh7372
+  ARM: mach-shmobile: Add DT table of INTC for sh73a0
+  ARM: mach-shmobile: Add DT table of INTC for sh7372
+  ARM: mach-shmobile: Add DT table of INTC for r8a7740
+  ARM: shmobile: Include DTSI of r8a7740 to armadillo800eva
+  ARM: shmobile: Include DTSI of sh73a0 to kzm9g board
+  ARM: shmobile: r8a7740: Use DT initialisation of INTC
+  ARM: shmobile: sh7372: Use DT initialisation of INTC
+
+Simon Horman (3):
+  ARM: shmobile: kzm9g: Use DT initialisation of INTC
+  ARM: shmobile: Add DT table of GIC for sh73a0
+  ARM: shmobile: sh73a0: Use DT for GIC
+
+ Documentation/devicetree/bindings/sh/intc.txt |  163 ++++
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts |    2 +-
+ arch/arm/boot/dts/r8a7740.dtsi                |  967 ++++++++++++++++++++-
+ arch/arm/boot/dts/sh7372.dtsi                 | 1140 +++++++++++++++++++++++++
+ arch/arm/boot/dts/sh73a0-kzm9g.dts            |    2 +-
+ arch/arm/boot/dts/sh73a0.dtsi                 |  821 ++++++++++++++++++
+ arch/arm/mach-shmobile/board-kzm9g.c          |    2 +-
+ arch/arm/mach-shmobile/include/mach/common.h  |    3 +
+ arch/arm/mach-shmobile/intc-r8a7740.c         |   69 +-
+ arch/arm/mach-shmobile/intc-sh7372.c          |  112 ++-
+ arch/arm/mach-shmobile/intc-sh73a0.c          |  163 ++--
+ arch/arm/mach-shmobile/setup-r8a7740.c        |    2 +-
+ arch/arm/mach-shmobile/setup-sh7372.c         |    2 +-
+ drivers/sh/intc/Makefile                      |    1 +
+ drivers/sh/intc/core.c                        |    2 +-
+ drivers/sh/intc/internals.h                   |    3 +-
+ drivers/sh/intc/irqdomain.c                   |    6 +-
+ drivers/sh/intc/of_intc.c                     |  646 ++++++++++++++
+ include/linux/sh_intc.h                       |   84 ++
+ 19 files changed, 4096 insertions(+), 94 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sh/intc.txt
+ create mode 100644 arch/arm/boot/dts/sh73a0.dtsi
+ create mode 100644 drivers/sh/intc/of_intc.c
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.10.4
