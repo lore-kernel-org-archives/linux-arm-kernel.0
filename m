@@ -1,87 +1,73 @@
-From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Thu, 22 Nov 2012 13:49:15 +0100
-Subject: [PATCH] video: mxsfb: fix typo: 'FAILING' instead of 'FALLING'
-In-Reply-To: <1353588555-13168-1-git-send-email-LW@KARO-electronics.de>
-References: <1353588555-13168-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1353588555-13168-2-git-send-email-LW@KARO-electronics.de>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Thu, 22 Nov 2012 13:51:49 +0100
+Subject: [PATCH v6 0/7] watchdog: dt: add support for the timeout-sec dt
+ property
+Message-ID: <1353588716-28917-1-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all,
+this patchset add the timeout-sec property to the watchdog core,
+to the at91sam9_wdt driver and on all framework enabled watchdog driver
+with dt support.
+The at91sam9_wdt is tested on evk-pr3,
+the other drivers are compile tested only.
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
----
- arch/arm/mach-mxs/mach-mxs.c |    6 +++---
- drivers/video/mxsfb.c        |    6 +++---
- include/linux/mxsfb.h        |    2 +-
- 3 files changed, 7 insertions(+), 7 deletions(-)
+This patchset depends on the patchset already sent:
+"[PATCH v9 0/3 RESEND] watchdog: at91sam9_wdt: add device tree support"
+that is already pulled in arm-soc/for-next branch.
 
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index d61b915..6c17cb7 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -42,7 +42,7 @@ static struct fb_videomode mx23evk_video_modes[] = {
- 		.hsync_len	= 1,
- 		.vsync_len	= 1,
- 		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
--				  FB_SYNC_DOTCLK_FAILING_ACT,
-+				  FB_SYNC_DOTCLK_FALLING_ACT,
- 	},
- };
- 
-@@ -60,7 +60,7 @@ static struct fb_videomode mx28evk_video_modes[] = {
- 		.hsync_len	= 10,
- 		.vsync_len	= 10,
- 		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
--				  FB_SYNC_DOTCLK_FAILING_ACT,
-+				  FB_SYNC_DOTCLK_FALLING_ACT,
- 	},
- };
- 
-@@ -96,7 +96,7 @@ static struct fb_videomode apx4devkit_video_modes[] = {
- 		.vsync_len	= 3,
- 		.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT |
- 				  FB_SYNC_DATA_ENABLE_HIGH_ACT |
--				  FB_SYNC_DOTCLK_FAILING_ACT,
-+				  FB_SYNC_DOTCLK_FALLING_ACT,
- 	},
- };
- 
-diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-index f2a49ef..eb45d32 100644
---- a/drivers/video/mxsfb.c
-+++ b/drivers/video/mxsfb.c
-@@ -107,7 +107,7 @@
- #define VDCTRL0_ENABLE_PRESENT		(1 << 28)
- #define VDCTRL0_VSYNC_ACT_HIGH		(1 << 27)
- #define VDCTRL0_HSYNC_ACT_HIGH		(1 << 26)
--#define VDCTRL0_DOTCLK_ACT_FAILING	(1 << 25)
-+#define VDCTRL0_DOTCLK_ACT_FALLING	(1 << 25)
- #define VDCTRL0_ENABLE_ACT_HIGH		(1 << 24)
- #define VDCTRL0_VSYNC_PERIOD_UNIT	(1 << 21)
- #define VDCTRL0_VSYNC_PULSE_WIDTH_UNIT	(1 << 20)
-@@ -458,8 +458,8 @@ static int mxsfb_set_par(struct fb_info *fb_info)
- 		vdctrl0 |= VDCTRL0_VSYNC_ACT_HIGH;
- 	if (fb_info->var.sync & FB_SYNC_DATA_ENABLE_HIGH_ACT)
- 		vdctrl0 |= VDCTRL0_ENABLE_ACT_HIGH;
--	if (fb_info->var.sync & FB_SYNC_DOTCLK_FAILING_ACT)
--		vdctrl0 |= VDCTRL0_DOTCLK_ACT_FAILING;
-+	if (fb_info->var.sync & FB_SYNC_DOTCLK_FALLING_ACT)
-+		vdctrl0 |= VDCTRL0_DOTCLK_ACT_FALLING;
- 
- 	writel(vdctrl0, host->base + LCDC_VDCTRL0);
- 
-diff --git a/include/linux/mxsfb.h b/include/linux/mxsfb.h
-index f14943d..a9eca68 100644
---- a/include/linux/mxsfb.h
-+++ b/include/linux/mxsfb.h
-@@ -25,7 +25,7 @@
- #define STMLCDIF_24BIT 3 /** pixel data bus to the display is of 24 bit width */
- 
- #define FB_SYNC_DATA_ENABLE_HIGH_ACT	(1 << 6)
--#define FB_SYNC_DOTCLK_FAILING_ACT	(1 << 7) /* failing/negtive edge sampling */
-+#define FB_SYNC_DOTCLK_FALLING_ACT	(1 << 7) /* falling/negative edge sampling */
- 
- struct mxsfb_platform_data {
- 	struct fb_videomode *mode_list;
+Best regards
+Fabio Porcedda
+
+changes:
+v6:
+  - remove patch for function of_get_timeout_sec as aked by Rob Herring
+  - add Acked-by: Jason Cooper <jason@lakedaemon.net>
+  - add Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+v5:
+  - fix codestyle for compilance ti checkpatch.pl about
+    "ERROR: do not initialise statics to 0 or NULL"
+    for s3c2410_wdt.c:56 and at91sam9_wdt.c:63
+v4:
+  - add of_get_timeout_sec
+  - add s3c2410_wdt driver
+  - split driver patch
+  - fixed watchdog_init_timeout handling of min_timeout and max_timeout
+v3:
+  - rename watchdog_probe_dt_timeout ->  watchdog_init_timeout
+  - move the watchdog_init_timeout function from inline to watchdog_core.c
+  - add timeout parameter handling code to watchdog_init_timeout
+  - add timeout-sec property to the pnx4008-wdt driver
+  - add two small commit for fixup and cleanup
+v2:
+  - change "timeout" to "timeout-sec" as asked by Jean-Christophe
+  - at91sam9_wdt: use the new helper function
+  - at91sam9_wdt: add bounds checking
+  - watchdog.h: add bounds checking
+
+Fabio Porcedda (7):
+  watchdog: core: dt: add support for the timeout-sec dt property
+  watchdog: orion_wdt: add timeout-sec property binding
+  watchdog: pnx4008: add timeout-sec property binding
+  watchdog: s3c2410_wdt: add timeout-sec property binding
+  watchdog: at91sam9_wdt: add timeout-sec property binding
+  watchdog: orion_wdt: move the min_timeout initialization
+  watchdog: WatchDog Timer Driver Core - fix comment
+
+ .../devicetree/bindings/watchdog/atmel-wdt.txt     |  4 +++
+ .../devicetree/bindings/watchdog/marvel.txt        |  5 +++
+ .../devicetree/bindings/watchdog/pnx4008-wdt.txt   |  4 +++
+ .../devicetree/bindings/watchdog/samsung-wdt.txt   |  3 ++
+ Documentation/watchdog/watchdog-kernel-api.txt     | 10 ++++++
+ drivers/watchdog/Kconfig                           |  1 +
+ drivers/watchdog/at91sam9_wdt.c                    | 16 ++++++++--
+ drivers/watchdog/orion_wdt.c                       | 10 +++---
+ drivers/watchdog/pnx4008_wdt.c                     |  7 ++--
+ drivers/watchdog/s3c2410_wdt.c                     |  6 ++--
+ drivers/watchdog/watchdog_core.c                   | 37 ++++++++++++++++++++++
+ include/linux/watchdog.h                           |  5 ++-
+ 12 files changed, 92 insertions(+), 16 deletions(-)
+
 -- 
-1.7.2.5
+1.8.0
