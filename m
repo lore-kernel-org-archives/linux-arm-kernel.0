@@ -1,35 +1,55 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 22 Nov 2012 09:54:29 +0100
-Subject: [PATCH] ARM i.MX6: Fix ethernet PLL clocks
-In-Reply-To: <20121122091618.GH24693@S2100-06.ap.freescale.net>
-References: <1353505652-28200-1-git-send-email-s.hauer@pengutronix.de>
- <20121122084228.GF24693@S2100-06.ap.freescale.net>
- <20121122084707.GA10369@pengutronix.de>
- <20121122091618.GH24693@S2100-06.ap.freescale.net>
-Message-ID: <20121122085429.GC10369@pengutronix.de>
+From: bjorn@mork.no (=?utf-8?Q?Bj=C3=B8rn_Mork?=)
+Date: Thu, 22 Nov 2012 09:55:30 +0100
+Subject: [PATCH 1/1] asix: use ramdom hw addr if the one read is not valid
+In-Reply-To: <50AD36A8.6000702@mvista.com> (Sergei Shtylyov's message of "Wed,
+ 21 Nov 2012 23:16:40 +0300")
+References: <1353493362-30418-1-git-send-email-plagnioj@jcrosoft.com>
+ <50AD36A8.6000702@mvista.com>
+Message-ID: <878v9uow3h.fsf@nemi.mork.no>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 05:16:21PM +0800, Shawn Guo wrote:
-> On Thu, Nov 22, 2012 at 09:47:07AM +0100, Sascha Hauer wrote:
-> > On Thu, Nov 22, 2012 at 04:42:31PM +0800, Shawn Guo wrote:
-> > > On Wed, Nov 21, 2012 at 02:47:32PM +0100, Sascha Hauer wrote:
-> > > > In current code the ethernet PLL (according to code pll8, according to datasheet
-> > > > pll6)
-> > > 
-> > > Yes, just checked the latest RM, it gets renumbered so.
-> > 
-> > So do we want to keep current code or change it according to the
-> > datasheet?
-> > 
-> While you are there, yeah, let's make it match doc :)
+Sergei Shtylyov <sshtylyov@mvista.com> writes:
+> On 11/21/2012 01:22 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>
+>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> Cc: linux-usb at vger.kernel.org
+>> Cc: netdev at vger.kernel.org
+>> ---
+>>  drivers/net/usb/asix_devices.c |   24 +++++++++++++++++++++---
+>>  1 file changed, 21 insertions(+), 3 deletions(-)
+>
+>> diff --git a/drivers/net/usb/asix_devices.c b/drivers/net/usb/asix_devices.c
+>> index 33ab824..7ebec5b 100644
+>> --- a/drivers/net/usb/asix_devices.c
+>> +++ b/drivers/net/usb/asix_devices.c
+>> @@ -225,7 +225,13 @@ static int ax88172_bind(struct usbnet *dev, struct usb_interface *intf)
+>>  			   ret);
+>>  		goto out;
+>>  	}
+>> -	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
+>> +
+>> +	if (is_valid_ether_addr(buf)) {
+>> +		memcpy(dev->net->dev_addr, buf, ETH_ALEN);
+>> +	} else {
+>> +		netdev_info(dev->net, "invalid hw address, using random\n");
+>> +		eth_hw_addr_random(dev->net);
+>> +	}
+>>  
+>>  	/* Initialize MII structure */
+>>  	dev->mii.dev = dev->net;
+[..]
+>
+>    Repeated thrice, this asks to be put into subroutine...
 
-Will do.
+Yes.  Looking at the driver, this probably goes for most of the three
+_bind() functions.  There is a lot of common code there.
 
-Sascha
+But more important wrt the eth_hw_addr_random() change: Does this
+actually work with real devices?  The driver implements a
+asix_set_mac_address() which writes the address back to the device when
+you change it.  I assume there is a reason for doing that.  Why don't
+you do it here?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+
+Bj?rn
