@@ -1,45 +1,43 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 23 Nov 2012 19:45:32 +0100
-Subject: [PATCH 3/3] ARM: at91: usb-a9g20: dt: add mmc-spi support
-In-Reply-To: <1353696332-12741-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20121123184115.GB4398@game.jcrosoft.org>
- <1353696332-12741-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1353696332-12741-3-git-send-email-plagnioj@jcrosoft.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Thu, 22 Nov 2012 13:51:51 +0900
+Subject: [PATCH v3 02/12] ARM: EXYNOS: Add clk_ops for gating clocks of System
+ MMU
+In-Reply-To: <50ACF847.3070709@samsung.com>
+References: <002801cdc7a5$8535f6d0$8fa1e470$%cho@samsung.com>
+ <50ACF847.3070709@samsung.com>
+Message-ID: <CAHQjnOMSB+0SrNAfrJdXo_MWCHjEULWVzyEejcOWxWeT73sZfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/usb_a9g20.dts |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+On Thu, Nov 22, 2012 at 12:50 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 11/21/12 14:03, Cho KyongHo wrote:
+>>
+>> Touching some System MMU needs its master devices' clock to be enabled
+>> before. This commit adds clk_ops.set_parent of gating clocks of System
+>> MMU to ensure gating clocks of System MMU's mater devices are enabled
+>> when enabling gating clocks of System MMU.
+>>
+>> Change-Id: Icd58b12f599e92692c032516331a444f4703ba6b
+>
+>
+> Same here, we don't need this :-)
+>
+>
+>> Signed-off-by: KyongHo Cho<pullip.cho@samsung.com>
+>> ---
+>>   arch/arm/mach-exynos/clock-exynos5.c | 25 +++++++++++++++++++++++++
+>>   1 file changed, 25 insertions(+)
+>>
+>
+> Looks good to me, and I think, this can be applied independently from this
+> series. Will apply with removing 'Change-Id'.
+>
+Yes. I missed that.
+It will be removed.
 
-diff --git a/arch/arm/boot/dts/usb_a9g20.dts b/arch/arm/boot/dts/usb_a9g20.dts
-index 2dacb16c..503f604 100644
---- a/arch/arm/boot/dts/usb_a9g20.dts
-+++ b/arch/arm/boot/dts/usb_a9g20.dts
-@@ -21,6 +21,22 @@
- 		reg = <0x20000000 0x4000000>;
- 	};
- 
-+	ahb {
-+		apb {
-+			spi1: spi at fffcc000 {
-+				cs-gpios = <&pioB 3 0>;
-+				status = "okay";
-+
-+				mmc-slot at 0 {
-+					compatible = "mmc-spi-slot";
-+					reg = <0>;
-+					gpios = <&pioC 4 0>;	/* CD */
-+					spi-max-frequency = <25000000>;
-+				};
-+			};
-+		};
-+	};
-+
- 	i2c at 0 {
- 		rv3029c2 at 56 {
- 			compatible = "rv3029c2";
--- 
-1.7.10.4
+Thank you.
+
+Cho KyongHo
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/ab795569/attachment-0001.html>
