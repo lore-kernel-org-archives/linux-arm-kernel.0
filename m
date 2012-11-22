@@ -1,58 +1,107 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 22 Nov 2012 15:48:32 +0100
-Subject: [GIT PULL] i.MX SoC updates
-Message-ID: <20121122144832.GI10369@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 22 Nov 2012 14:51:53 +0000
+Subject: [PATCH 2/2] input: gpio-keys: Add runtime support
+In-Reply-To: <1353590617-11466-2-git-send-email-lee.jones@linaro.org>
+References: <1353590617-11466-1-git-send-email-lee.jones@linaro.org>
+ <1353590617-11466-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <20121122145153.GB10986@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Another bunch of i.MX SoC updates, based on arm-soc/imx/soc. Please
-pull.
+Ignore this.
 
-Sascha
+I've just rebased and the API has changed slightly.
 
+Will fixup and resend.
 
-The following changes since commit d6aef84a48fa54ac606ae719fcd125199939f43d:
+> From: Jonas Aaberg <jonas.aberg@stericsson.com>
+> 
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: linux-input at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
+> Signed-off-by: Philippe Langlais <philippe.langlais@linaro.org>
+> Reviewed-by: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
+> ---
+>  drivers/input/keyboard/gpio_keys.c |   17 +++++++++++++----
+>  1 file changed, 13 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/input/keyboard/gpio_keys.c b/drivers/input/keyboard/gpio_keys.c
+> index 2cf6757..cff548c 100644
+> --- a/drivers/input/keyboard/gpio_keys.c
+> +++ b/drivers/input/keyboard/gpio_keys.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/of_platform.h>
+>  #include <linux/of_gpio.h>
+>  #include <linux/spinlock.h>
+> +#include <linux/pm_runtime.h>
+>  
+>  struct gpio_button_data {
+>  	const struct gpio_keys_button *button;
+> @@ -533,6 +534,7 @@ static int gpio_keys_open(struct input_dev *input)
+>  	struct gpio_keys_drvdata *ddata = input_get_drvdata(input);
+>  	const struct gpio_keys_platform_data *pdata = ddata->pdata;
+>  
+> +	pm_runtime_get_sync(input->dev.parent);
+>  	ddata->enabled = true;
+>  
+>  	return pdata->enable ? pdata->enable(input->dev.parent) : 0;
+> @@ -547,6 +549,8 @@ static void gpio_keys_close(struct input_dev *input)
+>  
+>  	if (pdata->disable)
+>  		pdata->disable(input->dev.parent);
+> +
+> +	pm_runtime_put(input->dev.parent);
+>  }
+>  
+>  /*
+> @@ -708,6 +712,8 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
+>  	input->id.product = 0x0001;
+>  	input->id.version = 0x0100;
+>  
+> +	pm_runtime_enable(&pdev->dev);
+> +
+>  	/* Enable auto repeat feature of Linux input subsystem */
+>  	if (pdata->rep)
+>  		__set_bit(EV_REP, input->evbit);
+> @@ -773,6 +779,8 @@ static int __devexit gpio_keys_remove(struct platform_device *pdev)
+>  	struct input_dev *input = ddata->input;
+>  	int i;
+>  
+> +	pm_runtime_disable(&pdev->dev);
+> +
+>  	sysfs_remove_group(&pdev->dev.kobj, &gpio_keys_attr_group);
+>  
+>  	device_init_wakeup(&pdev->dev, 0);
+> @@ -805,8 +813,8 @@ static int gpio_keys_suspend(struct device *dev)
+>  		}
+>  	} else {
+>  		ddata->enable_after_suspend = ddata->enabled;
+> -		if (ddata->enabled)
+> -			gpio_keys_close(ddata->input);
+> +		if (ddata->enabled && ddata->disable)
+> +			ddata->disable(dev);
+>  	}
+>  
+>  	return 0;
+> @@ -826,8 +834,9 @@ static int gpio_keys_resume(struct device *dev)
+>  			gpio_keys_gpio_report_event(bdata);
+>  	}
+>  
+> -	if (!device_may_wakeup(dev) && ddata->enable_after_suspend)
+> -		gpio_keys_open(ddata->input);
+> +	if (!device_may_wakeup(dev) && ddata->enable_after_suspend
+> +	    && ddata->enable)
+> +		ddata->enable(dev);
+>  
+>  	input_sync(ddata->input);
+>  
+> -- 
+> 1.7.9.5
+> 
 
-  ARM i.MX51 babbage: Add display support (2012-11-16 16:34:18 +0100)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-soc-1
-
-for you to fetch changes up to 2b254693bef4f1299de0afb231890fe348df11c6:
-
-  ARM i.MX6: remove gate_mask from pllv3 (2012-11-22 15:32:39 +0100)
-
-----------------------------------------------------------------
-ARM i.MX SoC updates for v3.8
-
-----------------------------------------------------------------
-Fabio Estevam (1):
-      ARM: mx5: Replace clk_register_clkdev with clock DT lookup
-
-Sascha Hauer (6):
-      ARM i.MX53: Add pwm support
-      ARM i.MX51: Add pwm support
-      ARM i.MX6: Add pwm support
-      ARM i.MX6: rename PLLs according to datasheet
-      ARM i.MX6: Fix ethernet PLL clocks
-      ARM i.MX6: remove gate_mask from pllv3
-
- .../devicetree/bindings/clock/imx5-clock.txt       |  191 ++++++++++++++++++++
- .../devicetree/bindings/clock/imx6q-clock.txt      |    9 +-
- arch/arm/boot/dts/imx51.dtsi                       |   57 ++++++
- arch/arm/boot/dts/imx53.dtsi                       |   66 +++++++
- arch/arm/boot/dts/imx6q.dtsi                       |   16 ++
- arch/arm/mach-imx/clk-imx51-imx53.c                |   26 +--
- arch/arm/mach-imx/clk-imx6q.c                      |   40 ++--
- arch/arm/mach-imx/clk-pllv3.c                      |   72 +-------
- arch/arm/mach-imx/clk.h                            |    3 +-
- arch/arm/mach-imx/imx51-dt.c                       |   28 +--
- arch/arm/mach-imx/mach-imx53.c                     |   31 +---
- 11 files changed, 386 insertions(+), 153 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/imx5-clock.txt
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
