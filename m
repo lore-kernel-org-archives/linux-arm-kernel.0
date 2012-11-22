@@ -1,61 +1,46 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Thu, 22 Nov 2012 20:15:05 +0100
-Subject: [PATCH] ARM : CLK: Fix clock multiplexers when registered before
- their parents.
-Message-ID: <20121122191505.18016.25951.stgit@localhost>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 22 Nov 2012 20:35:21 +0100
+Subject: [PATCH 1/4] OF: Add helper for matching against linux,stdout-path
+In-Reply-To: <20121122153152.2B9CB3E129E@localhost>
+References: <20121121155312.GX4398@game.jcrosoft.org>
+ <1353513428-25697-1-git-send-email-plagnioj@jcrosoft.com>
+ <CACxGe6tyPpjx4OtjHmhB9Cvnb7OwAjPEE4=K+wgWKYHcAV-ESQ@mail.gmail.com>
+ <20121122054138.GY4398@game.jcrosoft.org>
+ <20121122153152.2B9CB3E129E@localhost>
+Message-ID: <20121122193521.GA4398@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a clock, C is initialised any orphan clocks listing C as
-a possible parent are reparented to it regardless of the
-parent requested by the orphan's get_parent() operation.
+On 15:31 Thu 22 Nov     , Grant Likely wrote:
+> On Thu, 22 Nov 2012 06:41:38 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> > On 18:03 Wed 21 Nov     , Grant Likely wrote:
+> > > On Wed, Nov 21, 2012 at 3:57 PM, Jean-Christophe PLAGNIOL-VILLARD
+> > > <plagnioj@jcrosoft.com> wrote:
+> > > > From: Sascha Hauer <s.hauer@pengutronix.de>
+> > > >
+> > > > devicetrees may have a linux,stdout-path or stdout-path property
+> > > > in the chosen node describing the console device. This adds a helper
+> > > > function to match a device against this property and retrieve the options
+> > > > so a driver can call add_preferred_console for a matching device.
+> > > 
+> > > NIce. Looks like the right behaviour, but is a little inefficient.
+> > > Since the stdout property doesn't change this code could be called
+> > > once right after the tree is unflattened and then cache the pointer to
+> > > the node anarguments. Can you add the code to of_alias_scan()?
+> > do we assume that we can have only one stdout-path?
+> > 
+> > I think we could have more serial, framebuffer console
+> 
+> Nope. stdout-path as currently defined is only one device. Someone would
+> need to propose an extension for multiple stdout's before I'd bother
+> trying to support that.
+ok for this version I do not put it but I need it
 
-This means that multiplexers registered before their parents
-are reparented to the first parent subsequently declared,
-regardless of the selection made by the hardware registers.
+I want to have 2 console uart and framebuffer
 
-For example:
-	static const char *sel[] = { "srcA", "srcB", "dummy", "srcC" };
+Personnaly I'd just allow multiple instance of stdout-path
 
-	child = clk_register_mux(NULL, "child",  sel, ARRAY_SIZE(sel), ...);
-	clk_register_fixed(NULL, "dummy", ...);
-	clk_register_fixed(NULL, "srcA", ...);
-	clk_register_fixed(NULL, "srcB", ...);
-	clk_register_fixed(NULL, "srcC", ...);
+what do you prefer
 
-Causes child's parent to always be "dummy".
-
-To fix this, when an orphanned clock has a get_parent() operation,
-only reparent to the clock indicated by get_parent().
-
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
----
- drivers/clk/clk.c |   10 +++++++++-
- 1 files changed, 9 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index aae7b99..4c605ea 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1307,12 +1307,20 @@ int __clk_init(struct device *dev, struct clk *clk)
- 	 * walk the list of orphan clocks and reparent any that are children of
- 	 * this clock
- 	 */
--	hlist_for_each_entry_safe(orphan, tmp, tmp2, &clk_orphan_list, child_node)
-+	hlist_for_each_entry_safe(orphan, tmp, tmp2, &clk_orphan_list, child_node) {
-+		if (orphan->ops->get_parent) {
-+			i = orphan->ops->get_parent(orphan->hw);
-+			if (!strcmp(clk->name, orphan->parent_names[i]))
-+				__clk_reparent(orphan, clk);
-+			continue;
-+		}
-+
- 		for (i = 0; i < orphan->num_parents; i++)
- 			if (!strcmp(clk->name, orphan->parent_names[i])) {
- 				__clk_reparent(orphan, clk);
- 				break;
- 			}
-+	 }
- 
- 	/*
- 	 * optional platform-specific magic
+Best Regards,
+J.
