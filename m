@@ -1,48 +1,25 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 22 Nov 2012 21:21:02 +0000
-Subject: [PATCH 1/4] OF: Add helper for matching against linux, stdout-path
-In-Reply-To: <20121122193521.GA4398@game.jcrosoft.org>
-References: <20121121155312.GX4398@game.jcrosoft.org>
- <1353513428-25697-1-git-send-email-plagnioj@jcrosoft.com>
- <CACxGe6tyPpjx4OtjHmhB9Cvnb7OwAjPEE4=K+wgWKYHcAV-ESQ@mail.gmail.com>
- <20121122054138.GY4398@game.jcrosoft.org>
- <20121122153152.2B9CB3E129E@localhost>
- <20121122193521.GA4398@game.jcrosoft.org>
-Message-ID: <CACxGe6tD=1tL3dTXSnHusSVCh2T1UN86igNZBm=q3pL77nkJfA@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 23 Nov 2012 00:02:44 +0100 (CET)
+Subject: =?UTF-8?q?=5BPATCH=20097/493=5D=20scsi=3A=20remove=20use=20of=20=5F=5Fdevexit=5Fp?=
+In-Reply-To: <1353349642-3677-97-git-send-email-wfp5p@virginia.edu>
+References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
+ <1353349642-3677-97-git-send-email-wfp5p@virginia.edu>
+Message-ID: <Pine.LNX.4.64.1211230000500.11581@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 7:35 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 15:31 Thu 22 Nov     , Grant Likely wrote:
->> On Thu, 22 Nov 2012 06:41:38 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
->> > On 18:03 Wed 21 Nov     , Grant Likely wrote:
->> > > On Wed, Nov 21, 2012 at 3:57 PM, Jean-Christophe PLAGNIOL-VILLARD
->> > > <plagnioj@jcrosoft.com> wrote:
->> > > > From: Sascha Hauer <s.hauer@pengutronix.de>
->> > > >
->> > > > devicetrees may have a linux,stdout-path or stdout-path property
->> > > > in the chosen node describing the console device. This adds a helper
->> > > > function to match a device against this property and retrieve the options
->> > > > so a driver can call add_preferred_console for a matching device.
->> > >
->> > > NIce. Looks like the right behaviour, but is a little inefficient.
->> > > Since the stdout property doesn't change this code could be called
->> > > once right after the tree is unflattened and then cache the pointer to
->> > > the node anarguments. Can you add the code to of_alias_scan()?
->> > do we assume that we can have only one stdout-path?
->> >
->> > I think we could have more serial, framebuffer console
->>
->> Nope. stdout-path as currently defined is only one device. Someone would
->> need to propose an extension for multiple stdout's before I'd bother
->> trying to support that.
-> ok for this version I do not put it but I need it
->
-> I want to have 2 console uart and framebuffer
->
-> Personnaly I'd just allow multiple instance of stdout-path
+On Mon, 19 Nov 2012, Bill Pemberton wrote:
 
-Propose a binding extension.
+> CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
+> needed.
 
-g.
+>  drivers/scsi/tmscsim.c                    | 2 +-
+
+Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
