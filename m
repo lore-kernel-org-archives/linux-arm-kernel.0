@@ -1,48 +1,56 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 22 Nov 2012 17:31:44 +0800
-Subject: [PATCH v3 0/7] support other fsl SoCs with usbmisc + small fixes
-In-Reply-To: <87y5hu3s83.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
- <87y5hu3s83.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20121122093143.GA22420@nchen-desktop>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 22 Nov 2012 10:33:35 +0100
+Subject: [PATCH v3 0/6] ARM: EXYNOS: Add secure firmware support
+In-Reply-To: <0f5d01cdc87d$e7c81890$b75849b0$%kim@samsung.com>
+References: <1351178560-19188-1-git-send-email-t.figa@samsung.com>
+ <3879194.hz9mrTmL6z@amdc1227>
+ <0f5d01cdc87d$e7c81890$b75849b0$%kim@samsung.com>
+Message-ID: <4854667.0jktSvOtLR@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 11:24:44AM +0200, Alexander Shishkin wrote:
-> Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
-> 
-> > Nearly every SoC from Freescale has this non-core usb registers. This series
-> > adds support for more users of this driver.
-> >
-> > This series is based on Peter Chen's work. Its needed to merge his master branch
-> > before applying this series:
-> >
-> > https://github.com/hzpeterchen/linux-usb.git
-> >
-> > Marc Kleine-Budde (4):
-> >   usb: chipidea: usbmisc: unset global varibale usbmisc on driver
-> >     remove
-> >   usb: chipidea: usbmisc: fix a potential race condition
-> >   usb: chipidea: usbmisc: prepare driver to handle more than one soc
-> >   usb: chipidea: usbmisc: add support for ahb, ipg and per clock
-> >
-> > Michael Grzeschik (3):
-> >   usb: chipidea: usbmisc: rename file, struct and functions to
-> >     usbmisc_imx
-> >   usb: chipidea: usbmisc: add mx53 support
-> >   usb: chipidea: usbmisc: add post handling and errata fix for mx25
-> 
-> Cc'ing Peter Chen, in case he didn't see this. Peter, can you have a
-> look and give your Tested-by/Reviewed-by where appropriate?
+Hi Kgene,
 
-OK, I will have a look tomorrow or the beginning of next week.
+On Thursday 22 of November 2012 15:52:14 Kukjin Kim wrote:
+> Tomasz Figa wrote:
+> > On Monday 12 of November 2012 09:55:30 Russell King - ARM Linux wrote:
+> > > On Mon, Nov 12, 2012 at 04:39:28PM +0900, Kukjin Kim wrote:
+> > > > (+ Russell King)
+> > > 
+> > > I think there's still an amount of work to do here; it's not a
+> > > generic
+> > > interface at the moment because it makes some assumptions about how
+> > > things are done (eg, it assumes that there _will_ be a CPU boot
+> > > register; that is not always true.
+> > > 
+> > > Moreover, the 'cpu' arguments given seem to be uncertain whether
+> > > they're logical CPU numbers or physical CPU numbers.
+> > > 
+> > > Lastly, where is this interface actually documented?  It's just a
+> > > bunch
+> > > of code _without_ _any_ documentation.  That means people will
+> > > interpret it differently, and it'll get used differently from
+> > > platform to platform.
+> > > 
+> > > Let's have some documentation on this.
+> > 
+> > Right, I will include documentation in next version of this patchset.
 > 
-> Regards,
+> Any updates on this?
+> 
+> Thanks.
+> 
+> Best regards,
+> Kgene.
 > --
-> Alex
-> 
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
 
+I was waiting for some comments about my proposals, but since there is no 
+new input I will prepare and post next version today.
+
+Best regards.
 -- 
-
-Best Regards,
-Peter Chen
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Linux Platform
