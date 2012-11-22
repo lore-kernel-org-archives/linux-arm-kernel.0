@@ -1,32 +1,25 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 22 Nov 2012 22:40:56 +0100
-Subject: [PATCH v3 0/3] i2c: at91: add dma support
-In-Reply-To: <50ACA2D4.9040904@atmel.com>
-References: <1352911493-6979-1-git-send-email-ludovic.desroches@atmel.com>
- <20121116170514.GA21903@pengutronix.de>
- <50ACA2D4.9040904@atmel.com>
-Message-ID: <20121122214056.GC14851@pengutronix.de>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 22 Nov 2012 22:46:37 +0100
+Subject: [PATCH v4 04/11] pwm: pwm-tiecap: Add device-tree binding
+ support for APWM driver
+In-Reply-To: <1353503469-18634-5-git-send-email-avinashphilip@ti.com>
+References: <1353503469-18634-1-git-send-email-avinashphilip@ti.com>
+ <1353503469-18634-5-git-send-email-avinashphilip@ti.com>
+Message-ID: <20121122214637.GC14771@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+I forgot, the subject should be:
 
-> >Thanks, looks mostly good. I have problems applying patch 3. What is
-> >this series based against?
-> >
-> 
-> It was based against v3.7-rc4. Do you want me to rebase it against an
-> over version?
+	pwm: tiecap: Add device-tree binding
 
-That should be fine, but it still fails. The other patches apply, but
-have offsets which is suspicious, too. Can you re-check, please?
+for consistency. Same applies for patches 5, 6, 7 and 8.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/93751860/attachment.sig>
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/dd014499/attachment.sig>
