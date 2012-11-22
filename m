@@ -1,26 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Nov 2012 20:24:31 +0000
-Subject: [PATCH 0/5] remaining omap multiplatform patches for v3.8
- merge window
-In-Reply-To: <20121121174201.25576.61961.stgit@muffinssi.local>
-References: <20121121174201.25576.61961.stgit@muffinssi.local>
-Message-ID: <20121122202431.GS3332@n2100.arm.linux.org.uk>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 22 Nov 2012 21:47:04 +0100
+Subject: [PATCH v4 01/11] PWMSS: Add PWM Subsystem driver for
+ parent<->child relationship
+In-Reply-To: <1353503469-18634-2-git-send-email-avinashphilip@ti.com>
+References: <1353503469-18634-1-git-send-email-avinashphilip@ti.com>
+ <1353503469-18634-2-git-send-email-avinashphilip@ti.com>
+Message-ID: <20121122204704.GA16716@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 09:42:19AM -0800, Tony Lindgren wrote:
-> There are few drivers still breaking because of their
-> use of plat/cpu.h and cpu_is_omap macros. The following
-> already have patches queued in linux next:
-> 
-> - drivers/staging/omapdrm/omap_drv.c
-> - drivers/staging/omapdrm/omap_dmm_tiler.h
+On Wed, Nov 21, 2012 at 06:40:58PM +0530, Philip, Avinash wrote:
+[...]
+> +static const struct of_device_id pwmss_of_match[] = {
+> +	{
+> +		.compatible	= "ti,am33xx-pwmss",
+> +	},
 
-Note that there's a bunch of OMAP drivers in staging which are trivially
-broken anyway; I've not been bothering to report their breakages which
-my build system is finding - I figure that if they're trivially broken
-with compile time errors which aren't config related, and no one's
-bothering to fixing them, then no one is even trying to build them -
-which means they're not being used.
+For consistency with other drivers this should be all on one line.
 
-And if they're not being used, it's pointless them being in mainline.
+> +static const struct dev_pm_ops pwmss_pm_ops = {
+> +	SET_SYSTEM_SLEEP_PM_OPS(pwmss_suspend, pwmss_resume)
+> +};
+
+This could be even shorter:
+
+static SIMPLE_DEV_PM_OPS(pwmss_pm_ops, pwmss_suspend, pwmss_resume);
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/3bb858fb/attachment.sig>
