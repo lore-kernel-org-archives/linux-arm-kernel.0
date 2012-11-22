@@ -1,46 +1,32 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 22 Nov 2012 22:40:21 +0100
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <20121122133941.24B883E129E@localhost>
-References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
- <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
- <20121120215429.B621F3E1821@localhost>
- <13540495.epaCf4JVn9@percival>
- <20121122133941.24B883E129E@localhost>
-Message-ID: <20121122214021.GA14771@avionic-0098.adnet.avionic-design.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 22 Nov 2012 22:40:56 +0100
+Subject: [PATCH v3 0/3] i2c: at91: add dma support
+In-Reply-To: <50ACA2D4.9040904@atmel.com>
+References: <1352911493-6979-1-git-send-email-ludovic.desroches@atmel.com>
+ <20121116170514.GA21903@pengutronix.de>
+ <50ACA2D4.9040904@atmel.com>
+Message-ID: <20121122214056.GC14851@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 01:39:41PM +0000, Grant Likely wrote:
-[...]
-> I do think that each sequence should be contained within a single
-> property, but I'm open to other suggestions.
 
-IIRC a very early prototype did implement something like that. However
-because of the resource issues this had to be string based, so that the
-sequences looked somewhat like (Alex, correct me if I'm wrong):
+> >Thanks, looks mostly good. I have problems applying patch 3. What is
+> >this series based against?
+> >
+> 
+> It was based against v3.7-rc4. Do you want me to rebase it against an
+> over version?
 
-	power-on = <"REGULATOR", "power", 1, "GPIO", "enable", 1>;
+That should be fine, but it still fails. The other patches apply, but
+have offsets which is suspicious, too. Can you re-check, please?
 
-Instead we could possibly have something like:
-
-	power-on = <0 &reg 1,
-		    1 &gpio 42 0 1>;
-
-Where the first cell in each entry defines the type (0 = regulator, 1 =
-GPIO) and the rest would be a regular OF specifier for the given type of
-resource along with some defined parameter such as enable/disable,
-voltage, delay in ms, ... I don't know if that sounds any better. It
-looks sort of cryptic but it is more "in the spirit of" DT, right Grant?
-
-Writing this down, it seems to me like even that proposal was already
-discussed at some point. Again, Alex may remember better.
-
-Thierry
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/a95c92c7/attachment.sig>
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/93751860/attachment.sig>
