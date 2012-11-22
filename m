@@ -1,16 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Nov 2012 11:39:04 +0000
-Subject: [PATCH] ARM: implement optimized percpu variable access
-In-Reply-To: <20121122113401.GC3113@mudshark.cambridge.arm.com>
-References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
- <20121122113401.GC3113@mudshark.cambridge.arm.com>
-Message-ID: <20121122113904.GF5764@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 22 Nov 2012 09:44:07 -0200
+Subject: [RFC] ARM: mx27: Replace clk_register_clkdev with clock DT lookup
+In-Reply-To: <20121122075727.GX10369@pengutronix.de>
+References: <1353532526-12897-1-git-send-email-festevam@gmail.com>
+ <20121122075727.GX10369@pengutronix.de>
+Message-ID: <CAOMZO5BWhXSJSP_FFw69hOhcT7pt5JMqWMBZe3H7r1Yk105NEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 11:34:01AM +0000, Will Deacon wrote:
-> (3) Just make the thing depend on __LINUX_ARM_ARCH__ >= 7. Yes, we lose on
->     11MPCore, but we win on A8 and the code is much, much simpler.
+Hi Sascha,
 
-We also lose it in kernels built for mutli-platform, such as OMAP which
-needs to cover both ARMv7 and ARMv6.
+On Thu, Nov 22, 2012 at 5:57 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+
+>> +     Clock                   ID
+>> +     ---------------------------
+>> +     dummy                   0
+>> +     ckih                    1
+>> +     ckil                    2
+>> +     mpll                    3
+>> +     spll                    4
+>> +     mpll_main2              5
+>> +     ahb ipg                 6
+>         ^^^^^^^
+>
+> You could add the following to the clock code, this makes
+> generating the lists less error prone:
+>
+>         for (i = 0; i < ARRAY_SIZE(clk); i++)
+>                 pr_err("%-20s %d\n", IS_ERR(clk[i]) ? "-----" : __clk_get_name(clk[i]), i);
+
+Thanks, this was the issue. It boots fine now.
+
+Will rebase against imx/soc and re-submit.
+
+Thanks,
+
+Fabio Estevam
