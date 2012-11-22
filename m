@@ -1,57 +1,41 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 22 Nov 2012 16:44:43 +0200
-Subject: OMAP4430 produces boot warnings
-In-Reply-To: <1353594842.786.45.camel@sokoban>
-References: <20121121230337.GR3332@n2100.arm.linux.org.uk>
- <50AE1DC0.3030002@ti.com> <50AE2BB6.8080406@ti.com>
- <1353594842.786.45.camel@sokoban>
-Message-ID: <50AE3A5B.5040603@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 22 Nov 2012 15:45:47 +0100
+Subject: [GIT PULL] i.MX defconfig updates
+Message-ID: <20121122144547.GH10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-22 16:34, Tero Kristo wrote:
+Hi,
 
-> I guess you checked that DSS pwrdm is switching between RET and ON in
-> your setup?
+Please pull the following i.MX defconfig updates for i.MX
 
-Yes:
+Sascha
 
-# cat /debug/pm_debug/count |grep dss
-[   35.356567] pwrdm state mismatch(l3init_pwrdm) 3 != 1
-[   35.361938] pwrdm state mismatch(cam_pwrdm) 3 != 0
-[   35.366973] pwrdm state mismatch(ivahd_pwrdm) 3 != 1
-[   35.372253] pwrdm state mismatch(tesla_pwrdm) 3 != 1
-[   35.377532] pwrdm state mismatch(abe_pwrdm) 3 != 1
-dss_pwrdm (RET),OFF:1,RET:11,INA:0,ON:11,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-l3_dss_clkdm->dss_pwrdm (0)
+The following changes since commit a0d271cbfed1dd50278c6b06bead3d00ba0a88f9:
 
-then I load and unload the dss modules, and then:
+  Linux 3.6 (2012-09-30 16:47:46 -0700)
 
-# cat /debug/pm_debug/count |grep dss
-[   60.813629] pwrdm state mismatch(l3init_pwrdm) 3 != 1
-[   60.819000] pwrdm state mismatch(cam_pwrdm) 3 != 0
-[   60.824127] pwrdm state mismatch(ivahd_pwrdm) 3 != 1
-[   60.829376] pwrdm state mismatch(tesla_pwrdm) 3 != 1
-[   60.834625] pwrdm state mismatch(abe_pwrdm) 3 != 1
-dss_pwrdm (ON),OFF:1,RET:21,INA:0,ON:22,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-l3_dss_clkdm->dss_pwrdm (0)
+are available in the git repository at:
 
->> Does the pwrdm mistakenly think that in RET state the DSS still keeps
->> the register contents?
-> 
-> This might be the case, however the pwrdm code should be generic and
-> handle all domains properly. What is the tree / branch / commit you are
-> using for testing this stuff? I can take a look at this also.
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-defconfig
 
-arm-soc/for-next
+for you to fetch changes up to 5177ae56d1b6dcf4b23f1f89ed3be1c3dc0ad513:
 
- Tomi
+  ARM: imx: configs: Enable CONFIG_MEDIA_CAMERA_SUPPORT (2012-10-10 10:51:00 +0200)
 
+----------------------------------------------------------------
+ARM i.MX specific defconfig updates
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 899 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/54916d83/attachment.sig>
+----------------------------------------------------------------
+Fabio Estevam (2):
+      ARM: imx_v6_v7_defconfig: Add DA9052 regulator support
+      ARM: imx: configs: Enable CONFIG_MEDIA_CAMERA_SUPPORT
+
+ arch/arm/configs/imx_v4_v5_defconfig |    1 +
+ arch/arm/configs/imx_v6_v7_defconfig |    3 +++
+ 2 files changed, 4 insertions(+)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
