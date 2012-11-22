@@ -1,68 +1,51 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 22 Nov 2012 13:55:23 +0100
-Subject: [PATCH v2] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <20121121111711.fe915265.akpm@linux-foundation.org>
-References: <20121119144826.f59667b2.akpm@linux-foundation.org>
- <1353421905-3112-1-git-send-email-m.szyprowski@samsung.com>
- <20121120113325.dde266ed.akpm@linux-foundation.org>
- <50AC8C14.5050204@samsung.com>
- <20121121003643.97febbdb.akpm@linux-foundation.org>
- <50AC9CC7.8010103@samsung.com>
- <20121121111711.fe915265.akpm@linux-foundation.org>
-Message-ID: <50AE20BB.7030107@samsung.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 22 Nov 2012 13:01:47 +0000
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <4275468.QAmZy3xUK6@percival>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <1699753.ZQsWMHINxd@percival> <50AC956D.7020303@ti.com>
+ <4275468.QAmZy3xUK6@percival>
+Message-ID: <CACxGe6tLq7LAb_YwvJVnccJEJNEwKt6heEZER3L7tP1g1WnbXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 11/21/2012 8:17 PM, Andrew Morton wrote:
-> On Wed, 21 Nov 2012 10:20:07 +0100
-> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > On 11/21/2012 9:36 AM, Andrew Morton wrote:
-> > > On Wed, 21 Nov 2012 09:08:52 +0100 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > > > On 11/20/2012 8:33 PM, Andrew Morton wrote:
-> > > > > On Tue, 20 Nov 2012 15:31:45 +0100
-> > > > > Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > > > >
-> > > > > > dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag,
-> > > > > > regardless the flags provided by the caller. This causes excessive
-> > > > > > pruning of emergency memory pools without any good reason. Additionaly,
-> > > > > > on ARM architecture any driver which is using dmapools will sooner or
-> > > > > > later  trigger the following error:
-> > > > > > "ERROR: 256 KiB atomic DMA coherent pool is too small!
-> > > > > > Please increase it with coherent_pool= kernel parameter!".
-> > > > > > Increasing the coherent pool size usually doesn't help much and only
-> > > > > > delays such error, because all GFP_ATOMIC DMA allocations are always
-> > > > > > served from the special, very limited memory pool.
-> > > > > >
-> > > > >
-> > > > > Is this problem serious enough to justify merging the patch into 3.7?
-> > > > > And into -stable kernels?
-> > > >
-> > > > I wonder if it is a good idea to merge such change at the end of current
-> > > > -rc period.
-> > >
-> > > I'm not sure what you mean by this.
-> > >
-> > > But what we do sometimes if we think a patch needs a bit more
-> > > real-world testing before backporting is to merge it into -rc1 in the
-> > > normal merge window, and tag it for -stable backporting.  That way it
-> > > gets a few weeks(?) testing in mainline before getting backported.
-> >
-> > I just wondered that if it gets merged to v3.7-rc7 there won't be much time
-> > for real-world testing before final v3.7 release. This patch is in
-> > linux-next for over a week and I'm not aware of any issues, but -rc releases
-> > gets much more attention and testing than linux-next tree.
-> >
-> > If You think it's fine to put such change to v3.7-rc7 I will send a pull
-> > request and tag it for stable asap.
+On Wed, Nov 21, 2012 at 10:00 AM, Alex Courbot <acourbot@nvidia.com> wrote:
+> On Wednesday 21 November 2012 16:48:45 Tomi Valkeinen wrote:
+>> If the power-off sequence disables a regulator that was supposed to be
+>> enabled by the power-on sequence (but wasn't enabled because of an
+>> error), the regulator_disable is still called when the driver runs the
+>> power-off sequence, isn't it? Regulator enables and disables are ref
+>> counted, and the enables should match the disables.
 >
-> What I'm suggesting is that it be merged for 3.8-rc1 with a -stable
-> tag, then it will be backported into 3.7.x later on.
+> And there collapses my theory.
+>
+>> > Failures might be better handled if sequences have some "recovery policy"
+>> > about what to do when they fail, as mentioned in the link above. As you
+>> > pointed out, the driver might not always know enough about the resources
+>> > involved to do the right thing.
+>>
+>> Yes, I think such recovery policy would be needed.
+>
+> Indeed, from your last paragraph this makes even more sense now.
+>
+> Oh, and I noticed I forgot to reply to this:
+>
+>> This I didn't understand. Doesn't "<&pwm 2 xyz>" point to a single
+>> device, no matter where and how many times it's used?
+>
+> That's true - however when dereferencing the phandle, the underlying framework
+> will try to acquire the PWM, which will result in failure if the same resource
+> is referenced several times.
+>
+> One could compare the phandles to avoid this, but in your example you must
+> know that for PWMs the "xyz" part is not relevant for comparison.
+>
+> This makes referencing of resources by name much easier to implement and more
+> elegant with respect to frameworks leveraging.
 
-OK, I will push it to v3.8-rc1 then and tag for stable.
+I would rather (at least for how the DT bindings settle out) see the
+design separate the resource references from the sequence. ie. Declare
+which resources are used by a device's sequences all in one place and
+have the commands index into that.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+g.
