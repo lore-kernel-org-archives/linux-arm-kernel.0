@@ -1,7 +1,7 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Nov 2012 09:30:33 +0000
+Date: Thu, 22 Nov 2012 09:31:01 +0000
 Subject: [PATCH 1/3] CLK: uninline clk_prepare() and clk_unprepare()
-In-Reply-To: <20121122021750.GD25470@core.coreip.homeip.net>
+In-Reply-To: <20121122032407.21126.49680@nucleus>
 References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
  <1353403339-11679-2-git-send-email-dmitry.torokhov@gmail.com>
  <CAKohpo=B_7rVwePziyNe0rTMokcib_FgEN28cy4nByAzbUyaqg@mail.gmail.com>
@@ -9,30 +9,13 @@ References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
  <20121121205424.GA25470@core.coreip.homeip.net>
  <20121121223859.GQ3290@n2100.arm.linux.org.uk>
  <20121122021750.GD25470@core.coreip.homeip.net>
-Message-ID: <20121122093033.GA5764@n2100.arm.linux.org.uk>
+ <20121122031117.GE25470@core.coreip.homeip.net>
+ <20121122032407.21126.49680@nucleus>
+Message-ID: <20121122093101.GB5764@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 06:17:50PM -0800, Dmitry Torokhov wrote:
-> > You've checked non-ARM architectures too?
-> 
-> Yes:
-> 
-> [dtor at dtor-d630 linux-next]$ grep -r HAVE_CLK_PREPARE .
-> ./arch/arm/Kconfig:     select HAVE_CLK_PREPARE
-> Binary file ./.git/objects/pack/pack-7dad5ee164f601f1327dc78648fa317772c2d872.pack matches
-> ./include/linux/clk.h:#ifdef CONFIG_HAVE_CLK_PREPARE
-> ./include/linux/clk.h:#ifdef CONFIG_HAVE_CLK_PREPARE
-> ./drivers/clk/Kconfig:config HAVE_CLK_PREPARE
-> ./drivers/clk/Kconfig:  select HAVE_CLK_PREPARE
+On Wed, Nov 21, 2012 at 07:24:07PM -0800, Mike Turquette wrote:
+> Looks right to me.  Just need to remove the select from IMX as well.
 
-Err, no you haven't, not with that grep.  What you've found are the places
-which enable this, and say "yes, I have clk_prepare".
-
-What HAVE_CLK_PREPARE is about though is providing a transition path between
-drivers using clk_prepare() to platforms which _don't_ have a clk_prepare()
-implementation - and when it's unset, it provides a default implementation.
-
-So, finding all those places where the symbol exists is the exact opposite
-of what you need to be doing.  You need to find those platforms which have
-CLK support, but which don't have HAVE_CLK_PREPARE selected.
+Then you don't understand HAVE_CLK_PREPARE.
