@@ -1,39 +1,57 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 22 Nov 2012 15:43:11 +0100
-Subject: [GIT PULL] i.MX Board update
-Message-ID: <20121122144311.GG10369@pengutronix.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 22 Nov 2012 16:44:43 +0200
+Subject: OMAP4430 produces boot warnings
+In-Reply-To: <1353594842.786.45.camel@sokoban>
+References: <20121121230337.GR3332@n2100.arm.linux.org.uk>
+ <50AE1DC0.3030002@ti.com> <50AE2BB6.8080406@ti.com>
+ <1353594842.786.45.camel@sokoban>
+Message-ID: <50AE3A5B.5040603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2012-11-22 16:34, Tero Kristo wrote:
 
-Please pull the following board update for i.MX.
+> I guess you checked that DSS pwrdm is switching between RET and ON in
+> your setup?
 
-Sascha
+Yes:
 
-The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
+# cat /debug/pm_debug/count |grep dss
+[   35.356567] pwrdm state mismatch(l3init_pwrdm) 3 != 1
+[   35.361938] pwrdm state mismatch(cam_pwrdm) 3 != 0
+[   35.366973] pwrdm state mismatch(ivahd_pwrdm) 3 != 1
+[   35.372253] pwrdm state mismatch(tesla_pwrdm) 3 != 1
+[   35.377532] pwrdm state mismatch(abe_pwrdm) 3 != 1
+dss_pwrdm (RET),OFF:1,RET:11,INA:0,ON:11,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+l3_dss_clkdm->dss_pwrdm (0)
 
-  Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
+then I load and unload the dss modules, and then:
 
-are available in the git repository at:
+# cat /debug/pm_debug/count |grep dss
+[   60.813629] pwrdm state mismatch(l3init_pwrdm) 3 != 1
+[   60.819000] pwrdm state mismatch(cam_pwrdm) 3 != 0
+[   60.824127] pwrdm state mismatch(ivahd_pwrdm) 3 != 1
+[   60.829376] pwrdm state mismatch(tesla_pwrdm) 3 != 1
+[   60.834625] pwrdm state mismatch(abe_pwrdm) 3 != 1
+dss_pwrdm (ON),OFF:1,RET:21,INA:0,ON:22,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+l3_dss_clkdm->dss_pwrdm (0)
 
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-board
+>> Does the pwrdm mistakenly think that in RET state the DSS still keeps
+>> the register contents?
+> 
+> This might be the case, however the pwrdm code should be generic and
+> handle all domains properly. What is the tree / branch / commit you are
+> using for testing this stuff? I can take a look at this also.
 
-for you to fetch changes up to 038bdf63a72ac02a987981cf987622fd2de63f51:
+arm-soc/for-next
 
-  Visstrim SM10: Use mo_version to decide board video mode. (2012-11-02 09:23:30 +0100)
+ Tomi
 
-----------------------------------------------------------------
-ARM i.MX specific board updates for v3.8
 
-----------------------------------------------------------------
-Javier Martin (1):
-      Visstrim SM10: Use mo_version to decide board video mode.
-
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   52 ++++++++++++++++++++++++---
- 1 file changed, 47 insertions(+), 5 deletions(-)
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 899 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/54916d83/attachment.sig>
