@@ -1,36 +1,68 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 22 Nov 2012 15:31:52 +0000
-Subject: [PATCH 1/4] OF: Add helper for matching against linux, stdout-path
-In-Reply-To: <20121122054138.GY4398@game.jcrosoft.org>
-References: <20121121155312.GX4398@game.jcrosoft.org>
- <1353513428-25697-1-git-send-email-plagnioj@jcrosoft.com>
- <CACxGe6tyPpjx4OtjHmhB9Cvnb7OwAjPEE4=K+wgWKYHcAV-ESQ@mail.gmail.com>
- <20121122054138.GY4398@game.jcrosoft.org>
-Message-ID: <20121122153152.2B9CB3E129E@localhost>
+Date: Thu, 22 Nov 2012 15:33:36 +0000
+Subject: [PATCH] ARM: kernel: fix nr_cpu_ids check in DT logical map init
+In-Reply-To: <20121122120843.GA16972@e102568-lin.cambridge.arm.com>
+References: <1353516176-12929-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20121122120843.GA16972@e102568-lin.cambridge.arm.com>
+Message-ID: <20121122153337.083D73E129E@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Nov 2012 06:41:38 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> On 18:03 Wed 21 Nov     , Grant Likely wrote:
-> > On Wed, Nov 21, 2012 at 3:57 PM, Jean-Christophe PLAGNIOL-VILLARD
-> > <plagnioj@jcrosoft.com> wrote:
-> > > From: Sascha Hauer <s.hauer@pengutronix.de>
-> > >
-> > > devicetrees may have a linux,stdout-path or stdout-path property
-> > > in the chosen node describing the console device. This adds a helper
-> > > function to match a device against this property and retrieve the options
-> > > so a driver can call add_preferred_console for a matching device.
-> > 
-> > NIce. Looks like the right behaviour, but is a little inefficient.
-> > Since the stdout property doesn't change this code could be called
-> > once right after the tree is unflattened and then cache the pointer to
-> > the node anarguments. Can you add the code to of_alias_scan()?
-> do we assume that we can have only one stdout-path?
+On Thu, 22 Nov 2012 12:08:43 +0000, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> Hi Russell,
 > 
-> I think we could have more serial, framebuffer console
+> On Wed, Nov 21, 2012 at 04:42:56PM +0000, Lorenzo Pieralisi wrote:
+> > If a kernel is configured with a DT containing more /cpu nodes than
+> > nr_cpu_ids, the number of cpus must be capped in the DT parsing
+> > code. Current code carries out the check, but fails to cap the
+> > value and the check is executed after the cpu logical index is used,
+> > which can lead to memory corruption due to index overflow.
+> > 
+> > This patch refactors the check against nr_cpu_ids and move it before
+> > any computed index is used in the parsing code.
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Reported-by: Mark Rutland <mark.rutland@arm.com>
+> > ---
+> > Russell,
+> > 
+> > while refactoring the DT loop over nodes, I unfortunately missed this niggle
+> > in the parsing loop that Mark reported. Here is the fix, sorry for the
+> > additional commit, if it is ok for you I will add it to your patch system.
+> > 
+> > Apologies and thanks,
+> > Lorenzo
+> > 
+> >  arch/arm/kernel/devtree.c | 10 +++++++---
+> >  1 file changed, 7 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> > index aaf9add..70f1bde 100644
+> > --- a/arch/arm/kernel/devtree.c
+> > +++ b/arch/arm/kernel/devtree.c
+> > @@ -139,10 +139,14 @@ void __init arm_dt_init_cpu_maps(void)
+> >  			i = cpuidx++;
+> >  		}
+> >  
+> > -		tmp_map[i] = hwid;
+> > -
+> > -		if (cpuidx > nr_cpu_ids)
+> > +		if (WARN(cpuidx > nr_cpu_ids, "DT /cpu %u nodes greater than "
+> > +					       "max cores %u, capping them\n",
+> > +					       cpuidx, nr_cpu_ids)) {
+> > +			cpuidx = nr_cpu_ids;
+> >  			break;
+> > +		}
+> > +
+> > +		tmp_map[i] = hwid;
+> >  	}
+> >  
+> >  	if (WARN(!bootcpu_valid, "DT missing boot CPU MPIDR[23:0], "
+> 
+> If it looks fine to you, can I queue this simple fix in your patch
+> system please ?
+> 
+> Thanks and apologies for the extra commit,
+> Lorenzo
 
-Nope. stdout-path as currently defined is only one device. Someone would
-need to propose an extension for multiple stdout's before I'd bother
-trying to support that.
-
-g.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
