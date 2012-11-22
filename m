@@ -1,47 +1,77 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 22 Nov 2012 09:57:35 +0200
-Subject: Possible regression in arm/io.h
-In-Reply-To: <20121024152730.GH7339@mudshark.cambridge.arm.com>
-References: <CABYn4syj0GZAsDYVQfXg_qKAFkbrxPLoZWpKRzwf3gfRkMGZkQ@mail.gmail.com>
- <20121024105223.GC23775@mudshark.cambridge.arm.com>
- <CABYn4swp9JBEHgGTOkoe=tOh3Mf1dq5WYr=2xuKNpTmLX5LcFQ@mail.gmail.com>
- <20121024130957.GB7339@mudshark.cambridge.arm.com>
- <CABYn4sz4v7Uf07am=MtPAKAvvAjwt+-bTRaLrBjoiRuyR9cfZw@mail.gmail.com>
- <20121024135854.GD7339@mudshark.cambridge.arm.com>
- <CABYn4sxnwzj8KFfELzCLzQMcAjiqS3_Vr2kStkm-na8G1noPHA@mail.gmail.com>
- <20121024152730.GH7339@mudshark.cambridge.arm.com>
-Message-ID: <1353571055.2701.21.camel@sauron.fi.intel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 22 Nov 2012 08:57:27 +0100
+Subject: [RFC] ARM: mx27: Replace clk_register_clkdev with clock DT lookup
+In-Reply-To: <1353532526-12897-1-git-send-email-festevam@gmail.com>
+References: <1353532526-12897-1-git-send-email-festevam@gmail.com>
+Message-ID: <20121122075727.GX10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-10-24 at 16:27 +0100, Will Deacon wrote:
-> On Wed, Oct 24, 2012 at 04:04:46PM +0100, Bastian Hecht wrote:
-> > >> > Ok, I'll have a look at the impact of moving exclusively to "Q" when I get a
-> > >> > chance. Which toolchain are you using?
-> > >>
-> > >> gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
-> > >> For a more verbose info take a look at the bug report link.
-> > >
-> > > Ok, thanks. One other thing you could try while I try to find a copy of that
-> > > toolchain is changing the "+" modifier to an "=", like I proposed in this
-> > > version of the patch:
-> > 
-> > So if alter it to fit to your patch scheme the result is:
+On Wed, Nov 21, 2012 at 07:15:26PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Sorry, the change wasn't as trivial as I thought -- you have to reorder the
-> constraints because an output becomes an input for the load accessors. I
-> tried it myself and it doesn't fix the issue (I can reproduce it now).
+> Similarly as it was done for mx6q, use a DT lookup in order to make maintainance
+> task for the clock devices easier.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Sascha/Shawn,
+> 
+> Trying the same approach from mx6/mx5 does not work on mx27.
+> This patch causes the console to be messed up.
+> 
+> Any suggestion as to what should be different for mx27?
+> 
+> Thanks
+> 
+>  .../devicetree/bindings/clock/imx27-clock.txt      |  111 ++++++++++++++++++++
+>  arch/arm/boot/dts/imx27.dtsi                       |    8 ++
+>  arch/arm/mach-imx/clk-imx27.c                      |    9 ++
+>  arch/arm/mach-imx/imx27-dt.c                       |    3 +-
+>  4 files changed, 129 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/imx27-clock.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/imx27-clock.txt b/Documentation/devicetree/bindings/clock/imx27-clock.txt
+> new file mode 100644
+> index 0000000..e874a36
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/imx27-clock.txt
+> @@ -0,0 +1,111 @@
+> +* Clock bindings for Freescale i.MX27
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,imx27-ccm"
+> +- reg: Address and length of the register set
+> +- #clock-cells: Should be <1>
+> +
+> +The clock consumer should specify the desired clock by having the clock
+> +ID in its "clocks" phandle cell.  The following is a full list of i.MX27
+> +clocks and IDs.
+> +
+> +	Clock			ID
+> +	---------------------------
+> +	dummy			0 
+> +	ckih			1
+> +	ckil			2
+> +	mpll			3
+> +	spll			4
+> +	mpll_main2		5
+> +	ahb ipg			6
+        ^^^^^^^
 
-Any progress with this? Do we end up with gcc 4.6+ - uncompilable MTD
-drivers in 3.7?
+You could add the following to the clock code, this makes
+generating the lists less error prone:
+
+	for (i = 0; i < ARRAY_SIZE(clk); i++)
+		pr_err("%-20s %d\n", IS_ERR(clk[i]) ? "-----" : __clk_get_name(clk[i]), i);
+
+BTW you should base this on the imx/soc branch of the arm-soc tree.
+There are some changes in the numbering in there.
+
+Sascha
 
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/169d1411/attachment.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
