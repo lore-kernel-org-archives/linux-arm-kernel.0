@@ -1,17 +1,50 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 22 Nov 2012 09:30:45 +0800
-Subject: [PATCH 2/2] ARM: dts: mxs: add oled support for the cfa-10036
-In-Reply-To: <50AC97B3.5070709@free-electrons.com>
-References: <1351674774-2891-1-git-send-email-maxime.ripard@free-electrons.com>
- <1351674774-2891-3-git-send-email-maxime.ripard@free-electrons.com>
- <50AC97B3.5070709@free-electrons.com>
-Message-ID: <20121122013041.GA24693@S2100-06.ap.freescale.net>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Thu, 22 Nov 2012 11:01:34 +0900
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <20121121151209.GA4048@avionic-0098.adnet.avionic-design.de>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
+ <20121120215429.B621F3E1821@localhost>
+ <13540495.epaCf4JVn9@percival> <50ACB59B.4090404@iki.fi>
+ <20121121114018.GA31576@avionic-0098.adnet.avionic-design.de>
+ <50ACC341.3090204@ti.com>
+ <20121121130039.GA12191@avionic-0098.adnet.avionic-design.de>
+ <50ACD7DC.5060405@ti.com>
+ <CAAVeFuJofYwj926=3v0ApBCq_vNhCdC1PnzDc-B3d=LL_L40Uw@mail.gmail.com>
+ <20121121151209.GA4048@avionic-0098.adnet.avionic-design.de>
+Message-ID: <CAAVeFuK_V6nb874bygioi35mFNxaWuveKOedLT=YYsP4JfVqgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 09:58:27AM +0100, Maxime Ripard wrote:
-> Would you consider merging this patch?
-> Andrew Morton merged the driver into its tree
-> (http://marc.info/?l=linux-fbdev&m=135336761530731&w=2)
-> 
-Just applied, thanks.
+On Thu, Nov 22, 2012 at 12:12 AM, Thierry Reding
+<thierry.reding@avionic-design.de> wrote:
+> On Thu, Nov 22, 2012 at 12:02:47AM +0900, Alexandre Courbot wrote:
+>> Mmmm so maybe I am misinterpreting things, but it looks like we
+>> have just buried the power sequences here, haven't we?
+>
+> I don't think so. In fact I was just starting to think that maybe for
+> Tegra we could have a generic panel driver which used power sequences
+> to abstract away the pin differences for powering up the panel. Since
+> most likely that will be where the differences are there is a lot of
+> potential to factor things out into sequences.
+>
+> Perhaps what we may want to postpone for now is the DT representation
+> since that's what Tomi and Grant seem to be mostly opposed to.
+
+The thing I don't understand here is why would anyone want power
+sequences without the DT representation. Guys, that's the whole point! :)
+
+If we are to implement things into drivers, then callback functions
+are going to serve us just as well - even better, for they are more
+flexible. All we need to do is define a dedicated ops structure and
+have the driver plug the right callback functions depending on the
+"compatible" property of the DT device node. We don't need a framework
+for that.
+
+And if we are not going to use power seqs that's probably what we
+should do in order to get panels to work on Tegra boards for now. Then
+see how things turn out with the panel framework and whether there is
+a use for power seqs in it. But by the meantime, I don't see any
+motivation to merge power seqs sans DT support.
+
+Alex.
