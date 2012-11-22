@@ -1,31 +1,53 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Thu, 22 Nov 2012 03:47:31 +0100
-Subject: [PATCH v5 4/5] iommu/omap: adapt to runtime pm
-In-Reply-To: <1353373552-16039-5-git-send-email-omar.luna@linaro.org>
-References: <1353373552-16039-1-git-send-email-omar.luna@linaro.org>
- <1353373552-16039-5-git-send-email-omar.luna@linaro.org>
-Message-ID: <CAMP44s0h+6XTaJv8q-MJe4vmDiBzNG2cjTugSn7nFyAsZPk+Ag@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 21 Nov 2012 21:53:57 -0500
+Subject: [PATCH] ARM: kirkwood: Add Plat'Home OpenBlocks A6 support
+In-Reply-To: <CABMQnVL7bd7Om-7nZ33Y336PPtdMLmMWx63YwtMOZf5NftkeOw@mail.gmail.com>
+References: <1352792590-20052-1-git-send-email-iwamatsu@nigauri.org>
+ <20121113123739.GS22042@titan.lakedaemon.net>
+ <CABMQnVKPyEp-cm_M_Y4rSU_tNLHL0fhUKUUgZkTkV+8MhnjVdA@mail.gmail.com>
+ <CABMQnVL7bd7Om-7nZ33Y336PPtdMLmMWx63YwtMOZf5NftkeOw@mail.gmail.com>
+Message-ID: <20121122025357.GG15800@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 2:05 AM, Omar Ramirez Luna <omar.luna@linaro.org> wrote:
+On Thu, Nov 22, 2012 at 08:43:46AM +0900, Nobuhiro Iwamatsu wrote:
+> On Wed, Nov 14, 2012 at 4:54 AM, Nobuhiro Iwamatsu <iwamatsu@nigauri.org> wrote:
+> > On Tue, Nov 13, 2012 at 9:37 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> >> On Tue, Nov 13, 2012 at 04:43:09PM +0900, Nobuhiro Iwamatsu wrote:
+> >>> Add support for Plat'Home OpenBlocks A6 using the device tree
+> >>> where possible.
+> >>> This commit supports SATA, USB, ether and serial console.
+> >>>
+> >>> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> >>> ---
+> >>> V2:
+> >>>   - Remove unnecessary value from bootargs.
+> >>>   - Update comment for MPP table.
+> >>>   - Remove kirkwood_uart0_init().
+> >>
+> >> Thanks for the patch.  One small note.  In the future, please add a 'V2'
+> >> to the subject line, eg "[PATCH V2] ...".  It really helps us keep track of
+> >> which one to merge.
+> >
+> > Although I knew about it , I forgot adding "V2".
+> >
+> >>
+> >> No need to resend, I'll keep track of it since I'm about to pull
+> >> everything together over the next few days.
+> 
+> Where have you managed this patch?  http://git.infradead.org/ ?
 
-> @@ -1022,7 +1019,8 @@ static int __devexit omap_iommu_remove(struct platform_device *pdev)
->         release_mem_region(res->start, resource_size(res));
->         iounmap(obj->regbase);
->
-> -       clk_put(obj->clk);
-> +       pm_runtime_disable(obj->dev);
-> +
->         dev_info(&pdev->dev, "%s removed\n", obj->name);
->         kfree(obj);
->         return 0;
+Yes, mostly on my local machine currently.  I'm busy sorting everything.
+;-)
 
-I still believe this is not needed. The device framework does that
-when removing the device, and does it more properly, with
-__pm_runtime_disable(dev, false).
+> I would like to put this into 3.8.  And I would like to follow some
+> functions (clock frame work etc.) updated.
 
-Cheers.
+I'm not sure what you mean by the second sentence.  At any rate, Thomas
+has included your patch in his pull request, which I have merged in for
+3.8.  I should have everything up in the next day with pull requests
+sent to Arnd.
 
--- 
-Felipe Contreras
+thx,
+
+Jason.
