@@ -1,127 +1,159 @@
 From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Thu, 22 Nov 2012 20:32:30 +0900
-Subject: [PATCH v4 01/12] ARM: EXYNOS: Add clk_ops for gating clocks of System
- MMU
-Message-ID: <002201cdc8a5$0e9fb8c0$2bdf2a40$%cho@samsung.com>
+Date: Thu, 22 Nov 2012 20:33:21 +0900
+Subject: [PATCH v4 07/12] iommu/exynos: change rwlock to spinlock
+Message-ID: <002801cdc8a5$2d68bbd0$883a3370$%cho@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Touching some System MMU needs its master devices' clock to be enabled
-before. This commit adds clk_ops.set_parent of gating clocks of System
-MMU to ensure gating clocks of System MMU's mater devices are enabled
-when enabling gating clocks of System MMU.
+Since acquiring read_lock is not more frequent than write_lock, it is
+not beneficial to use rwlock, this commit changes rwlock to spinlock.
 
 Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
 ---
- arch/arm/mach-exynos/clock-exynos5.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ drivers/iommu/exynos-iommu.c | 32 ++++++++++++++++----------------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-index e48d7c2..a86e88e 100644
---- a/arch/arm/mach-exynos/clock-exynos5.c
-+++ b/arch/arm/mach-exynos/clock-exynos5.c
-@@ -614,6 +614,16 @@ static struct clksrc_clk exynos5_clk_aclk_300_gscl = {
- 	.reg_src = { .reg = EXYNOS5_CLKSRC_TOP3, .shift = 10, .size = 1 },
- };
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 0bb194e..e39ddac 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -184,7 +184,7 @@ struct sysmmu_drvdata {
+ 	struct clk *clk;
+ 	int activations;
+ 	struct sysmmu_version ver;
+-	rwlock_t lock;
++	spinlock_t lock;
+ 	struct iommu_domain *domain;
+ 	sysmmu_fault_handler_t fault_handler;
+ 	unsigned long pgtable;
+@@ -288,7 +288,7 @@ void exynos_sysmmu_set_prefbuf(struct device *dev,
+ 	BUG_ON((base0 + size0) <= base0);
+ 	BUG_ON((size1 > 0) && ((base1 + size1) <= base1));
  
-+static int exynos5_gate_clk_set_parent(struct clk *clk, struct clk *parent)
-+{
-+	clk->parent = parent;
-+	return 0;
-+}
-+
-+static struct clk_ops exynos5_gate_clk_ops = {
-+	.set_parent = exynos5_gate_clk_set_parent
-+};
-+
- static struct clk exynos5_init_clocks_off[] = {
- 	{
- 		.name		= "timers",
-@@ -855,71 +865,85 @@ static struct clk exynos5_init_clocks_off[] = {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_l, 0),
- 		.enable		= &exynos5_clk_ip_mfc_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 1),
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_r, 1),
- 		.enable		= &exynos5_clk_ip_mfc_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 2),
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(tv, 2),
- 		.enable		= &exynos5_clk_ip_disp1_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 9)
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(jpeg, 3),
- 		.enable		= &exynos5_clk_ip_gen_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 7),
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(rot, 4),
- 		.enable		= &exynos5_clk_ip_gen_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 6)
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(gsc0, 5),
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 7),
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(gsc1, 6),
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 8),
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(gsc2, 7),
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 9),
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(gsc3, 8),
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 10),
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(isp, 9),
- 		.enable		= &exynos5_clk_ip_isp0_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (0x3F << 8),
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME2,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(isp, 9),
- 		.enable		= &exynos5_clk_ip_isp1_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (0xF << 4),
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(camif0, 12),
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 11),
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(camif1, 13),
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 12),
- 	}, {
- 		.name		= SYSMMU_CLOCK_NAME,
- 		.devname	= SYSMMU_CLOCK_DEVNAME(2d, 14),
- 		.enable		= &exynos5_clk_ip_acp_ctrl,
-+		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 7)
+-	read_lock_irqsave(&data->lock, flags);
++	spin_lock_irqsave(&data->lock, flags);
+ 	if (!is_sysmmu_active(data))
+ 		goto finish;
+ 
+@@ -318,7 +318,7 @@ void exynos_sysmmu_set_prefbuf(struct device *dev,
+ 		}
  	}
- };
+ finish:
+-	read_unlock_irqrestore(&data->lock, flags);
++	spin_unlock_irqrestore(&data->lock, flags);
+ }
+ 
+ static void __set_fault_handler(struct sysmmu_drvdata *data,
+@@ -326,9 +326,9 @@ static void __set_fault_handler(struct sysmmu_drvdata *data,
+ {
+ 	unsigned long flags;
+ 
+-	write_lock_irqsave(&data->lock, flags);
++	spin_lock_irqsave(&data->lock, flags);
+ 	data->fault_handler = handler;
+-	write_unlock_irqrestore(&data->lock, flags);
++	spin_unlock_irqrestore(&data->lock, flags);
+ }
+ 
+ void exynos_sysmmu_set_fault_handler(struct device *dev,
+@@ -376,7 +376,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
+ 
+ 	int i, ret = -ENOSYS;
+ 
+-	read_lock(&data->lock);
++	spin_lock(&data->lock);
+ 
+ 	WARN_ON(!is_sysmmu_active(data));
+ 
+@@ -420,7 +420,7 @@ static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
+ 	if (itype != SYSMMU_FAULT_UNKNOWN)
+ 		sysmmu_unblock(data->sfrbases[i]);
+ 
+-	read_unlock(&data->lock);
++	spin_unlock(&data->lock);
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -431,7 +431,7 @@ static bool __exynos_sysmmu_disable(struct sysmmu_drvdata *data)
+ 	bool disabled = false;
+ 	int i;
+ 
+-	write_lock_irqsave(&data->lock, flags);
++	spin_lock_irqsave(&data->lock, flags);
+ 
+ 	if (!set_sysmmu_inactive(data))
+ 		goto finish;
+@@ -446,7 +446,7 @@ static bool __exynos_sysmmu_disable(struct sysmmu_drvdata *data)
+ 	data->pgtable = 0;
+ 	data->domain = NULL;
+ finish:
+-	write_unlock_irqrestore(&data->lock, flags);
++	spin_unlock_irqrestore(&data->lock, flags);
+ 
+ 	if (disabled)
+ 		dev_dbg(data->sysmmu, "Disabled\n");
+@@ -469,7 +469,7 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
+ 	int i, ret = 0;
+ 	unsigned long flags;
+ 
+-	write_lock_irqsave(&data->lock, flags);
++	spin_lock_irqsave(&data->lock, flags);
+ 
+ 	if (!set_sysmmu_active(data)) {
+ 		if (WARN_ON(pgtable != data->pgtable)) {
+@@ -506,7 +506,7 @@ static int __exynos_sysmmu_enable(struct sysmmu_drvdata *data,
+ 
+ 	dev_dbg(data->sysmmu, "Enabled\n");
+ finish:
+-	write_unlock_irqrestore(&data->lock, flags);
++	spin_unlock_irqrestore(&data->lock, flags);
+ 
+ 	return ret;
+ }
+@@ -553,7 +553,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova)
+ 	unsigned long flags;
+ 	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
+ 
+-	read_lock_irqsave(&data->lock, flags);
++	spin_lock_irqsave(&data->lock, flags);
+ 
+ 	if (is_sysmmu_active(data)) {
+ 		int i;
+@@ -569,7 +569,7 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, unsigned long iova)
+ 			"Disabled. Skipping invalidating TLB.\n");
+ 	}
+ 
+-	read_unlock_irqrestore(&data->lock, flags);
++	spin_unlock_irqrestore(&data->lock, flags);
+ }
+ 
+ void exynos_sysmmu_tlb_invalidate(struct device *dev)
+@@ -577,7 +577,7 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
+ 	unsigned long flags;
+ 	struct sysmmu_drvdata *data = dev_get_drvdata(dev->archdata.iommu);
+ 
+-	read_lock_irqsave(&data->lock, flags);
++	spin_lock_irqsave(&data->lock, flags);
+ 
+ 	if (is_sysmmu_active(data)) {
+ 		int i;
+@@ -592,7 +592,7 @@ void exynos_sysmmu_tlb_invalidate(struct device *dev)
+ 			"Disabled. Skipping invalidating TLB.\n");
+ 	}
+ 
+-	read_unlock_irqrestore(&data->lock, flags);
++	spin_unlock_irqrestore(&data->lock, flags);
+ }
+ 
+ static int __init __sysmmu_init_clock(struct device *sysmmu,
+@@ -748,7 +748,7 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ 	ret = __sysmmu_setup(dev, data);
+ 	if (!ret) {
+ 		data->sysmmu = dev;
+-		rwlock_init(&data->lock);
++		spin_lock_init(&data->lock);
+ 		INIT_LIST_HEAD(&data->node);
+ 
+ 		__set_fault_handler(data, &default_fault_handler);
 -- 
 1.8.0
