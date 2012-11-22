@@ -1,33 +1,38 @@
-From: narkewoody@gmail.com (Woody Wu)
-Date: Thu, 22 Nov 2012 09:19:53 +0000 (UTC)
-Subject: Kernel panic - not syncing: Attempted to kill init!
-Message-ID: <slrnkarrg7.av9.narkewoody@zuhnb712.local.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Thu, 22 Nov 2012 11:24:44 +0200
+Subject: [PATCH v3 0/7] support other fsl SoCs with usbmisc + small fixes
+In-Reply-To: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
+References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <87y5hu3s83.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
+Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
 
-"Kernel panic - not syncing: Attempted to kill init!
-exitcode=0x0000000b"
+> Nearly every SoC from Freescale has this non-core usb registers. This series
+> adds support for more users of this driver.
+>
+> This series is based on Peter Chen's work. Its needed to merge his master branch
+> before applying this series:
+>
+> https://github.com/hzpeterchen/linux-usb.git
+>
+> Marc Kleine-Budde (4):
+>   usb: chipidea: usbmisc: unset global varibale usbmisc on driver
+>     remove
+>   usb: chipidea: usbmisc: fix a potential race condition
+>   usb: chipidea: usbmisc: prepare driver to handle more than one soc
+>   usb: chipidea: usbmisc: add support for ahb, ipg and per clock
+>
+> Michael Grzeschik (3):
+>   usb: chipidea: usbmisc: rename file, struct and functions to
+>     usbmisc_imx
+>   usb: chipidea: usbmisc: add mx53 support
+>   usb: chipidea: usbmisc: add post handling and errata fix for mx25
 
-I got above message when I am porting 3.4.19 to a s3c2410 board.  I
-traced the execution path is: kernel_init() -> init_post() ->
-run_init_process("/sbin/init") -> kernel_execve().
+Cc'ing Peter Chen, in case he didn't see this. Peter, can you have a
+look and give your Tested-by/Reviewed-by where appropriate?
 
-And, in the last function kernel_execve, the call of do_execve sucessed.
-Then I see a piece of assembly code follows which I cannot understand.
-
-That means, the root file system, which is mtdblock3 in my case, is
-mounted and /sbin/init was started to execute, then I got the panic
-message.
-
-Is that possible that this is caused by the root file system instead of
-the kernel? The root file system is a very old one that can run with an
-old kernel 2.6.14.
-
-
-Do you have any clue?  Thanks in advance!
-
--- 
-woody
-I can't go back to yesterday - because I was a different person then.
+Regards,
+--
+Alex
