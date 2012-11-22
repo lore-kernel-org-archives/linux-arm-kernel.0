@@ -1,35 +1,87 @@
 From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Thu, 22 Nov 2012 13:49:14 +0100
-Subject: [BUGFIX PATCH] video: mxsfb: fix crash when unblanking the display
-Message-ID: <1353588555-13168-1-git-send-email-LW@KARO-electronics.de>
+Date: Thu, 22 Nov 2012 13:49:15 +0100
+Subject: [PATCH] video: mxsfb: fix typo: 'FAILING' instead of 'FALLING'
+In-Reply-To: <1353588555-13168-1-git-send-email-LW@KARO-electronics.de>
+References: <1353588555-13168-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1353588555-13168-2-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VDCTRL4 register does not provide the MXS SET/CLR/TOGGLE feature.
-The write in mxsfb_disable_controller() sets the data_cnt for the LCD
-DMA to 0 which obviously means the max. count for the LCD DMA and
-leads to overwriting arbitrary memory when the display is unblanked.
-
-Note: I already sent this patch in December 2011 but noone picked it up obviously.
 
 Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- drivers/video/mxsfb.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/mach-mxs/mach-mxs.c |    6 +++---
+ drivers/video/mxsfb.c        |    6 +++---
+ include/linux/mxsfb.h        |    2 +-
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index d61b915..6c17cb7 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -42,7 +42,7 @@ static struct fb_videomode mx23evk_video_modes[] = {
+ 		.hsync_len	= 1,
+ 		.vsync_len	= 1,
+ 		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
+-				  FB_SYNC_DOTCLK_FAILING_ACT,
++				  FB_SYNC_DOTCLK_FALLING_ACT,
+ 	},
+ };
+ 
+@@ -60,7 +60,7 @@ static struct fb_videomode mx28evk_video_modes[] = {
+ 		.hsync_len	= 10,
+ 		.vsync_len	= 10,
+ 		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
+-				  FB_SYNC_DOTCLK_FAILING_ACT,
++				  FB_SYNC_DOTCLK_FALLING_ACT,
+ 	},
+ };
+ 
+@@ -96,7 +96,7 @@ static struct fb_videomode apx4devkit_video_modes[] = {
+ 		.vsync_len	= 3,
+ 		.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT |
+ 				  FB_SYNC_DATA_ENABLE_HIGH_ACT |
+-				  FB_SYNC_DOTCLK_FAILING_ACT,
++				  FB_SYNC_DOTCLK_FALLING_ACT,
+ 	},
+ };
+ 
 diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-index 49619b4..f2a49ef 100644
+index f2a49ef..eb45d32 100644
 --- a/drivers/video/mxsfb.c
 +++ b/drivers/video/mxsfb.c
-@@ -369,7 +369,8 @@ static void mxsfb_disable_controller(struct fb_info *fb_info)
- 		loop--;
- 	}
+@@ -107,7 +107,7 @@
+ #define VDCTRL0_ENABLE_PRESENT		(1 << 28)
+ #define VDCTRL0_VSYNC_ACT_HIGH		(1 << 27)
+ #define VDCTRL0_HSYNC_ACT_HIGH		(1 << 26)
+-#define VDCTRL0_DOTCLK_ACT_FAILING	(1 << 25)
++#define VDCTRL0_DOTCLK_ACT_FALLING	(1 << 25)
+ #define VDCTRL0_ENABLE_ACT_HIGH		(1 << 24)
+ #define VDCTRL0_VSYNC_PERIOD_UNIT	(1 << 21)
+ #define VDCTRL0_VSYNC_PULSE_WIDTH_UNIT	(1 << 20)
+@@ -458,8 +458,8 @@ static int mxsfb_set_par(struct fb_info *fb_info)
+ 		vdctrl0 |= VDCTRL0_VSYNC_ACT_HIGH;
+ 	if (fb_info->var.sync & FB_SYNC_DATA_ENABLE_HIGH_ACT)
+ 		vdctrl0 |= VDCTRL0_ENABLE_ACT_HIGH;
+-	if (fb_info->var.sync & FB_SYNC_DOTCLK_FAILING_ACT)
+-		vdctrl0 |= VDCTRL0_DOTCLK_ACT_FAILING;
++	if (fb_info->var.sync & FB_SYNC_DOTCLK_FALLING_ACT)
++		vdctrl0 |= VDCTRL0_DOTCLK_ACT_FALLING;
  
--	writel(VDCTRL4_SYNC_SIGNALS_ON, host->base + LCDC_VDCTRL4 + REG_CLR);
-+	reg = readl(host->base + LCDC_VDCTRL4);
-+	writel(reg & ~VDCTRL4_SYNC_SIGNALS_ON, host->base + LCDC_VDCTRL4);
+ 	writel(vdctrl0, host->base + LCDC_VDCTRL0);
  
- 	clk_disable_unprepare(host->clk);
+diff --git a/include/linux/mxsfb.h b/include/linux/mxsfb.h
+index f14943d..a9eca68 100644
+--- a/include/linux/mxsfb.h
++++ b/include/linux/mxsfb.h
+@@ -25,7 +25,7 @@
+ #define STMLCDIF_24BIT 3 /** pixel data bus to the display is of 24 bit width */
  
+ #define FB_SYNC_DATA_ENABLE_HIGH_ACT	(1 << 6)
+-#define FB_SYNC_DOTCLK_FAILING_ACT	(1 << 7) /* failing/negtive edge sampling */
++#define FB_SYNC_DOTCLK_FALLING_ACT	(1 << 7) /* falling/negative edge sampling */
+ 
+ struct mxsfb_platform_data {
+ 	struct fb_videomode *mode_list;
 -- 
 1.7.2.5
