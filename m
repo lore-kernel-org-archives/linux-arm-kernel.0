@@ -1,76 +1,78 @@
-From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
-Date: Fri, 23 Nov 2012 06:15:16 +0900
-Subject: [PATCH] ARM: kirkwood: Add Plat'Home OpenBlocks A6 support
-In-Reply-To: <20121122060943.GE9177@lunn.ch>
-References: <1352792590-20052-1-git-send-email-iwamatsu@nigauri.org>
- <20121113123739.GS22042@titan.lakedaemon.net>
- <CABMQnVKPyEp-cm_M_Y4rSU_tNLHL0fhUKUUgZkTkV+8MhnjVdA@mail.gmail.com>
- <CABMQnVL7bd7Om-7nZ33Y336PPtdMLmMWx63YwtMOZf5NftkeOw@mail.gmail.com>
- <20121122025357.GG15800@titan.lakedaemon.net> <20121122060943.GE9177@lunn.ch>
-Message-ID: <CABMQnVL5qtJbLBat5rKEdQdaXhBfj+OgzhP9eeh02NPRaYCJEQ@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 22 Nov 2012 22:16:16 +0100
+Subject: [PATCH v4 00/11] Support for AM33xx PWM Subsystem
+In-Reply-To: <1353503469-18634-1-git-send-email-avinashphilip@ti.com>
+References: <1353503469-18634-1-git-send-email-avinashphilip@ti.com>
+Message-ID: <20121122211616.GK16716@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Andrew.
+On Wed, Nov 21, 2012 at 06:40:57PM +0530, Philip, Avinash wrote:
+> In AM33xx PWM sub modules like ECAP, EHRPWM & EQEP are  integrated to
+> PWM subsystem. All these submodules shares the resources (clock) & has
+> a clock gating register in PWM Subsystem. This patch series creates a
+> parent PWM Subsystem driver to handle access synchronization of shared
+> resources & clock gating from PWM Subsystem configuration space.
+> Also Device tree nodes populated to support parent child relation
+> between PWMSS, ECAP & EHRPWM submodules.
+> In addition EHRPWM module requires explicit clock gating from control
+> module & is handled by patch #2 & 8.
+> 
+> As suggested by  Thierry for handling clock gating for PWM submodules
+> should handle with a global function. This requires config space
+> handling done independent from driver and is done at parent driver.
+> 
+> So the parent<->child relation adopted to handle
+> 1. pm runtime synchronization
+> 2. PWM subsystem common config space clock gating for PWM submodules.
+> 
+> Patches supports
+> - Driver support for parent child relation handled patch #1
+> - Optional EHRPWM tb clock in patch #2
+> - Parent child in HWMOD handled at patch #3
+> - Device tree binding support handled in patch #4, 6 &8
+> - pinctrl support in patch #5 & 7.
+> - DT node populated in patch #9 ,10 & 11.
+> 
+> This patch series based on omap_dt/for_3.8/dts_part2 and tested
+> on am335x-evm & am335x-evmsk.
+> 
+> It depends on [1]
+> 
+> 1. https://lkml.org/lkml/2012/11/21/70
+> pwm: Device tree support for PWM polarity
+> 
+> Changes since v3:
+> 	- Rebased on top of omap_dt/for_3.8/dts_part2
+> 	- Add pwm backlight for am335xevm_sk
+> 	- Moved tipwmss.h to pwm-tipwmss.h
+> 
+> Philip, Avinash (11):
+>   PWMSS: Add PWM Subsystem driver for parent<->child relationship
+>   ARM: am33xx: clk: Add optional clock for EHRPWM
+>   ARM: OMAP: AM33xx hwmod: Add parent-child relationship for PWM
+>     subsystem
+>   pwm: pwm-tiecap: Add device-tree binding support for APWM driver
+>   pwm: pwm-tiecap: pinctrl support
+>   pwm: pwm-tiehrpwm: Add device-tree binding support for EHRPWM driver
+>   pwm: pwm-tiehrpwm: pinctrl support
+>   pwm: pwm-tiehrpwm: Adding TBCLK gating support.
+>   ARM: dts: AM33XX: Add PWMSS device tree nodes
+>   ARM: dts: AM33XX: Add PWM backlight DT data to am335x-evm
+>   ARM: dts: AM33XX: Add PWM backlight DT data to am335x-evmsk
 
-On Thu, Nov 22, 2012 at 3:09 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Wed, Nov 21, 2012 at 09:53:57PM -0500, Jason Cooper wrote:
->> On Thu, Nov 22, 2012 at 08:43:46AM +0900, Nobuhiro Iwamatsu wrote:
->> > On Wed, Nov 14, 2012 at 4:54 AM, Nobuhiro Iwamatsu <iwamatsu@nigauri.org> wrote:
->> > > On Tue, Nov 13, 2012 at 9:37 PM, Jason Cooper <jason@lakedaemon.net> wrote:
->> > >> On Tue, Nov 13, 2012 at 04:43:09PM +0900, Nobuhiro Iwamatsu wrote:
->> > >>> Add support for Plat'Home OpenBlocks A6 using the device tree
->> > >>> where possible.
->> > >>> This commit supports SATA, USB, ether and serial console.
->> > >>>
->> > >>> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
->> > >>> ---
->> > >>> V2:
->> > >>>   - Remove unnecessary value from bootargs.
->> > >>>   - Update comment for MPP table.
->> > >>>   - Remove kirkwood_uart0_init().
->> > >>
->> > >> Thanks for the patch.  One small note.  In the future, please add a 'V2'
->> > >> to the subject line, eg "[PATCH V2] ...".  It really helps us keep track of
->> > >> which one to merge.
->> > >
->> > > Although I knew about it , I forgot adding "V2".
->> > >
->> > >>
->> > >> No need to resend, I'll keep track of it since I'm about to pull
->> > >> everything together over the next few days.
->> >
->> > Where have you managed this patch?  http://git.infradead.org/ ?
->>
->> Yes, mostly on my local machine currently.  I'm busy sorting everything.
->> ;-)
->>
->> > I would like to put this into 3.8.  And I would like to follow some
->> > functions (clock frame work etc.) updated.
->>
->> I'm not sure what you mean by the second sentence.  At any rate, Thomas
->> has included your patch in his pull request,
->
-> Hi Jason
->
-> What out for the difference between OpenBlocks A6 and AX4. A6 is
-> kirkwood, AX4 is XP. I've seen patches from Thomas for AX4. I don't
-> remember patches for A6 from Thomas. For A6 it would be nice to have
-> pinctrl, convert EHCI to DT, etc.
->
-> Happy Thanks Giving,
->
->          Andrew
->
+Hi,
 
-Thank you for your advice.
-I explained that was not enough.
+So how do you want to get this merged? Should I take patches 1, 4, 5, 6,
+7 and 8 while the rest go through some ARM tree? Can we still merge this
+for 3.8? The patches don't seem to have build dependencies on each other
+but how about runtime dependencies?
 
-Best regards,
-  Nobuhiro
-
-
--- 
-Nobuhiro Iwamatsu
-   iwamatsu at {nigauri.org / debian.org}
-   GPG ID: 40AD1FA6
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/6f2ecaea/attachment.sig>
