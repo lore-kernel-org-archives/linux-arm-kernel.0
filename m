@@ -1,30 +1,40 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Wed, 21 Nov 2012 21:04:48 -0500
-Subject: [PATCH 07/29] usb: host: ehci-mv: remove unused variable
-In-Reply-To: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
-References: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <1353549910-988-7-git-send-email-xiechao.mail@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 22 Nov 2012 11:06:51 +0900
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <CAAVeFuK_V6nb874bygioi35mFNxaWuveKOedLT=YYsP4JfVqgA@mail.gmail.com>
+References: <20121120215429.B621F3E1821@localhost>
+ <13540495.epaCf4JVn9@percival> <50ACB59B.4090404@iki.fi>
+ <20121121114018.GA31576@avionic-0098.adnet.avionic-design.de>
+ <50ACC341.3090204@ti.com>
+ <20121121130039.GA12191@avionic-0098.adnet.avionic-design.de>
+ <50ACD7DC.5060405@ti.com>
+ <CAAVeFuJofYwj926=3v0ApBCq_vNhCdC1PnzDc-B3d=LL_L40Uw@mail.gmail.com>
+ <20121121151209.GA4048@avionic-0098.adnet.avionic-design.de>
+ <CAAVeFuK_V6nb874bygioi35mFNxaWuveKOedLT=YYsP4JfVqgA@mail.gmail.com>
+Message-ID: <20121122020649.GH4371@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Xie <chao.xie@marvell.com>
+On Thu, Nov 22, 2012 at 11:01:34AM +0900, Alexandre Courbot wrote:
 
-Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
----
- drivers/usb/host/ehci-mv.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+> The thing I don't understand here is why would anyone want power
+> sequences without the DT representation. Guys, that's the whole point! :)
 
-diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
-index 6c56297..3065809 100644
---- a/drivers/usb/host/ehci-mv.c
-+++ b/drivers/usb/host/ehci-mv.c
-@@ -302,7 +302,6 @@ static int mv_ehci_remove(struct platform_device *pdev)
- {
- 	struct ehci_hcd_mv *ehci_mv = platform_get_drvdata(pdev);
- 	struct usb_hcd *hcd = ehci_mv->hcd;
--	int clk_i;
- 
- 	if (hcd->rh_registered)
- 		usb_remove_hcd(hcd);
--- 
-1.7.4.1
+> If we are to implement things into drivers, then callback functions
+> are going to serve us just as well - even better, for they are more
+> flexible. All we need to do is define a dedicated ops structure and
+> have the driver plug the right callback functions depending on the
+> "compatible" property of the DT device node. We don't need a framework
+> for that.
+
+It allows drivers (both board drivers and actual drivers) to write these
+things in a semi-scripted form instead of having to open code everything
+each time, it'd save a bunch of tedious stuff with resource requesting
+for example.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/a77bf97c/attachment.sig>
