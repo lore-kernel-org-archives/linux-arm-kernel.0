@@ -1,80 +1,88 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 22 Nov 2012 17:32:38 +0900
-Subject: [PATCH v5 07/15] ARM: mach-shmobile: Add DT table of INTC for
- sh7372
-In-Reply-To: <1353571213-26006-8-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-References: <1353571213-26006-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
- <1353571213-26006-8-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-Message-ID: <CANqRtoS-w4pJ-rgwa_o1VSnnbw2Ae=nruJ7HYkbcMw-eJnWcjg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 22 Nov 2012 09:47:07 +0100
+Subject: [PATCH] ARM i.MX6: Fix ethernet PLL clocks
+In-Reply-To: <20121122084228.GF24693@S2100-06.ap.freescale.net>
+References: <1353505652-28200-1-git-send-email-s.hauer@pengutronix.de>
+ <20121122084228.GF24693@S2100-06.ap.freescale.net>
+Message-ID: <20121122084707.GA10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Iwamatsu-san,
+On Thu, Nov 22, 2012 at 04:42:31PM +0800, Shawn Guo wrote:
+> On Wed, Nov 21, 2012 at 02:47:32PM +0100, Sascha Hauer wrote:
+> > In current code the ethernet PLL (according to code pll8, according to datasheet
+> > pll6)
+> 
+> Yes, just checked the latest RM, it gets renumbered so.
 
-Thanks for your efforts so far.
+So do we want to keep current code or change it according to the
+datasheet?
 
-On Thu, Nov 22, 2012 at 5:00 PM, Nobuhiro Iwamatsu
-<nobuhiro.iwamatsu.yj@renesas.com> wrote:
-> Cc: Magnus Damm <damm@opensource.se>
-> Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-> Signed-off-by: Simon Horman <horms@verge.net.au>
->
-> ---
-> v5 [Nobuhiro Iwamatsu]
->   Add interrupt-cells to interrupt-controllers.
->
-> v4 [Magnus Damm]
-> * Rework the sh7372 DT INTC setup code to only make use of
->   "renesas,sh_intc" instead of using multiple special cases.
->
-> v3
-> * No change
->
-> v2 [Simon Horman]
-> * Use only tabs for indentation
->
-> v1 [Nobuhiro Iwamatsu]
-> ---
->  arch/arm/boot/dts/sh7372.dtsi | 1140 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 1140 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sh7372.dtsi b/arch/arm/boot/dts/sh7372.dtsi
-> index 677fc60..00f1645 100644
-> --- a/arch/arm/boot/dts/sh7372.dtsi
-> +++ b/arch/arm/boot/dts/sh7372.dtsi
+> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> > index 3ec242f..95f8ea5 100644
+> > --- a/arch/arm/mach-imx/clk-imx6q.c
+> > +++ b/arch/arm/mach-imx/clk-imx6q.c
+> > @@ -153,7 +153,7 @@ enum mx6q_clks {
+> >  	usdhc4, vdo_axi, vpu_axi, cko1, pll1_sys, pll2_bus, pll3_usb_otg,
+> >  	pll4_audio, pll5_video, pll6_mlb, pll7_usb_host, pll8_enet, ssi1_ipg,
+> >  	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
+> > -	clk_max
+> > +	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, clk_max
+> 
+> The clk_max was put on a separate line on purpose, so that you can add
+> new ones with + lines only.
 
-> +               intcs: interrupt-controller at 1 {
-> +                       compatible = "renesas,sh_intc";
-> +                       interrupt-controller;
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +                       #interrupt-cells = <1>;
-> +                       ranges;
-> +                       group_size = <11>;
-> +
-> +                       reg = <0xffd20000 0x200>,
-> +                               <0xffd50000 0x200>;
-> +
-> +                       VEU_VEU0: intsrc1 { vector = <0x3b00>; };
-> +                       VEU_VEU1: intsrc2 { vector = <0x3b20>; };
-> +                       VEU_VEU2: intsrc3 { vector = <0x3b40>; };
-> +                       VEU_VEU3: intsrc4 { vector = <0x3b60>; };
+Ok, will fix.
 
-Uhm... No.
+> 
+> >  };
+> >  
+> >  static struct clk *clk[clk_max];
+> > @@ -163,6 +163,13 @@ static enum mx6q_clks const clks_init_on[] __initconst = {
+> >  	mmdc_ch0_axi, rom,
+> >  };
+> >  
+> > +static struct clk_div_table clk_enet_ref_table[] = {
+> > +	{ .val = 0, .div = 20, },
+> > +	{ .val = 1, .div = 10, },
+> > +	{ .val = 2, .div = 5, },
+> > +	{ .val = 3, .div = 4, },
+> > +};
+> > +
+> >  int __init mx6q_clocks_init(void)
+> >  {
+> >  	struct device_node *np;
+> > @@ -202,6 +209,15 @@ int __init mx6q_clocks_init(void)
+> >  	clk[usbphy1] = imx_clk_gate("usbphy1", "pll3_usb_otg", base + 0x10, 6);
+> >  	clk[usbphy2] = imx_clk_gate("usbphy2", "pll7_usb_host", base + 0x20, 6);
+> >  
+> > +	clk[sata_ref] = imx_clk_gate("sata_ref", "pll8_enet", base + 0x20, 20);
+> > +	clk[pcie_ref] = imx_clk_gate("pcie_ref", "pll8_enet", base + 0x20, 19);
+> 
+> Offset 0x20 for PLL_ENET?
 
-We want the same vector number here as described in the data sheet.
-This looks like you're adding a software-defined base offset to the DT
-data instead of using IRQ domains as expected. So it should read
-<0x0700> which is the same as the VEU definition in the INTCS code in
-intc-sh7372.c.
+Indeed, that's wrong. It turned out that my sata disk only worked
+because the enet pll had the enable bits for the sata clock in the
+gate mask. Will fix that.
 
-I recommend you to remove the INTCS support from these patches and
-focus on INTCA only to begin with. Then later when you have corrected
-INTCS tables and perhaps also the C code then it can be added
-incrementally.
+> 
+> > +	clk[sata_ref_100m] = imx_clk_fixed_factor("sata_ref_100m", "sata_ref", 1, 5);
+> > +	clk[pcie_ref_125m] = imx_clk_fixed_factor("pcie_ref_100m", "pcie_ref", 1, 4);
+> 
+> s/pcie_ref_100m/pcie_ref_125m
 
-Please work on getting something small and simple merged.
+ok.
 
-Thanks,
+> 
+> Also, don't we generally have divider/factor be parent of gate, do we?
 
-/ magnus
+Will change.
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
