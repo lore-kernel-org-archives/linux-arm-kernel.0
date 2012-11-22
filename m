@@ -1,13 +1,13 @@
 From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
-Date: Thu, 22 Nov 2012 17:00:01 +0900
-Subject: [PATCH v5 04/15] ARM: mach-shmobile: Add support OF of INTC for sh73a0
+Date: Thu, 22 Nov 2012 17:00:02 +0900
+Subject: [PATCH v5 05/15] ARM: mach-shmobile: Add support OF of INTC for sh7372
 In-Reply-To: <1353571213-26006-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
 References: <1353571213-26006-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-Message-ID: <1353571213-26006-5-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+Message-ID: <1353571213-26006-6-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This CPU has four interrupt controllers (INTCS, INTCA pins, pint0 and pint1).
+This CPU has four interrupt controllers (INTCA, INTCS, pins-High and pins-Low).
 This supports these.
 
 Cc: Magnus Damm <damm@opensource.se>
@@ -15,196 +15,123 @@ Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 
 ---
-v3 [Nobuhiro Iwamatsu]
-* Rework the sh73a0 DT INTC init code to reduce the number of #ifdefs.
+
+v4 [Magnus Damm]
+* Fix the sh7372 INTC DT code for INTCA to use ARRAY_SIZE()
+  on intca_resources instead of intcs_resources.
+* Fix section mismatches in the sh7372 INTC DT code.
+* Rework the sh7372 DT INTC init code to reduce the number of #ifdefs.
+* Rework the sh7372 DT INTC setup code to only make use of
+  "renesas,sh_intc" instead of using zillions of special cases.
+
+  In the future the INTC DT code really wants to be moved to a
+  separate file that can be shared between multiple SoCs using
+  INTC as primary interrupt controller like for instance sh7372
+  and r8a7740.
+
+  The major ugly portion left is the intevtsa stuff that really
+  should be updated to make use of the parent interrupt controller
+  information in DT. intc_of_init() can be extended to install
+  the chained interrupt handler directly if the function call to
+  of_sh_intc_get_intevtsa_vect() succeeds.
+
+  When all SoCs are reworked like sh7372 then we can share the
+  SoC INTC DT code in one place and after that remove unused stuff
+  from of_intc.c like the following functions:
+   - of_sh_intc_get_meminfo()
+   - of_sh_intc_get_pint()
+   - of_sh_intc_get_intc_pins()
+
+v3
+* No change
 
 v2 [Simon Horman]
-* Use #ifdef instead of #if and #if defined
+* Don't add trailing blank line
+* Use #ifdef instead of #if defined
 * Use CONFIG_OF in place of CONFIG_OF_SH_INTC
 * Allow OF and non OF code to be compiled in the same binary and
-  provide sh73a0_init_irq_of() as a way to initialise INTC
-  using DT while sh73a0_init_irq() still initialises INTC
+  provide sh7372_init_irq_of() as a way to initialise INTC
+  using DT while sh7372_init_irq() still initialises INTC
   using the previous code paths. This is because we would
   like to be able to use a single configuration to compile a kernel
-  for multiple boards and not all sh73a0 boards have DT support yet.
+  for multiple boards and not all sh7372 boards have DT support yet.
 
 v1 [Nobuhiro Iwamatsu]
-
-fix2
-
-Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 ---
  arch/arm/mach-shmobile/include/mach/common.h |    1 +
- arch/arm/mach-shmobile/intc-sh73a0.c         |  161 ++++++++++++++++++--------
- 2 files changed, 113 insertions(+), 49 deletions(-)
+ arch/arm/mach-shmobile/intc-sh7372.c         |  112 ++++++++++++++++++++------
+ 2 files changed, 88 insertions(+), 25 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 8402b5d..7696a96 100644
+index 7696a96..f44a36b 100644
 --- a/arch/arm/mach-shmobile/include/mach/common.h
 +++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -48,6 +48,7 @@ extern int sh7372_do_idle_sysc(unsigned long sleep_mode);
- extern struct clk sh7372_extal1_clk;
- extern struct clk sh7372_extal2_clk;
+@@ -36,6 +36,7 @@ extern void sh7377_pinmux_init(void);
+ extern struct clk sh7377_extalc1_clk;
+ extern struct clk sh7377_extal2_clk;
  
-+extern void sh73a0_init_irq_of(void);
- extern void sh73a0_init_irq(void);
- extern void sh73a0_map_io(void);
- extern void sh73a0_add_early_devices(void);
-diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
-index f0c5e51..c9f6441 100644
---- a/arch/arm/mach-shmobile/intc-sh73a0.c
-+++ b/arch/arm/mach-shmobile/intc-sh73a0.c
-@@ -243,6 +243,43 @@ static struct intc_desc intcs_desc __initdata = {
- 			   intcs_prio_registers, NULL, NULL),
- };
++extern void sh7372_init_irq_of(void);
+ extern void sh7372_init_irq(void);
+ extern void sh7372_map_io(void);
+ extern void sh7372_add_early_devices(void);
+diff --git a/arch/arm/mach-shmobile/intc-sh7372.c b/arch/arm/mach-shmobile/intc-sh7372.c
+index a91caad..c923518 100644
+--- a/arch/arm/mach-shmobile/intc-sh7372.c
++++ b/arch/arm/mach-shmobile/intc-sh7372.c
+@@ -551,23 +551,28 @@ static void intcs_demux(unsigned int irq, struct irq_desc *desc)
  
-+/* IRQ PINS */
-+#define RELOC_BASE 0x1200
-+
-+/* INTCA IRQ pins at INTCS + RELOC_BASE to make space for GIC+INTC handling */
-+#define INTCS_VECT_RELOC(n, vect) INTCS_VECT((n), (vect) + RELOC_BASE)
-+
-+INTC_IRQ_PINS_32(intca_irq_pins, 0xe6900000,
-+		 INTCS_VECT_RELOC, "sh73a0-intca-irq-pins");
-+
-+/* PINT */
-+#define PINTER0_PHYS 0xe69000a0
-+#define PINTER1_PHYS 0xe69000a4
-+#define PINTER0_VIRT IOMEM(0xe69000a0)
-+#define PINTER1_VIRT IOMEM(0xe69000a4)
-+#define PINTRR0 IOMEM(0xe69000d0)
-+#define PINTRR1 IOMEM(0xe69000d4)
-+
-+#define PINT0A_IRQ(n, irq) INTC_IRQ((n), SH73A0_PINT0_IRQ(irq))
-+#define PINT0B_IRQ(n, irq) INTC_IRQ((n), SH73A0_PINT0_IRQ(irq + 8))
-+#define PINT0C_IRQ(n, irq) INTC_IRQ((n), SH73A0_PINT0_IRQ(irq + 16))
-+#define PINT0D_IRQ(n, irq) INTC_IRQ((n), SH73A0_PINT0_IRQ(irq + 24))
-+#define PINT1E_IRQ(n, irq) INTC_IRQ((n), SH73A0_PINT1_IRQ(irq))
-+
-+INTC_PINT(intc_pint0, PINTER0_PHYS, 0xe69000b0, "sh73a0-pint0",		\
-+  INTC_PINT_E(A), INTC_PINT_E(B), INTC_PINT_E(C), INTC_PINT_E(D),	\
-+  INTC_PINT_V(A, PINT0A_IRQ), INTC_PINT_V(B, PINT0B_IRQ),		\
-+  INTC_PINT_V(C, PINT0C_IRQ), INTC_PINT_V(D, PINT0D_IRQ),		\
-+  INTC_PINT_E(A), INTC_PINT_E(B), INTC_PINT_E(C), INTC_PINT_E(D),	\
-+  INTC_PINT_E(A), INTC_PINT_E(B), INTC_PINT_E(C), INTC_PINT_E(D));
-+
-+INTC_PINT(intc_pint1, PINTER1_PHYS, 0xe69000c0, "sh73a0-pint1",		\
-+  INTC_PINT_E(E), INTC_PINT_E_EMPTY, INTC_PINT_E_EMPTY, INTC_PINT_E_EMPTY, \
-+  INTC_PINT_V(E, PINT1E_IRQ), INTC_PINT_V_NONE,				\
-+  INTC_PINT_V_NONE, INTC_PINT_V_NONE,					\
-+  INTC_PINT_E_NONE, INTC_PINT_E_NONE, INTC_PINT_E_NONE, INTC_PINT_E(E), \
-+  INTC_PINT_E(E), INTC_PINT_E_NONE, INTC_PINT_E_NONE, INTC_PINT_E_NONE);
-+
- static struct irqaction sh73a0_intcs_cascade;
- 
- static irqreturn_t sh73a0_intcs_demux(int irq, void *dev_id)
-@@ -259,14 +296,6 @@ static int sh73a0_set_wake(struct irq_data *data, unsigned int on)
- 	return 0; /* always allow wakeup */
- }
- 
--#define RELOC_BASE 0x1200
+ static void __iomem *intcs_ffd2;
+ static void __iomem *intcs_ffd5;
 -
--/* INTCA IRQ pins at INTCS + RELOC_BASE to make space for GIC+INTC handling */
--#define INTCS_VECT_RELOC(n, vect) INTCS_VECT((n), (vect) + RELOC_BASE)
--
--INTC_IRQ_PINS_32(intca_irq_pins, 0xe6900000,
--		 INTCS_VECT_RELOC, "sh73a0-intca-irq-pins");
--
- static int to_gic_irq(struct irq_data *data)
+-void __init sh7372_init_irq(void)
++static void __iomem *intca_e694;
++static void __iomem *intca_e695;
++
++static void __init sh7372_init_intc(resource_size_t intca0_start,
++				    resource_size_t intca1_start,
++				    resource_size_t intcs0_start,
++				    resource_size_t intcs1_start,
++				    unsigned short vect)
  {
- 	unsigned int vect = irq2evt(data->irq) - INTCS_VECT_BASE;
-@@ -366,33 +395,6 @@ static irqreturn_t sh73a0_irq_pin_demux(int irq, void *dev_id)
+ 	void __iomem *intevtsa;
+ 	int n;
  
- static struct irqaction sh73a0_irq_pin_cascade[32];
+-	intcs_ffd2 = ioremap_nocache(0xffd20000, PAGE_SIZE);
+-	intevtsa = intcs_ffd2 + 0x100;
+-	intcs_ffd5 = ioremap_nocache(0xffd50000, PAGE_SIZE);
++	intca_e694 = IOMEM(intca0_start);
++	intca_e695 = IOMEM(intca1_start);
  
--#define PINTER0_PHYS 0xe69000a0
--#define PINTER1_PHYS 0xe69000a4
--#define PINTER0_VIRT IOMEM(0xe69000a0)
--#define PINTER1_VIRT IOMEM(0xe69000a4)
--#define PINTRR0 IOMEM(0xe69000d0)
--#define PINTRR1 IOMEM(0xe69000d4)
--
--#define PINT0A_IRQ(n, irq) INTC_IRQ((n), SH73A0_PINT0_IRQ(irq))
--#define PINT0B_IRQ(n, irq) INTC_IRQ((n), SH73A0_PINT0_IRQ(irq + 8))
--#define PINT0C_IRQ(n, irq) INTC_IRQ((n), SH73A0_PINT0_IRQ(irq + 16))
--#define PINT0D_IRQ(n, irq) INTC_IRQ((n), SH73A0_PINT0_IRQ(irq + 24))
--#define PINT1E_IRQ(n, irq) INTC_IRQ((n), SH73A0_PINT1_IRQ(irq))
--
--INTC_PINT(intc_pint0, PINTER0_PHYS, 0xe69000b0, "sh73a0-pint0",		\
--  INTC_PINT_E(A), INTC_PINT_E(B), INTC_PINT_E(C), INTC_PINT_E(D),	\
--  INTC_PINT_V(A, PINT0A_IRQ), INTC_PINT_V(B, PINT0B_IRQ),		\
--  INTC_PINT_V(C, PINT0C_IRQ), INTC_PINT_V(D, PINT0D_IRQ),		\
--  INTC_PINT_E(A), INTC_PINT_E(B), INTC_PINT_E(C), INTC_PINT_E(D),	\
--  INTC_PINT_E(A), INTC_PINT_E(B), INTC_PINT_E(C), INTC_PINT_E(D));
--
--INTC_PINT(intc_pint1, PINTER1_PHYS, 0xe69000c0, "sh73a0-pint1",		\
--  INTC_PINT_E(E), INTC_PINT_E_EMPTY, INTC_PINT_E_EMPTY, INTC_PINT_E_EMPTY, \
--  INTC_PINT_V(E, PINT1E_IRQ), INTC_PINT_V_NONE,				\
--  INTC_PINT_V_NONE, INTC_PINT_V_NONE,					\
--  INTC_PINT_E_NONE, INTC_PINT_E_NONE, INTC_PINT_E_NONE, INTC_PINT_E(E), \
--  INTC_PINT_E(E), INTC_PINT_E_NONE, INTC_PINT_E_NONE, INTC_PINT_E_NONE);
--
- static struct irqaction sh73a0_pint0_cascade;
- static struct irqaction sh73a0_pint1_cascade;
- 
-@@ -411,31 +413,27 @@ static void pint_demux(void __iomem *rr, void __iomem *er, int base_irq)
- 
- static irqreturn_t sh73a0_pint0_demux(int irq, void *dev_id)
- {
--	pint_demux(PINTRR0, PINTER0_VIRT, SH73A0_PINT0_IRQ(0));
-+	pint_demux(IOMEM(intca_irq_pins_resources[0].start + 0xd0),
-+			IOMEM(intca_irq_pins_resources[0].start + 0xa0),
-+			SH73A0_PINT0_IRQ(0));
- 	return IRQ_HANDLED;
- }
- 
- static irqreturn_t sh73a0_pint1_demux(int irq, void *dev_id)
- {
--	pint_demux(PINTRR1, PINTER1_VIRT, SH73A0_PINT1_IRQ(0));
-+	pint_demux(IOMEM(intca_irq_pins_resources[0].start + 0xd4),
-+			IOMEM(intca_irq_pins_resources[0].start + 0xa4),
-+			SH73A0_PINT1_IRQ(0));
- 	return IRQ_HANDLED;
- }
- 
--void __init sh73a0_init_irq(void)
-+static void __init sh73a0_init_intc(resource_size_t intcs0_start)
- {
--	void __iomem *gic_dist_base = IOMEM(0xf0001000);
--	void __iomem *gic_cpu_base = IOMEM(0xf0000100);
--	void __iomem *intevtsa = ioremap_nocache(0xffd20100, PAGE_SIZE);
- 	int k, n;
-+	void __iomem *intevtsa;
- 
--	gic_init(0, 29, gic_dist_base, gic_cpu_base);
--	gic_arch_extn.irq_set_wake = sh73a0_set_wake;
--
+-	register_intc_controller(&intca_desc);
+-	register_intc_controller(&intca_irq_pins_lo_desc);
+-	register_intc_controller(&intca_irq_pins_hi_desc);
 -	register_intc_controller(&intcs_desc);
--	register_intc_controller(&intca_irq_pins_desc);
--	register_intc_controller(&intc_pint0_desc);
--	register_intc_controller(&intc_pint1_desc);
--
-+	intevtsa = ioremap_nocache(intcs0_start + 0x100, PAGE_SIZE);
-+	
- 	/* demux using INTEVTSA */
- 	sh73a0_intcs_cascade.name = "INTCS cascade";
- 	sh73a0_intcs_cascade.handler = sh73a0_intcs_demux;
-@@ -464,3 +462,68 @@ void __init sh73a0_init_irq(void)
- 	sh73a0_pint1_cascade.handler = sh73a0_pint1_demux;
- 	setup_irq(gic_spi(34), &sh73a0_pint1_cascade);
- }
++	intcs_ffd2 = ioremap_nocache(intcs0_start, PAGE_SIZE);
++	intevtsa = intcs_ffd2 + 0x100;
++	intcs_ffd5 = ioremap_nocache(intcs1_start, PAGE_SIZE);
+ 
+ 	/* setup dummy cascade chip for INTCS */
+-	n = evt2irq(0xf80);
++	n = evt2irq(vect);
 +
+ 	irq_alloc_desc_at(n, numa_node_id());
+ 	irq_set_chip_and_handler_name(n, &dummy_irq_chip,
+ 				      handle_level_irq, "level");
+@@ -581,6 +586,66 @@ void __init sh7372_init_irq(void)
+ 	iowrite16(0, intcs_ffd2 + 0x104);
+ }
+ 
 +#ifdef CONFIG_OF
 +static unsigned short intevtsa_vect;
 +
-+#define INTC_RES_MAX 3
-+struct {
++#define INTC_RES_MAX 2
++static struct {
 +	struct intc_desc intc_desc;
 +	struct resource intc_res[INTC_RES_MAX];
 +} intc_data __initdata;
 +
 +static int __init intc_of_init(struct device_node *np,
-+						 struct device_node *parent)
++			       struct device_node *parent)
 +{
 +	int ret, i;
 +
@@ -235,28 +162,93 @@ index f0c5e51..c9f6441 100644
 +	{ /*sentinel*/ }
 +};
 +
-+void __init sh73a0_init_irq_of(void)
++void __init sh7372_init_irq_of(void)
 +{
 +	of_irq_init(irq_of_match);
 +
-+	sh73a0_init_intc(0xffd20000);
++	sh7372_init_intc(0xe6940000, 0xe6950000, 0xffd20000, 0xffd50000,
++			  intevtsa_vect);
 +}
 +#endif /* CONFIG_OF */
 +
-+void __init sh73a0_init_irq(void)
++void __init sh7372_init_irq(void)
 +{
-+	void __iomem *gic_dist_base = IOMEM(0xf0001000);
-+	void __iomem *gic_cpu_base = IOMEM(0xf0000100);
-+
-+	gic_init(0, 29, gic_dist_base, gic_cpu_base);
-+	gic_arch_extn.irq_set_wake = sh73a0_set_wake;
-+
++	register_intc_controller(&intca_desc);
++	register_intc_controller(&intca_irq_pins_lo_desc);
++	register_intc_controller(&intca_irq_pins_hi_desc);
 +	register_intc_controller(&intcs_desc);
-+	register_intc_controller(&intca_irq_pins_desc);
-+	register_intc_controller(&intc_pint0_desc);
-+	register_intc_controller(&intc_pint1_desc);
 +
-+	sh73a0_init_intc(0xffd20000);
++	sh7372_init_intc(0xe6940000, 0xe6950000, 0xffd20000, 0xffd50000, 0xf80);
 +}
++
+ static unsigned short ffd2[0x200];
+ static unsigned short ffd5[0x100];
+ 
+@@ -624,9 +689,6 @@ void sh7372_intcs_resume(void)
+ 		__raw_writeb(ffd5[k], intcs_ffd5 + k);
+ }
+ 
+-#define E694_BASE IOMEM(0xe6940000)
+-#define E695_BASE IOMEM(0xe6950000)
+-
+ static unsigned short e694[0x200];
+ static unsigned short e695[0x200];
+ 
+@@ -635,22 +697,22 @@ void sh7372_intca_suspend(void)
+ 	int k;
+ 
+ 	for (k = 0x00; k <= 0x38; k += 4)
+-		e694[k] = __raw_readw(E694_BASE + k);
++		e694[k] = __raw_readw(intca_e694 + k);
+ 
+ 	for (k = 0x80; k <= 0xb4; k += 4)
+-		e694[k] = __raw_readb(E694_BASE + k);
++		e694[k] = __raw_readb(intca_e694 + k);
+ 
+ 	for (k = 0x180; k <= 0x1b4; k += 4)
+-		e694[k] = __raw_readb(E694_BASE + k);
++		e694[k] = __raw_readb(intca_e694 + k);
+ 
+ 	for (k = 0x00; k <= 0x50; k += 4)
+-		e695[k] = __raw_readw(E695_BASE + k);
++		e695[k] = __raw_readw(intca_e695 + k);
+ 
+ 	for (k = 0x80; k <= 0xa8; k += 4)
+-		e695[k] = __raw_readb(E695_BASE + k);
++		e695[k] = __raw_readb(intca_e695 + k);
+ 
+ 	for (k = 0x180; k <= 0x1a8; k += 4)
+-		e695[k] = __raw_readb(E695_BASE + k);
++		e695[k] = __raw_readb(intca_e695+ k);
+ }
+ 
+ void sh7372_intca_resume(void)
+@@ -658,20 +720,20 @@ void sh7372_intca_resume(void)
+ 	int k;
+ 
+ 	for (k = 0x00; k <= 0x38; k += 4)
+-		__raw_writew(e694[k], E694_BASE + k);
++		__raw_writew(e694[k], intca_e694 + k);
+ 
+ 	for (k = 0x80; k <= 0xb4; k += 4)
+-		__raw_writeb(e694[k], E694_BASE + k);
++		__raw_writeb(e694[k], intca_e694 + k);
+ 
+ 	for (k = 0x180; k <= 0x1b4; k += 4)
+-		__raw_writeb(e694[k], E694_BASE + k);
++		__raw_writeb(e694[k], intca_e694 + k);
+ 
+ 	for (k = 0x00; k <= 0x50; k += 4)
+-		__raw_writew(e695[k], E695_BASE + k);
++		__raw_writew(e695[k], intca_e695 + k);
+ 
+ 	for (k = 0x80; k <= 0xa8; k += 4)
+-		__raw_writeb(e695[k], E695_BASE + k);
++		__raw_writeb(e695[k], intca_e695 + k);
+ 
+ 	for (k = 0x180; k <= 0x1a8; k += 4)
+-		__raw_writeb(e695[k], E695_BASE + k);
++		__raw_writeb(e695[k], intca_e695 + k);
+ }
 -- 
 1.7.10.4
