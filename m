@@ -1,42 +1,54 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 21 Nov 2012 20:05:16 -0800
-Subject: [PATCH 1/3] CLK: uninline clk_prepare() and clk_unprepare()
-In-Reply-To: <CAKohpo=fNxADu4z9y6R7XBJEvr7ksOOY0LqZ9MfHnBgmDFgBvg@mail.gmail.com>
-References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
- <1353403339-11679-2-git-send-email-dmitry.torokhov@gmail.com>
- <CAKohpo=B_7rVwePziyNe0rTMokcib_FgEN28cy4nByAzbUyaqg@mail.gmail.com>
- <20121121204324.21126.99677@nucleus>
- <CAKohpo=fNxADu4z9y6R7XBJEvr7ksOOY0LqZ9MfHnBgmDFgBvg@mail.gmail.com>
-Message-ID: <20121122040516.21126.17028@nucleus>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 22 Nov 2012 04:21:16 +0000
+Subject: [GIT PULL] ARM: ixp4xx: fixes for v3.7
+Message-ID: <mailman.7.1353558083.1035.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Viresh Kumar (2012-11-21 19:34:18)
-> On 22 November 2012 02:13, Mike Turquette <mturquette@ti.com> wrote:
-> > HAVE_CLK logically wraps HAVE_CLK_PREPARE.  There is no point in
-> > selecting HAVE_CLK_PREPARE without HAVE_CLK.
-> >
-> > Looking through the code I see that this used to be the case.  Commit
-> > 93abe8e "clk: add non CONFIG_HAVE_CLK routines" moved the
-> > clk_(un)prepare declarations outside of #ifdef CONFIG_HAVE_CLK.  That
-> > commit was authored by you.  Can you elaborate on why that aspect of the
-> > patch was needed?
-> 
-> Haha... Caught red handed :(
-> 
-> Before this commit, nothing was enclosed within CONFIG_HAVE_CLK and
-> this patch only introduced it. I am not really sure, why i kept
-> prepare/unprepare
-> out of it though :(
-> 
-> Maybe because some platform at that time is using it directly, without
-> CONFIG_HAVE_CLK. Not sure.
-> 
+The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
 
-No worries.  Looks like everything gets sorted out in the end ;)
+  Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
 
-Regards,
-Mike
+are available in the git repository at:
 
-> --
-> viresh
+  git://git.infradead.org/users/jcooper/linux.git tags/ixp4xx_fixes_for_3.7
+
+for you to fetch changes up to 0d2c9f0517e915ce03a04e91d3207827e0d274a8:
+
+  IXP4xx: use __iomem for MMIO (2012-11-22 03:36:45 +0000)
+
+----------------------------------------------------------------
+ixp4xx fixes for v3.7
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      IXP4xx: use __iomem for MMIO
+
+Krzysztof Haasa (9):
+      IXP4xx: Fix Goramo MultiLink platform compilation.
+      IXP4xx: Fix off-by-one bug in Goramo MultiLink platform.
+      IXP4xx: HW pseudo-random generator is available on IXP45x/46x only.
+      IXP4xx: ixp4xx_crypto driver requires Queue Manager and NPE drivers.
+      IXP4xx: Remove time limit for PCI TRDY to enable use of slow devices.
+      WAN: Remove redundant HDLC info printed by IXP4xx HSS driver.
+      IXP4xx crypto: MOD_AES{128,192,256} already include key size.
+      IXP4xx: Always ioremap() Queue Manager MMIO region at boot.
+      IXP4xx: map CPU config registers within VMALLOC region.
+
+Tim Gardner (1):
+      ixp4xx: Declare MODULE_FIRMWARE usage
+
+ arch/arm/mach-ixp4xx/common-pci.c               |  1 +
+ arch/arm/mach-ixp4xx/common.c                   | 13 +++----
+ arch/arm/mach-ixp4xx/goramo_mlr.c               |  3 +-
+ arch/arm/mach-ixp4xx/include/mach/debug-macro.S |  4 +--
+ arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h | 46 ++++++++++---------------
+ arch/arm/mach-ixp4xx/include/mach/qmgr.h        | 12 +++----
+ arch/arm/mach-ixp4xx/ixp4xx_npe.c               |  9 ++++-
+ arch/arm/mach-ixp4xx/ixp4xx_qmgr.c              | 12 +------
+ drivers/char/hw_random/Kconfig                  |  6 ++--
+ drivers/char/hw_random/ixp4xx-rng.c             |  5 ++-
+ drivers/crypto/Kconfig                          |  2 +-
+ drivers/crypto/ixp4xx_crypto.c                  | 12 +++----
+ drivers/net/wan/ixp4xx_hss.c                    |  2 +-
+ 13 files changed, 59 insertions(+), 68 deletions(-)
