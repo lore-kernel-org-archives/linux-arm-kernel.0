@@ -1,59 +1,87 @@
-From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
-Date: Thu, 22 Nov 2012 17:00:12 +0900
-Subject: [PATCH v5 15/15] ARM: shmobile: sh73a0: Use DT for GIC
-In-Reply-To: <1353571213-26006-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-References: <1353571213-26006-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-Message-ID: <1353571213-26006-16-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 22 Nov 2012 09:14:21 +0100
+Subject: [PATCH v3 1/3] ARM: imx27_visstrim_m10: Do not reserve VPU DMA
+ pool on board file
+In-Reply-To: <1353334027-30009-1-git-send-email-fabio.estevam@freescale.com>
+References: <1353334027-30009-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20121122081421.GZ10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Horman <horms@verge.net.au>
+Javier,
 
-Cc: Magnus Damm <damm@opensource.se>
-Cc: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-Signed-off-by: Simon Horman <horms@verge.net.au>
----
- arch/arm/mach-shmobile/intc-sh73a0.c |   12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+Are you ok with this patch?
 
-diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
-index c9f6441..f4076e2 100644
---- a/arch/arm/mach-shmobile/intc-sh73a0.c
-+++ b/arch/arm/mach-shmobile/intc-sh73a0.c
-@@ -429,12 +429,9 @@ static irqreturn_t sh73a0_pint1_demux(int irq, void *dev_id)
- 
- static void __init sh73a0_init_intc(resource_size_t intcs0_start)
- {
--	int k, n;
--	void __iomem *intevtsa;
--
--	intevtsa = ioremap_nocache(intcs0_start + 0x100, PAGE_SIZE);
-+	void __iomem *intevtsa =
-+			ioremap_nocache(intcs0_start + 0x100, PAGE_SIZE);
- 	
--	/* demux using INTEVTSA */
- 	sh73a0_intcs_cascade.name = "INTCS cascade";
- 	sh73a0_intcs_cascade.handler = sh73a0_intcs_demux;
- 	sh73a0_intcs_cascade.dev_id = intevtsa;
-@@ -500,6 +497,7 @@ static int __init intc_of_init(struct device_node *np,
- }
- 
- static const struct of_device_id irq_of_match[] __initconst = {
-+	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, }
- 	{ .compatible = "renesas,sh_intc", .data = intc_of_init },
- 	{ /*sentinel*/ }
- };
-@@ -514,10 +512,8 @@ void __init sh73a0_init_irq_of(void)
- 
- void __init sh73a0_init_irq(void)
- {
--	void __iomem *gic_dist_base = IOMEM(0xf0001000);
--	void __iomem *gic_cpu_base = IOMEM(0xf0000100);
- 
--	gic_init(0, 29, gic_dist_base, gic_cpu_base);
-+	gic_init(0, 29, IOMEM(0xf0001000), IOMEM(0xf0000100));
- 	gic_arch_extn.irq_set_wake = sh73a0_set_wake;
- 
- 	register_intc_controller(&intcs_desc);
+Sascha
+
+On Mon, Nov 19, 2012 at 12:07:05PM -0200, Fabio Estevam wrote:
+> Do not reserve VPU DMA pool on board file as this can be done via CMA.
+> 
+> The motivation for doing this is to allow to register the VPU driver via a common
+> SoC file instead of per board.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v2:
+> - No changes. Newly introduced on this series
+> 
+>  arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   21 ++-------------------
+>  1 file changed, 2 insertions(+), 19 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> index b744226..801b797 100644
+> --- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> @@ -264,7 +264,7 @@ static void __init visstrim_camera_init(void)
+>  static void __init visstrim_reserve(void)
+>  {
+>  	/* reserve 4 MiB for mx2-camera */
+> -	mx2_camera_base = arm_memblock_steal(3 * MX2_CAMERA_BUF_SIZE,
+> +	mx2_camera_base = arm_memblock_steal(2 * MX2_CAMERA_BUF_SIZE,
+>  			MX2_CAMERA_BUF_SIZE);
+>  }
+>  
+> @@ -434,23 +434,6 @@ static const struct imx_ssi_platform_data visstrim_m10_ssi_pdata __initconst = {
+>  	.flags			= IMX_SSI_DMA | IMX_SSI_SYN,
+>  };
+>  
+> -/* coda */
+> -
+> -static void __init visstrim_coda_init(void)
+> -{
+> -	struct platform_device *pdev;
+> -	int dma;
+> -
+> -	pdev = imx27_add_coda();
+> -	dma = dma_declare_coherent_memory(&pdev->dev,
+> -					  mx2_camera_base + MX2_CAMERA_BUF_SIZE,
+> -					  mx2_camera_base + MX2_CAMERA_BUF_SIZE,
+> -					  MX2_CAMERA_BUF_SIZE,
+> -					  DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+> -	if (!(dma & DMA_MEMORY_MAP))
+> -		return;
+> -}
+> -
+>  /* DMA deinterlace */
+>  static struct platform_device visstrim_deinterlace = {
+>  	.name = "m2m-deinterlace",
+> @@ -548,7 +531,7 @@ static void __init visstrim_m10_board_init(void)
+>  	gpio_led_register_device(0, &visstrim_m10_led_data);
+>  	visstrim_deinterlace_init();
+>  	visstrim_camera_init();
+> -	visstrim_coda_init();
+> +	imx27_add_coda();
+>  }
+>  
+>  static void __init visstrim_m10_timer_init(void)
+> -- 
+> 1.7.9.5
+> 
+> 
+> 
+
 -- 
-1.7.10.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
