@@ -1,95 +1,147 @@
 From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
-Date: Thu, 22 Nov 2012 16:59:59 +0900
-Subject: [PATCH v5 02/15] SH: intc: Add support OF of IRQ
+Date: Thu, 22 Nov 2012 17:00:00 +0900
+Subject: [PATCH v5 03/15] ARM: mach-shmobile: Add support OF of INTC for
+ r8a7740
 In-Reply-To: <1353571213-26006-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
 References: <1353571213-26006-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-Message-ID: <1353571213-26006-3-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+Message-ID: <1353571213-26006-4-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add information of device node to struct intc_desc.
+This CPU has three interrupt controllers (INTCA, INTCS and INTCA IRQ pins).
+This supports these.
 
 Cc: Magnus Damm <damm@opensource.se>
 Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 
 ---
+v3 [Nobuhiro Iwamatsu]
+* Rework the r8a7740 DT INTC init code to reduce the number of #ifdefs.
 
 v2 [Simon Horman]
-* fix typo in changelog, clean up whitespace
+* Use #ifdef instead of #if defined
+* Use CONFIG_OF in place of CONFIG_OF_SH_INTC
+* Allow OF and non OF code to be compiled in the same binary and
+  provide r8a7740_init_irq_of() as a way to initialise INTC
+  using DT while r8a7740_init_irq() still initialises INTC
+  using the previous code paths. This is because we would
+  like to be able to use a single configuration to compile a kernel
+  for multiple boards and not all r8a7740 boards have DT support yet.
 
 v1 [Nobuhiro Iwamatsu]
----
- drivers/sh/intc/core.c      |    2 +-
- drivers/sh/intc/internals.h |    3 ++-
- drivers/sh/intc/irqdomain.c |    6 +++---
- include/linux/sh_intc.h     |    1 +
- 4 files changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/sh/intc/core.c b/drivers/sh/intc/core.c
-index 8f32a13..3963af3 100644
---- a/drivers/sh/intc/core.c
-+++ b/drivers/sh/intc/core.c
-@@ -311,7 +311,7 @@ int __init register_intc_controller(struct intc_desc *desc)
+Update r8a7740
+
+Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+---
+ arch/arm/mach-shmobile/include/mach/common.h |    1 +
+ arch/arm/mach-shmobile/intc-r8a7740.c        |   69 +++++++++++++++++++++++---
+ 2 files changed, 64 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index d47e215..8402b5d 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -59,6 +59,7 @@ extern struct clk sh73a0_extal2_clk;
+ extern struct clk sh73a0_extcki_clk;
+ extern struct clk sh73a0_extalr_clk;
  
- 	BUG_ON(k > 256); /* _INTC_ADDR_E() and _INTC_ADDR_D() are 8 bits */
- 
--	intc_irq_domain_init(d, hw);
-+	intc_irq_domain_init(d, hw, desc->of_node);
- 
- 	/* register the vectors one by one */
- 	for (i = 0; i < hw->nr_vectors; i++) {
-diff --git a/drivers/sh/intc/internals.h b/drivers/sh/intc/internals.h
-index 7dff08e..e6f64bf 100644
---- a/drivers/sh/intc/internals.h
-+++ b/drivers/sh/intc/internals.h
-@@ -190,7 +190,8 @@ void intc_enable_disable_enum(struct intc_desc *desc, struct intc_desc_int *d,
- 			      intc_enum enum_id, int enable);
- 
- /* irqdomain.c */
--void intc_irq_domain_init(struct intc_desc_int *d, struct intc_hw_desc *hw);
-+void intc_irq_domain_init(struct intc_desc_int *d, struct intc_hw_desc *hw,
-+				struct device_node *of_node);
- 
- /* virq.c */
- void intc_subgroup_init(struct intc_desc *desc, struct intc_desc_int *d);
-diff --git a/drivers/sh/intc/irqdomain.c b/drivers/sh/intc/irqdomain.c
-index 3968f1c..22ab7af 100644
---- a/drivers/sh/intc/irqdomain.c
-+++ b/drivers/sh/intc/irqdomain.c
-@@ -42,7 +42,7 @@ static const struct irq_domain_ops intc_evt_ops = {
- };
- 
- void __init intc_irq_domain_init(struct intc_desc_int *d,
--				 struct intc_hw_desc *hw)
-+				 struct intc_hw_desc *hw, struct device_node *np)
- {
- 	unsigned int irq_base, irq_end;
- 
-@@ -59,10 +59,10 @@ void __init intc_irq_domain_init(struct intc_desc_int *d,
- 	 * tree penalty for linear cases with non-zero hwirq bases.
- 	 */
- 	if (irq_base == 0 && irq_end == (irq_base + hw->nr_vectors - 1))
--		d->domain = irq_domain_add_linear(NULL, hw->nr_vectors,
-+		d->domain = irq_domain_add_linear(np, hw->nr_vectors,
- 						  &intc_evt_ops, NULL);
- 	else
--		d->domain = irq_domain_add_tree(NULL, &intc_evt_ops, NULL);
-+		d->domain = irq_domain_add_tree(np, &intc_evt_ops, NULL);
- 
- 	BUG_ON(!d->domain);
++extern void r8a7740_init_irq_of(void);
+ extern void r8a7740_init_irq(void);
+ extern void r8a7740_map_io(void);
+ extern void r8a7740_add_early_devices(void);
+diff --git a/arch/arm/mach-shmobile/intc-r8a7740.c b/arch/arm/mach-shmobile/intc-r8a7740.c
+index 9a69a31..a28e0ea 100644
+--- a/arch/arm/mach-shmobile/intc-r8a7740.c
++++ b/arch/arm/mach-shmobile/intc-r8a7740.c
+@@ -1,8 +1,9 @@
+ /*
+  * R8A7740 processor support
+  *
+- * Copyright (C) 2011  Renesas Solutions Corp.
++ * Copyright (C) 2011, 2012  Renesas Solutions Corp.
+  * Copyright (C) 2011  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
++ * Copyright (C) 2012  Nobuhiro Iwamatsu <nobuhiro.iwamatsu@renesas.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -623,15 +624,71 @@ static void intcs_demux(unsigned int irq, struct irq_desc *desc)
+ 	generic_handle_irq(intcs_evt2irq(evtcodeas));
  }
-diff --git a/include/linux/sh_intc.h b/include/linux/sh_intc.h
-index b0e7925..6603da6 100644
---- a/include/linux/sh_intc.h
-+++ b/include/linux/sh_intc.h
-@@ -118,6 +118,7 @@ struct intc_desc {
- 	intc_enum force_disable;
- 	bool skip_syscore_suspend;
- 	struct intc_hw_desc hw;
-+	struct device_node *of_node;
- };
  
- #define DECLARE_INTC_DESC(symbol, chipname, vectors, groups,		\
+-void __init r8a7740_init_irq(void)
++static void __init r8a7740_init_intc(resource_size_t intcs0_start,
++					unsigned short vect)
+ {
+-	void __iomem *intevtsa = ioremap_nocache(0xffd20100, PAGE_SIZE);
++	void __iomem *intevtsa;
++
++	/* demux using INTEVTSA */
++	intevtsa = ioremap_nocache(intcs0_start + 0x100, PAGE_SIZE);
++	irq_set_handler_data(evt2irq(vect), (void *)intevtsa);
++	irq_set_chained_handler(evt2irq(vect), intcs_demux);
++}
++
++#ifdef CONFIG_OF
++static unsigned short intevtsa_vect;
++
++#define INTC_RES_MAX 2
++static struct {
++	struct intc_desc intc_desc;
++	struct resource intc_res[INTC_RES_MAX];
++} intc_data __initdata;
++
++static int __init intc_of_init(struct device_node *np,
++	struct device_node *parent)
++{
++	int ret, i;
++
++	memset(&intc_data, 0, sizeof(intc_data));
++
++	for (i = 0; i < INTC_RES_MAX; i++) {
++		ret = of_address_to_resource(np, i, &intc_data.intc_res[i]);
++		if (ret < 0)
++			break;
++	}
++
++	intc_data.intc_desc.name = (char *)of_node_full_name(np);
++	intc_data.intc_desc.resource = intc_data.intc_res;
++	intc_data.intc_desc.num_resources = i;
++
++	ret = of_sh_intc_get_intc(np, &intc_data.intc_desc);
++	if (ret)
++		return ret;
+ 
++	of_sh_intc_get_intevtsa_vect(np, &intevtsa_vect);
++
++	register_intc_controller(&intc_data.intc_desc);
++	return 0;
++}
++
++static const struct of_device_id irq_of_match[] __initconst = {
++	{ .compatible = "renesas,sh_intc", .data = intc_of_init },
++	{ /*sentinel*/ }
++};
++
++void __init r8a7740_init_irq_of(void)
++{
++	of_irq_init(irq_of_match);
++
++	r8a7740_init_intc(0xffd20000, intevtsa_vect);
++}
++#endif /* CONFIG_OF */
++
++void __init r8a7740_init_irq(void)
++{
+ 	register_intc_controller(&intca_desc);
+ 	register_intc_controller(&intca_irq_pins_desc);
+ 	register_intc_controller(&intcs_desc);
+ 
+-	/* demux using INTEVTSA */
+-	irq_set_handler_data(evt2irq(0xf80), (void *)intevtsa);
+-	irq_set_chained_handler(evt2irq(0xf80), intcs_demux);
++	r8a7740_init_intc(intcs_resources[0].start, 0xf80);
+ }
 -- 
 1.7.10.4
