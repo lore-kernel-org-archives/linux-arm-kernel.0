@@ -1,33 +1,25 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Thu, 22 Nov 2012 18:55:16 +0900
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <CACRpkdaNmBpfONDpt7zFqLaqfiGm+ELpO-v5gZmM0rEi_AzijQ@mail.gmail.com>
-References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
- <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
- <20121120215429.B621F3E1821@localhost>
- <20121121013133.GE4673@opensource.wolfsonmicro.com>
- <CACRpkdaNmBpfONDpt7zFqLaqfiGm+ELpO-v5gZmM0rEi_AzijQ@mail.gmail.com>
-Message-ID: <CAAVeFuLL28y89VGU4EfPdW-fKDZCFnyQ37UdhGpeZE3cn0Cbzg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Nov 2012 09:54:48 +0000
+Subject: [PATCH v2 1/3] CLK: get rid of HAVE_CLK_PREPARE
+In-Reply-To: <1353562482-12422-2-git-send-email-dmitry.torokhov@gmail.com>
+References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
+ <1353562482-12422-1-git-send-email-dmitry.torokhov@gmail.com>
+ <1353562482-12422-2-git-send-email-dmitry.torokhov@gmail.com>
+Message-ID: <20121122095448.GC5764@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 5:57 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> I have the same (limited by experience) opinion. Working sort of
-> near som audio drivers I have understood that power sequencing
-> is a big issue not only for things like this backlight example, but
-> even more so in the area of audio to avoid clicks and pops.
->
-> Is it correct to assume that this library will be useful also for ALSA
-> SoC type of devices?
+On Wed, Nov 21, 2012 at 09:34:40PM -0800, Dmitry Torokhov wrote:
+> HAVE_CLK_PREPARE is automatically selected by COMMON_CLK and the only
+> platform that explicitly selects HAVE_CLK_PREPARE is MXS which has been
+> switched to common clk framework, so we can delete this option now.
+> 
+> As part of this change we move declarations of clk_prepare() and
+> clk_unprepare() under HAVE_CLK and provide stubs if this option is not
+> enabled.
+> 
+> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-There should be nothing against that - provided ALSA's needs remain
-similar to the current set of actions (regulators, gpios, ...) it
-should be perfectly usable. Can you think of any usage that involves
-more than dumb regulator/gpio manipulation?
-
-If power seqs are to be used this way (as opposed to through the DT),
-it will become urgent to implement that gpio handlers library we were
-talking about in another thread, as we don't want to have GPIO numbers
-hard-coded into the sequences.
-
-Alex.
+NAK, until some proper investigation about whether this can be removed
+has been done.
