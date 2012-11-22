@@ -1,47 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 22 Nov 2012 11:44:39 +0000
-Subject: [PATCH] ARM: sp804: set cpumask to cpu_possible_mask for clock event
- device
-Message-ID: <1353584679-28583-1-git-send-email-will.deacon@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 22 Nov 2012 11:47:31 +0000
+Subject: [PATCH] ARM: perf: fix link error when CONFIG_HW_PERF_EVENTS is not
+ selected
+Message-ID: <1353584851-17842-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SP804 driver statically initialises the cpumask of the clock event
-device to be cpu_all_mask, which is derived from the compile-time
-constant NR_CPUS. This breaks SMP_ON_UP systems where the interrupt
-controller handling the sp804 doesn't have the irq_set_affinity callback
-on the irq_chip, because the common timer code fails to identify the
-device as cpu-local and ends up treating it as a broadcast device
-instead.
+Commit e50c541 (ARM: perf: add guest vs host discrimination) broken the
+link as perf_instruction_pointer and perf_misc_flags are not defined
+when CONFIG_HW_PERF_EVENTS is not selected.
 
-This patch fixes the problem by using cpu_possible_mask at runtime,
-which will correctly represent the possible CPUs when SMP_ON_UP is being
-used.
+As it make little sense to try and profile a guest without any HW event,
+just fallback to the original code when this config option is not selected.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Reported-by: Russell King <linux@arm.linux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/common/timer-sp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/include/asm/perf_event.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
-index df13a3f..9d2d3ba 100644
---- a/arch/arm/common/timer-sp.c
-+++ b/arch/arm/common/timer-sp.c
-@@ -162,7 +162,6 @@ static struct clock_event_device sp804_clockevent = {
- 	.set_mode	= sp804_set_mode,
- 	.set_next_event	= sp804_set_next_event,
- 	.rating		= 300,
--	.cpumask	= cpu_all_mask,
- };
+diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
+index 00416ed..7558775 100644
+--- a/arch/arm/include/asm/perf_event.h
++++ b/arch/arm/include/asm/perf_event.h
+@@ -21,9 +21,11 @@
+ #define C(_x)				PERF_COUNT_HW_CACHE_##_x
+ #define CACHE_OP_UNSUPPORTED		0xFFFF
  
- static struct irqaction sp804_timer_irq = {
-@@ -185,6 +184,7 @@ void __init sp804_clockevents_init(void __iomem *base, unsigned int irq,
- 	clkevt_reload = DIV_ROUND_CLOSEST(rate, HZ);
- 	evt->name = name;
- 	evt->irq = irq;
-+	evt->cpumask = cpu_possible_mask;
++#ifdef CONFIG_HW_PERF_EVENTS
+ struct pt_regs;
+ extern unsigned long perf_instruction_pointer(struct pt_regs *regs);
+ extern unsigned long perf_misc_flags(struct pt_regs *regs);
+ #define perf_misc_flags(regs)	perf_misc_flags(regs)
++#endif
  
- 	setup_irq(irq, &sp804_timer_irq);
- 	clockevents_config_and_register(evt, rate, 0xf, 0xffffffff);
+ #endif /* __ARM_PERF_EVENT_H__ */
 -- 
-1.8.0
+1.7.12
