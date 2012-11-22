@@ -1,25 +1,31 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 Nov 2012 16:09:57 +0000
-Subject: [PATCH 1/1] ARM: cache-l2x0: Fix compile time warnings when
- !CONFIG_OF
-In-Reply-To: <20121122122633.GG5764@n2100.arm.linux.org.uk>
-References: <1353586067-9989-1-git-send-email-lee.jones@linaro.org>
- <20121122122633.GG5764@n2100.arm.linux.org.uk>
-Message-ID: <20121122160957.GE10986@gmail.com>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Thu, 22 Nov 2012 16:28:57 +0000
+Subject: [PATCH] ARM: shmobile: r8a7779: Fix PFC - MOD_SEL2 missed an entry
+Message-ID: <1353601737-21641-1-git-send-email-phil.edworthy@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Nov 2012, Russell King - ARM Linux wrote:
+The list of functions selected by the MOD_SEL2 register was missing
+an entry. This caused all entries after this to modify the MOD_SEL2
+register incorrectly.
 
-> I assume you're working with an old kernel... this has already been
-> fixed.
+Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+---
+ arch/arm/mach-shmobile/pfc-r8a7779.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-If by 'old' you mean a few -rc's, then yes.
-
-I've rebased and the issue has gone away, thanks.
-
+diff --git a/arch/arm/mach-shmobile/pfc-r8a7779.c b/arch/arm/mach-shmobile/pfc-r8a7779.c
+index 9fac32e4..15f6a48 100644
+--- a/arch/arm/mach-shmobile/pfc-r8a7779.c
++++ b/arch/arm/mach-shmobile/pfc-r8a7779.c
+@@ -2525,7 +2525,7 @@ static struct pinmux_cfg_reg pinmux_config_regs[] = {
+ 	    /* SEL_SCIF [2] */
+ 	    FN_SEL_SCIF_0, FN_SEL_SCIF_1, FN_SEL_SCIF_2, FN_SEL_SCIF_3,
+ 	    /* SEL_CANCLK [2] */
+-	    FN_SEL_CANCLK_0, FN_SEL_CANCLK_1, FN_SEL_CANCLK_2,
++	    FN_SEL_CANCLK_0, FN_SEL_CANCLK_1, FN_SEL_CANCLK_2, 0,
+ 	    /* SEL_CAN0 [1] */
+ 	    FN_SEL_CAN0_0, FN_SEL_CAN0_1,
+ 	    /* SEL_HSCIF1 [1] */
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.5.4
