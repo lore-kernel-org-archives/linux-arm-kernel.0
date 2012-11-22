@@ -1,66 +1,74 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 22 Nov 2012 01:42:50 -0500
-Subject: [PATCH] ARM: kirkwood: Add Plat'Home OpenBlocks A6 support
-In-Reply-To: <20121122060943.GE9177@lunn.ch>
-References: <1352792590-20052-1-git-send-email-iwamatsu@nigauri.org>
- <20121113123739.GS22042@titan.lakedaemon.net>
- <CABMQnVKPyEp-cm_M_Y4rSU_tNLHL0fhUKUUgZkTkV+8MhnjVdA@mail.gmail.com>
- <CABMQnVL7bd7Om-7nZ33Y336PPtdMLmMWx63YwtMOZf5NftkeOw@mail.gmail.com>
- <20121122025357.GG15800@titan.lakedaemon.net>
- <20121122060943.GE9177@lunn.ch>
-Message-ID: <20121122064250.GH15800@titan.lakedaemon.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 22 Nov 2012 15:50:26 +0900
+Subject: [PATCH v2] ARM: exynos: add UART3 to DEBUG_LL ports
+In-Reply-To: <1353516865-2502-1-git-send-email-dianders@chromium.org>
+References: <1353451739-6317-1-git-send-email-dianders@chromium.org>
+ <1353516865-2502-1-git-send-email-dianders@chromium.org>
+Message-ID: <0f5a01cdc87d$a7326f60$f5974e20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 07:09:43AM +0100, Andrew Lunn wrote:
-> On Wed, Nov 21, 2012 at 09:53:57PM -0500, Jason Cooper wrote:
-> > On Thu, Nov 22, 2012 at 08:43:46AM +0900, Nobuhiro Iwamatsu wrote:
-> > > On Wed, Nov 14, 2012 at 4:54 AM, Nobuhiro Iwamatsu <iwamatsu@nigauri.org> wrote:
-> > > > On Tue, Nov 13, 2012 at 9:37 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> > > >> On Tue, Nov 13, 2012 at 04:43:09PM +0900, Nobuhiro Iwamatsu wrote:
-> > > >>> Add support for Plat'Home OpenBlocks A6 using the device tree
-> > > >>> where possible.
-> > > >>> This commit supports SATA, USB, ether and serial console.
-> > > >>>
-> > > >>> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> > > >>> ---
-> > > >>> V2:
-> > > >>>   - Remove unnecessary value from bootargs.
-> > > >>>   - Update comment for MPP table.
-> > > >>>   - Remove kirkwood_uart0_init().
-> > > >>
-> > > >> Thanks for the patch.  One small note.  In the future, please add a 'V2'
-> > > >> to the subject line, eg "[PATCH V2] ...".  It really helps us keep track of
-> > > >> which one to merge.
-> > > >
-> > > > Although I knew about it , I forgot adding "V2".
-> > > >
-> > > >>
-> > > >> No need to resend, I'll keep track of it since I'm about to pull
-> > > >> everything together over the next few days.
-> > > 
-> > > Where have you managed this patch?  http://git.infradead.org/ ?
-> > 
-> > Yes, mostly on my local machine currently.  I'm busy sorting everything.
-> > ;-)
-> > 
-> > > I would like to put this into 3.8.  And I would like to follow some
-> > > functions (clock frame work etc.) updated.
-> > 
-> > I'm not sure what you mean by the second sentence.  At any rate, Thomas
-> > has included your patch in his pull request,
+Doug Anderson wrote:
 > 
-> Hi Jason
+> From: Olof Johansson <olof@lixom.net>
 > 
-> What out for the difference between OpenBlocks A6 and AX4. A6 is
-> kirkwood, AX4 is XP. I've seen patches from Thomas for AX4. I don't
-> remember patches for A6 from Thomas. For A6 it would be nice to have
-> pinctrl, convert EHCI to DT, etc.
+> Add support for using UART3 for DEBUG_LL on exynos.
+> 
+> [dianders: added depend on ARCH_EXYNOS.]
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> 
+> ---
+> Changes in v2:
+> - Matched Olof's commit message.
+> - Added ARCH_EXYNOS to depend list.
+> 
+>  arch/arm/Kconfig.debug        |   11 +++++++++++
+>  arch/arm/plat-samsung/Kconfig |    1 +
+>  2 files changed, 12 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 33a8930..f54f170 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -355,6 +355,17 @@ choice
+>  		  The uncompressor code port configuration is now handled
+>  		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
+> 
+> +	config DEBUG_S3C_UART3
+> +		depends on PLAT_SAMSUNG && ARCH_EXYNOS
+> +		bool "Use S3C UART 3 for low-level debug"
+> +		help
+> +		  Say Y here if you want the debug print routines to direct
+> +		  their output to UART 3. The port must have been
+initialised
+> +		  by the boot-loader before use.
+> +
+> +		  The uncompressor code port configuration is now handled
+> +		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
+> +
+>  	config DEBUG_SOCFPGA_UART
+>  		depends on ARCH_SOCFPGA
+>  		bool "Use SOCFPGA UART for low-level debug"
+> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+> index 59401e1..d342ed0 100644
+> --- a/arch/arm/plat-samsung/Kconfig
+> +++ b/arch/arm/plat-samsung/Kconfig
+> @@ -502,5 +502,6 @@ config DEBUG_S3C_UART
+>  	default "0" if DEBUG_S3C_UART0
+>  	default "1" if DEBUG_S3C_UART1
+>  	default "2" if DEBUG_S3C_UART2
+> +	default "3" if DEBUG_S3C_UART3
+> 
+>  endif
+> --
+> 1.7.7.3
 
-Ahhh, good catch!  I'll add it in.
+Applied, thanks.
 
-> Happy Thanks Giving,
-
-Thanks!
-
-Jason.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
