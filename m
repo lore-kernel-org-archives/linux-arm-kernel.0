@@ -1,42 +1,80 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 22 Nov 2012 16:56:17 +0800
-Subject: [GIT PULL] mxs device tree changes for 3.8 (take 2)
-Message-ID: <20121122085611.GG24693@S2100-06.ap.freescale.net>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 22 Nov 2012 17:32:38 +0900
+Subject: [PATCH v5 07/15] ARM: mach-shmobile: Add DT table of INTC for
+ sh7372
+In-Reply-To: <1353571213-26006-8-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+References: <1353571213-26006-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+ <1353571213-26006-8-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+Message-ID: <CANqRtoS-w4pJ-rgwa_o1VSnnbw2Ae=nruJ7HYkbcMw-eJnWcjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4e556c046df2bd8d6eef6403c25bf8e52f64be93:
+Hi Iwamatsu-san,
 
-  ARM: mxs_defconfig: Improve USB related support (2012-11-16 15:11:32 +0800)
+Thanks for your efforts so far.
 
-are available in the git repository at:
+On Thu, Nov 22, 2012 at 5:00 PM, Nobuhiro Iwamatsu
+<nobuhiro.iwamatsu.yj@renesas.com> wrote:
+> Cc: Magnus Damm <damm@opensource.se>
+> Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+> Signed-off-by: Simon Horman <horms@verge.net.au>
+>
+> ---
+> v5 [Nobuhiro Iwamatsu]
+>   Add interrupt-cells to interrupt-controllers.
+>
+> v4 [Magnus Damm]
+> * Rework the sh7372 DT INTC setup code to only make use of
+>   "renesas,sh_intc" instead of using multiple special cases.
+>
+> v3
+> * No change
+>
+> v2 [Simon Horman]
+> * Use only tabs for indentation
+>
+> v1 [Nobuhiro Iwamatsu]
+> ---
+>  arch/arm/boot/dts/sh7372.dtsi | 1140 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 1140 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sh7372.dtsi b/arch/arm/boot/dts/sh7372.dtsi
+> index 677fc60..00f1645 100644
+> --- a/arch/arm/boot/dts/sh7372.dtsi
+> +++ b/arch/arm/boot/dts/sh7372.dtsi
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-dt-3.8-2
+> +               intcs: interrupt-controller at 1 {
+> +                       compatible = "renesas,sh_intc";
+> +                       interrupt-controller;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +                       #interrupt-cells = <1>;
+> +                       ranges;
+> +                       group_size = <11>;
+> +
+> +                       reg = <0xffd20000 0x200>,
+> +                               <0xffd50000 0x200>;
+> +
+> +                       VEU_VEU0: intsrc1 { vector = <0x3b00>; };
+> +                       VEU_VEU1: intsrc2 { vector = <0x3b20>; };
+> +                       VEU_VEU2: intsrc3 { vector = <0x3b40>; };
+> +                       VEU_VEU3: intsrc4 { vector = <0x3b60>; };
 
-for you to fetch changes up to 25d6dd859e73248432051257b4b4d2a3d51b295b:
+Uhm... No.
 
-  ARM: dts: mxs: add oled support for the cfa-10036 (2012-11-22 09:03:40 +0800)
+We want the same vector number here as described in the data sheet.
+This looks like you're adding a software-defined base offset to the DT
+data instead of using IRQ domains as expected. So it should read
+<0x0700> which is the same as the VEU definition in the INTCS code in
+intc-sh7372.c.
 
-----------------------------------------------------------------
-They are a few mxs dts updates coming a little bit late.  I'm sending
-them as the second mxs/dt pull request for 3.8.  Please consider to
-pull.
+I recommend you to remove the INTCS support from these patches and
+focus on INTCA only to begin with. Then later when you have corrected
+INTCS tables and perhaps also the C code then it can be added
+incrementally.
 
-----------------------------------------------------------------
-Fadil Berisha (1):
-      ARM: imx23-olinuxino: Add spi support
+Please work on getting something small and simple merged.
 
-Marek Vasut (1):
-      ARM: mxs: Add SchulerControl SPS1 DTS file
+Thanks,
 
-Maxime Ripard (1):
-      ARM: dts: mxs: add oled support for the cfa-10036
-
- arch/arm/boot/dts/Makefile            |    1 +
- arch/arm/boot/dts/imx23-olinuxino.dts |    9 ++
- arch/arm/boot/dts/imx23.dtsi          |   13 +++
- arch/arm/boot/dts/imx28-cfa10036.dts  |   19 ++++
- arch/arm/boot/dts/imx28-sps1.dts      |  169 +++++++++++++++++++++++++++++++++
- arch/arm/mach-mxs/mach-mxs.c          |    7 ++
- 6 files changed, 218 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx28-sps1.dts
+/ magnus
