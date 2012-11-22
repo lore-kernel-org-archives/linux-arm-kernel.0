@@ -1,40 +1,74 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 22 Nov 2012 11:06:51 +0900
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <CAAVeFuK_V6nb874bygioi35mFNxaWuveKOedLT=YYsP4JfVqgA@mail.gmail.com>
-References: <20121120215429.B621F3E1821@localhost>
- <13540495.epaCf4JVn9@percival> <50ACB59B.4090404@iki.fi>
- <20121121114018.GA31576@avionic-0098.adnet.avionic-design.de>
- <50ACC341.3090204@ti.com>
- <20121121130039.GA12191@avionic-0098.adnet.avionic-design.de>
- <50ACD7DC.5060405@ti.com>
- <CAAVeFuJofYwj926=3v0ApBCq_vNhCdC1PnzDc-B3d=LL_L40Uw@mail.gmail.com>
- <20121121151209.GA4048@avionic-0098.adnet.avionic-design.de>
- <CAAVeFuK_V6nb874bygioi35mFNxaWuveKOedLT=YYsP4JfVqgA@mail.gmail.com>
-Message-ID: <20121122020649.GH4371@opensource.wolfsonmicro.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Wed, 21 Nov 2012 21:04:49 -0500
+Subject: [PATCH 08/29] usb: gadget: mv_udc: fix the value of tranceiver
+In-Reply-To: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
+References: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <1353549910-988-8-git-send-email-xiechao.mail@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 11:01:34AM +0900, Alexandre Courbot wrote:
+From: Chao Xie <chao.xie@marvell.com>
 
-> The thing I don't understand here is why would anyone want power
-> sequences without the DT representation. Guys, that's the whole point! :)
+Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
+---
+ drivers/usb/gadget/mv_udc_core.c |   15 ++++++++++-----
+ 1 files changed, 10 insertions(+), 5 deletions(-)
 
-> If we are to implement things into drivers, then callback functions
-> are going to serve us just as well - even better, for they are more
-> flexible. All we need to do is define a dedicated ops structure and
-> have the driver plug the right callback functions depending on the
-> "compatible" property of the DT device node. We don't need a framework
-> for that.
-
-It allows drivers (both board drivers and actual drivers) to write these
-things in a semi-scripted form instead of having to open code everything
-each time, it'd save a bunch of tedious stuff with resource requesting
-for example.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/a77bf97c/attachment.sig>
+diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
+index c78d52f..c4adfeb 100644
+--- a/drivers/usb/gadget/mv_udc_core.c
++++ b/drivers/usb/gadget/mv_udc_core.c
+@@ -1394,7 +1394,7 @@ static int mv_udc_start(struct usb_gadget *gadget,
+ 
+ 	spin_unlock_irqrestore(&udc->lock, flags);
+ 
+-	if (!IS_ERR_OR_NULL(udc->transceiver)) {
++	if (udc->transceiver) {
+ 		retval = otg_set_peripheral(udc->transceiver->otg,
+ 					&udc->gadget);
+ 		if (retval) {
+@@ -2174,9 +2174,14 @@ static int __devinit mv_udc_probe(struct platform_device *pdev)
+ 	udc->dev = pdev;
+ 
+ #ifdef CONFIG_USB_OTG_UTILS
+-	if (pdata->mode == MV_USB_MODE_OTG)
++	if (pdata->mode == MV_USB_MODE_OTG) {
+ 		udc->transceiver = devm_usb_get_phy(&pdev->dev,
+ 					USB_PHY_TYPE_USB2);
++		if (IS_ERR_OR_NULL(udc->transceiver)) {
++			udc->transceiver = NULL;
++			return -ENODEV;
++		}
++	}
+ #endif
+ 
+ 	udc->clknum = pdata->clknum;
+@@ -2319,7 +2324,7 @@ static int __devinit mv_udc_probe(struct platform_device *pdev)
+ 	eps_init(udc);
+ 
+ 	/* VBUS detect: we can disable/enable clock on demand.*/
+-	if (!IS_ERR_OR_NULL(udc->transceiver))
++	if (udc->transceiver)
+ 		udc->clock_gating = 1;
+ 	else if (pdata->vbus) {
+ 		udc->clock_gating = 1;
+@@ -2386,7 +2391,7 @@ static int mv_udc_suspend(struct device *dev)
+ 	udc = dev_get_drvdata(dev);
+ 
+ 	/* if OTG is enabled, the following will be done in OTG driver*/
+-	if (!IS_ERR_OR_NULL(udc->transceiver))
++	if (udc->transceiver)
+ 		return 0;
+ 
+ 	if (udc->pdata->vbus && udc->pdata->vbus->poll)
+@@ -2421,7 +2426,7 @@ static int mv_udc_resume(struct device *dev)
+ 	udc = dev_get_drvdata(dev);
+ 
+ 	/* if OTG is enabled, the following will be done in OTG driver*/
+-	if (!IS_ERR_OR_NULL(udc->transceiver))
++	if (udc->transceiver)
+ 		return 0;
+ 
+ 	if (!udc->clock_gating) {
+-- 
+1.7.4.1
