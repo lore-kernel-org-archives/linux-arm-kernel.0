@@ -1,9 +1,9 @@
 From: xiechao.mail@gmail.com (Chao Xie)
-Date: Wed, 21 Nov 2012 21:04:52 -0500
-Subject: [PATCH 11/29] usb: ehci: ehci-mv: use PHY driver for ehci
+Date: Wed, 21 Nov 2012 21:04:54 -0500
+Subject: [PATCH 13/29] arm: mmp2: change the defintion of usb devices
 In-Reply-To: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
 References: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <1353549910-988-11-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <1353549910-988-13-git-send-email-xiechao.mail@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,101 +11,39 @@ From: Chao Xie <chao.xie@marvell.com>
 
 Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
 ---
- drivers/usb/host/ehci-mv.c |   37 +++++++++++++------------------------
- 1 files changed, 13 insertions(+), 24 deletions(-)
+ arch/arm/mach-mmp/include/mach/mmp2.h |    4 ++++
+ arch/arm/mach-mmp/mmp2.c              |    4 ++++
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
-index 3065809..be504fd 100644
---- a/drivers/usb/host/ehci-mv.c
-+++ b/drivers/usb/host/ehci-mv.c
-@@ -15,17 +15,18 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/usb/otg.h>
-+#include <linux/usb/mv_usb2.h>
- #include <linux/platform_data/mv_usb.h>
+diff --git a/arch/arm/mach-mmp/include/mach/mmp2.h b/arch/arm/mach-mmp/include/mach/mmp2.h
+index c4ca4d1..58e96b0 100644
+--- a/arch/arm/mach-mmp/include/mach/mmp2.h
++++ b/arch/arm/mach-mmp/include/mach/mmp2.h
+@@ -31,6 +31,10 @@ extern struct pxa_device_desc mmp2_device_sdh2;
+ extern struct pxa_device_desc mmp2_device_sdh3;
+ extern struct pxa_device_desc mmp2_device_asram;
+ extern struct pxa_device_desc mmp2_device_isram;
++extern struct pxa_device_desc mmp2_device_u2o;
++extern struct pxa_device_desc mmp2_device_u2ootg;
++extern struct pxa_device_desc mmp2_device_u2oehci;
++extern struct pxa_device_desc mmp2_device_u2ophy;
  
- #define CAPLENGTH_MASK         (0xff)
+ extern struct platform_device mmp2_device_gpio;
  
- struct ehci_hcd_mv {
- 	struct usb_hcd *hcd;
-+	struct mv_usb2_phy *mvphy;
+diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+index 3a3768c..73edbfc 100644
+--- a/arch/arm/mach-mmp/mmp2.c
++++ b/arch/arm/mach-mmp/mmp2.c
+@@ -153,6 +153,10 @@ MMP2_DEVICE(sdh3, "sdhci-pxav3", 3, MMC4, 0xd4281800, 0x120);
+ MMP2_DEVICE(asram, "asram", -1, NONE, 0xe0000000, 0x4000);
+ /* 0xd1000000 ~ 0xd101ffff is reserved for secure processor */
+ MMP2_DEVICE(isram, "isram", -1, NONE, 0xd1020000, 0x18000);
++MMP2_DEVICE(u2ophy, "mmp2-usb-phy", -1, NONE, 0xd4207000, 0x1ff);
++MMP2_DEVICE(u2o, "mv-udc", -1, USB_OTG, 0xd4208100, 0x1ff);
++MMP2_DEVICE(u2ootg, "mv-otg", -1, USB_OTG, 0xd4208100, 0x1ff);
++MMP2_DEVICE(u2oehci, "mv-ehci", -1, USB_OTG, 0xd4208100, 0x1ff);
  
- 	/* Which mode does this ehci running OTG/Host ? */
- 	int mode;
- 
--	void __iomem *phy_regs;
- 	void __iomem *cap_regs;
- 	void __iomem *op_regs;
- 
-@@ -59,8 +60,8 @@ static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
- 	int retval;
- 
- 	ehci_clock_enable(ehci_mv);
--	if (ehci_mv->pdata->phy_init) {
--		retval = ehci_mv->pdata->phy_init(ehci_mv->phy_regs);
-+	if (ehci_mv->mvphy->init) {
-+		retval = ehci_mv->mvphy->init(ehci_mv->mvphy);
- 		if (retval)
- 			return retval;
- 	}
-@@ -70,8 +71,8 @@ static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
- 
- static void mv_ehci_disable(struct ehci_hcd_mv *ehci_mv)
- {
--	if (ehci_mv->pdata->phy_deinit)
--		ehci_mv->pdata->phy_deinit(ehci_mv->phy_regs);
-+	if (ehci_mv->mvphy->shutdown)
-+		ehci_mv->mvphy->shutdown(ehci_mv->mvphy);
- 	ehci_clock_disable(ehci_mv);
- }
- 
-@@ -184,22 +185,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phyregs");
--	if (r == NULL) {
--		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
--		retval = -ENODEV;
--		goto err_clear_drvdata;
--	}
--
--	ehci_mv->phy_regs = devm_ioremap(&pdev->dev, r->start,
--					 resource_size(r));
--	if (ehci_mv->phy_regs == 0) {
--		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
--		retval = -EFAULT;
--		goto err_clear_drvdata;
--	}
--
--	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "capregs");
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!r) {
- 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
- 		retval = -ENODEV;
-@@ -214,6 +200,12 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 		goto err_clear_drvdata;
- 	}
- 
-+	ehci_mv->mvphy = mv_usb2_get_phy();
-+	if (ehci_mv->mvphy == NULL) {
-+		retval = -ENODEV;
-+		goto err_clear_drvdata;
-+	}
-+
- 	retval = mv_ehci_enable(ehci_mv);
- 	if (retval) {
- 		dev_err(&pdev->dev, "init phy error %d\n", retval);
-@@ -275,9 +267,6 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	if (pdata->private_init)
--		pdata->private_init(ehci_mv->op_regs, ehci_mv->phy_regs);
--
- 	dev_info(&pdev->dev,
- 		 "successful find EHCI device with regs 0x%p irq %d"
- 		 " working in %s mode\n", hcd->regs, hcd->irq,
+ struct resource mmp2_resource_gpio[] = {
+ 	{
 -- 
 1.7.4.1
