@@ -1,106 +1,49 @@
 From: javier.martin@vista-silicon.com (javier Martin)
-Date: Thu, 22 Nov 2012 09:21:20 +0100
-Subject: [PATCH v3 1/3] ARM: imx27_visstrim_m10: Do not reserve VPU DMA
- pool on board file
-In-Reply-To: <20121122081421.GZ10369@pengutronix.de>
-References: <1353334027-30009-1-git-send-email-fabio.estevam@freescale.com>
- <20121122081421.GZ10369@pengutronix.de>
-Message-ID: <CACKLOr3Bi82E3bKZ=mJ5eK1PeTzFxmq5=ZAyH9vhjgSqVAmTWg@mail.gmail.com>
+Date: Thu, 22 Nov 2012 09:23:18 +0100
+Subject: [PATCH 1/2] ARM: i.MX27: Add platform support for IRAM.
+In-Reply-To: <20121116124823.GR10369@pengutronix.de>
+References: <1352131185-12079-1-git-send-email-javier.martin@vista-silicon.com>
+ <20121116124823.GR10369@pengutronix.de>
+Message-ID: <CACKLOr3Gw-xz0YaVhYGM_FP6M+QOLGxdLjboxrx0Fj4wV2E6NA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 22 November 2012 09:14, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> Javier,
->
-> Are you ok with this patch?
-
-I don't fully agree with it.
-
-> Sascha
->
-> On Mon, Nov 19, 2012 at 12:07:05PM -0200, Fabio Estevam wrote:
->> Do not reserve VPU DMA pool on board file as this can be done via CMA.
+On 16 November 2012 13:48, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Mon, Nov 05, 2012 at 04:59:44PM +0100, Javier Martin wrote:
+>> Add support for IRAM to i.MX27 non-DT platforms using
+>> iram_init() function.
 >>
->> The motivation for doing this is to allow to register the VPU driver via a common
->> SoC file instead of per board.
->>
->> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 >> ---
->> Changes since v2:
->> - No changes. Newly introduced on this series
+>>  arch/arm/mach-imx/mm-imx27.c |    3 +++
+>>  1 file changed, 3 insertions(+)
 >>
->>  arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   21 ++-------------------
->>  1 file changed, 2 insertions(+), 19 deletions(-)
+>> diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
+>> index e7e24af..fd2416d 100644
+>> --- a/arch/arm/mach-imx/mm-imx27.c
+>> +++ b/arch/arm/mach-imx/mm-imx27.c
+>> @@ -27,6 +27,7 @@
+>>  #include <asm/pgtable.h>
+>>  #include <asm/mach/map.h>
+>>  #include <mach/iomux-v1.h>
+>> +#include <mach/iram.h>
 >>
->> diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
->> index b744226..801b797 100644
->> --- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
->> +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
->> @@ -264,7 +264,7 @@ static void __init visstrim_camera_init(void)
->>  static void __init visstrim_reserve(void)
->>  {
->>       /* reserve 4 MiB for mx2-camera */
->> -     mx2_camera_base = arm_memblock_steal(3 * MX2_CAMERA_BUF_SIZE,
->> +     mx2_camera_base = arm_memblock_steal(2 * MX2_CAMERA_BUF_SIZE,
->>                       MX2_CAMERA_BUF_SIZE);
->>  }
-
-You can't reduce the size of the reserved memory pool without removing
-every reference to (mx2_camera_base + 2 * MX2_CAMERA_BUF_SIZE) in
-dma_declare_coherent_memory() calls. Otherwise we'll be trying to use
-memory outside the pool.
-
-Alternatively, and provided CMA works properly in i.MX27, which is
-something I have not tested, you could just remove visstrim_reserve()
-callback and every reference to dma_declare_coherent_memory().
-
->> @@ -434,23 +434,6 @@ static const struct imx_ssi_platform_data visstrim_m10_ssi_pdata __initconst = {
->>       .flags                  = IMX_SSI_DMA | IMX_SSI_SYN,
->>  };
->>
->> -/* coda */
->> -
->> -static void __init visstrim_coda_init(void)
->> -{
->> -     struct platform_device *pdev;
->> -     int dma;
->> -
->> -     pdev = imx27_add_coda();
->> -     dma = dma_declare_coherent_memory(&pdev->dev,
->> -                                       mx2_camera_base + MX2_CAMERA_BUF_SIZE,
->> -                                       mx2_camera_base + MX2_CAMERA_BUF_SIZE,
->> -                                       MX2_CAMERA_BUF_SIZE,
->> -                                       DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
->> -     if (!(dma & DMA_MEMORY_MAP))
->> -             return;
->> -}
->> -
->>  /* DMA deinterlace */
->>  static struct platform_device visstrim_deinterlace = {
->>       .name = "m2m-deinterlace",
->> @@ -548,7 +531,7 @@ static void __init visstrim_m10_board_init(void)
->>       gpio_led_register_device(0, &visstrim_m10_led_data);
->>       visstrim_deinterlace_init();
->>       visstrim_camera_init();
->> -     visstrim_coda_init();
->> +     imx27_add_coda();
->>  }
->>
->>  static void __init visstrim_m10_timer_init(void)
->> --
->> 1.7.9.5
->>
->>
->>
+>>  /* MX27 memory map definition */
+>>  static struct map_desc imx27_io_desc[] __initdata = {
+>> @@ -94,4 +95,6 @@ void __init imx27_soc_init(void)
+>>       /* imx27 has the imx21 type audmux */
+>>       platform_device_register_simple("imx21-audmux", 0, imx27_audmux_res,
+>>                                       ARRAY_SIZE(imx27_audmux_res));
+>> +     /* imx27 has an iram of 46080 bytes size */
+>> +     iram_init(MX27_IRAM_BASE_ADDR, 46080);
 >
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> For this rather Philipps sram allocater patches should be used. This
+> would also solve the problem that mach/iram.h cannot be accessed anymore
+> in current -next. Fabio already sent a patch addressing this, but I
+> think we should go for a proper fix rather than just moving iram.h
+> to include/linux/
 
+Fine, I'll take a look at Philipps' patches.
 
 Regards.
 
