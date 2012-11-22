@@ -1,38 +1,117 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Thu, 22 Nov 2012 11:35:40 +0100
-Subject: [PATCH 2/2] mfd: ab8500-core: Add abx500-clk as an mfd child device
+Date: Thu, 22 Nov 2012 11:35:39 +0100
+Subject: [PATCH 1/2] clk: ux500: Initial support for abx500 clock driver
 In-Reply-To: <1353580540-3774-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1353580540-3774-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1353580540-3774-3-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1353580540-3774-2-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Hierarchically, the abx500-clk shall be considered as a child of the
-ab8500 core. The abx500-clk is intiated at arch init and thus the clks
-will be available when clients needs them.
+The abx500 clock driver is a platform driver which will be initialized
+during arch init. The platform device shall be added from the ab-core
+driver as a mfd child device to maintain correct boot sequence.
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
+Depending on what ab version we use, different clock definitions will
+be added.
+
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/mfd/ab8500-core.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/clk/ux500/Makefile     |    3 ++
+ drivers/clk/ux500/abx500-clk.c |   73 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 76 insertions(+)
+ create mode 100644 drivers/clk/ux500/abx500-clk.c
 
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index 1667c77..b8fe5f6f 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -984,6 +984,10 @@ static struct mfd_cell __devinitdata abx500_common_devs[] = {
- 		.of_compatible = "stericsson,ab8500-regulator",
- 	},
- 	{
+diff --git a/drivers/clk/ux500/Makefile b/drivers/clk/ux500/Makefile
+index 858fbfe..bcc0c11 100644
+--- a/drivers/clk/ux500/Makefile
++++ b/drivers/clk/ux500/Makefile
+@@ -10,3 +10,6 @@ obj-y += clk-prcmu.o
+ obj-y += u8500_clk.o
+ obj-y += u9540_clk.o
+ obj-y += u8540_clk.o
++
++# ABX500 clock driver
++obj-y += abx500-clk.o
+diff --git a/drivers/clk/ux500/abx500-clk.c b/drivers/clk/ux500/abx500-clk.c
+new file mode 100644
+index 0000000..e27c523
+--- /dev/null
++++ b/drivers/clk/ux500/abx500-clk.c
+@@ -0,0 +1,73 @@
++/*
++ * abx500 clock implementation for ux500 platform.
++ *
++ * Copyright (C) 2012 ST-Ericsson SA
++ * Author: Ulf Hansson <ulf.hansson@linaro.org>
++ *
++ * License terms: GNU General Public License (GPL) version 2
++ */
++
++#include <linux/err.h>
++#include <linux/module.h>
++#include <linux/device.h>
++#include <linux/platform_device.h>
++#include <linux/mfd/abx500/ab8500.h>
++
++/* TODO: Add clock implementations here */
++
++
++/* Clock definitions for ab8500 */
++static int ab8500_reg_clks(struct device *dev)
++{
++	return 0;
++}
++
++/* Clock definitions for ab8540 */
++static int ab8540_reg_clks(struct device *dev)
++{
++	return 0;
++}
++
++/* Clock definitions for ab9540 */
++static int ab9540_reg_clks(struct device *dev)
++{
++	return 0;
++}
++
++static int __devinit abx500_clk_probe(struct platform_device *pdev)
++{
++	struct ab8500 *parent = dev_get_drvdata(pdev->dev.parent);
++	int ret;
++
++	if (is_ab8500(parent) || is_ab8505(parent)) {
++		ret = ab8500_reg_clks(&pdev->dev);
++	} else if (is_ab8540(parent)) {
++		ret = ab8540_reg_clks(&pdev->dev);
++	} else if (is_ab9540(parent)) {
++		ret = ab9540_reg_clks(&pdev->dev);
++	} else {
++		dev_err(&pdev->dev, "non supported plf id\n");
++		return -ENODEV;
++	}
++
++	return ret;
++}
++
++static struct platform_driver abx500_clk_driver = {
++	.driver = {
 +		.name = "abx500-clk",
-+		.of_compatible = "stericsson,abx500-clk",
++		.owner = THIS_MODULE,
 +	},
-+	{
- 		.name = "ab8500-gpadc",
- 		.of_compatible = "stericsson,ab8500-gpadc",
- 		.num_resources = ARRAY_SIZE(ab8500_gpadc_resources),
++	.probe	= abx500_clk_probe,
++};
++
++static int __init abx500_clk_init(void)
++{
++	return platform_driver_register(&abx500_clk_driver);
++}
++
++arch_initcall(abx500_clk_init);
++
++MODULE_AUTHOR("Ulf Hansson <ulf.hansson@linaro.org");
++MODULE_DESCRIPTION("ABX500 clk driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.7.10
