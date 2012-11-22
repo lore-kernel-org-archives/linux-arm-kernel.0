@@ -1,104 +1,66 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Wed, 21 Nov 2012 21:04:51 -0500
-Subject: [PATCH 10/29] usb: gadget: mv_udc: use PHY driver for udc
-In-Reply-To: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
-References: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <1353549910-988-10-git-send-email-xiechao.mail@gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 21 Nov 2012 18:17:50 -0800
+Subject: [PATCH 1/3] CLK: uninline clk_prepare() and clk_unprepare()
+In-Reply-To: <20121121223859.GQ3290@n2100.arm.linux.org.uk>
+References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
+ <1353403339-11679-2-git-send-email-dmitry.torokhov@gmail.com>
+ <CAKohpo=B_7rVwePziyNe0rTMokcib_FgEN28cy4nByAzbUyaqg@mail.gmail.com>
+ <20121121204324.21126.99677@nucleus>
+ <20121121205424.GA25470@core.coreip.homeip.net>
+ <20121121223859.GQ3290@n2100.arm.linux.org.uk>
+Message-ID: <20121122021750.GD25470@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Xie <chao.xie@marvell.com>
+On Wed, Nov 21, 2012 at 10:38:59PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Nov 21, 2012 at 12:54:24PM -0800, Dmitry Torokhov wrote:
+> > On Wed, Nov 21, 2012 at 12:43:24PM -0800, Mike Turquette wrote:
+> > > Quoting Viresh Kumar (2012-11-20 02:13:55)
+> > > > On 20 November 2012 14:52, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+> > > > > We'll need to invoke clk_unprepare() via a pointer in our devm_*
+> > > > > conversion so let's uninline the pair.
+> > > > 
+> > > > Sorry, but you aren't doing this :(
+> > > > This routine is already uninlined as it is in clk.c
+> > > > 
+> > > > Instead you are just moving clk_prepare(), etc calls within
+> > > > #ifdef CONFIG_HAVE_CLK
+> > > > #else
+> > > > #endif
+> > > > 
+> > > > I doubt why they have been added under #ifdef CONFIG_HAVE_CLK_PREPARE
+> > > > earlier. Can they exist without CONFIG_HAVE_CLK
+> > > > 
+> > > > @Mike: ?
+> > > > 
+> > > 
+> > > HAVE_CLK logically wraps HAVE_CLK_PREPARE.  There is no point in
+> > > selecting HAVE_CLK_PREPARE without HAVE_CLK.
+> > > 
+> > > Looking through the code I see that this used to be the case.  Commit
+> > > 93abe8e "clk: add non CONFIG_HAVE_CLK routines" moved the
+> > > clk_(un)prepare declarations outside of #ifdef CONFIG_HAVE_CLK.  That
+> > > commit was authored by you.  Can you elaborate on why that aspect of the
+> > > patch was needed?
+> > > 
+> > 
+> > BTW, it looks like the only place where we select HAVE_CLK_PREPARE is
+> > IMX platform and it also selects COMMON_CLK so I think HAVE_CLK_PREPARE
+> > can be removed now.
+> 
+> You've checked non-ARM architectures too?
 
-It will get rid of the callbacks in pdata for phy init/shutdown
+Yes:
 
-Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
----
- drivers/usb/gadget/mv_udc.h      |    2 +-
- drivers/usb/gadget/mv_udc_core.c |   23 ++++++++---------------
- 2 files changed, 9 insertions(+), 16 deletions(-)
+[dtor at dtor-d630 linux-next]$ grep -r HAVE_CLK_PREPARE .
+./arch/arm/Kconfig:     select HAVE_CLK_PREPARE
+Binary file ./.git/objects/pack/pack-7dad5ee164f601f1327dc78648fa317772c2d872.pack matches
+./include/linux/clk.h:#ifdef CONFIG_HAVE_CLK_PREPARE
+./include/linux/clk.h:#ifdef CONFIG_HAVE_CLK_PREPARE
+./drivers/clk/Kconfig:config HAVE_CLK_PREPARE
+./drivers/clk/Kconfig:  select HAVE_CLK_PREPARE
 
-diff --git a/drivers/usb/gadget/mv_udc.h b/drivers/usb/gadget/mv_udc.h
-index 9073436..4851b2b 100644
---- a/drivers/usb/gadget/mv_udc.h
-+++ b/drivers/usb/gadget/mv_udc.h
-@@ -180,7 +180,6 @@ struct mv_udc {
- 
- 	struct mv_cap_regs __iomem	*cap_regs;
- 	struct mv_op_regs __iomem	*op_regs;
--	void __iomem                    *phy_regs;
- 	unsigned int			max_eps;
- 	struct mv_dqh			*ep_dqh;
- 	size_t				ep_dqh_size;
-@@ -217,6 +216,7 @@ struct mv_udc {
- 	struct work_struct	vbus_work;
- 	struct workqueue_struct *qwork;
- 
-+	struct mv_usb2_phy	*phy;
- 	struct usb_phy		*transceiver;
- 
- 	struct mv_usb_platform_data     *pdata;
-diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
-index c4adfeb..6f01d5e 100644
---- a/drivers/usb/gadget/mv_udc_core.c
-+++ b/drivers/usb/gadget/mv_udc_core.c
-@@ -35,6 +35,7 @@
- #include <linux/platform_device.h>
- #include <linux/clk.h>
- #include <linux/platform_data/mv_usb.h>
-+#include <linux/usb/mv_usb2.h>
- #include <asm/unaligned.h>
- 
- #include "mv_udc.h"
-@@ -1121,8 +1122,8 @@ static int mv_udc_enable_internal(struct mv_udc *udc)
- 
- 	dev_dbg(&udc->dev->dev, "enable udc\n");
- 	udc_clock_enable(udc);
--	if (udc->pdata->phy_init) {
--		retval = udc->pdata->phy_init(udc->phy_regs);
-+	if (udc->phy->init) {
-+		retval = udc->phy->init(udc->phy);
- 		if (retval) {
- 			dev_err(&udc->dev->dev,
- 				"init phy error %d\n", retval);
-@@ -1147,8 +1148,8 @@ static void mv_udc_disable_internal(struct mv_udc *udc)
- {
- 	if (udc->active) {
- 		dev_dbg(&udc->dev->dev, "disable udc\n");
--		if (udc->pdata->phy_deinit)
--			udc->pdata->phy_deinit(udc->phy_regs);
-+		if (udc->phy->shutdown)
-+			udc->phy->shutdown(udc->phy);
- 		udc_clock_disable(udc);
- 		udc->active = 0;
- 	}
-@@ -2194,7 +2195,7 @@ static int __devinit mv_udc_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "capregs");
-+	r = platform_get_resource(udc->dev, IORESOURCE_MEM, 0);
- 	if (r == NULL) {
- 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
- 		return -ENODEV;
-@@ -2207,17 +2208,9 @@ static int __devinit mv_udc_probe(struct platform_device *pdev)
- 		return -EBUSY;
- 	}
- 
--	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "phyregs");
--	if (r == NULL) {
--		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
-+	udc->phy = mv_usb2_get_phy();
-+	if (udc->phy == NULL)
- 		return -ENODEV;
--	}
--
--	udc->phy_regs = ioremap(r->start, resource_size(r));
--	if (udc->phy_regs == NULL) {
--		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
--		return -EBUSY;
--	}
- 
- 	/* we will acces controller register, so enable the clk */
- 	retval = mv_udc_enable_internal(udc);
+Thanks.
+
 -- 
-1.7.4.1
+Dmitry
