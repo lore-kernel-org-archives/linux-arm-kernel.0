@@ -1,51 +1,85 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 22 Nov 2012 13:01:47 +0000
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <4275468.QAmZy3xUK6@percival>
-References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
- <1699753.ZQsWMHINxd@percival> <50AC956D.7020303@ti.com>
- <4275468.QAmZy3xUK6@percival>
-Message-ID: <CACxGe6tLq7LAb_YwvJVnccJEJNEwKt6heEZER3L7tP1g1WnbXg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 22 Nov 2012 13:23:36 +0000
+Subject: [PATCH 1/2] input: gpio-keys: Disable hardware on suspend
+Message-ID: <1353590617-11466-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 10:00 AM, Alex Courbot <acourbot@nvidia.com> wrote:
-> On Wednesday 21 November 2012 16:48:45 Tomi Valkeinen wrote:
->> If the power-off sequence disables a regulator that was supposed to be
->> enabled by the power-on sequence (but wasn't enabled because of an
->> error), the regulator_disable is still called when the driver runs the
->> power-off sequence, isn't it? Regulator enables and disables are ref
->> counted, and the enables should match the disables.
->
-> And there collapses my theory.
->
->> > Failures might be better handled if sequences have some "recovery policy"
->> > about what to do when they fail, as mentioned in the link above. As you
->> > pointed out, the driver might not always know enough about the resources
->> > involved to do the right thing.
->>
->> Yes, I think such recovery policy would be needed.
->
-> Indeed, from your last paragraph this makes even more sense now.
->
-> Oh, and I noticed I forgot to reply to this:
->
->> This I didn't understand. Doesn't "<&pwm 2 xyz>" point to a single
->> device, no matter where and how many times it's used?
->
-> That's true - however when dereferencing the phandle, the underlying framework
-> will try to acquire the PWM, which will result in failure if the same resource
-> is referenced several times.
->
-> One could compare the phandles to avoid this, but in your example you must
-> know that for PWMs the "xyz" part is not relevant for comparison.
->
-> This makes referencing of resources by name much easier to implement and more
-> elegant with respect to frameworks leveraging.
+From: Jonas Aaberg <jonas.aberg@stericsson.com>
 
-I would rather (at least for how the DT bindings settle out) see the
-design separate the resource references from the sequence. ie. Declare
-which resources are used by a device's sequences all in one place and
-have the commands index into that.
+Disable hardware if active when suspending if the hw can not
+wake the system from suspend.
 
-g.
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: linux-input at vger.kernel.org
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
+Signed-off-by: Philippe Langlais <philippe.langlais@linaro.org>
+Reviewed-by: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
+---
+ drivers/input/keyboard/gpio_keys.c |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/drivers/input/keyboard/gpio_keys.c b/drivers/input/keyboard/gpio_keys.c
+index 6a68041..2cf6757 100644
+--- a/drivers/input/keyboard/gpio_keys.c
++++ b/drivers/input/keyboard/gpio_keys.c
+@@ -46,6 +46,8 @@ struct gpio_keys_drvdata {
+ 	const struct gpio_keys_platform_data *pdata;
+ 	struct input_dev *input;
+ 	struct mutex disable_lock;
++	bool enabled;
++	bool enable_after_suspend;
+ 	struct gpio_button_data data[0];
+ };
+ 
+@@ -531,6 +533,8 @@ static int gpio_keys_open(struct input_dev *input)
+ 	struct gpio_keys_drvdata *ddata = input_get_drvdata(input);
+ 	const struct gpio_keys_platform_data *pdata = ddata->pdata;
+ 
++	ddata->enabled = true;
++
+ 	return pdata->enable ? pdata->enable(input->dev.parent) : 0;
+ }
+ 
+@@ -539,6 +543,8 @@ static void gpio_keys_close(struct input_dev *input)
+ 	struct gpio_keys_drvdata *ddata = input_get_drvdata(input);
+ 	const struct gpio_keys_platform_data *pdata = ddata->pdata;
+ 
++	ddata->enabled = false;
++
+ 	if (pdata->disable)
+ 		pdata->disable(input->dev.parent);
+ }
+@@ -685,6 +691,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
+ 
+ 	ddata->pdata = pdata;
+ 	ddata->input = input;
++	ddata->enabled = false;
+ 	mutex_init(&ddata->disable_lock);
+ 
+ 	platform_set_drvdata(pdev, ddata);
+@@ -796,6 +803,10 @@ static int gpio_keys_suspend(struct device *dev)
+ 			if (bdata->button->wakeup)
+ 				enable_irq_wake(bdata->irq);
+ 		}
++	} else {
++		ddata->enable_after_suspend = ddata->enabled;
++		if (ddata->enabled)
++			gpio_keys_close(ddata->input);
+ 	}
+ 
+ 	return 0;
+@@ -814,6 +825,10 @@ static int gpio_keys_resume(struct device *dev)
+ 		if (gpio_is_valid(bdata->button->gpio))
+ 			gpio_keys_gpio_report_event(bdata);
+ 	}
++
++	if (!device_may_wakeup(dev) && ddata->enable_after_suspend)
++		gpio_keys_open(ddata->input);
++
+ 	input_sync(ddata->input);
+ 
+ 	return 0;
+-- 
+1.7.9.5
