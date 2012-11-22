@@ -1,66 +1,107 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 21 Nov 2012 18:17:50 -0800
-Subject: [PATCH 1/3] CLK: uninline clk_prepare() and clk_unprepare()
-In-Reply-To: <20121121223859.GQ3290@n2100.arm.linux.org.uk>
-References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
- <1353403339-11679-2-git-send-email-dmitry.torokhov@gmail.com>
- <CAKohpo=B_7rVwePziyNe0rTMokcib_FgEN28cy4nByAzbUyaqg@mail.gmail.com>
- <20121121204324.21126.99677@nucleus>
- <20121121205424.GA25470@core.coreip.homeip.net>
- <20121121223859.GQ3290@n2100.arm.linux.org.uk>
-Message-ID: <20121122021750.GD25470@core.coreip.homeip.net>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Wed, 21 Nov 2012 21:04:53 -0500
+Subject: [PATCH 12/29] usb: otg: mv_otg: use PHY driver for otg
+In-Reply-To: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
+References: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <1353549910-988-12-git-send-email-xiechao.mail@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 10:38:59PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Nov 21, 2012 at 12:54:24PM -0800, Dmitry Torokhov wrote:
-> > On Wed, Nov 21, 2012 at 12:43:24PM -0800, Mike Turquette wrote:
-> > > Quoting Viresh Kumar (2012-11-20 02:13:55)
-> > > > On 20 November 2012 14:52, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
-> > > > > We'll need to invoke clk_unprepare() via a pointer in our devm_*
-> > > > > conversion so let's uninline the pair.
-> > > > 
-> > > > Sorry, but you aren't doing this :(
-> > > > This routine is already uninlined as it is in clk.c
-> > > > 
-> > > > Instead you are just moving clk_prepare(), etc calls within
-> > > > #ifdef CONFIG_HAVE_CLK
-> > > > #else
-> > > > #endif
-> > > > 
-> > > > I doubt why they have been added under #ifdef CONFIG_HAVE_CLK_PREPARE
-> > > > earlier. Can they exist without CONFIG_HAVE_CLK
-> > > > 
-> > > > @Mike: ?
-> > > > 
-> > > 
-> > > HAVE_CLK logically wraps HAVE_CLK_PREPARE.  There is no point in
-> > > selecting HAVE_CLK_PREPARE without HAVE_CLK.
-> > > 
-> > > Looking through the code I see that this used to be the case.  Commit
-> > > 93abe8e "clk: add non CONFIG_HAVE_CLK routines" moved the
-> > > clk_(un)prepare declarations outside of #ifdef CONFIG_HAVE_CLK.  That
-> > > commit was authored by you.  Can you elaborate on why that aspect of the
-> > > patch was needed?
-> > > 
-> > 
-> > BTW, it looks like the only place where we select HAVE_CLK_PREPARE is
-> > IMX platform and it also selects COMMON_CLK so I think HAVE_CLK_PREPARE
-> > can be removed now.
-> 
-> You've checked non-ARM architectures too?
+From: Chao Xie <chao.xie@marvell.com>
 
-Yes:
+Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
+---
+ drivers/usb/otg/mv_otg.c |   33 ++++++++++++---------------------
+ drivers/usb/otg/mv_otg.h |    2 +-
+ 2 files changed, 13 insertions(+), 22 deletions(-)
 
-[dtor at dtor-d630 linux-next]$ grep -r HAVE_CLK_PREPARE .
-./arch/arm/Kconfig:     select HAVE_CLK_PREPARE
-Binary file ./.git/objects/pack/pack-7dad5ee164f601f1327dc78648fa317772c2d872.pack matches
-./include/linux/clk.h:#ifdef CONFIG_HAVE_CLK_PREPARE
-./include/linux/clk.h:#ifdef CONFIG_HAVE_CLK_PREPARE
-./drivers/clk/Kconfig:config HAVE_CLK_PREPARE
-./drivers/clk/Kconfig:  select HAVE_CLK_PREPARE
-
-Thanks.
-
+diff --git a/drivers/usb/otg/mv_otg.c b/drivers/usb/otg/mv_otg.c
+index ffc0689..344f246 100644
+--- a/drivers/usb/otg/mv_otg.c
++++ b/drivers/usb/otg/mv_otg.c
+@@ -25,6 +25,7 @@
+ #include <linux/usb/otg.h>
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/hcd.h>
++#include <linux/usb/mv_usb2.h>
+ #include <linux/platform_data/mv_usb.h>
+ 
+ #include "mv_otg.h"
+@@ -261,8 +262,8 @@ static int mv_otg_enable_internal(struct mv_otg *mvotg)
+ 	dev_dbg(&mvotg->pdev->dev, "otg enabled\n");
+ 
+ 	otg_clock_enable(mvotg);
+-	if (mvotg->pdata->phy_init) {
+-		retval = mvotg->pdata->phy_init(mvotg->phy_regs);
++	if (mvotg->mvphy->init) {
++		retval = mvotg->mvphy->init(mvotg->mvphy);
+ 		if (retval) {
+ 			dev_err(&mvotg->pdev->dev,
+ 				"init phy error %d\n", retval);
+@@ -288,8 +289,8 @@ static void mv_otg_disable_internal(struct mv_otg *mvotg)
+ {
+ 	if (mvotg->active) {
+ 		dev_dbg(&mvotg->pdev->dev, "otg disabled\n");
+-		if (mvotg->pdata->phy_deinit)
+-			mvotg->pdata->phy_deinit(mvotg->phy_regs);
++		if (mvotg->mvphy->shutdown)
++			mvotg->mvphy->shutdown(mvotg->mvphy);
+ 		otg_clock_disable(mvotg);
+ 		mvotg->active = 0;
+ 	}
+@@ -741,23 +742,8 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 	for (i = 0; i < OTG_TIMER_NUM; i++)
+ 		init_timer(&mvotg->otg_ctrl.timer[i]);
+ 
+-	r = platform_get_resource_byname(mvotg->pdev,
+-					 IORESOURCE_MEM, "phyregs");
+-	if (r == NULL) {
+-		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
+-		retval = -ENODEV;
+-		goto err_destroy_workqueue;
+-	}
+-
+-	mvotg->phy_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+-	if (mvotg->phy_regs == NULL) {
+-		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
+-		retval = -EFAULT;
+-		goto err_destroy_workqueue;
+-	}
+-
+-	r = platform_get_resource_byname(mvotg->pdev,
+-					 IORESOURCE_MEM, "capregs");
++	r = platform_get_resource(mvotg->pdev,
++					 IORESOURCE_MEM, 0);
+ 	if (r == NULL) {
+ 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
+ 		retval = -ENODEV;
+@@ -770,6 +756,11 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 		retval = -EFAULT;
+ 		goto err_destroy_workqueue;
+ 	}
++	mvotg->mvphy = mv_usb2_get_phy();
++	if (mvotg->mvphy == NULL) {
++		retval = -ENODEV;
++		goto err_destroy_workqueue;
++	}
+ 
+ 	/* we will acces controller register, so enable the udc controller */
+ 	retval = mv_otg_enable_internal(mvotg);
+diff --git a/drivers/usb/otg/mv_otg.h b/drivers/usb/otg/mv_otg.h
+index 8a9e351..7b9629a 100644
+--- a/drivers/usb/otg/mv_otg.h
++++ b/drivers/usb/otg/mv_otg.h
+@@ -137,10 +137,10 @@ struct mv_otg_regs {
+ 
+ struct mv_otg {
+ 	struct usb_phy phy;
++	struct mv_usb2_phy *mvphy;
+ 	struct mv_otg_ctrl otg_ctrl;
+ 
+ 	/* base address */
+-	void __iomem *phy_regs;
+ 	void __iomem *cap_regs;
+ 	struct mv_otg_regs __iomem *op_regs;
+ 
 -- 
-Dmitry
+1.7.4.1
