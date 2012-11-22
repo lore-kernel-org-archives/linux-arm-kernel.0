@@ -1,26 +1,21 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 23 Nov 2012 00:04:41 +0100 (CET)
-Subject: =?UTF-8?q?=5BPATCH=20414/493=5D=20mmc=3A=20remove=20use=20of=20=5F=5Fdevexit?=
-In-Reply-To: <1353349642-3677-414-git-send-email-wfp5p@virginia.edu>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-414-git-send-email-wfp5p@virginia.edu>
-Message-ID: <Pine.LNX.4.64.1211230002530.11581@axis700.grange>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Nov 2012 23:54:26 +0000
+Subject: [PATCH 0/3] sdhci-dove GPIO support for card detection
+Message-ID: <20121122235426.GT3332@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Nov 2012, Bill Pemberton wrote:
+The following three patches allow sdhci-dove to use a GPIO for card
+presence detection.  This is a three stage process:
 
-> CONFIG_HOTPLUG is going away as an option so __devexit is no
-> longer needed.
+1. Clean up error paths by using devm_clk_get().
+2. Use the two-stage sdhci initialization.
+3. Implement the GPIO card detection support.
 
->  drivers/mmc/host/sh_mmcif.c        | 2 +-
->  drivers/mmc/host/tmio_mmc.c        | 2 +-
+A very similar patch has been tested by Sebastian on the cubox; since
+that version, I've changed the error printing slightly and dropped the
+non-DT support for this feature as mainline doesn't have non-DT cubox
+support.
 
-Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+ drivers/mmc/host/sdhci-dove.c |  108 +++++++++++++++++++++++++++++++++--------
+ 1 files changed, 88 insertions(+), 20 deletions(-)
