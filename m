@@ -1,40 +1,75 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 22 Nov 2012 14:05:40 +0000
-Subject: [RESENDING] [PATCH 07/22] ASoC: Ux500: Initialise PCM from MSP
- probe rather than as a device
-In-Reply-To: <20120920125259.GA2755@gmail.com>
-References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
- <1344527268-5964-8-git-send-email-lee.jones@linaro.org>
- <CACRpkdbc6bGC4Yp7Bcdfev=Uc=1h4L1v+Lj9RbmJV3F+knQOZQ@mail.gmail.com>
- <20120919133343.GH25694@gmail.com>
- <505ADBE6.6080509@stericsson.com> <20120920125259.GA2755@gmail.com>
-Message-ID: <20121122140540.GA10986@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Nov 2012 14:06:14 +0000
+Subject: [PATCH 0/10] Kirkwood ASoC drivers fixes and improvements
+In-Reply-To: <20121120122051.GA12063@n2100.arm.linux.org.uk>
+References: <20121120121726.GN3290@n2100.arm.linux.org.uk>
+ <20121120122051.GA12063@n2100.arm.linux.org.uk>
+Message-ID: <20121122140614.GA26930@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Sep 2012, Lee Jones wrote:
+All,
 
-> > > Can we have some closure on this patch please, as it's blocking the
-> > > patch-set? I'm fairly sure the patch is doing the correct thing, as
-> > > seconded by Mark.
-> > 
-> > I still don't like this. It is the dai_link-struct that bothers me. We have
-> > "ux500-msp-i2s.1" as name of the platform AND the cpu_dai. The MSP I2S-block is
-> > not the platform and it is certainly not both platform and cpu-DAI at the same time.
-> > Mark: Did you have a solution for this? Couldn't we just put NULL on the
-> > platform_name instead?
-> 
-> There are other drivers which do this already. 
-> 
-> I don't think it's an issue to do this.
+I'm opening this to a wider audience in the hope of getting a solution.
 
-Has anyone had any more bright ideas on how we might handle this?
+There are classes of hardware out there where the DMA support is tightly
+integrated along side the rest of the I2S interface.
 
-The device is still being handled in platform code and I'm desperate
-to get it out of there.
+One such example of this is the hardware found on Marvell Kirkwood
+platforms and their derivatives.   Not only are the registers interleaved
+between the I2S interface part and the DMA part, and the DMA can only be
+used for I2S, but the current Kirkwood ASoC implementation in
+sound/soc/kirkwood shares a common data structure created by the "cpu dai"
+to provide register access and other data.  This data structure is
+"struct kirkwood_dma_data".
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+This means that in software, as things stand today, kirkwood-dma.c has
+intimate knowledge of kirkwood-i2s.c despite being two separate platform
+drivers.  This also means that the split between kirkwood-dma.c and
+kirkwood-i2s.c is entirely artificial, brought about by the insistance
+of ASoC that these things shall be separate.
+
+How does ASoC insist that these be separate?  It only provides the
+necessary callbacks for DMA related stuff to what it calls the "platform"
+driver.  The interface part is called a "cpu dai" and one of those must
+always be provided.  Each of these must be a separate platform device,
+because they're each named drivers, and the name comes from the
+device/driver.
+
+This is fine in the pre-DT world, where we have board files in arch/arm
+which can create whatever platform devices are needed to bring ASoC up,
+but we're moving to a DT-only solution - that means no board files.
+DT is a hardware description; it does not describe whatever random ideas
+some software implementation has come up with; a DT description of audio
+on Kirkwood will not make any distinction between the artificial
+"platform" part and the "cpu dai" part.
+
+Instead, a DT description will just declare there to be one I2S device
+with its relevant resources.
+
+Such a description is _inherently_ incompatible with ASoC as long as
+ASoC insists that there is this artificial distinction.
+
+What Mark is telling me is that he requires yet more board files to
+spring up under sound/soc/ which create these artificial platform
+devices.  Not only does that go against the direction which we're heading
+on ARM (at Linus' insistance) to get rid of board files, but it perpetuates
+this silly idea that every audio interface should be split up whether
+there's a distinction there or not.
+
+It also makes the handling of -EPROBE_DEFER yet more complex; using this
+driver on the Dove Cubox platform with built as a set of modules revealed
+that where a platform device was being registered by code in
+sound/soc/kirkwood, and would be immediately unregistered on -EPROBE_DEFER
+never to be re-registered.
+
+It is my belief that Mark's position is not the right solution for where
+things are heading.
+
+We need to have solutions which do not require artificial breakup of
+drivers; we need solutions where hardware can be described by DT and
+that DT description be used by the kernel with the minimum of code.
+What we don't need are yet more board files appearing in some other
+random part of the kernel tree.
+
+Your thoughts please.
