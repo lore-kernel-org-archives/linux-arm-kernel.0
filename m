@@ -1,119 +1,63 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 22 Nov 2012 10:59:18 +0100
-Subject: [PATCH 3/3] ARM i.MX6: remove gate_mask from pllv3
-In-Reply-To: <1353578358-23509-1-git-send-email-s.hauer@pengutronix.de>
-References: <1353578358-23509-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1353578358-23509-4-git-send-email-s.hauer@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Nov 2012 10:03:53 +0000
+Subject: [PATCH 1/3] CLK: uninline clk_prepare() and clk_unprepare()
+In-Reply-To: <20121122093033.GA5764@n2100.arm.linux.org.uk>
+References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
+ <1353403339-11679-2-git-send-email-dmitry.torokhov@gmail.com>
+ <CAKohpo=B_7rVwePziyNe0rTMokcib_FgEN28cy4nByAzbUyaqg@mail.gmail.com>
+ <20121121204324.21126.99677@nucleus>
+ <20121121205424.GA25470@core.coreip.homeip.net>
+ <20121121223859.GQ3290@n2100.arm.linux.org.uk>
+ <20121122021750.GD25470@core.coreip.homeip.net>
+ <20121122093033.GA5764@n2100.arm.linux.org.uk>
+Message-ID: <20121122100353.GD5764@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the additional enable bits in the enet PLL are handled
-as gates, the gate_mask is identical for all plls. Remove the
-gate_mask from the code and use the BM_PLL_ENABLE bit for
-enabling/disabling the PLL.
+On Thu, Nov 22, 2012 at 09:30:33AM +0000, Russell King - ARM Linux wrote:
+> On Wed, Nov 21, 2012 at 06:17:50PM -0800, Dmitry Torokhov wrote:
+> > > You've checked non-ARM architectures too?
+> > 
+> > Yes:
+> > 
+> > [dtor at dtor-d630 linux-next]$ grep -r HAVE_CLK_PREPARE .
+> > ./arch/arm/Kconfig:     select HAVE_CLK_PREPARE
+> > Binary file ./.git/objects/pack/pack-7dad5ee164f601f1327dc78648fa317772c2d872.pack matches
+> > ./include/linux/clk.h:#ifdef CONFIG_HAVE_CLK_PREPARE
+> > ./include/linux/clk.h:#ifdef CONFIG_HAVE_CLK_PREPARE
+> > ./drivers/clk/Kconfig:config HAVE_CLK_PREPARE
+> > ./drivers/clk/Kconfig:  select HAVE_CLK_PREPARE
+> 
+> Err, no you haven't, not with that grep.  What you've found are the places
+> which enable this, and say "yes, I have clk_prepare".
+> 
+> What HAVE_CLK_PREPARE is about though is providing a transition path between
+> drivers using clk_prepare() to platforms which _don't_ have a clk_prepare()
+> implementation - and when it's unset, it provides a default implementation.
+> 
+> So, finding all those places where the symbol exists is the exact opposite
+> of what you need to be doing.  You need to find those platforms which have
+> CLK support, but which don't have HAVE_CLK_PREPARE selected.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-imx/clk-imx6q.c |   16 ++++++++--------
- arch/arm/mach-imx/clk-pllv3.c |    9 +++------
- arch/arm/mach-imx/clk.h       |    3 +--
- 3 files changed, 12 insertions(+), 16 deletions(-)
+Right, according to my greps under arch/arm, the following define a
+clk_enable() function but do not define a clk_prepare() function:
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 622a299..b7c7ff3 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -197,14 +197,14 @@ int __init mx6q_clocks_init(void)
- 	base = of_iomap(np, 0);
- 	WARN_ON(!base);
- 
--	/*                   type                               name         parent_name  base     gate_mask div_mask */
--	clk[pll1_sys]      = imx_clk_pllv3(IMX_PLLV3_SYS,	"pll1_sys",	"osc", base,        0x2000,   0x7f);
--	clk[pll2_bus]      = imx_clk_pllv3(IMX_PLLV3_GENERIC,	"pll2_bus",	"osc", base + 0x30, 0x2000,   0x1);
--	clk[pll3_usb_otg]  = imx_clk_pllv3(IMX_PLLV3_USB,	"pll3_usb_otg",	"osc", base + 0x10, 0x2000,   0x3);
--	clk[pll4_audio]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll4_audio",	"osc", base + 0x70, 0x2000,   0x7f);
--	clk[pll5_video]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll5_video",	"osc", base + 0xa0, 0x2000,   0x7f);
--	clk[pll6_enet]     = imx_clk_pllv3(IMX_PLLV3_ENET,	"pll6_enet",	"osc", base + 0xe0, 0x2000,   0x3);
--	clk[pll7_usb_host] = imx_clk_pllv3(IMX_PLLV3_USB,	"pll7_usb_host","osc", base + 0x20, 0x2000,   0x3);
-+	/*                   type                               name         parent_name  base     div_mask */
-+	clk[pll1_sys]      = imx_clk_pllv3(IMX_PLLV3_SYS,	"pll1_sys",	"osc", base,        0x7f);
-+	clk[pll2_bus]      = imx_clk_pllv3(IMX_PLLV3_GENERIC,	"pll2_bus",	"osc", base + 0x30, 0x1);
-+	clk[pll3_usb_otg]  = imx_clk_pllv3(IMX_PLLV3_USB,	"pll3_usb_otg",	"osc", base + 0x10, 0x3);
-+	clk[pll4_audio]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll4_audio",	"osc", base + 0x70, 0x7f);
-+	clk[pll5_video]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll5_video",	"osc", base + 0xa0, 0x7f);
-+	clk[pll6_enet]     = imx_clk_pllv3(IMX_PLLV3_ENET,	"pll6_enet",	"osc", base + 0xe0, 0x3);
-+	clk[pll7_usb_host] = imx_clk_pllv3(IMX_PLLV3_USB,	"pll7_usb_host","osc", base + 0x20, 0x3);
- 
- 	clk[usbphy1] = imx_clk_gate("usbphy1", "pll3_usb_otg", base + 0x10, 6);
- 	clk[usbphy2] = imx_clk_gate("usbphy2", "pll7_usb_host", base + 0x20, 6);
-diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
-index 59e7433..d09bc3d 100644
---- a/arch/arm/mach-imx/clk-pllv3.c
-+++ b/arch/arm/mach-imx/clk-pllv3.c
-@@ -31,7 +31,6 @@
-  * @clk_hw:	 clock source
-  * @base:	 base address of PLL registers
-  * @powerup_set: set POWER bit to power up the PLL
-- * @gate_mask:	 mask of gate bits
-  * @div_mask:	 mask of divider bits
-  *
-  * IMX PLL clock version 3, found on i.MX6 series.  Divider for pllv3
-@@ -41,7 +40,6 @@ struct clk_pllv3 {
- 	struct clk_hw	hw;
- 	void __iomem	*base;
- 	bool		powerup_set;
--	u32		gate_mask;
- 	u32		div_mask;
- };
- 
-@@ -89,7 +87,7 @@ static int clk_pllv3_enable(struct clk_hw *hw)
- 	u32 val;
- 
- 	val = readl_relaxed(pll->base);
--	val |= pll->gate_mask;
-+	val |= BM_PLL_ENABLE;
- 	writel_relaxed(val, pll->base);
- 
- 	return 0;
-@@ -101,7 +99,7 @@ static void clk_pllv3_disable(struct clk_hw *hw)
- 	u32 val;
- 
- 	val = readl_relaxed(pll->base);
--	val &= ~pll->gate_mask;
-+	val &= ~BM_PLL_ENABLE;
- 	writel_relaxed(val, pll->base);
- }
- 
-@@ -307,7 +305,7 @@ static const struct clk_ops clk_pllv3_mlb_ops = {
- 
- struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
- 			  const char *parent_name, void __iomem *base,
--			  u32 gate_mask, u32 div_mask)
-+			  u32 div_mask)
- {
- 	struct clk_pllv3 *pll;
- 	const struct clk_ops *ops;
-@@ -339,7 +337,6 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
- 		ops = &clk_pllv3_ops;
- 	}
- 	pll->base = base;
--	pll->gate_mask = gate_mask;
- 	pll->div_mask = div_mask;
- 
- 	init.name = name;
-diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index 5f2d8ac..9d1f3b9 100644
---- a/arch/arm/mach-imx/clk.h
-+++ b/arch/arm/mach-imx/clk.h
-@@ -22,8 +22,7 @@ enum imx_pllv3_type {
- };
- 
- struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
--		const char *parent_name, void __iomem *base, u32 gate_mask,
--		u32 div_mask);
-+		const char *parent_name, void __iomem *base, u32 div_mask);
- 
- struct clk *clk_register_gate2(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
--- 
-1.7.10.4
+arch/arm/mach-w90x900/clock.c
+arch/arm/mach-ep93xx/clock.c
+arch/arm/plat-omap/clock.c
+arch/arm/plat-samsung/clock.c
+arch/arm/mach-lpc32xx/clock.c
+arch/arm/mach-msm/clock.c
+arch/arm/mach-mmp/clock.c
+arch/arm/mach-sa1100/clock.c
+arch/arm/mach-at91/clock.c
+arch/arm/mach-at91/at91x40.c
+arch/arm/mach-pxa/clock.c
+arch/arm/plat-versatile/clock.c
+arch/arm/mach-davinci/clock.c
+
+This list gets over twice as big if you widen the search to the arch/
+subtree.
+
+If any of these makes use of a driver which makes a call to clk_prepare(),
+removing HAVE_CLK_PREPARE will break all those platforms.
