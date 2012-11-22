@@ -1,67 +1,39 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 22 Nov 2012 16:34:02 +0200
-Subject: OMAP4430 produces boot warnings
-In-Reply-To: <50AE2BB6.8080406@ti.com>
-References: <20121121230337.GR3332@n2100.arm.linux.org.uk>
- <50AE1DC0.3030002@ti.com>  <50AE2BB6.8080406@ti.com>
-Message-ID: <1353594842.786.45.camel@sokoban>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 22 Nov 2012 15:43:11 +0100
+Subject: [GIT PULL] i.MX Board update
+Message-ID: <20121122144311.GG10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-11-22 at 15:42 +0200, Tomi Valkeinen wrote:
-> On 2012-11-22 14:42, Archit Taneja wrote:
-> > Hi,
-> > 
-> > On Thursday 22 November 2012 04:33 AM, Russell King - ARM Linux wrote:
-> >> This one is nice and long, from last nights boot test.  Looks like it was
-> >> introduced sometime in the last couple of weeks.  Full log at:
-> >>
-> >> http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=518
-> >>
-> >> and config:
-> >> http://www.arm.linux.org.uk/developer/build/file.php?type=config&idx=2786
-> > 
-> > Doing a bisect results in this commit:
-> > 
-> > commit 0c7018e232c5526869250e57da8043a86a45b5de
-> > Author: Rajendra Nayak <rnayak@ti.com>
-> > Date:   Thu Oct 18 12:20:06 2012 +0300
-> > 
-> >     ARM: OMAP4: suspend: Program all domains to retention
-> > 
-> >     Remove the FIXME's in the suspend sequence since
-> >     we now intend to support system level RET support.
-> > 
-> >     Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> >     Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> >     Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > 
-> > I guess this commit will allow DSS to go to a lower power state. So what
-> > might be happening is:
-> > 
-> > - After returning back from the lower power state, the DISPC base
-> > address register hasn't been restored. Leading to a fetch from a bad
-> > address. Resulting in an OCP error.
-> > 
-> > or
-> > 
-> > -  DSS never came back to ON state, and it's not able to access
-> > registers. I doubt this possibility because we got an OCP error
-> > interrupt from DISPC.
-> 
-> It seems that the problem is that dispc never restores the context,
-> because get_ctx_loss_count always returns 1. I enabled pwrdm debug
-> prints, and pwrdm_get_context_loss_count() always returns 1 for dss,
-> even if the register contents have obviously been lost.
+Hi,
 
-I guess you checked that DSS pwrdm is switching between RET and ON in
-your setup?
+Please pull the following board update for i.MX.
 
-> Does the pwrdm mistakenly think that in RET state the DSS still keeps
-> the register contents?
+Sascha
 
-This might be the case, however the pwrdm code should be generic and
-handle all domains properly. What is the tree / branch / commit you are
-using for testing this stuff? I can take a look at this also.
+The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
 
--Tero
+  Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-board
+
+for you to fetch changes up to 038bdf63a72ac02a987981cf987622fd2de63f51:
+
+  Visstrim SM10: Use mo_version to decide board video mode. (2012-11-02 09:23:30 +0100)
+
+----------------------------------------------------------------
+ARM i.MX specific board updates for v3.8
+
+----------------------------------------------------------------
+Javier Martin (1):
+      Visstrim SM10: Use mo_version to decide board video mode.
+
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   52 ++++++++++++++++++++++++---
+ 1 file changed, 47 insertions(+), 5 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
