@@ -1,42 +1,203 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Thu, 22 Nov 2012 12:09:54 +0900
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <20121122020649.GH4371@opensource.wolfsonmicro.com>
-References: <20121120215429.B621F3E1821@localhost>
- <13540495.epaCf4JVn9@percival> <50ACB59B.4090404@iki.fi>
- <20121121114018.GA31576@avionic-0098.adnet.avionic-design.de>
- <50ACC341.3090204@ti.com>
- <20121121130039.GA12191@avionic-0098.adnet.avionic-design.de>
- <50ACD7DC.5060405@ti.com>
- <CAAVeFuJofYwj926=3v0ApBCq_vNhCdC1PnzDc-B3d=LL_L40Uw@mail.gmail.com>
- <20121121151209.GA4048@avionic-0098.adnet.avionic-design.de>
- <CAAVeFuK_V6nb874bygioi35mFNxaWuveKOedLT=YYsP4JfVqgA@mail.gmail.com>
- <20121122020649.GH4371@opensource.wolfsonmicro.com>
-Message-ID: <CAAVeFu+zxQQ=8fTu1Fp21QrWp6yndsWHjEJ2Gi=LifviNKbvaA@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 21 Nov 2012 19:11:17 -0800
+Subject: [PATCH 1/3] CLK: uninline clk_prepare() and clk_unprepare()
+In-Reply-To: <20121122021750.GD25470@core.coreip.homeip.net>
+References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
+ <1353403339-11679-2-git-send-email-dmitry.torokhov@gmail.com>
+ <CAKohpo=B_7rVwePziyNe0rTMokcib_FgEN28cy4nByAzbUyaqg@mail.gmail.com>
+ <20121121204324.21126.99677@nucleus>
+ <20121121205424.GA25470@core.coreip.homeip.net>
+ <20121121223859.GQ3290@n2100.arm.linux.org.uk>
+ <20121122021750.GD25470@core.coreip.homeip.net>
+Message-ID: <20121122031117.GE25470@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 11:06 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Thu, Nov 22, 2012 at 11:01:34AM +0900, Alexandre Courbot wrote:
->
->> The thing I don't understand here is why would anyone want power
->> sequences without the DT representation. Guys, that's the whole point! :)
->
->> If we are to implement things into drivers, then callback functions
->> are going to serve us just as well - even better, for they are more
->> flexible. All we need to do is define a dedicated ops structure and
->> have the driver plug the right callback functions depending on the
->> "compatible" property of the DT device node. We don't need a framework
->> for that.
->
-> It allows drivers (both board drivers and actual drivers) to write these
-> things in a semi-scripted form instead of having to open code everything
-> each time, it'd save a bunch of tedious stuff with resource requesting
-> for example.
+On Wed, Nov 21, 2012 at 06:17:50PM -0800, Dmitry Torokhov wrote:
+> On Wed, Nov 21, 2012 at 10:38:59PM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Nov 21, 2012 at 12:54:24PM -0800, Dmitry Torokhov wrote:
+> > > On Wed, Nov 21, 2012 at 12:43:24PM -0800, Mike Turquette wrote:
+> > > > Quoting Viresh Kumar (2012-11-20 02:13:55)
+> > > > > On 20 November 2012 14:52, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+> > > > > > We'll need to invoke clk_unprepare() via a pointer in our devm_*
+> > > > > > conversion so let's uninline the pair.
+> > > > > 
+> > > > > Sorry, but you aren't doing this :(
+> > > > > This routine is already uninlined as it is in clk.c
+> > > > > 
+> > > > > Instead you are just moving clk_prepare(), etc calls within
+> > > > > #ifdef CONFIG_HAVE_CLK
+> > > > > #else
+> > > > > #endif
+> > > > > 
+> > > > > I doubt why they have been added under #ifdef CONFIG_HAVE_CLK_PREPARE
+> > > > > earlier. Can they exist without CONFIG_HAVE_CLK
+> > > > > 
+> > > > > @Mike: ?
+> > > > > 
+> > > > 
+> > > > HAVE_CLK logically wraps HAVE_CLK_PREPARE.  There is no point in
+> > > > selecting HAVE_CLK_PREPARE without HAVE_CLK.
+> > > > 
+> > > > Looking through the code I see that this used to be the case.  Commit
+> > > > 93abe8e "clk: add non CONFIG_HAVE_CLK routines" moved the
+> > > > clk_(un)prepare declarations outside of #ifdef CONFIG_HAVE_CLK.  That
+> > > > commit was authored by you.  Can you elaborate on why that aspect of the
+> > > > patch was needed?
+> > > > 
+> > > 
+> > > BTW, it looks like the only place where we select HAVE_CLK_PREPARE is
+> > > IMX platform and it also selects COMMON_CLK so I think HAVE_CLK_PREPARE
+> > > can be removed now.
+> > 
+> > You've checked non-ARM architectures too?
+> 
+> Yes:
+> 
+> [dtor at dtor-d630 linux-next]$ grep -r HAVE_CLK_PREPARE .
+> ./arch/arm/Kconfig:     select HAVE_CLK_PREPARE
+> Binary file ./.git/objects/pack/pack-7dad5ee164f601f1327dc78648fa317772c2d872.pack matches
+> ./include/linux/clk.h:#ifdef CONFIG_HAVE_CLK_PREPARE
+> ./include/linux/clk.h:#ifdef CONFIG_HAVE_CLK_PREPARE
+> ./drivers/clk/Kconfig:config HAVE_CLK_PREPARE
+> ./drivers/clk/Kconfig:  select HAVE_CLK_PREPARE
+> 
+> Thanks.
+> 
 
-Mmm, I overlooked that point - that's fair enough. Guess I should
-remove all DT support and stress that point in the documentation. Then
-maybe we'll have a deal.
+So how about the one blow?
 
-Alex.
+-- 
+Dmitry
+
+CLK: get rid of HAVE_CLK_PREPARE
+
+From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+HAVE_CLK_PREPARE is automatically selected by COMMON_CLK and the only
+platform that explicitly selects HAVE_CLK_PREPARE is MXS which has been
+switched to common clk framework, so we can delete this option now.
+
+As part of this change we move declarations of clk_prepare() and
+clk_unprepare() under HAVE_CLK and provide stubs if this option is not
+enabled.
+
+Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+---
+ drivers/clk/Kconfig |    4 ---
+ include/linux/clk.h |   68 ++++++++++++++++++++++++---------------------------
+ 2 files changed, 32 insertions(+), 40 deletions(-)
+
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index bace9e9..639ee9d 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -3,15 +3,11 @@ config CLKDEV_LOOKUP
+ 	bool
+ 	select HAVE_CLK
+ 
+-config HAVE_CLK_PREPARE
+-	bool
+-
+ config HAVE_MACH_CLKDEV
+ 	bool
+ 
+ config COMMON_CLK
+ 	bool
+-	select HAVE_CLK_PREPARE
+ 	select CLKDEV_LOOKUP
+ 	---help---
+ 	  The common clock framework is a single definition of struct
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index b3ac22d..f8204c3 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -84,42 +84,6 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
+ 
+ #endif
+ 
+-/**
+- * clk_prepare - prepare a clock source
+- * @clk: clock source
+- *
+- * This prepares the clock source for use.
+- *
+- * Must not be called from within atomic context.
+- */
+-#ifdef CONFIG_HAVE_CLK_PREPARE
+-int clk_prepare(struct clk *clk);
+-#else
+-static inline int clk_prepare(struct clk *clk)
+-{
+-	might_sleep();
+-	return 0;
+-}
+-#endif
+-
+-/**
+- * clk_unprepare - undo preparation of a clock source
+- * @clk: clock source
+- *
+- * This undoes a previously prepared clock.  The caller must balance
+- * the number of prepare and unprepare calls.
+- *
+- * Must not be called from within atomic context.
+- */
+-#ifdef CONFIG_HAVE_CLK_PREPARE
+-void clk_unprepare(struct clk *clk);
+-#else
+-static inline void clk_unprepare(struct clk *clk)
+-{
+-	might_sleep();
+-}
+-#endif
+-
+ #ifdef CONFIG_HAVE_CLK
+ /**
+  * clk_get - lookup and obtain a reference to a clock producer.
+@@ -159,6 +123,27 @@ struct clk *clk_get(struct device *dev, const char *id);
+ struct clk *devm_clk_get(struct device *dev, const char *id);
+ 
+ /**
++ * clk_prepare - prepare a clock source
++ * @clk: clock source
++ *
++ * This prepares the clock source for use.
++ *
++ * Must not be called from within atomic context.
++ */
++int clk_prepare(struct clk *clk);
++
++/**
++ * clk_unprepare - undo preparation of a clock source
++ * @clk: clock source
++ *
++ * This undoes a previously prepared clock.  The caller must balance
++ * the number of prepare and unprepare calls.
++ *
++ * Must not be called from within atomic context.
++ */
++void clk_unprepare(struct clk *clk);
++
++/**
+  * clk_enable - inform the system when the clock source should be running.
+  * @clk: clock source
+  *
+@@ -292,6 +277,17 @@ static inline void clk_put(struct clk *clk) {}
+ 
+ static inline void devm_clk_put(struct device *dev, struct clk *clk) {}
+ 
++static inline int clk_prepare(struct clk *clk)
++{
++	might_sleep();
++	return 0;
++}
++
++static inline void clk_unprepare(struct clk *clk)
++{
++	might_sleep();
++}
++
+ static inline int clk_enable(struct clk *clk)
+ {
+ 	return 0;
