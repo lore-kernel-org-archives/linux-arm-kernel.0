@@ -1,134 +1,52 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 21 Nov 2012 21:34:41 -0800
-Subject: [PATCH v2 2/3] CLK: uninline clk_prepare_enable() and
- clk_disable_unprepare()
-In-Reply-To: <1353562482-12422-1-git-send-email-dmitry.torokhov@gmail.com>
-References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
- <1353562482-12422-1-git-send-email-dmitry.torokhov@gmail.com>
-Message-ID: <1353562482-12422-3-git-send-email-dmitry.torokhov@gmail.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Thu, 22 Nov 2012 06:33:13 +0100
+Subject: [PATCH 1/4] OF: Add helper for matching against linux, stdout-path
+In-Reply-To: <20121121172631.GV10369@pengutronix.de>
+References: <20121121155312.GX4398@game.jcrosoft.org>
+ <1353513428-25697-1-git-send-email-plagnioj@jcrosoft.com>
+ <20121121172631.GV10369@pengutronix.de>
+Message-ID: <20653.47385.793796.215803@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We'll need to invoke clk_disable_unprepare() via a pointer in our devm_*
-conversion so let's uninline the pair.
+Hi,
 
-Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
----
- drivers/clk/clk.c   | 23 +++++++++++++++++++++++
- include/linux/clk.h | 53 +++++++++++++++++++++++++++++++----------------------
- 2 files changed, 54 insertions(+), 22 deletions(-)
+Sascha Hauer writes:
+> On Wed, Nov 21, 2012 at 04:57:05PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > From: Sascha Hauer <s.hauer@pengutronix.de>
+> > 
+> > devicetrees may have a linux,stdout-path or stdout-path property
+> > in the chosen node describing the console device. This adds a helper
+> > function to match a device against this property and retrieve the options
+> > so a driver can call add_preferred_console for a matching device.
+> > 
+[...]
+> > +	if (!tmp)
+> > +		return 0;
+> > +
+> > +	dn_stdout = of_find_node_by_path(tmp);
+> > +
+> > +	if (dn_stdout && dn_stdout == dn) {
+> > +		is_stdout = 1;
+> > +		tmp_option++;
+> > +		*option = kstrdup(tmp_option, GFP_KERNEL);
+> > +	}
+> > +
+> > +	of_node_put(dn_stdout);
+> 
+> dn_stdout may be NULL aswell.
+> 
+which is handled gracefully by of_node_put()...
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 56e4495e..92bdafd 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -557,6 +557,29 @@ int clk_enable(struct clk *clk)
- }
- EXPORT_SYMBOL_GPL(clk_enable);
- 
-+int clk_prepare_enable(struct clk *clk)
-+{
-+	int ret;
-+
-+	ret = clk_prepare(clk);
-+	if (ret)
-+		return ret;
-+
-+	ret = clk_enable(clk);
-+	if (ret)
-+		clk_unprepare(clk);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(clk_prepare_enable);
-+
-+void clk_disable_unprepare(struct clk *clk)
-+{
-+	clk_disable(clk);
-+	clk_unprepare(clk);
-+}
-+EXPORT_SYMBOL_GPL(clk_disable_unprepare);
-+
- /**
-  * __clk_round_rate - round the given rate for a clk
-  * @clk: round the rate of this clock
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index f8204c3..8bf149e 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -172,6 +172,26 @@ int clk_enable(struct clk *clk);
- void clk_disable(struct clk *clk);
- 
- /**
-+ * clk_prepare_enable - prepare and enable a clock source
-+ * @clk: clock source
-+ *
-+ * This prepares the clock source for use and enables it.
-+ *
-+ * Must not be called from within atomic context.
-+ */
-+int clk_prepare_enable(struct clk *clk);
-+
-+/**
-+ * clk_disable_unprepare - disable and undo preparation of a clock source
-+ * @clk: clock source
-+ *
-+ * This disables and undoes a previously prepared clock.
-+ *
-+ * Must not be called from within atomic context.
-+ */
-+void clk_disable_unprepare(struct clk *clk);
-+
-+/**
-  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
-  *		  This is only valid once the clock source has been enabled.
-  * @clk: clock source
-@@ -295,6 +315,17 @@ static inline int clk_enable(struct clk *clk)
- 
- static inline void clk_disable(struct clk *clk) {}
- 
-+static inline int clk_prepare_enable(struct clk *clk)
-+{
-+	might_sleep();
-+	return 0;
-+}
-+
-+static inline void clk_disable_unprepare(struct clk *clk)
-+{
-+	might_sleep();
-+}
-+
- static inline unsigned long clk_get_rate(struct clk *clk)
- {
- 	return 0;
-@@ -322,28 +353,6 @@ static inline struct clk *clk_get_parent(struct clk *clk)
- 
- #endif
- 
--/* clk_prepare_enable helps cases using clk_enable in non-atomic context. */
--static inline int clk_prepare_enable(struct clk *clk)
--{
--	int ret;
--
--	ret = clk_prepare(clk);
--	if (ret)
--		return ret;
--	ret = clk_enable(clk);
--	if (ret)
--		clk_unprepare(clk);
--
--	return ret;
--}
--
--/* clk_disable_unprepare helps cases using clk_disable in non-atomic context. */
--static inline void clk_disable_unprepare(struct clk *clk)
--{
--	clk_disable(clk);
--	clk_unprepare(clk);
--}
--
- /**
-  * clk_add_alias - add a new clock alias
-  * @alias: name for clock alias
+
+Lothar Wa?mann
 -- 
-1.7.11.7
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
