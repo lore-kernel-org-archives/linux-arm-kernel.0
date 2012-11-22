@@ -1,31 +1,24 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 22 Nov 2012 06:41:38 +0100
-Subject: [PATCH 1/4] OF: Add helper for matching against linux,stdout-path
-In-Reply-To: <CACxGe6tyPpjx4OtjHmhB9Cvnb7OwAjPEE4=K+wgWKYHcAV-ESQ@mail.gmail.com>
-References: <20121121155312.GX4398@game.jcrosoft.org>
- <1353513428-25697-1-git-send-email-plagnioj@jcrosoft.com>
- <CACxGe6tyPpjx4OtjHmhB9Cvnb7OwAjPEE4=K+wgWKYHcAV-ESQ@mail.gmail.com>
-Message-ID: <20121122054138.GY4398@game.jcrosoft.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 22 Nov 2012 14:12:41 +0800
+Subject: [PATCH v2 1/3] CLK: get rid of HAVE_CLK_PREPARE
+In-Reply-To: <1353562482-12422-2-git-send-email-dmitry.torokhov@gmail.com>
+References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
+ <1353562482-12422-1-git-send-email-dmitry.torokhov@gmail.com>
+ <1353562482-12422-2-git-send-email-dmitry.torokhov@gmail.com>
+Message-ID: <20121122061238.GB24693@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:03 Wed 21 Nov     , Grant Likely wrote:
-> On Wed, Nov 21, 2012 at 3:57 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> > From: Sascha Hauer <s.hauer@pengutronix.de>
-> >
-> > devicetrees may have a linux,stdout-path or stdout-path property
-> > in the chosen node describing the console device. This adds a helper
-> > function to match a device against this property and retrieve the options
-> > so a driver can call add_preferred_console for a matching device.
+On Wed, Nov 21, 2012 at 09:34:40PM -0800, Dmitry Torokhov wrote:
+> HAVE_CLK_PREPARE is automatically selected by COMMON_CLK and the only
+> platform that explicitly selects HAVE_CLK_PREPARE is MXS which has been
+> switched to common clk framework, so we can delete this option now.
 > 
-> NIce. Looks like the right behaviour, but is a little inefficient.
-> Since the stdout property doesn't change this code could be called
-> once right after the tree is unflattened and then cache the pointer to
-> the node anarguments. Can you add the code to of_alias_scan()?
-do we assume that we can have only one stdout-path?
+> As part of this change we move declarations of clk_prepare() and
+> clk_unprepare() under HAVE_CLK and provide stubs if this option is not
+> enabled.
+> 
+> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-I think we could have more serial, framebuffer console
-
-Best Regards,
-J.
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
