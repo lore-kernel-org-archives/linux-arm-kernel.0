@@ -1,72 +1,34 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Thu, 22 Nov 2012 09:56:30 +0100
-Subject: Order of clock multiplexer registrations
-Message-ID: <50ADE8BE.1000707@parkeon.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 22 Nov 2012 09:57:22 +0100
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <20121121013133.GE4673@opensource.wolfsonmicro.com>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
+ <20121120215429.B621F3E1821@localhost>
+ <20121121013133.GE4673@opensource.wolfsonmicro.com>
+Message-ID: <CACRpkdaNmBpfONDpt7zFqLaqfiGm+ELpO-v5gZmM0rEi_AzijQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Nov 21, 2012 at 2:31 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
 
-I notice that currently (3.7-rc6) the behaviour of clock multiplexers 
-depends on their registration order.
+> As I said in my earlier reviews I think this is a useful thing to have
+> as a utility library for drivers independantly of the DT bindings, it
+> would allow drivers to become more data driven.  Perhaps we can rework
+> the series so that the DT bindings are added as a final patch?  All the
+> rest of the code seems OK.
 
-Suppose the hardware has a 2 bit clock select field with
-00 => srcA
-01 => srcB
-10 => unused
-11 => srcC
+I have the same (limited by experience) opinion. Working sort of
+near som audio drivers I have understood that power sequencing
+is a big issue not only for things like this backlight example, but
+even more so in the area of audio to avoid clicks and pops.
 
-If the multiplexer is registered after the sources:
+Is it correct to assume that this library will be useful also for ALSA
+SoC type of devices?
 
-     static const char *sel[] = { "srcA", "srcB", "dummy", "srcC" };
+Then whether to couple that to DT or ACPI or SFI or whatever
+is a different discussion altogether.
 
-     clk_register_fixed(NULL, "dummy", ...);
-     clk_register_fixed(NULL, "srcA", ...);
-     clk_register_fixed(NULL, "srcB", ...);
-     clk_register_fixed(NULL, "srcC", ...);
-     child = clk_register_mux(NULL, "child",  sel, ARRAY_SIZE(sel), ...);
-
-Then all works as expected and child's parent will depend on the value 
-in the hardware clock select register.
-
-However, if the multiplexer is registered before the sources:
-
-     child = clk_register_mux(NULL, "child",  sel, ARRAY_SIZE(sel), ...);
-     clk_register_fixed(NULL, "dummy", ...);
-     clk_register_fixed(NULL, "srcA", ...);
-     clk_register_fixed(NULL, "srcB", ...);
-     clk_register_fixed(NULL, "srcC", ...);
-
-Then child's parent will always be the first registered parent clock 
-("dummy" in this case) regardless of the
-value in the hardware clock select register.
-
-This occurs because of the reparenting code in drivers/clk/clk.c 
-__clk_init():
-
-     /*
-      * walk the list of orphan clocks and reparent any that are children of
-      * this clock
-      */
-     hlist_for_each_entry_safe(orphan, tmp, tmp2, &clk_orphan_list, 
-child_node)
-         for (i = 0; i < orphan->num_parents; i++)
-             if (!strcmp(clk->name, orphan->parent_names[i])) {
-                 __clk_reparent(orphan, clk);
-                 break;
-             }
-
-
-Is this a bug or are multiplexers supposed to always be registered after 
-their parents?
-
-Currently this occurs for some i.MX53 clocks:
-|-- dummy
-|   |-- emi_fast_gate
-|   |-- gpc_dvfs
-|   `-- ipu_di0_sel
-
-
-Regards,
-
-Martin
+Yours,
+Linus Walleij
