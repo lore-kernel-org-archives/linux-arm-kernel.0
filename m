@@ -1,9 +1,9 @@
 From: xiechao.mail@gmail.com (Chao Xie)
-Date: Wed, 21 Nov 2012 21:04:53 -0500
-Subject: [PATCH 12/29] usb: otg: mv_otg: use PHY driver for otg
+Date: Wed, 21 Nov 2012 21:04:52 -0500
+Subject: [PATCH 11/29] usb: ehci: ehci-mv: use PHY driver for ehci
 In-Reply-To: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
 References: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <1353549910-988-12-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <1353549910-988-11-git-send-email-xiechao.mail@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,97 +11,101 @@ From: Chao Xie <chao.xie@marvell.com>
 
 Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
 ---
- drivers/usb/otg/mv_otg.c |   33 ++++++++++++---------------------
- drivers/usb/otg/mv_otg.h |    2 +-
- 2 files changed, 13 insertions(+), 22 deletions(-)
+ drivers/usb/host/ehci-mv.c |   37 +++++++++++++------------------------
+ 1 files changed, 13 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/usb/otg/mv_otg.c b/drivers/usb/otg/mv_otg.c
-index ffc0689..344f246 100644
---- a/drivers/usb/otg/mv_otg.c
-+++ b/drivers/usb/otg/mv_otg.c
-@@ -25,6 +25,7 @@
+diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
+index 3065809..be504fd 100644
+--- a/drivers/usb/host/ehci-mv.c
++++ b/drivers/usb/host/ehci-mv.c
+@@ -15,17 +15,18 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
  #include <linux/usb/otg.h>
- #include <linux/usb/gadget.h>
- #include <linux/usb/hcd.h>
 +#include <linux/usb/mv_usb2.h>
  #include <linux/platform_data/mv_usb.h>
  
- #include "mv_otg.h"
-@@ -261,8 +262,8 @@ static int mv_otg_enable_internal(struct mv_otg *mvotg)
- 	dev_dbg(&mvotg->pdev->dev, "otg enabled\n");
+ #define CAPLENGTH_MASK         (0xff)
  
- 	otg_clock_enable(mvotg);
--	if (mvotg->pdata->phy_init) {
--		retval = mvotg->pdata->phy_init(mvotg->phy_regs);
-+	if (mvotg->mvphy->init) {
-+		retval = mvotg->mvphy->init(mvotg->mvphy);
- 		if (retval) {
- 			dev_err(&mvotg->pdev->dev,
- 				"init phy error %d\n", retval);
-@@ -288,8 +289,8 @@ static void mv_otg_disable_internal(struct mv_otg *mvotg)
- {
- 	if (mvotg->active) {
- 		dev_dbg(&mvotg->pdev->dev, "otg disabled\n");
--		if (mvotg->pdata->phy_deinit)
--			mvotg->pdata->phy_deinit(mvotg->phy_regs);
-+		if (mvotg->mvphy->shutdown)
-+			mvotg->mvphy->shutdown(mvotg->mvphy);
- 		otg_clock_disable(mvotg);
- 		mvotg->active = 0;
+ struct ehci_hcd_mv {
+ 	struct usb_hcd *hcd;
++	struct mv_usb2_phy *mvphy;
+ 
+ 	/* Which mode does this ehci running OTG/Host ? */
+ 	int mode;
+ 
+-	void __iomem *phy_regs;
+ 	void __iomem *cap_regs;
+ 	void __iomem *op_regs;
+ 
+@@ -59,8 +60,8 @@ static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
+ 	int retval;
+ 
+ 	ehci_clock_enable(ehci_mv);
+-	if (ehci_mv->pdata->phy_init) {
+-		retval = ehci_mv->pdata->phy_init(ehci_mv->phy_regs);
++	if (ehci_mv->mvphy->init) {
++		retval = ehci_mv->mvphy->init(ehci_mv->mvphy);
+ 		if (retval)
+ 			return retval;
  	}
-@@ -741,23 +742,8 @@ static int mv_otg_probe(struct platform_device *pdev)
- 	for (i = 0; i < OTG_TIMER_NUM; i++)
- 		init_timer(&mvotg->otg_ctrl.timer[i]);
+@@ -70,8 +71,8 @@ static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
  
--	r = platform_get_resource_byname(mvotg->pdev,
--					 IORESOURCE_MEM, "phyregs");
+ static void mv_ehci_disable(struct ehci_hcd_mv *ehci_mv)
+ {
+-	if (ehci_mv->pdata->phy_deinit)
+-		ehci_mv->pdata->phy_deinit(ehci_mv->phy_regs);
++	if (ehci_mv->mvphy->shutdown)
++		ehci_mv->mvphy->shutdown(ehci_mv->mvphy);
+ 	ehci_clock_disable(ehci_mv);
+ }
+ 
+@@ -184,22 +185,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phyregs");
 -	if (r == NULL) {
 -		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
 -		retval = -ENODEV;
--		goto err_destroy_workqueue;
+-		goto err_clear_drvdata;
 -	}
 -
--	mvotg->phy_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
--	if (mvotg->phy_regs == NULL) {
+-	ehci_mv->phy_regs = devm_ioremap(&pdev->dev, r->start,
+-					 resource_size(r));
+-	if (ehci_mv->phy_regs == 0) {
 -		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
 -		retval = -EFAULT;
--		goto err_destroy_workqueue;
+-		goto err_clear_drvdata;
 -	}
 -
--	r = platform_get_resource_byname(mvotg->pdev,
--					 IORESOURCE_MEM, "capregs");
-+	r = platform_get_resource(mvotg->pdev,
-+					 IORESOURCE_MEM, 0);
- 	if (r == NULL) {
+-	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "capregs");
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!r) {
  		dev_err(&pdev->dev, "no I/O memory resource defined\n");
  		retval = -ENODEV;
-@@ -770,6 +756,11 @@ static int mv_otg_probe(struct platform_device *pdev)
- 		retval = -EFAULT;
- 		goto err_destroy_workqueue;
+@@ -214,6 +200,12 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		goto err_clear_drvdata;
  	}
-+	mvotg->mvphy = mv_usb2_get_phy();
-+	if (mvotg->mvphy == NULL) {
+ 
++	ehci_mv->mvphy = mv_usb2_get_phy();
++	if (ehci_mv->mvphy == NULL) {
 +		retval = -ENODEV;
-+		goto err_destroy_workqueue;
++		goto err_clear_drvdata;
 +	}
++
+ 	retval = mv_ehci_enable(ehci_mv);
+ 	if (retval) {
+ 		dev_err(&pdev->dev, "init phy error %d\n", retval);
+@@ -275,9 +267,6 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		}
+ 	}
  
- 	/* we will acces controller register, so enable the udc controller */
- 	retval = mv_otg_enable_internal(mvotg);
-diff --git a/drivers/usb/otg/mv_otg.h b/drivers/usb/otg/mv_otg.h
-index 8a9e351..7b9629a 100644
---- a/drivers/usb/otg/mv_otg.h
-+++ b/drivers/usb/otg/mv_otg.h
-@@ -137,10 +137,10 @@ struct mv_otg_regs {
- 
- struct mv_otg {
- 	struct usb_phy phy;
-+	struct mv_usb2_phy *mvphy;
- 	struct mv_otg_ctrl otg_ctrl;
- 
- 	/* base address */
--	void __iomem *phy_regs;
- 	void __iomem *cap_regs;
- 	struct mv_otg_regs __iomem *op_regs;
- 
+-	if (pdata->private_init)
+-		pdata->private_init(ehci_mv->op_regs, ehci_mv->phy_regs);
+-
+ 	dev_info(&pdev->dev,
+ 		 "successful find EHCI device with regs 0x%p irq %d"
+ 		 " working in %s mode\n", hcd->regs, hcd->irq,
 -- 
 1.7.4.1
