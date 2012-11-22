@@ -1,43 +1,114 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 22 Nov 2012 18:48:45 +0100
-Subject: [PATCH] ARM: shmobile: r8a7779: Fix PFC - MOD_SEL2 missed an entry
-In-Reply-To: <1353601737-21641-1-git-send-email-phil.edworthy@renesas.com>
-References: <1353601737-21641-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <2677976.XXZnUJZ9sQ@avalon>
+From: rajanikanth.hv@linaro.org (Rajanikanth H.V)
+Date: Fri, 23 Nov 2012 00:13:43 +0530
+Subject: [PATCH 0/4] Implement device tree support for ab8500 BM Devices
+Message-ID: <1353609827-8218-1-git-send-email-rajanikanth.hv@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 November 2012 16:28:57 Phil Edworthy wrote:
-> The list of functions selected by the MOD_SEL2 register was missing
-> an entry. This caused all entries after this to modify the MOD_SEL2
-> register incorrectly.
-> 
-> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+From: "Rajanikanth H.V" <rajanikanth.hv@linaro.org>
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+This patch-set adds device tree binding for ab8500 battery-managed
+devices. Removes the redundant platform structure maintained
+across bm devices and implements common DT probe routine across all the
+modules.
 
-Simon, this will conflict with my PFC patch series. As I'm still waiting for 
-review and need to send a v2 anyway, please apply this patch to your tree and 
-push it for v3.8 if time permits. I'll rebase my series on top of it.
+Test status:
+a) Tested across 'legacy platform data' and DT binding support
+	a.1) ab8500_charger driver fails to get regulator in the
+		legacy platform mode.
+b) Interrupt numbers assigned differs between legacy and FDT mode.
+    (a) Legacy platform_data Mode:
+    root at ME:/ cat /proc/interrupts
+               CPU0       CPU1
+    483:          0          0    ab8500  ab8500-ponkey-dbf
+    484:          0          0    ab8500  ab8500-ponkey-dbr
+    485:          0          0    ab8500  BATT_OVV
+    494:          0          1    ab8500
+    495:          0          0    ab8500  ab8500-rtc
+    501:          0         13    ab8500  NCONV_ACCU
+    503:          7         22    ab8500  CCEOC
+    504:          0          1    ab8500  CC_INT_CALIB
+    505:          0          0    ab8500  LOW_BAT_F
+    516:          0         34    ab8500  ab8500-gpadc
+    556:          0          0    ab8500  usb-link-status
+    
+    (b) FDT Mode:
+    root at ME:/ cat /proc/interrupts
+               CPU0       CPU1
+      6:          0          0    ab8500  ab8500-ponkey-dbf
+      7:          0          0    ab8500  ab8500-ponkey-dbr
+      8:          0          0    ab8500  BATT_OVV
+    162:          0          7    ab8500  ab8500-gpadc
+    163:          0          1    ab8500
+    164:          0          0    ab8500  ab8500-rtc
+    484:          0          0    ab8500  usb-link-status
+    499:          0          4    ab8500  NCONV_ACCU
+    500:          0          0    ab8500  LOW_BAT_F
+    502:          0          1    ab8500  CC_INT_CALIB
+    503:          0          6    ab8500  CCEOC
 
-> ---
->  arch/arm/mach-shmobile/pfc-r8a7779.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/pfc-r8a7779.c
-> b/arch/arm/mach-shmobile/pfc-r8a7779.c index 9fac32e4..15f6a48 100644
-> --- a/arch/arm/mach-shmobile/pfc-r8a7779.c
-> +++ b/arch/arm/mach-shmobile/pfc-r8a7779.c
-> @@ -2525,7 +2525,7 @@ static struct pinmux_cfg_reg pinmux_config_regs[] = {
->  	    /* SEL_SCIF [2] */
->  	    FN_SEL_SCIF_0, FN_SEL_SCIF_1, FN_SEL_SCIF_2, FN_SEL_SCIF_3,
->  	    /* SEL_CANCLK [2] */
-> -	    FN_SEL_CANCLK_0, FN_SEL_CANCLK_1, FN_SEL_CANCLK_2,
-> +	    FN_SEL_CANCLK_0, FN_SEL_CANCLK_1, FN_SEL_CANCLK_2, 0,
->  	    /* SEL_CAN0 [1] */
->  	    FN_SEL_CAN0_0, FN_SEL_CAN0_1,
->  	    /* SEL_HSCIF1 [1] */
+c) Event handlers across bm-modules have been verified only
+   during 'battery discharge process' as 'battery charging process'
+   depends on ab8500-usb code
+
+d) observed nested IRQ issue, log below:
+
+root at ME:/ ------------[ cut here ]------------
+WARNING: at /home/rhv00000/linaro_work/linux/kernel/irq/manage.c:635 irq_nested_primary_handler+0x20/0x28()
+Primary handler called for nested irq 193
+Modules linked in:
+[<c0014884>] (unwind_backtrace+0x0/0xf8) from [<c001cbb4>] (warn_slowpath_common+0x4c/0x64)
+[<c001cbb4>] (warn_slowpath_common+0x4c/0x64) from [<c001cc60>] (warn_slowpath_fmt+0x30/0x40)
+[<c001cc60>] (warn_slowpath_fmt+0x30/0x40) from [<c0060f00>] (irq_nested_primary_handler+0x20/0x28)
+[<c0060f00>] (irq_nested_primary_handler+0x20/0x28) from [<c0060b80>] (handle_irq_event_percpu+0x50/0x194)
+[<c0060b80>] (handle_irq_event_percpu+0x50/0x194) from [<c0060d00>] (handle_irq_event+0x3c/0x5c)
+[<c0060d00>] (handle_irq_event+0x3c/0x5c) from [<c0063034>] (handle_simple_irq+0x8c/0xc4)
+[<c0063034>] (handle_simple_irq+0x8c/0xc4) from [<c0062d84>] (resend_irqs+0x40/0x68)
+[<c0062d84>] (resend_irqs+0x40/0x68) from [<c00236d8>] (tasklet_action+0x84/0x120)
+[<c00236d8>] (tasklet_action+0x84/0x120) from [<c0023ae4>] (__do_softirq+0xd8/0x198)
+[<c0023ae4>] (__do_softirq+0xd8/0x198) from [<c0023ed4>] (irq_exit+0x90/0x98)
+[<c0023ed4>] (irq_exit+0x90/0x98) from [<c000f2cc>] (handle_IRQ+0x50/0xb0)
+[<c000f2cc>] (handle_IRQ+0x50/0xb0) from [<c00084f0>] (gic_handle_irq+0x28/0x5c)
+[<c00084f0>] (gic_handle_irq+0x28/0x5c) from [<c000df80>] (__irq_svc+0x40/0x70)
+Exception stack(0xebc5dea8 to 0xebc5def0)
+dea0:                   c0f45340 ebc4cf00 00000000 1f321f32 eb196600 ebc4cf00
+dec0: c05a3340 00000002 ebc4c600 00000000 eb1b2c00 ebc5df0c 00000000 ebc5def0
+dee0: c0040c7c c02ca5ec 60000013 ffffffff
+[<c000df80>] (__irq_svc+0x40/0x70) from [<c02ca5ec>] (_raw_spin_unlock_irq+0x28/0x50)
+[<c02ca5ec>] (_raw_spin_unlock_irq+0x28/0x50) from [<c0040c7c>] (finish_task_switch+0x28/0xf0)
+[<c0040c7c>] (finish_task_switch+0x28/0xf0) from [<c02c93f0>] (__schedule+0x254/0x548)
+[<c02c93f0>] (__schedule+0x254/0x548) from [<c0040088>] (smpboot_thread_fn+0x11c/0x250)
+[<c0040088>] (smpboot_thread_fn+0x11c/0x250) from [<c0037fc8>] (kthread+0xa4/0xb0)
+[<c0037fc8>] (kthread+0xa4/0xb0) from [<c000e418>] (ret_from_fork+0x14/0x3c)
+---[ end trace 1b75b31a2719ed1e ]---
+
+Rajanikanth H.V (4):
+  mfd: ab8500: add devicetree support for fuelgauge
+  mfd: ab8500: add devicetree support for btemp
+  mfd: ab8500: add devicetree support for charger
+  mfd: ab8500: add devicetree support for chargalg
+
+ Documentation/devicetree/bindings/mfd/ab8500.txt   |   27 +-
+ .../bindings/power_supply/ab8500/btemp.txt         |   16 +
+ .../bindings/power_supply/ab8500/chargalg.txt      |   16 +
+ .../bindings/power_supply/ab8500/charger.txt       |   25 +
+ .../devicetree/bindings/power_supply/ab8500/fg.txt |   58 +++
+ arch/arm/boot/dts/dbx5x0.dtsi                      |   26 +
+ drivers/mfd/ab8500-core.c                          |   20 +
+ drivers/power/Kconfig                              |    6 -
+ drivers/power/Makefile                             |    2 +-
+ drivers/power/ab8500_bmdata.c                      |  514 ++++++++++++++++++++
+ drivers/power/ab8500_btemp.c                       |   75 +--
+ drivers/power/ab8500_charger.c                     |   83 ++--
+ drivers/power/ab8500_fg.c                          |   81 +--
+ drivers/power/abx500_chargalg.c                    |   57 ++-
+ include/linux/mfd/abx500.h                         |   34 +-
+ 15 files changed, 879 insertions(+), 161 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power_supply/ab8500/btemp.txt
+ create mode 100644 Documentation/devicetree/bindings/power_supply/ab8500/chargalg.txt
+ create mode 100644 Documentation/devicetree/bindings/power_supply/ab8500/charger.txt
+ create mode 100644 Documentation/devicetree/bindings/power_supply/ab8500/fg.txt
+ create mode 100644 drivers/power/ab8500_bmdata.c
+
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.10.4
