@@ -1,87 +1,61 @@
-From: per.lkml@gmail.com (Per Forlin)
-Date: Thu, 22 Nov 2012 18:28:30 +0100
-Subject: [PATCH] mmc: mmci: Support non-power-of-two block sizes for
- ux500v2 variant
-In-Reply-To: <20121121165048.GO3290@n2100.arm.linux.org.uk>
-References: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
- <20121121153811.GN3290@n2100.arm.linux.org.uk>
- <CAFEEs1kzJUgsvnzgWwU4i7o1jkE=8iTq5+NJ_t1jdiHEm7b-RQ@mail.gmail.com>
- <20121121165048.GO3290@n2100.arm.linux.org.uk>
-Message-ID: <CAFEEs1nb+UD+8_jsKvGKhyFqGDogN5wsmV30PnELqahTMDyRVA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 22 Nov 2012 18:32:20 +0100
+Subject: [GIT PULL] Marvell: late fixes for 3.8
+Message-ID: <1353605545-7091-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 5:50 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Nov 21, 2012 at 05:13:55PM +0100, Per Forlin wrote:
->> On Wed, Nov 21, 2012 at 4:38 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Fri, Oct 12, 2012 at 04:02:02PM +0200, Ulf Hansson wrote:
->> >>  /*
->> >> + * Validate mmc prerequisites
->> >> + */
->> >> +static int mmci_validate_data(struct mmci_host *host,
->> >> +                           struct mmc_data *data)
->> >> +{
->> >> +     if (!data)
->> >> +             return 0;
->> >> +
->> >> +     if (!host->variant->non_power_of_2_blksize &&
->> >> +         !is_power_of_2(data->blksz)) {
->> >> +             dev_err(mmc_dev(host->mmc),
->> >> +                     "unsupported block size (%d bytes)\n", data->blksz);
->> >> +             return -EINVAL;
->> >> +     }
->> >> +
->> >> +     if (data->sg->offset & 3) {
->> >> +             dev_err(mmc_dev(host->mmc),
->> >> +                     "unsupported alginment (0x%x)\n", data->sg->offset);
->> >> +             return -EINVAL;
->> >> +     }
->> >
->> > Why?  What's the reasoning behind this suddenly introduced restriction?
->> > readsl()/writesl() copes just fine with non-aligned pointers.  It may be
->> > that your DMA engine can not, but that's no business interfering with
->> > non-DMA transfers, and no reason to fail such transfers.
->> >
->> > If your DMA engine can't do that then its your DMA engine code which
->> > should refuse to prepare the transfer.
->> >
->> > Yes, that means problems with the way things are ordered - or it needs a
->> > proper API where DMA engine can export these kinds of properties.
->> The alignment constraint is related to PIO, sg_miter and that FIFO
->> access must be done with 4 bytes.
->
-> Total claptrap.  No it isn't.
->
-> - sg_miter just deals with bytes, and number of bytes transferred; there
->   is no word assumptions in that code.  Indeed many ATA disks transfer
->   by half-word accesses so such a restriction would be insane.
->
-> - the FIFO access itself needs to be 32-bit words, so readsl or writesl
->   (or their io* equivalents must be used).
->
-> - but - and this is the killer item to your argument as I said above -
->   readsl and writesl _can_ take misaligned pointers and cope with them
->   fine.
->
-> The actual alignment of the buffer address is totally irrelevant here.
->
-> What isn't irrelevant is the _number_ of bytes to be transferred, but
-> that's something totally different and completely unrelated from
-> data->sg->offset.
-Let's try again :)
+Jason,
 
-Keep in mind that the mmc -block layer is aligned so from that aspect
-everything is fine.
-SDIO may have any length or alignment but sg-len is always 1.
+Here is a set of five fixes for Marvell SoC support, for 3.8. If they
+go in -rc1, it's good, but if it's too late, they can also just as
+well go after -rc1 since they really are fixes.
 
-There is just one sg-element and one continues buffer.
+ * PATCH 1 fixes an address decoding problem, which was preventing
+   SMP from working on OpenBlocks AX3-4. It is quite important as with
+   this patch, SMP simply doesn't work on OpenBlocks.
 
-sg-miter splits the continues buffer in chunks that may not be aligned
-with 4 byte size. It depends on the start address alignment of the
-buffer.
+ * PATCH 2 fixes a XOR initialization problem, which so far has been
+   seen only on OpenBlocks AX3-4 with its 2 GB memory extension, but
+   it basically prevents the kernel from booting at all on this
+   platform. So quite important fix.
 
-Is it more clear now?
-BR
-Per
+ * PATCH 3, 4, 5 are fixes for error handling. So in the normal case,
+   you don't get into the troubles that those patches are
+   fixing... but when PATCH 2 wasn't here on OpenBlocks, it showed
+   that the error handling of the mv_xor driver was not entirely
+   correct.
+
+If you want me to respin this with two separate pull requests, one for
+the address decoding thing and the other one for the four mv_xor
+fixes, just let me know and I'll do that.
+
+Thanks!
+
+The following changes since commit 1112b36094e48f89ce7dca5aee90b05c30162da9:
+
+  Merge tag 'marvell-armadaxp-smp-for-3.8' of github.com:MISL-EBU-System-SW/mainline-public into mevbu-dt-additions (2012-11-22 10:55:09 +0100)
+
+are available in the git repository at:
+
+  git at github.com:MISL-EBU-System-SW/mainline-public.git mvebu-misc-fixes
+
+for you to fetch changes up to 73d9cdca1ced6ab32be363b58699039bd82b062a:
+
+  dma: mv_xor: fix error handling path (2012-11-22 18:22:59 +0100)
+
+----------------------------------------------------------------
+Marvell misc fixes for 3.8
+
+----------------------------------------------------------------
+Thomas Petazzoni (5):
+      arm: mvebu: fix address decoding armada_cfg_base() function
+      dma: mv_xor: clear the window override control registers
+      dma: mv_xor: use request_irq() instead of devm_request_irq()
+      dma: mv_xor: fix error checking of irq_of_parse_and_map()
+      dma: mv_xor: fix error handling path
+
+ arch/arm/mach-mvebu/addr-map.c |    2 +-
+ drivers/dma/mv_xor.c           |   18 +++++++++++-------
+ drivers/dma/mv_xor.h           |    1 +
+ 3 files changed, 13 insertions(+), 8 deletions(-)
