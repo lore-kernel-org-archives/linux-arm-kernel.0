@@ -1,68 +1,122 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 22 Nov 2012 15:42:14 +0200
-Subject: OMAP4430 produces boot warnings
-In-Reply-To: <50AE1DC0.3030002@ti.com>
-References: <20121121230337.GR3332@n2100.arm.linux.org.uk>
- <50AE1DC0.3030002@ti.com>
-Message-ID: <50AE2BB6.8080406@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 22 Nov 2012 14:43:10 +0100
+Subject: [PATCH] mmc: mmci: Support non-power-of-two block sizes for
+ ux500v2 variant
+In-Reply-To: <20121121165048.GO3290@n2100.arm.linux.org.uk>
+References: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121121153811.GN3290@n2100.arm.linux.org.uk>
+ <CAFEEs1kzJUgsvnzgWwU4i7o1jkE=8iTq5+NJ_t1jdiHEm7b-RQ@mail.gmail.com>
+ <20121121165048.GO3290@n2100.arm.linux.org.uk>
+Message-ID: <CAPDyKFq4dBfP0ruxB-rQKruiXfk0iDLo5OKCkSQ4idK_gg1-Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-22 14:42, Archit Taneja wrote:
-> Hi,
-> 
-> On Thursday 22 November 2012 04:33 AM, Russell King - ARM Linux wrote:
->> This one is nice and long, from last nights boot test.  Looks like it was
->> introduced sometime in the last couple of weeks.  Full log at:
->>
->> http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=518
->>
->> and config:
->> http://www.arm.linux.org.uk/developer/build/file.php?type=config&idx=2786
-> 
-> Doing a bisect results in this commit:
-> 
-> commit 0c7018e232c5526869250e57da8043a86a45b5de
-> Author: Rajendra Nayak <rnayak@ti.com>
-> Date:   Thu Oct 18 12:20:06 2012 +0300
-> 
->     ARM: OMAP4: suspend: Program all domains to retention
-> 
->     Remove the FIXME's in the suspend sequence since
->     we now intend to support system level RET support.
-> 
->     Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->     Signed-off-by: Tero Kristo <t-kristo@ti.com>
->     Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> 
-> I guess this commit will allow DSS to go to a lower power state. So what
-> might be happening is:
-> 
-> - After returning back from the lower power state, the DISPC base
-> address register hasn't been restored. Leading to a fetch from a bad
-> address. Resulting in an OCP error.
-> 
-> or
-> 
-> -  DSS never came back to ON state, and it's not able to access
-> registers. I doubt this possibility because we got an OCP error
-> interrupt from DISPC.
+On 21 November 2012 17:50, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Nov 21, 2012 at 05:13:55PM +0100, Per Forlin wrote:
+>> On Wed, Nov 21, 2012 at 4:38 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Fri, Oct 12, 2012 at 04:02:02PM +0200, Ulf Hansson wrote:
+>> >>  /*
+>> >> + * Validate mmc prerequisites
+>> >> + */
+>> >> +static int mmci_validate_data(struct mmci_host *host,
+>> >> +                           struct mmc_data *data)
+>> >> +{
+>> >> +     if (!data)
+>> >> +             return 0;
+>> >> +
+>> >> +     if (!host->variant->non_power_of_2_blksize &&
+>> >> +         !is_power_of_2(data->blksz)) {
+>> >> +             dev_err(mmc_dev(host->mmc),
+>> >> +                     "unsupported block size (%d bytes)\n", data->blksz);
+>> >> +             return -EINVAL;
+>> >> +     }
+>> >> +
+>> >> +     if (data->sg->offset & 3) {
+>> >> +             dev_err(mmc_dev(host->mmc),
+>> >> +                     "unsupported alginment (0x%x)\n", data->sg->offset);
+>> >> +             return -EINVAL;
+>> >> +     }
+>> >
+>> > Why?  What's the reasoning behind this suddenly introduced restriction?
+>> > readsl()/writesl() copes just fine with non-aligned pointers.  It may be
+>> > that your DMA engine can not, but that's no business interfering with
+>> > non-DMA transfers, and no reason to fail such transfers.
+>> >
+>> > If your DMA engine can't do that then its your DMA engine code which
+>> > should refuse to prepare the transfer.
+>> >
+>> > Yes, that means problems with the way things are ordered - or it needs a
+>> > proper API where DMA engine can export these kinds of properties.
+>> The alignment constraint is related to PIO, sg_miter and that FIFO
+>> access must be done with 4 bytes.
+>
+> Total claptrap.  No it isn't.
+>
+> - sg_miter just deals with bytes, and number of bytes transferred; there
+>   is no word assumptions in that code.  Indeed many ATA disks transfer
+>   by half-word accesses so such a restriction would be insane.
+>
+> - the FIFO access itself needs to be 32-bit words, so readsl or writesl
+>   (or their io* equivalents must be used).
+>
+> - but - and this is the killer item to your argument as I said above -
+>   readsl and writesl _can_ take misaligned pointers and cope with them
+>   fine.
+>
+> The actual alignment of the buffer address is totally irrelevant here.
+>
+> What isn't irrelevant is the _number_ of bytes to be transferred, but
+> that's something totally different and completely unrelated from
+> data->sg->offset.
 
-It seems that the problem is that dispc never restores the context,
-because get_ctx_loss_count always returns 1. I enabled pwrdm debug
-prints, and pwrdm_get_context_loss_count() always returns 1 for dss,
-even if the register contents have obviously been lost.
+We totally agree with the above, but we still think it is worth to
+elaborate a bit on why we think the constraints on the buffer address
+could be a way forward.
+We have also been considering to verify the length of the buffers but
+felt in the end if was getting somewhat too complicated.
+Let's look at a concrete example.
 
-Does the pwrdm mistakenly think that in RET state the DSS still keeps
-the register contents?
+The mmci_pio_read|write functions are being provided with sg element
+buffers, which may have any length and any address alignment, as you
+stated.
 
- Tomi
+This example is a read:
+-sg-list has 2 elements.
+-sg-element [0], is 3 bytes long, and the address is not aligned to 4 bytes.
+-sg-element [1], is 1 bytes long and the address is aligned to 4 bytes.
 
+pio_read will start by reading one word (4 bytes) from the FIFO and
+fill the sg-element [0] with 3 of those 4 bytes. Then it will return
+that 3 bytes has been read.
+The upper pio_irq loop still think there is 1 byte more to read but
+will never be able to read it. Instead the DATAEND irq will be
+triggered and the mmc request will be "successfully" ended.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 899 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/40c241c6/attachment.sig>
+The above problem, can be fixed by reading data to a local allocated
+buffer instead of directly to the sg-element buffer. Thus an extra
+memcpy will be needed. Our concern is that it will be messy when
+solving the corner cases and thus affecting the "hot path" too much
+for pio_read.
+
+Instead we decided to figure out a way to prevent us from needing to
+take care of such pio_read situations completely. Since sg-element
+buffers can be considered to be consecutive in memory and by adding
+the 4 bytes alignment constraint of the buffer address, we believe
+this should do it. The idea is that it will then only be the _last_
+read to the FIFO which might be done as "unaligned" due to that the
+_length_ of data does not have to be 4 bytes aligned. Such read is
+already handled properly by pio_read.
+
+Do note, that the problem is present for pio_write as well. Here we
+could end up in writing "corrupt" data to the card or even worse,
+accessing data outside a mapped page casing page faults.
+This is again possible to be solved inside the pio_write function, but
+we fare that it will be messy and break the hot path.
+
+Sorry if this was too fussy, somewhat hard to explain without a
+"whiteboard". :-)
+
+Kind regards
+Ulf Hansson
