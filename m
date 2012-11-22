@@ -1,794 +1,447 @@
 From: pullip.cho@samsung.com (Cho KyongHo)
-Date: Thu, 22 Nov 2012 20:32:49 +0900
-Subject: [PATCH v4 03/12] ARM: EXYNOS: remove system mmu initialization from
- exynos tree
-Message-ID: <002401cdc8a5$1a415260$4ec3f720$%cho@samsung.com>
+Date: Thu, 22 Nov 2012 20:33:37 +0900
+Subject: [PATCH v4 10/12] iommu/exynos: add support for System MMU 3.2 and 3.3
+Message-ID: <002b01cdc8a5$368c8430$a3a58c90$%cho@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes System MMU initialization from arch/arm/mach-exynos/
-to move them to DT and the exynos-iommu driver except gating clock
-definitions.
+Since System MMU 3.2 and 3.3 have more prefetch buffers than 2, the
+existing function to set prefetch buffers, exynos_sysmmu_set_prefbuf()
+is not able to support them.
+This commit removes exynos_sysmmu_set_prefbuf() and introduces new
+interface, exynos_sysmmu_set_pbuf() that can pass information of
+more buffers than 2. It is safe to remove the existing function
+because there is no device driver in the kernel yet that calls the
+removed function.
 
 Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
 ---
- arch/arm/mach-exynos/Kconfig               |   5 -
- arch/arm/mach-exynos/Makefile              |   1 -
- arch/arm/mach-exynos/clock-exynos4.c       |  41 +++--
- arch/arm/mach-exynos/clock-exynos4210.c    |   9 +-
- arch/arm/mach-exynos/clock-exynos4212.c    |  23 ++-
- arch/arm/mach-exynos/clock-exynos5.c       |  62 ++++---
- arch/arm/mach-exynos/dev-sysmmu.c          | 274 -----------------------------
- arch/arm/mach-exynos/include/mach/sysmmu.h |  66 -------
- arch/arm/mach-exynos/mach-exynos4-dt.c     |  34 ++++
- arch/arm/mach-exynos/mach-exynos5-dt.c     |  30 ++++
- 10 files changed, 137 insertions(+), 408 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/dev-sysmmu.c
- delete mode 100644 arch/arm/mach-exynos/include/mach/sysmmu.h
+ drivers/iommu/exynos-iommu.c | 336 +++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 290 insertions(+), 46 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index bb3b09a..d5157d7 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -94,11 +94,6 @@ config EXYNOS4_SETUP_FIMD0
- 	help
- 	  Common setup code for FIMD0.
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index c2525ed..985d317 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -80,6 +80,13 @@
+ #define CTRL_BLOCK	0x7
+ #define CTRL_DISABLE	0x0
  
--config EXYNOS_DEV_SYSMMU
--	bool
--	help
--	  Common setup code for SYSTEM MMU in EXYNOS platforms
++#define CFG_LRU		0x1
++#define CFG_QOS(n)	((n & 0xF) << 7)
++#define CFG_MASK	0x0050FFFF /* Selecting bit 0-15, 20, 22 */
++#define CFG_SYSSEL	(1 << 22) /* System MMU 3.2 only */
++#define CFG_FLPDCACHE	(1 << 20) /* System MMU 3.2+ only */
++#define CFG_SHAREABLE	(1 << 12) /* System MMU 3.x only */
++
+ #define REG_MMU_CTRL		0x000
+ #define REG_MMU_CFG		0x004
+ #define REG_MMU_STATUS		0x008
+@@ -88,6 +95,10 @@
+ #define REG_PT_BASE_ADDR	0x014
+ #define REG_INT_STATUS		0x018
+ #define REG_INT_CLEAR		0x01C
++#define REG_PB_INFO		0x400
++#define REG_PB_LMM		0x404
++#define REG_PB_INDICATE		0x408
++#define REG_PB_CFG		0x40C
+ 
+ #define REG_PAGE_FAULT_ADDR	0x024
+ #define REG_AW_FAULT_ADDR	0x028
+@@ -99,10 +110,9 @@
+ #define MMU_MAJ_VER(reg)	(reg >> 28)
+ #define MMU_MIN_VER(reg)	((reg >> 21) & 0x7F)
+ 
+-#define REG_PB0_SADDR		0x04C
+-#define REG_PB0_EADDR		0x050
+-#define REG_PB1_SADDR		0x054
+-#define REG_PB1_EADDR		0x058
++#define MAX_NUM_PBUF		6
++
++#define NUM_MINOR_OF_SYSMMU_V3	4
+ 
+ static void *sysmmu_placeholder; /* Inidcate if a device is System MMU */
+ 
+@@ -197,6 +207,19 @@ struct sysmmu_version {
+ 	unsigned char minor;
+ };
+ 
++#define SYSMMU_PBUFCFG_TLB_UPDATE	(1 << 16)
++#define SYSMMU_PBUFCFG_ASCENDING	(1 << 12)
++#define SYSMMU_PBUFCFG_DSECENDING	(0 << 12) /* default */
++#define SYSMMU_PBUFCFG_PREFETCH		(1 << 8)
++#define SYSMMU_PBUFCFG_WRITE		(1 << 4)
++#define SYSMMU_PBUFCFG_READ		(0 << 4) /* default */
++
++struct sysmmu_prefbuf {
++	unsigned long base;
++	unsigned long size;
++	unsigned long config;
++};
++
+ struct sysmmu_drvdata {
+ 	struct device *sysmmu;	/* System MMU's device descriptor */
+ 	struct device *master;	/* Client device that needs System MMU */
+@@ -205,6 +228,8 @@ struct sysmmu_drvdata {
+ 	int activations;
+ 	struct sysmmu_version ver;
+ 	spinlock_t lock;
++	struct sysmmu_prefbuf pbufs[MAX_NUM_PBUF];
++	int num_pbufs;
+ 	struct iommu_domain *domain;
+ 	sysmmu_fault_handler_t fault_handler;
+ 	unsigned long pgtable;
+@@ -291,59 +316,277 @@ static void __sysmmu_set_ptbase(void __iomem *sfrbase,
+ 	__sysmmu_tlb_invalidate(sfrbase);
+ }
+ 
+-static void __sysmmu_set_prefbuf(void __iomem *sfrbase, unsigned long base,
+-						unsigned long size, int idx)
++static void __sysmmu_set_prefbuf(void __iomem *pbufbase, unsigned long base,
++					unsigned long size, int idx)
++{
++	__raw_writel(base, pbufbase + idx * 8);
++	__raw_writel(size - 1 + base,  pbufbase + 4 + idx * 8);
++}
++
++/*
++ * Offset of prefetch buffer setting registers are different
++ * between SysMMU 3.1 and 3.2. 3.3 has a single prefetch buffer setting.
++ */
++static unsigned short
++	pbuf_offset[NUM_MINOR_OF_SYSMMU_V3] = {0x04C, 0x04C, 0x070, 0x410};
++
++/**
++ * __sysmmu_sort_prefbuf - sort the given @prefbuf in descending order.
++ * @prefbuf: array of buffer information
++ * @nbufs: number of elements of @prefbuf
++ * @check_size: whether to compare buffer sizes. See below description.
++ *
++ * return value is valid if @check_size is ture. If the size of first buffer
++ * in @prefbuf is larger than or equal to the sum of the sizes of the other
++ * buffers, returns 1. If the size of the first buffer is smaller than the
++ * sum of other sizes, returns -1. Returns 0, otherwise.
++ */
++static int __sysmmu_sort_prefbuf(struct sysmmu_prefbuf prefbuf[],
++						int nbufs, bool check_size)
++{
++	int i;
++
++	for (i = 0; i < nbufs; i++) {
++		int j;
++		for (j = i + 1; j < nbufs; j++)
++			if (prefbuf[i].size < prefbuf[j].size)
++				swap(prefbuf[i], prefbuf[j]);
++	}
++
++	if (check_size) {
++		unsigned long sum = 0;
++		for (i = 1; i < nbufs; i++)
++			sum += prefbuf[i].size;
++
++		if (prefbuf[0].size < sum)
++			i = -1;
++		else if (prefbuf[0].size >= (sum * 2))
++			i = 1;
++		else
++			i = 0;
++	}
++
++	return i;
++}
++
++static void __exynos_sysmmu_set_pbuf_ver31(struct sysmmu_drvdata *drvdata,
++			int idx, int nbufs, struct sysmmu_prefbuf prefbuf[])
+ {
+-	__raw_writel(base, sfrbase + REG_PB0_SADDR + idx * 8);
+-	__raw_writel(size - 1 + base,  sfrbase + REG_PB0_EADDR + idx * 8);
++	unsigned long cfg =
++		__raw_readl(drvdata->sfrbases[idx] + REG_MMU_CFG) & CFG_MASK;
++
++	if (nbufs > 1) {
++		unsigned long base = prefbuf[1].base;
++		unsigned long end = prefbuf[1].base + prefbuf[1].size;
++
++		/* merging buffers from the second to the last */
++		while (nbufs-- > 2) {
++			base = min(base, prefbuf[nbufs - 1].base);
++			end = max(end, prefbuf[nbufs - 1].base +
++					prefbuf[nbufs - 1].size);
++		}
++
++		/* Separate PB mode */
++		cfg |= 2 << 28;
++
++		__sysmmu_set_prefbuf(drvdata->sfrbases[idx] + pbuf_offset[1],
++					base, end - base, 1);
++
++		drvdata->num_pbufs = 2;
++		drvdata->pbufs[0] = prefbuf[0];
++		drvdata->pbufs[1] = prefbuf[1];
++
++	} else {
++		/* Combined PB mode */
++		cfg |= 3 << 28;
++		drvdata->num_pbufs = 1;
++		drvdata->pbufs[0] = prefbuf[0];
++	}
++
++	__raw_writel(cfg, drvdata->sfrbases[idx] + REG_MMU_CFG);
++
++	__sysmmu_set_prefbuf(drvdata->sfrbases[idx] + pbuf_offset[1],
++				prefbuf[0].base, prefbuf[0].size, 0);
+ }
+ 
+-void exynos_sysmmu_set_prefbuf(struct device *dev,
+-				unsigned long base0, unsigned long size0,
+-				unsigned long base1, unsigned long size1)
++static void __exynos_sysmmu_set_pbuf_ver32(struct sysmmu_drvdata *drvdata,
++			int idx, int nbufs, struct sysmmu_prefbuf prefbuf[])
++{
++	int i;
++	unsigned long cfg =
++		__raw_readl(drvdata->sfrbases[idx] + REG_MMU_CFG) & CFG_MASK;
++
++	cfg |= 7 << 16; /* enabling PB0 ~ PB2 */
++
++	/* This is common to all cases below */
++	drvdata->pbufs[0] = prefbuf[0];
++
++	switch (nbufs) {
++	case 1:
++		/* Combined PB mode (0 ~ 2) */
++		cfg |= 1 << 19;
++		drvdata->num_pbufs = 1;
++		break;
++	case 2:
++		/* Combined PB mode (0 ~ 1) */
++		cfg |= 1 << 21;
++		drvdata->num_pbufs = 2;
++		drvdata->pbufs[1] = prefbuf[1];
++		break;
++	case 3:
++		drvdata->num_pbufs = 3;
++		drvdata->pbufs[1] = prefbuf[1];
++		drvdata->pbufs[2] = prefbuf[2];
++
++		__sysmmu_sort_prefbuf(drvdata->pbufs, 3, false);
++		swap(drvdata->pbufs[0], drvdata->pbufs[2]);
++
++		break;
++	default:
++		drvdata->pbufs[2].base = prefbuf[2].base;
++		/* drvdata->size is used for end address temporarily */
++		drvdata->pbufs[2].size = prefbuf[2].base + prefbuf[2].size;
++
++		/* Merging all buffers from the third to the last */
++		while (nbufs-- > 3) {
++			drvdata->pbufs[2].base = min(drvdata->pbufs[2].base,
++						prefbuf[nbufs - 1].base);
++			drvdata->pbufs[2].size = max(drvdata->pbufs[2].size,
++						prefbuf[nbufs - 1].base +
++						prefbuf[nbufs - 1].size);
++		}
++
++		drvdata->num_pbufs = 3;
++		drvdata->pbufs[1] = prefbuf[1];
++		drvdata->pbufs[2].size = drvdata->pbufs[2].size -
++					drvdata->pbufs[2].base;
++	}
++
++	for (i = 0; i < drvdata->num_pbufs; i++)
++		__sysmmu_set_prefbuf(drvdata->sfrbases[idx] + pbuf_offset[2],
++			drvdata->pbufs[i].base, drvdata->pbufs[i].size, i);
++
++	__raw_writel(cfg, drvdata->sfrbases[idx] + REG_MMU_CFG);
++}
++
++static void __exynos_sysmmu_set_pbuf_ver33(struct sysmmu_drvdata *drvdata,
++			int idx, int nbufs, struct sysmmu_prefbuf prefbuf[])
++{
++	static char pbcfg[6][6] = {
++		{7, 7, 7, 7, 7, 7}, {7, 7, 7, 7, 7, 7}, {2, 2, 3, 7, 7, 7},
++		{1, 2, 3, 4, 7, 7}, {7, 7, 7, 7, 7, 7}, {2, 3, 3, 4, 5, 6}
++		};
++	int pbselect;
++	int cmp, i;
++	long num_pb = __raw_readl(drvdata->sfrbases[idx] + REG_PB_INFO) &
++							((1 << 8) - 1);
++
++	if (nbufs > num_pb)
++		nbufs = num_pb; /* ignoring the rest of buffers */
++
++	for (i = 0; i < nbufs; i++)
++		drvdata->pbufs[i] = prefbuf[i];
++	drvdata->num_pbufs = nbufs;
++
++	cmp = __sysmmu_sort_prefbuf(drvdata->pbufs, nbufs, true);
++
++	pbselect = num_pb - nbufs;
++	if (num_pb == 6) {
++		if ((nbufs == 3) && (cmp == 1))
++			pbselect = 4;
++		else if (nbufs < 3)
++			pbselect = 5;
++	} else if ((num_pb == 3) && (nbufs < 3)) {
++			pbselect = 1;
++	}
++
++	__raw_writel(pbselect, drvdata->sfrbases[idx] + REG_PB_LMM);
++
++	/* Configure prefech buffers */
++	for (i = 0; i < nbufs; i++) {
++		__raw_writel(i, drvdata->sfrbases[idx] + REG_PB_INDICATE);
++		__raw_writel(drvdata->pbufs[i].config | 1,
++				drvdata->sfrbases[idx] + REG_PB_CFG);
++		__sysmmu_set_prefbuf(drvdata->sfrbases[idx] + pbuf_offset[3],
++			drvdata->pbufs[i].base, drvdata->pbufs[i].size, 0);
++	}
++
++	/* Disable prefetch buffers that is not set */
++	for (cmp = pbcfg[num_pb - 1][nbufs - 1] - nbufs; cmp > 0; cmp--) {
++		__raw_writel(cmp + nbufs - 1,
++				drvdata->sfrbases[idx] + REG_PB_INDICATE);
++		__raw_writel(0, drvdata->sfrbases[idx] + REG_PB_CFG);
++	}
++}
++
++static void (*func_set_pbuf[NUM_MINOR_OF_SYSMMU_V3])
++	(struct sysmmu_drvdata *, int, int, struct sysmmu_prefbuf []) = {
++		__exynos_sysmmu_set_pbuf_ver31,
++		__exynos_sysmmu_set_pbuf_ver31,
++		__exynos_sysmmu_set_pbuf_ver32,
++		__exynos_sysmmu_set_pbuf_ver33,
++};
++
++void exynos_sysmmu_set_pbuf(struct device *dev, int nbufs,
++				struct sysmmu_prefbuf prefbuf[])
+ {
+ 	struct device *sysmmu;
++	int nsfrs;
++
++	if (WARN_ON(nbufs < 1))
++		return;
+ 
+ 	for_each_sysmmu(dev, sysmmu) {
+-		int i;
+ 		unsigned long flags;
+-		struct sysmmu_drvdata *data = dev_get_drvdata(sysmmu);
++		struct sysmmu_drvdata *drvdata;
+ 
+-		BUG_ON((base0 + size0) <= base0);
+-		BUG_ON((size1 > 0) && ((base1 + size1) <= base1));
++		drvdata = dev_get_drvdata(sysmmu);
+ 
+-		spin_lock_irqsave(&data->lock, flags);
+-		if (!is_sysmmu_active(data)) {
+-			spin_unlock_irqrestore(&data->lock, flags);
++		spin_lock_irqsave(&drvdata->lock, flags);
++		if (!is_sysmmu_active(drvdata)) {
++			spin_unlock_irqrestore(&drvdata->lock, flags);
+ 			continue;
+ 		}
+ 
+-		for (i = 0; i < data->nsfrs; i++) {
+-			if (__sysmmu_version(data, i, NULL) == 3) {
+-				if (!sysmmu_block(data->sfrbases[i]))
+-					continue;
 -
- config EXYNOS4_DEV_DWMCI
- 	bool
- 	help
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 1797dee..7460ba2 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -53,7 +53,6 @@ obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
- obj-$(CONFIG_EXYNOS4_DEV_DWMCI)		+= dev-dwmci.o
- obj-$(CONFIG_EXYNOS_DEV_DMA)		+= dma.o
- obj-$(CONFIG_EXYNOS4_DEV_USB_OHCI)	+= dev-ohci.o
--obj-$(CONFIG_EXYNOS_DEV_SYSMMU)		+= dev-sysmmu.o
+-				if (size1 == 0) {
+-					if (size0 <= SZ_128K) {
+-						base1 = base0;
+-						size1 = size0;
+-					} else {
+-						size1 = size0 -
+-						ALIGN(size0 / 2, SZ_64K);
+-						size0 = size0 - size1;
+-						base1 = base0 + size0;
+-					}
+-				}
++		for (nsfrs = 0; nsfrs < drvdata->nsfrs; nsfrs++) {
++			unsigned int maj, min;
++
++			maj = __sysmmu_version(drvdata, nsfrs, &min);
  
- obj-$(CONFIG_ARCH_EXYNOS)		+= setup-i2c0.o
- obj-$(CONFIG_EXYNOS4_SETUP_FIMC)	+= setup-fimc.o
-diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
-index efead60..c81a0ca 100644
---- a/arch/arm/mach-exynos/clock-exynos4.c
-+++ b/arch/arm/mach-exynos/clock-exynos4.c
-@@ -24,7 +24,6 @@
+-				__sysmmu_set_prefbuf(
+-					data->sfrbases[i], base0, size0, 0);
+-				__sysmmu_set_prefbuf(
+-					data->sfrbases[i], base1, size1, 1);
++			BUG_ON(min > 3);
  
- #include <mach/map.h>
- #include <mach/regs-clock.h>
--#include <mach/sysmmu.h>
- 
- #include "common.h"
- #include "clock-exynos4.h"
-@@ -709,53 +708,53 @@ static struct clk exynos4_init_clocks_off[] = {
- 		.enable		= exynos4_clk_ip_peril_ctrl,
- 		.ctrlbit	= (1 << 14),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_l, 0),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.0",
- 		.enable		= exynos4_clk_ip_mfc_ctrl,
- 		.ctrlbit	= (1 << 1),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_r, 1),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.1",
- 		.enable		= exynos4_clk_ip_mfc_ctrl,
- 		.ctrlbit	= (1 << 2),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(tv, 2),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.2",
- 		.enable		= exynos4_clk_ip_tv_ctrl,
- 		.ctrlbit	= (1 << 4),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(jpeg, 3),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.3",
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 11),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(rot, 4),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.4",
- 		.enable		= exynos4_clk_ip_image_ctrl,
- 		.ctrlbit	= (1 << 4),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(fimc0, 5),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.5",
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 7),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(fimc1, 6),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.6",
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 8),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(fimc2, 7),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.7",
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 9),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(fimc3, 8),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.8",
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 10),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(fimd0, 10),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.10",
- 		.enable		= exynos4_clk_ip_lcd0_ctrl,
- 		.ctrlbit	= (1 << 4),
+-				sysmmu_unblock(data->sfrbases[i]);
++			if (sysmmu_block(drvdata->sfrbases[nsfrs])) {
++				func_set_pbuf[min](drvdata, nsfrs,
++							nbufs, prefbuf);
++				sysmmu_unblock(drvdata->sfrbases[nsfrs]);
++			}
++		} /* while (nsfrs < drvdata->nsfrs) */
++		spin_unlock_irqrestore(&drvdata->lock, flags);
++	}
++}
++
++static void __sysmmu_init_prefbuf(struct sysmmu_drvdata *drvdata, int idx,
++							int maj, int min)
++{
++	if (maj == 3) {
++		struct sysmmu_prefbuf pbuf[1] = { {0, ~0} };
++
++		func_set_pbuf[min](drvdata, idx, 1, pbuf);
++	}
++}
++
++static void __sysmmu_restore_state(struct sysmmu_drvdata *drvdata)
++{
++	int i, min;
++
++	for (i = 0; i < drvdata->nsfrs; i++) {
++		if (__sysmmu_version(drvdata, i, &min) == 3) {
++			if (sysmmu_block(drvdata->sfrbases[i])) {
++				func_set_pbuf[min](drvdata, i,
++					drvdata->num_pbufs, drvdata->pbufs);
++				sysmmu_unblock(drvdata->sfrbases[i]);
+ 			}
+ 		}
+-		spin_unlock_irqrestore(&data->lock, flags);
  	}
-diff --git a/arch/arm/mach-exynos/clock-exynos4210.c b/arch/arm/mach-exynos/clock-exynos4210.c
-index fed4c26..19af9f7 100644
---- a/arch/arm/mach-exynos/clock-exynos4210.c
-+++ b/arch/arm/mach-exynos/clock-exynos4210.c
-@@ -26,7 +26,6 @@
- #include <mach/hardware.h>
- #include <mach/map.h>
- #include <mach/regs-clock.h>
--#include <mach/sysmmu.h>
+ }
  
- #include "common.h"
- #include "clock-exynos4.h"
-@@ -129,13 +128,13 @@ static struct clk init_clocks_off[] = {
- 		.enable		= exynos4_clk_ip_lcd1_ctrl,
- 		.ctrlbit	= (1 << 0),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(2d, 14),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.9",
- 		.enable		= exynos4_clk_ip_image_ctrl,
- 		.ctrlbit	= (1 << 3),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(fimd1, 11),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.11",
- 		.enable		= exynos4_clk_ip_lcd1_ctrl,
- 		.ctrlbit	= (1 << 4),
- 	}, {
-diff --git a/arch/arm/mach-exynos/clock-exynos4212.c b/arch/arm/mach-exynos/clock-exynos4212.c
-index 8fba0b5..529476f 100644
---- a/arch/arm/mach-exynos/clock-exynos4212.c
-+++ b/arch/arm/mach-exynos/clock-exynos4212.c
-@@ -26,7 +26,6 @@
- #include <mach/hardware.h>
- #include <mach/map.h>
- #include <mach/regs-clock.h>
--#include <mach/sysmmu.h>
+@@ -500,7 +743,7 @@ static void __sysmmu_enable_nocount(struct sysmmu_drvdata *drvdata)
  
- #include "common.h"
- #include "clock-exynos4.h"
-@@ -111,21 +110,31 @@ static struct clksrc_clk clksrcs[] = {
+ 	for (i = 0; i < drvdata->nsfrs; i++) {
+ 		int maj, min;
+-		unsigned long cfg = 1;
++		unsigned long cfg = CFG_LRU | CFG_QOS(15);
  
- static struct clk init_clocks_off[] = {
- 	{
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(2d, 14),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.9",
- 		.enable		= exynos4_clk_ip_dmc_ctrl,
- 		.ctrlbit	= (1 << 24),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(isp, 9),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.12",
- 		.enable		= exynos4212_clk_ip_isp0_ctrl,
- 		.ctrlbit	= (7 << 8),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME2,
--		.devname	= SYSMMU_CLOCK_DEVNAME(isp, 9),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.13",
- 		.enable		= exynos4212_clk_ip_isp1_ctrl,
- 		.ctrlbit	= (1 << 4),
- 	}, {
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.14",
-+		.enable		= exynos4212_clk_ip_isp0_ctrl,
-+		.ctrlbit	= (1 << 11),
-+	}, {
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.15",
-+		.enable		= exynos4212_clk_ip_isp0_ctrl,
-+		.ctrlbit	= (1 << 12),
-+	}, {
- 		.name		= "flite",
- 		.devname	= "exynos-fimc-lite.0",
- 		.enable		= exynos4212_clk_ip_isp0_ctrl,
-diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-index a86e88e..13d0ed6 100644
---- a/arch/arm/mach-exynos/clock-exynos5.c
-+++ b/arch/arm/mach-exynos/clock-exynos5.c
-@@ -24,7 +24,6 @@
+ 		__sysmmu_set_ptbase(drvdata->sfrbases[i], drvdata->pgtable);
  
- #include <mach/map.h>
- #include <mach/regs-clock.h>
--#include <mach/sysmmu.h>
+@@ -508,15 +751,15 @@ static void __sysmmu_enable_nocount(struct sysmmu_drvdata *drvdata)
+ 		   call to __sysmmu_init_prefbuf() */
+ 		maj = __sysmmu_version(drvdata, i, &min);
+ 		if (maj == 3) {
+-			/* System MMU version is 3.x */
+-			__raw_writel((1 << 12) | (2 << 28),
+-					drvdata->sfrbases[i] + REG_MMU_CFG);
+-			__sysmmu_set_prefbuf(drvdata->sfrbases[i], 0, -1, 0);
+-			__sysmmu_set_prefbuf(drvdata->sfrbases[i], 0, -1, 1);
++			cfg |= CFG_SHAREABLE;
++			if (min == 2)
++				cfg |= CFG_FLPDCACHE | CFG_SYSSEL;
+ 		}
  
- #include "common.h"
+ 		__raw_writel(cfg, drvdata->sfrbases[i] + REG_MMU_CFG);
  
-@@ -862,86 +861,91 @@ static struct clk exynos5_init_clocks_off[] = {
- 		.enable		= exynos5_clk_ip_gscl_ctrl,
- 		.ctrlbit	= (1 << 3),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_l, 0),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.0",
- 		.enable		= &exynos5_clk_ip_mfc_ctrl,
- 		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 1),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_r, 1),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.1",
- 		.enable		= &exynos5_clk_ip_mfc_ctrl,
- 		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 2),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(tv, 2),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.2",
- 		.enable		= &exynos5_clk_ip_disp1_ctrl,
- 		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 9)
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(jpeg, 3),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.3",
- 		.enable		= &exynos5_clk_ip_gen_ctrl,
- 		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 7),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(rot, 4),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.4",
- 		.enable		= &exynos5_clk_ip_gen_ctrl,
- 		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 6)
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(gsc0, 5),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.5",
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
- 		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 7),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(gsc1, 6),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.6",
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
- 		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 8),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(gsc2, 7),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.7",
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
- 		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 9),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(gsc3, 8),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.8",
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
- 		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 10),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(isp, 9),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.9",
- 		.enable		= &exynos5_clk_ip_isp0_ctrl,
- 		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (0x3F << 8),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME2,
--		.devname	= SYSMMU_CLOCK_DEVNAME(isp, 9),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.10",
- 		.enable		= &exynos5_clk_ip_isp1_ctrl,
- 		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (0xF << 4),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(camif0, 12),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.11",
-+		.enable		= &exynos5_clk_ip_disp1_ctrl,
-+		.ctrlbit	= (1 << 8)
-+	}, {
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.12",
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
- 		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 11),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(camif1, 13),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.13",
- 		.enable		= &exynos5_clk_ip_gscl_ctrl,
- 		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 12),
- 	}, {
--		.name		= SYSMMU_CLOCK_NAME,
--		.devname	= SYSMMU_CLOCK_DEVNAME(2d, 14),
-+		.name		= "sysmmu",
-+		.devname	= "exynos-sysmmu.14",
- 		.enable		= &exynos5_clk_ip_acp_ctrl,
- 		.ops		= &exynos5_gate_clk_ops,
- 		.ctrlbit	= (1 << 7)
-diff --git a/arch/arm/mach-exynos/dev-sysmmu.c b/arch/arm/mach-exynos/dev-sysmmu.c
-deleted file mode 100644
-index c5b1ea3..0000000
---- a/arch/arm/mach-exynos/dev-sysmmu.c
-+++ /dev/null
-@@ -1,274 +0,0 @@
--/* linux/arch/arm/mach-exynos/dev-sysmmu.c
-- *
-- * Copyright (c) 2010-2012 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * EXYNOS - System MMU support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/platform_device.h>
--#include <linux/dma-mapping.h>
--
--#include <plat/cpu.h>
--
--#include <mach/map.h>
--#include <mach/irqs.h>
--#include <mach/sysmmu.h>
--
--static u64 exynos_sysmmu_dma_mask = DMA_BIT_MASK(32);
--
--#define SYSMMU_PLATFORM_DEVICE(ipname, devid)				\
--static struct sysmmu_platform_data platdata_##ipname = {		\
--	.dbgname = #ipname,						\
--};									\
--struct platform_device SYSMMU_PLATDEV(ipname) =				\
--{									\
--	.name		= SYSMMU_DEVNAME_BASE,				\
--	.id		= devid,					\
--	.dev		= {						\
--		.dma_mask		= &exynos_sysmmu_dma_mask,	\
--		.coherent_dma_mask	= DMA_BIT_MASK(32),		\
--		.platform_data		= &platdata_##ipname,		\
--	},								\
--}
--
--SYSMMU_PLATFORM_DEVICE(mfc_l,	0);
--SYSMMU_PLATFORM_DEVICE(mfc_r,	1);
--SYSMMU_PLATFORM_DEVICE(tv,	2);
--SYSMMU_PLATFORM_DEVICE(jpeg,	3);
--SYSMMU_PLATFORM_DEVICE(rot,	4);
--SYSMMU_PLATFORM_DEVICE(fimc0,	5); /* fimc* and gsc* exist exclusively */
--SYSMMU_PLATFORM_DEVICE(fimc1,	6);
--SYSMMU_PLATFORM_DEVICE(fimc2,	7);
--SYSMMU_PLATFORM_DEVICE(fimc3,	8);
--SYSMMU_PLATFORM_DEVICE(gsc0,	5);
--SYSMMU_PLATFORM_DEVICE(gsc1,	6);
--SYSMMU_PLATFORM_DEVICE(gsc2,	7);
--SYSMMU_PLATFORM_DEVICE(gsc3,	8);
--SYSMMU_PLATFORM_DEVICE(isp,	9);
--SYSMMU_PLATFORM_DEVICE(fimd0,	10);
--SYSMMU_PLATFORM_DEVICE(fimd1,	11);
--SYSMMU_PLATFORM_DEVICE(camif0,	12);
--SYSMMU_PLATFORM_DEVICE(camif1,	13);
--SYSMMU_PLATFORM_DEVICE(2d,	14);
--
--#define SYSMMU_RESOURCE_NAME(core, ipname) sysmmures_##core##_##ipname
--
--#define SYSMMU_RESOURCE(core, ipname)					\
--	static struct resource SYSMMU_RESOURCE_NAME(core, ipname)[] __initdata =
--
--#define DEFINE_SYSMMU_RESOURCE(core, mem, irq)				\
--	DEFINE_RES_MEM_NAMED(core##_PA_SYSMMU_##mem, SZ_4K, #mem),	\
--	DEFINE_RES_IRQ_NAMED(core##_IRQ_SYSMMU_##irq##_0, #mem)
--
--#define SYSMMU_RESOURCE_DEFINE(core, ipname, mem, irq)			\
--	SYSMMU_RESOURCE(core, ipname) {					\
--		DEFINE_SYSMMU_RESOURCE(core, mem, irq)			\
--	}
--
--struct sysmmu_resource_map {
--	struct platform_device *pdev;
--	struct resource *res;
--	u32 rnum;
--	struct device *pdd;
--	char *clocknames;
--};
--
--#define SYSMMU_RESOURCE_MAPPING(core, ipname, resname) {		\
--	.pdev = &SYSMMU_PLATDEV(ipname),				\
--	.res = SYSMMU_RESOURCE_NAME(EXYNOS##core, resname),		\
--	.rnum = ARRAY_SIZE(SYSMMU_RESOURCE_NAME(EXYNOS##core, resname)),\
--	.clocknames = SYSMMU_CLOCK_NAME,				\
--}
--
--#define SYSMMU_RESOURCE_MAPPING_MC(core, ipname, resname, pdata) {	\
--	.pdev = &SYSMMU_PLATDEV(ipname),				\
--	.res = SYSMMU_RESOURCE_NAME(EXYNOS##core, resname),		\
--	.rnum = ARRAY_SIZE(SYSMMU_RESOURCE_NAME(EXYNOS##core, resname)),\
--	.clocknames = SYSMMU_CLOCK_NAME "," SYSMMU_CLOCK_NAME2,		\
--}
--
--#ifdef CONFIG_EXYNOS_DEV_PD
--#define SYSMMU_RESOURCE_MAPPING_PD(core, ipname, resname, pd) {		\
--	.pdev = &SYSMMU_PLATDEV(ipname),				\
--	.res = &SYSMMU_RESOURCE_NAME(EXYNOS##core, resname),		\
--	.rnum = ARRAY_SIZE(SYSMMU_RESOURCE_NAME(EXYNOS##core, resname)),\
--	.clocknames = SYSMMU_CLOCK_NAME,				\
--	.pdd = &exynos##core##_device_pd[pd].dev,			\
--}
--
--#define SYSMMU_RESOURCE_MAPPING_MCPD(core, ipname, resname, pd, pdata) {\
--	.pdev = &SYSMMU_PLATDEV(ipname),				\
--	.res = &SYSMMU_RESOURCE_NAME(EXYNOS##core, resname),		\
--	.rnum = ARRAY_SIZE(SYSMMU_RESOURCE_NAME(EXYNOS##core, resname)),\
--	.clocknames = SYSMMU_CLOCK_NAME "," SYSMMU_CLOCK_NAME2,		\
--	.pdd = &exynos##core##_device_pd[pd].dev,			\
--}
--#else
--#define SYSMMU_RESOURCE_MAPPING_PD(core, ipname, resname, pd)		\
--		SYSMMU_RESOURCE_MAPPING(core, ipname, resname)
--#define SYSMMU_RESOURCE_MAPPING_MCPD(core, ipname, resname, pd, pdata)	\
--		SYSMMU_RESOURCE_MAPPING_MC(core, ipname, resname, pdata)
--
--#endif /* CONFIG_EXYNOS_DEV_PD */
--
--#ifdef CONFIG_ARCH_EXYNOS4
--SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimc0,	FIMC0,	FIMC0);
--SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimc1,	FIMC1,	FIMC1);
--SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimc2,	FIMC2,	FIMC2);
--SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimc3,	FIMC3,	FIMC3);
--SYSMMU_RESOURCE_DEFINE(EXYNOS4, jpeg,	JPEG,	JPEG);
--SYSMMU_RESOURCE_DEFINE(EXYNOS4, 2d,	G2D,	2D);
--SYSMMU_RESOURCE_DEFINE(EXYNOS4, tv,	TV,	TV_M0);
--SYSMMU_RESOURCE_DEFINE(EXYNOS4, 2d_acp,	2D_ACP,	2D);
--SYSMMU_RESOURCE_DEFINE(EXYNOS4, rot,	ROTATOR, ROTATOR);
--SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimd0,	FIMD0,	LCD0_M0);
--SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimd1,	FIMD1,	LCD1_M1);
--SYSMMU_RESOURCE_DEFINE(EXYNOS4, flite0,	FIMC_LITE0, FIMC_LITE0);
--SYSMMU_RESOURCE_DEFINE(EXYNOS4, flite1,	FIMC_LITE1, FIMC_LITE1);
--SYSMMU_RESOURCE_DEFINE(EXYNOS4, mfc_r,	MFC_R,	MFC_M0);
--SYSMMU_RESOURCE_DEFINE(EXYNOS4, mfc_l,	MFC_L,	MFC_M1);
--SYSMMU_RESOURCE(EXYNOS4, isp) {
--	DEFINE_SYSMMU_RESOURCE(EXYNOS4, FIMC_ISP, FIMC_ISP),
--	DEFINE_SYSMMU_RESOURCE(EXYNOS4, FIMC_DRC, FIMC_DRC),
--	DEFINE_SYSMMU_RESOURCE(EXYNOS4, FIMC_FD, FIMC_FD),
--	DEFINE_SYSMMU_RESOURCE(EXYNOS4, ISPCPU, FIMC_CX),
--};
--
--static struct sysmmu_resource_map sysmmu_resmap4[] __initdata = {
--	SYSMMU_RESOURCE_MAPPING_PD(4, fimc0,	fimc0,	PD_CAM),
--	SYSMMU_RESOURCE_MAPPING_PD(4, fimc1,	fimc1,	PD_CAM),
--	SYSMMU_RESOURCE_MAPPING_PD(4, fimc2,	fimc2,	PD_CAM),
--	SYSMMU_RESOURCE_MAPPING_PD(4, fimc3,	fimc3,	PD_CAM),
--	SYSMMU_RESOURCE_MAPPING_PD(4, tv,	tv,	PD_TV),
--	SYSMMU_RESOURCE_MAPPING_PD(4, mfc_r,	mfc_r,	PD_MFC),
--	SYSMMU_RESOURCE_MAPPING_PD(4, mfc_l,	mfc_l,	PD_MFC),
--	SYSMMU_RESOURCE_MAPPING_PD(4, rot,	rot,	PD_LCD0),
--	SYSMMU_RESOURCE_MAPPING_PD(4, jpeg,	jpeg,	PD_CAM),
--	SYSMMU_RESOURCE_MAPPING_PD(4, fimd0,	fimd0,	PD_LCD0),
--};
--
--static struct sysmmu_resource_map sysmmu_resmap4210[] __initdata = {
--	SYSMMU_RESOURCE_MAPPING_PD(4, 2d,	2d,	PD_LCD0),
--	SYSMMU_RESOURCE_MAPPING_PD(4, fimd1,	fimd1,	PD_LCD1),
--};
--
--static struct sysmmu_resource_map sysmmu_resmap4212[] __initdata = {
--	SYSMMU_RESOURCE_MAPPING(4,	2d,	2d_acp),
--	SYSMMU_RESOURCE_MAPPING_PD(4,	camif0, flite0,	PD_ISP),
--	SYSMMU_RESOURCE_MAPPING_PD(4,	camif1, flite1,	PD_ISP),
--	SYSMMU_RESOURCE_MAPPING_PD(4,	isp,	isp,	PD_ISP),
--};
--#endif /* CONFIG_ARCH_EXYNOS4 */
--
--#ifdef CONFIG_ARCH_EXYNOS5
--SYSMMU_RESOURCE_DEFINE(EXYNOS5, jpeg,	JPEG,	JPEG);
--SYSMMU_RESOURCE_DEFINE(EXYNOS5, fimd1,	FIMD1,	FIMD1);
--SYSMMU_RESOURCE_DEFINE(EXYNOS5, 2d,	2D,	2D);
--SYSMMU_RESOURCE_DEFINE(EXYNOS5, rot,	ROTATOR, ROTATOR);
--SYSMMU_RESOURCE_DEFINE(EXYNOS5, tv,	TV,	TV);
--SYSMMU_RESOURCE_DEFINE(EXYNOS5, flite0,	LITE0,	LITE0);
--SYSMMU_RESOURCE_DEFINE(EXYNOS5, flite1,	LITE1,	LITE1);
--SYSMMU_RESOURCE_DEFINE(EXYNOS5, gsc0,	GSC0,	GSC0);
--SYSMMU_RESOURCE_DEFINE(EXYNOS5, gsc1,	GSC1,	GSC1);
--SYSMMU_RESOURCE_DEFINE(EXYNOS5, gsc2,	GSC2,	GSC2);
--SYSMMU_RESOURCE_DEFINE(EXYNOS5, gsc3,	GSC3,	GSC3);
--SYSMMU_RESOURCE_DEFINE(EXYNOS5, mfc_r,	MFC_R,	MFC_R);
--SYSMMU_RESOURCE_DEFINE(EXYNOS5, mfc_l,	MFC_L,	MFC_L);
--SYSMMU_RESOURCE(EXYNOS5, isp) {
--	DEFINE_SYSMMU_RESOURCE(EXYNOS5, ISP, ISP),
--	DEFINE_SYSMMU_RESOURCE(EXYNOS5, DRC, DRC),
--	DEFINE_SYSMMU_RESOURCE(EXYNOS5, FD, FD),
--	DEFINE_SYSMMU_RESOURCE(EXYNOS5, ISPCPU, MCUISP),
--	DEFINE_SYSMMU_RESOURCE(EXYNOS5, SCALERC, SCALERCISP),
--	DEFINE_SYSMMU_RESOURCE(EXYNOS5, SCALERP, SCALERPISP),
--	DEFINE_SYSMMU_RESOURCE(EXYNOS5,	ODC, ODC),
--	DEFINE_SYSMMU_RESOURCE(EXYNOS5, DIS0, DIS0),
--	DEFINE_SYSMMU_RESOURCE(EXYNOS5, DIS1, DIS1),
--	DEFINE_SYSMMU_RESOURCE(EXYNOS5, 3DNR, 3DNR),
--};
--
--static struct sysmmu_resource_map sysmmu_resmap5[] __initdata = {
--	SYSMMU_RESOURCE_MAPPING(5,	jpeg,	jpeg),
--	SYSMMU_RESOURCE_MAPPING(5,	fimd1,	fimd1),
--	SYSMMU_RESOURCE_MAPPING(5,	2d,	2d),
--	SYSMMU_RESOURCE_MAPPING(5,	rot,	rot),
--	SYSMMU_RESOURCE_MAPPING_PD(5,	tv,	tv,	PD_DISP1),
--	SYSMMU_RESOURCE_MAPPING_PD(5,	camif0,	flite0,	PD_GSCL),
--	SYSMMU_RESOURCE_MAPPING_PD(5,	camif1,	flite1,	PD_GSCL),
--	SYSMMU_RESOURCE_MAPPING_PD(5,	gsc0,	gsc0,	PD_GSCL),
--	SYSMMU_RESOURCE_MAPPING_PD(5,	gsc1,	gsc1,	PD_GSCL),
--	SYSMMU_RESOURCE_MAPPING_PD(5,	gsc2,	gsc2,	PD_GSCL),
--	SYSMMU_RESOURCE_MAPPING_PD(5,	gsc3,	gsc3,	PD_GSCL),
--	SYSMMU_RESOURCE_MAPPING_PD(5,	mfc_r,	mfc_r,	PD_MFC),
--	SYSMMU_RESOURCE_MAPPING_PD(5,	mfc_l,	mfc_l,	PD_MFC),
--	SYSMMU_RESOURCE_MAPPING_MCPD(5,	isp,	isp,	PD_ISP, mc_platdata),
--};
--#endif /* CONFIG_ARCH_EXYNOS5 */
--
--static int __init init_sysmmu_platform_device(void)
--{
--	int i, j;
--	struct sysmmu_resource_map *resmap[2] = {NULL, NULL};
--	int nmap[2] = {0, 0};
--
--#ifdef CONFIG_ARCH_EXYNOS5
--	if (soc_is_exynos5250()) {
--		resmap[0] = sysmmu_resmap5;
--		nmap[0] = ARRAY_SIZE(sysmmu_resmap5);
--		nmap[1] = 0;
--	}
--#endif
--
--#ifdef CONFIG_ARCH_EXYNOS4
--	if (resmap[0] == NULL) {
--		resmap[0] = sysmmu_resmap4;
--		nmap[0] = ARRAY_SIZE(sysmmu_resmap4);
--	}
--
--	if (soc_is_exynos4210()) {
--		resmap[1] = sysmmu_resmap4210;
--		nmap[1] = ARRAY_SIZE(sysmmu_resmap4210);
--	}
--
--	if (soc_is_exynos4412() || soc_is_exynos4212()) {
--		resmap[1] = sysmmu_resmap4212;
--		nmap[1] = ARRAY_SIZE(sysmmu_resmap4212);
--	}
--#endif
--
--	for (j = 0; j < 2; j++) {
--		for (i = 0; i < nmap[j]; i++) {
--			struct sysmmu_resource_map *map;
--			struct sysmmu_platform_data *platdata;
--
--			map = &resmap[j][i];
--
--			map->pdev->dev.parent = map->pdd;
--
--			platdata = map->pdev->dev.platform_data;
--			platdata->clockname = map->clocknames;
--
--			if (platform_device_add_resources(map->pdev, map->res,
--								map->rnum)) {
--				pr_err("%s: Failed to add device resources for "
--						"%s.%d\n", __func__,
--						map->pdev->name, map->pdev->id);
--				continue;
--			}
--
--			if (platform_device_register(map->pdev)) {
--				pr_err("%s: Failed to register %s.%d\n",
--					__func__, map->pdev->name,
--						map->pdev->id);
--			}
--		}
--	}
--
--	return 0;
--}
--arch_initcall(init_sysmmu_platform_device);
-diff --git a/arch/arm/mach-exynos/include/mach/sysmmu.h b/arch/arm/mach-exynos/include/mach/sysmmu.h
-deleted file mode 100644
-index 88a4543..0000000
---- a/arch/arm/mach-exynos/include/mach/sysmmu.h
-+++ /dev/null
-@@ -1,66 +0,0 @@
--/*
-- * Copyright (c) 2011-2012 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * EXYNOS - System MMU support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef _ARM_MACH_EXYNOS_SYSMMU_H_
--#define _ARM_MACH_EXYNOS_SYSMMU_H_
--
--struct sysmmu_platform_data {
--	char *dbgname;
--	/* comma(,) separated list of clock names for clock gating */
--	char *clockname;
--};
--
--#define SYSMMU_DEVNAME_BASE "exynos-sysmmu"
--
--#define SYSMMU_CLOCK_NAME "sysmmu"
--#define SYSMMU_CLOCK_NAME2 "sysmmu_mc"
--
--#ifdef CONFIG_EXYNOS_DEV_SYSMMU
--#include <linux/device.h>
--struct platform_device;
--
--#define SYSMMU_PLATDEV(ipname) exynos_device_sysmmu_##ipname
--
--extern struct platform_device SYSMMU_PLATDEV(mfc_l);
--extern struct platform_device SYSMMU_PLATDEV(mfc_r);
--extern struct platform_device SYSMMU_PLATDEV(tv);
--extern struct platform_device SYSMMU_PLATDEV(jpeg);
--extern struct platform_device SYSMMU_PLATDEV(rot);
--extern struct platform_device SYSMMU_PLATDEV(fimc0);
--extern struct platform_device SYSMMU_PLATDEV(fimc1);
--extern struct platform_device SYSMMU_PLATDEV(fimc2);
--extern struct platform_device SYSMMU_PLATDEV(fimc3);
--extern struct platform_device SYSMMU_PLATDEV(gsc0);
--extern struct platform_device SYSMMU_PLATDEV(gsc1);
--extern struct platform_device SYSMMU_PLATDEV(gsc2);
--extern struct platform_device SYSMMU_PLATDEV(gsc3);
--extern struct platform_device SYSMMU_PLATDEV(isp);
--extern struct platform_device SYSMMU_PLATDEV(fimd0);
--extern struct platform_device SYSMMU_PLATDEV(fimd1);
--extern struct platform_device SYSMMU_PLATDEV(camif0);
--extern struct platform_device SYSMMU_PLATDEV(camif1);
--extern struct platform_device SYSMMU_PLATDEV(2d);
--
--#ifdef CONFIG_IOMMU_API
--static inline void platform_set_sysmmu(
--				struct device *sysmmu, struct device *dev)
--{
--	dev->archdata.iommu = sysmmu;
--}
--#endif
--
--#else /* !CONFIG_EXYNOS_DEV_SYSMMU */
--#define platform_set_sysmmu(sysmmu, dev) do { } while (0)
--#endif
--
--#define SYSMMU_CLOCK_DEVNAME(ipname, id) (SYSMMU_DEVNAME_BASE "." #id)
--
--#endif /* _ARM_MACH_EXYNOS_SYSMMU_H_ */
-diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
-index 8858068..14e5f84 100644
---- a/arch/arm/mach-exynos/mach-exynos4-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
-@@ -79,6 +79,40 @@ static const struct of_dev_auxdata exynos4_auxdata_lookup[] __initconst = {
- 	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_PDMA1, "dma-pl330.1", NULL),
- 	OF_DEV_AUXDATA("samsung,exynos4210-tmu", EXYNOS4_PA_TMU,
- 				"exynos-tmu", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x13620000,
-+			"exynos-sysmmu.0", NULL), /* MFC_L */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x13630000,
-+			"exynos-sysmmu.1", NULL), /* MFC_R */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x13E20000,
-+			"exynos-sysmmu.2", NULL), /* TV */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x11A60000,
-+			"exynos-sysmmu.3", NULL), /* JPEG */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x12A30000,
-+			"exynos-sysmmu.4", NULL), /* ROTATOR */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x11A20000,
-+			"exynos-sysmmu.5", NULL), /* FIMC0 */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x11A30000,
-+			"exynos-sysmmu.6", NULL), /* FIMC1 */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x11A40000,
-+			"exynos-sysmmu.7", NULL), /* FIMC2 */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x11A50000,
-+			"exynos-sysmmu.8", NULL), /* FIMC3 */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x12A20000,
-+			"exynos-sysmmu.9", NULL), /* G2D(4210) */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x10A40000,
-+			"exynos-sysmmu.9", NULL), /* G2D(4x12) */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x11E20000,
-+			"exynos-sysmmu.10", NULL), /* FIMD0 */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x12220000,
-+			"exynos-sysmmu.11", NULL), /* FIMD1(4210) */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x12260000,
-+			"exynos-sysmmu.12", NULL), /* IS0(4x12) */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x122B0000,
-+			"exynos-sysmmu.13", NULL), /* IS1(4x12) */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x123B0000,
-+			"exynos-sysmmu.14", NULL), /* FIMC-LITE0(4x12) */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x123C0000,
-+			"exynos-sysmmu.15", NULL), /* FIMC-LITE1(4x12) */
- 	{},
- };
- 
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index ed37273..98c6b25 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -86,6 +86,36 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
- 				"exynos5-hdmi", NULL),
- 	OF_DEV_AUXDATA("samsung,exynos5-mixer", 0x14450000,
- 				"exynos5-mixer", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x11210000,
-+			"exynos-sysmmu.0", "mfc"), /* MFC_L */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x11200000,
-+			"exynos-sysmmu.1", "mfc"), /* MFC_R */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x14650000,
-+			"exynos-sysmmu.2", NULL), /* TV */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x11F20000,
-+			"exynos-sysmmu.3", "jpeg"), /* JPEG */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x11D40000,
-+			"exynos-sysmmu.4", NULL), /* ROTATOR */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x13E80000,
-+			"exynos-sysmmu.5", "gscl"), /* GSCL0 */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x13E90000,
-+			"exynos-sysmmu.6", "gscl"), /* GSCL1 */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x13EA0000,
-+			"exynos-sysmmu.7", "gscl"), /* GSCL2 */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x13EB0000,
-+			"exynos-sysmmu.8", "gscl"), /* GSCL3 */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x13260000,
-+			"exynos-sysmmu.9", NULL), /* FIMC-IS0 */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x132C0000,
-+			"exynos-sysmmu.10", NULL), /* FIMC-IS1 */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x14640000,
-+			"exynos-sysmmu.11", NULL), /* FIMD1 */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x13C40000,
-+			"exynos-sysmmu.12", NULL), /* FIMC-LITE0 */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x13C50000,
-+			"exynos-sysmmu.13", NULL), /* FIMC-LITE1 */
-+	OF_DEV_AUXDATA("samsung,exynos-sysmmu", 0x10A60000,
-+			"exynos-sysmmu.14", NULL), /* G2D */
- 	{},
- };
- 
++		__sysmmu_init_prefbuf(drvdata, i, maj, min);
++
+ 		__raw_writel(CTRL_ENABLE, drvdata->sfrbases[i] + REG_MMU_CTRL);
+ 	}
+ }
+@@ -900,6 +1143,7 @@ static int sysmmu_resume(struct device *dev)
+ 	if (is_sysmmu_active(drvdata) &&
+ 		(!pm_runtime_enabled(dev) || drvdata->runtime_active)) {
+ 		__sysmmu_enable_nocount(drvdata);
++		__sysmmu_restore_state(drvdata);
+ 	}
+ 	spin_unlock_irqrestore(&drvdata->lock, flags);
+ 	return 0;
 -- 
 1.8.0
