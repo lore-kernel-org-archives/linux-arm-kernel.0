@@ -1,51 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 22 Nov 2012 11:58:12 +0000
-Subject: [PATCH] ARM: perf: fix link error when CONFIG_HW_PERF_EVENTS is
- not selected
-In-Reply-To: <1353584851-17842-1-git-send-email-marc.zyngier@arm.com>
-References: <1353584851-17842-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20121122115812.GD3113@mudshark.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 22 Nov 2012 12:07:47 +0000
+Subject: [PATCH 1/1] ARM: cache-l2x0: Fix compile time warnings when !CONFIG_OF
+Message-ID: <1353586067-9989-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 11:47:31AM +0000, Marc Zyngier wrote:
-> Commit e50c541 (ARM: perf: add guest vs host discrimination) broken the
-> link as perf_instruction_pointer and perf_misc_flags are not defined
-> when CONFIG_HW_PERF_EVENTS is not selected.
-> 
-> As it make little sense to try and profile a guest without any HW event,
-> just fallback to the original code when this config option is not selected.
-> 
-> Reported-by: Russell King <linux@arm.linux.org.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/include/asm/perf_event.h | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
-> index 00416ed..7558775 100644
-> --- a/arch/arm/include/asm/perf_event.h
-> +++ b/arch/arm/include/asm/perf_event.h
-> @@ -21,9 +21,11 @@
->  #define C(_x)				PERF_COUNT_HW_CACHE_##_x
->  #define CACHE_OP_UNSUPPORTED		0xFFFF
->  
-> +#ifdef CONFIG_HW_PERF_EVENTS
->  struct pt_regs;
->  extern unsigned long perf_instruction_pointer(struct pt_regs *regs);
->  extern unsigned long perf_misc_flags(struct pt_regs *regs);
->  #define perf_misc_flags(regs)	perf_misc_flags(regs)
-> +#endif
->  
->  #endif /* __ARM_PERF_EVENT_H__ */
-> -- 
+Introduced by:
+07bd005ed2457876f653fda12981708d737543df
+ARM: 7547/1: cache-l2x0: add support for Aurora L2 cache ctrl
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+arch/arm/mm/cache-l2x0.c:37:12: warning: ?l2_wt_override? defined but not used
+arch/arm/mm/cache-l2x0.c:292:22: warning: ?calc_range_end? defined but not used
+arch/arm/mm/cache-l2x0.c:315:13: warning: ?aurora_pa_range? defined but not used
+arch/arm/mm/cache-l2x0.c:328:13: warning: ?aurora_inv_range? defined but not used
+arch/arm/mm/cache-l2x0.c:347:13: warning: ?aurora_clean_range? defined but not used
+arch/arm/mm/cache-l2x0.c:365:13: warning: ?aurora_flush_range? defined but not used
 
-Thanks Marc for the fix and Russell for reporting the issue.
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mm/cache-l2x0.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-Please can you stick this in the patch system as I don't have any other
-perf patches pending for 3.8?
-
-Will
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index bfb5986..25a9226 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -34,7 +34,6 @@ static DEFINE_RAW_SPINLOCK(l2x0_lock);
+ static u32 l2x0_way_mask;	/* Bitmask of active ways */
+ static u32 l2x0_size;
+ static unsigned long sync_reg_offset = L2X0_CACHE_SYNC;
+-static int l2_wt_override;
+ 
+ /* Aurora don't have the cache ID register available, so we have to
+  * pass it though the device tree */
+@@ -284,6 +283,10 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
+ 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+ 
++#ifdef CONFIG_OF
++
++static int l2_wt_override;
++
+ /*
+  * Note that the end addresses passed to Linux primitives are
+  * noninclusive, while the hardware cache range operations use
+@@ -375,6 +378,7 @@ static void aurora_flush_range(unsigned long start, unsigned long end)
+ 		}
+ 	}
+ }
++#endif
+ 
+ static void l2x0_disable(void)
+ {
+-- 
+1.7.9.5
