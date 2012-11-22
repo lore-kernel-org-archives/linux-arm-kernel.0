@@ -1,36 +1,35 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 22 Nov 2012 11:46:14 +0200
-Subject: [PATCH] gpio: pl061: remove old comment
-Message-ID: <9726894cfe3ff11c9f3a95e436ae386637eba98f.1353577495.git.baruch@tkos.co.il>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 22 Nov 2012 10:47:38 +0100
+Subject: [PATCH 00/14] ARM: SPEAr: DT updates
+In-Reply-To: <CAKohpokMUTQja6tCz1RmKXFgu+X7MGFAi1+UWLgKhpViOuiMSA@mail.gmail.com>
+References: <cover.1352608333.git.viresh.kumar@linaro.org>
+ <201211121521.58766.arnd@arndb.de>
+ <CAKohpom0kMjuHx5jO-LTPKQhy_-r4khKi7UBPB_O-50K42FOeQ@mail.gmail.com>
+ <20121121202405.GA15549@quad.lixom.net>
+ <CAKohpokMUTQja6tCz1RmKXFgu+X7MGFAi1+UWLgKhpViOuiMSA@mail.gmail.com>
+Message-ID: <CACRpkdbsDzYuUJpVAS=ujv7EEq_nA-kAzHnN1F0d3WqoMEeCUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 3ab524754 (gpio: pl061: convert to use generic irq chip) we only have one
-spinlock in struct pl061_gpio.
+On Thu, Nov 22, 2012 at 4:19 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- drivers/gpio/gpio-pl061.c |    7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+> Last week i had chat with Arnd and Linus over Hangout, and following is
+> the status:
+> - Dependency patch of pinctrl is:
+>
+> commit 4ddb1c295752252f61670e35c791bf16e58bbce6
+> Author: Viresh Kumar <viresh.kumar@linaro.org>
+> Date:   Sat Oct 27 15:21:39 2012 +0530
+>
+>     ARM: SPEAr: Add plgpio node in device tree dtsi files
+>
+> And is already in pinctrl/devel branch. And this branch is stable as per Linus.
 
-diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-index b4b5da4..2b2e73c 100644
---- a/drivers/gpio/gpio-pl061.c
-+++ b/drivers/gpio/gpio-pl061.c
-@@ -48,12 +48,7 @@ struct pl061_context_save_regs {
- #endif
- 
- struct pl061_gpio {
--	/* Each of the two spinlocks protects a different set of hardware
--	 * regiters and data structurs. This decouples the code of the IRQ from
--	 * the GPIO code. This also makes the case of a GPIO routine call from
--	 * the IRQ code simpler.
--	 */
--	spinlock_t		lock;		/* GPIO registers */
-+	spinlock_t		lock;
- 
- 	void __iomem		*base;
- 	int			irq_base;
--- 
-1.7.10.4
+Well, famous last words. But that commit and below should
+be perfectly fine to pull into ARM SoC if need be. As long
+as we don't create too big a cobweb ... with linux-next not
+being done this week I'd watch it for this kind of stuff at this
+stage.
+
+Yours,
+Linus Walleij
