@@ -1,21 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Nov 2012 09:31:01 +0000
-Subject: [PATCH 1/3] CLK: uninline clk_prepare() and clk_unprepare()
-In-Reply-To: <20121122032407.21126.49680@nucleus>
-References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
- <1353403339-11679-2-git-send-email-dmitry.torokhov@gmail.com>
- <CAKohpo=B_7rVwePziyNe0rTMokcib_FgEN28cy4nByAzbUyaqg@mail.gmail.com>
- <20121121204324.21126.99677@nucleus>
- <20121121205424.GA25470@core.coreip.homeip.net>
- <20121121223859.GQ3290@n2100.arm.linux.org.uk>
- <20121122021750.GD25470@core.coreip.homeip.net>
- <20121122031117.GE25470@core.coreip.homeip.net>
- <20121122032407.21126.49680@nucleus>
-Message-ID: <20121122093101.GB5764@n2100.arm.linux.org.uk>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 22 Nov 2012 11:46:14 +0200
+Subject: [PATCH] gpio: pl061: remove old comment
+Message-ID: <9726894cfe3ff11c9f3a95e436ae386637eba98f.1353577495.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 07:24:07PM -0800, Mike Turquette wrote:
-> Looks right to me.  Just need to remove the select from IMX as well.
+Since 3ab524754 (gpio: pl061: convert to use generic irq chip) we only have one
+spinlock in struct pl061_gpio.
 
-Then you don't understand HAVE_CLK_PREPARE.
+Cc: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ drivers/gpio/gpio-pl061.c |    7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
+index b4b5da4..2b2e73c 100644
+--- a/drivers/gpio/gpio-pl061.c
++++ b/drivers/gpio/gpio-pl061.c
+@@ -48,12 +48,7 @@ struct pl061_context_save_regs {
+ #endif
+ 
+ struct pl061_gpio {
+-	/* Each of the two spinlocks protects a different set of hardware
+-	 * regiters and data structurs. This decouples the code of the IRQ from
+-	 * the GPIO code. This also makes the case of a GPIO routine call from
+-	 * the IRQ code simpler.
+-	 */
+-	spinlock_t		lock;		/* GPIO registers */
++	spinlock_t		lock;
+ 
+ 	void __iomem		*base;
+ 	int			irq_base;
+-- 
+1.7.10.4
