@@ -1,55 +1,72 @@
-From: bjorn@mork.no (=?utf-8?Q?Bj=C3=B8rn_Mork?=)
-Date: Thu, 22 Nov 2012 09:55:30 +0100
-Subject: [PATCH 1/1] asix: use ramdom hw addr if the one read is not valid
-In-Reply-To: <50AD36A8.6000702@mvista.com> (Sergei Shtylyov's message of "Wed,
- 21 Nov 2012 23:16:40 +0300")
-References: <1353493362-30418-1-git-send-email-plagnioj@jcrosoft.com>
- <50AD36A8.6000702@mvista.com>
-Message-ID: <878v9uow3h.fsf@nemi.mork.no>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Thu, 22 Nov 2012 09:56:30 +0100
+Subject: Order of clock multiplexer registrations
+Message-ID: <50ADE8BE.1000707@parkeon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei Shtylyov <sshtylyov@mvista.com> writes:
-> On 11/21/2012 01:22 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->
->> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> Cc: linux-usb at vger.kernel.org
->> Cc: netdev at vger.kernel.org
->> ---
->>  drivers/net/usb/asix_devices.c |   24 +++++++++++++++++++++---
->>  1 file changed, 21 insertions(+), 3 deletions(-)
->
->> diff --git a/drivers/net/usb/asix_devices.c b/drivers/net/usb/asix_devices.c
->> index 33ab824..7ebec5b 100644
->> --- a/drivers/net/usb/asix_devices.c
->> +++ b/drivers/net/usb/asix_devices.c
->> @@ -225,7 +225,13 @@ static int ax88172_bind(struct usbnet *dev, struct usb_interface *intf)
->>  			   ret);
->>  		goto out;
->>  	}
->> -	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
->> +
->> +	if (is_valid_ether_addr(buf)) {
->> +		memcpy(dev->net->dev_addr, buf, ETH_ALEN);
->> +	} else {
->> +		netdev_info(dev->net, "invalid hw address, using random\n");
->> +		eth_hw_addr_random(dev->net);
->> +	}
->>  
->>  	/* Initialize MII structure */
->>  	dev->mii.dev = dev->net;
-[..]
->
->    Repeated thrice, this asks to be put into subroutine...
+Hello,
 
-Yes.  Looking at the driver, this probably goes for most of the three
-_bind() functions.  There is a lot of common code there.
+I notice that currently (3.7-rc6) the behaviour of clock multiplexers 
+depends on their registration order.
 
-But more important wrt the eth_hw_addr_random() change: Does this
-actually work with real devices?  The driver implements a
-asix_set_mac_address() which writes the address back to the device when
-you change it.  I assume there is a reason for doing that.  Why don't
-you do it here?
+Suppose the hardware has a 2 bit clock select field with
+00 => srcA
+01 => srcB
+10 => unused
+11 => srcC
+
+If the multiplexer is registered after the sources:
+
+     static const char *sel[] = { "srcA", "srcB", "dummy", "srcC" };
+
+     clk_register_fixed(NULL, "dummy", ...);
+     clk_register_fixed(NULL, "srcA", ...);
+     clk_register_fixed(NULL, "srcB", ...);
+     clk_register_fixed(NULL, "srcC", ...);
+     child = clk_register_mux(NULL, "child",  sel, ARRAY_SIZE(sel), ...);
+
+Then all works as expected and child's parent will depend on the value 
+in the hardware clock select register.
+
+However, if the multiplexer is registered before the sources:
+
+     child = clk_register_mux(NULL, "child",  sel, ARRAY_SIZE(sel), ...);
+     clk_register_fixed(NULL, "dummy", ...);
+     clk_register_fixed(NULL, "srcA", ...);
+     clk_register_fixed(NULL, "srcB", ...);
+     clk_register_fixed(NULL, "srcC", ...);
+
+Then child's parent will always be the first registered parent clock 
+("dummy" in this case) regardless of the
+value in the hardware clock select register.
+
+This occurs because of the reparenting code in drivers/clk/clk.c 
+__clk_init():
+
+     /*
+      * walk the list of orphan clocks and reparent any that are children of
+      * this clock
+      */
+     hlist_for_each_entry_safe(orphan, tmp, tmp2, &clk_orphan_list, 
+child_node)
+         for (i = 0; i < orphan->num_parents; i++)
+             if (!strcmp(clk->name, orphan->parent_names[i])) {
+                 __clk_reparent(orphan, clk);
+                 break;
+             }
 
 
-Bj?rn
+Is this a bug or are multiplexers supposed to always be registered after 
+their parents?
+
+Currently this occurs for some i.MX53 clocks:
+|-- dummy
+|   |-- emi_fast_gate
+|   |-- gpc_dvfs
+|   `-- ipu_di0_sel
+
+
+Regards,
+
+Martin
