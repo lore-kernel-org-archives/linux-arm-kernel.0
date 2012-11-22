@@ -1,29 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Nov 2012 10:53:02 +0000
-Subject: Versatile randconfig build failure
-Message-ID: <20121122105302.GE5764@n2100.arm.linux.org.uk>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Thu, 22 Nov 2012 12:59:28 +0200
+Subject: [PATCH 2/5] ASoC: OMAP: mcbsp fixes for enabling ARM
+ multiplatform support
+In-Reply-To: <20121121174225.25576.54891.stgit@muffinssi.local>
+References: <20121121174201.25576.61961.stgit@muffinssi.local>
+ <20121121174225.25576.54891.stgit@muffinssi.local>
+Message-ID: <20121122125928.755ace5bd34f8a3c40ff4abe@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Last nights Versatile randconfig failed to build for various reasons,
-but also this non-driver related issue (as ever, these are linker
-messages, so the files pointed at are only approximations):
+On Wed, 21 Nov 2012 09:42:25 -0800
+Tony Lindgren <tony@atomide.com> wrote:
 
-kernel/built-in.o: In function `perf_prepare_sample':
-jump_label.c:(.text+0x3e0ac): undefined reference to `perf_misc_flags'
-jump_label.c:(.text+0x3e0d4): undefined reference to `perf_instruction_pointer'
-
-We have:
-- CONFIG_PERF_EVENTS=y
-- CONFIG_HW_PERF_EVENTS=n
-
-which allows the code in kernel/events/ to be built (which references the
-two above functions) but with HW_PERF_EVENTS unset, we don't provide them.
-
-Config:
-
-http://www.arm.linux.org.uk/developer/build/file.php?type=config&idx=2805
-
-Log:
-
-http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=2805
+> We cannot include any plat or mach headers for the multiplatform
+> support.
+> 
+> Fix the issue by defining local mcbsp_omap1().
+> 
+> cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> cc: Jarkko Nikula <jarkko.nikula@bitmer.com>
+> cc: Liam Girdwood <lrg@ti.com>
+> cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> cc: Jaroslav Kysela <perex@perex.cz>
+> cc: Takashi Iwai <tiwai@suse.de>
+> cc: alsa-devel at alsa-project.org
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  sound/soc/omap/mcbsp.c      |    4 +---
+>  sound/soc/omap/mcbsp.h      |    6 ++++++
+>  sound/soc/omap/omap-mcbsp.c |    5 ++---
+>  3 files changed, 9 insertions(+), 6 deletions(-)
+> 
+Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
