@@ -1,64 +1,59 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 22 Nov 2012 12:08:43 +0000
-Subject: [PATCH] ARM: kernel: fix nr_cpu_ids check in DT logical map init
-In-Reply-To: <1353516176-12929-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1353516176-12929-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20121122120843.GA16972@e102568-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 22 Nov 2012 12:08:57 +0000
+Subject: [PATCH] ARM: perf: fix link error when CONFIG_HW_PERF_EVENTS
+ is not selected
+In-Reply-To: <20121122115812.GD3113@mudshark.cambridge.arm.com>
+References: <1353584851-17842-1-git-send-email-marc.zyngier@arm.com>
+ <20121122115812.GD3113@mudshark.cambridge.arm.com>
+Message-ID: <50AE15D9.7070203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On 22/11/12 11:58, Will Deacon wrote:
+> On Thu, Nov 22, 2012 at 11:47:31AM +0000, Marc Zyngier wrote:
+>> Commit e50c541 (ARM: perf: add guest vs host discrimination) broken the
+>> link as perf_instruction_pointer and perf_misc_flags are not defined
+>> when CONFIG_HW_PERF_EVENTS is not selected.
+>>
+>> As it make little sense to try and profile a guest without any HW event,
+>> just fallback to the original code when this config option is not selected.
+>>
+>> Reported-by: Russell King <linux@arm.linux.org.uk>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/include/asm/perf_event.h | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
+>> index 00416ed..7558775 100644
+>> --- a/arch/arm/include/asm/perf_event.h
+>> +++ b/arch/arm/include/asm/perf_event.h
+>> @@ -21,9 +21,11 @@
+>>  #define C(_x)				PERF_COUNT_HW_CACHE_##_x
+>>  #define CACHE_OP_UNSUPPORTED		0xFFFF
+>>  
+>> +#ifdef CONFIG_HW_PERF_EVENTS
+>>  struct pt_regs;
+>>  extern unsigned long perf_instruction_pointer(struct pt_regs *regs);
+>>  extern unsigned long perf_misc_flags(struct pt_regs *regs);
+>>  #define perf_misc_flags(regs)	perf_misc_flags(regs)
+>> +#endif
+>>  
+>>  #endif /* __ARM_PERF_EVENT_H__ */
+>> -- 
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> Thanks Marc for the fix and Russell for reporting the issue.
+> 
+> Please can you stick this in the patch system as I don't have any other
+> perf patches pending for 3.8?
 
-On Wed, Nov 21, 2012 at 04:42:56PM +0000, Lorenzo Pieralisi wrote:
-> If a kernel is configured with a DT containing more /cpu nodes than
-> nr_cpu_ids, the number of cpus must be capped in the DT parsing
-> code. Current code carries out the check, but fails to cap the
-> value and the check is executed after the cpu logical index is used,
-> which can lead to memory corruption due to index overflow.
-> 
-> This patch refactors the check against nr_cpu_ids and move it before
-> any computed index is used in the parsing code.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reported-by: Mark Rutland <mark.rutland@arm.com>
-> ---
-> Russell,
-> 
-> while refactoring the DT loop over nodes, I unfortunately missed this niggle
-> in the parsing loop that Mark reported. Here is the fix, sorry for the
-> additional commit, if it is ok for you I will add it to your patch system.
-> 
-> Apologies and thanks,
-> Lorenzo
-> 
->  arch/arm/kernel/devtree.c | 10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> index aaf9add..70f1bde 100644
-> --- a/arch/arm/kernel/devtree.c
-> +++ b/arch/arm/kernel/devtree.c
-> @@ -139,10 +139,14 @@ void __init arm_dt_init_cpu_maps(void)
->  			i = cpuidx++;
->  		}
->  
-> -		tmp_map[i] = hwid;
-> -
-> -		if (cpuidx > nr_cpu_ids)
-> +		if (WARN(cpuidx > nr_cpu_ids, "DT /cpu %u nodes greater than "
-> +					       "max cores %u, capping them\n",
-> +					       cpuidx, nr_cpu_ids)) {
-> +			cpuidx = nr_cpu_ids;
->  			break;
-> +		}
-> +
-> +		tmp_map[i] = hwid;
->  	}
->  
->  	if (WARN(!bootcpu_valid, "DT missing boot CPU MPIDR[23:0], "
+Queued as 7584/1.
 
-If it looks fine to you, can I queue this simple fix in your patch
-system please ?
+Cheers,
 
-Thanks and apologies for the extra commit,
-Lorenzo
+	M.
+-- 
+Jazz is not dead. It just smells funny...
