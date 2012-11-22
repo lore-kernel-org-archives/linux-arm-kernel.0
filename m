@@ -1,46 +1,44 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 22 Nov 2012 20:35:21 +0100
-Subject: [PATCH 1/4] OF: Add helper for matching against linux,stdout-path
-In-Reply-To: <20121122153152.2B9CB3E129E@localhost>
-References: <20121121155312.GX4398@game.jcrosoft.org>
- <1353513428-25697-1-git-send-email-plagnioj@jcrosoft.com>
- <CACxGe6tyPpjx4OtjHmhB9Cvnb7OwAjPEE4=K+wgWKYHcAV-ESQ@mail.gmail.com>
- <20121122054138.GY4398@game.jcrosoft.org>
- <20121122153152.2B9CB3E129E@localhost>
-Message-ID: <20121122193521.GA4398@game.jcrosoft.org>
+From: anton.vorontsov@linaro.org (Anton Vorontsov)
+Date: Thu, 22 Nov 2012 12:08:41 -0800
+Subject: [PATCH 1/4] mfd: ab8500: add devicetree support for fuelgauge
+In-Reply-To: <1353609827-8218-2-git-send-email-rajanikanth.hv@linaro.org>
+References: <1353609827-8218-1-git-send-email-rajanikanth.hv@linaro.org>
+ <1353609827-8218-2-git-send-email-rajanikanth.hv@linaro.org>
+Message-ID: <20121122200841.GB12397@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:31 Thu 22 Nov     , Grant Likely wrote:
-> On Thu, 22 Nov 2012 06:41:38 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> > On 18:03 Wed 21 Nov     , Grant Likely wrote:
-> > > On Wed, Nov 21, 2012 at 3:57 PM, Jean-Christophe PLAGNIOL-VILLARD
-> > > <plagnioj@jcrosoft.com> wrote:
-> > > > From: Sascha Hauer <s.hauer@pengutronix.de>
-> > > >
-> > > > devicetrees may have a linux,stdout-path or stdout-path property
-> > > > in the chosen node describing the console device. This adds a helper
-> > > > function to match a device against this property and retrieve the options
-> > > > so a driver can call add_preferred_console for a matching device.
-> > > 
-> > > NIce. Looks like the right behaviour, but is a little inefficient.
-> > > Since the stdout property doesn't change this code could be called
-> > > once right after the tree is unflattened and then cache the pointer to
-> > > the node anarguments. Can you add the code to of_alias_scan()?
-> > do we assume that we can have only one stdout-path?
-> > 
-> > I think we could have more serial, framebuffer console
-> 
-> Nope. stdout-path as currently defined is only one device. Someone would
-> need to propose an extension for multiple stdout's before I'd bother
-> trying to support that.
-ok for this version I do not put it but I need it
+On Fri, Nov 23, 2012 at 12:13:44AM +0530, Rajanikanth H.V wrote:
+[...]
+> +/*
+> + * Note that the batres_vs_temp table must be strictly sorted by falling
+> + * temperature values to work.
+> + */
+> +struct batres_vs_temp temp_to_batres_tbl_thermistor[] = {
 
-I want to have 2 console uart and framebuffer
+It must be static.
 
-Personnaly I'd just allow multiple instance of stdout-path
+[..]
+> +struct batres_vs_temp temp_to_batres_tbl_ext_thermistor[] = {
 
-what do you prefer
+Ditto.
 
-Best Regards,
-J.
+> +	{ 60, 300},
+> +	{ 30, 300},
+> +	{ 20, 300},
+> +	{ 10, 300},
+> +	{ 00, 300},
+> +	{-10, 300},
+> +	{-20, 300},
+> +};
+> +
+> +/* battery resistance table for LI ION 9100 battery */
+> +struct batres_vs_temp temp_to_batres_tbl_9100[] = {
+
+Ditto.
+
+There are other issues, which I fixed in my tree for the previous series.
+So the previous series already merged, please post patches on top of it.
+
+Thanks,
+Anton.
