@@ -1,152 +1,330 @@
 From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 21 Nov 2012 21:34:40 -0800
-Subject: [PATCH v2 1/3] CLK: get rid of HAVE_CLK_PREPARE
+Date: Wed, 21 Nov 2012 21:34:42 -0800
+Subject: [PATCH v2 3/3] CLK: add more managed APIs
 In-Reply-To: <1353562482-12422-1-git-send-email-dmitry.torokhov@gmail.com>
 References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
  <1353562482-12422-1-git-send-email-dmitry.torokhov@gmail.com>
-Message-ID: <1353562482-12422-2-git-send-email-dmitry.torokhov@gmail.com>
+Message-ID: <1353562482-12422-4-git-send-email-dmitry.torokhov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HAVE_CLK_PREPARE is automatically selected by COMMON_CLK and the only
-platform that explicitly selects HAVE_CLK_PREPARE is MXS which has been
-switched to common clk framework, so we can delete this option now.
+When converting a driver to managed resources it is desirable to be able to
+manage all resources in the same fashion. This change allows managing clocks
+in the same way we manage all other resources.
 
-As part of this change we move declarations of clk_prepare() and
-clk_unprepare() under HAVE_CLK and provide stubs if this option is not
-enabled.
+This adds the following managed APIs:
+
+- devm_clk_prepare()/devm_clk_unprepare();
+- devm_clk_enable()/devm_clk_disable();
+- devm_clk_preapre_enable()/devm_clk_diable_unprepare().
 
 Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 ---
- arch/arm/Kconfig    |  1 -
- drivers/clk/Kconfig |  4 ----
- include/linux/clk.h | 68 +++++++++++++++++++++++++----------------------------
- 3 files changed, 32 insertions(+), 41 deletions(-)
+ drivers/clk/clk-devres.c |  90 +++++++++++++++++++++++++++++++---------
+ include/linux/clk.h      | 105 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 176 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ade7e92..ae6c1df 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -453,7 +453,6 @@ config ARCH_MXS
- 	select CLKSRC_MMIO
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
--	select HAVE_CLK_PREPARE
- 	select MULTI_IRQ_HANDLER
- 	select PINCTRL
- 	select SPARSE_IRQ
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index bace9e9..639ee9d 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -3,15 +3,11 @@ config CLKDEV_LOOKUP
- 	bool
- 	select HAVE_CLK
+diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
+index 8f57154..3a2286b 100644
+--- a/drivers/clk/clk-devres.c
++++ b/drivers/clk/clk-devres.c
+@@ -9,6 +9,32 @@
+ #include <linux/export.h>
+ #include <linux/gfp.h>
  
--config HAVE_CLK_PREPARE
--	bool
++static int devm_clk_match(struct device *dev, void *res, void *data)
++{
++	struct clk **c = res;
++
++	if (WARN_ON(!c || !*c))
++		return 0;
++
++	return *c == data;
++}
++
++
++static int devm_clk_create_devres(struct device *dev, struct clk *clk,
++				  void (*release)(struct device *, void *))
++{
++	struct clk **ptr;
++
++	ptr = devres_alloc(release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return -ENOMEM;
++
++	*ptr = clk;
++	devres_add(dev, ptr);
++
++	return 0;
++}
++
+ static void devm_clk_release(struct device *dev, void *res)
+ {
+ 	clk_put(*(struct clk **)res);
+@@ -16,34 +42,22 @@ static void devm_clk_release(struct device *dev, void *res)
+ 
+ struct clk *devm_clk_get(struct device *dev, const char *id)
+ {
+-	struct clk **ptr, *clk;
 -
- config HAVE_MACH_CLKDEV
- 	bool
+-	ptr = devres_alloc(devm_clk_release, sizeof(*ptr), GFP_KERNEL);
+-	if (!ptr)
+-		return ERR_PTR(-ENOMEM);
++	struct clk *clk;
++	int error;
  
- config COMMON_CLK
- 	bool
--	select HAVE_CLK_PREPARE
- 	select CLKDEV_LOOKUP
- 	---help---
- 	  The common clock framework is a single definition of struct
+ 	clk = clk_get(dev, id);
+ 	if (!IS_ERR(clk)) {
+-		*ptr = clk;
+-		devres_add(dev, ptr);
+-	} else {
+-		devres_free(ptr);
++		error = devm_clk_create_devres(dev, clk, devm_clk_release);
++		if (error) {
++			clk_put(clk);
++			return ERR_PTR(error);
++		}
+ 	}
+ 
+ 	return clk;
+ }
+ EXPORT_SYMBOL(devm_clk_get);
+ 
+-static int devm_clk_match(struct device *dev, void *res, void *data)
+-{
+-	struct clk **c = res;
+-	if (!c || !*c) {
+-		WARN_ON(!c || !*c);
+-		return 0;
+-	}
+-	return *c == data;
+-}
+-
+ void devm_clk_put(struct device *dev, struct clk *clk)
+ {
+ 	int ret;
+@@ -53,3 +67,41 @@ void devm_clk_put(struct device *dev, struct clk *clk)
+ 	WARN_ON(ret);
+ }
+ EXPORT_SYMBOL(devm_clk_put);
++
++#define DEFINE_DEVM_CLK_OP(create_op, destroy_op)			\
++static void devm_##destroy_op##_release(struct device *devm, void *res)	\
++{									\
++	destroy_op(*(struct clk **)res);				\
++}									\
++									\
++int devm_##create_op(struct device *dev, struct clk *clk)		\
++{									\
++	int error;							\
++									\
++	error = devm_clk_create_devres(dev, clk,			\
++					devm_##destroy_op##_release);	\
++	if (error)							\
++		return error;						\
++									\
++	error = create_op(clk);						\
++	if (error) {							\
++		WARN_ON(devres_destroy(dev,				\
++					devm_##destroy_op##_release,	\
++					devm_clk_match, clk));		\
++		return error;						\
++	}								\
++									\
++	return 0;							\
++}									\
++EXPORT_SYMBOL(devm_##create_op);					\
++									\
++void devm_##destroy_op(struct device *dev, struct clk *clk)		\
++{									\
++	WARN_ON(devres_release(dev, devm_##destroy_op##_release,	\
++				devm_clk_match, clk));			\
++}									\
++EXPORT_SYMBOL(devm_##destroy_op)
++
++DEFINE_DEVM_CLK_OP(clk_prepare, clk_unprepare);
++DEFINE_DEVM_CLK_OP(clk_prepare_enable, clk_disable_unprepare);
++DEFINE_DEVM_CLK_OP(clk_enable, clk_disable);
 diff --git a/include/linux/clk.h b/include/linux/clk.h
-index b3ac22d..f8204c3 100644
+index 8bf149e..04b6300 100644
 --- a/include/linux/clk.h
 +++ b/include/linux/clk.h
-@@ -84,42 +84,6 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
- 
- #endif
- 
--/**
-- * clk_prepare - prepare a clock source
-- * @clk: clock source
-- *
-- * This prepares the clock source for use.
-- *
-- * Must not be called from within atomic context.
-- */
--#ifdef CONFIG_HAVE_CLK_PREPARE
--int clk_prepare(struct clk *clk);
--#else
--static inline int clk_prepare(struct clk *clk)
--{
--	might_sleep();
--	return 0;
--}
--#endif
--
--/**
-- * clk_unprepare - undo preparation of a clock source
-- * @clk: clock source
-- *
-- * This undoes a previously prepared clock.  The caller must balance
-- * the number of prepare and unprepare calls.
-- *
-- * Must not be called from within atomic context.
-- */
--#ifdef CONFIG_HAVE_CLK_PREPARE
--void clk_unprepare(struct clk *clk);
--#else
--static inline void clk_unprepare(struct clk *clk)
--{
--	might_sleep();
--}
--#endif
--
- #ifdef CONFIG_HAVE_CLK
- /**
-  * clk_get - lookup and obtain a reference to a clock producer.
-@@ -159,6 +123,27 @@ struct clk *clk_get(struct device *dev, const char *id);
- struct clk *devm_clk_get(struct device *dev, const char *id);
+@@ -133,6 +133,17 @@ struct clk *devm_clk_get(struct device *dev, const char *id);
+ int clk_prepare(struct clk *clk);
  
  /**
-+ * clk_prepare - prepare a clock source
++ * devm_clk_prepare - prepare a clock source as managed resource
++ * @dev: device owning the resource
 + * @clk: clock source
 + *
 + * This prepares the clock source for use.
 + *
 + * Must not be called from within atomic context.
 + */
-+int clk_prepare(struct clk *clk);
++int devm_clk_prepare(struct device *dev, struct clk *clk);
 +
 +/**
-+ * clk_unprepare - undo preparation of a clock source
+  * clk_unprepare - undo preparation of a clock source
+  * @clk: clock source
+  *
+@@ -144,6 +155,18 @@ int clk_prepare(struct clk *clk);
+ void clk_unprepare(struct clk *clk);
+ 
+ /**
++ * devm_clk_unprepare - undo preparation of a managed clock source.
++ * @dev: device used to prepare the clock
 + * @clk: clock source
 + *
-+ * This undoes a previously prepared clock.  The caller must balance
-+ * the number of prepare and unprepare calls.
++ * This undoes preparation of a clock previously prepared with call
++ * to devm_clk_pepare().
 + *
 + * Must not be called from within atomic context.
 + */
-+void clk_unprepare(struct clk *clk);
++void devm_clk_unprepare(struct device *dev, struct clk *clk);
 +
 +/**
   * clk_enable - inform the system when the clock source should be running.
   * @clk: clock source
   *
-@@ -292,6 +277,17 @@ static inline void clk_put(struct clk *clk) {}
+@@ -156,6 +179,19 @@ void clk_unprepare(struct clk *clk);
+ int clk_enable(struct clk *clk);
  
- static inline void devm_clk_put(struct device *dev, struct clk *clk) {}
+ /**
++ * devm_clk_enable - enable the clock source as managed resource
++ * @dev: device owning the resource
++ * @clk: clock source
++ *
++ * If the clock can not be enabled/disabled, this should return success.
++ *
++ * May be not called from atomic contexts.
++ *
++ * Returns success (0) or negative errno.
++ */
++int devm_clk_enable(struct device *dev, struct clk *clk);
++
++/**
+  * clk_disable - inform the system when the clock source is no longer required.
+  * @clk: clock source
+  *
+@@ -172,6 +208,18 @@ int clk_enable(struct clk *clk);
+ void clk_disable(struct clk *clk);
  
-+static inline int clk_prepare(struct clk *clk)
+ /**
++ * devm_clk_disable - disable managed clock source resource
++ * @dev: device used to enable the clock
++ * @clk: clock source
++ *
++ * Inform the system that a clock source is no longer required by
++ * a driver and may be shut down.
++ *
++ * Must not be called from atomic contexts.
++ */
++void devm_clk_disable(struct device *dev, struct clk *clk);
++
++/**
+  * clk_prepare_enable - prepare and enable a clock source
+  * @clk: clock source
+  *
+@@ -182,6 +230,17 @@ void clk_disable(struct clk *clk);
+ int clk_prepare_enable(struct clk *clk);
+ 
+ /**
++ * devm_clk_prepare_enable - prepare and enable a managed clock source
++ * @dev: device owning the clock source
++ * @clk: clock source
++ *
++ * This prepares the clock source for use and enables it.
++ *
++ * Must not be called from within atomic context.
++ */
++int devm_clk_prepare_enable(struct device *dev, struct clk *clk);
++
++/**
+  * clk_disable_unprepare - disable and undo preparation of a clock source
+  * @clk: clock source
+  *
+@@ -192,6 +251,17 @@ int clk_prepare_enable(struct clk *clk);
+ void clk_disable_unprepare(struct clk *clk);
+ 
+ /**
++ * clk_disable_unprepare - disable and undo preparation of a managed clock source
++ * @dev: device used to prepare and enable the clock
++ * @clk: clock source
++ *
++ * This disables and undoes a previously prepared clock.
++ *
++ * Must not be called from within atomic context.
++ */
++void devm_clk_disable_unprepare(struct device *dev, struct clk *clk);
++
++/**
+  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
+  *		  This is only valid once the clock source has been enabled.
+  * @clk: clock source
+@@ -303,29 +373,64 @@ static inline int clk_prepare(struct clk *clk)
+ 	return 0;
+ }
+ 
++static inline int devm_clk_prepare(struct device *dev, struct clk *clk)
 +{
 +	might_sleep();
 +	return 0;
 +}
 +
-+static inline void clk_unprepare(struct clk *clk)
+ static inline void clk_unprepare(struct clk *clk)
+ {
+ 	might_sleep();
+ }
+ 
++static inline void devm_clk_unprepare(struct device *dev, struct clk *clk)
 +{
 +	might_sleep();
 +}
 +
  static inline int clk_enable(struct clk *clk)
+ {
+ 	return 0;
+ }
+ 
++static inline int devm_clk_enable(struct device *dev, struct clk *clk)
++{
++	might_sleep();
++	return 0;
++}
++
+ static inline void clk_disable(struct clk *clk) {}
+ 
++static inline void devm_clk_disable(struct device *dev, struct clk *clk)
++{
++	might_sleep();
++	return 0;
++}
++
+ static inline int clk_prepare_enable(struct clk *clk)
+ {
+ 	might_sleep();
+ 	return 0;
+ }
+ 
++static inline int devm_clk_prepare_enable(struct device *dev, struct clk *clk)
++{
++	might_sleep();
++	return 0;
++}
++
+ static inline void clk_disable_unprepare(struct clk *clk)
+ {
+ 	might_sleep();
+ }
+ 
++static inline void devm_clk_disable_unprepare(struct device *dev,
++					      struct clk *clk)
++{
++	might_sleep();
++}
++
+ static inline unsigned long clk_get_rate(struct clk *clk)
  {
  	return 0;
 -- 
