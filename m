@@ -1,70 +1,95 @@
 From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
-Date: Thu, 22 Nov 2012 16:59:57 +0900
-Subject: [PATCH v5 00/15] shmobile DT initialisation of INTC and GIC
-Message-ID: <1353571213-26006-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+Date: Thu, 22 Nov 2012 16:59:59 +0900
+Subject: [PATCH v5 02/15] SH: intc: Add support OF of IRQ
+In-Reply-To: <1353571213-26006-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+References: <1353571213-26006-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+Message-ID: <1353571213-26006-3-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, simon and Magnus.
+Add information of device node to struct intc_desc.
 
-I updated patch series for shmobile DT support.
-This version fixes definition of interrupt-controller. By this, I fixed
-external interrupt issuse on sh7372.
-And update r8a7740 and sh73a0 DT INTC init code to reduce the number of #ifdefs.
+Cc: Magnus Damm <damm@opensource.se>
+Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
 
 ---
 
-The aims of this series are:
+v2 [Simon Horman]
+* fix typo in changelog, clean up whitespace
 
-* Adding DT support to INTC
-* Allowing relevant ARM shmobile SoCs to use DT to initialise INTC
-* Allowing relevant ARM shmobile boards to use DT to initialise INTC
-* Allowing the sh73a0 SoC use DT to initialise GIC
-* Allowing the sh73a0 SoC use DT to initialise GIC, which in
-  turn allows the kzm9g board to use DT to initialise GIC
+v1 [Nobuhiro Iwamatsu]
+---
+ drivers/sh/intc/core.c      |    2 +-
+ drivers/sh/intc/internals.h |    3 ++-
+ drivers/sh/intc/irqdomain.c |    6 +++---
+ include/linux/sh_intc.h     |    1 +
+ 4 files changed, 7 insertions(+), 5 deletions(-)
 
-Nobuhiro Iwamatsu (12):
-  ARM: mach-shmobile: Add support OF for INTC of shmobile
-  SH: intc: Add support OF of IRQ
-  ARM: mach-shmobile: Add support OF of INTC for r8a7740
-  ARM: mach-shmobile: Add support OF of INTC for sh73a0
-  ARM: mach-shmobile: Add support OF of INTC for sh7372
-  ARM: mach-shmobile: Add DT table of INTC for sh73a0
-  ARM: mach-shmobile: Add DT table of INTC for sh7372
-  ARM: mach-shmobile: Add DT table of INTC for r8a7740
-  ARM: shmobile: Include DTSI of r8a7740 to armadillo800eva
-  ARM: shmobile: Include DTSI of sh73a0 to kzm9g board
-  ARM: shmobile: r8a7740: Use DT initialisation of INTC
-  ARM: shmobile: sh7372: Use DT initialisation of INTC
-
-Simon Horman (3):
-  ARM: shmobile: kzm9g: Use DT initialisation of INTC
-  ARM: shmobile: Add DT table of GIC for sh73a0
-  ARM: shmobile: sh73a0: Use DT for GIC
-
- Documentation/devicetree/bindings/sh/intc.txt |  163 ++++
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts |    2 +-
- arch/arm/boot/dts/r8a7740.dtsi                |  967 ++++++++++++++++++++-
- arch/arm/boot/dts/sh7372.dtsi                 | 1140 +++++++++++++++++++++++++
- arch/arm/boot/dts/sh73a0-kzm9g.dts            |    2 +-
- arch/arm/boot/dts/sh73a0.dtsi                 |  821 ++++++++++++++++++
- arch/arm/mach-shmobile/board-kzm9g.c          |    2 +-
- arch/arm/mach-shmobile/include/mach/common.h  |    3 +
- arch/arm/mach-shmobile/intc-r8a7740.c         |   69 +-
- arch/arm/mach-shmobile/intc-sh7372.c          |  112 ++-
- arch/arm/mach-shmobile/intc-sh73a0.c          |  163 ++--
- arch/arm/mach-shmobile/setup-r8a7740.c        |    2 +-
- arch/arm/mach-shmobile/setup-sh7372.c         |    2 +-
- drivers/sh/intc/Makefile                      |    1 +
- drivers/sh/intc/core.c                        |    2 +-
- drivers/sh/intc/internals.h                   |    3 +-
- drivers/sh/intc/irqdomain.c                   |    6 +-
- drivers/sh/intc/of_intc.c                     |  646 ++++++++++++++
- include/linux/sh_intc.h                       |   84 ++
- 19 files changed, 4096 insertions(+), 94 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sh/intc.txt
- create mode 100644 arch/arm/boot/dts/sh73a0.dtsi
- create mode 100644 drivers/sh/intc/of_intc.c
-
+diff --git a/drivers/sh/intc/core.c b/drivers/sh/intc/core.c
+index 8f32a13..3963af3 100644
+--- a/drivers/sh/intc/core.c
++++ b/drivers/sh/intc/core.c
+@@ -311,7 +311,7 @@ int __init register_intc_controller(struct intc_desc *desc)
+ 
+ 	BUG_ON(k > 256); /* _INTC_ADDR_E() and _INTC_ADDR_D() are 8 bits */
+ 
+-	intc_irq_domain_init(d, hw);
++	intc_irq_domain_init(d, hw, desc->of_node);
+ 
+ 	/* register the vectors one by one */
+ 	for (i = 0; i < hw->nr_vectors; i++) {
+diff --git a/drivers/sh/intc/internals.h b/drivers/sh/intc/internals.h
+index 7dff08e..e6f64bf 100644
+--- a/drivers/sh/intc/internals.h
++++ b/drivers/sh/intc/internals.h
+@@ -190,7 +190,8 @@ void intc_enable_disable_enum(struct intc_desc *desc, struct intc_desc_int *d,
+ 			      intc_enum enum_id, int enable);
+ 
+ /* irqdomain.c */
+-void intc_irq_domain_init(struct intc_desc_int *d, struct intc_hw_desc *hw);
++void intc_irq_domain_init(struct intc_desc_int *d, struct intc_hw_desc *hw,
++				struct device_node *of_node);
+ 
+ /* virq.c */
+ void intc_subgroup_init(struct intc_desc *desc, struct intc_desc_int *d);
+diff --git a/drivers/sh/intc/irqdomain.c b/drivers/sh/intc/irqdomain.c
+index 3968f1c..22ab7af 100644
+--- a/drivers/sh/intc/irqdomain.c
++++ b/drivers/sh/intc/irqdomain.c
+@@ -42,7 +42,7 @@ static const struct irq_domain_ops intc_evt_ops = {
+ };
+ 
+ void __init intc_irq_domain_init(struct intc_desc_int *d,
+-				 struct intc_hw_desc *hw)
++				 struct intc_hw_desc *hw, struct device_node *np)
+ {
+ 	unsigned int irq_base, irq_end;
+ 
+@@ -59,10 +59,10 @@ void __init intc_irq_domain_init(struct intc_desc_int *d,
+ 	 * tree penalty for linear cases with non-zero hwirq bases.
+ 	 */
+ 	if (irq_base == 0 && irq_end == (irq_base + hw->nr_vectors - 1))
+-		d->domain = irq_domain_add_linear(NULL, hw->nr_vectors,
++		d->domain = irq_domain_add_linear(np, hw->nr_vectors,
+ 						  &intc_evt_ops, NULL);
+ 	else
+-		d->domain = irq_domain_add_tree(NULL, &intc_evt_ops, NULL);
++		d->domain = irq_domain_add_tree(np, &intc_evt_ops, NULL);
+ 
+ 	BUG_ON(!d->domain);
+ }
+diff --git a/include/linux/sh_intc.h b/include/linux/sh_intc.h
+index b0e7925..6603da6 100644
+--- a/include/linux/sh_intc.h
++++ b/include/linux/sh_intc.h
+@@ -118,6 +118,7 @@ struct intc_desc {
+ 	intc_enum force_disable;
+ 	bool skip_syscore_suspend;
+ 	struct intc_hw_desc hw;
++	struct device_node *of_node;
+ };
+ 
+ #define DECLARE_INTC_DESC(symbol, chipname, vectors, groups,		\
 -- 
 1.7.10.4
