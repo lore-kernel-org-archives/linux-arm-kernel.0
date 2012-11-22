@@ -1,53 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 21 Nov 2012 21:53:57 -0500
-Subject: [PATCH] ARM: kirkwood: Add Plat'Home OpenBlocks A6 support
-In-Reply-To: <CABMQnVL7bd7Om-7nZ33Y336PPtdMLmMWx63YwtMOZf5NftkeOw@mail.gmail.com>
-References: <1352792590-20052-1-git-send-email-iwamatsu@nigauri.org>
- <20121113123739.GS22042@titan.lakedaemon.net>
- <CABMQnVKPyEp-cm_M_Y4rSU_tNLHL0fhUKUUgZkTkV+8MhnjVdA@mail.gmail.com>
- <CABMQnVL7bd7Om-7nZ33Y336PPtdMLmMWx63YwtMOZf5NftkeOw@mail.gmail.com>
-Message-ID: <20121122025357.GG15800@titan.lakedaemon.net>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Thu, 22 Nov 2012 12:09:54 +0900
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <20121122020649.GH4371@opensource.wolfsonmicro.com>
+References: <20121120215429.B621F3E1821@localhost>
+ <13540495.epaCf4JVn9@percival> <50ACB59B.4090404@iki.fi>
+ <20121121114018.GA31576@avionic-0098.adnet.avionic-design.de>
+ <50ACC341.3090204@ti.com>
+ <20121121130039.GA12191@avionic-0098.adnet.avionic-design.de>
+ <50ACD7DC.5060405@ti.com>
+ <CAAVeFuJofYwj926=3v0ApBCq_vNhCdC1PnzDc-B3d=LL_L40Uw@mail.gmail.com>
+ <20121121151209.GA4048@avionic-0098.adnet.avionic-design.de>
+ <CAAVeFuK_V6nb874bygioi35mFNxaWuveKOedLT=YYsP4JfVqgA@mail.gmail.com>
+ <20121122020649.GH4371@opensource.wolfsonmicro.com>
+Message-ID: <CAAVeFu+zxQQ=8fTu1Fp21QrWp6yndsWHjEJ2Gi=LifviNKbvaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 08:43:46AM +0900, Nobuhiro Iwamatsu wrote:
-> On Wed, Nov 14, 2012 at 4:54 AM, Nobuhiro Iwamatsu <iwamatsu@nigauri.org> wrote:
-> > On Tue, Nov 13, 2012 at 9:37 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> >> On Tue, Nov 13, 2012 at 04:43:09PM +0900, Nobuhiro Iwamatsu wrote:
-> >>> Add support for Plat'Home OpenBlocks A6 using the device tree
-> >>> where possible.
-> >>> This commit supports SATA, USB, ether and serial console.
-> >>>
-> >>> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> >>> ---
-> >>> V2:
-> >>>   - Remove unnecessary value from bootargs.
-> >>>   - Update comment for MPP table.
-> >>>   - Remove kirkwood_uart0_init().
-> >>
-> >> Thanks for the patch.  One small note.  In the future, please add a 'V2'
-> >> to the subject line, eg "[PATCH V2] ...".  It really helps us keep track of
-> >> which one to merge.
-> >
-> > Although I knew about it , I forgot adding "V2".
-> >
-> >>
-> >> No need to resend, I'll keep track of it since I'm about to pull
-> >> everything together over the next few days.
-> 
-> Where have you managed this patch?  http://git.infradead.org/ ?
+On Thu, Nov 22, 2012 at 11:06 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Thu, Nov 22, 2012 at 11:01:34AM +0900, Alexandre Courbot wrote:
+>
+>> The thing I don't understand here is why would anyone want power
+>> sequences without the DT representation. Guys, that's the whole point! :)
+>
+>> If we are to implement things into drivers, then callback functions
+>> are going to serve us just as well - even better, for they are more
+>> flexible. All we need to do is define a dedicated ops structure and
+>> have the driver plug the right callback functions depending on the
+>> "compatible" property of the DT device node. We don't need a framework
+>> for that.
+>
+> It allows drivers (both board drivers and actual drivers) to write these
+> things in a semi-scripted form instead of having to open code everything
+> each time, it'd save a bunch of tedious stuff with resource requesting
+> for example.
 
-Yes, mostly on my local machine currently.  I'm busy sorting everything.
-;-)
+Mmm, I overlooked that point - that's fair enough. Guess I should
+remove all DT support and stress that point in the documentation. Then
+maybe we'll have a deal.
 
-> I would like to put this into 3.8.  And I would like to follow some
-> functions (clock frame work etc.) updated.
-
-I'm not sure what you mean by the second sentence.  At any rate, Thomas
-has included your patch in his pull request, which I have merged in for
-3.8.  I should have everything up in the next day with pull requests
-sent to Arnd.
-
-thx,
-
-Jason.
+Alex.
