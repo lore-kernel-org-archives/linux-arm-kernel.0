@@ -1,71 +1,119 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 22 Nov 2012 10:59:16 +0100
-Subject: [PATCH 1/3] ARM i.MX6: rename PLLs according to datasheet
+Date: Thu, 22 Nov 2012 10:59:18 +0100
+Subject: [PATCH 3/3] ARM i.MX6: remove gate_mask from pllv3
 In-Reply-To: <1353578358-23509-1-git-send-email-s.hauer@pengutronix.de>
 References: <1353578358-23509-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1353578358-23509-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1353578358-23509-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In recent reference manuals the PLLs were renumbered. PLL8 now is
-PLL6 and vice versa. Change the code according to the reference
-manual to avoid confusion.
+Now that the additional enable bits in the enet PLL are handled
+as gates, the gate_mask is identical for all plls. Remove the
+gate_mask from the code and use the BM_PLL_ENABLE bit for
+enabling/disabling the PLL.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- Documentation/devicetree/bindings/clock/imx6q-clock.txt |    4 ++--
- arch/arm/mach-imx/clk-imx6q.c                           |    8 ++++----
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/mach-imx/clk-imx6q.c |   16 ++++++++--------
+ arch/arm/mach-imx/clk-pllv3.c |    9 +++------
+ arch/arm/mach-imx/clk.h       |    3 +--
+ 3 files changed, 12 insertions(+), 16 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-index 492bd99..bb71d4f 100644
---- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-@@ -187,9 +187,9 @@ clocks and IDs.
- 	pll3_usb_otg		172
- 	pll4_audio		173
- 	pll5_video		174
--	pll6_mlb		175
-+	pll8_mlb		175
- 	pll7_usb_host		176
--	pll8_enet		177
-+	pll6_enet		177
- 	ssi1_ipg		178
- 	ssi2_ipg		179
- 	ssi3_ipg		180
 diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 3ec242f..4066365 100644
+index 622a299..b7c7ff3 100644
 --- a/arch/arm/mach-imx/clk-imx6q.c
 +++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -151,7 +151,7 @@ enum mx6q_clks {
- 	gpmi_bch_apb, gpmi_bch, gpmi_io, gpmi_apb, sata, sdma, spba, ssi1,
- 	ssi2, ssi3, uart_ipg, uart_serial, usboh3, usdhc1, usdhc2, usdhc3,
- 	usdhc4, vdo_axi, vpu_axi, cko1, pll1_sys, pll2_bus, pll3_usb_otg,
--	pll4_audio, pll5_video, pll6_mlb, pll7_usb_host, pll8_enet, ssi1_ipg,
-+	pll4_audio, pll5_video, pll8_mlb, pll7_usb_host, pll6_enet, ssi1_ipg,
- 	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
- 	clk_max
- };
-@@ -195,9 +195,9 @@ int __init mx6q_clocks_init(void)
- 	clk[pll3_usb_otg]  = imx_clk_pllv3(IMX_PLLV3_USB,	"pll3_usb_otg",	"osc", base + 0x10, 0x2000,   0x3);
- 	clk[pll4_audio]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll4_audio",	"osc", base + 0x70, 0x2000,   0x7f);
- 	clk[pll5_video]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll5_video",	"osc", base + 0xa0, 0x2000,   0x7f);
--	clk[pll6_mlb]      = imx_clk_pllv3(IMX_PLLV3_MLB,	"pll6_mlb",	"osc", base + 0xd0, 0x2000,   0x0);
-+	clk[pll6_enet]     = imx_clk_pllv3(IMX_PLLV3_ENET,	"pll6_enet",	"osc", base + 0xe0, 0x182000, 0x3);
- 	clk[pll7_usb_host] = imx_clk_pllv3(IMX_PLLV3_USB,	"pll7_usb_host","osc", base + 0x20, 0x2000,   0x3);
--	clk[pll8_enet]     = imx_clk_pllv3(IMX_PLLV3_ENET,	"pll8_enet",	"osc", base + 0xe0, 0x182000, 0x3);
-+	clk[pll8_mlb]      = imx_clk_pllv3(IMX_PLLV3_MLB,	"pll8_mlb",	"osc", base + 0xd0, 0x2000,   0x0);
+@@ -197,14 +197,14 @@ int __init mx6q_clocks_init(void)
+ 	base = of_iomap(np, 0);
+ 	WARN_ON(!base);
+ 
+-	/*                   type                               name         parent_name  base     gate_mask div_mask */
+-	clk[pll1_sys]      = imx_clk_pllv3(IMX_PLLV3_SYS,	"pll1_sys",	"osc", base,        0x2000,   0x7f);
+-	clk[pll2_bus]      = imx_clk_pllv3(IMX_PLLV3_GENERIC,	"pll2_bus",	"osc", base + 0x30, 0x2000,   0x1);
+-	clk[pll3_usb_otg]  = imx_clk_pllv3(IMX_PLLV3_USB,	"pll3_usb_otg",	"osc", base + 0x10, 0x2000,   0x3);
+-	clk[pll4_audio]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll4_audio",	"osc", base + 0x70, 0x2000,   0x7f);
+-	clk[pll5_video]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll5_video",	"osc", base + 0xa0, 0x2000,   0x7f);
+-	clk[pll6_enet]     = imx_clk_pllv3(IMX_PLLV3_ENET,	"pll6_enet",	"osc", base + 0xe0, 0x2000,   0x3);
+-	clk[pll7_usb_host] = imx_clk_pllv3(IMX_PLLV3_USB,	"pll7_usb_host","osc", base + 0x20, 0x2000,   0x3);
++	/*                   type                               name         parent_name  base     div_mask */
++	clk[pll1_sys]      = imx_clk_pllv3(IMX_PLLV3_SYS,	"pll1_sys",	"osc", base,        0x7f);
++	clk[pll2_bus]      = imx_clk_pllv3(IMX_PLLV3_GENERIC,	"pll2_bus",	"osc", base + 0x30, 0x1);
++	clk[pll3_usb_otg]  = imx_clk_pllv3(IMX_PLLV3_USB,	"pll3_usb_otg",	"osc", base + 0x10, 0x3);
++	clk[pll4_audio]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll4_audio",	"osc", base + 0x70, 0x7f);
++	clk[pll5_video]    = imx_clk_pllv3(IMX_PLLV3_AV,	"pll5_video",	"osc", base + 0xa0, 0x7f);
++	clk[pll6_enet]     = imx_clk_pllv3(IMX_PLLV3_ENET,	"pll6_enet",	"osc", base + 0xe0, 0x3);
++	clk[pll7_usb_host] = imx_clk_pllv3(IMX_PLLV3_USB,	"pll7_usb_host","osc", base + 0x20, 0x3);
  
  	clk[usbphy1] = imx_clk_gate("usbphy1", "pll3_usb_otg", base + 0x10, 6);
  	clk[usbphy2] = imx_clk_gate("usbphy2", "pll7_usb_host", base + 0x20, 6);
-@@ -357,7 +357,7 @@ int __init mx6q_clocks_init(void)
- 	clk[ldb_di1]      = imx_clk_gate2("ldb_di1",       "ldb_di1_podf",      base + 0x74, 14);
- 	clk[ipu2_di1]     = imx_clk_gate2("ipu2_di1",      "ipu2_di1_sel",      base + 0x74, 10);
- 	clk[hsi_tx]       = imx_clk_gate2("hsi_tx",        "hsi_tx_podf",       base + 0x74, 16);
--	clk[mlb]          = imx_clk_gate2("mlb",           "pll6_mlb",          base + 0x74, 18);
-+	clk[mlb]          = imx_clk_gate2("mlb",           "pll8_mlb",          base + 0x74, 18);
- 	clk[mmdc_ch0_axi] = imx_clk_gate2("mmdc_ch0_axi",  "mmdc_ch0_axi_podf", base + 0x74, 20);
- 	clk[mmdc_ch1_axi] = imx_clk_gate2("mmdc_ch1_axi",  "mmdc_ch1_axi_podf", base + 0x74, 22);
- 	clk[ocram]        = imx_clk_gate2("ocram",         "ahb",               base + 0x74, 28);
+diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
+index 59e7433..d09bc3d 100644
+--- a/arch/arm/mach-imx/clk-pllv3.c
++++ b/arch/arm/mach-imx/clk-pllv3.c
+@@ -31,7 +31,6 @@
+  * @clk_hw:	 clock source
+  * @base:	 base address of PLL registers
+  * @powerup_set: set POWER bit to power up the PLL
+- * @gate_mask:	 mask of gate bits
+  * @div_mask:	 mask of divider bits
+  *
+  * IMX PLL clock version 3, found on i.MX6 series.  Divider for pllv3
+@@ -41,7 +40,6 @@ struct clk_pllv3 {
+ 	struct clk_hw	hw;
+ 	void __iomem	*base;
+ 	bool		powerup_set;
+-	u32		gate_mask;
+ 	u32		div_mask;
+ };
+ 
+@@ -89,7 +87,7 @@ static int clk_pllv3_enable(struct clk_hw *hw)
+ 	u32 val;
+ 
+ 	val = readl_relaxed(pll->base);
+-	val |= pll->gate_mask;
++	val |= BM_PLL_ENABLE;
+ 	writel_relaxed(val, pll->base);
+ 
+ 	return 0;
+@@ -101,7 +99,7 @@ static void clk_pllv3_disable(struct clk_hw *hw)
+ 	u32 val;
+ 
+ 	val = readl_relaxed(pll->base);
+-	val &= ~pll->gate_mask;
++	val &= ~BM_PLL_ENABLE;
+ 	writel_relaxed(val, pll->base);
+ }
+ 
+@@ -307,7 +305,7 @@ static const struct clk_ops clk_pllv3_mlb_ops = {
+ 
+ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
+ 			  const char *parent_name, void __iomem *base,
+-			  u32 gate_mask, u32 div_mask)
++			  u32 div_mask)
+ {
+ 	struct clk_pllv3 *pll;
+ 	const struct clk_ops *ops;
+@@ -339,7 +337,6 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
+ 		ops = &clk_pllv3_ops;
+ 	}
+ 	pll->base = base;
+-	pll->gate_mask = gate_mask;
+ 	pll->div_mask = div_mask;
+ 
+ 	init.name = name;
+diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
+index 5f2d8ac..9d1f3b9 100644
+--- a/arch/arm/mach-imx/clk.h
++++ b/arch/arm/mach-imx/clk.h
+@@ -22,8 +22,7 @@ enum imx_pllv3_type {
+ };
+ 
+ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
+-		const char *parent_name, void __iomem *base, u32 gate_mask,
+-		u32 div_mask);
++		const char *parent_name, void __iomem *base, u32 div_mask);
+ 
+ struct clk *clk_register_gate2(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
 -- 
 1.7.10.4
