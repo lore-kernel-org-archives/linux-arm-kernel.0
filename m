@@ -1,46 +1,75 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 22 Nov 2012 08:05:48 +0100
-Subject: [GIT PULL] arm-soc: Xilinx zynq multiplatform changes for v3.8
-In-Reply-To: <20121121200144.GD15213@quad.lixom.net>
-References: <CAHTX3d+bqMnsWxQp3GAmprSDzNB18otT3SrPi5MkA+d8006Aww@mail.gmail.com>
- <20121121200144.GD15213@quad.lixom.net>
-Message-ID: <CAHTX3dKm_=VaL=14vRr6+jGO2wrDXfW1asjXuZz0yeO0axZnbw@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 22 Nov 2012 08:35:17 +0100
+Subject: [PATCH 1/1 v2] asix: use ramdom hw addr if the one read is not valid
+In-Reply-To: <1353493362-30418-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1353493362-30418-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1353569717-1260-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: linux-usb at vger.kernel.org
+Cc: netdev at vger.kernel.org
+---
+v2:
 
-2012/11/21 Olof Johansson <olof@lixom.net>:
-> Hi,
->
-> On Wed, Nov 21, 2012 at 04:51:07PM +0100, Michal Simek wrote:
->> Hi Olof and Arnd,
->>
->> based on my chat with Olof today I have created new branch
->> with 4 patches which move zynq to multiplatform.
->>
->> This branch depends on arm-soc devel/debug_ll_init branch because
->> we needed Rob's "ARM: implement debug_ll_io_init()"
->> (sha1: afaee03511ba8002b26a9c6b1fe7d6baf33eac86)
->> patch.
->>
->> This branch also depends on zynq/dt branch because of previous major
->> zynq changes.
->> zynq/cleanup branch is subset of zynq/dt.
->>
->> That's why I have merged devel/debug_ll_init branch with zynq/dt and
->> add 4 patches
->> on the top of it.
->
-> Nice work.
->
-> This looks quite reasonable, is small and self-contained and doesn't really
-> affect anyone outside of zynq. So I've pulled into next/multiplatform for 3.8.
->
-> As part of this, the next/* branches have been somewhat reordered, since
-> multiplatform now includes next/dt contents I've moved it down below there. It
-> shouldn't affect much since no other branch pulls in next/multiplatform
-> contents.
+	introduce asix_set_netdev_dev_addr
 
-Thanks a lot,
-Michal
+Best Regards,
+J.
+ drivers/net/usb/asix_devices.c |   19 ++++++++++++++++---
+ 1 file changed, 16 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/net/usb/asix_devices.c b/drivers/net/usb/asix_devices.c
+index 33ab824..7a6e758 100644
+--- a/drivers/net/usb/asix_devices.c
++++ b/drivers/net/usb/asix_devices.c
+@@ -64,6 +64,16 @@ static void asix_status(struct usbnet *dev, struct urb *urb)
+ 	}
+ }
+ 
++static void asix_set_netdev_dev_addr(struct usbnet *dev, u8 *addr)
++{
++	if (is_valid_ether_addr(addr)) {
++		memcpy(dev->net->dev_addr, addr, ETH_ALEN);
++	} else {
++		netdev_info(dev->net, "invalid hw address, using random\n");
++		eth_hw_addr_random(dev->net);
++	}
++}
++
+ /* Get the PHY Identifier from the PHYSID1 & PHYSID2 MII registers */
+ static u32 asix_get_phyid(struct usbnet *dev)
+ {
+@@ -225,7 +235,8 @@ static int ax88172_bind(struct usbnet *dev, struct usb_interface *intf)
+ 			   ret);
+ 		goto out;
+ 	}
+-	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
++
++	asix_set_netdev_dev_addr(dev, buf);
+ 
+ 	/* Initialize MII structure */
+ 	dev->mii.dev = dev->net;
+@@ -423,7 +434,8 @@ static int ax88772_bind(struct usbnet *dev, struct usb_interface *intf)
+ 		netdev_dbg(dev->net, "Failed to read MAC address: %d\n", ret);
+ 		return ret;
+ 	}
+-	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
++
++	asix_set_netdev_dev_addr(dev, buf);
+ 
+ 	/* Initialize MII structure */
+ 	dev->mii.dev = dev->net;
+@@ -777,7 +789,8 @@ static int ax88178_bind(struct usbnet *dev, struct usb_interface *intf)
+ 		netdev_dbg(dev->net, "Failed to read MAC address: %d\n", ret);
+ 		return ret;
+ 	}
+-	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
++
++	asix_set_netdev_dev_addr(dev, buf);
+ 
+ 	/* Initialize MII structure */
+ 	dev->mii.dev = dev->net;
+-- 
+1.7.10.4
