@@ -1,76 +1,31 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Wed, 21 Nov 2012 21:05:10 -0500
-Subject: [PATCH 29/29] arm: mmp: devicetree: add usb support for pxa910_dkb
-In-Reply-To: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
-References: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <1353549910-988-29-git-send-email-xiechao.mail@gmail.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Thu, 22 Nov 2012 03:47:31 +0100
+Subject: [PATCH v5 4/5] iommu/omap: adapt to runtime pm
+In-Reply-To: <1353373552-16039-5-git-send-email-omar.luna@linaro.org>
+References: <1353373552-16039-1-git-send-email-omar.luna@linaro.org>
+ <1353373552-16039-5-git-send-email-omar.luna@linaro.org>
+Message-ID: <CAMP44s0h+6XTaJv8q-MJe4vmDiBzNG2cjTugSn7nFyAsZPk+Ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Xie <chao.xie@marvell.com>
+On Tue, Nov 20, 2012 at 2:05 AM, Omar Ramirez Luna <omar.luna@linaro.org> wrote:
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- arch/arm/boot/dts/pxa910.dtsi |   30 ++++++++++++++++++++++++++++++
- arch/arm/mach-mmp/mmp-dt.c    |    5 +++++
- 2 files changed, 35 insertions(+), 0 deletions(-)
+> @@ -1022,7 +1019,8 @@ static int __devexit omap_iommu_remove(struct platform_device *pdev)
+>         release_mem_region(res->start, resource_size(res));
+>         iounmap(obj->regbase);
+>
+> -       clk_put(obj->clk);
+> +       pm_runtime_disable(obj->dev);
+> +
+>         dev_info(&pdev->dev, "%s removed\n", obj->name);
+>         kfree(obj);
+>         return 0;
 
-diff --git a/arch/arm/boot/dts/pxa910.dtsi b/arch/arm/boot/dts/pxa910.dtsi
-index 825aaca..ea6c71a 100644
---- a/arch/arm/boot/dts/pxa910.dtsi
-+++ b/arch/arm/boot/dts/pxa910.dtsi
-@@ -44,6 +44,36 @@
- 				reg = <0xd4282000 0x1000>;
- 				mrvl,intc-nr-irqs = <64>;
- 			};
-+			usbphy: usbphy at d4207000 {
-+				compatible = "mrvl,pxa910-usb-phy";
-+				clocks = "usb_clk";
-+				reg = <0xd4207000 0x1ff>;
-+			};
-+			udc: udc at d4208100 {
-+				compatible = "mrvl,mv-udc";
-+				clocks = "usb_clk";
-+				extern_attr = <0>;
-+				mode = <0>;
-+				reg = <0xd4208100 0x1ff>;
-+				interrupts = <44>;
-+			};
-+			otg: otg at d4208100 {
-+				compatible = "mrvl,mv-otg";
-+				clocks = "usb_clk";
-+				extern_attr = <0>;
-+				mode = <0>;
-+				force_a_bus_req = <1>;
-+				disable_clock_gating = <1>;
-+				reg = <0xd4208100 0x1ff>;
-+				interrupts = <44>;
-+			};
-+			ehci: ehci at d4208100 {
-+				compatible = "mrvl,mv-ehci";
-+				clocks = "usb_clk";
-+				mode = <0>;
-+				reg = <0xd4208100 0x1ff>;
-+				interrupts = <44>;
-+			};
- 
- 		};
- 
-diff --git a/arch/arm/mach-mmp/mmp-dt.c b/arch/arm/mach-mmp/mmp-dt.c
-index 033cc31..5044552 100644
---- a/arch/arm/mach-mmp/mmp-dt.c
-+++ b/arch/arm/mach-mmp/mmp-dt.c
-@@ -45,6 +45,11 @@ static const struct of_dev_auxdata pxa910_auxdata_lookup[] __initconst = {
- 	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4037000, "pxa2xx-i2c.1", NULL),
- 	OF_DEV_AUXDATA("mrvl,mmp-gpio", 0xd4019000, "pxa-gpio", NULL),
- 	OF_DEV_AUXDATA("mrvl,mmp-rtc", 0xd4010000, "sa1100-rtc", NULL),
-+	OF_DEV_AUXDATA("mrvl,pxa910-usb-phy", 0xd4207000, "pxa910-usb-phy", NULL),
-+	OF_DEV_AUXDATA("mrvl,mv-udc", 0xd4208100, "mv-udc", NULL),
-+	OF_DEV_AUXDATA("mrvl,mv-otg", 0xd4208100, "mv-otg", NULL),
-+	OF_DEV_AUXDATA("mrvl,mv-udc", 0xd4208100, "mv-ehci", NULL),
-+
- 	{}
- };
- 
+I still believe this is not needed. The device framework does that
+when removing the device, and does it more properly, with
+__pm_runtime_disable(dev, false).
+
+Cheers.
+
 -- 
-1.7.4.1
+Felipe Contreras
