@@ -1,56 +1,44 @@
-From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
-Date: Thu, 22 Nov 2012 17:23:39 +0900
-Subject: [PATCH shmobile/DT 2/2] ARM: shmobile: Update document for sh_intc of
- DT
-In-Reply-To: <1353572619-29098-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-References: <1353572619-29098-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-Message-ID: <1353572619-29098-2-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 22 Nov 2012 10:28:59 +0200
+Subject: tfp410 and i2c_bus_num
+In-Reply-To: <20121121175747.GV18567@atomide.com>
+References: <50A64D35.9050109@ti.com> <20121116151959.GA19411@arwen.pp.htv.fi>
+ <50A65E40.9040208@ti.com> <20121116182146.GC20496@arwen.pp.htv.fi>
+ <50A72390.3050509@ti.com> <20121118113437.GB30462@arwen.pp.htv.fi>
+ <50A9D3DD.6040807@ti.com> <20121119092744.GB4211@arwen.pp.htv.fi>
+ <50AA1376.6060801@ti.com> <20121119121630.GC15540@arwen.pp.htv.fi>
+ <20121121175747.GV18567@atomide.com>
+Message-ID: <50ADE24B.7070006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Delete "renesas,sh_intcs" and "renesas,sh_intca_irq_pins" as compatible.
-This updates the information about these.
+On 2012-11-21 19:57, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [121119 04:25]:
+>> On Mon, Nov 19, 2012 at 01:09:42PM +0200, Tomi Valkeinen wrote:
+>>> On 2012-11-19 11:27, Felipe Balbi wrote:
+>>>>
+>>>> fair enough... it looks like this is going nowhere, so best we come back
+>>>> to this later. No reason to block your patch.
+>>>
+>>> Well, the patch is a fix for stable kernels, so even if we had a great
+>>> idea how to rewrite the dss device handling, it wouldn't affect this
+>>> patch =).
+>>
+>> ok good ;-)
+> 
+> FYI I'm assuming Tomi will resend the patch as there were some
+> changes requested early on in the thread.
 
-Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
----
- Documentation/devicetree/bindings/sh/intc.txt |   15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+Yes, I'll resend.
 
-diff --git a/Documentation/devicetree/bindings/sh/intc.txt b/Documentation/devicetree/bindings/sh/intc.txt
-index ebb2398..04b7f73 100644
---- a/Documentation/devicetree/bindings/sh/intc.txt
-+++ b/Documentation/devicetree/bindings/sh/intc.txt
-@@ -7,10 +7,7 @@ is managed by DT, in order to maintain compatibility.
- 
- Main node required properties:
- 
--- compatible : should be one of:
--	"renesas,sh_intca"
--	"renesas,sh_intcs"
--	"renesas,sh_intca_irq_pins"
-+- compatible : "renesas,sh_intc"
- 
- - interrupt-controller : Identifies the node as an interrupt controller
- - #interrupt-cells	: Set already 1.
-@@ -100,18 +97,10 @@ Optional:
- 	This node required properties:
- 	  * vector : This specifies the address phandle of INTCS.
- 
--Note:
--- "renesas,sh_intca" needs group_size, intc_group*, intc_vectors,
--  intc_mask_registers and intc_prio_registers.
--- "renesas,sh_intcs" needs group_size, intc_group*, intc_vectors,
--  intc_mask_registers, intc_prio_registers and  intc_intevtsa.
--- "renesas,sh_intca_irq_pins" needs intc_vectors, intc_mask_registers,
--  intc_prio_registers, intc_sense_registers and intc_ack_registers.
--
- Example:
- 
- 	intca: interrupt-controller at 0 {
--		compatible = "renesas,sh_intca";
-+		compatible = "renesas,sh_intc";
- 		interrupt-controller;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--- 
-1.7.10.4
+ Tomi
+
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 899 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/48da7514/attachment.sig>
