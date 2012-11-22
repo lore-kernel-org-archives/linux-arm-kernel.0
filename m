@@ -1,20 +1,153 @@
 From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 21 Nov 2012 21:34:39 -0800
-Subject: [PATCH v2 0/3] CLK: add more devm_* APIs
-In-Reply-To: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
+Date: Wed, 21 Nov 2012 21:34:40 -0800
+Subject: [PATCH v2 1/3] CLK: get rid of HAVE_CLK_PREPARE
+In-Reply-To: <1353562482-12422-1-git-send-email-dmitry.torokhov@gmail.com>
 References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
-Message-ID: <1353562482-12422-1-git-send-email-dmitry.torokhov@gmail.com>
+ <1353562482-12422-1-git-send-email-dmitry.torokhov@gmail.com>
+Message-ID: <1353562482-12422-2-git-send-email-dmitry.torokhov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is the 2nd version of patchset adding more devm_* APIs to CLK subsystem,
-hopefully with all issues addressed.
+HAVE_CLK_PREPARE is automatically selected by COMMON_CLK and the only
+platform that explicitly selects HAVE_CLK_PREPARE is MXS which has been
+switched to common clk framework, so we can delete this option now.
 
-If this is acceptable then I wonder who will carry the patchset? I can
-volunteer :) as I have a couple of pending patches that need this
-functionality.
+As part of this change we move declarations of clk_prepare() and
+clk_unprepare() under HAVE_CLK and provide stubs if this option is not
+enabled.
 
-Thanks!
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+---
+ arch/arm/Kconfig    |  1 -
+ drivers/clk/Kconfig |  4 ----
+ include/linux/clk.h | 68 +++++++++++++++++++++++++----------------------------
+ 3 files changed, 32 insertions(+), 41 deletions(-)
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ade7e92..ae6c1df 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -453,7 +453,6 @@ config ARCH_MXS
+ 	select CLKSRC_MMIO
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+-	select HAVE_CLK_PREPARE
+ 	select MULTI_IRQ_HANDLER
+ 	select PINCTRL
+ 	select SPARSE_IRQ
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index bace9e9..639ee9d 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -3,15 +3,11 @@ config CLKDEV_LOOKUP
+ 	bool
+ 	select HAVE_CLK
+ 
+-config HAVE_CLK_PREPARE
+-	bool
+-
+ config HAVE_MACH_CLKDEV
+ 	bool
+ 
+ config COMMON_CLK
+ 	bool
+-	select HAVE_CLK_PREPARE
+ 	select CLKDEV_LOOKUP
+ 	---help---
+ 	  The common clock framework is a single definition of struct
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index b3ac22d..f8204c3 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -84,42 +84,6 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
+ 
+ #endif
+ 
+-/**
+- * clk_prepare - prepare a clock source
+- * @clk: clock source
+- *
+- * This prepares the clock source for use.
+- *
+- * Must not be called from within atomic context.
+- */
+-#ifdef CONFIG_HAVE_CLK_PREPARE
+-int clk_prepare(struct clk *clk);
+-#else
+-static inline int clk_prepare(struct clk *clk)
+-{
+-	might_sleep();
+-	return 0;
+-}
+-#endif
+-
+-/**
+- * clk_unprepare - undo preparation of a clock source
+- * @clk: clock source
+- *
+- * This undoes a previously prepared clock.  The caller must balance
+- * the number of prepare and unprepare calls.
+- *
+- * Must not be called from within atomic context.
+- */
+-#ifdef CONFIG_HAVE_CLK_PREPARE
+-void clk_unprepare(struct clk *clk);
+-#else
+-static inline void clk_unprepare(struct clk *clk)
+-{
+-	might_sleep();
+-}
+-#endif
+-
+ #ifdef CONFIG_HAVE_CLK
+ /**
+  * clk_get - lookup and obtain a reference to a clock producer.
+@@ -159,6 +123,27 @@ struct clk *clk_get(struct device *dev, const char *id);
+ struct clk *devm_clk_get(struct device *dev, const char *id);
+ 
+ /**
++ * clk_prepare - prepare a clock source
++ * @clk: clock source
++ *
++ * This prepares the clock source for use.
++ *
++ * Must not be called from within atomic context.
++ */
++int clk_prepare(struct clk *clk);
++
++/**
++ * clk_unprepare - undo preparation of a clock source
++ * @clk: clock source
++ *
++ * This undoes a previously prepared clock.  The caller must balance
++ * the number of prepare and unprepare calls.
++ *
++ * Must not be called from within atomic context.
++ */
++void clk_unprepare(struct clk *clk);
++
++/**
+  * clk_enable - inform the system when the clock source should be running.
+  * @clk: clock source
+  *
+@@ -292,6 +277,17 @@ static inline void clk_put(struct clk *clk) {}
+ 
+ static inline void devm_clk_put(struct device *dev, struct clk *clk) {}
+ 
++static inline int clk_prepare(struct clk *clk)
++{
++	might_sleep();
++	return 0;
++}
++
++static inline void clk_unprepare(struct clk *clk)
++{
++	might_sleep();
++}
++
+ static inline int clk_enable(struct clk *clk)
+ {
+ 	return 0;
 -- 
-Dmitry
+1.7.11.7
