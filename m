@@ -1,117 +1,43 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Thu, 22 Nov 2012 11:35:39 +0100
-Subject: [PATCH 1/2] clk: ux500: Initial support for abx500 clock driver
-In-Reply-To: <1353580540-3774-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1353580540-3774-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1353580540-3774-2-git-send-email-ulf.hansson@stericsson.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 22 Nov 2012 11:45:17 +0100
+Subject: [PATCHv2] ARM: dts: cfa10049: Add PCA9555 GPIO expander to the
+ device tree
+In-Reply-To: <1353422015-4790-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <20121120144322.GE4882@S2100-06.ap.freescale.net>
+ <1353422015-4790-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <50AE023D.3000406@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-The abx500 clock driver is a platform driver which will be initialized
-during arch init. The platform device shall be added from the ab-core
-driver as a mfd child device to maintain correct boot sequence.
+Hi Shawn,
 
-Depending on what ab version we use, different clock definitions will
-be added.
+Le 20/11/2012 15:33, Maxime Ripard a ?crit :
+> Add the GPIO expander found on the i2c1 bus, behind the muxer to
+> the device tree.
+> 
+> This gpio expander will be used to get tachymeters values and data 
+> ready interruptions from the nuvoton NAU7802 ADCs.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/clk/ux500/Makefile     |    3 ++
- drivers/clk/ux500/abx500-clk.c |   73 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 76 insertions(+)
- create mode 100644 drivers/clk/ux500/abx500-clk.c
+If you're ok with it, I'd really like for that patch to be in 3.8.
+Is this version ok, or do you have any additional comments I could
+address?
 
-diff --git a/drivers/clk/ux500/Makefile b/drivers/clk/ux500/Makefile
-index 858fbfe..bcc0c11 100644
---- a/drivers/clk/ux500/Makefile
-+++ b/drivers/clk/ux500/Makefile
-@@ -10,3 +10,6 @@ obj-y += clk-prcmu.o
- obj-y += u8500_clk.o
- obj-y += u9540_clk.o
- obj-y += u8540_clk.o
-+
-+# ABX500 clock driver
-+obj-y += abx500-clk.o
-diff --git a/drivers/clk/ux500/abx500-clk.c b/drivers/clk/ux500/abx500-clk.c
-new file mode 100644
-index 0000000..e27c523
---- /dev/null
-+++ b/drivers/clk/ux500/abx500-clk.c
-@@ -0,0 +1,73 @@
-+/*
-+ * abx500 clock implementation for ux500 platform.
-+ *
-+ * Copyright (C) 2012 ST-Ericsson SA
-+ * Author: Ulf Hansson <ulf.hansson@linaro.org>
-+ *
-+ * License terms: GNU General Public License (GPL) version 2
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/module.h>
-+#include <linux/device.h>
-+#include <linux/platform_device.h>
-+#include <linux/mfd/abx500/ab8500.h>
-+
-+/* TODO: Add clock implementations here */
-+
-+
-+/* Clock definitions for ab8500 */
-+static int ab8500_reg_clks(struct device *dev)
-+{
-+	return 0;
-+}
-+
-+/* Clock definitions for ab8540 */
-+static int ab8540_reg_clks(struct device *dev)
-+{
-+	return 0;
-+}
-+
-+/* Clock definitions for ab9540 */
-+static int ab9540_reg_clks(struct device *dev)
-+{
-+	return 0;
-+}
-+
-+static int __devinit abx500_clk_probe(struct platform_device *pdev)
-+{
-+	struct ab8500 *parent = dev_get_drvdata(pdev->dev.parent);
-+	int ret;
-+
-+	if (is_ab8500(parent) || is_ab8505(parent)) {
-+		ret = ab8500_reg_clks(&pdev->dev);
-+	} else if (is_ab8540(parent)) {
-+		ret = ab8540_reg_clks(&pdev->dev);
-+	} else if (is_ab9540(parent)) {
-+		ret = ab9540_reg_clks(&pdev->dev);
-+	} else {
-+		dev_err(&pdev->dev, "non supported plf id\n");
-+		return -ENODEV;
-+	}
-+
-+	return ret;
-+}
-+
-+static struct platform_driver abx500_clk_driver = {
-+	.driver = {
-+		.name = "abx500-clk",
-+		.owner = THIS_MODULE,
-+	},
-+	.probe	= abx500_clk_probe,
-+};
-+
-+static int __init abx500_clk_init(void)
-+{
-+	return platform_driver_register(&abx500_clk_driver);
-+}
-+
-+arch_initcall(abx500_clk_init);
-+
-+MODULE_AUTHOR("Ulf Hansson <ulf.hansson@linaro.org");
-+MODULE_DESCRIPTION("ABX500 clk driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.10
+Thanks,
+Maxime
+
+- -- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://www.enigmail.net/
+
+iEYEARECAAYFAlCuAjsACgkQGxsu9jQV9naCFwCfXjxLa0qLRx2ThFDFLSC8bKAk
+hHsAnjYIC7xtbHzZW27GGy3TdfZO5O5M
+=0dLl
+-----END PGP SIGNATURE-----
