@@ -1,56 +1,38 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 22 Nov 2012 10:33:35 +0100
-Subject: [PATCH v3 0/6] ARM: EXYNOS: Add secure firmware support
-In-Reply-To: <0f5d01cdc87d$e7c81890$b75849b0$%kim@samsung.com>
-References: <1351178560-19188-1-git-send-email-t.figa@samsung.com>
- <3879194.hz9mrTmL6z@amdc1227>
- <0f5d01cdc87d$e7c81890$b75849b0$%kim@samsung.com>
-Message-ID: <4854667.0jktSvOtLR@amdc1227>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Nov 2012 09:30:33 +0000
+Subject: [PATCH 1/3] CLK: uninline clk_prepare() and clk_unprepare()
+In-Reply-To: <20121122021750.GD25470@core.coreip.homeip.net>
+References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
+ <1353403339-11679-2-git-send-email-dmitry.torokhov@gmail.com>
+ <CAKohpo=B_7rVwePziyNe0rTMokcib_FgEN28cy4nByAzbUyaqg@mail.gmail.com>
+ <20121121204324.21126.99677@nucleus>
+ <20121121205424.GA25470@core.coreip.homeip.net>
+ <20121121223859.GQ3290@n2100.arm.linux.org.uk>
+ <20121122021750.GD25470@core.coreip.homeip.net>
+Message-ID: <20121122093033.GA5764@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kgene,
-
-On Thursday 22 of November 2012 15:52:14 Kukjin Kim wrote:
-> Tomasz Figa wrote:
-> > On Monday 12 of November 2012 09:55:30 Russell King - ARM Linux wrote:
-> > > On Mon, Nov 12, 2012 at 04:39:28PM +0900, Kukjin Kim wrote:
-> > > > (+ Russell King)
-> > > 
-> > > I think there's still an amount of work to do here; it's not a
-> > > generic
-> > > interface at the moment because it makes some assumptions about how
-> > > things are done (eg, it assumes that there _will_ be a CPU boot
-> > > register; that is not always true.
-> > > 
-> > > Moreover, the 'cpu' arguments given seem to be uncertain whether
-> > > they're logical CPU numbers or physical CPU numbers.
-> > > 
-> > > Lastly, where is this interface actually documented?  It's just a
-> > > bunch
-> > > of code _without_ _any_ documentation.  That means people will
-> > > interpret it differently, and it'll get used differently from
-> > > platform to platform.
-> > > 
-> > > Let's have some documentation on this.
-> > 
-> > Right, I will include documentation in next version of this patchset.
+On Wed, Nov 21, 2012 at 06:17:50PM -0800, Dmitry Torokhov wrote:
+> > You've checked non-ARM architectures too?
 > 
-> Any updates on this?
+> Yes:
 > 
-> Thanks.
-> 
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
+> [dtor at dtor-d630 linux-next]$ grep -r HAVE_CLK_PREPARE .
+> ./arch/arm/Kconfig:     select HAVE_CLK_PREPARE
+> Binary file ./.git/objects/pack/pack-7dad5ee164f601f1327dc78648fa317772c2d872.pack matches
+> ./include/linux/clk.h:#ifdef CONFIG_HAVE_CLK_PREPARE
+> ./include/linux/clk.h:#ifdef CONFIG_HAVE_CLK_PREPARE
+> ./drivers/clk/Kconfig:config HAVE_CLK_PREPARE
+> ./drivers/clk/Kconfig:  select HAVE_CLK_PREPARE
 
-I was waiting for some comments about my proposals, but since there is no 
-new input I will prepare and post next version today.
+Err, no you haven't, not with that grep.  What you've found are the places
+which enable this, and say "yes, I have clk_prepare".
 
-Best regards.
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Linux Platform
+What HAVE_CLK_PREPARE is about though is providing a transition path between
+drivers using clk_prepare() to platforms which _don't_ have a clk_prepare()
+implementation - and when it's unset, it provides a default implementation.
+
+So, finding all those places where the symbol exists is the exact opposite
+of what you need to be doing.  You need to find those platforms which have
+CLK support, but which don't have HAVE_CLK_PREPARE selected.
