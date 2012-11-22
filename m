@@ -1,8 +1,8 @@
 From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
-Date: Fri, 23 Nov 2012 06:29:20 +0900
+Date: Fri, 23 Nov 2012 06:30:10 +0900
 Subject: [PATCH 1/3] ARM: kirkwood: Add support second I2C bus and RTC on
  OpenBlocks A6
-Message-ID: <1353619762-2045-1-git-send-email-iwamatsu@nigauri.org>
+Message-ID: <1353619812-2195-1-git-send-email-iwamatsu@nigauri.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
