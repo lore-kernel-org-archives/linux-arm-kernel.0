@@ -1,30 +1,29 @@
-From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
-Date: Fri, 23 Nov 2012 06:30:12 +0900
-Subject: [PATCH 3/3] ARM: Kirkwood: Convert to EHCI via DT for OpenBlocks A6
-In-Reply-To: <1353619812-2195-1-git-send-email-iwamatsu@nigauri.org>
-References: <1353619812-2195-1-git-send-email-iwamatsu@nigauri.org>
-Message-ID: <1353619812-2195-3-git-send-email-iwamatsu@nigauri.org>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 22 Nov 2012 22:29:41 +0100
+Subject: [PATCH v3] pwm: Device tree support for PWM polarity.
+In-Reply-To: <1353483644-32711-1-git-send-email-avinashphilip@ti.com>
+References: <1353483644-32711-1-git-send-email-avinashphilip@ti.com>
+Message-ID: <20121122212941.GL16716@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-EHCI driver enables by default in kirkwood.dtsi.
-This removes kirkwood_ehci_init function.
+On Wed, Nov 21, 2012 at 01:10:44PM +0530, Philip, Avinash wrote:
+> Add support for encoding PWM properties in bit encoded form with
+> of_pwm_xlate_with_flags() function support. Platforms require platform
+> specific PWM properties has to populate in 3rd cell of the pwm-specifier
+> and PWM driver should also set .of_xlate support with this function.
+> Currently PWM property polarity encoded in bit position 0 of the third
+> cell in pwm-specifier.
+> 
+> Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
 
-Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
----
- arch/arm/mach-kirkwood/board-openblocks_a6.c |    1 -
- 1 file changed, 1 deletion(-)
+Applied with two minor stylistic cleanups, thanks.
 
-diff --git a/arch/arm/mach-kirkwood/board-openblocks_a6.c b/arch/arm/mach-kirkwood/board-openblocks_a6.c
-index e807e8c..e71f984 100644
---- a/arch/arm/mach-kirkwood/board-openblocks_a6.c
-+++ b/arch/arm/mach-kirkwood/board-openblocks_a6.c
-@@ -66,6 +66,5 @@ void __init openblocks_a6_init(void)
- 	 * Basic setup. Needs to be called early.
- 	 */
- 	kirkwood_mpp_conf(openblocks_a6_mpp_config);
--	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&openblocks_ge00_data);
- }
--- 
-1.7.10.4
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/85d51df2/attachment-0001.sig>
