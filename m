@@ -1,9 +1,9 @@
 From: xiechao.mail@gmail.com (Chao Xie)
-Date: Wed, 21 Nov 2012 21:05:06 -0500
-Subject: [PATCH 25/29] usb: gadget: mv_udc: add device tree support
+Date: Wed, 21 Nov 2012 21:05:07 -0500
+Subject: [PATCH 26/29] usb: otg: mv_otg: add device tree support
 In-Reply-To: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
 References: <1353549910-988-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <1353549910-988-25-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <1353549910-988-26-git-send-email-xiechao.mail@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,56 +11,41 @@ From: Chao Xie <chao.xie@marvell.com>
 
 Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
 ---
- drivers/usb/gadget/mv_udc.h      |    5 +-
- drivers/usb/gadget/mv_udc_core.c |  105 ++++++++++++++++++++++++++++++--------
- 2 files changed, 85 insertions(+), 25 deletions(-)
+ drivers/usb/otg/mv_otg.c |  127 +++++++++++++++++++++++++++++++++++++--------
+ drivers/usb/otg/mv_otg.h |    6 +-
+ 2 files changed, 107 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/usb/gadget/mv_udc.h b/drivers/usb/gadget/mv_udc.h
-index 50ae7c7..de84722 100644
---- a/drivers/usb/gadget/mv_udc.h
-+++ b/drivers/usb/gadget/mv_udc.h
-@@ -179,6 +179,7 @@ struct mv_udc {
- 	int				irq;
- 
- 	unsigned int			extern_attr;
-+	unsigned int			mode;
- 	struct notifier_block		notifier;
- 
- 	struct mv_cap_regs __iomem	*cap_regs;
-@@ -222,11 +223,9 @@ struct mv_udc {
- 	struct mv_usb2_phy	*phy;
- 	struct usb_phy		*transceiver;
- 
--	struct mv_usb_platform_data     *pdata;
--
- 	/* some SOC has mutiple clock sources for USB*/
- 	unsigned int    clknum;
--	struct clk      *clk[0];
-+	struct clk      **clk;
- };
- 
- /* endpoint data structure */
-diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
-index 5571f42..2273a0c 100644
---- a/drivers/usb/gadget/mv_udc_core.c
-+++ b/drivers/usb/gadget/mv_udc_core.c
-@@ -34,6 +34,7 @@
- #include <linux/irq.h>
- #include <linux/platform_device.h>
+diff --git a/drivers/usb/otg/mv_otg.c b/drivers/usb/otg/mv_otg.c
+index bd6369c..887024c 100644
+--- a/drivers/usb/otg/mv_otg.c
++++ b/drivers/usb/otg/mv_otg.c
+@@ -17,6 +17,7 @@
+ #include <linux/device.h>
+ #include <linux/proc_fs.h>
  #include <linux/clk.h>
 +#include <linux/of.h>
- #include <linux/platform_data/mv_usb.h>
- #include <linux/usb/mv_usb2.h>
- #include <asm/unaligned.h>
-@@ -2153,21 +2154,57 @@ static int __devexit mv_udc_remove(struct platform_device *pdev)
+ #include <linux/workqueue.h>
+ #include <linux/platform_device.h>
+ 
+@@ -333,7 +334,7 @@ static void mv_otg_update_inputs(struct mv_otg *mvotg)
+ 	else
+ 		otg_ctrl->id = !!(otgsc & OTGSC_STS_USB_ID);
+ 
+-	if (mvotg->pdata->otg_force_a_bus_req && !otg_ctrl->id)
++	if (mvotg->otg_force_a_bus_req && !otg_ctrl->id)
+ 		otg_ctrl->a_bus_req = 1;
+ 
+ 	otg_ctrl->a_sess_vld = !!(otgsc & OTGSC_STS_A_SESSION_VALID);
+@@ -690,21 +691,69 @@ int mv_otg_remove(struct platform_device *pdev)
  	return 0;
  }
  
-+static int __devinit mv_udc_parse_dt(struct platform_device *pdev,
-+				struct mv_udc *udc)
++static int mv_otg_parse_dt(struct platform_device *pdev,
++				struct mv_otg *mvotg)
 +{
 +	struct device_node *np = pdev->dev.of_node;
 +	unsigned int clks_num;
++	unsigned int val;
 +	int i, ret;
 +	const char *clk_name;
 +
@@ -71,9 +56,9 @@ index 5571f42..2273a0c 100644
 +	if (clks_num < 0)
 +		return clks_num;
 +
-+	udc->clk = devm_kzalloc(&pdev->dev,
++	mvotg->clk = devm_kzalloc(&pdev->dev,
 +		sizeof(struct clk *) * clks_num, GFP_KERNEL);
-+	if (udc->clk == NULL)
++	if (mvotg->clk == NULL)
 +		return -ENOMEM;
 +
 +	for (i = 0; i < clks_num; i++) {
@@ -81,127 +66,168 @@ index 5571f42..2273a0c 100644
 +			&clk_name);
 +		if (ret)
 +			return ret;
-+		udc->clk[i] = devm_clk_get(&pdev->dev, clk_name);
-+		if (IS_ERR(udc->clk[i]))
-+			return PTR_ERR(udc->clk[i]);
++		mvotg->clk[i] = devm_clk_get(&pdev->dev, clk_name);
++		if (IS_ERR(mvotg->clk[i]))
++			return PTR_ERR(mvotg->clk[i]);
 +	}
 +
-+	udc->clknum = clks_num;
++	mvotg->clknum = clks_num;
 +
-+	ret = of_property_read_u32(np, "extern_attr", &udc->extern_attr);
++	ret = of_property_read_u32(np, "extern_attr", &mvotg->extern_attr);
 +	if (ret)
 +		return ret;
 +
-+	ret = of_property_read_u32(np, "mode", &udc->mode);
++	ret = of_property_read_u32(np, "mode", &mvotg->mode);
 +	if (ret)
 +		return ret;
++
++	ret = of_property_read_u32(np, "force_a_bus_req", &val);
++	if (ret)
++		return ret;
++	mvotg->otg_force_a_bus_req = !!val;
++
++	ret = of_property_read_u32(np, "disable_clock_gating", &val);
++	if (ret)
++		return ret;
++	mvotg->clock_gating = !val;
 +
 +	return 0;
 +}
 +
- static int __devinit mv_udc_probe(struct platform_device *pdev)
+ static int mv_otg_probe(struct platform_device *pdev)
  {
 -	struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
- 	struct mv_udc *udc;
- 	int retval = 0;
--	int clk_i = 0;
+ 	struct mv_otg *mvotg;
+ 	struct usb_otg *otg;
  	struct resource *r;
+-	int retval = 0, clk_i, i;
++	int retval = 0, i;
  	size_t size;
  
 -	if (pdata == NULL) {
--		dev_err(&pdev->dev, "missing platform_data\n");
+-		dev_err(&pdev->dev, "failed to get platform data\n");
 -		return -ENODEV;
 -	}
 -
--	size = sizeof(*udc) + sizeof(struct clk *) * pdata->clknum;
-+	size = sizeof(*udc);
- 	udc = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
- 	if (udc == NULL) {
- 		dev_err(&pdev->dev, "failed to allocate memory for udc\n");
-@@ -2175,14 +2212,43 @@ static int __devinit mv_udc_probe(struct platform_device *pdev)
- 	}
+-	size = sizeof(*mvotg) + sizeof(struct clk *) * pdata->clknum;
++	size = sizeof(*mvotg);
+ 	mvotg = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
+ 	if (!mvotg) {
+ 		dev_err(&pdev->dev, "failed to allocate memory!\n");
+@@ -718,17 +767,45 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, mvotg);
  
- 	udc->done = &release_done;
--	udc->extern_attr = pdata->extern_attr;
--	udc->pdata = pdev->dev.platform_data;
- 	spin_lock_init(&udc->lock);
+ 	mvotg->pdev = pdev;
+-	mvotg->extern_attr = pdata->extern_attr;
+-	mvotg->pdata = pdata;
  
- 	udc->dev = pdev;
- 
-+	retval = mv_udc_parse_dt(pdev, udc);
+-	mvotg->clknum = pdata->clknum;
+-	for (clk_i = 0; clk_i < mvotg->clknum; clk_i++) {
+-		mvotg->clk[clk_i] = devm_clk_get(&pdev->dev,
++	retval = mv_otg_parse_dt(pdev, mvotg);
 +	if (retval > 0) {
-+		/* no CONFIG_OF */
 +		struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
++		/* no CONFIG_OF */
 +		int clk_i = 0;
 +
 +		if (pdata == NULL) {
 +			dev_err(&pdev->dev, "missing platform_data\n");
 +			return -ENODEV;
 +		}
-+		udc->extern_attr = pdata->extern_attr;
-+		udc->mode = pdata->mode;
-+		udc->clknum = pdata->clknum;
++		mvotg->extern_attr = pdata->extern_attr;
++		mvotg->mode = pdata->mode;
++		mvotg->clknum = pdata->clknum;
++		mvotg->otg_force_a_bus_req = pdata->otg_force_a_bus_req;
++		if (pdata->disable_otg_clock_gating)
++			mvotg->clock_gating = 0;
 +
-+		size = sizeof(struct clk *) * udc->clknum;
-+		udc->clk = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
-+		if (udc->clk == NULL)
++		size = sizeof(struct clk *) * mvotg->clknum;
++		mvotg->clk = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
++		if (mvotg->clk == NULL) {
++			dev_err(&pdev->dev,
++				"failed to allocate memory for clk\n");
 +			return -ENOMEM;
-+		for (clk_i = 0; clk_i < udc->clknum; clk_i++) {
-+			udc->clk[clk_i] = devm_clk_get(&pdev->dev,
-+						pdata->clkname[clk_i]);
-+			if (IS_ERR(udc->clk[clk_i])) {
-+				retval = PTR_ERR(udc->clk[clk_i]);
++		}
++
++		for (clk_i = 0; clk_i < mvotg->clknum; clk_i++) {
++			mvotg->clk[clk_i] = devm_clk_get(&pdev->dev,
+ 						pdata->clkname[clk_i]);
+-		if (IS_ERR(mvotg->clk[clk_i])) {
+-			retval = PTR_ERR(mvotg->clk[clk_i]);
+-			return retval;
++			if (IS_ERR(mvotg->clk[clk_i])) {
++				dev_err(&pdev->dev, "failed to get clk %s\n",
++					pdata->clkname[clk_i]);
++				retval = PTR_ERR(mvotg->clk[clk_i]);
 +				return retval;
 +			}
-+		}
+ 		}
 +	} else if (retval < 0) {
 +		dev_err(&pdev->dev, "error parse dt\n");
 +		return retval;
-+	}
-+
- #ifdef CONFIG_USB_OTG_UTILS
--	if (pdata->mode == MV_USB_MODE_OTG) {
-+	if (udc->mode == MV_USB_MODE_OTG) {
- 		udc->transceiver = devm_usb_get_phy(&pdev->dev,
- 					USB_PHY_TYPE_USB2);
- 		if (IS_ERR_OR_NULL(udc->transceiver)) {
-@@ -2191,17 +2257,6 @@ static int __devinit mv_udc_probe(struct platform_device *pdev)
- 		}
  	}
- #endif
--
--	udc->clknum = pdata->clknum;
--	for (clk_i = 0; clk_i < udc->clknum; clk_i++) {
--		udc->clk[clk_i] = devm_clk_get(&pdev->dev,
--					pdata->clkname[clk_i]);
--		if (IS_ERR(udc->clk[clk_i])) {
--			retval = PTR_ERR(udc->clk[clk_i]);
--			return retval;
--		}
--	}
--
- 	r = platform_get_resource(udc->dev, IORESOURCE_MEM, 0);
- 	if (r == NULL) {
- 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
-@@ -2466,6 +2521,11 @@ static void mv_udc_shutdown(struct platform_device *pdev)
- 	mv_udc_disable(udc);
- }
  
-+static struct of_device_id mv_udc_dt_ids[] = {
-+	{ .compatible = "mrvl,mv-udc" },
-+};
-+MODULE_DEVICE_TABLE(of, mv_udc_dt_ids);
-+
- static struct platform_driver udc_driver = {
- 	.probe		= mv_udc_probe,
- 	.remove		= __exit_p(mv_udc_remove),
-@@ -2476,6 +2536,7 @@ static struct platform_driver udc_driver = {
- #ifdef CONFIG_PM
- 		.pm	= &mv_udc_pm_ops,
+ 	mvotg->qwork = create_singlethread_workqueue("mv_otg_queue");
+@@ -770,6 +847,7 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 	}
+ 	mvotg->mvphy = mv_usb2_get_phy();
+ 	if (mvotg->mvphy == NULL) {
++		dev_err(&pdev->dev, "failed to get usb phy\n");
+ 		retval = -ENODEV;
+ 		goto err_destroy_workqueue;
+ 	}
+@@ -791,9 +869,6 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 		mv_usb2_register_notifier(mvotg->mvphy, &mvotg->notifier);
+ 	}
+ 
+-	if (pdata->disable_otg_clock_gating)
+-		mvotg->clock_gating = 0;
+-
+ 	mv_otg_reset(mvotg);
+ 	mv_otg_init_irq(mvotg);
+ 
+@@ -892,13 +967,19 @@ static int mv_otg_resume(struct platform_device *pdev)
+ }
  #endif
-+		.of_match_table = mv_udc_dt_ids,
- 	},
+ 
++static struct of_device_id mv_otg_dt_ids[] = {
++	{ .compatible = "mrvl,mv-otg" },
++};
++MODULE_DEVICE_TABLE(of, mv_otg_dt_ids);
++
+ static struct platform_driver mv_otg_driver = {
+ 	.probe = mv_otg_probe,
+ 	.remove = __exit_p(mv_otg_remove),
+ 	.driver = {
+-		   .owner = THIS_MODULE,
+-		   .name = driver_name,
+-		   },
++		.owner = THIS_MODULE,
++		.name = driver_name,
++		.of_match_table = mv_otg_dt_ids,
++	},
+ #ifdef CONFIG_PM
+ 	.suspend = mv_otg_suspend,
+ 	.resume = mv_otg_resume,
+diff --git a/drivers/usb/otg/mv_otg.h b/drivers/usb/otg/mv_otg.h
+index f5bc7dd..3b9356d 100644
+--- a/drivers/usb/otg/mv_otg.h
++++ b/drivers/usb/otg/mv_otg.h
+@@ -157,12 +157,12 @@ struct mv_otg {
+ 
+ 	spinlock_t wq_lock;
+ 
+-	struct mv_usb_platform_data *pdata;
+-
+ 	unsigned int active;
+ 	unsigned int clock_gating;
++	unsigned int mode;
++	unsigned int otg_force_a_bus_req;
+ 	unsigned int clknum;
+-	struct clk *clk[0];
++	struct clk **clk;
  };
  
+ #endif
 -- 
 1.7.4.1
