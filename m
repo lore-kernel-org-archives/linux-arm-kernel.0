@@ -1,30 +1,22 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 22 Nov 2012 21:47:04 +0100
-Subject: [PATCH v4 01/11] PWMSS: Add PWM Subsystem driver for
- parent<->child relationship
-In-Reply-To: <1353503469-18634-2-git-send-email-avinashphilip@ti.com>
+Date: Thu, 22 Nov 2012 21:57:33 +0100
+Subject: [PATCH v4 04/11] pwm: pwm-tiecap: Add device-tree binding
+ support for APWM driver
+In-Reply-To: <1353503469-18634-5-git-send-email-avinashphilip@ti.com>
 References: <1353503469-18634-1-git-send-email-avinashphilip@ti.com>
- <1353503469-18634-2-git-send-email-avinashphilip@ti.com>
-Message-ID: <20121122204704.GA16716@avionic-0098.adnet.avionic-design.de>
+ <1353503469-18634-5-git-send-email-avinashphilip@ti.com>
+Message-ID: <20121122205732.GB16716@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 06:40:58PM +0530, Philip, Avinash wrote:
+On Wed, Nov 21, 2012 at 06:41:01PM +0530, Philip, Avinash wrote:
 [...]
-> +static const struct of_device_id pwmss_of_match[] = {
+> +static const struct of_device_id ecap_of_match[] = {
 > +	{
-> +		.compatible	= "ti,am33xx-pwmss",
+> +		.compatible	= "ti,am33xx-ecap",
 > +	},
 
-For consistency with other drivers this should be all on one line.
-
-> +static const struct dev_pm_ops pwmss_pm_ops = {
-> +	SET_SYSTEM_SLEEP_PM_OPS(pwmss_suspend, pwmss_resume)
-> +};
-
-This could be even shorter:
-
-static SIMPLE_DEV_PM_OPS(pwmss_pm_ops, pwmss_suspend, pwmss_resume);
+Same here, can be shorter by putting it on one line instead of three.
 
 Thierry
 -------------- next part --------------
@@ -33,4 +25,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/3bb858fb/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/aa26e773/attachment.sig>
