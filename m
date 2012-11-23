@@ -1,36 +1,62 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 23 Nov 2012 17:33:29 +0800
-Subject: [GIT PULL][for 3.8] pull request from arch pxa tree on armsoc/fix
-Message-ID: <CAN1soZx3fXEaryZYj7-s4aABF+kfkMpG595uteCwGh2eTsx1GQ@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 23 Nov 2012 11:34:38 +0200
+Subject: OMAP4430 produces boot warnings
+In-Reply-To: <50AE3A5B.5040603@ti.com>
+References: <20121121230337.GR3332@n2100.arm.linux.org.uk>
+ <50AE1DC0.3030002@ti.com>  <50AE2BB6.8080406@ti.com>
+ <1353594842.786.45.camel@sokoban>  <50AE3A5B.5040603@ti.com>
+Message-ID: <1353663278.25248.4.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof & Arnd,
+On Thu, 2012-11-22 at 16:44 +0200, Tomi Valkeinen wrote:
+> On 2012-11-22 16:34, Tero Kristo wrote:
+> 
+> > I guess you checked that DSS pwrdm is switching between RET and ON in
+> > your setup?
+> 
+> Yes:
+> 
+> # cat /debug/pm_debug/count |grep dss
+> [   35.356567] pwrdm state mismatch(l3init_pwrdm) 3 != 1
+> [   35.361938] pwrdm state mismatch(cam_pwrdm) 3 != 0
+> [   35.366973] pwrdm state mismatch(ivahd_pwrdm) 3 != 1
+> [   35.372253] pwrdm state mismatch(tesla_pwrdm) 3 != 1
+> [   35.377532] pwrdm state mismatch(abe_pwrdm) 3 != 1
+> dss_pwrdm (RET),OFF:1,RET:11,INA:0,ON:11,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+> l3_dss_clkdm->dss_pwrdm (0)
+> 
+> then I load and unload the dss modules, and then:
+> 
+> # cat /debug/pm_debug/count |grep dss
+> [   60.813629] pwrdm state mismatch(l3init_pwrdm) 3 != 1
+> [   60.819000] pwrdm state mismatch(cam_pwrdm) 3 != 0
+> [   60.824127] pwrdm state mismatch(ivahd_pwrdm) 3 != 1
+> [   60.829376] pwrdm state mismatch(tesla_pwrdm) 3 != 1
+> [   60.834625] pwrdm state mismatch(abe_pwrdm) 3 != 1
+> dss_pwrdm (ON),OFF:1,RET:21,INA:0,ON:22,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+> l3_dss_clkdm->dss_pwrdm (0)
+> 
+> >> Does the pwrdm mistakenly think that in RET state the DSS still keeps
+> >> the register contents?
+> > 
+> > This might be the case, however the pwrdm code should be generic and
+> > handle all domains properly. What is the tree / branch / commit you are
+> > using for testing this stuff? I can take a look at this also.
+> 
+> arm-soc/for-next
 
-Please help to merge armsoc/fix branch in arch pxa git tree.
+I guess this is caused because some of the patches are still not in the
+for-next branch, it looks like at least this is missing:
 
-It's just a new fix and it's not essential to us, I put it on the fix
-branch that you just pulled. You only need to pick up this commit in
-below.
+https://patchwork.kernel.org/patch/1608901/
 
-Regards
-Haojian
+...or the latest update done by Paul to that one.
 
-The following changes since commit 8757e168190a6ed2cd4aa23fc59bf86b0091b596:
+The patch I posted appears to have a small merge induced bug, it is
+registering the context loss soc_ops for am33xx when it should actually
+register those for omap4. This might explain another bug I've been
+looking at in a different branch recently... The update Paul posted does
+not seem to have this problem, but I haven't tested it myself.
 
-  ARM: pxa: fix pxa25x gpio wakeup setting (2012-11-21 13:14:42 +0800)
-
-are available in the git repository at:
-
-  git://github.com/hzhuang1/linux.git armsoc/fix
-
-for you to fetch changes up to d90cb69ddd032854b633c4069ba3493651cb8ebc:
-
-  ARM: pxa: add dummy SA1100 rtc clock in pxa25x (2012-11-23 17:27:41 +0800)
-
-----------------------------------------------------------------
-Andrea Adami (1):
-      ARM: pxa: add dummy SA1100 rtc clock in pxa25x
-
- arch/arm/mach-pxa/pxa25x.c |    1 +
- 1 file changed, 1 insertion(+)
+-Tero
