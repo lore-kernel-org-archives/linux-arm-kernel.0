@@ -1,158 +1,297 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 23 Nov 2012 17:04:15 +0000
-Subject: [PATCH v4 4/5] ARM: KVM: arch_timers: Add timer world switch
-In-Reply-To: <20121123163026.GL32200@mudshark.cambridge.arm.com>
-References: <20121110154554.3274.77777.stgit@chazy-air>
- <20121110154625.3274.39369.stgit@chazy-air>
- <20121123163026.GL32200@mudshark.cambridge.arm.com>
-Message-ID: <50AFAC8F.6050902@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 23 Nov 2012 11:06:07 -0600
+Subject: [PATCH] ARM: implement optimized percpu variable access
+In-Reply-To: <20121122113401.GC3113@mudshark.cambridge.arm.com>
+References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
+ <20121122113401.GC3113@mudshark.cambridge.arm.com>
+Message-ID: <50AFACFF.4000907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/11/12 16:30, Will Deacon wrote:
-> On Sat, Nov 10, 2012 at 03:46:25PM +0000, Christoffer Dall wrote:
->> From: Marc Zyngier <marc.zyngier@arm.com>
+On 11/22/2012 05:34 AM, Will Deacon wrote:
+> Hi Rob,
+> 
+> On Sun, Nov 11, 2012 at 03:20:40AM +0000, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
 >>
->> Do the necessary save/restore dance for the timers in the world
->> switch code. In the process, allow the guest to read the physical
->> counter, which is useful for its own clock_event_device.
+>> Use the previously unused TPIDRPRW register to store percpu offsets.
+>> TPIDRPRW is only accessible in PL1, so it can only be used in the kernel.
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+>> This saves 2 loads for each percpu variable access which should yield
+>> improved performance, but the improvement has not been quantified.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 >> ---
->>  arch/arm/kernel/asm-offsets.c  |    8 ++++++++
->>  arch/arm/kvm/arm.c             |    3 +++
->>  arch/arm/kvm/interrupts_head.S |   41 ++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 52 insertions(+)
->>
->> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
->> index 39b6221..50df318 100644
->> --- a/arch/arm/kernel/asm-offsets.c
->> +++ b/arch/arm/kernel/asm-offsets.c
->> @@ -177,6 +177,14 @@ int main(void)
->>    DEFINE(VGIC_CPU_APR,		offsetof(struct vgic_cpu, vgic_apr));
->>    DEFINE(VGIC_CPU_LR,		offsetof(struct vgic_cpu, vgic_lr));
->>    DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
->> +#ifdef CONFIG_KVM_ARM_TIMER
->> +  DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
->> +  DEFINE(VCPU_TIMER_CNTV_CVALH,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_cval32.high));
->> +  DEFINE(VCPU_TIMER_CNTV_CVALL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_cval32.low));
->> +  DEFINE(KVM_TIMER_CNTVOFF_H,	offsetof(struct kvm, arch.timer.cntvoff32.high));
->> +  DEFINE(KVM_TIMER_CNTVOFF_L,	offsetof(struct kvm, arch.timer.cntvoff32.low));
->> +  DEFINE(KVM_TIMER_ENABLED,	offsetof(struct kvm, arch.timer.enabled));
->> +#endif
->>    DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
->>  #endif
->>    DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 1716f12..8cdef69 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -661,6 +661,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  		update_vttbr(vcpu->kvm);
->>  
->>  		kvm_vgic_sync_to_cpu(vcpu);
->> +		kvm_timer_sync_to_cpu(vcpu);
->>  
->>  		local_irq_disable();
->>  
->> @@ -674,6 +675,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  
->>  		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
->>  			local_irq_enable();
->> +			kvm_timer_sync_from_cpu(vcpu);
->>  			kvm_vgic_sync_from_cpu(vcpu);
->>  			continue;
->>  		}
->> @@ -713,6 +715,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  		 * Back from guest
->>  		 *************************************************************/
->>  
->> +		kvm_timer_sync_from_cpu(vcpu);
->>  		kvm_vgic_sync_from_cpu(vcpu);
->>  
->>  		ret = handle_exit(vcpu, run, ret);
->> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
->> index 0003aab..ece84d1 100644
->> --- a/arch/arm/kvm/interrupts_head.S
->> +++ b/arch/arm/kvm/interrupts_head.S
->> @@ -422,6 +422,25 @@
->>  #define CNTHCTL_PL1PCEN		(1 << 1)
->>  
->>  .macro save_timer_state	vcpup
->> +#ifdef CONFIG_KVM_ARM_TIMER
->> +	ldr	r4, [\vcpup, #VCPU_KVM]
->> +	ldr	r2, [r4, #KVM_TIMER_ENABLED]
->> +	cmp	r2, #0
->> +	beq	1f
->> +
->> +	mrc	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
->> +	and	r2, #3
+>>  arch/arm/include/asm/Kbuild   |    1 -
+>>  arch/arm/include/asm/percpu.h |   44 +++++++++++++++++++++++++++++++++++++++++
+>>  arch/arm/kernel/smp.c         |    3 +++
+>>  3 files changed, 47 insertions(+), 1 deletion(-)
+>>  create mode 100644 arch/arm/include/asm/percpu.h
 > 
-> Why do you need this and (you do the masking on the restore path)?
+> Russell pointed out to me that this patch will break on v6 CPUs if they don't
+> have the thread ID registers and we're running with SMP_ON_UP=y. Looking at
+> the TRMs, the only case we care about is 1136 < r1p0, but it does indeed break
+> there (I have a board on my desk).
 
-Probably not necessary. We could just clear the enable below.
+Are there any non ARM Ltd. cores without v6K we need to worry about? I
+wouldn't think there are many 1136 < r1p0 out there (your desk being an
+obvious exception).
+
+> There are a few ways to fix this:
+> 
+> (1) Use the SMP alternates to patch the code when running on UP systems. I
+>     tried this and the code is absolutely diabolical (see below).
+> 
+> (2) Rely on the registers being RAZ/WI rather than undef (which seems to be
+>     the case on my board) and add on the pcpu delta manually. This is also
+>     really horrible.
+> 
+> (3) Just make the thing depend on __LINUX_ARM_ARCH__ >= 7. Yes, we lose on
+>     11MPCore, but we win on A8 and the code is much, much simpler.
+
+I would lean towards this option. It really only has to depend on v6K
+and !v6. We can refine the multi-platform selection to allow v7 and v6K
+only builds in addition to v7 and v6. I think we are going to have
+enough optimizations with v7 (gcc optimizations, thumb2, unaligned
+accesses, etc.) that most people will do v7 only builds.
+
+Rob
 
 > 
->> +	str	r2, [\vcpup, #VCPU_TIMER_CNTV_CTL]
->> +	bic	r2, #1			@ Clear ENABLE
->> +	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
->> +	isb
->> +
->> +	mrrc	p15, 3, r2, r3, c14	@ CNTV_CVAL
->> +	str	r3, [\vcpup, #VCPU_TIMER_CNTV_CVALH]
->> +	str	r2, [\vcpup, #VCPU_TIMER_CNTV_CVALL]
->> +
->> +1:
->> +#endif
->>  	@ Allow physical timer/counter access for the host
->>  	mrc	p15, 4, r2, c14, c1, 0	@ CNTHCTL
->>  	orr	r2, r2, #(CNTHCTL_PL1PCEN | CNTHCTL_PL1PCTEN)
->> @@ -435,6 +454,28 @@
->>  	orr	r2, r2, #CNTHCTL_PL1PCTEN
->>  	bic	r2, r2, #CNTHCTL_PL1PCEN
->>  	mcr	p15, 4, r2, c14, c1, 0	@ CNTHCTL
->> +
->> +#ifdef CONFIG_KVM_ARM_TIMER
->> +	ldr	r4, [\vcpup, #VCPU_KVM]
->> +	ldr	r2, [r4, #KVM_TIMER_ENABLED]
->> +	cmp	r2, #0
->> +	beq	1f
->> +
->> +	ldr	r3, [r4, #KVM_TIMER_CNTVOFF_H]
->> +	ldr	r2, [r4, #KVM_TIMER_CNTVOFF_L]
->> +	mcrr	p15, 4, r2, r3, c14	@ CNTVOFF
->> +	isb
->> +
->> +	ldr	r3, [\vcpup, #VCPU_TIMER_CNTV_CVALH]
->> +	ldr	r2, [\vcpup, #VCPU_TIMER_CNTV_CVALL]
->> +	mcrr	p15, 3, r2, r3, c14	@ CNTV_CVAL
->> +
->> +	ldr	r2, [\vcpup, #VCPU_TIMER_CNTV_CTL]
->> +	and	r2, #3
+> As an aside, you also need to make the asm block volatile in
+> __my_cpu_offset -- I can see it being re-ordered before the set for
+> secondary CPUs otherwise.
 > 
-> Please use the long form syntax for these instructions (and r2, r2, #3) as
-> toolchains have historically been picky about accepting these when not
-> targetting Thumb and it also makes it consistent with the rest of arch/arm/.
-
-OK.
-
+> Will
 > 
->> +	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
->> +	isb
->> +1:
->> +#endif
+> --->8
 > 
-> It's pretty horrible to take a macro argument (vcpup) and then open-code all
-> the other register numbers without moving the argument somewhere nice. Are
-> callers just expected to understand that you clobber {r2,r3,r4} and avoid
-> them? If so, why not just use the PCS so that people don't have to learn a
-> new convention?
-
-I'm happy to remove this vcpup and stick to r0/r1 (depending on the
-path). All macros have to know about the side effects anyway, as we
-switch all the registers.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> From b12ab049b864c2b6f0be1558c934d7213871b223 Mon Sep 17 00:00:00 2001
+> From: Will Deacon <will.deacon@arm.com>
+> Date: Wed, 21 Nov 2012 10:53:28 +0000
+> Subject: [PATCH 1/2] ARM: smp: move SMP_ON_UP alternate macros to common
+>  header file
+> 
+> The ALT_{UP,SMP} macros are used to patch instructions at runtime
+> depending on whether we are running on an SMP platform or not. This is
+> generally done in out-of-line assembly code, but there is also the need
+> for this functionality in inline assembly (e.g. spinlocks).
+> 
+> This patch moves the macros into their own header file, which provides
+> the correct definitions depending on __ASSEMBLY__.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/assembler.h | 29 +------------------
+>  arch/arm/include/asm/smp_on_up.h | 60 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/include/asm/spinlock.h  | 21 +++++---------
+>  arch/arm/kernel/head.S           |  1 +
+>  arch/arm/kernel/module.c         |  8 ++----
+>  5 files changed, 71 insertions(+), 48 deletions(-)
+>  create mode 100644 arch/arm/include/asm/smp_on_up.h
+> 
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index 2ef9581..7da33e0 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -23,6 +23,7 @@
+>  #include <asm/ptrace.h>
+>  #include <asm/domain.h>
+>  #include <asm/opcodes-virt.h>
+> +#include <asm/smp_on_up.h>
+>  
+>  #define IOMEM(x)	(x)
+>  
+> @@ -166,34 +167,6 @@
+>  	.long	9999b,9001f;			\
+>  	.popsection
+>  
+> -#ifdef CONFIG_SMP
+> -#define ALT_SMP(instr...)					\
+> -9998:	instr
+> -/*
+> - * Note: if you get assembler errors from ALT_UP() when building with
+> - * CONFIG_THUMB2_KERNEL, you almost certainly need to use
+> - * ALT_SMP( W(instr) ... )
+> - */
+> -#define ALT_UP(instr...)					\
+> -	.pushsection ".alt.smp.init", "a"			;\
+> -	.long	9998b						;\
+> -9997:	instr							;\
+> -	.if . - 9997b != 4					;\
+> -		.error "ALT_UP() content must assemble to exactly 4 bytes";\
+> -	.endif							;\
+> -	.popsection
+> -#define ALT_UP_B(label)					\
+> -	.equ	up_b_offset, label - 9998b			;\
+> -	.pushsection ".alt.smp.init", "a"			;\
+> -	.long	9998b						;\
+> -	W(b)	. + up_b_offset					;\
+> -	.popsection
+> -#else
+> -#define ALT_SMP(instr...)
+> -#define ALT_UP(instr...) instr
+> -#define ALT_UP_B(label) b label
+> -#endif
+> -
+>  /*
+>   * Instruction barrier
+>   */
+> diff --git a/arch/arm/include/asm/smp_on_up.h b/arch/arm/include/asm/smp_on_up.h
+> new file mode 100644
+> index 0000000..cc9c527
+> --- /dev/null
+> +++ b/arch/arm/include/asm/smp_on_up.h
+> @@ -0,0 +1,60 @@
+> +#ifndef __ASM_ARM_SMP_ON_UP_H_
+> +#define __ASM_ARM_SMP_ON_UP_H_
+> +
+> +#ifndef __ASSEMBLY__
+> +#ifdef CONFIG_SMP_ON_UP
+> +extern int fixup_smp(const void *addr, unsigned long size);
+> +#else
+> +static inline int fixup_smp(const void *addr, unsigned long size)
+> +{
+> +	return -EINVAL;
+> +}
+> +#endif	/* CONFIG_SMP_ON_UP */
+> +#endif	/* __ASSEMBLY__ */
+> +
+> +/*
+> + * Note: if you get assembler errors from ALT_UP() when building with
+> + * CONFIG_THUMB2_KERNEL, you almost certainly need to use
+> + * ALT_SMP( W(instr) ... )
+> + */
+> +#ifdef CONFIG_SMP
+> +#ifndef __ASSEMBLY__
+> +
+> +#define ALT_SMP(instr)						\
+> +	"9998:	" instr "\n"
+> +
+> +#define ALT_UP(instr)						\
+> +	"	.pushsection \".alt.smp.init\", \"a\"\n"	\
+> +	"	.long	9998b\n"				\
+> +	"	" instr "\n"					\
+> +	"	.popsection\n"
+> +
+> +#else
+> +
+> +#define ALT_SMP(instr...)					\
+> +9998:	instr
+> +
+> +#define ALT_UP(instr...)					\
+> +	.pushsection ".alt.smp.init", "a"			;\
+> +	.long	9998b						;\
+> +9997:	instr							;\
+> +	.if . - 9997b != 4					;\
+> +		.error "ALT_UP() content must assemble to exactly 4 bytes";\
+> +	.endif							;\
+> +	.popsection
+> +
+> +#define ALT_UP_B(label)						\
+> +	.equ	up_b_offset, label - 9998b			;\
+> +	.pushsection ".alt.smp.init", "a"			;\
+> +	.long	9998b						;\
+> +	W(b)	. + up_b_offset					;\
+> +	.popsection
+> +
+> +#endif	/* __ASSEMBLY */
+> +#else
+> +#define ALT_SMP(instr...)
+> +#define ALT_UP(instr...) instr
+> +#define ALT_UP_B(label) b label
+> +#endif	/* CONFIG_SMP */
+> +
+> +#endif	/* __ASM_ARM_SMP_ON_UP_H_ */
+> diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+> index b4ca707..58d2f42 100644
+> --- a/arch/arm/include/asm/spinlock.h
+> +++ b/arch/arm/include/asm/spinlock.h
+> @@ -6,20 +6,14 @@
+>  #endif
+>  
+>  #include <asm/processor.h>
+> +#include <asm/smp_on_up.h>
+>  
+>  /*
+>   * sev and wfe are ARMv6K extensions.  Uniprocessor ARMv6 may not have the K
+>   * extensions, so when running on UP, we have to patch these instructions away.
+>   */
+> -#define ALT_SMP(smp, up)					\
+> -	"9998:	" smp "\n"					\
+> -	"	.pushsection \".alt.smp.init\", \"a\"\n"	\
+> -	"	.long	9998b\n"				\
+> -	"	" up "\n"					\
+> -	"	.popsection\n"
+> -
+>  #ifdef CONFIG_THUMB2_KERNEL
+> -#define SEV		ALT_SMP("sev.w", "nop.w")
+> +#define SEV		ALT_SMP("sev.w")	ALT_UP("nop.w")
+>  /*
+>   * For Thumb-2, special care is needed to ensure that the conditional WFE
+>   * instruction really does assemble to exactly 4 bytes (as required by
+> @@ -33,13 +27,12 @@
+>   */
+>  #define WFE(cond)	ALT_SMP(		\
+>  	"it " cond "\n\t"			\
+> -	"wfe" cond ".n",			\
+> -						\
+> -	"nop.w"					\
+> -)
+> +	"wfe" cond ".n")			\
+> +			ALT_UP(			\
+> +	"nop.w")
+>  #else
+> -#define SEV		ALT_SMP("sev", "nop")
+> -#define WFE(cond)	ALT_SMP("wfe" cond, "nop")
+> +#define SEV		ALT_SMP("sev")		ALT_UP("nop")
+> +#define WFE(cond)	ALT_SMP("wfe" cond)	ALT_UP("nop")
+>  #endif
+>  
+>  static inline void dsb_sev(void)
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index 4eee351..c44b51f 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -495,6 +495,7 @@ smp_on_up:
+>  	.text
+>  __do_fixup_smp_on_up:
+>  	cmp	r4, r5
+> +	movhs	r0, #0
+>  	movhs	pc, lr
+>  	ldmia	r4!, {r0, r6}
+>   ARM(	str	r6, [r0, r3]	)
+> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+> index 1e9be5d..f2299d0 100644
+> --- a/arch/arm/kernel/module.c
+> +++ b/arch/arm/kernel/module.c
+> @@ -23,6 +23,7 @@
+>  #include <asm/pgtable.h>
+>  #include <asm/sections.h>
+>  #include <asm/smp_plat.h>
+> +#include <asm/smp_on_up.h>
+>  #include <asm/unwind.h>
+>  
+>  #ifdef CONFIG_XIP_KERNEL
+> @@ -266,7 +267,6 @@ static const Elf_Shdr *find_mod_section(const Elf32_Ehdr *hdr,
+>  }
+>  
+>  extern void fixup_pv_table(const void *, unsigned long);
+> -extern void fixup_smp(const void *, unsigned long);
+>  
+>  int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
+>  		    struct module *mod)
+> @@ -323,11 +323,7 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
+>  #endif
+>  	s = find_mod_section(hdr, sechdrs, ".alt.smp.init");
+>  	if (s && !is_smp())
+> -#ifdef CONFIG_SMP_ON_UP
+> -		fixup_smp((void *)s->sh_addr, s->sh_size);
+> -#else
+> -		return -EINVAL;
+> -#endif
+> +		return fixup_smp((void *)s->sh_addr, s->sh_size);
+>  	return 0;
+>  }
+>  
+> 
