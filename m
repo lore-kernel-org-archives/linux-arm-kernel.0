@@ -1,99 +1,39 @@
 From: ciminaghi@gnudd.com (Davide Ciminaghi)
-Date: Fri, 23 Nov 2012 16:08:28 +0100
-Subject: [PATCH 6/8] mmc: use the new <linux/sizes.h>
+Date: Fri, 23 Nov 2012 16:08:24 +0100
+Subject: [PATCH 2/8] gpio: pl061 depends on ARM
 In-Reply-To: <1353683310-23654-1-git-send-email-ciminaghi@gnudd.com>
 References: <1353683310-23654-1-git-send-email-ciminaghi@gnudd.com>
-Message-ID: <1353683310-23654-7-git-send-email-ciminaghi@gnudd.com>
+Message-ID: <1353683310-23654-3-git-send-email-ciminaghi@gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Alessandro Rubini <rubini@gnudd.com>
 
+Commit dece904d (gpio: pl061: use chained_irq_* functions in irq
+handler) introduced chained_irq_enter/exit, which is only
+available for arch/arm and the driver won't compile elsewhere.
+
+The dependency is thus made explicit, because AMBA is used in the x86
+world by a PCI-to-AMBA bridge, to be submitted.
+
 Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
 Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
 ---
- drivers/mmc/host/mmci.c     |    2 +-
- drivers/mmc/host/msm_sdcc.c |    2 +-
- drivers/mmc/host/mvsdio.c   |    2 +-
- drivers/mmc/host/mxcmmc.c   |    2 +-
- drivers/mmc/host/pxamci.c   |    3 +--
- 5 files changed, 5 insertions(+), 6 deletions(-)
+ drivers/gpio/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 5e39b31..731d98e 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -34,10 +34,10 @@
- #include <linux/pm_runtime.h>
- #include <linux/types.h>
- #include <linux/pinctrl/consumer.h>
-+#include <linux/sizes.h>
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 536bc23..fb238d3 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -185,7 +185,7 @@ config GPIO_MXS
  
- #include <asm/div64.h>
- #include <asm/io.h>
--#include <asm/sizes.h>
- 
- #include "mmci.h"
- 
-diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
-index 7c0af0e..aa61b79 100644
---- a/drivers/mmc/host/msm_sdcc.c
-+++ b/drivers/mmc/host/msm_sdcc.c
-@@ -37,10 +37,10 @@
- #include <linux/memory.h>
- #include <linux/gfp.h>
- #include <linux/gpio.h>
-+#include <linux/sizes.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/div64.h>
--#include <asm/sizes.h>
- 
- #include <linux/platform_data/mmc-msm_sdcc.h>
- #include <mach/msm_iomap.h>
-diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
-index de4c20b..e313cd9 100644
---- a/drivers/mmc/host/mvsdio.c
-+++ b/drivers/mmc/host/mvsdio.c
-@@ -22,8 +22,8 @@
- #include <linux/clk.h>
- #include <linux/gpio.h>
- #include <linux/mmc/host.h>
-+#include <linux/sizes.h>
- 
--#include <asm/sizes.h>
- #include <asm/unaligned.h>
- #include <linux/platform_data/mmc-mvsdio.h>
- 
-diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-index a72936e..8ce7e73 100644
---- a/drivers/mmc/host/mxcmmc.c
-+++ b/drivers/mmc/host/mxcmmc.c
-@@ -34,10 +34,10 @@
- #include <linux/regulator/consumer.h>
- #include <linux/dmaengine.h>
- #include <linux/types.h>
-+#include <linux/sizes.h>
- 
- #include <asm/dma.h>
- #include <asm/irq.h>
--#include <asm/sizes.h>
- #include <linux/platform_data/mmc-mxcmmc.h>
- 
- #include <linux/platform_data/dma-imx.h>
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index 3f9d6d5..af3604a 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -33,8 +33,7 @@
- #include <linux/of.h>
- #include <linux/of_gpio.h>
- #include <linux/of_device.h>
--
--#include <asm/sizes.h>
-+#include <linux/sizes.h>
- 
- #include <mach/hardware.h>
- #include <mach/dma.h>
+ config GPIO_PL061
+ 	bool "PrimeCell PL061 GPIO support"
+-	depends on ARM_AMBA
++	depends on ARM && ARM_AMBA
+ 	select GENERIC_IRQ_CHIP
+ 	help
+ 	  Say yes here to support the PrimeCell PL061 GPIO device
 -- 
 1.7.10.4
