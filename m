@@ -1,62 +1,67 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 23 Nov 2012 11:34:38 +0200
-Subject: OMAP4430 produces boot warnings
-In-Reply-To: <50AE3A5B.5040603@ti.com>
-References: <20121121230337.GR3332@n2100.arm.linux.org.uk>
- <50AE1DC0.3030002@ti.com>  <50AE2BB6.8080406@ti.com>
- <1353594842.786.45.camel@sokoban>  <50AE3A5B.5040603@ti.com>
-Message-ID: <1353663278.25248.4.camel@sokoban>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 23 Nov 2012 09:48:00 +0000
+Subject: [PATCH] mfd: ab8500: add static linkage for battery info
+In-Reply-To: <1353644071-14142-1-git-send-email-rajanikanth.hv@stericsson.com>
+References: <1353644071-14142-1-git-send-email-rajanikanth.hv@stericsson.com>
+Message-ID: <20121123094800.GH17471@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-11-22 at 16:44 +0200, Tomi Valkeinen wrote:
-> On 2012-11-22 16:34, Tero Kristo wrote:
-> 
-> > I guess you checked that DSS pwrdm is switching between RET and ON in
-> > your setup?
-> 
-> Yes:
-> 
-> # cat /debug/pm_debug/count |grep dss
-> [   35.356567] pwrdm state mismatch(l3init_pwrdm) 3 != 1
-> [   35.361938] pwrdm state mismatch(cam_pwrdm) 3 != 0
-> [   35.366973] pwrdm state mismatch(ivahd_pwrdm) 3 != 1
-> [   35.372253] pwrdm state mismatch(tesla_pwrdm) 3 != 1
-> [   35.377532] pwrdm state mismatch(abe_pwrdm) 3 != 1
-> dss_pwrdm (RET),OFF:1,RET:11,INA:0,ON:11,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-> l3_dss_clkdm->dss_pwrdm (0)
-> 
-> then I load and unload the dss modules, and then:
-> 
-> # cat /debug/pm_debug/count |grep dss
-> [   60.813629] pwrdm state mismatch(l3init_pwrdm) 3 != 1
-> [   60.819000] pwrdm state mismatch(cam_pwrdm) 3 != 0
-> [   60.824127] pwrdm state mismatch(ivahd_pwrdm) 3 != 1
-> [   60.829376] pwrdm state mismatch(tesla_pwrdm) 3 != 1
-> [   60.834625] pwrdm state mismatch(abe_pwrdm) 3 != 1
-> dss_pwrdm (ON),OFF:1,RET:21,INA:0,ON:22,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-> l3_dss_clkdm->dss_pwrdm (0)
-> 
-> >> Does the pwrdm mistakenly think that in RET state the DSS still keeps
-> >> the register contents?
-> > 
-> > This might be the case, however the pwrdm code should be generic and
-> > handle all domains properly. What is the tree / branch / commit you are
-> > using for testing this stuff? I can take a look at this also.
-> 
-> arm-soc/for-next
+How do you want this patch to be treated?
 
-I guess this is caused because some of the patches are still not in the
-for-next branch, it looks like at least this is missing:
+> From: "Rajanikanth H.V" <rajanikanth.hv@linaro.org>
+> 
+> enforce static linkage for battery attributes structures
+> 
+> this patch is against: "mfd-ab8500-add-devicetree-support-for-fuelgauge"
 
-https://patchwork.kernel.org/patch/1608901/
+Is this a patch or a branch? If it's a branch, why are you referencing
+it? Have you issued a pull request? If it's a patch (I'm assuming it
+hasn't been accepted yet), then you should just fix it up into the
+patch.
 
-...or the latest update done by Paul to that one.
+> Signed-off-by: Rajanikanth H.V <rajanikanth.hv@linaro.org>
+> ---
+>  drivers/power/ab8500_bmdata.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/power/ab8500_bmdata.c b/drivers/power/ab8500_bmdata.c
+> index ff8f055..db17930 100644
+> --- a/drivers/power/ab8500_bmdata.c
+> +++ b/drivers/power/ab8500_bmdata.c
+> @@ -143,7 +143,7 @@ static struct abx500_res_to_temp temp_tbl[] = {
+>   * Note that the batres_vs_temp table must be strictly sorted by falling
+>   * temperature values to work.
+>   */
+> -struct batres_vs_temp temp_to_batres_tbl_thermistor[] = {
+> +static struct batres_vs_temp temp_to_batres_tbl_thermistor[] = {
+>  	{ 40, 120},
+>  	{ 30, 135},
+>  	{ 20, 165},
+> @@ -157,7 +157,7 @@ struct batres_vs_temp temp_to_batres_tbl_thermistor[] = {
+>   * Note that the batres_vs_temp table must be strictly sorted by falling
+>   * temperature values to work.
+>   */
+> -struct batres_vs_temp temp_to_batres_tbl_ext_thermistor[] = {
+> +static struct batres_vs_temp temp_to_batres_tbl_ext_thermistor[] = {
+>  	{ 60, 300},
+>  	{ 30, 300},
+>  	{ 20, 300},
+> @@ -168,7 +168,7 @@ struct batres_vs_temp temp_to_batres_tbl_ext_thermistor[] = {
+>  };
+>  
+>  /* battery resistance table for LI ION 9100 battery */
+> -struct batres_vs_temp temp_to_batres_tbl_9100[] = {
+> +static struct batres_vs_temp temp_to_batres_tbl_9100[] = {
+>  	{ 60, 180},
+>  	{ 30, 180},
+>  	{ 20, 180},
+> -- 
+> 1.7.10.4
+> 
 
-The patch I posted appears to have a small merge induced bug, it is
-registering the context loss soc_ops for am33xx when it should actually
-register those for omap4. This might explain another bug I've been
-looking at in a different branch recently... The update Paul posted does
-not seem to have this problem, but I haven't tested it myself.
-
--Tero
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
