@@ -1,63 +1,42 @@
-From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
-Date: Sat, 24 Nov 2012 05:24:09 +0900
-Subject: [PATCH v2] ARM: Kirkwood: Add support LED of OpenBlocks A6
-Message-ID: <1353702249-4589-1-git-send-email-iwamatsu@nigauri.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 23 Nov 2012 12:32:27 -0800
+Subject: [PATCH] ARM: implement optimized percpu variable access
+In-Reply-To: <20121122113401.GC3113@mudshark.cambridge.arm.com>
+References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
+ <20121122113401.GC3113@mudshark.cambridge.arm.com>
+Message-ID: <20121123203226.GF5279@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OpenBlocks A6 has three leds via GPIO. This supports them.
-And this fix typo about led, because hardware manual has typo.
+* Will Deacon <will.deacon@arm.com> [121122 03:43]:
+> Hi Rob,
+> 
+> On Sun, Nov 11, 2012 at 03:20:40AM +0000, Rob Herring wrote:
+> > From: Rob Herring <rob.herring@calxeda.com>
+> > 
+> > Use the previously unused TPIDRPRW register to store percpu offsets.
+> > TPIDRPRW is only accessible in PL1, so it can only be used in the kernel.
+> > 
+> > This saves 2 loads for each percpu variable access which should yield
+> > improved performance, but the improvement has not been quantified.
+> > 
+> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> > ---
+> >  arch/arm/include/asm/Kbuild   |    1 -
+> >  arch/arm/include/asm/percpu.h |   44 +++++++++++++++++++++++++++++++++++++++++
+> >  arch/arm/kernel/smp.c         |    3 +++
+> >  3 files changed, 47 insertions(+), 1 deletion(-)
+> >  create mode 100644 arch/arm/include/asm/percpu.h
+> 
+> Russell pointed out to me that this patch will break on v6 CPUs if they don't
+> have the thread ID registers and we're running with SMP_ON_UP=y. Looking at
+> the TRMs, the only case we care about is 1136 < r1p0, but it does indeed break
+> there (I have a board on my desk).
 
-Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
----
- v2: Use gpio-leds, not gpio_leds.
+Sounds like it will break all omap2420 based systems like Nokia n8x0 :(
 
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts |   19 +++++++++++++++++++
- arch/arm/mach-kirkwood/board-openblocks_a6.c |    4 ++--
- 2 files changed, 21 insertions(+), 2 deletions(-)
+FYI those are booting with omap2plus_defconfig with SMP_ON_UP=y.
 
-diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-index 37dc3a7..e303169 100644
---- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-+++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-@@ -75,4 +75,23 @@
- 			};
- 		};
- 	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		led-red {
-+			label = "obsa6:red:stat";
-+			gpios = <&gpio1 9 1>;
-+		};
-+
-+		led-green {
-+			label = "obsa6:green:stat";
-+			gpios = <&gpio1 10 1>;
-+		};
-+
-+		led-yellow {
-+			label = "obsa6:yellow:stat";
-+			gpios = <&gpio1 11 1>;
-+		};
-+        };
- };
-diff --git a/arch/arm/mach-kirkwood/board-openblocks_a6.c b/arch/arm/mach-kirkwood/board-openblocks_a6.c
-index e71f984..815fc64 100644
---- a/arch/arm/mach-kirkwood/board-openblocks_a6.c
-+++ b/arch/arm/mach-kirkwood/board-openblocks_a6.c
-@@ -55,8 +55,8 @@ static unsigned int openblocks_a6_mpp_config[] __initdata = {
- 	MPP38_GPIO, /* INIT */
- 	MPP39_GPIO, /* USB OC */
- 	MPP41_GPIO, /* LED: Red */
--	MPP42_GPIO, /* LED: Yellow */
--	MPP43_GPIO, /* LED: Green */
-+	MPP42_GPIO, /* LED: Green */
-+	MPP43_GPIO, /* LED: Yellow */
- 	0,
- };
- 
--- 
-1.7.10.4
+Regards,
+
+Tony
