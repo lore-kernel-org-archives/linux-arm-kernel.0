@@ -1,43 +1,62 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 23 Nov 2012 19:41:15 +0100
-Subject: [PULL] at91: spi suport + pinctrl
-Message-ID: <20121123184115.GB4398@game.jcrosoft.org>
+Date: Fri, 23 Nov 2012 19:45:31 +0100
+Subject: [PATCH 2/3] ARM: at91: dt: sam9m10g45ek add spi support
+In-Reply-To: <1353696332-12741-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20121123184115.GB4398@game.jcrosoft.org>
+ <1353696332-12741-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1353696332-12741-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/at91sam9m10g45ek.dts |   33 ++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-	the following patch add the spi and its pinctrl support
-	to the sam9 IP that use the PDC (9263/9260/9g20/9g45)
-
-based on the mmc pull request
-
-please pull
-
-The following changes since commit c12a819e3ad9147acec3f20201fd51144f2244e9:
-
-  ARM: at91: pm9g45: add mmc support (2012-11-20 01:10:28 +0800)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git at91-3.8-pinctrl+mmc+spi
-
-for you to fetch changes up to 1869d34b6e3ff5bcdf7059dad431b8ae3818a4f6:
-
-  ARM: at91: dt: sam9m10g45ek add spi support (2012-11-22 04:51:42 +0800)
-
-----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (2):
-      ARM: at91: sam9: add spi dt support
-      ARM: at91: dt: sam9m10g45ek add spi support
-
- arch/arm/boot/dts/at91sam9260.dtsi     |   40 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9263.dtsi     |   40 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi     |   40 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts |   33 +++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/at91sam9260.c       |    2 ++
- arch/arm/mach-at91/at91sam9g45.c       |    2 ++
- 6 files changed, 157 insertions(+)
-
-Best Regards,
-J.
+diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+index 20c3191..829cbb1 100644
+--- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
++++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+@@ -102,6 +102,39 @@
+ 					};
+ 				};
+ 			};
++
++			spi0: spi at fffa4000 {
++				cs-gpios = <&pioB 3 0>;
++				status = "okay";
++
++				flash: at45db321d at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					compatible = "atmel,at45db321d", "atmel,at45", "atmel,dataflash";
++					reg = <0>;
++					spi-max-frequency = <15000000>;
++
++					bootstrap at 0 {
++						label = "bootstrap";
++						reg = <0x0 0x7fe0>;
++					};
++
++					barebox at 7fe0 {
++						label = "barebox";
++						reg = <0x7fe0 0x40110>;
++					};
++
++					bareboxenv at 480f0 {
++						label = "bareboxenv";
++						reg = <0x480f0 0x7fe0>;
++					};
++
++					kernel at 500d0 {
++						label = "Kernel";
++						reg = <0x500d0 0x3cff30>;
++					};
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+-- 
+1.7.10.4
