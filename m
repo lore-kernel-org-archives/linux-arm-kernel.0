@@ -1,85 +1,381 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 23 Nov 2012 17:12:21 +0100
-Subject: [PATCH] net/macb: Use non-coherent memory for rx buffers
-In-Reply-To: <1353678601-26888-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1353678601-26888-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <CAGhQ9VwWmP_B17LnAEqDHcL8Yd-s0C-Bf35z3+=vnJmK_NoCSw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 23 Nov 2012 16:17:59 +0000
+Subject: [PATCH v4 3/5] ARM: KVM: arch_timers: Add guest timer core support
+In-Reply-To: <20121110154618.3274.53380.stgit@chazy-air>
+References: <20121110154554.3274.77777.stgit@chazy-air>
+ <20121110154618.3274.53380.stgit@chazy-air>
+Message-ID: <20121123161759.GK32200@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
-
-On 23 November 2012 14:50, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> From: Havard Skinnemoen <havard@skinnemoen.net>
->
-> Allocate regular pages to use as backing for the RX ring and use the
-> DMA API to sync the caches. This should give a bit better performance
-> since it allows the CPU to do burst transfers from memory. It is also
-> a necessary step on the way to reduce the amount of copying done by
-> the driver.
->
-> Signed-off-by: Havard Skinnemoen <havard@skinnemoen.net>
-> [nicolas.ferre at atmel.com: adapt to newer kernel]
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Sat, Nov 10, 2012 at 03:46:19PM +0000, Christoffer Dall wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> We can inject a timer interrupt into the guest as a result of
+> three possible events:
+> - The virtual timer interrupt has fired while we were still
+>   executing the guest
+> - The timer interrupt hasn't fired, but it expired while we
+>   were doing the world switch
+> - A hrtimer we programmed earlier has fired
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 > ---
->  drivers/net/ethernet/cadence/macb.c | 206 +++++++++++++++++++++++-------------
->  drivers/net/ethernet/cadence/macb.h |  20 +++-
->  2 files changed, 148 insertions(+), 78 deletions(-)
+>  arch/arm/include/asm/kvm_arch_timer.h |   57 +++++++++
+>  arch/arm/kvm/reset.c                  |    9 +
+>  arch/arm/kvm/timer.c                  |  204 +++++++++++++++++++++++++++++++++
+>  3 files changed, 269 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/kvm/timer.c
+> 
+> diff --git a/arch/arm/include/asm/kvm_arch_timer.h b/arch/arm/include/asm/kvm_arch_timer.h
+> index 513b852..bd5e501 100644
+> --- a/arch/arm/include/asm/kvm_arch_timer.h
+> +++ b/arch/arm/include/asm/kvm_arch_timer.h
+> @@ -19,13 +19,68 @@
+>  #ifndef __ASM_ARM_KVM_ARCH_TIMER_H
+>  #define __ASM_ARM_KVM_ARCH_TIMER_H
+> 
+> +#include <linux/clocksource.h>
+> +#include <linux/hrtimer.h>
+> +#include <linux/workqueue.h>
+> +
+>  struct arch_timer_kvm {
+> +#ifdef CONFIG_KVM_ARM_TIMER
+> +       /* Is the timer enabled */
+> +       bool                    enabled;
+> +
+> +       /*
+> +        * Virtual offset (kernel access it through cntvoff, HYP code
+> +        * access it as two 32bit values).
+> +        */
+> +       union {
+> +               cycle_t         cntvoff;
+> +               struct {
+> +                       u32     low;    /* Restored only */
+> +                       u32     high;   /* Restored only */
+> +               } cntvoff32;
+> +       };
+> +#endif
 
-<snip>
+Endianness?
 
-> diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-> index 570908b..74e68a3 100644
-> --- a/drivers/net/ethernet/cadence/macb.h
-> +++ b/drivers/net/ethernet/cadence/macb.h
-> @@ -453,6 +453,23 @@ struct macb_dma_desc {
->  #define MACB_TX_USED_SIZE                      1
->
->  /**
-> + * struct macb_rx_page - data associated with a page used as RX buffers
-> + * @page: Physical page used as storage for the buffers
-> + * @phys: DMA address of the page
+>  };
+> 
+>  struct arch_timer_cpu {
+> +#ifdef CONFIG_KVM_ARM_TIMER
+> +       /* Registers: control register, timer value */
+> +       u32                             cntv_ctl;       /* Saved/restored */
+> +       union {
+> +               cycle_t                 cntv_cval;
+> +               struct {
+> +                       u32             low;            /* Saved/restored */
+> +                       u32             high;           /* Saved/restored */
+> +               } cntv_cval32;
+> +       };
+
+Similarly.
+
+> +       /*
+> +        * Anything that is not used directly from assembly code goes
+> +        * here.
+> +        */
+> +
+> +       /* Background timer used when the guest is not running */
+> +       struct hrtimer                  timer;
+> +
+> +       /* Work queued with the above timer expires */
+> +       struct work_struct              expired;
+> +
+> +       /* Background timer active */
+> +       bool                            armed;
+> +
+> +       /* Timer IRQ */
+> +       const struct kvm_irq_level      *irq;
+> +#endif
+>  };
+> 
+> -#ifndef CONFIG_KVM_ARM_TIMER
+> +#ifdef CONFIG_KVM_ARM_TIMER
+> +int kvm_timer_hyp_init(void);
+> +int kvm_timer_init(struct kvm *kvm);
+> +void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
+> +void kvm_timer_sync_to_cpu(struct kvm_vcpu *vcpu);
+> +void kvm_timer_sync_from_cpu(struct kvm_vcpu *vcpu);
+> +void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu);
+> +#else
+>  static inline int kvm_timer_hyp_init(void)
+>  {
+>         return 0;
+> diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
+> index b80256b..7463f5b 100644
+> --- a/arch/arm/kvm/reset.c
+> +++ b/arch/arm/kvm/reset.c
+> @@ -37,6 +37,12 @@ static struct kvm_regs a15_regs_reset = {
+>         .usr_regs.ARM_cpsr = SVC_MODE | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
+>  };
+> 
+> +#ifdef CONFIG_KVM_ARM_TIMER
+> +static const struct kvm_irq_level a15_virt_timer_ppi = {
+> +       { .irq = 27 },  /* irq: A7/A15 specific */
+
+This should be parameterised by the vCPU type.
+
+> +       .level = 1      /* level */
+> +};
+> +#endif
+> 
+>  /*******************************************************************************
+>   * Exported reset function
+> @@ -59,6 +65,9 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+>                         return -EINVAL;
+>                 cpu_reset = &a15_regs_reset;
+>                 vcpu->arch.midr = read_cpuid_id();
+> +#ifdef CONFIG_KVM_ARM_TIMER
+> +               vcpu->arch.timer_cpu.irq = &a15_virt_timer_ppi;
+> +#endif
+>                 break;
+>         default:
+>                 return -ENODEV;
+> diff --git a/arch/arm/kvm/timer.c b/arch/arm/kvm/timer.c
+> new file mode 100644
+> index 0000000..a241298
+> --- /dev/null
+> +++ b/arch/arm/kvm/timer.c
+
+Maybe kvm/arch_timer.c since it seems to be specific to that device and
+matches the naming for the main driver under kernel/? If we get new virtual
+timer devices in the future, I guess this would need to be split up so the
+arch-timer-specific bits are separate from generic hrtimer and kvm code.
+
+> @@ -0,0 +1,204 @@
+> +/*
+> + * Copyright (C) 2012 ARM Ltd.
+> + * Author: Marc Zyngier <marc.zyngier@arm.com>
 > + *
-> + * Each page is used to provide %MACB_RX_BUFFERS_PER_PAGE RX buffers.
-> + * The page gets an initial reference when it is inserted into the
-> + * ring, and an additional reference each time it is passed up the
-> + * stack as a fragment. When all the buffers have been used, we drop
-> + * the initial reference and allocate a new page. Any additional
-> + * references are dropped when the higher layers free the skb.
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 > + */
-> +struct macb_rx_page {
-> +       struct page             *page;
-> +       dma_addr_t              phys;
+> +
+> +#include <linux/of_irq.h>
+> +#include <linux/kvm.h>
+> +#include <linux/kvm_host.h>
+> +#include <linux/interrupt.h>
+> +
+> +#include <asm/arch_timer.h>
+> +
+> +#include <asm/kvm_vgic.h>
+> +#include <asm/kvm_arch_timer.h>
+> +
+> +static struct timecounter *timecounter;
+> +static struct workqueue_struct *wqueue;
+> +
+> +static cycle_t kvm_phys_timer_read(void)
+> +{
+> +       return timecounter->cc->read(timecounter->cc);
+> +}
+> +
+> +static void kvm_timer_inject_irq(struct kvm_vcpu *vcpu)
+> +{
+> +       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +
+> +       timer->cntv_ctl |= 1 << 1; /* Mask the interrupt in the guest */
+
+This is ARCH_TIMER_CTRL_IT_MASK right? We should make that definition
+available if it is needed here.
+
+> +       kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+> +                           vcpu->arch.timer_cpu.irq->irq,
+> +                           vcpu->arch.timer_cpu.irq->level);
+> +}
+> +
+> +static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+> +{
+> +       struct kvm_vcpu *vcpu = *(struct kvm_vcpu **)dev_id;
+> +
+> +       /*
+> +        * We disable the timer in the world switch and let it be
+> +        * handled by kvm_timer_sync_from_cpu(). Getting a timer
+> +        * interrupt at this point is a sure sign of some major
+> +        * breakage.
+> +        */
+> +       pr_warn("Unexpected interrupt %d on vcpu %p\n", irq, vcpu);
+> +       return IRQ_HANDLED;
+
+IRQ_NONE?
+
+> +}
+> +
+> +static void kvm_timer_inject_irq_work(struct work_struct *work)
+> +{
+> +       struct kvm_vcpu *vcpu;
+> +
+> +       vcpu = container_of(work, struct kvm_vcpu, arch.timer_cpu.expired);
+> +       vcpu->arch.timer_cpu.armed = false;
+> +       kvm_timer_inject_irq(vcpu);
+> +}
+> +
+> +static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+> +{
+> +       struct arch_timer_cpu *timer;
+> +       timer = container_of(hrt, struct arch_timer_cpu, timer);
+> +       queue_work(wqueue, &timer->expired);
+> +       return HRTIMER_NORESTART;
+> +}
+> +
+> +void kvm_timer_sync_to_cpu(struct kvm_vcpu *vcpu)
+> +{
+> +       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +
+> +       /*
+> +        * We're about to run this vcpu again, so there is no need to
+> +        * keep the background timer running, as we're about to
+> +        * populate the CPU timer again.
+> +        */
+> +       if (timer->armed) {
+> +               hrtimer_cancel(&timer->timer);
+> +               cancel_work_sync(&timer->expired);
+> +               timer->armed = false;
+> +       }
+> +}
+
+I think some helper functions like timer_is_armed, timer_arm and
+timer_disarm would make this more readable (resisting arm_timer, which
+confuses things more!).
+
+> +
+> +void kvm_timer_sync_from_cpu(struct kvm_vcpu *vcpu)
+> +{
+> +       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +       cycle_t cval, now;
+> +       u64 ns;
+> +
+> +       /* Check if the timer is enabled and unmasked first */
+> +       if ((timer->cntv_ctl & 3) != 1)
+> +               return;
+
+Again, we should create/use ARCH_TIMER #defines for this hardware bits.
+
+> +       cval = timer->cntv_cval;
+> +       now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
+
+We probably want to add an isb() *before* the mrrc in
+arch_timer_counter_read if you want to do things like this, because the
+counter can be speculated in advance.
+
+> +       BUG_ON(timer->armed);
+> +
+> +       if (cval <= now) {
+> +               /*
+> +                * Timer has already expired while we were not
+> +                * looking. Inject the interrupt and carry on.
+> +                */
+> +               kvm_timer_inject_irq(vcpu);
+> +               return;
+> +       }
+
+Does this buy you much? You still have to cope with the timer expiring here
+anyway.
+
+> +       timer->armed = true;
+> +       ns = cyclecounter_cyc2ns(timecounter->cc, cval - now);
+> +       hrtimer_start(&timer->timer, ktime_add_ns(ktime_get(), ns),
+> +                     HRTIMER_MODE_ABS);
+> +}
+> +
+> +void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
+> +{
+> +       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +
+> +       INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
+> +       hrtimer_init(&timer->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+> +       timer->timer.function = kvm_timer_expire;
+> +}
+> +
+> +static void kvm_timer_init_interrupt(void *info)
+> +{
+> +       unsigned int *irqp = info;
+> +
+> +       enable_percpu_irq(*irqp, 0);
+
+IRQ_TYPE_NONE
+
+> +}
+> +
+> +
+> +static const struct of_device_id arch_timer_of_match[] = {
+> +       { .compatible   = "arm,armv7-timer",    },
+> +       {},
 > +};
 > +
-> +/**
->   * struct macb_tx_skb - data about an skb which is being transmitted
->   * @skb: skb currently being transmitted
->   * @mapping: DMA address of the skb's data buffer
-> @@ -543,7 +560,7 @@ struct macb {
->
->         unsigned int            rx_tail;
->         struct macb_dma_desc    *rx_ring;
-> -       void                    *rx_buffers;
-> +       struct macb_rx_page     *rx_page;
->
->         unsigned int            tx_head, tx_tail;
->         struct macb_dma_desc    *tx_ring;
-> @@ -564,7 +581,6 @@ struct macb {
->
->         dma_addr_t              rx_ring_dma;
->         dma_addr_t              tx_ring_dma;
-> -       dma_addr_t              rx_buffers_dma;
->
->         struct mii_bus          *mii_bus;
->         struct phy_device       *phy_dev;
-> --
+> +int kvm_timer_hyp_init(void)
+> +{
+> +       struct device_node *np;
+> +       unsigned int ppi;
+> +       int err;
+> +
+> +       timecounter = arch_timer_get_timecounter();
+> +       if (!timecounter)
+> +               return -ENODEV;
+> +
+> +       np = of_find_matching_node(NULL, arch_timer_of_match);
+> +       if (!np) {
+> +               kvm_err("kvm_arch_timer: can't find DT node\n");
+> +               return -ENODEV;
+> +       }
+> +
+> +       ppi = irq_of_parse_and_map(np, 2);
+> +       if (!ppi) {
+> +               kvm_err("kvm_arch_timer: no virtual timer interrupt\n");
+> +               return -EINVAL;
+> +       }
+> +
+> +       err = request_percpu_irq(ppi, kvm_arch_timer_handler,
+> +                                "kvm guest timer", kvm_get_running_vcpus());
+> +       if (err) {
+> +               kvm_err("kvm_arch_timer: can't request interrupt %d (%d)\n",
+> +                       ppi, err);
+> +               return err;
+> +       }
+> +
+> +       wqueue = create_singlethread_workqueue("kvm_arch_timer");
+> +       if (!wqueue) {
+> +               free_percpu_irq(ppi, kvm_get_running_vcpus());
+> +               return -ENOMEM;
+> +       }
+> +
+> +       kvm_info("%s IRQ%d\n", np->name, ppi);
+> +       on_each_cpu(kvm_timer_init_interrupt, &ppi, 1);
 
-struct macb is shared between at91_ether and macb. Removing
-rx_buffers_dma and rx_buffers will break compilation on at91_ether.
+on_each_cpu currently just returns 0, but you could use that as your return
+value for good measure anyway.
 
-So please either leave the two struct members alone, for now, or fix
-up at91_ether at the same time.
+> +       return 0;
+> +}
+> +
+> +void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+> +{
+> +       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +
+> +       hrtimer_cancel(&timer->timer);
+> +       cancel_work_sync(&timer->expired);
+> +}
+> +
+> +int kvm_timer_init(struct kvm *kvm)
+> +{
+> +       if (timecounter && wqueue) {
+> +               kvm->arch.timer.cntvoff = kvm_phys_timer_read();
 
-regards
-Joachim Eastwood
+Shouldn't this be initialised to 0 and then updated on world switch?
+
+Will
