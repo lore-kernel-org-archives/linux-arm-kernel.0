@@ -1,88 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 Nov 2012 09:55:16 +0000
-Subject: [PATCH] mfd: ab8500: add static linkage for battery info
-In-Reply-To: <20121123094800.GH17471@gmail.com>
-References: <1353644071-14142-1-git-send-email-rajanikanth.hv@stericsson.com>
- <20121123094800.GH17471@gmail.com>
-Message-ID: <20121123095516.GJ17471@gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 23 Nov 2012 11:00:21 +0100
+Subject: [PATCH v3 3/7] usb: chipidea: usbmisc: fix a potential race
+ condition
+In-Reply-To: <20121123053635.GB22420@nchen-desktop>
+References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1353506793-8354-4-git-send-email-m.grzeschik@pengutronix.de>
+ <20121123053635.GB22420@nchen-desktop>
+Message-ID: <50AF4935.4000707@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> How do you want this patch to be treated?
->
-> Is this a patch or a branch? If it's a branch, why are you referencing
-> it? Have you issued a pull request? If it's a patch (I'm assuming it
-> hasn't been accepted yet), then you should just fix it up into the
-> patch.
-
-My apologies, I've just seen Anton's message to you.
-
-> > From: "Rajanikanth H.V" <rajanikanth.hv@linaro.org>
-> > 
-> > enforce static linkage for battery attributes structures
-
-    <subsystem>: Enforce static linkage for battery attributes structures
-                 ^
-                 Capital letter to start a sentence.
-
-It's always worth doing `git log --oneline <subsystem>` to see how
-the maintainer likes their $SUBJECT lines to be structured.
-
-> > this patch is against: "mfd-ab8500-add-devicetree-support-for-fuelgauge"
-
-There's no need to say this, please remove this line.
-
-You also need a short description of what you're actually doing
-in the patch.
-
-> > Signed-off-by: Rajanikanth H.V <rajanikanth.hv@linaro.org>
-> > ---
-> >  drivers/power/ab8500_bmdata.c |    6 +++---
-> >  1 file changed, 3 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/power/ab8500_bmdata.c b/drivers/power/ab8500_bmdata.c
-> > index ff8f055..db17930 100644
-> > --- a/drivers/power/ab8500_bmdata.c
-> > +++ b/drivers/power/ab8500_bmdata.c
-> > @@ -143,7 +143,7 @@ static struct abx500_res_to_temp temp_tbl[] = {
-> >   * Note that the batres_vs_temp table must be strictly sorted by falling
-> >   * temperature values to work.
-> >   */
-> > -struct batres_vs_temp temp_to_batres_tbl_thermistor[] = {
-> > +static struct batres_vs_temp temp_to_batres_tbl_thermistor[] = {
-> >  	{ 40, 120},
-> >  	{ 30, 135},
-> >  	{ 20, 165},
-> > @@ -157,7 +157,7 @@ struct batres_vs_temp temp_to_batres_tbl_thermistor[] = {
-> >   * Note that the batres_vs_temp table must be strictly sorted by falling
-> >   * temperature values to work.
-> >   */
-> > -struct batres_vs_temp temp_to_batres_tbl_ext_thermistor[] = {
-> > +static struct batres_vs_temp temp_to_batres_tbl_ext_thermistor[] = {
-> >  	{ 60, 300},
-> >  	{ 30, 300},
-> >  	{ 20, 300},
-> > @@ -168,7 +168,7 @@ struct batres_vs_temp temp_to_batres_tbl_ext_thermistor[] = {
-> >  };
-> >  
-> >  /* battery resistance table for LI ION 9100 battery */
-> > -struct batres_vs_temp temp_to_batres_tbl_9100[] = {
-> > +static struct batres_vs_temp temp_to_batres_tbl_9100[] = {
-> >  	{ 60, 180},
-> >  	{ 30, 180},
-> >  	{ 20, 180},
-> > -- 
-> > 1.7.10.4
-> > 
+On 11/23/2012 06:36 AM, Peter Chen wrote:
+> On Wed, Nov 21, 2012 at 03:06:29PM +0100, Michael Grzeschik wrote:
+>> From: Marc Kleine-Budde <mkl@pengutronix.de>
+>>
+>> This fixes a potential race condition where the ci13xxx_imx glue code
+>> could be fast enough to call one of the usbmisc_ops before he got a
+>> valid value on the static usbmisc pointer. To fix that we first set
+>> usbmisc, then call usbmisc_set_ops().
 > 
-> -- 
-> Lee Jones
-> Linaro ST-Ericsson Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+> usbmisc is subsys_initcall, and cil13xxx_imx is module_init. Any
+> potential situation that the ci13xxx_imx's probe is ran before the
+> usbmisc's probe is completed? Besides, there is usbmisc_ops value
+> check at the beginning of cil13xxx_imx's probe.
+
+It's bad practice to rely your code on some external ordering mechanism,
+even more if the correct solution is so simple. And as Sascha pointed
+out everything might be build as modules and loaded individually.
+
+Marc
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121123/0408da18/attachment.sig>
