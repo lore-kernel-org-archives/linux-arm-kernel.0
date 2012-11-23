@@ -1,33 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 23 Nov 2012 17:16:42 +0000
-Subject: [PATCH 0/5] remaining omap multiplatform patches for v3.8
- merge window
-In-Reply-To: <20121123165414.GE5279@atomide.com>
-References: <20121121174201.25576.61961.stgit@muffinssi.local>
- <20121122202431.GS3332@n2100.arm.linux.org.uk>
- <20121123165414.GE5279@atomide.com>
-Message-ID: <20121123171642.GU3332@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 23 Nov 2012 17:16:54 +0000
+Subject: [PATCH] ARM: implement optimized percpu variable access
+In-Reply-To: <50AFACFF.4000907@gmail.com>
+References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
+ <20121122113401.GC3113@mudshark.cambridge.arm.com>
+ <50AFACFF.4000907@gmail.com>
+Message-ID: <20121123171654.GO32200@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2012 at 08:54:15AM -0800, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [121122 12:26]:
-> > On Wed, Nov 21, 2012 at 09:42:19AM -0800, Tony Lindgren wrote:
-> > > There are few drivers still breaking because of their
-> > > use of plat/cpu.h and cpu_is_omap macros. The following
-> > > already have patches queued in linux next:
-> > > 
-> > > - drivers/staging/omapdrm/omap_drv.c
-> > > - drivers/staging/omapdrm/omap_dmm_tiler.h
+On Fri, Nov 23, 2012 at 05:06:07PM +0000, Rob Herring wrote:
+> On 11/22/2012 05:34 AM, Will Deacon wrote:
+> > On Sun, Nov 11, 2012 at 03:20:40AM +0000, Rob Herring wrote:
+> >> From: Rob Herring <rob.herring@calxeda.com>
+> >>
+> >> Use the previously unused TPIDRPRW register to store percpu offsets.
+> >> TPIDRPRW is only accessible in PL1, so it can only be used in the kernel.
+> >>
+> >> This saves 2 loads for each percpu variable access which should yield
+> >> improved performance, but the improvement has not been quantified.
+> >>
+> >> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> >> ---
+> >>  arch/arm/include/asm/Kbuild   |    1 -
+> >>  arch/arm/include/asm/percpu.h |   44 +++++++++++++++++++++++++++++++++++++++++
+> >>  arch/arm/kernel/smp.c         |    3 +++
+> >>  3 files changed, 47 insertions(+), 1 deletion(-)
+> >>  create mode 100644 arch/arm/include/asm/percpu.h
 > > 
-> > Note that there's a bunch of OMAP drivers in staging which are trivially
-> > broken anyway; I've not been bothering to report their breakages which
-> > my build system is finding - I figure that if they're trivially broken
-> > with compile time errors which aren't config related, and no one's
-> > bothering to fixing them, then no one is even trying to build them -
-> > which means they're not being used.
+> > Russell pointed out to me that this patch will break on v6 CPUs if they don't
+> > have the thread ID registers and we're running with SMP_ON_UP=y. Looking at
+> > the TRMs, the only case we care about is 1136 < r1p0, but it does indeed break
+> > there (I have a board on my desk).
 > 
-> Do you have a list of the broken drivers somewhere?
+> Are there any non ARM Ltd. cores without v6K we need to worry about? I
+> wouldn't think there are many 1136 < r1p0 out there (your desk being an
+> obvious exception).
 
-No, I've been ignoring the error messages from anything in staging, so
-it'll be a matter of digging through the last seven days build logs.
+To be honest, I'm not sure. It would be good if Marvell and Qualcomm could
+chime in as I wouldn't be surprised if they had some parts that fit this
+category.
+
+As for the 1136, we have a few spare if you want one!
+
+> > There are a few ways to fix this:
+> > 
+> > (1) Use the SMP alternates to patch the code when running on UP systems. I
+> >     tried this and the code is absolutely diabolical (see below).
+> > 
+> > (2) Rely on the registers being RAZ/WI rather than undef (which seems to be
+> >     the case on my board) and add on the pcpu delta manually. This is also
+> >     really horrible.
+> > 
+> > (3) Just make the thing depend on __LINUX_ARM_ARCH__ >= 7. Yes, we lose on
+> >     11MPCore, but we win on A8 and the code is much, much simpler.
+> 
+> I would lean towards this option. It really only has to depend on v6K
+> and !v6. We can refine the multi-platform selection to allow v7 and v6K
+> only builds in addition to v7 and v6. I think we are going to have
+> enough optimizations with v7 (gcc optimizations, thumb2, unaligned
+> accesses, etc.) that most people will do v7 only builds.
+
+Sounds alright to me, and I'm happy to test on the boards that I have.
+
+Will
