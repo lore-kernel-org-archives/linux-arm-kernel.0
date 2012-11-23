@@ -1,25 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 23 Nov 2012 23:06:44 +0900
-Subject: [PATCH 1/1] ASoC: Ux500: Initialise PCM from MSP probe rather
- than as a device
-In-Reply-To: <1353675941-7303-1-git-send-email-lee.jones@linaro.org>
-References: <1353675941-7303-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20121123140643.GO4529@opensource.wolfsonmicro.com>
+From: rric@kernel.org (Robert Richter)
+Date: Fri, 23 Nov 2012 15:10:25 +0100
+Subject: [PATCH 1/1] ARM: oprofile: add A5/A7/A15 entries in op_perf_name
+In-Reply-To: <20121120170817.GG27765@mudshark.cambridge.arm.com>
+References: <1351853016-4476-1-git-send-email-jgq516@gmail.com>
+ <20121105113102.GF3351@mudshark.cambridge.arm.com>
+ <20121120121747.GJ2504@rric.localhost>
+ <20121120155717.GD26475@mudshark.cambridge.arm.com>
+ <20121120163158.GO2504@rric.localhost>
+ <20121120165517.GC27765@mudshark.cambridge.arm.com>
+ <20121120170601.GR2504@rric.localhost>
+ <20121120170817.GG27765@mudshark.cambridge.arm.com>
+Message-ID: <20121123141025.GG24690@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2012 at 01:05:41PM +0000, Lee Jones wrote:
-> The PCM is a pseudo-device. It doesn't have any of it's own registers
-> or hardware. It rather acts as a layer of abstraction for DMA
-> transfers. Hence, instead of classifying it as a device in its own
-> right, we call the initialisation from the MSP driver.
+On 20.11.12 17:08:17, Will Deacon wrote:
+> > The advantage of a solution where userland updates cpu_type is that we
+> > never need to update the kernel anymore. This means, cpu detection can
+> > be part of the tools.
+> 
+> True, but the kernel-side perf code still needs updating to support the new
+> CPU so I don't think you win much.
 
-Applied, thanks.  Please always submit patches against the latest
-development versions of code.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121123/2cb89e80/attachment.sig>
+You also need perf support to use operf. If oprofile can update
+cpu_type, the oprofile kernel interface would work for new hardware
+without changes. We have support for both then, operf and opcontrol.
+
+-Robert
