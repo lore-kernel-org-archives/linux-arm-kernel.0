@@ -1,41 +1,31 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Fri, 23 Nov 2012 04:33:43 +0000
-Subject: [PATCH] video: da8xx-fb: clk_get on connection id fck
-In-Reply-To: <50AB7F7E.1070400@ti.com>
-References: <1353415261-30080-1-git-send-email-prakash.pm@ti.com>
- <50AB7F7E.1070400@ti.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3E9FB8D9@DBDE01.ent.ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 22 Nov 2012 20:42:50 -0800
+Subject: [GIT PULL] Samsung fixes-3 for v3.7
+In-Reply-To: <10e701cdc91d$151bf240$3f53d6c0$%kim@samsung.com>
+References: <50AB913D.2020604@samsung.com>
+ <10e701cdc91d$151bf240$3f53d6c0$%kim@samsung.com>
+Message-ID: <CAOesGMg7_UY5oWz_NDDRM0OykDybtwRrYOK1RVCjo6gLKAzXbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
+On Thu, Nov 22, 2012 at 5:51 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Kukjin Kim wrote:
+>>
+>> Hi Arnd, Olof
+>>
+>> Here is Samsung fixes for v3.7 and it is for fixing of mdma1 address for
+>> exynos4210 rev0 SoC.
+>>
+>> Please pull from:
+>> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>> v3.7-samsung-fixes-3
+>>
+>
+> Probably, missed?
 
-On Tue, Nov 20, 2012 at 18:32:54, Nori, Sekhar wrote:
-> On 11/20/2012 6:11 PM, Manjunathappa wrote:
-> > do clk_get on connection id "fck" to support OMAP based
-> > platforms having multiple clocks for module. Without this
-> > driver change clk_get fails on am335x.
-> > 
-> > This patch is based on the discussion in community
-> > http://marc.info/?l=linux-kernel&m=135166018907827&w=2
-> > 
-> > Signed-off-by: Manjunathappa <prakash.pm@ti.com>
-> > Cc: Vaibhav Hiremath <hvaibhav@ti.com>
-> 
-> For the mach-davinci changes:
-> 
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
-> 
-> Florian,
-> 
-> I assume you will want to take this through your tree?
-> 
+Yes, thanks for the reminder. By the way, I didn't know you supported
+rev0 silicon?
 
-Could you please pull in this?
+Pulled in now, I'll send a fresh pull request tomorrow.
 
-Thanks,
-Prakash
-
-> Thanks,
-> Sekhar
-> 
+-Olof
