@@ -1,69 +1,121 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Thu, 22 Nov 2012 22:50:02 -0800
-Subject: [PATCH 10/10] ARM: FIQ: Get rid of init_FIQ()
-In-Reply-To: <1353652071.755665772@f76.mail.ru>
-References: <20121123003849.GA973@lizard.mcd25758.sjc.wayport.net>
- <1353642030.851395840@f20.mail.ru> <20121123055328.GA21566@lizard>
- <1353652071.755665772@f76.mail.ru>
-Message-ID: <20121123065002.GB27827@lizard>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 23 Nov 2012 14:53:41 +0800
+Subject: [PATCH v3 6/7] usb: chipidea: usbmisc: add mx53 support
+In-Reply-To: <1353506793-8354-7-git-send-email-m.grzeschik@pengutronix.de>
+References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1353506793-8354-7-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <20121123065340.GD22420@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2012 at 10:27:51AM +0400, Alexander Shiyan wrote:
-> > On Fri, Nov 23, 2012 at 07:40:30AM +0400, Alexander Shiyan wrote:
-> > [...]
-> > > >  static unsigned long no_fiq_insn;
-> > > > +static int got_no_fiq_insn;
-> > > > @@ -78,11 +79,14 @@ void show_fiq_list(struct seq_file *p, int prec)
-> > > >  
-> > > >  void set_fiq_handler(void *start, unsigned int length)
-> > > >  {
-> > > > -#if defined(CONFIG_CPU_USE_DOMAINS)
-> > > > -	memcpy((void *)0xffff001c, start, length);
-> > > > -#else
-> > > > -	memcpy(vectors_page + 0x1c, start, length);
-> > > > +	unsigned long *addr = (void *)0xffff001c;
-> > > > +
-> > > > +#ifndef CONFIG_CPU_USE_DOMAINS
-> > > > +	addr = vectors_page + 0x1c;
-> > > >  #endif
-> > > > +	if (!cmpxchg(&got_no_fiq_insn, 0, 1))
-> > > > +		no_fiq_insn = *addr;
-> > > > +	memcpy(addr, start, length);
-> > > >  	flush_icache_range(0xffff001c, 0xffff001c + length);
-> > > >  	if (!vectors_high())
-> > > >  		flush_icache_range(0x1c, 0x1c + length);
-> > > > @@ -126,8 +130,3 @@ EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
-> > > > -
-> > > > -void __init init_FIQ(void)
-> > > > -{
-> > > > -	no_fiq_insn = *(unsigned long *)0xffff001c;
-> > > 
-> > > it seems that this is wrong. In this case we have an uninitialized variable and
-> > > sequential call claim_fiq and release_fiq could be fatal. FIXME please.
-> > 
-> > Um... I don't think I understand, can you please elaborate?
+On Wed, Nov 21, 2012 at 03:06:32PM +0100, Michael Grzeschik wrote:
+> This adds mx53 as the next user of the usbmisc driver and makes it
+> possible to disable the overcurrent-detection of the internal phy.
 > 
-> OK, I'll try to explain it.
-> At the end of the release_fiq function we have a call fiq_op. For the default
-> handler - is a fiq_def_op function, and we call this function with the option
-> "relinquish = 0", i.e. we want to restore old fiq_handler. But if we do not call
-> set_fiq_handler never before, we will have an uninitialized no_fiq_insn variable.
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> ---
+> Changes since v2:
+> * added defines for register offsets and bitmasks
+> * fixed disable_oc option for all ports
+> 
+>  drivers/usb/chipidea/usbmisc_imx.c |   51 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
+> 
+> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+> index e090e0f..b1811df 100644
+> --- a/drivers/usb/chipidea/usbmisc_imx.c
+> +++ b/drivers/usb/chipidea/usbmisc_imx.c
+> @@ -19,6 +19,13 @@
+>  
+>  #define USB_DEV_MAX 4
+>  
+> +#define MX53_USB_OTG_PHY_CTRL_0_OFFSET	0x08;
+> +#define MX53_USB_UH2_CTRL_OFFSET	0x14;
+> +#define MX53_USB_UH3_CTRL_OFFSET	0x18;
+> +#define MX53_BM_OVER_CUR_DIS_H1		BIT(5)
+> +#define MX53_BM_OVER_CUR_DIS_OTG	BIT(8)
+> +#define MX53_BM_OVER_CUR_DIS_UHx	BIT(30)
+> +
+>  #define MX6_BM_OVER_CUR_DIS		BIT(7)
 
-It should not matter when or in what order anyone calls the
-set_fiq_handler(), since it stores "no FIQ instruction" into no_fiq_insn
-at its first invocation:
+As every SoC platform's non-core register mapping is different,
+it is better to use .h to put register bit definition
+>  
+>  struct imx_usbmisc {
+> @@ -54,6 +61,45 @@ static struct usbmisc_usb_device *get_usbdev(struct device *dev)
+>  	return &usbmisc->usbdev[i];
+>  }
+>  
+> +static int usbmisc_imx53_init(struct device *dev)
+> +{
+> +	struct usbmisc_usb_device *usbdev;
+> +	void __iomem *reg;
+> +	unsigned long flags;
+> +	u32 val;
+> +
+> +	usbdev = get_usbdev(dev);
+> +	if (IS_ERR(usbdev))
+> +		return PTR_ERR(usbdev);
+> +
+> +	if (usbdev->disable_oc) {
+> +		spin_lock_irqsave(&usbmisc->lock, flags);
+> +		switch (usbdev->index) {
+> +		case 0:
+> +			reg = usbmisc->base + MX53_USB_OTG_PHY_CTRL_0_OFFSET;
+> +			val = readl(reg) | MX53_BM_OVER_CUR_DIS_OTG;
+> +			break;
+> +		case 1:
+> +			reg = usbmisc->base + MX53_USB_OTG_PHY_CTRL_0_OFFSET;
+> +			val = readl(reg) | MX53_BM_OVER_CUR_DIS_H1;
+> +			break;
+> +		case 2:
+> +			reg = usbmisc->base + MX53_USB_UH2_CTRL_OFFSET;
+> +			val = readl(reg) | MX53_BM_OVER_CUR_DIS_UHx;
+> +			break;
+> +		case 3:
+> +			reg = usbmisc->base + MX53_USB_UH3_CTRL_OFFSET;
+> +			val = readl(reg) | MX53_BM_OVER_CUR_DIS_UHx;
+> +			break;
+> +		}
+> +		if (reg && val)
+> +			writel(val, reg);
+> +		spin_unlock_irqrestore(&usbmisc->lock, flags);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static int usbmisc_imx6q_init(struct device *dev)
+>  {
+>  
+> @@ -76,11 +122,16 @@ static int usbmisc_imx6q_init(struct device *dev)
+>  	return 0;
+>  }
+>  
+> +static const struct usbmisc_ops imx53_usbmisc_ops = {
+> +	.init = usbmisc_imx53_init,
+> +};
+> +
+>  static const struct usbmisc_ops imx6q_usbmisc_ops = {
+>  	.init = usbmisc_imx6q_init,
+>  };
+>  
+>  static const struct of_device_id usbmisc_imx_dt_ids[] = {
+> +	{ .compatible = "fsl,imx53-usbmisc", .data = (void *)&imx53_usbmisc_ops },
+>  	{ .compatible = "fsl,imx6q-usbmisc", .data = (void *)&imx6q_usbmisc_ops },
+>  	{ /* sentinel */ }
+>  };
+> -- 
+> 1.7.10.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
-	if (!cmpxchg(&got_no_fiq_insn, 0, 1))
-		no_fiq_insn = *addr;
+-- 
 
-If we never called set_fiq_handler() before, during release_fiq() we'll:
-
-1. Copy the initial instruction from the vector page to 'no_fiq_insn';
-2. Copy the initial instruction from 'no_fiq_insn' to the vector page;
-
-So no_fiq_insn gets initialized, then we just instantly write the same
-value back.
-
-Thanks,
-Anton.
+Best Regards,
+Peter Chen
