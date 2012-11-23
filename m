@@ -1,21 +1,22 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 23 Nov 2012 17:04:42 +0100
-Subject: [PATCH] net/macb: GEM DMA configuration register update
-In-Reply-To: <1353678541-26839-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1353678541-26839-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <CAGhQ9Vw=Yk7RAMVsBM71QWNjsD99PnrTgRs5+pK8V2e=HirQqg@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 23 Nov 2012 11:06:15 -0500 (EST)
+Subject: [PATCH 06/29] usb: host: ehci-mv: fix clk APIs
+In-Reply-To: <1353549910-988-6-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1211231104500.1734-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 November 2012 14:49, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> Add information to the DMA Configuration Register to
-> maximize system performance:
-> - rx/tx packet buffer full memory size
-> - allow possibility to use INCR16 if supported
->
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Wed, 21 Nov 2012, Chao Xie wrote:
 
-Acked-by: Joachim Eastwood <manabian@gmail.com
+> From: Chao Xie <chao.xie@marvell.com>
+> 
+> Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
 
-regards
-Joachim Eastwood
+I don't like patches with no patch description.  You should write 
+something here, explaining why the change is needed.  What's wrong with 
+the clk APIs?
+
+The same hold for your other patches, except perhaps the trivial one 
+that removes an unused local variable definition.
+
+Alan Stern
