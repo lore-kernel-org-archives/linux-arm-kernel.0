@@ -1,27 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 23 Nov 2012 10:44:44 +0900
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <CACRpkdaNmBpfONDpt7zFqLaqfiGm+ELpO-v5gZmM0rEi_AzijQ@mail.gmail.com>
-References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
- <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
- <20121120215429.B621F3E1821@localhost>
- <20121121013133.GE4673@opensource.wolfsonmicro.com>
- <CACRpkdaNmBpfONDpt7zFqLaqfiGm+ELpO-v5gZmM0rEi_AzijQ@mail.gmail.com>
-Message-ID: <20121123014443.GD4385@opensource.wolfsonmicro.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 23 Nov 2012 10:51:40 +0900
+Subject: [GIT PULL] Samsung fixes-3 for v3.7
+In-Reply-To: <50AB913D.2020604@samsung.com>
+References: <50AB913D.2020604@samsung.com>
+Message-ID: <10e701cdc91d$151bf240$3f53d6c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 09:57:22AM +0100, Linus Walleij wrote:
+Kukjin Kim wrote:
+> 
+> Hi Arnd, Olof
+> 
+> Here is Samsung fixes for v3.7 and it is for fixing of mdma1 address for
+> exynos4210 rev0 SoC.
+> 
+> Please pull from:
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> v3.7-samsung-fixes-3
+> 
 
-> Is it correct to assume that this library will be useful also for ALSA
-> SoC type of devices?
+Probably, missed?
 
-ASoC has facilities for autogenerating the bulk of the sequences which
-with modern devices is all that you really need.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121123/6c6389e6/attachment.sig>
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> Thanks.
+> 
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+> 
+> The following changes since commit
+> f4a75d2eb7b1e2206094b901be09adb31ba63681:
+> 
+>    Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
+> 
+> are available in the git repository at:
+>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> v3.7-samsung-fixes-3
+> 
+> Bartlomiej Zolnierkiewicz (1):
+>        ARM: EXYNOS: PL330 MDMA1 fix for revision 0 of Exynos4210 SOC
+> 
+>   arch/arm/mach-exynos/dma.c              |    3 +++
+>   arch/arm/mach-exynos/include/mach/map.h |    1 +
+>   2 files changed, 4 insertions(+), 0 deletions(-)
