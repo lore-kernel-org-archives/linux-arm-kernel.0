@@ -1,20 +1,36 @@
-From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Fri, 23 Nov 2012 18:27:19 +0900
-Subject: [PATCH V3] ARM: EXYNOS5: Add I2S SFR base addresse
-In-Reply-To: <1352176605-16153-1-git-send-email-padma.v@samsung.com>
-References: <1352176605-16153-1-git-send-email-padma.v@samsung.com>
-Message-ID: <000501cdc95c$c2c3f9d0$484bed70$@com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 23 Nov 2012 17:33:29 +0800
+Subject: [GIT PULL][for 3.8] pull request from arch pxa tree on armsoc/fix
+Message-ID: <CAN1soZx3fXEaryZYj7-s4aABF+kfkMpG595uteCwGh2eTsx1GQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 6, 2012 at 1:37 PM, Padmavathi Venna wrote:
-> Subject: [PATCH V3] ARM: EXYNOS5: Add I2S SFR base addresse
-> 
-> This patch adds I2S controller0,1,2 base addresses
-> 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Hi Olof & Arnd,
 
-Acked-by: Sangbeom Kim <sbkim73@samsung.com>
+Please help to merge armsoc/fix branch in arch pxa git tree.
 
-Thanks,
-Sangbeom.
+It's just a new fix and it's not essential to us, I put it on the fix
+branch that you just pulled. You only need to pick up this commit in
+below.
+
+Regards
+Haojian
+
+The following changes since commit 8757e168190a6ed2cd4aa23fc59bf86b0091b596:
+
+  ARM: pxa: fix pxa25x gpio wakeup setting (2012-11-21 13:14:42 +0800)
+
+are available in the git repository at:
+
+  git://github.com/hzhuang1/linux.git armsoc/fix
+
+for you to fetch changes up to d90cb69ddd032854b633c4069ba3493651cb8ebc:
+
+  ARM: pxa: add dummy SA1100 rtc clock in pxa25x (2012-11-23 17:27:41 +0800)
+
+----------------------------------------------------------------
+Andrea Adami (1):
+      ARM: pxa: add dummy SA1100 rtc clock in pxa25x
+
+ arch/arm/mach-pxa/pxa25x.c |    1 +
+ 1 file changed, 1 insertion(+)
