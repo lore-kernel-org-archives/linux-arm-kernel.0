@@ -1,124 +1,94 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 23 Nov 2012 11:36:31 +0100
-Subject: [PATCH v4 3/3] ARM: OMAP: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <87zk2djox6.fsf@dell.be.48ers.dk>
-References: <1353338956-19420-1-git-send-email-zonque@gmail.com>
- <1353338956-19420-4-git-send-email-zonque@gmail.com>
- <87zk2djox6.fsf@dell.be.48ers.dk>
-Message-ID: <50AF51AF.4050003@gmail.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Fri, 23 Nov 2012 10:42:13 +0000
+Subject: [PATCH v4 00/11] Support for AM33xx PWM Subsystem
+In-Reply-To: <20121122211616.GK16716@avionic-0098.adnet.avionic-design.de>
+References: <1353503469-18634-1-git-send-email-avinashphilip@ti.com>
+ <20121122211616.GK16716@avionic-0098.adnet.avionic-design.de>
+Message-ID: <518397C60809E147AF5323E0420B992E3E9EE9FC@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-On 19.11.2012 21:52, Peter Korsgaard wrote:
->>>>>> "D" == Daniel Mack <zonque@gmail.com> writes:
+On Fri, Nov 23, 2012 at 02:46:16, Thierry Reding wrote:
+> On Wed, Nov 21, 2012 at 06:40:57PM +0530, Philip, Avinash wrote:
+> > In AM33xx PWM sub modules like ECAP, EHRPWM & EQEP are  integrated to
+> > PWM subsystem. All these submodules shares the resources (clock) & has
+> > a clock gating register in PWM Subsystem. This patch series creates a
+> > parent PWM Subsystem driver to handle access synchronization of shared
+> > resources & clock gating from PWM Subsystem configuration space.
+> > Also Device tree nodes populated to support parent child relation
+> > between PWMSS, ECAP & EHRPWM submodules.
+> > In addition EHRPWM module requires explicit clock gating from control
+> > module & is handled by patch #2 & 8.
+> > 
+> > As suggested by  Thierry for handling clock gating for PWM submodules
+> > should handle with a global function. This requires config space
+> > handling done independent from driver and is done at parent driver.
+> > 
+> > So the parent<->child relation adopted to handle
+> > 1. pm runtime synchronization
+> > 2. PWM subsystem common config space clock gating for PWM submodules.
+> > 
+> > Patches supports
+> > - Driver support for parent child relation handled patch #1
+> > - Optional EHRPWM tb clock in patch #2
+> > - Parent child in HWMOD handled at patch #3
+> > - Device tree binding support handled in patch #4, 6 &8
+> > - pinctrl support in patch #5 & 7.
+> > - DT node populated in patch #9 ,10 & 11.
+> > 
+> > This patch series based on omap_dt/for_3.8/dts_part2 and tested
+> > on am335x-evm & am335x-evmsk.
+> > 
+> > It depends on [1]
+> > 
+> > 1. https://lkml.org/lkml/2012/11/21/70
+> > pwm: Device tree support for PWM polarity
+> > 
+> > Changes since v3:
+> > 	- Rebased on top of omap_dt/for_3.8/dts_part2
+> > 	- Add pwm backlight for am335xevm_sk
+> > 	- Moved tipwmss.h to pwm-tipwmss.h
+> > 
+> > Philip, Avinash (11):
+> >   PWMSS: Add PWM Subsystem driver for parent<->child relationship
+> >   ARM: am33xx: clk: Add optional clock for EHRPWM
+> >   ARM: OMAP: AM33xx hwmod: Add parent-child relationship for PWM
+> >     subsystem
+> >   pwm: pwm-tiecap: Add device-tree binding support for APWM driver
+> >   pwm: pwm-tiecap: pinctrl support
+> >   pwm: pwm-tiehrpwm: Add device-tree binding support for EHRPWM driver
+> >   pwm: pwm-tiehrpwm: pinctrl support
+> >   pwm: pwm-tiehrpwm: Adding TBCLK gating support.
+> >   ARM: dts: AM33XX: Add PWMSS device tree nodes
+> >   ARM: dts: AM33XX: Add PWM backlight DT data to am335x-evm
+> >   ARM: dts: AM33XX: Add PWM backlight DT data to am335x-evmsk
 > 
 > Hi,
 > 
->  D> This patch adds basic DT bindings for OMAP GPMC.
->  D> The actual peripherals are instanciated from child nodes within the GPMC
-> 
-> s/instanciated/instantiated/
+> So how do you want to get this merged? Should I take patches 1, 4, 5, 6,
+> 7 and 8 while the rest go through some ARM tree? Can we still merge this
+> for 3.8?
 
-Thanks, fixed.
+These patches can go on, as DT node is not populated. Also without patch #3
+PWM Subsystem driver won't come and hence the platform devices for ECAP 
+& EHRPWM. So there is no issue in getting this merged in PWM subsystem.
 
-> 
->  D> node, and the only type of device that is currently supported is NAND.
-> 
->  D> Code was added to parse the generic GPMC timing parameters and some
->  D> documentation with examples on how to use them.
-> 
->  D> Successfully tested on an AM33xx board.
-> 
->  D> Signed-off-by: Daniel Mack <zonque@gmail.com>
->  D> ---
->  D>  .../devicetree/bindings/mtd/gpmc-nand.txt          |  84 ++++++++++
->  D>  arch/arm/mach-omap2/gpmc.c                         | 170 +++++++++++++++++++++
->  D>  2 files changed, 254 insertions(+)
->  D>  create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nand.txt
-> 
->  D> diff --git a/Documentation/devicetree/bindings/mtd/gpmc-nand.txt b/Documentation/devicetree/bindings/mtd/gpmc-nand.txt
->  D> new file mode 100644
->  D> index 0000000..20aa5b9
->  D> --- /dev/null
->  D> +++ b/Documentation/devicetree/bindings/mtd/gpmc-nand.txt
->  D> @@ -0,0 +1,84 @@
->  D> +Device tree bindings for GPMC connected NANDs
->  D> +
->  D> +GPMC connected NAND (found on OMAP boards) are represented as child nodes of
->  D> +the GPMC controller with a name of "nand".
->  D> +
->  D> +All timing relevant properties as well as generic gpmc child properties are
->  D> +explained in a separate documents - please refer to
->  D> +Documentation/devicetree/bindings/bus/ti-gpmc.txt
-> 
-> Which this patch seems to be missing?
+> The patches don't seem to have build dependencies on each other
+> but how about runtime dependencies?
 
-True - sorry for that. Will be back at v5.
+Patch #3 required for PWM subsystem driver to populate PWM subsystem HWMOD
+Entries and DT entries. 
+Patch #2 required for EHRPWM to have TBCLK handling. This patch required for
+EHRPWM driver functionality. But currently DT node is disabled for EHRPWM.
 
->  D> +
->  D> +For NAND specific properties such as ECC modes or bus width, please refer to
->  D> +Documentation/devicetree/bindings/mtd/nand.txt
->  D> +
->  D> +
->  D> +Required properties:
->  D> +
->  D> + - reg:		The CS line the peripheral is connected to
->  D> +
->  D> +Optional properties:
->  D> +
->  D> + - nand-bus-width: 		Set this numeric value to 16 if the hardware
->  D> +				is wired that way. If not specified, a bus
->  D> +				width of 8 is assumed.
->  D> + - ti,nand-ecc-opt:		A string setting the ECC layout to use. One of:
->  D> +
->  D> +	Layouts for 1-bit ecc: stored at end of spare area:
->  D> +
->  D> +		"software"	Software method (default)
->  D> +		"hw"		Hardware method (let gpmc do the error detection)
-> 
-> Nit: why are you spelling out 'software' when everything else is shortened?
+So the dependency on the entire series is patch #3, for backlight through PWM
+ecap.
 
-Right. Fixed.
+I will follow up with OMAP subsystem community for getting reviews/ack
+
+Thanks
+Avinash
 
 > 
->  D> +
->  D> +	Layouts for 1-bit ecc: stored at beginning of spare area as romcode:
->  D> +
->  D> +		"hw-romcode"	gpmc method & romcode layout
->  D> +		"bch4"		4-bit BCH ecc code
->  D> +		"bch8"		8-bit BCH ecc code
->  D> +
+> Thierry
 > 
-> These are not 1-bit - Well, romcode might be depending on SoC. Looking at
-> omap2.c it seems to be an alias for hw, so that isn't really helpful on
-> E.G. am33xx where you should select bch8 to have something compatible
-> with the romcode.
-
-Not sure whether I follow you here. drivers/mtd/nand/omap2.c handles
-cases for pdata->ecc_opt == OMAP_ECC_BCH8_CODE_HW, so the DT bindings
-need to offer a way to set it.
-
-Or are you purely referring to the comments only?
-
->  D> + - ti,nand-ecc-use-elm:		Property without value to specify that the
->  D> +				hardware error correction mode should be used.
-> 
-> It's called the error location module. Like you pointed out yourself,
-> this property isn't really nice. I haven't looked at the elm bindings in
-> detail, but couldn't the nand driver automatically use the elm if the
-> device tree provides a node for it? Perhaps the elm should be a subnode
-> of the nand one?
-
-That is to be discussed for the elm driver then. I'm not sure though
-whether the elm should always be used when its DT node is present.
-
-For now, I would leave it the way it is and have an optional
-"ti,nand-ecc-use-elm". I just added some more lines of documenation to
-describe the fact that the elm driver is needed in order to make it work.
-
-
-
-Daniel
