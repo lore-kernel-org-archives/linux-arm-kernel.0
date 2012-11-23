@@ -1,47 +1,97 @@
-From: i.mazanov@gmail.com (Igor Mazanov)
-Date: Fri, 23 Nov 2012 20:55:07 +0400
-Subject: [PATCH v3 5/5] ARM: OMAP2+: omap2plus_defconfig: Enable RTC
- support
-In-Reply-To: <1353404927-14412-6-git-send-email-anilkumar@ti.com>
-References: <1353404927-14412-1-git-send-email-anilkumar@ti.com>
- <1353404927-14412-6-git-send-email-anilkumar@ti.com>
-Message-ID: <50AFAA6B.9020706@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 23 Nov 2012 17:00:36 +0000
+Subject: [PATCH v4 3/5] ARM: KVM: arch_timers: Add guest timer core support
+In-Reply-To: <50AFA9BC.1010105@arm.com>
+References: <20121110154554.3274.77777.stgit@chazy-air>
+ <20121110154618.3274.53380.stgit@chazy-air>
+ <20121123161759.GK32200@mudshark.cambridge.arm.com>
+ <50AFA9BC.1010105@arm.com>
+Message-ID: <20121123170036.GN32200@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AnilKumar Ch wrote:
-> AM33XX family of devices uses RTC module, one has to manually enable
-> this support to use RTC features. So this patch enable RTC driver in
-> omap2plus_defconfig.
+On Fri, Nov 23, 2012 at 04:52:12PM +0000, Marc Zyngier wrote:
+> On 23/11/12 16:17, Will Deacon wrote:
+> >> diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
+> >> index b80256b..7463f5b 100644
+> >> --- a/arch/arm/kvm/reset.c
+> >> +++ b/arch/arm/kvm/reset.c
+> >> @@ -37,6 +37,12 @@ static struct kvm_regs a15_regs_reset = {
+> >>         .usr_regs.ARM_cpsr = SVC_MODE | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
+> >>  };
+> >>
+> >> +#ifdef CONFIG_KVM_ARM_TIMER
+> >> +static const struct kvm_irq_level a15_virt_timer_ppi = {
+> >> +       { .irq = 27 },  /* irq: A7/A15 specific */
+> >
+> > This should be parameterised by the vCPU type.
 > 
-> Signed-off-by: AnilKumar Ch <anilkumar-l0cyMroinI0@public.gmane.org>
-> ---
->  arch/arm/configs/omap2plus_defconfig |    1 +
->  1 file changed, 1 insertion(+)
+> This is already A15 specific, and assigned in an A15 specific code
+> section below.
+
+Right, but we can take the interrupt number from the device-tree, like we do
+for the host anyway.
+
+> >> +static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+> >> +{
+> >> +       struct kvm_vcpu *vcpu = *(struct kvm_vcpu **)dev_id;
+> >> +
+> >> +       /*
+> >> +        * We disable the timer in the world switch and let it be
+> >> +        * handled by kvm_timer_sync_from_cpu(). Getting a timer
+> >> +        * interrupt at this point is a sure sign of some major
+> >> +        * breakage.
+> >> +        */
+> >> +       pr_warn("Unexpected interrupt %d on vcpu %p\n", irq, vcpu);
+> >> +       return IRQ_HANDLED;
+> >
+> > IRQ_NONE?
 > 
-> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> index a4b330e..8839ac9 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -194,6 +194,7 @@ CONFIG_SDIO_UART=y
->  CONFIG_MMC_OMAP=y
->  CONFIG_MMC_OMAP_HS=y
->  CONFIG_RTC_CLASS=y
-> +CONFIG_RTC_DRV_OMAP=y
->  CONFIG_RTC_DRV_TWL92330=y
->  CONFIG_RTC_DRV_TWL4030=y
->  CONFIG_DMADEVICES=y
+> I don't think so. We're actually handling the interrupt (admittedly in a
+> very basic way), and as it is a per-cpu interrupt, there will be noone
+> else to take care of it.
 
-Hello,
+For an SPI, returning IRQ_NONE would (eventually) silence a screaming
+interrupt because the generic IRQ bits would disable it. I'm not sure if that
+applies to PPIs or not but if it does, I'd say that's a good reason to use it.
 
-But this is not enough, we need to change drivers/rtc/Kconfig too. This change 
-was offered in this thread
+> 
+> >> +       BUG_ON(timer->armed);
+> >> +
+> >> +       if (cval <= now) {
+> >> +               /*
+> >> +                * Timer has already expired while we were not
+> >> +                * looking. Inject the interrupt and carry on.
+> >> +                */
+> >> +               kvm_timer_inject_irq(vcpu);
+> >> +               return;
+> >> +       }
+> >
+> > Does this buy you much? You still have to cope with the timer expiring here
+> > anyway.
+> 
+> It definitely does from a latency point of view. Programming a timer
+> that will expire right away, calling the interrupt handler, queuing the
+> work queue, waiting for the workqueue to be scheduled and finally
+> delivering the interrupt... If we can catch a few of these early (and we
+> do), it is worth it.
 
-http://marc.info/?l=linux-arm-kernel&m=135057569913027&w=2
+Ok, interesting. I wasn't sure how often that happened in practice.
 
-But, may be all this previous rtc-related changes accounted already in some 
-development branch. I just doesn't see it in the current master. In this case, 
-when could we get RTC support in the current kernel?
+> >> +int kvm_timer_init(struct kvm *kvm)
+> >> +{
+> >> +       if (timecounter && wqueue) {
+> >> +               kvm->arch.timer.cntvoff = kvm_phys_timer_read();
+> >
+> > Shouldn't this be initialised to 0 and then updated on world switch?
+> 
+> No. You do not want your virtual offset to drift. Otherwise you'll
+> observe something like time dilatation, and your clocks will drift.
+> Plus, you really want all your vcpus to be synchronized. Allowing them
+> to drift apart could be an interesting experience... ;-)
 
-Regards,
-Igor.
+In which case, why do we initialise it to the physical timer in the first
+place? Surely the value doesn't matter, as long as everybody agrees on what
+it is?
+
+Will
