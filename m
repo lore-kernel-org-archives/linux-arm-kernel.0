@@ -1,38 +1,29 @@
-From: viresh.kumar@linaro.org (viresh kumar)
-Date: Fri, 23 Nov 2012 21:23:31 +0530
-Subject: [PATCH 3/8] pl080.h: moved from arm/include/asm/hardware to
- include/linux/amba/
-In-Reply-To: <1353683310-23654-4-git-send-email-ciminaghi@gnudd.com>
-References: <1353683310-23654-1-git-send-email-ciminaghi@gnudd.com>
- <1353683310-23654-4-git-send-email-ciminaghi@gnudd.com>
-Message-ID: <CAOh2x=keCbnPQzxB+AT5hEt_ukQ6GhPLuxkaQJCML27H9LbWwg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 23 Nov 2012 16:54:09 +0100
+Subject: [PATCH 0/2] Input: nomadik-ske-keypad - clk fixups
+In-Reply-To: <1351779602-13818-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1351779602-13818-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CAPDyKFq+MBo2338SiAF-mdDHpgTDJ0p6k2BaicJpSutGqtaubA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2012 at 8:38 PM, Davide Ciminaghi <ciminaghi@gnudd.com> wrote:
-> From: Alessandro Rubini <rubini@gnudd.com>
+On 1 November 2012 15:20, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+> From: Ulf Hansson <ulf.hansson@linaro.org>
 >
-> The header is used by drivers/dma/amba-pl08x.c, which can be compiled
-> under x86, where PL080 exists under a PCI-to-AMBA bridge. This patche
-> moves it where it can be accessed by other architectures, and fixes
-> all users.
+> Due to the convert to the common clk driver these changes for clks are needed.
 >
-> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
-> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
-> ---
->  arch/arm/include/asm/hardware/pl080.h |  146 ---------------------------------
->  arch/arm/mach-s3c64xx/dma.c           |    2 +-
->  arch/arm/mach-spear3xx/spear3xx.c     |    2 +-
->  arch/arm/mach-spear6xx/spear6xx.c     |    2 +-
->  drivers/dma/amba-pl08x.c              |    2 +-
->  include/linux/amba/pl080.h            |  146 +++++++++++++++++++++++++++++++++
->  6 files changed, 150 insertions(+), 150 deletions(-)
->  delete mode 100644 arch/arm/include/asm/hardware/pl080.h
->  create mode 100644 include/linux/amba/pl080.h
+> Ulf Hansson (2):
+>   Input: nomadik-ske-keypad - fixup use of clk
+>   Input: nomadik-ske-keypad - start using the apb_pclk
+>
+>  drivers/input/keyboard/nomadik-ske-keypad.c |   34 +++++++++++++++++++++++----
+>  1 file changed, 29 insertions(+), 5 deletions(-)
+>
+> --
+> 1.7.10
+>
 
-Again, generating this patch with
+Just a kind reminder here. Do we see any issues with merging this?
 
-git format-patch -C -M would have given us an easier patch to review.
-
---
-viresh
+Kind regards
+Ulf Hansson
