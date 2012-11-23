@@ -1,88 +1,111 @@
 From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Thu, 22 Nov 2012 16:42:47 -0800
-Subject: [PATCH 4/4] ARM: versatile: Make able to use UART ports for KGDB FIQ
- debugger
-In-Reply-To: <20121123002957.GA31679@lizard.mcd25758.sjc.wayport.net>
-References: <20121123002957.GA31679@lizard.mcd25758.sjc.wayport.net>
-Message-ID: <1353631367-4107-4-git-send-email-anton.vorontsov@linaro.org>
+Date: Thu, 22 Nov 2012 16:49:54 -0800
+Subject: [PATCH 01/10] ARM: mach-rpc: Don't register FIQs with genirq
+In-Reply-To: <20121123003849.GA973@lizard.mcd25758.sjc.wayport.net>
+References: <20121123003849.GA973@lizard.mcd25758.sjc.wayport.net>
+Message-ID: <1353631803-4853-1-git-send-email-anton.vorontsov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If enabled, kernel will able to enter KGDB upon serial line activity on
-UART ports.
+mach-rps registers FIQ controller with genirq, which makes no sense:
+these FIQs cannot be routed to IRQs, so there is no need to register
+it with genirq.
 
-Note that even with this patch and CONFIG_KGDB_FIQ is enabled, you still
-need to pass kgdb_fiq.enable=1 kernel command line option, otherwise UART
-will behave in a normal way.
-
-By default UART0 is used, but this can be changed via kgdb_fiq.uart_num
-kernel command line option.
+This effectively makes FIQ_START irrelevant.
 
 Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
 ---
- arch/arm/Kconfig                   |  1 +
- arch/arm/mach-versatile/Makefile   |  1 +
- arch/arm/mach-versatile/kgdb_fiq.c | 31 +++++++++++++++++++++++++++++++
- 3 files changed, 33 insertions(+)
- create mode 100644 arch/arm/mach-versatile/kgdb_fiq.c
+ arch/arm/mach-rpc/dma.c               |  4 ++--
+ arch/arm/mach-rpc/include/mach/irqs.h |  5 +++++
+ arch/arm/mach-rpc/irq.c               | 19 ++++---------------
+ 3 files changed, 11 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0bfa6cf..a94d9c5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -337,6 +337,7 @@ config ARCH_VERSATILE
- 	select PLAT_VERSATILE_CLCD
- 	select PLAT_VERSATILE_CLOCK
- 	select PLAT_VERSATILE_FPGA_IRQ
-+	select ARCH_MIGHT_HAVE_KGDB_FIQ
- 	help
- 	  This enables support for ARM Ltd Versatile board.
+diff --git a/arch/arm/mach-rpc/dma.c b/arch/arm/mach-rpc/dma.c
+index 85883b2..4a525be 100644
+--- a/arch/arm/mach-rpc/dma.c
++++ b/arch/arm/mach-rpc/dma.c
+@@ -289,13 +289,13 @@ static void floppy_enable_dma(unsigned int chan, dma_t *dma)
  
-diff --git a/arch/arm/mach-versatile/Makefile b/arch/arm/mach-versatile/Makefile
-index 81fa3fe..bfd761f 100644
---- a/arch/arm/mach-versatile/Makefile
-+++ b/arch/arm/mach-versatile/Makefile
-@@ -7,3 +7,4 @@ obj-$(CONFIG_ARCH_VERSATILE_PB)		+= versatile_pb.o
- obj-$(CONFIG_MACH_VERSATILE_AB)		+= versatile_ab.o
- obj-$(CONFIG_MACH_VERSATILE_DT)		+= versatile_dt.o
- obj-$(CONFIG_PCI)			+= pci.o
-+obj-$(CONFIG_KGDB_FIQ)			+= kgdb_fiq.o
-diff --git a/arch/arm/mach-versatile/kgdb_fiq.c b/arch/arm/mach-versatile/kgdb_fiq.c
-new file mode 100644
-index 0000000..3cdf71d
---- /dev/null
-+++ b/arch/arm/mach-versatile/kgdb_fiq.c
-@@ -0,0 +1,31 @@
-+/*
-+ * KGDB FIQ board support
-+ *
-+ * Copyright 2012 Linaro Ltd.
-+ *		  Anton Vorontsov <anton.vorontsov@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
-+ */
+ 	set_fiq_handler(fiqhandler_start, fiqhandler_length);
+ 	set_fiq_regs(&regs);
+-	enable_fiq(fdma->fiq);
++	iomd_unmask_fiq(fdma->fiq);
+ }
+ 
+ static void floppy_disable_dma(unsigned int chan, dma_t *dma)
+ {
+ 	struct floppy_dma *fdma = container_of(dma, struct floppy_dma, dma);
+-	disable_fiq(fdma->fiq);
++	iomd_mask_fiq(fdma->fiq);
+ 	release_fiq(&fh);
+ }
+ 
+diff --git a/arch/arm/mach-rpc/include/mach/irqs.h b/arch/arm/mach-rpc/include/mach/irqs.h
+index 6868e17..f27ead1 100644
+--- a/arch/arm/mach-rpc/include/mach/irqs.h
++++ b/arch/arm/mach-rpc/include/mach/irqs.h
+@@ -37,6 +37,11 @@
+ #define FIQ_EXPANSIONCARD	6
+ #define FIQ_FORCE		7
+ 
++#ifndef __ASSEMBLY__
++extern void iomd_mask_fiq(int fiq);
++extern void iomd_unmask_fiq(int fiq);
++#endif
 +
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/kgdb.h>
-+#include <mach/hardware.h>
-+#include <mach/platform.h>
-+#include <asm/hardware/vic.h>
-+
-+static int kgdb_fiq;
-+module_param_named(uart_num, kgdb_fiq, int, 0600);
-+MODULE_PARM_DESC(uart_num, "UART<number> port to use for KGDB FIQ");
-+
-+static int __init kgdb_fiq_init(void)
-+{
-+	WARN_ON(kgdb_fiq > INT_UARTINT2 - INT_UARTINT0);
-+
-+	return kgdb_register_fiq(INT_UARTINT0 + kgdb_fiq,
-+				 vic_fiq_select,
-+				 vic_is_fiq_rised);
-+}
-+console_initcall(kgdb_fiq_init);
+ /*
+  * This is the offset of the FIQ "IRQ" numbers
+  */
+diff --git a/arch/arm/mach-rpc/irq.c b/arch/arm/mach-rpc/irq.c
+index 3e4fa84..a4221b3 100644
+--- a/arch/arm/mach-rpc/irq.c
++++ b/arch/arm/mach-rpc/irq.c
+@@ -89,30 +89,24 @@ static struct irq_chip iomd_dma_chip = {
+ 	.irq_unmask	= iomd_unmask_irq_dma,
+ };
+ 
+-static void iomd_mask_irq_fiq(struct irq_data *d)
++void iomd_mask_fiq(int fiq)
+ {
+ 	unsigned int val, mask;
+ 
+-	mask = 1 << (d->irq & 7);
++	mask = 1 << (fiq & 7);
+ 	val = iomd_readb(IOMD_FIQMASK);
+ 	iomd_writeb(val & ~mask, IOMD_FIQMASK);
+ }
+ 
+-static void iomd_unmask_irq_fiq(struct irq_data *d)
++void iomd_unmask_fiq(int fiq)
+ {
+ 	unsigned int val, mask;
+ 
+-	mask = 1 << (d->irq & 7);
++	mask = 1 << (fiq & 7);
+ 	val = iomd_readb(IOMD_FIQMASK);
+ 	iomd_writeb(val | mask, IOMD_FIQMASK);
+ }
+ 
+-static struct irq_chip iomd_fiq_chip = {
+-	.irq_ack	= iomd_mask_irq_fiq,
+-	.irq_mask	= iomd_mask_irq_fiq,
+-	.irq_unmask	= iomd_unmask_irq_fiq,
+-};
+-
+ extern unsigned char rpc_default_fiq_start, rpc_default_fiq_end;
+ 
+ void __init rpc_init_irq(void)
+@@ -155,11 +149,6 @@ void __init rpc_init_irq(void)
+ 						 handle_level_irq);
+ 			set_irq_flags(irq, flags);
+ 			break;
+-
+-		case 64 ... 71:
+-			irq_set_chip(irq, &iomd_fiq_chip);
+-			set_irq_flags(irq, IRQF_VALID);
+-			break;
+ 		}
+ 	}
+ 
 -- 
 1.8.0
