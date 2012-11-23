@@ -1,29 +1,24 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 23 Nov 2012 16:54:09 +0100
-Subject: [PATCH 0/2] Input: nomadik-ske-keypad - clk fixups
-In-Reply-To: <1351779602-13818-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1351779602-13818-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CAPDyKFq+MBo2338SiAF-mdDHpgTDJ0p6k2BaicJpSutGqtaubA@mail.gmail.com>
+From: viresh.kumar@linaro.org (viresh kumar)
+Date: Fri, 23 Nov 2012 21:26:41 +0530
+Subject: [PATCH 4/8] watchdog: sp805_wdt depends on ARM
+In-Reply-To: <1353683310-23654-5-git-send-email-ciminaghi@gnudd.com>
+References: <1353683310-23654-1-git-send-email-ciminaghi@gnudd.com>
+ <1353683310-23654-5-git-send-email-ciminaghi@gnudd.com>
+Message-ID: <CAOh2x=mL8NzQuwjpuehbq3TiRp5dddS4fwYRT7OSQVicfLGZyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 November 2012 15:20, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-> From: Ulf Hansson <ulf.hansson@linaro.org>
+On Fri, Nov 23, 2012 at 8:38 PM, Davide Ciminaghi <ciminaghi@gnudd.com> wrote:
+> From: Alessandro Rubini <rubini@gnudd.com>
 >
-> Due to the convert to the common clk driver these changes for clks are needed.
+> The SP805 driver is only used by the Spear machines, and uses
+> writel_relaxed, which is not available on all architectures.
 >
-> Ulf Hansson (2):
->   Input: nomadik-ske-keypad - fixup use of clk
->   Input: nomadik-ske-keypad - start using the apb_pclk
+> The dependency from CONFIG_ARM avoids compilation problems under
+> randomconfig when CONFIG_ARM_AMBA is enabled for x86 builds.
 >
->  drivers/input/keyboard/nomadik-ske-keypad.c |   34 +++++++++++++++++++++++----
->  1 file changed, 29 insertions(+), 5 deletions(-)
->
-> --
-> 1.7.10
->
+> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
+> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+> Signed-off-by: Davide Ciminaghi <ciminaghi@gnudd.com>
 
-Just a kind reminder here. Do we see any issues with merging this?
-
-Kind regards
-Ulf Hansson
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
