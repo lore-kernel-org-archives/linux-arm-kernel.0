@@ -1,38 +1,43 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 23 Nov 2012 22:58:04 +0530
-Subject: [PATCH 1/8] DMA: PL330: use prefix in reg names to build under x86
-In-Reply-To: <20121123172337.GD24119@mail.gnudd.com>
-References: <1353683310-23654-1-git-send-email-ciminaghi@gnudd.com>
- <1353683310-23654-2-git-send-email-ciminaghi@gnudd.com>
- <CAOh2x=ncwZNQDKvFia_yrCmmDJ1Kkk+wP4fhcdeo_YtE97ridA@mail.gmail.com>
- <20121123172337.GD24119@mail.gnudd.com>
-Message-ID: <CAKohpokUHv96wutU1ZLxxnndR3wfTr3kjh3UKREtuiVV-V8+EA@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 23 Nov 2012 19:41:15 +0100
+Subject: [PULL] at91: spi suport + pinctrl
+Message-ID: <20121123184115.GB4398@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 November 2012 22:53, Davide Ciminaghi <ciminaghi@gnudd.com> wrote:
-> I tried that, but the resulting patch does not apply:
+HI,
 
-It will not. Git doesn't support it.
+	the following patch add the spi and its pinctrl support
+	to the sam9 IP that use the PDC (9263/9260/9g20/9g45)
 
-> $ git checkout -b pl330_test next-20121115
-> Switched to a new branch 'pl330_test'
->
-> $ git format-patch --word-diff 5f1e3c5~..5f1e3c5
+based on the mmc pull request
 
-I never asked you to do this. I asked you to use git diff command, just to
-verify what you have done is right or not? You can't send output of that
-as a patch :)
+please pull
 
-And maybe post that as an part of non-commit log, so that others can
-quickly review it. But because your patch is too big, it will make it a huge
-patch.
+The following changes since commit c12a819e3ad9147acec3f20201fd51144f2244e9:
 
-It was just an trick i was sharing with everybody else.
+  ARM: at91: pm9g45: add mmc support (2012-11-20 01:10:28 +0800)
 
-> Did I do anything wrong (sorry, I'm not a git guru at all) ?
+are available in the git repository at:
 
-Neither am i :)
+  git://github.com/at91linux/linux-at91.git at91-3.8-pinctrl+mmc+spi
 
---
-viresh
+for you to fetch changes up to 1869d34b6e3ff5bcdf7059dad431b8ae3818a4f6:
+
+  ARM: at91: dt: sam9m10g45ek add spi support (2012-11-22 04:51:42 +0800)
+
+----------------------------------------------------------------
+Jean-Christophe PLAGNIOL-VILLARD (2):
+      ARM: at91: sam9: add spi dt support
+      ARM: at91: dt: sam9m10g45ek add spi support
+
+ arch/arm/boot/dts/at91sam9260.dtsi     |   40 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9263.dtsi     |   40 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi     |   40 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts |   33 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/at91sam9260.c       |    2 ++
+ arch/arm/mach-at91/at91sam9g45.c       |    2 ++
+ 6 files changed, 157 insertions(+)
+
+Best Regards,
+J.
