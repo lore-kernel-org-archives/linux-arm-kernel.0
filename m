@@ -1,108 +1,152 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 23 Nov 2012 11:14:26 +0900
-Subject: [PATCH] ARM: EXYNOS: Add support for secondary CPU bring-up on
- Exynos4412
-In-Reply-To: <1353599419-24218-1-git-send-email-t.figa@samsung.com>
-References: <1353599419-24218-1-git-send-email-t.figa@samsung.com>
-Message-ID: <110a01cdc920$436c4d40$ca44e7c0$%kim@samsung.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Fri, 23 Nov 2012 10:50:22 +0800
+Subject: [RFC][PATCH] printk: add boot_quiet param to support deferred printk
+ while booting
+Message-ID: <1353639022-13273-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> Exynos4412 uses different information register for each core. This patch
-> adjusts the bring-up code to take that into account.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/platsmp.c | 30 ++++++++++++++++++++++++------
->  1 file changed, 24 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index f93d820..4ca8ff1 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -36,8 +36,22 @@
-> 
->  extern void exynos4_secondary_startup(void);
-> 
-> -#define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
-> -				S5P_INFORM5 : S5P_VA_SYSRAM)
-> +static inline void __iomem *cpu_boot_reg_base(void)
-> +{
-> +	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
-> +		return S5P_INFORM5;
-> +	return S5P_VA_SYSRAM;
-> +}
-> +
-> +static inline void __iomem *cpu_boot_reg(int cpu)
-> +{
-> +	void __iomem *boot_reg;
-> +
-> +	boot_reg = cpu_boot_reg_base();
-> +	if (soc_is_exynos4412())
-> +		boot_reg += 4*cpu;
-> +	return boot_reg;
-> +}
-> 
->  /*
->   * Write pen_release in a way that is guaranteed to be visible to all
-> @@ -84,6 +98,7 @@ static void __cpuinit exynos_secondary_init(unsigned int cpu)
->  static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  {
->  	unsigned long timeout;
-> +	unsigned long phys_cpu = cpu_logical_map(cpu);
-> 
->  	/*
->  	 * Set synchronisation state between this boot processor
-> @@ -99,7 +114,7 @@ static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct task_struct
->  	 * Note that "pen_release" is the hardware CPU ID, whereas
->  	 * "cpu" is Linux's internal ID.
->  	 */
-> -	write_pen_release(cpu_logical_map(cpu));
-> +	write_pen_release(phys_cpu);
-> 
->  	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
->  		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
-> @@ -133,7 +148,7 @@ static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct task_struct
->  		smp_rmb();
-> 
->  		__raw_writel(virt_to_phys(exynos4_secondary_startup),
-> -			CPU1_BOOT_REG);
-> +							cpu_boot_reg(phys_cpu));
->  		gic_raise_softirq(cpumask_of(cpu), 0);
-> 
->  		if (pen_release == -1)
-> @@ -181,6 +196,8 @@ static void __init exynos_smp_init_cpus(void)
-> 
->  static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
->  {
-> +	int i;
-> +
->  	if (!soc_is_exynos5250())
->  		scu_enable(scu_base_addr());
-> 
-> @@ -190,8 +207,9 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
->  	 * until it receives a soft interrupt, and then the
->  	 * secondary CPU branches to this address.
->  	 */
-> -	__raw_writel(virt_to_phys(exynos4_secondary_startup),
-> -			CPU1_BOOT_REG);
-> +	for (i = 1; i < max_cpus; ++i)
-> +		__raw_writel(virt_to_phys(exynos4_secondary_startup),
-> +					cpu_boot_reg(cpu_logical_map(i)));
->  }
-> 
->  struct smp_operations exynos_smp_ops __initdata = {
-> --
-> 1.8.0
+"quiet" boot param can make system boot faster without printk time.
+but many embedded systems want default loglevel as a always online
+diganostic, and it stills want a fast boot procedure without losing
+printk.
 
-Looks OK to me, will apply.
-Thanks.
+for example, for rearview and some other urgent scenerios, we want
+kernel boot more quickly without printk so that the vedio driver
+begins work earlier to show rearview image.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+another example, embedded systems using hibernation as a fast boot
+way will begin restore snapshot image earlier as we don't have
+printk time before the storage like sd/nand begins working.
+
+this patch makes the boot printk been dumped only either we get
+an urgent message(loglevel<4) or system state becomes RUNNING.
+
+Tested on SiRFprimaII, boot log without boot_quiet:
+Starting kernel ...
+...
+[    0.782970] sirfsoc_i2c b00e0000.i2c:  I2C adapter ready to operate
+[    0.788861] sirfsoc_i2c b00f0000.i2c:  I2C adapter ready to operate
+[    0.795006] cpuidle: using governor ladder
+[    0.798703] cpuidle: using governor menu
+[    0.802848] sdhci: Secure Digital Host Controller Interface driver
+[    0.808769] sdhci: Copyright(c) Pierre Ossman
+[    0.860817] mmc0: SDHCI controller on 56000000.sdhci [56000000.sdhci] using DMA
+[    0.865492] sdhci-pltfm: SDHCI platform and OF driver helper
+[    0.871614] TCP: cubic registered
+[    0.874253] VFP support v0.3: implementor 41 architecture 3 part 30 variant 9 rev 2
+[    0.887860] Freeing init memory: 856K
+...
+
+boot log with quiet_boot, you will see all printk is moved ahead and
+kernel boot with only a half time of the first time:
+
+Starting kernel ...
+...
+[    0.363188] sirfsoc_i2c b00e0000.i2c:  I2C adapter ready to operate
+[    0.363682] sirfsoc_i2c b00f0000.i2c:  I2C adapter ready to operate
+[    0.364010] cpuidle: using governor ladder
+[    0.364021] cpuidle: using governor menu
+[    0.364162] sdhci: Secure Digital Host Controller Interface driver
+[    0.364170] sdhci: Copyright(c) Pierre Ossman
+[    0.410932] mmc0: SDHCI controller on 56000000.sdhci [56000000.sdhci] using DMA
+[    0.411180] sdhci-pltfm: SDHCI platform and OF driver helper
+[    0.411871] TCP: cubic registered
+[    0.411926] VFP support v0.3: implementor 41 architecture 3 part 30 variant 9 rev 2
+[    0.417897] Freeing init memory: 856K
+...
+
+Signed-off-by: Barry Song <Barry.Song@csr.com>
+---
+ Note: This is only a RFC, after we agree about the idea, i will move
+ the boot_log_buf to __initdata.
+
+ Documentation/kernel-parameters.txt |    4 ++++
+ kernel/printk.c                     |   31 +++++++++++++++++++++++++++++++
+ 2 files changed, 35 insertions(+), 0 deletions(-)
+
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index 9776f06..d6060eb 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -2383,6 +2383,10 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 
+ 	quiet		[KNL] Disable most log messages
+ 
++	boot_quiet	[KNL] Defer boot log messages to the moment either
++			we get a high level message or system state becomes
++			running.
++
+ 	r128=		[HW,DRM]
+ 
+ 	raid=		[HW,RAID]
+diff --git a/kernel/printk.c b/kernel/printk.c
+index 2d607f4..0b88d6bf 100644
+--- a/kernel/printk.c
++++ b/kernel/printk.c
+@@ -250,6 +250,9 @@ static u32 clear_idx;
+ #define LOG_ALIGN __alignof__(struct log)
+ #endif
+ #define __LOG_BUF_LEN (1 << CONFIG_LOG_BUF_SHIFT)
++static char __boot_log_buf[__LOG_BUF_LEN] __aligned(LOG_ALIGN);
++static int boot_log_len;
++
+ static char __log_buf[__LOG_BUF_LEN] __aligned(LOG_ALIGN);
+ static char *log_buf = __log_buf;
+ static u32 log_buf_len = __LOG_BUF_LEN;
+@@ -1247,6 +1250,16 @@ module_param(ignore_loglevel, bool, S_IRUGO | S_IWUSR);
+ MODULE_PARM_DESC(ignore_loglevel, "ignore loglevel setting, to"
+ 	"print all kernel messages to the console.");
+ 
++static bool boot_quiet = false;
++
++static int __init boot_quiet_kernel(char *str)
++{
++        boot_quiet = true;
++        return 0;
++}
++
++early_param("boot_quiet", boot_quiet_kernel);
++
+ /*
+  * Call the console drivers, asking them to write out
+  * log_buf[start] to log_buf[end - 1].
+@@ -1258,6 +1271,20 @@ static void call_console_drivers(int level, const char *text, size_t len)
+ 
+ 	trace_console(text, 0, len, len);
+ 
++	/*
++	 * if users require boot_quiet feature, we don't write console
++	 * until we get a non-quiet message or system state becomes
++	 * running
++	 */
++	if (boot_quiet && (system_state == SYSTEM_BOOTING) &&
++		(level >= 4) && (level < console_loglevel)) {
++		if (len + boot_log_len > __LOG_BUF_LEN)
++			len = __LOG_BUF_LEN - boot_log_len;
++		memcpy(__boot_log_buf + boot_log_len, text, len);
++		boot_log_len += len;
++		return;
++	}
++
+ 	if (level >= console_loglevel && !ignore_loglevel)
+ 		return;
+ 	if (!console_drivers)
+@@ -1273,6 +1300,10 @@ static void call_console_drivers(int level, const char *text, size_t len)
+ 		if (!cpu_online(smp_processor_id()) &&
+ 		    !(con->flags & CON_ANYTIME))
+ 			continue;
++		if (unlikely(boot_log_len)) {
++			con->write(con, __boot_log_buf, boot_log_len);
++			boot_log_len = 0;
++		}
+ 		con->write(con, text, len);
+ 	}
+ }
+-- 
+1.7.5.4
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
