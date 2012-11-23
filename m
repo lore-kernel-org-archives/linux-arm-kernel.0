@@ -1,52 +1,166 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 23 Nov 2012 10:27:51 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCAxMC8xMF0gQVJNOiBGSVE6IEdldCByaWQgb2YgaW5p?=
- =?UTF-8?B?dF9GSVEoKQ==?=
-In-Reply-To: <20121123055328.GA21566@lizard>
-References: <20121123003849.GA973@lizard.mcd25758.sjc.wayport.net>
- <1353642030.851395840@f20.mail.ru> <20121123055328.GA21566@lizard>
-Message-ID: <1353652071.755665772@f76.mail.ru>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 23 Nov 2012 14:51:16 +0800
+Subject: [PATCH v3 5/7] usb: chipidea: usbmisc: add support for ahb,
+ ipg and per clock
+In-Reply-To: <1353506793-8354-6-git-send-email-m.grzeschik@pengutronix.de>
+References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1353506793-8354-6-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <20121123065115.GC22420@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, Nov 23, 2012 at 07:40:30AM +0400, Alexander Shiyan wrote:
-> [...]
-> > >  static unsigned long no_fiq_insn;
-> > > +static int got_no_fiq_insn;
-> > > @@ -78,11 +79,14 @@ void show_fiq_list(struct seq_file *p, int prec)
-> > >  
-> > >  void set_fiq_handler(void *start, unsigned int length)
-> > >  {
-> > > -#if defined(CONFIG_CPU_USE_DOMAINS)
-> > > -	memcpy((void *)0xffff001c, start, length);
-> > > -#else
-> > > -	memcpy(vectors_page + 0x1c, start, length);
-> > > +	unsigned long *addr = (void *)0xffff001c;
-> > > +
-> > > +#ifndef CONFIG_CPU_USE_DOMAINS
-> > > +	addr = vectors_page + 0x1c;
-> > >  #endif
-> > > +	if (!cmpxchg(&got_no_fiq_insn, 0, 1))
-> > > +		no_fiq_insn = *addr;
-> > > +	memcpy(addr, start, length);
-> > >  	flush_icache_range(0xffff001c, 0xffff001c + length);
-> > >  	if (!vectors_high())
-> > >  		flush_icache_range(0x1c, 0x1c + length);
-> > > @@ -126,8 +130,3 @@ EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
-> > > -
-> > > -void __init init_FIQ(void)
-> > > -{
-> > > -	no_fiq_insn = *(unsigned long *)0xffff001c;
-> > 
-> > it seems that this is wrong. In this case we have an uninitialized variable and
-> > sequential call claim_fiq and release_fiq could be fatal. FIXME please.
+On Wed, Nov 21, 2012 at 03:06:31PM +0100, Michael Grzeschik wrote:
+> From: Marc Kleine-Budde <mkl@pengutronix.de>
 > 
-> Um... I don't think I understand, can you please elaborate?
+> This patch adds support for a second and third clock to the usbmisc driver. On
+> modern freescale ARM cores like the imx51, imx53 and imx6q three clocks ("ahb",
+> "ipg" and "per") must be enabled in order to access the USB core.
 
-OK, I'll try to explain it.
-At the end of the release_fiq function we have a call fiq_op. For the default
-handler - is a fiq_def_op function, and we call this function with the option
-"relinquish = 0", i.e. we want to restore old fiq_handler. But if we do not call
-set_fiq_handler never before, we will have an uninitialized no_fiq_insn variable.
+The imx6q usb's clock structure is different with old mxc serials (mx3x, mx5x)
+due to different PHY. This patch will cause mx6q's probe fail, the message
+like below:
 
----
+imx_usb 2184000.usb: Failed to get clock, err=-2
+imx_usb: probe of 2184000.usb failed with error -2
+
+The mx5x (50, 51, 53) and mx6q's clock structure like below:
+
+mx5x:
+- usboh3_ipg_ahb: CCGR2(index13), used to access register
+(like your ahb)
+- usboh3_60M: CCGR2(index14), used to access register at serial phy mode
+as the phy is at serial mode, we need to use it at the first before the phy
+goes to other modes.
+(like your ipg)
+usbphy: used to transfer data
+(like your per)
+
+mx6q:
+- usboh3(Index 162 at DT), used to access register
+- usbphy(Index 182 for otg port at DT), at phy controller
+
+So, we may consider a way to consolidate both mx6q (mx28) and mxc (mx5x, mx3x)
+platforms.
+> 
+> ahb - AMBA High-Performance Bus clock domain
+> ipg - IP-Bus Gate clock domain
+> per - Peripheral clock domain
+> 
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> ---
+> Changes since v1:
+> * changed patch description
+> 
+>  drivers/usb/chipidea/usbmisc_imx.c |   60 +++++++++++++++++++++++++++---------
+>  1 file changed, 45 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+> index d0c7a03..e090e0f 100644
+> --- a/drivers/usb/chipidea/usbmisc_imx.c
+> +++ b/drivers/usb/chipidea/usbmisc_imx.c
+> @@ -24,7 +24,9 @@
+>  struct imx_usbmisc {
+>  	void __iomem *base;
+>  	spinlock_t lock;
+> -	struct clk *clk;
+> +	struct clk *clk_ahb;
+> +	struct clk *clk_ipg;
+> +	struct clk *clk_per;
+>  	struct usbmisc_usb_device usbdev[USB_DEV_MAX];
+>  	const struct usbmisc_ops *ops;
+>  };
+> @@ -104,38 +106,66 @@ static int __devinit usbmisc_imx_probe(struct platform_device *pdev)
+>  	if (!data->base)
+>  		return -EADDRNOTAVAIL;
+>  
+> -	data->clk = devm_clk_get(&pdev->dev, NULL);
+> -	if (IS_ERR(data->clk)) {
+> +	data->clk_ahb = devm_clk_get(&pdev->dev, "ahb");
+> +	if (IS_ERR(data->clk_ahb)) {
+>  		dev_err(&pdev->dev,
+> -			"failed to get clock, err=%ld\n", PTR_ERR(data->clk));
+> -		return PTR_ERR(data->clk);
+> +			"failed to get ahb clock, err=%ld\n", PTR_ERR(data->clk_ahb));
+> +		return PTR_ERR(data->clk_ahb);
+>  	}
+>  
+> -	ret = clk_prepare_enable(data->clk);
+> -	if (ret) {
+> +	data->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
+> +	if (IS_ERR(data->clk_ipg)) {
+>  		dev_err(&pdev->dev,
+> -			"clk_prepare_enable failed, err=%d\n", ret);
+> -		return ret;
+> +			"failed to get ipg clock, err=%ld\n", PTR_ERR(data->clk_ipg));
+> +		return PTR_ERR(data->clk_ipg);
+>  	}
+>  
+> +	data->clk_per = devm_clk_get(&pdev->dev, "per");
+> +	if (IS_ERR(data->clk_per)) {
+> +		dev_err(&pdev->dev,
+> +			"failed to get per clock, err=%ld\n", PTR_ERR(data->clk_per));
+> +		return PTR_ERR(data->clk_per);
+> +	}
+> +
+> +	ret = clk_prepare_enable(data->clk_ahb);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = clk_prepare_enable(data->clk_ipg);
+> +	if (ret)
+> +		goto err_ipg_failed;
+> +
+> +	ret = clk_prepare_enable(data->clk_per);
+> +	if (ret)
+> +		goto err_per_failed;
+> +
+>  	tmp_dev = (struct of_device_id *)
+>  		of_match_device(usbmisc_imx_dt_ids, &pdev->dev);
+>  	data->ops = (const struct usbmisc_ops *)tmp_dev->data;
+>  	usbmisc = data;
+>  	ret = usbmisc_set_ops(data->ops);
+> -	if (ret) {
+> -		usbmisc = NULL;
+> -		clk_disable_unprepare(data->clk);
+> -		return ret;
+> -	}
+> +	if (ret)
+> +		goto err_set_ops_failed;
+>  
+>  	return 0;
+> +
+> + err_set_ops_failed:
+> +	usbmisc = NULL;
+> +	clk_disable_unprepare(data->clk_per);
+> + err_per_failed:
+> +	clk_disable_unprepare(data->clk_ipg);
+> + err_ipg_failed:
+> +	clk_disable_unprepare(data->clk_ahb);
+> +
+> +	return ret;
+>  }
+>  
+>  static int __devexit usbmisc_imx_remove(struct platform_device *pdev)
+>  {
+>  	usbmisc_unset_ops(usbmisc->ops);
+> -	clk_disable_unprepare(usbmisc->clk);
+> +	clk_disable_unprepare(usbmisc->clk_per);
+> +	clk_disable_unprepare(usbmisc->clk_ipg);
+> +	clk_disable_unprepare(usbmisc->clk_ahb);
+>  	usbmisc = NULL;
+>  	return 0;
+>  }
+> -- 
+> 1.7.10.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+
+Best Regards,
+Peter Chen
