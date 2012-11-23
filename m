@@ -1,78 +1,49 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 23 Nov 2012 14:59:38 +0800
-Subject: [PATCH v3 7/7] usb: chipidea: usbmisc: add post handling and
- errata fix for mx25
-In-Reply-To: <1353506793-8354-8-git-send-email-m.grzeschik@pengutronix.de>
-References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
- <1353506793-8354-8-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <20121123065937.GE22420@nchen-desktop>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 22 Nov 2012 23:19:31 -0800
+Subject: [PATCH 1/3] CLK: uninline clk_prepare() and clk_unprepare()
+In-Reply-To: <20121122093033.GA5764@n2100.arm.linux.org.uk>
+References: <1353403339-11679-1-git-send-email-dmitry.torokhov@gmail.com>
+ <1353403339-11679-2-git-send-email-dmitry.torokhov@gmail.com>
+ <CAKohpo=B_7rVwePziyNe0rTMokcib_FgEN28cy4nByAzbUyaqg@mail.gmail.com>
+ <20121121204324.21126.99677@nucleus>
+ <20121121205424.GA25470@core.coreip.homeip.net>
+ <20121121223859.GQ3290@n2100.arm.linux.org.uk>
+ <20121122021750.GD25470@core.coreip.homeip.net>
+ <20121122093033.GA5764@n2100.arm.linux.org.uk>
+Message-ID: <20121123071931.GB12631@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 03:06:33PM +0100, Michael Grzeschik wrote:
-> This adds a post handling routine which is called after
-> ci13xxx_add_device was called. The first user is the mx25, which has to
-> disable the external-vbus-divider after the ude has started.
-udc has started?
+On Thu, Nov 22, 2012 at 09:30:33AM +0000, Russell King - ARM Linux wrote:
+> On Wed, Nov 21, 2012 at 06:17:50PM -0800, Dmitry Torokhov wrote:
+> > > You've checked non-ARM architectures too?
+> > 
+> > Yes:
+> > 
+> > [dtor at dtor-d630 linux-next]$ grep -r HAVE_CLK_PREPARE .
+> > ./arch/arm/Kconfig:     select HAVE_CLK_PREPARE
+> > Binary file ./.git/objects/pack/pack-7dad5ee164f601f1327dc78648fa317772c2d872.pack matches
+> > ./include/linux/clk.h:#ifdef CONFIG_HAVE_CLK_PREPARE
+> > ./include/linux/clk.h:#ifdef CONFIG_HAVE_CLK_PREPARE
+> > ./drivers/clk/Kconfig:config HAVE_CLK_PREPARE
+> > ./drivers/clk/Kconfig:  select HAVE_CLK_PREPARE
 > 
->  
-> +static int usbmisc_imx25_post(struct device *dev)
-> +{
-> +	struct usbmisc_usb_device *usbdev;
-> +	void __iomem *reg;
-> +	unsigned long flags;
-> +	u32 val;
-> +
-> +	usbdev = get_usbdev(dev);
-> +	if (IS_ERR(usbdev))
-> +		return PTR_ERR(usbdev);
-> +
-> +	reg = usbmisc->base + MX25_USB_PHY_CTRL_OFFSET;
-> +
-> +	if (usbdev->evdo) {
-> +		spin_lock_irqsave(&usbmisc->lock, flags);
-> +		val = readl(reg);
-> +		writel(val | MX25_BM_EXTERNAL_VBUS_DIVIDER, reg);
-> +		spin_unlock_irqrestore(&usbmisc->lock, flags);
-> +		mdelay(5); /* needed to stabilize voltage */
-better use usleep_range to avoid busy-wait.
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static int usbmisc_imx53_init(struct device *dev)
->  {
->  	struct usbmisc_usb_device *usbdev;
-> @@ -122,6 +150,10 @@ static int usbmisc_imx6q_init(struct device *dev)
->  	return 0;
->  }
->  
-> +static const struct usbmisc_ops imx25_usbmisc_ops = {
-> +	.post = usbmisc_imx25_post,
-> +};
-> +
->  static const struct usbmisc_ops imx53_usbmisc_ops = {
->  	.init = usbmisc_imx53_init,
->  };
-> @@ -131,6 +163,7 @@ static const struct usbmisc_ops imx6q_usbmisc_ops = {
->  };
->  
->  static const struct of_device_id usbmisc_imx_dt_ids[] = {
-> +	{ .compatible = "fsl,imx25-usbmisc", .data = (void *)&imx25_usbmisc_ops },
->  	{ .compatible = "fsl,imx53-usbmisc", .data = (void *)&imx53_usbmisc_ops },
->  	{ .compatible = "fsl,imx6q-usbmisc", .data = (void *)&imx6q_usbmisc_ops },
->  	{ /* sentinel */ }
-> -- 
-> 1.7.10.4
+> Err, no you haven't, not with that grep.  What you've found are the places
+> which enable this, and say "yes, I have clk_prepare".
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> What HAVE_CLK_PREPARE is about though is providing a transition path between
+> drivers using clk_prepare() to platforms which _don't_ have a clk_prepare()
+> implementation - and when it's unset, it provides a default implementation.
+
+Ahh, I see. Then I think my first patch was correct albeit it had bad changelog
+message. If provided stubs for clk_prepare()/clk_unprepare() for
+platforms that did not define HAVE_CLK and pushed the check for
+HAVE_CLK_PREPARE down into drivers/clk/clk.c so __clk_prepare() would
+either call platform implementation or just be an empty function.
+
+Am I correct or I am still missing something?
+
+Thanks.
 
 -- 
-
-Best Regards,
-Peter Chen
+Dmitry
