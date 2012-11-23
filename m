@@ -1,30 +1,30 @@
-From: shuah.khan@hp.com (Shuah Khan)
-Date: Fri, 23 Nov 2012 14:37:54 -0700
-Subject: [PATCH 9/9] tile: dma_debug: add debug_dma_mapping_error support
-Message-ID: <1353706674.5270.105.camel@lorien2>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Sat, 24 Nov 2012 00:12:08 +0100
+Subject: [PATCH] ARM: pxa: pxa27x.c: add dummy SA1100 rtc clock
+Message-ID: <1353712328-15830-1-git-send-email-andrea.adami@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dma-debug interface debug_dma_mapping_error() to debug drivers that fail
-to check dma mapping errors on addresses returned by dma_map_single() and
-dma_map_page() interfaces.
+* Using pxa27x you could now build both RTC_DRV_PXA and RTC_DRV_SA1100.
+* Make sure you don't use both together: link /dev/rtc0 or /dev/rtc1
+* to /dev/rtc according to your requirement.
 
-Signed-off-by: Shuah Khan <shuah.khan@hp.com>
+Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
 ---
- arch/tile/include/asm/dma-mapping.h |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-pxa/pxa27x.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/tile/include/asm/dma-mapping.h b/arch/tile/include/asm/dma-mapping.h
-index 4b6247d..f2ff191 100644
---- a/arch/tile/include/asm/dma-mapping.h
-+++ b/arch/tile/include/asm/dma-mapping.h
-@@ -72,6 +72,7 @@ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
- static inline int
- dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
- {
-+	debug_dma_mapping_error(dev, dma_addr);
- 	return get_dma_ops(dev)->mapping_error(dev, dma_addr);
- }
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index 8047ee0..5970ebc 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -230,6 +230,7 @@ static struct clk_lookup pxa27x_clkregs[] = {
+ 	INIT_CLKREG(&clk_pxa27x_memc, NULL, "MEMCLK"),
+ 	INIT_CLKREG(&clk_pxa27x_mem, "pxa2xx-pcmcia", NULL),
+ 	INIT_CLKREG(&clk_dummy, "pxa-gpio", NULL),
++	INIT_CLKREG(&clk_dummy, "sa1100-rtc", NULL),
+ };
  
+ #ifdef CONFIG_PM
 -- 
-1.7.9.5
+1.7.8.6
