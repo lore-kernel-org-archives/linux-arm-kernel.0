@@ -1,149 +1,117 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 Nov 2012 12:44:25 +0000
-Subject: [PATCH 1/1] gpio: Provide the STMPE GPIO driver with its own IRQ
- Domain
-Message-ID: <1353674665-31905-1-git-send-email-lee.jones@linaro.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 23 Nov 2012 13:44:39 +0100
+Subject: [PATCH 1/1] spi/atmel: add DT support
+In-Reply-To: <20121121151713.1F8873E0A47@localhost>
+References: <20121121151713.1F8873E0A47@localhost>
+Message-ID: <1353674679-13158-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The STMPE GPIO driver can be used as an IRQ controller by some
-related devices. Here we provide it with its very own IRQ Domain
-so that IRQs can be issued dynamically. This will stand the
-driver in good stead when it is enabled for Device Tree, as this
-it a prerequisite.
+the atmel_spi use only gpio for chip select
 
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: spi-devel-general at lists.sourceforge.net
 Cc: Grant Likely <grant.likely@secretlab.ca>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/gpio/gpio-stmpe.c |   67 +++++++++++++++++++++++++++------------------
- 1 file changed, 41 insertions(+), 26 deletions(-)
+Hi Grant,
 
-diff --git a/drivers/gpio/gpio-stmpe.c b/drivers/gpio/gpio-stmpe.c
-index dce3472..0e0471b 100644
---- a/drivers/gpio/gpio-stmpe.c
-+++ b/drivers/gpio/gpio-stmpe.c
-@@ -11,6 +11,7 @@
+	can we have this for 3.8
+	This patch is presetnt on the ML sing Feb 2012 and was depinding on
+	the cs-gpio dt that you just apply
+
+Best Regards,
+J.
+ .../devicetree/bindings/spi/spi_atmel.txt          |   26 ++++++++++++++++++++
+ drivers/spi/spi-atmel.c                            |   17 ++++++++++++-
+ 2 files changed, 42 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel.txt
+
+diff --git a/Documentation/devicetree/bindings/spi/spi_atmel.txt b/Documentation/devicetree/bindings/spi/spi_atmel.txt
+new file mode 100644
+index 0000000..07e04cd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/spi/spi_atmel.txt
+@@ -0,0 +1,26 @@
++Atmel SPI device
++
++Required properties:
++- compatible : should be "atmel,at91rm9200-spi".
++- reg: Address and length of the register set for the device
++- interrupts: Should contain spi interrupt
++- cs-gpios: chipselects
++
++Example:
++
++spi1: spi at fffcc000 {
++	compatible = "atmel,at91rm9200-spi";
++	reg = <0xfffcc000 0x4000>;
++	interrupts = <13 4 5>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	cs-gpios = <&pioB 3 0>;
++	status = "okay";
++
++	mmc-slot at 0 {
++		compatible = "mmc-spi-slot";
++		reg = <0>;
++		gpios = <&pioC 4 0>;	/* CD */
++		spi-max-frequency = <25000000>;
++	};
++};
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 61fb0ec..1615222 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -20,6 +20,7 @@
+ #include <linux/spi/spi.h>
  #include <linux/slab.h>
- #include <linux/gpio.h>
- #include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/interrupt.h>
- #include <linux/mfd/stmpe.h>
+ #include <linux/platform_data/atmel.h>
++#include <linux/of.h>
  
-@@ -28,6 +29,7 @@ struct stmpe_gpio {
- 	struct stmpe *stmpe;
- 	struct device *dev;
- 	struct mutex irq_lock;
-+	struct irq_domain *domain;
+ #include <asm/io.h>
+ #include <asm/gpio.h>
+@@ -768,6 +769,10 @@ static int atmel_spi_setup(struct spi_device *spi)
  
- 	int irq_base;
- 	unsigned norequest_mask;
-@@ -267,38 +269,55 @@ static irqreturn_t stmpe_gpio_irq(int irq, void *dev)
- 	return IRQ_HANDLED;
- }
- 
--static int __devinit stmpe_gpio_irq_init(struct stmpe_gpio *stmpe_gpio)
-+int stmpe_gpio_irq_map(struct irq_domain *d, unsigned int virq,
-+		       irq_hw_number_t hwirq)
- {
--	int base = stmpe_gpio->irq_base;
--	int irq;
-+	struct stmpe_gpio *stmpe_gpio = d->host_data;
+ 	/* chipselect must have been muxed as GPIO (e.g. in board setup) */
+ 	npcs_pin = (unsigned int)spi->controller_data;
 +
-+	if (!stmpe_gpio)
-+		return -EINVAL;
- 
--	for (irq = base; irq < base + stmpe_gpio->chip.ngpio; irq++) {
--		irq_set_chip_data(irq, stmpe_gpio);
--		irq_set_chip_and_handler(irq, &stmpe_gpio_irq_chip,
--					 handle_simple_irq);
--		irq_set_nested_thread(irq, 1);
-+	irq_set_chip_data(hwirq, stmpe_gpio);
-+	irq_set_chip_and_handler(hwirq, &stmpe_gpio_irq_chip,
-+				 handle_simple_irq);
-+	irq_set_nested_thread(hwirq, 1);
- #ifdef CONFIG_ARM
--		set_irq_flags(irq, IRQF_VALID);
-+	set_irq_flags(hwirq, IRQF_VALID);
- #else
--		irq_set_noprobe(irq);
-+	irq_set_noprobe(hwirq);
- #endif
--	}
- 
- 	return 0;
- }
- 
--static void stmpe_gpio_irq_remove(struct stmpe_gpio *stmpe_gpio)
-+void stmpe_gpio_irq_unmap(struct irq_domain *d, unsigned int virq)
- {
--	int base = stmpe_gpio->irq_base;
--	int irq;
--
--	for (irq = base; irq < base + stmpe_gpio->chip.ngpio; irq++) {
- #ifdef CONFIG_ARM
--		set_irq_flags(irq, 0);
-+	set_irq_flags(virq, 0);
- #endif
--		irq_set_chip_and_handler(irq, NULL, NULL);
--		irq_set_chip_data(irq, NULL);
-+	irq_set_chip_and_handler(virq, NULL, NULL);
-+	irq_set_chip_data(virq, NULL);
-+}
++	if (gpio_is_valid(spi->cs_gpio))
++		npcs_pin = spi->cs_gpio;
 +
-+const struct irq_domain_ops stmpe_gpio_irq_simple_ops = {
-+	.unmap = stmpe_gpio_irq_unmap,
-+	.map = stmpe_gpio_irq_map,
-+	.xlate = irq_domain_xlate_twocell,
+ 	asd = spi->controller_state;
+ 	if (!asd) {
+ 		asd = kzalloc(sizeof(struct atmel_spi_device), GFP_KERNEL);
+@@ -937,8 +942,9 @@ static int __devinit atmel_spi_probe(struct platform_device *pdev)
+ 	/* the spi->mode bits understood by this driver: */
+ 	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
+ 
++	master->dev.of_node = pdev->dev.of_node;
+ 	master->bus_num = pdev->id;
+-	master->num_chipselect = 4;
++	master->num_chipselect = master->dev.of_node ? 0 : 4;
+ 	master->setup = atmel_spi_setup;
+ 	master->transfer = atmel_spi_transfer;
+ 	master->cleanup = atmel_spi_cleanup;
+@@ -1064,11 +1070,20 @@ static int atmel_spi_resume(struct platform_device *pdev)
+ #define	atmel_spi_resume	NULL
+ #endif
+ 
++#if defined(CONFIG_OF)
++static const struct of_device_id atmel_spi_dt_ids[] = {
++	{ .compatible = "atmel,at91rm9200-spi" },
++	{ /* sentinel */ }
 +};
 +
-+static int __devinit stmpe_gpio_irq_init(struct stmpe_gpio *stmpe_gpio)
-+{
-+	int base = stmpe_gpio->irq_base;
-+
-+	stmpe_gpio->domain = irq_domain_add_simple(NULL,
-+				stmpe_gpio->chip.ngpio, base,
-+				&stmpe_gpio_irq_simple_ops, stmpe_gpio);
-+	if (!stmpe_gpio->domain) {
-+		dev_err(stmpe_gpio->dev, "failed to create irqdomain\n");
-+		return -ENOSYS;
- 	}
-+
-+	return 0;
- }
++MODULE_DEVICE_TABLE(of, atmel_spi_dt_ids);
++#endif
  
- static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
-@@ -348,7 +367,7 @@ static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
- 				IRQF_ONESHOT, "stmpe-gpio", stmpe_gpio);
- 		if (ret) {
- 			dev_err(&pdev->dev, "unable to get irq: %d\n", ret);
--			goto out_removeirq;
-+			goto out_disable;
- 		}
- 	}
- 
-@@ -368,9 +387,6 @@ static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
- out_freeirq:
- 	if (irq >= 0)
- 		free_irq(irq, stmpe_gpio);
--out_removeirq:
--	if (irq >= 0)
--		stmpe_gpio_irq_remove(stmpe_gpio);
- out_disable:
- 	stmpe_disable(stmpe, STMPE_BLOCK_GPIO);
- out_free:
-@@ -398,10 +414,9 @@ static int __devexit stmpe_gpio_remove(struct platform_device *pdev)
- 
- 	stmpe_disable(stmpe, STMPE_BLOCK_GPIO);
- 
--	if (irq >= 0) {
-+	if (irq >= 0)
- 		free_irq(irq, stmpe_gpio);
--		stmpe_gpio_irq_remove(stmpe_gpio);
--	}
-+
- 	platform_set_drvdata(pdev, NULL);
- 	kfree(stmpe_gpio);
- 
+ static struct platform_driver atmel_spi_driver = {
+ 	.driver		= {
+ 		.name	= "atmel_spi",
+ 		.owner	= THIS_MODULE,
++		.of_match_table	= of_match_ptr(atmel_spi_dt_ids),
+ 	},
+ 	.suspend	= atmel_spi_suspend,
+ 	.resume		= atmel_spi_resume,
 -- 
-1.7.9.5
+1.7.10.4
