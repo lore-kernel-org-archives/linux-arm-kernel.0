@@ -1,83 +1,45 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 23 Nov 2012 10:56:02 +0900
-Subject: [PATCH 3/4] ARM: dts: exynos4: add node for PL330 MDMA1 controller
-In-Reply-To: <201211221157.26615.b.zolnierkie@samsung.com>
-References: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
- <1351504796-24788-4-git-send-email-b.zolnierkie@samsung.com>
- <201211221157.26615.b.zolnierkie@samsung.com>
-Message-ID: <10f601cdc91d$b10e4770$132ad650$%kim@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 23 Nov 2012 10:58:39 +0900
+Subject: [RESENDING] [PATCH 07/22] ASoC: Ux500: Initialise PCM from MSP
+ probe rather than as a device
+In-Reply-To: <20121122140540.GA10986@gmail.com>
+References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
+ <1344527268-5964-8-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbc6bGC4Yp7Bcdfev=Uc=1h4L1v+Lj9RbmJV3F+knQOZQ@mail.gmail.com>
+ <20120919133343.GH25694@gmail.com>
+ <505ADBE6.6080509@stericsson.com> <20120920125259.GA2755@gmail.com>
+ <20121122140540.GA10986@gmail.com>
+Message-ID: <20121123015838.GH4385@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bartlomiej Zolnierkiewicz wrote:
-> 
-> 
-> Hi Kukjin,
-> 
-Hi Bart,
+On Thu, Nov 22, 2012 at 02:05:40PM +0000, Lee Jones wrote:
+> On Thu, 20 Sep 2012, Lee Jones wrote:
 
-> Could you also apply this patch?
-> 
-Yeah, looks good to me :-)
+> > > > Can we have some closure on this patch please, as it's blocking the
+> > > > patch-set? I'm fairly sure the patch is doing the correct thing, as
+> > > > seconded by Mark.
 
-Will apply, thanks.
+> > > I still don't like this. It is the dai_link-struct that bothers me. We have
+> > > "ux500-msp-i2s.1" as name of the platform AND the cpu_dai. The MSP I2S-block is
+> > > not the platform and it is certainly not both platform and cpu-DAI at the same time.
+> > > Mark: Did you have a solution for this? Couldn't we just put NULL on the
+> > > platform_name instead?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-> 
-> 
-> From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Subject: [PATCH v2] ARM: dts: exynos4: add node for PL330 MDMA1 controller
-> 
-> Add missing PL330 MDMA1 controller node to the device tree (DT).
-> 
-> [ Currently there is no problem with using 'non-secure' mdma1 address
->   instead of 'secure' one on revision 0 of Exynos4210 SOC (as used by
->   Universal C210 board) as this SOC revision is unsupported by DT. ]
-> 
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> v2: refreshed againt next-20121115 and added Reviewed-by tag
-> 
->  arch/arm/boot/dts/exynos4.dtsi         |    6 ++++++
->  arch/arm/mach-exynos/mach-exynos4-dt.c |    1 +
->  2 files changed, 7 insertions(+)
-> 
-> Index: b/arch/arm/boot/dts/exynos4.dtsi
-> ===================================================================
-> --- a/arch/arm/boot/dts/exynos4.dtsi	2012-11-22 11:40:51.000000000
-> +0100
-> +++ b/arch/arm/boot/dts/exynos4.dtsi	2012-11-22 11:53:29.520815274
-> +0100
-> @@ -244,5 +244,11 @@
->  			reg = <0x12690000 0x1000>;
->  			interrupts = <0 36 0>;
->  		};
-> +
-> +		mdma1: mdma at 12850000 {
-> +			compatible = "arm,pl330", "arm,primecell";
-> +			reg = <0x12850000 0x1000>;
-> +			interrupts = <0 34 0>;
-> +		};
->  	};
->  };
-> Index: b/arch/arm/mach-exynos/mach-exynos4-dt.c
-> ===================================================================
-> --- a/arch/arm/mach-exynos/mach-exynos4-dt.c	2012-11-22
-> 11:40:51.000000000 +0100
-> +++ b/arch/arm/mach-exynos/mach-exynos4-dt.c	2012-11-22
-> 11:53:55.248815271 +0100
-> @@ -77,6 +77,7 @@ static const struct of_dev_auxdata exyno
->  				"exynos4210-spi.2", NULL),
->  	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_PDMA0, "dma-pl330.0", NULL),
->  	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_PDMA1, "dma-pl330.1", NULL),
-> +	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_MDMA1, "dma-pl330.2", NULL),
->  	OF_DEV_AUXDATA("samsung,exynos4210-tmu", EXYNOS4_PA_TMU,
->  				"exynos-tmu", NULL),
->  	{},
+> > There are other drivers which do this already. 
+
+> > I don't think it's an issue to do this.
+
+> Has anyone had any more bright ideas on how we might handle this?
+
+> The device is still being handled in platform code and I'm desperate
+> to get it out of there.
+
+Why do we need any ideas?  Just implement it already.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121123/baf44d3c/attachment-0001.sig>
