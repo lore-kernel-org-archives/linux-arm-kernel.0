@@ -1,7 +1,7 @@
 From: shuah.khan@hp.com (Shuah Khan)
-Date: Fri, 23 Nov 2012 14:35:36 -0700
-Subject: [PATCH 6/9] powerpc: dma_debug: add debug_dma_mapping_error support
-Message-ID: <1353706536.5270.102.camel@lorien2>
+Date: Fri, 23 Nov 2012 14:36:33 -0700
+Subject: [PATCH 7/9] sh: dma_debug: add debug_dma_mapping_error support
+Message-ID: <1353706593.5270.103.camel@lorien2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,20 +11,20 @@ dma_map_page() interfaces.
 
 Signed-off-by: Shuah Khan <shuah.khan@hp.com>
 ---
- arch/powerpc/include/asm/dma-mapping.h |    1 +
+ arch/sh/include/asm/dma-mapping.h |    1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/powerpc/include/asm/dma-mapping.h b/arch/powerpc/include/asm/dma-mapping.h
-index 7816087..e27e9ad 100644
---- a/arch/powerpc/include/asm/dma-mapping.h
-+++ b/arch/powerpc/include/asm/dma-mapping.h
-@@ -172,6 +172,7 @@ static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+diff --git a/arch/sh/include/asm/dma-mapping.h b/arch/sh/include/asm/dma-mapping.h
+index 8bd965e..b437f2c 100644
+--- a/arch/sh/include/asm/dma-mapping.h
++++ b/arch/sh/include/asm/dma-mapping.h
+@@ -46,6 +46,7 @@ static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
  {
- 	struct dma_map_ops *dma_ops = get_dma_ops(dev);
+ 	struct dma_map_ops *ops = get_dma_ops(dev);
  
 +	debug_dma_mapping_error(dev, dma_addr);
- 	if (dma_ops->mapping_error)
- 		return dma_ops->mapping_error(dev, dma_addr);
+ 	if (ops->mapping_error)
+ 		return ops->mapping_error(dev, dma_addr);
  
 -- 
 1.7.9.5
