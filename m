@@ -1,22 +1,85 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 23 Nov 2012 11:06:15 -0500 (EST)
-Subject: [PATCH 06/29] usb: host: ehci-mv: fix clk APIs
-In-Reply-To: <1353549910-988-6-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1211231104500.1734-100000@iolanthe.rowland.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 23 Nov 2012 17:12:21 +0100
+Subject: [PATCH] net/macb: Use non-coherent memory for rx buffers
+In-Reply-To: <1353678601-26888-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1353678601-26888-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <CAGhQ9VwWmP_B17LnAEqDHcL8Yd-s0C-Bf35z3+=vnJmK_NoCSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Nov 2012, Chao Xie wrote:
+Hi Nicolas,
 
-> From: Chao Xie <chao.xie@marvell.com>
-> 
-> Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
+On 23 November 2012 14:50, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> From: Havard Skinnemoen <havard@skinnemoen.net>
+>
+> Allocate regular pages to use as backing for the RX ring and use the
+> DMA API to sync the caches. This should give a bit better performance
+> since it allows the CPU to do burst transfers from memory. It is also
+> a necessary step on the way to reduce the amount of copying done by
+> the driver.
+>
+> Signed-off-by: Havard Skinnemoen <havard@skinnemoen.net>
+> [nicolas.ferre at atmel.com: adapt to newer kernel]
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  drivers/net/ethernet/cadence/macb.c | 206 +++++++++++++++++++++++-------------
+>  drivers/net/ethernet/cadence/macb.h |  20 +++-
+>  2 files changed, 148 insertions(+), 78 deletions(-)
 
-I don't like patches with no patch description.  You should write 
-something here, explaining why the change is needed.  What's wrong with 
-the clk APIs?
+<snip>
 
-The same hold for your other patches, except perhaps the trivial one 
-that removes an unused local variable definition.
+> diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+> index 570908b..74e68a3 100644
+> --- a/drivers/net/ethernet/cadence/macb.h
+> +++ b/drivers/net/ethernet/cadence/macb.h
+> @@ -453,6 +453,23 @@ struct macb_dma_desc {
+>  #define MACB_TX_USED_SIZE                      1
+>
+>  /**
+> + * struct macb_rx_page - data associated with a page used as RX buffers
+> + * @page: Physical page used as storage for the buffers
+> + * @phys: DMA address of the page
+> + *
+> + * Each page is used to provide %MACB_RX_BUFFERS_PER_PAGE RX buffers.
+> + * The page gets an initial reference when it is inserted into the
+> + * ring, and an additional reference each time it is passed up the
+> + * stack as a fragment. When all the buffers have been used, we drop
+> + * the initial reference and allocate a new page. Any additional
+> + * references are dropped when the higher layers free the skb.
+> + */
+> +struct macb_rx_page {
+> +       struct page             *page;
+> +       dma_addr_t              phys;
+> +};
+> +
+> +/**
+>   * struct macb_tx_skb - data about an skb which is being transmitted
+>   * @skb: skb currently being transmitted
+>   * @mapping: DMA address of the skb's data buffer
+> @@ -543,7 +560,7 @@ struct macb {
+>
+>         unsigned int            rx_tail;
+>         struct macb_dma_desc    *rx_ring;
+> -       void                    *rx_buffers;
+> +       struct macb_rx_page     *rx_page;
+>
+>         unsigned int            tx_head, tx_tail;
+>         struct macb_dma_desc    *tx_ring;
+> @@ -564,7 +581,6 @@ struct macb {
+>
+>         dma_addr_t              rx_ring_dma;
+>         dma_addr_t              tx_ring_dma;
+> -       dma_addr_t              rx_buffers_dma;
+>
+>         struct mii_bus          *mii_bus;
+>         struct phy_device       *phy_dev;
+> --
 
-Alan Stern
+struct macb is shared between at91_ether and macb. Removing
+rx_buffers_dma and rx_buffers will break compilation on at91_ether.
+
+So please either leave the two struct members alone, for now, or fix
+up at91_ether at the same time.
+
+regards
+Joachim Eastwood
