@@ -1,7 +1,7 @@
 From: shuah.khan@hp.com (Shuah Khan)
-Date: Fri, 23 Nov 2012 14:37:22 -0700
-Subject: [PATCH 8/9] sparc: dma_debug: add debug_dma_mapping_error support
-Message-ID: <1353706642.5270.104.camel@lorien2>
+Date: Fri, 23 Nov 2012 14:37:54 -0700
+Subject: [PATCH 9/9] tile: dma_debug: add debug_dma_mapping_error support
+Message-ID: <1353706674.5270.105.camel@lorien2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,21 +10,20 @@ to check dma mapping errors on addresses returned by dma_map_single() and
 dma_map_page() interfaces.
 
 Signed-off-by: Shuah Khan <shuah.khan@hp.com>
-Acked-by: David S. Miller <davem@davemloft.net>
 ---
- arch/sparc/include/asm/dma-mapping.h |    1 +
+ arch/tile/include/asm/dma-mapping.h |    1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/sparc/include/asm/dma-mapping.h b/arch/sparc/include/asm/dma-mapping.h
-index 8493fd3..05fe53f 100644
---- a/arch/sparc/include/asm/dma-mapping.h
-+++ b/arch/sparc/include/asm/dma-mapping.h
-@@ -59,6 +59,7 @@ static inline void dma_free_attrs(struct device *dev, size_t size,
- 
- static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+diff --git a/arch/tile/include/asm/dma-mapping.h b/arch/tile/include/asm/dma-mapping.h
+index 4b6247d..f2ff191 100644
+--- a/arch/tile/include/asm/dma-mapping.h
++++ b/arch/tile/include/asm/dma-mapping.h
+@@ -72,6 +72,7 @@ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
+ static inline int
+ dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
  {
 +	debug_dma_mapping_error(dev, dma_addr);
- 	return (dma_addr == DMA_ERROR_CODE);
+ 	return get_dma_ops(dev)->mapping_error(dev, dma_addr);
  }
  
 -- 
