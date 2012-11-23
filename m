@@ -1,75 +1,59 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Fri, 23 Nov 2012 16:48:13 +0530
-Subject: [PATCH V3 5/5] ARM: Exynos: Avoid passing the clks through
- platform data
-In-Reply-To: <1352177317-16395-6-git-send-email-padma.v@samsung.com>
-References: <1352177317-16395-1-git-send-email-padma.v@samsung.com>
- <1352177317-16395-6-git-send-email-padma.v@samsung.com>
-Message-ID: <CAAgF-BcMBr-uNmL3L1g2qPmk17G1gN2Lwa9KRdjagm0z61GXkg@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 23 Nov 2012 12:18:11 +0100
+Subject: [PATCH v4 05/11] pwm: pwm-tiecap: pinctrl support
+In-Reply-To: <518397C60809E147AF5323E0420B992E3E9EEAAA@DBDE01.ent.ti.com>
+References: <1353503469-18634-1-git-send-email-avinashphilip@ti.com>
+ <1353503469-18634-6-git-send-email-avinashphilip@ti.com>
+ <20121122205944.GC16716@avionic-0098.adnet.avionic-design.de>
+ <518397C60809E147AF5323E0420B992E3E9EE991@DBDE01.ent.ti.com>
+ <20121123105110.GA6884@avionic-0098.adnet.avionic-design.de>
+ <518397C60809E147AF5323E0420B992E3E9EEAAA@DBDE01.ent.ti.com>
+Message-ID: <20121123111811.GA5072@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cc'ing Mark Brown.
+On Fri, Nov 23, 2012 at 11:12:15AM +0000, Philip, Avinash wrote:
+> On Fri, Nov 23, 2012 at 16:21:10, Thierry Reding wrote:
+> > On Fri, Nov 23, 2012 at 10:34:02AM +0000, Philip, Avinash wrote:
+> > > On Fri, Nov 23, 2012 at 02:29:44, Thierry Reding wrote:
+> > > > On Wed, Nov 21, 2012 at 06:41:02PM +0530, Philip, Avinash wrote:
+> > > > [...]
+> > > > > +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+> > > > > +	if (IS_ERR(pinctrl))
+> > > > > +		dev_warn(&pdev->dev, "failed to configure pins from driver\n");
+> > > > 
+> > > > I think we already discussed this, but shouldn't this be a fatal error?
+> > > 
+> > > I had checked relevant discussion and found this can be warning message.
+> > > This is because most boards don't have pinctrl implemented at this point,
+> > > or may never have.
+> > > 
+> > > https://lkml.org/lkml/2012/9/11/369
+> > > 
+> > > Any way I will change to
+> > > dev_warn(&pdev->dev, "unable to select pin group\n");
+> > > as in other drivers.
+> > 
+> > But in case pinctrl isn't implemented, shouldn't the implementation of
+> > devm_pinctrl_get_select_default() just be a no-op?
+> 
+> So driver can still exist but pin mux functionality missing. Then warning
+> message will give hints.
+> I am also ok with error message & failure of driver with EPROBE_DEFER,
+> if you want?
 
-On Tue, Nov 6, 2012 at 10:18 AM, Padmavathi Venna <padma.v@samsung.com> wrote:
-> I2S controller has an internal mux for RCLK source clks. The list
-> of source clk names were passed through platform data in non-dt case.
-> The variable holding the list of RCLK source clk names is not
-> required, as the list of clks need to be registered with clkdev
-> using generic connection id. This is required as part of adding DT
-> support for I2S controller driver.
->
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
->  arch/arm/mach-exynos/dev-audio.c |   12 ------------
->  1 files changed, 0 insertions(+), 12 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/dev-audio.c b/arch/arm/mach-exynos/dev-audio.c
-> index ae321c7..e7d46fd 100644
-> --- a/arch/arm/mach-exynos/dev-audio.c
-> +++ b/arch/arm/mach-exynos/dev-audio.c
-> @@ -23,11 +23,6 @@
->  #include <mach/irqs.h>
->  #include <mach/regs-audss.h>
->
-> -static const char *rclksrc[] = {
-> -       [0] = "busclk",
-> -       [1] = "i2sclk",
-> -};
-> -
->  static int exynos4_cfg_i2s(struct platform_device *pdev)
->  {
->         /* configure GPIO for i2s port */
-> @@ -55,7 +50,6 @@ static struct s3c_audio_pdata i2sv5_pdata = {
->                 .i2s = {
->                         .quirks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI
->                                          | QUIRK_NEED_RSTCLR,
-> -                       .src_clk = rclksrc,
->                         .idma_addr = EXYNOS4_AUDSS_INT_MEM,
->                 },
->         },
-> @@ -78,17 +72,11 @@ struct platform_device exynos4_device_i2s0 = {
->         },
->  };
->
-> -static const char *rclksrc_v3[] = {
-> -       [0] = "sclk_i2s",
-> -       [1] = "no_such_clock",
-> -};
-> -
->  static struct s3c_audio_pdata i2sv3_pdata = {
->         .cfg_gpio = exynos4_cfg_i2s,
->         .type = {
->                 .i2s = {
->                         .quirks = QUIRK_NO_MUXPSR,
-> -                       .src_clk = rclksrc_v3,
->                 },
->         },
->  };
-> --
-> 1.7.4.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Everybody seems to be doing it with a warning, so I guess that's fine
+for now. I just find it strange that if you request the default pin
+group to be selected when in fact the hardware doesn't support pinctrl
+at all you shouldn't be getting an error either.
+
+I'm adding LinusW on Cc, perhaps he can shed some light on it.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121123/2f56d97a/attachment-0001.sig>
