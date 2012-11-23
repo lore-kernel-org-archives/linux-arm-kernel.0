@@ -1,17 +1,20 @@
 From: davem@davemloft.net (David Miller)
-Date: Fri, 23 Nov 2012 14:30:23 -0500 (EST)
-Subject: [PATCH 1/1 v2] asix: use ramdom hw addr if the one read is not
- valid
-In-Reply-To: <1353569717-1260-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1353493362-30418-1-git-send-email-plagnioj@jcrosoft.com>
- <1353569717-1260-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20121123.143023.363645682831291797.davem@davemloft.net>
+Date: Fri, 23 Nov 2012 14:30:33 -0500 (EST)
+Subject: [PATCH] net/macb: GEM DMA configuration register update
+In-Reply-To: <1353678541-26839-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1353678541-26839-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20121123.143033.141910826801165909.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Date: Thu, 22 Nov 2012 08:35:17 +0100
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
+Date: Fri, 23 Nov 2012 14:49:01 +0100
 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Add information to the DMA Configuration Register to
+> maximize system performance:
+> - rx/tx packet buffer full memory size
+> - allow possibility to use INCR16 if supported
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 Applied to net-next.
