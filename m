@@ -1,176 +1,110 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 23 Nov 2012 16:31:20 +0800
-Subject: [PATCH 3/3] MMC: sdhci-dove: allow GPIOs to be used for card
- detection on Dove
-In-Reply-To: <E1TbgcZ-0007Kt-35@rmk-PC.arm.linux.org.uk>
-References: <20121122235426.GT3332@n2100.arm.linux.org.uk>
- <E1TbgcZ-0007Kt-35@rmk-PC.arm.linux.org.uk>
-Message-ID: <20121123083117.GA25754@S2100-06.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 23 Nov 2012 17:07:33 +0900
+Subject: [PATCH v4 00/12] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+In-Reply-To: <002101cdc8a4$fc375990$f4a60cb0$%cho@samsung.com>
+References: <002101cdc8a4$fc375990$f4a60cb0$%cho@samsung.com>
+Message-ID: <112e01cdc951$976699b0$c633cd10$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 11:55:51PM +0000, Russell King wrote:
-> This commit taken from Rabeeh's Cubox kernel and re-worked for DT;
-> Sebastian Hasselbrath is believed to be the original author.
+Cho KyongHo wrote:
 > 
-> Some Cuboxes require a GPIO for card detection; this implements the
-> optional GPIO support for card detection.  This GPIO is logic 0 for
-> card inserted.
+> The current exynos-iommu(System MMU) driver does not work autonomously
+> since it is lack of support for power management of peripheral blocks.
+> For example, MFC device driver must ensure that its System MMU is disabled
+> before MFC block is power-down not to invalidate IOTLB in the System MMU
+> when I/O memory mapping is changed. Because A System MMU is resides in the
+> same H/W block, access to control registers of System MMU while the H/W
+> block is turned off must be prohibited.
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  drivers/mmc/host/sdhci-dove.c |   73 +++++++++++++++++++++++++++++++++++++---
->  1 files changed, 67 insertions(+), 6 deletions(-)
+> This set of changes solves the above problem with setting each System MMUs
+> as the parent of the device which owns the System MMU to recieve the
+> information when the device is turned off or turned on.
 > 
-> diff --git a/drivers/mmc/host/sdhci-dove.c b/drivers/mmc/host/sdhci-dove.c
-> index 4af64f3..e621448 100644
-> --- a/drivers/mmc/host/sdhci-dove.c
-> +++ b/drivers/mmc/host/sdhci-dove.c
-> @@ -19,20 +19,30 @@
->   * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
->   */
->  
-> -#include <linux/err.h>
-> -#include <linux/io.h>
->  #include <linux/clk.h>
->  #include <linux/err.h>
-> -#include <linux/module.h>
-> +#include <linux/gpio.h>
-> +#include <linux/io.h>
->  #include <linux/mmc/host.h>
-> +#include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/of_gpio.h>
->  
->  #include "sdhci-pltfm.h"
->  
->  struct sdhci_dove_priv {
->  	struct clk *clk;
-> +	int gpio_cd;
->  };
->  
-> +static irqreturn_t sdhci_dove_carddetect_irq(int irq, void *data)
-> +{
-> +	struct sdhci_host *host = data;
-> +
-> +	tasklet_schedule(&host->card_tasklet);
-> +	return IRQ_HANDLED;
-> +}
-> +
->  static u16 sdhci_dove_readw(struct sdhci_host *host, int reg)
->  {
->  	u16 ret;
-> @@ -50,16 +60,25 @@ static u16 sdhci_dove_readw(struct sdhci_host *host, int reg)
->  
->  static u32 sdhci_dove_readl(struct sdhci_host *host, int reg)
->  {
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct sdhci_dove_priv *priv = pltfm_host->priv;
->  	u32 ret;
->  
-> +	ret = readl(host->ioaddr + reg);
-> +
->  	switch (reg) {
->  	case SDHCI_CAPABILITIES:
-> -		ret = readl(host->ioaddr + reg);
->  		/* Mask the support for 3.0V */
->  		ret &= ~SDHCI_CAN_VDD_300;
->  		break;
-> -	default:
-> -		ret = readl(host->ioaddr + reg);
-> +	case SDHCI_PRESENT_STATE:
-> +		if (gpio_is_valid(priv->gpio_cd)) {
-> +			if (gpio_get_value(priv->gpio_cd) == 0)
-> +				ret |= SDHCI_CARD_PRESENT;
-> +			else
-> +				ret &= ~SDHCI_CARD_PRESENT;
-> +		}
-> +		break;
+> Another big change to the driver is the support for devicetree.
+> The bindings for System MMU is described in
+> Documentation/devicetree/bindings/arm/samsung/system-mmu.txt
+> 
+> In addition, this patchset also includes several bug fixes and
+> enhancements
+> of the current driver.
+> 
+> Change log:
+> v4:
+> - Remove Change-Id from v3 patches
+> - Change the order of the third and the first patch
+>   Thanks to Kukjin Kim.
+> - Fix memory leak when allocating and assigning exynos_iommu_owner to
+> client
+>   device if the client device has multiple System MMUs.
+>   Thanks to Rahul Sharma.
+> 
+> v3:
+> - Fix prefetch buffer flag definition for System MMU 3.3 (patch 10/12)
+> - Fix incorrect setting for SET_RUNTIME_PM_OPS (patch 09/12)
+>   Thanks to Prathyush.
+> 
+> v2:
+> - Split the patch to iommu/exynos into 9 patches
+> - Support for System MMU 3.3
+> - Some code compaction
+> 
+> Patch summary:
+> [PATCH v4 01/12] ARM: EXYNOS: Add clk_ops for gating clocks of System MMU
+> [PATCH v4 02/12] ARM: EXYNOS: add System MMU definition to DT
+> [PATCH v4 03/12] ARM: EXYNOS: remove system mmu initialization from exynos
+> tree
+> [PATCH v4 04/12] iommu/exynos: support for device tree
+> [PATCH v4 05/12] iommu/exynos: pass version information from DT
+> [PATCH v4 06/12] iommu/exynos: allocate lv2 page table from own slab
+> [PATCH v4 07/12] iommu/exynos: change rwlock to spinlock
+> [PATCH v4 08/12] iommu/exynos: set System MMU as the parent of client
+> device
+> [PATCH v4 09/12] iommu/exynos: add support for runtime pm and
+> suspend/resume
+> [PATCH v4 10/12] iommu/exynos: add support for System MMU 3.2 and 3.3
+> [PATCH v4 11/12] iommu/exynos: add literal name of System MMU for
+> debugging
+> [PATCH v4 12/12] iommu/exynos: add debugfs entries for System MMU
+> 
+> Diffstats:
+>  .../devicetree/bindings/arm/exynos/system-mmu.txt  |   86 ++
+>  arch/arm/boot/dts/exynos4210.dtsi                  |   96 ++
+>  arch/arm/boot/dts/exynos4x12.dtsi                  |  124 ++
+>  arch/arm/boot/dts/exynos5250.dtsi                  |  147 +-
+>  arch/arm/mach-exynos/Kconfig                       |    5 -
+>  arch/arm/mach-exynos/Makefile                      |    1 -
+>  arch/arm/mach-exynos/clock-exynos4.c               |   41 +-
+>  arch/arm/mach-exynos/clock-exynos4210.c            |    9 +-
+>  arch/arm/mach-exynos/clock-exynos4212.c            |   23 +-
+>  arch/arm/mach-exynos/clock-exynos5.c               |   86 +-
+>  arch/arm/mach-exynos/dev-sysmmu.c                  |  274 ----
+>  arch/arm/mach-exynos/include/mach/sysmmu.h         |   66 -
+>  arch/arm/mach-exynos/mach-exynos4-dt.c             |   34 +
+>  arch/arm/mach-exynos/mach-exynos5-dt.c             |   30 +
+>  drivers/iommu/Kconfig                              |    2 +-
+>  drivers/iommu/exynos-iommu.c                       | 1428
++++++++++++++++-----
+>  16 files changed, 1720 insertions(+), 732 deletions(-)
 
-It seems that the helpers in drivers/mmc/core/slot-gpio.c can help to
-simplify the patch a lot.  With sdhci core code being calling
-mmc_gpio_get_cd() to query card present, the fake SDHCI_PRESENT_STATE
-implementation above can be totally saved.
+Looks good to me 1st~3rd patches. After quick review, I think, 1st and 2nd
+patches can go to upstream for v3.8 without any dependency. So I will.
 
-Shawn
+The 3rd patch has a dependency with other driver changes (4th ~ 12th), so it
+should be sent to upstream with others.
 
->  	}
->  	return ret;
->  }
-> @@ -94,6 +113,23 @@ static int __devinit sdhci_dove_probe(struct platform_device *pdev)
->  
->  	priv->clk = devm_clk_get(&pdev->dev, NULL);
->  
-> +	if (pdev->dev.of_node) {
-> +		priv->gpio_cd = of_get_named_gpio(pdev->dev.of_node,
-> +						  "cd-gpios", 0);
-> +	} else {
-> +		priv->gpio_cd = -EINVAL;
-> +	}
-> +
-> +	if (gpio_is_valid(priv->gpio_cd)) {
-> +		ret = gpio_request(priv->gpio_cd, "sdhci-cd");
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "card detect gpio request failed: %d\n",
-> +				ret);
-> +			return ret;
-> +		}
-> +		gpio_direction_input(priv->gpio_cd);
-> +	}
-> +
->  	host = sdhci_pltfm_init(pdev, &sdhci_dove_pdata);
->  	if (IS_ERR(host)) {
->  		ret = PTR_ERR(host);
-> @@ -112,13 +148,33 @@ static int __devinit sdhci_dove_probe(struct platform_device *pdev)
->  	if (ret)
->  		goto err_sdhci_add;
->  
-> +	/*
-> +	 * We must request the IRQ after sdhci_add_host(), as the tasklet only
-> +	 * gets setup in sdhci_add_host() and we oops.
-> +	 */
-> +	if (gpio_is_valid(priv->gpio_cd)) {
-> +		ret = request_irq(gpio_to_irq(priv->gpio_cd),
-> +				  sdhci_dove_carddetect_irq,
-> +				  IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
-> +				  mmc_hostname(host->mmc), host);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "card detect irq request failed: %d\n",
-> +				ret);
-> +			goto err_request_irq;
-> +		}
-> +	}
-> +
->  	return 0;
->  
-> +err_request_irq:
-> +	sdhci_remove_host(host, 0);
->  err_sdhci_add:
->  	if (!IS_ERR(priv->clk))
->  		clk_disable_unprepare(priv->clk);
->  	sdhci_pltfm_free(pdev);
->  err_sdhci_pltfm_init:
-> +	if (gpio_is_valid(priv->gpio_cd))
-> +		gpio_free(priv->gpio_cd);
->  	return ret;
->  }
->  
-> @@ -130,6 +186,11 @@ static int __devexit sdhci_dove_remove(struct platform_device *pdev)
->  
->  	sdhci_pltfm_unregister(pdev);
->  
-> +	if (gpio_is_valid(priv->gpio_cd)) {
-> +		free_irq(gpio_to_irq(priv->gpio_cd), host);
-> +		gpio_free(priv->gpio_cd);
-> +	}
-> +
->  	if (!IS_ERR(priv->clk))
->  		clk_disable_unprepare(priv->clk);
->  
-> -- 
-> 1.7.4.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+BTW since the 3rd patch touches many Samsung stuff in arch/arm/ so I'd
+prefer to take it in Samsung tree. If Joerg is ok on iommu/exynos driver
+changes for v3.8...
+
+Joerg, please let me know about iommu/exynos stuff so that I can decide to
+take 3rd patch or not for v3.8.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
