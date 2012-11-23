@@ -1,54 +1,83 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 23 Nov 2012 10:51:40 +0900
-Subject: [GIT PULL] Samsung fixes-3 for v3.7
-In-Reply-To: <50AB913D.2020604@samsung.com>
-References: <50AB913D.2020604@samsung.com>
-Message-ID: <10e701cdc91d$151bf240$3f53d6c0$%kim@samsung.com>
+Date: Fri, 23 Nov 2012 10:56:02 +0900
+Subject: [PATCH 3/4] ARM: dts: exynos4: add node for PL330 MDMA1 controller
+In-Reply-To: <201211221157.26615.b.zolnierkie@samsung.com>
+References: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
+ <1351504796-24788-4-git-send-email-b.zolnierkie@samsung.com>
+ <201211221157.26615.b.zolnierkie@samsung.com>
+Message-ID: <10f601cdc91d$b10e4770$132ad650$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+Bartlomiej Zolnierkiewicz wrote:
 > 
-> Hi Arnd, Olof
 > 
-> Here is Samsung fixes for v3.7 and it is for fixing of mdma1 address for
-> exynos4210 rev0 SoC.
+> Hi Kukjin,
 > 
-> Please pull from:
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> v3.7-samsung-fixes-3
-> 
+Hi Bart,
 
-Probably, missed?
+> Could you also apply this patch?
+> 
+Yeah, looks good to me :-)
 
-Thanks.
+Will apply, thanks.
 
 Best regards,
 Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> Thanks.
 > 
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
 > 
-> The following changes since commit
-> f4a75d2eb7b1e2206094b901be09adb31ba63681:
+> From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Subject: [PATCH v2] ARM: dts: exynos4: add node for PL330 MDMA1 controller
 > 
->    Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
+> Add missing PL330 MDMA1 controller node to the device tree (DT).
 > 
-> are available in the git repository at:
->    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> v3.7-samsung-fixes-3
+> [ Currently there is no problem with using 'non-secure' mdma1 address
+>   instead of 'secure' one on revision 0 of Exynos4210 SOC (as used by
+>   Universal C210 board) as this SOC revision is unsupported by DT. ]
 > 
-> Bartlomiej Zolnierkiewicz (1):
->        ARM: EXYNOS: PL330 MDMA1 fix for revision 0 of Exynos4210 SOC
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> v2: refreshed againt next-20121115 and added Reviewed-by tag
 > 
->   arch/arm/mach-exynos/dma.c              |    3 +++
->   arch/arm/mach-exynos/include/mach/map.h |    1 +
->   2 files changed, 4 insertions(+), 0 deletions(-)
+>  arch/arm/boot/dts/exynos4.dtsi         |    6 ++++++
+>  arch/arm/mach-exynos/mach-exynos4-dt.c |    1 +
+>  2 files changed, 7 insertions(+)
+> 
+> Index: b/arch/arm/boot/dts/exynos4.dtsi
+> ===================================================================
+> --- a/arch/arm/boot/dts/exynos4.dtsi	2012-11-22 11:40:51.000000000
+> +0100
+> +++ b/arch/arm/boot/dts/exynos4.dtsi	2012-11-22 11:53:29.520815274
+> +0100
+> @@ -244,5 +244,11 @@
+>  			reg = <0x12690000 0x1000>;
+>  			interrupts = <0 36 0>;
+>  		};
+> +
+> +		mdma1: mdma at 12850000 {
+> +			compatible = "arm,pl330", "arm,primecell";
+> +			reg = <0x12850000 0x1000>;
+> +			interrupts = <0 34 0>;
+> +		};
+>  	};
+>  };
+> Index: b/arch/arm/mach-exynos/mach-exynos4-dt.c
+> ===================================================================
+> --- a/arch/arm/mach-exynos/mach-exynos4-dt.c	2012-11-22
+> 11:40:51.000000000 +0100
+> +++ b/arch/arm/mach-exynos/mach-exynos4-dt.c	2012-11-22
+> 11:53:55.248815271 +0100
+> @@ -77,6 +77,7 @@ static const struct of_dev_auxdata exyno
+>  				"exynos4210-spi.2", NULL),
+>  	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_PDMA0, "dma-pl330.0", NULL),
+>  	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_PDMA1, "dma-pl330.1", NULL),
+> +	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_MDMA1, "dma-pl330.2", NULL),
+>  	OF_DEV_AUXDATA("samsung,exynos4210-tmu", EXYNOS4_PA_TMU,
+>  				"exynos-tmu", NULL),
+>  	{},
