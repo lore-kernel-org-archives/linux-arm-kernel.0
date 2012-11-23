@@ -1,48 +1,31 @@
 From: shuah.khan@hp.com (Shuah Khan)
-Date: Fri, 23 Nov 2012 14:29:02 -0700
-Subject: [PATCH 0/9] dma_debug: add debug_dma_mapping_error support to
- architectures that support DMA_DEBUG_API
-Message-ID: <1353706142.5270.93.camel@lorien2>
+Date: Fri, 23 Nov 2012 14:31:09 -0700
+Subject: [PATCH 1/9] ARM64: dma_debug: add debug_dma_mapping_error support
+Message-ID: <1353706269.5270.96.camel@lorien2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An earlier patch added dma mapping error debug feature to dma_debug
-infrastructure. References:
+Add dma-debug interface debug_dma_mapping_error() to debug drivers that fail
+to check dma mapping errors on addresses returned by dma_map_single() and
+dma_map_page() interfaces.
 
-https://lkml.org/lkml/2012/10/8/296
-https://lkml.org/lkml/2012/11/3/219
+Signed-off-by: Shuah Khan <shuah.khan@hp.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/dma-mapping.h |    1 +
+ 1 file changed, 1 insertion(+)
 
-The following series of patches adds the call to debug_dma_mapping_error() to
-architecture specific dma_mapping_error() interfaces on the following
-architectures that support CONFIG_DMA_API_DEBUG.
-
-arm64
-c6x
-ia64
-microblaze
-mips
-powerpc
-sh
-sparc
-tile
-
-arm - Change is already in Marek's dma-mapping tree[1] 
-https://patchwork.kernel.org/patch/1625601/
-
-microblaze - Change is already in linux-next. Including it for completeness
-linux-next commit f229605441030bcd315c21d97b25889d63ed0130
-
-x86 - done in the first patch that added the feature.
-
-ARM64: dma_debug: add debug_dma_mapping_error support
-c6x: dma_debug: add debug_dma_mapping_error support
-ia64: dma_debug: add debug_dma_mapping_error support
-microblaze: dma-mapping: support debug_dma_mapping_error
-mips: dma_debug: add debug_dma_mapping_error support
-powerpc: dma_debug: add debug_dma_mapping_error support
-sh: dma_debug: add debug_dma_mapping_error support
-sparc: dma_debug: add debug_dma_mapping_error support
-tile: dma_debug: add debug_dma_mapping_error support
-
-Thanks,
--- Shuah
+diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+index 538f4b4..9947768 100644
+--- a/arch/arm64/include/asm/dma-mapping.h
++++ b/arch/arm64/include/asm/dma-mapping.h
+@@ -50,6 +50,7 @@ static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
+ static inline int dma_mapping_error(struct device *dev, dma_addr_t dev_addr)
+ {
+ 	struct dma_map_ops *ops = get_dma_ops(dev);
++	debug_dma_mapping_error(dev, dev_addr);
+ 	return ops->mapping_error(dev, dev_addr);
+ }
+ 
+-- 
+1.7.9.5
