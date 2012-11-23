@@ -1,121 +1,74 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 23 Nov 2012 14:53:41 +0800
-Subject: [PATCH v3 6/7] usb: chipidea: usbmisc: add mx53 support
-In-Reply-To: <1353506793-8354-7-git-send-email-m.grzeschik@pengutronix.de>
-References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
- <1353506793-8354-7-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <20121123065340.GD22420@nchen-desktop>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 23 Nov 2012 07:54:29 +0100
+Subject: [PATCH] ARM: Kirkwood: Add support LED of OpenBlocks A6
+In-Reply-To: <1353629160-6002-1-git-send-email-iwamatsu@nigauri.org>
+References: <1353629160-6002-1-git-send-email-iwamatsu@nigauri.org>
+Message-ID: <20121123065429.GG9177@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 03:06:32PM +0100, Michael Grzeschik wrote:
-> This adds mx53 as the next user of the usbmisc driver and makes it
-> possible to disable the overcurrent-detection of the internal phy.
+On Fri, Nov 23, 2012 at 09:06:00AM +0900, Nobuhiro Iwamatsu wrote:
+> OpenBlocks A6 has three leds via GPIO. This supports them.
+> And this fix typo about led, because hardware manual has typo.
 > 
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
 > ---
-> Changes since v2:
-> * added defines for register offsets and bitmasks
-> * fixed disable_oc option for all ports
+>  arch/arm/boot/dts/kirkwood-openblocks_a6.dts |   19 +++++++++++++++++++
+>  arch/arm/mach-kirkwood/board-openblocks_a6.c |    4 ++--
+>  2 files changed, 21 insertions(+), 2 deletions(-)
 > 
->  drivers/usb/chipidea/usbmisc_imx.c |   51 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 51 insertions(+)
-> 
-> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-> index e090e0f..b1811df 100644
-> --- a/drivers/usb/chipidea/usbmisc_imx.c
-> +++ b/drivers/usb/chipidea/usbmisc_imx.c
-> @@ -19,6 +19,13 @@
->  
->  #define USB_DEV_MAX 4
->  
-> +#define MX53_USB_OTG_PHY_CTRL_0_OFFSET	0x08;
-> +#define MX53_USB_UH2_CTRL_OFFSET	0x14;
-> +#define MX53_USB_UH3_CTRL_OFFSET	0x18;
-> +#define MX53_BM_OVER_CUR_DIS_H1		BIT(5)
-> +#define MX53_BM_OVER_CUR_DIS_OTG	BIT(8)
-> +#define MX53_BM_OVER_CUR_DIS_UHx	BIT(30)
+> diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+> index 37dc3a7..183df04 100644
+> --- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+> +++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+> @@ -75,4 +75,23 @@
+>  			};
+>  		};
+>  	};
 > +
->  #define MX6_BM_OVER_CUR_DIS		BIT(7)
+> +	gpio_leds {
 
-As every SoC platform's non-core register mapping is different,
-it is better to use .h to put register bit definition
->  
->  struct imx_usbmisc {
-> @@ -54,6 +61,45 @@ static struct usbmisc_usb_device *get_usbdev(struct device *dev)
->  	return &usbmisc->usbdev[i];
->  }
->  
-> +static int usbmisc_imx53_init(struct device *dev)
-> +{
-> +	struct usbmisc_usb_device *usbdev;
-> +	void __iomem *reg;
-> +	unsigned long flags;
-> +	u32 val;
+Hi Nobuhiro
+
+Thanks for the patch, looks good except for a minor point. The
+convention is to use gpio-leds, not gpio_leds. 
+
+Thanks
+	Andrew
+
+> +		compatible = "gpio-leds";
 > +
-> +	usbdev = get_usbdev(dev);
-> +	if (IS_ERR(usbdev))
-> +		return PTR_ERR(usbdev);
+> +		led-red {
+> +			label = "obsa6:red:stat";
+> +			gpios = <&gpio1 9 1>;
+> +		};
 > +
-> +	if (usbdev->disable_oc) {
-> +		spin_lock_irqsave(&usbmisc->lock, flags);
-> +		switch (usbdev->index) {
-> +		case 0:
-> +			reg = usbmisc->base + MX53_USB_OTG_PHY_CTRL_0_OFFSET;
-> +			val = readl(reg) | MX53_BM_OVER_CUR_DIS_OTG;
-> +			break;
-> +		case 1:
-> +			reg = usbmisc->base + MX53_USB_OTG_PHY_CTRL_0_OFFSET;
-> +			val = readl(reg) | MX53_BM_OVER_CUR_DIS_H1;
-> +			break;
-> +		case 2:
-> +			reg = usbmisc->base + MX53_USB_UH2_CTRL_OFFSET;
-> +			val = readl(reg) | MX53_BM_OVER_CUR_DIS_UHx;
-> +			break;
-> +		case 3:
-> +			reg = usbmisc->base + MX53_USB_UH3_CTRL_OFFSET;
-> +			val = readl(reg) | MX53_BM_OVER_CUR_DIS_UHx;
-> +			break;
-> +		}
-> +		if (reg && val)
-> +			writel(val, reg);
-> +		spin_unlock_irqrestore(&usbmisc->lock, flags);
-> +	}
+> +		led-green {
+> +			label = "obsa6:green:stat";
+> +			gpios = <&gpio1 10 1>;
+> +		};
 > +
-> +	return 0;
-> +}
-> +
->  static int usbmisc_imx6q_init(struct device *dev)
->  {
->  
-> @@ -76,11 +122,16 @@ static int usbmisc_imx6q_init(struct device *dev)
->  	return 0;
->  }
->  
-> +static const struct usbmisc_ops imx53_usbmisc_ops = {
-> +	.init = usbmisc_imx53_init,
-> +};
-> +
->  static const struct usbmisc_ops imx6q_usbmisc_ops = {
->  	.init = usbmisc_imx6q_init,
+> +		led-yellow {
+> +			label = "obsa6:yellow:stat";
+> +			gpios = <&gpio1 11 1>;
+> +		};
+> +        };
+>  };
+> diff --git a/arch/arm/mach-kirkwood/board-openblocks_a6.c b/arch/arm/mach-kirkwood/board-openblocks_a6.c
+> index e71f984..815fc64 100644
+> --- a/arch/arm/mach-kirkwood/board-openblocks_a6.c
+> +++ b/arch/arm/mach-kirkwood/board-openblocks_a6.c
+> @@ -55,8 +55,8 @@ static unsigned int openblocks_a6_mpp_config[] __initdata = {
+>  	MPP38_GPIO, /* INIT */
+>  	MPP39_GPIO, /* USB OC */
+>  	MPP41_GPIO, /* LED: Red */
+> -	MPP42_GPIO, /* LED: Yellow */
+> -	MPP43_GPIO, /* LED: Green */
+> +	MPP42_GPIO, /* LED: Green */
+> +	MPP43_GPIO, /* LED: Yellow */
+>  	0,
 >  };
 >  
->  static const struct of_device_id usbmisc_imx_dt_ids[] = {
-> +	{ .compatible = "fsl,imx53-usbmisc", .data = (void *)&imx53_usbmisc_ops },
->  	{ .compatible = "fsl,imx6q-usbmisc", .data = (void *)&imx6q_usbmisc_ops },
->  	{ /* sentinel */ }
->  };
 > -- 
 > 1.7.10.4
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
--- 
-
-Best Regards,
-Peter Chen
