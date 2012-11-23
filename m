@@ -1,73 +1,43 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Fri, 23 Nov 2012 17:20:51 +0100
-Subject: [PATCH v3 5/7] usb: chipidea: usbmisc: add support for ahb,
- ipg and per clock
-In-Reply-To: <20121123065115.GC22420@nchen-desktop>
-References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
- <1353506793-8354-6-git-send-email-m.grzeschik@pengutronix.de>
- <20121123065115.GC22420@nchen-desktop>
-Message-ID: <20121123162051.GA31008@pengutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 23 Nov 2012 08:30:25 -0800
+Subject: [GIT PULL] ARM: SoC fixes for 3.7 (one more)
+Message-ID: <20121123163025.GA24140@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2012 at 02:51:16PM +0800, Peter Chen wrote:
-> On Wed, Nov 21, 2012 at 03:06:31PM +0100, Michael Grzeschik wrote:
-> > From: Marc Kleine-Budde <mkl@pengutronix.de>
-> > 
-> > This patch adds support for a second and third clock to the usbmisc driver. On
-> > modern freescale ARM cores like the imx51, imx53 and imx6q three clocks ("ahb",
-> > "ipg" and "per") must be enabled in order to access the USB core.
-> 
-> The imx6q usb's clock structure is different with old mxc serials (mx3x, mx5x)
-> due to different PHY. This patch will cause mx6q's probe fail, the message
-> like below:
-> 
-> imx_usb 2184000.usb: Failed to get clock, err=-2
-> imx_usb: probe of 2184000.usb failed with error -2
-> 
-> The mx5x (50, 51, 53) and mx6q's clock structure like below:
-> 
-> mx5x:
-> - usboh3_ipg_ahb: CCGR2(index13), used to access register
-> (like your ahb)
+Hi,
 
-That is probably the one, which already gets enabled inside the
-ci13xxx_imx code.
+I had missed one pull request in the batch you merged yesterday. Better
+keep them small and frequent at this point, so here it is.
 
-> - usboh3_60M: CCGR2(index14), used to access register at serial phy mode
-> as the phy is at serial mode, we need to use it at the first before the phy
-> goes to other modes.
-> (like your ipg)
+The following changes since commit 5a903166dd31a42e39283b075cc6b9a9c079d1af:
+
+  Merge tag 'fixes-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2012-11-22 09:22:13 -1000)
+
+are available in the git repository at:
 
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 
-> usbphy: used to transfer data
-> (like your per)
+for you to fetch changes up to c667f757f392aa7b4d87374b2a975dce8c6186d1:
 
-The "per" clk is a different clk than the usbphy. We have an usbphy clk
-aswell on the mx5x. As discussed before [1], we need a solution to enable
-the usbphy clk. The current approach is to let the nop-xceiver enable
-this.
+  Merge branch 'v3.7-samsung-fixes-3' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into fixes (2012-11-22 20:43:37 -0800)
 
-[1] http://www.spinics.net/lists/linux-usb/msg74489.html
+----------------------------------------------------------------
 
-> mx6q:
-> - usboh3(Index 162 at DT), used to access register
-> - usbphy(Index 182 for otg port at DT), at phy controller
+ARM: SoC fixes for 3.7
 
-> So, we may consider a way to consolidate both mx6q (mx28) and mxc (mx5x, mx3x)
-> platforms.
+I missed one pull request from Samsung with one fix in the previous
+batch. Here it is -- a dma driver fix for an early version of silicon
+that they still support.
 
-Yes, we will discuss a real clktree solution in the usbmisc driver for
-the different cores. The first thoughts are, that the clk configuration
-has completely to be done inside the usbmisc driver. For this, the
-usbmisc needs to become a hard dependency for the ci13xxx_imx glue code.
+----------------------------------------------------------------
+Bartlomiej Zolnierkiewicz (1):
+      ARM: EXYNOS: PL330 MDMA1 fix for revision 0 of Exynos4210 SOC
 
-Regards,
-Michael
+Olof Johansson (1):
+      Merge branch 'v3.7-samsung-fixes-3' of git://git.kernel.org/.../kgene/linux-samsung into fixes
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ arch/arm/mach-exynos/dma.c              | 3 +++
+ arch/arm/mach-exynos/include/mach/map.h | 1 +
+ 2 files changed, 4 insertions(+)
