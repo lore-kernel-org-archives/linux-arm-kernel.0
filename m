@@ -1,58 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 23 Nov 2012 12:55:07 +0000
-Subject: [PATCH 3/3] MMC: sdhci-dove: allow GPIOs to be used for card
- detection on Dove
-In-Reply-To: <20121123121422.GA26168@S2100-06.ap.freescale.net>
-References: <20121122235426.GT3332@n2100.arm.linux.org.uk>
- <E1TbgcZ-0007Kt-35@rmk-PC.arm.linux.org.uk>
- <20121123083117.GA25754@S2100-06.ap.freescale.net>
- <20121123085726.GK5764@n2100.arm.linux.org.uk>
- <20121123121422.GA26168@S2100-06.ap.freescale.net>
-Message-ID: <20121123125507.GO5764@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 23 Nov 2012 12:56:26 +0000
+Subject: [PATCH 1/1] mfd: Simplify IRQ domain registration code in STMPE
+Message-ID: <1353675386-6749-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2012 at 08:14:27PM +0800, Shawn Guo wrote:
-> On Fri, Nov 23, 2012 at 08:57:26AM +0000, Russell King - ARM Linux wrote:
-> > Does this work with the sdhci stuff?
-> 
-> Honestly, I'm not sure, but I guess it does, since I have seen
-> sdhci-pxav3 driver using the helpers.  Anyway, I'm going to adopt
-> the helpers for sdhci-esdhc-imx driver to find it out.
+Historically, a driver would have to decide whether it required
+a Linear or Legacy IRQ domain when registering one. This can end
+up as quite a lot of code. A new Simple call now exists which
+simplifies this process. Let's make use of it here.
 
-The thing that worries me is this:
+Samuel Ortiz <sameo@linux.intel.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/stmpe.c |   14 +++++---------
+ 1 file changed, 5 insertions(+), 9 deletions(-)
 
-static void sdhci_tasklet_card(unsigned long param)
-{
-...
-        /* Check host->mrq first in case we are runtime suspended */
-        if (host->mrq &&
-            !(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT)) {
-                pr_err("%s: Card removed during transfer!\n",
-                        mmc_hostname(host->mmc));
-                pr_err("%s: Resetting controller.\n",
-                        mmc_hostname(host->mmc));
-
-                sdhci_reset(host, SDHCI_RESET_CMD);
-                sdhci_reset(host, SDHCI_RESET_DATA);
-
-                host->mrq->cmd->error = -ENOMEDIUM;
-                tasklet_schedule(&host->finish_tasklet);
-        }
-...
-        mmc_detect_change(host->mmc, msecs_to_jiffies(200));
-}
-
-
-That gets called whenever a card is inserted/removed by the SDHCI code (if
-the SDHCI card detect is wired), or in my case by the interrupt routine
-the code in my patch adds.
-
-The slot-gpio.c stuff directly calls into mmc_detect_change (a) with a
-shorter delay, and (b) completely omits the above handling and resetting.
-My guess from the above code is that it'll work fine 90% of the time
-(because you'll remove the card without an active request), but the above
-code looks like it's addressing a corner case which will be omitted with
-the "generic" slot-gpio.c solution.
-
-So I don't think it's a good idea to use slot-gpio.c in this case.
+diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
+index b03cc64..0e6d8b8 100644
+--- a/drivers/mfd/stmpe.c
++++ b/drivers/mfd/stmpe.c
+@@ -889,18 +889,14 @@ static struct irq_domain_ops stmpe_irq_ops = {
+ static int __devinit stmpe_irq_init(struct stmpe *stmpe,
+ 				struct device_node *np)
+ {
+-	int base = stmpe->irq_base;
++	int base = 0;
+ 	int num_irqs = stmpe->variant->num_irqs;
+ 
+-	if (base) {
+-		stmpe->domain = irq_domain_add_legacy(
+-			np, num_irqs, base, 0, &stmpe_irq_ops, stmpe);
+-	}
+-	else {
+-		stmpe->domain = irq_domain_add_linear(
+-			np, num_irqs, &stmpe_irq_ops, stmpe);
+-	}
++	if (!np)
++		base = stmpe->irq_base;
+ 
++	stmpe->domain = irq_domain_add_simple(np, num_irqs, base,
++					      &stmpe_irq_ops, stmpe);
+ 	if (!stmpe->domain) {
+ 		dev_err(stmpe->dev, "Failed to create irqdomain\n");
+ 		return -ENOSYS;
+-- 
+1.7.9.5
