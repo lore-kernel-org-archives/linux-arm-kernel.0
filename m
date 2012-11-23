@@ -1,53 +1,49 @@
 From: ruifeihuang@gmail.com (Jello huang)
-Date: Thu, 22 Nov 2012 17:50:05 +0800
-Subject: Kernel panic - not syncing: Attempted to kill init!
-In-Reply-To: <slrnkarrg7.av9.narkewoody@zuhnb712.local.com>
-References: <slrnkarrg7.av9.narkewoody@zuhnb712.local.com>
-Message-ID: <CAPFyZi6VYWaMmb4WVZdDyv5yrz5MTvM8k6GkY_F=MsJNBU69JA@mail.gmail.com>
+Date: Fri, 23 Nov 2012 18:07:13 +0800
+Subject: [PATCH 0/5] OMAPFB: use dma_alloc instead of omap's vram
+In-Reply-To: <50AE2E15.2070501@ti.com>
+References: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
+ <20121112225037.GU6801@atomide.com> <50A5E801.3000100@ti.com>
+ <20121120221456.GO18567@atomide.com>
+ <CAPFyZi52e+BPLFQoSn_scdru=MP2NeBUNUkHnym8W3t90JW2jA@mail.gmail.com>
+ <50AE2E15.2070501@ti.com>
+Message-ID: <CAPFyZi4HPRg==bbyW93wtKmR5qG3fOqK_VNGuVGz0tpQ8QrxfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pls check u root file system.if the root file system is no filesystem or not
-* correct .the kernel shall*
-*throw the kernel panic*
+hi
+Sorry donot describe clearly.
+>>How do you allocate CMA memory from userspace
+ memory is allocated by userland then  pass the size to kernel space
+
+I mean that we can split two parts of memory heap .one for the kernel space
+and other for userland app. we can use dma_declare_contiguous to declare
+one dma device A and B .Then the all kernel driver allocate from A .The
+other B allocate for userland
 
 
-On 22 November 2012 17:19, Woody Wu <narkewoody@gmail.com> wrote:
+On 22 November 2012 21:52, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
 
 > Hi,
 >
-> "Kernel panic - not syncing: Attempted to kill init!
-> exitcode=0x0000000b"
+> On 2012-11-21 16:22, Jello huang wrote:
+> > HI Tomi,
+> > we need  one rank of cma to allocate the memory for driver in kernel
+> > space .And the default CMA is for allocating memory frome usespace.So
+> > if we allocate the memory from the
+> > default CMA zone ,there maybe introduce fragmention to the default CMA
+> > zone.The kernel space memory donot touch the memory from userspace
 >
-> I got above message when I am porting 3.4.19 to a s3c2410 board.  I
-> traced the execution path is: kernel_init() -> init_post() ->
-> run_init_process("/sbin/init") -> kernel_execve().
+> Can you elaborate a bit? I didn't understand your point. Are you saying
+> each kernel driver that uses dma_alloc should have their own CMA zone?
+> That doesn't make sense...
 >
-> And, in the last function kernel_execve, the call of do_execve sucessed.
-> Then I see a piece of assembly code follows which I cannot understand.
+> How do you allocate CMA memory from userspace?
 >
-> That means, the root file system, which is mtdblock3 in my case, is
-> mounted and /sbin/init was started to execute, then I got the panic
-> message.
->
-> Is that possible that this is caused by the root file system instead of
-> the kernel? The root file system is a very old one that can run with an
-> old kernel 2.6.14.
+>  Tomi
 >
 >
-> Do you have any clue?  Thanks in advance!
 >
-> --
-> woody
-> I can't go back to yesterday - because I was a different person then.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
 
 
 -- 
@@ -55,4 +51,4 @@ Thanks
 Jello Huang
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121122/8a7a7802/attachment.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121123/0c141965/attachment.html>
