@@ -1,67 +1,47 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 23 Nov 2012 13:36:36 +0800
-Subject: [PATCH v3 3/7] usb: chipidea: usbmisc: fix a potential race
- condition
-In-Reply-To: <1353506793-8354-4-git-send-email-m.grzeschik@pengutronix.de>
-References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
- <1353506793-8354-4-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <20121123053635.GB22420@nchen-desktop>
+From: anton.vorontsov@linaro.org (Anton Vorontsov)
+Date: Thu, 22 Nov 2012 21:53:28 -0800
+Subject: [PATCH 10/10] ARM: FIQ: Get rid of init_FIQ()
+In-Reply-To: <1353642030.851395840@f20.mail.ru>
+References: <20121123003849.GA973@lizard.mcd25758.sjc.wayport.net>
+ <1353631803-4853-10-git-send-email-anton.vorontsov@linaro.org>
+ <1353642030.851395840@f20.mail.ru>
+Message-ID: <20121123055328.GA21566@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2012 at 03:06:29PM +0100, Michael Grzeschik wrote:
-> From: Marc Kleine-Budde <mkl@pengutronix.de>
+On Fri, Nov 23, 2012 at 07:40:30AM +0400, Alexander Shiyan wrote:
+[...]
+> >  static unsigned long no_fiq_insn;
+> > +static int got_no_fiq_insn;
+> > @@ -78,11 +79,14 @@ void show_fiq_list(struct seq_file *p, int prec)
+> >  
+> >  void set_fiq_handler(void *start, unsigned int length)
+> >  {
+> > -#if defined(CONFIG_CPU_USE_DOMAINS)
+> > -	memcpy((void *)0xffff001c, start, length);
+> > -#else
+> > -	memcpy(vectors_page + 0x1c, start, length);
+> > +	unsigned long *addr = (void *)0xffff001c;
+> > +
+> > +#ifndef CONFIG_CPU_USE_DOMAINS
+> > +	addr = vectors_page + 0x1c;
+> >  #endif
+> > +	if (!cmpxchg(&got_no_fiq_insn, 0, 1))
+> > +		no_fiq_insn = *addr;
+> > +	memcpy(addr, start, length);
+> >  	flush_icache_range(0xffff001c, 0xffff001c + length);
+> >  	if (!vectors_high())
+> >  		flush_icache_range(0x1c, 0x1c + length);
+> > @@ -126,8 +130,3 @@ EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
+> > -
+> > -void __init init_FIQ(void)
+> > -{
+> > -	no_fiq_insn = *(unsigned long *)0xffff001c;
 > 
-> This fixes a potential race condition where the ci13xxx_imx glue code
-> could be fast enough to call one of the usbmisc_ops before he got a
-> valid value on the static usbmisc pointer. To fix that we first set
-> usbmisc, then call usbmisc_set_ops().
+> it seems that this is wrong. In this case we have an uninitialized variable and
+> sequential call claim_fiq and release_fiq could be fatal. FIXME please.
 
-usbmisc is subsys_initcall, and cil13xxx_imx is module_init. Any
-potential situation that the ci13xxx_imx's probe is ran before the
-usbmisc's probe is completed? Besides, there is usbmisc_ops value
-check at the beginning of cil13xxx_imx's probe.
-> 
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> ---
-> Changes since v1:
-> * split previous patch into two seperate.
-> 
->  drivers/usb/chipidea/usbmisc_imx.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-> index 552c63f..9145e04 100644
-> --- a/drivers/usb/chipidea/usbmisc_imx.c
-> +++ b/drivers/usb/chipidea/usbmisc_imx.c
-> @@ -116,14 +116,14 @@ static int __devinit usbmisc_imx_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> +	usbmisc = data;
->  	ret = usbmisc_set_ops(&imx6q_usbmisc_ops);
->  	if (ret) {
-> +		usbmisc = NULL;
->  		clk_disable_unprepare(data->clk);
->  		return ret;
->  	}
->  
-> -	usbmisc = data;
-> -
->  	return 0;
->  }
->  
-> -- 
-> 1.7.10.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Um... I don't think I understand, can you please elaborate?
 
--- 
-
-Best Regards,
-Peter Chen
+Thanks,
+Anton.
