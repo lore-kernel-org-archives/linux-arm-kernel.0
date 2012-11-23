@@ -1,165 +1,99 @@
 From: ciminaghi@gnudd.com (Davide Ciminaghi)
-Date: Fri, 23 Nov 2012 16:08:29 +0100
-Subject: [PATCH 7/8] drivers/amba: add support for a PCI bridge
+Date: Fri, 23 Nov 2012 16:08:28 +0100
+Subject: [PATCH 6/8] mmc: use the new <linux/sizes.h>
 In-Reply-To: <1353683310-23654-1-git-send-email-ciminaghi@gnudd.com>
 References: <1353683310-23654-1-git-send-email-ciminaghi@gnudd.com>
-Message-ID: <1353683310-23654-8-git-send-email-ciminaghi@gnudd.com>
+Message-ID: <1353683310-23654-7-git-send-email-ciminaghi@gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Alessandro Rubini <rubini@gnudd.com>
 
-This is a PCI driver that registers AMBA devices for the range of
-supported devices.  It is currently used by STA2X11, which exports
-AMBA peripherals under PCIe.  The original AMBA drivers work with no
-changes or minimal ones.
-
 Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
 Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Alan Cox <alan@linux.intel.com>
 ---
- drivers/Kconfig         |    2 +
- drivers/amba/Kconfig    |   10 +++++
- drivers/amba/Makefile   |    1 +
- drivers/amba/pci-amba.c |   93 +++++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 106 insertions(+)
- create mode 100644 drivers/amba/Kconfig
- create mode 100644 drivers/amba/pci-amba.c
+ drivers/mmc/host/mmci.c     |    2 +-
+ drivers/mmc/host/msm_sdcc.c |    2 +-
+ drivers/mmc/host/mvsdio.c   |    2 +-
+ drivers/mmc/host/mxcmmc.c   |    2 +-
+ drivers/mmc/host/pxamci.c   |    3 +--
+ 5 files changed, 5 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/Kconfig b/drivers/Kconfig
-index dbdefa3..6d98cb9 100644
---- a/drivers/Kconfig
-+++ b/drivers/Kconfig
-@@ -156,4 +156,6 @@ source "drivers/pwm/Kconfig"
- 
- source "drivers/irqchip/Kconfig"
- 
-+source "drivers/amba/Kconfig"
-+
- endmenu
-diff --git a/drivers/amba/Kconfig b/drivers/amba/Kconfig
-new file mode 100644
-index 0000000..b5b5aca
---- /dev/null
-+++ b/drivers/amba/Kconfig
-@@ -0,0 +1,10 @@
-+
-+config PCI_AMBA
-+	tristate "PCI-to-AMBA bridge"
-+	depends on ARM_AMBA && PCI
-+	---help---
-+	  This compiles a PCI driver that registers AMBA devices, so
-+	  the respective AMBA driver can be used unchanged if you have
-+	  a PCI to amba bridge. This is required for STA2X11 support.
-+
-+	  If uncertain, choose N.
-diff --git a/drivers/amba/Makefile b/drivers/amba/Makefile
-index 66e81c2..d30e947 100644
---- a/drivers/amba/Makefile
-+++ b/drivers/amba/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_ARM_AMBA)		+= bus.o
-+obj-$(CONFIG_PCI_AMBA)		+= pci-amba.o
- obj-$(CONFIG_TEGRA_AHB)		+= tegra-ahb.o
-diff --git a/drivers/amba/pci-amba.c b/drivers/amba/pci-amba.c
-new file mode 100644
-index 0000000..0b0a240
---- /dev/null
-+++ b/drivers/amba/pci-amba.c
-@@ -0,0 +1,93 @@
-+/*
-+ * Support for AMBA devices (both APB and AHB) behind a PCI bridge
-+ * Copyright 2012 ST Microelectronics (Alessandro Rubini)
-+ * GNU GPL version 2.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/amba/bus.h>
-+#include <linux/pci.h>
-+#include <linux/pci_ids.h>
-+#include <linux/slab.h>
-+#include <linux/irq.h>
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 5e39b31..731d98e 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -34,10 +34,10 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/types.h>
+ #include <linux/pinctrl/consumer.h>
 +#include <linux/sizes.h>
-+
-+static int __devinit pci_amba_probe(struct pci_dev *pdev,
-+				     const struct pci_device_id *id)
-+{
-+	struct amba_device *adev;
-+	char *name;
-+	int ret;
-+
-+	pci_enable_msi(pdev);
-+	ret = pci_enable_device(pdev);
-+	if (ret)
-+		return ret;
-+
-+	/* Create a name: each of them must be different */
-+	name = devm_kzalloc(&pdev->dev, strlen(dev_name(&pdev->dev)) + 6,
-+		GFP_KERNEL);
-+	sprintf(name, "amba-%s", dev_name(&pdev->dev));
-+
-+	/* Simply build an amba device and register it */
-+	adev = amba_device_alloc(name,  pdev->resource[0].start, SZ_4K);
-+	if (!adev)
-+		return -ENOMEM;
-+	adev->irq[0] = pdev->irq;
-+
-+	/* This bridge can host both APB and AHB devices, so set master */
-+	pci_set_master(pdev);
-+	if (pdev->vendor == PCI_VENDOR_ID_STMICRO) {
-+		/* Under sta2x11, DMA is there but limited to 512M */
-+		adev->dma_mask = SZ_512M - 1;
-+		adev->dev.coherent_dma_mask = SZ_512M - 1;
-+	}
-+
-+	adev->dev.platform_data = pdev->dev.platform_data;
-+	pci_set_drvdata(pdev, adev);
-+
-+	return amba_device_add(adev, &pdev->resource[0]);
-+};
-+
-+static void __devexit pci_amba_remove(struct pci_dev *pdev)
-+{
-+	struct amba_device *adev = pci_get_drvdata(pdev);
-+	amba_device_unregister(adev);
-+	pci_disable_msi(pdev);
-+}
-+
-+static DEFINE_PCI_DEVICE_TABLE(pci_amba_table) = {
-+	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_UART_HWFC)},
-+	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_UART_NO_HWFC)},
-+	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_SOC_DMA)},
-+	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_I2C)},
-+	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_SPI_HS)},
-+	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_SDIO_EMMC)},
-+	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_SDIO)},
-+	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_AUDIO_ROUTER_DMA)},
-+	{PCI_VDEVICE(STMICRO, PCI_DEVICE_ID_STMICRO_AUDIO_ROUTER_MSPS)},
-+	{0,}
-+};
-+
-+static struct pci_driver pci_amba_driver = {
-+	.name		= "pci-amba",
-+	.id_table	= pci_amba_table,
-+	.probe		= pci_amba_probe,
-+	.remove		= __devexit_p(pci_amba_remove),
-+};
-+
-+static int __init pci_amba_init(void)
-+{
-+	return pci_register_driver(&pci_amba_driver);
-+}
-+
-+static void __exit pci_amba_exit(void)
-+{
-+	pci_unregister_driver(&pci_amba_driver);
-+}
-+
-+module_init(pci_amba_init);
-+module_exit(pci_amba_exit);
-+
-+MODULE_LICENSE("GPL");
+ 
+ #include <asm/div64.h>
+ #include <asm/io.h>
+-#include <asm/sizes.h>
+ 
+ #include "mmci.h"
+ 
+diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
+index 7c0af0e..aa61b79 100644
+--- a/drivers/mmc/host/msm_sdcc.c
++++ b/drivers/mmc/host/msm_sdcc.c
+@@ -37,10 +37,10 @@
+ #include <linux/memory.h>
+ #include <linux/gfp.h>
+ #include <linux/gpio.h>
++#include <linux/sizes.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/div64.h>
+-#include <asm/sizes.h>
+ 
+ #include <linux/platform_data/mmc-msm_sdcc.h>
+ #include <mach/msm_iomap.h>
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index de4c20b..e313cd9 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -22,8 +22,8 @@
+ #include <linux/clk.h>
+ #include <linux/gpio.h>
+ #include <linux/mmc/host.h>
++#include <linux/sizes.h>
+ 
+-#include <asm/sizes.h>
+ #include <asm/unaligned.h>
+ #include <linux/platform_data/mmc-mvsdio.h>
+ 
+diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
+index a72936e..8ce7e73 100644
+--- a/drivers/mmc/host/mxcmmc.c
++++ b/drivers/mmc/host/mxcmmc.c
+@@ -34,10 +34,10 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/dmaengine.h>
+ #include <linux/types.h>
++#include <linux/sizes.h>
+ 
+ #include <asm/dma.h>
+ #include <asm/irq.h>
+-#include <asm/sizes.h>
+ #include <linux/platform_data/mmc-mxcmmc.h>
+ 
+ #include <linux/platform_data/dma-imx.h>
+diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
+index 3f9d6d5..af3604a 100644
+--- a/drivers/mmc/host/pxamci.c
++++ b/drivers/mmc/host/pxamci.c
+@@ -33,8 +33,7 @@
+ #include <linux/of.h>
+ #include <linux/of_gpio.h>
+ #include <linux/of_device.h>
+-
+-#include <asm/sizes.h>
++#include <linux/sizes.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/dma.h>
 -- 
 1.7.10.4
