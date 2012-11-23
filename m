@@ -1,26 +1,51 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 23 Nov 2012 23:27:48 +0900
-Subject: [PATCH 3/3] ASoC: atmel-pcm: add dma support
-In-Reply-To: <1353651257-2476-4-git-send-email-voice.shen@atmel.com>
-References: <1353651257-2476-1-git-send-email-voice.shen@atmel.com>
- <1353651257-2476-4-git-send-email-voice.shen@atmel.com>
-Message-ID: <20121123142747.GP4529@opensource.wolfsonmicro.com>
+From: ciminaghi@gnudd.com (Davide Ciminaghi)
+Date: Fri, 23 Nov 2012 16:08:27 +0100
+Subject: [PATCH 5/8] mmci: replace readsl/writesl with
+ ioread32_rep/iowrite32_rep
+In-Reply-To: <1353683310-23654-1-git-send-email-ciminaghi@gnudd.com>
+References: <1353683310-23654-1-git-send-email-ciminaghi@gnudd.com>
+Message-ID: <1353683310-23654-6-git-send-email-ciminaghi@gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2012 at 02:14:17PM +0800, Bo Shen wrote:
-> Add dmaengine specific routines and replace PDC ones in
-> pcm_ops if appropriate.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> [voice.shen at atmel.com: adapt to soc dmaengine framework]
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+Not all the architectures have readsl/writesl,
+use the more portable ioread32_rep/iowrite32_rep functions instead.
 
-Why is this not just two separate drivers?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121123/a44bbe27/attachment.sig>
+Signed-off-by: Davide Ciminaghi <ciminaghi@gnudd.com>
+---
+ drivers/mmc/host/mmci.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 9446c17..5e39b31 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -863,14 +863,14 @@ static int mmci_pio_read(struct mmci_host *host, char *buffer, unsigned int rema
+ 		if (unlikely(count & 0x3)) {
+ 			if (count < 4) {
+ 				unsigned char buf[4];
+-				readsl(base + MMCIFIFO, buf, 1);
++				ioread32_rep(base + MMCIFIFO, buf, 1);
+ 				memcpy(ptr, buf, count);
+ 			} else {
+-				readsl(base + MMCIFIFO, ptr, count >> 2);
++				ioread32_rep(base + MMCIFIFO, ptr, count >> 2);
+ 				count &= ~0x3;
+ 			}
+ 		} else {
+-			readsl(base + MMCIFIFO, ptr, count >> 2);
++			ioread32_rep(base + MMCIFIFO, ptr, count >> 2);
+ 		}
+ 
+ 		ptr += count;
+@@ -907,7 +907,7 @@ static int mmci_pio_write(struct mmci_host *host, char *buffer, unsigned int rem
+ 		 * byte become a 32bit write, 7 bytes will be two
+ 		 * 32bit writes etc.
+ 		 */
+-		writesl(base + MMCIFIFO, ptr, (count + 3) >> 2);
++		iowrite32_rep(base + MMCIFIFO, ptr, (count + 3) >> 2);
+ 
+ 		ptr += count;
+ 		remain -= count;
+-- 
+1.7.10.4
