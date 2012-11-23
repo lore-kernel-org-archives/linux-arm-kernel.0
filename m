@@ -1,48 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 Nov 2012 12:56:26 +0000
-Subject: [PATCH 1/1] mfd: Simplify IRQ domain registration code in STMPE
-Message-ID: <1353675386-6749-1-git-send-email-lee.jones@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 23 Nov 2012 18:28:32 +0530
+Subject: [PATCH 1/1] gpio: Provide the STMPE GPIO driver with its own IRQ
+ Domain
+In-Reply-To: <1353674665-31905-1-git-send-email-lee.jones@linaro.org>
+References: <1353674665-31905-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAKohponCWA62+C31nm8QoA5cANPQ09BsU4Sd-x07kA8G_g+AvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Historically, a driver would have to decide whether it required
-a Linear or Legacy IRQ domain when registering one. This can end
-up as quite a lot of code. A new Simple call now exists which
-simplifies this process. Let's make use of it here.
+On 23 November 2012 18:14, Lee Jones <lee.jones@linaro.org> wrote:
+> The STMPE GPIO driver can be used as an IRQ controller by some
+> related devices. Here we provide it with its very own IRQ Domain
+> so that IRQs can be issued dynamically. This will stand the
+> driver in good stead when it is enabled for Device Tree, as this
+> it a prerequisite.
+>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Samuel Ortiz <sameo@linux.intel.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/stmpe.c |   14 +++++---------
- 1 file changed, 5 insertions(+), 9 deletions(-)
+> diff --git a/drivers/gpio/gpio-stmpe.c b/drivers/gpio/gpio-stmpe.c
 
-diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
-index b03cc64..0e6d8b8 100644
---- a/drivers/mfd/stmpe.c
-+++ b/drivers/mfd/stmpe.c
-@@ -889,18 +889,14 @@ static struct irq_domain_ops stmpe_irq_ops = {
- static int __devinit stmpe_irq_init(struct stmpe *stmpe,
- 				struct device_node *np)
- {
--	int base = stmpe->irq_base;
-+	int base = 0;
- 	int num_irqs = stmpe->variant->num_irqs;
- 
--	if (base) {
--		stmpe->domain = irq_domain_add_legacy(
--			np, num_irqs, base, 0, &stmpe_irq_ops, stmpe);
--	}
--	else {
--		stmpe->domain = irq_domain_add_linear(
--			np, num_irqs, &stmpe_irq_ops, stmpe);
--	}
-+	if (!np)
-+		base = stmpe->irq_base;
- 
-+	stmpe->domain = irq_domain_add_simple(np, num_irqs, base,
-+					      &stmpe_irq_ops, stmpe);
- 	if (!stmpe->domain) {
- 		dev_err(stmpe->dev, "Failed to create irqdomain\n");
- 		return -ENOSYS;
--- 
-1.7.9.5
+> +const struct irq_domain_ops stmpe_gpio_irq_simple_ops = {
+
+static?
+
+> +       .unmap = stmpe_gpio_irq_unmap,
+> +       .map = stmpe_gpio_irq_map,
+> +       .xlate = irq_domain_xlate_twocell,
+> +};
+
+
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
