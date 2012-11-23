@@ -1,40 +1,58 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Fri, 23 Nov 2012 13:48:51 +0100
-Subject: [PATCH v4 05/11] pwm: pwm-tiecap: pinctrl support
-In-Reply-To: <20121123111811.GA5072@avionic-0098.adnet.avionic-design.de>
- (Thierry Reding's message of "Fri, 23 Nov 2012 12:18:11 +0100")
-References: <1353503469-18634-1-git-send-email-avinashphilip@ti.com>
- <1353503469-18634-6-git-send-email-avinashphilip@ti.com>
- <20121122205944.GC16716@avionic-0098.adnet.avionic-design.de>
- <518397C60809E147AF5323E0420B992E3E9EE991@DBDE01.ent.ti.com>
- <20121123105110.GA6884@avionic-0098.adnet.avionic-design.de>
- <518397C60809E147AF5323E0420B992E3E9EEAAA@DBDE01.ent.ti.com>
- <20121123111811.GA5072@avionic-0098.adnet.avionic-design.de>
-Message-ID: <87mwy8eb7w.fsf@dell.be.48ers.dk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 23 Nov 2012 12:55:07 +0000
+Subject: [PATCH 3/3] MMC: sdhci-dove: allow GPIOs to be used for card
+ detection on Dove
+In-Reply-To: <20121123121422.GA26168@S2100-06.ap.freescale.net>
+References: <20121122235426.GT3332@n2100.arm.linux.org.uk>
+ <E1TbgcZ-0007Kt-35@rmk-PC.arm.linux.org.uk>
+ <20121123083117.GA25754@S2100-06.ap.freescale.net>
+ <20121123085726.GK5764@n2100.arm.linux.org.uk>
+ <20121123121422.GA26168@S2100-06.ap.freescale.net>
+Message-ID: <20121123125507.GO5764@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Thierry" == Thierry Reding <thierry.reding@avionic-design.de> writes:
+On Fri, Nov 23, 2012 at 08:14:27PM +0800, Shawn Guo wrote:
+> On Fri, Nov 23, 2012 at 08:57:26AM +0000, Russell King - ARM Linux wrote:
+> > Does this work with the sdhci stuff?
+> 
+> Honestly, I'm not sure, but I guess it does, since I have seen
+> sdhci-pxav3 driver using the helpers.  Anyway, I'm going to adopt
+> the helpers for sdhci-esdhc-imx driver to find it out.
 
-Hi,
+The thing that worries me is this:
 
- Thierry> Everybody seems to be doing it with a warning, so I guess
- Thierry> that's fine for now. I just find it strange that if you
- Thierry> request the default pin group to be selected when in fact the
- Thierry> hardware doesn't support pinctrl at all you shouldn't be
- Thierry> getting an error either.
+static void sdhci_tasklet_card(unsigned long param)
+{
+...
+        /* Check host->mrq first in case we are runtime suspended */
+        if (host->mrq &&
+            !(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT)) {
+                pr_err("%s: Card removed during transfer!\n",
+                        mmc_hostname(host->mmc));
+                pr_err("%s: Resetting controller.\n",
+                        mmc_hostname(host->mmc));
 
-There's several different situations:
+                sdhci_reset(host, SDHCI_RESET_CMD);
+                sdhci_reset(host, SDHCI_RESET_DATA);
 
-- Platform without pinctrl support
-- Platform with pinctrl support but no pinmux specified in dt for device
-  (E.G. pinmux setup in bootloader)
-- Pinmux specified in dt
-- Some kind of misconfiguration in dt
+                host->mrq->cmd->error = -ENOMEDIUM;
+                tasklet_schedule(&host->finish_tasklet);
+        }
+...
+        mmc_detect_change(host->mmc, msecs_to_jiffies(200));
+}
 
-You could argue that devm_pinctrl_get_select_default() shouldn't return
-an error for the first situation, but how should it be able to know the
-difference between 2 and 4?
 
--- 
-Bye, Peter Korsgaard
+That gets called whenever a card is inserted/removed by the SDHCI code (if
+the SDHCI card detect is wired), or in my case by the interrupt routine
+the code in my patch adds.
+
+The slot-gpio.c stuff directly calls into mmc_detect_change (a) with a
+shorter delay, and (b) completely omits the above handling and resetting.
+My guess from the above code is that it'll work fine 90% of the time
+(because you'll remove the card without an active request), but the above
+code looks like it's addressing a corner case which will be omitted with
+the "generic" slot-gpio.c solution.
+
+So I don't think it's a good idea to use slot-gpio.c in this case.
