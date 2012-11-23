@@ -1,52 +1,36 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Thu, 22 Nov 2012 16:29:58 -0800
-Subject: [PATCH resend 0/4] ARM: KDB FIQ debugger
-Message-ID: <20121123002957.GA31679@lizard.mcd25758.sjc.wayport.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 23 Nov 2012 08:38:52 +0800
+Subject: [PATCH] ARM: pxa: pxa25x.c: add dummy SA1100 rtc clock
+In-Reply-To: <1353629019-32203-1-git-send-email-andrea.adami@gmail.com>
+References: <1353629019-32203-1-git-send-email-andrea.adami@gmail.com>
+Message-ID: <CAN1soZwNJRtfqLBqmnCaFt1F5ze2eFDPk8t0+GrjytcHOS-QHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andrew, Russell,
+On Fri, Nov 23, 2012 at 8:03 AM, Andrea Adami <andrea.adami@gmail.com> wrote:
+> * fix failure seen on Zaurus corgi:
+> * sa1100-rtc sa1100-rtc: failed to find rtc clock source
+> * sa1100-rtc: probe of sa1100-rtc failed with error -2
+>
+> Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
+> ---
+>  arch/arm/mach-pxa/pxa25x.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+> index 3352b37..0f05671 100644
+> --- a/arch/arm/mach-pxa/pxa25x.c
+> +++ b/arch/arm/mach-pxa/pxa25x.c
+> @@ -209,6 +209,7 @@ static struct clk_lookup pxa25x_clkregs[] = {
+>         INIT_CLKREG(&clk_pxa25x_gpio12, NULL, "GPIO12_CLK"),
+>         INIT_CLKREG(&clk_pxa25x_mem, "pxa2xx-pcmcia", NULL),
+>         INIT_CLKREG(&clk_dummy, "pxa-gpio", NULL),
+> +       INIT_CLKREG(&clk_dummy, "sa1100-rtc", NULL),
+>  };
+>
+>  static struct clk_lookup pxa25x_hwuart_clkreg =
+> --
+> 1.7.8.6
+>
 
-The KDB/NMI core support has been merged into v3.7-rc1, so the only ARM
-bits are pending now.
-
-I addressed all the comments ~two month ago, and since then just resending
-these patches. I know we're all busy, so no blaming. :) But then let's
-pass this via -mm?
-
-Short description of the KDB/FIQ debugger:
-
- The FIQ debugger is a facility that can be used to debug situations when
- the kernel stuck in uninterruptable sections, e.g. the kernel infinitely
- loops or deadlocked in an interrupt or with interrupts disabled. On some
- development boards there is even a special NMI button, which is very
- useful for debugging weird kernel hangs.
-
- And FIQ is basically an NMI, it has a higher priority than IRQs, and upon
- IRQ exception FIQs are not disabled. It is still possible to disable FIQs
- (as well as some "NMIs" on other architectures), but via special means.
-
-Old changelogs and a full rationale for these patches can be found here:
-
-	v1-v5, rationale: http://lkml.org/lkml/2012/9/10/2
-	v6: http://lkml.org/lkml/2012/9/10/2
-	v7: http://lkml.org/lkml/2012/9/13/367
-	v8: http://lkml.org/lkml/2012/9/19/525
-	v9: http://lkml.org/lkml/2012/9/24/538
-
-Thanks!
-Anton.
-
---
- arch/arm/Kconfig                    |  19 ++++
- arch/arm/common/vic.c               |  28 +++++
- arch/arm/include/asm/hardware/vic.h |   2 +
- arch/arm/include/asm/kgdb.h         |   8 ++
- arch/arm/kernel/Makefile            |   1 +
- arch/arm/kernel/entry-armv.S        | 167 +--------------------------
- arch/arm/kernel/entry-header.S      | 170 ++++++++++++++++++++++++++++
- arch/arm/kernel/kgdb_fiq.c          | 124 ++++++++++++++++++++
- arch/arm/kernel/kgdb_fiq_entry.S    |  87 ++++++++++++++
- arch/arm/mach-versatile/Makefile    |   1 +
- arch/arm/mach-versatile/kgdb_fiq.c  |  31 +++++
- 11 files changed, 472 insertions(+), 166 deletions(-)
+Acked & Applied
