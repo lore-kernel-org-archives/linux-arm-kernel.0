@@ -1,132 +1,149 @@
-From: p.paneri@samsung.com (Praveen Paneri)
-Date: Fri, 23 Nov 2012 18:02:32 +0530
-Subject: [PATCH v9 3/3] ARM: EXYNOS: Enabling samsung-usbphy driver for
- EXYNOS4210
-In-Reply-To: <1353673952-13537-1-git-send-email-p.paneri@samsung.com>
-References: <1353673952-13537-1-git-send-email-p.paneri@samsung.com>
-Message-ID: <1353673952-13537-4-git-send-email-p.paneri@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 23 Nov 2012 12:44:25 +0000
+Subject: [PATCH 1/1] gpio: Provide the STMPE GPIO driver with its own IRQ
+ Domain
+Message-ID: <1353674665-31905-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding usbphy node for Exynos4210 along with the platform data.
+The STMPE GPIO driver can be used as an IRQ controller by some
+related devices. Here we provide it with its very own IRQ Domain
+so that IRQs can be issued dynamically. This will stand the
+driver in good stead when it is enabled for Device Tree, as this
+it a prerequisite.
 
-Signed-off-by: Praveen Paneri <p.paneri@samsung.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/exynos4210-smdkv310.dts    |    5 +++++
- arch/arm/mach-exynos/Kconfig                 |    1 +
- arch/arm/mach-exynos/include/mach/map.h      |    1 +
- arch/arm/mach-exynos/mach-exynos4-dt.c       |    8 ++++++++
- arch/arm/mach-exynos/setup-usb-phy.c         |   13 +++++++++++++
- arch/arm/plat-samsung/include/plat/usb-phy.h |    1 +
- 6 files changed, 29 insertions(+), 0 deletions(-)
+ drivers/gpio/gpio-stmpe.c |   67 +++++++++++++++++++++++++++------------------
+ 1 file changed, 41 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-index 9b23a82..550903a 100644
---- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
-+++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-@@ -59,6 +59,11 @@
- 		status = "okay";
- 	};
+diff --git a/drivers/gpio/gpio-stmpe.c b/drivers/gpio/gpio-stmpe.c
+index dce3472..0e0471b 100644
+--- a/drivers/gpio/gpio-stmpe.c
++++ b/drivers/gpio/gpio-stmpe.c
+@@ -11,6 +11,7 @@
+ #include <linux/slab.h>
+ #include <linux/gpio.h>
+ #include <linux/irq.h>
++#include <linux/irqdomain.h>
+ #include <linux/interrupt.h>
+ #include <linux/mfd/stmpe.h>
  
-+	usbphy at 125B0000 {
-+		compatible = "samsung,exynos4210-usbphy";
-+		reg = <0x125B0000 0x100>;
-+	};
+@@ -28,6 +29,7 @@ struct stmpe_gpio {
+ 	struct stmpe *stmpe;
+ 	struct device *dev;
+ 	struct mutex irq_lock;
++	struct irq_domain *domain;
+ 
+ 	int irq_base;
+ 	unsigned norequest_mask;
+@@ -267,38 +269,55 @@ static irqreturn_t stmpe_gpio_irq(int irq, void *dev)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int __devinit stmpe_gpio_irq_init(struct stmpe_gpio *stmpe_gpio)
++int stmpe_gpio_irq_map(struct irq_domain *d, unsigned int virq,
++		       irq_hw_number_t hwirq)
+ {
+-	int base = stmpe_gpio->irq_base;
+-	int irq;
++	struct stmpe_gpio *stmpe_gpio = d->host_data;
 +
- 	keypad at 100A0000 {
- 		samsung,keypad-num-rows = <2>;
- 		samsung,keypad-num-columns = <8>;
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 945ce49..e0d481f 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -419,6 +419,7 @@ config MACH_EXYNOS4_DT
- 	select PINCTRL
- 	select PINCTRL_EXYNOS4
- 	select USE_OF
-+	select EXYNOS4_SETUP_USB_PHY
- 	help
- 	  Machine support for Samsung Exynos4 machine with device tree enabled.
- 	  Select this if a fdt blob is available for the Exynos4 SoC based board.
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 1df6abb..556aced 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -246,6 +246,7 @@
- #define S3C_PA_SPI1			EXYNOS4_PA_SPI1
- #define S3C_PA_SPI2			EXYNOS4_PA_SPI2
- #define S3C_PA_USB_HSOTG		EXYNOS4_PA_HSOTG
-+#define S3C_PA_USB_PHY			EXYNOS4_PA_HSPHY
++	if (!stmpe_gpio)
++		return -EINVAL;
  
- #define S5P_PA_EHCI			EXYNOS4_PA_EHCI
- #define S5P_PA_FIMC0			EXYNOS4_PA_FIMC0
-diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
-index 8858068..f7887e5 100644
---- a/arch/arm/mach-exynos/mach-exynos4-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
-@@ -13,6 +13,7 @@
+-	for (irq = base; irq < base + stmpe_gpio->chip.ngpio; irq++) {
+-		irq_set_chip_data(irq, stmpe_gpio);
+-		irq_set_chip_and_handler(irq, &stmpe_gpio_irq_chip,
+-					 handle_simple_irq);
+-		irq_set_nested_thread(irq, 1);
++	irq_set_chip_data(hwirq, stmpe_gpio);
++	irq_set_chip_and_handler(hwirq, &stmpe_gpio_irq_chip,
++				 handle_simple_irq);
++	irq_set_nested_thread(hwirq, 1);
+ #ifdef CONFIG_ARM
+-		set_irq_flags(irq, IRQF_VALID);
++	set_irq_flags(hwirq, IRQF_VALID);
+ #else
+-		irq_set_noprobe(irq);
++	irq_set_noprobe(hwirq);
+ #endif
+-	}
  
- #include <linux/of_platform.h>
- #include <linux/serial_core.h>
-+#include <linux/platform_data/samsung-usbphy.h>
+ 	return 0;
+ }
  
- #include <asm/mach/arch.h>
- #include <asm/hardware/gic.h>
-@@ -20,9 +21,14 @@
- 
- #include <plat/cpu.h>
- #include <plat/regs-serial.h>
-+#include <plat/usb-phy.h>
- 
- #include "common.h"
- 
-+static struct samsung_usbphy_data exynos4_usbphy_pdata = {
-+	.pmu_isolation = s5p_usb_phy_pmu_isolation,
+-static void stmpe_gpio_irq_remove(struct stmpe_gpio *stmpe_gpio)
++void stmpe_gpio_irq_unmap(struct irq_domain *d, unsigned int virq)
+ {
+-	int base = stmpe_gpio->irq_base;
+-	int irq;
+-
+-	for (irq = base; irq < base + stmpe_gpio->chip.ngpio; irq++) {
+ #ifdef CONFIG_ARM
+-		set_irq_flags(irq, 0);
++	set_irq_flags(virq, 0);
+ #endif
+-		irq_set_chip_and_handler(irq, NULL, NULL);
+-		irq_set_chip_data(irq, NULL);
++	irq_set_chip_and_handler(virq, NULL, NULL);
++	irq_set_chip_data(virq, NULL);
++}
++
++const struct irq_domain_ops stmpe_gpio_irq_simple_ops = {
++	.unmap = stmpe_gpio_irq_unmap,
++	.map = stmpe_gpio_irq_map,
++	.xlate = irq_domain_xlate_twocell,
 +};
 +
- /*
-  * The following lookup table is used to override device names when devices
-  * are registered from device tree. This is temporarily added to enable
-@@ -79,6 +85,8 @@ static const struct of_dev_auxdata exynos4_auxdata_lookup[] __initconst = {
- 	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_PDMA1, "dma-pl330.1", NULL),
- 	OF_DEV_AUXDATA("samsung,exynos4210-tmu", EXYNOS4_PA_TMU,
- 				"exynos-tmu", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos4210-usbphy", EXYNOS4_PA_HSPHY,
-+			"s3c-usbphy", &exynos4_usbphy_pdata),
- 	{},
- };
- 
-diff --git a/arch/arm/mach-exynos/setup-usb-phy.c b/arch/arm/mach-exynos/setup-usb-phy.c
-index b81cc56..1c62d20 100644
---- a/arch/arm/mach-exynos/setup-usb-phy.c
-+++ b/arch/arm/mach-exynos/setup-usb-phy.c
-@@ -221,3 +221,16 @@ int s5p_usb_phy_exit(struct platform_device *pdev, int type)
- 
- 	return -EINVAL;
- }
-+
-+void s5p_usb_phy_pmu_isolation(int on)
++static int __devinit stmpe_gpio_irq_init(struct stmpe_gpio *stmpe_gpio)
 +{
-+	if (on) {
-+		writel(readl(S5P_USBDEVICE_PHY_CONTROL)
-+			& ~S5P_USBDEVICE_PHY_ENABLE,
-+				S5P_USBDEVICE_PHY_CONTROL);
-+	} else {
-+		writel(readl(S5P_USBDEVICE_PHY_CONTROL)
-+			| S5P_USBDEVICE_PHY_ENABLE,
-+				S5P_USBDEVICE_PHY_CONTROL);
-+	}
-+}
-diff --git a/arch/arm/plat-samsung/include/plat/usb-phy.h b/arch/arm/plat-samsung/include/plat/usb-phy.h
-index 46b54bf..fafb0cc 100644
---- a/arch/arm/plat-samsung/include/plat/usb-phy.h
-+++ b/arch/arm/plat-samsung/include/plat/usb-phy.h
-@@ -20,5 +20,6 @@ enum s5p_usb_phy_type {
- extern struct samsung_usbphy_data s3c_usbphy_pdata;
- extern int s5p_usb_phy_init(struct platform_device *pdev, int type);
- extern int s5p_usb_phy_exit(struct platform_device *pdev, int type);
-+extern void s5p_usb_phy_pmu_isolation(int on);
++	int base = stmpe_gpio->irq_base;
++
++	stmpe_gpio->domain = irq_domain_add_simple(NULL,
++				stmpe_gpio->chip.ngpio, base,
++				&stmpe_gpio_irq_simple_ops, stmpe_gpio);
++	if (!stmpe_gpio->domain) {
++		dev_err(stmpe_gpio->dev, "failed to create irqdomain\n");
++		return -ENOSYS;
+ 	}
++
++	return 0;
+ }
  
- #endif /* __PLAT_SAMSUNG_USB_PHY_H */
+ static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
+@@ -348,7 +367,7 @@ static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
+ 				IRQF_ONESHOT, "stmpe-gpio", stmpe_gpio);
+ 		if (ret) {
+ 			dev_err(&pdev->dev, "unable to get irq: %d\n", ret);
+-			goto out_removeirq;
++			goto out_disable;
+ 		}
+ 	}
+ 
+@@ -368,9 +387,6 @@ static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
+ out_freeirq:
+ 	if (irq >= 0)
+ 		free_irq(irq, stmpe_gpio);
+-out_removeirq:
+-	if (irq >= 0)
+-		stmpe_gpio_irq_remove(stmpe_gpio);
+ out_disable:
+ 	stmpe_disable(stmpe, STMPE_BLOCK_GPIO);
+ out_free:
+@@ -398,10 +414,9 @@ static int __devexit stmpe_gpio_remove(struct platform_device *pdev)
+ 
+ 	stmpe_disable(stmpe, STMPE_BLOCK_GPIO);
+ 
+-	if (irq >= 0) {
++	if (irq >= 0)
+ 		free_irq(irq, stmpe_gpio);
+-		stmpe_gpio_irq_remove(stmpe_gpio);
+-	}
++
+ 	platform_set_drvdata(pdev, NULL);
+ 	kfree(stmpe_gpio);
+ 
 -- 
-1.7.1
+1.7.9.5
