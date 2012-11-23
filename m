@@ -1,143 +1,127 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 23 Nov 2012 13:05:41 +0000
-Subject: [PATCH 1/1] ASoC: Ux500: Initialise PCM from MSP probe rather than as
- a device
-Message-ID: <1353675941-7303-1-git-send-email-lee.jones@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 23 Nov 2012 14:37:29 +0100
+Subject: [PATCH 1/1] spi/atmel: add DT support
+In-Reply-To: <1353674679-13158-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20121121151713.1F8873E0A47@localhost>
+ <1353674679-13158-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <50AF7C19.8000306@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCM is a pseudo-device. It doesn't have any of it's own registers
-or hardware. It rather acts as a layer of abstraction for DMA
-transfers. Hence, instead of classifying it as a device in its own
-right, we call the initialisation from the MSP driver.
+On 11/23/2012 01:44 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> the atmel_spi use only gpio for chip select
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Ola LILJA2 <ola.o.lilja@stericsson.com>
-Cc: alsa-devel at alsa-project.org
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- sound/soc/ux500/mop500.c        |    4 ++--
- sound/soc/ux500/ux500_msp_dai.c |   14 +++++++++++++-
- sound/soc/ux500/ux500_pcm.c     |   19 ++++---------------
- sound/soc/ux500/ux500_pcm.h     |    3 +++
- 4 files changed, 22 insertions(+), 18 deletions(-)
+Seems simple and nice:
 
-diff --git a/sound/soc/ux500/mop500.c b/sound/soc/ux500/mop500.c
-index 54f7e25..651a52a 100644
---- a/sound/soc/ux500/mop500.c
-+++ b/sound/soc/ux500/mop500.c
-@@ -33,7 +33,7 @@ struct snd_soc_dai_link mop500_dai_links[] = {
- 		.stream_name = "ab8500_0",
- 		.cpu_dai_name = "ux500-msp-i2s.1",
- 		.codec_dai_name = "ab8500-codec-dai.0",
--		.platform_name = "ux500-pcm.0",
-+		.platform_name = "ux500-msp-i2s.1",
- 		.codec_name = "ab8500-codec.0",
- 		.init = mop500_ab8500_machine_init,
- 		.ops = mop500_ab8500_ops,
-@@ -43,7 +43,7 @@ struct snd_soc_dai_link mop500_dai_links[] = {
- 		.stream_name = "ab8500_1",
- 		.cpu_dai_name = "ux500-msp-i2s.3",
- 		.codec_dai_name = "ab8500-codec-dai.1",
--		.platform_name = "ux500-pcm.0",
-+		.platform_name = "ux500-msp-i2s.3",
- 		.codec_name = "ab8500-codec.0",
- 		.init = NULL,
- 		.ops = mop500_ab8500_ops,
-diff --git a/sound/soc/ux500/ux500_msp_dai.c b/sound/soc/ux500/ux500_msp_dai.c
-index be94bf9..66ca889 100644
---- a/sound/soc/ux500/ux500_msp_dai.c
-+++ b/sound/soc/ux500/ux500_msp_dai.c
-@@ -28,6 +28,7 @@
- 
- #include "ux500_msp_i2s.h"
- #include "ux500_msp_dai.h"
-+#include "ux500_pcm.h"
- 
- static int setup_pcm_multichan(struct snd_soc_dai *dai,
- 			struct ux500_msp_config *msp_config)
-@@ -806,11 +807,20 @@ static int __devinit ux500_msp_drv_probe(struct platform_device *pdev)
- 		goto err_init_msp;
- 	}
- 
-+	ret = ux500_pcm_register_platform(pdev);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev,
-+			"Error: %s: Failed to register PCM platform device!\n",
-+			__func__);
-+		goto err_reg_plat;
-+	}
-+
- 	return 0;
- 
-+err_reg_plat:
-+	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(ux500_msp_dai_drv));
- err_init_msp:
- 	clk_put(drvdata->clk);
--
- err_clk:
- 	devm_regulator_put(drvdata->reg_vape);
- 
-@@ -821,6 +831,8 @@ static int __devexit ux500_msp_drv_remove(struct platform_device *pdev)
- {
- 	struct ux500_msp_i2s_drvdata *drvdata = dev_get_drvdata(&pdev->dev);
- 
-+	ux500_pcm_unregister_platform(pdev);
-+
- 	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(ux500_msp_dai_drv));
- 
- 	devm_regulator_put(drvdata->reg_vape);
-diff --git a/sound/soc/ux500/ux500_pcm.c b/sound/soc/ux500/ux500_pcm.c
-index 1a04e24..894c9f4 100644
---- a/sound/soc/ux500/ux500_pcm.c
-+++ b/sound/soc/ux500/ux500_pcm.c
-@@ -282,7 +282,7 @@ static struct snd_soc_platform_driver ux500_pcm_soc_drv = {
- 	.pcm_new        = ux500_pcm_new,
- };
- 
--static int __devexit ux500_pcm_drv_probe(struct platform_device *pdev)
-+int __devinit ux500_pcm_register_platform(struct platform_device *pdev)
- {
- 	int ret;
- 
-@@ -296,23 +296,12 @@ static int __devexit ux500_pcm_drv_probe(struct platform_device *pdev)
- 
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(ux500_pcm_register_platform);
- 
--static int __devinit ux500_pcm_drv_remove(struct platform_device *pdev)
-+int __devexit ux500_pcm_unregister_platform(struct platform_device *pdev)
- {
- 	snd_soc_unregister_platform(&pdev->dev);
- 
- 	return 0;
- }
--
--static struct platform_driver ux500_pcm_driver = {
--	.driver = {
--		.name = "ux500-pcm",
--		.owner = THIS_MODULE,
--	},
--
--	.probe = ux500_pcm_drv_probe,
--	.remove = __devexit_p(ux500_pcm_drv_remove),
--};
--module_platform_driver(ux500_pcm_driver);
--
--MODULE_LICENSE("GPL v2");
-+EXPORT_SYMBOL_GPL(ux500_pcm_unregister_platform);
-diff --git a/sound/soc/ux500/ux500_pcm.h b/sound/soc/ux500/ux500_pcm.h
-index 77ed44d..76d3444 100644
---- a/sound/soc/ux500/ux500_pcm.h
-+++ b/sound/soc/ux500/ux500_pcm.h
-@@ -32,4 +32,7 @@
- #define UX500_PLATFORM_PERIODS_MAX		48
- #define UX500_PLATFORM_BUFFER_BYTES_MAX		(2048 * PAGE_SIZE)
- 
-+int ux500_pcm_register_platform(struct platform_device *pdev);
-+int ux500_pcm_unregister_platform(struct platform_device *pdev);
-+
- #endif
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> Cc: spi-devel-general at lists.sourceforge.net
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> ---
+> Hi Grant,
+> 
+> 	can we have this for 3.8
+> 	This patch is presetnt on the ML sing Feb 2012 and was depinding on
+> 	the cs-gpio dt that you just apply
+> 
+> Best Regards,
+> J.
+>  .../devicetree/bindings/spi/spi_atmel.txt          |   26 ++++++++++++++++++++
+>  drivers/spi/spi-atmel.c                            |   17 ++++++++++++-
+>  2 files changed, 42 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi_atmel.txt b/Documentation/devicetree/bindings/spi/spi_atmel.txt
+> new file mode 100644
+> index 0000000..07e04cd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/spi/spi_atmel.txt
+> @@ -0,0 +1,26 @@
+> +Atmel SPI device
+> +
+> +Required properties:
+> +- compatible : should be "atmel,at91rm9200-spi".
+> +- reg: Address and length of the register set for the device
+> +- interrupts: Should contain spi interrupt
+> +- cs-gpios: chipselects
+> +
+> +Example:
+> +
+> +spi1: spi at fffcc000 {
+> +	compatible = "atmel,at91rm9200-spi";
+> +	reg = <0xfffcc000 0x4000>;
+> +	interrupts = <13 4 5>;
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	cs-gpios = <&pioB 3 0>;
+> +	status = "okay";
+> +
+> +	mmc-slot at 0 {
+> +		compatible = "mmc-spi-slot";
+> +		reg = <0>;
+> +		gpios = <&pioC 4 0>;	/* CD */
+> +		spi-max-frequency = <25000000>;
+> +	};
+> +};
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index 61fb0ec..1615222 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/spi/spi.h>
+>  #include <linux/slab.h>
+>  #include <linux/platform_data/atmel.h>
+> +#include <linux/of.h>
+>  
+>  #include <asm/io.h>
+>  #include <asm/gpio.h>
+> @@ -768,6 +769,10 @@ static int atmel_spi_setup(struct spi_device *spi)
+>  
+>  	/* chipselect must have been muxed as GPIO (e.g. in board setup) */
+>  	npcs_pin = (unsigned int)spi->controller_data;
+> +
+> +	if (gpio_is_valid(spi->cs_gpio))
+> +		npcs_pin = spi->cs_gpio;
+> +
+>  	asd = spi->controller_state;
+>  	if (!asd) {
+>  		asd = kzalloc(sizeof(struct atmel_spi_device), GFP_KERNEL);
+> @@ -937,8 +942,9 @@ static int __devinit atmel_spi_probe(struct platform_device *pdev)
+>  	/* the spi->mode bits understood by this driver: */
+>  	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
+>  
+> +	master->dev.of_node = pdev->dev.of_node;
+>  	master->bus_num = pdev->id;
+> -	master->num_chipselect = 4;
+> +	master->num_chipselect = master->dev.of_node ? 0 : 4;
+>  	master->setup = atmel_spi_setup;
+>  	master->transfer = atmel_spi_transfer;
+>  	master->cleanup = atmel_spi_cleanup;
+> @@ -1064,11 +1070,20 @@ static int atmel_spi_resume(struct platform_device *pdev)
+>  #define	atmel_spi_resume	NULL
+>  #endif
+>  
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id atmel_spi_dt_ids[] = {
+> +	{ .compatible = "atmel,at91rm9200-spi" },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, atmel_spi_dt_ids);
+> +#endif
+>  
+>  static struct platform_driver atmel_spi_driver = {
+>  	.driver		= {
+>  		.name	= "atmel_spi",
+>  		.owner	= THIS_MODULE,
+> +		.of_match_table	= of_match_ptr(atmel_spi_dt_ids),
+>  	},
+>  	.suspend	= atmel_spi_suspend,
+>  	.resume		= atmel_spi_resume,
+> 
+
+
 -- 
-1.7.9.5
+Nicolas Ferre
