@@ -1,25 +1,59 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 23 Nov 2012 08:46:49 +0100 (CET)
-Subject: [PATCH 425/493] scsi: remove use of __devexit
-In-Reply-To: <1353349642-3677-425-git-send-email-wfp5p@virginia.edu>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-425-git-send-email-wfp5p@virginia.edu>
-Message-ID: <Pine.LNX.4.64.1211230845540.14984@axis700.grange>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 23 Nov 2012 08:49:04 +0100
+Subject: [PATCH 0/4] Dove pinctrl fixes and DT enabling
+In-Reply-To: <20121121155208.GF22106@titan.lakedaemon.net>
+References: <1353317996-20841-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CACRpkdYAnNCFDCjA67r0h_CSHMifb1Z83YJfYGQV3abPB8uQZg@mail.gmail.com>
+ <50ACAAF5.2030002@gmail.com>
+ <CACRpkdYzQuv8sPk57CvqiwMmV0z007cGqVkGOENmr_aYAN14=Q@mail.gmail.com>
+ <20121121155208.GF22106@titan.lakedaemon.net>
+Message-ID: <CACRpkdYXSR7Fv95bCPSTZiUHgV+jwnVw1MraE_73njNa807wnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Nov 2012, Bill Pemberton wrote:
+On Wed, Nov 21, 2012 at 4:52 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Wed, Nov 21, 2012 at 03:45:42PM +0100, Linus Walleij wrote:
 
-> CONFIG_HOTPLUG is going away as an option so __devexit is no
-> longer needed.
+>> So what I mean is that the patches creating pinctrl/mvebu is in the
+>> pinctrl tree, so if patches in the MVEBU tree depend on these,
+>> then it must have pulled in a branch from pinctrl or applied the
+>> same patches in that tree too (which is OK *sometimes*).
+>
+> Yes, Thomas and Gregory informed me of the pinctrl dependency and said
+> they were using for-next from the pinctrl tree.  I've used that branch
+> to merge and build successfully.  Is that ok in practice or is there a
+> more specific branch I should pull in as a dependency?
 
->  drivers/scsi/tmscsim.c                    | 2 +-
+Do not use for-next. That is a mix-down for the linux-next tree.
 
-Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+It is basically created like this:
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+git checkout for-next
+git reset --hard fixes
+git merge devel
+
+fixes will be based on the latest release candidate and devel on
+something older like -rc1, -rc2.
+
+If you pull something in it must be from the devel branch.
+
+The ebst idea is to take the last commit in the devel branch
+that you need, so the last mvebu commit in that branch.
+This is what the ARM SoC guys usually does.
+
+So: git pull <pinctrl tree> devel
+git log ...
+<find the commit you need e.g 10930572>
+git checkout -b my-new-mvebu-stuff 10930572
+
+So you branch off where you have the deps you
+need.
+
+That way I can still reorder patches *above* that
+commit (not that I should, but sometimes we discover
+commits that are not bisectable and such exceptions).
+
+The result can the be pulled into my tree or ARM SoC
+or similar.
+
+Linus Walleij
