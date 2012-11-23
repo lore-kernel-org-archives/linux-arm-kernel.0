@@ -1,7 +1,7 @@
 From: shuah.khan@hp.com (Shuah Khan)
-Date: Fri, 23 Nov 2012 14:32:06 -0700
-Subject: [PATCH 2/9] c6x: dma_debug: add debug_dma_mapping_error support
-Message-ID: <1353706326.5270.97.camel@lorien2>
+Date: Fri, 23 Nov 2012 14:32:55 -0700
+Subject: [PATCH 3/9] ia64: dma_debug: add debug_dma_mapping_error support
+Message-ID: <1353706375.5270.98.camel@lorien2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,21 +10,20 @@ to check dma mapping errors on addresses returned by dma_map_single() and
 dma_map_page() interfaces.
 
 Signed-off-by: Shuah Khan <shuah.khan@hp.com>
-Acked-by: Mark Salter <msalter@redhat.com>
 ---
- arch/c6x/include/asm/dma-mapping.h |    1 +
+ arch/ia64/include/asm/dma-mapping.h |    1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/c6x/include/asm/dma-mapping.h b/arch/c6x/include/asm/dma-mapping.h
-index 03579fd..3c69406 100644
---- a/arch/c6x/include/asm/dma-mapping.h
-+++ b/arch/c6x/include/asm/dma-mapping.h
-@@ -32,6 +32,7 @@ static inline int dma_set_mask(struct device *dev, u64 dma_mask)
-  */
- static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+diff --git a/arch/ia64/include/asm/dma-mapping.h b/arch/ia64/include/asm/dma-mapping.h
+index 4f5e814..cf3ab7e 100644
+--- a/arch/ia64/include/asm/dma-mapping.h
++++ b/arch/ia64/include/asm/dma-mapping.h
+@@ -58,6 +58,7 @@ static inline void dma_free_attrs(struct device *dev, size_t size,
+ static inline int dma_mapping_error(struct device *dev, dma_addr_t daddr)
  {
-+	debug_dma_mapping_error(dev, dma_addr);
- 	return dma_addr == ~0;
+ 	struct dma_map_ops *ops = platform_dma_get_ops(dev);
++	debug_dma_mapping_error(dev, daddr);
+ 	return ops->mapping_error(dev, daddr);
  }
  
 -- 
