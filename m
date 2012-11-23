@@ -1,94 +1,114 @@
 From: avinashphilip@ti.com (Philip, Avinash)
-Date: Fri, 23 Nov 2012 10:42:13 +0000
-Subject: [PATCH v4 00/11] Support for AM33xx PWM Subsystem
-In-Reply-To: <20121122211616.GK16716@avionic-0098.adnet.avionic-design.de>
-References: <1353503469-18634-1-git-send-email-avinashphilip@ti.com>
- <20121122211616.GK16716@avionic-0098.adnet.avionic-design.de>
-Message-ID: <518397C60809E147AF5323E0420B992E3E9EE9FC@DBDE01.ent.ti.com>
+Date: Fri, 23 Nov 2012 10:43:55 +0000
+Subject: [PATCH v3 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC
+ timings and NAND
+In-Reply-To: <50ACA9BB.7090106@gmail.com>
+References: <1351869956-2787-1-git-send-email-zonque@gmail.com>
+ <1351869956-2787-5-git-send-email-zonque@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9DA81F@DBDE01.ent.ti.com>
+ <5097B7EE.3000508@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9DC1F1@DBDE01.ent.ti.com>
+ <509A2E75.5060307@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9DE420@DBDE01.ent.ti.com>
+ <509EA360.2050504@gmail.com> <87mwycjmdn.fsf@dell.be.48ers.dk>
+ <50ACA9BB.7090106@gmail.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3E9EEA09@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2012 at 02:46:16, Thierry Reding wrote:
-> On Wed, Nov 21, 2012 at 06:40:57PM +0530, Philip, Avinash wrote:
-> > In AM33xx PWM sub modules like ECAP, EHRPWM & EQEP are  integrated to
-> > PWM subsystem. All these submodules shares the resources (clock) & has
-> > a clock gating register in PWM Subsystem. This patch series creates a
-> > parent PWM Subsystem driver to handle access synchronization of shared
-> > resources & clock gating from PWM Subsystem configuration space.
-> > Also Device tree nodes populated to support parent child relation
-> > between PWMSS, ECAP & EHRPWM submodules.
-> > In addition EHRPWM module requires explicit clock gating from control
-> > module & is handled by patch #2 & 8.
+On Wed, Nov 21, 2012 at 15:45:23, Daniel Mack wrote:
+> On 20.11.2012 16:59, Peter Korsgaard wrote:
+> >>>>>> "Daniel" == Daniel Mack <zonque@gmail.com> writes:
 > > 
-> > As suggested by  Thierry for handling clock gating for PWM submodules
-> > should handle with a global function. This requires config space
-> > handling done independent from driver and is done at parent driver.
+> > Hi,
 > > 
-> > So the parent<->child relation adopted to handle
-> > 1. pm runtime synchronization
-> > 2. PWM subsystem common config space clock gating for PWM submodules.
+> >  >>>> In omap2 driver NAND_ECC_HW ecc mode supports 3 ecc layout
+> >  >>>> OMAP_ECC_HAMMING_CODE_HW_ROMCODE
+> >  >>>> OMAP_ECC_BCH4_CODE_HW
+> >  >>>> OMAP_ECC_BCH8_CODE_HW
+> >  >>>> 
+> >  >>>> So selection of ecc layout data should come from DT not ecc mode.
+> >  >>> 
+> >  >>> Ok, I see. I would still like to set them by string rather than magic
+> >  >>> numbers that map to enum entries. Valid values would be "none", "hw",
+> >  >>> "hw-romcode", "bch4" and "bch8". Are you ok with that?
+> >  >> 
+> >  >> Ok, that's nice. Better use ecc_opt instead of ecc_mode.
 > > 
-> > Patches supports
-> > - Driver support for parent child relation handled patch #1
-> > - Optional EHRPWM tb clock in patch #2
-> > - Parent child in HWMOD handled at patch #3
-> > - Device tree binding support handled in patch #4, 6 &8
-> > - pinctrl support in patch #5 & 7.
-> > - DT node populated in patch #9 ,10 & 11.
+> >  Daniel> I did some more extensive tests that include reading the same
+> >  Daniel> nand pages from both U-Boot and the kernel with BCH8 ECC, and
+> >  Daniel> it turns out that -> is_elm_used needs to be set in the pdata
+> >  Daniel> in order to make this work.
 > > 
-> > This patch series based on omap_dt/for_3.8/dts_part2 and tested
-> > on am335x-evm & am335x-evmsk.
-> > 
-> > It depends on [1]
-> > 
-> > 1. https://lkml.org/lkml/2012/11/21/70
-> > pwm: Device tree support for PWM polarity
-> > 
-> > Changes since v3:
-> > 	- Rebased on top of omap_dt/for_3.8/dts_part2
-> > 	- Add pwm backlight for am335xevm_sk
-> > 	- Moved tipwmss.h to pwm-tipwmss.h
-> > 
-> > Philip, Avinash (11):
-> >   PWMSS: Add PWM Subsystem driver for parent<->child relationship
-> >   ARM: am33xx: clk: Add optional clock for EHRPWM
-> >   ARM: OMAP: AM33xx hwmod: Add parent-child relationship for PWM
-> >     subsystem
-> >   pwm: pwm-tiecap: Add device-tree binding support for APWM driver
-> >   pwm: pwm-tiecap: pinctrl support
-> >   pwm: pwm-tiehrpwm: Add device-tree binding support for EHRPWM driver
-> >   pwm: pwm-tiehrpwm: pinctrl support
-> >   pwm: pwm-tiehrpwm: Adding TBCLK gating support.
-> >   ARM: dts: AM33XX: Add PWMSS device tree nodes
-> >   ARM: dts: AM33XX: Add PWM backlight DT data to am335x-evm
-> >   ARM: dts: AM33XX: Add PWM backlight DT data to am335x-evmsk
+> > So what you're saying is that the choice of ELM or not is not just an
+> > optimization, it really changes the ECC layout? Perhaps it should be
+> > treated as a seperate layout (E.G. bch8-elm) then?
+
+Peter,
+
+In patch [1], mtd: nand: omap2: Support for hardware BCH
+
+ecc_layout made compatible with Rom Boot Loader ECC layout for am335x.
+
+This action is based on is_elm_used flag.
+
+Requirement of this flag is to identify the whether the platform
+ELM module & based on this configure ELM module if present.
+
+But ideally BCH8 ecc lay out didn't have a dependency on ELM, it
+can work with software BCH ecc. RBL compatibility is missing
+in software BCH because of addition of constant polynomial to
+ecc vector. If we remove the dependency on erased page handling
+by ecc vector with constant polynomial, software BCH can do the
+job of RBL compatibility.
+
+Ivan,
+Do you have any suggestions?
+Discussion for RBL compatibility found at [2].
+
+It is good that software BCH also support RBL compatibility by suppressing
+constant polynomial modification. Then ecc layout can be selected from
+DT entry and error correction can be chosen between software/hardware
+depending on the availability of ELM hardware.
+Currently RBL BCH8 compatibility depends on the availability of ELM
+hardware. Later once software BCH start supporting RBL compatibility,
+we can remove  the check.
+
 > 
-> Hi,
-> 
-> So how do you want to get this merged? Should I take patches 1, 4, 5, 6,
-> 7 and 8 while the rest go through some ARM tree? Can we still merge this
-> for 3.8?
+> That is what I experienced, yes. The kernel was unable to parse NAND
+> pages that were written from U-Boot with bch8 hardware mode when the elm
+> module was not active. Maybe someone from TI can explain that? Giving it
+> a dedicated name would also solve the problem with the extra DT property.
 
-These patches can go on, as DT node is not populated. Also without patch #3
-PWM Subsystem driver won't come and hence the platform devices for ECAP 
-& EHRPWM. So there is no issue in getting this merged in PWM subsystem.
+Daniel,
 
-> The patches don't seem to have build dependencies on each other
-> but how about runtime dependencies?
+Currently BCH8 is supported with software ecc error correction in mainline.
+The layout for BCH8 ECC layout is
+0-1 -> BAD block markers
+2-11-> oob free area
+12-63-> BCH8 ECC.
 
-Patch #3 required for PWM subsystem driver to populate PWM subsystem HWMOD
-Entries and DT entries. 
-Patch #2 required for EHRPWM to have TBCLK handling. This patch required for
-EHRPWM driver functionality. But currently DT node is disabled for EHRPWM.
+RBL ECC layout is
+0-1 -> BAD block markers
+2-57-> BCH8 ecc layout
+58-63-> OOB free area
 
-So the dependency on the entire series is patch #3, for backlight through PWM
-ecap.
+As u-boot also maintain RBL ecc layout, write from U-boot
+and read from Linux requires compatibility with RBL ecc layout.
+The same is achieved in the patch [1], with by setting is_elm_used
+to true.
 
-I will follow up with OMAP subsystem community for getting reviews/ack
+1. https://lkml.org/lkml/2012/10/31/87
+2. https://lkml.org/lkml/2012/10/11/20
 
 Thanks
 Avinash
-
 > 
-> Thierry
+> I'll wait until this is decided before I resend a new set that also
+> fixes the issue with the errornousely forgotten Documentation file.
+> 
+> 
+> Thanks,
+> Daniel
+> 
 > 
