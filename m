@@ -1,7 +1,7 @@
 From: shuah.khan@hp.com (Shuah Khan)
-Date: Fri, 23 Nov 2012 14:31:09 -0700
-Subject: [PATCH 1/9] ARM64: dma_debug: add debug_dma_mapping_error support
-Message-ID: <1353706269.5270.96.camel@lorien2>
+Date: Fri, 23 Nov 2012 14:32:06 -0700
+Subject: [PATCH 2/9] c6x: dma_debug: add debug_dma_mapping_error support
+Message-ID: <1353706326.5270.97.camel@lorien2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,21 +10,21 @@ to check dma mapping errors on addresses returned by dma_map_single() and
 dma_map_page() interfaces.
 
 Signed-off-by: Shuah Khan <shuah.khan@hp.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Mark Salter <msalter@redhat.com>
 ---
- arch/arm64/include/asm/dma-mapping.h |    1 +
+ arch/c6x/include/asm/dma-mapping.h |    1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index 538f4b4..9947768 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -50,6 +50,7 @@ static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
- static inline int dma_mapping_error(struct device *dev, dma_addr_t dev_addr)
+diff --git a/arch/c6x/include/asm/dma-mapping.h b/arch/c6x/include/asm/dma-mapping.h
+index 03579fd..3c69406 100644
+--- a/arch/c6x/include/asm/dma-mapping.h
++++ b/arch/c6x/include/asm/dma-mapping.h
+@@ -32,6 +32,7 @@ static inline int dma_set_mask(struct device *dev, u64 dma_mask)
+  */
+ static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
  {
- 	struct dma_map_ops *ops = get_dma_ops(dev);
-+	debug_dma_mapping_error(dev, dev_addr);
- 	return ops->mapping_error(dev, dev_addr);
++	debug_dma_mapping_error(dev, dma_addr);
+ 	return dma_addr == ~0;
  }
  
 -- 
