@@ -1,22 +1,75 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 23 Nov 2012 18:29:24 +0530
-Subject: [PATCH 1/1] mfd: Simplify IRQ domain registration code in STMPE
-In-Reply-To: <1353675386-6749-1-git-send-email-lee.jones@linaro.org>
-References: <1353675386-6749-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAKohponsfpvYgcuJugfYLf6uADGcbqjUAG_Yce2wmn=n_SoCkw@mail.gmail.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Fri, 23 Nov 2012 14:00:22 +0100
+Subject: [PATCH 2/2] cpufreq: governors: remove redundant code
+In-Reply-To: <98478a02ae69afc01b3c7860e42a4d763b2045e8.1350677395.git.viresh.kumar@linaro.org>
+References: <32e5bed743cc6cc4e614291a7080299f5f0d0933.1350677395.git.viresh.kumar@linaro.org>
+ <98478a02ae69afc01b3c7860e42a4d763b2045e8.1350677395.git.viresh.kumar@linaro.org>
+Message-ID: <20121123130022.GB7378@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 November 2012 18:26, Lee Jones <lee.jones@linaro.org> wrote:
-> Historically, a driver would have to decide whether it required
-> a Linear or Legacy IRQ domain when registering one. This can end
-> up as quite a lot of code. A new Simple call now exists which
-> simplifies this process. Let's make use of it here.
->
-> Samuel Ortiz <sameo@linux.intel.com>
+Hello Viresh,
 
-Cc: ?
+On Sat, Oct 20, 2012 at 01:42:06AM +0530, Viresh Kumar wrote:
+> +static inline int delay_for_sampling_rate(unsigned int sampling_rate)
+> +{
+> +	int delay = usecs_to_jiffies(sampling_rate);
+> +
+> +	/* We want all CPUs to do sampling nearly on same jiffy */
+> +	if (num_online_cpus() > 1)
+> +		delay -= jiffies % delay;
+> +
+> +	return delay;
+> +}
+[...]
+> +static void od_dbs_timer(struct work_struct *work)
+> +{
+> +	struct od_cpu_dbs_info_s *dbs_info =
+> +		container_of(work, struct od_cpu_dbs_info_s, cdbs.work.work);
+> +	unsigned int cpu = dbs_info->cdbs.cpu;
+> +	int delay, sample_type = dbs_info->sample_type;
+> +
+> +	mutex_lock(&dbs_info->cdbs.timer_mutex);
+>  
+> -/* cpufreq_ondemand Governor Tunables */
+> -#define show_one(file_name, object)					\
+> -static ssize_t show_##file_name						\
+> -(struct kobject *kobj, struct attribute *attr, char *buf)              \
+> -{									\
+> -	return sprintf(buf, "%u\n", dbs_tuners_ins.object);		\
+> +	/* Common NORMAL_SAMPLE setup */
+> +	dbs_info->sample_type = OD_NORMAL_SAMPLE;
+> +	if (sample_type == OD_SUB_SAMPLE) {
+> +		delay = dbs_info->freq_lo_jiffies;
+> +		__cpufreq_driver_target(dbs_info->cdbs.cur_policy,
+> +			dbs_info->freq_lo, CPUFREQ_RELATION_H);
+> +	} else {
+> +		dbs_check_cpu(&od_dbs_data, cpu);
+> +		if (dbs_info->freq_lo) {
+> +			/* Setup timer for SUB_SAMPLE */
+> +			dbs_info->sample_type = OD_SUB_SAMPLE;
+> +			delay = dbs_info->freq_hi_jiffies;
+> +		} else {
+> +			delay = delay_for_sampling_rate(dbs_info->rate_mult);
+                                                        ^^^^^^^^^^^^^^^^^^^
 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+I think this one should be:
 
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+delay = delay_for_sampling_rate(od_tuners.sampling_rate * dbs_info->rate_mult);
+
+as currently the timer is firing every jiffy.  This was the old code:
+
+> -static void do_dbs_timer(struct work_struct *work)
+[...]
+> -			delay = usecs_to_jiffies(dbs_tuners_ins.sampling_rate
+> -				* dbs_info->rate_mult);
+> -
+> -			if (num_online_cpus() > 1)
+> -				delay -= jiffies % delay;
+
+I'm sending a patch for this one.
+
+Fabio
+
+-- 
+Fabio Baltieri
