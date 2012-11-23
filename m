@@ -1,127 +1,72 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 23 Nov 2012 14:37:29 +0100
-Subject: [PATCH 1/1] spi/atmel: add DT support
-In-Reply-To: <1353674679-13158-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20121121151713.1F8873E0A47@localhost>
- <1353674679-13158-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <50AF7C19.8000306@atmel.com>
+Date: Fri, 23 Nov 2012 14:49:01 +0100
+Subject: [PATCH] net/macb: GEM DMA configuration register update
+Message-ID: <1353678541-26839-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2012 01:44 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> the atmel_spi use only gpio for chip select
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Add information to the DMA Configuration Register to
+maximize system performance:
+- rx/tx packet buffer full memory size
+- allow possibility to use INCR16 if supported
 
-Seems simple and nice:
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/net/ethernet/cadence/macb.c | 10 ++++++++--
+ drivers/net/ethernet/cadence/macb.h | 11 +++++++++++
+ 2 files changed, 19 insertions(+), 2 deletions(-)
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-> Cc: spi-devel-general at lists.sourceforge.net
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> ---
-> Hi Grant,
-> 
-> 	can we have this for 3.8
-> 	This patch is presetnt on the ML sing Feb 2012 and was depinding on
-> 	the cs-gpio dt that you just apply
-> 
-> Best Regards,
-> J.
->  .../devicetree/bindings/spi/spi_atmel.txt          |   26 ++++++++++++++++++++
->  drivers/spi/spi-atmel.c                            |   17 ++++++++++++-
->  2 files changed, 42 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/spi_atmel.txt b/Documentation/devicetree/bindings/spi/spi_atmel.txt
-> new file mode 100644
-> index 0000000..07e04cd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/spi/spi_atmel.txt
-> @@ -0,0 +1,26 @@
-> +Atmel SPI device
-> +
-> +Required properties:
-> +- compatible : should be "atmel,at91rm9200-spi".
-> +- reg: Address and length of the register set for the device
-> +- interrupts: Should contain spi interrupt
-> +- cs-gpios: chipselects
-> +
-> +Example:
-> +
-> +spi1: spi at fffcc000 {
-> +	compatible = "atmel,at91rm9200-spi";
-> +	reg = <0xfffcc000 0x4000>;
-> +	interrupts = <13 4 5>;
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	cs-gpios = <&pioB 3 0>;
-> +	status = "okay";
-> +
-> +	mmc-slot at 0 {
-> +		compatible = "mmc-spi-slot";
-> +		reg = <0>;
-> +		gpios = <&pioC 4 0>;	/* CD */
-> +		spi-max-frequency = <25000000>;
-> +	};
-> +};
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 61fb0ec..1615222 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -20,6 +20,7 @@
->  #include <linux/spi/spi.h>
->  #include <linux/slab.h>
->  #include <linux/platform_data/atmel.h>
-> +#include <linux/of.h>
->  
->  #include <asm/io.h>
->  #include <asm/gpio.h>
-> @@ -768,6 +769,10 @@ static int atmel_spi_setup(struct spi_device *spi)
->  
->  	/* chipselect must have been muxed as GPIO (e.g. in board setup) */
->  	npcs_pin = (unsigned int)spi->controller_data;
-> +
-> +	if (gpio_is_valid(spi->cs_gpio))
-> +		npcs_pin = spi->cs_gpio;
-> +
->  	asd = spi->controller_state;
->  	if (!asd) {
->  		asd = kzalloc(sizeof(struct atmel_spi_device), GFP_KERNEL);
-> @@ -937,8 +942,9 @@ static int __devinit atmel_spi_probe(struct platform_device *pdev)
->  	/* the spi->mode bits understood by this driver: */
->  	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
->  
-> +	master->dev.of_node = pdev->dev.of_node;
->  	master->bus_num = pdev->id;
-> -	master->num_chipselect = 4;
-> +	master->num_chipselect = master->dev.of_node ? 0 : 4;
->  	master->setup = atmel_spi_setup;
->  	master->transfer = atmel_spi_transfer;
->  	master->cleanup = atmel_spi_cleanup;
-> @@ -1064,11 +1070,20 @@ static int atmel_spi_resume(struct platform_device *pdev)
->  #define	atmel_spi_resume	NULL
->  #endif
->  
-> +#if defined(CONFIG_OF)
-> +static const struct of_device_id atmel_spi_dt_ids[] = {
-> +	{ .compatible = "atmel,at91rm9200-spi" },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, atmel_spi_dt_ids);
-> +#endif
->  
->  static struct platform_driver atmel_spi_driver = {
->  	.driver		= {
->  		.name	= "atmel_spi",
->  		.owner	= THIS_MODULE,
-> +		.of_match_table	= of_match_ptr(atmel_spi_dt_ids),
->  	},
->  	.suspend	= atmel_spi_suspend,
->  	.resume		= atmel_spi_resume,
-> 
-
-
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index cc6e593..6a59bce 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -1033,8 +1033,12 @@ static u32 macb_dbw(struct macb *bp)
+ }
+ 
+ /*
+- * Configure the receive DMA engine to use the correct receive buffer size.
+- * This is a configurable parameter for GEM.
++ * Configure the receive DMA engine
++ * - use the correct receive buffer size
++ * - set the possibility to use INCR16 bursts
++ *   (if not supported by FIFO, it will fallback to default)
++ * - set both rx/tx packet buffers to full memory size
++ * These are configurable parameters for GEM.
+  */
+ static void macb_configure_dma(struct macb *bp)
+ {
+@@ -1043,6 +1047,8 @@ static void macb_configure_dma(struct macb *bp)
+ 	if (macb_is_gem(bp)) {
+ 		dmacfg = gem_readl(bp, DMACFG) & ~GEM_BF(RXBS, -1L);
+ 		dmacfg |= GEM_BF(RXBS, RX_BUFFER_SIZE / 64);
++		dmacfg |= GEM_BF(FBLDO, 16);
++		dmacfg |= GEM_BIT(TXPBMS) | GEM_BF(RXBMS, -1L);
+ 		gem_writel(bp, DMACFG, dmacfg);
+ 	}
+ }
+diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+index 4414421..570908b 100644
+--- a/drivers/net/ethernet/cadence/macb.h
++++ b/drivers/net/ethernet/cadence/macb.h
+@@ -171,8 +171,19 @@
+ #define GEM_DBW128				2
+ 
+ /* Bitfields in DMACFG. */
++#define GEM_FBLDO_OFFSET			0
++#define GEM_FBLDO_SIZE				5
++#define GEM_RXBMS_OFFSET			8
++#define GEM_RXBMS_SIZE				2
++#define GEM_TXPBMS_OFFSET			10
++#define GEM_TXPBMS_SIZE				1
++#define GEM_TXCOEN_OFFSET			11
++#define GEM_TXCOEN_SIZE				1
+ #define GEM_RXBS_OFFSET				16
+ #define GEM_RXBS_SIZE				8
++#define GEM_DDRP_OFFSET				24
++#define GEM_DDRP_SIZE				1
++
+ 
+ /* Bitfields in NSR */
+ #define MACB_NSR_LINK_OFFSET			0
 -- 
-Nicolas Ferre
+1.8.0
