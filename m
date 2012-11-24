@@ -1,59 +1,21 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 24 Nov 2012 11:10:03 +0900
-Subject: [PATCH V3] ARM: EXYNOS5: Add I2S SFR base addresse
-In-Reply-To: <1352176605-16153-1-git-send-email-padma.v@samsung.com>
-References: <1352176605-16153-1-git-send-email-padma.v@samsung.com>
-Message-ID: <122601cdc9e8$d0e9eec0$72bdcc40$%kim@samsung.com>
+Date: Sat, 24 Nov 2012 11:10:08 +0900
+Subject: [PATCH 03/24] MAINTAINERS: remove arch/arm/plat-s5p/
+In-Reply-To: <1353716808-16375-4-git-send-email-cesarb@cesarb.net>
+References: <1353716808-16375-1-git-send-email-cesarb@cesarb.net>
+ <1353716808-16375-4-git-send-email-cesarb@cesarb.net>
+Message-ID: <122701cdc9e8$d397d0b0$7ac77210$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Padmavathi Venna wrote:
+Cesar Eduardo Barros wrote:
 > 
-> This patch adds I2S controller0,1,2 base addresses
+> These files were merged into plat-samsung.
 > 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
-> 
-> Changes since V2:
-> 	- Rebased on 3.7-rc3
-> 
-> Changes since V1:
-> 	- Rebased on 3.6-rc6
-> 	- Reverted Exynos4 I2S1,2 address changes that are added in V1
-> 	  as Exynos4 based boards have different I2S base addresses.
-> 
->  arch/arm/mach-exynos/include/mach/map.h |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-
-> exynos/include/mach/map.h
-> index ef4958b..4192d23 100644
-> --- a/arch/arm/mach-exynos/include/mach/map.h
-> +++ b/arch/arm/mach-exynos/include/mach/map.h
-> @@ -42,6 +42,9 @@
->  #define EXYNOS4_PA_I2S0			0x03830000
->  #define EXYNOS4_PA_I2S1			0xE3100000
->  #define EXYNOS4_PA_I2S2			0xE2A00000
-> +#define EXYNOS5_PA_I2S0			0x03830000
-> +#define EXYNOS5_PA_I2S1			0x12D60000
-> +#define EXYNOS5_PA_I2S2			0x12D70000
-> 
->  #define EXYNOS4_PA_PCM0			0x03840000
->  #define EXYNOS4_PA_PCM1			0x13980000
-> --
-> 1.7.4.4
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
 
-I have 2 comments on this.
-
-1. If above definitions are required, this patch can be squashed into the
-patch which they are used ([PATCH V3 2/2] ARM: EXYNOS: Enable platform
-support for I2S controllers) or this should be tied up one series with the
-patch.
-
-2. I think, we don't need this because the value can be used in auxdata
-directly.
-
-So, I don't apply this.
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
 Thanks.
 
@@ -62,3 +24,42 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
+> ---
+>  MAINTAINERS | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 041872a..9bdd5f3 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1074,7 +1074,6 @@ W:	http://www.fluff.org/ben/linux/
+>  S:	Maintained
+>  F:	arch/arm/plat-samsung/
+>  F:	arch/arm/plat-s3c24xx/
+> -F:	arch/arm/plat-s5p/
+>  F:	arch/arm/mach-s3c24*/
+>  F:	arch/arm/mach-s3c64xx/
+>  F:	drivers/*/*s3c2410*
+> @@ -1105,7 +1104,6 @@ M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
+>  L:	linux-arm-kernel at lists.infradead.org
+>  L:	linux-media at vger.kernel.org
+>  S:	Maintained
+> -F:	arch/arm/plat-s5p/dev-fimc*
+>  F:	arch/arm/plat-samsung/include/plat/*fimc*
+>  F:	drivers/media/platform/s5p-fimc/
+> 
+> @@ -1116,7 +1114,7 @@ M:	Jeongtae Park <jtp.park@samsung.com>
+>  L:	linux-arm-kernel at lists.infradead.org
+>  L:	linux-media at vger.kernel.org
+>  S:	Maintained
+> -F:	arch/arm/plat-s5p/dev-mfc.c
+> +F:	arch/arm/plat-samsung/s5p-dev-mfc.c
+>  F:	drivers/media/platform/s5p-mfc/
+> 
+>  ARM/SAMSUNG S5P SERIES TV SUBSYSTEM SUPPORT
+> --
+> 1.7.11.7
