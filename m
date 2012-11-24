@@ -1,121 +1,50 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 23 Nov 2012 20:42:36 -0700
-Subject: [PATCH 3/6] ARM: OMAP3xxx: CPUIdle: simplify the PER next-state code
+Date: Fri, 23 Nov 2012 20:42:39 -0700
+Subject: [PATCH 6/6] ARM: OMAP2+: powerdomain: fix powerdomain trace
+ integration
 In-Reply-To: <20121124033809.24638.11090.stgit@dusk.lan>
 References: <20121124033809.24638.11090.stgit@dusk.lan>
-Message-ID: <20121124034235.24638.52997.stgit@dusk.lan>
+Message-ID: <20121124034238.24638.66515.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP3xxx CPUIdle driver contains some code to place a lower bound
-on the PER powerdomain's power state.  Convert this code to a data-driven
-implementation to remove branches and to improve readability.
+From: Jean Pihet <jean.pihet@newoldbits.com>
 
+Fix the trace in the case a power domain did not hit the desired
+state, as reported by Paul Walmsley.
+
+Reported-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Jean Pihet <j-pihet@ti.com>
+[paul at pwsan.com: split this fix off from the patch
+ "ARM: OMAP2+: PM debug: trace the functional power domains states"]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/cpuidle34xx.c |   44 +++++++++++++++++++------------------
- 1 file changed, 22 insertions(+), 22 deletions(-)
+ arch/arm/mach-omap2/powerdomain.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index bca7a88..0067467 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -36,38 +36,51 @@
- 
- /* Mach specific information to be recorded in the C-state driver_data */
- struct omap3_idle_statedata {
--	u32 mpu_state;
--	u32 core_state;
-+	u8 mpu_state;
-+	u8 core_state;
-+	u8 per_min_state;
- };
- 
-+/*
-+ * Prevent PER OFF if CORE is not in RETention or OFF as this would
-+ * disable PER wakeups completely.
-+ */
- static struct omap3_idle_statedata omap3_idle_data[] = {
- 	{
- 		.mpu_state = PWRDM_POWER_ON,
- 		.core_state = PWRDM_POWER_ON,
-+		/* In C1 do not allow PER state lower than CORE state */
-+		.per_min_state = PWRDM_POWER_ON,
- 	},
- 	{
- 		.mpu_state = PWRDM_POWER_ON,
- 		.core_state = PWRDM_POWER_ON,
-+		.per_min_state = PWRDM_POWER_RET,
- 	},
- 	{
- 		.mpu_state = PWRDM_POWER_RET,
- 		.core_state = PWRDM_POWER_ON,
-+		.per_min_state = PWRDM_POWER_RET,
- 	},
- 	{
- 		.mpu_state = PWRDM_POWER_OFF,
- 		.core_state = PWRDM_POWER_ON,
-+		.per_min_state = PWRDM_POWER_RET,
- 	},
- 	{
- 		.mpu_state = PWRDM_POWER_RET,
- 		.core_state = PWRDM_POWER_RET,
-+		.per_min_state = PWRDM_POWER_OFF,
- 	},
- 	{
- 		.mpu_state = PWRDM_POWER_OFF,
- 		.core_state = PWRDM_POWER_RET,
-+		.per_min_state = PWRDM_POWER_OFF,
- 	},
- 	{
- 		.mpu_state = PWRDM_POWER_OFF,
- 		.core_state = PWRDM_POWER_OFF,
-+		.per_min_state = PWRDM_POWER_OFF,
- 	},
- };
- 
-@@ -207,10 +220,9 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- 			       struct cpuidle_driver *drv,
- 			       int index)
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index dea62a9..92388c0 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -143,7 +143,7 @@ static void _update_logic_membank_counters(struct powerdomain *pwrdm)
+ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
  {
--	int new_state_idx;
--	u32 core_next_state, per_next_state = 0, per_saved_state = 0;
-+	int new_state_idx, ret;
-+	u8 per_next_state, per_saved_state;
- 	struct omap3_idle_statedata *cx;
--	int ret;
  
- 	/*
- 	 * Use only C1 if CAM is active.
-@@ -231,25 +243,13 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+-	int prev, state, trace_state = 0;
++	int prev, next, state, trace_state = 0;
  
- 	/* Program PER state */
- 	cx = &omap3_idle_data[new_state_idx];
--	core_next_state = cx->core_state;
--	per_next_state = per_saved_state = pwrdm_read_next_pwrst(per_pd);
--	if (new_state_idx == 0) {
--		/* In C1 do not allow PER state lower than CORE state */
--		if (per_next_state < core_next_state)
--			per_next_state = core_next_state;
--	} else {
--		/*
--		 * Prevent PER OFF if CORE is not in RETention or OFF as this
--		 * would disable PER wakeups completely.
--		 */
--		if ((per_next_state == PWRDM_POWER_OFF) &&
--		    (core_next_state > PWRDM_POWER_RET))
--			per_next_state = PWRDM_POWER_RET;
--	}
- 
--	/* Are we changing PER target state? */
--	if (per_next_state != per_saved_state)
-+	per_next_state = pwrdm_read_next_pwrst(per_pd);
-+	per_saved_state = per_next_state;
-+	if (per_next_state < cx->per_min_state) {
-+		per_next_state = cx->per_min_state;
- 		pwrdm_set_next_pwrst(per_pd, per_next_state);
-+	}
- 
- 	ret = omap3_enter_idle(dev, drv, new_state_idx);
- 
+ 	if (pwrdm == NULL)
+ 		return -EINVAL;
+@@ -164,9 +164,10 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+ 		 * If the power domain did not hit the desired state,
+ 		 * generate a trace event with both the desired and hit states
+ 		 */
+-		if (state != prev) {
++		next = pwrdm_read_next_pwrst(pwrdm);
++		if (next != prev) {
+ 			trace_state = (PWRDM_TRACE_STATES_FLAG |
+-				       ((state & OMAP_POWERSTATE_MASK) << 8) |
++				       ((next & OMAP_POWERSTATE_MASK) << 8) |
+ 				       ((prev & OMAP_POWERSTATE_MASK) << 0));
+ 			trace_power_domain_target(pwrdm->name, trace_state,
+ 						  smp_processor_id());
