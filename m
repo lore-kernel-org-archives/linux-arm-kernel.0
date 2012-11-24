@@ -1,56 +1,38 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 23 Nov 2012 20:42:31 -0700
-Subject: [PATCH 0/6] ARM: OMAP2+: some PM fixes and cleanup for 3.9
-Message-ID: <20121124033809.24638.11090.stgit@dusk.lan>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 24 Nov 2012 05:11:04 +0000
+Subject: [GIT PULL 1/5] ARM: orion: fixes for v3.8
+Message-ID: <pull-1353733874-990435>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several OMAP2+ power management fixes, optimizations, and cleanup,
-intended for 3.9.  This series is a prerequisite for the functional
-powerdomain conversion series.
+The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
 
+  Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
 
-- Paul
+are available in the git repository at:
 
----
+  git://git.infradead.org/users/jcooper/linux.git tags/orion_fixes_for_3.7
 
-vmlinux object size
-(delta in bytes from TEST_cleanup-prcm_c9d501e5_v3.7-rc (c9d501e5cb0238910337213e12a09127221c35d8)):
-   text     data      bss    total  kernel
-      0        0        0        0  am33xx_only
-    +56        0        0      +56  n800_multi_omap2xxx
-    +56        0        0      +56  n800_only_a
-      0        0        0        0  omap1_defconfig
-      0        0        0        0  omap1_defconfig_1510innovator_only
-      0        0        0        0  omap1_defconfig_5912osk_only
-   +160        0        0     +160  omap2plus_defconfig
-    +88        0        0      +88  omap2plus_defconfig_2430sdp_only
-   +108        0        0     +108  omap2plus_defconfig_cpupm
-   +160        0        0     +160  omap2plus_defconfig_no_pm
-    +32        0        0      +32  omap2plus_defconfig_omap2_4_only
-    -84        0        0      -84  omap2plus_defconfig_omap3_4_only
-   +304        0      -48     +256  rmk_omap3430_ldp_allnoconfig
-      0        0        0        0  rmk_omap3430_ldp_oldconfig
-   +304        0      -48     +256  rmk_omap4430_sdp_allnoconfig
-    -48        0        0      -48  rmk_omap4430_sdp_oldconfig
+for you to fetch changes up to 1dc831bf53fddcc6443f74a39e72db5bcea4f15d:
 
+  ARM: Kirkwood: Update PCI-E fixup (2012-11-21 18:30:08 +0000)
 
-Jean Pihet (1):
-      ARM: OMAP2+: powerdomain: fix powerdomain trace integration
+----------------------------------------------------------------
+orion fixes for v3.7
 
-Paul Walmsley (5):
-      ARM: OMAP2xxx: powerdomain: core powerdomain missing logic retention states
-      ARM: OMAP2/3: PRM: fix bogus OMAP2xxx powerstate return values
-      ARM: OMAP3xxx: CPUIdle: simplify the PER next-state code
-      ARM: OMAP3xxx: CPUIdle: optimize __omap3_enter_idle()
-      ARM: OMAP4: MPUSS PM: remove unnecessary shim functions for powerdomain control
+ - dove irq fix
+ - kirkwood pcie fix
 
+----------------------------------------------------------------
+Jason Gunthorpe (1):
+      ARM: Kirkwood: Update PCI-E fixup
 
- arch/arm/mach-omap2/cpuidle34xx.c           |   79 ++++++++++++++----------
- arch/arm/mach-omap2/omap-mpuss-lowpower.c   |   43 ++-----------
- arch/arm/mach-omap2/powerdomain.c           |    7 +-
- arch/arm/mach-omap2/powerdomains2xxx_data.c |    1 
- arch/arm/mach-omap2/prm2xxx.c               |   88 ++++++++++++++++++++++++++-
- arch/arm/mach-omap2/prm2xxx_3xxx.c          |   22 -------
- arch/arm/mach-omap2/prm3xxx.c               |   28 ++++++++-
- 7 files changed, 166 insertions(+), 102 deletions(-)
+Russell King - ARM Linux (2):
+      Dove: Attempt to fix PMU/RTC interrupts
+      Dove: Fix irq_to_pmu()
+
+ arch/arm/Kconfig                     |  1 +
+ arch/arm/mach-dove/include/mach/pm.h |  2 +-
+ arch/arm/mach-dove/irq.c             | 14 +++++++++++++-
+ arch/arm/mach-kirkwood/pcie.c        | 11 ++++++++---
+ 4 files changed, 23 insertions(+), 5 deletions(-)
