@@ -1,113 +1,51 @@
-From: ciminaghi@gnudd.com (Davide Ciminaghi)
-Date: Sat, 24 Nov 2012 01:22:56 +0100
-Subject: [PATCH 3/8 v3] pl080.h: moved from arm/include/asm/hardware to
- include/linux/amba/
-In-Reply-To: <CAOh2x=keCbnPQzxB+AT5hEt_ukQ6GhPLuxkaQJCML27H9LbWwg@mail.gmail.com>
-References: <CAOh2x=keCbnPQzxB+AT5hEt_ukQ6GhPLuxkaQJCML27H9LbWwg@mail.gmail.com>
-Message-ID: <1353716576-19783-1-git-send-email-ciminaghi@gnudd.com>
+From: cesarb@cesarb.net (Cesar Eduardo Barros)
+Date: Fri, 23 Nov 2012 22:26:27 -0200
+Subject: [PATCH 03/24] MAINTAINERS: remove arch/arm/plat-s5p/
+In-Reply-To: <1353716808-16375-1-git-send-email-cesarb@cesarb.net>
+References: <1353716808-16375-1-git-send-email-cesarb@cesarb.net>
+Message-ID: <1353716808-16375-4-git-send-email-cesarb@cesarb.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alessandro Rubini <rubini@gnudd.com>
+These files were merged into plat-samsung.
 
-The header is used by drivers/dma/amba-pl08x.c, which can be compiled
-under x86, where PL080 exists under a PCI-to-AMBA bridge. This patche
-moves it where it can be accessed by other architectures, and fixes
-all users.
-
-Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
-Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
 ---
+ MAINTAINERS | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-As requested by Viresh Kumar, this is 3/8 again, generated with
-
-git format-patch -C -M
-
-Since the patch is not identical to the previous 3/8, I added "v3"
-to the subject.
-
-
- arch/arm/mach-s3c64xx/dma.c                                   |    2 +-
- arch/arm/mach-spear3xx/spear3xx.c                             |    2 +-
- arch/arm/mach-spear6xx/spear6xx.c                             |    2 +-
- drivers/dma/amba-pl08x.c                                      |    2 +-
- {arch/arm/include/asm/hardware => include/linux/amba}/pl080.h |    2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
- rename {arch/arm/include/asm/hardware => include/linux/amba}/pl080.h (99%)
-
-diff --git a/arch/arm/mach-s3c64xx/dma.c b/arch/arm/mach-s3c64xx/dma.c
-index f2a7a17..a77f521 100644
---- a/arch/arm/mach-s3c64xx/dma.c
-+++ b/arch/arm/mach-s3c64xx/dma.c
-@@ -23,6 +23,7 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/io.h>
-+#include <linux/amba/pl080.h>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 041872a..9bdd5f3 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1074,7 +1074,6 @@ W:	http://www.fluff.org/ben/linux/
+ S:	Maintained
+ F:	arch/arm/plat-samsung/
+ F:	arch/arm/plat-s3c24xx/
+-F:	arch/arm/plat-s5p/
+ F:	arch/arm/mach-s3c24*/
+ F:	arch/arm/mach-s3c64xx/
+ F:	drivers/*/*s3c2410*
+@@ -1105,7 +1104,6 @@ M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
+ L:	linux-arm-kernel at lists.infradead.org
+ L:	linux-media at vger.kernel.org
+ S:	Maintained
+-F:	arch/arm/plat-s5p/dev-fimc*
+ F:	arch/arm/plat-samsung/include/plat/*fimc*
+ F:	drivers/media/platform/s5p-fimc/
  
- #include <mach/dma.h>
- #include <mach/map.h>
-@@ -30,7 +31,6 @@
+@@ -1116,7 +1114,7 @@ M:	Jeongtae Park <jtp.park@samsung.com>
+ L:	linux-arm-kernel at lists.infradead.org
+ L:	linux-media at vger.kernel.org
+ S:	Maintained
+-F:	arch/arm/plat-s5p/dev-mfc.c
++F:	arch/arm/plat-samsung/s5p-dev-mfc.c
+ F:	drivers/media/platform/s5p-mfc/
  
- #include <mach/regs-sys.h>
- 
--#include <asm/hardware/pl080.h>
- 
- /* dma channel state information */
- 
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 98144ba..ba61129 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -15,9 +15,9 @@
- 
- #include <linux/amba/pl022.h>
- #include <linux/amba/pl08x.h>
-+#include <linux/amba/pl080.h>
- #include <linux/of_irq.h>
- #include <linux/io.h>
--#include <asm/hardware/pl080.h>
- #include <asm/hardware/vic.h>
- #include <plat/pl080.h>
- #include <mach/generic.h>
-diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index 5a5a52d..8ce65a2 100644
---- a/arch/arm/mach-spear6xx/spear6xx.c
-+++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -20,7 +20,7 @@
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
--#include <asm/hardware/pl080.h>
-+#include <linux/amba/pl080.h>
- #include <asm/hardware/vic.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 6eb6a5c..8bad254 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -83,7 +83,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/seq_file.h>
- #include <linux/slab.h>
--#include <asm/hardware/pl080.h>
-+#include <linux/amba/pl080.h>
- 
- #include "dmaengine.h"
- #include "virt-dma.h"
-diff --git a/arch/arm/include/asm/hardware/pl080.h b/include/linux/amba/pl080.h
-similarity index 99%
-rename from arch/arm/include/asm/hardware/pl080.h
-rename to include/linux/amba/pl080.h
-index 4eea210..3e7b62f 100644
---- a/arch/arm/include/asm/hardware/pl080.h
-+++ b/include/linux/amba/pl080.h
-@@ -1,4 +1,4 @@
--/* arch/arm/include/asm/hardware/pl080.h
-+/* include/linux/amba/pl080.h
-  *
-  * Copyright 2008 Openmoko, Inc.
-  * Copyright 2008 Simtec Electronics
+ ARM/SAMSUNG S5P SERIES TV SUBSYSTEM SUPPORT
 -- 
-1.7.10.4
+1.7.11.7
