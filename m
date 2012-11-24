@@ -1,34 +1,31 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat, 24 Nov 2012 09:29:31 +0100
-Subject: [PATCH 1/1] ARM: OMAP3: igep0020: default boot status LED to On
- instead of Heartbeat
-Message-ID: <1353745771-29983-1-git-send-email-javier.martinez@collabora.co.uk>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sat, 24 Nov 2012 15:23:30 +0530
+Subject: [PATCH] ARM: Exynos5: fix clock initialization for exynos5250
+Message-ID: <1353750810-21953-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IGEPv2 board uses an green GPIO LED to inform the user
-that the kernel could boot.
+The machine compatible value cannot be checked in exynos5_dt_map_io function
+since the tree is not unflattened yet. Fix this by using soc_is_exynos5250
+macro.
 
-The green status GPIO LED was default to Heartbeat but On
-is better to signal that is running correctly.
-
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/mach-omap2/board-igep0020.c |    2 +-
+ arch/arm/mach-exynos/mach-exynos5-dt.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index 0f24cb8..e526228 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -313,7 +313,7 @@ static struct gpio_led igep_gpio_leds[] = {
- 	},
- 	[3] = {
- 		.name			= "gpio-led:green:d1",
--		.default_trigger	= "heartbeat",
-+		.default_trigger	= "default-on",
- 		.gpio			= -EINVAL, /* gets replaced */
- 		.active_low		= 1,
- 	},
+diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+index 77010f8..845d8e2 100644
+--- a/arch/arm/mach-exynos/mach-exynos5-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+@@ -117,7 +117,7 @@ static void __init exynos5_dt_map_io(void)
+ {
+ 	exynos_init_io(NULL, 0);
+ 
+-	if (of_machine_is_compatible("samsung,exynos5250"))
++	if (soc_is_exynos5250())
+ 		s3c24xx_init_clocks(24000000);
+ }
+ 
 -- 
-1.7.7.6
+1.6.6.rc2
