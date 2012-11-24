@@ -1,54 +1,87 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sun, 25 Nov 2012 02:47:59 +0530
-Subject: [PATCH v4 06/12] ARM: dts: add exynos4 clock controller nodes
+Date: Sun, 25 Nov 2012 02:48:00 +0530
+Subject: [PATCH v4 07/12] ARM: dts: add xxti and xusbxti fixed rate clock
+ nodes for exynos4 based platforms
 In-Reply-To: <1353791885-2566-1-git-send-email-thomas.abraham@linaro.org>
 References: <1353791885-2566-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1353791885-2566-7-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1353791885-2566-8-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock controller nodes for Exynos4210 and Exynos4x12 SoC's.
+The clock frequency of xxti and xusbxti clocks is dependent on the frequency of the
+on-board oscillator that is used to generate these clocks. So allow the frequency
+of these clocks to be specfied from device tree.
 
 Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/boot/dts/exynos4210.dtsi |    6 ++++++
- arch/arm/boot/dts/exynos4x12.dtsi |    6 ++++++
- 2 files changed, 12 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/exynos4210-origen.dts   |   12 ++++++++++++
+ arch/arm/boot/dts/exynos4210-smdkv310.dts |   12 ++++++++++++
+ arch/arm/boot/dts/exynos4412-smdk4412.dts |   12 ++++++++++++
+ 3 files changed, 36 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index cca1546..74e656e 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -55,6 +55,12 @@
- 		samsung,mct-nr-local-irqs = <4>;
+diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+index f271001..d892ccc 100644
+--- a/arch/arm/boot/dts/exynos4210-origen.dts
++++ b/arch/arm/boot/dts/exynos4210-origen.dts
+@@ -121,4 +121,16 @@
+ 			linux,default-trigger = "heartbeat";
+ 		};
  	};
- 
-+	clock: clock-controller at 0x10030000 {
-+		compatible = "samsung,exynos4210-clock";
-+		reg = <0x10030000 0x20000>;
-+		#clock-cells = <1>;
-+	};
 +
- 	pinctrl_0: pinctrl at 11400000 {
- 		compatible = "samsung,pinctrl-exynos4210";
- 		reg = <0x11400000 0x1000>;
-diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index 179a62e..3b8da68 100644
---- a/arch/arm/boot/dts/exynos4x12.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -36,6 +36,12 @@
- 			     <0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>;
++	fixed-rate-clocks {
++		xxti {
++			compatible = "samsung,clock-xxti", "fixed-clock";
++			clock-frequency = <0>;
++		};
++
++		xusbxti {
++			compatible = "samsung,clock-xusbxti", "fixed-clock";
++			clock-frequency = <24000000>;
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+index 9b23a82..9a379eb 100644
+--- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
++++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+@@ -189,4 +189,16 @@
+ 			};
+ 		};
  	};
- 
-+	clock: clock-controller at 0x10030000 {
-+		compatible = "samsung,exynos4412-clock";
-+		reg = <0x10030000 0x20000>;
-+		#clock-cells = <1>;
-+	};
 +
- 	pinctrl_0: pinctrl at 11400000 {
- 		compatible = "samsung,pinctrl-exynos4x12";
- 		reg = <0x11400000 0x1000>;
++	fixed-rate-clocks {
++		xxti {
++			compatible = "samsung,clock-xxti", "fixed-clock";
++			clock-frequency = <12000000>;
++		};
++
++		xusbxti {
++			compatible = "samsung,clock-xusbxti", "fixed-clock";
++			clock-frequency = <24000000>;
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/exynos4412-smdk4412.dts b/arch/arm/boot/dts/exynos4412-smdk4412.dts
+index f05bf57..8f422fc 100644
+--- a/arch/arm/boot/dts/exynos4412-smdk4412.dts
++++ b/arch/arm/boot/dts/exynos4412-smdk4412.dts
+@@ -42,4 +42,16 @@
+ 	serial at 13830000 {
+ 		status = "okay";
+ 	};
++
++	fixed-rate-clocks {
++		xxti {
++			compatible = "samsung,clock-xxti", "fixed-clock";
++			clock-frequency = <0>;
++		};
++
++		xusbxti {
++			compatible = "samsung,clock-xusbxti", "fixed-clock";
++			clock-frequency = <24000000>;
++		};
++	};
+ };
 -- 
 1.7.4.4
