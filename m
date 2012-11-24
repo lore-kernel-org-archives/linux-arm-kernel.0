@@ -1,112 +1,240 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sun, 25 Nov 2012 02:48:01 +0530
-Subject: [PATCH v4 08/12] ARM: Exynos4: allow legacy board support to specify
- xxti and xusbxti clock speed
+Date: Sun, 25 Nov 2012 02:48:02 +0530
+Subject: [PATCH v4 09/12] ARM: dts: add clock provider information for all
+ controllers in Exynos4 SoC
 In-Reply-To: <1353791885-2566-1-git-send-email-thomas.abraham@linaro.org>
 References: <1353791885-2566-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1353791885-2566-9-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1353791885-2566-10-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock speed of xxti and xusbxti clocks depends on the oscillator used on the
-board to generate these clocks. For non-dt platforms, allow the board support
-for those platforms to set the clock frequency of xxti and xusbxti clocks.
+For all supported peripheral controllers on Exynos4, add clock lookup
+information.
 
 Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/mach-exynos/common.c              |    3 +++
- arch/arm/mach-exynos/common.h              |    1 +
- arch/arm/mach-exynos/mach-nuri.c           |    2 ++
- arch/arm/mach-exynos/mach-origen.c         |    2 ++
- arch/arm/mach-exynos/mach-smdkv310.c       |    2 ++
- arch/arm/mach-exynos/mach-universal_c210.c |    2 ++
- 6 files changed, 12 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/exynos4.dtsi |   48 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 48 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 3ff2f09..55fa586 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -69,6 +69,8 @@ static void exynos5_init_clocks(int xtal);
- static void exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no);
- static int exynos_init(void);
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 3428f1a..7486462 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -86,6 +86,8 @@
+ 		compatible = "samsung,s3c2410-wdt";
+ 		reg = <0x10060000 0x100>;
+ 		interrupts = <0 43 0>;
++		clocks = <&clock 345>;
++		clock-names = "watchdog";
+ 		status = "disabled";
+ 	};
  
-+unsigned long xxti_f = 0, xusbxti_f = 0;
-+
- static struct cpu_table cpu_ids[] __initdata = {
- 	{
- 		.idcode		= EXYNOS4210_CPU_ID,
-@@ -408,6 +410,7 @@ void __init exynos_timer_init(void)
- 	if (!of_have_populated_dt() && (soc_is_exynos4210() ||
- 		soc_is_exynos4212() || soc_is_exynos4412())) {
- 		exynos4_clk_init();
-+		exynos4_clk_register_fixed_ext(xxti_f, xusbxti_f);
- 		exynos_mct_init();
- 		return;
- 	}
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 42c49b7..3555d29 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -24,6 +24,7 @@ void exynos_init_late(void);
- extern void exynos_mct_init(void);
+@@ -93,6 +95,8 @@
+ 		compatible = "samsung,s3c6410-rtc";
+ 		reg = <0x10070000 0x100>;
+ 		interrupts = <0 44 0>, <0 45 0>;
++		clocks = <&clock 346>;
++		clock-names = "rtc";
+ 		status = "disabled";
+ 	};
  
- #ifdef CONFIG_COMMON_CLK
-+extern unsigned long xxti_f, xusbxti_f;
- extern void exynos4_clk_init(void);
- extern void exynos4_clk_register_fixed_ext(unsigned long, unsigned long);
- #else
-diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
-index 8695d33..afe068f 100644
---- a/arch/arm/mach-exynos/mach-nuri.c
-+++ b/arch/arm/mach-exynos/mach-nuri.c
-@@ -1332,6 +1332,8 @@ static void __init nuri_map_io(void)
- {
- 	exynos_init_io(NULL, 0);
- 	s3c24xx_init_uarts(nuri_uartcfgs, ARRAY_SIZE(nuri_uartcfgs));
-+	xxti_f = 0;
-+	xusbxti_f = 24000000;
- }
+@@ -100,6 +104,8 @@
+ 		compatible = "samsung,s5pv210-keypad";
+ 		reg = <0x100A0000 0x100>;
+ 		interrupts = <0 109 0>;
++		clocks = <&clock 347>;
++		clock-names = "keypad";
+ 		status = "disabled";
+ 	};
  
- static void __init nuri_reserve(void)
-diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
-index 838e66b..4e1c0c1 100644
---- a/arch/arm/mach-exynos/mach-origen.c
-+++ b/arch/arm/mach-exynos/mach-origen.c
-@@ -756,6 +756,8 @@ static void __init origen_map_io(void)
- {
- 	exynos_init_io(NULL, 0);
- 	s3c24xx_init_uarts(origen_uartcfgs, ARRAY_SIZE(origen_uartcfgs));
-+	xxti_f = 0;
-+	xusbxti_f = 24000000;
- }
+@@ -107,6 +113,8 @@
+ 		compatible = "samsung,exynos4210-sdhci";
+ 		reg = <0x12510000 0x100>;
+ 		interrupts = <0 73 0>;
++		clocks = <&clock 297>, <&clock 145>;
++		clock-names = "hsmmc", "mmc_busclk.2";
+ 		status = "disabled";
+ 	};
  
- static void __init origen_power_init(void)
-diff --git a/arch/arm/mach-exynos/mach-smdkv310.c b/arch/arm/mach-exynos/mach-smdkv310.c
-index 66dad92..b5e83f4 100644
---- a/arch/arm/mach-exynos/mach-smdkv310.c
-+++ b/arch/arm/mach-exynos/mach-smdkv310.c
-@@ -374,6 +374,8 @@ static void __init smdkv310_map_io(void)
- {
- 	exynos_init_io(NULL, 0);
- 	s3c24xx_init_uarts(smdkv310_uartcfgs, ARRAY_SIZE(smdkv310_uartcfgs));
-+	xxti_f = 12000000;
-+	xusbxti_f = 24000000;
- }
+@@ -114,6 +122,8 @@
+ 		compatible = "samsung,exynos4210-sdhci";
+ 		reg = <0x12520000 0x100>;
+ 		interrupts = <0 74 0>;
++		clocks = <&clock 298>, <&clock 146>;
++		clock-names = "hsmmc", "mmc_busclk.2";
+ 		status = "disabled";
+ 	};
  
- static void __init smdkv310_reserve(void)
-diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
-index 3999c16..3de63cb 100644
---- a/arch/arm/mach-exynos/mach-universal_c210.c
-+++ b/arch/arm/mach-exynos/mach-universal_c210.c
-@@ -1095,6 +1095,8 @@ static void __init universal_map_io(void)
- 	exynos_init_io(NULL, 0);
- 	s3c24xx_init_uarts(universal_uartcfgs, ARRAY_SIZE(universal_uartcfgs));
- 	s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
-+	xxti_f = 0;
-+	xusbxti_f = 24000000;
- }
+@@ -121,6 +131,8 @@
+ 		compatible = "samsung,exynos4210-sdhci";
+ 		reg = <0x12530000 0x100>;
+ 		interrupts = <0 75 0>;
++		clocks = <&clock 299>, <&clock 147>;
++		clock-names = "hsmmc", "mmc_busclk.2";
+ 		status = "disabled";
+ 	};
  
- static void s5p_tv_setup(void)
+@@ -128,6 +140,8 @@
+ 		compatible = "samsung,exynos4210-sdhci";
+ 		reg = <0x12540000 0x100>;
+ 		interrupts = <0 76 0>;
++		clocks = <&clock 300>, <&clock 148>;
++		clock-names = "hsmmc", "mmc_busclk.2";
+ 		status = "disabled";
+ 	};
+ 
+@@ -135,6 +149,8 @@
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0x13800000 0x100>;
+ 		interrupts = <0 52 0>;
++		clocks = <&clock 312>, <&clock 151>;
++		clock-names = "uart", "clk_uart_baud0";
+ 		status = "disabled";
+ 	};
+ 
+@@ -142,6 +158,8 @@
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0x13810000 0x100>;
+ 		interrupts = <0 53 0>;
++		clocks = <&clock 313>, <&clock 152>;
++		clock-names = "uart", "clk_uart_baud0";
+ 		status = "disabled";
+ 	};
+ 
+@@ -149,6 +167,8 @@
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0x13820000 0x100>;
+ 		interrupts = <0 54 0>;
++		clocks = <&clock 314>, <&clock 153>;
++		clock-names = "uart", "clk_uart_baud0";
+ 		status = "disabled";
+ 	};
+ 
+@@ -156,6 +176,8 @@
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0x13830000 0x100>;
+ 		interrupts = <0 55 0>;
++		clocks = <&clock 315>, <&clock 154>;
++		clock-names = "uart", "clk_uart_baud0";
+ 		status = "disabled";
+ 	};
+ 
+@@ -165,6 +187,8 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x13860000 0x100>;
+ 		interrupts = <0 58 0>;
++		clocks = <&clock 317>;
++		clock-names = "i2c";
+ 		status = "disabled";
+ 	};
+ 
+@@ -174,6 +198,8 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x13870000 0x100>;
+ 		interrupts = <0 59 0>;
++		clocks = <&clock 318>;
++		clock-names = "i2c";
+ 		status = "disabled";
+ 	};
+ 
+@@ -183,6 +209,8 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x13880000 0x100>;
+ 		interrupts = <0 60 0>;
++		clocks = <&clock 319>;
++		clock-names = "i2c";
+ 		status = "disabled";
+ 	};
+ 
+@@ -192,6 +220,8 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x13890000 0x100>;
+ 		interrupts = <0 61 0>;
++		clocks = <&clock 320>;
++		clock-names = "i2c";
+ 		status = "disabled";
+ 	};
+ 
+@@ -201,6 +231,8 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x138A0000 0x100>;
+ 		interrupts = <0 62 0>;
++		clocks = <&clock 321>;
++		clock-names = "i2c";
+ 		status = "disabled";
+ 	};
+ 
+@@ -210,6 +242,8 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x138B0000 0x100>;
+ 		interrupts = <0 63 0>;
++		clocks = <&clock 322>;
++		clock-names = "i2c";
+ 		status = "disabled";
+ 	};
+ 
+@@ -219,6 +253,8 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x138C0000 0x100>;
+ 		interrupts = <0 64 0>;
++		clocks = <&clock 323>;
++		clock-names = "i2c";
+ 		status = "disabled";
+ 	};
+ 
+@@ -228,6 +264,8 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x138D0000 0x100>;
+ 		interrupts = <0 65 0>;
++		clocks = <&clock 324>;
++		clock-names = "i2c";
+ 		status = "disabled";
+ 	};
+ 
+@@ -239,6 +277,8 @@
+ 		rx-dma-channel = <&pdma0 6>; /* preliminary */
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		clocks = <&clock 327>, <&clock 159>;
++		clock-names = "spi", "spi_busclk0";
+ 		status = "disabled";
+ 	};
+ 
+@@ -250,6 +290,8 @@
+ 		rx-dma-channel = <&pdma1 6>; /* preliminary */
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		clocks = <&clock 328>, <&clock 160>;
++		clock-names = "spi", "spi_busclk0";
+ 		status = "disabled";
+ 	};
+ 
+@@ -261,6 +303,8 @@
+ 		rx-dma-channel = <&pdma0 8>; /* preliminary */
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		clocks = <&clock 329>, <&clock 161>;
++		clock-names = "spi", "spi_busclk0";
+ 		status = "disabled";
+ 	};
+ 
+@@ -275,12 +319,16 @@
+ 			compatible = "arm,pl330", "arm,primecell";
+ 			reg = <0x12680000 0x1000>;
+ 			interrupts = <0 35 0>;
++			clocks = <&clock 292>;
++			clock-names = "apb_pclk";
+ 		};
+ 
+ 		pdma1: pdma at 12690000 {
+ 			compatible = "arm,pl330", "arm,primecell";
+ 			reg = <0x12690000 0x1000>;
+ 			interrupts = <0 36 0>;
++			clocks = <&clock 293>;
++			clock-names = "apb_pclk";
+ 		};
+ 	};
+ };
 -- 
 1.7.4.4
