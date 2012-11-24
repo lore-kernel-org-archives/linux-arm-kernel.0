@@ -1,31 +1,37 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 24 Nov 2012 15:23:30 +0530
-Subject: [PATCH] ARM: Exynos5: fix clock initialization for exynos5250
-Message-ID: <1353750810-21953-1-git-send-email-thomas.abraham@linaro.org>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Sat, 24 Nov 2012 10:34:02 +0100
+Subject: [PATCH 1/1] ARM: OMAP2+: enable support for GPIO connected LEDs
+Message-ID: <1353749642-30255-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The machine compatible value cannot be checked in exynos5_dt_map_io function
-since the tree is not unflattened yet. Fix this by using soc_is_exynos5250
-macro.
+Many OMAP boards use GPIO LEDs to notify status to the user
+on boot. So, it is good to have by default support for GPIO
+connected LEDs as well as some commonly used triggers.
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- arch/arm/mach-exynos/mach-exynos5-dt.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/configs/omap2plus_defconfig |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index 77010f8..845d8e2 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -117,7 +117,7 @@ static void __init exynos5_dt_map_io(void)
- {
- 	exynos_init_io(NULL, 0);
- 
--	if (of_machine_is_compatible("samsung,exynos5250"))
-+	if (soc_is_exynos5250())
- 		s3c24xx_init_clocks(24000000);
- }
- 
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 6333e96..7c6cbdf 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -193,6 +193,14 @@ CONFIG_MMC_UNSAFE_RESUME=y
+ CONFIG_SDIO_UART=y
+ CONFIG_MMC_OMAP=y
+ CONFIG_MMC_OMAP_HS=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_BACKLIGHT=y
++CONFIG_LEDS_TRIGGER_GPIO=y
++CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_TWL92330=y
+ CONFIG_RTC_DRV_TWL4030=y
 -- 
-1.6.6.rc2
+1.7.7.6
