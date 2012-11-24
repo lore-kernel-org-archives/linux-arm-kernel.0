@@ -1,55 +1,64 @@
-From: ppisa@pikron.com (Pavel Pisa)
-Date: Sat, 24 Nov 2012 09:18:42 +0100
-Subject: [PATCH 18/24] MAINTAINERS: remove drivers/mmc/host/imxmmc.*
-In-Reply-To: <1353716808-16375-19-git-send-email-cesarb@cesarb.net>
-References: <1353716808-16375-1-git-send-email-cesarb@cesarb.net>
- <1353716808-16375-19-git-send-email-cesarb@cesarb.net>
-Message-ID: <201211240918.42930.ppisa@pikron.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Sat, 24 Nov 2012 00:25:30 -0800
+Subject: [PATCH] ARM: eukrea_mbimx27-baseboard - use stock
+ get_pendown_state() in ads7846
+Message-ID: <20121124082529.GA7687@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 24 November 2012 01:26:42 Cesar Eduardo Barros wrote:
-> This driver was removed by commit 6187fee (mmc: remove imxmmc driver).
->
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Pavel Pisa <ppisa@pikron.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
-> ---
->  MAINTAINERS | 6 ------
->  1 file changed, 6 deletions(-)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index fc646ef..cac8e49 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -4905,12 +4905,6 @@ F:	Documentation/video4linux/meye.txt
->  F:	drivers/media/pci/meye/
->  F:	include/uapi/linux/meye.h
->
-> -MOTOROLA IMX MMC/SD HOST CONTROLLER INTERFACE DRIVER
-> -M:	Pavel Pisa <ppisa@pikron.com>
-> -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -S:	Maintained
-> -F:	drivers/mmc/host/imxmmc.*
-> -
->  MOXA SMARTIO/INDUSTIO/INTELLIO SERIAL CARD
->  M:	Jiri Slaby <jirislaby@gmail.com>
->  S:	Maintained
+The default implementation matches exactly our custom one so we can switch
+to using the default one. As a bonus the driver will take care of setting
+GPIO line for us.
 
-Acked-by: Pavel Pisa <pisa@cmp.felk.cvut.cz>
+Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+---
 
-I have still the hardware but have lack resources to keep with current
-kernel development for that old HW. We plan to switch to newer i.MX
-hardware - hopefully with more bug free MMC/SD support, because MX1
-has taken me yer a year of fighting with its bugs (on Linux and RTEMS
-as well).
+Not tested - no hardware, but should be fine.
 
-Best wishes,
+ arch/arm/mach-imx/eukrea_mbimx27-baseboard.c | 19 +------------------
+ 1 file changed, 1 insertion(+), 18 deletions(-)
+
+diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+index 98aef57..b20fc55 100644
+--- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+@@ -238,24 +238,8 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+ 
+-#define ADS7846_PENDOWN (GPIO_PORTD | 25)
+-
+-static void __maybe_unused ads7846_dev_init(void)
+-{
+-	if (gpio_request(ADS7846_PENDOWN, "ADS7846 pendown") < 0) {
+-		printk(KERN_ERR "can't get ads7846 pen down GPIO\n");
+-		return;
+-	}
+-	gpio_direction_input(ADS7846_PENDOWN);
+-}
+-
+-static int ads7846_get_pendown_state(void)
+-{
+-	return !gpio_get_value(ADS7846_PENDOWN);
+-}
+-
+ static struct ads7846_platform_data ads7846_config __initdata = {
+-	.get_pendown_state	= ads7846_get_pendown_state,
++	.gpio_pendown		= (GPIO_PORTD | 25),
+ 	.keep_vref_on		= 1,
+ };
+ 
+@@ -323,7 +307,6 @@ void __init eukrea_mbimx27_baseboard_init(void)
+ 	|| defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
+ 	/* ADS7846 Touchscreen controller init */
+ 	mxc_gpio_mode(GPIO_PORTD | 25 | GPIO_GPIO | GPIO_IN);
+-	ads7846_dev_init();
+ #endif
+ 
+ 	/* SPI_CS0 init */
+-- 
+1.7.11.7
 
 
-                Pavel Pisa
-    e-mail:     pisa at cmp.felk.cvut.cz
-    www:        http://cmp.felk.cvut.cz/~pisa
-    university: http://dce.fel.cvut.cz/
-    company:    http://www.pikron.com/
+-- 
+Dmitry
