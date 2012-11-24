@@ -1,35 +1,38 @@
 From: cesarb@cesarb.net (Cesar Eduardo Barros)
-Date: Fri, 23 Nov 2012 22:26:35 -0200
-Subject: [PATCH 11/24] MAINTAINERS: fix .../plat-mxc/include/mach/imxfb.h
+Date: Fri, 23 Nov 2012 22:26:42 -0200
+Subject: [PATCH 18/24] MAINTAINERS: remove drivers/mmc/host/imxmmc.*
 In-Reply-To: <1353716808-16375-1-git-send-email-cesarb@cesarb.net>
 References: <1353716808-16375-1-git-send-email-cesarb@cesarb.net>
-Message-ID: <1353716808-16375-12-git-send-email-cesarb@cesarb.net>
+Message-ID: <1353716808-16375-19-git-send-email-cesarb@cesarb.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This file was moved to include/linux/platform_data/video-imxfb.h by
-commit 82906b1 (ARM: imx: move platform_data definitions).
+This driver was removed by commit 6187fee (mmc: remove imxmmc driver).
 
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-fbdev at vger.kernel.org
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Pavel Pisa <ppisa@pikron.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
 ---
- MAINTAINERS | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ MAINTAINERS | 6 ------
+ 1 file changed, 6 deletions(-)
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index a67a67a..887d717 100644
+index fc646ef..cac8e49 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -3137,7 +3137,7 @@ M:	Sascha Hauer <kernel@pengutronix.de>
- L:	linux-fbdev at vger.kernel.org
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
--F:	arch/arm/plat-mxc/include/mach/imxfb.h
-+F:	include/linux/platform_data/video-imxfb.h
- F:	drivers/video/imxfb.c
+@@ -4905,12 +4905,6 @@ F:	Documentation/video4linux/meye.txt
+ F:	drivers/media/pci/meye/
+ F:	include/uapi/linux/meye.h
  
- FREESCALE SOC FS_ENET DRIVER
+-MOTOROLA IMX MMC/SD HOST CONTROLLER INTERFACE DRIVER
+-M:	Pavel Pisa <ppisa@pikron.com>
+-L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-S:	Maintained
+-F:	drivers/mmc/host/imxmmc.*
+-
+ MOXA SMARTIO/INDUSTIO/INTELLIO SERIAL CARD
+ M:	Jiri Slaby <jirislaby@gmail.com>
+ S:	Maintained
 -- 
 1.7.11.7
