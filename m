@@ -1,46 +1,45 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Sat, 24 Nov 2012 16:35:37 +0530
-Subject: [PATCH 1/8 v3] DMA: PL330: use prefix in reg names to build under
- x86
-In-Reply-To: <20121124070337.GA8030@mail.gnudd.com>
-References: <CAKohpokUHv96wutU1ZLxxnndR3wfTr3kjh3UKREtuiVV-V8+EA@mail.gmail.com>
- <1353718436-20194-1-git-send-email-ciminaghi@gnudd.com>
- <CAJe_ZhcGmeTviV8v8eCMFZTWLnOb24_kVa1TkZF=9oyc6=vA4A@mail.gmail.com>
- <20121124070337.GA8030@mail.gnudd.com>
-Message-ID: <CAJe_Zhck-vLQEHisE2ORbygmhA=7fcStuvOo2f4rvuCa1tAhEg@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 24 Nov 2012 10:00:04 -0500
+Subject: [PATCH 3/4] ARM: Dove: Convert to DT GPIO and pinctrl
+In-Reply-To: <20121124080240.3f600e89@skate>
+References: <1353317996-20841-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1353317996-20841-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20121124023942.GO15800@titan.lakedaemon.net>
+ <20121124080240.3f600e89@skate>
+Message-ID: <20121124150004.GQ15800@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 November 2012 12:33, Alessandro Rubini <rubini@gnudd.com> wrote:
-> My patch:
->>> This driver would not compile if ARM_AMBA is selected under x86,
->>> because "CS" and "DS" are already defined there.  But AMBA
->>> is used in the x86 world by a PCI-to-AMBA bridge, to be submitted.
->>>
->>> The patch just adds the "PL330_" prefix to all register and bit fields,
->>> so it can be built by randomconfig after ARM_AMBA appears within x86.
->
-> Jassy Brar:
->> Prefixing only CS and DS should be do the job.
->> Why do we have to make every symbol noisy with PL330_ ?
->
-> For internal consistency. I attacked this problem in July. This is
-> what you wrote:
->
->    I fully agree with your point and IIRC I always add some prefix to
->    definitions in header files.
->    Private defines in a .c file, without redundant prefixes, sounded like
->    safe to me at the time, but perhaps I was wrong.
->
->    (references: http://lkml.org/lkml/2012/7/1/56)
->
-> So I made the changes overall.  I dislike needless long patches, but
-> picking symbols to work around the conflict of the day while
-> introducing inconsistent naming doesn't look good to me.
->
-Sorry if I gave the wrong impression. I didn't agree (and IIRC nobody
-suggested) we prefix _every_ symbol in the driver now. Just CS, DS, ES
-and maybe SA, DA, CC too for some consistency. IOW, only regs, not
-bit-fields.
+On Sat, Nov 24, 2012 at 08:02:40AM +0100, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
+> 
+> On Fri, 23 Nov 2012 21:39:42 -0500, Jason Cooper wrote:
+> > > +		pinctrl: pinctrl at d0200 {
+> > > +			compatible = "marvell,dove-pinctrl";
+> > > +			reg = <0xd0200 0x10>;
+> > > +			clocks = <&gate_clk 22>;
+> > 
+> > The above line broke the dtbs build target for dove_defconfig.  I have
+> > removed it.  Please let me know if that is not the correct answer.  This
+> > was the only occurence of 'clk' in arch/arm/boot/dts/dove* .
+> 
+> Are you sure you merged
+> 
+>  [PATCH 7/8] ARM: dove: switch to DT clock providers ?
+> 
+> This one clearly adds gate_clk in dove.dtsi. This patch was part of the
+> pull request:
+> 
+> Subject: [GIT PULL v3] core, cpu and gated clocks for mvebu
+> Date: Tue, 20 Nov 2012 15:31:08 +0100
 
-regards.
+Yes, so that's what I thought happened.  This would have made orion/dt
+depend upon mvebu/everything.  It already had two other dependencies.
+Not ideal.
+
+The good thing is, the build is not broken.  Once v3.8-rc1 drops with
+all of our stuff merged, I'll post a fixup patch adding this back in.
+
+thx,
+
+Jason.
