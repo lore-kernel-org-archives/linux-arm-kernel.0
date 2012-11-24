@@ -1,114 +1,130 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 23 Nov 2012 21:39:42 -0500
-Subject: [PATCH 3/4] ARM: Dove: Convert to DT GPIO and pinctrl
-In-Reply-To: <1353317996-20841-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1353317996-20841-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1353317996-20841-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20121124023942.GO15800@titan.lakedaemon.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 23 Nov 2012 20:42:37 -0700
+Subject: [PATCH 4/6] ARM: OMAP3xxx: CPUIdle: optimize __omap3_enter_idle()
+In-Reply-To: <20121124033809.24638.11090.stgit@dusk.lan>
+References: <20121124033809.24638.11090.stgit@dusk.lan>
+Message-ID: <20121124034236.24638.93974.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 10:39:55AM +0100, Sebastian Hesselbarth wrote:
-> Following the ongoing conversion of Orion SoCs to DT, make use of
-> gpio and pinctrl drivers through DT. The main dtsi for Dove is prepared
-> to allow board specific descriptors to make use of pinctrl muxing.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Cc: Axel Lin <axel.lin@ingics.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/Kconfig            |    2 ++
->  arch/arm/boot/dts/dove.dtsi |   20 +++++++++++++++++---
->  2 files changed, 19 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index d5a28da..bb9a85d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -539,6 +539,8 @@ config ARCH_DOVE
->  	select CPU_V7
->  	select GENERIC_CLOCKEVENTS
->  	select MIGHT_HAVE_PCI
-> +	select PINCTRL
-> +	select PINCTRL_DOVE
->  	select PLAT_ORION_LEGACY
->  	select USB_ARCH_HAS_EHCI
->  	help
-> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> index 8c8ab62..c457480 100644
-> --- a/arch/arm/boot/dts/dove.dtsi
-> +++ b/arch/arm/boot/dts/dove.dtsi
-> @@ -4,6 +4,12 @@
->  	compatible = "marvell,dove";
->  	model = "Marvell Armada 88AP510 SoC";
->  
-> +	aliases {
-> +		gpio0 = &gpio0;
-> +		gpio1 = &gpio1;
-> +		gpio2 = &gpio2;
-> +	};
-> +
->  	soc at f1000000 {
->  		compatible = "simple-bus";
->  		#address-cells = <1>;
-> @@ -85,7 +91,8 @@
->  			#gpio-cells = <2>;
->  			gpio-controller;
->  			reg = <0xd0400 0x20>;
-> -			ngpio = <32>;
-> +			ngpios = <32>;
-> +			interrupt-controller;
->  			interrupts = <12>, <13>, <14>, <60>;
->  		};
->  
-> @@ -94,7 +101,8 @@
->  			#gpio-cells = <2>;
->  			gpio-controller;
->  			reg = <0xd0420 0x20>;
-> -			ngpio = <32>;
-> +			ngpios = <32>;
-> +			interrupt-controller;
->  			interrupts = <61>;
->  		};
->  
-> @@ -103,7 +111,13 @@
->  			#gpio-cells = <2>;
->  			gpio-controller;
->  			reg = <0xe8400 0x0c>;
-> -			ngpio = <8>;
-> +			ngpios = <8>;
-> +		};
-> +
-> +		pinctrl: pinctrl at d0200 {
-> +			compatible = "marvell,dove-pinctrl";
-> +			reg = <0xd0200 0x10>;
-> +			clocks = <&gate_clk 22>;
+Avoid programming the MPU and CORE powerdomain next-power-state
+registers if those powerdomains will never enter low-power states
+(e.g., the state that people refer to as "C1").
 
-The above line broke the dtbs build target for dove_defconfig.  I have
-removed it.  Please let me know if that is not the correct answer.  This
-was the only occurence of 'clk' in arch/arm/boot/dts/dove* .
+To avoid making assumptions about CPUIdle states based on their order
+in the list, use a flag to mark CPUIdle states that don't enter
+powerdomain low-power states.
 
-thx,
+Avoid a previous-power-state register read on the MPU powerdomain
+unless we know that the MPU was supposed to go OFF during the last
+state transition.  Previous-power-state register reads can be very
+expensive, so it's worth avoiding these when possible.
 
-Jason.
+Since the CORE_L3 clockdomain can't go inactive unless the MPU is active,
+there's little point blocking autoidle on the CORE_L3 clockdomain in "C1"
+state, since we've programmed the MPU clockdomain to stay active.
+Remove the unnecessary code.
 
->  		};
->  
->  		spi0: spi at 10600 {
-> -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/mach-omap2/cpuidle34xx.c |   35 ++++++++++++++++++++++-------------
+ 1 file changed, 22 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+index 0067467..ad70220 100644
+--- a/arch/arm/mach-omap2/cpuidle34xx.c
++++ b/arch/arm/mach-omap2/cpuidle34xx.c
+@@ -39,9 +39,21 @@ struct omap3_idle_statedata {
+ 	u8 mpu_state;
+ 	u8 core_state;
+ 	u8 per_min_state;
++	u8 flags;
+ };
+ 
+ /*
++ * Possible flag bits for struct omap3_idle_statedata.flags:
++ *
++ * OMAP_CPUIDLE_CX_NO_CLKDM_IDLE: don't allow the MPU clockdomain to go
++ *    inactive.  This in turn prevents the MPU DPLL from entering autoidle
++ *    mode, so wakeup latency is greatly reduced, at the cost of additional
++ *    energy consumption.  This also prevents the CORE clockdomain from
++ *    entering idle.
++ */
++#define OMAP_CPUIDLE_CX_NO_CLKDM_IDLE		BIT(0)
++
++/*
+  * Prevent PER OFF if CORE is not in RETention or OFF as this would
+  * disable PER wakeups completely.
+  */
+@@ -51,6 +63,7 @@ static struct omap3_idle_statedata omap3_idle_data[] = {
+ 		.core_state = PWRDM_POWER_ON,
+ 		/* In C1 do not allow PER state lower than CORE state */
+ 		.per_min_state = PWRDM_POWER_ON,
++		.flags = OMAP_CPUIDLE_CX_NO_CLKDM_IDLE,
+ 	},
+ 	{
+ 		.mpu_state = PWRDM_POWER_ON,
+@@ -91,27 +104,25 @@ static int __omap3_enter_idle(struct cpuidle_device *dev,
+ 				int index)
+ {
+ 	struct omap3_idle_statedata *cx = &omap3_idle_data[index];
+-	u32 mpu_state = cx->mpu_state, core_state = cx->core_state;
+ 
+ 	local_fiq_disable();
+ 
+-	pwrdm_set_next_pwrst(mpu_pd, mpu_state);
+-	pwrdm_set_next_pwrst(core_pd, core_state);
+-
+ 	if (omap_irq_pending() || need_resched())
+ 		goto return_sleep_time;
+ 
+ 	/* Deny idle for C1 */
+-	if (index == 0) {
++	if (cx->flags & OMAP_CPUIDLE_CX_NO_CLKDM_IDLE) {
+ 		clkdm_deny_idle(mpu_pd->pwrdm_clkdms[0]);
+-		clkdm_deny_idle(core_pd->pwrdm_clkdms[0]);
++	} else {
++		pwrdm_set_next_pwrst(mpu_pd, cx->mpu_state);
++		pwrdm_set_next_pwrst(core_pd, cx->core_state);
+ 	}
+ 
+ 	/*
+ 	 * Call idle CPU PM enter notifier chain so that
+ 	 * VFP context is saved.
+ 	 */
+-	if (mpu_state == PWRDM_POWER_OFF)
++	if (cx->mpu_state == PWRDM_POWER_OFF)
+ 		cpu_pm_enter();
+ 
+ 	/* Execute ARM wfi */
+@@ -121,17 +132,15 @@ static int __omap3_enter_idle(struct cpuidle_device *dev,
+ 	 * Call idle CPU PM enter notifier chain to restore
+ 	 * VFP context.
+ 	 */
+-	if (pwrdm_read_prev_pwrst(mpu_pd) == PWRDM_POWER_OFF)
++	if (cx->mpu_state == PWRDM_POWER_OFF &&
++	    pwrdm_read_prev_pwrst(mpu_pd) == PWRDM_POWER_OFF)
+ 		cpu_pm_exit();
+ 
+ 	/* Re-allow idle for C1 */
+-	if (index == 0) {
++	if (cx->flags & OMAP_CPUIDLE_CX_NO_CLKDM_IDLE)
+ 		clkdm_allow_idle(mpu_pd->pwrdm_clkdms[0]);
+-		clkdm_allow_idle(core_pd->pwrdm_clkdms[0]);
+-	}
+ 
+ return_sleep_time:
+-
+ 	local_fiq_enable();
+ 
+ 	return index;
+@@ -196,7 +205,7 @@ static int next_valid_state(struct cpuidle_device *dev,
+ 	 * Start search from the next (lower) state.
+ 	 */
+ 	for (idx = index - 1; idx >= 0; idx--) {
+-		cx =  &omap3_idle_data[idx];
++		cx = &omap3_idle_data[idx];
+ 		if ((cx->mpu_state >= mpu_deepest_state) &&
+ 		    (cx->core_state >= core_deepest_state)) {
+ 			next_index = idx;
