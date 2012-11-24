@@ -1,17 +1,17 @@
 From: cesarb@cesarb.net (Cesar Eduardo Barros)
-Date: Fri, 23 Nov 2012 22:26:29 -0200
-Subject: [PATCH 05/24] MAINTAINERS: fix
- arch/arm/mach-at91/include/mach/at_hdmac.h
+Date: Fri, 23 Nov 2012 22:26:35 -0200
+Subject: [PATCH 11/24] MAINTAINERS: fix .../plat-mxc/include/mach/imxfb.h
 In-Reply-To: <1353716808-16375-1-git-send-email-cesarb@cesarb.net>
 References: <1353716808-16375-1-git-send-email-cesarb@cesarb.net>
-Message-ID: <1353716808-16375-6-git-send-email-cesarb@cesarb.net>
+Message-ID: <1353716808-16375-12-git-send-email-cesarb@cesarb.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This file was moved to include/linux/platform_data/dma-atmel.h by commit
-7cdc39e (ARM: at91: move platform_data definitions).
+This file was moved to include/linux/platform_data/video-imxfb.h by
+commit 82906b1 (ARM: imx: move platform_data definitions).
 
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-fbdev at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
 ---
@@ -19,17 +19,17 @@ Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index c67b991..dd28c70 100644
+index a67a67a..887d717 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -1389,7 +1389,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Supported
- F:	drivers/dma/at_hdmac.c
- F:	drivers/dma/at_hdmac_regs.h
--F:	arch/arm/mach-at91/include/mach/at_hdmac.h
-+F:	include/linux/platform_data/dma-atmel.h
+@@ -3137,7 +3137,7 @@ M:	Sascha Hauer <kernel@pengutronix.de>
+ L:	linux-fbdev at vger.kernel.org
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+-F:	arch/arm/plat-mxc/include/mach/imxfb.h
++F:	include/linux/platform_data/video-imxfb.h
+ F:	drivers/video/imxfb.c
  
- ATMEL ISI DRIVER
- M:	Josh Wu <josh.wu@atmel.com>
+ FREESCALE SOC FS_ENET DRIVER
 -- 
 1.7.11.7
