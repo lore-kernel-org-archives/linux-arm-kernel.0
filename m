@@ -1,43 +1,28 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 24 Nov 2012 13:59:06 -0500
-Subject: [PATCH 3/4] ARM: Dove: Convert to DT GPIO and pinctrl
-In-Reply-To: <20121124191024.4b5d5b4c@skate>
-References: <1353317996-20841-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1353317996-20841-4-git-send-email-sebastian.hesselbarth@gmail.com>
- <20121124023942.GO15800@titan.lakedaemon.net>
- <20121124080240.3f600e89@skate>
- <20121124150004.GQ15800@titan.lakedaemon.net>
- <20121124191024.4b5d5b4c@skate>
-Message-ID: <20121124185906.GT15800@titan.lakedaemon.net>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sat, 24 Nov 2012 20:28:42 +0100
+Subject: [RESEND PATCH v3 0/3] i2c: at91: add dma support
+In-Reply-To: <1353661744-5703-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1353661744-5703-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20121124192842.GA3210@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 24, 2012 at 07:10:24PM +0100, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
+On Fri, Nov 23, 2012 at 10:09:01AM +0100, ludovic.desroches at atmel.com wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
 > 
-> On Sat, 24 Nov 2012 10:00:04 -0500, Jason Cooper wrote:
+> Hi Wolfram,
 > 
-> > Yes, so that's what I thought happened.  This would have made orion/dt
-> > depend upon mvebu/everything.  It already had two other dependencies.
-> > Not ideal.
-> > 
-> > The good thing is, the build is not broken.  Once v3.8-rc1 drops with
-> > all of our stuff merged, I'll post a fixup patch adding this back in.
-> 
-> It unfortunately means that Dove will be basically unbootable in
-> 3.8-rc1, as the driver will not be clk_get()ing its gatable clock, and
-> the clock driver will disable it. Maybe we can just live with it, I
-> don't know.
+> I've rebased the set of patches on 3.7-rc6. I hope you could apply them.
 
-Yes, I thought as much after I sent this reply.  Definitely a choice of
-the lesser of two evils.  As long as we don't break the build or have
-horrendous merge conflicts, I think it's tolerable.
+Yes, applied to for-next, thanks!
 
-Any one who is booting -rc1's is typically bug hunting.  This means
-Sebastian, who has been CC'd on all of this.  I don't want to rely on
-this in the future, but doing it once due to the circumstances is
-something I'm comfortable answering to.
-
-thx,
-
-Jason.
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121124/b2e6c681/attachment.sig>
