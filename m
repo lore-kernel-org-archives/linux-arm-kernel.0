@@ -1,37 +1,43 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat, 24 Nov 2012 10:34:02 +0100
-Subject: [PATCH 1/1] ARM: OMAP2+: enable support for GPIO connected LEDs
-Message-ID: <1353749642-30255-1-git-send-email-javier.martinez@collabora.co.uk>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sat, 24 Nov 2012 11:03:30 +0100
+Subject: [PATCH] cpuidle: add Calxeda SOC idle support
+In-Reply-To: <201211122200.07901.arnd@arndb.de>
+References: <1352330622-13616-1-git-send-email-robherring2@gmail.com>
+ <201211122200.07901.arnd@arndb.de>
+Message-ID: <2676657.zDjyfqIDdm@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many OMAP boards use GPIO LEDs to notify status to the user
-on boot. So, it is good to have by default support for GPIO
-connected LEDs as well as some commonly used triggers.
+On Monday, November 12, 2012 10:00:07 PM Arnd Bergmann wrote:
+> On Wednesday 07 November 2012, Rob Herring wrote:
+> > From: Rob Herring <rob.herring@calxeda.com>
+> > 
+> > Add support for core powergating on Calxeda platforms. Initially, this
+> > supports ECX-1000 (highbank), but support will be added for ECX-2000
+> > later.
+> > 
+> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Len Brown <len.brown@intel.com>
+> > Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> > It's not really clear where we want ARM cpuidle drivers. We're moving
+> > everything else out of arch/arm, and my understanding is Len doesn't want
+> > them in drivers/idle. It seems kind of silly to me to have the framework
+> > and drivers in 2 places. I've put this in drivers/cpuidle, but it doesn't
+> > make any difference to me.
+> 
+> Fine with me. I just don't want in in arch/arm because I'm guessing this will
+> be shared with arm64, which in turn shares idle (and other) drivers with various
+> powerpc, mips and x86 socs.
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- arch/arm/configs/omap2plus_defconfig |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+Applied to linux-pm.git/linux-next as v3.8 material.
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 6333e96..7c6cbdf 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -193,6 +193,14 @@ CONFIG_MMC_UNSAFE_RESUME=y
- CONFIG_SDIO_UART=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_BACKLIGHT=y
-+CONFIG_LEDS_TRIGGER_GPIO=y
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_TWL92330=y
- CONFIG_RTC_DRV_TWL4030=y
+Thanks,
+Rafael
+
+
 -- 
-1.7.7.6
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
