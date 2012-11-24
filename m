@@ -1,24 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 24 Nov 2012 11:34:13 +0530
-Subject: [PATCH 5/6] ARM: OMAP4: MPUSS PM: remove unnecessary shim
- functions for powerdomain control
-In-Reply-To: <20121124034237.24638.3621.stgit@dusk.lan>
-References: <20121124033809.24638.11090.stgit@dusk.lan>
- <20121124034237.24638.3621.stgit@dusk.lan>
-Message-ID: <50B0635D.2050700@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 24 Nov 2012 08:02:40 +0100
+Subject: [PATCH 3/4] ARM: Dove: Convert to DT GPIO and pinctrl
+In-Reply-To: <20121124023942.GO15800@titan.lakedaemon.net>
+References: <1353317996-20841-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1353317996-20841-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20121124023942.GO15800@titan.lakedaemon.net>
+Message-ID: <20121124080240.3f600e89@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 24 November 2012 09:12 AM, Paul Walmsley wrote:
-> The OMAP4 MPU subsystem power management code contains several unnecessary
-> shim functions for powerdomain control; remove them.
->
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> ---
-Most of them are inline functions so final object code
-will mostly same after and before the patch.
-But cleaning these helpers is better I guess. So..
+Dear Jason Cooper,
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Fri, 23 Nov 2012 21:39:42 -0500, Jason Cooper wrote:
+> > +		pinctrl: pinctrl at d0200 {
+> > +			compatible = "marvell,dove-pinctrl";
+> > +			reg = <0xd0200 0x10>;
+> > +			clocks = <&gate_clk 22>;
+> 
+> The above line broke the dtbs build target for dove_defconfig.  I have
+> removed it.  Please let me know if that is not the correct answer.  This
+> was the only occurence of 'clk' in arch/arm/boot/dts/dove* .
+
+Are you sure you merged
+
+ [PATCH 7/8] ARM: dove: switch to DT clock providers ?
+
+This one clearly adds gate_clk in dove.dtsi. This patch was part of the
+pull request:
+
+Subject: [GIT PULL v3] core, cpu and gated clocks for mvebu
+Date: Tue, 20 Nov 2012 15:31:08 +0100
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
