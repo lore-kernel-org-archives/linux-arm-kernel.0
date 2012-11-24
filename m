@@ -1,41 +1,81 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 24 Nov 2012 11:10:44 +0900
-Subject: [PATCH V3 0/5] Avoid passing clks through platform data
-In-Reply-To: <20121123115109.GH4529@opensource.wolfsonmicro.com>
-References: <1352177317-16395-1-git-send-email-padma.v@samsung.com>
- <CAAgF-Bevg7h1yq1bnLhwbUJ94+HKhaaJ6MeYvXUAunKpE-Lvkw@mail.gmail.com>
- <20121123115109.GH4529@opensource.wolfsonmicro.com>
-Message-ID: <122c01cdc9e8$e91ed500$bb5c7f00$%kim@samsung.com>
+Date: Sat, 24 Nov 2012 11:21:03 +0900
+Subject: [PATCH v4 0/5] ARM: EXYNOS: Add secure firmware support
+In-Reply-To: <1353599478-24617-1-git-send-email-t.figa@samsung.com>
+References: <1353599478-24617-1-git-send-email-t.figa@samsung.com>
+Message-ID: <122d01cdc9ea$5a0d6550$0e282ff0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+Tomasz Figa wrote:
 > 
-> On Fri, Nov 23, 2012 at 04:40:59PM +0530, Padma Venkat wrote:
-> > cc'ing Mark Brown.
-> >
-> > On Tue, Nov 6, 2012 at 10:18 AM, Padmavathi Venna <padma.v@samsung.com>
-> wrote:
-> > > Changes since v2:
-> > >         - Rebased on 3.7-rc3
+> Some Exynos-based boards are running with secure firmware running in
+> TrustZone secure world, which changes the way some things have to be
+> initialized.
 > 
-> Please don't do this, send the patches non-quoted.
+> This series adds support for specifying firmware operations, implements
+> some firmware operations for Exynos secure firmware and adds a method of
+> enabling secure firmware operations on Exynos-based boards through board
+> file and device tree.
+> 
+> Depends on:
+>   - ARM: EXYNOS: Add support for secondary CPU bring-up on Exynos4412
+> 
+> Changes since v3
+> ( http://thread.gmane.org/gmane.linux.kernel.samsung-soc/13442 )
+>   - Replaced cpu_boot_reg call with cpu_set_boot_addr
+>   - Added interface documentation
+>   - Separated from Exynos4x12 secondary CPU bring-up patch
+> 
+> Changes since v2
+> ( http://thread.gmane.org/gmane.linux.kernel.samsung-soc/12848 )
+>   - Made Exynos firmware binding require address
+>   - Minor style fixes
+> 
+> Changes since v1
+> ( http://thread.gmane.org/gmane.linux.kernel.samsung-
+> soc/12583/focus=12820 )
+>   - Changed return types of all operations to int
+>   - Defined all operations to return 0 on success, -ENOSYS when not
+>     implemented or appropriate error code on error
+> 
+> Tomasz Figa (5):
+>   ARM: Add interface for registering and calling firmware-specific
+>     operations
+>   ARM: EXYNOS: Add support for secure monitor calls
+>   ARM: EXYNOS: Add support for Exynos secure firmware
+>   ARM: EXYNOS: Add IO mapping for non-secure SYSRAM.
+>   ARM: EXYNOS: Add secure firmware support to secondary CPU bring-up
+> 
+>  Documentation/arm/firmware.txt                     | 88 ++++++++++++++++++++++
+>  .../devicetree/bindings/arm/samsung-boards.txt     | 10 +++
+>  arch/arm/common/Makefile                           |  2 +
+>  arch/arm/common/firmware.c                         | 18 +++++
+>  arch/arm/include/asm/firmware.h                    | 66 ++++++++++++++++
+>  arch/arm/mach-exynos/Makefile                      |  6 ++
+>  arch/arm/mach-exynos/common.c                      | 35 +++++++++
+>  arch/arm/mach-exynos/common.h                      |  2 +
+>  arch/arm/mach-exynos/exynos-smc.S                  | 22 ++++++
+>  arch/arm/mach-exynos/firmware.c                    | 70 +++++++++++++++++
+>  arch/arm/mach-exynos/include/mach/map.h            |  3 +
+>  arch/arm/mach-exynos/mach-exynos4-dt.c             |  1 +
+>  arch/arm/mach-exynos/platsmp.c                     | 32 ++++++--
+>  arch/arm/mach-exynos/smc.h                         | 31 ++++++++
+>  arch/arm/plat-samsung/include/plat/map-s5p.h       |  1 +
+>  15 files changed, 382 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/arm/firmware.txt
+>  create mode 100644 arch/arm/common/firmware.c
+>  create mode 100644 arch/arm/include/asm/firmware.h
+>  create mode 100644 arch/arm/mach-exynos/exynos-smc.S
+>  create mode 100644 arch/arm/mach-exynos/firmware.c
+>  create mode 100644 arch/arm/mach-exynos/smc.h
+> 
+> --
+> 1.8.0
 
-And it can make a confusion if there is no any explanation...
+Russell, I think, Tomasz addressed comments from you.
 
-Note, I applied following arch/arm/ Samsung stuff for audio with Sangbeom's
-ack:-)
-
-Padmavathi Venna (9):
-      ARM: EXYNOS: Add clocks for EXYNOS5 Audio Subsystem
-      ARM: dts: Add nodes for i2s controllers for Samsung EXYNOS5 platforms
-      ARM: EXYNOS: Enable platform support for I2S controllers
-      ARM: S3C64XX: Add I2S clkdev support
-      ARM: S5PC100: Add I2S clkdev support
-      ARM: S5P64X0: Add I2S clkdev support
-      ARM: S5PV210: Avoid passing the clks through platform data
-      ARM: EXYNOS: Avoid passing the clks through platform data
-      ARM: SAMSUNG: Delete the unnecessary variable
+If you're ok on this, please ack so that I can pick this up in my tree for v3.8...
 
 Thanks.
 
