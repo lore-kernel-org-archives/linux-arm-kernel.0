@@ -1,113 +1,46 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sun, 25 Nov 2012 02:48:03 +0530
-Subject: [PATCH v4 10/12] ARM: Exynos4: remove auxdata table from machine file
-In-Reply-To: <1353791885-2566-1-git-send-email-thomas.abraham@linaro.org>
-References: <1353791885-2566-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1353791885-2566-11-git-send-email-thomas.abraham@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 24 Nov 2012 15:21:49 -0800
+Subject: [PATCH] cpuidle: add Calxeda SOC idle support
+In-Reply-To: <2676657.zDjyfqIDdm@vostro.rjw.lan>
+References: <1352330622-13616-1-git-send-email-robherring2@gmail.com>
+ <201211122200.07901.arnd@arndb.de>
+ <2676657.zDjyfqIDdm@vostro.rjw.lan>
+Message-ID: <CAOesGMgUsmjZCpMN8WpYk2LpYpfxp-wyCwajw4TikgU8ve2g0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With support for device tree based clock lookup now available, remove the
-auxdata table from exynos4 dt-enabled machine file.
+Rafael,
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/mach-exynos/mach-exynos4-dt.c |   68 +-------------------------------
- 1 files changed, 2 insertions(+), 66 deletions(-)
+On Sat, Nov 24, 2012 at 2:03 AM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> On Monday, November 12, 2012 10:00:07 PM Arnd Bergmann wrote:
+>> On Wednesday 07 November 2012, Rob Herring wrote:
+>> > From: Rob Herring <rob.herring@calxeda.com>
+>> >
+>> > Add support for core powergating on Calxeda platforms. Initially, this
+>> > supports ECX-1000 (highbank), but support will be added for ECX-2000
+>> > later.
+>> >
+>> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> > Cc: Len Brown <len.brown@intel.com>
+>> > Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
+>>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>
+>> > It's not really clear where we want ARM cpuidle drivers. We're moving
+>> > everything else out of arch/arm, and my understanding is Len doesn't want
+>> > them in drivers/idle. It seems kind of silly to me to have the framework
+>> > and drivers in 2 places. I've put this in drivers/cpuidle, but it doesn't
+>> > make any difference to me.
+>>
+>> Fine with me. I just don't want in in arch/arm because I'm guessing this will
+>> be shared with arm64, which in turn shares idle (and other) drivers with various
+>> powerpc, mips and x86 socs.
+>
+> Applied to linux-pm.git/linux-next as v3.8 material.
 
-diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
-index c645992..473cb0a 100644
---- a/arch/arm/mach-exynos/mach-exynos4-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
-@@ -11,77 +11,14 @@
-  * published by the Free Software Foundation.
- */
- 
-+#include <linux/kernel.h>
- #include <linux/of_platform.h>
--#include <linux/serial_core.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/hardware/gic.h>
--#include <mach/map.h>
--
--#include <plat/cpu.h>
--#include <plat/regs-serial.h>
- 
- #include "common.h"
- 
--/*
-- * The following lookup table is used to override device names when devices
-- * are registered from device tree. This is temporarily added to enable
-- * device tree support addition for the Exynos4 architecture.
-- *
-- * For drivers that require platform data to be provided from the machine
-- * file, a platform data pointer can also be supplied along with the
-- * devices names. Usually, the platform data elements that cannot be parsed
-- * from the device tree by the drivers (example: function pointers) are
-- * supplied. But it should be noted that this is a temporary mechanism and
-- * at some point, the drivers should be capable of parsing all the platform
-- * data from the device tree.
-- */
--static const struct of_dev_auxdata exynos4_auxdata_lookup[] __initconst = {
--	OF_DEV_AUXDATA("samsung,exynos4210-uart", EXYNOS4_PA_UART0,
--				"exynos4210-uart.0", NULL),
--	OF_DEV_AUXDATA("samsung,exynos4210-uart", EXYNOS4_PA_UART1,
--				"exynos4210-uart.1", NULL),
--	OF_DEV_AUXDATA("samsung,exynos4210-uart", EXYNOS4_PA_UART2,
--				"exynos4210-uart.2", NULL),
--	OF_DEV_AUXDATA("samsung,exynos4210-uart", EXYNOS4_PA_UART3,
--				"exynos4210-uart.3", NULL),
--	OF_DEV_AUXDATA("samsung,exynos4210-sdhci", EXYNOS4_PA_HSMMC(0),
--				"exynos4-sdhci.0", NULL),
--	OF_DEV_AUXDATA("samsung,exynos4210-sdhci", EXYNOS4_PA_HSMMC(1),
--				"exynos4-sdhci.1", NULL),
--	OF_DEV_AUXDATA("samsung,exynos4210-sdhci", EXYNOS4_PA_HSMMC(2),
--				"exynos4-sdhci.2", NULL),
--	OF_DEV_AUXDATA("samsung,exynos4210-sdhci", EXYNOS4_PA_HSMMC(3),
--				"exynos4-sdhci.3", NULL),
--	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(0),
--				"s3c2440-i2c.0", NULL),
--	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(1),
--				"s3c2440-i2c.1", NULL),
--	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(2),
--				"s3c2440-i2c.2", NULL),
--	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(3),
--				"s3c2440-i2c.3", NULL),
--	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(4),
--				"s3c2440-i2c.4", NULL),
--	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(5),
--				"s3c2440-i2c.5", NULL),
--	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(6),
--				"s3c2440-i2c.6", NULL),
--	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(7),
--				"s3c2440-i2c.7", NULL),
--	OF_DEV_AUXDATA("samsung,exynos4210-spi", EXYNOS4_PA_SPI0,
--				"exynos4210-spi.0", NULL),
--	OF_DEV_AUXDATA("samsung,exynos4210-spi", EXYNOS4_PA_SPI1,
--				"exynos4210-spi.1", NULL),
--	OF_DEV_AUXDATA("samsung,exynos4210-spi", EXYNOS4_PA_SPI2,
--				"exynos4210-spi.2", NULL),
--	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_PDMA0, "dma-pl330.0", NULL),
--	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_PDMA1, "dma-pl330.1", NULL),
--	OF_DEV_AUXDATA("samsung,exynos4210-tmu", EXYNOS4_PA_TMU,
--				"exynos-tmu", NULL),
--	{},
--};
--
- static void __init exynos4_dt_map_io(void)
- {
- 	exynos_init_io(NULL, 0);
-@@ -89,8 +26,7 @@ static void __init exynos4_dt_map_io(void)
- 
- static void __init exynos4_dt_machine_init(void)
- {
--	of_platform_populate(NULL, of_default_bus_match_table,
--				exynos4_auxdata_lookup, NULL);
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
- static char const *exynos4_dt_compat[] __initdata = {
--- 
-1.7.4.4
+We already have it in arm-soc. Since there's no maintainer listed for
+the directory, it didn't seem like there were any better merge paths.
+
+
+
+-Olof
