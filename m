@@ -1,225 +1,116 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 23 Nov 2012 20:42:35 -0700
-Subject: [PATCH 2/6] ARM: OMAP2/3: PRM: fix bogus OMAP2xxx powerstate return
- values
+Date: Fri, 23 Nov 2012 20:42:38 -0700
+Subject: [PATCH 5/6] ARM: OMAP4: MPUSS PM: remove unnecessary shim functions
+ for powerdomain control
 In-Reply-To: <20121124033809.24638.11090.stgit@dusk.lan>
 References: <20121124033809.24638.11090.stgit@dusk.lan>
-Message-ID: <20121124034234.24638.79865.stgit@dusk.lan>
+Message-ID: <20121124034237.24638.3621.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP2xxx chips, the register bitfields for the
-PM_PWSTCTRL_*.POWERSTATE and PM_PWSTST_*.LASTSTATEENTERED are
-different than those used on OMAP3/4.  The order is reversed.  So, for
-example, on OMAP2xxx, 0x0 indicates 'ON'; but on OMAP3/4, 0x0
-indicates 'OFF'.  Similarly, on OMAP2xxx, 0x3 indicates 'OFF', but on
-OMAP3/4, 0x3 indicates 'ON'.
-
-To fix this, we treat the OMAP3/4 values as the powerdomain API
-values, and create new low-level powerdomain functions for the
-OMAP2xxx chips which translate between the OMAP2xxx values and the
-OMAP3/4 values.
-
-Without this patch, the conversion of the OMAP2xxx PM code to the
-functional powerstate code results in a non-booting kernel.
+The OMAP4 MPU subsystem power management code contains several unnecessary
+shim functions for powerdomain control; remove them.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/prm2xxx.c      |   88 +++++++++++++++++++++++++++++++++++-
- arch/arm/mach-omap2/prm2xxx_3xxx.c |   22 ---------
- arch/arm/mach-omap2/prm3xxx.c      |   28 ++++++++++-
- 3 files changed, 110 insertions(+), 28 deletions(-)
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |   43 +++++------------------------
+ 1 file changed, 7 insertions(+), 36 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prm2xxx.c b/arch/arm/mach-omap2/prm2xxx.c
-index bf24fc4..e4cdb69 100644
---- a/arch/arm/mach-omap2/prm2xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx.c
-@@ -29,6 +29,14 @@
- #include "prm-regbits-24xx.h"
- 
- /*
-+ * OMAP24xx PM_PWSTCTRL_*.POWERSTATE and PM_PWSTST_*.LASTSTATEENTERED bits -
-+ * these are reversed from the bits used on OMAP3+
-+ */
-+#define OMAP24XX_PWRDM_POWER_ON			0x0
-+#define OMAP24XX_PWRDM_POWER_RET		0x1
-+#define OMAP24XX_PWRDM_POWER_OFF		0x3
-+
-+/*
-  * omap2xxx_prm_reset_src_map - map from bits in the PRM_RSTST_WKUP
-  *   hardware register (which are specific to the OMAP2xxx SoCs) to
-  *   reset source ID bit shifts (which is an OMAP SoC-independent
-@@ -69,6 +77,34 @@ static u32 omap2xxx_prm_read_reset_sources(void)
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index 3f5fd7e..80d4742 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -86,37 +86,6 @@ static inline void set_cpu_wakeup_addr(unsigned int cpu_id, u32 addr)
  }
  
- /**
-+ * omap2xxx_pwrst_to_common_pwrst - convert OMAP2xxx pwrst to common pwrst
-+ * @omap2xxx_pwrst: OMAP2xxx hardware power state to convert
-+ *
-+ * Return the common power state bits corresponding to the OMAP2xxx
-+ * hardware power state bits @omap2xxx_pwrst, or -EINVAL upon error.
-+ */
-+static int omap2xxx_pwrst_to_common_pwrst(u8 omap2xxx_pwrst)
-+{
-+	u8 pwrst;
-+
-+	switch (omap2xxx_pwrst) {
-+	case OMAP24XX_PWRDM_POWER_OFF:
-+		pwrst = PWRDM_POWER_OFF;
-+		break;
-+	case OMAP24XX_PWRDM_POWER_RET:
-+		pwrst = PWRDM_POWER_RET;
-+		break;
-+	case OMAP24XX_PWRDM_POWER_ON:
-+		pwrst = PWRDM_POWER_ON;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return pwrst;
-+}
-+
-+/**
-  * omap2xxx_prm_dpll_reset - use DPLL reset to reboot the OMAP SoC
-  *
-  * Set the DPLL reset bit, which should reboot the SoC.  This is the
-@@ -98,10 +134,56 @@ int omap2xxx_clkdm_wakeup(struct clockdomain *clkdm)
+ /*
+- * Set the CPUx powerdomain's previous power state
+- */
+-static inline void set_cpu_next_pwrst(unsigned int cpu_id,
+-				unsigned int power_state)
+-{
+-	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
+-
+-	pwrdm_set_next_pwrst(pm_info->pwrdm, power_state);
+-}
+-
+-/*
+- * Read CPU's previous power state
+- */
+-static inline unsigned int read_cpu_prev_pwrst(unsigned int cpu_id)
+-{
+-	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
+-
+-	return pwrdm_read_prev_pwrst(pm_info->pwrdm);
+-}
+-
+-/*
+- * Clear the CPUx powerdomain's previous power state
+- */
+-static inline void clear_cpu_prev_pwrst(unsigned int cpu_id)
+-{
+-	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
+-
+-	pwrdm_clear_all_prev_pwrst(pm_info->pwrdm);
+-}
+-
+-/*
+  * Store the SCU power status value to scratchpad memory
+  */
+ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
+@@ -229,6 +198,7 @@ static void save_l2x0_context(void)
+  */
+ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+ {
++	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu);
+ 	unsigned int save_state = 0;
+ 	unsigned int wakeup_cpu;
+ 
+@@ -267,7 +237,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+ 		save_state = 2;
+ 
+ 	cpu_clear_prev_logic_pwrst(cpu);
+-	set_cpu_next_pwrst(cpu, power_state);
++	pwrdm_set_next_pwrst(pm_info->pwrdm, power_state);
+ 	set_cpu_wakeup_addr(cpu, virt_to_phys(omap4_cpu_resume));
+ 	scu_pwrst_prepare(cpu, power_state);
+ 	l2x0_pwrst_prepare(cpu, save_state);
+@@ -285,7 +255,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+ 	 * domain transition
+ 	 */
+ 	wakeup_cpu = smp_processor_id();
+-	set_cpu_next_pwrst(wakeup_cpu, PWRDM_POWER_ON);
++	pwrdm_set_next_pwrst(pm_info->pwrdm, PWRDM_POWER_ON);
+ 
+ 	pwrdm_post_transition(NULL);
+ 
+@@ -299,6 +269,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+  */
+ int __cpuinit omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
+ {
++	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu);
+ 	unsigned int cpu_state = 0;
+ 
+ 	if (omap_rev() == OMAP4430_REV_ES1_0)
+@@ -307,8 +278,8 @@ int __cpuinit omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
+ 	if (power_state == PWRDM_POWER_OFF)
+ 		cpu_state = 1;
+ 
+-	clear_cpu_prev_pwrst(cpu);
+-	set_cpu_next_pwrst(cpu, power_state);
++	pwrdm_clear_all_prev_pwrst(pm_info->pwrdm);
++	pwrdm_set_next_pwrst(pm_info->pwrdm, power_state);
+ 	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_secondary_startup));
+ 	scu_pwrst_prepare(cpu, power_state);
+ 
+@@ -319,7 +290,7 @@ int __cpuinit omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
+ 	 */
+ 	omap4_finish_suspend(cpu_state);
+ 
+-	set_cpu_next_pwrst(cpu, PWRDM_POWER_ON);
++	pwrdm_set_next_pwrst(pm_info->pwrdm, PWRDM_POWER_ON);
  	return 0;
  }
  
-+static int omap2xxx_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
-+{
-+	u8 omap24xx_pwrst;
-+
-+	switch (pwrst) {
-+	case PWRDM_POWER_OFF:
-+		omap24xx_pwrst = OMAP24XX_PWRDM_POWER_OFF;
-+		break;
-+	case PWRDM_POWER_RET:
-+		omap24xx_pwrst = OMAP24XX_PWRDM_POWER_RET;
-+		break;
-+	case PWRDM_POWER_ON:
-+		omap24xx_pwrst = OMAP24XX_PWRDM_POWER_ON;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	omap2_prm_rmw_mod_reg_bits(OMAP_POWERSTATE_MASK,
-+				   (omap24xx_pwrst << OMAP_POWERSTATE_SHIFT),
-+				   pwrdm->prcm_offs, OMAP2_PM_PWSTCTRL);
-+	return 0;
-+}
-+
-+static int omap2xxx_pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
-+{
-+	u8 omap2xxx_pwrst;
-+
-+	omap2xxx_pwrst = omap2_prm_read_mod_bits_shift(pwrdm->prcm_offs,
-+						       OMAP2_PM_PWSTCTRL,
-+						       OMAP_POWERSTATE_MASK);
-+
-+	return omap2xxx_pwrst_to_common_pwrst(omap2xxx_pwrst);
-+}
-+
-+static int omap2xxx_pwrdm_read_pwrst(struct powerdomain *pwrdm)
-+{
-+	u8 omap2xxx_pwrst;
-+
-+	omap2xxx_pwrst = omap2_prm_read_mod_bits_shift(pwrdm->prcm_offs,
-+						       OMAP2_PM_PWSTST,
-+						       OMAP_POWERSTATEST_MASK);
-+
-+	return omap2xxx_pwrst_to_common_pwrst(omap2xxx_pwrst);
-+}
-+
- struct pwrdm_ops omap2_pwrdm_operations = {
--	.pwrdm_set_next_pwrst	= omap2_pwrdm_set_next_pwrst,
--	.pwrdm_read_next_pwrst	= omap2_pwrdm_read_next_pwrst,
--	.pwrdm_read_pwrst	= omap2_pwrdm_read_pwrst,
-+	.pwrdm_set_next_pwrst	= omap2xxx_pwrdm_set_next_pwrst,
-+	.pwrdm_read_next_pwrst	= omap2xxx_pwrdm_read_next_pwrst,
-+	.pwrdm_read_pwrst	= omap2xxx_pwrdm_read_pwrst,
- 	.pwrdm_set_logic_retst	= omap2_pwrdm_set_logic_retst,
- 	.pwrdm_set_mem_onst	= omap2_pwrdm_set_mem_onst,
- 	.pwrdm_set_mem_retst	= omap2_pwrdm_set_mem_retst,
-diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-index 30517f5..a3e121f 100644
---- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-@@ -103,28 +103,6 @@ int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift, u8 st_shift)
- /* Powerdomain low-level functions */
- 
- /* Common functions across OMAP2 and OMAP3 */
--int omap2_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
--{
--	omap2_prm_rmw_mod_reg_bits(OMAP_POWERSTATE_MASK,
--				   (pwrst << OMAP_POWERSTATE_SHIFT),
--				   pwrdm->prcm_offs, OMAP2_PM_PWSTCTRL);
--	return 0;
--}
--
--int omap2_pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
--{
--	return omap2_prm_read_mod_bits_shift(pwrdm->prcm_offs,
--					     OMAP2_PM_PWSTCTRL,
--					     OMAP_POWERSTATE_MASK);
--}
--
--int omap2_pwrdm_read_pwrst(struct powerdomain *pwrdm)
--{
--	return omap2_prm_read_mod_bits_shift(pwrdm->prcm_offs,
--					     OMAP2_PM_PWSTST,
--					     OMAP_POWERSTATEST_MASK);
--}
--
- int omap2_pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank,
- 								u8 pwrst)
- {
-diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
-index b86116c..18762a2 100644
---- a/arch/arm/mach-omap2/prm3xxx.c
-+++ b/arch/arm/mach-omap2/prm3xxx.c
-@@ -278,6 +278,28 @@ static u32 omap3xxx_prm_read_reset_sources(void)
- 
- /* Powerdomain low-level functions */
- 
-+static int omap3_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
-+{
-+	omap2_prm_rmw_mod_reg_bits(OMAP_POWERSTATE_MASK,
-+				   (pwrst << OMAP_POWERSTATE_SHIFT),
-+				   pwrdm->prcm_offs, OMAP2_PM_PWSTCTRL);
-+	return 0;
-+}
-+
-+static int omap3_pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
-+{
-+	return omap2_prm_read_mod_bits_shift(pwrdm->prcm_offs,
-+					     OMAP2_PM_PWSTCTRL,
-+					     OMAP_POWERSTATE_MASK);
-+}
-+
-+static int omap3_pwrdm_read_pwrst(struct powerdomain *pwrdm)
-+{
-+	return omap2_prm_read_mod_bits_shift(pwrdm->prcm_offs,
-+					     OMAP2_PM_PWSTST,
-+					     OMAP_POWERSTATEST_MASK);
-+}
-+
- /* Applicable only for OMAP3. Not supported on OMAP2 */
- static int omap3_pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
- {
-@@ -356,9 +378,9 @@ static int omap3_pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm)
- }
- 
- struct pwrdm_ops omap3_pwrdm_operations = {
--	.pwrdm_set_next_pwrst	= omap2_pwrdm_set_next_pwrst,
--	.pwrdm_read_next_pwrst	= omap2_pwrdm_read_next_pwrst,
--	.pwrdm_read_pwrst	= omap2_pwrdm_read_pwrst,
-+	.pwrdm_set_next_pwrst	= omap3_pwrdm_set_next_pwrst,
-+	.pwrdm_read_next_pwrst	= omap3_pwrdm_read_next_pwrst,
-+	.pwrdm_read_pwrst	= omap3_pwrdm_read_pwrst,
- 	.pwrdm_read_prev_pwrst	= omap3_pwrdm_read_prev_pwrst,
- 	.pwrdm_set_logic_retst	= omap2_pwrdm_set_logic_retst,
- 	.pwrdm_read_logic_pwrst	= omap3_pwrdm_read_logic_pwrst,
