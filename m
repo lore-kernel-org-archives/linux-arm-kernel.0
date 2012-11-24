@@ -1,35 +1,55 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sat, 24 Nov 2012 00:15:39 -0800
-Subject: [PATCH 0/2] Input: nomadik-ske-keypad - clk fixups
-In-Reply-To: <CAPDyKFq+MBo2338SiAF-mdDHpgTDJ0p6k2BaicJpSutGqtaubA@mail.gmail.com>
-References: <1351779602-13818-1-git-send-email-ulf.hansson@stericsson.com>
- <CAPDyKFq+MBo2338SiAF-mdDHpgTDJ0p6k2BaicJpSutGqtaubA@mail.gmail.com>
-Message-ID: <20121124081539.GC24711@core.coreip.homeip.net>
+From: ppisa@pikron.com (Pavel Pisa)
+Date: Sat, 24 Nov 2012 09:18:42 +0100
+Subject: [PATCH 18/24] MAINTAINERS: remove drivers/mmc/host/imxmmc.*
+In-Reply-To: <1353716808-16375-19-git-send-email-cesarb@cesarb.net>
+References: <1353716808-16375-1-git-send-email-cesarb@cesarb.net>
+ <1353716808-16375-19-git-send-email-cesarb@cesarb.net>
+Message-ID: <201211240918.42930.ppisa@pikron.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Saturday 24 November 2012 01:26:42 Cesar Eduardo Barros wrote:
+> This driver was removed by commit 6187fee (mmc: remove imxmmc driver).
+>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Pavel Pisa <ppisa@pikron.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
+> ---
+>  MAINTAINERS | 6 ------
+>  1 file changed, 6 deletions(-)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index fc646ef..cac8e49 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -4905,12 +4905,6 @@ F:	Documentation/video4linux/meye.txt
+>  F:	drivers/media/pci/meye/
+>  F:	include/uapi/linux/meye.h
+>
+> -MOTOROLA IMX MMC/SD HOST CONTROLLER INTERFACE DRIVER
+> -M:	Pavel Pisa <ppisa@pikron.com>
+> -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -S:	Maintained
+> -F:	drivers/mmc/host/imxmmc.*
+> -
+>  MOXA SMARTIO/INDUSTIO/INTELLIO SERIAL CARD
+>  M:	Jiri Slaby <jirislaby@gmail.com>
+>  S:	Maintained
 
-On Fri, Nov 23, 2012 at 04:54:09PM +0100, Ulf Hansson wrote:
-> On 1 November 2012 15:20, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-> > From: Ulf Hansson <ulf.hansson@linaro.org>
-> >
-> > Due to the convert to the common clk driver these changes for clks are needed.
-> >
-> > Ulf Hansson (2):
-> >   Input: nomadik-ske-keypad - fixup use of clk
-> >   Input: nomadik-ske-keypad - start using the apb_pclk
-> >
-> >  drivers/input/keyboard/nomadik-ske-keypad.c |   34 +++++++++++++++++++++++----
-> >  1 file changed, 29 insertions(+), 5 deletions(-)
-> >
-> > --
-> > 1.7.10
-> >
-> 
-> Just a kind reminder here. Do we see any issues with merging this?
+Acked-by: Pavel Pisa <pisa@cmp.felk.cvut.cz>
 
-Both are in my 'next' branch, sorry for not notifying you earlier.
+I have still the hardware but have lack resources to keep with current
+kernel development for that old HW. We plan to switch to newer i.MX
+hardware - hopefully with more bug free MMC/SD support, because MX1
+has taken me yer a year of fighting with its bugs (on Linux and RTEMS
+as well).
 
--- 
-Dmitry
+Best wishes,
+
+
+                Pavel Pisa
+    e-mail:     pisa at cmp.felk.cvut.cz
+    www:        http://cmp.felk.cvut.cz/~pisa
+    university: http://dce.fel.cvut.cz/
+    company:    http://www.pikron.com/
