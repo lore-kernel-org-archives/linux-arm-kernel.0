@@ -1,74 +1,46 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Sun, 25 Nov 2012 15:29:45 -0500
-Subject: [PATCH 3/3] MMC: sdhci-dove: allow GPIOs to be used for card
- detection on Dove
-In-Reply-To: <20121123125507.GO5764@n2100.arm.linux.org.uk> (Russell King's
- message of "Fri, 23 Nov 2012 12:55:07 +0000")
-References: <20121122235426.GT3332@n2100.arm.linux.org.uk>
- <E1TbgcZ-0007Kt-35@rmk-PC.arm.linux.org.uk>
- <20121123083117.GA25754@S2100-06.ap.freescale.net>
- <20121123085726.GK5764@n2100.arm.linux.org.uk>
- <20121123121422.GA26168@S2100-06.ap.freescale.net>
- <20121123125507.GO5764@n2100.arm.linux.org.uk>
-Message-ID: <871ufh8lza.fsf@octavius.laptop.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 26 Nov 2012 08:22:14 +0900
+Subject: [PATCH] ARM: Exynos5: fix clock initialization for exynos5250
+In-Reply-To: <1353750810-21953-1-git-send-email-thomas.abraham@linaro.org>
+References: <1353750810-21953-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <12b301cdcb63$b3f60ca0$1be225e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, adding Guennadi,
+Thomas Abraham wrote:
+> 
+> The machine compatible value cannot be checked in exynos5_dt_map_io
+> function
+> since the tree is not unflattened yet. Fix this by using soc_is_exynos5250
+> macro.
+> 
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  arch/arm/mach-exynos/mach-exynos5-dt.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-
+> exynos/mach-exynos5-dt.c
+> index 77010f8..845d8e2 100644
+> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> @@ -117,7 +117,7 @@ static void __init exynos5_dt_map_io(void)
+>  {
+>  	exynos_init_io(NULL, 0);
+> 
+> -	if (of_machine_is_compatible("samsung,exynos5250"))
+> +	if (soc_is_exynos5250())
+>  		s3c24xx_init_clocks(24000000);
+>  }
+> 
+> --
 
-On Fri, Nov 23 2012, Russell King - ARM Linux wrote:
-> On Fri, Nov 23, 2012 at 08:14:27PM +0800, Shawn Guo wrote:
->> On Fri, Nov 23, 2012 at 08:57:26AM +0000, Russell King - ARM Linux wrote:
->> > Does this work with the sdhci stuff?
->> 
->> Honestly, I'm not sure, but I guess it does, since I have seen
->> sdhci-pxav3 driver using the helpers.  Anyway, I'm going to adopt
->> the helpers for sdhci-esdhc-imx driver to find it out.
->
-> The thing that worries me is this:
->
-> static void sdhci_tasklet_card(unsigned long param)
-> {
-> ...
->         /* Check host->mrq first in case we are runtime suspended */
->         if (host->mrq &&
->             !(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT)) {
->                 pr_err("%s: Card removed during transfer!\n",
->                         mmc_hostname(host->mmc));
->                 pr_err("%s: Resetting controller.\n",
->                         mmc_hostname(host->mmc));
->
->                 sdhci_reset(host, SDHCI_RESET_CMD);
->                 sdhci_reset(host, SDHCI_RESET_DATA);
->
->                 host->mrq->cmd->error = -ENOMEDIUM;
->                 tasklet_schedule(&host->finish_tasklet);
->         }
-> ...
->         mmc_detect_change(host->mmc, msecs_to_jiffies(200));
-> }
->
->
-> That gets called whenever a card is inserted/removed by the SDHCI code (if
-> the SDHCI card detect is wired), or in my case by the interrupt routine
-> the code in my patch adds.
->
-> The slot-gpio.c stuff directly calls into mmc_detect_change (a) with a
-> shorter delay, and (b) completely omits the above handling and resetting.
-> My guess from the above code is that it'll work fine 90% of the time
-> (because you'll remove the card without an active request), but the above
-> code looks like it's addressing a corner case which will be omitted with
-> the "generic" slot-gpio.c solution.
->
-> So I don't think it's a good idea to use slot-gpio.c in this case.
+Correct, applied.
 
-Guennadi, what are your thoughts about consolidating this reset logic
-between the sdhci tasklet and slot-gpio?  It would certainly be nice to
-use slot-gpio in cases like this one, so it's worth fixing.
+Thanks.
 
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
