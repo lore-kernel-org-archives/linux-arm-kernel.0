@@ -1,70 +1,230 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Sun, 25 Nov 2012 01:47:41 +0100
-Subject: [RFC 1/2] ARM: S3C24XX: add devicetree support for interrupts
+Date: Sun, 25 Nov 2012 01:48:19 +0100
+Subject: [RFC 2/2] ARM: S3C24XX: Add devicetree support and dt-board file for
+ s3c2416 SoCs
 In-Reply-To: <201211250145.21226.heiko@sntech.de>
 References: <201211250145.21226.heiko@sntech.de>
-Message-ID: <201211250147.42164.heiko@sntech.de>
+Message-ID: <201211250148.19348.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds devicetree parsing of the controller-data for the
-interrupt controllers on S3C24XX architectures.
+This adds a board file and the devicetree source files to support boards
+using the Samsung S3C2416 SoC.
+
+The dt source files contain the definitions generic to all S3C24XX SoCs
+in the s3c24xx.dtsi file which then gets extendes with S3C2416 specific
+definitions.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- .../interrupt-controller/samsung,s3c24xx-irq.txt   |   57 ++++++
- arch/arm/mach-s3c24xx/common.h                     |    1 +
- arch/arm/plat-s3c24xx/irq.c                        |  197 ++++++++++++++++++++
- 3 files changed, 255 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-irq.txt
+ arch/arm/boot/dts/Makefile              |    1 +
+ arch/arm/boot/dts/s3c2416-smdk2416.dts  |   79 +++++++++++++
+ arch/arm/boot/dts/s3c2416.dtsi          |  193 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/s3c24xx.dtsi          |  158 +++++++++++++++++++++++++
+ arch/arm/mach-s3c24xx/Kconfig           |    9 ++
+ arch/arm/mach-s3c24xx/Makefile          |    1 +
+ arch/arm/mach-s3c24xx/mach-s3c2416-dt.c |   91 +++++++++++++++
+ 7 files changed, 532 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/s3c2416-smdk2416.dts
+ create mode 100644 arch/arm/boot/dts/s3c2416.dtsi
+ create mode 100644 arch/arm/boot/dts/s3c24xx.dtsi
+ create mode 100644 arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-irq.txt b/Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-irq.txt
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 8cfd013..d8256f0 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -89,6 +89,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	am335x-bone.dtb
+ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb
++dtb-$(CONFIG_ARCH_S3C24XX) += s3c2416-smdk2416.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+ 	sh73a0-kzm9g.dtb \
+diff --git a/arch/arm/boot/dts/s3c2416-smdk2416.dts b/arch/arm/boot/dts/s3c2416-smdk2416.dts
 new file mode 100644
-index 0000000..c637637
+index 0000000..6863be6
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-irq.txt
-@@ -0,0 +1,57 @@
-+Samsung S3C24XX Interrupt Controllers
++++ b/arch/arm/boot/dts/s3c2416-smdk2416.dts
+@@ -0,0 +1,79 @@
++/*
++ * SAMSUNG SMDK2416 board device tree source
++ *
++ * Copyright (c) 2012 Heiko Stuebner <heiko@sntech.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
-+The S3C24XX SoCs contain custom set of interrupt controllers providing a
-+varying number of interrupt sources.
++/dts-v1/;
++/include/ "s3c2416.dtsi"
 +
-+The set consists of a main- and a sub-controller as well as a controller
-+for the external interrupts and on newer SoCs even a second main controller.
++/ {
++	model = "SMDK2416";
++	compatible = "samsung,s3c2416";
 +
-+The bit-to-interrupt and parent mapping of the controllers is not fixed
-+over all SoCs and therefore must be defined in the controller description.
++	memory {
++		reg =  <0x30000000 0x8000000>;
++	};
 +
-+Required properties:
-+- compatible: Compatible property value should be "samsung,s3c24xx-irq".
++	sdhci at 4AC00000 {
++		bus-width = <4>;
++		gpios = <&gpe 5 2 0>,  /* clock line */
++			<&gpe 6 2 0>,  /* command line */
++			<&gpe 7 2 0>,  /* data line 0 */
++			<&gpe 8 2 0>,  /* data line 1 */
++			<&gpe 9 2 0>,  /* data line 2 */
++			<&gpe 10 2 0>;  /* data line 3 */
++		cd-gpios = <&gpf 1 2 2>;
++		cd-inverted;
++		status = "okay";
++	};
 +
-+- reg: Physical base address of the controller and length of memory mapped
-+  region.
++	sdhci at 4A800000 {
++		bus-width = <4>;
++		gpios = <&gpl 9 2 0>,  /* clock line */
++			<&gpl 8 2 0>,  /* command line */
++			<&gpl 0 2 0>,  /* data line 0 */
++			<&gpl 1 2 0>,  /* data line 1 */
++			<&gpl 2 2 0>,  /* data line 2 */
++			<&gpl 3 2 0>;  /* data line 3 */
 +
-+- interrupt-controller : Identifies the node as an interrupt controller
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. The value shall be 2.
++		broken-cd;
++		status = "okay";
++	};
 +
-+- s3c24xx,irqlist : List of irqtypes found on this controller as
-+  two-value pairs consisting of irqtype and parent-irq
++	serial at 50000000 {
++		status = "okay";
++	};
 +
-+  parent-irq is always the list position of the irq in the irqlist
-+  of the parent controller (0..31)
++	serial at 50004000 {
++		status = "okay";
++	};
 +
-+  irqtypes are:
-+  - 0 .. none
-+  - 1 .. external interrupts in the main register (GPF0 .. GPF3)
-+  - 2 .. edge irq in the main register
-+  - 3 .. for parent-irqs, that have sub-irqs in child controllers
-+  - 4 .. level irqs in the sub-register
-+  - 5 .. edge irqs in the sub-register
-+  - 6 .. external irqs in the external irq register (starting with GPF4)
-+  - 7 .. irq in the second base irq controller of S3C2416/S3C2450 SoCs
++	serial at 50008000 {
++		status = "okay";
++	};
 +
-+Optional properties:
-+- interrupt_parent : The parent interrupt controller
++	serial at 5000C000 {
++		status = "okay";
++	};
 +
-+Example:
++	watchdog at 53000000 {
++		status = "okay";
++	};
++
++	rtc at 57000000 {
++		status = "okay";
++	};
++
++	i2c at 54000000 {
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-max-bus-freq = <100000>;
++		gpios = <&gpe 15 2 0>, /* SDA */
++			<&gpe 14 2 0>; /* SCL */
++		status = "okay";
++	};
++};
+diff --git a/arch/arm/boot/dts/s3c2416.dtsi b/arch/arm/boot/dts/s3c2416.dtsi
+new file mode 100644
+index 0000000..6663f28
+--- /dev/null
++++ b/arch/arm/boot/dts/s3c2416.dtsi
+@@ -0,0 +1,193 @@
++/*
++ * Samsung's S3C2416 SoC device tree source
++ *
++ * Copyright (c) 2012 Heiko Stuebner <heiko@sntech.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/include/ "s3c24xx.dtsi"
++
++/ {
++	model = "Samsung S3C2416 SoC";
++	compatible = "samsung,s3c2416";
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			compatible = "arm,arm926ejs";
++			reg = <0>;
++		};
++	};
++
++	intc:interrupt-controller at 4a000000 {
++		s3c24xx,irqlist = <1 0 /* EINT0 */
++				   1 0 /* EINT1 */
++				   1 0 /* EINT2 */
++				   1 0 /* EINT3 */
++				   3 0 /* EINT4to7 */
++				   3 0 /* EINT8to23 */
++				   0 0 /* reserved */
++				   2 0 /* nBATT_FLT */
++				   2 0 /* TICK */
++				   3 0 /* WDT/AC97 */
++				   2 0 /* TIMER0 */
++				   2 0 /* TIMER1 */
++				   2 0 /* TIMER2 */
++				   2 0 /* TIMER3 */
++				   2 0 /* TIMER4 */
++				   3 0 /* UART2 */
++				   3 0 /* LCD */
++				   3 0 /* DMA */
++				   3 0 /* UART3 */
++				   0 0 /* reserved */
++				   2 0 /* SDI1 */
++				   2 0 /* SDI0 */
++				   2 0 /* SPI0 */
++				   3 0 /* UART1 */
++				   2 0 /* NAND */
++				   2 0 /* USBD */
++				   2 0 /* USBH */
++				   2 0 /* IIC */
++				   3 0 /* UART0 */
++				   0 0 /* reserved */
++				   2 0 /* RTC */
++				   3 0>; /* ADCPARENT */
++	};
++
++	subintc:interrupt-controller at 4a000018 {
++		s3c24xx,irqlist = <4 28 /* UART0-RX */
++				   4 28 /* UART0-TX */
++				   4 28 /* UART0-ERR */
++				   4 23 /* UART1-RX */
++				   4 23 /* UART1-TX */
++				   4 23 /* UART1-ERR */
++				   4 15 /* UART2-RX */
++				   4 15 /* UART2-TX */
++				   4 15 /* UART2-ERR */
++				   5 31 /* TC */
++				   5 31 /* ADC */
++				   0 0 /* reserved */
++				   0 0 /* reserved */
++				   0 0 /* reserved */
++				   0 0 /* reserved */
++				   4 16 /* LCD2 */
++				   4 16 /* LCD3 */
++				   4 16 /* LCD4 */
++				   4 17 /* DMA0 */
++				   4 17 /* DMA1 */
++				   4 17 /* DMA2 */
++				   4 17 /* DMA3 */
++				   4 17 /* DMA4 */
++				   4 17 /* DMA5 */
++				   4 18 /* UART3-RX */
++				   4 18 /* UART3-TX */
++				   4 18 /* UART3-ERR */
++				   4 9 /* WDT */
++				   4 9>; /* AC97 */
++	};
 +
 +	intc2:interrupt-controller at 4a000040 {
 +		compatible = "samsung,s3c24xx-irq";
@@ -81,228 +241,383 @@ index 0000000..c637637
 +				   7 0 /* I2S0 */
 +				   7 0>; /* I2S1 */
 +	};
-diff --git a/arch/arm/mach-s3c24xx/common.h b/arch/arm/mach-s3c24xx/common.h
-index ed6276f..7a7b770 100644
---- a/arch/arm/mach-s3c24xx/common.h
-+++ b/arch/arm/mach-s3c24xx/common.h
-@@ -16,5 +16,6 @@ void s3c2410_restart(char mode, const char *cmd);
- void s3c244x_restart(char mode, const char *cmd);
++
++	serial at 50000000 {
++		compatible = "samsung,s3c2440-uart";
++		status = "disabled";
++	};
++
++	serial at 50004000 {
++		compatible = "samsung,s3c2440-uart";
++		status = "disabled";
++	};
++
++	serial at 50008000 {
++		compatible = "samsung,s3c2440-uart";
++		status = "disabled";
++	};
++
++	serial at 5000C000 {
++		compatible = "samsung,s3c2440-uart";
++		reg = <0x5000C000 0x4000>;
++		interrupt-parent = <&subintc>;
++		interrupts = <24 0>, <25 0>;
++		status = "disabled";
++	};
++
++	sdhci at 4AC00000 {
++		compatible = "samsung,s3c6410-sdhci";
++		reg = <0x4AC00000 0x100>;
++		interrupt-parent = <&intc>;
++		interrupts = <21 0>;
++		status = "disabled";
++	};
++
++	sdhci at 4A800000 {
++		compatible = "samsung,s3c6410-sdhci";
++		reg = <0x4A800000 0x100>;
++		interrupt-parent = <&intc>;
++		interrupts = <20 0>;
++		status = "disabled";
++	};
++
++	watchdog at 53000000 {
++		interrupt-parent = <&subintc>;
++		interrupts = <27 0>;
++	};
++
++	rtc at 57000000 {
++		compatible = "samsung,s3c2416-rtc";
++	};
++
++	i2c at 54000000 {
++		compatible = "samsung,s3c2440-i2c";
++		reg = <0x54000000 0x100>;
++		interrupt-parent = <&intc>;
++		interrupts = <27 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
++	gpio-controllers {
++		gpj: gpio-controller at 560000D0 {
++			compatible = "samsung,s3c24xx-gpio";
++			reg = <0x560000D0 0x10>;
++			#gpio-cells = <3>;
++		};
++
++		gpk: gpio-controller at 560000E0 {
++			compatible = "samsung,s3c24xx-gpio";
++			reg = <0x560000E0 0x10>;
++			#gpio-cells = <3>;
++		};
++
++		gpl: gpio-controller at 560000F0 {
++			compatible = "samsung,s3c24xx-gpio";
++			reg = <0x560000F0 0x10>;
++			#gpio-cells = <3>;
++		};
++
++		gpm: gpio-controller at 56000100 {
++			compatible = "samsung,s3c24xx-gpio";
++			reg = <0x56000100 0x10>;
++			#gpio-cells = <3>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/s3c24xx.dtsi b/arch/arm/boot/dts/s3c24xx.dtsi
+new file mode 100644
+index 0000000..8126c4f
+--- /dev/null
++++ b/arch/arm/boot/dts/s3c24xx.dtsi
+@@ -0,0 +1,158 @@
++/*
++ * Samsung's S3C24XX family device tree source
++ *
++ * Copyright (c) 2012 Heiko Stuebner <heiko@sntech.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/include/ "skeleton.dtsi"
++
++/ {
++	model = "Samsung S3C24XX SoC family";
++
++	intc:interrupt-controller at 4a000000 {
++		compatible = "samsung,s3c24xx-irq";
++		reg = <0x4a000000 0x18>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++	};
++
++	extintc:interrupt-controller at 560000a4 {
++		compatible = "samsung,s3c24xx-irq";
++		reg = <0x560000a4 0x8>;
++		interrupt-controller;
++		interrupt-parent = <&intc>;
++		#interrupt-cells = <2>;
++
++		s3c24xx,irqlist = <0 0 /* reserved */
++				   0 0 /* reserved */
++				   0 0 /* reserved */
++				   0 0 /* reserved */
++				   6 4 /* EINT4 */
++				   6 4 /* EINT5 */
++				   6 4 /* EINT6 */
++				   6 4 /* EINT7 */
++				   6 5 /* EINT8 */
++				   6 5 /* EINT9 */
++				   6 5 /* EINT10 */
++				   6 5 /* EINT11 */
++				   6 5 /* EINT12 */
++				   6 5 /* EINT13 */
++				   6 5 /* EINT14 */
++				   6 5 /* EINT15 */
++				   6 5 /* EINT16 */
++				   6 5 /* EINT17 */
++				   6 5 /* EINT18 */
++				   6 5 /* EINT19 */
++				   6 5 /* EINT20 */
++				   6 5 /* EINT21 */
++				   6 5 /* EINT22 */
++				   6 5>; /* EINT23 */
++	};
++
++	subintc:interrupt-controller at 4a000018 {
++		compatible = "samsung,s3c24xx-irq";
++		reg = <0x4a000018 0x8>;
++		interrupt-controller;
++		interrupt-parent = <&intc>;
++		#interrupt-cells = <2>;
++	};
++
++	gpio-controllers {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		gpio-controller;
++		ranges;
++
++		gpa: gpio-controller at 56000000 {
++			compatible = "samsung,s3c24xx-gpio";
++			reg = <0x56000000 0x10>;
++			#gpio-cells = <3>;
++		};
++
++		gpb: gpio-controller at 56000010 {
++			compatible = "samsung,s3c24xx-gpio";
++			reg = <0x56000010 0x10>;
++			#gpio-cells = <3>;
++		};
++
++		gpc: gpio-controller at 56000020 {
++			compatible = "samsung,s3c24xx-gpio";
++			reg = <0x56000020 0x10>;
++			#gpio-cells = <3>;
++		};
++
++		gpd: gpio-controller at 56000030 {
++			compatible = "samsung,s3c24xx-gpio";
++			reg = <0x56000030 0x10>;
++			#gpio-cells = <3>;
++		};
++
++		gpe: gpio-controller at 56000040 {
++			compatible = "samsung,s3c24xx-gpio";
++			reg = <0x56000040 0x10>;
++			#gpio-cells = <3>;
++		};
++
++		gpf: gpio-controller at 56000050 {
++			compatible = "samsung,s3c24xx-gpio";
++			reg = <0x56000050 0x10>;
++			#gpio-cells = <3>;
++		};
++
++		gpg: gpio-controller at 56000060 {
++			compatible = "samsung,s3c24xx-gpio";
++			reg = <0x56000060 0x10>;
++			#gpio-cells = <3>;
++		};
++
++		gph: gpio-controller at 56000070 {
++			compatible = "samsung,s3c24xx-gpio";
++			reg = <0x56000070 0x10>;
++			#gpio-cells = <3>;
++		};
++	};
++
++	serial at 50000000 {
++		compatible = "samsung,s3c2410-uart";
++		reg = <0x50000000 0x4000>;
++		interrupt-parent = <&subintc>;
++		interrupts = <0 0>, <1 0>;
++		status = "disabled";
++	};
++
++	serial at 50004000 {
++		compatible = "samsung,s3c2410-uart";
++		reg = <0x50004000 0x4000>;
++		interrupt-parent = <&subintc>;
++		interrupts = <3 0>, <4 0>;
++		status = "disabled";
++	};
++
++	serial at 50008000 {
++		compatible = "samsung,s3c2410-uart";
++		reg = <0x50008000 0x4000>;
++		interrupt-parent = <&subintc>;
++		interrupts = <6 0>, <7 0>;
++		status = "disabled";
++	};
++
++	watchdog at 53000000 {
++		compatible = "samsung,s3c2410-wdt";
++		reg = <0x53000000 0x100>;
++		interrupt-parent = <&intc>;
++		interrupts = <9 0>;
++		status = "disabled";
++	};
++
++	rtc at 57000000 {
++		compatible = "samsung,s3c2410-rtc";
++		reg = <0x57000000 0x100>;
++		interrupt-parent = <&intc>;
++		interrupts = <30 0>, <8 0>;
++		status = "disabled";
++	};
++};
+diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+index 2b6cb5f..ec137db 100644
+--- a/arch/arm/mach-s3c24xx/Kconfig
++++ b/arch/arm/mach-s3c24xx/Kconfig
+@@ -361,6 +361,15 @@ config MACH_SMDK2416
+ 	help
+ 	  Say Y here if you are using an SMDK2416
  
- extern struct syscore_ops s3c24xx_irq_syscore_ops;
-+extern void s3c24xx_init_irq_of(void);
++config MACH_S3C2416_DT
++	bool "Samsung S3C2416 machine using devicetree"
++	select USE_OF
++	help
++	  Machine support for Samsung S3C2416 machines with device tree enabled.
++	  Select this if a fdt blob is available for the S3C2416 SoC based board.
++	  Note: This is under development and not all peripherals can be supported
++	  with this machine file.
++
+ endif	# CPU_S3C2416
  
- #endif /* __ARCH_ARM_MACH_S3C24XX_COMMON_H */
-diff --git a/arch/arm/plat-s3c24xx/irq.c b/arch/arm/plat-s3c24xx/irq.c
-index 0510627..4f8fe4a 100644
---- a/arch/arm/plat-s3c24xx/irq.c
-+++ b/arch/arm/plat-s3c24xx/irq.c
-@@ -25,6 +25,9 @@
- #include <linux/slab.h>
+ if CPU_S3C2440
+diff --git a/arch/arm/mach-s3c24xx/Makefile b/arch/arm/mach-s3c24xx/Makefile
+index 6019b7c..a48ea40 100644
+--- a/arch/arm/mach-s3c24xx/Makefile
++++ b/arch/arm/mach-s3c24xx/Makefile
+@@ -67,6 +67,7 @@ obj-$(CONFIG_MACH_SMDK2413)		+= mach-smdk2413.o
+ obj-$(CONFIG_MACH_VSTMS)		+= mach-vstms.o
  
- #include <linux/irqdomain.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
+ obj-$(CONFIG_MACH_SMDK2416)		+= mach-smdk2416.o
++obj-$(CONFIG_MACH_S3C2416_DT)		+= mach-s3c2416-dt.o
  
- #include <asm/irq.h>
- #include <asm/mach/irq.h>
-@@ -956,3 +959,197 @@ void __init s3c2443_init_irq(void)
- 	s3c24xx_init_irq();
- }
- #endif
+ obj-$(CONFIG_MACH_ANUBIS)		+= mach-anubis.o
+ obj-$(CONFIG_MACH_AT2440EVB)		+= mach-at2440evb.o
+diff --git a/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c b/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+new file mode 100644
+index 0000000..8ffc8c9
+--- /dev/null
++++ b/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+@@ -0,0 +1,91 @@
++/*
++ * Samsung's S3C2416 flattened device tree enabled machine
++ *
++ * Copyright (c) 2012 Heiko Stuebner <heiko@sntech.de>
++ *
++ * based on mach-exynos/mach-exynos4-dt.c
++ *
++ * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ * Copyright (c) 2010-2011 Linaro Ltd.
++ *		www.linaro.org
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
-+#ifdef CONFIG_OF
-+static int __init s3c24xx_init_intc_of(struct device_node *np,
-+				       struct device_node *interrupt_parent)
-+{
-+	struct s3c_irq_intc *intc;
-+	struct s3c_irq_intc *parent;
-+	struct s3c_irq_data *irq_data;
-+	struct property *intc_prop;
-+	int irq_num = 0, irq_start = 0, irq_offset = 0;
-+	int ret, i, cnt;
-+	const __be32 *p;
-+	u32 val;
++#include <linux/of_platform.h>
++#include <linux/serial_core.h>
 +
-+	intc = kzalloc(sizeof(struct s3c_irq_intc), GFP_KERNEL);
-+	if (!intc)
-+		return -ENOMEM;
++#include <asm/mach/arch.h>
++#include <mach/map.h>
 +
-+	p = of_get_address(np, 0, NULL, NULL);
-+	if (!p) {
-+		pr_err("irq: register address missing\n");
-+		ret = -EINVAL;
-+		goto err_addr;
-+	}
++#include <plat/s3c2416.h>
 +
-+	/* select the correct data for the controller.
-+	 * Need to hard code the irq num start and offset
-+	 * to preserve the static mapping for now
-+	 */
-+	switch (of_translate_address(np, p)) {
-+	case 0x4a000000:
-+		pr_debug("irq: found main intc\n");
-+		intc->reg_pending = S3C2410_SRCPND;
-+		intc->reg_intpnd = S3C2410_INTPND;
-+		intc->reg_mask = S3C2410_INTMSK;
-+		irq_num = 32;
-+		irq_start = S3C2410_IRQ(0);
-+		irq_offset = 0;
-+		break;
-+	case 0x560000a4:
-+		pr_debug("irq: found extintc\n");
-+		intc->reg_pending = S3C2410_EINTPEND;
-+		intc->reg_mask = S3C2410_EINTMASK;
-+		irq_num = 20;
-+		irq_start = S3C2410_IRQ(32);
-+		irq_offset = 4;
-+		break;
-+	case 0x4a000018:
-+		pr_debug("irq: found subintc\n");
-+		intc->reg_pending = S3C2410_SUBSRCPND;
-+		intc->reg_mask = S3C2410_INTSUBMSK;
-+		irq_num = 29;
-+		irq_start = S3C2410_IRQSUB(0);
-+		irq_offset = 0;
-+		break;
-+	case 0x4a000040:
-+		pr_debug("irq: found intc2\n");
-+		intc->reg_pending = S3C2416_SRCPND2;
-+		intc->reg_intpnd = S3C2416_INTPND2;
-+		intc->reg_mask = S3C2416_INTMSK2;
-+		irq_num = 8;
-+		irq_start = S3C2416_IRQ(0);
-+		irq_offset = 0;
-+		break;
-+	case 0:
-+		pr_err("irq: couldn't translate address\n");
-+		ret = -EINVAL;
-+		goto err_addr;
-+	default:
-+		pr_err("irq: unsupported controller address\n");
-+		ret = -EINVAL;
-+		goto err_addr;
-+	}
++#include <plat/cpu.h>
++#include <plat/pm.h>
++#include <plat/regs-serial.h>
 +
-+	irq_data = kzalloc(sizeof(struct s3c_irq_data) * 32, GFP_KERNEL);
-+	if (!irq_data) {
-+		ret = -ENOMEM;
-+		goto err_addr;
-+	}
++#include "common.h"
 +
-+	cnt = 0;
-+	intc_prop = of_find_property(np, "s3c24xx,irqlist", NULL);
-+	if (!intc_prop) {
-+		pr_err("irq: irqlist not found\n");
-+		ret = -EINVAL;
-+		goto err_data;
-+	}
-+
-+	/* build the irq_data list */
-+	p = NULL;
-+	for (i = 0; i < 32; i++) {
-+		p = of_prop_next_u32(intc_prop, p, &val);
-+
-+		/* when we hit the first non-valid element, assume it's
-+		 * the end of the list. The rest of the fields are
-+		 * already of type S3C_IRQTYPE_NONE (value 0)
-+		 */
-+		if (!p)
-+			break;
-+
-+		irq_data[i].type = val;
-+
-+		p = of_prop_next_u32(intc_prop, p, &val);
-+		if (!p) {
-+			pr_warn("irq: uneven number of elements in irqlist, last value will be dropped\n");
-+			irq_data[i].type = 0;
-+			break;
-+		}
-+
-+		irq_data[i].parent_irq = val;
-+
-+		pr_debug("irq: found hwirq %d with type %d and parent %lu\n",
-+			 i, irq_data[i].type, irq_data[i].parent_irq);
-+		cnt++;
-+	}
-+
-+	/* if we haven't found any irq definition@all,
-+	 * something is very wrong.
-+	 */
-+	if (!cnt) {
-+		pr_err("irq: empty irq definition\n");
-+		ret = -EINVAL;
-+		goto err_data;
-+	}
-+
-+	intc->irqs = irq_data;
-+
-+	/* put the intc into the dt as property, so we can access it from
-+	 * as the interrupt_parent later
-+	 */
-+
-+	intc_prop = kzalloc(sizeof(struct property), GFP_KERNEL);
-+	if (!intc_prop) {
-+		ret = -ENOMEM;
-+		goto err_data;
-+	}
-+
-+	intc_prop->name = kstrdup("s3c-irq-intc", GFP_KERNEL);
-+	intc_prop->value = intc;
-+	intc_prop->length = sizeof(struct s3c_irq_intc);
-+
-+	ret = prom_add_property(np, intc_prop);
-+	if (ret) {
-+		pr_err("irq: failed to add dt property\n");
-+		goto err_prop;
-+	}
-+
-+	/* set the parent relationship */
-+	if (interrupt_parent) {
-+		parent = (struct s3c_irq_intc *)of_get_property(
-+				      interrupt_parent, "s3c-irq-intc", NULL);
-+		if (!parent) {
-+			pr_err("irq: no parent for non-root controller found\n");
-+			goto err_domain;
-+		}
-+
-+		intc->parent = parent;
-+	}
-+
-+	/* now that all the data is complete, init the irq-domain */
-+	s3c24xx_clear_intc(intc);
-+	intc->domain = irq_domain_add_legacy(np, irq_num, irq_start,
-+					     irq_offset, &s3c24xx_irq_ops,
-+					     intc);
-+	if (!intc->domain) {
-+		pr_err("irq: could not create irq-domain\n");
-+		ret = -EINVAL;
-+		goto err_domain;
-+	}
-+
-+	return 0;
-+
-+err_domain:
-+	prom_remove_property(np, intc_prop);
-+err_prop:
-+	kfree(intc_prop);
-+err_data:
-+	kfree(irq_data);
-+err_addr:
-+	kfree(intc);
-+
-+	return ret;
-+}
-+
-+static const struct of_device_id s3c24xx_irq_match[] __initconst = {
-+	{ .compatible = "samsung,s3c24xx-irq", .data = s3c24xx_init_intc_of, },
-+	{ /* sentinel */ }
++/*
++ * The following lookup table is used to override device names when devices
++ * are registered from device tree. This is temporarily added to enable
++ * device tree support addition for the S3C2416 architecture.
++ *
++ * For drivers that require platform data to be provided from the machine
++ * file, a platform data pointer can also be supplied along with the
++ * devices names. Usually, the platform data elements that cannot be parsed
++ * from the device tree by the drivers (example: function pointers) are
++ * supplied. But it should be noted that this is a temporary mechanism and
++ * at some point, the drivers should be capable of parsing all the platform
++ * data from the device tree.
++ */
++static const struct of_dev_auxdata s3c2416_auxdata_lookup[] __initconst = {
++	OF_DEV_AUXDATA("samsung,s3c2440-uart", S3C2410_PA_UART0,
++				"s3c2440-uart.0", NULL),
++	OF_DEV_AUXDATA("samsung,s3c2440-uart", S3C2410_PA_UART1,
++				"s3c2440-uart.1", NULL),
++	OF_DEV_AUXDATA("samsung,s3c2440-uart", S3C2410_PA_UART2,
++				"s3c2440-uart.2", NULL),
++	OF_DEV_AUXDATA("samsung,s3c2440-uart", S3C2443_PA_UART3,
++				"s3c2440-uart.3", NULL),
++	OF_DEV_AUXDATA("samsung,s3c6410-sdhci", S3C_PA_HSMMC0,
++				"s3c-sdhci.0", NULL),
++	OF_DEV_AUXDATA("samsung,s3c6410-sdhci", S3C_PA_HSMMC1,
++				"s3c-sdhci.1", NULL),
++	OF_DEV_AUXDATA("samsung,s3c2440-i2c", S3C_PA_IIC,
++				"s3c2440-i2c.0", NULL),
++	{},
 +};
 +
-+void __init s3c24xx_init_irq_of(void)
++static void __init s3c2416_dt_map_io(void)
 +{
-+	of_irq_init(s3c24xx_irq_match);
++	s3c24xx_init_io(NULL, 0);
++	s3c24xx_init_clocks(12000000);
 +}
-+#endif
++
++static void __init s3c2416_dt_machine_init(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table,
++				s3c2416_auxdata_lookup, NULL);
++
++	s3c_pm_init();
++}
++
++static char const *s3c2416_dt_compat[] __initdata = {
++	"samsung,s3c2416",
++	"samsung,s3c2450",
++	NULL
++};
++
++DT_MACHINE_START(S3C2416_DT, "Samsung S3C2416 (Flattened Device Tree)")
++	/* Maintainer: Heiko Stuebner <heiko@sntech.de> */
++	.init_irq	= s3c24xx_init_irq_of,
++	.map_io		= s3c2416_dt_map_io,
++	.init_machine	= s3c2416_dt_machine_init,
++	.timer		= &s3c24xx_timer,
++	.dt_compat	= s3c2416_dt_compat,
++	.restart	= s3c2416_restart,
++MACHINE_END
 -- 
 1.7.2.3
