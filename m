@@ -1,68 +1,95 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Sun, 25 Nov 2012 16:09:31 +0800
-Subject: [PATCH v3 6/7] usb: chipidea: usbmisc: add mx53 support
-In-Reply-To: <50AF49A5.6030708@pengutronix.de>
-References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
- <1353506793-8354-7-git-send-email-m.grzeschik@pengutronix.de>
- <20121123065340.GD22420@nchen-desktop>
- <50AF49A5.6030708@pengutronix.de>
-Message-ID: <20121125080931.GB16062@nchen-desktop>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Sun, 25 Nov 2012 00:32:29 -0800
+Subject: [PATCH 1/2] input: gpio-keys: Disable hardware on suspend
+In-Reply-To: <1353590617-11466-1-git-send-email-lee.jones@linaro.org>
+References: <1353590617-11466-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20121125083229.GB21091@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2012 at 11:02:13AM +0100, Marc Kleine-Budde wrote:
-> On 11/23/2012 07:53 AM, Peter Chen wrote:
-> > On Wed, Nov 21, 2012 at 03:06:32PM +0100, Michael Grzeschik wrote:
-> >> This adds mx53 as the next user of the usbmisc driver and makes it
-> >> possible to disable the overcurrent-detection of the internal phy.
-> >>
-> >> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> >> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> >> ---
-> >> Changes since v2:
-> >> * added defines for register offsets and bitmasks
-> >> * fixed disable_oc option for all ports
-> >>
-> >>  drivers/usb/chipidea/usbmisc_imx.c |   51 ++++++++++++++++++++++++++++++++++++
-> >>  1 file changed, 51 insertions(+)
-> >>
-> >> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-> >> index e090e0f..b1811df 100644
-> >> --- a/drivers/usb/chipidea/usbmisc_imx.c
-> >> +++ b/drivers/usb/chipidea/usbmisc_imx.c
-> >> @@ -19,6 +19,13 @@
-> >>  
-> >>  #define USB_DEV_MAX 4
-> >>  
-> >> +#define MX53_USB_OTG_PHY_CTRL_0_OFFSET	0x08;
-> >> +#define MX53_USB_UH2_CTRL_OFFSET	0x14;
-> >> +#define MX53_USB_UH3_CTRL_OFFSET	0x18;
-> >> +#define MX53_BM_OVER_CUR_DIS_H1		BIT(5)
-> >> +#define MX53_BM_OVER_CUR_DIS_OTG	BIT(8)
-> >> +#define MX53_BM_OVER_CUR_DIS_UHx	BIT(30)
-> >> +
-> >>  #define MX6_BM_OVER_CUR_DIS		BIT(7)
-> > 
-> > As every SoC platform's non-core register mapping is different,
-> > it is better to use .h to put register bit definition
+On Thu, Nov 22, 2012 at 01:23:36PM +0000, Lee Jones wrote:
+> From: Jonas Aaberg <jonas.aberg@stericsson.com>
 > 
-> AFAIK in the kernel we don't make extra .h files any more, if there is
-> only a single user of the contents.
-OK, if it is the current rule for kernel, then just keep it.
-My original mind was there will be more and more bit definition
-in future, and move it to .h to make the code clean and short.
-> 
-> Marc
-> -- 
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-> 
+> Disable hardware if active when suspending if the hw can not
+> wake the system from suspend.
 
+How about below instead (needs the other patch I have just sent out)?
 
+Thanks.
 
 -- 
+Dmitry
 
-Best Regards,
-Peter Chen
+Input: gpio-keys - disable hardware on suspend
+
+From: Jonas Aaberg <jonas.aberg@stericsson.com>
+
+Disable hardware if active when suspending if the hw can not
+wake the system from suspend.
+
+Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
+Signed-off-by: Philippe Langlais <philippe.langlais@linaro.org>
+Reviewed-by: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+---
+ drivers/input/keyboard/gpio_keys.c |   27 ++++++++++++++++++++++-----
+ 1 file changed, 22 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/input/keyboard/gpio_keys.c b/drivers/input/keyboard/gpio_keys.c
+index c7764ca..79435de 100644
+--- a/drivers/input/keyboard/gpio_keys.c
++++ b/drivers/input/keyboard/gpio_keys.c
+@@ -803,6 +803,7 @@ static int gpio_keys_remove(struct platform_device *pdev)
+ static int gpio_keys_suspend(struct device *dev)
+ {
+ 	struct gpio_keys_drvdata *ddata = dev_get_drvdata(dev);
++	struct input_dev *input = ddata->input;
+ 	int i;
+ 
+ 	if (device_may_wakeup(dev)) {
+@@ -811,6 +812,11 @@ static int gpio_keys_suspend(struct device *dev)
+ 			if (bdata->button->wakeup)
+ 				enable_irq_wake(bdata->irq);
+ 		}
++	} else {
++		mutex_lock(&input->mutex);
++		if (input->users)
++			gpio_keys_close(input);
++		mutex_unlock(&input->mutex);
+ 	}
+ 
+ 	return 0;
+@@ -819,16 +825,27 @@ static int gpio_keys_suspend(struct device *dev)
+ static int gpio_keys_resume(struct device *dev)
+ {
+ 	struct gpio_keys_drvdata *ddata = dev_get_drvdata(dev);
++	struct input_dev *input = ddata->input;
++	int error = 0;
+ 	int i;
+ 
+-	for (i = 0; i < ddata->pdata->nbuttons; i++) {
+-		struct gpio_button_data *bdata = &ddata->data[i];
+-		if (bdata->button->wakeup && device_may_wakeup(dev))
+-			disable_irq_wake(bdata->irq);
++	if (device_may_wakeup(dev)) {
++		for (i = 0; i < ddata->pdata->nbuttons; i++) {
++			struct gpio_button_data *bdata = &ddata->data[i];
++			if (bdata->button->wakeup)
++				disable_irq_wake(bdata->irq);
++		}
++	} else {
++		mutex_lock(&input->mutex);
++		if (input->users)
++			error = gpio_keys_open(input);
++		mutex_unlock(&input->mutex);
+ 	}
+ 
+-	gpio_keys_report_state(ddata);
++	if (error)
++		return error;
+ 
++	gpio_keys_report_state(ddata);
+ 	return 0;
+ }
+ #endif
