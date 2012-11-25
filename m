@@ -1,95 +1,60 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 25 Nov 2012 00:32:29 -0800
-Subject: [PATCH 1/2] input: gpio-keys: Disable hardware on suspend
-In-Reply-To: <1353590617-11466-1-git-send-email-lee.jones@linaro.org>
-References: <1353590617-11466-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20121125083229.GB21091@core.coreip.homeip.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Sun, 25 Nov 2012 17:18:35 +0800
+Subject: [PATCH v3 5/7] usb: chipidea: usbmisc: add support for ahb,
+ ipg and per clock
+In-Reply-To: <20121123162051.GA31008@pengutronix.de>
+References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1353506793-8354-6-git-send-email-m.grzeschik@pengutronix.de>
+ <20121123065115.GC22420@nchen-desktop>
+ <20121123162051.GA31008@pengutronix.de>
+Message-ID: <20121125091834.GA16661@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 01:23:36PM +0000, Lee Jones wrote:
-> From: Jonas Aaberg <jonas.aberg@stericsson.com>
+On Fri, Nov 23, 2012 at 05:20:51PM +0100, Michael Grzeschik wrote:
+> > usbphy: used to transfer data
+> > (like your per)
 > 
-> Disable hardware if active when suspending if the hw can not
-> wake the system from suspend.
+> The "per" clk is a different clk than the usbphy. We have an usbphy clk
+> aswell on the mx5x. As discussed before [1], we need a solution to enable
+> the usbphy clk. The current approach is to let the nop-xceiver enable
+> this.
+> 
+> [1] http://www.spinics.net/lists/linux-usb/msg74489.html
+It does not matter which the name is, this clock is related to usb 480M or 
+its source. We use nop-xceiver is just to create struct usb_otg
+and usb_phy. Clock information can be at imx specific file like
+cil13xxx_imx.
 
-How about below instead (needs the other patch I have just sent out)?
+> 
+> > mx6q:
+> > - usboh3(Index 162 at DT), used to access register
+> > - usbphy(Index 182 for otg port at DT), at phy controller
+> 
+> > So, we may consider a way to consolidate both mx6q (mx28) and mxc (mx5x, mx3x)
+> > platforms.
+> 
+> Yes, we will discuss a real clktree solution in the usbmisc driver for
+> the different cores. The first thoughts are, that the clk configuration
+> has completely to be done inside the usbmisc driver. For this, the
+> usbmisc needs to become a hard dependency for the ci13xxx_imx glue code.
 
-Thanks.
+For my mind, imx usb clock handling is better only at place, that is
+cil13xxx_imx. We can have imx_clk_enable and imx_clk_disable in it,
+and handling clk in imx_clk_enable using id_table or what else platform
+specific.
+> 
+> Regards,
+> Michael
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
 
 -- 
-Dmitry
 
-Input: gpio-keys - disable hardware on suspend
-
-From: Jonas Aaberg <jonas.aberg@stericsson.com>
-
-Disable hardware if active when suspending if the hw can not
-wake the system from suspend.
-
-Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
-Signed-off-by: Philippe Langlais <philippe.langlais@linaro.org>
-Reviewed-by: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
----
- drivers/input/keyboard/gpio_keys.c |   27 ++++++++++++++++++++++-----
- 1 file changed, 22 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/input/keyboard/gpio_keys.c b/drivers/input/keyboard/gpio_keys.c
-index c7764ca..79435de 100644
---- a/drivers/input/keyboard/gpio_keys.c
-+++ b/drivers/input/keyboard/gpio_keys.c
-@@ -803,6 +803,7 @@ static int gpio_keys_remove(struct platform_device *pdev)
- static int gpio_keys_suspend(struct device *dev)
- {
- 	struct gpio_keys_drvdata *ddata = dev_get_drvdata(dev);
-+	struct input_dev *input = ddata->input;
- 	int i;
- 
- 	if (device_may_wakeup(dev)) {
-@@ -811,6 +812,11 @@ static int gpio_keys_suspend(struct device *dev)
- 			if (bdata->button->wakeup)
- 				enable_irq_wake(bdata->irq);
- 		}
-+	} else {
-+		mutex_lock(&input->mutex);
-+		if (input->users)
-+			gpio_keys_close(input);
-+		mutex_unlock(&input->mutex);
- 	}
- 
- 	return 0;
-@@ -819,16 +825,27 @@ static int gpio_keys_suspend(struct device *dev)
- static int gpio_keys_resume(struct device *dev)
- {
- 	struct gpio_keys_drvdata *ddata = dev_get_drvdata(dev);
-+	struct input_dev *input = ddata->input;
-+	int error = 0;
- 	int i;
- 
--	for (i = 0; i < ddata->pdata->nbuttons; i++) {
--		struct gpio_button_data *bdata = &ddata->data[i];
--		if (bdata->button->wakeup && device_may_wakeup(dev))
--			disable_irq_wake(bdata->irq);
-+	if (device_may_wakeup(dev)) {
-+		for (i = 0; i < ddata->pdata->nbuttons; i++) {
-+			struct gpio_button_data *bdata = &ddata->data[i];
-+			if (bdata->button->wakeup)
-+				disable_irq_wake(bdata->irq);
-+		}
-+	} else {
-+		mutex_lock(&input->mutex);
-+		if (input->users)
-+			error = gpio_keys_open(input);
-+		mutex_unlock(&input->mutex);
- 	}
- 
--	gpio_keys_report_state(ddata);
-+	if (error)
-+		return error;
- 
-+	gpio_keys_report_state(ddata);
- 	return 0;
- }
- #endif
+Best Regards,
+Peter Chen
