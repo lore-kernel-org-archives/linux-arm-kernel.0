@@ -1,53 +1,49 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sun, 25 Nov 2012 00:32:46 +0100
-Subject: [PATCH] cpuidle: add Calxeda SOC idle support
-In-Reply-To: <CAOesGMgUsmjZCpMN8WpYk2LpYpfxp-wyCwajw4TikgU8ve2g0A@mail.gmail.com>
-References: <1352330622-13616-1-git-send-email-robherring2@gmail.com>
- <2676657.zDjyfqIDdm@vostro.rjw.lan>
- <CAOesGMgUsmjZCpMN8WpYk2LpYpfxp-wyCwajw4TikgU8ve2g0A@mail.gmail.com>
-Message-ID: <2198449.YMGY5GKIXr@vostro.rjw.lan>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Sun, 25 Nov 2012 01:45:20 +0100
+Subject: [RFC 0/2] ARM: S3C24XX: Add devicetree support
+Message-ID: <201211250145.21226.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, November 24, 2012 03:21:49 PM Olof Johansson wrote:
-> Rafael,
-> 
-> On Sat, Nov 24, 2012 at 2:03 AM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> > On Monday, November 12, 2012 10:00:07 PM Arnd Bergmann wrote:
-> >> On Wednesday 07 November 2012, Rob Herring wrote:
-> >> > From: Rob Herring <rob.herring@calxeda.com>
-> >> >
-> >> > Add support for core powergating on Calxeda platforms. Initially, this
-> >> > supports ECX-1000 (highbank), but support will be added for ECX-2000
-> >> > later.
-> >> >
-> >> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> >> > Cc: Len Brown <len.brown@intel.com>
-> >> > Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
-> >>
-> >> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> >>
-> >> > It's not really clear where we want ARM cpuidle drivers. We're moving
-> >> > everything else out of arch/arm, and my understanding is Len doesn't want
-> >> > them in drivers/idle. It seems kind of silly to me to have the framework
-> >> > and drivers in 2 places. I've put this in drivers/cpuidle, but it doesn't
-> >> > make any difference to me.
-> >>
-> >> Fine with me. I just don't want in in arch/arm because I'm guessing this will
-> >> be shared with arm64, which in turn shares idle (and other) drivers with various
-> >> powerpc, mips and x86 socs.
-> >
-> > Applied to linux-pm.git/linux-next as v3.8 material.
-> 
-> We already have it in arm-soc. Since there's no maintainer listed for
-> the directory, it didn't seem like there were any better merge paths.
+This series builts on my not-yet-accepted irq rework and provides the
+last bits to use devicetree on s3c2416 boards. It also requires the
+patch "serial: samsung: add devicetree properties for non-Exynos SoCs"
+which adds the missing device names to the mapping table.
 
-Cool, I'll drop it then.
+Thanks to the work of other developers all the drivers used already
+support dt, so only the interrupt controllers and board support was
+missing.
 
-Thanks,
-Rafael
+This of course easily expandable to the other s3c24xx SoCs in the
+future.
 
+So, while the underlying irq rework might still need changes, I'd really
+like to get feedback, especially on the irq controller bindings.
+
+The whole thing boots and runs sucessfully on my s3c2416 based board,
+which shares most caracteristics and all the used gpio with the smdk2416.
+
+
+Heiko Stuebner (2):
+  ARM: S3C24XX: add devicetree support for interrupts
+  ARM: S3C24XX: Add devicetree support and dt-board file for s3c2416 SoCs
+
+ .../interrupt-controller/samsung,s3c24xx-irq.txt   |   57 ++++++
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/s3c2416-smdk2416.dts             |   79 ++++++++
+ arch/arm/boot/dts/s3c2416.dtsi                     |  193 +++++++++++++++++++
+ arch/arm/boot/dts/s3c24xx.dtsi                     |  158 ++++++++++++++++
+ arch/arm/mach-s3c24xx/Kconfig                      |    9 +
+ arch/arm/mach-s3c24xx/Makefile                     |    1 +
+ arch/arm/mach-s3c24xx/common.h                     |    1 +
+ arch/arm/mach-s3c24xx/mach-s3c2416-dt.c            |   91 +++++++++
+ arch/arm/plat-s3c24xx/irq.c                        |  197 ++++++++++++++++++++
+ 10 files changed, 787 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-irq.txt
+ create mode 100644 arch/arm/boot/dts/s3c2416-smdk2416.dts
+ create mode 100644 arch/arm/boot/dts/s3c2416.dtsi
+ create mode 100644 arch/arm/boot/dts/s3c24xx.dtsi
+ create mode 100644 arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.7.2.3
