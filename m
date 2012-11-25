@@ -1,31 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 25 Nov 2012 14:07:01 +0000
-Subject: OMAP build now completely broken in latest arm-soc
-In-Reply-To: <CAOesGMgvGxfghFbyki7aXE8dVbAA7QQP6nwBKhzHftngGRi0Tw@mail.gmail.com>
-References: <20121125093704.GV3332@n2100.arm.linux.org.uk>
- <CAOesGMgvGxfghFbyki7aXE8dVbAA7QQP6nwBKhzHftngGRi0Tw@mail.gmail.com>
-Message-ID: <20121125140701.GW3332@n2100.arm.linux.org.uk>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sun, 25 Nov 2012 18:53:40 +0400
+Subject: [PATCH] ARM: Fix Kconfig symbols typo for LEDS
+Message-ID: <1353855220-5238-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 25, 2012 at 05:56:58AM -0800, Olof Johansson wrote:
-> Hi,
-> 
-> On Sun, Nov 25, 2012 at 1:37 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Not much more to say...
-> >
-> > arch/arm/plat-omap/i2c.c:35:1: error: expected identifier or '(' before '<<' token
-> 
-> Hmm. In for-next, line 35 is a blank line.
-> 
-> Could this be because of a merge conflict in your local version? This
-> is one of the files that has conflicts with mainline right now; I'll
-> look to see if we can resolve those in our tree later today.
+Correct option should be LEDS_TRIGGERS, not LEDS_TRIGGER.
 
-Hmm, it looks like a merge conflict which didn't get fixed up... and
-looking at it, it's beyond what I'd call trivial to fix.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-s3c24xx/Kconfig   |    2 +-
+ arch/arm/plat-versatile/Kconfig |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-So I'll shut down the build system until that can be resolved properly;
-as OMAP is effectively unbuildable there's not much point it running the
-builds.
+diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+index c0ef6b0..afd55c7 100644
+--- a/arch/arm/mach-s3c24xx/Kconfig
++++ b/arch/arm/mach-s3c24xx/Kconfig
+@@ -400,7 +400,7 @@ config MACH_MINI2440
+ 	bool "MINI2440 development board"
+ 	select EEPROM_AT24
+ 	select LEDS_CLASS
+-	select LEDS_TRIGGER
++	select LEDS_TRIGGERS
+ 	select LEDS_TRIGGER_BACKLIGHT
+ 	select NEW_LEDS
+ 	select S3C_DEV_NAND
+diff --git a/arch/arm/plat-versatile/Kconfig b/arch/arm/plat-versatile/Kconfig
+index 619f0fa..2c4332b 100644
+--- a/arch/arm/plat-versatile/Kconfig
++++ b/arch/arm/plat-versatile/Kconfig
+@@ -10,7 +10,7 @@ config PLAT_VERSATILE_LEDS
+ 	def_bool y if NEW_LEDS
+ 	depends on ARCH_REALVIEW || ARCH_VERSATILE
+ 	select LEDS_CLASS
+-	select LEDS_TRIGGER
++	select LEDS_TRIGGERS
+ 
+ config PLAT_VERSATILE_SCHED_CLOCK
+ 	def_bool y
+-- 
+1.7.8.6
