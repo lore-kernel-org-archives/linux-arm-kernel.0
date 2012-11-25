@@ -1,43 +1,32 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun, 25 Nov 2012 18:53:40 +0400
-Subject: [PATCH] ARM: Fix Kconfig symbols typo for LEDS
-Message-ID: <1353855220-5238-1-git-send-email-shc_work@mail.ru>
+Date: Sun, 25 Nov 2012 19:10:15 +0400
+Subject: [PATCH] ARM64: Remove incorrect Kconfig symbol HAVE_SPARSE_IRQ
+Message-ID: <1353856215-5371-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct option should be LEDS_TRIGGERS, not LEDS_TRIGGER.
+Kernel does not contain symbol HAVE_SPARSE_IRQ. Definition
+in arch/arm64/Kconfig seems typo because valid symbol is
+MAY_HAVE_SPARSE_IRQ.
+In any case SPARSE_IRQ is selected by default and we just
+remove selecting of this symbol.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-s3c24xx/Kconfig   |    2 +-
- arch/arm/plat-versatile/Kconfig |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/Kconfig |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index c0ef6b0..afd55c7 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -400,7 +400,7 @@ config MACH_MINI2440
- 	bool "MINI2440 development board"
- 	select EEPROM_AT24
- 	select LEDS_CLASS
--	select LEDS_TRIGGER
-+	select LEDS_TRIGGERS
- 	select LEDS_TRIGGER_BACKLIGHT
- 	select NEW_LEDS
- 	select S3C_DEV_NAND
-diff --git a/arch/arm/plat-versatile/Kconfig b/arch/arm/plat-versatile/Kconfig
-index 619f0fa..2c4332b 100644
---- a/arch/arm/plat-versatile/Kconfig
-+++ b/arch/arm/plat-versatile/Kconfig
-@@ -10,7 +10,7 @@ config PLAT_VERSATILE_LEDS
- 	def_bool y if NEW_LEDS
- 	depends on ARCH_REALVIEW || ARCH_VERSATILE
- 	select LEDS_CLASS
--	select LEDS_TRIGGER
-+	select LEDS_TRIGGERS
- 
- config PLAT_VERSATILE_SCHED_CLOCK
- 	def_bool y
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 20b688c..c0e93ac 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -23,7 +23,6 @@ config ARM64
+ 	select HAVE_IRQ_WORK
+ 	select HAVE_MEMBLOCK
+ 	select HAVE_PERF_EVENTS
+-	select HAVE_SPARSE_IRQ
+ 	select IRQ_DOMAIN
+ 	select MODULES_USE_ELF_RELA
+ 	select NO_BOOTMEM
 -- 
 1.7.8.6
