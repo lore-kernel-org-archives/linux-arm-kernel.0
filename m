@@ -1,49 +1,69 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Sun, 25 Nov 2012 01:45:20 +0100
-Subject: [RFC 0/2] ARM: S3C24XX: Add devicetree support
-Message-ID: <201211250145.21226.heiko@sntech.de>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Sun, 25 Nov 2012 16:05:33 +0800
+Subject: [PATCH v3 6/7] usb: chipidea: usbmisc: add mx53 support
+In-Reply-To: <20121123073939.GK10369@pengutronix.de>
+References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1353506793-8354-7-git-send-email-m.grzeschik@pengutronix.de>
+ <20121123065340.GD22420@nchen-desktop>
+ <20121123073939.GK10369@pengutronix.de>
+Message-ID: <20121125080532.GA16062@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series builts on my not-yet-accepted irq rework and provides the
-last bits to use devicetree on s3c2416 boards. It also requires the
-patch "serial: samsung: add devicetree properties for non-Exynos SoCs"
-which adds the missing device names to the mapping table.
+On Fri, Nov 23, 2012 at 08:39:39AM +0100, Sascha Hauer wrote:
+> On Fri, Nov 23, 2012 at 02:53:41PM +0800, Peter Chen wrote:
+> > On Wed, Nov 21, 2012 at 03:06:32PM +0100, Michael Grzeschik wrote:
+> > > This adds mx53 as the next user of the usbmisc driver and makes it
+> > > possible to disable the overcurrent-detection of the internal phy.
+> > > 
+> > > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> > > Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> > > ---
+> > > Changes since v2:
+> > > * added defines for register offsets and bitmasks
+> > > * fixed disable_oc option for all ports
+> > > 
+> > >  drivers/usb/chipidea/usbmisc_imx.c |   51 ++++++++++++++++++++++++++++++++++++
+> > >  1 file changed, 51 insertions(+)
+> > > 
+> > > diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+> > > index e090e0f..b1811df 100644
+> > > --- a/drivers/usb/chipidea/usbmisc_imx.c
+> > > +++ b/drivers/usb/chipidea/usbmisc_imx.c
+> > > @@ -19,6 +19,13 @@
+> > >  
+> > >  #define USB_DEV_MAX 4
+> > >  
+> > > +#define MX53_USB_OTG_PHY_CTRL_0_OFFSET	0x08;
+> > > +#define MX53_USB_UH2_CTRL_OFFSET	0x14;
+> > > +#define MX53_USB_UH3_CTRL_OFFSET	0x18;
+> > > +#define MX53_BM_OVER_CUR_DIS_H1		BIT(5)
+> > > +#define MX53_BM_OVER_CUR_DIS_OTG	BIT(8)
+> > > +#define MX53_BM_OVER_CUR_DIS_UHx	BIT(30)
+> > > +
+> > >  #define MX6_BM_OVER_CUR_DIS		BIT(7)
+> > 
+> > As every SoC platform's non-core register mapping is different,
+> > it is better to use .h to put register bit definition
+> 
+> What do the different register mapping have to do with putting the
+> definitions in .h files or not?
 
-Thanks to the work of other developers all the drivers used already
-support dt, so only the interrupt controllers and board support was
-missing.
-
-This of course easily expandable to the other s3c24xx SoCs in the
-future.
-
-So, while the underlying irq rework might still need changes, I'd really
-like to get feedback, especially on the irq controller bindings.
-
-The whole thing boots and runs sucessfully on my s3c2416 based board,
-which shares most caracteristics and all the used gpio with the smdk2416.
-
-
-Heiko Stuebner (2):
-  ARM: S3C24XX: add devicetree support for interrupts
-  ARM: S3C24XX: Add devicetree support and dt-board file for s3c2416 SoCs
-
- .../interrupt-controller/samsung,s3c24xx-irq.txt   |   57 ++++++
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/s3c2416-smdk2416.dts             |   79 ++++++++
- arch/arm/boot/dts/s3c2416.dtsi                     |  193 +++++++++++++++++++
- arch/arm/boot/dts/s3c24xx.dtsi                     |  158 ++++++++++++++++
- arch/arm/mach-s3c24xx/Kconfig                      |    9 +
- arch/arm/mach-s3c24xx/Makefile                     |    1 +
- arch/arm/mach-s3c24xx/common.h                     |    1 +
- arch/arm/mach-s3c24xx/mach-s3c2416-dt.c            |   91 +++++++++
- arch/arm/plat-s3c24xx/irq.c                        |  197 ++++++++++++++++++++
- 10 files changed, 787 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-irq.txt
- create mode 100644 arch/arm/boot/dts/s3c2416-smdk2416.dts
- create mode 100644 arch/arm/boot/dts/s3c2416.dtsi
- create mode 100644 arch/arm/boot/dts/s3c24xx.dtsi
- create mode 100644 arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+No difference, just keep the .c clean and short, as every soc has its
+non-core register mapping, so it may occupy several ten lines if
+you write down every offset and bit for single SoC, the bit definition 
+will grow longer and longer when more SoCs and more function are added.
+> 
+> Sascha
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
 
 -- 
-1.7.2.3
+
+Best Regards,
+Peter Chen
