@@ -1,37 +1,74 @@
-From: tremyfr@yahoo.fr (Philippe Reynes)
-Date: Sun, 25 Nov 2012 21:17:05 +0100
-Subject: [PATCH 4/4] apf27: add rtc ds1374 to the device tree
-In-Reply-To: <1353874625-14754-1-git-send-email-tremyfr@yahoo.fr>
-References: <1353874625-14754-1-git-send-email-tremyfr@yahoo.fr>
-Message-ID: <1353874625-14754-5-git-send-email-tremyfr@yahoo.fr>
+From: cjb@laptop.org (Chris Ball)
+Date: Sun, 25 Nov 2012 15:29:45 -0500
+Subject: [PATCH 3/3] MMC: sdhci-dove: allow GPIOs to be used for card
+ detection on Dove
+In-Reply-To: <20121123125507.GO5764@n2100.arm.linux.org.uk> (Russell King's
+ message of "Fri, 23 Nov 2012 12:55:07 +0000")
+References: <20121122235426.GT3332@n2100.arm.linux.org.uk>
+ <E1TbgcZ-0007Kt-35@rmk-PC.arm.linux.org.uk>
+ <20121123083117.GA25754@S2100-06.ap.freescale.net>
+ <20121123085726.GK5764@n2100.arm.linux.org.uk>
+ <20121123121422.GA26168@S2100-06.ap.freescale.net>
+ <20121123125507.GO5764@n2100.arm.linux.org.uk>
+Message-ID: <871ufh8lza.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Philippe Reynes <tremyfr@yahoo.fr>
----
- arch/arm/boot/dts/imx27-apf27.dts |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+Hi, adding Guennadi,
 
-diff --git a/arch/arm/boot/dts/imx27-apf27.dts b/arch/arm/boot/dts/imx27-apf27.dts
-index c0327c0..20b8ef2 100644
---- a/arch/arm/boot/dts/imx27-apf27.dts
-+++ b/arch/arm/boot/dts/imx27-apf27.dts
-@@ -42,6 +42,16 @@
- 			ethernet at 1002b000 {
- 				status = "okay";
- 			};
-+
-+			i2c1: i2c at 10012000 {
-+				clock-frequency = <400000>;
-+				status = "okay";
-+
-+				rtc at 68 {
-+					compatible = "dallas,ds1374";
-+					reg = <0x68>;
-+				};
-+			};
- 		};
- 
- 		nand at d8000000 {
+On Fri, Nov 23 2012, Russell King - ARM Linux wrote:
+> On Fri, Nov 23, 2012 at 08:14:27PM +0800, Shawn Guo wrote:
+>> On Fri, Nov 23, 2012 at 08:57:26AM +0000, Russell King - ARM Linux wrote:
+>> > Does this work with the sdhci stuff?
+>> 
+>> Honestly, I'm not sure, but I guess it does, since I have seen
+>> sdhci-pxav3 driver using the helpers.  Anyway, I'm going to adopt
+>> the helpers for sdhci-esdhc-imx driver to find it out.
+>
+> The thing that worries me is this:
+>
+> static void sdhci_tasklet_card(unsigned long param)
+> {
+> ...
+>         /* Check host->mrq first in case we are runtime suspended */
+>         if (host->mrq &&
+>             !(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT)) {
+>                 pr_err("%s: Card removed during transfer!\n",
+>                         mmc_hostname(host->mmc));
+>                 pr_err("%s: Resetting controller.\n",
+>                         mmc_hostname(host->mmc));
+>
+>                 sdhci_reset(host, SDHCI_RESET_CMD);
+>                 sdhci_reset(host, SDHCI_RESET_DATA);
+>
+>                 host->mrq->cmd->error = -ENOMEDIUM;
+>                 tasklet_schedule(&host->finish_tasklet);
+>         }
+> ...
+>         mmc_detect_change(host->mmc, msecs_to_jiffies(200));
+> }
+>
+>
+> That gets called whenever a card is inserted/removed by the SDHCI code (if
+> the SDHCI card detect is wired), or in my case by the interrupt routine
+> the code in my patch adds.
+>
+> The slot-gpio.c stuff directly calls into mmc_detect_change (a) with a
+> shorter delay, and (b) completely omits the above handling and resetting.
+> My guess from the above code is that it'll work fine 90% of the time
+> (because you'll remove the card without an active request), but the above
+> code looks like it's addressing a corner case which will be omitted with
+> the "generic" slot-gpio.c solution.
+>
+> So I don't think it's a good idea to use slot-gpio.c in this case.
+
+Guennadi, what are your thoughts about consolidating this reset logic
+between the sdhci tasklet and slot-gpio?  It would certainly be nice to
+use slot-gpio in cases like this one, so it's worth fixing.
+
+Thanks,
+
+- Chris.
 -- 
-1.7.4.4
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
