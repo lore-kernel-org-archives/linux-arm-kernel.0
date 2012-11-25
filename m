@@ -1,20 +1,35 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 25 Nov 2012 13:21:52 +0100
-Subject: [PATCH] ARM: pxa: pxa27x.c: add dummy SA1100 rtc clock
-In-Reply-To: <1353712328-15830-1-git-send-email-andrea.adami@gmail.com>
- (Andrea Adami's message of "Sat, 24 Nov 2012 00:12:08 +0100")
-References: <1353712328-15830-1-git-send-email-andrea.adami@gmail.com>
-Message-ID: <87ehjh3man.fsf@free.fr>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 25 Nov 2012 05:56:58 -0800
+Subject: OMAP build now completely broken in latest arm-soc
+In-Reply-To: <20121125093704.GV3332@n2100.arm.linux.org.uk>
+References: <20121125093704.GV3332@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMgvGxfghFbyki7aXE8dVbAA7QQP6nwBKhzHftngGRi0Tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrea Adami <andrea.adami@gmail.com> writes:
-> * Using pxa27x you could now build both RTC_DRV_PXA and RTC_DRV_SA1100.
-> * Make sure you don't use both together: link /dev/rtc0 or /dev/rtc1
-> * to /dev/rtc according to your requirement.
-Weird to have stars at the beginning of each line in the patch description.
-But anyway :
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Hi,
 
--- 
-Robert
+On Sun, Nov 25, 2012 at 1:37 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> Not much more to say...
+>
+> arch/arm/plat-omap/i2c.c:35:1: error: expected identifier or '(' before '<<' token
+
+Hmm. In for-next, line 35 is a blank line.
+
+Could this be because of a merge conflict in your local version? This
+is one of the files that has conflicts with mainline right now; I'll
+look to see if we can resolve those in our tree later today.
+
+
+> But also, the:
+>
+> arch/arm/mach-omap2/timer.c:163:28: warning: 'omap_counter_match' defined but not used
+>
+> warning is still there.
+
+There's a fix for this in Tony's tree, but he hasn't sent up the pull
+request for it yet.
+
+
+-Olof
