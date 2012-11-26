@@ -1,194 +1,64 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 26 Nov 2012 17:11:08 +0800
-Subject: [PATCH v3 7/7] usb: chipidea: imx: add internal vbus regulator control
-In-Reply-To: <1353921068-15673-1-git-send-email-peter.chen@freescale.com>
-References: <1353921068-15673-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1353921068-15673-8-git-send-email-peter.chen@freescale.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Mon, 26 Nov 2012 14:43:55 +0530
+Subject: [PATCH] i2c: omap: Remove the OMAP_I2C_FLAG_RESET_REGS_POSTIDLE flag
+Message-ID: <1353921235-22408-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- For host, the vbus should always be on.
-- For otg, the vbus is off defaultly, the vbus needs to be
-turned on/off when usb role switches.
+The OMAP_I2C_FLAG_RESET_REGS_POSTIDLE is not used anymore
+in the i2c driver. Remove the flag.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
-Changes for v3:
-- Add return value check for regulator_enable/regulator_disable
-- typo error
+Has dependency on the below patch
+http://git.pengutronix.de/?p=wsa/linux.git;a=commitdiff;h=554c96744afd169886bd6fc2736fb0d9aaf634e8
 
- drivers/usb/chipidea/ci.h          |    6 ++-
- drivers/usb/chipidea/ci13xxx_imx.c |   80 ++++++++++++++++++++++++++++--------
- 2 files changed, 66 insertions(+), 20 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    3 +--
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 +--
+ drivers/i2c/busses/i2c-omap.c              |    3 +--
+ 3 files changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index bc9e4e1..9528f6a 100644
---- a/drivers/usb/chipidea/ci.h
-+++ b/drivers/usb/chipidea/ci.h
-@@ -135,6 +135,7 @@ struct hw_bank {
-  * @hcd: pointer to usb_hcd for ehci host driver
-  * @otg: for otg support
-  * @events: events for otg, and handled at ci_role_work
-+ * @reg_vbus: used to control internal vbus regulator
-  */
- struct ci13xxx {
- 	struct device			*dev;
-@@ -171,10 +172,11 @@ struct ci13xxx {
- 	bool				global_phy;
- 	struct usb_phy			*transceiver;
- 	struct usb_hcd			*hcd;
--	struct usb_otg      otg;
-+	struct usb_otg			otg;
- #define CI_ID		0
- #define CI_B_SESS_VALID	1
--	unsigned long events;
-+	unsigned long			events;
-+	struct regulator		*reg_vbus;
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 943222c4..3dd9e69 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -791,8 +791,7 @@ static struct omap_hwmod omap3xxx_dss_venc_hwmod = {
+ /* I2C1 */
+ static struct omap_i2c_dev_attr i2c1_dev_attr = {
+ 	.fifo_depth	= 8, /* bytes */
+-	.flags		= OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
+-			  OMAP_I2C_FLAG_BUS_SHIFT_2,
++	.flags		= OMAP_I2C_FLAG_BUS_SHIFT_2,
  };
  
- static inline struct ci_role_driver *ci_role(struct ci13xxx *ci)
-diff --git a/drivers/usb/chipidea/ci13xxx_imx.c b/drivers/usb/chipidea/ci13xxx_imx.c
-index 86671a3..b50cfd7 100644
---- a/drivers/usb/chipidea/ci13xxx_imx.c
-+++ b/drivers/usb/chipidea/ci13xxx_imx.c
-@@ -88,14 +88,47 @@ EXPORT_SYMBOL_GPL(usbmisc_get_init_data);
- static struct ci13xxx_platform_data ci13xxx_imx_platdata __devinitdata  = {
- 	.name			= "ci13xxx_imx",
- 	.flags			= CI13XXX_REQUIRE_TRANSCEIVER |
--				  CI13XXX_DISABLE_STREAMING,
-+				  CI13XXX_DISABLE_STREAMING |
-+				  CI13XXX_REGS_SHARED,
- 	.capoffset		= DEF_CAPOFFSET,
+ static struct omap_hwmod omap3xxx_i2c1_hwmod = {
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 0b1249e..1afab5f 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -1527,8 +1527,7 @@ static struct omap_hwmod_class omap44xx_i2c_hwmod_class = {
  };
  
-+static int ci13xxx_otg_set_vbus(struct usb_otg *otg, bool enabled)
-+{
-+	struct ci13xxx	*ci = container_of(otg, struct ci13xxx, otg);
-+	struct regulator *reg_vbus = ci->reg_vbus;
-+	int ret;
-+
-+	WARN_ON(!reg_vbus);
-+
-+	if (reg_vbus) {
-+		if (enabled) {
-+			ret = regulator_enable(reg_vbus);
-+			if (ret) {
-+				dev_err(ci->dev,
-+				"Failed to enable vbus regulator, ret=%d\n",
-+				ret);
-+				return ret;
-+			}
-+		} else {
-+			ret = regulator_disable(reg_vbus);
-+			if (ret) {
-+				dev_err(ci->dev,
-+				"Failed to disable vbus regulator, ret=%d\n",
-+				ret);
-+				return ret;
-+			}
-+		}
-+	}
-+
-+	return 0;
-+}
-+
- static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
- {
- 	struct ci13xxx_imx_data *data;
- 	struct platform_device *plat_ci, *phy_pdev;
-+	struct ci13xxx	*ci;
- 	struct device_node *phy_np;
- 	struct resource *res;
- 	struct regulator *reg_vbus;
-@@ -152,20 +185,11 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
- 		}
- 	}
+ static struct omap_i2c_dev_attr i2c_dev_attr = {
+-	.flags	= OMAP_I2C_FLAG_BUS_SHIFT_NONE |
+-			OMAP_I2C_FLAG_RESET_REGS_POSTIDLE,
++	.flags	= OMAP_I2C_FLAG_BUS_SHIFT_NONE,
+ };
  
--	/* we only support host now, so enable vbus here */
- 	reg_vbus = devm_regulator_get(&pdev->dev, "vbus");
--	if (!IS_ERR(reg_vbus)) {
--		ret = regulator_enable(reg_vbus);
--		if (ret) {
--			dev_err(&pdev->dev,
--				"Failed to enable vbus regulator, err=%d\n",
--				ret);
--			goto put_np;
--		}
-+	if (!IS_ERR(reg_vbus))
- 		data->reg_vbus = reg_vbus;
--	} else {
-+	else
- 		reg_vbus = NULL;
--	}
+ /* i2c1 */
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 872444a..d3b853b 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1034,8 +1034,7 @@ static const struct i2c_algorithm omap_i2c_algo = {
+ #ifdef CONFIG_OF
+ static struct omap_i2c_bus_platform_data omap3_pdata = {
+ 	.rev = OMAP_I2C_IP_VERSION_1,
+-	.flags = OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
+-		 OMAP_I2C_FLAG_BUS_SHIFT_2,
++	.flags = OMAP_I2C_FLAG_BUS_SHIFT_2,
+ };
  
- 	ci13xxx_imx_platdata.phy = data->phy;
- 
-@@ -175,7 +199,7 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
- 		if (!pdev->dev.dma_mask) {
- 			ret = -ENOMEM;
- 			dev_err(&pdev->dev, "Failed to alloc dma_mask!\n");
--			goto err;
-+			goto put_np;
- 		}
- 		*pdev->dev.dma_mask = DMA_BIT_MASK(32);
- 		dma_set_coherent_mask(&pdev->dev, *pdev->dev.dma_mask);
-@@ -186,7 +210,7 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
- 		if (ret) {
- 			dev_err(&pdev->dev,
- 				"usbmisc init failed, ret=%d\n", ret);
--			goto err;
-+			goto put_np;
- 		}
- 	}
- 
-@@ -198,24 +222,44 @@ static int __devinit ci13xxx_imx_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev,
- 			"Can't register ci_hdrc platform device, err=%d\n",
- 			ret);
--		goto err;
-+		goto put_np;
- 	}
- 
- 	data->ci_pdev = plat_ci;
- 	platform_set_drvdata(pdev, data);
- 
-+	ci = platform_get_drvdata(plat_ci);
-+	/*
-+	 * Internal vbus on/off policy
-+	 * - Always on for host only function
-+	 * - Always off for gadget only function
-+	 * - call otg.set_vbus to control on/off according usb role
-+	 */
-+
-+	if (ci->roles[CI_ROLE_HOST] && !ci->roles[CI_ROLE_GADGET]
-+			&& reg_vbus) {
-+		ret = regulator_enable(reg_vbus);
-+		if (ret) {
-+			dev_err(&pdev->dev,
-+				"Failed to enable vbus regulator, ret=%d\n",
-+				ret);
-+			goto put_np;
-+		}
-+	} else if (ci->is_otg) {
-+		ci->otg.set_vbus = ci13xxx_otg_set_vbus;
-+		ci->reg_vbus = data->reg_vbus;
-+	}
-+
- 	pm_runtime_no_callbacks(&pdev->dev);
- 	pm_runtime_enable(&pdev->dev);
- 
- 	return 0;
- 
--err:
--	if (reg_vbus)
--		regulator_disable(reg_vbus);
- put_np:
- 	if (phy_np)
- 		of_node_put(phy_np);
- 	clk_disable_unprepare(data->clk);
-+
- 	return ret;
- }
- 
+ static struct omap_i2c_bus_platform_data omap4_pdata = {
 -- 
-1.7.0.4
+1.7.5.4
