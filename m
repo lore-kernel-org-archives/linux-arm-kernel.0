@@ -1,57 +1,33 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 26 Nov 2012 09:31:24 +0100
-Subject: [PATCH 1/1] ARM: OMAP2+: enable support for GPIO connected LEDs
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA7A476@DBDE01.ent.ti.com>
-References: <1353749642-30255-1-git-send-email-javier.martinez@collabora.co.uk>
- <331ABD5ECB02734CA317220B2BBEABC13EA7A476@DBDE01.ent.ti.com>
-Message-ID: <50B328DC.9060002@collabora.co.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 26 Nov 2012 00:32:32 -0800
+Subject: [GIT PULL 3/3] Samsung exynos5440 for v3.8
+In-Reply-To: <10d401cdc91b$09fe1980$1dfa4c80$%kim@samsung.com>
+References: <10d401cdc91b$09fe1980$1dfa4c80$%kim@samsung.com>
+Message-ID: <20121126083232.GH9580@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2012 06:45 AM, AnilKumar, Chimata wrote:
-> On Sat, Nov 24, 2012 at 15:04:02, Javier Martinez Canillas wrote:
->> Many OMAP boards use GPIO LEDs to notify status to the user
->> on boot. So, it is good to have by default support for GPIO
->> connected LEDs as well as some commonly used triggers.
->> 
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> ---
->>  arch/arm/configs/omap2plus_defconfig |    8 ++++++++
->>  1 files changed, 8 insertions(+), 0 deletions(-)
->> 
->> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
->> index 6333e96..7c6cbdf 100644
->> --- a/arch/arm/configs/omap2plus_defconfig
->> +++ b/arch/arm/configs/omap2plus_defconfig
->> @@ -193,6 +193,14 @@ CONFIG_MMC_UNSAFE_RESUME=y
->>  CONFIG_SDIO_UART=y
->>  CONFIG_MMC_OMAP=y
->>  CONFIG_MMC_OMAP_HS=y
->> +CONFIG_NEW_LEDS=y
->> +CONFIG_LEDS_CLASS=y
->> +CONFIG_LEDS_GPIO=y
->> +CONFIG_LEDS_TRIGGERS=y
->> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
->> +CONFIG_LEDS_TRIGGER_BACKLIGHT=y
->> +CONFIG_LEDS_TRIGGER_GPIO=y
->> +CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+On Fri, Nov 23, 2012 at 10:37:03AM +0900, Kukjin Kim wrote:
+> Arnd, Olof,
 > 
-> Hi Javier,
+> This is adding support for exynos5440, including Quad ARM Cortex-A15 cores
+> and its reference board SSDK5440.
 > 
-> Similar patch sent few days back
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/133760.html
+> Note, at this moment, just enabled minimal system part for initial kernel
+> boot and pinctrl driver.
 > 
-> Let me know do you have any comments
-> 
-> Thanks
-> AnilKumar
-> 
+> Please pull from:
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> next/soc-exynos5440
 
-Hi AnilKumar,
+Merged. This caused some new conflicts with previous samsung contents, since
+you add DT contents in several branches, etc. Please try to work on getting
+your amount of conflicts down a bit.
 
-I haven't seen your patch before sorry.
+If you want a good example to look at, see how Tony Lindgren handles OMAP.
+He's juggling a large number of topics with nearly no conflicts left
+for us to resolve at our level, by making sure new work is based on
+appropriate base branches.
 
-I've answered on your original patch thread.
 
-Thanks a lot and best regards,
-Javier
+-Olof
