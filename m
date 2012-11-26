@@ -1,64 +1,40 @@
-From: narkewoody@gmail.com (Woody Wu)
-Date: Mon, 26 Nov 2012 07:37:12 +0000 (UTC)
-Subject: The Ethernet driver doesn't get probed
-Message-ID: <slrnkb66vj.3sl.narkewoody@zuhnb712.local.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 25 Nov 2012 23:38:16 -0800
+Subject: [GIT PULL] i.MX SoC updates
+In-Reply-To: <20121122144832.GI10369@pengutronix.de>
+References: <20121122144832.GI10369@pengutronix.de>
+Message-ID: <20121126073816.GD9580@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, List
+On Thu, Nov 22, 2012 at 03:48:32PM +0100, Sascha Hauer wrote:
+> Another bunch of i.MX SoC updates, based on arm-soc/imx/soc. Please
+> pull.
+> 
+> Sascha
+> 
+> 
+> The following changes since commit d6aef84a48fa54ac606ae719fcd125199939f43d:
+> 
+>   ARM i.MX51 babbage: Add display support (2012-11-16 16:34:18 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-soc-1
+> 
+> for you to fetch changes up to 2b254693bef4f1299de0afb231890fe348df11c6:
+> 
+>   ARM i.MX6: remove gate_mask from pllv3 (2012-11-22 15:32:39 +0100)
+> 
+> ----------------------------------------------------------------
+> ARM i.MX SoC updates for v3.8
 
-I enabled an ax88796 Ethernet driver in the kernel configuration menu.
-Kernel version is 3.4.19. The arch is ARM and the system type is
-Samsung S3C2410.
+Pulled, thanks.
 
-In my debugging, I found the probe function of the driver did not get
-invoked.
+It's great to get signed tags, thanks! Getting a short one- or
+two-sentence summary of what's in the pull request would be extra
+bonus, at least on the ones what contain more than just a couple of
+patches. Nothing too time-consuming though.
 
-This driver is declared as platform_driver
 
-static struct platform_driver axdrv = {
-	.driver	= {
-		.name		= "ax88796",
-		.owner		= THIS_MODULE,
-	},
-	.probe		= ax_probe,
-	.remove		= ax_remove,
-	.suspend	= ax_suspend,
-	.resume		= ax_resume,
-};
-
-module_platform_driver(axdrv);
-
-So, its driver init function actually goes through
-platform_driver_register() and then driver_register(), which eventually
-call driver_attach() trying to attach the driver to the "platform" bus.
-But, on the platform bus, there is no any device that can match the
-ax88796 driver, hence the driver failed in attaching.
-
-I discovered the full list of devices found on the platform bus:
-
-    s3c2410-ohci,
-    s3c2410-lcd,
-    s3c2410-wdt,
-    s3c2410-i2c,
-    s3c24xx-iis,
-    s3c2410-nand,
-    s3c24xx_led,
-    s3c2410-uart,
-
-You see, in the list, there is no a device looks like ax88796. All these
-already existed devices on the platform bus are build-in peripherals on
-the SoC of s3c2410, they are compiled into the code by enabling some
-kernel configuration options.
-
-My question is, in terms of Linux driver technology, how to enable a
-non-PCI and not on-chip device driver? I think the ax_probe function
-must be called somehow, is this thinking right? If yes, I think before
-the driver get initialized, the corresponding device has to appear on
-the bus, but now it seems not.
-
-Thanks in advance.
-
--- 
-woody
-I can't go back to yesterday - because I was a different person then.
+-Olof
