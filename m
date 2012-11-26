@@ -1,151 +1,175 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 26 Nov 2012 16:18:11 +0100
-Subject: [PATCH v3 2/4] ARM: kirkwood: DT board setup for Network Space
- v2 and parents
-In-Reply-To: <20121126090253.GI9580@quad.lixom.net>
-References: <1350468546-25901-1-git-send-email-simon.guinot@sequanux.org>
- <1350468546-25901-3-git-send-email-simon.guinot@sequanux.org>
- <20121126090253.GI9580@quad.lixom.net>
-Message-ID: <20121126151811.GF8628@kw.sim.vm.gnt>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 26 Nov 2012 20:53:00 +0530
+Subject: [RFC 1/2] ARM: S3C24XX: add devicetree support for interrupts
+In-Reply-To: <201211261313.28307.heiko@sntech.de>
+References: <201211250145.21226.heiko@sntech.de>
+ <201211250147.42164.heiko@sntech.de>
+ <CAJuYYwR=4_bRvXqFxT56Bsv27A09xLR3Ps3D5kTdHf0G=Jj_Rg@mail.gmail.com>
+ <201211261313.28307.heiko@sntech.de>
+Message-ID: <CAJuYYwSi=5rbARhmrL5J-58LwraERHRmLs9B9X+110ZGBb9iBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 01:02:53AM -0800, Olof Johansson wrote:
-> Hi,
-> 
-> This is more directed at Jason and the other maintainers than you, Simon --
-> it's something I noticed when looking at his pull request.
-> 
-> On Wed, Oct 17, 2012 at 12:09:04PM +0200, Simon Guinot wrote:
-> 
-> > diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-> > index 50bca50..847e0c2 100644
-> > --- a/arch/arm/mach-kirkwood/Kconfig
-> > +++ b/arch/arm/mach-kirkwood/Kconfig
-> > @@ -130,6 +130,27 @@ config MACH_KM_KIRKWOOD_DT
-> >  	  Say 'Y' here if you want your kernel to support the
-> >  	  Keymile Kirkwood Reference Desgin, using Flattened Device Tree.
-> >  
-> > +config MACH_INETSPACE_V2_DT
-> > +	bool "LaCie Internet Space v2 NAS (Flattened Device Tree)"
-> > +	select ARCH_KIRKWOOD_DT
-> > +	help
-> > +	  Say 'Y' here if you want your kernel to support the LaCie
-> > +	  Internet Space v2 NAS, using Flattened Device Tree.
-> > +
-> > +config MACH_NETSPACE_V2_DT
-> > +	bool "LaCie Network Space v2 NAS (Flattened Device Tree)"
-> > +	select ARCH_KIRKWOOD_DT
-> > +	help
-> > +	  Say 'Y' here if you want your kernel to support the LaCie
-> > +	  Network Space v2 NAS, using Flattened Device Tree.
-> > +
-> > +config MACH_NETSPACE_MAX_V2_DT
-> > +	bool "LaCie Network Space Max v2 NAS (Flattened Device Tree)"
-> > +	select ARCH_KIRKWOOD_DT
-> > +	help
-> > +	  Say 'Y' here if you want your kernel to support the LaCie
-> > +	  Network Space Max v2 NAS, using Flattened Device Tree.
-> 
-> It would be nice to get away from these config options. The whole point with
-> device tree is to no longer have to do code changes for new similar boards.
-> 
-> And even then, since they share the same init function, there's no need for
-> three options, just one.
-> 
-> > diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-> > index 294779f..1f63d80 100644
-> > --- a/arch/arm/mach-kirkwood/Makefile
-> > +++ b/arch/arm/mach-kirkwood/Makefile
-> > @@ -31,3 +31,6 @@ obj-$(CONFIG_MACH_GOFLEXNET_DT)		+= board-goflexnet.o
-> >  obj-$(CONFIG_MACH_LSXL_DT)		+= board-lsxl.o
-> >  obj-$(CONFIG_MACH_IOMEGA_IX2_200_DT)	+= board-iomega_ix2_200.o
-> >  obj-$(CONFIG_MACH_KM_KIRKWOOD_DT)	+= board-km_kirkwood.o
-> > +obj-$(CONFIG_MACH_INETSPACE_V2_DT)	+= board-ns2.o
-> > +obj-$(CONFIG_MACH_NETSPACE_V2_DT)	+= board-ns2.o
-> > +obj-$(CONFIG_MACH_NETSPACE_MAX_V2_DT)	+= board-ns2.o
-> 
-> Same here.
+On 26 November 2012 17:43, Heiko St?bner <heiko@sntech.de> wrote:
+> Hi Thomas,
+>
+> Am Montag, 26. November 2012, 12:03:22 schrieb Thomas Abraham:
+>> Hi Heiko,
+>>
+>> On 25 November 2012 06:17, Heiko St?bner <heiko@sntech.de> wrote:
+>> > This adds devicetree parsing of the controller-data for the
+>> > interrupt controllers on S3C24XX architectures.
+>> >
+>> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>> > ---
+>> >
+>> >  .../interrupt-controller/samsung,s3c24xx-irq.txt   |   57 ++++++
+>> >  arch/arm/mach-s3c24xx/common.h                     |    1 +
+>> >  arch/arm/plat-s3c24xx/irq.c                        |  197
+>> >  ++++++++++++++++++++ 3 files changed, 255 insertions(+), 0 deletions(-)
+>> >  create mode 100644
+>> >  Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx-
+>> >  irq.txt
+>> >
+>> > diff --git
+>> > a/Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx
+>> > -irq.txt
+>> > b/Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx
+>> > -irq.txt new file mode 100644
+>> > index 0000000..c637637
+>> > --- /dev/null
+>> > +++
+>> > b/Documentation/devicetree/bindings/interrupt-controller/samsung,s3c24xx
+>> > -irq.txt @@ -0,0 +1,57 @@
+>> > +Samsung S3C24XX Interrupt Controllers
+>> > +
+>> > +The S3C24XX SoCs contain custom set of interrupt controllers providing a
+>> > +varying number of interrupt sources.
+>> > +
+>> > +The set consists of a main- and a sub-controller as well as a controller
+>> > +for the external interrupts and on newer SoCs even a second main
+>> > controller. +
+>> > +The bit-to-interrupt and parent mapping of the controllers is not fixed
+>> > +over all SoCs and therefore must be defined in the controller
+>> > description. +
+>> > +Required properties:
+>> > +- compatible: Compatible property value should be "samsung,s3c24xx-irq".
+>> > +
+>> > +- reg: Physical base address of the controller and length of memory
+>> > mapped +  region.
+>> > +
+>> > +- interrupt-controller : Identifies the node as an interrupt controller
+>> > +- #interrupt-cells : Specifies the number of cells needed to encode an
+>> > +  interrupt source. The value shall be 2.
+>> > +
+>> > +- s3c24xx,irqlist : List of irqtypes found on this controller as
+>> > +  two-value pairs consisting of irqtype and parent-irq
+>> > +
+>> > +  parent-irq is always the list position of the irq in the irqlist
+>> > +  of the parent controller (0..31)
+>> > +
+>> > +  irqtypes are:
+>> > +  - 0 .. none
+>> > +  - 1 .. external interrupts in the main register (GPF0 .. GPF3)
+>> > +  - 2 .. edge irq in the main register
+>> > +  - 3 .. for parent-irqs, that have sub-irqs in child controllers
+>> > +  - 4 .. level irqs in the sub-register
+>> > +  - 5 .. edge irqs in the sub-register
+>> > +  - 6 .. external irqs in the external irq register (starting with GPF4)
+>> > +  - 7 .. irq in the second base irq controller of S3C2416/S3C2450 SoCs
+>>
+>> Instead of defining the type of interrupt controller as above, is it
+>> possible to create multiple device nodes, with each node representing
+>> a type of interrupt controller with a unique compatible string and
+>> corresponding properties. There will be a init function for each type
+>> of interrupt controller. There should be a irq-domain for each of
+>> these different types of interrupt controller. And then, in the device
+>> tree source file, a proper tree like hierarchy of interrupt
+>> controllers can defined (using the interrupt-parent property for each
+>> controller node). The client nodes that generate the interrupt can
+>> specify the parent node and the interrupt number within the parent to
+>> which they generate the interrupt.
+>
+> I'm not sure I understand yet :-). The list describes the types of interrupts
+> inside the individual controllers.
+>
+> On all the s3c24xx we have three register sets denoting the main (SRCPND,
+> INTPND, INTMSK), sub (SUBSRCPEND, INTSUBMASK) and extint (EINTPEND, EINTMASK)
+> controllers. The bits of these registers are used for quite different irqs.
 
-Hi,
+We could consider main, sub and extint as three separate interrupt
+controllers and thus three different nodes in device tree. So the
+interrupt nodes could be something like (referring to 2416 manual).
 
-All this configuration options (plus those for ns2 lite and mini) are
-indeed useless as we are using a single init function. Moreover there
-is no code relying on this options in the file  board-ns2.c. All the
-checks are made at run-time.
+     main at 0x4a000000 {
+            compatible = "samsung,s3c2410-main";
+            reg = <0x4a000000 0x100>;
+            interrupt-controller;
+            #interrupt-cells = <2>;
+     };
 
-I will send a patch to remove this options.
+     sub at 0x4a001000 {
+            compatible = "samsung,s3c2410-sub";
+            reg = <0x4a001000 0x100>;
+            interrupt-controller;
+            #interrupt-cells = <2>;
+            interrupt-parent = <&main>;
+            interrupts = <28 0>, <23 0>, <.....  /*uart0/uart1/..*/
+     };
 
-Simon
+     eint@0x4a002000 {
+            compatible = "samsung,s3c2410-eint";
+            reg = <0x4a002000 0x100>;
+            interrupt-controller;
+            #interrupt-cells = <2>;
+            interrupt-parent = <&main>;
+            interrupts = <0 0>, <1 0>,
+                              <2 0>, <3 0>,
+                              <4 0>, <5 0>;
+     };
 
-> 
-> > diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> > index 70c5a28..b3e0519 100644
-> > --- a/arch/arm/mach-kirkwood/board-dt.c
-> > +++ b/arch/arm/mach-kirkwood/board-dt.c
-> > @@ -96,6 +96,11 @@ static void __init kirkwood_dt_init(void)
-> >  	if (of_machine_is_compatible("keymile,km_kirkwood"))
-> >  		km_kirkwood_init();
-> >  
-> > +	if (of_machine_is_compatible("lacie,inetspace_v2") ||
-> > +	    of_machine_is_compatible("lacie,netspace_v2") ||
-> > +	    of_machine_is_compatible("lacie,netspace_max_v2"))
-> > +		ns2_init();
-> > +
-> 
-> This function is now a long sequence of if statments like the ones above. It
-> would be great if they could be removed by moving most of the functionality
-> implemented in the board file to the device tree. Looks like it's not a whole
-> lot left, so that's promising. I'm guessing there's already efforts underway to
-> take care of the last pieces.
-> 
-> But, until then, I think it'd be nice to make this a table driven lookup
-> instead of a sequence of open-coded if statements. Tegra had this early on
-> before the board files were removed too. I.e. just a table of
-> 
-> static struct match_table {
-> 	char *compat;
-> 	void (*fn)(void);
-> } match_table = {
-> 	{ "lacie,inetspace_v2", ns2_init },
-> 	{ "lacie,netspace_v2", ns2_init },
-> 	....
-> }
-> 
-> and then an interator over that table.
-> 
-> > @@ -112,6 +117,9 @@ static const char *kirkwood_dt_board_compat[] = {
-> >  	"buffalo,lsxl",
-> >  	"iom,ix2-200",
-> >  	"keymile,km_kirkwood",
-> > +	"lacie,inetspace_v2",
-> > +	"lacie,netspace_max_v2",
-> > +	"lacie,netspace_v2",
-> >  	NULL
-> >  };
-> 
-> Same here. I actually think this is a table that is no longer needed -- the
-> board compat can/should be done on the generic compatible string instead of for
-> each most-specific board string.
-> 
-> > +static void ns2_power_off(void)
-> > +{
-> > +	gpio_set_value(NS2_GPIO_POWER_OFF, 1);
-> > +}
-> 
-> This kind of thing should be possible to generalize through a generic binding.
-> 
-> 
-> -Olof
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121126/60830598/attachment-0001.sig>
+There should be a corresponding irqchip driver code to handle each of
+these types of controllers. They should have their own irq-domain
+supported.
+
+Then the client nodes can specify the interrupt parent and interrupt
+number. For example, the uart node would be
+
+       uart at 50000000 {
+            compatible = "samsung,s3c2410-uart";
+            reg = <0x50000000 0x100>;
+            interrupt-parent = <&sub>;
+            interrupts = <0 0>, <1 0>, <2 0>; /*tx/rx/err*/
+       };
+
+> For example is bit 17 of the main register set used as DMA0 on earlier socs
+> while the dma interrupts moved to the subint registers for s3c2443 and later.
+
+Writing the nodes with the correct interrupt parent and the interrupt
+number should take care of this.
+
+>
+> So the entries in the irqlist describe the needed handlers for the hwirq bits
+> of the indidual controllers. So in this scheme you set for dt-devices the
+> interrupt parent to the correct register set and the interrupts field then
+> matches the bit of the register, according to the datasheet.
+>
+> When I changed the basic interrupt handling in the previous set, the changed
+> irq.c can for exmaple be found on [0], I created these lists in the code and
+> soc specific routines to init them for the still valid non-dt case.
+>
+> But as dt is about describing the hardware, I found the current solution nice,
+> because will I only need exactly one dt-init-function for all s3c24xx-socs,
+> instead of representing all the slight variances in code.
+>
+> I'm definitly not sure if all the different types of individual irq handlers
+> are strictly necessary yet, but they represent all the variants that were in
+> use in the original code.
+
+I have brought up this point just for discussion. You could choose the
+implementation that you prefer. I understand that implementing with
+different interrupt controller nodes might require lot of code
+changes.
+
+Thanks,
+Thomas.
