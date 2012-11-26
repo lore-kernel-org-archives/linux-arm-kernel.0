@@ -1,67 +1,44 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Mon, 26 Nov 2012 11:07:36 +0000
-Subject: [PATCH v3 03/10] ARM: OMAP: AM33xx hwmod: Add parent-child
- relationship for PWM subsystem
-In-Reply-To: <50B33043.2020700@ti.com>
-References: <1353387831-31538-1-git-send-email-avinashphilip@ti.com>
- <1353387831-31538-4-git-send-email-avinashphilip@ti.com>
- <518397C60809E147AF5323E0420B992E3E9EEA8C@DBDE01.ent.ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EC4C0FA@DBDE01.ent.ti.com>
- <50B33043.2020700@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC4D5C7@DBDE01.ent.ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 26 Nov 2012 11:13:37 +0000
+Subject: [PATCH] ARM: implement optimized percpu variable access
+In-Reply-To: <50B2679F.3070107@gmail.com>
+References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
+ <20121122113401.GC3113@mudshark.cambridge.arm.com>
+ <50B2679F.3070107@gmail.com>
+Message-ID: <20121126111337.GA13312@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+Hi Rob,
 
-On Mon, Nov 26, 2012 at 14:32:59, Cousson, Benoit wrote:
-> Hi Vaibhav,
+On Sun, Nov 25, 2012 at 06:46:55PM +0000, Rob Herring wrote:
+> On 11/22/2012 05:34 AM, Will Deacon wrote:
+> > As an aside, you also need to make the asm block volatile in
+> > __my_cpu_offset -- I can see it being re-ordered before the set for
+> > secondary CPUs otherwise.
 > 
-> On 11/26/2012 06:19 AM, Bedia, Vaibhav wrote:
-> > On Fri, Nov 23, 2012 at 16:36:06, Philip, Avinash wrote:
-> >> On Tue, Nov 20, 2012 at 10:33:44, Philip, Avinash wrote:
-> >>> As part of PWM subsystem integration, PWM subsystem are sharing
-> >>> resources like clock across submodules (ECAP, EQEP & EHRPWM).
-> >>> To handle resource sharing & IP integration
-> >>> 1. Rework on parent child relation between PWMSS and
-> >>>    ECAP, EQEP & EHRPWM child devices to support runtime PM.
-> >>> 2. Add support for opt_clks in EHRPWM HWMOD entry to handle additional
-> >>>    clock gating from control module.
-> >>> 3. Add HWMOD entries for EQEP PWM submodule.
-> >>>
-> >>
-> >> Is there any review on this patch?
-> >> This patch depends on ECAP & EHRPWM to work in am335x.
-> > 
-> > First of all, I think you should break up this patch as per the 3 points
-> > that you mentioned above.
-> > 
-> > The usage of opt_clks for this does not look right to me. Based on your
-> > description this clock is necessary and not optional on AM335x and on 
-> > Davinci platforms this clock does not exist.
-
-I checked the DA830 TRM and looks like TBCLK for eHRPWM is an always on clock
-there. So, the only difference in AM335x is an additional enable bit.
-
-Instead of adding this as opt_clk in hwmod, we could add an always on clock node
-in Davinci clock data and have the driver always do a clk_enable() on the tbclk
-as part of the probe sequence. On AM335x, with the right clock node this will enable
-the clock in hardware and on DA830 it turns into a NOP. This way we can avoid adding
-the opt_clk entry in hwmod of eHRPWM.
-
-> > 
-> > I think the custom activate/deactivate functions in the OMAP runtime PM
-> > implementation was a good fit for keeping this SoC integration detail out
-> > of the driver code. However, the current DT flow in omap_device.c seems to
-> > assign the default activate/deactivate ops. Is that approach deprecated?
+> I don't think that is right. Doing that means the register is reloaded
+> on every access and you end up with code like this (from handle_IRQ):
 > 
-> The issue is that this approach is not doable anymore with DT, that's
-> why I had to provide a default set of functions.
+> c000eb4c:       ee1d2f90        mrc     15, 0, r2, cr13, cr0, {4}
+> c000eb50:       e7926003        ldr     r6, [r2, r3]
+> c000eb54:       ee1d2f90        mrc     15, 0, r2, cr13, cr0, {4}
+> c000eb58:       e7821003        str     r1, [r2, r3]
+> c000eb5c:       eb006cb1        bl      c0029e28 <irq_enter>
 > 
+> I don't really see where there would be a re-ordering issue. There's no
+> percpu var access before or near the setting that I can see.
 
-So once all OMAP drivers get converted to DT, will there be no notion of
-latency based activate/deactivate functions? Or will it get used in a different
-manner?
+Well my A15 doesn't boot with your original patch unless I make that thing
+volatile, so something does need tweaking...
 
-Regards,
-Vaibhav
+The issue is on bringing up the secondary core, so I assumed that a lot
+of inlining goes on inside secondary_start_kernel and then the result is
+shuffled around, placing a cpu-offset read before we've done the set.
+
+Unfortunately, looking at the disassembly I can't see this happening at
+all, so I'll keep digging. The good news is that I've just reproduced the
+problem on the model, so I've got more visibility now (although both cores
+are just stuck in spinlocks...).
+
+Will
