@@ -1,39 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 Nov 2012 18:42:34 +0000
-Subject: [GIT PULL] Integrator SoC bus patches
-In-Reply-To: <CACRpkdYKWLMMOa7+CV8yMNe5-EV1p5fYeVJ+bn55KLLFBZdD=A@mail.gmail.com>
-References: <CACRpkdYKWLMMOa7+CV8yMNe5-EV1p5fYeVJ+bn55KLLFBZdD=A@mail.gmail.com>
-Message-ID: <201211261842.34190.arnd@arndb.de>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 26 Nov 2012 13:47:52 -0500 (EST)
+Subject: [PATCH 06/27] usb: host: ehci-mv: fix clk APIs
+In-Reply-To: <1353905020-29372-7-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1211261346240.2168-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 November 2012, Linus Walleij wrote:
-> could you please pull this Integrator patch set as previously circulated
-> on the list, targetting the v3.8 merge window? The details are in the
-> tag.
-> 
-> Please pull it in!
-> 
-> Yours,
-> Linus Walleij
-> 
-> 
-> The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
-> 
->   Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> tags/integrator-socbus
+On Sun, 25 Nov 2012, Chao Xie wrote:
 
-I'm going through my list of old pull requests to see if anything got
-missed. I don't see this one in arm-soc, and the tag doesn't seem to 
-be there in your kernel.org tree at this point. If this is something
-that should be merged in 3.8, please send another pull request with
-a working tag.
+> From: Chao Xie <chao.xie@marvell.com>
+> 
+> the clock common driver changes, and arch-mmp will make use of
+> the common clock driver instead of its own.
+> So for enable clock.
+> first prepare the clock
+> then enable the clock.
+> 
+> for disable clock
+> first disable the clock
+> then unprepare the clock
+> 
+> Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
 
-I remember having looked at the patches and I'm pretty sure they were
-all good to go in, so I have no idea what went wrong here.
+When you resubmit these patches with the right Signed-off-by: lines,
+you can add
 
-	Arnd
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
+
+to the ones affecting ehci-mv.c (patches 6, 7, 11, 21, and 27).
+
+Alan Stern
