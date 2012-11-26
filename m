@@ -1,45 +1,30 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 26 Nov 2012 11:30:34 +0200
-Subject: [PATCH 2/2] pinctrl: mvebu: make pdma clock on dove mandatory
-In-Reply-To: <1353921634-25210-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1353921525-25163-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1353921634-25210-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20121126093033.GH12673@sapphire.tkos.co.il>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 26 Nov 2012 01:32:40 -0800
+Subject: [PATCH 1/2] input: gpio-keys: Disable hardware on suspend
+In-Reply-To: <20121126090503.GB12782@gmail.com>
+References: <1353590617-11466-1-git-send-email-lee.jones@linaro.org>
+ <20121125083229.GB21091@core.coreip.homeip.net>
+ <20121126090503.GB12782@gmail.com>
+Message-ID: <20121126093240.GB13792@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+On Mon, Nov 26, 2012 at 09:05:03AM +0000, Lee Jones wrote:
+> > On Thu, Nov 22, 2012 at 01:23:36PM +0000, Lee Jones wrote:
+> > > From: Jonas Aaberg <jonas.aberg@stericsson.com>
+> > > 
+> > > Disable hardware if active when suspending if the hw can not
+> > > wake the system from suspend.
+> > 
+> > How about below instead (needs the other patch I have just sent out)?
+> 
+> Sorry Dmitry, I'm a little confused. What does this mean?
 
-On Mon, Nov 26, 2012 at 10:20:34AM +0100, Sebastian Hesselbarth wrote:
+The modified version of the patch I have sent depends on the other patch
+to gpio-keys that introduces gpio_keys_report_state() that I believe you
+have been CCed.
 
-[...]
-
-> diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c 
-> b/drivers/pinctrl/mvebu/pinctrl-dove.c
-> index 40c9c3e..90f257d 100644
-> --- a/drivers/pinctrl/mvebu/pinctrl-dove.c
-> +++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
-> @@ -595,8 +595,11 @@ static int __devinit dove_pinctrl_probe(struct platform_device *pdev)
->  	 * grab clk to make sure it is ticking.
->  	 */
->  	clk = devm_clk_get(&pdev->dev, NULL);
-> -	if (!IS_ERR(clk))
-> -		clk_prepare_enable(clk);
-> +	if (IS_ERR(clk)) {
-> +		dev_err(&pdev->dev, "Unable to get pdma clock");
-> +		return -ENODEV;
-
-Why not propagate the error up using PTR_RET(clk)?
-
-baruch
-
-> +	}
-> +	clk_prepare_enable(clk);
->  
->  	return mvebu_pinctrl_probe(pdev);
->  }
+Thanks.
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Dmitry
