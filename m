@@ -1,35 +1,64 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 25 Nov 2012 23:36:13 -0800
-Subject: [GIT PULL] i.MX defconfig updates
-In-Reply-To: <20121122144547.GH10369@pengutronix.de>
-References: <20121122144547.GH10369@pengutronix.de>
-Message-ID: <20121126073613.GC9580@quad.lixom.net>
+From: narkewoody@gmail.com (Woody Wu)
+Date: Mon, 26 Nov 2012 07:37:12 +0000 (UTC)
+Subject: The Ethernet driver doesn't get probed
+Message-ID: <slrnkb66vj.3sl.narkewoody@zuhnb712.local.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 03:45:47PM +0100, Sascha Hauer wrote:
-> Hi,
-> 
-> Please pull the following i.MX defconfig updates for i.MX
-> 
-> Sascha
-> 
-> The following changes since commit a0d271cbfed1dd50278c6b06bead3d00ba0a88f9:
-> 
->   Linux 3.6 (2012-09-30 16:47:46 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-defconfig
-> 
-> for you to fetch changes up to 5177ae56d1b6dcf4b23f1f89ed3be1c3dc0ad513:
-> 
->   ARM: imx: configs: Enable CONFIG_MEDIA_CAMERA_SUPPORT (2012-10-10 10:51:00 +0200)
-> 
-> ----------------------------------------------------------------
-> ARM i.MX specific defconfig updates
+Hi, List
 
-Pulled, thanks.
+I enabled an ax88796 Ethernet driver in the kernel configuration menu.
+Kernel version is 3.4.19. The arch is ARM and the system type is
+Samsung S3C2410.
 
+In my debugging, I found the probe function of the driver did not get
+invoked.
 
--Olof
+This driver is declared as platform_driver
+
+static struct platform_driver axdrv = {
+	.driver	= {
+		.name		= "ax88796",
+		.owner		= THIS_MODULE,
+	},
+	.probe		= ax_probe,
+	.remove		= ax_remove,
+	.suspend	= ax_suspend,
+	.resume		= ax_resume,
+};
+
+module_platform_driver(axdrv);
+
+So, its driver init function actually goes through
+platform_driver_register() and then driver_register(), which eventually
+call driver_attach() trying to attach the driver to the "platform" bus.
+But, on the platform bus, there is no any device that can match the
+ax88796 driver, hence the driver failed in attaching.
+
+I discovered the full list of devices found on the platform bus:
+
+    s3c2410-ohci,
+    s3c2410-lcd,
+    s3c2410-wdt,
+    s3c2410-i2c,
+    s3c24xx-iis,
+    s3c2410-nand,
+    s3c24xx_led,
+    s3c2410-uart,
+
+You see, in the list, there is no a device looks like ax88796. All these
+already existed devices on the platform bus are build-in peripherals on
+the SoC of s3c2410, they are compiled into the code by enabling some
+kernel configuration options.
+
+My question is, in terms of Linux driver technology, how to enable a
+non-PCI and not on-chip device driver? I think the ax_probe function
+must be called somehow, is this thinking right? If yes, I think before
+the driver get initialized, the corresponding device has to appear on
+the bus, but now it seems not.
+
+Thanks in advance.
+
+-- 
+woody
+I can't go back to yesterday - because I was a different person then.
