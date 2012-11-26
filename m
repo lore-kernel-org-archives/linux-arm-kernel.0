@@ -1,47 +1,41 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 26 Nov 2012 21:38:53 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the mmc tree
-Message-ID: <20121126213853.ccceb25dc3b3c5a24911abef@canb.auug.org.au>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 26 Nov 2012 11:39:42 +0100
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+In-Reply-To: <20121126213152.60b52e19d7fc84ce94c356c3@canb.auug.org.au>
+References: <20121126213152.60b52e19d7fc84ce94c356c3@canb.auug.org.au>
+Message-ID: <50B346EE.1050306@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-include/linux/platform_data/mmc-omap.h between commit 69bc0b677e6c ("mmc:
-omap_hsmmc: Enable HSPE bit for high speed cards") from the  tree and
-commit 53db20d123f7 ("mmc: omap: Remove cpu_is_omap usage from the
-driver") from the arm-soc tree.
+On 11/26/2012 11:31 AM, Stephen Rothwell :
+> Hi all,
+> 
+> Today's linux-next merge of the arm-soc tree got a conflict in 
+> drivers/tty/serial/atmel_serial.c between commit 95e629b761ce 
+> ("ARM/AVR32: get rid of serial_at91.h") from the arm tree and
+> commit bcd2360c1ff9 ("arm: at91: move platfarm_data to 
+> include/linux/platform_data/atmel.h") from the arm-soc tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no
+> action is required).
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Yes, good fix that has to be carried...
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Thanks, bye,
+- -- 
+Nicolas Ferre
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+Comment: Using GnuPG with undefined - http://www.enigmail.net/
 
-diff --cc include/linux/platform_data/mmc-omap.h
-index 346af5b,2bf6ea8..0000000
---- a/include/linux/platform_data/mmc-omap.h
-+++ b/include/linux/platform_data/mmc-omap.h
-@@@ -126,7 -107,9 +107,10 @@@ struct omap_mmc_platform_data 
-  		/* we can put the features above into this variable */
-  #define HSMMC_HAS_PBIAS		(1 << 0)
-  #define HSMMC_HAS_UPDATED_RESET	(1 << 1)
- -#define MMC_OMAP7XX		(1 << 2)
- -#define MMC_OMAP15XX		(1 << 3)
- -#define MMC_OMAP16XX		(1 << 4)
- +#define HSMMC_HAS_HSPE_SUPPORT	(1 << 2)
-++#define MMC_OMAP7XX		(1 << 3)
-++#define MMC_OMAP15XX		(1 << 4)
-++#define MMC_OMAP16XX		(1 << 5)
-  		unsigned features;
-  
-  		int switch_pin;			/* gpio (card detect) */
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121126/815f3fba/attachment.sig>
+iQEcBAEBAgAGBQJQs0buAAoJEAf03oE53VmQMPgH/0Gynlb5BBImnjSU75mh/dPC
+ob/lTJv3w/2gUKPqbOgyxTSmMc9ckFcDELAhFYt+df9hKfOMBzZAUPHLEclZolZ+
+AqpnIjGq88TYWMgaREUZ2bigTrzuWKqHiIWV/AoNcz2slhWC//CHK6z9SHE7hZOI
+zZFwf326v0dRkm4g785cqalg7pNxQDpE6iMZXuifb8zPWePgKBxqHyPRCbhP1dwu
+T4XQ3IgnrvzWcqz/V4mr8kppJXzHNfDEsVZ2XfndhUKVFY4qMGZhFBoTlI6LhNWO
+Nu2mD7TaENoKRijLYrdMfidJ65uwAGtEWA6UxEfV1VWVddSsi/D8OuniBta+Ewg=
+=zF93
+-----END PGP SIGNATURE-----
