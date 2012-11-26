@@ -1,63 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 Nov 2012 13:06:57 +0000
-Subject: [GIT PULL 5/5] ARM: mvebu: changes for v3.8
-In-Reply-To: <20121126113506.06c431cd@skate>
-References: <pull-1353733874-990435> <201211261028.26334.arnd@arndb.de>
- <20121126113506.06c431cd@skate>
-Message-ID: <201211261306.57407.arnd@arndb.de>
+Date: Mon, 26 Nov 2012 13:14:32 +0000
+Subject: [GIT PULL] ARM: ixp4xx: fixes for v3.7
+In-Reply-To: <0Lufa8-1TAtF11yb2-00zw9g@mx.kundenserver.de>
+References: <0Lufa8-1TAtF11yb2-00zw9g@mx.kundenserver.de>
+Message-ID: <201211261314.32662.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 26 November 2012, Thomas Petazzoni wrote:
-> Arnd,
+On Thursday 22 November 2012, Jason Cooper wrote:
+> The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
 > 
-> On Mon, 26 Nov 2012 10:28:26 +0000, Arnd Bergmann wrote:
-> > On Monday 26 November 2012, Thomas Petazzoni wrote:
-> > > Right. The problem is that some of the last developments had many
-> > > dependencies against the previous developments, from various branches.
-> > > So I wasn't sure how to do this last developments, and I did merge the
-> > > branches containing the previous developments that I needed.
-> > > 
-> > > I am really open to suggestions on how to improve my Git workflow to
-> > > handle this better. It certainly wasn't my intention to have this
-> > > "test-the-merge" thing appear publicly.
-> > 
-> > One thing that Sascha Hauer first introduced was an extra branch that
-> > has everything merged together to show how you want to handle
-> > the conflicts. We'll then merge the individual branches and in the
-> > end can check if there is any difference to what you had.
+>   Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
 > 
-> Maybe I don't understand correctly, but the problem that I had is not a
-> problem of conflicts, but rather the need to do development *on top* of
-> branches for which pull requests had already been sent.
-
-Ok, sorry for the confusion on my part.
-
-> For example, the clk support in the network driver depended on:
->  * The branch containing the new network driver to be there
->  * The branch containing the mvebu clk infrastructure to be there
+> are available in the git repository at:
 > 
-> What should I have done to do this clk support in the network driver,
-> if not a merge of the network driver branch + the mvebu clk
-> infrastructure branch?
+>   git://git.infradead.org/users/jcooper/linux.git tags/ixp4xx_fixes_for_3.7
+> 
+> for you to fetch changes up to 0d2c9f0517e915ce03a04e91d3207827e0d274a8:
+> 
+>   IXP4xx: use __iomem for MMIO (2012-11-22 03:36:45 +0000)
+> 
+> ----------------------------------------------------------------
+> ixp4xx fixes for v3.7
+> 
 
-No, this all sounds good, there is not easier way really. Sometimes
-you can do the branches in a way that each branch works by itself
-but you don't have to do a third branch to combine the features.
+I've merged them into the fixes branch now, thanks a lot for following
+up on these patches!
 
-In other cases, where you have multiple branches that all get
-merged through arm-soc (or another tree that uses branches like
-this), you can try to get everyone to agree on an order in advance,
-and then you just mandate that one branch has another one as
-a prerequisite.
+Olof, I'm undecided whether they are still appropriate for 3.7 since
+we're past the final -rc now. If we want them in, we should probably
+send them to Linus now and let him decide.  For all I can tell, ixp4xx
+is already completely broken without these patches, so there should be
+no harm in including them, but then again " 13 files changed, 59
+insertions(+), 68 deletions(-)" is slightly more than I'd like to send
+at this point.
 
-Yet another option is to have a few patches that serve as a
-common base for multiple branches: E.g. have one patch introduce
-a new interface as a stub and base two branches on top of the
-same commit, one that uses the interface and another one that
-implements it. Again, this is not always possible.
-
-If you do a lot of reworks at the same time, this always gets
-very hard.
+If you prefer, we can put them into next/fixes-non-critical, but then we
+might want to mark more of them as candidates for stable.
 
 	Arnd
