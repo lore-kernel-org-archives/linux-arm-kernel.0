@@ -1,34 +1,82 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 26 Nov 2012 11:56:19 +0000
-Subject: [PATCH 2/2] ASoC: Davinci: machine: Add device tree binding
-In-Reply-To: <1353557099-21599-3-git-send-email-gururaja.hebbar@ti.com>
-References: <1353557099-21599-1-git-send-email-gururaja.hebbar@ti.com>
- <1353557099-21599-3-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20121126115619.GF9411@opensource.wolfsonmicro.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 26 Nov 2012 12:57:13 +0100
+Subject: [PATCH] ARM: dts: add initial dts file for ORIGEN4QUAD
+In-Reply-To: <CAH9JG2VSnA3zJCP9OiBbrdaV1GqVKL0x4fn331D7YJxQs8VwMg@mail.gmail.com>
+References: <1353929538-24173-1-git-send-email-kh.choi@insignal.co.kr>
+ <CAH9JG2VSnA3zJCP9OiBbrdaV1GqVKL0x4fn331D7YJxQs8VwMg@mail.gmail.com>
+Message-ID: <1361143.TuLvfqvMr1@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 09:34:59AM +0530, Hebbar, Gururaja wrote:
+Hi Kyungmin, Kyuho,
 
-> +- dai-data		: A list of DAI data used by SOC code to register
-> +			  DAI, Codecs platform.
-> +			  The string index "should" be as shown below.
-> +dai-data =
-> +"<DAI Name>", 		"<DAI Stream Name>",
-> +"<CODEC DAI Name>",	"<true if evm_aic3x_init is required, else false>",
-> +"<evm ops required (evm_ops or evm_spdif_ops)>";
+On Monday 26 of November 2012 20:52:12 Kyungmin Park wrote:
+> Hi,
+> 
+> On 11/26/12, chlrbgh0 at gmail.com <chlrbgh0@gmail.com> wrote:
+> > From: Kyuho Choi <kh.choi@insignal.co.kr>
+> > 
+> > This patch adds initial dts file for ORIGEN4QUAD board.
+> > ORIGEN4QUAD board based on Samsung EXYNOS4412 SoC.
+> > More properties will be added later.
+> > 
+> > Signed-off-by: Kyuho Choi <kh.choi@insignal.co.kr>
+> > ---
+> > 
+> >  arch/arm/boot/dts/exynos4412-origen4quad.dts |   45
+> > 
+> > ++++++++++++++++++++++++++
+> > 
+> >  1 files changed, 45 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/boot/dts/exynos4412-origen4quad.dts
+> > 
+> > diff --git a/arch/arm/boot/dts/exynos4412-origen4quad.dts
+> > b/arch/arm/boot/dts/exynos4412-origen4quad.dts
+> > new file mode 100644
+> > index 0000000..390a2ab
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/exynos4412-origen4quad.dts
+> > @@ -0,0 +1,45 @@
+> > +/*
+> > + * Samsung's Exynos4412 based Origen4Quad board device tree source
+> > + *
+> > + * Copyright (c) 2012-2013 Isnignal Co., Ltd.
+> > + *		http://www.insignal.co.kr
+> > + *
+> > + * Device tree source file for Insignal's Origen4Quad board which is
+> > based on
+> > + * Samsung's Exynos4412 SoC.
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > modify + * it under the terms of the GNU General Public License
+> > version 2 as + * published by the Free Software Foundation.
+> > +*/
+> > +
+> > +/dts-v1/;
+> > +/include/ "exynos4412.dtsi"
+> > +
+> > +/ {
+> > +	model = "Insignal Origen4Quad board based on Exynos4412";
+> > +	compatible = "insignal,origen4quad", "samsung,exynos4412";
+> > +
+> > +	memory {
+> > +		reg = <0x40000000 0x40000000>;
+> > +	};
+> 
+> does it test to boot with this dts file?
+> does it support 1GiB memory section?
 
-This continues to have the same issue as with previous versions, this is
-all Linux internals (especially the evm_aic3x_init thing) not a
-description of the hardware, there's not enough information to allow
-someone to work out what the bindings for their system should be.
+It will most likely fail to boot with u-boot versions that do not support 
+replacing memory configuration in device tree and without 
+CONFIG_ARM_ATAG_DTB_COMPAT enabled.
 
-Do not post *ANY* further versions that have this evm_aic3x_init stuff
-in them, it's very annoying that you keep on ignoring this feedback.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121126/1d789485/attachment-0001.sig>
+In other words, the memory setup from dts is used only if both of the 
+following are true:
+ - CONFIG_ARM_ATAG_DTB_COMPAT is disabled
+ - u-boot does not modify memory setup in device tree passed to the kernel
+
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Linux Platform
