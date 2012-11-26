@@ -1,88 +1,53 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Mon, 26 Nov 2012 20:15:12 +0530
-Subject: [RFC PATCH] ASoC: Samsung: Register the audio platform device
-In-Reply-To: <1352894960-17434-2-git-send-email-padma.v@samsung.com>
-References: <1352894960-17434-1-git-send-email-padma.v@samsung.com>
- <1352894960-17434-2-git-send-email-padma.v@samsung.com>
-Message-ID: <CAAgF-BdHm_VFB-xsZ6kpAu5+9+1yMNVVGM_og+H3QghWQuf8+w@mail.gmail.com>
+From: sr@denx.de (Stefan Roese)
+Date: Mon, 26 Nov 2012 15:46:12 +0100
+Subject: [PATCH] ARM: sunxi: Add missing sun4i.dtsi file
+Message-ID: <1353941172-26121-1-git-send-email-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Patch f055f1f6 [ARM: sunxi: Add sun4i and cubieboard support] missed
+this sun4i.dtsi include file. This patch finally brings it upstream
+enabling support for sun4i boards.
 
-On Wed, Nov 14, 2012 at 5:39 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
-> Audio platform device is not a hardware peripherial.
-> So this device can't be added in the dt devices list.
-> So expanded the module_platform_driver and registered
-> this device using "platform_device_register_simple".
->
-> Also added the soc-core pm ops structure in the audio
-> platform driver.
->
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
->  sound/soc/samsung/smdk_wm8994.c |   31 ++++++++++++++++++++++++++++++-
->  1 files changed, 30 insertions(+), 1 deletions(-)
->
-> diff --git a/sound/soc/samsung/smdk_wm8994.c b/sound/soc/samsung/smdk_wm8994.c
-> index 48dd4dd..7f97969 100644
-> --- a/sound/soc/samsung/smdk_wm8994.c
-> +++ b/sound/soc/samsung/smdk_wm8994.c
-> @@ -173,16 +173,45 @@ static int __devexit smdk_audio_remove(struct platform_device *pdev)
->         return 0;
->  }
->
-> +static struct platform_device *smdk_audio_device;
-> +
->  static struct platform_driver smdk_audio_driver = {
->         .driver         = {
->                 .name   = "smdk-audio",
->                 .owner  = THIS_MODULE,
-> +               .pm     = &snd_soc_pm_ops,
->         },
->         .probe          = smdk_audio_probe,
->         .remove         = __devexit_p(smdk_audio_remove),
->  };
->
-> -module_platform_driver(smdk_audio_driver);
-> +static int __init smdk_audio_init(void)
-> +{
-> +       int ret;
-> +
-> +       ret = platform_driver_register(&smdk_audio_driver);
-> +       if (ret) {
-> +               pr_err("unable to register driver\n");
-> +               return ret;
-> +       }
-> +
-> +       smdk_audio_device = platform_device_register_simple("smdk-audio", -1, NULL, 0);
-> +       if (IS_ERR(smdk_audio_device)) {
-> +               platform_driver_unregister(&smdk_audio_driver);
-> +               return PTR_ERR(smdk_audio_device);
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static void __exit smdk_audio_exit(void)
-> +{
-> +       platform_device_unregister(smdk_audio_device);
-> +       platform_driver_unregister(&smdk_audio_driver);
-> +}
-> +
-> +module_init(smdk_audio_init);
-> +module_exit(smdk_audio_exit);
-Ping. Any comments on this patch?
+Signed-off-by: Stefan Roese <sr@denx.de>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+Arnd, I missed adding this include dtsi file in my last
+cubieboard/sun4i support patch. Please add this patch
+to your v3.8 branch.
 
-Thanks
-Padma
->
->  MODULE_DESCRIPTION("ALSA SoC SMDK WM8994");
->  MODULE_LICENSE("GPL");
-> --
-> 1.7.4.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks,
+Stefan
+
+ arch/arm/boot/dts/sun4i.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun4i.dtsi
+
+diff --git a/arch/arm/boot/dts/sun4i.dtsi b/arch/arm/boot/dts/sun4i.dtsi
+new file mode 100644
+index 0000000..e61fdd4
+--- /dev/null
++++ b/arch/arm/boot/dts/sun4i.dtsi
+@@ -0,0 +1,19 @@
++/*
++ * Copyright 2012 Stefan Roese
++ * Stefan Roese <sr@denx.de>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/include/ "sunxi.dtsi"
++
++/ {
++	memory {
++		reg = <0x40000000 0x80000000>;
++	};
++};
+-- 
+1.8.0
