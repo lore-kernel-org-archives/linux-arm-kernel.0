@@ -1,27 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Nov 2012 01:19:27 -0800
-Subject: [GIT PULL 2/5] ARM: orion: cleanup for v3.8
-In-Reply-To: <50b056f6.4689e50a.542a.ffff8136SMTPIN_ADDED_MISSING@mx.google.com>
-References: <pull-1353733874-990435>
- <50b056f6.4689e50a.542a.ffff8136SMTPIN_ADDED_MISSING@mx.google.com>
-Message-ID: <20121126091927.GD13866@quad.lixom.net>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 26 Nov 2012 10:20:34 +0100
+Subject: [PATCH 2/2] pinctrl: mvebu: make pdma clock on dove mandatory
+In-Reply-To: <1353921525-25163-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1353921525-25163-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1353921634-25210-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 24, 2012 at 05:11:06AM +0000, Jason Cooper wrote:
-> The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
-> 
->   Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/orion_cleanup_for_3.8
-> 
-> for you to fetch changes up to 4a9329a04ceec56fc1ec155b6ea4d8b50f350a7b:
-> 
->   ARM: Kirkwood: Use hw_pci.ops instead of hw_pci.scan (2012-11-21 20:09:11 +0000)
+With the ability to pass clocks through DT, now make the pdma
+clock of dove pinctrl mandatory. Otherwise, pinctrl will hang
+the system when accessing some registers.
 
-Pulled, thanks.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Axel Lin <axel.lin@ingics.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-kernel at vger.kernel.org 
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/pinctrl/mvebu/pinctrl-dove.c |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-
--Olof
+diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
+index 40c9c3e..90f257d 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-dove.c
++++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
+@@ -595,8 +595,11 @@ static int __devinit dove_pinctrl_probe(struct platform_device *pdev)
+ 	 * grab clk to make sure it is ticking.
+ 	 */
+ 	clk = devm_clk_get(&pdev->dev, NULL);
+-	if (!IS_ERR(clk))
+-		clk_prepare_enable(clk);
++	if (IS_ERR(clk)) {
++		dev_err(&pdev->dev, "Unable to get pdma clock");
++		return -ENODEV;
++	}
++	clk_prepare_enable(clk);
+ 
+ 	return mvebu_pinctrl_probe(pdev);
+ }
+-- 
+1.7.10.4
