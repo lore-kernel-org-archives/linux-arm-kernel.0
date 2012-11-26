@@ -1,67 +1,51 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Mon, 26 Nov 2012 16:44:13 +0100
-Subject: [PATCH v3 5/7] usb: chipidea: usbmisc: add support for ahb,
- ipg and per clock
-In-Reply-To: <20121125091834.GA16661@nchen-desktop>
-References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
- <1353506793-8354-6-git-send-email-m.grzeschik@pengutronix.de>
- <20121123065115.GC22420@nchen-desktop>
- <20121123162051.GA31008@pengutronix.de>
- <20121125091834.GA16661@nchen-desktop>
-Message-ID: <20121126154413.GB31008@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 26 Nov 2012 15:45:01 +0000
+Subject: [PATCH] ARM: S3C64XX: Add registration of WM2200 Bells device on
+ Cragganmore
+Message-ID: <1353944701-5129-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 25, 2012 at 05:18:35PM +0800, Peter Chen wrote:
-> On Fri, Nov 23, 2012 at 05:20:51PM +0100, Michael Grzeschik wrote:
-> > > usbphy: used to transfer data
-> > > (like your per)
-> > 
-> > The "per" clk is a different clk than the usbphy. We have an usbphy clk
-> > aswell on the mx5x. As discussed before [1], we need a solution to enable
-> > the usbphy clk. The current approach is to let the nop-xceiver enable
-> > this.
-> > 
-> > [1] http://www.spinics.net/lists/linux-usb/msg74489.html
-> It does not matter which the name is, this clock is related to usb 480M or 
-> its source. We use nop-xceiver is just to create struct usb_otg
-> and usb_phy. Clock information can be at imx specific file like
-> cil13xxx_imx.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/mach-crag6410.c |   10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-I think the clock task needs to become a sepreate topic, apart from this
-series.
-
-> > 
-> > > mx6q:
-> > > - usboh3(Index 162 at DT), used to access register
-> > > - usbphy(Index 182 for otg port at DT), at phy controller
-> > 
-> > > So, we may consider a way to consolidate both mx6q (mx28) and mxc (mx5x, mx3x)
-> > > platforms.
-> > 
-> > Yes, we will discuss a real clktree solution in the usbmisc driver for
-> > the different cores. The first thoughts are, that the clk configuration
-> > has completely to be done inside the usbmisc driver. For this, the
-> > usbmisc needs to become a hard dependency for the ci13xxx_imx glue code.
-> 
-> For my mind, imx usb clock handling is better only at place, that is
-> cil13xxx_imx. We can have imx_clk_enable and imx_clk_disable in it,
-> and handling clk in imx_clk_enable using id_table or what else platform
-> specific.
-
-As already mentioned, the clock layout differs from SoC to SoC.
-Therefore the usbmisc can become a mandatory instance over the
-ci13xxx_imx instances in all imx cases. This controlling interface can
-define the special clock setups and connection types for the underlying
-usb cores.
-
-I will send the next series without this clock handling.
-
-Regards,
-Michael
-
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index 2abe95d..c06bcfa 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -287,16 +287,21 @@ static struct platform_device littlemill_device = {
+ 	.id		= -1,
+ };
+ 
+-static struct platform_device bells_wm5102_device = {
++static struct platform_device bells_wm2200_device = {
+ 	.name		= "bells",
+ 	.id		= 0,
+ };
+ 
+-static struct platform_device bells_wm5110_device = {
++static struct platform_device bells_wm5102_device = {
+ 	.name		= "bells",
+ 	.id		= 1,
+ };
+ 
++static struct platform_device bells_wm5110_device = {
++	.name		= "bells",
++	.id		= 2,
++};
++
+ static struct regulator_consumer_supply wallvdd_consumers[] = {
+ 	REGULATOR_SUPPLY("SPKVDD", "1-001a"),
+ 	REGULATOR_SUPPLY("SPKVDD1", "1-001a"),
+@@ -376,6 +381,7 @@ static struct platform_device *crag6410_devices[] __initdata = {
+ 	&tobermory_device,
+ 	&littlemill_device,
+ 	&lowland_device,
++	&bells_wm2200_device,
+ 	&bells_wm5102_device,
+ 	&bells_wm5110_device,
+ 	&wallvdd_device,
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.10.4
