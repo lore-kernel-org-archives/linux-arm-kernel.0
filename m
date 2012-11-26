@@ -1,51 +1,70 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Mon, 26 Nov 2012 05:54:18 +0000
-Subject: [PATCH v3 5/5] ARM: OMAP2+: omap2plus_defconfig: Enable RTC
- support
-In-Reply-To: <50AFAA6B.9020706@gmail.com>
-References: <1353404927-14412-1-git-send-email-anilkumar@ti.com>
- <1353404927-14412-6-git-send-email-anilkumar@ti.com>
- <50AFAA6B.9020706@gmail.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA7A4B7@DBDE01.ent.ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 25 Nov 2012 22:00:38 -0800
+Subject: OMAP build now completely broken in latest arm-soc
+In-Reply-To: <20121125140701.GW3332@n2100.arm.linux.org.uk>
+References: <20121125093704.GV3332@n2100.arm.linux.org.uk>
+ <CAOesGMgvGxfghFbyki7aXE8dVbAA7QQP6nwBKhzHftngGRi0Tw@mail.gmail.com>
+ <20121125140701.GW3332@n2100.arm.linux.org.uk>
+Message-ID: <CAOesGMiv374Bhpt=Hu5o7E+eUGhX8R4w=1DLgxzzE6ieRUva=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2012 at 22:25:07, Igor Mazanov wrote:
-> AnilKumar Ch wrote:
-> > AM33XX family of devices uses RTC module, one has to manually enable
-> > this support to use RTC features. So this patch enable RTC driver in
-> > omap2plus_defconfig.
-> > 
-> > Signed-off-by: AnilKumar Ch <anilkumar-l0cyMroinI0@public.gmane.org>
-> > ---
-> >  arch/arm/configs/omap2plus_defconfig |    1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> > index a4b330e..8839ac9 100644
-> > --- a/arch/arm/configs/omap2plus_defconfig
-> > +++ b/arch/arm/configs/omap2plus_defconfig
-> > @@ -194,6 +194,7 @@ CONFIG_SDIO_UART=y
-> >  CONFIG_MMC_OMAP=y
-> >  CONFIG_MMC_OMAP_HS=y
-> >  CONFIG_RTC_CLASS=y
-> > +CONFIG_RTC_DRV_OMAP=y
-> >  CONFIG_RTC_DRV_TWL92330=y
-> >  CONFIG_RTC_DRV_TWL4030=y
-> >  CONFIG_DMADEVICES=y
-> 
-> Hello,
-> 
-> But this is not enough, we need to change drivers/rtc/Kconfig too. This change 
-> was offered in this thread
-> 
-> http://marc.info/?l=linux-arm-kernel&m=135057569913027&w=2
-> 
-> But, may be all this previous rtc-related changes accounted already in some 
-> development branch. I just doesn't see it in the current master. In this case, 
-> when could we get RTC support in the current kernel?
+Hi,
 
-The Kconfig modification already present in mainline (linux-next/master)
+On Sun, Nov 25, 2012 at 6:07 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Nov 25, 2012 at 05:56:58AM -0800, Olof Johansson wrote:
+>> Hi,
+>>
+>> On Sun, Nov 25, 2012 at 1:37 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > Not much more to say...
+>> >
+>> > arch/arm/plat-omap/i2c.c:35:1: error: expected identifier or '(' before '<<' token
+>>
+>> Hmm. In for-next, line 35 is a blank line.
+>>
+>> Could this be because of a merge conflict in your local version? This
+>> is one of the files that has conflicts with mainline right now; I'll
+>> look to see if we can resolve those in our tree later today.
+>
+> Hmm, it looks like a merge conflict which didn't get fixed up... and
+> looking at it, it's beyond what I'd call trivial to fix.
+>
+> So I'll shut down the build system until that can be resolved properly;
+> as OMAP is effectively unbuildable there's not much point it running the
+> builds.
 
-Thanks
-AnilKumar
+Tony, Tomi,
+
+I've taken a stab at resolving these conflicts. They seem to come from
+the cleanups combined with fixes that went upstream, and it seems like
+we want to stick to the arm-soc versions for most of the conflicts.
+
+I've pushed a merge of 3.7-rc7 into next/cleanup (and for-next) of
+arm-soc, can you please check and see if this is the correct
+resolution? As far as I can tell it is, but a double-check would be
+appreciated.
+
+Conflicts were in:
+
+        arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+        arch/arm/plat-omap/i2c.c
+        drivers/video/omap2/dss/dss.c
+
+The hwmod data was trivial (include files). i2c was a little hairier,
+a revert in mainline -- I presumed we're still good with our arm-soc
+contents so I stuck close to what we had there. The DSS change seems
+to be done completely differently in mainline, i.e. the surrounding
+code is different to what we have in arm-soc today, and it looks like
+the bugfix (3630-specific stuff) is taken care of in the version we
+had. So I stuck to that.
+
+But, please speak up ASAP if the above doesn't look correct, since we
+want to fix it up before we merge much on top.
+
+
+Thanks!
+
+
+-Olof
