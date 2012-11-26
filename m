@@ -1,42 +1,35 @@
-From: elen.song@atmel.com (Elen Song)
-Date: Mon, 26 Nov 2012 15:35:42 +0800
-Subject: [question] some question about the residue
-In-Reply-To: <1353912597.7077.67.camel@vkoul-udesk3>
-References: <1353912197-16616-1-git-send-email-elen.song@atmel.com>
- <1353912597.7077.67.camel@vkoul-udesk3>
-Message-ID: <50B31BCE.6020100@atmel.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 25 Nov 2012 23:36:13 -0800
+Subject: [GIT PULL] i.MX defconfig updates
+In-Reply-To: <20121122144547.GH10369@pengutronix.de>
+References: <20121122144547.GH10369@pengutronix.de>
+Message-ID: <20121126073613.GC9580@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-26 14:49, Vinod Koul wrote:
-> On Mon, 2012-11-26 at 14:43 +0800, Elen Song wrote:
->> Hi All:
->>
->> 	I got a question about the residue in struct dma_tx_state:
->>
->> 	I wonder what residue means, is it the current descriptor residue or
->>
->> 	the total dma buffer residue?
-> You read the status for descriptor, so it means this is residue for said
-> descriptor.
->
->
-Hi Koul:
+On Thu, Nov 22, 2012 at 03:45:47PM +0100, Sascha Hauer wrote:
+> Hi,
+> 
+> Please pull the following i.MX defconfig updates for i.MX
+> 
+> Sascha
+> 
+> The following changes since commit a0d271cbfed1dd50278c6b06bead3d00ba0a88f9:
+> 
+>   Linux 3.6 (2012-09-30 16:47:46 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-defconfig
+> 
+> for you to fetch changes up to 5177ae56d1b6dcf4b23f1f89ed3be1c3dc0ad513:
+> 
+>   ARM: imx: configs: Enable CONFIG_MEDIA_CAMERA_SUPPORT (2012-10-10 10:51:00 +0200)
+> 
+> ----------------------------------------------------------------
+> ARM i.MX specific defconfig updates
 
-Well , I don't get it , if I read the status of a LLI, is it means the 
-residue of total LLI length?
+Pulled, thanks.
 
-I saw driver/dma/amba-pl08x.c drivers/dma/coh901318.c, if read status of 
-a LLI, residue is the remain of LLI, not only
-current descriptor.
 
-1 patch from Russel King how he realize device_tx_status said:
-
-[PATCH] ARM: PL08x: clean up LLI lookup
-As the LLI list is an array, we can use maths to locate which LLI
-index we're currently at, and then sum up the remaining LLI entries
-until we reach the end of the list.
-
-Is it right?
-
-best regards
+-Olof
