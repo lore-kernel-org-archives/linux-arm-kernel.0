@@ -1,23 +1,65 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 26 Nov 2012 20:22:57 +0100
-Subject: [PATCH 1/1] ARM: ux500: Rename dbx500 cpufreq code to be more
- generic
-In-Reply-To: <1353601899-14648-1-git-send-email-lee.jones@linaro.org>
-References: <1353601899-14648-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdY-17EkPAsQOkLwLyc7wQRT7FJsY=3nycCe+n+fbMMv0Q@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 26 Nov 2012 12:25:05 -0700
+Subject: [PATCH V3 10/11] ARM: remove struct sys_timer suspend and resume
+ fields
+In-Reply-To: <CACRpkdb-cmwTH_7EJO02m2+CCZrJ2ycgtGpf8stoiFKSm8jqww@mail.gmail.com>
+References: <1353349867-28494-1-git-send-email-swarren@wwwdotorg.org>
+ <1353349867-28494-11-git-send-email-swarren@wwwdotorg.org>
+ <CACRpkdb-cmwTH_7EJO02m2+CCZrJ2ycgtGpf8stoiFKSm8jqww@mail.gmail.com>
+Message-ID: <50B3C211.6000600@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 5:31 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On 11/21/2012 01:28 AM, Linus Walleij wrote:
+> Oh and there was this comment/TODO:
+> 
+> On Mon, Nov 19, 2012 at 7:31 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> 
+>> @@ -17,15 +17,6 @@
+>>   *   Initialise the kernels jiffy timer source, claim interrupt
+>>   *   using setup_irq.  This is called early on during initialisation
+>>   *   while interrupts are still disabled on the local CPU.
+>> - * - suspend
+>> - *   Suspend the kernel jiffy timer source, if necessary.  This
+>> - *   is called with interrupts disabled, after all normal devices
+>> - *   have been suspended.  If no action is required, set this to
+>> - *   NULL.
+>> - * - resume
+>> - *   Resume the kernel jiffy timer source, if necessary.  This
+>> - *   is called with interrupts disabled before any normal devices
+>> - *   are resumed.  If no action is required, set this to NULL.
+>>   * - offset
+>>   *   Return the timer offset in microseconds since the last timer
+>>   *   interrupt.  Note: this must take account of any unprocessed
+>> @@ -33,8 +24,6 @@
+>>   */
+>>  struct sys_timer {
+>>         void                    (*init)(void);
+>> -       void                    (*suspend)(void);
+>> -       void                    (*resume)(void);
+>>  };
+> 
+> So from the above it is quite clear that the sys_timer is breaking
+> the suspend_noirq/resume_noirq naming convention from
+> runtime PM as IRQs are disabled on these paths.
+> 
+> The same goes for struct clock_event_device ...
+> 
+> So while this looks just as bad after as before the patch,
+> we should take a mental notice to rename the .suspend
+> and .resume hooks in the clock_event_device to
+> .suspend_noirq and .resume_noirq at some point.
+> 
+> I was thinking that if your patch set is introducing a
+> plethora of new users of these hooks we should maybe
+> stick a patch at the beginning of the series renaming the
+> hooks to *_noirq, but if it's a major obstacle it can surely wait.
 
-> The cpufreq driver doesn't only handle the db8500 anymore. There
-> are new variants which rely on it too, so we've renamed the
-> driver to be more generic.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-Good!
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+I think I'd prefer to keep that rename separate and do it later; while
+this series does introduce a few new users of the type, there are many
+more pre-existing users. Renaming all the users would end up making this
+series potentially conflict with addition of new users in tip.git or
+elsewhere, whereas any possible current conflicts from this series
+should be resolvable in arm-soc pretty easily I hope, so I'd rather
+create a separate series that does the rename, and probably apply it to
+tip.git, probably for 3.10?
