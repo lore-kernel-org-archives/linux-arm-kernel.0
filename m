@@ -1,46 +1,53 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Nov 2012 11:15:08 -0800
-Subject: [GIT PULL] ARM: ixp4xx: fixes for v3.7
-In-Reply-To: <201211261854.14248.arnd@arndb.de>
-References: <0Lufa8-1TAtF11yb2-00zw9g@mx.kundenserver.de>
- <201211261314.32662.arnd@arndb.de>
- <CAOesGMhRKfhjvhb0u+qADwpSJZbXEhXzbZAFgOdnbkmMgYy0mw@mail.gmail.com>
- <201211261854.14248.arnd@arndb.de>
-Message-ID: <CAOesGMi9sM5g3pd5Bj436ia5uzXWowSdJzqz4_onpdHyCQKPGA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 26 Nov 2012 12:15:17 -0700
+Subject: [PATCH V3 11/11] ARM: delete struct sys_timer
+In-Reply-To: <CAN1soZxf=i9Z9zOpbE2zUW6q6CY9TfOsUB7bf+-K_oLcmFqeCQ@mail.gmail.com>
+References: <1353349867-28494-1-git-send-email-swarren@wwwdotorg.org>
+ <1353349867-28494-12-git-send-email-swarren@wwwdotorg.org>
+ <CAN1soZxf=i9Z9zOpbE2zUW6q6CY9TfOsUB7bf+-K_oLcmFqeCQ@mail.gmail.com>
+Message-ID: <50B3BFC5.8070404@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 10:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 26 November 2012, Olof Johansson wrote:
->
->> > Olof, I'm undecided whether they are still appropriate for 3.7 since
->> > we're past the final -rc now. If we want them in, we should probably
->> > send them to Linus now and let him decide.  For all I can tell, ixp4xx
->> > is already completely broken without these patches, so there should be
->> > no harm in including them, but then again " 13 files changed, 59
->> > insertions(+), 68 deletions(-)" is slightly more than I'd like to send
->> > at this point.
->> >
->> > If you prefer, we can put them into next/fixes-non-critical, but then we
->> > might want to mark more of them as candidates for stable.
+On 11/20/2012 09:43 PM, Haojian Zhuang wrote:
+> On Tue, Nov 20, 2012 at 2:31 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
 >>
->> Since the code has been broken for quite a while, I don't see a big
->> urgency to get it in in the last week of a new release, but I can
->> easily be persuaded differently. Had I done the pull, I would probably
->> have merged them into fixes-non-critical myself.
->
-> I've just done a few pulls that I've found in my email backlog, but it
-> seems you already had everything under control, I was expecting more
-> work to be left over. I probably woudn't have started if I had known
-> it was this little. At least I have a good feeling about not having
-> missed anything important now.
->
->> But, as I said, I don't have strong opinions on the matter. :)
->
-> I can send the pull request(s) for the fixes this time, so at least
-> Linus doesn't blame you for what I pulled in ;-)
+>> Now that the only field in struct sys_timer is .init, delete the struct,
+>> and replace the machine descriptor .timer field with the initialization
+>> function itself.
+>>
+>> This will enable moving timer drivers into drivers/clocksource without
+>> having to place a public prototype of each struct sys_timer object into
+>> include/linux; the intent is to create a single of_clocksource_init()
+>> function that determines which timer driver to initialize by scanning
+>> the device dtree, much like the proposed irqchip_init() at:
+>> http://www.spinics.net/lists/arm-kernel/msg203686.html
+...
+> I checked the patch for mach-mmp.
+> 
+> @@ -69,7 +65,7 @@ static const char *mmp_dt_board_compat[] __initdata = {
+>  DT_MACHINE_START(PXA168_DT, "Marvell PXA168 (Device Tree Support)")
+>         .map_io         = mmp_map_io,
+>         .init_irq       = mmp_dt_irq_init,
+> -       .timer          = &mmp_dt_timer,
+> +       .init_time      = mmp_dt_init_timer,
+>         .init_machine   = pxa168_dt_init,
+>         .dt_compat      = mmp_dt_board_compat,
+>  MACHINE_END
+> @@ -77,7 +73,7 @@ MACHINE_END
+>  DT_MACHINE_START(PXA910_DT, "Marvell PXA910 (Device Tree Support)")
+>         .map_io         = mmp_map_io,
+>         .init_irq       = mmp_dt_irq_init,
+> -       .timer          = &mmp_dt_timer,
+> +       .init_time      = mmp_dt_timer_init,
+>         .init_machine   = pxa910_dt_init,
+>         .dt_compat      = mmp_dt_board_compat,
+>  MACHINE_END
+> 
+> This first init_time is assigned by mmp_dt_init_timer. But the second
+> init_time is
+> assigned by mmp_dt_timer_init. I think it's a typo error. Could you
+> help to fix this?
 
-Haha, ok, deal.
-
-
--Olof
+Thanks, I've fixed that up locally.
