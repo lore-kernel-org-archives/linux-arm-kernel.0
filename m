@@ -1,77 +1,79 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Mon, 26 Nov 2012 21:58:26 +0000
-Subject: [PATCH] ARM: implement optimized percpu variable access
-In-Reply-To: <20121126151534.GA13620@mudshark.cambridge.arm.com>
-References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
- <20121122113401.GC3113@mudshark.cambridge.arm.com>
- <50B2679F.3070107@gmail.com>
- <20121126111337.GA13312@mudshark.cambridge.arm.com>
- <20121126151534.GA13620@mudshark.cambridge.arm.com>
-Message-ID: <20121126215826.GA21160@jl-vm1.vm.bytemark.co.uk>
+From: bevenson@melinkcorp.com (Bryan Evenson)
+Date: Mon, 26 Nov 2012 17:09:46 -0500
+Subject: Help building 3.x kernel for AT91SAM9x5
+In-Reply-To: <91586D499ADFD74FBCFB8425266A5DE40137631A48C0@pluto.melinkcorp.local>
+References: <91586D499ADFD74FBCFB8425266A5DE40137631A48C0@pluto.melinkcorp.local>
+Message-ID: <91586D499ADFD74FBCFB8425266A5DE40137659736F1@pluto.melinkcorp.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon wrote:
-> That was a fun bit of debugging -- my hunch was right, but I was looking in the
-> wrong place because I had an unrelated problem with my bootloader.
+Offline I was directed to this set of instructions: http://www.eewiki.net/display/linuxonarm/AT91SAM9x5.  With this I'm able to build a set of files that boots on the SAM9G25-EK from the SD card.  I'm now trying to modify the steps to boot from NAND flash and I'm having problems.
+
+I have the kernel setup so that it outputs a uImage file suitable for booting from NAND flash and burned it to flash just like I have in the past.  During boot, I get the following output:
+
+    NAND read: device 0 offset 0x200000, size 0x250000                              
+     2424832 bytes read: OK                                                         
+    ## Booting kernel from Legacy Image at 22000000 ...                             
+       Image Name:   Linux-3.7.0-rc5-armv5-x0.10                                    
+       Image Type:   ARM Linux Kernel Image (uncompressed)                          
+       Data Size:    1770360 Bytes = 1.7 MiB                                        
+       Load Address: 20008000                                                       
+       Entry Point:  20008000                                                       
+       Verifying Checksum ... OK                                                    
+       Loading Kernel Image ... OK                                                  
+    OK                                                                              
+                                                                                
+    Starting kernel ...                                                             
+                                                                                
+    Uncompressing Linux... done, booting the kernel.
+
+... and then the system hangs.  At this point I'm at a loss as to what is failing.  My assumption is there is something device tree related that is not properly loaded onto flash, but since I have not worked with the device tree setup before I don't know what to check.  Any help (even redirection to a more appropriate list) would be greatly appreciated.
+
+Thanks,
+Bryan
+
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> kernel-bounces at lists.infradead.org] On Behalf Of Bryan Evenson
+> Sent: Tuesday, November 20, 2012 8:37 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Subject: Help building 3.x kernel for AT91SAM9x5
 > 
-> What happens is that every man and his dog is inlined into __schedule,
-> including all the runqueue accessors, such as this_rq(), which make use of
-> per-cpu offsets to get the correct pointer. The compiler then spits out
-> something like this near the start of the function:
+> All,
 > 
-[...]
->
-> so the address of the current runqueue has been calculated and stored, with
-> a bunch of other stuff, in a structure on the stack.
->
-[...]
->
-> 	barrier();
-> 	/*
-> 	 * this_rq must be evaluated again because prev may have moved
-> 	 * CPUs since it called schedule(), thus the 'rq' on its stack
-> 	 * frame will be invalid.
-> 	 */
-> 	finish_task_switch(this_rq(), prev);
+> I have a AT91SAM9G25 board that I have been using with the 2.6.39
+> kernel and the Atmel supported patches for this kernel using the
+> classic Open Embedded development tree.  I need to move to a 3.x kernel
+> to incorporate the AT91 ADC driver and the bug fixes for the RS-485
+> interface (so I would probably need 3.5 or later).  However, all
+> attempts I have made at building a 3.x kernel for the AT91SAM9G25 have
+> failed to produce a bootable kernel image.  I have tried modifying the
+> OE kernel recipe to utilize a 3.x kernel and I have tried using the
+> Yocto Project tools to build a custom BSP, both of which have failed no
+> matter how I tweak the setup.  Each attempt ends in the same results;
+> U-Boot unpacks the kernel, jumps to the start of the kernel and then
+> the system hangs.  I am looking for assistance in getting a 3.x kernel
+> booting on this device.  I have tried getting help from the Atmel Linux
+> forums and the Yocto Project forums and have not yet had success, so I
+> decided to move closer to the source.
 > 
-> The problem here is that, because our CPU accessors don't actually make any
-> memory references, the barrier() has no effect and the old value is just
-> reloaded off the stack:
->
-[...]
+> If anyone can offer assistance in getting a bootable 3.x kernel for the
+> AT91SAM9G25 I would greatly appreciate it.  I would prefer pointers in
+> how to modify a Bitbake kernel recipe for use with OE or the Yocto
+> Project, but instructions on how to build this kernel with CodeSourcery
+> would also be helpful.
 > 
-> which obviously causes complete chaos if the new task has been pulled from
-> a different runqueue! (this appears as a double spin unlock on rq->lock).
+> Once I get my system up and running, if there SAM9x5 kernel features
+> that need to be tested I would gladly help with testing.
 > 
-> Fixing this without giving up the performance improvement we gain by *avoiding*
-> the memory access in the first place is going to be tricky...
-
-Perhaps look at x86's approach, in arch/x86/include, <asm/current.h>,
-<asm/percpu.h> and <asm/switch_to.h>.
-
-current uses this_cpu_read_stable():
-
-/*
- * this_cpu_read() makes gcc load the percpu variable every time it is
- * accessed while this_cpu_read_stable() allows the value to be cached.
- * this_cpu_read_stable() is more efficient and can be used if its value
- * is guaranteed to be valid across cpus.  The current users include
- * get_current() and get_thread_info() both of which are actually
- * per-thread variables implemented as per-cpu variables and thus
- * stable for the duration of the respective task.
- */
-
-So how does x86 do it?
-
-After lots of staring at the x86 headers, I think
-this_read_cpu_stable() is a non-volatile asm which depends only on the
-address &current_task, which is constant (GCC doesn't know the address
-is dereferenced), and I can't see how reloading the value after
-switch_to() (32 or 64 bit versions) is guaranteed, unless the "p" asm
-is constraint implies something more than "the value is a pointer".
-
-I assume I've missed something very subtle, but if not x86 has the
-same bug/issue as discussed in this thread.
-
--- Jamie
+> Thanks,
+> Bryan Evenson
+> 
+> 
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
