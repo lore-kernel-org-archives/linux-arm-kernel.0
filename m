@@ -1,193 +1,125 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 26 Nov 2012 13:59:11 +0000
-Subject: [PATCH 1/2] gpiolib: add gpio_export_with_name
-In-Reply-To: <1353492849-29397-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20121121101259.GQ4398@game.jcrosoft.org>
- <1353492849-29397-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20121126135911.2F1D33E187C@localhost>
+From: mturquette@ti.com (Mike Turquette)
+Date: Mon, 26 Nov 2012 09:06:41 -0800
+Subject: [PATCH 1/2] clk: ux500: Initial support for abx500 clock driver
+In-Reply-To: <1353580540-3774-2-git-send-email-ulf.hansson@stericsson.com>
+References: <1353580540-3774-1-git-send-email-ulf.hansson@stericsson.com>
+ <1353580540-3774-2-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20121126170641.21126.73503@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Nov 2012 11:14:08 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> allow to specify a name to an exported gpio
+Quoting Ulf Hansson (2012-11-22 02:35:39)
+> From: Ulf Hansson <ulf.hansson@linaro.org>
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> The abx500 clock driver is a platform driver which will be initialized
+> during arch init. The platform device shall be added from the ab-core
+> driver as a mfd child device to maintain correct boot sequence.
+> 
+> Depending on what ab version we use, different clock definitions will
+> be added.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-The gpio sysfs ABI is already horrible, racy, and unsafe. Really, we
-need a proper chrdev interface for controlling gpios. Sysfs is fine for
-poking around and experimenting, but we cannot provide any fine grained
-access control, locking or faster IO with the one-file-per-gpio sysfs
-model. So, no, I don't think this is a good idea to extend gpiolib in
-this way.
+Taken into clk-next.
 
-However, I would be okay with making gpiochips first-class kobjects or
-struct devices that appear as a child of the gpio controller device so
-that userspace could interrogate the device tree node associated with
-the device.
-
-g.
+Thanks,
+Mike
 
 > ---
->  arch/mips/include/asm/mach-au1x00/gpio-au1000.h |    3 ++-
->  arch/mips/include/asm/mach-au1x00/gpio-au1300.h |    3 ++-
->  drivers/gpio/gpiolib.c                          |   12 +++++++-----
->  include/asm-generic/gpio.h                      |    6 ++++--
->  include/linux/gpio.h                            |   23 ++++++++++++++++++++++-
->  5 files changed, 37 insertions(+), 10 deletions(-)
+>  drivers/clk/ux500/Makefile     |    3 ++
+>  drivers/clk/ux500/abx500-clk.c |   73 ++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 76 insertions(+)
+>  create mode 100644 drivers/clk/ux500/abx500-clk.c
 > 
-> diff --git a/arch/mips/include/asm/mach-au1x00/gpio-au1000.h b/arch/mips/include/asm/mach-au1x00/gpio-au1000.h
-> index 73853b5a..af4accb 100644
-> --- a/arch/mips/include/asm/mach-au1x00/gpio-au1000.h
-> +++ b/arch/mips/include/asm/mach-au1x00/gpio-au1000.h
-> @@ -633,7 +633,8 @@ static inline int gpio_set_debounce(unsigned gpio, unsigned debounce)
->  	return -ENOSYS;
->  }
->  
-> -static inline int gpio_export(unsigned gpio, bool direction_may_change)
-> +static inline int gpio_export_with_name(unsigned gpio,
-> +	bool direction_may_change, const char *name)
->  {
->  	return -ENOSYS;
->  }
-> diff --git a/arch/mips/include/asm/mach-au1x00/gpio-au1300.h b/arch/mips/include/asm/mach-au1x00/gpio-au1300.h
-> index fb9975c..fcd152e 100644
-> --- a/arch/mips/include/asm/mach-au1x00/gpio-au1300.h
-> +++ b/arch/mips/include/asm/mach-au1x00/gpio-au1300.h
-> @@ -234,7 +234,8 @@ static inline void gpio_unexport(unsigned gpio)
->  {
->  }
->  
-> -static inline int gpio_export(unsigned gpio, bool direction_may_change)
-> +static inline int gpio_export_with_name(unsigned gpio,
-> +	bool direction_may_change, const char *name)
->  {
->  	return -ENOSYS;
->  }
-> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-> index b667f76..2141165 100644
-> --- a/drivers/gpio/gpiolib.c
-> +++ b/drivers/gpio/gpiolib.c
-> @@ -714,9 +714,10 @@ static struct class gpio_class = {
->  
->  
->  /**
-> - * gpio_export - export a GPIO through sysfs
-> + * gpio_export_with_name - export a GPIO through sysfs
->   * @gpio: gpio to make available, already requested
->   * @direction_may_change: true if userspace may change gpio direction
-> + * @name: gpio name
->   * Context: arch_initcall or later
->   *
->   * When drivers want to make a GPIO accessible to userspace after they
-> @@ -728,7 +729,7 @@ static struct class gpio_class = {
->   *
->   * Returns zero on success, else an error.
->   */
-> -int gpio_export(unsigned gpio, bool direction_may_change)
-> +int gpio_export_with_name(unsigned gpio, bool direction_may_change, const char *name)
->  {
->  	unsigned long		flags;
->  	struct gpio_desc	*desc;
-> @@ -766,7 +767,9 @@ int gpio_export(unsigned gpio, bool direction_may_change)
->  		direction_may_change = false;
->  	spin_unlock_irqrestore(&gpio_lock, flags);
->  
-> -	if (desc->chip->names && desc->chip->names[gpio - desc->chip->base])
-> +	if (name)
-> +		ioname = name;
-> +	else if (desc->chip->names && desc->chip->names[gpio - desc->chip->base])
->  		ioname = desc->chip->names[gpio - desc->chip->base];
->  
->  	dev = device_create(&gpio_class, desc->chip->dev, MKDEV(0, 0),
-> @@ -804,7 +807,7 @@ fail_unlock:
->  	pr_debug("%s: gpio%d status %d\n", __func__, gpio, status);
->  	return status;
->  }
-> -EXPORT_SYMBOL_GPL(gpio_export);
-> +EXPORT_SYMBOL_GPL(gpio_export_with_name);
->  
->  static int match_export(struct device *dev, void *data)
->  {
-> @@ -856,7 +859,6 @@ done:
->  }
->  EXPORT_SYMBOL_GPL(gpio_export_link);
->  
-> -
->  /**
->   * gpio_sysfs_set_active_low - set the polarity of gpio sysfs value
->   * @gpio: gpio to change
-> diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
-> index b6516f3..d04fc55 100644
-> --- a/include/asm-generic/gpio.h
-> +++ b/include/asm-generic/gpio.h
-> @@ -204,7 +204,8 @@ void devm_gpio_free(struct device *dev, unsigned int gpio);
->   * A sysfs interface can be exported by individual drivers if they want,
->   * but more typically is configured entirely from userspace.
->   */
-> -extern int gpio_export(unsigned gpio, bool direction_may_change);
-> +extern int gpio_export_with_name(unsigned gpio, bool direction_may_change,
-> +			const char *name);
->  extern int gpio_export_link(struct device *dev, const char *name,
->  			unsigned gpio);
->  extern int gpio_sysfs_set_active_low(unsigned gpio, int value);
-> @@ -249,7 +250,8 @@ struct device;
->  
->  /* sysfs support is only available with gpiolib, where it's optional */
->  
-> -static inline int gpio_export(unsigned gpio, bool direction_may_change)
-> +static inline int gpio_export_with_name(unsigned gpio,
-> +	bool direction_may_change, const char *name)
->  {
->  	return -ENOSYS;
->  }
-> diff --git a/include/linux/gpio.h b/include/linux/gpio.h
-> index 7ba2762..6e01b8c 100644
-> --- a/include/linux/gpio.h
-> +++ b/include/linux/gpio.h
-> @@ -189,7 +189,8 @@ static inline void gpio_set_value_cansleep(unsigned gpio, int value)
->  	WARN_ON(1);
->  }
->  
-> -static inline int gpio_export(unsigned gpio, bool direction_may_change)
-> +static inline int gpio_export_with_name(unsigned gpio,
-> +	bool direction_may_change, const char *name)
->  {
->  	/* GPIO can never have been requested or set as {in,out}put */
->  	WARN_ON(1);
-> @@ -247,4 +248,24 @@ gpiochip_remove_pin_ranges(struct gpio_chip *chip)
->  
->  #endif /* ! CONFIG_GENERIC_GPIO */
->  
-> +/**
-> + * gpio_export - export a GPIO through sysfs
-> + * @gpio: gpio to make available, already requested
-> + * @direction_may_change: true if userspace may change gpio direction
-> + * Context: arch_initcall or later
+> diff --git a/drivers/clk/ux500/Makefile b/drivers/clk/ux500/Makefile
+> index 858fbfe..bcc0c11 100644
+> --- a/drivers/clk/ux500/Makefile
+> +++ b/drivers/clk/ux500/Makefile
+> @@ -10,3 +10,6 @@ obj-y += clk-prcmu.o
+>  obj-y += u8500_clk.o
+>  obj-y += u9540_clk.o
+>  obj-y += u8540_clk.o
+> +
+> +# ABX500 clock driver
+> +obj-y += abx500-clk.o
+> diff --git a/drivers/clk/ux500/abx500-clk.c b/drivers/clk/ux500/abx500-clk.c
+> new file mode 100644
+> index 0000000..e27c523
+> --- /dev/null
+> +++ b/drivers/clk/ux500/abx500-clk.c
+> @@ -0,0 +1,73 @@
+> +/*
+> + * abx500 clock implementation for ux500 platform.
 > + *
-> + * When drivers want to make a GPIO accessible to userspace after they
-> + * have requested it -- perhaps while debugging, or as part of their
-> + * public interface -- they may use this routine.  If the GPIO can
-> + * change direction (some can't) and the caller allows it, userspace
-> + * will see "direction" sysfs attribute which may be used to change
-> + * the gpio's direction.  A "value" attribute will always be provided.
+> + * Copyright (C) 2012 ST-Ericsson SA
+> + * Author: Ulf Hansson <ulf.hansson@linaro.org>
 > + *
-> + * Returns zero on success, else an error.
+> + * License terms: GNU General Public License (GPL) version 2
 > + */
-> +static inline int gpio_export(unsigned gpio,bool direction_may_change)
+> +
+> +#include <linux/err.h>
+> +#include <linux/module.h>
+> +#include <linux/device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/mfd/abx500/ab8500.h>
+> +
+> +/* TODO: Add clock implementations here */
+> +
+> +
+> +/* Clock definitions for ab8500 */
+> +static int ab8500_reg_clks(struct device *dev)
 > +{
-> +	return gpio_export_with_name(gpio, direction_may_change, NULL);
+> +       return 0;
 > +}
 > +
->  #endif /* __LINUX_GPIO_H */
+> +/* Clock definitions for ab8540 */
+> +static int ab8540_reg_clks(struct device *dev)
+> +{
+> +       return 0;
+> +}
+> +
+> +/* Clock definitions for ab9540 */
+> +static int ab9540_reg_clks(struct device *dev)
+> +{
+> +       return 0;
+> +}
+> +
+> +static int __devinit abx500_clk_probe(struct platform_device *pdev)
+> +{
+> +       struct ab8500 *parent = dev_get_drvdata(pdev->dev.parent);
+> +       int ret;
+> +
+> +       if (is_ab8500(parent) || is_ab8505(parent)) {
+> +               ret = ab8500_reg_clks(&pdev->dev);
+> +       } else if (is_ab8540(parent)) {
+> +               ret = ab8540_reg_clks(&pdev->dev);
+> +       } else if (is_ab9540(parent)) {
+> +               ret = ab9540_reg_clks(&pdev->dev);
+> +       } else {
+> +               dev_err(&pdev->dev, "non supported plf id\n");
+> +               return -ENODEV;
+> +       }
+> +
+> +       return ret;
+> +}
+> +
+> +static struct platform_driver abx500_clk_driver = {
+> +       .driver = {
+> +               .name = "abx500-clk",
+> +               .owner = THIS_MODULE,
+> +       },
+> +       .probe  = abx500_clk_probe,
+> +};
+> +
+> +static int __init abx500_clk_init(void)
+> +{
+> +       return platform_driver_register(&abx500_clk_driver);
+> +}
+> +
+> +arch_initcall(abx500_clk_init);
+> +
+> +MODULE_AUTHOR("Ulf Hansson <ulf.hansson@linaro.org");
+> +MODULE_DESCRIPTION("ABX500 clk driver");
+> +MODULE_LICENSE("GPL v2");
 > -- 
-> 1.7.10.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+> 1.7.10
