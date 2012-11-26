@@ -1,92 +1,205 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 26 Nov 2012 10:43:10 +0100 (CET)
-Subject: [PATCH 3/3] MMC: sdhci-dove: allow GPIOs to be used for card
- detection on Dove
-In-Reply-To: <871ufh8lza.fsf@octavius.laptop.org>
-References: <20121122235426.GT3332@n2100.arm.linux.org.uk>
- <E1TbgcZ-0007Kt-35@rmk-PC.arm.linux.org.uk>
- <20121123083117.GA25754@S2100-06.ap.freescale.net>
- <20121123085726.GK5764@n2100.arm.linux.org.uk>
- <20121123121422.GA26168@S2100-06.ap.freescale.net>
- <20121123125507.GO5764@n2100.arm.linux.org.uk>
- <871ufh8lza.fsf@octavius.laptop.org>
-Message-ID: <Pine.LNX.4.64.1211260955070.11501@axis700.grange>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 26 Nov 2012 20:45:46 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the net-next tree
+Message-ID: <20121126204546.ef1f1b55e903eda38a61d5d1@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris
+Hi all,
 
-On Sun, 25 Nov 2012, Chris Ball wrote:
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/boot/dts/am33xx.dtsi between commit 1a39a65cba08 ("arm/dts:
+am33xx: Add CPSW and MDIO module nodes for AM33XX") from the net-next
+tree and commits 059b185d5345 ("ARM: dts: AM33XX: Add D_CAN device tree
+data") and 4c94ac29b5c1 ("ARM: dts: OMAP: Move interrupt-parent to the
+root node to avoid duplication") (and a few others that added more later
+nodes) from the arm-soc tree.
 
-> Hi, adding Guennadi,
-> 
-> On Fri, Nov 23 2012, Russell King - ARM Linux wrote:
-> > On Fri, Nov 23, 2012 at 08:14:27PM +0800, Shawn Guo wrote:
-> >> On Fri, Nov 23, 2012 at 08:57:26AM +0000, Russell King - ARM Linux wrote:
-> >> > Does this work with the sdhci stuff?
-> >> 
-> >> Honestly, I'm not sure, but I guess it does, since I have seen
-> >> sdhci-pxav3 driver using the helpers.  Anyway, I'm going to adopt
-> >> the helpers for sdhci-esdhc-imx driver to find it out.
-> >
-> > The thing that worries me is this:
-> >
-> > static void sdhci_tasklet_card(unsigned long param)
-> > {
-> > ...
-> >         /* Check host->mrq first in case we are runtime suspended */
-> >         if (host->mrq &&
-> >             !(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT)) {
-> >                 pr_err("%s: Card removed during transfer!\n",
-> >                         mmc_hostname(host->mmc));
-> >                 pr_err("%s: Resetting controller.\n",
-> >                         mmc_hostname(host->mmc));
-> >
-> >                 sdhci_reset(host, SDHCI_RESET_CMD);
-> >                 sdhci_reset(host, SDHCI_RESET_DATA);
-> >
-> >                 host->mrq->cmd->error = -ENOMEDIUM;
-> >                 tasklet_schedule(&host->finish_tasklet);
-> >         }
-> > ...
-> >         mmc_detect_change(host->mmc, msecs_to_jiffies(200));
-> > }
-> >
-> >
-> > That gets called whenever a card is inserted/removed by the SDHCI code (if
-> > the SDHCI card detect is wired), or in my case by the interrupt routine
-> > the code in my patch adds.
-> >
-> > The slot-gpio.c stuff directly calls into mmc_detect_change (a) with a
-> > shorter delay, and (b) completely omits the above handling and resetting.
-> > My guess from the above code is that it'll work fine 90% of the time
-> > (because you'll remove the card without an active request), but the above
-> > code looks like it's addressing a corner case which will be omitted with
-> > the "generic" slot-gpio.c solution.
-> >
-> > So I don't think it's a good idea to use slot-gpio.c in this case.
-> 
-> Guennadi, what are your thoughts about consolidating this reset logic
-> between the sdhci tasklet and slot-gpio?  It would certainly be nice to
-> use slot-gpio in cases like this one, so it's worth fixing.
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-Sure, this can be added. As for how - I see at least two possibilities: 
-(1) put the complete above block in a new mmc host operation and just call 
-it from the GPIO card-detect ISR, (2) taking into account, that many 
-(nearly all? all?) host drivers keep a pointer to the current mrq in their 
-private data struct, we could instead add such a pointer to struct 
-mmc_host, then the check "request in progress" could also be generalised, 
-and the operation would just have to reset the host and complete the 
-request (in the sdhci case schedule the task).
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-Note, that there's already a .hw_reset() operation, used by sdhci-pci only 
-so far, still, it seems we cannot (easily) hijack it.
-
-So, what would be the preferred way?
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+diff --cc arch/arm/boot/dts/am33xx.dtsi
+index a4615b4,20a3f29..0000000
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@@ -210,53 -222,121 +222,168 @@@
+  			interrupts = <91>;
+  		};
+  
+ +		mac: ethernet at 4a100000 {
+ +			compatible = "ti,cpsw";
+ +			ti,hwmods = "cpgmac0";
+ +			cpdma_channels = <8>;
+ +			ale_entries = <1024>;
+ +			bd_ram_size = <0x2000>;
+ +			no_bd_ram = <0>;
+ +			rx_descs = <64>;
+ +			mac_control = <0x20>;
+ +			slaves = <2>;
+ +			cpts_active_slave = <0>;
+ +			cpts_clock_mult = <0x80000000>;
+ +			cpts_clock_shift = <29>;
+ +			reg = <0x4a100000 0x800
+ +			       0x4a101200 0x100>;
+ +			#address-cells = <1>;
+ +			#size-cells = <1>;
+- 			interrupt-parent = <&intc>;
+ +			/*
+ +			 * c0_rx_thresh_pend
+ +			 * c0_rx_pend
+ +			 * c0_tx_pend
+ +			 * c0_misc_pend
+ +			 */
+ +			interrupts = <40 41 42 43>;
+ +			ranges;
+ +
+ +			davinci_mdio: mdio at 4a101000 {
+ +				compatible = "ti,davinci_mdio";
+ +				#address-cells = <1>;
+ +				#size-cells = <0>;
+ +				ti,hwmods = "davinci_mdio";
+ +				bus_freq = <1000000>;
+ +				reg = <0x4a101000 0x100>;
+ +			};
+ +
+ +			cpsw_emac0: slave at 4a100200 {
+ +				/* Filled in by U-Boot */
+ +				mac-address = [ 00 00 00 00 00 00 ];
+ +			};
+ +
+ +			cpsw_emac1: slave at 4a100300 {
+ +				/* Filled in by U-Boot */
+ +				mac-address = [ 00 00 00 00 00 00 ];
+ +			};
+ +
+ +		};
+++
++ 		dcan0: d_can at 481cc000 {
++ 			compatible = "bosch,d_can";
++ 			ti,hwmods = "d_can0";
++ 			reg = <0x481cc000 0x2000>;
++ 			interrupts = <52>;
++ 			status = "disabled";
++ 		};
++ 
++ 		dcan1: d_can at 481d0000 {
++ 			compatible = "bosch,d_can";
++ 			ti,hwmods = "d_can1";
++ 			reg = <0x481d0000 0x2000>;
++ 			interrupts = <55>;
++ 			status = "disabled";
++ 		};
++ 
++ 		timer1: timer at 44e31000 {
++ 			compatible = "ti,omap2-timer";
++ 			reg = <0x44e31000 0x400>;
++ 			interrupts = <67>;
++ 			ti,hwmods = "timer1";
++ 			ti,timer-alwon;
++ 		};
++ 
++ 		timer2: timer at 48040000 {
++ 			compatible = "ti,omap2-timer";
++ 			reg = <0x48040000 0x400>;
++ 			interrupts = <68>;
++ 			ti,hwmods = "timer2";
++ 		};
++ 
++ 		timer3: timer at 48042000 {
++ 			compatible = "ti,omap2-timer";
++ 			reg = <0x48042000 0x400>;
++ 			interrupts = <69>;
++ 			ti,hwmods = "timer3";
++ 		};
++ 
++ 		timer4: timer at 48044000 {
++ 			compatible = "ti,omap2-timer";
++ 			reg = <0x48044000 0x400>;
++ 			interrupts = <92>;
++ 			ti,hwmods = "timer4";
++ 			ti,timer-pwm;
++ 		};
++ 
++ 		timer5: timer at 48046000 {
++ 			compatible = "ti,omap2-timer";
++ 			reg = <0x48046000 0x400>;
++ 			interrupts = <93>;
++ 			ti,hwmods = "timer5";
++ 			ti,timer-pwm;
++ 		};
++ 
++ 		timer6: timer at 48048000 {
++ 			compatible = "ti,omap2-timer";
++ 			reg = <0x48048000 0x400>;
++ 			interrupts = <94>;
++ 			ti,hwmods = "timer6";
++ 			ti,timer-pwm;
++ 		};
++ 
++ 		timer7: timer at 4804a000 {
++ 			compatible = "ti,omap2-timer";
++ 			reg = <0x4804a000 0x400>;
++ 			interrupts = <95>;
++ 			ti,hwmods = "timer7";
++ 			ti,timer-pwm;
++ 		};
++ 
++ 		rtc at 44e3e000 {
++ 			compatible = "ti,da830-rtc";
++ 			reg = <0x44e3e000 0x1000>;
++ 			interrupts = <75
++ 				      76>;
++ 			ti,hwmods = "rtc";
++ 		};
++ 
++ 		spi0: spi at 48030000 {
++ 			compatible = "ti,omap4-mcspi";
++ 			#address-cells = <1>;
++ 			#size-cells = <0>;
++ 			reg = <0x48030000 0x400>;
++ 			interrupt = <65>;
++ 			ti,spi-num-cs = <2>;
++ 			ti,hwmods = "spi0";
++ 			status = "disabled";
++ 		};
++ 
++ 		spi1: spi at 481a0000 {
++ 			compatible = "ti,omap4-mcspi";
++ 			#address-cells = <1>;
++ 			#size-cells = <0>;
++ 			reg = <0x481a0000 0x400>;
++ 			interrupt = <125>;
++ 			ti,spi-num-cs = <2>;
++ 			ti,hwmods = "spi1";
++ 			status = "disabled";
++ 		};
++ 
++ 		usb at 47400000 {
++ 			compatible = "ti,musb-am33xx";
++ 			reg = <0x47400000 0x1000	/* usbss */
++ 			       0x47401000 0x800		/* musb instance 0 */
++ 			       0x47401800 0x800>;	/* musb instance 1 */
++ 			interrupts = <17		/* usbss */
++ 				      18		/* musb instance 0 */
++ 				      19>;		/* musb instance 1 */
++ 			multipoint = <1>;
++ 			num-eps = <16>;
++ 			ram-bits = <12>;
++ 			port0-mode = <3>;
++ 			port1-mode = <3>;
++ 			power = <250>;
++ 			ti,hwmods = "usb_otg_hs";
++ 		};
+  	};
+  };
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121126/222ee1ff/attachment.sig>
