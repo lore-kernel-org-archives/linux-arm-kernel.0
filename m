@@ -1,33 +1,108 @@
-From: tcmichals@gmail.com (Tim Michals)
-Date: Wed, 28 Nov 2012 13:15:23 -0600
-Subject: [PATCH] add hardware I2C support for ARM IMX23
-In-Reply-To: <20121128195821.71024xoxi57896tp@62.129.139.42>
-References: <20121128152403.45224dvyaufb1j7n@62.129.139.42>
- <20121128150851.GA4659@pengutronix.de>
- <20121128171039.14705ltphptrp5kv@62.129.139.42>
- <20121128162452.GB4659@pengutronix.de>
- <50B63F81.4050008@van-ginkel.eu>
- <CANqk_c-UemJvfoFQMt-iNUU0YmiSt-fb-=Y9=eKwE=ka-ffw6A@mail.gmail.com>
- <20121128195821.71024xoxi57896tp@62.129.139.42>
-Message-ID: <CANqk_c9ZuDz+krHgUHTC=1GrmBw=5pd9GDsdiy17iFDgi5Hrjg@mail.gmail.com>
+From: chlrbgh0@gmail.com (Kyuho Choi)
+Date: Mon, 26 Nov 2012 21:23:01 +0900
+Subject: [PATCH] ARM: dts: add initial dts file for ORIGEN4QUAD
+In-Reply-To: <CAH9JG2VSnA3zJCP9OiBbrdaV1GqVKL0x4fn331D7YJxQs8VwMg@mail.gmail.com>
+References: <1353929538-24173-1-git-send-email-kh.choi@insignal.co.kr>
+ <CAH9JG2VSnA3zJCP9OiBbrdaV1GqVKL0x4fn331D7YJxQs8VwMg@mail.gmail.com>
+Message-ID: <CAP2JTQKTGL0qsQXgS5K55UFH1X47aKvxP0NG7SkZn2+XTJw7-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sander,
+Hi,
 
+2012/11/26 Kyungmin Park <kmpark@infradead.org>
 
-
-
->  mxs-i2c 80058000.i2c: Failed to get PIO reg. write descriptor.
+> Hi,
 >
-> Yes, this is the same issue I've encountered, DMA operation did not
-terminate, as a quick fix added dmaengine_terminate_all(i2c->dmach);  to
-the last line of
-static void mxs_i2c_reset(struct mxs_i2c_dev *i2c)
-{
-...
-dmaengine_terminate_all(i2c->dmach);
-}
+> On 11/26/12, chlrbgh0 at gmail.com <chlrbgh0@gmail.com> wrote:
+> > From: Kyuho Choi <kh.choi@insignal.co.kr>
+> >
+> > This patch adds initial dts file for ORIGEN4QUAD board.
+> > ORIGEN4QUAD board based on Samsung EXYNOS4412 SoC.
+> > More properties will be added later.
+> >
+> > Signed-off-by: Kyuho Choi <kh.choi@insignal.co.kr>
+> > ---
+> >  arch/arm/boot/dts/exynos4412-origen4quad.dts |   45
+> > ++++++++++++++++++++++++++
+> >  1 files changed, 45 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/boot/dts/exynos4412-origen4quad.dts
+> >
+> > diff --git a/arch/arm/boot/dts/exynos4412-origen4quad.dts
+> > b/arch/arm/boot/dts/exynos4412-origen4quad.dts
+> > new file mode 100644
+> > index 0000000..390a2ab
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/exynos4412-origen4quad.dts
+> > @@ -0,0 +1,45 @@
+> > +/*
+> > + * Samsung's Exynos4412 based Origen4Quad board device tree source
+> > + *
+> > + * Copyright (c) 2012-2013 Isnignal Co., Ltd.
+> > + *           http://www.insignal.co.kr
+> > + *
+> > + * Device tree source file for Insignal's Origen4Quad board which is
+> based
+> > on
+> > + * Samsung's Exynos4412 SoC.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > +*/
+> > +
+> > +/dts-v1/;
+> > +/include/ "exynos4412.dtsi"
+> > +
+> > +/ {
+> > +     model = "Insignal Origen4Quad board based on Exynos4412";
+> > +     compatible = "insignal,origen4quad", "samsung,exynos4412";
+> > +
+> > +     memory {
+> > +             reg = <0x40000000 0x40000000>;
+> > +     };
+> does it test to boot with this dts file?
+> does it support 1GiB memory section?
+>
+> Yes, I'd test this dts.
+ORIGEN4QUAD board support 1GiB memory section.
+But in current patch, only support 760MiB on boot.
+
+> Thank you,
+> Kyungmin Park
+> > +
+> > +     chosen {
+> > +             bootargs ="root=/dev/ram0 rw ramdisk=32768
+> initrd=0x41000000,32M
+> > console=ttySAC2,115200 init=/linuxrc";
+> > +     };
+> > +
+> > +     serial at 13800000 {
+> > +             status = "okay";
+> > +     };
+> > +
+> > +     serial at 13810000 {
+> > +             status = "okay";
+> > +     };
+> > +
+> > +     serial at 13820000 {
+> > +             status = "okay";
+> > +     };
+> > +
+> > +     serial at 13830000 {
+> > +             status = "okay";
+> > +     };
+> > +};
+> > --
+> > 1.7.5.4
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+>
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121128/4dc5bdb2/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121126/7879a6f7/attachment-0001.html>
