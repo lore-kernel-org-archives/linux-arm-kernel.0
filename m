@@ -1,51 +1,63 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 26 Nov 2012 15:45:01 +0000
-Subject: [PATCH] ARM: S3C64XX: Add registration of WM2200 Bells device on
- Cragganmore
-Message-ID: <1353944701-5129-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 26 Nov 2012 07:53:58 -0800
+Subject: linux-next: manual merge of the arm-soc tree with the
+ omap_dss2 tree
+In-Reply-To: <20121126215600.236b2e44ffea1abbea26898b@canb.auug.org.au>
+References: <20121126215600.236b2e44ffea1abbea26898b@canb.auug.org.au>
+Message-ID: <20121126155358.GH5279@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/mach-crag6410.c |   10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+* Stephen Rothwell <sfr@canb.auug.org.au> [121126 02:58]:
+> Hi all,
+> 
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/plat-omap/common.c between commit b022e17b1c7e ("OMAP: common.c:
+> remove init call to vram") from the omap_dss2 tree and commit
+> f583f0f2c720 ("ARM: OMAP2+: Move omap_reserve() locally to mach-omap2")
+> from the arm-soc tree.
+> 
+> I fixed it up (by deleting the file and adding the following patch) and
+> can carry the fix as necessary (no action is required).
 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index 2abe95d..c06bcfa 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -287,16 +287,21 @@ static struct platform_device littlemill_device = {
- 	.id		= -1,
- };
+Thanks this is the correct fix.
+
+Tony
  
--static struct platform_device bells_wm5102_device = {
-+static struct platform_device bells_wm2200_device = {
- 	.name		= "bells",
- 	.id		= 0,
- };
- 
--static struct platform_device bells_wm5110_device = {
-+static struct platform_device bells_wm5102_device = {
- 	.name		= "bells",
- 	.id		= 1,
- };
- 
-+static struct platform_device bells_wm5110_device = {
-+	.name		= "bells",
-+	.id		= 2,
-+};
-+
- static struct regulator_consumer_supply wallvdd_consumers[] = {
- 	REGULATOR_SUPPLY("SPKVDD", "1-001a"),
- 	REGULATOR_SUPPLY("SPKVDD1", "1-001a"),
-@@ -376,6 +381,7 @@ static struct platform_device *crag6410_devices[] __initdata = {
- 	&tobermory_device,
- 	&littlemill_device,
- 	&lowland_device,
-+	&bells_wm2200_device,
- 	&bells_wm5102_device,
- 	&bells_wm5110_device,
- 	&wallvdd_device,
--- 
-1.7.10.4
+> From 523f2987a07f97c946c63e0be4558b8332b46e8f Mon Sep 17 00:00:00 2001
+> From: Stephen Rothwell <sfr@canb.auug.org.au>
+> Date: Mon, 26 Nov 2012 21:51:20 +1100
+> Subject: [PATCH] OMAP: common.c: remove init call to vram fixup
+> 
+> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> ---
+>  arch/arm/mach-omap2/common.c |    3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
+> index 5c2fd48..2dabb9e 100644
+> --- a/arch/arm/mach-omap2/common.c
+> +++ b/arch/arm/mach-omap2/common.c
+> @@ -16,8 +16,6 @@
+>  #include <linux/init.h>
+>  #include <linux/platform_data/dsp-omap.h>
+>  
+> -#include <plat/vram.h>
+> -
+>  #include "common.h"
+>  #include "omap-secure.h"
+>  
+> @@ -32,7 +30,6 @@ int __weak omap_secure_ram_reserve_memblock(void)
+>  
+>  void __init omap_reserve(void)
+>  {
+> -	omap_vram_reserve_sdram_memblock();
+>  	omap_dsp_reserve_sdram_memblock();
+>  	omap_secure_ram_reserve_memblock();
+>  	omap_barrier_reserve_memblock();
+> -- 
+> 1.7.10.280.gaa39
+> 
+> -- 
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
