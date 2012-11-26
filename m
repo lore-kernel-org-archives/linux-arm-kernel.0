@@ -1,44 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 26 Nov 2012 12:08:44 -0700
-Subject: [PATCH v5 07/10] document: devicetree: bind pinconf with pin
- single
-In-Reply-To: <1352968600-15345-8-git-send-email-haojian.zhuang@gmail.com>
-References: <1352968600-15345-1-git-send-email-haojian.zhuang@gmail.com>
- <1352968600-15345-8-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <50B3BE3C.2040600@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 26 Nov 2012 20:10:53 +0100
+Subject: [GIT PULL] Integrator SoC bus patches
+In-Reply-To: <201211261842.34190.arnd@arndb.de>
+References: <CACRpkdYKWLMMOa7+CV8yMNe5-EV1p5fYeVJ+bn55KLLFBZdD=A@mail.gmail.com>
+ <201211261842.34190.arnd@arndb.de>
+Message-ID: <CACRpkdbbxK4Z6PTD8MCTaMizQV9T=oc3neFVjRc1n95gCvn-SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2012 01:36 AM, Haojian Zhuang wrote:
-> Add comments with pinconf & gpio range in the document of
-> pinctrl-single.
+On Mon, Nov 26, 2012 at 7:42 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+>> tags/integrator-socbus
+>
+> I'm going through my list of old pull requests to see if anything got
+> missed. I don't see this one in arm-soc, and the tag doesn't seem to
+> be there in your kernel.org tree at this point. If this is something
+> that should be merged in 3.8, please send another pull request with
+> a working tag.
 
-> +- pinctrl-single,power-source : array of value that are used to configure
-> +  power source in the pinmux register. They're value of power source field
-> +  and power source mask.
-> +
-> +		/* power source, mask */
-> +		pinctrl-single,power-source = <0x1000 0x1800>;
-> +
-> +- pinctrl-single,bias : array of value that are used to configure the input
-> +  bias in the pinmux register.  They're value of bias field, bias mask,
-> +  bias disable value, bias pull down value & bias pull up value.
-> +
-> +		/* bias, mask, disable, pull down, pull up */
-> +		pinctrl-single,bias = <0xc000 0xe000 0 0xa000 0xc000>;
-> +
-> +- pinctrl-single,input-schmitt : array of value that are used to configure
-> +  input schmitt in the pinmux register. They're value of input schmitt field,
-> +  mask, & disable value.
-> +
-> +		/* input schmitt value, mask, disable */
-> +		pinctrl-single,input-schmitt = <0x40 0x70 0x40>;
+It was reiterated as tags/integrator-for-arm-soc
 
-For all 3 of those, the first cell in the property is "value". What does
-"value" represent? Surely the properties in the pinmux controller node
-itself just specify how to write to the field (so should specify field
-mask, and perhaps values for specific enums). However, any "value" to be
-actually written to the field should be specified by the pin
-configuration (sub) nodes, not the global top-level properties.
+I'll send a fresh pull request mail.
+
+> I remember having looked at the patches and I'm pretty sure they were
+> all good to go in, so I have no idea what went wrong here.
+
+Slipped between chairs, no big deal.
+
+Yours,
+Linus Walleij
