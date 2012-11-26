@@ -1,18 +1,21 @@
 From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 26 Nov 2012 11:16:15 +0100 (CET)
+Date: Mon, 26 Nov 2012 11:18:53 +0100 (CET)
 Subject: [PATCH 2/7] mmc: sdhi: enchance OF support for flags and cd-gpios
 In-Reply-To: <1353889014-17142-3-git-send-email-horms@verge.net.au>
 References: <1353889014-17142-1-git-send-email-horms@verge.net.au>
  <1353889014-17142-3-git-send-email-horms@verge.net.au>
-Message-ID: <Pine.LNX.4.64.1211261050340.11501@axis700.grange>
+Message-ID: <Pine.LNX.4.64.1211261116260.11501@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon
-
-Thanks for the patch, please, see some comments inline.
-
 On Mon, 26 Nov 2012, Simon Horman wrote:
+
+Sorry, forgot to mention: it is always good to add 
+devicetree-discuss at lists.ozlabs.org to such patches, also we need a 
+document undet Documentation/devicetree/bindings/mmc/.
+
+Thanks
+Guennadi
 
 > Enhance the OF support for SDHI by adding the following bindings:
 > 
@@ -33,32 +36,7 @@ On Mon, 26 Nov 2012, Simon Horman wrote:
 > 
 > This patch also requests the clock based on the device tree
 > node name if the platform data is absent.
-
-I'm not sure this is a good idea. IIUC, the idea is, that you either only 
-have one clock, then you don't use a name, or you use several clocks, then 
-your driver should know the names and what each of them is used for. See, 
-e.g. drivers/mtd/nand/gpmi-nand/gpmi-nand.c::gpmi_get_clks()
-
-static char *extra_clks_for_mx6q[GPMI_CLK_MAX] = {
-	"gpmi_apb", "gpmi_bch", "gpmi_bch_apb", "per1_bch",
-};
-
-static int __devinit gpmi_get_clks(struct gpmi_nand_data *this)
-{
-	...
-	/* The main clock is stored in the first. */
-	r->clock[0] = clk_get(this->dev, "gpmi_io");
-
-etc., and clock declaration in arch/arm/boot/dts/imx6q.dtsi:
-
-		gpmi-nand at 00112000 {
-			compatible = "fsl,imx6q-gpmi-nand";
-			...
-			clocks = <&clks 152>, <&clks 153>, <&clks 151>,
-				 <&clks 150>, <&clks 149>;
-			clock-names = "gpmi_io", "gpmi_apb", "gpmi_bch",
-				      "gpmi_bch_apb", "per1_bch";
-
+> 
 > The motivation for this is to allow registration of the SDHI
 > device of the KZM-A9-GT board through device tree.
 > 
@@ -119,22 +97,10 @@ etc., and clock declaration in arch/arm/boot/dts/imx6q.dtsi:
 >  };
 >  
 > +static int __devinit
-
-__devinit is being removed:
-
-http://thread.gmane.org/gmane.linux.ports.arm.omap/89686
-
-please, drop it from this patch.
-
 > +sh_mobile_sdhi_probe_clk(struct platform_device *pdev,
 > +			 struct sh_mobile_sdhi *priv,
 > +			 const char *clk_name)
 > +{
-
-Once you resolve the doubt about the clock name, maybe this function could 
-be dropped and you could just call clk_get() directly? Preferably from 
-sh_mobile_sdhi_probe() directly (also see below)?
-
 > +	priv->clk = clk_get(&pdev->dev, clk_name);
 > +	if (IS_ERR(priv->clk)) {
 > +		dev_err(&pdev->dev, "cannot get clock \"%s\"\n", clk_name);
@@ -154,10 +120,6 @@ sh_mobile_sdhi_probe() directly (also see below)?
 > +	int ret;
 > +
 > +	BUG_ON(!np);
-
-Hm, does this mean, that if you define CONFIG_OF in your kernel and don't 
-provide platform data the driver will just Oops?...
-
 > +
 > +	ret = sh_mobile_sdhi_probe_clk(pdev, priv, np->name);
 > +	if (ret)
@@ -218,10 +180,6 @@ provide platform data the driver will just Oops?...
 > +		if (ret)
 > +			goto eclkget;
 > +
-
-This breaks the no-DT and no-platform-data case. With this your patch the 
-clock wouldn't be obtain then.
-
 >  		mmc_data->flags = p->tmio_flags;
 > -		if (mmc_data->flags & TMIO_MMC_HAS_IDLE_WAIT)
 > -			mmc_data->write16_hook = sh_mobile_sdhi_write16_hook;
@@ -233,10 +191,6 @@ clock wouldn't be obtain then.
 >  			mmc_data->dma = &priv->dma_priv;
 >  		}
 > +	} else {
-
-Please, remember, that the driver should be able to work with no platform 
-data, no DT and CONFIG_OF either defined or not.
-
 > +		ret = sh_mobile_sdhi_probe_config_dt(pdev, priv);
 > +		if (ret)
 > +			goto eclkget;
@@ -250,8 +204,6 @@ data, no DT and CONFIG_OF either defined or not.
 > 1.7.10.4
 > 
 
-Thanks
-Guennadi
 ---
 Guennadi Liakhovetski, Ph.D.
 Freelance Open-Source Software Developer
