@@ -1,23 +1,75 @@
-From: elen.song@atmel.com (Elen Song)
-Date: Mon, 26 Nov 2012 14:43:17 +0800
-Subject: [question] some question about the residue
-Message-ID: <1353912197-16616-1-git-send-email-elen.song@atmel.com>
+From: archit@ti.com (Archit Taneja)
+Date: Mon, 26 Nov 2012 12:18:51 +0530
+Subject: OMAP4430 produces boot warnings
+In-Reply-To: <1353663278.25248.4.camel@sokoban>
+References: <20121121230337.GR3332@n2100.arm.linux.org.uk>
+ <50AE1DC0.3030002@ti.com> <50AE2BB6.8080406@ti.com>
+ <1353594842.786.45.camel@sokoban> <50AE3A5B.5040603@ti.com>
+ <1353663278.25248.4.camel@sokoban>
+Message-ID: <50B310D3.9050202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All:
+On Friday 23 November 2012 03:04 PM, Tero Kristo wrote:
+> On Thu, 2012-11-22 at 16:44 +0200, Tomi Valkeinen wrote:
+>> On 2012-11-22 16:34, Tero Kristo wrote:
+>>
+>>> I guess you checked that DSS pwrdm is switching between RET and ON in
+>>> your setup?
+>>
+>> Yes:
+>>
+>> # cat /debug/pm_debug/count |grep dss
+>> [   35.356567] pwrdm state mismatch(l3init_pwrdm) 3 != 1
+>> [   35.361938] pwrdm state mismatch(cam_pwrdm) 3 != 0
+>> [   35.366973] pwrdm state mismatch(ivahd_pwrdm) 3 != 1
+>> [   35.372253] pwrdm state mismatch(tesla_pwrdm) 3 != 1
+>> [   35.377532] pwrdm state mismatch(abe_pwrdm) 3 != 1
+>> dss_pwrdm (RET),OFF:1,RET:11,INA:0,ON:11,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+>> l3_dss_clkdm->dss_pwrdm (0)
+>>
+>> then I load and unload the dss modules, and then:
+>>
+>> # cat /debug/pm_debug/count |grep dss
+>> [   60.813629] pwrdm state mismatch(l3init_pwrdm) 3 != 1
+>> [   60.819000] pwrdm state mismatch(cam_pwrdm) 3 != 0
+>> [   60.824127] pwrdm state mismatch(ivahd_pwrdm) 3 != 1
+>> [   60.829376] pwrdm state mismatch(tesla_pwrdm) 3 != 1
+>> [   60.834625] pwrdm state mismatch(abe_pwrdm) 3 != 1
+>> dss_pwrdm (ON),OFF:1,RET:21,INA:0,ON:22,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+>> l3_dss_clkdm->dss_pwrdm (0)
+>>
+>>>> Does the pwrdm mistakenly think that in RET state the DSS still keeps
+>>>> the register contents?
+>>>
+>>> This might be the case, however the pwrdm code should be generic and
+>>> handle all domains properly. What is the tree / branch / commit you are
+>>> using for testing this stuff? I can take a look at this also.
+>>
+>> arm-soc/for-next
+>
+> I guess this is caused because some of the patches are still not in the
+> for-next branch, it looks like at least this is missing:
+>
+> https://patchwork.kernel.org/patch/1608901/
+>
+> ...or the latest update done by Paul to that one.
+>
+> The patch I posted appears to have a small merge induced bug, it is
+> registering the context loss soc_ops for am33xx when it should actually
+> register those for omap4. This might explain another bug I've been
+> looking at in a different branch recently... The update Paul posted does
+> not seem to have this problem, but I haven't tested it myself.
 
-	I got a question about the residue in struct dma_tx_state:
 
-	I wonder what residue means, is it the current descriptor residue or
+Applying the patch above, and registering the soc_ops for omap4 instead 
+of am33xx doesn't seem to help. The context lost count now always returns 0.
 
-	the total dma buffer residue?
+And to verify Tomi's observation, if we don't rely on the context lost 
+count, and restore the registers always, we don't see the problem.
 
-Thanks
+Btw, we use the function omap_pm_get_dev_context_loss_count to get the 
+count, do we use this or is there a new func to get the count?
 
-Best Regards
-
-Elen Song
-
--- 
-1.7.9.5
+Thanks,
+Archit
