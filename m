@@ -1,82 +1,114 @@
 From: xiechao.mail@gmail.com (Chao Xie)
-Date: Sun, 25 Nov 2012 23:43:21 -0500
-Subject: [PATCH 08/27] usb: gadget: mv_udc: fix the value of tranceiver
+Date: Sun, 25 Nov 2012 23:43:25 -0500
+Subject: [PATCH 12/27] usb: otg: mv_otg: use PHY driver for otg
 In-Reply-To: <1353905020-29372-1-git-send-email-xiechao.mail@gmail.com>
 References: <1353905020-29372-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <1353905020-29372-9-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <1353905020-29372-13-git-send-email-xiechao.mail@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chao Xie <chao.xie@marvell.com>
 
-usally we will use udc->tranceiver == NULL or
-udc->tranceiver != NULL.
-So when failed to get the udc->tranceiver by usb_get_phy(), we
-directly set udc->tranceiver to be NULL.
-Then the source code will not need macro IS_ERR_OR_NULL() for
-udc->tranceiver judgement. It can reduce the line size and make
-the judgement simple.
+Originaly, otg driver will call the callbacks in platform data
+for PHY initialization and shut down.
+With PHY driver, it will call the APIs provided by PHY driver
+for PHY initialization and shut down. It removes the callbacks
+in platform data, and at same time it removes one block in the
+way of enabling device tree for otg driver.
 
 Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
 ---
- drivers/usb/gadget/mv_udc_core.c |   15 ++++++++++-----
- 1 files changed, 10 insertions(+), 5 deletions(-)
+ drivers/usb/otg/mv_otg.c |   33 ++++++++++++---------------------
+ drivers/usb/otg/mv_otg.h |    2 +-
+ 2 files changed, 13 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
-index c78d52f..c4adfeb 100644
---- a/drivers/usb/gadget/mv_udc_core.c
-+++ b/drivers/usb/gadget/mv_udc_core.c
-@@ -1394,7 +1394,7 @@ static int mv_udc_start(struct usb_gadget *gadget,
+diff --git a/drivers/usb/otg/mv_otg.c b/drivers/usb/otg/mv_otg.c
+index ffc0689..344f246 100644
+--- a/drivers/usb/otg/mv_otg.c
++++ b/drivers/usb/otg/mv_otg.c
+@@ -25,6 +25,7 @@
+ #include <linux/usb/otg.h>
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/hcd.h>
++#include <linux/usb/mv_usb2.h>
+ #include <linux/platform_data/mv_usb.h>
  
- 	spin_unlock_irqrestore(&udc->lock, flags);
+ #include "mv_otg.h"
+@@ -261,8 +262,8 @@ static int mv_otg_enable_internal(struct mv_otg *mvotg)
+ 	dev_dbg(&mvotg->pdev->dev, "otg enabled\n");
  
--	if (!IS_ERR_OR_NULL(udc->transceiver)) {
-+	if (udc->transceiver) {
- 		retval = otg_set_peripheral(udc->transceiver->otg,
- 					&udc->gadget);
+ 	otg_clock_enable(mvotg);
+-	if (mvotg->pdata->phy_init) {
+-		retval = mvotg->pdata->phy_init(mvotg->phy_regs);
++	if (mvotg->mvphy->init) {
++		retval = mvotg->mvphy->init(mvotg->mvphy);
  		if (retval) {
-@@ -2174,9 +2174,14 @@ static int __devinit mv_udc_probe(struct platform_device *pdev)
- 	udc->dev = pdev;
+ 			dev_err(&mvotg->pdev->dev,
+ 				"init phy error %d\n", retval);
+@@ -288,8 +289,8 @@ static void mv_otg_disable_internal(struct mv_otg *mvotg)
+ {
+ 	if (mvotg->active) {
+ 		dev_dbg(&mvotg->pdev->dev, "otg disabled\n");
+-		if (mvotg->pdata->phy_deinit)
+-			mvotg->pdata->phy_deinit(mvotg->phy_regs);
++		if (mvotg->mvphy->shutdown)
++			mvotg->mvphy->shutdown(mvotg->mvphy);
+ 		otg_clock_disable(mvotg);
+ 		mvotg->active = 0;
+ 	}
+@@ -741,23 +742,8 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 	for (i = 0; i < OTG_TIMER_NUM; i++)
+ 		init_timer(&mvotg->otg_ctrl.timer[i]);
  
- #ifdef CONFIG_USB_OTG_UTILS
--	if (pdata->mode == MV_USB_MODE_OTG)
-+	if (pdata->mode == MV_USB_MODE_OTG) {
- 		udc->transceiver = devm_usb_get_phy(&pdev->dev,
- 					USB_PHY_TYPE_USB2);
-+		if (IS_ERR_OR_NULL(udc->transceiver)) {
-+			udc->transceiver = NULL;
-+			return -ENODEV;
-+		}
+-	r = platform_get_resource_byname(mvotg->pdev,
+-					 IORESOURCE_MEM, "phyregs");
+-	if (r == NULL) {
+-		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
+-		retval = -ENODEV;
+-		goto err_destroy_workqueue;
+-	}
+-
+-	mvotg->phy_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+-	if (mvotg->phy_regs == NULL) {
+-		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
+-		retval = -EFAULT;
+-		goto err_destroy_workqueue;
+-	}
+-
+-	r = platform_get_resource_byname(mvotg->pdev,
+-					 IORESOURCE_MEM, "capregs");
++	r = platform_get_resource(mvotg->pdev,
++					 IORESOURCE_MEM, 0);
+ 	if (r == NULL) {
+ 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
+ 		retval = -ENODEV;
+@@ -770,6 +756,11 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 		retval = -EFAULT;
+ 		goto err_destroy_workqueue;
+ 	}
++	mvotg->mvphy = mv_usb2_get_phy();
++	if (mvotg->mvphy == NULL) {
++		retval = -ENODEV;
++		goto err_destroy_workqueue;
 +	}
- #endif
  
- 	udc->clknum = pdata->clknum;
-@@ -2319,7 +2324,7 @@ static int __devinit mv_udc_probe(struct platform_device *pdev)
- 	eps_init(udc);
+ 	/* we will acces controller register, so enable the udc controller */
+ 	retval = mv_otg_enable_internal(mvotg);
+diff --git a/drivers/usb/otg/mv_otg.h b/drivers/usb/otg/mv_otg.h
+index 8a9e351..7b9629a 100644
+--- a/drivers/usb/otg/mv_otg.h
++++ b/drivers/usb/otg/mv_otg.h
+@@ -137,10 +137,10 @@ struct mv_otg_regs {
  
- 	/* VBUS detect: we can disable/enable clock on demand.*/
--	if (!IS_ERR_OR_NULL(udc->transceiver))
-+	if (udc->transceiver)
- 		udc->clock_gating = 1;
- 	else if (pdata->vbus) {
- 		udc->clock_gating = 1;
-@@ -2386,7 +2391,7 @@ static int mv_udc_suspend(struct device *dev)
- 	udc = dev_get_drvdata(dev);
+ struct mv_otg {
+ 	struct usb_phy phy;
++	struct mv_usb2_phy *mvphy;
+ 	struct mv_otg_ctrl otg_ctrl;
  
- 	/* if OTG is enabled, the following will be done in OTG driver*/
--	if (!IS_ERR_OR_NULL(udc->transceiver))
-+	if (udc->transceiver)
- 		return 0;
+ 	/* base address */
+-	void __iomem *phy_regs;
+ 	void __iomem *cap_regs;
+ 	struct mv_otg_regs __iomem *op_regs;
  
- 	if (udc->pdata->vbus && udc->pdata->vbus->poll)
-@@ -2421,7 +2426,7 @@ static int mv_udc_resume(struct device *dev)
- 	udc = dev_get_drvdata(dev);
- 
- 	/* if OTG is enabled, the following will be done in OTG driver*/
--	if (!IS_ERR_OR_NULL(udc->transceiver))
-+	if (udc->transceiver)
- 		return 0;
- 
- 	if (!udc->clock_gating) {
 -- 
 1.7.4.1
