@@ -1,42 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 Nov 2012 12:20:21 +0000
-Subject: [GIT PULL]: spear-for-3.8 (was earlier: Re: [PATCH 00/14] ARM:
- SPEAr: DT updates)
-In-Reply-To: <CAKohpokP60SXv02r8kETRLSf+RviFB8bgpO-VNvTfetQG4AtOA@mail.gmail.com>
-References: <CAKohpokP60SXv02r8kETRLSf+RviFB8bgpO-VNvTfetQG4AtOA@mail.gmail.com>
-Message-ID: <201211261220.21648.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 26 Nov 2012 07:24:03 -0500
+Subject: [GIT PULL 5/5] ARM: mvebu: changes for v3.8
+In-Reply-To: <20121126113506.06c431cd@skate>
+References: <pull-1353733874-990435> <20121126091652.GA13866@quad.lixom.net>
+ <20121126102805.5337f7f5@skate> <201211261028.26334.arnd@arndb.de>
+ <20121126113506.06c431cd@skate>
+Message-ID: <20121126122403.GX15800@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 26 November 2012, Viresh Kumar wrote:
-> On 22 November 2012 01:54, Olof Johansson <olof@lixom.net> wrote:
-> 
-> > We're also running out of time for 3.8 staging, but if you're able to
-> > figure out the above I'll make an attempt to apply the patches from above.
-> 
-> Hi Arnd/Olof,
-> 
-> To make things easy for you, i have a PULL request for you now :)
-> 
-> The following changes since commit 53d74fd79db19aae506de892273198b160c2ee95:
-> 
->   Merge commit 'gpio-lw/devel' into spear-for-3.8 (2012-11-26 15:48:53 +0530)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.linaro.org/people/vireshk/linux.git spear-for-3.8
-> 
-> for you to fetch changes up to df1590d9ae5e37e07e7cf91107e4c2c946ce8bf4:
-> 
->   ARM: SPEAr3xx: Shirq: Move shirq controller out of plat/ (2012-11-26
-> 16:55:33 +0530)
+On Mon, Nov 26, 2012 at 11:35:06AM +0100, Thomas Petazzoni wrote:
+> Note that I am also surprised by the fact that we had to remove a
+> 'clocks=' property in dove.dtsi, and therefore have a known-broken
+> 3.8-rc1 even before it is released. It sounds strange to me that the
+> separation of branches prevents from doing the correct changes. But
+> maybe I'm not seeing the entire problem, and therefore under-estimating
+> the issues at hand.
 
-Since Olof has done more than his share of the work for today, I've pulled
-it in now, into next/dt2 rather than next/dt because of the dependencies.
+When I removed this, I thought it was an accidental line left over from
+some clock work Sebastian was working on.  Primarily because it was the
+*only* reference to clock in that series.  It was only later that I
+found out it should have depended on mvebu/everything (or a subset of
+it).
 
-We already had the gpio dependency in arm-soc, but the pinctrl dependency
-is slightly newer than the one we had, so I added a second
-depends/pinctrl-devel2 branch based on 4ddb1c2.
+In an ideal world, we won't have to do an mvebu/everything, and then
+it's a lot easier to get all the dependencies correct.
 
-	Arnd
+At any rate, as Sebastian noted, it builds fine, it boots, and only
+hangs if you query the cooresponding debugfs element.  Not ideal, for
+sure, but easily fixed in -rc1.
+
+thx,
+
+Jason.
