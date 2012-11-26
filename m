@@ -1,35 +1,30 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Mon, 26 Nov 2012 17:33:39 +0530
-Subject: [PATCH RFC] i2c: omap: Remove the OMAP_I2C_IP_VERSION_*
-In-Reply-To: <20121126115208.GA17605@arwen.pp.htv.fi>
-References: <1353929982-13984-1-git-send-email-shubhrajyoti@ti.com>
- <20121126115208.GA17605@arwen.pp.htv.fi>
-Message-ID: <CAM=Q2cvU9zH49qrRPJVxwn80DiuBC2NeBOCpoV3JYMJ3e9Eu0w@mail.gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Mon, 26 Nov 2012 13:07:18 +0100
+Subject: [PATCH net-next] cpts: add missing kconfig dependency
+Message-ID: <1353931638-1023-1-git-send-email-richardcochran@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 5:22 PM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
->
-> On Mon, Nov 26, 2012 at 05:09:42PM +0530, Shubhrajyoti D wrote:
->> The OMAP_I2C_IP_VERSION_1 and OMAP_I2C_IP_VERSION_2 was needed
->> as on VER2 we were not reading all the 32-bits. Since now that
->> we read the hi register we do not need the OMAP_I2C_IP_VERSION_*.
->> Delete the same.
->>
->> The custom reset is also changed to detect VER2 based on the
->> scheme.
->
-> looks like this should become a series IMO.
->
-> First patch would move the macros to common header, second patch would
-> switch the Reset part to use those macros and third patch gets rid of
-> OMAP_I2C_IP_VERSION_*
->
-> other than that, looks very good to me.
+The Common Platform Time Sync function of the CPSW does not depend the
+CPSW configuration option as it should. This patch fixes the issue by
+adding the dependency.
 
-OK will respin it accordingly.
+Signed-off-by: Richard Cochran <richardcochran@gmail.com>
+---
+ drivers/net/ethernet/ti/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
->
-> --
-> balbi
+diff --git a/drivers/net/ethernet/ti/Kconfig b/drivers/net/ethernet/ti/Kconfig
+index 48fcb5e..4426151 100644
+--- a/drivers/net/ethernet/ti/Kconfig
++++ b/drivers/net/ethernet/ti/Kconfig
+@@ -62,6 +62,7 @@ config TI_CPSW
+ 
+ config TI_CPTS
+ 	boolean "TI Common Platform Time Sync (CPTS) Support"
++	depends on TI_CPSW
+ 	select PTP_1588_CLOCK
+ 	---help---
+ 	  This driver supports the Common Platform Time Sync unit of
+-- 
+1.7.2.5
