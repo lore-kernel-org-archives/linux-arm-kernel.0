@@ -1,57 +1,26 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Nov 2012 01:35:22 -0800
-Subject: [GIT PULL 4/5] ARM: orion: dt for v3.8
-In-Reply-To: <50b056f6.c188e50a.1750.ffff84caSMTPIN_ADDED_MISSING@mx.google.com>
-References: <pull-1353733874-990435>
- <50b056f6.c188e50a.1750.ffff84caSMTPIN_ADDED_MISSING@mx.google.com>
-Message-ID: <20121126093522.GE13866@quad.lixom.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 26 Nov 2012 10:36:48 +0100
+Subject: [PATCH 3/3] ASoC: atmel-pcm: add dma support
+In-Reply-To: <50B2CE2C.4080700@atmel.com>
+References: <1353651257-2476-1-git-send-email-voice.shen@atmel.com>
+ <1353651257-2476-4-git-send-email-voice.shen@atmel.com>
+ <20121123142747.GP4529@opensource.wolfsonmicro.com>
+ <50B2CE2C.4080700@atmel.com>
+Message-ID: <20121126093647.GA9411@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 24, 2012 at 05:11:11AM +0000, Jason Cooper wrote:
-> The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
-> 
->   Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/orion_dt_for_3.8
-> 
-> for you to fetch changes up to 2a18588c0ce336933be3c99c91e74e21db56a0fe:
-> 
->   ARM: Kirkwood: remove kirkwood_ehci_init() from new boards (2012-11-24 03:58:12 +0000)
-> 
-> ----------------------------------------------------------------
-> orion dt for v3.8
-> 
->  - ehci-orion dt binding
->  - gpio-poweroff
->  - use dt regulators
->  - move mpp to DT/pinctrl
+On Mon, Nov 26, 2012 at 10:04:28AM +0800, Bo Shen wrote:
 
-> 
-> Depends on:
-> 
->  - orion/boards
-> 
->     - merge conflicts
->        - keep all 'select's in Kconfig
->        - remove all #includes in board-*.c
-> 
->  - pinctrl/devel up to:
-> 
->     - 06763c7 pinctrl: mvebu: move to its own directory
+> I am not sure I got your means.
+> As I understand, I should keep the driver using pdc and won't touch it.
+> And create new a new driver using dma, am I right?
 
-By the way, this branch ended up having conflicts against the cleanup branch.
-It'd be nice to avoid those by basing your later topics on the cleanups if
-needed.
-
-It was mostly remove/remove conflicts of header files, and not a big deal to
-handle for us, but if by slight tweaks to branch organization at your level you
-can avoid some of them for us.
-
-Some conflicts are still of course OK -- just like Linus prefers to see them,
-we don't mind either. But some of the internal ones between different branches
-from the same maintainer are sometimes a bit more than we care for. :)
-
--Olof
+Yes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121126/08d37ce2/attachment-0001.sig>
