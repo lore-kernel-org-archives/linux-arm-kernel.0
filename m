@@ -1,53 +1,30 @@
-From: sr@denx.de (Stefan Roese)
-Date: Mon, 26 Nov 2012 15:46:12 +0100
-Subject: [PATCH] ARM: sunxi: Add missing sun4i.dtsi file
-Message-ID: <1353941172-26121-1-git-send-email-sr@denx.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 26 Nov 2012 14:49:44 +0000
+Subject: [RFC PATCH] ASoC: Samsung: Register the audio platform device
+In-Reply-To: <CAAgF-BdHm_VFB-xsZ6kpAu5+9+1yMNVVGM_og+H3QghWQuf8+w@mail.gmail.com>
+References: <1352894960-17434-1-git-send-email-padma.v@samsung.com>
+ <1352894960-17434-2-git-send-email-padma.v@samsung.com>
+ <CAAgF-BdHm_VFB-xsZ6kpAu5+9+1yMNVVGM_og+H3QghWQuf8+w@mail.gmail.com>
+Message-ID: <20121126144943.GM9411@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch f055f1f6 [ARM: sunxi: Add sun4i and cubieboard support] missed
-this sun4i.dtsi include file. This patch finally brings it upstream
-enabling support for sun4i boards.
+On Mon, Nov 26, 2012 at 08:15:12PM +0530, Padma Venkat wrote:
+> On Wed, Nov 14, 2012 at 5:39 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
----
-Arnd, I missed adding this include dtsi file in my last
-cubieboard/sun4i support patch. Please add this patch
-to your v3.8 branch.
+> > +module_init(smdk_audio_init);
+> > +module_exit(smdk_audio_exit);
 
-Thanks,
-Stefan
+> Ping. Any comments on this patch?
 
- arch/arm/boot/dts/sun4i.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun4i.dtsi
-
-diff --git a/arch/arm/boot/dts/sun4i.dtsi b/arch/arm/boot/dts/sun4i.dtsi
-new file mode 100644
-index 0000000..e61fdd4
---- /dev/null
-+++ b/arch/arm/boot/dts/sun4i.dtsi
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright 2012 Stefan Roese
-+ * Stefan Roese <sr@denx.de>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/include/ "sunxi.dtsi"
-+
-+/ {
-+	memory {
-+		reg = <0x40000000 0x80000000>;
-+	};
-+};
--- 
-1.8.0
+Don't send contentless pings and delete irrelevant context from replies.
+Please refer to the feedback I sent in response to Sangbeom's pull
+request - in short, this isn't the way to do this - do what the other
+platforms do.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121126/226146c4/attachment.sig>
