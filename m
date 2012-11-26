@@ -1,30 +1,82 @@
 From: xiechao.mail@gmail.com (Chao Xie)
-Date: Sun, 25 Nov 2012 23:43:20 -0500
-Subject: [PATCH 07/27] usb: host: ehci-mv: remove unused variable
+Date: Sun, 25 Nov 2012 23:43:21 -0500
+Subject: [PATCH 08/27] usb: gadget: mv_udc: fix the value of tranceiver
 In-Reply-To: <1353905020-29372-1-git-send-email-xiechao.mail@gmail.com>
 References: <1353905020-29372-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <1353905020-29372-8-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <1353905020-29372-9-git-send-email-xiechao.mail@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chao Xie <chao.xie@marvell.com>
 
+usally we will use udc->tranceiver == NULL or
+udc->tranceiver != NULL.
+So when failed to get the udc->tranceiver by usb_get_phy(), we
+directly set udc->tranceiver to be NULL.
+Then the source code will not need macro IS_ERR_OR_NULL() for
+udc->tranceiver judgement. It can reduce the line size and make
+the judgement simple.
+
 Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
 ---
- drivers/usb/host/ehci-mv.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+ drivers/usb/gadget/mv_udc_core.c |   15 ++++++++++-----
+ 1 files changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
-index 6c56297..3065809 100644
---- a/drivers/usb/host/ehci-mv.c
-+++ b/drivers/usb/host/ehci-mv.c
-@@ -302,7 +302,6 @@ static int mv_ehci_remove(struct platform_device *pdev)
- {
- 	struct ehci_hcd_mv *ehci_mv = platform_get_drvdata(pdev);
- 	struct usb_hcd *hcd = ehci_mv->hcd;
--	int clk_i;
+diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
+index c78d52f..c4adfeb 100644
+--- a/drivers/usb/gadget/mv_udc_core.c
++++ b/drivers/usb/gadget/mv_udc_core.c
+@@ -1394,7 +1394,7 @@ static int mv_udc_start(struct usb_gadget *gadget,
  
- 	if (hcd->rh_registered)
- 		usb_remove_hcd(hcd);
+ 	spin_unlock_irqrestore(&udc->lock, flags);
+ 
+-	if (!IS_ERR_OR_NULL(udc->transceiver)) {
++	if (udc->transceiver) {
+ 		retval = otg_set_peripheral(udc->transceiver->otg,
+ 					&udc->gadget);
+ 		if (retval) {
+@@ -2174,9 +2174,14 @@ static int __devinit mv_udc_probe(struct platform_device *pdev)
+ 	udc->dev = pdev;
+ 
+ #ifdef CONFIG_USB_OTG_UTILS
+-	if (pdata->mode == MV_USB_MODE_OTG)
++	if (pdata->mode == MV_USB_MODE_OTG) {
+ 		udc->transceiver = devm_usb_get_phy(&pdev->dev,
+ 					USB_PHY_TYPE_USB2);
++		if (IS_ERR_OR_NULL(udc->transceiver)) {
++			udc->transceiver = NULL;
++			return -ENODEV;
++		}
++	}
+ #endif
+ 
+ 	udc->clknum = pdata->clknum;
+@@ -2319,7 +2324,7 @@ static int __devinit mv_udc_probe(struct platform_device *pdev)
+ 	eps_init(udc);
+ 
+ 	/* VBUS detect: we can disable/enable clock on demand.*/
+-	if (!IS_ERR_OR_NULL(udc->transceiver))
++	if (udc->transceiver)
+ 		udc->clock_gating = 1;
+ 	else if (pdata->vbus) {
+ 		udc->clock_gating = 1;
+@@ -2386,7 +2391,7 @@ static int mv_udc_suspend(struct device *dev)
+ 	udc = dev_get_drvdata(dev);
+ 
+ 	/* if OTG is enabled, the following will be done in OTG driver*/
+-	if (!IS_ERR_OR_NULL(udc->transceiver))
++	if (udc->transceiver)
+ 		return 0;
+ 
+ 	if (udc->pdata->vbus && udc->pdata->vbus->poll)
+@@ -2421,7 +2426,7 @@ static int mv_udc_resume(struct device *dev)
+ 	udc = dev_get_drvdata(dev);
+ 
+ 	/* if OTG is enabled, the following will be done in OTG driver*/
+-	if (!IS_ERR_OR_NULL(udc->transceiver))
++	if (udc->transceiver)
+ 		return 0;
+ 
+ 	if (!udc->clock_gating) {
 -- 
 1.7.4.1
