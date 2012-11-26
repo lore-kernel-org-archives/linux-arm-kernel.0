@@ -1,38 +1,45 @@
-From: shuah.khan@hp.com (Shuah Khan)
-Date: Mon, 26 Nov 2012 09:09:50 -0700
-Subject: [PATCH 0/9] dma_debug: add debug_dma_mapping_error support to
- architectures that support DMA_DEBUG_API
-In-Reply-To: <20121126112217.GG25742@8bytes.org>
-References: <1353706142.5270.93.camel@lorien2>
- <20121126112217.GG25742@8bytes.org>
-Message-ID: <1353946190.2917.5.camel@lorien2>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 26 Nov 2012 16:10:35 +0000
+Subject: [PATCH 1/2] leds: Add generic support for memory mapped LEDs
+In-Reply-To: <CA+E=qVcjKz-3CAKrDVG+ymij5HAB5H=a9+4G0KOR0tTKLGJu4w@mail.gmail.com>
+References: <1351792722-15250-1-git-send-email-pawel.moll@arm.com>
+ <CA+E=qVcjKz-3CAKrDVG+ymij5HAB5H=a9+4G0KOR0tTKLGJu4w@mail.gmail.com>
+Message-ID: <1353946235.10271.11.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-11-26 at 12:22 +0100, Joerg Roedel wrote:
-> Hi Shuah,
-> 
-> On Fri, Nov 23, 2012 at 02:29:02PM -0700, Shuah Khan wrote:
-> > x86 - done in the first patch that added the feature.
-> > 
-> > ARM64: dma_debug: add debug_dma_mapping_error support
-> > c6x: dma_debug: add debug_dma_mapping_error support
-> > ia64: dma_debug: add debug_dma_mapping_error support
-> > microblaze: dma-mapping: support debug_dma_mapping_error
-> > mips: dma_debug: add debug_dma_mapping_error support
-> > powerpc: dma_debug: add debug_dma_mapping_error support
-> > sh: dma_debug: add debug_dma_mapping_error support
-> > sparc: dma_debug: add debug_dma_mapping_error support
-> > tile: dma_debug: add debug_dma_mapping_error support
-> 
-> Have you compile-tested the invididual archs you are changing here?
-> 
+On Mon, 2012-11-26 at 15:37 +0000, Vasily Khoruzhick wrote:
+> On Thu, Nov 1, 2012 at 8:58 PM, Pawel Moll <pawel.moll@arm.com> wrote:
+> > LEDs are often controlled by writing to memory mapped
+> > register. This patch adds:
+> >
+> > 1. Generic functions for platform code and drivers to create
+> >    class device for LEDs controlled by arbitrary bit masks.
+> >    The control register value is read, modified by logic AND
+> >    and OR operations with respective mask and written back.
+> >
+> > 2. A platform driver for simple use case when one or more LED
+> >    are controlled by consecutive bits in a register pointed
+> >    at by the platform device's memory resource. It can be
+> >    particularly useful for MFD cells being part of an other
+> >    device.
+>
+> This MMIO controls some latch (or whatever) which is actually GPIO.
+> So implementing generic GPIO MMIO driver and using leds-gpio on top of
+> it appears to be a better solution for me.
 
-Joerg,
+I won't argue that it is doable - I don't even have to implement the
+MMIO GPIO driver, because my MFD already has a set of pseudo-GPIO lines
+and extending those won't be a problem at all an I'll do exactly that if
+there is no other choice. But at the same time I hope you would agree
+that my_code->gpio_controller->gpio_led_description->register_device
+chain is longer than my_code->mmio_led one if you want to add a single
+"status" led for your little board ;-). I don't event mention that at
+least couple of the existing drivers follow the same "MMIO pattern"
+blindly.
 
-Yes I compile tested all of them (except microblaze) on Nov 20th
-linux_next git. The patch for microblaze is already in linux_next when I
-tried to apply the patch to Nov 20th linux-next and figured that is
-already covered and skipped that one.
+Nevertheless I'd really like to hear from the maintainers...
 
--- Shuah
+Thanks!
+
+Pawe?
