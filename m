@@ -1,70 +1,88 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 26 Nov 2012 15:44:06 +0100
-Subject: [PATCH] ARM: use clockevents_config_and_register() where possible
-In-Reply-To: <1353936857-15313-1-git-send-email-shawn.guo@linaro.org>
-References: <1353936857-15313-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <50B38036.9000500@antcom.de>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Mon, 26 Nov 2012 20:15:12 +0530
+Subject: [RFC PATCH] ASoC: Samsung: Register the audio platform device
+In-Reply-To: <1352894960-17434-2-git-send-email-padma.v@samsung.com>
+References: <1352894960-17434-1-git-send-email-padma.v@samsung.com>
+ <1352894960-17434-2-git-send-email-padma.v@samsung.com>
+Message-ID: <CAAgF-BdHm_VFB-xsZ6kpAu5+9+1yMNVVGM_og+H3QghWQuf8+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2012 02:34 PM, Shawn Guo wrote:
-> The clockevent core is able to figure out the best mult and shift,
-> calculate min_delta_ns and max_delta_ns, with the necessary info passed
-> into clockevents_config_and_register().  Use this combined configure
-> and register function where possible to make the codes less error prone
-> and gain some positive diff stat.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Anton Vorontsov <cbouatmailru@gmail.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Roland Stigge <stigge@antcom.de>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Barry Song <baohua.song@csr.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Tony Prisk <linux@prisktech.co.nz>
-> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
-> Cc: Wan ZongShun <mcuos.com@gmail.com>
-> Cc: Viresh Kumar <viresh.linux@gmail.com>
+Hi,
+
+On Wed, Nov 14, 2012 at 5:39 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
+> Audio platform device is not a hardware peripherial.
+> So this device can't be added in the dt devices list.
+> So expanded the module_platform_driver and registered
+> this device using "platform_device_register_simple".
+>
+> Also added the soc-core pm ops structure in the audio
+> platform driver.
+>
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 > ---
->  arch/arm/mach-at91/at91rm9200_time.c     |    7 ++-----
->  arch/arm/mach-cns3xxx/core.c             |   13 +++----------
->  arch/arm/mach-exynos/mct.c               |   18 ++++--------------
->  arch/arm/mach-footbridge/dc21285-timer.c |    6 +-----
->  arch/arm/mach-imx/epit.c                 |   15 +++------------
->  arch/arm/mach-imx/time.c                 |   15 +++------------
->  arch/arm/mach-ixp4xx/common.c            |   11 ++---------
->  arch/arm/mach-lpc32xx/timer.c            |    9 +--------
+>  sound/soc/samsung/smdk_wm8994.c |   31 ++++++++++++++++++++++++++++++-
+>  1 files changed, 30 insertions(+), 1 deletions(-)
+>
+> diff --git a/sound/soc/samsung/smdk_wm8994.c b/sound/soc/samsung/smdk_wm8994.c
+> index 48dd4dd..7f97969 100644
+> --- a/sound/soc/samsung/smdk_wm8994.c
+> +++ b/sound/soc/samsung/smdk_wm8994.c
+> @@ -173,16 +173,45 @@ static int __devexit smdk_audio_remove(struct platform_device *pdev)
+>         return 0;
+>  }
+>
+> +static struct platform_device *smdk_audio_device;
+> +
+>  static struct platform_driver smdk_audio_driver = {
+>         .driver         = {
+>                 .name   = "smdk-audio",
+>                 .owner  = THIS_MODULE,
+> +               .pm     = &snd_soc_pm_ops,
+>         },
+>         .probe          = smdk_audio_probe,
+>         .remove         = __devexit_p(smdk_audio_remove),
+>  };
+>
+> -module_platform_driver(smdk_audio_driver);
+> +static int __init smdk_audio_init(void)
+> +{
+> +       int ret;
+> +
+> +       ret = platform_driver_register(&smdk_audio_driver);
+> +       if (ret) {
+> +               pr_err("unable to register driver\n");
+> +               return ret;
+> +       }
+> +
+> +       smdk_audio_device = platform_device_register_simple("smdk-audio", -1, NULL, 0);
+> +       if (IS_ERR(smdk_audio_device)) {
+> +               platform_driver_unregister(&smdk_audio_driver);
+> +               return PTR_ERR(smdk_audio_device);
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static void __exit smdk_audio_exit(void)
+> +{
+> +       platform_device_unregister(smdk_audio_device);
+> +       platform_driver_unregister(&smdk_audio_driver);
+> +}
+> +
+> +module_init(smdk_audio_init);
+> +module_exit(smdk_audio_exit);
+Ping. Any comments on this patch?
 
-On LPC32xx:
-
-Tested-by: Roland Stigge <stigge@antcom.de>
-
-Thanks!
-
-Roland
-
->  arch/arm/mach-mmp/time.c                 |    7 ++-----
->  arch/arm/mach-msm/timer.c                |    6 +-----
->  arch/arm/mach-mxs/timer.c                |   24 +++++-------------------
->  arch/arm/mach-netx/time.c                |   10 ++--------
->  arch/arm/mach-omap1/time.c               |   11 ++---------
->  arch/arm/mach-omap1/timer32k.c           |   12 ++----------
->  arch/arm/mach-omap2/timer.c              |   13 +++----------
->  arch/arm/mach-prima2/timer.c             |   10 ++--------
->  arch/arm/mach-pxa/time.c                 |    8 ++------
->  arch/arm/mach-sa1100/time.c              |    8 ++------
->  arch/arm/mach-tegra/timer.c              |    8 ++------
->  arch/arm/mach-vt8500/timer.c             |    9 ++-------
->  arch/arm/mach-w90x900/time.c             |   10 ++--------
->  arch/arm/plat-iop/time.c                 |    9 ++-------
->  arch/arm/plat-orion/time.c               |    6 +-----
->  arch/arm/plat-samsung/s5p-time.c         |    9 +--------
->  arch/arm/plat-spear/time.c               |    8 +-------
->  25 files changed, 53 insertions(+), 209 deletions(-)
+Thanks
+Padma
+>
+>  MODULE_DESCRIPTION("ALSA SoC SMDK WM8994");
+>  MODULE_LICENSE("GPL");
+> --
+> 1.7.4.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
