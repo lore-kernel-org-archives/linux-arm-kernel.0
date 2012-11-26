@@ -1,28 +1,42 @@
-From: hector.oron@gmail.com (Hector Oron)
-Date: Mon, 26 Nov 2012 10:18:47 +0100
-Subject: [PATCH] arm: mvebu: support for the PlatHome OpenBlocks AX3 board
-In-Reply-To: <20121024172050.412ff1bf@skate>
-References: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121024150614.GD11837@lunn.ch> <20121024172050.412ff1bf@skate>
-Message-ID: <CAODfWeFY3ZN1U0dDLyLUc=0BpUMQH7LDfcAFbi--Y73qhfRXaQ@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 26 Nov 2012 10:18:44 +0100
+Subject: [PATCH 1/2] ARM: Dove: Add pinctrl clock to DT
+In-Reply-To: <20121125152845.GV15800@titan.lakedaemon.net>
+References: <20121125152845.GV15800@titan.lakedaemon.net>
+Message-ID: <1353921525-25163-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+During merge of the mvebu patches a clock gate for pinctrl was
+lost. This patch just readds the clock gate.
 
-2012/10/24 Thomas Petazzoni <thomas.petazzoni@free-electrons.com>:
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Axel Lin <axel.lin@ingics.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/boot/dts/dove.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-> With openblocks-ax3-4.dts being the simple addition of PCIe slot + more
-> RAM. That said, I don't have the ax3/2 board anyway, so should we plan
-> for something that nobody can test at the moment, or wait for someone
-> to get a ax3/2 board, and therefore be able to do the testing? I think
-> I prefer to submit dts files that are know to work and have been tested
-> on hardware that we have.
-
-I got an ax3/2 device, I would not mind to test any changes? Are you
-aware of which changes should I apply to dtsi file to work on ax3-2
-device?
-
-regards,
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index f3f7e9d..42eac1f 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -117,6 +117,7 @@
+ 		pinctrl: pinctrl at d0200 {
+ 			compatible = "marvell,dove-pinctrl";
+ 			reg = <0xd0200 0x10>;
++			clocks = <&gate_clk 22>;
+ 		};
+ 
+ 		spi0: spi at 10600 {
 -- 
- H?ctor Or?n  -.. . -... .. .- -.   -.. . ...- . .-.. --- .--. . .-.
+1.7.10.4
