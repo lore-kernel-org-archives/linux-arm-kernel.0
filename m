@@ -1,79 +1,258 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 26 Nov 2012 21:16:08 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the l2-mtd tree
-Message-ID: <20121126211608.136f1371f3b662907a89deee@canb.auug.org.au>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 26 Nov 2012 11:16:15 +0100 (CET)
+Subject: [PATCH 2/7] mmc: sdhi: enchance OF support for flags and cd-gpios
+In-Reply-To: <1353889014-17142-3-git-send-email-horms@verge.net.au>
+References: <1353889014-17142-1-git-send-email-horms@verge.net.au>
+ <1353889014-17142-3-git-send-email-horms@verge.net.au>
+Message-ID: <Pine.LNX.4.64.1211261050340.11501@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Simon
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-drivers/mtd/nand/mxc_nand.c between commit 06f255106923 ("mtd: remove use
-of __devinit") from the l2-mtd tree and commit 4d62435f0601 ("mtd:
-mxc_nand: remove cpu_is_xxx by using platform_device_id") from the
-arm-soc tree.
+Thanks for the patch, please, see some comments inline.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+On Mon, 26 Nov 2012, Simon Horman wrote:
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+> Enhance the OF support for SDHI by adding the following bindings:
+> 
+> * renesas,shmobile-sdhi-has-idle-wait:
+>   Equivalent to setting TMIO_MMC_HAS_IDLE_WAIT in
+>   the flags of platform data
+> 
+> * renesas,shmobile-sdhi-use-gpio-cd:
+>   Equivalent to setting TMIO_MMC_USE_GPIO_CD in
+>   the flags of platform data
+> 
+> * renesas,shmobile-sdhi-wrprotect-disable:
+>   Equivalent to setting TMIO_MMC_WRPROTECT_DISABLE in
+>   the flags of platform data
+> 
+> * cd-gpios:
+>   Equivalent to setting cd_gpio in platform data
+> 
+> This patch also requests the clock based on the device tree
+> node name if the platform data is absent.
 
-diff --cc drivers/mtd/nand/mxc_nand.c
-index 4aef6a3,022dcdc..0000000
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@@ -1337,33 -1378,7 +1378,7 @@@ static int __init mxcnd_probe_dt(struc
-  }
-  #endif
-  
-- static int __init mxcnd_probe_pdata(struct mxc_nand_host *host)
-- {
-- 	struct mxc_nand_platform_data *pdata = host->dev->platform_data;
-- 
-- 	if (!pdata)
-- 		return -ENODEV;
-- 
-- 	host->pdata = *pdata;
-- 
-- 	if (nfc_is_v1()) {
-- 		if (cpu_is_mx21())
-- 			host->devtype_data = &imx21_nand_devtype_data;
-- 		else
-- 			host->devtype_data = &imx27_nand_devtype_data;
-- 	} else if (nfc_is_v21()) {
-- 		host->devtype_data = &imx25_nand_devtype_data;
-- 	} else if (nfc_is_v3_2a()) {
-- 		host->devtype_data = &imx51_nand_devtype_data;
-- 	} else if (nfc_is_v3_2b()) {
-- 		host->devtype_data = &imx53_nand_devtype_data;
-- 	} else
-- 		BUG();
-- 
-- 	return 0;
-- }
-- 
- -static int __devinit mxcnd_probe(struct platform_device *pdev)
- +static int mxcnd_probe(struct platform_device *pdev)
-  {
-  	struct nand_chip *this;
-  	struct mtd_info *mtd;
-@@@ -1555,8 -1578,9 +1578,9 @@@ static struct platform_driver mxcnd_dri
-  		   .owner = THIS_MODULE,
-  		   .of_match_table = of_match_ptr(mxcnd_dt_ids),
-  	},
-+ 	.id_table = mxcnd_devtype,
-  	.probe = mxcnd_probe,
- -	.remove = __devexit_p(mxcnd_remove),
- +	.remove = mxcnd_remove,
-  };
-  module_platform_driver(mxcnd_driver);
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121126/5d86f9ad/attachment.sig>
+I'm not sure this is a good idea. IIUC, the idea is, that you either only 
+have one clock, then you don't use a name, or you use several clocks, then 
+your driver should know the names and what each of them is used for. See, 
+e.g. drivers/mtd/nand/gpmi-nand/gpmi-nand.c::gpmi_get_clks()
+
+static char *extra_clks_for_mx6q[GPMI_CLK_MAX] = {
+	"gpmi_apb", "gpmi_bch", "gpmi_bch_apb", "per1_bch",
+};
+
+static int __devinit gpmi_get_clks(struct gpmi_nand_data *this)
+{
+	...
+	/* The main clock is stored in the first. */
+	r->clock[0] = clk_get(this->dev, "gpmi_io");
+
+etc., and clock declaration in arch/arm/boot/dts/imx6q.dtsi:
+
+		gpmi-nand at 00112000 {
+			compatible = "fsl,imx6q-gpmi-nand";
+			...
+			clocks = <&clks 152>, <&clks 153>, <&clks 151>,
+				 <&clks 150>, <&clks 149>;
+			clock-names = "gpmi_io", "gpmi_apb", "gpmi_bch",
+				      "gpmi_bch_apb", "per1_bch";
+
+> The motivation for this is to allow registration of the SDHI
+> device of the KZM-A9-GT board through device tree.
+> 
+> The following device tree snippet illustrates the use of the bindings
+> described above.
+> 
+> 	sdhi0 at 0xee100000 {
+> 		compatible = "renesas,shmobile-sdhi";
+> 		reg = <0xee100000 0x100>;
+> 		interrupt-parent = <&gic>;
+> 		interrupts = <0 83 0x4
+> 			      0 84 0x4
+> 			      0 85 0x4>;
+> 		interrupt-names = "card_detect", "sdcard", "sdio";
+> 		reg-io-width = <2>;
+> 		vmmc-supply = <&fixedregulator2v8>;
+> 		vqmmc-supply = <&fixedregulator2v8>;
+> 		renesas,shmobile-sdhi-has-idle-wait;
+> 	};
+> 
+> 	sdhi2 at 0xee140000 {
+> 		compatible = "renesas,shmobile-sdhi";
+> 		reg = <0xee140000 0x100>;
+> 		interrupt-parent = <&gic>;
+> 		interrupts = <0 103 0x4
+> 			      0 104 0x4
+> 			      0 105 0x4>;
+> 		interrupt-names = "card_detect", "sdcard", "sdio";
+> 		reg-io-width = <2>;
+> 		vmmc-supply = <&fixedregulator2v8>;
+> 		vqmmc-supply = <&fixedregulator2v8>;
+> 		renesas,shmobile-sdhi-has-idle-wait;
+> 		renesas,shmobile-sdhi-use-gpio-cd;
+> 		renesas,shmobile-sdhi-wrprotect-disable;
+> 		cd-gpios = <&gpio 13 1>;
+> 	};
+> 
+> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Signed-off-by: Simon Horman <horms@verge.net.au>
+> ---
+>  drivers/mmc/host/sh_mobile_sdhi.c |   76 +++++++++++++++++++++++++++++++------
+>  1 file changed, 65 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sh_mobile_sdhi.c b/drivers/mmc/host/sh_mobile_sdhi.c
+> index 0bdc146..8c7e658 100644
+> --- a/drivers/mmc/host/sh_mobile_sdhi.c
+> +++ b/drivers/mmc/host/sh_mobile_sdhi.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/mfd/tmio.h>
+>  #include <linux/sh_dma.h>
+>  #include <linux/delay.h>
+> +#include <linux/of_gpio.h>
+>  
+>  #include "tmio_mmc.h"
+>  
+> @@ -117,13 +118,64 @@ static const struct sh_mobile_sdhi_ops sdhi_ops = {
+>  	.cd_wakeup = sh_mobile_sdhi_cd_wakeup,
+>  };
+>  
+> +static int __devinit
+
+__devinit is being removed:
+
+http://thread.gmane.org/gmane.linux.ports.arm.omap/89686
+
+please, drop it from this patch.
+
+> +sh_mobile_sdhi_probe_clk(struct platform_device *pdev,
+> +			 struct sh_mobile_sdhi *priv,
+> +			 const char *clk_name)
+> +{
+
+Once you resolve the doubt about the clock name, maybe this function could 
+be dropped and you could just call clk_get() directly? Preferably from 
+sh_mobile_sdhi_probe() directly (also see below)?
+
+> +	priv->clk = clk_get(&pdev->dev, clk_name);
+> +	if (IS_ERR(priv->clk)) {
+> +		dev_err(&pdev->dev, "cannot get clock \"%s\"\n", clk_name);
+> +		return PTR_ERR(priv->clk);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_OF
+> +static int __devinit
+> +sh_mobile_sdhi_probe_config_dt(struct platform_device *pdev,
+> +			       struct sh_mobile_sdhi *priv)
+> +{
+> +	struct tmio_mmc_data *mmc_data = &priv->mmc_data;
+> +	struct device_node *np = pdev->dev.of_node;
+> +	int ret;
+> +
+> +	BUG_ON(!np);
+
+Hm, does this mean, that if you define CONFIG_OF in your kernel and don't 
+provide platform data the driver will just Oops?...
+
+> +
+> +	ret = sh_mobile_sdhi_probe_clk(pdev, priv, np->name);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = of_get_named_gpio(np, "cd-gpios", 0);
+> +	if (gpio_is_valid(ret))
+> +		mmc_data->cd_gpio = ret;
+> +
+> +	if (of_get_property(np, "renesas,shmobile-sdhi-has-idle-wait", NULL))
+> +		mmc_data->flags |= TMIO_MMC_HAS_IDLE_WAIT;
+> +	if (of_get_property(np, "renesas,shmobile-sdhi-use-gpio-cd", NULL))
+> +		mmc_data->flags |= TMIO_MMC_USE_GPIO_CD;
+> +	if (of_get_property(np, "renesas,shmobile-sdhi-wrprotect-disable",
+> +			    NULL))
+> +		mmc_data->flags |= TMIO_MMC_WRPROTECT_DISABLE;
+> +
+> +	return 0;
+> +}
+> +#else
+> +static int __devinit
+> +sh_mobile_sdhi_probe_config_dt(struct platform_device *pdev,
+> +			       struct sh_mobile_sdhi *priv)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +
+>  static int __devinit sh_mobile_sdhi_probe(struct platform_device *pdev)
+>  {
+>  	struct sh_mobile_sdhi *priv;
+>  	struct tmio_mmc_data *mmc_data;
+>  	struct sh_mobile_sdhi_info *p = pdev->dev.platform_data;
+>  	struct tmio_mmc_host *host;
+> -	char clk_name[8];
+>  	int irq, ret, i = 0;
+>  	bool multiplexed_isr = true;
+>  
+> @@ -144,21 +196,17 @@ static int __devinit sh_mobile_sdhi_probe(struct platform_device *pdev)
+>  		}
+>  	}
+>  
+> -	snprintf(clk_name, sizeof(clk_name), "sdhi%d", pdev->id);
+> -	priv->clk = clk_get(&pdev->dev, clk_name);
+> -	if (IS_ERR(priv->clk)) {
+> -		dev_err(&pdev->dev, "cannot get clock \"%s\"\n", clk_name);
+> -		ret = PTR_ERR(priv->clk);
+> -		goto eclkget;
+> -	}
+> -
+>  	mmc_data->clk_enable = sh_mobile_sdhi_clk_enable;
+>  	mmc_data->clk_disable = sh_mobile_sdhi_clk_disable;
+>  	mmc_data->capabilities = MMC_CAP_MMC_HIGHSPEED;
+>  	if (p) {
+> +		char clk_name[8];
+> +		snprintf(clk_name, sizeof(clk_name), "sdhi%d", pdev->id);
+> +		ret = sh_mobile_sdhi_probe_clk(pdev, priv, clk_name);
+> +		if (ret)
+> +			goto eclkget;
+> +
+
+This breaks the no-DT and no-platform-data case. With this your patch the 
+clock wouldn't be obtain then.
+
+>  		mmc_data->flags = p->tmio_flags;
+> -		if (mmc_data->flags & TMIO_MMC_HAS_IDLE_WAIT)
+> -			mmc_data->write16_hook = sh_mobile_sdhi_write16_hook;
+>  		mmc_data->ocr_mask = p->tmio_ocr_mask;
+>  		mmc_data->capabilities |= p->tmio_caps;
+>  		mmc_data->capabilities2 |= p->tmio_caps2;
+> @@ -176,7 +224,13 @@ static int __devinit sh_mobile_sdhi_probe(struct platform_device *pdev)
+>  			priv->dma_priv.alignment_shift = 1; /* 2-byte alignment */
+>  			mmc_data->dma = &priv->dma_priv;
+>  		}
+> +	} else {
+
+Please, remember, that the driver should be able to work with no platform 
+data, no DT and CONFIG_OF either defined or not.
+
+> +		ret = sh_mobile_sdhi_probe_config_dt(pdev, priv);
+> +		if (ret)
+> +			goto eclkget;
+>  	}
+> +	if (mmc_data->flags & TMIO_MMC_HAS_IDLE_WAIT)
+> +		mmc_data->write16_hook = sh_mobile_sdhi_write16_hook;
+>  
+>  	/*
+>  	 * All SDHI blocks support 2-byte and larger block sizes in 4-bit
+> -- 
+> 1.7.10.4
+> 
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
