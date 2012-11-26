@@ -1,100 +1,115 @@
 From: mturquette@ti.com (Mike Turquette)
-Date: Mon, 26 Nov 2012 11:31:16 -0800
-Subject: [PATCH v4 00/12] clk: exynos4: migrate to common clock framework
-In-Reply-To: <1353791885-2566-1-git-send-email-thomas.abraham@linaro.org>
-References: <1353791885-2566-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20121126193116.21126.66261@nucleus>
+Date: Mon, 26 Nov 2012 11:57:42 -0800
+Subject: [PATCH] Don't mark shared helper functions as inline
+In-Reply-To: <1353957609-1295-1-git-send-email-Russ.Dill@ti.com>
+References: <1353957609-1295-1-git-send-email-Russ.Dill@ti.com>
+Message-ID: <20121126195742.21126.16500@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Thomas Abraham (2012-11-24 13:17:53)
-> Changes since v3:
-> - Includes changes suggested by Tomasz Figa <tomasz.figa@gmail.com>
+Quoting Russ Dill (2012-11-26 11:20:09)
+> The helper functions that access the opaque struct clk should
+> not be marked inline since they are contained in clk.c, but expected
+> to be used by other compilation units. This causes compile errors
+> under gcc-4.7
+> 
+> In file included from arch/arm/mach-omap2/clockdomain.c:25:0:
+> arch/arm/mach-omap2/clockdomain.c: In function ?clkdm_clk_disable?:
+> include/linux/clk-provider.h:338:12: error: inlining failed in call to always_inline ?__clk_get_enable_count?: function body not available
+> arch/arm/mach-omap2/clockdomain.c:1001:28: error: called from here
+> make[1]: *** [arch/arm/mach-omap2/clockdomain.o] Error 1
+> make: *** [arch/arm/mach-omap2] Error 2
 > 
 
-Hi Thomas,
+Hi Russ,
 
-3.7-rc7 is out and I do not wish to take any large changes this close to
-the merge window opening up.  I will review these patches and give any
-feedback now on the common clk bits, but merging in the
-drivers/clk/samsung parts would have to wait until after clk-next is
-rebased onto 3.8-rc.
+A fix for this was merged into rc7.  See 93532c8a, "clk: remove inline
+usage from clk-provider.h".
 
-Which tree do you want to merge this through?  Samsung or clk-next?
-Will you split the patches or take it all once you have gathered ACKs?
+Regardless, I'm still considering this patch.  I've heard many times
+that we should trust the compiler to optimize for us and some folks look
+down on inlining in general.  If anyone has an opinion on removing
+inlines from the common clk core then please do speak up.
 
-Thanks,
+Russ, can you update to the latest rc and verify if that fix is enough
+for you?
+
+Regards,
 Mike
 
-> This patch series migrates the Samsung Exynos4 SoC clock code to adopt the
-> common clock framework. The use of Samsung specific clock structures has
-> been removed and all board support code has been updated. imx-style of
-> clock registration and lookup has been adopted for device tree based
-> exynos4 platforms.
 > 
-> This patch series is based on the for-next branch of Samsung maintainer's
-> tree with all patches merged from clk-next branch of Mike's tree. This
-> series has been tested on Exynos4210 based Origen board and Exynos4412
-> based smdk board.
+> Signed-off-by: Russ Dill <Russ.Dill@ti.com>
+> ---
+>  drivers/clk/clk.c            | 14 +++++++-------
+>  include/linux/clk-provider.h |  4 ++--
+>  2 files changed, 9 insertions(+), 9 deletions(-)
 > 
-> Thomas Abraham (12):
->   clk: samsung: add common clock framework helper functions for Samsung platforms
->   clk: samsung: add pll clock registration helper functions
->   clk: exynos4: register clocks using common clock framework
->   ARM: Exynos: Rework timer initialization sequence
->   ARM: Exynos4: Migrate clock support to common clock framework
->   ARM: dts: add exynos4 clock controller nodes
->   ARM: dts: add xxti and xusbxti fixed rate clock nodes for exynos4 based platforms
->   ARM: Exynos4: allow legacy board support to specify xxti and xusbxti clock speed
->   ARM: dts: add clock provider information for all controllers in Exynos4 SoC
->   ARM: Exynos4: remove auxdata table from machine file
->   ARM: Exynos: use fin_pll clock as the tick clock source for mct
->   ARM: Exynos: add support for mct clock setup
-> 
->  .../devicetree/bindings/clock/exynos4-clock.txt    |  215 +++
->  arch/arm/boot/dts/exynos4.dtsi                     |   48 +
->  arch/arm/boot/dts/exynos4210-origen.dts            |   12 +
->  arch/arm/boot/dts/exynos4210-smdkv310.dts          |   12 +
->  arch/arm/boot/dts/exynos4210.dtsi                  |    6 +
->  arch/arm/boot/dts/exynos4412-smdk4412.dts          |   12 +
->  arch/arm/boot/dts/exynos4x12.dtsi                  |    6 +
->  arch/arm/mach-exynos/Kconfig                       |    1 +
->  arch/arm/mach-exynos/Makefile                      |    3 -
->  arch/arm/mach-exynos/clock-exynos4.c               | 1602 --------------------
->  arch/arm/mach-exynos/clock-exynos4.h               |   35 -
->  arch/arm/mach-exynos/clock-exynos4210.c            |  188 ---
->  arch/arm/mach-exynos/clock-exynos4212.c            |  192 ---
->  arch/arm/mach-exynos/common.c                      |   57 +-
->  arch/arm/mach-exynos/common.h                      |   21 +-
->  arch/arm/mach-exynos/mach-armlex4210.c             |    3 +-
->  arch/arm/mach-exynos/mach-exynos4-dt.c             |   71 +-
->  arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +-
->  arch/arm/mach-exynos/mach-nuri.c                   |    5 +-
->  arch/arm/mach-exynos/mach-origen.c                 |    5 +-
->  arch/arm/mach-exynos/mach-smdk4x12.c               |    5 +-
->  arch/arm/mach-exynos/mach-smdkv310.c               |    7 +-
->  arch/arm/mach-exynos/mach-universal_c210.c         |    3 +-
->  arch/arm/mach-exynos/mct.c                         |   32 +-
->  arch/arm/plat-samsung/Kconfig                      |    4 +-
->  drivers/clk/Makefile                               |    1 +
->  drivers/clk/samsung/Makefile                       |    6 +
->  drivers/clk/samsung/clk-exynos4.c                  |  655 ++++++++
->  drivers/clk/samsung/clk-pll.c                      |  400 +++++
->  drivers/clk/samsung/clk-pll.h                      |   38 +
->  drivers/clk/samsung/clk.c                          |  180 +++
->  drivers/clk/samsung/clk.h                          |  216 +++
->  32 files changed, 1905 insertions(+), 2138 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/exynos4-clock.txt
->  delete mode 100644 arch/arm/mach-exynos/clock-exynos4.c
->  delete mode 100644 arch/arm/mach-exynos/clock-exynos4.h
->  delete mode 100644 arch/arm/mach-exynos/clock-exynos4210.c
->  delete mode 100644 arch/arm/mach-exynos/clock-exynos4212.c
->  create mode 100644 drivers/clk/samsung/Makefile
->  create mode 100644 drivers/clk/samsung/clk-exynos4.c
->  create mode 100644 drivers/clk/samsung/clk-pll.c
->  create mode 100644 drivers/clk/samsung/clk-pll.h
->  create mode 100644 drivers/clk/samsung/clk.c
->  create mode 100644 drivers/clk/samsung/clk.h
-> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 56e4495e..ed01746 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -249,32 +249,32 @@ late_initcall(clk_disable_unused);
+>  
+>  /***    helper functions   ***/
+>  
+> -inline const char *__clk_get_name(struct clk *clk)
+> +const char *__clk_get_name(struct clk *clk)
+>  {
+>         return !clk ? NULL : clk->name;
+>  }
+>  
+> -inline struct clk_hw *__clk_get_hw(struct clk *clk)
+> +struct clk_hw *__clk_get_hw(struct clk *clk)
+>  {
+>         return !clk ? NULL : clk->hw;
+>  }
+>  
+> -inline u8 __clk_get_num_parents(struct clk *clk)
+> +u8 __clk_get_num_parents(struct clk *clk)
+>  {
+>         return !clk ? -EINVAL : clk->num_parents;
+>  }
+>  
+> -inline struct clk *__clk_get_parent(struct clk *clk)
+> +struct clk *__clk_get_parent(struct clk *clk)
+>  {
+>         return !clk ? NULL : clk->parent;
+>  }
+>  
+> -inline int __clk_get_enable_count(struct clk *clk)
+> +int __clk_get_enable_count(struct clk *clk)
+>  {
+>         return !clk ? -EINVAL : clk->enable_count;
+>  }
+>  
+> -inline int __clk_get_prepare_count(struct clk *clk)
+> +int __clk_get_prepare_count(struct clk *clk)
+>  {
+>         return !clk ? -EINVAL : clk->prepare_count;
+>  }
+> @@ -300,7 +300,7 @@ out:
+>         return ret;
+>  }
+>  
+> -inline unsigned long __clk_get_flags(struct clk *clk)
+> +unsigned long __clk_get_flags(struct clk *clk)
+>  {
+>         return !clk ? -EINVAL : clk->flags;
+>  }
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index c127315..f9f5e9e 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -335,8 +335,8 @@ const char *__clk_get_name(struct clk *clk);
+>  struct clk_hw *__clk_get_hw(struct clk *clk);
+>  u8 __clk_get_num_parents(struct clk *clk);
+>  struct clk *__clk_get_parent(struct clk *clk);
+> -inline int __clk_get_enable_count(struct clk *clk);
+> -inline int __clk_get_prepare_count(struct clk *clk);
+> +int __clk_get_enable_count(struct clk *clk);
+> +int __clk_get_prepare_count(struct clk *clk);
+>  unsigned long __clk_get_rate(struct clk *clk);
+>  unsigned long __clk_get_flags(struct clk *clk);
+>  int __clk_is_enabled(struct clk *clk);
 > -- 
-> 1.7.4.4
+> 1.8.0
