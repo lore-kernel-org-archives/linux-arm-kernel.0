@@ -1,34 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 Nov 2012 18:23:51 +0000
-Subject: [PATCH] ARM: sunxi: Add missing sun4i.dtsi file
-In-Reply-To: <1353941172-26121-1-git-send-email-sr@denx.de>
-References: <1353941172-26121-1-git-send-email-sr@denx.de>
-Message-ID: <201211261823.52160.arnd@arndb.de>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 26 Nov 2012 10:42:32 -0800
+Subject: [PATCH 01/27] usb: gadget: mv_udc: use udc_start and udc_stop
+ functions
+In-Reply-To: <20121126143431.GA19794@arwen.pp.htv.fi>
+References: <1353905020-29372-1-git-send-email-xiechao.mail@gmail.com>
+ <1353905020-29372-2-git-send-email-xiechao.mail@gmail.com>
+ <20121126143936.GB6322@kroah.com>
+ <20121126143431.GA19794@arwen.pp.htv.fi>
+Message-ID: <20121126184231.GB18590@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 26 November 2012, Stefan Roese wrote:
-> Patch f055f1f6 [ARM: sunxi: Add sun4i and cubieboard support] missed
-> this sun4i.dtsi include file. This patch finally brings it upstream
-> enabling support for sun4i boards.
+On Mon, Nov 26, 2012 at 04:34:31PM +0200, Felipe Balbi wrote:
+> Hi,
 > 
-> Signed-off-by: Stefan Roese <sr@denx.de>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
-> Arnd, I missed adding this include dtsi file in my last
-> cubieboard/sun4i support patch. Please add this patch
-> to your v3.8 branch.
+> On Mon, Nov 26, 2012 at 06:39:36AM -0800, Greg KH wrote:
+> > On Sun, Nov 25, 2012 at 11:43:14PM -0500, Chao Xie wrote:
+> > > From: Chao Xie <chao.xie@marvell.com>
+> > > 
+> > > This patches converts the driver into the new style start/stop
+> > > interface. As a result the driver no longer uses the static
+> > > global the_conroller variable.
+> > > 
+> > > Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
+> > 
+> > How come your signed-off-by address does not match your "From:" address
+> > on the patch?  The marvell.com address should be both here, right?
+> 
+> And how come I wasn't in Cc ???
 
-Hi Stefan,
-
-I've added it to the next/soc branch that contains the earlier patches.
-When you submit a patch for inclusion please always address both Olof
-and me, or cc the arm at kernel.org address that forwards to both of us.
-
-It is also helpful to get patches for one platform only from one person.
-I assume that Maxime is ok with you sending the patch this way, but
-it would be clearer if you send it to him to forward it here, or
-get an 'Acked-by:' tag from him before you send the patch for inclusion.
-
-	Arnd
+The author obviously didn't want the patches to actually be applied to
+any tree :)
