@@ -1,51 +1,47 @@
-From: elen.song@atmel.com (Elen Song)
-Date: Mon, 26 Nov 2012 18:37:28 +0800
-Subject: [question] some question about the residue
-In-Reply-To: <20121126102200.GB19440@n2100.arm.linux.org.uk>
-References: <1353912197-16616-1-git-send-email-elen.song@atmel.com>
- <1353912597.7077.67.camel@vkoul-udesk3> <50B31BCE.6020100@atmel.com>
- <20121126102200.GB19440@n2100.arm.linux.org.uk>
-Message-ID: <50B34668.1090402@atmel.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 26 Nov 2012 21:38:53 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the mmc tree
+Message-ID: <20121126213853.ccceb25dc3b3c5a24911abef@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-26 18:22, Russell King - ARM Linux wrote:
-> On Mon, Nov 26, 2012 at 03:35:42PM +0800, Elen Song wrote:
->> On 2012-11-26 14:49, Vinod Koul wrote:
->>> On Mon, 2012-11-26 at 14:43 +0800, Elen Song wrote:
->>>> Hi All:
->>>>
->>>> 	I got a question about the residue in struct dma_tx_state:
->>>>
->>>> 	I wonder what residue means, is it the current descriptor residue or
->>>>
->>>> 	the total dma buffer residue?
->>> You read the status for descriptor, so it means this is residue for said
->>> descriptor.
->>>
->>>
->> Hi Koul:
->>
->> Well , I don't get it , if I read the status of a LLI, is it means the
->> residue of total LLI length?
->>
->> I saw driver/dma/amba-pl08x.c drivers/dma/coh901318.c, if read status of
->> a LLI, residue is the remain of LLI, not only
->> current descriptor.
->>
->> 1 patch from Russel King how he realize device_tx_status said:
->>
->> [PATCH] ARM: PL08x: clean up LLI lookup
->> As the LLI list is an array, we can use maths to locate which LLI
->> index we're currently at, and then sum up the remaining LLI entries
->> until we reach the end of the list.
->>
->> Is it right?
-> It is as far as fixing a pretty major bug in the driver, but it doesn't
-> fix the other bug in the driver where it sums up all outstanding
-> descriptors, which pre-dates the understanding of 'residue'.
-So residue actually means current active descriptor remain, it should 
-not sums up all outstanding descriptors.
-the way amba-p108x.c and coh901318.c is wrong , right?
+Hi all,
 
-best regards
+Today's linux-next merge of the arm-soc tree got a conflict in
+include/linux/platform_data/mmc-omap.h between commit 69bc0b677e6c ("mmc:
+omap_hsmmc: Enable HSPE bit for high speed cards") from the  tree and
+commit 53db20d123f7 ("mmc: omap: Remove cpu_is_omap usage from the
+driver") from the arm-soc tree.
+
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc include/linux/platform_data/mmc-omap.h
+index 346af5b,2bf6ea8..0000000
+--- a/include/linux/platform_data/mmc-omap.h
++++ b/include/linux/platform_data/mmc-omap.h
+@@@ -126,7 -107,9 +107,10 @@@ struct omap_mmc_platform_data 
+  		/* we can put the features above into this variable */
+  #define HSMMC_HAS_PBIAS		(1 << 0)
+  #define HSMMC_HAS_UPDATED_RESET	(1 << 1)
+ -#define MMC_OMAP7XX		(1 << 2)
+ -#define MMC_OMAP15XX		(1 << 3)
+ -#define MMC_OMAP16XX		(1 << 4)
+ +#define HSMMC_HAS_HSPE_SUPPORT	(1 << 2)
+++#define MMC_OMAP7XX		(1 << 3)
+++#define MMC_OMAP15XX		(1 << 4)
+++#define MMC_OMAP16XX		(1 << 5)
+  		unsigned features;
+  
+  		int switch_pin;			/* gpio (card detect) */
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121126/815f3fba/attachment.sig>
