@@ -1,54 +1,34 @@
-From: acourbot@nvidia.com (Alex Courbot)
-Date: Mon, 26 Nov 2012 20:49:53 +0900
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <20121122214021.GA14771@avionic-0098.adnet.avionic-design.de>
-References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
- <20121122133941.24B883E129E@localhost>
- <20121122214021.GA14771@avionic-0098.adnet.avionic-design.de>
-Message-ID: <3319894.UD2L7QhyVv@percival>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 26 Nov 2012 11:56:19 +0000
+Subject: [PATCH 2/2] ASoC: Davinci: machine: Add device tree binding
+In-Reply-To: <1353557099-21599-3-git-send-email-gururaja.hebbar@ti.com>
+References: <1353557099-21599-1-git-send-email-gururaja.hebbar@ti.com>
+ <1353557099-21599-3-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <20121126115619.GF9411@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 November 2012 05:40:21 Thierry Reding wrote:
-> On Thu, Nov 22, 2012 at 01:39:41PM +0000, Grant Likely wrote:
-> [...]
-> 
-> > I do think that each sequence should be contained within a single
-> > property, but I'm open to other suggestions.
-> 
-> IIRC a very early prototype did implement something like that. However
-> because of the resource issues this had to be string based, so that the
-> sequences looked somewhat like (Alex, correct me if I'm wrong):
-> 
-> 	power-on = <"REGULATOR", "power", 1, "GPIO", "enable", 1>;
+On Thu, Nov 22, 2012 at 09:34:59AM +0530, Hebbar, Gururaja wrote:
 
-You're right. Back when the burning sun of July was beating down a little bit 
-too hard on my head.
+> +- dai-data		: A list of DAI data used by SOC code to register
+> +			  DAI, Codecs platform.
+> +			  The string index "should" be as shown below.
+> +dai-data =
+> +"<DAI Name>", 		"<DAI Stream Name>",
+> +"<CODEC DAI Name>",	"<true if evm_aic3x_init is required, else false>",
+> +"<evm ops required (evm_ops or evm_spdif_ops)>";
 
-https://lkml.org/lkml/2012/7/9/30
+This continues to have the same issue as with previous versions, this is
+all Linux internals (especially the evm_aic3x_init thing) not a
+description of the hardware, there's not enough information to allow
+someone to work out what the bindings for their system should be.
 
-> Instead we could possibly have something like:
-> 
-> 	power-on = <0 &reg 1,
-> 		    1 &gpio 42 0 1>;
-> 
-> Where the first cell in each entry defines the type (0 = regulator, 1 =
-> GPIO) and the rest would be a regular OF specifier for the given type of
-> resource along with some defined parameter such as enable/disable,
-> voltage, delay in ms, ... I don't know if that sounds any better. It
-> looks sort of cryptic but it is more "in the spirit of" DT, right Grant?
-> 
-> Writing this down, it seems to me like even that proposal was already
-> discussed at some point. Again, Alex may remember better.
-
-The idea that we had was to use preprocessor support in DTC to use macros 
-instead of strings for the step type. We also thought about using phandles 
-directly in there as well, but this would require some more API support.
-
-Anyway, at the current point we are not even sure whether we want or need 
-power seqs in the DT - so let's keep this topic on hold for a while. We can 
-still introduce the feature without DT support, and if it eventually turns out 
-during this winter that expressing power seqs in the DT makes sense, we will 
-have plenty of archives to read in front of the fire.
-
-Alex.
+Do not post *ANY* further versions that have this evm_aic3x_init stuff
+in them, it's very annoying that you keep on ignoring this feedback.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121126/1d789485/attachment-0001.sig>
