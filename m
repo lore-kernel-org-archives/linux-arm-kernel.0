@@ -1,45 +1,29 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Mon, 26 Nov 2012 11:41:43 +0000
-Subject: [PATCH 0/2] ARM/ASoC: Davinci: Device Tree Update
-In-Reply-To: <1353557099-21599-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1353557099-21599-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EAD78D4@DBDE01.ent.ti.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 26 Nov 2012 12:22:17 +0100
+Subject: [PATCH 0/9] dma_debug: add debug_dma_mapping_error support to
+ architectures that support DMA_DEBUG_API
+In-Reply-To: <1353706142.5270.93.camel@lorien2>
+References: <1353706142.5270.93.camel@lorien2>
+Message-ID: <20121126112217.GG25742@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+Hi Shuah,
 
-On Thu, Nov 22, 2012 at 09:34:57, Hebbar, Gururaja wrote:
-> From: "Hebbar, Gururaja" <gururaja.hebbar@ti.com>
+On Fri, Nov 23, 2012 at 02:29:02PM -0700, Shuah Khan wrote:
+> x86 - done in the first patch that added the feature.
 > 
-> 1. Add pinctrl for McASP Module
-> 2. Add DT support for Davinci machine platform (resend)
-> 
-> Second commit is a resend after re-basing on latest broonie-asoc/for-next
-> (v3.7-rc6)
-> 
-> Hebbar, Gururaja (2):
->   ASoC: davinci-mcasp: Add pinctrl support
->   ASoC: Davinci: machine: Add device tree binding
+> ARM64: dma_debug: add debug_dma_mapping_error support
+> c6x: dma_debug: add debug_dma_mapping_error support
+> ia64: dma_debug: add debug_dma_mapping_error support
+> microblaze: dma-mapping: support debug_dma_mapping_error
+> mips: dma_debug: add debug_dma_mapping_error support
+> powerpc: dma_debug: add debug_dma_mapping_error support
+> sh: dma_debug: add debug_dma_mapping_error support
+> sparc: dma_debug: add debug_dma_mapping_error support
+> tile: dma_debug: add debug_dma_mapping_error support
 
-With these 2 patches, DT support for Davinci ASoC will be complete 
-(well almost because edma dt binding is yet to be added). 
-However it will at least be complete on Davinci platform.
-
-Can you please review them and if it's OK, Could you please accept this series?
-
-> 
->  .../bindings/sound/davinci-evm-audio.txt           |   66 +++++++
->  sound/soc/davinci/davinci-evm.c                    |  185 +++++++++++++++++---
->  sound/soc/davinci/davinci-mcasp.c                  |    7 +
->  3 files changed, 238 insertions(+), 20 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/sound/davinci-evm-audio.txt
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
+Have you compile-tested the invididual archs you are changing here?
 
 
-Regards, 
-Gururaja
+	Joerg
