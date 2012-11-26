@@ -1,82 +1,78 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 26 Nov 2012 09:16:51 +0900
-Subject: [PATCH 4/7] ARM: shmobile: pfc-sh73a0: Register device tree
+Date: Mon, 26 Nov 2012 09:16:50 +0900
+Subject: [PATCH 3/7] sh: pfc: Allow device tree registration
 In-Reply-To: <1353889014-17142-1-git-send-email-horms@verge.net.au>
 References: <1353889014-17142-1-git-send-email-horms@verge.net.au>
-Message-ID: <1353889014-17142-5-git-send-email-horms@verge.net.au>
+Message-ID: <1353889014-17142-4-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the pfc with sh73a0_init_gpio_dt() to allow
-gpios provided by pfc to be accessed by devices which
-are registered using device tree.
+This is a crude mechanism to allow the pfc driver to
+be registered through device tree. The mofication of this
+is to provide a way for pfc gpios to be looked up by
+device tree for devices which use pfc gpios.
 
-The motivation of this is to allow the gpio used for carrier detect
-but the Micro SD SDHI port of the KZM-9A-GT board to be accessed
-using device tree. Thus, allowing the SDHI device of the KZM-9A-GT
-board to be registered using device tree.
+More specifically, the motivation is to allow the registration
+of the card-detect gpio for the Micro-SD SDHI slot of the KZM9G board.
 
+Cc: Paul Mundt <lethal@linux-sh.org>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/pfc-sh73a0.c |   45 +++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ drivers/sh/pfc/gpio.c  |   15 +++++++++++++++
+ include/linux/sh_pfc.h |    7 +++++++
+ 2 files changed, 22 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/pfc-sh73a0.c b/arch/arm/mach-shmobile/pfc-sh73a0.c
-index b442f9d..d1a04c0b 100644
---- a/arch/arm/mach-shmobile/pfc-sh73a0.c
-+++ b/arch/arm/mach-shmobile/pfc-sh73a0.c
-@@ -2797,7 +2797,52 @@ static struct pinmux_info sh73a0_pinmux_info = {
- 	.gpio_irq_size = ARRAY_SIZE(pinmux_irqs),
- };
+diff --git a/drivers/sh/pfc/gpio.c b/drivers/sh/pfc/gpio.c
+index 038fa07..322b927 100644
+--- a/drivers/sh/pfc/gpio.c
++++ b/drivers/sh/pfc/gpio.c
+@@ -136,6 +136,19 @@ static void sh_pfc_gpio_setup(struct sh_pfc_chip *chip)
+ 	gc->ngpio = (pfc->last_gpio - pfc->first_gpio) + 1;
+ }
  
 +#ifdef CONFIG_OF_GPIO
-+static int sh73a0_gpio_xlate(struct gpio_chip *gc,
-+			     const struct of_phandle_args *gpiospec,
-+			     u32 *flags)
++static void
++sh_pfc_register_gpiochip_dt(struct sh_pfc *pfc, struct gpio_chip *chip)
 +{
-+	if (WARN_ON(gc->of_gpio_n_cells < 2))
-+		return -EINVAL;
-+
-+	if (WARN_ON(gpiospec->args_count < gc->of_gpio_n_cells))
-+		return -EINVAL;
-+
-+	if (gpiospec->args[0] > gc->ngpio)
-+		return -EINVAL;
-+
-+	if (flags)
-+		*flags = gpiospec->args[1];
-+
-+	return gpiospec->args[0];
++	chip->of_node = pfc->of_node;
++	chip->of_gpio_n_cells = pfc->of_gpio_n_cells;
++	chip->of_xlate = pfc->of_xlate;
 +}
-+
-+static const struct of_device_id sh73a0_gpio_dt_match[] __initdata = {
-+	{ .compatible = "renesas,sh_pfc-sh73a0", },
-+	{}
-+};
-+
-+static inline void sh73a0_init_gpio_dt(void)
-+{
-+	struct device_node *of_node;
-+
-+	if (!of_have_populated_dt())
-+		return;
-+
-+	of_node = of_find_matching_node(NULL, sh73a0_gpio_dt_match);
-+	sh73a0_pinmux_info.of_node = of_node;
-+	sh73a0_pinmux_info.of_gpio_n_cells = 2;
-+	sh73a0_pinmux_info.of_xlate = sh73a0_gpio_xlate;
-+}
-+
 +#else
-+
-+static inline void sh73a0_init_gpio_dt(void) {}
-+
++static void sh_pfc_register_gpiochip_dt(struct sh_pfc *pfc,
++					struct gpio_chip *chip) {}
 +#endif
 +
- void sh73a0_pinmux_init(void)
+ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
  {
-+	sh73a0_init_gpio_dt();
- 	register_pinmux(&sh73a0_pinmux_info);
- }
+ 	struct sh_pfc_chip *chip;
+@@ -153,6 +166,8 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
+ 	if (unlikely(ret < 0))
+ 		kfree(chip);
+ 
++	sh_pfc_register_gpiochip_dt(pfc, &chip->gpio_chip);
++
+ 	pr_info("%s handling gpio %d -> %d\n",
+ 		pfc->name, pfc->first_gpio, pfc->last_gpio);
+ 
+diff --git a/include/linux/sh_pfc.h b/include/linux/sh_pfc.h
+index c19a092..9963370 100644
+--- a/include/linux/sh_pfc.h
++++ b/include/linux/sh_pfc.h
+@@ -124,6 +124,13 @@ struct sh_pfc {
+ 	struct pfc_window *window;
+ 
+ 	unsigned long unlock_reg;
++
++#ifdef CONFIG_OF_GPIO
++	struct device_node *of_node;
++	int of_gpio_n_cells;
++	int (*of_xlate)(struct gpio_chip *gc,
++		        const struct of_phandle_args *gpiospec, u32 *flags);
++#endif
+ };
+ 
+ /* XXX compat for now */
 -- 
 1.7.10.4
