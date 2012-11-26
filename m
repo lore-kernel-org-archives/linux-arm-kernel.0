@@ -1,125 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Nov 2012 01:02:53 -0800
-Subject: [PATCH v3 2/4] ARM: kirkwood: DT board setup for Network Space
- v2 and parents
-In-Reply-To: <1350468546-25901-3-git-send-email-simon.guinot@sequanux.org>
-References: <1350468546-25901-1-git-send-email-simon.guinot@sequanux.org>
- <1350468546-25901-3-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20121126090253.GI9580@quad.lixom.net>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 26 Nov 2012 10:02:59 +0100
+Subject: [PATCH v3 03/10] ARM: OMAP: AM33xx hwmod: Add parent-child
+ relationship for PWM subsystem
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC4C0FA@DBDE01.ent.ti.com>
+References: <1353387831-31538-1-git-send-email-avinashphilip@ti.com>
+ <1353387831-31538-4-git-send-email-avinashphilip@ti.com>
+ <518397C60809E147AF5323E0420B992E3E9EEA8C@DBDE01.ent.ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC4C0FA@DBDE01.ent.ti.com>
+Message-ID: <50B33043.2020700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Vaibhav,
 
-This is more directed at Jason and the other maintainers than you, Simon --
-it's something I noticed when looking at his pull request.
+On 11/26/2012 06:19 AM, Bedia, Vaibhav wrote:
+> On Fri, Nov 23, 2012 at 16:36:06, Philip, Avinash wrote:
+>> On Tue, Nov 20, 2012 at 10:33:44, Philip, Avinash wrote:
+>>> As part of PWM subsystem integration, PWM subsystem are sharing
+>>> resources like clock across submodules (ECAP, EQEP & EHRPWM).
+>>> To handle resource sharing & IP integration
+>>> 1. Rework on parent child relation between PWMSS and
+>>>    ECAP, EQEP & EHRPWM child devices to support runtime PM.
+>>> 2. Add support for opt_clks in EHRPWM HWMOD entry to handle additional
+>>>    clock gating from control module.
+>>> 3. Add HWMOD entries for EQEP PWM submodule.
+>>>
+>>
+>> Is there any review on this patch?
+>> This patch depends on ECAP & EHRPWM to work in am335x.
+> 
+> First of all, I think you should break up this patch as per the 3 points
+> that you mentioned above.
+> 
+> The usage of opt_clks for this does not look right to me. Based on your
+> description this clock is necessary and not optional on AM335x and on 
+> Davinci platforms this clock does not exist. 
+> 
+> I think the custom activate/deactivate functions in the OMAP runtime PM
+> implementation was a good fit for keeping this SoC integration detail out
+> of the driver code. However, the current DT flow in omap_device.c seems to
+> assign the default activate/deactivate ops. Is that approach deprecated?
 
-On Wed, Oct 17, 2012 at 12:09:04PM +0200, Simon Guinot wrote:
+The issue is that this approach is not doable anymore with DT, that's
+why I had to provide a default set of functions.
 
-> diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-> index 50bca50..847e0c2 100644
-> --- a/arch/arm/mach-kirkwood/Kconfig
-> +++ b/arch/arm/mach-kirkwood/Kconfig
-> @@ -130,6 +130,27 @@ config MACH_KM_KIRKWOOD_DT
->  	  Say 'Y' here if you want your kernel to support the
->  	  Keymile Kirkwood Reference Desgin, using Flattened Device Tree.
->  
-> +config MACH_INETSPACE_V2_DT
-> +	bool "LaCie Internet Space v2 NAS (Flattened Device Tree)"
-> +	select ARCH_KIRKWOOD_DT
-> +	help
-> +	  Say 'Y' here if you want your kernel to support the LaCie
-> +	  Internet Space v2 NAS, using Flattened Device Tree.
-> +
-> +config MACH_NETSPACE_V2_DT
-> +	bool "LaCie Network Space v2 NAS (Flattened Device Tree)"
-> +	select ARCH_KIRKWOOD_DT
-> +	help
-> +	  Say 'Y' here if you want your kernel to support the LaCie
-> +	  Network Space v2 NAS, using Flattened Device Tree.
-> +
-> +config MACH_NETSPACE_MAX_V2_DT
-> +	bool "LaCie Network Space Max v2 NAS (Flattened Device Tree)"
-> +	select ARCH_KIRKWOOD_DT
-> +	help
-> +	  Say 'Y' here if you want your kernel to support the LaCie
-> +	  Network Space Max v2 NAS, using Flattened Device Tree.
-
-It would be nice to get away from these config options. The whole point with
-device tree is to no longer have to do code changes for new similar boards.
-
-And even then, since they share the same init function, there's no need for
-three options, just one.
-
-> diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-> index 294779f..1f63d80 100644
-> --- a/arch/arm/mach-kirkwood/Makefile
-> +++ b/arch/arm/mach-kirkwood/Makefile
-> @@ -31,3 +31,6 @@ obj-$(CONFIG_MACH_GOFLEXNET_DT)		+= board-goflexnet.o
->  obj-$(CONFIG_MACH_LSXL_DT)		+= board-lsxl.o
->  obj-$(CONFIG_MACH_IOMEGA_IX2_200_DT)	+= board-iomega_ix2_200.o
->  obj-$(CONFIG_MACH_KM_KIRKWOOD_DT)	+= board-km_kirkwood.o
-> +obj-$(CONFIG_MACH_INETSPACE_V2_DT)	+= board-ns2.o
-> +obj-$(CONFIG_MACH_NETSPACE_V2_DT)	+= board-ns2.o
-> +obj-$(CONFIG_MACH_NETSPACE_MAX_V2_DT)	+= board-ns2.o
-
-Same here.
-
-> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> index 70c5a28..b3e0519 100644
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -96,6 +96,11 @@ static void __init kirkwood_dt_init(void)
->  	if (of_machine_is_compatible("keymile,km_kirkwood"))
->  		km_kirkwood_init();
->  
-> +	if (of_machine_is_compatible("lacie,inetspace_v2") ||
-> +	    of_machine_is_compatible("lacie,netspace_v2") ||
-> +	    of_machine_is_compatible("lacie,netspace_max_v2"))
-> +		ns2_init();
-> +
-
-This function is now a long sequence of if statments like the ones above. It
-would be great if they could be removed by moving most of the functionality
-implemented in the board file to the device tree. Looks like it's not a whole
-lot left, so that's promising. I'm guessing there's already efforts underway to
-take care of the last pieces.
-
-But, until then, I think it'd be nice to make this a table driven lookup
-instead of a sequence of open-coded if statements. Tegra had this early on
-before the board files were removed too. I.e. just a table of
-
-static struct match_table {
-	char *compat;
-	void (*fn)(void);
-} match_table = {
-	{ "lacie,inetspace_v2", ns2_init },
-	{ "lacie,netspace_v2", ns2_init },
-	....
-}
-
-and then an interator over that table.
-
-> @@ -112,6 +117,9 @@ static const char *kirkwood_dt_board_compat[] = {
->  	"buffalo,lsxl",
->  	"iom,ix2-200",
->  	"keymile,km_kirkwood",
-> +	"lacie,inetspace_v2",
-> +	"lacie,netspace_max_v2",
-> +	"lacie,netspace_v2",
->  	NULL
->  };
-
-Same here. I actually think this is a table that is no longer needed -- the
-board compat can/should be done on the generic compatible string instead of for
-each most-specific board string.
-
-> +static void ns2_power_off(void)
-> +{
-> +	gpio_set_value(NS2_GPIO_POWER_OFF, 1);
-> +}
-
-This kind of thing should be possible to generalize through a generic binding.
-
-
--Olof
+Regards,
+Benoit
