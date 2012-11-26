@@ -1,210 +1,101 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 26 Nov 2012 11:18:53 +0100 (CET)
-Subject: [PATCH 2/7] mmc: sdhi: enchance OF support for flags and cd-gpios
-In-Reply-To: <1353889014-17142-3-git-send-email-horms@verge.net.au>
-References: <1353889014-17142-1-git-send-email-horms@verge.net.au>
- <1353889014-17142-3-git-send-email-horms@verge.net.au>
-Message-ID: <Pine.LNX.4.64.1211261116260.11501@axis700.grange>
+From: per.forlin@stericsson.com (=?ISO-8859-1?Q?Per_F=F6rlin?=)
+Date: Mon, 26 Nov 2012 11:20:32 +0100
+Subject: [PATCH] mmc: mmci: Support non-power-of-two block sizes for
+ ux500v2 variant
+In-Reply-To: <20121122173708.GJ5764@n2100.arm.linux.org.uk>
+References: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121121153811.GN3290@n2100.arm.linux.org.uk>
+ <CAFEEs1kzJUgsvnzgWwU4i7o1jkE=8iTq5+NJ_t1jdiHEm7b-RQ@mail.gmail.com>
+ <20121121165048.GO3290@n2100.arm.linux.org.uk>
+ <CAFEEs1nb+UD+8_jsKvGKhyFqGDogN5wsmV30PnELqahTMDyRVA@mail.gmail.com>
+ <20121122173708.GJ5764@n2100.arm.linux.org.uk>
+Message-ID: <50B34270.7070403@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Nov 2012, Simon Horman wrote:
+On 11/22/2012 06:37 PM, Russell King - ARM Linux wrote:
+> On Thu, Nov 22, 2012 at 06:28:30PM +0100, Per Forlin wrote:
+>> On Wed, Nov 21, 2012 at 5:50 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> On Wed, Nov 21, 2012 at 05:13:55PM +0100, Per Forlin wrote:
+>>>> On Wed, Nov 21, 2012 at 4:38 PM, Russell King - ARM Linux
+>>>> <linux@arm.linux.org.uk> wrote:
+>>>>> On Fri, Oct 12, 2012 at 04:02:02PM +0200, Ulf Hansson wrote:
+>>>>>>  /*
+>>>>>> + * Validate mmc prerequisites
+>>>>>> + */
+>>>>>> +static int mmci_validate_data(struct mmci_host *host,
+>>>>>> +                           struct mmc_data *data)
+>>>>>> +{
+>>>>>> +     if (!data)
+>>>>>> +             return 0;
+>>>>>> +
+>>>>>> +     if (!host->variant->non_power_of_2_blksize &&
+>>>>>> +         !is_power_of_2(data->blksz)) {
+>>>>>> +             dev_err(mmc_dev(host->mmc),
+>>>>>> +                     "unsupported block size (%d bytes)\n", data->blksz);
+>>>>>> +             return -EINVAL;
+>>>>>> +     }
+>>>>>> +
+>>>>>> +     if (data->sg->offset & 3) {
+>>>>>> +             dev_err(mmc_dev(host->mmc),
+>>>>>> +                     "unsupported alginment (0x%x)\n", data->sg->offset);
+>>>>>> +             return -EINVAL;
+>>>>>> +     }
+>>>>>
+>>>>> Why?  What's the reasoning behind this suddenly introduced restriction?
+>>>>> readsl()/writesl() copes just fine with non-aligned pointers.  It may be
+>>>>> that your DMA engine can not, but that's no business interfering with
+>>>>> non-DMA transfers, and no reason to fail such transfers.
+>>>>>
+>>>>> If your DMA engine can't do that then its your DMA engine code which
+>>>>> should refuse to prepare the transfer.
+>>>>>
+>>>>> Yes, that means problems with the way things are ordered - or it needs a
+>>>>> proper API where DMA engine can export these kinds of properties.
+>>>> The alignment constraint is related to PIO, sg_miter and that FIFO
+>>>> access must be done with 4 bytes.
+>>>
+>>> Total claptrap.  No it isn't.
+>>>
+>>> - sg_miter just deals with bytes, and number of bytes transferred; there
+>>>   is no word assumptions in that code.  Indeed many ATA disks transfer
+>>>   by half-word accesses so such a restriction would be insane.
+>>>
+>>> - the FIFO access itself needs to be 32-bit words, so readsl or writesl
+>>>   (or their io* equivalents must be used).
+>>>
+>>> - but - and this is the killer item to your argument as I said above -
+>>>   readsl and writesl _can_ take misaligned pointers and cope with them
+>>>   fine.
+>>>
+>>> The actual alignment of the buffer address is totally irrelevant here.
+>>>
+>>> What isn't irrelevant is the _number_ of bytes to be transferred, but
+>>> that's something totally different and completely unrelated from
+>>> data->sg->offset.
+>> Let's try again :)
+>>
+>> Keep in mind that the mmc -block layer is aligned so from that aspect
+>> everything is fine.
+>> SDIO may have any length or alignment but sg-len is always 1.
+>>
+>> There is just one sg-element and one continues buffer.
+>>
+>> sg-miter splits the continues buffer in chunks that may not be aligned
+>> with 4 byte size. It depends on the start address alignment of the
+>> buffer.
+>>
+>> Is it more clear now?
+> 
+> Is this more clear: you may be passed a single buffer which is misaligned.
+> We cope with that just fine.  There is *no* reason to reject that transfer
+> because readsl/writesl cope just fine with it.
+> 
+The MMCI driver doesn't support alignment smaller than 4 bytes (it may result in data corruption).
+There are two options
+1. Either one should fix the driver to support it. Currently the driver only supports miss-alignment of the last sg-miter buffer.
+2. Or be kind to inform the user that the alignment is not supported.
 
-Sorry, forgot to mention: it is always good to add 
-devicetree-discuss at lists.ozlabs.org to such patches, also we need a 
-document undet Documentation/devicetree/bindings/mmc/.
-
-Thanks
-Guennadi
-
-> Enhance the OF support for SDHI by adding the following bindings:
-> 
-> * renesas,shmobile-sdhi-has-idle-wait:
->   Equivalent to setting TMIO_MMC_HAS_IDLE_WAIT in
->   the flags of platform data
-> 
-> * renesas,shmobile-sdhi-use-gpio-cd:
->   Equivalent to setting TMIO_MMC_USE_GPIO_CD in
->   the flags of platform data
-> 
-> * renesas,shmobile-sdhi-wrprotect-disable:
->   Equivalent to setting TMIO_MMC_WRPROTECT_DISABLE in
->   the flags of platform data
-> 
-> * cd-gpios:
->   Equivalent to setting cd_gpio in platform data
-> 
-> This patch also requests the clock based on the device tree
-> node name if the platform data is absent.
-> 
-> The motivation for this is to allow registration of the SDHI
-> device of the KZM-A9-GT board through device tree.
-> 
-> The following device tree snippet illustrates the use of the bindings
-> described above.
-> 
-> 	sdhi0 at 0xee100000 {
-> 		compatible = "renesas,shmobile-sdhi";
-> 		reg = <0xee100000 0x100>;
-> 		interrupt-parent = <&gic>;
-> 		interrupts = <0 83 0x4
-> 			      0 84 0x4
-> 			      0 85 0x4>;
-> 		interrupt-names = "card_detect", "sdcard", "sdio";
-> 		reg-io-width = <2>;
-> 		vmmc-supply = <&fixedregulator2v8>;
-> 		vqmmc-supply = <&fixedregulator2v8>;
-> 		renesas,shmobile-sdhi-has-idle-wait;
-> 	};
-> 
-> 	sdhi2 at 0xee140000 {
-> 		compatible = "renesas,shmobile-sdhi";
-> 		reg = <0xee140000 0x100>;
-> 		interrupt-parent = <&gic>;
-> 		interrupts = <0 103 0x4
-> 			      0 104 0x4
-> 			      0 105 0x4>;
-> 		interrupt-names = "card_detect", "sdcard", "sdio";
-> 		reg-io-width = <2>;
-> 		vmmc-supply = <&fixedregulator2v8>;
-> 		vqmmc-supply = <&fixedregulator2v8>;
-> 		renesas,shmobile-sdhi-has-idle-wait;
-> 		renesas,shmobile-sdhi-use-gpio-cd;
-> 		renesas,shmobile-sdhi-wrprotect-disable;
-> 		cd-gpios = <&gpio 13 1>;
-> 	};
-> 
-> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> Signed-off-by: Simon Horman <horms@verge.net.au>
-> ---
->  drivers/mmc/host/sh_mobile_sdhi.c |   76 +++++++++++++++++++++++++++++++------
->  1 file changed, 65 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sh_mobile_sdhi.c b/drivers/mmc/host/sh_mobile_sdhi.c
-> index 0bdc146..8c7e658 100644
-> --- a/drivers/mmc/host/sh_mobile_sdhi.c
-> +++ b/drivers/mmc/host/sh_mobile_sdhi.c
-> @@ -29,6 +29,7 @@
->  #include <linux/mfd/tmio.h>
->  #include <linux/sh_dma.h>
->  #include <linux/delay.h>
-> +#include <linux/of_gpio.h>
->  
->  #include "tmio_mmc.h"
->  
-> @@ -117,13 +118,64 @@ static const struct sh_mobile_sdhi_ops sdhi_ops = {
->  	.cd_wakeup = sh_mobile_sdhi_cd_wakeup,
->  };
->  
-> +static int __devinit
-> +sh_mobile_sdhi_probe_clk(struct platform_device *pdev,
-> +			 struct sh_mobile_sdhi *priv,
-> +			 const char *clk_name)
-> +{
-> +	priv->clk = clk_get(&pdev->dev, clk_name);
-> +	if (IS_ERR(priv->clk)) {
-> +		dev_err(&pdev->dev, "cannot get clock \"%s\"\n", clk_name);
-> +		return PTR_ERR(priv->clk);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_OF
-> +static int __devinit
-> +sh_mobile_sdhi_probe_config_dt(struct platform_device *pdev,
-> +			       struct sh_mobile_sdhi *priv)
-> +{
-> +	struct tmio_mmc_data *mmc_data = &priv->mmc_data;
-> +	struct device_node *np = pdev->dev.of_node;
-> +	int ret;
-> +
-> +	BUG_ON(!np);
-> +
-> +	ret = sh_mobile_sdhi_probe_clk(pdev, priv, np->name);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = of_get_named_gpio(np, "cd-gpios", 0);
-> +	if (gpio_is_valid(ret))
-> +		mmc_data->cd_gpio = ret;
-> +
-> +	if (of_get_property(np, "renesas,shmobile-sdhi-has-idle-wait", NULL))
-> +		mmc_data->flags |= TMIO_MMC_HAS_IDLE_WAIT;
-> +	if (of_get_property(np, "renesas,shmobile-sdhi-use-gpio-cd", NULL))
-> +		mmc_data->flags |= TMIO_MMC_USE_GPIO_CD;
-> +	if (of_get_property(np, "renesas,shmobile-sdhi-wrprotect-disable",
-> +			    NULL))
-> +		mmc_data->flags |= TMIO_MMC_WRPROTECT_DISABLE;
-> +
-> +	return 0;
-> +}
-> +#else
-> +static int __devinit
-> +sh_mobile_sdhi_probe_config_dt(struct platform_device *pdev,
-> +			       struct sh_mobile_sdhi *priv)
-> +{
-> +	return 0;
-> +}
-> +#endif
-> +
->  static int __devinit sh_mobile_sdhi_probe(struct platform_device *pdev)
->  {
->  	struct sh_mobile_sdhi *priv;
->  	struct tmio_mmc_data *mmc_data;
->  	struct sh_mobile_sdhi_info *p = pdev->dev.platform_data;
->  	struct tmio_mmc_host *host;
-> -	char clk_name[8];
->  	int irq, ret, i = 0;
->  	bool multiplexed_isr = true;
->  
-> @@ -144,21 +196,17 @@ static int __devinit sh_mobile_sdhi_probe(struct platform_device *pdev)
->  		}
->  	}
->  
-> -	snprintf(clk_name, sizeof(clk_name), "sdhi%d", pdev->id);
-> -	priv->clk = clk_get(&pdev->dev, clk_name);
-> -	if (IS_ERR(priv->clk)) {
-> -		dev_err(&pdev->dev, "cannot get clock \"%s\"\n", clk_name);
-> -		ret = PTR_ERR(priv->clk);
-> -		goto eclkget;
-> -	}
-> -
->  	mmc_data->clk_enable = sh_mobile_sdhi_clk_enable;
->  	mmc_data->clk_disable = sh_mobile_sdhi_clk_disable;
->  	mmc_data->capabilities = MMC_CAP_MMC_HIGHSPEED;
->  	if (p) {
-> +		char clk_name[8];
-> +		snprintf(clk_name, sizeof(clk_name), "sdhi%d", pdev->id);
-> +		ret = sh_mobile_sdhi_probe_clk(pdev, priv, clk_name);
-> +		if (ret)
-> +			goto eclkget;
-> +
->  		mmc_data->flags = p->tmio_flags;
-> -		if (mmc_data->flags & TMIO_MMC_HAS_IDLE_WAIT)
-> -			mmc_data->write16_hook = sh_mobile_sdhi_write16_hook;
->  		mmc_data->ocr_mask = p->tmio_ocr_mask;
->  		mmc_data->capabilities |= p->tmio_caps;
->  		mmc_data->capabilities2 |= p->tmio_caps2;
-> @@ -176,7 +224,13 @@ static int __devinit sh_mobile_sdhi_probe(struct platform_device *pdev)
->  			priv->dma_priv.alignment_shift = 1; /* 2-byte alignment */
->  			mmc_data->dma = &priv->dma_priv;
->  		}
-> +	} else {
-> +		ret = sh_mobile_sdhi_probe_config_dt(pdev, priv);
-> +		if (ret)
-> +			goto eclkget;
->  	}
-> +	if (mmc_data->flags & TMIO_MMC_HAS_IDLE_WAIT)
-> +		mmc_data->write16_hook = sh_mobile_sdhi_write16_hook;
->  
->  	/*
->  	 * All SDHI blocks support 2-byte and larger block sizes in 4-bit
-> -- 
-> 1.7.10.4
-> 
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+BR
+Per
