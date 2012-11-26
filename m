@@ -1,62 +1,35 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 26 Nov 2012 21:56:00 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the omap_dss2 tree
-Message-ID: <20121126215600.236b2e44ffea1abbea26898b@canb.auug.org.au>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 26 Nov 2012 11:57:19 +0100
+Subject: [PATCH 0/9] dma_debug: add debug_dma_mapping_error support to
+ architectures that support DMA_DEBUG_API
+In-Reply-To: <1353706142.5270.93.camel@lorien2>
+References: <1353706142.5270.93.camel@lorien2>
+Message-ID: <50B34B0F.3080204@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hello,
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/plat-omap/common.c between commit b022e17b1c7e ("OMAP: common.c:
-remove init call to vram") from the omap_dss2 tree and commit
-f583f0f2c720 ("ARM: OMAP2+: Move omap_reserve() locally to mach-omap2")
-from the arm-soc tree.
+On 11/23/2012 10:29 PM, Shuah Khan wrote:
+> An earlier patch added dma mapping error debug feature to dma_debug
+> infrastructure. References:
+>
+> https://lkml.org/lkml/2012/10/8/296
+> https://lkml.org/lkml/2012/11/3/219
+>
+> The following series of patches adds the call to debug_dma_mapping_error() to
+> architecture specific dma_mapping_error() interfaces on the following
+> architectures that support CONFIG_DMA_API_DEBUG.
 
-I fixed it up (by deleting the file and adding the following patch) and
-can carry the fix as necessary (no action is required).
+I've took all the patches to the next-dma-debug branch in my tree, I sorry
+that You have to wait so long for it. My branch is based on Joerg's
+dma-debug branch and I've included it for testing in linux-next branch.
 
->From 523f2987a07f97c946c63e0be4558b8332b46e8f Mon Sep 17 00:00:00 2001
-From: Stephen Rothwell <sfr@canb.auug.org.au>
-Date: Mon, 26 Nov 2012 21:51:20 +1100
-Subject: [PATCH] OMAP: common.c: remove init call to vram fixup
+Joerg: would You mind if I handle pushing the whole branch to v3.8
+via my kernel tree? Those changes should be kept close together to
+avoid build breaks for bisecting.
 
-Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
----
- arch/arm/mach-omap2/common.c |    3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
-index 5c2fd48..2dabb9e 100644
---- a/arch/arm/mach-omap2/common.c
-+++ b/arch/arm/mach-omap2/common.c
-@@ -16,8 +16,6 @@
- #include <linux/init.h>
- #include <linux/platform_data/dsp-omap.h>
- 
--#include <plat/vram.h>
--
- #include "common.h"
- #include "omap-secure.h"
- 
-@@ -32,7 +30,6 @@ int __weak omap_secure_ram_reserve_memblock(void)
- 
- void __init omap_reserve(void)
- {
--	omap_vram_reserve_sdram_memblock();
- 	omap_dsp_reserve_sdram_memblock();
- 	omap_secure_ram_reserve_memblock();
- 	omap_barrier_reserve_memblock();
+Best regards
 -- 
-1.7.10.280.gaa39
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121126/345d197d/attachment.sig>
+Marek Szyprowski
+Samsung Poland R&D Center
