@@ -1,46 +1,45 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 26 Nov 2012 08:22:14 +0900
-Subject: [PATCH] ARM: Exynos5: fix clock initialization for exynos5250
-In-Reply-To: <1353750810-21953-1-git-send-email-thomas.abraham@linaro.org>
-References: <1353750810-21953-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <12b301cdcb63$b3f60ca0$1be225e0$%kim@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 26 Nov 2012 09:16:48 +0900
+Subject: [PATCH 1/7] mmc: sh-mmcif: provide default allowed voltage
+In-Reply-To: <1353889014-17142-1-git-send-email-horms@verge.net.au>
+References: <1353889014-17142-1-git-send-email-horms@verge.net.au>
+Message-ID: <1353889014-17142-2-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
-> 
-> The machine compatible value cannot be checked in exynos5_dt_map_io
-> function
-> since the tree is not unflattened yet. Fix this by using soc_is_exynos5250
-> macro.
-> 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  arch/arm/mach-exynos/mach-exynos5-dt.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-
-> exynos/mach-exynos5-dt.c
-> index 77010f8..845d8e2 100644
-> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> @@ -117,7 +117,7 @@ static void __init exynos5_dt_map_io(void)
->  {
->  	exynos_init_io(NULL, 0);
-> 
-> -	if (of_machine_is_compatible("samsung,exynos5250"))
-> +	if (soc_is_exynos5250())
->  		s3c24xx_init_clocks(24000000);
->  }
-> 
-> --
+Use MMC_VDD_165_195 as the allowed voltages in the absence of
+platform data. This should allow device tree to initialise MMCIF
+for a number of boards.
 
-Correct, applied.
+A more complete solution would be to provide either MMCIF or MMC device
+try bindings to set the allowed voltages.
 
-Thanks.
+Tested on the KZM-A9-GT board
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ drivers/mmc/host/sh_mmcif.c |    7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
+index 11d2bc3..88d6866 100644
+--- a/drivers/mmc/host/sh_mmcif.c
++++ b/drivers/mmc/host/sh_mmcif.c
+@@ -1293,12 +1293,9 @@ static void sh_mmcif_init_ocr(struct sh_mmcif_host *host)
+ 
+ 	mmc_regulator_get_supply(mmc);
+ 
+-	if (!pd)
+-		return;
+-
+ 	if (!mmc->ocr_avail)
+-		mmc->ocr_avail = pd->ocr;
+-	else if (pd->ocr)
++		mmc->ocr_avail = pd ? pd->ocr : MMC_VDD_165_195;
++	else if (pd && pd->ocr)
+ 		dev_warn(mmc_dev(mmc), "Platform OCR mask is ignored\n");
+ }
+ 
+-- 
+1.7.10.4
