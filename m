@@ -1,82 +1,120 @@
-From: ucdevel@gmail.com (David McCullough)
-Date: Mon, 26 Nov 2012 10:45:27 +1000
-Subject: [PATCH] arm/crypto: Make asm SHA-1 and AES code Thumb-2 compatible
-In-Reply-To: <alpine.LFD.2.02.1211201348320.1182@xanadu.home>
-References: <20121030100742.17910.70241.stgit@localhost6.localdomain6>
- <1352119337-22619-1-git-send-email-dave.martin@linaro.org>
- <alpine.LFD.2.02.1211151723590.1238@xanadu.home>
- <20121120184616.GB1969@linaro.org>
- <alpine.LFD.2.02.1211201348320.1182@xanadu.home>
-Message-ID: <20121126004527.GA10151@spottygum.com>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Mon, 26 Nov 2012 10:27:39 +0900
+Subject: [PATCH v4 00/12] iommu/exynos: Fixes and Enhancements of System
+ MMU driver with DT
+In-Reply-To: <112e01cdc951$976699b0$c633cd10$%kim@samsung.com>
+References: <002101cdc8a4$fc375990$f4a60cb0$%cho@samsung.com>
+ <112e01cdc951$976699b0$c633cd10$%kim@samsung.com>
+Message-ID: <000001cdcb75$39d5d6a0$ad8183e0$%cho@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Nicolas Pitre wrote the following:
-> On Tue, 20 Nov 2012, Dave Martin wrote:
+> -----Original Message-----
+> From: Kukjin Kim [mailto:kgene.kim at samsung.com]
+> Sent: Friday, November 23, 2012 5:08 PM
+> Subject: RE: [PATCH v4 00/12] iommu/exynos: Fixes and Enhancements of System MMU driver with DT
 > 
-> > On Thu, Nov 15, 2012 at 05:26:44PM -0500, Nicolas Pitre wrote:
-> > > On Mon, 5 Nov 2012, Dave Martin wrote:
-> > > 
-> > > > This patch fixes aes-armv4.S and sha1-armv4-large.S to work
-> > > > natively in Thumb.  This allows ARM/Thumb interworking workarounds
-> > > > to be removed.
-> > > > 
-> > > > I also take the opportunity to convert some explicit assembler
-> > > > directives for exported functions to the standard
-> > > > ENTRY()/ENDPROC().
-> > > > 
-> > > > For the code itself:
-> > > > 
-> > > >   * In sha1_block_data_order, use of TEQ with sp is deprecated in
-> > > >     ARMv7 and not supported in Thumb.  For the branches back to
-> > > >     .L_00_15 and .L_40_59, the TEQ is converted to a CMP, under the
-> > > >     assumption that clobbering the C flag here will not cause
-> > > >     incorrect behaviour.
-> > > > 
-> > > >     For the first branch back to .L_20_39_or_60_79 the C flag is
-> > > >     important, so sp is moved temporarily into another register so
-> > > >     that TEQ can be used for the comparison.
-> > > > 
-> > > >   * In the AES code, most forms of register-indexed addressing with
-> > > >     shifts and rotates are not permitted for loads and stores in
-> > > >     Thumb, so the address calculation is done using a separate
-> > > >     instruction for the Thumb case.
-> > > > 
-> > > >     The resulting code is unlikely to be optimally scheduled, but
-> > > >     it should not have a large impact given the overall size of the
-> > > >     code.  I haven't run any benchmarks.
-> > > > 
-> > > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > > 
-> > > Acked-by: Nicolas Pitre <nico@linaro.org>
-> > > 
-> > > I didn't test it either, only reviewed the patch.  Looks obvious enough.  
-> > > And if something is wrong, then it is very unlikely to be unnoticed in 
-> > > practice.
-> > 
-> > I'd prefer someone tests this before I upload to the patch system.
-> > 
-> > I can do that, but I'm busy so it won't happen quickly...
-> > 
-> > Or do you think I should just go ahead?
+> Cho KyongHo wrote:
+> >
+> > The current exynos-iommu(System MMU) driver does not work autonomously
+> > since it is lack of support for power management of peripheral blocks.
+> > For example, MFC device driver must ensure that its System MMU is disabled
+> > before MFC block is power-down not to invalidate IOTLB in the System MMU
+> > when I/O memory mapping is changed. Because A System MMU is resides in the
+> > same H/W block, access to control registers of System MMU while the H/W
+> > block is turned off must be prohibited.
+> >
+> > This set of changes solves the above problem with setting each System MMUs
+> > as the parent of the device which owns the System MMU to recieve the
+> > information when the device is turned off or turned on.
+> >
+> > Another big change to the driver is the support for devicetree.
+> > The bindings for System MMU is described in
+> > Documentation/devicetree/bindings/arm/samsung/system-mmu.txt
+> >
+> > In addition, this patchset also includes several bug fixes and
+> > enhancements
+> > of the current driver.
+> >
+> > Change log:
+> > v4:
+> > - Remove Change-Id from v3 patches
+> > - Change the order of the third and the first patch
+> >   Thanks to Kukjin Kim.
+> > - Fix memory leak when allocating and assigning exynos_iommu_owner to
+> > client
+> >   device if the client device has multiple System MMUs.
+> >   Thanks to Rahul Sharma.
+> >
+> > v3:
+> > - Fix prefetch buffer flag definition for System MMU 3.3 (patch 10/12)
+> > - Fix incorrect setting for SET_RUNTIME_PM_OPS (patch 09/12)
+> >   Thanks to Prathyush.
+> >
+> > v2:
+> > - Split the patch to iommu/exynos into 9 patches
+> > - Support for System MMU 3.3
+> > - Some code compaction
+> >
+> > Patch summary:
+> > [PATCH v4 01/12] ARM: EXYNOS: Add clk_ops for gating clocks of System MMU
+> > [PATCH v4 02/12] ARM: EXYNOS: add System MMU definition to DT
+> > [PATCH v4 03/12] ARM: EXYNOS: remove system mmu initialization from exynos
+> > tree
+> > [PATCH v4 04/12] iommu/exynos: support for device tree
+> > [PATCH v4 05/12] iommu/exynos: pass version information from DT
+> > [PATCH v4 06/12] iommu/exynos: allocate lv2 page table from own slab
+> > [PATCH v4 07/12] iommu/exynos: change rwlock to spinlock
+> > [PATCH v4 08/12] iommu/exynos: set System MMU as the parent of client
+> > device
+> > [PATCH v4 09/12] iommu/exynos: add support for runtime pm and
+> > suspend/resume
+> > [PATCH v4 10/12] iommu/exynos: add support for System MMU 3.2 and 3.3
+> > [PATCH v4 11/12] iommu/exynos: add literal name of System MMU for
+> > debugging
+> > [PATCH v4 12/12] iommu/exynos: add debugfs entries for System MMU
+> >
+> > Diffstats:
+> >  .../devicetree/bindings/arm/exynos/system-mmu.txt  |   86 ++
+> >  arch/arm/boot/dts/exynos4210.dtsi                  |   96 ++
+> >  arch/arm/boot/dts/exynos4x12.dtsi                  |  124 ++
+> >  arch/arm/boot/dts/exynos5250.dtsi                  |  147 +-
+> >  arch/arm/mach-exynos/Kconfig                       |    5 -
+> >  arch/arm/mach-exynos/Makefile                      |    1 -
+> >  arch/arm/mach-exynos/clock-exynos4.c               |   41 +-
+> >  arch/arm/mach-exynos/clock-exynos4210.c            |    9 +-
+> >  arch/arm/mach-exynos/clock-exynos4212.c            |   23 +-
+> >  arch/arm/mach-exynos/clock-exynos5.c               |   86 +-
+> >  arch/arm/mach-exynos/dev-sysmmu.c                  |  274 ----
+> >  arch/arm/mach-exynos/include/mach/sysmmu.h         |   66 -
+> >  arch/arm/mach-exynos/mach-exynos4-dt.c             |   34 +
+> >  arch/arm/mach-exynos/mach-exynos5-dt.c             |   30 +
+> >  drivers/iommu/Kconfig                              |    2 +-
+> >  drivers/iommu/exynos-iommu.c                       | 1428
+> +++++++++++++++-----
+> >  16 files changed, 1720 insertions(+), 732 deletions(-)
 > 
-> If no one has provided test confirmation so far, that's either because 
-> no one cares, or any breakage in functionality would be so obvious that 
-> the incentive for testing before this hits mainline is not there.  In 
-> either cases that should be fine for you to go ahead and let any fixes, 
-> if any, be sent during the -rc period.
+> Looks good to me 1st~3rd patches. After quick review, I think, 1st and 2nd
+> patches can go to upstream for v3.8 without any dependency. So I will.
+> 
+> The 3rd patch has a dependency with other driver changes (4th ~ 12th), so it
+> should be sent to upstream with others.
+> 
+> BTW since the 3rd patch touches many Samsung stuff in arch/arm/ so I'd
+> prefer to take it in Samsung tree. If Joerg is ok on iommu/exynos driver
+> changes for v3.8...
+> 
+> Joerg, please let me know about iommu/exynos stuff so that I can decide to
+> take 3rd patch or not for v3.8.
+> 
 
-Ok,  I have tested this on little endian Kendin Micrel 8695 and on
-a big endian Intel Xscale 425.  Both worked fine.  I don't have any thumb
-systems,  but the patch can only improve thumb support since there was none
-previously :-)
+Hi, Kukjin Kim.
 
-Cheers,
-Davidm
+I found that control bit fields of clock gating of System MMU of MFC L/R is inversed.
+That is reported by Prathyush Kalashwaram.
 
-Tested-by: David McCullough <ucdevel@gmail.com>
-Acked-by: David McCullough <ucdevel@gmail.com>
+I will post v5 patchset that solves this.
 
--- 
-David McCullough,  ucdevel at gmail.com,   Ph: 0410 560 763
+Thank you.
+
+Cho KyongHo.
