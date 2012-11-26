@@ -1,82 +1,187 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 26 Nov 2012 09:16:52 +0900
-Subject: [PATCH 5/7] ARM: mach-shmobile: sh73a0: Allow initialisation of GIC
- by DT
+Date: Mon, 26 Nov 2012 09:16:53 +0900
+Subject: [PATCH 6/7] ARM: mach-shmobile: sh73a0: Minimal setup using DT
 In-Reply-To: <1353889014-17142-1-git-send-email-horms@verge.net.au>
 References: <1353889014-17142-1-git-send-email-horms@verge.net.au>
-Message-ID: <1353889014-17142-6-git-send-email-horms@verge.net.au>
+Message-ID: <1353889014-17142-7-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows the GIC interrupt controller of the sh73a0 SoC to be
-initialised using a flattened device tree blob.
+Allow a minimal setup of the sh73a0 SoC using a flattened device tree.
 
-It does not allow the INTC interrupt controller which is also present on
-the sh73a0 SoC to be enabled via device tree.  Nor does it handle sharing
-of interrupts between the GIC and INTC interrupt controllers.
+* Allow configuration of the i2c controllers using a flattened device tree.
 
-This limits the usefulness of this code to applications which only wish to
-access devices which use interrupts that can be handled by the GIC
-interrupt controller. Other applications should, for now, continue using
-non-device tree initialisation of the sh72a0 interrupt controllers.
+* SCI serial controller and CMT clock source, whose drivers do not yet
+  support configuration using a flattened device tree, are still configured
+  using C code in order to allow booting of a board with this SoC.
 
-An example dts snippet follows:
+An example dts snuppet follows:
 
-	gic: interrupt-controller at f0001000 {
-		compatible = "arm,cortex-a9-gic";
-		#interrupt-cells = <3>;
+	i2c0: i2c at 0xe6820000 {
 		#address-cells = <1>;
-		interrupt-controller;
-		reg = <0xf0001000 0x1000>,
-		      <0xf0000100 0x100>;
+		#size-cells = <0>;
+		compatible = "renesas,rmobile-iic";
+		reg = <0xe6820000 0x425>;
+		interrupt-parent = <&gic>;
+		interrupts = <0 167 0x4
+			      0 170 0x4>;
+	};
+
+	i2c1: i2c at 0xe6822000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "renesas,rmobile-iic";
+		reg = <0xe6822000 0x425>;
+		interrupt-parent = <&gic>;
+		interrupts = <0 51 0x4
+			      0 44 0x4>;
+
+		touchscreen at 55 {
+			compatible = "sitronix,st1232";
+			reg = <0x55>;
+			interrupt-parent = <&gic>;
+			interrupts = <0 9 0x4>;
+		};
+	};
+
+	i2c2: i2c at 0xe6824000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "renesas,rmobile-iic";
+		reg = <0xe6824000 0x425>;
+		interrupt-parent = <&gic>;
+		interrupts = <0 171 0x4
+			      0 174 0x4>;
+	};
+
+	i2c3: i2c at 0xe6826000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "renesas,rmobile-iic";
+		reg = <0xe6826000 0x425>;
+		interrupt-parent = <&gic>;
+		interrupts = <0 183 0x4
+			      0 186 0x4>;
+	};
+
+	i2c4: i2c at 0xe6828000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "renesas,rmobile-iic";
+		reg = <0xe6828000 0x425>;
+		interrupt-parent = <&gic>;
+		interrupts = <0 187 0x4
+			      0 190 0x4>;
 	};
 
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/common.h |    1 +
- arch/arm/mach-shmobile/intc-sh73a0.c         |   14 ++++++++++++++
- 2 files changed, 15 insertions(+)
+ arch/arm/mach-shmobile/include/mach/common.h |    2 ++
+ arch/arm/mach-shmobile/setup-sh73a0.c        |   41 ++++++++++++++++++++++----
+ 2 files changed, 38 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index d47e215..b50447e 100644
+index b50447e..06b905e 100644
 --- a/arch/arm/mach-shmobile/include/mach/common.h
 +++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -49,6 +49,7 @@ extern struct clk sh7372_extal1_clk;
- extern struct clk sh7372_extal2_clk;
- 
- extern void sh73a0_init_irq(void);
-+extern void sh73a0_init_irq_dt(void);
+@@ -52,7 +52,9 @@ extern void sh73a0_init_irq(void);
+ extern void sh73a0_init_irq_dt(void);
  extern void sh73a0_map_io(void);
  extern void sh73a0_add_early_devices(void);
++extern void sh73a0_add_early_devices_dt(void);
  extern void sh73a0_add_standard_devices(void);
-diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
-index f0c5e51..e492350 100644
---- a/arch/arm/mach-shmobile/intc-sh73a0.c
-+++ b/arch/arm/mach-shmobile/intc-sh73a0.c
-@@ -21,6 +21,7 @@
++extern void sh73a0_add_standard_devices_dt(void);
+ extern void sh73a0_clock_init(void);
+ extern void sh73a0_pinmux_init(void);
+ extern struct clk sh73a0_extal1_clk;
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index db99a4a..9096caa 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -23,6 +23,7 @@
  #include <linux/interrupt.h>
- #include <linux/module.h>
  #include <linux/irq.h>
-+#include <linux/of_irq.h>
+ #include <linux/platform_device.h>
++#include <linux/of_platform.h>
+ #include <linux/delay.h>
+ #include <linux/input.h>
  #include <linux/io.h>
- #include <linux/sh_intc.h>
- #include <mach/intc.h>
-@@ -464,3 +465,16 @@ void __init sh73a0_init_irq(void)
- 	sh73a0_pint1_cascade.handler = sh73a0_pint1_demux;
- 	setup_irq(gic_spi(34), &sh73a0_pint1_cascade);
- }
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id irq_of_match[] __initconst = {
-+	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
-+	{ },
+@@ -754,7 +755,7 @@ static struct platform_device pmu_device = {
+ 	.resource	= pmu_resources,
+ };
+ 
+-static struct platform_device *sh73a0_early_devices[] __initdata = {
++static struct platform_device *sh73a0_early_devices_dt[] __initdata = {
+ 	&scif0_device,
+ 	&scif1_device,
+ 	&scif2_device,
+@@ -765,6 +766,9 @@ static struct platform_device *sh73a0_early_devices[] __initdata = {
+ 	&scif7_device,
+ 	&scif8_device,
+ 	&cmt10_device,
 +};
 +
-+void __init sh73a0_init_irq_dt(void)
-+{
-+	of_irq_init(irq_of_match);
-+	gic_arch_extn.irq_set_wake = sh73a0_set_wake;
++static struct platform_device *sh73a0_early_devices[] __initdata = {
+ 	&tmu00_device,
+ 	&tmu01_device,
+ };
+@@ -782,11 +786,18 @@ static struct platform_device *sh73a0_late_devices[] __initdata = {
+ 
+ #define SRCR2          IOMEM(0xe61580b0)
+ 
+-void __init sh73a0_add_standard_devices(void)
++void __init sh73a0_add_standard_devices_dt(void)
+ {
+ 	/* Clear software reset bit on SY-DMAC module */
+ 	__raw_writel(__raw_readl(SRCR2) & ~(1 << 18), SRCR2);
+ 
++	platform_add_devices(sh73a0_early_devices_dt,
++			     ARRAY_SIZE(sh73a0_early_devices_dt));
 +}
-+#endif
++
++void __init sh73a0_add_standard_devices(void)
++{
++	sh73a0_add_standard_devices_dt();
+ 	platform_add_devices(sh73a0_early_devices,
+ 			    ARRAY_SIZE(sh73a0_early_devices));
+ 	platform_add_devices(sh73a0_late_devices,
+@@ -803,14 +814,34 @@ static void __init sh73a0_earlytimer_init(void)
+ 	sh73a0_register_twd();
+ }
+ 
+-void __init sh73a0_add_early_devices(void)
++static void __init
++sh73a0_add_early_devices_start(void)
+ {
+-	early_platform_add_devices(sh73a0_early_devices,
+-				   ARRAY_SIZE(sh73a0_early_devices));
++	early_platform_add_devices(sh73a0_early_devices_dt,
++				   ARRAY_SIZE(sh73a0_early_devices_dt));
++}
+ 
++static void __init
++sh73a0_add_early_devices_finish(void)
++{
+ 	/* setup early console here as well */
+ 	shmobile_setup_console();
+ 
+ 	/* override timer setup with soc-specific code */
+ 	shmobile_timer.init = sh73a0_earlytimer_init;
+ }
++
++void __init sh73a0_add_early_devices_dt(void)
++{
++	sh73a0_add_early_devices_start();
++	sh73a0_add_early_devices_finish();
++}
++
++void __init sh73a0_add_early_devices(void)
++{
++	sh73a0_add_early_devices_start();
++	early_platform_add_devices(sh73a0_early_devices,
++				   ARRAY_SIZE(sh73a0_early_devices));
++	sh73a0_add_early_devices_finish();
++}
++
 -- 
 1.7.10.4
