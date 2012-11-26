@@ -1,35 +1,92 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 26 Nov 2012 08:58:48 -0500
-Subject: [GIT PULL 3/5] ARM: orion: boards for v3.8
-In-Reply-To: <20121126091913.GC13866@quad.lixom.net>
-References: <pull-1353733874-990435>
- <50b056f7.452ce00a.4217.69b0SMTPIN_ADDED_MISSING@mx.google.com>
- <20121126091913.GC13866@quad.lixom.net>
-Message-ID: <20121126135848.GA15800@titan.lakedaemon.net>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 26 Nov 2012 15:06:37 +0100
+Subject: [PATCH 4/7] ARM: shmobile: pfc-sh73a0: Register device tree
+In-Reply-To: <1353889014-17142-5-git-send-email-horms@verge.net.au>
+References: <1353889014-17142-1-git-send-email-horms@verge.net.au>
+ <1353889014-17142-5-git-send-email-horms@verge.net.au>
+Message-ID: <7701261.79JI41uS12@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 01:19:13AM -0800, Olof Johansson wrote:
-> On Sat, Nov 24, 2012 at 05:11:09AM +0000, Jason Cooper wrote:
-> > The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
-> > 
-> >   Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.infradead.org/users/jcooper/linux.git tags/orion_boards_for_3.8
+Hi Simon,
+
+On Monday 26 November 2012 09:16:51 Simon Horman wrote:
+> Register the pfc with sh73a0_init_gpio_dt() to allow
+> gpios provided by pfc to be accessed by devices which
+> are registered using device tree.
 > 
-> Pulled, thanks. I commented on one of the patches though (Network Space v2).
+> The motivation of this is to allow the gpio used for carrier detect
+> but the Micro SD SDHI port of the KZM-9A-GT board to be accessed
+> using device tree. Thus, allowing the SDHI device of the KZM-9A-GT
+> board to be registered using device tree.
 > 
-> Obviously the mpp pieces of each board patch will go away now that the pinctrl
-> driver is in place, so hopefully most of the rest can be whittled down too over
-> the next couple of releases. :)
+> Signed-off-by: Simon Horman <horms@verge.net.au>
+> ---
+>  arch/arm/mach-shmobile/pfc-sh73a0.c |   45 ++++++++++++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+> 
+> diff --git a/arch/arm/mach-shmobile/pfc-sh73a0.c
+> b/arch/arm/mach-shmobile/pfc-sh73a0.c index b442f9d..d1a04c0b 100644
+> --- a/arch/arm/mach-shmobile/pfc-sh73a0.c
+> +++ b/arch/arm/mach-shmobile/pfc-sh73a0.c
+> @@ -2797,7 +2797,52 @@ static struct pinmux_info sh73a0_pinmux_info = {
+>  	.gpio_irq_size = ARRAY_SIZE(pinmux_irqs),
+>  };
+> 
+> +#ifdef CONFIG_OF_GPIO
+> +static int sh73a0_gpio_xlate(struct gpio_chip *gc,
+> +			     const struct of_phandle_args *gpiospec,
+> +			     u32 *flags)
+> +{
+> +	if (WARN_ON(gc->of_gpio_n_cells < 2))
+> +		return -EINVAL;
+> +
+> +	if (WARN_ON(gpiospec->args_count < gc->of_gpio_n_cells))
+> +		return -EINVAL;
+> +
+> +	if (gpiospec->args[0] > gc->ngpio)
+> +		return -EINVAL;
+> +
+> +	if (flags)
+> +		*flags = gpiospec->args[1];
+> +
+> +	return gpiospec->args[0];
+> +}
 
-I'm targetting v3.9 to get rid of most of the board files, the Kconfig
-of individual DT boards, and platform init of mv643xx_eth.  At that
-point, we'll be in shape to convert the legacy *-setup.c files, and move
-all DT support to mvebu.
+Is there any reason not to use of_gpio_simple_xlate here ? If there isn't, 
+of_xlate and of_gpio_n_cells default to of_gpio_simple_xlate and 2 
+respectively when of_xlate isn't specified, so you could omit both.
 
-thx,
+> +static const struct of_device_id sh73a0_gpio_dt_match[] __initdata = {
+> +	{ .compatible = "renesas,sh_pfc-sh73a0", },
+> +	{}
+> +};
+> +
+> +static inline void sh73a0_init_gpio_dt(void)
+> +{
+> +	struct device_node *of_node;
+> +
+> +	if (!of_have_populated_dt())
+> +		return;
+> +
+> +	of_node = of_find_matching_node(NULL, sh73a0_gpio_dt_match);
+> +	sh73a0_pinmux_info.of_node = of_node;
+> +	sh73a0_pinmux_info.of_gpio_n_cells = 2;
+> +	sh73a0_pinmux_info.of_xlate = sh73a0_gpio_xlate;
+> +}
+> +
+> +#else
+> +
+> +static inline void sh73a0_init_gpio_dt(void) {}
+> +
+> +#endif
+> +
+>  void sh73a0_pinmux_init(void)
+>  {
+> +	sh73a0_init_gpio_dt();
+>  	register_pinmux(&sh73a0_pinmux_info);
+>  }
+-- 
+Regards,
 
-Jason.
+Laurent Pinchart
