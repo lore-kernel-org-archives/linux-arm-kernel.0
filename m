@@ -1,19 +1,15 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 26 Nov 2012 17:23:43 -0500 (EST)
-Subject: [PATCH net-next] cpts: add missing kconfig dependency
-In-Reply-To: <1353931638-1023-1-git-send-email-richardcochran@gmail.com>
-References: <1353931638-1023-1-git-send-email-richardcochran@gmail.com>
-Message-ID: <20121126.172343.219794518162131020.davem@davemloft.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 26 Nov 2012 16:17:26 -0700
+Subject: [PATCH V2] ARM: dt: tegra: cardhu: Add drm components
+In-Reply-To: <1353396472-24167-1-git-send-email-markz@nvidia.com>
+References: <1353396472-24167-1-git-send-email-markz@nvidia.com>
+Message-ID: <50B3F886.3090701@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Cochran <richardcochran@gmail.com>
-Date: Mon, 26 Nov 2012 13:07:18 +0100
+On 11/20/2012 12:27 AM, Mark Zhang wrote:
+> This patch adds the rgb node which is needed by
+> tegra drm driver.
 
-> The Common Platform Time Sync function of the CPSW does not depend the
-> CPSW configuration option as it should. This patch fixes the issue by
-> adding the dependency.
-> 
-> Signed-off-by: Richard Cochran <richardcochran@gmail.com>
-
-Applied.
+This doesn't seem to include all the GPIOs/regulators/... required to
+enable the panel and backlight.
