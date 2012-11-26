@@ -1,39 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 26 Nov 2012 15:37:19 -0600
-Subject: [PATCH 4/9] ARM: GIC: remove direct use of gic_raise_softirq
-In-Reply-To: <1353466713-18967-5-git-send-email-robherring2@gmail.com>
-References: <1353466713-18967-1-git-send-email-robherring2@gmail.com>
- <1353466713-18967-5-git-send-email-robherring2@gmail.com>
-Message-ID: <50B3E10F.9070500@gmail.com>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Mon, 26 Nov 2012 16:38:29 -0500
+Subject: [RFC v2 1/1] RTL8712 alignment bug in 3.6 and up on ARMV5
+Message-ID: <CAMW5UfZmptBK5sLq3zMdPJ6C3Arqfyy4SY5BOPfqcOB1T-sbSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+I've been banging on my test setup for the past week.  I haven't
+tracked down the cause yet, but something in my prior build system
+results in this problem being masked with some builds.  Doing pure
+vanilla builds from git I'm able to reproduce with 3.6 and the 3.7-rc
+series reliably.  Support for my GFN doesn't exist officially prior to
+3.6 and I didn't want to introduce new variables by back porting
+support and trying to test with that patch set so I was unable to
+isolate a start point for the failure I found.  I can reproduce the
+failure with 3.7-rc6 currently.
 
-On 11/20/2012 08:58 PM, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> In preparation of moving gic code to drivers/irqchip, remove the direct
-> platform dependencies on gic_raise_softirq. Move the setup of
-> smp_cross_call into the gic code. All platforms are using IPI#0 for
-> core wakeup, so create a common wakeup ipi function.
+Currently I'm running stable on 3.7-rc6 with the below patch and my
+RealTek 8712 USB NIC.
 
-snip
+I'm open to any and all suggestions on how to test further.
 
-> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-> index 2e3be16..7933eb1 100644
-> --- a/arch/arm/include/asm/smp.h
-> +++ b/arch/arm/include/asm/smp.h
-> @@ -79,6 +79,7 @@ extern void cpu_die(void);
->  
->  extern void arch_send_call_function_single_ipi(int cpu);
->  extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
-> +extern void arch_send_wakeup_ipi(int cpu);
+Signed-off-by: Joshua Coombs <josh.coombs@gmail.com>
+--
+diff -ruN a/drivers/staging/rtl8712/rtl871x_sta_mgt.c
+b/drivers/staging/rtl8712/rtl871x_sta_mgt.c
+--- a/drivers/staging/rtl8712/rtl871x_sta_mgt.c 2012-11-17
+16:21:23.000000000 -0500
++++ b/drivers/staging/rtl8712/rtl871x_sta_mgt.c 2012-11-18
+14:58:27.000000000 -0500
+@@ -52,11 +52,11 @@
+  s32 i;
 
-I found there is already an arch_send_wakeup_ipi_mask() in your for-next
-tree, so I have rebased this to use it instead. Is your for-next branch
-stable for 3.8 and if not can you make commit b62655f4c6f3e4d21934e
-(ARM: 7571/1: SMP: add function arch_send_wakeup_ipi_mask()) available
-in a stable branch.
-
-Rob
+  pstapriv->pallocated_stainfo_buf = _malloc(sizeof(struct sta_info) *
+-   NUM_STA + 4);
++   NUM_STA + 8);
+  if (pstapriv->pallocated_stainfo_buf == NULL)
+  return _FAIL;
+- pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 4 -
+- ((addr_t)(pstapriv->pallocated_stainfo_buf) & 3);
++ pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 8 -
++ ((addr_t)(pstapriv->pallocated_stainfo_buf) & 7);
+  _init_queue(&pstapriv->free_sta_queue);
+  spin_lock_init(&pstapriv->sta_hash_lock);
+  pstapriv->asoc_sta_count = 0;
