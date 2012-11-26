@@ -1,44 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 26 Nov 2012 11:13:37 +0000
-Subject: [PATCH] ARM: implement optimized percpu variable access
-In-Reply-To: <50B2679F.3070107@gmail.com>
-References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
- <20121122113401.GC3113@mudshark.cambridge.arm.com>
- <50B2679F.3070107@gmail.com>
-Message-ID: <20121126111337.GA13312@mudshark.cambridge.arm.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 26 Nov 2012 22:15:04 +1100
+Subject: linux-next: manual merge of the samsung tree with the arm-soc tree
+Message-ID: <20121126221504.b5da9b5f938ed84b0693c4a3@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Kukjin,
 
-On Sun, Nov 25, 2012 at 06:46:55PM +0000, Rob Herring wrote:
-> On 11/22/2012 05:34 AM, Will Deacon wrote:
-> > As an aside, you also need to make the asm block volatile in
-> > __my_cpu_offset -- I can see it being re-ordered before the set for
-> > secondary CPUs otherwise.
-> 
-> I don't think that is right. Doing that means the register is reloaded
-> on every access and you end up with code like this (from handle_IRQ):
-> 
-> c000eb4c:       ee1d2f90        mrc     15, 0, r2, cr13, cr0, {4}
-> c000eb50:       e7926003        ldr     r6, [r2, r3]
-> c000eb54:       ee1d2f90        mrc     15, 0, r2, cr13, cr0, {4}
-> c000eb58:       e7821003        str     r1, [r2, r3]
-> c000eb5c:       eb006cb1        bl      c0029e28 <irq_enter>
-> 
-> I don't really see where there would be a re-ordering issue. There's no
-> percpu var access before or near the setting that I can see.
+Today's linux-next merge of the samsung tree got a conflict in
+arch/arm/boot/dts/exynos5250-smdk5250.dts between commit 24025f6f5821
+("Merge branch 'next/dt-samsung' of
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into
+next/dt") from the arm-soc tree and commit 65fc7232786b ("Merge branch
+'next/devel-samsung-3' into for-next") from the samsung tree.
 
-Well my A15 doesn't boot with your original patch unless I make that thing
-volatile, so something does need tweaking...
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-The issue is on bringing up the secondary core, so I assumed that a lot
-of inlining goes on inside secondary_start_kernel and then the result is
-shuffled around, placing a cpu-offset read before we've done the set.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-Unfortunately, looking at the disassembly I can't see this happening at
-all, so I'll keep digging. The good news is that I've just reproduced the
-problem on the model, so I've got more visibility now (although both cores
-are just stuck in spinlocks...).
-
-Will
+diff --cc arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 29f1333,cdeb4f2..0000000
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@@ -208,4 -200,31 +204,27 @@@
+  		samsung,mfc-r = <0x43000000 0x800000>;
+  		samsung,mfc-l = <0x51000000 0x800000>;
+  	};
++ 
+ -	hdmi {
+ -		hpd-gpio = <&gpx3 7 0xf 1 3>;
+ -	};
+ -
++ 	i2s_0: i2s at 03830000 {
++ 		gpios = <&gpz 0 2 0 0>, <&gpz 1 2 0 0>, <&gpz 2 2 0 0>,
++ 			<&gpz 3 2 0 0>, <&gpz 4 2 0 0>, <&gpz 5 2 0 0>,
++ 			<&gpz 6 2 0 0>;
++ 	};
++ 
++ 	i2s_1: i2s at 12D60000 {
++ 		status = "disabled";
++ 	};
++ 
++ 	i2s_2: i2s at 12D70000 {
++ 		status = "disabled";
++ 	};
++ 
++ 	dp-controller {
++ 		samsung,color-space = <0>;
++ 		samsung,dynamic-range = <0>;
++ 		samsung,ycbcr-coeff = <0>;
++ 		samsung,color-depth = <1>;
++ 		samsung,link-rate = <0x0a>;
++ 		samsung,lane-count = <4>;
++ 	};
+  };
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121126/66668faf/attachment.sig>
