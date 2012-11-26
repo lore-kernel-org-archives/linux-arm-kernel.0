@@ -1,16 +1,16 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 26 Nov 2012 14:00:17 -0700
-Subject: [PATCH 1/1] arm: tegra: select correct parent clk for pll_p
-In-Reply-To: <1353396556-7738-1-git-send-email-sivaramn@nvidia.com>
-References: <1353396556-7738-1-git-send-email-sivaramn@nvidia.com>
-Message-ID: <50B3D861.7050700@wwwdotorg.org>
+Date: Mon, 26 Nov 2012 14:00:28 -0700
+Subject: [PATCH 1/1] arm: tegra: fix comment in dsib clk set_parent
+In-Reply-To: <1353498147-14574-1-git-send-email-sivaramn@nvidia.com>
+References: <1353498147-14574-1-git-send-email-sivaramn@nvidia.com>
+Message-ID: <50B3D86C.40104@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2012 12:29 AM, Sivaram Nair wrote:
-> For Tegra30, pll_p clk's parent is wrongly specified as clk_m instead of
-> pll_ref in the tegra30_clk_init_table and this is resulting in a
-> boot-time warning. This patch fixes this by correcting the clk init
-> table.
+On 11/21/2012 04:42 AM, Sivaram Nair wrote:
+> Since the clk framework has already taken necessary locks before calling
+> into the arch clk ops code, no further locks are needed while setting
+> the parent of dsib clk. This patch removes a comment that indicated
+> otherwise, and yet did not take any locks.
 
 Thanks, applied.
