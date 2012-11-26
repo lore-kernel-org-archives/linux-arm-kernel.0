@@ -1,53 +1,77 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 26 Nov 2012 12:15:17 -0700
-Subject: [PATCH V3 11/11] ARM: delete struct sys_timer
-In-Reply-To: <CAN1soZxf=i9Z9zOpbE2zUW6q6CY9TfOsUB7bf+-K_oLcmFqeCQ@mail.gmail.com>
-References: <1353349867-28494-1-git-send-email-swarren@wwwdotorg.org>
- <1353349867-28494-12-git-send-email-swarren@wwwdotorg.org>
- <CAN1soZxf=i9Z9zOpbE2zUW6q6CY9TfOsUB7bf+-K_oLcmFqeCQ@mail.gmail.com>
-Message-ID: <50B3BFC5.8070404@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 26 Nov 2012 20:16:15 +0100
+Subject: [GIT PULL] Integrator changes for v3.8
+Message-ID: <CACRpkdZsd88699+z9XTJpAmfu9CJhknQB-55=sR_VAU4HG7Xjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2012 09:43 PM, Haojian Zhuang wrote:
-> On Tue, Nov 20, 2012 at 2:31 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> Now that the only field in struct sys_timer is .init, delete the struct,
->> and replace the machine descriptor .timer field with the initialization
->> function itself.
->>
->> This will enable moving timer drivers into drivers/clocksource without
->> having to place a public prototype of each struct sys_timer object into
->> include/linux; the intent is to create a single of_clocksource_init()
->> function that determines which timer driver to initialize by scanning
->> the device dtree, much like the proposed irqchip_init() at:
->> http://www.spinics.net/lists/arm-kernel/msg203686.html
-...
-> I checked the patch for mach-mmp.
-> 
-> @@ -69,7 +65,7 @@ static const char *mmp_dt_board_compat[] __initdata = {
->  DT_MACHINE_START(PXA168_DT, "Marvell PXA168 (Device Tree Support)")
->         .map_io         = mmp_map_io,
->         .init_irq       = mmp_dt_irq_init,
-> -       .timer          = &mmp_dt_timer,
-> +       .init_time      = mmp_dt_init_timer,
->         .init_machine   = pxa168_dt_init,
->         .dt_compat      = mmp_dt_board_compat,
->  MACHINE_END
-> @@ -77,7 +73,7 @@ MACHINE_END
->  DT_MACHINE_START(PXA910_DT, "Marvell PXA910 (Device Tree Support)")
->         .map_io         = mmp_map_io,
->         .init_irq       = mmp_dt_irq_init,
-> -       .timer          = &mmp_dt_timer,
-> +       .init_time      = mmp_dt_timer_init,
->         .init_machine   = pxa910_dt_init,
->         .dt_compat      = mmp_dt_board_compat,
->  MACHINE_END
-> 
-> This first init_time is assigned by mmp_dt_init_timer. But the second
-> init_time is
-> assigned by mmp_dt_timer_init. I think it's a typo error. Could you
-> help to fix this?
+Hi ARM SoC guys,
 
-Thanks, I've fixed that up locally.
+these are the accumulated Integrator patches for v3.8,
+description in the tag. I know it's not split across multiple
+topics, but the IM-PD1 clocks and irq driver stuff is already
+on separate topics. This is the socbus and "the rest".
+
+Pleas pull them in!
+
+Yours,
+Linus Walleij
+
+
+The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
+
+  Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+tags/integrator-for-arm-soc
+
+for you to fetch changes up to f7a9b36517d38cfa2213a346b154d2d7046ff223:
+
+  ARM: integrator: use BUG_ON where possible (2012-11-17 19:44:39 +0100)
+
+----------------------------------------------------------------
+---------------------------------------------------------------
+This series will do the following:
+- Switch the Integrator/AP and /CP to use the SoC bus
+  when booting from device tree.
+- Group all devices on the SoC below this bus so as to
+  set a good example of how to do this. The bus was
+  invented by Lee Jones, let's show how it's to be used
+  on a DT:ed SoC.
+- Fetch the special system controller offsets from two
+  special device tree nodes for each case and replace
+  the static mappings with these at boot.
+- Move some static remaps to the ATAG-only code path
+  and delete some static maps that aren't used.
+- Push dependencies on system controller remaps down
+  to the Integrator/AP board file and the PCIv3 driver
+  respectively and use only dynamic remappings.
+- Fix up conditional BUG() usage in the PCIv3 driver
+  to be simpler and more to the point.
+
+----------------------------------------------------------------
+Linus Walleij (7):
+      ARM: integrator: hook the AP into the SoC bus
+      ARM: integrator: hook the CP into the SoC bus
+      ARM: integrator: remove static AP syscon mapping
+      ARM: integrator: remove static CP syscon mapping
+      ARM: integrator: delete SC mapping on the CP
+      ARM: integrator: delete static UART1 mapping
+      ARM: integrator: push down SC dependencies
+
+Sasha Levin (1):
+      ARM: integrator: use BUG_ON where possible
+
+ Documentation/devicetree/bindings/arm/arm-boards |   4 +
+ arch/arm/boot/dts/integratorap.dts               |   5 +
+ arch/arm/boot/dts/integratorcp.dts               |   5 +
+ arch/arm/mach-integrator/Kconfig                 |   2 +
+ arch/arm/mach-integrator/common.h                |   8 +-
+ arch/arm/mach-integrator/core.c                  | 141 +++++++++++++-------
+ arch/arm/mach-integrator/include/mach/platform.h |   1 -
+ arch/arm/mach-integrator/integrator_ap.c         | 158 +++++++++++++++++++----
+ arch/arm/mach-integrator/integrator_cp.c         | 115 +++++++++++++----
+ arch/arm/mach-integrator/pci_v3.c                |  32 ++---
+ 10 files changed, 354 insertions(+), 117 deletions(-)
