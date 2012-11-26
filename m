@@ -1,168 +1,140 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 26 Nov 2012 14:39:43 +0800
-Subject: [PATCH] mmc: sdhci-imx-esdhc: use more devm_* functions
-Message-ID: <1353911983-10103-1-git-send-email-shawn.guo@linaro.org>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 26 Nov 2012 12:45:55 +0530
+Subject: [PATCH] ARM: Exynos: Remove unused non-dt support for dwmci controller
+Message-ID: <1353914155-1716-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm_kzalloc, devm_gpio_request_one and devm_request_irq to make
-cleanup path simpler.
+With device tree support enabled for dwmci controller, the unused non-dt support
+for dwmci controller can be removed.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- drivers/mmc/host/sdhci-esdhc-imx.c |   56 ++++++++++++------------------------
- 1 file changed, 18 insertions(+), 38 deletions(-)
+ arch/arm/mach-exynos/Makefile             |    1 -
+ arch/arm/mach-exynos/dev-dwmci.c          |   75 -----------------------------
+ arch/arm/mach-exynos/include/mach/dwmci.h |   20 --------
+ 3 files changed, 0 insertions(+), 96 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/dev-dwmci.c
+ delete mode 100644 arch/arm/mach-exynos/include/mach/dwmci.h
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index effc2ac..1849461 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -456,10 +456,10 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 
- 	pltfm_host = sdhci_priv(host);
- 
--	imx_data = kzalloc(sizeof(struct pltfm_imx_data), GFP_KERNEL);
-+	imx_data = devm_kzalloc(&pdev->dev, sizeof(*imx_data), GFP_KERNEL);
- 	if (!imx_data) {
- 		err = -ENOMEM;
--		goto err_imx_data;
-+		goto free_sdhci;
- 	}
- 
- 	if (of_id)
-@@ -470,19 +470,19 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 	imx_data->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
- 	if (IS_ERR(imx_data->clk_ipg)) {
- 		err = PTR_ERR(imx_data->clk_ipg);
--		goto err_clk_get;
-+		goto free_sdhci;
- 	}
- 
- 	imx_data->clk_ahb = devm_clk_get(&pdev->dev, "ahb");
- 	if (IS_ERR(imx_data->clk_ahb)) {
- 		err = PTR_ERR(imx_data->clk_ahb);
--		goto err_clk_get;
-+		goto free_sdhci;
- 	}
- 
- 	imx_data->clk_per = devm_clk_get(&pdev->dev, "per");
- 	if (IS_ERR(imx_data->clk_per)) {
- 		err = PTR_ERR(imx_data->clk_per);
--		goto err_clk_get;
-+		goto free_sdhci;
- 	}
- 
- 	pltfm_host->clk = imx_data->clk_per;
-@@ -494,7 +494,7 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 	imx_data->pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
- 	if (IS_ERR(imx_data->pinctrl)) {
- 		err = PTR_ERR(imx_data->pinctrl);
--		goto pin_err;
-+		goto disable_clk;
- 	}
- 
- 	host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
-@@ -519,7 +519,7 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 		if (!host->mmc->parent->platform_data) {
- 			dev_err(mmc_dev(host->mmc), "no board data!\n");
- 			err = -EINVAL;
--			goto no_board_data;
-+			goto disable_clk;
- 		}
- 		imx_data->boarddata = *((struct esdhc_platform_data *)
- 					host->mmc->parent->platform_data);
-@@ -527,7 +527,8 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 
- 	/* write_protect */
- 	if (boarddata->wp_type == ESDHC_WP_GPIO) {
--		err = gpio_request_one(boarddata->wp_gpio, GPIOF_IN, "ESDHC_WP");
-+		err = devm_gpio_request_one(&pdev->dev, boarddata->wp_gpio,
-+					    GPIOF_IN, "ESDHC_WP");
- 		if (err) {
- 			dev_warn(mmc_dev(host->mmc),
- 				 "no write-protect pin available!\n");
-@@ -543,19 +544,21 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 
- 	switch (boarddata->cd_type) {
- 	case ESDHC_CD_GPIO:
--		err = gpio_request_one(boarddata->cd_gpio, GPIOF_IN, "ESDHC_CD");
-+		err = devm_gpio_request_one(&pdev->dev, boarddata->cd_gpio,
-+					    GPIOF_IN, "ESDHC_CD");
- 		if (err) {
- 			dev_err(mmc_dev(host->mmc),
- 				"no card-detect pin available!\n");
--			goto no_card_detect_pin;
-+			goto disable_clk;
- 		}
- 
--		err = request_irq(gpio_to_irq(boarddata->cd_gpio), cd_irq,
-+		err = devm_request_irq(&pdev->dev,
-+				 gpio_to_irq(boarddata->cd_gpio), cd_irq,
- 				 IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
- 				 mmc_hostname(host->mmc), host);
- 		if (err) {
- 			dev_err(mmc_dev(host->mmc), "request irq error\n");
--			goto no_card_detect_irq;
-+			goto disable_clk;
- 		}
- 		/* fall through */
- 
-@@ -574,27 +577,15 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 
- 	err = sdhci_add_host(host);
- 	if (err)
--		goto err_add_host;
-+		goto disable_clk;
- 
- 	return 0;
- 
--err_add_host:
--	if (gpio_is_valid(boarddata->cd_gpio))
--		free_irq(gpio_to_irq(boarddata->cd_gpio), host);
--no_card_detect_irq:
--	if (gpio_is_valid(boarddata->cd_gpio))
--		gpio_free(boarddata->cd_gpio);
--	if (gpio_is_valid(boarddata->wp_gpio))
--		gpio_free(boarddata->wp_gpio);
--no_card_detect_pin:
--no_board_data:
--pin_err:
-+disable_clk:
- 	clk_disable_unprepare(imx_data->clk_per);
- 	clk_disable_unprepare(imx_data->clk_ipg);
- 	clk_disable_unprepare(imx_data->clk_ahb);
--err_clk_get:
--	kfree(imx_data);
--err_imx_data:
-+free_sdhci:
- 	sdhci_pltfm_free(pdev);
- 	return err;
- }
-@@ -604,25 +595,14 @@ static int __devexit sdhci_esdhc_imx_remove(struct platform_device *pdev)
- 	struct sdhci_host *host = platform_get_drvdata(pdev);
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
- 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
--	struct esdhc_platform_data *boarddata = &imx_data->boarddata;
- 	int dead = (readl(host->ioaddr + SDHCI_INT_STATUS) == 0xffffffff);
- 
- 	sdhci_remove_host(host, dead);
- 
--	if (gpio_is_valid(boarddata->wp_gpio))
--		gpio_free(boarddata->wp_gpio);
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index c12ed6a..b189881 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -50,7 +50,6 @@ obj-$(CONFIG_MACH_EXYNOS5_DT)		+= mach-exynos5-dt.o
+ obj-y					+= dev-uart.o
+ obj-$(CONFIG_ARCH_EXYNOS4)		+= dev-audio.o
+ obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
+-obj-$(CONFIG_EXYNOS4_DEV_DWMCI)		+= dev-dwmci.o
+ obj-$(CONFIG_EXYNOS_DEV_DMA)		+= dma.o
+ obj-$(CONFIG_EXYNOS4_DEV_USB_OHCI)	+= dev-ohci.o
+ obj-$(CONFIG_EXYNOS_DEV_SYSMMU)		+= dev-sysmmu.o
+diff --git a/arch/arm/mach-exynos/dev-dwmci.c b/arch/arm/mach-exynos/dev-dwmci.c
+deleted file mode 100644
+index 7903501..0000000
+--- a/arch/arm/mach-exynos/dev-dwmci.c
++++ /dev/null
+@@ -1,75 +0,0 @@
+-/*
+- * linux/arch/arm/mach-exynos4/dev-dwmci.c
+- *
+- * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
+- *
+- * Platform device for Synopsys DesignWare Mobile Storage IP
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
 -
--	if (gpio_is_valid(boarddata->cd_gpio)) {
--		free_irq(gpio_to_irq(boarddata->cd_gpio), host);
--		gpio_free(boarddata->cd_gpio);
--	}
+-#include <linux/kernel.h>
+-#include <linux/dma-mapping.h>
+-#include <linux/platform_device.h>
+-#include <linux/interrupt.h>
+-#include <linux/ioport.h>
+-#include <linux/mmc/dw_mmc.h>
 -
- 	clk_disable_unprepare(imx_data->clk_per);
- 	clk_disable_unprepare(imx_data->clk_ipg);
- 	clk_disable_unprepare(imx_data->clk_ahb);
- 
--	kfree(imx_data);
+-#include <plat/devs.h>
 -
- 	sdhci_pltfm_free(pdev);
- 
- 	return 0;
+-#include <mach/map.h>
+-
+-static int exynos4_dwmci_get_bus_wd(u32 slot_id)
+-{
+-	return 4;
+-}
+-
+-static int exynos4_dwmci_init(u32 slot_id, irq_handler_t handler, void *data)
+-{
+-	return 0;
+-}
+-
+-static struct resource exynos4_dwmci_resource[] = {
+-	[0] = DEFINE_RES_MEM(EXYNOS4_PA_DWMCI, SZ_4K),
+-	[1] = DEFINE_RES_IRQ(EXYNOS4_IRQ_DWMCI),
+-};
+-
+-static struct dw_mci_board exynos4_dwci_pdata = {
+-	.num_slots			= 1,
+-	.quirks				= DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
+-	.bus_hz				= 80 * 1000 * 1000,
+-	.detect_delay_ms	= 200,
+-	.init				= exynos4_dwmci_init,
+-	.get_bus_wd			= exynos4_dwmci_get_bus_wd,
+-};
+-
+-static u64 exynos4_dwmci_dmamask = DMA_BIT_MASK(32);
+-
+-struct platform_device exynos4_device_dwmci = {
+-	.name		= "dw_mmc",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(exynos4_dwmci_resource),
+-	.resource	= exynos4_dwmci_resource,
+-	.dev		= {
+-		.dma_mask		= &exynos4_dwmci_dmamask,
+-		.coherent_dma_mask	= DMA_BIT_MASK(32),
+-		.platform_data	= &exynos4_dwci_pdata,
+-	},
+-};
+-
+-void __init exynos4_dwmci_set_platdata(struct dw_mci_board *pd)
+-{
+-	struct dw_mci_board *npd;
+-
+-	npd = s3c_set_platdata(pd, sizeof(struct dw_mci_board),
+-			&exynos4_device_dwmci);
+-
+-	if (!npd->init)
+-		npd->init = exynos4_dwmci_init;
+-	if (!npd->get_bus_wd)
+-		npd->get_bus_wd = exynos4_dwmci_get_bus_wd;
+-}
+diff --git a/arch/arm/mach-exynos/include/mach/dwmci.h b/arch/arm/mach-exynos/include/mach/dwmci.h
+deleted file mode 100644
+index 7ce6574..0000000
+--- a/arch/arm/mach-exynos/include/mach/dwmci.h
++++ /dev/null
+@@ -1,20 +0,0 @@
+-/* linux/arch/arm/mach-exynos4/include/mach/dwmci.h
+- *
+- * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com/
+- *
+- * Synopsys DesignWare Mobile Storage for EXYNOS4210
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#ifndef __ASM_ARM_ARCH_DWMCI_H
+-#define __ASM_ARM_ARCH_DWMCI_H __FILE__
+-
+-#include <linux/mmc/dw_mmc.h>
+-
+-extern void exynos4_dwmci_set_platdata(struct dw_mci_board *pd);
+-
+-#endif /* __ASM_ARM_ARCH_DWMCI_H */
 -- 
-1.7.9.5
+1.7.5.4
