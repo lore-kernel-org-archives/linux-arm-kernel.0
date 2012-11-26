@@ -1,41 +1,45 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Mon, 26 Nov 2012 05:19:23 +0000
-Subject: [PATCH v3 03/10] ARM: OMAP: AM33xx hwmod: Add parent-child
- relationship for PWM subsystem
-In-Reply-To: <518397C60809E147AF5323E0420B992E3E9EEA8C@DBDE01.ent.ti.com>
-References: <1353387831-31538-1-git-send-email-avinashphilip@ti.com>
- <1353387831-31538-4-git-send-email-avinashphilip@ti.com>
- <518397C60809E147AF5323E0420B992E3E9EEA8C@DBDE01.ent.ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC4C0FA@DBDE01.ent.ti.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Mon, 26 Nov 2012 05:45:24 +0000
+Subject: [PATCH 1/1] ARM: OMAP2+: enable support for GPIO connected LEDs
+In-Reply-To: <1353749642-30255-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1353749642-30255-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA7A476@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2012 at 16:36:06, Philip, Avinash wrote:
-> On Tue, Nov 20, 2012 at 10:33:44, Philip, Avinash wrote:
-> > As part of PWM subsystem integration, PWM subsystem are sharing
-> > resources like clock across submodules (ECAP, EQEP & EHRPWM).
-> > To handle resource sharing & IP integration
-> > 1. Rework on parent child relation between PWMSS and
-> >    ECAP, EQEP & EHRPWM child devices to support runtime PM.
-> > 2. Add support for opt_clks in EHRPWM HWMOD entry to handle additional
-> >    clock gating from control module.
-> > 3. Add HWMOD entries for EQEP PWM submodule.
-> > 
+On Sat, Nov 24, 2012 at 15:04:02, Javier Martinez Canillas wrote:
+> Many OMAP boards use GPIO LEDs to notify status to the user
+> on boot. So, it is good to have by default support for GPIO
+> connected LEDs as well as some commonly used triggers.
 > 
-> Is there any review on this patch?
-> This patch depends on ECAP & EHRPWM to work in am335x.
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  arch/arm/configs/omap2plus_defconfig |    8 ++++++++
+>  1 files changed, 8 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> index 6333e96..7c6cbdf 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -193,6 +193,14 @@ CONFIG_MMC_UNSAFE_RESUME=y
+>  CONFIG_SDIO_UART=y
+>  CONFIG_MMC_OMAP=y
+>  CONFIG_MMC_OMAP_HS=y
+> +CONFIG_NEW_LEDS=y
+> +CONFIG_LEDS_CLASS=y
+> +CONFIG_LEDS_GPIO=y
+> +CONFIG_LEDS_TRIGGERS=y
+> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+> +CONFIG_LEDS_TRIGGER_BACKLIGHT=y
+> +CONFIG_LEDS_TRIGGER_GPIO=y
+> +CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
 
-First of all, I think you should break up this patch as per the 3 points
-that you mentioned above.
+Hi Javier,
 
-The usage of opt_clks for this does not look right to me. Based on your
-description this clock is necessary and not optional on AM335x and on 
-Davinci platforms this clock does not exist. 
+Similar patch sent few days back
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/133760.html
 
-I think the custom activate/deactivate functions in the OMAP runtime PM
-implementation was a good fit for keeping this SoC integration detail out
-of the driver code. However, the current DT flow in omap_device.c seems to
-assign the default activate/deactivate ops. Is that approach deprecated?
+Let me know do you have any comments
 
-Regards,
-Vaibhav
+Thanks
+AnilKumar
