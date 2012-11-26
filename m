@@ -1,75 +1,21 @@
-From: archit@ti.com (Archit Taneja)
-Date: Mon, 26 Nov 2012 12:18:51 +0530
-Subject: OMAP4430 produces boot warnings
-In-Reply-To: <1353663278.25248.4.camel@sokoban>
-References: <20121121230337.GR3332@n2100.arm.linux.org.uk>
- <50AE1DC0.3030002@ti.com> <50AE2BB6.8080406@ti.com>
- <1353594842.786.45.camel@sokoban> <50AE3A5B.5040603@ti.com>
- <1353663278.25248.4.camel@sokoban>
-Message-ID: <50B310D3.9050202@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 26 Nov 2012 07:53:41 +0100
+Subject: [PATCH] gpio: pl061: remove old comment
+In-Reply-To: <9726894cfe3ff11c9f3a95e436ae386637eba98f.1353577495.git.baruch@tkos.co.il>
+References: <9726894cfe3ff11c9f3a95e436ae386637eba98f.1353577495.git.baruch@tkos.co.il>
+Message-ID: <CACRpkdYW2Y0ExgxMxMU6cpYrN_n3gn55HJ1WvwOWOZ8=v5O+cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 November 2012 03:04 PM, Tero Kristo wrote:
-> On Thu, 2012-11-22 at 16:44 +0200, Tomi Valkeinen wrote:
->> On 2012-11-22 16:34, Tero Kristo wrote:
->>
->>> I guess you checked that DSS pwrdm is switching between RET and ON in
->>> your setup?
->>
->> Yes:
->>
->> # cat /debug/pm_debug/count |grep dss
->> [   35.356567] pwrdm state mismatch(l3init_pwrdm) 3 != 1
->> [   35.361938] pwrdm state mismatch(cam_pwrdm) 3 != 0
->> [   35.366973] pwrdm state mismatch(ivahd_pwrdm) 3 != 1
->> [   35.372253] pwrdm state mismatch(tesla_pwrdm) 3 != 1
->> [   35.377532] pwrdm state mismatch(abe_pwrdm) 3 != 1
->> dss_pwrdm (RET),OFF:1,RET:11,INA:0,ON:11,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
->> l3_dss_clkdm->dss_pwrdm (0)
->>
->> then I load and unload the dss modules, and then:
->>
->> # cat /debug/pm_debug/count |grep dss
->> [   60.813629] pwrdm state mismatch(l3init_pwrdm) 3 != 1
->> [   60.819000] pwrdm state mismatch(cam_pwrdm) 3 != 0
->> [   60.824127] pwrdm state mismatch(ivahd_pwrdm) 3 != 1
->> [   60.829376] pwrdm state mismatch(tesla_pwrdm) 3 != 1
->> [   60.834625] pwrdm state mismatch(abe_pwrdm) 3 != 1
->> dss_pwrdm (ON),OFF:1,RET:21,INA:0,ON:22,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
->> l3_dss_clkdm->dss_pwrdm (0)
->>
->>>> Does the pwrdm mistakenly think that in RET state the DSS still keeps
->>>> the register contents?
->>>
->>> This might be the case, however the pwrdm code should be generic and
->>> handle all domains properly. What is the tree / branch / commit you are
->>> using for testing this stuff? I can take a look at this also.
->>
->> arm-soc/for-next
+On Thu, Nov 22, 2012 at 10:46 AM, Baruch Siach <baruch@tkos.co.il> wrote:
+
+> Since 3ab524754 (gpio: pl061: convert to use generic irq chip) we only have one
+> spinlock in struct pl061_gpio.
 >
-> I guess this is caused because some of the patches are still not in the
-> for-next branch, it looks like at least this is missing:
->
-> https://patchwork.kernel.org/patch/1608901/
->
-> ...or the latest update done by Paul to that one.
->
-> The patch I posted appears to have a small merge induced bug, it is
-> registering the context loss soc_ops for am33xx when it should actually
-> register those for omap4. This might explain another bug I've been
-> looking at in a different branch recently... The update Paul posted does
-> not seem to have this problem, but I haven't tested it myself.
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Applying the patch above, and registering the soc_ops for omap4 instead 
-of am33xx doesn't seem to help. The context lost count now always returns 0.
-
-And to verify Tomi's observation, if we don't rely on the context lost 
-count, and restore the registers always, we don't see the problem.
-
-Btw, we use the function omap_pm_get_dev_context_loss_count to get the 
-count, do we use this or is there a new func to get the count?
-
-Thanks,
-Archit
+Yours,
+Linus Walleij
