@@ -1,47 +1,58 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 26 Nov 2012 09:46:57 +0100
-Subject: [PATCH 11/24] MAINTAINERS: fix .../plat-mxc/include/mach/imxfb.h
-In-Reply-To: <1353716808-16375-12-git-send-email-cesarb@cesarb.net>
+Date: Mon, 26 Nov 2012 09:51:01 +0100
+Subject: [PATCH 18/24] MAINTAINERS: remove drivers/mmc/host/imxmmc.*
+In-Reply-To: <201211240918.42930.ppisa@pikron.com>
 References: <1353716808-16375-1-git-send-email-cesarb@cesarb.net>
- <1353716808-16375-12-git-send-email-cesarb@cesarb.net>
-Message-ID: <20121126084657.GY10369@pengutronix.de>
+ <1353716808-16375-19-git-send-email-cesarb@cesarb.net>
+ <201211240918.42930.ppisa@pikron.com>
+Message-ID: <20121126085101.GZ10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2012 at 10:26:35PM -0200, Cesar Eduardo Barros wrote:
-> This file was moved to include/linux/platform_data/video-imxfb.h by
-> commit 82906b1 (ARM: imx: move platform_data definitions).
-> 
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: linux-fbdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
+Hi Pavel,
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+On Sat, Nov 24, 2012 at 09:18:42AM +0100, Pavel Pisa wrote:
+> On Saturday 24 November 2012 01:26:42 Cesar Eduardo Barros wrote:
+> > This driver was removed by commit 6187fee (mmc: remove imxmmc driver).
+> >
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Pavel Pisa <ppisa@pikron.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
+> > ---
+> >  MAINTAINERS | 6 ------
+> >  1 file changed, 6 deletions(-)
+> >
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index fc646ef..cac8e49 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -4905,12 +4905,6 @@ F:	Documentation/video4linux/meye.txt
+> >  F:	drivers/media/pci/meye/
+> >  F:	include/uapi/linux/meye.h
+> >
+> > -MOTOROLA IMX MMC/SD HOST CONTROLLER INTERFACE DRIVER
+> > -M:	Pavel Pisa <ppisa@pikron.com>
+> > -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> > -S:	Maintained
+> > -F:	drivers/mmc/host/imxmmc.*
+> > -
+> >  MOXA SMARTIO/INDUSTIO/INTELLIO SERIAL CARD
+> >  M:	Jiri Slaby <jirislaby@gmail.com>
+> >  S:	Maintained
+> 
+> Acked-by: Pavel Pisa <pisa@cmp.felk.cvut.cz>
+> 
+> I have still the hardware but have lack resources to keep with current
+> kernel development for that old HW. We plan to switch to newer i.MX
+> hardware - hopefully with more bug free MMC/SD support, because MX1
+> has taken me yer a year of fighting with its bugs (on Linux and RTEMS
+> as well).
+
+They are bug free enough to work ;)
 
 Sascha
 
-> ---
->  MAINTAINERS | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index a67a67a..887d717 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -3137,7 +3137,7 @@ M:	Sascha Hauer <kernel@pengutronix.de>
->  L:	linux-fbdev at vger.kernel.org
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
-> -F:	arch/arm/plat-mxc/include/mach/imxfb.h
-> +F:	include/linux/platform_data/video-imxfb.h
->  F:	drivers/video/imxfb.c
->  
->  FREESCALE SOC FS_ENET DRIVER
-> -- 
-> 1.7.11.7
-> 
-> 
 
 -- 
 Pengutronix e.K.                           |                             |
