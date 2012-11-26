@@ -1,99 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 26 Nov 2012 09:05:03 +0000
-Subject: [PATCH 1/2] input: gpio-keys: Disable hardware on suspend
-In-Reply-To: <20121125083229.GB21091@core.coreip.homeip.net>
-References: <1353590617-11466-1-git-send-email-lee.jones@linaro.org>
- <20121125083229.GB21091@core.coreip.homeip.net>
-Message-ID: <20121126090503.GB12782@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 26 Nov 2012 10:08:14 +0100
+Subject: [PATCH 2/4] ds1374: add support of device tree
+In-Reply-To: <1353874625-14754-3-git-send-email-tremyfr@yahoo.fr>
+References: <1353874625-14754-1-git-send-email-tremyfr@yahoo.fr>
+ <1353874625-14754-3-git-send-email-tremyfr@yahoo.fr>
+Message-ID: <20121126100814.1459e3d7@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Nov 22, 2012 at 01:23:36PM +0000, Lee Jones wrote:
-> > From: Jonas Aaberg <jonas.aberg@stericsson.com>
-> > 
-> > Disable hardware if active when suspending if the hw can not
-> > wake the system from suspend.
-> 
-> How about below instead (needs the other patch I have just sent out)?
+Dear Philippe Reynes,
 
-Sorry Dmitry, I'm a little confused. What does this mean?
-
-> Input: gpio-keys - disable hardware on suspend
-> 
-> From: Jonas Aaberg <jonas.aberg@stericsson.com>
-> 
-> Disable hardware if active when suspending if the hw can not
-> wake the system from suspend.
-> 
-> Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
-> Signed-off-by: Philippe Langlais <philippe.langlais@linaro.org>
-> Reviewed-by: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+On Sun, 25 Nov 2012 21:17:03 +0100, Philippe Reynes wrote:
+> Signed-off-by: Philippe Reynes <tremyfr@yahoo.fr>
 > ---
->  drivers/input/keyboard/gpio_keys.c |   27 ++++++++++++++++++++++-----
->  1 file changed, 22 insertions(+), 5 deletions(-)
+>  drivers/rtc/rtc-ds1374.c |    8 ++++++++
+>  1 files changed, 8 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/input/keyboard/gpio_keys.c b/drivers/input/keyboard/gpio_keys.c
-> index c7764ca..79435de 100644
-> --- a/drivers/input/keyboard/gpio_keys.c
-> +++ b/drivers/input/keyboard/gpio_keys.c
-> @@ -803,6 +803,7 @@ static int gpio_keys_remove(struct platform_device *pdev)
->  static int gpio_keys_suspend(struct device *dev)
->  {
->  	struct gpio_keys_drvdata *ddata = dev_get_drvdata(dev);
-> +	struct input_dev *input = ddata->input;
->  	int i;
+> diff --git a/drivers/rtc/rtc-ds1374.c b/drivers/rtc/rtc-ds1374.c
+> index 9663160..174c532 100644
+> --- a/drivers/rtc/rtc-ds1374.c
+> +++ b/drivers/rtc/rtc-ds1374.c
+> @@ -49,6 +49,14 @@ static const struct i2c_device_id ds1374_id[] = {
+>  };
+>  MODULE_DEVICE_TABLE(i2c, ds1374_id);
 >  
->  	if (device_may_wakeup(dev)) {
-> @@ -811,6 +812,11 @@ static int gpio_keys_suspend(struct device *dev)
->  			if (bdata->button->wakeup)
->  				enable_irq_wake(bdata->irq);
->  		}
-> +	} else {
-> +		mutex_lock(&input->mutex);
-> +		if (input->users)
-> +			gpio_keys_close(input);
-> +		mutex_unlock(&input->mutex);
->  	}
->  
->  	return 0;
-> @@ -819,16 +825,27 @@ static int gpio_keys_suspend(struct device *dev)
->  static int gpio_keys_resume(struct device *dev)
->  {
->  	struct gpio_keys_drvdata *ddata = dev_get_drvdata(dev);
-> +	struct input_dev *input = ddata->input;
-> +	int error = 0;
->  	int i;
->  
-> -	for (i = 0; i < ddata->pdata->nbuttons; i++) {
-> -		struct gpio_button_data *bdata = &ddata->data[i];
-> -		if (bdata->button->wakeup && device_may_wakeup(dev))
-> -			disable_irq_wake(bdata->irq);
-> +	if (device_may_wakeup(dev)) {
-> +		for (i = 0; i < ddata->pdata->nbuttons; i++) {
-> +			struct gpio_button_data *bdata = &ddata->data[i];
-> +			if (bdata->button->wakeup)
-> +				disable_irq_wake(bdata->irq);
-> +		}
-> +	} else {
-> +		mutex_lock(&input->mutex);
-> +		if (input->users)
-> +			error = gpio_keys_open(input);
-> +		mutex_unlock(&input->mutex);
->  	}
->  
-> -	gpio_keys_report_state(ddata);
-> +	if (error)
-> +		return error;
->  
-> +	gpio_keys_report_state(ddata);
->  	return 0;
->  }
->  #endif
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id ds1374_of_match[] __devinitconst = {
+> +	{ .compatible = "dallas,ds1374" },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, ds1374_of_match);
+> +#endif
+> +
 
+Don't we need a Device Tree binding documentation in
+Documentation/devicetree/bindings/rtc/ ?
+
+Thomas
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
