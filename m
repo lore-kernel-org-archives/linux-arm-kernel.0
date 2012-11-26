@@ -1,41 +1,116 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 Nov 2012 13:14:32 +0000
-Subject: [GIT PULL] ARM: ixp4xx: fixes for v3.7
-In-Reply-To: <0Lufa8-1TAtF11yb2-00zw9g@mx.kundenserver.de>
-References: <0Lufa8-1TAtF11yb2-00zw9g@mx.kundenserver.de>
-Message-ID: <201211261314.32662.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 26 Nov 2012 21:31:40 +0800
+Subject: [PATCH] clocksource: use clockevents_config_and_register() where
+ possible
+Message-ID: <1353936700-15255-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 November 2012, Jason Cooper wrote:
-> The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
-> 
->   Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/ixp4xx_fixes_for_3.7
-> 
-> for you to fetch changes up to 0d2c9f0517e915ce03a04e91d3207827e0d274a8:
-> 
->   IXP4xx: use __iomem for MMIO (2012-11-22 03:36:45 +0000)
-> 
-> ----------------------------------------------------------------
-> ixp4xx fixes for v3.7
-> 
+The clockevent core is able to figure out the best mult and shift,
+calculate min_delta_ns and max_delta_ns, with the necessary info passed
+into clockevents_config_and_register().  Use this combined configure
+and register function where possible to make the codes less error prone
+and gain some positive diff stat.
 
-I've merged them into the fixes branch now, thanks a lot for following
-up on these patches!
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Andres Salomon <dilinger@queued.net>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/clocksource/cs5535-clockevt.c |   11 ++---------
+ drivers/clocksource/sunxi_timer.c     |   11 ++---------
+ drivers/clocksource/tcb_clksrc.c      |    7 +------
+ 3 files changed, 5 insertions(+), 24 deletions(-)
 
-Olof, I'm undecided whether they are still appropriate for 3.7 since
-we're past the final -rc now. If we want them in, we should probably
-send them to Linus now and let him decide.  For all I can tell, ixp4xx
-is already completely broken without these patches, so there should be
-no harm in including them, but then again " 13 files changed, 59
-insertions(+), 68 deletions(-)" is slightly more than I'd like to send
-at this point.
-
-If you prefer, we can put them into next/fixes-non-critical, but then we
-might want to mark more of them as candidates for stable.
-
-	Arnd
+diff --git a/drivers/clocksource/cs5535-clockevt.c b/drivers/clocksource/cs5535-clockevt.c
+index d927938..ea21048 100644
+--- a/drivers/clocksource/cs5535-clockevt.c
++++ b/drivers/clocksource/cs5535-clockevt.c
+@@ -100,7 +100,6 @@ static struct clock_event_device cs5535_clockevent = {
+ 	.set_mode = mfgpt_set_mode,
+ 	.set_next_event = mfgpt_next_event,
+ 	.rating = 250,
+-	.shift = 32
+ };
+ 
+ static irqreturn_t mfgpt_tick(int irq, void *dev_id)
+@@ -169,17 +168,11 @@ static int __init cs5535_mfgpt_init(void)
+ 	cs5535_mfgpt_write(cs5535_event_clock, MFGPT_REG_SETUP, val);
+ 
+ 	/* Set up the clock event */
+-	cs5535_clockevent.mult = div_sc(MFGPT_HZ, NSEC_PER_SEC,
+-			cs5535_clockevent.shift);
+-	cs5535_clockevent.min_delta_ns = clockevent_delta2ns(0xF,
+-			&cs5535_clockevent);
+-	cs5535_clockevent.max_delta_ns = clockevent_delta2ns(0xFFFE,
+-			&cs5535_clockevent);
+-
+ 	printk(KERN_INFO DRV_NAME
+ 		": Registering MFGPT timer as a clock event, using IRQ %d\n",
+ 		timer_irq);
+-	clockevents_register_device(&cs5535_clockevent);
++	clockevents_config_and_register(&cs5535_clockevent, MFGPT_HZ,
++					0xF, 0xFFFE);
+ 
+ 	return 0;
+ 
+diff --git a/drivers/clocksource/sunxi_timer.c b/drivers/clocksource/sunxi_timer.c
+index 3c46434..5026b78 100644
+--- a/drivers/clocksource/sunxi_timer.c
++++ b/drivers/clocksource/sunxi_timer.c
+@@ -74,7 +74,6 @@ static int sunxi_clkevt_next_event(unsigned long evt,
+ 
+ static struct clock_event_device sunxi_clockevent = {
+ 	.name = "sunxi_tick",
+-	.shift = 32,
+ 	.rating = 300,
+ 	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+ 	.set_mode = sunxi_clkevt_mode,
+@@ -153,16 +152,10 @@ static void __init sunxi_timer_init(void)
+ 	val = readl(timer_base + TIMER_CTL_REG);
+ 	writel(val | TIMER_CTL_ENABLE, timer_base + TIMER_CTL_REG);
+ 
+-	sunxi_clockevent.mult = div_sc(rate / TIMER_SCAL,
+-				NSEC_PER_SEC,
+-				sunxi_clockevent.shift);
+-	sunxi_clockevent.max_delta_ns = clockevent_delta2ns(0xff,
+-							    &sunxi_clockevent);
+-	sunxi_clockevent.min_delta_ns = clockevent_delta2ns(0x1,
+-							    &sunxi_clockevent);
+ 	sunxi_clockevent.cpumask = cpumask_of(0);
+ 
+-	clockevents_register_device(&sunxi_clockevent);
++	clockevents_config_and_register(&sunxi_clockevent, rate / TIMER_SCAL,
++					0x1, 0xff);
+ }
+ 
+ struct sys_timer sunxi_timer = {
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index 32cb929..8a61872 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -157,7 +157,6 @@ static struct tc_clkevt_device clkevt = {
+ 		.name		= "tc_clkevt",
+ 		.features	= CLOCK_EVT_FEAT_PERIODIC
+ 					| CLOCK_EVT_FEAT_ONESHOT,
+-		.shift		= 32,
+ 		/* Should be lower than at91rm9200's system timer */
+ 		.rating		= 125,
+ 		.set_next_event	= tc_next_event,
+@@ -196,13 +195,9 @@ static void __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+ 
+ 	timer_clock = clk32k_divisor_idx;
+ 
+-	clkevt.clkevt.mult = div_sc(32768, NSEC_PER_SEC, clkevt.clkevt.shift);
+-	clkevt.clkevt.max_delta_ns
+-		= clockevent_delta2ns(0xffff, &clkevt.clkevt);
+-	clkevt.clkevt.min_delta_ns = clockevent_delta2ns(1, &clkevt.clkevt) + 1;
+ 	clkevt.clkevt.cpumask = cpumask_of(0);
+ 
+-	clockevents_register_device(&clkevt.clkevt);
++	clockevents_config_and_register(&clkevt.clkevt, 32768, 1, 0xffff);
+ 
+ 	setup_irq(irq, &tc_irqaction);
+ }
+-- 
+1.7.9.5
