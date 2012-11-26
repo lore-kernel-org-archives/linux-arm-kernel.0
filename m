@@ -1,25 +1,52 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Nov 2012 00:06:16 -0800
-Subject: [GIT PULL 2/3] Samsung dt-2 for v3.8
-In-Reply-To: <10d501cdc91b$1419fd80$3c4df880$%kim@samsung.com>
-References: <10d501cdc91b$1419fd80$3c4df880$%kim@samsung.com>
-Message-ID: <20121126080616.GG9580@quad.lixom.net>
+From: martinez.javier@gmail.com (Javier Martinez Canillas)
+Date: Mon, 26 Nov 2012 09:29:24 +0100
+Subject: [PATCH 6/7] ARM: OMAP2+: omap2plus_defconfig: Enable leds-gpio
+ driver
+In-Reply-To: <1353481163-29462-7-git-send-email-anilkumar@ti.com>
+References: <1353481163-29462-1-git-send-email-anilkumar@ti.com>
+ <1353481163-29462-7-git-send-email-anilkumar@ti.com>
+Message-ID: <CAAwP0s1eL_VkRfR7FgNNmUfbAeHro9yaJGFa_HO+49tNuSS3yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2012 at 10:37:20AM +0900, Kukjin Kim wrote:
-> Arnd, Olof,
-> 
-> Here is second Samsung DT stuff for v3.8.
-> 
-> This is including power domain DT support for exynos and Google ARM
-> Chromebook, Snow board and exynos4210-origen updates.
-> 
-> Please pull from:
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> next/dt-samsung-2
+On Wed, Nov 21, 2012 at 7:59 AM, AnilKumar Ch <anilkumar@ti.com> wrote:
+> AM335X-EVMSK and AM335X-BONE devices have gpio controlled user leds,
+> one has to manually enable this support to use user leds. So this
+> patch enables gpio-leds driver in omap2plus_defconfig. Also enables
+> TRIGGER_TIMER and TRIGGER_HEARTBEAT.
+>
+> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> ---
+>  arch/arm/configs/omap2plus_defconfig |    5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> index 133f04a..5e1a763 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -202,6 +202,11 @@ CONFIG_MMC_UNSAFE_RESUME=y
+>  CONFIG_SDIO_UART=y
+>  CONFIG_MMC_OMAP=y
+>  CONFIG_MMC_OMAP_HS=y
+> +CONFIG_NEW_LEDS=y
+> +CONFIG_LEDS_GPIO=y
+> +CONFIG_LEDS_TRIGGERS=y
+> +CONFIG_LEDS_TRIGGER_TIMER=y
+> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_OMAP=y
+>  CONFIG_RTC_DRV_TWL92330=y
+> --
+> 1.7.9.5
+>
 
-Pulled in as samsung/dt2
+Hi AnilKumar,
 
+Your patch looks good to me but I would enable
+CONFIG_LEDS_TRIGGER_DEFAULT_ON too
+since this seems to be a very popular trigger used on many boards.
 
--Olof
+But this could be made on a follow up patch too, so is your call.
+
+Best regards,
+Javier
