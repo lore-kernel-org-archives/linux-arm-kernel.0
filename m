@@ -1,37 +1,64 @@
-From: wfp5p@viridian.itc.virginia.edu (Bill Pemberton)
-Date: Mon, 26 Nov 2012 08:52:18 -0500
-Subject: [PATCH 065/493] i2c: remove use of __devexit_p
-In-Reply-To: <20121122214915.GD14851@pengutronix.de>
-Message-ID: <20121126135218.45F6780157@viridian.itc.virginia.edu>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 26 Nov 2012 08:56:13 -0500
+Subject: [GIT PULL 4/5] ARM: orion: dt for v3.8
+In-Reply-To: <20121126093522.GE13866@quad.lixom.net>
+References: <pull-1353733874-990435>
+ <50b056f6.c188e50a.1750.ffff84caSMTPIN_ADDED_MISSING@mx.google.com>
+ <20121126093522.GE13866@quad.lixom.net>
+Message-ID: <20121126135613.GZ15800@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram Sang writes:
+On Mon, Nov 26, 2012 at 01:35:22AM -0800, Olof Johansson wrote:
+> On Sat, Nov 24, 2012 at 05:11:11AM +0000, Jason Cooper wrote:
+> > The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
+> > 
+> >   Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.infradead.org/users/jcooper/linux.git tags/orion_dt_for_3.8
+> > 
+> > for you to fetch changes up to 2a18588c0ce336933be3c99c91e74e21db56a0fe:
+> > 
+> >   ARM: Kirkwood: remove kirkwood_ehci_init() from new boards (2012-11-24 03:58:12 +0000)
+> > 
+> > ----------------------------------------------------------------
+> > orion dt for v3.8
+> > 
+> >  - ehci-orion dt binding
+> >  - gpio-poweroff
+> >  - use dt regulators
+> >  - move mpp to DT/pinctrl
 > 
+> > 
+> > Depends on:
+> > 
+> >  - orion/boards
+> > 
+> >     - merge conflicts
+> >        - keep all 'select's in Kconfig
+> >        - remove all #includes in board-*.c
+> > 
+> >  - pinctrl/devel up to:
+> > 
+> >     - 06763c7 pinctrl: mvebu: move to its own directory
 > 
-> --osDK9TLjxFScVI/L
-> Content-Type: text/plain; charset=us-ascii
-> Content-Disposition: inline
-> Content-Transfer-Encoding: quoted-printable
+> By the way, this branch ended up having conflicts against the cleanup branch.
+> It'd be nice to avoid those by basing your later topics on the cleanups if
+> needed.
 > 
-> On Tue, Nov 20, 2012 at 02:46:21PM +0100, Jean Delvare wrote:
-> > On Mon, 19 Nov 2012 13:20:14 -0500, Bill Pemberton wrote:
-> > > CONFIG_HOTPLUG is going away as an option so __devexit_p is no longer
-> > > needed.
-> >=20
-> > As mentioned on the lm-sensors list for hwmon patches already, I think
-> > it would be much clearer to not split __devexit, __devexit_p, __devinit
-> > etc. removal into separate patches. One patch per subsystem would be
-> > easier to review and apply. If patches grow too large then you'd rather
-> > split in a different direction, for example drivers/i2c/muxes vs.
-> > drivers/i2c/busses or even grouped by related bus drivers (see entries
-> > "I2C OVER PARALLEL PORT" and "I2C/SMBUS CONTROLLER DRIVERS FOR PC" in
-> > MAINTAINERS for examples of meaningful groups.)
+> It was mostly remove/remove conflicts of header files, and not a big deal to
+> handle for us, but if by slight tweaks to branch organization at your level you
+> can avoid some of them for us.
 > 
-> I agree with Jean here. Is there a V2 planned? With a change like this?
-> 
+> Some conflicts are still of course OK -- just like Linus prefers to see them,
+> we don't mind either. But some of the internal ones between different branches
+> from the same maintainer are sometimes a bit more than we care for. :)
 
-Yes, my plan is to redo the patches for the i2c subsystem.
+You should have seen it before I merged /dt-pinctrl into /dt ;-)  But
+yes, I'll depend on /cleanup to avoid that in the future.
 
--- 
-Bill
+thx,
+
+Jason.
