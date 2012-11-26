@@ -1,27 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 26 Nov 2012 10:28:26 +0000
-Subject: [GIT PULL 5/5] ARM: mvebu: changes for v3.8
-In-Reply-To: <20121126102805.5337f7f5@skate>
-References: <pull-1353733874-990435> <20121126091652.GA13866@quad.lixom.net>
- <20121126102805.5337f7f5@skate>
-Message-ID: <201211261028.26334.arnd@arndb.de>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 26 Nov 2012 21:31:52 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20121126213152.60b52e19d7fc84ce94c356c3@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 26 November 2012, Thomas Petazzoni wrote:
-> Right. The problem is that some of the last developments had many
-> dependencies against the previous developments, from various branches.
-> So I wasn't sure how to do this last developments, and I did merge the
-> branches containing the previous developments that I needed.
-> 
-> I am really open to suggestions on how to improve my Git workflow to
-> handle this better. It certainly wasn't my intention to have this
-> "test-the-merge" thing appear publicly.
-> 
+Hi all,
 
-One thing that Sascha Hauer first introduced was an extra branch that
-has everything merged together to show how you want to handle
-the conflicts. We'll then merge the individual branches and in the
-end can check if there is any difference to what you had.
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/tty/serial/atmel_serial.c between commit 95e629b761ce
+("ARM/AVR32: get rid of serial_at91.h") from the arm tree and commit
+bcd2360c1ff9 ("arm: at91: move platfarm_data to
+include/linux/platform_data/atmel.h") from the arm-soc tree.
 
-	Arnd
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/tty/serial/atmel_serial.c
+index 1a8a271,5660ec2..0000000
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@@ -39,13 -39,13 +39,12 @@@
+  #include <linux/atmel_pdc.h>
+  #include <linux/atmel_serial.h>
+  #include <linux/uaccess.h>
+ +#include <linux/pinctrl/consumer.h>
++ #include <linux/platform_data/atmel.h>
+  
+  #include <asm/io.h>
+  #include <asm/ioctls.h>
+  
+- #include <mach/board.h>
+- 
+ -#include <asm/mach/serial_at91.h>
+ -
+  #ifdef CONFIG_ARM
+  #include <mach/cpu.h>
+  #include <asm/gpio.h>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121126/7ad920e4/attachment.sig>
