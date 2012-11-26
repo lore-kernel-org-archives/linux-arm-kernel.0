@@ -1,59 +1,43 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 26 Nov 2012 15:40:05 +0000
-Subject: [PATCH v3 6/7] usb: chipidea: usbmisc: add mx53 support
-In-Reply-To: <20121125080931.GB16062@nchen-desktop>
-References: <1353506793-8354-1-git-send-email-m.grzeschik@pengutronix.de>
- <1353506793-8354-7-git-send-email-m.grzeschik@pengutronix.de>
- <20121123065340.GD22420@nchen-desktop> <50AF49A5.6030708@pengutronix.de>
- <20121125080931.GB16062@nchen-desktop>
-Message-ID: <20121126154005.8CC8D3E1ABE@localhost>
+Date: Mon, 26 Nov 2012 15:34:53 +0000
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <20121122214021.GA14771@avionic-0098.adnet.avionic-design.de>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <1353149747-31871-2-git-send-email-acourbot@nvidia.com>
+ <20121120215429.B621F3E1821@localhost> <13540495.epaCf4JVn9@percival>
+ <20121122133941.24B883E129E@localhost>
+ <20121122214021.GA14771@avionic-0098.adnet.avionic-design.de>
+Message-ID: <20121126153453.2AA023E1AAA@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 25 Nov 2012 16:09:31 +0800, Peter Chen <peter.chen@freescale.com> wrote:
-> On Fri, Nov 23, 2012 at 11:02:13AM +0100, Marc Kleine-Budde wrote:
-> > On 11/23/2012 07:53 AM, Peter Chen wrote:
-> > > On Wed, Nov 21, 2012 at 03:06:32PM +0100, Michael Grzeschik wrote:
-> > >> This adds mx53 as the next user of the usbmisc driver and makes it
-> > >> possible to disable the overcurrent-detection of the internal phy.
-> > >>
-> > >> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> > >> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> > >> ---
-> > >> Changes since v2:
-> > >> * added defines for register offsets and bitmasks
-> > >> * fixed disable_oc option for all ports
-> > >>
-> > >>  drivers/usb/chipidea/usbmisc_imx.c |   51 ++++++++++++++++++++++++++++++++++++
-> > >>  1 file changed, 51 insertions(+)
-> > >>
-> > >> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-> > >> index e090e0f..b1811df 100644
-> > >> --- a/drivers/usb/chipidea/usbmisc_imx.c
-> > >> +++ b/drivers/usb/chipidea/usbmisc_imx.c
-> > >> @@ -19,6 +19,13 @@
-> > >>  
-> > >>  #define USB_DEV_MAX 4
-> > >>  
-> > >> +#define MX53_USB_OTG_PHY_CTRL_0_OFFSET	0x08;
-> > >> +#define MX53_USB_UH2_CTRL_OFFSET	0x14;
-> > >> +#define MX53_USB_UH3_CTRL_OFFSET	0x18;
-> > >> +#define MX53_BM_OVER_CUR_DIS_H1		BIT(5)
-> > >> +#define MX53_BM_OVER_CUR_DIS_OTG	BIT(8)
-> > >> +#define MX53_BM_OVER_CUR_DIS_UHx	BIT(30)
-> > >> +
-> > >>  #define MX6_BM_OVER_CUR_DIS		BIT(7)
-> > > 
-> > > As every SoC platform's non-core register mapping is different,
-> > > it is better to use .h to put register bit definition
-> > 
-> > AFAIK in the kernel we don't make extra .h files any more, if there is
-> > only a single user of the contents.
-> OK, if it is the current rule for kernel, then just keep it.
-> My original mind was there will be more and more bit definition
-> in future, and move it to .h to make the code clean and short.
+On Thu, 22 Nov 2012 22:40:21 +0100, Thierry Reding <thierry.reding@avionic-design.de> wrote:
+> On Thu, Nov 22, 2012 at 01:39:41PM +0000, Grant Likely wrote:
+> [...]
+> > I do think that each sequence should be contained within a single
+> > property, but I'm open to other suggestions.
+> 
+> IIRC a very early prototype did implement something like that. However
+> because of the resource issues this had to be string based, so that the
+> sequences looked somewhat like (Alex, correct me if I'm wrong):
+> 
+> 	power-on = <"REGULATOR", "power", 1, "GPIO", "enable", 1>;
+> 
+> Instead we could possibly have something like:
+> 
+> 	power-on = <0 &reg 1,
+> 		    1 &gpio 42 0 1>;
 
-Yeah. If there is only one user then keep it in the .c file. The kernel
-is huge, so keeping things out of the global scope is a GoodThing(tm).
+Yes, that would work, although I still think it would be a good idea to
+split the used resources off into the gpios/pwms/regs/etc properties.
+
+> Where the first cell in each entry defines the type (0 = regulator, 1 =
+> GPIO) and the rest would be a regular OF specifier for the given type of
+> resource along with some defined parameter such as enable/disable,
+> voltage, delay in ms, ... I don't know if that sounds any better. It
+> looks sort of cryptic but it is more "in the spirit of" DT, right Grant?
+
+It is still kind of a ham-handed approach, but it does fit better with
+existing conventions than the hierarchy of nodes does.
 
 g.
