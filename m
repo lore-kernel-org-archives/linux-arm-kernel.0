@@ -1,58 +1,57 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Sun, 25 Nov 2012 19:06:19 -0800 (PST)
-Subject: [PATCH v5 00/15] shmobile DT initialisation of INTC and GIC
-In-Reply-To: <1353571213-26006-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-References: <1353571213-26006-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-Message-ID: <87d2z1vza0.wl%kuninori.morimoto.gx@renesas.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 26 Nov 2012 13:06:26 +0900
+Subject: [PATCH 1/7] mmc: sh-mmcif: provide default allowed voltage
+In-Reply-To: <1353889014-17142-2-git-send-email-horms@verge.net.au>
+References: <1353889014-17142-1-git-send-email-horms@verge.net.au>
+ <1353889014-17142-2-git-send-email-horms@verge.net.au>
+Message-ID: <CANqRtoT8yFx8fe0Fkmh6F91NxajgcPYmheSwpqKk4HtQkX6_pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Simon,
 
-Hi Iwamatsu-san
-
-> Hi, simon and Magnus.
-> 
-> I updated patch series for shmobile DT support.
-> This version fixes definition of interrupt-controller. By this, I fixed
-> external interrupt issuse on sh7372.
-> And update r8a7740 and sh73a0 DT INTC init code to reduce the number of #ifdefs.
-> 
+On Mon, Nov 26, 2012 at 9:16 AM, Simon Horman <horms@verge.net.au> wrote:
+> Use MMC_VDD_165_195 as the allowed voltages in the absence of
+> platform data. This should allow device tree to initialise MMCIF
+> for a number of boards.
+>
+> A more complete solution would be to provide either MMCIF or MMC device
+> try bindings to set the allowed voltages.
+>
+> Tested on the KZM-A9-GT board
+>
+> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Signed-off-by: Simon Horman <horms@verge.net.au>
 > ---
-> 
-> The aims of this series are:
-> 
-> * Adding DT support to INTC
-> * Allowing relevant ARM shmobile SoCs to use DT to initialise INTC
-> * Allowing relevant ARM shmobile boards to use DT to initialise INTC
-> * Allowing the sh73a0 SoC use DT to initialise GIC
-> * Allowing the sh73a0 SoC use DT to initialise GIC, which in
->   turn allows the kzm9g board to use DT to initialise GIC
-> 
-> Nobuhiro Iwamatsu (12):
->   ARM: mach-shmobile: Add support OF for INTC of shmobile
->   SH: intc: Add support OF of IRQ
->   ARM: mach-shmobile: Add support OF of INTC for r8a7740
->   ARM: mach-shmobile: Add support OF of INTC for sh73a0
->   ARM: mach-shmobile: Add support OF of INTC for sh7372
->   ARM: mach-shmobile: Add DT table of INTC for sh73a0
->   ARM: mach-shmobile: Add DT table of INTC for sh7372
->   ARM: mach-shmobile: Add DT table of INTC for r8a7740
->   ARM: shmobile: Include DTSI of r8a7740 to armadillo800eva
->   ARM: shmobile: Include DTSI of sh73a0 to kzm9g board
->   ARM: shmobile: r8a7740: Use DT initialisation of INTC
->   ARM: shmobile: sh7372: Use DT initialisation of INTC
-> 
-> Simon Horman (3):
->   ARM: shmobile: kzm9g: Use DT initialisation of INTC
->   ARM: shmobile: Add DT table of GIC for sh73a0
->   ARM: shmobile: sh73a0: Use DT for GIC
+>  drivers/mmc/host/sh_mmcif.c |    7 ++-----
+>  1 file changed, 2 insertions(+), 5 deletions(-)
 
-This is not super important, but
-did you check your patch by  ./scripts/checkpatch.pl ?
+Thanks for your patch!
 
-Occasionally it may be unavoidable, but this type of patches can be.
+> diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
+> index 11d2bc3..88d6866 100644
+> --- a/drivers/mmc/host/sh_mmcif.c
+> +++ b/drivers/mmc/host/sh_mmcif.c
+> @@ -1293,12 +1293,9 @@ static void sh_mmcif_init_ocr(struct sh_mmcif_host *host)
+>
+>         mmc_regulator_get_supply(mmc);
+>
+> -       if (!pd)
+> -               return;
+> -
+>         if (!mmc->ocr_avail)
+> -               mmc->ocr_avail = pd->ocr;
+> -       else if (pd->ocr)
+> +               mmc->ocr_avail = pd ? pd->ocr : MMC_VDD_165_195;
+> +       else if (pd && pd->ocr)
+>                 dev_warn(mmc_dev(mmc), "Platform OCR mask is ignored\n");
+>  }
 
+I may be mistaken, but I somehow thought that the code in
+mmc_regulator_get_supply() would take care of this automatically for
+us already. So this kind of patch isn't really needed as long as you
+tie in regulators via DT as expected.
 
-Best regards
----
-Kuninori Morimoto
+Thanks,
+
+/ magnus
