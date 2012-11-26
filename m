@@ -1,105 +1,21 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Mon, 26 Nov 2012 12:38:52 -0800
-Subject: [PATCH] MTD: at91: atmel_nand: return bit flips for the PMECC
- read_page()
-In-Reply-To: <1353474863-28430-1-git-send-email-josh.wu@atmel.com>
-References: <1353474863-28430-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <50B3D35C.2000704@newsguy.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 26 Nov 2012 12:40:54 -0800
+Subject: [GIT PULL] ARM: OMAP2+: hwmod/PRM changes for 3.8
+In-Reply-To: <20121126203651.GJ5279@atomide.com>
+References: <alpine.DEB.2.00.1211220016160.32242@utopia.booyaka.com>
+ <20121126203651.GJ5279@atomide.com>
+Message-ID: <20121126204054.GK5279@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh, sorry for the delay.
-
-I guess maybe I missed this one when I did the bitflips patch?  Anyway, please
-see below...
-
-
-On 11/20/2012 09:14 PM, Josh Wu wrote:
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
->  drivers/mtd/nand/atmel_nand.c |   13 +++++++++----
->  1 file changed, 9 insertions(+), 4 deletions(-)
+* Tony Lindgren <tony@atomide.com> [121126 12:39]:
 > 
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index 9144557..860dd36 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -723,6 +723,7 @@ static int pmecc_correction(struct mtd_info *mtd, u32 pmecc_stat, uint8_t *buf,
->  	struct atmel_nand_host *host = nand_chip->priv;
->  	int i, err_nbr, eccbytes;
->  	uint8_t *buf_pos;
-> +	int total_err = 0;
->  
->  	eccbytes = nand_chip->ecc.bytes;
->  	for (i = 0; i < eccbytes; i++)
-> @@ -750,12 +751,13 @@ normal_check:
->  				pmecc_correct_data(mtd, buf_pos, ecc, i,
->  					host->pmecc_bytes_per_sector, err_nbr);
->  				mtd->ecc_stats.corrected += err_nbr;
-> +				total_err += err_nbr;
->  			}
->  		}
->  		pmecc_stat >>= 1;
->  	}
->  
-> -	return 0;
-> +	return total_err;
->  }
->  
->  static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
-> @@ -767,6 +769,7 @@ static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
->  	uint32_t *eccpos = chip->ecc.layout->eccpos;
->  	uint32_t stat;
->  	unsigned long end_time;
-> +	int bitflips = 0;
->  
->  	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_RST);
->  	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
-> @@ -789,11 +792,13 @@ static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
->  	}
->  
->  	stat = pmecc_readl_relaxed(host->ecc, ISR);
-> -	if (stat != 0)
-> -		if (pmecc_correction(mtd, stat, buf, &oob[eccpos[0]]) != 0)
-> +	if (stat != 0) {
-> +		bitflips = pmecc_correction(mtd, stat, buf, &oob[eccpos[0]]);
-> +		if (bitflips < 0)
->  			return -EIO;
+> Thanks pulling into omap-for-v3.8/devel-prcm, let's see if
+> we can still get this and the clock changes in.
 
+Sorry I mean the timer changes from Jon and Igor, not clock
+changes.
 
-This is wrong.  In the case of uncorrectible bitflips, read_page() should return
-0.  The nand infrastructure code is alerted to the uncorrectible bitflips case
-by the ecc_stats, and returns -EBADMSG.  This is the correct return code from
-the mtd layer (i.e., mtd_read()) for uncorrectible bitflips.  (See the bottom of
-nand_do_read_ops() in nand_base.c.)
+Regards,
 
-Returning 0 when uncorrectible bitflips occur is a bit counter-intuitive and
-potentially confusing, I know.  (Fixing that would involve some rework to
-nand_base.c.)  This prompted me to add this comment in nand.h:
-
- * @read_page:	function to read a page according to the ECC generator
- *		requirements; returns maximum number of bitflips corrected in
- *		any single ECC step, 0 if bitflips uncorrectable, -EIO hw error
-
-
-I made a similiar mistake in the docg4 driver, where I returned -EBADMSG on
-uncorrectible errors.  One consequence of that mistake was that mtdchar returned
-0 to userspace, which user code interprets as 0 bytes read, and typically
-re-issues the read.  When I ran nanddump, the read of a page containing the
-uncorrectible errors was repeated over and over.  In the case of this patch as
-currently implemented, -EIO will get propagated up as-is, and the entire read
-operation will be aborted with an error.  -EIO should only be returned in the
-case of a hardware error.
-
-Hope this makes sense.
-
-Mike
-
-
-> +	}
->  
-> -	return 0;
-> +	return bitflips;
->  }
->  
->  static int atmel_nand_pmecc_write_page(struct mtd_info *mtd,
+Tony
