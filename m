@@ -1,61 +1,73 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 26 Nov 2012 09:51:01 +0100
-Subject: [PATCH 18/24] MAINTAINERS: remove drivers/mmc/host/imxmmc.*
-In-Reply-To: <201211240918.42930.ppisa@pikron.com>
-References: <1353716808-16375-1-git-send-email-cesarb@cesarb.net>
- <1353716808-16375-19-git-send-email-cesarb@cesarb.net>
- <201211240918.42930.ppisa@pikron.com>
-Message-ID: <20121126085101.GZ10369@pengutronix.de>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 26 Nov 2012 14:23:13 +0530
+Subject: DMABUF V4L2 patches got merged
+In-Reply-To: <20121125180245.658e68a7@redhat.com>
+References: <20121125180245.658e68a7@redhat.com>
+Message-ID: <CAJuYYwTtczvRHHQenOmvXzERuEHrmTZs8jjWFpme2ONvYyyTrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+Hi Aditya.
 
-On Sat, Nov 24, 2012 at 09:18:42AM +0100, Pavel Pisa wrote:
-> On Saturday 24 November 2012 01:26:42 Cesar Eduardo Barros wrote:
-> > This driver was removed by commit 6187fee (mmc: remove imxmmc driver).
-> >
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Pavel Pisa <ppisa@pikron.com>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
-> > ---
-> >  MAINTAINERS | 6 ------
-> >  1 file changed, 6 deletions(-)
-> >
-> > diff --git a/MAINTAINERS b/MAINTAINERS
-> > index fc646ef..cac8e49 100644
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -4905,12 +4905,6 @@ F:	Documentation/video4linux/meye.txt
-> >  F:	drivers/media/pci/meye/
-> >  F:	include/uapi/linux/meye.h
-> >
-> > -MOTOROLA IMX MMC/SD HOST CONTROLLER INTERFACE DRIVER
-> > -M:	Pavel Pisa <ppisa@pikron.com>
-> > -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> > -S:	Maintained
-> > -F:	drivers/mmc/host/imxmmc.*
-> > -
-> >  MOXA SMARTIO/INDUSTIO/INTELLIO SERIAL CARD
-> >  M:	Jiri Slaby <jirislaby@gmail.com>
-> >  S:	Maintained
-> 
-> Acked-by: Pavel Pisa <pisa@cmp.felk.cvut.cz>
-> 
-> I have still the hardware but have lack resources to keep with current
-> kernel development for that old HW. We plan to switch to newer i.MX
-> hardware - hopefully with more bug free MMC/SD support, because MX1
-> has taken me yer a year of fighting with its bugs (on Linux and RTEMS
-> as well).
+FYI, just in case you have not seen this email.
 
-They are bug free enough to work ;)
-
-Sascha
+Thanks,
+Thomas.
 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+On 26 November 2012 01:32, Mauro Carvalho Chehab <mchehab@redhat.com> wrote:
+> Hi all,
+>
+> Today, I finally merged the DMABUF V4L2 patches from Tomasz.
+>
+> The DMABUF allows replacing the old V4L2 Overlay method by something more
+> robust and safer.
+>
+> It was a long road to get them ready for their upstream inclusion, and to
+> be able to test on both embedded and personal computers.
+>
+> Along this weekend, I was able to test it using 4 different test scenarios:
+>
+>         - vivi + s5p-tv;
+>         - uvcvideo + fimc (m2m) + s5p-tv;
+>         - s5k4ecgx + fimc (m2m) + s5p-tv;
+>         - uvcvideo + i915.
+>
+> The first 3 tests ran on a Samsung Origen Rev. A board; the 4th one on a
+> notebook, with a Sandy Bridge i5core processor with GPU, and an embedded
+> UVC camera.
+>
+> While testing the s5k4ecgx sensor driver, I also added support for multiplane
+> at libv4l, via its plugin interface:
+>
+>         http://git.linuxtv.org/v4l-utils.git/commit/ced1be346fe4f61c864cba9d81f66089d4e32a56
+>
+> Such tests wouldn't be possible without the help of Linaro and Samsung,
+> with donated me some hardware for the tests, and Ideas on Board for making
+> uvcvideo + i915 driver to work especially for this test.
+>
+> Thank you all for your support!
+>
+> In particular, Sylwester helped me a lot to fix several non-related issues with
+> the Origen board, that was not running with an upstream Kernel.
+>
+> There are a number of patches required to make the Origen board to work with an
+> Upstream Kernel. Also, its sensor driver (s5k4ecgx) was not submitted upstream
+> yet. In order to help others that may need to do similar tests, I added the
+> needed patches on my experimental tree, at branch origen+dmabuf:
+>
+>         http://git.linuxtv.org/mchehab/experimental.git/shortlog/refs/heads/origen%2Bdmabuf
+>
+> Still missing there are the wireless/bluetooth support. It seems that there are
+> some patches for it already, but they aren't submitted upstream, nor I didn't
+> test they.
+>
+> I expect that Linaro and Samsung will be able to submit real soon the pending
+> patches needed by Origen in time for its addition on 3.8.
+>
+> Thank you all!
+> Mauro
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
