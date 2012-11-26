@@ -1,32 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 26 Nov 2012 20:10:53 +0100
-Subject: [GIT PULL] Integrator SoC bus patches
-In-Reply-To: <201211261842.34190.arnd@arndb.de>
-References: <CACRpkdYKWLMMOa7+CV8yMNe5-EV1p5fYeVJ+bn55KLLFBZdD=A@mail.gmail.com>
- <201211261842.34190.arnd@arndb.de>
-Message-ID: <CACRpkdbbxK4Z6PTD8MCTaMizQV9T=oc3neFVjRc1n95gCvn-SQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 26 Nov 2012 11:15:08 -0800
+Subject: [GIT PULL] ARM: ixp4xx: fixes for v3.7
+In-Reply-To: <201211261854.14248.arnd@arndb.de>
+References: <0Lufa8-1TAtF11yb2-00zw9g@mx.kundenserver.de>
+ <201211261314.32662.arnd@arndb.de>
+ <CAOesGMhRKfhjvhb0u+qADwpSJZbXEhXzbZAFgOdnbkmMgYy0mw@mail.gmail.com>
+ <201211261854.14248.arnd@arndb.de>
+Message-ID: <CAOesGMi9sM5g3pd5Bj436ia5uzXWowSdJzqz4_onpdHyCQKPGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 7:42 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-
->>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
->> tags/integrator-socbus
+On Mon, Nov 26, 2012 at 10:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 26 November 2012, Olof Johansson wrote:
 >
-> I'm going through my list of old pull requests to see if anything got
-> missed. I don't see this one in arm-soc, and the tag doesn't seem to
-> be there in your kernel.org tree at this point. If this is something
-> that should be merged in 3.8, please send another pull request with
-> a working tag.
+>> > Olof, I'm undecided whether they are still appropriate for 3.7 since
+>> > we're past the final -rc now. If we want them in, we should probably
+>> > send them to Linus now and let him decide.  For all I can tell, ixp4xx
+>> > is already completely broken without these patches, so there should be
+>> > no harm in including them, but then again " 13 files changed, 59
+>> > insertions(+), 68 deletions(-)" is slightly more than I'd like to send
+>> > at this point.
+>> >
+>> > If you prefer, we can put them into next/fixes-non-critical, but then we
+>> > might want to mark more of them as candidates for stable.
+>>
+>> Since the code has been broken for quite a while, I don't see a big
+>> urgency to get it in in the last week of a new release, but I can
+>> easily be persuaded differently. Had I done the pull, I would probably
+>> have merged them into fixes-non-critical myself.
+>
+> I've just done a few pulls that I've found in my email backlog, but it
+> seems you already had everything under control, I was expecting more
+> work to be left over. I probably woudn't have started if I had known
+> it was this little. At least I have a good feeling about not having
+> missed anything important now.
+>
+>> But, as I said, I don't have strong opinions on the matter. :)
+>
+> I can send the pull request(s) for the fixes this time, so at least
+> Linus doesn't blame you for what I pulled in ;-)
 
-It was reiterated as tags/integrator-for-arm-soc
+Haha, ok, deal.
 
-I'll send a fresh pull request mail.
 
-> I remember having looked at the patches and I'm pretty sure they were
-> all good to go in, so I have no idea what went wrong here.
-
-Slipped between chairs, no big deal.
-
-Yours,
-Linus Walleij
+-Olof
