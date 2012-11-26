@@ -1,95 +1,66 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 26 Nov 2012 17:02:19 +0530
-Subject: [GIT PULL]: spear-for-3.8 (was earlier: Re: [PATCH 00/14] ARM: SPEAr:
- DT updates)
-Message-ID: <CAKohpokP60SXv02r8kETRLSf+RviFB8bgpO-VNvTfetQG4AtOA@mail.gmail.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Mon, 26 Nov 2012 11:32:49 +0000
+Subject: [alsa-devel] [PATCH 0/3] ASoC: Davinci: McASP: add support new
+ McASP IP Variant
+In-Reply-To: <CAGm1_kut_wmno7vG_Vm=7c7e4A7ih+PpGP-GzzYWrfT99UC0FQ@mail.gmail.com>
+References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
+ <506B6A9D.3090100@gmail.com>
+ <1BAFE6F6C881BF42822005164F1491C33EA99A40@DBDE01.ent.ti.com>
+ <506C1E97.1070700@gmail.com>
+ <1BAFE6F6C881BF42822005164F1491C33EA99DA8@DBDE01.ent.ti.com>
+ <CAGm1_kut_wmno7vG_Vm=7c7e4A7ih+PpGP-GzzYWrfT99UC0FQ@mail.gmail.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EAD7872@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 November 2012 01:54, Olof Johansson <olof@lixom.net> wrote:
+Yegor,
 
-> We're also running out of time for 3.8 staging, but if you're able to
-> figure out the above I'll make an attempt to apply the patches from above.
+On Sun, Nov 25, 2012 at 15:56:27, Yegor Yefremov wrote:
+> On Wed, Oct 3, 2012 at 2:57 PM, Hebbar, Gururaja <gururaja.hebbar@ti.com> wrote:
+> > On Wed, Oct 03, 2012 at 16:46:39, Daniel Mack wrote:
+> >> On 03.10.2012 09:16, Hebbar, Gururaja wrote:
+> >> > On Wed, Oct 03, 2012 at 03:58:45, Daniel Mack wrote:
+> >> >> On 31.08.2012 14:50, Hebbar, Gururaja wrote:
+> >> >>> The OMAP2+ variant of McASP is different from Davinci variant w.r.to some
+> >> >>> register offset and missing generic SRAM APIs support
+> >> >>>
 
-Hi Arnd/Olof,
+..snip..
+..snip..
 
-To make things easy for you, i have a PULL request for you now :)
+> >>
+> >> Please do :) Or just push your entire tree somewhere.
+> >
+> > I have pushed the code at below git repo
+> > Repo :https://github.com/hvaibhav/am335x-linux
+> > Branch : am335x-upstream-staging-audio
+> >
+> > This includes
+> > 1. (linux-next + AM335x patches)
+> > 2. McASP DT conversion
+> > 3. EDMA hack
+> > 4. AM335x audio specific DT blobs
+> > 5. Am335x dma DT blobs [hack]
+> >
+> > Kindly let me know if you need any more details.
+> 
 
-The following changes since commit 53d74fd79db19aae506de892273198b160c2ee95:
+> What can be expected in 3.8? 
 
-  Merge commit 'gpio-lw/devel' into spear-for-3.8 (2012-11-26 15:48:53 +0530)
+1. ASoC McASP DT conversion is 80% complete. Davinci Machine DT conversion
+& McASP pinctrl support is yet to be accepted. I sent a patch recently and 
+waiting for feedback.
 
-are available in the git repository at:
+> And what will have to wait for 3.9?
+AFAIK
+1. EDMA port for McASP driver
+2. AM335x support on Davinci ASoC (Kconfig & makefile)
+3. DT blobs for Audio modules on AM335x (am335x-evm.dts & am33xx.dtsi)
+
+> 
+> Yegor
+> 
 
 
-  git://git.linaro.org/people/vireshk/linux.git spear-for-3.8
-
-for you to fetch changes up to df1590d9ae5e37e07e7cf91107e4c2c946ce8bf4:
-
-  ARM: SPEAr3xx: Shirq: Move shirq controller out of plat/ (2012-11-26
-16:55:33 +0530)
-
-----------------------------------------------------------------
-Deepak Sikri (1):
-      ARM: SPEAr: DT: Modify DT bindings for STMMAC
-
-Shiraz Hashim (6):
-      ARM: SPEAr13xx: DT: Add spics gpio controller nodes
-      ARM: SPEAr: DT: Update device nodes
-      ARM: SPEAr13xx: Remove fields not required for ssp controller
-      ARM: SPEAr3xx: shirq: simplify and move the shared irq multiplexor to DT
-      ARM: SPEAr3xx: DT: add shirq node for interrupt multiplexor
-      ARM: SPEAr320: DT: Add SPEAr 320 HMI board support
-
-Vipin Kumar (1):
-      ARM: SPEAr: DT: Update partition info for MTD devices
-
-Vipul Kumar Samar (5):
-      ARM: SPEAr: DT: Update pinctrl list
-      ARM: SPEAr: DT: Fix existing DT support
-      ARM: SPEAr: DT: add uart state to fix warning
-      ARM: SPEAr1310: Move 1310 specific misc register into machine
-specific files
-      ARM: SPEAr1310: Fix AUXDATA for compact flash controller
-
-Viresh Kumar (1):
-      ARM: SPEAr3xx: Shirq: Move shirq controller out of plat/
-
- .../devicetree/bindings/arm/spear/shirq.txt        |  48 ++++
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/spear1310-evb.dts                | 165 +++++++++--
- arch/arm/boot/dts/spear1310.dtsi                   |  32 ++-
- arch/arm/boot/dts/spear1340-evb.dts                | 253 +++++++++++++++--
- arch/arm/boot/dts/spear1340.dtsi                   |  61 ++++
- arch/arm/boot/dts/spear13xx.dtsi                   |  72 ++++-
- arch/arm/boot/dts/spear300-evb.dts                 |  20 +-
- arch/arm/boot/dts/spear300.dtsi                    |  14 +-
- arch/arm/boot/dts/spear310-evb.dts                 |  30 +-
- arch/arm/boot/dts/spear310.dtsi                    |  18 ++
- arch/arm/boot/dts/spear320-evb.dts                 |  35 ++-
- arch/arm/boot/dts/spear320-hmi.dts                 | 305 ++++++++++++++++++++
- arch/arm/boot/dts/spear320.dtsi                    |  39 ++-
- arch/arm/boot/dts/spear3xx.dtsi                    |   5 +-
- arch/arm/boot/dts/spear600-evb.dts                 |  46 ++-
- arch/arm/boot/dts/spear600.dtsi                    |  16 ++
- arch/arm/mach-spear13xx/include/mach/spear.h       |   8 -
- arch/arm/mach-spear13xx/spear1310.c                |  16 +-
- arch/arm/mach-spear13xx/spear13xx.c                |   2 -
- arch/arm/mach-spear3xx/include/mach/irqs.h         |  10 +-
- arch/arm/mach-spear3xx/spear300.c                  | 103 -------
- arch/arm/mach-spear3xx/spear310.c                  | 202 -------------
- arch/arm/mach-spear3xx/spear320.c                  | 205 +------------
- arch/arm/mach-spear3xx/spear3xx.c                  |   4 +
- arch/arm/plat-spear/Makefile                       |   2 +-
- arch/arm/plat-spear/shirq.c                        | 118 --------
- drivers/clk/spear/spear1310_clock.c                |   1 +
- drivers/irqchip/Makefile                           |   3 +-
- drivers/irqchip/spear-shirq.c                      | 316 +++++++++++++++++++++
- .../shirq.h => include/linux/irqchip/spear-shirq.h |  49 ++--
- 31 files changed, 1426 insertions(+), 775 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/spear/shirq.txt
- create mode 100644 arch/arm/boot/dts/spear320-hmi.dts
- delete mode 100644 arch/arm/plat-spear/shirq.c
- create mode 100644 drivers/irqchip/spear-shirq.c
- rename arch/arm/plat-spear/include/plat/shirq.h =>
-include/linux/irqchip/spear-shirq.h (60%)
+Regards, 
+Gururaja
