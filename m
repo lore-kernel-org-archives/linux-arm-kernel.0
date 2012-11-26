@@ -1,58 +1,132 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 26 Nov 2012 13:39:32 +0900
-Subject: [PATCH 1/7] mmc: sh-mmcif: provide default allowed voltage
-In-Reply-To: <CANqRtoT8yFx8fe0Fkmh6F91NxajgcPYmheSwpqKk4HtQkX6_pw@mail.gmail.com>
-References: <1353889014-17142-1-git-send-email-horms@verge.net.au>
- <1353889014-17142-2-git-send-email-horms@verge.net.au>
- <CANqRtoT8yFx8fe0Fkmh6F91NxajgcPYmheSwpqKk4HtQkX6_pw@mail.gmail.com>
-Message-ID: <20121126043931.GB12790@verge.net.au>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Sun, 25 Nov 2012 23:43:13 -0500
+Subject: [PATCH 00/27] mv-usb fix and enhancement patches
+Message-ID: <1353905020-29372-1-git-send-email-xiechao.mail@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 01:06:26PM +0900, Magnus Damm wrote:
-> Hi Simon,
-> 
-> On Mon, Nov 26, 2012 at 9:16 AM, Simon Horman <horms@verge.net.au> wrote:
-> > Use MMC_VDD_165_195 as the allowed voltages in the absence of
-> > platform data. This should allow device tree to initialise MMCIF
-> > for a number of boards.
-> >
-> > A more complete solution would be to provide either MMCIF or MMC device
-> > try bindings to set the allowed voltages.
-> >
-> > Tested on the KZM-A9-GT board
-> >
-> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > Signed-off-by: Simon Horman <horms@verge.net.au>
-> > ---
-> >  drivers/mmc/host/sh_mmcif.c |    7 ++-----
-> >  1 file changed, 2 insertions(+), 5 deletions(-)
-> 
-> Thanks for your patch!
-> 
-> > diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
-> > index 11d2bc3..88d6866 100644
-> > --- a/drivers/mmc/host/sh_mmcif.c
-> > +++ b/drivers/mmc/host/sh_mmcif.c
-> > @@ -1293,12 +1293,9 @@ static void sh_mmcif_init_ocr(struct sh_mmcif_host *host)
-> >
-> >         mmc_regulator_get_supply(mmc);
-> >
-> > -       if (!pd)
-> > -               return;
-> > -
-> >         if (!mmc->ocr_avail)
-> > -               mmc->ocr_avail = pd->ocr;
-> > -       else if (pd->ocr)
-> > +               mmc->ocr_avail = pd ? pd->ocr : MMC_VDD_165_195;
-> > +       else if (pd && pd->ocr)
-> >                 dev_warn(mmc_dev(mmc), "Platform OCR mask is ignored\n");
-> >  }
-> 
-> I may be mistaken, but I somehow thought that the code in
-> mmc_regulator_get_supply() would take care of this automatically for
-> us already. So this kind of patch isn't really needed as long as you
-> tie in regulators via DT as expected.
+From: Chao Xie <chao.xie@marvell.com>
 
-Thanks, I'll check that. I did write this patch before hooking
-up the regulators correctly.
+The patches are divied into 3 parts
+1. bug fixes
+  usb: gadget: mv_udc: use udc_start and udc_stop functions
+  usb: gadget: mv_udc: use devm_xxx for probe
+  usb: gadget: mv_udc: fix the clk APIs
+  usb: otg: mv_otg: use devm_xxx for probe
+  usb: otg: mv_otg: fix the clk APIs
+  usb: host: ehci-mv: fix clk APIs
+  usb: host: ehci-mv: remove unused variable
+  usb: gadget: mv_udc: fix the value of tranceiver
+Above patches are bug fixes.
+
+2. PHY driver
+To remove the callbacks in the platform data, a usb PHY driver
+for marvell udc/otg/ehci is written.
+For device tree support, it is not good to pass the callback
+pointers by platform data. The PHY driver also removes the
+block.
+
+  usb: phy: mv_usb2: add PHY driver for marvell usb2 controller
+  usb: gadget: mv_udc: use PHY driver for udc
+  usb: ehci: ehci-mv: use PHY driver for ehci
+  usb: otg: mv_otg: use PHY driver for otg
+Above patches are marvell usb PHY driver support.
+
+  arm: mmp2: change the defintion of usb devices
+  arm: pxa910: change the defintion of usb devices
+  arm: brownstone: add usb support for the board
+  arm: ttc_dkb: add usb support
+  arm: mmp: remove the usb phy setting
+  arm: mmp: remove usb devices from pxa168
+Above patches are for SOC/board support for marvell usb PHY
+driver.
+
+3. external chip support
+The marvell usb controller can detect the vbus/idpin, but it
+need PHY and usb clocks to be enabled.
+Based on measurement it will import 15mA current, and increase
+the power when the usb is not used.
+Using a external chip to detect vbus/idpin changes will save
+the power.
+In fact the marvell PMIC 88pm860x and 88pm80x can do it. The
+drivers are located at drivers/mfd.
+So add a middle layer in the marvell usb PHY driver.
+PMIC call the APIs in middle driver to registers the callback
+for vbus/idpin detection/query
+udc/otg/ehci driver will call the APIs to get vbus/idpin changes
+and query the states of the vbus/idpin.
+  usb: phy: mv_usb2_phy: add externel chip support
+  usb: gadget: mv_udc: add extern chip support
+  usb: ehci: ehci-mv: add extern chip support
+  usb: otg: mv_otg: add extern chip support
+Above patches are the middle layer suppor for udc/otg/ehci
+
+  arm: mmp: add extern chip support for brownstone
+  arm: mmp: add extern chip support for ttc_dkb
+Above patches are corresponding board file changes
+ 
+4. device tree support
+After removing the callbacks in platform data, and the not
+constant variables in platform data. All the information needed
+by udc/otg/ehci driver are constant.
+
+  usb: gadget: mv_udc: add device tree support
+  usb: otg: mv_otg: add device tree support
+  usb: ehci: ehci-mv: add device tree support
+Above patches are device tree support for udc/otg/ehci driver.
+
+Chao Xie (27):
+  usb: gadget: mv_udc: use udc_start and udc_stop functions
+  usb: gadget: mv_udc: use devm_xxx for probe
+  usb: gadget: mv_udc: fix the clk APIs
+  usb: otg: mv_otg: use devm_xxx for probe
+  usb: otg: mv_otg: fix the clk APIs
+  usb: host: ehci-mv: fix clk APIs
+  usb: host: ehci-mv: remove unused variable
+  usb: gadget: mv_udc: fix the value of tranceiver
+  usb: phy: mv_usb2: add PHY driver for marvell usb2 controller
+  usb: gadget: mv_udc: use PHY driver for udc
+  usb: ehci: ehci-mv: use PHY driver for ehci
+  usb: otg: mv_otg: use PHY driver for otg
+  arm: mmp2: change the defintion of usb devices
+  arm: pxa910: change the defintion of usb devices
+  arm: brownstone: add usb support for the board
+  arm: ttc_dkb: add usb support
+  arm: mmp: remove the usb phy setting
+  arm: mmp: remove usb devices from pxa168
+  usb: phy: mv_usb2_phy: add externel chip support
+  usb: gadget: mv_udc: add extern chip support
+  usb: ehci: ehci-mv: add extern chip support
+  usb: otg: mv_otg: add extern chip support
+  arm: mmp: add extern chip support for brownstone
+  arm: mmp: add extern chip support for ttc_dkb
+  usb: gadget: mv_udc: add device tree support
+  usb: otg: mv_otg: add device tree support
+  usb: ehci: ehci-mv: add device tree support
+
+ arch/arm/mach-mmp/brownstone.c            |   45 +++
+ arch/arm/mach-mmp/devices.c               |  278 ----------------
+ arch/arm/mach-mmp/include/mach/mmp2.h     |    4 +
+ arch/arm/mach-mmp/include/mach/pxa910.h   |    7 +-
+ arch/arm/mach-mmp/include/mach/regs-usb.h |  253 --------------
+ arch/arm/mach-mmp/mmp2.c                  |    4 +
+ arch/arm/mach-mmp/pxa168.c                |   42 ---
+ arch/arm/mach-mmp/pxa910.c                |    4 +
+ arch/arm/mach-mmp/ttc_dkb.c               |   32 +-
+ drivers/usb/gadget/mv_udc.h               |   10 +-
+ drivers/usb/gadget/mv_udc_core.c          |  385 +++++++++++-----------
+ drivers/usb/host/ehci-mv.c                |  158 ++++++----
+ drivers/usb/otg/mv_otg.c                  |  283 +++++++++--------
+ drivers/usb/otg/mv_otg.h                  |   11 +-
+ drivers/usb/phy/Kconfig                   |    7 +
+ drivers/usb/phy/Makefile                  |    1 +
+ drivers/usb/phy/mv_usb2_phy.c             |  508 +++++++++++++++++++++++++++++
+ include/linux/platform_data/mv_usb.h      |   22 +-
+ include/linux/usb/mv_usb2.h               |   97 ++++++
+ 19 files changed, 1171 insertions(+), 980 deletions(-)
+ delete mode 100644 arch/arm/mach-mmp/include/mach/regs-usb.h
+ create mode 100644 drivers/usb/phy/mv_usb2_phy.c
+ create mode 100644 include/linux/usb/mv_usb2.h
+
+-- 
+1.7.4.1
