@@ -1,7 +1,7 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 26 Nov 2012 15:24:41 +0530
-Subject: [PATCH] i2c: omap: Remove the OMAP_I2C_FLAG_RESET_REGS_POSTIDLE flag
-Message-ID: <1353923681-9576-1-git-send-email-shubhrajyoti@ti.com>
+Date: Mon, 26 Nov 2012 15:25:11 +0530
+Subject: [PATCHv2] i2c: omap: Remove the OMAP_I2C_FLAG_RESET_REGS_POSTIDLE flag
+Message-ID: <1353923711-9615-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
