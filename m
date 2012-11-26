@@ -1,159 +1,72 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Mon, 26 Nov 2012 20:27:27 +0900
-Subject: [PATCH] ARM: Exynos: Remove unused non-dt support for dwmci
- controller
-In-Reply-To: <1353914155-1716-1-git-send-email-thomas.abraham@linaro.org>
-References: <1353914155-1716-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CAH9JG2X_=Vr=52BY=vjZVtf9fzSox2KMjXGr0U4uAJu6MHjwQw@mail.gmail.com>
+From: chlrbgh0@gmail.com (chlrbgh0 at gmail.com)
+Date: Mon, 26 Nov 2012 20:32:18 +0900
+Subject: [PATCH] ARM: dts: add initial dts file for ORIGEN4QUAD
+Message-ID: <1353929538-24173-1-git-send-email-kh.choi@insignal.co.kr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/12, Thomas Abraham <thomas.abraham@linaro.org> wrote:
-> With device tree support enabled for dwmci controller, the unused non-dt
-> support
-> for dwmci controller can be removed.
+From: Kyuho Choi <kh.choi@insignal.co.kr>
 
-Are there no problem to use legacy board? e.g., universal_c210.
+This patch adds initial dts file for ORIGEN4QUAD board.
+ORIGEN4QUAD board based on Samsung EXYNOS4412 SoC.
+More properties will be added later.
 
->
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  arch/arm/mach-exynos/Makefile             |    1 -
->  arch/arm/mach-exynos/dev-dwmci.c          |   75
-> -----------------------------
->  arch/arm/mach-exynos/include/mach/dwmci.h |   20 --------
->  3 files changed, 0 insertions(+), 96 deletions(-)
->  delete mode 100644 arch/arm/mach-exynos/dev-dwmci.c
->  delete mode 100644 arch/arm/mach-exynos/include/mach/dwmci.h
->
-> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-> index c12ed6a..b189881 100644
-> --- a/arch/arm/mach-exynos/Makefile
-> +++ b/arch/arm/mach-exynos/Makefile
-> @@ -50,7 +50,6 @@ obj-$(CONFIG_MACH_EXYNOS5_DT)		+= mach-exynos5-dt.o
->  obj-y					+= dev-uart.o
->  obj-$(CONFIG_ARCH_EXYNOS4)		+= dev-audio.o
->  obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
-> -obj-$(CONFIG_EXYNOS4_DEV_DWMCI)		+= dev-dwmci.o
->  obj-$(CONFIG_EXYNOS_DEV_DMA)		+= dma.o
->  obj-$(CONFIG_EXYNOS4_DEV_USB_OHCI)	+= dev-ohci.o
->  obj-$(CONFIG_EXYNOS_DEV_SYSMMU)		+= dev-sysmmu.o
-> diff --git a/arch/arm/mach-exynos/dev-dwmci.c
-> b/arch/arm/mach-exynos/dev-dwmci.c
-> deleted file mode 100644
-> index 7903501..0000000
-> --- a/arch/arm/mach-exynos/dev-dwmci.c
-> +++ /dev/null
-> @@ -1,75 +0,0 @@
-> -/*
-> - * linux/arch/arm/mach-exynos4/dev-dwmci.c
-> - *
-> - * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-> - *		http://www.samsung.com
-> - *
-> - * Platform device for Synopsys DesignWare Mobile Storage IP
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> - */
-> -
-> -#include <linux/kernel.h>
-> -#include <linux/dma-mapping.h>
-> -#include <linux/platform_device.h>
-> -#include <linux/interrupt.h>
-> -#include <linux/ioport.h>
-> -#include <linux/mmc/dw_mmc.h>
-> -
-> -#include <plat/devs.h>
-> -
-> -#include <mach/map.h>
-> -
-> -static int exynos4_dwmci_get_bus_wd(u32 slot_id)
-> -{
-> -	return 4;
-> -}
-> -
-> -static int exynos4_dwmci_init(u32 slot_id, irq_handler_t handler, void
-> *data)
-> -{
-> -	return 0;
-> -}
-> -
-> -static struct resource exynos4_dwmci_resource[] = {
-> -	[0] = DEFINE_RES_MEM(EXYNOS4_PA_DWMCI, SZ_4K),
-> -	[1] = DEFINE_RES_IRQ(EXYNOS4_IRQ_DWMCI),
-> -};
-> -
-> -static struct dw_mci_board exynos4_dwci_pdata = {
-> -	.num_slots			= 1,
-> -	.quirks				= DW_MCI_QUIRK_BROKEN_CARD_DETECTION,
-> -	.bus_hz				= 80 * 1000 * 1000,
-> -	.detect_delay_ms	= 200,
-> -	.init				= exynos4_dwmci_init,
-> -	.get_bus_wd			= exynos4_dwmci_get_bus_wd,
-> -};
-> -
-> -static u64 exynos4_dwmci_dmamask = DMA_BIT_MASK(32);
-> -
-> -struct platform_device exynos4_device_dwmci = {
-> -	.name		= "dw_mmc",
-> -	.id		= -1,
-> -	.num_resources	= ARRAY_SIZE(exynos4_dwmci_resource),
-> -	.resource	= exynos4_dwmci_resource,
-> -	.dev		= {
-> -		.dma_mask		= &exynos4_dwmci_dmamask,
-> -		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> -		.platform_data	= &exynos4_dwci_pdata,
-> -	},
-> -};
-> -
-> -void __init exynos4_dwmci_set_platdata(struct dw_mci_board *pd)
-> -{
-> -	struct dw_mci_board *npd;
-> -
-> -	npd = s3c_set_platdata(pd, sizeof(struct dw_mci_board),
-> -			&exynos4_device_dwmci);
-> -
-> -	if (!npd->init)
-> -		npd->init = exynos4_dwmci_init;
-> -	if (!npd->get_bus_wd)
-> -		npd->get_bus_wd = exynos4_dwmci_get_bus_wd;
-> -}
-> diff --git a/arch/arm/mach-exynos/include/mach/dwmci.h
-> b/arch/arm/mach-exynos/include/mach/dwmci.h
-> deleted file mode 100644
-> index 7ce6574..0000000
-> --- a/arch/arm/mach-exynos/include/mach/dwmci.h
-> +++ /dev/null
-> @@ -1,20 +0,0 @@
-> -/* linux/arch/arm/mach-exynos4/include/mach/dwmci.h
-> - *
-> - * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-> - *		http://www.samsung.com/
-> - *
-> - * Synopsys DesignWare Mobile Storage for EXYNOS4210
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - */
-> -
-> -#ifndef __ASM_ARM_ARCH_DWMCI_H
-> -#define __ASM_ARM_ARCH_DWMCI_H __FILE__
-> -
-> -#include <linux/mmc/dw_mmc.h>
-> -
-> -extern void exynos4_dwmci_set_platdata(struct dw_mci_board *pd);
-> -
-> -#endif /* __ASM_ARM_ARCH_DWMCI_H */
-> --
-> 1.7.5.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Signed-off-by: Kyuho Choi <kh.choi@insignal.co.kr>
+---
+ arch/arm/boot/dts/exynos4412-origen4quad.dts |   45 ++++++++++++++++++++++++++
+ 1 files changed, 45 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos4412-origen4quad.dts
+
+diff --git a/arch/arm/boot/dts/exynos4412-origen4quad.dts b/arch/arm/boot/dts/exynos4412-origen4quad.dts
+new file mode 100644
+index 0000000..390a2ab
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos4412-origen4quad.dts
+@@ -0,0 +1,45 @@
++/*
++ * Samsung's Exynos4412 based Origen4Quad board device tree source
++ *
++ * Copyright (c) 2012-2013 Isnignal Co., Ltd.
++ *		http://www.insignal.co.kr
++ *
++ * Device tree source file for Insignal's Origen4Quad board which is based on
++ * Samsung's Exynos4412 SoC.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/dts-v1/;
++/include/ "exynos4412.dtsi"
++
++/ {
++	model = "Insignal Origen4Quad board based on Exynos4412";
++	compatible = "insignal,origen4quad", "samsung,exynos4412";
++
++	memory {
++		reg = <0x40000000 0x40000000>;
++	};
++
++	chosen {
++		bootargs ="root=/dev/ram0 rw ramdisk=32768 initrd=0x41000000,32M console=ttySAC2,115200 init=/linuxrc";
++	};
++
++	serial at 13800000 {
++		status = "okay";
++	};
++
++	serial at 13810000 {
++		status = "okay";
++	};
++
++	serial at 13820000 {
++		status = "okay";
++	};
++
++	serial at 13830000 {
++		status = "okay";
++	};
++};
+-- 
+1.7.5.4
