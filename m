@@ -1,96 +1,34 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Tue, 27 Nov 2012 15:00:54 +0100
-Subject: [PATCH v3 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <518397C60809E147AF5323E0420B992E3E9EEA09@DBDE01.ent.ti.com>
-References: <1351869956-2787-1-git-send-email-zonque@gmail.com>
- <1351869956-2787-5-git-send-email-zonque@gmail.com>
- <518397C60809E147AF5323E0420B992E3E9DA81F@DBDE01.ent.ti.com>
- <5097B7EE.3000508@gmail.com>
- <518397C60809E147AF5323E0420B992E3E9DC1F1@DBDE01.ent.ti.com>
- <509A2E75.5060307@gmail.com>
- <518397C60809E147AF5323E0420B992E3E9DE420@DBDE01.ent.ti.com>
- <509EA360.2050504@gmail.com> <87mwycjmdn.fsf@dell.be.48ers.dk>
- <50ACA9BB.7090106@gmail.com>
- <518397C60809E147AF5323E0420B992E3E9EEA09@DBDE01.ent.ti.com>
-Message-ID: <50B4C796.4010403@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 27 Nov 2012 14:04:02 +0000
+Subject: [PATCH 1/2] ASoC: davinci-mcasp: Add pinctrl support
+In-Reply-To: <87y5hn1tey.fsf@dell.be.48ers.dk>
+References: <1353557099-21599-1-git-send-email-gururaja.hebbar@ti.com>
+ <1353557099-21599-2-git-send-email-gururaja.hebbar@ti.com>
+ <20121126114511.GE9411@opensource.wolfsonmicro.com>
+ <87y5hn1tey.fsf@dell.be.48ers.dk>
+Message-ID: <20121127140402.GE4468@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Avinash,
-Hi Peter,
+On Mon, Nov 26, 2012 at 09:55:33PM -0800, Peter Korsgaard wrote:
+> >>>>> "Mark" == Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
 
-On 23.11.2012 11:43, Philip, Avinash wrote:
-> On Wed, Nov 21, 2012 at 15:45:23, Daniel Mack wrote:
->> On 20.11.2012 16:59, Peter Korsgaard wrote:
->>>>>>>> "Daniel" == Daniel Mack <zonque@gmail.com> writes:
+>  Mark> Since the driver is happy to continue without the pins why is it
+>  Mark> bothering requesting them in the first place?  In other words, this
+>  Mark> should be a hard error.
 
-> Peter,
-> 
-> In patch [1], mtd: nand: omap2: Support for hardware BCH
-> 
-> ecc_layout made compatible with Rom Boot Loader ECC layout for am335x.
-> 
-> This action is based on is_elm_used flag.
-> 
-> Requirement of this flag is to identify the whether the platform
-> ELM module & based on this configure ELM module if present.
-> 
-> But ideally BCH8 ecc lay out didn't have a dependency on ELM, it
-> can work with software BCH ecc. RBL compatibility is missing
-> in software BCH because of addition of constant polynomial to
-> ecc vector. If we remove the dependency on erased page handling
-> by ecc vector with constant polynomial, software BCH can do the
-> job of RBL compatibility.
-> 
-> Ivan,
-> Do you have any suggestions?
-> Discussion for RBL compatibility found at [2].
-> 
-> It is good that software BCH also support RBL compatibility by suppressing
-> constant polynomial modification. Then ecc layout can be selected from
-> DT entry and error correction can be chosen between software/hardware
-> depending on the availability of ELM hardware.
-> Currently RBL BCH8 compatibility depends on the availability of ELM
-> hardware. Later once software BCH start supporting RBL compatibility,
-> we can remove  the check.
-> 
->>
->> That is what I experienced, yes. The kernel was unable to parse NAND
->> pages that were written from U-Boot with bch8 hardware mode when the elm
->> module was not active. Maybe someone from TI can explain that? Giving it
->> a dedicated name would also solve the problem with the extra DT property.
-> 
-> Daniel,
-> 
-> Currently BCH8 is supported with software ecc error correction in mainline.
-> The layout for BCH8 ECC layout is
-> 0-1 -> BAD block markers
-> 2-11-> oob free area
-> 12-63-> BCH8 ECC.
-> 
-> RBL ECC layout is
-> 0-1 -> BAD block markers
-> 2-57-> BCH8 ecc layout
-> 58-63-> OOB free area
-> 
-> As u-boot also maintain RBL ecc layout, write from U-boot
-> and read from Linux requires compatibility with RBL ecc layout.
-> The same is achieved in the patch [1], with by setting is_elm_used
-> to true.
-> 
-> 1. https://lkml.org/lkml/2012/10/31/87
-> 2. https://lkml.org/lkml/2012/10/11/20
+> Sorry, I disagree. As was discussed recently, there's several reasons
+> why the pinctrl call might fail, and not all are fatal (E.G. pinmux
+> already setup by bootloader):
 
-So, after reading this, I'm still uncertain what's your preferred way of
-handling the bindings here. Are you saying we should stick with the
-is_elm_used flag, and subsequently care for BCH8 software mode
-compatibility?
+> http://article.gmane.org/gmane.linux.kernel/1399756
 
-I would like to submit a new version soon, so it can be queued up for
-the next merge window, and that decision is the last blocker currently
-for sending out a new series.
-
-
-Many thanks,
-Daniel
+I'd expect the platform to provide stub mappings for cases where the
+pinmux code shouldn't do anything.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121127/ebfb3682/attachment.sig>
