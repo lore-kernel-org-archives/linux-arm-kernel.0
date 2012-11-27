@@ -1,46 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 27 Nov 2012 13:03:11 +0000
-Subject: [PATCH 1/1] ARM: ux500: Fix u9540 booting issues
-In-Reply-To: <201211271236.01493.arnd@arndb.de>
-References: <1354008890-10476-1-git-send-email-lee.jones@linaro.org>
- <201211271236.01493.arnd@arndb.de>
-Message-ID: <20121127130311.GE2013@gmail.com>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Tue, 27 Nov 2012 18:30:35 +0530
+Subject: [PATCH 2/3] ARM: exynos5: Add gate clocks for HS-I2C
+In-Reply-To: <1354021236-28596-1-git-send-email-ch.naveen@samsung.com>
+References: <1354021236-28596-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <1354021236-28596-3-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Nov 2012, Arnd Bergmann wrote:
+Adds clock gating bits for High Speed I2C channels 0, 1, 2 and 3.
 
-> On Tuesday 27 November 2012, Lee Jones wrote:
-> 
-> > The u9540 stopped booting after the v3.7 merge window due to
-> > a lack of common clk support and early PRCMU initialisation.
-> > In this patch we rectify these issues, placing the u9540
-> > development board back into a successfully booting state.
-> 
-> > -       if (cpu_is_u8500_family())
-> > +       if (cpu_is_u8500_family() || cpu_is_u9540())
-> >                 u8500_clk_init();
-> > -       else if (cpu_is_u9540())
-> > -               u9540_clk_init();
-> >         else if (cpu_is_u8540())
-> >                 u8540_clk_init();
-> 
-> It certainly doesn't /look/ right, even if it works.  Can you explain why
-> u8540_clk_init works and u9540_clk_init doesn't?
+Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+---
+ arch/arm/mach-exynos/clock-exynos5.c |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Because it's empty. :)
-
-Common clk doesn't support the u9540 yet, and even when it does,
-most (all?) of the clocks will be identical to the u9540 in any
-case.
-
-I believe Linus wants to apply this with a TODO, to ensure the
-board is at least bootable. This whole section is in the wrong
-place anyway IMHO, and needs moving out to somewhere less hacky,
-rather than initialising clocks and the PRCMU from .init_irq.
-
+diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
+index 2d3057b..37c6104 100644
+--- a/arch/arm/mach-exynos/clock-exynos5.c
++++ b/arch/arm/mach-exynos/clock-exynos5.c
+@@ -781,6 +781,26 @@ static struct clk exynos5_init_clocks_off[] = {
+ 		.enable		= exynos5_clk_ip_peric_ctrl,
+ 		.ctrlbit	= (1 << 26),
+ 	}, {
++		.name		= "hsi2c",
++		.devname	= "exynos5-hs-i2c.0",
++		.enable		= exynos5_clk_ip_peric_ctrl,
++		.ctrlbit	= (1 << 28),
++	}, {
++		.name		= "hsi2c",
++		.devname	= "exynos5-hs-i2c.1",
++		.enable		= exynos5_clk_ip_peric_ctrl,
++		.ctrlbit	= (1 << 29),
++	}, {
++		.name		= "hsi2c",
++		.devname	= "exynos5-hs-i2c.2",
++		.enable		= exynos5_clk_ip_peric_ctrl,
++		.ctrlbit	= (1 << 30),
++	}, {
++		.name		= "hsi2c",
++		.devname	= "exynos5-hs-i2c.3",
++		.enable		= exynos5_clk_ip_peric_ctrl,
++		.ctrlbit	= (1 << 31),
++	}, {
+ 		.name		= "ac97",
+ 		.devname	= "samsung-ac97",
+ 		.enable		= exynos5_clk_ip_peric_ctrl,
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
