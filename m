@@ -1,49 +1,86 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Tue, 27 Nov 2012 15:57:14 +0530
-Subject: [PATCH 1/1] net: cpts: fix for build break after ARM SoC integration
-Message-ID: <1354012034-31686-1-git-send-email-mugunthanvnm@ti.com>
+From: kh.choi@insignal.co.kr (kh.choi)
+Date: Tue, 27 Nov 2012 19:28:09 +0900
+Subject: [PATCH] ARM: dts: add initial dts file for ORIGEN4QUAD
+In-Reply-To: <1361143.TuLvfqvMr1@amdc1227>
+References: <1353929538-24173-1-git-send-email-kh.choi@insignal.co.kr>
+ <CAH9JG2VSnA3zJCP9OiBbrdaV1GqVKL0x4fn331D7YJxQs8VwMg@mail.gmail.com>
+ <1361143.TuLvfqvMr1@amdc1227>
+Message-ID: <50B495B9.4060005@insignal.co.kr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  CC      drivers/net/ethernet/ti/cpts.o
-drivers/net/ethernet/ti/cpts.c:30:24: fatal error: plat/clock.h: No such file or directory
-compilation terminated.
-make[4]: *** [drivers/net/ethernet/ti/cpts.o] Error 1
-make[3]: *** [drivers/net/ethernet/ti] Error 2
-make[2]: *** [drivers/net/ethernet] Error 2
-make[1]: *** [drivers/net] Error 2
+Hi Tomasz,
 
-fix for build break as the header file is removed from plat-omap as part of
-the below patch
-
-commit a135eaae524acba1509a3b19c97fae556e4da7cd
-Author: Paul Walmsley <paul@pwsan.com>
-Date:   Thu Sep 27 10:33:34 2012 -0600
-
-    ARM: OMAP: remove plat/clock.h
-
-    Remove arch/arm/plat-omap/include/plat/clock.h by merging it into
-    arch/arm/mach-omap1/clock.h and arch/arm/mach-omap2/clock.h.
-    The goal here is to facilitate ARM single image kernels by removing
-    includes via the "plat/" symlink.
-
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
- drivers/net/ethernet/ti/cpts.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/net/ethernet/ti/cpts.c b/drivers/net/ethernet/ti/cpts.c
-index 3377667..5e62c1a 100644
---- a/drivers/net/ethernet/ti/cpts.c
-+++ b/drivers/net/ethernet/ti/cpts.c
-@@ -27,8 +27,6 @@
- #include <linux/uaccess.h>
- #include <linux/workqueue.h>
- 
--#include <plat/clock.h>
--
- #include "cpts.h"
- 
- #ifdef CONFIG_TI_CPTS
--- 
-1.7.0.4
+2012-11-26 ?? 8:57, Tomasz Figa ? ?:
+> Hi Kyungmin, Kyuho,
+>
+> On Monday 26 of November 2012 20:52:12 Kyungmin Park wrote:
+>> Hi,
+>>
+>> On 11/26/12, chlrbgh0 at gmail.com <chlrbgh0@gmail.com> wrote:
+>>> From: Kyuho Choi <kh.choi@insignal.co.kr>
+>>>
+>>> This patch adds initial dts file for ORIGEN4QUAD board.
+>>> ORIGEN4QUAD board based on Samsung EXYNOS4412 SoC.
+>>> More properties will be added later.
+>>>
+>>> Signed-off-by: Kyuho Choi <kh.choi@insignal.co.kr>
+>>> ---
+>>>
+>>>   arch/arm/boot/dts/exynos4412-origen4quad.dts |   45
+>>>
+>>> ++++++++++++++++++++++++++
+>>>
+>>>   1 files changed, 45 insertions(+), 0 deletions(-)
+>>>   create mode 100644 arch/arm/boot/dts/exynos4412-origen4quad.dts
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos4412-origen4quad.dts
+>>> b/arch/arm/boot/dts/exynos4412-origen4quad.dts
+>>> new file mode 100644
+>>> index 0000000..390a2ab
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/exynos4412-origen4quad.dts
+>>> @@ -0,0 +1,45 @@
+>>> +/*
+>>> + * Samsung's Exynos4412 based Origen4Quad board device tree source
+>>> + *
+>>> + * Copyright (c) 2012-2013 Isnignal Co., Ltd.
+>>> + *		http://www.insignal.co.kr
+>>> + *
+>>> + * Device tree source file for Insignal's Origen4Quad board which is
+>>> based on
+>>> + * Samsung's Exynos4412 SoC.
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or
+>>> modify + * it under the terms of the GNU General Public License
+>>> version 2 as + * published by the Free Software Foundation.
+>>> +*/
+>>> +
+>>> +/dts-v1/;
+>>> +/include/ "exynos4412.dtsi"
+>>> +
+>>> +/ {
+>>> +	model = "Insignal Origen4Quad board based on Exynos4412";
+>>> +	compatible = "insignal,origen4quad", "samsung,exynos4412";
+>>> +
+>>> +	memory {
+>>> +		reg = <0x40000000 0x40000000>;
+>>> +	};
+>>
+>> does it test to boot with this dts file?
+>> does it support 1GiB memory section?
+>
+> It will most likely fail to boot with u-boot versions that do not support
+> replacing memory configuration in device tree and without
+> CONFIG_ARM_ATAG_DTB_COMPAT enabled.
+>
+> In other words, the memory setup from dts is used only if both of the
+> following are true:
+>   - CONFIG_ARM_ATAG_DTB_COMPAT is disabled
+>   - u-boot does not modify memory setup in device tree passed to the kernel
+I'd working based on `exynos4_defconfig` for ORIGEN4QUAD board.
+`exynos4_defconfig`s default disabled CONFIG_ARM_ATAG_DTB_COMPAT.
+And ORIGEN4QUAD working on u-boot v2012.10.
+>
+> Best regards,
+>
