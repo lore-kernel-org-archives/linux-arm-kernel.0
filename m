@@ -1,33 +1,126 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 27 Nov 2012 17:05:47 +0530
-Subject: [PATCH] cpufreq: SPEAr: Add CPUFreq driver
-In-Reply-To: <1728458.5AqJNfNVgK@vostro.rjw.lan>
-References: <7ec0e3f4b81b70f3def4257e6b9781efd4c7a3d2.1353785862.git.viresh.kumar@linaro.org>
- <20121127040135.GB27305@S2100-06.ap.freescale.net>
- <CAKohpomSAogQVeBQ8HaWwwoTVCsMha5d_1Wid6N3t5SnVZTc=w@mail.gmail.com>
- <1728458.5AqJNfNVgK@vostro.rjw.lan>
-Message-ID: <CAKohpo=XirzP5Dj5kZq8Ou7D-W8CjfT8m=_vpjim4oH9jXfdQQ@mail.gmail.com>
+From: archit@ti.com (Archit Taneja)
+Date: Tue, 27 Nov 2012 17:26:36 +0530
+Subject: OMAP4430 produces boot warnings
+In-Reply-To: <50B4A2B7.9080806@ti.com>
+References: <20121121230337.GR3332@n2100.arm.linux.org.uk>
+ <50AE1DC0.3030002@ti.com> <50AE2BB6.8080406@ti.com>
+ <1353594842.786.45.camel@sokoban> <50AE3A5B.5040603@ti.com>
+ <1353663278.25248.4.camel@sokoban> <50B310D3.9050202@ti.com>
+ <50B35D0E.6000509@ti.com> <50B4A2B7.9080806@ti.com>
+Message-ID: <50B4AA74.1090300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 November 2012 17:08, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> On Tuesday, November 27, 2012 09:28:01 AM Viresh Kumar wrote:
->> On 27 November 2012 09:31, Shawn Guo <shawn.guo@linaro.org> wrote:
->> > On Sun, Nov 25, 2012 at 01:09:28AM +0530, Viresh Kumar wrote:
->> >> +cpufreq {
->> >> +     compatible = "st,cpufreq-spear";
->> >
->> > I do not think we need a "cpufreq" node, as we already have node for
->> > cpu to contain these.
+On Tuesday 27 November 2012 04:53 PM, Tomi Valkeinen wrote:
+> On 2012-11-26 14:14, Archit Taneja wrote:
+>
+>> So Rajendra and I found the problem.
 >>
->> Hmm.. Yes, can be done.
+>> The function _omap4_update_context_lost() reads the register
+>> RM_DSS_DSS_CONTEXT for all DSS hwmods, and increments the count if we
+>> read a non zero value. The issue is that the DSS's parent platform
+>> device (tied to dss_core hwmod) is called first when resuming, it
+>> correctly reads the register and observes that DSS lost context, and
+>> then clears the register.
+>>
+>> When the children hwmods are enabled, the see that the registers are
+>> cleared, and hence never increment their count.
+>>
+>> One option is to make the DSS driver use the context lost count of the
+>> hwmod corresponding to the parent platform device. It sort of makes a
+>> bit of sense as all the DSS platform devices belong to the same power
+>> domain, so considering only the parent's context lost count is not so bad.
+>>
+>> The second option would be to have some usecounting mechanism in
+>> omap_hwmod where different hwmods belonging to the same power domain
+>> don't have their PM_CONTEXT registers cleared until all the hwmods are
+>> enabled.
+>>
+>> The first option is easier to implement, here is a patch for the DISPC
+>> driver:
+>>
+>>
+>>  From 619276fa0e62b90875475eb345a310f1223e82f6 Mon Sep 17 00:00:00 2001
+>> From: Archit Taneja <archit@ti.com>
+>> Date: Mon, 26 Nov 2012 17:22:27 +0530
+>> Subject: [PATCH] OMAPDSS: DISPC: Use DISPC's parent device to get context
+>>   lost count
+>>
+>> When enabling a hwmod, omap_hwmod refers to the register mentioned in the
+>> hwmod struct's member 'prcm.omap4.context_offs' to see whether context was
+>> lost or not. It increments the context lost count for the hwmod and then
+>> clears
+>> the register.
+>>
+>> All the DSS hwmods have the same register(RM_DSS_DSS_CONTEXT) as
+>> context_offs.
+>> When DSS is enabled, the first hwmod to be enabled is the "dss_core"
+>> hwmod since
+>> it's the parent platform device. The dss_core hwmod updates it's context
+>> lost
+>> count correctly and clears the register. When the hwmods corresponding
+>> to the
+>> children platform devices are enabled. They see that the register is
+>> clear, and
+>> don't increment their context lost count. Therefore, all the children
+>> platfrom
+>> devices never report a change in context.
+>>
+>> The DISPC driver currently gets the context lost count for DSS from it's
+>> corresponsing platform device instance. The DISPC platform device is one
+>> of the
+>> child devices, and doesn't report the context lost count correctly.
+>>
+>> Make the DISPC driver get the context lost count from it's parent. The
+>> parent
+>> platform device's hwmod is the only one which correctly updates the
+>> context lost
+>> count.
+>>
+>> Signed-off-by: Archit Taneja <archit@ti.com>
+>> ---
+>>   drivers/video/omap2/dss/dispc.c |    4 ++--
+>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/video/omap2/dss/dispc.c
+>> b/drivers/video/omap2/dss/dispc.c
+>> index a5ab354..d9dfc4ad 100644
+>> --- a/drivers/video/omap2/dss/dispc.c
+>> +++ b/drivers/video/omap2/dss/dispc.c
+>> @@ -374,7 +374,7 @@ static void dispc_save_context(void)
+>>       if (dss_has_feature(FEAT_CORE_CLK_DIV))
+>>           SR(DIVISOR);
+>>
+>> -    dispc.ctx_loss_cnt = dss_get_ctx_loss_count(&dispc.pdev->dev);
+>> +    dispc.ctx_loss_cnt = dss_get_ctx_loss_count(dispc.pdev->dev.parent);
+>>       dispc.ctx_valid = true;
+>>
+>>       DSSDBG("context saved, ctx_loss_count %d\n", dispc.ctx_loss_cnt);
+>> @@ -389,7 +389,7 @@ static void dispc_restore_context(void)
+>>       if (!dispc.ctx_valid)
+>>           return;
+>>
+>> -    ctx = dss_get_ctx_loss_count(&dispc.pdev->dev);
+>> +    ctx = dss_get_ctx_loss_count(dispc.pdev->dev.parent);
+>>
+>>       if (ctx >= 0 && ctx == dispc.ctx_loss_cnt)
+>>           return;
 >
-> OK, so changes are going to be made to the driver, right?
+> Hmm, well this feels like a hack. DISPC driver doesn't know how the DSS
+> modules are arranged, which module belongs to which power domain, etc.
 >
-> I'll drop it then and please resubmit when ready (and tested) after the changes.
+> If it cannot be fixed in the arch code, I guess we could just have
+> dss_get_ctx_loss_count(void) function which always returns the
+> dss_core's ctx loss count, and define that on all the platforms omapdss
+> is used, the dss_core's ctx loss count is the same as ctx loss count for
+> all the dss submodules.
+>
+> I think the above is true for all OMAPs. But it feels like a hack too,
+> but not as bad as the above patch.
 
-Yes, for now this would be the only change i have. I can resend it right now,
-if you can still pick it for 3.8.
+Yes, a function taking in no platform device in dss's core.c would be 
+less hacky. I guess we would need this for now, because a solution in 
+omap_hwmod would be more complex and it may not be ready by the merge 
+window.
 
---
-viresh
+Archit
