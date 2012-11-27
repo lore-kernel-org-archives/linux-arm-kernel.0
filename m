@@ -1,32 +1,22 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 27 Nov 2012 14:04:31 +0530
-Subject: [PATCH 1/1] ARM: OMAP2+: enable devtmpfs and devtmpfs automount
-In-Reply-To: <1353504411-19811-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1353504411-19811-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <50B47B17.2040608@ti.com>
+From: teemu.keskinarkaus@crosscontrol.com (Teemu Keskinarkaus)
+Date: Tue, 27 Nov 2012 08:34:44 +0000
+Subject: Libertas/SDIO(8686) and Freescale mx5
+Message-ID: <E25187DA1B6BED42A600EBDF4CE04518021F9AB9C2@MAIL-UA.ccs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2012 6:56 PM, Javier Martinez Canillas wrote:
-> Since udev-182, udev no longer creates device nodes under /dev
+Hi,
 
-Nit: Looks like this happened from udev-176 onward.
+I did find some Libertas stuff on mailing list archive, but nothing related to my case so here goes.
 
-http://permalink.gmane.org/gmane.linux.hotplug.devel/17230
+We have mx53 based hardware running Linux (2.6.35.3) and there is also Marvel 8686 WLAN-module connected to SDIO.  I've compiled Libertas drivers to Linux and also sd/mmc drivers. 
 
-Whoever is taking the patch can _probably_ fix it up while applying.
+One problem is that system boots from SD-card so if I enable MMC debug there will be lots of debug prints just from SD-card access. 
 
-> and this has to be managed by the kernel devtmpfs filesystem.
-> 
-> This means that a kernel built with the current OMAP2+ config
-> will not boot on a system with a recent udev.
+SD-card is connected on first sd/mmc-interface and the WLAN-module on second. I've added both busses on board config and I can see them via debugfs.  Now when I load the Libertas modules (also the _sdio one) there is no traffic on second mmc-bus. I think I need somehow tie the libertas_sdio to mmc1, but I'm not sure how to do that. This is probably trivial thing, but I couldn't find any documentation about this.  So, does anyone know how to do that?
 
-> Also, it is good to have /dev automatically mounted since some
-> non-initramfs based setups assumes this and don't manually mount it.
+Once I get that working I can start sorting other things. I already have firmware files in place in /lib/firmware/libertas
 
-For curiosity sake, any examples of such setups? I am using fedora 17 on
-DaVinci and that doesn't seem to need it. Anyway, agreed that its better
-to keep it enabled.
+Btw. If mxc_mmc - module is needed, it cannot be loaded since it will give error that symbol mxc_mmc_force_detect is already defined and it's defined in mx_sdhci - driver.
 
-Thanks,
-Sekhar
+-Teemu K.
