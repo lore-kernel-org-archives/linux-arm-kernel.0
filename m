@@ -1,45 +1,88 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Mon, 26 Nov 2012 23:50:27 +0000
-Subject: [PATCH] ARM: implement optimized percpu variable access
-In-Reply-To: <20121126215826.GA21160@jl-vm1.vm.bytemark.co.uk>
-References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
- <20121122113401.GC3113@mudshark.cambridge.arm.com>
- <50B2679F.3070107@gmail.com>
- <20121126111337.GA13312@mudshark.cambridge.arm.com>
- <20121126151534.GA13620@mudshark.cambridge.arm.com>
- <20121126215826.GA21160@jl-vm1.vm.bytemark.co.uk>
-Message-ID: <20121126235027.GB21160@jl-vm1.vm.bytemark.co.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 27 Nov 2012 01:07:28 +0100
+Subject: [PATCH 3/7] sh: pfc: Allow device tree registration
+In-Reply-To: <1353889014-17142-4-git-send-email-horms@verge.net.au>
+References: <1353889014-17142-1-git-send-email-horms@verge.net.au>
+ <1353889014-17142-4-git-send-email-horms@verge.net.au>
+Message-ID: <1528017.UPeIBOTTC7@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jamie Lokier wrote:
-> So how does x86 do it?
+Hi Simon,
+
+On Monday 26 November 2012 09:16:50 Simon Horman wrote:
+> This is a crude mechanism to allow the pfc driver to
+> be registered through device tree. The mofication of this
+> is to provide a way for pfc gpios to be looked up by
+> device tree for devices which use pfc gpios.
 > 
-> After lots of staring at the x86 headers, I think
-> this_read_cpu_stable() is a non-volatile asm which depends only on the
-> address &current_task, which is constant (GCC doesn't know the address
-> is dereferenced), and I can't see how reloading the value after
-> switch_to() (32 or 64 bit versions) is guaranteed, unless the "p" asm
-> is constraint implies something more than "the value is a pointer".
+> More specifically, the motivation is to allow the registration
+> of the card-detect gpio for the Micro-SD SDHI slot of the KZM9G board.
+
+I've just posted v2 of my PCF patches ("SH pin control and GPIO rework with OF 
+support") that include OF support for GPIOs. This patch as well as patch 4/7 
+and the gpio node in patch 7/7 and shouldn't be required anymore.
+
+> Cc: Paul Mundt <lethal@linux-sh.org>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms@verge.net.au>
+> ---
+>  drivers/sh/pfc/gpio.c  |   15 +++++++++++++++
+>  include/linux/sh_pfc.h |    7 +++++++
+>  2 files changed, 22 insertions(+)
 > 
-> I assume I've missed something very subtle, but if not x86 has the
-> same bug/issue as discussed in this thread.
+> diff --git a/drivers/sh/pfc/gpio.c b/drivers/sh/pfc/gpio.c
+> index 038fa07..322b927 100644
+> --- a/drivers/sh/pfc/gpio.c
+> +++ b/drivers/sh/pfc/gpio.c
+> @@ -136,6 +136,19 @@ static void sh_pfc_gpio_setup(struct sh_pfc_chip *chip)
+> gc->ngpio = (pfc->last_gpio - pfc->first_gpio) + 1;
+>  }
+> 
+> +#ifdef CONFIG_OF_GPIO
+> +static void
+> +sh_pfc_register_gpiochip_dt(struct sh_pfc *pfc, struct gpio_chip *chip)
+> +{
+> +	chip->of_node = pfc->of_node;
+> +	chip->of_gpio_n_cells = pfc->of_gpio_n_cells;
+> +	chip->of_xlate = pfc->of_xlate;
+> +}
+> +#else
+> +static void sh_pfc_register_gpiochip_dt(struct sh_pfc *pfc,
+> +					struct gpio_chip *chip) {}
+> +#endif
+> +
+>  int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
+>  {
+>  	struct sh_pfc_chip *chip;
+> @@ -153,6 +166,8 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
+>  	if (unlikely(ret < 0))
+>  		kfree(chip);
+> 
+> +	sh_pfc_register_gpiochip_dt(pfc, &chip->gpio_chip);
+> +
+>  	pr_info("%s handling gpio %d -> %d\n",
+>  		pfc->name, pfc->first_gpio, pfc->last_gpio);
+> 
+> diff --git a/include/linux/sh_pfc.h b/include/linux/sh_pfc.h
+> index c19a092..9963370 100644
+> --- a/include/linux/sh_pfc.h
+> +++ b/include/linux/sh_pfc.h
+> @@ -124,6 +124,13 @@ struct sh_pfc {
+>  	struct pfc_window *window;
+> 
+>  	unsigned long unlock_reg;
+> +
+> +#ifdef CONFIG_OF_GPIO
+> +	struct device_node *of_node;
+> +	int of_gpio_n_cells;
+> +	int (*of_xlate)(struct gpio_chip *gc,
+> +		        const struct of_phandle_args *gpiospec, u32 *flags);
+> +#endif
+>  };
+> 
+>  /* XXX compat for now */
+-- 
+Regards,
 
-Well I wasn't thinking too clearly there.
-
-As long as the various scheduler functions don't _care_ that anything
-which calls this_read_cpu_stable() is a function of the current task,
-and hence current stack, it's fine to have them cached on the stack
-and/or in registers across the context switch.
-
-The general rule: When this_cpu... is used for something which is a
-constant function of the current stack (task), not really a function
-of the CPU (that being just an optimisation), this_cpu_read_stable()
-is fine.  When it's for something CPU dependent, non-caching
-this_cpu... is needed.  Not caching the per-CPU variable address isn't
-special to context switching.  It's unsafe to cache the address in any
-preemptible context, and across anything which may call schedule().
-
-Groovy.
-
--- Jamie
+Laurent Pinchart
