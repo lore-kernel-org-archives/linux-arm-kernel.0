@@ -1,62 +1,31 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Tue, 27 Nov 2012 06:24:03 +0000
-Subject: [PATCH v3 03/10] ARM: OMAP: AM33xx hwmod: Add parent-child
- relationship for PWM subsystem
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC4D5C7@DBDE01.ent.ti.com>
-References: <1353387831-31538-1-git-send-email-avinashphilip@ti.com>
- <1353387831-31538-4-git-send-email-avinashphilip@ti.com>
- <518397C60809E147AF5323E0420B992E3E9EEA8C@DBDE01.ent.ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EC4C0FA@DBDE01.ent.ti.com>
- <50B33043.2020700@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EC4D5C7@DBDE01.ent.ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3E9EFFAC@DBDE01.ent.ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 27 Nov 2012 06:43:13 +0000
+Subject: [PATCH] ARM: SAMSUNG: Fix build of I2S driver
+In-Reply-To: <15c501cdcc36$db54cb00$91fe6100$%kim@samsung.com>
+References: <1353944420-3972-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <15c501cdcc36$db54cb00$91fe6100$%kim@samsung.com>
+Message-ID: <20121127064313.GV9411@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 16:37:36, Bedia, Vaibhav wrote:
-> Hi Benoit,
-> 
-> On Mon, Nov 26, 2012 at 14:32:59, Cousson, Benoit wrote:
-> > Hi Vaibhav,
-> > 
-> > On 11/26/2012 06:19 AM, Bedia, Vaibhav wrote:
-> > > On Fri, Nov 23, 2012 at 16:36:06, Philip, Avinash wrote:
-> > >> On Tue, Nov 20, 2012 at 10:33:44, Philip, Avinash wrote:
-> > >>> As part of PWM subsystem integration, PWM subsystem are sharing
-> > >>> resources like clock across submodules (ECAP, EQEP & EHRPWM).
-> > >>> To handle resource sharing & IP integration
-> > >>> 1. Rework on parent child relation between PWMSS and
-> > >>>    ECAP, EQEP & EHRPWM child devices to support runtime PM.
-> > >>> 2. Add support for opt_clks in EHRPWM HWMOD entry to handle additional
-> > >>>    clock gating from control module.
-> > >>> 3. Add HWMOD entries for EQEP PWM submodule.
-> > >>>
-> > >>
-> > >> Is there any review on this patch?
-> > >> This patch depends on ECAP & EHRPWM to work in am335x.
-> > > 
-> > > First of all, I think you should break up this patch as per the 3 points
-> > > that you mentioned above.
+On Tue, Nov 27, 2012 at 09:33:43AM +0900, Kukjin Kim wrote:
 
-I will split the patches into 2.
-1. One for correcting hwmod entries  plus adding EQEP HWMOD entry
-2. Adding parent child relation in hwmod entry.
+> I checked Samsung audio driver stuff just now. If you don't mind, I will
+> drop the patch 48a2050d ("ARM: SAMSUNG: Delete the unnecessary variable")
+> instead of applying this.
 
-> > > 
-> > > The usage of opt_clks for this does not look right to me. Based on your
-> > > description this clock is necessary and not optional on AM335x and on 
-> > > Davinci platforms this clock does not exist.
-> 
-> I checked the DA830 TRM and looks like TBCLK for eHRPWM is an always on clock
-> there. So, the only difference in AM335x is an additional enable bit.
-> 
-> Instead of adding this as opt_clk in hwmod, we could add an always on clock node
-> in Davinci clock data and have the driver always do a clk_enable() on the tbclk
-> as part of the probe sequence. On AM335x, with the right clock node this will enable
-> the clock in hardware and on DA830 it turns into a NOP. This way we can avoid adding
-> the opt_clk entry in hwmod of eHRPWM.
+That works just as well for me, thanks.  Padma, as I said in the commit
+log this should be done as part of a single patch series rather than
+sending separately to ARM or ASoC so that both trees continue to build
+at each point.
 
-I will remove opt_clk in HWMOD and made tbclk is a mandatory clock in EHRPWM driver.
+> If any unprepared patches for Samsung audio in my tree, please let me know.
 
-Thanks
-Avinash
+Will do.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121127/5cc18e82/attachment.sig>
