@@ -1,30 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Nov 2012 08:38:29 +0000
-Subject: linux-next: manual merge of the arm-soc tree with the battery tree
-In-Reply-To: <20121127155223.849e73a08fc1b382d4622ff8@canb.auug.org.au>
-References: <20121127155223.849e73a08fc1b382d4622ff8@canb.auug.org.au>
-Message-ID: <201211270838.29360.arnd@arndb.de>
+From: Claudio.Fontana@huawei.com (Claudio Fontana)
+Date: Tue, 27 Nov 2012 09:39:13 +0100
+Subject: [PATCH 0/1 RESEND 2] ARM: plat-versatile: move secondary CPU startup
+ out of .init.
+Message-ID: <50B47C31.2040709@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 November 2012, Stephen Rothwell wrote:
 
->   
->  -config AB8500_BATTERY_THERM_ON_BATCTRL
->  -	bool "Thermistor connected on BATCTRL ADC"
->  -	depends on AB8500_BM
->  -	help
->  -	  Say Y to enable battery temperature measurements using
->  -	  thermistor connected on BATCTRL ADC.
->  -
-> + source "drivers/power/reset/Kconfig"
-> + 
->   endif # POWER_SUPPLY
->   
->   source "drivers/power/avs/Kconfig"
-> 
+Hello,
 
+I am implementing virtual CPU hotplug for the the ARM Cortex A-15 VExpress motherboard.
+This is mainly a QEMU feature, which allows dynamically changing the number
+of CPUs in the guest.
 
-Looks good, thanks!
+I stumbled upon a limitation in the kernel support for plat-versatile,
+which contains the secondary CPU startup code for the VExpress.
 
-	Arnd
+Basically, the secondary CPU startup code is preceded by the macro __INIT,
+which causes the code to be freed in free_initmem() during kernel_init().
+
+This means that any attempt at hot-booting CPUs in the guest results in
+VCPUs jumping to a memory address that was freed, after which the VCPU
+behaves erratically, as can be expected.
+
+With this patch applied, we use __CPUINIT instead of __INIT, so that
+the right thing happens:
+under CONFIG_HOTPLUG_CPU, the secondary CPU startup code is not freed,
+the secondary VCPUs start successfully, and it's all gardens and blue skies.
+
+Tested successfully using the ARM fast models for the Cortex-A15.
+
+--
+Claudio Fontana (1):
+  ARM: plat-versatile: move secondary CPU startup code out of .init.
+
+ arch/arm/plat-versatile/headsmp.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+-- 
+1.7.12.1
