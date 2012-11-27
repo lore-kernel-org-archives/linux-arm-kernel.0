@@ -1,19 +1,40 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 27 Nov 2012 10:23:21 +0530
-Subject: [PATCH] cpufreq: SPEAr: Add CPUFreq driver
-In-Reply-To: <20121127051649.GC27305@S2100-06.ap.freescale.net>
-References: <7ec0e3f4b81b70f3def4257e6b9781efd4c7a3d2.1353785862.git.viresh.kumar@linaro.org>
- <20121127040135.GB27305@S2100-06.ap.freescale.net>
- <CAKohpomSAogQVeBQ8HaWwwoTVCsMha5d_1Wid6N3t5SnVZTc=w@mail.gmail.com>
- <20121127051649.GC27305@S2100-06.ap.freescale.net>
-Message-ID: <CAKohpo=jY62tTPZWJhP=BYLe2qZ3C-tY9MG6Ho+6fExavwwv=Q@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 27 Nov 2012 15:57:32 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the usb tree
+Message-ID: <20121127155732.c3422fdbf62501ee134024d7@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 November 2012 10:46, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Shouldn't it also be handled by cpu clock provider?
+Hi all,
 
-Not really sure.
+Today's linux-next merge of the arm-soc tree got a conflict in drivers/usb/host/ehci-orion.c between commit 41ac7b3ab7fe ("usb: remove use of __devinit") from the usb tree and commit 77dae54ab385 ("ARM: Kirkwood: ehci-orion: Add device tree binding") from the arm-soc tree.
 
---
-viresh
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/usb/host/ehci-orion.c
+index f74794c,e7e8275..0000000
+--- a/drivers/usb/host/ehci-orion.c
++++ b/drivers/usb/host/ehci-orion.c
+@@@ -167,7 -184,9 +170,9 @@@ ehci_orion_conf_mbus_windows(struct usb
+  	}
+  }
+  
++ static u64 ehci_orion_dma_mask = DMA_BIT_MASK(32);
++ 
+ -static int __devinit ehci_orion_drv_probe(struct platform_device *pdev)
+ +static int ehci_orion_drv_probe(struct platform_device *pdev)
+  {
+  	struct orion_ehci_data *pd = pdev->dev.platform_data;
+  	const struct mbus_dram_target_info *dram;
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121127/3ca480d8/attachment.sig>
