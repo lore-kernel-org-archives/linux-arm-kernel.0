@@ -1,61 +1,53 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 27 Nov 2012 01:03:56 -0800
-Subject: [PATCH v2] ARM: eukrea_mbimx27-baseboard - use stock
- get_pendown_state() in ads7846
-In-Reply-To: <20121127074209.GL10369@pengutronix.de>
-References: <20121124082529.GA7687@core.coreip.homeip.net>
- <20121127074209.GL10369@pengutronix.de>
-Message-ID: <20121127090356.GA25658@core.coreip.homeip.net>
+From: anton.vorontsov@linaro.org (Anton Vorontsov)
+Date: Tue, 27 Nov 2012 01:05:56 -0800
+Subject: [PATCH 10/10] ARM: FIQ: Get rid of init_FIQ()
+In-Reply-To: <20121123075138.GA2136@lizard>
+References: <20121123003849.GA973@lizard.mcd25758.sjc.wayport.net>
+ <1353652071.755665772@f76.mail.ru> <20121123065002.GB27827@lizard>
+ <1353656161.911816605@f287.mail.ru> <20121123075138.GA2136@lizard>
+Message-ID: <20121127090553.GA12289@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default implementation matches exactly our custom one so we can switch
-to using the default one. As a bonus the driver will take care of setting
-GPIO line for us.
+On Thu, Nov 22, 2012 at 11:51:38PM -0800, Anton Vorontsov wrote:
+> On Fri, Nov 23, 2012 at 11:36:01AM +0400, Alexander Shiyan wrote:
+> [...]
+> > got_no_fiq_insn also not initialized.
+> 
+> It is static, so by definition it is initialized to 0.
+> 
+> > I think as a whole on this issue requires additional comments from Russell
+> > as the author of implementation.
+> > 
+> > PS: In any case, I can reproduce it and check it out if you send me a patchset
+> > to my email as an attachment.
+> 
+> Sent privately.
 
-Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
----
+Andrew, Arnd, just FYI, it works for Alexander.
 
-Adjusted to use IMX_GPIO_NR() macro.
+----- Forwarded message from Alexander Shiyan <shc_work@mail.ru> -----
+Date: Tue, 27 Nov 2012 12:42:50 +0400
+From: Alexander Shiyan <shc_work@mail.ru>
+To: Anton Vorontsov <anton.vorontsov@linaro.org>
+Subject: Re[2]: FIQ
 
- arch/arm/mach-imx/eukrea_mbimx27-baseboard.c |   19 +------------------
- 1 file changed, 1 insertion(+), 18 deletions(-)
+> Hello Alexander,
+> 
+> On Tue, Nov 27, 2012 at 12:14:28PM +0400, Alexander Shiyan wrote:
+> > Sorry, I lost the original message to the correct answer.
+> > Today I had a test of removal init_FIQ.
+> > The test took place on a custom board with a custom ARM CLPS711X OSS audio
+> > driver, which uses the FIQ interrupts. Everything works fine.
+> 
+> Nice! Thanks a lot for testing!
+> 
+> Can you please reply to the original thread, with the
+> 
+> 	Tested-by: Alexander Shiyan <shc_work@mail.ru>
+> ?
+> 
+> This will help pushing the series forward, plus will give you a credit for
+> your efforts.
 
-diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-index 98aef57..f361143 100644
---- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-+++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-@@ -238,24 +238,8 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
- 
--#define ADS7846_PENDOWN (GPIO_PORTD | 25)
--
--static void __maybe_unused ads7846_dev_init(void)
--{
--	if (gpio_request(ADS7846_PENDOWN, "ADS7846 pendown") < 0) {
--		printk(KERN_ERR "can't get ads7846 pen down GPIO\n");
--		return;
--	}
--	gpio_direction_input(ADS7846_PENDOWN);
--}
--
--static int ads7846_get_pendown_state(void)
--{
--	return !gpio_get_value(ADS7846_PENDOWN);
--}
--
- static struct ads7846_platform_data ads7846_config __initdata = {
--	.get_pendown_state	= ads7846_get_pendown_state,
-+	.gpio_pendown		= IMX_GPIO_NR(4, 25),
- 	.keep_vref_on		= 1,
- };
- 
-@@ -323,7 +307,6 @@ void __init eukrea_mbimx27_baseboard_init(void)
- 	|| defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
- 	/* ADS7846 Touchscreen controller init */
- 	mxc_gpio_mode(GPIO_PORTD | 25 | GPIO_GPIO | GPIO_IN);
--	ads7846_dev_init();
- #endif
- 
- 	/* SPI_CS0 init */
+I am lost thread in my mailbox, you can just copy/paste my reply and ping for Arnd.
