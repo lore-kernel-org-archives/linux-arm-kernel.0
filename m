@@ -1,38 +1,60 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Tue, 27 Nov 2012 10:06:59 -0800
-Subject: [PATCH] MTD: at91: atmel_nand: return bit flips for the PMECC
- read_page()
-In-Reply-To: <50AD9E8E.7050402@atmel.com>
-References: <1353474863-28430-1-git-send-email-josh.wu@atmel.com>
- <50ACA764.3030002@atmel.com> <50AD9E8E.7050402@atmel.com>
-Message-ID: <50B50143.7080408@newsguy.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 27 Nov 2012 10:15:52 -0800
+Subject: [PATCH 2/6 v5] clk, highbank: Prevent glitches in non-bypass
+ reset mode
+In-Reply-To: <1354028674-23685-3-git-send-email-mark.langsdorf@calxeda.com>
+References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1354028674-23685-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1354028674-23685-3-git-send-email-mark.langsdorf@calxeda.com>
+Message-ID: <CAPtuhTjjTTfXRAf6BAuG0L_NQubcYwCCi6WCBYR9ddtG-koMHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2012 07:39 PM, Josh Wu wrote:
-> Hi, Nicolas
-> 
-> On 11/21/2012 6:05 PM, Nicolas Ferre wrote:
->> On 11/21/2012 06:14 AM, Josh Wu :
->>>
->> Can we have more comment to figure out why it is needed please?
-> 
-> I will add following comment in the commit message in the v2 version.
-> 
-> Since the commit: 3f91e94f7f511de74c0d2abe08672ccdbdd1961c ("mtd: nand:
-> read_page() returns max_bitflips ()")
-> The ecc.read_page() method for nand drivers is changed to return the maximum
-> number of bitflips instead of just returning 0.
-> 
-> And the nand.h is also explain that. I would like to adapt to it.
+On Tue, Nov 27, 2012 at 7:04 AM, Mark Langsdorf
+<mark.langsdorf@calxeda.com> wrote:
+>
+> The highbank clock will glitch with the current code if the
+> clock rate is reset without relocking the PLL. Program the PLL
+> correctly to prevent glitches.
+>
+> Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: mturquette at linaro.org
 
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-This patch avails the atmel_nand device of a change that was merged to the
-kernel mtd code several months ago.  That change fixed a problem where higher
-layers that use the -EUCLEAN return code to make judgements on block wear (e.g.
-ubi) were marking blocks as bad when a normal number of bitflip corrections were
-made.  The problem affected newer nands with greater ecc strength.  See the
-entry on 'bitflip_threshold' in Documentation/ABI/testing/sysfs-class-mtd
-
-Thanks,
+Regards,
 Mike
+
+> ---
+> Changes from v4
+>         None.
+> Changes from v3
+>         Changelog text and patch name now correspond to the actual patch.
+>         was clk, highbank: remove non-bypass reset mode.
+> Changes from v2
+>         None.
+> Changes from v1:
+>         Removed erroneous reformating.
+>
+>  drivers/clk/clk-highbank.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/clk/clk-highbank.c b/drivers/clk/clk-highbank.c
+> index 52fecad..3a0b723 100644
+> --- a/drivers/clk/clk-highbank.c
+> +++ b/drivers/clk/clk-highbank.c
+> @@ -182,8 +182,10 @@ static int clk_pll_set_rate(struct clk_hw *hwclk, unsigned long rate,
+>                 reg |= HB_PLL_EXT_ENA;
+>                 reg &= ~HB_PLL_EXT_BYPASS;
+>         } else {
+> +               writel(reg | HB_PLL_EXT_BYPASS, hbclk->reg);
+>                 reg &= ~HB_PLL_DIVQ_MASK;
+>                 reg |= divq << HB_PLL_DIVQ_SHIFT;
+> +               writel(reg | HB_PLL_EXT_BYPASS, hbclk->reg);
+>         }
+>         writel(reg, hbclk->reg);
+>
+> --
+> 1.7.11.7
+>
