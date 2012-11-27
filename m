@@ -1,48 +1,157 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 27 Nov 2012 17:02:24 -0500 (EST)
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 27 Nov 2012 16:02:58 -0600
 Subject: [PATCH] ARM: implement optimized percpu variable access
-In-Reply-To: <50B525AE.8010001@gmail.com>
+In-Reply-To: <20121127010203.GC21160@jl-vm1.vm.bytemark.co.uk>
 References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
- <alpine.LFD.2.02.1211271157150.4576@xanadu.home> <50B5168A.3080309@gmail.com>
- <50B525AE.8010001@gmail.com>
-Message-ID: <alpine.LFD.2.02.1211271652330.4576@xanadu.home>
+ <20121122113401.GC3113@mudshark.cambridge.arm.com>
+ <50B2679F.3070107@gmail.com>
+ <20121126111337.GA13312@mudshark.cambridge.arm.com>
+ <20121126151534.GA13620@mudshark.cambridge.arm.com>
+ <20121127010203.GC21160@jl-vm1.vm.bytemark.co.uk>
+Message-ID: <50B53892.6070004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Nov 2012, Rob Herring wrote:
-
-> On 11/27/2012 01:37 PM, Rob Herring wrote:
-> > On 11/27/2012 11:19 AM, Nicolas Pitre wrote:
-> >> On Sat, 10 Nov 2012, Rob Herring wrote:
-> >>
-> >>> From: Rob Herring <rob.herring@calxeda.com>
-> >>>
-> >>> Use the previously unused TPIDRPRW register to store percpu offsets.
-> >>> TPIDRPRW is only accessible in PL1, so it can only be used in the kernel.
-> >>>
-> >>> This saves 2 loads for each percpu variable access which should yield
-> >>> improved performance, but the improvement has not been quantified.
-> >>>
-> >>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> >>
-> >> I've just got around to wrap my brain around this patch and the 
-> >> discussion that ensued.
-> >>
-> >> Isn't your patch lacking the preserving and restoring of the TPIDRPRW in 
-> >> the suspend and resume paths.
-> > 
-> > Why yes, you are right. And I noticed the v6 save/restore is missing the
-> > user thread ID for v6K as well. I haven't looked closer, but perhaps it
-> > is never used.
+On 11/26/2012 07:02 PM, Jamie Lokier wrote:
+> Will Deacon wrote:
+>> On Mon, Nov 26, 2012 at 11:13:37AM +0000, Will Deacon wrote:
+>>> On Sun, Nov 25, 2012 at 06:46:55PM +0000, Rob Herring wrote:
+>>>> On 11/22/2012 05:34 AM, Will Deacon wrote:
+>>>>> As an aside, you also need to make the asm block volatile in
+>>>>> __my_cpu_offset -- I can see it being re-ordered before the set for
+>>>>> secondary CPUs otherwise.
+>>>>
+>>>> I don't really see where there would be a re-ordering issue. There's no
+>>>> percpu var access before or near the setting that I can see.
+>>>
+>>> The issue is on bringing up the secondary core, so I assumed that a lot
+>>> of inlining goes on inside secondary_start_kernel and then the result is
+>>> shuffled around, placing a cpu-offset read before we've done the set.
+>>>
+>>> Unfortunately, looking at the disassembly I can't see this happening at
+>>> all, so I'll keep digging. The good news is that I've just reproduced the
+>>> problem on the model, so I've got more visibility now (although both cores
+>>> are just stuck in spinlocks...).
+>>
+>> That was a fun bit of debugging -- my hunch was right,
 > 
-> Moving the setup from secondary_start_kernel to cpu_init will address
-> this. cpu_init is called for both secondary boot and resume of the boot
-> cpu. There is no need to save it, we can just reinitialize.
+> Yes it was.
+> 
+> I'll sum up what I found looking at the x86 version.
 
-Hmmm.  Agree on not having to save it.  However cpu_init is called a bit 
-late in secondary_start_kernel and probably that ought to be moved 
-earlier.  It seems to me that a lot of stuff called prior cpu_init has 
-the potential to use per CPU variables somewhere.
+Thanks for your analysis.
 
+> Brief summary:
+> 
+>    1. Due to preemption, it's not safe to cache per-CPU values within
+>       a function in general.
+>    2. Except, if they are per-thread values (like current and
+>       current_thread_info) that don't depend on the CPU and just use
+>       per-CPU for efficient reading.
+>    3. So, implement separate this_cpu_read_stable() and
+>       this_cpu_read() if you want GCC to cache certain values that are
+>       safe to cache.
+>    4. Use asm volatile, not just an "m" constraint.  I think x86 has a
+>       bug by using just "m" for this_cpu_read().
+> 
+> Long version:
+> 
+>    - It's not really about the code in schedule().  It's about when
+>      context switch can happen.  Which is every instruction in a
+>      preemptible context.
+> 
+>    - this_cpu (and __my_cpu_offset) need to reload the per-CPU offset
+>      each time.  This is because per-CPU offset can change on every
+>      instruction in a preemptible context.
 
-Nicolas
+An access itself is not atomic which means accesses to percpu variables
+can only be with preemption disabled.
+
+If I'm reading the x86 versions of this_cpu_read correctly, they are a
+single instruction and therefore don't need to disable preemption. I
+don't think we could do that on ARM. This also means they don't have a
+barriers around the access (from preempt_enable and preempt_disable)
+like the generic versions do.
+
+> 
+>    - For task-dependent values like current and current_thread_info(),
+>      x86 uses a variant called this_cpu_read_stable().  That is
+>      allowed to be cached by GCC across barrier() and in general.
+> 
+>    - Probably this_cpu_read_stable() ought to be available more
+>      generically across archs
+
+This is probably irrelevant for this discussion. ARM uses the stack
+pointer to get current like x86-32.
+
+>    - That means interaction with barrier(), and with switch_to(),
+>      aren't relevant.  There are two flavours: Safe to cache always,
+>      and safe to cache never.  (If you count !CONFIG_PREEMPT maybe
+>      it's different, but that's tweaking.)
+> 
+>    - x86 __my_cpu_offset does a memory read, using an "m" asm
+>      constraint on a per-CPU variable (this_cpu_off).  This makes it
+>      sensitive to barrier(), and otherwise cache the value.  It's a
+>      nice trick, if it's safe.
+> 
+>    - That seems like a nice trick, allowing some reads to be reused
+>      between instructions.  It can be replicated even on other archs,
+>      using an "m" constraint on a dummy extern variable (no need to
+>      actually read anything!).  But I'm not convinced this isn't a bug
+>      on x86.  Consider this code:
+> 
+> #include <linux/percpu.h>
+> #include <linux/preempt.h>
+> #include <linux/preempt.h>
+> 
+> DEFINE_PER_CPU(int, myvar1) = 0;
+> DEFINE_PER_CPU(int, myvar2) = 0;
+> 
+> static spinlock_t mylock = SPIN_LOCK_UNLOCKED;
+> 
+> int mytest(void)
+> {
+>         long flags;
+>         int x, y, z;
+> 
+>         x = this_cpu_read(myvar1);
+> 
+>         spin_lock_irqsave(&mylock, flags);
+> 
+>         /*
+>          * These two values should be consistent due to irqsave: No
+>          * preemption, no interrupts.  But on x86, GCC can reuse the x
+>          * above for the value of y.  If preemption happened before the
+>          * irqsave, y and z are not consistent.
+>          */
+>         y = this_cpu_read(myvar1);
+>         z = this_cpu_read(myvar2);
+>         spin_unlock_irqrestore(&mylock, flags);
+> 
+>         return y + z;
+> }
+> 
+> I think the optimisation behaviour of this_cpu_read() is unsafe on x86
+> for the reason in the comment above.  I have tested with GCC 4.5.2 on
+> x86-32 and it really does what the comment says.
+
+I find that the first read into x is just discarded. If I include x in y
++ z + x, then the load happens.
+
+I've tried a variety of builds with PREEMPT and !PREEMPT and gcc seems
+to honor the compiler barriers even without an "m" constraint. With
+PREMMPT, I get a load (mrc) for each access. With !PREEMPT, I get a
+single load for all accesses.
+
+Rob
+
+> 
+> Curiously all uses of __this_cpu_ptr() are fine: that asm uses
+> volatile.  I think this_cpu_read() also needs the volatile; but not
+> this_cpu_read_stable().
+> 
+> It's rather subtle and I wouldn't be surprised if I'm mistaken.
+> 
+> Best,
+> -- Jamie
+> 
