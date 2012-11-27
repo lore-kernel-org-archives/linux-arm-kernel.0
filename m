@@ -1,44 +1,20 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 27 Nov 2012 10:58:10 +0100
-Subject: [PATCH 1/1] ARM: OMAP2+: omap2plus_defconfig: enable twl4030
- SoC audio
-In-Reply-To: <1353979275-6237-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1353979275-6237-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <50B48EB2.1040804@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 27 Nov 2012 10:01:43 +0000
+Subject: [Patch v6 4/4] ASoC: at91sam9g20ek-wm8731: convert to dt support
+In-Reply-To: <201211270844.29311.arnd@arndb.de>
+References: <1352887751-21848-1-git-send-email-voice.shen@atmel.com>
+ <201211262123.42812.arnd@arndb.de> <50B42B4B.90407@atmel.com>
+ <201211270844.29311.arnd@arndb.de>
+Message-ID: <20121127100143.GA6028@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2012 02:21 AM, Javier Martinez Canillas wrote:
-> Many TI OMAP SoC based boards that uses twl4030 as codec have
-> been updated to use the unified audio driver (omap-twl4030)
-> since they have similar audio setup.
-> 
-> So, is good to have it built to add audio support to these boards.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+On Tue, Nov 27, 2012 at 08:44:29AM +0000, Arnd Bergmann wrote:
 
-I also agree that it is a good practice to enable this in the defconfig.
+> I think I'm missing context here. What's holding this up? It looks like it should
+> have been merged before 531f67e41d, possibly into both arm-soc and asoc.
 
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-
-> ---
->  arch/arm/configs/omap2plus_defconfig |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> index 7c6cbdf..022212c 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -172,6 +172,7 @@ CONFIG_SND_DEBUG=y
->  CONFIG_SND_USB_AUDIO=m
->  CONFIG_SND_SOC=m
->  CONFIG_SND_OMAP_SOC=m
-> +CONFIG_SND_OMAP_SOC_OMAP_TWL4030=m
->  CONFIG_SND_OMAP_SOC_OMAP3_PANDORA=m
->  CONFIG_USB=y
->  CONFIG_USB_DEBUG=y
-> 
-
-
--- 
-P?ter
+Jean-Christophe was very insistent that the pinctrl stuff got added and
+I'd expect he'd be applying the code as he's maintaining that branch (it
+doesn't apply in ASoC due to other dependencies) but I've not seen any
+response from him since the code was posted.
