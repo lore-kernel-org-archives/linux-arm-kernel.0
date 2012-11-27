@@ -1,92 +1,16 @@
 From: mark.langsdorf@calxeda.com (Mark Langsdorf)
-Date: Tue, 27 Nov 2012 14:04:27 -0600
-Subject: [PATCH 1/6 v6] arm: use devicetree to get smp_twd clock
-In-Reply-To: <1354046672-7392-1-git-send-email-mark.langsdorf@calxeda.com>
+Date: Tue, 27 Nov 2012 14:04:26 -0600
+Subject: [PATCH 0/6 v6] cpufreq: add support for Calxeda ECX-1000 (highbank)
+In-Reply-To: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
 References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1354046672-7392-1-git-send-email-mark.langsdorf@calxeda.com>
-Message-ID: <1354046672-7392-2-git-send-email-mark.langsdorf@calxeda.com>
+Message-ID: <1354046672-7392-1-git-send-email-mark.langsdorf@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+This patch series adds cpufreq support for the Calxeda
+ECX-1000 (highbank) SoCs. The driver is based on the 
+cpufreq-cpu0 driver. Because of the unique way that 
+highbank uses the EnergyCore Management Engine to manage
+voltages, it was not possible to use the cpufreq-cpu0 driver.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
----
-Changes from v4, v5
-        None.
-Changes from v3
-        No longer setting *clk to NULL in twd_get_clock().
-Changes from v2
-        Turned the check for the node pointer into an if-then-else statement.
-        Removed the second, redundant clk_get_rate.
-Changes from v1
-        None.
-
- arch/arm/kernel/smp_twd.c | 19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index b22d700..af46b80 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -237,12 +237,15 @@ static irqreturn_t twd_handler(int irq, void *dev_id)
- 	return IRQ_NONE;
- }
- 
--static struct clk *twd_get_clock(void)
-+static struct clk *twd_get_clock(struct device_node *np)
- {
- 	struct clk *clk;
- 	int err;
- 
--	clk = clk_get_sys("smp_twd", NULL);
-+	if (np)
-+		clk = of_clk_get(np, 0);
-+	else
-+		clk = clk_get_sys("smp_twd", NULL);
- 	if (IS_ERR(clk)) {
- 		pr_err("smp_twd: clock not found: %d\n", (int)PTR_ERR(clk));
- 		return clk;
-@@ -263,6 +266,7 @@ static struct clk *twd_get_clock(void)
- 		return ERR_PTR(err);
- 	}
- 
-+	twd_timer_rate = clk_get_rate(clk);
- 	return clk;
- }
- 
-@@ -273,12 +277,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- {
- 	struct clock_event_device **this_cpu_clk;
- 
--	if (!twd_clk)
--		twd_clk = twd_get_clock();
--
--	if (!IS_ERR_OR_NULL(twd_clk))
--		twd_timer_rate = clk_get_rate(twd_clk);
--	else
-+	if (IS_ERR_OR_NULL(twd_clk))
- 		twd_calibrate_rate();
- 
- 	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
-@@ -349,6 +348,8 @@ int __init twd_local_timer_register(struct twd_local_timer *tlt)
- 	if (!twd_base)
- 		return -ENOMEM;
- 
-+	twd_clk = twd_get_clock(NULL);
-+
- 	return twd_local_timer_common_register();
- }
- 
-@@ -383,6 +384,8 @@ void __init twd_local_timer_of_register(void)
- 		goto out;
- 	}
- 
-+	twd_clk = twd_get_clock(np);
-+
- 	err = twd_local_timer_common_register();
- 
- out:
--- 
-1.7.11.7
+--Mark Langsdorf
