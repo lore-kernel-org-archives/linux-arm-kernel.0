@@ -1,40 +1,39 @@
-From: elen.song@atmel.com (Elen Song)
-Date: Tue, 27 Nov 2012 10:39:46 +0800
-Subject: [question] some question about the residue
-In-Reply-To: <20121126104027.GD19440@n2100.arm.linux.org.uk>
-References: <1353912197-16616-1-git-send-email-elen.song@atmel.com>
- <1353912597.7077.67.camel@vkoul-udesk3> <50B31BCE.6020100@atmel.com>
- <20121126102200.GB19440@n2100.arm.linux.org.uk> <50B34668.1090402@atmel.com>
- <20121126104027.GD19440@n2100.arm.linux.org.uk>
-Message-ID: <50B427F2.30204@atmel.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 27 Nov 2012 11:45:46 +0900
+Subject: [PATCH] Update ARM/SHMOBILE section of MAINTAINERS
+Message-ID: <1353984346-25463-1-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-26 18:40, Russell King - ARM Linux wrote:
-> On Mon, Nov 26, 2012 at 06:37:28PM +0800, Elen Song wrote:
->> So residue actually means current active descriptor remain, it should
-> No, not the current active descriptor - the transfer identified by the
-> cookie, and only that transfer.
-Hi Russell King:
+From: Simon Horman <horms+renesas@verge.net.au>
 
-     Thank you for your explanations.
-     Here I got an example, perhaps you can help me figure out if it is 
-correct.
+I have been handling maintenance of shmobile
+for a little over a release-cycle now and it seems
+to appropriate to update the MAINTAINERS file accordingly.
 
-//allocate a cyclic transfer with 2 descriptors, a cookie identify 
-current transfer.
-desc = dmaengine_prep_dma_cyclic(chan,
-                                 sg_dma_address,
-                                 sg_dma_len,
-                                 sg_dma_len/2,
-                                 DMA_DEV_TO_MEM);
-cookie= dmaengine_submit(desc);
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ MAINTAINERS |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-//if transfer in progress, state.residue is current transfer 
-remain(sg_dma_len remain), not current descriptor remain(sg_dma_len/2 
-remain).
-device_tx_status(chan,cookie, &state);
-
-     Is it right?
-
-Best Regards
+diff --git a/MAINTAINERS b/MAINTAINERS
+index e73060f..056200c 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1114,12 +1114,12 @@ S:	Maintained
+ F:	drivers/media/platform/s5p-tv/
+ 
+ ARM/SHMOBILE ARM ARCHITECTURE
+-M:	Paul Mundt <lethal@linux-sh.org>
++M:	Simon Horman <horms@verge.net.au>
+ M:	Magnus Damm <magnus.damm@gmail.com>
+ L:	linux-sh at vger.kernel.org
+ W:	http://oss.renesas.com
+ Q:	http://patchwork.kernel.org/project/linux-sh/list/
+-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/lethal/sh-2.6.git rmobile-latest
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git next
+ S:	Supported
+ F:	arch/arm/mach-shmobile/
+ F:	drivers/sh/
+-- 
+1.7.10.4
