@@ -1,88 +1,39 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 27 Nov 2012 10:37:43 -0500
-Subject: [GIT PULL 5/5] ARM: mvebu: changes for v3.8
-In-Reply-To: <CADx9zJDCvHwKRQF77UJ8O==LOsyTb=dW7b4N3Wzu+Z6=k5oh+w@mail.gmail.com>
-References: <E1Tc82J-0001T0-7f@merlin.infradead.org>
- <CADx9zJDCvHwKRQF77UJ8O==LOsyTb=dW7b4N3Wzu+Z6=k5oh+w@mail.gmail.com>
-Message-ID: <20121127153743.GJ15800@titan.lakedaemon.net>
+Date: Tue, 27 Nov 2012 15:56:01 +0000
+Subject: [GIT PULL] ARM: mvebu: cache-l2x0 for v3.8
+Message-ID: <mailman.14.1354031767.1035.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2012 at 04:01:58PM +0100, Gregory CLEMENT wrote:
-> 2012/11/24 Jason Cooper <jason@lakedaemon.net>:
-> > The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
-> >
-> >   Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.infradead.org/users/jcooper/linux.git tags/mvebu_everything_for_3.8
-> >
-> > for you to fetch changes up to 56580bb422e5f542da19c057f348dd39634138e7:
-> >
-> >   Merge branch 'mvebu-misc-fixes' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything (2012-11-24 04:08:49 +0000)
-> >
-> > ----------------------------------------------------------------
-> >
-> > mvebu everything for v3.8
-> >  - due to the complex interdependencies of the received pull requests
-> >    I decided to keep this in one branch the way they recommended merging it
-> >  - this was their first attempt at doing pull requests, we'll work on it
-> >    with them
-> >
-> >  - added SMP support for mvebu SoCs
-> >  - added coherency fabric
-> >  - added mdio and mvneta drivers
-> >  - added mirabox board
-> >  - added openblocks ax3-4 board
-> >  - clock fixes and improvements
-> >  - converted mv_xor driver to devicetree (extensive series in itself)
-> >
-> > merge conflicts with orion/*
-> >  - arch/arm/mach-kirkwood/Kconfig
-> >     - select everything
-> >  - arch/arm/mach-kirkwood/board-dt.c
-> >     - remove AUXDATA
-> >     - keep all of_machine_is_compatible()
-> >     - use of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL)
-> >
-> > ----------------------------------------------------------------
-> > Andrew Lunn (3):
-> >       ARM: Kirkwood: switch to DT clock providers
-> >       dma: mv_xor: Add a device_control function
-> >       arm: kirkwood: Convert XOR instantiation to DT.
-> >
-> > Gregory CLEMENT (17):
-> >       arm: mvebu: support for the Globalscale Mirabox board
-> >       clk: mvebu: add armada-370-xp CPU specific clocks
-> >       clk: mvebu: armada 370/XP add clock gating control provider for DT
-> >       clk: armada-370-xp: add support for clock framework
-> >       clocksource: convert time-armada-370-xp to clk framework
-> >       arm: mvebu: increase atomic coherent pool size for armada 370/XP
-> >       arm: mvebu: SATA support: SoC-level DT data for Armada 370/XP
-> >       arm: mvebu: SATA support: mvebu_defconfig update
-> >       arm: mvebu: SATA support: board-level DT data for Armada 370/XP boards
-> >       arm: mvebu: Add support for coherency fabric in mach-mvebu
-> >       arm: mvebu: Add initial support for power managmement service unit
-> >       arm: mvebu: Add IPI support via doorbells
-> >       arm: mm: Add support for PJ4B cpu and init routines
-> >       arm: mvebu: Add SMP support for Armada XP
-> >       arm: dma mapping: Export a dma ops function arm_dma_set_mask
-> >       arm: plat-orion: Add coherency attribute when setup mbus target
-> >       arm: mvebu: Add hardware I/O Coherency support
-> 
-> Hello Jason,
-> 
-> I have just realized that you seems to have forgot to add the 3
-> patches related to L2 cache support. It is strange because it was part
-> of you branch mvebu/boards.
-> 
-> Did I miss something?
+The following changes since commit 56580bb422e5f542da19c057f348dd39634138e7:
 
-No, I followed the email Thomas and you sent to a fault ;-).  It appears
-those three patches weren't among your pull requests.  I'll have a pull
-request up shortly.  Sorry for the confusion.
+  Merge branch 'mvebu-misc-fixes' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything (2012-11-24 04:08:49 +0000)
 
-thx,
+are available in the git repository at:
 
-Jason.
+
+  git://git.infradead.org/users/jcooper/linux.git tags/mvebu_cache_l2x0_for_3.8
+
+for you to fetch changes up to 3ee11aef75db51c69cb8cb91dd01afb28036f1b5:
+
+  arm: l2x0: add aurora related properties to OF binding (2012-11-27 15:35:43 +0000)
+
+----------------------------------------------------------------
+mvebu cache-l2x0 for v3.8
+
+ - Add support for l2x0 cache on mvebu boards
+
+ - Depends on mvebu/everything
+
+----------------------------------------------------------------
+Gregory CLEMENT (3):
+      arm: mvebu: add L2 cache support
+      arm: mvebu: add Aurora L2 Cache Controller to the DT
+      arm: l2x0: add aurora related properties to OF binding
+
+ Documentation/devicetree/bindings/arm/l2cc.txt | 9 +++++++++
+ arch/arm/boot/dts/armada-370.dtsi              | 6 ++++++
+ arch/arm/boot/dts/armada-xp.dtsi               | 7 +++++++
+ arch/arm/mach-mvebu/Kconfig                    | 1 +
+ arch/arm/mach-mvebu/irq-armada-370-xp.c        | 4 ++++
+ 5 files changed, 27 insertions(+)
