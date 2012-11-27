@@ -1,98 +1,39 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Tue, 27 Nov 2012 14:18:11 +0530
-Subject: [PATCH v5 06/12] ARM: AM33XX: clk: Add clock node for EHRPWM TBCLK
-In-Reply-To: <1354006097-25895-1-git-send-email-avinashphilip@ti.com>
-References: <1354006097-25895-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <1354006097-25895-7-git-send-email-avinashphilip@ti.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 27 Nov 2012 14:20:25 +0530
+Subject: [PATCH] ARM: Exynos: Remove unused non-dt support for dwmci
+ controller
+In-Reply-To: <001301cdcc5c$3e87b0f0$bb9712d0$%jun@samsung.com>
+References: <1353914155-1716-1-git-send-email-thomas.abraham@linaro.org>
+ <001301cdcc5c$3e87b0f0$bb9712d0$%jun@samsung.com>
+Message-ID: <CAJuYYwT+p3PdALE8uHQ9hszbYBxnjg-joZZtU3_gmDfjG4FL=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-EHRPWM module requires explicit clock gating of TBCLK from control
-module. Hence add TBCLK clock node in clock tree for EHRPWM modules.
+On 27 November 2012 10:31, Seungwon Jeon <tgih.jun@samsung.com> wrote:
+> On Monday, November 26, 2012, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+>> With device tree support enabled for dwmci controller, the unused non-dt support
+>> for dwmci controller can be removed.
+>>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>>  arch/arm/mach-exynos/Makefile             |    1 -
+>>  arch/arm/mach-exynos/dev-dwmci.c          |   75 -----------------------------
+>>  arch/arm/mach-exynos/include/mach/dwmci.h |   20 --------
+>>  3 files changed, 0 insertions(+), 96 deletions(-)
+>>  delete mode 100644 arch/arm/mach-exynos/dev-dwmci.c
+>>  delete mode 100644 arch/arm/mach-exynos/include/mach/dwmci.h
+>
+> Hi Thomas,
+>
+> The following parts are remained. Also, no used code.
+> Could you check it?
+>
+> ./plat-samsung/include/plat/devs.h:126:extern struct platform_device exynos4_device_dwmci;
+> ./Kconfig:111:config EXYNOS4_DEV_DWMCI
 
-Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
----
-Changes since v4:
-	- Add dev_id field in clcok tree for TBCLK to remove support
-	  for optional HWMOD clock support for EHRPWM.
+Hi Seungwon,
 
- arch/arm/mach-omap2/clock33xx_data.c |   37 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/control.h        |    8 +++++++
- 2 files changed, 45 insertions(+), 0 deletions(-)
+Yes, I have missed that. Thanks for pointing this out. I will take care of this.
 
-diff --git a/arch/arm/mach-omap2/clock33xx_data.c b/arch/arm/mach-omap2/clock33xx_data.c
-index 1a45d6b..d08cd9a 100644
---- a/arch/arm/mach-omap2/clock33xx_data.c
-+++ b/arch/arm/mach-omap2/clock33xx_data.c
-@@ -996,6 +996,40 @@ static struct clk wdt1_fck = {
- };
- 
- /*
-+ * PWMSS Time based module clock node. This node is
-+ * requred to enable clock gating for EHRPWM TBCLK.
-+ */
-+static struct clk ehrpwm0_tbclk = {
-+	.name		= "ehrpwm0_tbclk",
-+	.clkdm_name	= "l4ls_clkdm",
-+	.enable_reg	= AM33XX_CTRL_REGADDR(AM33XX_PWMSS_TBCLK_CLKCTRL),
-+	.enable_bit	= AM33XX_PWMSS0_TBCLKEN_SHIFT,
-+	.ops		= &clkops_omap2_dflt,
-+	.parent		= &l4ls_gclk,
-+	.recalc		= &followparent_recalc,
-+};
-+
-+static struct clk ehrpwm1_tbclk = {
-+	.name		= "ehrpwm1_tbclk",
-+	.clkdm_name	= "l4ls_clkdm",
-+	.enable_reg	= AM33XX_CTRL_REGADDR(AM33XX_PWMSS_TBCLK_CLKCTRL),
-+	.enable_bit	= AM33XX_PWMSS1_TBCLKEN_SHIFT,
-+	.ops		= &clkops_omap2_dflt,
-+	.parent		= &l4ls_gclk,
-+	.recalc		= &followparent_recalc,
-+};
-+
-+static struct clk ehrpwm2_tbclk = {
-+	.name		= "ehrpwm2_tbclk",
-+	.clkdm_name	= "l4ls_clkdm",
-+	.enable_reg	= AM33XX_CTRL_REGADDR(AM33XX_PWMSS_TBCLK_CLKCTRL),
-+	.enable_bit	= AM33XX_PWMSS2_TBCLKEN_SHIFT,
-+	.ops		= &clkops_omap2_dflt,
-+	.parent		= &l4ls_gclk,
-+	.recalc		= &followparent_recalc,
-+};
-+
-+/*
-  * clkdev
-  */
- static struct omap_clk am33xx_clks[] = {
-@@ -1075,6 +1109,9 @@ static struct omap_clk am33xx_clks[] = {
- 	CLK(NULL,	"clkout2_ck",		&clkout2_ck,	CK_AM33XX),
- 	CLK(NULL,	"timer_32k_ck",		&clkdiv32k_ick,	CK_AM33XX),
- 	CLK(NULL,	"timer_sys_ck",		&sys_clkin_ck,	CK_AM33XX),
-+	CLK("48300200.ehrpwm",	"tbclk",	&ehrpwm0_tbclk,	CK_AM33XX),
-+	CLK("48302200.ehrpwm",	"tbclk",	&ehrpwm1_tbclk,	CK_AM33XX),
-+	CLK("48304200.ehrpwm",	"tbclk",	&ehrpwm2_tbclk,	CK_AM33XX),
- };
- 
- int __init am33xx_clk_init(void)
-diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
-index a89e825..c0e34e6 100644
---- a/arch/arm/mach-omap2/control.h
-+++ b/arch/arm/mach-omap2/control.h
-@@ -357,6 +357,14 @@
- #define AM33XX_CONTROL_STATUS_SYSBOOT1_WIDTH		0x2
- #define AM33XX_CONTROL_STATUS_SYSBOOT1_MASK		(0x3 << 22)
- 
-+/* AM33XX PWMSS Control register */
-+#define AM33XX_PWMSS_TBCLK_CLKCTRL			0x664
-+
-+/* AM33XX  PWMSS Control bitfields */
-+#define AM33XX_PWMSS0_TBCLKEN_SHIFT			0
-+#define AM33XX_PWMSS1_TBCLKEN_SHIFT			1
-+#define AM33XX_PWMSS2_TBCLKEN_SHIFT			2
-+
- /* CONTROL OMAP STATUS register to identify OMAP3 features */
- #define OMAP3_CONTROL_OMAP_STATUS	0x044c
- 
--- 
-1.7.0.4
+Thanks,
+Thomas.
