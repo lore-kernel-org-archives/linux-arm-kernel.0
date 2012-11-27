@@ -1,90 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 27 Nov 2012 13:13:10 +0000
-Subject: [PATCH 3/3] Input: bu21013_ts - Add support for Device Tree booting
-In-Reply-To: <1354021990-16978-1-git-send-email-lee.jones@linaro.org>
-References: <1354021990-16978-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1354021990-16978-4-git-send-email-lee.jones@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 27 Nov 2012 13:17:42 +0000
+Subject: [PATCH] ARM: implement optimized percpu variable access
+In-Reply-To: <50B3A74F.20602@gmail.com>
+References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
+ <20121122113401.GC3113@mudshark.cambridge.arm.com>
+ <50B2679F.3070107@gmail.com>
+ <20121126111337.GA13312@mudshark.cambridge.arm.com>
+ <20121126151534.GA13620@mudshark.cambridge.arm.com>
+ <50B3A74F.20602@gmail.com>
+Message-ID: <20121127131742.GB16122@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we can register the BU21013_ts touch screen when booting with
-Device Tree enabled. Here we parse all the necessary components
-previously expected to be passed from platform data.
+On Mon, Nov 26, 2012 at 05:30:55PM +0000, Rob Herring wrote:
+> On 11/26/2012 09:15 AM, Will Deacon wrote:
+> > The problem here is that, because our CPU accessors don't actually make any
+> > memory references, the barrier() has no effect and the old value is just
+> > reloaded off the stack:
+> > 
+> >   c02c1f22:       f54a fe49       bl      c000cbb8 <__switch_to>
+> >   c02c1f26:       4601            mov     r1, r0
+> >   c02c1f28:       68f8            ldr     r0, [r7, #12]
+> >   c02c1f2a:       f56f ffd5       bl      c0031ed8 <finish_task_switch>
+> > 
+> > which obviously causes complete chaos if the new task has been pulled from
+> > a different runqueue! (this appears as a double spin unlock on rq->lock).
+> > 
+> > Fixing this without giving up the performance improvement we gain by *avoiding*
+> > the memory access in the first place is going to be tricky...
+> 
+> What compiler and config are you using? I get a reload of the register here:
+> 
+> c0350fba:       f001 fa9d       bl      c03524f8 <__switch_to>
+> c0350fbe:       4601            mov     r1, r0
+> c0350fc0:       ee1d 0f90       mrc     15, 0, r0, cr13, cr0, {4}
+> c0350fc4:       4c2a            ldr     r4, [pc, #168]  ; (c0351070
+> <__schedule+0x390>)
+> c0350fc6:       f649 1590       movw    r5, #39312      ; 0x9990
+> c0350fca:       1900            adds    r0, r0, r4
+> c0350fcc:       f2cc 0556       movt    r5, #49238      ; 0xc056
+> c0350fd0:       f4e7 fd56       bl      c0038a80 <finish_task_switch>
 
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: linux-input at vger.kernel.org
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/input/touchscreen/bu21013_ts.c |   36 ++++++++++++++++++++++++++++----
- 1 file changed, 32 insertions(+), 4 deletions(-)
+I tried both Linaro 12.07 and 12.10 GCC builds, although the problem would
+only occur if I did a make clean and then a fresh build on top of that.
+Just building the relavant object files didn't seem to tickle the problem.
 
-diff --git a/drivers/input/touchscreen/bu21013_ts.c b/drivers/input/touchscreen/bu21013_ts.c
-index 8982bea..dbbd1f8 100644
---- a/drivers/input/touchscreen/bu21013_ts.c
-+++ b/drivers/input/touchscreen/bu21013_ts.c
-@@ -15,6 +15,8 @@
- #include <linux/regulator/consumer.h>
- #include <linux/module.h>
- #include <linux/gpio.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
- 
- #define PEN_DOWN_INTR	0
- #define MAX_FINGERS	2
-@@ -454,13 +456,30 @@ static void bu21013_cs_disable(struct bu21013_ts_data *bu21013_data)
-  * This function used to initializes the i2c-client touchscreen
-  * driver and returns integer.
-  */
-+static void __devinit bu21013_of_probe(struct device_node *np,
-+				       struct bu21013_platform_device *pdata)
-+{
-+	pdata->y_flip = pdata->x_flip = false;
-+
-+	pdata->x_flip = of_property_read_bool(np, "rohm,flip-x");
-+	pdata->y_flip = of_property_read_bool(np, "rohm,flip-y");
-+
-+	of_property_read_u32(np, "rohm,touch-max-x", &pdata->touch_x_max);
-+	of_property_read_u32(np, "rohm,touch-max-y", &pdata->touch_y_max);
-+
-+	pdata->touch_pin = of_get_named_gpio(np, "touch-gpio", 0);
-+	pdata->cs_pin = of_get_named_gpio(np, "reset-gpio", 0);
-+
-+	pdata->ext_clk = false;
-+}
-+
- static int __devinit bu21013_probe(struct i2c_client *client,
- 				   const struct i2c_device_id *id)
- {
- 	struct bu21013_ts_data *bu21013_data;
- 	struct input_dev *in_dev;
--	const struct bu21013_platform_device *pdata =
--					client->dev.platform_data;
-+	struct device_node *np = client->dev.of_node;
-+	struct bu21013_platform_device *pdata = client->dev.platform_data;
- 	int error;
- 
- 	if (!i2c_check_functionality(client->adapter,
-@@ -470,8 +489,17 @@ static int __devinit bu21013_probe(struct i2c_client *client,
- 	}
- 
- 	if (!pdata) {
--		dev_err(&client->dev, "platform data not defined\n");
--		return -EINVAL;
-+		if (np) {
-+			pdata = devm_kzalloc(&client->dev, sizeof(*pdata),
-+					GFP_KERNEL);
-+			if (!pdata)
-+				return -ENOMEM;
-+
-+			bu21013_of_probe(np, pdata);
-+		} else {
-+			dev_err(&client->dev, "no device tree or platform data\n");
-+			return -EINVAL;
-+		}
- 	}
- 
- 	if (!gpio_is_valid(pdata->touch_pin)) {
--- 
-1.7.9.5
+I can mail you my .config if you like?
+
+Will
