@@ -1,44 +1,42 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 28 Nov 2012 08:31:19 +0900
-Subject: [PATCH] ARM: S3C64XX: Add dummy supplies for Glenfarclas LDOs
-In-Reply-To: <1354030486-26742-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1354030486-26742-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <50B54D47.1040301@samsung.com>
+Date: Wed, 28 Nov 2012 08:31:30 +0900
+Subject: [PATCH] ARM: Exynos: Remove unused non-dt support for dwmci
+ controller
+In-Reply-To: <CAJuYYwT+p3PdALE8uHQ9hszbYBxnjg-joZZtU3_gmDfjG4FL=g@mail.gmail.com>
+References: <1353914155-1716-1-git-send-email-thomas.abraham@linaro.org>	<001301cdcc5c$3e87b0f0$bb9712d0$%jun@samsung.com>
+ <CAJuYYwT+p3PdALE8uHQ9hszbYBxnjg-joZZtU3_gmDfjG4FL=g@mail.gmail.com>
+Message-ID: <50B54D52.8070209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/12 00:34, Mark Brown wrote:
-> These are not actually connected but it saves them going through probe
-> deferral.
+On 11/27/12 17:50, Thomas Abraham wrote:
+> On 27 November 2012 10:31, Seungwon Jeon<tgih.jun@samsung.com>  wrote:
+>> On Monday, November 26, 2012, Thomas Abraham<thomas.abraham@linaro.org>  wrote:
+>>> With device tree support enabled for dwmci controller, the unused non-dt support
+>>> for dwmci controller can be removed.
+>>>
+>>> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
+>>> ---
+>>>   arch/arm/mach-exynos/Makefile             |    1 -
+>>>   arch/arm/mach-exynos/dev-dwmci.c          |   75 -----------------------------
+>>>   arch/arm/mach-exynos/include/mach/dwmci.h |   20 --------
+>>>   3 files changed, 0 insertions(+), 96 deletions(-)
+>>>   delete mode 100644 arch/arm/mach-exynos/dev-dwmci.c
+>>>   delete mode 100644 arch/arm/mach-exynos/include/mach/dwmci.h
+>>
+>> Hi Thomas,
+>>
+>> The following parts are remained. Also, no used code.
+>> Could you check it?
+>>
+>> ./plat-samsung/include/plat/devs.h:126:extern struct platform_device exynos4_device_dwmci;
+>> ./Kconfig:111:config EXYNOS4_DEV_DWMCI
 >
-> Signed-off-by: Mark Brown<broonie@opensource.wolfsonmicro.com>
-> ---
->   arch/arm/mach-s3c64xx/mach-crag6410.c |   10 ++++++++++
->   1 file changed, 10 insertions(+)
+> Hi Seungwon,
 >
-> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> index c06bcfa..701f421 100644
-> --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> @@ -333,6 +333,16 @@ static struct regulator_consumer_supply wallvdd_consumers[] = {
->   	REGULATOR_SUPPLY("DC1VDD", "1-0034"),
->   	REGULATOR_SUPPLY("DC2VDD", "1-0034"),
->   	REGULATOR_SUPPLY("DC3VDD", "1-0034"),
-> +	REGULATOR_SUPPLY("LDO1VDD", "1-0034"),
-> +	REGULATOR_SUPPLY("LDO2VDD", "1-0034"),
-> +	REGULATOR_SUPPLY("LDO4VDD", "1-0034"),
-> +	REGULATOR_SUPPLY("LDO5VDD", "1-0034"),
-> +	REGULATOR_SUPPLY("LDO6VDD", "1-0034"),
-> +	REGULATOR_SUPPLY("LDO7VDD", "1-0034"),
-> +	REGULATOR_SUPPLY("LDO8VDD", "1-0034"),
-> +	REGULATOR_SUPPLY("LDO9VDD", "1-0034"),
-> +	REGULATOR_SUPPLY("LDO10VDD", "1-0034"),
-> +	REGULATOR_SUPPLY("LDO11VDD", "1-0034"),
->   };
+> Yes, I have missed that. Thanks for pointing this out. I will take care of this.
 >
->   static struct regulator_init_data wallvdd_data = {
-
-Applied, thanks.
+I amended the commit as per Seungwon's pointing out.
 
 Thanks.
 
