@@ -1,48 +1,41 @@
 From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Tue, 27 Nov 2012 17:16:58 +0100
-Subject: [PATCH v4 3/6] usb: chipidea: usbmisc: fix a potential race condition
-In-Reply-To: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
-References: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1354033021-10585-4-git-send-email-m.grzeschik@pengutronix.de>
+Date: Tue, 27 Nov 2012 17:16:55 +0100
+Subject: [PATCH v4 0/6] support other fsl SoCs with usbmisc + small fixes
+Message-ID: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Kleine-Budde <mkl@pengutronix.de>
+Nearly every SoC from Freescale has this non-core usb registers. This series
+adds support for more users of this driver.
 
-This fixes a potential race condition where the ci13xxx_imx glue code
-could be fast enough to call one of the usbmisc_ops before he got a
-valid value on the static usbmisc pointer. To fix that we first set
-usbmisc, then call usbmisc_set_ops().
+This series is based on Peter Chen's work. Its needed to merge his master branch
+before applying this series:
 
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
----
-Changes since v1:
-* split previous patch into two seperate.
+https://github.com/hzpeterchen/linux-usb.git
 
- drivers/usb/chipidea/usbmisc_imx.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Changes since v3:
+* removed [PATCH v3 5/7] usb: chipidea: usbmisc: add support for ahb, ipg and per clock
 
-diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-index 552c63f..9145e04 100644
---- a/drivers/usb/chipidea/usbmisc_imx.c
-+++ b/drivers/usb/chipidea/usbmisc_imx.c
-@@ -116,14 +116,14 @@ static int __devinit usbmisc_imx_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	usbmisc = data;
- 	ret = usbmisc_set_ops(&imx6q_usbmisc_ops);
- 	if (ret) {
-+		usbmisc = NULL;
- 		clk_disable_unprepare(data->clk);
- 		return ret;
- 	}
- 
--	usbmisc = data;
--
- 	return 0;
- }
- 
+
+Marc Kleine-Budde (3):
+  usb: chipidea: usbmisc: unset global varibale usbmisc on driver remove
+  usb: chipidea: usbmisc: fix a potential race condition
+  usb: chipidea: usbmisc: prepare driver to handle more than one soc
+
+Michael Grzeschik (3):
+  usb: chipidea: usbmisc: rename file, struct and functions to usbmisc_imx
+  usb: chipidea: usbmisc: add mx53 support
+  usb: chipidea: usbmisc: add post handling and errata fix for mx25
+
+ .../devicetree/bindings/usb/ci13xxx-imx.txt        |    2 +
+ drivers/usb/chipidea/Makefile                      |    2 +-
+ drivers/usb/chipidea/ci13xxx_imx.c                 |   12 +
+ drivers/usb/chipidea/ci13xxx_imx.h                 |    3 +
+ drivers/usb/chipidea/usbmisc_imx.c                 |  252 ++++++++++++++++++++
+ drivers/usb/chipidea/usbmisc_imx6q.c               |  162 -------------
+ 6 files changed, 270 insertions(+), 163 deletions(-)
+ create mode 100644 drivers/usb/chipidea/usbmisc_imx.c
+ delete mode 100644 drivers/usb/chipidea/usbmisc_imx6q.c
+
 -- 
 1.7.10.4
