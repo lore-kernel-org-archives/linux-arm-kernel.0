@@ -1,51 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 27 Nov 2012 09:03:38 +0000
-Subject: [GIT PULL] ST-Ericsson Device Tree patches
-In-Reply-To: <201211261749.17958.arnd@arndb.de>
-References: <20121120162836.GE28265@gmail.com>
- <20121126160755.GD6824@gmail.com>
- <201211261749.17958.arnd@arndb.de>
-Message-ID: <20121127090338.GD7897@gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 27 Nov 2012 01:03:56 -0800
+Subject: [PATCH v2] ARM: eukrea_mbimx27-baseboard - use stock
+ get_pendown_state() in ads7846
+In-Reply-To: <20121127074209.GL10369@pengutronix.de>
+References: <20121124082529.GA7687@core.coreip.homeip.net>
+ <20121127074209.GL10369@pengutronix.de>
+Message-ID: <20121127090356.GA25658@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Nov 2012, Arnd Bergmann wrote:
+The default implementation matches exactly our custom one so we can switch
+to using the default one. As a bonus the driver will take care of setting
+GPIO line for us.
 
-> On Monday 26 November 2012, Lee Jones wrote:
-> > Arnd, Olof,
-> > 
-> > The previous pull request had some duplicate patches in, which have now been
-> > removed. Please remove the previous branch and replace it with this one.
-> > 
-> 
-> Hi Lee,
-> 
-> There are quite a number of patches that got merged into next/dt after your
-> series. If there are just a few duplicate patches, I would prefer to leave
-> it there rather than replace and redo the merges on top, which has the
-> potential of creating other history confusion if someone based another branch
-> on top of next/dt without telling us.
+Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+---
 
-I'll give you the information and leave the decision up to you.
+Adjusted to use IMX_GPIO_NR() macro.
 
-> If you still think we should replace that branch, please be more specific
-> about what patches are affected.
+ arch/arm/mach-imx/eukrea_mbimx27-baseboard.c |   19 +------------------
+ 1 file changed, 1 insertion(+), 18 deletions(-)
 
-/* Patches that appear twice */
-$ git log --format=%s v3.7-rc3..arm-soc/ux500/dt | sort | uniq -c | sort -r
- 2 ARM: ux500: Move regulator-name properties out to board DTS files
- 2 ARM: ux500: Enable SDI4 port on the u9540 when booting with Device Tree
- 2 ARM: ux500: Enable all MMC devices on the u9540 when booting with DT
- 2 ARM: ux500: Add UART support to the u9540 Device Tree
- 2 ARM: ux500: Add skeleton DTS file for the u9540
- 2 ARM: ux500: Add SDI (MMC) support to the HREF Device Tree
-<snip>
-
-Instead of cocking up your tree, would you like me to send another pull-
-request containing reverts for the second appearance of these patches?
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+index 98aef57..f361143 100644
+--- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+@@ -238,24 +238,8 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+ 
+-#define ADS7846_PENDOWN (GPIO_PORTD | 25)
+-
+-static void __maybe_unused ads7846_dev_init(void)
+-{
+-	if (gpio_request(ADS7846_PENDOWN, "ADS7846 pendown") < 0) {
+-		printk(KERN_ERR "can't get ads7846 pen down GPIO\n");
+-		return;
+-	}
+-	gpio_direction_input(ADS7846_PENDOWN);
+-}
+-
+-static int ads7846_get_pendown_state(void)
+-{
+-	return !gpio_get_value(ADS7846_PENDOWN);
+-}
+-
+ static struct ads7846_platform_data ads7846_config __initdata = {
+-	.get_pendown_state	= ads7846_get_pendown_state,
++	.gpio_pendown		= IMX_GPIO_NR(4, 25),
+ 	.keep_vref_on		= 1,
+ };
+ 
+@@ -323,7 +307,6 @@ void __init eukrea_mbimx27_baseboard_init(void)
+ 	|| defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
+ 	/* ADS7846 Touchscreen controller init */
+ 	mxc_gpio_mode(GPIO_PORTD | 25 | GPIO_GPIO | GPIO_IN);
+-	ads7846_dev_init();
+ #endif
+ 
+ 	/* SPI_CS0 init */
