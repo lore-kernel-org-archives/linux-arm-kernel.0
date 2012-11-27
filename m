@@ -1,75 +1,37 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Tue, 27 Nov 2012 14:18:16 +0530
-Subject: [PATCH v5 11/12] ARM: dts: AM33XX: Add PWM backlight DT data to
- am335x-evm
-In-Reply-To: <1354006097-25895-1-git-send-email-avinashphilip@ti.com>
-References: <1354006097-25895-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <1354006097-25895-12-git-send-email-avinashphilip@ti.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 27 Nov 2012 14:24:00 +0530
+Subject: [PATCH v4 00/12] clk: exynos4: migrate to common clock framework
+In-Reply-To: <20121126193116.21126.66261@nucleus>
+References: <1353791885-2566-1-git-send-email-thomas.abraham@linaro.org>
+ <20121126193116.21126.66261@nucleus>
+Message-ID: <CAJuYYwRMRUzijeTKiMcy5P3qV-OHW1wwGq3FiZ_fpf+Tcs+pKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PWM output from ecap0 uses as backlight source. Also adds low threshold
-value to have a uniform divisions in brightness-levels scales.
+On 27 November 2012 01:01, Mike Turquette <mturquette@ti.com> wrote:
+> Quoting Thomas Abraham (2012-11-24 13:17:53)
+>> Changes since v3:
+>> - Includes changes suggested by Tomasz Figa <tomasz.figa@gmail.com>
+>>
+>
+> Hi Thomas,
+>
+> 3.7-rc7 is out and I do not wish to take any large changes this close to
+> the merge window opening up.  I will review these patches and give any
+> feedback now on the common clk bits, but merging in the
+> drivers/clk/samsung parts would have to wait until after clk-next is
+> rebased onto 3.8-rc.
+>
+> Which tree do you want to merge this through?  Samsung or clk-next?
+> Will you split the patches or take it all once you have gathered ACKs?
 
-Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
-Reviewed-by: Thierry Reding <thierry.reding@avionic-design.de>
----
-Changes since v4:
-	- Replaced usage of tab with space in compatible field
+Hi Mike,
 
-Changes since v3:
-	- Add epwmss parent status="okay" field.
+Ok. 3.8-rc should be fine. Since there are other Samsung platforms
+being also converted over to common clock, I feel this could go
+through the Samsung tree your ack. And there are lot of platform
+specific bits that are touched, so it is easier to get it merged into
+Samsung tree.
 
- arch/arm/boot/dts/am335x-evm.dts |   23 +++++++++++++++++++++++
- 1 files changed, 23 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 9f65f17..73a035b 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -44,6 +44,12 @@
- 				0x154 0x27	/* spi0_d0.gpio0_3, INPUT | MODE7 */
- 			>;
- 		};
-+
-+		ecap0_pins: backlight_pins {
-+			pinctrl-single,pins = <
-+				0x164 0x0	/* eCAP0_in_PWM0_out.eCAP0_in_PWM0_out MODE0 */
-+			>;
-+		};
- 	};
- 
- 	ocp {
-@@ -102,6 +108,16 @@
- 				reg = <0x48>;
- 			};
- 		};
-+
-+		epwmss0: epwmss at 48300000 {
-+			status = "okay";
-+
-+			ecap0: ecap at 48300100 {
-+				status = "okay";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&ecap0_pins>;
-+			};
-+		};
- 	};
- 
- 	vbat: fixedregulator at 0 {
-@@ -158,6 +174,13 @@
- 			gpio-key,wakeup;
- 		};
- 	};
-+
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&ecap0 0 50000 0>;
-+		brightness-levels = <0 51 53 56 62 75 101 152 255>;
-+		default-brightness-level = <8>;
-+	};
- };
- 
- /include/ "tps65910.dtsi"
--- 
-1.7.0.4
+Thanks,
+Thomas.
