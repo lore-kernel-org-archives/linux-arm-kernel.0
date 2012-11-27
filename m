@@ -1,116 +1,88 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 27 Nov 2012 16:37:32 +0100
-Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
-In-Reply-To: <50B4D9E9.8070607@ti.com>
-References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
- <6982060.HfOokt4dIn@avalon> <50B4D9E9.8070607@ti.com>
-Message-ID: <3136860.Z3VvKjeKpU@avalon>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 27 Nov 2012 10:37:43 -0500
+Subject: [GIT PULL 5/5] ARM: mvebu: changes for v3.8
+In-Reply-To: <CADx9zJDCvHwKRQF77UJ8O==LOsyTb=dW7b4N3Wzu+Z6=k5oh+w@mail.gmail.com>
+References: <E1Tc82J-0001T0-7f@merlin.infradead.org>
+ <CADx9zJDCvHwKRQF77UJ8O==LOsyTb=dW7b4N3Wzu+Z6=k5oh+w@mail.gmail.com>
+Message-ID: <20121127153743.GJ15800@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
-
-On Tuesday 27 November 2012 17:19:05 Tomi Valkeinen wrote:
-> On 2012-11-27 17:08, Laurent Pinchart wrote:
-> > On Wednesday 21 November 2012 14:04:17 Tomi Valkeinen wrote:
-> >> On 2012-11-21 13:40, Thierry Reding wrote:
-> > [snip]
-> > 
-> >>> One thing that's not very clear is how the backlight subsystem should be
-> >>> wired up with the display framework. I have a patch on top of the Tegra
-> >>> DRM driver which adds some ad-hoc display support using this power
-> >>> sequences series and the pwm-backlight.
-> >> 
-> >> I think that's a separate issue: how to associate the lcd device and
-> >> backlight device together. I don't have a clear answer to this.
-> >> 
-> >> There are many ways the backlight may be handled. In some cases the
-> >> panel and the backlight are truly independent, and you can use the other
-> >> without using the other (not very practical, though =).
-> > 
-> > From a control point of view that's always the case for DPI panels (as
-> > those panels have no control bus, the backlight control bus is by
-> > definition separate) and is the case for the two DBI panels I've seen
-> > (but I won't claim that's a significative number of panels).
+On Tue, Nov 27, 2012 at 04:01:58PM +0100, Gregory CLEMENT wrote:
+> 2012/11/24 Jason Cooper <jason@lakedaemon.net>:
+> > The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
+> >
+> >   Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
+> >
+> > are available in the git repository at:
+> >
+> >   git://git.infradead.org/users/jcooper/linux.git tags/mvebu_everything_for_3.8
+> >
+> > for you to fetch changes up to 56580bb422e5f542da19c057f348dd39634138e7:
+> >
+> >   Merge branch 'mvebu-misc-fixes' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything (2012-11-24 04:08:49 +0000)
+> >
+> > ----------------------------------------------------------------
+> >
+> > mvebu everything for v3.8
+> >  - due to the complex interdependencies of the received pull requests
+> >    I decided to keep this in one branch the way they recommended merging it
+> >  - this was their first attempt at doing pull requests, we'll work on it
+> >    with them
+> >
+> >  - added SMP support for mvebu SoCs
+> >  - added coherency fabric
+> >  - added mdio and mvneta drivers
+> >  - added mirabox board
+> >  - added openblocks ax3-4 board
+> >  - clock fixes and improvements
+> >  - converted mv_xor driver to devicetree (extensive series in itself)
+> >
+> > merge conflicts with orion/*
+> >  - arch/arm/mach-kirkwood/Kconfig
+> >     - select everything
+> >  - arch/arm/mach-kirkwood/board-dt.c
+> >     - remove AUXDATA
+> >     - keep all of_machine_is_compatible()
+> >     - use of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL)
+> >
+> > ----------------------------------------------------------------
+> > Andrew Lunn (3):
+> >       ARM: Kirkwood: switch to DT clock providers
+> >       dma: mv_xor: Add a device_control function
+> >       arm: kirkwood: Convert XOR instantiation to DT.
+> >
+> > Gregory CLEMENT (17):
+> >       arm: mvebu: support for the Globalscale Mirabox board
+> >       clk: mvebu: add armada-370-xp CPU specific clocks
+> >       clk: mvebu: armada 370/XP add clock gating control provider for DT
+> >       clk: armada-370-xp: add support for clock framework
+> >       clocksource: convert time-armada-370-xp to clk framework
+> >       arm: mvebu: increase atomic coherent pool size for armada 370/XP
+> >       arm: mvebu: SATA support: SoC-level DT data for Armada 370/XP
+> >       arm: mvebu: SATA support: mvebu_defconfig update
+> >       arm: mvebu: SATA support: board-level DT data for Armada 370/XP boards
+> >       arm: mvebu: Add support for coherency fabric in mach-mvebu
+> >       arm: mvebu: Add initial support for power managmement service unit
+> >       arm: mvebu: Add IPI support via doorbells
+> >       arm: mm: Add support for PJ4B cpu and init routines
+> >       arm: mvebu: Add SMP support for Armada XP
+> >       arm: dma mapping: Export a dma ops function arm_dma_set_mask
+> >       arm: plat-orion: Add coherency attribute when setup mbus target
+> >       arm: mvebu: Add hardware I/O Coherency support
 > 
-> They may have a control bus, I2C, SPI, etc. In some cases that can be
-> used to control the backlight. But yes, it's separate from the video bus.
+> Hello Jason,
 > 
-> >> But then with some LCDs the backlight may be controlled by sending
-> >> commands to the panel, and in this case the two may be quite linked.
-> >> Changing the backlight requires the panel driver to be up and running,
-> >> and sometimes the sending the backlight commands may need to be (say, DSI
-> >> display, with backlight commands going over the DSI bus).
-> > 
-> > When you write "sending commands to the panel", do you mean on the same
-> > control bus that the panel use ? Or would that also include for instance
-> > an I2C backlight controller integrated inside a DSI panel module ? In the
-> > later
->
-> I mean the same control bus that is used to control the panel, be it shared
-> with video bus like DSI, or separate like I2C.
+> I have just realized that you seems to have forgot to add the 3
+> patches related to L2 cache support. It is strange because it was part
+> of you branch mvebu/boards.
 > 
-> > case there might still be dependencies between the panel controller and
-> > the backlight controller (let's say for instance that the panel controller
-> > has a DSI-controller GPIO wired to the backlight controller reset signal),
-> > but in practice I don't know if that's ever the case.
-> > 
-> >> So my feeling is that the panel driver should know about the related
-> >> backlight device. In the first case the panel driver would just call
-> >> enable/disable in the backlight device when the panel is turned on.
-> > 
-> > That makes sense. Unless I'm mistaken a backlight is always associated
-> > with a panel (it would be called a light if there was no panel in front
-> > of it). We can thus expose backlight operations in the panel CDF
-> > (in-kernel) API. The panel driver would need a way to retrieve a pointer
-> > to the associated backlight device.
-> 
-> I agree.
-> 
-> >> In the second case of the DSI panel... I'm not sure. I've implemented it
-> >> so that the panel driver creates the backlight device, and implements
-> >> the backlight callbacks. It then sends the DSI commands from those
-> >> callbacks.
-> > 
-> > If we decide to make the panel expose backlight operations we could get
-> > rid of the backlight device in this case.
-> 
-> Do you mean there would be a real backlight device only when there's a
-> totally independent backlight for the panel?
+> Did I miss something?
 
-I'm toying with that idea.
+No, I followed the email Thomas and you sent to a fault ;-).  It appears
+those three patches weren't among your pull requests.  I'll have a pull
+request up shortly.  Sorry for the confusion.
 
-I see two reasons for having backlight devices in the kernel right now.
+thx,
 
-- Integration with the fbdev API to control the backlight automatically on 
-fbdev blank/unblank/suspend/resume. That's something I want to get rid of, 
-backlight should not depend on fbdev. If the backlight in-kernel API is 
-exposed by the panel through CDF operations we won't need this anymore.
-
-- Exposing backlight control to userspace in sysfs. That's quite probably 
-something we want to keep, if only for compatibility reasons. Backlight on/off 
-should be controlled through the display APIs through DPMS control, but we 
-have no way that I'm aware of to control the backlight brightness in the FBDEV 
-and KMS APIs. It might make sense to add a backlight API to KMS for the 
-future.
-
-One possibly crazy idea I had was to replace backlight devices as we know them 
-with LED devices (a LED driver IC shouldn't be supported by different APIs 
-depending on whether the LEDs it drives are used as a backlight or not), and 
-have the panel hook up with the associated LED device to expose backlight 
-operations through the CDF. Panels with a backlight controller tied to the 
-panel controller (control through DSI for instance) would implement the 
-backlight operations directly without instantiating a LED device. This still 
-leaves the question of the userspace backlight brightness API open.
-
--- 
-Regards,
-
-Laurent Pinchart
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121127/a40b44fd/attachment.sig>
+Jason.
