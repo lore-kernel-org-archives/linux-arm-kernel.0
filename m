@@ -1,33 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Nov 2012 12:31:22 +0000
-Subject: [GIT PULL v3] ST-Ericsson Device Tree patches
-In-Reply-To: <20121127111540.GC2013@gmail.com>
-References: <20121120162836.GE28265@gmail.com>
- <20121127111540.GC2013@gmail.com>
-Message-ID: <201211271231.23121.arnd@arndb.de>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 27 Nov 2012 18:01:39 +0530
+Subject: [PATCH] fixup! cpufreq: SPEAr: Add CPUFreq driver
+Message-ID: <2d845c8e19392c2b82a243e6e878ae4e5e771c2f.1353785862.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 November 2012, Lee Jones wrote:
-> The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
-> 
->   Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/ljones/linux-3.0-ux500.git ste-dt-for-next
-> 
-> for you to fetch changes up to e13316d60658aee7987b51025f342649baa33487:
-> 
->   ARM: ux500: Rename dbx500 cpufreq code to be more generic (2012-11-27 10:58:57 +0000)
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+Hi Rafael,
 
-Pulled into next/dt and updated the ux500/dt branch to the latest head. Thanks!
+To make review easier and faster, i am sending incremental patch for SPEAr
+cpufreq driver. This patch was earlier discussed here:
 
-Olof, just to clarify: there are 43 patches listed in the pull request, but there
-are actually just 5 patches that were not there before. As discussed with Lee on
-#linaro-kernel, this fixes a long-standing build error in for-next u8500_defconfig,
-but does not fix the problem of a couple of duplicate patch IDs that still have in
-the ux500/dt branch. I could not come up with a way that would actually improve
-the situation rather than introduce other problems.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/135088.html
 
-	Arnd
+ .../devicetree/bindings/cpufreq/cpufreq-spear.txt  | 33 +++++++++++++++-------
+ drivers/cpufreq/spear-cpufreq.c                    |  4 +--
+ 2 files changed, 25 insertions(+), 12 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-spear.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-spear.txt
+index 4cf2819..f3d44984 100644
+--- a/Documentation/devicetree/bindings/cpufreq/cpufreq-spear.txt
++++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-spear.txt
+@@ -6,7 +6,6 @@ It supports both uniprocessor (UP) and symmetric multiprocessor (SMP) systems
+ which share clock across all CPUs.
+ 
+ Required properties:
+-- compatible: "st,cpufreq-spear"
+ - cpufreq_tbl: Table of frequencies CPU could be transitioned into, in the
+   increasing order.
+ 
+@@ -14,16 +13,30 @@ Optional properties:
+ - clock-latency: Specify the possible maximum transition latency for clock, in
+   unit of nanoseconds.
+ 
++Both required and optional properties listed above must be defined under node
++/cpus/cpu at 0.
++
+ Examples:
+ --------
++cpus {
++
++	<...>
++
++	cpu at 0 {
++		compatible = "arm,cortex-a9";
++		reg = <0>;
++
++		<...>
++
++		cpufreq_tbl = < 166000
++				200000
++				250000
++				300000
++				400000
++				500000
++				600000 >;
++	};
++
++	<...>
+ 
+-cpufreq {
+-	compatible = "st,cpufreq-spear";
+-	cpufreq_tbl = < 166000
+-			200000
+-			250000
+-			300000
+-			400000
+-			500000
+-			600000 >;
+ };
+diff --git a/drivers/cpufreq/spear-cpufreq.c b/drivers/cpufreq/spear-cpufreq.c
+index a7fe880..4575cfe 100644
+--- a/drivers/cpufreq/spear-cpufreq.c
++++ b/drivers/cpufreq/spear-cpufreq.c
+@@ -224,9 +224,9 @@ static int spear_cpufreq_driver_init(void)
+ 	const __be32 *val;
+ 	int cnt, i, ret;
+ 
+-	np = of_find_compatible_node(NULL, NULL, "st,cpufreq-spear");
++	np = of_find_node_by_path("/cpus/cpu at 0");
+ 	if (!np) {
+-		pr_err("No cpufreq node found");
++		pr_err("No cpu node found");
+ 		return -ENODEV;
+ 	}
+ 
+-- 
+1.7.12.rc2.18.g61b472e
