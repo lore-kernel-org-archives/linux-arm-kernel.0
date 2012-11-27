@@ -1,56 +1,38 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 27 Nov 2012 09:33:43 +0900
-Subject: [PATCH] ARM: SAMSUNG: Fix build of I2S driver
-In-Reply-To: <1353944420-3972-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1353944420-3972-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <15c501cdcc36$db54cb00$91fe6100$%kim@samsung.com>
+Date: Tue, 27 Nov 2012 09:35:50 +0900
+Subject: [GIT PULL 1/3] Samsung devel-2 for v3.8
+In-Reply-To: <20121126075323.GF9580@quad.lixom.net>
+References: <10d601cdc91b$1a5e73b0$4f1b5b10$%kim@samsung.com>
+ <20121126075323.GF9580@quad.lixom.net>
+Message-ID: <15c601cdcc37$26aef440$740cdcc0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+Olof Johansson wrote:
 > 
-> Commit 48a2050d36f0da5a7d22e3bd7dbf3bf8a5a538bc (ARM: SAMSUNG: Delete
-> the unnecessary variable) removed the src_clk field from the platform
-> data header for the I2S driver without a corresponding change having
-> been made in the I2S driver to stop using the field, causing build
-> breaks.
+> Hi Kgene,
 > 
-> This change should not be being made independently of removal of the
-> uses of the field since it will cause build failures in any tree where
-> it has been merged but the removals have not been merged.  Currently
-> the removal of the users in the ASoC driver has not been merged.
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  include/linux/platform_data/asoc-s3c.h |    6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/include/linux/platform_data/asoc-s3c.h
-> b/include/linux/platform_data/asoc-s3c.h
-> index 8827259..aa9875f 100644
-> --- a/include/linux/platform_data/asoc-s3c.h
-> +++ b/include/linux/platform_data/asoc-s3c.h
-> @@ -38,6 +38,12 @@ struct samsung_i2s {
->  #define QUIRK_NEED_RSTCLR	(1 << 3)
->  	/* Quirks of the I2S controller */
->  	u32 quirks;
-> +
-> +	/*
-> +	 * Array of clock names that can be used to generate I2S signals.
-> +	 * Also corresponds to clocks of I2SMOD[10]
-> +	 */
-> +	const char **src_clk;
->  	dma_addr_t idma_addr;
->  };
-> 
-> --
-> 1.7.10.4
+Hi :-)
 
-I checked Samsung audio driver stuff just now. If you don't mind, I will
-drop the patch 48a2050d ("ARM: SAMSUNG: Delete the unnecessary variable")
-instead of applying this.
+> On Fri, Nov 23, 2012 at 10:37:30AM +0900, Kukjin Kim wrote:
+> > Hi Arnd, Olof
+> >
+> > Here is second Samsung development patches for v3.8.
+> 
+> Please start sorting your branches more. When someone sends in a large
+> "devel" branch, it doesn't fit our tree organization very well. The
+> branch below contains fixes, new features and cleanups all in one branch.
+> 
+OK, I see and I will sorting it out more carefully.
 
-If any unprepared patches for Samsung audio in my tree, please let me know.
+> > This includes properly enabling PM support and UART3 DEBUG_LL for
+> exynos5
+> > and CAMIF for s3c24xx/s3c64xx.
+> 
+> "Properly enabling PM support" sounds like worthy of a branch on its own,
+> for example.
+> 
+Agreed, I will re-send pull-request tonight.
 
 Thanks.
 
