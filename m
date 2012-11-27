@@ -1,75 +1,92 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 27 Nov 2012 11:53:14 -0800
-Subject: [PATCH] ARM: EXYNOS: Avoid early use of of_machine_is_compatible()
-Message-ID: <1354045994-8977-1-git-send-email-dianders@chromium.org>
+From: mark.langsdorf@calxeda.com (Mark Langsdorf)
+Date: Tue, 27 Nov 2012 14:04:27 -0600
+Subject: [PATCH 1/6 v6] arm: use devicetree to get smp_twd clock
+In-Reply-To: <1354046672-7392-1-git-send-email-mark.langsdorf@calxeda.com>
+References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1354046672-7392-1-git-send-email-mark.langsdorf@calxeda.com>
+Message-ID: <1354046672-7392-2-git-send-email-mark.langsdorf@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recent commit "ARM: EXYNOS: add support for EXYNOS5440 SoC" broke
-support for exynos5250 because of_machine_is_compatible() was used too
-early in the boot process.  It also probably meant that the exynos5440
-failed to use the proper iotable.  Switch to use
-of_flat_dt_is_compatible() in both of these cases.
+From: Rob Herring <rob.herring@calxeda.com>
 
-The failure I was seeing in exynos5250 because of this was:
-  Division by zero in kernel.
-  [<80015ed4>] (unwind_backtrace+0x0/0xec) from [<8045c7a4>] (dump_stack+0x20/0x24)
-  [<8045c7a4>] (dump_stack+0x20/0x24) from [<80012990>] (__div0+0x20/0x28)
-  [<80012990>] (__div0+0x20/0x28) from [<8021ab04>] (Ldiv0_64+0x8/0x18)
-  [<8021ab04>] (Ldiv0_64+0x8/0x18) from [<80068560>] (__clocksource_updatefreq_scale+0x54/0x134)
-  [<80068560>] (__clocksource_updatefreq_scale+0x54/0x134) from [<8006865c>] (__clocksource_register_scale+0x1c/0x54)
-  [<8006865c>] (__clocksource_register_scale+0x1c/0x54) from [<80612a18>] (exynos_timer_init+0x100/0x1e8)
-  [<80612a18>] (exynos_timer_init+0x100/0x1e8) from [<8060d184>] (time_init+0x28/0x38)
-  [<8060d184>] (time_init+0x28/0x38) from [<8060a754>] (start_kernel+0x1e0/0x3c8)
-  [<8060a754>] (start_kernel+0x1e0/0x3c8) from [<40008078>] (0x40008078)
-
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
 ---
- arch/arm/mach-exynos/common.c          |    5 ++++-
- arch/arm/mach-exynos/mach-exynos5-dt.c |    4 +++-
- 2 files changed, 7 insertions(+), 2 deletions(-)
+Changes from v4, v5
+        None.
+Changes from v3
+        No longer setting *clk to NULL in twd_get_clock().
+Changes from v2
+        Turned the check for the node pointer into an if-then-else statement.
+        Removed the second, redundant clk_get_rate.
+Changes from v1
+        None.
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 73b940f..b919f5f 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -18,6 +18,7 @@
- #include <linux/sched.h>
- #include <linux/serial_core.h>
- #include <linux/of.h>
-+#include <linux/of_fdt.h>
- #include <linux/of_irq.h>
- #include <linux/export.h>
- #include <linux/irqdomain.h>
-@@ -335,8 +336,10 @@ void __init exynos_init_late(void)
- 
- void __init exynos_init_io(struct map_desc *mach_desc, int size)
- {
-+	unsigned long root = of_get_flat_dt_root();
-+
- 	/* initialize the io descriptors we need for initialization */
--	if (of_machine_is_compatible("samsung,exynos5440"))
-+	if (of_flat_dt_is_compatible(root, "samsung,exynos5440"))
- 		iotable_init(exynos5440_iodesc, ARRAY_SIZE(exynos5440_iodesc));
- 	else
- 		iotable_init(exynos_iodesc, ARRAY_SIZE(exynos_iodesc));
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index 67fa3c2..7b76c3f 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -122,9 +122,11 @@ static const struct of_dev_auxdata exynos5440_auxdata_lookup[] __initconst = {
- 
- static void __init exynos5_dt_map_io(void)
- {
-+	unsigned long root = of_get_flat_dt_root();
-+
- 	exynos_init_io(NULL, 0);
- 
--	if (of_machine_is_compatible("samsung,exynos5250"))
-+	if (of_flat_dt_is_compatible(root, "samsung,exynos5250"))
- 		s3c24xx_init_clocks(24000000);
+ arch/arm/kernel/smp_twd.c | 19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index b22d700..af46b80 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -237,12 +237,15 @@ static irqreturn_t twd_handler(int irq, void *dev_id)
+ 	return IRQ_NONE;
  }
  
+-static struct clk *twd_get_clock(void)
++static struct clk *twd_get_clock(struct device_node *np)
+ {
+ 	struct clk *clk;
+ 	int err;
+ 
+-	clk = clk_get_sys("smp_twd", NULL);
++	if (np)
++		clk = of_clk_get(np, 0);
++	else
++		clk = clk_get_sys("smp_twd", NULL);
+ 	if (IS_ERR(clk)) {
+ 		pr_err("smp_twd: clock not found: %d\n", (int)PTR_ERR(clk));
+ 		return clk;
+@@ -263,6 +266,7 @@ static struct clk *twd_get_clock(void)
+ 		return ERR_PTR(err);
+ 	}
+ 
++	twd_timer_rate = clk_get_rate(clk);
+ 	return clk;
+ }
+ 
+@@ -273,12 +277,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ {
+ 	struct clock_event_device **this_cpu_clk;
+ 
+-	if (!twd_clk)
+-		twd_clk = twd_get_clock();
+-
+-	if (!IS_ERR_OR_NULL(twd_clk))
+-		twd_timer_rate = clk_get_rate(twd_clk);
+-	else
++	if (IS_ERR_OR_NULL(twd_clk))
+ 		twd_calibrate_rate();
+ 
+ 	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
+@@ -349,6 +348,8 @@ int __init twd_local_timer_register(struct twd_local_timer *tlt)
+ 	if (!twd_base)
+ 		return -ENOMEM;
+ 
++	twd_clk = twd_get_clock(NULL);
++
+ 	return twd_local_timer_common_register();
+ }
+ 
+@@ -383,6 +384,8 @@ void __init twd_local_timer_of_register(void)
+ 		goto out;
+ 	}
+ 
++	twd_clk = twd_get_clock(np);
++
+ 	err = twd_local_timer_common_register();
+ 
+ out:
 -- 
-1.7.7.3
+1.7.11.7
