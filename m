@@ -1,31 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 27 Nov 2012 14:34:07 +0000
-Subject: [PATCH 1/3] Input: bu21013_ts - Request a regulator that
- actually exists
-In-Reply-To: <20121127133404.GA13065@sirena.org.uk>
-References: <1354021990-16978-1-git-send-email-lee.jones@linaro.org>
- <1354021990-16978-2-git-send-email-lee.jones@linaro.org>
- <20121127133404.GA13065@sirena.org.uk>
-Message-ID: <20121127143407.GG2013@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 27 Nov 2012 14:42:42 +0000 (UTC)
+Subject: [PATCH 1/1] net: cpts: fix for build break after ARM SoC
+ integration
+In-Reply-To: <1354012034-31686-1-git-send-email-mugunthanvnm@ti.com>
+References: <1354012034-31686-1-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <alpine.DEB.2.00.1211271442270.20857@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Nov 2012, Mark Brown wrote:
+On Tue, 27 Nov 2012, Mugunthan V N wrote:
 
-> On Tue, Nov 27, 2012 at 01:13:08PM +0000, Lee Jones wrote:
-> > Currently the BU21013 Touch Screen driver requests a regulator by the
-> > name of 'V-TOUCH', which doesn't exist anywhere in the kernel. The
-> > correct name, as referenced in platform regulator code is 'avdd'. Here,
-> > when we request a regulator, we use the correct name instead.
+>   CC      drivers/net/ethernet/ti/cpts.o
+> drivers/net/ethernet/ti/cpts.c:30:24: fatal error: plat/clock.h: No such file or directory
+> compilation terminated.
+> make[4]: *** [drivers/net/ethernet/ti/cpts.o] Error 1
+> make[3]: *** [drivers/net/ethernet/ti] Error 2
+> make[2]: *** [drivers/net/ethernet] Error 2
+> make[1]: *** [drivers/net] Error 2
 > 
-> The regulator should be requested using whatever the name for the supply
-> in the datasheet - AVDD does sound very pluasible but it'd be good to
-> check.
+> fix for build break as the header file is removed from plat-omap as part of
+> the below patch
+> 
+> commit a135eaae524acba1509a3b19c97fae556e4da7cd
+> Author: Paul Walmsley <paul@pwsan.com>
+> Date:   Thu Sep 27 10:33:34 2012 -0600
+> 
+>     ARM: OMAP: remove plat/clock.h
+> 
+>     Remove arch/arm/plat-omap/include/plat/clock.h by merging it into
+>     arch/arm/mach-omap1/clock.h and arch/arm/mach-omap2/clock.h.
+>     The goal here is to facilitate ARM single image kernels by removing
+>     includes via the "plat/" symlink.
+> 
+> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
 
-Right. 'avdd' is correct.
+Acked-by: Paul Walmsley <paul@pwsan.com>
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+
+- Paul
