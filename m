@@ -1,38 +1,44 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 27 Nov 2012 09:35:50 +0900
-Subject: [GIT PULL 1/3] Samsung devel-2 for v3.8
-In-Reply-To: <20121126075323.GF9580@quad.lixom.net>
-References: <10d601cdc91b$1a5e73b0$4f1b5b10$%kim@samsung.com>
- <20121126075323.GF9580@quad.lixom.net>
-Message-ID: <15c601cdcc37$26aef440$740cdcc0$%kim@samsung.com>
+Date: Tue, 27 Nov 2012 09:39:01 +0900
+Subject: [GIT PULL 3/3] Samsung exynos5440 for v3.8
+In-Reply-To: <20121126083232.GH9580@quad.lixom.net>
+References: <10d401cdc91b$09fe1980$1dfa4c80$%kim@samsung.com>
+ <20121126083232.GH9580@quad.lixom.net>
+Message-ID: <15c801cdcc37$984bbb60$c8e33220$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Olof Johansson wrote:
 > 
-> Hi Kgene,
-> 
-Hi :-)
-
-> On Fri, Nov 23, 2012 at 10:37:30AM +0900, Kukjin Kim wrote:
-> > Hi Arnd, Olof
+> On Fri, Nov 23, 2012 at 10:37:03AM +0900, Kukjin Kim wrote:
+> > Arnd, Olof,
 > >
-> > Here is second Samsung development patches for v3.8.
+> > This is adding support for exynos5440, including Quad ARM Cortex-A15
+> cores
+> > and its reference board SSDK5440.
+> >
+> > Note, at this moment, just enabled minimal system part for initial
+> kernel
+> > boot and pinctrl driver.
+> >
+> > Please pull from:
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > next/soc-exynos5440
 > 
-> Please start sorting your branches more. When someone sends in a large
-> "devel" branch, it doesn't fit our tree organization very well. The
-> branch below contains fixes, new features and cleanups all in one branch.
+> Merged. This caused some new conflicts with previous samsung contents,
+> since
+> you add DT contents in several branches, etc. Please try to work on
+> getting
+> your amount of conflicts down a bit.
 > 
-OK, I see and I will sorting it out more carefully.
+Oops could be, it's my fault. Sorry for inconvenience.
 
-> > This includes properly enabling PM support and UART3 DEBUG_LL for
-> exynos5
-> > and CAMIF for s3c24xx/s3c64xx.
+> If you want a good example to look at, see how Tony Lindgren handles OMAP.
+> He's juggling a large number of topics with nearly no conflicts left
+> for us to resolve at our level, by making sure new work is based on
+> appropriate base branches.
 > 
-> "Properly enabling PM support" sounds like worthy of a branch on its own,
-> for example.
-> 
-Agreed, I will re-send pull-request tonight.
+Sure, I will.
 
 Thanks.
 
