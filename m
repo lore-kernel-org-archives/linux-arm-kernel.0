@@ -1,94 +1,288 @@
-From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Tue, 27 Nov 2012 17:16:59 +0100
-Subject: [PATCH v4 4/6] usb: chipidea: usbmisc: prepare driver to handle more
- than one soc
-In-Reply-To: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
-References: <1354033021-10585-1-git-send-email-m.grzeschik@pengutronix.de>
-Message-ID: <1354033021-10585-5-git-send-email-m.grzeschik@pengutronix.de>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Tue, 27 Nov 2012 17:24:55 +0100
+Subject: [RFC 1/2] ARM: S3C24XX: add devicetree support for interrupts
+In-Reply-To: <CAJuYYwTre+cU0mgJExON2-+1fREyL3LgdqJ4NbC8zG+03yxptA@mail.gmail.com>
+References: <201211250145.21226.heiko@sntech.de>
+ <201211261704.09273.heiko@sntech.de>
+ <CAJuYYwTre+cU0mgJExON2-+1fREyL3LgdqJ4NbC8zG+03yxptA@mail.gmail.com>
+Message-ID: <201211271724.55938.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Kleine-Budde <mkl@pengutronix.de>
+Am Dienstag, 27. November 2012, 07:12:52 schrieb Thomas Abraham:
+> On 26 November 2012 21:34, Heiko St?bner <heiko@sntech.de> wrote:
+> > Hi Thomas,
+> > 
+> > Am Montag, 26. November 2012, 16:23:00 schrieb Thomas Abraham:
+> >> On 26 November 2012 17:43, Heiko St?bner <heiko@sntech.de> wrote:
+> >> > Hi Thomas,
+> >> > 
+> >> > Am Montag, 26. November 2012, 12:03:22 schrieb Thomas Abraham:
+> >> >> Hi Heiko,
+> >> >> 
+> >> >> On 25 November 2012 06:17, Heiko St?bner <heiko@sntech.de> wrote:
+> >> >> > This adds devicetree parsing of the controller-data for the
+> >> >> > interrupt controllers on S3C24XX architectures.
+> >> >> > 
+> >> >> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> >> >> > ---
+> >> >> > 
+> >> >> >  .../interrupt-controller/samsung,s3c24xx-irq.txt   |   57 ++++++
+> >> >> >  arch/arm/mach-s3c24xx/common.h                     |    1 +
+> >> >> >  arch/arm/plat-s3c24xx/irq.c                        |  197
+> >> >> >  ++++++++++++++++++++ 3 files changed, 255 insertions(+), 0
+> >> >> >  deletions(-) create mode 100644
+> >> >> >  Documentation/devicetree/bindings/interrupt-controller/samsung,s3c
+> >> >> >  24x x- irq.txt
+> >> >> > 
+> >> >> > diff --git
+> >> >> > a/Documentation/devicetree/bindings/interrupt-controller/samsung,s3
+> >> >> > c24 xx -irq.txt
+> >> >> > b/Documentation/devicetree/bindings/interrupt-controller/samsung,s3
+> >> >> > c24 xx -irq.txt new file mode 100644
+> >> >> > index 0000000..c637637
+> >> >> > --- /dev/null
+> >> >> > +++
+> >> >> > b/Documentation/devicetree/bindings/interrupt-controller/samsung,s3
+> >> >> > c24 xx -irq.txt @@ -0,0 +1,57 @@
+> >> >> > +Samsung S3C24XX Interrupt Controllers
+> >> >> > +
+> >> >> > +The S3C24XX SoCs contain custom set of interrupt controllers
+> >> >> > providing a +varying number of interrupt sources.
+> >> >> > +
+> >> >> > +The set consists of a main- and a sub-controller as well as a
+> >> >> > controller +for the external interrupts and on newer SoCs even a
+> >> >> > second main controller. +
+> >> >> > +The bit-to-interrupt and parent mapping of the controllers is not
+> >> >> > fixed +over all SoCs and therefore must be defined in the
+> >> >> > controller description. +
+> >> >> > +Required properties:
+> >> >> > +- compatible: Compatible property value should be
+> >> >> > "samsung,s3c24xx-irq". +
+> >> >> > +- reg: Physical base address of the controller and length of
+> >> >> > memory mapped +  region.
+> >> >> > +
+> >> >> > +- interrupt-controller : Identifies the node as an interrupt
+> >> >> > controller +- #interrupt-cells : Specifies the number of cells
+> >> >> > needed to encode an +  interrupt source. The value shall be 2.
+> >> >> > +
+> >> >> > +- s3c24xx,irqlist : List of irqtypes found on this controller as
+> >> >> > +  two-value pairs consisting of irqtype and parent-irq
+> >> >> > +
+> >> >> > +  parent-irq is always the list position of the irq in the irqlist
+> >> >> > +  of the parent controller (0..31)
+> >> >> > +
+> >> >> > +  irqtypes are:
+> >> >> > +  - 0 .. none
+> >> >> > +  - 1 .. external interrupts in the main register (GPF0 .. GPF3)
+> >> >> > +  - 2 .. edge irq in the main register
+> >> >> > +  - 3 .. for parent-irqs, that have sub-irqs in child controllers
+> >> >> > +  - 4 .. level irqs in the sub-register
+> >> >> > +  - 5 .. edge irqs in the sub-register
+> >> >> > +  - 6 .. external irqs in the external irq register (starting with
+> >> >> > GPF4) +  - 7 .. irq in the second base irq controller of
+> >> >> > S3C2416/S3C2450 SoCs
+> >> >> 
+> >> >> Instead of defining the type of interrupt controller as above, is it
+> >> >> possible to create multiple device nodes, with each node representing
+> >> >> a type of interrupt controller with a unique compatible string and
+> >> >> corresponding properties. There will be a init function for each type
+> >> >> of interrupt controller. There should be a irq-domain for each of
+> >> >> these different types of interrupt controller. And then, in the
+> >> >> device tree source file, a proper tree like hierarchy of interrupt
+> >> >> controllers can defined (using the interrupt-parent property for each
+> >> >> controller node). The client nodes that generate the interrupt can
+> >> >> specify the parent node and the interrupt number within the parent to
+> >> >> which they generate the interrupt.
+> >> > 
+> >> > I'm not sure I understand yet :-). The list describes the types of
+> >> > interrupts inside the individual controllers.
+> >> > 
+> >> > On all the s3c24xx we have three register sets denoting the main
+> >> > (SRCPND, INTPND, INTMSK), sub (SUBSRCPEND, INTSUBMASK) and extint
+> >> > (EINTPEND, EINTMASK) controllers. The bits of these registers are
+> >> > used for quite different irqs.
+> >> 
+> >> We could consider main, sub and extint as three separate interrupt
+> >> controllers and thus three different nodes in device tree. So the
+> >> interrupt nodes could be something like (referring to 2416 manual).
+> >> 
+> >>      main at 0x4a000000 {
+> >>      
+> >>             compatible = "samsung,s3c2410-main";
+> >>             reg = <0x4a000000 0x100>;
+> >>             interrupt-controller;
+> >>             #interrupt-cells = <2>;
+> >>      
+> >>      };
+> >>      
+> >>      sub at 0x4a001000 {
+> >>      
+> >>             compatible = "samsung,s3c2410-sub";
+> >>             reg = <0x4a001000 0x100>;
+> >>             interrupt-controller;
+> >>             #interrupt-cells = <2>;
+> >>             interrupt-parent = <&main>;
+> >>             interrupts = <28 0>, <23 0>, <.....  /*uart0/uart1/..*/
+> >>      
+> >>      };
+> >>      
+> >>      eint at 0x4a002000 {
+> >>      
+> >>             compatible = "samsung,s3c2410-eint";
+> >>             reg = <0x4a002000 0x100>;
+> >>             interrupt-controller;
+> >>             #interrupt-cells = <2>;
+> >>             interrupt-parent = <&main>;
+> >>             interrupts = <0 0>, <1 0>,
+> >>             
+> >>                               <2 0>, <3 0>,
+> >>                               <4 0>, <5 0>;
+> >>      
+> >>      };
+> >> 
+> >> There should be a corresponding irqchip driver code to handle each of
+> >> these types of controllers. They should have their own irq-domain
+> >> supported.
+> >> 
+> >> Then the client nodes can specify the interrupt parent and interrupt
+> >> number. For example, the uart node would be
+> >> 
+> >>        uart at 50000000 {
+> >>        
+> >>             compatible = "samsung,s3c2410-uart";
+> >>             reg = <0x50000000 0x100>;
+> >>             interrupt-parent = <&sub>;
+> >>             interrupts = <0 0>, <1 0>, <2 0>; /*tx/rx/err*/
+> >>        
+> >>        };
+> >> > 
+> >> > For example is bit 17 of the main register set used as DMA0 on earlier
+> >> > socs while the dma interrupts moved to the subint registers for
+> >> > s3c2443 and later.
+> >> 
+> >> Writing the nodes with the correct interrupt parent and the interrupt
+> >> number should take care of this.
+> >> 
+> >> > So the entries in the irqlist describe the needed handlers for the
+> >> > hwirq bits of the indidual controllers. So in this scheme you set for
+> >> > dt-devices the interrupt parent to the correct register set and the
+> >> > interrupts field then matches the bit of the register, according to
+> >> > the datasheet.
+> >> > 
+> >> > When I changed the basic interrupt handling in the previous set, the
+> >> > changed irq.c can for exmaple be found on [0], I created these lists
+> >> > in the code and soc specific routines to init them for the still
+> >> > valid non-dt case.
+> >> > 
+> >> > But as dt is about describing the hardware, I found the current
+> >> > solution nice, because will I only need exactly one dt-init-function
+> >> > for all s3c24xx-socs, instead of representing all the slight
+> >> > variances in code.
+> >> > 
+> >> > I'm definitly not sure if all the different types of individual irq
+> >> > handlers are strictly necessary yet, but they represent all the
+> >> > variants that were in use in the original code.
+> >> 
+> >> I have brought up this point just for discussion. You could choose the
+> >> implementation that you prefer. I understand that implementing with
+> >> different interrupt controller nodes might require lot of code
+> >> changes.
+> > 
+> > first of all, thanks for the feedback. Working on this is like moving in
+> > a fog where I don't really see where I'm going - so I don't claim to be
+> > right.
+> > 
+> > 
+> > 
+> > But somehow I have the feeling we're talking about similar things here
+> > :-)
+> > 
+> > If you look in the second patch, you'll see that there are already the
+> > three (or 4 in the case of the s3c2416) interrupt controllers defined
+> > [intc, subintc, extintc]. But as they contain the data of their
+> > individual interrupts inside the devicetree definitions, they don't need
+> > individual init functions but only one which constructs the interrupt
+> > data out of the list provided.
+> > 
+> > The real list for a platform in the second patch might also help in
+> > showing why this list was necessary.
+> 
+> Ok, I had not looked at the second patch carefully enough. There are
+> four interrupt controller nodes but I am still not sure if the
+> bindings for those nodes are correct. The question here is, did we
+> design the binding to suit a specific linux implementation of the
+> interrupt controller. Ideally, the bindings should just be enough to
+> explain the interconnection between the interrupt controller and the
+> client devices. And should be OS agnostic as much as possible. The
+> seven irqtypes in the binding definition seems to suggest that we are
+> encoding a software defined abstraction into the binding, which does
+> not seem right.
 
-This attaches the usbmisc_ops to the of_device_id data and
-makes it possible to define special functions per soc.
 
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
----
-Changes since v2:
-* renamed bitmask to reflect soctype mx6
+Because of the mails from yesterday I took another look at my code, after 
+letting it sit for the previous days and I found more optimization 
+possiblities.
 
- drivers/usb/chipidea/usbmisc_imx.c |   15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+It should be possible to trim the irqtypes down to level,edge and eint types 
+and do the gathering of the other informations in the code. This would make 
+the list more os-agnostic.
+The list itself does describe the interconnections between the controllers, so 
+I think it's not false per se, just the multitude of probably redundant types 
+used should probably go down.
 
-diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-index 9145e04..d0c7a03 100644
---- a/drivers/usb/chipidea/usbmisc_imx.c
-+++ b/drivers/usb/chipidea/usbmisc_imx.c
-@@ -19,13 +19,14 @@
- 
- #define USB_DEV_MAX 4
- 
--#define BM_OVER_CUR_DIS		BIT(7)
-+#define MX6_BM_OVER_CUR_DIS		BIT(7)
- 
- struct imx_usbmisc {
- 	void __iomem *base;
- 	spinlock_t lock;
- 	struct clk *clk;
- 	struct usbmisc_usb_device usbdev[USB_DEV_MAX];
-+	const struct usbmisc_ops *ops;
- };
- 
- static struct imx_usbmisc *usbmisc;
-@@ -65,7 +66,7 @@ static int usbmisc_imx6q_init(struct device *dev)
- 	if (usbdev->disable_oc) {
- 		spin_lock_irqsave(&usbmisc->lock, flags);
- 		reg = readl(usbmisc->base + usbdev->index * 4);
--		writel(reg | BM_OVER_CUR_DIS,
-+		writel(reg | MX6_BM_OVER_CUR_DIS,
- 			usbmisc->base + usbdev->index * 4);
- 		spin_unlock_irqrestore(&usbmisc->lock, flags);
- 	}
-@@ -78,7 +79,7 @@ static const struct usbmisc_ops imx6q_usbmisc_ops = {
- };
- 
- static const struct of_device_id usbmisc_imx_dt_ids[] = {
--	{ .compatible = "fsl,imx6q-usbmisc"},
-+	{ .compatible = "fsl,imx6q-usbmisc", .data = (void *)&imx6q_usbmisc_ops },
- 	{ /* sentinel */ }
- };
- 
-@@ -87,6 +88,7 @@ static int __devinit usbmisc_imx_probe(struct platform_device *pdev)
- 	struct resource	*res;
- 	struct imx_usbmisc *data;
- 	int ret;
-+	struct of_device_id *tmp_dev;
- 
- 	if (usbmisc)
- 		return -EBUSY;
-@@ -116,8 +118,11 @@ static int __devinit usbmisc_imx_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	tmp_dev = (struct of_device_id *)
-+		of_match_device(usbmisc_imx_dt_ids, &pdev->dev);
-+	data->ops = (const struct usbmisc_ops *)tmp_dev->data;
- 	usbmisc = data;
--	ret = usbmisc_set_ops(&imx6q_usbmisc_ops);
-+	ret = usbmisc_set_ops(data->ops);
- 	if (ret) {
- 		usbmisc = NULL;
- 		clk_disable_unprepare(data->clk);
-@@ -129,7 +134,7 @@ static int __devinit usbmisc_imx_probe(struct platform_device *pdev)
- 
- static int __devexit usbmisc_imx_remove(struct platform_device *pdev)
- {
--	usbmisc_unset_ops(&imx6q_usbmisc_ops);
-+	usbmisc_unset_ops(usbmisc->ops);
- 	clk_disable_unprepare(usbmisc->clk);
- 	usbmisc = NULL;
- 	return 0;
--- 
-1.7.10.4
+
+The other option could be to really change to individual initializers for the 
+different implementations and have all the data in the code instead of the dt. 
+For this I've compared all the different implementations and it seems this 
+would lead to at least handlers for s3c2410, s3c2440, s3c2442, s3c2412 and 
+s3c2443. For the time being they will be in the code in any case, because of 
+all the non-dt boards 
+
+If anyone is interested, the comparison can be found on [0].
+
+
+Btw. do you know if it would have bad effects to register (but not use) for 
+example the cam interrupt-handler on a machine that does not have it. (The 
+additional cam, cf and spi1 interrupts are the only things differing between 
+the s3c2443 and s3c2416 SoCs).
+
+
+> > The basic problem is, that each individual interrupt inside one of the
+> > controllers might need a different handler and access a specific parent
+> > interrupt. For example the uart0-rx,tx,err interrupts in the subintc must
+> > ack/mask the uart0 interrupt in the main intc; similar for a lot of other
+> > interrupts. And the s3c24xx,irqlist provides this mapping to handler and
+> > parent, so it does not need to be codified.
+> 
+> I believe the three node example that I listed above should be able to
+> handle this, but yes, it might require additional code to support it.
+> For example, the uart device node has listed three interrupts. The
+> uart controller drivers can register three separate interrupt handlers
+> for these interrupts. As far as the interrupt handling for 'main'
+> controller, I see that this is very similar to the way interrupt
+> combiner module has been coded for exynos soc's. So the combiner
+> interrupt controller code in mach-exynos/common.c file can be used a
+> reference on how this can be handled.
+
+I'v seen the combiner code as well, but from the code itself I've not managed 
+to understand the combiner this well yet. And Exynos datasheets, to get a 
+textual description of the combiner, are not this easy to come by ;-) .
+
+
+> > And of course the second problem this approach should solve is, that the
+> > interrupts in the controllers differ and also move between most of the
+> > s3c24xx sub-architectures.
+> 
+> Yes, I understand how difficult it can get while writing a generalized
+> code for all soc's in s3c24xx family.
+
+again, thanks for taking the time to read and answer all these mails :-)
+
+
+Thanks
+Heiko
+
+
+[0] 
+https://docs.google.com/spreadsheet/pub?key=0Am5FJAmTa7wydENkdkwwRVA5eEVTb09fb0RtcGhnTlE&output=html
