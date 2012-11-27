@@ -1,39 +1,33 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Tue, 27 Nov 2012 10:47:41 +0530
-Subject: [PATCH] Input: omap4-keypad: Remove the OMAP4_KBD_SYSCONFIG and
- OMAP4_KBD_SYSSTATUS
-In-Reply-To: <20121126180158.GD14623@core.coreip.homeip.net>
-References: <1353927079-12493-1-git-send-email-shubhrajyoti@ti.com>
- <20121126180158.GD14623@core.coreip.homeip.net>
-Message-ID: <CAM=Q2cu_7gDvT57QhwbUpH1GQA7HgZ3j-sMbVq8UvYemO08TBA@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 27 Nov 2012 11:08:36 +0530
+Subject: linux-next: manual merge of the arm-soc tree with the slave-dma
+ tree
+In-Reply-To: <20121127154430.36e87542081a7cc50f80d0f6@canb.auug.org.au>
+References: <20121127154430.36e87542081a7cc50f80d0f6@canb.auug.org.au>
+Message-ID: <CAKohpo=K2kX-M4NM9onrn-Rr4otJwcQ1HxN5cKPYvj+Tza_0Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 11:31 PM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> On Mon, Nov 26, 2012 at 04:21:19PM +0530, Shubhrajyoti D wrote:
->> The macros OMAP4_KBD_SYSSTATUS and OMAP4_KBD_SYSSTATUS are not used
->> so remove them.
+On 27 November 2012 10:14, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/mach-spear13xx/spear1310.c between commit b47394911c26 ("ARM:
+> SPEAr13xx: Pass DW DMAC platform data from DT") from the slave-dma tree
+> and commit 300a6856324a ("ARM: SPEAr1310: Fix AUXDATA for compact flash
+> controller") from the arm-soc tree.
 >
-> They document the existing registers and do not add bloat to the
-> generated objects so let's leave them be.
+> I have no idea how to fix this up, so I just effectively dropped the
+> arm-doc tree patch.
 
-The objective of the patch is not to prevent bloat.
+Hi Stephen,
 
-Actually these registers have power/system impact so it was decided
-that the drivers will not
-configure the sysc registers (infact not define). Currently hwmod
-configures the registers.
+So sorry for that, Can you please take arm-soc version here? Patch 300a6856324a
+is doing the correct thing. i.e. we need
 
-To be safe I thought of deleting it.
++       OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL, &cf_pdata),
 
+instead of
 
->
-> Thanks.
->
-> --
-> Dmitry
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-input" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
++       OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL, "cf"),
+
+--
+viresh
