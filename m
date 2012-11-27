@@ -1,90 +1,13 @@
-From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Tue, 27 Nov 2012 18:30:36 +0530
-Subject: [PATCH 3/3] arm: exynos5: Add HS-I2C device tree platform information
-In-Reply-To: <1354021236-28596-1-git-send-email-ch.naveen@samsung.com>
-References: <1354021236-28596-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <1354021236-28596-4-git-send-email-ch.naveen@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 27 Nov 2012 13:13:07 +0000
+Subject: [PATCH 0/3] Input: bu21013_ts - fixups and DT enablement
+Message-ID: <1354021990-16978-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds HS-I2C device tree platform information in
-exynos5.dtsi and exynos5-smdk5250.
+Grouped together for easy tracking.
 
-Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
----
- arch/arm/boot/dts/exynos5250-smdk5250.dts |   16 +++++++++++++++
- arch/arm/boot/dts/exynos5250.dtsi         |   32 +++++++++++++++++++++++++++++
- 2 files changed, 48 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index fc37e19..4e22b84 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -161,6 +161,22 @@
- 		};
- 	};
- 
-+	hsi2c at 12C50000 {
-+		status = "disabled";
-+	};
-+
-+	hsi2c at 12D00000 {
-+		status = "disabled";
-+	};
-+
-+	hsi2c at 12D50000 {
-+		status = "disabled";
-+	};
-+
-+	hsi2c at 12DE0000 {
-+		status = "disabled";
-+	};
-+
- 	dwmmc_0: dwmmc0 at 12200000 {
- 		num-slots = <1>;
- 		supports-highspeed;
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index a42b02b0..276ecb3 100755
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -182,6 +182,38 @@
- 		#size-cells = <0>;
- 	};
- 
-+	hsi2c at 12C50000 {
-+		compatible = "samsung,exynos5-hs-i2c";
-+		reg = <0x12C50000 0x1000>;
-+		interrupts = <0 56 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	hsi2c at 12D00000 {
-+		compatible = "samsung,exynos5-hs-i2c";
-+		reg = <0x12D00000 0x1000>;
-+		interrupts = <0 57 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	hsi2c at 12D50000 {
-+		compatible = "samsung,exynos5-hs-i2c";
-+		reg = <0x12D50000 0x1000>;
-+		interrupts = <0 58 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	hsi2c at 12DE0000 {
-+		compatible = "samsung,exynos5-hs-i2c";
-+		reg = <0x12DE0000 0x1000>;
-+		interrupts = <0 59 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
- 	spi_0: spi at 12d20000 {
- 		compatible = "samsung,exynos4210-spi";
- 		reg = <0x12d20000 0x100>;
--- 
-1.7.9.5
+ arch/arm/mach-ux500/board-mop500-stuib.c |   71 +-------------------
+ drivers/input/touchscreen/bu21013_ts.c   |  105 +++++++++++++++++++++++-------
+ include/linux/input/bu21013.h            |    9 +--
+ 3 files changed, 85 insertions(+), 100 deletions(-)
