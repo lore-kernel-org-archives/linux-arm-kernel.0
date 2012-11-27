@@ -1,62 +1,78 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 27 Nov 2012 12:36:37 +0900
-Subject: [PATCH 4/7] ARM: shmobile: pfc-sh73a0: Register device tree
-In-Reply-To: <7701261.79JI41uS12@avalon>
-References: <1353889014-17142-1-git-send-email-horms@verge.net.au>
- <1353889014-17142-5-git-send-email-horms@verge.net.au>
- <7701261.79JI41uS12@avalon>
-Message-ID: <20121127033635.GJ13206@verge.net.au>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 27 Nov 2012 09:28:01 +0530
+Subject: [PATCH] cpufreq: SPEAr: Add CPUFreq driver
+In-Reply-To: <20121127040135.GB27305@S2100-06.ap.freescale.net>
+References: <7ec0e3f4b81b70f3def4257e6b9781efd4c7a3d2.1353785862.git.viresh.kumar@linaro.org>
+ <20121127040135.GB27305@S2100-06.ap.freescale.net>
+Message-ID: <CAKohpomSAogQVeBQ8HaWwwoTVCsMha5d_1Wid6N3t5SnVZTc=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 03:06:37PM +0100, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> On Monday 26 November 2012 09:16:51 Simon Horman wrote:
-> > Register the pfc with sh73a0_init_gpio_dt() to allow
-> > gpios provided by pfc to be accessed by devices which
-> > are registered using device tree.
-> > 
-> > The motivation of this is to allow the gpio used for carrier detect
-> > but the Micro SD SDHI port of the KZM-9A-GT board to be accessed
-> > using device tree. Thus, allowing the SDHI device of the KZM-9A-GT
-> > board to be registered using device tree.
-> > 
-> > Signed-off-by: Simon Horman <horms@verge.net.au>
-> > ---
-> >  arch/arm/mach-shmobile/pfc-sh73a0.c |   45 ++++++++++++++++++++++++++++++++
-> >  1 file changed, 45 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-shmobile/pfc-sh73a0.c
-> > b/arch/arm/mach-shmobile/pfc-sh73a0.c index b442f9d..d1a04c0b 100644
-> > --- a/arch/arm/mach-shmobile/pfc-sh73a0.c
-> > +++ b/arch/arm/mach-shmobile/pfc-sh73a0.c
-> > @@ -2797,7 +2797,52 @@ static struct pinmux_info sh73a0_pinmux_info = {
-> >  	.gpio_irq_size = ARRAY_SIZE(pinmux_irqs),
-> >  };
-> > 
-> > +#ifdef CONFIG_OF_GPIO
-> > +static int sh73a0_gpio_xlate(struct gpio_chip *gc,
-> > +			     const struct of_phandle_args *gpiospec,
-> > +			     u32 *flags)
-> > +{
-> > +	if (WARN_ON(gc->of_gpio_n_cells < 2))
-> > +		return -EINVAL;
-> > +
-> > +	if (WARN_ON(gpiospec->args_count < gc->of_gpio_n_cells))
-> > +		return -EINVAL;
-> > +
-> > +	if (gpiospec->args[0] > gc->ngpio)
-> > +		return -EINVAL;
-> > +
-> > +	if (flags)
-> > +		*flags = gpiospec->args[1];
-> > +
-> > +	return gpiospec->args[0];
-> > +}
-> 
-> Is there any reason not to use of_gpio_simple_xlate here ? If there isn't, 
-> of_xlate and of_gpio_n_cells default to of_gpio_simple_xlate and 2 
-> respectively when of_xlate isn't specified, so you could omit both.
+Hi Shawn,
 
-No reason other than that I wasn't aware of of_gpio_simple_xlate.
+Thanks for feedback.
+
+On 27 November 2012 09:31, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Sun, Nov 25, 2012 at 01:09:28AM +0530, Viresh Kumar wrote:
+>> +cpufreq {
+>> +     compatible = "st,cpufreq-spear";
+>
+> I do not think we need a "cpufreq" node, as we already have node for
+> cpu to contain these.
+
+Hmm.. Yes, can be done.
+
+>> +     cpufreq_tbl = < 166000
+>> +                     200000
+>> +                     250000
+>> +                     300000
+>> +                     400000
+>> +                     500000
+>> +                     600000 >;
+>
+> It's a little bit unusual that cpu runs such a freq range
+> (166 ~ 600 MHz) at a fixed voltage.  You really have no way
+> to scale voltage?
+
+AFAIK, there is no voltage scaling.
+
+@Shiraz/Deepak: Can you confirm?
+
+>> diff --git a/drivers/cpufreq/spear-cpufreq.c b/drivers/cpufreq/spear-cpufreq.c
+>> +static int spear_cpufreq_target(struct cpufreq_policy *policy,
+>> +             unsigned int target_freq, unsigned int relation)
+>> +{
+>> +     struct cpufreq_freqs freqs;
+>> +     unsigned long newfreq;
+>> +     struct clk *srcclk;
+>> +     int index, ret, mult = 1;
+>> +
+>> +     if (cpufreq_frequency_table_target(policy, spear_cpufreq.freq_tbl,
+>> +                             target_freq, relation, &index))
+>> +             return -EINVAL;
+>> +
+>> +     freqs.cpu = policy->cpu;
+>> +     freqs.old = spear_cpufreq_get(0);
+>> +
+>> +     newfreq = spear_cpufreq.freq_tbl[index].frequency * 1000;
+>> +     if (of_machine_is_compatible("st,spear1340")) {
+>> +             /*
+>> +              * SPEAr1340 is special in the sense that due to the possibility
+>> +              * of multiple clock sources for cpu clk's parent we can have
+>> +              * different clock source for different frequency of cpu clk.
+>> +              * Hence we need to choose one from amongst these possible clock
+>> +              * sources.
+>> +              */
+>> +             srcclk = spear1340_cpu_get_possible_parent(newfreq);
+>
+> From what I can see, if spear1340 clock driver can handle such special
+> setup of clk, the driver will be nothing SPEAr specific and can probably
+> be saved by just using cpufreq-cpu0.
+
+There are few more patches we have for this driver, which are depending
+on some mach stuff to be pushed first. We need to program system controller
+too for make cpu clock transitions more stable. They should come after some
+time.
+
+--
+viresh
