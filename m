@@ -1,35 +1,39 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 27 Nov 2012 15:03:26 +0530
-Subject: [PATCH] cpufreq: SPEAr: Add CPUFreq driver
-In-Reply-To: <CAPKp9uZ-HpAp2KO9qKXsMCoGJS3Vn-VW34h6cbv8o01Vzzi4jw@mail.gmail.com>
-References: <7ec0e3f4b81b70f3def4257e6b9781efd4c7a3d2.1353785862.git.viresh.kumar@linaro.org>
- <CAPKp9uZ-HpAp2KO9qKXsMCoGJS3Vn-VW34h6cbv8o01Vzzi4jw@mail.gmail.com>
-Message-ID: <CAKohponbWUTtxMBLTGaRTmQX4WArtHAt9KzAnqF2OtQpf46osg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 27 Nov 2012 09:34:50 +0000
+Subject: [PATCH 1/1] ARM: ux500: Fix u9540 booting issues
+Message-ID: <1354008890-10476-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 November 2012 14:54, Sudeep K N <sudeepholla.maillist@gmail.com> wrote:
-> On Sat, Nov 24, 2012 at 7:39 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> [...]
->> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-spear.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-spear.txt
->> new file mode 100644
->> index 0000000..4cf2819
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-spear.txt
->> @@ -0,0 +1,29 @@
->> +SPEAr cpufreq driver
->> +-------------------
->> +
->> +SPEAr SoC cpufreq driver for CPU frequency scaling.
->> +It supports both uniprocessor (UP) and symmetric multiprocessor (SMP) systems
->> +which share clock across all CPUs.
->
-> If this is the case, is there any particular reason why you cannot use
-> the generic
-> cpufreq-cpu0 driver ?
+The u9540 stopped booting after the v3.7 merge window due to
+a lack of common clk support and early PRCMU initialisation.
+In this patch we rectify these issues, placing the u9540
+development board back into a successfully booting state.
 
-Please go through the discussion already done with Shawn. There is lot of
-SPEAr specific code here.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/cpu.c |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
---
-viresh
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index 721e7b4..d4dcec5 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -71,13 +71,11 @@ void __init ux500_init_irq(void)
+ 	 * Init clocks here so that they are available for system timer
+ 	 * initialization.
+ 	 */
+-	if (cpu_is_u8500_family())
++	if (cpu_is_u8500_family() || cpu_is_u9540())
+ 		db8500_prcmu_early_init();
+ 
+-	if (cpu_is_u8500_family())
++	if (cpu_is_u8500_family() || cpu_is_u9540())
+ 		u8500_clk_init();
+-	else if (cpu_is_u9540())
+-		u9540_clk_init();
+ 	else if (cpu_is_u8540())
+ 		u8540_clk_init();
+ }
+-- 
+1.7.9.5
