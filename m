@@ -1,90 +1,42 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 27 Nov 2012 18:01:39 +0530
-Subject: [PATCH] fixup! cpufreq: SPEAr: Add CPUFreq driver
-Message-ID: <2d845c8e19392c2b82a243e6e878ae4e5e771c2f.1353785862.git.viresh.kumar@linaro.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 27 Nov 2012 14:31:46 +0200
+Subject: OMAP4430 produces boot warnings
+In-Reply-To: <50B4B045.7090603@ti.com>
+References: <20121121230337.GR3332@n2100.arm.linux.org.uk>
+ <50AE1DC0.3030002@ti.com>  <50AE2BB6.8080406@ti.com>
+ <1353594842.786.45.camel@sokoban>  <50AE3A5B.5040603@ti.com>
+ <1353663278.25248.4.camel@sokoban> <50B310D3.9050202@ti.com>
+ <50B35D0E.6000509@ti.com> <50B4A2B7.9080806@ti.com>
+ <50B4AA74.1090300@ti.com>  <50B4B045.7090603@ti.com>
+Message-ID: <1354019506.3250.10.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
-Hi Rafael,
+On Tue, 2012-11-27 at 14:21 +0200, Tomi Valkeinen wrote:
+> On 2012-11-27 13:56, Archit Taneja wrote:
+> > On Tuesday 27 November 2012 04:53 PM, Tomi Valkeinen wrote:
+> 
+> >> Hmm, well this feels like a hack. DISPC driver doesn't know how the DSS
+> >> modules are arranged, which module belongs to which power domain, etc.
+> >>
+> >> If it cannot be fixed in the arch code, I guess we could just have
+> >> dss_get_ctx_loss_count(void) function which always returns the
+> >> dss_core's ctx loss count, and define that on all the platforms omapdss
+> >> is used, the dss_core's ctx loss count is the same as ctx loss count for
+> >> all the dss submodules.
+> >>
+> >> I think the above is true for all OMAPs. But it feels like a hack too,
+> >> but not as bad as the above patch.
+> > 
+> > Yes, a function taking in no platform device in dss's core.c would be
+> > less hacky. I guess we would need this for now, because a solution in
+> > omap_hwmod would be more complex and it may not be ready by the merge
+> > window.
+> 
+> Ok. Can you cook up a patch and test it?
+> 
+> PM guys, does the above sound like an acceptable work-around?
 
-To make review easier and faster, i am sending incremental patch for SPEAr
-cpufreq driver. This patch was earlier discussed here:
+This sounds like a good approach to me at least.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/135088.html
-
- .../devicetree/bindings/cpufreq/cpufreq-spear.txt  | 33 +++++++++++++++-------
- drivers/cpufreq/spear-cpufreq.c                    |  4 +--
- 2 files changed, 25 insertions(+), 12 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-spear.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-spear.txt
-index 4cf2819..f3d44984 100644
---- a/Documentation/devicetree/bindings/cpufreq/cpufreq-spear.txt
-+++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-spear.txt
-@@ -6,7 +6,6 @@ It supports both uniprocessor (UP) and symmetric multiprocessor (SMP) systems
- which share clock across all CPUs.
- 
- Required properties:
--- compatible: "st,cpufreq-spear"
- - cpufreq_tbl: Table of frequencies CPU could be transitioned into, in the
-   increasing order.
- 
-@@ -14,16 +13,30 @@ Optional properties:
- - clock-latency: Specify the possible maximum transition latency for clock, in
-   unit of nanoseconds.
- 
-+Both required and optional properties listed above must be defined under node
-+/cpus/cpu at 0.
-+
- Examples:
- --------
-+cpus {
-+
-+	<...>
-+
-+	cpu at 0 {
-+		compatible = "arm,cortex-a9";
-+		reg = <0>;
-+
-+		<...>
-+
-+		cpufreq_tbl = < 166000
-+				200000
-+				250000
-+				300000
-+				400000
-+				500000
-+				600000 >;
-+	};
-+
-+	<...>
- 
--cpufreq {
--	compatible = "st,cpufreq-spear";
--	cpufreq_tbl = < 166000
--			200000
--			250000
--			300000
--			400000
--			500000
--			600000 >;
- };
-diff --git a/drivers/cpufreq/spear-cpufreq.c b/drivers/cpufreq/spear-cpufreq.c
-index a7fe880..4575cfe 100644
---- a/drivers/cpufreq/spear-cpufreq.c
-+++ b/drivers/cpufreq/spear-cpufreq.c
-@@ -224,9 +224,9 @@ static int spear_cpufreq_driver_init(void)
- 	const __be32 *val;
- 	int cnt, i, ret;
- 
--	np = of_find_compatible_node(NULL, NULL, "st,cpufreq-spear");
-+	np = of_find_node_by_path("/cpus/cpu at 0");
- 	if (!np) {
--		pr_err("No cpufreq node found");
-+		pr_err("No cpu node found");
- 		return -ENODEV;
- 	}
- 
--- 
-1.7.12.rc2.18.g61b472e
+-Tero
