@@ -1,34 +1,53 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 27 Nov 2012 14:04:02 +0000
-Subject: [PATCH 1/2] ASoC: davinci-mcasp: Add pinctrl support
-In-Reply-To: <87y5hn1tey.fsf@dell.be.48ers.dk>
-References: <1353557099-21599-1-git-send-email-gururaja.hebbar@ti.com>
- <1353557099-21599-2-git-send-email-gururaja.hebbar@ti.com>
- <20121126114511.GE9411@opensource.wolfsonmicro.com>
- <87y5hn1tey.fsf@dell.be.48ers.dk>
-Message-ID: <20121127140402.GE4468@opensource.wolfsonmicro.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 Nov 2012 15:16:20 +0100
+Subject: [PATCH] clk: ux500: assume PRCC clocks are off by default
+In-Reply-To: <CAPDyKFrqvtFJZHi3tGQ6x8tyHXv6-S7K8_CrqCYf8TQJ0h6jFw@mail.gmail.com>
+References: <1354024310-22021-1-git-send-email-linus.walleij@stericsson.com>
+ <CAPDyKFrqvtFJZHi3tGQ6x8tyHXv6-S7K8_CrqCYf8TQJ0h6jFw@mail.gmail.com>
+Message-ID: <CACRpkdZEFVs+OMT2d3=KoTimpJ_HYFq3aL1EvoL4qQdjtocs2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 09:55:33PM -0800, Peter Korsgaard wrote:
-> >>>>> "Mark" == Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
+On Tue, Nov 27, 2012 at 2:58 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 27 November 2012 14:51, Linus Walleij <linus.walleij@stericsson.com> wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
 
->  Mark> Since the driver is happy to continue without the pins why is it
->  Mark> bothering requesting them in the first place?  In other words, this
->  Mark> should be a hard error.
+>> So instead assume that the PRCC clocks are *not* on, and
+>> everything starts working. This may cause a few extra writes
+>> to the enable registers but it's worth it. We cannot read
+>> the status registers to find out if the clock is on at
+>> this point as that means we first have to turn on the
+>> clock to the peripheral cluster.
+>>
+>> Reported-by: Lee Jones <lee.jones@linaro.org>
+>> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+>> Cc: Philippe Begnic <philippe.begnic@st.com>
+>> Cc: Per Forlin <per.forlin@stericsson.com>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> Mike: this needs to go into v3.7. (Yes, sorry for not seeing
+>> this earlier, but the problem did manifest itself in very
+>> strange ways.) If v3.7 is not possible, make sure to add the
+>
+> Hold on!
+>
+> I see what you are trying to solve. But the next problem when going
+> ahead with this patch is that some clocks, which are default on, will
+> be kept on unless some client explicit disables it. This is not OK. I
+> will get back to you with some more ideas how to proceed.
 
-> Sorry, I disagree. As was discussed recently, there's several reasons
-> why the pinctrl call might fail, and not all are fatal (E.G. pinmux
-> already setup by bootloader):
+OK ... well that means if we don't come up with a better solution
+we need to choose the lesser of two evils:
 
-> http://article.gmane.org/gmane.linux.kernel/1399756
+- Apply this and get a power regression
 
-I'd expect the platform to provide stub mappings for cases where the
-pinmux code shouldn't do anything.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121127/ebfb3682/attachment.sig>
+- Not apply this and get a GPIO regression which cascades
+  to child devices, for example STMPE keypad and SD Card
+  detect on older boards is
+  not working at all without this.
+
+So let's see if we can fix the perfect patch to avoid having to
+choose...
+
+Yours,
+Linus Walleij
