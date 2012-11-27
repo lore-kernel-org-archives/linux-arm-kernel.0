@@ -1,49 +1,28 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 27 Nov 2012 09:39:01 +0900
-Subject: [GIT PULL 3/3] Samsung exynos5440 for v3.8
-In-Reply-To: <20121126083232.GH9580@quad.lixom.net>
-References: <10d401cdc91b$09fe1980$1dfa4c80$%kim@samsung.com>
- <20121126083232.GH9580@quad.lixom.net>
-Message-ID: <15c801cdcc37$984bbb60$c8e33220$%kim@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 27 Nov 2012 09:42:26 +0900
+Subject: [PATCH 3/7] sh: pfc: Allow device tree registration
+In-Reply-To: <1528017.UPeIBOTTC7@avalon>
+References: <1353889014-17142-1-git-send-email-horms@verge.net.au>
+ <1353889014-17142-4-git-send-email-horms@verge.net.au>
+ <1528017.UPeIBOTTC7@avalon>
+Message-ID: <20121127004225.GE9724@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
+On Tue, Nov 27, 2012 at 01:07:28AM +0100, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> On Fri, Nov 23, 2012 at 10:37:03AM +0900, Kukjin Kim wrote:
-> > Arnd, Olof,
-> >
-> > This is adding support for exynos5440, including Quad ARM Cortex-A15
-> cores
-> > and its reference board SSDK5440.
-> >
-> > Note, at this moment, just enabled minimal system part for initial
-> kernel
-> > boot and pinctrl driver.
-> >
-> > Please pull from:
-> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > next/soc-exynos5440
+> On Monday 26 November 2012 09:16:50 Simon Horman wrote:
+> > This is a crude mechanism to allow the pfc driver to
+> > be registered through device tree. The mofication of this
+> > is to provide a way for pfc gpios to be looked up by
+> > device tree for devices which use pfc gpios.
+> > 
+> > More specifically, the motivation is to allow the registration
+> > of the card-detect gpio for the Micro-SD SDHI slot of the KZM9G board.
 > 
-> Merged. This caused some new conflicts with previous samsung contents,
-> since
-> you add DT contents in several branches, etc. Please try to work on
-> getting
-> your amount of conflicts down a bit.
-> 
-Oops could be, it's my fault. Sorry for inconvenience.
-
-> If you want a good example to look at, see how Tony Lindgren handles OMAP.
-> He's juggling a large number of topics with nearly no conflicts left
-> for us to resolve at our level, by making sure new work is based on
-> appropriate base branches.
-> 
-Sure, I will.
+> I've just posted v2 of my PCF patches ("SH pin control and GPIO rework with OF 
+> support") that include OF support for GPIOs. This patch as well as patch 4/7 
+> and the gpio node in patch 7/7 and shouldn't be required anymore.
 
 Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
