@@ -1,33 +1,25 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 27 Nov 2012 10:54:03 +0800
-Subject: [Patch v6 4/4] ASoC: at91sam9g20ek-wm8731: convert to dt support
-In-Reply-To: <201211262123.42812.arnd@arndb.de>
-References: <1352887751-21848-1-git-send-email-voice.shen@atmel.com>
- <1352887751-21848-5-git-send-email-voice.shen@atmel.com>
- <201211262123.42812.arnd@arndb.de>
-Message-ID: <50B42B4B.90407@atmel.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 27 Nov 2012 01:08:07 -0200
+Subject: [PATCH 1/4] ARM: dts: Add very basic dt support for mx31pdk
+In-Reply-To: <20121126100340.GE10369@pengutronix.de>
+References: <1353611447-7732-1-git-send-email-fabio.estevam@freescale.com>
+ <20121126100340.GE10369@pengutronix.de>
+Message-ID: <CAOMZO5BDgyJ0cww18Sz8h5JDy7CgqwhcA=wwZhggge==rCdBZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 11/27/2012 5:23, Arnd Bergmann wrote:
-> On Wednesday 14 November 2012, Bo Shen wrote:
->> +
->> +                       ssc0: ssc at fffbc000 {
->> +                               status = "okay";
->> +                               pinctrl-0 = <&pinctrl_ssc0_tx>;
->> +                       };
->>                  };
+On Mon, Nov 26, 2012 at 8:03 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Thu, Nov 22, 2012 at 05:10:43PM -0200, Fabio Estevam wrote:
+>> Add very basic dt support for mx31pdk.
 >>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 >
-> This gives me a build error in linux-next with at91sam9g20_defconfig:
->
-> ERROR (phandle_references): Reference to non-existent node or label "pinctrl_ssc0_tx"
+> Could you provide a bit more complete patch? I think at least the low
+> hanging fruits like nor flash and nand, some i2c devices is not much
+> work but would save a lot of churn in patching the file.
 
-Yes, this is because there is a cross merge patch at: 
-https://patchwork.kernel.org/patch/1776941/ acked by Mark Brown, however 
-it does not merged.
+Ok, what about the other patches of the series? Are they good?
 
-Best Regards,
-Bo Shen
+Regards,
+
+Fabio Estevam
