@@ -1,33 +1,19 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 26 Nov 2012 17:13:42 -0800
-Subject: OMAP build now completely broken in latest arm-soc
-In-Reply-To: <CAOesGMgvGxfghFbyki7aXE8dVbAA7QQP6nwBKhzHftngGRi0Tw@mail.gmail.com>
-References: <20121125093704.GV3332@n2100.arm.linux.org.uk>
- <CAOesGMgvGxfghFbyki7aXE8dVbAA7QQP6nwBKhzHftngGRi0Tw@mail.gmail.com>
-Message-ID: <20121127011341.GO5279@atomide.com>
+Date: Mon, 26 Nov 2012 17:18:06 -0800
+Subject: [PATCH] ARM: use clockevents_config_and_register() where possible
+In-Reply-To: <1353936857-15313-1-git-send-email-shawn.guo@linaro.org>
+References: <1353936857-15313-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20121127011805.GP5279@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [121125 05:59]:
-> On Sun, Nov 25, 2012 at 1:37 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > But also, the:
-> >
-> > arch/arm/mach-omap2/timer.c:163:28: warning: 'omap_counter_match' defined but not used
-> >
-> > warning is still there.
-> 
-> There's a fix for this in Tony's tree, but he hasn't sent up the pull
-> request for it yet.
+* Shawn Guo <shawn.guo@linaro.org> [121126 05:36]:
+> The clockevent core is able to figure out the best mult and shift,
+> calculate min_delta_ns and max_delta_ns, with the necessary info passed
+> into clockevents_config_and_register().  Use this combined configure
+> and register function where possible to make the codes less error prone
+> and gain some positive diff stat.
 
-Sent a pull request for that as "omap late timer clean-up
-(and a warning fix) for v3.8 merge window". The fix is there
-there as the topmost third patch, but that probably does not
-matter in this case as the regression was introduced in the
-patches queued.
+Cool. Seems to boot for omap1 and omap2+, so:
 
-Let me know if you want it separately though.
-
-Regards,
-
-Tony
+Tested-by: Tony Lindgren <tony@atomide.com>
