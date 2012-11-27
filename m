@@ -1,49 +1,19 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 27 Nov 2012 15:52:23 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the battery tree
-Message-ID: <20121127155223.849e73a08fc1b382d4622ff8@canb.auug.org.au>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 27 Nov 2012 10:23:21 +0530
+Subject: [PATCH] cpufreq: SPEAr: Add CPUFreq driver
+In-Reply-To: <20121127051649.GC27305@S2100-06.ap.freescale.net>
+References: <7ec0e3f4b81b70f3def4257e6b9781efd4c7a3d2.1353785862.git.viresh.kumar@linaro.org>
+ <20121127040135.GB27305@S2100-06.ap.freescale.net>
+ <CAKohpomSAogQVeBQ8HaWwwoTVCsMha5d_1Wid6N3t5SnVZTc=w@mail.gmail.com>
+ <20121127051649.GC27305@S2100-06.ap.freescale.net>
+Message-ID: <CAKohpo=jY62tTPZWJhP=BYLe2qZ3C-tY9MG6Ho+6fExavwwv=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 27 November 2012 10:46, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Shouldn't it also be handled by cpu clock provider?
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-drivers/power/Kconfig between commit bd9e8ab2d58d ("ab8500: Add
-devicetree support for btemp") from the battery tree and commit
-96ff0f5c7efd ("power: Add simple poweroff-gpio driver") from the arm-soc
-tree.
+Not really sure.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc drivers/power/Kconfig
-index 263499f,b1d956d..0000000
---- a/drivers/power/Kconfig
-+++ b/drivers/power/Kconfig
-@@@ -346,6 -329,15 +346,8 @@@ config AB8500_B
-  	help
-  	  Say Y to include support for AB8500 battery management.
-  
- -config AB8500_BATTERY_THERM_ON_BATCTRL
- -	bool "Thermistor connected on BATCTRL ADC"
- -	depends on AB8500_BM
- -	help
- -	  Say Y to enable battery temperature measurements using
- -	  thermistor connected on BATCTRL ADC.
- -
-+ source "drivers/power/reset/Kconfig"
-+ 
-  endif # POWER_SUPPLY
-  
-  source "drivers/power/avs/Kconfig"
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121127/5ac41480/attachment.sig>
+--
+viresh
