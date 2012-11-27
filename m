@@ -1,58 +1,73 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 27 Nov 2012 10:52:03 -0600
-Subject: [PATCH 1/1] ARM: OMAP: fix build error in
- arch/arm/mach-omap2/timer.c
-In-Reply-To: <1354011886-31553-1-git-send-email-mugunthanvnm@ti.com>
-References: <1354011886-31553-1-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <50B4EFB3.5060901@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 27 Nov 2012 09:29:00 -0800
+Subject: [PATCH v3 02/11] clk: davinci - add PSC clock driver
+In-Reply-To: <50B4D6B1.3000903@ti.com>
+References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
+ <1351181518-11882-3-git-send-email-m-karicheri2@ti.com>
+ <50950908.1060302@ti.com> <5097D6FC.7040202@ti.com>
+ <20121110022254.18014.31873@nucleus> <50B4D6B1.3000903@ti.com>
+Message-ID: <20121127172900.21126.89528@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 11/27/2012 04:24 AM, Mugunthan V N wrote:
->   CC      arch/arm/mach-omap2/timer.o
-> arch/arm/mach-omap2/timer.c: In function 'omap_get_timer_dt':
-> arch/arm/mach-omap2/timer.c:195:3: error: implicit declaration of function 'prom_add_property'
-> make[1]: *** [arch/arm/mach-omap2/timer.o] Error 1
-> make: *** [arch/arm/mach-omap2] Error 2
-
-Thanks for sending. You may wish to mentioned that this is seen on
-today's linux-next (I am seeing the same problem).
-
-> fix for build break as the functions "prom_*_property" is renamed to
-> of_*_property by the below patch
+Quoting Sekhar Nori (2012-11-27 07:05:21)
+> Hi Mike,
 > 
-> commit 79d1c712958f94372482ad74578b00f44e744c12
-> Author: Nathan Fontenot <nfont@linux.vnet.ibm.com>
-> Date:   Tue Oct 2 16:58:46 2012 +0000
+> On 11/10/2012 7:52 AM, Mike Turquette wrote:
+> > Quoting Murali Karicheri (2012-11-05 07:10:52)
+> >> On 11/03/2012 08:07 AM, Sekhar Nori wrote:
+> >>> On 10/25/2012 9:41 PM, Murali Karicheri wrote:
+> >>>> This is the driver for the Power Sleep Controller (PSC) hardware
+> >>>> found on DM SoCs as well Keystone SoCs (c6x). This driver borrowed
+> >>>> code from arch/arm/mach-davinci/psc.c and implemented the driver
+> >>>> as per common clock provider API. The PSC module is responsible for
+> >>>> enabling/disabling the Power Domain and Clock domain for different IPs
+> >>>> present in the SoC. The driver is configured through the clock data
+> >>>> passed to the driver through struct clk_psc_data.
+> >>>>
+> >>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> >>>> ---
+> >>>> +/**
+> >>>> + * struct clk_psc - DaVinci PSC clock driver data
+> >>>> + *
+> >>>> + * @hw: clk_hw for the psc
+> >>>> + * @psc_data: Driver specific data
+> >>>> + */
+> >>>> +struct clk_psc {
+> >>>> +    struct clk_hw hw;
+> >>>> +    struct clk_psc_data *psc_data;
+> >>>> +    spinlock_t *lock;
+> >>> Unused member? I don't see this being used.
+> >>
+> >> OK. Will remove.
+> > 
+> > Those locks are only used for the case where a register might contain
+> > bits for several clocks.  Thus RMW operations are protected.  On OMAP
+> > this isn't necessary due to a very generous register layout (typically
+> > one 32-bit reg per module) controlling clocks.  Seems tha tmaybe this is
+> > not needed for PSC module either?
 > 
->     powerpc+of: Rename the drivers/of prom_* functions to of_*
+> Sorry about the late reply. The above is not totally true for PSC. There
+> are some registers (like PTCMD) which are common for all clocks.
 > 
->     Rename the prom_*_property routines of the generic OF code to of_*_property.
->     This brings them in line with the naming used by the rest of the OF code.
+> There is an enable_lock used in drivers/clk/clk.c which serializes all
+> enable/disable calls across the clock tree. Since that is done, further
+> locking at clk-psc level is not really needed, no?
 > 
-> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
-> ---
->  arch/arm/mach-omap2/timer.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index 099e406..5fd5e23 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -192,7 +192,7 @@ static struct device_node * __init omap_get_timer_dt(struct of_device_id *match,
->  			continue;
->  		}
->  
-> -		prom_add_property(np, &device_disabled);
-> +		of_add_property(np, &device_disabled);
->  		return np;
->  	}
 
-I tested this on the AM335x device and it is working fine. So ...
+I haven't finished looking through the PSC design document yet, but my
+answer to your question is this:
 
-Acked-by: Jon Hunter <jon-hunter@ti.com>
-Tested-by: Jon Hunter <jon-hunter@ti.com>
+If a register is only used for clk_enable/disable calls (not touched by
+anything held under the prepare_lock mutex) and if that register isn't
+used anywhere else in the code (outside of the clk framework) then yes,
+the enable_lock spinlock is enough for you.
 
-Cheers
-Jon
+Also have you looked into regmap?  Since you are defining your own clock
+type that might be something nice for you.
+
+Regards,
+Mike
+
+> Thanks,
+> Sekhar
