@@ -1,65 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 27 Nov 2012 11:00:18 -0700
-Subject: [PATCH] mfd: vexpress-sysreg: Remove LEDs code
-In-Reply-To: <CAOesGMgJqPCXNxfEA+=NVE_yMtSKS_vnzNkT9Of9bqw0t5iMww@mail.gmail.com>
-References: <1353332344-16754-1-git-send-email-pawel.moll@arm.com>
- <20121121085539.GR7615@quad.lixom.net>
- <CAOesGMgJqPCXNxfEA+=NVE_yMtSKS_vnzNkT9Of9bqw0t5iMww@mail.gmail.com>
-Message-ID: <50B4FFB2.6050601@wwwdotorg.org>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Tue, 27 Nov 2012 10:06:59 -0800
+Subject: [PATCH] MTD: at91: atmel_nand: return bit flips for the PMECC
+ read_page()
+In-Reply-To: <50AD9E8E.7050402@atmel.com>
+References: <1353474863-28430-1-git-send-email-josh.wu@atmel.com>
+ <50ACA764.3030002@atmel.com> <50AD9E8E.7050402@atmel.com>
+Message-ID: <50B50143.7080408@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2012 02:04 AM, Olof Johansson wrote:
-> On Wed, Nov 21, 2012 at 12:55 AM, Olof Johansson <olof@lixom.net> wrote:
->> On Mon, Nov 19, 2012 at 01:39:04PM +0000, Pawel Moll wrote:
->>> As the current LEDs code breaks other platform, remove it.
->>>
->>> It shall be replaced by a generic "MMIO LEDs" driver.
->>>
->>> Reported-by: Stephen Warren <swarren@wwwdotorg.org>
->>> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
->>> ---
->>>  drivers/mfd/vexpress-sysreg.c |   77 -----------------------------------------
->>>  1 file changed, 77 deletions(-)
->>>
->>> Hi Arnd,
->>>
->>> As I haven't managed to get any feedback on the generic MMIO
->>> LEDs driver so far, I have to postpone it till next cycle and
->>> completely remove the LED-related code from the vexpress-sysreg
->>> driver, as it breaks other platforms today.
->>>
->>> Would you be so kind to apply this patch, please? Alternatively
->>> you can pull it from here:
->>>
->>>   git://git.linaro.org/people/pawelmoll/linux.git vexpress-soc2
->>>
->>> (this branch is based on the vexpress-soc you already have)
->>
->> Applied the patch on top of vexpress/soc, and merged in that branch into
->> next/soc again (it had been reverted due to the issues)
+On 11/21/2012 07:39 PM, Josh Wu wrote:
+> Hi, Nicolas
 > 
-> Actually, I replaced our current vexpress/soc with the latest one you
-> had sent a pull request from before, since it had the appropriate
-> dependencies with the clock tree sorted out
-> (git://git.linaro.org/people/pawelmoll/linux.git vexpress-clk-soc).
-
-In next-20121127, I still see that drivers/mfd/vexpress-sysreg.c has the
-following code:
-
-> static int __init vexpress_sysreg_init_leds(void)
-> {
->         struct vexpress_sysreg_led *led;
->         int i;
+> On 11/21/2012 6:05 PM, Nicolas Ferre wrote:
+>> On 11/21/2012 06:14 AM, Josh Wu :
+>>>
+>> Can we have more comment to figure out why it is needed please?
 > 
->         /* Clear all user LEDs */
->         writel(0, vexpress_sysreg_base + SYS_LED);
-...
-> }
-> device_initcall(vexpress_sysreg_init_leds);
+> I will add following comment in the commit message in the v2 version.
+> 
+> Since the commit: 3f91e94f7f511de74c0d2abe08672ccdbdd1961c ("mtd: nand:
+> read_page() returns max_bitflips ()")
+> The ecc.read_page() method for nand drivers is changed to return the maximum
+> number of bitflips instead of just returning 0.
+> 
+> And the nand.h is also explain that. I would like to adapt to it.
 
-... and on systems where vexpress_sysreg_base is not set, this crashes
-the kernel on boot.
 
-Shouldn't the patch "mfd: vexpress-sysreg: Remove LEDs code" be applied
-to solve this?
+This patch avails the atmel_nand device of a change that was merged to the
+kernel mtd code several months ago.  That change fixed a problem where higher
+layers that use the -EUCLEAN return code to make judgements on block wear (e.g.
+ubi) were marking blocks as bad when a normal number of bitflip corrections were
+made.  The problem affected newer nands with greater ecc strength.  See the
+entry on 'bitflip_threshold' in Documentation/ABI/testing/sysfs-class-mtd
+
+Thanks,
+Mike
