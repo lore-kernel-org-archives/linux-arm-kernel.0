@@ -1,88 +1,171 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 27 Nov 2012 01:07:28 +0100
-Subject: [PATCH 3/7] sh: pfc: Allow device tree registration
-In-Reply-To: <1353889014-17142-4-git-send-email-horms@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 27 Nov 2012 09:32:16 +0900
+Subject: [PATCH 6/7] ARM: mach-shmobile: sh73a0: Minimal setup using DT
+In-Reply-To: <67705146.EhpdzQI6yT@avalon>
 References: <1353889014-17142-1-git-send-email-horms@verge.net.au>
- <1353889014-17142-4-git-send-email-horms@verge.net.au>
-Message-ID: <1528017.UPeIBOTTC7@avalon>
+ <CANqRtoQmNh5Sz-YLPMvEbp0FhYW=s2tBez+Duex1vyr=yVnPuA@mail.gmail.com>
+ <20121126045805.GC12790@verge.net.au> <67705146.EhpdzQI6yT@avalon>
+Message-ID: <20121127003216.GB9724@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Mon, Nov 26, 2012 at 01:53:06PM +0100, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> On Monday 26 November 2012 13:58:06 Simon Horman wrote:
+> > On Mon, Nov 26, 2012 at 01:23:12PM +0900, Magnus Damm wrote:
+> > > On Mon, Nov 26, 2012 at 9:16 AM, Simon Horman <horms@verge.net.au> wrote:
+> > > > Allow a minimal setup of the sh73a0 SoC using a flattened device tree.
+> > > > 
+> > > > * Allow configuration of the i2c controllers using a flattened device
+> > > >   tree.
+> > > > 
+> > > > * SCI serial controller and CMT clock source, whose drivers do not yet
+> > > >   support configuration using a flattened device tree, are still
+> > > >   configured
+> > > >   using C code in order to allow booting of a board with this SoC.
+> > > > 
+> > > > An example dts snuppet follows:
+> > > >         i2c0: i2c at 0xe6820000 {
+> > > >         
+> > > >                 #address-cells = <1>;
+> > > >                 #size-cells = <0>;
+> > > >                 compatible = "renesas,rmobile-iic";
+> > > >                 reg = <0xe6820000 0x425>;
+> > > >                 interrupt-parent = <&gic>;
+> > > >                 interrupts = <0 167 0x4
+> > > >                 
+> > > >                               0 170 0x4>;
+> > > >         
+> > > >         };
+> > > >         
+> > > >         i2c1: i2c at 0xe6822000 {
+> > > >         
+> > > >                 #address-cells = <1>;
+> > > >                 #size-cells = <0>;
+> > > >                 compatible = "renesas,rmobile-iic";
+> > > >                 reg = <0xe6822000 0x425>;
+> > > >                 interrupt-parent = <&gic>;
+> > > >                 interrupts = <0 51 0x4
+> > > >                 
+> > > >                               0 44 0x4>;
+> > > >                 
+> > > >                 touchscreen at 55 {
+> > > >                 
+> > > >                         compatible = "sitronix,st1232";
+> > > >                         reg = <0x55>;
+> > > >                         interrupt-parent = <&gic>;
+> > > >                         interrupts = <0 9 0x4>;
+> > > >                 
+> > > >                 };
+> > > >         
+> > > >         };
+> > > >         
+> > > >         i2c2: i2c at 0xe6824000 {
+> > > >         
+> > > >                 #address-cells = <1>;
+> > > >                 #size-cells = <0>;
+> > > >                 compatible = "renesas,rmobile-iic";
+> > > >                 reg = <0xe6824000 0x425>;
+> > > >                 interrupt-parent = <&gic>;
+> > > >                 interrupts = <0 171 0x4
+> > > >                 
+> > > >                               0 174 0x4>;
+> > > >         
+> > > >         };
+> > > >         
+> > > >         i2c3: i2c at 0xe6826000 {
+> > > >         
+> > > >                 #address-cells = <1>;
+> > > >                 #size-cells = <0>;
+> > > >                 compatible = "renesas,rmobile-iic";
+> > > >                 reg = <0xe6826000 0x425>;
+> > > >                 interrupt-parent = <&gic>;
+> > > >                 interrupts = <0 183 0x4
+> > > >                 
+> > > >                               0 186 0x4>;
+> > > >         
+> > > >         };
+> > > >         
+> > > >         i2c4: i2c at 0xe6828000 {
+> > > >         
+> > > >                 #address-cells = <1>;
+> > > >                 #size-cells = <0>;
+> > > >                 compatible = "renesas,rmobile-iic";
+> > > >                 reg = <0xe6828000 0x425>;
+> > > >                 interrupt-parent = <&gic>;
+> > > >                 interrupts = <0 187 0x4
+> > > >                 
+> > > >                               0 190 0x4>;
+> > > >         
+> > > >         };
+> > > 
+> > > Uhm, doesn't the above want to go into sh73a0.dtsi?
+> > 
+> > There are two things that I am unsure of:
+> > 
+> > * What should go into sh73a0.dtsi and what should go into
+> >   sh73a0-kzm9g-refere3nce.dts.
+> > 
+> >   The i2c seems like it should go into sh73a0.dtsi as it is part of the
+> >   soc. Likewise the interrupt controllers.
+> > 
+> >   But when it comes to mmcif and sdhi I am less sure. Both of these make use
+> >   of regulators. Are the regulators part of the board or the SoC?
+> 
+> It depends on the regulators. In theory you could have on-SoC regulators that 
+> would thus be part of the SoC. In practice I'm not sure how often that 
+> happens.
+> 
+> Most of the regulators are provided by the PMIC, so we can create PMIC-
+> specific .dtsi files that would be included by boards. See twl4030.dtsi for an 
+> example. Other board-specific regulators, including fixed regulators, should 
+> be provided by the board.
+> 
+> >   If the are part of the board then it makes it more difficult to put mmcif
+> >   and sdhi into sh73a0.dtsi as they need to reference the regulators
+> >   somehow.
+> 
+> I think you can split a node across several files. You could have
+> 
+>         mmcif: mmcif at 0x10010000 {
+>                 compatible = "renesas,sh-mmcif";
+>                 reg = <0xe6bd0000 0x100>;
+>                 interrupt-parent = <&gic>;
+>                 interrupts = <0 140 0x4
+>                               0 141 0x4>;
+>                 reg-io-width = <4>;
+>         };
+> 
+> in the SoC .dtsi, and
+> 
+>         &mmcif {
+>                 vmmc-supply = <&fixedregulator1v8>;
+>                 vqmmc-supply = <&fixedregulator1v8>;
+>         };
+> 
+> in the board .dts.
 
-On Monday 26 November 2012 09:16:50 Simon Horman wrote:
-> This is a crude mechanism to allow the pfc driver to
-> be registered through device tree. The mofication of this
-> is to provide a way for pfc gpios to be looked up by
-> device tree for devices which use pfc gpios.
-> 
-> More specifically, the motivation is to allow the registration
-> of the card-detect gpio for the Micro-SD SDHI slot of the KZM9G board.
+Thanks, I discovered that after writing my previous email.
+I think it is an approach well suited to the needs of kzm9g
+and I intend to use it.
 
-I've just posted v2 of my PCF patches ("SH pin control and GPIO rework with OF 
-support") that include OF support for GPIOs. This patch as well as patch 4/7 
-and the gpio node in patch 7/7 and shouldn't be required anymore.
+> > * What to do the of_dev_auxdata.
+> > 
+> >   Currently I add this in patch 4 to the board-kzm9g.c. It is used to force
+> >   the name of the i2c, mmcif and sdhi devices in order to allow their clock
+> >   lookup to work (though come to think of it it may not be necessary for
+> >   mmcif and sdhi).
+> 
+> Shouldn't clocks be specified as an attribute in DT nodes that reference the 
+> clock node ?
 
-> Cc: Paul Mundt <lethal@linux-sh.org>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Signed-off-by: Simon Horman <horms@verge.net.au>
-> ---
->  drivers/sh/pfc/gpio.c  |   15 +++++++++++++++
->  include/linux/sh_pfc.h |    7 +++++++
->  2 files changed, 22 insertions(+)
-> 
-> diff --git a/drivers/sh/pfc/gpio.c b/drivers/sh/pfc/gpio.c
-> index 038fa07..322b927 100644
-> --- a/drivers/sh/pfc/gpio.c
-> +++ b/drivers/sh/pfc/gpio.c
-> @@ -136,6 +136,19 @@ static void sh_pfc_gpio_setup(struct sh_pfc_chip *chip)
-> gc->ngpio = (pfc->last_gpio - pfc->first_gpio) + 1;
->  }
-> 
-> +#ifdef CONFIG_OF_GPIO
-> +static void
-> +sh_pfc_register_gpiochip_dt(struct sh_pfc *pfc, struct gpio_chip *chip)
-> +{
-> +	chip->of_node = pfc->of_node;
-> +	chip->of_gpio_n_cells = pfc->of_gpio_n_cells;
-> +	chip->of_xlate = pfc->of_xlate;
-> +}
-> +#else
-> +static void sh_pfc_register_gpiochip_dt(struct sh_pfc *pfc,
-> +					struct gpio_chip *chip) {}
-> +#endif
-> +
->  int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
->  {
->  	struct sh_pfc_chip *chip;
-> @@ -153,6 +166,8 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
->  	if (unlikely(ret < 0))
->  		kfree(chip);
-> 
-> +	sh_pfc_register_gpiochip_dt(pfc, &chip->gpio_chip);
-> +
->  	pr_info("%s handling gpio %d -> %d\n",
->  		pfc->name, pfc->first_gpio, pfc->last_gpio);
-> 
-> diff --git a/include/linux/sh_pfc.h b/include/linux/sh_pfc.h
-> index c19a092..9963370 100644
-> --- a/include/linux/sh_pfc.h
-> +++ b/include/linux/sh_pfc.h
-> @@ -124,6 +124,13 @@ struct sh_pfc {
->  	struct pfc_window *window;
-> 
->  	unsigned long unlock_reg;
-> +
-> +#ifdef CONFIG_OF_GPIO
-> +	struct device_node *of_node;
-> +	int of_gpio_n_cells;
-> +	int (*of_xlate)(struct gpio_chip *gc,
-> +		        const struct of_phandle_args *gpiospec, u32 *flags);
-> +#endif
->  };
-> 
->  /* XXX compat for now */
--- 
-Regards,
+Oh, I will look into that.
 
-Laurent Pinchart
+Magnus's suggestion was to register the names that DT will use
+in the clock .c file.
+
+In either case I think we can get rid of auxdata.
+
+> >   In any case, the location of the of_dev_auxdata might be come a bit
+> >   tricky if it covers devices in both the board and SoC dts files.
