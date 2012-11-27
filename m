@@ -1,86 +1,126 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 27 Nov 2012 12:35:27 -0500 (EST)
-Subject: [PATCH] ARM: implement optimized percpu variable access
-In-Reply-To: <20121126151534.GA13620@mudshark.cambridge.arm.com>
-References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
- <20121122113401.GC3113@mudshark.cambridge.arm.com>
- <50B2679F.3070107@gmail.com>
- <20121126111337.GA13312@mudshark.cambridge.arm.com>
- <20121126151534.GA13620@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1211271232390.4576@xanadu.home>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Tue, 27 Nov 2012 09:52:50 -0800
+Subject: [PATCH] Don't mark shared helper functions as inline
+In-Reply-To: <20121126195742.21126.16500@nucleus>
+References: <1353957609-1295-1-git-send-email-Russ.Dill@ti.com>
+ <20121126195742.21126.16500@nucleus>
+Message-ID: <CA+Bv8XbR68-VcOF3JkL47+L9yZFkpv16JTbQfA02yZUGnPZvEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Nov 2012, Will Deacon wrote:
+On Mon, Nov 26, 2012 at 11:57 AM, Mike Turquette <mturquette@ti.com> wrote:
+>
+> Quoting Russ Dill (2012-11-26 11:20:09)
+> > The helper functions that access the opaque struct clk should
+> > not be marked inline since they are contained in clk.c, but expected
+> > to be used by other compilation units. This causes compile errors
+> > under gcc-4.7
+> >
+> > In file included from arch/arm/mach-omap2/clockdomain.c:25:0:
+> > arch/arm/mach-omap2/clockdomain.c: In function ?clkdm_clk_disable?:
+> > include/linux/clk-provider.h:338:12: error: inlining failed in call to always_inline ?__clk_get_enable_count?: function body not available
+> > arch/arm/mach-omap2/clockdomain.c:1001:28: error: called from here
+> > make[1]: *** [arch/arm/mach-omap2/clockdomain.o] Error 1
+> > make: *** [arch/arm/mach-omap2] Error 2
+> >
+>
+> Hi Russ,
+>
+> A fix for this was merged into rc7.  See 93532c8a, "clk: remove inline
+> usage from clk-provider.h".
+>
+> Regardless, I'm still considering this patch.  I've heard many times
+> that we should trust the compiler to optimize for us and some folks look
+> down on inlining in general.  If anyone has an opinion on removing
+> inlines from the common clk core then please do speak up.
+>
+> Russ, can you update to the latest rc and verify if that fix is enough
+> for you?
 
-> On Mon, Nov 26, 2012 at 11:13:37AM +0000, Will Deacon wrote:
-> > On Sun, Nov 25, 2012 at 06:46:55PM +0000, Rob Herring wrote:
-> > > On 11/22/2012 05:34 AM, Will Deacon wrote:
-> > > > As an aside, you also need to make the asm block volatile in
-> > > > __my_cpu_offset -- I can see it being re-ordered before the set for
-> > > > secondary CPUs otherwise.
-> > > 
-> > > I don't really see where there would be a re-ordering issue. There's no
-> > > percpu var access before or near the setting that I can see.
-> > 
-> > The issue is on bringing up the secondary core, so I assumed that a lot
-> > of inlining goes on inside secondary_start_kernel and then the result is
-> > shuffled around, placing a cpu-offset read before we've done the set.
-> > 
-> > Unfortunately, looking at the disassembly I can't see this happening at
-> > all, so I'll keep digging. The good news is that I've just reproduced the
-> > problem on the model, so I've got more visibility now (although both cores
-> > are just stuck in spinlocks...).
-> 
-> That was a fun bit of debugging -- my hunch was right, but I was looking in the
-> wrong place because I had an unrelated problem with my bootloader.
-> 
-> What happens is that every man and his dog is inlined into __schedule,
-> including all the runqueue accessors, such as this_rq(), which make use of
-> per-cpu offsets to get the correct pointer. The compiler then spits out
-> something like this near the start of the function:
-> 
->   c02c1d66:       af04            add     r7, sp, #16
->   [...]
->   c02c1d6c:       ee1d 3f90       mrc     15, 0, r3, cr13, cr0, {4}
->   c02c1d70:       199b            adds    r3, r3, r6
->   c02c1d72:       f8c7 e008       str.w   lr, [r7, #8]
->   c02c1d76:       617b            str     r3, [r7, #20]
->   c02c1d78:       613e            str     r6, [r7, #16]
->   c02c1d7a:       60fb            str     r3, [r7, #12]
-> 
-> so the address of the current runqueue has been calculated and stored, with
-> a bunch of other stuff, in a structure on the stack.
-> 
-> We then do our context_switch dance (which is also inlined) and return as
-> the next task (since we've done switch_{mm,to}) before doing:
-> 
-> 	barrier();
-> 	/*
-> 	 * this_rq must be evaluated again because prev may have moved
-> 	 * CPUs since it called schedule(), thus the 'rq' on its stack
-> 	 * frame will be invalid.
-> 	 */
-> 	finish_task_switch(this_rq(), prev);
-> 
-> The problem here is that, because our CPU accessors don't actually make any
-> memory references, the barrier() has no effect and the old value is just
-> reloaded off the stack:
-> 
->   c02c1f22:       f54a fe49       bl      c000cbb8 <__switch_to>
->   c02c1f26:       4601            mov     r1, r0
->   c02c1f28:       68f8            ldr     r0, [r7, #12]
->   c02c1f2a:       f56f ffd5       bl      c0031ed8 <finish_task_switch>
-> 
-> which obviously causes complete chaos if the new task has been pulled from
-> a different runqueue! (this appears as a double spin unlock on rq->lock).
-> 
-> Fixing this without giving up the performance improvement we gain by *avoiding*
-> the memory access in the first place is going to be tricky...
+Yes, that commit fixes the compile issue too. I'd go with the more
+complete removal of inlines though. If you have a declaration in a
+header, it makes no sense to call it inline in the .c
 
-What about adding a memory constraint in the offset accessor to create a 
-dependency upon which the barrier will have an effect, but without 
-actually making any memory access?
-
-
-Nicolas
+> Regards,
+> Mike
+>
+> >
+> > Signed-off-by: Russ Dill <Russ.Dill@ti.com>
+> > ---
+> >  drivers/clk/clk.c            | 14 +++++++-------
+> >  include/linux/clk-provider.h |  4 ++--
+> >  2 files changed, 9 insertions(+), 9 deletions(-)
+> >
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index 56e4495e..ed01746 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -249,32 +249,32 @@ late_initcall(clk_disable_unused);
+> >
+> >  /***    helper functions   ***/
+> >
+> > -inline const char *__clk_get_name(struct clk *clk)
+> > +const char *__clk_get_name(struct clk *clk)
+> >  {
+> >         return !clk ? NULL : clk->name;
+> >  }
+> >
+> > -inline struct clk_hw *__clk_get_hw(struct clk *clk)
+> > +struct clk_hw *__clk_get_hw(struct clk *clk)
+> >  {
+> >         return !clk ? NULL : clk->hw;
+> >  }
+> >
+> > -inline u8 __clk_get_num_parents(struct clk *clk)
+> > +u8 __clk_get_num_parents(struct clk *clk)
+> >  {
+> >         return !clk ? -EINVAL : clk->num_parents;
+> >  }
+> >
+> > -inline struct clk *__clk_get_parent(struct clk *clk)
+> > +struct clk *__clk_get_parent(struct clk *clk)
+> >  {
+> >         return !clk ? NULL : clk->parent;
+> >  }
+> >
+> > -inline int __clk_get_enable_count(struct clk *clk)
+> > +int __clk_get_enable_count(struct clk *clk)
+> >  {
+> >         return !clk ? -EINVAL : clk->enable_count;
+> >  }
+> >
+> > -inline int __clk_get_prepare_count(struct clk *clk)
+> > +int __clk_get_prepare_count(struct clk *clk)
+> >  {
+> >         return !clk ? -EINVAL : clk->prepare_count;
+> >  }
+> > @@ -300,7 +300,7 @@ out:
+> >         return ret;
+> >  }
+> >
+> > -inline unsigned long __clk_get_flags(struct clk *clk)
+> > +unsigned long __clk_get_flags(struct clk *clk)
+> >  {
+> >         return !clk ? -EINVAL : clk->flags;
+> >  }
+> > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> > index c127315..f9f5e9e 100644
+> > --- a/include/linux/clk-provider.h
+> > +++ b/include/linux/clk-provider.h
+> > @@ -335,8 +335,8 @@ const char *__clk_get_name(struct clk *clk);
+> >  struct clk_hw *__clk_get_hw(struct clk *clk);
+> >  u8 __clk_get_num_parents(struct clk *clk);
+> >  struct clk *__clk_get_parent(struct clk *clk);
+> > -inline int __clk_get_enable_count(struct clk *clk);
+> > -inline int __clk_get_prepare_count(struct clk *clk);
+> > +int __clk_get_enable_count(struct clk *clk);
+> > +int __clk_get_prepare_count(struct clk *clk);
+> >  unsigned long __clk_get_rate(struct clk *clk);
+> >  unsigned long __clk_get_flags(struct clk *clk);
+> >  int __clk_is_enabled(struct clk *clk);
+> > --
+> > 1.8.0
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
