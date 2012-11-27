@@ -1,33 +1,34 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 27 Nov 2012 11:08:36 +0530
-Subject: linux-next: manual merge of the arm-soc tree with the slave-dma
- tree
-In-Reply-To: <20121127154430.36e87542081a7cc50f80d0f6@canb.auug.org.au>
-References: <20121127154430.36e87542081a7cc50f80d0f6@canb.auug.org.au>
-Message-ID: <CAKohpo=K2kX-M4NM9onrn-Rr4otJwcQ1HxN5cKPYvj+Tza_0Ug@mail.gmail.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Mon, 26 Nov 2012 21:55:33 -0800
+Subject: [PATCH 1/2] ASoC: davinci-mcasp: Add pinctrl support
+In-Reply-To: <20121126114511.GE9411@opensource.wolfsonmicro.com> (Mark Brown's
+ message of "Mon, 26 Nov 2012 11:45:11 +0000")
+References: <1353557099-21599-1-git-send-email-gururaja.hebbar@ti.com>
+ <1353557099-21599-2-git-send-email-gururaja.hebbar@ti.com>
+ <20121126114511.GE9411@opensource.wolfsonmicro.com>
+Message-ID: <87y5hn1tey.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 November 2012 10:14, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> arch/arm/mach-spear13xx/spear1310.c between commit b47394911c26 ("ARM:
-> SPEAr13xx: Pass DW DMAC platform data from DT") from the slave-dma tree
-> and commit 300a6856324a ("ARM: SPEAr1310: Fix AUXDATA for compact flash
-> controller") from the arm-soc tree.
->
-> I have no idea how to fix this up, so I just effectively dropped the
-> arm-doc tree patch.
+>>>>> "Mark" == Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
 
-Hi Stephen,
+Hi,
 
-So sorry for that, Can you please take arm-soc version here? Patch 300a6856324a
-is doing the correct thing. i.e. we need
+ Mark> On Thu, Nov 22, 2012 at 09:34:58AM +0530, Hebbar, Gururaja wrote:
+ >> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+ >> +	if (IS_ERR(pinctrl))
+ >> +		dev_warn(&pdev->dev,
+ >> +			"pins are not configured from the driver\n");
 
-+       OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL, &cf_pdata),
+ Mark> Since the driver is happy to continue without the pins why is it
+ Mark> bothering requesting them in the first place?  In other words, this
+ Mark> should be a hard error.
 
-instead of
+Sorry, I disagree. As was discussed recently, there's several reasons
+why the pinctrl call might fail, and not all are fatal (E.G. pinmux
+already setup by bootloader):
 
-+       OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL, "cf"),
+http://article.gmane.org/gmane.linux.kernel/1399756
 
---
-viresh
+-- 
+Bye, Peter Korsgaard
