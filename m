@@ -1,23 +1,19 @@
-From: deepak.sikri@st.com (Deepak Sikri)
-Date: Tue, 27 Nov 2012 09:46:43 +0530
-Subject: [PATCH] cpufreq: SPEAr: Add CPUFreq driver
-In-Reply-To: <CAKohpomSAogQVeBQ8HaWwwoTVCsMha5d_1Wid6N3t5SnVZTc=w@mail.gmail.com>
-References: <7ec0e3f4b81b70f3def4257e6b9781efd4c7a3d2.1353785862.git.viresh.kumar@linaro.org>
- <20121127040135.GB27305@S2100-06.ap.freescale.net>
- <CAKohpomSAogQVeBQ8HaWwwoTVCsMha5d_1Wid6N3t5SnVZTc=w@mail.gmail.com>
-Message-ID: <50B43EAB.80602@st.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 27 Nov 2012 13:23:24 +0900
+Subject: [PATCH] Update ARM/SHMOBILE section of MAINTAINERS
+In-Reply-To: <1353984346-25463-1-git-send-email-horms@verge.net.au>
+References: <1353984346-25463-1-git-send-email-horms@verge.net.au>
+Message-ID: <20121127042324.GC30445@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2012 9:28 AM, Viresh Kumar wrote:
->>> [snip..]
->>> It's a little bit unusual that cpu runs such a freq range
->>> (166 ~ 600 MHz) at a fixed voltage.  You really have no way
->>> to scale voltage?
-> AFAIK, there is no voltage scaling.
->
-> @Shiraz/Deepak: Can you confirm?
+On Tue, Nov 27, 2012 at 11:45:46AM +0900, Simon Horman wrote:
+> From: Simon Horman <horms+renesas@verge.net.au>
+> 
+> I have been handling maintenance of shmobile
+> for a little over a release-cycle now and it seems
+> to appropriate to update the MAINTAINERS file accordingly.
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-We do not have any provision for voltage scaling in SPEAr.
-
-Deepak
+Acked-by: Paul Mundt <lethal@linux-sh.org>
