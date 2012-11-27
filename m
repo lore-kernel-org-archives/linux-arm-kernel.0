@@ -1,34 +1,37 @@
-From: vinholikatti@gmail.com (vinayak holikatti)
-Date: Tue, 27 Nov 2012 17:02:51 +0530
-Subject: [PATCH 192/493] scsi: remove use of __devinit
-In-Reply-To: <1353349642-3677-192-git-send-email-wfp5p@virginia.edu>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-192-git-send-email-wfp5p@virginia.edu>
-Message-ID: <CAKVbJB9wTj9HtXYTW0Le+oHsdMACkuBnf2jSXu-pAx+gPKoBYA@mail.gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 27 Nov 2012 12:38:15 +0100
+Subject: [PATCH] cpufreq: SPEAr: Add CPUFreq driver
+In-Reply-To: <CAKohpomSAogQVeBQ8HaWwwoTVCsMha5d_1Wid6N3t5SnVZTc=w@mail.gmail.com>
+References: <7ec0e3f4b81b70f3def4257e6b9781efd4c7a3d2.1353785862.git.viresh.kumar@linaro.org>
+ <20121127040135.GB27305@S2100-06.ap.freescale.net>
+ <CAKohpomSAogQVeBQ8HaWwwoTVCsMha5d_1Wid6N3t5SnVZTc=w@mail.gmail.com>
+Message-ID: <1728458.5AqJNfNVgK@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->  drivers/scsi/ufs/ufshcd.c                 |  2 +-
+On Tuesday, November 27, 2012 09:28:01 AM Viresh Kumar wrote:
+> Hi Shawn,
+> 
+> Thanks for feedback.
+> 
+> On 27 November 2012 09:31, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > On Sun, Nov 25, 2012 at 01:09:28AM +0530, Viresh Kumar wrote:
+> >> +cpufreq {
+> >> +     compatible = "st,cpufreq-spear";
+> >
+> > I do not think we need a "cpufreq" node, as we already have node for
+> > cpu to contain these.
+> 
+> Hmm.. Yes, can be done.
 
-Acked-by: Vinayak Holikatti <vinholikatti@gmail.com>
+OK, so changes are going to be made to the driver, right?
 
-only for drivers/scsi/ufs/ufshcd.c
+I'll drop it then and please resubmit when ready (and tested) after the changes.
 
-> diff --git a/drivers/scsi/ufs/ufshcd.c b/drivers/scsi/ufs/ufshcd.c
-> index 4a370f8..a79ff87 100644
-> --- a/drivers/scsi/ufs/ufshcd.c
-> +++ b/drivers/scsi/ufs/ufshcd.c
-> @@ -1811,7 +1811,7 @@ static int ufshcd_set_dma_mask(struct ufs_hba *hba)
->   *
->   * Returns 0 on success, non-zero value on failure
->   */
-> -static int __devinit
-> +static int
->  ufshcd_probe(struct pci_dev *pdev, const struct pci_device_id *id)
->  {
->         struct Scsi_Host *host;
+Thanks,
+Rafael
 
 
 -- 
-Regards,
-Vinayak Holikatti
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
