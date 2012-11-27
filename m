@@ -1,136 +1,86 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 27 Nov 2012 09:31:02 -0800
-Subject: [PATCH v4 00/12] clk: exynos4: migrate to common clock
- framework
-In-Reply-To: <15d501cdcc3a$3b5b6fb0$b2124f10$%kim@samsung.com>
-References: <1353791885-2566-1-git-send-email-thomas.abraham@linaro.org>
- <20121126193116.21126.66261@nucleus>
- <15d501cdcc3a$3b5b6fb0$b2124f10$%kim@samsung.com>
-Message-ID: <20121127173102.21126.27914@nucleus>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 27 Nov 2012 12:35:27 -0500 (EST)
+Subject: [PATCH] ARM: implement optimized percpu variable access
+In-Reply-To: <20121126151534.GA13620@mudshark.cambridge.arm.com>
+References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
+ <20121122113401.GC3113@mudshark.cambridge.arm.com>
+ <50B2679F.3070107@gmail.com>
+ <20121126111337.GA13312@mudshark.cambridge.arm.com>
+ <20121126151534.GA13620@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1211271232390.4576@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kukjin Kim (2012-11-26 16:57:53)
-> Mike Turquette wrote:
-> > 
-> > Quoting Thomas Abraham (2012-11-24 13:17:53)
-> > > Changes since v3:
-> > > - Includes changes suggested by Tomasz Figa <tomasz.figa@gmail.com>
-> > >
-> > 
-> > Hi Thomas,
-> > 
-> Hi Mike,
-> 
-> > 3.7-rc7 is out and I do not wish to take any large changes this close to
-> > the merge window opening up.  I will review these patches and give any
-> > feedback now on the common clk bits, but merging in the
-> > drivers/clk/samsung parts would have to wait until after clk-next is
-> > rebased onto 3.8-rc.
-> > 
-> I agree. Would be better if this could be provided early 3.8-rc.
-> 
-> > Which tree do you want to merge this through?  Samsung or clk-next?
-> > Will you split the patches or take it all once you have gathered ACKs?
-> > 
-> Mike, if you're ok, I'd like to take this series in Samsung tree because this changes are very important and touches many Samsung stuff.
-> 
+On Mon, 26 Nov 2012, Will Deacon wrote:
 
-Sounds good to me.
-
-Regards,
-Mike
-
-> Of course, I can create topic branch for your clk-next if you want.
-> 
-> Thanks.
-> 
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
-> 
-> > Thanks,
-> > Mike
+> On Mon, Nov 26, 2012 at 11:13:37AM +0000, Will Deacon wrote:
+> > On Sun, Nov 25, 2012 at 06:46:55PM +0000, Rob Herring wrote:
+> > > On 11/22/2012 05:34 AM, Will Deacon wrote:
+> > > > As an aside, you also need to make the asm block volatile in
+> > > > __my_cpu_offset -- I can see it being re-ordered before the set for
+> > > > secondary CPUs otherwise.
+> > > 
+> > > I don't really see where there would be a re-ordering issue. There's no
+> > > percpu var access before or near the setting that I can see.
 > > 
-> > > This patch series migrates the Samsung Exynos4 SoC clock code to adopt
-> > the
-> > > common clock framework. The use of Samsung specific clock structures has
-> > > been removed and all board support code has been updated. imx-style of
-> > > clock registration and lookup has been adopted for device tree based
-> > > exynos4 platforms.
-> > >
-> > > This patch series is based on the for-next branch of Samsung
-> > maintainer's
-> > > tree with all patches merged from clk-next branch of Mike's tree. This
-> > > series has been tested on Exynos4210 based Origen board and Exynos4412
-> > > based smdk board.
-> > >
-> > > Thomas Abraham (12):
-> > >   clk: samsung: add common clock framework helper functions for Samsung
-> > platforms
-> > >   clk: samsung: add pll clock registration helper functions
-> > >   clk: exynos4: register clocks using common clock framework
-> > >   ARM: Exynos: Rework timer initialization sequence
-> > >   ARM: Exynos4: Migrate clock support to common clock framework
-> > >   ARM: dts: add exynos4 clock controller nodes
-> > >   ARM: dts: add xxti and xusbxti fixed rate clock nodes for exynos4
-> > based platforms
-> > >   ARM: Exynos4: allow legacy board support to specify xxti and xusbxti
-> > clock speed
-> > >   ARM: dts: add clock provider information for all controllers in
-> > Exynos4 SoC
-> > >   ARM: Exynos4: remove auxdata table from machine file
-> > >   ARM: Exynos: use fin_pll clock as the tick clock source for mct
-> > >   ARM: Exynos: add support for mct clock setup
-> > >
-> > >  .../devicetree/bindings/clock/exynos4-clock.txt    |  215 +++
-> > >  arch/arm/boot/dts/exynos4.dtsi                     |   48 +
-> > >  arch/arm/boot/dts/exynos4210-origen.dts            |   12 +
-> > >  arch/arm/boot/dts/exynos4210-smdkv310.dts          |   12 +
-> > >  arch/arm/boot/dts/exynos4210.dtsi                  |    6 +
-> > >  arch/arm/boot/dts/exynos4412-smdk4412.dts          |   12 +
-> > >  arch/arm/boot/dts/exynos4x12.dtsi                  |    6 +
-> > >  arch/arm/mach-exynos/Kconfig                       |    1 +
-> > >  arch/arm/mach-exynos/Makefile                      |    3 -
-> > >  arch/arm/mach-exynos/clock-exynos4.c               | 1602 -----------------
-> > ---
-> > >  arch/arm/mach-exynos/clock-exynos4.h               |   35 -
-> > >  arch/arm/mach-exynos/clock-exynos4210.c            |  188 ---
-> > >  arch/arm/mach-exynos/clock-exynos4212.c            |  192 ---
-> > >  arch/arm/mach-exynos/common.c                      |   57 +-
-> > >  arch/arm/mach-exynos/common.h                      |   21 +-
-> > >  arch/arm/mach-exynos/mach-armlex4210.c             |    3 +-
-> > >  arch/arm/mach-exynos/mach-exynos4-dt.c             |   71 +-
-> > >  arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +-
-> > >  arch/arm/mach-exynos/mach-nuri.c                   |    5 +-
-> > >  arch/arm/mach-exynos/mach-origen.c                 |    5 +-
-> > >  arch/arm/mach-exynos/mach-smdk4x12.c               |    5 +-
-> > >  arch/arm/mach-exynos/mach-smdkv310.c               |    7 +-
-> > >  arch/arm/mach-exynos/mach-universal_c210.c         |    3 +-
-> > >  arch/arm/mach-exynos/mct.c                         |   32 +-
-> > >  arch/arm/plat-samsung/Kconfig                      |    4 +-
-> > >  drivers/clk/Makefile                               |    1 +
-> > >  drivers/clk/samsung/Makefile                       |    6 +
-> > >  drivers/clk/samsung/clk-exynos4.c                  |  655 ++++++++
-> > >  drivers/clk/samsung/clk-pll.c                      |  400 +++++
-> > >  drivers/clk/samsung/clk-pll.h                      |   38 +
-> > >  drivers/clk/samsung/clk.c                          |  180 +++
-> > >  drivers/clk/samsung/clk.h                          |  216 +++
-> > >  32 files changed, 1905 insertions(+), 2138 deletions(-)
-> > >  create mode 100644 Documentation/devicetree/bindings/clock/exynos4-
-> > clock.txt
-> > >  delete mode 100644 arch/arm/mach-exynos/clock-exynos4.c
-> > >  delete mode 100644 arch/arm/mach-exynos/clock-exynos4.h
-> > >  delete mode 100644 arch/arm/mach-exynos/clock-exynos4210.c
-> > >  delete mode 100644 arch/arm/mach-exynos/clock-exynos4212.c
-> > >  create mode 100644 drivers/clk/samsung/Makefile
-> > >  create mode 100644 drivers/clk/samsung/clk-exynos4.c
-> > >  create mode 100644 drivers/clk/samsung/clk-pll.c
-> > >  create mode 100644 drivers/clk/samsung/clk-pll.h
-> > >  create mode 100644 drivers/clk/samsung/clk.c
-> > >  create mode 100644 drivers/clk/samsung/clk.h
-> > >
-> > > --
-> > > 1.7.4.4
+> > The issue is on bringing up the secondary core, so I assumed that a lot
+> > of inlining goes on inside secondary_start_kernel and then the result is
+> > shuffled around, placing a cpu-offset read before we've done the set.
+> > 
+> > Unfortunately, looking at the disassembly I can't see this happening at
+> > all, so I'll keep digging. The good news is that I've just reproduced the
+> > problem on the model, so I've got more visibility now (although both cores
+> > are just stuck in spinlocks...).
+> 
+> That was a fun bit of debugging -- my hunch was right, but I was looking in the
+> wrong place because I had an unrelated problem with my bootloader.
+> 
+> What happens is that every man and his dog is inlined into __schedule,
+> including all the runqueue accessors, such as this_rq(), which make use of
+> per-cpu offsets to get the correct pointer. The compiler then spits out
+> something like this near the start of the function:
+> 
+>   c02c1d66:       af04            add     r7, sp, #16
+>   [...]
+>   c02c1d6c:       ee1d 3f90       mrc     15, 0, r3, cr13, cr0, {4}
+>   c02c1d70:       199b            adds    r3, r3, r6
+>   c02c1d72:       f8c7 e008       str.w   lr, [r7, #8]
+>   c02c1d76:       617b            str     r3, [r7, #20]
+>   c02c1d78:       613e            str     r6, [r7, #16]
+>   c02c1d7a:       60fb            str     r3, [r7, #12]
+> 
+> so the address of the current runqueue has been calculated and stored, with
+> a bunch of other stuff, in a structure on the stack.
+> 
+> We then do our context_switch dance (which is also inlined) and return as
+> the next task (since we've done switch_{mm,to}) before doing:
+> 
+> 	barrier();
+> 	/*
+> 	 * this_rq must be evaluated again because prev may have moved
+> 	 * CPUs since it called schedule(), thus the 'rq' on its stack
+> 	 * frame will be invalid.
+> 	 */
+> 	finish_task_switch(this_rq(), prev);
+> 
+> The problem here is that, because our CPU accessors don't actually make any
+> memory references, the barrier() has no effect and the old value is just
+> reloaded off the stack:
+> 
+>   c02c1f22:       f54a fe49       bl      c000cbb8 <__switch_to>
+>   c02c1f26:       4601            mov     r1, r0
+>   c02c1f28:       68f8            ldr     r0, [r7, #12]
+>   c02c1f2a:       f56f ffd5       bl      c0031ed8 <finish_task_switch>
+> 
+> which obviously causes complete chaos if the new task has been pulled from
+> a different runqueue! (this appears as a double spin unlock on rq->lock).
+> 
+> Fixing this without giving up the performance improvement we gain by *avoiding*
+> the memory access in the first place is going to be tricky...
+
+What about adding a memory constraint in the offset accessor to create a 
+dependency upon which the barrier will have an effect, but without 
+actually making any memory access?
+
+
+Nicolas
