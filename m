@@ -1,53 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Nov 2012 15:16:20 +0100
-Subject: [PATCH] clk: ux500: assume PRCC clocks are off by default
-In-Reply-To: <CAPDyKFrqvtFJZHi3tGQ6x8tyHXv6-S7K8_CrqCYf8TQJ0h6jFw@mail.gmail.com>
-References: <1354024310-22021-1-git-send-email-linus.walleij@stericsson.com>
- <CAPDyKFrqvtFJZHi3tGQ6x8tyHXv6-S7K8_CrqCYf8TQJ0h6jFw@mail.gmail.com>
-Message-ID: <CACRpkdZEFVs+OMT2d3=KoTimpJ_HYFq3aL1EvoL4qQdjtocs2w@mail.gmail.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Tue, 27 Nov 2012 06:20:55 -0800
+Subject: [PATCH v4 05/11] pwm: pwm-tiecap: pinctrl support
+In-Reply-To: <20121124203423.GA26951@avionic-0098.adnet.avionic-design.de>
+ (Thierry Reding's message of "Sat, 24 Nov 2012 21:34:23 +0100")
+References: <1353503469-18634-1-git-send-email-avinashphilip@ti.com>
+ <1353503469-18634-6-git-send-email-avinashphilip@ti.com>
+ <20121122205944.GC16716@avionic-0098.adnet.avionic-design.de>
+ <518397C60809E147AF5323E0420B992E3E9EE991@DBDE01.ent.ti.com>
+ <20121123105110.GA6884@avionic-0098.adnet.avionic-design.de>
+ <518397C60809E147AF5323E0420B992E3E9EEAAA@DBDE01.ent.ti.com>
+ <20121123111811.GA5072@avionic-0098.adnet.avionic-design.de>
+ <87mwy8eb7w.fsf@dell.be.48ers.dk>
+ <20121124203423.GA26951@avionic-0098.adnet.avionic-design.de>
+Message-ID: <87txsb160o.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2012 at 2:58 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 27 November 2012 14:51, Linus Walleij <linus.walleij@stericsson.com> wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
+>>>>> "Thierry" == Thierry Reding <thierry.reding@avionic-design.de> writes:
 
->> So instead assume that the PRCC clocks are *not* on, and
->> everything starts working. This may cause a few extra writes
->> to the enable registers but it's worth it. We cannot read
->> the status registers to find out if the clock is on at
->> this point as that means we first have to turn on the
->> clock to the peripheral cluster.
->>
->> Reported-by: Lee Jones <lee.jones@linaro.org>
->> Cc: Ulf Hansson <ulf.hansson@linaro.org>
->> Cc: Philippe Begnic <philippe.begnic@st.com>
->> Cc: Per Forlin <per.forlin@stericsson.com>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> Mike: this needs to go into v3.7. (Yes, sorry for not seeing
->> this earlier, but the problem did manifest itself in very
->> strange ways.) If v3.7 is not possible, make sure to add the
->
-> Hold on!
->
-> I see what you are trying to solve. But the next problem when going
-> ahead with this patch is that some clocks, which are default on, will
-> be kept on unless some client explicit disables it. This is not OK. I
-> will get back to you with some more ideas how to proceed.
+Hi,
 
-OK ... well that means if we don't come up with a better solution
-we need to choose the lesser of two evils:
+ >> There's several different situations:
+ >> 
+ >> - Platform without pinctrl support
+ >> - Platform with pinctrl support but no pinmux specified in dt for device
+ >> (E.G. pinmux setup in bootloader)
+ >> - Pinmux specified in dt
+ >> - Some kind of misconfiguration in dt
+ >> 
+ >> You could argue that devm_pinctrl_get_select_default() shouldn't return
+ >> an error for the first situation, but how should it be able to know the
+ >> difference between 2 and 4?
 
-- Apply this and get a power regression
+ Thierry> In case where the platform supports pinctrl but no pinmux is specified
+ Thierry> for the device it should just assume that no pinmuxing is needed. That
+ Thierry> sounds like the most logical behaviour to me. In those cases pinctrl
+ Thierry> could just assume that the default has already been selected and not
+ Thierry> return an error.
 
-- Not apply this and get a GPIO regression which cascades
-  to child devices, for example STMPE keypad and SD Card
-  detect on older boards is
-  not working at all without this.
+Agreed.
 
-So let's see if we can fix the perfect patch to avoid having to
-choose...
+ Thierry> But you can't reasonably expect to cope with misconfigured DT
+ Thierry> content.  Heck, there's no way for you to even know if it is
+ Thierry> misconfigured.
 
-Yours,
-Linus Walleij
+With 'misconfigured DT' I just mean any kind of real error.
+
+
+ Thierry> That said, I'm not sure how much of an issue this really
+ Thierry> is. Pinmuxing is only used for functions local to a given
+ Thierry> chip, right? So if an SoC supports pinctrl and a given
+ Thierry> peripheral needs pinmuxing then we can reasonably assume that
+ Thierry> your second case can't happen, can't we?
+
+Well, peripherals only need pinmuxing if the bootloader didn't already
+set it up in advance. We could naturally enforce people to add
+"redundant" pinmux info to their .dts files, but I'm not sure I like
+that idea.
+
+-- 
+Bye, Peter Korsgaard
