@@ -1,20 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 27 Nov 2012 13:34:04 +0000
-Subject: [PATCH 1/3] Input: bu21013_ts - Request a regulator that
- actually exists
-In-Reply-To: <1354021990-16978-2-git-send-email-lee.jones@linaro.org>
-References: <1354021990-16978-1-git-send-email-lee.jones@linaro.org>
- <1354021990-16978-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20121127133404.GA13065@sirena.org.uk>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 27 Nov 2012 14:51:50 +0100
+Subject: [PATCH] clk: ux500: assume PRCC clocks are off by default
+Message-ID: <1354024310-22021-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2012 at 01:13:08PM +0000, Lee Jones wrote:
-> Currently the BU21013 Touch Screen driver requests a regulator by the
-> name of 'V-TOUCH', which doesn't exist anywhere in the kernel. The
-> correct name, as referenced in platform regulator code is 'avdd'. Here,
-> when we request a regulator, we use the correct name instead.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-The regulator should be requested using whatever the name for the supply
-in the datasheet - AVDD does sound very pluasible but it'd be good to
-check.
+The code for the PRCC clock assumed that on boot all the PRCC
+clocks were on, defining them as enabled. However some such
+clocks like the clock for the GPIO block 6 in the PER2
+peripheral group are not on at all.
+
+This would manifest itself as a GPIO block seeming to be
+clocked and working from the debugfs point of view when
+actually it was not clocked at all.
+
+So instead assume that the PRCC clocks are *not* on, and
+everything starts working. This may cause a few extra writes
+to the enable registers but it's worth it. We cannot read
+the status registers to find out if the clock is on at
+this point as that means we first have to turn on the
+clock to the peripheral cluster.
+
+Reported-by: Lee Jones <lee.jones@linaro.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Philippe Begnic <philippe.begnic@st.com>
+Cc: Per Forlin <per.forlin@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Mike: this needs to go into v3.7. (Yes, sorry for not seeing
+this earlier, but the problem did manifest itself in very
+strange ways.) If v3.7 is not possible, make sure to add the
+Cc: stable at kernel.org tag to it.
+---
+ drivers/clk/ux500/clk-prcc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/ux500/clk-prcc.c b/drivers/clk/ux500/clk-prcc.c
+index 7eee7f7..0a20a06 100644
+--- a/drivers/clk/ux500/clk-prcc.c
++++ b/drivers/clk/ux500/clk-prcc.c
+@@ -120,7 +120,7 @@ static struct clk *clk_reg_prcc(const char *name,
+ 		goto free_clk;
+ 
+ 	clk->cg_sel = cg_sel;
+-	clk->is_enabled = 1;
++	clk->is_enabled = 0;
+ 
+ 	clk_prcc_init.name = name;
+ 	clk_prcc_init.ops = clk_prcc_ops;
+-- 
+1.7.11.3
