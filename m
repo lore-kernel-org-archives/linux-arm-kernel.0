@@ -1,86 +1,99 @@
-From: kh.choi@insignal.co.kr (kh.choi)
-Date: Tue, 27 Nov 2012 19:28:09 +0900
-Subject: [PATCH] ARM: dts: add initial dts file for ORIGEN4QUAD
-In-Reply-To: <1361143.TuLvfqvMr1@amdc1227>
-References: <1353929538-24173-1-git-send-email-kh.choi@insignal.co.kr>
- <CAH9JG2VSnA3zJCP9OiBbrdaV1GqVKL0x4fn331D7YJxQs8VwMg@mail.gmail.com>
- <1361143.TuLvfqvMr1@amdc1227>
-Message-ID: <50B495B9.4060005@insignal.co.kr>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 27 Nov 2012 11:15:40 +0000
+Subject: [GIT PULL v3] ST-Ericsson Device Tree patches
+In-Reply-To: <20121120162836.GE28265@gmail.com>
+References: <20121120162836.GE28265@gmail.com>
+Message-ID: <20121127111540.GC2013@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
 
-2012-11-26 ?? 8:57, Tomasz Figa ? ?:
-> Hi Kyungmin, Kyuho,
->
-> On Monday 26 of November 2012 20:52:12 Kyungmin Park wrote:
->> Hi,
->>
->> On 11/26/12, chlrbgh0 at gmail.com <chlrbgh0@gmail.com> wrote:
->>> From: Kyuho Choi <kh.choi@insignal.co.kr>
->>>
->>> This patch adds initial dts file for ORIGEN4QUAD board.
->>> ORIGEN4QUAD board based on Samsung EXYNOS4412 SoC.
->>> More properties will be added later.
->>>
->>> Signed-off-by: Kyuho Choi <kh.choi@insignal.co.kr>
->>> ---
->>>
->>>   arch/arm/boot/dts/exynos4412-origen4quad.dts |   45
->>>
->>> ++++++++++++++++++++++++++
->>>
->>>   1 files changed, 45 insertions(+), 0 deletions(-)
->>>   create mode 100644 arch/arm/boot/dts/exynos4412-origen4quad.dts
->>>
->>> diff --git a/arch/arm/boot/dts/exynos4412-origen4quad.dts
->>> b/arch/arm/boot/dts/exynos4412-origen4quad.dts
->>> new file mode 100644
->>> index 0000000..390a2ab
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/exynos4412-origen4quad.dts
->>> @@ -0,0 +1,45 @@
->>> +/*
->>> + * Samsung's Exynos4412 based Origen4Quad board device tree source
->>> + *
->>> + * Copyright (c) 2012-2013 Isnignal Co., Ltd.
->>> + *		http://www.insignal.co.kr
->>> + *
->>> + * Device tree source file for Insignal's Origen4Quad board which is
->>> based on
->>> + * Samsung's Exynos4412 SoC.
->>> + *
->>> + * This program is free software; you can redistribute it and/or
->>> modify + * it under the terms of the GNU General Public License
->>> version 2 as + * published by the Free Software Foundation.
->>> +*/
->>> +
->>> +/dts-v1/;
->>> +/include/ "exynos4412.dtsi"
->>> +
->>> +/ {
->>> +	model = "Insignal Origen4Quad board based on Exynos4412";
->>> +	compatible = "insignal,origen4quad", "samsung,exynos4412";
->>> +
->>> +	memory {
->>> +		reg = <0x40000000 0x40000000>;
->>> +	};
->>
->> does it test to boot with this dts file?
->> does it support 1GiB memory section?
->
-> It will most likely fail to boot with u-boot versions that do not support
-> replacing memory configuration in device tree and without
-> CONFIG_ARM_ATAG_DTB_COMPAT enabled.
->
-> In other words, the memory setup from dts is used only if both of the
-> following are true:
->   - CONFIG_ARM_ATAG_DTB_COMPAT is disabled
->   - u-boot does not modify memory setup in device tree passed to the kernel
-I'd working based on `exynos4_defconfig` for ORIGEN4QUAD board.
-`exynos4_defconfig`s default disabled CONFIG_ARM_ATAG_DTB_COMPAT.
-And ORIGEN4QUAD working on u-boot v2012.10.
->
-> Best regards,
->
+  Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/ljones/linux-3.0-ux500.git ste-dt-for-next
+
+for you to fetch changes up to e13316d60658aee7987b51025f342649baa33487:
+
+  ARM: ux500: Rename dbx500 cpufreq code to be more generic (2012-11-27 10:58:57 +0000)
+
+----------------------------------------------------------------
+Fabio Baltieri (1):
+      ARM: dts: add missing ux500 device trees
+
+Lee Jones (42):
+      ARM: ux500: Move regulator-name properties out to board DTS files
+      ARM: ux500: Fix initialisation order for UIBs
+      ARM: ux500: Elaborate on SDI device node names in Device Tree
+      ARM: ux500: Add SDI (MMC) support to the HREF Device Tree
+      ARM: ux500: Correct Snowball's external SD/MMC slot's bus width
+      ARM: ux500: Create a DTS hierarchy for ST-Ericsson's HREF boards
+      ARM: ux500: Create a Device Tree for early HREFs
+      ARM: ux500: Add support for gpio-keys and Proximity Sensor for HREF
+      ARM: ux500: Remove platform specific device registration when DT is enabled
+      ARM: ux500: Move all Device Tree booting into cpu-db8500
+      ARM: ux500: Strip out duplicate touch screen platform information
+      Documentation: Detail permitted DT properties for the BU21013 Touch Screen
+      ARM: ux500: Create a new Device Tree include file for boards supporting STUIBs
+      ARM: ux500: Stop calling the UIB init function when using Device Tree
+      ARM: ux500: Add all bu21013 touch screen components to supported Device Trees
+      ARM: ux500: Stop informing the regulator subsystem that we have full constraints
+      ARM: ux500: Apply a Device Tree node for the STMPE MFD
+      ARM: ux500: Supply the STMPE keypad Device Tree node to the STUIB DT
+      ARM: ux500: Remove unused board compatible string
+      ARM: ux500: Add skeleton DTS file for the u9540
+      ARM: ux500: Add support for ST-Ericsson's u9540 SoC
+      ARM: ux500: Add UART support to the u9540 Device Tree
+      ARM: ux500: Enable SDI4 port on the u9540 when booting with Device Tree
+      ARM: ux500: Enable all MMC devices on the u9540 when booting with DT
+      ARM: ux500: Rename references to the ccu9540 dev board accordingly
+      ARM: ux500: Remove duplicate DT_MACHINE_START - make u8500 for generic
+      ARM: ux500: List DT compatibility using platform names rather than by board
+      ARM: ux500: Add node for the MMC GPIO regulator
+      ARM: ux500: Change the type of interrupt to something compatible
+      ARM: ux500: CONFIG: Enable GPIO Regulators
+      ARM: ux500: Convert DT_MACHINE_START to use SMP operations
+      ARM: ux500: Move regulator-name properties out to board DTS files
+      ARM: ux500: Add SDI (MMC) support to the HREF Device Tree
+      ARM: ux500: Add skeleton DTS file for the u9540
+      ARM: ux500: Add UART support to the u9540 Device Tree
+      ARM: ux500: Enable SDI4 port on the u9540 when booting with Device Tree
+      ARM: ux500: Enable all MMC devices on the u9540 when booting with DT
+      ARM: ux500: Describe UART platform registering issues more accurately
+      ARM: ux500: Disable the MMCI gpio-regulator by default
+      ARM: ux500: Move board specific GPIO info out to subordinate DTS files
+      ARM: ux500: Stop registering the PCM driver from platform code
+      ARM: ux500: Rename dbx500 cpufreq code to be more generic
+
+ .../bindings/input/touchscreen/bu21013.txt         |   28 ++
+ arch/arm/boot/dts/Makefile                         |    5 +-
+ arch/arm/boot/dts/ccu9540.dts                      |   72 ++++++
+ arch/arm/boot/dts/dbx5x0.dtsi                      |   57 ++--
+ arch/arm/boot/dts/href.dtsi                        |  273 ++++++++++++++++++++
+ arch/arm/boot/dts/hrefprev60.dts                   |   48 ++++
+ arch/arm/boot/dts/hrefv60plus.dts                  |  217 ++++++++++++----
+ arch/arm/boot/dts/snowball.dts                     |  140 +++++++++-
+ arch/arm/boot/dts/stuib.dtsi                       |   78 ++++++
+ arch/arm/boot/dts/u9540.dts                        |   72 ++++++
+ arch/arm/configs/u8500_defconfig                   |    1 +
+ arch/arm/mach-ux500/board-mop500-audio.c           |   16 --
+ arch/arm/mach-ux500/board-mop500-stuib.c           |   22 +-
+ arch/arm/mach-ux500/board-mop500.c                 |  146 +----------
+ arch/arm/mach-ux500/board-mop500.h                 |   10 +-
+ arch/arm/mach-ux500/cpu-db8500.c                   |  111 +++++++-
+ arch/arm/mach-ux500/cpu.c                          |    3 +
+ 17 files changed, 1018 insertions(+), 281 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/bu21013.txt
+ create mode 100644 arch/arm/boot/dts/ccu9540.dts
+ create mode 100644 arch/arm/boot/dts/href.dtsi
+ create mode 100644 arch/arm/boot/dts/hrefprev60.dts
+ create mode 100644 arch/arm/boot/dts/stuib.dtsi
+ create mode 100644 arch/arm/boot/dts/u9540.dts
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
