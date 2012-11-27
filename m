@@ -1,33 +1,34 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Tue, 27 Nov 2012 13:05:20 +0530
-Subject: [PATCH] ARM: SAMSUNG: Fix build of I2S driver
-In-Reply-To: <20121127064313.GV9411@opensource.wolfsonmicro.com>
-References: <1353944420-3972-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <15c501cdcc36$db54cb00$91fe6100$%kim@samsung.com>
- <20121127064313.GV9411@opensource.wolfsonmicro.com>
-Message-ID: <CAAgF-BcHKMWqgpU=SFtb4ivmgLydodS+_GM0-Z5_QM3coEErZQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 27 Nov 2012 08:39:00 +0100
+Subject: [PATCH 1/4] ARM: dts: Add very basic dt support for mx31pdk
+In-Reply-To: <CAOMZO5BDgyJ0cww18Sz8h5JDy7CgqwhcA=wwZhggge==rCdBZA@mail.gmail.com>
+References: <1353611447-7732-1-git-send-email-fabio.estevam@freescale.com>
+ <20121126100340.GE10369@pengutronix.de>
+ <CAOMZO5BDgyJ0cww18Sz8h5JDy7CgqwhcA=wwZhggge==rCdBZA@mail.gmail.com>
+Message-ID: <20121127073900.GK10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2012 at 12:13 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Nov 27, 2012 at 09:33:43AM +0900, Kukjin Kim wrote:
->
->> I checked Samsung audio driver stuff just now. If you don't mind, I will
->> drop the patch 48a2050d ("ARM: SAMSUNG: Delete the unnecessary variable")
->> instead of applying this.
->
-> That works just as well for me, thanks.  Padma, as I said in the commit
-> log this should be done as part of a single patch series rather than
-> sending separately to ARM or ASoC so that both trees continue to build
-> at each point.
+On Tue, Nov 27, 2012 at 01:08:07AM -0200, Fabio Estevam wrote:
+> On Mon, Nov 26, 2012 at 8:03 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Thu, Nov 22, 2012 at 05:10:43PM -0200, Fabio Estevam wrote:
+> >> Add very basic dt support for mx31pdk.
+> >>
+> >> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> >
+> > Could you provide a bit more complete patch? I think at least the low
+> > hanging fruits like nor flash and nand, some i2c devices is not much
+> > work but would save a lot of churn in patching the file.
+> 
+> Ok, what about the other patches of the series? Are they good?
 
-Ok. I will send as a single patch.
+Yeah, the rest looks ok. Applied them.
 
->
->> If any unprepared patches for Samsung audio in my tree, please let me know.
->
-> Will do.
+Sascha
 
-Thanks
-Padma
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
