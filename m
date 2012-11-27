@@ -1,57 +1,111 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 27 Nov 2012 20:35:21 +0530
-Subject: [PATCH v3 02/11] clk: davinci - add PSC clock driver
-In-Reply-To: <20121110022254.18014.31873@nucleus>
-References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
- <1351181518-11882-3-git-send-email-m-karicheri2@ti.com>
- <50950908.1060302@ti.com> <5097D6FC.7040202@ti.com>
- <20121110022254.18014.31873@nucleus>
-Message-ID: <50B4D6B1.3000903@ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 27 Nov 2012 16:08:23 +0100
+Subject: [PATCHv9 1/3] Runtime Interpreted Power Sequences
+In-Reply-To: <50ACC341.3090204@ti.com>
+References: <1353149747-31871-1-git-send-email-acourbot@nvidia.com>
+ <20121121114018.GA31576@avionic-0098.adnet.avionic-design.de>
+ <50ACC341.3090204@ti.com>
+Message-ID: <6982060.HfOokt4dIn@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi Tomi,
 
-On 11/10/2012 7:52 AM, Mike Turquette wrote:
-> Quoting Murali Karicheri (2012-11-05 07:10:52)
->> On 11/03/2012 08:07 AM, Sekhar Nori wrote:
->>> On 10/25/2012 9:41 PM, Murali Karicheri wrote:
->>>> This is the driver for the Power Sleep Controller (PSC) hardware
->>>> found on DM SoCs as well Keystone SoCs (c6x). This driver borrowed
->>>> code from arch/arm/mach-davinci/psc.c and implemented the driver
->>>> as per common clock provider API. The PSC module is responsible for
->>>> enabling/disabling the Power Domain and Clock domain for different IPs
->>>> present in the SoC. The driver is configured through the clock data
->>>> passed to the driver through struct clk_psc_data.
->>>>
->>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>>> ---
->>>> +/**
->>>> + * struct clk_psc - DaVinci PSC clock driver data
->>>> + *
->>>> + * @hw: clk_hw for the psc
->>>> + * @psc_data: Driver specific data
->>>> + */
->>>> +struct clk_psc {
->>>> +    struct clk_hw hw;
->>>> +    struct clk_psc_data *psc_data;
->>>> +    spinlock_t *lock;
->>> Unused member? I don't see this being used.
->>
->> OK. Will remove.
+On Wednesday 21 November 2012 14:04:17 Tomi Valkeinen wrote:
+> On 2012-11-21 13:40, Thierry Reding wrote:
+
+[snip]
+
+> > One thing that's not very clear is how the backlight subsystem should be
+> > wired up with the display framework. I have a patch on top of the Tegra
+> > DRM driver which adds some ad-hoc display support using this power
+> > sequences series and the pwm-backlight.
 > 
-> Those locks are only used for the case where a register might contain
-> bits for several clocks.  Thus RMW operations are protected.  On OMAP
-> this isn't necessary due to a very generous register layout (typically
-> one 32-bit reg per module) controlling clocks.  Seems tha tmaybe this is
-> not needed for PSC module either?
+> I think that's a separate issue: how to associate the lcd device and
+> backlight device together. I don't have a clear answer to this.
+> 
+> There are many ways the backlight may be handled. In some cases the
+> panel and the backlight are truly independent, and you can use the other
+> without using the other (not very practical, though =).
 
-Sorry about the late reply. The above is not totally true for PSC. There
-are some registers (like PTCMD) which are common for all clocks.
+>From a control point of view that's always the case for DPI panels (as those 
+panels have no control bus, the backlight control bus is by definition 
+separate) and is the case for the two DBI panels I've seen (but I won't claim 
+that's a significative number of panels).
 
-There is an enable_lock used in drivers/clk/clk.c which serializes all
-enable/disable calls across the clock tree. Since that is done, further
-locking at clk-psc level is not really needed, no?
+> But then with some LCDs the backlight may be controlled by sending commands
+> to the panel, and in this case the two may be quite linked. Changing the
+> backlight requires the panel driver to be up and running, and sometimes the
+> sending the backlight commands may need to be (say, DSI display, with
+> backlight commands going over the DSI bus).
 
-Thanks,
-Sekhar
+When you write "sending commands to the panel", do you mean on the same 
+control bus that the panel use ? Or would that also include for instance an 
+I2C backlight controller integrated inside a DSI panel module ? In the later 
+case there might still be dependencies between the panel controller and the 
+backlight controller (let's say for instance that the panel controller has a 
+DSI-controller GPIO wired to the backlight controller reset signal), but in 
+practice I don't know if that's ever the case.
+
+> So my feeling is that the panel driver should know about the related
+> backlight device. In the first case the panel driver would just call
+> enable/disable in the backlight device when the panel is turned on.
+
+That makes sense. Unless I'm mistaken a backlight is always associated with a 
+panel (it would be called a light if there was no panel in front of it). We 
+can thus expose backlight operations in the panel CDF (in-kernel) API. The 
+panel driver would need a way to retrieve a pointer to the associated 
+backlight device.
+
+> In the second case of the DSI panel... I'm not sure. I've implemented it
+> so that the panel driver creates the backlight device, and implements
+> the backlight callbacks. It then sends the DSI commands from those
+> callbacks.
+
+If we decide to make the panel expose backlight operations we could get rid of 
+the backlight device in this case.
+
+> > From reading the proposal for the panel/display framework, it sounds
+> > like a lot more is planned than just enabling or disabling panels, but
+> > it also seems like a lot of code needs to be written to support things
+> > like DSI, DBI or other control busses.
+> > 
+> > At least for Tegra, and I think the same holds for a wide variety of
+> > other SoCs, dumb panels would be enough for a start. In the interest of
+> > getting a working solution for those setups, maybe we can start small
+> > and add just enough framework to register dumb panel drivers to along
+> > with code to wire up a backlight to light up the display. Then we could
+> > possibly still make it to have a proper solution to support the various
+> > LVDS panels for Tegra with 3.9.
+> 
+> Yes, we (Laurent and me) both agree that we should start simple.
+> 
+> However, the common panel framework is not strictly needed for this. I'm
+> not sure of the current architecture for Tegra, but for OMAP we already
+> have panel drivers (omap specific ones, though). The panel drivers may
+> support multiple models, (for example,
+> drivers/video/omap2/displays/panel-generic-dpi.c).
+> 
+> I don't see any problem with adding small Tegra specific panel drivers
+> for the time being, with the intention of converting to common panel
+> framework when that's available.
+
+I'm fine with that, but using the CDF would be even better :-)
+
+> Of course, the DT side is an issue. If you now create DT bindings for a
+> temporary model, and need to change it again later, you'll have some
+> headaches trying managing that without breaking the old bindings... This
+> is why I haven't pushed DT bindings for OMAP, as I know I have to change
+> them in the near future.
+
+-- 
+Regards,
+
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121127/177324be/attachment.sig>
