@@ -1,77 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 27 Nov 2012 16:29:12 -0700
-Subject: [PATCH V7 3/7] arm64: use new common dtc rule
-In-Reply-To: <1354058956-7199-1-git-send-email-swarren@wwwdotorg.org>
-References: <1354058956-7199-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1354058956-7199-3-git-send-email-swarren@wwwdotorg.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 28 Nov 2012 08:31:19 +0900
+Subject: [PATCH] ARM: S3C64XX: Add dummy supplies for Glenfarclas LDOs
+In-Reply-To: <1354030486-26742-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1354030486-26742-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <50B54D47.1040301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 11/28/12 00:34, Mark Brown wrote:
+> These are not actually connected but it saves them going through probe
+> deferral.
+>
+> Signed-off-by: Mark Brown<broonie@opensource.wolfsonmicro.com>
+> ---
+>   arch/arm/mach-s3c64xx/mach-crag6410.c |   10 ++++++++++
+>   1 file changed, 10 insertions(+)
+>
+> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+> index c06bcfa..701f421 100644
+> --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
+> +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+> @@ -333,6 +333,16 @@ static struct regulator_consumer_supply wallvdd_consumers[] = {
+>   	REGULATOR_SUPPLY("DC1VDD", "1-0034"),
+>   	REGULATOR_SUPPLY("DC2VDD", "1-0034"),
+>   	REGULATOR_SUPPLY("DC3VDD", "1-0034"),
+> +	REGULATOR_SUPPLY("LDO1VDD", "1-0034"),
+> +	REGULATOR_SUPPLY("LDO2VDD", "1-0034"),
+> +	REGULATOR_SUPPLY("LDO4VDD", "1-0034"),
+> +	REGULATOR_SUPPLY("LDO5VDD", "1-0034"),
+> +	REGULATOR_SUPPLY("LDO6VDD", "1-0034"),
+> +	REGULATOR_SUPPLY("LDO7VDD", "1-0034"),
+> +	REGULATOR_SUPPLY("LDO8VDD", "1-0034"),
+> +	REGULATOR_SUPPLY("LDO9VDD", "1-0034"),
+> +	REGULATOR_SUPPLY("LDO10VDD", "1-0034"),
+> +	REGULATOR_SUPPLY("LDO11VDD", "1-0034"),
+>   };
+>
+>   static struct regulator_init_data wallvdd_data = {
 
-The current rules have the .dtb files build in a different directory
-from the .dts files. This patch changes arm64 to use the generic dtb
-rule which builds .dtb files in the same directory as the source .dts.
+Applied, thanks.
 
-This requires moving parts of arch/arm64/boot/Makefile into newly created
-arch/arm64/boot/dts/Makefile, and updating arch/arm64/Makefile to call the
-new Makefile.
+Thanks.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-v7: New patch.
----
- arch/arm64/Makefile          |    2 +-
- arch/arm64/boot/Makefile     |    5 -----
- arch/arm64/boot/dts/Makefile |    5 +++++
- 3 files changed, 6 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm64/boot/dts/Makefile
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 364191f..fd3d4a1 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -54,7 +54,7 @@ zinstall install: vmlinux
- 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
- 
- %.dtb:
--	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-+	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
- 
- # We use MRPROPER_FILES and CLEAN_FILES now
- archclean:
-diff --git a/arch/arm64/boot/Makefile b/arch/arm64/boot/Makefile
-index eca209b..5a0e3ab 100644
---- a/arch/arm64/boot/Makefile
-+++ b/arch/arm64/boot/Makefile
-@@ -22,9 +22,6 @@ $(obj)/Image: vmlinux FORCE
- $(obj)/Image.gz: $(obj)/Image FORCE
- 	$(call if_changed,gzip)
- 
--$(obj)/%.dtb: $(src)/dts/%.dts
--	$(call cmd,dtc)
--
- install: $(obj)/Image
- 	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
- 	$(obj)/Image System.map "$(INSTALL_PATH)"
-@@ -32,5 +29,3 @@ install: $(obj)/Image
- zinstall: $(obj)/Image.gz
- 	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
- 	$(obj)/Image.gz System.map "$(INSTALL_PATH)"
--
--clean-files += *.dtb
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-new file mode 100644
-index 0000000..801e2d7
---- /dev/null
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -0,0 +1,5 @@
-+targets += dtbs
-+
-+dtbs: $(addprefix $(obj)/, $(dtb-y))
-+
-+clean-files := *.dtb
--- 
-1.7.10.4
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
