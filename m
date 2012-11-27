@@ -1,36 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 27 Nov 2012 13:16:52 +0800
-Subject: [PATCH] cpufreq: SPEAr: Add CPUFreq driver
-In-Reply-To: <CAKohpomSAogQVeBQ8HaWwwoTVCsMha5d_1Wid6N3t5SnVZTc=w@mail.gmail.com>
-References: <7ec0e3f4b81b70f3def4257e6b9781efd4c7a3d2.1353785862.git.viresh.kumar@linaro.org>
- <20121127040135.GB27305@S2100-06.ap.freescale.net>
- <CAKohpomSAogQVeBQ8HaWwwoTVCsMha5d_1Wid6N3t5SnVZTc=w@mail.gmail.com>
-Message-ID: <20121127051649.GC27305@S2100-06.ap.freescale.net>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 27 Nov 2012 15:52:23 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the battery tree
+Message-ID: <20121127155223.849e73a08fc1b382d4622ff8@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2012 at 09:28:01AM +0530, Viresh Kumar wrote:
-> >> +     if (of_machine_is_compatible("st,spear1340")) {
-> >> +             /*
-> >> +              * SPEAr1340 is special in the sense that due to the possibility
-> >> +              * of multiple clock sources for cpu clk's parent we can have
-> >> +              * different clock source for different frequency of cpu clk.
-> >> +              * Hence we need to choose one from amongst these possible clock
-> >> +              * sources.
-> >> +              */
-> >> +             srcclk = spear1340_cpu_get_possible_parent(newfreq);
-> >
-> > From what I can see, if spear1340 clock driver can handle such special
-> > setup of clk, the driver will be nothing SPEAr specific and can probably
-> > be saved by just using cpufreq-cpu0.
-> 
-> There are few more patches we have for this driver, which are depending
-> on some mach stuff to be pushed first. We need to program system controller
-> too for make cpu clock transitions more stable.
+Hi all,
 
-Shouldn't it also be handled by cpu clock provider?
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/power/Kconfig between commit bd9e8ab2d58d ("ab8500: Add
+devicetree support for btemp") from the battery tree and commit
+96ff0f5c7efd ("power: Add simple poweroff-gpio driver") from the arm-soc
+tree.
 
-Shawn
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-> They should come after some
-> time.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/power/Kconfig
+index 263499f,b1d956d..0000000
+--- a/drivers/power/Kconfig
++++ b/drivers/power/Kconfig
+@@@ -346,6 -329,15 +346,8 @@@ config AB8500_B
+  	help
+  	  Say Y to include support for AB8500 battery management.
+  
+ -config AB8500_BATTERY_THERM_ON_BATCTRL
+ -	bool "Thermistor connected on BATCTRL ADC"
+ -	depends on AB8500_BM
+ -	help
+ -	  Say Y to enable battery temperature measurements using
+ -	  thermistor connected on BATCTRL ADC.
+ -
++ source "drivers/power/reset/Kconfig"
++ 
+  endif # POWER_SUPPLY
+  
+  source "drivers/power/avs/Kconfig"
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121127/5ac41480/attachment.sig>
