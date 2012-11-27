@@ -1,73 +1,41 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 27 Nov 2012 09:29:00 -0800
-Subject: [PATCH v3 02/11] clk: davinci - add PSC clock driver
-In-Reply-To: <50B4D6B1.3000903@ti.com>
-References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
- <1351181518-11882-3-git-send-email-m-karicheri2@ti.com>
- <50950908.1060302@ti.com> <5097D6FC.7040202@ti.com>
- <20121110022254.18014.31873@nucleus> <50B4D6B1.3000903@ti.com>
-Message-ID: <20121127172900.21126.89528@nucleus>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 27 Nov 2012 12:29:39 -0500 (EST)
+Subject: [PATCH] ARM: implement optimized percpu variable access
+In-Reply-To: <50A0F390.7060800@gmail.com>
+References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
+ <20121112102354.GA2346@mudshark.cambridge.arm.com>
+ <50A0F390.7060800@gmail.com>
+Message-ID: <alpine.LFD.2.02.1211271220270.4576@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sekhar Nori (2012-11-27 07:05:21)
-> Hi Mike,
-> 
-> On 11/10/2012 7:52 AM, Mike Turquette wrote:
-> > Quoting Murali Karicheri (2012-11-05 07:10:52)
-> >> On 11/03/2012 08:07 AM, Sekhar Nori wrote:
-> >>> On 10/25/2012 9:41 PM, Murali Karicheri wrote:
-> >>>> This is the driver for the Power Sleep Controller (PSC) hardware
-> >>>> found on DM SoCs as well Keystone SoCs (c6x). This driver borrowed
-> >>>> code from arch/arm/mach-davinci/psc.c and implemented the driver
-> >>>> as per common clock provider API. The PSC module is responsible for
-> >>>> enabling/disabling the Power Domain and Clock domain for different IPs
-> >>>> present in the SoC. The driver is configured through the clock data
-> >>>> passed to the driver through struct clk_psc_data.
-> >>>>
-> >>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> >>>> ---
-> >>>> +/**
-> >>>> + * struct clk_psc - DaVinci PSC clock driver data
-> >>>> + *
-> >>>> + * @hw: clk_hw for the psc
-> >>>> + * @psc_data: Driver specific data
-> >>>> + */
-> >>>> +struct clk_psc {
-> >>>> +    struct clk_hw hw;
-> >>>> +    struct clk_psc_data *psc_data;
-> >>>> +    spinlock_t *lock;
-> >>> Unused member? I don't see this being used.
-> >>
-> >> OK. Will remove.
+On Mon, 12 Nov 2012, Rob Herring wrote:
+> On 11/12/2012 04:23 AM, Will Deacon wrote:
+> > On Sun, Nov 11, 2012 at 03:20:40AM +0000, Rob Herring wrote:
+> >> +static inline void set_my_cpu_offset(unsigned long off)
+> >> +{
+> >> +	asm volatile("mcr p15, 0, %0, c13, c0, 4	@ set TPIDRPRW" : : "r" (off) : "cc" );
+> >> +}
 > > 
-> > Those locks are only used for the case where a register might contain
-> > bits for several clocks.  Thus RMW operations are protected.  On OMAP
-> > this isn't necessary due to a very generous register layout (typically
-> > one 32-bit reg per module) controlling clocks.  Seems tha tmaybe this is
-> > not needed for PSC module either?
+> > You don't need the "cc" here.
 > 
-> Sorry about the late reply. The above is not totally true for PSC. There
-> are some registers (like PTCMD) which are common for all clocks.
-> 
-> There is an enable_lock used in drivers/clk/clk.c which serializes all
-> enable/disable calls across the clock tree. Since that is done, further
-> locking at clk-psc level is not really needed, no?
-> 
+> You would think so, but the compiler drops this instruction if you
+> don't. set_cr does the same thing.
 
-I haven't finished looking through the PSC design document yet, but my
-answer to your question is this:
+If set_cr does it, that's because of historical reasons.  A long long 
+time ago, you could use predicates inside inline assembly statements.  
+The %? was needed to conditionally execute the included instructions in 
+case gcc had decided not to branch over your code.  So you had to write:
 
-If a register is only used for clk_enable/disable calls (not touched by
-anything held under the prepare_lock mutex) and if that register isn't
-used anywhere else in the code (outside of the clk framework) then yes,
-the enable_lock spinlock is enough for you.
+	asm volatile("mcr%? p15, 0, %0, c13, c0, 4" : : "r" (off));
 
-Also have you looked into regmap?  Since you are defining your own clock
-type that might be something nice for you.
+Or, if you didn't want to bother with %?, you had to clobber the 
+condition code to force gcc to emit a branch over the inline assembly 
+block when it shouldn't have been executed.
 
-Regards,
-Mike
+This subtlety was the source of many bugs as most people didn't use %? 
+properly, so CC is always assumed to be clobbered by inline assembly 
+now.
 
-> Thanks,
-> Sekhar
+
+Nicolas
