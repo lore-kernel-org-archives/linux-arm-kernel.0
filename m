@@ -1,57 +1,98 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 27 Nov 2012 23:56:44 +0100
-Subject: [PATCH] clk: ux500: fix bit error
-In-Reply-To: <1354043720-30850-1-git-send-email-linus.walleij@stericsson.com>
-References: <1354043720-30850-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CAPDyKFqb2Trqk02K_ROb_UPfT4z8zV_mS4EsrXVTt8jAqU3bVA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 27 Nov 2012 16:29:11 -0700
+Subject: [PATCH V7 2/7] ARM: dt: change .dtb build rules to build in dts
+ directory
+In-Reply-To: <1354058956-7199-1-git-send-email-swarren@wwwdotorg.org>
+References: <1354058956-7199-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1354058956-7199-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 November 2012 20:15, Linus Walleij <linus.walleij@stericsson.com> wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
->
-> This fixes a bit error in the U8500 clock implementation: the
-> unused p2_pclk12 registered at bit 12 in periphereral group 6
-> was defined as using bit 11 rather than bit 12.
->
-> When walking over and disabling the unused clocks in the tree
-> at late init time, p2_pclk12 was disabled, by effectively
-> clearing the but for p2_pclk11 instead of bit 12 as it should
-> have, thus disabling gpio block 6 and 7.
->
-> Reported-by: Lee Jones <lee.jones@linaro.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Philippe Begnic <philippe.begnic@st.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Mike if this gets ACKed (beware of more mistakes from this
-> coder) it should go into v3.7 or if that fails be tagged with
-> Cc: stable at kernel.org.
-> ---
->  drivers/clk/ux500/u8500_clk.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
-> index fb9f291..20ecaa7 100644
-> --- a/drivers/clk/ux500/u8500_clk.c
-> +++ b/drivers/clk/ux500/u8500_clk.c
-> @@ -317,7 +317,7 @@ void u8500_clk_init(void)
->         clk_register_clkdev(clk, NULL, "gpioblock1");
->
->         clk = clk_reg_prcc_pclk("p2_pclk12", "per2clk", U8500_CLKRST2_BASE,
-> -                               BIT(11), 0);
-> +                               BIT(12), 0);
->
->         clk = clk_reg_prcc_pclk("p3_pclk0", "per3clk", U8500_CLKRST3_BASE,
->                                 BIT(0), 0);
-> --
-> 1.7.11.3
->
+From: Grant Likely <grant.likely@secretlab.ca>
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+The current rules have the .dtb files build in a different directory
+from the .dts files. The only reason for this is that it was what
+PowerPC has done historically. This patch changes ARM to use the generic
+dtb rule which builds .dtb files in the same directory as the source .dts.
 
-Yes, for sure this need to go stable. What a mess a "typo" can cause.
-Thanks a lot Linus for finding this!
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+[swarren: added rm command for old stale .dtb files]
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+v7: New patch.
+---
+ arch/arm/Makefile          |    4 ++--
+ arch/arm/boot/Makefile     |   12 ------------
+ arch/arm/boot/dts/Makefile |    8 ++++++++
+ 3 files changed, 10 insertions(+), 14 deletions(-)
 
-Kind regards
-Ulf Hansson
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 1ec5f67..5f92252 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -291,10 +291,10 @@ zinstall uinstall install: vmlinux
+ 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
+ 
+ %.dtb: scripts
+-	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
++	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
+ 
+ dtbs: scripts
+-	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
++	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) dtbs
+ 
+ # We use MRPROPER_FILES and CLEAN_FILES now
+ archclean:
+diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+index 9137df5..abfce28 100644
+--- a/arch/arm/boot/Makefile
++++ b/arch/arm/boot/Makefile
+@@ -15,8 +15,6 @@ ifneq ($(MACHINE),)
+ include $(srctree)/$(MACHINE)/Makefile.boot
+ endif
+ 
+-include $(srctree)/arch/arm/boot/dts/Makefile
+-
+ # Note: the following conditions must always be true:
+ #   ZRELADDR == virt_to_phys(PAGE_OFFSET + TEXT_OFFSET)
+ #   PARAMS_PHYS must be within 4MB of ZRELADDR
+@@ -59,16 +57,6 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
+ 
+ endif
+ 
+-targets += $(dtb-y)
+-
+-# Rule to build device tree blobs
+-$(obj)/%.dtb: $(src)/dts/%.dts FORCE
+-	$(call if_changed_dep,dtc)
+-
+-$(obj)/dtbs: $(addprefix $(obj)/, $(dtb-y))
+-
+-clean-files := *.dtb
+-
+ ifneq ($(LOADADDR),)
+   UIMAGE_LOADADDR=$(LOADADDR)
+ else
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a17d5ab..cb217f8 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -136,4 +136,12 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
+ 	wm8650-mid.dtb
+ dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
+ 
++targets += dtbs
+ endif
++
++dtbs: $(addprefix $(obj)/, $(dtb-y))
++	# *.dtb used to be generated in the directory above. Clean out the
++	# old build results so people don't accidentally use them.
++	rm -f $(obj)/../*.dtb
++
++clean-files := *.dtb
+-- 
+1.7.10.4
