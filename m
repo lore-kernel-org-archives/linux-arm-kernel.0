@@ -1,99 +1,118 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 27 Nov 2012 11:15:40 +0000
-Subject: [GIT PULL v3] ST-Ericsson Device Tree patches
-In-Reply-To: <20121120162836.GE28265@gmail.com>
-References: <20121120162836.GE28265@gmail.com>
-Message-ID: <20121127111540.GC2013@gmail.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 27 Nov 2012 12:14:55 +0100
+Subject: [PATCH v3 2/4] ARM: kirkwood: DT board setup for Network Space
+ v2 and parents
+In-Reply-To: <20121126160449.GD15800@titan.lakedaemon.net>
+References: <1350468546-25901-1-git-send-email-simon.guinot@sequanux.org>
+ <1350468546-25901-3-git-send-email-simon.guinot@sequanux.org>
+ <20121126090253.GI9580@quad.lixom.net>
+ <20121126151811.GF8628@kw.sim.vm.gnt>
+ <20121126160449.GD15800@titan.lakedaemon.net>
+Message-ID: <20121127111454.GG8628@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
+On Mon, Nov 26, 2012 at 11:04:49AM -0500, Jason Cooper wrote:
+> On Mon, Nov 26, 2012 at 04:18:11PM +0100, Simon Guinot wrote:
+> > On Mon, Nov 26, 2012 at 01:02:53AM -0800, Olof Johansson wrote:
+> > > Hi,
+> > > 
+> > > This is more directed at Jason and the other maintainers than you, Simon --
+> > > it's something I noticed when looking at his pull request.
+> > > 
+> > > On Wed, Oct 17, 2012 at 12:09:04PM +0200, Simon Guinot wrote:
+> > > 
+> > > > diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+> > > > index 50bca50..847e0c2 100644
+> > > > --- a/arch/arm/mach-kirkwood/Kconfig
+> > > > +++ b/arch/arm/mach-kirkwood/Kconfig
+> > > > @@ -130,6 +130,27 @@ config MACH_KM_KIRKWOOD_DT
+> > > >  	  Say 'Y' here if you want your kernel to support the
+> > > >  	  Keymile Kirkwood Reference Desgin, using Flattened Device Tree.
+> > > >  
+> > > > +config MACH_INETSPACE_V2_DT
+> > > > +	bool "LaCie Internet Space v2 NAS (Flattened Device Tree)"
+> > > > +	select ARCH_KIRKWOOD_DT
+> > > > +	help
+> > > > +	  Say 'Y' here if you want your kernel to support the LaCie
+> > > > +	  Internet Space v2 NAS, using Flattened Device Tree.
+> > > > +
+> > > > +config MACH_NETSPACE_V2_DT
+> > > > +	bool "LaCie Network Space v2 NAS (Flattened Device Tree)"
+> > > > +	select ARCH_KIRKWOOD_DT
+> > > > +	help
+> > > > +	  Say 'Y' here if you want your kernel to support the LaCie
+> > > > +	  Network Space v2 NAS, using Flattened Device Tree.
+> > > > +
+> > > > +config MACH_NETSPACE_MAX_V2_DT
+> > > > +	bool "LaCie Network Space Max v2 NAS (Flattened Device Tree)"
+> > > > +	select ARCH_KIRKWOOD_DT
+> > > > +	help
+> > > > +	  Say 'Y' here if you want your kernel to support the LaCie
+> > > > +	  Network Space Max v2 NAS, using Flattened Device Tree.
+> > > 
+> > > It would be nice to get away from these config options. The whole point with
+> > > device tree is to no longer have to do code changes for new similar boards.
+> > > 
+> > > And even then, since they share the same init function, there's no need for
+> > > three options, just one.
+> > > 
+> > > > diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+> > > > index 294779f..1f63d80 100644
+> > > > --- a/arch/arm/mach-kirkwood/Makefile
+> > > > +++ b/arch/arm/mach-kirkwood/Makefile
+> > > > @@ -31,3 +31,6 @@ obj-$(CONFIG_MACH_GOFLEXNET_DT)		+= board-goflexnet.o
+> > > >  obj-$(CONFIG_MACH_LSXL_DT)		+= board-lsxl.o
+> > > >  obj-$(CONFIG_MACH_IOMEGA_IX2_200_DT)	+= board-iomega_ix2_200.o
+> > > >  obj-$(CONFIG_MACH_KM_KIRKWOOD_DT)	+= board-km_kirkwood.o
+> > > > +obj-$(CONFIG_MACH_INETSPACE_V2_DT)	+= board-ns2.o
+> > > > +obj-$(CONFIG_MACH_NETSPACE_V2_DT)	+= board-ns2.o
+> > > > +obj-$(CONFIG_MACH_NETSPACE_MAX_V2_DT)	+= board-ns2.o
+> > > 
+> > > Same here.
+> > 
+> > Hi,
+> > 
+> > All this configuration options (plus those for ns2 lite and mini) are
+> > indeed useless as we are using a single init function. Moreover there
+> > is no code relying on this options in the file  board-ns2.c. All the
+> > checks are made at run-time.
+> > 
+> > I will send a patch to remove this options.
+> 
+> No need to jump on it just yet.  Nothing more is going into 3.8.  We
+> plan on cleaning up a lot of this as the first part of stuff for 3.9.
+> It'll be easier to have one series knocking it all out as opposed to
+> several board-specific patches from individuals.
 
-  Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
+About the config duplicate options, I think that the ns2 is the only
+problem. But if you plan to remove the board-*.c files for 3.9, maybe
+there is no need at all to fix the issue ?
+ 
+> 
+> Unless, of course, you're volunteering to do the whole cleanup.  Then by
+> all means, don't let me stand in your way.  :-)
 
-are available in the git repository at:
+The whole cleanup, I don't know :) But for sure, I can help. For
+example, I could do the gpio-poweroff migration.
 
-  git://git.linaro.org/people/ljones/linux-3.0-ux500.git ste-dt-for-next
+Simon
 
-for you to fetch changes up to e13316d60658aee7987b51025f342649baa33487:
-
-  ARM: ux500: Rename dbx500 cpufreq code to be more generic (2012-11-27 10:58:57 +0000)
-
-----------------------------------------------------------------
-Fabio Baltieri (1):
-      ARM: dts: add missing ux500 device trees
-
-Lee Jones (42):
-      ARM: ux500: Move regulator-name properties out to board DTS files
-      ARM: ux500: Fix initialisation order for UIBs
-      ARM: ux500: Elaborate on SDI device node names in Device Tree
-      ARM: ux500: Add SDI (MMC) support to the HREF Device Tree
-      ARM: ux500: Correct Snowball's external SD/MMC slot's bus width
-      ARM: ux500: Create a DTS hierarchy for ST-Ericsson's HREF boards
-      ARM: ux500: Create a Device Tree for early HREFs
-      ARM: ux500: Add support for gpio-keys and Proximity Sensor for HREF
-      ARM: ux500: Remove platform specific device registration when DT is enabled
-      ARM: ux500: Move all Device Tree booting into cpu-db8500
-      ARM: ux500: Strip out duplicate touch screen platform information
-      Documentation: Detail permitted DT properties for the BU21013 Touch Screen
-      ARM: ux500: Create a new Device Tree include file for boards supporting STUIBs
-      ARM: ux500: Stop calling the UIB init function when using Device Tree
-      ARM: ux500: Add all bu21013 touch screen components to supported Device Trees
-      ARM: ux500: Stop informing the regulator subsystem that we have full constraints
-      ARM: ux500: Apply a Device Tree node for the STMPE MFD
-      ARM: ux500: Supply the STMPE keypad Device Tree node to the STUIB DT
-      ARM: ux500: Remove unused board compatible string
-      ARM: ux500: Add skeleton DTS file for the u9540
-      ARM: ux500: Add support for ST-Ericsson's u9540 SoC
-      ARM: ux500: Add UART support to the u9540 Device Tree
-      ARM: ux500: Enable SDI4 port on the u9540 when booting with Device Tree
-      ARM: ux500: Enable all MMC devices on the u9540 when booting with DT
-      ARM: ux500: Rename references to the ccu9540 dev board accordingly
-      ARM: ux500: Remove duplicate DT_MACHINE_START - make u8500 for generic
-      ARM: ux500: List DT compatibility using platform names rather than by board
-      ARM: ux500: Add node for the MMC GPIO regulator
-      ARM: ux500: Change the type of interrupt to something compatible
-      ARM: ux500: CONFIG: Enable GPIO Regulators
-      ARM: ux500: Convert DT_MACHINE_START to use SMP operations
-      ARM: ux500: Move regulator-name properties out to board DTS files
-      ARM: ux500: Add SDI (MMC) support to the HREF Device Tree
-      ARM: ux500: Add skeleton DTS file for the u9540
-      ARM: ux500: Add UART support to the u9540 Device Tree
-      ARM: ux500: Enable SDI4 port on the u9540 when booting with Device Tree
-      ARM: ux500: Enable all MMC devices on the u9540 when booting with DT
-      ARM: ux500: Describe UART platform registering issues more accurately
-      ARM: ux500: Disable the MMCI gpio-regulator by default
-      ARM: ux500: Move board specific GPIO info out to subordinate DTS files
-      ARM: ux500: Stop registering the PCM driver from platform code
-      ARM: ux500: Rename dbx500 cpufreq code to be more generic
-
- .../bindings/input/touchscreen/bu21013.txt         |   28 ++
- arch/arm/boot/dts/Makefile                         |    5 +-
- arch/arm/boot/dts/ccu9540.dts                      |   72 ++++++
- arch/arm/boot/dts/dbx5x0.dtsi                      |   57 ++--
- arch/arm/boot/dts/href.dtsi                        |  273 ++++++++++++++++++++
- arch/arm/boot/dts/hrefprev60.dts                   |   48 ++++
- arch/arm/boot/dts/hrefv60plus.dts                  |  217 ++++++++++++----
- arch/arm/boot/dts/snowball.dts                     |  140 +++++++++-
- arch/arm/boot/dts/stuib.dtsi                       |   78 ++++++
- arch/arm/boot/dts/u9540.dts                        |   72 ++++++
- arch/arm/configs/u8500_defconfig                   |    1 +
- arch/arm/mach-ux500/board-mop500-audio.c           |   16 --
- arch/arm/mach-ux500/board-mop500-stuib.c           |   22 +-
- arch/arm/mach-ux500/board-mop500.c                 |  146 +----------
- arch/arm/mach-ux500/board-mop500.h                 |   10 +-
- arch/arm/mach-ux500/cpu-db8500.c                   |  111 +++++++-
- arch/arm/mach-ux500/cpu.c                          |    3 +
- 17 files changed, 1018 insertions(+), 281 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/input/touchscreen/bu21013.txt
- create mode 100644 arch/arm/boot/dts/ccu9540.dts
- create mode 100644 arch/arm/boot/dts/href.dtsi
- create mode 100644 arch/arm/boot/dts/hrefprev60.dts
- create mode 100644 arch/arm/boot/dts/stuib.dtsi
- create mode 100644 arch/arm/boot/dts/u9540.dts
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> 
+> Otherwise, I'll put this series together near v3.8-rc1.
+> 
+> thx,
+> 
+> Jason.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121127/e8d0a61b/attachment.sig>
