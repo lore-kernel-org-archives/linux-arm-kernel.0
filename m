@@ -1,42 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 27 Nov 2012 08:00:35 -0500
-Subject: [PATCH] arm: mvebu: support for the PlatHome OpenBlocks AX3 board
-In-Reply-To: <20121126102535.6a5da505@skate>
-References: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121024150614.GD11837@lunn.ch> <20121024172050.412ff1bf@skate>
- <CAODfWeFY3ZN1U0dDLyLUc=0BpUMQH7LDfcAFbi--Y73qhfRXaQ@mail.gmail.com>
- <20121126102535.6a5da505@skate>
-Message-ID: <20121127130035.GI15800@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Nov 2012 13:26:34 +0000
+Subject: [PATCH] ARM: implement optimized percpu variable access
+In-Reply-To: <20121127131742.GB16122@mudshark.cambridge.arm.com>
+References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
+ <20121122113401.GC3113@mudshark.cambridge.arm.com>
+ <50B2679F.3070107@gmail.com>
+ <20121126111337.GA13312@mudshark.cambridge.arm.com>
+ <20121126151534.GA13620@mudshark.cambridge.arm.com>
+ <50B3A74F.20602@gmail.com>
+ <20121127131742.GB16122@mudshark.cambridge.arm.com>
+Message-ID: <20121127132634.GE19440@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 10:25:35AM +0100, Thomas Petazzoni wrote:
-> On Mon, 26 Nov 2012 10:18:47 +0100, Hector Oron wrote:
-> 
-> > I got an ax3/2 device, I would not mind to test any changes? Are you
-> > aware of which changes should I apply to dtsi file to work on ax3-2
-> > device?
-> 
-> If I'm correct, the differences between AX-2 and AX3-4 is:
-> 
->  * AX3-2 has two Ethernet interfaces, while AX3-4 has four Ethernet
->    interfaces
-> 
->  * AX3-4 is in standard mounted with a 2 GB additional DRAM in a
->    SO-DIMM slot, while the AX3-2 is not. However, it is not clear if
->    the SO-DIMM slot is present or not on the AX3-2 (could you confirm
->    this?).
-> 
->  * AX3-2 does not have a mini PCIe slot, while AX3-4 has one.
-> 
-> So I guess you could create a separate armada-xp-openblocks-ax3-2.dts
-> file to support this new board. Maybe at some point it will make sense
-> to have a common armada-xp-openblocks-ax3.dtsi that both board .dts
-> includes.
+On Tue, Nov 27, 2012 at 01:17:42PM +0000, Will Deacon wrote:
+> I tried both Linaro 12.07 and 12.10 GCC builds, although the problem would
+> only occur if I did a make clean and then a fresh build on top of that.
+> Just building the relavant object files didn't seem to tickle the problem.
 
-Adding plathome to the email list to see if they can offer any
-concrete answers.
+Given that the GCC optimiser does different things depending on the
+direction the wind is blowing, that doesn't surprise me (anyone who's
+looked at the output of modern gcc for even fairly simple functions
+will know that how gcc optimises depends on a _lot_ of factors - even
+what the preceding functions in the same compilation unit are.)
 
-thx,
+So I would not take too much into reading the output; if it's _possible_
+for GCC to create an output which is not what we'd call correct, then
+it's possible for it to create it, and because someone elses GCC doesn't
+that's no reason to dismiss it (it could really be some subtle difference
+causing the optimiser to behave slightly differently at that point.)
 
-Jason.
+It _could_ be that the optimiser has decided on Jamie's test that it's
+cheaper to recompute the percpu value, rather than yours where it's
+decided to cache it on the stack.
+
+So... if the point where the percpu stuff needs to be reloaded has a
+compiler barrier, and that compiler barrier does not have an effect on
+our percpu stuff being reloaded, then we still need to fix that.
