@@ -1,50 +1,29 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Tue, 27 Nov 2012 12:53:00 +0000
-Subject: [PATCH 2/2] ASoC: Davinci: machine: Add device tree binding
-In-Reply-To: <20121126115619.GF9411@opensource.wolfsonmicro.com>
-References: <1353557099-21599-1-git-send-email-gururaja.hebbar@ti.com>
- <1353557099-21599-3-git-send-email-gururaja.hebbar@ti.com>
- <20121126115619.GF9411@opensource.wolfsonmicro.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EADA52C@DBDE01.ent.ti.com>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Tue, 27 Nov 2012 18:30:33 +0530
+Subject: [PATCH 0/3] i2c: Add High speed I2C controller driver for Exynos5
+Message-ID: <1354021236-28596-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 17:26:19, Mark Brown wrote:
-> On Thu, Nov 22, 2012 at 09:34:59AM +0530, Hebbar, Gururaja wrote:
-> 
-> > +- dai-data		: A list of DAI data used by SOC code to register
-> > +			  DAI, Codecs platform.
-> > +			  The string index "should" be as shown below.
-> > +dai-data =
-> > +"<DAI Name>", 		"<DAI Stream Name>",
-> > +"<CODEC DAI Name>",	"<true if evm_aic3x_init is required, else false>",
-> > +"<evm ops required (evm_ops or evm_spdif_ops)>";
-> 
-> This continues to have the same issue as with previous versions, this is
-> all Linux internals (especially the evm_aic3x_init thing) not a
-> description of the hardware, there's not enough information to allow
-> someone to work out what the bindings for their system should be.
+Exynos5 and latter SoCs from Samsung supports High Speed I2C controller.
+This patch set adds the controller driver, device tree information for Exynos5
+platform and defines gating clocks.
 
-Last time when you gave the review comments for this, I misunderstood it for
-missing/incomplete documentation, which is why I added more details to the
-binding document in V3. 
+Naveen Krishna Chatradhi (3):
+  i2c: exynos5: add High Speed I2C controller driver
+  ARM: exynos5: Add gate clocks for HS-I2C
+  arm: exynos5: Add HS-I2C device tree platform information
 
-Now that I have understood correctly, I will be removing references to 
-linux/software parts in the DT and will handle it internally in the driver
-code. 
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |   16 +
+ arch/arm/boot/dts/exynos5250.dtsi         |   32 ++
+ arch/arm/mach-exynos/clock-exynos5.c      |   20 +
+ drivers/i2c/busses/Kconfig                |    6 +
+ drivers/i2c/busses/Makefile               |    1 +
+ drivers/i2c/busses/i2c-exynos5.c          |  758 +++++++++++++++++++++++++++++
+ drivers/i2c/busses/i2c-exynos5.h          |   80 +++
+ 7 files changed, 913 insertions(+)
+ create mode 100644 drivers/i2c/busses/i2c-exynos5.c
+ create mode 100644 drivers/i2c/busses/i2c-exynos5.h
 
-Kindly accept my apologies in this regard.
-
-> 
-> Do not post *ANY* further versions that have this evm_aic3x_init stuff
-> in them, it's very annoying that you keep on ignoring this feedback.
-
-Sure will remove the reference and repost it soon.
-
-Thanks for all the review and guidance.
-
-> 
-
-
-Regards, 
-Gururaja
+-- 
+1.7.9.5
