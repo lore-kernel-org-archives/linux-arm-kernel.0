@@ -1,88 +1,112 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 26 Nov 2012 17:06:12 -0800
-Subject: [GIT PULL 3/3] omap late multiplatform cleanup for v3.8 merge window 
-In-Reply-To: <pull-1353978372-642963>
-Message-ID: <mailman.13.1353978405.1035.linux-arm-kernel@lists.infradead.org>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 27 Nov 2012 09:12:30 +0800
+Subject: [PATCH 6/9] usb: chipidea: add PTW and PTS handling
+In-Reply-To: <1352909950-32555-7-git-send-email-m.grzeschik@pengutronix.de>
+References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352909950-32555-7-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <20121127011210.GA17856@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 0f9cb211ba5db93d488fe6b154138231fdd0e22d:
+On Wed, Nov 14, 2012 at 05:19:07PM +0100, Michael Grzeschik wrote:
+>  /**
+>   * hw_device_reset: resets chip (execute without interruption)
+>   * @ci: the controller
+> @@ -237,6 +256,8 @@ int hw_device_reset(struct ci13xxx *ci, u32 mode)
+>  	if (ci->platdata->flags & CI13XXX_DISABLE_STREAMING)
+>  		hw_write(ci, OP_USBMODE, USBMODE_CI_SDIS, USBMODE_CI_SDIS);
+>  
+> +	hw_portsc_configure(ci);
+> +
+>  	/* USBMODE should be configured step by step */
+>  	hw_write(ci, OP_USBMODE, USBMODE_CM, USBMODE_CM_IDLE);
+>  	hw_write(ci, OP_USBMODE, USBMODE_CM, mode);
+> @@ -522,6 +543,32 @@ void ci13xxx_remove_device(struct platform_device *pdev)
+>  }
+>  EXPORT_SYMBOL_GPL(ci13xxx_remove_device);
+>  
+> +void ci13xxx_get_dr_flags(struct device_node *of_node, struct ci13xxx_platform_data *pdata)
+> +{
+> +	int interface = of_get_usbphy_mode(of_node);
+> +
+> +	switch (interface) {
+> +	case USBPHY_INTERFACE_MODE_UTMI:
+> +		pdata->flags |= CI13XXX_PORTSC_PTS_UTMI;
+> +		break;
+> +	case USBPHY_INTERFACE_MODE_UTMIW:
+> +		pdata->flags |= CI13XXX_PORTSC_PTS_UTMI |
+> +			CI13XXX_PORTSC_PTW_16BIT;
+> +		break;
+> +	case USBPHY_INTERFACE_MODE_ULPI:
+> +		pdata->flags |= CI13XXX_PORTSC_PTS_ULPI;
+> +		break;
+> +	case USBPHY_INTERFACE_MODE_SERIAL:
+> +		pdata->flags |= CI13XXX_PORTSC_PTS_FSLS;
+> +		break;
+> +	case USBPHY_INTERFACE_MODE_NA:
+> +	default:
+> +		pr_err("no phy interface defined\n");
+> +	}
+> +
+> +}
+> +EXPORT_SYMBOL_GPL(ci13xxx_get_dr_flags);
+> +
+>  void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata)
+>  {
+>  	const unsigned char *dr_mode;
+> diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+> index ebff9f4..b23ee1d 100644
+> --- a/drivers/usb/chipidea/host.c
+> +++ b/drivers/usb/chipidea/host.c
+> @@ -106,6 +106,10 @@ static int host_start(struct ci13xxx *ci)
+>  	if (usb_disabled())
+>  		return -ENODEV;
+>  
+> +	hw_portsc_configure(ci);
+> +
+> +	mdelay(10);
+is usleep_range ok?
+Why host needs 10ms delay, but peripheral mode doesn't?
 
-  Merge tag 'v3.7-rc7' into next/cleanup (2012-11-25 21:34:34 -0800)
+> +
+>  	hcd = usb_create_hcd(&ci_ehci_hc_driver, ci->dev, dev_name(ci->dev));
+>  	if (!hcd)
+>  		return -ENOMEM;
+> diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+> index 906d259..cafca23 100644
+> --- a/include/linux/usb/chipidea.h
+> +++ b/include/linux/usb/chipidea.h
+> @@ -21,6 +21,12 @@ struct ci13xxx_platform_data {
+>  #define CI13XXX_DISABLE_STREAMING	BIT(3)
+>  #define CI13XXX_DR_MODE_HOST		BIT(4)
+>  #define CI13XXX_DR_MODE_PERIPHERAL	BIT(5)
+> +#define CI13XXX_PORTSC_PTW_8BIT		BIT(6)
+> +#define CI13XXX_PORTSC_PTW_16BIT	BIT(7)
+> +#define CI13XXX_PORTSC_PTS_UTMI		BIT(8)
+> +#define CI13XXX_PORTSC_PTS_ULPI		BIT(9)
+> +#define CI13XXX_PORTSC_PTS_FSLS		BIT(10)
+> +
+>  #define CI13XXX_DR_MODE_MASK \
+>  	(CI13XXX_DR_MODE_HOST | CI13XXX_DR_MODE_PERIPHERAL)
+>  
+> @@ -42,4 +48,7 @@ void ci13xxx_remove_device(struct platform_device *pdev);
+>  /* Parse of-tree "dr_mode" property */
+>  void ci13xxx_get_dr_mode(struct device_node *of_node, struct ci13xxx_platform_data *pdata);
+>  
+> +/* Parse of-tree "flags" */
+> +void ci13xxx_get_dr_flags(struct device_node *of_node, struct ci13xxx_platform_data *pdata);
+> +
+>  #endif
+> -- 
+> 1.7.10.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
-are available in the git repository at:
+-- 
 
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/cleanup-multiplatform-v2-signed
-
-for you to fetch changes up to 5ebb428d045ea9b908864547819786d5bcebad05:
-
-  ARM: OMAP: Move plat-omap/dma-omap.h to include/linux/omap-dma.h (2012-11-26 13:19:23 -0800)
-
-----------------------------------------------------------------
-Remaining patches to allow omap2+ to build with multiplatform
-enabled. Unfortunately the DMA header patch had to be redone
-to avoid adding new multiplatform specific include paths, the
-other patches are just trivial compile fixes.
-
-Note that this does not yet contain the necessary Kconfig
-changes as we are still waiting for some drivers to get
-fixed up first.
-
-----------------------------------------------------------------
-Tony Lindgren (3):
-      watchdog: OMAP: fixup for ARM multiplatform support
-      ASoC: OMAP: mcbsp fixes for enabling ARM multiplatform support
-      ARM: OMAP: Move plat-omap/dma-omap.h to include/linux/omap-dma.h
-
- arch/arm/mach-omap1/board-h2.c                     |   2 +-
- arch/arm/mach-omap1/board-h3.c                     |   2 +-
- arch/arm/mach-omap1/board-palmte.c                 |   2 +-
- arch/arm/mach-omap1/board-palmtt.c                 |   2 +-
- arch/arm/mach-omap1/board-palmz71.c                |   2 +-
- arch/arm/mach-omap1/board-sx1.c                    |   2 +-
- arch/arm/mach-omap1/dma.c                          |   2 +-
- arch/arm/mach-omap1/io.c                           |   2 +-
- arch/arm/mach-omap1/lcd_dma.c                      |   2 +-
- arch/arm/mach-omap1/mcbsp.c                        |   2 +-
- arch/arm/mach-omap1/pm.c                           |   2 +-
- arch/arm/mach-omap2/board-3430sdp.c                |   2 +-
- arch/arm/mach-omap2/board-h4.c                     |   2 +-
- arch/arm/mach-omap2/board-rx51-peripherals.c       |   2 +-
- arch/arm/mach-omap2/board-rx51.c                   |   2 +-
- arch/arm/mach-omap2/devices.c                      |   2 +-
- arch/arm/mach-omap2/dma.c                          |   2 +-
- arch/arm/mach-omap2/io.c                           |   2 +-
- arch/arm/mach-omap2/mcbsp.c                        |   2 +-
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   2 +-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   2 +-
- .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |   3 +-
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   2 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   2 +-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   2 +-
- arch/arm/mach-omap2/pm24xx.c                       |   2 +-
- arch/arm/mach-omap2/pm34xx.c                       |   3 +-
- arch/arm/mach-omap2/serial.c                       |   2 +-
- arch/arm/plat-omap/dma.c                           |   2 +-
- arch/arm/plat-omap/include/plat-omap/dma-omap.h    | 377 ---------------------
- drivers/crypto/omap-aes.c                          |   2 +-
- drivers/crypto/omap-sham.c                         |   2 +-
- drivers/dma/omap-dma.c                             |   2 -
- drivers/media/platform/omap/omap_vout.c            |   2 +-
- drivers/media/platform/omap/omap_vout_vrfb.c       |   2 +-
- drivers/media/platform/omap3isp/ispstat.h          |   2 +-
- drivers/media/platform/soc_camera/omap1_camera.c   |   2 +-
- drivers/mtd/nand/omap2.c                           |   1 -
- drivers/mtd/onenand/omap2.c                        |   2 +-
- drivers/usb/gadget/omap_udc.c                      |   2 +-
- drivers/usb/musb/tusb6010_omap.c                   |   2 +-
- drivers/video/omap/lcdc.c                          |   2 +-
- drivers/video/omap/omapfb_main.c                   |   2 +-
- drivers/video/omap/sossi.c                         |   2 +-
- drivers/watchdog/omap_wdt.c                        |   2 -
- include/linux/omap-dma.h                           | 366 ++++++++++++++++++++
- sound/soc/omap/mcbsp.c                             |   4 +-
- sound/soc/omap/mcbsp.h                             |   6 +
- sound/soc/omap/omap-mcbsp.c                        |   5 +-
- 49 files changed, 417 insertions(+), 430 deletions(-)
- delete mode 100644 arch/arm/plat-omap/include/plat-omap/dma-omap.h
+Best Regards,
+Peter Chen
