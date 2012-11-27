@@ -1,39 +1,56 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 27 Nov 2012 14:42:22 -0600
-Subject: [PATCH] ARM: implement optimized percpu variable access
-In-Reply-To: <50B5168A.3080309@gmail.com>
-References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
- <alpine.LFD.2.02.1211271157150.4576@xanadu.home> <50B5168A.3080309@gmail.com>
-Message-ID: <50B525AE.8010001@gmail.com>
+From: s.peter@mpl.ch (Stefan Peter)
+Date: Tue, 27 Nov 2012 21:57:24 +0100
+Subject: [PATCH v3 2/4] ARM: kirkwood: DT board setup for Network Space
+ v2 and parents
+In-Reply-To: <20121127111454.GG8628@kw.sim.vm.gnt>
+References: <1350468546-25901-1-git-send-email-simon.guinot@sequanux.org>
+ <1350468546-25901-3-git-send-email-simon.guinot@sequanux.org>
+ <20121126090253.GI9580@quad.lixom.net> <20121126151811.GF8628@kw.sim.vm.gnt>
+ <20121126160449.GD15800@titan.lakedaemon.net>
+ <20121127111454.GG8628@kw.sim.vm.gnt>
+Message-ID: <50B52934.4090705@mpl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2012 01:37 PM, Rob Herring wrote:
-> On 11/27/2012 11:19 AM, Nicolas Pitre wrote:
->> On Sat, 10 Nov 2012, Rob Herring wrote:
->>
->>> From: Rob Herring <rob.herring@calxeda.com>
+On 27.11.2012 12:14, Simon Guinot wrote:
+> On Mon, Nov 26, 2012 at 11:04:49AM -0500, Jason Cooper wrote:
+>> On Mon, Nov 26, 2012 at 04:18:11PM +0100, Simon Guinot wrote:
+>>> On Mon, Nov 26, 2012 at 01:02:53AM -0800, Olof Johansson wrote:
+
+>>>>> +config MACH_NETSPACE_MAX_V2_DT
+>>>>> +	bool "LaCie Network Space Max v2 NAS (Flattened Device Tree)"
+>>>>> +	select ARCH_KIRKWOOD_DT
+>>>>> +	help
+>>>>> +	  Say 'Y' here if you want your kernel to support the LaCie
+>>>>> +	  Network Space Max v2 NAS, using Flattened Device Tree.
+>>>>
+>>>> It would be nice to get away from these config options. The whole point with
+>>>> device tree is to no longer have to do code changes for new similar boards.
+>>>>
+>>>> And even then, since they share the same init function, there's no need for
+>>>> three options, just one.
+>>>>
+
 >>>
->>> Use the previously unused TPIDRPRW register to store percpu offsets.
->>> TPIDRPRW is only accessible in PL1, so it can only be used in the kernel.
->>>
->>> This saves 2 loads for each percpu variable access which should yield
->>> improved performance, but the improvement has not been quantified.
->>>
->>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->>
->> I've just got around to wrap my brain around this patch and the 
->> discussion that ensued.
->>
->> Isn't your patch lacking the preserving and restoring of the TPIDRPRW in 
->> the suspend and resume paths.
+>>> I will send a patch to remove this options.
+
+>> No need to jump on it just yet.  Nothing more is going into 3.8.  We
+>> plan on cleaning up a lot of this as the first part of stuff for 3.9.
+>> It'll be easier to have one series knocking it all out as opposed to
+>> several board-specific patches from individuals.
 > 
-> Why yes, you are right. And I noticed the v6 save/restore is missing the
-> user thread ID for v6K as well. I haven't looked closer, but perhaps it
-> is never used.
+> About the config duplicate options, I think that the ns2 is the only
+> problem. But if you plan to remove the board-*.c files for 3.9, maybe
+> there is no need at all to fix the issue ?
+>  
 
-Moving the setup from secondary_start_kernel to cpu_init will address
-this. cpu_init is called for both secondary boot and resume of the boot
-cpu. There is no need to save it, we can just reinitialize.
+Are there any plans to convert the existing non-DT kirkwood boards in
+3.9, too?
 
-Rob
+Regards
+
+Stefan Peter
+
+-- 
+MPL AG, Switzerland                     http://www.mpl.ch
+Tel. +41 (0)56 483 34 34          Fax: +41(0)56 493 30 20
