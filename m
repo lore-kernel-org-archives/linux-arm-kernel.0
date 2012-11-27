@@ -1,53 +1,48 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Tue, 27 Nov 2012 01:05:56 -0800
-Subject: [PATCH 10/10] ARM: FIQ: Get rid of init_FIQ()
-In-Reply-To: <20121123075138.GA2136@lizard>
-References: <20121123003849.GA973@lizard.mcd25758.sjc.wayport.net>
- <1353652071.755665772@f76.mail.ru> <20121123065002.GB27827@lizard>
- <1353656161.911816605@f287.mail.ru> <20121123075138.GA2136@lizard>
-Message-ID: <20121127090553.GA12289@lizard>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 27 Nov 2012 10:20:37 +0100
+Subject: [PATCH 1/1] ARM: OMAP2+: enable devtmpfs and devtmpfs automount
+In-Reply-To: <50B47B17.2040608@ti.com>
+References: <1353504411-19811-1-git-send-email-javier.martinez@collabora.co.uk>
+ <50B47B17.2040608@ti.com>
+Message-ID: <50B485E5.1050401@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 11:51:38PM -0800, Anton Vorontsov wrote:
-> On Fri, Nov 23, 2012 at 11:36:01AM +0400, Alexander Shiyan wrote:
-> [...]
-> > got_no_fiq_insn also not initialized.
+On 11/27/2012 09:34 AM, Sekhar Nori wrote:
+> On 11/21/2012 6:56 PM, Javier Martinez Canillas wrote:
+>> Since udev-182, udev no longer creates device nodes under /dev
 > 
-> It is static, so by definition it is initialized to 0.
+> Nit: Looks like this happened from udev-176 onward.
 > 
-> > I think as a whole on this issue requires additional comments from Russell
-> > as the author of implementation.
-> > 
-> > PS: In any case, I can reproduce it and check it out if you send me a patchset
-> > to my email as an attachment.
+> http://permalink.gmane.org/gmane.linux.hotplug.devel/17230
 > 
-> Sent privately.
+> Whoever is taking the patch can _probably_ fix it up while applying.
+> 
 
-Andrew, Arnd, just FYI, it works for Alexander.
+Hi Sekhar,
 
------ Forwarded message from Alexander Shiyan <shc_work@mail.ru> -----
-Date: Tue, 27 Nov 2012 12:42:50 +0400
-From: Alexander Shiyan <shc_work@mail.ru>
-To: Anton Vorontsov <anton.vorontsov@linaro.org>
-Subject: Re[2]: FIQ
+Thanks for clarifying this, I read that it was udev-182 from the Linux from
+scratch documentation:
+http://www.linuxfromscratch.org/lfs/view/jh/chapter07/udev.html
 
-> Hello Alexander,
+>> and this has to be managed by the kernel devtmpfs filesystem.
+>> 
+>> This means that a kernel built with the current OMAP2+ config
+>> will not boot on a system with a recent udev.
 > 
-> On Tue, Nov 27, 2012 at 12:14:28PM +0400, Alexander Shiyan wrote:
-> > Sorry, I lost the original message to the correct answer.
-> > Today I had a test of removal init_FIQ.
-> > The test took place on a custom board with a custom ARM CLPS711X OSS audio
-> > driver, which uses the FIQ interrupts. Everything works fine.
+>> Also, it is good to have /dev automatically mounted since some
+>> non-initramfs based setups assumes this and don't manually mount it.
 > 
-> Nice! Thanks a lot for testing!
+> For curiosity sake, any examples of such setups? I am using fedora 17 on
+> DaVinci and that doesn't seem to need it. Anyway, agreed that its better
+> to keep it enabled.
 > 
-> Can you please reply to the original thread, with the
+> Thanks,
+> Sekhar
 > 
-> 	Tested-by: Alexander Shiyan <shc_work@mail.ru>
-> ?
-> 
-> This will help pushing the series forward, plus will give you a credit for
-> your efforts.
 
-I am lost thread in my mailbox, you can just copy/paste my reply and ping for Arnd.
+I'm using an IGEPv2 (TI OMAP3 DM3735) with an openembedded build and the oe udev
+init script from the recipe I use seems to assume this.
+
+Best regards,
+Javier
