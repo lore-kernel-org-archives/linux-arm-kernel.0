@@ -1,108 +1,108 @@
-From: dromede@gmail.com (dromede at gmail.com)
-Date: Wed, 28 Nov 2012 23:08:38 +0100
-Subject: [RFC][PATCH] pxamci: defining CONFIG_REGULATOR_DUMMY may break PXA
- MMC controller driver.
-Message-ID: <1354140518-13433-1-git-send-email-dromede@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 28 Nov 2012 23:16:40 +0100
+Subject: [PATCH 1/2] amba: create a resource parent registrator
+Message-ID: <1354141000-22942-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marko Katic <dromede.gmail.com>
+This creates amba_apb_device_add_res() and
+amba_ahb_device_add_res() respectively, to add devices with
+another parent than iomem_resource. This is needed to specify
+that a device is contained in a specific IO range.
 
-Here's an interesting scenario. The spitz machine has an
-Intersil 6271A voltage regulator and an ADS7846 touchscreen
-controller. The ADS7846 driver requires the use of the voltage regulator
-or if not present, CONFIG_REGULATOR_DUMMY should be used for proper operation.
-So to support both devices, CONFIG_REGULATOR and CONFIG REGULATOR_DUMMY have
-to be defined.
-
-However, enabling CONFIG_REGULATOR_DUMMY breaks pxamci in pxamci_init_ocr().
-and pxamci_set_power() in the case when no vmmc regulator is present.
-
-These functions don't handle the presence of a dummy regulator very well
-since they expect a proper regulator when CONFIG_REGULATOR is defined or
-no regulator at all. I've modified both to do more checking and to always
-fall back to platform data if such data is present.
-
-I should probably add some dev_warns somewhere, i would like some input
-on that.
-
-Signed-off-by: Marko Katic <dromede@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/mmc/host/pxamci.c |   36 ++++++++++++++++++++++--------------
- 1 files changed, 22 insertions(+), 14 deletions(-)
+ drivers/amba/bus.c       | 32 ++++++++++++++++++++++++++++----
+ include/linux/amba/bus.h | 10 ++++++++++
+ 2 files changed, 38 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index cb2dc0e..ffbf177 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -80,18 +80,24 @@ struct pxamci_host {
- static inline void pxamci_init_ocr(struct pxamci_host *host)
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index e8eb91b..a2fc56d 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -546,7 +546,8 @@ EXPORT_SYMBOL_GPL(amba_device_add);
+ static struct amba_device *
+ amba_aphb_device_add(struct device *parent, const char *name,
+ 		     resource_size_t base, size_t size, int irq1, int irq2,
+-		     void *pdata, unsigned int periphid, u64 dma_mask)
++		     void *pdata, unsigned int periphid, u64 dma_mask,
++		     struct resource *resbase)
  {
- #ifdef CONFIG_REGULATOR
-+	int ocr_mask;
- 	host->vcc = regulator_get(mmc_dev(host->mmc), "vmmc");
+ 	struct amba_device *dev;
+ 	int ret;
+@@ -563,7 +564,7 @@ amba_aphb_device_add(struct device *parent, const char *name,
+ 	dev->dev.platform_data = pdata;
+ 	dev->dev.parent = parent;
  
- 	if (IS_ERR(host->vcc))
- 		host->vcc = NULL;
- 	else {
--		host->mmc->ocr_avail = mmc_regulator_get_ocrmask(host->vcc);
--		if (host->pdata && host->pdata->ocr_mask)
-+		ocr_mask = mmc_regulator_get_ocrmask(host->vcc);
-+		if (ocr_mask <= 0)
-+			host->mmc->ocr_avail = 0;
-+		else
-+			host->mmc->ocr_avail = ocr_mask;
-+
-+		if (host->pdata && host->pdata->ocr_mask && host->mmc->ocr_avail)
- 			dev_warn(mmc_dev(host->mmc),
- 				"ocr_mask/setpower will not be used\n");
- 	}
- #endif
--	if (host->vcc == NULL) {
-+	if (host->vcc == NULL || host->mmc->ocr_avail == 0) {
- 		/* fall-back to platform data */
- 		host->mmc->ocr_avail = host->pdata ?
- 			host->pdata->ocr_mask :
-@@ -104,27 +110,29 @@ static inline int pxamci_set_power(struct pxamci_host *host,
- 				    unsigned int vdd)
+-	ret = amba_device_add(dev, &iomem_resource);
++	ret = amba_device_add(dev, resbase);
+ 	if (ret) {
+ 		amba_device_put(dev);
+ 		return ERR_PTR(ret);
+@@ -578,7 +579,7 @@ amba_apb_device_add(struct device *parent, const char *name,
+ 		    void *pdata, unsigned int periphid)
  {
- 	int on;
--
-+
-+#ifdef CONFIG_REGULATOR
- 	if (host->vcc) {
--		int ret;
-+		int ret = 0;
+ 	return amba_aphb_device_add(parent, name, base, size, irq1, irq2, pdata,
+-				    periphid, 0);
++				    periphid, 0, &iomem_resource);
+ }
+ EXPORT_SYMBOL_GPL(amba_apb_device_add);
  
--		if (power_mode == MMC_POWER_UP) {
-+		if (power_mode == MMC_POWER_UP)
- 			ret = mmc_regulator_set_ocr(host->mmc, host->vcc, vdd);
--			if (ret)
--				return ret;
--		} else if (power_mode == MMC_POWER_OFF) {
-+
-+		if (power_mode == MMC_POWER_OFF)
- 			ret = mmc_regulator_set_ocr(host->mmc, host->vcc, 0);
--			if (ret)
--				return ret;
--		}
-+
-+		if (ret == 0)
-+			return ret;
- 	}
--	if (!host->vcc && host->pdata &&
-+#endif
-+
-+	if (host->pdata &&
- 	    gpio_is_valid(host->pdata->gpio_power)) {
- 		on = ((1 << vdd) & host->pdata->ocr_mask);
- 		gpio_set_value(host->pdata->gpio_power,
- 			       !!on ^ host->pdata->gpio_power_invert);
- 	}
--	if (!host->vcc && host->pdata && host->pdata->setpower)
-+	if (host->pdata && host->pdata->setpower)
- 		host->pdata->setpower(mmc_dev(host->mmc), vdd);
+@@ -588,10 +589,33 @@ amba_ahb_device_add(struct device *parent, const char *name,
+ 		    void *pdata, unsigned int periphid)
+ {
+ 	return amba_aphb_device_add(parent, name, base, size, irq1, irq2, pdata,
+-				    periphid, ~0ULL);
++				    periphid, ~0ULL, &iomem_resource);
+ }
+ EXPORT_SYMBOL_GPL(amba_ahb_device_add);
  
- 	return 0;
++struct amba_device *
++amba_apb_device_add_res(struct device *parent, const char *name,
++			resource_size_t base, size_t size, int irq1,
++			int irq2, void *pdata, unsigned int periphid,
++			struct resource *resbase)
++{
++	return amba_aphb_device_add(parent, name, base, size, irq1, irq2, pdata,
++				    periphid, 0, resbase);
++}
++EXPORT_SYMBOL_GPL(amba_apb_device_add_res);
++
++struct amba_device *
++amba_ahb_device_add_res(struct device *parent, const char *name,
++			resource_size_t base, size_t size, int irq1,
++			int irq2, void *pdata, unsigned int periphid,
++			struct resource *resbase)
++{
++	return amba_aphb_device_add(parent, name, base, size, irq1, irq2, pdata,
++				    periphid, ~0ULL, resbase);
++}
++EXPORT_SYMBOL_GPL(amba_ahb_device_add_res);
++
++
+ static void amba_device_initialize(struct amba_device *dev, const char *name)
+ {
+ 	device_initialize(&dev->dev);
+diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
+index d364171..43ec7e2 100644
+--- a/include/linux/amba/bus.h
++++ b/include/linux/amba/bus.h
+@@ -71,6 +71,16 @@ struct amba_device *amba_ahb_device_add(struct device *parent, const char *name,
+ 					resource_size_t base, size_t size,
+ 					int irq1, int irq2, void *pdata,
+ 					unsigned int periphid);
++struct amba_device *
++amba_apb_device_add_res(struct device *parent, const char *name,
++			resource_size_t base, size_t size, int irq1,
++			int irq2, void *pdata, unsigned int periphid,
++			struct resource *resbase);
++struct amba_device *
++amba_ahb_device_add_res(struct device *parent, const char *name,
++			resource_size_t base, size_t size, int irq1,
++			int irq2, void *pdata, unsigned int periphid,
++			struct resource *resbase);
+ void amba_device_unregister(struct amba_device *);
+ struct amba_device *amba_find_device(const char *, struct device *, unsigned int, unsigned int);
+ int amba_request_regions(struct amba_device *, const char *);
 -- 
-1.7.4.1
+1.7.11.7
