@@ -1,35 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Nov 2012 23:16:57 +0100
-Subject: [PATCH 2/2] ARM: integrator: pass the lm resource to amba
-Message-ID: <1354141017-22987-1-git-send-email-linus.walleij@linaro.org>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 28 Nov 2012 17:51:34 -0500 (EST)
+Subject: [PATCH 1/1] net: ethernet: cpsw: fix build warnings for CPSW
+ when CPTS not selected
+In-Reply-To: <1354038820-11095-1-git-send-email-mugunthanvnm@ti.com>
+References: <1354038820-11095-1-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <20121128.175134.357731690357578238.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This passes the lm resource to register the AMBA devices on the
-LM as contained within the LM resource.
+From: Mugunthan V N <mugunthanvnm@ti.com>
+Date: Tue, 27 Nov 2012 23:23:40 +0530
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-integrator/impd1.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+>   CC      drivers/net/ethernet/ti/cpsw.o
+> drivers/net/ethernet/ti/cpsw.c: In function 'cpsw_ndo_ioctl':
+> drivers/net/ethernet/ti/cpsw.c:881:20: warning: unused variable 'priv'
+> 
+> The build warning is generated when CPTS is not selected in Kernel Build.
+> Fixing by passing the net_device pointer to cpts IOCTL instead of passing priv
+> 
+> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
 
-diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
-index b3d86d7..9f82f9d 100644
---- a/arch/arm/mach-integrator/impd1.c
-+++ b/arch/arm/mach-integrator/impd1.c
-@@ -342,9 +342,10 @@ static int impd1_probe(struct lm_device *dev)
- 
- 		pc_base = dev->resource.start + idev->offset;
- 		snprintf(devname, 32, "lm%x:%5.5lx", dev->id, idev->offset >> 12);
--		d = amba_ahb_device_add(&dev->dev, devname, pc_base, SZ_4K,
--					dev->irq, dev->irq,
--					idev->platform_data, idev->id);
-+		d = amba_ahb_device_add_res(&dev->dev, devname, pc_base, SZ_4K,
-+					    dev->irq, dev->irq,
-+					    idev->platform_data, idev->id,
-+					    &dev->resource);
- 		if (IS_ERR(d)) {
- 			dev_err(&dev->dev, "unable to register device: %ld\n", PTR_ERR(d));
- 			continue;
--- 
-1.7.11.7
+Applied.
