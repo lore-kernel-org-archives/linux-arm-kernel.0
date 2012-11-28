@@ -1,203 +1,156 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Nov 2012 13:44:10 +0000
-Subject: [PATCH v4 04/13] ARM: KVM: Initial VGIC MMIO support code
-In-Reply-To: <20121128130934.GF21671@mudshark.cambridge.arm.com>
-References: <20121110154358.3061.16338.stgit@chazy-air>
- <20121110154444.3061.22464.stgit@chazy-air>
- <20121128130934.GF21671@mudshark.cambridge.arm.com>
-Message-ID: <50B6152A.3050909@arm.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 28 Nov 2012 14:48:32 +0100
+Subject: [PATCH 1/1] ARM: tegra: bus_notifier registers IOMMU devices(was:
+ How to specify IOMMU'able devices in DT)
+In-Reply-To: <20120924.145014.1452596970914043018.hdoyu@nvidia.com>
+References: <20120924124452.41070ed2ee9944d930cffffc@nvidia.com><054901cd9a45$db1a7ea0$914f7be0$%szyprowski@samsung.com><20120924.145014.1452596970914043018.hdoyu@nvidia.com>
+Message-ID: <20121128.154832.539666140149950229.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/11/12 13:09, Will Deacon wrote:
-> On Sat, Nov 10, 2012 at 03:44:44PM +0000, Christoffer Dall wrote:
->> From: Marc Zyngier <marc.zyngier@arm.com>
->>
->> Wire the initial in-kernel MMIO support code for the VGIC, used
->> for the distributor emulation.
+Hiroshi Doyu <hdoyu@nvidia.com> wrote @ Mon, 24 Sep 2012 14:50:14 +0300 (EEST):
+...
+> > > > On Mon, 2012-09-24 at 12:04 +0300, Hiroshi Doyu wrote:
+> > > > > diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> > > > > index a1a7225..9eae3be 100644
+> > > > > --- a/drivers/base/platform.c
+> > > > > +++ b/drivers/base/platform.c
+> > > > > @@ -21,6 +21,8 @@
+> > > > >  #include <linux/slab.h>
+> > > > >  #include <linux/pm_runtime.h>
+> > > > >
+> > > > > +#include <asm/dma-iommu.h>
+> > > > > +
+> > > > >  #include "base.h"
+> > > > >
+> > > > >  #define to_platform_driver(drv)        (container_of((drv), struct
+> > > > > platform_driver, \
+> > > > > @@ -305,8 +307,19 @@ int platform_device_add(struct platform_device
+> > > > > *pdev)
+> > > > >                  dev_name(&pdev->dev), dev_name(pdev->dev.parent));
+> > > > >
+> > > > >         ret = device_add(&pdev->dev);
+> > > > > -       if (ret == 0)
+> > > > > -               return ret;
+> > > > > +       if (ret)
+> > > > > +               goto failed;
+> > > > > +
+> > > > > +#ifdef CONFIG_PLATFORM_ENABLE_IOMMU
+> > > > > +       if (platform_bus_type.map && !pdev->dev.archdata.mapping) {
+> > > > > +               ret = arm_iommu_attach_device(&pdev->dev,
+> > > > > +                                             platform_bus_type.map);
+> > > > > +               if (ret)
+> > > > > +                       goto failed;
+> > > >
+> > > > This is horrible ... you're adding an architecture specific callback
+> > > > into our generic code; that's really a no-no.  If the concept of
+> > > > CONFIG_PLATFORM_ENABE_IOMMU is useful to more than just arm, then this
+> > > > could become a generic callback.
+> > > 
+> > > As mentioned in the original, this is a heck to explain what is
+> > > needed. I am looking for some generic solution for how to specify
+> > > IOMMU info for each platform devices. I'm guessing that some other SoC
+> > > may have the similar requirements on the above. As you mentioned, this
+> > > solution should be a generic, not arch specific.
+> > 
+> > Please read more about bus notifiers. IMHO a good example is provided in 
+> > the following thread:
+> > http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg12238.html
 > 
-> [...]
-> 
->> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
->> new file mode 100644
->> index 0000000..26ada3b
->> --- /dev/null
->> +++ b/arch/arm/kvm/vgic.c
->> @@ -0,0 +1,138 @@
->> +/*
->> + * Copyright (C) 2012 ARM Ltd.
->> + * Author: Marc Zyngier <marc.zyngier@arm.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program; if not, write to the Free Software
->> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
->> + */
->> +
->> +#include <linux/kvm.h>
->> +#include <linux/kvm_host.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/io.h>
->> +#include <asm/kvm_emulate.h>
->> +
->> +#define ACCESS_READ_VALUE	(1 << 0)
->> +#define ACCESS_READ_RAZ		(0 << 0)
->> +#define ACCESS_READ_MASK(x)	((x) & (1 << 0))
->> +#define ACCESS_WRITE_IGNORED	(0 << 1)
->> +#define ACCESS_WRITE_SETBIT	(1 << 1)
->> +#define ACCESS_WRITE_CLEARBIT	(2 << 1)
->> +#define ACCESS_WRITE_VALUE	(3 << 1)
->> +#define ACCESS_WRITE_MASK(x)	((x) & (3 << 1))
->> +
->> +/**
->> + * vgic_reg_access - access vgic register
->> + * @mmio:   pointer to the data describing the mmio access
->> + * @reg:    pointer to the virtual backing of the vgic distributor struct
->> + * @offset: least significant 2 bits used for word offset
->> + * @mode:   ACCESS_ mode (see defines above)
->> + *
->> + * Helper to make vgic register access easier using one of the access
->> + * modes defined for vgic register access
->> + * (read,raz,write-ignored,setbit,clearbit,write)
->> + */
->> +static void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
->> +			    u32 offset, int mode)
->> +{
->> +	int word_offset = offset & 3;
-> 
-> You can get rid of this variable.
-> 
->> +	int shift = word_offset * 8;
-> 
-> shift = (offset & 3) << 3;
-> 
->> +	u32 mask;
->> +	u32 regval;
->> +
->> +	/*
->> +	 * Any alignment fault should have been delivered to the guest
->> +	 * directly (ARM ARM B3.12.7 "Prioritization of aborts").
->> +	 */
->> +
->> +	mask = (~0U) >> (word_offset * 8);
-> 
-> then use shift here.
+> This bus notifier seems enough flexible to afford the variation of
+> IOMMU map info, like Tegra ASID, which could be platform-specific, and
+> the other could be common too. There's already iommu_bus_notifier
+> too. I'll try to implement something base on this.
 
-Sure.
+Experimentally implemented as below. With the followig patch, each
+device could specify its own map in DT, and automatically the device
+would be attached to the map.
 
->> +	if (reg)
->> +		regval = *reg;
->> +	else {
-> 
-> Use braces for the if clause.
+There is a case that some devices share a map. This patch doesn't
+suppor such case yet.
 
-Indeed.
+>From 8cb75bb6f3a8535a077e0e85265f87c1f1289bfd Mon Sep 17 00:00:00 2001
+From: Hiroshi Doyu <hdoyu@nvidia.com>
+Date: Wed, 28 Nov 2012 14:47:04 +0200
+Subject: [PATCH 1/1] ARM: tegra: bus_notifier registers IOMMU devices
 
-> 
->> +		BUG_ON(mode != (ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED));
->> +		regval = 0;
->> +	}
->> +
->> +	if (mmio->is_write) {
->> +		u32 data = (*((u32 *)mmio->data) & mask) << shift;
->> +		switch (ACCESS_WRITE_MASK(mode)) {
->> +		case ACCESS_WRITE_IGNORED:
->> +			return;
->> +
->> +		case ACCESS_WRITE_SETBIT:
->> +			regval |= data;
->> +			break;
->> +
->> +		case ACCESS_WRITE_CLEARBIT:
->> +			regval &= ~data;
->> +			break;
->> +
->> +		case ACCESS_WRITE_VALUE:
->> +			regval = (regval & ~(mask << shift)) | data;
->> +			break;
->> +		}
->> +		*reg = regval;
->> +	} else {
->> +		switch (ACCESS_READ_MASK(mode)) {
->> +		case ACCESS_READ_RAZ:
->> +			regval = 0;
->> +			/* fall through */
->> +
->> +		case ACCESS_READ_VALUE:
->> +			*((u32 *)mmio->data) = (regval >> shift) & mask;
->> +		}
->> +	}
->> +}
-> 
-> It might be a good idea to have some port accessors for mmio->data otherwise
-> you'll likely get endianness issues creeping in.
+platform_bus notifier registers IOMMU devices if dma-window is
+specified.
 
-Aarrgh! This depends on the relative endianess of host and guest. 'm
-feeling slightly sick...
+Its format is:
+  dma-window = <"start" "size">;
+ex)
+  dma-window = <0x12345000 0x8000>;
 
->> +/* All this should be handled by kvm_bus_io_*()... FIXME!!! */
-> 
-> I don't follow this comment :) Can you either make it clearer (and less
-> alarming!) or just drop it please?
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ arch/arm/mach-tegra/board-dt-tegra30.c |   40 ++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-The non-alarming version should read:
-
-/*
- * I would have liked to use the kvm_bus_io_*() API instead, but
- * it cannot cope with banked registers (only the VM pointer is
- * passed around, and we need the vcpu). One of these days, someone
- * please fix it!
- */
-
-> 
->> +struct mmio_range {
->> +	unsigned long base;
->> +	unsigned long len;
->> +	bool (*handle_mmio)(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
->> +			    u32 offset);
->> +};
-> 
-> Why not make offset a phys_addr_t?
-
-Very good point.
-
->> +static const struct mmio_range vgic_ranges[] = {
->> +	{}
->> +};
->> +
->> +static const
->> +struct mmio_range *find_matching_range(const struct mmio_range *ranges,
->> +				       struct kvm_exit_mmio *mmio,
->> +				       unsigned long base)
->> +{
->> +	const struct mmio_range *r = ranges;
->> +	unsigned long addr = mmio->phys_addr - base;
-> 
-> Same here, I don't think we want to truncate everything to unsigned long.
-
-Indeed.
-
->> +	while (r->len) {
->> +		if (addr >= r->base &&
->> +		    (addr + mmio->len) <= (r->base + r->len))
->> +			return r;
->> +		r++;
->> +	}
-> 
-> Hmm, does this work correctly for adjacent mmio devices where addr sits
-> on the boundary (i.e. the first address of the second device)?
-
-I think it is OK. We basically check that both ends of the access are
-within a single range (we do not bother with cross range accesses).
-
-	M.
+diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
+index a2b6cf1..570d718 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra30.c
++++ b/arch/arm/mach-tegra/board-dt-tegra30.c
+@@ -30,9 +30,11 @@
+ #include <linux/of_fdt.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
++#include <linux/of_iommu.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/hardware/gic.h>
++#include <asm/dma-iommu.h>
+ 
+ #include "board.h"
+ #include "clock.h"
+@@ -86,10 +88,48 @@ static __initdata struct tegra_clk_init_table tegra_dt_clk_init_table[] = {
+ 	{ NULL,		NULL,		0,		0},
+ };
+ 
++#ifdef CONFIG_ARM_DMA_USE_IOMMU
++static int tegra_iommu_device_notifier(struct notifier_block *nb,
++				       unsigned long event, void *_dev)
++{
++	struct dma_iommu_mapping *map = NULL;
++	struct device *dev = _dev;
++	dma_addr_t base;
++	size_t size;
++	int err;
++
++	switch (event) {
++	case BUS_NOTIFY_ADD_DEVICE:
++		err = of_get_dma_window(dev->of_node, NULL, 0, NULL, &base,
++					&size);
++		if (!err)
++			map = arm_iommu_create_mapping(&platform_bus_type,
++						       base, size, 0);
++		if (IS_ERR_OR_NULL(map))
++			break;
++		if (arm_iommu_attach_device(dev, map))
++			dev_err(dev, "Failed to attach %s\n", dev_name(dev));
++		dev_dbg(dev, "Attached %s to map %p\n", dev_name(dev), map);
++		break;
++	}
++	return NOTIFY_DONE;
++}
++#else
++#define tegra_iommu_device_notifier NULL
++#endif
++
++static struct notifier_block tegra_iommu_device_nb = {
++	.notifier_call = tegra_iommu_device_notifier,
++};
++
+ static void __init tegra30_dt_init(void)
+ {
+ 	tegra_clk_init_from_table(tegra_dt_clk_init_table);
+ 
++	if (IS_ENABLED(CONFIG_ARM_DMA_USE_IOMMU))
++		bus_register_notifier(&platform_bus_type,
++				      &tegra_iommu_device_nb);
++
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 				tegra30_auxdata_lookup, NULL);
+ }
 -- 
-Jazz is not dead. It just smells funny...
+1.7.9.5
