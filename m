@@ -1,29 +1,59 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 28 Nov 2012 17:12:07 +1100
-Subject: linux-next: manual merge of the clk tree with the arm-soc tree
-Message-ID: <20121128171207.e8e19e40f2c43104951d389a@canb.auug.org.au>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 28 Nov 2012 11:58:57 +0530
+Subject: [PATCH 3/3] ARM: AM335x: Fix warning in timer.c
+In-Reply-To: <1354068915-3378-4-git-send-email-jon-hunter@ti.com>
+References: <1354068915-3378-1-git-send-email-jon-hunter@ti.com>
+ <1354068915-3378-4-git-send-email-jon-hunter@ti.com>
+Message-ID: <50B5AF29.4020306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Wednesday 28 November 2012 07:45 AM, Jon Hunter wrote:
+> When compiling the kernel with configuration options ...
+>
+>   # CONFIG_ARCH_OMAP2 is not set
+>   # CONFIG_ARCH_OMAP3 is not set
+>   # CONFIG_ARCH_OMAP4 is not set
+>   # CONFIG_SOC_OMAP5 is not set
+>   CONFIG_SOC_AM33XX=y
+>
+>   ... the following build warning is seen.
+>
+>    CC      arch/arm/mach-omap2/timer.o
+>    arch/arm/mach-omap2/timer.c:395:19: warning: ?omap2_sync32k_clocksource_init?
+>    	defined but not used [-Wunused-function]
+>
+> This issue was introduced by commit 6f80b3b (ARM: OMAP2+: timer: remove
+> CONFIG_OMAP_32K_TIMER) where the omap2_sync32k_clocksource_init() is no
+> longer referenced by the timer initialisation function for the AM335x
+> device as it has no 32k-sync timer.
+>
+> Fix this by only including the omap2_sync32k_clocksource_init() function
+> if either OMAP2, OMAP3, OMAP4 or OMAP5 devices are enabled.
+>
+> Cc: Igor Grinberg <grinberg@compulab.co.il>
+>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+>   arch/arm/mach-omap2/timer.c |    3 +++
+>   1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index eb96712..085c7e7 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -386,6 +386,8 @@ static u32 notrace dmtimer_read_sched_clock(void)
+>   	return 0;
+>   }
+>
+> +#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3) || \
+> +	defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+#ifndef CONFIG_SOC_AM33XX ?
 
-Today's linux-next merge of the clk tree got a conflict in
-arch/arm/mach-ux500/cpu-db8500.c between commit e13316d60658 ("ARM:
-ux500: Rename dbx500 cpufreq code to be more generic") from the arm-soc
-tree and commit 50545e1d237b ("ARM: ux500: Remove cpufreq platform
-device") from the clk tree.
+#ifdef things are really ugly and needs constant patching and
+hence something like CONFIG_HAS_32K kind of feature flags are
+better. But that will undo certain part of f80b3b
+(ARM: OMAP2+: timer: remove  CONFIG_OMAP_32K_TIMER).
 
-I fixed it up (I used the clk tree version since that removed the code
-that the arm-soc tree version modified) and can carry the fix as
-necessary (no action is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121128/f9fffd51/attachment.sig>
+Regards
+santosh
