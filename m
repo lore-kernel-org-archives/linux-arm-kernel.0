@@ -1,55 +1,66 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 28 Nov 2012 15:00:54 +0100
-Subject: [PATCH] mmc: mmci: Fixup and cleanup code for DMA handling
-In-Reply-To: <CAPDyKFqt-yaA9LNAMEH0bE+109bceAuO94B+W5UbMmGUsVWFKw@mail.gmail.com>
-References: <1350056012-18625-1-git-send-email-ulf.hansson@stericsson.com>
- <CACRpkdZqe3uB9wGM5g5LUJuZEtzeBW=Hs5RF=5_CKU0CBWJRyA@mail.gmail.com>
- <CAPDyKFr=aN+MN+VCvbAqNa7mu+fxTTeHdcA1oCv8QWqpdT8MGQ@mail.gmail.com>
- <CACRpkdZPbrvfk0QNB7x8YZ+DVibPJMTLsLDSf310CcBEeOTuww@mail.gmail.com>
- <CAPDyKFqfjaDcj361eoMtp3BwQMAW5JcUcyoovFPzXdL0a3dzUg@mail.gmail.com>
- <CAPDyKFqt-yaA9LNAMEH0bE+109bceAuO94B+W5UbMmGUsVWFKw@mail.gmail.com>
-Message-ID: <CAPDyKFoC=j1JUY=NAUdAH8gDGrc7MCZFvs3wCdkxWi=yLbk3LQ@mail.gmail.com>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Wed, 28 Nov 2012 10:04:33 -0400
+Subject: OMAP* Latest build failures
+In-Reply-To: <20121120175733.GH18567@atomide.com>
+References: <20121114092643.GG3290@n2100.arm.linux.org.uk>
+ <20121117093307.GL3332@n2100.arm.linux.org.uk>
+ <20121120175733.GH18567@atomide.com>
+Message-ID: <50B619F1.3000207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 November 2012 16:22, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 16 October 2012 13:44, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 16 October 2012 10:17, Linus Walleij <linus.walleij@linaro.org> wrote:
->>> On Tue, Oct 16, 2012 at 9:16 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>
->>>> This code has not been tested on a "legacy" ARM PL180 but only for
->>>> ux500 boards. Even if it should affect DMA handling we should test
->>>> this properly. Would be great if you were able to help out, I guess
->>>> you still have available hardware for these tests?
->>>
->>> I can test the Integrator/CP and Realview in IRQ/PIO mode and
->>> the U300 in DMA mode.
->>
->> Great!
->>
->>>
->>> I need some help to provoke errorpath in DMA mode though,
->>> so any hints are welcome...
->>
->> One good option could be to stress test card insert/removal sequences,
->> while at the same time doing read/write requests.
->>
->>>
->>> Yours,
->>> Linus Walleij
->>
->> Kind regards
->> Ulf Hansson
->
-> Just a kind reminder for Linus; did you manage to do some tests for
-> these patches?
->
-> Kind regards
-> Ulf Hansson
+Tony, Russell,
 
-I have now tested these patches for ARM-RealView PB1176. Looks good! I
-stress tested card insert/remove at the same time you write/read to
-the card. Error handling is stable.
+On 20-11-2012 13:57, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [121117 01:35]:
+>> On Wed, Nov 14, 2012 at 09:26:43AM +0000, Russell King - ARM Linux wrote:
+>>> OMAP* allnoconfig fails:
+>>>
+>>> arch/arm/mach-omap2/built-in.o: In function `omap_dss_set_min_bus_tput':
+>>> twl-common.c:(.text+0x1e08): undefined reference to `omap_pm_set_min_bus_tput'
+>>> arch/arm/mach-omap2/built-in.o: In function `omap_hwmod_init_postsetup':
+>>> twl-common.c:(.init.text+0x8f8): undefined reference to `omap_pm_if_early_init'
+>>> arch/arm/mach-omap2/built-in.o: In function `omap_serial_init_port':
+>>> twl-common.c:(.init.text+0x1284): undefined reference to `omap_pm_get_dev_context_loss_count'
+>>> arch/arm/mach-omap2/built-in.o: In function `omap_timer_init':
+>>> twl-common.c:(.init.text+0x1544): undefined reference to `omap_pm_get_dev_context_loss_count'
+>>> arch/arm/mach-omap2/built-in.o: In function `omap2_common_pm_init':
+>>> twl-common.c:(.init.text+0x1af0): undefined reference to `omap_pm_if_init'
+>>> arch/arm/mach-omap2/built-in.o: In function `omap2_gpio_dev_init':
+>>> twl-common.c:(.init.text+0x2168): undefined reference to `omap_pm_get_dev_context_loss_count'
+>>> arch/arm/mach-omap2/built-in.o: In function `omap_display_init':
+>>> twl-common.c:(.init.text+0x25cc): undefined reference to `omap_pm_get_dev_context_loss_count'
+>>
+>> These are now gone, but we have a new warning:
+>>
+>> arch/arm/mach-omap2/timer.c:163:28: warning: 'omap_counter_match' defined but not used
+>
+> Jon, care to fix this one?
+>
+>> And the randconfig found:
+>>
+>> drivers/staging/omap-thermal/omap-bandgap.c: In function 'omap_bandgap_readl':
+>> drivers/staging/omap-thermal/omap-bandgap.c:46:2: error: implicit declaration of function 'readl'
+>> drivers/staging/omap-thermal/omap-bandgap.c: In function 'omap_bandgap_writel':
+>> drivers/staging/omap-thermal/omap-bandgap.c:51:2: error: implicit declaration of function 'writel'
+>>
+>> Which, as its in staging, maybe its not important but it's another source
+>> of unnecessary failure.
 
-Kind regards
-Ulf Hansson
+Well, it is important, thanks for checking this code. I appreciate if 
+you keep your report.
+
+>
+> Radhesh & Eduardo, can you fix this?
+>
+
+This has been already fixed:
+https://patchwork.kernel.org/patch/1734621/
+
+And is already queued by Greg (staging-next):
+http://git.kernel.org/?p=linux/kernel/git/gregkh/staging.git;a=commit;h=2aeeb8acfc19f8a9f283081bbf77919b61b92042
+
+> Regards,
+>
+> Tony
+>
