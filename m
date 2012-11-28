@@ -1,76 +1,54 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 28 Nov 2012 17:58:55 +0100
-Subject: [PATCH RESEND v5 0/4] OMAP GPMC DT bindings
-Message-ID: <1354121939-11246-1-git-send-email-zonque@gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 28 Nov 2012 18:09:07 +0100
+Subject: [PATCH] add hardware I2C support for ARM IMX23
+In-Reply-To: <50B63F81.4050008@van-ginkel.eu>
+References: <20121128152403.45224dvyaufb1j7n@62.129.139.42>
+ <20121128150851.GA4659@pengutronix.de>
+ <20121128171039.14705ltphptrp5kv@62.129.139.42>
+ <20121128162452.GB4659@pengutronix.de>
+ <50B63F81.4050008@van-ginkel.eu>
+Message-ID: <20121128170907.GC4659@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Resending +devicetree-discuss, +Rob, +Grant]
+Hi,
 
+(adding the i2c list)
 
-This is a series of patches to support GPMC peripherals on OMAP boards.
+On Wed, Nov 28, 2012 at 05:44:49PM +0100, Sander van Ginkel wrote:
+> tested with:
+> CONFIG_I2C_MXS=m
+> CONFIG_I2C_MXS=y
+> 
+> in combination with CONFIG_GPIO_MXS enabled and disabled
+> 
+> used kernels: 3.6 and 3.7.0-rc6
+> 
+> My I2C slave is a PCF8575 i/o expander with some LEDs at the output.
+> These are controlled through sysfs.
 
-Depends on Linus' master +
-omap-next (branch omap-for-v3.8/cleanup-headers-gpmc)
+Thanks, this is useful info.
 
-The only supported peripheral for now is NAND, but other types would be
-easy to add.
+> Just tested with "i2cdetc -y -r 0" that crashes with  "BUG: soft
+> lockup - CPU#0 stuck for 22s!"
+> according to the docs (IMX23RM.pdf) the interrupts for I2C are 26
+> and 27 that why I assigned these two in the dts.
 
-Version 2 addresses details pointed out by Jon Hunter, Afzal Mohammed
-and Rob Herring:
+You might want to try my for-next branch or wait for 3.8-rc1, maybe the
+DMA termination patch helps? Also enabling I2C debug messages is
+probably worth it.
 
- - add "reg" and "ti,hwmod" properties to Documentation
- - use generic of_mtd functions and the property names defined by them,
-   namely "nand-bus-width" and "nand-ecc-mode"
- - reduce the default register space size in the Documentation to 8K,
-   as found in the hwmod code
- - switch to a DT layout based on ranges and address translation.
-   Although this property is not currently looked at as long as the
-   handling code still uses the runtime calculation methods, we now
-   have these values in the bindings, eventually allowing us to
-   switch the implementation with less pain.
+Regards,
 
-Version 3 includes fixes pointed out by Jon Hunter:
-
- - better documentation of the 'ranges' property to describe the
-   fact that it's representing the CS lines
- - GPMC_CS_CONFIGx -> GPMC_CONFIGx in comments
- - drop interrupt-parent from example bindings
- - add of_node_put() at the end of the child iteration
-
-Version 4 fixes compilation for !CONFIG_MTD_NAND and includes more
-details from Jon Hunter and Avinash, Philip:
-
- - Add "num-cs" and "num-waitpins" properties, which will eventually
-   be used to get rid of GPMC_CS_NUM
- - Better description of generic nand DT properties
- - Dropped patch 3/4 as an equivalent fix was already merged
- - Added ti,nand-ecc-use-elm property
-
-Version 5 with regards to Avinash, Philip and Peter Korsgaard:
-
- - Re-add accidentially forgotten
-   Documentation/devicetree/bindings/bus/ti-gpmc.txt
- - Rename "software" ecc mode to "sw"
- - Initialize gpmc_nand_data->is_elm_used to 'true' rather than 1
- - Drop ti,nand-ecc-use-elm binding in favor of a new ecc mode
-   named "bch8-am335xrbl-compatible"
- - Add two more patches for section mismatch fixups
-
-Daniel Mack (4):
-  mtd: omap-nand: pass device_node in platform data
-  ARM: OMAP: gpmc-nand: drop __init annotation
-  ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
-  ARM: OMAP: gpmc: add DT bindings for GPMC timings and NAND
-
- Documentation/devicetree/bindings/bus/ti-gpmc.txt  |  76 +++++++++
- .../devicetree/bindings/mtd/gpmc-nand.txt          |  81 +++++++++
- arch/arm/mach-omap2/gpmc-nand.c                    |  15 +-
- arch/arm/mach-omap2/gpmc.c                         | 181 ++++++++++++++++++++-
- drivers/mtd/nand/omap2.c                           |   4 +-
- 5 files changed, 348 insertions(+), 9 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/bus/ti-gpmc.txt
- create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+   Wolfram
 
 -- 
-1.7.11.7
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121128/8e813c29/attachment.sig>
