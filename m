@@ -1,28 +1,60 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 28 Nov 2012 16:08:51 +0100
-Subject: [PATCH] add hardware I2C support for ARM IMX23
-In-Reply-To: <20121128152403.45224dvyaufb1j7n@62.129.139.42>
-References: <20121128152403.45224dvyaufb1j7n@62.129.139.42>
-Message-ID: <20121128150851.GA4659@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 28 Nov 2012 15:16:08 +0000
+Subject: OMAP* Latest build failures
+In-Reply-To: <50B619F1.3000207@ti.com>
+References: <20121114092643.GG3290@n2100.arm.linux.org.uk>
+ <20121117093307.GL3332@n2100.arm.linux.org.uk>
+ <20121120175733.GH18567@atomide.com> <50B619F1.3000207@ti.com>
+Message-ID: <20121128151608.GY3332@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2012 at 03:24:03PM +0100, sander van ginkel wrote:
-> The I2C hardware in the IMX233 is currently not supported,
-> however the i2c-mxs driver seems to be suitable.
-> To use the i2c-mxs driver it has to be added to the devicetree
-> for the IMX23.
+On Wed, Nov 28, 2012 at 10:04:33AM -0400, Eduardo Valentin wrote:
+> Tony, Russell,
+>
+> On 20-11-2012 13:57, Tony Lindgren wrote:
+>> * Russell King - ARM Linux <linux@arm.linux.org.uk> [121117 01:35]:
+>>> On Wed, Nov 14, 2012 at 09:26:43AM +0000, Russell King - ARM Linux wrote:
+>>> And the randconfig found:
+>>>
+>>> drivers/staging/omap-thermal/omap-bandgap.c: In function 'omap_bandgap_readl':
+>>> drivers/staging/omap-thermal/omap-bandgap.c:46:2: error: implicit declaration of function 'readl'
+>>> drivers/staging/omap-thermal/omap-bandgap.c: In function 'omap_bandgap_writel':
+>>> drivers/staging/omap-thermal/omap-bandgap.c:51:2: error: implicit declaration of function 'writel'
+>>>
+>>> Which, as its in staging, maybe its not important but it's another source
+>>> of unnecessary failure.
+>
+> Well, it is important, thanks for checking this code. I appreciate if  
+> you keep your report.
+>
+>>
+>> Radhesh & Eduardo, can you fix this?
+>>
+>
+> This has been already fixed:
+> https://patchwork.kernel.org/patch/1734621/
+>
+> And is already queued by Greg (staging-next):
+> http://git.kernel.org/?p=linux/kernel/git/gregkh/staging.git;a=commit;h=2aeeb8acfc19f8a9f283081bbf77919b61b92042
 
-Have you tested it? There have been problems reported when using
-i2cdetect...
+Good.  Now, there's also this too:
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121128/e64fb55d/attachment.sig>
+drivers/staging/omap-thermal/omap-thermal-common.c: In function 'omap_thermal_expose_sensor':
+drivers/staging/omap-thermal/omap-thermal-common.c:259:28: error: storage size of 'pdata' isn't known
+drivers/staging/omap-thermal/omap-thermal-common.c:261:2: error: 'data' undeclared (first use in this function)
+drivers/staging/omap-thermal/omap-thermal-common.c:264:3: error: implicit declaration of function 'omap_thermal_build_pdata'
+drivers/staging/omap-thermal/omap-thermal-common.c: In function 'omap_thermal_build_cpufreq_clip':
+drivers/staging/omap-thermal/omap-thermal-common.c:330:41: error: dereferencing pointer to incomplete type
+drivers/staging/omap-thermal/omap-thermal-common.c:343:3: error: invalid use of undefined type 'struct freq_clip_table'
+drivers/staging/omap-thermal/omap-thermal-common.c:343:3: error: invalid use of undefined type 'struct freq_clip_table'
+drivers/staging/omap-thermal/omap-thermal-common.c:343:6: error: dereferencing pointer to incomplete type
+drivers/staging/omap-thermal/omap-thermal-common.c:344:3: error: invalid use of undefined type 'struct freq_clip_table'
+drivers/staging/omap-thermal/omap-thermal-common.c:344:3: error: invalid use of undefined type 'struct freq_clip_table'
+drivers/staging/omap-thermal/omap-thermal-common.c:344:6: error: dereferencing pointer to incomplete type
+drivers/staging/omap-thermal/omap-thermal-common.c:345:3: error: invalid use of undefined type 'struct freq_clip_table'
+drivers/staging/omap-thermal/omap-thermal-common.c:345:3: error: invalid use of undefined type 'struct freq_clip_table'
+drivers/staging/omap-thermal/omap-thermal-common.c:345:6: error: dereferencing pointer to incomplete type
+drivers/staging/omap-thermal/omap-thermal-common.c:375:2: error: too many arguments to function 'cpufreq_cooling_register'
+
+Is it also fixed in Gregkh's staging-next branch?
