@@ -1,19 +1,20 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 28 Nov 2012 09:15:48 +0900
-Subject: [GIT PULL 4/7] Samsung cam for v3.8
-Message-ID: <50B557B4.3090109@samsung.com>
+Date: Wed, 28 Nov 2012 09:16:03 +0900
+Subject: [GIT PULL 5/7] Samsung pinctrl-2 for v3.8
+Message-ID: <50B557C3.4040502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof
+Arnd, Olof,
 
-This is including update Samsung cam for v3.8
+This is updating Samsung pinctrl for v3.8 and actually just including 
+fix a checkpatch error.
 
-Just adding camif gpio setup and clkdev.
+This is based on next/pinctrl-samsung is already into arm-soc tree.
 
-Pleases pull from:
+Please pull from:
 git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-next/cam-samsung
+next/pinctrl-samsung-2
 
 Thanks.
 
@@ -23,23 +24,17 @@ Kgene.
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
+The following changes since commit 4a991b410cd7940c48f261e854e8698923e23fd2:
 
-   Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
+   pinctrl: samsung: Update error check for unsigned variables 
+(2012-11-19 10:03:35 +0900)
 
 are available in the git repository at:
    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-next/cam-samsung
+next/pinctrl-samsung-2
 
-Sylwester Nawrocki (2):
-       ARM: SAMSUNG: Add s3c24xx/s3c64xx CAMIF GPIO setup helpers
-       ARM: S3C24XX: Add clkdev entry for camif-upll clock
+Sachin Kamat (1):
+       pinctrl: samsung: Do not initialise statics to 0
 
-  arch/arm/mach-s3c24xx/Kconfig         |    1 +
-  arch/arm/mach-s3c24xx/clock-s3c2440.c |    1 +
-  arch/arm/plat-samsung/Kconfig         |    5 ++
-  arch/arm/plat-samsung/Makefile        |    1 +
-  arch/arm/plat-samsung/setup-camif.c   |   70 
-+++++++++++++++++++++++++++++++++
-  5 files changed, 78 insertions(+), 0 deletions(-)
-  create mode 100644 arch/arm/plat-samsung/setup-camif.c
+  drivers/pinctrl/pinctrl-samsung.c |    2 +-
+  1 files changed, 1 insertions(+), 1 deletions(-)
