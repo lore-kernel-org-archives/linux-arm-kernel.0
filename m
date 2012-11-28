@@ -1,38 +1,24 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 28 Nov 2012 17:24:52 +0100
-Subject: [PATCH] add hardware I2C support for ARM IMX23
-In-Reply-To: <20121128171039.14705ltphptrp5kv@62.129.139.42>
-References: <20121128152403.45224dvyaufb1j7n@62.129.139.42>
- <20121128150851.GA4659@pengutronix.de>
- <20121128171039.14705ltphptrp5kv@62.129.139.42>
-Message-ID: <20121128162452.GB4659@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 28 Nov 2012 16:31:09 +0000
+Subject: [PATCH 3/3] Input: bu21013_ts - Add support for Device Tree
+ booting
+In-Reply-To: <20121128085731.GH2013@gmail.com>
+References: <1354021990-16978-1-git-send-email-lee.jones@linaro.org>
+ <1354021990-16978-4-git-send-email-lee.jones@linaro.org>
+ <20121128070332.GC23378@core.coreip.homeip.net>
+ <20121128085731.GH2013@gmail.com>
+Message-ID: <20121128163105.GA28698@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 28, 2012 at 08:57:31AM +0000, Lee Jones wrote:
 
-> I've tested it with multiple configs.
+> > I applied these 3 patches, but for DT we also need to specify compatible
+> > ID and set up of_match_table pointer. 
 
-Please specify a bit more what you tested and what configs mean. It is
-especially important to talk to slaves since this is where DMA problems
-occured.
+> Why do you need a compatible string?
 
-> i2cdetect -l gives me:
-> i2c-0   i2c             MXS I2C adapter                         I2C adapter
-
-'i2cdetect -r ...' would be more interesting to see communication with
-slaves happening :) Also, what kernel did you test?
-
-Thanks,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121128/dfe84d0f/attachment.sig>
+The I2C subsystem guesses at a compatible string by default but it's
+much better to explicitly set one as conflicts do arise from time to
+time (eg, Wolfson parts are called WMxxxx but the WM prefix is also used
+by at least WonderMedia).
