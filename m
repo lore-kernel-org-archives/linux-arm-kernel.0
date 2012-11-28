@@ -1,57 +1,167 @@
-From: archit@ti.com (Archit Taneja)
-Date: Wed, 28 Nov 2012 16:14:58 +0530
-Subject: OMAP4430 produces boot warnings
-In-Reply-To: <1354019506.3250.10.camel@sokoban>
-References: <20121121230337.GR3332@n2100.arm.linux.org.uk>
- <50AE1DC0.3030002@ti.com> <50AE2BB6.8080406@ti.com>
- <1353594842.786.45.camel@sokoban> <50AE3A5B.5040603@ti.com>
- <1353663278.25248.4.camel@sokoban> <50B310D3.9050202@ti.com>
- <50B35D0E.6000509@ti.com> <50B4A2B7.9080806@ti.com> <50B4AA74.1090300@ti.com>
- <50B4B045.7090603@ti.com> <1354019506.3250.10.camel@sokoban>
-Message-ID: <50B5EB2A.3040204@ti.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Wed, 28 Nov 2012 16:21:40 +0530
+Subject: [PATCH] ARM: DTS: CROS5250: Add max77686 device tree support
+Message-ID: <1354099900-24779-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 November 2012 06:01 PM, Tero Kristo wrote:
-> On Tue, 2012-11-27 at 14:21 +0200, Tomi Valkeinen wrote:
->> On 2012-11-27 13:56, Archit Taneja wrote:
->>> On Tuesday 27 November 2012 04:53 PM, Tomi Valkeinen wrote:
->>
->>>> Hmm, well this feels like a hack. DISPC driver doesn't know how the DSS
->>>> modules are arranged, which module belongs to which power domain, etc.
->>>>
->>>> If it cannot be fixed in the arch code, I guess we could just have
->>>> dss_get_ctx_loss_count(void) function which always returns the
->>>> dss_core's ctx loss count, and define that on all the platforms omapdss
->>>> is used, the dss_core's ctx loss count is the same as ctx loss count for
->>>> all the dss submodules.
+The exynos5250 based chromebooks have a max77686 pmic on i2c channel 0.
+Add support for the pmic in the common cros5250 dts file.
+Tested after enabling cpufreq support for exynos5250 SoC and varying the
+arm frequency/voltage using the userspace governer.
 
-Well the context lost count we are interested in isn't the "omapdss" 
-platform device in core.c, it's the "omapdss_dss" platform device in dss.c
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+ arch/arm/boot/dts/cros5250-common.dtsi |  137 ++++++++++++++++++++++++++++++++
+ 1 files changed, 137 insertions(+), 0 deletions(-)
 
-I was considering moving the dss_get_ctx_lost_count() to dss.c, as it 
-needs the "omapdss_dss" platform_device. It looks better in core.c, but 
-we would need a dirty way to give it the "omapdss_dss". What do you think?
-
-Archit
-
->>>>
->>>> I think the above is true for all OMAPs. But it feels like a hack too,
->>>> but not as bad as the above patch.
->>>
->>> Yes, a function taking in no platform device in dss's core.c would be
->>> less hacky. I guess we would need this for now, because a solution in
->>> omap_hwmod would be more complex and it may not be ready by the merge
->>> window.
->>
->> Ok. Can you cook up a patch and test it?
->>
->> PM guys, does the above sound like an acceptable work-around?
->
-> This sounds like a good approach to me at least.
->
-> -Tero
->
->
->
->
+diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
+index fddd174..7849824 100644
+--- a/arch/arm/boot/dts/cros5250-common.dtsi
++++ b/arch/arm/boot/dts/cros5250-common.dtsi
+@@ -24,6 +24,143 @@
+ 		samsung,i2c-max-bus-freq = <378000>;
+ 		gpios = <&gpb3 0 2 3 0>,
+ 			<&gpb3 1 2 3 0>;
++
++		max77686 at 09 {
++			compatible = "maxim,max77686";
++			reg = <0x09>;
++
++			voltage-regulators {
++				ldo1_reg: LDO1 {
++					regulator-name = "vdd_alive";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo2_reg: LDO2 {
++					regulator-name = "vdd_micom";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo3_reg: LDO3 {
++					regulator-name = "vdd_rtc";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo7_reg: LDO7 {
++					regulator-name = "vdd10_xpll";
++					regulator-min-microvolt = <1100000>;
++					regulator-max-microvolt = <1100000>;
++					regulator-always-on;
++				};
++
++				ldo8_reg: LDO8 {
++					regulator-name = "vdd10_mipihdmi";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo10_reg: LDO10 {
++					regulator-name = "vdd18_mipihdmi";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo12_reg: LDO12 {
++					regulator-name = "vdd33_usb3";
++					regulator-min-microvolt = <3000000>;
++					regulator-max-microvolt = <3000000>;
++					regulator-always-on;
++				};
++
++				ldo14_reg: LDO14 {
++					regulator-name = "vdd18_abb0";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo15_reg: LDO15 {
++					regulator-name = "vdd10_hsic";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo16_reg: LDO16 {
++					regulator-name = "vdd18_hsic";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				buck1_reg: BUCK1 {
++					regulator-name = "vdd_mif";
++					regulator-min-microvolt = <950000>;
++					regulator-max-microvolt = <1300000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck2_reg: BUCK2 {
++					regulator-name = "vdd_arm";
++					regulator-min-microvolt = <850000>;
++					regulator-max-microvolt = <1350000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck3_reg: BUCK3 {
++					regulator-name = "vdd_int";
++					regulator-min-microvolt = <900000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck4_reg: BUCK4 {
++					regulator-name = "vdd_g3d";
++					regulator-min-microvolt = <850000>;
++					regulator-max-microvolt = <1300000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck5_reg: BUCK5 {
++					regulator-name = "vdd18_adc";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				buck6_reg: BUCK6 {
++					regulator-name = "vdd_bat1";
++					regulator-min-microvolt = <1350000>;
++					regulator-max-microvolt = <1350000>;
++					regulator-always-on;
++				};
++
++				buck7_reg: BUCK7 {
++					regulator-name = "vdd_bat2";
++					regulator-min-microvolt = <2000000>;
++					regulator-max-microvolt = <2000000>;
++					regulator-always-on;
++				};
++
++				buck8_reg: BUCK8 {
++					regulator-name = "vdd_emmc";
++					regulator-min-microvolt = <2850000>;
++					regulator-max-microvolt = <2850000>;
++					regulator-always-on;
++				};
++			};
++		};
+ 	};
+ 
+ 	i2c at 12C70000 {
+-- 
+1.7.8.6
