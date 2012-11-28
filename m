@@ -1,43 +1,44 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 28 Nov 2012 15:38:28 +0100
-Subject: [PATCH v5 3/4] ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
+Date: Wed, 28 Nov 2012 15:38:27 +0100
+Subject: [PATCH v5 2/4] ARM: OMAP: gpmc-nand: drop __init annotation
 In-Reply-To: <1354113509-7972-1-git-send-email-zonque@gmail.com>
 References: <1354113509-7972-1-git-send-email-zonque@gmail.com>
-Message-ID: <1354113509-7972-4-git-send-email-zonque@gmail.com>
+Message-ID: <1354113509-7972-3-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+gpmc_nand_init() will be called from another driver's probe() function,
+so the easiest way to prevent section mismatches is to drop the
+annotation here.
+
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- arch/arm/mach-omap2/gpmc-nand.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/gpmc-nand.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
-index f9f23a2..c8a72ba 100644
+index 8607735..f9f23a2 100644
 --- a/arch/arm/mach-omap2/gpmc-nand.c
 +++ b/arch/arm/mach-omap2/gpmc-nand.c
-@@ -92,17 +92,18 @@ static int omap2_nand_gpmc_retime(
- static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
+@@ -89,7 +89,7 @@ static int omap2_nand_gpmc_retime(
+ 	return 0;
+ }
+ 
+-static bool __init gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
++static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
  {
  	/* support only OMAP3 class */
--	if (!cpu_is_omap34xx()) {
-+	if (!cpu_is_omap34xx() && !soc_is_am33xx()) {
- 		pr_err("BCH ecc is not supported on this CPU\n");
- 		return 0;
- 	}
+ 	if (!cpu_is_omap34xx()) {
+@@ -110,8 +110,8 @@ static bool __init gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
+ 	return 1;
+ }
  
- 	/*
--	 * For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1.
--	 * Other chips may be added if confirmed to work.
-+	 * For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1
-+	 * and AM33xx derivates. Other chips may be added if confirmed to work.
- 	 */
- 	if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW) &&
--	    (!cpu_is_omap3630() || (GET_OMAP_REVISION() == 0))) {
-+	    (!cpu_is_omap3630() || (GET_OMAP_REVISION() == 0)) &&
-+	    (!soc_is_am33xx())) {
- 		pr_err("BCH 4-bit mode is not supported on this CPU\n");
- 		return 0;
- 	}
+-int __init gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
+-			  struct gpmc_timings *gpmc_t)
++int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
++		   struct gpmc_timings *gpmc_t)
+ {
+ 	int err	= 0;
+ 	struct device *dev = &gpmc_nand_device.dev;
 -- 
 1.7.11.7
