@@ -1,61 +1,50 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 27 Nov 2012 20:15:15 -0600
-Subject: [PATCH 3/3] ARM: AM335x: Fix warning in timer.c
-In-Reply-To: <1354068915-3378-1-git-send-email-jon-hunter@ti.com>
-References: <1354068915-3378-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1354068915-3378-4-git-send-email-jon-hunter@ti.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Wed, 28 Nov 2012 02:37:58 +0000
+Subject: [PATCH] ARM: use clockevents_config_and_register() where possible
+In-Reply-To: <1353936857-15313-1-git-send-email-shawn.guo@linaro.org>
+References: <1353936857-15313-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <5EB3BFCD089AD643B9BB63439F5FD5E901229845B5@SHAASIEXM01.ASIA.ROOT.PRI>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When compiling the kernel with configuration options ...
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawn.guo at linaro.org]
+> Sent: Monday, November 26, 2012 9:34 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Arnd Bergmann; Olof Johansson; Shawn Guo; Nicolas Ferre; Anton
+> Vorontsov; Kukjin Kim; Russell King; Sascha Hauer; Jason Cooper; Roland Stigge;
+> Eric Miao; Haojian Zhuang; David Brown; Tony Lindgren; Barry Song; Stephen
+> Warren; Tony Prisk; Lennert Buytenhek; Wan ZongShun; Viresh Kumar
+> Subject: [PATCH] ARM: use clockevents_config_and_register() where possible
+> 
+> The clockevent core is able to figure out the best mult and shift,
+> calculate min_delta_ns and max_delta_ns, with the necessary info passed
+> into clockevents_config_and_register().  Use this combined configure
+> and register function where possible to make the codes less error prone
+> and gain some positive diff stat.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Anton Vorontsov <cbouatmailru@gmail.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Roland Stigge <stigge@antcom.de>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Barry Song <baohua.song@csr.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Tony Prisk <linux@prisktech.co.nz>
+> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
+> Cc: Wan ZongShun <mcuos.com@gmail.com>
+> Cc: Viresh Kumar <viresh.linux@gmail.com>
+> ---
 
- # CONFIG_ARCH_OMAP2 is not set
- # CONFIG_ARCH_OMAP3 is not set
- # CONFIG_ARCH_OMAP4 is not set
- # CONFIG_SOC_OMAP5 is not set
- CONFIG_SOC_AM33XX=y
+Acked-by: Barry Song <baohua.song@csr.com>
 
- ... the following build warning is seen.
 
-  CC      arch/arm/mach-omap2/timer.o
-  arch/arm/mach-omap2/timer.c:395:19: warning: ?omap2_sync32k_clocksource_init?
-  	defined but not used [-Wunused-function]
-
-This issue was introduced by commit 6f80b3b (ARM: OMAP2+: timer: remove
-CONFIG_OMAP_32K_TIMER) where the omap2_sync32k_clocksource_init() is no
-longer referenced by the timer initialisation function for the AM335x
-device as it has no 32k-sync timer.
-
-Fix this by only including the omap2_sync32k_clocksource_init() function
-if either OMAP2, OMAP3, OMAP4 or OMAP5 devices are enabled.
-
-Cc: Igor Grinberg <grinberg@compulab.co.il>
-
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/mach-omap2/timer.c |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index eb96712..085c7e7 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -386,6 +386,8 @@ static u32 notrace dmtimer_read_sched_clock(void)
- 	return 0;
- }
- 
-+#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3) || \
-+	defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
- static struct of_device_id omap_counter_match[] __initdata = {
- 	{ .compatible = "ti,omap-counter32k", },
- 	{ }
-@@ -451,6 +453,7 @@ static int __init omap2_sync32k_clocksource_init(void)
- 
- 	return ret;
- }
-+#endif
- 
- static void __init omap2_gptimer_clocksource_init(int gptimer_id,
- 						const char *fck_source)
--- 
-1.7.10.4
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
