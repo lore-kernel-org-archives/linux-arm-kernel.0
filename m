@@ -1,78 +1,65 @@
-From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
-Date: Wed, 28 Nov 2012 12:10:07 -0500
-Subject: [PATCH] ARM: davinci: da8xx_register_spi() should not register
- SPI board info
-In-Reply-To: <50B5CFFE.7010701@ti.com>
-References: <1347323353-19764-1-git-send-email-vivien.didelot@savoirfairelinux.com>
- <50B5CFFE.7010701@ti.com>
-Message-ID: <1354122607.6612.6.camel@trivette.mtl.sfl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 28 Nov 2012 17:12:21 +0000
+Subject: [PATCH] mmc: mmci: Support non-power-of-two block sizes for
+ ux500v2 variant
+In-Reply-To: <CAFEEs1nZboGyAfpYQ2hUvp366FiS0=8u5zL6Vr1RfXac_Ls_dw@mail.gmail.com>
+References: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121121153811.GN3290@n2100.arm.linux.org.uk>
+ <CAFEEs1kzJUgsvnzgWwU4i7o1jkE=8iTq5+NJ_t1jdiHEm7b-RQ@mail.gmail.com>
+ <20121121165048.GO3290@n2100.arm.linux.org.uk>
+ <CAFEEs1nb+UD+8_jsKvGKhyFqGDogN5wsmV30PnELqahTMDyRVA@mail.gmail.com>
+ <20121122173708.GJ5764@n2100.arm.linux.org.uk>
+ <50B34270.7070403@stericsson.com>
+ <20121126102712.GC19440@n2100.arm.linux.org.uk>
+ <50B349D3.2050806@stericsson.com>
+ <CAFEEs1nZboGyAfpYQ2hUvp366FiS0=8u5zL6Vr1RfXac_Ls_dw@mail.gmail.com>
+Message-ID: <20121128171221.GF19440@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+On Wed, Nov 28, 2012 at 05:55:13PM +0100, Per Forlin wrote:
+> I have tried to work out an if-statement to check this properly. Here
+> is my conclusion,
+> This only works if sg len is 1 (in the SDIO case)
+> 
+> if (WRITE)
+>   align = sg->offset & 3
+> else if (READ)
+>   align = 0
+> 
+> if (sg->offset & 3 && (PAGE_SIZE - (sg->offset + align) < host->size))
+>    error; /* cannot be handled by mmci driver */
 
-On Wed, 2012-11-28 at 14:19 +0530, Sekhar Nori wrote:
-> Hi Vivien,
-> 
-> On 9/11/2012 5:59 AM, Vivien Didelot wrote:
-> > Without this patch, da8xx_register_spi() registers the SPI board info,
-> > the SPI controller, and sets its number of chipselect to the size of the
-> > static spi_board_info array. This is bad because a SPI board info may
-> > declare devices for different SPI buses, and because other code can also
-> > call spi_register_board_info() (e.g. a daughter board might provide
-> > additional SPI devices).
-> > 
-> > This patch removes the spi_register_board_info() call from
-> > da8xx_register_spi(), renames this last one to da8xx_register_spi_bus()
-> > to be more explicit, takes the number of chipselect as a function
-> > parameter, and updates the impacted board-da8{3,5}0-evm.c, and
-> > board-mityomapl138.c files accordingly. It also sets the SPI platform
-> > data static, as it doesn't need to be exported.
-> > 
-> > Signed-off-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
-> 
-> Sorry about the late reply. It seems I missed seeing this completely
-> until you reminded Kevin about it.
-> 
-> The patch looks good to me except some minor issues. I made those
-> changes myself locally since I am the one guilty of getting back on this
-> so late. See below:
-> 
-> > ---
-> >  arch/arm/mach-davinci/board-da830-evm.c    |  9 +++++++--
-> >  arch/arm/mach-davinci/board-da850-evm.c    |  9 +++++++--
-> >  arch/arm/mach-davinci/board-mityomapl138.c |  9 +++++++--
-> >  arch/arm/mach-davinci/devices-da8xx.c      | 14 +++-----------
-> >  arch/arm/mach-davinci/include/mach/da8xx.h |  3 +--
-> >  5 files changed, 25 insertions(+), 19 deletions(-)
-> 
-> The patch doesn't apply to the latest kernel anymore. I resolved that.
-> 
-> > 
-> > diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-> > index 11c3db9..adb8d87 100644
-> > --- a/arch/arm/mach-davinci/board-da830-evm.c
-> > +++ b/arch/arm/mach-davinci/board-da830-evm.c
-> > @@ -652,8 +652,13 @@ static __init void da830_evm_init(void)
-> >  	if (ret)
-> >  		pr_warning("da830_evm_init: rtc setup failed: %d\n", ret);
-> >  
-> > -	ret = da8xx_register_spi(0, da830evm_spi_info,
-> > -				 ARRAY_SIZE(da830evm_spi_info));
-> > +	ret = spi_register_board_info(da830evm_spi_info,
-> > +				      ARRAY_SIZE(da830evm_spi_info));
-> > +	if (ret)
-> > +		pr_warning("da830_evm_init: spi info registration failed: %d\n",
-> > +			   ret);
-> 
-> Checkpatch asks us to use pr_warn() instead. Fixed that. Also, used
-> __func__ to print function name. Rob Tivy has patches fixing these all
-> through this file.
-> 
-> Thanks,
-> Sekhar
+This looks wrong.  For starters, why in the write case do you _add_ the
+byte offset in the word to sg->offset ?  So, if we're offset by one byte,
+it becomes two bytes.  Makes no sense.
 
-Thank you for considering the patch and for the upstream update!
+Secondly, (PAGE_SIZE - whatever) < host->size will be mostly always true.
+What that means is the check is effectively just "sg->offset & 3".
 
-Cheers,
-Vivien
+Ah, maybe that's what you're trying to do - obfuscate the code in the hope
+that I won't analyse it so you can get your check past me and then remove
+all the obfuscation later... but maybe I'm just paranoid. :)
+
+> Is this if-statement align with your view of the alignment issue ?
+
+I've no idea why you're making it soo complicated.
+
+Let's review.  It copes fine with aligned buffers.  It copes fine with
+misaligned buffers that don't cross a page boundary.  It also copes
+fine with transfers that end with a non-word sized number of bytes
+(which we don't need a check for).
+
+So:
+
+	/* We can't cope with a misaligned transfer which crosses a page */
+	if (sg->offset & 3 && (sg->offset + sg->len > PAGE_SIZE ||
+			       data->sg_len > 1))
+		bad;
+
+See what I've done there?  I've taken the English and converted it directly
+to code.  And the comment also matches the code.
+
+And this way we continue to allow buffers that the string-IO operations
+can cope with just fine, but avoid the issue of a word crossing a page
+boundary.
