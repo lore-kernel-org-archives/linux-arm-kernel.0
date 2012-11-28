@@ -1,57 +1,37 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 28 Nov 2012 16:27:27 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the thermal tree
-Message-ID: <20121128162727.b7fa486fb3cc39f8c9169b19@canb.auug.org.au>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 28 Nov 2012 11:17:21 +0530
+Subject: [PATCH 2/3] ARM: OMAP4: Fix build error and warning in timer.c
+In-Reply-To: <1354068915-3378-3-git-send-email-jon-hunter@ti.com>
+References: <1354068915-3378-1-git-send-email-jon-hunter@ti.com>
+ <1354068915-3378-3-git-send-email-jon-hunter@ti.com>
+Message-ID: <50B5A569.4000908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/boot/dts/dbx5x0.dtsi between commit dc1956b5f84d ("Thermal: Add
-ST-Ericsson DB8500 thermal properties and platform data") from the
-thermal tree and commit 0563f638f052 ("ARM: ux500: Add node for the MMC
-GPIO regulator") from the arm-soc tree.
-
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/boot/dts/dbx5x0.dtsi
-index 487b705,9f55363..0000000
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@@ -695,10 -630,18 +664,23 @@@
-  			status = "disabled";
-  		};
-  
- +		cpufreq-cooling {
- +			compatible = "stericsson,db8500-cpufreq-cooling";
- +			status = "disabled";
- +		 };
- +
-+ 		vmmci: regulator-gpio {
-+ 			compatible = "regulator-gpio";
-+ 
-+ 			regulator-min-microvolt = <1800000>;
-+ 			regulator-max-microvolt = <2600000>;
-+ 			regulator-name = "mmci-reg";
-+ 			regulator-type = "voltage";
-+ 
-+ 			states = <1800000 0x1
-+ 				  2900000 0x0>;
-+ 
-+ 			status = "disabled";
-+ 		};
-  	};
-  };
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121128/f32d1adc/attachment-0001.sig>
+On Wednesday 28 November 2012 07:45 AM, Jon Hunter wrote:
+> When compiling the kernel with configuration option CONFIG_ARCH_OMAP4
+> enabled and CONFIG_LOCAL_TIMERS disabled, the following build error and
+> warning is seen.
+>
+>    CC      arch/arm/mach-omap2/timer.o
+>    arch/arm/mach-omap2/timer.c: In function ?omap4_local_timer_init?:
+>    arch/arm/mach-omap2/timer.c:630:2: error: implicit declaration of
+>    	function ?omap4_sync32_timer_init?
+> 	[-Werror=implicit-function-declaration]
+>    arch/arm/mach-omap2/timer.c: At top level:
+>    arch/arm/mach-omap2/timer.c:607:1: warning: ?omap4_sync32k_timer_init?
+>    	defined but not used [-Wunused-function]
+>    cc1: some warnings being treated as errors
+>    make[1]: *** [arch/arm/mach-omap2/timer.o] Error 1
+>
+> This issue was introduced by commit 6f80b3b (ARM: OMAP2+: timer: remove
+> CONFIG_OMAP_32K_TIMER) where the "k" is missing from the "sync32k" in
+> the function name "omap4_sync32_timer_init". Therefore, correct this
+> typo to resolve the above error and warning.
+>
+> Cc: Igor Grinberg <grinberg@compulab.co.il>
+>
+> Reported-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
