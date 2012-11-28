@@ -1,28 +1,80 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Nov 2012 17:04:44 +0100
-Subject: [PATCH 3/8 v3] pl080.h: moved from arm/include/asm/hardware to
- include/linux/amba/
-In-Reply-To: <1353716576-19783-1-git-send-email-ciminaghi@gnudd.com>
-References: <CAOh2x=keCbnPQzxB+AT5hEt_ukQ6GhPLuxkaQJCML27H9LbWwg@mail.gmail.com>
- <1353716576-19783-1-git-send-email-ciminaghi@gnudd.com>
-Message-ID: <CACRpkdYFfPVogqW3UTP4CU-ZfBE7_awGOYxcTZiTRrq-49FdwA@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 28 Nov 2012 10:06:07 -0600
+Subject: [PATCH 3/3] ARM: AM335x: Fix warning in timer.c
+In-Reply-To: <50B5BB5A.4060200@ti.com>
+References: <1354068915-3378-1-git-send-email-jon-hunter@ti.com>
+ <1354068915-3378-4-git-send-email-jon-hunter@ti.com>
+ <50B5AF29.4020306@ti.com> <50B5B33C.8020007@compulab.co.il>
+ <50B5BB5A.4060200@ti.com>
+Message-ID: <50B6366F.9060207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 24, 2012 at 1:22 AM, Davide Ciminaghi <ciminaghi@gnudd.com> wrote:
 
-> From: Alessandro Rubini <rubini@gnudd.com>
->
-> The header is used by drivers/dma/amba-pl08x.c, which can be compiled
-> under x86, where PL080 exists under a PCI-to-AMBA bridge. This patche
-> moves it where it can be accessed by other architectures, and fixes
-> all users.
->
-> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
-> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+On 11/28/2012 01:20 AM, Santosh Shilimkar wrote:
+> On Wednesday 28 November 2012 12:16 PM, Igor Grinberg wrote:
+>> On 11/28/12 08:28, Santosh Shilimkar wrote:
+>>> On Wednesday 28 November 2012 07:45 AM, Jon Hunter wrote:
+>>>> When compiling the kernel with configuration options ...
+>>>>
+>>>>    # CONFIG_ARCH_OMAP2 is not set
+>>>>    # CONFIG_ARCH_OMAP3 is not set
+>>>>    # CONFIG_ARCH_OMAP4 is not set
+>>>>    # CONFIG_SOC_OMAP5 is not set
+>>>>    CONFIG_SOC_AM33XX=y
+>>>>
+>>>>    ... the following build warning is seen.
+>>>>
+>>>>     CC      arch/arm/mach-omap2/timer.o
+>>>>     arch/arm/mach-omap2/timer.c:395:19: warning:
+>>>> ?omap2_sync32k_clocksource_init?
+>>>>         defined but not used [-Wunused-function]
+>>>>
+>>>> This issue was introduced by commit 6f80b3b (ARM: OMAP2+: timer: remove
+>>>> CONFIG_OMAP_32K_TIMER) where the omap2_sync32k_clocksource_init() is no
+>>>> longer referenced by the timer initialisation function for the AM335x
+>>>> device as it has no 32k-sync timer.
+>>>>
+>>>> Fix this by only including the omap2_sync32k_clocksource_init()
+>>>> function
+>>>> if either OMAP2, OMAP3, OMAP4 or OMAP5 devices are enabled.
+>>>>
+>>>> Cc: Igor Grinberg <grinberg@compulab.co.il>
+>>>>
+>>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>>>> ---
+>>>>    arch/arm/mach-omap2/timer.c |    3 +++
+>>>>    1 file changed, 3 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+>>>> index eb96712..085c7e7 100644
+>>>> --- a/arch/arm/mach-omap2/timer.c
+>>>> +++ b/arch/arm/mach-omap2/timer.c
+>>>> @@ -386,6 +386,8 @@ static u32 notrace dmtimer_read_sched_clock(void)
+>>>>        return 0;
+>>>>    }
+>>>>
+>>>> +#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3) || \
+>>>> +    defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+>>> #ifndef CONFIG_SOC_AM33XX ?
+>>>
+>>> #ifdef things are really ugly and needs constant patching and
+>>> hence something like CONFIG_HAS_32K kind of feature flags are
+>>> better. But that will undo certain part of f80b3b
+>>> (ARM: OMAP2+: timer: remove  CONFIG_OMAP_32K_TIMER).
+>>
+>> Agreed on ugliness of ifdefs.
+>> What about adding __maybe_unused to the function signature?
+>> That will cover any future SoC also w/o the need to extend the ifdefs.
+>>
+> Sounds good to me.
 
-OK!
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Yes agree on the ugliness of this. However, my thought was these would
+only remain until we migrate over to device-tree and then the detection
+of the a 32k source can be determine via DT.
 
-Yours,
-Linus Walleij
+However, I can update to use __maybe_unused for now. We just need to
+remember to remove this in the future if it becomes unnecessary :-)
+
+Cheers
+Jon
