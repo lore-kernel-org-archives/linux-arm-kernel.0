@@ -1,100 +1,142 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 28 Nov 2012 16:44:20 +0100
-Subject: [PATCH v4 0/5] ARM: EXYNOS: Add secure firmware support
-In-Reply-To: <122d01cdc9ea$5a0d6550$0e282ff0$%kim@samsung.com>
-References: <1353599478-24617-1-git-send-email-t.figa@samsung.com>
- <122d01cdc9ea$5a0d6550$0e282ff0$%kim@samsung.com>
-Message-ID: <3839370.Os5KVhzhEZ@amdc1227>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 28 Nov 2012 09:47:04 -0600
+Subject: [PATCH 1/3] ARM: OMAP2+: Fix realtime_counter_init warning in
+ timer.c
+In-Reply-To: <50B5AAB4.9010103@ti.com>
+References: <1354068915-3378-1-git-send-email-jon-hunter@ti.com>
+ <1354068915-3378-2-git-send-email-jon-hunter@ti.com>
+ <50B5AAB4.9010103@ti.com>
+Message-ID: <50B631F8.8010608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Saturday 24 of November 2012 11:21:03 Kukjin Kim wrote:
-> Tomasz Figa wrote:
-> > Some Exynos-based boards are running with secure firmware running in
-> > TrustZone secure world, which changes the way some things have to be
-> > initialized.
-> > 
-> > This series adds support for specifying firmware operations,
-> > implements
-> > some firmware operations for Exynos secure firmware and adds a method
-> > of enabling secure firmware operations on Exynos-based boards through
-> > board file and device tree.
-> > 
-> > Depends on:
-> >   - ARM: EXYNOS: Add support for secondary CPU bring-up on Exynos4412
-> > 
-> > Changes since v3
-> > ( http://thread.gmane.org/gmane.linux.kernel.samsung-soc/13442 )
-> > 
-> >   - Replaced cpu_boot_reg call with cpu_set_boot_addr
-> >   - Added interface documentation
-> >   - Separated from Exynos4x12 secondary CPU bring-up patch
-> > 
-> > Changes since v2
-> > ( http://thread.gmane.org/gmane.linux.kernel.samsung-soc/12848 )
-> > 
-> >   - Made Exynos firmware binding require address
-> >   - Minor style fixes
-> > 
-> > Changes since v1
-> > ( http://thread.gmane.org/gmane.linux.kernel.samsung-
-> > soc/12583/focus=12820 )
-> > 
-> >   - Changed return types of all operations to int
-> >   - Defined all operations to return 0 on success, -ENOSYS when not
-> >   
-> >     implemented or appropriate error code on error
-> > 
-> > Tomasz Figa (5):
-> >   ARM: Add interface for registering and calling firmware-specific
-> >   
-> >     operations
-> >   
-> >   ARM: EXYNOS: Add support for secure monitor calls
-> >   ARM: EXYNOS: Add support for Exynos secure firmware
-> >   ARM: EXYNOS: Add IO mapping for non-secure SYSRAM.
-> >   ARM: EXYNOS: Add secure firmware support to secondary CPU bring-up
-> >  
-> >  Documentation/arm/firmware.txt                     | 88
-> >  ++++++++++++++++++++++
-> >  .../devicetree/bindings/arm/samsung-boards.txt     | 10 +++
-> >  arch/arm/common/Makefile                           |  2 +
-> >  arch/arm/common/firmware.c                         | 18 +++++
-> >  arch/arm/include/asm/firmware.h                    | 66
-> >  ++++++++++++++++ arch/arm/mach-exynos/Makefile                     
-> >  |  6 ++
-> >  arch/arm/mach-exynos/common.c                      | 35 +++++++++
-> >  arch/arm/mach-exynos/common.h                      |  2 +
-> >  arch/arm/mach-exynos/exynos-smc.S                  | 22 ++++++
-> >  arch/arm/mach-exynos/firmware.c                    | 70
-> >  +++++++++++++++++ arch/arm/mach-exynos/include/mach/map.h           
-> >  |  3 +
-> >  arch/arm/mach-exynos/mach-exynos4-dt.c             |  1 +
-> >  arch/arm/mach-exynos/platsmp.c                     | 32 ++++++--
-> >  arch/arm/mach-exynos/smc.h                         | 31 ++++++++
-> >  arch/arm/plat-samsung/include/plat/map-s5p.h       |  1 +
-> >  15 files changed, 382 insertions(+), 5 deletions(-)
-> >  create mode 100644 Documentation/arm/firmware.txt
-> >  create mode 100644 arch/arm/common/firmware.c
-> >  create mode 100644 arch/arm/include/asm/firmware.h
-> >  create mode 100644 arch/arm/mach-exynos/exynos-smc.S
-> >  create mode 100644 arch/arm/mach-exynos/firmware.c
-> >  create mode 100644 arch/arm/mach-exynos/smc.h
-> > 
-> > --
-> > 1.8.0
+On 11/28/2012 12:09 AM, Santosh Shilimkar wrote:
+> On Wednesday 28 November 2012 07:45 AM, Jon Hunter wrote:
+>> In commit fa6d79d (ARM: OMAP: Add initialisation for the real-time
+>> counter), the function realtime_counter_init() was added. However, if
+>> the kernel configuration option CONFIG_SOC_OMAP5 is not selected then
+>> the following compiler warning is observed.
+>>
+>>    CC      arch/arm/mach-omap2/timer.o
+>>    arch/arm/mach-omap2/timer.c:489:20: warning: ?realtime_counter_init?
+>>    defined but not used [-Wunused-function]
+>>
+>> Commit fa6d79d also introduced the kernel configuration option
+>> CONFIG_SOC_HAS_REALTIME_COUNTER. If this option is not selected then the
+>> a stub function for realtime_counter_init() is defined.
+>>
+>> The option CONFIG_SOC_HAS_REALTIME_COUNTER and stub function are not
+>> really needed because ...
+>>
+>> 1. For non-OMAP5 devices, there is no realtime counter and so
+>>     realtime_counter_init() function is not used.
+>> 2. For OMAP5 devices, CONFIG_SOC_HAS_REALTIME_COUNTER is always selected
+>>     and cannot be disabled, so the stub function for
+>> realtime_counter_init()
+>>     is never used.
+>>
+>> Fix this warning by removing the kernel configuration option
+>> CONFIG_SOC_HAS_REALTIME_COUNTER and stub function, and only include
+>> the function realtime_counter_init() if CONFIG_SOC_OMAP5 is selected.
+>>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>
+>> Reported-by: Tony Lindgren <tony@atomide.com>
+>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>> ---
+> The #ifdef was avoided because the real-time counter can be used on
+> other future SOCs. And the those SOCs just select
+> SOC_HAS_REALTIME_COUNTER. And that stub was added because OMAP5 can
+> work without real-time counter configuration enabled using 32K counter.
+> But since we are any way have that SOC_HAS_REALTIME_COUNTER always
+> set for SOC which wants to use it, we can actually remove the stub
+> and hence avoid the warning. Let me know if below patch is ok
+> with you ? attached the same for mailer issues
+>
+> From e000aa13e47e29fbe3473bfd0277cb057c3160cc Mon Sep 17 00:00:00 2001
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Date: Wed, 28 Nov 2012 11:28:57 +0530
+> Subject: [PATCH] ARM: OMAP2+: Fix realtime_counter_init warning in timer.c
+> MIME-Version: 1.0
+> Content-Type: text/plain; charset=UTF-8
+> Content-Transfer-Encoding: 8bit
 > 
-> Russell, I think, Tomasz addressed comments from you.
+> In commit fa6d79d (ARM: OMAP: Add initialisation for the real-time
+> counter), the function realtime_counter_init() was added. However, if
+> the kernel configuration option CONFIG_SOC_OMAP5 is not selected then
+> the following compiler warning is observed.
 > 
-> If you're ok on this, please ack so that I can pick this up in my tree
-> for v3.8...
+>     CC      arch/arm/mach-omap2/timer.o
+>     arch/arm/mach-omap2/timer.c:489:20: warning: ?realtime_counter_init?
+>     defined but not used [-Wunused-function]
+> 
+> It is because of the stub init function which was added for the cases
+> where realtime_counter_init() is called with
+> !CONFIG_SOC_HAS_REALTIME_COUNTER.
+> This is actually not necessary since the SOC which need this feature
+> will explicitly select the configuration.
+> 
+> So just drop the unused stub to avoid the build warning.
+> 
+> Patch is made after seeing Jon's patch which was wrapping the
+> real-time counter code under needed SOC #ifdef
+> 
+> Cc: Jon Hunter <jon-hunter@ti.com>
+> 
+> Reported-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-omap2/timer.c |    3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index 69e4663..79d8e6b 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -428,9 +428,6 @@ static void __init realtime_counter_init(void)
+> 
+>      iounmap(base);
+>  }
+> -#else
+> -static inline void __init realtime_counter_init(void)
+> -{}
+>  #endif
+> 
+>  #define OMAP_SYS_TIMER_INIT(name, clkev_nr, clkev_src,            \
 
-Arnd, Olof, what do you think?
+Hi Santosh,
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Linux Platform
+Thanks for the feedback. Unfortunately, the above is not enough. If I
+disable SOC_OMAP5 and leave SOC_HAS_REALTIME_COUNTER enabled, then I
+still see the warning message. So I could see that people could still
+hit this with randconfig.
+
+Understand the desire to make this a selectable configuration, but given
+to date only OMAP5 uses it, it was simpler and cleaner just to remove
+the option. However, we could keep the option and just do something like ...
+
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 813c267..500f2f6 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -26,6 +26,8 @@ config SOC_HAS_OMAP2_SDRC
+
+ config SOC_HAS_REALTIME_COUNTER
+        bool "Real time free running counter"
++       depends on SOC_OMAP5
++       default y
+
+ config ARCH_OMAP2
+        bool "TI OMAP2"
+@@ -79,7 +81,6 @@ config SOC_OMAP5
+        select ARM_GIC
+        select CPU_V7
+        select HAVE_SMP
+-       select SOC_HAS_REALTIME_COUNTER
+        select COMMON_CLK
+
+I have tested this and this resolves the warning.
+
+Cheers
+Jon
