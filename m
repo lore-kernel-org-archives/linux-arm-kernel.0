@@ -1,117 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Nov 2012 13:15:20 +0000
-Subject: [PATCH v4 02/13] ARM: KVM: Keep track of currently running vcpus
-In-Reply-To: <20121128124743.GD21671@mudshark.cambridge.arm.com>
-References: <20121110154358.3061.16338.stgit@chazy-air>
- <20121110154430.3061.64584.stgit@chazy-air>
- <20121128124743.GD21671@mudshark.cambridge.arm.com>
-Message-ID: <50B60E68.2020501@arm.com>
+From: mark.langsdorf@calxeda.com (Mark Langsdorf)
+Date: Wed, 28 Nov 2012 07:16:12 -0600
+Subject: [PATCH 6/6 v6] cpufreq, highbank: add support for highbank cpufreq
+In-Reply-To: <20121128023240.GA28170@S2100-06.ap.freescale.net>
+References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1354046672-7392-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1354046672-7392-7-git-send-email-mark.langsdorf@calxeda.com>
+ <20121128023240.GA28170@S2100-06.ap.freescale.net>
+Message-ID: <50B60E9C.9000405@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/11/12 12:47, Will Deacon wrote:
-> Just a bunch of typos in this one :)
-
-Typos? me? ;-)
-
+On 11/27/2012 08:32 PM, Shawn Guo wrote:
+> On Tue, Nov 27, 2012 at 02:04:32PM -0600, Mark Langsdorf wrote:
+>> Highbank processors depend on the external ECME to perform voltage
+>> management based on a requested frequency. Communication between the
+>> A9 cores and the ECME happens over the pl320 IPC channel.
 > 
-> On Sat, Nov 10, 2012 at 03:44:30PM +0000, Christoffer Dall wrote:
->> From: Marc Zyngier <marc.zyngier@arm.com>
->>
->> When an interrupt occurs for the guest, it is sometimes necessary
->> to find out which vcpu was running at that point.
->>
->> Keep track of which vcpu is being tun in kvm_arch_vcpu_ioctl_run(),
+> ...
 > 
-> run
-> 
->> and allow the data to be retrived using either:
-> 
-> retrieved
-> 
->> - kvm_arm_get_running_vcpu(): returns the vcpu running at this point
->>   on the current CPU. Can only be used in a non-preemptable context.
-> 
-> preemptible
-> 
->> - kvm_arm_get_running_vcpus(): returns the per-CPU variable holding
->>   the the running vcpus, useable for per-CPU interrupts.
-> 
-> -the
-> usable
-> 
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
->> ---
->>  arch/arm/include/asm/kvm_host.h |   10 ++++++++++
->>  arch/arm/kvm/arm.c              |   30 ++++++++++++++++++++++++++++++
->>  2 files changed, 40 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index e7fc249..e66cd56 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -154,4 +154,14 @@ static inline int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
->>  {
->>  	return 0;
->>  }
->> +
->> +struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
->> +struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
-> 
-> DECLARE_PER_CPU?
-
-Ah, nice one. I didn't even now it existed!
-
->> +int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
->> +unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
->> +struct kvm_one_reg;
->> +int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
->> +int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
->> +
->>  #endif /* __ARM_KVM_HOST_H__ */
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 2cdc07b..60b119a 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -53,11 +53,38 @@ static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
->>  static struct vfp_hard_struct __percpu *kvm_host_vfp_state;
->>  static unsigned long hyp_default_vectors;
->>  
->> +/* Per-CPU variable containing the currently running vcpu. */
->> +static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
->> +
->>  /* The VMID used in the VTTBR */
->>  static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
->>  static u8 kvm_next_vmid;
->>  static DEFINE_SPINLOCK(kvm_vmid_lock);
->>  
->> +static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+>> +static int hb_voltage_change(unsigned int freq)
 >> +{
->> +	BUG_ON(preemptible());
->> +	__get_cpu_var(kvm_arm_running_vcpu) = vcpu;
->> +}
+>> +	int i;
+>> +	u32 msg[7];
 >> +
->> +/**
->> + * kvm_arm_get_running_vcpu - get the vcpu running on the current CPU.
->> + * Must be called from non-preemptible context
->> + */
->> +struct kvm_vcpu *kvm_arm_get_running_vcpu(void)
->> +{
->> +	BUG_ON(preemptible());
->> +	return __get_cpu_var(kvm_arm_running_vcpu);
->> +}
+>> +	msg[0] = HB_CPUFREQ_CHANGE_NOTE;
+>> +	msg[1] = freq / 1000;
+>> +	for (i = 2; i < 7; i++)
+>> +		msg[i] = 0;
 >> +
->> +/**
->> + * kvm_arm_get_running_vcpus - get the per-CPU array on currently running vcpus.
->> + */
+>> +	return pl320_ipc_transmit(msg);
 > 
-> s/on/of/ ?
+> Is it possible to have this handled inside clk_set_rate() call of cpu
+> clock?
 
-Indeed.
+Standard practice is to have cpufreq_set_target() handle voltage
+transitions and leave clk_set_rate() handle the frequency changes. I'd
+have to move most of the logic of hb_set_target() into
+clk_highbank.c:clk_pll_set_rate() and then add extra logic for when
+cpufreq is not enabled/loaded. I don't think the clk maintainers would
+take that patch, either.
 
-Thanks,
+So no.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+--Mark Langsdorf
+Calxeda, Inc.
