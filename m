@@ -1,108 +1,35 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Nov 2012 23:16:40 +0100
-Subject: [PATCH 1/2] amba: create a resource parent registrator
-Message-ID: <1354141000-22942-1-git-send-email-linus.walleij@linaro.org>
+Date: Wed, 28 Nov 2012 23:16:57 +0100
+Subject: [PATCH 2/2] ARM: integrator: pass the lm resource to amba
+Message-ID: <1354141017-22987-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This creates amba_apb_device_add_res() and
-amba_ahb_device_add_res() respectively, to add devices with
-another parent than iomem_resource. This is needed to specify
-that a device is contained in a specific IO range.
+This passes the lm resource to register the AMBA devices on the
+LM as contained within the LM resource.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/amba/bus.c       | 32 ++++++++++++++++++++++++++++----
- include/linux/amba/bus.h | 10 ++++++++++
- 2 files changed, 38 insertions(+), 4 deletions(-)
+ arch/arm/mach-integrator/impd1.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index e8eb91b..a2fc56d 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -546,7 +546,8 @@ EXPORT_SYMBOL_GPL(amba_device_add);
- static struct amba_device *
- amba_aphb_device_add(struct device *parent, const char *name,
- 		     resource_size_t base, size_t size, int irq1, int irq2,
--		     void *pdata, unsigned int periphid, u64 dma_mask)
-+		     void *pdata, unsigned int periphid, u64 dma_mask,
-+		     struct resource *resbase)
- {
- 	struct amba_device *dev;
- 	int ret;
-@@ -563,7 +564,7 @@ amba_aphb_device_add(struct device *parent, const char *name,
- 	dev->dev.platform_data = pdata;
- 	dev->dev.parent = parent;
+diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
+index b3d86d7..9f82f9d 100644
+--- a/arch/arm/mach-integrator/impd1.c
++++ b/arch/arm/mach-integrator/impd1.c
+@@ -342,9 +342,10 @@ static int impd1_probe(struct lm_device *dev)
  
--	ret = amba_device_add(dev, &iomem_resource);
-+	ret = amba_device_add(dev, resbase);
- 	if (ret) {
- 		amba_device_put(dev);
- 		return ERR_PTR(ret);
-@@ -578,7 +579,7 @@ amba_apb_device_add(struct device *parent, const char *name,
- 		    void *pdata, unsigned int periphid)
- {
- 	return amba_aphb_device_add(parent, name, base, size, irq1, irq2, pdata,
--				    periphid, 0);
-+				    periphid, 0, &iomem_resource);
- }
- EXPORT_SYMBOL_GPL(amba_apb_device_add);
- 
-@@ -588,10 +589,33 @@ amba_ahb_device_add(struct device *parent, const char *name,
- 		    void *pdata, unsigned int periphid)
- {
- 	return amba_aphb_device_add(parent, name, base, size, irq1, irq2, pdata,
--				    periphid, ~0ULL);
-+				    periphid, ~0ULL, &iomem_resource);
- }
- EXPORT_SYMBOL_GPL(amba_ahb_device_add);
- 
-+struct amba_device *
-+amba_apb_device_add_res(struct device *parent, const char *name,
-+			resource_size_t base, size_t size, int irq1,
-+			int irq2, void *pdata, unsigned int periphid,
-+			struct resource *resbase)
-+{
-+	return amba_aphb_device_add(parent, name, base, size, irq1, irq2, pdata,
-+				    periphid, 0, resbase);
-+}
-+EXPORT_SYMBOL_GPL(amba_apb_device_add_res);
-+
-+struct amba_device *
-+amba_ahb_device_add_res(struct device *parent, const char *name,
-+			resource_size_t base, size_t size, int irq1,
-+			int irq2, void *pdata, unsigned int periphid,
-+			struct resource *resbase)
-+{
-+	return amba_aphb_device_add(parent, name, base, size, irq1, irq2, pdata,
-+				    periphid, ~0ULL, resbase);
-+}
-+EXPORT_SYMBOL_GPL(amba_ahb_device_add_res);
-+
-+
- static void amba_device_initialize(struct amba_device *dev, const char *name)
- {
- 	device_initialize(&dev->dev);
-diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-index d364171..43ec7e2 100644
---- a/include/linux/amba/bus.h
-+++ b/include/linux/amba/bus.h
-@@ -71,6 +71,16 @@ struct amba_device *amba_ahb_device_add(struct device *parent, const char *name,
- 					resource_size_t base, size_t size,
- 					int irq1, int irq2, void *pdata,
- 					unsigned int periphid);
-+struct amba_device *
-+amba_apb_device_add_res(struct device *parent, const char *name,
-+			resource_size_t base, size_t size, int irq1,
-+			int irq2, void *pdata, unsigned int periphid,
-+			struct resource *resbase);
-+struct amba_device *
-+amba_ahb_device_add_res(struct device *parent, const char *name,
-+			resource_size_t base, size_t size, int irq1,
-+			int irq2, void *pdata, unsigned int periphid,
-+			struct resource *resbase);
- void amba_device_unregister(struct amba_device *);
- struct amba_device *amba_find_device(const char *, struct device *, unsigned int, unsigned int);
- int amba_request_regions(struct amba_device *, const char *);
+ 		pc_base = dev->resource.start + idev->offset;
+ 		snprintf(devname, 32, "lm%x:%5.5lx", dev->id, idev->offset >> 12);
+-		d = amba_ahb_device_add(&dev->dev, devname, pc_base, SZ_4K,
+-					dev->irq, dev->irq,
+-					idev->platform_data, idev->id);
++		d = amba_ahb_device_add_res(&dev->dev, devname, pc_base, SZ_4K,
++					    dev->irq, dev->irq,
++					    idev->platform_data, idev->id,
++					    &dev->resource);
+ 		if (IS_ERR(d)) {
+ 			dev_err(&dev->dev, "unable to register device: %ld\n", PTR_ERR(d));
+ 			continue;
 -- 
 1.7.11.7
