@@ -1,47 +1,136 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 28 Nov 2012 11:12:26 +0000
-Subject: [rtc-linux] [PATCH v3 1/5] rtc: OMAP: Add system pm_power_off
- to rtc driver
-In-Reply-To: <20121127154239.0efad6d5.akpm@linux-foundation.org>
-References: <1353404927-14412-1-git-send-email-anilkumar@ti.com>
- <1353404927-14412-2-git-send-email-anilkumar@ti.com>
- <20121127154239.0efad6d5.akpm@linux-foundation.org>
-Message-ID: <20121128111226.GX3332@n2100.arm.linux.org.uk>
+From: archit@ti.com (Archit Taneja)
+Date: Wed, 28 Nov 2012 17:01:39 +0530
+Subject: [PATCH] OMAPDSS: Use only "omapdss_dss" platform device to get
+ context lost count
+Message-ID: <1354102299-4928-1-git-send-email-archit@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2012 at 03:42:39PM -0800, Andrew Morton wrote:
-> > +	/* Do not allow to execute any other task */
-> > +	spin_lock_irqsave(&lock, flags);
-> > +	while (1);
-> 
-> I suspect this doesn't do what you want it to do.
-> 
-> Firstly, please provide adequate code comments here so that code
-> readers do not also need to be mind readers.
-> 
-> If you want to stop this CPU dead in its tracks (why?) then
-> 
-> 	local_irq_disable();
-> 	while (1)
-> 		;		/* Note correct code layout */
-> 
-> will do it.  But it means that the NMI watchdog (if present) will come
-> along and whack the machine in the head a few seconds later.  And this
-> does nothing to stop other CPUs.
-> 
-> But not being a mind reader, I'm really at a loss to suggest what
-> should be done here.  
+When enabling a hwmod, omap_hwmod refers to the register mentioned in the
+hwmod struct's member 'prcm.omap4.context_offs' to see whether context was
+lost or not. It increments the context lost count for the hwmod and then clears
+the register.
 
-It's hooking into the pm_power_off hook, which is called from kernel/sys.c
-via arch code.  We will have already stopped all other CPUs at this point.
+All the DSS hwmods have the same register(RM_DSS_DSS_CONTEXT) as context_offs.
+When DSS is enabled, the first hwmod to be enabled is the "dss_core" hwmod since
+it's corresponding platform device is the parent platform device("omapdss_dss").
+The dss_core hwmod updates it's context lost count correctly and clears the
+register. When the hwmods corresponding to the children platform devices are
+enabled, they see that the register is clear, and don't increment their context
+lost count. Therefore, all the children platform devices never report a loss in
+context.
 
-Why there's that while (1) there I don't know; when pm_power_off is not
-hooked, we don't do anything like that - and what will happen in that
-case is we'll return all the way back to sys_reboot(), which will call
-do_exit(0) on us.
+The DISPC driver currently gets the context lost count for DSS power domain from
+it's corresponding platform device instance("omapdss_dispc"). The DISPC platform
+device is one of the child devices, and it's corresponding hwmod("dss_dispc")
+doesn't report the context lost count correctly.
 
-I don't see a problem with that, and I don't see why we need to spin
-(without any power saving too) waiting for some event.  If we've called
-sys_reboot with LINUX_REBOOT_CMD_POWER_OFF, we'd better have already
-killed most of userspace off by that time anyway.
+Modify dss_get_ctx_loss_count() such that it always takes the "omapdss_dss"
+platform device as it's input, move the function to dss.c so that it has access
+to that platform device.
+
+Signed-off-by: Archit Taneja <archit@ti.com>
+---
+ drivers/video/omap2/dss/core.c  |   15 ---------------
+ drivers/video/omap2/dss/dispc.c |    4 ++--
+ drivers/video/omap2/dss/dss.c   |   15 +++++++++++++++
+ drivers/video/omap2/dss/dss.h   |    3 ++-
+ 4 files changed, 19 insertions(+), 18 deletions(-)
+
+diff --git a/drivers/video/omap2/dss/core.c b/drivers/video/omap2/dss/core.c
+index d94ef9e..ceb912b 100644
+--- a/drivers/video/omap2/dss/core.c
++++ b/drivers/video/omap2/dss/core.c
+@@ -93,21 +93,6 @@ struct regulator *dss_get_vdds_sdi(void)
+ 	return reg;
+ }
+ 
+-int dss_get_ctx_loss_count(struct device *dev)
+-{
+-	struct omap_dss_board_info *board_data = core.pdev->dev.platform_data;
+-	int cnt;
+-
+-	if (!board_data->get_context_loss_count)
+-		return -ENOENT;
+-
+-	cnt = board_data->get_context_loss_count(dev);
+-
+-	WARN_ONCE(cnt < 0, "get_context_loss_count failed: %d\n", cnt);
+-
+-	return cnt;
+-}
+-
+ int dss_dsi_enable_pads(int dsi_id, unsigned lane_mask)
+ {
+ 	struct omap_dss_board_info *board_data = core.pdev->dev.platform_data;
+diff --git a/drivers/video/omap2/dss/dispc.c b/drivers/video/omap2/dss/dispc.c
+index a5ab354..67d4497 100644
+--- a/drivers/video/omap2/dss/dispc.c
++++ b/drivers/video/omap2/dss/dispc.c
+@@ -374,7 +374,7 @@ static void dispc_save_context(void)
+ 	if (dss_has_feature(FEAT_CORE_CLK_DIV))
+ 		SR(DIVISOR);
+ 
+-	dispc.ctx_loss_cnt = dss_get_ctx_loss_count(&dispc.pdev->dev);
++	dispc.ctx_loss_cnt = dss_get_ctx_loss_count();
+ 	dispc.ctx_valid = true;
+ 
+ 	DSSDBG("context saved, ctx_loss_count %d\n", dispc.ctx_loss_cnt);
+@@ -389,7 +389,7 @@ static void dispc_restore_context(void)
+ 	if (!dispc.ctx_valid)
+ 		return;
+ 
+-	ctx = dss_get_ctx_loss_count(&dispc.pdev->dev);
++	ctx = dss_get_ctx_loss_count();
+ 
+ 	if (ctx >= 0 && ctx == dispc.ctx_loss_cnt)
+ 		return;
+diff --git a/drivers/video/omap2/dss/dss.c b/drivers/video/omap2/dss/dss.c
+index 602102c..d2cbee2 100644
+--- a/drivers/video/omap2/dss/dss.c
++++ b/drivers/video/omap2/dss/dss.c
+@@ -151,6 +151,21 @@ static void dss_restore_context(void)
+ #undef SR
+ #undef RR
+ 
++int dss_get_ctx_loss_count(void)
++{
++	struct omap_dss_board_info *board_data = dss.pdev->dev.platform_data;
++	int cnt;
++
++	if (!board_data->get_context_loss_count)
++		return -ENOENT;
++
++	cnt = board_data->get_context_loss_count(&dss.pdev->dev);
++
++	WARN_ONCE(cnt < 0, "get_context_loss_count failed: %d\n", cnt);
++
++	return cnt;
++}
++
+ void dss_sdi_init(int datapairs)
+ {
+ 	u32 l;
+diff --git a/drivers/video/omap2/dss/dss.h b/drivers/video/omap2/dss/dss.h
+index 6728892..5577660 100644
+--- a/drivers/video/omap2/dss/dss.h
++++ b/drivers/video/omap2/dss/dss.h
+@@ -190,7 +190,6 @@ const char *dss_get_default_display_name(void);
+ struct bus_type *dss_get_bus(void);
+ struct regulator *dss_get_vdds_dsi(void);
+ struct regulator *dss_get_vdds_sdi(void);
+-int dss_get_ctx_loss_count(struct device *dev);
+ int dss_dsi_enable_pads(int dsi_id, unsigned lane_mask);
+ void dss_dsi_disable_pads(int dsi_id, unsigned lane_mask);
+ int dss_set_min_bus_tput(struct device *dev, unsigned long tput);
+@@ -309,6 +308,8 @@ void dss_dump_clocks(struct seq_file *s);
+ void dss_debug_dump_clocks(struct seq_file *s);
+ #endif
+ 
++int dss_get_ctx_loss_count(void);
++
+ void dss_sdi_init(int datapairs);
+ int dss_sdi_enable(void);
+ void dss_sdi_disable(void);
+-- 
+1.7.9.5
