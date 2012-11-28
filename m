@@ -1,35 +1,31 @@
-From: dromede@gmail.com (dromede at gmail.com)
-Date: Wed, 28 Nov 2012 22:46:41 +0100
-Subject: [PATCH] backlight: corgi_lcd: Fix WARN_ON() when calling
- corgi_bl_set_intensity.
-Message-ID: <1354139201-12834-1-git-send-email-dromede@gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 28 Nov 2012 16:04:56 -0600
+Subject: [PATCH V2 0/4] ARM: OMAP2+: Timer build warnings and error fixes
+Message-ID: <1354140300-16825-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marko Katic <dromede.gmail.com>
+Fixes for build warnings and errors seen with various kernel
+configuration combinations. Based upon Tony Lindgren's OMAP
+master branch.
 
+V2 changes:
+- Update fix for realtime counter per feedback from Santosh
+- Update fix when building for only AM335x with Igor's suggestion to
+  use __maybe_unused (thanks Igor!)
+- Add Vaibhav's fixes for sparse warnings
 
-Signed-off-by: Marko Katic <dromede@gmail.com>
----
- drivers/video/backlight/corgi_lcd.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Jon Hunter (3):
+  ARM: OMAP2+: Fix realtime_counter_init warning in timer.c
+  ARM: OMAP4: Fix build error and warning in timer.c
+  ARM: AM335x: Fix warning in timer.c
 
-diff --git a/drivers/video/backlight/corgi_lcd.c b/drivers/video/backlight/corgi_lcd.c
-index c781768..8b002d7 100644
---- a/drivers/video/backlight/corgi_lcd.c
-+++ b/drivers/video/backlight/corgi_lcd.c
-@@ -409,10 +409,10 @@ static int corgi_bl_set_intensity(struct corgi_lcd *lcd, int intensity)
- 	cont = !!(intensity & 0x20) ^ lcd->gpio_backlight_cont_inverted;
- 
- 	if (gpio_is_valid(lcd->gpio_backlight_cont))
--		gpio_set_value(lcd->gpio_backlight_cont, cont);
-+		gpio_set_value_cansleep(lcd->gpio_backlight_cont, cont);
- 
- 	if (gpio_is_valid(lcd->gpio_backlight_on))
--		gpio_set_value(lcd->gpio_backlight_on, intensity);
-+		gpio_set_value_cansleep(lcd->gpio_backlight_on, intensity);
- 
- 	if (lcd->kick_battery)
- 		lcd->kick_battery();
+Vaibhav Hiremath (1):
+  ARM: OMAP2+: Fix sparse warnings in timer.c
+
+ arch/arm/mach-omap2/Kconfig |    3 ++-
+ arch/arm/mach-omap2/timer.c |    8 ++++----
+ 2 files changed, 6 insertions(+), 5 deletions(-)
+
 -- 
-1.7.4.1
+1.7.10.4
