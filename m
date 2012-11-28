@@ -1,66 +1,30 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Wed, 28 Nov 2012 10:04:33 -0400
-Subject: OMAP* Latest build failures
-In-Reply-To: <20121120175733.GH18567@atomide.com>
-References: <20121114092643.GG3290@n2100.arm.linux.org.uk>
- <20121117093307.GL3332@n2100.arm.linux.org.uk>
- <20121120175733.GH18567@atomide.com>
-Message-ID: <50B619F1.3000207@ti.com>
+From: ajaykumar.rs@samsung.com (Ajay Kumar)
+Date: Wed, 28 Nov 2012 19:59:47 +0530
+Subject: [PATCH 1/3] ARM: dts: Add device tree node for G2D controller on
+ Exynos5
+Message-ID: <1354112989-3161-1-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony, Russell,
+Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+---
+ arch/arm/boot/dts/exynos5250.dtsi |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-On 20-11-2012 13:57, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [121117 01:35]:
->> On Wed, Nov 14, 2012 at 09:26:43AM +0000, Russell King - ARM Linux wrote:
->>> OMAP* allnoconfig fails:
->>>
->>> arch/arm/mach-omap2/built-in.o: In function `omap_dss_set_min_bus_tput':
->>> twl-common.c:(.text+0x1e08): undefined reference to `omap_pm_set_min_bus_tput'
->>> arch/arm/mach-omap2/built-in.o: In function `omap_hwmod_init_postsetup':
->>> twl-common.c:(.init.text+0x8f8): undefined reference to `omap_pm_if_early_init'
->>> arch/arm/mach-omap2/built-in.o: In function `omap_serial_init_port':
->>> twl-common.c:(.init.text+0x1284): undefined reference to `omap_pm_get_dev_context_loss_count'
->>> arch/arm/mach-omap2/built-in.o: In function `omap_timer_init':
->>> twl-common.c:(.init.text+0x1544): undefined reference to `omap_pm_get_dev_context_loss_count'
->>> arch/arm/mach-omap2/built-in.o: In function `omap2_common_pm_init':
->>> twl-common.c:(.init.text+0x1af0): undefined reference to `omap_pm_if_init'
->>> arch/arm/mach-omap2/built-in.o: In function `omap2_gpio_dev_init':
->>> twl-common.c:(.init.text+0x2168): undefined reference to `omap_pm_get_dev_context_loss_count'
->>> arch/arm/mach-omap2/built-in.o: In function `omap_display_init':
->>> twl-common.c:(.init.text+0x25cc): undefined reference to `omap_pm_get_dev_context_loss_count'
->>
->> These are now gone, but we have a new warning:
->>
->> arch/arm/mach-omap2/timer.c:163:28: warning: 'omap_counter_match' defined but not used
->
-> Jon, care to fix this one?
->
->> And the randconfig found:
->>
->> drivers/staging/omap-thermal/omap-bandgap.c: In function 'omap_bandgap_readl':
->> drivers/staging/omap-thermal/omap-bandgap.c:46:2: error: implicit declaration of function 'readl'
->> drivers/staging/omap-thermal/omap-bandgap.c: In function 'omap_bandgap_writel':
->> drivers/staging/omap-thermal/omap-bandgap.c:51:2: error: implicit declaration of function 'writel'
->>
->> Which, as its in staging, maybe its not important but it's another source
->> of unnecessary failure.
-
-Well, it is important, thanks for checking this code. I appreciate if 
-you keep your report.
-
->
-> Radhesh & Eduardo, can you fix this?
->
-
-This has been already fixed:
-https://patchwork.kernel.org/patch/1734621/
-
-And is already queued by Greg (staging-next):
-http://git.kernel.org/?p=linux/kernel/git/gregkh/staging.git;a=commit;h=2aeeb8acfc19f8a9f283081bbf77919b61b92042
-
-> Regards,
->
-> Tony
->
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 581e57a..6d50c15 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -613,4 +613,10 @@
+ 		reg = <0x14450000 0x10000>;
+ 		interrupts = <0 94 0>;
+ 	};
++
++	g2d: g2d {
++		compatible = "samsung,exynos-g2d-41";
++		reg = <0x10850000 0x1000>;
++		interrupts = <0 91 0>;
++	};
+ };
+-- 
+1.7.1
