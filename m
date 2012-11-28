@@ -1,194 +1,45 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Tue, 27 Nov 2012 22:06:26 -0500
-Subject: [V2 PATCH 27/27] usb: ehci: ehci-mv: add device tree support
-In-Reply-To: <1354071986-28032-1-git-send-email-chao.xie@marvell.com>
-References: <1354071986-28032-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1354071986-28032-28-git-send-email-chao.xie@marvell.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 28 Nov 2012 14:26:10 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the slave-dma
+ tree
+In-Reply-To: <CAKohpo=K2kX-M4NM9onrn-Rr4otJwcQ1HxN5cKPYvj+Tza_0Ug@mail.gmail.com>
+References: <20121127154430.36e87542081a7cc50f80d0f6@canb.auug.org.au>
+ <CAKohpo=K2kX-M4NM9onrn-Rr4otJwcQ1HxN5cKPYvj+Tza_0Ug@mail.gmail.com>
+Message-ID: <20121128142610.9fdfaf75a98ef83a12c32d9b@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All blocks are removed. Add the device tree support for ehci.
+Hi,
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
----
- drivers/usb/host/ehci-mv.c |  104 +++++++++++++++++++++++++++++++++-----------
- 1 files changed, 79 insertions(+), 25 deletions(-)
+On Tue, 27 Nov 2012 11:08:36 +0530 Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>
+> On 27 November 2012 10:14, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> > Today's linux-next merge of the arm-soc tree got a conflict in
+> > arch/arm/mach-spear13xx/spear1310.c between commit b47394911c26 ("ARM:
+> > SPEAr13xx: Pass DW DMAC platform data from DT") from the slave-dma tree
+> > and commit 300a6856324a ("ARM: SPEAr1310: Fix AUXDATA for compact flash
+> > controller") from the arm-soc tree.
+> >
+> > I have no idea how to fix this up, so I just effectively dropped the
+> > arm-doc tree patch.
+> 
+> So sorry for that, Can you please take arm-soc version here? Patch 300a6856324a
+> is doing the correct thing. i.e. we need
+> 
+> +       OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL, &cf_pdata),
+> 
+> instead of
+> 
+> +       OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL, "cf"),
 
-diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
-index 171e145..0e99dac 100644
---- a/drivers/usb/host/ehci-mv.c
-+++ b/drivers/usb/host/ehci-mv.c
-@@ -13,6 +13,7 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/clk.h>
-+#include <linux/of.h>
- #include <linux/err.h>
- #include <linux/usb/otg.h>
- #include <linux/usb/mv_usb2.h>
-@@ -32,11 +33,9 @@ struct ehci_hcd_mv {
- 
- 	struct usb_phy *otg;
- 
--	struct mv_usb_platform_data *pdata;
--
- 	/* clock source and total clock number */
- 	unsigned int clknum;
--	struct clk *clk[0];
-+	struct clk **clk;
- };
- 
- static void ehci_clock_enable(struct ehci_hcd_mv *ehci_mv)
-@@ -138,22 +137,55 @@ static const struct hc_driver mv_ehci_hc_driver = {
- 	.bus_resume = ehci_bus_resume,
- };
- 
-+static int __devinit mv_ehci_parse_dt(struct platform_device *pdev,
-+				struct ehci_hcd_mv *ehci_mv)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	unsigned int clks_num;
-+	int i, ret;
-+	const char *clk_name;
-+
-+	if (!np)
-+		return 1;
-+
-+	clks_num = of_property_count_strings(np, "clocks");
-+	if (clks_num < 0)
-+		return clks_num;
-+
-+	ehci_mv->clk = devm_kzalloc(&pdev->dev,
-+		sizeof(struct clk *) * clks_num, GFP_KERNEL);
-+	if (ehci_mv->clk == NULL)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < clks_num; i++) {
-+		ret = of_property_read_string_index(np, "clocks", i,
-+			&clk_name);
-+		if (ret)
-+			return ret;
-+		ehci_mv->clk[i] = clk_get(NULL, clk_name);
-+		if (IS_ERR(ehci_mv->clk[i]))
-+			return PTR_ERR(ehci_mv->clk[i]);
-+	}
-+
-+	ehci_mv->clknum = clks_num;
-+
-+	ret = of_property_read_u32(np, "mode", &ehci_mv->mode);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+
- static int mv_ehci_probe(struct platform_device *pdev)
- {
--	struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
- 	struct usb_hcd *hcd;
- 	struct ehci_hcd *ehci;
- 	struct ehci_hcd_mv *ehci_mv;
- 	struct resource *r;
--	int clk_i, retval = -ENODEV;
-+	int retval = -ENODEV;
- 	u32 offset;
- 	size_t size;
- 
--	if (!pdata) {
--		dev_err(&pdev->dev, "missing platform_data\n");
--		return -ENODEV;
--	}
--
- 	if (usb_disabled())
- 		return -ENODEV;
- 
-@@ -161,7 +193,7 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 	if (!hcd)
- 		return -ENOMEM;
- 
--	size = sizeof(*ehci_mv) + sizeof(struct clk *) * pdata->clknum;
-+	size = sizeof(*ehci_mv);
- 	ehci_mv = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
- 	if (ehci_mv == NULL) {
- 		dev_err(&pdev->dev, "cannot allocate ehci_hcd_mv\n");
-@@ -170,19 +202,36 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 	}
- 
- 	platform_set_drvdata(pdev, ehci_mv);
--	ehci_mv->pdata = pdata;
- 	ehci_mv->hcd = hcd;
- 
--	ehci_mv->clknum = pdata->clknum;
--	for (clk_i = 0; clk_i < ehci_mv->clknum; clk_i++) {
--		ehci_mv->clk[clk_i] =
--		    devm_clk_get(&pdev->dev, pdata->clkname[clk_i]);
--		if (IS_ERR(ehci_mv->clk[clk_i])) {
--			dev_err(&pdev->dev, "error get clck \"%s\"\n",
--				pdata->clkname[clk_i]);
--			retval = PTR_ERR(ehci_mv->clk[clk_i]);
--			goto err_clear_drvdata;
-+	retval = mv_ehci_parse_dt(pdev, ehci_mv);
-+	if (retval > 0) {
-+		struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
-+		int clk_i = 0;
-+
-+		/* no CONFIG_OF */
-+		if (pdata == NULL) {
-+			dev_err(&pdev->dev, "missing platform_data\n");
-+			return -ENODEV;
-+		}
-+		ehci_mv->mode = pdata->mode;
-+		ehci_mv->clknum = pdata->clknum;
-+
-+		size = sizeof(struct clk *) * ehci_mv->clknum;
-+		ehci_mv->clk = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
-+		if (ehci_mv->clk == NULL)
-+			return -ENOMEM;
-+		for (clk_i = 0; clk_i < ehci_mv->clknum; clk_i++) {
-+			ehci_mv->clk[clk_i] = devm_clk_get(&pdev->dev,
-+						pdata->clkname[clk_i]);
-+			if (IS_ERR(ehci_mv->clk[clk_i])) {
-+				retval = PTR_ERR(ehci_mv->clk[clk_i]);
-+				return retval;
-+			}
- 		}
-+	} else if (retval < 0) {
-+		dev_err(&pdev->dev, "error parse dt\n");
-+		return retval;
- 	}
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -230,7 +279,6 @@ static int mv_ehci_probe(struct platform_device *pdev)
- 	ehci = hcd_to_ehci(hcd);
- 	ehci->caps = (struct ehci_caps *) ehci_mv->cap_regs;
- 
--	ehci_mv->mode = pdata->mode;
- 	if (ehci_mv->mode == MV_USB_MODE_OTG) {
- #ifdef CONFIG_USB_OTG_UTILS
- 		ehci_mv->otg = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
-@@ -334,13 +382,19 @@ static void mv_ehci_shutdown(struct platform_device *pdev)
- 		hcd->driver->shutdown(hcd);
- }
- 
-+static struct of_device_id mv_ehci_dt_ids[] = {
-+	{ .compatible = "mrvl,mv-ehci" },
-+};
-+MODULE_DEVICE_TABLE(of, mv_ehci_dt_ids);
-+
- static struct platform_driver ehci_mv_driver = {
- 	.probe = mv_ehci_probe,
- 	.remove = mv_ehci_remove,
- 	.shutdown = mv_ehci_shutdown,
- 	.driver = {
--		   .name = "mv-ehci",
--		   .bus = &platform_bus_type,
--		   },
-+		.name = "mv-ehci",
-+		.bus = &platform_bus_type,
-+		.of_match_table = mv_ehci_dt_ids,
-+	},
- 	.id_table = ehci_id_table,
- };
+Done, it should be correct on today's linux-next.
 -- 
-1.7.4.1
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121128/c6a70176/attachment.sig>
