@@ -1,24 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 28 Nov 2012 16:31:09 +0000
-Subject: [PATCH 3/3] Input: bu21013_ts - Add support for Device Tree
- booting
-In-Reply-To: <20121128085731.GH2013@gmail.com>
-References: <1354021990-16978-1-git-send-email-lee.jones@linaro.org>
- <1354021990-16978-4-git-send-email-lee.jones@linaro.org>
- <20121128070332.GC23378@core.coreip.homeip.net>
- <20121128085731.GH2013@gmail.com>
-Message-ID: <20121128163105.GA28698@sirena.org.uk>
+From: ciminaghi@gnudd.com (Davide Ciminaghi)
+Date: Wed, 28 Nov 2012 17:33:12 +0100
+Subject: [PATCH 5/8] mmci: replace readsl/writesl with
+ ioread32_rep/iowrite32_rep
+In-Reply-To: <CACRpkdaWNC0ayN4JbEq63W+KLUdYfH5SmSu8=CNucQNixvmPUw@mail.gmail.com>
+References: <1353683310-23654-1-git-send-email-ciminaghi@gnudd.com>
+ <1353683310-23654-6-git-send-email-ciminaghi@gnudd.com>
+ <CACRpkdaWNC0ayN4JbEq63W+KLUdYfH5SmSu8=CNucQNixvmPUw@mail.gmail.com>
+Message-ID: <20121128163312.GC16612@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2012 at 08:57:31AM +0000, Lee Jones wrote:
+On Wed, Nov 28, 2012 at 05:08:27PM +0100, Linus Walleij wrote:
+> On Fri, Nov 23, 2012 at 4:08 PM, Davide Ciminaghi <ciminaghi@gnudd.com> wrote:
+> 
+> > Not all the architectures have readsl/writesl,
+> > use the more portable ioread32_rep/iowrite32_rep functions instead.
+> >
+> > Signed-off-by: Davide Ciminaghi <ciminaghi@gnudd.com>
+> 
+> Can't think of anything better, put it in Russell's patch tracker when
+> you think you're finished with it.
 
-> > I applied these 3 patches, but for DT we also need to specify compatible
-> > ID and set up of_match_table pointer. 
+ok, will do that.
 
-> Why do you need a compatible string?
-
-The I2C subsystem guesses at a compatible string by default but it's
-much better to explicitly set one as conflicts do arise from time to
-time (eg, Wolfson parts are called WMxxxx but the WM prefix is also used
-by at least WonderMedia).
+Thanks and regards
+Davide
