@@ -1,49 +1,80 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Tue, 27 Nov 2012 22:06:05 -0500
-Subject: [V2 PATCH 06/27] usb: host: ehci-mv: fix clk APIs
+Date: Tue, 27 Nov 2012 22:06:07 -0500
+Subject: [V2 PATCH 08/27] usb: gadget: mv_udc: fix the value of tranceiver
 In-Reply-To: <1354071986-28032-1-git-send-email-chao.xie@marvell.com>
 References: <1354071986-28032-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1354071986-28032-7-git-send-email-chao.xie@marvell.com>
+Message-ID: <1354071986-28032-9-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the clock common driver changes, and arch-mmp will make use of
-the common clock driver instead of its own.
-So for enable clock.
-first prepare the clock
-then enable the clock.
-
-for disable clock
-first disable the clock
-then unprepare the clock
+usally we will use udc->tranceiver == NULL or
+udc->tranceiver != NULL.
+So when failed to get the udc->tranceiver by usb_get_phy(), we
+directly set udc->tranceiver to be NULL.
+Then the source code will not need macro IS_ERR_OR_NULL() for
+udc->tranceiver judgement. It can reduce the line size and make
+the judgement simple.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
 ---
- drivers/usb/host/ehci-mv.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/usb/gadget/mv_udc_core.c |   15 ++++++++++-----
+ 1 files changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
-index f7bfc0b..6c56297 100644
---- a/drivers/usb/host/ehci-mv.c
-+++ b/drivers/usb/host/ehci-mv.c
-@@ -43,7 +43,7 @@ static void ehci_clock_enable(struct ehci_hcd_mv *ehci_mv)
- 	unsigned int i;
+diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
+index c78d52f..c4adfeb 100644
+--- a/drivers/usb/gadget/mv_udc_core.c
++++ b/drivers/usb/gadget/mv_udc_core.c
+@@ -1394,7 +1394,7 @@ static int mv_udc_start(struct usb_gadget *gadget,
  
- 	for (i = 0; i < ehci_mv->clknum; i++)
--		clk_enable(ehci_mv->clk[i]);
-+		clk_prepare_enable(ehci_mv->clk[i]);
- }
+ 	spin_unlock_irqrestore(&udc->lock, flags);
  
- static void ehci_clock_disable(struct ehci_hcd_mv *ehci_mv)
-@@ -51,7 +51,7 @@ static void ehci_clock_disable(struct ehci_hcd_mv *ehci_mv)
- 	unsigned int i;
+-	if (!IS_ERR_OR_NULL(udc->transceiver)) {
++	if (udc->transceiver) {
+ 		retval = otg_set_peripheral(udc->transceiver->otg,
+ 					&udc->gadget);
+ 		if (retval) {
+@@ -2174,9 +2174,14 @@ static int __devinit mv_udc_probe(struct platform_device *pdev)
+ 	udc->dev = pdev;
  
- 	for (i = 0; i < ehci_mv->clknum; i++)
--		clk_disable(ehci_mv->clk[i]);
-+		clk_disable_unprepare(ehci_mv->clk[i]);
- }
+ #ifdef CONFIG_USB_OTG_UTILS
+-	if (pdata->mode == MV_USB_MODE_OTG)
++	if (pdata->mode == MV_USB_MODE_OTG) {
+ 		udc->transceiver = devm_usb_get_phy(&pdev->dev,
+ 					USB_PHY_TYPE_USB2);
++		if (IS_ERR_OR_NULL(udc->transceiver)) {
++			udc->transceiver = NULL;
++			return -ENODEV;
++		}
++	}
+ #endif
  
- static int mv_ehci_enable(struct ehci_hcd_mv *ehci_mv)
+ 	udc->clknum = pdata->clknum;
+@@ -2319,7 +2324,7 @@ static int __devinit mv_udc_probe(struct platform_device *pdev)
+ 	eps_init(udc);
+ 
+ 	/* VBUS detect: we can disable/enable clock on demand.*/
+-	if (!IS_ERR_OR_NULL(udc->transceiver))
++	if (udc->transceiver)
+ 		udc->clock_gating = 1;
+ 	else if (pdata->vbus) {
+ 		udc->clock_gating = 1;
+@@ -2386,7 +2391,7 @@ static int mv_udc_suspend(struct device *dev)
+ 	udc = dev_get_drvdata(dev);
+ 
+ 	/* if OTG is enabled, the following will be done in OTG driver*/
+-	if (!IS_ERR_OR_NULL(udc->transceiver))
++	if (udc->transceiver)
+ 		return 0;
+ 
+ 	if (udc->pdata->vbus && udc->pdata->vbus->poll)
+@@ -2421,7 +2426,7 @@ static int mv_udc_resume(struct device *dev)
+ 	udc = dev_get_drvdata(dev);
+ 
+ 	/* if OTG is enabled, the following will be done in OTG driver*/
+-	if (!IS_ERR_OR_NULL(udc->transceiver))
++	if (udc->transceiver)
+ 		return 0;
+ 
+ 	if (!udc->clock_gating) {
 -- 
 1.7.4.1
