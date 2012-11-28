@@ -1,35 +1,87 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 28 Nov 2012 09:08:40 +0000
-Subject: [GIT PULL] ASoC: Samsung: Updates for v3.8
-In-Reply-To: <CAAgF-Bfv46Xt0hFdPmviCdZbpje1M4MBnmCsHGgdOjcq4SnuJw@mail.gmail.com>
-References: <001601cdcd28$ce5204c0$6af60e40$@com>
- <CAAgF-Bfv46Xt0hFdPmviCdZbpje1M4MBnmCsHGgdOjcq4SnuJw@mail.gmail.com>
-Message-ID: <20121128090840.GH32691@opensource.wolfsonmicro.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Wed, 28 Nov 2012 15:51:42 +0530
+Subject: [PATCH 3/3] ARM: AM335x: Fix warning in timer.c
+In-Reply-To: <1354068915-3378-4-git-send-email-jon-hunter@ti.com>
+References: <1354068915-3378-1-git-send-email-jon-hunter@ti.com>
+ <1354068915-3378-4-git-send-email-jon-hunter@ti.com>
+Message-ID: <50B5E5B6.9080107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2012 at 11:21:31AM +0530, Padma Venkat wrote:
-> On Wed, Nov 28, 2012 at 10:55 AM, Sangbeom Kim <sbkim73@samsung.com> wrote:
 
-> >> > The requirement for an alias is also very odd, where does that come from?
 
-> >> I don't know that Which one is odd. Please let me know.
+On 11/28/2012 7:45 AM, Jon Hunter wrote:
+> When compiling the kernel with configuration options ...
+> 
+>  # CONFIG_ARCH_OMAP2 is not set
+>  # CONFIG_ARCH_OMAP3 is not set
+>  # CONFIG_ARCH_OMAP4 is not set
+>  # CONFIG_SOC_OMAP5 is not set
+>  CONFIG_SOC_AM33XX=y
+> 
+>  ... the following build warning is seen.
+> 
+>   CC      arch/arm/mach-omap2/timer.o
+>   arch/arm/mach-omap2/timer.c:395:19: warning: ?omap2_sync32k_clocksource_init?
+>   	defined but not used [-Wunused-function]
+> 
+> This issue was introduced by commit 6f80b3b (ARM: OMAP2+: timer: remove
+> CONFIG_OMAP_32K_TIMER) where the omap2_sync32k_clocksource_init() is no
+> longer referenced by the timer initialisation function for the AM335x
+> device as it has no 32k-sync timer.
+> 
+> Fix this by only including the omap2_sync32k_clocksource_init() function
+> if either OMAP2, OMAP3, OMAP4 or OMAP5 devices are enabled.
+> 
+> Cc: Igor Grinberg <grinberg@compulab.co.il>
+> 
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+>  arch/arm/mach-omap2/timer.c |    3 +++
+>  1 file changed, 3 insertions(+)
+> 
 
-> > Having them at all is odd - it's not something other DT bindings have needed and there was nothing
-> > saying what it was for.
+Jon,
 
-> What is the exact requirement here? Should I remove the alias ids or
-> I2S1 and I2S2 nodes as they are in disabled state? This is done same
-> way as SPI and I2C. Please explain me.
+I applied all these patches and it fixes build warning and also I have
+tested it on Bone platform without any issues.
 
-If you need those aliases you need to explain why.  They're listed as
-mandatory so presumably they must be needed for something?  It might be
-that this is a good idea we didn't think of before so the answer is just
-to document that rather than remove them.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121128/ee60652f/attachment-0001.sig>
+I also ran parse on this and saw further warning,
+
+  CHECK   arch/arm/mach-omap2/timer.c
+arch/arm/mach-omap2/timer.c:193:13: warning: symbol 'omap_dmtimer_init'
+was not declared. Should it be static?
+arch/arm/mach-omap2/timer.c:213:12: warning: symbol
+'omap_dm_timer_get_errata' was not declared. Should it be static?
+
+Below patch fixes that too, feel free to merge it into your's
+
+
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 085c7e7..1d1cfec 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -190,7 +190,7 @@ static struct device_node * __init
+omap_get_timer_dt(struct of_device_id *match,
+  * kernel registering these devices remove them dynamically from the device
+  * tree on boot.
+  */
+-void __init omap_dmtimer_init(void)
++static void __init omap_dmtimer_init(void)
+ {
+        struct device_node *np;
+
+@@ -210,7 +210,7 @@ void __init omap_dmtimer_init(void)
+  *
+  * Get the timer errata flags that are specific to the OMAP device
+being used.
+  */
+-u32 __init omap_dm_timer_get_errata(void)
++static u32 __init omap_dm_timer_get_errata(void)
+ {
+        if (cpu_is_omap24xx())
+                return 0;
+
+
+Thanks,
+Vaibhav
