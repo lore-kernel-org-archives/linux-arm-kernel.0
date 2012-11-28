@@ -1,28 +1,42 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 28 Nov 2012 11:38:49 +0100
-Subject: [PATCHv2] i2c: omap: Remove the
- OMAP_I2C_FLAG_RESET_REGS_POSTIDLE flag
-In-Reply-To: <1353923711-9615-1-git-send-email-shubhrajyoti@ti.com>
-References: <1353923711-9615-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20121128103849.GA14238@pengutronix.de>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Wed, 28 Nov 2012 16:17:47 +0530
+Subject: [PATCH V4 0/2] Add DT support for i2s
+Message-ID: <1354099669-1735-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 03:25:11PM +0530, Shubhrajyoti D wrote:
-> The OMAP_I2C_FLAG_RESET_REGS_POSTIDLE is not used anymore
-> in the i2c driver. Remove the flag.
-> 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+V4 patches are based on Mark Brown's for-next branch of
+"git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git"
+ 
+Changes since V3:
+	- Added syntex of gpio specifier as suggested by Mark Brown in
+	  DT document file
+	- Added the requirement for having I2S alias ids
+	- Explained about gpio lines
+	- Made a seperate patch to get the I2S rclk src clk from alias ID
+	  	 
+Changes since V2:
+        - Rebased on 3.7-rc3
+        - Custom DT bindings are prefixed with samsung
+        - As generic device tree DMA helpers not yet mainlined
+          I am still using custom dma bindings. So added a
+          priliminary statement regarding the same. I will rework
+          on my patch once generic DMA helpers are mainlined.
 
-Trivial enough to still go into 3.8. Applied to -next, thanks!
+Chnages since V1:
+        - Rebased on 3.6-rc6
+
+Padmavathi Venna (2):
+  ASoC: Samsung: Get I2S src_clk from clock alias id.
+  ASoC: SAMSUNG: Add DT support for i2s
+
+ .../devicetree/bindings/sound/samsung-i2s.txt      |   78 +++++++
+ include/linux/platform_data/asoc-s3c.h             |    6 -
+ sound/soc/samsung/dma.c                            |    1 +
+ sound/soc/samsung/dma.h                            |    1 +
+ sound/soc/samsung/i2s.c                            |  238 +++++++++++++++----
+ 5 files changed, 268 insertions(+), 56 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/samsung-i2s.txt
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121128/1893610c/attachment.sig>
+1.7.4.4
