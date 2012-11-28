@@ -1,31 +1,51 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 28 Nov 2012 16:04:56 -0600
-Subject: [PATCH V2 0/4] ARM: OMAP2+: Timer build warnings and error fixes
-Message-ID: <1354140300-16825-1-git-send-email-jon-hunter@ti.com>
+Date: Wed, 28 Nov 2012 16:05:00 -0600
+Subject: [PATCH V2 4/4] ARM: OMAP2+: Fix sparse warnings in timer.c
+In-Reply-To: <1354140300-16825-1-git-send-email-jon-hunter@ti.com>
+References: <1354140300-16825-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <1354140300-16825-5-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes for build warnings and errors seen with various kernel
-configuration combinations. Based upon Tony Lindgren's OMAP
-master branch.
+From: Vaibhav Hiremath <hvaibhav@ti.com>
 
-V2 changes:
-- Update fix for realtime counter per feedback from Santosh
-- Update fix when building for only AM335x with Igor's suggestion to
-  use __maybe_unused (thanks Igor!)
-- Add Vaibhav's fixes for sparse warnings
+Sparse generates the following warnings when compiling mach-omap2/timer.c.
 
-Jon Hunter (3):
-  ARM: OMAP2+: Fix realtime_counter_init warning in timer.c
-  ARM: OMAP4: Fix build error and warning in timer.c
-  ARM: AM335x: Fix warning in timer.c
+  CHECK   arch/arm/mach-omap2/timer.c
+  arch/arm/mach-omap2/timer.c:193:13: warning: symbol 'omap_dmtimer_init'
+  was not declared. Should it be static?
+  arch/arm/mach-omap2/timer.c:213:12: warning: symbol
+  'omap_dm_timer_get_errata' was not declared. Should it be static?
 
-Vaibhav Hiremath (1):
-  ARM: OMAP2+: Fix sparse warnings in timer.c
+Add static to function declaration to fix warnings.
 
- arch/arm/mach-omap2/Kconfig |    3 ++-
- arch/arm/mach-omap2/timer.c |    8 ++++----
- 2 files changed, 6 insertions(+), 5 deletions(-)
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ arch/arm/mach-omap2/timer.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 79df809..c6d173f 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -190,7 +190,7 @@ static struct device_node * __init omap_get_timer_dt(struct of_device_id *match,
+  * kernel registering these devices remove them dynamically from the device
+  * tree on boot.
+  */
+-void __init omap_dmtimer_init(void)
++static void __init omap_dmtimer_init(void)
+ {
+ 	struct device_node *np;
+ 
+@@ -210,7 +210,7 @@ void __init omap_dmtimer_init(void)
+  *
+  * Get the timer errata flags that are specific to the OMAP device being used.
+  */
+-u32 __init omap_dm_timer_get_errata(void)
++static u32 __init omap_dm_timer_get_errata(void)
+ {
+ 	if (cpu_is_omap24xx())
+ 		return 0;
 -- 
 1.7.10.4
