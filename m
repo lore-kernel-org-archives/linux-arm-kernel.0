@@ -1,81 +1,78 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 28 Nov 2012 19:40:59 +0530
-Subject: [RFC 1/2] ARM: S3C24XX: add devicetree support for interrupts
-In-Reply-To: <201211271724.55938.heiko@sntech.de>
-References: <201211250145.21226.heiko@sntech.de>
- <201211261704.09273.heiko@sntech.de>
- <CAJuYYwTre+cU0mgJExON2-+1fREyL3LgdqJ4NbC8zG+03yxptA@mail.gmail.com>
- <201211271724.55938.heiko@sntech.de>
-Message-ID: <CAJuYYwSJ+mz0FHZ+DPO-mLjretKiwojn2B1o3tDF-rt5-yVQkw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 28 Nov 2012 14:13:28 +0000
+Subject: [PATCH v4 03/13] ARM: KVM: Initial VGIC infrastructure support
+In-Reply-To: <50B60D11.7000904@arm.com>
+References: <20121110154358.3061.16338.stgit@chazy-air>
+ <20121110154437.3061.76180.stgit@chazy-air>
+ <20121128124955.GE21671@mudshark.cambridge.arm.com>
+ <50B60D11.7000904@arm.com>
+Message-ID: <20121128141328.GI21671@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Wed, Nov 28, 2012 at 01:09:37PM +0000, Marc Zyngier wrote:
+> On 28/11/12 12:49, Will Deacon wrote:
+> > On Sat, Nov 10, 2012 at 03:44:37PM +0000, Christoffer Dall wrote:
+> >> @@ -363,7 +370,7 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+> >>   */
+> >>  int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
+> >>  {
+> >> -	return !!v->arch.irq_lines;
+> >> +	return !!v->arch.irq_lines || kvm_vgic_vcpu_pending_irq(v);
+> >>  }
+> > 
+> > So interrupt injection without the in-kernel GIC updates irq_lines, but the
+> > in-kernel GIC has its own separate data structures? Why can't the in-kernel GIC
+> > just use irq_lines instead of irq_pending_on_cpu?
+> 
+> They serve very different purposes:
+> - irq_lines directly controls the IRQ and FIQ lines (it is or-ed into
+> the HCR register before entering the guest)
+> - irq_pending_on_cpu deals with the CPU interface, and only that. Plus,
+> it is a kernel only thing. What triggers the interrupt on the guest is
+> the presence of list registers with a pending state.
+> 
+> You signal interrupts one way or the other.
 
-On 27 November 2012 21:54, Heiko St?bner <heiko@sntech.de> wrote:
+Ok, thanks for the explanation. I suspect that we could use (another)
+cosmetic change then. How about cpui_irq_pending and hcr_irq_pending?
 
-[...]
+> >>  int kvm_arch_vcpu_in_guest_mode(struct kvm_vcpu *v)
+> >> @@ -633,6 +640,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> >>  
+> >>  		update_vttbr(vcpu->kvm);
+> >>  
+> >> +		kvm_vgic_sync_to_cpu(vcpu);
+> >> +
+> >>  		local_irq_disable();
+> >>  
+> >>  		/*
+> >> @@ -645,6 +654,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> >>  
+> >>  		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
+> >>  			local_irq_enable();
+> >> +			kvm_vgic_sync_from_cpu(vcpu);
+> >>  			continue;
+> >>  		}
+> > 
+> > For VFP, we use different terminology (sync and flush). I don't think they're
+> > any clearer than what you have, but the consistency would be nice.
+> 
+> Which one maps to which?
 
->
->
-> Because of the mails from yesterday I took another look at my code, after
-> letting it sit for the previous days and I found more optimization
-> possiblities.
->
-> It should be possible to trim the irqtypes down to level,edge and eint types
-> and do the gathering of the other informations in the code. This would make
-> the list more os-agnostic.
-> The list itself does describe the interconnections between the controllers, so
-> I think it's not false per se, just the multitude of probably redundant types
-> used should probably go down.
+sync:	hardware -> data structure
+flush:	data structure -> hardware
 
-Ok.
+> > Given that both these functions are run with interrupts enabled, why doesn't
+> > the second require a lock for updating dist->irq_pending_on_cpu? I notice
+> > there's a random smp_mb() over there...
+> 
+> Updating *only* irq_pending_on_cpu doesn't require the lock (set_bit()
+> should be safe, and I think the smp_mb() is a leftover of some debugging
+> hack). kvm_vgic_to_cpu() does a lot more (it picks interrupt from the
+> distributor, hence requires the lock to be taken).
 
->
-> The other option could be to really change to individual initializers for the
-> different implementations and have all the data in the code instead of the dt.
-> For this I've compared all the different implementations and it seems this
-> would lead to at least handlers for s3c2410, s3c2440, s3c2442, s3c2412 and
-> s3c2443. For the time being they will be in the code in any case, because of
-> all the non-dt boards
+Ok, if the barrier is just a hangover from something else and you don't have
+any races with test/clear operations then you should be alright.
 
-I did feel that it this could have been handled with dt + some kernel
-code for all s3c24xx soc's but probably I am under estimating the
-effort here. If it helps, the dt code need not be intermixed with
-non-dt code and there can be runtime check on whether to take dt and
-non-dt path.
-
->
-> If anyone is interested, the comparison can be found on [0].
->
->
-> Btw. do you know if it would have bad effects to register (but not use) for
-> example the cam interrupt-handler on a machine that does not have it. (The
-> additional cam, cf and spi1 interrupts are the only things differing between
-> the s3c2443 and s3c2416 SoCs).
-
-I am not aware of any bad effects of this (if those interrupts are
-never enabled). But logically, it might be better not to do this. Is
-this something that cannot be handled by checking the machine
-compatible value.
-
->
->
-
-[...]
-
->
-> I'v seen the combiner code as well, but from the code itself I've not managed
-> to understand the combiner this well yet. And Exynos datasheets, to get a
-> textual description of the combiner, are not this easy to come by ;-) .
-
-Yes, I understand. Basically interrupt combiner combines upto 8
-interrupts into one interrupt that is delivered to combiner's
-interrupt parent, which is the gic interrupt controller in case of
-exynos. There are 16 to 32 interrupt combiners in a soc. Combiner has
-the basic mask, pend and unmask registers.
-
-Thanks,
-Thomas.
-
-[...]
+Will
