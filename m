@@ -1,369 +1,228 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Tue, 27 Nov 2012 22:06:01 -0500
-Subject: [V2 PATCH 02/27] usb: gadget: mv_udc: use devm_xxx for probe
+Date: Tue, 27 Nov 2012 22:06:03 -0500
+Subject: [V2 PATCH 04/27] usb: otg: mv_otg: use devm_xxx for probe
 In-Reply-To: <1354071986-28032-1-git-send-email-chao.xie@marvell.com>
 References: <1354071986-28032-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1354071986-28032-3-git-send-email-chao.xie@marvell.com>
+Message-ID: <1354071986-28032-5-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-use devm_xxx for udc driver probe. So we do need care about
+use devm_xxx for otg driver probe. So we do need care about
 the resources release in driver remove or failure handling
 in driver probe.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/usb/gadget/mv_udc_core.c |  156 ++++++++++++++------------------------
- 1 files changed, 56 insertions(+), 100 deletions(-)
+ drivers/usb/otg/mv_otg.c |   82 ++++++++++++---------------------------------
+ 1 files changed, 22 insertions(+), 60 deletions(-)
 
-diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
-index fa4950a..1104327 100644
---- a/drivers/usb/gadget/mv_udc_core.c
-+++ b/drivers/usb/gadget/mv_udc_core.c
-@@ -2115,12 +2115,11 @@ static void gadget_release(struct device *dev)
- 	complete(udc->done);
- }
- 
--static int __devexit mv_udc_remove(struct platform_device *dev)
-+static int __devexit mv_udc_remove(struct platform_device *pdev)
+diff --git a/drivers/usb/otg/mv_otg.c b/drivers/usb/otg/mv_otg.c
+index 3f124e8..70e222d 100644
+--- a/drivers/usb/otg/mv_otg.c
++++ b/drivers/usb/otg/mv_otg.c
+@@ -662,18 +662,9 @@ static struct attribute_group inputs_attr_group = {
+ int mv_otg_remove(struct platform_device *pdev)
  {
- 	struct mv_udc *udc;
+ 	struct mv_otg *mvotg = platform_get_drvdata(pdev);
 -	int clk_i;
  
--	udc = platform_get_drvdata(dev);
-+	udc = platform_get_drvdata(pdev);
+ 	sysfs_remove_group(&mvotg->pdev->dev.kobj, &inputs_attr_group);
  
- 	usb_del_gadget_udc(&udc->gadget);
- 
-@@ -2129,55 +2128,27 @@ static int __devexit mv_udc_remove(struct platform_device *dev)
- 		destroy_workqueue(udc->qwork);
- 	}
- 
--	/*
--	 * If we have transceiver inited,
--	 * then vbus irq will not be requested in udc driver.
--	 */
--	if (udc->pdata && udc->pdata->vbus
--		&& udc->clock_gating && IS_ERR_OR_NULL(udc->transceiver))
--		free_irq(udc->pdata->vbus->irq, &dev->dev);
+-	if (mvotg->irq)
+-		free_irq(mvotg->irq, mvotg);
 -
- 	/* free memory allocated in probe */
- 	if (udc->dtd_pool)
- 		dma_pool_destroy(udc->dtd_pool);
+-	if (mvotg->pdata->vbus)
+-		free_irq(mvotg->pdata->vbus->irq, mvotg);
+-	if (mvotg->pdata->id)
+-		free_irq(mvotg->pdata->id->irq, mvotg);
+-
+ 	if (mvotg->qwork) {
+ 		flush_workqueue(mvotg->qwork);
+ 		destroy_workqueue(mvotg->qwork);
+@@ -681,21 +672,9 @@ int mv_otg_remove(struct platform_device *pdev)
  
- 	if (udc->ep_dqh)
--		dma_free_coherent(&dev->dev, udc->ep_dqh_size,
-+		dma_free_coherent(&pdev->dev, udc->ep_dqh_size,
- 			udc->ep_dqh, udc->ep_dqh_dma);
+ 	mv_otg_disable(mvotg);
  
--	kfree(udc->eps);
+-	if (mvotg->cap_regs)
+-		iounmap(mvotg->cap_regs);
 -
--	if (udc->irq)
--		free_irq(udc->irq, &dev->dev);
+-	if (mvotg->phy_regs)
+-		iounmap(mvotg->phy_regs);
 -
- 	mv_udc_disable(udc);
+-	for (clk_i = 0; clk_i <= mvotg->clknum; clk_i++)
+-		clk_put(mvotg->clk[clk_i]);
+-
+ 	usb_remove_phy(&mvotg->phy);
+ 	platform_set_drvdata(pdev, NULL);
  
--	if (udc->cap_regs)
--		iounmap(udc->cap_regs);
+-	kfree(mvotg->phy.otg);
+-	kfree(mvotg);
 -
--	if (udc->phy_regs)
--		iounmap(udc->phy_regs);
--
--	if (udc->status_req) {
--		kfree(udc->status_req->req.buf);
--		kfree(udc->status_req);
--	}
--
--	for (clk_i = 0; clk_i <= udc->clknum; clk_i++)
--		clk_put(udc->clk[clk_i]);
--
- 	device_unregister(&udc->gadget.dev);
- 
- 	/* free dev, wait for the release() finished */
- 	wait_for_completion(udc->done);
--	kfree(udc);
- 
  	return 0;
  }
  
--static int __devinit mv_udc_probe(struct platform_device *dev)
-+static int __devinit mv_udc_probe(struct platform_device *pdev)
- {
--	struct mv_usb_platform_data *pdata = dev->dev.platform_data;
-+	struct mv_usb_platform_data *pdata = pdev->dev.platform_data;
- 	struct mv_udc *udc;
- 	int retval = 0;
- 	int clk_i = 0;
-@@ -2185,70 +2156,68 @@ static int __devinit mv_udc_probe(struct platform_device *dev)
- 	size_t size;
- 
- 	if (pdata == NULL) {
--		dev_err(&dev->dev, "missing platform_data\n");
-+		dev_err(&pdev->dev, "missing platform_data\n");
- 		return -ENODEV;
+@@ -714,17 +693,15 @@ static int mv_otg_probe(struct platform_device *pdev)
  	}
  
- 	size = sizeof(*udc) + sizeof(struct clk *) * pdata->clknum;
--	udc = kzalloc(size, GFP_KERNEL);
-+	udc = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
- 	if (udc == NULL) {
--		dev_err(&dev->dev, "failed to allocate memory for udc\n");
-+		dev_err(&pdev->dev, "failed to allocate memory for udc\n");
+ 	size = sizeof(*mvotg) + sizeof(struct clk *) * pdata->clknum;
+-	mvotg = kzalloc(size, GFP_KERNEL);
++	mvotg = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
+ 	if (!mvotg) {
+ 		dev_err(&pdev->dev, "failed to allocate memory!\n");
  		return -ENOMEM;
  	}
  
- 	udc->done = &release_done;
--	udc->pdata = dev->dev.platform_data;
-+	udc->pdata = pdev->dev.platform_data;
- 	spin_lock_init(&udc->lock);
+-	otg = kzalloc(sizeof *otg, GFP_KERNEL);
+-	if (!otg) {
+-		kfree(mvotg);
++	otg = devm_kzalloc(&pdev->dev, sizeof(*otg), GFP_KERNEL);
++	if (!otg)
+ 		return -ENOMEM;
+-	}
  
--	udc->dev = dev;
-+	udc->dev = pdev;
+ 	platform_set_drvdata(pdev, mvotg);
  
- #ifdef CONFIG_USB_OTG_UTILS
- 	if (pdata->mode == MV_USB_MODE_OTG)
--		udc->transceiver = usb_get_phy(USB_PHY_TYPE_USB2);
-+		udc->transceiver = devm_usb_get_phy(&pdev->dev,
-+					USB_PHY_TYPE_USB2);
- #endif
+@@ -733,18 +710,18 @@ static int mv_otg_probe(struct platform_device *pdev)
  
- 	udc->clknum = pdata->clknum;
- 	for (clk_i = 0; clk_i < udc->clknum; clk_i++) {
--		udc->clk[clk_i] = clk_get(&dev->dev, pdata->clkname[clk_i]);
-+		udc->clk[clk_i] = devm_clk_get(&pdev->dev,
-+					pdata->clkname[clk_i]);
- 		if (IS_ERR(udc->clk[clk_i])) {
- 			retval = PTR_ERR(udc->clk[clk_i]);
+ 	mvotg->clknum = pdata->clknum;
+ 	for (clk_i = 0; clk_i < mvotg->clknum; clk_i++) {
+-		mvotg->clk[clk_i] = clk_get(&pdev->dev, pdata->clkname[clk_i]);
++		mvotg->clk[clk_i] = devm_clk_get(&pdev->dev,
++						pdata->clkname[clk_i]);
+ 		if (IS_ERR(mvotg->clk[clk_i])) {
+ 			retval = PTR_ERR(mvotg->clk[clk_i]);
 -			goto err_put_clk;
 +			return retval;
  		}
  	}
  
- 	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "capregs");
- 	if (r == NULL) {
--		dev_err(&dev->dev, "no I/O memory resource defined\n");
--		retval = -ENODEV;
+ 	mvotg->qwork = create_singlethread_workqueue("mv_otg_queue");
+ 	if (!mvotg->qwork) {
+ 		dev_dbg(&pdev->dev, "cannot create workqueue for OTG\n");
+-		retval = -ENOMEM;
 -		goto err_put_clk;
-+		dev_err(&pdev->dev, "no I/O memory resource defined\n");
-+		return -ENODEV;
++		return -ENOMEM;
  	}
  
- 	udc->cap_regs = (struct mv_cap_regs __iomem *)
--		ioremap(r->start, resource_size(r));
-+		devm_ioremap(&pdev->dev, r->start, resource_size(r));
- 	if (udc->cap_regs == NULL) {
--		dev_err(&dev->dev, "failed to map I/O memory\n");
--		retval = -EBUSY;
--		goto err_put_clk;
-+		dev_err(&pdev->dev, "failed to map I/O memory\n");
-+		return -EBUSY;
+ 	INIT_DELAYED_WORK(&mvotg->work, mv_otg_work);
+@@ -772,7 +749,7 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 		goto err_destroy_workqueue;
  	}
  
- 	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "phyregs");
+-	mvotg->phy_regs = ioremap(r->start, resource_size(r));
++	mvotg->phy_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+ 	if (mvotg->phy_regs == NULL) {
+ 		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
+ 		retval = -EFAULT;
+@@ -784,21 +761,21 @@ static int mv_otg_probe(struct platform_device *pdev)
  	if (r == NULL) {
--		dev_err(&dev->dev, "no phy I/O memory resource defined\n");
--		retval = -ENODEV;
--		goto err_iounmap_capreg;
-+		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
-+		return -ENODEV;
- 	}
- 
- 	udc->phy_regs = ioremap(r->start, resource_size(r));
- 	if (udc->phy_regs == NULL) {
--		dev_err(&dev->dev, "failed to map phy I/O memory\n");
--		retval = -EBUSY;
--		goto err_iounmap_capreg;
-+		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
-+		return -EBUSY;
- 	}
- 
- 	/* we will acces controller register, so enable the clk */
- 	retval = mv_udc_enable_internal(udc);
- 	if (retval)
--		goto err_iounmap_phyreg;
-+		return retval;
- 
- 	udc->op_regs =
- 		(struct mv_op_regs __iomem *)((unsigned long)udc->cap_regs
-@@ -2265,11 +2234,11 @@ static int __devinit mv_udc_probe(struct platform_device *dev)
- 
- 	size = udc->max_eps * sizeof(struct mv_dqh) *2;
- 	size = (size + DQH_ALIGNMENT - 1) & ~(DQH_ALIGNMENT - 1);
--	udc->ep_dqh = dma_alloc_coherent(&dev->dev, size,
-+	udc->ep_dqh = dma_alloc_coherent(&pdev->dev, size,
- 					&udc->ep_dqh_dma, GFP_KERNEL);
- 
- 	if (udc->ep_dqh == NULL) {
--		dev_err(&dev->dev, "allocate dQH memory failed\n");
-+		dev_err(&pdev->dev, "allocate dQH memory failed\n");
- 		retval = -ENOMEM;
- 		goto err_disable_clock;
- 	}
-@@ -2277,7 +2246,7 @@ static int __devinit mv_udc_probe(struct platform_device *dev)
- 
- 	/* create dTD dma_pool resource */
- 	udc->dtd_pool = dma_pool_create("mv_dtd",
--			&dev->dev,
-+			&pdev->dev,
- 			sizeof(struct mv_dtd),
- 			DTD_ALIGNMENT,
- 			DMA_BOUNDARY);
-@@ -2288,19 +2257,20 @@ static int __devinit mv_udc_probe(struct platform_device *dev)
- 	}
- 
- 	size = udc->max_eps * sizeof(struct mv_ep) *2;
--	udc->eps = kzalloc(size, GFP_KERNEL);
-+	udc->eps = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
- 	if (udc->eps == NULL) {
--		dev_err(&dev->dev, "allocate ep memory failed\n");
-+		dev_err(&pdev->dev, "allocate ep memory failed\n");
- 		retval = -ENOMEM;
- 		goto err_destroy_dma;
- 	}
- 
- 	/* initialize ep0 status request structure */
--	udc->status_req = kzalloc(sizeof(struct mv_req), GFP_KERNEL);
-+	udc->status_req = devm_kzalloc(&pdev->dev, sizeof(struct mv_req),
-+					GFP_KERNEL);
- 	if (!udc->status_req) {
--		dev_err(&dev->dev, "allocate status_req memory failed\n");
-+		dev_err(&pdev->dev, "allocate status_req memory failed\n");
- 		retval = -ENOMEM;
--		goto err_free_eps;
-+		goto err_destroy_dma;
- 	}
- 	INIT_LIST_HEAD(&udc->status_req->queue);
- 
-@@ -2315,17 +2285,17 @@ static int __devinit mv_udc_probe(struct platform_device *dev)
- 
- 	r = platform_get_resource(udc->dev, IORESOURCE_IRQ, 0);
- 	if (r == NULL) {
--		dev_err(&dev->dev, "no IRQ resource defined\n");
-+		dev_err(&pdev->dev, "no IRQ resource defined\n");
+ 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
  		retval = -ENODEV;
--		goto err_free_status_req;
-+		goto err_destroy_dma;
- 	}
- 	udc->irq = r->start;
--	if (request_irq(udc->irq, mv_udc_irq,
-+	if (devm_request_irq(&pdev->dev, udc->irq, mv_udc_irq,
- 		IRQF_SHARED, driver_name, udc)) {
--		dev_err(&dev->dev, "Request irq %d for UDC failed\n",
-+		dev_err(&pdev->dev, "Request irq %d for UDC failed\n",
- 			udc->irq);
- 		retval = -ENODEV;
--		goto err_free_status_req;
-+		goto err_destroy_dma;
+-		goto err_unmap_phyreg;
++		goto err_destroy_workqueue;
  	}
  
- 	/* initialize gadget structure */
-@@ -2337,14 +2307,14 @@ static int __devinit mv_udc_probe(struct platform_device *dev)
+-	mvotg->cap_regs = ioremap(r->start, resource_size(r));
++	mvotg->cap_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+ 	if (mvotg->cap_regs == NULL) {
+ 		dev_err(&pdev->dev, "failed to map I/O memory\n");
+ 		retval = -EFAULT;
+-		goto err_unmap_phyreg;
++		goto err_destroy_workqueue;
+ 	}
  
- 	/* the "gadget" abstracts/virtualizes the controller */
- 	dev_set_name(&udc->gadget.dev, "gadget");
--	udc->gadget.dev.parent = &dev->dev;
--	udc->gadget.dev.dma_mask = dev->dev.dma_mask;
-+	udc->gadget.dev.parent = &pdev->dev;
-+	udc->gadget.dev.dma_mask = pdev->dev.dma_mask;
- 	udc->gadget.dev.release = gadget_release;
- 	udc->gadget.name = driver_name;		/* gadget name */
+ 	/* we will acces controller register, so enable the udc controller */
+ 	retval = mv_otg_enable_internal(mvotg);
+ 	if (retval) {
+ 		dev_err(&pdev->dev, "mv otg enable error %d\n", retval);
+-		goto err_unmap_capreg;
++		goto err_destroy_workqueue;
+ 	}
  
- 	retval = device_register(&udc->gadget.dev);
- 	if (retval)
--		goto err_free_irq;
-+		goto err_destroy_dma;
+ 	mvotg->op_regs =
+@@ -806,9 +783,9 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 			+ (readl(mvotg->cap_regs) & CAPLENGTH_MASK));
  
- 	eps_init(udc);
- 
-@@ -2353,10 +2323,11 @@ static int __devinit mv_udc_probe(struct platform_device *dev)
- 		udc->clock_gating = 1;
- 	else if (pdata->vbus) {
- 		udc->clock_gating = 1;
--		retval = request_threaded_irq(pdata->vbus->irq, NULL,
-+		retval = devm_request_threaded_irq(&pdev->dev,
-+				pdata->vbus->irq, NULL,
- 				mv_udc_vbus_irq, IRQF_ONESHOT, "vbus", udc);
+ 	if (pdata->id) {
+-		retval = request_threaded_irq(pdata->id->irq, NULL,
+-					      mv_otg_inputs_irq,
+-					      IRQF_ONESHOT, "id", mvotg);
++		retval = devm_request_threaded_irq(&pdev->dev, pdata->id->irq,
++						NULL, mv_otg_inputs_irq,
++						IRQF_ONESHOT, "id", mvotg);
  		if (retval) {
--			dev_info(&dev->dev,
-+			dev_info(&pdev->dev,
- 				"Can not request irq for VBUS, "
- 				"disable clock gating\n");
- 			udc->clock_gating = 0;
-@@ -2364,7 +2335,7 @@ static int __devinit mv_udc_probe(struct platform_device *dev)
+ 			dev_info(&pdev->dev,
+ 				 "Failed to request irq for ID\n");
+@@ -818,9 +795,9 @@ static int mv_otg_probe(struct platform_device *pdev)
  
- 		udc->qwork = create_singlethread_workqueue("mv_udc_queue");
- 		if (!udc->qwork) {
--			dev_err(&dev->dev, "cannot create workqueue\n");
-+			dev_err(&pdev->dev, "cannot create workqueue\n");
- 			retval = -ENOMEM;
- 			goto err_unregister;
- 		}
-@@ -2382,43 +2353,28 @@ static int __devinit mv_udc_probe(struct platform_device *dev)
- 	else
- 		udc->vbus_active = 1;
+ 	if (pdata->vbus) {
+ 		mvotg->clock_gating = 1;
+-		retval = request_threaded_irq(pdata->vbus->irq, NULL,
+-					      mv_otg_inputs_irq,
+-					      IRQF_ONESHOT, "vbus", mvotg);
++		retval = devm_request_threaded_irq(&pdev->dev, pdata->vbus->irq,
++						NULL, mv_otg_inputs_irq,
++						IRQF_ONESHOT, "vbus", mvotg);
+ 		if (retval) {
+ 			dev_info(&pdev->dev,
+ 				 "Failed to request irq for VBUS, "
+@@ -844,7 +821,7 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 	}
  
--	retval = usb_add_gadget_udc(&dev->dev, &udc->gadget);
-+	retval = usb_add_gadget_udc(&pdev->dev, &udc->gadget);
- 	if (retval)
--		goto err_unregister;
-+		goto err_create_workqueue;
+ 	mvotg->irq = r->start;
+-	if (request_irq(mvotg->irq, mv_otg_irq, IRQF_SHARED,
++	if (devm_request_irq(&pdev->dev, mvotg->irq, mv_otg_irq, IRQF_SHARED,
+ 			driver_name, mvotg)) {
+ 		dev_err(&pdev->dev, "Request irq %d for OTG failed\n",
+ 			mvotg->irq);
+@@ -857,14 +834,14 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 	if (retval < 0) {
+ 		dev_err(&pdev->dev, "can't register transceiver, %d\n",
+ 			retval);
+-		goto err_free_irq;
++		goto err_disable_clk;
+ 	}
  
--	platform_set_drvdata(dev, udc);
--	dev_info(&dev->dev, "successful probe UDC device %s clock gating.\n",
-+	platform_set_drvdata(pdev, udc);
-+	dev_info(&pdev->dev, "successful probe UDC device %s clock gating.\n",
- 		udc->clock_gating ? "with" : "without");
+ 	retval = sysfs_create_group(&pdev->dev.kobj, &inputs_attr_group);
+ 	if (retval < 0) {
+ 		dev_dbg(&pdev->dev,
+ 			"Can't register sysfs attr group: %d\n", retval);
+-		goto err_set_transceiver;
++		goto err_remove_phy;
+ 	}
+ 
+ 	spin_lock_init(&mvotg->wq_lock);
+@@ -879,30 +856,15 @@ static int mv_otg_probe(struct platform_device *pdev)
  
  	return 0;
  
-+err_create_workqueue:
-+	destroy_workqueue(udc->qwork);
- err_unregister:
--	if (udc->pdata && udc->pdata->vbus
--		&& udc->clock_gating && IS_ERR_OR_NULL(udc->transceiver))
--		free_irq(pdata->vbus->irq, &dev->dev);
- 	device_unregister(&udc->gadget.dev);
+-err_set_transceiver:
++err_remove_phy:
+ 	usb_remove_phy(&mvotg->phy);
 -err_free_irq:
--	free_irq(udc->irq, &dev->dev);
--err_free_status_req:
--	kfree(udc->status_req->req.buf);
--	kfree(udc->status_req);
--err_free_eps:
--	kfree(udc->eps);
- err_destroy_dma:
- 	dma_pool_destroy(udc->dtd_pool);
- err_free_dma:
--	dma_free_coherent(&dev->dev, udc->ep_dqh_size,
-+	dma_free_coherent(&pdev->dev, udc->ep_dqh_size,
- 			udc->ep_dqh, udc->ep_dqh_dma);
- err_disable_clock:
- 	mv_udc_disable_internal(udc);
--err_iounmap_phyreg:
--	iounmap(udc->phy_regs);
--err_iounmap_capreg:
--	iounmap(udc->cap_regs);
+-	free_irq(mvotg->irq, mvotg);
+ err_disable_clk:
+-	if (pdata->vbus)
+-		free_irq(pdata->vbus->irq, mvotg);
+-	if (pdata->id)
+-		free_irq(pdata->id->irq, mvotg);
+ 	mv_otg_disable_internal(mvotg);
+-err_unmap_capreg:
+-	iounmap(mvotg->cap_regs);
+-err_unmap_phyreg:
+-	iounmap(mvotg->phy_regs);
+ err_destroy_workqueue:
+ 	flush_workqueue(mvotg->qwork);
+ 	destroy_workqueue(mvotg->qwork);
 -err_put_clk:
 -	for (clk_i--; clk_i >= 0; clk_i--)
--		clk_put(udc->clk[clk_i]);
--	kfree(udc);
-+
+-		clk_put(mvotg->clk[clk_i]);
+ 
+ 	platform_set_drvdata(pdev, NULL);
+-	kfree(otg);
+-	kfree(mvotg);
+ 
  	return retval;
  }
- 
-@@ -2489,12 +2445,12 @@ static const struct dev_pm_ops mv_udc_pm_ops = {
- };
- #endif
- 
--static void mv_udc_shutdown(struct platform_device *dev)
-+static void mv_udc_shutdown(struct platform_device *pdev)
- {
- 	struct mv_udc *udc;
- 	u32 mode;
- 
--	udc = platform_get_drvdata(dev);
-+	udc = platform_get_drvdata(pdev);
- 	/* reset controller mode to IDLE */
- 	mv_udc_enable(udc);
- 	mode = readl(&udc->op_regs->usbmode);
 -- 
 1.7.4.1
