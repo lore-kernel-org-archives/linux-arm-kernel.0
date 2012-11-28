@@ -1,28 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Nov 2012 17:00:35 +0100
-Subject: [PATCH 4/8] watchdog: sp805_wdt depends on ARM
-In-Reply-To: <1353683310-23654-5-git-send-email-ciminaghi@gnudd.com>
-References: <1353683310-23654-1-git-send-email-ciminaghi@gnudd.com>
- <1353683310-23654-5-git-send-email-ciminaghi@gnudd.com>
-Message-ID: <CACRpkdb1e=4yV6pP1aw_p8vW0MQUDiV5ZQq1TzobyOKZN7gcXQ@mail.gmail.com>
+From: viresh.kumar@linaro.org (viresh kumar)
+Date: Wed, 28 Nov 2012 21:31:09 +0530
+Subject: [RFC 1/2] clk: use struct clk only for external API
+In-Reply-To: <1354103571-27394-1-git-send-email-rabin.vincent@stericsson.com>
+References: <1354103571-27394-1-git-send-email-rabin.vincent@stericsson.com>
+Message-ID: <CAOh2x=kw11+fGK6G_fKm2CA3TNGnG_mFq1eHeNxQ-B97-Wd_NA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2012 at 4:08 PM, Davide Ciminaghi <ciminaghi@gnudd.com> wrote:
-
-> From: Alessandro Rubini <rubini@gnudd.com>
+On Wed, Nov 28, 2012 at 5:22 PM, Rabin Vincent
+<rabin.vincent@stericsson.com> wrote:
+> In order to provide per-user accounting, this separates the struct clk
+> used in the common clock framework into two structures 'struct clk_core'
+> and 'struct clk'.  struct clk_core will be used for internal
+> manipulation and struct clk will be used in the clock API
+> implementation.
 >
-> The SP805 driver is only used by the Spear machines, and uses
-> writel_relaxed, which is not available on all architectures.
+> In this patch, struct clk is simply renamed to struct clk_core and a new
+> struct clk is implemented which simply wraps it.  In the next patch, the
+> new struct clk will be used to implement per-user clock enable
+> accounting.
 >
-> The dependency from CONFIG_ARM avoids compilation problems under
-> randomconfig when CONFIG_ARM_AMBA is enabled for x86 builds.
+> There is a rather hacky #define of clk_core to clk for the non-common
+> clk case in order to avoid a mass rename of all clk non-common clk
+> implementations.
 >
-> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
-> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
-> Signed-off-by: Davide Ciminaghi <ciminaghi@gnudd.com>
+> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Hi Rabin,
 
-Yours,
-Linus Walleij
+I reviewed it with help of git diff --word-diff and didn't found any silly
+mistake in the replacement of clk with clk_core :)
+
+> diff --git a/drivers/clk/clk-core.h b/drivers/clk/clk-core.h
+> +#ifdef CONFIG_COMMON_CLK
+> +#define clk_to_clk_core(clk)   ((struct clk_core *)(clk))
+> +#define clk_core_to_clk(core)  ((struct clk *)(core))
+> +#else
+> +#define clk_to_clk_core(clk)   ((clk))
+> +#define clk_core_to_clk(core)  ((core))
+> +#endif
+
+> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+> +struct clk {
+> +       struct clk_core clk;
+> +};
+> +
+
+Isn't something wrong here? For common clk case shouldn't
+this be:
+
+> +#define clk_to_clk_core(clk)  (&clk->clk)
+> +#define clk_core_to_clk(core) (container_of(clk, ...))  //not getting into the exact format here
+
+Sorry, if i am missing basics.
+
+--
+viresh
