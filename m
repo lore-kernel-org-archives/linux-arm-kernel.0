@@ -1,52 +1,100 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 28 Nov 2012 15:18:15 +0000
-Subject: OMAP* Latest build failures
-In-Reply-To: <50AC0B83.9070704@ti.com>
-References: <20121114092643.GG3290@n2100.arm.linux.org.uk>
- <20121117093307.GL3332@n2100.arm.linux.org.uk>
- <20121120175733.GH18567@atomide.com> <50AC0B83.9070704@ti.com>
-Message-ID: <20121128151814.GZ3332@n2100.arm.linux.org.uk>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 28 Nov 2012 16:44:20 +0100
+Subject: [PATCH v4 0/5] ARM: EXYNOS: Add secure firmware support
+In-Reply-To: <122d01cdc9ea$5a0d6550$0e282ff0$%kim@samsung.com>
+References: <1353599478-24617-1-git-send-email-t.figa@samsung.com>
+ <122d01cdc9ea$5a0d6550$0e282ff0$%kim@samsung.com>
+Message-ID: <3839370.Os5KVhzhEZ@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 05:00:19PM -0600, Jon Hunter wrote:
-> 
-> On 11/20/2012 11:57 AM, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [121117 01:35]:
-> >> On Wed, Nov 14, 2012 at 09:26:43AM +0000, Russell King - ARM Linux wrote:
-> >>> OMAP* allnoconfig fails:
-> >>>
-> >>> arch/arm/mach-omap2/built-in.o: In function `omap_dss_set_min_bus_tput':
-> >>> twl-common.c:(.text+0x1e08): undefined reference to `omap_pm_set_min_bus_tput'
-> >>> arch/arm/mach-omap2/built-in.o: In function `omap_hwmod_init_postsetup':
-> >>> twl-common.c:(.init.text+0x8f8): undefined reference to `omap_pm_if_early_init'
-> >>> arch/arm/mach-omap2/built-in.o: In function `omap_serial_init_port':
-> >>> twl-common.c:(.init.text+0x1284): undefined reference to `omap_pm_get_dev_context_loss_count'
-> >>> arch/arm/mach-omap2/built-in.o: In function `omap_timer_init':
-> >>> twl-common.c:(.init.text+0x1544): undefined reference to `omap_pm_get_dev_context_loss_count'
-> >>> arch/arm/mach-omap2/built-in.o: In function `omap2_common_pm_init':
-> >>> twl-common.c:(.init.text+0x1af0): undefined reference to `omap_pm_if_init'
-> >>> arch/arm/mach-omap2/built-in.o: In function `omap2_gpio_dev_init':
-> >>> twl-common.c:(.init.text+0x2168): undefined reference to `omap_pm_get_dev_context_loss_count'
-> >>> arch/arm/mach-omap2/built-in.o: In function `omap_display_init':
-> >>> twl-common.c:(.init.text+0x25cc): undefined reference to `omap_pm_get_dev_context_loss_count'
-> >>
-> >> These are now gone, but we have a new warning:
-> >>
-> >> arch/arm/mach-omap2/timer.c:163:28: warning: 'omap_counter_match' defined but not used
-> > 
-> > Jon, care to fix this one?
-> 
-> Fix already available here [1]. I actually included this in my latest
-> pull request with some other timer clean-ups [2]. Let me know if you are
-> ok with this being part of this pull request or if you want to handle
-> this separately.
-> 
-> Cheers
-> Jon
-> 
-> [1] http://marc.info/?l=linux-omap&m=135300866115036&w=2
-> [2] http://marc.info/?l=linux-omap&m=135308624321232&w=2
+Hi,
 
-Well, it's now two weeks on, and the warning is still there... what's going
-on?  Why aren't fixes propagating upstream?
+On Saturday 24 of November 2012 11:21:03 Kukjin Kim wrote:
+> Tomasz Figa wrote:
+> > Some Exynos-based boards are running with secure firmware running in
+> > TrustZone secure world, which changes the way some things have to be
+> > initialized.
+> > 
+> > This series adds support for specifying firmware operations,
+> > implements
+> > some firmware operations for Exynos secure firmware and adds a method
+> > of enabling secure firmware operations on Exynos-based boards through
+> > board file and device tree.
+> > 
+> > Depends on:
+> >   - ARM: EXYNOS: Add support for secondary CPU bring-up on Exynos4412
+> > 
+> > Changes since v3
+> > ( http://thread.gmane.org/gmane.linux.kernel.samsung-soc/13442 )
+> > 
+> >   - Replaced cpu_boot_reg call with cpu_set_boot_addr
+> >   - Added interface documentation
+> >   - Separated from Exynos4x12 secondary CPU bring-up patch
+> > 
+> > Changes since v2
+> > ( http://thread.gmane.org/gmane.linux.kernel.samsung-soc/12848 )
+> > 
+> >   - Made Exynos firmware binding require address
+> >   - Minor style fixes
+> > 
+> > Changes since v1
+> > ( http://thread.gmane.org/gmane.linux.kernel.samsung-
+> > soc/12583/focus=12820 )
+> > 
+> >   - Changed return types of all operations to int
+> >   - Defined all operations to return 0 on success, -ENOSYS when not
+> >   
+> >     implemented or appropriate error code on error
+> > 
+> > Tomasz Figa (5):
+> >   ARM: Add interface for registering and calling firmware-specific
+> >   
+> >     operations
+> >   
+> >   ARM: EXYNOS: Add support for secure monitor calls
+> >   ARM: EXYNOS: Add support for Exynos secure firmware
+> >   ARM: EXYNOS: Add IO mapping for non-secure SYSRAM.
+> >   ARM: EXYNOS: Add secure firmware support to secondary CPU bring-up
+> >  
+> >  Documentation/arm/firmware.txt                     | 88
+> >  ++++++++++++++++++++++
+> >  .../devicetree/bindings/arm/samsung-boards.txt     | 10 +++
+> >  arch/arm/common/Makefile                           |  2 +
+> >  arch/arm/common/firmware.c                         | 18 +++++
+> >  arch/arm/include/asm/firmware.h                    | 66
+> >  ++++++++++++++++ arch/arm/mach-exynos/Makefile                     
+> >  |  6 ++
+> >  arch/arm/mach-exynos/common.c                      | 35 +++++++++
+> >  arch/arm/mach-exynos/common.h                      |  2 +
+> >  arch/arm/mach-exynos/exynos-smc.S                  | 22 ++++++
+> >  arch/arm/mach-exynos/firmware.c                    | 70
+> >  +++++++++++++++++ arch/arm/mach-exynos/include/mach/map.h           
+> >  |  3 +
+> >  arch/arm/mach-exynos/mach-exynos4-dt.c             |  1 +
+> >  arch/arm/mach-exynos/platsmp.c                     | 32 ++++++--
+> >  arch/arm/mach-exynos/smc.h                         | 31 ++++++++
+> >  arch/arm/plat-samsung/include/plat/map-s5p.h       |  1 +
+> >  15 files changed, 382 insertions(+), 5 deletions(-)
+> >  create mode 100644 Documentation/arm/firmware.txt
+> >  create mode 100644 arch/arm/common/firmware.c
+> >  create mode 100644 arch/arm/include/asm/firmware.h
+> >  create mode 100644 arch/arm/mach-exynos/exynos-smc.S
+> >  create mode 100644 arch/arm/mach-exynos/firmware.c
+> >  create mode 100644 arch/arm/mach-exynos/smc.h
+> > 
+> > --
+> > 1.8.0
+> 
+> Russell, I think, Tomasz addressed comments from you.
+> 
+> If you're ok on this, please ack so that I can pick this up in my tree
+> for v3.8...
+
+Arnd, Olof, what do you think?
+
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Linux Platform
