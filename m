@@ -1,37 +1,24 @@
-From: sander@van-ginkel.eu (sander van ginkel)
-Date: Wed, 28 Nov 2012 19:58:21 +0100
-Subject: [PATCH] add hardware I2C support for ARM IMX23
-In-Reply-To: <CANqk_c-UemJvfoFQMt-iNUU0YmiSt-fb-=Y9=eKwE=ka-ffw6A@mail.gmail.com>
-References: <20121128152403.45224dvyaufb1j7n@62.129.139.42>
- <20121128150851.GA4659@pengutronix.de>
- <20121128171039.14705ltphptrp5kv@62.129.139.42>
- <20121128162452.GB4659@pengutronix.de> <50B63F81.4050008@van-ginkel.eu>
- <CANqk_c-UemJvfoFQMt-iNUU0YmiSt-fb-=Y9=eKwE=ka-ffw6A@mail.gmail.com>
-Message-ID: <20121128195821.71024xoxi57896tp@62.129.139.42>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 28 Nov 2012 19:18:22 +0000
+Subject: [PATCH V4 1/2] ASoC: Samsung: Get I2S src_clk from clock alias id.
+In-Reply-To: <1354099669-1735-2-git-send-email-padma.v@samsung.com>
+References: <1354099669-1735-1-git-send-email-padma.v@samsung.com>
+ <1354099669-1735-2-git-send-email-padma.v@samsung.com>
+Message-ID: <20121128191822.GB32691@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Sander,
->
-> Just tested with "i2cdetc -y -r 0" that crashes with  "BUG: soft
-lockup -
->> CPU#0 stuck for 22s!"
->> according to the docs (IMX23RM.pdf) the interrupts for I2C are 26
-and 27
->> that why I assigned these two in the dts.
->>
->
-> In your dts, is it 26, 27? Order matters, it should be 27, 26.
-Error ISR,
-> DMA.
->
+On Wed, Nov 28, 2012 at 04:17:48PM +0530, Padmavathi Venna wrote:
+> As the I2S src clks are registered with clkdev using generic
+> connection id, driver can get the clk name using generic id.
+> So the variable representing the array of rclk src clks is
+> deleted.
 
-Hi Tim,
-
-Thanks for your suggestion. I swapped the numbers and it solved the crash.
-However I still have to debug some more because it gives now :
-  mxs-i2c 80058000.i2c: Failed to get PIO reg. write descriptor.
-
-Thanks,
-
-Sander
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121128/179766d5/attachment-0001.sig>
