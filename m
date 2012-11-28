@@ -1,62 +1,32 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 28 Nov 2012 08:40:27 +0200
-Subject: [PATCH 2/3] ARM: OMAP4: Fix build error and warning in timer.c
-In-Reply-To: <1354068915-3378-3-git-send-email-jon-hunter@ti.com>
-References: <1354068915-3378-1-git-send-email-jon-hunter@ti.com>
- <1354068915-3378-3-git-send-email-jon-hunter@ti.com>
-Message-ID: <50B5B1DB.4080701@compulab.co.il>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Wed, 28 Nov 2012 14:42:35 +0800
+Subject: [PATCH] ARM: mmp: select PINCTRL for ARCH_MMP
+Message-ID: <1354084955.18972.2.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/12 04:15, Jon Hunter wrote:
-> When compiling the kernel with configuration option CONFIG_ARCH_OMAP4
-> enabled and CONFIG_LOCAL_TIMERS disabled, the following build error and
-> warning is seen.
-> 
->   CC      arch/arm/mach-omap2/timer.o
->   arch/arm/mach-omap2/timer.c: In function ?omap4_local_timer_init?:
->   arch/arm/mach-omap2/timer.c:630:2: error: implicit declaration of
->   	function ?omap4_sync32_timer_init?
-> 	[-Werror=implicit-function-declaration]
->   arch/arm/mach-omap2/timer.c: At top level:
->   arch/arm/mach-omap2/timer.c:607:1: warning: ?omap4_sync32k_timer_init?
->   	defined but not used [-Wunused-function]
->   cc1: some warnings being treated as errors
->   make[1]: *** [arch/arm/mach-omap2/timer.o] Error 1
-> 
-> This issue was introduced by commit 6f80b3b (ARM: OMAP2+: timer: remove
-> CONFIG_OMAP_32K_TIMER) where the "k" is missing from the "sync32k" in
-> the function name "omap4_sync32_timer_init". Therefore, correct this
-> typo to resolve the above error and warning.
+This makes PINCTRL related config options visible.
+Otherwise there is no way to build pinctrl drivers for MMP2, PXA168 and PXA910.
 
-Yeah ;-( sorry for this...
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+---
+This patch was sent on https://lkml.org/lkml/2012/11/12/10
+Resend to Haojian's correct email address.
 
-> 
-> Cc: Igor Grinberg <grinberg@compulab.co.il>
-> 
-> Reported-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+ arch/arm/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
-
-> ---
->  arch/arm/mach-omap2/timer.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index a9f99e3..eb96712 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -627,7 +627,7 @@ static void __init omap4_local_timer_init(void)
->  #else /* CONFIG_LOCAL_TIMERS */
->  static inline void omap4_local_timer_init(void)
->  {
-> -	omap4_sync32_timer_init();
-> +	omap4_sync32k_timer_init();
->  }
->  #endif /* CONFIG_LOCAL_TIMERS */
->  OMAP_SYS_TIMER(4, local);
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1fd4208..2f8bfd4 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -591,6 +591,7 @@ config ARCH_MMP
+ 	select GPIO_PXA
+ 	select IRQ_DOMAIN
+ 	select NEED_MACH_GPIO_H
++	select PINCTRL
+ 	select PLAT_PXA
+ 	select SPARSE_IRQ
+ 	help
 -- 
-Regards,
-Igor.
+1.7.9.5
