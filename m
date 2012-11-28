@@ -1,35 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 28 Nov 2012 08:22:59 +0100
-Subject: [PATCH v2] ARM: dts: mx27: Fix the AIPI bus for FEC
-In-Reply-To: <CAOMZO5BZnpNrS_kKiqTmzYtzW7jQOtmHN-3cGH-10rj2v66Jjw@mail.gmail.com>
-References: <1353525578-20309-1-git-send-email-fabio.estevam@freescale.com>
- <CAOMZO5BZnpNrS_kKiqTmzYtzW7jQOtmHN-3cGH-10rj2v66Jjw@mail.gmail.com>
-Message-ID: <20121128072259.GM10369@pengutronix.de>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 28 Nov 2012 13:56:09 +0530
+Subject: [PATCH] drivers: bus: omap_interconnect: Fix rand-config build
+ warning
+In-Reply-To: <20121031232606.GH15766@atomide.com>
+References: <1350480519-1890-1-git-send-email-lokeshvutla@ti.com>
+ <507EB3CC.6060005@ti.com> <20121025003509.GI11928@atomide.com>
+ <20121025004216.GJ11928@atomide.com> <5088DD22.1050000@ti.com>
+ <20121025191546.GY11928@atomide.com> <508A2F28.3020204@ti.com>
+ <508E29E9.7020809@ti.com> <20121031232606.GH15766@atomide.com>
+Message-ID: <50B5CAA1.4000807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2012 at 02:28:41PM -0200, Fabio Estevam wrote:
-> Hi Sascha,
-> 
-> On Wed, Nov 21, 2012 at 5:19 PM, Fabio Estevam
-> <fabio.estevam@freescale.com> wrote:
-> > FEC controller is connected to AIPI2 bus.
-> >
-> > Also fix the AIPI1 address range.
-> >
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > ---
-> > Changes since v1:
-> > - Remove ethernet from aipi1 bus on phytec board.
-> 
-> This one is a bug fix. Could this be applied?
+Hi,
 
-Just did that.
+On Thursday 01 November 2012 04:56 AM, Tony Lindgren wrote:
+> * Lokesh Vutla <lokeshvutla@ti.com> [121029 00:03]:
+>> Is the above discussion fine for you ?
+>> Will you pick this patch or
+>> you want any more modifications ?
+>
+> Let's see what Arnd says.
+Gentle ping on this...
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks
+Lokesh
+>
+> Regards,
+>
+> Tony
+>
