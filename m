@@ -1,50 +1,76 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Wed, 28 Nov 2012 02:37:58 +0000
-Subject: [PATCH] ARM: use clockevents_config_and_register() where possible
-In-Reply-To: <1353936857-15313-1-git-send-email-shawn.guo@linaro.org>
-References: <1353936857-15313-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <5EB3BFCD089AD643B9BB63439F5FD5E901229845B5@SHAASIEXM01.ASIA.ROOT.PRI>
+From: m-watanabe@plathome.co.jp (Mio Watanabe)
+Date: Wed, 28 Nov 2012 11:45:01 +0900
+Subject: [PATCH] arm: mvebu: support for the PlatHome OpenBlocks AX3 board
+In-Reply-To: <20121127130035.GI15800@titan.lakedaemon.net>
+References: <20121126102535.6a5da505@skate>
+ <20121127130035.GI15800@titan.lakedaemon.net>
+Message-ID: <20121128114501.6D13.F504C49B@plathome.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawn.guo at linaro.org]
-> Sent: Monday, November 26, 2012 9:34 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Arnd Bergmann; Olof Johansson; Shawn Guo; Nicolas Ferre; Anton
-> Vorontsov; Kukjin Kim; Russell King; Sascha Hauer; Jason Cooper; Roland Stigge;
-> Eric Miao; Haojian Zhuang; David Brown; Tony Lindgren; Barry Song; Stephen
-> Warren; Tony Prisk; Lennert Buytenhek; Wan ZongShun; Viresh Kumar
-> Subject: [PATCH] ARM: use clockevents_config_and_register() where possible
+Dear Jason and all,
+
+Thank you for adding us to the email list.
+
+Thomas is correct. The differences between AX3-2 and AX3-4 are only 3 as following.
+
+
+                                                    AX3-2                   AX3-4  
+No. of ethernet interface                2                           4
+SO-DIMM slot                                none                       1                            
+mini PCIe slot                                none                       1
+
+
+
+I delite Mr. Matumoto from the list since he quit Plat'Home already and
+I am his successor. Please just remain "eg@". It is a mailing list
+including our development section. Thank you.
+
+Kind regards,
+Mio Watanabe
+
+????????????????????????
+Plat'Home Co., Ltd.
+Product Marketing Dept.
+Nihon Building Kudanbekkan 3F
+4-1-3 Kudankita, Chiyoda-ku, Tokyo
+102-0073 Japan
+TEL: ++81 (0) 3 5213 4373
+FAX: ++81 (0) 3 3221-0882
+E-mail : m-watanabe at plathome.co.jp
+
+
+
+On Tue, 27 Nov 2012 08:00:35 -0500
+Jason Cooper <jason@lakedaemon.net> wrote:
+
+> On Mon, Nov 26, 2012 at 10:25:35AM +0100, Thomas Petazzoni wrote:
+> > On Mon, 26 Nov 2012 10:18:47 +0100, Hector Oron wrote:
+> > 
+> > > I got an ax3/2 device, I would not mind to test any changes? Are you
+> > > aware of which changes should I apply to dtsi file to work on ax3-2
+> > > device?
+> > 
+> > If I'm correct, the differences between AX-2 and AX3-4 is:
+> > 
+> >  * AX3-2 has two Ethernet interfaces, while AX3-4 has four Ethernet
+> >    interfaces
+> > 
+> >  * AX3-4 is in standard mounted with a 2 GB additional DRAM in a
+> >    SO-DIMM slot, while the AX3-2 is not. However, it is not clear if
+> >    the SO-DIMM slot is present or not on the AX3-2 (could you confirm
+> >    this?).
+> > 
+> >  * AX3-2 does not have a mini PCIe slot, while AX3-4 has one.
+> > 
+> > So I guess you could create a separate armada-xp-openblocks-ax3-2.dts
+> > file to support this new board. Maybe at some point it will make sense
+> > to have a common armada-xp-openblocks-ax3.dtsi that both board .dts
+> > includes.
 > 
-> The clockevent core is able to figure out the best mult and shift,
-> calculate min_delta_ns and max_delta_ns, with the necessary info passed
-> into clockevents_config_and_register().  Use this combined configure
-> and register function where possible to make the codes less error prone
-> and gain some positive diff stat.
+> Adding plathome to the email list to see if they can offer any
+> concrete answers.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Anton Vorontsov <cbouatmailru@gmail.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Roland Stigge <stigge@antcom.de>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Barry Song <baohua.song@csr.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Tony Prisk <linux@prisktech.co.nz>
-> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
-> Cc: Wan ZongShun <mcuos.com@gmail.com>
-> Cc: Viresh Kumar <viresh.linux@gmail.com>
-> ---
-
-Acked-by: Barry Song <baohua.song@csr.com>
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+> thx,
+> 
+> Jason.
