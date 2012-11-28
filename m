@@ -1,143 +1,34 @@
-From: per.lkml@gmail.com (Per Forlin)
-Date: Wed, 28 Nov 2012 17:55:13 +0100
-Subject: [PATCH] mmc: mmci: Support non-power-of-two block sizes for
- ux500v2 variant
-In-Reply-To: <50B349D3.2050806@stericsson.com>
-References: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
- <20121121153811.GN3290@n2100.arm.linux.org.uk>
- <CAFEEs1kzJUgsvnzgWwU4i7o1jkE=8iTq5+NJ_t1jdiHEm7b-RQ@mail.gmail.com>
- <20121121165048.GO3290@n2100.arm.linux.org.uk>
- <CAFEEs1nb+UD+8_jsKvGKhyFqGDogN5wsmV30PnELqahTMDyRVA@mail.gmail.com>
- <20121122173708.GJ5764@n2100.arm.linux.org.uk>
- <50B34270.7070403@stericsson.com>
- <20121126102712.GC19440@n2100.arm.linux.org.uk>
- <50B349D3.2050806@stericsson.com>
-Message-ID: <CAFEEs1nZboGyAfpYQ2hUvp366FiS0=8u5zL6Vr1RfXac_Ls_dw@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 28 Nov 2012 17:59:47 +0100
+Subject: [PATCH v5 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <20121128164606.GD5312@atomide.com>
+References: <1354113509-7972-1-git-send-email-zonque@gmail.com>
+ <1354113509-7972-5-git-send-email-zonque@gmail.com>
+ <20121128164606.GD5312@atomide.com>
+Message-ID: <50B64303.2020100@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2012 at 11:52 AM, Per F?rlin <per.forlin@stericsson.com> wrote:
-> On 11/26/2012 11:27 AM, Russell King - ARM Linux wrote:
->> On Mon, Nov 26, 2012 at 11:20:32AM +0100, Per F?rlin wrote:
->>> On 11/22/2012 06:37 PM, Russell King - ARM Linux wrote:
->>>> On Thu, Nov 22, 2012 at 06:28:30PM +0100, Per Forlin wrote:
->>>>> On Wed, Nov 21, 2012 at 5:50 PM, Russell King - ARM Linux
->>>>> <linux@arm.linux.org.uk> wrote:
->>>>>> On Wed, Nov 21, 2012 at 05:13:55PM +0100, Per Forlin wrote:
->>>>>>> On Wed, Nov 21, 2012 at 4:38 PM, Russell King - ARM Linux
->>>>>>> <linux@arm.linux.org.uk> wrote:
->>>>>>>> On Fri, Oct 12, 2012 at 04:02:02PM +0200, Ulf Hansson wrote:
->>>>>>>>>  /*
->>>>>>>>> + * Validate mmc prerequisites
->>>>>>>>> + */
->>>>>>>>> +static int mmci_validate_data(struct mmci_host *host,
->>>>>>>>> +                           struct mmc_data *data)
->>>>>>>>> +{
->>>>>>>>> +     if (!data)
->>>>>>>>> +             return 0;
->>>>>>>>> +
->>>>>>>>> +     if (!host->variant->non_power_of_2_blksize &&
->>>>>>>>> +         !is_power_of_2(data->blksz)) {
->>>>>>>>> +             dev_err(mmc_dev(host->mmc),
->>>>>>>>> +                     "unsupported block size (%d bytes)\n", data->blksz);
->>>>>>>>> +             return -EINVAL;
->>>>>>>>> +     }
->>>>>>>>> +
->>>>>>>>> +     if (data->sg->offset & 3) {
->>>>>>>>> +             dev_err(mmc_dev(host->mmc),
->>>>>>>>> +                     "unsupported alginment (0x%x)\n", data->sg->offset);
->>>>>>>>> +             return -EINVAL;
->>>>>>>>> +     }
->>>>>>>>
->>>>>>>> Why?  What's the reasoning behind this suddenly introduced restriction?
->>>>>>>> readsl()/writesl() copes just fine with non-aligned pointers.  It may be
->>>>>>>> that your DMA engine can not, but that's no business interfering with
->>>>>>>> non-DMA transfers, and no reason to fail such transfers.
->>>>>>>>
->>>>>>>> If your DMA engine can't do that then its your DMA engine code which
->>>>>>>> should refuse to prepare the transfer.
->>>>>>>>
->>>>>>>> Yes, that means problems with the way things are ordered - or it needs a
->>>>>>>> proper API where DMA engine can export these kinds of properties.
->>>>>>> The alignment constraint is related to PIO, sg_miter and that FIFO
->>>>>>> access must be done with 4 bytes.
->>>>>>
->>>>>> Total claptrap.  No it isn't.
->>>>>>
->>>>>> - sg_miter just deals with bytes, and number of bytes transferred; there
->>>>>>   is no word assumptions in that code.  Indeed many ATA disks transfer
->>>>>>   by half-word accesses so such a restriction would be insane.
->>>>>>
->>>>>> - the FIFO access itself needs to be 32-bit words, so readsl or writesl
->>>>>>   (or their io* equivalents must be used).
->>>>>>
->>>>>> - but - and this is the killer item to your argument as I said above -
->>>>>>   readsl and writesl _can_ take misaligned pointers and cope with them
->>>>>>   fine.
->>>>>>
->>>>>> The actual alignment of the buffer address is totally irrelevant here.
->>>>>>
->>>>>> What isn't irrelevant is the _number_ of bytes to be transferred, but
->>>>>> that's something totally different and completely unrelated from
->>>>>> data->sg->offset.
->>>>> Let's try again :)
->>>>>
->>>>> Keep in mind that the mmc -block layer is aligned so from that aspect
->>>>> everything is fine.
->>>>> SDIO may have any length or alignment but sg-len is always 1.
->>>>>
->>>>> There is just one sg-element and one continues buffer.
->>>>>
->>>>> sg-miter splits the continues buffer in chunks that may not be aligned
->>>>> with 4 byte size. It depends on the start address alignment of the
->>>>> buffer.
->>>>>
->>>>> Is it more clear now?
->>>>
->>>> Is this more clear: you may be passed a single buffer which is misaligned.
->>>> We cope with that just fine.  There is *no* reason to reject that transfer
->>>> because readsl/writesl cope just fine with it.
->>>>
->>> The MMCI driver doesn't support alignment smaller than 4 bytes (it may
->>> result in data corruption).
+On 28.11.2012 17:46, Tony Lindgren wrote:
+> * Daniel Mack <zonque@gmail.com> [121128 06:40]:
+>> This patch adds basic DT bindings for OMAP GPMC.
 >>
->> Explain yourself.  That's what's lacking here.  I'm explaining why I
->> think you're wrong, but you're just asserting all the time that I'm
->> wrong without giving any real details.
+>> The actual peripherals are instantiated from child nodes within the GPMC
+>> node, and the only type of device that is currently supported is NAND.
 >>
->>> There are two options
->>> 1. Either one should fix the driver to support it. Currently the driver
->>> only supports miss-alignment of the last sg-miter buffer.
->>> 2. Or be kind to inform the user that the alignment is not supported.
+>> Code was added to parse the generic GPMC timing parameters and some
+>> documentation with examples on how to use them.
 >>
->> Look, it's very very simple.
->>
->> If you have a multi-sg transfer, and the pointer starts off being
->> misaligned, the first transfer to the end of the page _MAY_ be a
->> non-word aligned number of bytes.  _THAT_ is what you should be checking.
->> _THAT_ is what the limitation is in the driver.  _NOT_ that the pointer
->> is misaligned.
->>
-> There will be no multi-sg transfer that is misaligned because SDIO-fwk set the sg-length to 1. Still the transfer may be multi-PAGE with sg-length 1 which is something that mmci driver cannot handle.
->
-> The intention of "data->sg->offset & 3" is to check for misaligned data. What would you replace this check with?
->
-> Thanks
-> Per
->
-I have tried to work out an if-statement to check this properly. Here
-is my conclusion,
-This only works if sg len is 1 (in the SDIO case)
+>> Successfully tested on an AM33xx board.
+> 
+> Please resend this with devicetree-discuss at lists.ozlabs.org and
+> the people listed in MAINTAINERS in the cc:
+> 
+> Grant Likely <grant.likely@secretlab.ca>
+> Rob Herring <rob.herring@calxeda.com>
 
-if (WRITE)
-  align = sg->offset & 3
-else if (READ)
-  align = 0
+Sorry - I picked the wrong entry from my history when sending. Resent now.
 
-if (sg->offset & 3 && (PAGE_SIZE - (sg->offset + align) < host->size))
-   error; /* cannot be handled by mmci driver */
 
-Is this if-statement align with your view of the alignment issue ?
-
-BR
-Per
+Daniel
