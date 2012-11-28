@@ -1,54 +1,54 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 28 Nov 2012 16:04:58 -0600
-Subject: [PATCH V2 2/4] ARM: OMAP4: Fix build error and warning in timer.c
+Date: Wed, 28 Nov 2012 16:04:59 -0600
+Subject: [PATCH V2 3/4] ARM: AM335x: Fix warning in timer.c
 In-Reply-To: <1354140300-16825-1-git-send-email-jon-hunter@ti.com>
 References: <1354140300-16825-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1354140300-16825-3-git-send-email-jon-hunter@ti.com>
+Message-ID: <1354140300-16825-4-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When compiling the kernel with configuration option CONFIG_ARCH_OMAP4
-enabled and CONFIG_LOCAL_TIMERS disabled, the following build error and
-warning is seen.
+When compiling the kernel with configuration options ...
+
+ # CONFIG_ARCH_OMAP2 is not set
+ # CONFIG_ARCH_OMAP3 is not set
+ # CONFIG_ARCH_OMAP4 is not set
+ # CONFIG_SOC_OMAP5 is not set
+ CONFIG_SOC_AM33XX=y
+
+ ... the following build warning is seen.
 
   CC      arch/arm/mach-omap2/timer.o
-  arch/arm/mach-omap2/timer.c: In function ?omap4_local_timer_init?:
-  arch/arm/mach-omap2/timer.c:630:2: error: implicit declaration of
-  	function ?omap4_sync32_timer_init?
-	[-Werror=implicit-function-declaration]
-  arch/arm/mach-omap2/timer.c: At top level:
-  arch/arm/mach-omap2/timer.c:607:1: warning: ?omap4_sync32k_timer_init?
+  arch/arm/mach-omap2/timer.c:395:19: warning: ?omap2_sync32k_clocksource_init?
   	defined but not used [-Wunused-function]
-  cc1: some warnings being treated as errors
-  make[1]: *** [arch/arm/mach-omap2/timer.o] Error 1
 
 This issue was introduced by commit 6f80b3b (ARM: OMAP2+: timer: remove
-CONFIG_OMAP_32K_TIMER) where the "k" is missing from the "sync32k" in
-the function name "omap4_sync32_timer_init". Therefore, correct this
-typo to resolve the above error and warning.
+CONFIG_OMAP_32K_TIMER) where the omap2_sync32k_clocksource_init() is no
+longer referenced by the timer initialisation function for the AM335x
+device as it has no 32k-sync timer.
+
+Fix this by adding the "__maybe_unused" compiler directive to the
+omap2_sync32k_clocksource_init() function to indicate that this function
+may be used for certain configurations.
 
 Cc: Igor Grinberg <grinberg@compulab.co.il>
 
-Reported-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
  arch/arm/mach-omap2/timer.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index b9cff72..3bbb244 100644
+index 3bbb244..79df809 100644
 --- a/arch/arm/mach-omap2/timer.c
 +++ b/arch/arm/mach-omap2/timer.c
-@@ -630,7 +630,7 @@ static void __init omap4_local_timer_init(void)
- #else /* CONFIG_LOCAL_TIMERS */
- static inline void omap4_local_timer_init(void)
+@@ -392,7 +392,7 @@ static struct of_device_id omap_counter_match[] __initdata = {
+ };
+ 
+ /* Setup free-running counter for clocksource */
+-static int __init omap2_sync32k_clocksource_init(void)
++static int __init __maybe_unused omap2_sync32k_clocksource_init(void)
  {
--	omap4_sync32_timer_init();
-+	omap4_sync32k_timer_init();
- }
- #endif /* CONFIG_LOCAL_TIMERS */
- OMAP_SYS_TIMER(4, local);
+ 	int ret;
+ 	struct device_node *np = NULL;
 -- 
 1.7.10.4
