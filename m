@@ -1,92 +1,203 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 28 Nov 2012 18:52:36 +0530
-Subject: [PATCH v3 02/11] clk: davinci - add PSC clock driver
-In-Reply-To: <20121127172900.21126.89528@nucleus>
-References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
- <1351181518-11882-3-git-send-email-m-karicheri2@ti.com>
- <50950908.1060302@ti.com> <5097D6FC.7040202@ti.com>
- <20121110022254.18014.31873@nucleus> <50B4D6B1.3000903@ti.com>
- <20121127172900.21126.89528@nucleus>
-Message-ID: <50B6101C.30502@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 28 Nov 2012 13:44:10 +0000
+Subject: [PATCH v4 04/13] ARM: KVM: Initial VGIC MMIO support code
+In-Reply-To: <20121128130934.GF21671@mudshark.cambridge.arm.com>
+References: <20121110154358.3061.16338.stgit@chazy-air>
+ <20121110154444.3061.22464.stgit@chazy-air>
+ <20121128130934.GF21671@mudshark.cambridge.arm.com>
+Message-ID: <50B6152A.3050909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2012 10:59 PM, Mike Turquette wrote:
-> Quoting Sekhar Nori (2012-11-27 07:05:21)
->> Hi Mike,
+On 28/11/12 13:09, Will Deacon wrote:
+> On Sat, Nov 10, 2012 at 03:44:44PM +0000, Christoffer Dall wrote:
+>> From: Marc Zyngier <marc.zyngier@arm.com>
 >>
->> On 11/10/2012 7:52 AM, Mike Turquette wrote:
->>> Quoting Murali Karicheri (2012-11-05 07:10:52)
->>>> On 11/03/2012 08:07 AM, Sekhar Nori wrote:
->>>>> On 10/25/2012 9:41 PM, Murali Karicheri wrote:
->>>>>> This is the driver for the Power Sleep Controller (PSC) hardware
->>>>>> found on DM SoCs as well Keystone SoCs (c6x). This driver borrowed
->>>>>> code from arch/arm/mach-davinci/psc.c and implemented the driver
->>>>>> as per common clock provider API. The PSC module is responsible for
->>>>>> enabling/disabling the Power Domain and Clock domain for different IPs
->>>>>> present in the SoC. The driver is configured through the clock data
->>>>>> passed to the driver through struct clk_psc_data.
->>>>>>
->>>>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>>>>> ---
->>>>>> +/**
->>>>>> + * struct clk_psc - DaVinci PSC clock driver data
->>>>>> + *
->>>>>> + * @hw: clk_hw for the psc
->>>>>> + * @psc_data: Driver specific data
->>>>>> + */
->>>>>> +struct clk_psc {
->>>>>> +    struct clk_hw hw;
->>>>>> +    struct clk_psc_data *psc_data;
->>>>>> +    spinlock_t *lock;
->>>>> Unused member? I don't see this being used.
->>>>
->>>> OK. Will remove.
->>>
->>> Those locks are only used for the case where a register might contain
->>> bits for several clocks.  Thus RMW operations are protected.  On OMAP
->>> this isn't necessary due to a very generous register layout (typically
->>> one 32-bit reg per module) controlling clocks.  Seems tha tmaybe this is
->>> not needed for PSC module either?
->>
->> Sorry about the late reply. The above is not totally true for PSC. There
->> are some registers (like PTCMD) which are common for all clocks.
->>
->> There is an enable_lock used in drivers/clk/clk.c which serializes all
->> enable/disable calls across the clock tree. Since that is done, further
->> locking at clk-psc level is not really needed, no?
->>
+>> Wire the initial in-kernel MMIO support code for the VGIC, used
+>> for the distributor emulation.
 > 
-> I haven't finished looking through the PSC design document yet, but my
-> answer to your question is this:
+> [...]
 > 
-> If a register is only used for clk_enable/disable calls (not touched by
+>> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
+>> new file mode 100644
+>> index 0000000..26ada3b
+>> --- /dev/null
+>> +++ b/arch/arm/kvm/vgic.c
+>> @@ -0,0 +1,138 @@
+>> +/*
+>> + * Copyright (C) 2012 ARM Ltd.
+>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program; if not, write to the Free Software
+>> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+>> + */
+>> +
+>> +#include <linux/kvm.h>
+>> +#include <linux/kvm_host.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/io.h>
+>> +#include <asm/kvm_emulate.h>
+>> +
+>> +#define ACCESS_READ_VALUE	(1 << 0)
+>> +#define ACCESS_READ_RAZ		(0 << 0)
+>> +#define ACCESS_READ_MASK(x)	((x) & (1 << 0))
+>> +#define ACCESS_WRITE_IGNORED	(0 << 1)
+>> +#define ACCESS_WRITE_SETBIT	(1 << 1)
+>> +#define ACCESS_WRITE_CLEARBIT	(2 << 1)
+>> +#define ACCESS_WRITE_VALUE	(3 << 1)
+>> +#define ACCESS_WRITE_MASK(x)	((x) & (3 << 1))
+>> +
+>> +/**
+>> + * vgic_reg_access - access vgic register
+>> + * @mmio:   pointer to the data describing the mmio access
+>> + * @reg:    pointer to the virtual backing of the vgic distributor struct
+>> + * @offset: least significant 2 bits used for word offset
+>> + * @mode:   ACCESS_ mode (see defines above)
+>> + *
+>> + * Helper to make vgic register access easier using one of the access
+>> + * modes defined for vgic register access
+>> + * (read,raz,write-ignored,setbit,clearbit,write)
+>> + */
+>> +static void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
+>> +			    u32 offset, int mode)
+>> +{
+>> +	int word_offset = offset & 3;
+> 
+> You can get rid of this variable.
+> 
+>> +	int shift = word_offset * 8;
+> 
+> shift = (offset & 3) << 3;
+> 
+>> +	u32 mask;
+>> +	u32 regval;
+>> +
+>> +	/*
+>> +	 * Any alignment fault should have been delivered to the guest
+>> +	 * directly (ARM ARM B3.12.7 "Prioritization of aborts").
+>> +	 */
+>> +
+>> +	mask = (~0U) >> (word_offset * 8);
+> 
+> then use shift here.
 
-This is right, all PSC registers are only touched in clk_enable/disable
-calls. clk-psc.c also populates .is_enabled, but that's only a regsiter
-read anyway. Plus looks like even that is always accessed under enable_lock.
+Sure.
 
-> anything held under the prepare_lock mutex) and if that register isn't
+>> +	if (reg)
+>> +		regval = *reg;
+>> +	else {
+> 
+> Use braces for the if clause.
 
-The requirement that these registers should not be touched when held
-under prepare_lock mutex is not met because functions like
-clk_disabled_unused_subtree() which are called under prepare_lock mutex
-will end up calling clk_disable() anyway.
+Indeed.
 
-Perhaps you meant: not touched by anything under 'prepare_lock' mutex
-while being outside of the 'enable_lock' spinlock?
+> 
+>> +		BUG_ON(mode != (ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED));
+>> +		regval = 0;
+>> +	}
+>> +
+>> +	if (mmio->is_write) {
+>> +		u32 data = (*((u32 *)mmio->data) & mask) << shift;
+>> +		switch (ACCESS_WRITE_MASK(mode)) {
+>> +		case ACCESS_WRITE_IGNORED:
+>> +			return;
+>> +
+>> +		case ACCESS_WRITE_SETBIT:
+>> +			regval |= data;
+>> +			break;
+>> +
+>> +		case ACCESS_WRITE_CLEARBIT:
+>> +			regval &= ~data;
+>> +			break;
+>> +
+>> +		case ACCESS_WRITE_VALUE:
+>> +			regval = (regval & ~(mask << shift)) | data;
+>> +			break;
+>> +		}
+>> +		*reg = regval;
+>> +	} else {
+>> +		switch (ACCESS_READ_MASK(mode)) {
+>> +		case ACCESS_READ_RAZ:
+>> +			regval = 0;
+>> +			/* fall through */
+>> +
+>> +		case ACCESS_READ_VALUE:
+>> +			*((u32 *)mmio->data) = (regval >> shift) & mask;
+>> +		}
+>> +	}
+>> +}
+> 
+> It might be a good idea to have some port accessors for mmio->data otherwise
+> you'll likely get endianness issues creeping in.
 
-> used anywhere else in the code (outside of the clk framework) then yes,
-> the enable_lock spinlock is enough for you.
+Aarrgh! This depends on the relative endianess of host and guest. 'm
+feeling slightly sick...
 
-No, they are not accessed out side of clk framework. At least currently.
-PSC can also be used to provide a "reset" to some IPs, but there is no
-"reset framework" which uses this feature.
+>> +/* All this should be handled by kvm_bus_io_*()... FIXME!!! */
+> 
+> I don't follow this comment :) Can you either make it clearer (and less
+> alarming!) or just drop it please?
 
-> Also have you looked into regmap?  Since you are defining your own clock
-> type that might be something nice for you.
+The non-alarming version should read:
 
-No, haven't looked at regmap yet. Will look at that.
+/*
+ * I would have liked to use the kvm_bus_io_*() API instead, but
+ * it cannot cope with banked registers (only the VM pointer is
+ * passed around, and we need the vcpu). One of these days, someone
+ * please fix it!
+ */
 
-Thanks,
-Sekhar
+> 
+>> +struct mmio_range {
+>> +	unsigned long base;
+>> +	unsigned long len;
+>> +	bool (*handle_mmio)(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
+>> +			    u32 offset);
+>> +};
+> 
+> Why not make offset a phys_addr_t?
+
+Very good point.
+
+>> +static const struct mmio_range vgic_ranges[] = {
+>> +	{}
+>> +};
+>> +
+>> +static const
+>> +struct mmio_range *find_matching_range(const struct mmio_range *ranges,
+>> +				       struct kvm_exit_mmio *mmio,
+>> +				       unsigned long base)
+>> +{
+>> +	const struct mmio_range *r = ranges;
+>> +	unsigned long addr = mmio->phys_addr - base;
+> 
+> Same here, I don't think we want to truncate everything to unsigned long.
+
+Indeed.
+
+>> +	while (r->len) {
+>> +		if (addr >= r->base &&
+>> +		    (addr + mmio->len) <= (r->base + r->len))
+>> +			return r;
+>> +		r++;
+>> +	}
+> 
+> Hmm, does this work correctly for adjacent mmio devices where addr sits
+> on the boundary (i.e. the first address of the second device)?
+
+I think it is OK. We basically check that both ends of the access are
+within a single range (we do not bother with cross range accesses).
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
