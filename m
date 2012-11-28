@@ -1,90 +1,218 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Tue, 27 Nov 2012 22:06:15 -0500
-Subject: [V2 PATCH 16/27] arm: ttc_dkb: add usb support
+Date: Tue, 27 Nov 2012 22:06:18 -0500
+Subject: [V2 PATCH 19/27] usb: phy: mv_usb2_phy: add externel chip support
 In-Reply-To: <1354071986-28032-1-git-send-email-chao.xie@marvell.com>
 References: <1354071986-28032-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1354071986-28032-17-git-send-email-chao.xie@marvell.com>
+Message-ID: <1354071986-28032-20-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for ttc_dkb board, add udc/otg/ehci support
+For the vbus and idpin detection. It may be completed by some
+external chip, for example the pmic chip 88pm860x in driver/mfd
+can do it.
+Although the usb controller can detect the vbus and id pin, but
+it need clock on and PHY enabled to detect the
+vbus/idpin. It will increase the power.
+Using the external chip to detect vbus/idpin can save the power.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- arch/arm/mach-mmp/ttc_dkb.c |   30 +++++++++++++++++++-----------
- 1 files changed, 19 insertions(+), 11 deletions(-)
+ drivers/usb/phy/mv_usb2_phy.c        |   54 +++++++++++++++++++++++++++++
+ include/linux/platform_data/mv_usb.h |   15 +++-----
+ include/linux/usb/mv_usb2.h          |   62 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 121 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index ce55fd8..0962791 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -27,7 +27,6 @@
- #include <mach/mfp-pxa910.h>
- #include <mach/pxa910.h>
- #include <mach/irqs.h>
--#include <mach/regs-usb.h>
+diff --git a/drivers/usb/phy/mv_usb2_phy.c b/drivers/usb/phy/mv_usb2_phy.c
+index ed82bf3..0f81dca 100644
+--- a/drivers/usb/phy/mv_usb2_phy.c
++++ b/drivers/usb/phy/mv_usb2_phy.c
+@@ -136,6 +136,53 @@ struct mv_usb2_phy *mv_usb2_get_phy(void)
+ }
+ EXPORT_SYMBOL(mv_usb2_get_phy);
  
- #include "common.h"
++int mv_usb2_register_notifier(struct mv_usb2_phy *phy,
++		struct notifier_block *nb)
++{
++	int ret;
++
++	if (!phy)
++		return -ENODEV;
++
++	ret = atomic_notifier_chain_register(phy->extern_chip.head, nb);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++EXPORT_SYMBOL(mv_usb2_register_notifier);
++
++int mv_usb2_unregister_notifier(struct mv_usb2_phy *phy,
++		struct notifier_block *nb)
++{
++	int ret;
++
++	if (!phy)
++		return -ENODEV;
++
++	ret = atomic_notifier_chain_unregister(phy->extern_chip.head, nb);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++EXPORT_SYMBOL(mv_usb2_unregister_notifier);
++
++int mv_usb2_notify(struct mv_usb2_phy *phy, unsigned long val, void *v)
++{
++	int ret;
++
++	if (!phy)
++		return -ENODEV;
++
++	ret = atomic_notifier_call_chain(phy->extern_chip.head, val, v);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++EXPORT_SYMBOL(mv_usb2_notify);
++
+ static unsigned int u2o_get(void __iomem *base, unsigned int offset)
+ {
+ 	return readl_relaxed(base + offset);
+@@ -414,6 +461,13 @@ static int __devinit usb_phy_probe(struct platform_device *pdev)
+ 	mv_phy->init = usb_phy_init;
+ 	mv_phy->shutdown = usb_phy_shutdown;
  
-@@ -158,20 +157,24 @@ static struct i2c_board_info ttc_dkb_i2c_info[] = {
++	mv_phy->extern_chip.head = devm_kzalloc(&pdev->dev,
++					sizeof(*mv_phy->extern_chip.head),
++					GFP_KERNEL);
++	if (mv_phy->extern_chip.head == NULL)
++		return -ENOMEM;
++	ATOMIC_INIT_NOTIFIER_HEAD(mv_phy->extern_chip.head);
++
+ 	platform_set_drvdata(pdev, mv_phy);
+ 
+ 	the_phy = mv_phy;
+diff --git a/include/linux/platform_data/mv_usb.h b/include/linux/platform_data/mv_usb.h
+index fd3d1b4..dc25d60 100644
+--- a/include/linux/platform_data/mv_usb.h
++++ b/include/linux/platform_data/mv_usb.h
+@@ -28,16 +28,13 @@ enum {
+ 	VBUS_HIGH	= 1 << 0,
  };
  
- #ifdef CONFIG_USB_SUPPORT
--#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
+-struct mv_usb_addon_irq {
+-	unsigned int	irq;
+-	int		(*poll)(void);
+-};
+-
++#define MV_USB_HAS_VBUS_DETECTION	(1 << 0)
++#define MV_USB_HAS_IDPIN_DETECTION	(1 << 1)
+ struct mv_usb_platform_data {
+ 	unsigned int		clknum;
+ 	char			**clkname;
+-	struct mv_usb_addon_irq	*id;	/* Only valid for OTG. ID pin change*/
+-	struct mv_usb_addon_irq	*vbus;	/* valid for OTG/UDC. VBUS change*/
++
++	unsigned int		extern_attr;
  
- static char *pxa910_usb_clock_name[] = {
--	[0] = "U2OCLK",
-+	[0] = "usb_clk",
+ 	/* only valid for HCD. OTG or Host only*/
+ 	unsigned int		mode;
+@@ -45,9 +42,7 @@ struct mv_usb_platform_data {
+ 	/* This flag is used for that needs id pin checked by otg */
+ 	unsigned int    disable_otg_clock_gating:1;
+ 	/* Force a_bus_req to be asserted */
+-	 unsigned int    otg_force_a_bus_req:1;
+-
+-	int	(*set_vbus)(unsigned int vbus);
++	unsigned int    otg_force_a_bus_req:1;
+ };
+ 
+ struct mv_usb_phy_platform_data {
+diff --git a/include/linux/usb/mv_usb2.h b/include/linux/usb/mv_usb2.h
+index 5d3d7bd..3e34b94 100644
+--- a/include/linux/usb/mv_usb2.h
++++ b/include/linux/usb/mv_usb2.h
+@@ -17,6 +17,33 @@
+ 
+ #include <linux/clk.h>
+ 
++enum {
++	EVENT_VBUS,
++	EVENT_ID,
 +};
 +
-+static struct mv_usb_phy_platform_data ttc_usb_phy_pdata = {
-+	.clknum		= 1,
-+	.clkname	= pxa910_usb_clock_name,
++struct pxa_usb_vbus_ops {
++	int (*get_vbus)(unsigned int *level);
++	int (*set_vbus)(unsigned int level);
++	int (*init)(void);
++};
++
++struct pxa_usb_idpin_ops {
++	int (*get_idpin)(unsigned int *level);
++	int (*init)(void);
++};
++
++struct pxa_usb_extern_ops {
++	struct pxa_usb_vbus_ops		vbus;
++	struct pxa_usb_idpin_ops	idpin;
++};
++
++struct mv_usb2_extern_chip {
++	unsigned int id;
++	struct pxa_usb_extern_ops ops;
++	struct atomic_notifier_head *head;
++};
++
+ struct mv_usb2_phy {
+ 	struct platform_device	*pdev;
+ 	struct mutex		phy_lock;
+@@ -26,10 +53,45 @@ struct mv_usb2_phy {
+ 	struct clk		**clks;
+ 	unsigned int		clks_num;
+ 
++	struct mv_usb2_extern_chip extern_chip;
++
+ 	int	(*init)(struct mv_usb2_phy *mv_phy);
+ 	void	(*shutdown)(struct mv_usb2_phy *mv_phy);
  };
  
-+#if defined(CONFIG_USB_MV_UDC) || defined(CONFIG_USB_EHCI_MV_U2O)
+ struct mv_usb2_phy *mv_usb2_get_phy(void);
+ 
++#define mv_usb2_has_extern_call(phy, o, f, arg...)( \
++{ \
++	int ret;					\
++	ret = (!phy ? 0 : ((phy->extern_chip.ops.o.f) ?	\
++		1 : 0));				\
++	ret;						\
++} \
++)
 +
- static struct mv_usb_platform_data ttc_usb_pdata = {
- 	.clknum		= 1,
- 	.clkname	= pxa910_usb_clock_name,
- 	.vbus		= NULL,
- 	.mode		= MV_USB_MODE_OTG,
- 	.otg_force_a_bus_req = 1,
--	.phy_init	= pxa_usb_phy_init,
--	.phy_deinit	= pxa_usb_phy_deinit,
- 	.set_vbus	= NULL,
- };
- #endif
-@@ -198,19 +201,24 @@ static void __init ttc_dkb_init(void)
- 	pxa910_add_twsi(0, NULL, ARRAY_AND_SIZE(ttc_dkb_i2c_info));
- 	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
- 
-+#ifdef CONFIG_USB_SUPPORT
-+	pxa_register_device(&pxa910_device_u2ophy, &ttc_usb_phy_pdata,
-+				sizeof(ttc_usb_phy_pdata));
-+#endif
++#define mv_usb2_extern_call(phy, o, f, args...)( \
++{ \
++	int ret;						\
++	ret = (!phy ? -ENODEV : ((phy->extern_chip.ops.o.f) ?	\
++		phy->extern_chip.ops.o.f(args) : -ENOIOCTLCMD));\
++	ret;							\
++} \
++)
 +
- #ifdef CONFIG_USB_MV_UDC
--	pxa168_device_u2o.dev.platform_data = &ttc_usb_pdata;
--	platform_device_register(&pxa168_device_u2o);
-+	pxa_register_device(&pxa910_device_u2o, &ttc_usb_pdata,
-+				sizeof(ttc_usb_pdata));
++#define mv_usb2_set_extern_call(phy, o, f, p)( \
++{ \
++	int ret;							\
++	ret = !phy ? -ENODEV : ((phy->extern_chip.ops.o.f) ?		\
++		-EINVAL : ({phy->extern_chip.ops.o.f = p; 0; }));	\
++	ret;								\
++} \
++)
++
++extern int mv_usb2_register_notifier(struct mv_usb2_phy *phy,
++					struct notifier_block *nb);
++extern int mv_usb2_unregister_notifier(struct mv_usb2_phy *phy,
++					struct notifier_block *nb);
++extern int mv_usb2_notify(struct mv_usb2_phy *phy, unsigned long val, void *v);
++
  #endif
- 
- #ifdef CONFIG_USB_EHCI_MV_U2O
--	pxa168_device_u2oehci.dev.platform_data = &ttc_usb_pdata;
--	platform_device_register(&pxa168_device_u2oehci);
-+	pxa_register_device(&pxa910_device_u2oehci, &ttc_usb_pdata,
-+				sizeof(ttc_usb_pdata));
- #endif
- 
- #ifdef CONFIG_USB_MV_OTG
--	pxa168_device_u2ootg.dev.platform_data = &ttc_usb_pdata;
--	platform_device_register(&pxa168_device_u2ootg);
-+	pxa_register_device(&pxa910_device_u2ootg, &ttc_usb_pdata,
-+				sizeof(ttc_usb_pdata));
- #endif
- }
- 
 -- 
 1.7.4.1
