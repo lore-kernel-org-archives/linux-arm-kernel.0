@@ -1,54 +1,78 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 28 Nov 2012 18:09:07 +0100
-Subject: [PATCH] add hardware I2C support for ARM IMX23
-In-Reply-To: <50B63F81.4050008@van-ginkel.eu>
-References: <20121128152403.45224dvyaufb1j7n@62.129.139.42>
- <20121128150851.GA4659@pengutronix.de>
- <20121128171039.14705ltphptrp5kv@62.129.139.42>
- <20121128162452.GB4659@pengutronix.de>
- <50B63F81.4050008@van-ginkel.eu>
-Message-ID: <20121128170907.GC4659@pengutronix.de>
+From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
+Date: Wed, 28 Nov 2012 12:10:07 -0500
+Subject: [PATCH] ARM: davinci: da8xx_register_spi() should not register
+ SPI board info
+In-Reply-To: <50B5CFFE.7010701@ti.com>
+References: <1347323353-19764-1-git-send-email-vivien.didelot@savoirfairelinux.com>
+ <50B5CFFE.7010701@ti.com>
+Message-ID: <1354122607.6612.6.camel@trivette.mtl.sfl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sekhar,
 
-(adding the i2c list)
-
-On Wed, Nov 28, 2012 at 05:44:49PM +0100, Sander van Ginkel wrote:
-> tested with:
-> CONFIG_I2C_MXS=m
-> CONFIG_I2C_MXS=y
+On Wed, 2012-11-28 at 14:19 +0530, Sekhar Nori wrote:
+> Hi Vivien,
 > 
-> in combination with CONFIG_GPIO_MXS enabled and disabled
+> On 9/11/2012 5:59 AM, Vivien Didelot wrote:
+> > Without this patch, da8xx_register_spi() registers the SPI board info,
+> > the SPI controller, and sets its number of chipselect to the size of the
+> > static spi_board_info array. This is bad because a SPI board info may
+> > declare devices for different SPI buses, and because other code can also
+> > call spi_register_board_info() (e.g. a daughter board might provide
+> > additional SPI devices).
+> > 
+> > This patch removes the spi_register_board_info() call from
+> > da8xx_register_spi(), renames this last one to da8xx_register_spi_bus()
+> > to be more explicit, takes the number of chipselect as a function
+> > parameter, and updates the impacted board-da8{3,5}0-evm.c, and
+> > board-mityomapl138.c files accordingly. It also sets the SPI platform
+> > data static, as it doesn't need to be exported.
+> > 
+> > Signed-off-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
 > 
-> used kernels: 3.6 and 3.7.0-rc6
+> Sorry about the late reply. It seems I missed seeing this completely
+> until you reminded Kevin about it.
 > 
-> My I2C slave is a PCF8575 i/o expander with some LEDs at the output.
-> These are controlled through sysfs.
+> The patch looks good to me except some minor issues. I made those
+> changes myself locally since I am the one guilty of getting back on this
+> so late. See below:
+> 
+> > ---
+> >  arch/arm/mach-davinci/board-da830-evm.c    |  9 +++++++--
+> >  arch/arm/mach-davinci/board-da850-evm.c    |  9 +++++++--
+> >  arch/arm/mach-davinci/board-mityomapl138.c |  9 +++++++--
+> >  arch/arm/mach-davinci/devices-da8xx.c      | 14 +++-----------
+> >  arch/arm/mach-davinci/include/mach/da8xx.h |  3 +--
+> >  5 files changed, 25 insertions(+), 19 deletions(-)
+> 
+> The patch doesn't apply to the latest kernel anymore. I resolved that.
+> 
+> > 
+> > diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+> > index 11c3db9..adb8d87 100644
+> > --- a/arch/arm/mach-davinci/board-da830-evm.c
+> > +++ b/arch/arm/mach-davinci/board-da830-evm.c
+> > @@ -652,8 +652,13 @@ static __init void da830_evm_init(void)
+> >  	if (ret)
+> >  		pr_warning("da830_evm_init: rtc setup failed: %d\n", ret);
+> >  
+> > -	ret = da8xx_register_spi(0, da830evm_spi_info,
+> > -				 ARRAY_SIZE(da830evm_spi_info));
+> > +	ret = spi_register_board_info(da830evm_spi_info,
+> > +				      ARRAY_SIZE(da830evm_spi_info));
+> > +	if (ret)
+> > +		pr_warning("da830_evm_init: spi info registration failed: %d\n",
+> > +			   ret);
+> 
+> Checkpatch asks us to use pr_warn() instead. Fixed that. Also, used
+> __func__ to print function name. Rob Tivy has patches fixing these all
+> through this file.
+> 
+> Thanks,
+> Sekhar
 
-Thanks, this is useful info.
+Thank you for considering the patch and for the upstream update!
 
-> Just tested with "i2cdetc -y -r 0" that crashes with  "BUG: soft
-> lockup - CPU#0 stuck for 22s!"
-> according to the docs (IMX23RM.pdf) the interrupts for I2C are 26
-> and 27 that why I assigned these two in the dts.
-
-You might want to try my for-next branch or wait for 3.8-rc1, maybe the
-DMA termination patch helps? Also enabling I2C debug messages is
-probably worth it.
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121128/8e813c29/attachment.sig>
+Cheers,
+Vivien
