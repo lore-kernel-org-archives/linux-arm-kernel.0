@@ -1,45 +1,73 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 28 Nov 2012 15:38:26 +0100
-Subject: [PATCH v5 1/4] mtd: omap-nand: pass device_node in platform data
-In-Reply-To: <1354113509-7972-1-git-send-email-zonque@gmail.com>
-References: <1354113509-7972-1-git-send-email-zonque@gmail.com>
-Message-ID: <1354113509-7972-2-git-send-email-zonque@gmail.com>
+Date: Wed, 28 Nov 2012 15:38:25 +0100
+Subject: [PATCH v5 0/4] OMAP GPMC DT bindings
+Message-ID: <1354113509-7972-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pass an optional device_node pointer in the platform data, which in turn
-will be put into a mtd_part_parser_data. This way, code that sets up the
-platform devices can pass along the node from DT so that the partitions
-can be parsed.
+This is a series of patches to support GPMC peripherals on OMAP boards.
 
-For non-DT boards, this change has no effect.
+Depends on Linus' master +
+omap-next (branch omap-for-v3.8/cleanup-headers-gpmc)
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
- drivers/mtd/nand/omap2.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+The only supported peripheral for now is NAND, but other types would be
+easy to add.
 
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index 3282b15..a733f15 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -1331,6 +1331,7 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
- 	dma_cap_mask_t mask;
- 	unsigned sig;
- 	struct resource			*res;
-+	struct mtd_part_parser_data	ppdata = {};
- 
- 	pdata = pdev->dev.platform_data;
- 	if (pdata == NULL) {
-@@ -1556,7 +1557,8 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
- 		goto out_release_mem_region;
- 	}
- 
--	mtd_device_parse_register(&info->mtd, NULL, NULL, pdata->parts,
-+	ppdata.of_node = pdata->of_node;
-+	mtd_device_parse_register(&info->mtd, NULL, &ppdata, pdata->parts,
- 				  pdata->nr_parts);
- 
- 	platform_set_drvdata(pdev, &info->mtd);
+Version 2 addresses details pointed out by Jon Hunter, Afzal Mohammed
+and Rob Herring:
+
+ - add "reg" and "ti,hwmod" properties to Documentation
+ - use generic of_mtd functions and the property names defined by them,
+   namely "nand-bus-width" and "nand-ecc-mode"
+ - reduce the default register space size in the Documentation to 8K,
+   as found in the hwmod code
+ - switch to a DT layout based on ranges and address translation.
+   Although this property is not currently looked at as long as the
+   handling code still uses the runtime calculation methods, we now
+   have these values in the bindings, eventually allowing us to
+   switch the implementation with less pain.
+
+Version 3 includes fixes pointed out by Jon Hunter:
+
+ - better documentation of the 'ranges' property to describe the
+   fact that it's representing the CS lines
+ - GPMC_CS_CONFIGx -> GPMC_CONFIGx in comments
+ - drop interrupt-parent from example bindings
+ - add of_node_put() at the end of the child iteration
+
+Version 4 fixes compilation for !CONFIG_MTD_NAND and includes more
+details from Jon Hunter and Avinash, Philip:
+
+ - Add "num-cs" and "num-waitpins" properties, which will eventually
+   be used to get rid of GPMC_CS_NUM
+ - Better description of generic nand DT properties
+ - Dropped patch 3/4 as an equivalent fix was already merged
+ - Added ti,nand-ecc-use-elm property
+
+Version 5 with regards to Avinash, Philip and Peter Korsgaard:
+
+ - Re-add accidentially forgotten
+   Documentation/devicetree/bindings/bus/ti-gpmc.txt
+ - Rename "software" ecc mode to "sw"
+ - Initialize gpmc_nand_data->is_elm_used to 'true' rather than 1
+ - Drop ti,nand-ecc-use-elm binding in favor of a new ecc mode
+   named "bch8-am335xrbl-compatible"
+ - Add two more patches for section mismatch fixups
+
+Daniel Mack (4):
+  mtd: omap-nand: pass device_node in platform data
+  ARM: OMAP: gpmc-nand: drop __init annotation
+  ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
+  ARM: OMAP: gpmc: add DT bindings for GPMC timings and NAND
+
+ Documentation/devicetree/bindings/bus/ti-gpmc.txt  |  76 +++++++++
+ .../devicetree/bindings/mtd/gpmc-nand.txt          |  81 +++++++++
+ arch/arm/mach-omap2/gpmc-nand.c                    |  15 +-
+ arch/arm/mach-omap2/gpmc.c                         | 181 ++++++++++++++++++++-
+ drivers/mtd/nand/omap2.c                           |   4 +-
+ 5 files changed, 348 insertions(+), 9 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/bus/ti-gpmc.txt
+ create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+
 -- 
 1.7.11.7
