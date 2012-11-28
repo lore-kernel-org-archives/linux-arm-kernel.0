@@ -1,69 +1,37 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 28 Nov 2012 14:19:02 +0530
-Subject: [PATCH] ARM: davinci: da8xx_register_spi() should not register
- SPI board info
-In-Reply-To: <1347323353-19764-1-git-send-email-vivien.didelot@savoirfairelinux.com>
-References: <1347323353-19764-1-git-send-email-vivien.didelot@savoirfairelinux.com>
-Message-ID: <50B5CFFE.7010701@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 28 Nov 2012 08:57:31 +0000
+Subject: [PATCH 3/3] Input: bu21013_ts - Add support for Device Tree
+ booting
+In-Reply-To: <20121128070332.GC23378@core.coreip.homeip.net>
+References: <1354021990-16978-1-git-send-email-lee.jones@linaro.org>
+ <1354021990-16978-4-git-send-email-lee.jones@linaro.org>
+ <20121128070332.GC23378@core.coreip.homeip.net>
+Message-ID: <20121128085731.GH2013@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivien,
+Hi Dmitry,
 
-On 9/11/2012 5:59 AM, Vivien Didelot wrote:
-> Without this patch, da8xx_register_spi() registers the SPI board info,
-> the SPI controller, and sets its number of chipselect to the size of the
-> static spi_board_info array. This is bad because a SPI board info may
-> declare devices for different SPI buses, and because other code can also
-> call spi_register_board_info() (e.g. a daughter board might provide
-> additional SPI devices).
+> On Tue, Nov 27, 2012 at 01:13:10PM +0000, Lee Jones wrote:
+> > Now we can register the BU21013_ts touch screen when booting with
+> > Device Tree enabled. Here we parse all the necessary components
+> > previously expected to be passed from platform data.
 > 
-> This patch removes the spi_register_board_info() call from
-> da8xx_register_spi(), renames this last one to da8xx_register_spi_bus()
-> to be more explicit, takes the number of chipselect as a function
-> parameter, and updates the impacted board-da8{3,5}0-evm.c, and
-> board-mityomapl138.c files accordingly. It also sets the SPI platform
-> data static, as it doesn't need to be exported.
-> 
-> Signed-off-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+> I applied these 3 patches, but for DT we also need to specify compatible
+> ID and set up of_match_table pointer. 
 
-Sorry about the late reply. It seems I missed seeing this completely
-until you reminded Kevin about it.
+Why do you need a compatible string?
 
-The patch looks good to me except some minor issues. I made those
-changes myself locally since I am the one guilty of getting back on this
-so late. See below:
+> Please send me a follow-up patches
+> doing that and also describing DT bindings for BU21013.
 
-> ---
->  arch/arm/mach-davinci/board-da830-evm.c    |  9 +++++++--
->  arch/arm/mach-davinci/board-da850-evm.c    |  9 +++++++--
->  arch/arm/mach-davinci/board-mityomapl138.c |  9 +++++++--
->  arch/arm/mach-davinci/devices-da8xx.c      | 14 +++-----------
->  arch/arm/mach-davinci/include/mach/da8xx.h |  3 +--
->  5 files changed, 25 insertions(+), 19 deletions(-)
+I'll send the documentation as a seperate reply to your email.
 
-The patch doesn't apply to the latest kernel anymore. I resolved that.
+Kind regards,
+Lee
 
-> 
-> diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-> index 11c3db9..adb8d87 100644
-> --- a/arch/arm/mach-davinci/board-da830-evm.c
-> +++ b/arch/arm/mach-davinci/board-da830-evm.c
-> @@ -652,8 +652,13 @@ static __init void da830_evm_init(void)
->  	if (ret)
->  		pr_warning("da830_evm_init: rtc setup failed: %d\n", ret);
->  
-> -	ret = da8xx_register_spi(0, da830evm_spi_info,
-> -				 ARRAY_SIZE(da830evm_spi_info));
-> +	ret = spi_register_board_info(da830evm_spi_info,
-> +				      ARRAY_SIZE(da830evm_spi_info));
-> +	if (ret)
-> +		pr_warning("da830_evm_init: spi info registration failed: %d\n",
-> +			   ret);
-
-Checkpatch asks us to use pr_warn() instead. Fixed that. Also, used
-__func__ to print function name. Rob Tivy has patches fixing these all
-through this file.
-
-Thanks,
-Sekhar
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
