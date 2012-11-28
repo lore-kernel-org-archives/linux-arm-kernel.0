@@ -1,53 +1,143 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 28 Nov 2012 08:42:01 -0800
-Subject: [PATCH v5 3/4] ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
-In-Reply-To: <1354113509-7972-4-git-send-email-zonque@gmail.com>
-References: <1354113509-7972-1-git-send-email-zonque@gmail.com>
- <1354113509-7972-4-git-send-email-zonque@gmail.com>
-Message-ID: <20121128164200.GC5312@atomide.com>
+From: per.lkml@gmail.com (Per Forlin)
+Date: Wed, 28 Nov 2012 17:55:13 +0100
+Subject: [PATCH] mmc: mmci: Support non-power-of-two block sizes for
+ ux500v2 variant
+In-Reply-To: <50B349D3.2050806@stericsson.com>
+References: <1350050522-8852-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121121153811.GN3290@n2100.arm.linux.org.uk>
+ <CAFEEs1kzJUgsvnzgWwU4i7o1jkE=8iTq5+NJ_t1jdiHEm7b-RQ@mail.gmail.com>
+ <20121121165048.GO3290@n2100.arm.linux.org.uk>
+ <CAFEEs1nb+UD+8_jsKvGKhyFqGDogN5wsmV30PnELqahTMDyRVA@mail.gmail.com>
+ <20121122173708.GJ5764@n2100.arm.linux.org.uk>
+ <50B34270.7070403@stericsson.com>
+ <20121126102712.GC19440@n2100.arm.linux.org.uk>
+ <50B349D3.2050806@stericsson.com>
+Message-ID: <CAFEEs1nZboGyAfpYQ2hUvp366FiS0=8u5zL6Vr1RfXac_Ls_dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Daniel Mack <zonque@gmail.com> [121128 06:40]:
+On Mon, Nov 26, 2012 at 11:52 AM, Per F?rlin <per.forlin@stericsson.com> wrote:
+> On 11/26/2012 11:27 AM, Russell King - ARM Linux wrote:
+>> On Mon, Nov 26, 2012 at 11:20:32AM +0100, Per F?rlin wrote:
+>>> On 11/22/2012 06:37 PM, Russell King - ARM Linux wrote:
+>>>> On Thu, Nov 22, 2012 at 06:28:30PM +0100, Per Forlin wrote:
+>>>>> On Wed, Nov 21, 2012 at 5:50 PM, Russell King - ARM Linux
+>>>>> <linux@arm.linux.org.uk> wrote:
+>>>>>> On Wed, Nov 21, 2012 at 05:13:55PM +0100, Per Forlin wrote:
+>>>>>>> On Wed, Nov 21, 2012 at 4:38 PM, Russell King - ARM Linux
+>>>>>>> <linux@arm.linux.org.uk> wrote:
+>>>>>>>> On Fri, Oct 12, 2012 at 04:02:02PM +0200, Ulf Hansson wrote:
+>>>>>>>>>  /*
+>>>>>>>>> + * Validate mmc prerequisites
+>>>>>>>>> + */
+>>>>>>>>> +static int mmci_validate_data(struct mmci_host *host,
+>>>>>>>>> +                           struct mmc_data *data)
+>>>>>>>>> +{
+>>>>>>>>> +     if (!data)
+>>>>>>>>> +             return 0;
+>>>>>>>>> +
+>>>>>>>>> +     if (!host->variant->non_power_of_2_blksize &&
+>>>>>>>>> +         !is_power_of_2(data->blksz)) {
+>>>>>>>>> +             dev_err(mmc_dev(host->mmc),
+>>>>>>>>> +                     "unsupported block size (%d bytes)\n", data->blksz);
+>>>>>>>>> +             return -EINVAL;
+>>>>>>>>> +     }
+>>>>>>>>> +
+>>>>>>>>> +     if (data->sg->offset & 3) {
+>>>>>>>>> +             dev_err(mmc_dev(host->mmc),
+>>>>>>>>> +                     "unsupported alginment (0x%x)\n", data->sg->offset);
+>>>>>>>>> +             return -EINVAL;
+>>>>>>>>> +     }
+>>>>>>>>
+>>>>>>>> Why?  What's the reasoning behind this suddenly introduced restriction?
+>>>>>>>> readsl()/writesl() copes just fine with non-aligned pointers.  It may be
+>>>>>>>> that your DMA engine can not, but that's no business interfering with
+>>>>>>>> non-DMA transfers, and no reason to fail such transfers.
+>>>>>>>>
+>>>>>>>> If your DMA engine can't do that then its your DMA engine code which
+>>>>>>>> should refuse to prepare the transfer.
+>>>>>>>>
+>>>>>>>> Yes, that means problems with the way things are ordered - or it needs a
+>>>>>>>> proper API where DMA engine can export these kinds of properties.
+>>>>>>> The alignment constraint is related to PIO, sg_miter and that FIFO
+>>>>>>> access must be done with 4 bytes.
+>>>>>>
+>>>>>> Total claptrap.  No it isn't.
+>>>>>>
+>>>>>> - sg_miter just deals with bytes, and number of bytes transferred; there
+>>>>>>   is no word assumptions in that code.  Indeed many ATA disks transfer
+>>>>>>   by half-word accesses so such a restriction would be insane.
+>>>>>>
+>>>>>> - the FIFO access itself needs to be 32-bit words, so readsl or writesl
+>>>>>>   (or their io* equivalents must be used).
+>>>>>>
+>>>>>> - but - and this is the killer item to your argument as I said above -
+>>>>>>   readsl and writesl _can_ take misaligned pointers and cope with them
+>>>>>>   fine.
+>>>>>>
+>>>>>> The actual alignment of the buffer address is totally irrelevant here.
+>>>>>>
+>>>>>> What isn't irrelevant is the _number_ of bytes to be transferred, but
+>>>>>> that's something totally different and completely unrelated from
+>>>>>> data->sg->offset.
+>>>>> Let's try again :)
+>>>>>
+>>>>> Keep in mind that the mmc -block layer is aligned so from that aspect
+>>>>> everything is fine.
+>>>>> SDIO may have any length or alignment but sg-len is always 1.
+>>>>>
+>>>>> There is just one sg-element and one continues buffer.
+>>>>>
+>>>>> sg-miter splits the continues buffer in chunks that may not be aligned
+>>>>> with 4 byte size. It depends on the start address alignment of the
+>>>>> buffer.
+>>>>>
+>>>>> Is it more clear now?
+>>>>
+>>>> Is this more clear: you may be passed a single buffer which is misaligned.
+>>>> We cope with that just fine.  There is *no* reason to reject that transfer
+>>>> because readsl/writesl cope just fine with it.
+>>>>
+>>> The MMCI driver doesn't support alignment smaller than 4 bytes (it may
+>>> result in data corruption).
+>>
+>> Explain yourself.  That's what's lacking here.  I'm explaining why I
+>> think you're wrong, but you're just asserting all the time that I'm
+>> wrong without giving any real details.
+>>
+>>> There are two options
+>>> 1. Either one should fix the driver to support it. Currently the driver
+>>> only supports miss-alignment of the last sg-miter buffer.
+>>> 2. Or be kind to inform the user that the alignment is not supported.
+>>
+>> Look, it's very very simple.
+>>
+>> If you have a multi-sg transfer, and the pointer starts off being
+>> misaligned, the first transfer to the end of the page _MAY_ be a
+>> non-word aligned number of bytes.  _THAT_ is what you should be checking.
+>> _THAT_ is what the limitation is in the driver.  _NOT_ that the pointer
+>> is misaligned.
+>>
+> There will be no multi-sg transfer that is misaligned because SDIO-fwk set the sg-length to 1. Still the transfer may be multi-PAGE with sg-length 1 which is something that mmci driver cannot handle.
+>
+> The intention of "data->sg->offset & 3" is to check for misaligned data. What would you replace this check with?
+>
+> Thanks
+> Per
+>
+I have tried to work out an if-statement to check this properly. Here
+is my conclusion,
+This only works if sg len is 1 (in the SDIO case)
 
-Please add a patch description here.
+if (WRITE)
+  align = sg->offset & 3
+else if (READ)
+  align = 0
 
-Regards,
+if (sg->offset & 3 && (PAGE_SIZE - (sg->offset + align) < host->size))
+   error; /* cannot be handled by mmci driver */
 
-Tony
+Is this if-statement align with your view of the alignment issue ?
 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> ---
->  arch/arm/mach-omap2/gpmc-nand.c | 9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
-> index f9f23a2..c8a72ba 100644
-> --- a/arch/arm/mach-omap2/gpmc-nand.c
-> +++ b/arch/arm/mach-omap2/gpmc-nand.c
-> @@ -92,17 +92,18 @@ static int omap2_nand_gpmc_retime(
->  static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
->  {
->  	/* support only OMAP3 class */
-> -	if (!cpu_is_omap34xx()) {
-> +	if (!cpu_is_omap34xx() && !soc_is_am33xx()) {
->  		pr_err("BCH ecc is not supported on this CPU\n");
->  		return 0;
->  	}
->  
->  	/*
-> -	 * For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1.
-> -	 * Other chips may be added if confirmed to work.
-> +	 * For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1
-> +	 * and AM33xx derivates. Other chips may be added if confirmed to work.
->  	 */
->  	if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW) &&
-> -	    (!cpu_is_omap3630() || (GET_OMAP_REVISION() == 0))) {
-> +	    (!cpu_is_omap3630() || (GET_OMAP_REVISION() == 0)) &&
-> +	    (!soc_is_am33xx())) {
->  		pr_err("BCH 4-bit mode is not supported on this CPU\n");
->  		return 0;
->  	}
-> -- 
-> 1.7.11.7
-> 
+BR
+Per
