@@ -1,221 +1,92 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Nov 2012 13:22:54 +0000
-Subject: [kvmarm] [PATCH v4 05/13] ARM: KVM: VGIC accept vcpu and dist
- base addresses from user space
-In-Reply-To: <20121128131139.GG21671@mudshark.cambridge.arm.com>
-References: <20121110154358.3061.16338.stgit@chazy-air>
- <20121110154451.3061.74235.stgit@chazy-air>
- <20121128131139.GG21671@mudshark.cambridge.arm.com>
-Message-ID: <50B6102E.10509@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 28 Nov 2012 18:52:36 +0530
+Subject: [PATCH v3 02/11] clk: davinci - add PSC clock driver
+In-Reply-To: <20121127172900.21126.89528@nucleus>
+References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
+ <1351181518-11882-3-git-send-email-m-karicheri2@ti.com>
+ <50950908.1060302@ti.com> <5097D6FC.7040202@ti.com>
+ <20121110022254.18014.31873@nucleus> <50B4D6B1.3000903@ti.com>
+ <20121127172900.21126.89528@nucleus>
+Message-ID: <50B6101C.30502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/11/12 13:11, Will Deacon wrote:
-> On Sat, Nov 10, 2012 at 03:44:51PM +0000, Christoffer Dall wrote:
->> User space defines the model to emulate to a guest and should therefore
->> decide which addresses are used for both the virtual CPU interface
->> directly mapped in the guest physical address space and for the emulated
->> distributor interface, which is mapped in software by the in-kernel VGIC
->> support.
+On 11/27/2012 10:59 PM, Mike Turquette wrote:
+> Quoting Sekhar Nori (2012-11-27 07:05:21)
+>> Hi Mike,
 >>
->> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
->> ---
->>  arch/arm/include/asm/kvm_mmu.h  |    2 +
->>  arch/arm/include/asm/kvm_vgic.h |    9 ++++++
->>  arch/arm/kvm/arm.c              |   16 ++++++++++
->>  arch/arm/kvm/vgic.c             |   61 +++++++++++++++++++++++++++++++++++++++
->>  4 files changed, 87 insertions(+), 1 deletion(-)
+>> On 11/10/2012 7:52 AM, Mike Turquette wrote:
+>>> Quoting Murali Karicheri (2012-11-05 07:10:52)
+>>>> On 11/03/2012 08:07 AM, Sekhar Nori wrote:
+>>>>> On 10/25/2012 9:41 PM, Murali Karicheri wrote:
+>>>>>> This is the driver for the Power Sleep Controller (PSC) hardware
+>>>>>> found on DM SoCs as well Keystone SoCs (c6x). This driver borrowed
+>>>>>> code from arch/arm/mach-davinci/psc.c and implemented the driver
+>>>>>> as per common clock provider API. The PSC module is responsible for
+>>>>>> enabling/disabling the Power Domain and Clock domain for different IPs
+>>>>>> present in the SoC. The driver is configured through the clock data
+>>>>>> passed to the driver through struct clk_psc_data.
+>>>>>>
+>>>>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>>>>>> ---
+>>>>>> +/**
+>>>>>> + * struct clk_psc - DaVinci PSC clock driver data
+>>>>>> + *
+>>>>>> + * @hw: clk_hw for the psc
+>>>>>> + * @psc_data: Driver specific data
+>>>>>> + */
+>>>>>> +struct clk_psc {
+>>>>>> +    struct clk_hw hw;
+>>>>>> +    struct clk_psc_data *psc_data;
+>>>>>> +    spinlock_t *lock;
+>>>>> Unused member? I don't see this being used.
+>>>>
+>>>> OK. Will remove.
+>>>
+>>> Those locks are only used for the case where a register might contain
+>>> bits for several clocks.  Thus RMW operations are protected.  On OMAP
+>>> this isn't necessary due to a very generous register layout (typically
+>>> one 32-bit reg per module) controlling clocks.  Seems tha tmaybe this is
+>>> not needed for PSC module either?
 >>
->> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
->> index 9bd0508..0800531 100644
->> --- a/arch/arm/include/asm/kvm_mmu.h
->> +++ b/arch/arm/include/asm/kvm_mmu.h
->> @@ -26,6 +26,8 @@
->>   * To save a bit of memory and to avoid alignment issues we assume 39-bit IPA
->>   * for now, but remember that the level-1 table must be aligned to its size.
->>   */
->> +#define KVM_PHYS_SHIFT	(38)
+>> Sorry about the late reply. The above is not totally true for PSC. There
+>> are some registers (like PTCMD) which are common for all clocks.
+>>
+>> There is an enable_lock used in drivers/clk/clk.c which serializes all
+>> enable/disable calls across the clock tree. Since that is done, further
+>> locking at clk-psc level is not really needed, no?
+>>
 > 
-> Seems a bit small...
+> I haven't finished looking through the PSC design document yet, but my
+> answer to your question is this:
+> 
+> If a register is only used for clk_enable/disable calls (not touched by
 
-It's now been fixed to be 40 bits.
+This is right, all PSC registers are only touched in clk_enable/disable
+calls. clk-psc.c also populates .is_enabled, but that's only a regsiter
+read anyway. Plus looks like even that is always accessed under enable_lock.
 
-> +#define KVM_PHYS_MASK	((1ULL << KVM_PHYS_SHIFT) - 1)
->>  #define PTRS_PER_PGD2	512
->>  #define PGD2_ORDER	get_order(PTRS_PER_PGD2 * sizeof(pgd_t))
->>  
->> diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
->> index b444ecf..9ca8d21 100644
->> --- a/arch/arm/include/asm/kvm_vgic.h
->> +++ b/arch/arm/include/asm/kvm_vgic.h
->> @@ -20,6 +20,9 @@
->>  #define __ASM_ARM_KVM_VGIC_H
->>  
->>  struct vgic_dist {
->> +	/* Distributor and vcpu interface mapping in the guest */
->> +	phys_addr_t		vgic_dist_base;
->> +	phys_addr_t		vgic_cpu_base;
->>  };
->>  
->>  struct vgic_cpu {
->> @@ -31,6 +34,7 @@ struct kvm_run;
->>  struct kvm_exit_mmio;
->>  
->>  #ifdef CONFIG_KVM_ARM_VGIC
->> +int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr);
->>  bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>  		      struct kvm_exit_mmio *mmio);
->>  
->> @@ -40,6 +44,11 @@ static inline int kvm_vgic_hyp_init(void)
->>  	return 0;
->>  }
->>  
->> +static inline int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr)
->> +{
->> +	return 0;
->> +}
->> +
->>  static inline int kvm_vgic_init(struct kvm *kvm)
->>  {
->>  	return 0;
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 426828a..3ac1aab 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -61,6 +61,8 @@ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
->>  static u8 kvm_next_vmid;
->>  static DEFINE_SPINLOCK(kvm_vmid_lock);
->>  
->> +static bool vgic_present;
->> +
->>  static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
->>  {
->>  	BUG_ON(preemptible());
->> @@ -825,7 +827,19 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
->>  static int kvm_vm_ioctl_set_device_address(struct kvm *kvm,
->>  					   struct kvm_device_address *dev_addr)
->>  {
->> -	return -ENODEV;
->> +	unsigned long dev_id, type;
->> +
->> +	dev_id = (dev_addr->id & KVM_DEVICE_ID_MASK) >> KVM_DEVICE_ID_SHIFT;
->> +	type = (dev_addr->id & KVM_DEVICE_TYPE_MASK) >> KVM_DEVICE_TYPE_SHIFT;
->> +
->> +	switch (dev_id) {
->> +	case KVM_ARM_DEVICE_VGIC_V2:
->> +		if (!vgic_present)
->> +			return -ENXIO;
->> +		return kvm_vgic_set_addr(kvm, type, dev_addr->addr);
->> +	default:
->> +		return -ENODEV;
->> +	}
->>  }
->>  
->>  long kvm_arch_vm_ioctl(struct file *filp,
->> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
->> index 26ada3b..f85b275 100644
->> --- a/arch/arm/kvm/vgic.c
->> +++ b/arch/arm/kvm/vgic.c
->> @@ -22,6 +22,13 @@
->>  #include <linux/io.h>
->>  #include <asm/kvm_emulate.h>
->>  
->> +#define VGIC_ADDR_UNDEF		(-1)
->> +#define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == (typeof(_x))VGIC_ADDR_UNDEF)
->> +
->> +#define VGIC_DIST_SIZE		0x1000
->> +#define VGIC_CPU_SIZE		0x2000
-> 
-> These defines might be useful to userspace so that they don't request the
-> distributor and the cpu interface to be place too close together (been there,
-> done that :).
+> anything held under the prepare_lock mutex) and if that register isn't
 
-Fair enough.
+The requirement that these registers should not be touched when held
+under prepare_lock mutex is not met because functions like
+clk_disabled_unused_subtree() which are called under prepare_lock mutex
+will end up calling clk_disable() anyway.
 
->> +
->> +
->>  #define ACCESS_READ_VALUE	(1 << 0)
->>  #define ACCESS_READ_RAZ		(0 << 0)
->>  #define ACCESS_READ_MASK(x)	((x) & (1 << 0))
->> @@ -136,3 +143,57 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run, struct kvm_exi
->>  {
->>  	return KVM_EXIT_MMIO;
->>  }
->> +
->> +static bool vgic_ioaddr_overlap(struct kvm *kvm)
->> +{
->> +	phys_addr_t dist = kvm->arch.vgic.vgic_dist_base;
->> +	phys_addr_t cpu = kvm->arch.vgic.vgic_cpu_base;
->> +
->> +	if (IS_VGIC_ADDR_UNDEF(dist) || IS_VGIC_ADDR_UNDEF(cpu))
->> +		return false;
->> +	if ((dist <= cpu && dist + VGIC_DIST_SIZE > cpu) ||
->> +	    (cpu <= dist && cpu + VGIC_CPU_SIZE > dist))
->> +		return true;
->> +	return false;
-> 
-> Just return the predicate that you're testing.
-> 
->> +}
->> +
->> +int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr)
->> +{
->> +	int r = 0;
->> +	struct vgic_dist *vgic = &kvm->arch.vgic;
->> +
->> +	if (addr & ~KVM_PHYS_MASK)
->> +		return -E2BIG;
->> +
->> +	if (addr & ~PAGE_MASK)
->> +		return -EINVAL;
->> +
->> +	mutex_lock(&kvm->lock);
->> +	switch (type) {
->> +	case KVM_VGIC_V2_ADDR_TYPE_DIST:
->> +		if (!IS_VGIC_ADDR_UNDEF(vgic->vgic_dist_base))
->> +			return -EEXIST;
->> +		if (addr + VGIC_DIST_SIZE < addr)
->> +			return -EINVAL;
-> 
-> I think somebody else pointed out the missing mutex_unlocks on the failure
-> paths.
+Perhaps you meant: not touched by anything under 'prepare_lock' mutex
+while being outside of the 'enable_lock' spinlock?
 
-Yes, it's been fixed in the tree already.
+> used anywhere else in the code (outside of the clk framework) then yes,
+> the enable_lock spinlock is enough for you.
 
->> +		kvm->arch.vgic.vgic_dist_base = addr;
->> +		break;
->> +	case KVM_VGIC_V2_ADDR_TYPE_CPU:
->> +		if (!IS_VGIC_ADDR_UNDEF(vgic->vgic_cpu_base))
->> +			return -EEXIST;
->> +		if (addr + VGIC_CPU_SIZE < addr)
->> +			return -EINVAL;
->> +		kvm->arch.vgic.vgic_cpu_base = addr;
->> +		break;
->> +	default:
->> +		r = -ENODEV;
->> +	}
->> +
->> +	if (vgic_ioaddr_overlap(kvm)) {
->> +		kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
->> +		kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
->> +		return -EINVAL;
-> 
-> Perhaps we could put all the address checking in one place, so that the wrapping
-> round zero checks and the overlap checks can be in the same function?
-> 
->> +	}
->> +
->> +	mutex_unlock(&kvm->lock);
->> +	return r;
->> +}
-> 
-> Will
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
-> 
+No, they are not accessed out side of clk framework. At least currently.
+PSC can also be used to provide a "reset" to some IPs, but there is no
+"reset framework" which uses this feature.
 
+> Also have you looked into regmap?  Since you are defining your own clock
+> type that might be something nice for you.
 
--- 
-Jazz is not dead. It just smells funny...
+No, haven't looked at regmap yet. Will look at that.
+
+Thanks,
+Sekhar
