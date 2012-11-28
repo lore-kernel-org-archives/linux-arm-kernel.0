@@ -1,68 +1,35 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 28 Nov 2012 12:50:58 +0530
-Subject: [PATCH 3/3] ARM: AM335x: Fix warning in timer.c
-In-Reply-To: <50B5B33C.8020007@compulab.co.il>
-References: <1354068915-3378-1-git-send-email-jon-hunter@ti.com>
- <1354068915-3378-4-git-send-email-jon-hunter@ti.com>
- <50B5AF29.4020306@ti.com> <50B5B33C.8020007@compulab.co.il>
-Message-ID: <50B5BB5A.4060200@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 28 Nov 2012 08:22:59 +0100
+Subject: [PATCH v2] ARM: dts: mx27: Fix the AIPI bus for FEC
+In-Reply-To: <CAOMZO5BZnpNrS_kKiqTmzYtzW7jQOtmHN-3cGH-10rj2v66Jjw@mail.gmail.com>
+References: <1353525578-20309-1-git-send-email-fabio.estevam@freescale.com>
+ <CAOMZO5BZnpNrS_kKiqTmzYtzW7jQOtmHN-3cGH-10rj2v66Jjw@mail.gmail.com>
+Message-ID: <20121128072259.GM10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 November 2012 12:16 PM, Igor Grinberg wrote:
-> On 11/28/12 08:28, Santosh Shilimkar wrote:
->> On Wednesday 28 November 2012 07:45 AM, Jon Hunter wrote:
->>> When compiling the kernel with configuration options ...
->>>
->>>    # CONFIG_ARCH_OMAP2 is not set
->>>    # CONFIG_ARCH_OMAP3 is not set
->>>    # CONFIG_ARCH_OMAP4 is not set
->>>    # CONFIG_SOC_OMAP5 is not set
->>>    CONFIG_SOC_AM33XX=y
->>>
->>>    ... the following build warning is seen.
->>>
->>>     CC      arch/arm/mach-omap2/timer.o
->>>     arch/arm/mach-omap2/timer.c:395:19: warning: ?omap2_sync32k_clocksource_init?
->>>         defined but not used [-Wunused-function]
->>>
->>> This issue was introduced by commit 6f80b3b (ARM: OMAP2+: timer: remove
->>> CONFIG_OMAP_32K_TIMER) where the omap2_sync32k_clocksource_init() is no
->>> longer referenced by the timer initialisation function for the AM335x
->>> device as it has no 32k-sync timer.
->>>
->>> Fix this by only including the omap2_sync32k_clocksource_init() function
->>> if either OMAP2, OMAP3, OMAP4 or OMAP5 devices are enabled.
->>>
->>> Cc: Igor Grinberg <grinberg@compulab.co.il>
->>>
->>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->>> ---
->>>    arch/arm/mach-omap2/timer.c |    3 +++
->>>    1 file changed, 3 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
->>> index eb96712..085c7e7 100644
->>> --- a/arch/arm/mach-omap2/timer.c
->>> +++ b/arch/arm/mach-omap2/timer.c
->>> @@ -386,6 +386,8 @@ static u32 notrace dmtimer_read_sched_clock(void)
->>>        return 0;
->>>    }
->>>
->>> +#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3) || \
->>> +    defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
->> #ifndef CONFIG_SOC_AM33XX ?
->>
->> #ifdef things are really ugly and needs constant patching and
->> hence something like CONFIG_HAS_32K kind of feature flags are
->> better. But that will undo certain part of f80b3b
->> (ARM: OMAP2+: timer: remove  CONFIG_OMAP_32K_TIMER).
->
-> Agreed on ugliness of ifdefs.
-> What about adding __maybe_unused to the function signature?
-> That will cover any future SoC also w/o the need to extend the ifdefs.
->
-Sounds good to me.
+On Tue, Nov 27, 2012 at 02:28:41PM -0200, Fabio Estevam wrote:
+> Hi Sascha,
+> 
+> On Wed, Nov 21, 2012 at 5:19 PM, Fabio Estevam
+> <fabio.estevam@freescale.com> wrote:
+> > FEC controller is connected to AIPI2 bus.
+> >
+> > Also fix the AIPI1 address range.
+> >
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > ---
+> > Changes since v1:
+> > - Remove ethernet from aipi1 bus on phytec board.
+> 
+> This one is a bug fix. Could this be applied?
 
-Regards
-Santosh
+Just did that.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
