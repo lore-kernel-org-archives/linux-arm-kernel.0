@@ -1,119 +1,29 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 28 Nov 2012 11:39:56 +0530
-Subject: [PATCH 1/3] ARM: OMAP2+: Fix realtime_counter_init warning in
- timer.c
-In-Reply-To: <1354068915-3378-2-git-send-email-jon-hunter@ti.com>
-References: <1354068915-3378-1-git-send-email-jon-hunter@ti.com>
- <1354068915-3378-2-git-send-email-jon-hunter@ti.com>
-Message-ID: <50B5AAB4.9010103@ti.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 28 Nov 2012 17:12:07 +1100
+Subject: linux-next: manual merge of the clk tree with the arm-soc tree
+Message-ID: <20121128171207.e8e19e40f2c43104951d389a@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 November 2012 07:45 AM, Jon Hunter wrote:
-> In commit fa6d79d (ARM: OMAP: Add initialisation for the real-time
-> counter), the function realtime_counter_init() was added. However, if
-> the kernel configuration option CONFIG_SOC_OMAP5 is not selected then
-> the following compiler warning is observed.
->
->    CC      arch/arm/mach-omap2/timer.o
->    arch/arm/mach-omap2/timer.c:489:20: warning: ?realtime_counter_init?
->    defined but not used [-Wunused-function]
->
-> Commit fa6d79d also introduced the kernel configuration option
-> CONFIG_SOC_HAS_REALTIME_COUNTER. If this option is not selected then the
-> a stub function for realtime_counter_init() is defined.
->
-> The option CONFIG_SOC_HAS_REALTIME_COUNTER and stub function are not
-> really needed because ...
->
-> 1. For non-OMAP5 devices, there is no realtime counter and so
->     realtime_counter_init() function is not used.
-> 2. For OMAP5 devices, CONFIG_SOC_HAS_REALTIME_COUNTER is always selected
->     and cannot be disabled, so the stub function for realtime_counter_init()
->     is never used.
->
-> Fix this warning by removing the kernel configuration option
-> CONFIG_SOC_HAS_REALTIME_COUNTER and stub function, and only include
-> the function realtime_counter_init() if CONFIG_SOC_OMAP5 is selected.
->
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->
-> Reported-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
-The #ifdef was avoided because the real-time counter can be used on 
-other future SOCs. And the those SOCs just select
-SOC_HAS_REALTIME_COUNTER. And that stub was added because OMAP5 can
-work without real-time counter configuration enabled using 32K counter.
-But since we are any way have that SOC_HAS_REALTIME_COUNTER always
-set for SOC which wants to use it, we can actually remove the stub
-and hence avoid the warning. Let me know if below patch is ok
-with you ? attached the same for mailer issues
+Hi Mike,
 
- From e000aa13e47e29fbe3473bfd0277cb057c3160cc Mon Sep 17 00:00:00 2001
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Wed, 28 Nov 2012 11:28:57 +0530
-Subject: [PATCH] ARM: OMAP2+: Fix realtime_counter_init warning in timer.c
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
+Today's linux-next merge of the clk tree got a conflict in
+arch/arm/mach-ux500/cpu-db8500.c between commit e13316d60658 ("ARM:
+ux500: Rename dbx500 cpufreq code to be more generic") from the arm-soc
+tree and commit 50545e1d237b ("ARM: ux500: Remove cpufreq platform
+device") from the clk tree.
 
-In commit fa6d79d (ARM: OMAP: Add initialisation for the real-time
-counter), the function realtime_counter_init() was added. However, if
-the kernel configuration option CONFIG_SOC_OMAP5 is not selected then
-the following compiler warning is observed.
+I fixed it up (I used the clk tree version since that removed the code
+that the arm-soc tree version modified) and can carry the fix as
+necessary (no action is required).
 
-     CC      arch/arm/mach-omap2/timer.o
-     arch/arm/mach-omap2/timer.c:489:20: warning: ?realtime_counter_init?
-     defined but not used [-Wunused-function]
-
-It is because of the stub init function which was added for the cases
-where realtime_counter_init() is called with 
-!CONFIG_SOC_HAS_REALTIME_COUNTER.
-This is actually not necessary since the SOC which need this feature
-will explicitly select the configuration.
-
-So just drop the unused stub to avoid the build warning.
-
-Patch is made after seeing Jon's patch which was wrapping the
-real-time counter code under needed SOC #ifdef
-
-Cc: Jon Hunter <jon-hunter@ti.com>
-
-Reported-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
-  arch/arm/mach-omap2/timer.c |    3 ---
-  1 file changed, 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 69e4663..79d8e6b 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -428,9 +428,6 @@ static void __init realtime_counter_init(void)
-
-  	iounmap(base);
-  }
--#else
--static inline void __init realtime_counter_init(void)
--{}
-  #endif
-
-  #define OMAP_SYS_TIMER_INIT(name, clkev_nr, clkev_src,			\
 -- 
-1.7.9.5
-
-
-
-
-
-
-
-
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0001-ARM-OMAP2-Fix-realtime_counter_init-warning-in-timer.patch
-Type: text/x-patch
-Size: 1797 bytes
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121128/18a565d1/attachment-0001.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121128/f9fffd51/attachment.sig>
