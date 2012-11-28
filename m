@@ -1,48 +1,104 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 28 Nov 2012 12:36:04 +0000
-Subject: vexpress compilation error in next-20121127
-In-Reply-To: <50B56601.5010305@broadcom.com>
-References: <50B56601.5010305@broadcom.com>
-Message-ID: <1354106164.2987.21.camel@hornet>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 28 Nov 2012 12:47:43 +0000
+Subject: [PATCH v4 02/13] ARM: KVM: Keep track of currently running vcpus
+In-Reply-To: <20121110154430.3061.64584.stgit@chazy-air>
+References: <20121110154358.3061.16338.stgit@chazy-air>
+ <20121110154430.3061.64584.stgit@chazy-air>
+Message-ID: <20121128124743.GD21671@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-11-28 at 01:16 +0000, Markus Mayer wrote:
-> Hi Pawel,
+Just a bunch of typos in this one :)
+
+On Sat, Nov 10, 2012 at 03:44:30PM +0000, Christoffer Dall wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> There seems to be an issue compiling vexpress at this point. The problem 
-> being that vexpress' makefile references reset.o, but there's no reset.c 
-> in arch/arm/mach-vexpress.
+> When an interrupt occurs for the guest, it is sometimes necessary
+> to find out which vcpu was running at that point.
 > 
-> [...]
->    CC      arch/arm/mach-bcm/board_bcm.o
->    LD      arch/arm/mach-bcm/built-in.o
->    CC      arch/arm/mach-vexpress/v2m.o
-> make[1]: *** No rule to make target `arch/arm/mach-vexpress/reset.o', 
-> needed by `arch/arm/mach-vexpress/built-in.o'.  Stop.
-> make: *** [arch/arm/mach-vexpress] Error 2
+> Keep track of which vcpu is being tun in kvm_arch_vcpu_ioctl_run(),
+
+run
+
+> and allow the data to be retrived using either:
+
+retrieved
+
+> - kvm_arm_get_running_vcpu(): returns the vcpu running at this point
+>   on the current CPU. Can only be used in a non-preemptable context.
+
+preemptible
+
+> - kvm_arm_get_running_vcpus(): returns the per-CPU variable holding
+>   the the running vcpus, useable for per-CPU interrupts.
+
+-the
+usable
+
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+> ---
+>  arch/arm/include/asm/kvm_host.h |   10 ++++++++++
+>  arch/arm/kvm/arm.c              |   30 ++++++++++++++++++++++++++++++
+>  2 files changed, 40 insertions(+)
 > 
-> The commit in question seems to be this:
-> 
-> http://git.kernel.org/?p=linux/kernel/git/arm/arm-soc.git;a=commitdiff;h=38669e045dbf8f62a008898a7fb1e93975b3817c
-> 
-> It adds the reference to reset.o to the makefile, but doesn't add 
-> reset.c itself. That doesn't seem right -- or did I overlook anything 
-> obvious?
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index e7fc249..e66cd56 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -154,4 +154,14 @@ static inline int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
+>  {
+>  	return 0;
+>  }
+> +
+> +struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+> +struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
 
-That's strange... The reset.c comes from the vexpress/drivers branch,
-which seems to be merged correctly in the arm-soc:
+DECLARE_PER_CPU?
 
-http://git.kernel.org/?p=linux/kernel/git/arm/arm-soc.git;a=tree;f=arch/arm/mach-vexpress;hb=refs/heads/for-next
+> +int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
+> +unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
+> +struct kvm_one_reg;
+> +int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
+> +int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
+> +
+>  #endif /* __ARM_KVM_HOST_H__ */
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 2cdc07b..60b119a 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -53,11 +53,38 @@ static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
+>  static struct vfp_hard_struct __percpu *kvm_host_vfp_state;
+>  static unsigned long hyp_default_vectors;
+>  
+> +/* Per-CPU variable containing the currently running vcpu. */
+> +static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
+> +
+>  /* The VMID used in the VTTBR */
+>  static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
+>  static u8 kvm_next_vmid;
+>  static DEFINE_SPINLOCK(kvm_vmid_lock);
+>  
+> +static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+> +{
+> +	BUG_ON(preemptible());
+> +	__get_cpu_var(kvm_arm_running_vcpu) = vcpu;
+> +}
+> +
+> +/**
+> + * kvm_arm_get_running_vcpu - get the vcpu running on the current CPU.
+> + * Must be called from non-preemptible context
+> + */
+> +struct kvm_vcpu *kvm_arm_get_running_vcpu(void)
+> +{
+> +	BUG_ON(preemptible());
+> +	return __get_cpu_var(kvm_arm_running_vcpu);
+> +}
+> +
+> +/**
+> + * kvm_arm_get_running_vcpus - get the per-CPU array on currently running vcpus.
+> + */
 
-And it's there in the linux-next head:
+s/on/of/ ?
 
-https://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=tree;f=arch/arm/mach-vexpress
-
-Also the next-20121127 looks good for me:
-
-https://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=tree;f=arch/arm/mach-vexpress;h=47f9de5972efaa719c35bb9dce177fbd2954647c;hb=ce2931ab5e448a93fee55d9d82de9f5e754ff6f7
-
-Are you sure you've checked out the correct tag?
-
-Pawe?
+Will
