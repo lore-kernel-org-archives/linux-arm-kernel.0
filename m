@@ -1,46 +1,117 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 28 Nov 2012 20:34:36 -0800
-Subject: [PATCH 6/6 v6] cpufreq, highbank: add support for highbank cpufreq
-In-Reply-To: <20121129015133.GD28170@S2100-06.ap.freescale.net>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1354046672-7392-1-git-send-email-mark.langsdorf@calxeda.com>
- <1354046672-7392-7-git-send-email-mark.langsdorf@calxeda.com>
- <20121128023240.GA28170@S2100-06.ap.freescale.net>
- <50B60E9C.9000405@calxeda.com>
- <20121128145759.GB28170@S2100-06.ap.freescale.net>
- <20121128151741.GC28170@S2100-06.ap.freescale.net>
- <20121128160115.21126.3841@nucleus>
- <20121129015133.GD28170@S2100-06.ap.freescale.net>
-Message-ID: <20121129043436.21126.714@nucleus>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 29 Nov 2012 16:03:09 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the driver-core tree
+Message-ID: <20121129160309.7dc352f433d39f1bde0018a8@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Shawn Guo (2012-11-28 17:51:36)
-> > The notifiers in the clk framework might be a better place for this than
-> > just simply hacking the logic into the .set_rate callback.
-> 
-> Ah, right.  How did I forget about that nice piece?
-> 
-> > I haven't looked at the definition of hb_voltage_change but does the
-> > call graph make any clk api calls?  Are you talking over i2c to a
-> > regulator?  If so then you'll probably hit the same reentrancy problem I
-> > hit when trying to make a general solution.
-> 
-> So, how is your "reentrancy in the common clk framework" series[1]
-> going on?  Haven't seen any update since August.
-> 
+Hi all,
 
-I've begun to look at a dvfs api that builds on top of the clock
-framework, as opposed to using clk_set_rate as the dvfs api itself.
-This eliminates the need for reentrancy, at least for the dvfs case.
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/leds/leds-ns2.c between commit 98ea1ea20cb7 ("leds: remove use of
+__devinit") from the driver-core tree and commit 72052fcc1026 ("leds:
+leds-ns2: add device tree binding") from the arm-soc tree.
 
-I'll post more when I have it.  Honestly the reentrancy stuff was just
-too ugly.  I might try again some day but for now I'm thinking a less
-radical approach deserves consideration.
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-Thanks,
-Mike
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-> Shawn
-> 
-> [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/182198
+diff --cc drivers/leds/leds-ns2.c
+index bc6a0db,d64cc22..0000000
+--- a/drivers/leds/leds-ns2.c
++++ b/drivers/leds/leds-ns2.c
+@@@ -247,9 -260,67 +248,65 @@@ static void delete_ns2_led(struct ns2_l
+  {
+  	device_remove_file(led_dat->cdev.dev, &dev_attr_sata);
+  	led_classdev_unregister(&led_dat->cdev);
+ -	gpio_free(led_dat->cmd);
+ -	gpio_free(led_dat->slow);
+  }
+  
++ #ifdef CONFIG_OF_GPIO
++ /*
++  * Translate OpenFirmware node properties into platform_data.
++  */
+ -static int __devinit
+++static int
++ ns2_leds_get_of_pdata(struct device *dev, struct ns2_led_platform_data *pdata)
++ {
++ 	struct device_node *np = dev->of_node;
++ 	struct device_node *child;
++ 	struct ns2_led *leds;
++ 	int num_leds = 0;
++ 	int i = 0;
++ 
++ 	num_leds = of_get_child_count(np);
++ 	if (!num_leds)
++ 		return -ENODEV;
++ 
++ 	leds = devm_kzalloc(dev, num_leds * sizeof(struct ns2_led),
++ 			    GFP_KERNEL);
++ 	if (!leds)
++ 		return -ENOMEM;
++ 
++ 	for_each_child_of_node(np, child) {
++ 		const char *string;
++ 		int ret;
++ 
++ 		ret = of_get_named_gpio(child, "cmd-gpio", 0);
++ 		if (ret < 0)
++ 			return ret;
++ 		leds[i].cmd = ret;
++ 		ret = of_get_named_gpio(child, "slow-gpio", 0);
++ 		if (ret < 0)
++ 			return ret;
++ 		leds[i].slow = ret;
++ 		ret = of_property_read_string(child, "label", &string);
++ 		leds[i].name = (ret == 0) ? string : child->name;
++ 		ret = of_property_read_string(child, "linux,default-trigger",
++ 					      &string);
++ 		if (ret == 0)
++ 			leds[i].default_trigger = string;
++ 
++ 		i++;
++ 	}
++ 
++ 	pdata->leds = leds;
++ 	pdata->num_leds = num_leds;
++ 
++ 	return 0;
++ }
++ 
++ static const struct of_device_id of_ns2_leds_match[] = {
++ 	{ .compatible = "lacie,ns2-leds", },
++ 	{},
++ };
++ #endif /* CONFIG_OF_GPIO */
++ 
+ -static int __devinit ns2_led_probe(struct platform_device *pdev)
+ +static int ns2_led_probe(struct platform_device *pdev)
+  {
+  	struct ns2_led_platform_data *pdata = pdev->dev.platform_data;
+  	struct ns2_led_data *leds_data;
+@@@ -296,10 -381,11 +367,11 @@@ static int ns2_led_remove(struct platfo
+  
+  static struct platform_driver ns2_led_driver = {
+  	.probe		= ns2_led_probe,
+ -	.remove		= __devexit_p(ns2_led_remove),
+ +	.remove		= ns2_led_remove,
+  	.driver		= {
+- 		.name	= "leds-ns2",
+- 		.owner	= THIS_MODULE,
++ 		.name		= "leds-ns2",
++ 		.owner		= THIS_MODULE,
++ 		.of_match_table	= of_match_ptr(of_ns2_leds_match),
+  	},
+  };
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121129/3d6430ed/attachment.sig>
