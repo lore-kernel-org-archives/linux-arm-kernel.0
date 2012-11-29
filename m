@@ -1,44 +1,33 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 29 Nov 2012 12:00:43 -0600
-Subject: [PATCH v6 1/5] ARM: OMAP: gpmc: don't create devices from initcall
- on DT
-In-Reply-To: <1354204892-22762-2-git-send-email-zonque@gmail.com>
-References: <1354204892-22762-1-git-send-email-zonque@gmail.com>
- <1354204892-22762-2-git-send-email-zonque@gmail.com>
-Message-ID: <50B7A2CB.4020407@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 29 Nov 2012 11:25:02 -0700
+Subject: [PATCH 2/2] ARM: tegra: moving stuff away from mach/clk.h
+In-Reply-To: <50B6FCE5.7080003@nvidia.com>
+References: <1353999553-5196-1-git-send-email-sivaramn@nvidia.com>
+ <1353999553-5196-2-git-send-email-sivaramn@nvidia.com>
+ <50B6FCE5.7080003@nvidia.com>
+Message-ID: <50B7A87E.5070302@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 11/29/2012 10:01 AM, Daniel Mack wrote:
-> On DT driven boards, the gpmc node will match the driver. Hence, there's
-> no need to do that unconditionally from the initcall.
+On 11/28/2012 11:12 PM, Prashant Gaikwad wrote:
+> On Tuesday 27 November 2012 12:29 PM, Sivaram Nair wrote:
+>> This patch moves some stuff away from mach/clk.h to other mach-tegra
+>> files. This is part of the efforts to get rid of mach/clk.h which in
+>> turn will help to enable single zImage.
+>>
+>> Signed-off-by: Sivaram Nair <sivaramn@nvidia.com>
+>> ---
+>>   arch/arm/mach-tegra/clock.c            |    1 +
+>>   arch/arm/mach-tegra/clock.h            |   12 ++++++++++--
+>>   arch/arm/mach-tegra/include/mach/clk.h |   11 -----------
+>>   3 files changed, 11 insertions(+), 13 deletions(-)
 > 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> ---
->  arch/arm/mach-omap2/gpmc.c | 7 +++++++
->  1 file changed, 7 insertions(+)
+> This patch will not add any real value since I have removed clk_cfg_ex
+> functionality in clock code rework.
+> It's just that I will have to rebase my changes on this.
 > 
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index 60f1cce..1dcb30c 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -844,6 +844,13 @@ static int __init omap_gpmc_init(void)
->  	struct platform_device *pdev;
->  	char *oh_name = "gpmc";
->  
-> +	/*
-> +	 * if the board boots up with a populated DT, do not
-> +	 * manually add the device from this initcall
-> +	 */
-> +	if (of_have_populated_dt())
-> +		return -ENODEV;
-> +
->  	oh = omap_hwmod_lookup(oh_name);
->  	if (!oh) {
->  		pr_err("Could not look up %s\n", oh_name);
+> Reviewed-by: Prashant Gaikwad <pgaikwad@nvidia.com>
 
-Acked-by: Jon Hunter <jon-hunter@ti.com>
-
-Thanks
-Jon
+In that case, I may as well not apply patch 2/2 at all, and I'll just
+take your clock code cleanup instead. I assume that will be posted for
+inclusion into 3.9?
