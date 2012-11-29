@@ -1,68 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Nov 2012 21:45:05 +0000
-Subject: Branches next/soc and for-next
-In-Reply-To: <50B7BF41.7060807@broadcom.com>
-References: <50B7BF41.7060807@broadcom.com>
-Message-ID: <201211292145.05481.arnd@arndb.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 29 Nov 2012 20:27:12 +0000
+Subject: [PATCH v4] Introduce irqchip infrastructure
+In-Reply-To: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1353448867-15008-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20121129202712.26D4B3E0912@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 November 2012, Markus Mayer wrote:
+On Tue, 20 Nov 2012 23:00:51 +0100, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+> Hello,
 > 
-> Hi Arnd and Olof,
+> Here is a set of patches that introduces a small irqchip
+> infrastructure that allows the registration of irqchip drivers without
+> having each of those drivers to expose a public API and header in
+> include/linux/irqchip/, and moves a number of existing irqchip
+> controller to this infrastructure.
 > 
-> Following a short discussion with Pawel regarding a build breakage in 
-> next/soc (see 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/thread.html#135208), 
-> I would like to ask you for some clarification as to the differences 
-> between the branches next/soc and for-next and what that means for 
-> development.
-> 
-> If I understand correctly, next/soc is being used to integrate SoC work 
-> from various board- or vendor-specific branches. for-next, in turn, 
-> integrates next/soc with driver branches and other non-SoC related 
-> branches. Is this somewhat accurate? 
+> This new version (detailed changelog below) provides a number of
+> improvements: usage of a special link section to avoid the central
+> registration in irqchip.{c,h} of all irqchip drivers, and addition of
+> the GIC, VIC and Versatile FPGA IRQ drivers move, thanks to Rob
+> Herring and Linus Walleij.
 
-Yes, this is exactly correct.
+Hey Thomas,
 
-> -- What happens to code in 
-> for-next? Is that what eventually gets pulled into mainline?
+This looks pretty darn sensible. Good job.
 
-The for-next branch contains a lot of merges between all the other next/*
-branches. The individual branches get sent in the next merge window,
-but the for-next branch does not. Linus does all the merges himself.
- 
-> As I mentioned in my discussion with Pawel, next/soc currently doesn't 
-> build for vexpress and, since vexpress is multiplatform-enabled, no 
-> other multiplatform target will build, either. The reason for this, 
-> Pawel explained, was that he was asked to split his patch, so it could 
-> be applied to different branches, depending on the subsystem area his 
-> changes were made in. As a result, a file needed for compilation 
-> (arch/mach-vexpress/reset.c) is missing in next/soc.
+I've not reviewed deeply, but you can add my:
 
-This is a mistake that should not have happened.
+Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
 
-> How are such build errors generally addressed? How long does it usually 
-> take?
-
-If you have a fix, then we will usually integrate it within days. The
-problem is that we normally don't test the individual branches and
-to some degree trust that the branches we get are ok.
-
-The normal way to address this problem is by documenting the dependencies
-between branches that get pulled into the arm-soc tree.
-
-> And, lastly, which branch would you recommend to use for 
-> development to generate patches relative to arm-soc?
-
-You don't. All branches that get submitted into arm-soc should be
-working by themselves and just be based on a -rc release from Linus.
-When that is not possible, e.g. when you have dependencies like
-the one you mention, you can base one branch you send on another one
-that is already part of arm-soc. Don't base on a complete next/*
-branch though, but rather take the minimal set of dependencies.
-
-Also, try not to rebase your branch before submitting it, to make
-sure that the testing you did is still valid.
-
-	Arnd
+g.
