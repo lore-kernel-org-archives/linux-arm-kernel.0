@@ -1,31 +1,51 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 29 Nov 2012 10:35:01 +0200
-Subject: [GIT PULL] remoteproc: a single fix for 3.7
-Message-ID: <CAK=WgbZjufLpFevD2BJbceRGS4HQqK9fas=yakDDZ2uUcdrU-w@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 29 Nov 2012 10:42:18 +0200
+Subject: [PATCH] video: da8xx-fb: clk_get on connection id fck
+In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3E9FB8D9@DBDE01.ent.ti.com>
+References: <1353415261-30080-1-git-send-email-prakash.pm@ti.com>
+ <50AB7F7E.1070400@ti.com>
+ <A73F36158E33644199EB82C5EC81C7BC3E9FB8D9@DBDE01.ent.ti.com>
+Message-ID: <50B71FEA.1070503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 2012-11-23 06:33, Manjunathappa, Prakash wrote:
+> Hi Tomi,
+> 
+> On Tue, Nov 20, 2012 at 18:32:54, Nori, Sekhar wrote:
+>> On 11/20/2012 6:11 PM, Manjunathappa wrote:
+>>> do clk_get on connection id "fck" to support OMAP based
+>>> platforms having multiple clocks for module. Without this
+>>> driver change clk_get fails on am335x.
+>>>
+>>> This patch is based on the discussion in community
+>>> http://marc.info/?l=linux-kernel&m=135166018907827&w=2
+>>>
+>>> Signed-off-by: Manjunathappa <prakash.pm@ti.com>
+>>> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+>>
+>> For the mach-davinci changes:
+>>
+>> Acked-by: Sekhar Nori <nsekhar@ti.com>
+>>
+>> Florian,
+>>
+>> I assume you will want to take this through your tree?
+>>
+> 
+> Could you please pull in this?
 
-The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
+Merged this and the "da8xx-fb: LCDC driver cleanup" to:
 
-  Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
+git://gitorious.org/linux-omap-dss2/linux.git for-next
 
-are available in the git repository at:
+ Tomi
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
-tags/rproc-3.7-fix
 
-for you to fetch changes up to dab55bbafdb491ce2c3f2d7136e54101e948b911:
-
-  remoteproc: fix error path of ->find_vqs (2012-11-29 10:05:09 +0200)
-
-----------------------------------------------------------------
-A single remoteproc fix for an error path issue reported by Ido Yariv.
-
-----------------------------------------------------------------
-Ohad Ben-Cohen (1):
-      remoteproc: fix error path of ->find_vqs
-
- drivers/remoteproc/remoteproc_virtio.c | 18 ++++++++++++------
- 1 file changed, 12 insertions(+), 6 deletions(-)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 899 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121129/affe6c0b/attachment.sig>
