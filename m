@@ -1,52 +1,51 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 29 Nov 2012 14:02:45 +0100 (CET)
-Subject: [PATCH] ARM: mx25_3ds: Add camera support
-In-Reply-To: <CAOMZO5C0RSYfMWY1qHmuVJ00+48hvZQJrKcAom_0AE9qYmxOHA@mail.gmail.com>
-References: <1354022509-20505-1-git-send-email-fabio.estevam@freescale.com>
- <20121128060543.GA31335@sapphire.tkos.co.il>
- <CAOMZO5C0RSYfMWY1qHmuVJ00+48hvZQJrKcAom_0AE9qYmxOHA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1211291402260.11210@axis700.grange>
+From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
+Date: Thu, 29 Nov 2012 14:09:51 +0100
+Subject: [PATCH] backlight: corgi_lcd: Fix WARN_ON() when calling
+ corgi_bl_set_intensity.
+In-Reply-To: <001501cdcdf2$b3f8f730$1beae590$%han@samsung.com>
+References: <1354139201-12834-1-git-send-email-dromede@gmail.com>
+ <001501cdcdf2$b3f8f730$1beae590$%han@samsung.com>
+Message-ID: <CAHod+Gd3UU7NdRLAAbsX6TUugnjKBwUsDy7yBQzyykuf5GHMVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Nov 2012, Fabio Estevam wrote:
+On Thu, Nov 29, 2012 at 6:30 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+> On Thursday, November 29, 2012 6:47 AM, Marko Katic wrote
+>> Subject: [PATCH] backlight: corgi_lcd: Fix WARN_ON() when calling corgi_bl_set_intensity.
+>
+> CC'ed Andrew Morton.
+>
+>
+> Hi Marko Katic,
+> The commit subject and commit message are not clear.
+>
+> How about using subject as below?
+> backlight: corgi_lcd: use gpio_set_value_cansleep()
+>
+> In addition, 'Fix WARN_ON() when calling corgi_bl_set_intensity'
+> would be the reason why you submit this patch.
+> Please make the commit message more detail.
+>
+> Also, I have a question on gpio driver.
+> In order to trigger WARN_ON(chip->can_sleep), 'can_sleep' should be
+> set as 1. However, I cannot find 'can_sleep = 1' in the PXA gpio driver.
+> What gpio driver do you use to test corgi_lcd driver?
+>
+>
+> Best regards,
+> Jingoo Han
+>
 
-> Hi Baruch,
-> 
-> On Wed, Nov 28, 2012 at 4:05 AM, Baruch Siach <baruch@tkos.co.il> wrote:
-> 
-> > Good to see some activity on i.MX25 camera support. Did you test video capture
-> > with a latest kernel?  You have surely noticed that i.MX25 support in the
-> > mx2_camera driver is marked BROKEN since 087c78a8.
-> 
-> I basically checked that mx2_camera can be probed:
-> 
-> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
-> mx2-camera imx25-camera.0: Camera driver attached to camera 0
-> ov2640 0-0030: ov2640 Product ID 26:42 Manufacturer ID 7f:a2
-> i2c i2c-0: OV2640 Probed
-> mx2-camera imx25-camera.0: Camera driver detached from camera 0
-> mx2-camera imx25-camera.0: MX2 Camera (CSI) driver probed, clock
-> frequency: 22166666
-> 
-> Tried a Gstreamer pipeline but it is failing, but this Gstreamer issue
-> is not mx25 related as I saw the same issue with mx27/mx31.
-
-Can you try mplayer?
-
-Thanks
-Guennadi
-
-> Do you still have access to a mx25pdk?
-> 
-> I will try v4l-utils when I get a chance.
-> 
-> Regards,
-> 
-> Fabio Estevam
-> 
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Well, the commit message was short because i thought it was a quick
+and obvious fix.
+But it doesn't really matter now since you raise a valid point with
+your question.
+There are two classes of devices that use this lcd, corgi and spitz
+(both are in mach-pxa tree). Both have
+several variants. All of them use the SCOOP chip for backlight control
+(arm/common/scoop.c) except akita which
+uses the max7310 gpio expander for backlight control. The SCOOP chip
+driver doesn't set can_sleep but the
+max7310 does. So this patch is probably only valid for akita machines.
+I'll test this further and post a revised patch
+soon.
