@@ -1,74 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Nov 2012 14:32:24 +0000
-Subject: [GIT PULL] ARM: ixp4xx bug fixes
-In-Reply-To: <201211291424.25711.arnd@arndb.de>
-References: <201211291424.25711.arnd@arndb.de>
-Message-ID: <201211291432.24480.arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 29 Nov 2012 17:17:30 +0000 (UTC)
+Subject: [PATCH 1/3] ARM: OMAP4: Update timer clock aliases (fwd)
+Message-ID: <alpine.DEB.2.00.1211291713530.20529@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
 
-These are the bug fixes originally sent as part of a longer patch series by
-Krzysztof Halasa. I've already queued them up for 3.8 now, since I think it's
-too much churn this late in the cycle. On the other hand they have been
-in Linux-next for ages and some of them look like they fix serious problems
-in ixp4xx, so if you don't mind messing up the diffstat for the post-rc7
-patches, you can also decide to pick them up.
+Hi Tony,
 
-	Arnd
+well it seems that I did miss at least one important clock patch for v3.8.  
+This appears to be needed to avoid failures when attempting to set parent 
+clocks for GPTIMER5-7 on OMAP4.  Could you consider this one for late 
+v3.8?  If you prefer, I can send a pull request for it.  Otherwise, will 
+send it as part of the v3.8-rc1 integration fixes.
 
+thanks,
+
+
+- Paul
+
+---------- Forwarded message ----------
+Date: Thu, 29 Nov 2012 11:02:17 -0600
+From: Jon Hunter <jon-hunter@ti.com>
+To: Paul Walmsley <paul@pwsan.com>
+Cc: linux-omap <linux-omap@vger.kernel.org>,
+    linux-arm <linux-arm-kernel@lists.infradead.org>
+Subject: Re: [PATCH 1/3] ARM: OMAP4: Update timer clock aliases
+
+
+On 11/29/2012 04:53 AM, Paul Walmsley wrote:
+> Hi Jon,
+> 
+> On Wed, 7 Nov 2012, Jon Hunter wrote:
+> 
+>> Commit "ARM: dts: OMAP4: Update timer addresses" updated the device-tree
+>> names of the OMAP4 timers 5-7 because the default address for the timers
+>> was changed from the L3 address to the MPU private address. When booting
+>> with device-tree, this introduces a regression when attempting to set
+>> the parent clock of timers 5-7 to the sys_clk_div_ck. Therefore, update
+>> the clock aliases for timer 5-7 to reflect the updated device-tree name
+>> for the timers.
+> 
+> Reviewing my E-mail inbox, just saw that this one is marked as being 
+> needed for v3.8.  Is that still the case?  If so, we should ask Tony to 
+> take an updated version of this patch, given the recent CCF conversion.
+
+Yes this is still needed for v3.8.
+
+> Following is the updated patch.
+
+Thanks, looks good to me.
+
+Cheers
+Jon
+
+
+From: Jon Hunter <jon-hunter@ti.com>
+Date: Thu, 29 Nov 2012 03:47:46 -0700
+Subject: [PATCH] ARM: OMAP4: Update timer clock aliases
+
+Commit "ARM: dts: OMAP4: Update timer addresses" updated the device-tree
+names of the OMAP4 timers 5-7 because the default address for the timers
+was changed from the L3 address to the MPU private address. When booting
+with device-tree, this introduces a regression when attempting to set
+the parent clock of timers 5-7 to the sys_clk_div_ck. Therefore, update
+the clock aliases for timer 5-7 to reflect the updated device-tree name
+for the timers.
+
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+[paul at pwsan.com: updated to apply after the CCF conversion]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
-The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
+ arch/arm/mach-omap2/cclock44xx_data.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-  Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/ixp4xx-fixes
-
-for you to fetch changes up to 0d2c9f0517e915ce03a04e91d3207827e0d274a8:
-
-  IXP4xx: use __iomem for MMIO (2012-11-22 03:36:45 +0000)
-
-----------------------------------------------------------------
-ARM: ixp4xx bug fixes
-
-These were originally prepared by Krzysztof Halasa but not submitted
-in time for v3.7 due to some confusion about how ixp4xx patches should
-be handled. Jason Cooper thankfully offered to help out sending the
-patches upstream through arm-soc now, but given the timing, we could
-as well delay them for 3.8.
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      IXP4xx: use __iomem for MMIO
-
-Krzysztof Ha?asa (9):
-      IXP4xx: Fix Goramo MultiLink platform compilation.
-      IXP4xx: Fix off-by-one bug in Goramo MultiLink platform.
-      IXP4xx: HW pseudo-random generator is available on IXP45x/46x only.
-      IXP4xx: ixp4xx_crypto driver requires Queue Manager and NPE drivers.
-      IXP4xx: Remove time limit for PCI TRDY to enable use of slow devices.
-      WAN: Remove redundant HDLC info printed by IXP4xx HSS driver.
-      IXP4xx crypto: MOD_AES{128,192,256} already include key size.
-      IXP4xx: Always ioremap() Queue Manager MMIO region at boot.
-      IXP4xx: map CPU config registers within VMALLOC region.
-
-Tim Gardner (1):
-      ixp4xx: Declare MODULE_FIRMWARE usage
-
- arch/arm/mach-ixp4xx/common-pci.c               |    1 +
- arch/arm/mach-ixp4xx/common.c                   |   13 +++++--------
- arch/arm/mach-ixp4xx/goramo_mlr.c               |    3 ++-
- arch/arm/mach-ixp4xx/include/mach/debug-macro.S |    4 ++--
- arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h |   46 +++++++++++++++++++---------------------------
- arch/arm/mach-ixp4xx/include/mach/qmgr.h        |   12 ++++++------
- arch/arm/mach-ixp4xx/ixp4xx_npe.c               |    9 ++++++++-
- arch/arm/mach-ixp4xx/ixp4xx_qmgr.c              |   12 +-----------
- drivers/char/hw_random/Kconfig                  |    6 +++---
- drivers/char/hw_random/ixp4xx-rng.c             |    5 ++++-
- drivers/crypto/Kconfig                          |    2 +-
- drivers/crypto/ixp4xx_crypto.c                  |   12 ++++++------
- drivers/net/wan/ixp4xx_hss.c                    |    2 +-
- 13 files changed, 59 insertions(+), 68 deletions(-)
+diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
+index aa56c3e..a1f0b55 100644
+--- a/arch/arm/mach-omap2/cclock44xx_data.c
++++ b/arch/arm/mach-omap2/cclock44xx_data.c
+@@ -1935,10 +1935,10 @@ static struct omap_clk omap44xx_clks[] = {
+ 	CLK("4803e000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
+ 	CLK("48086000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
+ 	CLK("48088000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
+-	CLK("49038000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+-	CLK("4903a000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+-	CLK("4903c000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+-	CLK("4903e000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
++	CLK("40138000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
++	CLK("4013a000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
++	CLK("4013c000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
++	CLK("4013e000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+ 	CLK(NULL,	"cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
+ };
+ 
+-- 
+1.7.10.4
