@@ -1,67 +1,47 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Thu, 29 Nov 2012 18:19:27 +0100
-Subject: [PATCH] ARM: sharpsl_param: Fix hang on boot in
- sharpsl_save_param().
-In-Reply-To: <1354138524-12543-1-git-send-email-dromede@gmail.com>
-References: <1354138524-12543-1-git-send-email-dromede@gmail.com>
-Message-ID: <CAAQYJAs-4WSOx3FLNTtfPjFxVV6VkXb015qDQeZ2=RJCHdjK=w@mail.gmail.com>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Thu, 29 Nov 2012 09:20:57 -0800
+Subject: [PATCH v2] MTD: at91: atmel_nand: return bit flips for the PMECC
+ read_page()
+In-Reply-To: <50B71292.4020604@atmel.com>
+References: <1354013431-13598-1-git-send-email-josh.wu@atmel.com>
+ <50B50D81.3060401@newsguy.com> <50B51605.9040703@newsguy.com>
+ <50B71292.4020604@atmel.com>
+Message-ID: <50B79979.1090406@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2012 at 10:35 PM,  <dromede@gmail.com> wrote:
-> From: Marko Katic <dromede.gmail.com>
->
-> Devices that call sharpsl_save_param() will hang on boot due to
-> a memcpy call that uses a physical address that is no longer
-> accessible. This is caused by the following commit:
->
-> commit 72662e01088394577be4a3f14da94cf87bea2591
-> Author: Will Deacon <will.deacon@arm.com>
-> Date:   Wed Nov 23 12:03:27 2011 +0000
->
->     ARM: head.S: only include __turn_mmu_on in the initial identity mapping
->
-> I suspect that due to the abovementioned commit the mmu gets turned on earlier
-> and thus, memcpy in sharpsl_save_param() will fail.
->
-> Fix this by converting the physical address into a virtual one.
->
-> Signed-off-by: Marko Katic <dromede@gmail.com>
-> ---
->  arch/arm/common/sharpsl_param.c |    4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/common/sharpsl_param.c b/arch/arm/common/sharpsl_param.c
-> index d56c932..04555dc 100644
-> --- a/arch/arm/common/sharpsl_param.c
-> +++ b/arch/arm/common/sharpsl_param.c
-> @@ -14,6 +14,7 @@
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/string.h>
-> +#include <asm/memory.h>
->  #include <asm/mach/sharpsl_param.h>
->
->  /*
-> @@ -41,7 +42,8 @@ EXPORT_SYMBOL(sharpsl_param);
->
->  void sharpsl_save_param(void)
->  {
-> -       memcpy(&sharpsl_param, (void *)PARAM_BASE, sizeof(struct sharpsl_param_info));
-> +       void *param_start = phys_to_virt(PARAM_BASE);
-> +       memcpy(&sharpsl_param, param_start, sizeof(struct sharpsl_param_info));
->
->         if (sharpsl_param.comadj_keyword != COMADJ_MAGIC)
->                 sharpsl_param.comadj=-1;
-> --
-> 1.7.10.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On 11/28/2012 11:45 PM, Josh Wu wrote:
+> Hi, Mike
+> 
+> On 11/28/2012 3:35 AM, Mike Dunn wrote:
+>>
+>> BTW, with such a wide range for ecc strength - up to 24 bits, according to the
+>> commit message for the pmecc patch - you may want to think about setting an
+>> appropriate bitflip_threshold in the driver.  I'm not a nand expert, and I don't
+>> know much about the atmel_nand specifically, but I would think that if 23 bits
+>> are corrected on a page of size 2k (or less), maybe a return code of -EUCLEAN
+>> from mtd_read() might be appropriate.
+> 
+> After checking the nand_base.c, I saw it will set the mtd.bitflip_threshold to
+> mtd->ecc.strength during nand_scan_tail().
+> in the atmel_nand code, the ecc strength will be set correctly, that means
+> bitflip_threashold should be set up correctly by default.
+> so I think I don't need set up the the bitflip_threshold anymore if I set ecc
+> strength correctly. Am I missing any point here?
 
-With this patch Zaurus corgi/poodle/spitz can boot kernels 3.3, 3.4 and 3.6
 
-Tested-by: Andrea Adami <andrea.adami@gmail.com>
+No, you are correct; bitflip_threshold is set to ecc.strength by default if the
+driver has not assigned it a value already.  I just wondered if the default
+value is too liberal given the possibility of such high ecc strength in your
+case.  With bitflip_threshold == 24 (default for the greatest possible
+ecc.strength on atmel_nand with pmecc) mtd_read() will not return -EUCLEAN until
+24 bitflips are corrected on a page that is no greater than 2k in size, and may
+be as small as 512 bytes (if I read the code correctly).
+
+The -EUCLEAN return code is used by higher layers as an indication that a block
+may be going bad.  I don't know whether or not a block bears scrutiny when 23
+bitflips are corrected on a page.  I guess it depends on the particular flash
+device.  It was just a thought.
+
+Hope this makes sense.
+Mike
