@@ -1,41 +1,67 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 29 Nov 2012 11:03:00 -0600
-Subject: [PATCH 0/3] ARM: OMAP4: Clock fixes
-In-Reply-To: <alpine.DEB.2.00.1211291120220.20529@utopia.booyaka.com>
-References: <1352313782-21602-1-git-send-email-jon-hunter@ti.com>
- <alpine.DEB.2.00.1211291120220.20529@utopia.booyaka.com>
-Message-ID: <50B79544.8030507@ti.com>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Thu, 29 Nov 2012 18:19:27 +0100
+Subject: [PATCH] ARM: sharpsl_param: Fix hang on boot in
+ sharpsl_save_param().
+In-Reply-To: <1354138524-12543-1-git-send-email-dromede@gmail.com>
+References: <1354138524-12543-1-git-send-email-dromede@gmail.com>
+Message-ID: <CAAQYJAs-4WSOx3FLNTtfPjFxVV6VkXb015qDQeZ2=RJCHdjK=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 28, 2012 at 10:35 PM,  <dromede@gmail.com> wrote:
+> From: Marko Katic <dromede.gmail.com>
+>
+> Devices that call sharpsl_save_param() will hang on boot due to
+> a memcpy call that uses a physical address that is no longer
+> accessible. This is caused by the following commit:
+>
+> commit 72662e01088394577be4a3f14da94cf87bea2591
+> Author: Will Deacon <will.deacon@arm.com>
+> Date:   Wed Nov 23 12:03:27 2011 +0000
+>
+>     ARM: head.S: only include __turn_mmu_on in the initial identity mapping
+>
+> I suspect that due to the abovementioned commit the mmu gets turned on earlier
+> and thus, memcpy in sharpsl_save_param() will fail.
+>
+> Fix this by converting the physical address into a virtual one.
+>
+> Signed-off-by: Marko Katic <dromede@gmail.com>
+> ---
+>  arch/arm/common/sharpsl_param.c |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/common/sharpsl_param.c b/arch/arm/common/sharpsl_param.c
+> index d56c932..04555dc 100644
+> --- a/arch/arm/common/sharpsl_param.c
+> +++ b/arch/arm/common/sharpsl_param.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/string.h>
+> +#include <asm/memory.h>
+>  #include <asm/mach/sharpsl_param.h>
+>
+>  /*
+> @@ -41,7 +42,8 @@ EXPORT_SYMBOL(sharpsl_param);
+>
+>  void sharpsl_save_param(void)
+>  {
+> -       memcpy(&sharpsl_param, (void *)PARAM_BASE, sizeof(struct sharpsl_param_info));
+> +       void *param_start = phys_to_virt(PARAM_BASE);
+> +       memcpy(&sharpsl_param, param_start, sizeof(struct sharpsl_param_info));
+>
+>         if (sharpsl_param.comadj_keyword != COMADJ_MAGIC)
+>                 sharpsl_param.comadj=-1;
+> --
+> 1.7.10.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-On 11/29/2012 05:21 AM, Paul Walmsley wrote:
-> Hi Jon,
-> 
-> On Wed, 7 Nov 2012, Jon Hunter wrote:
-> 
->> Fixes included, fixing up timer clock aliases for v3.8 and working
->> around ABE DPLL issue seen with latest u-boot bootloader (v2012.10).
->>
->> Testing includes:
->> - Boot testing on OMAP3430 Beagle, OMAP4430 Panda and OMAP4460 Panda
->> - Boot tested with device-tree on OMAP4430 Panda and OMAP4460 Panda
->>   and validated that all timers are working.
->> - Suspend testing on OMAP3430 Beagle and OMAP4430 Panda (suspend not
->>   functional on OMAP4460 Panda prior to this series and so could not
->>   be tested).
->> - Core retention validated on OMAP3430 Beagle.
->>
->> Jon Hunter (3):
->>   ARM: OMAP4: Update timer clock aliases
->>   ARM: OMAP4: Enhance support for DPLLs with 4X multiplier
->>   ARM: OMAP4460: Workaround ABE DPLL failing to turn-on
-> 
-> So I'd plan to queue #2 and #3 for v3.8-rc1.  But they need to be updated 
-> after the common clock framework conversion.  Could you update those to 
-> apply on the arm-soc for-next branch?
+With this patch Zaurus corgi/poodle/spitz can boot kernels 3.3, 3.4 and 3.6
 
-Yes no problem.
-
-Cheers
-Jon
+Tested-by: Andrea Adami <andrea.adami@gmail.com>
