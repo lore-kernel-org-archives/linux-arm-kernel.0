@@ -1,40 +1,133 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 29 Nov 2012 11:11:16 -0800
-Subject: [PATCH v2] ARM: implement optimized percpu variable access
-In-Reply-To: <1354200764-23751-1-git-send-email-robherring2@gmail.com>
-References: <1354200764-23751-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20121129191115.GH5312@atomide.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Thu, 29 Nov 2012 14:47:21 -0500
+Subject: [PATCH] ARM: Factor out cpuid implementor and part number
+Message-ID: <1354218441-24866-1-git-send-email-c.dall@virtualopensystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [121129 06:55]:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Use the previously unused TPIDRPRW register to store percpu offsets.
-> TPIDRPRW is only accessible in PL1, so it can only be used in the kernel.
-> 
-> This replaces 2 loads with a mrc instruction for each percpu variable
-> access. With hackbench, the performance improvement is 1.4% on Cortex-A9
-> (highbank). Taking an average of 30 runs of "hackbench -l 1000" yields:
-> 
-> Before: 6.2191
-> After: 6.1348
-> 
-> Will Deacon reported similar delta on v6 with 11MPCore.
-> 
-> The asm "memory" constraints are needed here to ensure the percpu offset
-> gets reloaded. Testing by Will found that this would not happen in
-> __schedule() which is a bit of a special case as preemption is disabled
-> but the execution can move cores.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> ---
-> Changes in v2:
-> - Add asm "memory" constraint
-> - Only enable on v6K and v7 and avoid enabling for v6 SMP_ON_UP
+Decoding the implementor and part number of the CPU id in the CPU ID
+register is needed by KVM, so we factor it out to share the code.
 
-Thanks, seems to still boot on omap2 with omap2plus_defconfig.
-Once the other comments are sorted out:
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+---
+Applies to Will Deacon's perf/updates branch
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+ arch/arm/include/asm/cputype.h   |   26 ++++++++++++++++++++++++++
+ arch/arm/kernel/perf_event_cpu.c |   31 ++++++++++++++++---------------
+ 2 files changed, 42 insertions(+), 15 deletions(-)
+
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index cb47d28..306fb2c 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -51,6 +51,22 @@ extern unsigned int processor_id;
+ #define read_cpuid_ext(reg) 0
+ #endif
+ 
++#define IMPLEMENTOR_ARM		0x41
++#define IMPLEMENTOR_INTEL	0x69
++
++#define PART_NUMBER_ARM1136	0xB360
++#define PART_NUMBER_ARM1156	0xB560
++#define PART_NUMBER_ARM1176	0xB760
++#define PART_NUMBER_ARM11MPCORE	0xB020
++#define PART_NUMBER_CORTEX_A8	0xC080
++#define PART_NUMBER_CORTEX_A9 	0xC090
++#define PART_NUMBER_CORTEX_A5 	0xC050
++#define PART_NUMBER_CORTEX_A15	0xC0F0
++#define PART_NUMBER_CORTEX_A7	0xC070
++
++#define PART_NUMBER_XSCALE1	0x1
++#define PART_NUMBER_XSCALE2	0x2
++
+ /*
+  * The CPU ID never changes at run time, so we might as well tell the
+  * compiler that it's constant.  Use this function to read the CPU ID
+@@ -61,6 +77,16 @@ static inline unsigned int __attribute_const__ read_cpuid_id(void)
+ 	return read_cpuid(CPUID_ID);
+ }
+ 
++static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
++{
++	return (read_cpuid_id() & 0xFF000000) >> 24;
++}
++
++static inline unsigned int __attribute_const__ read_cpuid_part_number(void)
++{
++	return (read_cpuid_id() & 0xFFF0);
++}
++
+ static inline unsigned int __attribute_const__ read_cpuid_cachetype(void)
+ {
+ 	return read_cpuid(CPUID_CACHETYPE);
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index 9a4f630..fb817e1 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -202,47 +202,48 @@ static int __devinit probe_current_pmu(struct arm_pmu *pmu)
+ {
+ 	int cpu = get_cpu();
+ 	unsigned long cpuid = read_cpuid_id();
+-	unsigned long implementor = (cpuid & 0xFF000000) >> 24;
+-	unsigned long part_number = (cpuid & 0xFFF0);
++	unsigned long implementor = read_cpuid_implementor();
++	unsigned long part_number = read_cpuid_part_number();
+ 	int ret = -ENODEV;
+ 
+ 	pr_info("probing PMU on CPU %d\n", cpu);
+ 
+ 	/* ARM Ltd CPUs. */
+-	if (0x41 == implementor) {
++	if (implementor == IMPLEMENTOR_ARM) {
+ 		switch (part_number) {
+-		case 0xB360:	/* ARM1136 */
+-		case 0xB560:	/* ARM1156 */
+-		case 0xB760:	/* ARM1176 */
++		case PART_NUMBER_ARM1136:
++		case PART_NUMBER_ARM1156:
++		case PART_NUMBER_ARM1176:
+ 			ret = armv6pmu_init(pmu);
+ 			break;
+-		case 0xB020:	/* ARM11mpcore */
++		case PART_NUMBER_ARM11MPCORE:
+ 			ret = armv6mpcore_pmu_init(pmu);
+ 			break;
+-		case 0xC080:	/* Cortex-A8 */
++		case PART_NUMBER_CORTEX_A8:
+ 			ret = armv7_a8_pmu_init(pmu);
+ 			break;
+-		case 0xC090:	/* Cortex-A9 */
++		case PART_NUMBER_CORTEX_A9:
+ 			ret = armv7_a9_pmu_init(pmu);
+ 			break;
+-		case 0xC050:	/* Cortex-A5 */
++		case PART_NUMBER_CORTEX_A5:
+ 			ret = armv7_a5_pmu_init(pmu);
+ 			break;
+-		case 0xC0F0:	/* Cortex-A15 */
++		case PART_NUMBER_CORTEX_A15:
+ 			ret = armv7_a15_pmu_init(pmu);
+ 			break;
+-		case 0xC070:	/* Cortex-A7 */
++			break;
++		case PART_NUMBER_CORTEX_A7:
+ 			ret = armv7_a7_pmu_init(pmu);
+ 			break;
+ 		}
+ 	/* Intel CPUs [xscale]. */
+-	} else if (0x69 == implementor) {
++	} else if (implementor == IMPLEMENTOR_INTEL) {
+ 		part_number = (cpuid >> 13) & 0x7;
+ 		switch (part_number) {
+-		case 1:
++		case PART_NUMBER_XSCALE1:
+ 			ret = xscale1pmu_init(pmu);
+ 			break;
+-		case 2:
++		case PART_NUMBER_XSCALE2:
+ 			ret = xscale2pmu_init(pmu);
+ 			break;
+ 		}
+-- 
+1.7.9.5
