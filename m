@@ -1,108 +1,59 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 29 Nov 2012 12:59:31 +0100
-Subject: [PATCH] video: mxsfb: fix typo: 'FAILING' instead of 'FALLING'
-In-Reply-To: <1353588555-13168-2-git-send-email-LW@KARO-electronics.de>
-References: <1353588555-13168-1-git-send-email-LW@KARO-electronics.de>
- <1353588555-13168-2-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20663.20003.18426.828567@ipc1.ka-ro>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 29 Nov 2012 12:00:00 +0000
+Subject: [PATCH 3/3] Input: bu21013_ts - Add support for Device Tree
+ booting
+In-Reply-To: <20121129112058.GH32691@opensource.wolfsonmicro.com>
+References: <1354021990-16978-1-git-send-email-lee.jones@linaro.org>
+ <1354021990-16978-4-git-send-email-lee.jones@linaro.org>
+ <20121128070332.GC23378@core.coreip.homeip.net>
+ <20121128085731.GH2013@gmail.com>
+ <20121128163105.GA28698@sirena.org.uk>
+ <20121129100808.GW2013@gmail.com>
+ <20121129112058.GH32691@opensource.wolfsonmicro.com>
+Message-ID: <20121129120000.GJ2013@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 29 Nov 2012, Mark Brown wrote:
 
-adding Juergen Beisert as the driver's author to the recipient list.
-
-Lothar Wa?mann writes:
+> On Thu, Nov 29, 2012 at 10:08:08AM +0000, Lee Jones wrote:
+> > On Wed, 28 Nov 2012, Mark Brown wrote:
 > 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
->  arch/arm/mach-mxs/mach-mxs.c |    6 +++---
->  drivers/video/mxsfb.c        |    6 +++---
->  include/linux/mxsfb.h        |    2 +-
->  3 files changed, 7 insertions(+), 7 deletions(-)
+> > > The I2C subsystem guesses at a compatible string by default but it's
+> > > much better to explicitly set one as conflicts do arise from time to
+> > > time (eg, Wolfson parts are called WMxxxx but the WM prefix is also used
+> > > by at least WonderMedia).
 > 
-> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> index d61b915..6c17cb7 100644
-> --- a/arch/arm/mach-mxs/mach-mxs.c
-> +++ b/arch/arm/mach-mxs/mach-mxs.c
-> @@ -42,7 +42,7 @@ static struct fb_videomode mx23evk_video_modes[] = {
->  		.hsync_len	= 1,
->  		.vsync_len	= 1,
->  		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
-> -				  FB_SYNC_DOTCLK_FAILING_ACT,
-> +				  FB_SYNC_DOTCLK_FALLING_ACT,
->  	},
->  };
->  
-> @@ -60,7 +60,7 @@ static struct fb_videomode mx28evk_video_modes[] = {
->  		.hsync_len	= 10,
->  		.vsync_len	= 10,
->  		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
-> -				  FB_SYNC_DOTCLK_FAILING_ACT,
-> +				  FB_SYNC_DOTCLK_FALLING_ACT,
->  	},
->  };
->  
-> @@ -96,7 +96,7 @@ static struct fb_videomode apx4devkit_video_modes[] = {
->  		.vsync_len	= 3,
->  		.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT |
->  				  FB_SYNC_DATA_ENABLE_HIGH_ACT |
-> -				  FB_SYNC_DOTCLK_FAILING_ACT,
-> +				  FB_SYNC_DOTCLK_FALLING_ACT,
->  	},
->  };
->  
-> diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-> index f2a49ef..eb45d32 100644
-> --- a/drivers/video/mxsfb.c
-> +++ b/drivers/video/mxsfb.c
-> @@ -107,7 +107,7 @@
->  #define VDCTRL0_ENABLE_PRESENT		(1 << 28)
->  #define VDCTRL0_VSYNC_ACT_HIGH		(1 << 27)
->  #define VDCTRL0_HSYNC_ACT_HIGH		(1 << 26)
-> -#define VDCTRL0_DOTCLK_ACT_FAILING	(1 << 25)
-> +#define VDCTRL0_DOTCLK_ACT_FALLING	(1 << 25)
->  #define VDCTRL0_ENABLE_ACT_HIGH		(1 << 24)
->  #define VDCTRL0_VSYNC_PERIOD_UNIT	(1 << 21)
->  #define VDCTRL0_VSYNC_PULSE_WIDTH_UNIT	(1 << 20)
-> @@ -458,8 +458,8 @@ static int mxsfb_set_par(struct fb_info *fb_info)
->  		vdctrl0 |= VDCTRL0_VSYNC_ACT_HIGH;
->  	if (fb_info->var.sync & FB_SYNC_DATA_ENABLE_HIGH_ACT)
->  		vdctrl0 |= VDCTRL0_ENABLE_ACT_HIGH;
-> -	if (fb_info->var.sync & FB_SYNC_DOTCLK_FAILING_ACT)
-> -		vdctrl0 |= VDCTRL0_DOTCLK_ACT_FAILING;
-> +	if (fb_info->var.sync & FB_SYNC_DOTCLK_FALLING_ACT)
-> +		vdctrl0 |= VDCTRL0_DOTCLK_ACT_FALLING;
->  
->  	writel(vdctrl0, host->base + LCDC_VDCTRL0);
->  
-> diff --git a/include/linux/mxsfb.h b/include/linux/mxsfb.h
-> index f14943d..a9eca68 100644
-> --- a/include/linux/mxsfb.h
-> +++ b/include/linux/mxsfb.h
-> @@ -25,7 +25,7 @@
->  #define STMLCDIF_24BIT 3 /** pixel data bus to the display is of 24 bit width */
->  
->  #define FB_SYNC_DATA_ENABLE_HIGH_ACT	(1 << 6)
-> -#define FB_SYNC_DOTCLK_FAILING_ACT	(1 << 7) /* failing/negtive edge sampling */
-> +#define FB_SYNC_DOTCLK_FALLING_ACT	(1 << 7) /* falling/negative edge sampling */
->  
->  struct mxsfb_platform_data {
->  	struct fb_videomode *mode_list;
-> -- 
-> 1.7.2.5
+> > It uses the exact device name, rather than guessing. I don't think
+> > you're allowed to have duplicate device names in the system, or there
+> > would be clashes at registration time.
 > 
-ping?
+> > The system is the same for platform data and DT alike.
+> 
+> Right, which is why this mostly works, but it's still better to provide
+> an actual compatible string which we can be 100% certain will avoid
+> conflicts.  This is very low cost when one is already defining DT
+> bindings.
 
+I know that it's an easy thing to do, but I'm more worried about
+what would happen if the an I2C device is registered using the
+current way (stripping the compatible string and using it as a
+client look-up) and we also provide a compatible entry in the
+driver itself. Do you know if there is any danger of duplicate
+registration or suchlike?
 
-Lothar Wa?mann
+> > Hence, there should be no need to have a compatible string in any i2c
+> > driver registration information.
+> 
+> We're getting away with it at present (and frankly nobody's going to
+> build in two different drivers for a chip of the same name for practical
+> systems anyway).
+
+Right. In the same way as we're getting away with it when we
+register a platform_device using the register/add routines.
+
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
