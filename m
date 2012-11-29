@@ -1,49 +1,29 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Nov 2012 13:08:44 +0000
-Subject: [PATCH] ARM: Fix page counting in mem_init and show_mem
-In-Reply-To: <1350956091-5276-1-git-send-email-spang@chromium.org>
-References: <1350956091-5276-1-git-send-email-spang@chromium.org>
-Message-ID: <20121129130844.GI19440@n2100.arm.linux.org.uk>
+Date: Thu, 29 Nov 2012 13:18:24 +0000
+Subject: [PATCH] backlight: corgi_lcd: Fix WARN_ON() when calling
+ corgi_bl_set_intensity.
+In-Reply-To: <CAHod+Gd3UU7NdRLAAbsX6TUugnjKBwUsDy7yBQzyykuf5GHMVQ@mail.gmail.com>
+References: <1354139201-12834-1-git-send-email-dromede@gmail.com>
+ <001501cdcdf2$b3f8f730$1beae590$%han@samsung.com>
+ <CAHod+Gd3UU7NdRLAAbsX6TUugnjKBwUsDy7yBQzyykuf5GHMVQ@mail.gmail.com>
+Message-ID: <20121129131824.GJ19440@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 09:34:51PM -0400, Michael Spang wrote:
->  	for_each_bank (i, mi) {
->  		struct membank *bank = &mi->bank[i];
-> -		unsigned int pfn1, pfn2;
-> -		struct page *page, *end;
-> +		unsigned int start, end, pfn;
->  
-> -		pfn1 = bank_pfn_start(bank);
-> -		pfn2 = bank_pfn_end(bank);
-> +		start = bank_pfn_start(bank);
-> +		end = bank_pfn_end(bank);
->  
-> -		page = pfn_to_page(pfn1);
-> -		end  = pfn_to_page(pfn2 - 1) + 1;
-> +		for (pfn = start; pfn < end; pfn++) {
-> +			struct page *page;
-> +
-> +			if (!pfn_valid(pfn))
-> +				continue;
+On Thu, Nov 29, 2012 at 02:09:51PM +0100, Marko Kati? wrote:
+> Well, the commit message was short because i thought it was a quick
+> and obvious fix.
 
-This is not a very good fix; what this means is that we end up calling
-pfn_valid() for each and every page in the system, and as pfn_valid()
-may not be a simple test (but a search) we should avoid that when we're
-iterating over all pages in the system.
+Don't always expect the person who ends up applying your patch to know
+what your patch is doing.  Don't expect people who are looking back
+through the git history to look at the patch to work out whether your
+commit is relevant to them.  I suspect Andrew Morton doesn't know what
+a "SCOOP" or "AKITA" is...
 
-Firstly, the mem blank information is assumed from the very beginning
-to be aligned with the sparsemem split-up.  This comes from the previous
-discontiguous implementation where this was an absolute requirement.  We
-continue to require that.
+Commit messages are there not only to describe the change, but also say
+why the change is necessary.  Think about it as your chance to "sell"
+the patch.
 
-Secondly, if you're worred about the stolen memory, then we need to be
-iterating over the memblock information instead of the membank information.
-This is slightly more complex because memblock will merge neighbouring
-regions into one contiguous entry - and this needs to be split up here.
-This is why I persisted with the membank stuff here as that _should_
-already be appropriately split.
-
-In the long run though, moving to memblock and dealing better with the
-split memory maps (rather than looking up each and every page using
-pfn_to_page()) is the right way to go.
+One good step would be to include the warning message dump from the
+kernel (your subject line says you're hitting a WARN_ON so include
+that.)  At least then people can see your starting point for the patch.
