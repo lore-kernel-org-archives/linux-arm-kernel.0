@@ -1,48 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 29 Nov 2012 11:57:10 +0100
-Subject: [PATCH] ARM: sunxi: Add missing sun4i.dtsi file
-In-Reply-To: <201211261823.52160.arnd@arndb.de>
-References: <1353941172-26121-1-git-send-email-sr@denx.de>
- <201211261823.52160.arnd@arndb.de>
-Message-ID: <50B73F86.9080203@free-electrons.com>
+From: armando.visconti@st.com (Armando Visconti)
+Date: Thu, 29 Nov 2012 12:04:02 +0100
+Subject: [PATCH] nommu: Enable the strict alignment (CR_A) bit only if ARCH <
+ v6
+Message-ID: <1354187042-28568-1-git-send-email-armando.visconti@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch keeps disabled the strict alignment CP15 bit for
+all armv6 and armv7 processor without the mmu. This behaviour
+is now same as in the mmu case.
 
-Le 26/11/2012 19:23, Arnd Bergmann a ?crit :
-> On Monday 26 November 2012, Stefan Roese wrote:
->> Patch f055f1f6 [ARM: sunxi: Add sun4i and cubieboard support] missed
->> this sun4i.dtsi include file. This patch finally brings it upstream
->> enabling support for sun4i boards.
->>
->> Signed-off-by: Stefan Roese <sr@denx.de>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->> Arnd, I missed adding this include dtsi file in my last
->> cubieboard/sun4i support patch. Please add this patch
->> to your v3.8 branch.
-> 
-> Hi Stefan,
-> 
-> I've added it to the next/soc branch that contains the earlier patches.
-> When you submit a patch for inclusion please always address both Olof
-> and me, or cc the arm at kernel.org address that forwards to both of us.
-> 
-> It is also helpful to get patches for one platform only from one person.
-> I assume that Maxime is ok with you sending the patch this way, but
-> it would be clearer if you send it to him to forward it here, or
-> get an 'Acked-by:' tag from him before you send the patch for inclusion.
+Signed-off-by: Armando Visconti <armando.visconti@st.com>
+---
+ arch/arm/kernel/head-nommu.S |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I'm definitely okay with the change, but yes, I'd prefer to be kept in
-the loop :)
-
-Thanks,
-Maxime
-
+diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+index 278cfc1..2c228a0 100644
+--- a/arch/arm/kernel/head-nommu.S
++++ b/arch/arm/kernel/head-nommu.S
+@@ -68,7 +68,7 @@ __after_proc_init:
+ 	 * CP15 system control register value returned in r0 from
+ 	 * the CPU init function.
+ 	 */
+-#ifdef CONFIG_ALIGNMENT_TRAP
++#if defined(CONFIG_ALIGNMENT_TRAP) && __LINUX_ARM_ARCH__ < 6
+ 	orr	r0, r0, #CR_A
+ #else
+ 	bic	r0, r0, #CR_A
 -- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.4.4
