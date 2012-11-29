@@ -1,78 +1,39 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 29 Nov 2012 21:42:38 +0100
-Subject: [PATCH v6 4/5] ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
-In-Reply-To: <50B7C677.7090504@ti.com>
-References: <1354204892-22762-1-git-send-email-zonque@gmail.com>
- <1354204892-22762-5-git-send-email-zonque@gmail.com>
- <50B7BE9C.6040506@ti.com> <50B7C677.7090504@ti.com>
-Message-ID: <50B7C8BE.7050002@gmail.com>
+From: mcgrof@do-not-panic.com (Luis R. Rodriguez)
+Date: Thu, 29 Nov 2012 12:45:04 -0800
+Subject: [PATCH 0/6] drivers: convert struct spinlock to spinlock_t
+Message-ID: <1354221910-22493-1-git-send-email-mcgrof@do-not-panic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.11.2012 21:32, Jon Hunter wrote:
-> 
-> On 11/29/2012 01:59 PM, Jon Hunter wrote:
->>
->> On 11/29/2012 10:01 AM, Daniel Mack wrote:
->>> The am33xx is capable of handling bch error correction modes, so
->>> enable that feature in the driver.
->>>
->>> Signed-off-by: Daniel Mack <zonque@gmail.com>
->>> ---
->>>  arch/arm/mach-omap2/gpmc-nand.c | 9 +++++----
->>>  1 file changed, 5 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
->>> index f9f23a2..c8a72ba 100644
->>> --- a/arch/arm/mach-omap2/gpmc-nand.c
->>> +++ b/arch/arm/mach-omap2/gpmc-nand.c
->>> @@ -92,17 +92,18 @@ static int omap2_nand_gpmc_retime(
->>>  static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
->>>  {
->>>  	/* support only OMAP3 class */
->>> -	if (!cpu_is_omap34xx()) {
->>> +	if (!cpu_is_omap34xx() && !soc_is_am33xx()) {
->>>  		pr_err("BCH ecc is not supported on this CPU\n");
->>>  		return 0;
->>>  	}
->>>  
->>>  	/*
->>> -	 * For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1.
->>> -	 * Other chips may be added if confirmed to work.
->>> +	 * For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1
->>> +	 * and AM33xx derivates. Other chips may be added if confirmed to work.
->>>  	 */
->>>  	if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW) &&
->>> -	    (!cpu_is_omap3630() || (GET_OMAP_REVISION() == 0))) {
->>> +	    (!cpu_is_omap3630() || (GET_OMAP_REVISION() == 0)) &&
->>> +	    (!soc_is_am33xx())) {
->>>  		pr_err("BCH 4-bit mode is not supported on this CPU\n");
->>>  		return 0;
->>>  	}
->>
->> Sorry I should have seen this earlier. Ideally, this type of thing
->> should be reflected by the device-tree/platform-data and we should get
->> away from these cpu_is_xxxx macros for hardware features (where we can).
->> Furthermore, we need to avoid including plat-omap/gpmc.h in drivers for
->> the single zImage work (I see the omap nand driver is including gpmc.h).
->>
->> Tony, should this be addressed now or can we live this for the minute
->> and fix-up later?
-> 
-> Actually, I see that you do read the ecc mode from DT, so is this really
-> needed? It would be good to eliminate this.
+From: "Luis R. Rodriguez" <mcgrof@do-not-panic.com>
 
-The ecc mode is read from DT, right. But the gpmc bindings can be used
-for many OMAP derivates in the future, and this check is there to make
-sure the configured settings are supported by the hardware after all,
-just like if the ecc mode would have been passed as static platform
-data. So what is it exactly that you want to get rid of?
+Turns out a few drivers have strayed away from using the
+spinlock_t typedef and decided to use struct spinlock
+directly. This series converts these drivers to use
+spinlock_t. Each change has been compile tested with
+allmodconfig and sparse checked. Driver developers
+may want to look at the compile error output / sparse
+error report supplied in each commit log, in particular
+brcmfmac and i915, there are quite a few things that
+are not related to this change that the developers
+can clean up / fix.
 
-I agree though that we could solve this with via the of_device_id's data
-pointer of the matching driver. But as you said yourself, this can well
-be done later, and the problem here is that we still need the
-cpu_is_xxx() macros for older platforms, right?
+Luis R. Rodriguez (6):
+  ux500: convert struct spinlock to spinlock_t
+  i915: convert struct spinlock to spinlock_t
+  s5p-fimc: convert struct spinlock to spinlock_t
+  s5p-jpeg: convert struct spinlock to spinlock_t
+  brcmfmac: convert struct spinlock to spinlock_t
+  ie6xx_wdt: convert struct spinlock to spinlock_t
 
+ drivers/crypto/ux500/cryp/cryp.h               |    4 ++--
+ drivers/crypto/ux500/hash/hash_alg.h           |    4 ++--
+ drivers/gpu/drm/i915/i915_drv.h                |    4 ++--
+ drivers/media/platform/s5p-fimc/mipi-csis.c    |    2 +-
+ drivers/media/platform/s5p-jpeg/jpeg-core.h    |    2 +-
+ drivers/net/wireless/brcm80211/brcmfmac/fweh.h |    2 +-
+ drivers/watchdog/ie6xx_wdt.c                   |    2 +-
+ 7 files changed, 10 insertions(+), 10 deletions(-)
 
-Thanks,
-Daniel
+-- 
+1.7.10.4
