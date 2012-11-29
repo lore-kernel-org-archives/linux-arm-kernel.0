@@ -1,132 +1,157 @@
-From: mcgrof@do-not-panic.com (Luis R. Rodriguez)
-Date: Thu, 29 Nov 2012 12:45:09 -0800
-Subject: [PATCH 5/6] brcmfmac: convert struct spinlock to spinlock_t
-In-Reply-To: <1354221910-22493-1-git-send-email-mcgrof@do-not-panic.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 29 Nov 2012 21:49:35 +0100
+Subject: [PATCH 2/6] i915: convert struct spinlock to spinlock_t
+In-Reply-To: <1354221910-22493-3-git-send-email-mcgrof@do-not-panic.com>
 References: <1354221910-22493-1-git-send-email-mcgrof@do-not-panic.com>
-Message-ID: <1354221910-22493-6-git-send-email-mcgrof@do-not-panic.com>
+ <1354221910-22493-3-git-send-email-mcgrof@do-not-panic.com>
+Message-ID: <20121129204935.GA4384@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Luis R. Rodriguez" <mcgrof@do-not-panic.com>
-
-spinlock_t should always be used.
-
-  LD      drivers/net/wireless/brcm80211/built-in.o
-  CHECK   drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.o
-  CHECK   drivers/net/wireless/brcm80211/brcmfmac/fwil.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/fwil.o
-  CHECK   drivers/net/wireless/brcm80211/brcmfmac/fweh.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/fweh.o
-  CHECK   drivers/net/wireless/brcm80211/brcmfmac/dhd_cdc.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/dhd_cdc.o
-  CHECK   drivers/net/wireless/brcm80211/brcmfmac/dhd_common.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/dhd_common.o
-  CHECK   drivers/net/wireless/brcm80211/brcmfmac/dhd_linux.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/dhd_linux.o
-  CHECK   drivers/net/wireless/brcm80211/brcmfmac/dhd_sdio.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/dhd_sdio.o
-  CHECK   drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.o
-  CHECK   drivers/net/wireless/brcm80211/brcmfmac/bcmsdh_sdmmc.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/bcmsdh_sdmmc.o
-  CHECK   drivers/net/wireless/brcm80211/brcmfmac/sdio_chip.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/sdio_chip.o
-  CHECK   drivers/net/wireless/brcm80211/brcmfmac/usb.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/usb.o
-  CHECK   drivers/net/wireless/brcm80211/brcmfmac/dhd_dbg.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/dhd_dbg.o
-  LD [M]  drivers/net/wireless/brcm80211/brcmfmac/brcmfmac.o
-  LD      drivers/net/wireless/brcm80211/brcmsmac/built-in.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/mac80211_if.c
-drivers/net/wireless/brcm80211/brcmsmac/mac80211_if.c:1311:6: warning: context imbalance in 'brcms_down' - unexpected unlock
-drivers/net/wireless/brcm80211/brcmsmac/mac80211_if.c:1598:6: warning: context imbalance in 'brcms_rfkill_set_hw_state' - unexpected unlock
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/mac80211_if.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/ucode_loader.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/ucode_loader.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/ampdu.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/ampdu.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/antsel.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/antsel.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/channel.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/channel.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/main.c
-drivers/net/wireless/brcm80211/brcmsmac/main.c:6246:36: warning: Initializer entry defined twice
-drivers/net/wireless/brcm80211/brcmsmac/main.c:6246:43:   also defined here
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/main.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/phy_shim.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/phy_shim.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/pmu.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/pmu.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/rate.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/rate.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/stf.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/stf.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/aiutils.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/aiutils.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/phy/phy_cmn.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/phy/phy_cmn.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/phy/phy_lcn.c
-drivers/net/wireless/brcm80211/brcmsmac/phy/phy_lcn.c:3313:46: warning: cast truncates bits from constant value (ffff7fff becomes 7fff)
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/phy/phy_lcn.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.c
-drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.c:17688:47: warning: cast truncates bits from constant value (ffff7fff becomes 7fff)
-drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.c:18187:53: warning: cast truncates bits from constant value (ffff3fff becomes 3fff)
-drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.c:21160:36: warning: cast truncates bits from constant value (ffff3fff becomes 3fff)
-drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.c:23321:35: warning: cast truncates bits from constant value (ffff7fff becomes 7fff)
-drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.c:28343:44: warning: cast truncates bits from constant value (ffff1fff becomes 1fff)
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/phy/phytbl_lcn.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/phy/phytbl_lcn.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/phy/phytbl_n.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/phy/phytbl_n.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/phy/phy_qmath.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/phy/phy_qmath.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/dma.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/dma.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/brcms_trace_events.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/brcms_trace_events.o
-  CHECK   drivers/net/wireless/brcm80211/brcmsmac/debug.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/debug.o
-  LD [M]  drivers/net/wireless/brcm80211/brcmsmac/brcmsmac.o
-  LD      drivers/net/wireless/brcm80211/brcmutil/built-in.o
-  CHECK   drivers/net/wireless/brcm80211/brcmutil/utils.c
-  CC [M]  drivers/net/wireless/brcm80211/brcmutil/utils.o
-  LD [M]  drivers/net/wireless/brcm80211/brcmutil/brcmutil.o
-  Building modules, stage 2.
-  MODPOST 3 modules
-  CC      drivers/net/wireless/brcm80211/brcmfmac/brcmfmac.mod.o
-  LD [M]  drivers/net/wireless/brcm80211/brcmfmac/brcmfmac.ko
-  CC      drivers/net/wireless/brcm80211/brcmsmac/brcmsmac.mod.o
-  LD [M]  drivers/net/wireless/brcm80211/brcmsmac/brcmsmac.ko
-  CC      drivers/net/wireless/brcm80211/brcmutil/brcmutil.mod.o
-  LD [M]  drivers/net/wireless/brcm80211/brcmutil/brcmutil.ko
-
-Cc: Brett Rudley <brudley@broadcom.com>
-Cc: Roland Vossen <rvossen@broadcom.com>
-Cc: Arend van Spriel <arend@broadcom.com>
-Cc: Franky (Zhenhui) Lin <frankyl@broadcom.com>
-Cc: Kan Yan <kanyan@broadcom.com>
-Cc: linux-wireless at vger.kernel.org
-Cc: brcm80211-dev-list at broadcom.com
-Reported-by: Hauke Mehrtens <hauke@hauke-m.de>
-Signed-off-by: Luis R. Rodriguez <mcgrof@do-not-panic.com>
----
- drivers/net/wireless/brcm80211/brcmfmac/fweh.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/net/wireless/brcm80211/brcmfmac/fweh.h b/drivers/net/wireless/brcm80211/brcmfmac/fweh.h
-index b39246a..240a2ea 100644
---- a/drivers/net/wireless/brcm80211/brcmfmac/fweh.h
-+++ b/drivers/net/wireless/brcm80211/brcmfmac/fweh.h
-@@ -158,7 +158,7 @@ typedef int (*brcmf_fweh_handler_t)(struct brcmf_if *ifp,
-  */
- struct brcmf_fweh_info {
- 	struct work_struct event_work;
--	struct spinlock evt_q_lock;
-+	spinlock_t evt_q_lock;
- 	struct list_head event_q;
- 	int (*evt_handler[BRCMF_E_LAST])(struct brcmf_if *ifp,
- 					 const struct brcmf_event_msg *evtmsg,
+On Thu, Nov 29, 2012 at 12:45:06PM -0800, Luis R. Rodriguez wrote:
+> From: "Luis R. Rodriguez" <mcgrof@do-not-panic.com>
+> 
+> spinlock_t should always be used.
+> 
+>   LD      drivers/gpu/drm/i915/built-in.o
+>   CHECK   drivers/gpu/drm/i915/i915_drv.c
+>   CC [M]  drivers/gpu/drm/i915/i915_drv.o
+>   CHECK   drivers/gpu/drm/i915/i915_dma.c
+>   CC [M]  drivers/gpu/drm/i915/i915_dma.o
+>   CHECK   drivers/gpu/drm/i915/i915_irq.c
+>   CC [M]  drivers/gpu/drm/i915/i915_irq.o
+>   CHECK   drivers/gpu/drm/i915/i915_debugfs.c
+> drivers/gpu/drm/i915/i915_debugfs.c:558:31: warning: dereference of noderef expression
+> drivers/gpu/drm/i915/i915_debugfs.c:558:39: warning: dereference of noderef expression
+> drivers/gpu/drm/i915/i915_debugfs.c:558:51: warning: dereference of noderef expression
+> drivers/gpu/drm/i915/i915_debugfs.c:558:63: warning: dereference of noderef expression
+>   CC [M]  drivers/gpu/drm/i915/i915_debugfs.o
+>   CHECK   drivers/gpu/drm/i915/i915_suspend.c
+>   CC [M]  drivers/gpu/drm/i915/i915_suspend.o
+>   CHECK   drivers/gpu/drm/i915/i915_gem.c
+> drivers/gpu/drm/i915/i915_gem.c:3703:14: warning: incorrect type in assignment (different base types)
+> drivers/gpu/drm/i915/i915_gem.c:3703:14:    expected unsigned int [unsigned] [usertype] mask
+> drivers/gpu/drm/i915/i915_gem.c:3703:14:    got restricted gfp_t
+> drivers/gpu/drm/i915/i915_gem.c:3706:22: warning: invalid assignment: &=
+> drivers/gpu/drm/i915/i915_gem.c:3706:22:    left side has type unsigned int
+> drivers/gpu/drm/i915/i915_gem.c:3706:22:    right side has type restricted gfp_t
+> drivers/gpu/drm/i915/i915_gem.c:3707:22: warning: invalid assignment: |=
+> drivers/gpu/drm/i915/i915_gem.c:3707:22:    left side has type unsigned int
+> drivers/gpu/drm/i915/i915_gem.c:3707:22:    right side has type restricted gfp_t
+> drivers/gpu/drm/i915/i915_gem.c:3711:39: warning: incorrect type in argument 2 (different base types)
+> drivers/gpu/drm/i915/i915_gem.c:3711:39:    expected restricted gfp_t [usertype] mask
+> drivers/gpu/drm/i915/i915_gem.c:3711:39:    got unsigned int [unsigned] [usertype] mask
+>   CC [M]  drivers/gpu/drm/i915/i915_gem.o
+>   CHECK   drivers/gpu/drm/i915/i915_gem_context.c
+>   CC [M]  drivers/gpu/drm/i915/i915_gem_context.o
+>   CHECK   drivers/gpu/drm/i915/i915_gem_debug.c
+>   CC [M]  drivers/gpu/drm/i915/i915_gem_debug.o
+>   CHECK   drivers/gpu/drm/i915/i915_gem_evict.c
+>   CC [M]  drivers/gpu/drm/i915/i915_gem_evict.o
+>   CHECK   drivers/gpu/drm/i915/i915_gem_execbuffer.c
+>   CC [M]  drivers/gpu/drm/i915/i915_gem_execbuffer.o
+>   CHECK   drivers/gpu/drm/i915/i915_gem_gtt.c
+>   CC [M]  drivers/gpu/drm/i915/i915_gem_gtt.o
+>   CHECK   drivers/gpu/drm/i915/i915_gem_stolen.c
+>   CC [M]  drivers/gpu/drm/i915/i915_gem_stolen.o
+>   CHECK   drivers/gpu/drm/i915/i915_gem_tiling.c
+>   CC [M]  drivers/gpu/drm/i915/i915_gem_tiling.o
+>   CHECK   drivers/gpu/drm/i915/i915_sysfs.c
+>   CC [M]  drivers/gpu/drm/i915/i915_sysfs.o
+>   CHECK   drivers/gpu/drm/i915/i915_trace_points.c
+>   CC [M]  drivers/gpu/drm/i915/i915_trace_points.o
+>   CHECK   drivers/gpu/drm/i915/intel_display.c
+> drivers/gpu/drm/i915/intel_display.c:1736:9: warning: mixing different enum types
+> drivers/gpu/drm/i915/intel_display.c:1736:9:     int enum transcoder  versus
+> drivers/gpu/drm/i915/intel_display.c:1736:9:     int enum pipe
+> drivers/gpu/drm/i915/intel_display.c:3659:48: warning: mixing different enum types
+> drivers/gpu/drm/i915/intel_display.c:3659:48:     int enum pipe  versus
+> drivers/gpu/drm/i915/intel_display.c:3659:48:     int enum transcoder
+>   CC [M]  drivers/gpu/drm/i915/intel_display.o
+>   CHECK   drivers/gpu/drm/i915/intel_crt.c
+>   CC [M]  drivers/gpu/drm/i915/intel_crt.o
+>   CHECK   drivers/gpu/drm/i915/intel_lvds.c
+>   CC [M]  drivers/gpu/drm/i915/intel_lvds.o
+>   CHECK   drivers/gpu/drm/i915/intel_bios.c
+> drivers/gpu/drm/i915/intel_bios.c:706:60: warning: incorrect type in initializer (different address spaces)
+> drivers/gpu/drm/i915/intel_bios.c:706:60:    expected struct vbt_header *vbt
+> drivers/gpu/drm/i915/intel_bios.c:706:60:    got void [noderef] <asn:2>*vbt
+> drivers/gpu/drm/i915/intel_bios.c:726:42: warning: incorrect type in argument 1 (different address spaces)
+> drivers/gpu/drm/i915/intel_bios.c:726:42:    expected void const *<noident>
+> drivers/gpu/drm/i915/intel_bios.c:726:42:    got unsigned char [noderef] [usertype] <asn:2>*
+> drivers/gpu/drm/i915/intel_bios.c:727:40: warning: cast removes address space of expression
+> drivers/gpu/drm/i915/intel_bios.c:738:24: warning: cast removes address space of expression
+>   CC [M]  drivers/gpu/drm/i915/intel_bios.o
+>   CHECK   drivers/gpu/drm/i915/intel_ddi.c
+> drivers/gpu/drm/i915/intel_ddi.c:87:6: warning: symbol 'intel_prepare_ddi_buffers' was not declared. Should it be static?
+> drivers/gpu/drm/i915/intel_ddi.c:1036:34: warning: mixing different enum types
+> drivers/gpu/drm/i915/intel_ddi.c:1036:34:     int enum pipe  versus
+> drivers/gpu/drm/i915/intel_ddi.c:1036:34:     int enum transcoder
+>   CC [M]  drivers/gpu/drm/i915/intel_ddi.o
+> drivers/gpu/drm/i915/intel_ddi.c: In function ?intel_ddi_setup_hw_pll_state?:
+> drivers/gpu/drm/i915/intel_ddi.c:1129:2: warning: ?port? may be used uninitialized in this function [-Wmaybe-uninitialized]
+> drivers/gpu/drm/i915/intel_ddi.c:1111:12: note: ?port? was declared here
+>   CHECK   drivers/gpu/drm/i915/intel_dp.c
+>   CC [M]  drivers/gpu/drm/i915/intel_dp.o
+>   CHECK   drivers/gpu/drm/i915/intel_hdmi.c
+>   CC [M]  drivers/gpu/drm/i915/intel_hdmi.o
+>   CHECK   drivers/gpu/drm/i915/intel_sdvo.c
+>   CC [M]  drivers/gpu/drm/i915/intel_sdvo.o
+>   CHECK   drivers/gpu/drm/i915/intel_modes.c
+>   CC [M]  drivers/gpu/drm/i915/intel_modes.o
+>   CHECK   drivers/gpu/drm/i915/intel_panel.c
+>   CC [M]  drivers/gpu/drm/i915/intel_panel.o
+>   CHECK   drivers/gpu/drm/i915/intel_pm.c
+> drivers/gpu/drm/i915/intel_pm.c:2173:1: warning: symbol 'mchdev_lock' was not declared. Should it be static?
+>   CC [M]  drivers/gpu/drm/i915/intel_pm.o
+>   CHECK   drivers/gpu/drm/i915/intel_i2c.c
+>   CC [M]  drivers/gpu/drm/i915/intel_i2c.o
+>   CHECK   drivers/gpu/drm/i915/intel_fb.c
+>   CC [M]  drivers/gpu/drm/i915/intel_fb.o
+>   CHECK   drivers/gpu/drm/i915/intel_tv.c
+>   CC [M]  drivers/gpu/drm/i915/intel_tv.o
+>   CHECK   drivers/gpu/drm/i915/intel_dvo.c
+>   CC [M]  drivers/gpu/drm/i915/intel_dvo.o
+>   CHECK   drivers/gpu/drm/i915/intel_ringbuffer.c
+>   CC [M]  drivers/gpu/drm/i915/intel_ringbuffer.o
+>   CHECK   drivers/gpu/drm/i915/intel_overlay.c
+>   CC [M]  drivers/gpu/drm/i915/intel_overlay.o
+>   CHECK   drivers/gpu/drm/i915/intel_sprite.c
+>   CC [M]  drivers/gpu/drm/i915/intel_sprite.o
+>   CHECK   drivers/gpu/drm/i915/intel_opregion.c
+>   CC [M]  drivers/gpu/drm/i915/intel_opregion.o
+>   CHECK   drivers/gpu/drm/i915/dvo_ch7xxx.c
+>   CC [M]  drivers/gpu/drm/i915/dvo_ch7xxx.o
+>   CHECK   drivers/gpu/drm/i915/dvo_ch7017.c
+>   CC [M]  drivers/gpu/drm/i915/dvo_ch7017.o
+>   CHECK   drivers/gpu/drm/i915/dvo_ivch.c
+>   CC [M]  drivers/gpu/drm/i915/dvo_ivch.o
+>   CHECK   drivers/gpu/drm/i915/dvo_tfp410.c
+>   CC [M]  drivers/gpu/drm/i915/dvo_tfp410.o
+>   CHECK   drivers/gpu/drm/i915/dvo_sil164.c
+>   CC [M]  drivers/gpu/drm/i915/dvo_sil164.o
+>   CHECK   drivers/gpu/drm/i915/dvo_ns2501.c
+>   CC [M]  drivers/gpu/drm/i915/dvo_ns2501.o
+>   CHECK   drivers/gpu/drm/i915/i915_gem_dmabuf.c
+>   CC [M]  drivers/gpu/drm/i915/i915_gem_dmabuf.o
+>   CHECK   drivers/gpu/drm/i915/i915_ioc32.c
+>   CC [M]  drivers/gpu/drm/i915/i915_ioc32.o
+>   CHECK   drivers/gpu/drm/i915/intel_acpi.c
+>   CC [M]  drivers/gpu/drm/i915/intel_acpi.o
+>   LD [M]  drivers/gpu/drm/i915/i915.o
+>   Building modules, stage 2.
+>   MODPOST 1 modules
+>   CC      drivers/gpu/drm/i915/i915.mod.o
+>   LD [M]  drivers/gpu/drm/i915/i915.ko
+> 
+> Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
+> Cc: intel-gfx at lists.freedesktop.org
+> Cc: dri-devel at lists.freedesktop.org
+> Reported-by: Hauke Mehrtens <hauke@hauke-m.de>
+> Signed-off-by: Luis R. Rodriguez <mcgrof@do-not-panic.com>
+Queued for -next (3.9), thanks for the patch.
+-Daniel
 -- 
-1.7.10.4
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
