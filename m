@@ -1,39 +1,24 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 29 Nov 2012 10:45:58 +0530
-Subject: [PATCH V2 3/4] ARM: AM335x: Fix warning in timer.c
-In-Reply-To: <1354140300-16825-4-git-send-email-jon-hunter@ti.com>
-References: <1354140300-16825-1-git-send-email-jon-hunter@ti.com>
- <1354140300-16825-4-git-send-email-jon-hunter@ti.com>
-Message-ID: <50B6EF8E.70803@ti.com>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 28 Nov 2012 21:17:30 -0800
+Subject: linux-next: manual merge of the arm-soc tree with the
+ driver-core tree
+In-Reply-To: <20121129160309.7dc352f433d39f1bde0018a8@canb.auug.org.au>
+References: <20121129160309.7dc352f433d39f1bde0018a8@canb.auug.org.au>
+Message-ID: <20121129051730.GD4375@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 November 2012 03:34 AM, Jon Hunter wrote:
-> When compiling the kernel with configuration options ...
->
->   # CONFIG_ARCH_OMAP2 is not set
->   # CONFIG_ARCH_OMAP3 is not set
->   # CONFIG_ARCH_OMAP4 is not set
->   # CONFIG_SOC_OMAP5 is not set
->   CONFIG_SOC_AM33XX=y
->
->   ... the following build warning is seen.
->
->    CC      arch/arm/mach-omap2/timer.o
->    arch/arm/mach-omap2/timer.c:395:19: warning: ?omap2_sync32k_clocksource_init?
->    	defined but not used [-Wunused-function]
->
-> This issue was introduced by commit 6f80b3b (ARM: OMAP2+: timer: remove
-> CONFIG_OMAP_32K_TIMER) where the omap2_sync32k_clocksource_init() is no
-> longer referenced by the timer initialisation function for the AM335x
-> device as it has no 32k-sync timer.
->
-> Fix this by adding the "__maybe_unused" compiler directive to the
-> omap2_sync32k_clocksource_init() function to indicate that this function
-> may be used for certain configurations.
->
-> Cc: Igor Grinberg <grinberg@compulab.co.il>
->
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Thu, Nov 29, 2012 at 04:03:09PM +1100, Stephen Rothwell wrote:
+> Hi all,
+> 
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> drivers/leds/leds-ns2.c between commit 98ea1ea20cb7 ("leds: remove use of
+> __devinit") from the driver-core tree and commit 72052fcc1026 ("leds:
+> leds-ns2: add device tree binding") from the arm-soc tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
+
+Looks good, thanks.
+
+greg k-h
