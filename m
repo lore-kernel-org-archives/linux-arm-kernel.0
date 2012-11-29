@@ -1,71 +1,54 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 29 Nov 2012 10:53:38 +0000 (UTC)
-Subject: [PATCH 1/3] ARM: OMAP4: Update timer clock aliases
-In-Reply-To: <1352313782-21602-2-git-send-email-jon-hunter@ti.com>
-References: <1352313782-21602-1-git-send-email-jon-hunter@ti.com>
- <1352313782-21602-2-git-send-email-jon-hunter@ti.com>
-Message-ID: <alpine.DEB.2.00.1211291048580.20529@utopia.booyaka.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 29 Nov 2012 12:54:42 +0200
+Subject: [PATCH] OMAPDSS: Use only "omapdss_dss" platform device to get
+ context lost count
+In-Reply-To: <1354102299-4928-1-git-send-email-archit@ti.com>
+References: <1354102299-4928-1-git-send-email-archit@ti.com>
+Message-ID: <50B73EF2.4090307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+On 2012-11-28 13:31, Archit Taneja wrote:
+> When enabling a hwmod, omap_hwmod refers to the register mentioned in the
+> hwmod struct's member 'prcm.omap4.context_offs' to see whether context was
+> lost or not. It increments the context lost count for the hwmod and then clears
+> the register.
+> 
+> All the DSS hwmods have the same register(RM_DSS_DSS_CONTEXT) as context_offs.
+> When DSS is enabled, the first hwmod to be enabled is the "dss_core" hwmod since
+> it's corresponding platform device is the parent platform device("omapdss_dss").
+> The dss_core hwmod updates it's context lost count correctly and clears the
+> register. When the hwmods corresponding to the children platform devices are
+> enabled, they see that the register is clear, and don't increment their context
+> lost count. Therefore, all the children platform devices never report a loss in
+> context.
+> 
+> The DISPC driver currently gets the context lost count for DSS power domain from
+> it's corresponding platform device instance("omapdss_dispc"). The DISPC platform
+> device is one of the child devices, and it's corresponding hwmod("dss_dispc")
+> doesn't report the context lost count correctly.
+> 
+> Modify dss_get_ctx_loss_count() such that it always takes the "omapdss_dss"
+> platform device as it's input, move the function to dss.c so that it has access
+> to that platform device.
+> 
+> Signed-off-by: Archit Taneja <archit@ti.com>
+> ---
+>  drivers/video/omap2/dss/core.c  |   15 ---------------
+>  drivers/video/omap2/dss/dispc.c |    4 ++--
+>  drivers/video/omap2/dss/dss.c   |   15 +++++++++++++++
+>  drivers/video/omap2/dss/dss.h   |    3 ++-
+>  4 files changed, 19 insertions(+), 18 deletions(-)
 
-On Wed, 7 Nov 2012, Jon Hunter wrote:
+I think this looks fine. I'll apply to dss master.
 
-> Commit "ARM: dts: OMAP4: Update timer addresses" updated the device-tree
-> names of the OMAP4 timers 5-7 because the default address for the timers
-> was changed from the L3 address to the MPU private address. When booting
-> with device-tree, this introduces a regression when attempting to set
-> the parent clock of timers 5-7 to the sys_clk_div_ck. Therefore, update
-> the clock aliases for timer 5-7 to reflect the updated device-tree name
-> for the timers.
-
-Reviewing my E-mail inbox, just saw that this one is marked as being 
-needed for v3.8.  Is that still the case?  If so, we should ask Tony to 
-take an updated version of this patch, given the recent CCF conversion.
-
-Following is the updated patch.
+ Tomi
 
 
-- Paul
-
-From: Jon Hunter <jon-hunter@ti.com>
-Date: Thu, 29 Nov 2012 03:47:46 -0700
-Subject: [PATCH] ARM: OMAP4: Update timer clock aliases
-
-Commit "ARM: dts: OMAP4: Update timer addresses" updated the device-tree
-names of the OMAP4 timers 5-7 because the default address for the timers
-was changed from the L3 address to the MPU private address. When booting
-with device-tree, this introduces a regression when attempting to set
-the parent clock of timers 5-7 to the sys_clk_div_ck. Therefore, update
-the clock aliases for timer 5-7 to reflect the updated device-tree name
-for the timers.
-
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-[paul at pwsan.com: updated to apply after the CCF conversion]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/cclock44xx_data.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-index aa56c3e..a1f0b55 100644
---- a/arch/arm/mach-omap2/cclock44xx_data.c
-+++ b/arch/arm/mach-omap2/cclock44xx_data.c
-@@ -1935,10 +1935,10 @@ static struct omap_clk omap44xx_clks[] = {
- 	CLK("4803e000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
- 	CLK("48086000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
- 	CLK("48088000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
--	CLK("49038000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
--	CLK("4903a000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
--	CLK("4903c000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
--	CLK("4903e000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
-+	CLK("40138000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
-+	CLK("4013a000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
-+	CLK("4013c000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
-+	CLK("4013e000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
- 	CLK(NULL,	"cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
- };
- 
--- 
-1.7.10.4
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 899 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121129/09711c45/attachment.sig>
