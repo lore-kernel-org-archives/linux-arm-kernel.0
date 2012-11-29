@@ -1,154 +1,76 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 29 Nov 2012 08:52:44 -0600
-Subject: [PATCH v2] ARM: implement optimized percpu variable access
-Message-ID: <1354200764-23751-1-git-send-email-robherring2@gmail.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Thu, 29 Nov 2012 14:59:29 +0000
+Subject: [PATCH v5 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC
+ timings and NAND
+In-Reply-To: <50B75806.8030501@gmail.com>
+References: <1354121939-11246-1-git-send-email-zonque@gmail.com>
+ <1354121939-11246-5-git-send-email-zonque@gmail.com>
+ <518397C60809E147AF5323E0420B992E3EA0B986@DBDE01.ent.ti.com>
+ <50B75806.8030501@gmail.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3EA0BB4B@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Thu, Nov 29, 2012 at 18:11:42, Daniel Mack wrote:
+> On 29.11.2012 13:36, Philip, Avinash wrote:
+> > On Wed, Nov 28, 2012 at 22:28:59, Daniel Mack wrote:
+> > [...]
+> >> +	if (!of_property_read_string(child, "ti,nand-ecc-opt", &s)) {
+> >> +		for (val = 0; val < ARRAY_SIZE(nand_ecc_opts); val++)
+> >> +			if (!strcasecmp(s, nand_ecc_opts[val])) {
+> >> +				gpmc_nand_data->ecc_opt = val;
+> >> +				break;
+> >> +			}
+> >> +
+> >> +		/*
+> >> +		 *  AM335x RBL compatibility mode - dependns on runtime
+> >> +		 * detection of the error location module.
+> >> +		 */
+> >> +		if (!strcasecmp(s, "bch8-am335xrbl-compatible")) {
+> >> +			gpmc_nand_data->ecc_opt = OMAP_ECC_BCH8_CODE_HW;
+> >> +			gpmc_nand_data->is_elm_used = true;
+> > 
+> > Remove is_elm_used from struct omap_nand_platform_data. Now this data
+> > populated as part of run time detection of elm module. So please remove
+> > The usage of is_elm_used;
+> 
+> So why do we need "bch8-am335xrbl-compatible" as special case then?
+> 
+> I thought the whole idea here is to tell the driver we want bch8 *and*
+> the usage of the elm, instead of falling back to the (incompatible)
+> software mode? If I remove that assignment, "bch8-am335xrbl-compatible"
+> is the same than "bch8".
+> 
 
-Use the previously unused TPIDRPRW register to store percpu offsets.
-TPIDRPRW is only accessible in PL1, so it can only be used in the kernel.
+Here we have different problems present. 
+1. GPMC-NAND DT binding support.
+2. Compatible ECC layout between kernel, boot loader.
+3. Support for hardware accelerator, i.e ELM for error correction.
 
-This replaces 2 loads with a mrc instruction for each percpu variable
-access. With hackbench, the performance improvement is 1.4% on Cortex-A9
-(highbank). Taking an average of 30 runs of "hackbench -l 1000" yields:
+So priority should go for GPMC DT binding support. 
+Can you please proceed with GPMC-NAND DT bindings without considering
+ELM so that driver features existing can be obtained with DT.
 
-Before: 6.2191
-After: 6.1348
+I will take care of ECC layout (or RBL) compatibility along with ELM
+series. I will make ELM series on top of your changes. This way we can
+avoid circular dependency
 
-Will Deacon reported similar delta on v6 with 11MPCore.
+>
+> Which detail am I missing? :)
 
-The asm "memory" constraints are needed here to ensure the percpu offset
-gets reloaded. Testing by Will found that this would not happen in
-__schedule() which is a bit of a special case as preemption is disabled
-but the execution can move cores.
+I think what you need is NAND ECC layout to be common across Kernel and
+boot loader. Strictly speaking ELM is not a necessity for it. The common
+layout can be obtained even without presence of ELM, ELM is only a hardware
+accelerator for error correction. If ELM is not used, we can rely on software
+error correction, at least theoretically. But the way software error correction
+is handled currently in omap nand driver will not help us as ecc layout assumed
+is different.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
-Changes in v2:
-- Add asm "memory" constraint
-- Only enable on v6K and v7 and avoid enabling for v6 SMP_ON_UP
-- Fix missing initialization of TPIDRPRW for resume path
-- Move cpu_init to beginning of secondary_start_kernel to ensure percpu
-  variables can be accessed as early as possible.
+Thanks
+Avinash
 
- arch/arm/include/asm/Kbuild   |    1 -
- arch/arm/include/asm/percpu.h |   45 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/setup.c       |    6 ++++++
- arch/arm/kernel/smp.c         |    4 +++-
- 4 files changed, 54 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/include/asm/percpu.h
-
-diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
-index f70ae17..2ffdaac 100644
---- a/arch/arm/include/asm/Kbuild
-+++ b/arch/arm/include/asm/Kbuild
-@@ -16,7 +16,6 @@ generic-y += local64.h
- generic-y += msgbuf.h
- generic-y += param.h
- generic-y += parport.h
--generic-y += percpu.h
- generic-y += poll.h
- generic-y += resource.h
- generic-y += sections.h
-diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
-new file mode 100644
-index 0000000..968c0a1
---- /dev/null
-+++ b/arch/arm/include/asm/percpu.h
-@@ -0,0 +1,45 @@
-+/*
-+ * Copyright 2012 Calxeda, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef _ASM_ARM_PERCPU_H_
-+#define _ASM_ARM_PERCPU_H_
-+
-+/*
-+ * Same as asm-generic/percpu.h, except that we store the per cpu offset
-+ * in the TPIDRPRW. TPIDRPRW only exists on V6K and V7
-+ */
-+#if defined(CONFIG_SMP) && !defined(CONFIG_CPU_V6)
-+static inline void set_my_cpu_offset(unsigned long off)
-+{
-+	/* Set TPIDRPRW */
-+	asm volatile("mcr p15, 0, %0, c13, c0, 4" : : "r" (off) : "memory");
-+}
-+
-+static inline unsigned long __my_cpu_offset(void)
-+{
-+	unsigned long off;
-+	/* Read TPIDRPRW */
-+	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : : "memory");
-+	return off;
-+}
-+#define __my_cpu_offset __my_cpu_offset()
-+#else
-+#define set_my_cpu_offset(x)	do {} while(0)
-+
-+#endif /* CONFIG_SMP */
-+
-+#include <asm-generic/percpu.h>
-+
-+#endif /* _ASM_ARM_PERCPU_H_ */
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index da1d1aa..b2909ce 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -383,6 +383,12 @@ void cpu_init(void)
- 		BUG();
- 	}
- 
-+	/*
-+	 * This only works on resume and secondary cores. For booting on the
-+	 * boot cpu, smp_prepare_boot_cpu is called after percpu area setup.
-+	 */
-+	set_my_cpu_offset(per_cpu_offset(cpu));
-+
- 	cpu_proc_init();
- 
- 	/*
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index fbc8b26..aadcca7 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -296,6 +296,8 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
- 	struct mm_struct *mm = &init_mm;
- 	unsigned int cpu;
- 
-+	cpu_init();
-+
- 	/*
- 	 * The identity mapping is uncached (strongly ordered), so
- 	 * switch away from it before attempting any exclusive accesses.
-@@ -315,7 +317,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
- 
- 	printk("CPU%u: Booted secondary processor\n", cpu);
- 
--	cpu_init();
- 	preempt_disable();
- 	trace_hardirqs_off();
- 
-@@ -371,6 +372,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
- 
- void __init smp_prepare_boot_cpu(void)
- {
-+	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
- }
- 
- void __init smp_prepare_cpus(unsigned int max_cpus)
--- 
-1.7.10.4
+> 
+> 
+> Daniel
+> 
+> 
