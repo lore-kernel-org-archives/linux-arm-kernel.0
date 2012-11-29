@@ -1,47 +1,36 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 29 Nov 2012 14:43:15 +0200
-Subject: [PATCH] ARM: mx25_3ds: Add camera support
-In-Reply-To: <CAOMZO5C0RSYfMWY1qHmuVJ00+48hvZQJrKcAom_0AE9qYmxOHA@mail.gmail.com>
-References: <1354022509-20505-1-git-send-email-fabio.estevam@freescale.com>
- <20121128060543.GA31335@sapphire.tkos.co.il>
- <CAOMZO5C0RSYfMWY1qHmuVJ00+48hvZQJrKcAom_0AE9qYmxOHA@mail.gmail.com>
-Message-ID: <20121129124314.GF12054@sapphire.tkos.co.il>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Thu, 29 Nov 2012 14:54:02 +0200
+Subject: [PATCH 4/9] usb: chipidea: ci13xxx-imx: add "dr_mode" property to
+ device tree bindings
+In-Reply-To: <20121126094626.GB15740@nchen-desktop>
+References: <1352909950-32555-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1352909950-32555-5-git-send-email-m.grzeschik@pengutronix.de>
+ <878va17oii.fsf@ashishki-desk.ger.corp.intel.com>
+ <20121126094626.GB15740@nchen-desktop>
+Message-ID: <87pq2wmuxh.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Peter Chen <peter.chen@freescale.com> writes:
 
-On Thu, Nov 29, 2012 at 10:38:36AM -0200, Fabio Estevam wrote:
-> On Wed, Nov 28, 2012 at 4:05 AM, Baruch Siach <baruch@tkos.co.il> wrote:
-> 
-> > Good to see some activity on i.MX25 camera support. Did you test video capture
-> > with a latest kernel?  You have surely noticed that i.MX25 support in the
-> > mx2_camera driver is marked BROKEN since 087c78a8.
-> 
-> I basically checked that mx2_camera can be probed:
-> 
-> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
-> mx2-camera imx25-camera.0: Camera driver attached to camera 0
-> ov2640 0-0030: ov2640 Product ID 26:42 Manufacturer ID 7f:a2
-> i2c i2c-0: OV2640 Probed
-> mx2-camera imx25-camera.0: Camera driver detached from camera 0
-> mx2-camera imx25-camera.0: MX2 Camera (CSI) driver probed, clock
-> frequency: 22166666
-> 
-> Tried a Gstreamer pipeline but it is failing, but this Gstreamer issue
-> is not mx25 related as I saw the same issue with mx27/mx31.
-> 
-> Do you still have access to a mx25pdk?
+> On Fri, Nov 16, 2012 at 01:53:09PM +0200, Alexander Shishkin wrote:
+>> Michael Grzeschik <m.grzeschik@pengutronix.de> writes:
+>> I'd prefer this function to live in ci13xxx_imx, since that's where it's
+>> used and it doesn't really need anything from core.c anyway. Or maybe it
+>> would make sense to make it even more generic (for other devitetree
+>> users), since you're saying that other drivers are using this already.
+>> 
+>> Looks good to me otherwise.
+>
+> I think it supplies a way that the platform can override the usb role,
+> only freescale uses it, but also other platforms may use it. It is a
+> generic feature, other chipidea users may need it.
 
-Not anymore, unfortunately.
+I'm not objecting against the flags, I just don't like the function in
+chipidea core. Platform code can just use the flags. It can be either
+part of the platform driver or a generic dt helper, in case there are
+more users, it doesn't belong to chipidea core.
 
-> I will try v4l-utils when I get a chance.
-
-Thanks. Keep me posted.
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Regards,
+--
+Alex
