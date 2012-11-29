@@ -1,157 +1,190 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 29 Nov 2012 21:49:35 +0100
-Subject: [PATCH 2/6] i915: convert struct spinlock to spinlock_t
-In-Reply-To: <1354221910-22493-3-git-send-email-mcgrof@do-not-panic.com>
-References: <1354221910-22493-1-git-send-email-mcgrof@do-not-panic.com>
- <1354221910-22493-3-git-send-email-mcgrof@do-not-panic.com>
-Message-ID: <20121129204935.GA4384@phenom.ffwll.local>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 29 Nov 2012 21:56:18 +0100
+Subject: [PATCH v6 5/5] ARM: OMAP: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <50B7C57C.3070701@ti.com>
+References: <1354204892-22762-1-git-send-email-zonque@gmail.com>
+ <1354204892-22762-6-git-send-email-zonque@gmail.com>
+ <50B7C57C.3070701@ti.com>
+Message-ID: <50B7CBF2.3040908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 29, 2012 at 12:45:06PM -0800, Luis R. Rodriguez wrote:
-> From: "Luis R. Rodriguez" <mcgrof@do-not-panic.com>
+On 29.11.2012 21:28, Jon Hunter wrote:
 > 
-> spinlock_t should always be used.
+> On 11/29/2012 10:01 AM, Daniel Mack wrote:
+>> This patch adds basic DT bindings for OMAP GPMC.
+>>
+>> The actual peripherals are instantiated from child nodes within the GPMC
+>> node, and the only type of device that is currently supported is NAND.
+>>
+>> Code was added to parse the generic GPMC timing parameters and some
+>> documentation with examples on how to use them.
+>>
+>> Successfully tested on an AM33xx board.
+>>
+>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>> ---
+>>  Documentation/devicetree/bindings/bus/ti-gpmc.txt  |  76 +++++++++
+>>  .../devicetree/bindings/mtd/gpmc-nand.txt          |  76 +++++++++
+>>  arch/arm/mach-omap2/gpmc.c                         | 171 ++++++++++++++++++++-
+>>  3 files changed, 322 insertions(+), 1 deletion(-)
+>>  create mode 100644 Documentation/devicetree/bindings/bus/ti-gpmc.txt
+>>  create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/bus/ti-gpmc.txt b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
+>> new file mode 100644
+>> index 0000000..ba3d6a5
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
+>> @@ -0,0 +1,76 @@
+>> +Device tree bindings for OMAP general purpose memory controllers (GPMC)
+>> +
+>> +The actual devices are instantiated from the child nodes of a GPMC node.
+>> +
+>> +Required properties:
+>> +
+>> + - compatible:		Should be set to "ti,gpmc"
+>> + - reg:			A resource specifier for the register space
+>> +			(see the example below)
+>> + - ti,hwmods:		Should be set to "ti,gpmc" until the DT transition is
+>> +			completed.
+>> + - #address-cells:	Must be set to 2 to allow memory address translation
+>> + - #size-cells:		Must be set to 1 to allow CS address passing
+>> + - num-cs:		The maximum number of chip-select lines that controller
+>> +			can support.
+>> + - num-waitpins:	The maximum number of wait pins that controller can
+>> +			support.
+>> + - ranges:		Must be set up to reflect the memory layout with four
+>> +			integer values for each chip-select line in use:
+>> +
+>> +			   <cs-number> 0 <physical address of mapping> <size>
+>> +
+>> +			Note that this property is not currently parsed.
+>> +			Calculated values derived from the contents of the
+>> +			per-CS register GPMC_CONFIG7 (as set up by the
+>> +			bootloader) are used. That will change in the future,
+>> +			so be sure to fill the correct values here.
+>> +
+>> +Timing properties for child nodes. All are optional and default to 0.
+>> +
+>> + - gpmc,sync-clk:	Minimum clock period for synchronous mode, in picoseconds
+>> +
+>> + Chip-select signal timings corresponding to GPMC_CONFIG2:
+>> + - gpmc,cs-on:		Assertion time
+>> + - gpmc,cs-rd-off:	Read deassertion time
+>> + - gpmc,cs-wr-off:	Write deassertion time
+>> +
+>> + ADV signal timings corresponding to GPMC_CONFIG3:
+>> + - gpmc,adv-on:		Assertion time
+>> + - gpmc,adv-rd-off:	Read deassertion time
+>> + - gpmc,adv-wr-off:	Write deassertion time
+>> +
+>> + WE signals timings corresponding to GPMC_CONFIG4:
+>> + - gpmc,we-on:		Assertion time
+>> + - gpmc,we-off:		Deassertion time
+>> +
+>> + OE signals timings corresponding to GPMC_CONFIG4:
+>> + - gpmc,oe-on:		Assertion time
+>> + - gpmc,oe-off:		Deassertion time
+>> +
+>> + Access time and cycle time timings corresponding to GPMC_CONFIG5:
+>> + - gpmc,page-burst-access: Multiple access word delay
+>> + - gpmc,access:		Start-cycle to first data valid delay
+>> + - gpmc,rd-cycle:	Total read cycle time
+>> + - gpmc,wr-cycle:	Total write cycle time
+>> +
+>> +The following are only on OMAP3430:
+>> + - gpmc,wr-access
+>> + - gpmc,wr-data-mux-bus
 > 
->   LD      drivers/gpu/drm/i915/built-in.o
->   CHECK   drivers/gpu/drm/i915/i915_drv.c
->   CC [M]  drivers/gpu/drm/i915/i915_drv.o
->   CHECK   drivers/gpu/drm/i915/i915_dma.c
->   CC [M]  drivers/gpu/drm/i915/i915_dma.o
->   CHECK   drivers/gpu/drm/i915/i915_irq.c
->   CC [M]  drivers/gpu/drm/i915/i915_irq.o
->   CHECK   drivers/gpu/drm/i915/i915_debugfs.c
-> drivers/gpu/drm/i915/i915_debugfs.c:558:31: warning: dereference of noderef expression
-> drivers/gpu/drm/i915/i915_debugfs.c:558:39: warning: dereference of noderef expression
-> drivers/gpu/drm/i915/i915_debugfs.c:558:51: warning: dereference of noderef expression
-> drivers/gpu/drm/i915/i915_debugfs.c:558:63: warning: dereference of noderef expression
->   CC [M]  drivers/gpu/drm/i915/i915_debugfs.o
->   CHECK   drivers/gpu/drm/i915/i915_suspend.c
->   CC [M]  drivers/gpu/drm/i915/i915_suspend.o
->   CHECK   drivers/gpu/drm/i915/i915_gem.c
-> drivers/gpu/drm/i915/i915_gem.c:3703:14: warning: incorrect type in assignment (different base types)
-> drivers/gpu/drm/i915/i915_gem.c:3703:14:    expected unsigned int [unsigned] [usertype] mask
-> drivers/gpu/drm/i915/i915_gem.c:3703:14:    got restricted gfp_t
-> drivers/gpu/drm/i915/i915_gem.c:3706:22: warning: invalid assignment: &=
-> drivers/gpu/drm/i915/i915_gem.c:3706:22:    left side has type unsigned int
-> drivers/gpu/drm/i915/i915_gem.c:3706:22:    right side has type restricted gfp_t
-> drivers/gpu/drm/i915/i915_gem.c:3707:22: warning: invalid assignment: |=
-> drivers/gpu/drm/i915/i915_gem.c:3707:22:    left side has type unsigned int
-> drivers/gpu/drm/i915/i915_gem.c:3707:22:    right side has type restricted gfp_t
-> drivers/gpu/drm/i915/i915_gem.c:3711:39: warning: incorrect type in argument 2 (different base types)
-> drivers/gpu/drm/i915/i915_gem.c:3711:39:    expected restricted gfp_t [usertype] mask
-> drivers/gpu/drm/i915/i915_gem.c:3711:39:    got unsigned int [unsigned] [usertype] mask
->   CC [M]  drivers/gpu/drm/i915/i915_gem.o
->   CHECK   drivers/gpu/drm/i915/i915_gem_context.c
->   CC [M]  drivers/gpu/drm/i915/i915_gem_context.o
->   CHECK   drivers/gpu/drm/i915/i915_gem_debug.c
->   CC [M]  drivers/gpu/drm/i915/i915_gem_debug.o
->   CHECK   drivers/gpu/drm/i915/i915_gem_evict.c
->   CC [M]  drivers/gpu/drm/i915/i915_gem_evict.o
->   CHECK   drivers/gpu/drm/i915/i915_gem_execbuffer.c
->   CC [M]  drivers/gpu/drm/i915/i915_gem_execbuffer.o
->   CHECK   drivers/gpu/drm/i915/i915_gem_gtt.c
->   CC [M]  drivers/gpu/drm/i915/i915_gem_gtt.o
->   CHECK   drivers/gpu/drm/i915/i915_gem_stolen.c
->   CC [M]  drivers/gpu/drm/i915/i915_gem_stolen.o
->   CHECK   drivers/gpu/drm/i915/i915_gem_tiling.c
->   CC [M]  drivers/gpu/drm/i915/i915_gem_tiling.o
->   CHECK   drivers/gpu/drm/i915/i915_sysfs.c
->   CC [M]  drivers/gpu/drm/i915/i915_sysfs.o
->   CHECK   drivers/gpu/drm/i915/i915_trace_points.c
->   CC [M]  drivers/gpu/drm/i915/i915_trace_points.o
->   CHECK   drivers/gpu/drm/i915/intel_display.c
-> drivers/gpu/drm/i915/intel_display.c:1736:9: warning: mixing different enum types
-> drivers/gpu/drm/i915/intel_display.c:1736:9:     int enum transcoder  versus
-> drivers/gpu/drm/i915/intel_display.c:1736:9:     int enum pipe
-> drivers/gpu/drm/i915/intel_display.c:3659:48: warning: mixing different enum types
-> drivers/gpu/drm/i915/intel_display.c:3659:48:     int enum pipe  versus
-> drivers/gpu/drm/i915/intel_display.c:3659:48:     int enum transcoder
->   CC [M]  drivers/gpu/drm/i915/intel_display.o
->   CHECK   drivers/gpu/drm/i915/intel_crt.c
->   CC [M]  drivers/gpu/drm/i915/intel_crt.o
->   CHECK   drivers/gpu/drm/i915/intel_lvds.c
->   CC [M]  drivers/gpu/drm/i915/intel_lvds.o
->   CHECK   drivers/gpu/drm/i915/intel_bios.c
-> drivers/gpu/drm/i915/intel_bios.c:706:60: warning: incorrect type in initializer (different address spaces)
-> drivers/gpu/drm/i915/intel_bios.c:706:60:    expected struct vbt_header *vbt
-> drivers/gpu/drm/i915/intel_bios.c:706:60:    got void [noderef] <asn:2>*vbt
-> drivers/gpu/drm/i915/intel_bios.c:726:42: warning: incorrect type in argument 1 (different address spaces)
-> drivers/gpu/drm/i915/intel_bios.c:726:42:    expected void const *<noident>
-> drivers/gpu/drm/i915/intel_bios.c:726:42:    got unsigned char [noderef] [usertype] <asn:2>*
-> drivers/gpu/drm/i915/intel_bios.c:727:40: warning: cast removes address space of expression
-> drivers/gpu/drm/i915/intel_bios.c:738:24: warning: cast removes address space of expression
->   CC [M]  drivers/gpu/drm/i915/intel_bios.o
->   CHECK   drivers/gpu/drm/i915/intel_ddi.c
-> drivers/gpu/drm/i915/intel_ddi.c:87:6: warning: symbol 'intel_prepare_ddi_buffers' was not declared. Should it be static?
-> drivers/gpu/drm/i915/intel_ddi.c:1036:34: warning: mixing different enum types
-> drivers/gpu/drm/i915/intel_ddi.c:1036:34:     int enum pipe  versus
-> drivers/gpu/drm/i915/intel_ddi.c:1036:34:     int enum transcoder
->   CC [M]  drivers/gpu/drm/i915/intel_ddi.o
-> drivers/gpu/drm/i915/intel_ddi.c: In function ?intel_ddi_setup_hw_pll_state?:
-> drivers/gpu/drm/i915/intel_ddi.c:1129:2: warning: ?port? may be used uninitialized in this function [-Wmaybe-uninitialized]
-> drivers/gpu/drm/i915/intel_ddi.c:1111:12: note: ?port? was declared here
->   CHECK   drivers/gpu/drm/i915/intel_dp.c
->   CC [M]  drivers/gpu/drm/i915/intel_dp.o
->   CHECK   drivers/gpu/drm/i915/intel_hdmi.c
->   CC [M]  drivers/gpu/drm/i915/intel_hdmi.o
->   CHECK   drivers/gpu/drm/i915/intel_sdvo.c
->   CC [M]  drivers/gpu/drm/i915/intel_sdvo.o
->   CHECK   drivers/gpu/drm/i915/intel_modes.c
->   CC [M]  drivers/gpu/drm/i915/intel_modes.o
->   CHECK   drivers/gpu/drm/i915/intel_panel.c
->   CC [M]  drivers/gpu/drm/i915/intel_panel.o
->   CHECK   drivers/gpu/drm/i915/intel_pm.c
-> drivers/gpu/drm/i915/intel_pm.c:2173:1: warning: symbol 'mchdev_lock' was not declared. Should it be static?
->   CC [M]  drivers/gpu/drm/i915/intel_pm.o
->   CHECK   drivers/gpu/drm/i915/intel_i2c.c
->   CC [M]  drivers/gpu/drm/i915/intel_i2c.o
->   CHECK   drivers/gpu/drm/i915/intel_fb.c
->   CC [M]  drivers/gpu/drm/i915/intel_fb.o
->   CHECK   drivers/gpu/drm/i915/intel_tv.c
->   CC [M]  drivers/gpu/drm/i915/intel_tv.o
->   CHECK   drivers/gpu/drm/i915/intel_dvo.c
->   CC [M]  drivers/gpu/drm/i915/intel_dvo.o
->   CHECK   drivers/gpu/drm/i915/intel_ringbuffer.c
->   CC [M]  drivers/gpu/drm/i915/intel_ringbuffer.o
->   CHECK   drivers/gpu/drm/i915/intel_overlay.c
->   CC [M]  drivers/gpu/drm/i915/intel_overlay.o
->   CHECK   drivers/gpu/drm/i915/intel_sprite.c
->   CC [M]  drivers/gpu/drm/i915/intel_sprite.o
->   CHECK   drivers/gpu/drm/i915/intel_opregion.c
->   CC [M]  drivers/gpu/drm/i915/intel_opregion.o
->   CHECK   drivers/gpu/drm/i915/dvo_ch7xxx.c
->   CC [M]  drivers/gpu/drm/i915/dvo_ch7xxx.o
->   CHECK   drivers/gpu/drm/i915/dvo_ch7017.c
->   CC [M]  drivers/gpu/drm/i915/dvo_ch7017.o
->   CHECK   drivers/gpu/drm/i915/dvo_ivch.c
->   CC [M]  drivers/gpu/drm/i915/dvo_ivch.o
->   CHECK   drivers/gpu/drm/i915/dvo_tfp410.c
->   CC [M]  drivers/gpu/drm/i915/dvo_tfp410.o
->   CHECK   drivers/gpu/drm/i915/dvo_sil164.c
->   CC [M]  drivers/gpu/drm/i915/dvo_sil164.o
->   CHECK   drivers/gpu/drm/i915/dvo_ns2501.c
->   CC [M]  drivers/gpu/drm/i915/dvo_ns2501.o
->   CHECK   drivers/gpu/drm/i915/i915_gem_dmabuf.c
->   CC [M]  drivers/gpu/drm/i915/i915_gem_dmabuf.o
->   CHECK   drivers/gpu/drm/i915/i915_ioc32.c
->   CC [M]  drivers/gpu/drm/i915/i915_ioc32.o
->   CHECK   drivers/gpu/drm/i915/intel_acpi.c
->   CC [M]  drivers/gpu/drm/i915/intel_acpi.o
->   LD [M]  drivers/gpu/drm/i915/i915.o
->   Building modules, stage 2.
->   MODPOST 1 modules
->   CC      drivers/gpu/drm/i915/i915.mod.o
->   LD [M]  drivers/gpu/drm/i915/i915.ko
+> Actually, these are applicable to AM335x as well. I believe that the
+> comment should be "applicable to OMAP3+ and AM335x". The gpmc driver was
+> updated to set the flags for these features based upon gpmc version ID.
 > 
-> Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
-> Cc: intel-gfx at lists.freedesktop.org
-> Cc: dri-devel at lists.freedesktop.org
-> Reported-by: Hauke Mehrtens <hauke@hauke-m.de>
-> Signed-off-by: Luis R. Rodriguez <mcgrof@do-not-panic.com>
-Queued for -next (3.9), thanks for the patch.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+>> +
+>> +
+>> +Example for an AM33xx board:
+>> +
+>> +	gpmc: gpmc at 50000000 {
+>> +		compatible = "ti,gpmc";
+>> +		ti,hwmods = "gpmc";
+>> +		reg = <0x50000000 0x2000>;
+>> +		interrupts = <100>;
+>> +
+>> +		num-cs = <8>;
+>> +		#address-cells = <2>;
+>> +		#size-cells = <1>;
+>> +		ranges = <0 0 0x08000000 0x10000000>; /* CS0 @addr 0x8000000, size 0x10000000 */
+> 
+> Nit, you have num-wait pins as a required property but not shown here in
+> the example.
+> 
+>> +
+>> +		/* child nodes go here */
+>> +	};
+>> diff --git a/Documentation/devicetree/bindings/mtd/gpmc-nand.txt b/Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+>> new file mode 100644
+>> index 0000000..58c876f
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+>> @@ -0,0 +1,76 @@
+>> +Device tree bindings for GPMC connected NANDs
+>> +
+>> +GPMC connected NAND (found on OMAP boards) are represented as child nodes of
+>> +the GPMC controller with a name of "nand".
+>> +
+>> +All timing relevant properties as well as generic gpmc child properties are
+>> +explained in a separate documents - please refer to
+>> +Documentation/devicetree/bindings/bus/ti-gpmc.txt
+>> +
+>> +For NAND specific properties such as ECC modes or bus width, please refer to
+>> +Documentation/devicetree/bindings/mtd/nand.txt
+>> +
+>> +
+>> +Required properties:
+>> +
+>> + - reg:		The CS line the peripheral is connected to
+>> +
+>> +Optional properties:
+>> +
+>> + - nand-bus-width: 		Set this numeric value to 16 if the hardware
+>> +				is wired that way. If not specified, a bus
+>> +				width of 8 is assumed.
+>> +
+>> + - ti,nand-ecc-opt:		A string setting the ECC layout to use. One of:
+>> +
+>> +		"sw"		Software method (default)
+>> +		"hw"		Hardware method
+>> +		"hw-romcode"	gpmc hamming mode method & romcode layout
+>> +		"bch4"		4-bit BCH ecc code
+>> +		"bch8"		8-bit BCH ecc code
+>> +
+>> +For inline partiton table parsing (optional):
+>> +
+>> + - #address-cells: should be set to 1
+>> + - #size-cells: should be set to 1
+>> +
+>> +Example for an AM33xx board:
+>> +
+>> +	gpmc: gpmc at 50000000 {
+>> +		compatible = "ti,gpmc";
+>> +		ti,hwmods = "gpmc";
+>> +		reg = <0x50000000 0x1000000>;
+> 
+> Nit, good to make reg size consistent with the above example.
+> 
+>> +		interrupts = <100>;
+>> +		num-cs = <8>;
+>> +		num-waitpins = <8>;
+> 
+> Nit, AM335x only has 2 wait-pins. Number of wait-pins is typically less
+> than number of CS pins.
+> 
+> Other than these minor comments, looks good to me. Thanks for updating.
+
+Thanks for these remarks! All fixed locally. I can send out a v7 tomorrow.
+
+
+Best,
+Daniel
