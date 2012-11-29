@@ -1,9 +1,9 @@
 From: mcgrof@do-not-panic.com (Luis R. Rodriguez)
-Date: Thu, 29 Nov 2012 12:45:08 -0800
-Subject: [PATCH 4/6] s5p-jpeg: convert struct spinlock to spinlock_t
+Date: Thu, 29 Nov 2012 12:45:09 -0800
+Subject: [PATCH 5/6] brcmfmac: convert struct spinlock to spinlock_t
 In-Reply-To: <1354221910-22493-1-git-send-email-mcgrof@do-not-panic.com>
 References: <1354221910-22493-1-git-send-email-mcgrof@do-not-panic.com>
-Message-ID: <1354221910-22493-5-git-send-email-mcgrof@do-not-panic.com>
+Message-ID: <1354221910-22493-6-git-send-email-mcgrof@do-not-panic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,38 +11,122 @@ From: "Luis R. Rodriguez" <mcgrof@do-not-panic.com>
 
 spinlock_t should always be used.
 
-Could not get this to build with allmodconfig:
-
-mcgrof at frijol ~/linux-next (git::(no branch))$ make C=1 M=drivers/media/platform/s5p-jpeg
-
-  WARNING: Symbol version dump /home/mcgrof/linux-next/Module.symvers
-           is missing; modules will have no dependencies and modversions.
-
+  LD      drivers/net/wireless/brcm80211/built-in.o
+  CHECK   drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.o
+  CHECK   drivers/net/wireless/brcm80211/brcmfmac/fwil.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/fwil.o
+  CHECK   drivers/net/wireless/brcm80211/brcmfmac/fweh.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/fweh.o
+  CHECK   drivers/net/wireless/brcm80211/brcmfmac/dhd_cdc.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/dhd_cdc.o
+  CHECK   drivers/net/wireless/brcm80211/brcmfmac/dhd_common.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/dhd_common.o
+  CHECK   drivers/net/wireless/brcm80211/brcmfmac/dhd_linux.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/dhd_linux.o
+  CHECK   drivers/net/wireless/brcm80211/brcmfmac/dhd_sdio.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/dhd_sdio.o
+  CHECK   drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.o
+  CHECK   drivers/net/wireless/brcm80211/brcmfmac/bcmsdh_sdmmc.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/bcmsdh_sdmmc.o
+  CHECK   drivers/net/wireless/brcm80211/brcmfmac/sdio_chip.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/sdio_chip.o
+  CHECK   drivers/net/wireless/brcm80211/brcmfmac/usb.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/usb.o
+  CHECK   drivers/net/wireless/brcm80211/brcmfmac/dhd_dbg.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmfmac/dhd_dbg.o
+  LD [M]  drivers/net/wireless/brcm80211/brcmfmac/brcmfmac.o
+  LD      drivers/net/wireless/brcm80211/brcmsmac/built-in.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/mac80211_if.c
+drivers/net/wireless/brcm80211/brcmsmac/mac80211_if.c:1311:6: warning: context imbalance in 'brcms_down' - unexpected unlock
+drivers/net/wireless/brcm80211/brcmsmac/mac80211_if.c:1598:6: warning: context imbalance in 'brcms_rfkill_set_hw_state' - unexpected unlock
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/mac80211_if.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/ucode_loader.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/ucode_loader.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/ampdu.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/ampdu.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/antsel.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/antsel.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/channel.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/channel.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/main.c
+drivers/net/wireless/brcm80211/brcmsmac/main.c:6246:36: warning: Initializer entry defined twice
+drivers/net/wireless/brcm80211/brcmsmac/main.c:6246:43:   also defined here
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/main.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/phy_shim.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/phy_shim.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/pmu.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/pmu.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/rate.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/rate.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/stf.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/stf.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/aiutils.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/aiutils.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/phy/phy_cmn.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/phy/phy_cmn.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/phy/phy_lcn.c
+drivers/net/wireless/brcm80211/brcmsmac/phy/phy_lcn.c:3313:46: warning: cast truncates bits from constant value (ffff7fff becomes 7fff)
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/phy/phy_lcn.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.c
+drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.c:17688:47: warning: cast truncates bits from constant value (ffff7fff becomes 7fff)
+drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.c:18187:53: warning: cast truncates bits from constant value (ffff3fff becomes 3fff)
+drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.c:21160:36: warning: cast truncates bits from constant value (ffff3fff becomes 3fff)
+drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.c:23321:35: warning: cast truncates bits from constant value (ffff7fff becomes 7fff)
+drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.c:28343:44: warning: cast truncates bits from constant value (ffff1fff becomes 1fff)
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/phy/phytbl_lcn.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/phy/phytbl_lcn.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/phy/phytbl_n.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/phy/phytbl_n.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/phy/phy_qmath.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/phy/phy_qmath.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/dma.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/dma.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/brcms_trace_events.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/brcms_trace_events.o
+  CHECK   drivers/net/wireless/brcm80211/brcmsmac/debug.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmsmac/debug.o
+  LD [M]  drivers/net/wireless/brcm80211/brcmsmac/brcmsmac.o
+  LD      drivers/net/wireless/brcm80211/brcmutil/built-in.o
+  CHECK   drivers/net/wireless/brcm80211/brcmutil/utils.c
+  CC [M]  drivers/net/wireless/brcm80211/brcmutil/utils.o
+  LD [M]  drivers/net/wireless/brcm80211/brcmutil/brcmutil.o
   Building modules, stage 2.
-  MODPOST 0 modules
+  MODPOST 3 modules
+  CC      drivers/net/wireless/brcm80211/brcmfmac/brcmfmac.mod.o
+  LD [M]  drivers/net/wireless/brcm80211/brcmfmac/brcmfmac.ko
+  CC      drivers/net/wireless/brcm80211/brcmsmac/brcmsmac.mod.o
+  LD [M]  drivers/net/wireless/brcm80211/brcmsmac/brcmsmac.ko
+  CC      drivers/net/wireless/brcm80211/brcmutil/brcmutil.mod.o
+  LD [M]  drivers/net/wireless/brcm80211/brcmutil/brcmutil.ko
 
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-media at vger.kernel.org
+Cc: Brett Rudley <brudley@broadcom.com>
+Cc: Roland Vossen <rvossen@broadcom.com>
+Cc: Arend van Spriel <arend@broadcom.com>
+Cc: Franky (Zhenhui) Lin <frankyl@broadcom.com>
+Cc: Kan Yan <kanyan@broadcom.com>
+Cc: linux-wireless at vger.kernel.org
+Cc: brcm80211-dev-list at broadcom.com
 Reported-by: Hauke Mehrtens <hauke@hauke-m.de>
 Signed-off-by: Luis R. Rodriguez <mcgrof@do-not-panic.com>
 ---
- drivers/media/platform/s5p-jpeg/jpeg-core.h |    2 +-
+ drivers/net/wireless/brcm80211/brcmfmac/fweh.h |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.h b/drivers/media/platform/s5p-jpeg/jpeg-core.h
-index 022b9b9..8a4013e 100644
---- a/drivers/media/platform/s5p-jpeg/jpeg-core.h
-+++ b/drivers/media/platform/s5p-jpeg/jpeg-core.h
-@@ -62,7 +62,7 @@
+diff --git a/drivers/net/wireless/brcm80211/brcmfmac/fweh.h b/drivers/net/wireless/brcm80211/brcmfmac/fweh.h
+index b39246a..240a2ea 100644
+--- a/drivers/net/wireless/brcm80211/brcmfmac/fweh.h
++++ b/drivers/net/wireless/brcm80211/brcmfmac/fweh.h
+@@ -158,7 +158,7 @@ typedef int (*brcmf_fweh_handler_t)(struct brcmf_if *ifp,
   */
- struct s5p_jpeg {
- 	struct mutex		lock;
--	struct spinlock		slock;
-+	spinlock_t		slock;
- 
- 	struct v4l2_device	v4l2_dev;
- 	struct video_device	*vfd_encoder;
+ struct brcmf_fweh_info {
+ 	struct work_struct event_work;
+-	struct spinlock evt_q_lock;
++	spinlock_t evt_q_lock;
+ 	struct list_head event_q;
+ 	int (*evt_handler[BRCMF_E_LAST])(struct brcmf_if *ifp,
+ 					 const struct brcmf_event_msg *evtmsg,
 -- 
 1.7.10.4
