@@ -1,23 +1,22 @@
-From: mmayer@broadcom.com (Markus Mayer)
-Date: Thu, 29 Nov 2012 12:03:29 -0800
-Subject: vexpress compilation error in next-20121127
-In-Reply-To: <1354189196.2987.59.camel@hornet>
-References: <50B56601.5010305@broadcom.com>
- <1354106164.2987.21.camel@hornet> <50B679C9.2010808@broadcom.com>
- <1354189196.2987.59.camel@hornet>
-Message-ID: <50B7BF91.1070705@broadcom.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Nov 2012 20:07:08 +0000
+Subject: [GIT PULL] ARM: final SoC fixes for 3.7
+In-Reply-To: <201211291424.25711.arnd@arndb.de>
+References: <201211291424.25711.arnd@arndb.de>
+Message-ID: <20121129200708.GN19440@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-11-29 03:39 AM, Pawel Moll wrote:
->>
->> Is there a quick way to describe the difference between these two
->> branches? I am okay to use for-next rather than next/soc, but I would
->> like to know what the difference between the two.
->
-> Those are questions to Arnd and Olof [...]
+On Thu, Nov 29, 2012 at 02:24:25PM +0000, Arnd Bergmann wrote:
+> Hi Linus,
+> 
+> These should be the last bug fixes you get from Olof and me for 3.7.
+> This is based on the previous one you pulled and there is nothing
+> spectacular in here. I'll follow up with a second pull request
+> knowing that those are probably too late now, but I'd like to let
+> you know about the ones that didn't make it and give you the chance
+> to pull those anyway if you prefer.
 
-Thanks for your help. I have started a new thread for this topic.
-
-Regards,
--Markus
+I don't see anything in here for the OMAP warning that I've been reporting
+for the last two weeks.  What's going on with getting fixes merged into
+arm-soc?
