@@ -1,22 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Nov 2012 20:07:08 +0000
-Subject: [GIT PULL] ARM: final SoC fixes for 3.7
-In-Reply-To: <201211291424.25711.arnd@arndb.de>
-References: <201211291424.25711.arnd@arndb.de>
-Message-ID: <20121129200708.GN19440@n2100.arm.linux.org.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 29 Nov 2012 21:10:26 +0100
+Subject: [PATCH 4/4] rtc: pxa: request rtc irqs when probe/remove the
+ device
+In-Reply-To: <1354155670-6267-4-git-send-email-chao.xie@marvell.com> (Chao
+ Xie's message of "Wed, 28 Nov 2012 21:21:10 -0500")
+References: <1354155670-6267-1-git-send-email-chao.xie@marvell.com>
+ <1354155670-6267-4-git-send-email-chao.xie@marvell.com>
+Message-ID: <87mwy0187h.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 29, 2012 at 02:24:25PM +0000, Arnd Bergmann wrote:
-> Hi Linus,
-> 
-> These should be the last bug fixes you get from Olof and me for 3.7.
-> This is based on the previous one you pulled and there is nothing
-> spectacular in here. I'll follow up with a second pull request
-> knowing that those are probably too late now, but I'd like to let
-> you know about the ones that didn't make it and give you the chance
-> to pull those anyway if you prefer.
+Chao Xie <chao.xie@marvell.com> writes:
 
-I don't see anything in here for the OMAP warning that I've been reporting
-for the last two weeks.  What's going on with getting fixes merged into
-arm-soc?
+> The original pxa_rtc_open/pxa_rtc_release will be called
+> when the /dev/rtc0 is opened or closed.
+> In fact, these two functions will register/unregister the irqs.
+> User application will use /dev/rtc0 to read the rtc time or set
+> the alarm. The rtc should still run indepent of open/close the
+> rtc device.
+> So only register the irqs when probe the device,
+> and disable clock and unregister the irqs when remove the device.
+No, as Russell I think that's not correct.
+
+This is not how RTC API should be used. And on top of RTC API considerations,
+consider this : today, rtc-pxa and rtc-sa1100 _can_ coexist on a PXA platform,
+and be used alternatively (I know, it's a bit borderline because of IO space,
+but anyway it does work). How will that be possible with your patch ?
+
+Cheers.
+
+--
+Robert
