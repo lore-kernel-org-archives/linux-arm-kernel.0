@@ -1,34 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Nov 2012 15:53:03 +0000
-Subject: [PATCH v2] ARM: implement optimized percpu variable access
-In-Reply-To: <alpine.LFD.2.02.1211291039060.4576@xanadu.home>
-References: <1354200764-23751-1-git-send-email-robherring2@gmail.com>
- <alpine.LFD.2.02.1211291039060.4576@xanadu.home>
-Message-ID: <20121129155303.GL19440@n2100.arm.linux.org.uk>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Thu, 29 Nov 2012 10:57:00 -0500
+Subject: [PATCH v4 01/14] ARM: Add page table and page defines needed by
+ KVM
+In-Reply-To: <20121119141417.GT3205@mudshark.cambridge.arm.com>
+References: <20121110154203.2836.46686.stgit@chazy-air>
+ <20121110154217.2836.41905.stgit@chazy-air>
+ <20121119141417.GT3205@mudshark.cambridge.arm.com>
+Message-ID: <CANM98q+H6J56HqidqKTpTT1Er-wHsSNyJi4zwGVG2eX6N04vPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 29, 2012 at 10:45:50AM -0500, Nicolas Pitre wrote:
-> On Thu, 29 Nov 2012, Rob Herring wrote:
-> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> With the above, and moving the call to cpu_init() after the call to 
-> cpu_switch_mm(mm->pgd, mm) to fix Will's concerns (personally I'd put it 
-> right after local_flush_tlb_all())... 
+On Mon, Nov 19, 2012 at 9:14 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Sat, Nov 10, 2012 at 03:42:17PM +0000, Christoffer Dall wrote:
+>> KVM uses the stage-2 page tables and the Hyp page table format,
+>> so we define the fields and page protection flags needed by KVM.
+>>
+>> The nomenclature is this:
+>>  - page_hyp:        PL2 code/data mappings
+>>  - page_hyp_device: PL2 device mappings (vgic access)
+>>  - page_s2:         Stage-2 code/data page mappings
+>>  - page_s2_device:  Stage-2 device mappings (vgic access)
+>>
+>> Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
+>> Christoffer Dall <c.dall@virtualopensystems.com>
+>
+> [...]
+>
+>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>> index 941dfb9..087d949 100644
+>> --- a/arch/arm/mm/mmu.c
+>> +++ b/arch/arm/mm/mmu.c
+>> @@ -57,43 +57,61 @@ static unsigned int cachepolicy __initdata = CPOLICY_WRITEBACK;
+>>  static unsigned int ecc_mask __initdata = 0;
+>>  pgprot_t pgprot_user;
+>>  pgprot_t pgprot_kernel;
+>> +pgprot_t pgprot_hyp_device;
+>> +pgprot_t pgprot_s2;
+>> +pgprot_t pgprot_s2_device;
+>>
+>>  EXPORT_SYMBOL(pgprot_user);
+>>  EXPORT_SYMBOL(pgprot_kernel);
+>> +EXPORT_SYMBOL(pgprot_hyp_device);
+>> +EXPORT_SYMBOL(pgprot_s2);
+>> +EXPORT_SYMBOL(pgprot_s2_device);
+>
+> Do we still need these?
+>
 
-You're confused.  We were suggesting before the printk().
+the exports, nope.
 
-The reasoning is: printk() is not guaranteed not to access per-cpu
-variables, so it needs to be before the first printk.  It can't be
-before cpu_switch_mm(), and putting it before the TLB flush does
-_not_ guarantee that TLB/MMU isn't going to still be seeing the
-strongly-ordered attribute - so it _must_ be after the TLB flush.
+>>  struct cachepolicy {
+>>       const char      policy[16];
+>>       unsigned int    cr_mask;
+>>       pmdval_t        pmd;
+>>       pteval_t        pte;
+>> +     pteval_t        pte_s2;
+>>  };
+>>
+>> +#ifdef CONFIG_ARM_LPAE
+>> +#define s2_policy(policy)    policy
+>> +#else
+>> +#define s2_policy(policy)    0
+>> +#endif
+>
+> Put the macro in pgtable-{2,3}level.h?
+>
 
-As for the setup of the active MM, that's something that I still
-think should come as early as possible (even before the per-cpu
-stuff) because that is getting everything properly initialized and
-setup for this new thread; there's a risk that a fault occuring
-before that point may cause issues, specially if active_mm were NULL.
+I think that's weird, defining something far away from where it's used
+will only make it harder to read, pgtable.h is not included in this
+file, and there are other #ifdef CONFIG_ARM_LPAE in that file.
 
-So, between cpumask_set_cpu() and printk() please.
+Here's the fix from above:
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 087d949..46ca62b 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -63,9 +63,6 @@ pgprot_t pgprot_s2_device;
+
+ EXPORT_SYMBOL(pgprot_user);
+ EXPORT_SYMBOL(pgprot_kernel);
+-EXPORT_SYMBOL(pgprot_hyp_device);
+-EXPORT_SYMBOL(pgprot_s2);
+-EXPORT_SYMBOL(pgprot_s2_device);
+
+ struct cachepolicy {
+ 	const char	policy[16];
+
+
+-Christoffer
