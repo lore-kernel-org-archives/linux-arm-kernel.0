@@ -1,59 +1,123 @@
-From: jbe@pengutronix.de (Juergen Beisert)
-Date: Thu, 29 Nov 2012 14:50:00 +0100
-Subject: [BUGFIX PATCH] video: mxsfb: fix crash when unblanking the display
-In-Reply-To: <20663.19785.221750.909491@ipc1.ka-ro>
-References: <1353588555-13168-1-git-send-email-LW@KARO-electronics.de>
- <20663.19785.221750.909491@ipc1.ka-ro>
-Message-ID: <201211291450.00886.jbe@pengutronix.de>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Thu, 29 Nov 2012 15:53:26 +0200
+Subject: [PATCH v3 2/7] usb: chipidea: add otg file
+In-Reply-To: <1353921068-15673-3-git-send-email-peter.chen@freescale.com>
+References: <1353921068-15673-1-git-send-email-peter.chen@freescale.com>
+ <1353921068-15673-3-git-send-email-peter.chen@freescale.com>
+Message-ID: <87mwy0ms6h.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar,
+Peter Chen <peter.chen@freescale.com> writes:
 
-Lothar Wa?mann wrote:
-> > The VDCTRL4 register does not provide the MXS SET/CLR/TOGGLE feature.
-> > The write in mxsfb_disable_controller() sets the data_cnt for the LCD
-> > DMA to 0 which obviously means the max. count for the LCD DMA and
-> > leads to overwriting arbitrary memory when the display is unblanked.
+> diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+> index d738603..8702871 100644
+> --- a/drivers/usb/chipidea/ci.h
+> +++ b/drivers/usb/chipidea/ci.h
+> @@ -129,6 +129,7 @@ struct hw_bank {
+>   * @vbus_active: is VBUS active
+>   * @transceiver: pointer to USB PHY, if any
+>   * @hcd: pointer to usb_hcd for ehci host driver
+> + * @otg: for otg support
+>   */
+>  struct ci13xxx {
+>  	struct device			*dev;
+> @@ -164,6 +165,7 @@ struct ci13xxx {
+>  	bool				global_phy;
+>  	struct usb_phy			*transceiver;
+>  	struct usb_hcd			*hcd;
+> +	struct usb_otg      otg;
 
-Overwriting? It should be a reading DMA unit, shouldn't it?
+Can you indent the "otg" so that it's aligned with the rest?
 
-> > Note: I already sent this patch in December 2011 but noone picked it up
-> > obviously.
-> >
-> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> > ---
-> >  drivers/video/mxsfb.c |    3 ++-
-> >  1 files changed, 2 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-> > index 49619b4..f2a49ef 100644
-> > --- a/drivers/video/mxsfb.c
-> > +++ b/drivers/video/mxsfb.c
-> > @@ -369,7 +369,8 @@ static void mxsfb_disable_controller(struct fb_info
-> > *fb_info) loop--;
-> >  	}
-> >
-> > -	writel(VDCTRL4_SYNC_SIGNALS_ON, host->base + LCDC_VDCTRL4 + REG_CLR);
-> > +	reg = readl(host->base + LCDC_VDCTRL4);
-> > +	writel(reg & ~VDCTRL4_SYNC_SIGNALS_ON, host->base + LCDC_VDCTRL4);
-> >
-> >  	clk_disable_unprepare(host->clk);
-> >
-> > --
-> > 1.7.2.5
->
-> ping? 
+>  };
+>  
+>  static inline struct ci_role_driver *ci_role(struct ci13xxx *ci)
+> diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+> new file mode 100644
+> index 0000000..7dea3b3
+> --- /dev/null
+> +++ b/drivers/usb/chipidea/otg.c
+> @@ -0,0 +1,60 @@
+> +/*
+> + * otg.c - ChipIdea USB IP core OTG driver
+> + *
+> + * Copyright (C) 2012 Freescale Semiconductor, Inc.
+> + *
+> + * Author: Peter Chen
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/platform_device.h>
+> +#include <linux/module.h>
+> +#include <linux/io.h>
+> +#include <linux/irq.h>
+> +#include <linux/kernel.h>
+> +#include <linux/slab.h>
 
-I'm not sure if the missing SET/CLR feature for this register is a typo in the 
-i.MX23/i.MX28 data sheets or if it is intended. Lets assume its the truth 
-what they have written:
+Most of these look unnecessary.
 
-Acked-by: Juergen Beisert <jbe@pengutronix.de>
+> +#include <linux/usb/gadget.h>
+> +#include <linux/usb/otg.h>
+> +#include <linux/usb/chipidea.h>
+> +
+> +#include "ci.h"
+> +#include "udc.h"
+> +#include "bits.h"
+> +#include "host.h"
+> +#include "debug.h"
 
-Regards,
-Juergen
+And these.
 
--- 
-Pengutronix e.K.                              | Juergen Beisert             |
-Linux Solutions for Science and Industry      | http://www.pengutronix.de/  |
+> +
+> +static int ci_otg_set_peripheral(struct usb_otg *otg,
+> +		struct usb_gadget *periph)
+> +{
+> +	otg->gadget = periph;
+> +
+> +	return 0;
+> +}
+> +
+> +static int ci_otg_set_host(struct usb_otg *otg, struct usb_bus *host)
+> +{
+> +	otg->host = host;
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * ci_hdrc_otg_init - initialize device related bits
+> + * ci: the controller
+> + *
+> + * This function create otg struct, if the device can switch between
+> + * device and host.
+> + */
+> +int ci_hdrc_otg_init(struct ci13xxx *ci)
+> +{
+> +	/* Useless at current */
+> +	ci->otg.set_peripheral = ci_otg_set_peripheral;
+> +	ci->otg.set_host = ci_otg_set_host;
+> +	if (!IS_ERR_OR_NULL(ci->transceiver))
+> +		ci->transceiver->otg = &ci->otg;
+> +
+> +	return 0;
+> +}
+> diff --git a/drivers/usb/chipidea/otg.h b/drivers/usb/chipidea/otg.h
+> new file mode 100644
+> index 0000000..b4c6b3e
+> --- /dev/null
+> +++ b/drivers/usb/chipidea/otg.h
+> @@ -0,0 +1,6 @@
+> +#ifndef __DRIVERS_USB_CHIPIDEA_OTG_H
+> +#define __DRIVERS_USB_CHIPIDEA_OTG_H
+> +
+> +int ci_hdrc_otg_init(struct ci13xxx *ci);
+
+Can you put it to ci.h instead?
+
+Thanks,
+--
+Alex
