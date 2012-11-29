@@ -1,29 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Nov 2012 13:18:24 +0000
-Subject: [PATCH] backlight: corgi_lcd: Fix WARN_ON() when calling
- corgi_bl_set_intensity.
-In-Reply-To: <CAHod+Gd3UU7NdRLAAbsX6TUugnjKBwUsDy7yBQzyykuf5GHMVQ@mail.gmail.com>
-References: <1354139201-12834-1-git-send-email-dromede@gmail.com>
- <001501cdcdf2$b3f8f730$1beae590$%han@samsung.com>
- <CAHod+Gd3UU7NdRLAAbsX6TUugnjKBwUsDy7yBQzyykuf5GHMVQ@mail.gmail.com>
-Message-ID: <20121129131824.GJ19440@n2100.arm.linux.org.uk>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Thu, 29 Nov 2012 14:42:17 +0100
+Subject: [PATCH] video: mxsfb: fix typo: 'FAILING' instead of 'FALLING'
+In-Reply-To: <20663.20003.18426.828567@ipc1.ka-ro>
+References: <1353588555-13168-1-git-send-email-LW@KARO-electronics.de>
+ <1353588555-13168-2-git-send-email-LW@KARO-electronics.de>
+ <20663.20003.18426.828567@ipc1.ka-ro>
+Message-ID: <201211291442.17768.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 29, 2012 at 02:09:51PM +0100, Marko Kati? wrote:
-> Well, the commit message was short because i thought it was a quick
-> and obvious fix.
+Hi Lothar,
 
-Don't always expect the person who ends up applying your patch to know
-what your patch is doing.  Don't expect people who are looking back
-through the git history to look at the patch to work out whether your
-commit is relevant to them.  I suspect Andrew Morton doesn't know what
-a "SCOOP" or "AKITA" is...
+Lothar Wa?mann wrote:
+> [...]
+> ping?
 
-Commit messages are there not only to describe the change, but also say
-why the change is necessary.  Think about it as your chance to "sell"
-the patch.
+What a nice typo :))
 
-One good step would be to include the warning message dump from the
-kernel (your subject line says you're hitting a WARN_ON so include
-that.)  At least then people can see your starting point for the patch.
+You can add my:
+Acked-by: Juergen Beisert <jbe@pengutronix.de>
+
+Regards,
+Juergen
+
+-- 
+Pengutronix e.K.                              | Juergen Beisert             |
+Linux Solutions for Science and Industry      | http://www.pengutronix.de/  |
