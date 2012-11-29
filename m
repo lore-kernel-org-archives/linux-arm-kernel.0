@@ -1,80 +1,41 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 29 Nov 2012 11:02:17 -0600
-Subject: [PATCH 1/3] ARM: OMAP4: Update timer clock aliases
-In-Reply-To: <alpine.DEB.2.00.1211291048580.20529@utopia.booyaka.com>
+Date: Thu, 29 Nov 2012 11:03:00 -0600
+Subject: [PATCH 0/3] ARM: OMAP4: Clock fixes
+In-Reply-To: <alpine.DEB.2.00.1211291120220.20529@utopia.booyaka.com>
 References: <1352313782-21602-1-git-send-email-jon-hunter@ti.com>
- <1352313782-21602-2-git-send-email-jon-hunter@ti.com>
- <alpine.DEB.2.00.1211291048580.20529@utopia.booyaka.com>
-Message-ID: <50B79519.3080509@ti.com>
+ <alpine.DEB.2.00.1211291120220.20529@utopia.booyaka.com>
+Message-ID: <50B79544.8030507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 11/29/2012 04:53 AM, Paul Walmsley wrote:
+On 11/29/2012 05:21 AM, Paul Walmsley wrote:
 > Hi Jon,
 > 
 > On Wed, 7 Nov 2012, Jon Hunter wrote:
 > 
->> Commit "ARM: dts: OMAP4: Update timer addresses" updated the device-tree
->> names of the OMAP4 timers 5-7 because the default address for the timers
->> was changed from the L3 address to the MPU private address. When booting
->> with device-tree, this introduces a regression when attempting to set
->> the parent clock of timers 5-7 to the sys_clk_div_ck. Therefore, update
->> the clock aliases for timer 5-7 to reflect the updated device-tree name
->> for the timers.
+>> Fixes included, fixing up timer clock aliases for v3.8 and working
+>> around ABE DPLL issue seen with latest u-boot bootloader (v2012.10).
+>>
+>> Testing includes:
+>> - Boot testing on OMAP3430 Beagle, OMAP4430 Panda and OMAP4460 Panda
+>> - Boot tested with device-tree on OMAP4430 Panda and OMAP4460 Panda
+>>   and validated that all timers are working.
+>> - Suspend testing on OMAP3430 Beagle and OMAP4430 Panda (suspend not
+>>   functional on OMAP4460 Panda prior to this series and so could not
+>>   be tested).
+>> - Core retention validated on OMAP3430 Beagle.
+>>
+>> Jon Hunter (3):
+>>   ARM: OMAP4: Update timer clock aliases
+>>   ARM: OMAP4: Enhance support for DPLLs with 4X multiplier
+>>   ARM: OMAP4460: Workaround ABE DPLL failing to turn-on
 > 
-> Reviewing my E-mail inbox, just saw that this one is marked as being 
-> needed for v3.8.  Is that still the case?  If so, we should ask Tony to 
-> take an updated version of this patch, given the recent CCF conversion.
+> So I'd plan to queue #2 and #3 for v3.8-rc1.  But they need to be updated 
+> after the common clock framework conversion.  Could you update those to 
+> apply on the arm-soc for-next branch?
 
-Yes this is still needed for v3.8.
-
-> Following is the updated patch.
-
-Thanks, looks good to me.
+Yes no problem.
 
 Cheers
 Jon
-
-> 
-> - Paul
-> 
-> From: Jon Hunter <jon-hunter@ti.com>
-> Date: Thu, 29 Nov 2012 03:47:46 -0700
-> Subject: [PATCH] ARM: OMAP4: Update timer clock aliases
-> 
-> Commit "ARM: dts: OMAP4: Update timer addresses" updated the device-tree
-> names of the OMAP4 timers 5-7 because the default address for the timers
-> was changed from the L3 address to the MPU private address. When booting
-> with device-tree, this introduces a regression when attempting to set
-> the parent clock of timers 5-7 to the sys_clk_div_ck. Therefore, update
-> the clock aliases for timer 5-7 to reflect the updated device-tree name
-> for the timers.
-> 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> [paul at pwsan.com: updated to apply after the CCF conversion]
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> ---
->  arch/arm/mach-omap2/cclock44xx_data.c |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-> index aa56c3e..a1f0b55 100644
-> --- a/arch/arm/mach-omap2/cclock44xx_data.c
-> +++ b/arch/arm/mach-omap2/cclock44xx_data.c
-> @@ -1935,10 +1935,10 @@ static struct omap_clk omap44xx_clks[] = {
->  	CLK("4803e000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
->  	CLK("48086000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
->  	CLK("48088000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
-> -	CLK("49038000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
-> -	CLK("4903a000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
-> -	CLK("4903c000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
-> -	CLK("4903e000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
-> +	CLK("40138000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
-> +	CLK("4013a000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
-> +	CLK("4013c000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
-> +	CLK("4013e000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
->  	CLK(NULL,	"cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
->  };
->  
-> 
