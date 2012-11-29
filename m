@@ -1,59 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 29 Nov 2012 12:00:00 +0000
-Subject: [PATCH 3/3] Input: bu21013_ts - Add support for Device Tree
- booting
-In-Reply-To: <20121129112058.GH32691@opensource.wolfsonmicro.com>
-References: <1354021990-16978-1-git-send-email-lee.jones@linaro.org>
- <1354021990-16978-4-git-send-email-lee.jones@linaro.org>
- <20121128070332.GC23378@core.coreip.homeip.net>
- <20121128085731.GH2013@gmail.com>
- <20121128163105.GA28698@sirena.org.uk>
- <20121129100808.GW2013@gmail.com>
- <20121129112058.GH32691@opensource.wolfsonmicro.com>
-Message-ID: <20121129120000.GJ2013@gmail.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Thu, 29 Nov 2012 12:36:05 +0000
+Subject: [PATCH v5 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC
+ timings and NAND
+In-Reply-To: <1354121939-11246-5-git-send-email-zonque@gmail.com>
+References: <1354121939-11246-1-git-send-email-zonque@gmail.com>
+ <1354121939-11246-5-git-send-email-zonque@gmail.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3EA0B986@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Nov 2012, Mark Brown wrote:
+On Wed, Nov 28, 2012 at 22:28:59, Daniel Mack wrote:
+[...]
+> +	if (!of_property_read_string(child, "ti,nand-ecc-opt", &s)) {
+> +		for (val = 0; val < ARRAY_SIZE(nand_ecc_opts); val++)
+> +			if (!strcasecmp(s, nand_ecc_opts[val])) {
+> +				gpmc_nand_data->ecc_opt = val;
+> +				break;
+> +			}
+> +
+> +		/*
+> +		 *  AM335x RBL compatibility mode - dependns on runtime
+> +		 * detection of the error location module.
+> +		 */
+> +		if (!strcasecmp(s, "bch8-am335xrbl-compatible")) {
+> +			gpmc_nand_data->ecc_opt = OMAP_ECC_BCH8_CODE_HW;
+> +			gpmc_nand_data->is_elm_used = true;
 
-> On Thu, Nov 29, 2012 at 10:08:08AM +0000, Lee Jones wrote:
-> > On Wed, 28 Nov 2012, Mark Brown wrote:
-> 
-> > > The I2C subsystem guesses at a compatible string by default but it's
-> > > much better to explicitly set one as conflicts do arise from time to
-> > > time (eg, Wolfson parts are called WMxxxx but the WM prefix is also used
-> > > by at least WonderMedia).
-> 
-> > It uses the exact device name, rather than guessing. I don't think
-> > you're allowed to have duplicate device names in the system, or there
-> > would be clashes at registration time.
-> 
-> > The system is the same for platform data and DT alike.
-> 
-> Right, which is why this mostly works, but it's still better to provide
-> an actual compatible string which we can be 100% certain will avoid
-> conflicts.  This is very low cost when one is already defining DT
-> bindings.
+Remove is_elm_used from struct omap_nand_platform_data. Now this data
+populated as part of run time detection of elm module. So please remove
+The usage of is_elm_used;
 
-I know that it's an easy thing to do, but I'm more worried about
-what would happen if the an I2C device is registered using the
-current way (stripping the compatible string and using it as a
-client look-up) and we also provide a compatible entry in the
-driver itself. Do you know if there is any danger of duplicate
-registration or suchlike?
+http://www.spinics.net/lists/arm-kernel/msg210549.html
 
-> > Hence, there should be no need to have a compatible string in any i2c
-> > driver registration information.
+Thanks
+Avinash 
 > 
-> We're getting away with it at present (and frankly nobody's going to
-> build in two different drivers for a chip of the same name for practical
-> systems anyway).
-
-Right. In the same way as we're getting away with it when we
-register a platform_device using the register/add routines.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
