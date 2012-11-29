@@ -1,36 +1,47 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 29 Nov 2012 11:21:57 +0000 (UTC)
-Subject: [PATCH 0/3] ARM: OMAP4: Clock fixes
-In-Reply-To: <1352313782-21602-1-git-send-email-jon-hunter@ti.com>
-References: <1352313782-21602-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <alpine.DEB.2.00.1211291120220.20529@utopia.booyaka.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 29 Nov 2012 11:24:26 +0000
+Subject: [PATCH 3/3] Input: bu21013_ts - Add support for Device Tree
+ booting
+In-Reply-To: <20121129100808.GW2013@gmail.com>
+References: <1354021990-16978-1-git-send-email-lee.jones@linaro.org>
+ <1354021990-16978-4-git-send-email-lee.jones@linaro.org>
+ <20121128070332.GC23378@core.coreip.homeip.net>
+ <20121128085731.GH2013@gmail.com>
+ <20121128163105.GA28698@sirena.org.uk>
+ <20121129100808.GW2013@gmail.com>
+Message-ID: <20121129112058.GH32691@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+On Thu, Nov 29, 2012 at 10:08:08AM +0000, Lee Jones wrote:
+> On Wed, 28 Nov 2012, Mark Brown wrote:
 
-On Wed, 7 Nov 2012, Jon Hunter wrote:
+> > The I2C subsystem guesses at a compatible string by default but it's
+> > much better to explicitly set one as conflicts do arise from time to
+> > time (eg, Wolfson parts are called WMxxxx but the WM prefix is also used
+> > by at least WonderMedia).
 
-> Fixes included, fixing up timer clock aliases for v3.8 and working
-> around ABE DPLL issue seen with latest u-boot bootloader (v2012.10).
-> 
-> Testing includes:
-> - Boot testing on OMAP3430 Beagle, OMAP4430 Panda and OMAP4460 Panda
-> - Boot tested with device-tree on OMAP4430 Panda and OMAP4460 Panda
->   and validated that all timers are working.
-> - Suspend testing on OMAP3430 Beagle and OMAP4430 Panda (suspend not
->   functional on OMAP4460 Panda prior to this series and so could not
->   be tested).
-> - Core retention validated on OMAP3430 Beagle.
-> 
-> Jon Hunter (3):
->   ARM: OMAP4: Update timer clock aliases
->   ARM: OMAP4: Enhance support for DPLLs with 4X multiplier
->   ARM: OMAP4460: Workaround ABE DPLL failing to turn-on
+> It uses the exact device name, rather than guessing. I don't think
+> you're allowed to have duplicate device names in the system, or there
+> would be clashes at registration time.
 
-So I'd plan to queue #2 and #3 for v3.8-rc1.  But they need to be updated 
-after the common clock framework conversion.  Could you update those to 
-apply on the arm-soc for-next branch?
- 
+> The system is the same for platform data and DT alike.
 
-- Paul
+Right, which is why this mostly works, but it's still better to provide
+an actual compatible string which we can be 100% certain will avoid
+conflicts.  This is very low cost when one is already defining DT
+bindings.
+
+> Hence, there should be no need to have a compatible string in any i2c
+> driver registration information.
+
+We're getting away with it at present (and frankly nobody's going to
+build in two different drivers for a chip of the same name for practical
+systems anyway).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121129/999bdc18/attachment.sig>
