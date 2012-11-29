@@ -1,45 +1,47 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 29 Nov 2012 13:41:42 +0100
-Subject: [PATCH v5 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <518397C60809E147AF5323E0420B992E3EA0B986@DBDE01.ent.ti.com>
-References: <1354121939-11246-1-git-send-email-zonque@gmail.com>
- <1354121939-11246-5-git-send-email-zonque@gmail.com>
- <518397C60809E147AF5323E0420B992E3EA0B986@DBDE01.ent.ti.com>
-Message-ID: <50B75806.8030501@gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 29 Nov 2012 14:43:15 +0200
+Subject: [PATCH] ARM: mx25_3ds: Add camera support
+In-Reply-To: <CAOMZO5C0RSYfMWY1qHmuVJ00+48hvZQJrKcAom_0AE9qYmxOHA@mail.gmail.com>
+References: <1354022509-20505-1-git-send-email-fabio.estevam@freescale.com>
+ <20121128060543.GA31335@sapphire.tkos.co.il>
+ <CAOMZO5C0RSYfMWY1qHmuVJ00+48hvZQJrKcAom_0AE9qYmxOHA@mail.gmail.com>
+Message-ID: <20121129124314.GF12054@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.11.2012 13:36, Philip, Avinash wrote:
-> On Wed, Nov 28, 2012 at 22:28:59, Daniel Mack wrote:
-> [...]
->> +	if (!of_property_read_string(child, "ti,nand-ecc-opt", &s)) {
->> +		for (val = 0; val < ARRAY_SIZE(nand_ecc_opts); val++)
->> +			if (!strcasecmp(s, nand_ecc_opts[val])) {
->> +				gpmc_nand_data->ecc_opt = val;
->> +				break;
->> +			}
->> +
->> +		/*
->> +		 *  AM335x RBL compatibility mode - dependns on runtime
->> +		 * detection of the error location module.
->> +		 */
->> +		if (!strcasecmp(s, "bch8-am335xrbl-compatible")) {
->> +			gpmc_nand_data->ecc_opt = OMAP_ECC_BCH8_CODE_HW;
->> +			gpmc_nand_data->is_elm_used = true;
+Hi Fabio,
+
+On Thu, Nov 29, 2012 at 10:38:36AM -0200, Fabio Estevam wrote:
+> On Wed, Nov 28, 2012 at 4:05 AM, Baruch Siach <baruch@tkos.co.il> wrote:
 > 
-> Remove is_elm_used from struct omap_nand_platform_data. Now this data
-> populated as part of run time detection of elm module. So please remove
-> The usage of is_elm_used;
+> > Good to see some activity on i.MX25 camera support. Did you test video capture
+> > with a latest kernel?  You have surely noticed that i.MX25 support in the
+> > mx2_camera driver is marked BROKEN since 087c78a8.
+> 
+> I basically checked that mx2_camera can be probed:
+> 
+> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+> mx2-camera imx25-camera.0: Camera driver attached to camera 0
+> ov2640 0-0030: ov2640 Product ID 26:42 Manufacturer ID 7f:a2
+> i2c i2c-0: OV2640 Probed
+> mx2-camera imx25-camera.0: Camera driver detached from camera 0
+> mx2-camera imx25-camera.0: MX2 Camera (CSI) driver probed, clock
+> frequency: 22166666
+> 
+> Tried a Gstreamer pipeline but it is failing, but this Gstreamer issue
+> is not mx25 related as I saw the same issue with mx27/mx31.
+> 
+> Do you still have access to a mx25pdk?
 
-So why do we need "bch8-am335xrbl-compatible" as special case then?
+Not anymore, unfortunately.
 
-I thought the whole idea here is to tell the driver we want bch8 *and*
-the usage of the elm, instead of falling back to the (incompatible)
-software mode? If I remove that assignment, "bch8-am335xrbl-compatible"
-is the same than "bch8".
+> I will try v4l-utils when I get a chance.
 
-Which detail am I missing? :)
+Thanks. Keep me posted.
 
+baruch
 
-Daniel
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
