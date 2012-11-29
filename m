@@ -1,30 +1,42 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 29 Nov 2012 09:00:19 +0900
-Subject: [GIT PULL v2] Renesas ARM-based SoC maintainers for v3.8 #1
-Message-ID: <1354147220-10552-1-git-send-email-horms@verge.net.au>
+Date: Thu, 29 Nov 2012 09:00:20 +0900
+Subject: [PATCH] Update ARM/SHMOBILE section of MAINTAINERS
+In-Reply-To: <1354147220-10552-1-git-send-email-horms@verge.net.au>
+References: <1354147220-10552-1-git-send-email-horms@verge.net.au>
+Message-ID: <1354147220-10552-2-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Simon Horman <horms+renesas@verge.net.au>
 
-Please consider the following maintainers change for 3.8.
+I have been handling maintenance of shmobile
+for a little over a release-cycle now and it seems
+to appropriate to update the MAINTAINERS file accordingly.
 
-----------------------------------------------------------------
-The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
-
-  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git maintainers
-
-for you to fetch changes up to 5e2125985045270564f84ce8891a0453320f27cb:
-
-  Update ARM/SHMOBILE section of MAINTAINERS (2012-11-28 10:29:47 +0900)
-
-----------------------------------------------------------------
-Simon Horman (1):
-      Update ARM/SHMOBILE section of MAINTAINERS
-
+Acked-by: Paul Mundt <lethal@linux-sh.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  MAINTAINERS |    4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index e73060f..056200c 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1114,12 +1114,12 @@ S:	Maintained
+ F:	drivers/media/platform/s5p-tv/
+ 
+ ARM/SHMOBILE ARM ARCHITECTURE
+-M:	Paul Mundt <lethal@linux-sh.org>
++M:	Simon Horman <horms@verge.net.au>
+ M:	Magnus Damm <magnus.damm@gmail.com>
+ L:	linux-sh at vger.kernel.org
+ W:	http://oss.renesas.com
+ Q:	http://patchwork.kernel.org/project/linux-sh/list/
+-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/lethal/sh-2.6.git rmobile-latest
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git next
+ S:	Supported
+ F:	arch/arm/mach-shmobile/
+ F:	drivers/sh/
+-- 
+1.7.10.4
