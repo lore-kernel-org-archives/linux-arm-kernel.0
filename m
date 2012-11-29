@@ -1,30 +1,56 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 29 Nov 2012 09:52:41 +0200
-Subject: [PATCH v5 0/5] OMAP: iommu: hwmod, reset handling and runtime PM
-In-Reply-To: <1353373552-16039-1-git-send-email-omar.luna@linaro.org>
-References: <1353373552-16039-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <CAK=Wgba1eu1+NFsS1+xcO4rq+steWi9-HW6RgySAU3FX1XsEeg@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 29 Nov 2012 15:45:22 +0800
+Subject: [PATCH v2] MTD: at91: atmel_nand: return bit flips for the PMECC
+ read_page()
+In-Reply-To: <50B51605.9040703@newsguy.com>
+References: <1354013431-13598-1-git-send-email-josh.wu@atmel.com>
+ <50B50D81.3060401@newsguy.com> <50B51605.9040703@newsguy.com>
+Message-ID: <50B71292.4020604@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2012 at 3:05 AM, Omar Ramirez Luna <omar.luna@linaro.org> wrote:
-> These patches are needed for remoteproc to work on OMAP4.
+Hi, Mike
+
+On 11/28/2012 3:35 AM, Mike Dunn wrote:
+> On 11/27/2012 10:59 AM, Mike Dunn wrote:
+>> On 11/27/2012 02:50 AM, Josh Wu wrote:
+>>> This patch fix pmecc's read_page() to return maximum number of bitflips, 0 if uncorrectable.
+>>>
+>>> In the commit: 3f91e94f7f511de74c0d2abe08672ccdbdd1961c ("mtd: nand: read_page() returns max_bitflips ()"),
+>>> The ecc.read_page() is changed to return the maximum number of bitflips.
+>>> And when meet uncorrectable bitflips it needs to return 0.
+>>>
+>>> See the comment in nand.h:
+>>>   * @read_page:	function to read a page according to the ECC generator
+>>>   *		requirements; returns maximum number of bitflips corrected in
+>>>   *		any single ECC step, 0 if bitflips uncorrectable, -EIO hw error
+>>>
+>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>>> ---
+>>> change since v1:
+>>>    1. add detail commit message for the fix.
+>>>    2. return 0 when meet uncorrectable bitflips according to Mike Dunn's suggestion.
+>>
+>> Reviewed-by: Mike Dunn <mikedunn@newsguy.com>
+>>
+>> I see now the pmecc controller patch in the git log.  Nice work.
 >
-> Introduced iommu hwmod support for OMAP3 (iva, isp) and
-> OMAP4 (ipu, dsp), along with the corresponding runtime PM
-> and routines to deassert reset lines, enable/disable clocks
-> and configure sysc registers.
+> BTW, with such a wide range for ecc strength - up to 24 bits, according to the
+> commit message for the pmecc patch - you may want to think about setting an
+> appropriate bitflip_threshold in the driver.  I'm not a nand expert, and I don't
+> know much about the atmel_nand specifically, but I would think that if 23 bits
+> are corrected on a page of size 2k (or less), maybe a return code of -EUCLEAN
+> from mtd_read() might be appropriate.
 
-I tested the entire series with remoteproc/rpmsg on OMAP4 and it looks good.
-
-Since this is super needed, and have already been going on for quite a
-while, I'd really like to see this go in. We could then incrementally
-deal with any outstanding comment or issue that might show up.
-
-Joerg, can you please take it (or at least its first four patches) ?
-We have Tony's ack for the mach-omap2 parts.
-
-Tested-by: Ohad Ben-Cohen <ohad@wizery.com>
+After checking the nand_base.c, I saw it will set the 
+mtd.bitflip_threshold to mtd->ecc.strength during nand_scan_tail().
+in the atmel_nand code, the ecc strength will be set correctly, that 
+means bitflip_threashold should be set up correctly by default.
+so I think I don't need set up the the bitflip_threshold anymore if I 
+set ecc strength correctly. Am I missing any point here?
 
 Thanks,
-Ohad.
+Josh Wu
+
+>
+> Mike
