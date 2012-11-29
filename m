@@ -1,132 +1,115 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Thu, 29 Nov 2012 23:59:27 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the
- driver-core tree
-In-Reply-To: <20121129160309.7dc352f433d39f1bde0018a8@canb.auug.org.au>
-References: <20121129160309.7dc352f433d39f1bde0018a8@canb.auug.org.au>
-Message-ID: <20121129225927.GJ8628@kw.sim.vm.gnt>
+From: dromede@gmail.com (dromede at gmail.com)
+Date: Fri, 30 Nov 2012 00:22:59 +0100
+Subject: [PATCH] [ARM] pxa/spitz: Minor code refactor and typo fixes
+Message-ID: <1354231379-17289-1-git-send-email-dromede@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 29, 2012 at 04:03:09PM +1100, Stephen Rothwell wrote:
-> Hi all,
-> 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> drivers/leds/leds-ns2.c between commit 98ea1ea20cb7 ("leds: remove use of
-> __devinit") from the driver-core tree and commit 72052fcc1026 ("leds:
-> leds-ns2: add device tree binding") from the arm-soc tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+From: Marko Katic <dromede.gmail.com>
 
-Hi Stephen,
+This patch slightly changes the way i2c devices are defined
+and registered.
+I2c devices that are present in  all spitz variants are always defined
+while the max7310 gpio expander specific to the akita variant is defined
+conditionally. This makes more sense and will result in a slightly smaller kernel
+for some variants.
 
-The merge is fine and the driver works as expected.
+I2c init function spitz_i2c_init() is simplified and is now more readable.
 
-Thanks.
+Some code sections were renamed to better describe their contents.
 
-Simon
+Signed-off-by: Marko Katic <dromede@gmail.com>
+---
+ arch/arm/mach-pxa/spitz.c |   46 ++++++++++++++++++++++++---------------------
+ 1 file changed, 25 insertions(+), 21 deletions(-)
 
-> 
-> -- 
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-> diff --cc drivers/leds/leds-ns2.c
-> index bc6a0db,d64cc22..0000000
-> --- a/drivers/leds/leds-ns2.c
-> +++ b/drivers/leds/leds-ns2.c
-> @@@ -247,9 -260,67 +248,65 @@@ static void delete_ns2_led(struct ns2_l
->   {
->   	device_remove_file(led_dat->cdev.dev, &dev_attr_sata);
->   	led_classdev_unregister(&led_dat->cdev);
->  -	gpio_free(led_dat->cmd);
->  -	gpio_free(led_dat->slow);
->   }
->   
-> + #ifdef CONFIG_OF_GPIO
-> + /*
-> +  * Translate OpenFirmware node properties into platform_data.
-> +  */
->  -static int __devinit
-> ++static int
-> + ns2_leds_get_of_pdata(struct device *dev, struct ns2_led_platform_data *pdata)
-> + {
-> + 	struct device_node *np = dev->of_node;
-> + 	struct device_node *child;
-> + 	struct ns2_led *leds;
-> + 	int num_leds = 0;
-> + 	int i = 0;
-> + 
-> + 	num_leds = of_get_child_count(np);
-> + 	if (!num_leds)
-> + 		return -ENODEV;
-> + 
-> + 	leds = devm_kzalloc(dev, num_leds * sizeof(struct ns2_led),
-> + 			    GFP_KERNEL);
-> + 	if (!leds)
-> + 		return -ENOMEM;
-> + 
-> + 	for_each_child_of_node(np, child) {
-> + 		const char *string;
-> + 		int ret;
-> + 
-> + 		ret = of_get_named_gpio(child, "cmd-gpio", 0);
-> + 		if (ret < 0)
-> + 			return ret;
-> + 		leds[i].cmd = ret;
-> + 		ret = of_get_named_gpio(child, "slow-gpio", 0);
-> + 		if (ret < 0)
-> + 			return ret;
-> + 		leds[i].slow = ret;
-> + 		ret = of_property_read_string(child, "label", &string);
-> + 		leds[i].name = (ret == 0) ? string : child->name;
-> + 		ret = of_property_read_string(child, "linux,default-trigger",
-> + 					      &string);
-> + 		if (ret == 0)
-> + 			leds[i].default_trigger = string;
-> + 
-> + 		i++;
-> + 	}
-> + 
-> + 	pdata->leds = leds;
-> + 	pdata->num_leds = num_leds;
-> + 
-> + 	return 0;
-> + }
-> + 
-> + static const struct of_device_id of_ns2_leds_match[] = {
-> + 	{ .compatible = "lacie,ns2-leds", },
-> + 	{},
-> + };
-> + #endif /* CONFIG_OF_GPIO */
-> + 
->  -static int __devinit ns2_led_probe(struct platform_device *pdev)
->  +static int ns2_led_probe(struct platform_device *pdev)
->   {
->   	struct ns2_led_platform_data *pdata = pdev->dev.platform_data;
->   	struct ns2_led_data *leds_data;
-> @@@ -296,10 -381,11 +367,11 @@@ static int ns2_led_remove(struct platfo
->   
->   static struct platform_driver ns2_led_driver = {
->   	.probe		= ns2_led_probe,
->  -	.remove		= __devexit_p(ns2_led_remove),
->  +	.remove		= ns2_led_remove,
->   	.driver		= {
-> - 		.name	= "leds-ns2",
-> - 		.owner	= THIS_MODULE,
-> + 		.name		= "leds-ns2",
-> + 		.owner		= THIS_MODULE,
-> + 		.of_match_table	= of_match_ptr(of_ns2_leds_match),
->   	},
->   };
->   
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121129/70b51c92/attachment.sig>
+diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+index 2073f0e..0f92264 100644
+--- a/arch/arm/mach-pxa/spitz.c
++++ b/arch/arm/mach-pxa/spitz.c
+@@ -732,7 +732,7 @@ static inline void spitz_lcd_init(void) {}
+ #endif
+ 
+ /******************************************************************************
+- * Framebuffer
++ * NAND Flash
+  ******************************************************************************/
+ #if defined(CONFIG_MTD_NAND_SHARPSL) || defined(CONFIG_MTD_NAND_SHARPSL_MODULE)
+ static struct mtd_partition spitz_nand_partitions[] = {
+@@ -858,23 +858,13 @@ static inline void spitz_nor_init(void) {}
+ #endif
+ 
+ /******************************************************************************
+- * GPIO expander
++ * I2C devices
+  ******************************************************************************/
+ #if defined(CONFIG_I2C_PXA) || defined(CONFIG_I2C_PXA_MODULE)
+ static struct pca953x_platform_data akita_pca953x_pdata = {
+ 	.gpio_base		= AKITA_IOEXP_GPIO_BASE,
+ };
+ 
+-static struct i2c_board_info spitz_i2c_devs[] = {
+-	{
+-		.type		= "wm8750",
+-		.addr		= 0x1b,
+-	}, {
+-		.type		= "max7310",
+-		.addr		= 0x18,
+-		.platform_data	= &akita_pca953x_pdata,
+-	},
+-};
+ 
+ static struct regulator_consumer_supply isl6271a_consumers[] = {
+ 	REGULATOR_SUPPLY("vcc_core", NULL),
+@@ -894,7 +884,12 @@ static struct regulator_init_data isl6271a_info[] = {
+ 	}
+ };
+ 
+-static struct i2c_board_info spitz_pi2c_devs[] = {
++/* wm8750 and isl6271a are present in all spitz variants */
++static struct i2c_board_info spitz_i2c_devs[2] = {
++	{
++		.type		= "wm8750",
++		.addr		= 0x1b,
++	},
+ 	{
+ 		.type		= "isl6271a",
+ 		.addr		= 0x0c,
+@@ -902,18 +897,27 @@ static struct i2c_board_info spitz_pi2c_devs[] = {
+ 	},
+ };
+ 
++#ifdef CONFIG_MACH_AKITA
++static struct i2c_board_info akita_i2c_devs[1] = {
++	{
++		.type		= "max7310",
++		.addr		= 0x18,
++		.platform_data	= &akita_pca953x_pdata,
++	},
++};
++#endif
++
+ static void __init spitz_i2c_init(void)
+ {
+-	int size = ARRAY_SIZE(spitz_i2c_devs);
+-
+-	/* Only Akita has the max7310 chip */
+-	if (!machine_is_akita())
+-		size--;
+-
+ 	pxa_set_i2c_info(NULL);
+ 	pxa27x_set_i2c_power_info(NULL);
+-	i2c_register_board_info(0, spitz_i2c_devs, size);
+-	i2c_register_board_info(1, ARRAY_AND_SIZE(spitz_pi2c_devs));
++
++	i2c_register_board_info(0, &spitz_i2c_devs[0], 1);
++	i2c_register_board_info(1, &spitz_i2c_devs[1], 1);
++
++	if (machine_is_akita())
++		i2c_register_board_info(0, akita_i2c_devs, 1);
++
+ }
+ #else
+ static inline void spitz_i2c_init(void) {}
+-- 
+1.7.10.4
