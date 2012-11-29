@@ -1,68 +1,38 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Wed, 28 Nov 2012 21:21:10 -0500
-Subject: [PATCH 4/4] rtc: pxa: request rtc irqs when probe/remove the device
-In-Reply-To: <1354155670-6267-1-git-send-email-chao.xie@marvell.com>
-References: <1354155670-6267-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1354155670-6267-4-git-send-email-chao.xie@marvell.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Wed, 28 Nov 2012 21:31:14 -0500
+Subject: [PATCH -next] mmc: wmt-sdmmc: fix potential NULL pointer dereference
+ in wmt_mci_probe()
+Message-ID: <CAPgLHd9bKK54pR591ytB1_S3EOw4F177=Ofqf_h_n9_+SFyi2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original pxa_rtc_open/pxa_rtc_release will be called
-when the /dev/rtc0 is opened or closed.
-In fact, these two functions will register/unregister the irqs.
-User application will use /dev/rtc0 to read the rtc time or set
-the alarm. The rtc should still run indepent of open/close the
-rtc device.
-So only register the irqs when probe the device,
-and disable clock and unregister the irqs when remove the device.
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
+The dereference to 'of_id' should be moved below the NULL test.
+
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- drivers/rtc/rtc-pxa.c |   11 +++++++++--
- 1 files changed, 9 insertions(+), 2 deletions(-)
+ drivers/mmc/host/wmt-sdmmc.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/rtc/rtc-pxa.c b/drivers/rtc/rtc-pxa.c
-index 29646af..19abeb8 100644
---- a/drivers/rtc/rtc-pxa.c
-+++ b/drivers/rtc/rtc-pxa.c
-@@ -340,8 +340,6 @@ static int pxa_rtc_proc(struct device *dev, struct seq_file *seq)
- }
+diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
+index 5ba4605..f737b0c 100644
+--- a/drivers/mmc/host/wmt-sdmmc.c
++++ b/drivers/mmc/host/wmt-sdmmc.c
+@@ -773,7 +773,7 @@ static int __devinit wmt_mci_probe(struct platform_device *pdev)
+ 	struct device_node *np = pdev->dev.of_node;
+ 	const struct of_device_id *of_id =
+ 		of_match_device(wmt_mci_dt_ids, &pdev->dev);
+-	const struct wmt_mci_caps *wmt_caps = of_id->data;
++	const struct wmt_mci_caps *wmt_caps;
+ 	int ret;
+ 	int regular_irq, dma_irq;
  
- static const struct rtc_class_ops pxa_rtc_ops = {
--	.open = pxa_rtc_open,
--	.release = pxa_rtc_release,
- 	.read_time = pxa_rtc_read_time,
- 	.set_time = pxa_rtc_set_time,
- 	.read_alarm = pxa_rtc_read_alarm,
-@@ -435,6 +433,11 @@ static int __init pxa_rtc_probe(struct platform_device *pdev)
- 		}
+@@ -787,6 +787,7 @@ static int __devinit wmt_mci_probe(struct platform_device *pdev)
+ 		return -EFAULT;
  	}
  
-+	ret = pxa_rtc_open(&pdev->dev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Unable to request irqs for rtc\n");
-+		goto err_open;
-+	}
- 	/*
- 	 * If the clock divider is uninitialized then reset it to the
- 	 * default value to get the 1Hz clock.
-@@ -461,6 +464,8 @@ static int __init pxa_rtc_probe(struct platform_device *pdev)
- 	return 0;
++	wmt_caps = of_id->data;
+ 	regular_irq = irq_of_parse_and_map(np, 0);
+ 	dma_irq = irq_of_parse_and_map(np, 1);
  
- err_rtc_reg:
-+	pxa_rtc_release(&pdev->dev);
-+err_open:
- 	if (pxa_rtc->id == RTC_PXA95X)
- 		 iounmap(pxa_rtc->base_psbr);
- err_map_base_psbr:
-@@ -477,6 +482,8 @@ static int __exit pxa_rtc_remove(struct platform_device *pdev)
- 
- 	rtc_device_unregister(pxa_rtc->rtc);
- 
-+	pxa_rtc_release(&pdev->dev);
-+
- 	spin_lock_irq(&pxa_rtc->lock);
- 	iounmap(pxa_rtc->base);
- 	spin_unlock_irq(&pxa_rtc->lock);
--- 
-1.7.4.1
