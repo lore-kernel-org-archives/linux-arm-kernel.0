@@ -1,91 +1,60 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Thu, 29 Nov 2012 10:57:00 -0500
-Subject: [PATCH v4 01/14] ARM: Add page table and page defines needed by
- KVM
-In-Reply-To: <20121119141417.GT3205@mudshark.cambridge.arm.com>
-References: <20121110154203.2836.46686.stgit@chazy-air>
- <20121110154217.2836.41905.stgit@chazy-air>
- <20121119141417.GT3205@mudshark.cambridge.arm.com>
-Message-ID: <CANM98q+H6J56HqidqKTpTT1Er-wHsSNyJi4zwGVG2eX6N04vPw@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 29 Nov 2012 17:01:29 +0100
+Subject: [PATCH v6 2/5] mtd: omap-nand: pass device_node in platform data
+In-Reply-To: <1354204892-22762-1-git-send-email-zonque@gmail.com>
+References: <1354204892-22762-1-git-send-email-zonque@gmail.com>
+Message-ID: <1354204892-22762-3-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 9:14 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Sat, Nov 10, 2012 at 03:42:17PM +0000, Christoffer Dall wrote:
->> KVM uses the stage-2 page tables and the Hyp page table format,
->> so we define the fields and page protection flags needed by KVM.
->>
->> The nomenclature is this:
->>  - page_hyp:        PL2 code/data mappings
->>  - page_hyp_device: PL2 device mappings (vgic access)
->>  - page_s2:         Stage-2 code/data page mappings
->>  - page_s2_device:  Stage-2 device mappings (vgic access)
->>
->> Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
->> Christoffer Dall <c.dall@virtualopensystems.com>
->
-> [...]
->
->> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->> index 941dfb9..087d949 100644
->> --- a/arch/arm/mm/mmu.c
->> +++ b/arch/arm/mm/mmu.c
->> @@ -57,43 +57,61 @@ static unsigned int cachepolicy __initdata = CPOLICY_WRITEBACK;
->>  static unsigned int ecc_mask __initdata = 0;
->>  pgprot_t pgprot_user;
->>  pgprot_t pgprot_kernel;
->> +pgprot_t pgprot_hyp_device;
->> +pgprot_t pgprot_s2;
->> +pgprot_t pgprot_s2_device;
->>
->>  EXPORT_SYMBOL(pgprot_user);
->>  EXPORT_SYMBOL(pgprot_kernel);
->> +EXPORT_SYMBOL(pgprot_hyp_device);
->> +EXPORT_SYMBOL(pgprot_s2);
->> +EXPORT_SYMBOL(pgprot_s2_device);
->
-> Do we still need these?
->
+Pass an optional device_node pointer in the platform data, which in turn
+will be put into a mtd_part_parser_data. This way, code that sets up the
+platform devices can pass along the node from DT so that the partitions
+can be parsed.
 
-the exports, nope.
+For non-DT boards, this change has no effect.
 
->>  struct cachepolicy {
->>       const char      policy[16];
->>       unsigned int    cr_mask;
->>       pmdval_t        pmd;
->>       pteval_t        pte;
->> +     pteval_t        pte_s2;
->>  };
->>
->> +#ifdef CONFIG_ARM_LPAE
->> +#define s2_policy(policy)    policy
->> +#else
->> +#define s2_policy(policy)    0
->> +#endif
->
-> Put the macro in pgtable-{2,3}level.h?
->
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+---
+ drivers/mtd/nand/omap2.c                     | 4 +++-
+ include/linux/platform_data/mtd-nand-omap2.h | 4 +++-
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
-I think that's weird, defining something far away from where it's used
-will only make it harder to read, pgtable.h is not included in this
-file, and there are other #ifdef CONFIG_ARM_LPAE in that file.
-
-Here's the fix from above:
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 087d949..46ca62b 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -63,9 +63,6 @@ pgprot_t pgprot_s2_device;
-
- EXPORT_SYMBOL(pgprot_user);
- EXPORT_SYMBOL(pgprot_kernel);
--EXPORT_SYMBOL(pgprot_hyp_device);
--EXPORT_SYMBOL(pgprot_s2);
--EXPORT_SYMBOL(pgprot_s2_device);
-
- struct cachepolicy {
- 	const char	policy[16];
-
-
--Christoffer
+diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+index 3282b15..a733f15 100644
+--- a/drivers/mtd/nand/omap2.c
++++ b/drivers/mtd/nand/omap2.c
+@@ -1331,6 +1331,7 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
+ 	dma_cap_mask_t mask;
+ 	unsigned sig;
+ 	struct resource			*res;
++	struct mtd_part_parser_data	ppdata = {};
+ 
+ 	pdata = pdev->dev.platform_data;
+ 	if (pdata == NULL) {
+@@ -1556,7 +1557,8 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
+ 		goto out_release_mem_region;
+ 	}
+ 
+-	mtd_device_parse_register(&info->mtd, NULL, NULL, pdata->parts,
++	ppdata.of_node = pdata->of_node;
++	mtd_device_parse_register(&info->mtd, NULL, &ppdata, pdata->parts,
+ 				  pdata->nr_parts);
+ 
+ 	platform_set_drvdata(pdev, &info->mtd);
+diff --git a/include/linux/platform_data/mtd-nand-omap2.h b/include/linux/platform_data/mtd-nand-omap2.h
+index 24d32ca..6bf9ef4 100644
+--- a/include/linux/platform_data/mtd-nand-omap2.h
++++ b/include/linux/platform_data/mtd-nand-omap2.h
+@@ -60,6 +60,8 @@ struct omap_nand_platform_data {
+ 	int			devsize;
+ 	enum omap_ecc           ecc_opt;
+ 	struct gpmc_nand_regs	reg;
+-};
+ 
++	/* for passing the partitions */
++	struct device_node	*of_node;
++};
+ #endif
+-- 
+1.7.11.7
