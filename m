@@ -1,51 +1,66 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 29 Nov 2012 10:42:18 +0200
-Subject: [PATCH] video: da8xx-fb: clk_get on connection id fck
-In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3E9FB8D9@DBDE01.ent.ti.com>
-References: <1353415261-30080-1-git-send-email-prakash.pm@ti.com>
- <50AB7F7E.1070400@ti.com>
- <A73F36158E33644199EB82C5EC81C7BC3E9FB8D9@DBDE01.ent.ti.com>
-Message-ID: <50B71FEA.1070503@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 29 Nov 2012 10:08:08 +0000
+Subject: [PATCH 3/3] Input: bu21013_ts - Add support for Device Tree
+ booting
+In-Reply-To: <20121128163105.GA28698@sirena.org.uk>
+References: <1354021990-16978-1-git-send-email-lee.jones@linaro.org>
+ <1354021990-16978-4-git-send-email-lee.jones@linaro.org>
+ <20121128070332.GC23378@core.coreip.homeip.net>
+ <20121128085731.GH2013@gmail.com>
+ <20121128163105.GA28698@sirena.org.uk>
+Message-ID: <20121129100808.GW2013@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-23 06:33, Manjunathappa, Prakash wrote:
-> Hi Tomi,
+On Wed, 28 Nov 2012, Mark Brown wrote:
+
+> On Wed, Nov 28, 2012 at 08:57:31AM +0000, Lee Jones wrote:
 > 
-> On Tue, Nov 20, 2012 at 18:32:54, Nori, Sekhar wrote:
->> On 11/20/2012 6:11 PM, Manjunathappa wrote:
->>> do clk_get on connection id "fck" to support OMAP based
->>> platforms having multiple clocks for module. Without this
->>> driver change clk_get fails on am335x.
->>>
->>> This patch is based on the discussion in community
->>> http://marc.info/?l=linux-kernel&m=135166018907827&w=2
->>>
->>> Signed-off-by: Manjunathappa <prakash.pm@ti.com>
->>> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
->>
->> For the mach-davinci changes:
->>
->> Acked-by: Sekhar Nori <nsekhar@ti.com>
->>
->> Florian,
->>
->> I assume you will want to take this through your tree?
->>
+> > > I applied these 3 patches, but for DT we also need to specify compatible
+> > > ID and set up of_match_table pointer. 
 > 
-> Could you please pull in this?
+> > Why do you need a compatible string?
+> 
+> The I2C subsystem guesses at a compatible string by default but it's
+> much better to explicitly set one as conflicts do arise from time to
+> time (eg, Wolfson parts are called WMxxxx but the WM prefix is also used
+> by at least WonderMedia).
 
-Merged this and the "da8xx-fb: LCDC driver cleanup" to:
+It uses the exact device name, rather than guessing. I don't think
+you're allowed to have duplicate device names in the system, or there
+would be clashes at registration time.
 
-git://gitorious.org/linux-omap-dss2/linux.git for-next
+The system is the same for platform data and DT alike.
 
- Tomi
+In platform data we have: 
+
+> struct i2c_board_info mop500_i2c0_devices_stuib[] = {
+>         {
+>                 .type = "bu21013_tp",
+>                 .addr = 0x5C,
+>         }
+> };
+
+Where (i2c_client)client->name is populated by 'type', which should
+then match 'driver.name' exactly.
+
+And in DT we have:
+
+bu21013_tp at 0x5c {
+        compatible = "rhom,bu21013_tp";
+        reg = <0x5c>;
+};
+
+Where (i2c_client)client->name is populated by of_modalias_node(), which
+uses the compatible string in the DTS(I) file and takes off the
+'<vendor>,' which should then match 'driver.name' exactly.
+
+Hence, there should be no need to have a compatible string in any i2c
+driver registration information.
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 899 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121129/affe6c0b/attachment.sig>
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
