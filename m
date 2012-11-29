@@ -1,58 +1,46 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 29 Nov 2012 16:27:25 +1300
-Subject: [PATCH -next] mmc: wmt-sdmmc: fix potential NULL pointer
- dereference in wmt_mci_probe()
-In-Reply-To: <CAPgLHd9bKK54pR591ytB1_S3EOw4F177=Ofqf_h_n9_+SFyi2g@mail.gmail.com>
-References: <CAPgLHd9bKK54pR591ytB1_S3EOw4F177=Ofqf_h_n9_+SFyi2g@mail.gmail.com>
-Message-ID: <1354159645.3008.9.camel@gitbox>
+From: mturquette@ti.com (Mike Turquette)
+Date: Wed, 28 Nov 2012 20:34:36 -0800
+Subject: [PATCH 6/6 v6] cpufreq, highbank: add support for highbank cpufreq
+In-Reply-To: <20121129015133.GD28170@S2100-06.ap.freescale.net>
+References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1354046672-7392-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1354046672-7392-7-git-send-email-mark.langsdorf@calxeda.com>
+ <20121128023240.GA28170@S2100-06.ap.freescale.net>
+ <50B60E9C.9000405@calxeda.com>
+ <20121128145759.GB28170@S2100-06.ap.freescale.net>
+ <20121128151741.GC28170@S2100-06.ap.freescale.net>
+ <20121128160115.21126.3841@nucleus>
+ <20121129015133.GD28170@S2100-06.ap.freescale.net>
+Message-ID: <20121129043436.21126.714@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-11-28 at 21:31 -0500, Wei Yongjun wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Quoting Shawn Guo (2012-11-28 17:51:36)
+> > The notifiers in the clk framework might be a better place for this than
+> > just simply hacking the logic into the .set_rate callback.
 > 
-> The dereference to 'of_id' should be moved below the NULL test.
+> Ah, right.  How did I forget about that nice piece?
 > 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> ---
->  drivers/mmc/host/wmt-sdmmc.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> > I haven't looked at the definition of hb_voltage_change but does the
+> > call graph make any clk api calls?  Are you talking over i2c to a
+> > regulator?  If so then you'll probably hit the same reentrancy problem I
+> > hit when trying to make a general solution.
 > 
-> diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
-> index 5ba4605..f737b0c 100644
-> --- a/drivers/mmc/host/wmt-sdmmc.c
-> +++ b/drivers/mmc/host/wmt-sdmmc.c
-> @@ -773,7 +773,7 @@ static int __devinit wmt_mci_probe(struct platform_device *pdev)
->  	struct device_node *np = pdev->dev.of_node;
->  	const struct of_device_id *of_id =
->  		of_match_device(wmt_mci_dt_ids, &pdev->dev);
-> -	const struct wmt_mci_caps *wmt_caps = of_id->data;
-> +	const struct wmt_mci_caps *wmt_caps;
->  	int ret;
->  	int regular_irq, dma_irq;
->  
-> @@ -787,6 +787,7 @@ static int __devinit wmt_mci_probe(struct platform_device *pdev)
->  		return -EFAULT;
->  	}
->  
-> +	wmt_caps = of_id->data;
->  	regular_irq = irq_of_parse_and_map(np, 0);
->  	dma_irq = irq_of_parse_and_map(np, 1);
->  
+> So, how is your "reentrancy in the common clk framework" series[1]
+> going on?  Haven't seen any update since August.
 > 
 
-Arguable this is unnecessary as of_id can never be NULL unless
-of_match_device return's NULL and since it matches against the same
-table as the probe that should never happen.
+I've begun to look at a dvfs api that builds on top of the clock
+framework, as opposed to using clk_set_rate as the dvfs api itself.
+This eliminates the need for reentrancy, at least for the dvfs case.
 
-Given that there is a test at the start already for the NULL pointers,
-this does make sense however - I'm just not sure how it will ever
-happen. You could just remove the test instead.
+I'll post more when I have it.  Honestly the reentrancy stuff was just
+too ugly.  I might try again some day but for now I'm thinking a less
+radical approach deserves consideration.
 
-Either way, this does fix a 'potential' bug, so if everyone else is
-happy:
+Thanks,
+Mike
 
-Acked-by: Tony Prisk <linux@prisktech.co.nz>
-
-Regards
-Tony P
+> Shawn
+> 
+> [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/182198
