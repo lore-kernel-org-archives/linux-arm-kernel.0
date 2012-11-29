@@ -1,38 +1,68 @@
-From: mmayer@broadcom.com (Markus Mayer)
-Date: Thu, 29 Nov 2012 12:02:09 -0800
-Subject: Branches next/soc and for-next
-Message-ID: <50B7BF41.7060807@broadcom.com>
+From: spang@chromium.org (Michael Spang)
+Date: Thu, 29 Nov 2012 15:03:46 -0500
+Subject: [PATCH] ARM: Fix page counting in mem_init and show_mem
+In-Reply-To: <20121129130844.GI19440@n2100.arm.linux.org.uk>
+References: <1350956091-5276-1-git-send-email-spang@chromium.org>
+ <20121129130844.GI19440@n2100.arm.linux.org.uk>
+Message-ID: <CAC5F_1=SEDNsWGdPdFXB+RASV2oaRrnoOx46h2jCDwgNAEZXvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+On Thu, Nov 29, 2012 at 8:08 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Oct 22, 2012 at 09:34:51PM -0400, Michael Spang wrote:
+>>       for_each_bank (i, mi) {
+>>               struct membank *bank = &mi->bank[i];
+>> -             unsigned int pfn1, pfn2;
+>> -             struct page *page, *end;
+>> +             unsigned int start, end, pfn;
+>>
+>> -             pfn1 = bank_pfn_start(bank);
+>> -             pfn2 = bank_pfn_end(bank);
+>> +             start = bank_pfn_start(bank);
+>> +             end = bank_pfn_end(bank);
+>>
+>> -             page = pfn_to_page(pfn1);
+>> -             end  = pfn_to_page(pfn2 - 1) + 1;
+>> +             for (pfn = start; pfn < end; pfn++) {
+>> +                     struct page *page;
+>> +
+>> +                     if (!pfn_valid(pfn))
+>> +                             continue;
+>
+> This is not a very good fix; what this means is that we end up calling
+> pfn_valid() for each and every page in the system, and as pfn_valid()
+> may not be a simple test (but a search) we should avoid that when we're
+> iterating over all pages in the system.
+>
+> Firstly, the mem blank information is assumed from the very beginning
+> to be aligned with the sparsemem split-up.  This comes from the previous
+> discontiguous implementation where this was an absolute requirement.  We
+> continue to require that.
 
-Following a short discussion with Pawel regarding a build breakage in 
-next/soc (see 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/thread.html#135208), 
-I would like to ask you for some clarification as to the differences 
-between the branches next/soc and for-next and what that means for 
-development.
+Little confused here.
 
-If I understand correctly, next/soc is being used to integrate SoC work 
-from various board- or vendor-specific branches. for-next, in turn, 
-integrates next/soc with driver branches and other non-SoC related 
-branches. Is this somewhat accurate? -- What happens to code in 
-for-next? Is that what eventually gets pulled into mainline?
+On my system, there are 2 membanks and 8 sparsemem sections.
+Obviously, the banks have been further divided into sections by
+sparsemem. My problem occurs because this code assumes there's a
+single struct page array for the whole bank, when really there are
+multiple.
 
-As I mentioned in my discussion with Pawel, next/soc currently doesn't 
-build for vexpress and, since vexpress is multiplatform-enabled, no 
-other multiplatform target will build, either. The reason for this, 
-Pawel explained, was that he was asked to split his patch, so it could 
-be applied to different branches, depending on the subsystem area his 
-changes were made in. As a result, a file needed for compilation 
-(arch/mach-vexpress/reset.c) is missing in next/soc.
+Each struct page array is allocated in a separate call to bootmem.
+It's disastrous if bootmem can't allocate them contiguously. This
+happens on one of my devices with certain kernel options.
 
-How are such build errors generally addressed? How long does it usually 
-take? And, lastly, which branch would you recommend to use for 
-development to generate patches relative to arm-soc?
+>
+> Secondly, if you're worred about the stolen memory, then we need to be
+> iterating over the memblock information instead of the membank information.
+> This is slightly more complex because memblock will merge neighbouring
+> regions into one contiguous entry - and this needs to be split up here.
+> This is why I persisted with the membank stuff here as that _should_
+> already be appropriately split.
+>
+> In the long run though, moving to memblock and dealing better with the
+> split memory maps (rather than looking up each and every page using
+> pfn_to_page()) is the right way to go.
 
-Thanks for your help.
-
-Regards,
--Markus
+Thanks,
+Michael
