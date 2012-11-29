@@ -1,22 +1,80 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 29 Nov 2012 16:56:43 +0000
-Subject: [PATCH] ARM64: Remove incorrect Kconfig symbol HAVE_SPARSE_IRQ
-In-Reply-To: <1353856215-5371-1-git-send-email-shc_work@mail.ru>
-References: <1353856215-5371-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20121129165643.GG30437@arm.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 29 Nov 2012 11:02:17 -0600
+Subject: [PATCH 1/3] ARM: OMAP4: Update timer clock aliases
+In-Reply-To: <alpine.DEB.2.00.1211291048580.20529@utopia.booyaka.com>
+References: <1352313782-21602-1-git-send-email-jon-hunter@ti.com>
+ <1352313782-21602-2-git-send-email-jon-hunter@ti.com>
+ <alpine.DEB.2.00.1211291048580.20529@utopia.booyaka.com>
+Message-ID: <50B79519.3080509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 25, 2012 at 03:10:15PM +0000, Alexander Shiyan wrote:
-> Kernel does not contain symbol HAVE_SPARSE_IRQ. Definition
-> in arch/arm64/Kconfig seems typo because valid symbol is
-> MAY_HAVE_SPARSE_IRQ.
-> In any case SPARSE_IRQ is selected by default and we just
-> remove selecting of this symbol.
+
+On 11/29/2012 04:53 AM, Paul Walmsley wrote:
+> Hi Jon,
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> On Wed, 7 Nov 2012, Jon Hunter wrote:
+> 
+>> Commit "ARM: dts: OMAP4: Update timer addresses" updated the device-tree
+>> names of the OMAP4 timers 5-7 because the default address for the timers
+>> was changed from the L3 address to the MPU private address. When booting
+>> with device-tree, this introduces a regression when attempting to set
+>> the parent clock of timers 5-7 to the sys_clk_div_ck. Therefore, update
+>> the clock aliases for timer 5-7 to reflect the updated device-tree name
+>> for the timers.
+> 
+> Reviewing my E-mail inbox, just saw that this one is marked as being 
+> needed for v3.8.  Is that still the case?  If so, we should ask Tony to 
+> take an updated version of this patch, given the recent CCF conversion.
 
-Thanks. Applied.
+Yes this is still needed for v3.8.
 
--- 
-Catalin
+> Following is the updated patch.
+
+Thanks, looks good to me.
+
+Cheers
+Jon
+
+> 
+> - Paul
+> 
+> From: Jon Hunter <jon-hunter@ti.com>
+> Date: Thu, 29 Nov 2012 03:47:46 -0700
+> Subject: [PATCH] ARM: OMAP4: Update timer clock aliases
+> 
+> Commit "ARM: dts: OMAP4: Update timer addresses" updated the device-tree
+> names of the OMAP4 timers 5-7 because the default address for the timers
+> was changed from the L3 address to the MPU private address. When booting
+> with device-tree, this introduces a regression when attempting to set
+> the parent clock of timers 5-7 to the sys_clk_div_ck. Therefore, update
+> the clock aliases for timer 5-7 to reflect the updated device-tree name
+> for the timers.
+> 
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> [paul at pwsan.com: updated to apply after the CCF conversion]
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> ---
+>  arch/arm/mach-omap2/cclock44xx_data.c |    8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
+> index aa56c3e..a1f0b55 100644
+> --- a/arch/arm/mach-omap2/cclock44xx_data.c
+> +++ b/arch/arm/mach-omap2/cclock44xx_data.c
+> @@ -1935,10 +1935,10 @@ static struct omap_clk omap44xx_clks[] = {
+>  	CLK("4803e000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
+>  	CLK("48086000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
+>  	CLK("48088000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
+> -	CLK("49038000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+> -	CLK("4903a000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+> -	CLK("4903c000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+> -	CLK("4903e000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+> +	CLK("40138000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+> +	CLK("4013a000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+> +	CLK("4013c000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+> +	CLK("4013e000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+>  	CLK(NULL,	"cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
+>  };
+>  
+> 
