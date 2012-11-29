@@ -1,38 +1,51 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 29 Nov 2012 11:39:56 +0000
-Subject: vexpress compilation error in next-20121127
-In-Reply-To: <50B679C9.2010808@broadcom.com>
-References: <50B56601.5010305@broadcom.com>
- <1354106164.2987.21.camel@hornet> <50B679C9.2010808@broadcom.com>
-Message-ID: <1354189196.2987.59.camel@hornet>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Thu, 29 Nov 2012 17:16:31 +0530
+Subject: [PATCH v3 0/3] mtd: nand: OMAP: ELM error correction support for BCH
+ ecc
+Message-ID: <1354189595-12784-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-11-28 at 20:53 +0000, Markus Mayer wrote:
-> What I am really concerned about is an arm-soc branch that has commit 
-> 8ac49e0485 in it 
-> (http://git.kernel.org/?p=linux/kernel/git/arm/arm-soc.git;a=commit;h=8ac49e0485bb79223a111b366a3b1f5ec9148729). 
-> That commit seems to be in next/soc as well as for-next. Therefore, 
-> either one might serve my purpose. I am able to build for-next, but 
-> cannot build next/soc due to the above problem.
-> 
-> Is there a quick way to describe the difference between these two 
-> branches? I am okay to use for-next rather than next/soc, but I would 
-> like to know what the difference between the two.
+Support to use ELM as BCH 4 & 8 bit error correction module. Also performance
+enhancement by adding single shot read_page and write_page functions for the
+nand flashes with page size less than 4 KB.
 
-Those are questions to Arnd and Olof, really, but _as far as I
-understand_ theirs workflow, they keep pull topic branches from
-developers into the respective "next" topic branches (ie. both
-vexpress/soc and broadcom/soc got into next/soc), then all the topic
-branches are merged into general for-next (so both next/soc and
-next/drivers - amongst others - are there).
+ELM module can be used to correct errors reported by BCH 4, 8 & 16 bit
+ECC scheme. For now only 4 & 8 bit support is added.
 
->Also, is it okay for one of the two branches to temporarily not build 
-> (as is currently the case with next/soc)?
+BCH 4 & 8 bit error detection support is already available in mainline
+kernel and works with software error correction.
 
-This is a policy question, again for Arnd and Olof. In my case I had a
-long series of changes with internal dependencies and they asked me to
-break it into topic branches. Maybe I could have done better job with
-that, but other approach would have meant merge conflicts.
+This series is based on [1] and tested with RFC: OMAP GPMC bindings
+patch series
 
-Pawe?
+1. linux-next/20121129
+
+Tested on am335x-evm for BCH 4 and 8 bit error correction.
+
+Changes since v1:
+	- Erased page is identified by checking byte [13/7] in read
+	  ecc. To filter out bit flips in OOB area, check 0 bits in
+	  the byte greater than 4.
+	- GPMC ecc engine configuration moves to omap2.c NAND driver.
+
+Changes since v2:
+	- Added runtime detection of elm module, instead of depending
+	  on platform data.
+	- Added bit flip correction in OOB ecc data if bit flip happen
+	  OOB data.
+
+Philip, Avinash (3):
+  mtd: nand: omap2: Update nerrors using ecc.strength
+  mtd: devices: elm: Add support for ELM error correction
+  mtd: nand: omap2: Support for hardware BCH error correction.
+
+ Documentation/devicetree/bindings/mtd/elm.txt |   17 +
+ drivers/mtd/devices/Makefile                  |    4 +-
+ drivers/mtd/devices/elm.c                     |  418 ++++++++++++++++++
+ drivers/mtd/nand/omap2.c                      |  563 +++++++++++++++++++++++--
+ include/linux/platform_data/elm.h             |   55 +++
+ 5 files changed, 1017 insertions(+), 41 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/elm.txt
+ create mode 100644 drivers/mtd/devices/elm.c
+ create mode 100644 include/linux/platform_data/elm.h
