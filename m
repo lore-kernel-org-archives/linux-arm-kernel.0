@@ -1,138 +1,154 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 29 Nov 2012 23:44:32 +0900
-Subject: [PATCH 1/2] i2c-s3c2410: Leave the bus disabled unless it is in
- use
-In-Reply-To: <1354165536-18529-2-git-send-email-ch.naveen@samsung.com>
-References: <1354165536-18529-1-git-send-email-ch.naveen@samsung.com>
- <1354165536-18529-2-git-send-email-ch.naveen@samsung.com>
-Message-ID: <CAH9JG2VZAZfpfCjtxgMDsJPNf10FOO_PNV4poVkTgX=2XCoEpQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 29 Nov 2012 08:52:44 -0600
+Subject: [PATCH v2] ARM: implement optimized percpu variable access
+Message-ID: <1354200764-23751-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+From: Rob Herring <rob.herring@calxeda.com>
 
-On Thu, Nov 29, 2012 at 2:05 PM, Naveen Krishna Chatradhi
-<ch.naveen@samsung.com> wrote:
-> From: Simon Glass <sjg@chromium.org>
->
-> There is a rather odd feature of the exynos i2c controller that if it
-> is left enabled, it can lock itself up with the clk line held low.
-> This makes the bus unusable.
->
-> Unfortunately, the s3c24xx_i2c_set_master() function does not notice
-> this, and reports a timeout. From then on the bus cannot be used until
-> the AP is rebooted.
->
-> The problem happens when any sort of interrupt occurs (e.g. due to a
-> bus transition) when we are not in the middle of a transaction. We
-> have seen many instances of this when U-Boot leaves the bus apparently
-> happy, but Linux cannot access it.
->
-> The current code is therefore pretty fragile.
->
-> This fixes things by leaving the bus disabled unless we are actually
-> in a transaction. We enable the bus at the start of the transaction and
-> disable it at the end. That way we won't get interrupts and will not
-> lock up the bus.
->
-> It might be possible to clear pending interrupts on start-up, but this
-> seems to be a more robust solution. We can't service interrupts when
-> we are not in a transaction, and anyway would rather not lock up the
-> bus while we try.
->
-> Signed-off-by: Simon Glass <sjg@chromium.org>
-> Cc: Grant Grundler <grundler@chromium.org>
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> ---
->  drivers/i2c/busses/i2c-s3c2410.c |   37 +++++++++++++++++++++++++++++++++----
->  1 file changed, 33 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-> index e93e7d6..2fd346d 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> @@ -186,6 +186,31 @@ static inline void s3c24xx_i2c_enable_irq(struct s3c24xx_i2c *i2c)
->         writel(tmp | S3C2410_IICCON_IRQEN, i2c->regs + S3C2410_IICCON);
->  }
->
-> +/*
-> + * Disable the bus so that we won't get any interrupts from now on, or try
-> + * to drive any lines. This is the default state when we don't have
-> + * anything to send/receive.
-> + *
-> + * If there is an event on the bus, or we have a pre-existing event at
-> + * kernel boot time, we may not notice the event and the I2C controller
-> + * will lock the bus with the I2C clock line low indefinitely.
-> + */
-> +static inline void s3c24xx_i2c_disable_bus(struct s3c24xx_i2c *i2c)
-> +{
-> +       unsigned long tmp;
-> +
-> +       /* Stop driving the I2C pins */
-> +       tmp = readl(i2c->regs + S3C2410_IICSTAT);
-> +       tmp &= ~S3C2410_IICSTAT_TXRXEN;
-> +       writel(tmp, i2c->regs + S3C2410_IICSTAT);
-> +
-> +       /* We don't expect any interrupts now, and don't want send acks */
-> +       tmp = readl(i2c->regs + S3C2410_IICCON);
-> +       tmp &= ~(S3C2410_IICCON_IRQEN | S3C2410_IICCON_IRQPEND |
-> +               S3C2410_IICCON_ACKEN);
-> +       writel(tmp, i2c->regs + S3C2410_IICCON);
-> +}
-> +
->
->  /* s3c24xx_i2c_message_start
->   *
-> @@ -646,7 +671,11 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
->
->         s3c24xx_i2c_wait_idle(i2c);
->
-> +       s3c24xx_i2c_disable_bus(i2c);
-> +
->   out:
-> +       i2c->state = STATE_IDLE;
-> +
->         return ret;
->  }
->
-> @@ -912,7 +941,6 @@ static void s3c24xx_i2c_dt_gpio_free(struct s3c24xx_i2c *i2c)
->
->  static int s3c24xx_i2c_init(struct s3c24xx_i2c *i2c)
->  {
-> -       unsigned long iicon = S3C2410_IICCON_IRQEN | S3C2410_IICCON_ACKEN;
->         struct s3c2410_platform_i2c *pdata;
->         unsigned int freq;
->
-> @@ -926,12 +954,12 @@ static int s3c24xx_i2c_init(struct s3c24xx_i2c *i2c)
->
->         dev_info(i2c->dev, "slave address 0x%02x\n", pdata->slave_addr);
->
-> -       writel(iicon, i2c->regs + S3C2410_IICCON);
-> +       writel(0, i2c->regs + S3C2410_IICCON);
-> +       writel(0, i2c->regs + S3C2410_IICSTAT);
->
->         /* we need to work out the divisors for the clock... */
->
->         if (s3c24xx_i2c_clockrate(i2c, &freq) != 0) {
-> -               writel(0, i2c->regs + S3C2410_IICCON);
->                 dev_err(i2c->dev, "cannot meet bus frequency required\n");
->                 return -EINVAL;
->         }
-> @@ -939,7 +967,8 @@ static int s3c24xx_i2c_init(struct s3c24xx_i2c *i2c)
->         /* todo - check that the i2c lines aren't being dragged anywhere */
->
->         dev_info(i2c->dev, "bus frequency set to %d KHz\n", freq);
-> -       dev_dbg(i2c->dev, "S3C2410_IICCON=0x%02lx\n", iicon);
-> +       dev_dbg(i2c->dev, "S3C2410_IICCON=0x%02x\n",
-> +               readl(i2c->regs + S3C2410_IICCON));
->
->         return 0;
->  }
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Use the previously unused TPIDRPRW register to store percpu offsets.
+TPIDRPRW is only accessible in PL1, so it can only be used in the kernel.
+
+This replaces 2 loads with a mrc instruction for each percpu variable
+access. With hackbench, the performance improvement is 1.4% on Cortex-A9
+(highbank). Taking an average of 30 runs of "hackbench -l 1000" yields:
+
+Before: 6.2191
+After: 6.1348
+
+Will Deacon reported similar delta on v6 with 11MPCore.
+
+The asm "memory" constraints are needed here to ensure the percpu offset
+gets reloaded. Testing by Will found that this would not happen in
+__schedule() which is a bit of a special case as preemption is disabled
+but the execution can move cores.
+
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
+Changes in v2:
+- Add asm "memory" constraint
+- Only enable on v6K and v7 and avoid enabling for v6 SMP_ON_UP
+- Fix missing initialization of TPIDRPRW for resume path
+- Move cpu_init to beginning of secondary_start_kernel to ensure percpu
+  variables can be accessed as early as possible.
+
+ arch/arm/include/asm/Kbuild   |    1 -
+ arch/arm/include/asm/percpu.h |   45 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/setup.c       |    6 ++++++
+ arch/arm/kernel/smp.c         |    4 +++-
+ 4 files changed, 54 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/include/asm/percpu.h
+
+diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+index f70ae17..2ffdaac 100644
+--- a/arch/arm/include/asm/Kbuild
++++ b/arch/arm/include/asm/Kbuild
+@@ -16,7 +16,6 @@ generic-y += local64.h
+ generic-y += msgbuf.h
+ generic-y += param.h
+ generic-y += parport.h
+-generic-y += percpu.h
+ generic-y += poll.h
+ generic-y += resource.h
+ generic-y += sections.h
+diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
+new file mode 100644
+index 0000000..968c0a1
+--- /dev/null
++++ b/arch/arm/include/asm/percpu.h
+@@ -0,0 +1,45 @@
++/*
++ * Copyright 2012 Calxeda, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef _ASM_ARM_PERCPU_H_
++#define _ASM_ARM_PERCPU_H_
++
++/*
++ * Same as asm-generic/percpu.h, except that we store the per cpu offset
++ * in the TPIDRPRW. TPIDRPRW only exists on V6K and V7
++ */
++#if defined(CONFIG_SMP) && !defined(CONFIG_CPU_V6)
++static inline void set_my_cpu_offset(unsigned long off)
++{
++	/* Set TPIDRPRW */
++	asm volatile("mcr p15, 0, %0, c13, c0, 4" : : "r" (off) : "memory");
++}
++
++static inline unsigned long __my_cpu_offset(void)
++{
++	unsigned long off;
++	/* Read TPIDRPRW */
++	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : : "memory");
++	return off;
++}
++#define __my_cpu_offset __my_cpu_offset()
++#else
++#define set_my_cpu_offset(x)	do {} while(0)
++
++#endif /* CONFIG_SMP */
++
++#include <asm-generic/percpu.h>
++
++#endif /* _ASM_ARM_PERCPU_H_ */
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index da1d1aa..b2909ce 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -383,6 +383,12 @@ void cpu_init(void)
+ 		BUG();
+ 	}
+ 
++	/*
++	 * This only works on resume and secondary cores. For booting on the
++	 * boot cpu, smp_prepare_boot_cpu is called after percpu area setup.
++	 */
++	set_my_cpu_offset(per_cpu_offset(cpu));
++
+ 	cpu_proc_init();
+ 
+ 	/*
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index fbc8b26..aadcca7 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -296,6 +296,8 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+ 	struct mm_struct *mm = &init_mm;
+ 	unsigned int cpu;
+ 
++	cpu_init();
++
+ 	/*
+ 	 * The identity mapping is uncached (strongly ordered), so
+ 	 * switch away from it before attempting any exclusive accesses.
+@@ -315,7 +317,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+ 
+ 	printk("CPU%u: Booted secondary processor\n", cpu);
+ 
+-	cpu_init();
+ 	preempt_disable();
+ 	trace_hardirqs_off();
+ 
+@@ -371,6 +372,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
+ 
+ void __init smp_prepare_boot_cpu(void)
+ {
++	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
+ }
+ 
+ void __init smp_prepare_cpus(unsigned int max_cpus)
+-- 
+1.7.10.4
