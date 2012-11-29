@@ -1,70 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 29 Nov 2012 15:05:09 +0000
-Subject: [PATCH v2] ARM: implement optimized percpu variable access
-In-Reply-To: <1354200764-23751-1-git-send-email-robherring2@gmail.com>
-References: <1354200764-23751-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20121129150509.GB19866@mudshark.cambridge.arm.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 29 Nov 2012 16:07:20 +0100
+Subject: [PATCH v5 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <518397C60809E147AF5323E0420B992E3EA0BB4B@DBDE01.ent.ti.com>
+References: <1354121939-11246-1-git-send-email-zonque@gmail.com>
+ <1354121939-11246-5-git-send-email-zonque@gmail.com>
+ <518397C60809E147AF5323E0420B992E3EA0B986@DBDE01.ent.ti.com>
+ <50B75806.8030501@gmail.com>
+ <518397C60809E147AF5323E0420B992E3EA0BB4B@DBDE01.ent.ti.com>
+Message-ID: <50B77A28.8080608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-Thanks for the v2. One comment inline...
-
-On Thu, Nov 29, 2012 at 02:52:44PM +0000, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On 29.11.2012 15:59, Philip, Avinash wrote:
+> On Thu, Nov 29, 2012 at 18:11:42, Daniel Mack wrote:
+>> On 29.11.2012 13:36, Philip, Avinash wrote:
+>>> On Wed, Nov 28, 2012 at 22:28:59, Daniel Mack wrote:
+>>> [...]
+>>>> +	if (!of_property_read_string(child, "ti,nand-ecc-opt", &s)) {
+>>>> +		for (val = 0; val < ARRAY_SIZE(nand_ecc_opts); val++)
+>>>> +			if (!strcasecmp(s, nand_ecc_opts[val])) {
+>>>> +				gpmc_nand_data->ecc_opt = val;
+>>>> +				break;
+>>>> +			}
+>>>> +
+>>>> +		/*
+>>>> +		 *  AM335x RBL compatibility mode - dependns on runtime
+>>>> +		 * detection of the error location module.
+>>>> +		 */
+>>>> +		if (!strcasecmp(s, "bch8-am335xrbl-compatible")) {
+>>>> +			gpmc_nand_data->ecc_opt = OMAP_ECC_BCH8_CODE_HW;
+>>>> +			gpmc_nand_data->is_elm_used = true;
+>>>
+>>> Remove is_elm_used from struct omap_nand_platform_data. Now this data
+>>> populated as part of run time detection of elm module. So please remove
+>>> The usage of is_elm_used;
+>>
+>> So why do we need "bch8-am335xrbl-compatible" as special case then?
+>>
+>> I thought the whole idea here is to tell the driver we want bch8 *and*
+>> the usage of the elm, instead of falling back to the (incompatible)
+>> software mode? If I remove that assignment, "bch8-am335xrbl-compatible"
+>> is the same than "bch8".
+>>
 > 
-> Use the previously unused TPIDRPRW register to store percpu offsets.
-> TPIDRPRW is only accessible in PL1, so it can only be used in the kernel.
+> Here we have different problems present. 
+> 1. GPMC-NAND DT binding support.
+> 2. Compatible ECC layout between kernel, boot loader.
+> 3. Support for hardware accelerator, i.e ELM for error correction.
 > 
-> This replaces 2 loads with a mrc instruction for each percpu variable
-> access. With hackbench, the performance improvement is 1.4% on Cortex-A9
-> (highbank). Taking an average of 30 runs of "hackbench -l 1000" yields:
+> So priority should go for GPMC DT binding support. 
+> Can you please proceed with GPMC-NAND DT bindings without considering
+> ELM so that driver features existing can be obtained with DT.
 > 
-> Before: 6.2191
-> After: 6.1348
-> 
-> Will Deacon reported similar delta on v6 with 11MPCore.
-> 
-> The asm "memory" constraints are needed here to ensure the percpu offset
-> gets reloaded. Testing by Will found that this would not happen in
-> __schedule() which is a bit of a special case as preemption is disabled
-> but the execution can move cores.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> ---
-> Changes in v2:
-> - Add asm "memory" constraint
-> - Only enable on v6K and v7 and avoid enabling for v6 SMP_ON_UP
-> - Fix missing initialization of TPIDRPRW for resume path
-> - Move cpu_init to beginning of secondary_start_kernel to ensure percpu
->   variables can be accessed as early as possible.
+> I will take care of ECC layout (or RBL) compatibility along with ELM
+> series. I will make ELM series on top of your changes. This way we can
+> avoid circular dependency
 
-[...]
+Ok, fair enough. I'll drop "bch8-am335xrbl-compatible" from the list
+again and only care for those that are present in the enum.
 
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index fbc8b26..aadcca7 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -296,6 +296,8 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
->  	struct mm_struct *mm = &init_mm;
->  	unsigned int cpu;
->  
-> +	cpu_init();
-> +
->  	/*
->  	 * The identity mapping is uncached (strongly ordered), so
->  	 * switch away from it before attempting any exclusive accesses.
-> @@ -315,7 +317,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
->  
->  	printk("CPU%u: Booted secondary processor\n", cpu);
->  
-> -	cpu_init();
->  	preempt_disable();
->  	trace_hardirqs_off();
+Before I send the patches again, could you quickly state which
+repository they will go through? I'll make sure there are no conflicts
+when applying.
 
-It's really not safe moving the cpu_init that early because we're running
-strongly ordered at that point, so locks aren't working.
+>> Which detail am I missing? :)
+> 
+> I think what you need is NAND ECC layout to be common across Kernel and
+> boot loader. Strictly speaking ELM is not a necessity for it. The common
+> layout can be obtained even without presence of ELM, ELM is only a hardware
+> accelerator for error correction. If ELM is not used, we can rely on software
+> error correction, at least theoretically. But the way software error correction
+> is handled currently in omap nand driver will not help us as ecc layout assumed
+> is different.
 
-Will
+Yes, understood, hence I need some workaround for now, which I can
+happily keep in my local branch.
+
+
+Thanks,
+Daniel
