@@ -1,52 +1,74 @@
-From: p.paneri@samsung.com (Praveen Paneri)
-Date: Fri, 30 Nov 2012 17:54:33 +0530
-Subject: [PATCH v8 2/2] usb: s3c-hsotg: Adding phy driver support
-In-Reply-To: <4963449.bQgUShLPPx@amdc1227>
-References: <1352888836-17192-1-git-send-email-p.paneri@samsung.com>
- <1433031.3ftjAfsj34@flatron>
- <CAD6zSYMNSX8ASPBLpft-0riBi-xeD_b=BjCjSrftX_5_F2+TDA@mail.gmail.com>
- <4963449.bQgUShLPPx@amdc1227>
-Message-ID: <CAD6zSYO+DiDaKJ=a3V97yDLeNFmyfFFiNp9ba8iA-pgcF5fj=Q@mail.gmail.com>
+From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
+Date: Fri, 30 Nov 2012 13:28:33 +0100
+Subject: [ARM] head.S change broke platform device registration?
+In-Reply-To: <20121130121738.GA1960@linaro.org>
+References: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
+ <20121130121738.GA1960@linaro.org>
+Message-ID: <CAHod+GcgvxPGUi4p9-qVuRXfyODrYwDvU8u5cChgiXjFYpwOEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2012 at 6:50 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Praveen,
+On Fri, Nov 30, 2012 at 1:17 PM, Dave Martin <dave.martin@linaro.org> wrote:
+> On Fri, Nov 30, 2012 at 02:38:14AM +0100, Marko Kati? wrote:
+>> I recently tried to boot v3.7-rc7 on my akita (Sharp Zaurus C-1000,
+>> PXA270 machine).
+>> Backlight never turned on but the kernel booted just fine.
+>> After some investigation i determined that the gpio expander (max7310,
+>> i2c chip) is not even
+>> registered and thus not present in /sys/bus/i2c/devices.
+>> Backlight gpio controls are hooked to this chip thus, no backlight.
+>>
+>> I thought that too many things could have caused this so i went
+>> straight to bisecting.
+>> Bisection pointed me to this commit:
+>>
+>>  commit 424e5994e63326a42012f003f1174f3c363c7b62
+>> Author: Dave Martin <dave.martin@linaro.org>
+>> Date:   Fri Feb 10 18:07:07 2012 -0800
+>>
+>>     ARM: zImage/virt: hyp mode entry support for the zImage loader
+>>
+>>     The zImage loader needs to turn on the MMU in order to take
+>>     advantage of caching while decompressing the zImage.  Running this
+>>     in hyp mode would require the LPAE pagetable format to be
+>>     supported; to avoid this complexity, this patch switches out of hyp
+>>     mode, and returns back to hyp mode just before booting the kernel.
+>>
+>>     This implementation assumes that the Hyp mode view of memory and the
+>>     PL1 view of memory are coherent, providing that the MMU and caches
+>>     are off in both, as required by the boot protocol.  The zImage
+>>     decompression code must drain the write buffer on completion anyway, and
+>>     entry into Hyp mode should flush any prefetch buffer, avoiding hazards
+>>     associated with local write buffers and the pipeline.
+>>
+>>     Signed-off-by: Dave Martin <dave.martin@linaro.org>
+>>     Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> This commit was merged in v3.7-rc1. And indeed, if i
+>> revert this single commit, my gpio expander reappears and
+>> so does my backlight.
+>> I made no other changes to the vanilla 3.7-rc7
+>> except this revert.
+>>
+>> This seems very strange to me because i, with my limited knowledge,
+>> cannot see any correlation between this commit and the bug i am experiencing.
+>>
+>> Does anyone know what exactly is happening here?
 >
-> On Friday 23 of November 2012 09:54:51 Praveen Paneri wrote:
->> We will anyway remove the platform data part soon. If you say I can
->> resend it again.
+> This is indeed strange, since there is not much difference to the kernel
+> if CONFIG_ARM_VIRT_EXT is not set.
 >
-> I think that the requirement for platform data on DT-enabled systems
-> should be removed before this series get merged, because there are already
-> patches being worked on to remove auxdata tables (common clock framework
-> support by Thomas Abraham).
-Next is to add support for 4210, 4x12 and Exynos5 (patches were sent
-by vivek Gautam already). Not only s3c-hsotg but ehci, ohci and dwc
-will start using phy driver.
-This will remove phy related platform data passed to these drivers and...
+> Unless a bug is causing the kernel to trample on some random memory,
+> there is no reason for this to cause I2C devices to disappear.
 >
-> Adding next auxdata entry (containing platform data that must be provided)
-> would make them depend on phy platform data removal patch, which would
-> complicate things.
-s3c-hsotg platform data is also passing "is_osc" (Clock source info)
-and "dma" (dma mode info) from platform_data. IT seems they both are
-not used as on now. May be Lukasz can tell if we can move that to
-config option and get rid of s3c-hsotg_plat completely.
+> It could be something unrelated, like additional and removal of code
+> changing the position or alignment of other parts of the kernel image.
+>
+> Have you could try undoing parts of the patch to narrow the bug down
+> further?
+>
+> Cheers
+> ---Dave
 
-Once that is done only AUXDATA entry, which will be remaining, will be
-that of phy driver and I understand that we have to work towards
-removal of that as well but I guess this is a good first step towards
-the goal.
-
->
-> Best regards,
-> --
-> Tomasz Figa
-> Samsung Poland R&D Center
-> SW Solution Development, Linux Platform
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+No, not yet. As i said my knowledge of what goes on in head.S is limited
+so i'd rather not mess with it.
