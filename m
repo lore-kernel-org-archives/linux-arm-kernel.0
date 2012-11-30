@@ -1,52 +1,31 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Fri, 30 Nov 2012 09:38:26 +0100
-Subject: [PATCH 0/6] drivers: convert struct spinlock to spinlock_t
-In-Reply-To: <1354221910-22493-1-git-send-email-mcgrof@do-not-panic.com>
-References: <1354221910-22493-1-git-send-email-mcgrof@do-not-panic.com>
-Message-ID: <50B87082.3020604@broadcom.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 30 Nov 2012 17:44:44 +0900
+Subject: [PATCH 4/5] ARM: shmobile: kzm9g: use voltage regulators by default
+In-Reply-To: <1354265085-2444-1-git-send-email-horms@verge.net.au>
+References: <1354265085-2444-1-git-send-email-horms@verge.net.au>
+Message-ID: <1354265085-2444-5-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2012 09:45 PM, Luis R. Rodriguez wrote:
-> From: "Luis R. Rodriguez" <mcgrof@do-not-panic.com>
-> 
-> Turns out a few drivers have strayed away from using the
-> spinlock_t typedef and decided to use struct spinlock
-> directly. This series converts these drivers to use
-> spinlock_t. Each change has been compile tested with
-> allmodconfig and sparse checked. Driver developers
-> may want to look at the compile error output / sparse
-> error report supplied in each commit log, in particular
-> brcmfmac and i915, there are quite a few things that
-> are not related to this change that the developers
-> can clean up / fix.
+This is needed to initialise the MMCIF device in the
+absence of platform data.
 
-So what is the rationale here. During mainlining our drivers we had to
-remove all uses of 'typedef struct foo foo_t;'. The Linux CodingStyle
-(chapter 5 Typedefs) is spending a number of lines explaining why.
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ arch/arm/configs/kzm9g_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-So is spinlock_t an exception to this rule simply because the kernel
-uses spinlock_t all over the place. Using Greg's favorite final email
-remark:
-
-Confused.
-
-Gr. AvS
-
-> Luis R. Rodriguez (6):
->   ux500: convert struct spinlock to spinlock_t
->   i915: convert struct spinlock to spinlock_t
->   s5p-fimc: convert struct spinlock to spinlock_t
->   s5p-jpeg: convert struct spinlock to spinlock_t
->   brcmfmac: convert struct spinlock to spinlock_t
->   ie6xx_wdt: convert struct spinlock to spinlock_t
-> 
->  drivers/crypto/ux500/cryp/cryp.h               |    4 ++--
->  drivers/crypto/ux500/hash/hash_alg.h           |    4 ++--
->  drivers/gpu/drm/i915/i915_drv.h                |    4 ++--
->  drivers/media/platform/s5p-fimc/mipi-csis.c    |    2 +-
->  drivers/media/platform/s5p-jpeg/jpeg-core.h    |    2 +-
->  drivers/net/wireless/brcm80211/brcmfmac/fweh.h |    2 +-
->  drivers/watchdog/ie6xx_wdt.c                   |    2 +-
->  7 files changed, 10 insertions(+), 10 deletions(-)
-> 
+diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
+index c88b578..6d7fd53 100644
+--- a/arch/arm/configs/kzm9g_defconfig
++++ b/arch/arm/configs/kzm9g_defconfig
+@@ -83,6 +83,7 @@ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_SH_MOBILE=y
+ CONFIG_GPIO_PCF857X=y
+ # CONFIG_HWMON is not set
++CONFIG_REGULATOR=y
+ CONFIG_FB=y
+ CONFIG_FB_SH_MOBILE_LCDC=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+-- 
+1.7.10.4
