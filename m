@@ -1,63 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Nov 2012 13:45:22 +0000
-Subject: [ARM] head.S change broke platform device registration?
-In-Reply-To: <CAHod+GeZQx6-pUHPocbyMJCLawMUhrZuZf=mrgWax=L7eNJGhg@mail.gmail.com>
-References: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
- <50B88A59.6070207@arm.com>
- <CAHod+GeZQx6-pUHPocbyMJCLawMUhrZuZf=mrgWax=L7eNJGhg@mail.gmail.com>
-Message-ID: <50B8B872.2000008@arm.com>
+From: narkewoody@gmail.com (Woody Wu)
+Date: Fri, 30 Nov 2012 13:49:36 +0000 (UTC)
+Subject: nfs root not responding?
+References: <slrnkbgkqq.2kq.narkewoody@zuhnb712.local.com>
+ <20121130083252.B4301200171@gemini.denx.de>
+Message-ID: <slrnkbhe9o.2ee.narkewoody@zuhnb712.local.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/11/12 12:20, Marko Kati? wrote:
->> This is incredibly puzzling. I could understand your board not booting
->> at all because of this patch, but an i2c device missing?
->>
->> Can you see the i2c controller at all? I'll try to dig my PXA270 board
->> and see if I can reproduce your issue.
->>
->>         M.
->> --
->> Jazz is not dead. It just smells funny...
->>
-> 
-> There are three i2c devices on my board:
-> 
-> static struct i2c_board_info spitz_i2c_devs[] = {
-> 	{
-> 		.type		= "wm8750",
-> 		.addr		= 0x1b,
-> 	}, {
-> 		.type		= "max7310",
-> 		.addr		= 0x18,
-> 		.platform_data	= &akita_pca953x_pdata,
-> 	},
-> };
-> 
-> These two are on bus 0.
-> 
-> static struct i2c_board_info spitz_pi2c_devs[] = {
-> 	{
-> 		.type		= "isl6271a",
-> 		.addr		= 0x0c,
-> 		.platform_data	= &isl6271a_info,
-> 	},
-> };
-> 
-> This one is on bus 1.
-> 
-> With commit 424e5994e63326a42012f003f1174f3c363c7b62 applied
-> Only the max7310 is missing, the other two register and work fine.
-> 
-> Now, if i try to register _only_ the max7310 chip, it shows up but it doesn't
-> work. In that case i get this:
-> 
-> gpiochip_add: gpios 204..211 (max7310) failed to register
-> pca953x: probe of 0-0018 failed with error -16
+On 2012-11-30, Wolfgang Denk <wd@denx.de> wrote:
+> Dear Woody Wu,
+>
+> In message <slrnkbgkqq.2kq.narkewoody@zuhnb712.local.com> you wrote:
+>> 
+>> I just enabled the network in the kernel and trying to load a rootfs
+>> from remote nfs server.  The kernel did the DHCP succeed and got the
+>> ip and other network parameters.  But it then keep always complaining
+>> that "nfs server not responding" and the login prompt does not show up.
+>
+> Try adding "proto=tcp" as mount option and test if this changes
+> anything.
+>
 
-Right. So what you need to do is find out why GPIOs 204 to 211 are
-unavailable. Something must get clobbered one way or another.
+Hi, Wolfgang
 
-	M.
+Where to specify the option?  Is it something like
+nfsroot=....,proto=tcp?  A little confuse to me about mount option and
+nfs option.
+
+Thanks.
+
 -- 
-Jazz is not dead. It just smells funny...
+woody
+I can't go back to yesterday - because I was a different person then.
