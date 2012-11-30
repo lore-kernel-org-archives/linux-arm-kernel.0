@@ -1,42 +1,41 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 30 Nov 2012 11:17:48 +0000
-Subject: [GIT PULL] GPIO patch stack for v3.8
-In-Reply-To: <CACRpkdYDbfJO+RxbRpBmMi=mCj2L8a1rNgJgFW9EsxTPw2ivsA@mail.gmail.com>
-References: <CACRpkdYDbfJO+RxbRpBmMi=mCj2L8a1rNgJgFW9EsxTPw2ivsA@mail.gmail.com>
-Message-ID: <20121130111748.B872E3E14C4@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 30 Nov 2012 11:46:34 +0000
+Subject: [PATCH v4 01/14] ARM: Add page table and page defines needed by
+ KVM
+In-Reply-To: <CANM98q+H6J56HqidqKTpTT1Er-wHsSNyJi4zwGVG2eX6N04vPw@mail.gmail.com>
+References: <20121110154203.2836.46686.stgit@chazy-air>
+ <20121110154217.2836.41905.stgit@chazy-air>
+ <20121119141417.GT3205@mudshark.cambridge.arm.com>
+ <CANM98q+H6J56HqidqKTpTT1Er-wHsSNyJi4zwGVG2eX6N04vPw@mail.gmail.com>
+Message-ID: <20121130114634.GC26305@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Nov 2012 10:30:27 +0100, Linus Walleij <linus.walleij@linaro.org> wrote:
-> Hi Grant,
+On Thu, Nov 29, 2012 at 03:57:00PM +0000, Christoffer Dall wrote:
+> On Mon, Nov 19, 2012 at 9:14 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Sat, Nov 10, 2012 at 03:42:17PM +0000, Christoffer Dall wrote:
+> >>
+> >> +#ifdef CONFIG_ARM_LPAE
+> >> +#define s2_policy(policy)    policy
+> >> +#else
+> >> +#define s2_policy(policy)    0
+> >> +#endif
+> >
+> > Put the macro in pgtable-{2,3}level.h?
+> >
 > 
-> to avoid any mess during the v3.8 merge window, could you please pull
-> this patch stack to your GPIO branch for v3.8?
-> 
-> All these patches have been resting in linux-next and are reviewed and
-> ACKed by maintainers. A more verbose description is in the signed
-> tag.
-> 
-> Some confusion stems from the fact that I applied my own patches
-> without replying to myself that I applied them ... split personality/role
-> problem. If you pull this in, things should be more clear on what's
-> queued and not - everything is in your tree.
-> 
-> Note that ARM SoC is already using parts of this tree as baseline
-> for stuff in their tree so rebasing this patch trail is *not*
-> recommended.
+> I think that's weird, defining something far away from where it's used
+> will only make it harder to read, pgtable.h is not included in this
+> file, and there are other #ifdef CONFIG_ARM_LPAE in that file.
 
-Don't worry, I won't rebase anything that I grab out of your tree.
 
-> Please pull it in!
-> 
-> Apart from this there are a few gpiolib patches in the pinctrl tree as
-> well. Those are about adding the GPIOchip local GPIO numberspace
-> to pinctrl local numberspace ranges as we discussed with Dong
-> Aisheng in Hong Kong, I'd be happy to brief you on the implementation
-> if need be. It's also detailed here:
-> https://blueprints.launchpad.net/linux-linaro/+spec/pinctrl-gpiorange-makeover
+Of course pgtable.h is included in this file -- we have direct references to
+L_PTE_MT_UNCACHED, for example, so by your logic we should inline all of
+that too!
 
-Those are fine.
+Yes, there are other CONFIG_ARM_LPAE checks in this file, but only where
+there's a piece of code that is not applicable one way or the other. For
+data definitions, it's really easy to fix in the headers so please do it
+there instead.
 
-g.
+Will
