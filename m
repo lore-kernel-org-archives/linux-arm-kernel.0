@@ -1,85 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 30 Nov 2012 14:34:35 +0000
-Subject: [ARM] head.S change broke platform device registration?
-In-Reply-To: <CAHod+GeZQx6-pUHPocbyMJCLawMUhrZuZf=mrgWax=L7eNJGhg@mail.gmail.com>
-References: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
- <50B88A59.6070207@arm.com>
- <CAHod+GeZQx6-pUHPocbyMJCLawMUhrZuZf=mrgWax=L7eNJGhg@mail.gmail.com>
-Message-ID: <20121130143435.GP19440@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 30 Nov 2012 14:46:36 +0000
+Subject: [PATCH v4 14/14] KVM: ARM: Handle I/O aborts
+In-Reply-To: <20121119150924.GF3205@mudshark.cambridge.arm.com>
+References: <20121110154203.2836.46686.stgit@chazy-air>
+ <20121110154348.2836.45008.stgit@chazy-air>
+ <20121119150924.GF3205@mudshark.cambridge.arm.com>
+Message-ID: <20121130144636.GB1960@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 30, 2012 at 01:20:06PM +0100, Marko Kati? wrote:
-> There are three i2c devices on my board:
+On Mon, Nov 19, 2012 at 03:09:24PM +0000, Will Deacon wrote:
+> On Sat, Nov 10, 2012 at 03:43:49PM +0000, Christoffer Dall wrote:
+> > When the guest accesses I/O memory this will create data abort
+> > exceptions and they are handled by decoding the HSR information
+> > (physical address, read/write, length, register) and forwarding reads
+> > and writes to QEMU which performs the device emulation.
+> > 
+> > Certain classes of load/store operations do not support the syndrome
+> > information provided in the HSR and we therefore must be able to fetch
+> > the offending instruction from guest memory and decode it manually.
+> > 
+> > We only support instruction decoding for valid reasonable MMIO operations
+> > where trapping them do not provide sufficient information in the HSR (no
+> > 16-bit Thumb instructions provide register writeback that we care about).
+> > 
+> > The following instruction types are NOT supported for MMIO operations
+> > despite the HSR not containing decode info:
+> >  - any Load/Store multiple
+> >  - any load/store exclusive
+> >  - any load/store dual
+> >  - anything with the PC as the dest register
+> > 
+> > This requires changing the general flow somewhat since new calls to run
+> > the VCPU must check if there's a pending MMIO load and perform the write
+> > after userspace has made the data available.
+> > 
+> > Rusty Russell fixed a horrible race pointed out by Ben Herrenschmidt:
+> > (1) Guest complicated mmio instruction traps.
+> > (2) The hardware doesn't tell us enough, so we need to read the actual
+> >     instruction which was being exectuted.
+> > (3) KVM maps the instruction virtual address to a physical address.
+> > (4) The guest (SMP) swaps out that page, and fills it with something else.
+> > (5) We read the physical address, but now that's the wrong thing.
+> > 
+> > Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
+> > Signed-off-by: Rusty Russell <rusty.russell@linaro.org>
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 > 
-> static struct i2c_board_info spitz_i2c_devs[] = {
-> 	{
-> 		.type		= "wm8750",
-> 		.addr		= 0x1b,
-> 	}, {
-> 		.type		= "max7310",
-> 		.addr		= 0x18,
-> 		.platform_data	= &akita_pca953x_pdata,
-> 	},
-> };
-> 
-> These two are on bus 0.
-> 
-> static struct i2c_board_info spitz_pi2c_devs[] = {
-> 	{
-> 		.type		= "isl6271a",
-> 		.addr		= 0x0c,
-> 		.platform_data	= &isl6271a_info,
-> 	},
-> };
-> 
-> This one is on bus 1.
-> 
-> With commit 424e5994e63326a42012f003f1174f3c363c7b62 applied
-> Only the max7310 is missing, the other two register and work fine.
-> 
-> Now, if i try to register _only_ the max7310 chip, it shows up but it doesn't
-> work. In that case i get this:
-> 
-> gpiochip_add: gpios 204..211 (max7310) failed to register
-> pca953x: probe of 0-0018 failed with error -16
+> This is looking like the right sort of thing now, but I would like to
+> see an Acked-by from Dave [CC'd] for this patch.
 
--16 is -EBUSY.  This happens because this check fails:
+Apologies for not looking at this until now -- it looks like my mutt
+filter was buggy, causing me to miss a few mails.
 
-        /* these GPIO numbers must not be managed by another gpio_chip */
-        for (id = base; id < base + chip->ngpio; id++) {
-                if (gpio_desc[id].chip != NULL) {
-                        status = -EBUSY;
-                        break;
-                }
-        }
 
-and it basically means that the GPIO numbers have already been taken.
+I haven't reviewed the code in depth, but it looks like a reasonable
+and fairly clean subsystem-specific decoder implementation.
 
-There is another device in spitz.c that could occupy the same space, and
-that's the scoop 2 device - but that won't be registered if your platform
-is Akita.
+This still is not generic, and looks a bit too specialised to lead
+directly to a generic implementation which could be reused by other
+subsystems.  But I think it is a step in the right direction in terms of
+the general way the code works.  If a future generic decode
+implementation does not reuse this code, it should still be able to
+reuse ideas from it.
 
-Hang on a moment - look at how the I2C devices are registered:
+The amount of decode here is not that huge, so if KVM needs it, I'm not
+sure if it is worth blocking this patch just because it's not generic.
 
-        int size = ARRAY_SIZE(spitz_i2c_devs);
+I still feel we are going to want to consolidate this decode stuff at
+some point, though.
 
-        /* Only Akita has the max7310 chip */
-        if (!machine_is_akita())
-                size--;
-
-        i2c_register_board_info(0, spitz_i2c_devs, size);
-
-So, the first entry is _always_ registered, but the second entry is only
-registered if the platform is an Akita.
-
-This all sounds like the kernel isn't booting with the correct platform
-ID.  Check the kernel messages - the first few, it tells you what platform
-it's booting for.  And yes, you have CONFIG_PXA_SHARPSL_DETECT_MACH_ID
-enabled which inserts code into the decompressor to detect the platform
-type, and it's highly likely that some change has disrupted that code,
-though it still reads fine in the disassembly.
-
-My guess is there's a timing issue between the MMU turning off and the
-other accesses; knowing which platform you end up being identified as may
-help.
+Cheers
+---Dave
