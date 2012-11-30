@@ -1,147 +1,59 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Fri, 30 Nov 2012 10:47:33 -0500
-Subject: [PATCH v4] ARM: Factor out cpuid implementor and part number
-Message-ID: <1354290453-59868-1-git-send-email-c.dall@virtualopensystems.com>
+Date: Fri, 30 Nov 2012 10:54:52 -0500
+Subject: [PATCH v4 01/14] ARM: Add page table and page defines needed by
+ KVM
+In-Reply-To: <20121130114634.GC26305@mudshark.cambridge.arm.com>
+References: <20121110154203.2836.46686.stgit@chazy-air>
+ <20121110154217.2836.41905.stgit@chazy-air>
+ <20121119141417.GT3205@mudshark.cambridge.arm.com>
+ <CANM98q+H6J56HqidqKTpTT1Er-wHsSNyJi4zwGVG2eX6N04vPw@mail.gmail.com>
+ <20121130114634.GC26305@mudshark.cambridge.arm.com>
+Message-ID: <CANM98qLj=GNiJa6Lt_AmY16cF-PPhcEECe+O0PQhmPqHtGLLqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Decoding the implementor and part number of the CPU id in the CPU ID
-register is needed by KVM, so we factor it out to share the code.
+On Fri, Nov 30, 2012 at 6:46 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Nov 29, 2012 at 03:57:00PM +0000, Christoffer Dall wrote:
+>> On Mon, Nov 19, 2012 at 9:14 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Sat, Nov 10, 2012 at 03:42:17PM +0000, Christoffer Dall wrote:
+>> >>
+>> >> +#ifdef CONFIG_ARM_LPAE
+>> >> +#define s2_policy(policy)    policy
+>> >> +#else
+>> >> +#define s2_policy(policy)    0
+>> >> +#endif
+>> >
+>> > Put the macro in pgtable-{2,3}level.h?
+>> >
+>>
+>> I think that's weird, defining something far away from where it's used
+>> will only make it harder to read, pgtable.h is not included in this
+>> file, and there are other #ifdef CONFIG_ARM_LPAE in that file.
+>
+>
+> Of course pgtable.h is included in this file -- we have direct references to
+> L_PTE_MT_UNCACHED, for example, so by your logic we should inline all of
+> that too!
 
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
----
-Changes since v3 (doh!):
- - Only call read_cpuid_part_number once and squash warning
-Changes since v2:
- - Take implementor as argument to read_cpuid_part_number
-Changes since v1:
- - Accidentally pointed to an old file, this one has more consistent
-   naming of the cpu implementor and part number defines.
+no, not at all!
 
- arch/arm/include/asm/cputype.h   |   34 ++++++++++++++++++++++++++++++++++
- arch/arm/kernel/perf_event_cpu.c |   32 +++++++++++++++-----------------
- 2 files changed, 49 insertions(+), 17 deletions(-)
+>
+> Yes, there are other CONFIG_ARM_LPAE checks in this file, but only where
+> there's a piece of code that is not applicable one way or the other. For
+> data definitions, it's really easy to fix in the headers so please do it
+> there instead.
+>
+I don't see that macro as a data definition, it's a way to avoid
+compile error when those defines are not there, and I don't see where
+that would ever be used outside this file, so moving it just makes you
+go hunting for the definition elsewhere.
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index cb47d28..3e6cd4e 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -51,6 +51,22 @@ extern unsigned int processor_id;
- #define read_cpuid_ext(reg) 0
- #endif
- 
-+#define ARM_CPU_IMP_ARM			0x41
-+#define ARM_CPU_IMP_INTEL		0x69
-+
-+#define ARM_CPU_PART_ARM1136		0xB360
-+#define ARM_CPU_PART_ARM1156		0xB560
-+#define ARM_CPU_PART_ARM1176		0xB760
-+#define ARM_CPU_PART_ARM11MPCORE	0xB020
-+#define ARM_CPU_PART_CORTEX_A8		0xC080
-+#define ARM_CPU_PART_CORTEX_A9 		0xC090
-+#define ARM_CPU_PART_CORTEX_A5 		0xC050
-+#define ARM_CPU_PART_CORTEX_A15		0xC0F0
-+#define ARM_CPU_PART_CORTEX_A7		0xC070
-+
-+#define ARM_CPU_PART_XSCALE1		0x1
-+#define ARM_CPU_PART_XSCALE2		0x2
-+
- /*
-  * The CPU ID never changes at run time, so we might as well tell the
-  * compiler that it's constant.  Use this function to read the CPU ID
-@@ -61,6 +77,24 @@ static inline unsigned int __attribute_const__ read_cpuid_id(void)
- 	return read_cpuid(CPUID_ID);
- }
- 
-+static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
-+{
-+	return (read_cpuid_id() & 0xFF000000) >> 24;
-+}
-+
-+static inline unsigned int __attribute_const__
-+read_cpuid_part_number(unsigned int implementor)
-+{
-+	switch (implementor) {
-+	case ARM_CPU_IMP_ARM:
-+		return (read_cpuid_id() & 0xFFF0);
-+	case ARM_CPU_IMP_INTEL:
-+		return (read_cpuid_id() >> 13) & 0x7;
-+	default:
-+		return 0;
-+	}
-+}
-+
- static inline unsigned int __attribute_const__ read_cpuid_cachetype(void)
- {
- 	return read_cpuid(CPUID_CACHETYPE);
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index 9a4f630..3ab19aa 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -201,48 +201,46 @@ static struct platform_device_id __devinitdata cpu_pmu_plat_device_ids[] = {
- static int __devinit probe_current_pmu(struct arm_pmu *pmu)
- {
- 	int cpu = get_cpu();
--	unsigned long cpuid = read_cpuid_id();
--	unsigned long implementor = (cpuid & 0xFF000000) >> 24;
--	unsigned long part_number = (cpuid & 0xFFF0);
-+	unsigned long implementor = read_cpuid_implementor();
-+	unsigned long part_number = read_cpuid_part_number(implementor);
- 	int ret = -ENODEV;
- 
- 	pr_info("probing PMU on CPU %d\n", cpu);
- 
- 	/* ARM Ltd CPUs. */
--	if (0x41 == implementor) {
-+	if (implementor == ARM_CPU_IMP_ARM) {
- 		switch (part_number) {
--		case 0xB360:	/* ARM1136 */
--		case 0xB560:	/* ARM1156 */
--		case 0xB760:	/* ARM1176 */
-+		case ARM_CPU_PART_ARM1136:
-+		case ARM_CPU_PART_ARM1156:
-+		case ARM_CPU_PART_ARM1176:
- 			ret = armv6pmu_init(pmu);
- 			break;
--		case 0xB020:	/* ARM11mpcore */
-+		case ARM_CPU_PART_ARM11MPCORE:
- 			ret = armv6mpcore_pmu_init(pmu);
- 			break;
--		case 0xC080:	/* Cortex-A8 */
-+		case ARM_CPU_PART_CORTEX_A8:
- 			ret = armv7_a8_pmu_init(pmu);
- 			break;
--		case 0xC090:	/* Cortex-A9 */
-+		case ARM_CPU_PART_CORTEX_A9:
- 			ret = armv7_a9_pmu_init(pmu);
- 			break;
--		case 0xC050:	/* Cortex-A5 */
-+		case ARM_CPU_PART_CORTEX_A5:
- 			ret = armv7_a5_pmu_init(pmu);
- 			break;
--		case 0xC0F0:	/* Cortex-A15 */
-+		case ARM_CPU_PART_CORTEX_A15:
- 			ret = armv7_a15_pmu_init(pmu);
- 			break;
--		case 0xC070:	/* Cortex-A7 */
-+		case ARM_CPU_PART_CORTEX_A7:
- 			ret = armv7_a7_pmu_init(pmu);
- 			break;
- 		}
- 	/* Intel CPUs [xscale]. */
--	} else if (0x69 == implementor) {
--		part_number = (cpuid >> 13) & 0x7;
-+	} else if (implementor == ARM_CPU_IMP_INTEL) {
- 		switch (part_number) {
--		case 1:
-+		case ARM_CPU_PART_XSCALE1:
- 			ret = xscale1pmu_init(pmu);
- 			break;
--		case 2:
-+		case ARM_CPU_PART_XSCALE2:
- 			ret = xscale2pmu_init(pmu);
- 			break;
- 		}
--- 
-1.7.9.5
+Perhaps there's an idea behind these files stating that it's
+universally better to have things in a header file, but I don't quite
+see why?
+
+(I can definitely move it, and I don't want to fight over it, I'm
+merely trying to understand why it would make the code cleaner/better
+to maintain/etc.)
+
+-Christoffer
