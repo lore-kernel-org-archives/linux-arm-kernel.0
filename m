@@ -1,51 +1,29 @@
-From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
-Date: Fri, 30 Nov 2012 02:38:14 +0100
-Subject: [ARM] head.S change broke platform device registration?
-Message-ID: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Thu, 29 Nov 2012 18:13:01 -0800
+Subject: [PATCH 2/2] i2c-s3c2410: Add bus arbitration implementation
+In-Reply-To: <20121129163448.GA3761@sirena.org.uk>
+References: <1354165536-18529-1-git-send-email-ch.naveen@samsung.com>
+ <1354165536-18529-3-git-send-email-ch.naveen@samsung.com>
+ <20121129163448.GA3761@sirena.org.uk>
+Message-ID: <CAPnjgZ0atD3k=gT0vjgkLO_SA8DMak6SiT6nZ_2T6WFqtK0szQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I recently tried to boot v3.7-rc7 on my akita (Sharp Zaurus C-1000,
-PXA270 machine).
-Backlight never turned on but the kernel booted just fine.
-After some investigation i determined that the gpio expander (max7310,
-i2c chip) is not even
-registered and thus not present in /sys/bus/i2c/devices.
-Backlight gpio controls are hooked to this chip thus, no backlight.
++Olof
 
-I thought that too many things could have caused this so i went
-straight to bisecting.
-Bisection pointed me to this commit:
+On Thu, Nov 29, 2012 at 8:34 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Thu, Nov 29, 2012 at 10:35:35AM +0530, Naveen Krishna Chatradhi wrote:
+>
+>> The arbitrator is a general purpose function which uses two GPIOs to
+>> communicate with another device to claim/release a bus. We use it to
+>> arbitrate an i2c port between the AP and the EC.
+>
+> Should this not be layerd on top of the I2C controller rather than part
+> of the controller driver?  It doesn't seem terribly controller specific.
 
- commit 424e5994e63326a42012f003f1174f3c363c7b62
-Author: Dave Martin <dave.martin@linaro.org>
-Date:   Fri Feb 10 18:07:07 2012 -0800
+It was originally done separately but I think it was felt that this
+was overly complex. Olof can you please comment on this?
 
-    ARM: zImage/virt: hyp mode entry support for the zImage loader
-
-    The zImage loader needs to turn on the MMU in order to take
-    advantage of caching while decompressing the zImage.  Running this
-    in hyp mode would require the LPAE pagetable format to be
-    supported; to avoid this complexity, this patch switches out of hyp
-    mode, and returns back to hyp mode just before booting the kernel.
-
-    This implementation assumes that the Hyp mode view of memory and the
-    PL1 view of memory are coherent, providing that the MMU and caches
-    are off in both, as required by the boot protocol.  The zImage
-    decompression code must drain the write buffer on completion anyway, and
-    entry into Hyp mode should flush any prefetch buffer, avoiding hazards
-    associated with local write buffers and the pipeline.
-
-    Signed-off-by: Dave Martin <dave.martin@linaro.org>
-    Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-This commit was merged in v3.7-rc1. And indeed, if i
-revert this single commit, my gpio expander reappears and
-so does my backlight.
-I made no other changes to the vanilla 3.7-rc7
-except this revert.
-
-This seems very strange to me because i, with my limited knowledge,
-cannot see any correlation between this commit and the bug i am experiencing.
-
-Does anyone know what exactly is happening here?
+Regards,
+Simon
