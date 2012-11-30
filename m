@@ -1,247 +1,249 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 30 Nov 2012 17:44:42 +0900
-Subject: [PATCH 2/5] ARM: mach-shmobile: sh73a0: Minimal setup using DT
+Date: Fri, 30 Nov 2012 17:44:45 +0900
+Subject: [PATCH 5/5] ARM: mach-shmobile: kzm9g: Reference DT implementation
 In-Reply-To: <1354265085-2444-1-git-send-email-horms@verge.net.au>
 References: <1354265085-2444-1-git-send-email-horms@verge.net.au>
-Message-ID: <1354265085-2444-3-git-send-email-horms@verge.net.au>
+Message-ID: <1354265085-2444-6-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Simon Horman <horms+renesas@verge.net.au>
 
-Allow a minimal setup of the sh73a0 SoC using a flattened device tree.
+Provide alternate board code for the kzm9g to demonstrate
+how DT may be used given the current state of driver
+device tree support. This is intended to act as a reference
+for mach-shmobile developers.
 
-* Configure the i2c controllers using a flattened device tree.
+Some notes:
 
-SCI serial controller and CMT clock source, whose drivers do not yet
-support configuration using a flattened device tree, are still configured
-using C code in order to allow booting of a board with this SoC.
+* Brings up the GIC interrupt handler using device tree
+* Brings up the following device using device tree:
+  - MMCIF (MMC)
+* Does not bring up the INTC interrupt controller at all,
+  thus external devices may not be used
+* Uses existing C code and not device tree to initialise the following,
+  which are needed for a working board:
+  - SCIF (Serial)
+  - CMT (Clock)
+  - PFC (GPIO)
+
+To use this alternate board code instead of the normal board code,
+CONFIG_MACH_KZM9G_REFERENCE should be selected in the kernel config.
+And the sh73a0-kzm9g-reference.dtb flattened device tree blob should be used.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 ---
 
 v2
-* Add extra entries to clock-sh73a0.c:lookups[] and
-  remove auxdata. Ultimtely the clocks will be described
-  in DT, but the code isn't there yet.
-* Use shmobile_setup_delay() and perform late initialisation of clocks
+* Do not initialise touchscreen, it requires the INTC interrupt controller
+  but for now this configuration only has the GIC interrupt controller.
+* Define mmcif and sdhi in SoC dtsi and reference in board dts.
+* Do not initialise SDHI, the driver needs to be updated
 ---
- arch/arm/boot/dts/sh73a0.dtsi                |   60 ++++++++++++++++++++++++++
- arch/arm/mach-shmobile/clock-sh73a0.c        |    5 +++
- arch/arm/mach-shmobile/include/mach/common.h |    2 +
- arch/arm/mach-shmobile/setup-sh73a0.c        |   39 ++++++++++++++++-
- 4 files changed, 105 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/Makefile                     |    3 +-
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts   |   37 ++++++++++
+ arch/arm/mach-shmobile/Kconfig                 |   10 +++
+ arch/arm/mach-shmobile/Makefile                |    8 ++-
+ arch/arm/mach-shmobile/board-kzm9g-reference.c |   92 ++++++++++++++++++++++++
+ 5 files changed, 148 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+ create mode 100644 arch/arm/mach-shmobile/board-kzm9g-reference.c
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 77c8e43..fc7f0fd 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -38,4 +38,64 @@
- 		reg = <0xf0001000 0x1000>,
- 		      <0xf0000100 0x100>;
- 	};
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f37cf9f..c606375 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -77,7 +77,8 @@ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+-	sh73a0-kzm9g.dtb
++	sh73a0-kzm9g.dtb \
++	sh73a0-kzm9g-reference.dtb
+ dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
+ 	spear1340-evb.dtb
+ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+new file mode 100644
+index 0000000..588016e
+--- /dev/null
++++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+@@ -0,0 +1,37 @@
++/*
++ * Device Tree Source for the KZM-A9-GT board
++ *
++ * Copyright (C) 2012 Horms Solutions Ltd.
++ *
++ * Based on sh73a0-kzm9g.dts
++ * Copyright (C) 2012 Renesas Solutions Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
-+	i2c0: i2c at 0xe6820000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xe6820000 0x425>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 167 0x4
-+			      0 168 0x4
-+			      0 169 0x4
-+			      0 170 0x4>;
++/dts-v1/;
++/include/ "sh73a0-reference.dtsi"
++
++/ {
++	model = "KZM-A9-GT";
++	compatible = "renesas,kzm9g-reference", "renesas,sh73a0";
++
++	memory {
++		device_type = "memory";
++		reg = <0x41000000 0x1e800000>;
 +	};
 +
-+	i2c1: i2c at 0xe6822000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xe6822000 0x425>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 51 0x4
-+			      0 52 0x4
-+			      0 53 0x4
-+			      0 54 0x4>;
++	fixedregulator1v8: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-1.8V";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
 +	};
++};
 +
-+	i2c2: i2c at 0xe6824000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xe6824000 0x425>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 171 0x4
-+			      0 172 0x4
-+			      0 173 0x4
-+			      0 174 0x4>;
-+	};
-+
-+	i2c3: i2c at 0xe6826000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xe6826000 0x425>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 183 0x4
-+			      0 184 0x4
-+			      0 185 0x4
-+			      0 186 0x4>;
-+	};
-+
-+	i2c4: i2c at 0xe6828000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,rmobile-iic";
-+		reg = <0xe6828000 0x425>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 187 0x4
-+			      0 188 0x4
-+			      0 189 0x4
-+			      0 190 0x4>;
-+	};
- };
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index 516ff7f..8bc7a2b 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -545,6 +545,7 @@ static struct clk_lookup lookups[] = {
++&mmcif {
++	vmmc-supply = <&fixedregulator1v8>;
++	vqmmc-supply = <&fixedregulator1v8>;
++};
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 8ae100c..ca95c2b 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -136,6 +136,16 @@ config MACH_KZM9G
+ 	select SND_SOC_AK4642 if SND_SIMPLE_CARD
+ 	select USE_OF
  
- 	/* MSTP32 clocks */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.2", &mstp_clks[MSTP001]), /* I2C2 */
-+	CLKDEV_DEV_ID("e6824000.i2c", &mstp_clks[MSTP001]), /* I2C2 */
- 	CLKDEV_DEV_ID("sh_mobile_ceu.1", &mstp_clks[MSTP129]), /* CEU1 */
- 	CLKDEV_DEV_ID("sh-mobile-csi2.1", &mstp_clks[MSTP128]), /* CSI2-RX1 */
- 	CLKDEV_DEV_ID("sh_mobile_ceu.0", &mstp_clks[MSTP127]), /* CEU0 */
-@@ -553,6 +554,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP125]), /* TMU01 */
- 	CLKDEV_DEV_ID("sh-mipi-dsi.0", &mstp_clks[MSTP118]), /* DSITX */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.0", &mstp_clks[MSTP116]), /* I2C0 */
-+	CLKDEV_DEV_ID("e6820000.i2c", &mstp_clks[MSTP116]), /* I2C0 */
- 	CLKDEV_DEV_ID("sh_mobile_lcdc_fb.0", &mstp_clks[MSTP100]), /* LCDC0 */
- 	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP219]), /* SCIFA7 */
- 	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP218]), /* SY-DMAC */
-@@ -569,6 +571,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_fsi2", &mstp_clks[MSTP328]), /* FSI */
- 	CLKDEV_DEV_ID("sh_irda.0", &mstp_clks[MSTP325]), /* IrDA */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.1", &mstp_clks[MSTP323]), /* I2C1 */
-+	CLKDEV_DEV_ID("e6822000.i2c", &mstp_clks[MSTP323]), /* I2C1 */
- 	CLKDEV_DEV_ID("renesas_usbhs", &mstp_clks[MSTP322]), /* USB */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]), /* SDHI0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP313]), /* SDHI1 */
-@@ -579,7 +582,9 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("leds-renesas-tpu.30", &mstp_clks[MSTP301]), /* TPU3 */
- 	CLKDEV_DEV_ID("leds-renesas-tpu.41", &mstp_clks[MSTP300]), /* TPU4 */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.3", &mstp_clks[MSTP411]), /* I2C3 */
-+	CLKDEV_DEV_ID("e6826000.i2c", &mstp_clks[MSTP411]), /* I2C3 */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.4", &mstp_clks[MSTP410]), /* I2C4 */
-+	CLKDEV_DEV_ID("e6828000.i2c", &mstp_clks[MSTP410]), /* I2C4 */
- 	CLKDEV_DEV_ID("sh_keysc.0", &mstp_clks[MSTP403]), /* KEYSC */
- };
++config MACH_KZM9G_REFERENCE
++	bool "KZM-A9-GT board - Reference Device Tree Implementation"
++	depends on MACH_KZM9G
++	---help---
++	   Use reference implementation of KZM-A9-GT board support
++	   which makes as greater use of device tree at the expense
++	   of not supporting a number of devices.
++
++	   This is intended to aid developers
++
+ comment "SH-Mobile System Configuration"
  
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index b50447e..06b905e 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -52,7 +52,9 @@ extern void sh73a0_init_irq(void);
- extern void sh73a0_init_irq_dt(void);
- extern void sh73a0_map_io(void);
- extern void sh73a0_add_early_devices(void);
-+extern void sh73a0_add_early_devices_dt(void);
- extern void sh73a0_add_standard_devices(void);
-+extern void sh73a0_add_standard_devices_dt(void);
- extern void sh73a0_clock_init(void);
- extern void sh73a0_pinmux_init(void);
- extern struct clk sh73a0_extal1_clk;
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index eab1bae..f8bdac4 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -23,6 +23,7 @@
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/platform_device.h>
+ config CPU_HAS_INTEVT
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index e3556c6..7ffa428 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -51,7 +51,13 @@ obj-$(CONFIG_MACH_BONITO)	+= board-bonito.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+ obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
+-obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
++ifeq ($(CONFIG_MACH_KZM9G),y)
++ifeq ($(CONFIG_MACH_KZM9G_REFERENCE),y)
++obj-y	+= board-kzm9g-reference.o
++else
++obj-y	+= board-kzm9g.o
++endif
++endif
+ 
+ # Framework support
+ obj-$(CONFIG_SMP)		+= $(smp-y)
+diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+new file mode 100644
+index 0000000..29c334d
+--- /dev/null
++++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+@@ -0,0 +1,92 @@
++/*
++ * KZM-A9-GT board support - Reference Device Tree Implementation
++ *
++ * Copyright (C) 2012	Horms Solutions Ltd.
++ *
++ * Based on board-kzm9g.c
++ * Copyright (C) 2012	Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <linux/delay.h>
++#include <linux/gpio.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/input.h>
 +#include <linux/of_platform.h>
- #include <linux/delay.h>
- #include <linux/input.h>
- #include <linux/io.h>
-@@ -35,6 +36,7 @@
- #include <mach/irqs.h>
- #include <mach/sh73a0.h>
- #include <mach/common.h>
++#include <mach/sh73a0.h>
++#include <mach/common.h>
++#include <asm/hardware/cache-l2x0.h>
 +#include <asm/hardware/gic.h>
- #include <asm/mach-types.h>
- #include <asm/mach/map.h>
- #include <asm/mach/arch.h>
-@@ -779,7 +781,7 @@ static struct platform_device pmu_device = {
- 	.resource	= pmu_resources,
- };
- 
--static struct platform_device *sh73a0_early_devices[] __initdata = {
-+static struct platform_device *sh73a0_early_devices_dt[] __initdata = {
- 	&scif0_device,
- 	&scif1_device,
- 	&scif2_device,
-@@ -790,6 +792,9 @@ static struct platform_device *sh73a0_early_devices[] __initdata = {
- 	&scif7_device,
- 	&scif8_device,
- 	&cmt10_device,
-+};
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
 +
-+static struct platform_device *sh73a0_early_devices[] __initdata = {
- 	&tmu00_device,
- 	&tmu01_device,
- };
-@@ -812,6 +817,8 @@ void __init sh73a0_add_standard_devices(void)
- 	/* Clear software reset bit on SY-DMAC module */
- 	__raw_writel(__raw_readl(SRCR2) & ~(1 << 18), SRCR2);
- 
-+	platform_add_devices(sh73a0_early_devices_dt,
-+			    ARRAY_SIZE(sh73a0_early_devices_dt));
- 	platform_add_devices(sh73a0_early_devices,
- 			    ARRAY_SIZE(sh73a0_early_devices));
- 	platform_add_devices(sh73a0_late_devices,
-@@ -830,6 +837,8 @@ static void __init sh73a0_earlytimer_init(void)
- 
- void __init sh73a0_add_early_devices(void)
- {
-+	early_platform_add_devices(sh73a0_early_devices_dt,
-+				   ARRAY_SIZE(sh73a0_early_devices_dt));
- 	early_platform_add_devices(sh73a0_early_devices,
- 				   ARRAY_SIZE(sh73a0_early_devices));
- 
-@@ -839,3 +848,31 @@ void __init sh73a0_add_early_devices(void)
- 	/* override timer setup with soc-specific code */
- 	shmobile_timer.init = sh73a0_earlytimer_init;
- }
-+
-+#ifdef CONFIG_USE_OF
-+static const struct of_dev_auxdata sh73a0_auxdata_lookup[] __initconst = {
-+	{},
-+};
-+
-+void __init sh73a0_add_early_devices_dt(void)
++static void __init kzm_init(void)
 +{
-+	shmobile_setup_delay(1196, 44, 46); /* Cortex-A9 @ 1196MHz */
++	/* enable SCIFA4 */
++	gpio_request(GPIO_FN_SCIFA4_TXD, NULL);
++	gpio_request(GPIO_FN_SCIFA4_RXD, NULL);
++	gpio_request(GPIO_FN_SCIFA4_RTS_, NULL);
++	gpio_request(GPIO_FN_SCIFA4_CTS_, NULL);
 +
-+	early_platform_add_devices(sh73a0_early_devices_dt,
-+				   ARRAY_SIZE(sh73a0_early_devices_dt));
++	/* enable MMCIF */
++	gpio_request(GPIO_FN_MMCCLK0,		NULL);
++	gpio_request(GPIO_FN_MMCCMD0_PU,	NULL);
++	gpio_request(GPIO_FN_MMCD0_0_PU,	NULL);
++	gpio_request(GPIO_FN_MMCD0_1_PU,	NULL);
++	gpio_request(GPIO_FN_MMCD0_2_PU,	NULL);
++	gpio_request(GPIO_FN_MMCD0_3_PU,	NULL);
++	gpio_request(GPIO_FN_MMCD0_4_PU,	NULL);
++	gpio_request(GPIO_FN_MMCD0_5_PU,	NULL);
++	gpio_request(GPIO_FN_MMCD0_6_PU,	NULL);
++	gpio_request(GPIO_FN_MMCD0_7_PU,	NULL);
 +
-+	/* setup early console here as well */
-+	shmobile_setup_console();
++	/* I2C 3 */
++	gpio_request(GPIO_FN_PORT27_I2C_SCL3, NULL);
++	gpio_request(GPIO_FN_PORT28_I2C_SDA3, NULL);
++
++#ifdef CONFIG_CACHE_L2X0
++	/* Early BRESP enable, Shared attribute override enable, 64K*8way */
++	l2x0_init(IOMEM(0xf0100000), 0x40460000, 0x82000fff);
++#endif
++
++	sh73a0_add_standard_devices_dt();
 +}
 +
-+void __init sh73a0_add_standard_devices_dt(void)
++static void kzm9g_restart(char mode, const char *cmd)
 +{
-+	/* clocks are setup late during boot in the case of DT */
-+	sh73a0_clock_init();
-+
-+	platform_add_devices(sh73a0_early_devices_dt,
-+			     ARRAY_SIZE(sh73a0_early_devices_dt));
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			     sh73a0_auxdata_lookup, NULL);
++#define RESCNT2 IOMEM(0xe6188020)
++	/* Do soft power on reset */
++	writel((1 << 31), RESCNT2);
 +}
-+#endif /* CONFIG_USE_OF */
++
++static const char *kzm9g_boards_compat_dt[] __initdata = {
++	"renesas,kzm9g-reference",
++	NULL,
++};
++
++DT_MACHINE_START(KZM9G_DT, "kzm9g-reference")
++	.smp		= smp_ops(sh73a0_smp_ops),
++	.map_io		= sh73a0_map_io,
++	.init_early	= sh73a0_add_early_devices_dt,
++	.nr_irqs	= NR_IRQS_LEGACY,
++	.init_irq	= sh73a0_init_irq_dt,
++	.handle_irq	= gic_handle_irq,
++	.init_machine	= kzm_init,
++	.init_late	= shmobile_init_late,
++	.timer		= &shmobile_timer,
++	.restart	= kzm9g_restart,
++	.dt_compat	= kzm9g_boards_compat_dt,
++MACHINE_END
 -- 
 1.7.10.4
