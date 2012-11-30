@@ -1,69 +1,57 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 30 Nov 2012 12:17:39 +0000
+From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
+Date: Fri, 30 Nov 2012 13:20:06 +0100
 Subject: [ARM] head.S change broke platform device registration?
-In-Reply-To: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
+In-Reply-To: <50B88A59.6070207@arm.com>
 References: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
-Message-ID: <20121130121738.GA1960@linaro.org>
+ <50B88A59.6070207@arm.com>
+Message-ID: <CAHod+GeZQx6-pUHPocbyMJCLawMUhrZuZf=mrgWax=L7eNJGhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 30, 2012 at 02:38:14AM +0100, Marko Kati? wrote:
-> I recently tried to boot v3.7-rc7 on my akita (Sharp Zaurus C-1000,
-> PXA270 machine).
-> Backlight never turned on but the kernel booted just fine.
-> After some investigation i determined that the gpio expander (max7310,
-> i2c chip) is not even
-> registered and thus not present in /sys/bus/i2c/devices.
-> Backlight gpio controls are hooked to this chip thus, no backlight.
-> 
-> I thought that too many things could have caused this so i went
-> straight to bisecting.
-> Bisection pointed me to this commit:
-> 
->  commit 424e5994e63326a42012f003f1174f3c363c7b62
-> Author: Dave Martin <dave.martin@linaro.org>
-> Date:   Fri Feb 10 18:07:07 2012 -0800
-> 
->     ARM: zImage/virt: hyp mode entry support for the zImage loader
-> 
->     The zImage loader needs to turn on the MMU in order to take
->     advantage of caching while decompressing the zImage.  Running this
->     in hyp mode would require the LPAE pagetable format to be
->     supported; to avoid this complexity, this patch switches out of hyp
->     mode, and returns back to hyp mode just before booting the kernel.
-> 
->     This implementation assumes that the Hyp mode view of memory and the
->     PL1 view of memory are coherent, providing that the MMU and caches
->     are off in both, as required by the boot protocol.  The zImage
->     decompression code must drain the write buffer on completion anyway, and
->     entry into Hyp mode should flush any prefetch buffer, avoiding hazards
->     associated with local write buffers and the pipeline.
-> 
->     Signed-off-by: Dave Martin <dave.martin@linaro.org>
->     Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> This commit was merged in v3.7-rc1. And indeed, if i
-> revert this single commit, my gpio expander reappears and
-> so does my backlight.
-> I made no other changes to the vanilla 3.7-rc7
-> except this revert.
-> 
-> This seems very strange to me because i, with my limited knowledge,
-> cannot see any correlation between this commit and the bug i am experiencing.
-> 
-> Does anyone know what exactly is happening here?
+> This is incredibly puzzling. I could understand your board not booting
+> at all because of this patch, but an i2c device missing?
+>
+> Can you see the i2c controller at all? I'll try to dig my PXA270 board
+> and see if I can reproduce your issue.
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
+>
 
-This is indeed strange, since there is not much difference to the kernel
-if CONFIG_ARM_VIRT_EXT is not set.
+There are three i2c devices on my board:
 
-Unless a bug is causing the kernel to trample on some random memory,
-there is no reason for this to cause I2C devices to disappear.
+static struct i2c_board_info spitz_i2c_devs[] = {
+	{
+		.type		= "wm8750",
+		.addr		= 0x1b,
+	}, {
+		.type		= "max7310",
+		.addr		= 0x18,
+		.platform_data	= &akita_pca953x_pdata,
+	},
+};
 
-It could be something unrelated, like additional and removal of code
-changing the position or alignment of other parts of the kernel image.
+These two are on bus 0.
 
-Have you could try undoing parts of the patch to narrow the bug down
-further?
+static struct i2c_board_info spitz_pi2c_devs[] = {
+	{
+		.type		= "isl6271a",
+		.addr		= 0x0c,
+		.platform_data	= &isl6271a_info,
+	},
+};
 
-Cheers
----Dave
+This one is on bus 1.
+
+With commit 424e5994e63326a42012f003f1174f3c363c7b62 applied
+Only the max7310 is missing, the other two register and work fine.
+
+Now, if i try to register _only_ the max7310 chip, it shows up but it doesn't
+work. In that case i get this:
+
+gpiochip_add: gpios 204..211 (max7310) failed to register
+pca953x: probe of 0-0018 failed with error -16
+
+And then when i revert 424e5994e63326a42012f003f1174f3c363c7b62
+and register _only_ the max7310, it works fine.
