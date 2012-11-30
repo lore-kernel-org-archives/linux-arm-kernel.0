@@ -1,34 +1,39 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 30 Nov 2012 15:04:12 +0800
-Subject: [PATCH 1/4] rtc: sa1100: enable/disable rtc when probe/remove the
- device
-In-Reply-To: <20121129102519.GG19440@n2100.arm.linux.org.uk>
-References: <1354155670-6267-1-git-send-email-chao.xie@marvell.com>
- <20121129102519.GG19440@n2100.arm.linux.org.uk>
-Message-ID: <CAN1soZxUA2PPy4694ByX1FTyWiJkha8QpKFK5Jc3Wf3zT0huOA@mail.gmail.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Fri, 30 Nov 2012 12:39:05 +0530
+Subject: [PATCH 2/2] ARM: tegra: moving stuff away from mach/clk.h
+In-Reply-To: <50B7A87E.5070302@wwwdotorg.org>
+References: <1353999553-5196-1-git-send-email-sivaramn@nvidia.com>
+ <1353999553-5196-2-git-send-email-sivaramn@nvidia.com>
+ <50B6FCE5.7080003@nvidia.com> <50B7A87E.5070302@wwwdotorg.org>
+Message-ID: <50B85B91.6080802@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 29, 2012 at 6:25 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Nov 28, 2012 at 09:21:07PM -0500, Chao Xie wrote:
->> The original sa1100_rtc_open/sa1100_rtc_release will be called
->> when the /dev/rtc0 is opened or closed.
->> In fact, these two functions will enable/disable the clock, and
->> register/unregister the irqs.
->> User application will use /dev/rtc0 to read the rtc time or set
->> the alarm. The rtc should still run indepent of open/close the
->> rtc device.
->> So only enable clock and register the irqs when probe the device,
->> and disable clock and unregister the irqs when remove the device.
->
-> NAK.  I don't think you properly understand what's going on here if you
-> think moving the entire open and release functions into the probe and
-> remove functions is the right thing to do.
+On Thursday 29 November 2012 11:55 PM, Stephen Warren wrote:
+> On 11/28/2012 11:12 PM, Prashant Gaikwad wrote:
+>> On Tuesday 27 November 2012 12:29 PM, Sivaram Nair wrote:
+>>> This patch moves some stuff away from mach/clk.h to other mach-tegra
+>>> files. This is part of the efforts to get rid of mach/clk.h which in
+>>> turn will help to enable single zImage.
+>>>
+>>> Signed-off-by: Sivaram Nair <sivaramn@nvidia.com>
+>>> ---
+>>>    arch/arm/mach-tegra/clock.c            |    1 +
+>>>    arch/arm/mach-tegra/clock.h            |   12 ++++++++++--
+>>>    arch/arm/mach-tegra/include/mach/clk.h |   11 -----------
+>>>    3 files changed, 11 insertions(+), 13 deletions(-)
+>> This patch will not add any real value since I have removed clk_cfg_ex
+>> functionality in clock code rework.
+>> It's just that I will have to rebase my changes on this.
+>>
+>> Reviewed-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+> In that case, I may as well not apply patch 2/2 at all, and I'll just
+> take your clock code cleanup instead. I assume that will be posted for
+> inclusion into 3.9?
 
-Since PXA27x & PXA3xx supports dual rtc device at the same time,
-user could choose use either of rtc at run time. Then clk & irq are setup
-in open().
+Yes, I am targeting for 3.9.
 
-Chao,
-So you shouldn't remove them into probe().
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
