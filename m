@@ -1,25 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 30 Nov 2012 09:58:08 -0800
-Subject: [PATCH] ARM: sunxi: add missing include for mdelay()
-In-Reply-To: <50B86BCA.7050103@free-electrons.com>
-References: <20121130013730.GA30592@beefymiracle.amer.corp.natinst.com>
- <50B86BCA.7050103@free-electrons.com>
-Message-ID: <20121130175808.GA4505@quad.lixom.net>
+Date: Fri, 30 Nov 2012 10:01:23 -0800
+Subject: [PATCH] irq: versatile: delete dangling variable
+In-Reply-To: <1354120850-15382-1-git-send-email-linus.walleij@stericsson.com>
+References: <1354120850-15382-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20121130180123.GB4505@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 30, 2012 at 09:18:18AM +0100, Maxime Ripard wrote:
-> Le 30/11/2012 02:37, Josh Cartwright a ?crit :
-> >   CC      arch/arm/mach-sunxi/sunxi.o
-> > ./arch/arm/mach-sunxi/sunxi.c: In function 'sunxi_restart':
-> > ./arch/arm/mach-sunxi/sunxi.c:55:3: error: implicit declaration of function 'mdelay' [-Werror=implicit-function-declaration]
-> > 
-> > Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+On Wed, Nov 28, 2012 at 05:40:50PM +0100, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> This one was just creating noise like this:
 > 
+> drivers/irqchip/irq-versatile-fpga.c: In function 'fpga_irq_of_init':
+> drivers/irqchip/irq-versatile-fpga.c:180:24: warning: unused variable 'f'
+> 
+> Reported-by: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Arnd, Olof: please put this patch directly where the offending
+> commit is. If I understand correctly that is on the branch
+> integrator/irq.
 
-Thanks, applied on top of sunxi/soc2.
-
+Thanks, applied.
 
 -Olof
