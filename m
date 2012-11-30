@@ -1,146 +1,140 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 30 Nov 2012 10:01:50 -0600
-Subject: [PATCH V7 1/7] kbuild: centralize .dts->.dtb rule
-In-Reply-To: <1354058956-7199-1-git-send-email-swarren@wwwdotorg.org>
-References: <1354058956-7199-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <50B8D86E.1080109@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 30 Nov 2012 16:03:38 +0000
+Subject: [PATCH v3] ARM: Factor out cpuid implementor and part number
+In-Reply-To: <1354290073-55801-1-git-send-email-c.dall@virtualopensystems.com>
+References: <1354290073-55801-1-git-send-email-c.dall@virtualopensystems.com>
+Message-ID: <20121130160337.GQ19440@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2012 05:29 PM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Fri, Nov 30, 2012 at 10:41:13AM -0500, Christoffer Dall wrote:
+> Decoding the implementor and part number of the CPU id in the CPU ID
+> register is needed by KVM, so we factor it out to share the code.
 > 
-> All architectures that use cmd_dtc do so in almost the same way. Create
-> a central build rule to avoid duplication. The one difference is that
-> most current uses of dtc build $(obj)/%.dtb from $(src)/dts/%.dts rather
-> than building the .dtb in the same directory as the .dts file. This
-> difference will be eliminated arch-by-arch in future patches.
-> 
-> MIPS is the exception here; it already uses the exact same rule as the
-> new common rule, so the duplicate is removed in this patch to avoid any
-> conflict. arch/mips changes courtesy of Ralf Baechle.
-> 
-> Update Documentation/kbuild to remove the explicit call to cmd_dtc from
-> the example, now that the rule exists in a centralized location.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Jonas Bonn <jonas@southpole.se>
-> Cc: linux at lists.openrisc.net
-> Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
-> Cc: linux-c6x-dev at linux-c6x.org
-> Cc: Mark Salter <msalter@redhat.com>
-> Cc: Michal Simek <monstr@monstr.eu>
-> Cc: microblaze-uclinux at itee.uq.edu.au
-> Cc: Chris Zankel <chris@zankel.net>
-> Cc: linux-xtensa at linux-xtensa.org
-> Cc: Max Filippov <jcmvbkbc@gmail.com>
-> Signed-off-by: Ralf Baechle <ralf@linux-mips.org>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 > ---
-> This is based on next-20121126.
-> 
+> Changes since v2:
+>  - Take implementor as argument to read_cpuid_part_number
 
-I'll apply the series but I need a stable base. Looks like xtensa has
-the dependency. Or I can just drop xtensa.
+Actually, I don't think this is the correct way.  There's noting
+inherently different about Xscale wrt part numbers, it's just that
+someone decided to do stuff "differently" and use the CPU part
+number to identify the SoC as a whole.
 
-Rob
+Here's the full list:
 
-> I've split out this dtc rule cleanup as a separate patch series.
-> Hopefully it can be applied without too much controversy, then I'll move
-> back to discussing running cpp over *.dts.
-> 
-> v7:
-> * Build *.dtb from *.dts not src/*.dts.
-> * Removed all arch/ updates except MIPS.
-> v6: Added arch/{arm64,microblaze,mips} updates.
-> v5: Updated Documentation/kbuild.
-> v4: No change.
-> v3: No change.
-> v2: New patch.
-> ---
->  Documentation/kbuild/makefiles.txt |   15 ++++++++-------
->  arch/mips/cavium-octeon/Makefile   |    3 ---
->  arch/mips/lantiq/dts/Makefile      |    3 ---
->  arch/mips/netlogic/dts/Makefile    |    3 ---
->  scripts/Makefile.lib               |    3 +++
->  5 files changed, 11 insertions(+), 16 deletions(-)
-> 
-> diff --git a/Documentation/kbuild/makefiles.txt b/Documentation/kbuild/makefiles.txt
-> index ec9ae67..14c3f4f 100644
-> --- a/Documentation/kbuild/makefiles.txt
-> +++ b/Documentation/kbuild/makefiles.txt
-> @@ -1175,15 +1175,16 @@ When kbuild executes, the following steps are followed (roughly):
->  	in an init section in the image. Platform code *must* copy the
->  	blob to non-init memory prior to calling unflatten_device_tree().
+80200	69052000	fffffff0
+PXA250	69052100	fffff7f0
+PXA210	69052120	fffff3f0
+8032x	69052420	fffff7e0
+PXA255	69052d00	fffffff0
+80219	69052e20	ffffffe0
+8033x	69054010	fffffd30
+IXP43x	69054040	fffffff0
+PXA270	69054110	fffffff0
+IXP2400	69054190	fffffff0
+IXP2800	690541a0	fffffff0
+IXP42x	690541c0	ffffffc0
+IXP46x	69054200	ffffff00
+Xscale3	69056000	ffffe000
+PXA935	56056000	ffffe000
+
+What we get from these is:
+XScale1 can be identified by (id & 0xe000) == 0x2000
+Xscale2 can be identified by (id & 0xe000) == 0x4000
+Xscale3 can be identified by (id & 0xe000) == 0x6000
+
+I don't think we should make a distinction in read_cpuid_part_number()
+between these; if manufacturers are silly enough to abuse these fields
+then its their problem. :)
+
+What I suggest is that read_cpuid_part_number() returns the part number
+field as defined by ARM.  We then also define XSCALE_ARCH_MASK to be
+0xe000 and a bunch of XSCALE_ARCH_V1..V3 along those lines.  Maybe even
+a xscale_cpu_version() macro which returns the XScale CPU version
+pre-masked.
+
+That would mean this becomes:
+
+> @@ -202,47 +202,48 @@ static int __devinit probe_current_pmu(struct arm_pmu *pmu)
+>  {
+>  	int cpu = get_cpu();
+>  	unsigned long cpuid = read_cpuid_id();
+> -	unsigned long implementor = (cpuid & 0xFF000000) >> 24;
+> -	unsigned long part_number = (cpuid & 0xFFF0);
+> +	unsigned long implementor = read_cpuid_implementor();
+
+Why not pass the cpuid that we read into these functions?
+
+> +	unsigned long part_number;
+	unsigned long part_number = read_cpuid_part_number(cpuid);
+
+>  	int ret = -ENODEV;
 >  
-> -	Example:
-> -		#arch/x86/platform/ce4100/Makefile
-> -		clean-files := *dtb.S
-> +	To use this command, simply add *.dtb into obj-y or targets, or make
-> +	some other target depend on %.dtb
+>  	pr_info("probing PMU on CPU %d\n", cpu);
 >  
-> -		DTC_FLAGS := -p 1024
-> -		obj-y += foo.dtb.o
-> +	A central rule exists to create $(obj)/%.dtb from $(src)/%.dts;
-> +	architecture Makefiles do no need to explicitly write out that rule.
->  
-> -		$(obj)/%.dtb: $(src)/%.dts
-> -			$(call cmd,dtc)
-> +	Example:
-> +		targets += $(dtb-y)
-> +		clean-files += *.dtb
-> +		DTC_FLAGS ?= -p 1024
->  
->  --- 6.8 Custom kbuild commands
->  
-> diff --git a/arch/mips/cavium-octeon/Makefile b/arch/mips/cavium-octeon/Makefile
-> index bc96e29..6e927cf 100644
-> --- a/arch/mips/cavium-octeon/Makefile
-> +++ b/arch/mips/cavium-octeon/Makefile
-> @@ -24,9 +24,6 @@ DTB_FILES = $(patsubst %.dts, %.dtb, $(DTS_FILES))
->  
->  obj-y += $(patsubst %.dts, %.dtb.o, $(DTS_FILES))
->  
-> -$(obj)/%.dtb: $(src)/%.dts FORCE
-> -	$(call if_changed_dep,dtc)
-> -
->  # Let's keep the .dtb files around in case we want to look at them.
->  .SECONDARY:  $(addprefix $(obj)/, $(DTB_FILES))
->  
-> diff --git a/arch/mips/lantiq/dts/Makefile b/arch/mips/lantiq/dts/Makefile
-> index 674fca4..6fa72dd 100644
-> --- a/arch/mips/lantiq/dts/Makefile
-> +++ b/arch/mips/lantiq/dts/Makefile
-> @@ -1,4 +1 @@
->  obj-$(CONFIG_DT_EASY50712) := easy50712.dtb.o
-> -
-> -$(obj)/%.dtb: $(obj)/%.dts
-> -	$(call if_changed,dtc)
-> diff --git a/arch/mips/netlogic/dts/Makefile b/arch/mips/netlogic/dts/Makefile
-> index 67ae3fe2..d117d46 100644
-> --- a/arch/mips/netlogic/dts/Makefile
-> +++ b/arch/mips/netlogic/dts/Makefile
-> @@ -1,4 +1 @@
->  obj-$(CONFIG_DT_XLP_EVP) := xlp_evp.dtb.o
-> -
-> -$(obj)/%.dtb: $(obj)/%.dts
-> -	$(call if_changed,dtc)
-> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-> index 0be6f11..bdf42fd 100644
-> --- a/scripts/Makefile.lib
-> +++ b/scripts/Makefile.lib
-> @@ -266,6 +266,9 @@ $(obj)/%.dtb.S: $(obj)/%.dtb
->  quiet_cmd_dtc = DTC     $@
->  cmd_dtc = $(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 $(DTC_FLAGS) -d $(depfile) $<
->  
-> +$(obj)/%.dtb: $(src)/%.dts FORCE
-> +	$(call if_changed_dep,dtc)
-> +
->  # Bzip2
->  # ---------------------------------------------------------------------------
->  
-> 
+>  	/* ARM Ltd CPUs. */
+> -	if (0x41 == implementor) {
+> +	if (implementor == ARM_CPU_IMP_ARM) {
+> +		part_number = read_cpuid_part_number(implementor);
+
+This goes.
+
+>  		switch (part_number) {
+> -		case 0xB360:	/* ARM1136 */
+> -		case 0xB560:	/* ARM1156 */
+> -		case 0xB760:	/* ARM1176 */
+> +		case ARM_CPU_PART_ARM1136:
+> +		case ARM_CPU_PART_ARM1156:
+> +		case ARM_CPU_PART_ARM1176:
+>  			ret = armv6pmu_init(pmu);
+>  			break;
+> -		case 0xB020:	/* ARM11mpcore */
+> +		case ARM_CPU_PART_ARM11MPCORE:
+>  			ret = armv6mpcore_pmu_init(pmu);
+>  			break;
+> -		case 0xC080:	/* Cortex-A8 */
+> +		case ARM_CPU_PART_CORTEX_A8:
+>  			ret = armv7_a8_pmu_init(pmu);
+>  			break;
+> -		case 0xC090:	/* Cortex-A9 */
+> +		case ARM_CPU_PART_CORTEX_A9:
+>  			ret = armv7_a9_pmu_init(pmu);
+>  			break;
+> -		case 0xC050:	/* Cortex-A5 */
+> +		case ARM_CPU_PART_CORTEX_A5:
+>  			ret = armv7_a5_pmu_init(pmu);
+>  			break;
+> -		case 0xC0F0:	/* Cortex-A15 */
+> +		case ARM_CPU_PART_CORTEX_A15:
+>  			ret = armv7_a15_pmu_init(pmu);
+>  			break;
+> -		case 0xC070:	/* Cortex-A7 */
+> +		case ARM_CPU_PART_CORTEX_A7:
+>  			ret = armv7_a7_pmu_init(pmu);
+>  			break;
+>  		}
+>  	/* Intel CPUs [xscale]. */
+> -	} else if (0x69 == implementor) {
+> -		part_number = (cpuid >> 13) & 0x7;
+> +	} else if (implementor == ARM_CPU_IMP_INTEL) {
+> +		part_number = read_cpuid_part_number(implementor);
+>  		switch (part_number) {
+
+		switch (xscale_cpu_version(part_number)) {
+
+> -		case 1:
+> +		case ARM_CPU_PART_XSCALE1:
+
+		case XSCALE_ARCH_V1:
+
+>  			ret = xscale1pmu_init(pmu);
+>  			break;
+> -		case 2:
+> +		case ARM_CPU_PART_XSCALE2:
+
+		case XSCALE_ARCH_V2:
+
+and we can use read_cpuid_part_number() where getting at that field
+in the CPU ID information matters.
