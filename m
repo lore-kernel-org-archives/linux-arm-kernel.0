@@ -1,16 +1,47 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 30 Nov 2012 12:28:49 -0700
-Subject: [PATCH] ARM: dt: tegra: cardhu: Add drm components
-In-Reply-To: <1354254256-10212-1-git-send-email-markz@nvidia.com>
-References: <1354254256-10212-1-git-send-email-markz@nvidia.com>
-Message-ID: <50B908F1.8000407@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 30 Nov 2012 19:32:54 +0000
+Subject: [PATCH 07/10] arm: arch_timer: add arch_counter_enable_user_access
+In-Reply-To: <1354297568-26366-8-git-send-email-mark.rutland@arm.com>
+References: <1354297568-26366-1-git-send-email-mark.rutland@arm.com>
+ <1354297568-26366-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <20121130193254.GA12819@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2012 10:44 PM, Mark Zhang wrote:
-> This patch adds the RGB & HDMI nodes in Tegra 30 cardhu's dts.
-> This makes the LVDS & HDMI working.
+On Fri, Nov 30, 2012 at 05:46:05PM +0000, Mark Rutland wrote:
+> Several bits in CNTKCTL reset to 0, including PL0VTEN. For platforms
+> using the generic timer which wish to have a fast gettimeofday vDSO
+> implementation, these bits must be set to 1 by the kernel.
+> 
+> Add an arch_counter_enable_user_access function for this. As we don't
+> (currently) use the counter from PL0 on arm, the implementation is an
+> empty stub.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/include/asm/arch_timer.h |    7 +++++++
+>  arch/arm/kernel/arch_timer.c      |    2 ++
+>  2 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+> index 701f2b7..c50e415 100644
+> --- a/arch/arm/include/asm/arch_timer.h
+> +++ b/arch/arm/include/asm/arch_timer.h
+> @@ -108,6 +108,13 @@ static inline u64 arch_counter_get_cntvct(void)
+>  	return cval;
+>  }
+>  
+> +static inline void __cpuinit arch_counter_enable_user_access(void)
+> +{
+> +	/*
+> +	 * Do nothing - the counter is never mapped to userspace threads,
+> +	 * so we don't care whether access is enabled or not.
+> +	 */
+> +}
 
-This still doesn't add any of the backlight/panel GPIO programming,
-which I believe is required before we enable any LCDs. We could add the
-HDMI node without that though.
+Might be worth explicitly *disabling* userspace access for the time being
+then (and rename this function to arch_counter_set_user_access?).
+
+Will
