@@ -1,27 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 30 Nov 2012 09:09:28 -0800
-Subject: [GIT PULL] ARM: mvebu: cache-l2x0 for v3.8
-In-Reply-To: <50b4e296.5387e50a.72fc.4b8aSMTPIN_ADDED_MISSING@mx.google.com>
-References: <50b4e296.5387e50a.72fc.4b8aSMTPIN_ADDED_MISSING@mx.google.com>
-Message-ID: <20121130170928.GD697@quad.lixom.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 30 Nov 2012 17:14:21 +0000
+Subject: [PATCH v4 08/14] KVM: ARM: World-switch implementation
+In-Reply-To: <CANM98q+TQZiXe3GLjcPpPVZz40emmizgnEmyZEju1ruKNR6EEQ@mail.gmail.com>
+References: <20121110154203.2836.46686.stgit@chazy-air>
+ <20121110154306.2836.93473.stgit@chazy-air>
+ <20121119145758.GA3205@mudshark.cambridge.arm.com>
+ <CANM98qJFFP=2ueyUpbN6x15XwtWXbgZjkMBaq2jVpqik4kT54Q@mail.gmail.com>
+ <20121130151500.GC26289@mudshark.cambridge.arm.com>
+ <CANM98q+TQZiXe3GLjcPpPVZz40emmizgnEmyZEju1ruKNR6EEQ@mail.gmail.com>
+Message-ID: <20121130171420.GC619@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2012 at 03:56:01PM +0000, Jason Cooper wrote:
-> The following changes since commit 56580bb422e5f542da19c057f348dd39634138e7:
-> 
->   Merge branch 'mvebu-misc-fixes' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything (2012-11-24 04:08:49 +0000)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/mvebu_cache_l2x0_for_3.8
-> 
-> for you to fetch changes up to 3ee11aef75db51c69cb8cb91dd01afb28036f1b5:
-> 
->   arm: l2x0: add aurora related properties to OF binding (2012-11-27 15:35:43 +0000)
+On Fri, Nov 30, 2012 at 04:47:40PM +0000, Christoffer Dall wrote:
+> On Fri, Nov 30, 2012 at 10:15 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > At this point, VM1 is running and VM0:VCPU1 is running. VM0:VCPU0 is not
+> > running because physical CPU0 is handling an interrupt. The problem is that
+> > when VCPU0 *is* resumed, it will update the VMID of VM0 and could be
+> > scheduled in parallel with VCPU1 but with a different VMID.
+> >
+> > How do you avoid this in the current code?
+> >
+> I don't. Nice catch. Please apply your interesting brain to the following fix:)
 
-Thanks, pulled.
+I'm far too sober to look at your patch right now, but I'll think about it
+over the weekend [I can't break it at a quick glance] :)
 
+In the meantime, can you think about whether the TLB operations need to run
+on every CPU please?
 
--Olof
+Will
