@@ -1,44 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 30 Nov 2012 09:18:18 +0100
-Subject: [PATCH] ARM: sunxi: add missing include for mdelay()
-In-Reply-To: <20121130013730.GA30592@beefymiracle.amer.corp.natinst.com>
-References: <20121130013730.GA30592@beefymiracle.amer.corp.natinst.com>
-Message-ID: <50B86BCA.7050103@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 30 Nov 2012 08:21:39 +0000
+Subject: [PATCH 1/2] Boottime: A tool for automatic measurement of
+ kernel/bootloader boot time
+In-Reply-To: <CAPnjgZ1SRvZtUD7wUV4E41Vi7q6B9qGLvGPhMqx_Heoq7YwOkA@mail.gmail.com>
+References: <1352973847-21605-1-git-send-email-lee.jones@linaro.org>
+ <1352973847-21605-2-git-send-email-lee.jones@linaro.org>
+ <CAH9JG2UX0Wyr-QKw3=tbUXeuEhHe04_cFkkAp6bB2Rr-x7ViHQ@mail.gmail.com>
+ <20121115112543.GC21682@gmail.com>
+ <20121120161638.GD28265@gmail.com>
+ <CAPnjgZ1SRvZtUD7wUV4E41Vi7q6B9qGLvGPhMqx_Heoq7YwOkA@mail.gmail.com>
+Message-ID: <20121130082139.GA26023@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 30/11/2012 02:37, Josh Cartwright a ?crit :
->   CC      arch/arm/mach-sunxi/sunxi.o
-> ./arch/arm/mach-sunxi/sunxi.c: In function 'sunxi_restart':
-> ./arch/arm/mach-sunxi/sunxi.c:55:3: error: implicit declaration of function 'mdelay' [-Werror=implicit-function-declaration]
-> 
-> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+On Thu, 29 Nov 2012, Simon Glass wrote:
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Hi,
+> 
+> On Tue, Nov 20, 2012 at 8:16 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> >> > > +/* for automatic boot timing testcases */
+> >> > > +#define ATAG_BOOTTIME  0x41000403
+> >> > Where can I refer this ATAG usage? can you point out the reference URL
+> >> > or patches?
+> >>
+> >> I assumed this would be in Mainline u-boot, but apparently not.
+> >> On closer inspection of the internal ST-Ericsson u-boot, this
+> >> functionality appears to be provided by patches which currently
+> >> exist as delta. So in essence, the bootloader you use will have
+> >> to be patched in a similar way for you to retrieve information
+> >> surrounding bootloader boot times.
+> >>
+> >> And there was me thinking it was magic. ;)
+> >
+> > Okay, so I'm going through the motions of upstreaming this magic
+> > now. Please see the link below for reference:
+> >
+> > http://marc.info/?l=u-boot&m=135342273317337&w=2
+> 
+> Given that U-Boot has bootstage, would it make sense to upstream that
+> to the kernel? Some RFC patches were sent before this went into U-Boot
+> to sound out the interest.
 
-> ---
-> Fixes multiplatform build error seen with today's linux-next-20121129.
-> 
->  arch/arm/mach-sunxi/sunxi.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index dc634ae..9be910f 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -10,6 +10,7 @@
->   * warranty of any kind, whether express or implied.
->   */
->  
-> +#include <linux/delay.h>
->  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/of_address.h>
-> 
-
+Right. As Simon and I have already discussed, I am pulling the
+u-boot and kernel boottime components in lieu of bootstage.
 
 -- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
