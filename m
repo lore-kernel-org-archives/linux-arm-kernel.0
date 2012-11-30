@@ -1,57 +1,52 @@
-From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
-Date: Fri, 30 Nov 2012 13:20:06 +0100
-Subject: [ARM] head.S change broke platform device registration?
-In-Reply-To: <50B88A59.6070207@arm.com>
-References: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
- <50B88A59.6070207@arm.com>
-Message-ID: <CAHod+GeZQx6-pUHPocbyMJCLawMUhrZuZf=mrgWax=L7eNJGhg@mail.gmail.com>
+From: p.paneri@samsung.com (Praveen Paneri)
+Date: Fri, 30 Nov 2012 17:54:33 +0530
+Subject: [PATCH v8 2/2] usb: s3c-hsotg: Adding phy driver support
+In-Reply-To: <4963449.bQgUShLPPx@amdc1227>
+References: <1352888836-17192-1-git-send-email-p.paneri@samsung.com>
+ <1433031.3ftjAfsj34@flatron>
+ <CAD6zSYMNSX8ASPBLpft-0riBi-xeD_b=BjCjSrftX_5_F2+TDA@mail.gmail.com>
+ <4963449.bQgUShLPPx@amdc1227>
+Message-ID: <CAD6zSYO+DiDaKJ=a3V97yDLeNFmyfFFiNp9ba8iA-pgcF5fj=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This is incredibly puzzling. I could understand your board not booting
-> at all because of this patch, but an i2c device missing?
+On Wed, Nov 28, 2012 at 6:50 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Praveen,
 >
-> Can you see the i2c controller at all? I'll try to dig my PXA270 board
-> and see if I can reproduce your issue.
+> On Friday 23 of November 2012 09:54:51 Praveen Paneri wrote:
+>> We will anyway remove the platform data part soon. If you say I can
+>> resend it again.
 >
->         M.
+> I think that the requirement for platform data on DT-enabled systems
+> should be removed before this series get merged, because there are already
+> patches being worked on to remove auxdata tables (common clock framework
+> support by Thomas Abraham).
+Next is to add support for 4210, 4x12 and Exynos5 (patches were sent
+by vivek Gautam already). Not only s3c-hsotg but ehci, ohci and dwc
+will start using phy driver.
+This will remove phy related platform data passed to these drivers and...
+>
+> Adding next auxdata entry (containing platform data that must be provided)
+> would make them depend on phy platform data removal patch, which would
+> complicate things.
+s3c-hsotg platform data is also passing "is_osc" (Clock source info)
+and "dma" (dma mode info) from platform_data. IT seems they both are
+not used as on now. May be Lukasz can tell if we can move that to
+config option and get rid of s3c-hsotg_plat completely.
+
+Once that is done only AUXDATA entry, which will be remaining, will be
+that of phy driver and I understand that we have to work towards
+removal of that as well but I guess this is a good first step towards
+the goal.
+
+>
+> Best regards,
 > --
-> Jazz is not dead. It just smells funny...
+> Tomasz Figa
+> Samsung Poland R&D Center
+> SW Solution Development, Linux Platform
 >
-
-There are three i2c devices on my board:
-
-static struct i2c_board_info spitz_i2c_devs[] = {
-	{
-		.type		= "wm8750",
-		.addr		= 0x1b,
-	}, {
-		.type		= "max7310",
-		.addr		= 0x18,
-		.platform_data	= &akita_pca953x_pdata,
-	},
-};
-
-These two are on bus 0.
-
-static struct i2c_board_info spitz_pi2c_devs[] = {
-	{
-		.type		= "isl6271a",
-		.addr		= 0x0c,
-		.platform_data	= &isl6271a_info,
-	},
-};
-
-This one is on bus 1.
-
-With commit 424e5994e63326a42012f003f1174f3c363c7b62 applied
-Only the max7310 is missing, the other two register and work fine.
-
-Now, if i try to register _only_ the max7310 chip, it shows up but it doesn't
-work. In that case i get this:
-
-gpiochip_add: gpios 204..211 (max7310) failed to register
-pca953x: probe of 0-0018 failed with error -16
-
-And then when i revert 424e5994e63326a42012f003f1174f3c363c7b62
-and register _only_ the max7310, it works fine.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
