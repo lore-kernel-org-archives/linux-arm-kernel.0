@@ -1,30 +1,50 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 30 Nov 2012 11:08:55 +0100
-Subject: [PATCH v2 1/3] ARM/dts: omap3: Add generic DT support for IGEP devices
+Date: Fri, 30 Nov 2012 11:08:57 +0100
+Subject: [PATCH v2 3/3] ARM/dts: omap3: Add support for IGEP COM Module
 In-Reply-To: <1354270137-31538-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1354270137-31538-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1354270137-31538-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1354270137-31538-4-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a generic .dtsi device tree source file for the
-common characteristics across IGEP Technology devices.
+ISEE IGEP COM Module is an TI OMAP3 SoC computer on module.
+
+This patch adds an initial device tree support to boot an
+IGEP COM Module from the MMC/SD.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- arch/arm/boot/dts/omap3-igep.dtsi |   93 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 93 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap3-igep.dtsi
 
-diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+Changes since v1:
+    - Use default-state = "on" instead default-trigger = "default-on" for LED
+    - Update GPIO mapping according to latest IGEP COM Module rev.E instead D
+
+ arch/arm/boot/dts/Makefile           |    1 +
+ arch/arm/boot/dts/omap3-igep0030.dts |   44 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap3-igep0030.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 1dc0f39..78c99bc 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -67,6 +67,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap3-evm.dtb \
+ 	omap3-tobi.dtb \
+ 	omap3-igep0020.dtb \
++	omap3-igep0030.dtb \
+ 	omap4-panda.dtb \
+ 	omap4-pandaES.dtb \
+ 	omap4-var_som.dtb \
+diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
 new file mode 100644
-index 0000000..a093bff
+index 0000000..9dc48d2
 --- /dev/null
-+++ b/arch/arm/boot/dts/omap3-igep.dtsi
-@@ -0,0 +1,93 @@
++++ b/arch/arm/boot/dts/omap3-igep0030.dts
+@@ -0,0 +1,44 @@
 +/*
-+ * Device Tree Source for IGEP Technology devices
++ * Device Tree Source for IGEP COM Module
 + *
 + * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
 + * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
@@ -33,88 +53,39 @@ index 0000000..a093bff
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
-+/dts-v1/;
 +
-+/include/ "omap3.dtsi"
++/include/ "omap3-igep.dtsi"
 +
 +/ {
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x20000000>; /* 512 MB */
-+	};
++	model = "IGEP COM Module";
++	compatible = "isee,omap3-igep0030", "ti,omap3";
 +
-+	sound {
-+		compatible = "ti,omap-twl4030";
-+		ti,model = "igep2";
-+		ti,mcbsp = <&mcbsp2>;
-+		ti,codec = <&twl_audio>;
-+	};
-+};
-+
-+&omap3_pmx_core {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+		  &mcbsp2_pins
-+	>;
-+
-+	uart3_pins: pinmux_uart3_pins {
-+		pinctrl-single,pins = <
-+			0x16e 0x100	/* uart3_rx.uart3_rx INPUT | MODE0 */
-+			0x170 0		/* uart3_tx.uart3_tx OUTPUT | MODE0 */
-+		>;
-+	};
-+
-+	mcbsp2_pins: pinmux_mcbsp2_pins {
-+		pinctrl-single,pins = <
-+			0x1a2 0x0104	/* mcspi1_cs2.gpio_176 INPUT | MODE4 */
-+		>;
-+	};
-+};
-+
-+&i2c1 {
-+	clock-frequency = <2600000>;
-+
-+	twl: twl at 48 {
-+		reg = <0x48>;
-+		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-+		interrupt-parent = <&intc>;
-+
-+		vsim: regulator at 10 {
-+			compatible = "ti,twl4030-vsim";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <3000000>;
++	leds {
++		compatible = "gpio-leds";
++		boot {
++			 label = "omap3:green:boot";
++			 gpios = <&twl_gpio 13 1>;
++			 default-state = "on";
 +		};
 +
-+		twl_audio: audio {
-+			compatible = "ti,twl4030-audio";
-+			codec {
-+			      };
++		user0 {
++			 label = "omap3:red:user0";
++			 gpios = <&twl_gpio 18 1>; /* LEDA */
++			 default-state = "off";
++		};
++
++		user1 {
++			 label = "omap3:green:user1";
++			 gpios = <&twl_gpio 19 1>; /* LEDB */
++			 default-state = "off";
++		};
++
++		user2 {
++			 label = "omap3:red:user1";
++			 gpios = <&gpio1 16 1>;
++			 default-state = "off";
 +		};
 +	};
-+};
-+
-+/include/ "twl4030.dtsi"
-+
-+&i2c2 {
-+	clock-frequency = <400000>;
-+};
-+
-+&mmc1 {
-+	vmmc-supply = <&vmmc1>;
-+	vmmc_aux-supply = <&vsim>;
-+	bus-width = <8>;
-+};
-+
-+&mmc2 {
-+	status = "disabled";
-+};
-+
-+&mmc3 {
-+	status = "disabled";
-+};
-+
-+&twl_gpio {
-+	ti,use-leds;
 +};
 -- 
 1.7.7.6
