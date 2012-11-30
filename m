@@ -1,47 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 30 Nov 2012 09:33:52 -0800
-Subject: [GIT PULL 6/7] Samsung devel-3 for v3.8
-In-Reply-To: <50B557CE.7050909@samsung.com>
-References: <50B557CE.7050909@samsung.com>
-Message-ID: <20121130173352.GE697@quad.lixom.net>
+Date: Fri, 30 Nov 2012 09:36:48 -0800
+Subject: [GIT PULL 1/7] Samsung fixes for v3.7
+In-Reply-To: <1d7601cdceea$b96d7580$2c486080$%kim@samsung.com>
+References: <50B55783.3020509@samsung.com>
+ <1d7601cdceea$b96d7580$2c486080$%kim@samsung.com>
+Message-ID: <20121130173648.GF697@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Nov 28, 2012 at 09:16:14AM +0900, Kukjin Kim wrote:
-> Arnd, Olof
+On Fri, Nov 30, 2012 at 08:06:19PM +0900, Kukjin Kim wrote:
+> Kukjin Kim wrote:
+> > 
+> > Hi Arnd, Olof,
+> > 
+> Hi,
 > 
-> This is including Samsung small updates(developments) for v3.8.
+> > I sorted out my branches as per Olof's suggestion
+> > 
+> I checked only merged this into arm-soc tree.
 > 
-> add node PL330 MDMA1 and UART3 for DEBUG_LL and secondary cpu
-> bring-up for exynos4412.
-> 
-> Please pull from:
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> next/devel-samsung-3
+> Any problems on 2nd ~ 7th pull request? Or missed? ;-)
 
-Please try to avoid these "devel" branches -- call them a proper topic
-instead. These seem to be:
-
-> Bartlomiej Zolnierkiewicz (1):
->       ARM: dts: add node for PL330 MDMA1 controller for exynos4
-
-That's a dt patch.
-
-> 
-> Olof Johansson (1):
->       ARM: EXYNOS: add UART3 to DEBUG_LL ports
-
-This is a soc support patch, or maybe driver.
-
-> Tomasz Figa (1):
->       ARM: EXYNOS: Add support for secondary CPU bring-up on Exynos4412
-
-That's another soc support patch.
-
-
-I will pull this into next/soc since 2 out of the three patches belong there.
+Pulled 2-7.
 
 
 -Olof
