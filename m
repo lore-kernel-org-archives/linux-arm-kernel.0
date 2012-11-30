@@ -1,35 +1,20 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 30 Nov 2012 15:24:59 +0000
-Subject: [PATCH 1/1] ARM: ux500: Change IRQ from low-to-high edge triggered to
- high-to-low
-Message-ID: <1354289099-17931-1-git-send-email-lee.jones@linaro.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 30 Nov 2012 09:36:18 -0600
+Subject: [PATCH] of: dma: Fix-up for warnings !CONFIG_OF
+In-Reply-To: <1354232877.7077.74.camel@vkoul-udesk3>
+References: <1354227867-13357-1-git-send-email-jon-hunter@ti.com>
+ <1354232877.7077.74.camel@vkoul-udesk3>
+Message-ID: <50B8D272.7000603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the STMPE IRQ is triggered to be active high level-sensitive, the
-Nomadik GPIO controller it uses complains, although it still works.
-Recently we attempted to move triggering to low-to-high in an attempt
-to prevent the warning; however, this ensured that the IRQ was actually
-missed completely. Now we have a solution which both works and keeps the
-GPIO controller happy.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stuib.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 11/29/2012 05:47 PM, Vinod Koul wrote:
+> On Thu, 2012-11-29 at 16:24 -0600, Jon Hunter wrote:
+>> When compiling the kernel with DMA engine support enabled and device-tree
+>> support disabled, the following warnings are observed.
+> Thanks, already committed same change last night.
 
-diff --git a/arch/arm/boot/dts/stuib.dtsi b/arch/arm/boot/dts/stuib.dtsi
-index 39446a2..615392a 100644
---- a/arch/arm/boot/dts/stuib.dtsi
-+++ b/arch/arm/boot/dts/stuib.dtsi
-@@ -15,7 +15,7 @@
- 			stmpe1601: stmpe1601 at 40 {
- 				compatible = "st,stmpe1601";
- 				reg = <0x40>;
--				interrupts = <26 0x1>;
-+				interrupts = <26 0x2>;
- 				interrupt-parent = <&gpio6>;
- 				interrupt-controller;
- 
--- 
-1.7.9.5
+Great! Thanks.
+
+Jon
