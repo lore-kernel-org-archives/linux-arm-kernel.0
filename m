@@ -1,86 +1,98 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Fri, 30 Nov 2012 11:23:43 +0530
-Subject: [PATCH RESEND v5 0/4] OMAP GPMC DT bindings
-In-Reply-To: <50B77DD5.4090001@gmail.com>
-References: <1354121939-11246-1-git-send-email-zonque@gmail.com>
- <518397C60809E147AF5323E0420B992E3EA07317@DBDE01.ent.ti.com>
- <50B74DCC.5060808@gmail.com>
- <518397C60809E147AF5323E0420B992E3EA0BB6B@DBDE01.ent.ti.com>
- <50B77DD5.4090001@gmail.com>
-Message-ID: <50B849E7.30600@ti.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Fri, 30 Nov 2012 01:13:58 -0500
+Subject: [PATCH v4 07/14] KVM: ARM: Inject IRQs and FIQs from userspace
+In-Reply-To: <20121119162122.GI3205@mudshark.cambridge.arm.com>
+References: <20121110154203.2836.46686.stgit@chazy-air>
+ <20121110154259.2836.49857.stgit@chazy-air>
+ <20121119145546.GZ3205@mudshark.cambridge.arm.com>
+ <CANM98qJmkZZ2H+y8sdxBoT6WRgzcFSmKkTPWQnONDhezx5GEQQ@mail.gmail.com>
+ <20121119152629.GH3205@mudshark.cambridge.arm.com>
+ <CANM98q+ts0s1DJO8CxjSDorh1wztjKKU5WdkoAGeWRrSUNi9DA@mail.gmail.com>
+ <20121119162122.GI3205@mudshark.cambridge.arm.com>
+Message-ID: <CANM98q+vZbtJ5-xsfbRhpd8QZt+Pb5-Oh2_ujhtH6PJo+PmRkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/29/2012 8:53 PM, Daniel Mack wrote:
-> On 29.11.2012 16:08, Philip, Avinash wrote:
->> On Thu, Nov 29, 2012 at 17:28:04, Daniel Mack wrote:
->>> Hi Avinash,
->>>
->>> On 29.11.2012 06:24, Philip, Avinash wrote:
->>>> On Wed, Nov 28, 2012 at 22:28:55, Daniel Mack wrote:
->>>>> [Resending +devicetree-discuss, +Rob, +Grant]
->>>>>
->>>>>
->>>>> This is a series of patches to support GPMC peripherals on OMAP boards.
->>>>>
->>>>> Depends on Linus' master +
->>>>> omap-next (branch omap-for-v3.8/cleanup-headers-gpmc)
->>>>
->>>> Can you resend this series on top of linux_next?
->>>
->>> The only branch these patches depend on is the
->>> "omap-for-v3.8/cleanup-headers-gpmc" branch from omap_next. Are you
->>> actually seeing any merge conflicts with my series? If so, which branch
->>> are you referring to exactly?
->>>
->>>> Some of the missing items I seen 
->>>> 1. Of_node not populated in  omap_nand_platform_data structure.
->>>
->>> Hmm - gpmc_probe_nand_child() from 4/4 adds
->>>
->>>   gpmc_nand_data->of_node = child;
->>>
->>> Do I miss anything?
->>
->> I didn't found definition for of_node member in omap_nand_platform_data
->> structure. This also might be missing in liniux-next?
-> 
-> Ah, right. I got that entry from your patch ("mtd: nand: omap2: Support
-> for hardware BCH error correction"). But you're right, it should be part
-> of my series. Will add that when resending, but note that your ELM
-> series will then cause a (trivial) merge conflict.
-> 
->>>> 2. Remove platform device creation from hwmod as GPMC DT is populating.
->>>>    Currently GPMC device creaing from DT & HWMOD.
->>>
->>> This is already addressed in cd00b0530 ("ARM: OMAP2+: gpmc: Fix kernel
->>> BUG for DT boot mode") by Vaibhav Hiremath, which I got via Afzal's USB
->>> branch:
->>
->> Purpose of VH's patch was to get beagle bone booting, but Jon sent another
->> patch that made beagle bone boot and it has reached mainline by v3.7-rc2,
->> hence the patch you are referring to is currently not going upstream. Still to
->> have GPMC DT work, we need that patch as other wise there would be two GPMC
->> devices. In earlier versions of your series, you had a similar patch, it is
->> required, can you please add it to your series as otherwise with your series
->> GPMC DT won't work.
-> 
-> Ok, fine. Will do.
+On Mon, Nov 19, 2012 at 11:21 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Nov 19, 2012 at 04:09:06PM +0000, Christoffer Dall wrote:
+>> On Mon, Nov 19, 2012 at 10:26 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Mon, Nov 19, 2012 at 03:04:38PM +0000, Christoffer Dall wrote:
+>> In all seriousness, I will unite myself with an alcoholic beverage one
+>> of these evenings and try to see what I can do about it, maybe split
+>> it up somehow, I'll give it a shot.
 >
-
-Feel free to take that patch forward, merge into your series.
-
-Thanks,
-Vaibhav
-
-
-> 
-> Daniel
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> So this might be to do with the way you've split up the patches (likely I'll
+> have similar complaints against the vGIC code, but at least it will make
+> sense there!)...
+>
+>> >> >> +int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level)
+>> >> >> +{
+>> >> >> +       u32 irq = irq_level->irq;
+>> >> >> +       unsigned int irq_type, vcpu_idx, irq_num;
+>> >> >> +       int nrcpus = atomic_read(&kvm->online_vcpus);
+>> >> >> +       struct kvm_vcpu *vcpu = NULL;
+>> >> >> +       bool level = irq_level->level;
+>> >> >> +
+>> >> >> +       irq_type = (irq >> KVM_ARM_IRQ_TYPE_SHIFT) & KVM_ARM_IRQ_TYPE_MASK;
+>> >> >> +       vcpu_idx = (irq >> KVM_ARM_IRQ_VCPU_SHIFT) & KVM_ARM_IRQ_VCPU_MASK;
+>> >> >> +       irq_num = (irq >> KVM_ARM_IRQ_NUM_SHIFT) & KVM_ARM_IRQ_NUM_MASK;
+>> >> >> +
+>> >> >> +       trace_kvm_irq_line(irq_type, vcpu_idx, irq_num, irq_level->level);
+>> >> >> +
+>> >> >> +       if (irq_type == KVM_ARM_IRQ_TYPE_CPU ||
+>> >> >> +           irq_type == KVM_ARM_IRQ_TYPE_PPI) {
+>> >> >> +               if (vcpu_idx >= nrcpus)
+>> >> >> +                       return -EINVAL;
+>> >> >> +
+>> >> >> +               vcpu = kvm_get_vcpu(kvm, vcpu_idx);
+>> >> >> +               if (!vcpu)
+>> >> >> +                       return -EINVAL;
+>> >> >> +       }
+>> >> >> +
+>> >> >> +       switch (irq_type) {
+>> >> >> +       case KVM_ARM_IRQ_TYPE_CPU:
+>> >> >> +               if (irq_num > KVM_ARM_IRQ_CPU_FIQ)
+>> >> >> +                       return -EINVAL;
+>> >> >> +
+>> >> >> +               return vcpu_interrupt_line(vcpu, irq_num, level);
+>> >> >> +       }
+>> >> >> +
+>> >> >> +       return -EINVAL;
+>> >> >> +}
+>
+> This obviously doesn't handle PPIs, which is where the confusion lies. You
+> can just as easily write it as:
+>
+> int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level)
+> {
+>         u32 irq = irq_level->irq;
+>         unsigned int irq_type, vcpu_idx, irq_num;
+>         int nrcpus = atomic_read(&kvm->online_vcpus);
+>         struct kvm_vcpu *vcpu = NULL;
+>         bool level = irq_level->level;
+>
+>         irq_type = (irq >> KVM_ARM_IRQ_TYPE_SHIFT) & KVM_ARM_IRQ_TYPE_MASK;
+>         vcpu_idx = (irq >> KVM_ARM_IRQ_VCPU_SHIFT) & KVM_ARM_IRQ_VCPU_MASK;
+>         irq_num = (irq >> KVM_ARM_IRQ_NUM_SHIFT) & KVM_ARM_IRQ_NUM_MASK;
+>
+>         trace_kvm_irq_line(irq_type, vcpu_idx, irq_num, irq_level->level);
+>
+>         if (irq_type != KVM_ARM_IRQ_TYPE_CPU)
+>                 return -EINVAL;
+>
+>         if (vcpu_idx >= nrcpus)
+>                 return -EINVAL;
+>
+>         vcpu = kvm_get_vcpu(kvm, vcpu_idx);
+>         if (!vcpu)
+>                 return -EINVAL;
+>
+>         if (irq_num > KVM_ARM_IRQ_CPU_FIQ)
+>                 return -EINVAL;
+>
+>         return vcpu_interrupt_line(vcpu, irq_num, level);
+> }
+>
+> Then add all the IRQ complexity in a later patch!
+>
+that was pretty constructive, I did just that. Thanks.
