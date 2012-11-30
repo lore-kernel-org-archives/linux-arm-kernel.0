@@ -1,75 +1,110 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 30 Nov 2012 14:46:36 +0000
-Subject: [PATCH v4 14/14] KVM: ARM: Handle I/O aborts
-In-Reply-To: <20121119150924.GF3205@mudshark.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 30 Nov 2012 15:15:00 +0000
+Subject: [PATCH v4 08/14] KVM: ARM: World-switch implementation
+In-Reply-To: <CANM98qJFFP=2ueyUpbN6x15XwtWXbgZjkMBaq2jVpqik4kT54Q@mail.gmail.com>
 References: <20121110154203.2836.46686.stgit@chazy-air>
- <20121110154348.2836.45008.stgit@chazy-air>
- <20121119150924.GF3205@mudshark.cambridge.arm.com>
-Message-ID: <20121130144636.GB1960@linaro.org>
+ <20121110154306.2836.93473.stgit@chazy-air>
+ <20121119145758.GA3205@mudshark.cambridge.arm.com>
+ <CANM98qJFFP=2ueyUpbN6x15XwtWXbgZjkMBaq2jVpqik4kT54Q@mail.gmail.com>
+Message-ID: <20121130151500.GC26289@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 03:09:24PM +0000, Will Deacon wrote:
-> On Sat, Nov 10, 2012 at 03:43:49PM +0000, Christoffer Dall wrote:
-> > When the guest accesses I/O memory this will create data abort
-> > exceptions and they are handled by decoding the HSR information
-> > (physical address, read/write, length, register) and forwarding reads
-> > and writes to QEMU which performs the device emulation.
-> > 
-> > Certain classes of load/store operations do not support the syndrome
-> > information provided in the HSR and we therefore must be able to fetch
-> > the offending instruction from guest memory and decode it manually.
-> > 
-> > We only support instruction decoding for valid reasonable MMIO operations
-> > where trapping them do not provide sufficient information in the HSR (no
-> > 16-bit Thumb instructions provide register writeback that we care about).
-> > 
-> > The following instruction types are NOT supported for MMIO operations
-> > despite the HSR not containing decode info:
-> >  - any Load/Store multiple
-> >  - any load/store exclusive
-> >  - any load/store dual
-> >  - anything with the PC as the dest register
-> > 
-> > This requires changing the general flow somewhat since new calls to run
-> > the VCPU must check if there's a pending MMIO load and perform the write
-> > after userspace has made the data available.
-> > 
-> > Rusty Russell fixed a horrible race pointed out by Ben Herrenschmidt:
-> > (1) Guest complicated mmio instruction traps.
-> > (2) The hardware doesn't tell us enough, so we need to read the actual
-> >     instruction which was being exectuted.
-> > (3) KVM maps the instruction virtual address to a physical address.
-> > (4) The guest (SMP) swaps out that page, and fills it with something else.
-> > (5) We read the physical address, but now that's the wrong thing.
-> > 
-> > Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
-> > Signed-off-by: Rusty Russell <rusty.russell@linaro.org>
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+On Fri, Nov 30, 2012 at 06:37:04AM +0000, Christoffer Dall wrote:
+> On Mon, Nov 19, 2012 at 9:57 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >
+> > I must be missing something here: how do you ensure that a guest running
+> > on multiple CPUs continues to have the same VMID across them after a
+> > rollover?
+> >
 > 
-> This is looking like the right sort of thing now, but I would like to
-> see an Acked-by from Dave [CC'd] for this patch.
+> when a roll over occurs, there's no problem until someone comes along
+> that doesn't have a valid vmid (need_new_vmid_gen will return true).
 
-Apologies for not looking at this until now -- it looks like my mutt
-filter was buggy, causing me to miss a few mails.
+Well a roll-over is triggered by somebody not having a valid VMID and us
+failing to allocate a new one from the current generation.
+
+> In this case, to assign a vmid, we need to start a new generation of
+> id's to assign one, and must ensure that all old vmid's are no longer
+> used. So how do we ensure that?
+> 
+> Well, we increment the kvm_vmid_gen, causing all other cpus who try to
+> run a VM to hit the spin_lock if they exit the VMs. We reserve the
+> vmid 1 for the new cpu, and we call on_each_cpu, which causes an ipi
+> to all other physical cpus, and waits until the other physical cpus
+> actually complete reset_vm_context.
+> 
+> At this point, once on_each_cpu(reset_vm_context) returns, all other
+> physical CPUs have cleared their data structures for occurences of old
+> vmids, and the kvm_vmid_gen has been incremented, so no other vcpus
+> can come and claim other vmids until we unlock the spinlock, and
+> everything starts over.
+> 
+> Makes sense?
+
+Yes, but I still don't understand how you ensure VMID consistency across
+different vcpus of the same vm. Imagine the following scenario:
+
+We have two VMs:
+
+	VM0: VCPU0 on physical CPU0, VCPU1 on physical CPU1
+	VM1: VCPU0 on physical CPU2
+
+Also assume that VM0 is happily running and we want to schedule VM1 for
+the first time. Finally, also assume that kvm_next_vmid is zero (that is,
+the next allocation will trigger a roll-over).
+
+Now, we want to schedule VM1:
 
 
-I haven't reviewed the code in depth, but it looks like a reasonable
-and fairly clean subsystem-specific decoder implementation.
+	kvm_arch_init_vm
+		kvm->arch.vmid_gen = 0;
+	kvm_arch_vcpu_ioctl_run
+		update_vttbr
+			need_new_vmid_gen == true
+			lock(kvm_vmid_lock)
+			kvm_vmid_gen++;
+			kvm_next_vmid = 1;
+			on_each_cpu(reset_vm_context);
 
-This still is not generic, and looks a bit too specialised to lead
-directly to a generic implementation which could be reused by other
-subsystems.  But I think it is a step in the right direction in terms of
-the general way the code works.  If a future generic decode
-implementation does not reuse this code, it should still be able to
-reuse ideas from it.
 
-The amount of decode here is not that huge, so if KVM needs it, I'm not
-sure if it is worth blocking this patch just because it's not generic.
+At this point, the other two (physical) CPUs exit the guest:
 
-I still feel we are going to want to consolidate this decode stuff at
-some point, though.
 
-Cheers
----Dave
+	kvm_guest_exit					// Received IRQ from cross-call
+	local_irq_enable
+		kvm_call_hyp(__kvm_flush_vm_context);	// Invalidate TLB (this is overkill as should be bcast)
+	cond_resched;
+	update_vttbr
+		need_new_vmid_gen == true
+		/* spin on kvm_vmid_lock */
+
+
+I think the __kvm_flush_vm_context is overkill -- you should check
+tlb_ops_need_broadcast (which is currently only true for 11MPCore). However,
+continuing with this, the other CPU gets its vmid and releases the lock:
+
+
+			/* receives vmid 1, kvm_next_vmid = 2 */
+			unlock(kvm_vmid_lock)
+			/* Back to the guest */
+
+
+Now, let's say that CPU0 takes an interrupt (which it goes off to handle)
+and CPU1 grabs the lock:
+
+
+		lock(kvm_vmid_lock)
+		/* CPU1 receives vmid 2, bumps vmid counter */
+		unlock(kvm_vmid_lock)
+		/* Back to the guest */
+
+
+At this point, VM1 is running and VM0:VCPU1 is running. VM0:VCPU0 is not
+running because physical CPU0 is handling an interrupt. The problem is that
+when VCPU0 *is* resumed, it will update the VMID of VM0 and could be
+scheduled in parallel with VCPU1 but with a different VMID.
+
+How do you avoid this in the current code?
+
+Will
