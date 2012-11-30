@@ -1,133 +1,39 @@
-From: gclement00@gmail.com (Gregory CLEMENT)
-Date: Fri, 30 Nov 2012 08:27:23 +0100
-Subject: [GIT PULL 5/5] ARM: mvebu: changes for v3.8
-In-Reply-To: <20121126091652.GA13866@quad.lixom.net>
-References: <50b056f7.8687e50a.170d.7c22SMTPIN_ADDED_MISSING@mx.google.com>
- <20121126091652.GA13866@quad.lixom.net>
-Message-ID: <CADx9zJA-RsOtMvbeXVy-s-XAzRk3R2WJJYWNBA=tyosdvwa7vw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 30 Nov 2012 13:34:49 +0530
+Subject: [GIT PULL 1/3] omap late timer clean-up (and a warning fix) for
+ v3.8 merge window
+In-Reply-To: <20121130071833.GD6899@quad.lixom.net>
+References: <50b41207.c188e50a.6d1e.ffffd469SMTPIN_ADDED_BROKEN@mx.google.com>
+ <20121130071833.GD6899@quad.lixom.net>
+Message-ID: <50B868A1.2090001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/11/26 Olof Johansson <olof@lixom.net>:
-> Hi,
->
-> On Sat, Nov 24, 2012 at 05:11:14AM +0000, Jason Cooper wrote:
->> The following changes since commit f4a75d2eb7b1e2206094b901be09adb31ba63681:
+Olof,
+
+On Friday 30 November 2012 12:48 PM, Olof Johansson wrote:
+> On Mon, Nov 26, 2012 at 05:06:11PM -0800, Tony Lindgren wrote:
+>> The following changes since commit 9dc57643738f9fbe45c10cc062903d5dfda5bdd9:
 >>
->>   Linux 3.7-rc6 (2012-11-16 17:42:40 -0800)
+>>    Merge branch 'fixes-timer' of github.com:jonhunter/linux into omap-for-v3.8/timer (2012-11-13 13:52:38 -0800)
 >>
 >> are available in the git repository at:
 >>
->>   git://git.infradead.org/users/jcooper/linux.git tags/mvebu_everything_for_3.8
 >>
->> for you to fetch changes up to 56580bb422e5f542da19c057f348dd39634138e7:
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/cleanup-timer-signed
 >>
->>   Merge branch 'mvebu-misc-fixes' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything (2012-11-24 04:08:49 +0000)
+>> for you to fetch changes up to 26f01998b0657a61167a819f1c37cb9f9e9d674b:
 >>
->> ----------------------------------------------------------------
->>
->> mvebu everything for v3.8
->>  - due to the complex interdependencies of the received pull requests
->>    I decided to keep this in one branch the way they recommended merging it
->>  - this was their first attempt at doing pull requests, we'll work on it
->>    with them
->>
->>  - added SMP support for mvebu SoCs
->>  - added coherency fabric
->>  - added mdio and mvneta drivers
->>  - added mirabox board
->>  - added openblocks ax3-4 board
->>  - clock fixes and improvements
->>  - converted mv_xor driver to devicetree (extensive series in itself)
->>
->> merge conflicts with orion/*
->>  - arch/arm/mach-kirkwood/Kconfig
->>     - select everything
->>  - arch/arm/mach-kirkwood/board-dt.c
->>     - remove AUXDATA
->>     - keep all of_machine_is_compatible()
->>     - use of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL)
->>
->> ----------------------------------------------------------------
->> Andrew Lunn (3):
->>       ARM: Kirkwood: switch to DT clock providers
->>       dma: mv_xor: Add a device_control function
->>       arm: kirkwood: Convert XOR instantiation to DT.
->>
->> Gregory CLEMENT (17):
->>       arm: mvebu: support for the Globalscale Mirabox board
->>       clk: mvebu: add armada-370-xp CPU specific clocks
->>       clk: mvebu: armada 370/XP add clock gating control provider for DT
->>       clk: armada-370-xp: add support for clock framework
->>       clocksource: convert time-armada-370-xp to clk framework
->>       arm: mvebu: increase atomic coherent pool size for armada 370/XP
->>       arm: mvebu: SATA support: SoC-level DT data for Armada 370/XP
->>       arm: mvebu: SATA support: mvebu_defconfig update
->>       arm: mvebu: SATA support: board-level DT data for Armada 370/XP boards
->>       arm: mvebu: Add support for coherency fabric in mach-mvebu
->>       arm: mvebu: Add initial support for power managmement service unit
->>       arm: mvebu: Add IPI support via doorbells
->>       arm: mm: Add support for PJ4B cpu and init routines
->>       arm: mvebu: Add SMP support for Armada XP
->>       arm: dma mapping: Export a dma ops function arm_dma_set_mask
->>       arm: plat-orion: Add coherency attribute when setup mbus target
->>       arm: mvebu: Add hardware I/O Coherency support
->>
->> Jason Cooper (14):
->>       Merge tag 'marvell-mvebu-clk-3.8' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything
->>       Merge tag 'marvell-sata-3.8' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything
->>       Merge tag 'marvell-neta-for-3.8' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything
->>       Merge tag 'marvell-boards-net-for-3.8' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything
->>       Merge tag 'marvell-net-mdio-checkpatch-fixes-3.8' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything
->>       Merge tag 'marvell-mvneta-fix-and-clk-support-3.8' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything
->>       Merge tag 'marvell-neta-dt-clk-updates-3.8' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything
->>       Merge tag 'marvell-xor-cleanup-dt-binding-3.8' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything
->>       Merge tag 'marvell-xor-board-dt-changes-3.8-v2' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything
->>       Merge tag 'marvell-net-xor-defconfig-for-3.8' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything
->>       Merge tag 'marvell-armadaxp-smp-for-3.8' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything
->>       Merge tag 'marvell-hwiocc-for-3.8' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything
->>       Merge tag 'marvell-openblocks-i2c-sata-for-3.8' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything
->>       Merge branch 'mvebu-misc-fixes' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything
+>>    ARM: OMAP3: cm-t3517: use GPTIMER for system clock (2012-11-21 10:20:43 -0800)
 >
-> Based on these merge commits, it looks like they organized things pretty well.
-> With this amount of code, if you want to mostly expose this to us coming
-> up to our level, that's fine.
+> By the way, I had to apply the following fixup on top of this (in next/cleanup)
+> to fix a compilation failure. Seems to be caused by "ARM: OMAP2+: timer: remove
+> CONFIG_OMAP_32K_TIMER" from Igor.
 >
-> Looking at the actual tree (in gitk to get visalization), it looks like
-> things held up well until the "test-the-merge" mergepoint which had some
-> patches on top of it instead of in a separate branch, I think? Those
-> merges are these:
->
->> Thomas Petazzoni (74):
->>       Merge tag 'marvell-mvebu-clk-3.8' of github.com:MISL-EBU-System-SW/mainline-public into test-the-merge
->>       Merge tag 'marvell-sata-3.8' of github.com:MISL-EBU-System-SW/mainline-public into test-the-merge
->>       Merge tag 'marvell-neta-for-3.8' of github.com:MISL-EBU-System-SW/mainline-public into test-the-merge
->>       Merge tag 'marvell-boards-net-for-3.8' of github.com:MISL-EBU-System-SW/mainline-public into test-the-merge
-> [..]
->>       Merge tag 'marvell-mvebu-clk-3.8' of github.com:MISL-EBU-System-SW/mainline-public into test-the-merge
->>       Merge tag 'marvell-sata-3.8' of github.com:MISL-EBU-System-SW/mainline-public into test-the-merge
->>       Merge tag 'marvell-neta-for-3.8' of github.com:MISL-EBU-System-SW/mainline-public into test-the-merge
->>       Merge tag 'marvell-boards-net-for-3.8' of github.com:MISL-EBU-System-SW/mainline-public into test-the-merge
->>       Merge tag 'marvell-net-mdio-checkpatch-fixes-3.8' of github.com:MISL-EBU-System-SW/mainline-public into test-the-merge
->>       Merge tag 'marvell-mvneta-fix-and-clk-support-3.8' of github.com:MISL-EBU-System-SW/mainline-public into test-the-merge
->>       Merge tag 'marvell-neta-dt-clk-updates-3.8' of github.com:MISL-EBU-System-SW/mainline-public into test-the-merge
->>       Merge tag 'marvell-xor-cleanup-dt-binding-3.8' of github.com:MISL-EBU-System-SW/mainline-public into test-the-merge
->>       Merge tag 'marvell-xor-board-dt-changes-3.8-v2' of github.com:MISL-EBU-System-SW/mainline-public into test-the-merge
->>       Merge tag 'marvell-net-xor-defconfig-for-3.8' of github.com:MISL-EBU-System-SW/mainline-public into test-the-merge
->
->
-> I'll take a closer look at the rest tomorrow, it's getting a bit late here and
-> I have to call it a day.
->
+There was similar patch [1] like yours from Jon to fix above build
+break.
 
-Hello,
-Olof, Arnd,
-what is the current status of this pull?
+Regards
+santosh
 
-If you had encountered any issues, don't hesitate to let me know.
-If I can help on any points I will.
-
-Thanks,
-
--- 
-Gregory CLEMENT
+[1] http://www.spinics.net/lists/linux-omap/msg83260.html
