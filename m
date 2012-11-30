@@ -1,63 +1,59 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 30 Nov 2012 17:45:58 +0000
-Subject: [PATCH 00/10] Unify arm_generic and arch_timer drivers
-Message-ID: <1354297568-26366-1-git-send-email-mark.rutland@arm.com>
+Date: Fri, 30 Nov 2012 17:45:59 +0000
+Subject: [PATCH 01/10] arm: arch_timer: remove redundant available check
+In-Reply-To: <1354297568-26366-1-git-send-email-mark.rutland@arm.com>
+References: <1354297568-26366-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1354297568-26366-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we have two drivers for the ARM generic / architected timer,
-arch_timer in arch/arm, and arm_generic in drivers/clocksource. This is
-an unnecessary duplication of code, and will only lead to maintenance
-headaches later.
+This check is a holdover from the pre-devicetree days. As the timer
+is not probed except by platforms which register it via devicetree,
+it's not strictly necessary.
 
-This patch series splits the generic portion of the arch_timer out to
-drivers/clocksource, and ports the arm64 code to use it. The now unused
-arm_generic driver is removed in the process.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kernel/arch_timer.c |   12 ------------
+ 1 files changed, 0 insertions(+), 12 deletions(-)
 
-The series applies to v3.7-rc7, and has been tested on a TC2 test chip.
-Aside from a slight conflict in arch/arm64/Kconfig, it also applies to
-Catalin's soc-armv8-model branch [1], the result of which has been
-tested on an AArch64 model.
-
-Obviously I'm not aiming for the merge window, but I'm posting now in
-the hope this can get some early feedback.
-
-Thanks,
-Mark
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git soc-armv8-model
-
-Mark Rutland (10):
-  arm: arch_timer: remove redundant available check
-  arm: arch_timer: use u64/u32 for register data
-  arm: arch_timer: standardise counter reading
-  arm: arch_timer: split cntfrq accessor
-  arm: arch_timer: factor out register accessors
-  arm: arch_timer: divorce from local_timer api
-  arm: arch_timer: add arch_counter_enable_user_access
-  arm: arch_timer: move core to drivers/clocksource
-  arm64: move from arm_generic to arm_arch_timer
-  Documentation: Add ARMv8 to arch_timer devicetree
-
- .../devicetree/bindings/arm/arch_timer.txt         |    7 +-
- arch/arm/Kconfig                                   |    3 +-
- arch/arm/include/asm/arch_timer.h                  |  107 ++++-
- arch/arm/kernel/arch_timer.c                       |  504 +-------------------
- arch/arm/mach-omap2/Kconfig                        |    2 +-
- arch/arm64/Kconfig                                 |    1 +
- arch/arm64/include/asm/arch_timer.h                |  133 +++++
- arch/arm64/include/asm/arm_generic.h               |  100 ----
- arch/arm64/kernel/time.c                           |   29 +-
- drivers/clocksource/Kconfig                        |    6 +-
- drivers/clocksource/Makefile                       |    2 +-
- drivers/clocksource/arm_arch_timer.c               |  375 +++++++++++++++
- drivers/clocksource/arm_generic.c                  |  232 ---------
- include/clocksource/arm_arch_timer.h               |   63 +++
- include/clocksource/arm_generic.h                  |   21 -
- 15 files changed, 730 insertions(+), 855 deletions(-)
- create mode 100644 arch/arm64/include/asm/arch_timer.h
- delete mode 100644 arch/arm64/include/asm/arm_generic.h
- create mode 100644 drivers/clocksource/arm_arch_timer.c
- delete mode 100644 drivers/clocksource/arm_generic.c
- create mode 100644 include/clocksource/arm_arch_timer.h
- delete mode 100644 include/clocksource/arm_generic.h
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index c8ef207..a4d3b5c 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -20,11 +20,9 @@
+ #include <linux/of_irq.h>
+ #include <linux/io.h>
+ 
+-#include <asm/cputype.h>
+ #include <asm/delay.h>
+ #include <asm/localtimer.h>
+ #include <asm/arch_timer.h>
+-#include <asm/system_info.h>
+ #include <asm/sched_clock.h>
+ 
+ static unsigned long arch_timer_rate;
+@@ -259,20 +257,10 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
+ 	return 0;
+ }
+ 
+-/* Is the optional system timer available? */
+-static int local_timer_is_architected(void)
+-{
+-	return (cpu_architecture() >= CPU_ARCH_ARMv7) &&
+-	       ((read_cpuid_ext(CPUID_EXT_PFR1) >> 16) & 0xf) == 1;
+-}
+-
+ static int arch_timer_available(void)
+ {
+ 	unsigned long freq;
+ 
+-	if (!local_timer_is_architected())
+-		return -ENXIO;
+-
+ 	if (arch_timer_rate == 0) {
+ 		freq = arch_timer_reg_read(ARCH_TIMER_PHYS_ACCESS,
+ 					   ARCH_TIMER_REG_FREQ);
+-- 
+1.7.0.4
