@@ -1,41 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 30 Nov 2012 11:46:34 +0000
-Subject: [PATCH v4 01/14] ARM: Add page table and page defines needed by
- KVM
-In-Reply-To: <CANM98q+H6J56HqidqKTpTT1Er-wHsSNyJi4zwGVG2eX6N04vPw@mail.gmail.com>
-References: <20121110154203.2836.46686.stgit@chazy-air>
- <20121110154217.2836.41905.stgit@chazy-air>
- <20121119141417.GT3205@mudshark.cambridge.arm.com>
- <CANM98q+H6J56HqidqKTpTT1Er-wHsSNyJi4zwGVG2eX6N04vPw@mail.gmail.com>
-Message-ID: <20121130114634.GC26305@mudshark.cambridge.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 30 Nov 2012 12:54:29 +0100
+Subject: [PATCH 2/5] mfd: db8500: Update cpufreq device name
+In-Reply-To: <20121130105031.GK3176@sortiz-mobl>
+References: <1354098464-6665-1-git-send-email-ulf.hansson@stericsson.com>
+ <1354098464-6665-3-git-send-email-ulf.hansson@stericsson.com>
+ <20121130105031.GK3176@sortiz-mobl>
+Message-ID: <CAPDyKFrjd8mtfG2fVOr5CseAK7UEr=W6Ok8FYwP1DsgBtk4RNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 29, 2012 at 03:57:00PM +0000, Christoffer Dall wrote:
-> On Mon, Nov 19, 2012 at 9:14 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Sat, Nov 10, 2012 at 03:42:17PM +0000, Christoffer Dall wrote:
-> >>
-> >> +#ifdef CONFIG_ARM_LPAE
-> >> +#define s2_policy(policy)    policy
-> >> +#else
-> >> +#define s2_policy(policy)    0
-> >> +#endif
-> >
-> > Put the macro in pgtable-{2,3}level.h?
-> >
-> 
-> I think that's weird, defining something far away from where it's used
-> will only make it harder to read, pgtable.h is not included in this
-> file, and there are other #ifdef CONFIG_ARM_LPAE in that file.
+On 30 November 2012 11:50, Samuel Ortiz <sameo@linux.intel.com> wrote:
+> Hi Ulf,
+>
+> On Wed, Nov 28, 2012 at 11:27:41AM +0100, Ulf Hansson wrote:
+>> From: Lee Jones <lee.jones@linaro.org>
+>>
+>> Since the cpufreq driver for ux500 has been renamed from
+>> cpufreq-db8500 to cpufreq-dbx500, we need to change the
+>> device name here as well.
+>>
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> Cc: Samuel Ortiz <sameo@linux.intel.com>
+>> ---
+>>  drivers/mfd/db8500-prcmu.c |    4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+> This one doesn't apply to my tree, it would make more sense to push this one
+> through Mike's tree.
 
+Yes, you are right! My earlier clock patches which was affecting
+cpufreq and mfd was merged through Mikes tree.
+I will suggest this complete patchset shall go though Mikes tree.
 
-Of course pgtable.h is included in this file -- we have direct references to
-L_PTE_MT_UNCACHED, for example, so by your logic we should inline all of
-that too!
+Do I have your ack for the mfd patch?
 
-Yes, there are other CONFIG_ARM_LPAE checks in this file, but only where
-there's a piece of code that is not applicable one way or the other. For
-data definitions, it's really easy to fix in the headers so please do it
-there instead.
+> Or I'll queue it to my for-next branch after the next merge window closes, as
+> you prefer.
+>
+> Cheers,
+> Samuel.
+>
+> --
+> Intel Open Source Technology Centre
+> http://oss.intel.com/
+> --
+> To unsubscribe from this list: send the line "unsubscribe cpufreq" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Will
+Kind regards
+Ulf Hansson
