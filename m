@@ -1,50 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 30 Nov 2012 10:21:59 +0000
-Subject: [PATCH v4 03/14] ARM: Factor out cpuid implementor and part number
-In-Reply-To: <CANM98qLDLRdaOWWOU-zUs38+0A4YjSWLMUeuF=1KteFnyQyDsA@mail.gmail.com>
-References: <20121110154203.2836.46686.stgit@chazy-air>
- <20121110154231.2836.24377.stgit@chazy-air>
- <20121119142126.GV3205@mudshark.cambridge.arm.com>
- <CANM98qLDLRdaOWWOU-zUs38+0A4YjSWLMUeuF=1KteFnyQyDsA@mail.gmail.com>
-Message-ID: <20121130102159.GA26305@mudshark.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 30 Nov 2012 10:28:41 +0000
+Subject: [ARM] head.S change broke platform device registration?
+In-Reply-To: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
+References: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
+Message-ID: <50B88A59.6070207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 29, 2012 at 09:38:46PM +0000, Christoffer Dall wrote:
-> On Mon, Nov 19, 2012 at 9:21 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Sat, Nov 10, 2012 at 03:42:31PM +0000, Christoffer Dall wrote:
-> >> Decoding the implementor and part number of the CPU id in the CPU ID
-> >> register is needed by KVM, so we factor it out to share the code.
-> >>
-> >> Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
-> >> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+On 30/11/12 01:38, Marko Kati? wrote:
+> I recently tried to boot v3.7-rc7 on my akita (Sharp Zaurus C-1000,
+> PXA270 machine).
+> Backlight never turned on but the kernel booted just fine.
+> After some investigation i determined that the gpio expander (max7310,
+> i2c chip) is not even
+> registered and thus not present in /sys/bus/i2c/devices.
+> Backlight gpio controls are hooked to this chip thus, no backlight.
+> 
+> I thought that too many things could have caused this so i went
+> straight to bisecting.
+> Bisection pointed me to this commit:
+> 
+>  commit 424e5994e63326a42012f003f1174f3c363c7b62
+> Author: Dave Martin <dave.martin@linaro.org>
+> Date:   Fri Feb 10 18:07:07 2012 -0800
+> 
+>     ARM: zImage/virt: hyp mode entry support for the zImage loader
+> 
+>     The zImage loader needs to turn on the MMU in order to take
+>     advantage of caching while decompressing the zImage.  Running this
+>     in hyp mode would require the LPAE pagetable format to be
+>     supported; to avoid this complexity, this patch switches out of hyp
+>     mode, and returns back to hyp mode just before booting the kernel.
+> 
+>     This implementation assumes that the Hyp mode view of memory and the
+>     PL1 view of memory are coherent, providing that the MMU and caches
+>     are off in both, as required by the boot protocol.  The zImage
+>     decompression code must drain the write buffer on completion anyway, and
+>     entry into Hyp mode should flush any prefetch buffer, avoiding hazards
+>     associated with local write buffers and the pipeline.
+> 
+>     Signed-off-by: Dave Martin <dave.martin@linaro.org>
+>     Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> This commit was merged in v3.7-rc1. And indeed, if i
+> revert this single commit, my gpio expander reappears and
+> so does my backlight.
+> I made no other changes to the vanilla 3.7-rc7
+> except this revert.
+> 
+> This seems very strange to me because i, with my limited knowledge,
+> cannot see any correlation between this commit and the bug i am experiencing.
+> 
+> Does anyone know what exactly is happening here?
 
-[...]
+This is incredibly puzzling. I could understand your board not booting
+at all because of this patch, but an i2c device missing?
 
-> >> +static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
-> >> +{
-> >> +     return (read_cpuid_id() & 0xFF000000) >> 24;
-> >> +}
-> >> +
-> >> +static inline unsigned int __attribute_const__ read_cpuid_part_number(void)
-> >> +{
-> >> +     return (read_cpuid_id() & 0xFFF0);
-> >> +}
-> >
-> > Perhaps this should take the implementor as an argument, given that the
-> > part number is described differently between implementors. The xscale
-> > stuff can then move in here (we'll need to check the xscale docs in case
-> > perf is using a subfield -- I can't remember off-hand).
+Can you see the i2c controller at all? I'll try to dig my PXA270 board
+and see if I can reproduce your issue.
 
-[...]
-
-> > If you stick this one in a separate patch, I can take it via the perf
-> > tree (along with the CPUID rework above).
-> >
-> thanks,
-> I sent a separate patch.
-
-Looks like we still have the ugly xscale cpuid parsing inline. Could you
-move it as I suggested, please?
-
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny...
