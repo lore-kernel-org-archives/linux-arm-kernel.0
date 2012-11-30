@@ -1,46 +1,40 @@
-From: vitalya@ti.com (Vitaly Andrianov)
-Date: Fri, 30 Nov 2012 08:04:53 -0500
-Subject: [PATCH] arm: mm: lpae: add PTE loop to alloc_init_section
-Message-ID: <1354280693-28696-1-git-send-email-vitalya@ti.com>
+From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
+Date: Fri, 30 Nov 2012 14:07:09 +0100
+Subject: [ARM] head.S change broke platform device registration?
+In-Reply-To: <20121130124049.GO19440@n2100.arm.linux.org.uk>
+References: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
+ <20121130121738.GA1960@linaro.org>
+ <CAHod+GcgvxPGUi4p9-qVuRXfyODrYwDvU8u5cChgiXjFYpwOEg@mail.gmail.com>
+ <20121130124049.GO19440@n2100.arm.linux.org.uk>
+Message-ID: <CAHod+GfREC5cuOkfruD=DZgik_hqL8hcDSrKc3FKdLL7BT6L1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without enabled LPAE the alloc_init_pud never calls the alloc_init_section
-to map more then one segment. In that case the alloc_init_section doesn't
-need the loop when makes pte mapping. The loop is required when LPAE is
-enabled and alloc_init_pud may ask to map multiple sections.
-
-This patch adds the loop.
-
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
----
- arch/arm/mm/mmu.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 2dbacf9..5ac134a 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -614,11 +614,20 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
- 
- 		flush_pmd_entry(p);
- 	} else {
-+#ifndef CONFIG_ARM_LPAE
- 		/*
- 		 * No need to loop; pte's aren't interested in the
- 		 * individual L1 entries.
- 		 */
- 		alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
-+#else
-+		unsigned long next;
-+		do {
-+			next = pmd_addr_end(addr, end);
-+			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys), type);
-+			phys += next - addr;
-+		} while (pmd++, addr=next, addr != end);
-+#endif
- 	}
- }
- 
--- 
-1.7.9.5
+On Fri, Nov 30, 2012 at 1:40 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Nov 30, 2012 at 01:28:33PM +0100, Marko Kati? wrote:
+>> On Fri, Nov 30, 2012 at 1:17 PM, Dave Martin <dave.martin@linaro.org> wrote:
+>> > This is indeed strange, since there is not much difference to the kernel
+>> > if CONFIG_ARM_VIRT_EXT is not set.
+>> >
+>> > Unless a bug is causing the kernel to trample on some random memory,
+>> > there is no reason for this to cause I2C devices to disappear.
+>> >
+>> > It could be something unrelated, like additional and removal of code
+>> > changing the position or alignment of other parts of the kernel image.
+>> >
+>> > Have you could try undoing parts of the patch to narrow the bug down
+>> > further?
+>> >
+>> > Cheers
+>> > ---Dave
+>>
+>> No, not yet. As i said my knowledge of what goes on in head.S is limited
+>> so i'd rather not mess with it.
+>
+> Well, I think everyone's confused how this change could cause an I2C
+> device to vanish.  I've been through this code carefully and I don't
+> see anything that would affect an I2C device here.  The code in question
+> is not even touching any hardware.
+>
+> Please post your .config file so we can see how your kernel is configured.
