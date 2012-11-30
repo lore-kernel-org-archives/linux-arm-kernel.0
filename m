@@ -1,40 +1,33 @@
-From: sander@van-ginkel.eu (sander van ginkel)
-Date: Fri, 30 Nov 2012 17:32:24 +0100
-Subject: [PATCH] add hardware I2C support for ARM IMX23
-In-Reply-To: <20121128170907.GC4659@pengutronix.de>
-References: <20121128152403.45224dvyaufb1j7n@62.129.139.42>
- <20121128150851.GA4659@pengutronix.de>
- <20121128171039.14705ltphptrp5kv@62.129.139.42>
- <20121128162452.GB4659@pengutronix.de> <50B63F81.4050008@van-ginkel.eu>
- <20121128170907.GC4659@pengutronix.de>
-Message-ID: <20121130173224.10203ha9fee3y36g@62.129.139.42>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 30 Nov 2012 08:47:35 -0800
+Subject: [GIT PULL 1/7] Samsung fixes for v3.7
+In-Reply-To: <1d7601cdceea$b96d7580$2c486080$%kim@samsung.com>
+References: <50B55783.3020509@samsung.com>
+ <1d7601cdceea$b96d7580$2c486080$%kim@samsung.com>
+Message-ID: <20121130164735.GA697@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> You might want to try my for-next branch or wait for 3.8-rc1, maybe
-the
-> DMA termination patch helps? Also enabling I2C debug messages is
-> probably worth it.
->
-> Regards,
->
->    Wolfram
->
-> --
-> Pengutronix e.K.                           | Wolfram Sang
-      |
-> Industrial Linux Solutions                 |
-http://www.pengutronix.de/  |
->
+On Fri, Nov 30, 2012 at 08:06:19PM +0900, Kukjin Kim wrote:
+> Kukjin Kim wrote:
+> > 
+> > Hi Arnd, Olof,
+> > 
+> Hi,
+> 
+> > I sorted out my branches as per Olof's suggestion
+> > 
+> I checked only merged this into arm-soc tree.
+> 
+> Any problems on 2nd ~ 7th pull request? Or missed? ;-)
 
-I've tested your git tree, with the same config as I used for the  
-3.7.0-rc6 release (IMX i2c build in)
-It's not a 100% fix
+I just haven't gotten to it yet. They came in late, and it was during the time
+when Stephen Rothwell got back from vacation and was dealing with a lot of
+merge conflicts in linux-next. I didn't want to add anything to his load by
+merging a lot of stuff the first few days.
 
-If I do "i2cdetect -y -r 0" with 3.7.0-rc6, i2cdetect gets confused  
-and the kernel keeps dumping "mxs-i2c 80058000.i2c: Failed to get PIO  
-reg. write descriptor."
-If I do the same with your git release I get the same result, but only  
-when i2cdetect is running. When it's finished or I terminate, the  
-kprint will also disappear.
-So there is some improvement but not 100% yet.
+I'll likely get to it today. And if I don't, it might not make 3.8. Those
+are the risks with sending merge requests late, after all.
+
+
+-Olof
