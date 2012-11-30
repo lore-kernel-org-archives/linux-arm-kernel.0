@@ -1,91 +1,50 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 30 Nov 2012 11:08:57 +0100
-Subject: [PATCH v2 3/3] ARM/dts: omap3: Add support for IGEP COM Module
-In-Reply-To: <1354270137-31538-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1354270137-31538-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1354270137-31538-4-git-send-email-javier.martinez@collabora.co.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 30 Nov 2012 10:21:59 +0000
+Subject: [PATCH v4 03/14] ARM: Factor out cpuid implementor and part number
+In-Reply-To: <CANM98qLDLRdaOWWOU-zUs38+0A4YjSWLMUeuF=1KteFnyQyDsA@mail.gmail.com>
+References: <20121110154203.2836.46686.stgit@chazy-air>
+ <20121110154231.2836.24377.stgit@chazy-air>
+ <20121119142126.GV3205@mudshark.cambridge.arm.com>
+ <CANM98qLDLRdaOWWOU-zUs38+0A4YjSWLMUeuF=1KteFnyQyDsA@mail.gmail.com>
+Message-ID: <20121130102159.GA26305@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ISEE IGEP COM Module is an TI OMAP3 SoC computer on module.
+On Thu, Nov 29, 2012 at 09:38:46PM +0000, Christoffer Dall wrote:
+> On Mon, Nov 19, 2012 at 9:21 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Sat, Nov 10, 2012 at 03:42:31PM +0000, Christoffer Dall wrote:
+> >> Decoding the implementor and part number of the CPU id in the CPU ID
+> >> register is needed by KVM, so we factor it out to share the code.
+> >>
+> >> Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
+> >> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 
-This patch adds an initial device tree support to boot an
-IGEP COM Module from the MMC/SD.
+[...]
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
----
+> >> +static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
+> >> +{
+> >> +     return (read_cpuid_id() & 0xFF000000) >> 24;
+> >> +}
+> >> +
+> >> +static inline unsigned int __attribute_const__ read_cpuid_part_number(void)
+> >> +{
+> >> +     return (read_cpuid_id() & 0xFFF0);
+> >> +}
+> >
+> > Perhaps this should take the implementor as an argument, given that the
+> > part number is described differently between implementors. The xscale
+> > stuff can then move in here (we'll need to check the xscale docs in case
+> > perf is using a subfield -- I can't remember off-hand).
 
-Changes since v1:
-    - Use default-state = "on" instead default-trigger = "default-on" for LED
-    - Update GPIO mapping according to latest IGEP COM Module rev.E instead D
+[...]
 
- arch/arm/boot/dts/Makefile           |    1 +
- arch/arm/boot/dts/omap3-igep0030.dts |   44 ++++++++++++++++++++++++++++++++++
- 2 files changed, 45 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap3-igep0030.dts
+> > If you stick this one in a separate patch, I can take it via the perf
+> > tree (along with the CPUID rework above).
+> >
+> thanks,
+> I sent a separate patch.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 1dc0f39..78c99bc 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -67,6 +67,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3-evm.dtb \
- 	omap3-tobi.dtb \
- 	omap3-igep0020.dtb \
-+	omap3-igep0030.dtb \
- 	omap4-panda.dtb \
- 	omap4-pandaES.dtb \
- 	omap4-var_som.dtb \
-diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
-new file mode 100644
-index 0000000..9dc48d2
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-igep0030.dts
-@@ -0,0 +1,44 @@
-+/*
-+ * Device Tree Source for IGEP COM Module
-+ *
-+ * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
-+ * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/include/ "omap3-igep.dtsi"
-+
-+/ {
-+	model = "IGEP COM Module";
-+	compatible = "isee,omap3-igep0030", "ti,omap3";
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		boot {
-+			 label = "omap3:green:boot";
-+			 gpios = <&twl_gpio 13 1>;
-+			 default-state = "on";
-+		};
-+
-+		user0 {
-+			 label = "omap3:red:user0";
-+			 gpios = <&twl_gpio 18 1>; /* LEDA */
-+			 default-state = "off";
-+		};
-+
-+		user1 {
-+			 label = "omap3:green:user1";
-+			 gpios = <&twl_gpio 19 1>; /* LEDB */
-+			 default-state = "off";
-+		};
-+
-+		user2 {
-+			 label = "omap3:red:user1";
-+			 gpios = <&gpio1 16 1>;
-+			 default-state = "off";
-+		};
-+	};
-+};
--- 
-1.7.7.6
+Looks like we still have the ugly xscale cpuid parsing inline. Could you
+move it as I suggested, please?
+
+Will
