@@ -1,72 +1,86 @@
-From: markz@nvidia.com (Mark Zhang)
-Date: Fri, 30 Nov 2012 13:44:16 +0800
-Subject: [PATCH] ARM: dt: tegra: cardhu: Add drm components
-Message-ID: <1354254256-10212-1-git-send-email-markz@nvidia.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Fri, 30 Nov 2012 11:23:43 +0530
+Subject: [PATCH RESEND v5 0/4] OMAP GPMC DT bindings
+In-Reply-To: <50B77DD5.4090001@gmail.com>
+References: <1354121939-11246-1-git-send-email-zonque@gmail.com>
+ <518397C60809E147AF5323E0420B992E3EA07317@DBDE01.ent.ti.com>
+ <50B74DCC.5060808@gmail.com>
+ <518397C60809E147AF5323E0420B992E3EA0BB6B@DBDE01.ent.ti.com>
+ <50B77DD5.4090001@gmail.com>
+Message-ID: <50B849E7.30600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the RGB & HDMI nodes in Tegra 30 cardhu's dts.
-This makes the LVDS & HDMI working.
 
-Signed-off-by: Mark Zhang <markz@nvidia.com>
----
-Changes:
-- This patch depcrates the patch:
-  "[PATCH V2] ARM: dt: tegra: cardhu: Add drm components"
-  Because the issue that LCD and HDMI can't work at the same time
-  has been fixed by Thierry's patch:
-  "drm: tegra: Use framebuffer pitch as line stride"
 
- arch/arm/boot/dts/tegra30-cardhu.dtsi |   23 +++++++++++++++++++++--
- 1 file changed, 21 insertions(+), 2 deletions(-)
+On 11/29/2012 8:53 PM, Daniel Mack wrote:
+> On 29.11.2012 16:08, Philip, Avinash wrote:
+>> On Thu, Nov 29, 2012 at 17:28:04, Daniel Mack wrote:
+>>> Hi Avinash,
+>>>
+>>> On 29.11.2012 06:24, Philip, Avinash wrote:
+>>>> On Wed, Nov 28, 2012 at 22:28:55, Daniel Mack wrote:
+>>>>> [Resending +devicetree-discuss, +Rob, +Grant]
+>>>>>
+>>>>>
+>>>>> This is a series of patches to support GPMC peripherals on OMAP boards.
+>>>>>
+>>>>> Depends on Linus' master +
+>>>>> omap-next (branch omap-for-v3.8/cleanup-headers-gpmc)
+>>>>
+>>>> Can you resend this series on top of linux_next?
+>>>
+>>> The only branch these patches depend on is the
+>>> "omap-for-v3.8/cleanup-headers-gpmc" branch from omap_next. Are you
+>>> actually seeing any merge conflicts with my series? If so, which branch
+>>> are you referring to exactly?
+>>>
+>>>> Some of the missing items I seen 
+>>>> 1. Of_node not populated in  omap_nand_platform_data structure.
+>>>
+>>> Hmm - gpmc_probe_nand_child() from 4/4 adds
+>>>
+>>>   gpmc_nand_data->of_node = child;
+>>>
+>>> Do I miss anything?
+>>
+>> I didn't found definition for of_node member in omap_nand_platform_data
+>> structure. This also might be missing in liniux-next?
+> 
+> Ah, right. I got that entry from your patch ("mtd: nand: omap2: Support
+> for hardware BCH error correction"). But you're right, it should be part
+> of my series. Will add that when resending, but note that your ELM
+> series will then cause a (trivial) merge conflict.
+> 
+>>>> 2. Remove platform device creation from hwmod as GPMC DT is populating.
+>>>>    Currently GPMC device creaing from DT & HWMOD.
+>>>
+>>> This is already addressed in cd00b0530 ("ARM: OMAP2+: gpmc: Fix kernel
+>>> BUG for DT boot mode") by Vaibhav Hiremath, which I got via Afzal's USB
+>>> branch:
+>>
+>> Purpose of VH's patch was to get beagle bone booting, but Jon sent another
+>> patch that made beagle bone boot and it has reached mainline by v3.7-rc2,
+>> hence the patch you are referring to is currently not going upstream. Still to
+>> have GPMC DT work, we need that patch as other wise there would be two GPMC
+>> devices. In earlier versions of your series, you had a similar patch, it is
+>> required, can you please add it to your series as otherwise with your series
+>> GPMC DT won't work.
+> 
+> Ok, fine. Will do.
+>
 
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index bdb2a66..9b33bfb 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -27,6 +27,25 @@
- 	model = "NVIDIA Tegra30 Cardhu evaluation board";
- 	compatible = "nvidia,cardhu", "nvidia,tegra30";
- 
-+	host1x {
-+		dc at 54200000 {
-+			rgb {
-+				status = "okay";
-+				nvidia,ddc-i2c-bus = <&rgb_ddc>;
-+			};
-+		};
-+
-+		hdmi {
-+			status = "okay";
-+
-+			vdd-supply = <&sys_3v3_reg>;
-+			pll-supply = <&vio_reg>;
-+
-+			nvidia,hpd-gpio = <&gpio 111 0>; /* PN7 */
-+			nvidia,ddc-i2c-bus = <&hdmi_ddc>;
-+		};
-+	};
-+
- 	memory {
- 		reg = <0x80000000 0x40000000>;
- 	};
-@@ -114,7 +133,7 @@
- 		clock-frequency = <408000000>;
- 	};
- 
--	i2c at 7000c000 {
-+	rgb_ddc: i2c at 7000c000 {
- 		status = "okay";
- 		clock-frequency = <100000>;
- 	};
-@@ -137,7 +156,7 @@
- 		};
- 	};
- 
--	i2c at 7000c700 {
-+	hdmi_ddc: i2c at 7000c700 {
- 		status = "okay";
- 		clock-frequency = <100000>;
- 	};
--- 
-1.7.9.5
+Feel free to take that patch forward, merge into your series.
+
+Thanks,
+Vaibhav
+
+
+> 
+> Daniel
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
