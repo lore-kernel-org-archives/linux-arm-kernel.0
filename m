@@ -1,138 +1,155 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Fri, 30 Nov 2012 13:49:13 -0500
-Subject: [PATCH v4 08/14] KVM: ARM: World-switch implementation
-In-Reply-To: <20121130171420.GC619@mudshark.cambridge.arm.com>
-References: <20121110154203.2836.46686.stgit@chazy-air>
- <20121110154306.2836.93473.stgit@chazy-air>
- <20121119145758.GA3205@mudshark.cambridge.arm.com>
- <CANM98qJFFP=2ueyUpbN6x15XwtWXbgZjkMBaq2jVpqik4kT54Q@mail.gmail.com>
- <20121130151500.GC26289@mudshark.cambridge.arm.com>
- <CANM98q+TQZiXe3GLjcPpPVZz40emmizgnEmyZEju1ruKNR6EEQ@mail.gmail.com>
- <20121130171420.GC619@mudshark.cambridge.arm.com>
-Message-ID: <CANM98qJQBD3+iW0uCptXBgsPBuBBfuaT1FN3EivMywwD-oNi=Q@mail.gmail.com>
+Date: Fri, 30 Nov 2012 14:17:22 -0500
+Subject: [PATCH v3] ARM: Factor out cpuid implementor and part number
+In-Reply-To: <20121130160337.GQ19440@n2100.arm.linux.org.uk>
+References: <1354290073-55801-1-git-send-email-c.dall@virtualopensystems.com>
+ <20121130160337.GQ19440@n2100.arm.linux.org.uk>
+Message-ID: <CANM98qJQykGm2X+OUAewxPsLg+ZEBnt_qR5FLSKfKjZFiKm_Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 30, 2012 at 12:14 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Nov 30, 2012 at 04:47:40PM +0000, Christoffer Dall wrote:
->> On Fri, Nov 30, 2012 at 10:15 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > At this point, VM1 is running and VM0:VCPU1 is running. VM0:VCPU0 is not
->> > running because physical CPU0 is handling an interrupt. The problem is that
->> > when VCPU0 *is* resumed, it will update the VMID of VM0 and could be
->> > scheduled in parallel with VCPU1 but with a different VMID.
->> >
->> > How do you avoid this in the current code?
->> >
->> I don't. Nice catch. Please apply your interesting brain to the following fix:)
+On Fri, Nov 30, 2012 at 11:03 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Nov 30, 2012 at 10:41:13AM -0500, Christoffer Dall wrote:
+>> Decoding the implementor and part number of the CPU id in the CPU ID
+>> register is needed by KVM, so we factor it out to share the code.
+>>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+>> ---
+>> Changes since v2:
+>>  - Take implementor as argument to read_cpuid_part_number
 >
-> I'm far too sober to look at your patch right now, but I'll think about it
-> over the weekend [I can't break it at a quick glance] :)
+> Actually, I don't think this is the correct way.  There's noting
+> inherently different about Xscale wrt part numbers, it's just that
+> someone decided to do stuff "differently" and use the CPU part
+> number to identify the SoC as a whole.
 >
-> In the meantime, can you think about whether the TLB operations need to run
-> on every CPU please?
+> Here's the full list:
 >
-they don't we can invalidate the TLB and the icache using the inner
-shareability domain. Here's a patch:
+> 80200   69052000        fffffff0
+> PXA250  69052100        fffff7f0
+> PXA210  69052120        fffff3f0
+> 8032x   69052420        fffff7e0
+> PXA255  69052d00        fffffff0
+> 80219   69052e20        ffffffe0
+> 8033x   69054010        fffffd30
+> IXP43x  69054040        fffffff0
+> PXA270  69054110        fffffff0
+> IXP2400 69054190        fffffff0
+> IXP2800 690541a0        fffffff0
+> IXP42x  690541c0        ffffffc0
+> IXP46x  69054200        ffffff00
+> Xscale3 69056000        ffffe000
+> PXA935  56056000        ffffe000
+>
+> What we get from these is:
+> XScale1 can be identified by (id & 0xe000) == 0x2000
+> Xscale2 can be identified by (id & 0xe000) == 0x4000
+> Xscale3 can be identified by (id & 0xe000) == 0x6000
+>
+> I don't think we should make a distinction in read_cpuid_part_number()
+> between these; if manufacturers are silly enough to abuse these fields
+> then its their problem. :)
+>
+> What I suggest is that read_cpuid_part_number() returns the part number
+> field as defined by ARM.  We then also define XSCALE_ARCH_MASK to be
+> 0xe000 and a bunch of XSCALE_ARCH_V1..V3 along those lines.  Maybe even
+> a xscale_cpu_version() macro which returns the XScale CPU version
+> pre-masked.
+>
+> That would mean this becomes:
+>
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index ad1390f..df1b753 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -146,6 +146,7 @@ struct kvm_one_reg;
- int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
- int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
- u64 kvm_call_hyp(void *hypfn, ...);
-+void force_vm_exit(const cpumask_t *mask);
+sounds great to me.
 
- #define KVM_ARCH_WANT_MMU_NOTIFIER
- struct kvm;
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index c4f631e..674592e 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -405,9 +405,14 @@ int kvm_arch_vcpu_in_guest_mode(struct kvm_vcpu *v)
- 	return v->mode == IN_GUEST_MODE;
- }
+>> @@ -202,47 +202,48 @@ static int __devinit probe_current_pmu(struct arm_pmu *pmu)
+>>  {
+>>       int cpu = get_cpu();
+>>       unsigned long cpuid = read_cpuid_id();
+>> -     unsigned long implementor = (cpuid & 0xFF000000) >> 24;
+>> -     unsigned long part_number = (cpuid & 0xFFF0);
+>> +     unsigned long implementor = read_cpuid_implementor();
+>
+> Why not pass the cpuid that we read into these functions?
+>
 
--static void reset_vm_context(void *info)
-+/* Just ensure a guest exit from a particular CPU */
-+static void exit_vm_noop(void *info)
- {
--	kvm_call_hyp(__kvm_flush_vm_context);
-+}
-+
-+void force_vm_exit(const cpumask_t *mask)
-+{
-+	smp_call_function_many(mask, exit_vm_noop, NULL, true);
- }
+we actually don't need that one anymore, and it all has
+__attribute_const__ anyhow.
 
- /**
-@@ -445,17 +450,33 @@ static void update_vttbr(struct kvm *kvm)
+>> +     unsigned long part_number;
+>         unsigned long part_number = read_cpuid_part_number(cpuid);
+>
+>>       int ret = -ENODEV;
+>>
+>>       pr_info("probing PMU on CPU %d\n", cpu);
+>>
+>>       /* ARM Ltd CPUs. */
+>> -     if (0x41 == implementor) {
+>> +     if (implementor == ARM_CPU_IMP_ARM) {
+>> +             part_number = read_cpuid_part_number(implementor);
+>
+> This goes.
+>
+>>               switch (part_number) {
+>> -             case 0xB360:    /* ARM1136 */
+>> -             case 0xB560:    /* ARM1156 */
+>> -             case 0xB760:    /* ARM1176 */
+>> +             case ARM_CPU_PART_ARM1136:
+>> +             case ARM_CPU_PART_ARM1156:
+>> +             case ARM_CPU_PART_ARM1176:
+>>                       ret = armv6pmu_init(pmu);
+>>                       break;
+>> -             case 0xB020:    /* ARM11mpcore */
+>> +             case ARM_CPU_PART_ARM11MPCORE:
+>>                       ret = armv6mpcore_pmu_init(pmu);
+>>                       break;
+>> -             case 0xC080:    /* Cortex-A8 */
+>> +             case ARM_CPU_PART_CORTEX_A8:
+>>                       ret = armv7_a8_pmu_init(pmu);
+>>                       break;
+>> -             case 0xC090:    /* Cortex-A9 */
+>> +             case ARM_CPU_PART_CORTEX_A9:
+>>                       ret = armv7_a9_pmu_init(pmu);
+>>                       break;
+>> -             case 0xC050:    /* Cortex-A5 */
+>> +             case ARM_CPU_PART_CORTEX_A5:
+>>                       ret = armv7_a5_pmu_init(pmu);
+>>                       break;
+>> -             case 0xC0F0:    /* Cortex-A15 */
+>> +             case ARM_CPU_PART_CORTEX_A15:
+>>                       ret = armv7_a15_pmu_init(pmu);
+>>                       break;
+>> -             case 0xC070:    /* Cortex-A7 */
+>> +             case ARM_CPU_PART_CORTEX_A7:
+>>                       ret = armv7_a7_pmu_init(pmu);
+>>                       break;
+>>               }
+>>       /* Intel CPUs [xscale]. */
+>> -     } else if (0x69 == implementor) {
+>> -             part_number = (cpuid >> 13) & 0x7;
+>> +     } else if (implementor == ARM_CPU_IMP_INTEL) {
+>> +             part_number = read_cpuid_part_number(implementor);
+>>               switch (part_number) {
+>
+>                 switch (xscale_cpu_version(part_number)) {
+>
+>> -             case 1:
+>> +             case ARM_CPU_PART_XSCALE1:
+>
+>                 case XSCALE_ARCH_V1:
+>
+>>                       ret = xscale1pmu_init(pmu);
+>>                       break;
+>> -             case 2:
+>> +             case ARM_CPU_PART_XSCALE2:
+>
+>                 case XSCALE_ARCH_V2:
+>
+> and we can use read_cpuid_part_number() where getting at that field
+> in the CPU ID information matters.
 
- 	spin_lock(&kvm_vmid_lock);
+sending out a new patch.
 
-+	/*
-+	 * We need to re-check the vmid_gen here to ensure that if another vcpu
-+	 * already allocated a valid vmid for this vm, then this vcpu should
-+	 * use the same vmid.
-+	 */
-+	if (!need_new_vmid_gen(kvm)) {
-+		spin_unlock(&kvm_vmid_lock);
-+		return;
-+	}
-+
- 	/* First user of a new VMID generation? */
- 	if (unlikely(kvm_next_vmid == 0)) {
- 		atomic64_inc(&kvm_vmid_gen);
- 		kvm_next_vmid = 1;
-
- 		/*
--		 * On SMP we know no other CPUs can use this CPU's or
--		 * each other's VMID since the kvm_vmid_lock blocks
--		 * them from reentry to the guest.
-+		 * On SMP we know no other CPUs can use this CPU's or each
-+		 * other's VMID after force_vm_exit returns since the
-+		 * kvm_vmid_lock blocks them from reentry to the guest.
-+		 */
-+		force_vm_exit(cpu_all_mask);
-+		/*
-+		 * Now broadcast TLB + ICACHE invalidation over the inner
-+		 * shareable domain to make sure all data structures are
-+		 * clean.
- 		 */
--		on_each_cpu(reset_vm_context, NULL, 1);
-+		kvm_call_hyp(__kvm_flush_vm_context);
- 	}
-
- 	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index 8a1f2df..91bb9c5 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -63,14 +63,18 @@ ENTRY(__kvm_tlb_flush_vmid)
- ENDPROC(__kvm_tlb_flush_vmid)
-
- /********************************************************************
-- * Flush TLBs and instruction caches of current CPU for all VMIDs
-+ * Flush TLBs and instruction caches of all CPUs inside the inner-shareable
-+ * domain, for all VMIDs
-  *
-  * void __kvm_flush_vm_context(void);
-  */
- ENTRY(__kvm_flush_vm_context)
- 	mov	r0, #0			@ rn parameter for c15 flushes is SBZ
--	mcr     p15, 4, r0, c8, c7, 4   @ Invalidate Non-secure Non-Hyp TLB
--	mcr     p15, 0, r0, c7, c5, 0   @ Invalidate instruction caches
-+
-+	/* Invalidate NS Non-Hyp TLB Inner Shareable (TLBIALLNSNHIS) */
-+	mcr     p15, 4, r0, c8, c3, 4
-+	/* Invalidate instruction caches Inner Shareable (ICIALLUIS) */
-+	mcr     p15, 0, r0, c7, c1, 0
- 	dsb
- 	isb				@ Not necessary if followed by eret
-
--- 
-1.7.9.5
-
-
+Thanks!
 -Christoffer
