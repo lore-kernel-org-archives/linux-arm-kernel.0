@@ -1,97 +1,93 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 29 Nov 2012 17:17:30 +0000 (UTC)
-Subject: [PATCH 1/3] ARM: OMAP4: Update timer clock aliases (fwd)
-Message-ID: <alpine.DEB.2.00.1211291713530.20529@utopia.booyaka.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Fri, 30 Nov 2012 09:45:13 +0000
+Subject: [PATCH v5 00/12] Support for AM33xx PWM Subsystem
+In-Reply-To: <20121128142101.GB21042@avionic-0098.adnet.avionic-design.de>
+References: <1354006097-25895-1-git-send-email-avinashphilip@ti.com>
+ <20121128142101.GB21042@avionic-0098.adnet.avionic-design.de>
+Message-ID: <518397C60809E147AF5323E0420B992E3EA0E480@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Tony,
-
-well it seems that I did miss at least one important clock patch for v3.8.  
-This appears to be needed to avoid failures when attempting to set parent 
-clocks for GPTIMER5-7 on OMAP4.  Could you consider this one for late 
-v3.8?  If you prefer, I can send a pull request for it.  Otherwise, will 
-send it as part of the v3.8-rc1 integration fixes.
-
-thanks,
-
-
-- Paul
-
----------- Forwarded message ----------
-Date: Thu, 29 Nov 2012 11:02:17 -0600
-From: Jon Hunter <jon-hunter@ti.com>
-To: Paul Walmsley <paul@pwsan.com>
-Cc: linux-omap <linux-omap@vger.kernel.org>,
-    linux-arm <linux-arm-kernel@lists.infradead.org>
-Subject: Re: [PATCH 1/3] ARM: OMAP4: Update timer clock aliases
-
-
-On 11/29/2012 04:53 AM, Paul Walmsley wrote:
-> Hi Jon,
+On Wed, Nov 28, 2012 at 19:51:01, Thierry Reding wrote:
+> On Tue, Nov 27, 2012 at 02:18:05PM +0530, Philip, Avinash wrote:
+> > In AM33xx PWM sub modules like ECAP, EHRPWM & EQEP are  integrated to
+> > PWM subsystem. All these submodules shares the resources (clock) & has
+> > a clock gating register in PWM Subsystem. This patch series creates a
+> > parent PWM Subsystem driver to handle access synchronization of shared
+> > resources & clock gating from PWM Subsystem configuration space.
+> > Also Device tree nodes populated to support parent child relation
+> > between PWMSS, ECAP & EHRPWM submodules.
+> > In addition EHRPWM module requires explicit clock gating from control
+> > module & is handled by patch #6 & 7.
+> > 
+> > As suggested by  Thierry for handling clock gating for PWM submodules
+> > should handle with a global function. This requires config space
+> > handling done independent from driver and is done at parent driver.
+> > 
+> > So the parent<->child relation adopted to handle
+> > 1. pm runtime synchronization
+> > 2. PWM subsystem common config space clock gating for PWM submodules.
+> > 
+> > Patches supports
+> > - Driver support for parent child relation handled patch #1
+> > - HWMOD data correction in EPWMSS at patch #2
+> > - Parent child in HWMOD relation handled at patch #3
+> > - Optional EHRPWM tb clock in patch #6
+> > - Support for TBCLK clock gating at patch #7.
+> > - Device tree binding support handled in patch #4,8 
+> > - Pinctrl support in patch #5 & 9.
+> > - DT node populated in patch #10 ,11 & 12.
+> > 
+> > This patch series based on omap_dt/for_3.8/dts_part2 and tested
+> > on am335x-evm & am335x-evmsk.
+> > 
+> > This patch series will come under 3 subsystem basically. But sent
+> > it in single patch series to have a clearer picture of why the
+> > OMAP subsystem changes required.
+> > 
+> > Patches come under PWM (1,4,5,7,8,9)
+> > Patches come under OMAP (2,3,6)
+> > Patches come under DT (10,11,12).
+> > 
+> > It depends on [1]
+> > 1. https://gitorious.org/linux-pwm/linux-pwm/commit/83af24027b3df1af5c5a9aa9adcdcfeb3429d3be
+> > pwm: Device tree support for PWM polarity
+> > 
+> > Changes since v3:
+> > 	- Rebased on top of omap_dt/for_3.8/dts_part2
+> > 	- Add pwm backlight for am335xevm_sk
+> > 	- Moved tipwmss.h to pwm-tipwmss.h
+> > 
+> > Philip, Avinash (12):
+> >   PWMSS: Add PWM Subsystem driver for parent<->child relationship
+> >   ARM: OMAP: AM33xx hwmod: Corrects PWM subsystem HWMOD entries
+> >   ARM: OMAP: AM33xx hwmod: Add parent-child relationship for PWM
+> >     subsystem
+> >   pwm: tiecap: Add device-tree binding
+> >   pwm: pwm-tiecap: pinctrl support
+> >   ARM: AM33XX: clk: Add clock node for EHRPWM TBCLK
+> >   pwm: pwm-tiehrpwm: Adding TBCLK gating support.
+> >   pwm: tiehrpwm: Add device-tree binding
+> >   pwm: pwm-tiehrpwm: pinctrl support
+> >   ARM: dts: AM33XX: Add PWMSS device tree nodes
+> >   ARM: dts: AM33XX: Add PWM backlight DT data to am335x-evm
+> >   ARM: dts: AM33XX: Add PWM backlight DT data to am335x-evmsk
 > 
-> On Wed, 7 Nov 2012, Jon Hunter wrote:
+> Patches 1, 4, 5, 7, 8 and 9 applied, with a minor fixup to the subject
+> line of patch 1. Thanks.
+
+Thierry,
+Thanks for applying the PWM patches.
+I will follow up with OMAP community for other patches.
+
+Paul/Benoit,
+
+Is there any way to get HWMOD and DT patches getting accepted in 3.8?
+Or should I wait and send rebased patch based on 3.8-rc1?
+
+Thanks
+Avinash
+
 > 
->> Commit "ARM: dts: OMAP4: Update timer addresses" updated the device-tree
->> names of the OMAP4 timers 5-7 because the default address for the timers
->> was changed from the L3 address to the MPU private address. When booting
->> with device-tree, this introduces a regression when attempting to set
->> the parent clock of timers 5-7 to the sys_clk_div_ck. Therefore, update
->> the clock aliases for timer 5-7 to reflect the updated device-tree name
->> for the timers.
+> Thierry
 > 
-> Reviewing my E-mail inbox, just saw that this one is marked as being 
-> needed for v3.8.  Is that still the case?  If so, we should ask Tony to 
-> take an updated version of this patch, given the recent CCF conversion.
-
-Yes this is still needed for v3.8.
-
-> Following is the updated patch.
-
-Thanks, looks good to me.
-
-Cheers
-Jon
-
-
-From: Jon Hunter <jon-hunter@ti.com>
-Date: Thu, 29 Nov 2012 03:47:46 -0700
-Subject: [PATCH] ARM: OMAP4: Update timer clock aliases
-
-Commit "ARM: dts: OMAP4: Update timer addresses" updated the device-tree
-names of the OMAP4 timers 5-7 because the default address for the timers
-was changed from the L3 address to the MPU private address. When booting
-with device-tree, this introduces a regression when attempting to set
-the parent clock of timers 5-7 to the sys_clk_div_ck. Therefore, update
-the clock aliases for timer 5-7 to reflect the updated device-tree name
-for the timers.
-
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-[paul at pwsan.com: updated to apply after the CCF conversion]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/cclock44xx_data.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-index aa56c3e..a1f0b55 100644
---- a/arch/arm/mach-omap2/cclock44xx_data.c
-+++ b/arch/arm/mach-omap2/cclock44xx_data.c
-@@ -1935,10 +1935,10 @@ static struct omap_clk omap44xx_clks[] = {
- 	CLK("4803e000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
- 	CLK("48086000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
- 	CLK("48088000.timer",	"timer_sys_ck",	&sys_clkin_ck,	CK_443X),
--	CLK("49038000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
--	CLK("4903a000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
--	CLK("4903c000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
--	CLK("4903e000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
-+	CLK("40138000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
-+	CLK("4013a000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
-+	CLK("4013c000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
-+	CLK("4013e000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
- 	CLK(NULL,	"cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
- };
- 
--- 
-1.7.10.4
