@@ -1,64 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Nov 2012 10:28:41 +0000
-Subject: [ARM] head.S change broke platform device registration?
-In-Reply-To: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
-References: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
-Message-ID: <50B88A59.6070207@arm.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Fri, 30 Nov 2012 11:50:31 +0100
+Subject: [PATCH 2/5] mfd: db8500: Update cpufreq device name
+In-Reply-To: <1354098464-6665-3-git-send-email-ulf.hansson@stericsson.com>
+References: <1354098464-6665-1-git-send-email-ulf.hansson@stericsson.com>
+ <1354098464-6665-3-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20121130105031.GK3176@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/11/12 01:38, Marko Kati? wrote:
-> I recently tried to boot v3.7-rc7 on my akita (Sharp Zaurus C-1000,
-> PXA270 machine).
-> Backlight never turned on but the kernel booted just fine.
-> After some investigation i determined that the gpio expander (max7310,
-> i2c chip) is not even
-> registered and thus not present in /sys/bus/i2c/devices.
-> Backlight gpio controls are hooked to this chip thus, no backlight.
-> 
-> I thought that too many things could have caused this so i went
-> straight to bisecting.
-> Bisection pointed me to this commit:
-> 
->  commit 424e5994e63326a42012f003f1174f3c363c7b62
-> Author: Dave Martin <dave.martin@linaro.org>
-> Date:   Fri Feb 10 18:07:07 2012 -0800
-> 
->     ARM: zImage/virt: hyp mode entry support for the zImage loader
-> 
->     The zImage loader needs to turn on the MMU in order to take
->     advantage of caching while decompressing the zImage.  Running this
->     in hyp mode would require the LPAE pagetable format to be
->     supported; to avoid this complexity, this patch switches out of hyp
->     mode, and returns back to hyp mode just before booting the kernel.
-> 
->     This implementation assumes that the Hyp mode view of memory and the
->     PL1 view of memory are coherent, providing that the MMU and caches
->     are off in both, as required by the boot protocol.  The zImage
->     decompression code must drain the write buffer on completion anyway, and
->     entry into Hyp mode should flush any prefetch buffer, avoiding hazards
->     associated with local write buffers and the pipeline.
-> 
->     Signed-off-by: Dave Martin <dave.martin@linaro.org>
->     Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> This commit was merged in v3.7-rc1. And indeed, if i
-> revert this single commit, my gpio expander reappears and
-> so does my backlight.
-> I made no other changes to the vanilla 3.7-rc7
-> except this revert.
-> 
-> This seems very strange to me because i, with my limited knowledge,
-> cannot see any correlation between this commit and the bug i am experiencing.
-> 
-> Does anyone know what exactly is happening here?
+Hi Ulf,
 
-This is incredibly puzzling. I could understand your board not booting
-at all because of this patch, but an i2c device missing?
+On Wed, Nov 28, 2012 at 11:27:41AM +0100, Ulf Hansson wrote:
+> From: Lee Jones <lee.jones@linaro.org>
+> 
+> Since the cpufreq driver for ux500 has been renamed from
+> cpufreq-db8500 to cpufreq-dbx500, we need to change the
+> device name here as well.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> ---
+>  drivers/mfd/db8500-prcmu.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+This one doesn't apply to my tree, it would make more sense to push this one
+through Mike's tree.
+Or I'll queue it to my for-next branch after the next merge window closes, as
+you prefer.
 
-Can you see the i2c controller at all? I'll try to dig my PXA270 board
-and see if I can reproduce your issue.
+Cheers,
+Samuel.
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Intel Open Source Technology Centre
+http://oss.intel.com/
