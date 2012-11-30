@@ -1,24 +1,146 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 30 Nov 2012 15:38:56 +0000 (UTC)
-Subject: [PATCH v5 00/12] Support for AM33xx PWM Subsystem
-In-Reply-To: <518397C60809E147AF5323E0420B992E3EA0E480@DBDE01.ent.ti.com>
-References: <1354006097-25895-1-git-send-email-avinashphilip@ti.com>
- <20121128142101.GB21042@avionic-0098.adnet.avionic-design.de>
- <518397C60809E147AF5323E0420B992E3EA0E480@DBDE01.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1211301533560.18138@utopia.booyaka.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Fri, 30 Nov 2012 10:41:13 -0500
+Subject: [PATCH v3] ARM: Factor out cpuid implementor and part number
+Message-ID: <1354290073-55801-1-git-send-email-c.dall@virtualopensystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Nov 2012, Philip, Avinash wrote:
+Decoding the implementor and part number of the CPU id in the CPU ID
+register is needed by KVM, so we factor it out to share the code.
 
-> Is there any way to get HWMOD and DT patches getting accepted in 3.8?
-> Or should I wait and send rebased patch based on 3.8-rc1?
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+---
+Changes since v2:
+ - Take implementor as argument to read_cpuid_part_number
+Changes since v1:
+ - Accidentally pointed to an old file, this one has more consistent
+   naming of the cpu implementor and part number defines.
 
-Our upstreams aren't taking any more new features for v3.8, so basing on 
-v3.8-rc1 is the best thing to do now.
+ arch/arm/include/asm/cputype.h   |   34 ++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/perf_event_cpu.c |   33 +++++++++++++++++----------------
+ 2 files changed, 51 insertions(+), 16 deletions(-)
 
-In the meantime, you can try basing your series against a recent for-next 
-HEAD to get an early start on testing, etc.
-
-
-- Paul
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index cb47d28..3e6cd4e 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -51,6 +51,22 @@ extern unsigned int processor_id;
+ #define read_cpuid_ext(reg) 0
+ #endif
+ 
++#define ARM_CPU_IMP_ARM			0x41
++#define ARM_CPU_IMP_INTEL		0x69
++
++#define ARM_CPU_PART_ARM1136		0xB360
++#define ARM_CPU_PART_ARM1156		0xB560
++#define ARM_CPU_PART_ARM1176		0xB760
++#define ARM_CPU_PART_ARM11MPCORE	0xB020
++#define ARM_CPU_PART_CORTEX_A8		0xC080
++#define ARM_CPU_PART_CORTEX_A9 		0xC090
++#define ARM_CPU_PART_CORTEX_A5 		0xC050
++#define ARM_CPU_PART_CORTEX_A15		0xC0F0
++#define ARM_CPU_PART_CORTEX_A7		0xC070
++
++#define ARM_CPU_PART_XSCALE1		0x1
++#define ARM_CPU_PART_XSCALE2		0x2
++
+ /*
+  * The CPU ID never changes at run time, so we might as well tell the
+  * compiler that it's constant.  Use this function to read the CPU ID
+@@ -61,6 +77,24 @@ static inline unsigned int __attribute_const__ read_cpuid_id(void)
+ 	return read_cpuid(CPUID_ID);
+ }
+ 
++static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
++{
++	return (read_cpuid_id() & 0xFF000000) >> 24;
++}
++
++static inline unsigned int __attribute_const__
++read_cpuid_part_number(unsigned int implementor)
++{
++	switch (implementor) {
++	case ARM_CPU_IMP_ARM:
++		return (read_cpuid_id() & 0xFFF0);
++	case ARM_CPU_IMP_INTEL:
++		return (read_cpuid_id() >> 13) & 0x7;
++	default:
++		return 0;
++	}
++}
++
+ static inline unsigned int __attribute_const__ read_cpuid_cachetype(void)
+ {
+ 	return read_cpuid(CPUID_CACHETYPE);
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index 9a4f630..0ec7b54 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -202,47 +202,48 @@ static int __devinit probe_current_pmu(struct arm_pmu *pmu)
+ {
+ 	int cpu = get_cpu();
+ 	unsigned long cpuid = read_cpuid_id();
+-	unsigned long implementor = (cpuid & 0xFF000000) >> 24;
+-	unsigned long part_number = (cpuid & 0xFFF0);
++	unsigned long implementor = read_cpuid_implementor();
++	unsigned long part_number;
+ 	int ret = -ENODEV;
+ 
+ 	pr_info("probing PMU on CPU %d\n", cpu);
+ 
+ 	/* ARM Ltd CPUs. */
+-	if (0x41 == implementor) {
++	if (implementor == ARM_CPU_IMP_ARM) {
++		part_number = read_cpuid_part_number(implementor);
+ 		switch (part_number) {
+-		case 0xB360:	/* ARM1136 */
+-		case 0xB560:	/* ARM1156 */
+-		case 0xB760:	/* ARM1176 */
++		case ARM_CPU_PART_ARM1136:
++		case ARM_CPU_PART_ARM1156:
++		case ARM_CPU_PART_ARM1176:
+ 			ret = armv6pmu_init(pmu);
+ 			break;
+-		case 0xB020:	/* ARM11mpcore */
++		case ARM_CPU_PART_ARM11MPCORE:
+ 			ret = armv6mpcore_pmu_init(pmu);
+ 			break;
+-		case 0xC080:	/* Cortex-A8 */
++		case ARM_CPU_PART_CORTEX_A8:
+ 			ret = armv7_a8_pmu_init(pmu);
+ 			break;
+-		case 0xC090:	/* Cortex-A9 */
++		case ARM_CPU_PART_CORTEX_A9:
+ 			ret = armv7_a9_pmu_init(pmu);
+ 			break;
+-		case 0xC050:	/* Cortex-A5 */
++		case ARM_CPU_PART_CORTEX_A5:
+ 			ret = armv7_a5_pmu_init(pmu);
+ 			break;
+-		case 0xC0F0:	/* Cortex-A15 */
++		case ARM_CPU_PART_CORTEX_A15:
+ 			ret = armv7_a15_pmu_init(pmu);
+ 			break;
+-		case 0xC070:	/* Cortex-A7 */
++		case ARM_CPU_PART_CORTEX_A7:
+ 			ret = armv7_a7_pmu_init(pmu);
+ 			break;
+ 		}
+ 	/* Intel CPUs [xscale]. */
+-	} else if (0x69 == implementor) {
+-		part_number = (cpuid >> 13) & 0x7;
++	} else if (implementor == ARM_CPU_IMP_INTEL) {
++		part_number = read_cpuid_part_number(implementor);
+ 		switch (part_number) {
+-		case 1:
++		case ARM_CPU_PART_XSCALE1:
+ 			ret = xscale1pmu_init(pmu);
+ 			break;
+-		case 2:
++		case ARM_CPU_PART_XSCALE2:
+ 			ret = xscale2pmu_init(pmu);
+ 			break;
+ 		}
+-- 
+1.7.9.5
