@@ -1,49 +1,37 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 30 Nov 2012 13:44:54 +0100
-Subject: [PATCH 2/5] mfd: db8500: Update cpufreq device name
-In-Reply-To: <CAPDyKFrjd8mtfG2fVOr5CseAK7UEr=W6Ok8FYwP1DsgBtk4RNQ@mail.gmail.com>
-References: <1354098464-6665-1-git-send-email-ulf.hansson@stericsson.com>
- <1354098464-6665-3-git-send-email-ulf.hansson@stericsson.com>
- <20121130105031.GK3176@sortiz-mobl>
- <CAPDyKFrjd8mtfG2fVOr5CseAK7UEr=W6Ok8FYwP1DsgBtk4RNQ@mail.gmail.com>
-Message-ID: <20121130124454.GR3176@sortiz-mobl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 30 Nov 2012 12:40:49 +0000
+Subject: [ARM] head.S change broke platform device registration?
+In-Reply-To: <CAHod+GcgvxPGUi4p9-qVuRXfyODrYwDvU8u5cChgiXjFYpwOEg@mail.gmail.com>
+References: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
+ <20121130121738.GA1960@linaro.org>
+ <CAHod+GcgvxPGUi4p9-qVuRXfyODrYwDvU8u5cChgiXjFYpwOEg@mail.gmail.com>
+Message-ID: <20121130124049.GO19440@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
-
-On Fri, Nov 30, 2012 at 12:54:29PM +0100, Ulf Hansson wrote:
-> On 30 November 2012 11:50, Samuel Ortiz <sameo@linux.intel.com> wrote:
-> > Hi Ulf,
+On Fri, Nov 30, 2012 at 01:28:33PM +0100, Marko Kati? wrote:
+> On Fri, Nov 30, 2012 at 1:17 PM, Dave Martin <dave.martin@linaro.org> wrote:
+> > This is indeed strange, since there is not much difference to the kernel
+> > if CONFIG_ARM_VIRT_EXT is not set.
 > >
-> > On Wed, Nov 28, 2012 at 11:27:41AM +0100, Ulf Hansson wrote:
-> >> From: Lee Jones <lee.jones@linaro.org>
-> >>
-> >> Since the cpufreq driver for ux500 has been renamed from
-> >> cpufreq-db8500 to cpufreq-dbx500, we need to change the
-> >> device name here as well.
-> >>
-> >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> >> ---
-> >>  drivers/mfd/db8500-prcmu.c |    4 ++--
-> >>  1 file changed, 2 insertions(+), 2 deletions(-)
-> > This one doesn't apply to my tree, it would make more sense to push this one
-> > through Mike's tree.
+> > Unless a bug is causing the kernel to trample on some random memory,
+> > there is no reason for this to cause I2C devices to disappear.
+> >
+> > It could be something unrelated, like additional and removal of code
+> > changing the position or alignment of other parts of the kernel image.
+> >
+> > Have you could try undoing parts of the patch to narrow the bug down
+> > further?
+> >
+> > Cheers
+> > ---Dave
 > 
-> Yes, you are right! My earlier clock patches which was affecting
-> cpufreq and mfd was merged through Mikes tree.
-> I will suggest this complete patchset shall go though Mikes tree.
-> 
-> Do I have your ack for the mfd patch?
-Yes:
+> No, not yet. As i said my knowledge of what goes on in head.S is limited
+> so i'd rather not mess with it.
 
-Acked-by: Samuel Ortiz <sameo@linux.intel.com>
+Well, I think everyone's confused how this change could cause an I2C
+device to vanish.  I've been through this code carefully and I don't
+see anything that would affect an I2C device here.  The code in question
+is not even touching any hardware.
 
-Cheers,
-Samuel.
-
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Please post your .config file so we can see how your kernel is configured.
