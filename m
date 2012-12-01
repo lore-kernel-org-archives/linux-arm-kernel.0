@@ -1,40 +1,46 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 1 Dec 2012 13:21:08 -0500
-Subject: [PATCH 1/2] ARM: Dove: Add pinctrl clock to DT
-In-Reply-To: <50BA495B.3010008@gmail.com>
-References: <20121125152845.GV15800@titan.lakedaemon.net>
- <1353921525-25163-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <CACRpkdZcHsvSG-vfynd0jYrs0kVYqPsgtroSrQdz4yDZexQZjA@mail.gmail.com>
- <20121201181313.GF12509@titan.lakedaemon.net>
- <50BA495B.3010008@gmail.com>
-Message-ID: <20121201182108.GH12509@titan.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 1 Dec 2012 10:33:59 -0800
+Subject: [GIT PULL 3/3] omap late multiplatform cleanup for v3.8 merge
+ window
+In-Reply-To: <CAOesGMgzPVsiVqSe30f2bGZ4MKOjA9+Usw3OqX8wFkrdD570mQ@mail.gmail.com>
+References: <50b4120b.d088e50a.742e.ffffd3d3SMTPIN_ADDED_MISSING@mx.google.com>
+ <20121130065314.GB6899@quad.lixom.net>
+ <20121130172643.GI5312@atomide.com>
+ <CAOesGMgzPVsiVqSe30f2bGZ4MKOjA9+Usw3OqX8wFkrdD570mQ@mail.gmail.com>
+Message-ID: <20121201183359.GS5312@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 01, 2012 at 07:15:55PM +0100, Sebastian Hesselbarth wrote:
-> On 12/01/2012 07:13 PM, Jason Cooper wrote:
-> >On Sat, Dec 01, 2012 at 06:07:06PM +0100, Linus Walleij wrote:
-> >>On Mon, Nov 26, 2012 at 10:18 AM, Sebastian Hesselbarth
-> >><sebastian.hesselbarth@gmail.com>  wrote:
-> >>
-> >>>During merge of the mvebu patches a clock gate for pinctrl was
-> >>>lost. This patch just readds the clock gate.
-> >>>
-> >>>Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
-> >>
-> >>Acked-by: Linus Walleij<linus.walleij@linaro.org>
-> >>
-> >>So who's supposed to merge this patch? Me? The MVEBU-maintainer?
+* Olof Johansson <olof@lixom.net> [121130 21:57]:
+> On Fri, Nov 30, 2012 at 9:26 AM, Tony Lindgren <tony@atomide.com> wrote:
 > >
-> >I'll take it and merge it in once v3.8-rc1 drops.
+> > BTW, note that "[GIT PULL] omap iommu clean-up dependency branch for
+> > v3.8 merge window" is still pending it seems?
 > 
-> Linus, Jason,
+> Done, thanks for the reminder.
+
+OK thanks.
 > 
-> I agree to take it through Jason's tree but please take v2 of
-> the patch as there has been a small change in one of the patches.
+> > The following changes since commit 2589d056122f6dcb405d411eae872aac8cf9da1b:
+> >
+> >   Merge tag 'tags/omap-for-v3.8/devel-prcm-signed' into omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3 (2012-11-30 08:40:31 -0800)
+> >
+> > are available in the git repository at:
+> >
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/tags/omap-for-v3.8/cleanup-multiplatform-no-clock-signed
+> >
+> 
+> Pulled in, I had two minor conflicts to resolve resulting in two
+> one-line differences in the diff stat (removed an empty line between
+> some includes).
+> 
+> I ended up pulling this into next/pm2, since that's where the last of
+> the prereqs was and we'll likely reshuffle some of those late branches
+> before merging anyway.
 
-Yes, I have it flagged.
+OK thanks.
 
-thx,
+Regards,
 
-Jason.
+Tony
