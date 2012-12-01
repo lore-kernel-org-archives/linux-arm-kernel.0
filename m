@@ -1,28 +1,40 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 1 Dec 2012 17:51:02 +0100
-Subject: [PATCH 1/1] ARM: ux500: Change IRQ from low-to-high edge
- triggered to high-to-low
-In-Reply-To: <1354289099-17931-1-git-send-email-lee.jones@linaro.org>
-References: <1354289099-17931-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdafvpnyq7YMV=iSjN4+u1hpt3xntAb-daJZifG9VpgnOw@mail.gmail.com>
+Date: Sat, 1 Dec 2012 17:56:24 +0100
+Subject: [PATCH 0/2] gpio: dt: add gpio-export support
+In-Reply-To: <20121124184846.GC4398@game.jcrosoft.org>
+References: <20121121101259.GQ4398@game.jcrosoft.org>
+ <CACRpkdZN12bsx_YgXFfOPZzebjNG6fbwF9y=vNhzzyye-jsQUg@mail.gmail.com>
+ <20121124184846.GC4398@game.jcrosoft.org>
+Message-ID: <CACRpkdbMNxFAYZBVai4=GjMioRhe6odhFrPsM3Tx_p6gBA357g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 30, 2012 at 4:24 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Sat, Nov 24, 2012 at 7:48 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 15:43 Wed 21 Nov     , Linus Walleij wrote:
+>> On Wed, Nov 21, 2012 at 11:12 AM, Jean-Christophe PLAGNIOL-VILLARD
+>> <plagnioj@jcrosoft.com> wrote:
+>>
+>> > HI,
+>> >
+>> >         This patch serie add the support of gpio-export to DT
+>> >
+>> >         This also extend to gpio_export with the possibility to specify a name
+>> >         for the gpio.
+>> >         When you support different hardware you do not need to knwon which gpio
+>> >         is used at application level just you have it
+>> >
+>> >         based on next-20121115 tested on AT91 Animeo IP
+>> >
+>> >   gpiolib-of: ad gpio-export support (2012-11-19 20:36:03 +0800)
+>>
+>> OK so this is definately Grant territory, I'm just a novice in DT land...
+>> Grant can you look at this?
+> Grant any comment?
 
-> When the STMPE IRQ is triggered to be active high level-sensitive, the
-> Nomadik GPIO controller it uses complains, although it still works.
-> Recently we attempted to move triggering to low-to-high in an attempt
-> to prevent the warning; however, this ensured that the IRQ was actually
-> missed completely. Now we have a solution which both works and keeps the
-> GPIO controller happy.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Yeah, ping on Grant :-)
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Is this something I should put into the ux500 tree or will you
-take care of this in a separate pull request?
+He did come back online last week but will need time to catch up.
 
 Yours,
 Linus Walleij
