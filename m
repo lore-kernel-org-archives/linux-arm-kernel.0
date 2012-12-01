@@ -1,135 +1,120 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Sat, 01 Dec 2012 15:37:27 +0530
-Subject: [PATCH 2/2] ASoC: Samsung: Do not register samsung audio dma device as
- pdev
-In-Reply-To: <1354356447-16784-1-git-send-email-padma.v@samsung.com>
-References: <1354356447-16784-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1354356447-16784-3-git-send-email-padma.v@samsung.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 1 Dec 2012 08:05:27 -0500
+Subject: [PATCH] ARM: ixp4xx: Add "ask" handler for timer interrupts
+In-Reply-To: <1354347213-22237-1-git-send-email-shc_work@mail.ru>
+References: <1354347213-22237-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20121201130527.GD12509@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously, the ASoC 'platform' (PCM/DMA) object was instantiated via a
-platform_device. This didn't represent the hardware well, since there
-was no separate hardware associated with this platform_device; it was a
-virtual device with sole purpose to call snd_soc_register_platform().
+Hi Alexander,
 
-This change removes the platform_device completely. Each Samsung DAI now
-registers the ASoC 'platform' itself. Machine drivers are adjusted for
-the new 'platform' name.
+On Sat, Dec 01, 2012 at 11:33:33AM +0400, Alexander Shiyan wrote:
+> Rather than modify the EOI flags directly in the timer interrupt,
+> let's deal with these flags in the "ask" procedure.
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- sound/soc/samsung/dma.c         |   24 ++++++------------------
- sound/soc/samsung/dma.h         |    3 +++
- sound/soc/samsung/i2s.c         |    3 +++
- sound/soc/samsung/smdk_wm8994.c |    7 +++++--
- 4 files changed, 17 insertions(+), 20 deletions(-)
+Please specify the procedure name instead of "ask", eg ixp4xx_irq_ack().
+Same goes for the Subject line.
 
-diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
-index 359708c..f7e0d47 100644
---- a/sound/soc/samsung/dma.c
-+++ b/sound/soc/samsung/dma.c
-@@ -433,30 +433,18 @@ static struct snd_soc_platform_driver samsung_asoc_platform = {
- 	.pcm_free	= dma_free_dma_buffers,
- };
- 
--static int __devinit samsung_asoc_platform_probe(struct platform_device *pdev)
-+int __devinit samsung_dma_platform_register(struct device *dev)
- {
--	return snd_soc_register_platform(&pdev->dev, &samsung_asoc_platform);
-+	return snd_soc_register_platform(dev, &samsung_asoc_platform);
- }
-+EXPORT_SYMBOL_GPL(samsung_dma_platform_register);
- 
--static int __devexit samsung_asoc_platform_remove(struct platform_device *pdev)
-+void __devexit samsung_dma_platform_unregister(struct device *dev)
- {
--	snd_soc_unregister_platform(&pdev->dev);
--	return 0;
-+	snd_soc_unregister_platform(dev);
- }
--
--static struct platform_driver asoc_dma_driver = {
--	.driver = {
--		.name = "samsung-audio",
--		.owner = THIS_MODULE,
--	},
--
--	.probe = samsung_asoc_platform_probe,
--	.remove = __devexit_p(samsung_asoc_platform_remove),
--};
--
--module_platform_driver(asoc_dma_driver);
-+EXPORT_SYMBOL_GPL(samsung_dma_platform_unregister);
- 
- MODULE_AUTHOR("Ben Dooks, <ben@simtec.co.uk>");
- MODULE_DESCRIPTION("Samsung ASoC DMA Driver");
- MODULE_LICENSE("GPL");
--MODULE_ALIAS("platform:samsung-audio");
-diff --git a/sound/soc/samsung/dma.h b/sound/soc/samsung/dma.h
-index 2e60415..3c462a8 100644
---- a/sound/soc/samsung/dma.h
-+++ b/sound/soc/samsung/dma.h
-@@ -22,4 +22,7 @@ struct s3c_dma_params {
- 	struct property *dma_prop;
- };
- 
-+int samsung_dma_platform_register(struct device *dev);
-+void samsung_dma_platform_unregister(struct device *dev);
-+
- #endif
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index a7d03d9..dbf1e5c 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -1075,6 +1075,7 @@ static __devinit int samsung_i2s_probe(struct platform_device *pdev)
- 		sec_dai = dev_get_drvdata(&pdev->dev);
- 		snd_soc_register_dai(&sec_dai->pdev->dev,
- 			&sec_dai->i2s_dai_drv);
-+		samsung_dma_platform_register(&pdev->dev);
- 		return 0;
- 	}
- 
-@@ -1232,6 +1233,8 @@ static __devinit int samsung_i2s_probe(struct platform_device *pdev)
- 
- 	pm_runtime_enable(&pdev->dev);
- 
-+	samsung_dma_platform_register(&pdev->dev);
-+
- 	return 0;
- err:
- 	release_mem_region(regs_base, resource_size(res));
-diff --git a/sound/soc/samsung/smdk_wm8994.c b/sound/soc/samsung/smdk_wm8994.c
-index f9ba2b9..2f3e2b8 100644
---- a/sound/soc/samsung/smdk_wm8994.c
-+++ b/sound/soc/samsung/smdk_wm8994.c
-@@ -128,7 +128,7 @@ static struct snd_soc_dai_link smdk_dai[] = {
- 		.stream_name = "Pri_Dai",
- 		.cpu_dai_name = "samsung-i2s.0",
- 		.codec_dai_name = "wm8994-aif1",
--		.platform_name = "samsung-audio",
-+		.platform_name = "samsung-i2s.0",
- 		.codec_name = "wm8994-codec",
- 		.init = smdk_wm8994_init_paiftx,
- 		.ops = &smdk_ops,
-@@ -137,7 +137,7 @@ static struct snd_soc_dai_link smdk_dai[] = {
- 		.stream_name = "Sec_Dai",
- 		.cpu_dai_name = "samsung-i2s.4",
- 		.codec_dai_name = "wm8994-aif1",
--		.platform_name = "samsung-audio",
-+		.platform_name = "samsung-i2s.4",
- 		.codec_name = "wm8994-codec",
- 		.ops = &smdk_ops,
- 	},
-@@ -168,6 +168,9 @@ static int __devinit smdk_audio_probe(struct platform_device *pdev)
- 			   "Property 'samsung,i2s-controller' missing or invalid\n");
- 			ret = -EINVAL;
- 		}
-+
-+		smdk_dai[0].platform_name = NULL;
-+		smdk_dai[0].platform_of_node = smdk_dai[0].cpu_of_node;
- 	}
- 
- 	ret = snd_soc_register_card(card);
--- 
-1.7.4.4
+What brought about this change, is this part of a larger series?
+
+thx,
+
+Jason.
+
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/mach-ixp4xx/common.c      |   34 +++++++++++++++++++++++++---------
+>  drivers/input/misc/ixp4xx-beeper.c |    3 ---
+>  2 files changed, 25 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+> index 8c0c0e2..27046ec 100644
+> --- a/arch/arm/mach-ixp4xx/common.c
+> +++ b/arch/arm/mach-ixp4xx/common.c
+> @@ -202,10 +202,28 @@ static void ixp4xx_irq_mask(struct irq_data *d)
+>  
+>  static void ixp4xx_irq_ack(struct irq_data *d)
+>  {
+> -	int line = (d->irq < 32) ? irq2gpio[d->irq] : -1;
+> +	int line;
+>  
+> -	if (line >= 0)
+> -		*IXP4XX_GPIO_GPISR = (1 << line);
+> +	switch (d->irq) {
+> +	case IRQ_IXP4XX_TIMER1:
+> +		*IXP4XX_OSST = IXP4XX_OSST_TIMER_1_PEND;
+> +		break;
+> +	case IRQ_IXP4XX_TIMER2:
+> +		*IXP4XX_OSST = IXP4XX_OSST_TIMER_2_PEND;
+> +		break;
+> +	case IRQ_IXP4XX_TIMESTAMP:
+> +		*IXP4XX_OSST = IXP4XX_OSST_TIMER_TS_PEND;
+> +		break;
+> +	case IRQ_IXP4XX_WDOG:
+> +		*IXP4XX_OSST = IXP4XX_OSST_TIMER_WDOG_PEND;
+> +		break;
+> +	default:
+> +		line = (d->irq < 32) ? irq2gpio[d->irq] : -1;
+> +
+> +		if (line >= 0)
+> +			*IXP4XX_GPIO_GPISR = (1 << line);
+> +		break;
+> +	}
+>  }
+>  
+>  /*
+> @@ -247,6 +265,10 @@ void __init ixp4xx_init_irq(void)
+>  	/* Disable all interrupt */
+>  	*IXP4XX_ICMR = 0x0; 
+>  
+> +	/* Clear Timer Pending Interrupts */
+> +	*IXP4XX_OSST = IXP4XX_OSST_TIMER_1_PEND | IXP4XX_OSST_TIMER_2_PEND |
+> +		       IXP4XX_OSST_TIMER_TS_PEND | IXP4XX_OSST_TIMER_WDOG_PEND;
+> +
+>  	if (cpu_is_ixp46x() || cpu_is_ixp43x()) {
+>  		/* Route upper 32 sources to IRQ instead of FIQ */
+>  		*IXP4XX_ICLR2 = 0x00;
+> @@ -274,9 +296,6 @@ static irqreturn_t ixp4xx_timer_interrupt(int irq, void *dev_id)
+>  {
+>  	struct clock_event_device *evt = dev_id;
+>  
+> -	/* Clear Pending Interrupt by writing '1' to it */
+> -	*IXP4XX_OSST = IXP4XX_OSST_TIMER_1_PEND;
+> -
+>  	evt->event_handler(evt);
+>  
+>  	return IRQ_HANDLED;
+> @@ -294,9 +313,6 @@ void __init ixp4xx_timer_init(void)
+>  	/* Reset/disable counter */
+>  	*IXP4XX_OSRT1 = 0;
+>  
+> -	/* Clear Pending Interrupt by writing '1' to it */
+> -	*IXP4XX_OSST = IXP4XX_OSST_TIMER_1_PEND;
+> -
+>  	/* Reset time-stamp counter */
+>  	*IXP4XX_OSTS = 0;
+>  
+> diff --git a/drivers/input/misc/ixp4xx-beeper.c b/drivers/input/misc/ixp4xx-beeper.c
+> index 6ab3dec..2923e47 100644
+> --- a/drivers/input/misc/ixp4xx-beeper.c
+> +++ b/drivers/input/misc/ixp4xx-beeper.c
+> @@ -78,9 +78,6 @@ static int ixp4xx_spkr_event(struct input_dev *dev, unsigned int type, unsigned
+>  
+>  static irqreturn_t ixp4xx_spkr_interrupt(int irq, void *dev_id)
+>  {
+> -	/* clear interrupt */
+> -	*IXP4XX_OSST = IXP4XX_OSST_TIMER_2_PEND;
+> -
+>  	/* flip the beeper output */
+>  	*IXP4XX_GPIO_GPOUTR ^= (1 << (unsigned int) dev_id);
+>  
+> -- 
+> 1.7.8.6
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
