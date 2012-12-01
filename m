@@ -1,28 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 1 Dec 2012 16:11:08 +0100
-Subject: [PATCH 2/8] gpio: pl061 depends on ARM
-In-Reply-To: <1353683310-23654-3-git-send-email-ciminaghi@gnudd.com>
-References: <1353683310-23654-1-git-send-email-ciminaghi@gnudd.com>
- <1353683310-23654-3-git-send-email-ciminaghi@gnudd.com>
-Message-ID: <CACRpkdZAW_O0AoZD=uOHu7BmEAAbmbc8kLqWfm7iDQrs0TgRdA@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 1 Dec 2012 10:41:05 -0500
+Subject: [PATCH] ARM: ixp4xx: Add "ask" handler for timer interrupts
+In-Reply-To: <1354367688.468230210@f2.mail.ru>
+References: <1354347213-22237-1-git-send-email-shc_work@mail.ru>
+ <20121201130527.GD12509@titan.lakedaemon.net>
+ <1354367688.468230210@f2.mail.ru>
+Message-ID: <20121201154105.GE12509@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2012 at 4:08 PM, Davide Ciminaghi <ciminaghi@gnudd.com> wrote:
+On Sat, Dec 01, 2012 at 05:14:48PM +0400, Alexander Shiyan wrote:
+> > On Sat, Dec 01, 2012 at 11:33:33AM +0400, Alexander Shiyan wrote:
+> > > Rather than modify the EOI flags directly in the timer interrupt,
+> > > let's deal with these flags in the "ask" procedure.
+> > 
+> > Please specify the procedure name instead of "ask", eg ixp4xx_irq_ack().
+> > Same goes for the Subject line.
+> > 
+> > What brought about this change, is this part of a larger series?
+> 
+> It all started with an attempt to clear the unneeded calls from drivers.
+> Series not yet, just an initial attempt to put everything in its place.
 
-> From: Alessandro Rubini <rubini@gnudd.com>
->
-> Commit dece904d (gpio: pl061: use chained_irq_* functions in irq
-> handler) introduced chained_irq_enter/exit, which is only
-> available for arch/arm and the driver won't compile elsewhere.
->
-> The dependency is thus made explicit, because AMBA is used in the x86
-> world by a PCI-to-AMBA bridge, to be submitted.
->
-> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
-> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+Ok, sounds good.  There's definitely a lot of cleanup work in ixp4xx.
+Drivers needing moved to drivers/, etc.
 
-Patch applied with Viresh's ACK.
+thx,
 
-Yours,
-Linus Walleij
+Jason.
