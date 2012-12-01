@@ -1,60 +1,69 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 1 Dec 2012 18:30:00 +0100
-Subject: [RFC 2/2] clk: per-user clock accounting for debug
-In-Reply-To: <1354103571-27394-2-git-send-email-rabin.vincent@stericsson.com>
-References: <1354103571-27394-1-git-send-email-rabin.vincent@stericsson.com>
- <1354103571-27394-2-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <CACRpkdYQ8SWKR0ZrT4oHNT-0yuTuR0dCCMLDSR6NxDD5MhcCpw@mail.gmail.com>
+From: francescolavra.fl@gmail.com (Francesco Lavra)
+Date: Sat, 01 Dec 2012 19:09:51 +0100
+Subject: [PATCH] ab8500: remove explicit handling of battery type
+In-Reply-To: <1354130865-6148-1-git-send-email-rajanikanth.hv@linaro.org>
+References: <1354130865-6148-1-git-send-email-rajanikanth.hv@linaro.org>
+Message-ID: <50BA47EF.4040409@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2012 at 12:52 PM, Rabin Vincent
-<rabin.vincent@stericsson.com> wrote:
+Hi,
 
-> When a clock has multiple users, the WARNING on imbalance of
-> enable/disable may not show the guilty party since although they may
-> have commited the error earlier, the warning is emitted later when some
-> other user, presumably innocent, disables the clock.
->
-> Provide per-user clock enable/disable accounting and disabler tracking
-> in order to help debug these problems.
->
-> NOTE: with this patch, clk_get_parent() behaves like clk_get(), i.e. it
-> needs to be matched with a clk_put().  Otherwise, memory will leak.
->
-> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+On 11/28/2012 08:27 PM, Rajanikanth H.V wrote:
+> From: "Rajanikanth H.V" <rajanikanth.hv@stericsson.com>
+> 
+> property, battery-type shall be one of supported technology type
+> instead blank
+> - refer: Documentation/devicetree/bindings/power_supply/ab8500/fg.txt
+> 	for the list supported types
+> - this patch appends to ab8500 bm devs DT binding patch set
+> 	ref: commit-id e0f1abeba5c2d8a2183566717d99294fd1a29c2e
+> 		git://git.infradead.org/battery-2.6.git
+> - promote ab8500_fg probe to happen before ab8500_btemp probe as
+> 	btemp driver depends on fuelgauge list,
+> 	ref: ab8500_fg_get(...)
+> 
+> Signed-off-by: Rajanikanth H.V <rajanikanth.hv@stericsson.com>
+> ---
+>  drivers/power/Makefile        |    2 +-
+>  drivers/power/ab8500_bmdata.c |   10 +++-------
+>  2 files changed, 4 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/power/Makefile b/drivers/power/Makefile
+> index 696e3a9..070c73d 100644
+> --- a/drivers/power/Makefile
+> +++ b/drivers/power/Makefile
+> @@ -38,7 +38,7 @@ obj-$(CONFIG_CHARGER_PCF50633)	+= pcf50633-charger.o
+>  obj-$(CONFIG_BATTERY_JZ4740)	+= jz4740-battery.o
+>  obj-$(CONFIG_BATTERY_INTEL_MID)	+= intel_mid_battery.o
+>  obj-$(CONFIG_BATTERY_RX51)	+= rx51_battery.o
+> -obj-$(CONFIG_AB8500_BM)		+= ab8500_bmdata.o ab8500_charger.o ab8500_btemp.o ab8500_fg.o abx500_chargalg.o
+> +obj-$(CONFIG_AB8500_BM)		+= ab8500_bmdata.o ab8500_charger.o ab8500_fg.o ab8500_btemp.o abx500_chargalg.o
+>  obj-$(CONFIG_CHARGER_ISP1704)	+= isp1704_charger.o
+>  obj-$(CONFIG_CHARGER_MAX8903)	+= max8903_charger.o
+>  obj-$(CONFIG_CHARGER_TWL4030)	+= twl4030_charger.o
+> diff --git a/drivers/power/ab8500_bmdata.c b/drivers/power/ab8500_bmdata.c
+> index 03cc528..f16b60c 100644
+> --- a/drivers/power/ab8500_bmdata.c
+> +++ b/drivers/power/ab8500_bmdata.c
+> @@ -461,7 +461,6 @@ bmdevs_of_probe(struct device *dev,
+>  	struct  device_node *np_bat_supply;
+>  	struct	abx500_bm_data *bat;
+>  	const char *btech;
+> -	char bat_tech[8];
+>  	int i, thermistor;
+>  
+>  	*battery = &ab8500_bm_data;
+> @@ -488,12 +487,9 @@ bmdevs_of_probe(struct device *dev,
+>  		"stericsson,battery-type", NULL);
+>  	if (!btech) {
+>  		dev_warn(dev, "missing property battery-name/type\n");
+> -		strcpy(bat_tech, "UNKNOWN");
+> -	} else {
+> -		strcpy(bat_tech, btech);
+> +		return -EINVAL;
 
-Overall this looks very helpful.
+Before returning, of_node_put() should be called on the device node.
 
-> @@ -504,7 +525,15 @@ void clk_disable(struct clk *clk_user)
->         unsigned long flags;
->
->         spin_lock_irqsave(&enable_lock, flags);
-> -       __clk_disable(clk);
-> +       if (!WARN(clk_user->enable_count == 0,
-> +                 "incorrect disable clk dev %s con %s last disabler %pF\n",
-> +                 clk_user->dev_id, clk_user->con_id, clk_user->last_disable)) {
-> +
-> +               clk_user->last_disable = __builtin_return_address(0);
-> +               clk_user->enable_count--;
-> +
-> +               __clk_disable(clk);
-> +       }
-
-It seems as if an unbalanced clk_disable() call is done before any
-clk_enable() call something like:
-
-"incorrect disable clk dev foo con bar last disabler (null)"
-
-Then the second WARN() will be triggered in __clk_disable().
-
-Have you tried this usecase?
-
-Maybe we can avoid the confusing warning, I don't know.
-No big deal maybe.
-
-Apart from that:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+--
+Francesco
