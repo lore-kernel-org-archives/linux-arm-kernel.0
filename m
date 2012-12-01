@@ -1,59 +1,81 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 1 Dec 2012 09:27:40 +0900
-Subject: [PATCH 3/5] ARM: mach-shmobile: sh73a0: Initialise MMCIF using DT
-In-Reply-To: <3094701.LTMQnxTPNp@avalon>
-References: <1354265085-2444-1-git-send-email-horms@verge.net.au>
- <1354265085-2444-4-git-send-email-horms@verge.net.au>
- <3094701.LTMQnxTPNp@avalon>
-Message-ID: <20121201002739.GB4416@verge.net.au>
+From: rtivy@ti.com (Tivy, Robert)
+Date: Sat, 1 Dec 2012 02:11:28 +0000
+Subject: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
+ OMAP-L138 DSP
+In-Reply-To: <50B88F7C.5000705@ti.com>
+References: <1352853207-20602-1-git-send-email-rtivy@ti.com>
+ <1352853207-20602-5-git-send-email-rtivy@ti.com> <50AB76FA.1050505@ti.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311F952B@DFLE08.ent.ti.com>
+ <50B88F7C.5000705@ti.com>
+Message-ID: <13514BD7FAEBA745BBD7D8A672905C14311FAC29@DFLE08.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 30, 2012 at 01:30:44PM +0100, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> Thank you for the patch.
-> 
-> On Friday 30 November 2012 17:44:43 Simon Horman wrote:
-> > From: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > This device also requires a voltage regulator which
-> > should be defined in a board-specific maner. An example
-> > dts snipped follows.
-> > 
-> > / {
-> > 	fixedregulator1v8: fixedregulator at 0 {
-> > 		compatible = "regulator-fixed";
-> > 		regulator-name = "fixed-1.8V";
-> > 		regulator-min-microvolt = <1800000>;
-> > 		regulator-max-microvolt = <1800000>;
-> > 	};
-> > };
-> > 
-> > &mmcif {
-> > 	vmmc-supply = <&fixedregulator1v8>;
-> > 	vqmmc-supply = <&fixedregulator1v8>;
-> > };
-> > 
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > ---
-> > 
-> > v2
-> > * Removed SDHI intitialisation as the driver needs updating first
-> > * Moved MMC DT from sh73a0.dtsi to sh73a0-reference.dtsi
-> >   as it is not appropriate for use by sh73a0-kzm9g.dts yet.
-> >   This is because sh73a0-kzm9g.dts and board-kzm9g.c use
-> >   both the GIC and INTC interrupt controllers to provide
-> >   access to a rich set of devices. This is achieved by initilising
-> >   the interrupt controllers using C code. Work on allowing the INC
-> >   controller to be initialised using DT is in progress, however,
-> >   until that is complete only GIC may be initialised using DT.
-> > * Add extra entries to clock-sh73a0.c:lookups[] and
-> >   remove auxdata. Ultimtely the clocks will be described
-> >   in DT, but the code isn't there yet.
-> 
-> Could you please add this as a TO-DO item either in the commit message or in 
-> arch/arm/mach-shmobile/clock-sh73a0.c ?
+Hi Sekhar,
 
-Sure, will do.
+> -----Original Message-----
+> From: Nori, Sekhar
+> Sent: Friday, November 30, 2012 2:51 AM
+> To: Tivy, Robert
+> Cc: davinci-linux-open-source at linux.davincidsp.com; linux-arm-
+> kernel at lists.infradead.org; Ring, Chris; Grosen, Mark
+> Subject: Re: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
+> OMAP-L138 DSP
+> 
+> Hi Rob,
+> 
+> On 11/29/2012 7:08 AM, Tivy, Robert wrote:
+> > Hi Sekhar,
+> >
+> > Please see comments and noob questions below...
+> >
+> >> -----Original Message-----
+> >> From: Nori, Sekhar
+> >> Sent: Tuesday, November 20, 2012 4:27 AM
+> >> To: Tivy, Robert
+> >> Cc: davinci-linux-open-source at linux.davincidsp.com; linux-arm-
+> >> kernel at lists.infradead.org; Ring, Chris; Grosen, Mark
+> >> Subject: Re: [PATCH v3 5/6] ARM: davinci: remoteproc board support
+> >> for
+> >> OMAP-L138 DSP
+> >>
+> >> On 11/14/2012 6:03 AM, Robert Tivy wrote:
+> >>> Requires CMA services.
+> >>>
+> >>> New 'clk_reset()' API added so that the DSP's reset state can be
+> >>> toggled separately from its enable/disable operation.
+> >>
+> >> But we cannot add a private clk_ API without it being defined in
+> >> include/linux/clk.h. So, this requires wider alignment.
+> >>
+> >> And I am not sure clock API should be extended to support reset
+> since
+> >> "resetting a clock" does not make a lot of sense. On DaVinci, clock
+> >> gating and reset are handled by the same module, but that need not
+> >> always be the case.
+> >>
+> >> What you need is a way to reset an IP. I do not know of an existing
+> >> framework to do this; likely a new API needs to be created. I am
+> >> guessing this never existed so far because most of the IPs can be
+> >> reset internally (by writing a bit within its own register space). I
+> >> guess DSP is different since its actually a co-processor and may not
+> >> have such a bit.
+> >>
+> >> How about simulating a reset by making the DSP jump to its reset
+> >> address. While I am sure its not quite the same as resetting the DSP
+> >> using PSC, may be it could be used while you wait for consensus
+> >> around handling module reset in kernel?
+> >
+> > Since the ARM can't write the DSP's program counter I suspect such a
+> temporary solution is not possible.
+> 
+> Okay. I think the way forward on this is to start a separate thread
+> including the ARM list, LKML and the remoteproc folks to see if it
+> makes sense to create a reset API in kernel. You can describe the
+> usecase you have.
+
+Instead of fighting that fight, I thought of another way.  The da8xx_dsp platform_device has private data registered in its device struct.  This private data can contain a function pointer for a "DSP reset" function, and davinci_remoteproc.c can call the registered function.  Does that sound OK?
+
+Regards,
+
+- Rob
