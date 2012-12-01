@@ -1,43 +1,33 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Mon, 3 Dec 2012 12:43:51 -0000
-Subject: [PATCH v2] net/macb: Use non-coherent memory for rx buffers
-In-Reply-To: <1354536876-6274-1-git-send-email-nicolas.ferre@atmel.com>
-References: <CAGhQ9VwWmP_B17LnAEqDHcL8Yd-s0C-Bf35z3+=vnJmK_NoCSw@mail.gmail.com>
- <1354536876-6274-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B70D5@saturn3.aculab.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 1 Dec 2012 16:07:59 +0100
+Subject: at91-3.8-pinctrl+mmc+spi branch build failure
+Message-ID: <CAGhQ9VzHM6iyt-VBsYKkuReLA+Z+bxRiO1S1bVXitUakePeXUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Allocate regular pages to use as backing for the RX ring and use the
-> DMA API to sync the caches. This should give a bit better performance
-> since it allows the CPU to do burst transfers from memory. It is also
-> a necessary step on the way to reduce the amount of copying done by
-> the driver.
+Hello Jean-Christophe,
 
-I've not tried to understand the patches, but you have to be
-very careful using non-snooped memory for descriptor rings.
-No amount of DMA API calls can sort out some of the issues.
+I noticed you created a branch with RM9200 DT support on
+github.com/at91linux/linux-at91.git.
 
-Basically you must not dirty a cache line that contains data
-that the MAC unit might still write to.
+But when I tried to build it fails with:
+CC arch/arm/mach-at91/board-rm9200-dt.o
+arch/arm/mach-at91/board-rm9200-dt.c:25:22: fatal error: at91_aic.h: No
+such file or directory
+compilation terminated.
+make[1]: *** [arch/arm/mach-at91/board-rm9200-dt.o] Error 1
+make: *** [arch/arm/mach-at91] Error 2
 
-For the receive ring this means that you must not setup
-new rx buffers for ring entries until the MAC unit has
-filled all the ring entries in the same cache line.
-This probably means only adding rx buffers in blocks
-of 8 or 16 (or even more if there are large cache lines).
+So I think you need to pull in your header cleanup patches.
 
-I can't see any code in the patch that does this.
+One other thing; Can I base my work off this branch?
+I have DT support for my custom board coming and the RM9200 device tree is
+missing bindings for the stuff that's been added lately; SPI, SSC, MMC and
+EMAC.
 
-Doing the same for the tx ring is more difficult, especially
-if you can't stop the MAC unit polling the TX ring on a
-timer basis.
-Basically you can only give the MAX tx packets if either
-it is idle, or if the tx ring containing the new entries
-starts on a cache line.
-If the MAC unit is polling the ring, then to give it
-multiple items you may need to update the 'owner' bit
-in the first ring entry last - just in case the cache
-line gets written out before you've finished.
 
-	David
+regards
+Joachim Eastwood
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121201/a10e4d8a/attachment-0001.html>
