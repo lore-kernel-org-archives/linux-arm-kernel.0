@@ -1,46 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 1 Dec 2012 10:33:59 -0800
-Subject: [GIT PULL 3/3] omap late multiplatform cleanup for v3.8 merge
- window
-In-Reply-To: <CAOesGMgzPVsiVqSe30f2bGZ4MKOjA9+Usw3OqX8wFkrdD570mQ@mail.gmail.com>
-References: <50b4120b.d088e50a.742e.ffffd3d3SMTPIN_ADDED_MISSING@mx.google.com>
- <20121130065314.GB6899@quad.lixom.net>
- <20121130172643.GI5312@atomide.com>
- <CAOesGMgzPVsiVqSe30f2bGZ4MKOjA9+Usw3OqX8wFkrdD570mQ@mail.gmail.com>
-Message-ID: <20121201183359.GS5312@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 1 Dec 2012 21:25:51 +0000
+Subject: [PATCH] ARM: ixp4xx: Add "ask" handler for timer interrupts
+In-Reply-To: <1354347213-22237-1-git-send-email-shc_work@mail.ru>
+References: <1354347213-22237-1-git-send-email-shc_work@mail.ru>
+Message-ID: <201212012125.51935.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [121130 21:57]:
-> On Fri, Nov 30, 2012 at 9:26 AM, Tony Lindgren <tony@atomide.com> wrote:
-> >
-> > BTW, note that "[GIT PULL] omap iommu clean-up dependency branch for
-> > v3.8 merge window" is still pending it seems?
-> 
-> Done, thanks for the reminder.
+On Saturday 01 December 2012, Alexander Shiyan wrote:
+> +       switch (d->irq) {
+> +       case IRQ_IXP4XX_TIMER1:
+> +               *IXP4XX_OSST = IXP4XX_OSST_TIMER_1_PEND;
+> +               break;
+> +       case IRQ_IXP4XX_TIMER2:
+> +               *IXP4XX_OSST = IXP4XX_OSST_TIMER_2_PEND;
+> +               break;
+> +       case IRQ_IXP4XX_TIMESTAMP:
+> +               *IXP4XX_OSST = IXP4XX_OSST_TIMER_TS_PEND;
+> +               break;
+> +       case IRQ_IXP4XX_WDOG:
+> +               *IXP4XX_OSST = IXP4XX_OSST_TIMER_WDOG_PEND;
+> +               break;
 
-OK thanks.
-> 
-> > The following changes since commit 2589d056122f6dcb405d411eae872aac8cf9da1b:
-> >
-> >   Merge tag 'tags/omap-for-v3.8/devel-prcm-signed' into omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3 (2012-11-30 08:40:31 -0800)
-> >
-> > are available in the git repository at:
-> >
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/tags/omap-for-v3.8/cleanup-multiplatform-no-clock-signed
-> >
-> 
-> Pulled in, I had two minor conflicts to resolve resulting in two
-> one-line differences in the diff stat (removed an empty line between
-> some includes).
-> 
-> I ended up pulling this into next/pm2, since that's where the last of
-> the prereqs was and we'll likely reshuffle some of those late branches
-> before merging anyway.
+Since you are touching these lines, it probably makes sense to convert them
+to use writel_relaxed() in the process. Dereferencing a volatile pointer
+in order to do MMIO is strongly discouraged, see
+Documentation/volatile-considered-harmful.txt
 
-OK thanks.
-
-Regards,
-
-Tony
+	Arnd
