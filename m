@@ -1,30 +1,24 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 1 Dec 2012 10:41:05 -0500
-Subject: [PATCH] ARM: ixp4xx: Add "ask" handler for timer interrupts
-In-Reply-To: <1354367688.468230210@f2.mail.ru>
-References: <1354347213-22237-1-git-send-email-shc_work@mail.ru>
- <20121201130527.GD12509@titan.lakedaemon.net>
- <1354367688.468230210@f2.mail.ru>
-Message-ID: <20121201154105.GE12509@titan.lakedaemon.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 1 Dec 2012 16:56:41 +0100
+Subject: [PATCH 1/1] mfd: Simplify IRQ domain registration code in STMPE
+In-Reply-To: <1353675386-6749-1-git-send-email-lee.jones@linaro.org>
+References: <1353675386-6749-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdbkGD3edGFf=3begHOtoYg+kZFHgQriZ4LT1OEz1FpD=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 01, 2012 at 05:14:48PM +0400, Alexander Shiyan wrote:
-> > On Sat, Dec 01, 2012 at 11:33:33AM +0400, Alexander Shiyan wrote:
-> > > Rather than modify the EOI flags directly in the timer interrupt,
-> > > let's deal with these flags in the "ask" procedure.
-> > 
-> > Please specify the procedure name instead of "ask", eg ixp4xx_irq_ack().
-> > Same goes for the Subject line.
-> > 
-> > What brought about this change, is this part of a larger series?
-> 
-> It all started with an attempt to clear the unneeded calls from drivers.
-> Series not yet, just an initial attempt to put everything in its place.
+On Fri, Nov 23, 2012 at 1:56 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Ok, sounds good.  There's definitely a lot of cleanup work in ixp4xx.
-Drivers needing moved to drivers/, etc.
+> Historically, a driver would have to decide whether it required
+> a Linear or Legacy IRQ domain when registering one. This can end
+> up as quite a lot of code. A new Simple call now exists which
+> simplifies this process. Let's make use of it here.
+>
+> Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-thx,
+Should do the trick!
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Jason.
+Yours,
+Linus Walleij
