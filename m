@@ -1,81 +1,110 @@
-From: rtivy@ti.com (Tivy, Robert)
-Date: Sat, 1 Dec 2012 02:11:28 +0000
-Subject: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
- OMAP-L138 DSP
-In-Reply-To: <50B88F7C.5000705@ti.com>
-References: <1352853207-20602-1-git-send-email-rtivy@ti.com>
- <1352853207-20602-5-git-send-email-rtivy@ti.com> <50AB76FA.1050505@ti.com>
- <13514BD7FAEBA745BBD7D8A672905C14311F952B@DFLE08.ent.ti.com>
- <50B88F7C.5000705@ti.com>
-Message-ID: <13514BD7FAEBA745BBD7D8A672905C14311FAC29@DFLE08.ent.ti.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Sat, 1 Dec 2012 09:33:30 +0530
+Subject: [PATCH] ARM: DTS: CROS5250: Add max77686 device tree support
+In-Reply-To: <CAD=FV=Xfbt25-_JMENLiR+N+oC-vPkjxR8brbqYtt4ZFr-60kw@mail.gmail.com>
+References: <1354099900-24779-1-git-send-email-a.kesavan@samsung.com>
+ <CAD=FV=Xfbt25-_JMENLiR+N+oC-vPkjxR8brbqYtt4ZFr-60kw@mail.gmail.com>
+Message-ID: <CAM4voakrpSJX6WWU5EMD-sUPqgjeOdph-R1KUBYJTEPDbr=wgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+Hi Doug,
 
-> -----Original Message-----
-> From: Nori, Sekhar
-> Sent: Friday, November 30, 2012 2:51 AM
-> To: Tivy, Robert
-> Cc: davinci-linux-open-source at linux.davincidsp.com; linux-arm-
-> kernel at lists.infradead.org; Ring, Chris; Grosen, Mark
-> Subject: Re: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
-> OMAP-L138 DSP
-> 
-> Hi Rob,
-> 
-> On 11/29/2012 7:08 AM, Tivy, Robert wrote:
-> > Hi Sekhar,
-> >
-> > Please see comments and noob questions below...
-> >
-> >> -----Original Message-----
-> >> From: Nori, Sekhar
-> >> Sent: Tuesday, November 20, 2012 4:27 AM
-> >> To: Tivy, Robert
-> >> Cc: davinci-linux-open-source at linux.davincidsp.com; linux-arm-
-> >> kernel at lists.infradead.org; Ring, Chris; Grosen, Mark
-> >> Subject: Re: [PATCH v3 5/6] ARM: davinci: remoteproc board support
-> >> for
-> >> OMAP-L138 DSP
-> >>
-> >> On 11/14/2012 6:03 AM, Robert Tivy wrote:
-> >>> Requires CMA services.
-> >>>
-> >>> New 'clk_reset()' API added so that the DSP's reset state can be
-> >>> toggled separately from its enable/disable operation.
-> >>
-> >> But we cannot add a private clk_ API without it being defined in
-> >> include/linux/clk.h. So, this requires wider alignment.
-> >>
-> >> And I am not sure clock API should be extended to support reset
-> since
-> >> "resetting a clock" does not make a lot of sense. On DaVinci, clock
-> >> gating and reset are handled by the same module, but that need not
-> >> always be the case.
-> >>
-> >> What you need is a way to reset an IP. I do not know of an existing
-> >> framework to do this; likely a new API needs to be created. I am
-> >> guessing this never existed so far because most of the IPs can be
-> >> reset internally (by writing a bit within its own register space). I
-> >> guess DSP is different since its actually a co-processor and may not
-> >> have such a bit.
-> >>
-> >> How about simulating a reset by making the DSP jump to its reset
-> >> address. While I am sure its not quite the same as resetting the DSP
-> >> using PSC, may be it could be used while you wait for consensus
-> >> around handling module reset in kernel?
-> >
-> > Since the ARM can't write the DSP's program counter I suspect such a
-> temporary solution is not possible.
-> 
-> Okay. I think the way forward on this is to start a separate thread
-> including the ARM list, LKML and the remoteproc folks to see if it
-> makes sense to create a reset API in kernel. You can describe the
-> usecase you have.
+Thanks for the comments
 
-Instead of fighting that fight, I thought of another way.  The da8xx_dsp platform_device has private data registered in its device struct.  This private data can contain a function pointer for a "DSP reset" function, and davinci_remoteproc.c can call the registered function.  Does that sound OK?
+[...]
+> I don't believe this is right.  In the least the name is wrong since
+> the LDO2 signal from max77686 actually goes to the EC as a signal for
+> detecting the end of the PMIC power on sequence.  The signal
+> "vdd_micom" is actually the LDO2 signal from tps65090.
+>
+> Current Chrome OS kernel tree doesn't have an entry for LDO2 so it is
+> using whatever the bootloader setup, I believe.
+I will use generic names such as "P1.8V_LDO_OUT2" to avoid confusion.
+
+The regulator core assumes that a dt enabled machine will have all
+constraints defined
+and for those that are not it disables them. So, you may see some
+instances listed here
+that are not present in the chrome os kernel tree,
+
+[...]
+> In Chrome OS kernel tree these don't have names like this and are just
+> named vdd_ldo3.  While I can see a point to being a little more
+> specific, it can also be misleading.  This LDO not only provides
+> "vdd_rtc" but also several other signals (I see it go to VDDQ_PRE1,
+> VIO of the max77686 itself, ...  Maybe just keep the generic "vdd_do3"
+> name?
+>
+> This comment also applies to most of the other definitions.
+Sure, I 'll change them all.
+
+[...]
+> I see that several regulators that are in Chrome OS's kernel are not
+> here, like LDO6, LDO11, LDO13, and LDO17.  Can you explain their
+> absence?
+These are unused LDOs on the snow and need not be listed.
+
+>
+>
+>> +                               ldo7_reg: LDO7 {
+>> +                                       regulator-name = "vdd10_xpll";
+>> +                                       regulator-min-microvolt = <1100000>;
+>> +                                       regulator-max-microvolt = <1100000>;
+>
+> This voltage doesn't match what Chrome OS has.  We have 1.0V.  Do you
+> have a specific reason for increasing?
+The default is 1.1V and the schematics I have shows 1.1V as well.
+Looks like the one in
+chrome os is incorrect.
+
+[...]
+>> +                               buck5_reg: BUCK5 {
+>> +                                       regulator-name = "vdd18_adc";
+>> +                                       regulator-min-microvolt = <1800000>;
+>> +                                       regulator-max-microvolt = <1800000>;
+>> +                                       regulator-always-on;
+>
+> I see you removed "regulator-boot-on;" compared to ChromeOS kernel.
+> Can you explain why?
+Will fix as it is "ON" at boot.
+
+>
+>> +                               };
+>> +
+>> +                               buck6_reg: BUCK6 {
+>> +                                       regulator-name = "vdd_bat1";
+>> +                                       regulator-min-microvolt = <1350000>;
+>> +                                       regulator-max-microvolt = <1350000>;
+>> +                                       regulator-always-on;
+>> +                               };
+>> +
+>> +                               buck7_reg: BUCK7 {
+>> +                                       regulator-name = "vdd_bat2";
+>> +                                       regulator-min-microvolt = <2000000>;
+>> +                                       regulator-max-microvolt = <2000000>;
+>> +                                       regulator-always-on;
+>> +                               };
+>
+> buck6 and buck7 aren't in Chrome OS kernel (so just using whatever the
+> bootloader provided).  Specifying them here is fine (and these values
+> look correct), but I'm not 100% convinced about the name (similar to
+> LDOs, these signals go lots of places).
+Naming will be fixed.
+
+>
+>> +
+>> +                               buck8_reg: BUCK8 {
+>> +                                       regulator-name = "vdd_emmc";
+>> +                                       regulator-min-microvolt = <2850000>;
+>> +                                       regulator-max-microvolt = <2850000>;
+>> +                                       regulator-always-on;
+>
+> I see you removed "regulator-boot-on;" compared to ChromeOS kernel.
+> Can you explain why?
+BUCK8 is by default "OFF".
+
+Will re-post on Tuesday.
 
 Regards,
-
-- Rob
+Abhilash
