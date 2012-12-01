@@ -1,30 +1,30 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 1 Dec 2012 22:49:38 +0900
-Subject: [PATCH 1/2] ASoC: Samsung: WM8994: Add basic device tree support
- for machine file
-In-Reply-To: <1354356447-16784-2-git-send-email-padma.v@samsung.com>
-References: <1354356447-16784-1-git-send-email-padma.v@samsung.com>
- <1354356447-16784-2-git-send-email-padma.v@samsung.com>
-Message-ID: <20121201134937.GD17981@opensource.wolfsonmicro.com>
+Date: Sat, 1 Dec 2012 23:05:13 +0900
+Subject: [PATCH] ARM: SAMSUNG: Fix build of I2S driver
+In-Reply-To: <1d7501cdcee9$ddefbb30$99cf3190$%kim@samsung.com>
+References: <1353944420-3972-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <15c501cdcc36$db54cb00$91fe6100$%kim@samsung.com>
+ <20121127064313.GV9411@opensource.wolfsonmicro.com>
+ <1d7501cdcee9$ddefbb30$99cf3190$%kim@samsung.com>
+Message-ID: <20121201140512.GF17981@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 01, 2012 at 03:37:26PM +0530, Padmavathi Venna wrote:
-> Add the basic device tree based lookup.
-> 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
->  sound/soc/samsung/smdk_wm8994.c |   23 +++++++++++++++++++++++
+On Fri, Nov 30, 2012 at 08:00:10PM +0900, Kukjin Kim wrote:
 
-Any new device tree bindings need binding documentation.
+> Mark, I'm holding on Padma's changes for Samsung audio.
 
-Your subject line is also very misleading here...  it should say that
-it's talking about the SMDK.  There's at least two other WM8994 based
-Samsung boards in mainline.
+> If any updates about this from your side?
+
+> Is it ok to send current next/audio-samsung in my tree to upstream for v3.8?
+
+They didn't seem to have broken anything in -next for me, though I
+suspect you'll have bisection breakage for Exynos as the platform data
+is being removed separately to the driver update to not look for it.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121201/b82b780b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121201/0c628bf3/attachment.sig>
