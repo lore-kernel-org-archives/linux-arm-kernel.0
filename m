@@ -1,24 +1,35 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Sun, 2 Dec 2012 15:06:45 +0100
-Subject: [PATCH 0/9] dma_debug: add debug_dma_mapping_error support to
- architectures that support DMA_DEBUG_API
-In-Reply-To: <50B34B0F.3080204@samsung.com>
-References: <1353706142.5270.93.camel@lorien2> <50B34B0F.3080204@samsung.com>
-Message-ID: <20121202140644.GP30633@8bytes.org>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Sun, 02 Dec 2012 23:32:19 +0800
+Subject: [PATCH] ARM: sunxi: Include linux/delay.h
+Message-ID: <1354462339.24917.0.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+This fixes below build error:
+
+  CC      arch/arm/mach-sunxi/sunxi.o
+arch/arm/mach-sunxi/sunxi.c: In function 'sunxi_restart':
+arch/arm/mach-sunxi/sunxi.c:55:3: error: implicit declaration of function 'mdelay' [-Werror=implicit-function-declaration]
+cc1: some warnings being treated as errors
+make[1]: *** [arch/arm/mach-sunxi/sunxi.o] Error 1
+make: *** [arch/arm/mach-sunxi] Error 2
+
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+---
+ arch/arm/mach-sunxi/sunxi.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index dc634ae..fba8d6e 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -12,6 +12,7 @@
  
-On Mon, Nov 26, 2012 at 11:57:19AM +0100, Marek Szyprowski wrote:
-
-> I've took all the patches to the next-dma-debug branch in my tree, I sorry
-> that You have to wait so long for it. My branch is based on Joerg's
-> dma-debug branch and I've included it for testing in linux-next branch.
-
-The patches are now two times in next. One version from my tree and one
-from yours. Please remove the version from your tree, the patches should
-go upstream via my dma-debug branch.
-
-
-	Joerg
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/delay.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+-- 
+1.7.9.5
