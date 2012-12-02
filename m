@@ -1,64 +1,29 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Mon, 3 Dec 2012 00:48:27 +0100
-Subject: [PATCH] ARM: kirkwood: convert Guruplug to use the device tree
-In-Reply-To: <20121202234110.GM12509@titan.lakedaemon.net>
-References: <20121202155124.GA30807@1wt.eu>
- <20121202230926.GJ12509@titan.lakedaemon.net> <20121202232226.GL30822@1wt.eu>
- <20121202234110.GM12509@titan.lakedaemon.net>
-Message-ID: <20121202234827.GM30822@1wt.eu>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 3 Dec 2012 08:57:30 +0900
+Subject: [GIT PULL v2] Renesas ARM-based SoC maintainers for v3.8 #1
+In-Reply-To: <20121130165250.GB697@quad.lixom.net>
+References: <1354147220-10552-1-git-send-email-horms@verge.net.au>
+ <20121130165250.GB697@quad.lixom.net>
+Message-ID: <20121202235730.GD12310@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 02, 2012 at 06:41:10PM -0500, Jason Cooper wrote:
-> On Mon, Dec 03, 2012 at 12:22:26AM +0100, Willy Tarreau wrote:
-> > Hi Jason,
+On Fri, Nov 30, 2012 at 08:52:50AM -0800, Olof Johansson wrote:
+> On Thu, Nov 29, 2012 at 09:00:19AM +0900, Simon Horman wrote:
+> > Hi Olof, Hi Arnd,
 > > 
-> > On Sun, Dec 02, 2012 at 06:09:26PM -0500, Jason Cooper wrote:
-> > > Willy,
-> > > 
-> > > Great first DT patch!  A few comments below.
-> > > 
-> > > On Sun, Dec 02, 2012 at 04:51:24PM +0100, Willy Tarreau wrote:
-> > > > Add a device tree entry for the Guruplug board. This port was
-> > > > based both on the work done on the dreamplug and the dockstar.
-> > > > 
-> > > > It builds, boots and works on my Guruplug Server plus.
-> > > 
-> > > iirc, the Guruplug Server Plus has an esata port.  Since this is the
-> > > hardware you have, lets make this patch specific to it.  So, the Subject
-> > > line should refer to "Guruplug Server Plus", and
+> > Please consider the following maintainers change for 3.8.
 > > 
-> > (...)
+> > ----------------------------------------------------------------
+> > The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
 > > 
-> > Thank you for your review and clear comments, I'll update the patch
-> > accordingly.
+> >   Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
 > > 
-> > Since there are already pending changes for the merge window, I'll
-> > rather resend it after the merge window when the changes are already
-> > done, what do you think ?
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git maintainers
 > 
-> Doesn't matter in this case, I'll handle any conflicts.  Please resend
-> when ready.  You can just base off of v3.7-rc7, or v3.8 if it drops.
+> THanks, pulled into next/fixes-non-critical, since we've likely sent our last
+> fixes batch to Linus.
 
-OK will do.
-
-> btw - did you upgrade u-boot for DT?
-
-I remember I upgraded it recently because of the incompatibility with
-kernels >= 3.2 causing random hangs at boot, but I don't know if it
-supports DT.
-
-> You should just have to add
-> CONFIG_OF_LIBFDT to include/configs/guruplug.h.  Then,
-> 
-> bootm <kern addr> <initrd addr> <dtb addr>
-> 
-> Without an initrd,
-> 
-> bootm <kern addr> - <dtb addr>
-
-Interesting, I'll have to check (I've put it back into my bag right
-now).
-
-Thanks!
-Willy
+Thanks, its clearly not a critical fix.
