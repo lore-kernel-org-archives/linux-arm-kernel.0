@@ -1,94 +1,31 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Sun, 2 Dec 2012 07:17:08 -0500
-Subject: [PATCH -next] [media] s5p-mfc: remove unused variable
-Message-ID: <CAPgLHd8BLn1_O4-9rCBbREq4ke2ZaJAVWLhOEF2QwACxub=vUQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 2 Dec 2012 13:13:37 +0000
+Subject: [PATCH] ARM: ixp4xx: Add "ask" handler for timer interrupts
+In-Reply-To: <1354428123.119115041@f313.mail.ru>
+References: <1354347213-22237-1-git-send-email-shc_work@mail.ru>
+ <201212020011.42105.arnd@arndb.de> <1354428123.119115041@f313.mail.ru>
+Message-ID: <201212021313.37790.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Sunday 02 December 2012, Alexander Shiyan wrote:
+> > diff --git a/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h b/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
+> > index eb68b61..2522ab0 100644
+> > --- a/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
+> > +++ b/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
+> > @@ -92,7 +92,7 @@
+> >  /*
+> >   * Expansion Bus Controller registers.
+> >   */
+> > -#define IXP4XX_EXP_REG(x) ((volatile u32 __iomem *)(IXP4XX_EXP_CFG_BASE_VIRT+(x)))
+> > +#define IXP4XX_EXP_REG(x) (IXP4XX_EXP_CFG_BASE_VIRT+(x))
+> Modify this to:
+> #define IXP4XX_EXP_REG(x) IOMEM(IXP4XX_EXP_CFG_BASE_VIRT+(x))
+> to avoid compiler warnings.
+> 
 
-The variable index is initialized but never used
-otherwise, so remove the unused variable.
+Hmm, not sure what went wrong here. Actually the definition of 
+IXP4XX_EXP_CFG_BASE_VIRT itself should use the IOMEM() macro, like
+all the other IXP4XX_*_BASE_VIRT do.
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/media/platform/s5p-mfc/s5p_mfc.c        | 5 -----
- drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 6 ------
- 2 files changed, 11 deletions(-)
-
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index 3afe879..856cf00 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -273,7 +273,6 @@ static void s5p_mfc_handle_frame_new(struct s5p_mfc_ctx *ctx, unsigned int err)
- 	struct s5p_mfc_buf  *dst_buf;
- 	size_t dspl_y_addr;
- 	unsigned int frame_type;
--	unsigned int index;
- 
- 	dspl_y_addr = s5p_mfc_hw_call(dev->mfc_ops, get_dspl_y_adr, dev);
- 	frame_type = s5p_mfc_hw_call(dev->mfc_ops, get_dec_frame_type, dev);
-@@ -310,7 +309,6 @@ static void s5p_mfc_handle_frame_new(struct s5p_mfc_ctx *ctx, unsigned int err)
- 			vb2_buffer_done(dst_buf->b,
- 				err ? VB2_BUF_STATE_ERROR : VB2_BUF_STATE_DONE);
- 
--			index = dst_buf->b->v4l2_buf.index;
- 			break;
- 		}
- 	}
-@@ -326,8 +324,6 @@ static void s5p_mfc_handle_frame(struct s5p_mfc_ctx *ctx,
- 	unsigned long flags;
- 	unsigned int res_change;
- 
--	unsigned int index;
--
- 	dst_frame_status = s5p_mfc_hw_call(dev->mfc_ops, get_dspl_status, dev)
- 				& S5P_FIMV_DEC_STATUS_DECODING_STATUS_MASK;
- 	res_change = (s5p_mfc_hw_call(dev->mfc_ops, get_dspl_status, dev)
-@@ -387,7 +383,6 @@ static void s5p_mfc_handle_frame(struct s5p_mfc_ctx *ctx,
- 			mfc_debug(2, "Running again the same buffer\n");
- 			ctx->after_packed_pb = 1;
- 		} else {
--			index = src_buf->b->v4l2_buf.index;
- 			mfc_debug(2, "MFC needs next buffer\n");
- 			ctx->consumed_stream = 0;
- 			list_del(&src_buf->list);
-
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-index 3a8cfd9..bf4d2f4 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-@@ -1408,7 +1408,6 @@ static inline int s5p_mfc_run_dec_frame(struct s5p_mfc_ctx *ctx)
- 	struct s5p_mfc_buf *temp_vb;
- 	unsigned long flags;
- 	int last_frame = 0;
--	unsigned int index;
- 
- 	spin_lock_irqsave(&dev->irqlock, flags);
- 
-@@ -1427,8 +1426,6 @@ static inline int s5p_mfc_run_dec_frame(struct s5p_mfc_ctx *ctx)
- 			temp_vb->b->v4l2_planes[0].bytesused);
- 	spin_unlock_irqrestore(&dev->irqlock, flags);
- 
--	index = temp_vb->b->v4l2_buf.index;
--
- 	dev->curr_ctx = ctx->num;
- 	s5p_mfc_clean_ctx_int_flags(ctx);
- 	if (temp_vb->b->v4l2_planes[0].bytesused == 0) {
-@@ -1452,7 +1449,6 @@ static inline int s5p_mfc_run_enc_frame(struct s5p_mfc_ctx *ctx)
- 	unsigned int src_y_size, src_c_size;
- 	*/
- 	unsigned int dst_size;
--	unsigned int index;
- 
- 	spin_lock_irqsave(&dev->irqlock, flags);
- 
-@@ -1487,8 +1483,6 @@ static inline int s5p_mfc_run_enc_frame(struct s5p_mfc_ctx *ctx)
- 
- 	spin_unlock_irqrestore(&dev->irqlock, flags);
- 
--	index = src_mb->b->v4l2_buf.index;
--
- 	dev->curr_ctx = ctx->num;
- 	s5p_mfc_clean_ctx_int_flags(ctx);
- 	s5p_mfc_encode_one_frame_v6(ctx);
+	Arnd
