@@ -1,92 +1,43 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon,  3 Dec 2012 13:41:43 +0100
-Subject: [PATCH v3 3/3] ARM/dts: omap3: Add support for IGEP COM Module
-In-Reply-To: <1354538503-22671-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1354538503-22671-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1354538503-22671-4-git-send-email-javier.martinez@collabora.co.uk>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Mon, 3 Dec 2012 12:43:51 -0000
+Subject: [PATCH v2] net/macb: Use non-coherent memory for rx buffers
+In-Reply-To: <1354536876-6274-1-git-send-email-nicolas.ferre@atmel.com>
+References: <CAGhQ9VwWmP_B17LnAEqDHcL8Yd-s0C-Bf35z3+=vnJmK_NoCSw@mail.gmail.com>
+ <1354536876-6274-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B70D5@saturn3.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ISEE IGEP COM Module is an TI OMAP3 SoC computer on module.
+> Allocate regular pages to use as backing for the RX ring and use the
+> DMA API to sync the caches. This should give a bit better performance
+> since it allows the CPU to do burst transfers from memory. It is also
+> a necessary step on the way to reduce the amount of copying done by
+> the driver.
 
-This patch adds an initial device tree support to boot an
-IGEP COM Module from the MMC/SD.
+I've not tried to understand the patches, but you have to be
+very careful using non-snooped memory for descriptor rings.
+No amount of DMA API calls can sort out some of the issues.
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
-Tested-by: Enric Balletbo i Serra <eballetbo@gmail.com>
----
+Basically you must not dirty a cache line that contains data
+that the MAC unit might still write to.
 
-Changes since v1:
-    - Use default-state = "on" instead default-trigger = "default-on" for LED
-    - Update GPIO mapping according to latest IGEP COM Module rev.E instead D
+For the receive ring this means that you must not setup
+new rx buffers for ring entries until the MAC unit has
+filled all the ring entries in the same cache line.
+This probably means only adding rx buffers in blocks
+of 8 or 16 (or even more if there are large cache lines).
 
- arch/arm/boot/dts/Makefile           |    1 +
- arch/arm/boot/dts/omap3-igep0030.dts |   44 ++++++++++++++++++++++++++++++++++
- 2 files changed, 45 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap3-igep0030.dts
+I can't see any code in the patch that does this.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 1dc0f39..78c99bc 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -67,6 +67,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3-evm.dtb \
- 	omap3-tobi.dtb \
- 	omap3-igep0020.dtb \
-+	omap3-igep0030.dtb \
- 	omap4-panda.dtb \
- 	omap4-pandaES.dtb \
- 	omap4-var_som.dtb \
-diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
-new file mode 100644
-index 0000000..9dc48d2
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-igep0030.dts
-@@ -0,0 +1,44 @@
-+/*
-+ * Device Tree Source for IGEP COM Module
-+ *
-+ * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
-+ * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/include/ "omap3-igep.dtsi"
-+
-+/ {
-+	model = "IGEP COM Module";
-+	compatible = "isee,omap3-igep0030", "ti,omap3";
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		boot {
-+			 label = "omap3:green:boot";
-+			 gpios = <&twl_gpio 13 1>;
-+			 default-state = "on";
-+		};
-+
-+		user0 {
-+			 label = "omap3:red:user0";
-+			 gpios = <&twl_gpio 18 1>; /* LEDA */
-+			 default-state = "off";
-+		};
-+
-+		user1 {
-+			 label = "omap3:green:user1";
-+			 gpios = <&twl_gpio 19 1>; /* LEDB */
-+			 default-state = "off";
-+		};
-+
-+		user2 {
-+			 label = "omap3:red:user1";
-+			 gpios = <&gpio1 16 1>;
-+			 default-state = "off";
-+		};
-+	};
-+};
--- 
-1.7.7.6
+Doing the same for the tx ring is more difficult, especially
+if you can't stop the MAC unit polling the TX ring on a
+timer basis.
+Basically you can only give the MAX tx packets if either
+it is idle, or if the tx ring containing the new entries
+starts on a cache line.
+If the MAC unit is polling the ring, then to give it
+multiple items you may need to update the 'owner' bit
+in the first ring entry last - just in case the cache
+line gets written out before you've finished.
+
+	David
