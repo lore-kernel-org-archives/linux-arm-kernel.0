@@ -1,47 +1,47 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Mon, 3 Dec 2012 09:39:37 +0800
-Subject: [PATCH 1/4] rtc: sa1100: enable/disable rtc when probe/remove the
- device
-In-Reply-To: <CAN1soZxUA2PPy4694ByX1FTyWiJkha8QpKFK5Jc3Wf3zT0huOA@mail.gmail.com>
-References: <1354155670-6267-1-git-send-email-chao.xie@marvell.com>
- <20121129102519.GG19440@n2100.arm.linux.org.uk>
- <CAN1soZxUA2PPy4694ByX1FTyWiJkha8QpKFK5Jc3Wf3zT0huOA@mail.gmail.com>
-Message-ID: <CADApbejZXach=YaiL5rEWA5+uc+mO8PzQzUKN+k90HfxEsqgtA@mail.gmail.com>
+From: narkewoody@gmail.com (Woody Wu)
+Date: Mon, 3 Dec 2012 01:53:27 +0000 (UTC)
+Subject: nfs root not responding?
+References: <slrnkbgkqq.2kq.narkewoody@zuhnb712.local.com>
+ <20121130083252.B4301200171@gemini.denx.de>
+Message-ID: <slrnkbo1et.1p8.narkewoody@zuhnb712.local.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 30, 2012 at 3:04 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Thu, Nov 29, 2012 at 6:25 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Wed, Nov 28, 2012 at 09:21:07PM -0500, Chao Xie wrote:
->>> The original sa1100_rtc_open/sa1100_rtc_release will be called
->>> when the /dev/rtc0 is opened or closed.
->>> In fact, these two functions will enable/disable the clock, and
->>> register/unregister the irqs.
->>> User application will use /dev/rtc0 to read the rtc time or set
->>> the alarm. The rtc should still run indepent of open/close the
->>> rtc device.
->>> So only enable clock and register the irqs when probe the device,
->>> and disable clock and unregister the irqs when remove the device.
->>
->> NAK.  I don't think you properly understand what's going on here if you
->> think moving the entire open and release functions into the probe and
->> remove functions is the right thing to do.
+On 2012-11-30, Wolfgang Denk <wd@denx.de> wrote:
+> Dear Woody Wu,
 >
-> Since PXA27x & PXA3xx supports dual rtc device at the same time,
-> user could choose use either of rtc at run time. Then clk & irq are setup
-> in open().
+> In message <slrnkbgkqq.2kq.narkewoody@zuhnb712.local.com> you wrote:
+>> 
+>> I just enabled the network in the kernel and trying to load a rootfs
+>> from remote nfs server.  The kernel did the DHCP succeed and got the
+>> ip and other network parameters.  But it then keep always complaining
+>> that "nfs server not responding" and the login prompt does not show up.
 >
-> Chao,
-> So you shouldn't remove them into probe().
+> Try adding "proto=tcp" as mount option and test if this changes
+> anything.
+>
 
-How can user to choose one RTC?
-The user API, for example "date" will open the device, get the time
-and then close the device.
-WHen set a alarm, it is the same routine. open->set->close.
-The open routine will enable clock and register irq, close will
-disable the clock and unregister irq. It means that if only open is
-invoked, rtc begins to work, and after close is invoked rtc stops
-working. It means that the user can not get correct time and can not
-get right alarm.
+The result is the same after adding "proto=tcp".  A suspicous thing I
+found it, while the nfs was not working, I tried to ping the target from
+another host, but the ping is not reachable.  I then skipped the nfs
+mounting by specifing another kernel command to mount my old but not fully
+workable root image, where I run /bin/sh as init
+(root=/dev/my_old_img_partition init=/bin/sh). After got the command
+prompt, I found the target still not reachable by ping.  Does it mean my
+ethernet driver is not really running? On one side, this can explain the
+nfs problem, but why the dhcp work and did get assigned an IP?
+
+
+> You may also want to have a look at this FAQ:
+> http://www.denx.de/wiki/view/DULG/EthernetIsUnreliable
+>
+>
+> Best regards,
+>
+> Wolfgang Denk
+>
+
+
+-- 
+woody
+I can't go back to yesterday - because I was a different person then.
