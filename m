@@ -1,30 +1,51 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 3 Dec 2012 14:09:56 -0500
-Subject: [PATCH v4 09/14] KVM: ARM: Emulation framework and CP15 emulation
-In-Reply-To: <20121203110537.GD18579@mudshark.cambridge.arm.com>
-References: <20121110154203.2836.46686.stgit@chazy-air>
- <20121110154313.2836.2851.stgit@chazy-air>
- <20121119150105.GB3205@mudshark.cambridge.arm.com>
- <CANM98qKSnt8dmjs9f5ufLPBYAvaSunzKsDTMfi2hm6nLjgjLqg@mail.gmail.com>
- <20121203110537.GD18579@mudshark.cambridge.arm.com>
-Message-ID: <CANM98qKnDNknap3EGGcTH-_vhbdDDhNFO1Axx-crr+q3p5i=Uw@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Mon, 03 Dec 2012 14:11:59 -0500
+Subject: [PATCH 3/3] MMC: sdhci-dove: allow GPIOs to be used for card
+ detection on Dove
+In-Reply-To: <Pine.LNX.4.64.1211260955070.11501@axis700.grange> (Guennadi
+ Liakhovetski's message of "Mon, 26 Nov 2012 10:43:10 +0100 (CET)")
+References: <20121122235426.GT3332@n2100.arm.linux.org.uk>
+ <E1TbgcZ-0007Kt-35@rmk-PC.arm.linux.org.uk>
+ <20121123083117.GA25754@S2100-06.ap.freescale.net>
+ <20121123085726.GK5764@n2100.arm.linux.org.uk>
+ <20121123121422.GA26168@S2100-06.ap.freescale.net>
+ <20121123125507.GO5764@n2100.arm.linux.org.uk>
+ <871ufh8lza.fsf@octavius.laptop.org>
+ <Pine.LNX.4.64.1211260955070.11501@axis700.grange>
+Message-ID: <87y5hfhrwg.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 3, 2012 at 6:05 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Nov 30, 2012 at 08:22:28PM +0000, Christoffer Dall wrote:
->> On Mon, Nov 19, 2012 at 10:01 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Sat, Nov 10, 2012 at 03:43:13PM +0000, Christoffer Dall wrote:
->> > This should probably be 0xff and also use the macros that Lorenzo is
->> > introducing:
->> >
->> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/132977.html
->> >
->>
->> in the A15 TRM bits [7:2] are reserved, so we really only do care
->> about bits [1:0], and this file is A15 specific, but if you prefer, I
->> can merge this:
+Hi Guennadi,
+
+On Mon, Nov 26 2012, Guennadi Liakhovetski wrote:
+>> Guennadi, what are your thoughts about consolidating this reset logic
+>> between the sdhci tasklet and slot-gpio?  It would certainly be nice to
+>> use slot-gpio in cases like this one, so it's worth fixing.
 >
-> The upper bits are RAZ, so yes, please do merge something like this.
->
-I did, thanks!
+> Sure, this can be added. As for how - I see at least two possibilities: 
+> (1) put the complete above block in a new mmc host operation and just call 
+> it from the GPIO card-detect ISR, (2) taking into account, that many 
+> (nearly all? all?) host drivers keep a pointer to the current mrq in their 
+> private data struct, we could instead add such a pointer to struct 
+> mmc_host, then the check "request in progress" could also be generalised, 
+> and the operation would just have to reset the host and complete the 
+> request (in the sdhci case schedule the task).
+
+They both sound pretty attractive.  Maybe we start out with (1), which
+would create a patch we could more reasonably send to stable@ to get
+slot-gpio handling the reset during transfers properly in older kernels,
+and then refactor into (2) later?
+
+> Note, that there's already a .hw_reset() operation, used by sdhci-pci
+> only so far, still, it seems we cannot (easily) hijack it.
+
+That one's implementing an eMMC 4.5 spec feature, not related to this
+kind of reset.
+
+Thanks!
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
