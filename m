@@ -1,122 +1,35 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 03 Dec 2012 13:16:51 +0100
-Subject: [PATCH v2 1/3] ARM/dts: omap3: Add generic DT support for IGEP
- devices
-In-Reply-To: <50BC8685.20105@ti.com>
-References: <1354270137-31538-1-git-send-email-javier.martinez@collabora.co.uk>
- <1354270137-31538-2-git-send-email-javier.martinez@collabora.co.uk>
- <50BC8685.20105@ti.com>
-Message-ID: <50BC9833.6060205@collabora.co.uk>
+Date: Mon,  3 Dec 2012 13:41:40 +0100
+Subject: [PATCH v3 0/3] ARM/dts: omap3: Add DT support for IGEP devices
+Message-ID: <1354538503-22671-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2012 12:01 PM, Benoit Cousson wrote:
-> On 11/30/2012 11:08 AM, Javier Martinez Canillas wrote:
->> Add a generic .dtsi device tree source file for the
->> common characteristics across IGEP Technology devices.
->> 
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
->> ---
->>  arch/arm/boot/dts/omap3-igep.dtsi |   93 +++++++++++++++++++++++++++++++++++++
->>  1 files changed, 93 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm/boot/dts/omap3-igep.dtsi
->> 
->> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
->> new file mode 100644
->> index 0000000..a093bff
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
->> @@ -0,0 +1,93 @@
->> +/*
->> + * Device Tree Source for IGEP Technology devices
->> + *
->> + * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
->> + * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +/dts-v1/;
->> +
->> +/include/ "omap3.dtsi"
->> +
->> +/ {
->> +	memory {
->> +		device_type = "memory";
->> +		reg = <0x80000000 0x20000000>; /* 512 MB */
->> +	};
->> +
->> +	sound {
->> +		compatible = "ti,omap-twl4030";
->> +		ti,model = "igep2";
->> +		ti,mcbsp = <&mcbsp2>;
->> +		ti,codec = <&twl_audio>;
->> +	};
->> +};
->> +
->> +&omap3_pmx_core {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <
->> +		  &mcbsp2_pins
->> +	>;
-> 
-> Tony made a comment to avoid associating these data inside the pmx_core
-> and instead do that in the dedicated device part.
->
+IGEP technology devices are TI OMAP3 SoC based industrial embedded
+and computer-on-module boards. This patch-set adds initial device
+tree support for these devices.
 
-Hi Benoit,
+The device trees allows to boot from an MMC and are working all the
+components that already have device tree support on OMAP3 SoCs:
 
-Thanks a lot for your feedback.
+- MMC/SD
+- UARTs
+- GPIO LEDs
+- TWL4030 codec audio
+- pinmux/pinconf pinctrl
 
-I didn't know about this convention, the OMAP mcspi1_cs2 pin is configured in
-gpio_176 mode (OMAP_MUX_MODE4) because this GPIO line is used as the SMSC9221
-LAN Ethernet controller IRQ.
+Some peripheral are still not working such as Flash storage and
+Ethernet but support for these will also be included once the
+OMAP GPMC device tree binding patches land on mainline.
 
-But since the ethernet chip is connected to the OMAP3 processor thourgh its GPMC
-and the DT support for GPMC is still not merged in mainline, DT support this
-this pheripheral is still missing on this initial DT.
+This is a v3 of the patch-set that solves issues pointed out by
+Enric Balletbo and Benoit Cousson.
 
-So, I'll just removes mcbsp2_pins for now and this can be added again on the
-ethernet device part once support for this pheripheral is added.
+The patch-set is composed of the following patches:
 
->> +
->> +	uart3_pins: pinmux_uart3_pins {
->> +		pinctrl-single,pins = <
->> +			0x16e 0x100	/* uart3_rx.uart3_rx INPUT | MODE0 */
->> +			0x170 0		/* uart3_tx.uart3_tx OUTPUT | MODE0 */
->> +		>;
->> +	};
->> +
->> +	mcbsp2_pins: pinmux_mcbsp2_pins {
->> +		pinctrl-single,pins = <
->> +			0x1a2 0x0104	/* mcspi1_cs2.gpio_176 INPUT | MODE4 */
->> +		>;
->> +	};
-> 
-> BTW, in this case, the UART3 does not seems to have any connection with
-> the pins settings. Sine your don't have it in the pmx_core you should
-> have it in side the UART3 node.
-> 
-> &uart3 {
-> 	pinctrl-names = "default";
-> 	pinctrl-0 = <&uart3_pins>;
-> };
-> 
+[PATCH v3 1/3] ARM/dts: omap3: Add generic DT support for IGEP devices
+[PATCH v3 2/3] ARM/dts: omap3: Add support for IGEPv2 board
+[PATCH v3 3/3] ARM/dts: omap3: Add support for IGEP COM Module
 
-Yes, I missed that. Thanks for pointing this out.
-
-> The rational is that, the mux will be done only if the driver is probed
-> and not unconditionally during pmx_core probe like it will be the case
-> otherwise.
-> 
-> Regards,
-> Benoit
-> 
-> 
-
-I'll post a v3 with your suggestions.
-
-Thanks a lot and best regards,
+Best regards,
 Javier
