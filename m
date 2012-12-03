@@ -1,50 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  4 Dec 2012 00:50:25 +0100
-Subject: [PATCH] ARM: omap: kill NEED_MACH_GPIO_H
-Message-ID: <1354578625-25760-1-git-send-email-linus.walleij@linaro.org>
+From: tim.bird@am.sony.com (Tim Bird)
+Date: Mon, 3 Dec 2012 15:51:03 -0800
+Subject: nfs root not responding?
+In-Reply-To: <slrnkbo3ca.1p8.narkewoody@zuhnb712.local.com>
+References: <slrnkbgkqq.2kq.narkewoody@zuhnb712.local.com>
+ <20121130083252.B4301200171@gemini.denx.de>
+ <slrnkbo1et.1p8.narkewoody@zuhnb712.local.com>
+ <slrnkbo3ca.1p8.narkewoody@zuhnb712.local.com>
+Message-ID: <50BD3AE7.6050807@am.sony.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This does not appear to be used by the OMAP.
+On 12/02/2012 06:26 PM, Woody Wu wrote:> By enabling the debug output in my Ethernet driver, I captured some
+> network traffics.
+...
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/Kconfig                        | 1 -
- arch/arm/mach-omap1/include/mach/gpio.h | 3 ---
- arch/arm/mach-omap2/include/mach/gpio.h | 3 ---
- 3 files changed, 7 deletions(-)
- delete mode 100644 arch/arm/mach-omap1/include/mach/gpio.h
- delete mode 100644 arch/arm/mach-omap2/include/mach/gpio.h
+Rather than try to decode this by hand, I recommend you use Wireshark.
+It has proven invaluable to me to identify and resolve networking
+problems on boot (particular with NFS root-mounted file systems).
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index f456cf4..12deaec 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -938,7 +938,6 @@ config ARCH_OMAP
- 	select CLKSRC_MMIO
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_CLK
--	select NEED_MACH_GPIO_H
- 	help
- 	  Support for TI's OMAP platform (OMAP1/2/3/4).
- 
-diff --git a/arch/arm/mach-omap1/include/mach/gpio.h b/arch/arm/mach-omap1/include/mach/gpio.h
-deleted file mode 100644
-index ebf86c0..0000000
---- a/arch/arm/mach-omap1/include/mach/gpio.h
-+++ /dev/null
-@@ -1,3 +0,0 @@
--/*
-- * arch/arm/mach-omap1/include/mach/gpio.h
-- */
-diff --git a/arch/arm/mach-omap2/include/mach/gpio.h b/arch/arm/mach-omap2/include/mach/gpio.h
-deleted file mode 100644
-index 5621cc5..0000000
---- a/arch/arm/mach-omap2/include/mach/gpio.h
-+++ /dev/null
-@@ -1,3 +0,0 @@
--/*
-- * arch/arm/mach-omap2/include/mach/gpio.h
-- */
--- 
-1.7.11.7
+WireShark can decode the DHCP packets and the NFS request headers, which
+is very handy.  You can tell which side of the connection is sending wrong
+information, or not responding.  BTW - in case it's not obvious, you run
+it on host and capture the ethernet traffic on the connection between your
+host and target.
+ -- Tim
+
+=============================
+Tim Bird
+Architecture Group Chair, CE Workgroup of the Linux Foundation
+Senior Staff Engineer, Sony Network Entertainment
+=============================
