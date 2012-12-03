@@ -1,29 +1,39 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 3 Dec 2012 08:57:30 +0900
-Subject: [GIT PULL v2] Renesas ARM-based SoC maintainers for v3.8 #1
-In-Reply-To: <20121130165250.GB697@quad.lixom.net>
-References: <1354147220-10552-1-git-send-email-horms@verge.net.au>
- <20121130165250.GB697@quad.lixom.net>
-Message-ID: <20121202235730.GD12310@verge.net.au>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 2 Dec 2012 19:09:36 -0500
+Subject: [PATCH] ARM: kirkwood: convert Guruplug to use the device tree
+In-Reply-To: <20121202234827.GM30822@1wt.eu>
+References: <20121202155124.GA30807@1wt.eu>
+ <20121202230926.GJ12509@titan.lakedaemon.net>
+ <20121202232226.GL30822@1wt.eu>
+ <20121202234110.GM12509@titan.lakedaemon.net>
+ <20121202234827.GM30822@1wt.eu>
+Message-ID: <20121203000936.GN12509@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 30, 2012 at 08:52:50AM -0800, Olof Johansson wrote:
-> On Thu, Nov 29, 2012 at 09:00:19AM +0900, Simon Horman wrote:
-> > Hi Olof, Hi Arnd,
-> > 
-> > Please consider the following maintainers change for 3.8.
-> > 
-> > ----------------------------------------------------------------
-> > The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
-> > 
-> >   Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git maintainers
+On Mon, Dec 03, 2012 at 12:48:27AM +0100, Willy Tarreau wrote:
+> On Sun, Dec 02, 2012 at 06:41:10PM -0500, Jason Cooper wrote:
+...
+> > btw - did you upgrade u-boot for DT?
 > 
-> THanks, pulled into next/fixes-non-critical, since we've likely sent our last
-> fixes batch to Linus.
+> I remember I upgraded it recently because of the incompatibility with
+> kernels >= 3.2 causing random hangs at boot, but I don't know if it
+> supports DT.
+> 
+> > You should just have to add
+> > CONFIG_OF_LIBFDT to include/configs/guruplug.h.  Then,
+> > 
+> > bootm <kern addr> <initrd addr> <dtb addr>
+> > 
+> > Without an initrd,
+> > 
+> > bootm <kern addr> - <dtb addr>
+> 
+> Interesting, I'll have to check (I've put it back into my bag right
+> now).
 
-Thanks, its clearly not a critical fix.
+v2012.10 does not have it enabled for the guruplug.
+
+hth,
+
+Jason.
