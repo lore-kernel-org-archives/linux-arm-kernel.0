@@ -1,40 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Dec 2012 00:01:17 +0100
-Subject: [PATCH] GPIO: MVEBU: Fix so only built when CONFIG_OF_IRQ
-In-Reply-To: <1354463099-6121-1-git-send-email-andrew@lunn.ch>
-References: <1354463099-6121-1-git-send-email-andrew@lunn.ch>
-Message-ID: <CACRpkdbJACeOfjFvwsHaj47Jw-0qPSd_kziOHEJ=PPMmbovQ4g@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 4 Dec 2012 10:26:31 +1100
+Subject: omap2plus_defconfig fails to build
+In-Reply-To: <CAAfyv37BA4YMRFJsN5n7EeAD7iE3hzQ2PDqBAtqCju7JdxrvTA@mail.gmail.com>
+References: <CAAfyv37BA4YMRFJsN5n7EeAD7iE3hzQ2PDqBAtqCju7JdxrvTA@mail.gmail.com>
+Message-ID: <20121204102631.3d8d41e3e8a8c0eb71734e55@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 2, 2012 at 4:44 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+Hi all,
 
-> This driver only builds when CONFIG_OF_IRQ is enabled. So add this as
-> a dependency. Dockstar, and other none DT boards don't build because
-> of this, when all other OF boards are disabled.
+On Thu, 29 Nov 2012 11:40:18 +0100 Belisko Marek <marek.belisko@gmail.com> wrote:
 >
-> Reported-by: Willy Tarreau <w@1wt.eu>
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Tested-by: Willy Tarreau <w@1wt.eu>
-> ---
->  drivers/gpio/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index 6dbc403..4d84c17 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -153,6 +153,7 @@ config GPIO_MSM_V2
->  config GPIO_MVEBU
->         def_bool y
->         depends on PLAT_ORION
-> +       depends on OF_IRQ
->         select GPIO_GENERIC
->         select GENERIC_IRQ_CHIP
+> I've update linux-next to next-20121129 and omap2plus_defconfig fails to build:
+> arch/arm/mach-omap2/timer.c: In function 'omap_get_timer_dt':
+> arch/arm/mach-omap2/timer.c:195: error: implicit declaration of
+> function 'prom_add_property'
 
-This does not apply to the GPIO tree, I assume it's intended for the
-MVEBU tree.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Caused by commit 9725f4451a9c ("ARM: OMAP: Add DT support for timer
+driver") from the arm-soc tree interacting with commit 79d1c712958f
+("powerpc+of: Rename the drivers/of prom_* functions to of_*") from the
+powerpc tree.
 
-Yours,
-Linus Walleij
+I will fix this up in today' linux-next (by changing prom_add_property to
+of_add_property).  Someone will need to remember to tell Linus when the
+latter of those two commits gets merged.
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121204/e98be5ad/attachment.sig>
