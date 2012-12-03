@@ -1,26 +1,46 @@
-From: greg@kroah.com (Greg KH)
-Date: Mon, 3 Dec 2012 10:25:45 -0800
-Subject: linux-next: manual merge of the arm-soc tree with the slave_dma
- and tree
-In-Reply-To: <20121203171232.04772e84d18948bbbcafdeef@canb.auug.org.au>
-References: <20121203171232.04772e84d18948bbbcafdeef@canb.auug.org.au>
-Message-ID: <20121203182545.GA32702@kroah.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 03 Dec 2012 11:31:58 -0700
+Subject: [PATCH 1/5] ARM: tegra20: cpuidle: add powered-down state for
+ secondary CPU
+In-Reply-To: <1354503607-13707-2-git-send-email-josephl@nvidia.com>
+References: <1354503607-13707-1-git-send-email-josephl@nvidia.com>
+ <1354503607-13707-2-git-send-email-josephl@nvidia.com>
+Message-ID: <50BCF01E.4070504@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 03, 2012 at 05:12:32PM +1100, Stephen Rothwell wrote:
-> Hi all,
+On 12/02/2012 08:00 PM, Joseph Lo wrote:
+> The powered-down state of Tegra20 requires power gating both CPU cores.
+> When the secondary CPU requests to enter powered-down state, it saves
+> its own contexts and then enters WFI. The Tegra20 had a limition to
+> power down both CPU cores. The secondary CPU must waits for CPU0 in
+> powered-down state too. If the secondary CPU be woken up before CPU0
+> entering powered-down state, then it needs to restore its CPU states
+> and waits for next chance.
 > 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> drivers/dma/mv_xor.c between commit d51e88b99533 ("dma: Convert dev_printk
-> (KERN_<LEVEL> to dev_<level>(") from the slave-dma tree, commits
-> a7d6e3ec28bb ("dma: remove use of __devexit_p") and 463a1f8b3cee ("dma:
-> remove use of __devinit") from the driver-core tree and various commits
-> from the arm-soc tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+> Be aware of that, you may see the legacy power state "LP2" in the code
+> which is exactly the same meaning of "CPU power down".
 
-Looks good to me, thanks.
+> diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
 
-greg k-h
+> +/*
+> + * tegra_pen_lock
+> + *
+> + * spinlock implementation with no atomic test-and-set and no coherence
+> + * using Peterson's algorithm on strongly-ordered registers
+> + * used to synchronize a cpu waking up from wfi with entering lp2 on idle
+> + *
+> + * SCRATCH37 = r1 = !turn (inverted from Peterson's algorithm)
+
+A link to a description of that algorithm would be useful.
+
+> + * on cpu 0:
+> + * SCRATCH38 = r2 = flag[0]
+> + * SCRATCH39 = r3 = flag[1]
+> + * on cpu1:
+> + * SCRATCH39 = r2 = flag[1]
+> + * SCRATCH38 = r3 = flag[0]
+
+That implies that r2/r3 are used for different purposes on the 2 CPUs,
+and/or shadow the values of different registers. However, I see nothing
+in the code which is conditional on cpu ID.
