@@ -1,36 +1,40 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon,  3 Dec 2012 16:14:37 +0800
-Subject: [PATCH] clk: factor: calculate rate by do_div
-Message-ID: <1354522477-11991-1-git-send-email-haojian.zhuang@gmail.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Mon,  3 Dec 2012 13:51:42 +0530
+Subject: [PATCH v5 0/2] ARM: davinci: add support for dm365 vpbe display
+Message-ID: <1354522904-22501-1-git-send-email-prabhakar.lad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk->rate = parent->rate / div * mult
+From: Lad, Prabhakar <prabhakar.lad@ti.com>
 
-The formula is OK. But it may overflow while we do operate with
-unsigned long. So use do_div instead.
+This patch series enables VPBE display driver on DM365.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
----
- drivers/clk/clk-fixed-factor.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Changes for v5:
+1: pass different platform names to handle different ip's.
+2: Fixed review comments pointed by Sekhar.
 
-diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-index a489985..1ef271e 100644
---- a/drivers/clk/clk-fixed-factor.c
-+++ b/drivers/clk/clk-fixed-factor.c
-@@ -28,8 +28,11 @@ static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
- 		unsigned long parent_rate)
- {
- 	struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
-+	unsigned long long int rate;
- 
--	return parent_rate * fix->mult / fix->div;
-+	rate = (unsigned long long int)parent_rate * fix->mult;
-+	do_div(rate, fix->div);
-+	return (unsigned long)rate;
- }
- 
- static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
+Changes for v4:
+1: Replaced the obsolete preset API by timings API.
+
+Changes for v3:
+1: Removed VPSS clock alias for master and slave which was
+   sent for VPSS driver. since this patch was dependent on
+   patch[1]. I will revist this patch once MC(captrure driver)
+   goes into mainline.
+[1] http://www.spinics.net/lists/linux-media/msg50562.html
+
+Changes for v2:
+1: Added VPSS clock so that capture and display
+   can work independent.
+
+Manjunath Hadli (2):
+  ARM: davinci: dm365: add support for v4l2 video display
+  ARM: davinci: dm365 EVM: add support for VPBE display
+
+ arch/arm/mach-davinci/board-dm365-evm.c |  179 +++++++++++++++++++++++++++-
+ arch/arm/mach-davinci/davinci.h         |    2 +-
+ arch/arm/mach-davinci/dm365.c           |  203 +++++++++++++++++++++++++++++--
+ 3 files changed, 370 insertions(+), 14 deletions(-)
+
 -- 
-1.7.10.4
+1.7.4.1
