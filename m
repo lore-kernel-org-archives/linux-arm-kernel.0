@@ -1,38 +1,38 @@
-From: rajanikanth.hv@linaro.org (Rajanikanth H.V)
-Date: Mon,  3 Dec 2012 23:42:55 +0530
-Subject: [PATCH 2/2] ab8500: promote ab8500_fg probe before ab8500_btemp probe
-In-Reply-To: <1354558375-15110-1-git-send-email-rajanikanth.hv@linaro.org>
-References: <1354558375-15110-1-git-send-email-rajanikanth.hv@linaro.org>
-Message-ID: <1354558375-15110-2-git-send-email-rajanikanth.hv@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 03 Dec 2012 11:18:49 -0700
+Subject: [PATCH 1/5] ARM: tegra20: cpuidle: add powered-down state for
+ secondary CPU
+In-Reply-To: <1354503607-13707-2-git-send-email-josephl@nvidia.com>
+References: <1354503607-13707-1-git-send-email-josephl@nvidia.com>
+ <1354503607-13707-2-git-send-email-josephl@nvidia.com>
+Message-ID: <50BCED09.4040700@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Rajanikanth H.V" <rajanikanth.hv@stericsson.com>
+On 12/02/2012 08:00 PM, Joseph Lo wrote:
+> The powered-down state of Tegra20 requires power gating both CPU cores.
+> When the secondary CPU requests to enter powered-down state, it saves
+> its own contexts and then enters WFI. The Tegra20 had a limition to
+> power down both CPU cores. The secondary CPU must waits for CPU0 in
+> powered-down state too. If the secondary CPU be woken up before CPU0
+> entering powered-down state, then it needs to restore its CPU states
+> and waits for next chance.
+> 
+> Be aware of that, you may see the legacy power state "LP2" in the code
+> which is exactly the same meaning of "CPU power down".
 
-ab8500_fg driver prepares instance list of fuelgauge which is
-required by btemp driver for battery identification. So make sure
-that ab8500 fuelgauge list is ready before btemp driver starts.
+>  arch/arm/mach-tegra/sleep-tegra20.S   |  145 +++++++++++++++++++++++++++++++++
 
-for '3.7-rc5': of git://git.infradead.org/battery-2.6.git
+Is it actually necessary to implement those parts of the code in
+assembly? It looks like it's mostly just memory read/write and a few
+barriers, all of which can be coded in regular C or invoked from C.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Rajanikanth H.V <rajanikanth.hv@stericsson.com>
----
- drivers/power/Makefile |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The reason I ask is that we eventually want to remove all hard-coded
+virtual memory addresses, such as TEGRA_PMC_VIRT, and it'll be a lot
+easier to access memory relative to a variable base address from C than
+assembly.
 
-diff --git a/drivers/power/Makefile b/drivers/power/Makefile
-index 696e3a9..070c73d 100644
---- a/drivers/power/Makefile
-+++ b/drivers/power/Makefile
-@@ -38,7 +38,7 @@ obj-$(CONFIG_CHARGER_PCF50633)	+= pcf50633-charger.o
- obj-$(CONFIG_BATTERY_JZ4740)	+= jz4740-battery.o
- obj-$(CONFIG_BATTERY_INTEL_MID)	+= intel_mid_battery.o
- obj-$(CONFIG_BATTERY_RX51)	+= rx51_battery.o
--obj-$(CONFIG_AB8500_BM)		+= ab8500_bmdata.o ab8500_charger.o ab8500_btemp.o ab8500_fg.o abx500_chargalg.o
-+obj-$(CONFIG_AB8500_BM)		+= ab8500_bmdata.o ab8500_charger.o ab8500_fg.o ab8500_btemp.o abx500_chargalg.o
- obj-$(CONFIG_CHARGER_ISP1704)	+= isp1704_charger.o
- obj-$(CONFIG_CHARGER_MAX8903)	+= max8903_charger.o
- obj-$(CONFIG_CHARGER_TWL4030)	+= twl4030_charger.o
--- 
-1.7.10.4
+Now, perhaps we can solve this later; when we actually try to get this
+code into drivers/cpuidle/ and remove the hard-coded virtual memory
+addresses. Still, it'd be great if we didn't have to re-write the code
+as much (from .S->.c) when making those changes...
