@@ -1,61 +1,50 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 3 Dec 2012 15:43:53 -0200
-Subject: mx28: BUG: spinlock bad magic on CPU#0, swapper/0
-Message-ID: <CAOMZO5CVy-+t7M-5aCUe3YhaWmP8bmFd=j0sEFw049KU7=jh+w@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 3 Dec 2012 17:46:17 +0000
+Subject: [PATCH] nommu: Enable the strict alignment (CR_A) bit only if
+ ARCH < v6
+In-Reply-To: <20121203172553.GC14363@n2100.arm.linux.org.uk>
+References: <1354187042-28568-1-git-send-email-armando.visconti@st.com>
+ <50BCD6DB.2030200@st.com>
+ <20121203172553.GC14363@n2100.arm.linux.org.uk>
+Message-ID: <20121203174617.GL20074@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Dec 03, 2012 at 05:25:53PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Dec 03, 2012 at 05:44:11PM +0100, Armando Visconti wrote:
+> > On 11/29/2012 12:04 PM, Armando VISCONTI wrote:
+> >> This patch keeps disabled the strict alignment CP15 bit for
+> >> all armv6 and armv7 processor without the mmu. This behaviour
+> >> is now same as in the mmu case.
+> >>
+> >> Signed-off-by: Armando Visconti<armando.visconti@st.com>
+> >> ---
+> >>   arch/arm/kernel/head-nommu.S |    2 +-
+> >>   1 files changed, 1 insertions(+), 1 deletions(-)
+> >>
+> >> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+> >> index 278cfc1..2c228a0 100644
+> >> --- a/arch/arm/kernel/head-nommu.S
+> >> +++ b/arch/arm/kernel/head-nommu.S
+> >> @@ -68,7 +68,7 @@ __after_proc_init:
+> >>   	 * CP15 system control register value returned in r0 from
+> >>   	 * the CPU init function.
+> >>   	 */
+> >> -#ifdef CONFIG_ALIGNMENT_TRAP
+> >> +#if defined(CONFIG_ALIGNMENT_TRAP)&&  __LINUX_ARM_ARCH__<  6
+> >>   	orr	r0, r0, #CR_A
+> >>   #else
+> >>   	bic	r0, r0, #CR_A
+> >
+> > Any feedback on this simple patch?
+> 
+> Well, it brings the nommu version into line with the mmu version, so
+> it's sensible.  Please put it in the patch system, thanks.
 
-I am getting the following warning on today's linux-next
-(3.7.0-rc7-next-20121203) running on a i.mx28:
+In which case, I'll definitely dust-off the patches to prevent unaligned
+accesses to strongly-ordered memory because that results in good ol'
+UNPREDICTABLE behaviour.
 
-[    0.076125] BUG: spinlock bad magic on CPU#0, swapper/0
-[    0.076218]  lock: atomic64_lock+0xc0/0x200, .magic: 00000000,
-.owner: <none>/-1, .owner_cpu: 0
-[    0.076312] [<c0013e78>] (unwind_backtrace+0x0/0xf0) from
-[<c01be0b8>] (do_raw_spin_lock+0x70/0x140)
-[    0.076406] [<c01be0b8>] (do_raw_spin_lock+0x70/0x140) from
-[<c03712cc>] (_raw_spin_lock_irqsave+0x50/0x5c)
-[    0.076437] [<c03712cc>] (_raw_spin_lock_irqsave+0x50/0x5c) from
-[<c01c02e0>] (atomic64_add_return+0x30/0x5c)
-[    0.076500] [<c01c02e0>] (atomic64_add_return+0x30/0x5c) from
-[<c00e70a4>] (alloc_mnt_ns.isra.8+0x48/0xd4)
-[    0.076562] [<c00e70a4>] (alloc_mnt_ns.isra.8+0x48/0xd4) from
-[<c00e7270>] (create_mnt_ns+0xc/0x54)
-[    0.076656] [<c00e7270>] (create_mnt_ns+0xc/0x54) from [<c04eb5a0>]
-(mnt_init+0x120/0x1dc)
-[    0.076687] [<c04eb5a0>] (mnt_init+0x120/0x1dc) from [<c04eb198>]
-(vfs_caches_init+0xdc/0x108)
-[    0.076750] [<c04eb198>] (vfs_caches_init+0xdc/0x108) from
-[<c04e06e4>] (start_kernel+0x244/0x2a0)
-[    0.076812] [<c04e06e4>] (start_kernel+0x244/0x2a0) from
-[<40008074>] (0x40008074)
-[    5.794750] BUG: spinlock lockup suspected on CPU#0, swapper/0
-[    5.794812]  lock: atomic64_lock+0xc0/0x200, .magic: 00000000,
-.owner: <none>/-1, .owner_cpu: 0
-[    5.794875] [<c0013e78>] (unwind_backtrace+0x0/0xf0) from
-[<c01be140>] (do_raw_spin_lock+0xf8/0x140)
-[    5.794937] [<c01be140>] (do_raw_spin_lock+0xf8/0x140) from
-[<c03712cc>] (_raw_spin_lock_irqsave+0x50/0x5c)
-[    5.794968] [<c03712cc>] (_raw_spin_lock_irqsave+0x50/0x5c) from
-[<c01c02e0>] (atomic64_add_return+0x30/0x5c)
-[    5.795031] [<c01c02e0>] (atomic64_add_return+0x30/0x5c) from
-[<c00e70a4>] (alloc_mnt_ns.isra.8+0x48/0xd4)
-[    5.795093] [<c00e70a4>] (alloc_mnt_ns.isra.8+0x48/0xd4) from
-[<c00e7270>] (create_mnt_ns+0xc/0x54)
-[    5.795156] [<c00e7270>] (create_mnt_ns+0xc/0x54) from [<c04eb5a0>]
-(mnt_init+0x120/0x1dc)
-[    5.795218] [<c04eb5a0>] (mnt_init+0x120/0x1dc) from [<c04eb198>]
-(vfs_caches_init+0xdc/0x108)
-[    5.795250] [<c04eb198>] (vfs_caches_init+0xdc/0x108) from
-[<c04e06e4>] (start_kernel+0x244/0x2a0)
-[    5.795312] [<c04e06e4>] (start_kernel+0x244/0x2a0) from
-[<40008074>] (0x40008074)
+I think Uwe also requires some of the stuff there for his M3 port.
 
-
-Is it a known issue?
-
-Regards,
-
-Fabio Estevam
+Will
