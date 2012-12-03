@@ -1,36 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 03 Dec 2012 10:27:46 -0700
-Subject: [PATCH V7 3/7] arm64: use new common dtc rule
-In-Reply-To: <20121129143041.GC30437@arm.com>
-References: <1354058956-7199-1-git-send-email-swarren@wwwdotorg.org>
- <1354058956-7199-3-git-send-email-swarren@wwwdotorg.org>
- <20121129143041.GC30437@arm.com>
-Message-ID: <50BCE112.3050203@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Dec 2012 17:25:53 +0000
+Subject: [PATCH] nommu: Enable the strict alignment (CR_A) bit only if
+ ARCH < v6
+In-Reply-To: <50BCD6DB.2030200@st.com>
+References: <1354187042-28568-1-git-send-email-armando.visconti@st.com>
+ <50BCD6DB.2030200@st.com>
+Message-ID: <20121203172553.GC14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2012 07:30 AM, Catalin Marinas wrote:
-> On Tue, Nov 27, 2012 at 11:29:12PM +0000, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
+On Mon, Dec 03, 2012 at 05:44:11PM +0100, Armando Visconti wrote:
+> On 11/29/2012 12:04 PM, Armando VISCONTI wrote:
+>> This patch keeps disabled the strict alignment CP15 bit for
+>> all armv6 and armv7 processor without the mmu. This behaviour
+>> is now same as in the mmu case.
 >>
->> The current rules have the .dtb files build in a different directory
->> from the .dts files. This patch changes arm64 to use the generic dtb
->> rule which builds .dtb files in the same directory as the source .dts.
+>> Signed-off-by: Armando Visconti<armando.visconti@st.com>
+>> ---
+>>   arch/arm/kernel/head-nommu.S |    2 +-
+>>   1 files changed, 1 insertions(+), 1 deletions(-)
 >>
->> This requires moving parts of arch/arm64/boot/Makefile into newly created
->> arch/arm64/boot/dts/Makefile, and updating arch/arm64/Makefile to call the
->> new Makefile.
->>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> 
-> I had a bit more clean-up in a local patch (see attached). Depending on
-> the timing, you can just fold it into your patch (basically removing the
-> MACHINE argument, adding KBUILD_DTBS and dtbs target help). It's been
-> derived from your arch/arm patch anyway ;).
+>> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+>> index 278cfc1..2c228a0 100644
+>> --- a/arch/arm/kernel/head-nommu.S
+>> +++ b/arch/arm/kernel/head-nommu.S
+>> @@ -68,7 +68,7 @@ __after_proc_init:
+>>   	 * CP15 system control register value returned in r0 from
+>>   	 * the CPU init function.
+>>   	 */
+>> -#ifdef CONFIG_ALIGNMENT_TRAP
+>> +#if defined(CONFIG_ALIGNMENT_TRAP)&&  __LINUX_ARM_ARCH__<  6
+>>   	orr	r0, r0, #CR_A
+>>   #else
+>>   	bic	r0, r0, #CR_A
+>
+> Any feedback on this simple patch?
 
-Thanks. Just to follow up on this, Rob has applied the series (minus
-Xtensa) to a local tree, I believe intending to take it for 3.8(?), and
-has included a modified version of this patch there (i.e. rebased onto
-my series and hence slightly adjusted for it).
+Well, it brings the nommu version into line with the mmu version, so
+it's sensible.  Please put it in the patch system, thanks.
