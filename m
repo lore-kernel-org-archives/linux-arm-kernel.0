@@ -1,26 +1,26 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Mon, 03 Dec 2012 18:20:27 +0000
-Subject: [PATCH 1/3] ARM: nommu: allow unaligned accesses on ARMv6+
- processors
-In-Reply-To: <1354557403-20386-1-git-send-email-will.deacon@arm.com>
-References: <1354557403-20386-1-git-send-email-will.deacon@arm.com>
-Message-ID: <50BCED6B.8010206@arm.com>
+From: greg@kroah.com (Greg KH)
+Date: Mon, 3 Dec 2012 10:25:45 -0800
+Subject: linux-next: manual merge of the arm-soc tree with the slave_dma
+ and tree
+In-Reply-To: <20121203171232.04772e84d18948bbbcafdeef@canb.auug.org.au>
+References: <20121203171232.04772e84d18948bbbcafdeef@canb.auug.org.au>
+Message-ID: <20121203182545.GA32702@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/12 17:56, Will Deacon wrote:
-> Commit 8428e84d ("ARM: 7150/1: Allow kernel unaligned accesses on ARMv6+
-> processors") unconditionally clears SCTLR.A for ARMv6+ processors, since
-> newer toolchains assume that unaligned memory accesses will not fault
-> for these cores.
->
-> This patch adds the corresponding change for nommu kernel builds.
->
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Mon, Dec 03, 2012 at 05:12:32PM +1100, Stephen Rothwell wrote:
+> Hi all,
+> 
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> drivers/dma/mv_xor.c between commit d51e88b99533 ("dma: Convert dev_printk
+> (KERN_<LEVEL> to dev_<level>(") from the slave-dma tree, commits
+> a7d6e3ec28bb ("dma: remove use of __devexit_p") and 463a1f8b3cee ("dma:
+> remove use of __devinit") from the driver-core tree and various commits
+> from the arm-soc tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
 
-For the series:
-Tested-by: Jonathan Austin <jonathan.austin@arm.com>
+Looks good to me, thanks.
 
-(Tested on Cortex-R Series models)
-
-Jonny
+greg k-h
