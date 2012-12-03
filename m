@@ -1,30 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 03 Dec 2012 21:19:52 +0100
-Subject: [PATCH] ARM: sunxi: Include linux/delay.h
-In-Reply-To: <1354462339.24917.0.camel@phoenix>
-References: <1354462339.24917.0.camel@phoenix>
-Message-ID: <50BD0968.3060405@free-electrons.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 3 Dec 2012 14:41:11 -0600
+Subject: [PATCH V2 0/4] ARM: OMAP4: Clock fixes
+Message-ID: <1354567275-6447-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/12/2012 16:32, Axel Lin a ?crit :
-> This fixes below build error:
-> 
->   CC      arch/arm/mach-sunxi/sunxi.o
-> arch/arm/mach-sunxi/sunxi.c: In function 'sunxi_restart':
-> arch/arm/mach-sunxi/sunxi.c:55:3: error: implicit declaration of function 'mdelay' [-Werror=implicit-function-declaration]
-> cc1: some warnings being treated as errors
-> make[1]: *** [arch/arm/mach-sunxi/sunxi.o] Error 1
-> make: *** [arch/arm/mach-sunxi] Error 2
+Fixes included, fixing up timer clock aliases for v3.8 and working
+around ABE DPLL issue seen with latest u-boot bootloader (v2012.10).
 
-A similar patch has already been merged by Arnd:
-http://git.kernel.org/?p=linux/kernel/git/arm/arm-soc.git;a=commit;h=5e51651de30677f9d36805de9c261bf80f415790
+Testing includes:
+- Boot testing on OMAP4460 Panda and verifying that all dmtimers are
+  working.
 
-Thanks,
-Maxime
+V2 changes:
+- Updated series to latest ARM-SoC for-next branch that includes common
+  clock updates for OMAP4.
+- Added new function table for non-M4X DPLLs which is now required after
+  enhancing support for OMAP4 DPLLs for 4X multiplier.
+
+Jon Hunter (4):
+  ARM: OMAP4: Update timer clock aliases
+  ARM: OMAP4: Add function table for non-M4X dplls
+  ARM: OMAP4: Enhance support for DPLLs with 4X multiplier
+  ARM: OMAP4460: Workaround ABE DPLL failing to turn-on
+
+ arch/arm/mach-omap2/cclock44xx_data.c |   49 ++++++++++++++++++++-----
+ arch/arm/mach-omap2/clock.h           |   10 ++++++
+ arch/arm/mach-omap2/dpll3xxx.c        |   46 ++++++++++++++++--------
+ arch/arm/mach-omap2/dpll44xx.c        |   64 ++++++++++++++++++++++++++++-----
+ 4 files changed, 138 insertions(+), 31 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
