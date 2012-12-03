@@ -1,62 +1,36 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Mon, 3 Dec 2012 14:25:40 -0000
-Subject: [PATCH v2] net/macb: Use non-coherent memory for rx buffers
-In-Reply-To: <50BCA746.1020705@atmel.com>
-References: <CAGhQ9VwWmP_B17LnAEqDHcL8Yd-s0C-Bf35z3+=vnJmK_NoCSw@mail.gmail.com>
- <1354536876-6274-1-git-send-email-nicolas.ferre@atmel.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B70D5@saturn3.aculab.com>
- <50BCA746.1020705@atmel.com>
-Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B70D6@saturn3.aculab.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 03 Dec 2012 16:35:16 +0200
+Subject: [PATCH v2] MTD: at91: atmel_nand: return bit flips for the
+ PMECC read_page()
+In-Reply-To: <1354013431-13598-1-git-send-email-josh.wu@atmel.com>
+References: <1354013431-13598-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1354545316.11583.14.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 12/03/2012 01:43 PM, David Laight :
-> >> Allocate regular pages to use as backing for the RX ring and use the
-> >> DMA API to sync the caches. This should give a bit better performance
-> >> since it allows the CPU to do burst transfers from memory. It is also
-> >> a necessary step on the way to reduce the amount of copying done by
-> >> the driver.
-> >
-> > I've not tried to understand the patches, but you have to be
-> > very careful using non-snooped memory for descriptor rings.
-> > No amount of DMA API calls can sort out some of the issues.
+On Tue, 2012-11-27 at 18:50 +0800, Josh Wu wrote:
+> This patch fix pmecc's read_page() to return maximum number of bitflips, 0 if uncorrectable.
 > 
-> David,
+> In the commit: 3f91e94f7f511de74c0d2abe08672ccdbdd1961c ("mtd: nand: read_page() returns max_bitflips ()"),
+> The ecc.read_page() is changed to return the maximum number of bitflips.
+> And when meet uncorrectable bitflips it needs to return 0.
 > 
-> Maybe I have not described the patch properly but the non-coherent
-> memory is not used for descriptor rings. It is used for DMA buffers
-> pointed out by descriptors (that are allocated as coherent memory).
+> See the comment in nand.h:
+>  * @read_page:	function to read a page according to the ECC generator
+>  *		requirements; returns maximum number of bitflips corrected in
+>  *		any single ECC step, 0 if bitflips uncorrectable, -EIO hw error
 > 
-> As buffers are filled up by the interface DMA and then, afterwards, used
-> by the driver to pass data to the net layer, it seems to me that the use
-> of non-coherent memory is sensible.
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 
-Ah, ok - difficult to actually determine from a fast read of the code.
-So you invalidate (I think that is the right term) all the cache lines
-that are part of each rx buffer before giving it back to the MAC unit.
-(Maybe that first time, and just those cache lines that might have been
-written to after reception - I'd worry about whether the CRC is written
-into the rx buffer!)
+Pushed to l2-mtd.git, thanks!
 
-I was wondering if the code needs to do per page allocations?
-Perhaps that is necessary to avoid needing a large block of
-contiguous physical memory (and virtual addresses)?
-
-I know from some experiments done many years ago that a data
-copy in the MAC tx and rx path isn't necessarily as bad as
-people may think - especially if it removes complicated
-'buffer loaning' schemes and/or iommu setup (or bounce
-buffers due to limited hardware memory addressing).
-
-The rx copy can usually be made to be a 'whole word' copy
-(ie you copy the two bytes of garbage that (mis)align the
-destination MAC address, and some bytes after the CRC.
-With some hardware I believe it is possible for the cache
-controller to do cache-line aligned copies very quickly!
-(Some very new x86 cpus might be doing this for 'rep movsd'.)
-
-The copy in the rx path is also better for short packets
-the can end up queued for userspace (although a copy in
-the socket code would solve that one.
-
-	David
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121203/3dc8bf5f/attachment.sig>
