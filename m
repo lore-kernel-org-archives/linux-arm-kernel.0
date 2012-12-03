@@ -1,90 +1,29 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 3 Dec 2012 20:11:42 +0530
-Subject: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
- OMAP-L138 DSP
-In-Reply-To: <13514BD7FAEBA745BBD7D8A672905C14311FAC29@DFLE08.ent.ti.com>
-References: <1352853207-20602-1-git-send-email-rtivy@ti.com>
- <1352853207-20602-5-git-send-email-rtivy@ti.com> <50AB76FA.1050505@ti.com>
- <13514BD7FAEBA745BBD7D8A672905C14311F952B@DFLE08.ent.ti.com>
- <50B88F7C.5000705@ti.com>
- <13514BD7FAEBA745BBD7D8A672905C14311FAC29@DFLE08.ent.ti.com>
-Message-ID: <50BCBA26.4070608@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 3 Dec 2012 14:47:54 +0000
+Subject: [PATCH 5/8] mmci: replace readsl/writesl with
+ ioread32_rep/iowrite32_rep
+In-Reply-To: <1353683310-23654-6-git-send-email-ciminaghi@gnudd.com>
+References: <1353683310-23654-1-git-send-email-ciminaghi@gnudd.com>
+ <1353683310-23654-6-git-send-email-ciminaghi@gnudd.com>
+Message-ID: <20121203144754.GI20074@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Davide,
 
-On 12/1/2012 7:41 AM, Tivy, Robert wrote:
-> Hi Sekhar,
-> 
->> -----Original Message-----
->> From: Nori, Sekhar
->> Sent: Friday, November 30, 2012 2:51 AM
->> To: Tivy, Robert
->> Cc: davinci-linux-open-source at linux.davincidsp.com; linux-arm-
->> kernel at lists.infradead.org; Ring, Chris; Grosen, Mark
->> Subject: Re: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
->> OMAP-L138 DSP
->>
->> Hi Rob,
->>
->> On 11/29/2012 7:08 AM, Tivy, Robert wrote:
->>> Hi Sekhar,
->>>
->>> Please see comments and noob questions below...
->>>
->>>> -----Original Message-----
->>>> From: Nori, Sekhar
->>>> Sent: Tuesday, November 20, 2012 4:27 AM
->>>> To: Tivy, Robert
->>>> Cc: davinci-linux-open-source at linux.davincidsp.com; linux-arm-
->>>> kernel at lists.infradead.org; Ring, Chris; Grosen, Mark
->>>> Subject: Re: [PATCH v3 5/6] ARM: davinci: remoteproc board support
->>>> for
->>>> OMAP-L138 DSP
->>>>
->>>> On 11/14/2012 6:03 AM, Robert Tivy wrote:
->>>>> Requires CMA services.
->>>>>
->>>>> New 'clk_reset()' API added so that the DSP's reset state can be
->>>>> toggled separately from its enable/disable operation.
->>>>
->>>> But we cannot add a private clk_ API without it being defined in
->>>> include/linux/clk.h. So, this requires wider alignment.
->>>>
->>>> And I am not sure clock API should be extended to support reset
->> since
->>>> "resetting a clock" does not make a lot of sense. On DaVinci, clock
->>>> gating and reset are handled by the same module, but that need not
->>>> always be the case.
->>>>
->>>> What you need is a way to reset an IP. I do not know of an existing
->>>> framework to do this; likely a new API needs to be created. I am
->>>> guessing this never existed so far because most of the IPs can be
->>>> reset internally (by writing a bit within its own register space). I
->>>> guess DSP is different since its actually a co-processor and may not
->>>> have such a bit.
->>>>
->>>> How about simulating a reset by making the DSP jump to its reset
->>>> address. While I am sure its not quite the same as resetting the DSP
->>>> using PSC, may be it could be used while you wait for consensus
->>>> around handling module reset in kernel?
->>>
->>> Since the ARM can't write the DSP's program counter I suspect such a
->> temporary solution is not possible.
->>
->> Okay. I think the way forward on this is to start a separate thread
->> including the ARM list, LKML and the remoteproc folks to see if it
->> makes sense to create a reset API in kernel. You can describe the
->> usecase you have.
-> 
-> Instead of fighting that fight, I thought of another way.  The da8xx_dsp platform_device has private data registered in its device struct.  This private data can contain a function pointer for a "DSP reset" function, and davinci_remoteproc.c can call the registered function.  Does that sound OK?
+On Fri, Nov 23, 2012 at 03:08:27PM +0000, Davide Ciminaghi wrote:
+> Not all the architectures have readsl/writesl,
+> use the more portable ioread32_rep/iowrite32_rep functions instead.
 
-Passing function pointers from platform code will not work when
-converting to device tree (DT). DA850 will gain DT boot with v3.8 and
-there is work ongoing on converting drivers to be DT-aware. Adding a new
-driver which is DT-incompatible will not be right. Hence, I will not
-recommend this now.
+I've already got a patch for this in my io branch:
 
-Thanks,
-Sekhar
+  https://git.kernel.org/?p=linux/kernel/git/will/linux.git;a=shortlog;h=refs/heads/io
+
+but since I've been dragging my feet on that series, you can also have my
+ack:
+
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+I should get round to sending another version of that lot soon.
+
+Will
