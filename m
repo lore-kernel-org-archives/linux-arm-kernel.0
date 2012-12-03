@@ -1,58 +1,29 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Mon, 3 Dec 2012 22:34:27 +0530
-Subject: [PATCH 3/3] net: cpsw: implement ioctl for MII
-In-Reply-To: <1354542569-6165-3-git-send-email-jlu@pengutronix.de>
-References: <1354542569-6165-1-git-send-email-jlu@pengutronix.de>
- <1354542569-6165-3-git-send-email-jlu@pengutronix.de>
-Message-ID: <50BCDB9B.80307@ti.com>
+From: ryan.harkin@linaro.org (Ryan Harkin)
+Date: Mon, 3 Dec 2012 17:11:36 +0000
+Subject: Use of CONFIG_ARM_GIC on aarch64
+Message-ID: <CAD0U-hL-K+1PiBE87suWr6Vmg5Ad9=D2CLnuCFDNaoTh-1exbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/3/2012 7:19 PM, Jan Luebbe wrote:
-> This allows using tools like mii-diag on CPSW.
->
-> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
-> ---
->   drivers/net/ethernet/ti/cpsw.c |   15 +++++++++++++++
->   1 file changed, 15 insertions(+)
->
-> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-> index 8de3e92..f476c03 100644
-> --- a/drivers/net/ethernet/ti/cpsw.c
-> +++ b/drivers/net/ethernet/ti/cpsw.c
-> @@ -629,6 +629,20 @@ static void cpsw_ndo_change_rx_flags(struct net_device *ndev, int flags)
->   		dev_err(&ndev->dev, "multicast traffic cannot be filtered!\n");
->   }
->   
-> +static int cpsw_ndo_do_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
-> +{
-> +	struct cpsw_priv *priv = netdev_priv(ndev);
-> +	struct phy_device *phy = priv->slaves[0].phy;
-> +
-> +	if (!netif_running(ndev))
-> +		return -EINVAL;
-> +
-> +	if (!phy)
-> +		return -ENODEV;
-> +
-> +	return phy_mii_ioctl(phy, rq, cmd);
-> +}
-> +
->   static void cpsw_ndo_tx_timeout(struct net_device *ndev)
->   {
->   	struct cpsw_priv *priv = netdev_priv(ndev);
-> @@ -670,6 +684,7 @@ static const struct net_device_ops cpsw_netdev_ops = {
->   	.ndo_start_xmit		= cpsw_ndo_start_xmit,
->   	.ndo_change_rx_flags	= cpsw_ndo_change_rx_flags,
->   	.ndo_validate_addr	= eth_validate_addr,
-> +	.ndo_do_ioctl		= cpsw_ndo_do_ioctl,
->   	.ndo_change_mtu		= eth_change_mtu,
->   	.ndo_tx_timeout		= cpsw_ndo_tx_timeout,
->   	.ndo_get_stats		= cpsw_ndo_get_stats,
+Hi Catalin,
 
-Already ndo_do_ioctl is already implemented. Can you rebase the patch 
-with latest git repo
-and resubmit the patch
+I have startied to host the Linaro aarch64 branch on the ARM Landing
+Team's GIT repo.  This repo will start to be used for our Android
+builds, etc, as we sort out the manifests and so on.
 
-Regards
-Mugunthan V N
+I thought I should make you aware that I've patched the use of
+CONFIG_ARM_GIC [1] so that I can build 32- and 64-bit platforms from
+the same tree.  I found that when I was building our existing vexpress
+kernel, compilation failed for drivers/irqchip/gic.c.  Once fixed, it
+failed to link due to drivers/irqchip/gic.c duplicating symbols that
+are already in arch/arm/common/gic.c.
+
+I realise that the irqchip will probably replace the
+arch/arm/common/gic.c in the grand scheme of things, meaning no action
+is needed on your behalf.  But I thought it might be worth telling you
+that I'd hacked your driver in my tree.
+
+Regards,
+Ryan.
+
+[1] http://git.linaro.org/gitweb?p=landing-teams/working/arm/kernel.git;a=commit;h=3da607b107ff9c3ed0c644a9f8bac1d980ee9c8f
