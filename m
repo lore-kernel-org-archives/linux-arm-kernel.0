@@ -1,118 +1,78 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 3 Dec 2012 11:00:07 +0800
-Subject: [PATCH 5/5] ARM: tegra20: cpuidle: apply coupled cpuidle for
- powered-down mode
-In-Reply-To: <1354503607-13707-1-git-send-email-josephl@nvidia.com>
-References: <1354503607-13707-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1354503607-13707-6-git-send-email-josephl@nvidia.com>
+From: devendra.aaru@gmail.com (devendra.aaru)
+Date: Mon, 3 Dec 2012 00:02:33 -0500
+Subject: [PATCH 1/4] rtc: sa1100: enable/disable rtc when probe/remove the
+ device
+In-Reply-To: <1354155670-6267-1-git-send-email-chao.xie@marvell.com>
+References: <1354155670-6267-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <CAHdPZaP+8wi6ZL5ugvgoEiq5AaLK8+V1SDbirMw0zj=C=w9ZNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "powered-down" cpuidle mode of Tegra20 needs the CPU0 be the last one
-core to go into this mode before other core. The coupled cpuidle framework
-can help to sync the MPCore to coupled state then go into "powered-down"
-idle mode together. The driver can just assume the MPCore come into
-"powered-down" mode at the same time. No need to take care if the CPU_0
-goes into this mode along and only can put it into safe idle mode (WFI).
+CCing Andrew as he is the maintainer of the rtc subsystem
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm/mach-tegra/Kconfig           |    1 +
- arch/arm/mach-tegra/cpuidle-tegra20.c |   37 +++++++++++++++++----------------
- 2 files changed, 20 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index e426d1b..e07241a 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -4,6 +4,7 @@ comment "NVIDIA Tegra options"
- 
- config ARCH_TEGRA_2x_SOC
- 	bool "Enable support for Tegra20 family"
-+	select ARCH_NEEDS_CPU_IDLE_COUPLED
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_ERRATA_720789
- 	select ARM_ERRATA_742230
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-index 9371a00..02b2cf7 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra20.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-@@ -37,9 +37,10 @@
- #include "flowctrl.h"
- 
- #ifdef CONFIG_PM_SLEEP
--static int tegra20_idle_lp2(struct cpuidle_device *dev,
--			    struct cpuidle_driver *drv,
--			    int index);
-+static atomic_t abort_barrier;
-+static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
-+				    struct cpuidle_driver *drv,
-+				    int index);
- #endif
- 
- static struct cpuidle_driver tegra_idle_driver = {
-@@ -55,11 +56,12 @@ static struct cpuidle_driver tegra_idle_driver = {
- 		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
- #ifdef CONFIG_PM_SLEEP
- 		[1] = {
--			.enter			= tegra20_idle_lp2,
-+			.enter			= tegra20_idle_lp2_coupled,
- 			.exit_latency		= 5000,
- 			.target_residency	= 10000,
- 			.power_usage		= 0,
--			.flags			= CPUIDLE_FLAG_TIME_VALID,
-+			.flags			= CPUIDLE_FLAG_TIME_VALID |
-+						  CPUIDLE_FLAG_COUPLED,
- 			.name			= "powered-down",
- 			.desc			= "CPU power gated",
- 		},
-@@ -204,28 +206,24 @@ static inline bool tegra20_idle_enter_lp2_cpu_1(struct cpuidle_device *dev,
- }
- #endif
- 
--static int __cpuinit tegra20_idle_lp2(struct cpuidle_device *dev,
--				      struct cpuidle_driver *drv,
--				      int index)
-+static int __cpuinit tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
-+					      struct cpuidle_driver *drv,
-+					      int index)
- {
- 	u32 cpu = is_smp() ? cpu_logical_map(dev->cpu) : dev->cpu;
- 	bool entered_lp2 = false;
--	bool last_cpu;
-+
-+	cpuidle_coupled_parallel_barrier(dev, &abort_barrier);
- 
- 	local_fiq_disable();
- 
--	last_cpu =  tegra_set_cpu_in_lp2(cpu);
-+	tegra_set_cpu_in_lp2(cpu);
- 	cpu_pm_enter();
- 
--	if (cpu == 0) {
--		if (last_cpu)
--			entered_lp2 = tegra20_cpu_cluster_power_down(dev, drv,
--								     index);
--		else
--			cpu_do_idle();
--	} else {
-+	if (cpu == 0)
-+		entered_lp2 = tegra20_cpu_cluster_power_down(dev, drv, index);
-+	else
- 		entered_lp2 = tegra20_idle_enter_lp2_cpu_1(dev, drv, index);
--	}
- 
- 	cpu_pm_exit();
- 	tegra_clear_cpu_in_lp2(cpu);
-@@ -258,6 +256,9 @@ int __init tegra20_cpuidle_init(void)
- 	for_each_possible_cpu(cpu) {
- 		dev = &per_cpu(tegra_idle_device, cpu);
- 		dev->cpu = cpu;
-+#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
-+		dev->coupled_cpus = *cpu_online_mask;
-+#endif
- 
- 		dev->state_count = drv->state_count;
- 		ret = cpuidle_register_device(dev);
--- 
-1.7.0.4
+On Wed, Nov 28, 2012 at 9:21 PM, Chao Xie <chao.xie@marvell.com> wrote:
+> The original sa1100_rtc_open/sa1100_rtc_release will be called
+> when the /dev/rtc0 is opened or closed.
+> In fact, these two functions will enable/disable the clock, and
+> register/unregister the irqs.
+> User application will use /dev/rtc0 to read the rtc time or set
+> the alarm. The rtc should still run indepent of open/close the
+> rtc device.
+> So only enable clock and register the irqs when probe the device,
+> and disable clock and unregister the irqs when remove the device.
+>
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> ---
+>  drivers/rtc/rtc-sa1100.c |    9 +++++++--
+>  1 files changed, 7 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
+> index 50a5c4a..e933327 100644
+> --- a/drivers/rtc/rtc-sa1100.c
+> +++ b/drivers/rtc/rtc-sa1100.c
+> @@ -218,8 +218,6 @@ static int sa1100_rtc_proc(struct device *dev, struct seq_file *seq)
+>  }
+>
+>  static const struct rtc_class_ops sa1100_rtc_ops = {
+> -       .open = sa1100_rtc_open,
+> -       .release = sa1100_rtc_release,
+>         .read_time = sa1100_rtc_read_time,
+>         .set_time = sa1100_rtc_set_time,
+>         .read_alarm = sa1100_rtc_read_alarm,
+> @@ -253,6 +251,10 @@ static int sa1100_rtc_probe(struct platform_device *pdev)
+>         spin_lock_init(&info->lock);
+>         platform_set_drvdata(pdev, info);
+>
+> +       ret = sa1100_rtc_open(&pdev->dev);
+> +       if (ret)
+> +               goto err_open;
+> +
+>         /*
+>          * According to the manual we should be able to let RTTR be zero
+>          * and then a default diviser for a 32.768KHz clock is used.
+> @@ -305,7 +307,9 @@ static int sa1100_rtc_probe(struct platform_device *pdev)
+>
+>         return 0;
+>  err_dev:
+> +       sa1100_rtc_release(&pdev->dev);
+>         platform_set_drvdata(pdev, NULL);
+> +err_open:
+>         clk_put(info->clk);
+>  err_clk:
+>         kfree(info);
+> @@ -318,6 +322,7 @@ static int sa1100_rtc_remove(struct platform_device *pdev)
+>
+>         if (info) {
+>                 rtc_device_unregister(info->rtc);
+> +               sa1100_rtc_release(&pdev->dev);
+>                 clk_put(info->clk);
+>                 platform_set_drvdata(pdev, NULL);
+>                 kfree(info);
+> --
+> 1.7.4.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
