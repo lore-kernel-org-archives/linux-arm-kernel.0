@@ -1,66 +1,195 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Mon, 3 Dec 2012 14:16:51 +0000
-Subject: [PATCH 3/3] net: cpsw: implement ioctl for MII
-In-Reply-To: <1354542569-6165-3-git-send-email-jlu@pengutronix.de>
-References: <1354542569-6165-1-git-send-email-jlu@pengutronix.de>
- <1354542569-6165-3-git-send-email-jlu@pengutronix.de>
-Message-ID: <1354544211.7030.32.camel@deadeye.wl.decadent.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 03 Dec 2012 14:21:15 +0000
+Subject: [PATCH v4 09/13] ARM: KVM: VGIC interrupt injection
+In-Reply-To: <20121203132543.GE20074@mudshark.cambridge.arm.com>
+References: <20121110154358.3061.16338.stgit@chazy-air>
+ <20121110154518.3061.69353.stgit@chazy-air>
+ <20121203132543.GE20074@mudshark.cambridge.arm.com>
+Message-ID: <50BCB55B.3070000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-12-03 at 14:49 +0100, Jan Luebbe wrote:
-> This allows using tools like mii-diag on CPSW.
+On 03/12/12 13:25, Will Deacon wrote:
+> On Sat, Nov 10, 2012 at 03:45:18PM +0000, Christoffer Dall wrote:
+>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> Plug the interrupt injection code. Interrupts can now be generated
+>> from user space.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+>> ---
+>>  arch/arm/include/asm/kvm_vgic.h |    8 +++
+>>  arch/arm/kvm/arm.c              |   29 +++++++++++++
+>>  arch/arm/kvm/vgic.c             |   90 +++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 127 insertions(+)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
+>> index 7229324..6e3d303 100644
+>> --- a/arch/arm/include/asm/kvm_vgic.h
+>> +++ b/arch/arm/include/asm/kvm_vgic.h
+>> @@ -241,6 +241,8 @@ struct kvm_exit_mmio;
+>>  int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr);
+>>  void kvm_vgic_sync_to_cpu(struct kvm_vcpu *vcpu);
+>>  void kvm_vgic_sync_from_cpu(struct kvm_vcpu *vcpu);
+>> +int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+>> +			bool level);
+>>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+>>  bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>  		      struct kvm_exit_mmio *mmio);
+>> @@ -271,6 +273,12 @@ static inline void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu) {}
+>>  static inline void kvm_vgic_sync_to_cpu(struct kvm_vcpu *vcpu) {}
+>>  static inline void kvm_vgic_sync_from_cpu(struct kvm_vcpu *vcpu) {}
+>>  
+>> +static inline int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid,
+>> +				      const struct kvm_irq_level *irq)
+>> +{
+>> +	return 0;
+>> +}
+>> +
+>>  static inline int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
+>>  {
+>>  	return 0;
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 3ac1aab..f43da01 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -764,10 +764,31 @@ int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level)
+>>  
+>>  	switch (irq_type) {
+>>  	case KVM_ARM_IRQ_TYPE_CPU:
+>> +		if (irqchip_in_kernel(kvm))
+>> +			return -ENXIO;
+>> +
+>>  		if (irq_num > KVM_ARM_IRQ_CPU_FIQ)
+>>  			return -EINVAL;
+>>  
+>>  		return vcpu_interrupt_line(vcpu, irq_num, level);
+>> +#ifdef CONFIG_KVM_ARM_VGIC
+>> +	case KVM_ARM_IRQ_TYPE_PPI:
+>> +		if (!irqchip_in_kernel(kvm))
+>> +			return -ENXIO;
+>> +
+>> +		if (irq_num < 16 || irq_num > 31)
+>> +			return -EINVAL;
 > 
-> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
-> ---
->  drivers/net/ethernet/ti/cpsw.c |   15 +++++++++++++++
->  1 file changed, 15 insertions(+)
+> It's our favourite two numbers again! :)
+
+I already fixed a number of them. Probably missed this one though.
+
+>> +
+>> +		return kvm_vgic_inject_irq(kvm, vcpu->vcpu_id, irq_num, level);
+>> +	case KVM_ARM_IRQ_TYPE_SPI:
+>> +		if (!irqchip_in_kernel(kvm))
+>> +			return -ENXIO;
+>> +
+>> +		if (irq_num < 32 || irq_num > KVM_ARM_IRQ_GIC_MAX)
+>> +			return -EINVAL;
+>> +
+>> +		return kvm_vgic_inject_irq(kvm, 0, irq_num, level);
+>> +#endif
+>>  	}
+>>  
+>>  	return -EINVAL;
+>> @@ -849,6 +870,14 @@ long kvm_arch_vm_ioctl(struct file *filp,
+>>  	void __user *argp = (void __user *)arg;
+>>  
+>>  	switch (ioctl) {
+>> +#ifdef CONFIG_KVM_ARM_VGIC
+>> +	case KVM_CREATE_IRQCHIP: {
+>> +		if (vgic_present)
+>> +			return kvm_vgic_create(kvm);
+>> +		else
+>> +			return -EINVAL;
 > 
-> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-> index 8de3e92..f476c03 100644
-> --- a/drivers/net/ethernet/ti/cpsw.c
-> +++ b/drivers/net/ethernet/ti/cpsw.c
-> @@ -629,6 +629,20 @@ static void cpsw_ndo_change_rx_flags(struct net_device *ndev, int flags)
->  		dev_err(&ndev->dev, "multicast traffic cannot be filtered!\n");
->  }
->  
-> +static int cpsw_ndo_do_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
-> +{
-> +	struct cpsw_priv *priv = netdev_priv(ndev);
-> +	struct phy_device *phy = priv->slaves[0].phy;
-> +
-> +	if (!netif_running(ndev))
-> +		return -EINVAL;
+> ENXIO? At least, that's what you use when setting the GIC addresses.
 
-This is consistent with other drivers, and I'm not going to object to
-one more instance, but I don't think this is the proper error code - we
-don't know that there's anything wrong with the arguments, it's just
-that the *device* is in the wrong state.  I don't know what the right
-error code is, though.  Really I would prefer that MDIO would work even
-when the device is down, unless you know that all MDIO-manageable
-devices are powered off.
+-EINVAL seems to be one of the values other archs are using. -ENXIO is
+not one of them for KVM_CREATE_IRQCHIP. Doesn't mean they are right, but
+for the sake of keeping userspace happy, I'm not really inclined to
+change this.
 
-Ben.
+Christoffer?
 
-> +	if (!phy)
-> +		return -ENODEV;
-> +
-> +	return phy_mii_ioctl(phy, rq, cmd);
-> +}
-> +
->  static void cpsw_ndo_tx_timeout(struct net_device *ndev)
->  {
->  	struct cpsw_priv *priv = netdev_priv(ndev);
-> @@ -670,6 +684,7 @@ static const struct net_device_ops cpsw_netdev_ops = {
->  	.ndo_start_xmit		= cpsw_ndo_start_xmit,
->  	.ndo_change_rx_flags	= cpsw_ndo_change_rx_flags,
->  	.ndo_validate_addr	= eth_validate_addr,
-> +	.ndo_do_ioctl		= cpsw_ndo_do_ioctl,
->  	.ndo_change_mtu		= eth_change_mtu,
->  	.ndo_tx_timeout		= cpsw_ndo_tx_timeout,
->  	.ndo_get_stats		= cpsw_ndo_get_stats,
+>> +	}
+>> +#endif
+>>  	case KVM_SET_DEVICE_ADDRESS: {
+>>  		struct kvm_device_address dev_addr;
+>>  
+>> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
+>> index dda5623..70040bb 100644
+>> --- a/arch/arm/kvm/vgic.c
+>> +++ b/arch/arm/kvm/vgic.c
+>> @@ -75,6 +75,7 @@
+>>  #define ACCESS_WRITE_MASK(x)	((x) & (3 << 1))
+>>  
+>>  static void vgic_update_state(struct kvm *kvm);
+>> +static void vgic_kick_vcpus(struct kvm *kvm);
+>>  static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
+>>  
+>>  static inline int vgic_irq_is_edge(struct vgic_dist *dist, int irq)
+>> @@ -542,6 +543,9 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run, struct kvm_exi
+>>  	kvm_prepare_mmio(run, mmio);
+>>  	kvm_handle_mmio_return(vcpu, run);
+>>  
+>> +	if (updated_state)
+>> +		vgic_kick_vcpus(vcpu->kvm);
+>> +
+>>  	return true;
+>>  }
+>>  
+>> @@ -867,6 +871,92 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
+>>  	return test_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
+>>  }
+>>  
+>> +static void vgic_kick_vcpus(struct kvm *kvm)
+>> +{
+>> +	struct kvm_vcpu *vcpu;
+>> +	int c;
+>> +
+>> +	/*
+>> +	 * We've injected an interrupt, time to find out who deserves
+>> +	 * a good kick...
+>> +	 */
+>> +	kvm_for_each_vcpu(c, vcpu, kvm) {
+>> +		if (kvm_vgic_vcpu_pending_irq(vcpu))
+>> +			kvm_vcpu_kick(vcpu);
+>> +	}
+>> +}
+>> +
+>> +static bool vgic_update_irq_state(struct kvm *kvm, int cpuid,
+>> +				  unsigned int irq_num, bool level)
+>> +{
+>> +	struct vgic_dist *dist = &kvm->arch.vgic;
+>> +	struct kvm_vcpu *vcpu;
+>> +	int is_edge, is_level, state;
+>> +	int enabled;
+>> +	bool ret = true;
+>> +
+>> +	spin_lock(&dist->lock);
+>> +
+>> +	is_edge = vgic_irq_is_edge(dist, irq_num);
+>> +	is_level = !is_edge;
+>> +	state = vgic_bitmap_get_irq_val(&dist->irq_state, cpuid, irq_num);
+>> +
+>> +	/*
+>> +	 * Only inject an interrupt if:
+>> +	 * - level triggered and we change level
+>> +	 * - edge triggered and we have a rising edge
+>> +	 */
+>> +	if ((is_level && !(state ^ level)) || (is_edge && (state || !level))) {
+>> +		ret = false;
+>> +		goto out;
+>> +	}
+> 
+> Eek, more of the edge/level combo. Can this be be restructured so that we
+> have vgic_update_{edge,level}_irq_state, which are called from here
+> appropriately?
 
+I'll have a look.
+
+Thanks,
+
+	M.
 -- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+Jazz is not dead. It just smells funny...
