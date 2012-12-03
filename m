@@ -1,50 +1,154 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Dec 2012 17:46:17 +0000
-Subject: [PATCH] nommu: Enable the strict alignment (CR_A) bit only if
- ARCH < v6
-In-Reply-To: <20121203172553.GC14363@n2100.arm.linux.org.uk>
-References: <1354187042-28568-1-git-send-email-armando.visconti@st.com>
- <50BCD6DB.2030200@st.com>
- <20121203172553.GC14363@n2100.arm.linux.org.uk>
-Message-ID: <20121203174617.GL20074@mudshark.cambridge.arm.com>
+Date: Mon,  3 Dec 2012 17:52:39 +0000
+Subject: [RFC PATCH 1/2] ARM: Dummy Virtual Machine platform support
+In-Reply-To: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
+References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1354557160-20144-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 03, 2012 at 05:25:53PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 03, 2012 at 05:44:11PM +0100, Armando Visconti wrote:
-> > On 11/29/2012 12:04 PM, Armando VISCONTI wrote:
-> >> This patch keeps disabled the strict alignment CP15 bit for
-> >> all armv6 and armv7 processor without the mmu. This behaviour
-> >> is now same as in the mmu case.
-> >>
-> >> Signed-off-by: Armando Visconti<armando.visconti@st.com>
-> >> ---
-> >>   arch/arm/kernel/head-nommu.S |    2 +-
-> >>   1 files changed, 1 insertions(+), 1 deletions(-)
-> >>
-> >> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-> >> index 278cfc1..2c228a0 100644
-> >> --- a/arch/arm/kernel/head-nommu.S
-> >> +++ b/arch/arm/kernel/head-nommu.S
-> >> @@ -68,7 +68,7 @@ __after_proc_init:
-> >>   	 * CP15 system control register value returned in r0 from
-> >>   	 * the CPU init function.
-> >>   	 */
-> >> -#ifdef CONFIG_ALIGNMENT_TRAP
-> >> +#if defined(CONFIG_ALIGNMENT_TRAP)&&  __LINUX_ARM_ARCH__<  6
-> >>   	orr	r0, r0, #CR_A
-> >>   #else
-> >>   	bic	r0, r0, #CR_A
-> >
-> > Any feedback on this simple patch?
-> 
-> Well, it brings the nommu version into line with the mmu version, so
-> it's sensible.  Please put it in the patch system, thanks.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-In which case, I'll definitely dust-off the patches to prevent unaligned
-accesses to strongly-ordered memory because that results in good ol'
-UNPREDICTABLE behaviour.
+Add support for the smallest, dumbest possible platform, to be
+used as a guest for KVM or other hypervisors.
 
-I think Uwe also requires some of the stuff there for his M3 port.
+It only mandates a GIC and architected timers. Fits nicely with
+a multiplatform zImage. Uses very little silicon area.
 
-Will
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/Kconfig            |  2 ++
+ arch/arm/Makefile           |  1 +
+ arch/arm/mach-virt/Kconfig  |  9 +++++++
+ arch/arm/mach-virt/Makefile |  5 ++++
+ arch/arm/mach-virt/virt.c   | 65 +++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 82 insertions(+)
+ create mode 100644 arch/arm/mach-virt/Kconfig
+ create mode 100644 arch/arm/mach-virt/Makefile
+ create mode 100644 arch/arm/mach-virt/virt.c
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 781725e..ba0dca7 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1126,6 +1126,8 @@ source "arch/arm/mach-versatile/Kconfig"
+ source "arch/arm/mach-vexpress/Kconfig"
+ source "arch/arm/plat-versatile/Kconfig"
+ 
++source "arch/arm/mach-virt/Kconfig"
++
+ source "arch/arm/mach-w90x900/Kconfig"
+ 
+ # Definitions to make life easier
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 5f914fc..e8232ad 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -192,6 +192,7 @@ machine-$(CONFIG_ARCH_SOCFPGA)		+= socfpga
+ machine-$(CONFIG_ARCH_SPEAR13XX)	+= spear13xx
+ machine-$(CONFIG_ARCH_SPEAR3XX)		+= spear3xx
+ machine-$(CONFIG_MACH_SPEAR600)		+= spear6xx
++machine-$(CONFIG_ARCH_VIRT)		+= virt
+ machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
+ 
+ # Platform directory name.  This list is sorted alphanumerically
+diff --git a/arch/arm/mach-virt/Kconfig b/arch/arm/mach-virt/Kconfig
+new file mode 100644
+index 0000000..a568a2a
+--- /dev/null
++++ b/arch/arm/mach-virt/Kconfig
+@@ -0,0 +1,9 @@
++config ARCH_VIRT
++	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
++	select ARCH_WANT_OPTIONAL_GPIOLIB
++	select ARM_GIC
++	select ARM_ARCH_TIMER
++	select HAVE_SMP
++	select CPU_V7
++	select SPARSE_IRQ
++	select USE_OF
+diff --git a/arch/arm/mach-virt/Makefile b/arch/arm/mach-virt/Makefile
+new file mode 100644
+index 0000000..7ddbfa6
+--- /dev/null
++++ b/arch/arm/mach-virt/Makefile
+@@ -0,0 +1,5 @@
++#
++# Makefile for the linux kernel.
++#
++
++obj-y					:= virt.o
+diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
+new file mode 100644
+index 0000000..174b9da
+--- /dev/null
++++ b/arch/arm/mach-virt/virt.c
+@@ -0,0 +1,65 @@
++/*
++ * Dummy Virtual Machine - does what it says on the tin.
++ *
++ * Copyright (C) 2012 ARM Ltd
++ * Authors: Will Deacon <will.deacon@arm.com>,
++ *          Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++
++#include <asm/arch_timer.h>
++#include <asm/hardware/gic.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++
++const static struct of_device_id irq_match[] = {
++	{ .compatible = "arm,cortex-a15-gic", .data = gic_of_init, },
++	{}
++};
++
++static void __init gic_init_irq(void)
++{
++	of_irq_init(irq_match);
++}
++
++static void __init virt_init(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++static void __init virt_timer_init(void)
++{
++	WARN_ON(arch_timer_of_register() != 0);
++	WARN_ON(arch_timer_sched_clock_init() != 0);
++}
++
++static const char *virt_dt_match[] = {
++	"linux,dummy-virt",
++	NULL
++};
++
++static struct sys_timer virt_timer = {
++	.init = virt_timer_init,
++};
++
++DT_MACHINE_START(VIRT, "Dummy Virtual Machine")
++	.init_irq	= gic_init_irq,
++	.handle_irq     = gic_handle_irq,
++	.timer		= &virt_timer,
++	.init_machine	= virt_init,
++	.dt_compat	= virt_dt_match,
++MACHINE_END
+-- 
+1.8.0
