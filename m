@@ -1,32 +1,37 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 3 Dec 2012 15:54:40 -0200
-Subject: [PATCH] ARM: mxs_defconfig: Fix MTD_M25P80 selection
-Message-ID: <1354557281-23760-1-git-send-email-fabio.estevam@freescale.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon,  3 Dec 2012 17:56:41 +0000
+Subject: [PATCH 1/3] ARM: nommu: allow unaligned accesses on ARMv6+ processors
+Message-ID: <1354557403-20386-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 8f9d87a0 (ARM: mxs_defconfig: Add SPI and LRADC support) missed the
-'=y' annotation to CONFIG_MTD_M25P80.
+Commit 8428e84d ("ARM: 7150/1: Allow kernel unaligned accesses on ARMv6+
+processors") unconditionally clears SCTLR.A for ARMv6+ processors, since
+newer toolchains assume that unaligned memory accesses will not fault
+for these cores.
 
-Fix it, so that SPI Flash can be probed.
+This patch adds the corresponding change for nommu kernel builds.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/configs/mxs_defconfig |    2 +-
+
+Identical to Armando's recent patch but included here for completeness.
+
+ arch/arm/kernel/head-nommu.S | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 7bf5351..60de31c 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -55,7 +55,7 @@ CONFIG_DEVTMPFS=y
- CONFIG_MTD=y
- CONFIG_MTD_CHAR=y
- CONFIG_MTD_DATAFLASH=y
--CONFIG_MTD_M25P80
-+CONFIG_MTD_M25P80=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_GPMI_NAND=y
- CONFIG_NETDEVICES=y
+diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+index 278cfc1..2c228a0 100644
+--- a/arch/arm/kernel/head-nommu.S
++++ b/arch/arm/kernel/head-nommu.S
+@@ -68,7 +68,7 @@ __after_proc_init:
+ 	 * CP15 system control register value returned in r0 from
+ 	 * the CPU init function.
+ 	 */
+-#ifdef CONFIG_ALIGNMENT_TRAP
++#if defined(CONFIG_ALIGNMENT_TRAP) && __LINUX_ARM_ARCH__ < 6
+ 	orr	r0, r0, #CR_A
+ #else
+ 	bic	r0, r0, #CR_A
 -- 
-1.7.9.5
+1.8.0
