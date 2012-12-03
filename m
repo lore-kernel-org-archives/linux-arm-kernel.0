@@ -1,49 +1,29 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Mon, 3 Dec 2012 10:40:53 +0800
-Subject: [PATCH 2/4] rtc: pxa: fix rtc caculation issue
-In-Reply-To: <87r4nc18i1.fsf@free.fr>
-References: <1354155670-6267-1-git-send-email-chao.xie@marvell.com>
- <1354155670-6267-2-git-send-email-chao.xie@marvell.com>
- <87r4nc18i1.fsf@free.fr>
-Message-ID: <CADApbehR9TcrGU-t2ZqT58O0OswVmJPQ1paceO6k1+ADvU026A@mail.gmail.com>
+From: nvmarkzhang@gmail.com (Mark Zhang)
+Date: Mon, 03 Dec 2012 10:48:40 +0800
+Subject: [PATCH] ARM: dt: tegra: cardhu: Add drm components
+In-Reply-To: <50B908F1.8000407@wwwdotorg.org>
+References: <1354254256-10212-1-git-send-email-markz@nvidia.com>
+ <50B908F1.8000407@wwwdotorg.org>
+Message-ID: <50BC1308.4050407@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 30, 2012 at 4:04 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Chao Xie <chao.xie@marvell.com> writes:
->
-> Hi Chao Xie,
->
-> First of all, could you please send patches from rtc-pxa to me also, as I'm
-> maintaining that driver ?
->
-> Second point, the original design of the driver relies on the special case of
-> writing zeroes to WOM and DOM, as mentionned in PXA27x Developers Guide, chapter
-> 21.4.2.3.5 "Writing Alarm Registers with Invalid (Zero) Data", which states :
->> Day-Of-Week (DOW), or Week-Of-Month (WOM), Day of Month (DOM), Month or Year
->> fields?Zero is not valid for these fields. If zero is written into any of
->> these fields, it is ignored while generating the alarm.
->
-> I'd like to know if your patch fixes something, or is an enhancement ?
->
-> Cheers.
->
-> --
-> Robert
->
-> PS: I've not checked the patch yet, that's just a prelimary comment on the patch
-> message.
+On 12/01/2012 03:28 AM, Stephen Warren wrote:
+> On 11/29/2012 10:44 PM, Mark Zhang wrote:
+>> This patch adds the RGB & HDMI nodes in Tegra 30 cardhu's dts.
+>> This makes the LVDS & HDMI working.
+> 
+> This still doesn't add any of the backlight/panel GPIO programming,
+> which I believe is required before we enable any LCDs. We could add the
+> HDMI node without that though.
 
-hi
-I am sorry, i just use get_maintainer.pl to get the "to" list.
-I have go through the spec. The spec has the desctiption about the
-invalid data writing.
-I am a little confused about the "wrting 0 to DOW". The descrption is
-confused. first it said that "If zero is written into any of these
-fields, it is ignored
-while generating the alarm", then it gives a example, that if writing
-0 to DOW, "For example, if a zero is written into a DOW field, the
-alarm is set
-every day at the time written in the Hours, Minutes, and Seconds
-field?. It seems that the Year/Month/Week will not take effect.
-I will do the test on the board again, and send out the update.
+Okay. So I think I may misunderstood your words several days ago, when I
+submitted the v1 and v2 version for this patch.
+
+So let's hold on this and wait for the backlight/panel working on cardhu.
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
