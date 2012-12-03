@@ -1,47 +1,126 @@
-From: narkewoody@gmail.com (Woody Wu)
-Date: Mon, 3 Dec 2012 01:53:27 +0000 (UTC)
-Subject: nfs root not responding?
-References: <slrnkbgkqq.2kq.narkewoody@zuhnb712.local.com>
- <20121130083252.B4301200171@gemini.denx.de>
-Message-ID: <slrnkbo1et.1p8.narkewoody@zuhnb712.local.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 3 Dec 2012 10:07:52 +0800
+Subject: [PATCH] [ARM] pxa/spitz: Minor code refactor and typo fixes
+In-Reply-To: <1354231379-17289-1-git-send-email-dromede@gmail.com>
+References: <1354231379-17289-1-git-send-email-dromede@gmail.com>
+Message-ID: <CAMPhdO-MsiAdf6vvPXQ4MhMhdNiV5MXeKDhH9EHO+iy7ESVtKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-30, Wolfgang Denk <wd@denx.de> wrote:
-> Dear Woody Wu,
->
-> In message <slrnkbgkqq.2kq.narkewoody@zuhnb712.local.com> you wrote:
->> 
->> I just enabled the network in the kernel and trying to load a rootfs
->> from remote nfs server.  The kernel did the DHCP succeed and got the
->> ip and other network parameters.  But it then keep always complaining
->> that "nfs server not responding" and the login prompt does not show up.
->
-> Try adding "proto=tcp" as mount option and test if this changes
-> anything.
->
+Hi Marko,
 
-The result is the same after adding "proto=tcp".  A suspicous thing I
-found it, while the nfs was not working, I tried to ping the target from
-another host, but the ping is not reachable.  I then skipped the nfs
-mounting by specifing another kernel command to mount my old but not fully
-workable root image, where I run /bin/sh as init
-(root=/dev/my_old_img_partition init=/bin/sh). After got the command
-prompt, I found the target still not reachable by ping.  Does it mean my
-ethernet driver is not really running? On one side, this can explain the
-nfs problem, but why the dhcp work and did get assigned an IP?
+Could you split the patch into two? i.e. the change to i2c and one other change
+to cleanup the code a bit. That will be cleaner.
 
+Thanks
 
-> You may also want to have a look at this FAQ:
-> http://www.denx.de/wiki/view/DULG/EthernetIsUnreliable
+On Fri, Nov 30, 2012 at 7:22 AM,  <dromede@gmail.com> wrote:
+> From: Marko Katic <dromede.gmail.com>
 >
+> This patch slightly changes the way i2c devices are defined
+> and registered.
+> I2c devices that are present in  all spitz variants are always defined
+> while the max7310 gpio expander specific to the akita variant is defined
+> conditionally. This makes more sense and will result in a slightly smaller kernel
+> for some variants.
 >
-> Best regards,
+> I2c init function spitz_i2c_init() is simplified and is now more readable.
 >
-> Wolfgang Denk
+> Some code sections were renamed to better describe their contents.
 >
-
-
--- 
-woody
-I can't go back to yesterday - because I was a different person then.
+> Signed-off-by: Marko Katic <dromede@gmail.com>
+> ---
+>  arch/arm/mach-pxa/spitz.c |   46 ++++++++++++++++++++++++---------------------
+>  1 file changed, 25 insertions(+), 21 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+> index 2073f0e..0f92264 100644
+> --- a/arch/arm/mach-pxa/spitz.c
+> +++ b/arch/arm/mach-pxa/spitz.c
+> @@ -732,7 +732,7 @@ static inline void spitz_lcd_init(void) {}
+>  #endif
+>
+>  /******************************************************************************
+> - * Framebuffer
+> + * NAND Flash
+>   ******************************************************************************/
+>  #if defined(CONFIG_MTD_NAND_SHARPSL) || defined(CONFIG_MTD_NAND_SHARPSL_MODULE)
+>  static struct mtd_partition spitz_nand_partitions[] = {
+> @@ -858,23 +858,13 @@ static inline void spitz_nor_init(void) {}
+>  #endif
+>
+>  /******************************************************************************
+> - * GPIO expander
+> + * I2C devices
+>   ******************************************************************************/
+>  #if defined(CONFIG_I2C_PXA) || defined(CONFIG_I2C_PXA_MODULE)
+>  static struct pca953x_platform_data akita_pca953x_pdata = {
+>         .gpio_base              = AKITA_IOEXP_GPIO_BASE,
+>  };
+>
+> -static struct i2c_board_info spitz_i2c_devs[] = {
+> -       {
+> -               .type           = "wm8750",
+> -               .addr           = 0x1b,
+> -       }, {
+> -               .type           = "max7310",
+> -               .addr           = 0x18,
+> -               .platform_data  = &akita_pca953x_pdata,
+> -       },
+> -};
+>
+>  static struct regulator_consumer_supply isl6271a_consumers[] = {
+>         REGULATOR_SUPPLY("vcc_core", NULL),
+> @@ -894,7 +884,12 @@ static struct regulator_init_data isl6271a_info[] = {
+>         }
+>  };
+>
+> -static struct i2c_board_info spitz_pi2c_devs[] = {
+> +/* wm8750 and isl6271a are present in all spitz variants */
+> +static struct i2c_board_info spitz_i2c_devs[2] = {
+> +       {
+> +               .type           = "wm8750",
+> +               .addr           = 0x1b,
+> +       },
+>         {
+>                 .type           = "isl6271a",
+>                 .addr           = 0x0c,
+> @@ -902,18 +897,27 @@ static struct i2c_board_info spitz_pi2c_devs[] = {
+>         },
+>  };
+>
+> +#ifdef CONFIG_MACH_AKITA
+> +static struct i2c_board_info akita_i2c_devs[1] = {
+> +       {
+> +               .type           = "max7310",
+> +               .addr           = 0x18,
+> +               .platform_data  = &akita_pca953x_pdata,
+> +       },
+> +};
+> +#endif
+> +
+>  static void __init spitz_i2c_init(void)
+>  {
+> -       int size = ARRAY_SIZE(spitz_i2c_devs);
+> -
+> -       /* Only Akita has the max7310 chip */
+> -       if (!machine_is_akita())
+> -               size--;
+> -
+>         pxa_set_i2c_info(NULL);
+>         pxa27x_set_i2c_power_info(NULL);
+> -       i2c_register_board_info(0, spitz_i2c_devs, size);
+> -       i2c_register_board_info(1, ARRAY_AND_SIZE(spitz_pi2c_devs));
+> +
+> +       i2c_register_board_info(0, &spitz_i2c_devs[0], 1);
+> +       i2c_register_board_info(1, &spitz_i2c_devs[1], 1);
+> +
+> +       if (machine_is_akita())
+> +               i2c_register_board_info(0, akita_i2c_devs, 1);
+> +
+>  }
+>  #else
+>  static inline void spitz_i2c_init(void) {}
+> --
+> 1.7.10.4
+>
