@@ -1,29 +1,56 @@
-From: nvmarkzhang@gmail.com (Mark Zhang)
-Date: Mon, 03 Dec 2012 10:48:40 +0800
-Subject: [PATCH] ARM: dt: tegra: cardhu: Add drm components
-In-Reply-To: <50B908F1.8000407@wwwdotorg.org>
-References: <1354254256-10212-1-git-send-email-markz@nvidia.com>
- <50B908F1.8000407@wwwdotorg.org>
-Message-ID: <50BC1308.4050407@gmail.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Mon, 3 Dec 2012 10:53:07 +0800
+Subject: [PATCH 1/4] rtc: sa1100: enable/disable rtc when probe/remove the
+ device
+In-Reply-To: <CADApbejZXach=YaiL5rEWA5+uc+mO8PzQzUKN+k90HfxEsqgtA@mail.gmail.com>
+References: <1354155670-6267-1-git-send-email-chao.xie@marvell.com>
+ <20121129102519.GG19440@n2100.arm.linux.org.uk>
+ <CAN1soZxUA2PPy4694ByX1FTyWiJkha8QpKFK5Jc3Wf3zT0huOA@mail.gmail.com>
+ <CADApbejZXach=YaiL5rEWA5+uc+mO8PzQzUKN+k90HfxEsqgtA@mail.gmail.com>
+Message-ID: <CADApbegrJDe5SiO255WdKYai1U7WjBYfMHuCm-hTNfx5p6Wz-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2012 03:28 AM, Stephen Warren wrote:
-> On 11/29/2012 10:44 PM, Mark Zhang wrote:
->> This patch adds the RGB & HDMI nodes in Tegra 30 cardhu's dts.
->> This makes the LVDS & HDMI working.
-> 
-> This still doesn't add any of the backlight/panel GPIO programming,
-> which I believe is required before we enable any LCDs. We could add the
-> HDMI node without that though.
+On Mon, Dec 3, 2012 at 9:39 AM, Chao Xie <xiechao.mail@gmail.com> wrote:
+> On Fri, Nov 30, 2012 at 3:04 PM, Haojian Zhuang
+> <haojian.zhuang@gmail.com> wrote:
+>> On Thu, Nov 29, 2012 at 6:25 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> On Wed, Nov 28, 2012 at 09:21:07PM -0500, Chao Xie wrote:
+>>>> The original sa1100_rtc_open/sa1100_rtc_release will be called
+>>>> when the /dev/rtc0 is opened or closed.
+>>>> In fact, these two functions will enable/disable the clock, and
+>>>> register/unregister the irqs.
+>>>> User application will use /dev/rtc0 to read the rtc time or set
+>>>> the alarm. The rtc should still run indepent of open/close the
+>>>> rtc device.
+>>>> So only enable clock and register the irqs when probe the device,
+>>>> and disable clock and unregister the irqs when remove the device.
+>>>
+>>> NAK.  I don't think you properly understand what's going on here if you
+>>> think moving the entire open and release functions into the probe and
+>>> remove functions is the right thing to do.
+>>
+>> Since PXA27x & PXA3xx supports dual rtc device at the same time,
+>> user could choose use either of rtc at run time. Then clk & irq are setup
+>> in open().
+>>
+>> Chao,
+>> So you shouldn't remove them into probe().
+>
+> How can user to choose one RTC?
+> The user API, for example "date" will open the device, get the time
+> and then close the device.
+> WHen set a alarm, it is the same routine. open->set->close.
+> The open routine will enable clock and register irq, close will
+> disable the clock and unregister irq. It means that if only open is
+> invoked, rtc begins to work, and after close is invoked rtc stops
+> working. It means that the user can not get correct time and can not
+> get right alarm.
 
-Okay. So I think I may misunderstood your words several days ago, when I
-submitted the v1 and v2 version for this patch.
-
-So let's hold on this and wait for the backlight/panel working on cardhu.
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+hi
+I want to correct what i said. For the irq register/unregister i think
+can be done at open/release. But for clock enable/disable, i do not
+think so. If clock is disabled, as i think RTC will not work. User API
+still use open->get_time->close for "date" command. It means that RTC
+will not return correct date to user.
