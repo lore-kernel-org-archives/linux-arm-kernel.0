@@ -1,126 +1,129 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Dec 2012 13:31:29 +0000
-Subject: [PATCH v4 10/13] ARM: KVM: VGIC control interface world switch
-In-Reply-To: <20121110154525.3061.45070.stgit@chazy-air>
-References: <20121110154358.3061.16338.stgit@chazy-air>
- <20121110154525.3061.45070.stgit@chazy-air>
-Message-ID: <20121203133129.GF20074@mudshark.cambridge.arm.com>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Mon, 3 Dec 2012 19:01:39 +0530
+Subject: [PATCH v2 1/2] ARM: Exynos5250: Enabling ehci-s5p driver
+In-Reply-To: <1352362764-14595-1-git-send-email-gautam.vivek@samsung.com>
+References: <CAFp+6iEwbw5jw_JiUosfZYykFNdbnh+OW6-RrJ7NnYN8csUJmw@mail.gmail.com>
+ <1352362764-14595-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <CAFp+6iFWC9gt9CviiEEq=7iw6AcpWiKYnLubN=yTuWcdBcmpQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 10, 2012 at 03:45:25PM +0000, Christoffer Dall wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Enable the VGIC control interface to be save-restored on world switch.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+Hi Kukjin,
+
+
+On Thu, Nov 8, 2012 at 1:49 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+> Adding EHCI device tree node for Exynos5250 along with
+> the device base adress and gpio line for vbus.
+>
+Any thoughts about this please ?
+
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Acked-by: Jingoo Han <jg1.han@samsung.com>
 > ---
->  arch/arm/include/asm/kvm_arm.h |   12 +++++++
->  arch/arm/kernel/asm-offsets.c  |   12 +++++++
->  arch/arm/kvm/interrupts_head.S |   68 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 92 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-> index 246afd7..8f5dd22 100644
-> --- a/arch/arm/include/asm/kvm_arm.h
-> +++ b/arch/arm/include/asm/kvm_arm.h
-> @@ -192,4 +192,16 @@
->  #define HSR_EC_DABT	(0x24)
->  #define HSR_EC_DABT_HYP	(0x25)
->  
-> +/* GICH offsets */
-> +#define GICH_HCR	0x0
-> +#define GICH_VTR	0x4
-> +#define GICH_VMCR	0x8
-> +#define GICH_MISR	0x10
-> +#define GICH_EISR0 	0x20
-> +#define GICH_EISR1 	0x24
-> +#define GICH_ELRSR0 	0x30
-> +#define GICH_ELRSR1 	0x34
-> +#define GICH_APR	0xf0
-> +#define GICH_LR0	0x100
-
-Similar thing to the other new gic defines -- they're probably better off
-in gic.h
-
+>  .../devicetree/bindings/usb/exynos-usb.txt         |   25 ++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts          |    4 +++
+>  arch/arm/boot/dts/exynos5250.dtsi                  |    6 ++++
+>  arch/arm/mach-exynos/include/mach/map.h            |    1 +
+>  arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +
+>  5 files changed, 38 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/usb/exynos-usb.txt
+>
+> diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+> new file mode 100644
+> index 0000000..833f5cf
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+> @@ -0,0 +1,25 @@
+> +Samsung Exynos SoC USB controller
 > +
->  #endif /* __ARM_KVM_ARM_H__ */
-> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-> index 95cab37..39b6221 100644
-> --- a/arch/arm/kernel/asm-offsets.c
-> +++ b/arch/arm/kernel/asm-offsets.c
-> @@ -167,6 +167,18 @@ int main(void)
->    DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.hxfar));
->    DEFINE(VCPU_HPFAR,		offsetof(struct kvm_vcpu, arch.hpfar));
->    DEFINE(VCPU_HYP_PC,		offsetof(struct kvm_vcpu, arch.hyp_pc));
-> +#ifdef CONFIG_KVM_ARM_VGIC
-> +  DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
-> +  DEFINE(VGIC_CPU_HCR,		offsetof(struct vgic_cpu, vgic_hcr));
-> +  DEFINE(VGIC_CPU_VMCR,		offsetof(struct vgic_cpu, vgic_vmcr));
-> +  DEFINE(VGIC_CPU_MISR,		offsetof(struct vgic_cpu, vgic_misr));
-> +  DEFINE(VGIC_CPU_EISR,		offsetof(struct vgic_cpu, vgic_eisr));
-> +  DEFINE(VGIC_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_elrsr));
-> +  DEFINE(VGIC_CPU_APR,		offsetof(struct vgic_cpu, vgic_apr));
-> +  DEFINE(VGIC_CPU_LR,		offsetof(struct vgic_cpu, vgic_lr));
-> +  DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
-> +  DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
-> +#endif
->    DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
->  #endif
->    return 0; 
-> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-> index 2ac8b4a..c2423d8 100644
-> --- a/arch/arm/kvm/interrupts_head.S
-> +++ b/arch/arm/kvm/interrupts_head.S
-> @@ -341,6 +341,45 @@
->   * @vcpup: Register pointing to VCPU struct
->   */
->  .macro save_vgic_state	vcpup
-> +#ifdef CONFIG_KVM_ARM_VGIC
-> +	/* Get VGIC VCTRL base into r2 */
-> +	ldr	r2, [\vcpup, #VCPU_KVM]
-> +	ldr	r2, [r2, #KVM_VGIC_VCTRL]
-> +	cmp	r2, #0
-> +	beq	2f
+> +The USB devices interface with USB controllers on Exynos SOCs.
+> +The device node has following properties.
 > +
-> +	/* Compute the address of struct vgic_cpu */
-> +	add	r11, \vcpup, #VCPU_VGIC_CPU
+> +EHCI
+> +Required properties:
+> + - compatible: should be "samsung,exynos-ehci" for USB 2.0
+> +   EHCI controller in host mode.
+> + - reg: physical base address of the controller and length of memory mapped
+> +   region.
+> + - interrupts: interrupt number to the cpu.
+> +
+> +Optional properties:
+> + - samsung,vbus-gpio:  if present, specifies the GPIO that
+> +   needs to be pulled up for the bus to be powered.
+> +
+> +Example:
+> +
+> +       usb at 12110000 {
+> +               compatible = "samsung,exynos-ehci";
+> +               reg = <0x12110000 0x100>;
+> +               interrupts = <0 71 0>;
+> +               samsung,vbus-gpio = <&gpx2 6 1 3 3>;
+> +       };
+> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> index 405009c..7c8064f 100644
+> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> @@ -193,4 +193,8 @@
+>         hdmi {
+>                 hpd-gpio = <&gpx3 7 0xf 1 3>;
+>         };
+> +
+> +       usb at 12110000 {
+> +               samsung,vbus-gpio = <&gpx2 6 1 3 3>;
+> +       };
+>  };
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index cf6a02d..2995445 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -238,6 +238,12 @@
+>                 #size-cells = <0>;
+>         };
+>
+> +       usb at 12110000 {
+> +               compatible = "samsung,exynos-ehci";
+> +               reg = <0x12110000 0x100>;
+> +               interrupts = <0 71 0>;
+> +       };
+> +
+>         amba {
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+> index ef4958b..9a86b99 100644
+> --- a/arch/arm/mach-exynos/include/mach/map.h
+> +++ b/arch/arm/mach-exynos/include/mach/map.h
+> @@ -197,6 +197,7 @@
+>  #define EXYNOS4_PA_EHCI                        0x12580000
+>  #define EXYNOS4_PA_OHCI                        0x12590000
+>  #define EXYNOS4_PA_HSPHY               0x125B0000
+> +#define EXYNOS5_PA_EHCI                        0x12110000
+>  #define EXYNOS4_PA_MFC                 0x13400000
+>
+>  #define EXYNOS4_PA_UART                        0x13800000
+> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> index ed37273..89fa624 100644
+> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> @@ -86,6 +86,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
+>                                 "exynos5-hdmi", NULL),
+>         OF_DEV_AUXDATA("samsung,exynos5-mixer", 0x14450000,
+>                                 "exynos5-mixer", NULL),
+> +       OF_DEV_AUXDATA("samsung,exynos-ehci", EXYNOS5_PA_EHCI,
+> +                               "s5p-ehci", NULL),
+>         {},
+>  };
+>
+> --
+> 1.7.6.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Given that we're dealing with constants, it would be more efficient to
-express this addition as part of the immediate offset and let gas spit
-out the final computed address for the stores below.
 
-> +
-> +	/* Save all interesting registers */
-> +	ldr	r3, [r2, #GICH_HCR]
-> +	ldr	r4, [r2, #GICH_VMCR]
-> +	ldr	r5, [r2, #GICH_MISR]
-> +	ldr	r6, [r2, #GICH_EISR0]
-> +	ldr	r7, [r2, #GICH_EISR1]
-> +	ldr	r8, [r2, #GICH_ELRSR0]
-> +	ldr	r9, [r2, #GICH_ELRSR1]
-> +	ldr	r10, [r2, #GICH_APR]
-> +
-> +	str	r3, [r11, #VGIC_CPU_HCR]
-> +	str	r4, [r11, #VGIC_CPU_VMCR]
-> +	str	r5, [r11, #VGIC_CPU_MISR]
-> +	str	r6, [r11, #VGIC_CPU_EISR]
-> +	str	r7, [r11, #(VGIC_CPU_EISR + 4)]
-> +	str	r8, [r11, #VGIC_CPU_ELRSR]
-> +	str	r9, [r11, #(VGIC_CPU_ELRSR + 4)]
-> +	str	r10, [r11, #VGIC_CPU_APR]
-> +
-> +	/* Save list registers */
-> +	add	r2, r2, #GICH_LR0
-> +	add	r3, r11, #VGIC_CPU_LR
-> +	ldr	r4, [r11, #VGIC_CPU_NR_LR]
-> +1:	ldr	r6, [r2], #4
-> +	str	r6, [r3], #4
-> +	subs	r4, r4, #1
-> +	bne	1b
-> +2:
-> +#endif
->  .endm
 
-Will
+-- 
+Thanks & Regards
+Vivek
