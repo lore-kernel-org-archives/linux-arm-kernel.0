@@ -1,27 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 3 Dec 2012 17:25:25 +0000
-Subject: Replacing dma_alloc_writecombine for aarch64
-In-Reply-To: <CAD0U-h+a6_1gtTS9pq-p7_BPmNnghUMMFZAHr8JdiK1kXrEHZQ@mail.gmail.com>
-References: <CAD0U-h+a6_1gtTS9pq-p7_BPmNnghUMMFZAHr8JdiK1kXrEHZQ@mail.gmail.com>
-Message-ID: <20121203172525.GD4261@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 03 Dec 2012 10:26:24 -0700
+Subject: [PATCH V7 2/7] ARM: dt: change .dtb build rules to build in dts
+ directory
+In-Reply-To: <50BCD030.7020908@gmail.com>
+References: <1354058956-7199-1-git-send-email-swarren@wwwdotorg.org>
+ <1354058956-7199-2-git-send-email-swarren@wwwdotorg.org>
+ <50BCD030.7020908@gmail.com>
+Message-ID: <50BCE0C0.8000708@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 03, 2012 at 05:18:35PM +0000, Ryan Harkin wrote:
-> Some time ago, I converted the PL111 driver to use device tree [1].  I
-> gathered some feedback after an RFC and I was recently updating my
-> driver.  However, with my aarch64 work, I found that the driver
-> doesn't compile for aarch64 because I've been using
-> dma_alloc_writecombine in the driver.  As aarch64 doesn't use the
-> driver with DMA, I hacked it to get my aarch64 branch working.
+On 12/03/2012 09:15 AM, Rob Herring wrote:
+> On 11/27/2012 05:29 PM, Stephen Warren wrote:
+>> From: Grant Likely <grant.likely@secretlab.ca>
+>>
+>> The current rules have the .dtb files build in a different directory
+>> from the .dts files. The only reason for this is that it was what
+>> PowerPC has done historically. This patch changes ARM to use the generic
+>> dtb rule which builds .dtb files in the same directory as the source .dts.
 > 
-> Is there another API you can recommend I use for DMA that will work
-> with both flavours?
+> [snip]
+> 
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index a17d5ab..cb217f8 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -136,4 +136,12 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
+>>  	wm8650-mid.dtb
+>>  dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
+>>  
+>> +targets += dtbs
+>>  endif
+>> +
+>> +dtbs: $(addprefix $(obj)/, $(dtb-y))
+>> +	# *.dtb used to be generated in the directory above. Clean out the
+>> +	# old build results so people don't accidentally use them.
+>> +	rm -f $(obj)/../*.dtb
+> 
+> Do you intend for this to print out? Seems a little noisy to me for a
+> one-time problem. Are you trying to tell users the dtb files moved or
+> just prevent them from using the old ones? Quietly removing them would
+> still accomplish the latter.
 
-You can use dma_alloc_coherent() which gives the same thing on ARMv7
-(and some ARMv6) and AArch64 (write-combine memory). However, there is
-ARMv5 where this translates to strongly ordered memory, so you can't the
-coherent variant all the time.
-
--- 
-Catalin
+Oh, I just wasn't thinking; I guess this should be @rm or similar. Will
+you fix this up locally since you've applied the patches?
