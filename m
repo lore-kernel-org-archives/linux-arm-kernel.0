@@ -1,327 +1,269 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 03 Dec 2012 15:55:35 -0600
-Subject: [RFC PATCH 2/2] ARM: SMP support for mach-virt
-In-Reply-To: <1354557160-20144-3-git-send-email-will.deacon@arm.com>
-References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
- <1354557160-20144-3-git-send-email-will.deacon@arm.com>
-Message-ID: <50BD1FD7.9040000@gmail.com>
+From: giridhar.maruthy@linaro.org (Giridhar Maruthy)
+Date: Tue, 4 Dec 2012 07:53:57 +0900
+Subject: [PATCH] I2C: EXYNOS: Add slave support to i2c
+In-Reply-To: <CAH9JG2VU7gLU-tdhUcGYtkn3aE5+CePKZD7U0OhpDMgJjARWyw@mail.gmail.com>
+References: <1354354961-28833-1-git-send-email-giridhar.maruthy@linaro.org>
+ <CAHuqX+EQ0pZnm27yAVqC=NRX8huQ5EvbC8PGn2G3xYw4D71gQA@mail.gmail.com>
+ <CAH9JG2VU7gLU-tdhUcGYtkn3aE5+CePKZD7U0OhpDMgJjARWyw@mail.gmail.com>
+Message-ID: <CAHuqX+GjysHvd7b8n5vjBHA+HNOY6aeRaKSnH0Jq-0z_vni9Hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2012 11:52 AM, Will Deacon wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> This patch adds support for SMP to mach-virt.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/mach-virt/Makefile  |   1 +
->  arch/arm/mach-virt/headsmp.S |  38 ++++++++
->  arch/arm/mach-virt/platsmp.c | 205 +++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-virt/virt.c    |   6 ++
->  4 files changed, 250 insertions(+)
->  create mode 100644 arch/arm/mach-virt/headsmp.S
->  create mode 100644 arch/arm/mach-virt/platsmp.c
-> 
-> diff --git a/arch/arm/mach-virt/Makefile b/arch/arm/mach-virt/Makefile
-> index 7ddbfa6..9ce8a28 100644
-> --- a/arch/arm/mach-virt/Makefile
-> +++ b/arch/arm/mach-virt/Makefile
-> @@ -3,3 +3,4 @@
->  #
->  
->  obj-y					:= virt.o
-> +obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
-> diff --git a/arch/arm/mach-virt/headsmp.S b/arch/arm/mach-virt/headsmp.S
-> new file mode 100644
-> index 0000000..e27afb0
-> --- /dev/null
-> +++ b/arch/arm/mach-virt/headsmp.S
-> @@ -0,0 +1,38 @@
-> +/*
-> + *  Copyright (c) 2012 ARM Limited
-> + *  All Rights Reserved
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#include <linux/linkage.h>
-> +#include <linux/init.h>
-> +
-> +	__INIT
-> +
-> +/*
-> + * This provides a "holding pen" into which all secondary cores are held
-> + * until we're ready for them to initialise.
-> + */
-> +ENTRY(virt_secondary_startup)
-> +	mrc	p15, 0, r0, c0, c0, 5
-> +	and	r0, r0, #15
-> +	adr	r4, 1f
-> +	ldmia	r4, {r5, r6}
-> +	sub	r4, r4, r5
-> +	add	r6, r6, r4
-> +pen:	ldr	r7, [r6]
-> +	cmp	r7, r0
-> +	bne	pen
+Thank you Kyungmin Park for the review.
 
-Why is the pen is needed? It should only be needed for hotplug on
-systems that can't reset their cores. I'd hope you could design good
-virtual h/w.
+On 3 December 2012 22:28, Kyungmin Park <kmpark@infradead.org> wrote:
+>
+> Hi,
+>
+> On Mon, Dec 3, 2012 at 9:16 PM, Giridhar Maruthy
+> <giridhar.maruthy@linaro.org> wrote:
+> > This patch adds slave support to i2c. The dt entry i2c-mode
+> > decides at probe time if the controller needs to work in
+> > slave mode and the controller is accordingly programmed.
+> >
+> > Signed-off-by: Giridhar Maruthy <giridhar.maruthy@linaro.org>
+> > ---
+> >  drivers/i2c/busses/i2c-s3c2410.c |  100
+> > ++++++++++++++++++++++++++------------
+> >  1 file changed, 68 insertions(+), 32 deletions(-)
+> >
+> > diff --git a/drivers/i2c/busses/i2c-s3c2410.c
+> > b/drivers/i2c/busses/i2c-s3c2410.c
+> > index e93e7d6..d83a6d7 100644
+> > --- a/drivers/i2c/busses/i2c-s3c2410.c
+> > +++ b/drivers/i2c/busses/i2c-s3c2410.c
+> > @@ -53,6 +53,9 @@
+> >  /* Max time to wait for bus to become idle after a xfer (in us) */
+> >  #define S3C2410_IDLE_TIMEOUT   5000
+> >
+> > +/* To find the master/slave mode of current controller */
+> > +#define is_master(i2c) (!i2c->i2c_mode)
+> > +
+> >  /* i2c controller state */
+> >  enum s3c24xx_i2c_state {
+> >         STATE_IDLE,
+> > @@ -89,6 +92,8 @@ struct s3c24xx_i2c {
+> >  #ifdef CONFIG_CPU_FREQ
+> >         struct notifier_block   freq_transition;
+> >  #endif
+> > +       /* i2c_mode: 0 is for master; and 1 is for slave */
+> > +       unsigned int            i2c_mode;
+> If it's used for master or not, doesn't better to use 'is_master' or
+> 'is_slave'? what's the meaning of 'i2c_mode'?
+> and
+> #define is_master(i2c) (i2c->is_master)
 
-> +
-> +	/*
-> +	 * we've been released from the holding pen: secondary_stack
-> +	 * should now contain the SVC stack for this core
-> +	 */
-> +	b	secondary_startup
-> +
-> +	.align
-> +1:	.long	.
-> +	.long	pen_release
-> +ENDPROC(virt_secondary_startup)
-> diff --git a/arch/arm/mach-virt/platsmp.c b/arch/arm/mach-virt/platsmp.c
-> new file mode 100644
-> index 0000000..fe02f51
-> --- /dev/null
-> +++ b/arch/arm/mach-virt/platsmp.c
-> @@ -0,0 +1,205 @@
-> +/*
-> + * Dummy Virtual Machine - does what it says on the tin.
-> + *
-> + * SMP operations, shamelessly stolen from:
-> + * arch/arm64/kernel/smp.c
-> + *
-> + * Copyright (C) 2012 ARM Ltd
-> + * Author: Catalin Marinas <catalin.marinas@arm.com>
-> + * Author: Will Deacon <will.deacon@arm.com>
-> + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/smp.h>
-> +#include <linux/errno.h>
-> +#include <linux/delay.h>
-> +#include <linux/device.h>
-> +#include <linux/jiffies.h>
-> +#include <linux/of.h>
-> +
-> +#include <asm/cacheflush.h>
-> +#include <asm/smp_plat.h>
-> +#include <asm/hardware/gic.h>
-> +
-> +extern void virt_secondary_startup(void);
-> +
-> +static DEFINE_RAW_SPINLOCK(boot_lock);
-> +static phys_addr_t cpu_release_addr[NR_CPUS];
-> +
-> +/*
-> + * Write secondary_holding_pen_release in a way that is guaranteed to be
-> + * visible to all observers, irrespective of whether they're taking part
-> + * in coherency or not.  This is necessary for the hotplug code to work
-> + * reliably.
-> + */
-> +static void __cpuinit write_pen_release(int val)
-> +{
-> +	void *start = (void *)&pen_release;
-> +	unsigned long size = sizeof(pen_release);
-> +
-> +	pen_release = val;
-> +	smp_wmb();
-> +	__cpuc_flush_dcache_area(start, size);
-> +	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
-> +}
-> +
-> +/*
-> + * Enumerate the possible CPU set from the device tree.
-> + */
-> +static void __init virt_smp_init_cpus(void)
-> +{
-> +	const char *enable_method;
-> +	struct device_node *dn = NULL;
-> +	int cpu = 0;
-> +	u32 release_addr;
-> +
-> +	while ((dn = of_find_node_by_type(dn, "cpu"))) {
-> +		if (cpu >= NR_CPUS)
-> +			goto next;
-> +
-> +		/*
-> +		 * We currently support only the "spin-table" enable-method.
-> +		 */
-> +		enable_method = of_get_property(dn, "enable-method", NULL);
-> +		if (!enable_method || strcmp(enable_method, "spin-table")) {
 
-Are these documented?
+I thought mode indicates master mode or slave mode, but I agree
+'is_master' name is better. Will change that.
 
-> +			pr_err("CPU %d: missing or invalid enable-method property: %s\n",
-> +			       cpu, enable_method);
-> +			goto next;
-> +		}
-> +
-> +		/*
-> +		 * Determine the address from which the CPU is polling.
-> +		 */
-> +		if (of_property_read_u32(dn, "cpu-release-addr", &release_addr)) {
-> +			pr_err("CPU %d: missing or invalid cpu-release-addr property\n",
-> +			       cpu);
-> +			goto next;
-> +		}
-> +
-> +		cpu_release_addr[cpu] = release_addr;
-> +		set_cpu_possible(cpu, true);
-> +next:
-> +		cpu++;
-> +	}
-> +
-> +	/* sanity check */
-> +	if (cpu > NR_CPUS)
-> +		pr_warning("no. of cores (%d) greater than configured maximum of %d - clipping\n",
-> +			   cpu, NR_CPUS);
-> +
-> +	set_smp_cross_call(gic_raise_softirq);
-> +}
-> +
-> +static void __init virt_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +	int cpu;
-> +	void **release_addr;
-> +	unsigned int ncores = num_possible_cpus();
-> +
-> +	/*
-> +	 * are we trying to boot more cores than exist?
-> +	 */
-> +	if (max_cpus > ncores)
-> +		max_cpus = ncores;
-> +
-> +	/*
-> +	 * Initialise the present map (which describes the set of CPUs
-> +	 * actually populated at the present time) and release the
-> +	 * secondaries from the bootloader.
-> +	 */
-> +	for_each_possible_cpu(cpu) {
-> +		if (max_cpus == 0)
-> +			break;
-> +
-> +		if (!cpu_release_addr[cpu])
-> +			continue;
-> +
-> +		release_addr = __va(cpu_release_addr[cpu]);
-> +		release_addr[0] = (void *)__pa(virt_secondary_startup);
-> +		smp_wmb();
-> +		__cpuc_flush_dcache_area(release_addr, sizeof(release_addr[0]));
-> +		outer_clean_range(__pa(release_addr), __pa(release_addr+1));
-> +
-> +		set_cpu_present(cpu, true);
-> +		max_cpus--;
-> +	}
-> +}
-> +
-> +static int __cpuinit virt_boot_secondary(unsigned int cpu,
-> +					 struct task_struct *idle)
-> +{
-> +	unsigned long timeout;
-> +
-> +	/*
-> +	 * Set synchronisation state between this boot processor
-> +	 * and the secondary one
-> +	 */
-> +	raw_spin_lock(&boot_lock);
-> +
-> +	/*
-> +	 * Update the pen release flag.
-> +	 */
-> +	write_pen_release(cpu);
-> +
-> +	/*
-> +	 * Send the secondary CPU a soft interrupt, causing the
-> +	 * secondaries to read pen_release.
-> +	 */
-> +	gic_raise_softirq(cpumask_of(cpu), 0);
-> +
-> +	timeout = jiffies + (1 * HZ);
-> +	while (time_before(jiffies, timeout)) {
-> +		if (pen_release == -1UL)
-> +			break;
-> +		udelay(10);
-> +	}
-> +
-> +	/*
-> +	 * Now the secondary core is starting up let it run its
-> +	 * calibrations, then wait for it to finish
-> +	 */
-> +	raw_spin_unlock(&boot_lock);
-> +
-> +	return pen_release != -1 ? -ENOSYS : 0;
-> +}
-> +
-> +static void __cpuinit virt_secondary_init(unsigned int cpu)
-> +{
-> +	/*
-> +	 * if any interrupts are already enabled for the primary
-> +	 * core (e.g. timer irq), then they will not have been enabled
-> +	 * for us: do so
-> +	 */
-> +	gic_secondary_init(0);
-> +
-> +	/*
-> +	 * let the primary processor know we're out of the
-> +	 * pen, then head off into the C entry point
-> +	 */
-> +	write_pen_release(-1);
-> +
-> +	/*
-> +	 * Synchronise with the boot thread.
-> +	 */
-> +	raw_spin_lock(&boot_lock);
-> +	raw_spin_unlock(&boot_lock);
-> +}
-> +
-> +struct smp_operations __initdata virt_smp_ops = {
-> +	.smp_init_cpus		= virt_smp_init_cpus,
-> +	.smp_prepare_cpus	= virt_smp_prepare_cpus,
-> +	.smp_secondary_init	= virt_secondary_init,
-> +	.smp_boot_secondary	= virt_boot_secondary,
-> +};
-> diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
-> index 174b9da..d764835 100644
-> --- a/arch/arm/mach-virt/virt.c
-> +++ b/arch/arm/mach-virt/virt.c
-> @@ -20,6 +20,7 @@
->  
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
-> +#include <linux/smp.h>
->  
->  #include <asm/arch_timer.h>
->  #include <asm/hardware/gic.h>
-> @@ -56,10 +57,15 @@ static struct sys_timer virt_timer = {
->  	.init = virt_timer_init,
->  };
->  
-> +#ifdef CONFIG_SMP
-> +extern struct smp_operations virt_smp_ops;
-> +#endif
-> +
->  DT_MACHINE_START(VIRT, "Dummy Virtual Machine")
->  	.init_irq	= gic_init_irq,
->  	.handle_irq     = gic_handle_irq,
->  	.timer		= &virt_timer,
->  	.init_machine	= virt_init,
-> +	.smp		= smp_ops(virt_smp_ops),
->  	.dt_compat	= virt_dt_match,
->  MACHINE_END
-> 
+>
+> Thank you,
+> Kyungmin Park
+> >  };
+> >
+> >  static struct platform_device_id s3c24xx_driver_ids[] = {
+> > @@ -202,11 +207,21 @@ static void s3c24xx_i2c_message_start(struct
+> > s3c24xx_i2c *i2c,
+> >         stat = 0;
+> >         stat |=  S3C2410_IICSTAT_TXRXEN;
+> >
+> > -       if (msg->flags & I2C_M_RD) {
+> > -               stat |= S3C2410_IICSTAT_MASTER_RX;
+> > -               addr |= 1;
+> > -       } else
+> > -               stat |= S3C2410_IICSTAT_MASTER_TX;
+> > +       if (is_master(i2c)) {
+> > +               /* Master mode */
+> > +               if (msg->flags & I2C_M_RD) {
+> > +                       stat |= S3C2410_IICSTAT_MASTER_RX;
+> > +                       addr |= 1;
+> > +               } else
+> > +                       stat |= S3C2410_IICSTAT_MASTER_TX;
+> > +       } else {
+> > +               /* Slave mode */
+> > +               if (msg->flags & I2C_M_RD) {
+> > +                       stat |= S3C2410_IICSTAT_SLAVE_RX;
+> > +                       addr |= 1;
+> > +               } else
+> > +                       stat |= S3C2410_IICSTAT_SLAVE_TX;
+> > +       }
+> >
+> >         if (msg->flags & I2C_M_REV_DIR_ADDR)
+> >                 addr ^= 1;
+> > @@ -228,8 +243,10 @@ static void s3c24xx_i2c_message_start(struct
+> > s3c24xx_i2c *i2c,
+> >         dev_dbg(i2c->dev, "iiccon, %08lx\n", iiccon);
+> >         writel(iiccon, i2c->regs + S3C2410_IICCON);
+> >
+> > -       stat |= S3C2410_IICSTAT_START;
+> > -       writel(stat, i2c->regs + S3C2410_IICSTAT);
+> > +       if (is_master(i2c)) {
+> > +               stat |= S3C2410_IICSTAT_START;
+> > +               writel(stat, i2c->regs + S3C2410_IICSTAT);
+> > +       }
+> >  }
+> >
+> >  static inline void s3c24xx_i2c_stop(struct s3c24xx_i2c *i2c, int ret)
+> > @@ -272,14 +289,19 @@ static inline void s3c24xx_i2c_stop(struct s3c24xx_i2c
+> > *i2c, int ret)
+> >          * devices, the host as Master and the HDMIPHY device as the slave.
+> >          * Skipping the STOP condition has been tested on this bus and
+> > works.
+> >          */
+> > -       if (i2c->quirks & QUIRK_HDMIPHY) {
+> > -               /* Stop driving the I2C pins */
+> > -               iicstat &= ~S3C2410_IICSTAT_TXRXEN;
+> > -       } else {
+> > -               /* stop the transfer */
+> > -               iicstat &= ~S3C2410_IICSTAT_START;
+> > +       if (is_master(i2c)) {
+> > +               if (i2c->quirks & QUIRK_HDMIPHY) {
+> > +                       /* Stop driving the I2C pins */
+> > +                       iicstat &= ~S3C2410_IICSTAT_TXRXEN;
+> > +               } else {
+> > +                       /* stop the transfer */
+> > +                       if (is_master(i2c)) {
+> > +                               /* Start/Stop required only for master */
+> > +                               iicstat &= ~S3C2410_IICSTAT_START;
+> > +                       }
+> > +               }
+> > +               writel(iicstat, i2c->regs + S3C2410_IICSTAT);
+> >         }
+> > -       writel(iicstat, i2c->regs + S3C2410_IICSTAT);
+> >
+> >         i2c->state = STATE_STOP;
+> >
+> > @@ -348,7 +370,8 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c,
+> > unsigned long iicstat)
+> >                  */
+> >
+> >                 if (iicstat & S3C2410_IICSTAT_LASTBIT &&
+> > -                   !(i2c->msg->flags & I2C_M_IGNORE_NAK)) {
+> > +                   !(i2c->msg->flags & I2C_M_IGNORE_NAK) &&
+> > +                   is_master(i2c)) {
+> >                         /* ack was not received... */
+> >
+> >                         dev_dbg(i2c->dev, "ack was not received\n");
+> > @@ -380,7 +403,7 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c,
+> > unsigned long iicstat)
+> >                  * end of the message, and if so, work out what to do
+> >                  */
+> >
+> > -               if (!(i2c->msg->flags & I2C_M_IGNORE_NAK)) {
+> > +               if (!(i2c->msg->flags & I2C_M_IGNORE_NAK) && is_master(i2c))
+> > {
+> >                         if (iicstat & S3C2410_IICSTAT_LASTBIT) {
+> >                                 dev_dbg(i2c->dev, "WRITE: No Ack\n");
+> >
+> > @@ -432,7 +455,6 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c,
+> > unsigned long iicstat)
+> >
+> >                 } else {
+> >                         /* send stop */
+> > -
+> >                         s3c24xx_i2c_stop(i2c, 0);
+> >                 }
+> >                 break;
+> > @@ -447,7 +469,7 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c,
+> > unsigned long iicstat)
+> >                 i2c->msg->buf[i2c->msg_ptr++] = byte;
+> >
+> >   prepare_read:
+> > -               if (is_msglast(i2c)) {
+> > +               if (is_msglast(i2c) && is_master(i2c)) {
+> >                         /* last byte of buffer */
+> >
+> >                         if (is_lastmsg(i2c))
+> > @@ -612,11 +634,13 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
+> >         if (i2c->suspended)
+> >                 return -EIO;
+> >
+> > -       ret = s3c24xx_i2c_set_master(i2c);
+> > -       if (ret != 0) {
+> > -               dev_err(i2c->dev, "cannot get bus (error %d)\n", ret);
+> > -               ret = -EAGAIN;
+> > -               goto out;
+> > +       if (is_master(i2c)) {
+> > +               ret = s3c24xx_i2c_set_master(i2c);
+> > +               if (ret != 0) {
+> > +                       dev_err(i2c->dev, "cannot get bus (error %d)\n",
+> > ret);
+> > +                       ret = -EAGAIN;
+> > +                       goto out;
+> > +               }
+> >         }
+> >
+> >         i2c->msg     = msgs;
+> > @@ -628,23 +652,29 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
+> >         s3c24xx_i2c_enable_irq(i2c);
+> >         s3c24xx_i2c_message_start(i2c, msgs);
+> >
+> > -       timeout = wait_event_timeout(i2c->wait, i2c->msg_num == 0, HZ * 5);
+> > +       if (is_master(i2c))
+> > +               timeout = wait_event_timeout(i2c->wait,\
+> > +                               i2c->msg_num == 0, HZ * 5);
+> > +       else
+> > +               wait_event_interruptible(i2c->wait, i2c->msg_num == 0);
+> >
+> >         ret = i2c->msg_idx;
+> >
+> >         /* having these next two as dev_err() makes life very
+> >          * noisy when doing an i2cdetect */
+> >
+> > -       if (timeout == 0)
+> > -               dev_dbg(i2c->dev, "timeout\n");
+> > -       else if (ret != num)
+> > -               dev_dbg(i2c->dev, "incomplete xfer (%d)\n", ret);
+> > +       if (is_master(i2c)) {
+> > +               if (timeout == 0)
+> > +                       dev_dbg(i2c->dev, "timeout\n");
+> > +               else if (ret != num)
+> > +                       dev_dbg(i2c->dev, "incomplete xfer (%d)\n", ret);
+> >
+> > -       /* For QUIRK_HDMIPHY, bus is already disabled */
+> > -       if (i2c->quirks & QUIRK_HDMIPHY)
+> > -               goto out;
+> > +               /* For QUIRK_HDMIPHY, bus is already disabled */
+> > +               if (i2c->quirks & QUIRK_HDMIPHY)
+> > +                       goto out;
+> >
+> > -       s3c24xx_i2c_wait_idle(i2c);
+> > +               s3c24xx_i2c_wait_idle(i2c);
+> > +       }
+> >
+> >   out:
+> >         return ret;
+> > @@ -963,6 +993,7 @@ s3c24xx_i2c_parse_dt(struct device_node *np, struct
+> > s3c24xx_i2c *i2c)
+> >         of_property_read_u32(np, "samsung,i2c-slave-addr",
+> > &pdata->slave_addr);
+> >         of_property_read_u32(np, "samsung,i2c-max-bus-freq",
+> >                                 (u32 *)&pdata->frequency);
+> > +       of_property_read_u32(np, "samsung,i2c-mode", &i2c->i2c_mode);
+> >  }
+> >  #else
+> >  static void
+> > @@ -1004,6 +1035,10 @@ static int s3c24xx_i2c_probe(struct platform_device
+> > *pdev)
+> >                 goto err_noclk;
+> >         }
+> >
+> > +       /* By default, i2c works in master mode */
+> > +       /* This currently will be updated using DT */
+> > +       i2c->i2c_mode   = 0;
+> > +
+> >         i2c->quirks = s3c24xx_get_device_quirks(pdev);
+> >         if (pdata)
+> >                 memcpy(i2c->pdata, pdata, sizeof(*pdata));
+> > @@ -1017,6 +1052,7 @@ static int s3c24xx_i2c_probe(struct platform_device
+> > *pdev)
+> >         i2c->adap.class   = I2C_CLASS_HWMON | I2C_CLASS_SPD;
+> >         i2c->tx_setup     = 50;
+> >
+> > +
+> >         init_waitqueue_head(&i2c->wait);
+> >
+> >         /* find the clock and enable it */
+> > --
+> > 1.7.9.5
