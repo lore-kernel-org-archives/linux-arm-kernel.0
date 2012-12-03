@@ -1,61 +1,54 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 03 Dec 2012 11:52:40 -0700
-Subject: [PATCH 5/5] ARM: tegra20: cpuidle: apply coupled cpuidle for
- powered-down mode
-In-Reply-To: <1354503607-13707-6-git-send-email-josephl@nvidia.com>
-References: <1354503607-13707-1-git-send-email-josephl@nvidia.com>
- <1354503607-13707-6-git-send-email-josephl@nvidia.com>
-Message-ID: <50BCF4F8.60606@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 03 Dec 2012 12:55:05 -0600
+Subject: [PATCH 2/3] ARM: nommu: prevent generation of kernel unaligned
+ memory accesses
+In-Reply-To: <1354557403-20386-2-git-send-email-will.deacon@arm.com>
+References: <1354557403-20386-1-git-send-email-will.deacon@arm.com>
+ <1354557403-20386-2-git-send-email-will.deacon@arm.com>
+Message-ID: <50BCF589.4010509@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2012 08:00 PM, Joseph Lo wrote:
-> The "powered-down" cpuidle mode of Tegra20 needs the CPU0 be the last one
-> core to go into this mode before other core. The coupled cpuidle framework
-> can help to sync the MPCore to coupled state then go into "powered-down"
-> idle mode together. The driver can just assume the MPCore come into
-> "powered-down" mode at the same time. No need to take care if the CPU_0
-> goes into this mode along and only can put it into safe idle mode (WFI).
+On 12/03/2012 11:56 AM, Will Deacon wrote:
+> Recent ARMv7 toolchains assume that unaligned memory accesses will not
+> fault and will instead be handled by the processor.
+> 
+> For the nommu case (without an MPU), memory will be treated as
+> strongly-ordered and therefore unaligned accesses may fault regardless
+> of the SCTLR.A setting.
+> 
+> This patch passes -mno-unaligned-access to GCC when compiling for nommu
+> targets, preventing the generation of unaligned memory access in the
+> kernel.
 
-I wonder if it wouldn't be simpler to squash this patch into one of the
-earlier patches, and just use coupled cpuidle from the very start?
+BTW, this option will not fully prevent unaligned accesses. This code
+will still generate unaligned accesses:
 
-> +static int __cpuinit tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
-> +					      struct cpuidle_driver *drv,
-> +					      int index)
+void func(void)
+{
+	char array[] = { 1, 2, 3 };
+}
 
-> -	if (cpu == 0) {
-> -		if (last_cpu)
-> -			entered_lp2 = tegra20_cpu_cluster_power_down(dev, drv,
-> -								     index);
-> -		else
-> -			cpu_do_idle();
-> -	} else {
-> +	if (cpu == 0)
-> +		entered_lp2 = tegra20_cpu_cluster_power_down(dev, drv, index);
-> +	else
->  		entered_lp2 = tegra20_idle_enter_lp2_cpu_1(dev, drv, index);
-> -	}
+u-boot has been fixing these up by making the arrays static.
 
-So I assume that coupled cpuidle only calls this function on CPU 0 once
-it has guaranteed that CPU n are all in this same idle state. What does
-CPU 0 do now, when it wants to enter LP2 but can't because CPU n aren't
-in LP2? Do we need to explicitly provide some kind of function to
-implement this waiting state, or does coupled cpuidle ensure the LP3 is
-entered, or implement WFI itself, or ...?
+Rob
 
-> @@ -258,6 +256,9 @@ int __init tegra20_cpuidle_init(void)
-
-> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
-> +		dev->coupled_cpus = *cpu_online_mask;
-> +#endif
-
-What if that changes; I assume couple cpuidle handles that by
-registering a notifier?
-
-Is there any way that the kernel can boot with only CPU 0 "plugged in",
-but later have the other CPU hotplugged in? In other words, should that
-hard-code a mask (3?) that describes the HW, rather than relying on the
-runtime hotplug status? (think about what happens when this idle code is
-moved into drivers/cpuidle/ and built as a module, and hence could be
-initialized with only 1 CPU hotplugged in).
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/Makefile | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 5f914fc..03363e2 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -32,6 +32,7 @@ KBUILD_DEFCONFIG := versatile_defconfig
+>  # defines filename extension depending memory management type.
+>  ifeq ($(CONFIG_MMU),)
+>  MMUEXT		:= -nommu
+> +KBUILD_CFLAGS	+= $(call cc-option,-mno-unaligned-access)
+>  endif
+>  
+>  ifeq ($(CONFIG_FRAME_POINTER),y)
+> 
