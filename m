@@ -1,38 +1,40 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  3 Dec 2012 17:56:43 +0000
-Subject: [PATCH 3/3] ARM: nommu: do not enable DCACHE_WORD_ACCESS when
- !CONFIG_MMU
+Date: Mon,  3 Dec 2012 17:56:42 +0000
+Subject: [PATCH 2/3] ARM: nommu: prevent generation of kernel unaligned memory
+ accesses
 In-Reply-To: <1354557403-20386-1-git-send-email-will.deacon@arm.com>
 References: <1354557403-20386-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1354557403-20386-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1354557403-20386-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit b9a50f74905a ("ARM: 7450/1: dcache: select DCACHE_WORD_ACCESS for
-little-endian ARMv6+ CPUs") added support for word-at-time path
-comparisons, relying on the ability to perform unaligned loads with
-negligible performance impact in hardware.
+Recent ARMv7 toolchains assume that unaligned memory accesses will not
+fault and will instead be handled by the processor.
 
-For nommu configurations without MPU support, this is unpredictable and
-so we should fall back to the byte-by-byte routines.
+For the nommu case (without an MPU), memory will be treated as
+strongly-ordered and therefore unaligned accesses may fault regardless
+of the SCTLR.A setting.
+
+This patch passes -mno-unaligned-access to GCC when compiling for nommu
+targets, preventing the generation of unaligned memory access in the
+kernel.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/Makefile | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ade7e92..3388431 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -6,7 +6,7 @@ config ARM
- 	select ARCH_HAVE_CUSTOM_GPIO_H
- 	select ARCH_WANT_IPC_PARSE_VERSION
- 	select CPU_PM if (SUSPEND || CPU_IDLE)
--	select DCACHE_WORD_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && !CPU_BIG_ENDIAN
-+	select DCACHE_WORD_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && !CPU_BIG_ENDIAN && MMU
- 	select GENERIC_ATOMIC64 if (CPU_V6 || !CPU_32v6K || !AEABI)
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
- 	select GENERIC_IRQ_PROBE
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 5f914fc..03363e2 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -32,6 +32,7 @@ KBUILD_DEFCONFIG := versatile_defconfig
+ # defines filename extension depending memory management type.
+ ifeq ($(CONFIG_MMU),)
+ MMUEXT		:= -nommu
++KBUILD_CFLAGS	+= $(call cc-option,-mno-unaligned-access)
+ endif
+ 
+ ifeq ($(CONFIG_FRAME_POINTER),y)
 -- 
 1.8.0
