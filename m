@@ -1,47 +1,38 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 03 Dec 2012 10:15:44 -0600
-Subject: [PATCH V7 2/7] ARM: dt: change .dtb build rules to build in dts
- directory
-In-Reply-To: <1354058956-7199-2-git-send-email-swarren@wwwdotorg.org>
-References: <1354058956-7199-1-git-send-email-swarren@wwwdotorg.org>
- <1354058956-7199-2-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <50BCD030.7020908@gmail.com>
+From: armando.visconti@st.com (Armando Visconti)
+Date: Mon, 3 Dec 2012 17:44:11 +0100
+Subject: [PATCH] nommu: Enable the strict alignment (CR_A) bit only if
+ ARCH < v6
+In-Reply-To: <1354187042-28568-1-git-send-email-armando.visconti@st.com>
+References: <1354187042-28568-1-git-send-email-armando.visconti@st.com>
+Message-ID: <50BCD6DB.2030200@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2012 05:29 PM, Stephen Warren wrote:
-> From: Grant Likely <grant.likely@secretlab.ca>
-> 
-> The current rules have the .dtb files build in a different directory
-> from the .dts files. The only reason for this is that it was what
-> PowerPC has done historically. This patch changes ARM to use the generic
-> dtb rule which builds .dtb files in the same directory as the source .dts.
+On 11/29/2012 12:04 PM, Armando VISCONTI wrote:
+> This patch keeps disabled the strict alignment CP15 bit for
+> all armv6 and armv7 processor without the mmu. This behaviour
+> is now same as in the mmu case.
+>
+> Signed-off-by: Armando Visconti<armando.visconti@st.com>
+> ---
+>   arch/arm/kernel/head-nommu.S |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+> index 278cfc1..2c228a0 100644
+> --- a/arch/arm/kernel/head-nommu.S
+> +++ b/arch/arm/kernel/head-nommu.S
+> @@ -68,7 +68,7 @@ __after_proc_init:
+>   	 * CP15 system control register value returned in r0 from
+>   	 * the CPU init function.
+>   	 */
+> -#ifdef CONFIG_ALIGNMENT_TRAP
+> +#if defined(CONFIG_ALIGNMENT_TRAP)&&  __LINUX_ARM_ARCH__<  6
+>   	orr	r0, r0, #CR_A
+>   #else
+>   	bic	r0, r0, #CR_A
 
-[snip]
+Any feedback on this simple patch?
 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index a17d5ab..cb217f8 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -136,4 +136,12 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
->  	wm8650-mid.dtb
->  dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
->  
-> +targets += dtbs
->  endif
-> +
-> +dtbs: $(addprefix $(obj)/, $(dtb-y))
-> +	# *.dtb used to be generated in the directory above. Clean out the
-> +	# old build results so people don't accidentally use them.
-> +	rm -f $(obj)/../*.dtb
-
-Do you intend for this to print out? Seems a little noisy to me for a
-one-time problem. Are you trying to tell users the dtb files moved or
-just prevent them from using the old ones? Quietly removing them would
-still accomplish the latter.
-
-Rob
-
-> +
-> +clean-files := *.dtb
-> 
+Thx,
+Armando
