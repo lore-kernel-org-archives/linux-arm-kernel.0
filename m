@@ -1,78 +1,57 @@
-From: devendra.aaru@gmail.com (devendra.aaru)
-Date: Mon, 3 Dec 2012 00:02:33 -0500
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 3 Dec 2012 13:33:39 +0800
 Subject: [PATCH 1/4] rtc: sa1100: enable/disable rtc when probe/remove the
  device
-In-Reply-To: <1354155670-6267-1-git-send-email-chao.xie@marvell.com>
+In-Reply-To: <CADApbejZXach=YaiL5rEWA5+uc+mO8PzQzUKN+k90HfxEsqgtA@mail.gmail.com>
 References: <1354155670-6267-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <CAHdPZaP+8wi6ZL5ugvgoEiq5AaLK8+V1SDbirMw0zj=C=w9ZNw@mail.gmail.com>
+ <20121129102519.GG19440@n2100.arm.linux.org.uk>
+ <CAN1soZxUA2PPy4694ByX1FTyWiJkha8QpKFK5Jc3Wf3zT0huOA@mail.gmail.com>
+ <CADApbejZXach=YaiL5rEWA5+uc+mO8PzQzUKN+k90HfxEsqgtA@mail.gmail.com>
+Message-ID: <CAN1soZxTc_69bX519j1okZ-6Rgc=2Wp-XdLaW5aJ6Leye_KH8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CCing Andrew as he is the maintainer of the rtc subsystem
+On Mon, Dec 3, 2012 at 9:39 AM, Chao Xie <xiechao.mail@gmail.com> wrote:
+> On Fri, Nov 30, 2012 at 3:04 PM, Haojian Zhuang
+> <haojian.zhuang@gmail.com> wrote:
+>> On Thu, Nov 29, 2012 at 6:25 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> On Wed, Nov 28, 2012 at 09:21:07PM -0500, Chao Xie wrote:
+>>>> The original sa1100_rtc_open/sa1100_rtc_release will be called
+>>>> when the /dev/rtc0 is opened or closed.
+>>>> In fact, these two functions will enable/disable the clock, and
+>>>> register/unregister the irqs.
+>>>> User application will use /dev/rtc0 to read the rtc time or set
+>>>> the alarm. The rtc should still run indepent of open/close the
+>>>> rtc device.
+>>>> So only enable clock and register the irqs when probe the device,
+>>>> and disable clock and unregister the irqs when remove the device.
+>>>
+>>> NAK.  I don't think you properly understand what's going on here if you
+>>> think moving the entire open and release functions into the probe and
+>>> remove functions is the right thing to do.
+>>
+>> Since PXA27x & PXA3xx supports dual rtc device at the same time,
+>> user could choose use either of rtc at run time. Then clk & irq are setup
+>> in open().
+>>
+>> Chao,
+>> So you shouldn't remove them into probe().
+>
+> How can user to choose one RTC?
 
-On Wed, Nov 28, 2012 at 9:21 PM, Chao Xie <chao.xie@marvell.com> wrote:
-> The original sa1100_rtc_open/sa1100_rtc_release will be called
-> when the /dev/rtc0 is opened or closed.
-> In fact, these two functions will enable/disable the clock, and
-> register/unregister the irqs.
-> User application will use /dev/rtc0 to read the rtc time or set
-> the alarm. The rtc should still run indepent of open/close the
-> rtc device.
-> So only enable clock and register the irqs when probe the device,
-> and disable clock and unregister the irqs when remove the device.
->
-> Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> ---
->  drivers/rtc/rtc-sa1100.c |    9 +++++++--
->  1 files changed, 7 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
-> index 50a5c4a..e933327 100644
-> --- a/drivers/rtc/rtc-sa1100.c
-> +++ b/drivers/rtc/rtc-sa1100.c
-> @@ -218,8 +218,6 @@ static int sa1100_rtc_proc(struct device *dev, struct seq_file *seq)
->  }
->
->  static const struct rtc_class_ops sa1100_rtc_ops = {
-> -       .open = sa1100_rtc_open,
-> -       .release = sa1100_rtc_release,
->         .read_time = sa1100_rtc_read_time,
->         .set_time = sa1100_rtc_set_time,
->         .read_alarm = sa1100_rtc_read_alarm,
-> @@ -253,6 +251,10 @@ static int sa1100_rtc_probe(struct platform_device *pdev)
->         spin_lock_init(&info->lock);
->         platform_set_drvdata(pdev, info);
->
-> +       ret = sa1100_rtc_open(&pdev->dev);
-> +       if (ret)
-> +               goto err_open;
-> +
->         /*
->          * According to the manual we should be able to let RTTR be zero
->          * and then a default diviser for a 32.768KHz clock is used.
-> @@ -305,7 +307,9 @@ static int sa1100_rtc_probe(struct platform_device *pdev)
->
->         return 0;
->  err_dev:
-> +       sa1100_rtc_release(&pdev->dev);
->         platform_set_drvdata(pdev, NULL);
-> +err_open:
->         clk_put(info->clk);
->  err_clk:
->         kfree(info);
-> @@ -318,6 +322,7 @@ static int sa1100_rtc_remove(struct platform_device *pdev)
->
->         if (info) {
->                 rtc_device_unregister(info->rtc);
-> +               sa1100_rtc_release(&pdev->dev);
->                 clk_put(info->clk);
->                 platform_set_drvdata(pdev, NULL);
->                 kfree(info);
-> --
-> 1.7.4.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+/dev/rtc0 & /dev/rtc1.
+
+The user can choose the rtc by iteself. Is it right?
+
+> The user API, for example "date" will open the device, get the time
+> and then close the device.
+
+"date" command is always using /dev/rtc. It's the alias of rtc0 or rtc1.
+
+> WHen set a alarm, it is the same routine. open->set->close.
+> The open routine will enable clock and register irq, close will
+> disable the clock and unregister irq. It means that if only open is
+> invoked, rtc begins to work, and after close is invoked rtc stops
+> working. It means that the user can not get correct time and can not
+> get right alarm.
