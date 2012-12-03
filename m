@@ -1,178 +1,267 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Dec 2012 13:25:43 +0000
-Subject: [PATCH v4 09/13] ARM: KVM: VGIC interrupt injection
-In-Reply-To: <20121110154518.3061.69353.stgit@chazy-air>
-References: <20121110154358.3061.16338.stgit@chazy-air>
- <20121110154518.3061.69353.stgit@chazy-air>
-Message-ID: <20121203132543.GE20074@mudshark.cambridge.arm.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Mon, 3 Dec 2012 22:28:21 +0900
+Subject: [PATCH] I2C: EXYNOS: Add slave support to i2c
+In-Reply-To: <CAHuqX+EQ0pZnm27yAVqC=NRX8huQ5EvbC8PGn2G3xYw4D71gQA@mail.gmail.com>
+References: <1354354961-28833-1-git-send-email-giridhar.maruthy@linaro.org>
+ <CAHuqX+EQ0pZnm27yAVqC=NRX8huQ5EvbC8PGn2G3xYw4D71gQA@mail.gmail.com>
+Message-ID: <CAH9JG2VU7gLU-tdhUcGYtkn3aE5+CePKZD7U0OhpDMgJjARWyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 10, 2012 at 03:45:18PM +0000, Christoffer Dall wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Plug the interrupt injection code. Interrupts can now be generated
-> from user space.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+Hi,
+
+On Mon, Dec 3, 2012 at 9:16 PM, Giridhar Maruthy
+<giridhar.maruthy@linaro.org> wrote:
+> This patch adds slave support to i2c. The dt entry i2c-mode
+> decides at probe time if the controller needs to work in
+> slave mode and the controller is accordingly programmed.
+>
+> Signed-off-by: Giridhar Maruthy <giridhar.maruthy@linaro.org>
 > ---
->  arch/arm/include/asm/kvm_vgic.h |    8 +++
->  arch/arm/kvm/arm.c              |   29 +++++++++++++
->  arch/arm/kvm/vgic.c             |   90 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 127 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
-> index 7229324..6e3d303 100644
-> --- a/arch/arm/include/asm/kvm_vgic.h
-> +++ b/arch/arm/include/asm/kvm_vgic.h
-> @@ -241,6 +241,8 @@ struct kvm_exit_mmio;
->  int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr);
->  void kvm_vgic_sync_to_cpu(struct kvm_vcpu *vcpu);
->  void kvm_vgic_sync_from_cpu(struct kvm_vcpu *vcpu);
-> +int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
-> +			bool level);
->  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->  bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  		      struct kvm_exit_mmio *mmio);
-> @@ -271,6 +273,12 @@ static inline void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu) {}
->  static inline void kvm_vgic_sync_to_cpu(struct kvm_vcpu *vcpu) {}
->  static inline void kvm_vgic_sync_from_cpu(struct kvm_vcpu *vcpu) {}
->  
-> +static inline int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid,
-> +				      const struct kvm_irq_level *irq)
-> +{
-> +	return 0;
-> +}
+>  drivers/i2c/busses/i2c-s3c2410.c |  100
+> ++++++++++++++++++++++++++------------
+>  1 file changed, 68 insertions(+), 32 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-s3c2410.c
+> b/drivers/i2c/busses/i2c-s3c2410.c
+> index e93e7d6..d83a6d7 100644
+> --- a/drivers/i2c/busses/i2c-s3c2410.c
+> +++ b/drivers/i2c/busses/i2c-s3c2410.c
+> @@ -53,6 +53,9 @@
+>  /* Max time to wait for bus to become idle after a xfer (in us) */
+>  #define S3C2410_IDLE_TIMEOUT   5000
+>
+> +/* To find the master/slave mode of current controller */
+> +#define is_master(i2c) (!i2c->i2c_mode)
 > +
->  static inline int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
->  {
->  	return 0;
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 3ac1aab..f43da01 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -764,10 +764,31 @@ int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level)
->  
->  	switch (irq_type) {
->  	case KVM_ARM_IRQ_TYPE_CPU:
-> +		if (irqchip_in_kernel(kvm))
-> +			return -ENXIO;
-> +
->  		if (irq_num > KVM_ARM_IRQ_CPU_FIQ)
->  			return -EINVAL;
->  
->  		return vcpu_interrupt_line(vcpu, irq_num, level);
-> +#ifdef CONFIG_KVM_ARM_VGIC
-> +	case KVM_ARM_IRQ_TYPE_PPI:
-> +		if (!irqchip_in_kernel(kvm))
-> +			return -ENXIO;
-> +
-> +		if (irq_num < 16 || irq_num > 31)
-> +			return -EINVAL;
+>  /* i2c controller state */
+>  enum s3c24xx_i2c_state {
+>         STATE_IDLE,
+> @@ -89,6 +92,8 @@ struct s3c24xx_i2c {
+>  #ifdef CONFIG_CPU_FREQ
+>         struct notifier_block   freq_transition;
+>  #endif
+> +       /* i2c_mode: 0 is for master; and 1 is for slave */
+> +       unsigned int            i2c_mode;
+If it's used for master or not, doesn't better to use 'is_master' or
+'is_slave'? what's the meaning of 'i2c_mode'?
+and
+#define is_master(i2c) (i2c->is_master)
 
-It's our favourite two numbers again! :)
-
-> +
-> +		return kvm_vgic_inject_irq(kvm, vcpu->vcpu_id, irq_num, level);
-> +	case KVM_ARM_IRQ_TYPE_SPI:
-> +		if (!irqchip_in_kernel(kvm))
-> +			return -ENXIO;
-> +
-> +		if (irq_num < 32 || irq_num > KVM_ARM_IRQ_GIC_MAX)
-> +			return -EINVAL;
-> +
-> +		return kvm_vgic_inject_irq(kvm, 0, irq_num, level);
-> +#endif
->  	}
->  
->  	return -EINVAL;
-> @@ -849,6 +870,14 @@ long kvm_arch_vm_ioctl(struct file *filp,
->  	void __user *argp = (void __user *)arg;
->  
->  	switch (ioctl) {
-> +#ifdef CONFIG_KVM_ARM_VGIC
-> +	case KVM_CREATE_IRQCHIP: {
-> +		if (vgic_present)
-> +			return kvm_vgic_create(kvm);
-> +		else
-> +			return -EINVAL;
-
-ENXIO? At least, that's what you use when setting the GIC addresses.
-
-> +	}
-> +#endif
->  	case KVM_SET_DEVICE_ADDRESS: {
->  		struct kvm_device_address dev_addr;
->  
-> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-> index dda5623..70040bb 100644
-> --- a/arch/arm/kvm/vgic.c
-> +++ b/arch/arm/kvm/vgic.c
-> @@ -75,6 +75,7 @@
->  #define ACCESS_WRITE_MASK(x)	((x) & (3 << 1))
->  
->  static void vgic_update_state(struct kvm *kvm);
-> +static void vgic_kick_vcpus(struct kvm *kvm);
->  static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
->  
->  static inline int vgic_irq_is_edge(struct vgic_dist *dist, int irq)
-> @@ -542,6 +543,9 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run, struct kvm_exi
->  	kvm_prepare_mmio(run, mmio);
->  	kvm_handle_mmio_return(vcpu, run);
->  
-> +	if (updated_state)
-> +		vgic_kick_vcpus(vcpu->kvm);
-> +
->  	return true;
+Thank you,
+Kyungmin Park
+>  };
+>
+>  static struct platform_device_id s3c24xx_driver_ids[] = {
+> @@ -202,11 +207,21 @@ static void s3c24xx_i2c_message_start(struct
+> s3c24xx_i2c *i2c,
+>         stat = 0;
+>         stat |=  S3C2410_IICSTAT_TXRXEN;
+>
+> -       if (msg->flags & I2C_M_RD) {
+> -               stat |= S3C2410_IICSTAT_MASTER_RX;
+> -               addr |= 1;
+> -       } else
+> -               stat |= S3C2410_IICSTAT_MASTER_TX;
+> +       if (is_master(i2c)) {
+> +               /* Master mode */
+> +               if (msg->flags & I2C_M_RD) {
+> +                       stat |= S3C2410_IICSTAT_MASTER_RX;
+> +                       addr |= 1;
+> +               } else
+> +                       stat |= S3C2410_IICSTAT_MASTER_TX;
+> +       } else {
+> +               /* Slave mode */
+> +               if (msg->flags & I2C_M_RD) {
+> +                       stat |= S3C2410_IICSTAT_SLAVE_RX;
+> +                       addr |= 1;
+> +               } else
+> +                       stat |= S3C2410_IICSTAT_SLAVE_TX;
+> +       }
+>
+>         if (msg->flags & I2C_M_REV_DIR_ADDR)
+>                 addr ^= 1;
+> @@ -228,8 +243,10 @@ static void s3c24xx_i2c_message_start(struct
+> s3c24xx_i2c *i2c,
+>         dev_dbg(i2c->dev, "iiccon, %08lx\n", iiccon);
+>         writel(iiccon, i2c->regs + S3C2410_IICCON);
+>
+> -       stat |= S3C2410_IICSTAT_START;
+> -       writel(stat, i2c->regs + S3C2410_IICSTAT);
+> +       if (is_master(i2c)) {
+> +               stat |= S3C2410_IICSTAT_START;
+> +               writel(stat, i2c->regs + S3C2410_IICSTAT);
+> +       }
 >  }
->  
-> @@ -867,6 +871,92 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
->  	return test_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
+>
+>  static inline void s3c24xx_i2c_stop(struct s3c24xx_i2c *i2c, int ret)
+> @@ -272,14 +289,19 @@ static inline void s3c24xx_i2c_stop(struct s3c24xx_i2c
+> *i2c, int ret)
+>          * devices, the host as Master and the HDMIPHY device as the slave.
+>          * Skipping the STOP condition has been tested on this bus and
+> works.
+>          */
+> -       if (i2c->quirks & QUIRK_HDMIPHY) {
+> -               /* Stop driving the I2C pins */
+> -               iicstat &= ~S3C2410_IICSTAT_TXRXEN;
+> -       } else {
+> -               /* stop the transfer */
+> -               iicstat &= ~S3C2410_IICSTAT_START;
+> +       if (is_master(i2c)) {
+> +               if (i2c->quirks & QUIRK_HDMIPHY) {
+> +                       /* Stop driving the I2C pins */
+> +                       iicstat &= ~S3C2410_IICSTAT_TXRXEN;
+> +               } else {
+> +                       /* stop the transfer */
+> +                       if (is_master(i2c)) {
+> +                               /* Start/Stop required only for master */
+> +                               iicstat &= ~S3C2410_IICSTAT_START;
+> +                       }
+> +               }
+> +               writel(iicstat, i2c->regs + S3C2410_IICSTAT);
+>         }
+> -       writel(iicstat, i2c->regs + S3C2410_IICSTAT);
+>
+>         i2c->state = STATE_STOP;
+>
+> @@ -348,7 +370,8 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c,
+> unsigned long iicstat)
+>                  */
+>
+>                 if (iicstat & S3C2410_IICSTAT_LASTBIT &&
+> -                   !(i2c->msg->flags & I2C_M_IGNORE_NAK)) {
+> +                   !(i2c->msg->flags & I2C_M_IGNORE_NAK) &&
+> +                   is_master(i2c)) {
+>                         /* ack was not received... */
+>
+>                         dev_dbg(i2c->dev, "ack was not received\n");
+> @@ -380,7 +403,7 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c,
+> unsigned long iicstat)
+>                  * end of the message, and if so, work out what to do
+>                  */
+>
+> -               if (!(i2c->msg->flags & I2C_M_IGNORE_NAK)) {
+> +               if (!(i2c->msg->flags & I2C_M_IGNORE_NAK) && is_master(i2c))
+> {
+>                         if (iicstat & S3C2410_IICSTAT_LASTBIT) {
+>                                 dev_dbg(i2c->dev, "WRITE: No Ack\n");
+>
+> @@ -432,7 +455,6 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c,
+> unsigned long iicstat)
+>
+>                 } else {
+>                         /* send stop */
+> -
+>                         s3c24xx_i2c_stop(i2c, 0);
+>                 }
+>                 break;
+> @@ -447,7 +469,7 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c,
+> unsigned long iicstat)
+>                 i2c->msg->buf[i2c->msg_ptr++] = byte;
+>
+>   prepare_read:
+> -               if (is_msglast(i2c)) {
+> +               if (is_msglast(i2c) && is_master(i2c)) {
+>                         /* last byte of buffer */
+>
+>                         if (is_lastmsg(i2c))
+> @@ -612,11 +634,13 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
+>         if (i2c->suspended)
+>                 return -EIO;
+>
+> -       ret = s3c24xx_i2c_set_master(i2c);
+> -       if (ret != 0) {
+> -               dev_err(i2c->dev, "cannot get bus (error %d)\n", ret);
+> -               ret = -EAGAIN;
+> -               goto out;
+> +       if (is_master(i2c)) {
+> +               ret = s3c24xx_i2c_set_master(i2c);
+> +               if (ret != 0) {
+> +                       dev_err(i2c->dev, "cannot get bus (error %d)\n",
+> ret);
+> +                       ret = -EAGAIN;
+> +                       goto out;
+> +               }
+>         }
+>
+>         i2c->msg     = msgs;
+> @@ -628,23 +652,29 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
+>         s3c24xx_i2c_enable_irq(i2c);
+>         s3c24xx_i2c_message_start(i2c, msgs);
+>
+> -       timeout = wait_event_timeout(i2c->wait, i2c->msg_num == 0, HZ * 5);
+> +       if (is_master(i2c))
+> +               timeout = wait_event_timeout(i2c->wait,\
+> +                               i2c->msg_num == 0, HZ * 5);
+> +       else
+> +               wait_event_interruptible(i2c->wait, i2c->msg_num == 0);
+>
+>         ret = i2c->msg_idx;
+>
+>         /* having these next two as dev_err() makes life very
+>          * noisy when doing an i2cdetect */
+>
+> -       if (timeout == 0)
+> -               dev_dbg(i2c->dev, "timeout\n");
+> -       else if (ret != num)
+> -               dev_dbg(i2c->dev, "incomplete xfer (%d)\n", ret);
+> +       if (is_master(i2c)) {
+> +               if (timeout == 0)
+> +                       dev_dbg(i2c->dev, "timeout\n");
+> +               else if (ret != num)
+> +                       dev_dbg(i2c->dev, "incomplete xfer (%d)\n", ret);
+>
+> -       /* For QUIRK_HDMIPHY, bus is already disabled */
+> -       if (i2c->quirks & QUIRK_HDMIPHY)
+> -               goto out;
+> +               /* For QUIRK_HDMIPHY, bus is already disabled */
+> +               if (i2c->quirks & QUIRK_HDMIPHY)
+> +                       goto out;
+>
+> -       s3c24xx_i2c_wait_idle(i2c);
+> +               s3c24xx_i2c_wait_idle(i2c);
+> +       }
+>
+>   out:
+>         return ret;
+> @@ -963,6 +993,7 @@ s3c24xx_i2c_parse_dt(struct device_node *np, struct
+> s3c24xx_i2c *i2c)
+>         of_property_read_u32(np, "samsung,i2c-slave-addr",
+> &pdata->slave_addr);
+>         of_property_read_u32(np, "samsung,i2c-max-bus-freq",
+>                                 (u32 *)&pdata->frequency);
+> +       of_property_read_u32(np, "samsung,i2c-mode", &i2c->i2c_mode);
 >  }
->  
-> +static void vgic_kick_vcpus(struct kvm *kvm)
-> +{
-> +	struct kvm_vcpu *vcpu;
-> +	int c;
+>  #else
+>  static void
+> @@ -1004,6 +1035,10 @@ static int s3c24xx_i2c_probe(struct platform_device
+> *pdev)
+>                 goto err_noclk;
+>         }
+>
+> +       /* By default, i2c works in master mode */
+> +       /* This currently will be updated using DT */
+> +       i2c->i2c_mode   = 0;
 > +
-> +	/*
-> +	 * We've injected an interrupt, time to find out who deserves
-> +	 * a good kick...
-> +	 */
-> +	kvm_for_each_vcpu(c, vcpu, kvm) {
-> +		if (kvm_vgic_vcpu_pending_irq(vcpu))
-> +			kvm_vcpu_kick(vcpu);
-> +	}
-> +}
+>         i2c->quirks = s3c24xx_get_device_quirks(pdev);
+>         if (pdata)
+>                 memcpy(i2c->pdata, pdata, sizeof(*pdata));
+> @@ -1017,6 +1052,7 @@ static int s3c24xx_i2c_probe(struct platform_device
+> *pdev)
+>         i2c->adap.class   = I2C_CLASS_HWMON | I2C_CLASS_SPD;
+>         i2c->tx_setup     = 50;
+>
 > +
-> +static bool vgic_update_irq_state(struct kvm *kvm, int cpuid,
-> +				  unsigned int irq_num, bool level)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	struct kvm_vcpu *vcpu;
-> +	int is_edge, is_level, state;
-> +	int enabled;
-> +	bool ret = true;
-> +
-> +	spin_lock(&dist->lock);
-> +
-> +	is_edge = vgic_irq_is_edge(dist, irq_num);
-> +	is_level = !is_edge;
-> +	state = vgic_bitmap_get_irq_val(&dist->irq_state, cpuid, irq_num);
-> +
-> +	/*
-> +	 * Only inject an interrupt if:
-> +	 * - level triggered and we change level
-> +	 * - edge triggered and we have a rising edge
-> +	 */
-> +	if ((is_level && !(state ^ level)) || (is_edge && (state || !level))) {
-> +		ret = false;
-> +		goto out;
-> +	}
-
-Eek, more of the edge/level combo. Can this be be restructured so that we
-have vgic_update_{edge,level}_irq_state, which are called from here
-appropriately?
-
-Will
+>         init_waitqueue_head(&i2c->wait);
+>
+>         /* find the clock and enable it */
+> --
+> 1.7.9.5
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
