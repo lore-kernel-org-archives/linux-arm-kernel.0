@@ -1,37 +1,35 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 3 Dec 2012 14:21:10 +0100
-Subject: [PATCH v2] net/macb: Use non-coherent memory for rx buffers
-In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B70D5@saturn3.aculab.com>
-References: <CAGhQ9VwWmP_B17LnAEqDHcL8Yd-s0C-Bf35z3+=vnJmK_NoCSw@mail.gmail.com>
- <1354536876-6274-1-git-send-email-nicolas.ferre@atmel.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B70D5@saturn3.aculab.com>
-Message-ID: <50BCA746.1020705@atmel.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 3 Dec 2012 13:22:07 +0000
+Subject: [RFC PATCH 1/1] KVM: ARM: add vgic state save and restore support
+In-Reply-To: <CAFEAcA-wopCCZrX2-eak-YAVpR2ZorGAyBVpcHUxjbxewVCFeg@mail.gmail.com>
+References: <1354531019-9335-1-git-send-email-b29396@freescale.com>
+ <CAFEAcA-wopCCZrX2-eak-YAVpR2ZorGAyBVpcHUxjbxewVCFeg@mail.gmail.com>
+Message-ID: <CAFEAcA827i0RYShk+nV5_iSnqU_fF1nf8-YnUME9nD8Fj=JOtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2012 01:43 PM, David Laight :
->> Allocate regular pages to use as backing for the RX ring and use the
->> DMA API to sync the caches. This should give a bit better performance
->> since it allows the CPU to do burst transfers from memory. It is also
->> a necessary step on the way to reduce the amount of copying done by
->> the driver.
-> 
-> I've not tried to understand the patches, but you have to be
-> very careful using non-snooped memory for descriptor rings.
-> No amount of DMA API calls can sort out some of the issues.
+On 3 December 2012 12:02, Peter Maydell <peter.maydell@linaro.org> wrote:
+> By far the largest part of the save/restore work here is figuring out
+> what the right state to expose to userspace is so we can retain that
+> compatibility guarantee.
 
-David,
+Some further thoughts on this...
 
-Maybe I have not described the patch properly but the non-coherent
-memory is not used for descriptor rings. It is used for DMA buffers
-pointed out by descriptors (that are allocated as coherent memory).
+What we're really providing the guest here is a hardware-accelerated
+software emulation of a no-virtualization GICv2. So it's better for
+the state we expose to userspace to be the state of that emulated
+hardware, and not to expose details of exactly what that hardware
+acceleration is. The hw accel is a property of the host CPU,
+not of the guest VM environment, so it could be different on
+different kernels or host CPUs, which would make migration potentially
+tedious. For instance, consider migration where the source machine
+has a VGIC with more list registers than the destination machine.
 
-As buffers are filled up by the interface DMA and then, afterwards, used
-by the driver to pass data to the net layer, it seems to me that the use
-of non-coherent memory is sensible.
+Obviously you could convert between different representations
+in a number of places (source kernel, source qemu, destination
+qemu, destination kernel), but I think it makes sense for the
+canonical representation to be the guest-visible representation
+of the emulated hardware, rather than privileging any one
+acceleration implementation above another.
 
-Do you still have reluctance with this patch?
-
-Best regards,
--- 
-Nicolas Ferre
+-- PMM
