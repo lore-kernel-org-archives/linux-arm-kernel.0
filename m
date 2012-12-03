@@ -1,36 +1,26 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 03 Dec 2012 11:20:26 -0700
-Subject: [PATCH 2/5] ARM: tegra20: clocks: add CPU low-power function
- into tegra_cpu_car_ops
-In-Reply-To: <1354503607-13707-3-git-send-email-josephl@nvidia.com>
-References: <1354503607-13707-1-git-send-email-josephl@nvidia.com>
- <1354503607-13707-3-git-send-email-josephl@nvidia.com>
-Message-ID: <50BCED6A.7000702@wwwdotorg.org>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Mon, 03 Dec 2012 18:20:27 +0000
+Subject: [PATCH 1/3] ARM: nommu: allow unaligned accesses on ARMv6+
+ processors
+In-Reply-To: <1354557403-20386-1-git-send-email-will.deacon@arm.com>
+References: <1354557403-20386-1-git-send-email-will.deacon@arm.com>
+Message-ID: <50BCED6B.8010206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2012 08:00 PM, Joseph Lo wrote:
-> Add suspend, resume and rail_off_ready API into tegra_cpu_car_ops. These
-> functions were used for CPU powered-down state maintenance.
+On 03/12/12 17:56, Will Deacon wrote:
+> Commit 8428e84d ("ARM: 7150/1: Allow kernel unaligned accesses on ARMv6+
+> processors") unconditionally clears SCTLR.A for ARMv6+ processors, since
+> newer toolchains assume that unaligned memory accesses will not fault
+> for these cores.
+>
+> This patch adds the corresponding change for nommu kernel builds.
+>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-> diff --git a/arch/arm/mach-tegra/tegra20_clocks.c b/arch/arm/mach-tegra/tegra20_clocks.c
+For the series:
+Tested-by: Jonathan Austin <jonathan.austin@arm.com>
 
-> +static bool tegra20_cpu_rail_off_ready(void)
+(Tested on Cortex-R Series models)
 
-> +	if ((cpu_rst_status & 0x2) != 0x2)
-> +		return false;
-> +
-> +	return true;
-> +}
-
-Perhaps simplify that to:
-
-return cpu_rst_status & 2;
-
-or perhaps if that generates an int->bool performance warning:
-
-return !!(cpu_rst_status & 2);
-
-or:
-
-return (cpu_rst_status >> 1) & 1;
+Jonny
