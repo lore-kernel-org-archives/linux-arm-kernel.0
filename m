@@ -1,108 +1,377 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 3 Dec 2012 12:02:55 +0000
-Subject: [RFC PATCH 1/1] KVM: ARM: add vgic state save and restore support
-In-Reply-To: <1354531019-9335-1-git-send-email-b29396@freescale.com>
-References: <1354531019-9335-1-git-send-email-b29396@freescale.com>
-Message-ID: <CAFEAcA-wopCCZrX2-eak-YAVpR2ZorGAyBVpcHUxjbxewVCFeg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 3 Dec 2012 13:14:36 +0100
+Subject: [PATCH v2] net/macb: Use non-coherent memory for rx buffers
+In-Reply-To: <CAGhQ9VwWmP_B17LnAEqDHcL8Yd-s0C-Bf35z3+=vnJmK_NoCSw@mail.gmail.com>
+References: <CAGhQ9VwWmP_B17LnAEqDHcL8Yd-s0C-Bf35z3+=vnJmK_NoCSw@mail.gmail.com>
+Message-ID: <1354536876-6274-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 December 2012 10:36, Dong Aisheng <b29396@freescale.com> wrote:
-> The patch is mainly for implementing the vgic state save and retore function.
-> I'm not sure the current implementation method is the most proper way.
-> So i'd like to send out the patch for RFC on the direction and issues i met
-> during the implementation.
->
-> There're mainly two ways to implement such function while it looks different
-> ways have different issues respectively.
-> 1) Firstly i tried using ONE_REG interfaces that user spaces could
-> read all virtual gic dist registers and gic virtual interfaces control
-> registers for saving gic states. (The vitural cpu interfaces registers
-> are not exported since it's state could be got from GICH_VMCR register which
-> already reflects the basic cpu interface states.)
-> The way to do this could be to mannually emulate MMIO access in
-> kernel to re-use vgic_handle_mmio code since the vgic code in kernel does
-> not maintain gic state in registers format and we can not simply memcpy
-> the kernel gic registers to user spaces.
->
-> For this way, the problem is that it looks a bit low efficiency for emulate
-> register access
+From: Havard Skinnemoen <havard@skinnemoen.net>
 
-Efficiency is really not a significant concern here, because state
-save and restore only happens when doing VM migration, which is
-already a slow process (mostly dominated by the costs of moving the
-VM memory from one machine to another).
+Allocate regular pages to use as backing for the RX ring and use the
+DMA API to sync the caches. This should give a bit better performance
+since it allows the CPU to do burst transfers from memory. It is also
+a necessary step on the way to reduce the amount of copying done by
+the driver.
 
-> and via current ONE_REG interface we do not know which CPU
-> is performing the register access, so the banked registers are not
-> suppported well,
+Signed-off-by: Havard Skinnemoen <havard@skinnemoen.net>
+[nicolas.ferre at atmel.com: adapt to newer kernel]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+v2: - keep struct macb members as they are shared between
+      at91_ether and macb.
 
-Actually you do, because it's a vcpu ioctl. That does raise a
-different question, though. ONE_REG is currently aimed as a vcpu
-ioctl for CPU state save/restore -- how does it need to change
-to handle device state save/restore where the device is not per-cpu?
+ drivers/net/ethernet/cadence/macb.c | 206 +++++++++++++++++++++++-------------
+ drivers/net/ethernet/cadence/macb.h |  18 ++++
+ 2 files changed, 148 insertions(+), 76 deletions(-)
 
-> e.g. some banked dist registers and banked cpu virtual interfaces
-> control registers.
-> So i'm not sure we should still go follow this way.
-
-You can handle banked registers the same way we handle the cache
-ID registers in the main CPU. In general ONE_REG is not supposed
-to expose direct access to registers which behave like the hardware
-registers: it is supposed to expose access to registers which
-merely store "state", ie which can be idempotently saved and loaded.
-Sometimes this means the kernel has to invent its own registers which
-don't have side effects.
-
-> 2) Another way is, as x86, to use standard KVM_SET_IRQCHIP/KVM_GET_IRQCHIP
-> ioctl to save and restore irq chip state. e.g. arch/x86/kvm/x86.c.
-> This method does not have banked registers issue since it could all be
-> handled by SW and it looks simpler than the first way.
-> The problem is that the x86 kvm irqchip driver are using almost the same data
-> structure as user space to represent irqchip states which then can be easily
-> copied to user spaces. But arm vgic driver are using different data structure,
-> e.g. qemu gic common code is using gic_state while in kernel vgic code is using
-> a number of vgic_bitmaps.
-> We could either read all the in-kernel vgic_bitmaps from user space and
-> mannually convert it to git_state for user space to use to re-use the exist
-> common state handle codes in qemu or convert to git_state format in kernel
-> and then export to user space, but neither way looks good and they also
-> look low efficiency, so i can not see enough reasons to do so.
-
-Somebody needs to do this conversion, or TCG-to-KVM migrations won't work.
-I don't have a strong opinion whether it ought to be userspace or kernel;
-I think the deciding factor is probably going to be which is the easiest
-for the kernel to support into the future as a stable ABI (even as GIC
-versions change etc).
-
-> The current implementation in this patch does not do any convertion
-> between the two different state formats and it just simply export what we have
-> in kernel to represent gic state to user space via KVM_GET_IRQCHIP,
-> that means we does not use much common state handle code in arm_gic_common.c
-> in qemu.
-
-This is definitely the wrong approach, I'm afraid. I still strongly
-feel we should be using the standard ONE_REG interfaces here (though
-there is perhaps an argument to be made against this, along the lines
-of my remarks above about it being a vcpu ioctl).
-
-> However, by comparing to first method, the disadvantage of second method
-> is that it has side effect. Once the kernel vgic state code changes, it may
-> also need change the user space code accordingly since the user space
-> are using the kernel state definition.
-
-Any approach that doesn't maintain binary compatibility across kernel
-versions is definitely not going to work. In particular you have to
-be able to accept state that may have been saved out by a different
-older kernel version (for doing VM migrations between host machines
-with different kernels installed).
-
-By far the largest part of the save/restore work here is figuring out
-what the right state to expose to userspace is so we can retain that
-compatibility guarantee. Whether we then use ONE_REG or a single struct
-as the userspace view of that state is really a very minor part of it.
-This is the thing you really need to be thinking about and presenting
-as an RFC proposal, in my opinion.
-
-thanks
--- PMM
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index 6a59bce..c2955da 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -10,6 +10,7 @@
+ 
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ #include <linux/clk.h>
++#include <linux/highmem.h>
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+ #include <linux/kernel.h>
+@@ -35,6 +36,8 @@
+ #define RX_BUFFER_SIZE		128
+ #define RX_RING_SIZE		512 /* must be power of 2 */
+ #define RX_RING_BYTES		(sizeof(struct macb_dma_desc) * RX_RING_SIZE)
++#define RX_BUFFERS_PER_PAGE	(PAGE_SIZE / RX_BUFFER_SIZE)
++#define RX_RING_PAGES		(RX_RING_SIZE / RX_BUFFERS_PER_PAGE)
+ 
+ #define TX_RING_SIZE		128 /* must be power of 2 */
+ #define TX_RING_BYTES		(sizeof(struct macb_dma_desc) * TX_RING_SIZE)
+@@ -90,9 +93,16 @@ static struct macb_dma_desc *macb_rx_desc(struct macb *bp, unsigned int index)
+ 	return &bp->rx_ring[macb_rx_ring_wrap(index)];
+ }
+ 
+-static void *macb_rx_buffer(struct macb *bp, unsigned int index)
++static struct macb_rx_page *macb_rx_page(struct macb *bp, unsigned int index)
+ {
+-	return bp->rx_buffers + RX_BUFFER_SIZE * macb_rx_ring_wrap(index);
++	unsigned int entry = macb_rx_ring_wrap(index);
++
++	return &bp->rx_page[entry / RX_BUFFERS_PER_PAGE];
++}
++
++static unsigned int macb_rx_page_offset(struct macb *bp, unsigned int index)
++{
++	return (index % RX_BUFFERS_PER_PAGE) * RX_BUFFER_SIZE;
+ }
+ 
+ void macb_set_hwaddr(struct macb *bp)
+@@ -528,11 +538,15 @@ static void macb_tx_interrupt(struct macb *bp)
+ static int macb_rx_frame(struct macb *bp, unsigned int first_frag,
+ 			 unsigned int last_frag)
+ {
+-	unsigned int len;
+-	unsigned int frag;
+-	unsigned int offset;
+-	struct sk_buff *skb;
+-	struct macb_dma_desc *desc;
++	unsigned int		len;
++	unsigned int		frag;
++	unsigned int		skb_offset;
++	unsigned int		pg_offset;
++	struct macb_rx_page	*rx_page;
++	dma_addr_t		phys;
++	void			*buf;
++	struct sk_buff		*skb;
++	struct macb_dma_desc	*desc;
+ 
+ 	desc = macb_rx_desc(bp, last_frag);
+ 	len = MACB_BFEXT(RX_FRMLEN, desc->ctrl);
+@@ -566,7 +580,7 @@ static int macb_rx_frame(struct macb *bp, unsigned int first_frag,
+ 		return 1;
+ 	}
+ 
+-	offset = 0;
++	skb_offset = 0;
+ 	len += NET_IP_ALIGN;
+ 	skb_checksum_none_assert(skb);
+ 	skb_put(skb, len);
+@@ -574,13 +588,28 @@ static int macb_rx_frame(struct macb *bp, unsigned int first_frag,
+ 	for (frag = first_frag; ; frag++) {
+ 		unsigned int frag_len = RX_BUFFER_SIZE;
+ 
+-		if (offset + frag_len > len) {
++		if (skb_offset + frag_len > len) {
+ 			BUG_ON(frag != last_frag);
+-			frag_len = len - offset;
++			frag_len = len - skb_offset;
+ 		}
+-		skb_copy_to_linear_data_offset(skb, offset,
+-				macb_rx_buffer(bp, frag), frag_len);
+-		offset += RX_BUFFER_SIZE;
++
++		rx_page = macb_rx_page(bp, frag);
++		pg_offset = macb_rx_page_offset(bp, frag);
++		phys = rx_page->phys;
++
++		dma_sync_single_range_for_cpu(&bp->pdev->dev, phys,
++				pg_offset, frag_len, DMA_FROM_DEVICE);
++
++		buf = kmap_atomic(rx_page->page);
++		skb_copy_to_linear_data_offset(skb, skb_offset,
++				buf + pg_offset, frag_len);
++		kunmap_atomic(buf);
++
++		skb_offset += frag_len;
++
++		dma_sync_single_range_for_device(&bp->pdev->dev, phys,
++				pg_offset, frag_len, DMA_FROM_DEVICE);
++
+ 		desc = macb_rx_desc(bp, frag);
+ 		desc->addr &= ~MACB_BIT(RX_USED);
+ 
+@@ -860,86 +889,90 @@ static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 	return NETDEV_TX_OK;
+ }
+ 
+-static void macb_free_consistent(struct macb *bp)
++static void macb_free_rings(struct macb *bp)
+ {
+-	if (bp->tx_skb) {
+-		kfree(bp->tx_skb);
+-		bp->tx_skb = NULL;
+-	}
+-	if (bp->rx_ring) {
+-		dma_free_coherent(&bp->pdev->dev, RX_RING_BYTES,
+-				  bp->rx_ring, bp->rx_ring_dma);
+-		bp->rx_ring = NULL;
+-	}
+-	if (bp->tx_ring) {
+-		dma_free_coherent(&bp->pdev->dev, TX_RING_BYTES,
+-				  bp->tx_ring, bp->tx_ring_dma);
+-		bp->tx_ring = NULL;
+-	}
+-	if (bp->rx_buffers) {
+-		dma_free_coherent(&bp->pdev->dev,
+-				  RX_RING_SIZE * RX_BUFFER_SIZE,
+-				  bp->rx_buffers, bp->rx_buffers_dma);
+-		bp->rx_buffers = NULL;
++	int i;
++
++	for (i = 0; i < RX_RING_PAGES; i++) {
++		struct macb_rx_page *rx_page = &bp->rx_page[i];
++
++		if (!rx_page->page)
++			continue;
++
++		dma_unmap_page(&bp->pdev->dev, rx_page->phys,
++			       PAGE_SIZE, DMA_FROM_DEVICE);
++		put_page(rx_page->page);
++		rx_page->page = NULL;
+ 	}
++
++	kfree(bp->tx_skb);
++	kfree(bp->rx_page);
++	dma_free_coherent(&bp->pdev->dev, TX_RING_BYTES, bp->tx_ring,
++			  bp->tx_ring_dma);
++	dma_free_coherent(&bp->pdev->dev, RX_RING_BYTES, bp->rx_ring,
++			  bp->rx_ring_dma);
+ }
+ 
+-static int macb_alloc_consistent(struct macb *bp)
++static int macb_init_rings(struct macb *bp)
+ {
+-	int size;
++	struct page	*page;
++	dma_addr_t	phys;
++	unsigned int	page_idx;
++	unsigned int	ring_idx;
++	unsigned int	i;
+ 
+-	size = TX_RING_SIZE * sizeof(struct macb_tx_skb);
+-	bp->tx_skb = kmalloc(size, GFP_KERNEL);
+-	if (!bp->tx_skb)
+-		goto out_err;
+-
+-	size = RX_RING_BYTES;
+-	bp->rx_ring = dma_alloc_coherent(&bp->pdev->dev, size,
++	bp->rx_ring = dma_alloc_coherent(&bp->pdev->dev, RX_RING_BYTES,
+ 					 &bp->rx_ring_dma, GFP_KERNEL);
+ 	if (!bp->rx_ring)
+-		goto out_err;
++		goto err_alloc_rx_ring;
++
+ 	netdev_dbg(bp->dev,
+ 		   "Allocated RX ring of %d bytes at %08lx (mapped %p)\n",
+-		   size, (unsigned long)bp->rx_ring_dma, bp->rx_ring);
++		   RX_RING_BYTES, (unsigned long)bp->rx_ring_dma, bp->rx_ring);
+ 
+-	size = TX_RING_BYTES;
+-	bp->tx_ring = dma_alloc_coherent(&bp->pdev->dev, size,
++	bp->tx_ring = dma_alloc_coherent(&bp->pdev->dev, TX_RING_BYTES,
+ 					 &bp->tx_ring_dma, GFP_KERNEL);
+ 	if (!bp->tx_ring)
+-		goto out_err;
+-	netdev_dbg(bp->dev,
+-		   "Allocated TX ring of %d bytes at %08lx (mapped %p)\n",
+-		   size, (unsigned long)bp->tx_ring_dma, bp->tx_ring);
+-
+-	size = RX_RING_SIZE * RX_BUFFER_SIZE;
+-	bp->rx_buffers = dma_alloc_coherent(&bp->pdev->dev, size,
+-					    &bp->rx_buffers_dma, GFP_KERNEL);
+-	if (!bp->rx_buffers)
+-		goto out_err;
++		goto err_alloc_tx_ring;
++
+ 	netdev_dbg(bp->dev,
+-		   "Allocated RX buffers of %d bytes at %08lx (mapped %p)\n",
+-		   size, (unsigned long)bp->rx_buffers_dma, bp->rx_buffers);
++		   "Allocated TX ring of %d bytes at 0x%08lx (mapped %p)\n",
++		   TX_RING_BYTES, (unsigned long)bp->tx_ring_dma, bp->tx_ring);
+ 
+-	return 0;
++	bp->rx_page = kcalloc(RX_RING_PAGES, sizeof(struct macb_rx_page),
++			      GFP_KERNEL);
++	if (!bp->rx_page)
++		goto err_alloc_rx_page;
+ 
+-out_err:
+-	macb_free_consistent(bp);
+-	return -ENOMEM;
+-}
++	bp->tx_skb = kcalloc(TX_RING_SIZE, sizeof(struct macb_tx_skb),
++			     GFP_KERNEL);
++	if (!bp->tx_skb)
++		goto err_alloc_tx_skb;
+ 
+-static void macb_init_rings(struct macb *bp)
+-{
+-	int i;
+-	dma_addr_t addr;
++	for (page_idx = 0, ring_idx = 0; page_idx < RX_RING_PAGES; page_idx++) {
++		page = alloc_page(GFP_KERNEL);
++		if (!page)
++			goto err_alloc_page;
++
++		phys = dma_map_page(&bp->pdev->dev, page, 0, PAGE_SIZE,
++				    DMA_FROM_DEVICE);
++		if (dma_mapping_error(&bp->pdev->dev, phys))
++			goto err_map_page;
++
++		bp->rx_page[page_idx].page = page;
++		bp->rx_page[page_idx].phys = phys;
+ 
+-	addr = bp->rx_buffers_dma;
+-	for (i = 0; i < RX_RING_SIZE; i++) {
+-		bp->rx_ring[i].addr = addr;
+-		bp->rx_ring[i].ctrl = 0;
+-		addr += RX_BUFFER_SIZE;
++		for (i = 0; i < RX_BUFFERS_PER_PAGE; i++, ring_idx++) {
++			bp->rx_ring[ring_idx].addr = phys;
++			bp->rx_ring[ring_idx].ctrl = 0;
++			phys += RX_BUFFER_SIZE;
++		}
+ 	}
+ 	bp->rx_ring[RX_RING_SIZE - 1].addr |= MACB_BIT(RX_WRAP);
+ 
++	netdev_dbg(bp->dev, "Allocated %u RX buffers (%lu pages)\n",
++		   RX_RING_SIZE, RX_RING_PAGES);
++
+ 	for (i = 0; i < TX_RING_SIZE; i++) {
+ 		bp->tx_ring[i].addr = 0;
+ 		bp->tx_ring[i].ctrl = MACB_BIT(TX_USED);
+@@ -947,6 +980,28 @@ static void macb_init_rings(struct macb *bp)
+ 	bp->tx_ring[TX_RING_SIZE - 1].ctrl |= MACB_BIT(TX_WRAP);
+ 
+ 	bp->rx_tail = bp->tx_head = bp->tx_tail = 0;
++
++	return 0;
++
++err_map_page:
++	__free_page(page);
++err_alloc_page:
++	while (page_idx--) {
++		dma_unmap_page(&bp->pdev->dev, bp->rx_page[page_idx].phys,
++			       PAGE_SIZE, DMA_FROM_DEVICE);
++		__free_page(bp->rx_page[page_idx].page);
++	}
++	kfree(bp->tx_skb);
++err_alloc_tx_skb:
++	kfree(bp->rx_page);
++err_alloc_rx_page:
++	dma_free_coherent(&bp->pdev->dev, TX_RING_BYTES, bp->tx_ring,
++			  bp->tx_ring_dma);
++err_alloc_tx_ring:
++	dma_free_coherent(&bp->pdev->dev, RX_RING_BYTES, bp->rx_ring,
++			  bp->rx_ring_dma);
++err_alloc_rx_ring:
++	return -ENOMEM;
+ }
+ 
+ static void macb_reset_hw(struct macb *bp)
+@@ -1221,16 +1276,15 @@ static int macb_open(struct net_device *dev)
+ 	if (!bp->phy_dev)
+ 		return -EAGAIN;
+ 
+-	err = macb_alloc_consistent(bp);
++	err = macb_init_rings(bp);
+ 	if (err) {
+-		netdev_err(dev, "Unable to allocate DMA memory (error %d)\n",
++		netdev_err(dev, "Unable to allocate DMA rings (error %d)\n",
+ 			   err);
+ 		return err;
+ 	}
+ 
+ 	napi_enable(&bp->napi);
+ 
+-	macb_init_rings(bp);
+ 	macb_init_hw(bp);
+ 
+ 	/* schedule a link state check */
+@@ -1257,7 +1311,7 @@ static int macb_close(struct net_device *dev)
+ 	netif_carrier_off(dev);
+ 	spin_unlock_irqrestore(&bp->lock, flags);
+ 
+-	macb_free_consistent(bp);
++	macb_free_rings(bp);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+index 570908b..e82242b 100644
+--- a/drivers/net/ethernet/cadence/macb.h
++++ b/drivers/net/ethernet/cadence/macb.h
+@@ -453,6 +453,23 @@ struct macb_dma_desc {
+ #define MACB_TX_USED_SIZE			1
+ 
+ /**
++ * struct macb_rx_page - data associated with a page used as RX buffers
++ * @page: Physical page used as storage for the buffers
++ * @phys: DMA address of the page
++ *
++ * Each page is used to provide %MACB_RX_BUFFERS_PER_PAGE RX buffers.
++ * The page gets an initial reference when it is inserted into the
++ * ring, and an additional reference each time it is passed up the
++ * stack as a fragment. When all the buffers have been used, we drop
++ * the initial reference and allocate a new page. Any additional
++ * references are dropped when the higher layers free the skb.
++ */
++struct macb_rx_page {
++	struct page		*page;
++	dma_addr_t		phys;
++};
++
++/**
+  * struct macb_tx_skb - data about an skb which is being transmitted
+  * @skb: skb currently being transmitted
+  * @mapping: DMA address of the skb's data buffer
+@@ -543,6 +560,7 @@ struct macb {
+ 
+ 	unsigned int		rx_tail;
+ 	struct macb_dma_desc	*rx_ring;
++	struct macb_rx_page	*rx_page;
+ 	void			*rx_buffers;
+ 
+ 	unsigned int		tx_head, tx_tail;
+-- 
+1.8.0
