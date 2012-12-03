@@ -1,54 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 03 Dec 2012 12:55:05 -0600
-Subject: [PATCH 2/3] ARM: nommu: prevent generation of kernel unaligned
- memory accesses
-In-Reply-To: <1354557403-20386-2-git-send-email-will.deacon@arm.com>
-References: <1354557403-20386-1-git-send-email-will.deacon@arm.com>
- <1354557403-20386-2-git-send-email-will.deacon@arm.com>
-Message-ID: <50BCF589.4010509@gmail.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Mon, 3 Dec 2012 14:09:56 -0500
+Subject: [PATCH v4 09/14] KVM: ARM: Emulation framework and CP15 emulation
+In-Reply-To: <20121203110537.GD18579@mudshark.cambridge.arm.com>
+References: <20121110154203.2836.46686.stgit@chazy-air>
+ <20121110154313.2836.2851.stgit@chazy-air>
+ <20121119150105.GB3205@mudshark.cambridge.arm.com>
+ <CANM98qKSnt8dmjs9f5ufLPBYAvaSunzKsDTMfi2hm6nLjgjLqg@mail.gmail.com>
+ <20121203110537.GD18579@mudshark.cambridge.arm.com>
+Message-ID: <CANM98qKnDNknap3EGGcTH-_vhbdDDhNFO1Axx-crr+q3p5i=Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2012 11:56 AM, Will Deacon wrote:
-> Recent ARMv7 toolchains assume that unaligned memory accesses will not
-> fault and will instead be handled by the processor.
-> 
-> For the nommu case (without an MPU), memory will be treated as
-> strongly-ordered and therefore unaligned accesses may fault regardless
-> of the SCTLR.A setting.
-> 
-> This patch passes -mno-unaligned-access to GCC when compiling for nommu
-> targets, preventing the generation of unaligned memory access in the
-> kernel.
-
-BTW, this option will not fully prevent unaligned accesses. This code
-will still generate unaligned accesses:
-
-void func(void)
-{
-	char array[] = { 1, 2, 3 };
-}
-
-u-boot has been fixing these up by making the arrays static.
-
-Rob
-
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/Makefile | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 5f914fc..03363e2 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -32,6 +32,7 @@ KBUILD_DEFCONFIG := versatile_defconfig
->  # defines filename extension depending memory management type.
->  ifeq ($(CONFIG_MMU),)
->  MMUEXT		:= -nommu
-> +KBUILD_CFLAGS	+= $(call cc-option,-mno-unaligned-access)
->  endif
->  
->  ifeq ($(CONFIG_FRAME_POINTER),y)
-> 
+On Mon, Dec 3, 2012 at 6:05 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Nov 30, 2012 at 08:22:28PM +0000, Christoffer Dall wrote:
+>> On Mon, Nov 19, 2012 at 10:01 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Sat, Nov 10, 2012 at 03:43:13PM +0000, Christoffer Dall wrote:
+>> > This should probably be 0xff and also use the macros that Lorenzo is
+>> > introducing:
+>> >
+>> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/132977.html
+>> >
+>>
+>> in the A15 TRM bits [7:2] are reserved, so we really only do care
+>> about bits [1:0], and this file is A15 specific, but if you prefer, I
+>> can merge this:
+>
+> The upper bits are RAZ, so yes, please do merge something like this.
+>
+I did, thanks!
