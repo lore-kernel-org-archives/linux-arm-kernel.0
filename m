@@ -1,73 +1,42 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Mon, 3 Dec 2012 13:42:25 +0800
-Subject: [PATCH 1/4] rtc: sa1100: enable/disable rtc when probe/remove the
- device
-In-Reply-To: <CAN1soZwppuRm9ETq1dwhy7Y+_aoJ9Kt5O1rypqD9T6f4caGV6g@mail.gmail.com>
-References: <1354155670-6267-1-git-send-email-chao.xie@marvell.com>
- <20121129102519.GG19440@n2100.arm.linux.org.uk>
- <CAN1soZxUA2PPy4694ByX1FTyWiJkha8QpKFK5Jc3Wf3zT0huOA@mail.gmail.com>
- <CADApbejZXach=YaiL5rEWA5+uc+mO8PzQzUKN+k90HfxEsqgtA@mail.gmail.com>
- <CADApbegrJDe5SiO255WdKYai1U7WjBYfMHuCm-hTNfx5p6Wz-Q@mail.gmail.com>
- <CAN1soZwppuRm9ETq1dwhy7Y+_aoJ9Kt5O1rypqD9T6f4caGV6g@mail.gmail.com>
-Message-ID: <CADApbehekRckjfRgqNm-PPxmJSXyF17JP5hPtBqMt4vd+Wht=w@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 3 Dec 2012 16:52:18 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the omap_dss2 tree
+Message-ID: <20121203165218.c45a0500dcdd0a441ae3e7de@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 3, 2012 at 1:35 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> On Mon, Dec 3, 2012 at 10:53 AM, Chao Xie <xiechao.mail@gmail.com> wrote:
->> On Mon, Dec 3, 2012 at 9:39 AM, Chao Xie <xiechao.mail@gmail.com> wrote:
->>> On Fri, Nov 30, 2012 at 3:04 PM, Haojian Zhuang
->>> <haojian.zhuang@gmail.com> wrote:
->>>> On Thu, Nov 29, 2012 at 6:25 PM, Russell King - ARM Linux
->>>> <linux@arm.linux.org.uk> wrote:
->>>>> On Wed, Nov 28, 2012 at 09:21:07PM -0500, Chao Xie wrote:
->>>>>> The original sa1100_rtc_open/sa1100_rtc_release will be called
->>>>>> when the /dev/rtc0 is opened or closed.
->>>>>> In fact, these two functions will enable/disable the clock, and
->>>>>> register/unregister the irqs.
->>>>>> User application will use /dev/rtc0 to read the rtc time or set
->>>>>> the alarm. The rtc should still run indepent of open/close the
->>>>>> rtc device.
->>>>>> So only enable clock and register the irqs when probe the device,
->>>>>> and disable clock and unregister the irqs when remove the device.
->>>>>
->>>>> NAK.  I don't think you properly understand what's going on here if you
->>>>> think moving the entire open and release functions into the probe and
->>>>> remove functions is the right thing to do.
->>>>
->>>> Since PXA27x & PXA3xx supports dual rtc device at the same time,
->>>> user could choose use either of rtc at run time. Then clk & irq are setup
->>>> in open().
->>>>
->>>> Chao,
->>>> So you shouldn't remove them into probe().
->>>
->>> How can user to choose one RTC?
->>> The user API, for example "date" will open the device, get the time
->>> and then close the device.
->>> WHen set a alarm, it is the same routine. open->set->close.
->>> The open routine will enable clock and register irq, close will
->>> disable the clock and unregister irq. It means that if only open is
->>> invoked, rtc begins to work, and after close is invoked rtc stops
->>> working. It means that the user can not get correct time and can not
->>> get right alarm.
->>
->> hi
->> I want to correct what i said. For the irq register/unregister i think
->> can be done at open/release. But for clock enable/disable, i do not
->> think so. If clock is disabled, as i think RTC will not work. User API
->> still use open->get_time->close for "date" command. It means that RTC
->> will not return correct date to user.
->
-> I didn't get your point. Do you mean that RTC can't work without your patch?
-hi
-open/release will done two things
-1. enable/disable clock
-2. register/unregister the irq
-i checked the rtc dev code. register/unregister irq is prefered to be
-done at open/release routine, and the users will keep rtc to be opened
-if he want to make use of the interrupts.
-the only problemis the clock. It should be on always.
-If user want to get the rtc value, or set alarm. it will  follow
-open->ioctrl->release. After release the clock is offed, and i do not
-think rtc will has its value updated if the clock is offed.
+Hi all,
+
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/media/platform/omap/omap_vout.c between commit 950e2fb420d5
+("[media] omap_vout: use omapdss's version instead of cpu_is_*") from the
+omap_dss2 tree and commit 45c3eb7d3a07 ("ARM: OMAP: Move
+plat-omap/dma-omap.h to include/linux/omap-dma.h") from the arm-soc tree.
+
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/media/platform/omap/omap_vout.c
+index 718e5f6,9935040..0000000
+--- a/drivers/media/platform/omap/omap_vout.c
++++ b/drivers/media/platform/omap/omap_vout.c
+@@@ -44,6 -44,8 +44,7 @@@
+  #include <media/v4l2-device.h>
+  #include <media/v4l2-ioctl.h>
+  
+ -#include <plat/cpu.h>
++ #include <linux/omap-dma.h>
+  #include <video/omapvrfb.h>
+  #include <video/omapdss.h>
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121203/1e116ff9/attachment.sig>
