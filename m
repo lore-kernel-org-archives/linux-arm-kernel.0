@@ -1,75 +1,126 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 03 Dec 2012 10:33:11 +0000
-Subject: [PATCH v4 08/14] KVM: ARM: World-switch implementation
-In-Reply-To: <CANM98qJQBD3+iW0uCptXBgsPBuBBfuaT1FN3EivMywwD-oNi=Q@mail.gmail.com>
-References: <20121110154203.2836.46686.stgit@chazy-air>
- <20121110154306.2836.93473.stgit@chazy-air>
- <20121119145758.GA3205@mudshark.cambridge.arm.com>
- <CANM98qJFFP=2ueyUpbN6x15XwtWXbgZjkMBaq2jVpqik4kT54Q@mail.gmail.com>
- <20121130151500.GC26289@mudshark.cambridge.arm.com>
- <CANM98q+TQZiXe3GLjcPpPVZz40emmizgnEmyZEju1ruKNR6EEQ@mail.gmail.com>
- <20121130171420.GC619@mudshark.cambridge.arm.com>
- <CANM98qJQBD3+iW0uCptXBgsPBuBBfuaT1FN3EivMywwD-oNi=Q@mail.gmail.com>
-Message-ID: <50BC7FE7.6050006@arm.com>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Mon, 3 Dec 2012 11:38:42 +0100
+Subject: [PATCH v2 1/3] ARM/dts: omap3: Add generic DT support for IGEP
+ devices
+In-Reply-To: <1354270137-31538-2-git-send-email-javier.martinez@collabora.co.uk>
+References: <1354270137-31538-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1354270137-31538-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CAFqH_537iZqH7WuGbMzOMLZqzYBwRw-AAPGgxW=oZ65Lkf4bow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/11/12 18:49, Christoffer Dall wrote:
-> On Fri, Nov 30, 2012 at 12:14 PM, Will Deacon <will.deacon@arm.com> wrote:
->> On Fri, Nov 30, 2012 at 04:47:40PM +0000, Christoffer Dall wrote:
->>> On Fri, Nov 30, 2012 at 10:15 AM, Will Deacon <will.deacon@arm.com> wrote:
->>>> At this point, VM1 is running and VM0:VCPU1 is running. VM0:VCPU0 is not
->>>> running because physical CPU0 is handling an interrupt. The problem is that
->>>> when VCPU0 *is* resumed, it will update the VMID of VM0 and could be
->>>> scheduled in parallel with VCPU1 but with a different VMID.
->>>>
->>>> How do you avoid this in the current code?
->>>>
->>> I don't. Nice catch. Please apply your interesting brain to the following fix:)
->>
->> I'm far too sober to look at your patch right now, but I'll think about it
->> over the weekend [I can't break it at a quick glance] :)
->>
->> In the meantime, can you think about whether the TLB operations need to run
->> on every CPU please?
->>
-> they don't we can invalidate the TLB and the icache using the inner
-> shareability domain. Here's a patch:
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index ad1390f..df1b753 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -146,6 +146,7 @@ struct kvm_one_reg;
->  int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
->  int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
->  u64 kvm_call_hyp(void *hypfn, ...);
-> +void force_vm_exit(const cpumask_t *mask);
-> 
->  #define KVM_ARCH_WANT_MMU_NOTIFIER
->  struct kvm;
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index c4f631e..674592e 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -405,9 +405,14 @@ int kvm_arch_vcpu_in_guest_mode(struct kvm_vcpu *v)
->  	return v->mode == IN_GUEST_MODE;
->  }
-> 
-> -static void reset_vm_context(void *info)
-> +/* Just ensure a guest exit from a particular CPU */
-> +static void exit_vm_noop(void *info)
->  {
-> -	kvm_call_hyp(__kvm_flush_vm_context);
-> +}
+2012/11/30 Javier Martinez Canillas <javier.martinez@collabora.co.uk>:
+> Add a generic .dtsi device tree source file for the
+> common characteristics across IGEP Technology devices.
+>
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  arch/arm/boot/dts/omap3-igep.dtsi |   93 +++++++++++++++++++++++++++++++++++++
+>  1 files changed, 93 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/omap3-igep.dtsi
+>
+> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+> new file mode 100644
+> index 0000000..a093bff
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
+> @@ -0,0 +1,93 @@
+> +/*
+> + * Device Tree Source for IGEP Technology devices
+> + *
+> + * Copyright (C) 2012 Javier Martinez Canillas <javier@collabora.co.uk>
+> + * Copyright (C) 2012 Enric Balletbo i Serra <eballetbo@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +/dts-v1/;
 > +
-> +void force_vm_exit(const cpumask_t *mask)
-> +{
-> +	smp_call_function_many(mask, exit_vm_noop, NULL, true);
->  }
+> +/include/ "omap3.dtsi"
+> +
+> +/ {
+> +       memory {
+> +               device_type = "memory";
+> +               reg = <0x80000000 0x20000000>; /* 512 MB */
+> +       };
+> +
+> +       sound {
+> +               compatible = "ti,omap-twl4030";
+> +               ti,model = "igep2";
+> +               ti,mcbsp = <&mcbsp2>;
+> +               ti,codec = <&twl_audio>;
+> +       };
+> +};
+> +
+> +&omap3_pmx_core {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <
+> +                 &mcbsp2_pins
+> +       >;
+> +
+> +       uart3_pins: pinmux_uart3_pins {
+> +               pinctrl-single,pins = <
+> +                       0x16e 0x100     /* uart3_rx.uart3_rx INPUT | MODE0 */
+> +                       0x170 0         /* uart3_tx.uart3_tx OUTPUT | MODE0 */
+> +               >;
+> +       };
+> +
+> +       mcbsp2_pins: pinmux_mcbsp2_pins {
+> +               pinctrl-single,pins = <
+> +                       0x1a2 0x0104    /* mcspi1_cs2.gpio_176 INPUT | MODE4 */
+> +               >;
+> +       };
+> +};
+> +
+> +&i2c1 {
+> +       clock-frequency = <2600000>;
+> +
+> +       twl: twl at 48 {
+> +               reg = <0x48>;
+> +               interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+> +               interrupt-parent = <&intc>;
+> +
+> +               vsim: regulator at 10 {
+> +                       compatible = "ti,twl4030-vsim";
+> +                       regulator-min-microvolt = <1800000>;
+> +                       regulator-max-microvolt = <3000000>;
+> +               };
+> +
+> +               twl_audio: audio {
+> +                       compatible = "ti,twl4030-audio";
+> +                       codec {
+> +                             };
+> +               };
+> +       };
+> +};
+> +
+> +/include/ "twl4030.dtsi"
+> +
+> +&i2c2 {
+> +       clock-frequency = <400000>;
+> +};
+> +
+> +&mmc1 {
+> +       vmmc-supply = <&vmmc1>;
+> +       vmmc_aux-supply = <&vsim>;
+> +       bus-width = <8>;
+> +};
+> +
+> +&mmc2 {
+> +       status = "disabled";
+> +};
+> +
+> +&mmc3 {
+> +       status = "disabled";
+> +};
+> +
+> +&twl_gpio {
+> +       ti,use-leds;
+> +};
+> --
+> 1.7.7.6
+>
 
-Care to update the do_nothing() call in emulate.c to use this as well?
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Tested-by: Enric Balletbo i Serra <eballetbo@gmail.com>
