@@ -1,139 +1,62 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 03 Dec 2012 14:26:48 +0000
-Subject: [PATCH v4 10/13] ARM: KVM: VGIC control interface world switch
-In-Reply-To: <20121203133129.GF20074@mudshark.cambridge.arm.com>
-References: <20121110154358.3061.16338.stgit@chazy-air>
- <20121110154525.3061.45070.stgit@chazy-air>
- <20121203133129.GF20074@mudshark.cambridge.arm.com>
-Message-ID: <50BCB6A8.101@arm.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Mon, 3 Dec 2012 14:25:40 -0000
+Subject: [PATCH v2] net/macb: Use non-coherent memory for rx buffers
+In-Reply-To: <50BCA746.1020705@atmel.com>
+References: <CAGhQ9VwWmP_B17LnAEqDHcL8Yd-s0C-Bf35z3+=vnJmK_NoCSw@mail.gmail.com>
+ <1354536876-6274-1-git-send-email-nicolas.ferre@atmel.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B70D5@saturn3.aculab.com>
+ <50BCA746.1020705@atmel.com>
+Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B70D6@saturn3.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/12 13:31, Will Deacon wrote:
-> On Sat, Nov 10, 2012 at 03:45:25PM +0000, Christoffer Dall wrote:
->> From: Marc Zyngier <marc.zyngier@arm.com>
->>
->> Enable the VGIC control interface to be save-restored on world switch.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
->> ---
->>  arch/arm/include/asm/kvm_arm.h |   12 +++++++
->>  arch/arm/kernel/asm-offsets.c  |   12 +++++++
->>  arch/arm/kvm/interrupts_head.S |   68 ++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 92 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
->> index 246afd7..8f5dd22 100644
->> --- a/arch/arm/include/asm/kvm_arm.h
->> +++ b/arch/arm/include/asm/kvm_arm.h
->> @@ -192,4 +192,16 @@
->>  #define HSR_EC_DABT	(0x24)
->>  #define HSR_EC_DABT_HYP	(0x25)
->>  
->> +/* GICH offsets */
->> +#define GICH_HCR	0x0
->> +#define GICH_VTR	0x4
->> +#define GICH_VMCR	0x8
->> +#define GICH_MISR	0x10
->> +#define GICH_EISR0 	0x20
->> +#define GICH_EISR1 	0x24
->> +#define GICH_ELRSR0 	0x30
->> +#define GICH_ELRSR1 	0x34
->> +#define GICH_APR	0xf0
->> +#define GICH_LR0	0x100
+> On 12/03/2012 01:43 PM, David Laight :
+> >> Allocate regular pages to use as backing for the RX ring and use the
+> >> DMA API to sync the caches. This should give a bit better performance
+> >> since it allows the CPU to do burst transfers from memory. It is also
+> >> a necessary step on the way to reduce the amount of copying done by
+> >> the driver.
+> >
+> > I've not tried to understand the patches, but you have to be
+> > very careful using non-snooped memory for descriptor rings.
+> > No amount of DMA API calls can sort out some of the issues.
 > 
-> Similar thing to the other new gic defines -- they're probably better off
-> in gic.h
-
-Agreed.
-
->> +
->>  #endif /* __ARM_KVM_ARM_H__ */
->> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
->> index 95cab37..39b6221 100644
->> --- a/arch/arm/kernel/asm-offsets.c
->> +++ b/arch/arm/kernel/asm-offsets.c
->> @@ -167,6 +167,18 @@ int main(void)
->>    DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.hxfar));
->>    DEFINE(VCPU_HPFAR,		offsetof(struct kvm_vcpu, arch.hpfar));
->>    DEFINE(VCPU_HYP_PC,		offsetof(struct kvm_vcpu, arch.hyp_pc));
->> +#ifdef CONFIG_KVM_ARM_VGIC
->> +  DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
->> +  DEFINE(VGIC_CPU_HCR,		offsetof(struct vgic_cpu, vgic_hcr));
->> +  DEFINE(VGIC_CPU_VMCR,		offsetof(struct vgic_cpu, vgic_vmcr));
->> +  DEFINE(VGIC_CPU_MISR,		offsetof(struct vgic_cpu, vgic_misr));
->> +  DEFINE(VGIC_CPU_EISR,		offsetof(struct vgic_cpu, vgic_eisr));
->> +  DEFINE(VGIC_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_elrsr));
->> +  DEFINE(VGIC_CPU_APR,		offsetof(struct vgic_cpu, vgic_apr));
->> +  DEFINE(VGIC_CPU_LR,		offsetof(struct vgic_cpu, vgic_lr));
->> +  DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
->> +  DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
->> +#endif
->>    DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
->>  #endif
->>    return 0; 
->> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
->> index 2ac8b4a..c2423d8 100644
->> --- a/arch/arm/kvm/interrupts_head.S
->> +++ b/arch/arm/kvm/interrupts_head.S
->> @@ -341,6 +341,45 @@
->>   * @vcpup: Register pointing to VCPU struct
->>   */
->>  .macro save_vgic_state	vcpup
->> +#ifdef CONFIG_KVM_ARM_VGIC
->> +	/* Get VGIC VCTRL base into r2 */
->> +	ldr	r2, [\vcpup, #VCPU_KVM]
->> +	ldr	r2, [r2, #KVM_VGIC_VCTRL]
->> +	cmp	r2, #0
->> +	beq	2f
->> +
->> +	/* Compute the address of struct vgic_cpu */
->> +	add	r11, \vcpup, #VCPU_VGIC_CPU
+> David,
 > 
-> Given that we're dealing with constants, it would be more efficient to
-> express this addition as part of the immediate offset and let gas spit
-> out the final computed address for the stores below.
-
-We had that for a while, and with the kvm_vcpu structure growing, we
-ended up having fields out of the reach of an immediate offset. Is
-kvm_vcpu too big? Yes.
-
->> +
->> +	/* Save all interesting registers */
->> +	ldr	r3, [r2, #GICH_HCR]
->> +	ldr	r4, [r2, #GICH_VMCR]
->> +	ldr	r5, [r2, #GICH_MISR]
->> +	ldr	r6, [r2, #GICH_EISR0]
->> +	ldr	r7, [r2, #GICH_EISR1]
->> +	ldr	r8, [r2, #GICH_ELRSR0]
->> +	ldr	r9, [r2, #GICH_ELRSR1]
->> +	ldr	r10, [r2, #GICH_APR]
->> +
->> +	str	r3, [r11, #VGIC_CPU_HCR]
->> +	str	r4, [r11, #VGIC_CPU_VMCR]
->> +	str	r5, [r11, #VGIC_CPU_MISR]
->> +	str	r6, [r11, #VGIC_CPU_EISR]
->> +	str	r7, [r11, #(VGIC_CPU_EISR + 4)]
->> +	str	r8, [r11, #VGIC_CPU_ELRSR]
->> +	str	r9, [r11, #(VGIC_CPU_ELRSR + 4)]
->> +	str	r10, [r11, #VGIC_CPU_APR]
->> +
->> +	/* Save list registers */
->> +	add	r2, r2, #GICH_LR0
->> +	add	r3, r11, #VGIC_CPU_LR
->> +	ldr	r4, [r11, #VGIC_CPU_NR_LR]
->> +1:	ldr	r6, [r2], #4
->> +	str	r6, [r3], #4
->> +	subs	r4, r4, #1
->> +	bne	1b
->> +2:
->> +#endif
->>  .endm
+> Maybe I have not described the patch properly but the non-coherent
+> memory is not used for descriptor rings. It is used for DMA buffers
+> pointed out by descriptors (that are allocated as coherent memory).
 > 
-> Will
-> 
+> As buffers are filled up by the interface DMA and then, afterwards, used
+> by the driver to pass data to the net layer, it seems to me that the use
+> of non-coherent memory is sensible.
 
+Ah, ok - difficult to actually determine from a fast read of the code.
+So you invalidate (I think that is the right term) all the cache lines
+that are part of each rx buffer before giving it back to the MAC unit.
+(Maybe that first time, and just those cache lines that might have been
+written to after reception - I'd worry about whether the CRC is written
+into the rx buffer!)
 
--- 
-Jazz is not dead. It just smells funny...
+I was wondering if the code needs to do per page allocations?
+Perhaps that is necessary to avoid needing a large block of
+contiguous physical memory (and virtual addresses)?
+
+I know from some experiments done many years ago that a data
+copy in the MAC tx and rx path isn't necessarily as bad as
+people may think - especially if it removes complicated
+'buffer loaning' schemes and/or iommu setup (or bounce
+buffers due to limited hardware memory addressing).
+
+The rx copy can usually be made to be a 'whole word' copy
+(ie you copy the two bytes of garbage that (mis)align the
+destination MAC address, and some bytes after the CRC.
+With some hardware I believe it is possible for the cache
+controller to do cache-line aligned copies very quickly!
+(Some very new x86 cpus might be doing this for 'rep movsd'.)
+
+The copy in the rx path is also better for short packets
+the can end up queued for userspace (although a copy in
+the socket code would solve that one.
+
+	David
