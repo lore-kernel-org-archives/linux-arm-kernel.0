@@ -1,92 +1,26 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Mon, 03 Dec 2012 10:17:05 +0100
-Subject: [PATCH 0/6 v8] gpio: Add block GPIO
-In-Reply-To: <1354298637-25058-1-git-send-email-stigge@antcom.de>
-References: <1354298637-25058-1-git-send-email-stigge@antcom.de>
-Message-ID: <50BC6E11.3040203@grandegger.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Dec 2012 09:48:29 +0000
+Subject: [PATCH 1/4] rtc: sa1100: enable/disable rtc when probe/remove
+ the device
+In-Reply-To: <CADApbegrJDe5SiO255WdKYai1U7WjBYfMHuCm-hTNfx5p6Wz-Q@mail.gmail.com>
+References: <1354155670-6267-1-git-send-email-chao.xie@marvell.com>
+ <20121129102519.GG19440@n2100.arm.linux.org.uk>
+ <CAN1soZxUA2PPy4694ByX1FTyWiJkha8QpKFK5Jc3Wf3zT0huOA@mail.gmail.com>
+ <CADApbejZXach=YaiL5rEWA5+uc+mO8PzQzUKN+k90HfxEsqgtA@mail.gmail.com>
+ <CADApbegrJDe5SiO255WdKYai1U7WjBYfMHuCm-hTNfx5p6Wz-Q@mail.gmail.com>
+Message-ID: <20121203094828.GA14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roland,
+On Mon, Dec 03, 2012 at 10:53:07AM +0800, Chao Xie wrote:
+> I want to correct what i said. For the irq register/unregister i think
+> can be done at open/release. But for clock enable/disable, i do not
+> think so. If clock is disabled, as i think RTC will not work. User API
+> still use open->get_time->close for "date" command. It means that RTC
+> will not return correct date to user.
 
-On 11/30/2012 07:03 PM, Roland Stigge wrote:
-> This set of patches adds:
-> 
-> * Block GPIO API to gpiolib
-> * Sysfs support for GPIO API, to provide userland access
-> * Device interface for userland access (alternative to sysfs)
-> * Devicetree support to instantiate GPIO blocks via DT
-> * Example implementations in several gpio drivers since they need
->   special accessor functions for block wise GPIO access
-> * Fix for race condition in gpiolib on device creation
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> --
-> 
-> Changes since v7:
-> * Fixed error in API documentation (name arg missing in prototype)
-> * Fixed compile error if sysfs is missing: Moved gpio_block_is_output()
->   out of sysfs-ifdef
-> * Added error handling to gpio_block_register()
-> * Added mask attribute to sysfs (although dev interface exists now)
-> 
-> Changes since v6:
-> * Changed realloc to list handling
-> * Added mask to kernel API
-> * Added device interface as userspace API
-> * Changed sizeof() to BITS_PER_LONG
-> * Fixed multiline comment style
-> * Documented direction setting by the user
-> * Documented order of handled chips in case of multiple chips in one block
-> 
-> Changes since v5:
-> * Documented sysfs: elaborated on "exported" and "values" attributes
-> * Documented sysfs: gpiochip is a separate class now
-> * Aggregated driver support patches for block gpio into one single patch
-> * Added gpio block driver support for twl6040 and pch
-> 
-> Changes since v4:
-> * Documented word width
-> * Bugfix: export/unexport on register/unregister
-> * Using default dev_attrs for gpio_block_class
-> * Fix gpiolib: race condition on device creation
-> * Added driver support for ucb14500, vt8500, xilinx
-> 
-> Changes since v3:
-> * Added driver support for pca953x, em, pl061, max732x, pcf857x
-> * Coding style improvements
-> * Fixed krealloc memory leak in error case
-> * sysfs: values in hex
-> * Register blocks in a list
-> * Narrowing lock scope
-> * Use S_IWUSR and S_IRUGO instead of direct octal values
-> * Use for_each_set_bit()
-> * Change from unsigned to unsigned long for masks and values
-> 
-> Changes since v2:
-> * Added sysfs support
-> * Added devicetree support
-> * Added support for lpc32xx, generic
-> * Added functions for GPIO block registration
-> * Added more error checking
-> * Bit remapping bugfix
-> 
-> Changes since v1:
-> * API change to 32/64 bit word, bit masks
-> 
-> Thanks to Ryan Mallon, Linus Walleij, Stijn Devriendt, Jean-Christophe
-> Plagniol-Villard, Mark Brown, Greg Kroah-Hartman, Grant Likely, Stefan
-> Roese and Wolfgang Grandegger for reviewing!
+"I think" is not good enough for patches like this.  Please test it.
 
-I re-tried v8 on my AT91-SAM9G45 board and it works fine if
-CONFIG_GPIO_SYSFS is enable. Unfortunately, the access via misc device
-fails if CONFIG_GPIO_SYSFS is not set. That's due to gpio_block_export()
-returning -ENOSYS in gpio_block_register().
-
-Anyway, I really like that new GPIO block interface making life for
-applications fiddling with GPIOs much easier and faster. Just the poll
-support is missing.
-
-Thanks,
-
-Wolfgang.
+On SA11x0 and PXA platforms, the clock for the sa1100-rtc is a dummy
+clock; it has no effect.  For MMP, I don't have access to the TRMs so
+that's something you're going to have to find out.
