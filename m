@@ -1,40 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  3 Dec 2012 17:56:42 +0000
-Subject: [PATCH 2/3] ARM: nommu: prevent generation of kernel unaligned memory
- accesses
-In-Reply-To: <1354557403-20386-1-git-send-email-will.deacon@arm.com>
-References: <1354557403-20386-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1354557403-20386-2-git-send-email-will.deacon@arm.com>
+From: rajanikanth.hv@linaro.org (Rajanikanth H.V)
+Date: Mon,  3 Dec 2012 23:42:54 +0530
+Subject: [PATCH 1/2] ab8500: remove explicit handling of battery type
+Message-ID: <1354558375-15110-1-git-send-email-rajanikanth.hv@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent ARMv7 toolchains assume that unaligned memory accesses will not
-fault and will instead be handled by the processor.
+From: "Rajanikanth H.V" <rajanikanth.hv@stericsson.com>
 
-For the nommu case (without an MPU), memory will be treated as
-strongly-ordered and therefore unaligned accesses may fault regardless
-of the SCTLR.A setting.
+dt property, 'battery-type' shall be one of supported technology type
+instead blank.
+refer:Documentation/devicetree/bindings/power_supply/ab8500/fg.txt
+      for the list of supported types
 
-This patch passes -mno-unaligned-access to GCC when compiling for nommu
-targets, preventing the generation of unaligned memory access in the
-kernel.
+thanks to Francesco Lavra for highlighting missing of_node_put(...)
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+for '3.7-rc5': of git://git.infradead.org/battery-2.6.git
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Rajanikanth H.V <rajanikanth.hv@stericsson.com>
 ---
- arch/arm/Makefile | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/power/ab8500_bmdata.c |   11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 5f914fc..03363e2 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -32,6 +32,7 @@ KBUILD_DEFCONFIG := versatile_defconfig
- # defines filename extension depending memory management type.
- ifeq ($(CONFIG_MMU),)
- MMUEXT		:= -nommu
-+KBUILD_CFLAGS	+= $(call cc-option,-mno-unaligned-access)
- endif
+diff --git a/drivers/power/ab8500_bmdata.c b/drivers/power/ab8500_bmdata.c
+index 03cc528..2230b2c 100644
+--- a/drivers/power/ab8500_bmdata.c
++++ b/drivers/power/ab8500_bmdata.c
+@@ -461,7 +461,6 @@ bmdevs_of_probe(struct device *dev,
+ 	struct  device_node *np_bat_supply;
+ 	struct	abx500_bm_data *bat;
+ 	const char *btech;
+-	char bat_tech[8];
+ 	int i, thermistor;
  
- ifeq ($(CONFIG_FRAME_POINTER),y)
+ 	*battery = &ab8500_bm_data;
+@@ -488,12 +487,10 @@ bmdevs_of_probe(struct device *dev,
+ 		"stericsson,battery-type", NULL);
+ 	if (!btech) {
+ 		dev_warn(dev, "missing property battery-name/type\n");
+-		strcpy(bat_tech, "UNKNOWN");
+-	} else {
+-		strcpy(bat_tech, btech);
++		of_node_put(np_bat_supply);
++		return -EINVAL;
+ 	}
+-
+-	if (strncmp(bat_tech, "LION", 4) == 0) {
++	if (strncmp(btech, "LION", 4) == 0) {
+ 		bat->no_maintenance  = true;
+ 		bat->chg_unknown_bat = true;
+ 		bat->bat_type[BATTERY_UNKNOWN].charge_full_design = 2600;
+@@ -508,7 +505,7 @@ bmdevs_of_probe(struct device *dev,
+ 		if (thermistor == NTC_EXTERNAL) {
+ 			btype->batres_tbl =
+ 				temp_to_batres_tbl_ext_thermistor;
+-		} else if (strncmp(bat_tech, "LION", 4) == 0) {
++		} else if (strncmp(btech, "LION", 4) == 0) {
+ 			btype->batres_tbl =
+ 				temp_to_batres_tbl_9100;
+ 		} else {
 -- 
-1.8.0
+1.7.10.4
