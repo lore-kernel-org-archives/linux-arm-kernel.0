@@ -1,51 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 4 Dec 2012 09:14:17 +0000
-Subject: [PATCH 1/1] gpio: Provide the STMPE GPIO driver with its own IRQ
- Domain
-In-Reply-To: <CACRpkdbdCsx_SJvD9i+Geniy_McJb1dujzrSLu+o6bvcjUp_cw@mail.gmail.com>
-References: <1353683949-9275-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdbdCsx_SJvD9i+Geniy_McJb1dujzrSLu+o6bvcjUp_cw@mail.gmail.com>
-Message-ID: <20121204091417.GE2718@gmail.com>
+From: armando.visconti@st.com (Armando Visconti)
+Date: Tue, 4 Dec 2012 10:36:55 +0100
+Subject: [PATCH] nommu: Enable the strict alignment (CR_A) bit only if
+ ARCH < v6
+In-Reply-To: <20121203174617.GL20074@mudshark.cambridge.arm.com>
+References: <1354187042-28568-1-git-send-email-armando.visconti@st.com>
+ <50BCD6DB.2030200@st.com> <20121203172553.GC14363@n2100.arm.linux.org.uk>
+ <20121203174617.GL20074@mudshark.cambridge.arm.com>
+Message-ID: <50BDC437.1050701@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 01 Dec 2012, Linus Walleij wrote:
+On 12/03/2012 06:46 PM, Will Deacon wrote:
+> On Mon, Dec 03, 2012 at 05:25:53PM +0000, Russell King - ARM Linux wrote:
+>> On Mon, Dec 03, 2012 at 05:44:11PM +0100, Armando Visconti wrote:
+>>> On 11/29/2012 12:04 PM, Armando VISCONTI wrote:
+>>>> This patch keeps disabled the strict alignment CP15 bit for
+>>>> all armv6 and armv7 processor without the mmu. This behaviour
+>>>> is now same as in the mmu case.
+>>>>
+>>>> Signed-off-by: Armando Visconti<armando.visconti@st.com>
+>>>> ---
+>>>>    arch/arm/kernel/head-nommu.S |    2 +-
+>>>>    1 files changed, 1 insertions(+), 1 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+>>>> index 278cfc1..2c228a0 100644
+>>>> --- a/arch/arm/kernel/head-nommu.S
+>>>> +++ b/arch/arm/kernel/head-nommu.S
+>>>> @@ -68,7 +68,7 @@ __after_proc_init:
+>>>>    	 * CP15 system control register value returned in r0 from
+>>>>    	 * the CPU init function.
+>>>>    	 */
+>>>> -#ifdef CONFIG_ALIGNMENT_TRAP
+>>>> +#if defined(CONFIG_ALIGNMENT_TRAP)&&   __LINUX_ARM_ARCH__<   6
+>>>>    	orr	r0, r0, #CR_A
+>>>>    #else
+>>>>    	bic	r0, r0, #CR_A
+>>>
+>>> Any feedback on this simple patch?
+>>
+>> Well, it brings the nommu version into line with the mmu version, so
+>> it's sensible.  Please put it in the patch system, thanks.
+>
 
-> On Fri, Nov 23, 2012 at 4:19 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > The STMPE GPIO driver can be used as an IRQ controller by some
-> > related devices. Here we provide it with its very own IRQ Domain
-> > so that IRQs can be issued dynamically. This will stand the
-> > driver in good stead when it is enabled for Device Tree, as this
-> > it a prerequisite.
-> >
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> The patch looks bogus since there is no code exercising the added
-> irqdomain code in this patch, it's basically a no-op in the irq
-> path, which is wrong for an irqdomain.
-> 
-> It is lacking a irq_create_mapping() in stmpe_gpio_to_irq(),
-> removal of the irq_base member and usage of
-> irq_find_mapping() in stmpe_gpio_irq().
-> 
-> Only then will the irqdomain actually be used for what it's
-> intended for.
-> 
-> So I get the impression that this is one of these "let's
-> just throw a dummy irqdomain in there so we can use
-> it with devicetree" kind of things...
+Done!
 
-It's not meant to be bogus, as it will be used.
+> In which case, I'll definitely dust-off the patches to prevent unaligned
+> accesses to strongly-ordered memory because that results in good ol'
+> UNPREDICTABLE behaviour.
+>
 
-Albeit, we are not uses of the GPIO functionality AFAICT.
+Yes, we definetely need them.
 
-I'll look at your comments in a bit and fixup.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thx,
+Arm
