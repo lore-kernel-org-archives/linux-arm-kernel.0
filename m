@@ -1,19 +1,26 @@
-From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
-Date: Tue, 4 Dec 2012 22:24:47 +0100
-Subject: [PATCH] [ARM] pxa/spitz: Minor code refactor and typo fixes
-In-Reply-To: <CAMPhdO-MsiAdf6vvPXQ4MhMhdNiV5MXeKDhH9EHO+iy7ESVtKA@mail.gmail.com>
-References: <1354231379-17289-1-git-send-email-dromede@gmail.com>
- <CAMPhdO-MsiAdf6vvPXQ4MhMhdNiV5MXeKDhH9EHO+iy7ESVtKA@mail.gmail.com>
-Message-ID: <CAHod+GeyThW1=bEUkmpB4xjSRE-nqTKSuWTfff-iz2Q4uX0-JQ@mail.gmail.com>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Tue, 4 Dec 2012 22:32:32 +0100
+Subject: [PATCH v2] ARM: eukrea_mbimx27-baseboard - use stock
+ get_pendown_state() in ads7846
+In-Reply-To: <20121204210922.GA8620@core.coreip.homeip.net>
+References: <20121124082529.GA7687@core.coreip.homeip.net>
+ <20121127074209.GL10369@pengutronix.de>
+ <20121127090356.GA25658@core.coreip.homeip.net>
+ <20121204210922.GA8620@core.coreip.homeip.net>
+Message-ID: <20121204223232.700787a1@eb-e6520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 3, 2012 at 3:07 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> Hi Marko,
->
-> Could you split the patch into two? i.e. the change to i2c and one other change
-> to cleanup the code a bit. That will be cleaner.
->
-> Thanks
+Le Tue, 4 Dec 2012 13:09:22 -0800,
+Dmitry Torokhov <dmitry.torokhov@gmail.com> a ?crit :
 
-Will do.
+> On Tue, Nov 27, 2012 at 01:03:56AM -0800, Dmitry Torokhov wrote:
+> > The default implementation matches exactly our custom one so we can switch
+> > to using the default one. As a bonus the driver will take care of setting
+> > GPIO line for us.
+> > 
+> > Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> 
+> Eric, Sascha, could I get a formal ack on this one please ?
+> 
+Acked-by: Eric B?nard <eric@eukrea.com>
