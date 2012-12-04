@@ -1,36 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Dec 2012 14:37:25 +0000
-Subject: [RFC PATCH 2/2] ARM: SMP support for mach-virt
-In-Reply-To: <20121204134010.GP23368@mudshark.cambridge.arm.com>
-References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
- <1354557160-20144-3-git-send-email-will.deacon@arm.com>
- <50BD1FD7.9040000@gmail.com>
- <20121204124047.GM23368@mudshark.cambridge.arm.com>
- <20121204133326.GE14363@n2100.arm.linux.org.uk>
- <20121204134010.GP23368@mudshark.cambridge.arm.com>
-Message-ID: <20121204143724.GF14363@n2100.arm.linux.org.uk>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 04 Dec 2012 15:46:51 +0100
+Subject: linker problem with xip kernel and recent toolchains
+Message-ID: <50BE0CDB.5000704@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 04, 2012 at 01:40:10PM +0000, Will Deacon wrote:
-> On Tue, Dec 04, 2012 at 01:33:26PM +0000, Russell King - ARM Linux wrote:
-> > The memory that these 'offline' CPUs is executing then gets overwritten,
-> > and that's game over for those CPUs.
-> 
-> That's not strictly true. The device-tree passed to the kernel should have a
-> /memreserve/ entry for the SMP pen to avoid exactly this scenario. In real
-> hardware, this still sucks because you have spinning CPUs burning up power
-> but that's not such a problem with a virtual platform.
+Hello,
 
-Umm.  So let's see.  If I'm running v3.6 stock kernel and want to kexec
-into a v3.7 stock kernel.  The SMP pen is part of the v3.6 kernel, which
-will be located at 32K into the RAM.  The v3.7 kernel will also want to
-occupy the same place.  At some point you have to overwrite the v3.6
-kernel with the v3.7 kernel image.
+we've just discovered a linker problem with newer toolchains, that
+support --build-id and xip kernels. The resulting vmlinux is about 13
+MiB big, but the xipimage ~2GiB.
 
-That happens _before_ the DT has been parsed, so any memreserve stuff
-will be ignored.  And it's at that point that your "offline" secondary
-CPUs will have their instructions overwritten.
+A look at the vmlinux's objdump shows that the .notes section is around
+2 GiB and it's placed by the linker script into the RAM. With the ROM
+starting at 0x0 this results into a ~2 GiB big image.
 
-That's fine if the pen ends up being at the same place but that's not
-something we guarantee.
+>   [16] .data             PROGBITS        88008000 0a0000 012aa0 00  WA  0   0 256
+>   [17] .notes            NOTE            8801aaa0 0b2aa0 000024 00  AX  0   0  4
+>   [18] .bss              NOBITS          8801aae0 0b2ac4 005414 00  WA  0   0 32
+
+After discarding the .notes section in the objcopy (see patch below) the
+resulting binary images has a proper size again.
+
+Marc
+
+index 1ec5f67..4448790 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -18,7 +18,7 @@ ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
+ LDFLAGS_vmlinux        += --be8
+ endif
+
+-OBJCOPYFLAGS   :=-O binary -R .comment -S
++OBJCOPYFLAGS   :=-O binary -R .comment -R .notes -S
+ GZFLAGS                :=-9
+ #KBUILD_CFLAGS +=-pipe
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 261 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121204/78670e47/attachment.sig>
