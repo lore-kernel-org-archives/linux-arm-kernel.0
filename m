@@ -1,189 +1,98 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 4 Dec 2012 09:02:12 -0800
-Subject: [PATCH v2] ARM: DTS: CROS5250: Add max77686 device tree support
-In-Reply-To: <1354627096-9433-1-git-send-email-a.kesavan@samsung.com>
-References: <1354099900-24779-1-git-send-email-a.kesavan@samsung.com>
- <1354627096-9433-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <CAD=FV=VRPwuaOJrjGvtWzRQfb=NYsmP9Vfyk8jsxTMTv=6Pa7A@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue,  4 Dec 2012 18:04:59 +0100
+Subject: [PATCH] arm: mvebu: Use dw-apb-uart instead of ns16650 as UART driver
+Message-ID: <1354640699-6066-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash,
+The UART controller used in the Armada 370 and Armada XP SoCs is the
+Synopsys DesignWare 8250 (aka Synopsys DesignWare ABP UART). The
+improper use of the ns16550 can lead to a kernel oops during boot if
+a character is sent to the UART before the initialization of the
+driver. The DW APB has an extra interrupt that gets raised when
+writing to the LCR when busy. This explains why we need to use
+dw-apb-uart driver to handle this.
 
-On Tue, Dec 4, 2012 at 5:18 AM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
-> The exynos5250 based chromebooks have a max77686 pmic on i2c channel 0.
-> Add support for the pmic in the common cros5250 dts file.
-> Tested after enabling cpufreq support for exynos5250 SoC and varying the
-> arm frequency/voltage using the userspace governer.
->
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> ---
-> Changes since v1:
-> * Used generic names for the regulators
-> * Changed BUCK5 as being default "ON"
->  arch/arm/boot/dts/cros5250-common.dtsi |  138 ++++++++++++++++++++++++++++++++
->  1 files changed, 138 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
-> index fddd174..8ab8394 100644
-> --- a/arch/arm/boot/dts/cros5250-common.dtsi
-> +++ b/arch/arm/boot/dts/cros5250-common.dtsi
-> @@ -24,6 +24,144 @@
->                 samsung,i2c-max-bus-freq = <378000>;
->                 gpios = <&gpb3 0 2 3 0>,
->                         <&gpb3 1 2 3 0>;
-> +
-> +               max77686 at 09 {
-> +                       compatible = "maxim,max77686";
-> +                       reg = <0x09>;
-> +
-> +                       voltage-regulators {
-> +                               ldo1_reg: LDO1 {
-> +                                       regulator-name = "P1.0V_LDO_OUT1";
-> +                                       regulator-min-microvolt = <1000000>;
-> +                                       regulator-max-microvolt = <1000000>;
-> +                                       regulator-always-on;
-> +                               };
-> +
-> +                               ldo2_reg: LDO2 {
-> +                                       regulator-name = "P1.8V_LDO_OUT2";
-> +                                       regulator-min-microvolt = <1800000>;
-> +                                       regulator-max-microvolt = <1800000>;
-> +                                       regulator-always-on;
-> +                               };
-> +
-> +                               ldo3_reg: LDO3 {
-> +                                       regulator-name = "P1.8V_LDO_OUT3";
-> +                                       regulator-min-microvolt = <1800000>;
-> +                                       regulator-max-microvolt = <1800000>;
-> +                                       regulator-always-on;
-> +                               };
-> +
-> +                               ldo7_reg: LDO7 {
-> +                                       regulator-name = "P1.0V_LDO_OUT7";
-> +                                       regulator-min-microvolt = <1100000>;
-> +                                       regulator-max-microvolt = <1100000>;
-> +                                       regulator-always-on;
-> +                               };
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
 
-This matches the signal name on the most recent schematics, which is
-good, but I'd be slightly happier if it said "1.1V" in instead of
-1.0V.  I'd imagine that if we ever rev the schematics that we'd fix
-that.
+This patch fixed a bug introduced in 3.7, but as there are very few
+boards supported in 3.7 (only the Armada 370 and Armada XP evaluation
+boards), it is not a big deal if this patch is only applied for 3.8.
 
-> +
-> +                               ldo8_reg: LDO8 {
-> +                                       regulator-name = "P1.0V_LDO_OUT8";
-> +                                       regulator-min-microvolt = <1000000>;
-> +                                       regulator-max-microvolt = <1000000>;
-> +                                       regulator-always-on;
-> +                               };
-> +
-> +                               ldo10_reg: LDO10 {
-> +                                       regulator-name = "P1.8V_LDO_OUT10";
-> +                                       regulator-min-microvolt = <1800000>;
-> +                                       regulator-max-microvolt = <1800000>;
-> +                                       regulator-always-on;
-> +                               };
-> +
-> +                               ldo12_reg: LDO12 {
-> +                                       regulator-name = "P3.0V_LDO_OUT12";
-> +                                       regulator-min-microvolt = <3000000>;
-> +                                       regulator-max-microvolt = <3000000>;
-> +                                       regulator-always-on;
-> +                               };
-> +
-> +                               ldo14_reg: LDO14 {
-> +                                       regulator-name = "P1.8V_LDO_OUT14";
-> +                                       regulator-min-microvolt = <1800000>;
-> +                                       regulator-max-microvolt = <1800000>;
-> +                                       regulator-always-on;
-> +                               };
-> +
-> +                               ldo15_reg: LDO15 {
-> +                                       regulator-name = "P1.0V_LDO_OUT15";
-> +                                       regulator-min-microvolt = <1000000>;
-> +                                       regulator-max-microvolt = <1000000>;
-> +                                       regulator-always-on;
-> +                               };
-> +
-> +                               ldo16_reg: LDO16 {
-> +                                       regulator-name = "P1.8V_LDO_OUT16";
-> +                                       regulator-min-microvolt = <1800000>;
-> +                                       regulator-max-microvolt = <1800000>;
-> +                                       regulator-always-on;
-> +                               };
-> +
-> +                               buck1_reg: BUCK1 {
-> +                                       regulator-name = "vdd_mif";
-> +                                       regulator-min-microvolt = <950000>;
-> +                                       regulator-max-microvolt = <1300000>;
-> +                                       regulator-always-on;
-> +                                       regulator-boot-on;
-> +                               };
-> +
-> +                               buck2_reg: BUCK2 {
-> +                                       regulator-name = "vdd_arm";
-> +                                       regulator-min-microvolt = <850000>;
-> +                                       regulator-max-microvolt = <1350000>;
-> +                                       regulator-always-on;
-> +                                       regulator-boot-on;
-> +                               };
-> +
-> +                               buck3_reg: BUCK3 {
-> +                                       regulator-name = "vdd_int";
-> +                                       regulator-min-microvolt = <900000>;
-> +                                       regulator-max-microvolt = <1200000>;
-> +                                       regulator-always-on;
-> +                                       regulator-boot-on;
-> +                               };
-> +
-> +                               buck4_reg: BUCK4 {
-> +                                       regulator-name = "vdd_g3d";
-> +                                       regulator-min-microvolt = <850000>;
-> +                                       regulator-max-microvolt = <1300000>;
-> +                                       regulator-always-on;
-> +                                       regulator-boot-on;
-> +                               };
-> +
-> +                               buck5_reg: BUCK5 {
-> +                                       regulator-name = "P1.8V_BUCK_OUT5";
-> +                                       regulator-min-microvolt = <1800000>;
-> +                                       regulator-max-microvolt = <1800000>;
-> +                                       regulator-always-on;
-> +                                       regulator-boot-on;
-> +                               };
-> +
-> +                               buck6_reg: BUCK6 {
-> +                                       regulator-name = "P1.35V_BUCK_OUT6";
-> +                                       regulator-min-microvolt = <1350000>;
-> +                                       regulator-max-microvolt = <1350000>;
-> +                                       regulator-always-on;
-> +                               };
-> +
-> +                               buck7_reg: BUCK7 {
-> +                                       regulator-name = "P2.0V_BUCK_OUT7";
-> +                                       regulator-min-microvolt = <2000000>;
-> +                                       regulator-max-microvolt = <2000000>;
-> +                                       regulator-always-on;
-> +                               };
-> +
-> +                               buck8_reg: BUCK8 {
-> +                                       regulator-name = "P2.85V_BUCK_OUT8";
-> +                                       regulator-min-microvolt = <2850000>;
-> +                                       regulator-max-microvolt = <2850000>;
-> +                                       regulator-always-on;
-> +                               };
-> +                       };
-> +               };
->         };
->
->         i2c at 12C70000 {
-> --
-> 1.6.6.1
->
+This patch is based on 3.7-rc8 and can be applied on top of the
+current arm-soc/for-next with a trivial conflict on mvebu_defconfig.
 
-...would love to see LDO7 name fixed up, but otherwise looks good to
-me.  Thanks!
+---
+ arch/arm/boot/dts/armada-370-xp.dtsi |    6 ++++--
+ arch/arm/boot/dts/armada-xp.dtsi     |    6 ++++--
+ arch/arm/configs/mvebu_defconfig     |    2 +-
+ 3 files changed, 9 insertions(+), 5 deletions(-)
 
-Acked-by: Doug Anderson <dianders@chromium.org>
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 16cc82c..03640f7 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -44,17 +44,19 @@
+ 		ranges;
+ 
+ 		serial at d0012000 {
+-				compatible = "ns16550";
++				compatible = "snps,dw-apb-uart";
+ 				reg = <0xd0012000 0x100>;
+ 				reg-shift = <2>;
+ 				interrupts = <41>;
++				reg-io-width = <4>;
+ 				status = "disabled";
+ 		};
+ 		serial at d0012100 {
+-				compatible = "ns16550";
++				compatible = "snps,dw-apb-uart";
+ 				reg = <0xd0012100 0x100>;
+ 				reg-shift = <2>;
+ 				interrupts = <42>;
++				reg-io-width = <4>;
+ 				status = "disabled";
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 71d6b5d..9a0e744 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -29,17 +29,19 @@
+ 
+ 	soc {
+ 		serial at d0012200 {
+-				compatible = "ns16550";
++				compatible = "snps,dw-apb-uart";
+ 				reg = <0xd0012200 0x100>;
+ 				reg-shift = <2>;
+ 				interrupts = <43>;
++				reg-io-width = <4>;
+ 				status = "disabled";
+ 		};
+ 		serial at d0012300 {
+-				compatible = "ns16550";
++				compatible = "snps,dw-apb-uart";
+ 				reg = <0xd0012300 0x100>;
+ 				reg-shift = <2>;
+ 				interrupts = <44>;
++				reg-io-width = <4>;
+ 				status = "disabled";
+ 		};
+ 
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index 3458752..9e34084 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -22,7 +22,7 @@ CONFIG_VFP=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+-CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_SERIAL_8250_DW=y
+ CONFIG_GPIOLIB=y
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_USB_SUPPORT is not set
+-- 
+1.7.9.5
