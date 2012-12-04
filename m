@@ -1,67 +1,126 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue,  4 Dec 2012 15:53:57 +0800
-Subject: [v2 PATCH 11/14] spi/atmel_spi: correct 16 bits transfer with DMA
+Date: Tue,  4 Dec 2012 15:54:00 +0800
+Subject: [v2 PATCH 14/14] ARM: dts: add spi nodes for atmel boards
 In-Reply-To: <1354607640-13229-1-git-send-email-wenyou.yang@atmel.com>
 References: <1354607640-13229-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1354607640-13229-12-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1354607640-13229-15-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Richard Genoud <richard.genoud@gmail.com>
 
 Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-Cc: grant.likely at secretlab.ca
-Cc: spi-devel-general at lists.sourceforge.net
+[wenyou.yang at atmel.com: added spi nodes for other atmel boards]
+[wenyou.yang at atmel.com: remove the cs-gpios property for sam9x5ek boards]
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Cc: linux at arm.linux.org.uk
 ---
- drivers/spi/spi-atmel.c |   17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/at91sam9263ek.dts         |    9 +++++++++
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |    9 +++++++++
+ arch/arm/boot/dts/at91sam9g25ek.dts         |    9 +++++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      |    9 +++++++++
+ arch/arm/boot/dts/at91sam9n12ek.dts         |    9 +++++++++
+ 5 files changed, 45 insertions(+)
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 9616fab..61452a5 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -439,12 +439,18 @@ static inline int atmel_spi_xfer_can_be_chained(struct spi_transfer *xfer)
- }
+diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
+index f86ac4b..11e274d 100644
+--- a/arch/arm/boot/dts/at91sam9263ek.dts
++++ b/arch/arm/boot/dts/at91sam9263ek.dts
+@@ -50,6 +50,15 @@
+ 				atmel,vbus-gpio = <&pioA 25 0>;
+ 				status = "okay";
+ 			};
++
++			spi0: spi at fffa4000 {
++				status = "okay";
++				mtd_dataflash at 0 {
++					compatible = "atmel,at45", "atmel,dataflash";
++					spi-max-frequency = <50000000>;
++					reg = <0>;
++				};
++			};
+ 		};
  
- static int atmel_spi_dma_slave_config(struct atmel_spi *as,
--				struct dma_slave_config *slave_config)
-+				struct dma_slave_config *slave_config,
-+				u8 bits_per_word)
- {
- 	int err = 0;
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+index e6391a4..3c3b63d 100644
+--- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+@@ -51,6 +51,15 @@
+ 				atmel,vbus-gpio = <&pioC 5 0>;
+ 				status = "okay";
+ 			};
++
++			spi0: spi at fffc8000 {
++				status = "okay";
++				mtd_dataflash at 0 {
++					compatible = "atmel,at45", "atmel,dataflash";
++					spi-max-frequency = <50000000>;
++					reg = <1>;
++				};
++			};
+ 		};
  
--	slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
--	slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	if (bits_per_word > 8) {
-+		slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-+		slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-+	} else {
-+		slave_config->dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+		slave_config->src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	}
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
+index 877c08f..3b84bc9 100644
+--- a/arch/arm/boot/dts/at91sam9g25ek.dts
++++ b/arch/arm/boot/dts/at91sam9g25ek.dts
+@@ -44,6 +44,15 @@
+ 			i2c2: i2c at f8018000 {
+ 				status = "okay";
+ 			};
++
++			spi0: spi at f0000000 {
++				status = "okay";
++				m25p80 at 0 {
++					compatible = "atmel,at25df321a";
++					spi-max-frequency = <50000000>;
++					reg = <0>;
++				};
++			};
+ 		};
  
- 	slave_config->dst_addr = (dma_addr_t)as->phybase + SPI_TDR;
- 	slave_config->src_addr = (dma_addr_t)as->phybase + SPI_RDR;
-@@ -506,7 +512,7 @@ static int __devinit atmel_spi_configure_dma(struct atmel_spi *as)
- 		goto error;
- 	}
+ 		usb0: ohci at 00600000 {
+diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+index 15e1dd4..a23ac6e 100644
+--- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
++++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+@@ -54,6 +54,15 @@
+ 			i2c1: i2c at fff88000 {
+ 				status = "okay";
+ 			};
++
++			spi0: spi at fffa4000{
++				status = "okay";
++				mtd_dataflash at 0 {
++					compatible = "atmel,at45", "atmel,dataflash";
++					spi-max-frequency = <13000000>;
++					reg = <0>;
++				};
++			};
+ 		};
  
--	err = atmel_spi_dma_slave_config(as, &slave_config);
-+	err = atmel_spi_dma_slave_config(as, &slave_config, 8);
- 	if (err)
- 		goto error;
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
+index 912b2c2..706bd00 100644
+--- a/arch/arm/boot/dts/at91sam9n12ek.dts
++++ b/arch/arm/boot/dts/at91sam9n12ek.dts
+@@ -45,6 +45,15 @@
+ 			i2c1: i2c at f8014000 {
+ 				status = "okay";
+ 			};
++
++			spi0: spi at f0000000 {
++				status = "okay";
++				m25p80 at 0 {
++					compatible = "atmel,at25df321a";
++					spi-max-frequency = <50000000>;
++					reg = <0>;
++				};
++			};
+ 		};
  
-@@ -641,10 +647,9 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
- 
- 	*plen = len;
- 
--	if (atmel_spi_dma_slave_config(as, &slave_config))
-+	if (atmel_spi_dma_slave_config(as, &slave_config, 8))
- 		goto err_exit;
- 
--
- 	/* Send both scatterlists */
- 	rxdesc = rxchan->device->device_prep_slave_sg(rxchan,
- 					&as->dma.sgrx,
+ 		nand0: nand at 40000000 {
 -- 
 1.7.9.5
