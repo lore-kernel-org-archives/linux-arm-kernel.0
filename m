@@ -1,48 +1,189 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 04 Dec 2012 12:00:07 -0500 (EST)
-Subject: [RFC PATCH 0/2] Add support for a fake, para-virtualised machine
-In-Reply-To: <50BE04C6.4070602@gmail.com>
-References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
- <50BD1F81.9080304@gmail.com>
- <20121204123001.GL23368@mudshark.cambridge.arm.com>
- <50BE04C6.4070602@gmail.com>
-Message-ID: <alpine.LFD.2.02.1212041142490.6589@xanadu.home>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 4 Dec 2012 09:02:12 -0800
+Subject: [PATCH v2] ARM: DTS: CROS5250: Add max77686 device tree support
+In-Reply-To: <1354627096-9433-1-git-send-email-a.kesavan@samsung.com>
+References: <1354099900-24779-1-git-send-email-a.kesavan@samsung.com>
+ <1354627096-9433-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <CAD=FV=VRPwuaOJrjGvtWzRQfb=NYsmP9Vfyk8jsxTMTv=6Pa7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Dec 2012, Rob Herring wrote:
+Abhilash,
 
-> That to me is highlighting where we need to do more work on DT driving
-> the initialization. The platforms are still aware of what kind of timers
-> and interrupt controllers are present. They should not be. There's work
-> in progress for both of those.
-> 
-> Lorenzo's DT MPIDR patches should trim down smp code some. The DT spin
-> table code could probably be common. I think I could use it on highbank
-> as well. If we decide the pen code stays, then it should be common
-> rather than creating yet another copy.
+On Tue, Dec 4, 2012 at 5:18 AM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+> The exynos5250 based chromebooks have a max77686 pmic on i2c channel 0.
+> Add support for the pmic in the common cros5250 dts file.
+> Tested after enabling cpufreq support for exynos5250 SoC and varying the
+> arm frequency/voltage using the userspace governer.
+>
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> ---
+> Changes since v1:
+> * Used generic names for the regulators
+> * Changed BUCK5 as being default "ON"
+>  arch/arm/boot/dts/cros5250-common.dtsi |  138 ++++++++++++++++++++++++++++++++
+>  1 files changed, 138 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
+> index fddd174..8ab8394 100644
+> --- a/arch/arm/boot/dts/cros5250-common.dtsi
+> +++ b/arch/arm/boot/dts/cros5250-common.dtsi
+> @@ -24,6 +24,144 @@
+>                 samsung,i2c-max-bus-freq = <378000>;
+>                 gpios = <&gpb3 0 2 3 0>,
+>                         <&gpb3 1 2 3 0>;
+> +
+> +               max77686 at 09 {
+> +                       compatible = "maxim,max77686";
+> +                       reg = <0x09>;
+> +
+> +                       voltage-regulators {
+> +                               ldo1_reg: LDO1 {
+> +                                       regulator-name = "P1.0V_LDO_OUT1";
+> +                                       regulator-min-microvolt = <1000000>;
+> +                                       regulator-max-microvolt = <1000000>;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               ldo2_reg: LDO2 {
+> +                                       regulator-name = "P1.8V_LDO_OUT2";
+> +                                       regulator-min-microvolt = <1800000>;
+> +                                       regulator-max-microvolt = <1800000>;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               ldo3_reg: LDO3 {
+> +                                       regulator-name = "P1.8V_LDO_OUT3";
+> +                                       regulator-min-microvolt = <1800000>;
+> +                                       regulator-max-microvolt = <1800000>;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               ldo7_reg: LDO7 {
+> +                                       regulator-name = "P1.0V_LDO_OUT7";
+> +                                       regulator-min-microvolt = <1100000>;
+> +                                       regulator-max-microvolt = <1100000>;
+> +                                       regulator-always-on;
+> +                               };
 
-I don't want to rain on the "everything should be common" parade here.  
-However, for the best part of last year I've been working on kernel 
-support for big.LITTLE systems, and the handling of CPU hotplug 
-(including SMP secondary boot) is far from being a trivial task.  
-Managing the simple bringing up or down of a CPU in such an environment 
-required hundreds of new lines of code.  That is far from a simple 
-holding pen or spinning table to say the least.
+This matches the signal name on the most recent schematics, which is
+good, but I'd be slightly happier if it said "1.1V" in instead of
+1.0V.  I'd imagine that if we ever rev the schematics that we'd fix
+that.
 
-[ For the curious, I'll post this code here soon for review. ]
+> +
+> +                               ldo8_reg: LDO8 {
+> +                                       regulator-name = "P1.0V_LDO_OUT8";
+> +                                       regulator-min-microvolt = <1000000>;
+> +                                       regulator-max-microvolt = <1000000>;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               ldo10_reg: LDO10 {
+> +                                       regulator-name = "P1.8V_LDO_OUT10";
+> +                                       regulator-min-microvolt = <1800000>;
+> +                                       regulator-max-microvolt = <1800000>;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               ldo12_reg: LDO12 {
+> +                                       regulator-name = "P3.0V_LDO_OUT12";
+> +                                       regulator-min-microvolt = <3000000>;
+> +                                       regulator-max-microvolt = <3000000>;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               ldo14_reg: LDO14 {
+> +                                       regulator-name = "P1.8V_LDO_OUT14";
+> +                                       regulator-min-microvolt = <1800000>;
+> +                                       regulator-max-microvolt = <1800000>;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               ldo15_reg: LDO15 {
+> +                                       regulator-name = "P1.0V_LDO_OUT15";
+> +                                       regulator-min-microvolt = <1000000>;
+> +                                       regulator-max-microvolt = <1000000>;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               ldo16_reg: LDO16 {
+> +                                       regulator-name = "P1.8V_LDO_OUT16";
+> +                                       regulator-min-microvolt = <1800000>;
+> +                                       regulator-max-microvolt = <1800000>;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               buck1_reg: BUCK1 {
+> +                                       regulator-name = "vdd_mif";
+> +                                       regulator-min-microvolt = <950000>;
+> +                                       regulator-max-microvolt = <1300000>;
+> +                                       regulator-always-on;
+> +                                       regulator-boot-on;
+> +                               };
+> +
+> +                               buck2_reg: BUCK2 {
+> +                                       regulator-name = "vdd_arm";
+> +                                       regulator-min-microvolt = <850000>;
+> +                                       regulator-max-microvolt = <1350000>;
+> +                                       regulator-always-on;
+> +                                       regulator-boot-on;
+> +                               };
+> +
+> +                               buck3_reg: BUCK3 {
+> +                                       regulator-name = "vdd_int";
+> +                                       regulator-min-microvolt = <900000>;
+> +                                       regulator-max-microvolt = <1200000>;
+> +                                       regulator-always-on;
+> +                                       regulator-boot-on;
+> +                               };
+> +
+> +                               buck4_reg: BUCK4 {
+> +                                       regulator-name = "vdd_g3d";
+> +                                       regulator-min-microvolt = <850000>;
+> +                                       regulator-max-microvolt = <1300000>;
+> +                                       regulator-always-on;
+> +                                       regulator-boot-on;
+> +                               };
+> +
+> +                               buck5_reg: BUCK5 {
+> +                                       regulator-name = "P1.8V_BUCK_OUT5";
+> +                                       regulator-min-microvolt = <1800000>;
+> +                                       regulator-max-microvolt = <1800000>;
+> +                                       regulator-always-on;
+> +                                       regulator-boot-on;
+> +                               };
+> +
+> +                               buck6_reg: BUCK6 {
+> +                                       regulator-name = "P1.35V_BUCK_OUT6";
+> +                                       regulator-min-microvolt = <1350000>;
+> +                                       regulator-max-microvolt = <1350000>;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               buck7_reg: BUCK7 {
+> +                                       regulator-name = "P2.0V_BUCK_OUT7";
+> +                                       regulator-min-microvolt = <2000000>;
+> +                                       regulator-max-microvolt = <2000000>;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               buck8_reg: BUCK8 {
+> +                                       regulator-name = "P2.85V_BUCK_OUT8";
+> +                                       regulator-min-microvolt = <2850000>;
+> +                                       regulator-max-microvolt = <2850000>;
+> +                                       regulator-always-on;
+> +                               };
+> +                       };
+> +               };
+>         };
+>
+>         i2c at 12C70000 {
+> --
+> 1.6.6.1
+>
 
-So my point of view is: if you do not need a holding pen because you can 
-hold individual CPUs in reset, then don't.  Many platforms with support 
-in the kernel can do that, yet they copied the holding pen code just 
-because it is there.  And that is total crap.
+...would love to see LDO7 name fixed up, but otherwise looks good to
+me.  Thanks!
 
-on the topic of a para-virtualised machine, I think that it should 
-simply implement the PSCI calls to bring up CPUs _without_ any holding 
-pen nor spinning tables.  You issue the appropriate PSCI call with the 
-physical address for secondary_startup() as argument and you're done.  
-The host intercepts that call and free a new CPU instance in response.  
-That's all.
-
-
-Nicolas
+Acked-by: Doug Anderson <dianders@chromium.org>
