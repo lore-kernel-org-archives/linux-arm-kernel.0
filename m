@@ -1,44 +1,36 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 4 Dec 2012 14:37:42 +0530
-Subject: [PATCH 2/3] arm: exynos5: Enable PM generic domain support in
- Kconfig
-In-Reply-To: <1354018957-17752-3-git-send-email-prasanna.ps@samsung.com>
-References: <1354018957-17752-1-git-send-email-prasanna.ps@samsung.com>
- <1354018957-17752-3-git-send-email-prasanna.ps@samsung.com>
-Message-ID: <CAJuYYwTJGQW3QhubqkmURmA0TedxHeFdo8+rB0Q=eHGvGQ_jTw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 4 Dec 2012 09:12:15 +0000
+Subject: [PATCH 1/1] ARM: ux500: Change IRQ from low-to-high edge
+ triggered to high-to-low
+In-Reply-To: <CACRpkdafvpnyq7YMV=iSjN4+u1hpt3xntAb-daJZifG9VpgnOw@mail.gmail.com>
+References: <1354289099-17931-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdafvpnyq7YMV=iSjN4+u1hpt3xntAb-daJZifG9VpgnOw@mail.gmail.com>
+Message-ID: <20121204091215.GD2718@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 November 2012 17:52, Prasanna Kumar <prasanna.ps@samsung.com> wrote:
-> From: Prasanna Kumar <prasanna.ps@samsung.com>
->
-> This patch adds support to enable PM generic domains
-> under Exynos5 family
->
-> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+On Sat, 01 Dec 2012, Linus Walleij wrote:
 
-Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
+> On Fri, Nov 30, 2012 at 4:24 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > When the STMPE IRQ is triggered to be active high level-sensitive, the
+> > Nomadik GPIO controller it uses complains, although it still works.
+> > Recently we attempted to move triggering to low-to-high in an attempt
+> > to prevent the warning; however, this ensured that the IRQ was actually
+> > missed completely. Now we have a solution which both works and keeps the
+> > GPIO controller happy.
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Is this something I should put into the ux500 tree or will you
+> take care of this in a separate pull request?
 
-> ---
->  arch/arm/mach-exynos/Kconfig |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 945ce49..c07a29c 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -63,6 +63,7 @@ config SOC_EXYNOS5250
->         depends on ARCH_EXYNOS5
->         select S5P_PM if PM
->         select S5P_SLEEP if PM
-> +       select PM_GENERIC_DOMAINS if PM
->         select S5P_DEV_MFC
->         select SAMSUNG_DMADEV
->         help
-> --
-> 1.7.0.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Can you still get this into the RCs, as it's a bugfix?
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
