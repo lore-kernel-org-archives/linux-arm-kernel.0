@@ -1,109 +1,62 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 04 Dec 2012 18:08:50 +0100
-Subject: [PATCH] arm: mvebu: Use dw-apb-uart instead of ns16650 as UART
- driver
-In-Reply-To: <1354640699-6066-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1354640699-6066-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <50BE2E22.6020606@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 Dec 2012 17:11:29 +0000
+Subject: [RFC PATCH 0/2] Add support for a fake, para-virtualised machine
+In-Reply-To: <alpine.LFD.2.02.1212041142490.6589@xanadu.home>
+References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
+ <50BD1F81.9080304@gmail.com>
+ <20121204123001.GL23368@mudshark.cambridge.arm.com>
+ <50BE04C6.4070602@gmail.com>
+ <alpine.LFD.2.02.1212041142490.6589@xanadu.home>
+Message-ID: <20121204171129.GE5314@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2012 06:04 PM, Gregory CLEMENT wrote:
-> The UART controller used in the Armada 370 and Armada XP SoCs is the
-> Synopsys DesignWare 8250 (aka Synopsys DesignWare ABP UART). The
-> improper use of the ns16550 can lead to a kernel oops during boot if
-> a character is sent to the UART before the initialization of the
-> driver. The DW APB has an extra interrupt that gets raised when
-> writing to the LCR when busy. This explains why we need to use
-> dw-apb-uart driver to handle this.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
-> 
-> This patch fixed a bug introduced in 3.7, but as there are very few
-> boards supported in 3.7 (only the Armada 370 and Armada XP evaluation
-> boards), it is not a big deal if this patch is only applied for 3.8.
-> 
-> This patch is based on 3.7-rc8 and can be applied on top of the
-> current arm-soc/for-next with a trivial conflict on mvebu_defconfig.
-> 
+Hi Nicolas,
 
-Jason,
-
-do you want a git pull, or is it easier to just pick this single patch?
-
-Thanks,
-Gregory
-
-> ---
->  arch/arm/boot/dts/armada-370-xp.dtsi |    6 ++++--
->  arch/arm/boot/dts/armada-xp.dtsi     |    6 ++++--
->  arch/arm/configs/mvebu_defconfig     |    2 +-
->  3 files changed, 9 insertions(+), 5 deletions(-)
+On Tue, Dec 04, 2012 at 05:00:07PM +0000, Nicolas Pitre wrote:
+> On Tue, 4 Dec 2012, Rob Herring wrote:
 > 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 16cc82c..03640f7 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -44,17 +44,19 @@
->  		ranges;
->  
->  		serial at d0012000 {
-> -				compatible = "ns16550";
-> +				compatible = "snps,dw-apb-uart";
->  				reg = <0xd0012000 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <41>;
-> +				reg-io-width = <4>;
->  				status = "disabled";
->  		};
->  		serial at d0012100 {
-> -				compatible = "ns16550";
-> +				compatible = "snps,dw-apb-uart";
->  				reg = <0xd0012100 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <42>;
-> +				reg-io-width = <4>;
->  				status = "disabled";
->  		};
->  
-> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> index 71d6b5d..9a0e744 100644
-> --- a/arch/arm/boot/dts/armada-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> @@ -29,17 +29,19 @@
->  
->  	soc {
->  		serial at d0012200 {
-> -				compatible = "ns16550";
-> +				compatible = "snps,dw-apb-uart";
->  				reg = <0xd0012200 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <43>;
-> +				reg-io-width = <4>;
->  				status = "disabled";
->  		};
->  		serial at d0012300 {
-> -				compatible = "ns16550";
-> +				compatible = "snps,dw-apb-uart";
->  				reg = <0xd0012300 0x100>;
->  				reg-shift = <2>;
->  				interrupts = <44>;
-> +				reg-io-width = <4>;
->  				status = "disabled";
->  		};
->  
-> diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-> index 3458752..9e34084 100644
-> --- a/arch/arm/configs/mvebu_defconfig
-> +++ b/arch/arm/configs/mvebu_defconfig
-> @@ -22,7 +22,7 @@ CONFIG_VFP=y
->  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
->  CONFIG_SERIAL_8250=y
->  CONFIG_SERIAL_8250_CONSOLE=y
-> -CONFIG_SERIAL_OF_PLATFORM=y
-> +CONFIG_SERIAL_8250_DW=y
->  CONFIG_GPIOLIB=y
->  CONFIG_GPIO_SYSFS=y
->  # CONFIG_USB_SUPPORT is not set
+> > That to me is highlighting where we need to do more work on DT driving
+> > the initialization. The platforms are still aware of what kind of timers
+> > and interrupt controllers are present. They should not be. There's work
+> > in progress for both of those.
+> > 
+> > Lorenzo's DT MPIDR patches should trim down smp code some. The DT spin
+> > table code could probably be common. I think I could use it on highbank
+> > as well. If we decide the pen code stays, then it should be common
+> > rather than creating yet another copy.
 > 
+> I don't want to rain on the "everything should be common" parade here.  
+> However, for the best part of last year I've been working on kernel 
+> support for big.LITTLE systems, and the handling of CPU hotplug 
+> (including SMP secondary boot) is far from being a trivial task.  
+> Managing the simple bringing up or down of a CPU in such an environment 
+> required hundreds of new lines of code.  That is far from a simple 
+> holding pen or spinning table to say the least.
+> 
+> [ For the curious, I'll post this code here soon for review. ]
+> 
+> So my point of view is: if you do not need a holding pen because you can 
+> hold individual CPUs in reset, then don't.  Many platforms with support 
+> in the kernel can do that, yet they copied the holding pen code just 
+> because it is there.  And that is total crap.
+
+Agreed, but it's also total crap forcing emulation of a made-up power
+controller on the host in the case of a virtual platform.
+
+> on the topic of a para-virtualised machine, I think that it should 
+> simply implement the PSCI calls to bring up CPUs _without_ any holding 
+> pen nor spinning tables.  You issue the appropriate PSCI call with the 
+> physical address for secondary_startup() as argument and you're done.  
+> The host intercepts that call and free a new CPU instance in response.  
+> That's all.
+
+I'd be happy to go with this suggestion if it wasn't for one thing:
+platforms that do not implement a secure mode. For these platforms, smc will
+be an undefined instruction at the exception level where it is executed and
+therefore cannot be trapped by the hypervisor.
+
+If that situation requires a pen, I see no benefit from having two boot
+schemes where one of them would work in every case.
+
+Will
