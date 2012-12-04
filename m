@@ -1,31 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Dec 2012 13:29:50 +0000
-Subject: About the workaround for the 484863 L220 erratum
-In-Reply-To: <4AE7B88EC8BA74469869BB7EEB7D66671BCA3685@g01jpexmbyt23>
-References: <4AE7B88EC8BA74469869BB7EEB7D66671BCA3685@g01jpexmbyt23>
-Message-ID: <20121204132950.GO23368@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 4 Dec 2012 13:33:26 +0000
+Subject: [RFC PATCH 2/2] ARM: SMP support for mach-virt
+In-Reply-To: <20121204124047.GM23368@mudshark.cambridge.arm.com>
+References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
+ <1354557160-20144-3-git-send-email-will.deacon@arm.com>
+ <50BD1FD7.9040000@gmail.com>
+ <20121204124047.GM23368@mudshark.cambridge.arm.com>
+Message-ID: <20121204133326.GE14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 04, 2012 at 12:57:57PM +0000, Asano, Yasushi wrote:
-> Hi,
+On Tue, Dec 04, 2012 at 12:40:47PM +0000, Will Deacon wrote:
+> On Mon, Dec 03, 2012 at 09:55:35PM +0000, Rob Herring wrote:
+> > Why is the pen is needed? It should only be needed for hotplug on
+> > systems that can't reset their cores. I'd hope you could design good
+> > virtual h/w.
 > 
-> I am looking for a workaround for the 484863 L220 erratum. 
-> "484863: The Cache Sync operation does not guarantee that the Eviction Buffer is empty"
-> 
-> Then I found a patch as below.
-> http://www.linux-arm.org/git?p=linux-2.6-stable.git;a=commitdiff;h=61f0ab1658f41f34c1910848063c565095a47864
-> Though It seems to need should correct this probrem, this patch has not been marged into the mainline yet.
-> 
-> v3.6.9?arch/arm/include/asm/io.h
-> #define writel_relaxed(v,c)     __raw_writel((__force u32) cpu_to_le32(v),c)
+> It's not so much about designing good virtual h/w as it is avoiding tying
+> the platform to it. What we don't want is to mandate that in order to boot
+> this machine, you *must* implement an emulation of some virtual
+> power-controller or SMP booting device. If we go down that route, there's
+> less advantage from having the virtual platform in the first place.
 
-What's the significance of this?
+There is actually a bigger problem here.  Let's say that you have a
+quad SMP platform.  You've arranged for your kernel to boot and only
+bring one of those cores online.
 
-> Could you please tell me if you know the reason why it does not get into the mainline.
+You then kexec() or reboot.  As far as the kernel is concerned, those
+other two CPUs are not online and are not running any kernel code;
+however in reality they could be sitting in this 'pen'.
 
-Probably because, looking at the patch in question, it uses a swp
-instruction in the kernel which could be fatal if we have swp emulation
-enabled (we only emulate for user mode).
+The memory that these 'offline' CPUs is executing then gets overwritten,
+and that's game over for those CPUs.
 
-Will
+So, the 'pen' approach in the kernel is fragile, I'd much rather not
+have it.  It was fine in the beginning for the initial ARM Ltd SMP
+platforms but in this modern age it has no place in real platforms where
+there is proper control of the secondary CPUs.
