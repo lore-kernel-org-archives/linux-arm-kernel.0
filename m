@@ -1,84 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Dec 2012 12:40:47 +0000
-Subject: [RFC PATCH 2/2] ARM: SMP support for mach-virt
-In-Reply-To: <50BD1FD7.9040000@gmail.com>
-References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
- <1354557160-20144-3-git-send-email-will.deacon@arm.com>
- <50BD1FD7.9040000@gmail.com>
-Message-ID: <20121204124047.GM23368@mudshark.cambridge.arm.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 4 Dec 2012 14:41:59 +0200
+Subject: [PATCH 5/5] ARM: tegra20: cpuidle: apply coupled cpuidle for
+ powered-down mode
+In-Reply-To: <50BCF4F8.60606@wwwdotorg.org>
+References: <1354503607-13707-1-git-send-email-josephl@nvidia.com>
+ <1354503607-13707-6-git-send-email-josephl@nvidia.com>
+ <50BCF4F8.60606@wwwdotorg.org>
+Message-ID: <20121204124159.GO19258@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 03, 2012 at 09:55:35PM +0000, Rob Herring wrote:
-> On 12/03/2012 11:52 AM, Will Deacon wrote:
-> > From: Marc Zyngier <marc.zyngier@arm.com>
-> > 
-> > This patch adds support for SMP to mach-virt.
-> > 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > 
-
-[...]
-
-> > +/*
-> > + * This provides a "holding pen" into which all secondary cores are held
-> > + * until we're ready for them to initialise.
-> > + */
-> > +ENTRY(virt_secondary_startup)
-> > +	mrc	p15, 0, r0, c0, c0, 5
-> > +	and	r0, r0, #15
-> > +	adr	r4, 1f
-> > +	ldmia	r4, {r5, r6}
-> > +	sub	r4, r4, r5
-> > +	add	r6, r6, r4
-> > +pen:	ldr	r7, [r6]
-> > +	cmp	r7, r0
-> > +	bne	pen
 > 
-> Why is the pen is needed? It should only be needed for hotplug on
-> systems that can't reset their cores. I'd hope you could design good
-> virtual h/w.
-
-It's not so much about designing good virtual h/w as it is avoiding tying
-the platform to it. What we don't want is to mandate that in order to boot
-this machine, you *must* implement an emulation of some virtual
-power-controller or SMP booting device. If we go down that route, there's
-less advantage from having the virtual platform in the first place.
-
-There's also less of a problem with the pen approach to booting because
-ultimately the virtual CPUs executing there are just pthreads and will be
-scheduled appropriately by the hypervisor (in contrast to a real system
-where there may be concerns about power consumption and memory bandwidth).
-
-For hotplug, sure, we could have an *optional* virtio-based device for
-dealing with that if we want to. We could even have some early probing code
-for it and use it for SMP boot if we find a matching DT node, but we'd still
-need to keep the pen code lying around as a fallback.
-
-> > +/*
-> > + * Enumerate the possible CPU set from the device tree.
-> > + */
-> > +static void __init virt_smp_init_cpus(void)
-> > +{
-> > +	const char *enable_method;
-> > +	struct device_node *dn = NULL;
-> > +	int cpu = 0;
-> > +	u32 release_addr;
-> > +
-> > +	while ((dn = of_find_node_by_type(dn, "cpu"))) {
-> > +		if (cpu >= NR_CPUS)
-> > +			goto next;
-> > +
-> > +		/*
-> > +		 * We currently support only the "spin-table" enable-method.
-> > +		 */
-> > +		enable_method = of_get_property(dn, "enable-method", NULL);
-> > +		if (!enable_method || strcmp(enable_method, "spin-table")) {
+> > @@ -258,6 +256,9 @@ int __init tegra20_cpuidle_init(void)
 > 
-> Are these documented?
+> > +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
+> > +		dev->coupled_cpus = *cpu_online_mask;
+> > +#endif
+> 
+> What if that changes; I assume couple cpuidle handles that by
+> registering a notifier?
+> 
 
-It's part of the EPAPR spec iirc and follows the booting protocol used by
-arm64.
+Yes. see drivers/cpuidle/coupled.c:651
 
-Will
+> Is there any way that the kernel can boot with only CPU 0 "plugged in",
+> but later have the other CPU hotplugged in? In other words, should that
+> hard-code a mask (3?) that describes the HW, rather than relying on the
+> runtime hotplug status? (think about what happens when this idle code is
+> moved into drivers/cpuidle/ and built as a module, and hence could be
+> initialized with only 1 CPU hotplugged in).
+
+Using the cpu_possible_mask might be a better idea. The only other user
+of coupled cpuidle (OMAP4) also uses cpu_online_mask however.
+
+Cheers,
+
+Peter.
