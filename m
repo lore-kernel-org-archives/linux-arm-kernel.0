@@ -1,45 +1,52 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 04 Dec 2012 11:06:39 -0500
-Subject: [PATCH 3/3] MMC: sdhci-dove: allow GPIOs to be used for card
- detection on Dove
-In-Reply-To: <Pine.LNX.4.64.1212041651500.26918@axis700.grange> (Guennadi
- Liakhovetski's message of "Tue, 4 Dec 2012 17:00:49 +0100 (CET)")
-References: <20121122235426.GT3332@n2100.arm.linux.org.uk>
- <E1TbgcZ-0007Kt-35@rmk-PC.arm.linux.org.uk>
- <20121123083117.GA25754@S2100-06.ap.freescale.net>
- <20121123085726.GK5764@n2100.arm.linux.org.uk>
- <20121123121422.GA26168@S2100-06.ap.freescale.net>
- <20121123125507.GO5764@n2100.arm.linux.org.uk>
- <871ufh8lza.fsf@octavius.laptop.org>
- <Pine.LNX.4.64.1211260955070.11501@axis700.grange>
- <87y5hfhrwg.fsf@octavius.laptop.org>
- <Pine.LNX.4.64.1212041651500.26918@axis700.grange>
-Message-ID: <87zk1tg5tc.fsf@octavius.laptop.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 Dec 2012 16:11:13 +0000
+Subject: [RFC PATCH 2/2] ARM: SMP support for mach-virt
+In-Reply-To: <20121204143724.GF14363@n2100.arm.linux.org.uk>
+References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
+ <1354557160-20144-3-git-send-email-will.deacon@arm.com>
+ <50BD1FD7.9040000@gmail.com>
+ <20121204124047.GM23368@mudshark.cambridge.arm.com>
+ <20121204133326.GE14363@n2100.arm.linux.org.uk>
+ <20121204134010.GP23368@mudshark.cambridge.arm.com>
+ <20121204143724.GF14363@n2100.arm.linux.org.uk>
+Message-ID: <20121204161113.GT23368@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+On Tue, Dec 04, 2012 at 02:37:25PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Dec 04, 2012 at 01:40:10PM +0000, Will Deacon wrote:
+> > On Tue, Dec 04, 2012 at 01:33:26PM +0000, Russell King - ARM Linux wrote:
+> > > The memory that these 'offline' CPUs is executing then gets overwritten,
+> > > and that's game over for those CPUs.
+> > 
+> > That's not strictly true. The device-tree passed to the kernel should have a
+> > /memreserve/ entry for the SMP pen to avoid exactly this scenario. In real
+> > hardware, this still sucks because you have spinning CPUs burning up power
+> > but that's not such a problem with a virtual platform.
+> 
+> Umm.  So let's see.  If I'm running v3.6 stock kernel and want to kexec
+> into a v3.7 stock kernel.  The SMP pen is part of the v3.6 kernel, which
+> will be located at 32K into the RAM.  The v3.7 kernel will also want to
+> occupy the same place.  At some point you have to overwrite the v3.6
+> kernel with the v3.7 kernel image.
 
-On Tue, Dec 04 2012, Guennadi Liakhovetski wrote:
->> They both sound pretty attractive.  Maybe we start out with (1), which
->> would create a patch we could more reasonably send to stable@ to get
->> slot-gpio handling the reset during transfers properly in older kernels,
->> and then refactor into (2) later?
->
-> Just posted 3 patches for this, have a look if that's what you were 
-> thinking about. Not sure though why this is needed for stable, but I'm 
-> probably just missing some crucial information on the topic.
+If the 3.6 kernel didn't bring those CPUs online, they will sit in the
+bootloader pen (out of the way of the kernel image) rather than the kernel
+pen so I don't think there will be a problem.
 
-Thanks!  I'll take a look.  I agree that this isn't definitely needed
-in -stable, but I'm glad we have the option if someone finds that their
-host isn't functioning after card removal during a transfer.
+The problem you're describing actually happens when the 3.6 kernel onlines
+all of the CPUs, because now it has no way to hotplug them off safely. This
+is also an issue with non-virtualised hardware but we could solve it for the
+virtual platform by having a para-virtualised device for doing CPU hotplug.
 
-Russell, are you happy with switching sdhci-dove over to slot-gpio with
-this patchset?
+> That happens _before_ the DT has been parsed, so any memreserve stuff
+> will be ignored.  And it's at that point that your "offline" secondary
+> CPUs will have their instructions overwritten.
+> 
+> That's fine if the pen ends up being at the same place but that's not
+> something we guarantee.
 
-Thanks,
+Having CPUs in limbo between the bootloader the being online in the kernel
+is something we should just avoid. Isn't that pen __init anyway?
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Will
