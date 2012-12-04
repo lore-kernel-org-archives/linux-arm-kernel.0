@@ -1,164 +1,66 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 4 Dec 2012 14:50:29 +0900
-Subject: [PATCH shmobile/DT 1/2] ARM: shmobile: Remove some of_sh_intc_*
- functions
-In-Reply-To: <1353572619-29098-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-References: <1353572619-29098-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-Message-ID: <20121204055029.GC15969@verge.net.au>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 4 Dec 2012 11:28:14 +0530
+Subject: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
+ OMAP-L138 DSP
+In-Reply-To: <50BD07D8.5000305@ti.com>
+References: <1352853207-20602-1-git-send-email-rtivy@ti.com>
+ <1352853207-20602-5-git-send-email-rtivy@ti.com> <50AB76FA.1050505@ti.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311F952B@DFLE08.ent.ti.com>
+ <50B88F7C.5000705@ti.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311FAC29@DFLE08.ent.ti.com>
+ <50BCBA26.4070608@ti.com> <50BD07D8.5000305@ti.com>
+Message-ID: <50BD90F6.4080102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2012 at 05:23:38PM +0900, Nobuhiro Iwamatsu wrote:
-> This removes of_sh_intc_get_meminfo, of_sh_intc_get_pint and of_sh_intc_get_intc functions.
-> These are not already used.
+On 12/4/2012 1:43 AM, Cyril Chemparathy wrote:
 
-Hi Iwamatsu-san,
+> On 12/03/2012 09:41 AM, Sekhar Nori wrote:
 
-these patches are for Paul, right?
+>> On 12/1/2012 7:41 AM, Tivy, Robert wrote:
 
+>> Passing function pointers from platform code will not work when
+>> converting to device tree (DT). DA850 will gain DT boot with v3.8 and
+>> there is work ongoing on converting drivers to be DT-aware. Adding a new
+>> driver which is DT-incompatible will not be right. Hence, I will not
+>> recommend this now.
+
+> Not sure if this solves your problem, but you could add a new clock type
+> (PSC_LRESET?) as a child under the PSC clock node for the DSP. Something
+> like:
 > 
-> Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-> ---
->  drivers/sh/intc/of_intc.c |   76 ---------------------------------------------
->  include/linux/sh_intc.h   |   28 -----------------
->  2 files changed, 104 deletions(-)
+>   |
+>   +-- PSC x (DSP0 clock)
+>   |    |
+>   |    +-- PSC-LRESET x (DSP0 reset control)
+>   |
+>   +-- PSC y (DSP1 clock)
+>   |    |
+>   |    +-- PSC-LRESET y (DSP1 reset control)
+>   |
+>   +-- PSC z (DSP2 clock)
+>   |    |
+>   |    +-- PSC-LRESET z (DSP2 reset control)
 > 
-> diff --git a/drivers/sh/intc/of_intc.c b/drivers/sh/intc/of_intc.c
-> index 30b1090..e833e48 100644
-> --- a/drivers/sh/intc/of_intc.c
-> +++ b/drivers/sh/intc/of_intc.c
-> @@ -529,49 +529,6 @@ void __init of_sh_intc_get_skip_syscore_suspend(struct device_node *np,
->  		d->skip_syscore_suspend = false;
->  }
->  
-> -int __init of_sh_intc_get_meminfo(struct device_node *np,
-> -				struct resource *res, int res_no)
-> -{
-> -	int ret = 0, i;
-> -
-> -	for (i = 0 ; i < res_no ; i++) {
-> -		ret = of_address_to_resource(np, i, &res[i]);
-> -		if (ret) {
-> -			pr_err("could not determine device base address\n");
-> -			return ret;
-> -		}
-> -
-> -		pr_debug("%s: Address 0x%x, size %d\n",
-> -					__func__, res[i].start, resource_size(&res[i]));
-> -	}
-> -
-> -	return ret;
-> -}
-> -
-> -int __init of_sh_intc_get_pint(struct device_node *np, struct intc_desc *d)
-> -{
-> -	/* pint uses vector, mask and sence. */
-> -	int ret = of_sh_intc_get_vector(np, &d->hw.vectors,
-> -				&d->hw.nr_vectors);
-> -	if (ret)
-> -		return ret;
-> -
-> -	ret = of_sh_intc_get_mask(np, &d->hw.mask_regs,
-> -				&d->hw.nr_mask_regs);
-> -	if (ret)
-> -		return ret;
-> -
-> -	ret = of_sh_intc_get_sense(np, &d->hw.sense_regs,
-> -				&d->hw.nr_sense_regs);
-> -	/* INTC may not need Sence register. */
-> -	if (ret && ret != -ENOENT)
-> -		return ret;
-> -
-> -	d->of_node = np;
-> -
-> -	return 0;
-> -}
-> -
->  int __init of_sh_intc_get_intc(struct device_node *np, struct intc_desc *d)
->  {
->  	int ret = of_sh_intc_get_vector(np, &d->hw.vectors,
-> @@ -611,36 +568,3 @@ int __init of_sh_intc_get_intc(struct device_node *np, struct intc_desc *d)
->  
->  	return 0;
->  }
-> -
-> -int __init of_sh_intc_get_intc_pins(struct device_node *np,
-> -				struct intc_desc *d)
-> -{
-> -	int ret = of_sh_intc_get_vector(np, &d->hw.vectors,
-> -				&d->hw.nr_vectors);
-> -	if (ret)
-> -		return ret;
-> -
-> -	ret = of_sh_intc_get_mask(np, &d->hw.mask_regs,
-> -				&d->hw.nr_mask_regs);
-> -	if (ret)
-> -		return ret;
-> -
-> -	ret = of_sh_intc_get_prio(np, &d->hw.prio_regs,
-> -				&d->hw.nr_prio_regs);
-> -	if (ret)
-> -		return ret;
-> -
-> -	ret = of_sh_intc_get_sense(np, &d->hw.sense_regs,
-> -				&d->hw.nr_sense_regs);
-> -	if (ret)
-> -		return ret;
-> -
-> -	ret = of_sh_intc_get_ack(np, &d->hw.ack_regs,
-> -				&d->hw.nr_ack_regs);
-> -	if (ret)
-> -		return ret;
-> -
-> -	d->of_node = np;
-> -
-> -	return 0;
-> -}
-> diff --git a/include/linux/sh_intc.h b/include/linux/sh_intc.h
-> index 6603da6..c7954ee 100644
-> --- a/include/linux/sh_intc.h
-> +++ b/include/linux/sh_intc.h
-> @@ -161,26 +161,6 @@ static inline int register_intc_userimask(unsigned long addr)
->  int of_sh_intc_get_intc(struct device_node *np, struct intc_desc *d);
->  
->  /*
-> - * of_sh_initc_get_intc_pins() - Get INTC Pins table.
-> - * @np:     device node to get INTC from
-> - * @d:      a pointer of intc pins table
-> - *
-> - * Return: one of the errno value on the error condition
-> - */
-> -int of_sh_intc_get_intc_pins(struct device_node *np, struct intc_desc *d);
-> -
-> -/*
-> - * of_sh_intc_get_meminfo() - Get and set INTC register of memory.
-> - * @np:     device node to get INTC from
-> - * @res_mem:   a pointer of resource
-> - * @res_no:  resource number
-> - *
-> - * Return: one of the errno value on the error condition
-> - */
-> -int of_sh_intc_get_meminfo(struct device_node *np,
-> -				struct resource *res_mem, int resno);
-> -
-> -/*
->   * of_sh_intc_get_force_enable - Get and set force_enable vector in
->   *                               struct intc_desc.
->   * @np:  device node to get INTC from
-> @@ -221,13 +201,5 @@ void of_sh_intc_get_skip_syscore_suspend(struct device_node *np,
->   * Return: one of the errno value on the error condition
->   */
->  int of_sh_intc_get_intevtsa_vect(struct device_node *np, unsigned short *vect);
-> -/*
-> - * of_sh_initc_get_intc_pint() - Get INTC Pint table.
-> - * @np:     device node to get INTC from
-> - * @d:      a pointer of intc pint table
-> - *
-> - * Return: one of the errno value on the error condition
-> - */
-> -int of_sh_intc_get_pint(struct device_node *np, struct intc_desc *d);
->  
->  #endif /* __SH_INTC_H */
-> -- 
-> 1.7.10.4
 > 
+> The idea here being that if you enable the PSC clocks, you enable the
+> clock gates, but leave the DSPs in reset.  On the other hand, if you
+> enable the reset clock, the code implicitly enables the gate (via
+> parent), and takes the DSP out of reset as well.
+> 
+> This is not quite the cleanest way to do it, considering that reset
+> lines have no business in the clock tree, but then, this is probably the
+> simplest way to fit in.  Thoughts?
+
+This may work (on a technical level), but I am not really a fan of this
+since this is essentially a hack, as you (almost) point out. It does not
+model the hardware clock tree correctly and we are still struck with
+using clock APIs for reset control.
+
+I still think we need to find a better method of dealing with IP reset.
+May be an acceptable method already exists. Some one needs to summarize
+the problem statement well enough and I am sure finding the right
+solution will not be too long drawn.
+
+Thanks,
+Sekhar
