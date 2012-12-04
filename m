@@ -1,292 +1,290 @@
-From: giridhar.maruthy@linaro.org (Giridhar Maruthy)
-Date: Tue, 4 Dec 2012 07:46:56 +0900
-Subject: [PATCH] I2C: EXYNOS: Add slave support to i2c
-In-Reply-To: <CAH9JG2VU7gLU-tdhUcGYtkn3aE5+CePKZD7U0OhpDMgJjARWyw@mail.gmail.com>
-References: <1354354961-28833-1-git-send-email-giridhar.maruthy@linaro.org>
- <CAHuqX+EQ0pZnm27yAVqC=NRX8huQ5EvbC8PGn2G3xYw4D71gQA@mail.gmail.com>
- <CAH9JG2VU7gLU-tdhUcGYtkn3aE5+CePKZD7U0OhpDMgJjARWyw@mail.gmail.com>
-Message-ID: <CAHuqX+GoS+zA-WiEnO9c8wNCaeNjJO1TPH-wNQCUv4BZ6JyThQ@mail.gmail.com>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Tue, 04 Dec 2012 09:15:21 +0530
+Subject: [RFC v2 PATCH 0/2] sched: Integrating Per-entity-load-tracking
+ with the core scheduler
+In-Reply-To: <20121115164730.17426.36051.stgit@preeti.in.ibm.com>
+References: <20121115164730.17426.36051.stgit@preeti.in.ibm.com>
+Message-ID: <50BD71D1.80001@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you Kyungmin Park for the review.
+Hi everyone
 
-On 3 December 2012 22:28, Kyungmin Park <kmpark@infradead.org> wrote:
+I conducted a few experiments with a workload to compare the following
+parameters with this patchset and without this patchset:
+1.The performance of the workload
+2.The sum of the waitime to run of the processes queued on each cpu-the
+  cumulative latency.
+3.The number of migrations of tasks between cpus.
 
-> Hi,
->
-> On Mon, Dec 3, 2012 at 9:16 PM, Giridhar Maruthy
-> <giridhar.maruthy@linaro.org> wrote:
-> > This patch adds slave support to i2c. The dt entry i2c-mode
-> > decides at probe time if the controller needs to work in
-> > slave mode and the controller is accordingly programmed.
-> >
-> > Signed-off-by: Giridhar Maruthy <giridhar.maruthy@linaro.org>
-> > ---
-> >  drivers/i2c/busses/i2c-s3c2410.c |  100
-> > ++++++++++++++++++++++++++------------
-> >  1 file changed, 68 insertions(+), 32 deletions(-)
-> >
-> > diff --git a/drivers/i2c/busses/i2c-s3c2410.c
-> > b/drivers/i2c/busses/i2c-s3c2410.c
-> > index e93e7d6..d83a6d7 100644
-> > --- a/drivers/i2c/busses/i2c-s3c2410.c
-> > +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> > @@ -53,6 +53,9 @@
-> >  /* Max time to wait for bus to become idle after a xfer (in us) */
-> >  #define S3C2410_IDLE_TIMEOUT   5000
-> >
-> > +/* To find the master/slave mode of current controller */
-> > +#define is_master(i2c) (!i2c->i2c_mode)
-> > +
-> >  /* i2c controller state */
-> >  enum s3c24xx_i2c_state {
-> >         STATE_IDLE,
-> > @@ -89,6 +92,8 @@ struct s3c24xx_i2c {
-> >  #ifdef CONFIG_CPU_FREQ
-> >         struct notifier_block   freq_transition;
-> >  #endif
-> > +       /* i2c_mode: 0 is for master; and 1 is for slave */
-> > +       unsigned int            i2c_mode;
-> If it's used for master or not, doesn't better to use 'is_master' or
-> 'is_slave'? what's the meaning of 'i2c_mode'?
-> and
-> #define is_master(i2c) (i2c->is_master)
->
+The observations and inferences are given below:
 
-I thought mode indicates master mode or slave mode, but I agree 'is_master'
-name is better. Will change that.
+_Experimental setup:
 
->
-> Thank you,
-> Kyungmin Park
->  >  };
-> >
-> >  static struct platform_device_id s3c24xx_driver_ids[] = {
-> > @@ -202,11 +207,21 @@ static void s3c24xx_i2c_message_start(struct
-> > s3c24xx_i2c *i2c,
-> >         stat = 0;
-> >         stat |=  S3C2410_IICSTAT_TXRXEN;
-> >
-> > -       if (msg->flags & I2C_M_RD) {
-> > -               stat |= S3C2410_IICSTAT_MASTER_RX;
-> > -               addr |= 1;
-> > -       } else
-> > -               stat |= S3C2410_IICSTAT_MASTER_TX;
-> > +       if (is_master(i2c)) {
-> > +               /* Master mode */
-> > +               if (msg->flags & I2C_M_RD) {
-> > +                       stat |= S3C2410_IICSTAT_MASTER_RX;
-> > +                       addr |= 1;
-> > +               } else
-> > +                       stat |= S3C2410_IICSTAT_MASTER_TX;
-> > +       } else {
-> > +               /* Slave mode */
-> > +               if (msg->flags & I2C_M_RD) {
-> > +                       stat |= S3C2410_IICSTAT_SLAVE_RX;
-> > +                       addr |= 1;
-> > +               } else
-> > +                       stat |= S3C2410_IICSTAT_SLAVE_TX;
-> > +       }
-> >
-> >         if (msg->flags & I2C_M_REV_DIR_ADDR)
-> >                 addr ^= 1;
-> > @@ -228,8 +243,10 @@ static void s3c24xx_i2c_message_start(struct
-> > s3c24xx_i2c *i2c,
-> >         dev_dbg(i2c->dev, "iiccon, %08lx\n", iiccon);
-> >         writel(iiccon, i2c->regs + S3C2410_IICCON);
-> >
-> > -       stat |= S3C2410_IICSTAT_START;
-> > -       writel(stat, i2c->regs + S3C2410_IICSTAT);
-> > +       if (is_master(i2c)) {
-> > +               stat |= S3C2410_IICSTAT_START;
-> > +               writel(stat, i2c->regs + S3C2410_IICSTAT);
-> > +       }
-> >  }
-> >
-> >  static inline void s3c24xx_i2c_stop(struct s3c24xx_i2c *i2c, int ret)
-> > @@ -272,14 +289,19 @@ static inline void s3c24xx_i2c_stop(struct
-> s3c24xx_i2c
-> > *i2c, int ret)
-> >          * devices, the host as Master and the HDMIPHY device as the
-> slave.
-> >          * Skipping the STOP condition has been tested on this bus and
-> > works.
-> >          */
-> > -       if (i2c->quirks & QUIRK_HDMIPHY) {
-> > -               /* Stop driving the I2C pins */
-> > -               iicstat &= ~S3C2410_IICSTAT_TXRXEN;
-> > -       } else {
-> > -               /* stop the transfer */
-> > -               iicstat &= ~S3C2410_IICSTAT_START;
-> > +       if (is_master(i2c)) {
-> > +               if (i2c->quirks & QUIRK_HDMIPHY) {
-> > +                       /* Stop driving the I2C pins */
-> > +                       iicstat &= ~S3C2410_IICSTAT_TXRXEN;
-> > +               } else {
-> > +                       /* stop the transfer */
-> > +                       if (is_master(i2c)) {
-> > +                               /* Start/Stop required only for master */
-> > +                               iicstat &= ~S3C2410_IICSTAT_START;
-> > +                       }
-> > +               }
-> > +               writel(iicstat, i2c->regs + S3C2410_IICSTAT);
-> >         }
-> > -       writel(iicstat, i2c->regs + S3C2410_IICSTAT);
-> >
-> >         i2c->state = STATE_STOP;
-> >
-> > @@ -348,7 +370,8 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c
-> *i2c,
-> > unsigned long iicstat)
-> >                  */
-> >
-> >                 if (iicstat & S3C2410_IICSTAT_LASTBIT &&
-> > -                   !(i2c->msg->flags & I2C_M_IGNORE_NAK)) {
-> > +                   !(i2c->msg->flags & I2C_M_IGNORE_NAK) &&
-> > +                   is_master(i2c)) {
-> >                         /* ack was not received... */
-> >
-> >                         dev_dbg(i2c->dev, "ack was not received\n");
-> > @@ -380,7 +403,7 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c
-> *i2c,
-> > unsigned long iicstat)
-> >                  * end of the message, and if so, work out what to do
-> >                  */
-> >
-> > -               if (!(i2c->msg->flags & I2C_M_IGNORE_NAK)) {
-> > +               if (!(i2c->msg->flags & I2C_M_IGNORE_NAK) &&
-> is_master(i2c))
-> > {
-> >                         if (iicstat & S3C2410_IICSTAT_LASTBIT) {
-> >                                 dev_dbg(i2c->dev, "WRITE: No Ack\n");
-> >
-> > @@ -432,7 +455,6 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c
-> *i2c,
-> > unsigned long iicstat)
-> >
-> >                 } else {
-> >                         /* send stop */
-> > -
-> >                         s3c24xx_i2c_stop(i2c, 0);
-> >                 }
-> >                 break;
-> > @@ -447,7 +469,7 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c
-> *i2c,
-> > unsigned long iicstat)
-> >                 i2c->msg->buf[i2c->msg_ptr++] = byte;
-> >
-> >   prepare_read:
-> > -               if (is_msglast(i2c)) {
-> > +               if (is_msglast(i2c) && is_master(i2c)) {
-> >                         /* last byte of buffer */
-> >
-> >                         if (is_lastmsg(i2c))
-> > @@ -612,11 +634,13 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c
-> *i2c,
-> >         if (i2c->suspended)
-> >                 return -EIO;
-> >
-> > -       ret = s3c24xx_i2c_set_master(i2c);
-> > -       if (ret != 0) {
-> > -               dev_err(i2c->dev, "cannot get bus (error %d)\n", ret);
-> > -               ret = -EAGAIN;
-> > -               goto out;
-> > +       if (is_master(i2c)) {
-> > +               ret = s3c24xx_i2c_set_master(i2c);
-> > +               if (ret != 0) {
-> > +                       dev_err(i2c->dev, "cannot get bus (error %d)\n",
-> > ret);
-> > +                       ret = -EAGAIN;
-> > +                       goto out;
-> > +               }
-> >         }
-> >
-> >         i2c->msg     = msgs;
-> > @@ -628,23 +652,29 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c
-> *i2c,
-> >         s3c24xx_i2c_enable_irq(i2c);
-> >         s3c24xx_i2c_message_start(i2c, msgs);
-> >
-> > -       timeout = wait_event_timeout(i2c->wait, i2c->msg_num == 0, HZ *
-> 5);
-> > +       if (is_master(i2c))
-> > +               timeout = wait_event_timeout(i2c->wait,\
-> > +                               i2c->msg_num == 0, HZ * 5);
-> > +       else
-> > +               wait_event_interruptible(i2c->wait, i2c->msg_num == 0);
-> >
-> >         ret = i2c->msg_idx;
-> >
-> >         /* having these next two as dev_err() makes life very
-> >          * noisy when doing an i2cdetect */
-> >
-> > -       if (timeout == 0)
-> > -               dev_dbg(i2c->dev, "timeout\n");
-> > -       else if (ret != num)
-> > -               dev_dbg(i2c->dev, "incomplete xfer (%d)\n", ret);
-> > +       if (is_master(i2c)) {
-> > +               if (timeout == 0)
-> > +                       dev_dbg(i2c->dev, "timeout\n");
-> > +               else if (ret != num)
-> > +                       dev_dbg(i2c->dev, "incomplete xfer (%d)\n", ret);
-> >
-> > -       /* For QUIRK_HDMIPHY, bus is already disabled */
-> > -       if (i2c->quirks & QUIRK_HDMIPHY)
-> > -               goto out;
-> > +               /* For QUIRK_HDMIPHY, bus is already disabled */
-> > +               if (i2c->quirks & QUIRK_HDMIPHY)
-> > +                       goto out;
-> >
-> > -       s3c24xx_i2c_wait_idle(i2c);
-> > +               s3c24xx_i2c_wait_idle(i2c);
-> > +       }
-> >
-> >   out:
-> >         return ret;
-> > @@ -963,6 +993,7 @@ s3c24xx_i2c_parse_dt(struct device_node *np, struct
-> > s3c24xx_i2c *i2c)
-> >         of_property_read_u32(np, "samsung,i2c-slave-addr",
-> > &pdata->slave_addr);
-> >         of_property_read_u32(np, "samsung,i2c-max-bus-freq",
-> >                                 (u32 *)&pdata->frequency);
-> > +       of_property_read_u32(np, "samsung,i2c-mode", &i2c->i2c_mode);
-> >  }
-> >  #else
-> >  static void
-> > @@ -1004,6 +1035,10 @@ static int s3c24xx_i2c_probe(struct
-> platform_device
-> > *pdev)
-> >                 goto err_noclk;
-> >         }
-> >
-> > +       /* By default, i2c works in master mode */
-> > +       /* This currently will be updated using DT */
-> > +       i2c->i2c_mode   = 0;
-> > +
-> >         i2c->quirks = s3c24xx_get_device_quirks(pdev);
-> >         if (pdata)
-> >                 memcpy(i2c->pdata, pdata, sizeof(*pdata));
-> > @@ -1017,6 +1052,7 @@ static int s3c24xx_i2c_probe(struct platform_device
-> > *pdev)
-> >         i2c->adap.class   = I2C_CLASS_HWMON | I2C_CLASS_SPD;
-> >         i2c->tx_setup     = 50;
-> >
-> > +
-> >         init_waitqueue_head(&i2c->wait);
-> >
-> >         /* find the clock and enable it */
-> > --
-> > 1.7.9.5
-> >
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
->
+_1.The workload is at the end of the mail.Every run of the workload was for
+  10s.
+2.Different number of long running and short running threads were run
+each time.
+3.The setup was on a two socket Pre-Nehalam machine,but one socket had
+all its cpus
+  offlined.Thus only one socket was active throughout the experiment.The
+socket
+  consisted of 4 cores.
+4.The statistics below have been collected from /proc/schedstats except
+  throughput which is output by the workload.
+  -Latency has been observed from the eighth field in the cpu statistics
+   in /proc/schedstat
+   cpu<N> 1 2 3 4 5 6 7 "8" 9
+  -Number of migrations has been calculated by summing up the #pulls during
+   the idle,busy and newly_idle states of all the cpus.This is also given by
+   /proc/schedstats
+
+5.FieldA->#short-running-tasks [For every 10ms passed sleep for 9ms,work
+for 1ms]
+  a 10% task.
+  FieldB->#long-running-tasks
+  Field1->Throughput with patch (records/s read)
+  Field2->Throughput without patch (records/s read)
+  Field3->#Migrations with patch
+  Field4->#Migrations without patch
+  Field5->Latency with patch
+  Field6->Latency without patch
+ 
+    A     B         1                   2            3           4      
+  5           6
+-------------------------------------------------------------------------------------
+    5     5    49,93,368    48,68,351    108        28      22s      18.3s
+    4     2    34,37,669    34,37,547      58        50       0.6s     
+0.17s
+   16    0    38,66,597    38,74,580  1151    1014       1.88s    1.65s
+
+_Inferences_
+
+1.Clearly an increase in the number of pulls can be seen with this
+patch,this
+  has resulted in an increase in the latency.This *should have* resulted
+in a
+  decrease in throughput but in the first two cases this is not
+reflected.This
+  could be due to some error in the benchmark itself or the way I am
+calculating
+  the throughput.Keeping this issue aside,I focus on the #pulls and
+latency effect.
+
+2.On integrating PJT's metric with the load balancer,#Migrations
+  increase due to the following reason, which I figured out by going
+through the
+  traces.
+
+                                                   Task1        Task3
+                                                   Task2        Task4
+                                                  ------            ------
+                                                 Group1      Group2
+
+  Case1:Load_as_per_pjt             1028        1121
+  Case2:Load_without_pjt            2048        2048
+
+                                                          Fig1.
+
+  During load balancing
+  Case1: Group2 is overloaded,one of the tasks is moved to Group1
+  Case2: Group1 and Group2 are equally loaded,hence no migrations
+
+  This is observed so many times,that it is no wonder that the
+#migrations have
+  increased with this patch.Here Group refers to sched_group.
+
+3.The next obvious step was be to see if so many migrations with my patch is
+  prudent or not.The latency numbers reflect that it is not.
+
+4.As I said earlier,I keep throughput out of these inferences because it
+  distracts us from something that is stark clear
+  *Migrations incurred due to PJT's metric is not affecting the tasks
+   positively.*
+
+5.The above is my first observation.This does not however say that using
+PJT's
+  metric with the load balancer might be a bad idea.This could mean many
+things
+  out which the correct one has to be figured out.Among them I list out
+a few.
+
+  a)Simply replacing the existing metric used by Load Balancer with PJT's
+    metric might not really derive the benefit that PJT's metric has to
+offer.
+  b)I have not been able to figure out what kind of workloads actually
+    benefit from the way we have applied the PJT's metric.Maybe we are using
+    a workload which is adversely getting affected.
+
+6.My next step in my opinion will be to resolve the following issues in the
+  decreasing order of priority:
+
+  a)Run some other benchmark like kernbench and find out if the
+    throughput reflects increase in latency correctly.If it does,then I
+will need
+    to find out why the current benchmark was behaving weird,else I will
+need to
+    go through the traces to figure out this issue.
+  b)If I find out that the throughput is consistent with the
+latency,then we need
+    to modify the strictness(the granularity of time at which the load is
+    getting updated) with which PJT's metric is calculating load,or use it
+    in some other way in load balancing.
+
+Looking forward to your feedback on this :)
+
+--------------------------BEGIN WORKLOAD---------------------------------
+/*
+ * test.c - Two instances of this program is run.One instance where sleep
+ * time is 0 and another instance which sleeps between regular instances
+ * of time.This is done to create both long running and short running tasks
+ * on the cpu.
+ *
+ * Multiple threads are created of each instance.The threads request for a
+ * memory chunk,write into it and then free it.This is done throughout the
+ * period of the run.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; version 2 of the License.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
+ * USA
+ */
+
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/mman.h>
+#include <pthread.h>
+#include <string.h>
+#include <time.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+#include "malloc.h"
+
+/* Variable entities */
+static unsigned int seconds;
+static unsigned int threads;
+static unsigned int mem_chunk_size;
+static unsigned int sleep_at;
+static unsigned int sleep_interval;
+
+
+/* Fixed entities */
+typedef size_t mem_slot_t;/* 8 bytes */
+static unsigned int slot_size = sizeof(mem_slot_t);
+
+/* Other parameters */
+static volatile int start;
+static time_t start_time;
+static unsigned int records_read;
+pthread_mutex_t records_count_lock = PTHREAD_MUTEX_INITIALIZER;
+
+
+static unsigned int write_to_mem(void)
+{
+    int i, j;
+    mem_slot_t *scratch_pad, *temp;
+    mem_chunk_size = slot_size * 256;
+    mem_slot_t *end;
+    sleep_at = 2800; /* sleep for every 2800 records-short runs,else
+sleep_at=0 */
+    sleep_interval = 9000; /* sleep for 9 ms */
+
+    for (i=0; start == 1; i++)
+    {
+        /* ask for a memory chunk */
+        scratch_pad = (mem_slot_t *)malloc(mem_chunk_size);
+        if (scratch_pad == NULL) {
+            fprintf(stderr,"Could not allocate memory\n");
+            exit(1);
+        }
+        end = scratch_pad + (mem_chunk_size / slot_size);
+        /* write into this chunk */
+        for (temp = scratch_pad, j=0; temp < end; temp++, j++)
+            *temp = (mem_slot_t)j;
+
+        /* Free this chunk */
+        free(scratch_pad);
+
+        /* Decide the duty cycle;currently 10 ms */
+        if (sleep_at && !(i % sleep_at))
+            usleep(sleep_interval);
+
+    }
+    return (i);
+}
+
+static void *
+thread_run(void *arg)
+{
+
+    unsigned int records_local;
+
+    /* Wait for the start signal */
+
+    while (start == 0);
+
+    records_local = write_to_mem();
+
+    pthread_mutex_lock(&records_count_lock);
+    records_read += records_local;
+    pthread_mutex_unlock(&records_count_lock);
+
+    return NULL;
+}
+
+static void start_threads()
+{
+    double diff_time;
+    unsigned int i;
+    int err;
+    threads = 8;
+    seconds = 10;
+
+    pthread_t thread_array[threads];
+    for (i = 0; i < threads; i++) {
+        err = pthread_create(&thread_array[i], NULL, thread_run, NULL);
+        if (err) {
+            fprintf(stderr, "Error creating thread %d\n", i);
+            exit(1);
+        }
+    }
+    start_time = time(NULL);
+    start = 1;
+    sleep(seconds);
+    start = 0;
+    diff_time = difftime(time(NULL), start_time);
+
+    for (i = 0; i < threads; i++) {
+        err = pthread_join(thread_array[i], NULL);
+        if (err) {
+            fprintf(stderr, "Error joining thread %d\n", i);
+            exit(1);
+        }
+    }
+     printf("%u records/s\n",
+        (unsigned int) (((double) records_read)/diff_time));
+
+}
+int main()
+{
+    start_threads();
+    return 0;
+}
+
+------------------------END WORKLOAD------------------------------------
+Regards
+Preeti U Murthy
+
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121204/8fa2b6e8/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121204/824271aa/attachment-0001.html>
