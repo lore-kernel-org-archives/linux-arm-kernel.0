@@ -1,42 +1,61 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 4 Dec 2012 09:32:12 +0800
-Subject: [PATCH] clk: factor: calculate rate by do_div
-In-Reply-To: <1354522477-11991-1-git-send-email-haojian.zhuang@gmail.com>
-References: <1354522477-11991-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <CAN1soZze6Ogn_zi7JJN0JNzoMFkHLJyKyjTV7rSWUmQhwRU0NQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 3 Dec 2012 17:41:15 -0800
+Subject: [PATCH] ARM: omap: kill NEED_MACH_GPIO_H
+In-Reply-To: <1354578625-25760-1-git-send-email-linus.walleij@linaro.org>
+References: <1354578625-25760-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20121204014114.GA4636@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 3, 2012 at 4:14 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> clk->rate = parent->rate / div * mult
->
-> The formula is OK. But it may overflow while we do operate with
-> unsigned long. So use do_div instead.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> ---
->  drivers/clk/clk-fixed-factor.c |    5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-> index a489985..1ef271e 100644
-> --- a/drivers/clk/clk-fixed-factor.c
-> +++ b/drivers/clk/clk-fixed-factor.c
-> @@ -28,8 +28,11 @@ static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
->                 unsigned long parent_rate)
->  {
->         struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
-> +       unsigned long long int rate;
->
-> -       return parent_rate * fix->mult / fix->div;
-> +       rate = (unsigned long long int)parent_rate * fix->mult;
-> +       do_div(rate, fix->div);
-> +       return (unsigned long)rate;
->  }
->
->  static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
-> --
-> 1.7.10.4
->
+* Linus Walleij <linus.walleij@linaro.org> [121203 15:52]:
+> This does not appear to be used by the OMAP.
 
-Correct Mike's email address.
+Thanks, I already have a smilar patch already queued in
+linux next as 873e6980 (ARM: OMAP: Remove NEED_MACH_GPIO_H).
+
+Regards,
+
+Tony
+ 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/Kconfig                        | 1 -
+>  arch/arm/mach-omap1/include/mach/gpio.h | 3 ---
+>  arch/arm/mach-omap2/include/mach/gpio.h | 3 ---
+>  3 files changed, 7 deletions(-)
+>  delete mode 100644 arch/arm/mach-omap1/include/mach/gpio.h
+>  delete mode 100644 arch/arm/mach-omap2/include/mach/gpio.h
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index f456cf4..12deaec 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -938,7 +938,6 @@ config ARCH_OMAP
+>  	select CLKSRC_MMIO
+>  	select GENERIC_CLOCKEVENTS
+>  	select HAVE_CLK
+> -	select NEED_MACH_GPIO_H
+>  	help
+>  	  Support for TI's OMAP platform (OMAP1/2/3/4).
+>  
+> diff --git a/arch/arm/mach-omap1/include/mach/gpio.h b/arch/arm/mach-omap1/include/mach/gpio.h
+> deleted file mode 100644
+> index ebf86c0..0000000
+> --- a/arch/arm/mach-omap1/include/mach/gpio.h
+> +++ /dev/null
+> @@ -1,3 +0,0 @@
+> -/*
+> - * arch/arm/mach-omap1/include/mach/gpio.h
+> - */
+> diff --git a/arch/arm/mach-omap2/include/mach/gpio.h b/arch/arm/mach-omap2/include/mach/gpio.h
+> deleted file mode 100644
+> index 5621cc5..0000000
+> --- a/arch/arm/mach-omap2/include/mach/gpio.h
+> +++ /dev/null
+> @@ -1,3 +0,0 @@
+> -/*
+> - * arch/arm/mach-omap2/include/mach/gpio.h
+> - */
+> -- 
+> 1.7.11.7
+> 
