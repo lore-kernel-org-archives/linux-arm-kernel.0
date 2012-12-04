@@ -1,331 +1,155 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Tue,  4 Dec 2012 21:39:45 +0100
-Subject: [PATCH 3/6 v9] gpio: Add userland device interface to block GPIO
+Date: Tue,  4 Dec 2012 21:39:47 +0100
+Subject: [PATCH 5/6 v9] gpio: Add device tree support to block GPIO API
 In-Reply-To: <1354653588-4018-1-git-send-email-stigge@antcom.de>
 References: <1354653588-4018-1-git-send-email-stigge@antcom.de>
-Message-ID: <1354653588-4018-4-git-send-email-stigge@antcom.de>
+Message-ID: <1354653588-4018-6-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a character device interface to the block GPIO system.
+This patch adds device tree support to the block GPIO API.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
+
 ---
- Documentation/ABI/testing/dev-gpioblock |   34 +++++
- drivers/gpio/gpiolib.c                  |  208 +++++++++++++++++++++++++++++++-
- include/linux/gpio.h                    |   10 +
- 3 files changed, 251 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/gpio/gpio-block.txt |   36 +++++++
+ drivers/gpio/Makefile                                 |    1 
+ drivers/gpio/gpioblock-of.c                           |   84 ++++++++++++++++++
+ 3 files changed, 121 insertions(+)
 
 --- /dev/null
-+++ linux-2.6/Documentation/ABI/testing/dev-gpioblock
-@@ -0,0 +1,34 @@
-+What:		/dev/<gpioblock>
-+Date:		Nov 2012
-+KernelVersion:	3.7
-+Contact:	Roland Stigge <stigge@antcom.de>
-+Description:	The /dev/<gpioblock> character device node provides userspace
-+		access to GPIO blocks, named exactly as the block, e.g.
-+		/dev/block0.
++++ linux-2.6/Documentation/devicetree/bindings/gpio/gpio-block.txt
+@@ -0,0 +1,36 @@
++Block GPIO definition
++=====================
 +
-+		Reading:
-+		When reading sizeof(unsigned long) bytes from the device, the
-+		current state of the block, masked by the current mask (see
-+		below) can be obtained as a word. When the device is opened
-+		with O_NONBLOCK, read() always returns with data immediately,
-+		otherwise it blocks until data is available, see IRQ handling
-+		below.
++This binding specifies arbitrary blocks of gpios, combining gpios from one or
++more GPIO controllers together, to form a word for r/w access.
 +
-+		Writing:
-+		By writing sizeof(unsigned long) bytes to the device, the
-+		current state of the block can be set. This operation is
-+		masked by the current mask (see below).
++Required property:
++- compatible: must be "linux,gpio-block"
 +
-+		IRQ handling:
-+		When one or more IRQs in the block are IRQ capable, you can
-+		poll() on the device to check/wait for this IRQ. If no IRQ
-+		is available, poll() returns -ENOSYS and userspace needs to
-+		(busy) poll itself if necessary.
++Required subnodes:
++- the name will be the registered name of the block
++- property "gpios" is a list of gpios for the respective block
 +
-+		Setting the mask (default: all bits set):
-+		By doing an ioctl(fd, 0, &mask) with an unsigned long mask, the
-+		current mask for read and write operations on this gpio block
-+		can be set.
++Example:
 +
-+		See also Documentation/gpio.txt for an explanation of block
-+		GPIO.
---- linux-2.6.orig/drivers/gpio/gpiolib.c
-+++ linux-2.6/drivers/gpio/gpiolib.c
-@@ -11,6 +11,8 @@
- #include <linux/of_gpio.h>
- #include <linux/idr.h>
- #include <linux/slab.h>
-+#include <linux/uaccess.h>
-+#include <linux/poll.h>
++        blockgpio {
++                compatible = "linux,gpio-block";
++
++                block0 {
++                        gpios = <&gpio 3 0 0>,
++                                <&gpio 3 1 0>;
++                };
++                block1 {
++                        gpios = <&gpio 4 1 0>,
++                                <&gpio 4 3 0>,
++                                <&gpio 4 2 0>,
++                                <&gpio 4 4 0>,
++                                <&gpio 4 5 0>,
++                                <&gpio 4 6 0>,
++                                <&gpio 4 7 0>,
++                                <&gpio 4 8 0>,
++                                <&gpio 4 9 0>,
++                                <&gpio 4 10 0>,
++                                <&gpio 4 19 0>;
++                };
++        };
+--- linux-2.6.orig/drivers/gpio/Makefile
++++ linux-2.6/drivers/gpio/Makefile
+@@ -4,6 +4,7 @@ ccflags-$(CONFIG_DEBUG_GPIO)	+= -DDEBUG
  
- #define CREATE_TRACE_POINTS
- #include <trace/events/gpio.h>
-@@ -2122,6 +2124,190 @@ struct gpio_block *gpio_block_find_by_na
- }
- EXPORT_SYMBOL_GPL(gpio_block_find_by_name);
+ obj-$(CONFIG_GPIOLIB)		+= gpiolib.o devres.o
+ obj-$(CONFIG_OF_GPIO)		+= gpiolib-of.o
++obj-$(CONFIG_OF_GPIO)		+= gpioblock-of.o
  
-+static struct gpio_block *gpio_block_find_by_minor(int minor)
+ # Device drivers. Generally keep list sorted alphabetically
+ obj-$(CONFIG_GPIO_GENERIC)	+= gpio-generic.o
+--- /dev/null
++++ linux-2.6/drivers/gpio/gpioblock-of.c
+@@ -0,0 +1,84 @@
++/*
++ * OF implementation for Block GPIO
++ *
++ * Copyright (C) 2012 Roland Stigge <stigge@antcom.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
++#include <linux/of.h>
++#include <linux/of_gpio.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/err.h>
++
++static int __devinit gpioblock_of_probe(struct platform_device *pdev)
 +{
-+	struct gpio_block *i;
++	struct device_node *block;
++	unsigned *gpios;
++	int ngpio;
++	int ret;
++	struct gpio_block *gb;
 +
-+	list_for_each_entry(i, &gpio_block_list, list)
-+		if (i->miscdev.minor == minor)
-+			return i;
-+	return NULL;
-+}
++	for_each_available_child_of_node(pdev->dev.of_node, block) {
++		int i;
 +
-+static bool gpio_block_is_irq_duplicate(struct gpio_block *block, int index)
-+{
-+	int irq = gpio_to_irq(block->gpio[index]);
-+	int i;
-+
-+	for (i = 0; i < index; i++)
-+		if (gpio_to_irq(block->gpio[i]) == irq)
-+			return true;
-+	return false;
-+}
-+
-+static irqreturn_t gpio_block_irq_handler(int irq, void *dev)
-+{
-+	struct gpio_block *block = dev;
-+
-+	wake_up_interruptible(&block->wait_queue);
-+	block->got_int = true;
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int gpio_block_fop_open(struct inode *in, struct file *f)
-+{
-+	int i;
-+	struct gpio_block *block = gpio_block_find_by_minor(MINOR(in->i_rdev));
-+	int status;
-+	int irq;
-+
-+	if (!block)
-+		return -ENOENT;
-+
-+	block->irq_controlled = false;
-+	block->got_int = false;
-+	init_waitqueue_head(&block->wait_queue);
-+	f->private_data = block;
-+
-+	for (i = 0; i < block->ngpio; i++) {
-+		status = gpio_request(block->gpio[i], "gpioblock dev");
-+		if (status)
-+			goto err1;
-+
-+		irq = gpio_to_irq(block->gpio[i]);
-+		if (irq >= 0 &&
-+		    !test_bit(FLAG_IS_OUT, &gpio_desc[block->gpio[i]].flags) &&
-+		    !gpio_block_is_irq_duplicate(block, i)) {
-+			status = request_irq(irq, gpio_block_irq_handler,
-+					     IRQF_TRIGGER_FALLING,
-+					     block->name, block);
-+			if (status)
-+				goto err2;
-+
-+			block->irq_controlled = true;
++		ngpio = of_gpio_count(block);
++		gpios = kzalloc(ngpio * sizeof(*gpios), GFP_KERNEL);
++		if (!gpios)
++			return -ENOMEM;
++		for (i = 0; i < ngpio; i++) {
++			ret = of_get_gpio(block, i);
++			if (ret < 0)
++				return ret; /* expect -EPROBE_DEFER */
++			gpios[i] = ret;
 +		}
-+	}
-+
-+	return 0;
-+
-+err1:
-+	while (i > 0) {
-+		i--;
-+
-+		irq = gpio_to_irq(block->gpio[i]);
-+		if (irq >= 0 &&
-+		    !test_bit(FLAG_IS_OUT, &gpio_desc[block->gpio[i]].flags) &&
-+		    !gpio_block_is_irq_duplicate(block, i))
-+			free_irq(irq, block);
-+err2:
-+		gpio_free(block->gpio[i]);
-+	}
-+	return status;
-+}
-+
-+static int gpio_block_fop_release(struct inode *in, struct file *f)
-+{
-+	int i;
-+	struct gpio_block *block = (struct gpio_block *)f->private_data;
-+
-+	for (i = 0; i < block->ngpio; i++) {
-+		int irq = gpio_to_irq(block->gpio[i]);
-+
-+		if (irq >= 0 &&
-+		    !test_bit(FLAG_IS_OUT, &gpio_desc[block->gpio[i]].flags) &&
-+		    !gpio_block_is_irq_duplicate(block, i))
-+			free_irq(irq, block);
-+
-+		gpio_free(block->gpio[i]);
-+	}
-+
-+	return 0;
-+}
-+
-+static ssize_t gpio_block_fop_read(struct file *f, char __user *buf, size_t n,
-+				   loff_t *offset)
-+{
-+	struct gpio_block *block = (struct gpio_block *)f->private_data;
-+	int err;
-+
-+	if (block->irq_controlled) {
-+		if (!(f->f_flags & O_NONBLOCK))
-+			wait_event_interruptible(block->wait_queue,
-+						 block->got_int);
-+		block->got_int = 0;
-+	}
-+
-+	if (n >= sizeof(unsigned long)) {
-+		unsigned long values = gpio_block_get(block, block->cur_mask);
-+
-+		err = put_user(values, (unsigned long __user *)buf);
-+		if (err)
-+			return err;
-+
-+		return sizeof(unsigned long);
++		gb = gpio_block_create(gpios, ngpio, block->name);
++		if (IS_ERR(gb)) {
++			dev_err(&pdev->dev,
++				"Error creating GPIO block from device tree\n");
++			return PTR_ERR(gb);
++		}
++		ret = gpio_block_register(gb);
++		if (ret < 0) {
++			gpio_block_free(gb);
++			return ret;
++		}
++		kfree(gpios);
++		dev_info(&pdev->dev, "Registered gpio block %s: %d gpios\n",
++			 block->name, ngpio);
 +	}
 +	return 0;
 +}
 +
-+static ssize_t gpio_block_fop_write(struct file *f, const char __user *buf,
-+				    size_t n, loff_t *offset)
-+{
-+	struct gpio_block *block = (struct gpio_block *)f->private_data;
-+	int err;
++#ifdef CONFIG_OF
++static struct of_device_id gpioblock_of_match[] __devinitdata = {
++	{ .compatible = "linux,gpio-block", },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, gpioblock_of_match);
++#endif
 +
-+	if (n >= sizeof(unsigned long)) {
-+		unsigned long values;
++static struct platform_driver gpioblock_of_driver = {
++	.driver	= {
++		.name = "gpio-block",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(gpioblock_of_match),
 +
-+		err = get_user(values, (unsigned long __user *)buf);
-+		if (err)
-+			return err;
-+		if (gpio_block_is_output(block))
-+			gpio_block_set(block, block->cur_mask, values);
-+		else
-+			return -EPERM;
-+		return sizeof(unsigned long);
-+	}
-+	return 0;
-+}
-+
-+static long gpio_block_fop_ioctl(struct file *f, unsigned int cmd,
-+				 unsigned long arg)
-+{
-+	struct gpio_block *block = (struct gpio_block *)f->private_data;
-+	unsigned long __user *x = (unsigned long __user *)arg;
-+
-+	if (cmd == 0)
-+		return get_user(block->cur_mask, x);
-+
-+	return -EINVAL;
-+}
-+
-+unsigned int gpio_block_fop_poll(struct file *f, struct poll_table_struct *pt)
-+{
-+	struct gpio_block *block = (struct gpio_block *)f->private_data;
-+
-+	if (!block->irq_controlled)
-+		return -ENOSYS;
-+
-+	if (!block->got_int)
-+		poll_wait(f, &block->wait_queue, pt);
-+
-+	if (block->got_int)
-+		return POLLIN;
-+
-+	return 0;
-+}
-+
-+static const struct file_operations gpio_block_fops = {
-+	.open = gpio_block_fop_open,
-+	.release = gpio_block_fop_release,
-+	.read = gpio_block_fop_read,
-+	.write = gpio_block_fop_write,
-+	.unlocked_ioctl = gpio_block_fop_ioctl,
-+	.poll = gpio_block_fop_poll,
++	},
++	.probe	= gpioblock_of_probe,
 +};
 +
- int gpio_block_register(struct gpio_block *block)
- {
- 	int ret;
-@@ -2132,12 +2318,31 @@ int gpio_block_register(struct gpio_bloc
- 	list_add(&block->list, &gpio_block_list);
- 
- 	ret = gpio_block_export(block);
--	if (ret)
++module_platform_driver(gpioblock_of_driver);
 +
-+	/*
-+	 * ret == ENOSYS is the case where GPIO_SYSFS is deactivated. In this
-+	 * case, we can continue safely anyway, since we can provide the device
-+	 * interface.
-+	 */
-+	if (ret && ret != -ENOSYS)
- 		goto err1;
- 
-+	block->miscdev.name = block->name;
-+	block->miscdev.nodename = block->name;
-+	block->miscdev.minor = MISC_DYNAMIC_MINOR;
-+	block->miscdev.fops = &gpio_block_fops;
-+	block->miscdev.mode = S_IWUSR | S_IRUGO;
-+
-+	ret = misc_register(&block->miscdev);
-+	if (ret)
-+		goto err2;
-+
- 	return 0;
-+err2:
-+	gpio_block_unexport(block);
- err1:
- 	list_del(&block->list);
-+
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(gpio_block_register);
-@@ -2150,6 +2355,7 @@ void gpio_block_unregister(struct gpio_b
- 		if (i == block) {
- 			list_del(&i->list);
- 			gpio_block_unexport(block);
-+			misc_deregister(&block->miscdev);
- 			break;
- 		}
- }
---- linux-2.6.orig/include/linux/gpio.h
-+++ linux-2.6/include/linux/gpio.h
-@@ -4,6 +4,8 @@
- #include <linux/errno.h>
- #include <linux/types.h>
- #include <linux/list.h>
-+#include <linux/sched.h>
-+#include <linux/miscdevice.h>
- 
- /* see Documentation/gpio.txt */
- 
-@@ -89,6 +91,10 @@ struct gpio_block_chip {
-  * @gpio:       list of gpios in this block
-  * @list:       global list of blocks, maintained by gpiolib
-  * @cur_mask:   currently used gpio mask used by userspace API
-+ * @miscdev:    userspace API: device
-+ * @wait_queue: userspace API: wait queue waiting for IRQ
-+ * @irq_controlled: userspace API: flag: using IRQ or not
-+ * @got_int:    userspace API: change detection via IRQ
-  */
- struct gpio_block {
- 	struct list_head	gbc_list;
-@@ -99,6 +105,10 @@ struct gpio_block {
- 
- 	struct list_head	list;
- 	unsigned long		cur_mask;
-+	struct miscdevice	miscdev;
-+	wait_queue_head_t	wait_queue;
-+	bool			irq_controlled;
-+	bool			got_int;
- };
- 
- #ifdef CONFIG_GENERIC_GPIO
++MODULE_DESCRIPTION("GPIO Block driver");
++MODULE_AUTHOR("Roland Stigge <stigge@antcom.de>");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:gpioblock-of");
