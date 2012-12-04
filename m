@@ -1,31 +1,34 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue,  4 Dec 2012 19:10:56 +0100
-Subject: [PATCH 1/4] ARM: at91: fix gpios on i2c-gpio for RM9200 DT
-In-Reply-To: <1354644659-31385-1-git-send-email-manabian@gmail.com>
-References: <1354644659-31385-1-git-send-email-manabian@gmail.com>
-Message-ID: <1354644659-31385-2-git-send-email-manabian@gmail.com>
+Date: Tue,  4 Dec 2012 19:10:55 +0100
+Subject: [PATCH 0/4] AT91RM9200 MMC, SSC and EMAC bindings
+Message-ID: <1354644659-31385-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- arch/arm/boot/dts/at91rm9200.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+These patches create bindings for MMC, SSC and EMAC in the AT91RM9200 devicetree. Patches are based on the pinctrl tree (at91 branch) since that's where the rest of the RM9200 devicetree patches is located.
 
-diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-index e154f24..222047f 100644
---- a/arch/arm/boot/dts/at91rm9200.dtsi
-+++ b/arch/arm/boot/dts/at91rm9200.dtsi
-@@ -336,8 +336,8 @@
- 
- 	i2c at 0 {
- 		compatible = "i2c-gpio";
--		gpios = <&pioA 23 0 /* sda */
--			 &pioA 24 0 /* scl */
-+		gpios = <&pioA 25 0 /* sda */
-+			 &pioA 26 0 /* scl */
- 			>;
- 		i2c-gpio,sda-open-drain;
- 		i2c-gpio,scl-open-drain;
+Patch 1 is a short fix for the RM9200 pins. Forgot to change the pins when I copied the bindings from another SoC.
+
+Patch 2 creates bindings for MMC on RM9200. I have not been able to test the bindings since my board doesn't have MMC.
+
+Patch 3 creates SSC bindings. Clock additions are also needed but these will coming through the ASoC tree. SSC bindings seem to work. I haven't been able to test actual audio though.
+
+Patch 4 creates EMAC bindings. These are tested and are working.
+
+
+I also have bindings for I2c and SPI on RM9200. I'll send patches when Atmel SPI support hits next.
+
+
+Joachim Eastwood (4):
+  ARM: at91: fix gpios on i2c-gpio for RM9200 DT
+  ARM: at91: add MMC bindings to RM9200 DT
+  ARM: at91: add SSC bindings to RM9200 DT
+  ARM: at91: add EMAC bindings to RM9200 DT
+
+ arch/arm/boot/dts/at91rm9200.dtsi  | 162 ++++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/at91rm9200ek.dts |   5 ++
+ arch/arm/mach-at91/at91rm9200.c    |   2 +
+ 3 files changed, 167 insertions(+), 2 deletions(-)
+
 -- 
 1.8.0
