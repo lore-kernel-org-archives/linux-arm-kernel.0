@@ -1,204 +1,122 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue,  4 Dec 2012 15:53:48 +0800
-Subject: [v2 PATCH 02/14] of_spi: add generic binding support to specify cs
- gpio
+Date: Tue,  4 Dec 2012 15:53:52 +0800
+Subject: [v2 PATCH 06/14] spi/atmel_spi: add flag to controller data for lock
+ operations
 In-Reply-To: <1354607640-13229-1-git-send-email-wenyou.yang@atmel.com>
 References: <1354607640-13229-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1354607640-13229-3-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1354607640-13229-7-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-This will allow to use gpio for chip select with no modification in the
-driver binding
+Will allow to drop the lock during DMA operations.
 
-When use the cs-gpios, the gpio number will be passed via the cs_gpio field
-and the number of chip select will automatically increased.
-
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: spi-devel-general at lists.sourceforge.net
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Cc: grant.likely at secretlab.ca
-Cc: rob.herring at calxeda.com
-Cc: rob at landley.net
-Cc: richard.genoud at gmail.com
+Cc: spi-devel-general at lists.sourceforge.net
 ---
-Hi, Richard,
+ drivers/spi/spi-atmel.c |   31 +++++++++++++++++++------------
+ 1 file changed, 19 insertions(+), 12 deletions(-)
 
-This patch based on the original patch from Jean-Christophe, 
- 	[PATCH] of_spi: add generic binding support to specify cs gpio
-and merge the patch from Richard Genoud,
-	[PATCH] [BUG] SPI: array out of bound => no CS
-
-Could you sign your signature in this patch?
-
-Best Regards,
-Wenyou Yang
-
- Documentation/devicetree/bindings/spi/spi-bus.txt |    6 +++
- drivers/spi/spi.c                                 |   55 +++++++++++++++++++--
- include/linux/spi/spi.h                           |    3 ++
- 3 files changed, 61 insertions(+), 3 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/spi/spi-bus.txt b/Documentation/devicetree/bindings/spi/spi-bus.txt
-index d2c33d0..7f59ae30 100644
---- a/Documentation/devicetree/bindings/spi/spi-bus.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-bus.txt
-@@ -12,6 +12,7 @@ The SPI master node requires the following properties:
- - #size-cells     - should be zero.
- - compatible      - name of SPI bus controller following generic names
-     		recommended practice.
-+- cs-gpios	  - (optional) gpios chip select.
- No other properties are required in the SPI bus node.  It is assumed
- that a driver for an SPI bus device will understand that it is an SPI bus.
- However, the binding does not attempt to define the specific method for
-@@ -21,6 +22,8 @@ assumption that board specific platform code will be used to manage
- chip selects.  Individual drivers can define additional properties to
- support describing the chip select layout.
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 76a1baf..37f54c3 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -187,6 +187,7 @@
+  */
+ struct atmel_spi {
+ 	spinlock_t		lock;
++	unsigned long		flags;
  
-+If cs-gpios is used the number of chip select will automatically increased.
-+
- Optional property:
- - num-cs : total number of chipselects
- 
-@@ -37,6 +40,9 @@ contain the following properties.
- - spi-cs-high     - (optional) Empty property indicating device requires
-     		chip select active high
- 
-+If a gpio chipselect is used for the SPI slave the gpio number will be passed
-+via the controller_data
-+
- SPI example for an MPC5200 SPI bus:
- 	spi at f00 {
- 		#address-cells = <1>;
-diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
-index 84c2861..74e6577 100644
---- a/drivers/spi/spi.c
-+++ b/drivers/spi/spi.c
-@@ -30,6 +30,7 @@
- #include <linux/slab.h>
- #include <linux/mod_devicetable.h>
- #include <linux/spi/spi.h>
-+#include <linux/of_gpio.h>
- #include <linux/pm_runtime.h>
- #include <linux/export.h>
- #include <linux/sched.h>
-@@ -327,6 +328,7 @@ struct spi_device *spi_alloc_device(struct spi_master *master)
- 	spi->dev.parent = &master->dev;
- 	spi->dev.bus = &spi_bus_type;
- 	spi->dev.release = spidev_release;
-+	spi->cs_gpio = -EINVAL;
- 	device_initialize(&spi->dev);
- 	return spi;
+ 	resource_size_t		phybase;
+ 	void __iomem		*regs;
+@@ -323,6 +324,16 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
+ 		gpio_set_value(asd->npcs_pin, !active);
  }
-@@ -344,15 +346,16 @@ EXPORT_SYMBOL_GPL(spi_alloc_device);
- int spi_add_device(struct spi_device *spi)
+ 
++static void atmel_spi_lock(struct atmel_spi *as)
++{
++		spin_lock_irqsave(&as->lock, as->flags);
++}
++
++static void atmel_spi_unlock(struct atmel_spi *as)
++{
++		spin_unlock_irqrestore(&as->lock, as->flags);
++}
++
+ static inline int atmel_spi_xfer_is_last(struct spi_message *msg,
+ 					struct spi_transfer *xfer)
  {
- 	static DEFINE_MUTEX(spi_add_lock);
--	struct device *dev = spi->master->dev.parent;
-+	struct spi_master *master = spi->master;
-+	struct device *dev = master->dev.parent;
- 	struct device *d;
- 	int status;
+@@ -559,9 +570,9 @@ atmel_spi_msg_done(struct spi_master *master, struct atmel_spi *as,
+ 		"xfer complete: %u bytes transferred\n",
+ 		msg->actual_length);
  
- 	/* Chipselects are numbered 0..max; validate. */
--	if (spi->chip_select >= spi->master->num_chipselect) {
-+	if (spi->chip_select >= master->num_chipselect) {
- 		dev_err(dev, "cs%d >= max %d\n",
- 			spi->chip_select,
--			spi->master->num_chipselect);
-+			master->num_chipselect);
- 		return -EINVAL;
+-	spin_unlock(&as->lock);
++	atmel_spi_unlock(as);
+ 	msg->complete(msg->context);
+-	spin_lock(&as->lock);
++	atmel_spi_lock(as);
+ 
+ 	as->current_transfer = NULL;
+ 	as->next_transfer = NULL;
+@@ -788,13 +799,11 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 		spi->controller_state = asd;
+ 		gpio_direction_output(npcs_pin, !(spi->mode & SPI_CS_HIGH));
+ 	} else {
+-		unsigned long		flags;
+-
+-		spin_lock_irqsave(&as->lock, flags);
++		atmel_spi_lock(as);
+ 		if (as->stay == spi)
+ 			as->stay = NULL;
+ 		cs_deactivate(as, spi);
+-		spin_unlock_irqrestore(&as->lock, flags);
++		atmel_spi_unlock(as);
  	}
  
-@@ -376,6 +379,9 @@ int spi_add_device(struct spi_device *spi)
- 		goto done;
- 	}
+ 	asd->csr = csr;
+@@ -813,7 +822,6 @@ static int atmel_spi_transfer(struct spi_device *spi, struct spi_message *msg)
+ {
+ 	struct atmel_spi	*as;
+ 	struct spi_transfer	*xfer;
+-	unsigned long		flags;
+ 	struct device		*controller = spi->master->dev.parent;
+ 	u8			bits;
+ 	struct atmel_spi_device	*asd;
+@@ -878,11 +886,11 @@ static int atmel_spi_transfer(struct spi_device *spi, struct spi_message *msg)
+ 	msg->status = -EINPROGRESS;
+ 	msg->actual_length = 0;
  
-+	if (master->cs_gpios)
-+		spi->cs_gpio = master->cs_gpios[spi->chip_select];
-+
- 	/* Drivers may modify this initial i/o setup, but will
- 	 * normally rely on the device being setup.  Devices
- 	 * using SPI_CS_HIGH can't coexist well otherwise...
-@@ -946,6 +952,45 @@ struct spi_master *spi_alloc_master(struct device *dev, unsigned size)
+-	spin_lock_irqsave(&as->lock, flags);
++	atmel_spi_lock(as);
+ 	list_add_tail(&msg->queue, &as->queue);
+ 	if (!as->current_transfer)
+ 		atmel_spi_next_message(spi->master);
+-	spin_unlock_irqrestore(&as->lock, flags);
++	atmel_spi_unlock(as);
+ 
+ 	return 0;
  }
- EXPORT_SYMBOL_GPL(spi_alloc_master);
+@@ -892,17 +900,16 @@ static void atmel_spi_cleanup(struct spi_device *spi)
+ 	struct atmel_spi	*as = spi_master_get_devdata(spi->master);
+ 	struct atmel_spi_device	*asd = spi->controller_state;
+ 	unsigned		gpio = (unsigned) spi->controller_data;
+-	unsigned long		flags;
  
-+#ifdef CONFIG_OF
-+static int of_spi_register_master(struct spi_master *master)
-+{
-+	int nb, i;
-+	int *cs;
-+	struct device_node *np = master->dev.of_node;
-+
-+	if (!np)
-+		return 0;
-+
-+	nb = of_gpio_named_count(np, "cs-gpios");
-+
-+	if (nb < 1)
-+		return 0;
-+
-+	cs = devm_kzalloc(&master->dev,
-+			  sizeof(int) * (master->num_chipselect + nb),
-+			  GFP_KERNEL);
-+	master->cs_gpios = cs;
-+
-+	if (!master->cs_gpios)
-+		return -ENOMEM;
-+
-+	memset(cs, -EINVAL, master->num_chipselect);
-+	cs += master->num_chipselect;
-+	master->num_chipselect += nb;
-+
-+	for (i = 0; i < nb; i++)
-+		cs[i] = of_get_named_gpio(np, "cs-gpios", i);
-+
-+	return 0;
-+}
-+#else
-+static int of_spi_register_master(struct spi_master *master)
-+{
-+	return 0;
-+}
-+#endif
-+
- /**
-  * spi_register_master - register SPI master controller
-  * @master: initialized master, originally from spi_alloc_master()
-@@ -977,6 +1022,10 @@ int spi_register_master(struct spi_master *master)
- 	if (!dev)
- 		return -ENODEV;
+ 	if (!asd)
+ 		return;
  
-+	status = of_spi_register_master(master);
-+	if (status)
-+		return status;
-+
- 	/* even if it's just one always-selected device, there must
- 	 * be@least one chipselect
- 	 */
-diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
-index fa702ae..f629189 100644
---- a/include/linux/spi/spi.h
-+++ b/include/linux/spi/spi.h
-@@ -90,6 +90,7 @@ struct spi_device {
- 	void			*controller_state;
- 	void			*controller_data;
- 	char			modalias[SPI_NAME_SIZE];
-+	int			cs_gpio;	/* chip select gpio */
+-	spin_lock_irqsave(&as->lock, flags);
++	atmel_spi_lock(as);
+ 	if (as->stay == spi) {
+ 		as->stay = NULL;
+ 		cs_deactivate(as, spi);
+ 	}
+-	spin_unlock_irqrestore(&as->lock, flags);
++	atmel_spi_unlock(as);
  
- 	/*
- 	 * likely need more hooks for more protocol options affecting how
-@@ -362,6 +363,8 @@ struct spi_master {
- 	int (*transfer_one_message)(struct spi_master *master,
- 				    struct spi_message *mesg);
- 	int (*unprepare_transfer_hardware)(struct spi_master *master);
-+	/* gpio chip select */
-+	int			*cs_gpios;
- };
- 
- static inline void *spi_master_get_devdata(struct spi_master *master)
+ 	spi->controller_state = NULL;
+ 	gpio_free(gpio);
 -- 
 1.7.9.5
