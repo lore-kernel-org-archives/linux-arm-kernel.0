@@ -1,63 +1,48 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 04 Dec 2012 10:45:58 -0600
-Subject: [RFC PATCH 2/2] ARM: SMP support for mach-virt
-In-Reply-To: <20121204161113.GT23368@mudshark.cambridge.arm.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 04 Dec 2012 12:00:07 -0500 (EST)
+Subject: [RFC PATCH 0/2] Add support for a fake, para-virtualised machine
+In-Reply-To: <50BE04C6.4070602@gmail.com>
 References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
- <1354557160-20144-3-git-send-email-will.deacon@arm.com>
- <50BD1FD7.9040000@gmail.com>
- <20121204124047.GM23368@mudshark.cambridge.arm.com>
- <20121204133326.GE14363@n2100.arm.linux.org.uk>
- <20121204134010.GP23368@mudshark.cambridge.arm.com>
- <20121204143724.GF14363@n2100.arm.linux.org.uk>
- <20121204161113.GT23368@mudshark.cambridge.arm.com>
-Message-ID: <50BE28C6.2010403@gmail.com>
+ <50BD1F81.9080304@gmail.com>
+ <20121204123001.GL23368@mudshark.cambridge.arm.com>
+ <50BE04C6.4070602@gmail.com>
+Message-ID: <alpine.LFD.2.02.1212041142490.6589@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2012 10:11 AM, Will Deacon wrote:
-> On Tue, Dec 04, 2012 at 02:37:25PM +0000, Russell King - ARM Linux wrote:
->> On Tue, Dec 04, 2012 at 01:40:10PM +0000, Will Deacon wrote:
->>> On Tue, Dec 04, 2012 at 01:33:26PM +0000, Russell King - ARM Linux wrote:
->>>> The memory that these 'offline' CPUs is executing then gets overwritten,
->>>> and that's game over for those CPUs.
->>>
->>> That's not strictly true. The device-tree passed to the kernel should have a
->>> /memreserve/ entry for the SMP pen to avoid exactly this scenario. In real
->>> hardware, this still sucks because you have spinning CPUs burning up power
->>> but that's not such a problem with a virtual platform.
->>
->> Umm.  So let's see.  If I'm running v3.6 stock kernel and want to kexec
->> into a v3.7 stock kernel.  The SMP pen is part of the v3.6 kernel, which
->> will be located at 32K into the RAM.  The v3.7 kernel will also want to
->> occupy the same place.  At some point you have to overwrite the v3.6
->> kernel with the v3.7 kernel image.
-> 
-> If the 3.6 kernel didn't bring those CPUs online, they will sit in the
-> bootloader pen (out of the way of the kernel image) rather than the kernel
-> pen so I don't think there will be a problem.
-> 
-> The problem you're describing actually happens when the 3.6 kernel onlines
-> all of the CPUs, because now it has no way to hotplug them off safely. This
-> is also an issue with non-virtualised hardware but we could solve it for the
-> virtual platform by having a para-virtualised device for doing CPU hotplug.
-> 
->> That happens _before_ the DT has been parsed, so any memreserve stuff
->> will be ignored.  And it's at that point that your "offline" secondary
->> CPUs will have their instructions overwritten.
->>
->> That's fine if the pen ends up being at the same place but that's not
->> something we guarantee.
-> 
-> Having CPUs in limbo between the bootloader the being online in the kernel
-> is something we should just avoid. Isn't that pen __init anyway?
+On Tue, 4 Dec 2012, Rob Herring wrote:
 
-Aren't we mixing 2 pens here? You must have some simple bootloader
-containing vector table and a pen that the dtb points to, right? The pen
-you have in the kernel is only needed when hotplug only does a wfi. As
-you don't yet support hotplug, then you can drop all the kernel pen code.
+> That to me is highlighting where we need to do more work on DT driving
+> the initialization. The platforms are still aware of what kind of timers
+> and interrupt controllers are present. They should not be. There's work
+> in progress for both of those.
+> 
+> Lorenzo's DT MPIDR patches should trim down smp code some. The DT spin
+> table code could probably be common. I think I could use it on highbank
+> as well. If we decide the pen code stays, then it should be common
+> rather than creating yet another copy.
 
-If there is no way to reset the core, then couldn't the hotplug code
-tear down the cpu setup and just jump back to 0x0 which then returns to
-the bootloader's pen?
+I don't want to rain on the "everything should be common" parade here.  
+However, for the best part of last year I've been working on kernel 
+support for big.LITTLE systems, and the handling of CPU hotplug 
+(including SMP secondary boot) is far from being a trivial task.  
+Managing the simple bringing up or down of a CPU in such an environment 
+required hundreds of new lines of code.  That is far from a simple 
+holding pen or spinning table to say the least.
 
-Rob
+[ For the curious, I'll post this code here soon for review. ]
+
+So my point of view is: if you do not need a holding pen because you can 
+hold individual CPUs in reset, then don't.  Many platforms with support 
+in the kernel can do that, yet they copied the holding pen code just 
+because it is there.  And that is total crap.
+
+on the topic of a para-virtualised machine, I think that it should 
+simply implement the PSCI calls to bring up CPUs _without_ any holding 
+pen nor spinning tables.  You issue the appropriate PSCI call with the 
+physical address for secondary_startup() as argument and you're done.  
+The host intercepts that call and free a new CPU instance in response.  
+That's all.
+
+
+Nicolas
