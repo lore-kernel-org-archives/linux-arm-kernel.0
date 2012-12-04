@@ -1,32 +1,44 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue,  4 Dec 2012 22:55:11 +0800
-Subject: [PATCH v2 0/4] Support imx6q WAIT mode
-Message-ID: <1354632915-27134-1-git-send-email-shawn.guo@linaro.org>
+Date: Tue,  4 Dec 2012 22:55:12 +0800
+Subject: [PATCH v2 1/4] ARM: imx: allow timer counter to roll over
+In-Reply-To: <1354632915-27134-1-git-send-email-shawn.guo@linaro.org>
+References: <1354632915-27134-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1354632915-27134-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With more intensive testing on different revisions of imx6q, we found
-that the power gating state can not always work reliably.  So v2 of
-the series drops the support for that state and adds clock gating state
-only.  As the result, we need not to use coupled cpuidle now.
+The timer is configured in free-run mode.  The counter should be
+allowed to roll over to 0 when reaching 0xffffffff.  Let's do that
+by always returning 0 in set_next_event.
 
-Shawn Guo (4):
-  ARM: imx: allow timer counter to roll over
-  ARM: imx: mask gpc interrupts initially
-  ARM: imx: move imx6q_cpuidle_driver into a separate file
-  ARM: imx6q: support WAIT mode using cpuidle
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/time.c |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
- arch/arm/mach-imx/Makefile        |    6 ++-
- arch/arm/mach-imx/clk-imx6q.c     |   12 +++++
- arch/arm/mach-imx/common.h        |    3 ++
- arch/arm/mach-imx/cpuidle-imx6q.c |   98 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/cpuidle.h       |    5 ++
- arch/arm/mach-imx/gpc.c           |    5 ++
- arch/arm/mach-imx/mach-imx6q.c    |   17 +++----
- arch/arm/mach-imx/platsmp.c       |   10 ++++
- arch/arm/mach-imx/time.c          |    6 +--
- 9 files changed, 146 insertions(+), 16 deletions(-)
- create mode 100644 arch/arm/mach-imx/cpuidle-imx6q.c
-
+diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
+index f017302..858098c 100644
+--- a/arch/arm/mach-imx/time.c
++++ b/arch/arm/mach-imx/time.c
+@@ -139,8 +139,7 @@ static int mx1_2_set_next_event(unsigned long evt,
+ 
+ 	__raw_writel(tcmp, timer_base + MX1_2_TCMP);
+ 
+-	return (int)(tcmp - __raw_readl(timer_base + MX1_2_TCN)) < 0 ?
+-				-ETIME : 0;
++	return 0;
+ }
+ 
+ static int v2_set_next_event(unsigned long evt,
+@@ -152,8 +151,7 @@ static int v2_set_next_event(unsigned long evt,
+ 
+ 	__raw_writel(tcmp, timer_base + V2_TCMP);
+ 
+-	return (int)(tcmp - __raw_readl(timer_base + V2_TCN)) < 0 ?
+-				-ETIME : 0;
++	return 0;
+ }
+ 
+ #ifdef DEBUG
 -- 
 1.7.9.5
