@@ -1,51 +1,35 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 04 Dec 2012 15:46:51 +0100
-Subject: linker problem with xip kernel and recent toolchains
-Message-ID: <50BE0CDB.5000704@pengutronix.de>
+From: ryan.harkin@linaro.org (Ryan Harkin)
+Date: Tue, 4 Dec 2012 14:53:10 +0000
+Subject: Replacing dma_alloc_writecombine for aarch64
+In-Reply-To: <20121203172525.GD4261@arm.com>
+References: <CAD0U-h+a6_1gtTS9pq-p7_BPmNnghUMMFZAHr8JdiK1kXrEHZQ@mail.gmail.com>
+ <20121203172525.GD4261@arm.com>
+Message-ID: <CAD0U-hJnZftJkOGOOCPuCPgCAbiF2Eq9daLvbKaQmgORSHgQzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 3 December 2012 17:25, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, Dec 03, 2012 at 05:18:35PM +0000, Ryan Harkin wrote:
+>> Some time ago, I converted the PL111 driver to use device tree [1].  I
+>> gathered some feedback after an RFC and I was recently updating my
+>> driver.  However, with my aarch64 work, I found that the driver
+>> doesn't compile for aarch64 because I've been using
+>> dma_alloc_writecombine in the driver.  As aarch64 doesn't use the
+>> driver with DMA, I hacked it to get my aarch64 branch working.
+>>
+>> Is there another API you can recommend I use for DMA that will work
+>> with both flavours?
+>
+> You can use dma_alloc_coherent() which gives the same thing on ARMv7
+> (and some ARMv6) and AArch64 (write-combine memory). However, there is
+> ARMv5 where this translates to strongly ordered memory, so you can't the
+> coherent variant all the time.
 
-we've just discovered a linker problem with newer toolchains, that
-support --build-id and xip kernels. The resulting vmlinux is about 13
-MiB big, but the xipimage ~2GiB.
+Thanks, Catalin.  I'll give it a go.
 
-A look at the vmlinux's objdump shows that the .notes section is around
-2 GiB and it's placed by the linker script into the RAM. With the ROM
-starting at 0x0 this results into a ~2 GiB big image.
+I'm slightly worried about the ARMv5 comment as I probably have to
+take into account that my driver may get used there, but I'll see how
+it shakes out on vexpress first.
 
->   [16] .data             PROGBITS        88008000 0a0000 012aa0 00  WA  0   0 256
->   [17] .notes            NOTE            8801aaa0 0b2aa0 000024 00  AX  0   0  4
->   [18] .bss              NOBITS          8801aae0 0b2ac4 005414 00  WA  0   0 32
-
-After discarding the .notes section in the objcopy (see patch below) the
-resulting binary images has a proper size again.
-
-Marc
-
-index 1ec5f67..4448790 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -18,7 +18,7 @@ ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
- LDFLAGS_vmlinux        += --be8
- endif
-
--OBJCOPYFLAGS   :=-O binary -R .comment -S
-+OBJCOPYFLAGS   :=-O binary -R .comment -R .notes -S
- GZFLAGS                :=-9
- #KBUILD_CFLAGS +=-pipe
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 261 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121204/78670e47/attachment.sig>
+Cheers,
+Ryan.
