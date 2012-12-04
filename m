@@ -1,8 +1,9 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Dec 2012 17:30:45 +0000
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 04 Dec 2012 13:10:27 -0500 (EST)
 Subject: [RFC PATCH 2/2] ARM: SMP support for mach-virt
-In-Reply-To: <50BE31E9.3040404@arm.com>
-References: <1354557160-20144-3-git-send-email-will.deacon@arm.com>
+In-Reply-To: <20121204171628.GF5314@mudshark.cambridge.arm.com>
+References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
+ <1354557160-20144-3-git-send-email-will.deacon@arm.com>
  <50BD1FD7.9040000@gmail.com>
  <20121204124047.GM23368@mudshark.cambridge.arm.com>
  <20121204133326.GE14363@n2100.arm.linux.org.uk>
@@ -11,33 +12,24 @@ References: <1354557160-20144-3-git-send-email-will.deacon@arm.com>
  <20121204161113.GT23368@mudshark.cambridge.arm.com>
  <50BE28C6.2010403@gmail.com>
  <20121204171628.GF5314@mudshark.cambridge.arm.com>
- <50BE31E9.3040404@arm.com>
-Message-ID: <20121204173045.GI5314@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1212041306560.6589@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 04, 2012 at 05:24:57PM +0000, Marc Zyngier wrote:
-> On 04/12/12 17:16, Will Deacon wrote:
-> > On Tue, Dec 04, 2012 at 04:45:58PM +0000, Rob Herring wrote:
-> >> Aren't we mixing 2 pens here? You must have some simple bootloader
-> >> containing vector table and a pen that the dtb points to, right? The pen
-> >> you have in the kernel is only needed when hotplug only does a wfi. As
-> >> you don't yet support hotplug, then you can drop all the kernel pen code.
-> > 
-> > Yes, both qemu and kvmtool have bootloader pens outside of the kernel but
-> > since wfi is not trapped by kvm, the secondaries can be released early due
-> > to a spurious wakeup so we need the second pen.
+On Tue, 4 Dec 2012, Will Deacon wrote:
+
+> On Tue, Dec 04, 2012 at 04:45:58PM +0000, Rob Herring wrote:
+> > If there is no way to reset the core, then couldn't the hotplug code
+> > tear down the cpu setup and just jump back to 0x0 which then returns to
+> > the bootloader's pen?
 > 
-> Actually, KVM traps WFI and puts the vcpu thread on a wait queue (we are
-> actually giving more guaranties than the architecture offers here).
+> I think hotplug really should be implemented with a virtio device. We just
+> trap back to the emulation and kill the vcpu thread.
 
-Ok, if we can rely on this behaviour in the future this sounds promising.
-Can somebody comment from the Xen side of things please?
+Hotplug and secondary boot should really be considered the same and use 
+the same methods.  So if you envision a virtio device for hotplug, then 
+just use that for secondary boot as well.  PSCI might be simpler to 
+implement though.
 
-> We should be able to remove the loop and rely on WFI.
 
-Yes, we should be able to remove the kernel-side loop. We still won't have
-hotplug and friends, but that can come later because there's a discussion
-around PSCI vs virtual power controller to be had there.
-
-Will
+Nicolas
