@@ -1,8 +1,9 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 4 Dec 2012 17:00:49 +0100 (CET)
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 04 Dec 2012 11:06:39 -0500
 Subject: [PATCH 3/3] MMC: sdhci-dove: allow GPIOs to be used for card
  detection on Dove
-In-Reply-To: <87y5hfhrwg.fsf@octavius.laptop.org>
+In-Reply-To: <Pine.LNX.4.64.1212041651500.26918@axis700.grange> (Guennadi
+ Liakhovetski's message of "Tue, 4 Dec 2012 17:00:49 +0100 (CET)")
 References: <20121122235426.GT3332@n2100.arm.linux.org.uk>
  <E1TbgcZ-0007Kt-35@rmk-PC.arm.linux.org.uk>
  <20121123083117.GA25754@S2100-06.ap.freescale.net>
@@ -12,57 +13,33 @@ References: <20121122235426.GT3332@n2100.arm.linux.org.uk>
  <871ufh8lza.fsf@octavius.laptop.org>
  <Pine.LNX.4.64.1211260955070.11501@axis700.grange>
  <87y5hfhrwg.fsf@octavius.laptop.org>
-Message-ID: <Pine.LNX.4.64.1212041651500.26918@axis700.grange>
+ <Pine.LNX.4.64.1212041651500.26918@axis700.grange>
+Message-ID: <87zk1tg5tc.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris
+Hi Guennadi,
 
-On Mon, 3 Dec 2012, Chris Ball wrote:
+On Tue, Dec 04 2012, Guennadi Liakhovetski wrote:
+>> They both sound pretty attractive.  Maybe we start out with (1), which
+>> would create a patch we could more reasonably send to stable@ to get
+>> slot-gpio handling the reset during transfers properly in older kernels,
+>> and then refactor into (2) later?
+>
+> Just posted 3 patches for this, have a look if that's what you were 
+> thinking about. Not sure though why this is needed for stable, but I'm 
+> probably just missing some crucial information on the topic.
 
-> Hi Guennadi,
-> 
-> On Mon, Nov 26 2012, Guennadi Liakhovetski wrote:
-> >> Guennadi, what are your thoughts about consolidating this reset logic
-> >> between the sdhci tasklet and slot-gpio?  It would certainly be nice to
-> >> use slot-gpio in cases like this one, so it's worth fixing.
-> >
-> > Sure, this can be added. As for how - I see at least two possibilities: 
-> > (1) put the complete above block in a new mmc host operation and just call 
-> > it from the GPIO card-detect ISR, (2) taking into account, that many 
-> > (nearly all? all?) host drivers keep a pointer to the current mrq in their 
-> > private data struct, we could instead add such a pointer to struct 
-> > mmc_host, then the check "request in progress" could also be generalised, 
-> > and the operation would just have to reset the host and complete the 
-> > request (in the sdhci case schedule the task).
-> 
-> They both sound pretty attractive.  Maybe we start out with (1), which
-> would create a patch we could more reasonably send to stable@ to get
-> slot-gpio handling the reset during transfers properly in older kernels,
-> and then refactor into (2) later?
+Thanks!  I'll take a look.  I agree that this isn't definitely needed
+in -stable, but I'm glad we have the option if someone finds that their
+host isn't functioning after card removal during a transfer.
 
-Just posted 3 patches for this, have a look if that's what you were 
-thinking about. Not sure though why this is needed for stable, but I'm 
-probably just missing some crucial information on the topic.
+Russell, are you happy with switching sdhci-dove over to slot-gpio with
+this patchset?
 
-Thanks
-Guennadi
+Thanks,
 
-> > Note, that there's already a .hw_reset() operation, used by sdhci-pci
-> > only so far, still, it seems we cannot (easily) hijack it.
-> 
-> That one's implementing an eMMC 4.5 spec feature, not related to this
-> kind of reset.
-> 
-> Thanks!
-> 
-> - Chris.
-> -- 
-> Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-> One Laptop Per Child
-> 
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
