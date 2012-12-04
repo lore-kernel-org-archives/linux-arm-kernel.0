@@ -1,45 +1,50 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 4 Dec 2012 14:47:02 +0800
-Subject: [PATCH 1/5] ARM: tegra20: cpuidle: add powered-down state for
- secondary CPU
-In-Reply-To: <50BCED09.4040700@wwwdotorg.org>
-References: <1354503607-13707-1-git-send-email-josephl@nvidia.com>
- <1354503607-13707-2-git-send-email-josephl@nvidia.com>
- <50BCED09.4040700@wwwdotorg.org>
-Message-ID: <1354603622.30563.12.camel@jlo-ubuntu-64.nvidia.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 4 Dec 2012 15:01:39 +0800
+Subject: [PATCH 1/4] rtc: sa1100: enable/disable rtc when probe/remove the
+ device
+In-Reply-To: <CADApbegRJO+CJJYotP9vL4-kp5qmf4OZEzmqFAR6xu5yhRReFA@mail.gmail.com>
+References: <1354155670-6267-1-git-send-email-chao.xie@marvell.com>
+ <20121129102519.GG19440@n2100.arm.linux.org.uk>
+ <CAN1soZxUA2PPy4694ByX1FTyWiJkha8QpKFK5Jc3Wf3zT0huOA@mail.gmail.com>
+ <CADApbejZXach=YaiL5rEWA5+uc+mO8PzQzUKN+k90HfxEsqgtA@mail.gmail.com>
+ <CADApbegrJDe5SiO255WdKYai1U7WjBYfMHuCm-hTNfx5p6Wz-Q@mail.gmail.com>
+ <20121203094828.GA14363@n2100.arm.linux.org.uk>
+ <CADApbegRJO+CJJYotP9vL4-kp5qmf4OZEzmqFAR6xu5yhRReFA@mail.gmail.com>
+Message-ID: <CAN1soZzP5nH31teq3bZ2sXgnPimjvDZ8rEO6J01XbigowUQHvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-12-04 at 02:18 +0800, Stephen Warren wrote:
-> On 12/02/2012 08:00 PM, Joseph Lo wrote:
-> > The powered-down state of Tegra20 requires power gating both CPU cores.
-> > When the secondary CPU requests to enter powered-down state, it saves
-> > its own contexts and then enters WFI. The Tegra20 had a limition to
-> > power down both CPU cores. The secondary CPU must waits for CPU0 in
-> > powered-down state too. If the secondary CPU be woken up before CPU0
-> > entering powered-down state, then it needs to restore its CPU states
-> > and waits for next chance.
-> > 
-> > Be aware of that, you may see the legacy power state "LP2" in the code
-> > which is exactly the same meaning of "CPU power down".
-> 
-> >  arch/arm/mach-tegra/sleep-tegra20.S   |  145 +++++++++++++++++++++++++++++++++
-> 
-> Is it actually necessary to implement those parts of the code in
-> assembly? It looks like it's mostly just memory read/write and a few
-> barriers, all of which can be coded in regular C or invoked from C.
-> 
-> The reason I ask is that we eventually want to remove all hard-coded
-> virtual memory addresses, such as TEGRA_PMC_VIRT, and it'll be a lot
-> easier to access memory relative to a variable base address from C than
-> assembly.
-> 
-> Now, perhaps we can solve this later; when we actually try to get this
-> code into drivers/cpuidle/ and remove the hard-coded virtual memory
-> addresses. Still, it'd be great if we didn't have to re-write the code
-> as much (from .S->.c) when making those changes...
+On Tuesday, December 4, 2012, Chao Xie wrote:
+>
+> On Mon, Dec 3, 2012 at 5:48 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Dec 03, 2012 at 10:53:07AM +0800, Chao Xie wrote:
+> >> I want to correct what i said. For the irq register/unregister i think
+> >> can be done at open/release. But for clock enable/disable, i do not
+> >> think so. If clock is disabled, as i think RTC will not work. User API
+> >> still use open->get_time->close for "date" command. It means that RTC
+> >> will not return correct date to user.
+> >
+> > "I think" is not good enough for patches like this.  Please test it.
+> >
+> > On SA11x0 and PXA platforms, the clock for the sa1100-rtc is a dummy
+> > clock; it has no effect.  For MMP, I don't have access to the TRMs so
+> > that's something you're going to have to find out.
+>
+> I tested at pxa910 which uses rtc-sa1100 as driver.
+> the test procedure is simple
+> open->ioctl(RTC_RD_TIME)->close
+> With the original code, the rtc will not update, i always get the same value
+>
+> remove clock disable/enable in release/open, and enable/disable clock
+> at probe/remove.
+> the rtc can update, and i can read the correct rtc value.
 
-OK. Let me think how to do this for both Tegra20 and Tegra30.
+Yes, clock shouldn't be controlled in open/close. Otherwise, RTC can't
+work since
+clock is already gated. I didn't find the issue since there're two RTC
+enabled in my
+board. The default one impacts the test.
 
-Thanks,
-Joseph
+I think that you need send the patch that only move clock operation
+into probe().
