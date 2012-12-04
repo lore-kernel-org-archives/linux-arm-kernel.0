@@ -1,90 +1,62 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 4 Dec 2012 18:16:28 +0100
-Subject: [PATCH v2] net/macb: Use non-coherent memory for rx buffers
-In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B70D6@saturn3.aculab.com>
-References: <CAGhQ9VwWmP_B17LnAEqDHcL8Yd-s0C-Bf35z3+=vnJmK_NoCSw@mail.gmail.com>
- <1354536876-6274-1-git-send-email-nicolas.ferre@atmel.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B70D5@saturn3.aculab.com>
- <50BCA746.1020705@atmel.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B70D6@saturn3.aculab.com>
-Message-ID: <50BE2FEC.2070500@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 Dec 2012 17:16:28 +0000
+Subject: [RFC PATCH 2/2] ARM: SMP support for mach-virt
+In-Reply-To: <50BE28C6.2010403@gmail.com>
+References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
+ <1354557160-20144-3-git-send-email-will.deacon@arm.com>
+ <50BD1FD7.9040000@gmail.com>
+ <20121204124047.GM23368@mudshark.cambridge.arm.com>
+ <20121204133326.GE14363@n2100.arm.linux.org.uk>
+ <20121204134010.GP23368@mudshark.cambridge.arm.com>
+ <20121204143724.GF14363@n2100.arm.linux.org.uk>
+ <20121204161113.GT23368@mudshark.cambridge.arm.com>
+ <50BE28C6.2010403@gmail.com>
+Message-ID: <20121204171628.GF5314@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2012 03:25 PM, David Laight :
->> On 12/03/2012 01:43 PM, David Laight :
->>>> Allocate regular pages to use as backing for the RX ring and use the
->>>> DMA API to sync the caches. This should give a bit better performance
->>>> since it allows the CPU to do burst transfers from memory. It is also
->>>> a necessary step on the way to reduce the amount of copying done by
->>>> the driver.
->>>
->>> I've not tried to understand the patches, but you have to be
->>> very careful using non-snooped memory for descriptor rings.
->>> No amount of DMA API calls can sort out some of the issues.
->>
->> David,
->>
->> Maybe I have not described the patch properly but the non-coherent
->> memory is not used for descriptor rings. It is used for DMA buffers
->> pointed out by descriptors (that are allocated as coherent memory).
->>
->> As buffers are filled up by the interface DMA and then, afterwards, used
->> by the driver to pass data to the net layer, it seems to me that the use
->> of non-coherent memory is sensible.
+On Tue, Dec 04, 2012 at 04:45:58PM +0000, Rob Herring wrote:
+> On 12/04/2012 10:11 AM, Will Deacon wrote:
+> > On Tue, Dec 04, 2012 at 02:37:25PM +0000, Russell King - ARM Linux wrote:
+> >> Umm.  So let's see.  If I'm running v3.6 stock kernel and want to kexec
+> >> into a v3.7 stock kernel.  The SMP pen is part of the v3.6 kernel, which
+> >> will be located at 32K into the RAM.  The v3.7 kernel will also want to
+> >> occupy the same place.  At some point you have to overwrite the v3.6
+> >> kernel with the v3.7 kernel image.
+> > 
+> > If the 3.6 kernel didn't bring those CPUs online, they will sit in the
+> > bootloader pen (out of the way of the kernel image) rather than the kernel
+> > pen so I don't think there will be a problem.
+> > 
+> > The problem you're describing actually happens when the 3.6 kernel onlines
+> > all of the CPUs, because now it has no way to hotplug them off safely. This
+> > is also an issue with non-virtualised hardware but we could solve it for the
+> > virtual platform by having a para-virtualised device for doing CPU hotplug.
+> > 
+> >> That happens _before_ the DT has been parsed, so any memreserve stuff
+> >> will be ignored.  And it's at that point that your "offline" secondary
+> >> CPUs will have their instructions overwritten.
+> >>
+> >> That's fine if the pen ends up being at the same place but that's not
+> >> something we guarantee.
+> > 
+> > Having CPUs in limbo between the bootloader the being online in the kernel
+> > is something we should just avoid. Isn't that pen __init anyway?
 > 
-> Ah, ok - difficult to actually determine from a fast read of the code.
-> So you invalidate (I think that is the right term) all the cache lines
-> that are part of each rx buffer before giving it back to the MAC unit.
-> (Maybe that first time, and just those cache lines that might have been
-> written to after reception - I'd worry about whether the CRC is written
-> into the rx buffer!)
+> Aren't we mixing 2 pens here? You must have some simple bootloader
+> containing vector table and a pen that the dtb points to, right? The pen
+> you have in the kernel is only needed when hotplug only does a wfi. As
+> you don't yet support hotplug, then you can drop all the kernel pen code.
 
-If I understand well, you mean that the call to:
+Yes, both qemu and kvmtool have bootloader pens outside of the kernel but
+since wfi is not trapped by kvm, the secondaries can be released early due
+to a spurious wakeup so we need the second pen.
 
-		dma_sync_single_range_for_device(&bp->pdev->dev, phys,
-				pg_offset, frag_len, DMA_FROM_DEVICE);
+> If there is no way to reset the core, then couldn't the hotplug code
+> tear down the cpu setup and just jump back to 0x0 which then returns to
+> the bootloader's pen?
 
-in the rx path after having copied the data to skb is not needed?
-That is also the conclusion that I found after having thinking about
-this again... I will check this.
+I think hotplug really should be implemented with a virtio device. We just
+trap back to the emulation and kill the vcpu thread.
 
-For the CRC, my driver is not using the CRC offloading feature for the
-moment. So no CRC is written by the device.
-
-> I was wondering if the code needs to do per page allocations?
-> Perhaps that is necessary to avoid needing a large block of
-> contiguous physical memory (and virtual addresses)?
-
-The page management seems interesting for future management of RX
-buffers as skb fragments: that will allow to avoid copying received data.
-
-> I know from some experiments done many years ago that a data
-> copy in the MAC tx and rx path isn't necessarily as bad as
-> people may think - especially if it removes complicated
-> 'buffer loaning' schemes and/or iommu setup (or bounce
-> buffers due to limited hardware memory addressing).
-> 
-> The rx copy can usually be made to be a 'whole word' copy
-> (ie you copy the two bytes of garbage that (mis)align the
-> destination MAC address, and some bytes after the CRC.
-> With some hardware I believe it is possible for the cache
-> controller to do cache-line aligned copies very quickly!
-> (Some very new x86 cpus might be doing this for 'rep movsd'.)
-
-Well, on our side, the "memory bus" resource is precious, so I imagine
-that even with an optimized copy, limiting the use of this resource
-should be better.
-
-> The copy in the rx path is also better for short packets
-> the can end up queued for userspace (although a copy in
-> the socket code would solve that one.
-
-Sure, some patches by Haavard that I am working on at the moment are
-taking care of copying in any cases the first 62 bytes (+2 bytes
-alignment) for each packet so that we cover the case of short packets
-and headers...
-
-Thanks for your comments, best regards,
--- 
-Nicolas Ferre
+Will
