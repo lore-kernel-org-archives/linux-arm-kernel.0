@@ -1,69 +1,102 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 4 Dec 2012 12:45:12 +0000
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 4 Dec 2012 20:53:03 +0800
 Subject: [RFC PATCH 1/1] KVM: ARM: add vgic state save and restore support
-In-Reply-To: <20121204122747.GB7450@b29396-Latitude-E6410>
+In-Reply-To: <CAFEAcA8Z-Y4Q6+p4rtByBCdwycLJm-86edUeaECoaMXx=1rLxg@mail.gmail.com>
 References: <1354531019-9335-1-git-send-email-b29396@freescale.com>
  <CAFEAcA-wopCCZrX2-eak-YAVpR2ZorGAyBVpcHUxjbxewVCFeg@mail.gmail.com>
- <CAFEAcA827i0RYShk+nV5_iSnqU_fF1nf8-YnUME9nD8Fj=JOtQ@mail.gmail.com>
- <20121204122747.GB7450@b29396-Latitude-E6410>
-Message-ID: <CAFEAcA-ETqp=Pvz4cq6YbXMNhLbE_HS7GLxwSpmWfoza3F__UQ@mail.gmail.com>
+ <20121204114410.GA7450@b29396-Latitude-E6410>
+ <CAFEAcA8Z-Y4Q6+p4rtByBCdwycLJm-86edUeaECoaMXx=1rLxg@mail.gmail.com>
+Message-ID: <20121204125303.GC7450@b29396-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 December 2012 12:27, Dong Aisheng <b29396@freescale.com> wrote:
-> On Mon, Dec 03, 2012 at 01:22:07PM +0000, Peter Maydell wrote:
->> What we're really providing the guest here is a hardware-accelerated
->> software emulation of a no-virtualization GICv2. So it's better for
->> the state we expose to userspace to be the state of that emulated
->> hardware, and not to expose details of exactly what that hardware
->> acceleration is.
->
-> It looks like a good idea.
-> Then in which format? User space qemu and kernel space vgic are using
-> different data format to describe gic state.
-> We definitely need a standard one to use with good compatibility.
-> One simple way may be just registers value of no-virtualization GICv2.
+On Tue, Dec 04, 2012 at 12:05:12PM +0000, Peter Maydell wrote:
+> On 4 December 2012 11:44, Dong Aisheng <b29396@freescale.com> wrote:
+> > On Mon, Dec 03, 2012 at 12:02:55PM +0000, Peter Maydell wrote:
+> 
+> > Probably one way we could try to avoid this issue is also saving the
+> > banked registers value in kernel, then using it as return value of ONE_REG
+> > access of specified VCPU rather than performing real register access to get
+> > the correct banked register value.
+> 
+> You absolutely can't do real hardware accesses to perform the state
+> save/restore -- the VM/vcpu might not be running at this point,
+> and the hardware could well be set up with some other VM's state.
+> 
 
-"Values of registers" and "state of a device" are not identical
-(though the internal state is often made visible via registers).
-We care about the latter, not the former.
+I'm not very quit understand since i did not touch too much on how MP runs
+with kvm/qemu.
+My understanding is that each VCPU is binded to a physical cpu.
+For example, when we wants to get gic virtual interface control0 register
+for vcpu0 via ONE_REG, the physical cpu0 will perform it instead to get
+the correct bankded registers values.
+Then what do you mean the VM/vcpu might not be running at that point?
 
-> User space could convert the register value to whatever format it wants
-> if needed. But that means we need to emulate gic cpu interface registers
-> in kernel for user space to read which is also not so conveniently.
+> >> different question, though. ONE_REG is currently aimed as a vcpu
+> >> ioctl for CPU state save/restore -- how does it need to change
+> >> to handle device state save/restore where the device is not per-cpu?
+> >>
+> > What do you mean not per-cpu device? Or should it be said per-cpu device?
+> > I'm a bit confused. For per-cpu variable, it means each cpu has
+> > its own copy of the variable.
+> > Then my understanding of non per-cpu device is that the device state
+> > is consistent between all CPUs. It does not care which CPU is accessing
+> > it. Then what issues do you mean for such devices when using ONE_REG?
+> 
+> The GIC is not a per-cpu device -- there is only one GIC even if
+> you have a four-cpu (four-core) machine. ONE_REG is a vcpu ioctl,
+> which means it is currently assumed to work only for reading
+> registers for a single vcpu. That doesn't make a great deal of
+> sense for devices like the GIC which aren't per-cpu (even if some
+> of their registers are banked). If there was a vm-ioctl version of
+> ONE_REG that would be ok to call from a non-vcpu thread and could
+> just return us the whole GIC state.
+> 
 
-Yes, conversion code is tedious for somebody. My argument is that
-the correct 'somebody' is the kernel.
+Understand, thanks for the clear explanation.
 
->> The hw accel is a property of the host CPU,
->> not of the guest VM environment, so it could be different on
->> different kernels or host CPUs, which would make migration potentially
->> tedious. For instance, consider migration where the source machine
->> has a VGIC with more list registers than the destination machine.
->>
->
-> Per my understanding,  qemu is a part of hypervisor, right?
-> The it should be able to handle hw difference to support gic
-> state saving running on different host.
+> >> Somebody needs to do this conversion, or TCG-to-KVM migrations won't work.
+> >> I don't have a strong opinion whether it ought to be userspace or kernel;
+> >> I think the deciding factor is probably going to be which is the easiest
+> >> for the kernel to support into the future as a stable ABI (even as GIC
+> >> versions change etc).
+> >>
+> >
+> > I don't know too much about TCG, will spend some time to research.
+> > It looks to me if we're using ONE_REG, we then have to do it in qemu.
+> 
+> No, whether we use ONE_REG or GET/SET_IRQCHIP does not affect whether
+> we do this conversion in qemu or in the kernel. The two choices are
+> completely distinct.
+> 
 
-No, it's userspace support code for the hypervisor. In particular,
-it is the kernel that cares about the specific details of
-exact host hardware we're running on. Userspace doesn't generally
-see that level of detail.
+My question is after using ONE_REG interface, we only export registers
+value to user space, i can see what else we still need to convert
+in the kernel?
 
-> So i can not see big issue on exporting hw accel to qemu.
+> > I could try ONE_REG if the banked registers access issue is not exist.
+> > I'm not very familiar with x86 virtualization hw support, but i did refer to
+> > x86 i8259.c code to implement this function for arm. And it looks the
+> > KVM_SET_IRQCHIP/KVM_GET_IRQCHIP is designed for irqchip state save/retore.
+> > Maybe the hw is too much different between x86 and arm.
+> 
+> The x86 KVM ABI was generally the first one put in and it varies
+> between "exactly the right thing for everybody", "generally the right
+> thing but described in a slightly x86-centric way", "not really
+> suitable for all architectures" down to "this really is x86 only".
+> Separately, sometimes it turns out that the approach taken for x86
+> wasn't the best possible, and newer APIs have been designed since.
+> ONE_REG is one of those -- the idea is that new KVM ports will use
+> it, but x86 will have to retain the old-style interface for compatibility
+> anyway.
+> 
+> So copying x86's approach is not always the best approach (though
+> it is not always the wrong approach either -- this is a judgement
+> call).
+> 
 
-It could be done that way. I'm just arguing that the other
-way is better: see my final paragraph quoted below.
+Okay, got it.
+thanks for the history. :)
 
->> Obviously you could convert between different representations
->> in a number of places (source kernel, source qemu, destination
->> qemu, destination kernel), but I think it makes sense for the
->> canonical representation to be the guest-visible representation
->> of the emulated hardware, rather than privileging any one
->> acceleration implementation above another.
-
-PS: you don't need to quote my signature and the mailing list
-footer in your reply emails...
-
--- PMM
+Regards
+Dong Aisheng
