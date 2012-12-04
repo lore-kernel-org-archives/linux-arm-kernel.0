@@ -1,23 +1,23 @@
-From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
-Date: Tue, 04 Dec 2012 12:06:24 +0100
-Subject: [PATCH 3/3] net: cpsw: implement ioctl for MII
-In-Reply-To: <50BCDB9B.80307@ti.com>
-References: <1354542569-6165-1-git-send-email-jlu@pengutronix.de>
- <1354542569-6165-3-git-send-email-jlu@pengutronix.de>
- <50BCDB9B.80307@ti.com>
-Message-ID: <1354619184.3906.10.camel@coredoba.hi.pengutronix.de>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 4 Dec 2012 12:06:56 +0100
+Subject: linux-next: manual merge of the arm-soc tree with the iommu tree
+In-Reply-To: <20121204154203.f0e7e87d1ae99e5c528434f8@canb.auug.org.au>
+References: <20121204154203.f0e7e87d1ae99e5c528434f8@canb.auug.org.au>
+Message-ID: <20121204110655.GE18368@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-12-03 at 22:34 +0530, Mugunthan V N wrote:
-> Already ndo_do_ioctl is already implemented. Can you rebase the patch 
-> with latest git repo
-> and resubmit the patch
+On Tue, Dec 04, 2012 at 03:42:03PM +1100, Stephen Rothwell wrote:
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/mach-omap2/clock44xx_data.c between commit 298ea44f211d ("ARM:
+> OMAP4: hwmod data: ipu and dsp to use parent clocks instead of leaf
+> clocks") from the iommu tree and commit 13a5b6228679 ("ARM: OMAP44xx:
+> clock: drop obsolete clock data") from the arm-soc tree.
+> 
+> I just deleted the file as the latter did and can carry the fix as
+> necessary (no action is required).
 
-Sorry, I should have checked that before. I'll update the other patches
-and resubmit.
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Ohad, Omar, any comment on this?
+
+
+	Joerg
