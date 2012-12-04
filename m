@@ -1,83 +1,204 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue,  4 Dec 2012 15:53:51 +0800
-Subject: [v2 PATCH 05/14] spi/atmel_spi: status information passed through
- controller data
+Date: Tue,  4 Dec 2012 15:53:48 +0800
+Subject: [v2 PATCH 02/14] of_spi: add generic binding support to specify cs
+ gpio
 In-Reply-To: <1354607640-13229-1-git-send-email-wenyou.yang@atmel.com>
 References: <1354607640-13229-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1354607640-13229-6-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1354607640-13229-3-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-The status of transfer is stored in controller data structure
-so that it can be used not only by atmel_spi_msg_done() function.
-This will be useful for upcoming dmaengine enabled driver.
+This will allow to use gpio for chip select with no modification in the
+driver binding
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: grant.likely at secretlab.ca
+When use the cs-gpios, the gpio number will be passed via the cs_gpio field
+and the number of chip select will automatically increased.
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: devicetree-discuss at lists.ozlabs.org
 Cc: spi-devel-general at lists.sourceforge.net
+Cc: grant.likely at secretlab.ca
+Cc: rob.herring at calxeda.com
+Cc: rob at landley.net
+Cc: richard.genoud at gmail.com
 ---
- drivers/spi/spi-atmel.c |   13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
+Hi, Richard,
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index fc1222a..76a1baf 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -201,6 +201,7 @@ struct atmel_spi {
- 	unsigned long		current_remaining_bytes;
- 	struct spi_transfer	*next_transfer;
- 	unsigned long		next_remaining_bytes;
-+	int			done_status;
+This patch based on the original patch from Jean-Christophe, 
+ 	[PATCH] of_spi: add generic binding support to specify cs gpio
+and merge the patch from Richard Genoud,
+	[PATCH] [BUG] SPI: array out of bound => no CS
+
+Could you sign your signature in this patch?
+
+Best Regards,
+Wenyou Yang
+
+ Documentation/devicetree/bindings/spi/spi-bus.txt |    6 +++
+ drivers/spi/spi.c                                 |   55 +++++++++++++++++++--
+ include/linux/spi/spi.h                           |    3 ++
+ 3 files changed, 61 insertions(+), 3 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/spi/spi-bus.txt b/Documentation/devicetree/bindings/spi/spi-bus.txt
+index d2c33d0..7f59ae30 100644
+--- a/Documentation/devicetree/bindings/spi/spi-bus.txt
++++ b/Documentation/devicetree/bindings/spi/spi-bus.txt
+@@ -12,6 +12,7 @@ The SPI master node requires the following properties:
+ - #size-cells     - should be zero.
+ - compatible      - name of SPI bus controller following generic names
+     		recommended practice.
++- cs-gpios	  - (optional) gpios chip select.
+ No other properties are required in the SPI bus node.  It is assumed
+ that a driver for an SPI bus device will understand that it is an SPI bus.
+ However, the binding does not attempt to define the specific method for
+@@ -21,6 +22,8 @@ assumption that board specific platform code will be used to manage
+ chip selects.  Individual drivers can define additional properties to
+ support describing the chip select layout.
  
- 	void			*buffer;
- 	dma_addr_t		buffer_dma;
-@@ -544,15 +545,15 @@ static void atmel_spi_dma_unmap_xfer(struct spi_master *master,
++If cs-gpios is used the number of chip select will automatically increased.
++
+ Optional property:
+ - num-cs : total number of chipselects
  
- static void
- atmel_spi_msg_done(struct spi_master *master, struct atmel_spi *as,
--		struct spi_message *msg, int status, int stay)
-+		struct spi_message *msg, int stay)
+@@ -37,6 +40,9 @@ contain the following properties.
+ - spi-cs-high     - (optional) Empty property indicating device requires
+     		chip select active high
+ 
++If a gpio chipselect is used for the SPI slave the gpio number will be passed
++via the controller_data
++
+ SPI example for an MPC5200 SPI bus:
+ 	spi at f00 {
+ 		#address-cells = <1>;
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index 84c2861..74e6577 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -30,6 +30,7 @@
+ #include <linux/slab.h>
+ #include <linux/mod_devicetable.h>
+ #include <linux/spi/spi.h>
++#include <linux/of_gpio.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/export.h>
+ #include <linux/sched.h>
+@@ -327,6 +328,7 @@ struct spi_device *spi_alloc_device(struct spi_master *master)
+ 	spi->dev.parent = &master->dev;
+ 	spi->dev.bus = &spi_bus_type;
+ 	spi->dev.release = spidev_release;
++	spi->cs_gpio = -EINVAL;
+ 	device_initialize(&spi->dev);
+ 	return spi;
+ }
+@@ -344,15 +346,16 @@ EXPORT_SYMBOL_GPL(spi_alloc_device);
+ int spi_add_device(struct spi_device *spi)
  {
--	if (!stay || status < 0)
-+	if (!stay || as->done_status < 0)
- 		cs_deactivate(as, msg->spi);
- 	else
- 		as->stay = msg->spi;
+ 	static DEFINE_MUTEX(spi_add_lock);
+-	struct device *dev = spi->master->dev.parent;
++	struct spi_master *master = spi->master;
++	struct device *dev = master->dev.parent;
+ 	struct device *d;
+ 	int status;
  
- 	list_del(&msg->queue);
--	msg->status = status;
-+	msg->status = as->done_status;
+ 	/* Chipselects are numbered 0..max; validate. */
+-	if (spi->chip_select >= spi->master->num_chipselect) {
++	if (spi->chip_select >= master->num_chipselect) {
+ 		dev_err(dev, "cs%d >= max %d\n",
+ 			spi->chip_select,
+-			spi->master->num_chipselect);
++			master->num_chipselect);
+ 		return -EINVAL;
+ 	}
  
- 	dev_dbg(master->dev.parent,
- 		"xfer complete: %u bytes transferred\n",
-@@ -564,6 +565,7 @@ atmel_spi_msg_done(struct spi_master *master, struct atmel_spi *as,
+@@ -376,6 +379,9 @@ int spi_add_device(struct spi_device *spi)
+ 		goto done;
+ 	}
  
- 	as->current_transfer = NULL;
- 	as->next_transfer = NULL;
-+	as->done_status = 0;
++	if (master->cs_gpios)
++		spi->cs_gpio = master->cs_gpios[spi->chip_select];
++
+ 	/* Drivers may modify this initial i/o setup, but will
+ 	 * normally rely on the device being setup.  Devices
+ 	 * using SPI_CS_HIGH can't coexist well otherwise...
+@@ -946,6 +952,45 @@ struct spi_master *spi_alloc_master(struct device *dev, unsigned size)
+ }
+ EXPORT_SYMBOL_GPL(spi_alloc_master);
  
- 	/* continue if needed */
- 	if (list_empty(&as->queue) || as->stopping)
-@@ -641,7 +643,8 @@ atmel_spi_interrupt(int irq, void *dev_id)
- 		/* Clear any overrun happening while cleaning up */
- 		spi_readl(as, SR);
++#ifdef CONFIG_OF
++static int of_spi_register_master(struct spi_master *master)
++{
++	int nb, i;
++	int *cs;
++	struct device_node *np = master->dev.of_node;
++
++	if (!np)
++		return 0;
++
++	nb = of_gpio_named_count(np, "cs-gpios");
++
++	if (nb < 1)
++		return 0;
++
++	cs = devm_kzalloc(&master->dev,
++			  sizeof(int) * (master->num_chipselect + nb),
++			  GFP_KERNEL);
++	master->cs_gpios = cs;
++
++	if (!master->cs_gpios)
++		return -ENOMEM;
++
++	memset(cs, -EINVAL, master->num_chipselect);
++	cs += master->num_chipselect;
++	master->num_chipselect += nb;
++
++	for (i = 0; i < nb; i++)
++		cs[i] = of_get_named_gpio(np, "cs-gpios", i);
++
++	return 0;
++}
++#else
++static int of_spi_register_master(struct spi_master *master)
++{
++	return 0;
++}
++#endif
++
+ /**
+  * spi_register_master - register SPI master controller
+  * @master: initialized master, originally from spi_alloc_master()
+@@ -977,6 +1022,10 @@ int spi_register_master(struct spi_master *master)
+ 	if (!dev)
+ 		return -ENODEV;
  
--		atmel_spi_msg_done(master, as, msg, -EIO, 0);
-+		as->done_status = -EIO;
-+		atmel_spi_msg_done(master, as, msg, 0);
- 	} else if (pending & (SPI_BIT(RXBUFF) | SPI_BIT(ENDRX))) {
- 		ret = IRQ_HANDLED;
++	status = of_spi_register_master(master);
++	if (status)
++		return status;
++
+ 	/* even if it's just one always-selected device, there must
+ 	 * be@least one chipselect
+ 	 */
+diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
+index fa702ae..f629189 100644
+--- a/include/linux/spi/spi.h
++++ b/include/linux/spi/spi.h
+@@ -90,6 +90,7 @@ struct spi_device {
+ 	void			*controller_state;
+ 	void			*controller_data;
+ 	char			modalias[SPI_NAME_SIZE];
++	int			cs_gpio;	/* chip select gpio */
  
-@@ -659,7 +662,7 @@ atmel_spi_interrupt(int irq, void *dev_id)
+ 	/*
+ 	 * likely need more hooks for more protocol options affecting how
+@@ -362,6 +363,8 @@ struct spi_master {
+ 	int (*transfer_one_message)(struct spi_master *master,
+ 				    struct spi_message *mesg);
+ 	int (*unprepare_transfer_hardware)(struct spi_master *master);
++	/* gpio chip select */
++	int			*cs_gpios;
+ };
  
- 			if (atmel_spi_xfer_is_last(msg, xfer)) {
- 				/* report completed message */
--				atmel_spi_msg_done(master, as, msg, 0,
-+				atmel_spi_msg_done(master, as, msg,
- 						xfer->cs_change);
- 			} else {
- 				if (xfer->cs_change) {
+ static inline void *spi_master_get_devdata(struct spi_master *master)
 -- 
 1.7.9.5
