@@ -1,87 +1,116 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 4 Dec 2012 08:56:47 +0000
-Subject: [PATCH 1/2] ab8500: remove explicit handling of battery type
-In-Reply-To: <1354558375-15110-1-git-send-email-rajanikanth.hv@linaro.org>
-References: <1354558375-15110-1-git-send-email-rajanikanth.hv@linaro.org>
-Message-ID: <20121204085647.GA2718@gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 4 Dec 2012 14:29:24 +0530
+Subject: [PATCH 3/3] ARM: EXYNOS5: save CLK_TOP_SRC3 register before
+ powergating
+In-Reply-To: <1354018957-17752-4-git-send-email-prasanna.ps@samsung.com>
+References: <1354018957-17752-1-git-send-email-prasanna.ps@samsung.com>
+ <1354018957-17752-4-git-send-email-prasanna.ps@samsung.com>
+Message-ID: <CAJuYYwQ7W-1DKbECW1LASVEwXdcZhs09ksx0ppsaphA=YkWeeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: "Rajanikanth H.V" <rajanikanth.hv@stericsson.com>
-> 
-> dt property, 'battery-type' shall be one of supported technology type
-> instead blank.
-> refer:Documentation/devicetree/bindings/power_supply/ab8500/fg.txt
->       for the list of supported types
-> 
-> thanks to Francesco Lavra for highlighting missing of_node_put(...)
-> 
-> for '3.7-rc5': of git://git.infradead.org/battery-2.6.git
-
-Uppercase 'DT'. 
-No need for the comma after 'property'.
-No real need to reference to the documentation.
-No need to add personal thanks to a commit message.
-No need to mention the patch's intended route in the commit message.
-
-How about something more like:
-
-Subject: ab8500: Remove initial "UNKNOWN" battery-type string assignment
-
-DT property 'stericsson,battery-type' should always be present in the
-Device Tree when describing battery hardware. Thus, instead of
-pointlessly assigning "UNKNOWN" as a valid battery-type, we should
-actually fail initialisation entirely if the property is missing.
-
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Rajanikanth H.V <rajanikanth.hv@stericsson.com>
+On 27 November 2012 17:52, Prasanna Kumar <prasanna.ps@samsung.com> wrote:
+> From: Prasanna Kumar <prasanna.ps@samsung.com>
+>
+> This patch adds a software workaround to the hardware
+> problem found in exynos5 while powergating.
+>
+> It is observed that CLK_TOP_SRC3 register gets modified if
+> the G-Scaler/MFC devices are power gated. The clock for G-Scaler gets
+> set to XXTI which results in the device running very slow .
+> A big drop in performance is noticed whilerunning the video.
+> This issue also occurs while powergating MFC.
+>
+> The value of clock source register is restored once the powergating
+> operation is completed.
+>
+> Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
 > ---
->  drivers/power/ab8500_bmdata.c |   11 ++++-------
->  1 file changed, 4 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/power/ab8500_bmdata.c b/drivers/power/ab8500_bmdata.c
-> index 03cc528..2230b2c 100644
-> --- a/drivers/power/ab8500_bmdata.c
-> +++ b/drivers/power/ab8500_bmdata.c
-> @@ -461,7 +461,6 @@ bmdevs_of_probe(struct device *dev,
->  	struct  device_node *np_bat_supply;
->  	struct	abx500_bm_data *bat;
->  	const char *btech;
-> -	char bat_tech[8];
->  	int i, thermistor;
->  
->  	*battery = &ab8500_bm_data;
-> @@ -488,12 +487,10 @@ bmdevs_of_probe(struct device *dev,
->  		"stericsson,battery-type", NULL);
->  	if (!btech) {
->  		dev_warn(dev, "missing property battery-name/type\n");
-> -		strcpy(bat_tech, "UNKNOWN");
-> -	} else {
-> -		strcpy(bat_tech, btech);
-> +		of_node_put(np_bat_supply);
-> +		return -EINVAL;
->  	}
-> -
-> -	if (strncmp(bat_tech, "LION", 4) == 0) {
-> +	if (strncmp(btech, "LION", 4) == 0) {
->  		bat->no_maintenance  = true;
->  		bat->chg_unknown_bat = true;
->  		bat->bat_type[BATTERY_UNKNOWN].charge_full_design = 2600;
-> @@ -508,7 +505,7 @@ bmdevs_of_probe(struct device *dev,
->  		if (thermistor == NTC_EXTERNAL) {
->  			btype->batres_tbl =
->  				temp_to_batres_tbl_ext_thermistor;
-> -		} else if (strncmp(bat_tech, "LION", 4) == 0) {
-> +		} else if (strncmp(btech, "LION", 4) == 0) {
->  			btype->batres_tbl =
->  				temp_to_batres_tbl_9100;
->  		} else {
-> -- 
-> 1.7.10.4
-> 
+>  arch/arm/mach-exynos/pm_domains.c |   27 +++++++++++++++++++++++++++
+>  1 files changed, 27 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+> index 9f1351d..955cbe3 100644
+> --- a/arch/arm/mach-exynos/pm_domains.c
+> +++ b/arch/arm/mach-exynos/pm_domains.c
+> @@ -24,6 +24,8 @@
+>
+>  #include <mach/regs-pmu.h>
+>  #include <plat/devs.h>
+> +#include <mach/regs-clock.h>
+> +#include <plat/cpu.h>
+>
+>  /*
+>   * Exynos specific wrapper around the generic power domain
+> @@ -41,6 +43,7 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
+>         void __iomem *base;
+>         u32 timeout, pwr;
+>         char *op;
+> +       u32 tmp = 0;
+>
+>         pd = container_of(domain, struct exynos_pm_domain, pd);
+>         base = pd->base;
+> @@ -48,6 +51,23 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
+>         pwr = power_on ? S5P_INT_LOCAL_PWR_EN : 0;
+>         __raw_writel(pwr, base);
+>
+> +       /*
+> +        *It is found that the CLK SRC register in exynos5
+> +        *gets modified when power domain of gsc/mfc/isp/disp1
+> +        *is powered off.This happens only after the system is
+> +        *suspended and resumed and not before that.
+> +        *The following fix adresses this hardware issue.
+> +        *It saves the value of clock source register and
+> +        *resores it later
+> +        */
+> +
+> +       if (soc_is_exynos5250()) {
+> +               if (!power_on) {
+> +                       /* save clock source register */
+> +                       tmp = __raw_readl(EXYNOS5_CLKSRC_TOP3);
+> +               }
+> +       }
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Does the value of EXYNOS5_CLKSRC_TOP3 register change as soon as the
+G-Scaler/MFC devices are power gated?
+
+- If yes, the value of CLKSRC register should be saved before the
+power domain register is programmed.
+
+- If not, as mentioned in the comment, if this issue occurs during a
+suspend-resume cycle, the value of this register can be saved and
+restored in the clock driver code itself.
+
+The other thing that needs to be relooked into here is the use of
+EXYNOS5_CLKSRC_TOP3 register address. Currently, the clock registers
+are statically io-remapped. With the upcoming migration to common
+clock for Exynos5, the clock registers will not be statically
+io-remapped but instead remapped during clock initialization. So the
+use of EXYNOS5_CLKSRC_TOP3 will not hold and so we need to relook into
+this.
+
+> +
+>         /* Wait max 1ms */
+>         timeout = 10;
+>
+> @@ -61,6 +81,13 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
+>                 cpu_relax();
+>                 usleep_range(80, 100);
+>         }
+> +
+> +       if (soc_is_exynos5250()) {
+
+We could use the of_machine_is_compatible api here instead of
+soc_is_exynos5250() macro.
+
+> +               if (!power_on) {
+> +                       /* restore clock source register */
+> +                       __raw_writel(tmp, EXYNOS5_CLKSRC_TOP3);
+> +               }
+> +       }
+>         return 0;
+>  }
+
+
+Thanks,
+Thomas.
