@@ -1,28 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 4 Dec 2012 19:37:52 +0000
-Subject: [RFC PATCH 2/2] ARM: SMP support for mach-virt
-In-Reply-To: <20121204172424.GG5314@mudshark.cambridge.arm.com>
-References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
- <20121204163555.GH14363@n2100.arm.linux.org.uk>
- <20121204172424.GG5314@mudshark.cambridge.arm.com>
-Message-ID: <201212041937.53046.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 4 Dec 2012 14:45:01 -0500
+Subject: [PATCH] arm: mvebu: Use dw-apb-uart instead of ns16650 as UART
+ driver
+In-Reply-To: <50BE2E22.6020606@free-electrons.com>
+References: <1354640699-6066-1-git-send-email-gregory.clement@free-electrons.com>
+ <50BE2E22.6020606@free-electrons.com>
+Message-ID: <20121204194501.GT12509@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 December 2012, Will Deacon wrote:
+On Tue, Dec 04, 2012 at 06:08:50PM +0100, Gregory CLEMENT wrote:
+> On 12/04/2012 06:04 PM, Gregory CLEMENT wrote:
+> > The UART controller used in the Armada 370 and Armada XP SoCs is the
+> > Synopsys DesignWare 8250 (aka Synopsys DesignWare ABP UART). The
+> > improper use of the ns16550 can lead to a kernel oops during boot if
+> > a character is sent to the UART before the initialization of the
+> > driver. The DW APB has an extra interrupt that gets raised when
+> > writing to the LCR when busy. This explains why we need to use
+> > dw-apb-uart driver to handle this.
 > > 
-> > Most other real-world platforms out there have a way to power off the
-> > unused secondary CPUs - Tegra and OMAP both do.
+> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > ---
+> > 
+> > This patch fixed a bug introduced in 3.7, but as there are very few
+> > boards supported in 3.7 (only the Armada 370 and Armada XP evaluation
+> > boards), it is not a big deal if this patch is only applied for 3.8.
+
+mirabox, openblocks A3/4, but your point still stands.
+
+> > This patch is based on 3.7-rc8 and can be applied on top of the
+> > current arm-soc/for-next with a trivial conflict on mvebu_defconfig.
+> > 
 > 
-> If a virtual machine powers off a virtual CPU, I doubt we want to power of
-> its corresponding CPU -- that logic can remain in the host. All we need to
-> do is kill the virtual CPU thread, which we can do easily enough. Booting is
-> the more difficult problem because we introduce a reliance on a virtual
-> device being ready incredibly early, essentially hardcoding part of the
-> virtual machine.
+> Jason,
+> 
+> do you want a git pull, or is it easier to just pick this single patch?
 
-Powering off a virtual CPU is the same as killing the virtual CPU thread.
-Not powering it off would imply that we schedule a host CPU to run an
-endless loop on it.
+nah, I'll just queue it up for v3.8-rc1
 
-	Arnd
+thx,
+
+Jason.
