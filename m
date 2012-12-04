@@ -1,60 +1,40 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 4 Dec 2012 11:05:46 +1100
-Subject: omap2plus_defconfig fails to build
-In-Reply-To: <50BD37FA.2090501@ti.com>
-References: <CAAfyv37BA4YMRFJsN5n7EeAD7iE3hzQ2PDqBAtqCju7JdxrvTA@mail.gmail.com>
- <20121204102631.3d8d41e3e8a8c0eb71734e55@canb.auug.org.au>
- <50BD37FA.2090501@ti.com>
-Message-ID: <20121204110546.61973b83030490faa62848a0@canb.auug.org.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 3 Dec 2012 16:11:36 -0800
+Subject: [PATCH 2/2] i2c-s3c2410: Add bus arbitration implementation
+In-Reply-To: <20121201132632.GA17981@opensource.wolfsonmicro.com>
+References: <1354165536-18529-1-git-send-email-ch.naveen@samsung.com>
+ <1354165536-18529-3-git-send-email-ch.naveen@samsung.com>
+ <20121129163448.GA3761@sirena.org.uk>
+ <CAPnjgZ0atD3k=gT0vjgkLO_SA8DMak6SiT6nZ_2T6WFqtK0szQ@mail.gmail.com>
+ <CAOesGMgE0JEHsdySpua34_kbWi1+z4n4UdW0kumiJEROi7O2pQ@mail.gmail.com>
+ <20121201132632.GA17981@opensource.wolfsonmicro.com>
+Message-ID: <CAOesGMgzBGieYJ131sUX7u8EWPEusxareFzC0XPt48+oNuh-xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-On Mon, 3 Dec 2012 17:38:34 -0600 Jon Hunter <jon-hunter@ti.com> wrote:
+On Sat, Dec 1, 2012 at 5:26 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Thu, Nov 29, 2012 at 10:14:58PM -0800, Olof Johansson wrote:
+>> On Thu, Nov 29, 2012 at 6:13 PM, Simon Glass <sjg@chromium.org> wrote:
 >
-> On 12/03/2012 05:26 PM, Stephen Rothwell wrote:
-> > 
-> > On Thu, 29 Nov 2012 11:40:18 +0100 Belisko Marek <marek.belisko@gmail.com> wrote:
-> >>
-> >> I've update linux-next to next-20121129 and omap2plus_defconfig fails to build:
-> >> arch/arm/mach-omap2/timer.c: In function 'omap_get_timer_dt':
-> >> arch/arm/mach-omap2/timer.c:195: error: implicit declaration of
-> >> function 'prom_add_property'
-> > 
-> > Caused by commit 9725f4451a9c ("ARM: OMAP: Add DT support for timer
-> > driver") from the arm-soc tree interacting with commit 79d1c712958f
-> > ("powerpc+of: Rename the drivers/of prom_* functions to of_*") from the
-> > powerpc tree.
-> > 
-> > I will fix this up in today' linux-next (by changing prom_add_property to
-> > of_add_property).  Someone will need to remember to tell Linus when the
-> > latter of those two commits gets merged.
-> 
-> Just to let you know there is a patch available for this problem [1].
-> 
-> Tony, Olof, Arnd, not sure how you guys wish to handle this one.
+>> > It was originally done separately but I think it was felt that this
+>> > was overly complex. Olof can you please comment on this?
+>
+>> it is indeed not controller specific per se, but we are unaware of any
+>> other platform/driver using it. So, it seemed reasonable to implement
+>> it in the driver as long as we have only one user; if another one
+>> comes along it's of course better to move it to the common i2c code.
+>
+>> At least that was my opinion at the time. I could be convinced
+>> otherwise if someone else has strong opinions on the matter.
+>
+> This sort of approach is half the reason SPI ended up being so fun...  I
+> suspect if you look hard enough you'll find that this is just the first
+> time someone tried to upstream such a scheme.  This is all especially
+> true for the DT bindings, even if the implementation is driver local for
+> now it'd be better to define generic bindings.
 
-They just really need to send this to Linus along with the pull request,
-or Ben does, depending on who gets in first.
+Ok, sounds like we might as well make it generic then. Naveen?
 
-> 
-> Cheers
-> Jon
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg210179.html
 
-I will apply this to the arm-soc merge in linux-next today.  The error
-will only happen the linux-next at the moment.  Thanks for the pointer -
-I actually fished it out of patchwork.
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121204/d3ce0c37/attachment.sig>
+-Olof
