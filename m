@@ -1,62 +1,90 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Dec 2012 17:11:29 +0000
-Subject: [RFC PATCH 0/2] Add support for a fake, para-virtualised machine
-In-Reply-To: <alpine.LFD.2.02.1212041142490.6589@xanadu.home>
-References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
- <50BD1F81.9080304@gmail.com>
- <20121204123001.GL23368@mudshark.cambridge.arm.com>
- <50BE04C6.4070602@gmail.com>
- <alpine.LFD.2.02.1212041142490.6589@xanadu.home>
-Message-ID: <20121204171129.GE5314@mudshark.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 4 Dec 2012 18:16:28 +0100
+Subject: [PATCH v2] net/macb: Use non-coherent memory for rx buffers
+In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B70D6@saturn3.aculab.com>
+References: <CAGhQ9VwWmP_B17LnAEqDHcL8Yd-s0C-Bf35z3+=vnJmK_NoCSw@mail.gmail.com>
+ <1354536876-6274-1-git-send-email-nicolas.ferre@atmel.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B70D5@saturn3.aculab.com>
+ <50BCA746.1020705@atmel.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B70D6@saturn3.aculab.com>
+Message-ID: <50BE2FEC.2070500@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
-
-On Tue, Dec 04, 2012 at 05:00:07PM +0000, Nicolas Pitre wrote:
-> On Tue, 4 Dec 2012, Rob Herring wrote:
+On 12/03/2012 03:25 PM, David Laight :
+>> On 12/03/2012 01:43 PM, David Laight :
+>>>> Allocate regular pages to use as backing for the RX ring and use the
+>>>> DMA API to sync the caches. This should give a bit better performance
+>>>> since it allows the CPU to do burst transfers from memory. It is also
+>>>> a necessary step on the way to reduce the amount of copying done by
+>>>> the driver.
+>>>
+>>> I've not tried to understand the patches, but you have to be
+>>> very careful using non-snooped memory for descriptor rings.
+>>> No amount of DMA API calls can sort out some of the issues.
+>>
+>> David,
+>>
+>> Maybe I have not described the patch properly but the non-coherent
+>> memory is not used for descriptor rings. It is used for DMA buffers
+>> pointed out by descriptors (that are allocated as coherent memory).
+>>
+>> As buffers are filled up by the interface DMA and then, afterwards, used
+>> by the driver to pass data to the net layer, it seems to me that the use
+>> of non-coherent memory is sensible.
 > 
-> > That to me is highlighting where we need to do more work on DT driving
-> > the initialization. The platforms are still aware of what kind of timers
-> > and interrupt controllers are present. They should not be. There's work
-> > in progress for both of those.
-> > 
-> > Lorenzo's DT MPIDR patches should trim down smp code some. The DT spin
-> > table code could probably be common. I think I could use it on highbank
-> > as well. If we decide the pen code stays, then it should be common
-> > rather than creating yet another copy.
+> Ah, ok - difficult to actually determine from a fast read of the code.
+> So you invalidate (I think that is the right term) all the cache lines
+> that are part of each rx buffer before giving it back to the MAC unit.
+> (Maybe that first time, and just those cache lines that might have been
+> written to after reception - I'd worry about whether the CRC is written
+> into the rx buffer!)
+
+If I understand well, you mean that the call to:
+
+		dma_sync_single_range_for_device(&bp->pdev->dev, phys,
+				pg_offset, frag_len, DMA_FROM_DEVICE);
+
+in the rx path after having copied the data to skb is not needed?
+That is also the conclusion that I found after having thinking about
+this again... I will check this.
+
+For the CRC, my driver is not using the CRC offloading feature for the
+moment. So no CRC is written by the device.
+
+> I was wondering if the code needs to do per page allocations?
+> Perhaps that is necessary to avoid needing a large block of
+> contiguous physical memory (and virtual addresses)?
+
+The page management seems interesting for future management of RX
+buffers as skb fragments: that will allow to avoid copying received data.
+
+> I know from some experiments done many years ago that a data
+> copy in the MAC tx and rx path isn't necessarily as bad as
+> people may think - especially if it removes complicated
+> 'buffer loaning' schemes and/or iommu setup (or bounce
+> buffers due to limited hardware memory addressing).
 > 
-> I don't want to rain on the "everything should be common" parade here.  
-> However, for the best part of last year I've been working on kernel 
-> support for big.LITTLE systems, and the handling of CPU hotplug 
-> (including SMP secondary boot) is far from being a trivial task.  
-> Managing the simple bringing up or down of a CPU in such an environment 
-> required hundreds of new lines of code.  That is far from a simple 
-> holding pen or spinning table to say the least.
-> 
-> [ For the curious, I'll post this code here soon for review. ]
-> 
-> So my point of view is: if you do not need a holding pen because you can 
-> hold individual CPUs in reset, then don't.  Many platforms with support 
-> in the kernel can do that, yet they copied the holding pen code just 
-> because it is there.  And that is total crap.
+> The rx copy can usually be made to be a 'whole word' copy
+> (ie you copy the two bytes of garbage that (mis)align the
+> destination MAC address, and some bytes after the CRC.
+> With some hardware I believe it is possible for the cache
+> controller to do cache-line aligned copies very quickly!
+> (Some very new x86 cpus might be doing this for 'rep movsd'.)
 
-Agreed, but it's also total crap forcing emulation of a made-up power
-controller on the host in the case of a virtual platform.
+Well, on our side, the "memory bus" resource is precious, so I imagine
+that even with an optimized copy, limiting the use of this resource
+should be better.
 
-> on the topic of a para-virtualised machine, I think that it should 
-> simply implement the PSCI calls to bring up CPUs _without_ any holding 
-> pen nor spinning tables.  You issue the appropriate PSCI call with the 
-> physical address for secondary_startup() as argument and you're done.  
-> The host intercepts that call and free a new CPU instance in response.  
-> That's all.
+> The copy in the rx path is also better for short packets
+> the can end up queued for userspace (although a copy in
+> the socket code would solve that one.
 
-I'd be happy to go with this suggestion if it wasn't for one thing:
-platforms that do not implement a secure mode. For these platforms, smc will
-be an undefined instruction at the exception level where it is executed and
-therefore cannot be trapped by the hypervisor.
+Sure, some patches by Haavard that I am working on at the moment are
+taking care of copying in any cases the first 62 bytes (+2 bytes
+alignment) for each packet so that we cover the case of short packets
+and headers...
 
-If that situation requires a pen, I see no benefit from having two boot
-schemes where one of them would work in every case.
-
-Will
+Thanks for your comments, best regards,
+-- 
+Nicolas Ferre
