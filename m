@@ -1,248 +1,302 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Tue, 4 Dec 2012 03:26:26 +0000
-Subject: [PATCH 01/11] watchdog/at91sam9_wdt: remove the file_operations
- struct
-In-Reply-To: <20121116135427.GJ4398@game.jcrosoft.org>
-References: <1352877369-19740-1-git-send-email-wenyou.yang@atmel.com>
- <1352877369-19740-2-git-send-email-wenyou.yang@atmel.com>
- <20121116135427.GJ4398@game.jcrosoft.org>
-Message-ID: <B256D81BAE5131468A838E5D7A2436413A01CEA1@penmbx01>
+From: csd@broadcom.com (Christian Daudt)
+Date: Mon, 3 Dec 2012 19:55:24 -0800
+Subject: [PATCH] ARM: bcm281xx: Add timer driver
+Message-ID: <1354593324-21300-1-git-send-email-csd@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi JC,
+This adds support for the Broadcom timer, used in the following SoCs:
+BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
 
-> -----Original Message-----
-> From: Jean-Christophe PLAGNIOL-VILLARD [mailto:plagnioj at jcrosoft.com]
-> Sent: 2012?11?16? 21:54
-> To: Yang, Wenyou
-> Cc: linux-arm-kernel at lists.infradead.org; wim at iguana.be;
-> linux-watchdog at vger.kernel.org; linux-kernel at vger.kernel.org; Ferre, Nicolas; Lin,
-> JM
-> Subject: Re: [PATCH 01/11] watchdog/at91sam9_wdt: remove the file_operations
-> struct
-> 
-> On 15:15 Wed 14 Nov     , Wenyou Yang wrote:
-> > Remove the file_operations struct and miscdevice struct for future
-> > add to use the watchdog framework.
-> NACK
-> 
-> you break the watchdog support
-> 
-> you must not break the kernel suport except if it's impossible to do otherwise
-> here it is no the case
+This patch needs the arm-soc/soc/next branch
 
-Thanks.
+Signed-off-by: Christian Daudt <csd@broadcom.com>
 
-But it is said so in the kernel document (Documentation/watchdog/convert_drivers_to_kernel_api.txt).
-"the old drivers define their own file_operations for actions like open(), write()etc... These are now handled by the framework"
-
-And the codes in these function is not used under the new framework which is implemented in the framework.
-So I only make it in the separated patch to simpler.
-> 
-> Best Regards,
-> J.
-
-Best Regards
-Wenyou Yang
-
-> >
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > ---
-> >  drivers/watchdog/at91sam9_wdt.c |  131 ---------------------------------------
-> >  1 file changed, 131 deletions(-)
-> >
-> > diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-> > index 05e1be8..549c256 100644
-> > --- a/drivers/watchdog/at91sam9_wdt.c
-> > +++ b/drivers/watchdog/at91sam9_wdt.c
-> > @@ -18,11 +18,9 @@
-> >  #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-> >
-> >  #include <linux/errno.h>
-> > -#include <linux/fs.h>
-> >  #include <linux/init.h>
-> >  #include <linux/io.h>
-> >  #include <linux/kernel.h>
-> > -#include <linux/miscdevice.h>
-> >  #include <linux/module.h>
-> >  #include <linux/moduleparam.h>
-> >  #include <linux/platform_device.h>
-> > @@ -31,7 +29,6 @@
-> >  #include <linux/jiffies.h>
-> >  #include <linux/timer.h>
-> >  #include <linux/bitops.h>
-> > -#include <linux/uaccess.h>
-> >
-> >  #include "at91sam9_wdt.h"
-> >
-> > @@ -102,35 +99,6 @@ static void at91_ping(unsigned long data)
-> >  }
-> >
-> >  /*
-> > - * Watchdog device is opened, and watchdog starts running.
-> > - */
-> > -static int at91_wdt_open(struct inode *inode, struct file *file)
-> > -{
-> > -	if (test_and_set_bit(0, &at91wdt_private.open))
-> > -		return -EBUSY;
-> > -
-> > -	at91wdt_private.next_heartbeat = jiffies + heartbeat * HZ;
-> > -	mod_timer(&at91wdt_private.timer, jiffies + WDT_TIMEOUT);
-> > -
-> > -	return nonseekable_open(inode, file);
-> > -}
-> > -
-> > -/*
-> > - * Close the watchdog device.
-> > - */
-> > -static int at91_wdt_close(struct inode *inode, struct file *file)
-> > -{
-> > -	clear_bit(0, &at91wdt_private.open);
-> > -
-> > -	/* stop internal ping */
-> > -	if (!at91wdt_private.expect_close)
-> > -		del_timer(&at91wdt_private.timer);
-> > -
-> > -	at91wdt_private.expect_close = 0;
-> > -	return 0;
-> > -}
-> > -
-> > -/*
-> >   * Set the watchdog time interval in 1/256Hz (write-once)
-> >   * Counter is 12 bit.
-> >   */
-> > @@ -168,101 +136,11 @@ static const struct watchdog_info at91_wdt_info = {
-> >  						WDIOF_MAGICCLOSE,
-> >  };
-> >
-> > -/*
-> > - * Handle commands from user-space.
-> > - */
-> > -static long at91_wdt_ioctl(struct file *file,
-> > -		unsigned int cmd, unsigned long arg)
-> > -{
-> > -	void __user *argp = (void __user *)arg;
-> > -	int __user *p = argp;
-> > -	int new_value;
-> > -
-> > -	switch (cmd) {
-> > -	case WDIOC_GETSUPPORT:
-> > -		return copy_to_user(argp, &at91_wdt_info,
-> > -				    sizeof(at91_wdt_info)) ? -EFAULT : 0;
-> > -
-> > -	case WDIOC_GETSTATUS:
-> > -	case WDIOC_GETBOOTSTATUS:
-> > -		return put_user(0, p);
-> > -
-> > -	case WDIOC_KEEPALIVE:
-> > -		at91wdt_private.next_heartbeat = jiffies + heartbeat * HZ;
-> > -		return 0;
-> > -
-> > -	case WDIOC_SETTIMEOUT:
-> > -		if (get_user(new_value, p))
-> > -			return -EFAULT;
-> > -
-> > -		heartbeat = new_value;
-> > -		at91wdt_private.next_heartbeat = jiffies + heartbeat * HZ;
-> > -
-> > -		return put_user(new_value, p);  /* return current value */
-> > -
-> > -	case WDIOC_GETTIMEOUT:
-> > -		return put_user(heartbeat, p);
-> > -	}
-> > -	return -ENOTTY;
-> > -}
-> > -
-> > -/*
-> > - * Pat the watchdog whenever device is written to.
-> > - */
-> > -static ssize_t at91_wdt_write(struct file *file, const char *data, size_t len,
-> > -								loff_t *ppos)
-> > -{
-> > -	if (!len)
-> > -		return 0;
-> > -
-> > -	/* Scan for magic character */
-> > -	if (!nowayout) {
-> > -		size_t i;
-> > -
-> > -		at91wdt_private.expect_close = 0;
-> > -
-> > -		for (i = 0; i < len; i++) {
-> > -			char c;
-> > -			if (get_user(c, data + i))
-> > -				return -EFAULT;
-> > -			if (c == 'V') {
-> > -				at91wdt_private.expect_close = 42;
-> > -				break;
-> > -			}
-> > -		}
-> > -	}
-> > -
-> > -	at91wdt_private.next_heartbeat = jiffies + heartbeat * HZ;
-> > -
-> > -	return len;
-> > -}
-> > -
-> > -/* ......................................................................... */
-> > -
-> > -static const struct file_operations at91wdt_fops = {
-> > -	.owner			= THIS_MODULE,
-> > -	.llseek			= no_llseek,
-> > -	.unlocked_ioctl	= at91_wdt_ioctl,
-> > -	.open			= at91_wdt_open,
-> > -	.release		= at91_wdt_close,
-> > -	.write			= at91_wdt_write,
-> > -};
-> > -
-> > -static struct miscdevice at91wdt_miscdev = {
-> > -	.minor		= WATCHDOG_MINOR,
-> > -	.name		= "watchdog",
-> > -	.fops		= &at91wdt_fops,
-> > -};
-> > -
-> >  static int __init at91wdt_probe(struct platform_device *pdev)
-> >  {
-> >  	struct resource	*r;
-> >  	int res;
-> >
-> > -	if (at91wdt_miscdev.parent)
-> > -		return -EBUSY;
-> > -	at91wdt_miscdev.parent = &pdev->dev;
-> > -
-> >  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >  	if (!r)
-> >  		return -ENODEV;
-> > @@ -277,10 +155,6 @@ static int __init at91wdt_probe(struct platform_device
-> *pdev)
-> >  	if (res)
-> >  		return res;
-> >
-> > -	res = misc_register(&at91wdt_miscdev);
-> > -	if (res)
-> > -		return res;
-> > -
-> >  	at91wdt_private.next_heartbeat = jiffies + heartbeat * HZ;
-> >  	setup_timer(&at91wdt_private.timer, at91_ping, 0);
-> >  	mod_timer(&at91wdt_private.timer, jiffies + WDT_TIMEOUT);
-> > @@ -295,10 +169,6 @@ static int __exit at91wdt_remove(struct platform_device
-> *pdev)
-> >  {
-> >  	int res;
-> >
-> > -	res = misc_deregister(&at91wdt_miscdev);
-> > -	if (!res)
-> > -		at91wdt_miscdev.parent = NULL;
-> > -
-> >  	return res;
-> >  }
-> >
-> > @@ -326,4 +196,3 @@ module_exit(at91sam_wdt_exit);
-> >  MODULE_AUTHOR("Renaud CERRATO <r.cerrato@til-technologies.fr>");
-> >  MODULE_DESCRIPTION("Watchdog driver for Atmel AT91SAM9x processors");
-> >  MODULE_LICENSE("GPL");
-> > -MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
-> > --
-> > 1.7.9.5
-> >
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index ad13588..8f71f40 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -47,4 +47,12 @@
+ 		    cache-unified;
+ 		    cache-level = <2>;
+ 	};
++
++	timer at 35006000 {
++		compatible = "bcm,kona-timer";
++		reg = <0x35006000 0x1000>;
++		interrupts = <0x0 7 0x4>;
++		clock-frequency = <32768>;
++	};
++
+ };
+diff --git a/arch/arm/mach-bcm/board_bcm.c b/arch/arm/mach-bcm/board_bcm.c
+index 3a62f1b..2457010 100644
+--- a/arch/arm/mach-bcm/board_bcm.c
++++ b/arch/arm/mach-bcm/board_bcm.c
+@@ -27,12 +27,10 @@ static const struct of_device_id irq_match[] = {
+ 	{}
+ };
+ 
+-static void timer_init(void)
+-{
+-}
++extern void bcm_timer_init(void);
+ 
+ static struct sys_timer timer = {
+-	.init = timer_init,
++	.init = bcm_timer_init,
+ };
+ 
+ static void __init init_irq(void)
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 603be36..fb4fc51 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -14,5 +14,6 @@ obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
+ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
+ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
+ obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
++obj-$(CONFIG_ARCH_BCM)		+= bcm_timer.o
+ 
+ obj-$(CONFIG_CLKSRC_ARM_GENERIC)	+= arm_generic.o
+diff --git a/drivers/clocksource/bcm_timer.c b/drivers/clocksource/bcm_timer.c
+new file mode 100644
+index 0000000..85d1904
+--- /dev/null
++++ b/drivers/clocksource/bcm_timer.c
+@@ -0,0 +1,202 @@
++/*
++ * Copyright (C) 2012 Broadcom Corporation
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/init.h>
++#include <linux/irq.h>
++#include <linux/interrupt.h>
++#include <linux/jiffies.h>
++#include <linux/clockchips.h>
++#include <linux/types.h>
++
++#include <linux/io.h>
++#include <asm/mach/time.h>
++
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++
++#include "bcm_timer.h"
++
++struct bcm_timers {
++	int tmr_irq;
++	void __iomem *tmr_regs;
++};
++
++struct bcm_timers timers;
++
++static u32 arch_timer_rate;
++
++/* We use the peripheral timers for system tick, the cpu global timer for
++ * profile tick
++ */
++static void timer_disable_and_clear(void __iomem *base)
++{
++	uint32_t reg;
++
++	/* clear and disable timer interrupts
++	 * We are using compare/match register 0 for
++	 * our system interrupts
++	 */
++	reg = 0;
++
++	/* Clear compare (0) interrupt */
++	reg |= 1 << KONA_GPTIMER_STCS_TIMER_MATCH_SHIFT;
++	/* disable compare */
++	reg &= ~(1 << KONA_GPTIMER_STCS_COMPARE_ENABLE_SHIFT);
++
++	writel(reg, base + KONA_GPTIMER_STCS_OFFSET);
++
++}
++
++static void
++timer_get_counter(void *timer_base, uint32_t *msw, uint32_t *lsw)
++{
++	void __iomem *base = IOMEM(timer_base);
++
++	/* Read 64-bit free running counter
++	 * 1. Read hi-word
++	 * 2. Read low-word
++	 * 3. Read hi-word again
++	 * 4.1
++	 *      if new hi-word is not equal to previously read hi-word, then
++	 *      start from #1
++	 * 4.2
++	 *      if new hi-word is equal to previously read hi-word then stop.
++	 */
++
++	while (1) {
++		*msw = readl(base + KONA_GPTIMER_STCHI_OFFSET);
++		*lsw = readl(base + KONA_GPTIMER_STCLO_OFFSET);
++		if (*msw == readl(base + KONA_GPTIMER_STCHI_OFFSET))
++			break;
++	}
++
++	return;
++}
++
++static const struct of_device_id bcm_timer_ids[] __initconst = {
++	{.compatible = "bcm,kona-timer"},
++	{},
++};
++
++static void __init timers_init(void)
++{
++	struct device_node *node;
++	u32 freq;
++
++	node = of_find_matching_node(NULL, bcm_timer_ids);
++
++	if (!node)
++		panic("No timer");
++
++	if (!of_property_read_u32(node, "clock-frequency", &freq))
++		arch_timer_rate = freq;
++	else
++		panic("clock-frequency not set in the .dts file");
++
++	/* Setup IRQ numbers */
++	timers.tmr_irq = irq_of_parse_and_map(node, 0);
++
++	/* Setup IO addresses */
++	timers.tmr_regs = of_iomap(node, 0);
++
++	timer_disable_and_clear(timers.tmr_regs);
++}
++
++static int timer_set_next_event(unsigned long clc,
++				  struct clock_event_device *unused)
++{
++	/* timer (0) is disabled by the timer interrupt already
++	 * so, here we reload the next event value and re-enable
++	 * the timer
++	 *
++	 * This way, we are potentially losing the time between
++	 * timer-interrupt->set_next_event. CPU local timers, when
++	 * they come in should get rid of skew
++	 */
++
++	uint32_t lsw, msw;
++	uint32_t reg;
++
++	timer_get_counter(timers.tmr_regs, &msw, &lsw);
++
++	/* Load the "next" event tick value */
++	writel(lsw + clc, timers.tmr_regs + KONA_GPTIMER_STCM0_OFFSET);
++
++	/* Enable compare */
++	reg = readl(timers.tmr_regs + KONA_GPTIMER_STCS_OFFSET);
++	reg |= (1 << KONA_GPTIMER_STCS_COMPARE_ENABLE_SHIFT);
++	writel(reg, timers.tmr_regs + KONA_GPTIMER_STCS_OFFSET);
++
++	return 0;
++}
++
++static void timer_set_mode(enum clock_event_mode mode,
++			     struct clock_event_device *unused)
++{
++	switch (mode) {
++	case CLOCK_EVT_MODE_ONESHOT:
++		/* by default mode is one shot don't do any thing */
++		break;
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_SHUTDOWN:
++	default:
++		timer_disable_and_clear(timers.tmr_regs);
++	}
++}
++
++static struct clock_event_device clockevent_timer = {
++	.name = "timer 1",
++	.features = CLOCK_EVT_FEAT_ONESHOT,
++	.shift = 32,
++	.set_next_event = timer_set_next_event,
++	.set_mode = timer_set_mode
++};
++
++static void __init timer_clockevents_init(void)
++{
++	clockevent_timer.mult = div_sc(arch_timer_rate, NSEC_PER_SEC,
++					 clockevent_timer.shift);
++
++	clockevent_timer.max_delta_ns =
++	    clockevent_delta2ns(0xffffffff, &clockevent_timer);
++
++	clockevent_timer.min_delta_ns =
++	    clockevent_delta2ns(6, &clockevent_timer);
++
++	clockevent_timer.cpumask = cpumask_of(0);
++	clockevents_register_device(&clockevent_timer);
++}
++
++static irqreturn_t timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = &clockevent_timer;
++
++	timer_disable_and_clear(timers.tmr_regs);
++	evt->event_handler(evt);
++	return IRQ_HANDLED;
++}
++
++static struct irqaction timer_irq = {
++	.name = "Kona Timer Tick",
++	.flags = IRQF_TIMER,
++	.handler = timer_interrupt,
++};
++
++void __init bcm_timer_init(void)
++{
++	timers_init();
++	timer_clockevents_init();
++	setup_irq(timers.tmr_irq, &timer_irq);
++	timer_set_next_event((arch_timer_rate / HZ), NULL);
++}
+diff --git a/drivers/clocksource/bcm_timer.h b/drivers/clocksource/bcm_timer.h
+new file mode 100644
+index 0000000..96a6280
+--- /dev/null
++++ b/drivers/clocksource/bcm_timer.h
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) 2012 Broadcom Corporation
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __KONA_TIMER_H__
++#define __KONA_TIMER_H__
++
++#define KONA_GPTIMER_STCS_OFFSET			0x00000000
++#define KONA_GPTIMER_STCLO_OFFSET			0x00000004
++#define KONA_GPTIMER_STCHI_OFFSET			0x00000008
++#define KONA_GPTIMER_STCM0_OFFSET			0x0000000C
++
++#define KONA_GPTIMER_STCS_TIMER_MATCH_SHIFT		0
++#define KONA_GPTIMER_STCS_COMPARE_ENABLE_SHIFT		4
++
++#endif /* __KONA_TIMER_H__ */
+-- 
+1.7.1
