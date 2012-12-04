@@ -1,124 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Dec 2012 11:55:26 +0000
-Subject: [PATCH] ARM: pass syscall return value to sys_exit tracepoint
-In-Reply-To: <20121204104038.GA23368@mudshark.cambridge.arm.com>
-References: <1354369134-20296-1-git-send-email-andrew_gabbasov@mentor.com>
- <20121203133735.GG20074@mudshark.cambridge.arm.com>
- <20121203141251.GB14363@n2100.arm.linux.org.uk>
- <6C5EA58090A5ED459815C4D04C2B466F8C567A21@EU-MBX-01.mgc.mentorg.com>
- <20121204103809.GD14363@n2100.arm.linux.org.uk>
- <20121204104038.GA23368@mudshark.cambridge.arm.com>
-Message-ID: <20121204115526.GK23368@mudshark.cambridge.arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 4 Dec 2012 12:05:12 +0000
+Subject: [RFC PATCH 1/1] KVM: ARM: add vgic state save and restore support
+In-Reply-To: <20121204114410.GA7450@b29396-Latitude-E6410>
+References: <1354531019-9335-1-git-send-email-b29396@freescale.com>
+ <CAFEAcA-wopCCZrX2-eak-YAVpR2ZorGAyBVpcHUxjbxewVCFeg@mail.gmail.com>
+ <20121204114410.GA7450@b29396-Latitude-E6410>
+Message-ID: <CAFEAcA8Z-Y4Q6+p4rtByBCdwycLJm-86edUeaECoaMXx=1rLxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 04, 2012 at 10:40:38AM +0000, Will Deacon wrote:
-> On Tue, Dec 04, 2012 at 10:38:09AM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Dec 04, 2012 at 09:48:28AM +0000, Gabbasov, Andrew wrote:
-> > > The other registers in "regs" structure are not saved around ptrace_syscall_trace,
-> > > and both audit_syscall_exit and trace_sys_exit get the register values, potentially
-> > > changed by a debugger. Does it make sense to save the isolated return value
-> > > for trace_sys_exit call only and not to save other registers, passed, for example,
-> > > to audit_syscall_exit function that takes the return value from regs structure?
-> > > Isn't it a reasonable assumption that a debugger will preserve important
-> > > register values (or intentionally change them for some purpose) in case
-> > > of syscall_exit, as we rely on this for syscall_enter case?
-> > 
-> > Actually, why are we doing things in a different order to x86?  If we
-> > assume that x86 has this stuff correctly ordered, then shouldn't we
-> > be following the sequence presented there?
-> > 
-> > x86 on entry does:
-> > - secure_computing
-> > - tracehook_report_syscall_entry
-> > - trace_sys_enter
-> > - audit_syscall_entry
-> > and on exit:
-> > - audit_syscall_exit
-> > - trace_sys_exit
-> > - tracehook_report_syscall_exit
-> > 
-> > We appear to be doing the _exact_ reverse ordering in our syscall exit
-> > path - why is that?
-> 
-> 
-> I've just been looking at that and the problem stems around having ->syscall
-> set for the current thread before calling the sys_exit tracepoint. The audit
-> code should definitely be moved earlier.
-> 
-> Working on a patch...
+On 4 December 2012 11:44, Dong Aisheng <b29396@freescale.com> wrote:
+> On Mon, Dec 03, 2012 at 12:02:55PM +0000, Peter Maydell wrote:
 
-Ok, how about something like the following?
+> Probably one way we could try to avoid this issue is also saving the
+> banked registers value in kernel, then using it as return value of ONE_REG
+> access of specified VCPU rather than performing real register access to get
+> the correct banked register value.
 
-Will
+You absolutely can't do real hardware accesses to perform the state
+save/restore -- the VM/vcpu might not be running at this point,
+and the hardware could well be set up with some other VM's state.
 
---->8
+>> different question, though. ONE_REG is currently aimed as a vcpu
+>> ioctl for CPU state save/restore -- how does it need to change
+>> to handle device state save/restore where the device is not per-cpu?
+>>
+> What do you mean not per-cpu device? Or should it be said per-cpu device?
+> I'm a bit confused. For per-cpu variable, it means each cpu has
+> its own copy of the variable.
+> Then my understanding of non per-cpu device is that the device state
+> is consistent between all CPUs. It does not care which CPU is accessing
+> it. Then what issues do you mean for such devices when using ONE_REG?
 
-commit 0109b339755b29f92733c1f257911615fc231727
-Author: Will Deacon <will.deacon@arm.com>
-Date:   Tue Dec 4 11:47:14 2012 +0000
+The GIC is not a per-cpu device -- there is only one GIC even if
+you have a four-cpu (four-core) machine. ONE_REG is a vcpu ioctl,
+which means it is currently assumed to work only for reading
+registers for a single vcpu. That doesn't make a great deal of
+sense for devices like the GIC which aren't per-cpu (even if some
+of their registers are banked). If there was a vm-ioctl version of
+ONE_REG that would be ok to call from a non-vcpu thread and could
+just return us the whole GIC state.
 
-    ARM: syscall: rework ordering in syscall_trace_exit
-    
-    syscall_trace_exit is currently doing things back-to-front; invoking
-    the audit hook *after* signalling the debugger, which presents an
-    opportunity for the registers to be re-written by userspace in order to
-    bypass auditing constaints.
-    
-    This patch fixes the ordering by moving the audit code first and the
-    tracehook code last. On the face of it, it looks like
-    current_thread_info()->syscall may be incorrect for the sys_exit
-    tracepoint, but that's actually not an issue because it will have been
-    set during syscall entry and cannot have changed since then.
-    
-    Reported-by: Andrew Gabbasov <Andrew_Gabbasov@mentor.com>
-    Signed-off-by: Will Deacon <will.deacon@arm.com>
+>> Somebody needs to do this conversion, or TCG-to-KVM migrations won't work.
+>> I don't have a strong opinion whether it ought to be userspace or kernel;
+>> I think the deciding factor is probably going to be which is the easiest
+>> for the kernel to support into the future as a stable ABI (even as GIC
+>> versions change etc).
+>>
+>
+> I don't know too much about TCG, will spend some time to research.
+> It looks to me if we're using ONE_REG, we then have to do it in qemu.
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 8355d4b..1dd5122 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -452,7 +452,6 @@ __sys_trace:
- 
- __sys_trace_return:
- 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
--	mov	r1, scno
- 	mov	r0, sp
- 	bl	syscall_trace_exit
- 	b	ret_slow_syscall
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 518536d..0e9c779 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -957,17 +957,22 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
- 	return scno;
- }
- 
--asmlinkage int syscall_trace_exit(struct pt_regs *regs, int scno)
-+asmlinkage void syscall_trace_exit(struct pt_regs *regs)
- {
--	current_thread_info()->syscall = scno;
--
--	if (test_thread_flag(TIF_SYSCALL_TRACE))
--		scno = tracehook_report_syscall(regs, PTRACE_SYSCALL_EXIT);
-+	/*
-+	 * Audit the syscall before anything else, as a debugger may
-+	 * come in and change the current registers.
-+	 */
-+	audit_syscall_exit(regs);
- 
-+	/*
-+	 * Note that we haven't updated the ->syscall field for the
-+	 * current thread. This isn't a problem because it will have
-+	 * been set on syscall entry and there hasn't been an opportunity
-+	 * for a PTRACE_SET_SYSCALL since then.
-+	 */
- 	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
--		trace_sys_exit(regs, scno);
-+		trace_sys_exit(regs, regs_return_value(regs));
- 
--	audit_syscall_exit(regs);
--
--	return scno;
-+	tracehook_report_syscall(regs, PTRACE_SYSCALL_EXIT);
- }
+No, whether we use ONE_REG or GET/SET_IRQCHIP does not affect whether
+we do this conversion in qemu or in the kernel. The two choices are
+completely distinct.
+
+> I could try ONE_REG if the banked registers access issue is not exist.
+> I'm not very familiar with x86 virtualization hw support, but i did refer to
+> x86 i8259.c code to implement this function for arm. And it looks the
+> KVM_SET_IRQCHIP/KVM_GET_IRQCHIP is designed for irqchip state save/retore.
+> Maybe the hw is too much different between x86 and arm.
+
+The x86 KVM ABI was generally the first one put in and it varies
+between "exactly the right thing for everybody", "generally the right
+thing but described in a slightly x86-centric way", "not really
+suitable for all architectures" down to "this really is x86 only".
+Separately, sometimes it turns out that the approach taken for x86
+wasn't the best possible, and newer APIs have been designed since.
+ONE_REG is one of those -- the idea is that new KVM ports will use
+it, but x86 will have to retain the old-style interface for compatibility
+anyway.
+
+So copying x86's approach is not always the best approach (though
+it is not always the wrong approach either -- this is a judgement
+call).
+
+-- PMM
