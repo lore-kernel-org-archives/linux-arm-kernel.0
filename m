@@ -1,38 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Dec 2012 10:38:09 +0000
-Subject: [PATCH] ARM: pass syscall return value to sys_exit tracepoint
-In-Reply-To: <6C5EA58090A5ED459815C4D04C2B466F8C567A21@EU-MBX-01.mgc.mentorg.com>
-References: <1354369134-20296-1-git-send-email-andrew_gabbasov@mentor.com>
- <20121203133735.GG20074@mudshark.cambridge.arm.com>
- <20121203141251.GB14363@n2100.arm.linux.org.uk>
- <6C5EA58090A5ED459815C4D04C2B466F8C567A21@EU-MBX-01.mgc.mentorg.com>
-Message-ID: <20121204103809.GD14363@n2100.arm.linux.org.uk>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 04 Dec 2012 18:54:25 +0800
+Subject: at91: Status of NAND flash access
+In-Reply-To: <91586D499ADFD74FBCFB8425266A5DE4013765CC370A@pluto.melinkcorp.local>
+References: <91586D499ADFD74FBCFB8425266A5DE4013765CC370A@pluto.melinkcorp.local>
+Message-ID: <50BDD661.7070803@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 04, 2012 at 09:48:28AM +0000, Gabbasov, Andrew wrote:
-> The other registers in "regs" structure are not saved around ptrace_syscall_trace,
-> and both audit_syscall_exit and trace_sys_exit get the register values, potentially
-> changed by a debugger. Does it make sense to save the isolated return value
-> for trace_sys_exit call only and not to save other registers, passed, for example,
-> to audit_syscall_exit function that takes the return value from regs structure?
-> Isn't it a reasonable assumption that a debugger will preserve important
-> register values (or intentionally change them for some purpose) in case
-> of syscall_exit, as we rely on this for syscall_enter case?
+Hi, Bryan
 
-Actually, why are we doing things in a different order to x86?  If we
-assume that x86 has this stuff correctly ordered, then shouldn't we
-be following the sequence presented there?
+On 12/3/2012 10:39 PM, Bryan Evenson wrote:
+> I have a kernel build of 3.7-rc5 that is built for the AT91SAM9G25.  The kernel has issues when it tries to read the filesystem from NAND flash.  If I change to an NFS setup then the filesystem loads.
+According to your question, it is not very clear to me, so could you 
+give more detail then I can help.
 
-x86 on entry does:
-- secure_computing
-- tracehook_report_syscall_entry
-- trace_sys_enter
-- audit_syscall_entry
-and on exit:
-- audit_syscall_exit
-- trace_sys_exit
-- tracehook_report_syscall_exit
+What type (ubi, jffs2, or others) of your filesystem is used? How do you 
+flush the file system into the nand flash, by SAM-BA, or U-Boot? With or 
+without pmecc?
+And what ecc type (pmecc, soft, none) do you enabled in the kernel?
 
-We appear to be doing the _exact_ reverse ordering in our syscall exit
-path - why is that?
+> I've seen some patches on this list lately related to AT91 NAND flash (specifically this thread: http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/133748.html) and I believe my problems may be related to this issue.  But, I'm having trouble following the thread to find the current status.
+>
+> Can anyone tell me what the status is on NAND flash access for the AT91 series with the 3.7-rc5 kernel?  If this version has a known bug, is there a different suggested version I use that fixes the issue?
+In 3.7-rc5, I think the atmel nand driver should work well with 
+AT91SAM9G25EK board even without the patch you mentioned in above URL.
+
+Just for PMECC, you need add following code in 
+arch/arm/boot/dts/at91sam9x5cm.dtsi:
+-                        nand-ecc-mode = "soft";
++                       nand-ecc-mode = "hw";
++                        atmel,has-pmecc;        /* Enable PMECC */
++                        atmel,pmecc-cap = <2>;    /* PMECC error bits*/
++                        atmel,pmecc-sector-size = <512>;  /* sector 
+size for PMECC, it is not page size */
+
+Also you can check the readme file in: 
+Documentation/devicetree/bindings/mtd/atmel-nand.txt
+
+Best Regards,
+Josh Wu
+
+>
+> Thanks,
+> Bryan
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
