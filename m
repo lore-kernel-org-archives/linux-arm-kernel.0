@@ -1,21 +1,173 @@
-From: yasushi.asano@jp.fujitsu.com (Asano, Yasushi)
-Date: Tue, 4 Dec 2012 12:57:57 +0000
-Subject: About the workaround for the 484863 L220 erratum
-Message-ID: <4AE7B88EC8BA74469869BB7EEB7D66671BCA3685@g01jpexmbyt23>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Tue, 04 Dec 2012 18:48:16 +0530
+Subject: [PATCH v2] ARM: DTS: CROS5250: Add max77686 device tree support
+In-Reply-To: <1354099900-24779-1-git-send-email-a.kesavan@samsung.com>
+References: <1354099900-24779-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1354627096-9433-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The exynos5250 based chromebooks have a max77686 pmic on i2c channel 0.
+Add support for the pmic in the common cros5250 dts file.
+Tested after enabling cpufreq support for exynos5250 SoC and varying the
+arm frequency/voltage using the userspace governer.
 
-I am looking for a workaround for the 484863 L220 erratum. 
-"484863: The Cache Sync operation does not guarantee that the Eviction Buffer is empty"
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+Changes since v1:
+* Used generic names for the regulators
+* Changed BUCK5 as being default "ON"
+ arch/arm/boot/dts/cros5250-common.dtsi |  138 ++++++++++++++++++++++++++++++++
+ 1 files changed, 138 insertions(+), 0 deletions(-)
 
-Then I found a patch as below.
-http://www.linux-arm.org/git?p=linux-2.6-stable.git;a=commitdiff;h=61f0ab1658f41f34c1910848063c565095a47864
-Though It seems to need should correct this probrem, this patch has not been marged into the mainline yet.
-
-v3.6.9?arch/arm/include/asm/io.h
-#define writel_relaxed(v,c)     __raw_writel((__force u32) cpu_to_le32(v),c)
-
-Could you please tell me if you know the reason why it does not get into the mainline.
-Thank you for your time and assistance regarding this matter.
+diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
+index fddd174..8ab8394 100644
+--- a/arch/arm/boot/dts/cros5250-common.dtsi
++++ b/arch/arm/boot/dts/cros5250-common.dtsi
+@@ -24,6 +24,144 @@
+ 		samsung,i2c-max-bus-freq = <378000>;
+ 		gpios = <&gpb3 0 2 3 0>,
+ 			<&gpb3 1 2 3 0>;
++
++		max77686 at 09 {
++			compatible = "maxim,max77686";
++			reg = <0x09>;
++
++			voltage-regulators {
++				ldo1_reg: LDO1 {
++					regulator-name = "P1.0V_LDO_OUT1";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo2_reg: LDO2 {
++					regulator-name = "P1.8V_LDO_OUT2";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo3_reg: LDO3 {
++					regulator-name = "P1.8V_LDO_OUT3";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo7_reg: LDO7 {
++					regulator-name = "P1.0V_LDO_OUT7";
++					regulator-min-microvolt = <1100000>;
++					regulator-max-microvolt = <1100000>;
++					regulator-always-on;
++				};
++
++				ldo8_reg: LDO8 {
++					regulator-name = "P1.0V_LDO_OUT8";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo10_reg: LDO10 {
++					regulator-name = "P1.8V_LDO_OUT10";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo12_reg: LDO12 {
++					regulator-name = "P3.0V_LDO_OUT12";
++					regulator-min-microvolt = <3000000>;
++					regulator-max-microvolt = <3000000>;
++					regulator-always-on;
++				};
++
++				ldo14_reg: LDO14 {
++					regulator-name = "P1.8V_LDO_OUT14";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo15_reg: LDO15 {
++					regulator-name = "P1.0V_LDO_OUT15";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo16_reg: LDO16 {
++					regulator-name = "P1.8V_LDO_OUT16";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				buck1_reg: BUCK1 {
++					regulator-name = "vdd_mif";
++					regulator-min-microvolt = <950000>;
++					regulator-max-microvolt = <1300000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck2_reg: BUCK2 {
++					regulator-name = "vdd_arm";
++					regulator-min-microvolt = <850000>;
++					regulator-max-microvolt = <1350000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck3_reg: BUCK3 {
++					regulator-name = "vdd_int";
++					regulator-min-microvolt = <900000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck4_reg: BUCK4 {
++					regulator-name = "vdd_g3d";
++					regulator-min-microvolt = <850000>;
++					regulator-max-microvolt = <1300000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck5_reg: BUCK5 {
++					regulator-name = "P1.8V_BUCK_OUT5";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck6_reg: BUCK6 {
++					regulator-name = "P1.35V_BUCK_OUT6";
++					regulator-min-microvolt = <1350000>;
++					regulator-max-microvolt = <1350000>;
++					regulator-always-on;
++				};
++
++				buck7_reg: BUCK7 {
++					regulator-name = "P2.0V_BUCK_OUT7";
++					regulator-min-microvolt = <2000000>;
++					regulator-max-microvolt = <2000000>;
++					regulator-always-on;
++				};
++
++				buck8_reg: BUCK8 {
++					regulator-name = "P2.85V_BUCK_OUT8";
++					regulator-min-microvolt = <2850000>;
++					regulator-max-microvolt = <2850000>;
++					regulator-always-on;
++				};
++			};
++		};
+ 	};
+ 
+ 	i2c at 12C70000 {
+-- 
+1.6.6.1
