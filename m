@@ -1,60 +1,34 @@
 From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Tue,  4 Dec 2012 11:10:44 +0100
-Subject: [PATCH 1/2] clocksource: nomadik-mtu: support timer-based delay
+Date: Tue,  4 Dec 2012 11:10:45 +0100
+Subject: [PATCH 2/2] cpufreq: db8500: set CPUFREQ_CONST_LOOPS
 In-Reply-To: <1354615845-2758-1-git-send-email-fabio.baltieri@linaro.org>
 References: <1354615845-2758-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <1354615845-2758-2-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <1354615845-2758-3-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to use Nomadik MTU for timer-based delay.
+As ux500 is being converted to timer based delay loops, and the timer
+used is not depending on CPUs clock frequency, set cpufreq_driver flag
+CPUFREQ_CONST_LOOPS to prevent cpufreq rescaling loops_for_jiffies.
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 ---
- drivers/clocksource/nomadik-mtu.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/cpufreq/db8500-cpufreq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/nomadik-mtu.c b/drivers/clocksource/nomadik-mtu.c
-index 8914c3c..5f3c8db 100644
---- a/drivers/clocksource/nomadik-mtu.c
-+++ b/drivers/clocksource/nomadik-mtu.c
-@@ -15,6 +15,7 @@
- #include <linux/clocksource.h>
- #include <linux/clk.h>
- #include <linux/jiffies.h>
-+#include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/platform_data/clocksource-nomadik-mtu.h>
- #include <asm/mach/time.h>
-@@ -64,6 +65,7 @@ static void __iomem *mtu_base;
- static bool clkevt_periodic;
- static u32 clk_prescale;
- static u32 nmdk_cycle;		/* write-once */
-+static struct delay_timer mtu_delay_timer;
- 
- #ifdef CONFIG_NOMADIK_MTU_SCHED_CLOCK
- /*
-@@ -80,6 +82,11 @@ static u32 notrace nomadik_read_sched_clock(void)
+diff --git a/drivers/cpufreq/db8500-cpufreq.c b/drivers/cpufreq/db8500-cpufreq.c
+index 74b830b..e758891 100644
+--- a/drivers/cpufreq/db8500-cpufreq.c
++++ b/drivers/cpufreq/db8500-cpufreq.c
+@@ -150,7 +150,7 @@ static int __cpuinit db8500_cpufreq_init(struct cpufreq_policy *policy)
  }
- #endif
  
-+static unsigned long nmdk_timer_read_current_timer(void)
-+{
-+	return ~readl_relaxed(mtu_base + MTU_VAL(0));
-+}
-+
- /* Clockevent device: use one-shot mode */
- static int nmdk_clkevt_next(unsigned long evt, struct clock_event_device *ev)
- {
-@@ -227,4 +234,8 @@ void __init nmdk_timer_init(void __iomem *base, int irq)
- 	setup_irq(irq, &nmdk_timer_irq);
- 	nmdk_clkevt.cpumask = cpumask_of(0);
- 	clockevents_config_and_register(&nmdk_clkevt, rate, 2, 0xffffffffU);
-+
-+	mtu_delay_timer.read_current_timer = &nmdk_timer_read_current_timer;
-+	mtu_delay_timer.freq = rate;
-+	register_current_timer_delay(&mtu_delay_timer);
- }
+ static struct cpufreq_driver db8500_cpufreq_driver = {
+-	.flags  = CPUFREQ_STICKY,
++	.flags  = CPUFREQ_STICKY | CPUFREQ_CONST_LOOPS,
+ 	.verify = db8500_cpufreq_verify_speed,
+ 	.target = db8500_cpufreq_target,
+ 	.get    = db8500_cpufreq_getspeed,
 -- 
 1.7.12.1
