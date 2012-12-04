@@ -1,46 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Dec 2012 15:44:59 +0000
-Subject: [PATCH v2 1/4] ARM: imx: allow timer counter to roll over
-In-Reply-To: <1354632915-27134-2-git-send-email-shawn.guo@linaro.org>
-References: <1354632915-27134-1-git-send-email-shawn.guo@linaro.org>
- <1354632915-27134-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20121204154459.GG14363@n2100.arm.linux.org.uk>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 4 Dec 2012 16:51:28 +0100 (CET)
+Subject: [PATCH 0/3] mmc: add a card-event host call-back
+Message-ID: <Pine.LNX.4.64.1212041633470.26918@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 04, 2012 at 10:55:12PM +0800, Shawn Guo wrote:
-> The timer is configured in free-run mode.  The counter should be
-> allowed to roll over to 0 when reaching 0xffffffff.  Let's do that
-> by always returning 0 in set_next_event.
-
-Are you sure this is correct?  It looks wrong to me.
-
-If the time set by the next event has passed, you must return -ETIME
-from set_next_event() so that the generic timer code can compensate
-for the missed event and recalculate it, otherwise you will end up
-having to wait a full count cycle before receiving the next event.
-
-If you find that you're being passed such a small increment that you're
-constantly hitting that condition, you need to increase your minimum
-waited interval.
+In a recent thread [1] an extension to the slot-gpio MMC API, adding a 
+host call-back for card detection events, has been proposed. This 
+extension shall be used by the SDHCI driver to reset the host if the card 
+is ejected during a running request. These patches add such a call-back.
 
 
-> diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-> index f017302..858098c 100644
-> --- a/arch/arm/mach-imx/time.c
-> +++ b/arch/arm/mach-imx/time.c
-> @@ -139,8 +139,7 @@ static int mx1_2_set_next_event(unsigned long evt,
->  
->  	__raw_writel(tcmp, timer_base + MX1_2_TCMP);
->  
-> -	return (int)(tcmp - __raw_readl(timer_base + MX1_2_TCN)) < 0 ?
-> -				-ETIME : 0;
-> +	return 0;
+Thanks
+Guennadi
 
-So what this code was doing is: tcmp is the counter value we expect with
-the expected event time added.  This may wrap 32-bits.  We subtract the
-current timer value after we've set the compare register.  If the current
-timer value was larger than the expected event time, we return -ETIME.
+[1] http://thread.gmane.org/gmane.linux.kernel.mmc/17924/focus=17927
 
-That to me sounds 100% correct.  Your replacement code of always returning
-zero looks wrong.
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
