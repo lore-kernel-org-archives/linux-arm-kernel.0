@@ -1,80 +1,69 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue,  4 Dec 2012 13:00:22 -0800
-Subject: [PATCH 1/2] clk: introduce optional disable_unused callback
-In-Reply-To: <1354654823-1576-1-git-send-email-mturquette@linaro.org>
-References: <1354654823-1576-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1354654823-1576-2-git-send-email-mturquette@linaro.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 4 Dec 2012 13:09:22 -0800
+Subject: [PATCH v2] ARM: eukrea_mbimx27-baseboard - use stock
+ get_pendown_state() in ads7846
+In-Reply-To: <20121127090356.GA25658@core.coreip.homeip.net>
+References: <20121124082529.GA7687@core.coreip.homeip.net>
+ <20121127074209.GL10369@pengutronix.de>
+ <20121127090356.GA25658@core.coreip.homeip.net>
+Message-ID: <20121204210922.GA8620@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some gate clocks have special needs which must be handled during the
-disable-unused clocks sequence.  These needs might be driven by software
-due to the fact that we're disabling a clock outside of the normal
-clk_disable path and a clk's enable_count will not be accurate.  On the
-other hand a specific hardware programming sequence might need to be
-followed for this corner case.
+On Tue, Nov 27, 2012 at 01:03:56AM -0800, Dmitry Torokhov wrote:
+> The default implementation matches exactly our custom one so we can switch
+> to using the default one. As a bonus the driver will take care of setting
+> GPIO line for us.
+> 
+> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-This change is needed for the upcoming OMAP port to the common clock
-framework.  Specifically, it is undesirable to treat the disable-unused
-path identically to the normal clk_disable path since other software
-layers are involved.  In this case OMAP's clockdomain code throws WARNs
-and bails early due to the clock's enable_count being set to zero.  A
-custom callback mitigates this problem nicely.
+Eric, Sascha, could I get a formal ack on this one please ?
 
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
----
- drivers/clk/clk.c            |   13 +++++++++++--
- include/linux/clk-provider.h |    6 ++++++
- 2 files changed, 17 insertions(+), 2 deletions(-)
+> ---
+> 
+> Adjusted to use IMX_GPIO_NR() macro.
+> 
+>  arch/arm/mach-imx/eukrea_mbimx27-baseboard.c |   19 +------------------
+>  1 file changed, 1 insertion(+), 18 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+> index 98aef57..f361143 100644
+> --- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+> +++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+> @@ -238,24 +238,8 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
+>  	.flags = IMXUART_HAVE_RTSCTS,
+>  };
+>  
+> -#define ADS7846_PENDOWN (GPIO_PORTD | 25)
+> -
+> -static void __maybe_unused ads7846_dev_init(void)
+> -{
+> -	if (gpio_request(ADS7846_PENDOWN, "ADS7846 pendown") < 0) {
+> -		printk(KERN_ERR "can't get ads7846 pen down GPIO\n");
+> -		return;
+> -	}
+> -	gpio_direction_input(ADS7846_PENDOWN);
+> -}
+> -
+> -static int ads7846_get_pendown_state(void)
+> -{
+> -	return !gpio_get_value(ADS7846_PENDOWN);
+> -}
+> -
+>  static struct ads7846_platform_data ads7846_config __initdata = {
+> -	.get_pendown_state	= ads7846_get_pendown_state,
+> +	.gpio_pendown		= IMX_GPIO_NR(4, 25),
+>  	.keep_vref_on		= 1,
+>  };
+>  
+> @@ -323,7 +307,6 @@ void __init eukrea_mbimx27_baseboard_init(void)
+>  	|| defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
+>  	/* ADS7846 Touchscreen controller init */
+>  	mxc_gpio_mode(GPIO_PORTD | 25 | GPIO_GPIO | GPIO_IN);
+> -	ads7846_dev_init();
+>  #endif
+>  
+>  	/* SPI_CS0 init */
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 9955ad7..251e45d 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -219,8 +219,17 @@ static void clk_disable_unused_subtree(struct clk *clk)
- 	if (clk->flags & CLK_IGNORE_UNUSED)
- 		goto unlock_out;
- 
--	if (__clk_is_enabled(clk) && clk->ops->disable)
--		clk->ops->disable(clk->hw);
-+	/*
-+	 * some gate clocks have special needs during the disable-unused
-+	 * sequence.  call .disable_unused if available, otherwise fall
-+	 * back to .disable
-+	 */
-+	if (__clk_is_enabled(clk)) {
-+		if (clk->ops->disable_unused)
-+			clk->ops->disable_unused(clk->hw);
-+		else if (clk->ops->disable)
-+			clk->ops->disable(clk->hw);
-+	}
- 
- unlock_out:
- 	spin_unlock_irqrestore(&enable_lock, flags);
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 3593a3c..1c94d18 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -57,6 +57,11 @@ struct clk_hw;
-  * 		This function must not sleep. Optional, if this op is not
-  * 		set then the enable count will be used.
-  *
-+ * @disable_unused: Disable the clock atomically.  Only called from
-+ *		clk_disable_unused for gate clocks with special needs.
-+ *		Called with enable_lock held.  This function must not
-+ *		sleep.
-+ *
-  * @recalc_rate	Recalculate the rate of this clock, by querying hardware. The
-  * 		parent rate is an input parameter.  It is up to the caller to
-  * 		ensure that the prepare_mutex is held across this call.
-@@ -106,6 +111,7 @@ struct clk_ops {
- 	int		(*enable)(struct clk_hw *hw);
- 	void		(*disable)(struct clk_hw *hw);
- 	int		(*is_enabled)(struct clk_hw *hw);
-+	void		(*disable_unused)(struct clk_hw *hw);
- 	unsigned long	(*recalc_rate)(struct clk_hw *hw,
- 					unsigned long parent_rate);
- 	long		(*round_rate)(struct clk_hw *hw, unsigned long,
 -- 
-1.7.9.5
+Dmitry
