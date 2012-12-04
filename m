@@ -1,183 +1,81 @@
-From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
-Date: Tue, 4 Dec 2012 16:44:26 +0900
-Subject: [PATCH shmobile/DT 1/2] ARM: shmobile: Remove some of_sh_intc_*
- functions
-In-Reply-To: <20121204055029.GC15969@verge.net.au>
-References: <1353572619-29098-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
- <20121204055029.GC15969@verge.net.au>
-Message-ID: <CABMQnVJY_UPoC=oX2DQWQp7+UVO-Xxnn+YAWkJ_sNMtC0S8fKw@mail.gmail.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Tue,  4 Dec 2012 15:53:46 +0800
+Subject: [v2 PATCH 00/14] atmel SPI controller with dmaengine and device tree
+ support
+Message-ID: <1354607640-13229-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi All, 
 
-No, These patches are to devel/dt of your repository.
+This set of patches is to add dmaengine and device tree support for atmel spi.
+The work is based on Jean-Christophe, Nicolas and Richard's work.
+I tested it on at91sam9x5ek, at91sam9m10g45ek.
 
-Best regards,
-  Nobuhiro
+It is based on v3.7-rc8.
 
+Changelog:
+v2: 
+   1./ Remove the patch :PATCH]mtd: m25p80: change the m25p80_read to reading page to page
+	which purpose to fix the BUG: when run "flashcp /bin/busybox /dev/mtdX" in 
+	the at91sam9g25ek with DMA mode, it arises a OOPS. 
+	Now fix it in this patch:
+	[PATHC] spi/atmel_spi: add dmaengine support changing to fix the [BUG].
 
-On Tue, Dec 4, 2012 at 2:50 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Nov 22, 2012 at 05:23:38PM +0900, Nobuhiro Iwamatsu wrote:
->> This removes of_sh_intc_get_meminfo, of_sh_intc_get_pint and of_sh_intc_get_intc functions.
->> These are not already used.
->
-> Hi Iwamatsu-san,
->
-> these patches are for Paul, right?
->
->>
->> Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
->> ---
->>  drivers/sh/intc/of_intc.c |   76 ---------------------------------------------
->>  include/linux/sh_intc.h   |   28 -----------------
->>  2 files changed, 104 deletions(-)
->>
->> diff --git a/drivers/sh/intc/of_intc.c b/drivers/sh/intc/of_intc.c
->> index 30b1090..e833e48 100644
->> --- a/drivers/sh/intc/of_intc.c
->> +++ b/drivers/sh/intc/of_intc.c
->> @@ -529,49 +529,6 @@ void __init of_sh_intc_get_skip_syscore_suspend(struct device_node *np,
->>               d->skip_syscore_suspend = false;
->>  }
->>
->> -int __init of_sh_intc_get_meminfo(struct device_node *np,
->> -                             struct resource *res, int res_no)
->> -{
->> -     int ret = 0, i;
->> -
->> -     for (i = 0 ; i < res_no ; i++) {
->> -             ret = of_address_to_resource(np, i, &res[i]);
->> -             if (ret) {
->> -                     pr_err("could not determine device base address\n");
->> -                     return ret;
->> -             }
->> -
->> -             pr_debug("%s: Address 0x%x, size %d\n",
->> -                                     __func__, res[i].start, resource_size(&res[i]));
->> -     }
->> -
->> -     return ret;
->> -}
->> -
->> -int __init of_sh_intc_get_pint(struct device_node *np, struct intc_desc *d)
->> -{
->> -     /* pint uses vector, mask and sence. */
->> -     int ret = of_sh_intc_get_vector(np, &d->hw.vectors,
->> -                             &d->hw.nr_vectors);
->> -     if (ret)
->> -             return ret;
->> -
->> -     ret = of_sh_intc_get_mask(np, &d->hw.mask_regs,
->> -                             &d->hw.nr_mask_regs);
->> -     if (ret)
->> -             return ret;
->> -
->> -     ret = of_sh_intc_get_sense(np, &d->hw.sense_regs,
->> -                             &d->hw.nr_sense_regs);
->> -     /* INTC may not need Sence register. */
->> -     if (ret && ret != -ENOENT)
->> -             return ret;
->> -
->> -     d->of_node = np;
->> -
->> -     return 0;
->> -}
->> -
->>  int __init of_sh_intc_get_intc(struct device_node *np, struct intc_desc *d)
->>  {
->>       int ret = of_sh_intc_get_vector(np, &d->hw.vectors,
->> @@ -611,36 +568,3 @@ int __init of_sh_intc_get_intc(struct device_node *np, struct intc_desc *d)
->>
->>       return 0;
->>  }
->> -
->> -int __init of_sh_intc_get_intc_pins(struct device_node *np,
->> -                             struct intc_desc *d)
->> -{
->> -     int ret = of_sh_intc_get_vector(np, &d->hw.vectors,
->> -                             &d->hw.nr_vectors);
->> -     if (ret)
->> -             return ret;
->> -
->> -     ret = of_sh_intc_get_mask(np, &d->hw.mask_regs,
->> -                             &d->hw.nr_mask_regs);
->> -     if (ret)
->> -             return ret;
->> -
->> -     ret = of_sh_intc_get_prio(np, &d->hw.prio_regs,
->> -                             &d->hw.nr_prio_regs);
->> -     if (ret)
->> -             return ret;
->> -
->> -     ret = of_sh_intc_get_sense(np, &d->hw.sense_regs,
->> -                             &d->hw.nr_sense_regs);
->> -     if (ret)
->> -             return ret;
->> -
->> -     ret = of_sh_intc_get_ack(np, &d->hw.ack_regs,
->> -                             &d->hw.nr_ack_regs);
->> -     if (ret)
->> -             return ret;
->> -
->> -     d->of_node = np;
->> -
->> -     return 0;
->> -}
->> diff --git a/include/linux/sh_intc.h b/include/linux/sh_intc.h
->> index 6603da6..c7954ee 100644
->> --- a/include/linux/sh_intc.h
->> +++ b/include/linux/sh_intc.h
->> @@ -161,26 +161,6 @@ static inline int register_intc_userimask(unsigned long addr)
->>  int of_sh_intc_get_intc(struct device_node *np, struct intc_desc *d);
->>
->>  /*
->> - * of_sh_initc_get_intc_pins() - Get INTC Pins table.
->> - * @np:     device node to get INTC from
->> - * @d:      a pointer of intc pins table
->> - *
->> - * Return: one of the errno value on the error condition
->> - */
->> -int of_sh_intc_get_intc_pins(struct device_node *np, struct intc_desc *d);
->> -
->> -/*
->> - * of_sh_intc_get_meminfo() - Get and set INTC register of memory.
->> - * @np:     device node to get INTC from
->> - * @res_mem:   a pointer of resource
->> - * @res_no:  resource number
->> - *
->> - * Return: one of the errno value on the error condition
->> - */
->> -int of_sh_intc_get_meminfo(struct device_node *np,
->> -                             struct resource *res_mem, int resno);
->> -
->> -/*
->>   * of_sh_intc_get_force_enable - Get and set force_enable vector in
->>   *                               struct intc_desc.
->>   * @np:  device node to get INTC from
->> @@ -221,13 +201,5 @@ void of_sh_intc_get_skip_syscore_suspend(struct device_node *np,
->>   * Return: one of the errno value on the error condition
->>   */
->>  int of_sh_intc_get_intevtsa_vect(struct device_node *np, unsigned short *vect);
->> -/*
->> - * of_sh_initc_get_intc_pint() - Get INTC Pint table.
->> - * @np:     device node to get INTC from
->> - * @d:      a pointer of intc pint table
->> - *
->> - * Return: one of the errno value on the error condition
->> - */
->> -int of_sh_intc_get_pint(struct device_node *np, struct intc_desc *d);
->>
->>  #endif /* __SH_INTC_H */
->> --
->> 1.7.10.4
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+   2./ Remove two patches:
+   	which purpose to read dts property to select SPI IP version and DMA mode
+	Now they will be gat from device tree different compatile.
+
+   3./ Fix DMA: when enable both spi0 AND spi1, the spi0 doesn't work BUG.
+
+   4./ Rebase v3.7-rc8.
+
+Best Regards,
+Wenyou Yang.
 
 
+Jean-Christophe PLAGNIOL-VILLARD (3):
+  of: add dma-mask binding
+  of_spi: add generic binding support to specify cs gpio
+  spi/atmel_spi: add DT support
+
+Nicolas Ferre (5):
+  spi/atmel_spi: add physical base address
+  spi/atmel_spi: call unmapping on transfers buffers
+  spi/atmel_spi: status information passed through controller data
+  spi/atmel_spi: add flag to controller data for lock operations
+  spi/atmel_spi: add dmaengine support
+
+Richard Genoud (6):
+  spi/atmel_spi: Fix spi-atmel driver to adapt to slave_config changes
+  spi/atmel_spi: correct 16 bits transfers using PIO
+  spi/atmel_spi: correct 16 bits transfer with DMA
+  ARM: at91: add clocks for spi DT entries
+  ARM: dts: add spi nodes for atmel SoC
+  ARM: dts: add spi nodes for atmel boards
+
+ Documentation/devicetree/bindings/spi/spi-bus.txt  |    6 +
+ .../devicetree/bindings/spi/spi_atmel.txt          |   23 +
+ arch/arm/boot/dts/at91sam9260.dtsi                 |   30 +
+ arch/arm/boot/dts/at91sam9263.dtsi                 |   30 +
+ arch/arm/boot/dts/at91sam9263ek.dts                |    9 +
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi        |    9 +
+ arch/arm/boot/dts/at91sam9g25ek.dts                |    9 +
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |   30 +
+ arch/arm/boot/dts/at91sam9m10g45ek.dts             |    9 +
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |   30 +
+ arch/arm/boot/dts/at91sam9n12ek.dts                |    9 +
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |   30 +
+ arch/arm/mach-at91/at91sam9260.c                   |    2 +
+ arch/arm/mach-at91/at91sam9g45.c                   |    2 +
+ arch/arm/mach-at91/at91sam9n12.c                   |    2 +
+ arch/arm/mach-at91/at91sam9x5.c                    |    2 +
+ drivers/of/platform.c                              |   23 +-
+ drivers/spi/spi-atmel.c                            |  793 ++++++++++++++++++--
+ drivers/spi/spi.c                                  |   55 +-
+ include/linux/spi/spi.h                            |    3 +
+ 20 files changed, 1033 insertions(+), 73 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel.txt
 
 -- 
-Nobuhiro Iwamatsu
+1.7.9.5
