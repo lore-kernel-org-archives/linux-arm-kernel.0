@@ -1,65 +1,36 @@
-From: mark.langsdorf@calxeda.com (Mark Langsdorf)
-Date: Tue,  4 Dec 2012 08:34:01 -0600
-Subject: [PATCH 5/6 v7] power: export opp cpufreq functions
-In-Reply-To: <1354631642-30433-1-git-send-email-mark.langsdorf@calxeda.com>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1354631642-30433-1-git-send-email-mark.langsdorf@calxeda.com>
-Message-ID: <1354631642-30433-6-git-send-email-mark.langsdorf@calxeda.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 4 Dec 2012 14:37:25 +0000
+Subject: [RFC PATCH 2/2] ARM: SMP support for mach-virt
+In-Reply-To: <20121204134010.GP23368@mudshark.cambridge.arm.com>
+References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
+ <1354557160-20144-3-git-send-email-will.deacon@arm.com>
+ <50BD1FD7.9040000@gmail.com>
+ <20121204124047.GM23368@mudshark.cambridge.arm.com>
+ <20121204133326.GE14363@n2100.arm.linux.org.uk>
+ <20121204134010.GP23368@mudshark.cambridge.arm.com>
+Message-ID: <20121204143724.GF14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These functions are needed to make the cpufreq-core0 and highbank-cpufreq
-drivers loadable as modules.
+On Tue, Dec 04, 2012 at 01:40:10PM +0000, Will Deacon wrote:
+> On Tue, Dec 04, 2012 at 01:33:26PM +0000, Russell King - ARM Linux wrote:
+> > The memory that these 'offline' CPUs is executing then gets overwritten,
+> > and that's game over for those CPUs.
+> 
+> That's not strictly true. The device-tree passed to the kernel should have a
+> /memreserve/ entry for the SMP pen to avoid exactly this scenario. In real
+> hardware, this still sucks because you have spinning CPUs burning up power
+> but that's not such a problem with a virtual platform.
 
-Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
-Acked-by: Nishanth Menon <nm@ti.com>
----
-Changes from v4, v5, v6
-        None.
-Changes from v3
-        includes linux/export.h instead of module.h.
-Changes from v2
-        None.
-Changes from v1
-        Added Nishanth Menon's ack.
-        Clarified the purpose of the change in the commit message.
+Umm.  So let's see.  If I'm running v3.6 stock kernel and want to kexec
+into a v3.7 stock kernel.  The SMP pen is part of the v3.6 kernel, which
+will be located at 32K into the RAM.  The v3.7 kernel will also want to
+occupy the same place.  At some point you have to overwrite the v3.6
+kernel with the v3.7 kernel image.
 
- drivers/base/power/opp.c | 4 ++++
- 1 file changed, 4 insertions(+)
+That happens _before_ the DT has been parsed, so any memreserve stuff
+will be ignored.  And it's at that point that your "offline" secondary
+CPUs will have their instructions overwritten.
 
-diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-index d946864..4062ec3 100644
---- a/drivers/base/power/opp.c
-+++ b/drivers/base/power/opp.c
-@@ -23,6 +23,7 @@
- #include <linux/rcupdate.h>
- #include <linux/opp.h>
- #include <linux/of.h>
-+#include <linux/export.h>
- 
- /*
-  * Internal data structure organization with the OPP layer library is as
-@@ -643,6 +644,7 @@ int opp_init_cpufreq_table(struct device *dev,
- 
- 	return 0;
- }
-+EXPORT_SYMBOL(opp_init_cpufreq_table);
- 
- /**
-  * opp_free_cpufreq_table() - free the cpufreq table
-@@ -660,6 +662,7 @@ void opp_free_cpufreq_table(struct device *dev,
- 	kfree(*table);
- 	*table = NULL;
- }
-+EXPORT_SYMBOL(opp_free_cpufreq_table);
- #endif		/* CONFIG_CPU_FREQ */
- 
- /**
-@@ -720,4 +723,5 @@ int of_init_opp_table(struct device *dev)
- 
- 	return 0;
- }
-+EXPORT_SYMBOL(of_init_opp_table);
- #endif
--- 
-1.7.11.7
+That's fine if the pen ends up being at the same place but that's not
+something we guarantee.
