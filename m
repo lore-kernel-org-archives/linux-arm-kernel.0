@@ -1,44 +1,39 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue,  4 Dec 2012 22:55:12 +0800
-Subject: [PATCH v2 1/4] ARM: imx: allow timer counter to roll over
+Date: Tue,  4 Dec 2012 22:55:13 +0800
+Subject: [PATCH v2 2/4] ARM: imx: mask gpc interrupts initially
 In-Reply-To: <1354632915-27134-1-git-send-email-shawn.guo@linaro.org>
 References: <1354632915-27134-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1354632915-27134-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1354632915-27134-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer is configured in free-run mode.  The counter should be
-allowed to roll over to 0 when reaching 0xffffffff.  Let's do that
-by always returning 0 in set_next_event.
+Mask gpc interrupts initially to avoid suspicious interrupts.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/time.c |    6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ arch/arm/mach-imx/gpc.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index f017302..858098c 100644
---- a/arch/arm/mach-imx/time.c
-+++ b/arch/arm/mach-imx/time.c
-@@ -139,8 +139,7 @@ static int mx1_2_set_next_event(unsigned long evt,
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index e1537f9..722e5df 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -101,11 +101,16 @@ static void imx_gpc_irq_mask(struct irq_data *d)
+ void __init imx_gpc_init(void)
+ {
+ 	struct device_node *np;
++	int i;
  
- 	__raw_writel(tcmp, timer_base + MX1_2_TCMP);
+ 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
+ 	gpc_base = of_iomap(np, 0);
+ 	WARN_ON(!gpc_base);
  
--	return (int)(tcmp - __raw_readl(timer_base + MX1_2_TCN)) < 0 ?
--				-ETIME : 0;
-+	return 0;
- }
- 
- static int v2_set_next_event(unsigned long evt,
-@@ -152,8 +151,7 @@ static int v2_set_next_event(unsigned long evt,
- 
- 	__raw_writel(tcmp, timer_base + V2_TCMP);
- 
--	return (int)(tcmp - __raw_readl(timer_base + V2_TCN)) < 0 ?
--				-ETIME : 0;
-+	return 0;
- }
- 
- #ifdef DEBUG
++	/* Initially mask all interrupts */
++	for (i = 0; i < IMR_NUM; i++)
++		writel_relaxed(~0, gpc_base + GPC_IMR1 + i * 4);
++
+ 	/* Register GPC as the secondary interrupt controller behind GIC */
+ 	gic_arch_extn.irq_mask = imx_gpc_irq_mask;
+ 	gic_arch_extn.irq_unmask = imx_gpc_irq_unmask;
 -- 
 1.7.9.5
