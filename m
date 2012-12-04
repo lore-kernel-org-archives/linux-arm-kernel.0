@@ -1,43 +1,84 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Dec 2012 13:31:37 +0100
-Subject: [PATCH 1/1] ARM: ux500: Change IRQ from low-to-high edge
- triggered to high-to-low
-In-Reply-To: <20121204091215.GD2718@gmail.com>
-References: <1354289099-17931-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdafvpnyq7YMV=iSjN4+u1hpt3xntAb-daJZifG9VpgnOw@mail.gmail.com>
- <20121204091215.GD2718@gmail.com>
-Message-ID: <CACRpkdYn7tuCjNiy0KpDEefC3tMDjKSnaWKzM38URN9HQALT7Q@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 Dec 2012 12:40:47 +0000
+Subject: [RFC PATCH 2/2] ARM: SMP support for mach-virt
+In-Reply-To: <50BD1FD7.9040000@gmail.com>
+References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
+ <1354557160-20144-3-git-send-email-will.deacon@arm.com>
+ <50BD1FD7.9040000@gmail.com>
+Message-ID: <20121204124047.GM23368@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 4, 2012 at 10:12 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Sat, 01 Dec 2012, Linus Walleij wrote:
->
->> On Fri, Nov 30, 2012 at 4:24 PM, Lee Jones <lee.jones@linaro.org> wrote:
->>
->> > When the STMPE IRQ is triggered to be active high level-sensitive, the
->> > Nomadik GPIO controller it uses complains, although it still works.
->> > Recently we attempted to move triggering to low-to-high in an attempt
->> > to prevent the warning; however, this ensured that the IRQ was actually
->> > missed completely. Now we have a solution which both works and keeps the
->> > GPIO controller happy.
->> >
->> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>
->> Is this something I should put into the ux500 tree or will you
->> take care of this in a separate pull request?
->
-> Can you still get this into the RCs, as it's a bugfix?
+On Mon, Dec 03, 2012 at 09:55:35PM +0000, Rob Herring wrote:
+> On 12/03/2012 11:52 AM, Will Deacon wrote:
+> > From: Marc Zyngier <marc.zyngier@arm.com>
+> > 
+> > This patch adds support for SMP to mach-virt.
+> > 
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > 
 
-Well it doesn't apply to the -rc:s since it's patching
-arch/arm/boot/dts/stuib.dtsi which does not exist in
-the v3.7 series.
+[...]
 
-Either what you want is to submit a fix to Arnd & Olof
-on top of your previous DT patches, or you need to send
-a rebased version...
+> > +/*
+> > + * This provides a "holding pen" into which all secondary cores are held
+> > + * until we're ready for them to initialise.
+> > + */
+> > +ENTRY(virt_secondary_startup)
+> > +	mrc	p15, 0, r0, c0, c0, 5
+> > +	and	r0, r0, #15
+> > +	adr	r4, 1f
+> > +	ldmia	r4, {r5, r6}
+> > +	sub	r4, r4, r5
+> > +	add	r6, r6, r4
+> > +pen:	ldr	r7, [r6]
+> > +	cmp	r7, r0
+> > +	bne	pen
+> 
+> Why is the pen is needed? It should only be needed for hotplug on
+> systems that can't reset their cores. I'd hope you could design good
+> virtual h/w.
 
-Yours,
-Linus Walleij
+It's not so much about designing good virtual h/w as it is avoiding tying
+the platform to it. What we don't want is to mandate that in order to boot
+this machine, you *must* implement an emulation of some virtual
+power-controller or SMP booting device. If we go down that route, there's
+less advantage from having the virtual platform in the first place.
+
+There's also less of a problem with the pen approach to booting because
+ultimately the virtual CPUs executing there are just pthreads and will be
+scheduled appropriately by the hypervisor (in contrast to a real system
+where there may be concerns about power consumption and memory bandwidth).
+
+For hotplug, sure, we could have an *optional* virtio-based device for
+dealing with that if we want to. We could even have some early probing code
+for it and use it for SMP boot if we find a matching DT node, but we'd still
+need to keep the pen code lying around as a fallback.
+
+> > +/*
+> > + * Enumerate the possible CPU set from the device tree.
+> > + */
+> > +static void __init virt_smp_init_cpus(void)
+> > +{
+> > +	const char *enable_method;
+> > +	struct device_node *dn = NULL;
+> > +	int cpu = 0;
+> > +	u32 release_addr;
+> > +
+> > +	while ((dn = of_find_node_by_type(dn, "cpu"))) {
+> > +		if (cpu >= NR_CPUS)
+> > +			goto next;
+> > +
+> > +		/*
+> > +		 * We currently support only the "spin-table" enable-method.
+> > +		 */
+> > +		enable_method = of_get_property(dn, "enable-method", NULL);
+> > +		if (!enable_method || strcmp(enable_method, "spin-table")) {
+> 
+> Are these documented?
+
+It's part of the EPAPR spec iirc and follows the booting protocol used by
+arm64.
+
+Will
