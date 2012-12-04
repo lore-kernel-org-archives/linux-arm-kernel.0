@@ -1,81 +1,66 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 04 Dec 2012 07:16:00 -0600
-Subject: [v2 PATCH 01/14] of: add dma-mask binding
-In-Reply-To: <1354607640-13229-2-git-send-email-wenyou.yang@atmel.com>
-References: <1354607640-13229-1-git-send-email-wenyou.yang@atmel.com>
- <1354607640-13229-2-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <50BDF790.3080401@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 4 Dec 2012 18:52:45 +0530
+Subject: [PATCH v5 2/2] ARM: davinci: dm365 EVM: add support for VPBE
+ display
+In-Reply-To: <1354522904-22501-3-git-send-email-prabhakar.lad@ti.com>
+References: <1354522904-22501-1-git-send-email-prabhakar.lad@ti.com>
+ <1354522904-22501-3-git-send-email-prabhakar.lad@ti.com>
+Message-ID: <50BDF925.3090700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2012 01:53 AM, Wenyou Yang wrote:
-> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+On 12/3/2012 1:51 PM, Prabhakar Lad wrote:
+> From: Manjunath Hadli <manjunath.hadli@ti.com>
 > 
-> This will allow each device to specify its dma-mask for this we use the
-> coherent_dma_mask as pointer. By default the dma-mask will be set to
-> DMA_BIT_MASK(32).
-> The microblaze architecture hook is drop
+> add support for V4L2 video display to DM365 EVM.
+> Support for SD and ED modes is provided, along with Composite
+> and Component outputs.
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: grant.likely at secretlab.ca
-> Cc: rob.herring at calxeda.com
-> Cc: devicetree-discuss at lists.ozlabs.org
+> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
 > ---
-
-My same comment as the last version applies. Use dma-ranges.
-
-Rob
-
->  drivers/of/platform.c |   23 ++++++++++++++++-------
->  1 file changed, 16 insertions(+), 7 deletions(-)
+>  arch/arm/mach-davinci/board-dm365-evm.c |  177 ++++++++++++++++++++++++++++++-
+>  1 files changed, 176 insertions(+), 1 deletions(-)
 > 
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index b80891b..31ed405 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -130,6 +130,21 @@ void of_device_make_bus_id(struct device *dev)
->  	dev_set_name(dev, "%s.%d", node->name, magic - 1);
->  }
+> diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+> index 0c3dae6..10f2a85 100644
+> --- a/arch/arm/mach-davinci/board-dm365-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm365-evm.c
+> @@ -27,6 +27,7 @@
+>  #include <linux/input.h>
+>  #include <linux/spi/spi.h>
+>  #include <linux/spi/eeprom.h>
+> +#include <linux/v4l2-dv-timings.h>
 >  
-> +static void of_get_dma_mask(struct device *dev, struct device_node *np)
-> +{
-> +	const __be32 *prop;
-> +	int len;
-> +
-> +	prop = of_get_property(np, "dma-mask", &len);
-> +
-> +	dev->dma_mask = &dev->coherent_dma_mask;
-> +
-> +	if (!prop)
-> +		dev->coherent_dma_mask = DMA_BIT_MASK(32);
-> +	else
-> +		dev->coherent_dma_mask = of_read_number(prop, len / 4);
-> +}
-> +
->  /**
->   * of_device_alloc - Allocate and initialize an of_device
->   * @np: device node to assign to device
-> @@ -171,10 +186,8 @@ struct platform_device *of_device_alloc(struct device_node *np,
->  		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
->  	}
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> @@ -374,6 +375,180 @@ static struct vpfe_config vpfe_cfg = {
+>  	.ccdc = "ISIF",
+>  };
 >  
-> +	of_get_dma_mask(&dev->dev, np);
->  	dev->dev.of_node = of_node_get(np);
-> -#if defined(CONFIG_MICROBLAZE)
-> -	dev->dev.dma_mask = &dev->archdata.dma_mask;
-> -#endif
->  	dev->dev.parent = parent;
->  
->  	if (bus_id)
-> @@ -211,10 +224,6 @@ struct platform_device *of_platform_device_create_pdata(
->  	if (!dev)
->  		return NULL;
->  
-> -#if defined(CONFIG_MICROBLAZE)
-> -	dev->archdata.dma_mask = 0xffffffffUL;
-> -#endif
-> -	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
->  	dev->dev.bus = &platform_bus_type;
->  	dev->dev.platform_data = platform_data;
->  
-> 
+> +/* venc standards timings */
+> +static struct vpbe_enc_mode_info dm365evm_enc_std_timing[] = {
+> +	{
+> +		.name		= "ntsc",
+> +		.timings_type	= VPBE_ENC_STD,
+> +		.std_id		= V4L2_STD_525_60,
+> +		.interlaced	= 1,
+> +		.xres		= 720,
+> +		.yres		= 480,
+> +		.aspect		= {11, 10},
+> +		.fps		= {30000, 1001},
+> +		.left_margin	= 0x79,
+> +		.right_margin	= 0,
+> +		.upper_margin	= 0x10,
+> +		.lower_margin	= 0,
+> +		.hsync_len	= 0,
+> +		.vsync_len	= 0,
+> +		.flags		= 0,
+
+I wonder what makes this entire information board specific? Shouldn't
+these (or at least most of these) be same across all devices which
+support NTSC and hence should be coming from some common code instead of
+being replicated for each platform that supports NTSC?
+
+Thanks,
+Sekhar
