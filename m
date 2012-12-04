@@ -1,40 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 3 Dec 2012 16:11:36 -0800
-Subject: [PATCH 2/2] i2c-s3c2410: Add bus arbitration implementation
-In-Reply-To: <20121201132632.GA17981@opensource.wolfsonmicro.com>
-References: <1354165536-18529-1-git-send-email-ch.naveen@samsung.com>
- <1354165536-18529-3-git-send-email-ch.naveen@samsung.com>
- <20121129163448.GA3761@sirena.org.uk>
- <CAPnjgZ0atD3k=gT0vjgkLO_SA8DMak6SiT6nZ_2T6WFqtK0szQ@mail.gmail.com>
- <CAOesGMgE0JEHsdySpua34_kbWi1+z4n4UdW0kumiJEROi7O2pQ@mail.gmail.com>
- <20121201132632.GA17981@opensource.wolfsonmicro.com>
-Message-ID: <CAOesGMgzBGieYJ131sUX7u8EWPEusxareFzC0XPt48+oNuh-xA@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 4 Dec 2012 09:32:12 +0800
+Subject: [PATCH] clk: factor: calculate rate by do_div
+In-Reply-To: <1354522477-11991-1-git-send-email-haojian.zhuang@gmail.com>
+References: <1354522477-11991-1-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <CAN1soZze6Ogn_zi7JJN0JNzoMFkHLJyKyjTV7rSWUmQhwRU0NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 1, 2012 at 5:26 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Thu, Nov 29, 2012 at 10:14:58PM -0800, Olof Johansson wrote:
->> On Thu, Nov 29, 2012 at 6:13 PM, Simon Glass <sjg@chromium.org> wrote:
+On Mon, Dec 3, 2012 at 4:14 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+> clk->rate = parent->rate / div * mult
 >
->> > It was originally done separately but I think it was felt that this
->> > was overly complex. Olof can you please comment on this?
+> The formula is OK. But it may overflow while we do operate with
+> unsigned long. So use do_div instead.
 >
->> it is indeed not controller specific per se, but we are unaware of any
->> other platform/driver using it. So, it seemed reasonable to implement
->> it in the driver as long as we have only one user; if another one
->> comes along it's of course better to move it to the common i2c code.
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> ---
+>  drivers/clk/clk-fixed-factor.c |    5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 >
->> At least that was my opinion at the time. I could be convinced
->> otherwise if someone else has strong opinions on the matter.
+> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+> index a489985..1ef271e 100644
+> --- a/drivers/clk/clk-fixed-factor.c
+> +++ b/drivers/clk/clk-fixed-factor.c
+> @@ -28,8 +28,11 @@ static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
+>                 unsigned long parent_rate)
+>  {
+>         struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
+> +       unsigned long long int rate;
 >
-> This sort of approach is half the reason SPI ended up being so fun...  I
-> suspect if you look hard enough you'll find that this is just the first
-> time someone tried to upstream such a scheme.  This is all especially
-> true for the DT bindings, even if the implementation is driver local for
-> now it'd be better to define generic bindings.
+> -       return parent_rate * fix->mult / fix->div;
+> +       rate = (unsigned long long int)parent_rate * fix->mult;
+> +       do_div(rate, fix->div);
+> +       return (unsigned long)rate;
+>  }
+>
+>  static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
+> --
+> 1.7.10.4
+>
 
-Ok, sounds like we might as well make it generic then. Naveen?
-
-
--Olof
+Correct Mike's email address.
