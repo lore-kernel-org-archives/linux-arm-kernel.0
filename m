@@ -1,116 +1,87 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 4 Dec 2012 14:29:24 +0530
-Subject: [PATCH 3/3] ARM: EXYNOS5: save CLK_TOP_SRC3 register before
- powergating
-In-Reply-To: <1354018957-17752-4-git-send-email-prasanna.ps@samsung.com>
+Date: Tue, 4 Dec 2012 14:35:13 +0530
+Subject: [PATCH 1/3] ARM: dts: exynos5: Set up power domain for MFC and
+ G-scaler
+In-Reply-To: <1354018957-17752-2-git-send-email-prasanna.ps@samsung.com>
 References: <1354018957-17752-1-git-send-email-prasanna.ps@samsung.com>
- <1354018957-17752-4-git-send-email-prasanna.ps@samsung.com>
-Message-ID: <CAJuYYwQ7W-1DKbECW1LASVEwXdcZhs09ksx0ppsaphA=YkWeeQ@mail.gmail.com>
+ <1354018957-17752-2-git-send-email-prasanna.ps@samsung.com>
+Message-ID: <CAJuYYwSdDqjX7=CZsagjF+0fzCFdB1DiG4JXn5Dh+ZxNssQvnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 27 November 2012 17:52, Prasanna Kumar <prasanna.ps@samsung.com> wrote:
 > From: Prasanna Kumar <prasanna.ps@samsung.com>
 >
-> This patch adds a software workaround to the hardware
-> problem found in exynos5 while powergating.
->
-> It is observed that CLK_TOP_SRC3 register gets modified if
-> the G-Scaler/MFC devices are power gated. The clock for G-Scaler gets
-> set to XXTI which results in the device running very slow .
-> A big drop in performance is noticed whilerunning the video.
-> This issue also occurs while powergating MFC.
->
-> The value of clock source register is restored once the powergating
-> operation is completed.
+> This patch adds device tree nodes for MFC and G-scaler power domains of exynos5.
+> It binds these power-domain nodes to repsective device tree nodes.
 >
 > Signed-off-by: Prasanna Kumar <prasanna.ps@samsung.com>
+
+Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
+
 > ---
->  arch/arm/mach-exynos/pm_domains.c |   27 +++++++++++++++++++++++++++
->  1 files changed, 27 insertions(+), 0 deletions(-)
+>  arch/arm/boot/dts/exynos5250.dtsi |   15 +++++++++++++++
+>  1 files changed, 15 insertions(+), 0 deletions(-)
 >
-> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-> index 9f1351d..955cbe3 100644
-> --- a/arch/arm/mach-exynos/pm_domains.c
-> +++ b/arch/arm/mach-exynos/pm_domains.c
-> @@ -24,6 +24,8 @@
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index 8f46227..23f9bf1 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -83,6 +83,7 @@
+>                 compatible = "samsung,mfc-v6";
+>                 reg = <0x11000000 0x10000>;
+>                 interrupts = <0 96 0>;
+> +               samsung,power-domain = <&pd_mfc>;
+>         };
 >
->  #include <mach/regs-pmu.h>
->  #include <plat/devs.h>
-> +#include <mach/regs-clock.h>
-> +#include <plat/cpu.h>
+>         rtc {
+> @@ -578,28 +579,42 @@
+>                 };
+>         };
 >
->  /*
->   * Exynos specific wrapper around the generic power domain
-> @@ -41,6 +43,7 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
->         void __iomem *base;
->         u32 timeout, pwr;
->         char *op;
-> +       u32 tmp = 0;
->
->         pd = container_of(domain, struct exynos_pm_domain, pd);
->         base = pd->base;
-> @@ -48,6 +51,23 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
->         pwr = power_on ? S5P_INT_LOCAL_PWR_EN : 0;
->         __raw_writel(pwr, base);
->
-> +       /*
-> +        *It is found that the CLK SRC register in exynos5
-> +        *gets modified when power domain of gsc/mfc/isp/disp1
-> +        *is powered off.This happens only after the system is
-> +        *suspended and resumed and not before that.
-> +        *The following fix adresses this hardware issue.
-> +        *It saves the value of clock source register and
-> +        *resores it later
-> +        */
+> +       pd_gsc: gsc-power-domain at 0x10044000 {
+> +               compatible = "samsung,exynos4210-pd";
+> +               reg = <0x10044000 0x20>;
+> +       };
 > +
-> +       if (soc_is_exynos5250()) {
-> +               if (!power_on) {
-> +                       /* save clock source register */
-> +                       tmp = __raw_readl(EXYNOS5_CLKSRC_TOP3);
-> +               }
-> +       }
-
-Does the value of EXYNOS5_CLKSRC_TOP3 register change as soon as the
-G-Scaler/MFC devices are power gated?
-
-- If yes, the value of CLKSRC register should be saved before the
-power domain register is programmed.
-
-- If not, as mentioned in the comment, if this issue occurs during a
-suspend-resume cycle, the value of this register can be saved and
-restored in the clock driver code itself.
-
-The other thing that needs to be relooked into here is the use of
-EXYNOS5_CLKSRC_TOP3 register address. Currently, the clock registers
-are statically io-remapped. With the upcoming migration to common
-clock for Exynos5, the clock registers will not be statically
-io-remapped but instead remapped during clock initialization. So the
-use of EXYNOS5_CLKSRC_TOP3 will not hold and so we need to relook into
-this.
-
+> +       pd_mfc: mfc-power-domain at 0x10044040 {
+> +               compatible = "samsung,exynos4210-pd";
+> +               reg = <0x10044040 0x20>;
+> +       };
 > +
->         /* Wait max 1ms */
->         timeout = 10;
+>         gsc_0:  gsc at 0x13e00000 {
+>                 compatible = "samsung,exynos5-gsc";
+>                 reg = <0x13e00000 0x1000>;
+>                 interrupts = <0 85 0>;
+> +               samsung,power-domain = <&pd_gsc>;
+>         };
 >
-> @@ -61,6 +81,13 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
->                 cpu_relax();
->                 usleep_range(80, 100);
->         }
-> +
-> +       if (soc_is_exynos5250()) {
-
-We could use the of_machine_is_compatible api here instead of
-soc_is_exynos5250() macro.
-
-> +               if (!power_on) {
-> +                       /* restore clock source register */
-> +                       __raw_writel(tmp, EXYNOS5_CLKSRC_TOP3);
-> +               }
-> +       }
->         return 0;
->  }
-
-
-Thanks,
-Thomas.
+>         gsc_1:  gsc at 0x13e10000 {
+>                 compatible = "samsung,exynos5-gsc";
+>                 reg = <0x13e10000 0x1000>;
+>                 interrupts = <0 86 0>;
+> +               samsung,power-domain = <&pd_gsc>;
+>         };
+>
+>         gsc_2:  gsc at 0x13e20000 {
+>                 compatible = "samsung,exynos5-gsc";
+>                 reg = <0x13e20000 0x1000>;
+>                 interrupts = <0 87 0>;
+> +               samsung,power-domain = <&pd_gsc>;
+>         };
+>
+>         gsc_3:  gsc at 0x13e30000 {
+>                 compatible = "samsung,exynos5-gsc";
+>                 reg = <0x13e30000 0x1000>;
+>                 interrupts = <0 88 0>;
+> +               samsung,power-domain = <&pd_gsc>;
+>         };
+>
+>         hdmi {
+> --
+> 1.7.0.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
