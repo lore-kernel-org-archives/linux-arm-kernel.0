@@ -1,252 +1,68 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 5 Dec 2012 00:21:52 +0800
-Subject: [PATCH 6/6 v7] cpufreq, highbank: add support for highbank cpufreq
-In-Reply-To: <1354631642-30433-7-git-send-email-mark.langsdorf@calxeda.com>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1354631642-30433-1-git-send-email-mark.langsdorf@calxeda.com>
- <1354631642-30433-7-git-send-email-mark.langsdorf@calxeda.com>
-Message-ID: <20121204162149.GA24986@S2100-06.ap.freescale.net>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 4 Dec 2012 17:00:49 +0100 (CET)
+Subject: [PATCH 3/3] MMC: sdhci-dove: allow GPIOs to be used for card
+ detection on Dove
+In-Reply-To: <87y5hfhrwg.fsf@octavius.laptop.org>
+References: <20121122235426.GT3332@n2100.arm.linux.org.uk>
+ <E1TbgcZ-0007Kt-35@rmk-PC.arm.linux.org.uk>
+ <20121123083117.GA25754@S2100-06.ap.freescale.net>
+ <20121123085726.GK5764@n2100.arm.linux.org.uk>
+ <20121123121422.GA26168@S2100-06.ap.freescale.net>
+ <20121123125507.GO5764@n2100.arm.linux.org.uk>
+ <871ufh8lza.fsf@octavius.laptop.org>
+ <Pine.LNX.4.64.1211260955070.11501@axis700.grange>
+ <87y5hfhrwg.fsf@octavius.laptop.org>
+Message-ID: <Pine.LNX.4.64.1212041651500.26918@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 04, 2012 at 08:34:02AM -0600, Mark Langsdorf wrote:
-> Highbank processors depend on the external ECME to perform voltage
-> management based on a requested frequency. Communication between the
-> A9 cores and the ECME happens over the pl320 IPC channel.
+Hi Chris
+
+On Mon, 3 Dec 2012, Chris Ball wrote:
+
+> Hi Guennadi,
 > 
-> Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
-> Cc: shawn.guo at linaro.org
-> Cc: mturquette at ti.com
-> ---
-> Changes from v6
-> 	Removed devicetree bindings documentation.
-> 	Restructured driver to use clk notifications.
-> 	Core driver logic is now cpufreq-clk0.
-
-Great.  It saves some codes :)
-
-> Changes from v5
->         Changed ipc_transmit() to pl320_ipc_transmit().
-> Changes from v4
->         Removed erroneous changes to arch/arm/Kconfig.
->         Removed unnecessary changes to drivers/cpufreq/Kconfig.arm
->         Alphabetized additions to arch/arm/mach-highbank/Kconfig
->         Changed ipc call and header to match new ipc location in 
->         drivers/mailbox.
-> Changes from v3
->         None.
-> Changes from v2
->         Changed transition latency binding in code to match documentation.
-> Changes from v1
->         Added highbank specific Kconfig changes.
+> On Mon, Nov 26 2012, Guennadi Liakhovetski wrote:
+> >> Guennadi, what are your thoughts about consolidating this reset logic
+> >> between the sdhci tasklet and slot-gpio?  It would certainly be nice to
+> >> use slot-gpio in cases like this one, so it's worth fixing.
+> >
+> > Sure, this can be added. As for how - I see at least two possibilities: 
+> > (1) put the complete above block in a new mmc host operation and just call 
+> > it from the GPIO card-detect ISR, (2) taking into account, that many 
+> > (nearly all? all?) host drivers keep a pointer to the current mrq in their 
+> > private data struct, we could instead add such a pointer to struct 
+> > mmc_host, then the check "request in progress" could also be generalised, 
+> > and the operation would just have to reset the host and complete the 
+> > request (in the sdhci case schedule the task).
 > 
->  arch/arm/boot/dts/highbank.dts     |  10 ++++
->  arch/arm/mach-highbank/Kconfig     |   2 +
->  drivers/cpufreq/Kconfig.arm        |  16 ++++++
->  drivers/cpufreq/Makefile           |   1 +
->  drivers/cpufreq/highbank-cpufreq.c | 106 +++++++++++++++++++++++++++++++++++++
->  5 files changed, 135 insertions(+)
->  create mode 100644 drivers/cpufreq/highbank-cpufreq.c
+> They both sound pretty attractive.  Maybe we start out with (1), which
+> would create a patch we could more reasonably send to stable@ to get
+> slot-gpio handling the reset during transfers properly in older kernels,
+> and then refactor into (2) later?
+
+Just posted 3 patches for this, have a look if that's what you were 
+thinking about. Not sure though why this is needed for stable, but I'm 
+probably just missing some crucial information on the topic.
+
+Thanks
+Guennadi
+
+> > Note, that there's already a .hw_reset() operation, used by sdhci-pci
+> > only so far, still, it seems we cannot (easily) hijack it.
 > 
-> diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-> index 0c6fc34..7c4c27d 100644
-> --- a/arch/arm/boot/dts/highbank.dts
-> +++ b/arch/arm/boot/dts/highbank.dts
-> @@ -36,6 +36,16 @@
->  			next-level-cache = <&L2>;
->  			clocks = <&a9pll>;
->  			clock-names = "cpu";
-> +			operating-points = <
-> +				/* kHz    ignored */
-> +				 1300000  1000000
-> +				 1200000  1000000
-> +				 1100000  1000000
-> +				  800000  1000000
-> +				  400000  1000000
-> +				  200000  1000000
-> +			>;
-> +			clock-latency = <100000>;
->  		};
->  
->  		cpu at 1 {
-> diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
-> index 2896881..b7862da 100644
-> --- a/arch/arm/mach-highbank/Kconfig
-> +++ b/arch/arm/mach-highbank/Kconfig
-> @@ -1,5 +1,7 @@
->  config ARCH_HIGHBANK
->  	bool "Calxeda ECX-1000 (Highbank)" if ARCH_MULTI_V7
-> +	select ARCH_HAS_CPUFREQ
-> +	select ARCH_HAS_OPP
->  	select ARCH_WANT_OPTIONAL_GPIOLIB
->  	select ARM_AMBA
->  	select ARM_GIC
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 5961e64..7aaac9f 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -76,3 +76,19 @@ config ARM_EXYNOS5250_CPUFREQ
->  	help
->  	  This adds the CPUFreq driver for Samsung EXYNOS5250
->  	  SoC.
-> +
-> +config ARM_HIGHBANK_CPUFREQ
-> +	tristate "Calxeda Highbank-based"
-> +	depends on ARCH_HIGHBANK
-> +	select CPU_FREQ_TABLE
-> +	select GENERIC_CPUFREQ_CPU0
-> +	select PM_OPP
-> +	select REGULATOR
-> +
-> +	default m
-> +	help
-> +	  This adds the CPUFreq driver for Calxeda Highbank SoC
-> +	  based boards.
-> +
-> +	  If in doubt, say N.
-> +
-> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-> index 1bc90e1..9e8f12a 100644
-> --- a/drivers/cpufreq/Makefile
-> +++ b/drivers/cpufreq/Makefile
-> @@ -50,6 +50,7 @@ obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
->  obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)	+= exynos4x12-cpufreq.o
->  obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)	+= exynos5250-cpufreq.o
->  obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)     += omap-cpufreq.o
-> +obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
->  
->  ##################################################################################
->  # PowerPC platform drivers
-> diff --git a/drivers/cpufreq/highbank-cpufreq.c b/drivers/cpufreq/highbank-cpufreq.c
-> new file mode 100644
-> index 0000000..25ef437
-> --- /dev/null
-> +++ b/drivers/cpufreq/highbank-cpufreq.c
-> @@ -0,0 +1,106 @@
-> +/*
-> + * Copyright (C) 2012 Calxeda, Inc.
-> + *
-> + * derived from cpufreq-cpu0 by Freescale Semiconductor
-
-It's not any more, right?
-
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/clk.h>
-> +#include <linux/cpu.h>
-> +#include <linux/err.h>
-> +#include <linux/of.h>
-> +#include <linux/opp.h>
-
-Do you need this header?
-
-> +#include <linux/slab.h>
-> +#include <linux/mailbox.h>
-> +
-> +#define HB_CPUFREQ_CHANGE_NOTE 0x80000001
-> +
-> +static struct device *cpu_dev;
-> +static struct clk *cpu_clk;
-
-These two now can be local variables hb_cpufreq_driver_init().
-
-> +
-> +static int hb_voltage_change(unsigned int freq)
-> +{
-> +	int i;
-> +	u32 msg[7];
-> +
-> +	msg[0] = HB_CPUFREQ_CHANGE_NOTE;
-> +	msg[1] = freq / 1000000;
-> +	for (i = 2; i < 7; i++)
-> +		msg[i] = 0;
-> +
-> +	return pl320_ipc_transmit(msg);
-> +}
-> +
-> +static int hb_cpufreq_clk_notify(struct notifier_block *nb, 
-> +				unsigned long action, void *hclk)
-> +{
-> +	struct clk_notifier_data *clk_data = hclk;
-> +	int i = 0;
-> +
-> +	if (action == PRE_RATE_CHANGE) {
-> +		if (clk_data->new_rate > clk_data->old_rate)
-> +			while (hb_voltage_change(clk_data->new_rate))
-> +				if (i++ > 15)
-> +					return NOTIFY_STOP;
-> +	} else if (action == POST_RATE_CHANGE)
-
-Add a {} pair for else block or remove {} for if?
-
-> +		if (clk_data->new_rate < clk_data->old_rate)
-> +			while (hb_voltage_change(clk_data->new_rate))
-> +				if (i++ > 15)
-> +					break;
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static struct notifier_block hb_cpufreq_clk_nb = {
-> +	.notifier_call = hb_cpufreq_clk_notify,
-> +};
-> +
-> +static int __devinit hb_cpufreq_driver_init(void)
-
-Isn't there a big series removing __devinit from the kernel tree
-as CONFIG_HOTPLUG is going away?
-
-Shawn
-
-> +{
-> +	struct device_node *np;
-> +	int ret;
-> +
-> +	np = of_find_node_by_path("/cpus/cpu at 0");
-> +	if (!np) {
-> +		pr_err("failed to find highbank cpufreq node\n");
-> +		return -ENOENT;
-> +	}
-> +
-> +	cpu_dev = get_cpu_device(0);
-> +	if (!cpu_dev) {
-> +		pr_err("failed to get highbank cpufreq device\n");
-> +		ret = -ENODEV;
-> +		goto out_put_node;
-> +	}
-> +
-> +	cpu_dev->of_node = np;
-> +
-> +	cpu_clk = clk_get(cpu_dev, NULL);
-> +	if (IS_ERR(cpu_clk)) {
-> +		ret = PTR_ERR(cpu_clk);
-> +		pr_err("failed to get cpu0 clock: %d\n", ret);
-> +		goto out_put_node;
-> +	}
-> +
-> +	ret = clk_notifier_register(cpu_clk, &hb_cpufreq_clk_nb);
-> +	if (ret) {
-> +		pr_err("failed to register clk notifier: %d\n", ret);
-> +		goto out_put_node;
-> +	}
-> +
-> +out_put_node:
-> +	of_node_put(np);
-> +	return ret;
-> +}
-> +late_initcall(hb_cpufreq_driver_init);
-> +
-> +MODULE_AUTHOR("Mark Langsdorf <mark.langsdorf@calxeda.com>");
-> +MODULE_DESCRIPTION("Calxeda Highbank cpufreq driver");
-> +MODULE_LICENSE("GPL");
+> That one's implementing an eMMC 4.5 spec feature, not related to this
+> kind of reset.
+> 
+> Thanks!
+> 
+> - Chris.
 > -- 
-> 1.7.11.7
+> Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+> One Laptop Per Child
 > 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
