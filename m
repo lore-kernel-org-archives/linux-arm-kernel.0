@@ -1,96 +1,164 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 04 Dec 2012 14:28:15 +0900
-Subject: [PATCH v3] backlight: corgi_lcd: Use gpio_set_value_cansleep() to
- avoid WARN_ON
-Message-ID: <000b01cdd1e0$293f0d90$7bbd28b0$%han@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 4 Dec 2012 14:50:29 +0900
+Subject: [PATCH shmobile/DT 1/2] ARM: shmobile: Remove some of_sh_intc_*
+ functions
+In-Reply-To: <1353572619-29098-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+References: <1353572619-29098-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+Message-ID: <20121204055029.GC15969@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marko Katic <dromede@gmail.com>
+On Thu, Nov 22, 2012 at 05:23:38PM +0900, Nobuhiro Iwamatsu wrote:
+> This removes of_sh_intc_get_meminfo, of_sh_intc_get_pint and of_sh_intc_get_intc functions.
+> These are not already used.
 
-Changing backlight intensity on an Akita (Sharp Zaurus C-1000)
-triggers WARN_ON message:
+Hi Iwamatsu-san,
 
-WARNING: at drivers/gpio/gpiolib.c:1672 __gpio_set_value+0x38/0xa4()
-Modules linked in:
-Backtrace:
-[<c000c0ac>] (dump_backtrace+0x0/0x110) from [<c02c8278>] (dump_stack+0x18/0x1c)
- r6:c0158fc8 r5:00000009 r4:00000000 r3:c03d4f70
-[<c02c8260>] (dump_stack+0x0/0x1c) from [<c0019194>] (warn_slowpath_common+0x54/0x6c)
-[<c0019140>] (warn_slowpath_common+0x0/0x6c) from [<c00191d0>] (warn_slowpath_null+0x24/0x2c)
- r8:c38d5c00 r7:c03f82c0 r6:00000000 r5:000000d0 r4:c384e4fc
-r3:00000009
-[<c00191ac>] (warn_slowpath_null+0x0/0x2c) from [<c0158fc8>] (__gpio_set_value+0x38/0xa4)
-[<c0158f90>] (__gpio_set_value+0x0/0xa4) from [<c0169b4c>] (corgi_bl_set_intensity+0x44/0x74)
- r7:c3933418 r6:c3933400 r5:c392cdf0 r4:0000002f
-[<c0169b08>] (corgi_bl_set_intensity+0x0/0x74) from [<c0169c1c>] (corgi_bl_update_status+0x5c/0x64)
- r5:c03d31f0 r4:c3933400
-[<c0169bc0>] (corgi_bl_update_status+0x0/0x64) from [<c02c3a68>] (corgi_lcd_probe+0x1a8/0x258)
- r4:c392cdf0 r3:c0169bc0
-[<c02c38c0>] (corgi_lcd_probe+0x0/0x258) from [<c01da7a4>] (spi_drv_probe+0x20/0x24)
- r8:00000052 r7:c0192d9c r6:c03da6e8 r5:c38d5c34 r4:c38d5c00
-[<c01da784>] (spi_drv_probe+0x0/0x24) from [<c0192c44>] (driver_probe_device+0xb0/0x208)
-[<c0192b94>] (driver_probe_device+0x0/0x208) from [<c0192e0c>] (__driver_attach+0x70/0x94)
- r6:c03da6e8 r5:c38d5c34 r4:c38d5c00 r3:00000000
-[<c0192d9c>] (__driver_attach+0x0/0x94) from [<c0191268>] (bus_for_each_dev+0x54/0x90)
- r6:c03da6e8 r5:c3827e80 r4:00000000 r3:00000000
-[<c0191214>] (bus_for_each_dev+0x0/0x90) from [<c01927a4>] (driver_attach+0x20/0x28)
- r7:00000000 r6:c03e29ec r5:c3932980 r4:c03da6e8
-[<c0192784>] (driver_attach+0x0/0x28) from [<c0192340>] (bus_add_driver+0xd4/0x22c)
-[<c019226c>] (bus_add_driver+0x0/0x22c) from [<c019335c>] (driver_register+0xa4/0x134)
- r8:00000052 r7:c03ea900 r6:c03c32ac r5:c03bdfc8 r4:c03da6e8
-[<c01932b8>] (driver_register+0x0/0x134) from [<c01db7ec>] (spi_register_driver+0x4c/0x60)
-[<c01db7a0>] (spi_register_driver+0x0/0x60) from [<c03b3ce0>] (corgi_lcd_driver_init+0x14/0x1c)
-[<c03b3ccc>] (corgi_lcd_driver_init+0x0/0x1c) from [<c000868c>] (do_one_initcall+0x9c/0x174)
-[<c00085f0>] (do_one_initcall+0x0/0x174) from [<c02c1b94>] (kernel_init+0xf4/0x2a8)
-[<c02c1aa0>] (kernel_init+0x0/0x2a8) from [<c0009270>] (ret_from_fork+0x14/0x24)
----[ end trace a863a63f242ee38c ]---
+these patches are for Paul, right?
 
-Akita machines have backlight controls hooked to a gpio expander chip,
-max7310. In this case, pca953x_gpio_set_value() can be called to control
-gpio, and pca953x_setup_gpio() sets can_sleep flag. Therefore,
-gpio_set_value_cansleep() should be used in order to avoid WARN_ON on
-akita machines.
-
-Akita is the only exception in this case since other users of corgi_lcd
-access backlight gpio controls through a different gpio expander such as
-max7310 which does not set the can_sleep flag.
-
-[jg1.han at samsung.com: used gpio_cansleep()]
-Signed-off-by: Marko Katic <dromede@gmail.com>
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
----
- drivers/video/backlight/corgi_lcd.c |   17 +++++++++++++----
- 1 files changed, 13 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/video/backlight/corgi_lcd.c b/drivers/video/backlight/corgi_lcd.c
-index e2e1b62..e5168f4 100644
---- a/drivers/video/backlight/corgi_lcd.c
-+++ b/drivers/video/backlight/corgi_lcd.c
-@@ -408,11 +408,20 @@ static int corgi_bl_set_intensity(struct corgi_lcd *lcd, int intensity)
- 	/* Bit 5 via GPIO_BACKLIGHT_CONT */
- 	cont = !!(intensity & 0x20) ^ lcd->gpio_backlight_cont_inverted;
- 
--	if (gpio_is_valid(lcd->gpio_backlight_cont))
--		gpio_set_value(lcd->gpio_backlight_cont, cont);
-+	if (gpio_is_valid(lcd->gpio_backlight_cont)) {
-+		if (gpio_cansleep(lcd->gpio_backlight_cont))
-+			gpio_set_value_cansleep(lcd->gpio_backlight_cont, cont);
-+		else
-+			gpio_set_value(lcd->gpio_backlight_cont, cont);
-+	}
- 
--	if (gpio_is_valid(lcd->gpio_backlight_on))
--		gpio_set_value(lcd->gpio_backlight_on, intensity);
-+	if (gpio_is_valid(lcd->gpio_backlight_on)) {
-+		if (gpio_cansleep(lcd->gpio_backlight_on))
-+			gpio_set_value_cansleep(lcd->gpio_backlight_on,
-+						intensity);
-+		else
-+			gpio_set_value(lcd->gpio_backlight_on, intensity);
-+	}
- 
- 	if (lcd->kick_battery)
- 		lcd->kick_battery();
--- 
-1.7.2.5
+> 
+> Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+> ---
+>  drivers/sh/intc/of_intc.c |   76 ---------------------------------------------
+>  include/linux/sh_intc.h   |   28 -----------------
+>  2 files changed, 104 deletions(-)
+> 
+> diff --git a/drivers/sh/intc/of_intc.c b/drivers/sh/intc/of_intc.c
+> index 30b1090..e833e48 100644
+> --- a/drivers/sh/intc/of_intc.c
+> +++ b/drivers/sh/intc/of_intc.c
+> @@ -529,49 +529,6 @@ void __init of_sh_intc_get_skip_syscore_suspend(struct device_node *np,
+>  		d->skip_syscore_suspend = false;
+>  }
+>  
+> -int __init of_sh_intc_get_meminfo(struct device_node *np,
+> -				struct resource *res, int res_no)
+> -{
+> -	int ret = 0, i;
+> -
+> -	for (i = 0 ; i < res_no ; i++) {
+> -		ret = of_address_to_resource(np, i, &res[i]);
+> -		if (ret) {
+> -			pr_err("could not determine device base address\n");
+> -			return ret;
+> -		}
+> -
+> -		pr_debug("%s: Address 0x%x, size %d\n",
+> -					__func__, res[i].start, resource_size(&res[i]));
+> -	}
+> -
+> -	return ret;
+> -}
+> -
+> -int __init of_sh_intc_get_pint(struct device_node *np, struct intc_desc *d)
+> -{
+> -	/* pint uses vector, mask and sence. */
+> -	int ret = of_sh_intc_get_vector(np, &d->hw.vectors,
+> -				&d->hw.nr_vectors);
+> -	if (ret)
+> -		return ret;
+> -
+> -	ret = of_sh_intc_get_mask(np, &d->hw.mask_regs,
+> -				&d->hw.nr_mask_regs);
+> -	if (ret)
+> -		return ret;
+> -
+> -	ret = of_sh_intc_get_sense(np, &d->hw.sense_regs,
+> -				&d->hw.nr_sense_regs);
+> -	/* INTC may not need Sence register. */
+> -	if (ret && ret != -ENOENT)
+> -		return ret;
+> -
+> -	d->of_node = np;
+> -
+> -	return 0;
+> -}
+> -
+>  int __init of_sh_intc_get_intc(struct device_node *np, struct intc_desc *d)
+>  {
+>  	int ret = of_sh_intc_get_vector(np, &d->hw.vectors,
+> @@ -611,36 +568,3 @@ int __init of_sh_intc_get_intc(struct device_node *np, struct intc_desc *d)
+>  
+>  	return 0;
+>  }
+> -
+> -int __init of_sh_intc_get_intc_pins(struct device_node *np,
+> -				struct intc_desc *d)
+> -{
+> -	int ret = of_sh_intc_get_vector(np, &d->hw.vectors,
+> -				&d->hw.nr_vectors);
+> -	if (ret)
+> -		return ret;
+> -
+> -	ret = of_sh_intc_get_mask(np, &d->hw.mask_regs,
+> -				&d->hw.nr_mask_regs);
+> -	if (ret)
+> -		return ret;
+> -
+> -	ret = of_sh_intc_get_prio(np, &d->hw.prio_regs,
+> -				&d->hw.nr_prio_regs);
+> -	if (ret)
+> -		return ret;
+> -
+> -	ret = of_sh_intc_get_sense(np, &d->hw.sense_regs,
+> -				&d->hw.nr_sense_regs);
+> -	if (ret)
+> -		return ret;
+> -
+> -	ret = of_sh_intc_get_ack(np, &d->hw.ack_regs,
+> -				&d->hw.nr_ack_regs);
+> -	if (ret)
+> -		return ret;
+> -
+> -	d->of_node = np;
+> -
+> -	return 0;
+> -}
+> diff --git a/include/linux/sh_intc.h b/include/linux/sh_intc.h
+> index 6603da6..c7954ee 100644
+> --- a/include/linux/sh_intc.h
+> +++ b/include/linux/sh_intc.h
+> @@ -161,26 +161,6 @@ static inline int register_intc_userimask(unsigned long addr)
+>  int of_sh_intc_get_intc(struct device_node *np, struct intc_desc *d);
+>  
+>  /*
+> - * of_sh_initc_get_intc_pins() - Get INTC Pins table.
+> - * @np:     device node to get INTC from
+> - * @d:      a pointer of intc pins table
+> - *
+> - * Return: one of the errno value on the error condition
+> - */
+> -int of_sh_intc_get_intc_pins(struct device_node *np, struct intc_desc *d);
+> -
+> -/*
+> - * of_sh_intc_get_meminfo() - Get and set INTC register of memory.
+> - * @np:     device node to get INTC from
+> - * @res_mem:   a pointer of resource
+> - * @res_no:  resource number
+> - *
+> - * Return: one of the errno value on the error condition
+> - */
+> -int of_sh_intc_get_meminfo(struct device_node *np,
+> -				struct resource *res_mem, int resno);
+> -
+> -/*
+>   * of_sh_intc_get_force_enable - Get and set force_enable vector in
+>   *                               struct intc_desc.
+>   * @np:  device node to get INTC from
+> @@ -221,13 +201,5 @@ void of_sh_intc_get_skip_syscore_suspend(struct device_node *np,
+>   * Return: one of the errno value on the error condition
+>   */
+>  int of_sh_intc_get_intevtsa_vect(struct device_node *np, unsigned short *vect);
+> -/*
+> - * of_sh_initc_get_intc_pint() - Get INTC Pint table.
+> - * @np:     device node to get INTC from
+> - * @d:      a pointer of intc pint table
+> - *
+> - * Return: one of the errno value on the error condition
+> - */
+> -int of_sh_intc_get_pint(struct device_node *np, struct intc_desc *d);
+>  
+>  #endif /* __SH_INTC_H */
+> -- 
+> 1.7.10.4
+> 
