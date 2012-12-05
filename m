@@ -1,54 +1,36 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed,  5 Dec 2012 09:34:26 +0800
-Subject: [v2 PATCH 7/8] ARM: dts: add the watchdog nodes for at91sam9x5 and
- at91sam9n12 SoC
+Date: Wed,  5 Dec 2012 09:34:27 +0800
+Subject: [v2 PATCH 8/8] ARM: dts: add the watchdog nodes for at91sam9g25ek
+ boards
 In-Reply-To: <1354671267-19277-1-git-send-email-wenyou.yang@atmel.com>
 References: <1354671267-19277-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1354671267-19277-8-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1354671267-19277-9-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Tested on the at91sam9g25ek boards
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 Cc: linux at arm.linux.org.uk
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/at91sam9n12.dtsi |    6 ++++++
- arch/arm/boot/dts/at91sam9x5.dtsi  |    6 ++++++
- 2 files changed, 12 insertions(+)
+ arch/arm/boot/dts/at91sam9g25ek.dts |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 82508d6..4c3b411 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -202,6 +202,12 @@
- 				#size-cells = <0>;
- 				status = "disabled";
+diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
+index 877c08f..2f03edc 100644
+--- a/arch/arm/boot/dts/at91sam9g25ek.dts
++++ b/arch/arm/boot/dts/at91sam9g25ek.dts
+@@ -44,6 +44,10 @@
+ 			i2c2: i2c at f8018000 {
+ 				status = "okay";
  			};
 +
 +			watchdog at fffffe40 {
-+				compatible = "atmel,at91sam9260-wdt";
-+				reg = <0xfffffe40 0x10>;
-+				status = "disabled";
++				status = "okay";
 +			};
  		};
  
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 03fc136..e8e7afe 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -263,6 +263,12 @@
- 					trigger-value = <0x6>;
- 				};
- 			};
-+
-+			watchdog at fffffe40 {
-+				compatible = "atmel,at91sam9260-wdt";
-+				reg = <0xfffffe40 0x10>;
-+				status = "disabled";
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
+ 		usb0: ohci at 00600000 {
 -- 
 1.7.9.5
