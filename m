@@ -1,110 +1,63 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 5 Dec 2012 10:00:03 -0800
-Subject: [PATCH 1/2] clk: introduce optional disable_unused callback
-In-Reply-To: <CAPDyKFpGR++iN1JQ+ceUq+Qa216nrwLUdMDdB+Ei4VsLrnzKTQ@mail.gmail.com>
-References: <1354654823-1576-1-git-send-email-mturquette@linaro.org>
- <1354654823-1576-2-git-send-email-mturquette@linaro.org>
- <CAPDyKFpGR++iN1JQ+ceUq+Qa216nrwLUdMDdB+Ei4VsLrnzKTQ@mail.gmail.com>
-Message-ID: <CAPtuhTgGtKfDDx5GU5F+MLTz7B8YHknLAP65gXYut+TJCgtEpQ@mail.gmail.com>
+Date: Wed, 5 Dec 2012 10:02:14 -0800
+Subject: [PATCH 2/6 v8] clk, highbank: Prevent glitches in non-bypass
+ reset mode
+In-Reply-To: <1354726121-17190-3-git-send-email-mark.langsdorf@calxeda.com>
+References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1354726121-17190-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1354726121-17190-3-git-send-email-mark.langsdorf@calxeda.com>
+Message-ID: <CAPtuhTjsvSs5cif4yiDXwzET-hygqQk5yMn3WvqxiBHDgbpfcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 5, 2012 at 8:13 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 4 December 2012 22:00, Mike Turquette <mturquette@linaro.org> wrote:
->> Some gate clocks have special needs which must be handled during the
->> disable-unused clocks sequence.  These needs might be driven by software
->> due to the fact that we're disabling a clock outside of the normal
->> clk_disable path and a clk's enable_count will not be accurate.  On the
->> other hand a specific hardware programming sequence might need to be
->> followed for this corner case.
->>
->> This change is needed for the upcoming OMAP port to the common clock
->> framework.  Specifically, it is undesirable to treat the disable-unused
->> path identically to the normal clk_disable path since other software
->> layers are involved.  In this case OMAP's clockdomain code throws WARNs
->> and bails early due to the clock's enable_count being set to zero.  A
->> custom callback mitigates this problem nicely.
->>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Signed-off-by: Mike Turquette <mturquette@linaro.org>
->> ---
->>  drivers/clk/clk.c            |   13 +++++++++++--
->>  include/linux/clk-provider.h |    6 ++++++
->>  2 files changed, 17 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index 9955ad7..251e45d 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -219,8 +219,17 @@ static void clk_disable_unused_subtree(struct clk *clk)
->>         if (clk->flags & CLK_IGNORE_UNUSED)
->>                 goto unlock_out;
->>
->> -       if (__clk_is_enabled(clk) && clk->ops->disable)
->> -               clk->ops->disable(clk->hw);
->> +       /*
->> +        * some gate clocks have special needs during the disable-unused
->> +        * sequence.  call .disable_unused if available, otherwise fall
->> +        * back to .disable
->> +        */
->> +       if (__clk_is_enabled(clk)) {
->> +               if (clk->ops->disable_unused)
->> +                       clk->ops->disable_unused(clk->hw);
->> +               else if (clk->ops->disable)
->> +                       clk->ops->disable(clk->hw);
->> +       }
->>
->>  unlock_out:
->>         spin_unlock_irqrestore(&enable_lock, flags);
->> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
->> index 3593a3c..1c94d18 100644
->> --- a/include/linux/clk-provider.h
->> +++ b/include/linux/clk-provider.h
->> @@ -57,6 +57,11 @@ struct clk_hw;
->>   *             This function must not sleep. Optional, if this op is not
->>   *             set then the enable count will be used.
->>   *
->> + * @disable_unused: Disable the clock atomically.  Only called from
->> + *             clk_disable_unused for gate clocks with special needs.
->> + *             Called with enable_lock held.  This function must not
->> + *             sleep.
->> + *
->>   * @recalc_rate        Recalculate the rate of this clock, by querying hardware. The
->>   *             parent rate is an input parameter.  It is up to the caller to
->>   *             ensure that the prepare_mutex is held across this call.
->> @@ -106,6 +111,7 @@ struct clk_ops {
->>         int             (*enable)(struct clk_hw *hw);
->>         void            (*disable)(struct clk_hw *hw);
->>         int             (*is_enabled)(struct clk_hw *hw);
->> +       void            (*disable_unused)(struct clk_hw *hw);
->>         unsigned long   (*recalc_rate)(struct clk_hw *hw,
->>                                         unsigned long parent_rate);
->>         long            (*round_rate)(struct clk_hw *hw, unsigned long,
->> --
->> 1.7.9.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Wed, Dec 5, 2012 at 8:48 AM, Mark Langsdorf
+<mark.langsdorf@calxeda.com> wrote:
+> The highbank clock will glitch with the current code if the
+> clock rate is reset without relocking the PLL. Program the PLL
+> correctly to prevent glitches.
 >
-> Is there a need for updating the clk documentation around this?
->
+> Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: mturquette at linaro.org
+> ---
+> Changes from v6, v7
+>         None.
+> Changes from v5
+>         Added Mike Turquette's ack.
 
-I knew I was forgetting something.  The documentation needs a general
-cleanup effort and this callback should not go undocumented for long.
-
-> Anyway, you have my:
->
-> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
->
-
-Thanks!
+It appears that my Ack has not been added to this version of the patch.
 
 Regards,
 Mike
 
+> Changes from v4
+>         None.
+> Changes from v3
+>         Changelog text and patch name now correspond to the actual patch.
+>         was clk, highbank: remove non-bypass reset mode.
+> Changes from v2
+>         None.
+> Changes from v1
+>         Removed erroneous reformating.
 >
-> Kind regards
-> Ulf Hansson
+>  drivers/clk/clk-highbank.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/clk/clk-highbank.c b/drivers/clk/clk-highbank.c
+> index 52fecad..3a0b723 100644
+> --- a/drivers/clk/clk-highbank.c
+> +++ b/drivers/clk/clk-highbank.c
+> @@ -182,8 +182,10 @@ static int clk_pll_set_rate(struct clk_hw *hwclk, unsigned long rate,
+>                 reg |= HB_PLL_EXT_ENA;
+>                 reg &= ~HB_PLL_EXT_BYPASS;
+>         } else {
+> +               writel(reg | HB_PLL_EXT_BYPASS, hbclk->reg);
+>                 reg &= ~HB_PLL_DIVQ_MASK;
+>                 reg |= divq << HB_PLL_DIVQ_SHIFT;
+> +               writel(reg | HB_PLL_EXT_BYPASS, hbclk->reg);
+>         }
+>         writel(reg, hbclk->reg);
+>
+> --
+> 1.7.11.7
+>
