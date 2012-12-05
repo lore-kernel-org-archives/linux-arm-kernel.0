@@ -1,114 +1,140 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 05 Dec 2012 20:24:57 +0100
-Subject: [PATCH v7 0/5] OMAP GPMC DT bindings
-In-Reply-To: <50BF9EF8.3060507@ti.com>
-References: <1354734571-10774-1-git-send-email-zonque@gmail.com>
- <50BF9EF8.3060507@ti.com>
-Message-ID: <50BF9F89.1000407@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Dec 2012 19:21:41 +0000
+Subject: [PATCH v4] backlight: corgi_lcd: Use gpio_set_value_cansleep()
+ to avoid WARN_ON
+In-Reply-To: <CAHod+Gdb_LEnhx5cz9j=q9PyS4L=Yjxs303dHon9i-tgjJRtDA@mail.gmail.com>
+References: <000201cdd283$baf50160$30df0420$%han@samsung.com>
+ <20121205093027.GK14363@n2100.arm.linux.org.uk>
+ <CAHod+Gdb_LEnhx5cz9j=q9PyS4L=Yjxs303dHon9i-tgjJRtDA@mail.gmail.com>
+Message-ID: <20121205192141.GQ14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.12.2012 20:22, Jon Hunter wrote:
+On Wed, Dec 05, 2012 at 07:20:00PM +0100, Marko Kati? wrote:
+> On Wed, Dec 5, 2012 at 10:30 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Wed, Dec 05, 2012 at 09:59:07AM +0900, Jingoo Han wrote:
+> >> -     if (gpio_is_valid(lcd->gpio_backlight_cont))
+> >> -             gpio_set_value(lcd->gpio_backlight_cont, cont);
+> >> +     if (gpio_is_valid(lcd->gpio_backlight_cont)) {
+> >> +             if (gpio_cansleep(lcd->gpio_backlight_cont))
+> >> +                     gpio_set_value_cansleep(lcd->gpio_backlight_cont, cont);
+> >> +             else
+> >> +                     gpio_set_value(lcd->gpio_backlight_cont, cont);
+> >> +     }
+> >
+> > Why not simply:
+> >
+> > +       if (gpio_is_valid(lcd->gpio_backlight_cont))
+> > +               gpio_set_value_cansleep(lcd->gpio_backlight_cont, cont);
 > 
-> On 12/05/2012 01:09 PM, Daniel Mack wrote:
->> This is a series of patches to support GPMC peripherals on OMAP boards.
->>
->> Grant, Rob, could you have a look and give your Acked-by if
->> appropriate?
->>
->>
->> Many thanks again,
->> Daniel
->>
->>
->> Tested on Linus' master +
->> omap-next (branch omap-for-v3.8/cleanup-headers-gpmc)
->>
->> Generated from linux-next as of today, resolving one trivial include
->> file rebase conflict.
->>
->> The only supported peripheral for now is NAND, but other types would be
->> easy to add.
->>
->> Version 2 addresses details pointed out by Jon Hunter, Afzal Mohammed
->> and Rob Herring:
->>
->>  - add "reg" and "ti,hwmod" properties to Documentation
->>  - use generic of_mtd functions and the property names defined by them,
->>    namely "nand-bus-width" and "nand-ecc-mode"
->>  - reduce the default register space size in the Documentation to 8K,
->>    as found in the hwmod code
->>  - switch to a DT layout based on ranges and address translation.
->>    Although this property is not currently looked at as long as the
->>    handling code still uses the runtime calculation methods, we now
->>    have these values in the bindings, eventually allowing us to
->>    switch the implementation with less pain.
->>
->> Version 3 includes fixes pointed out by Jon Hunter:
->>
->>  - better documentation of the 'ranges' property to describe the
->>    fact that it's representing the CS lines
->>  - GPMC_CS_CONFIGx -> GPMC_CONFIGx in comments
->>  - drop interrupt-parent from example bindings
->>  - add of_node_put() at the end of the child iteration
->>
->> Version 4 fixes compilation for !CONFIG_MTD_NAND and includes more
->> details from Jon Hunter and Avinash, Philip:
->>
->>  - Add "num-cs" and "num-waitpins" properties, which will eventually
->>    be used to get rid of GPMC_CS_NUM
->>  - Better description of generic nand DT properties
->>  - Dropped patch 3/4 as an equivalent fix was already merged
->>  - Added ti,nand-ecc-use-elm property
->>
->> Version 5 with regards to Avinash, Philip and Peter Korsgaard:
->>
->>  - Re-add accidentially forgotten
->>    Documentation/devicetree/bindings/bus/ti-gpmc.txt
->>  - Rename "software" ecc mode to "sw"
->>  - Initialize gpmc_nand_data->is_elm_used to 'true' rather than 1
->>  - Drop ti,nand-ecc-use-elm binding in favor of a new ecc mode
->>    named "bch8-am335xrbl-compatible"
->>  - Add two more patches for section mismatch fixups
->>
->> Version 6:
->>
->>  - Dropped "bch8-am335xrbl-compatible" mode again. As discussed with
->>    Avinash, the ELM issue will be solved subsequently in s separate
->>    series.
->>  - re-added a patch to bail out of automatic GPMC instanciation in
->>    case of DT boot.
->>  - re-added the "of_node" addition in mtd_nand_omap2.h in 2/5
->>
->> Version 7: comments from Jon Hunter, all affecting the documentation:
->>
->>  - add num-wait pins properties as they are marked 'required'
->>  - make reg sizes consistent
->>  - AM335x only has 2 wait-pins
->>
->> Again, many thanks to everybody, in particular Avinash, for the long
->> disussion about how to the these details right in the first place.
->>
->>
->> Daniel
->>
->> Daniel Mack (5):
->>   ARM: OMAP: gpmc: don't create devices from initcall on DT
->>   mtd: omap-nand: pass device_node in platform data
->>   ARM: OMAP: gpmc-nand: drop __init annotation
->>   ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
+> My first patch did exactly this but there were complains about it's
+> commit message.
+
+So that's a reason to drop the patch?  Err, forgive me for being thick
+as a medieval castle wall, but what does complaints about the commit
+message have to do with the contents of the patch?  Why can't you just
+fix the commit message?
+
+> And i just found out that Marek Vasut posted the exact same patch more
+> than a year ago.
 > 
-> Do you still need patch #4 now? Can't we drop this?
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/046955.html
 > 
-> May be worth just including what is required for linux-next as this is
-> 3.9 material.
+> It was not applied for various reasons.
 
-Well, yes, otherwise the driver init will bail of course, so I need it
-locally.
+Looking at that thread (which is corrupted btw, probably thanks to the
+crappy python based locking in mailman) - here's a better archiver:
 
-Feel free to drop it when that's not needed at the time of merging the
-series, but for now I resubmitted everything you need to test and use
-these patches :)
+http://lists.arm.linux.org.uk/lurker/thread/20110402.014316.74101499.en.html
 
+it didn't go anywhere because the discussion was distracted by the loss
+of David Brownell.
 
-Daniel
+Eric shares my opinion of the _cansleep() mess, but unfortunately it's
+what we have and no one's come up with any better solutions to it.  (I
+argued from the outset that the gpio_xxx_cansleep() should've been
+gpio_xxx() and the non-cansleep() version should be called
+gpio_xxx_atomic() so that by default people use the version which _can_
+sleep, but have to think about it when they want to manipulate GPIOs in
+non-task contexts.)
+
+That's off-topic though.  Using just the _cansleep() version is far
+better than messing around with stuff like:
+
+	if (gpio_cansleep(gpio))
+		gpio_xxx_cansleep(gpio);
+	else
+		gpio_xxx(gpio);
+
+> > If you read the gpiolib code and documentation, what you will realise is
+> > that the two calls are identical except for the "might_sleep_if()" in
+> > gpio_set_value_cansleep().  You will also note that gpiolib itself _only_
+> > calls gpio_set_value_cansleep() without checking gpio_cansleep() in
+> > contexts where sleeping is possible.  So if it's good enough for gpiolib,
+> > it should be good enough here.
+> 
+> The documentation tells which calls to use when you don't need to sleep
+> and which calls to use when you might sleep. And here we have a case
+> where the same call to gpio_set_value might sleep or doesn't have to,
+> depending on the model.
+> In this case, i'd rather use gpio_cansleep check as Andrew proposed.
+> 
+> I will also say that the distinction between gpio_set_value and
+> gpio_set_value_cansleep.
+> is rather confusing at this point. Is it really necessary to have both ?
+
+No.  You can call gpio_set_value_cansleep() from task contexts for any
+GPIO just fine, but you can't call it from atomic contexts (it will
+complain).  It doesn't matter whether the GPIO can sleep or not.
+
+You can call gpio_set_value() from any context without it complaining,
+however, gpio_set_value() can't be used with a GPIO which sleeps.
+
+Look, when it comes down to it, in _task_ context, where sleeps are
+permissible:
+
+	gpio_set_value(gpio, xxx);
+and
+	gpio_set_value_cansleep(gpio, xxx);
+
+are exactly the same thing; they will both set the value of a GPIO
+output, whether it be an atomic or a sleeping gpio to the requested
+value.
+
+The difference between the two becomes important if you're not in task
+context, where only the non-_cansleep() versions can be used.  This is
+enforced by the _cansleep() versions issuing a WARN_ON() if they're
+used in non-task contexts.  And conversely, the non-_cansleep() versions
+will warn (as you've found) if you use that call with a GPIO which will
+sleep.
+
+There is another solution to this mess:
+
+void __gpio_set_value(unsigned gpio, int value)
+{
+	struct gpio_chip	*chip;
+
+	chip = gpio_to_chip(gpio);
+	/* Should be using gpio_set_value_cansleep() */
+-	WARN_ON(chip->can_sleep);
++	might_sleep_if(chip->can_sleep);
+	trace_gpio_value(gpio, 0, value);
+	if (test_bit(FLAG_OPEN_DRAIN,  &gpio_desc[gpio].flags))
+		_gpio_set_open_drain_value(gpio, chip, value);
+	else if (test_bit(FLAG_OPEN_SOURCE,  &gpio_desc[gpio].flags))
+		_gpio_set_open_source_value(gpio, chip, value);
+	else
+		chip->set(chip, gpio - chip->base, value);
+}
+EXPORT_SYMBOL_GPL(__gpio_set_value);
+
+With the above change (and an equivalent change everywhere else), it means
+gpio_set_value() is callable from task contexts on GPIOs which can sleep.
+
+However, it loses us some checking - we no longer have the cross-platform
+checking that we get with the existing API, and that's why it's undesirable.
+
+As I say above, IMHO it would've been much better to rename these functions
+to be the other way around but David was always very dismissive of any
+comments I had against any code he'd written.
