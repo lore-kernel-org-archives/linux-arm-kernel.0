@@ -1,27 +1,33 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Wed, 5 Dec 2012 15:22:14 -0000
-Subject: [PATCH v2] net/macb: Use non-coherent memory for rx buffers
-In-Reply-To: <50BF6467.5060701@atmel.com>
-References: <CAGhQ9VwWmP_B17LnAEqDHcL8Yd-s0C-Bf35z3+=vnJmK_NoCSw@mail.gmail.com>
- <1354536876-6274-1-git-send-email-nicolas.ferre@atmel.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B70D5@saturn3.aculab.com>
- <50BCA746.1020705@atmel.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B70D6@saturn3.aculab.com>
- <50BE2FEC.2070500@atmel.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B70D9@saturn3.aculab.com>
- <50BF6467.5060701@atmel.com>
-Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B70DB@saturn3.aculab.com>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Wed,  5 Dec 2012 16:34:41 +0100
+Subject: [PATCH] pwm: i.MX: eliminate build warning
+Message-ID: <1354721681-31843-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Well, for the 10/100 MACB interface, I am stuck with 128 Bytes buffers!
-> So this use of pages seems sensible.
+compiling the i.MX pwm driver produces the following warning:
+|drivers/pwm/pwm-imx.c: In function 'imx_pwm_probe':
+|drivers/pwm/pwm-imx.c:281:7: warning: assignment discards qualifiers from pointer target type
 
-If you have dma coherent memory you can make the rx buffer space
-be an array of short buffers referenced by adjacent ring entries
-(possibly with the last one slightly short to allow for the
-2 byte offset).
-Then, when a big frame ends up in multiple buffers, you need
-a maximum of two copies to extract the data.
+Apply a 'const' attribute to the affected variable declaration.
 
-	David
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ drivers/pwm/pwm-imx.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+index 8f26e9f..65a86bd 100644
+--- a/drivers/pwm/pwm-imx.c
++++ b/drivers/pwm/pwm-imx.c
+@@ -235,7 +235,7 @@ static int imx_pwm_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *of_id =
+ 			of_match_device(imx_pwm_dt_ids, &pdev->dev);
+-	struct imx_pwm_data *data;
++	const struct imx_pwm_data *data;
+ 	struct imx_chip *imx;
+ 	struct resource *r;
+ 	int ret = 0;
+-- 
+1.7.2.5
