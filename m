@@ -1,101 +1,208 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 5 Dec 2012 10:49:47 -0800
-Subject: [PATCH 6/6 v8] cpufreq, highbank: add support for highbank cpufreq
-In-Reply-To: <1354726121-17190-7-git-send-email-mark.langsdorf@calxeda.com>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1354726121-17190-1-git-send-email-mark.langsdorf@calxeda.com>
- <1354726121-17190-7-git-send-email-mark.langsdorf@calxeda.com>
-Message-ID: <CAPtuhTg4N7zAMf_Vfw1Xfbn3OmZ7hVffVuc=kMByxf_hJLkpPw@mail.gmail.com>
+From: wg@grandegger.com (Wolfgang Grandegger)
+Date: Wed, 05 Dec 2012 20:01:07 +0100
+Subject: [PATCH 3/6 v9] gpio: Add userland device interface to block GPIO
+In-Reply-To: <1354653588-4018-4-git-send-email-stigge@antcom.de>
+References: <1354653588-4018-1-git-send-email-stigge@antcom.de>
+ <1354653588-4018-4-git-send-email-stigge@antcom.de>
+Message-ID: <50BF99F3.4060207@grandegger.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 5, 2012 at 8:48 AM, Mark Langsdorf
-<mark.langsdorf@calxeda.com> wrote:
-> diff --git a/drivers/cpufreq/highbank-cpufreq.c b/drivers/cpufreq/highbank-cpufreq.c
-> new file mode 100644
-> index 0000000..1f28fa6
+On 12/04/2012 09:39 PM, Roland Stigge wrote:
+> This patch adds a character device interface to the block GPIO system.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> ---
+>  Documentation/ABI/testing/dev-gpioblock |   34 +++++
+>  drivers/gpio/gpiolib.c                  |  208 +++++++++++++++++++++++++++++++-
+>  include/linux/gpio.h                    |   10 +
+>  3 files changed, 251 insertions(+), 1 deletion(-)
+> 
 > --- /dev/null
-> +++ b/drivers/cpufreq/highbank-cpufreq.c
-> @@ -0,0 +1,102 @@
-
-Looks pretty good to me.  Some tedious nitpicks and discussion below.
-<snip>
-
-> +static int hb_voltage_change(unsigned int freq)
+> +++ linux-2.6/Documentation/ABI/testing/dev-gpioblock
+> @@ -0,0 +1,34 @@
+> +What:		/dev/<gpioblock>
+> +Date:		Nov 2012
+> +KernelVersion:	3.7
+> +Contact:	Roland Stigge <stigge@antcom.de>
+> +Description:	The /dev/<gpioblock> character device node provides userspace
+> +		access to GPIO blocks, named exactly as the block, e.g.
+> +		/dev/block0.
+> +
+> +		Reading:
+> +		When reading sizeof(unsigned long) bytes from the device, the
+> +		current state of the block, masked by the current mask (see
+> +		below) can be obtained as a word. When the device is opened
+> +		with O_NONBLOCK, read() always returns with data immediately,
+> +		otherwise it blocks until data is available, see IRQ handling
+> +		below.
+> +
+> +		Writing:
+> +		By writing sizeof(unsigned long) bytes to the device, the
+> +		current state of the block can be set. This operation is
+> +		masked by the current mask (see below).
+> +
+> +		IRQ handling:
+> +		When one or more IRQs in the block are IRQ capable, you can
+> +		poll() on the device to check/wait for this IRQ. If no IRQ
+> +		is available, poll() returns -ENOSYS and userspace needs to
+> +		(busy) poll itself if necessary.
+> +
+> +		Setting the mask (default: all bits set):
+> +		By doing an ioctl(fd, 0, &mask) with an unsigned long mask, the
+> +		current mask for read and write operations on this gpio block
+> +		can be set.
+> +
+> +		See also Documentation/gpio.txt for an explanation of block
+> +		GPIO.
+> --- linux-2.6.orig/drivers/gpio/gpiolib.c
+> +++ linux-2.6/drivers/gpio/gpiolib.c
+> @@ -11,6 +11,8 @@
+>  #include <linux/of_gpio.h>
+>  #include <linux/idr.h>
+>  #include <linux/slab.h>
+> +#include <linux/uaccess.h>
+> +#include <linux/poll.h>
+>  
+>  #define CREATE_TRACE_POINTS
+>  #include <trace/events/gpio.h>
+> @@ -2122,6 +2124,190 @@ struct gpio_block *gpio_block_find_by_na
+>  }
+>  EXPORT_SYMBOL_GPL(gpio_block_find_by_name);
+>  
+> +static struct gpio_block *gpio_block_find_by_minor(int minor)
 > +{
-> +       int i;
-> +       u32 msg[7];
+> +	struct gpio_block *i;
 > +
-> +       msg[0] = HB_CPUFREQ_CHANGE_NOTE;
-> +       msg[1] = freq / 1000000;
-> +       for (i = 2; i < 7; i++)
-> +               msg[i] = 0;
-> +
-> +       return pl320_ipc_transmit(msg);
+> +	list_for_each_entry(i, &gpio_block_list, list)
+> +		if (i->miscdev.minor == minor)
+> +			return i;
+> +	return NULL;
 > +}
 > +
-> +static int hb_cpufreq_clk_notify(struct notifier_block *nb,
-> +                               unsigned long action, void *hclk)
+> +static bool gpio_block_is_irq_duplicate(struct gpio_block *block, int index)
 > +{
-> +       struct clk_notifier_data *clk_data = hclk;
-> +       int i = 0;
+> +	int irq = gpio_to_irq(block->gpio[index]);
+> +	int i;
 > +
-> +       if (action == PRE_RATE_CHANGE) {
-> +               if (clk_data->new_rate > clk_data->old_rate)
-> +                       while (hb_voltage_change(clk_data->new_rate))
-> +                               if (i++ > 15)
-
-There are a few magic numbers here.  How about something like:
-
-#define HB_VOLT_CHANGE_MAX_TRIES 15
-
-Maybe do the same for the i2c message length?
-
-> +                                       return NOTIFY_STOP;
-
-How about NOTIFY_BAD?  It more clearly signals that an error has occurred.
-
-You could also return notifier_from_errno(-ETIMEDOUT) here if you
-prefer but that would only be for the sake of readability.
-clk_set_rate doesn't actually return the notifier error code in the
-event of a notifier abort.
-
-> +       } else if (action == POST_RATE_CHANGE) {
-> +               if (clk_data->new_rate < clk_data->old_rate)
-> +                       while (hb_voltage_change(clk_data->new_rate))
-> +                               if (i++ > 15)
-> +                                       break;
-
-Same as above.  It is true that the clock framework does nothing with
-post-rate change notifier aborts but that might change in the future.
-
-> +       }
-> +
-> +       return NOTIFY_DONE;
+> +	for (i = 0; i < index; i++)
+> +		if (gpio_to_irq(block->gpio[i]) == irq)
+> +			return true;
+> +	return false;
 > +}
 > +
-> +static struct notifier_block hb_cpufreq_clk_nb = {
-> +       .notifier_call = hb_cpufreq_clk_notify,
-> +};
+> +static irqreturn_t gpio_block_irq_handler(int irq, void *dev)
+> +{
+> +	struct gpio_block *block = dev;
 > +
+> +	wake_up_interruptible(&block->wait_queue);
+> +	block->got_int = true;
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int gpio_block_fop_open(struct inode *in, struct file *f)
+> +{
+> +	int i;
+> +	struct gpio_block *block = gpio_block_find_by_minor(MINOR(in->i_rdev));
+> +	int status;
+> +	int irq;
+> +
+> +	if (!block)
+> +		return -ENOENT;
+> +
+> +	block->irq_controlled = false;
+> +	block->got_int = false;
+> +	init_waitqueue_head(&block->wait_queue);
+> +	f->private_data = block;
+> +
+> +	for (i = 0; i < block->ngpio; i++) {
+> +		status = gpio_request(block->gpio[i], "gpioblock dev");
 
-Do you have any plans to convert your voltage change routine over to
-the regulator framework?  Likewise do you plan to use the OPP library
-in the future?  I can understand if you do not do that since your
-regulator/dvfs programming model makes things very simple for you.
+You could use the name of the GPIO block.
 
-The reason I bring this up is that I did float a patch a while back
-for a generalized dvfs notifier handler.  The prereqs for using it are
-1) ccf, 2) regulator fwk, 3) opp definitions.  Here is the patch:
-https://github.com/mturquette/linux/commit/05a280bbc0819a6858d73088a632666f0c7f68a4
+> +		if (status)
+> +			goto err1;
+> +
+> +		irq = gpio_to_irq(block->gpio[i]);
+> +		if (irq >= 0 &&
+> +		    !test_bit(FLAG_IS_OUT, &gpio_desc[block->gpio[i]].flags) &&
+> +		    !gpio_block_is_irq_duplicate(block, i)) {
+> +			status = request_irq(irq, gpio_block_irq_handler,
+> +					     IRQF_TRIGGER_FALLING,
+> +					     block->name, block);
+> +			if (status)
+> +				goto err2;
+> +
+> +			block->irq_controlled = true;
+> +		}
+> +	}
 
-And an example usage in the OMAP CPUfreq driver:
-https://github.com/mturquette/linux/commit/958f10bb98a293aa912e7eb9cd6edbdc51c1c04a
+There is no need to request IRQs if "O_NONBLOCK" is specified.
 
-I understand if this approach incurs too much software overhead for
-you but I wanted to throw it out there.  It might working nicely in
-the cpufreq-cpu0 driver or some other "generic" CPUfreq driver for
-implementing DVFS.
+> +
+> +	return 0;
+> +
+> +err1:
+> +	while (i > 0) {
+> +		i--;
+> +
+> +		irq = gpio_to_irq(block->gpio[i]);
+> +		if (irq >= 0 &&
+> +		    !test_bit(FLAG_IS_OUT, &gpio_desc[block->gpio[i]].flags) &&
+> +		    !gpio_block_is_irq_duplicate(block, i))
+> +			free_irq(irq, block);
+> +err2:
+> +		gpio_free(block->gpio[i]);
+> +	}
+> +	return status;
+> +}
+> +
+> +static int gpio_block_fop_release(struct inode *in, struct file *f)
+> +{
+> +	int i;
+> +	struct gpio_block *block = (struct gpio_block *)f->private_data;
+> +
+> +	for (i = 0; i < block->ngpio; i++) {
+> +		int irq = gpio_to_irq(block->gpio[i]);
+> +
+> +		if (irq >= 0 &&
+> +		    !test_bit(FLAG_IS_OUT, &gpio_desc[block->gpio[i]].flags) &&
+> +		    !gpio_block_is_irq_duplicate(block, i))
+> +			free_irq(irq, block);
+> +
+> +		gpio_free(block->gpio[i]);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static ssize_t gpio_block_fop_read(struct file *f, char __user *buf, size_t n,
+> +				   loff_t *offset)
+> +{
+> +	struct gpio_block *block = (struct gpio_block *)f->private_data;
+> +	int err;
+> +
+> +	if (block->irq_controlled) {
+> +		if (!(f->f_flags & O_NONBLOCK))
+> +			wait_event_interruptible(block->wait_queue,
+> +						 block->got_int);
+> +		block->got_int = 0;
+> +	}
+> +
+> +	if (n >= sizeof(unsigned long)) {
+> +		unsigned long values = gpio_block_get(block, block->cur_mask);
+> +
+> +		err = put_user(values, (unsigned long __user *)buf);
+> +		if (err)
+> +			return err;
+> +
+> +		return sizeof(unsigned long);
+> +	}
+> +	return 0;
+> +}
 
-Regards,
-Mike
+I observed that the read returns once immediately (without blocking)
+after reboot. I did not look into that yet.
+
+Wolfgang.
