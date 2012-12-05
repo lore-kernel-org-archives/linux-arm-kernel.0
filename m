@@ -1,46 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 5 Dec 2012 15:50:44 +0000
-Subject: [PATCH] ARM: bcm281xx: Add timer driver
-In-Reply-To: <50BF0DAE.6000202@broadcom.com>
-References: <1354593324-21300-1-git-send-email-csd@broadcom.com>
- <50BEB77F.10303@wwwdotorg.org> <50BF0DAE.6000202@broadcom.com>
-Message-ID: <201212051550.44288.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Dec 2012 15:55:41 +0000
+Subject: [PATCH v4 12/13] ARM: KVM: vgic: reduce the number of vcpu kick
+In-Reply-To: <50BF4EC8.1050902@arm.com>
+References: <20121110154358.3061.16338.stgit@chazy-air>
+ <20121110154539.3061.82553.stgit@chazy-air>
+ <20121205104358.GC22385@mudshark.cambridge.arm.com>
+ <20121205105822.GL14363@n2100.arm.linux.org.uk> <50BF3B75.1060007@arm.com>
+ <20121205122952.GO14363@n2100.arm.linux.org.uk> <50BF4EC8.1050902@arm.com>
+Message-ID: <20121205155541.GP14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 December 2012, Christian Daudt wrote:
-> On 12-12-04 06:54 PM, Stephen Warren wrote:
-> > On 12/03/2012 08:55 PM, Christian Daudt wrote:
-> > I'm slightly worried about "kona". Is it a well-known name outside
-> > Broadcom for this HW block? If it really is the name though, it's fine I
-> > guess, since it's within the "bcm," name-space here.
-> Some of these konas slip by :) This is an internal name, but I don't 
-> need to use it here. I'll change this to "bcm,bcm-timer"
+On Wed, Dec 05, 2012 at 01:40:24PM +0000, Marc Zyngier wrote:
+> Admittedly, the whole sequence should be rewritten to be clearer. What
+> it does is "If we're running a guest and there is no active interrupt,
+> then kick the guest".
 
-bcm-timer sounds a bit too generic, unless it's the only one used in
-Broadcom, I don't mind a code name like "kona" if that serves to
-uniquely identify this timer implementation.
-If you don't want to to use that, you should pick a specific mode number
-and encode that into the compatible string, such as "bcm,bcm28154-timer".
-You can then use the same string for every SoC whose timer is the
-same as the one in the bcm28154.
+On the whole this entire thing should be written clearer; from the
+explanations you've given it seems that the only reason this code works
+is because you're relying on several behaviours all coming together to
+achieve the right result - which makes for fragile code.
 
-> >> diff --git a/drivers/clocksource/bcm_timer.c b/drivers/clocksource/bcm_timer.c
-> > Is this timer HW used in every Broadcom chip? I wonder if the file
-> > shouldn't be named bcm_kona_timer.c to allow co-existence with any others.
->
-> I'm sure it is not used in every Broadcom chip, but it is used in the 
-> ones I'm upstreaming at this point. I can always rename it if it turns 
-> out that this is no longer the only one, can't I ? I have been 
-> struggling a bit with when to use just "bcm" for name, and when to use 
-> something else. Internally we've used kona (and a number of other 
-> internal only names) but I've been trying to scrub these out of the code 
-> going to upstream, as the internal names are meaningless. But then I end 
-> up with no name in some cases, and I don't know that that is more 
-> helpful than the meaningless name...
+You're partly relying on atomic types to ensure that the increment and
+decrement happen exclusively.  You're then relying on a combination of
+IRQ protection and cmpxchg() to ensure that the non-atomic read of the
+atomic type won't be a problem.
 
-If the name means something to you and is not likely to be used elsewhere in
-broadcom for something different, then it's a good enough name. Leaving
-out the name is not enough.
+This doesn't inspire confidence, and I have big concerns over whether
+this code will still be understandable in a number of years time.
 
-	Arnd
+And I still wonder how safe this is even with your explanations.  IRQ
+disabling only works for the local CPU core so I still have questions
+over this wrt a SMP host OS.
