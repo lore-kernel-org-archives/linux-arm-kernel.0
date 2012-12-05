@@ -1,45 +1,126 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed,  5 Dec 2012 14:33:13 +0100
-Subject: [GIT PULL] Improve the SMP support of the interrupt controller for
- Armada XP
-Message-ID: <1354714394-11622-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Wed,  5 Dec 2012 14:33:14 +0100
+Subject: [PATCH] arm: mvebu: Improve the SMP support of the interrupt
+ controller
+In-Reply-To: <1354714394-11622-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1354714394-11622-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1354714394-11622-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+From: Yehuda Yitschak <yehuday@marvell.com>
 
-here it is the patch set to improve the Armada XP SMP support. This
-pull can be merged without any conflict even on the last
-arm-soc/for-next. As Linus Torvalds told that the release of 3.7 won't
-happen before next week, I'd like to have this improvement as part of
-3.8.
+This patch makes the interrupt controller driver more SMP aware for
+the Armada XP SoCs. It adds the support for the per-CPU irq. It also
+adds the implementation for the set_affinity hook.
 
-Thanks!
+Patch initialy wrote by Yehuda Yitschak and reworked by Gregory
+CLEMENT for submission.
 
-Gregory
-
-The following changes since commit 56580bb422e5f542da19c057f348dd39634138e7:
-
-  Merge branch 'mvebu-misc-fixes' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything (2012-11-24 04:08:49 +0000)
-
-are available in the git repository at:
-
-
-  git at github.com:MISL-EBU-System-SW/mainline-public.git tags/mvebu-irq-smp-armada-xp
-
-for you to fetch changes up to d1c1c368df413d78f6b9588038eebc13c9a59382:
-
-  arm: mvebu: Improve the SMP support of the interrupt controller (2012-12-05 13:19:26 +0100)
-
-----------------------------------------------------------------
-Improve the SMP support of the interrupt controller
-
-This patch allows a better handling of IRQ in SMP mode for the Armada
-
-----------------------------------------------------------------
-Yehuda Yitschak (1):
-      arm: mvebu: Improve the SMP support of the interrupt controller
-
+Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
  arch/arm/boot/dts/armada-xp.dtsi        |    2 +-
  arch/arm/mach-mvebu/irq-armada-370-xp.c |   49 ++++++++++++++++++++++++++++---
  2 files changed, 46 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 45a567c..088d280 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -23,7 +23,7 @@
+ 	compatible = "marvell,armadaxp", "marvell,armada-370-xp";
+ 
+ 	mpic: interrupt-controller at d0020000 {
+-	      reg = <0xd0020a00 0x1d0>,
++	      reg = <0xd0020a00 0x2d0>,
+ 		    <0xd0021070 0x58>;
+ 	};
+ 
+diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/arch/arm/mach-mvebu/irq-armada-370-xp.c
+index 549b684..9f2fe84 100644
+--- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
++++ b/arch/arm/mach-mvebu/irq-armada-370-xp.c
+@@ -33,6 +33,7 @@
+ #define ARMADA_370_XP_INT_CONTROL		(0x00)
+ #define ARMADA_370_XP_INT_SET_ENABLE_OFFS	(0x30)
+ #define ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS	(0x34)
++#define ARMADA_370_XP_INT_SOURCE_CTL(irq)	(0x100 + irq*4)
+ 
+ #define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
+ 
+@@ -40,28 +41,68 @@
+ #define ARMADA_370_XP_IN_DRBEL_MSK_OFFS          (0xc)
+ #define ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS        (0x8)
+ 
++#define ARMADA_370_XP_MAX_PER_CPU_IRQS		(28)
++
+ #define ACTIVE_DOORBELLS			(8)
+ 
++static DEFINE_RAW_SPINLOCK(irq_controller_lock);
++
+ static void __iomem *per_cpu_int_base;
+ static void __iomem *main_int_base;
+ static struct irq_domain *armada_370_xp_mpic_domain;
+ 
++/*
++ * For shared global interrupts, mask/unmask global enable bit
++ * For CPU interrtups, mask/unmask the calling CPU's bit
++ */
+ static void armada_370_xp_irq_mask(struct irq_data *d)
+ {
+-	writel(irqd_to_hwirq(d),
+-	       per_cpu_int_base + ARMADA_370_XP_INT_SET_MASK_OFFS);
++	irq_hw_number_t hwirq = irqd_to_hwirq(d);
++
++	if (hwirq > ARMADA_370_XP_MAX_PER_CPU_IRQS)
++		writel(hwirq, main_int_base +
++				ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS);
++	else
++		writel(hwirq, main_int_base +
++				ARMADA_370_XP_INT_SET_MASK_OFFS);
+ }
+ 
+ static void armada_370_xp_irq_unmask(struct irq_data *d)
+ {
+-	writel(irqd_to_hwirq(d),
+-	       per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
++	irq_hw_number_t hwirq = irqd_to_hwirq(d);
++
++	if (hwirq > ARMADA_370_XP_MAX_PER_CPU_IRQS)
++		writel(hwirq, main_int_base +
++				ARMADA_370_XP_INT_SET_ENABLE_OFFS);
++	else
++		writel(hwirq, main_int_base +
++				ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
+ }
+ 
+ #ifdef CONFIG_SMP
+ static int armada_xp_set_affinity(struct irq_data *d,
+ 				  const struct cpumask *mask_val, bool force)
+ {
++	unsigned long reg;
++	unsigned long new_mask = 0;
++	unsigned long online_mask = 0;
++	irq_hw_number_t hwirq = irqd_to_hwirq(d);
++	int cpu;
++
++	for_each_cpu(cpu, cpu_online_mask)
++		online_mask |= 1 << cpu_logical_map(cpu);
++
++	for_each_cpu(cpu, mask_val)
++		new_mask |= 1 << cpu_logical_map(cpu);
++
++	raw_spin_lock(&irq_controller_lock);
++
++	reg = readl(main_int_base + ARMADA_370_XP_INT_SOURCE_CTL(hwirq));
++	reg = (reg & (~online_mask)) | new_mask;
++	writel(reg, main_int_base + ARMADA_370_XP_INT_SOURCE_CTL(hwirq));
++
++	raw_spin_unlock(&irq_controller_lock);
++
+ 	return 0;
+ }
+ #endif
+-- 
+1.7.9.5
