@@ -1,117 +1,114 @@
 From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 05 Dec 2012 09:29:59 +0900
-Subject: [PATCH v3] backlight: corgi_lcd: Use gpio_set_value_cansleep() to
- avoid WARN_ON
-In-Reply-To: <CAHod+Gf6TSAS7+543prWb8To8UGevYFMZnZoN7weWu36Mws8ow@mail.gmail.com>
-References: <000b01cdd1e0$293f0d90$7bbd28b0$%han@samsung.com>
- <CAHod+Gf6TSAS7+543prWb8To8UGevYFMZnZoN7weWu36Mws8ow@mail.gmail.com>
-Message-ID: <000001cdd27f$a88f1000$f9ad3000$%han@samsung.com>
+Date: Wed, 05 Dec 2012 09:37:43 +0900
+Subject: [PATCH] backlight: corgi_lcd: Use gpio_set_value_cansleep() for
+ akita machines to avoid WARN_ON trigger
+In-Reply-To: <CAHod+GdDuwbYryrDnBriLnTSiFf4R_WwzcdGoxi6NUe1eemTaA@mail.gmail.com>
+References: <1354237577-4653-1-git-send-email-dromede@gmail.com>
+ <20121129173646.110887c3.akpm@linux-foundation.org>
+ <CAHod+GdDuwbYryrDnBriLnTSiFf4R_WwzcdGoxi6NUe1eemTaA@mail.gmail.com>
+Message-ID: <000101cdd280$bcf2ad80$36d80880$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 05, 2012 8:28 AM, Marko Katic wrote
-> On Tue, Dec 4, 2012 at 6:28 AM, Jingoo Han <jg1.han@samsung.com> wrote:
-> > From: Marko Katic <dromede@gmail.com>
+On Wednesday, December 05, 2012 7:19 AM, Marko Katic wrote
+> On Fri, Nov 30, 2012 at 2:36 AM, Andrew Morton
+> <akpm@linux-foundation.org> wrote:
+> > On Fri, 30 Nov 2012 02:06:17 +0100
+> > dromede at gmail.com wrote:
 > >
-> > Changing backlight intensity on an Akita (Sharp Zaurus C-1000)
-> > triggers WARN_ON message:
+> >> From: Marko Katic <dromede.gmail.com>
+> >>
+> >> Changing backlight intensity on an Akita (Sharp Zaurus C-1000)
+> >> will always trigger a WARN_ON:
+> >>
+> >> WARNING: at drivers/gpio/gpiolib.c:1672 __gpio_set_value+0x38/0xa4()
+> >>
+> >> ...
+> >>
+> >> Akita machines have backlight controls hooked to a gpio expander chip, max7310.
+> >> The driver that controls the max7310 sets the cansleep flag and the corgi_lcd
+> >> driver only uses plain gpio_set_value calls for changing backlight controls.
+> >> This triggers the WARN_ON on akita machines.
+> >>
+> >> Akita is the only exception in this case since other users of corgi_bl access
+> >> backlight gpio controls through a different gpio expander which does not set the cansleep flag.
 > >
-> > WARNING: at drivers/gpio/gpiolib.c:1672 __gpio_set_value+0x38/0xa4()
-> > Modules linked in:
-> > Backtrace:
-> > [<c000c0ac>] (dump_backtrace+0x0/0x110) from [<c02c8278>] (dump_stack+0x18/0x1c)
-> >  r6:c0158fc8 r5:00000009 r4:00000000 r3:c03d4f70
-> > [<c02c8260>] (dump_stack+0x0/0x1c) from [<c0019194>] (warn_slowpath_common+0x54/0x6c)
-> > [<c0019140>] (warn_slowpath_common+0x0/0x6c) from [<c00191d0>] (warn_slowpath_null+0x24/0x2c)
-> >  r8:c38d5c00 r7:c03f82c0 r6:00000000 r5:000000d0 r4:c384e4fc
-> > r3:00000009
-> > [<c00191ac>] (warn_slowpath_null+0x0/0x2c) from [<c0158fc8>] (__gpio_set_value+0x38/0xa4)
-> > [<c0158f90>] (__gpio_set_value+0x0/0xa4) from [<c0169b4c>] (corgi_bl_set_intensity+0x44/0x74)
-> >  r7:c3933418 r6:c3933400 r5:c392cdf0 r4:0000002f
-> > [<c0169b08>] (corgi_bl_set_intensity+0x0/0x74) from [<c0169c1c>] (corgi_bl_update_status+0x5c/0x64)
-> >  r5:c03d31f0 r4:c3933400
-> > [<c0169bc0>] (corgi_bl_update_status+0x0/0x64) from [<c02c3a68>] (corgi_lcd_probe+0x1a8/0x258)
-> >  r4:c392cdf0 r3:c0169bc0
-> > [<c02c38c0>] (corgi_lcd_probe+0x0/0x258) from [<c01da7a4>] (spi_drv_probe+0x20/0x24)
-> >  r8:00000052 r7:c0192d9c r6:c03da6e8 r5:c38d5c34 r4:c38d5c00
-> > [<c01da784>] (spi_drv_probe+0x0/0x24) from [<c0192c44>] (driver_probe_device+0xb0/0x208)
-> > [<c0192b94>] (driver_probe_device+0x0/0x208) from [<c0192e0c>] (__driver_attach+0x70/0x94)
-> >  r6:c03da6e8 r5:c38d5c34 r4:c38d5c00 r3:00000000
-> > [<c0192d9c>] (__driver_attach+0x0/0x94) from [<c0191268>] (bus_for_each_dev+0x54/0x90)
-> >  r6:c03da6e8 r5:c3827e80 r4:00000000 r3:00000000
-> > [<c0191214>] (bus_for_each_dev+0x0/0x90) from [<c01927a4>] (driver_attach+0x20/0x28)
-> >  r7:00000000 r6:c03e29ec r5:c3932980 r4:c03da6e8
-> > [<c0192784>] (driver_attach+0x0/0x28) from [<c0192340>] (bus_add_driver+0xd4/0x22c)
-> > [<c019226c>] (bus_add_driver+0x0/0x22c) from [<c019335c>] (driver_register+0xa4/0x134)
-> >  r8:00000052 r7:c03ea900 r6:c03c32ac r5:c03bdfc8 r4:c03da6e8
-> > [<c01932b8>] (driver_register+0x0/0x134) from [<c01db7ec>] (spi_register_driver+0x4c/0x60)
-> > [<c01db7a0>] (spi_register_driver+0x0/0x60) from [<c03b3ce0>] (corgi_lcd_driver_init+0x14/0x1c)
-> > [<c03b3ccc>] (corgi_lcd_driver_init+0x0/0x1c) from [<c000868c>] (do_one_initcall+0x9c/0x174)
-> > [<c00085f0>] (do_one_initcall+0x0/0x174) from [<c02c1b94>] (kernel_init+0xf4/0x2a8)
-> > [<c02c1aa0>] (kernel_init+0x0/0x2a8) from [<c0009270>] (ret_from_fork+0x14/0x24)
-> > ---[ end trace a863a63f242ee38c ]---
-> >
-> > Akita machines have backlight controls hooked to a gpio expander chip,
-> > max7310. In this case, pca953x_gpio_set_value() can be called to control
-> > gpio, and pca953x_setup_gpio() sets can_sleep flag. Therefore,
-> > gpio_set_value_cansleep() should be used in order to avoid WARN_ON on
-> > akita machines.
-> >
-> > Akita is the only exception in this case since other users of corgi_lcd
-> > access backlight gpio controls through a different gpio expander such as
-> > max7310 which does not set the can_sleep flag.
+> > Let's be nice and specific, please.  You're referring to
+> > pca953x_gpio_set_value(), yes?  And it uses i2c transfers which can
+> > sleep?
 > 
-> I think you forgot to delete "such as max7310". Akita has
-> the max7310, all the other models have a different expander.
-
-Yes, you're right.
-I added an unnecessary word, 'such as max7310'.
-It should be deleted.
-
-I will send v4 patch, soon.
-
-Best regards,
-Jingoo Han
-
+> Point taken, will change this in my v2 commit message.
 > 
 > >
-> > [jg1.han at samsung.com: used gpio_cansleep()]
-> > Signed-off-by: Marko Katic <dromede@gmail.com>
-> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> > ---
-> >  drivers/video/backlight/corgi_lcd.c |   17 +++++++++++++----
-> >  1 files changed, 13 insertions(+), 4 deletions(-)
+> >> Fix this by conditionally using gpio_set_value_cansleep() when changing backlight intensity on
+> >> akita machines.
 > >
-> > diff --git a/drivers/video/backlight/corgi_lcd.c b/drivers/video/backlight/corgi_lcd.c
-> > index e2e1b62..e5168f4 100644
-> > --- a/drivers/video/backlight/corgi_lcd.c
-> > +++ b/drivers/video/backlight/corgi_lcd.c
-> > @@ -408,11 +408,20 @@ static int corgi_bl_set_intensity(struct corgi_lcd *lcd, int intensity)
-> >         /* Bit 5 via GPIO_BACKLIGHT_CONT */
-> >         cont = !!(intensity & 0x20) ^ lcd->gpio_backlight_cont_inverted;
+> > I don't get this.  There is no difference between
+> > gpio_set_value_cansleep() and __gpio_set_value() apart from the
+> > generation of debug warnings.  What's going on here?
 > >
-> > -       if (gpio_is_valid(lcd->gpio_backlight_cont))
-> > -               gpio_set_value(lcd->gpio_backlight_cont, cont);
-> > +       if (gpio_is_valid(lcd->gpio_backlight_cont)) {
-> > +               if (gpio_cansleep(lcd->gpio_backlight_cont))
-> > +                       gpio_set_value_cansleep(lcd->gpio_backlight_cont, cont);
-> > +               else
-> > +                       gpio_set_value(lcd->gpio_backlight_cont, cont);
-> > +       }
+> >> index c781768..f33e26f 100644
+> >> --- a/drivers/video/backlight/corgi_lcd.c
+> >> +++ b/drivers/video/backlight/corgi_lcd.c
+> >> @@ -26,7 +26,7 @@
+> >>  #include <linux/spi/corgi_lcd.h>
+> >>  #include <linux/slab.h>
+> >>  #include <asm/mach/sharpsl_param.h>
+> >> -
+> >> +#include <asm/mach-types.h>
+> >>  #define POWER_IS_ON(pwr)     ((pwr) <= FB_BLANK_NORMAL)
+> >>
+> >>  /* Register Addresses */
+> >> @@ -408,11 +408,19 @@ static int corgi_bl_set_intensity(struct corgi_lcd *lcd, int intensity)
+> >>       /* Bit 5 via GPIO_BACKLIGHT_CONT */
+> >>       cont = !!(intensity & 0x20) ^ lcd->gpio_backlight_cont_inverted;
+> >>
+> >> -     if (gpio_is_valid(lcd->gpio_backlight_cont))
+> >> -             gpio_set_value(lcd->gpio_backlight_cont, cont);
+> >> +     if (gpio_is_valid(lcd->gpio_backlight_cont)) {
+> >> +             if (machine_is_akita())
+> >> +                     gpio_set_value_cansleep(lcd->gpio_backlight_cont, cont);
+> >> +             else
+> >> +                     gpio_set_value(lcd->gpio_backlight_cont, cont);
+> >> +     }
 > >
-> > -       if (gpio_is_valid(lcd->gpio_backlight_on))
-> > -               gpio_set_value(lcd->gpio_backlight_on, intensity);
-> > +       if (gpio_is_valid(lcd->gpio_backlight_on)) {
-> > +               if (gpio_cansleep(lcd->gpio_backlight_on))
-> > +                       gpio_set_value_cansleep(lcd->gpio_backlight_on,
-> > +                                               intensity);
-> > +               else
-> > +                       gpio_set_value(lcd->gpio_backlight_on, intensity);
-> > +       }
+> > See, here you could do
 > >
-> >         if (lcd->kick_battery)
-> >                 lcd->kick_battery();
-> > --
-> > 1.7.2.5
+> >         if (__gpio_cansleep(lcd->gpio_backlight_cont))
+> >                 gpio_set_value_cansleep(...);
+> >         else
+> >                 gpio_set_value(...);
 > >
+> > and solve the problem forever, without having to hackily add
+> > hardware-specific exceptions.
 > >
+> > But such a change simply demonstrates the silliness of
+> > this gpio_set_value_cansleep-vs-gpio_set_value thing.
+> >
+> > Confused.
+> 
+> There are 8 different models of Zaurus devices that use
+> this particular lcd panel. 7 of them access it's backlight gpio controls
+> through the same memory mapped gpio expander chip.
+> And here's the akita model, the only one that uses an i2c gpio
+> expander that can sleep.
+> Also, these are legacy devices and this is an obsolete lcd panel. It is
+> _very_ unlikely that there will be more devices in the kernel tree
+> that use this panel.
+> I also found plenty of examples of machine_is_* usage in the drivers/ tree.
+> These were the reasons why i used machine_is_akita to solve this problem.
+
+Even though there are many examples using machine_is_* usage in the drivers/,
+it is not preferable. Also, some drivers has removed this usage.
+
+Moreover, if you have an experience or knowledge about Device tree,
+you will know easily that these usages are not preferable.
+
+To sum up, machine_is_* usage affects compile. However, using gpio_cansleep()
+cannot affect compile of the driver, so it can keep the same binary
+regardless of machine type.
+
+
+> 
+> On the other hand, i do agree that yours is a more elegant solution and i will
+> use it in my v2 patch.
