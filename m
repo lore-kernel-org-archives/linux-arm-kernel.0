@@ -1,231 +1,122 @@
-From: mark.langsdorf@calxeda.com (Mark Langsdorf)
-Date: Wed,  5 Dec 2012 10:48:41 -0600
-Subject: [PATCH 6/6 v8] cpufreq, highbank: add support for highbank cpufreq
-In-Reply-To: <1354726121-17190-1-git-send-email-mark.langsdorf@calxeda.com>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1354726121-17190-1-git-send-email-mark.langsdorf@calxeda.com>
-Message-ID: <1354726121-17190-7-git-send-email-mark.langsdorf@calxeda.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 05 Dec 2012 18:26:34 +0100
+Subject: [PATCH v6 4/5] ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
+In-Reply-To: <20121205171950.GF21682@atomide.com>
+References: <1354204892-22762-1-git-send-email-zonque@gmail.com>
+ <1354204892-22762-5-git-send-email-zonque@gmail.com>
+ <50B7BE9C.6040506@ti.com> <50B7C677.7090504@ti.com>
+ <50B7C8BE.7050002@gmail.com> <50B7CCB1.6000506@ti.com>
+ <50BF4670.8070602@gmail.com> <20121205171950.GF21682@atomide.com>
+Message-ID: <50BF83CA.5050007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Highbank processors depend on the external ECME to perform voltage
-management based on a requested frequency. Communication between the
-A9 cores and the ECME happens over the pl320 IPC channel.
+Hi Tony,
 
-Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
-Cc: shawn.guo at linaro.org
-Cc: mturquette at linaro.org
----
-Changes from v7
-	Removed old attribution to cpufreq-cpu0.
-	Added some description in the documentation.
-	Made cpu_dev, cpu_clk into local variables.
-	Removed __devinit.
-	Removed some unneeded includes.
-	Added a brace to clarify some nested if logic.
-Changes from v6
-        Removed devicetree bindings documentation.
-        Restructured driver to use clk notifications.
-        Core driver logic is now cpufreq-clk0.
-Changes from v5
-        Changed ipc_transmit() to pl320_ipc_transmit().
-Changes from v4
-        Removed erroneous changes to arch/arm/Kconfig.
-        Removed unnecessary changes to drivers/cpufreq/Kconfig.arm
-        Alphabetized additions to arch/arm/mach-highbank/Kconfig
-        Changed ipc call and header to match new ipc location in 
-        drivers/mailbox.
-Changes from v3
-        None.
-Changes from v2
-        Changed transition latency binding in code to match documentation.
-Changes from v1
-        Added highbank specific Kconfig changes.
+On 05.12.2012 18:19, Tony Lindgren wrote:
+> * Daniel Mack <zonque@gmail.com> [121205 05:07]:
+>> On 29.11.2012 21:59, Jon Hunter wrote:
+>>> On 11/29/2012 02:42 PM, Daniel Mack wrote:
+>>>> On 29.11.2012 21:32, Jon Hunter wrote:
+>>>>>
+>>>>> On 11/29/2012 01:59 PM, Jon Hunter wrote:
+>>>>>>
+>>>>>> On 11/29/2012 10:01 AM, Daniel Mack wrote:
+>>>>>>> The am33xx is capable of handling bch error correction modes, so
+>>>>>>> enable that feature in the driver.
+>>>>>>>
+>>>>>>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>>>>>>> ---
+>>>>>>>  arch/arm/mach-omap2/gpmc-nand.c | 9 +++++----
+>>>>>>>  1 file changed, 5 insertions(+), 4 deletions(-)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
+>>>>>>> index f9f23a2..c8a72ba 100644
+>>>>>>> --- a/arch/arm/mach-omap2/gpmc-nand.c
+>>>>>>> +++ b/arch/arm/mach-omap2/gpmc-nand.c
+>>>>>>> @@ -92,17 +92,18 @@ static int omap2_nand_gpmc_retime(
+>>>>>>>  static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
+>>>>>>>  {
+>>>>>>>  	/* support only OMAP3 class */
+>>>>>>> -	if (!cpu_is_omap34xx()) {
+>>>>>>> +	if (!cpu_is_omap34xx() && !soc_is_am33xx()) {
+>>>>>>>  		pr_err("BCH ecc is not supported on this CPU\n");
+>>>>>>>  		return 0;
+>>>>>>>  	}
+>>>>>>>  
+>>>>>>>  	/*
+>>>>>>> -	 * For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1.
+>>>>>>> -	 * Other chips may be added if confirmed to work.
+>>>>>>> +	 * For now, assume 4-bit mode is only supported on OMAP3630 ES1.x, x>=1
+>>>>>>> +	 * and AM33xx derivates. Other chips may be added if confirmed to work.
+>>>>>>>  	 */
+>>>>>>>  	if ((ecc_opt == OMAP_ECC_BCH4_CODE_HW) &&
+>>>>>>> -	    (!cpu_is_omap3630() || (GET_OMAP_REVISION() == 0))) {
+>>>>>>> +	    (!cpu_is_omap3630() || (GET_OMAP_REVISION() == 0)) &&
+>>>>>>> +	    (!soc_is_am33xx())) {
+>>>>>>>  		pr_err("BCH 4-bit mode is not supported on this CPU\n");
+>>>>>>>  		return 0;
+>>>>>>>  	}
+>>>>>>
+>>>>>> Sorry I should have seen this earlier. Ideally, this type of thing
+>>>>>> should be reflected by the device-tree/platform-data and we should get
+>>>>>> away from these cpu_is_xxxx macros for hardware features (where we can).
+>>>>>> Furthermore, we need to avoid including plat-omap/gpmc.h in drivers for
+>>>>>> the single zImage work (I see the omap nand driver is including gpmc.h).
+>>>>>>
+>>>>>> Tony, should this be addressed now or can we live this for the minute
+>>>>>> and fix-up later?
+>>>>>
+>>>>> Actually, I see that you do read the ecc mode from DT, so is this really
+>>>>> needed? It would be good to eliminate this.
+>>>>
+>>>> The ecc mode is read from DT, right. But the gpmc bindings can be used
+>>>> for many OMAP derivates in the future, and this check is there to make
+>>>> sure the configured settings are supported by the hardware after all,
+>>>> just like if the ecc mode would have been passed as static platform
+>>>> data. So what is it exactly that you want to get rid of?
+>>>
+>>> The above function.
+>>>
+>>> If there is a hardware bug that prevents us from using the hw-ecc mode
+>>> that is supported (which is the case for omap3630 es1.0), then we should
+>>> have a GPMC_ERRATA_xxx flag somewhere to indicate this and these errata
+>>> flags should be populated at probe.
+>>>
+>>>> I agree though that we could solve this with via the of_device_id's data
+>>>> pointer of the matching driver. But as you said yourself, this can well
+>>>> be done later, and the problem here is that we still need the
+>>>> cpu_is_xxx() macros for older platforms, right?
+>>>
+>>> Yes, but we cannot/shouldn't use these cpu_is_xxx macros from within
+>>> driver code. Ok, here we can calling a platform function that is calling
+>>> the macro, but for single zImage we cannot do that either. We cannot
+>>> include platform headers in drivers for single zImage. We have to get
+>>> away from that. Therefore, such information needs to be passed by
+>>> platform data, device tree, etc.
+>>>
+>>> I will let Tony decide on how he wants us to handle this.
+>>
+>> Any idea yet about this detail? The other small Documentation changes
+>> you brought up are fixed in my tree and ready for resubmission.
+> 
+> The plat/cpu.h file will disappear after the merge window, which means
+> omap2+ related drivers cannot use cpu_is_omap macros.
+>
+> For legacy booting systems, this flag should be just passed in the
+> platform_data from the platform init code. Then device tree can
+> deal with it based on the compatible flag.
+>
 
- arch/arm/boot/dts/highbank.dts     |  10 ++++
- arch/arm/mach-highbank/Kconfig     |   2 +
- drivers/cpufreq/Kconfig.arm        |  16 ++++++
- drivers/cpufreq/Makefile           |   1 +
- drivers/cpufreq/highbank-cpufreq.c | 102 +++++++++++++++++++++++++++++++++++++
- 5 files changed, 131 insertions(+)
- create mode 100644 drivers/cpufreq/highbank-cpufreq.c
+Ok, thanks for explaining.
 
-diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-index 0c6fc34..7c4c27d 100644
---- a/arch/arm/boot/dts/highbank.dts
-+++ b/arch/arm/boot/dts/highbank.dts
-@@ -36,6 +36,16 @@
- 			next-level-cache = <&L2>;
- 			clocks = <&a9pll>;
- 			clock-names = "cpu";
-+			operating-points = <
-+				/* kHz    ignored */
-+				 1300000  1000000
-+				 1200000  1000000
-+				 1100000  1000000
-+				  800000  1000000
-+				  400000  1000000
-+				  200000  1000000
-+			>;
-+			clock-latency = <100000>;
- 		};
- 
- 		cpu at 1 {
-diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
-index 2896881..b7862da 100644
---- a/arch/arm/mach-highbank/Kconfig
-+++ b/arch/arm/mach-highbank/Kconfig
-@@ -1,5 +1,7 @@
- config ARCH_HIGHBANK
- 	bool "Calxeda ECX-1000 (Highbank)" if ARCH_MULTI_V7
-+	select ARCH_HAS_CPUFREQ
-+	select ARCH_HAS_OPP
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_AMBA
- 	select ARM_GIC
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 5961e64..7aaac9f 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -76,3 +76,19 @@ config ARM_EXYNOS5250_CPUFREQ
- 	help
- 	  This adds the CPUFreq driver for Samsung EXYNOS5250
- 	  SoC.
-+
-+config ARM_HIGHBANK_CPUFREQ
-+	tristate "Calxeda Highbank-based"
-+	depends on ARCH_HIGHBANK
-+	select CPU_FREQ_TABLE
-+	select GENERIC_CPUFREQ_CPU0
-+	select PM_OPP
-+	select REGULATOR
-+
-+	default m
-+	help
-+	  This adds the CPUFreq driver for Calxeda Highbank SoC
-+	  based boards.
-+
-+	  If in doubt, say N.
-+
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 1bc90e1..9e8f12a 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -50,6 +50,7 @@ obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
- obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)	+= exynos4x12-cpufreq.o
- obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)	+= exynos5250-cpufreq.o
- obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)     += omap-cpufreq.o
-+obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
- 
- ##################################################################################
- # PowerPC platform drivers
-diff --git a/drivers/cpufreq/highbank-cpufreq.c b/drivers/cpufreq/highbank-cpufreq.c
-new file mode 100644
-index 0000000..1f28fa6
---- /dev/null
-+++ b/drivers/cpufreq/highbank-cpufreq.c
-@@ -0,0 +1,102 @@
-+/*
-+ * Copyright (C) 2012 Calxeda, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/clk.h>
-+#include <linux/cpu.h>
-+#include <linux/err.h>
-+#include <linux/of.h>
-+#include <linux/mailbox.h>
-+
-+#define HB_CPUFREQ_CHANGE_NOTE 0x80000001
-+
-+static int hb_voltage_change(unsigned int freq)
-+{
-+	int i;
-+	u32 msg[7];
-+
-+	msg[0] = HB_CPUFREQ_CHANGE_NOTE;
-+	msg[1] = freq / 1000000;
-+	for (i = 2; i < 7; i++)
-+		msg[i] = 0;
-+
-+	return pl320_ipc_transmit(msg);
-+}
-+
-+static int hb_cpufreq_clk_notify(struct notifier_block *nb, 
-+				unsigned long action, void *hclk)
-+{
-+	struct clk_notifier_data *clk_data = hclk;
-+	int i = 0;
-+
-+	if (action == PRE_RATE_CHANGE) {
-+		if (clk_data->new_rate > clk_data->old_rate)
-+			while (hb_voltage_change(clk_data->new_rate))
-+				if (i++ > 15)
-+					return NOTIFY_STOP;
-+	} else if (action == POST_RATE_CHANGE) {
-+		if (clk_data->new_rate < clk_data->old_rate)
-+			while (hb_voltage_change(clk_data->new_rate))
-+				if (i++ > 15)
-+					break;
-+	}
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block hb_cpufreq_clk_nb = {
-+	.notifier_call = hb_cpufreq_clk_notify,
-+};
-+
-+static int hb_cpufreq_driver_init(void)
-+{
-+	struct device *cpu_dev;
-+	struct clk *cpu_clk;
-+	struct device_node *np;
-+	int ret;
-+
-+	np = of_find_node_by_path("/cpus/cpu at 0");
-+	if (!np) {
-+		pr_err("failed to find highbank cpufreq node\n");
-+		return -ENOENT;
-+	}
-+
-+	cpu_dev = get_cpu_device(0);
-+	if (!cpu_dev) {
-+		pr_err("failed to get highbank cpufreq device\n");
-+		ret = -ENODEV;
-+		goto out_put_node;
-+	}
-+
-+	cpu_dev->of_node = np;
-+
-+	cpu_clk = clk_get(cpu_dev, NULL);
-+	if (IS_ERR(cpu_clk)) {
-+		ret = PTR_ERR(cpu_clk);
-+		pr_err("failed to get cpu0 clock: %d\n", ret);
-+		goto out_put_node;
-+	}
-+
-+	ret = clk_notifier_register(cpu_clk, &hb_cpufreq_clk_nb);
-+	if (ret) {
-+		pr_err("failed to register clk notifier: %d\n", ret);
-+		goto out_put_node;
-+	}
-+
-+out_put_node:
-+	of_node_put(np);
-+	return ret;
-+}
-+late_initcall(hb_cpufreq_driver_init);
-+
-+MODULE_AUTHOR("Mark Langsdorf <mark.langsdorf@calxeda.com>");
-+MODULE_DESCRIPTION("Calxeda Highbank cpufreq driver");
-+MODULE_LICENSE("GPL");
--- 
-1.7.11.7
+Does that mean this patch series should be postponed until after the
+merge window and then build upon that change or should we merge the
+patch in question here as is and then care for the cleanups after the
+window?
+
+I can also rebase this set on top of the removal patches if they exist
+already somewhere.
+
+
+Daniel
