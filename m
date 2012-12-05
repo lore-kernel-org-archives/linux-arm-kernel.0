@@ -1,53 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 5 Dec 2012 09:41:14 -0800
-Subject: [PATCH v6 4/5] ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
-In-Reply-To: <50BF83CA.5050007@gmail.com>
-References: <1354204892-22762-1-git-send-email-zonque@gmail.com>
- <1354204892-22762-5-git-send-email-zonque@gmail.com>
- <50B7BE9C.6040506@ti.com> <50B7C677.7090504@ti.com>
- <50B7C8BE.7050002@gmail.com> <50B7CCB1.6000506@ti.com>
- <50BF4670.8070602@gmail.com> <20121205171950.GF21682@atomide.com>
- <50BF83CA.5050007@gmail.com>
-Message-ID: <20121205174114.GH21682@atomide.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 05 Dec 2012 12:58:47 -0500 (EST)
+Subject: [PATCH] net/macb: increase RX buffer size for GEM
+In-Reply-To: <50BF6366.8080600@atmel.com>
+References: <1354536943-6356-1-git-send-email-nicolas.ferre@atmel.com>
+ <20121204.132227.1430662061932892582.davem@davemloft.net>
+ <50BF6366.8080600@atmel.com>
+Message-ID: <20121205.125847.649579012053540438.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Daniel Mack <zonque@gmail.com> [121205 09:29]:
-> On 05.12.2012 18:19, Tony Lindgren wrote:
-> > 
-> > The plat/cpu.h file will disappear after the merge window, which means
-> > omap2+ related drivers cannot use cpu_is_omap macros.
-> >
-> > For legacy booting systems, this flag should be just passed in the
-> > platform_data from the platform init code. Then device tree can
-> > deal with it based on the compatible flag.
-> >
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
+Date: Wed, 5 Dec 2012 16:08:22 +0100
+
+> On 12/04/2012 07:22 PM, David Miller :
+>> From: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Date: Mon, 3 Dec 2012 13:15:43 +0100
+>> 
+>>> Macb Ethernet controller requires a RX buffer of 128 bytes. It is
+>>> highly sub-optimal for Gigabit-capable GEM that is able to use
+>>> a bigger DMA buffer. Change this constant and associated macros
+>>> with data stored in the private structure.
+>>> I also kept the result of buffers per page calculation to lower the
+>>> impact of this move to a variable rx buffer size on rx hot path.
+>>> RX DMA buffer size has to be multiple of 64 bytes as indicated in
+>>> DMA Configuration Register specification.
+>>>
+>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> 
+>> This looks like it will waste a couple hundred bytes for 1500 MTU
+>> frames, am I right?
 > 
-> Ok, thanks for explaining.
+> Yep! But buffers get recycled, and with the current memory management by
+> pages, it seems that I have to rework some part of it to optimize this
+> memory usage (8KB memory blocks split into 5 buffers each as David said...).
 > 
-> Does that mean this patch series should be postponed until after the
-> merge window and then build upon that change or should we merge the
-> patch in question here as is and then care for the cleanups after the
-> window?
+> Do you think it is worth digging this way or may I rework the rx buffer
+> management in case of the GEM interface. If I implement a different path
+> for GEM interface, I will have the possibility to tailor rx DMA buffers
+> from 1500 Bytes up to 10KB jumbo frames...
 
-Well to me it seems that you only have cpu_is_omap usage in
-arch/arm/mach-omap2/gpmc-nand.c, which will be OK. Only the code
-under drivers/* needs to be fixed for that. So your patches may
-be OK, but..
-
-> I can also rebase this set on top of the removal patches if they exist
-> already somewhere.
-
-..please check that your patches work with current linux next.
-
-It's too late to queue thing for v3.8 merge window at this point,
-as we want the patches sitting in linux next for a week at least
-before they get pulled.
-
-And we still need the acks for the device tree binding as well.
-
-So let's plan on queueing these after -rc1.
-
-Regards,
-
-Tony
+I almost think you have to.
