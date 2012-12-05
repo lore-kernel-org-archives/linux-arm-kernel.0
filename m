@@ -1,190 +1,107 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 5 Dec 2012 18:11:09 +0800
-Subject: [PATCH V2 6/6] ARM: tegra20: cpuidle: apply coupled cpuidle
- for powered-down mode
-In-Reply-To: <1354701715-24150-9-git-send-email-josephl@nvidia.com>
-References: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
- <1354701715-24150-9-git-send-email-josephl@nvidia.com>
-Message-ID: <1354702269.25317.1.camel@jlo-ubuntu-64.nvidia.com>
+From: dmitry.kasatkin@intel.com (Kasatkin, Dmitry)
+Date: Wed, 5 Dec 2012 12:28:28 +0200
+Subject: [PATCH v4 0/8] crypto: omap-sham updates
+In-Reply-To: <1353351301-6453-1-git-send-email-mgreer@animalcreek.com>
+References: <1353351301-6453-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <CALLzPKa9OdxAQBhUV-c0yBfRRuAmN-BCGLV9jbUsHaPzC5veqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, there is something wrong.
-Please ignore this mail.
+Hello,
 
-On Wed, 2012-12-05 at 18:01 +0800, Joseph Lo wrote:
-> config ARCH_TEGRA_3x_SOC
->  	bool "Enable support for Tegra30 family"
-> +	select ARCH_NEEDS_CPU_IDLE_COUPLED
->  	select ARCH_REQUIRE_GPIOLIB
->  	select ARM_ERRATA_743622
->  	select ARM_ERRATA_751472
-> diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
-> index 5e8cbf5..f880350 100644
-> --- a/arch/arm/mach-tegra/cpuidle-tegra30.c
-> +++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
-> @@ -23,6 +23,7 @@
->  #include <linux/module.h>
->  #include <linux/cpuidle.h>
->  #include <linux/cpu_pm.h>
-> +#include <linux/cpumask.h>
->  #include <linux/clockchips.h>
->  
->  #include <asm/cpuidle.h>
-> @@ -30,14 +31,18 @@
->  #include <asm/suspend.h>
->  #include <asm/smp_plat.h>
->  
-> +#include "irq.h"
->  #include "pm.h"
->  #include "sleep.h"
->  #include "tegra_cpu_car.h"
->  
->  #ifdef CONFIG_PM_SLEEP
-> -static int tegra30_idle_lp2(struct cpuidle_device *dev,
-> -			    struct cpuidle_driver *drv,
-> -			    int index);
-> +static bool abort_flag;
-> +static atomic_t abort_barrier;
-> +static cpumask_t cpus_out_lp2;
-> +static int tegra30_idle_lp2_coupled(struct cpuidle_device *dev,
-> +				    struct cpuidle_driver *drv,
-> +				    int index);
->  #endif
->  
->  static struct cpuidle_driver tegra_idle_driver = {
-> @@ -53,11 +58,12 @@ static struct cpuidle_driver tegra_idle_driver = {
->  		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
->  #ifdef CONFIG_PM_SLEEP
->  		[1] = {
-> -			.enter			= tegra30_idle_lp2,
-> +			.enter			= tegra30_idle_lp2_coupled,
->  			.exit_latency		= 2000,
->  			.target_residency	= 2200,
->  			.power_usage		= 0,
-> -			.flags			= CPUIDLE_FLAG_TIME_VALID,
-> +			.flags			= CPUIDLE_FLAG_TIME_VALID |
-> +						  CPUIDLE_FLAG_COUPLED,
->  			.name			= "powered-down",
->  			.desc			= "CPU power gated",
->  		},
-> @@ -79,8 +85,8 @@ static bool tegra30_cpu_cluster_power_down(struct cpuidle_device *dev,
->  	/* All CPUs entering LP2 is not working.
->  	 * Don't let CPU0 enter LP2 when any secondary CPU is online.
->  	 */
-> -	if (num_online_cpus() > 1 || !tegra_cpu_rail_off_ready()) {
-> -		cpu_do_idle();
-> +	if (num_online_cpus() > 1 && !tegra_cpu_rail_off_ready()) {
-> +//		cpu_do_idle();
->  		return false;
->  	}
->  
-> @@ -94,6 +100,13 @@ static bool tegra30_cpu_cluster_power_down(struct cpuidle_device *dev,
->  }
->  
->  #ifdef CONFIG_SMP
-> +static void tegra30_wake_up_secondary_cpus(u32 cpu)
-> +{
-> +//	if (!cpumask_test_cpu(cpu, &cpus_out_lp2))
-> +		arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-> +//		gic_raise_softirq(cpumask_of(cpu), 0);
-> +}                                       
-> +
->  static bool tegra30_cpu_core_power_down(struct cpuidle_device *dev,
->  					struct cpuidle_driver *drv,
->  					int index)
-> @@ -113,6 +126,11 @@ static bool tegra30_cpu_core_power_down(struct cpuidle_device *dev,
->  	return true;
->  }
->  #else
-> +static inline void tegra30_wake_up_secondary_cpus(u32 cpu)
-> +{
-> +	return;
-> +}
-> +
->  static inline bool tegra30_cpu_core_power_down(struct cpuidle_device *dev,
->  					       struct cpuidle_driver *drv,
->  					       int index)
-> @@ -121,36 +139,56 @@ static inline bool tegra30_cpu_core_power_down(struct cpuidle_device *dev,
->  }
->  #endif
->  
-> -static int __cpuinit tegra30_idle_lp2(struct cpuidle_device *dev,
-> -				      struct cpuidle_driver *drv,
-> -				      int index)
-> +static int __cpuinit tegra30_idle_lp2_coupled(struct cpuidle_device *dev,
-> +					      struct cpuidle_driver *drv,
-> +					      int index)
->  {
->  	u32 cpu = is_smp() ? cpu_logical_map(dev->cpu) : dev->cpu;
->  	bool entered_lp2 = false;
-> -	bool last_cpu;
-> +int i;
-> +	abort_flag = tegra_pending_irq();
-> +	cpumask_clear(&cpus_out_lp2);
-> +	cpuidle_coupled_parallel_barrier(dev, &abort_barrier);
-> +//printk(KERN_EMERG "cpu %d in\n", cpu);
-> +	if (abort_flag)
-> +		return -EINTR;
->  
->  	local_fiq_disable();
->  
-> -	last_cpu = tegra_set_cpu_in_lp2(cpu);
-> +	tegra_set_cpu_in_lp2(cpu);
->  	cpu_pm_enter();
->  
->  	if (cpu == 0) {
-> -		if (last_cpu)
-> -			entered_lp2 = tegra30_cpu_cluster_power_down(dev, drv,
-> -								     index);
-> -		else
-> -			cpu_do_idle();
-> +		while (num_online_cpus() > 1 && !tegra_cpu_rail_off_ready()) {
-> +			cpu_relax();
-> +			
-> +//			if (!cpumask_empty(&cpus_out_lp2))
-> +//				goto out;
-> +		}
-> +		entered_lp2 = tegra30_cpu_cluster_power_down(dev, drv, index);
-> +
-> +out:
-> +//		if (!entered_lp2) {
-> +//			int i;
-> +			for_each_online_cpu(i)
-> +				if (i != cpu)
-> +					tegra30_wake_up_secondary_cpus(i);
-> +//		}
->  	} else {
->  		entered_lp2 = tegra30_cpu_core_power_down(dev, drv, index);
-> +		cpumask_set_cpu(cpu, &cpus_out_lp2);
->  	}
->  
-> +
->  	cpu_pm_exit();
->  	tegra_clear_cpu_in_lp2(cpu);
-> -
-> +//
-> +//
->  	local_fiq_enable();
->  
->  	smp_rmb();
-> -
-> +//printk(KERN_EMERG "cpu %d out\n", cpu);
-> +cpuidle_coupled_parallel_barrier(dev, &abort_barrier);
->  	return (entered_lp2) ? index : 0;
->  }
->  #endif
-> @@ -175,6 +213,9 @@ int __init tegra30_cpuidle_init(void)
->  	for_each_possible_cpu(cpu) {
->  		dev = &per_cpu(tegra_idle_device, cpu);
->  		dev->cpu = cpu;
-> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
-> +		dev->coupled_cpus = *cpu_online_mask;
-> +#endif
->  
->  		dev->state_count = drv->state_count;
->  		ret = cpuidle_register_device(dev);
+I am not working on OMAP anymore and not able to test anything.
+But in general changes are OK for me.
+
+- Dmitry
+
+
+On Mon, Nov 19, 2012 at 8:54 PM, Mark A. Greer <mgreer@animalcreek.com> wrote:
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
+>
+> Changes since v3:
+>         - Added hwmod support for SIDLEMODE.  This requires adding
+>           a specific omap_hwmod_sysc_fields structure since there
+>           are not generic ones that have the correct offsets.
+>         - Added patch to remove the cpu check from the omap-sham
+>           driver.  This can likely be ignored since there is a patch
+>           that already does this in Tony's branch.  I added it to
+>           make it easier for others to test while Tony's patch makes
+>           its way to the k.o.
+>
+> Changes since v2:
+>         - Reworked pm_runtime calls to match where original clk_*
+>           calls were so provide better PM (as per Kevin Hilman's
+>           comments).
+>
+> Changes since v1:
+>         - Removed the check of CM_IDLEST to see if the module exists
+>           and instead add the hwmod data for all omap2's and omap3 GP's.
+>         - Placed new sha_ick clk entries after the 'omap-sham' entry
+>           in the clockxxx_data.c files
+>         - Removed cpu_is_xxx() checks in
+>           arch/arm/mach-omap2/devices.c:omap_init_sham()
+>         - Rebased on the latest k.o. kernel
+>
+>
+> This series updates the crypto omap-sham driver and supporting
+> infrastructure.
+>
+> Notes:
+>
+> a) Based on 3587b1b (fanotify: fix FAN_Q_OVERFLOW case of fanotify_read()).
+>
+> b) Since these patches will likely go though the OMAP tree (and not
+>    through the crypto tree), it would be nice if the crypto guy(s)
+>    would ACK or NACK patches 5-7 which modify the
+>    drivers/crypto/omap-sham.c driver.
+>
+> c) These have only been tested on an omap2420 h4 and an am37x evm.  If you
+>    have different hardware available and a few minutes, please test them.
+>    A quick and easy test is to enable tcrypt as a module
+>    (CONFIG_CRYPTO_TEST=m), boot, then run 'modprobe tcrypt sec=2 mode=403'.
+>    'CONFIG_CRYPTO_SHA1' and 'CONFIG_CRYPTO_DEV_OMAP_SHAM' also have to be
+>    enabled.  A quick 'grep omap-sham /proc/interrupts' will tell you if
+>    the omap-sham driver was really used.
+>
+> d) To test these patches, you will likely need...
+>    i) The patch included here:
+>            http://marc.info/?l=kernel-janitors&m=134910841909057&w=2
+>    ii) This patch from linux-omap/master:
+>            27615a9 (ARM: OMAP: Trivial driver changes to remove include
+>                            plat/cpu.h)
+>    iii) This patch from Paul Walmsley:
+>            http://www.spinics.net/lists/linux-omap/msg79436.html
+>
+> e) If you prefer, a version you can test is available at
+>    git at github.com:mgreeraz/linux-mag.git wip/crypto/sham-v3+test
+>
+> f) There is a reduction in DMA performance after switching to dmaengine
+>    (see http://www.spinics.net/lists/linux-omap/msg79855.html)
+>
+> g) Many thanks to Jon Hunter for testing on his omap2420 h4.
+>
+> Mark A. Greer (8):
+>   ARM: OMAP2xxx: hwmod: Convert SHAM crypto device data to hwmod
+>   ARM: OMAP2xxx: hwmod: Add DMA support for SHAM module
+>   ARM: OMAP3xxx: hwmod: Convert SHAM crypto device data to hwmod
+>   ARM: OMAP2+: Remove unnecessary message when no SHA IP is present
+>   crypto: omap-sham: Remove cpu_is/omap_type check from driver
+>   crypto: omap-sham: Convert to use pm_runtime API
+>   crypto: omap-sham: Add code to use dmaengine API
+>   crypto: omap_sham: Remove usage of private DMA API
+>
+>  arch/arm/mach-omap2/clock2430_data.c               |   1 +
+>  arch/arm/mach-omap2/clock3xxx_data.c               |   1 +
+>  arch/arm/mach-omap2/devices.c                      |  73 ++------
+>  arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   1 +
+>  arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   1 +
+>  .../mach-omap2/omap_hwmod_2xxx_interconnect_data.c |  18 ++
+>  arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  43 +++++
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  66 +++++++
+>  arch/arm/mach-omap2/omap_hwmod_common_data.h       |   2 +
+>  drivers/crypto/omap-sham.c                         | 202 +++++++++++----------
+>  10 files changed, 251 insertions(+), 157 deletions(-)
+>
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 1.7.12
+>
