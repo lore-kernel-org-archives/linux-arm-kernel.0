@@ -1,45 +1,108 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 5 Dec 2012 18:01:47 +0800
-Subject: [PATCH V2 0/6] ARM: tegra20: cpuidle: add power-down state
-Message-ID: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
+Date: Wed, 5 Dec 2012 18:01:48 +0800
+Subject: [PATCH V2 1/6] ARM: tegra: add pending SGI checking API
+In-Reply-To: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
+References: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
+Message-ID: <1354701715-24150-2-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a "powered-down" state in cpuidle for Tegra20. It requires power
-gating both CPU cores. When the CPU1 requests to enter "powered-down"
-state, it saves its own state and then enters WFI. When the CPU0 requests
-the same state, it attempts to put the CPU1 into reset to prevent it from
-waking up. Then power down both CPUs together and turn off the CPU rail.
+The "powered-down" CPU idle mode of Tegra cut off the vdd_cpu rail, it
+include the power of GIC. That caused the SGI (Software Generated
+Interrupt) been lost. Because the SGI can't wake up the CPU that in
+the "powered-down" CPU idle mode. We need to check if there is any
+pending SGI when go into "powered-down" CPU idle mode. This is important
+especially when applying the coupled cpuidle framework into "power-down"
+cpuidle dirver. Because the coupled cpuidle framework may have the
+chance that misses IPI_SINGLE_FUNC handling sometimes.
 
-If the CPU1 be woken up before CPU0 entering powered-down state, then it
-needs to restore it's CPU state and waits for next chance.
+For the PPI or SPI, something like the legacy peripheral interrupt. It
+still can be maintained by Tegra legacy interrupt controller. If there
+is any pending PPI or SPI when CPU in "powered-down" CPU idle mode. The
+CPU can be woken up immediately. So we don't need to take care the same
+situation for PPI or SPI.
 
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
 V2:
-* add a new patch for checking if there is any pending SGI
-* if there is a SGI pending for the CPU, then we will abort the
-  "powered-down" idle for the both CPUs that already in coupled state
-
-Verified on Seaboard(Tegra20) and Cardhu(Tegra30).
-
-Joseph Lo (6):
-  ARM: tegra: add pending SGI checking API
-  ARM: tegra20: cpuidle: add powered-down state for secondary CPU
-  ARM: tegra20: clocks: add CPU low-power function into
-    tegra_cpu_car_ops
-  ARM: tegra20: flowctrl: add support for cpu_suspend_enter/exit
-  ARM: tegra20: cpuidle: add powered-down state for CPU0
-  ARM: tegra20: cpuidle: apply coupled cpuidle for powered-down mode
-
- arch/arm/mach-tegra/Kconfig           |    1 +
- arch/arm/mach-tegra/cpuidle-tegra20.c |  191 +++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/flowctrl.c        |   38 ++++++-
- arch/arm/mach-tegra/flowctrl.h        |    4 +
- arch/arm/mach-tegra/irq.c             |   17 +++-
- arch/arm/mach-tegra/irq.h             |   22 ++++
- arch/arm/mach-tegra/pm.c              |    2 +
- arch/arm/mach-tegra/sleep-tegra20.S   |  198 +++++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/sleep.S           |   19 +++
- arch/arm/mach-tegra/sleep.h           |   26 +++++
- arch/arm/mach-tegra/tegra20_clocks.c  |   99 ++++++++++++++++
- 11 files changed, 610 insertions(+), 7 deletions(-)
+* new in V2
+---
+ arch/arm/mach-tegra/irq.c |   17 +++++++++++++++--
+ arch/arm/mach-tegra/irq.h |   22 ++++++++++++++++++++++
+ 2 files changed, 37 insertions(+), 2 deletions(-)
  create mode 100644 arch/arm/mach-tegra/irq.h
+
+diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+index b7886f1..3d2483a 100644
+--- a/arch/arm/mach-tegra/irq.c
++++ b/arch/arm/mach-tegra/irq.c
+@@ -45,7 +45,10 @@
+ 
+ #define FIRST_LEGACY_IRQ 32
+ 
++#define SGI_MASK 0xFFFF
++
+ static int num_ictlrs;
++static void __iomem *distbase = IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE);
+ 
+ static void __iomem *ictlr_reg_base[] = {
+ 	IO_ADDRESS(TEGRA_PRIMARY_ICTLR_BASE),
+@@ -55,6 +58,18 @@ static void __iomem *ictlr_reg_base[] = {
+ 	IO_ADDRESS(TEGRA_QUINARY_ICTLR_BASE),
+ };
+ 
++bool tegra_pending_sgi(void)
++{
++	u32 pending_set;
++
++	pending_set = readl_relaxed(distbase + GIC_DIST_PENDING_SET);
++
++	if (pending_set & SGI_MASK)
++		return true;
++
++	return false;
++}
++
+ static inline void tegra_irq_write_mask(unsigned int irq, unsigned long reg)
+ {
+ 	void __iomem *base;
+@@ -114,9 +129,7 @@ static int tegra_retrigger(struct irq_data *d)
+ void __init tegra_init_irq(void)
+ {
+ 	int i;
+-	void __iomem *distbase;
+ 
+-	distbase = IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE);
+ 	num_ictlrs = readl_relaxed(distbase + GIC_DIST_CTR) & 0x1f;
+ 
+ 	if (num_ictlrs > ARRAY_SIZE(ictlr_reg_base)) {
+diff --git a/arch/arm/mach-tegra/irq.h b/arch/arm/mach-tegra/irq.h
+new file mode 100644
+index 0000000..5142649
+--- /dev/null
++++ b/arch/arm/mach-tegra/irq.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright (c) 2012, NVIDIA Corporation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __TEGRA_IRQ_H
++#define __TEGRA_IRQ_H
++
++bool tegra_pending_sgi(void);
++
++#endif
+-- 
+1.7.0.4
