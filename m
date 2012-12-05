@@ -1,79 +1,79 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 5 Dec 2012 20:14:51 +0800
-Subject: [PATCH v2 1/4] ARM: imx: allow timer counter to roll over
-In-Reply-To: <20121204154459.GG14363@n2100.arm.linux.org.uk>
-References: <1354632915-27134-1-git-send-email-shawn.guo@linaro.org>
- <1354632915-27134-2-git-send-email-shawn.guo@linaro.org>
- <20121204154459.GG14363@n2100.arm.linux.org.uk>
-Message-ID: <20121205121449.GA26180@S2100-06.ap.freescale.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 5 Dec 2012 17:33:37 +0530
+Subject: [PATCH v3 1/3] mtd: nand: omap2: Update nerrors using ecc.strength
+In-Reply-To: <1354189595-12784-2-git-send-email-avinashphilip@ti.com>
+References: <1354189595-12784-1-git-send-email-avinashphilip@ti.com>
+ <1354189595-12784-2-git-send-email-avinashphilip@ti.com>
+Message-ID: <50BF3819.9010200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 04, 2012 at 03:44:59PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Dec 04, 2012 at 10:55:12PM +0800, Shawn Guo wrote:
-> > The timer is configured in free-run mode.  The counter should be
-> > allowed to roll over to 0 when reaching 0xffffffff.  Let's do that
-> > by always returning 0 in set_next_event.
+Hi Avinash,
+
+On 11/29/2012 5:16 PM, Philip, Avinash wrote:
+> Update number of errors using nand ecc strength.
+> Also add macro definitions BCH8_ERROR_MAX & BCH4_ERROR_MAX
+
+Can you please describe why the original method of setting nerrors was
+incorrect? Was it causing any issues in any particular configuration?
+Mentioning this will help maintainers assign priority to your patch. If
+this is a real bug affecting existing platforms, then there is a chance
+this patch can get into v3.7 (or at least into v3.8-rc1).
+
+Like Peter who commented on this before, I am not a fan of using macros
+for self-describing constants - especially when you end up using the
+same numbers inside the macro name itself. No need to resend any thing
+just for this, you can wait to see if the maintainers are okay with it.
+
+Thanks,
+Sekhar
+
 > 
-> Are you sure this is correct?  It looks wrong to me.
+> Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
+> ---
+> :100644 100644 359293e... 7e61dac... M	drivers/mtd/nand/omap2.c
+>  drivers/mtd/nand/omap2.c |   12 ++++++++----
+>  1 files changed, 8 insertions(+), 4 deletions(-)
 > 
-> If the time set by the next event has passed, you must return -ETIME
-> from set_next_event() so that the generic timer code can compensate
-> for the missed event and recalculate it, otherwise you will end up
-> having to wait a full count cycle before receiving the next event.
+> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+> index 359293e..7e61dac 100644
+> --- a/drivers/mtd/nand/omap2.c
+> +++ b/drivers/mtd/nand/omap2.c
+> @@ -118,6 +118,9 @@
+>  
+>  #define OMAP24XX_DMA_GPMC		4
+>  
+> +#define BCH8_MAX_ERROR		8	/* upto 8 bit correctable */
+> +#define BCH4_MAX_ERROR		4	/* upto 4 bit correctable */
+> +
+>  /* oob info generated runtime depending on ecc algorithm and layout selected */
+>  static struct nand_ecclayout omap_oobinfo;
+>  /* Define some generic bad / good block scan pattern which are used
+> @@ -1042,7 +1045,7 @@ static void omap3_enable_hwecc_bch(struct mtd_info *mtd, int mode)
+>  	struct nand_chip *chip = mtd->priv;
+>  	u32 val;
+>  
+> -	nerrors = (info->nand.ecc.bytes == 13) ? 8 : 4;
+> +	nerrors = info->nand.ecc.strength;
+>  	dev_width = (chip->options & NAND_BUSWIDTH_16) ? 1 : 0;
+>  	nsectors = 1;
+>  	/*
+> @@ -1219,13 +1222,14 @@ static int omap3_init_bch(struct mtd_info *mtd, int ecc_opt)
+>  	struct omap_nand_info *info = container_of(mtd, struct omap_nand_info,
+>  						   mtd);
+>  #ifdef CONFIG_MTD_NAND_OMAP_BCH8
+> -	const int hw_errors = 8;
+> +	const int hw_errors = BCH8_MAX_ERROR;
+>  #else
+> -	const int hw_errors = 4;
+> +	const int hw_errors = BCH4_MAX_ERROR;
+>  #endif
+>  	info->bch = NULL;
+>  
+> -	max_errors = (ecc_opt == OMAP_ECC_BCH8_CODE_HW) ? 8 : 4;
+> +	max_errors = (ecc_opt == OMAP_ECC_BCH8_CODE_HW) ?
+> +		BCH8_MAX_ERROR : BCH4_MAX_ERROR;
+>  	if (max_errors != hw_errors) {
+>  		pr_err("cannot configure %d-bit BCH ecc, only %d-bit supported",
+>  		       max_errors, hw_errors);
 > 
-> If you find that you're being passed such a small increment that you're
-> constantly hitting that condition, you need to increase your minimum
-> waited interval.
-
-I think we already have a proper min_delta_tick setting to ensure we
-will not run into the situation that the event will get expired in
-v2_set_next_event().  I guess that's the reason why most of the
-set_next_event() implementations under arch/arm can always return 0?
-
-> > diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-> > index f017302..858098c 100644
-> > --- a/arch/arm/mach-imx/time.c
-> > +++ b/arch/arm/mach-imx/time.c
-> > @@ -139,8 +139,7 @@ static int mx1_2_set_next_event(unsigned long evt,
-> >  
-> >  	__raw_writel(tcmp, timer_base + MX1_2_TCMP);
-> >  
-> > -	return (int)(tcmp - __raw_readl(timer_base + MX1_2_TCN)) < 0 ?
-> > -				-ETIME : 0;
-> > +	return 0;
-> 
-> So what this code was doing is: tcmp is the counter value we expect with
-> the expected event time added.  This may wrap 32-bits.  We subtract the
-> current timer value after we've set the compare register.  If the current
-> timer value was larger than the expected event time, we return -ETIME.
-
->From what I have seen, it never happens in event expiring case but
-always in counter wrapping.  Since the timer is configured in free-run
-mode and can keep running after wrapping, it should be safe to always
-return zero.
-
-> That to me sounds 100% correct.  Your replacement code of always returning
-> zero looks wrong.
-
-The code change is fixing a problem seen with WAIT mode support, without
-introducing any regression from what I've seen.
-
-Enabling WAIT mode support with the original code, we will easily run
-into an infinite loop in tick_handle_oneshot_broadcast() - "goto again;"
-This happens because when global event did not expire any CPU local
-events, the broadcast device will be rearmed to a CPU local next_event,
-which could be far away from now and result in a max_delta_tick
-programming in set_next_event().  This will certainly cause a counter
-wrapping and then a -ETIME return, which in turn makes the execution
-fall into the "goto again" loop.
-
-One thing I do not understand is why tick_broadcast_set_event() is being
-called with parameter "force" being 0 in tick_handle_oneshot_broadcast().
-This will make clockevents_program_event() skip
-clockevents_program_min_delta() call in that case.  Changing "force"
-to 1 also fixes my problem, but I wouldn't be so aggressive to change
-the clockevents core code when there is a fix that could be applied
-at platform level.
-
-Shawn
