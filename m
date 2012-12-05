@@ -1,53 +1,45 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Wed, 5 Dec 2012 09:35:39 -0000
-Subject: [PATCH v2] net/macb: Use non-coherent memory for rx buffers
-In-Reply-To: <50BE2FEC.2070500@atmel.com>
-References: <CAGhQ9VwWmP_B17LnAEqDHcL8Yd-s0C-Bf35z3+=vnJmK_NoCSw@mail.gmail.com>
- <1354536876-6274-1-git-send-email-nicolas.ferre@atmel.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B70D5@saturn3.aculab.com>
- <50BCA746.1020705@atmel.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B70D6@saturn3.aculab.com>
- <50BE2FEC.2070500@atmel.com>
-Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B70D9@saturn3.aculab.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 5 Dec 2012 18:01:47 +0800
+Subject: [PATCH V2 0/6] ARM: tegra20: cpuidle: add power-down state
+Message-ID: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> If I understand well, you mean that the call to:
-> 
-> 		dma_sync_single_range_for_device(&bp->pdev->dev, phys,
-> 				pg_offset, frag_len, DMA_FROM_DEVICE);
-> 
-> in the rx path after having copied the data to skb is not needed?
-> That is also the conclusion that I found after having thinking about
-> this again... I will check this.
+This adds a "powered-down" state in cpuidle for Tegra20. It requires power
+gating both CPU cores. When the CPU1 requests to enter "powered-down"
+state, it saves its own state and then enters WFI. When the CPU0 requests
+the same state, it attempts to put the CPU1 into reset to prevent it from
+waking up. Then power down both CPUs together and turn off the CPU rail.
 
-You need to make sure that the memory isn't in the data cache
-when you give the rx buffer back to the MAC.
-(and ensure the cpu doesn't read it until the rx is complete.)
-I've NFI what that dma_sync call does - you need to invalidate
-the cache lines.
- 
-> For the CRC, my driver is not using the CRC offloading feature for the
-> moment. So no CRC is written by the device.
+If the CPU1 be woken up before CPU0 entering powered-down state, then it
+needs to restore it's CPU state and waits for next chance.
 
-I was thinking it would matter if the MAC wrote the CRC into the
-buffer (even though it was excluded from the length).
-It doesn't - you only need to worry about data you've read.
+V2:
+* add a new patch for checking if there is any pending SGI
+* if there is a SGI pending for the CPU, then we will abort the
+  "powered-down" idle for the both CPUs that already in coupled state
 
-> > I was wondering if the code needs to do per page allocations?
-> > Perhaps that is necessary to avoid needing a large block of
-> > contiguous physical memory (and virtual addresses)?
-> 
-> The page management seems interesting for future management of RX
-> buffers as skb fragments: that will allow to avoid copying received data.
+Verified on Seaboard(Tegra20) and Cardhu(Tegra30).
 
-Dunno - the complexities of such buffer loaning schemes often
-exceed the gain of avoiding the data copy.
-Using buffers allocated to the skb is a bit different - since
-you completely forget about the memory once you pass the skb
-upstream.
+Joseph Lo (6):
+  ARM: tegra: add pending SGI checking API
+  ARM: tegra20: cpuidle: add powered-down state for secondary CPU
+  ARM: tegra20: clocks: add CPU low-power function into
+    tegra_cpu_car_ops
+  ARM: tegra20: flowctrl: add support for cpu_suspend_enter/exit
+  ARM: tegra20: cpuidle: add powered-down state for CPU0
+  ARM: tegra20: cpuidle: apply coupled cpuidle for powered-down mode
 
-Some quick sums indicate you might want to allocate 8k memory
-blocks and split into 5 buffers.
-
-	David
+ arch/arm/mach-tegra/Kconfig           |    1 +
+ arch/arm/mach-tegra/cpuidle-tegra20.c |  191 +++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/flowctrl.c        |   38 ++++++-
+ arch/arm/mach-tegra/flowctrl.h        |    4 +
+ arch/arm/mach-tegra/irq.c             |   17 +++-
+ arch/arm/mach-tegra/irq.h             |   22 ++++
+ arch/arm/mach-tegra/pm.c              |    2 +
+ arch/arm/mach-tegra/sleep-tegra20.S   |  198 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/sleep.S           |   19 +++
+ arch/arm/mach-tegra/sleep.h           |   26 +++++
+ arch/arm/mach-tegra/tegra20_clocks.c  |   99 ++++++++++++++++
+ 11 files changed, 610 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/irq.h
