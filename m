@@ -1,84 +1,60 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 5 Dec 2012 15:05:00 +0800
-Subject: [V2 PATCH 1/2] rtc: sa1100: move clock enable/disable to
- probe/remove
-In-Reply-To: <1354690149-3043-1-git-send-email-chao.xie@marvell.com>
-References: <1354690149-3043-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <CAN1soZwHigQNxRv17oDbX87wntxh_NjwDmhFkDabc4HW-ZH6bw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 5 Dec 2012 14:05:47 +0530
+Subject: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
+ OMAP-L138 DSP
+In-Reply-To: <13514BD7FAEBA745BBD7D8A672905C14311FB29D@DFLE08.ent.ti.com>
+References: <1352853207-20602-1-git-send-email-rtivy@ti.com>
+ <1352853207-20602-5-git-send-email-rtivy@ti.com>	<50AB76FA.1050505@ti.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311F952B@DFLE08.ent.ti.com>
+ <50B88F7C.5000705@ti.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311FAC29@DFLE08.ent.ti.com>
+ <50BCBA26.4070608@ti.com> <50BD07D8.5000305@ti.com> <50BD90F6.4080102@ti.com>
+ <50BE0E54.5060607@ti.com> <50BE2115.4000606@ti.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311FB29D@DFLE08.ent.ti.com>
+Message-ID: <50BF0763.8000304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 5, 2012 at 2:49 PM, Chao Xie <chao.xie@marvell.com> wrote:
-> The original sa1100_rtc_open/sa1100_rtc_release will be called
-> when the /dev/rtc0 is opened or closed.
-> In fact, these two functions will enable/disable the clock.
-> Disabling clock will make rtc not work.
-> So only enable/disable clock when probe/remove the device.
->
-> Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> ---
->  drivers/rtc/rtc-sa1100.c |   11 ++++++-----
->  1 files changed, 6 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
-> index 50a5c4a..34f66b8 100644
-> --- a/drivers/rtc/rtc-sa1100.c
-> +++ b/drivers/rtc/rtc-sa1100.c
-> @@ -108,9 +108,6 @@ static int sa1100_rtc_open(struct device *dev)
->         struct rtc_device *rtc = info->rtc;
->         int ret;
->
-> -       ret = clk_prepare_enable(info->clk);
-> -       if (ret)
-> -               goto fail_clk;
->         ret = request_irq(info->irq_1hz, sa1100_rtc_interrupt, 0, "rtc 1Hz", dev);
->         if (ret) {
->                 dev_err(dev, "IRQ %d already in use.\n", info->irq_1hz);
-> @@ -130,7 +127,6 @@ static int sa1100_rtc_open(struct device *dev)
->         free_irq(info->irq_1hz, dev);
->   fail_ui:
->         clk_disable_unprepare(info->clk);
-> - fail_clk:
->         return ret;
->  }
->
-> @@ -144,7 +140,6 @@ static void sa1100_rtc_release(struct device *dev)
->
->         free_irq(info->irq_alarm, dev);
->         free_irq(info->irq_1hz, dev);
-> -       clk_disable_unprepare(info->clk);
->  }
->
->  static int sa1100_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
-> @@ -253,6 +248,9 @@ static int sa1100_rtc_probe(struct platform_device *pdev)
->         spin_lock_init(&info->lock);
->         platform_set_drvdata(pdev, info);
->
-> +       ret = clk_prepare_enable(info->clk);
-> +       if (ret)
-> +               goto err_enable_clk;
->         /*
->          * According to the manual we should be able to let RTTR be zero
->          * and then a default diviser for a 32.768KHz clock is used.
-> @@ -305,6 +303,8 @@ static int sa1100_rtc_probe(struct platform_device *pdev)
->
->         return 0;
->  err_dev:
-> +       clk_disable_unprepare(info->clk);
-> +err_enable_clk:
->         platform_set_drvdata(pdev, NULL);
->         clk_put(info->clk);
->  err_clk:
-> @@ -318,6 +318,7 @@ static int sa1100_rtc_remove(struct platform_device *pdev)
->
->         if (info) {
->                 rtc_device_unregister(info->rtc);
-> +               clk_disable_unprepare(info->clk);
->                 clk_put(info->clk);
->                 platform_set_drvdata(pdev, NULL);
->                 kfree(info);
-> --
-> 1.7.4.1
->
+adding back the ARM list.
 
-Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+On 12/5/2012 7:53 AM, Tivy, Robert wrote:
+>> -----Original Message-----
+>> From: davinci-linux-open-source-bounces at linux.davincidsp.com
+>> [mailto:davinci-linux-open-source-bounces at linux.davincidsp.com] On
+>> Behalf Of Karicheri, Muralidharan
+>> Sent: Tuesday, December 04, 2012 8:13 AM
+>> To: davinci-linux-open-source at linux.davincidsp.com
+>> Subject: Re: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
+>> OMAP-L138 DSP
+>>
+>> On 12/04/2012 09:53 AM, Murali Karicheri wrote:
+>>>>
+>>>>
+>>> I believe this is addressing the same issue. This is a DT based
+>>> solution, which I believe should add a framework and enhance it to
+>>> support DT.
+>> Forgot to paste the link. Here we go
+>>
+>> https://patchwork.kernel.org/patch/1635051/
+>>
+> 
+> Thanks Murali, very interesting.
+> 
+> The thread in your link above mentions omap_hwmod at the end, and I've been looking at how that's handled but it's quite complex.  Would a similar solution (davinci_hwmod) be a good approach?
+
+Um, no. I don't think the thread is proposing hwmod kind of
+implementation for each machine that implements the (to be proposed)
+reset API. Mike is just asking to have a look at omap hwmod to see how
+it handles device resets for an inspiration on how the proposed API can
+work. The final API will generic with machine specific implementation
+for each machine that implements it.
+
+OMAP created HWMOD to handle the complexities of that chip, there is no
+need to replicate that in DaVinci.
+
+The link is definitely interesting and exactly what we were looking for.
+It will be better to continue the discussion on that thread there so all
+interested parties are on a single thread.
+
+Thanks,
+Sekhar
