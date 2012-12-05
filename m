@@ -1,39 +1,22 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed,  5 Dec 2012 22:42:12 +0100
-Subject: [PATCH] i2c: at91: add of_device_id entry for at91rm9200
-Message-ID: <1354743732-11581-1-git-send-email-manabian@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 5 Dec 2012 21:50:42 +0000
+Subject: [PATCH v4] backlight: corgi_lcd: Use gpio_set_value_cansleep() to
+ avoid WARN_ON
+In-Reply-To: <20121205192141.GQ14363@n2100.arm.linux.org.uk>
+References: <000201cdd283$baf50160$30df0420$%han@samsung.com>
+ <20121205093027.GK14363@n2100.arm.linux.org.uk>
+ <CAHod+Gdb_LEnhx5cz9j=q9PyS4L=Yjxs303dHon9i-tgjJRtDA@mail.gmail.com>
+ <20121205192141.GQ14363@n2100.arm.linux.org.uk>
+Message-ID: <CACxGe6sz_5epOLW47-nbXpBrjc4ZAVaFL3Ge5jt8H9HEbnzpcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
-Hi,
+On Wed, Dec 5, 2012 at 7:21 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> As I say above, IMHO it would've been much better to rename these functions
+> to be the other way around but David was always very dismissive of any
+> comments I had against any code he'd written.
 
-AT91RM9200 is gaining DT support now so let's add an id to the i2c driver.
+FWIW, I'll gladly take a patch to rename them now if someone does the legwork.
 
-Tested on custom RM9200 board. Since the driver doesn't support pinctrl
-muxing yet I had to add pinctrl hogs for the i2c pins in my dts for it
-to work.
-
-regards
-Joachim Eastwood
-
- drivers/i2c/busses/i2c-at91.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index b4575ee..c504aa8 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -584,6 +584,9 @@ static const struct platform_device_id at91_twi_devtypes[] = {
- #if defined(CONFIG_OF)
- static const struct of_device_id atmel_twi_dt_ids[] = {
- 	{
-+		.compatible = "atmel,at91rm9200-i2c",
-+		.data = &at91rm9200_config,
-+	} , {
- 		.compatible = "atmel,at91sam9260-i2c",
- 		.data = &at91sam9260_config,
- 	} , {
--- 
-1.8.0
+g.
