@@ -1,54 +1,98 @@
-From: frank.rowand@am.sony.com (Frank Rowand)
-Date: Tue, 4 Dec 2012 21:05:29 -0800
-Subject: [PATCH RT 0/2][RFC] fix RCU stall warning on ARM
-In-Reply-To: <50BED1DA.7070907@am.sony.com>
-References: <50BED1DA.7070907@am.sony.com>
-Message-ID: <50BED619.8060102@am.sony.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Wed, 5 Dec 2012 05:15:52 +0000
+Subject: [PATCH v3 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC
+ timings and NAND
+In-Reply-To: <20121201215014.GA11236@parrot.com>
+References: <5097B7EE.3000508@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9DC1F1@DBDE01.ent.ti.com>
+ <509A2E75.5060307@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9DE420@DBDE01.ent.ti.com>
+ <509EA360.2050504@gmail.com> <87mwycjmdn.fsf@dell.be.48ers.dk>
+ <50ACA9BB.7090106@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9EEA09@DBDE01.ent.ti.com>
+ <50B4C796.4010403@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9F25CB@DBDE01.ent.ti.com>
+ <20121201215014.GA11236@parrot.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3EA1100E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/12 20:47, Frank Rowand wrote:
-> The RCU stall warning functions call trigger_all_cpu_backtrace()
-> to print a backtrace on each cpu.  This function is only
-> implemented for x86.  Add a version for ARM.
+On Sun, Dec 02, 2012 at 03:20:14, Ivan Djelic wrote:
+> On Wed, Nov 28, 2012 at 05:01:30AM +0000, Philip, Avinash wrote:
+> (...)
+> > 
+> > Daniel,
+> > 
+> > So can you start supporting "bch8-am335xrbl-compatible" and remove usage of
+> > is_elm_used in dt. This should come in ecc_opt field.
+> > 
+> > In omap2 NAND driver, AM335x RBL compatibility is achieved depending on ecc_layout
+> > and runtime detection of elm module. So options related to can be
+> > 1. bch8-am335xrbl-compatible is enabled and run time detection of
+> >    Of elm module passed, RBL compatibility achieved.
+> > 2. bch8-am335xrbl-compatible is enabled and run time detection of
+> >    of elm module failed, RBL compatibility sacrificed but continue with
+> >    software BCH8 error correction. Sacrificing RBL compatibility
+> >    because of constant polynomial addition and usage of 14 byte instead of 13 byte.
+> > 
+> > Ivan,
+> > Do you have any plan of removing addition of constant polynomial to ecc data
+> > and go for extra byte checking to find erased pages?
+> > This way we can start support BCH8 with RBL compatible and kernel
+> > Didn't put any restriction of the ecc layout.
 > 
-> With CONFIG_PREEMPT_RT_FULL enabled, flushing the output from
-> printk() is inhibited in some contexts to avoid increasing
-> real time latencies.  The RCU stall warnings are inhibited
-> on ARM due to this feature.  (I have not tested whether this
-> is also the case on other architectures.)  Add back the
-> oops_in_progress flag to allow the RCU stall warnings to
-> print immediately.
+> Hello Avinash,
+> 
+> Sorry about the response delay.
+> First a short reminder of pros and cons of the "constant polynomial addition"
+> (let's just call it "CPA") feature:
+> 
+> pros:
+> - it elegantly solves all problems related to reading an erased page (no clumsy hack needed)
+> - better performance: when a bitflip appears on an erased page (often this is a "sticky" bitflip),
+>   there is no need to perform a full scan+cleanup of the page each time it is read
 
-When I first implemented these patches on a locally modified
-3.0.27-rt67, the call to "bust_spinlocks(0)" that I added to
-print_cpu_stall() led to LOCKDEP warning of inconsistent
-lock state from a trylock in serial_omap_console_write():
+No need for scan + cleanup on each read, as the chances of encountering bit flips in erased page
+is less. Also to find bit flips in erased page, compare ecc vector for read erased page against
+a standard ecc vector. Presence of bit flips can find by checking the compare results. In case of
+mismatch, should go for correction of bit flips in erased page with full scan.
 
-        else if (oops_in_progress)
-                locked = spin_trylock_irqsave(&up->port.lock, flags);
+So with this approach, we can nullify the effect of CPA for erased page bit flip handling.
 
-If I understand correctly, the warning is triggered on the
-slow lock path.  Some more of the warning is:
+> 
+> cons:
+> - the ecc vector is not compatible with RBL
+> 
+> RBL compatibility is not necessary in my case, because I'm using the OMAP MLC ROM boot mode.
+> Rather than completely removing the CPA feature, I'd like to keep it as an option; it could
+> even be used with the ELM module.
 
-   inconsistent {HARDIRQ-ON-W} -> {IN-HARDIRQ-W} usage.
-   swapper/1/0 [HC1[1]:SC0[0]:HE0:SE1] takes:
-    (&(&(&port->lock)->lock)->wait_lock){?.+...}, at: [<c0478ed0>] rt_spin_trylock_irqsave+0x24/0xe0
+I agree RBL compatibility depends on the user. But with RBL compatibility, there is no sacrifice
+of any existing feature. Is it right?
 
-   ...
+Also nand driver get simplified with removal of CPA, so that both HW & SW error correction
+can go for same ecc calculation.
 
-   other info that might help us debug this:
-    Possible unsafe locking scenario:
+> 
+> I'm OK to submit a patch in this direction, but first I'd like to wait for the dust to settle
+> on arch/arm/mach-omap2 and mtd/nand/omap2.c with Afzal patches and everything; things have become
+> a bit complicated to follow recently :-)
 
-          CPU0
-          ----
-     lock(&(&(&port->lock)->lock)->wait_lock);
-     <Interrupt>
-       lock(&(&(&port->lock)->lock)->wait_lock);
+Afzal's changes are in & are settled now.
 
+> Also, I think it would be nice to move BCH code out of omap2.c into a separate file.
+> What do you think ?
 
-I have not been able to trigger the warning on recent versions
-of the patches, but I suspect the latent problem might still
-exist.
+With BCH code you mean, omap3_correct_data_bch()?
 
--Frank
+I think this can be part of omap2 driver it self as it is ecc correctable method for 
+nand driver.
+
+Thanks
+Avinash
+
+> 
+> BR,
+> --
+> Ivan
+> 
