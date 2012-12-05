@@ -1,345 +1,74 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 5 Dec 2012 10:50:15 +0000
-Subject: [PATCH V2 2/6] ARM: tegra20: cpuidle: add powered-down state for
- secondary CPU
-In-Reply-To: <1354701715-24150-3-git-send-email-josephl@nvidia.com>
-References: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
- <1354701715-24150-3-git-send-email-josephl@nvidia.com>
-Message-ID: <20121205105010.GA12999@e102568-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Dec 2012 10:58:22 +0000
+Subject: [PATCH v4 12/13] ARM: KVM: vgic: reduce the number of vcpu kick
+In-Reply-To: <20121205104358.GC22385@mudshark.cambridge.arm.com>
+References: <20121110154358.3061.16338.stgit@chazy-air>
+ <20121110154539.3061.82553.stgit@chazy-air>
+ <20121205104358.GC22385@mudshark.cambridge.arm.com>
+Message-ID: <20121205105822.GL14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 05, 2012 at 10:01:49AM +0000, Joseph Lo wrote:
-> The powered-down state of Tegra20 requires power gating both CPU cores.
-> When the secondary CPU requests to enter powered-down state, it saves
-> its own contexts and then enters WFI. The Tegra20 had a limition to
-> power down both CPU cores. The secondary CPU must waits for CPU0 in
-> powered-down state too. If the secondary CPU be woken up before CPU0
-> entering powered-down state, then it needs to restore its CPU states
-> and waits for next chance.
+On Wed, Dec 05, 2012 at 10:43:58AM +0000, Will Deacon wrote:
+> On Sat, Nov 10, 2012 at 03:45:39PM +0000, Christoffer Dall wrote:
+> > From: Marc Zyngier <marc.zyngier@arm.com>
+> > 
+> > If we have level interrupts already programmed to fire on a vcpu,
+> > there is no reason to kick it after injecting a new interrupt,
+> > as we're guaranteed that we'll exit when the level interrupt will
+> > be EOId (VGIC_LR_EOI is set).
+> > 
+> > The exit will force a reload of the VGIC, injecting the new interrupts.
+> > 
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+> > ---
+> >  arch/arm/include/asm/kvm_vgic.h |   10 ++++++++++
+> >  arch/arm/kvm/arm.c              |   10 +++++++++-
+> >  arch/arm/kvm/vgic.c             |   10 ++++++++--
+> >  3 files changed, 27 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
+> > index a8e7a93..7d2662c 100644
+> > --- a/arch/arm/include/asm/kvm_vgic.h
+> > +++ b/arch/arm/include/asm/kvm_vgic.h
+> > @@ -215,6 +215,9 @@ struct vgic_cpu {
+> >  	u32		vgic_elrsr[2];	/* Saved only */
+> >  	u32		vgic_apr;
+> >  	u32		vgic_lr[64];	/* A15 has only 4... */
+> > +
+> > +	/* Number of level-triggered interrupt in progress */
+> > +	atomic_t	irq_active_count;
+> >  #endif
+> >  };
+> >  
+> > @@ -254,6 +257,8 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+> >  
+> >  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.vctrl_base))
+> >  #define vgic_initialized(k)	((k)->arch.vgic.ready)
+> > +#define vgic_active_irq(v)	(atomic_read(&(v)->arch.vgic_cpu.irq_active_count) == 0)
 > 
-> Be aware of that, you may see the legacy power state "LP2" in the code
-> which is exactly the same meaning of "CPU power down".
-> 
-> Based on the work by:
-> Colin Cross <ccross@android.com>
-> Gary King <gking@nvidia.com>
-> 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
-> V2:
-> * no change
-> ---
->  arch/arm/mach-tegra/cpuidle-tegra20.c |   84 +++++++++++++++++++
->  arch/arm/mach-tegra/pm.c              |    2 +
->  arch/arm/mach-tegra/sleep-tegra20.S   |  145 +++++++++++++++++++++++++++++++++
->  arch/arm/mach-tegra/sleep.h           |   23 +++++
->  4 files changed, 254 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-> index d32e8b0..9d59a46 100644
-> --- a/arch/arm/mach-tegra/cpuidle-tegra20.c
-> +++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-> @@ -22,21 +22,105 @@
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/cpuidle.h>
-> +#include <linux/cpu_pm.h>
-> +#include <linux/clockchips.h>
-> 
->  #include <asm/cpuidle.h>
-> +#include <asm/proc-fns.h>
-> +#include <asm/suspend.h>
-> +#include <asm/smp_plat.h>
-> +
-> +#include "pm.h"
-> +#include "sleep.h"
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int tegra20_idle_lp2(struct cpuidle_device *dev,
-> +                           struct cpuidle_driver *drv,
-> +                           int index);
-> +#endif
-> 
->  static struct cpuidle_driver tegra_idle_driver = {
->         .name = "tegra_idle",
->         .owner = THIS_MODULE,
->         .en_core_tk_irqen = 1,
-> +#ifdef CONFIG_PM_SLEEP
-> +       .state_count = 2,
-> +#else
->         .state_count = 1,
-> +#endif
+> When is the atomic_t initialised to zero? I can only see increments.
 
-These hardcoded values are not nice.
+I'd question whether an atomic type is correct for this; the only
+protection that it's offering is to ensure that the atomic increment
+and decrement occur atomically - there's nothing else that they're doing
+in this code.
 
->         .states = {
->                 [0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
-> +#ifdef CONFIG_PM_SLEEP
-> +               [1] = {
-> +                       .enter                  = tegra20_idle_lp2,
-> +                       .exit_latency           = 5000,
-> +                       .target_residency       = 10000,
-> +                       .power_usage            = 0,
-> +                       .flags                  = CPUIDLE_FLAG_TIME_VALID,
-> +                       .name                   = "powered-down",
-> +                       .desc                   = "CPU power gated",
-> +               },
-> +#endif
->         },
->  };
-> 
->  static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
-> 
-> +#ifdef CONFIG_PM_SLEEP
-> +#ifdef CONFIG_SMP
-> +static bool tegra20_idle_enter_lp2_cpu_1(struct cpuidle_device *dev,
-> +                                        struct cpuidle_driver *drv,
-> +                                        int index)
-> +{
-> +       clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-> +
-> +       smp_wmb();
+If those atomic increments and decrements are occuring beneath a common
+lock, then using atomic types is just mere code obfuscation.
 
-Can you explain to me the need for this barrier ?
+For example, I'd like to question the correctness of this:
 
-> +
-> +       cpu_suspend(0, tegra20_sleep_cpu_secondary_finish);
-> +
-> +       tegra20_cpu_clear_resettable();
-> +
-> +       clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-> +
-> +       return true;
-> +}
-> +#else
-> +static inline bool tegra20_idle_enter_lp2_cpu_1(struct cpuidle_device *dev,
-> +                                               struct cpuidle_driver *drv,
-> +                                               int index)
-> +{
-> +       return true;
-> +}
-> +#endif
-> +
-> +static int __cpuinit tegra20_idle_lp2(struct cpuidle_device *dev,
-> +                                     struct cpuidle_driver *drv,
-> +                                     int index)
-> +{
-> +       u32 cpu = is_smp() ? cpu_logical_map(dev->cpu) : dev->cpu;
-> +       bool entered_lp2 = false;
-> +
-> +       local_fiq_disable();
-> +
-> +       tegra_set_cpu_in_lp2(cpu);
-> +       cpu_pm_enter();
-> +
-> +       if (cpu == 0)
-> +               cpu_do_idle();
-> +       else
-> +               entered_lp2 = tegra20_idle_enter_lp2_cpu_1(dev, drv, index);
-> +
-> +       cpu_pm_exit();
-> +       tegra_clear_cpu_in_lp2(cpu);
-> +
-> +       local_fiq_enable();
-> +
-> +       smp_rmb();
-> +
-> +       return (entered_lp2) ? index : 0;
-> +}
-> +#endif
-> +
->  int __init tegra20_cpuidle_init(void)
->  {
->         int ret;
-> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-> index 1b11707..db72ea9 100644
-> --- a/arch/arm/mach-tegra/pm.c
-> +++ b/arch/arm/mach-tegra/pm.c
-> @@ -173,6 +173,8 @@ bool __cpuinit tegra_set_cpu_in_lp2(int phy_cpu_id)
-> 
->         if ((phy_cpu_id == 0) && cpumask_equal(cpu_lp2_mask, cpu_online_mask))
->                 last_cpu = true;
-> +       else if (phy_cpu_id == 1)
-> +               tegra20_cpu_set_resettable_soon();
-> 
->         spin_unlock(&tegra_lp2_lock);
->         return last_cpu;
-> diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
-> index 72ce709..dfb2be5 100644
-> --- a/arch/arm/mach-tegra/sleep-tegra20.S
-> +++ b/arch/arm/mach-tegra/sleep-tegra20.S
-> @@ -21,6 +21,8 @@
->  #include <linux/linkage.h>
-> 
->  #include <asm/assembler.h>
-> +#include <asm/proc-fns.h>
-> +#include <asm/cp15.h>
-> 
->  #include "sleep.h"
->  #include "flowctrl.h"
-> @@ -78,3 +80,146 @@ ENTRY(tegra20_cpu_shutdown)
->         mov     pc, lr
->  ENDPROC(tegra20_cpu_shutdown)
->  #endif
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +/*
-> + * tegra_pen_lock
-> + *
-> + * spinlock implementation with no atomic test-and-set and no coherence
-> + * using Peterson's algorithm on strongly-ordered registers
-> + * used to synchronize a cpu waking up from wfi with entering lp2 on idle
-> + *
-> + * SCRATCH37 = r1 = !turn (inverted from Peterson's algorithm)
-> + * on cpu 0:
-> + * SCRATCH38 = r2 = flag[0]
-> + * SCRATCH39 = r3 = flag[1]
-> + * on cpu1:
-> + * SCRATCH39 = r2 = flag[1]
-> + * SCRATCH38 = r3 = flag[0]
-> + *
-> + * must be called with MMU on
-> + * corrupts r0-r3, r12
-> + */
-> +ENTRY(tegra_pen_lock)
-> +       mov32   r3, TEGRA_PMC_VIRT
-> +       cpu_id  r0
-> +       add     r1, r3, #PMC_SCRATCH37
-> +       cmp     r0, #0
-> +       addeq   r2, r3, #PMC_SCRATCH38
-> +       addeq   r3, r3, #PMC_SCRATCH39
-> +       addne   r2, r3, #PMC_SCRATCH39
-> +       addne   r3, r3, #PMC_SCRATCH38
-> +
-> +       mov     r12, #1
-> +       str     r12, [r2]               @ flag[cpu] = 1
-> +       dsb
-> +       str     r12, [r1]               @ !turn = cpu
-> +1:     dsb
-> +       ldr     r12, [r3]
-> +       cmp     r12, #1                 @ flag[!cpu] == 1?
-> +       ldreq   r12, [r1]
-> +       cmpeq   r12, r0                 @ !turn == cpu?
-> +       beq     1b                      @ while !turn == cpu && flag[!cpu] == 1
-> +
-> +       mov     pc, lr                  @ locked
-> +ENDPROC(tegra_pen_lock)
-> +
-> +ENTRY(tegra_pen_unlock)
-> +       dsb
-> +       mov32   r3, TEGRA_PMC_VIRT
-> +       cpu_id  r0
-> +       cmp     r0, #0
-> +       addeq   r2, r3, #PMC_SCRATCH38
-> +       addne   r2, r3, #PMC_SCRATCH39
-> +       mov     r12, #0
-> +       str     r12, [r2]
-> +       mov     pc, lr
-> +ENDPROC(tegra_pen_unlock)
++               if (vgic_active_irq(vcpu) &&
++                   cmpxchg(&vcpu->mode, EXITING_GUEST_MODE, IN_GUEST_MODE) == EXITING_GUEST_MODE)
 
-There is an ongoing work to make this locking scheme for MMU/coherency off
-paths ARM generic, and we do not want to merge yet another platform specific
-locking mechanism. I will point you to the patchset when it hits LAK.
+What if vgic_active_irq() reads the atomic type, immediately after it gets
+decremented to zero before the cmpxchg() is executed?  Would that be a
+problem?
 
-> +
-> +/*
-> + * tegra20_cpu_clear_resettable(void)
-> + *
-> + * Called to clear the "resettable soon" flag in PMC_SCRATCH41 when
-> + * it is expected that the secondary CPU will be idle soon.
-> + */
-> +ENTRY(tegra20_cpu_clear_resettable)
-> +       mov32   r1, TEGRA_PMC_VIRT + PMC_SCRATCH41
-> +       mov     r12, #CPU_NOT_RESETTABLE
-> +       str     r12, [r1]
-> +       mov     pc, lr
-> +ENDPROC(tegra20_cpu_clear_resettable)
-> +
-> +/*
-> + * tegra20_cpu_set_resettable_soon(void)
-> + *
-> + * Called to set the "resettable soon" flag in PMC_SCRATCH41 when
-> + * it is expected that the secondary CPU will be idle soon.
-> + */
-> +ENTRY(tegra20_cpu_set_resettable_soon)
-> +       mov32   r1, TEGRA_PMC_VIRT + PMC_SCRATCH41
-> +       mov     r12, #CPU_RESETTABLE_SOON
-> +       str     r12, [r1]
-> +       mov     pc, lr
-> +ENDPROC(tegra20_cpu_set_resettable_soon)
-> +
-> +/*
-> + * tegra20_sleep_cpu_secondary_finish(unsigned long v2p)
-> + *
-> + * Enters WFI on secondary CPU by exiting coherency.
-> + */
-> +ENTRY(tegra20_sleep_cpu_secondary_finish)
-> +       mrc     p15, 0, r11, c1, c0, 1  @ save actlr before exiting coherency
-> +
-> +       /* Flush and disable the L1 data cache */
-> +       bl      tegra_disable_clean_inv_dcache
-> +
-> +       mov32   r0, TEGRA_PMC_VIRT + PMC_SCRATCH41
-> +       mov     r3, #CPU_RESETTABLE
-> +       str     r3, [r0]
-> +
-> +       bl      cpu_do_idle
-> +
-> +       /*
-> +        * cpu may be reset while in wfi, which will return through
-> +        * tegra_resume to cpu_resume
-> +        * or interrupt may wake wfi, which will return here
-> +        * cpu state is unchanged - MMU is on, cache is on, coherency
-> +        * is off, and the data cache is off
-> +        *
-> +        * r11 contains the original actlr
-> +        */
-> +
-> +       bl      tegra_pen_lock
-> +
-> +       mov32   r3, TEGRA_PMC_VIRT
-> +       add     r0, r3, #PMC_SCRATCH41
-> +       mov     r3, #CPU_NOT_RESETTABLE
-> +       str     r3, [r0]
-> +
-> +       bl      tegra_pen_unlock
-> +
-> +       /* Re-enable the data cache */
-> +       mrc     p15, 0, r10, c1, c0, 0
-> +       orr     r10, r10, #CR_C
-> +       mcr     p15, 0, r10, c1, c0, 0
-> +       isb
-> +
-> +       mcr     p15, 0, r11, c1, c0, 1  @ reenable coherency
-> +
-> +       /* Invalidate the TLBs & BTAC */
-> +       mov     r1, #0
-> +       mcr     p15, 0, r1, c8, c3, 0   @ invalidate shared TLBs
-> +       mcr     p15, 0, r1, c7, c1, 6   @ invalidate shared BTAC
-> +       dsb
-> +       isb
-> +
-> +       /* the cpu was running with coherency disabled,
-> +        * caches may be out of date */
-> +       bl      v7_flush_kern_cache_louis
-> +
-> +       ldmia   sp!, {r1 - r3}          @ pop phys pgd, virt SP, phys resume fn
-> +       mov     r0, #0                  @ return success
-> +       mov     sp, r2                  @ sp is stored in r2 by __cpu_suspend
-
-This is not true. sp is retrieved from the r2 value popped above.
-Anyway, all this code is a copy'n'paste from __cpu_suspend. Now if I got
-what you want to do right, all you want to do is return to cpu_suspend
-with r0 == 0.
-
-(1) You should not rely on the register layout of __cpu_suspend since if
-    it changes we have to patch this code as well. Do not rely on that.
-(2) Why do you want to return with r0 == 0 ? To me that's a mistery.
-    Is that because you want cpu_suspend to restore the page table
-    pointer ? Even in that case I am afraid I am against this code.
-    Usage of cpu_suspend must be consistent and you *must* not use it as a
-    plaster or rely on any specific register layout, it has to be used
-    for the purpose it has been designed for.
-
-Lorenzo
+If yes, yet again this illustrates why the use of atomic types leads people
+down the path of believing that their code somehow becomes magically safe
+through the use of this smoke-screen.  IMHO, every use of atomic_t must be
+questioned and carefully analysed before it gets into the kernel - many
+are buggy through assumptions that atomic_t buys you something magic.
