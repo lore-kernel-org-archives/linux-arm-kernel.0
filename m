@@ -1,42 +1,110 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 05 Dec 2012 12:58:47 -0500 (EST)
-Subject: [PATCH] net/macb: increase RX buffer size for GEM
-In-Reply-To: <50BF6366.8080600@atmel.com>
-References: <1354536943-6356-1-git-send-email-nicolas.ferre@atmel.com>
- <20121204.132227.1430662061932892582.davem@davemloft.net>
- <50BF6366.8080600@atmel.com>
-Message-ID: <20121205.125847.649579012053540438.davem@davemloft.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 5 Dec 2012 10:00:03 -0800
+Subject: [PATCH 1/2] clk: introduce optional disable_unused callback
+In-Reply-To: <CAPDyKFpGR++iN1JQ+ceUq+Qa216nrwLUdMDdB+Ei4VsLrnzKTQ@mail.gmail.com>
+References: <1354654823-1576-1-git-send-email-mturquette@linaro.org>
+ <1354654823-1576-2-git-send-email-mturquette@linaro.org>
+ <CAPDyKFpGR++iN1JQ+ceUq+Qa216nrwLUdMDdB+Ei4VsLrnzKTQ@mail.gmail.com>
+Message-ID: <CAPtuhTgGtKfDDx5GU5F+MLTz7B8YHknLAP65gXYut+TJCgtEpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
-Date: Wed, 5 Dec 2012 16:08:22 +0100
+On Wed, Dec 5, 2012 at 8:13 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 4 December 2012 22:00, Mike Turquette <mturquette@linaro.org> wrote:
+>> Some gate clocks have special needs which must be handled during the
+>> disable-unused clocks sequence.  These needs might be driven by software
+>> due to the fact that we're disabling a clock outside of the normal
+>> clk_disable path and a clk's enable_count will not be accurate.  On the
+>> other hand a specific hardware programming sequence might need to be
+>> followed for this corner case.
+>>
+>> This change is needed for the upcoming OMAP port to the common clock
+>> framework.  Specifically, it is undesirable to treat the disable-unused
+>> path identically to the normal clk_disable path since other software
+>> layers are involved.  In this case OMAP's clockdomain code throws WARNs
+>> and bails early due to the clock's enable_count being set to zero.  A
+>> custom callback mitigates this problem nicely.
+>>
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+>> ---
+>>  drivers/clk/clk.c            |   13 +++++++++++--
+>>  include/linux/clk-provider.h |    6 ++++++
+>>  2 files changed, 17 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>> index 9955ad7..251e45d 100644
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -219,8 +219,17 @@ static void clk_disable_unused_subtree(struct clk *clk)
+>>         if (clk->flags & CLK_IGNORE_UNUSED)
+>>                 goto unlock_out;
+>>
+>> -       if (__clk_is_enabled(clk) && clk->ops->disable)
+>> -               clk->ops->disable(clk->hw);
+>> +       /*
+>> +        * some gate clocks have special needs during the disable-unused
+>> +        * sequence.  call .disable_unused if available, otherwise fall
+>> +        * back to .disable
+>> +        */
+>> +       if (__clk_is_enabled(clk)) {
+>> +               if (clk->ops->disable_unused)
+>> +                       clk->ops->disable_unused(clk->hw);
+>> +               else if (clk->ops->disable)
+>> +                       clk->ops->disable(clk->hw);
+>> +       }
+>>
+>>  unlock_out:
+>>         spin_unlock_irqrestore(&enable_lock, flags);
+>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+>> index 3593a3c..1c94d18 100644
+>> --- a/include/linux/clk-provider.h
+>> +++ b/include/linux/clk-provider.h
+>> @@ -57,6 +57,11 @@ struct clk_hw;
+>>   *             This function must not sleep. Optional, if this op is not
+>>   *             set then the enable count will be used.
+>>   *
+>> + * @disable_unused: Disable the clock atomically.  Only called from
+>> + *             clk_disable_unused for gate clocks with special needs.
+>> + *             Called with enable_lock held.  This function must not
+>> + *             sleep.
+>> + *
+>>   * @recalc_rate        Recalculate the rate of this clock, by querying hardware. The
+>>   *             parent rate is an input parameter.  It is up to the caller to
+>>   *             ensure that the prepare_mutex is held across this call.
+>> @@ -106,6 +111,7 @@ struct clk_ops {
+>>         int             (*enable)(struct clk_hw *hw);
+>>         void            (*disable)(struct clk_hw *hw);
+>>         int             (*is_enabled)(struct clk_hw *hw);
+>> +       void            (*disable_unused)(struct clk_hw *hw);
+>>         unsigned long   (*recalc_rate)(struct clk_hw *hw,
+>>                                         unsigned long parent_rate);
+>>         long            (*round_rate)(struct clk_hw *hw, unsigned long,
+>> --
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> Is there a need for updating the clk documentation around this?
+>
 
-> On 12/04/2012 07:22 PM, David Miller :
->> From: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Date: Mon, 3 Dec 2012 13:15:43 +0100
->> 
->>> Macb Ethernet controller requires a RX buffer of 128 bytes. It is
->>> highly sub-optimal for Gigabit-capable GEM that is able to use
->>> a bigger DMA buffer. Change this constant and associated macros
->>> with data stored in the private structure.
->>> I also kept the result of buffers per page calculation to lower the
->>> impact of this move to a variable rx buffer size on rx hot path.
->>> RX DMA buffer size has to be multiple of 64 bytes as indicated in
->>> DMA Configuration Register specification.
->>>
->>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> 
->> This looks like it will waste a couple hundred bytes for 1500 MTU
->> frames, am I right?
-> 
-> Yep! But buffers get recycled, and with the current memory management by
-> pages, it seems that I have to rework some part of it to optimize this
-> memory usage (8KB memory blocks split into 5 buffers each as David said...).
-> 
-> Do you think it is worth digging this way or may I rework the rx buffer
-> management in case of the GEM interface. If I implement a different path
-> for GEM interface, I will have the possibility to tailor rx DMA buffers
-> from 1500 Bytes up to 10KB jumbo frames...
+I knew I was forgetting something.  The documentation needs a general
+cleanup effort and this callback should not go undocumented for long.
 
-I almost think you have to.
+> Anyway, you have my:
+>
+> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+>
+
+Thanks!
+
+Regards,
+Mike
+
+>
+> Kind regards
+> Ulf Hansson
