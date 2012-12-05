@@ -1,43 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 5 Dec 2012 15:58:48 -0500
-Subject: [GIT PULL] Improve the SMP support of the interrupt controller
- for Armada XP
-In-Reply-To: <50BFB23C.5040906@free-electrons.com>
-References: <1354714394-11622-1-git-send-email-gregory.clement@free-electrons.com>
- <50BFAE8B.1080303@free-electrons.com>
- <20121205203607.GW12509@titan.lakedaemon.net>
- <50BFB23C.5040906@free-electrons.com>
-Message-ID: <20121205205848.GX12509@titan.lakedaemon.net>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Wed,  5 Dec 2012 22:42:12 +0100
+Subject: [PATCH] i2c: at91: add of_device_id entry for at91rm9200
+Message-ID: <1354743732-11581-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 05, 2012 at 09:44:44PM +0100, Gregory CLEMENT wrote:
-> On 12/05/2012 09:36 PM, Jason Cooper wrote:
-> > On Wed, Dec 05, 2012 at 09:28:59PM +0100, Gregory CLEMENT wrote:
-> >> On 12/05/2012 02:33 PM, Gregory CLEMENT wrote:
-> >>> Jason,
-> >>>
-> >>> here it is the patch set to improve the Armada XP SMP support. This
-> >>> pull can be merged without any conflict even on the last
-> >>> arm-soc/for-next. As Linus Torvalds told that the release of 3.7 won't
-> >>> happen before next week, I'd like to have this improvement as part of
-> >>> 3.8.
-> >>>
-> >>
-> >> Please ignore this git pull, the code is buggy in non-SMP mode. A new
-> >> version is incoming. Sorry.
-> > 
-> > Ok, please do me a favor and don't send pull requests until patches have
-> > had sufficient review on lakml.
-> > 
-> 
-> OK, I will
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+Hi,
 
-Just to be clear, I don't mind if you throw it up on your public repo
-and put the git pull info in a cover letter or the remarks section of
-patch email.  The problem is when folks see 'GIT PULL' in the subject,
-they assume it has already been reviewed.  And, thus, don't review it.
+AT91RM9200 is gaining DT support now so let's add an id to the i2c driver.
 
-hth,
+Tested on custom RM9200 board. Since the driver doesn't support pinctrl
+muxing yet I had to add pinctrl hogs for the i2c pins in my dts for it
+to work.
 
-Jason.
+regards
+Joachim Eastwood
+
+ drivers/i2c/busses/i2c-at91.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index b4575ee..c504aa8 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -584,6 +584,9 @@ static const struct platform_device_id at91_twi_devtypes[] = {
+ #if defined(CONFIG_OF)
+ static const struct of_device_id atmel_twi_dt_ids[] = {
+ 	{
++		.compatible = "atmel,at91rm9200-i2c",
++		.data = &at91rm9200_config,
++	} , {
+ 		.compatible = "atmel,at91sam9260-i2c",
+ 		.data = &at91sam9260_config,
+ 	} , {
+-- 
+1.8.0
