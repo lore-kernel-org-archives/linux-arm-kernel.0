@@ -1,111 +1,96 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Dec 2012 12:29:52 +0000
-Subject: [PATCH v4 12/13] ARM: KVM: vgic: reduce the number of vcpu kick
-In-Reply-To: <50BF3B75.1060007@arm.com>
-References: <20121110154358.3061.16338.stgit@chazy-air>
- <20121110154539.3061.82553.stgit@chazy-air>
- <20121205104358.GC22385@mudshark.cambridge.arm.com>
- <20121205105822.GL14363@n2100.arm.linux.org.uk> <50BF3B75.1060007@arm.com>
-Message-ID: <20121205122952.GO14363@n2100.arm.linux.org.uk>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Wed, 5 Dec 2012 12:43:59 +0000
+Subject: [PATCH v3 1/3] mtd: nand: omap2: Update nerrors using ecc.strength
+In-Reply-To: <50BF3819.9010200@ti.com>
+References: <1354189595-12784-1-git-send-email-avinashphilip@ti.com>
+ <1354189595-12784-2-git-send-email-avinashphilip@ti.com>
+ <50BF3819.9010200@ti.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3EA1139B@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 05, 2012 at 12:17:57PM +0000, Marc Zyngier wrote:
-> On 05/12/12 10:58, Russell King - ARM Linux wrote:
-> > On Wed, Dec 05, 2012 at 10:43:58AM +0000, Will Deacon wrote:
-> >> On Sat, Nov 10, 2012 at 03:45:39PM +0000, Christoffer Dall wrote:
-> >>> From: Marc Zyngier <marc.zyngier@arm.com>
-> >>>
-> >>> If we have level interrupts already programmed to fire on a vcpu,
-> >>> there is no reason to kick it after injecting a new interrupt,
-> >>> as we're guaranteed that we'll exit when the level interrupt will
-> >>> be EOId (VGIC_LR_EOI is set).
-> >>>
-> >>> The exit will force a reload of the VGIC, injecting the new interrupts.
-> >>>
-> >>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
-> >>> ---
-> >>>  arch/arm/include/asm/kvm_vgic.h |   10 ++++++++++
-> >>>  arch/arm/kvm/arm.c              |   10 +++++++++-
-> >>>  arch/arm/kvm/vgic.c             |   10 ++++++++--
-> >>>  3 files changed, 27 insertions(+), 3 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
-> >>> index a8e7a93..7d2662c 100644
-> >>> --- a/arch/arm/include/asm/kvm_vgic.h
-> >>> +++ b/arch/arm/include/asm/kvm_vgic.h
-> >>> @@ -215,6 +215,9 @@ struct vgic_cpu {
-> >>>  	u32		vgic_elrsr[2];	/* Saved only */
-> >>>  	u32		vgic_apr;
-> >>>  	u32		vgic_lr[64];	/* A15 has only 4... */
-> >>> +
-> >>> +	/* Number of level-triggered interrupt in progress */
-> >>> +	atomic_t	irq_active_count;
-> >>>  #endif
-> >>>  };
-> >>>  
-> >>> @@ -254,6 +257,8 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> >>>  
-> >>>  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.vctrl_base))
-> >>>  #define vgic_initialized(k)	((k)->arch.vgic.ready)
-> >>> +#define vgic_active_irq(v)	(atomic_read(&(v)->arch.vgic_cpu.irq_active_count) == 0)
-> >>
-> >> When is the atomic_t initialised to zero? I can only see increments.
+On Wed, Dec 05, 2012 at 17:33:37, Nori, Sekhar wrote:
+> Hi Avinash,
+> 
+> On 11/29/2012 5:16 PM, Philip, Avinash wrote:
+> > Update number of errors using nand ecc strength.
+> > Also add macro definitions BCH8_ERROR_MAX & BCH4_ERROR_MAX
+> 
+> Can you please describe why the original method of setting nerrors was
+> incorrect? Was it causing any issues in any particular configuration?
+
+It affects the reusability of the code. For example BCH8 with AM335x RBL 
+compatibility requires  14 bytes instead of 13 byte. So setting nerrors
+with
+	nerrors = (info->nand.ecc.bytes == 13) ? 8 : 4;
+will break am335x RBL compatibility.
+
+> Mentioning this will help maintainers assign priority to your patch. If
+> this is a real bug affecting existing platforms, then there is a chance
+> this patch can get into v3.7 (or at least into v3.8-rc1).
+> 
+> Like Peter who commented on this before, I am not a fan of using macros
+> for self-describing constants - especially when you end up using the
+> same numbers inside the macro name itself. No need to resend any thing
+> just for this, you can wait to see if the maintainers are okay with it.
+
+Yes I agree. But the same constants are used in multiple places here.
+So usage of macro helps in readability & code debugging.
+
+Thanks
+Avinash
+ 
+> 
+> Thanks,
+> Sekhar
+> 
 > > 
-> > I'd question whether an atomic type is correct for this; the only
-> > protection that it's offering is to ensure that the atomic increment
-> > and decrement occur atomically - there's nothing else that they're doing
-> > in this code.
+> > Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
+> > ---
+> > :100644 100644 359293e... 7e61dac... M	drivers/mtd/nand/omap2.c
+> >  drivers/mtd/nand/omap2.c |   12 ++++++++----
+> >  1 files changed, 8 insertions(+), 4 deletions(-)
 > > 
-> > If those atomic increments and decrements are occuring beneath a common
-> > lock, then using atomic types is just mere code obfuscation.
-> 
-> No, they occur on code paths that do not have a common lock (one of them
-> being an interrupt handler). This may change though, after one comment
-> Will made earlier (the thing about delayed interrupts).
-> 
-> If these two code sections become mutually exclusive, then indeed there
-> will be no point in having an atomic type anymore.
-> 
-> > For example, I'd like to question the correctness of this:
+> > diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+> > index 359293e..7e61dac 100644
+> > --- a/drivers/mtd/nand/omap2.c
+> > +++ b/drivers/mtd/nand/omap2.c
+> > @@ -118,6 +118,9 @@
+> >  
+> >  #define OMAP24XX_DMA_GPMC		4
+> >  
+> > +#define BCH8_MAX_ERROR		8	/* upto 8 bit correctable */
+> > +#define BCH4_MAX_ERROR		4	/* upto 4 bit correctable */
+> > +
+> >  /* oob info generated runtime depending on ecc algorithm and layout selected */
+> >  static struct nand_ecclayout omap_oobinfo;
+> >  /* Define some generic bad / good block scan pattern which are used
+> > @@ -1042,7 +1045,7 @@ static void omap3_enable_hwecc_bch(struct mtd_info *mtd, int mode)
+> >  	struct nand_chip *chip = mtd->priv;
+> >  	u32 val;
+> >  
+> > -	nerrors = (info->nand.ecc.bytes == 13) ? 8 : 4;
+> > +	nerrors = info->nand.ecc.strength;
+> >  	dev_width = (chip->options & NAND_BUSWIDTH_16) ? 1 : 0;
+> >  	nsectors = 1;
+> >  	/*
+> > @@ -1219,13 +1222,14 @@ static int omap3_init_bch(struct mtd_info *mtd, int ecc_opt)
+> >  	struct omap_nand_info *info = container_of(mtd, struct omap_nand_info,
+> >  						   mtd);
+> >  #ifdef CONFIG_MTD_NAND_OMAP_BCH8
+> > -	const int hw_errors = 8;
+> > +	const int hw_errors = BCH8_MAX_ERROR;
+> >  #else
+> > -	const int hw_errors = 4;
+> > +	const int hw_errors = BCH4_MAX_ERROR;
+> >  #endif
+> >  	info->bch = NULL;
+> >  
+> > -	max_errors = (ecc_opt == OMAP_ECC_BCH8_CODE_HW) ? 8 : 4;
+> > +	max_errors = (ecc_opt == OMAP_ECC_BCH8_CODE_HW) ?
+> > +		BCH8_MAX_ERROR : BCH4_MAX_ERROR;
+> >  	if (max_errors != hw_errors) {
+> >  		pr_err("cannot configure %d-bit BCH ecc, only %d-bit supported",
+> >  		       max_errors, hw_errors);
 > > 
-> > +               if (vgic_active_irq(vcpu) &&
-> > +                   cmpxchg(&vcpu->mode, EXITING_GUEST_MODE, IN_GUEST_MODE) == EXITING_GUEST_MODE)
-> > 
-> > What if vgic_active_irq() reads the atomic type, immediately after it gets
-> > decremented to zero before the cmpxchg() is executed?  Would that be a
-> > problem?
 > 
-> I do not think so. If the value gets decremented, it means we took a
-> maintenance interrupt, which means we exited the guest at some point.
-> Two possibilities:
-> 
-> - We're not in guest mode anymore (vcpu->mode = OUTSIDE_GUEST_MODE), and
-> cmpxchg will fail, hence signaling the guest to reload its state. This
-> is not needed (the guest will reload its state anyway), but doesn't
-> cause any harm.
-
-What is the relative ordering of the atomic decrement and setting
-vcpu->mode to be OUTSIDE_GUEST_MODE ?  Is there a window where we have
-decremented this atomic type but vcpu->mode is still set to IN_GUEST_MODE.
-
-> - We're back into the guest (vcpu->mode = IN_GUEST_MODE), and cmpxchg
-> will fail as well, triggering a reload which is needed this time.
-
-Well, the whole code looks really weird to me, especially that:
-
-+       if (kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE) {
-+               if (vgic_active_irq(vcpu) &&
-+                   cmpxchg(&vcpu->mode, EXITING_GUEST_MODE, IN_GUEST_MODE) == EXITING_GUEST_MODE)
-+                       return 0;
-+
-+               return 1;
-+       }
-
-I've no idea what kvm_vcpu_exiting_guest_mode() is (it doesn't exist in
-any tree I have access to)...
-
-In any case, look at the version I converted to spinlocks and see whether
-you think the code looks reasonable in that form.  If it doesn't then it
-isn't reasonable in atomic types either.
