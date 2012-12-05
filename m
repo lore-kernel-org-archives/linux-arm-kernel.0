@@ -1,73 +1,62 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 05 Dec 2012 11:36:28 -0700
-Subject: [PATCH 1/5] ARM: tegra20: cpuidle: add powered-down state for
- secondary CPU
-In-Reply-To: <1354604712.30563.31.camel@jlo-ubuntu-64.nvidia.com>
-References: <1354503607-13707-1-git-send-email-josephl@nvidia.com>
- <1354503607-13707-2-git-send-email-josephl@nvidia.com>
- <50BCF01E.4070504@wwwdotorg.org>
- <1354604712.30563.31.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <50BF942C.5000203@wwwdotorg.org>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 05 Dec 2012 19:40:47 +0100
+Subject: [PATCH v6 4/5] ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
+In-Reply-To: <20121205183315.GI21682@atomide.com>
+References: <1354204892-22762-5-git-send-email-zonque@gmail.com>
+ <50B7BE9C.6040506@ti.com> <50B7C677.7090504@ti.com>
+ <50B7C8BE.7050002@gmail.com> <50B7CCB1.6000506@ti.com>
+ <50BF4670.8070602@gmail.com> <20121205171950.GF21682@atomide.com>
+ <50BF83CA.5050007@gmail.com> <20121205174114.GH21682@atomide.com>
+ <50BF9047.6000904@ti.com> <20121205183315.GI21682@atomide.com>
+Message-ID: <50BF952F.9080406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2012 12:05 AM, Joseph Lo wrote:
-> On Tue, 2012-12-04 at 02:31 +0800, Stephen Warren wrote:
->> On 12/02/2012 08:00 PM, Joseph Lo wrote:
->>> The powered-down state of Tegra20 requires power gating both CPU cores.
->>> When the secondary CPU requests to enter powered-down state, it saves
->>> its own contexts and then enters WFI. The Tegra20 had a limition to
->>> power down both CPU cores. The secondary CPU must waits for CPU0 in
->>> powered-down state too. If the secondary CPU be woken up before CPU0
->>> entering powered-down state, then it needs to restore its CPU states
->>> and waits for next chance.
+On 05.12.2012 19:33, Tony Lindgren wrote:
+> * Jon Hunter <jon-hunter@ti.com> [121205 10:22]:
+>>
+>> On 12/05/2012 11:41 AM, Tony Lindgren wrote:
+>>> * Daniel Mack <zonque@gmail.com> [121205 09:29]:
+>>>> On 05.12.2012 18:19, Tony Lindgren wrote:
+>>>>>
+>>>>> The plat/cpu.h file will disappear after the merge window, which means
+>>>>> omap2+ related drivers cannot use cpu_is_omap macros.
+>>>>>
+>>>>> For legacy booting systems, this flag should be just passed in the
+>>>>> platform_data from the platform init code. Then device tree can
+>>>>> deal with it based on the compatible flag.
+>>>>>
+>>>>
+>>>> Ok, thanks for explaining.
+>>>>
+>>>> Does that mean this patch series should be postponed until after the
+>>>> merge window and then build upon that change or should we merge the
+>>>> patch in question here as is and then care for the cleanups after the
+>>>> window?
 >>>
->>> Be aware of that, you may see the legacy power state "LP2" in the code
->>> which is exactly the same meaning of "CPU power down".
+>>> Well to me it seems that you only have cpu_is_omap usage in
+>>> arch/arm/mach-omap2/gpmc-nand.c, which will be OK. Only the code
+>>> under drivers/* needs to be fixed for that. So your patches may
+>>> be OK, but..
 >>
->>> diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
+>> The real problem here is that drivers/mtd/nand/omap2.c is including
+>> plat/gpmc.h and calling a function in arch/arm/mach-omap/gpmc-nand.c. So
+>> although Daniel's patches are not introducing any new problems for
+>> single zImage, they do highlight a problem that we have with the omap2
+>> nand driver that needs to be addressed for single zImage.
 >>
->>> +/*
->>> + * tegra_pen_lock
->>> + *
->>> + * spinlock implementation with no atomic test-and-set and no coherence
->>> + * using Peterson's algorithm on strongly-ordered registers
->>> + * used to synchronize a cpu waking up from wfi with entering lp2 on idle
->>> + *
->>> + * SCRATCH37 = r1 = !turn (inverted from Peterson's algorithm)
->>
->> A link to a description of that algorithm would be useful.
->>
-> This algorithm was very famous. It can be very easy to find on the
-> internet. But if you want the link of the paper, it may not be
-> available. It usually need to access the paper as a member.
+>> So either we fix this now or after merging Daniel's changes. Either is
+>> fine with me.
 > 
-> Can you accept a link from wikipedia?
-> http://en.wikipedia.org/wiki/Peterson's_algorithm#cite_ref-1
+> Ah I see. Yes it would be good to fix that issue first to avoid
+> adding any new blockers for multiplatform build.
 
-Yes, that's fine (although I'd drop the anchor from the URL; i.e. remove
-"#cite_ref-1").
+Already fixed by Afzal here:
 
->>> + * on cpu 0:
->>> + * SCRATCH38 = r2 = flag[0]
->>> + * SCRATCH39 = r3 = flag[1]
->>> + * on cpu1:
->>> + * SCRATCH39 = r2 = flag[1]
->>> + * SCRATCH38 = r3 = flag[0]
->>
->> That implies that r2/r3 are used for different purposes on the 2 CPUs,
->> and/or shadow the values of different registers. However, I see nothing
->> in the code which is conditional on cpu ID.
-> 
-> here:
-> +       cpu_id  r0
-> +       add     r1, r3, #PMC_SCRATCH37
-> +       cmp     r0, #0
-> +       addeq   r2, r3, #PMC_SCRATCH38
-> +       addeq   r3, r3, #PMC_SCRATCH39
-> +       addne   r2, r3, #PMC_SCRATCH39
-> +       addne   r3, r3, #PMC_SCRATCH38
-> It's proper to say that the SCRATCH38/SCRATCH39 are used for dedicate
-> cpu lock flag on the 2 CPUs.
+https://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap.git;a=commitdiff;h=2ef9f3dd
 
-Doh. I overlooked the "cpu_id" invocation.
+... which is also in linux-next.
+
+
+
+Daniel
