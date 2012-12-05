@@ -1,39 +1,34 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 05 Dec 2012 23:15:01 +0000
-Subject: [PATCH RESEND] ARM/SPI: New driver for SPI master controller for
- CLPS711X-target
-In-Reply-To: <20121205003331.9dd3d8f4eee2dfe84e7c08fa@mail.ru>
-References: <1352309429-21482-1-git-send-email-shc_work@mail.ru>
- <201211122143.34537.arnd@arndb.de>
- <20121205003331.9dd3d8f4eee2dfe84e7c08fa@mail.ru>
-Message-ID: <20121205231501.D40863E0E22@localhost>
+From: spang@chromium.org (Michael Spang)
+Date: Wed,  5 Dec 2012 18:17:12 -0500
+Subject: [PATCH] samsung: Add missing include guard to gpio-core.h
+Message-ID: <1354749432-6028-1-git-send-email-spang@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 5 Dec 2012 00:33:31 +0400, Alexander Shiyan <shc_work@mail.ru> wrote:
-> On Mon, 12 Nov 2012 21:43:34 +0000
-> Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > On Wednesday 07 November 2012, Alexander Shiyan wrote:
-> > > This patch add new driver for CLPS711X SPI master controller.
-> > > Due to platform limitations driver supports only 8 bit transfer mode.
-> > > Chip select control is handled via GPIO.
-> > > 
-> > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > 
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> 
-> Please apply this patch in the SPI tree.
+Signed-off-by: Michael Spang <spang@chromium.org>
+---
+ arch/arm/plat-samsung/include/plat/gpio-core.h |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-Applied, thanks.
-
-g.
-
-> 
-> -- 
-> Alexander Shiyan <shc_work@mail.ru>
-
+diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h b/arch/arm/plat-samsung/include/plat/gpio-core.h
+index 1fe6917..8622c9a 100644
+--- a/arch/arm/plat-samsung/include/plat/gpio-core.h
++++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
+@@ -11,6 +11,9 @@
+  * published by the Free Software Foundation.
+ */
+ 
++#ifndef __PLAT_SAMSUNG_GPIO_CORE_H
++#define __PLAT_SAMSUNG_GPIO_CORE_H
++
+ #define GPIOCON_OFF	(0x00)
+ #define GPIODAT_OFF	(0x04)
+ 
+@@ -122,3 +125,5 @@ extern struct samsung_gpio_pm samsung_gpio_pm_4bit;
+ /* locking wrappers to deal with multiple access to the same gpio bank */
+ #define samsung_gpio_lock(_oc, _fl) spin_lock_irqsave(&(_oc)->lock, _fl)
+ #define samsung_gpio_unlock(_oc, _fl) spin_unlock_irqrestore(&(_oc)->lock, _fl)
++
++#endif /* __PLAT_SAMSUNG_GPIO_CORE_H */
 -- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+1.7.7.3
