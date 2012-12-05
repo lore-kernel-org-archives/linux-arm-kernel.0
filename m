@@ -1,106 +1,62 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 5 Dec 2012 19:37:55 +0000 (UTC)
-Subject: OMAP baseline test results for v3.7-rc8
-Message-ID: <alpine.DEB.2.00.1212051936480.23086@utopia.booyaka.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 5 Dec 2012 20:51:34 +0100
+Subject: [PATCH] nommu: Enable the strict alignment (CR_A) bit only if
+ ARCH < v6
+In-Reply-To: <20121203174617.GL20074@mudshark.cambridge.arm.com>
+References: <1354187042-28568-1-git-send-email-armando.visconti@st.com>
+ <50BCD6DB.2030200@st.com>
+ <20121203172553.GC14363@n2100.arm.linux.org.uk>
+ <20121203174617.GL20074@mudshark.cambridge.arm.com>
+Message-ID: <20121205195134.GD3384@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-Here are some basic OMAP test results for Linux v3.7-rc8.
-Logs and other details at:
+On Mon, Dec 03, 2012 at 05:46:17PM +0000, Will Deacon wrote:
+> On Mon, Dec 03, 2012 at 05:25:53PM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Dec 03, 2012 at 05:44:11PM +0100, Armando Visconti wrote:
+> > > On 11/29/2012 12:04 PM, Armando VISCONTI wrote:
+> > >> This patch keeps disabled the strict alignment CP15 bit for
+> > >> all armv6 and armv7 processor without the mmu. This behaviour
+> > >> is now same as in the mmu case.
+> > >>
+> > >> Signed-off-by: Armando Visconti<armando.visconti@st.com>
+> > >> ---
+> > >>   arch/arm/kernel/head-nommu.S |    2 +-
+> > >>   1 files changed, 1 insertions(+), 1 deletions(-)
+> > >>
+> > >> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+> > >> index 278cfc1..2c228a0 100644
+> > >> --- a/arch/arm/kernel/head-nommu.S
+> > >> +++ b/arch/arm/kernel/head-nommu.S
+> > >> @@ -68,7 +68,7 @@ __after_proc_init:
+> > >>   	 * CP15 system control register value returned in r0 from
+> > >>   	 * the CPU init function.
+> > >>   	 */
+> > >> -#ifdef CONFIG_ALIGNMENT_TRAP
+> > >> +#if defined(CONFIG_ALIGNMENT_TRAP)&&  __LINUX_ARM_ARCH__<  6
+> > >>   	orr	r0, r0, #CR_A
+> > >>   #else
+> > >>   	bic	r0, r0, #CR_A
+> > >
+> > > Any feedback on this simple patch?
+> > 
+> > Well, it brings the nommu version into line with the mmu version, so
+> > it's sensible.  Please put it in the patch system, thanks.
+> 
+> In which case, I'll definitely dust-off the patches to prevent unaligned
+> accesses to strongly-ordered memory because that results in good ol'
+> UNPREDICTABLE behaviour.
+> 
+> I think Uwe also requires some of the stuff there for his M3 port.
+I didn't check more context than available in the patch and I also
+didn't double-check the M3-docs, but AFAIK the M3 doesn't have a cp15
+and I noopt this code out.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.7-rc8/20121204220128/
+Best regards
+Uwe
 
-
-Passing tests
--------------
-
-Boot to userspace (10/11): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
-    3730beaglexm, 37xxevm, 4430es2panda, 5912osk, am335xbone,
-    4460pandaes
-  
-PM ret/off, suspend + dynamic idle (3/4): 3530es3beagle, 3730beaglexm,
-    37xxevm
-
-
-Failing tests: fixed by posted patches
---------------------------------------
-
-Boot tests:
-
-* 3730 Beagle XM: "attempt to access beyond end of device"
-  - Not an OMAP-specific problem
-  - Should be fixed by http://marc.info/?l=linux-kernel&m=135458657217682&w=2
-
-Other:
-
-* 2420N800: powers down 30 seconds after boot
-  - Presumably due to missing CBUS patches for watchdog control
-  - http://lkml.org/lkml/2012/9/3/265
-  - http://marc.info/?l=linux-omap&m=135274739624125&w=2
-
-
-Failing tests: needing investigation
-------------------------------------
-
-Boot tests:
-
-* CM-T3517: L3 in-band error with IPSS during boot
-  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
-  - Longstanding issue; does not occur on the 3517EVM
-
-* 3517EVM & CM-T3517: boot hangs with NFS root
-  - Likely some Kconfig, board file, and PM issues with EMAC
-
-* CM-T3517: boot hangs with MMC root
-  - Due to missing MMC setup in board file
-
-Other:
-
-* 4430es2panda: omap_hwmod: l3_instr: _wait_target_disable failed
-  - Unknown cause; could be due to the lack of hierarchical enable/disable
-    in hwmod code
-  - Jon Hunter reports this does not appear with the same X-loader/bootloader
-    on his 4430ES2.3 Panda, so could be ES-level dependent
-
-
-Failing tests: needing local investigation (may be due to testbed issues)
--------------------------------------------------------------------------
-
-Boot tests:
-
-* AM335x Beaglebone: omap2plus_defconfig kernels don't boot
-  - May be fixed now, pending retest:
-    - http://marc.info/?l=linux-omap&m=135082257727502&w=2
-  - Not yet part of the automated test suite
-  * May be due to an old U-boot with FDT support problems used here?
-    Pending local investigation and re-test
-
-PM tests:
-
-* 3730 Beagle XM: does not serial wake from off-idle suspend when console
-  UART doesn't clock gate ("debug ignore_loglevel")
-  - Not yet part of the automated test suite; cause unknown
-  - Pending re-test
-
-
-
-vmlinux object size
-(delta in bytes from test_v3.7-rc7 (9489e9dcae718d5fde988e4a684a0f55b5f94d17)):
-   text     data      bss    total  kernel
-  -1624        0        0    -1624  am33xx_only
-  -1280        0        0    -1280  n800_multi_omap2xxx
-  -1264        0        0    -1264  n800_only_a
-  -1508        0        0    -1508  omap1_defconfig
-  -1492        0        0    -1492  omap1_defconfig_1510innovator_only
-  -1524        0        0    -1524  omap1_defconfig_5912osk_only
-  -1768        0        0    -1768  omap2plus_defconfig
-  -1576        0        0    -1576  omap2plus_defconfig_2430sdp_only
-  -1704        0        0    -1704  omap2plus_defconfig_cpupm
-  -1704        0        0    -1704  omap2plus_defconfig_no_pm
-  -1704        0        0    -1704  omap2plus_defconfig_omap2_4_only
-  -1832        0        0    -1832  omap2plus_defconfig_omap3_4_only
-  -1244        0      +68    -1176  rmk_omap3430_ldp_allnoconfig
-  -1728        0        0    -1728  rmk_omap3430_ldp_oldconfig
-  -1244        0      +68    -1176  rmk_omap4430_sdp_allnoconfig
-  -1312        0        0    -1312  rmk_omap4430_sdp_oldconfig
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
