@@ -1,79 +1,100 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 5 Dec 2012 17:33:37 +0530
-Subject: [PATCH v3 1/3] mtd: nand: omap2: Update nerrors using ecc.strength
-In-Reply-To: <1354189595-12784-2-git-send-email-avinashphilip@ti.com>
-References: <1354189595-12784-1-git-send-email-avinashphilip@ti.com>
- <1354189595-12784-2-git-send-email-avinashphilip@ti.com>
-Message-ID: <50BF3819.9010200@ti.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Wed,  5 Dec 2012 13:13:06 +0100
+Subject: [PATCH 1/2] ARM: shmobile: sh73a0: Add CPU sleep suspend
+Message-ID: <1354709587-25288-1-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Avinash,
+From: Bastian Hecht <hechtb@gmail.com>
 
-On 11/29/2012 5:16 PM, Philip, Avinash wrote:
-> Update number of errors using nand ecc strength.
-> Also add macro definitions BCH8_ERROR_MAX & BCH4_ERROR_MAX
+Add the lighest possible sleep mode on Cortex-A9 cores: CPU sleep. It is
+entered by a simple dsb and wfi instruction via cpu_do_idle(). As just
+clocks are stopped there is no need to save or restore any state of the
+system.
 
-Can you please describe why the original method of setting nerrors was
-incorrect? Was it causing any issues in any particular configuration?
-Mentioning this will help maintainers assign priority to your patch. If
-this is a real bug affecting existing platforms, then there is a chance
-this patch can get into v3.7 (or at least into v3.8-rc1).
+Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+---
+ arch/arm/mach-shmobile/Makefile              |    1 +
+ arch/arm/mach-shmobile/board-kzm9g.c         |    2 ++
+ arch/arm/mach-shmobile/include/mach/common.h |    1 +
+ arch/arm/mach-shmobile/pm-sh73a0.c           |   32 ++++++++++++++++++++++++++
+ 4 files changed, 36 insertions(+)
+ create mode 100644 arch/arm/mach-shmobile/pm-sh73a0.c
 
-Like Peter who commented on this before, I am not a fan of using macros
-for self-describing constants - especially when you end up using the
-same numbers inside the macro name itself. No need to resend any thing
-just for this, you can wait to see if the maintainers are okay with it.
-
-Thanks,
-Sekhar
-
-> 
-> Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
-> ---
-> :100644 100644 359293e... 7e61dac... M	drivers/mtd/nand/omap2.c
->  drivers/mtd/nand/omap2.c |   12 ++++++++----
->  1 files changed, 8 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-> index 359293e..7e61dac 100644
-> --- a/drivers/mtd/nand/omap2.c
-> +++ b/drivers/mtd/nand/omap2.c
-> @@ -118,6 +118,9 @@
->  
->  #define OMAP24XX_DMA_GPMC		4
->  
-> +#define BCH8_MAX_ERROR		8	/* upto 8 bit correctable */
-> +#define BCH4_MAX_ERROR		4	/* upto 4 bit correctable */
-> +
->  /* oob info generated runtime depending on ecc algorithm and layout selected */
->  static struct nand_ecclayout omap_oobinfo;
->  /* Define some generic bad / good block scan pattern which are used
-> @@ -1042,7 +1045,7 @@ static void omap3_enable_hwecc_bch(struct mtd_info *mtd, int mode)
->  	struct nand_chip *chip = mtd->priv;
->  	u32 val;
->  
-> -	nerrors = (info->nand.ecc.bytes == 13) ? 8 : 4;
-> +	nerrors = info->nand.ecc.strength;
->  	dev_width = (chip->options & NAND_BUSWIDTH_16) ? 1 : 0;
->  	nsectors = 1;
->  	/*
-> @@ -1219,13 +1222,14 @@ static int omap3_init_bch(struct mtd_info *mtd, int ecc_opt)
->  	struct omap_nand_info *info = container_of(mtd, struct omap_nand_info,
->  						   mtd);
->  #ifdef CONFIG_MTD_NAND_OMAP_BCH8
-> -	const int hw_errors = 8;
-> +	const int hw_errors = BCH8_MAX_ERROR;
->  #else
-> -	const int hw_errors = 4;
-> +	const int hw_errors = BCH4_MAX_ERROR;
->  #endif
->  	info->bch = NULL;
->  
-> -	max_errors = (ecc_opt == OMAP_ECC_BCH8_CODE_HW) ? 8 : 4;
-> +	max_errors = (ecc_opt == OMAP_ECC_BCH8_CODE_HW) ?
-> +		BCH8_MAX_ERROR : BCH4_MAX_ERROR;
->  	if (max_errors != hw_errors) {
->  		pr_err("cannot configure %d-bit BCH ecc, only %d-bit supported",
->  		       max_errors, hw_errors);
-> 
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index fe2c97c..d0d06f2 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -43,6 +43,7 @@ obj-$(CONFIG_ARCH_SHMOBILE)	+= pm-rmobile.o
+ obj-$(CONFIG_ARCH_SH7372)	+= pm-sh7372.o sleep-sh7372.o
+ obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o
+ obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
++obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
+ 
+ # Board objects
+ obj-$(CONFIG_MACH_G3EVM)	+= board-g3evm.o
+diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
+index 0a43f31..dc8c0f8 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g.c
++++ b/arch/arm/mach-shmobile/board-kzm9g.c
+@@ -760,6 +760,8 @@ static void __init kzm_init(void)
+ 
+ 	sh73a0_add_standard_devices();
+ 	platform_add_devices(kzm_devices, ARRAY_SIZE(kzm_devices));
++
++	sh73a0_pm_init();
+ }
+ 
+ static void kzm9g_restart(char mode, const char *cmd)
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index d47e215..318551b3 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -54,6 +54,7 @@ extern void sh73a0_add_early_devices(void);
+ extern void sh73a0_add_standard_devices(void);
+ extern void sh73a0_clock_init(void);
+ extern void sh73a0_pinmux_init(void);
++extern void sh73a0_pm_init(void);
+ extern struct clk sh73a0_extal1_clk;
+ extern struct clk sh73a0_extal2_clk;
+ extern struct clk sh73a0_extcki_clk;
+diff --git a/arch/arm/mach-shmobile/pm-sh73a0.c b/arch/arm/mach-shmobile/pm-sh73a0.c
+new file mode 100644
+index 0000000..9cf67bb
+--- /dev/null
++++ b/arch/arm/mach-shmobile/pm-sh73a0.c
+@@ -0,0 +1,32 @@
++/*
++ * sh73a0 Power management support
++ *
++ *  Copyright (C) 2012 Bastian Hecht <hechtb+renesas@gmail.com>
++ *
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ */
++
++#include <linux/suspend.h>
++#include <mach/common.h>
++
++#ifdef CONFIG_SUSPEND
++static int sh73a0_enter_suspend(suspend_state_t suspend_state)
++{
++	cpu_do_idle();
++	return 0;
++}
++
++static void sh73a0_suspend_init(void)
++{
++	shmobile_suspend_ops.enter = sh73a0_enter_suspend;
++}
++#else
++static void sh73a0_suspend_init(void) {}
++#endif
++
++void __init sh73a0_pm_init(void)
++{
++	sh73a0_suspend_init();
++}
+-- 
+1.7.9.5
