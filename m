@@ -1,208 +1,38 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Wed, 05 Dec 2012 20:01:07 +0100
-Subject: [PATCH 3/6 v9] gpio: Add userland device interface to block GPIO
-In-Reply-To: <1354653588-4018-4-git-send-email-stigge@antcom.de>
-References: <1354653588-4018-1-git-send-email-stigge@antcom.de>
- <1354653588-4018-4-git-send-email-stigge@antcom.de>
-Message-ID: <50BF99F3.4060207@grandegger.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed,  5 Dec 2012 20:09:27 +0100
+Subject: [PATCH v7 1/5] ARM: OMAP: gpmc: don't create devices from initcall on
+ DT
+In-Reply-To: <1354734571-10774-1-git-send-email-zonque@gmail.com>
+References: <1354734571-10774-1-git-send-email-zonque@gmail.com>
+Message-ID: <1354734571-10774-2-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2012 09:39 PM, Roland Stigge wrote:
-> This patch adds a character device interface to the block GPIO system.
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> ---
->  Documentation/ABI/testing/dev-gpioblock |   34 +++++
->  drivers/gpio/gpiolib.c                  |  208 +++++++++++++++++++++++++++++++-
->  include/linux/gpio.h                    |   10 +
->  3 files changed, 251 insertions(+), 1 deletion(-)
-> 
-> --- /dev/null
-> +++ linux-2.6/Documentation/ABI/testing/dev-gpioblock
-> @@ -0,0 +1,34 @@
-> +What:		/dev/<gpioblock>
-> +Date:		Nov 2012
-> +KernelVersion:	3.7
-> +Contact:	Roland Stigge <stigge@antcom.de>
-> +Description:	The /dev/<gpioblock> character device node provides userspace
-> +		access to GPIO blocks, named exactly as the block, e.g.
-> +		/dev/block0.
-> +
-> +		Reading:
-> +		When reading sizeof(unsigned long) bytes from the device, the
-> +		current state of the block, masked by the current mask (see
-> +		below) can be obtained as a word. When the device is opened
-> +		with O_NONBLOCK, read() always returns with data immediately,
-> +		otherwise it blocks until data is available, see IRQ handling
-> +		below.
-> +
-> +		Writing:
-> +		By writing sizeof(unsigned long) bytes to the device, the
-> +		current state of the block can be set. This operation is
-> +		masked by the current mask (see below).
-> +
-> +		IRQ handling:
-> +		When one or more IRQs in the block are IRQ capable, you can
-> +		poll() on the device to check/wait for this IRQ. If no IRQ
-> +		is available, poll() returns -ENOSYS and userspace needs to
-> +		(busy) poll itself if necessary.
-> +
-> +		Setting the mask (default: all bits set):
-> +		By doing an ioctl(fd, 0, &mask) with an unsigned long mask, the
-> +		current mask for read and write operations on this gpio block
-> +		can be set.
-> +
-> +		See also Documentation/gpio.txt for an explanation of block
-> +		GPIO.
-> --- linux-2.6.orig/drivers/gpio/gpiolib.c
-> +++ linux-2.6/drivers/gpio/gpiolib.c
-> @@ -11,6 +11,8 @@
->  #include <linux/of_gpio.h>
->  #include <linux/idr.h>
->  #include <linux/slab.h>
-> +#include <linux/uaccess.h>
-> +#include <linux/poll.h>
->  
->  #define CREATE_TRACE_POINTS
->  #include <trace/events/gpio.h>
-> @@ -2122,6 +2124,190 @@ struct gpio_block *gpio_block_find_by_na
->  }
->  EXPORT_SYMBOL_GPL(gpio_block_find_by_name);
->  
-> +static struct gpio_block *gpio_block_find_by_minor(int minor)
-> +{
-> +	struct gpio_block *i;
-> +
-> +	list_for_each_entry(i, &gpio_block_list, list)
-> +		if (i->miscdev.minor == minor)
-> +			return i;
-> +	return NULL;
-> +}
-> +
-> +static bool gpio_block_is_irq_duplicate(struct gpio_block *block, int index)
-> +{
-> +	int irq = gpio_to_irq(block->gpio[index]);
-> +	int i;
-> +
-> +	for (i = 0; i < index; i++)
-> +		if (gpio_to_irq(block->gpio[i]) == irq)
-> +			return true;
-> +	return false;
-> +}
-> +
-> +static irqreturn_t gpio_block_irq_handler(int irq, void *dev)
-> +{
-> +	struct gpio_block *block = dev;
-> +
-> +	wake_up_interruptible(&block->wait_queue);
-> +	block->got_int = true;
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int gpio_block_fop_open(struct inode *in, struct file *f)
-> +{
-> +	int i;
-> +	struct gpio_block *block = gpio_block_find_by_minor(MINOR(in->i_rdev));
-> +	int status;
-> +	int irq;
-> +
-> +	if (!block)
-> +		return -ENOENT;
-> +
-> +	block->irq_controlled = false;
-> +	block->got_int = false;
-> +	init_waitqueue_head(&block->wait_queue);
-> +	f->private_data = block;
-> +
-> +	for (i = 0; i < block->ngpio; i++) {
-> +		status = gpio_request(block->gpio[i], "gpioblock dev");
+On DT driven boards, the gpmc node will match the driver. Hence, there's
+no need to do that unconditionally from the initcall.
 
-You could use the name of the GPIO block.
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+---
+ arch/arm/mach-omap2/gpmc.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-> +		if (status)
-> +			goto err1;
-> +
-> +		irq = gpio_to_irq(block->gpio[i]);
-> +		if (irq >= 0 &&
-> +		    !test_bit(FLAG_IS_OUT, &gpio_desc[block->gpio[i]].flags) &&
-> +		    !gpio_block_is_irq_duplicate(block, i)) {
-> +			status = request_irq(irq, gpio_block_irq_handler,
-> +					     IRQF_TRIGGER_FALLING,
-> +					     block->name, block);
-> +			if (status)
-> +				goto err2;
-> +
-> +			block->irq_controlled = true;
-> +		}
-> +	}
-
-There is no need to request IRQs if "O_NONBLOCK" is specified.
-
-> +
-> +	return 0;
-> +
-> +err1:
-> +	while (i > 0) {
-> +		i--;
-> +
-> +		irq = gpio_to_irq(block->gpio[i]);
-> +		if (irq >= 0 &&
-> +		    !test_bit(FLAG_IS_OUT, &gpio_desc[block->gpio[i]].flags) &&
-> +		    !gpio_block_is_irq_duplicate(block, i))
-> +			free_irq(irq, block);
-> +err2:
-> +		gpio_free(block->gpio[i]);
-> +	}
-> +	return status;
-> +}
-> +
-> +static int gpio_block_fop_release(struct inode *in, struct file *f)
-> +{
-> +	int i;
-> +	struct gpio_block *block = (struct gpio_block *)f->private_data;
-> +
-> +	for (i = 0; i < block->ngpio; i++) {
-> +		int irq = gpio_to_irq(block->gpio[i]);
-> +
-> +		if (irq >= 0 &&
-> +		    !test_bit(FLAG_IS_OUT, &gpio_desc[block->gpio[i]].flags) &&
-> +		    !gpio_block_is_irq_duplicate(block, i))
-> +			free_irq(irq, block);
-> +
-> +		gpio_free(block->gpio[i]);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static ssize_t gpio_block_fop_read(struct file *f, char __user *buf, size_t n,
-> +				   loff_t *offset)
-> +{
-> +	struct gpio_block *block = (struct gpio_block *)f->private_data;
-> +	int err;
-> +
-> +	if (block->irq_controlled) {
-> +		if (!(f->f_flags & O_NONBLOCK))
-> +			wait_event_interruptible(block->wait_queue,
-> +						 block->got_int);
-> +		block->got_int = 0;
-> +	}
-> +
-> +	if (n >= sizeof(unsigned long)) {
-> +		unsigned long values = gpio_block_get(block, block->cur_mask);
-> +
-> +		err = put_user(values, (unsigned long __user *)buf);
-> +		if (err)
-> +			return err;
-> +
-> +		return sizeof(unsigned long);
-> +	}
-> +	return 0;
-> +}
-
-I observed that the read returns once immediately (without blocking)
-after reboot. I did not look into that yet.
-
-Wolfgang.
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 65468f6..d5cbd29 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -1214,6 +1214,13 @@ static int __init omap_gpmc_init(void)
+ 	struct platform_device *pdev;
+ 	char *oh_name = "gpmc";
+ 
++	/*
++	 * if the board boots up with a populated DT, do not
++	 * manually add the device from this initcall
++	 */
++	if (of_have_populated_dt())
++		return -ENODEV;
++
+ 	oh = omap_hwmod_lookup(oh_name);
+ 	if (!oh) {
+ 		pr_err("Could not look up %s\n", oh_name);
+-- 
+1.7.11.7
