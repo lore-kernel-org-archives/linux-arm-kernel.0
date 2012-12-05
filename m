@@ -1,177 +1,85 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Wed, 05 Dec 2012 08:51:42 +0530
-Subject: [PATCH v3] ARM: DTS: CROS5250: Add max77686 device tree support
-In-Reply-To: <1354099900-24779-1-git-send-email-a.kesavan@samsung.com>
-References: <1354099900-24779-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1354677702-22669-1-git-send-email-a.kesavan@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue,  4 Dec 2012 20:22:59 -0700
+Subject: [PATCH] ARM: bcm2835: add a pm_power_off implementation
+Message-ID: <1354677779-12072-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The exynos5250 based chromebooks have a max77686 pmic on i2c channel 0.
-Add support for the pmic in the common cros5250 dts file.
-Tested after enabling cpufreq support for exynos5250 SoC and varying the
-arm frequency/voltage using the userspace governer.
+From: Dom Cobley <popcornmix@gmail.com>
 
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-Acked-by: Doug Anderson <dianders@chromium.org>
+Add a pm_power_off function that resets the SoC, and indicates to
+bootcode.bin not to boot. Should allow a lower power 'off' state, even
+if it's not really off.
+
+This is commit 48efdd2 "Add a pm_power_off function that resets us, ..."
+downstream.
+
+Signed-off-by: Dom Cobley <popcornmix@gmail.com>
+[swarren: Various non-semantic rework for upstreaming]
+Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
-Changes since v1:
-* Used generic names for the regulators
-* Changed BUCK5 as being default "ON"
-Changes since v2:
-* Fixed the LDO7 name from "P1.0V_LDO_OUT7" to "P1.1V_LDO_OUT7"
+This is for 3.9; just posting early!
 
- arch/arm/boot/dts/cros5250-common.dtsi |  138 ++++++++++++++++++++++++++++++++
- 1 files changed, 138 insertions(+), 0 deletions(-)
+ arch/arm/mach-bcm2835/bcm2835.c |   28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/cros5250-common.dtsi b/arch/arm/boot/dts/cros5250-common.dtsi
-index fddd174..8ab8394 100644
---- a/arch/arm/boot/dts/cros5250-common.dtsi
-+++ b/arch/arm/boot/dts/cros5250-common.dtsi
-@@ -24,6 +24,144 @@
- 		samsung,i2c-max-bus-freq = <378000>;
- 		gpios = <&gpb3 0 2 3 0>,
- 			<&gpb3 1 2 3 0>;
-+
-+		max77686 at 09 {
-+			compatible = "maxim,max77686";
-+			reg = <0x09>;
-+
-+			voltage-regulators {
-+				ldo1_reg: LDO1 {
-+					regulator-name = "P1.0V_LDO_OUT1";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo2_reg: LDO2 {
-+					regulator-name = "P1.8V_LDO_OUT2";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo3_reg: LDO3 {
-+					regulator-name = "P1.8V_LDO_OUT3";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo7_reg: LDO7 {
-+					regulator-name = "P1.1V_LDO_OUT7";
-+					regulator-min-microvolt = <1100000>;
-+					regulator-max-microvolt = <1100000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo8_reg: LDO8 {
-+					regulator-name = "P1.0V_LDO_OUT8";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo10_reg: LDO10 {
-+					regulator-name = "P1.8V_LDO_OUT10";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo12_reg: LDO12 {
-+					regulator-name = "P3.0V_LDO_OUT12";
-+					regulator-min-microvolt = <3000000>;
-+					regulator-max-microvolt = <3000000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo14_reg: LDO14 {
-+					regulator-name = "P1.8V_LDO_OUT14";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo15_reg: LDO15 {
-+					regulator-name = "P1.0V_LDO_OUT15";
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
-+				};
-+
-+				ldo16_reg: LDO16 {
-+					regulator-name = "P1.8V_LDO_OUT16";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+				};
-+
-+				buck1_reg: BUCK1 {
-+					regulator-name = "vdd_mif";
-+					regulator-min-microvolt = <950000>;
-+					regulator-max-microvolt = <1300000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck2_reg: BUCK2 {
-+					regulator-name = "vdd_arm";
-+					regulator-min-microvolt = <850000>;
-+					regulator-max-microvolt = <1350000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck3_reg: BUCK3 {
-+					regulator-name = "vdd_int";
-+					regulator-min-microvolt = <900000>;
-+					regulator-max-microvolt = <1200000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck4_reg: BUCK4 {
-+					regulator-name = "vdd_g3d";
-+					regulator-min-microvolt = <850000>;
-+					regulator-max-microvolt = <1300000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck5_reg: BUCK5 {
-+					regulator-name = "P1.8V_BUCK_OUT5";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				buck6_reg: BUCK6 {
-+					regulator-name = "P1.35V_BUCK_OUT6";
-+					regulator-min-microvolt = <1350000>;
-+					regulator-max-microvolt = <1350000>;
-+					regulator-always-on;
-+				};
-+
-+				buck7_reg: BUCK7 {
-+					regulator-name = "P2.0V_BUCK_OUT7";
-+					regulator-min-microvolt = <2000000>;
-+					regulator-max-microvolt = <2000000>;
-+					regulator-always-on;
-+				};
-+
-+				buck8_reg: BUCK8 {
-+					regulator-name = "P2.85V_BUCK_OUT8";
-+					regulator-min-microvolt = <2850000>;
-+					regulator-max-microvolt = <2850000>;
-+					regulator-always-on;
-+				};
-+			};
-+		};
- 	};
+diff --git a/arch/arm/mach-bcm2835/bcm2835.c b/arch/arm/mach-bcm2835/bcm2835.c
+index f0d739f..c867d0e 100644
+--- a/arch/arm/mach-bcm2835/bcm2835.c
++++ b/arch/arm/mach-bcm2835/bcm2835.c
+@@ -26,11 +26,13 @@
+ #include <mach/bcm2835_soc.h>
  
- 	i2c at 12C70000 {
+ #define PM_RSTC				0x1c
++#define PM_RSTS				0x20
+ #define PM_WDOG				0x24
+ 
+ #define PM_PASSWORD			0x5a000000
+ #define PM_RSTC_WRCFG_MASK		0x00000030
+ #define PM_RSTC_WRCFG_FULL_RESET	0x00000020
++#define PM_RSTS_HADWRH_SET		0x00000040
+ 
+ static void __iomem *wdt_regs;
+ 
+@@ -67,6 +69,29 @@ static void bcm2835_restart(char mode, const char *cmd)
+ 	mdelay(1);
+ }
+ 
++/*
++ * We can't really power off, but if we do the normal reset scheme, and
++ * indicate to bootcode.bin not to reboot, then most of the chip will be
++ * powered off.
++ */
++static void bcm2835_power_off(void)
++{
++	u32 val;
++
++	/*
++	 * We set the watchdog hard reset bit here to distinguish this reset
++	 * from the normal (full) reset. bootcode.bin will not reboot after a
++	 * hard reset.
++	 */
++	val = readl_relaxed(wdt_regs + PM_RSTS);
++	val &= ~PM_RSTC_WRCFG_MASK;
++	val |= PM_PASSWORD | PM_RSTS_HADWRH_SET;
++	writel_relaxed(val, wdt_regs + PM_RSTS);
++
++	/* Continue with normal reset mechanism */
++	bcm2835_restart(0, "");
++}
++
+ static struct map_desc io_map __initdata = {
+ 	.virtual = BCM2835_PERIPH_VIRT,
+ 	.pfn = __phys_to_pfn(BCM2835_PERIPH_PHYS),
+@@ -84,6 +109,9 @@ static void __init bcm2835_init(void)
+ 	int ret;
+ 
+ 	bcm2835_setup_restart();
++	if (wdt_regs)
++		pm_power_off = bcm2835_power_off;
++
+ 	bcm2835_init_clocks();
+ 
+ 	ret = of_platform_populate(NULL, of_default_bus_match_table, NULL,
 -- 
-1.6.6.1
+1.7.10.4
