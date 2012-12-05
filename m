@@ -1,58 +1,48 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 05 Dec 2012 10:17:58 +0900
-Subject: [PATCH v3] backlight: corgi_lcd: Use gpio_set_value_cansleep() to
- avoid WARN_ON
-In-Reply-To: <20121204145822.056b6cf6.akpm@linux-foundation.org>
-References: <000b01cdd1e0$293f0d90$7bbd28b0$%han@samsung.com>
- <20121204145822.056b6cf6.akpm@linux-foundation.org>
-Message-ID: <000501cdd286$5c8f7ad0$15ae7070$%han@samsung.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed,  5 Dec 2012 09:34:19 +0800
+Subject: [v2 PATCH 0/8] watchdog/at91sam9_wdt: Convert to use the new
+ framework
+Message-ID: <1354671267-19277-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 05, 2012 7:58 AM, Andrew Morton wrote
-> On Tue, 04 Dec 2012 14:28:15 +0900
-> Jingoo Han <jg1.han@samsung.com> wrote:
-> 
-> > From: Marko Katic <dromede@gmail.com>
-> >
-> > Changing backlight intensity on an Akita (Sharp Zaurus C-1000)
-> > triggers WARN_ON message:
-> 
-> Well, I queued it up.
-> 
-> > ...
-> >
-> > --- a/drivers/video/backlight/corgi_lcd.c
-> > +++ b/drivers/video/backlight/corgi_lcd.c
-> > @@ -408,11 +408,20 @@ static int corgi_bl_set_intensity(struct corgi_lcd *lcd, int intensity)
-> >  	/* Bit 5 via GPIO_BACKLIGHT_CONT */
-> >  	cont = !!(intensity & 0x20) ^ lcd->gpio_backlight_cont_inverted;
-> >
-> > -	if (gpio_is_valid(lcd->gpio_backlight_cont))
-> > -		gpio_set_value(lcd->gpio_backlight_cont, cont);
-> > +	if (gpio_is_valid(lcd->gpio_backlight_cont)) {
-> > +		if (gpio_cansleep(lcd->gpio_backlight_cont))
-> > +			gpio_set_value_cansleep(lcd->gpio_backlight_cont, cont);
-> > +		else
-> > +			gpio_set_value(lcd->gpio_backlight_cont, cont);
-> > +	}
-> 
-> But this looks utterly daft.  Grant, these two things are the same - do
-> we need both of them?
+Hi, All
 
-Hi Andrew,
+The purpose of the patch series is to convert to use the watchdog framework,
+I tested it on at91sam9g25ek.
 
-There is another difference, except for warning message.
-There is might_sleep_if(extra_checks) in gpio_set_value_cansleep().
+It is based on v3.7-rc8 + Fabio Porcedda's add device tree support 
+				and add timeout-sec property binding
 
-Also, I saw the Documentation/gpio.txt as below:
+ChangeLog 
+v2:
+1./ Remove the patches to add devive tree support which Fabio Porcedda
+	has done and submitted.
 
-172         /* GPIO OUTPUT */
-173         void gpio_set_value(unsigned gpio, int value);
-...
-213         /* GPIO OUTPUT, might sleep */
-214         void gpio_set_value_cansleep(unsigned gpio, int value);
+2./ Replace __raw_readl, __raw_writel with readl_relaxed, writel_relaxed.
 
+3./ Rebase on v3.7-rc8.
 
-Best regards,
-Jingoo Han
+Best Regards
+Wenyou Yang
+
+Wenyou Yang (8):
+  watchdog/at91sam9_wdt: Remove at91wdt_private and add at91wdt_drvdata
+    struct
+  watchdog/at91sam9_wdt: Convert to use the watchdog framework
+  watchdog/at91sam9_wdt: Adjust the options of watchdog_info
+  watchdog/at91sam9_wdt: Add nowayout helpers to Watchdog Timer Driver
+    Kernel API
+  watchdog/at91sam9_wdt: Remove the __initdata of at91wdt_wdd
+  watchdog/at91sam9_wdt: Use module_platform_driver()
+  ARM: dts: add the watchdog nodes for at91sam9x5 and at91sam9n12 SoC
+  ARM: dts: add the watchdog nodes for at91sam9g25ek boards
+
+ arch/arm/boot/dts/at91sam9g25ek.dts |    4 +
+ arch/arm/boot/dts/at91sam9n12.dtsi  |    6 +
+ arch/arm/boot/dts/at91sam9x5.dtsi   |    6 +
+ drivers/watchdog/at91sam9_wdt.c     |  288 ++++++++++++++---------------------
+ 4 files changed, 132 insertions(+), 172 deletions(-)
+
+-- 
+1.7.9.5
