@@ -1,54 +1,38 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed,  5 Dec 2012 09:34:25 +0800
-Subject: [v2 PATCH 6/8] watchdog/at91sam9_wdt: Use module_platform_driver()
+Date: Wed,  5 Dec 2012 09:34:22 +0800
+Subject: [v2 PATCH 3/8] watchdog/at91sam9_wdt: Adjust the options of
+ watchdog_info
 In-Reply-To: <1354671267-19277-1-git-send-email-wenyou.yang@atmel.com>
 References: <1354671267-19277-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1354671267-19277-7-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1354671267-19277-4-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using module_platform_driver() replaces module_init() and module_exit()
-and makes the code simpler.
+Since the Watchdog Timer Mode Register can be only written only once,
+so the watchdog_info shall not support WDIOF_SETTIMEOUT
+and WDIOF_MAGICCLOSE options, remove them.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 Cc: wim at iguana.be
 Cc: linux-watchdog at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/watchdog/at91sam9_wdt.c |   14 ++------------
- 1 file changed, 2 insertions(+), 12 deletions(-)
+ drivers/watchdog/at91sam9_wdt.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index 5afd3fb..a7c0881 100644
+index 92467d4..4dc6d61 100644
 --- a/drivers/watchdog/at91sam9_wdt.c
 +++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -278,6 +278,7 @@ MODULE_DEVICE_TABLE(of, at91_wdt_dt_ids);
- #endif
+@@ -156,8 +156,7 @@ static int at91wdt_enable(struct watchdog_device *wddev, unsigned int timeout)
  
- static struct platform_driver at91wdt_driver = {
-+	.probe		= at91wdt_probe,
- 	.remove		= __exit_p(at91wdt_remove),
- 	.driver		= {
- 		.name	= "at91_wdt",
-@@ -286,18 +287,7 @@ static struct platform_driver at91wdt_driver = {
- 	},
+ static const struct watchdog_info at91_wdt_info = {
+ 	.identity	= DRV_NAME,
+-	.options	= WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
+-						WDIOF_MAGICCLOSE,
++	.options	= WDIOF_KEEPALIVEPING,
  };
  
--static int __init at91sam_wdt_init(void)
--{
--	return platform_driver_probe(&at91wdt_driver, at91wdt_probe);
--}
--
--static void __exit at91sam_wdt_exit(void)
--{
--	platform_driver_unregister(&at91wdt_driver);
--}
--
--module_init(at91sam_wdt_init);
--module_exit(at91sam_wdt_exit);
-+module_platform_driver(at91wdt_driver);
- 
- MODULE_AUTHOR("Renaud CERRATO <r.cerrato@til-technologies.fr>");
- MODULE_DESCRIPTION("Watchdog driver for Atmel AT91SAM9x processors");
+ static int at91wdt_start(struct watchdog_device *wddev)
 -- 
 1.7.9.5
