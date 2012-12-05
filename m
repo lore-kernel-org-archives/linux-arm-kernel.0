@@ -1,38 +1,35 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed,  5 Dec 2012 09:34:22 +0800
-Subject: [v2 PATCH 3/8] watchdog/at91sam9_wdt: Adjust the options of
- watchdog_info
+Date: Wed,  5 Dec 2012 09:34:24 +0800
+Subject: [v2 PATCH 5/8] watchdog/at91sam9_wdt: Remove the __initdata of
+ at91wdt_wdd
 In-Reply-To: <1354671267-19277-1-git-send-email-wenyou.yang@atmel.com>
 References: <1354671267-19277-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1354671267-19277-4-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1354671267-19277-6-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the Watchdog Timer Mode Register can be only written only once,
-so the watchdog_info shall not support WDIOF_SETTIMEOUT
-and WDIOF_MAGICCLOSE options, remove them.
+For this variable will be used in the timer handler.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 Cc: wim at iguana.be
 Cc: linux-watchdog at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/watchdog/at91sam9_wdt.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/watchdog/at91sam9_wdt.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index 92467d4..4dc6d61 100644
+index f1e21dd..5afd3fb 100644
 --- a/drivers/watchdog/at91sam9_wdt.c
 +++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -156,8 +156,7 @@ static int at91wdt_enable(struct watchdog_device *wddev, unsigned int timeout)
- 
- static const struct watchdog_info at91_wdt_info = {
- 	.identity	= DRV_NAME,
--	.options	= WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
--						WDIOF_MAGICCLOSE,
-+	.options	= WDIOF_KEEPALIVEPING,
+@@ -201,7 +201,7 @@ static struct watchdog_ops at91wdt_ops = {
+ 	.ping = at91wdt_ping,
  };
  
- static int at91wdt_start(struct watchdog_device *wddev)
+-static struct watchdog_device at91wdt_wdd __initdata = {
++static struct watchdog_device at91wdt_wdd = {
+ 	.timeout = WDT_HEARTBEAT,
+ 	.min_timeout = MIN_HEARTBEAT,
+ 	.max_timeout = MAX_HEARTBEAT,
 -- 
 1.7.9.5
