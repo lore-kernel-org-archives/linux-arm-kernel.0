@@ -1,44 +1,107 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Wed,  5 Dec 2012 20:09:29 +0100
-Subject: [PATCH v7 3/5] ARM: OMAP: gpmc-nand: drop __init annotation
-In-Reply-To: <1354734571-10774-1-git-send-email-zonque@gmail.com>
-References: <1354734571-10774-1-git-send-email-zonque@gmail.com>
-Message-ID: <1354734571-10774-4-git-send-email-zonque@gmail.com>
+Date: Wed,  5 Dec 2012 20:09:26 +0100
+Subject: [PATCH v7 0/5] OMAP GPMC DT bindings
+Message-ID: <1354734571-10774-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpmc_nand_init() will be called from another driver's probe() function,
-so the easiest way to prevent section mismatches is to drop the
-annotation here.
+This is a series of patches to support GPMC peripherals on OMAP boards.
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
- arch/arm/mach-omap2/gpmc-nand.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Grant, Rob, could you have a look and give your Acked-by if
+appropriate?
 
-diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
-index db969a5..3059f5e 100644
---- a/arch/arm/mach-omap2/gpmc-nand.c
-+++ b/arch/arm/mach-omap2/gpmc-nand.c
-@@ -89,7 +89,7 @@ static int omap2_nand_gpmc_retime(
- 	return 0;
- }
- 
--static bool __init gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
-+static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
- {
- 	/* support only OMAP3 class */
- 	if (!cpu_is_omap34xx()) {
-@@ -110,8 +110,8 @@ static bool __init gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
- 	return 1;
- }
- 
--int __init gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
--			  struct gpmc_timings *gpmc_t)
-+int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
-+		   struct gpmc_timings *gpmc_t)
- {
- 	int err	= 0;
- 	struct device *dev = &gpmc_nand_device.dev;
+
+Many thanks again,
+Daniel
+
+
+Tested on Linus' master +
+omap-next (branch omap-for-v3.8/cleanup-headers-gpmc)
+
+Generated from linux-next as of today, resolving one trivial include
+file rebase conflict.
+
+The only supported peripheral for now is NAND, but other types would be
+easy to add.
+
+Version 2 addresses details pointed out by Jon Hunter, Afzal Mohammed
+and Rob Herring:
+
+ - add "reg" and "ti,hwmod" properties to Documentation
+ - use generic of_mtd functions and the property names defined by them,
+   namely "nand-bus-width" and "nand-ecc-mode"
+ - reduce the default register space size in the Documentation to 8K,
+   as found in the hwmod code
+ - switch to a DT layout based on ranges and address translation.
+   Although this property is not currently looked at as long as the
+   handling code still uses the runtime calculation methods, we now
+   have these values in the bindings, eventually allowing us to
+   switch the implementation with less pain.
+
+Version 3 includes fixes pointed out by Jon Hunter:
+
+ - better documentation of the 'ranges' property to describe the
+   fact that it's representing the CS lines
+ - GPMC_CS_CONFIGx -> GPMC_CONFIGx in comments
+ - drop interrupt-parent from example bindings
+ - add of_node_put() at the end of the child iteration
+
+Version 4 fixes compilation for !CONFIG_MTD_NAND and includes more
+details from Jon Hunter and Avinash, Philip:
+
+ - Add "num-cs" and "num-waitpins" properties, which will eventually
+   be used to get rid of GPMC_CS_NUM
+ - Better description of generic nand DT properties
+ - Dropped patch 3/4 as an equivalent fix was already merged
+ - Added ti,nand-ecc-use-elm property
+
+Version 5 with regards to Avinash, Philip and Peter Korsgaard:
+
+ - Re-add accidentially forgotten
+   Documentation/devicetree/bindings/bus/ti-gpmc.txt
+ - Rename "software" ecc mode to "sw"
+ - Initialize gpmc_nand_data->is_elm_used to 'true' rather than 1
+ - Drop ti,nand-ecc-use-elm binding in favor of a new ecc mode
+   named "bch8-am335xrbl-compatible"
+ - Add two more patches for section mismatch fixups
+
+Version 6:
+
+ - Dropped "bch8-am335xrbl-compatible" mode again. As discussed with
+   Avinash, the ELM issue will be solved subsequently in s separate
+   series.
+ - re-added a patch to bail out of automatic GPMC instanciation in
+   case of DT boot.
+ - re-added the "of_node" addition in mtd_nand_omap2.h in 2/5
+
+Version 7: comments from Jon Hunter, all affecting the documentation:
+
+ - add num-wait pins properties as they are marked 'required'
+ - make reg sizes consistent
+ - AM335x only has 2 wait-pins
+
+Again, many thanks to everybody, in particular Avinash, for the long
+disussion about how to the these details right in the first place.
+
+
+Daniel
+
+Daniel Mack (5):
+  ARM: OMAP: gpmc: don't create devices from initcall on DT
+  mtd: omap-nand: pass device_node in platform data
+  ARM: OMAP: gpmc-nand: drop __init annotation
+  ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
+  ARM: OMAP: gpmc: add DT bindings for GPMC timings and NAND
+
+ Documentation/devicetree/bindings/bus/ti-gpmc.txt  |  76 +++++++++
+ .../devicetree/bindings/mtd/gpmc-nand.txt          |  76 +++++++++
+ arch/arm/mach-omap2/gpmc-nand.c                    |  15 +-
+ arch/arm/mach-omap2/gpmc.c                         | 178 ++++++++++++++++++++-
+ drivers/mtd/nand/omap2.c                           |   4 +-
+ include/linux/platform_data/mtd-nand-omap2.h       |   4 +-
+ 6 files changed, 343 insertions(+), 10 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/bus/ti-gpmc.txt
+ create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+
 -- 
 1.7.11.7
