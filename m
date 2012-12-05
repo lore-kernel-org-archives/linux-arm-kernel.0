@@ -1,104 +1,101 @@
 From: csd@broadcom.com (Christian Daudt)
-Date: Wed, 5 Dec 2012 00:36:50 -0800
-Subject: [PATCH] Add support for generic BCM SoC chipsets
-In-Reply-To: <50BEC101.5090905@wwwdotorg.org>
-References: <1352391196-9984-1-git-send-email-csd@broadcom.com>
- <509C7771.9020400@wwwdotorg.org> <509FA975.6060203@broadcom.com>
- <50BEC101.5090905@wwwdotorg.org>
-Message-ID: <50BF07A2.9010208@broadcom.com>
+Date: Wed, 05 Dec 2012 01:02:38 -0800
+Subject: [PATCH] ARM: bcm281xx: Add timer driver
+In-Reply-To: <50BEB77F.10303@wwwdotorg.org>
+References: <1354593324-21300-1-git-send-email-csd@broadcom.com>
+ <50BEB77F.10303@wwwdotorg.org>
+Message-ID: <50BF0DAE.6000202@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-12-04 07:35 PM, Stephen Warren wrote:
-> On 11/11/2012 06:34 AM, Christian Daudt wrote:
->> On 12-11-08 07:24 PM, Stephen Warren wrote:
-> ...
->>> Is the intent for this to support other BCM SoCs in the future, such as
->>> the bcm2835 in the Raspberry Pi, and the mach-bcm476x which Domenico
->>> Andreoli recently sent patches for? It'd be awesome if Broadcom could
->>> provide MMC and USB drivers for the bcm2835 for example.
->> Yes and no :) The intent is to support other BCM SoCs in the future, but
->> Broadcom has a fair number of ARM based SoCs. My primary focus is on the
->> ones from my group within Broadcom (mobile SoCs), but the plan is to
->> bring in others as feasible, and collaborate with other upstreaming work
->> being done for BCM SoCs.
+On 12-12-04 06:54 PM, Stephen Warren wrote:
+> On 12/03/2012 08:55 PM, Christian Daudt wrote:
+>> This adds support for the Broadcom timer, used in the following SoCs:
+>> BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
 >>
->> As for bcm2835 MMC and USB, we will be upstreaming MMC and USB bcm281xx
->> as part of this effort and while I haven't checked the bcm2835 guts (it
->> comes from a different team within Broadcom) I suspect it might share
->> the same IP blocks, which would make it fairly easy to extend our work
->> to add 2835 support. Stay tuned !
-> So, the bcm2835/Raspberry Pi port is at the stage where MMC and/or USB
-> drivers would be the next useful thing to upstream. However, in order to
-> use those blocks, we should really get communication with the VideoCore
-> working in order to ensure that power and clocks to those modules are
-> configured and enabled.
-Cool. I've started a rewrite of our sdhci driver for upstreaming.
->
-> This begs a few questions
->
-> * Do all/most Broadcom SoCs have a VideoCore.
-The mobile ones yes, there are a few different versions of videocore. 
-But I'm pretty sure that the version in bcm2835 is identical or almost 
-identical to the version in the mobile SoCs I'm upstreaming.
->
-> * If so, does the VC typically have complete control over the clock and
-> power/reset trees? Or, are you planning to control these aspects from
-> Linux on the SoCs you're working on upstreaming? If so, is there
-> publicly accessible documentation for your SoC, and is it possible to
-> release similar docs for the 2835?
-As far as I know, the bcm2835 design in which the videocore has control 
-over the SoC is unique to that model. No other Broadcom SoCs follow that 
-design - or at least none of the mobile SoCs that I work on. As for 
-documentation, there is no publicly available doc on the soc I'm working 
-on. I don't know the state of the 2835 documentation - that comes from a 
-different group within Broadcom.
+>> This patch needs the arm-soc/soc/next branch
+> I assume this is being applied for 3.9, so it'll want to be rebased on
+> the struct sys_timer removal, which I hope to get into linux-next very
+> early after 3.8-rc1.
+Not sure at this point - from my point of view earlier is always better 
+so if it makes it to 3.8 that's fine by me. But ultimately whatever 
+makes sense is fine by me so if 3.8 is not appropriate then 3.9 it is.
 
-> * If the VC controls this, how standardized is the communication
-> mechanism with the VC; do all SoCs have the same mailbox HW, use the
-> same format for the messages passed through the mailbox, and for mailbox
-> channels where the message is a pointer to the message buffer, do they
-> use the same format for that message buffer?
 >
-> I note that the earlier Raspberry Pi firmwares didn't include support
-> for the so-called "property mailbox" channel[1]; it was added in later
-> firmwares. So I assume this is something custom for the Raspberry Pi.
-> That'd be a pity since this message format fixed some nasty issues with
-> the other non-property mailbox messages, at least for power control...
-As I mentioned above, the 2835 architecture does not follow the design 
-used on the mobile SoCs. It is unique as far as I know. The mobile SoCs 
-I'm upstreaming boot from the ARM core and the videcore does, well, 
-video stuff :) My (very vague) understanding of the 2835 is that it 
-boots from videocore, and the videocore retains a number of 
-responsibilities.
+>> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+>> +	timer at 35006000 {
+>> +		compatible = "bcm,kona-timer";
+> Is there DT binding documentation for this?
+I'll add one
+> I'm slightly worried about "kona". Is it a well-known name outside
+> Broadcom for this HW block? If it really is the name though, it's fine I
+> guess, since it's within the "bcm," name-space here.
+Some of these konas slip by :) This is an internal name, but I don't 
+need to use it here. I'll change this to "bcm,bcm-timer"
 
-> Overall, I'm wondering whether the Raspberry Pi upstreaming efforts
-> should just hold off completely until you've got more of the
-> BCM11351/... stuff upstream and simply add that to the Raspberry Pi DT,
-> or whether this aspect won't be re-usable at all.
-It is hard to say at this point what the commonality is - I honestly am 
-not that familiar with the 2835. I do suspect that a number of drivers 
-will be similar in that they start from common IP blocks, but they are 
-connected differently in the different SoCs and thus the drivers won't 
-be identical. But it's just a suspicion at this point.
-  I have purchased a few Raspberry PIs for my team so that we can 
-familiarize ourselves a bit more with it though :) I think that once we 
-have a basic working set upstreamed (basic clocks, emmc/sd, gpio, and a 
-couple of others), we can then take a look at the 2835 as to how 
-applicable what we've upstreamed is for it. I can't give you a timeframe 
-for this though so I don't know if you want to wait for it or not.
-> If there isn't any commonality now in the VC firmware responsibilities
-> and/or message formats, would it be possible to create some kind of
-> standard interface to the firmware, and builds of the firmware that
-> implement that, for upstreaming purposes?
-I'll try to understand better the 2835 in the next few weeks so I can 
-provide more meaningful responses. Maybe it'll be my Christmas reading 
-material...
+>> diff --git a/drivers/clocksource/bcm_timer.c b/drivers/clocksource/bcm_timer.c
+> Is this timer HW used in every Broadcom chip? I wonder if the file
+> shouldn't be named bcm_kona_timer.c to allow co-existence with any others.
+I'm sure it is not used in every Broadcom chip, but it is used in the 
+ones I'm upstreaming at this point. I can always rename it if it turns 
+out that this is no longer the only one, can't I ? I have been 
+struggling a bit with when to use just "bcm" for name, and when to use 
+something else. Internally we've used kona (and a number of other 
+internal only names) but I've been trying to scrub these out of the code 
+going to upstream, as the internal names are meaningless. But then I end 
+up with no name in some cases, and I don't know that that is more 
+helpful than the meaningless name...
 
-  Cheers,
+>> +struct bcm_timers {
+>> +	int tmr_irq;
+>> +	void __iomem *tmr_regs;
+>> +};
+>> +
+>> +struct bcm_timers timers;
+> Should that be static?
+changed.
+>
+>> +/* We use the peripheral timers for system tick, the cpu global timer for
+>> + * profile tick
+>> + */
+> I think it's usual to leave the /* line empty, so that would be:
+>
+>> +/*
+>> + * We use the peripheral timers for system tick, the cpu global timer for
+>> + * profile tick
+>> + */
+changed.
+>> +static void timer_disable_and_clear(void __iomem *base)
+>> +	reg = 0;
+>> +
+>> +	/* Clear compare (0) interrupt */
+>> +	reg |= 1 << KONA_GPTIMER_STCS_TIMER_MATCH_SHIFT;
+>> +	/* disable compare */
+>> +	reg &= ~(1 << KONA_GPTIMER_STCS_COMPARE_ENABLE_SHIFT);
+> That bit isn't set anywhere; is there a need to clear it; should "reg =
+> 0" above be a readl() of the register?
+yes, that is missing. I'll add it.
+>> +static void
+>> +timer_get_counter(void *timer_base, uint32_t *msw, uint32_t *lsw)
+>> +	while (1) {
+>> +		*msw = readl(base + KONA_GPTIMER_STCHI_OFFSET);
+>> +		*lsw = readl(base + KONA_GPTIMER_STCLO_OFFSET);
+>> +		if (*msw == readl(base + KONA_GPTIMER_STCHI_OFFSET))
+>> +			break;
+>> +	}
+> I guess it's very unlikely, but should there be a limit to the loop
+> count here, or a diagnostic if it runs too long?
+I'll add a pr_err if it runs too many times. That should never happen.
+>> +static void __init timer_clockevents_init(void)
+> Can this function use clockevents_config_and_register() to avoid a bunch
+> of the manual calculations and assignments?
+I'll take a look whether it can or not.
+>
+>> diff --git a/drivers/clocksource/bcm_timer.h b/drivers/clocksource/bcm_timer.h
+> You may as well move these definitions into the .c file since they don't
+> need to be public?
+agreed.
+
+
+  Thanks,
     csd
-
-> [1] https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
->
-> Thanks for any information!
->
