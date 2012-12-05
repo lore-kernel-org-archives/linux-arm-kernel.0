@@ -1,59 +1,57 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 05 Dec 2012 23:10:44 +0100
-Subject: [PATCH 0/6 v8] gpio: Add block GPIO
-In-Reply-To: <50BF9627.4050102@grandegger.com>
-References: <1354298637-25058-1-git-send-email-stigge@antcom.de>
- <50BC6E11.3040203@grandegger.com> <50BE5F8A.2000903@antcom.de>
- <50BF9627.4050102@grandegger.com>
-Message-ID: <50BFC664.8080708@antcom.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 05 Dec 2012 15:18:14 -0700
+Subject: [PATCH V2 2/6] ARM: tegra20: cpuidle: add powered-down state
+ for secondary CPU
+In-Reply-To: <1354701715-24150-3-git-send-email-josephl@nvidia.com>
+References: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
+ <1354701715-24150-3-git-send-email-josephl@nvidia.com>
+Message-ID: <50BFC826.1020705@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfgang,
-
-On 05/12/12 19:44, Wolfgang Grandegger wrote:
->> * There is probably an explicit interrupt configuration necessary (via
->> struct gpio_block, and devicetree, respectively) since there are
->> constellations where gpio_to_irq() isn't working. E.g., in contrast to
->> controllers which are aware of their IRQs and providing to_irq(), there
->> is typically independent wiring from GPIO expander chips' interrupt line
->> to individual IRQ inputs on SoCs/CPUs. Or should all this be solved via
->> devicetree and drivers (which should support IRQ config where possible)?
+On 12/05/2012 03:01 AM, Joseph Lo wrote:
+> The powered-down state of Tegra20 requires power gating both CPU cores.
+> When the secondary CPU requests to enter powered-down state, it saves
+> its own contexts and then enters WFI. The Tegra20 had a limition to
+> power down both CPU cores. The secondary CPU must waits for CPU0 in
+> powered-down state too. If the secondary CPU be woken up before CPU0
+> entering powered-down state, then it needs to restore its CPU states
+> and waits for next chance.
 > 
-> Yes, I think it's up to the device tree or platform code to properly setup
-> the interrupt... like for defining the GPIO block.
+> Be aware of that, you may see the legacy power state "LP2" in the code
+> which is exactly the same meaning of "CPU power down".
 
-OK, sounds reasonable. Luckily, in reality it already works fine in this
-regard with many current drivers.
+> diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
 
->> * For the same reason, the IRQ flags are currently IRQF_TRIGGER_FALLING,
->> which isn't flexible. Instead, either preset by board setup/firmware, or
->> via interrupts config in devicetree (optional property of a GPIO block?)
-> 
-> Yes, and it did fail on my setup.
+> +static int __cpuinit tegra20_idle_lp2(struct cpuidle_device *dev,
 
-OK, will replace the flags with 0 (and need to fix my own board setup ;-) ).
+> +	return (entered_lp2) ? index : 0;
 
->> * Some GPIOs' IRQs are not suitable for GPI input change detection. E.g.
->> on LPC32xx, I can configure the IRQ which is controlled directly by the
->> GPI's values as FALLING, RISING, HIGH /exclusive/ or LOW. I.e., this way
->> it's not possible to detect both 0->1 and 1->0 changes without
->> reconfiguring the GPIO controller inbetween. Other controllers provide a
->> dedicated interrupt on all values changes.
-> 
-> Hm.
+No need for the brackets there.
 
-For now, we are expecting IRQs to fire on "changes". Otherwise, the user
-needs to handle the issue manually, using busy polling, manual
-reconfiguration of the GPIO controller etc.
+BTW, could you Cc Colin Cross on any future revisions of these patches;
+it'd be good to get his take on them.
 
->> * Would IRQF_SHARED be appropriate to enable opening IRQ enabled GPIO
->> blocks multiple times?
-> 
-> Sounds reasonable for me. Some more comments in the patch mails...
+> diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
 
-OK, will do in the next update.
+> +/*
+> + * tegra_pen_lock
 
-Thanks for your feedback,
+> + * on cpu 0:
+> + * SCRATCH38 = r2 = flag[0]
+> + * SCRATCH39 = r3 = flag[1]
 
-Roland
+It would be slightly clearer if that was written:
+
+* r2 = flag[0] (in SCRATCH38)
+* r3 = flag[1] (in SCRATCH39)
+
+since the meaning of r2/r3 is what's being selected.
+
+> +	mov	r12, #1
+> +	str	r12, [r2]		@ flag[cpu] = 1
+> +	dsb
+> +	str	r12, [r1]		@ !turn = cpu
+
+Should that be "str r0, [r1]"? Otherwise, you're always writing 1 there,
+not writing the CPU ID as expected.
