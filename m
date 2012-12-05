@@ -1,62 +1,62 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 5 Dec 2012 20:51:34 +0100
-Subject: [PATCH] nommu: Enable the strict alignment (CR_A) bit only if
- ARCH < v6
-In-Reply-To: <20121203174617.GL20074@mudshark.cambridge.arm.com>
-References: <1354187042-28568-1-git-send-email-armando.visconti@st.com>
- <50BCD6DB.2030200@st.com>
- <20121203172553.GC14363@n2100.arm.linux.org.uk>
- <20121203174617.GL20074@mudshark.cambridge.arm.com>
-Message-ID: <20121205195134.GD3384@pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 05 Dec 2012 21:28:59 +0100
+Subject: [GIT PULL] Improve the SMP support of the interrupt controller
+ for Armada XP
+In-Reply-To: <1354714394-11622-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1354714394-11622-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <50BFAE8B.1080303@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Mon, Dec 03, 2012 at 05:46:17PM +0000, Will Deacon wrote:
-> On Mon, Dec 03, 2012 at 05:25:53PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Dec 03, 2012 at 05:44:11PM +0100, Armando Visconti wrote:
-> > > On 11/29/2012 12:04 PM, Armando VISCONTI wrote:
-> > >> This patch keeps disabled the strict alignment CP15 bit for
-> > >> all armv6 and armv7 processor without the mmu. This behaviour
-> > >> is now same as in the mmu case.
-> > >>
-> > >> Signed-off-by: Armando Visconti<armando.visconti@st.com>
-> > >> ---
-> > >>   arch/arm/kernel/head-nommu.S |    2 +-
-> > >>   1 files changed, 1 insertions(+), 1 deletions(-)
-> > >>
-> > >> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-> > >> index 278cfc1..2c228a0 100644
-> > >> --- a/arch/arm/kernel/head-nommu.S
-> > >> +++ b/arch/arm/kernel/head-nommu.S
-> > >> @@ -68,7 +68,7 @@ __after_proc_init:
-> > >>   	 * CP15 system control register value returned in r0 from
-> > >>   	 * the CPU init function.
-> > >>   	 */
-> > >> -#ifdef CONFIG_ALIGNMENT_TRAP
-> > >> +#if defined(CONFIG_ALIGNMENT_TRAP)&&  __LINUX_ARM_ARCH__<  6
-> > >>   	orr	r0, r0, #CR_A
-> > >>   #else
-> > >>   	bic	r0, r0, #CR_A
-> > >
-> > > Any feedback on this simple patch?
-> > 
-> > Well, it brings the nommu version into line with the mmu version, so
-> > it's sensible.  Please put it in the patch system, thanks.
+On 12/05/2012 02:33 PM, Gregory CLEMENT wrote:
+> Jason,
 > 
-> In which case, I'll definitely dust-off the patches to prevent unaligned
-> accesses to strongly-ordered memory because that results in good ol'
-> UNPREDICTABLE behaviour.
+> here it is the patch set to improve the Armada XP SMP support. This
+> pull can be merged without any conflict even on the last
+> arm-soc/for-next. As Linus Torvalds told that the release of 3.7 won't
+> happen before next week, I'd like to have this improvement as part of
+> 3.8.
 > 
-> I think Uwe also requires some of the stuff there for his M3 port.
-I didn't check more context than available in the patch and I also
-didn't double-check the M3-docs, but AFAIK the M3 doesn't have a cp15
-and I noopt this code out.
 
-Best regards
-Uwe
+Please ignore this git pull, the code is buggy in non-SMP mode. A new
+version is incoming. Sorry.
+
+Gregory
+
+> Thanks!
+> 
+> Gregory
+> 
+> The following changes since commit 56580bb422e5f542da19c057f348dd39634138e7:
+> 
+>   Merge branch 'mvebu-misc-fixes' of git://github.com/MISL-EBU-System-SW/mainline-public into mvebu/everything (2012-11-24 04:08:49 +0000)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git at github.com:MISL-EBU-System-SW/mainline-public.git tags/mvebu-irq-smp-armada-xp
+> 
+> for you to fetch changes up to d1c1c368df413d78f6b9588038eebc13c9a59382:
+> 
+>   arm: mvebu: Improve the SMP support of the interrupt controller (2012-12-05 13:19:26 +0100)
+> 
+> ----------------------------------------------------------------
+> Improve the SMP support of the interrupt controller
+> 
+> This patch allows a better handling of IRQ in SMP mode for the Armada
+> 
+> ----------------------------------------------------------------
+> Yehuda Yitschak (1):
+>       arm: mvebu: Improve the SMP support of the interrupt controller
+> 
+>  arch/arm/boot/dts/armada-xp.dtsi        |    2 +-
+>  arch/arm/mach-mvebu/irq-armada-370-xp.c |   49 ++++++++++++++++++++++++++++---
+>  2 files changed, 46 insertions(+), 5 deletions(-)
+> 
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
