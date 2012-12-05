@@ -1,55 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 5 Dec 2012 10:33:16 -0800
-Subject: [PATCH v6 4/5] ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
-In-Reply-To: <50BF9047.6000904@ti.com>
-References: <1354204892-22762-5-git-send-email-zonque@gmail.com>
- <50B7BE9C.6040506@ti.com> <50B7C677.7090504@ti.com>
- <50B7C8BE.7050002@gmail.com> <50B7CCB1.6000506@ti.com>
- <50BF4670.8070602@gmail.com> <20121205171950.GF21682@atomide.com>
- <50BF83CA.5050007@gmail.com> <20121205174114.GH21682@atomide.com>
- <50BF9047.6000904@ti.com>
-Message-ID: <20121205183315.GI21682@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 05 Dec 2012 11:34:37 -0700
+Subject: [PATCH 2/5] ARM: tegra20: clocks: add CPU low-power function
+ into tegra_cpu_car_ops
+In-Reply-To: <1354598707.30563.10.camel@jlo-ubuntu-64.nvidia.com>
+References: <1354503607-13707-1-git-send-email-josephl@nvidia.com>
+ <1354503607-13707-3-git-send-email-josephl@nvidia.com>
+ <50BD8646.6070608@nvidia.com>
+ <1354598707.30563.10.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <50BF93BD.9090808@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [121205 10:22]:
+On 12/03/2012 10:25 PM, Joseph Lo wrote:
+> On Tue, 2012-12-04 at 13:12 +0800, Prashant Gaikwad wrote:
+>> On Monday 03 December 2012 08:30 AM, Joseph Lo wrote:
+>>> Add suspend, resume and rail_off_ready API into tegra_cpu_car_ops. These
+>>> functions were used for CPU powered-down state maintenance.
+>>>
+>>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>>> ---
+>>>   arch/arm/mach-tegra/tegra20_clocks.c |  102 ++++++++++++++++++++++++++++++++++
+>>>   1 files changed, 102 insertions(+), 0 deletions(-)
+>>
+>> I have a concern here, I am working on removing these ops and replacing 
+>> it with clock.
+>> Adding suspend/resume to these will make it more difficult to remove.
+>>
+>> Any other way to implement this?
+>>
 > 
-> On 12/05/2012 11:41 AM, Tony Lindgren wrote:
-> > * Daniel Mack <zonque@gmail.com> [121205 09:29]:
-> >> On 05.12.2012 18:19, Tony Lindgren wrote:
-> >>>
-> >>> The plat/cpu.h file will disappear after the merge window, which means
-> >>> omap2+ related drivers cannot use cpu_is_omap macros.
-> >>>
-> >>> For legacy booting systems, this flag should be just passed in the
-> >>> platform_data from the platform init code. Then device tree can
-> >>> deal with it based on the compatible flag.
-> >>>
-> >>
-> >> Ok, thanks for explaining.
-> >>
-> >> Does that mean this patch series should be postponed until after the
-> >> merge window and then build upon that change or should we merge the
-> >> patch in question here as is and then care for the cleanups after the
-> >> window?
-> > 
-> > Well to me it seems that you only have cpu_is_omap usage in
-> > arch/arm/mach-omap2/gpmc-nand.c, which will be OK. Only the code
-> > under drivers/* needs to be fixed for that. So your patches may
-> > be OK, but..
+> Prashant,
 > 
-> The real problem here is that drivers/mtd/nand/omap2.c is including
-> plat/gpmc.h and calling a function in arch/arm/mach-omap/gpmc-nand.c. So
-> although Daniel's patches are not introducing any new problems for
-> single zImage, they do highlight a problem that we have with the omap2
-> nand driver that needs to be addressed for single zImage.
->
-> So either we fix this now or after merging Daniel's changes. Either is
-> fine with me.
+> Thanks for remind.
+> Actually the "tegra_cpu_car_ops" is more like reset & suspend/resume
+> handling, it's not really related to clock framework. So it's more like
+> some functions for CPU power management control. Maybe I can move them
+> (Tegra20 & Tegra30) to another pm related file later.
+> 
+> How do you think, Stephen?
 
-Ah I see. Yes it would be good to fix that issue first to avoid
-adding any new blockers for multiplatform build.
-
-Regards,
-
-Tony
+Well, the CAR (Clock And Reset) HW module implements this functionality,
+right? As such, the code should be part of the clock driver. The whole
+reason we have the car_ops in the first place is so that only the clock
+driver touches the clock HW module. I hope we'll eventually do the same
+for all HW modules.
