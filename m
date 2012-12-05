@@ -1,149 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Dec 2012 11:16:06 +0000
-Subject: [PATCH v4 12/13] ARM: KVM: vgic: reduce the number of vcpu kick
-In-Reply-To: <20121110154539.3061.82553.stgit@chazy-air>
-References: <20121110154358.3061.16338.stgit@chazy-air>
- <20121110154539.3061.82553.stgit@chazy-air>
-Message-ID: <20121205111606.GM14363@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 5 Dec 2012 20:14:51 +0800
+Subject: [PATCH v2 1/4] ARM: imx: allow timer counter to roll over
+In-Reply-To: <20121204154459.GG14363@n2100.arm.linux.org.uk>
+References: <1354632915-27134-1-git-send-email-shawn.guo@linaro.org>
+ <1354632915-27134-2-git-send-email-shawn.guo@linaro.org>
+ <20121204154459.GG14363@n2100.arm.linux.org.uk>
+Message-ID: <20121205121449.GA26180@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the sake of public education, let me rewrite this patch a bit to
-illustrate why atomic_t's are bad, and then people can review this
-instead.
-
-Every change I've made here is functionally equivalent to the behaviour
-of the atomic type; I have not added any new bugs here that aren't
-present in the original code.
-
-It is my hope that through education like this, people will see that
-atomic types have no magic properties, and their use does not make
-code automatically race free and correct; in fact, the inappropriate
-use of atomic types is pure obfuscation and causes confusion.
-
-On Sat, Nov 10, 2012 at 04:45:39PM +0100, Christoffer Dall wrote:
-> diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
-> index a8e7a93..7d2662c 100644
-> --- a/arch/arm/include/asm/kvm_vgic.h
-> +++ b/arch/arm/include/asm/kvm_vgic.h
-> @@ -215,6 +215,9 @@ struct vgic_cpu {
->  	u32		vgic_elrsr[2];	/* Saved only */
->  	u32		vgic_apr;
->  	u32		vgic_lr[64];	/* A15 has only 4... */
-> +
-> +	/* Number of level-triggered interrupt in progress */
-> +	atomic_t	irq_active_count;
-
-+	int		irq_active_count;
-
->  #endif
->  };
->  
-> @@ -254,6 +257,8 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  
->  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.vctrl_base))
->  #define vgic_initialized(k)	((k)->arch.vgic.ready)
-> +#define vgic_active_irq(v)	(atomic_read(&(v)->arch.vgic_cpu.irq_active_count) == 0)
-> +
-
-+#define vgic_active_irq(v)	((v)->arch.vgic_cpu.irq_active_count)
-
->  #else
->  static inline int kvm_vgic_hyp_init(void)
->  {
-> @@ -305,6 +310,11 @@ static inline bool vgic_initialized(struct kvm *kvm)
->  {
->  	return true;
->  }
-> +
-> +static inline int vgic_active_irq(struct kvm_vcpu *vcpu)
-> +{
-> +	return 0;
-> +}
->  #endif
->  
->  #endif
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index a633d9d..1716f12 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -94,7 +94,15 @@ int kvm_arch_hardware_enable(void *garbage)
->  
->  int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
->  {
-> -	return kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE;
-> +	if (kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE) {
-> +		if (vgic_active_irq(vcpu) &&
-> +		    cmpxchg(&vcpu->mode, EXITING_GUEST_MODE, IN_GUEST_MODE) == EXITING_GUEST_MODE)
-> +			return 0;
-
-So with the above change to the macro, this becomes:
-+		if (vcpu->arch.vgic_cpu.irq_active_count &&
-+		    cmpxchg(&vcpu->mode, EXITING_GUEST_MODE, IN_GUEST_MODE) == EXITING_GUEST_MODE)
-
-> +
-> +		return 1;
-> +	}
-> +
-> +	return 0;
->  }
->  
->  void kvm_arch_hardware_disable(void *garbage)
-> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-> index 415ddb8..146de1d 100644
-> --- a/arch/arm/kvm/vgic.c
-> +++ b/arch/arm/kvm/vgic.c
-> @@ -705,8 +705,10 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
->  		kvm_debug("LR%d piggyback for IRQ%d %x\n", lr, irq, vgic_cpu->vgic_lr[lr]);
->  		BUG_ON(!test_bit(lr, vgic_cpu->lr_used));
->  		vgic_cpu->vgic_lr[lr] |= VGIC_LR_PENDING_BIT;
-> -		if (is_level)
-> +		if (is_level) {
->  			vgic_cpu->vgic_lr[lr] |= VGIC_LR_EOI;
-> +			atomic_inc(&vgic_cpu->irq_active_count);
-
-+			spin_lock_irqsave(&atomic_lock, flags);
-+			vgic_cpu->irq_active_count++;
-+			spin_unlock_irqrestore(&atomic_lock, flags);
-
-> +		}
->  		return true;
->  	}
->  
-> @@ -718,8 +720,10 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
->  
->  	kvm_debug("LR%d allocated for IRQ%d %x\n", lr, irq, sgi_source_id);
->  	vgic_cpu->vgic_lr[lr] = MK_LR_PEND(sgi_source_id, irq);
-> -	if (is_level)
-> +	if (is_level) {
->  		vgic_cpu->vgic_lr[lr] |= VGIC_LR_EOI;
-> +		atomic_inc(&vgic_cpu->irq_active_count);
-
-+		spin_lock_irqsave(&atomic_lock, flags);
-+		vgic_cpu->irq_active_count++;
-+		spin_unlock_irqrestore(&atomic_lock, flags);
-
-> +	}
->  
->  	vgic_cpu->vgic_irq_lr_map[irq] = lr;
->  	clear_bit(lr, (unsigned long *)vgic_cpu->vgic_elrsr);
-> @@ -1011,6 +1015,8 @@ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
->  
->  			vgic_bitmap_set_irq_val(&dist->irq_active,
->  						vcpu->vcpu_id, irq, 0);
-> +			atomic_dec(&vgic_cpu->irq_active_count);
-
-+			spin_lock_irqsave(&atomic_lock, flags);
-+			vgic_cpu->irq_active_count--;
-+			spin_unlock_irqrestore(&atomic_lock, flags);
-
-> +			smp_mb();
->  			vgic_cpu->vgic_lr[lr] &= ~VGIC_LR_EOI;
->  			writel_relaxed(vgic_cpu->vgic_lr[lr],
->  				       dist->vctrl_base + GICH_LR0 + (lr << 2));
+On Tue, Dec 04, 2012 at 03:44:59PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Dec 04, 2012 at 10:55:12PM +0800, Shawn Guo wrote:
+> > The timer is configured in free-run mode.  The counter should be
+> > allowed to roll over to 0 when reaching 0xffffffff.  Let's do that
+> > by always returning 0 in set_next_event.
 > 
+> Are you sure this is correct?  It looks wrong to me.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> If the time set by the next event has passed, you must return -ETIME
+> from set_next_event() so that the generic timer code can compensate
+> for the missed event and recalculate it, otherwise you will end up
+> having to wait a full count cycle before receiving the next event.
+> 
+> If you find that you're being passed such a small increment that you're
+> constantly hitting that condition, you need to increase your minimum
+> waited interval.
+
+I think we already have a proper min_delta_tick setting to ensure we
+will not run into the situation that the event will get expired in
+v2_set_next_event().  I guess that's the reason why most of the
+set_next_event() implementations under arch/arm can always return 0?
+
+> > diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
+> > index f017302..858098c 100644
+> > --- a/arch/arm/mach-imx/time.c
+> > +++ b/arch/arm/mach-imx/time.c
+> > @@ -139,8 +139,7 @@ static int mx1_2_set_next_event(unsigned long evt,
+> >  
+> >  	__raw_writel(tcmp, timer_base + MX1_2_TCMP);
+> >  
+> > -	return (int)(tcmp - __raw_readl(timer_base + MX1_2_TCN)) < 0 ?
+> > -				-ETIME : 0;
+> > +	return 0;
+> 
+> So what this code was doing is: tcmp is the counter value we expect with
+> the expected event time added.  This may wrap 32-bits.  We subtract the
+> current timer value after we've set the compare register.  If the current
+> timer value was larger than the expected event time, we return -ETIME.
+
+>From what I have seen, it never happens in event expiring case but
+always in counter wrapping.  Since the timer is configured in free-run
+mode and can keep running after wrapping, it should be safe to always
+return zero.
+
+> That to me sounds 100% correct.  Your replacement code of always returning
+> zero looks wrong.
+
+The code change is fixing a problem seen with WAIT mode support, without
+introducing any regression from what I've seen.
+
+Enabling WAIT mode support with the original code, we will easily run
+into an infinite loop in tick_handle_oneshot_broadcast() - "goto again;"
+This happens because when global event did not expire any CPU local
+events, the broadcast device will be rearmed to a CPU local next_event,
+which could be far away from now and result in a max_delta_tick
+programming in set_next_event().  This will certainly cause a counter
+wrapping and then a -ETIME return, which in turn makes the execution
+fall into the "goto again" loop.
+
+One thing I do not understand is why tick_broadcast_set_event() is being
+called with parameter "force" being 0 in tick_handle_oneshot_broadcast().
+This will make clockevents_program_event() skip
+clockevents_program_min_delta() call in that case.  Changing "force"
+to 1 also fixes my problem, but I wouldn't be so aggressive to change
+the clockevents core code when there is a fix that could be applied
+at platform level.
+
+Shawn
