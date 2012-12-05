@@ -1,65 +1,39 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 5 Dec 2012 16:12:39 +0100
-Subject: [PATCH v2] net/macb: Use non-coherent memory for rx buffers
-In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B70D9@saturn3.aculab.com>
-References: <CAGhQ9VwWmP_B17LnAEqDHcL8Yd-s0C-Bf35z3+=vnJmK_NoCSw@mail.gmail.com>
- <1354536876-6274-1-git-send-email-nicolas.ferre@atmel.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B70D5@saturn3.aculab.com>
- <50BCA746.1020705@atmel.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B70D6@saturn3.aculab.com>
- <50BE2FEC.2070500@atmel.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B70D9@saturn3.aculab.com>
-Message-ID: <50BF6467.5060701@atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 5 Dec 2012 15:15:57 +0000
+Subject: [RFC PATCH 0/2] Add support for a fake, para-virtualised machine
+In-Reply-To: <20121205150732.GJ22385@mudshark.cambridge.arm.com>
+References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
+ <50BD1F81.9080304@gmail.com>
+ <20121204123001.GL23368@mudshark.cambridge.arm.com>
+ <50BE04C6.4070602@gmail.com>
+ <alpine.LFD.2.02.1212041142490.6589@xanadu.home>
+ <20121204171129.GE5314@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1212041252290.6589@xanadu.home>
+ <20121204181446.GJ5314@mudshark.cambridge.arm.com>
+ <CAHkRjk5HgM=kL5Li_9qrwXfD+vJGvLLoha_ns6KFdxZW7gLwbA@mail.gmail.com>
+ <20121205150732.GJ22385@mudshark.cambridge.arm.com>
+Message-ID: <20121205151557.GE27057@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2012 10:35 AM, David Laight :
->> If I understand well, you mean that the call to:
->>
->> 		dma_sync_single_range_for_device(&bp->pdev->dev, phys,
->> 				pg_offset, frag_len, DMA_FROM_DEVICE);
->>
->> in the rx path after having copied the data to skb is not needed?
->> That is also the conclusion that I found after having thinking about
->> this again... I will check this.
-> 
-> You need to make sure that the memory isn't in the data cache
-> when you give the rx buffer back to the MAC.
-> (and ensure the cpu doesn't read it until the rx is complete.)
-> I've NFI what that dma_sync call does - you need to invalidate
-> the cache lines.
+On Wed, Dec 05, 2012 at 03:07:32PM +0000, Will Deacon wrote:
+> On Wed, Dec 05, 2012 at 02:52:57PM +0000, Catalin Marinas wrote:
+> > Just for clarification, AArch32 with virtualisation mandates the
+> > security extensions, so the SMC can be trapped. On AArch64 it is a bit
+> > tricky since the presence of EL3 is not mandate, in which case SMC
+> > would undef (don't as why ;). That's where we can have different
+> > enable methods specified via the DT.
+>
+> Not entirely true: only ARMv7 mandates the security extensions in this
+> manner. You can still have ARMv8 CPUs running AArch32 code without the
+> security extensions.
 
-The invalidate of cache lines is done by
-dma_sync_single_range_for_device(, DMA_FROM_DEVICE) so I need to keep it.
+Yes, I pretty much had the 32-bit and 64-bit ARM ports in mind. An
+AArch32 guest OS running on an AArch64 KVM would indeed have this issue.
 
->> For the CRC, my driver is not using the CRC offloading feature for the
->> moment. So no CRC is written by the device.
-> 
-> I was thinking it would matter if the MAC wrote the CRC into the
-> buffer (even though it was excluded from the length).
-> It doesn't - you only need to worry about data you've read.
-> 
->>> I was wondering if the code needs to do per page allocations?
->>> Perhaps that is necessary to avoid needing a large block of
->>> contiguous physical memory (and virtual addresses)?
->>
->> The page management seems interesting for future management of RX
->> buffers as skb fragments: that will allow to avoid copying received data.
-> 
-> Dunno - the complexities of such buffer loaning schemes often
-> exceed the gain of avoiding the data copy.
-> Using buffers allocated to the skb is a bit different - since
-> you completely forget about the memory once you pass the skb
-> upstream.
-> 
-> Some quick sums indicate you might want to allocate 8k memory
-> blocks and split into 5 buffers.
+But HVC PSCI would still work for the mach-virt in all cases.
 
-Well, for the 10/100 MACB interface, I am stuck with 128 Bytes buffers!
-So this use of pages seems sensible.
-On the other hand, it is true that I may have to reconsider the GEM
-memory management (it one is able to cover 128-10KB rx DMA buffers)...
+--
+Catalin
 
-Best regards,
--- 
-Nicolas Ferre
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
