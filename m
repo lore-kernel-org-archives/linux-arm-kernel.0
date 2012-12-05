@@ -1,140 +1,106 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Dec 2012 19:21:41 +0000
-Subject: [PATCH v4] backlight: corgi_lcd: Use gpio_set_value_cansleep()
- to avoid WARN_ON
-In-Reply-To: <CAHod+Gdb_LEnhx5cz9j=q9PyS4L=Yjxs303dHon9i-tgjJRtDA@mail.gmail.com>
-References: <000201cdd283$baf50160$30df0420$%han@samsung.com>
- <20121205093027.GK14363@n2100.arm.linux.org.uk>
- <CAHod+Gdb_LEnhx5cz9j=q9PyS4L=Yjxs303dHon9i-tgjJRtDA@mail.gmail.com>
-Message-ID: <20121205192141.GQ14363@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 5 Dec 2012 19:37:55 +0000 (UTC)
+Subject: OMAP baseline test results for v3.7-rc8
+Message-ID: <alpine.DEB.2.00.1212051936480.23086@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 05, 2012 at 07:20:00PM +0100, Marko Kati? wrote:
-> On Wed, Dec 5, 2012 at 10:30 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Wed, Dec 05, 2012 at 09:59:07AM +0900, Jingoo Han wrote:
-> >> -     if (gpio_is_valid(lcd->gpio_backlight_cont))
-> >> -             gpio_set_value(lcd->gpio_backlight_cont, cont);
-> >> +     if (gpio_is_valid(lcd->gpio_backlight_cont)) {
-> >> +             if (gpio_cansleep(lcd->gpio_backlight_cont))
-> >> +                     gpio_set_value_cansleep(lcd->gpio_backlight_cont, cont);
-> >> +             else
-> >> +                     gpio_set_value(lcd->gpio_backlight_cont, cont);
-> >> +     }
-> >
-> > Why not simply:
-> >
-> > +       if (gpio_is_valid(lcd->gpio_backlight_cont))
-> > +               gpio_set_value_cansleep(lcd->gpio_backlight_cont, cont);
-> 
-> My first patch did exactly this but there were complains about it's
-> commit message.
 
-So that's a reason to drop the patch?  Err, forgive me for being thick
-as a medieval castle wall, but what does complaints about the commit
-message have to do with the contents of the patch?  Why can't you just
-fix the commit message?
+Here are some basic OMAP test results for Linux v3.7-rc8.
+Logs and other details at:
 
-> And i just found out that Marek Vasut posted the exact same patch more
-> than a year ago.
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/046955.html
-> 
-> It was not applied for various reasons.
+    http://www.pwsan.com/omap/testlogs/test_v3.7-rc8/20121204220128/
 
-Looking at that thread (which is corrupted btw, probably thanks to the
-crappy python based locking in mailman) - here's a better archiver:
 
-http://lists.arm.linux.org.uk/lurker/thread/20110402.014316.74101499.en.html
+Passing tests
+-------------
 
-it didn't go anywhere because the discussion was distracted by the loss
-of David Brownell.
+Boot to userspace (10/11): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
+    3730beaglexm, 37xxevm, 4430es2panda, 5912osk, am335xbone,
+    4460pandaes
+  
+PM ret/off, suspend + dynamic idle (3/4): 3530es3beagle, 3730beaglexm,
+    37xxevm
 
-Eric shares my opinion of the _cansleep() mess, but unfortunately it's
-what we have and no one's come up with any better solutions to it.  (I
-argued from the outset that the gpio_xxx_cansleep() should've been
-gpio_xxx() and the non-cansleep() version should be called
-gpio_xxx_atomic() so that by default people use the version which _can_
-sleep, but have to think about it when they want to manipulate GPIOs in
-non-task contexts.)
 
-That's off-topic though.  Using just the _cansleep() version is far
-better than messing around with stuff like:
+Failing tests: fixed by posted patches
+--------------------------------------
 
-	if (gpio_cansleep(gpio))
-		gpio_xxx_cansleep(gpio);
-	else
-		gpio_xxx(gpio);
+Boot tests:
 
-> > If you read the gpiolib code and documentation, what you will realise is
-> > that the two calls are identical except for the "might_sleep_if()" in
-> > gpio_set_value_cansleep().  You will also note that gpiolib itself _only_
-> > calls gpio_set_value_cansleep() without checking gpio_cansleep() in
-> > contexts where sleeping is possible.  So if it's good enough for gpiolib,
-> > it should be good enough here.
-> 
-> The documentation tells which calls to use when you don't need to sleep
-> and which calls to use when you might sleep. And here we have a case
-> where the same call to gpio_set_value might sleep or doesn't have to,
-> depending on the model.
-> In this case, i'd rather use gpio_cansleep check as Andrew proposed.
-> 
-> I will also say that the distinction between gpio_set_value and
-> gpio_set_value_cansleep.
-> is rather confusing at this point. Is it really necessary to have both ?
+* 3730 Beagle XM: "attempt to access beyond end of device"
+  - Not an OMAP-specific problem
+  - Should be fixed by http://marc.info/?l=linux-kernel&m=135458657217682&w=2
 
-No.  You can call gpio_set_value_cansleep() from task contexts for any
-GPIO just fine, but you can't call it from atomic contexts (it will
-complain).  It doesn't matter whether the GPIO can sleep or not.
+Other:
 
-You can call gpio_set_value() from any context without it complaining,
-however, gpio_set_value() can't be used with a GPIO which sleeps.
+* 2420N800: powers down 30 seconds after boot
+  - Presumably due to missing CBUS patches for watchdog control
+  - http://lkml.org/lkml/2012/9/3/265
+  - http://marc.info/?l=linux-omap&m=135274739624125&w=2
 
-Look, when it comes down to it, in _task_ context, where sleeps are
-permissible:
 
-	gpio_set_value(gpio, xxx);
-and
-	gpio_set_value_cansleep(gpio, xxx);
+Failing tests: needing investigation
+------------------------------------
 
-are exactly the same thing; they will both set the value of a GPIO
-output, whether it be an atomic or a sleeping gpio to the requested
-value.
+Boot tests:
 
-The difference between the two becomes important if you're not in task
-context, where only the non-_cansleep() versions can be used.  This is
-enforced by the _cansleep() versions issuing a WARN_ON() if they're
-used in non-task contexts.  And conversely, the non-_cansleep() versions
-will warn (as you've found) if you use that call with a GPIO which will
-sleep.
+* CM-T3517: L3 in-band error with IPSS during boot
+  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
+  - Longstanding issue; does not occur on the 3517EVM
 
-There is another solution to this mess:
+* 3517EVM & CM-T3517: boot hangs with NFS root
+  - Likely some Kconfig, board file, and PM issues with EMAC
 
-void __gpio_set_value(unsigned gpio, int value)
-{
-	struct gpio_chip	*chip;
+* CM-T3517: boot hangs with MMC root
+  - Due to missing MMC setup in board file
 
-	chip = gpio_to_chip(gpio);
-	/* Should be using gpio_set_value_cansleep() */
--	WARN_ON(chip->can_sleep);
-+	might_sleep_if(chip->can_sleep);
-	trace_gpio_value(gpio, 0, value);
-	if (test_bit(FLAG_OPEN_DRAIN,  &gpio_desc[gpio].flags))
-		_gpio_set_open_drain_value(gpio, chip, value);
-	else if (test_bit(FLAG_OPEN_SOURCE,  &gpio_desc[gpio].flags))
-		_gpio_set_open_source_value(gpio, chip, value);
-	else
-		chip->set(chip, gpio - chip->base, value);
-}
-EXPORT_SYMBOL_GPL(__gpio_set_value);
+Other:
 
-With the above change (and an equivalent change everywhere else), it means
-gpio_set_value() is callable from task contexts on GPIOs which can sleep.
+* 4430es2panda: omap_hwmod: l3_instr: _wait_target_disable failed
+  - Unknown cause; could be due to the lack of hierarchical enable/disable
+    in hwmod code
+  - Jon Hunter reports this does not appear with the same X-loader/bootloader
+    on his 4430ES2.3 Panda, so could be ES-level dependent
 
-However, it loses us some checking - we no longer have the cross-platform
-checking that we get with the existing API, and that's why it's undesirable.
 
-As I say above, IMHO it would've been much better to rename these functions
-to be the other way around but David was always very dismissive of any
-comments I had against any code he'd written.
+Failing tests: needing local investigation (may be due to testbed issues)
+-------------------------------------------------------------------------
+
+Boot tests:
+
+* AM335x Beaglebone: omap2plus_defconfig kernels don't boot
+  - May be fixed now, pending retest:
+    - http://marc.info/?l=linux-omap&m=135082257727502&w=2
+  - Not yet part of the automated test suite
+  * May be due to an old U-boot with FDT support problems used here?
+    Pending local investigation and re-test
+
+PM tests:
+
+* 3730 Beagle XM: does not serial wake from off-idle suspend when console
+  UART doesn't clock gate ("debug ignore_loglevel")
+  - Not yet part of the automated test suite; cause unknown
+  - Pending re-test
+
+
+
+vmlinux object size
+(delta in bytes from test_v3.7-rc7 (9489e9dcae718d5fde988e4a684a0f55b5f94d17)):
+   text     data      bss    total  kernel
+  -1624        0        0    -1624  am33xx_only
+  -1280        0        0    -1280  n800_multi_omap2xxx
+  -1264        0        0    -1264  n800_only_a
+  -1508        0        0    -1508  omap1_defconfig
+  -1492        0        0    -1492  omap1_defconfig_1510innovator_only
+  -1524        0        0    -1524  omap1_defconfig_5912osk_only
+  -1768        0        0    -1768  omap2plus_defconfig
+  -1576        0        0    -1576  omap2plus_defconfig_2430sdp_only
+  -1704        0        0    -1704  omap2plus_defconfig_cpupm
+  -1704        0        0    -1704  omap2plus_defconfig_no_pm
+  -1704        0        0    -1704  omap2plus_defconfig_omap2_4_only
+  -1832        0        0    -1832  omap2plus_defconfig_omap3_4_only
+  -1244        0      +68    -1176  rmk_omap3430_ldp_allnoconfig
+  -1728        0        0    -1728  rmk_omap3430_ldp_oldconfig
+  -1244        0      +68    -1176  rmk_omap4430_sdp_allnoconfig
+  -1312        0        0    -1312  rmk_omap4430_sdp_oldconfig
