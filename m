@@ -1,39 +1,27 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 5 Dec 2012 15:15:57 +0000
-Subject: [RFC PATCH 0/2] Add support for a fake, para-virtualised machine
-In-Reply-To: <20121205150732.GJ22385@mudshark.cambridge.arm.com>
-References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
- <50BD1F81.9080304@gmail.com>
- <20121204123001.GL23368@mudshark.cambridge.arm.com>
- <50BE04C6.4070602@gmail.com>
- <alpine.LFD.2.02.1212041142490.6589@xanadu.home>
- <20121204171129.GE5314@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1212041252290.6589@xanadu.home>
- <20121204181446.GJ5314@mudshark.cambridge.arm.com>
- <CAHkRjk5HgM=kL5Li_9qrwXfD+vJGvLLoha_ns6KFdxZW7gLwbA@mail.gmail.com>
- <20121205150732.GJ22385@mudshark.cambridge.arm.com>
-Message-ID: <20121205151557.GE27057@arm.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Wed, 5 Dec 2012 15:22:14 -0000
+Subject: [PATCH v2] net/macb: Use non-coherent memory for rx buffers
+In-Reply-To: <50BF6467.5060701@atmel.com>
+References: <CAGhQ9VwWmP_B17LnAEqDHcL8Yd-s0C-Bf35z3+=vnJmK_NoCSw@mail.gmail.com>
+ <1354536876-6274-1-git-send-email-nicolas.ferre@atmel.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B70D5@saturn3.aculab.com>
+ <50BCA746.1020705@atmel.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B70D6@saturn3.aculab.com>
+ <50BE2FEC.2070500@atmel.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B70D9@saturn3.aculab.com>
+ <50BF6467.5060701@atmel.com>
+Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B70DB@saturn3.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 05, 2012 at 03:07:32PM +0000, Will Deacon wrote:
-> On Wed, Dec 05, 2012 at 02:52:57PM +0000, Catalin Marinas wrote:
-> > Just for clarification, AArch32 with virtualisation mandates the
-> > security extensions, so the SMC can be trapped. On AArch64 it is a bit
-> > tricky since the presence of EL3 is not mandate, in which case SMC
-> > would undef (don't as why ;). That's where we can have different
-> > enable methods specified via the DT.
->
-> Not entirely true: only ARMv7 mandates the security extensions in this
-> manner. You can still have ARMv8 CPUs running AArch32 code without the
-> security extensions.
+> Well, for the 10/100 MACB interface, I am stuck with 128 Bytes buffers!
+> So this use of pages seems sensible.
 
-Yes, I pretty much had the 32-bit and 64-bit ARM ports in mind. An
-AArch32 guest OS running on an AArch64 KVM would indeed have this issue.
+If you have dma coherent memory you can make the rx buffer space
+be an array of short buffers referenced by adjacent ring entries
+(possibly with the last one slightly short to allow for the
+2 byte offset).
+Then, when a big frame ends up in multiple buffers, you need
+a maximum of two copies to extract the data.
 
-But HVC PSCI would still work for the mach-virt in all cases.
-
---
-Catalin
-
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+	David
