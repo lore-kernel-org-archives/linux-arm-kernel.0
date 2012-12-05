@@ -1,126 +1,141 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed,  5 Dec 2012 14:33:14 +0100
-Subject: [PATCH] arm: mvebu: Improve the SMP support of the interrupt
- controller
-In-Reply-To: <1354714394-11622-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1354714394-11622-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1354714394-11622-2-git-send-email-gregory.clement@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 05 Dec 2012 13:40:24 +0000
+Subject: [PATCH v4 12/13] ARM: KVM: vgic: reduce the number of vcpu kick
+In-Reply-To: <20121205122952.GO14363@n2100.arm.linux.org.uk>
+References: <20121110154358.3061.16338.stgit@chazy-air>
+ <20121110154539.3061.82553.stgit@chazy-air>
+ <20121205104358.GC22385@mudshark.cambridge.arm.com>
+ <20121205105822.GL14363@n2100.arm.linux.org.uk> <50BF3B75.1060007@arm.com>
+ <20121205122952.GO14363@n2100.arm.linux.org.uk>
+Message-ID: <50BF4EC8.1050902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yehuda Yitschak <yehuday@marvell.com>
+On 05/12/12 12:29, Russell King - ARM Linux wrote:
+> On Wed, Dec 05, 2012 at 12:17:57PM +0000, Marc Zyngier wrote:
+>> On 05/12/12 10:58, Russell King - ARM Linux wrote:
+>>> On Wed, Dec 05, 2012 at 10:43:58AM +0000, Will Deacon wrote:
+>>>> On Sat, Nov 10, 2012 at 03:45:39PM +0000, Christoffer Dall wrote:
+>>>>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>>>>
+>>>>> If we have level interrupts already programmed to fire on a vcpu,
+>>>>> there is no reason to kick it after injecting a new interrupt,
+>>>>> as we're guaranteed that we'll exit when the level interrupt will
+>>>>> be EOId (VGIC_LR_EOI is set).
+>>>>>
+>>>>> The exit will force a reload of the VGIC, injecting the new interrupts.
+>>>>>
+>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+>>>>> ---
+>>>>>  arch/arm/include/asm/kvm_vgic.h |   10 ++++++++++
+>>>>>  arch/arm/kvm/arm.c              |   10 +++++++++-
+>>>>>  arch/arm/kvm/vgic.c             |   10 ++++++++--
+>>>>>  3 files changed, 27 insertions(+), 3 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
+>>>>> index a8e7a93..7d2662c 100644
+>>>>> --- a/arch/arm/include/asm/kvm_vgic.h
+>>>>> +++ b/arch/arm/include/asm/kvm_vgic.h
+>>>>> @@ -215,6 +215,9 @@ struct vgic_cpu {
+>>>>>  	u32		vgic_elrsr[2];	/* Saved only */
+>>>>>  	u32		vgic_apr;
+>>>>>  	u32		vgic_lr[64];	/* A15 has only 4... */
+>>>>> +
+>>>>> +	/* Number of level-triggered interrupt in progress */
+>>>>> +	atomic_t	irq_active_count;
+>>>>>  #endif
+>>>>>  };
+>>>>>  
+>>>>> @@ -254,6 +257,8 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>>>>  
+>>>>>  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.vctrl_base))
+>>>>>  #define vgic_initialized(k)	((k)->arch.vgic.ready)
+>>>>> +#define vgic_active_irq(v)	(atomic_read(&(v)->arch.vgic_cpu.irq_active_count) == 0)
+>>>>
+>>>> When is the atomic_t initialised to zero? I can only see increments.
+>>>
+>>> I'd question whether an atomic type is correct for this; the only
+>>> protection that it's offering is to ensure that the atomic increment
+>>> and decrement occur atomically - there's nothing else that they're doing
+>>> in this code.
+>>>
+>>> If those atomic increments and decrements are occuring beneath a common
+>>> lock, then using atomic types is just mere code obfuscation.
+>>
+>> No, they occur on code paths that do not have a common lock (one of them
+>> being an interrupt handler). This may change though, after one comment
+>> Will made earlier (the thing about delayed interrupts).
+>>
+>> If these two code sections become mutually exclusive, then indeed there
+>> will be no point in having an atomic type anymore.
+>>
+>>> For example, I'd like to question the correctness of this:
+>>>
+>>> +               if (vgic_active_irq(vcpu) &&
+>>> +                   cmpxchg(&vcpu->mode, EXITING_GUEST_MODE, IN_GUEST_MODE) == EXITING_GUEST_MODE)
+>>>
+>>> What if vgic_active_irq() reads the atomic type, immediately after it gets
+>>> decremented to zero before the cmpxchg() is executed?  Would that be a
+>>> problem?
+>>
+>> I do not think so. If the value gets decremented, it means we took a
+>> maintenance interrupt, which means we exited the guest at some point.
+>> Two possibilities:
+>>
+>> - We're not in guest mode anymore (vcpu->mode = OUTSIDE_GUEST_MODE), and
+>> cmpxchg will fail, hence signaling the guest to reload its state. This
+>> is not needed (the guest will reload its state anyway), but doesn't
+>> cause any harm.
+> 
+> What is the relative ordering of the atomic decrement and setting
+> vcpu->mode to be OUTSIDE_GUEST_MODE ?  Is there a window where we have
+> decremented this atomic type but vcpu->mode is still set to IN_GUEST_MODE.
 
-This patch makes the interrupt controller driver more SMP aware for
-the Armada XP SoCs. It adds the support for the per-CPU irq. It also
-adds the implementation for the set_affinity hook.
+OUTSIDE_GUEST_MODE always occurs first, while interrupts are still
+masked in SVC. We then unmask the interrupts, causing the maintenance
+interrupt to be handled. Only this handler causes the active count to be
+decremented.
 
-Patch initialy wrote by Yehuda Yitschak and reworked by Gregory
-CLEMENT for submission.
+>> - We're back into the guest (vcpu->mode = IN_GUEST_MODE), and cmpxchg
+>> will fail as well, triggering a reload which is needed this time.
+> 
+> Well, the whole code looks really weird to me, especially that:
+> 
+> +       if (kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE) {
+> +               if (vgic_active_irq(vcpu) &&
+> +                   cmpxchg(&vcpu->mode, EXITING_GUEST_MODE, IN_GUEST_MODE) == EXITING_GUEST_MODE)
+> +                       return 0;
+> +
+> +               return 1;
+> +       }
+> 
+> I've no idea what kvm_vcpu_exiting_guest_mode() is (it doesn't exist in
+> any tree I have access to)...
 
-Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-xp.dtsi        |    2 +-
- arch/arm/mach-mvebu/irq-armada-370-xp.c |   49 ++++++++++++++++++++++++++++---
- 2 files changed, 46 insertions(+), 5 deletions(-)
+You should find it in include/linux/kvm_host.h. It reads:
+static inline int kvm_vcpu_exiting_guest_mode(struct kvm_vcpu *vcpu)
+{
+        return cmpxchg(&vcpu->mode, IN_GUEST_MODE, EXITING_GUEST_MODE);
+}
 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 45a567c..088d280 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -23,7 +23,7 @@
- 	compatible = "marvell,armadaxp", "marvell,armada-370-xp";
- 
- 	mpic: interrupt-controller at d0020000 {
--	      reg = <0xd0020a00 0x1d0>,
-+	      reg = <0xd0020a00 0x2d0>,
- 		    <0xd0021070 0x58>;
- 	};
- 
-diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-index 549b684..9f2fe84 100644
---- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-@@ -33,6 +33,7 @@
- #define ARMADA_370_XP_INT_CONTROL		(0x00)
- #define ARMADA_370_XP_INT_SET_ENABLE_OFFS	(0x30)
- #define ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS	(0x34)
-+#define ARMADA_370_XP_INT_SOURCE_CTL(irq)	(0x100 + irq*4)
- 
- #define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
- 
-@@ -40,28 +41,68 @@
- #define ARMADA_370_XP_IN_DRBEL_MSK_OFFS          (0xc)
- #define ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS        (0x8)
- 
-+#define ARMADA_370_XP_MAX_PER_CPU_IRQS		(28)
-+
- #define ACTIVE_DOORBELLS			(8)
- 
-+static DEFINE_RAW_SPINLOCK(irq_controller_lock);
-+
- static void __iomem *per_cpu_int_base;
- static void __iomem *main_int_base;
- static struct irq_domain *armada_370_xp_mpic_domain;
- 
-+/*
-+ * For shared global interrupts, mask/unmask global enable bit
-+ * For CPU interrtups, mask/unmask the calling CPU's bit
-+ */
- static void armada_370_xp_irq_mask(struct irq_data *d)
- {
--	writel(irqd_to_hwirq(d),
--	       per_cpu_int_base + ARMADA_370_XP_INT_SET_MASK_OFFS);
-+	irq_hw_number_t hwirq = irqd_to_hwirq(d);
-+
-+	if (hwirq > ARMADA_370_XP_MAX_PER_CPU_IRQS)
-+		writel(hwirq, main_int_base +
-+				ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS);
-+	else
-+		writel(hwirq, main_int_base +
-+				ARMADA_370_XP_INT_SET_MASK_OFFS);
- }
- 
- static void armada_370_xp_irq_unmask(struct irq_data *d)
- {
--	writel(irqd_to_hwirq(d),
--	       per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-+	irq_hw_number_t hwirq = irqd_to_hwirq(d);
-+
-+	if (hwirq > ARMADA_370_XP_MAX_PER_CPU_IRQS)
-+		writel(hwirq, main_int_base +
-+				ARMADA_370_XP_INT_SET_ENABLE_OFFS);
-+	else
-+		writel(hwirq, main_int_base +
-+				ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
- }
- 
- #ifdef CONFIG_SMP
- static int armada_xp_set_affinity(struct irq_data *d,
- 				  const struct cpumask *mask_val, bool force)
- {
-+	unsigned long reg;
-+	unsigned long new_mask = 0;
-+	unsigned long online_mask = 0;
-+	irq_hw_number_t hwirq = irqd_to_hwirq(d);
-+	int cpu;
-+
-+	for_each_cpu(cpu, cpu_online_mask)
-+		online_mask |= 1 << cpu_logical_map(cpu);
-+
-+	for_each_cpu(cpu, mask_val)
-+		new_mask |= 1 << cpu_logical_map(cpu);
-+
-+	raw_spin_lock(&irq_controller_lock);
-+
-+	reg = readl(main_int_base + ARMADA_370_XP_INT_SOURCE_CTL(hwirq));
-+	reg = (reg & (~online_mask)) | new_mask;
-+	writel(reg, main_int_base + ARMADA_370_XP_INT_SOURCE_CTL(hwirq));
-+
-+	raw_spin_unlock(&irq_controller_lock);
-+
- 	return 0;
- }
- #endif
+Admittedly, the whole sequence should be rewritten to be clearer. What
+it does is "If we're running a guest and there is no active interrupt,
+then kick the guest".
+
+It probably means the above code should read:
+
+if (!vgic_active_irq(vcpu))
+        return kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE;
+
+return 0;
+
+> In any case, look at the version I converted to spinlocks and see whether
+> you think the code looks reasonable in that form.  If it doesn't then it
+> isn't reasonable in atomic types either.
+
+I had a look, and I don't find it problematic.
+
+	M.
 -- 
-1.7.9.5
+Jazz is not dead. It just smells funny...
