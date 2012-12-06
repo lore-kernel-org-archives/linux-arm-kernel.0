@@ -1,55 +1,67 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 6 Dec 2012 14:27:10 +0100
-Subject: at91sam9260 MACB problem with IP fragmentation
-In-Reply-To: <50C08233.9030905@erwinrol.com>
-References: <50C08233.9030905@erwinrol.com>
-Message-ID: <50C09D2E.8050608@atmel.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 06 Dec 2012 14:05:15 +0000
+Subject: [PATCH 1/4] spi: sh-msiof: Remove unneeded clock name
+In-Reply-To: <1352288407-20594-2-git-send-email-hechtb@gmail.com>
+References: <1352288407-20594-1-git-send-email-hechtb@gmail.com>
+ <1352288407-20594-2-git-send-email-hechtb@gmail.com>
+Message-ID: <20121206140515.75E6B3E089D@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Erwin,
+On Wed,  7 Nov 2012 12:40:04 +0100, Bastian Hecht <hechtb@gmail.com> wrote:
+> clk_get() no longer needs a character string for associating the right
+> clock as this is done via the device struct now.
+> 
+> Signed-off-by: Bastian Hecht <hechtb@gmail.com>
 
-On 12/06/2012 12:32 PM, Erwin Rol :
-> Hello Nicolas, Havard, all,
-> 
-> I have a very obscure problem with a at91sam9260 board (almost 1 to 1
-> copy of the Atmel EK).
-> 
-> The MACB seems to stall when I use large (>2 * MTU) UDP datagrams. The
-> test case is that a udp echo client (PC) sends datagrams with increasing
-> length to the AT91 until the max length of the UDP datagram is reached.
-> When there is no IP fragmentation everything is fine, but when the
-> datagrams are starting to get fragmented the AT91 will not reply
-> anymore. But as soon as some network traffic happens it goes on again,
-> and non of the data is lost.
-> 
-> With wireshark the effect can be easily seen (192.168.1.4 is the PC echo
-> client, and 192.168.1.133 is the at91 echo server) After the first
-> request there comes no reply. After a 5 second timeout the second
-> request is send. And then both replies are returned.
-> 
-> When I enabled debugging output it all started to work. So I tried some
-> udelays in the driver instead of printk and with a 1ms delay in the irq
-> handler it started working. Of course that is an unacceptable fix, but
-> it looks like that is some weird race condition that causes the sending
-> to stall. The only difference with normal MTU sized datagrams I can
-> think of is that the fragmented packets can be passed very quickly to
-> the macb tx function, because the kernel has all 5 skb's ready.
-> 
-> I would be very interested to hear if someone else could reproduce this
-> problem. Or even better, has seen this problem and has a fix for it.
-> 
-> I tried several kernels including the test version from Nicolas that he
-> posted on LKML in October. They all show the same effect.
+Applied, thanks.
 
-[..]
+g.
 
-It seems that Matteo has the same behavior: check here:
-http://www.spinics.net/lists/netdev/msg218951.html
+> ---
+>  drivers/spi/spi-sh-msiof.c |    6 ++----
+>  1 files changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-sh-msiof.c b/drivers/spi/spi-sh-msiof.c
+> index 1f466bc..96358d0 100644
+> --- a/drivers/spi/spi-sh-msiof.c
+> +++ b/drivers/spi/spi-sh-msiof.c
+> @@ -597,7 +597,6 @@ static int sh_msiof_spi_probe(struct platform_device *pdev)
+>  	struct resource	*r;
+>  	struct spi_master *master;
+>  	struct sh_msiof_spi_priv *p;
+> -	char clk_name[16];
+>  	int i;
+>  	int ret;
+>  
+> @@ -614,10 +613,9 @@ static int sh_msiof_spi_probe(struct platform_device *pdev)
+>  	p->info = pdev->dev.platform_data;
+>  	init_completion(&p->done);
+>  
+> -	snprintf(clk_name, sizeof(clk_name), "msiof%d", pdev->id);
+> -	p->clk = clk_get(&pdev->dev, clk_name);
+> +	p->clk = clk_get(&pdev->dev, NULL);
+>  	if (IS_ERR(p->clk)) {
+> -		dev_err(&pdev->dev, "cannot get clock \"%s\"\n", clk_name);
+> +		dev_err(&pdev->dev, "cannot get clock\n");
+>  		ret = PTR_ERR(p->clk);
+>  		goto err1;
+>  	}
+> -- 
+> 1.7.5.4
+> 
+> 
+> ------------------------------------------------------------------------------
+> LogMeIn Central: Instant, anywhere, Remote PC access and management.
+> Stay in control, update software, and manage PCs from one command center
+> Diagnose problems and improve visibility into emerging IT issues
+> Automate, monitor and manage. Do more in less time with Central
+> http://p.sf.net/sfu/logmein12331_d2d
+> _______________________________________________
+> spi-devel-general mailing list
+> spi-devel-general at lists.sourceforge.net
+> https://lists.sourceforge.net/lists/listinfo/spi-devel-general
 
-I am working on the macb driver right now, so I will try to reproduce
-and track this issue on my side.
-
-Best regards,
 -- 
-Nicolas Ferre
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
