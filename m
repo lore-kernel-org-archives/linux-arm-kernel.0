@@ -1,39 +1,170 @@
-From: omar.ramirez@copitl.com (Omar Ramirez Luna)
-Date: Thu, 6 Dec 2012 16:54:04 -0600
-Subject: linux-next: manual merge of the arm-soc tree with the iommu tree
-In-Reply-To: <CAK=WgbYDKN1deDTw3KvymvhoE1h_apX2E8zK=cDbu68+Gwcayw@mail.gmail.com>
-References: <20121204154203.f0e7e87d1ae99e5c528434f8@canb.auug.org.au>
- <20121204110655.GE18368@8bytes.org>
- <CAK=WgbYDKN1deDTw3KvymvhoE1h_apX2E8zK=cDbu68+Gwcayw@mail.gmail.com>
-Message-ID: <CAJ6Av5OBhpsSRiZNOa1a65yMT04Evaja6j8qPBiSuVM1DPdB1Q@mail.gmail.com>
+From: stepanm@codeaurora.org (Stepan Moskovchenko)
+Date: Thu,  6 Dec 2012 14:55:41 -0800
+Subject: [PATCH v3] of: Output devicetree alias names in uevent
+In-Reply-To: <20121206192500.0BF073E3A5E@localhost>
+References: <20121206192500.0BF073E3A5E@localhost>
+Message-ID: <1354834541-26765-1-git-send-email-stepanm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+In some situations, userspace may want to resolve a
+device by function and logical number (ie, "serial0")
+rather than by the base address or full device path. Being
+able to resolve a device by alias frees userspace from the
+burden of otherwise having to maintain a mapping between
+device addresses and their logical assignments on each
+platform when multiple instances of the same hardware block
+are present in the system.
 
-On Tue, Dec 4, 2012 at 5:10 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> On Tue, Dec 4, 2012 at 1:06 PM, Joerg Roedel <joro@8bytes.org> wrote:
->> On Tue, Dec 04, 2012 at 03:42:03PM +1100, Stephen Rothwell wrote:
->>> Today's linux-next merge of the arm-soc tree got a conflict in
->>> arch/arm/mach-omap2/clock44xx_data.c between commit 298ea44f211d ("ARM:
->>> OMAP4: hwmod data: ipu and dsp to use parent clocks instead of leaf
->>> clocks") from the iommu tree and commit 13a5b6228679 ("ARM: OMAP44xx:
->>> clock: drop obsolete clock data") from the arm-soc tree.
->>>
->>> I just deleted the file as the latter did and can carry the fix as
->>> necessary (no action is required).
->>
->> Ohad, Omar, any comment on this?
->
-> I'd prefer Omar or Paul to have a look here. Looping in Tony as well.
+Although the uevent device attribute contains devicetree
+compatible information and the full device path, the uevent
+does not list the alises that may have been defined for the
+device.
 
-I have checked next-20121206, it's OK to delete that file as the patch
-from Paul is doing that for common clock framework migration; now the
-only missing hunk from my original patch should apply to
-arch/arm/mach-omap2/cclock44xx_data.c which is the file that now has
-ipu_fck and dsp_fck (unused) clocks, I can send a patch to remove them
-through linux-omap tree.
+Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+---
+v3: Fix copyright/license message on of_platform.h to match
+    the messages in the file the code came from.
 
-Cheers,
+I also noticed that some of the comments in the original
+header might no longer apply, but I copied the header in
+its entirety. I can try to trim these down if you like.
 
-Omar
+ drivers/of/base.c       |   23 +++--------------------
+ drivers/of/device.c     |   17 +++++++++++++++++
+ drivers/of/of_private.h |   41 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 61 insertions(+), 20 deletions(-)
+ create mode 100644 drivers/of/of_private.h
+
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 5806449..715aef2 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -24,32 +24,15 @@
+ #include <linux/slab.h>
+ #include <linux/proc_fs.h>
+
+-/**
+- * struct alias_prop - Alias property in 'aliases' node
+- * @link:	List node to link the structure in aliases_lookup list
+- * @alias:	Alias property name
+- * @np:		Pointer to device_node that the alias stands for
+- * @id:		Index value from end of alias name
+- * @stem:	Alias string without the index
+- *
+- * The structure represents one alias property of 'aliases' node as
+- * an entry in aliases_lookup list.
+- */
+-struct alias_prop {
+-	struct list_head link;
+-	const char *alias;
+-	struct device_node *np;
+-	int id;
+-	char stem[0];
+-};
++#include "of_private.h"
+
+-static LIST_HEAD(aliases_lookup);
++LIST_HEAD(aliases_lookup);
+
+ struct device_node *allnodes;
+ struct device_node *of_chosen;
+ struct device_node *of_aliases;
+
+-static DEFINE_MUTEX(of_aliases_mutex);
++DEFINE_MUTEX(of_aliases_mutex);
+
+ /* use when traversing tree through the allnext, child, sibling,
+  * or parent members of struct device_node.
+diff --git a/drivers/of/device.c b/drivers/of/device.c
+index 4c74e4f..b8d31db 100644
+--- a/drivers/of/device.c
++++ b/drivers/of/device.c
+@@ -8,6 +8,7 @@
+ #include <linux/slab.h>
+
+ #include <asm/errno.h>
++#include "of_private.h"
+
+ /**
+  * of_match_device - Tell if a struct device matches an of_device_id list
+@@ -131,6 +132,7 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
+ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
+ {
+ 	const char *compat;
++	struct alias_prop *app;
+ 	int seen = 0, cplen, sl;
+
+ 	if ((!dev) || (!dev->of_node))
+@@ -153,6 +155,21 @@ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
+ 		seen++;
+ 	}
+ 	add_uevent_var(env, "OF_COMPATIBLE_N=%d", seen);
++
++	seen = 0;
++	mutex_lock(&of_aliases_mutex);
++	list_for_each_entry(app, &aliases_lookup, link) {
++		if (dev->of_node == app->np) {
++			add_uevent_var(env, "OF_ALIAS_%d=%s", seen,
++				       app->alias);
++			seen++;
++		}
++	}
++
++	if (seen)
++		add_uevent_var(env, "OF_ALIAS_N=%d", seen);
++
++	mutex_unlock(&of_aliases_mutex);
+ }
+
+ int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env)
+diff --git a/drivers/of/of_private.h b/drivers/of/of_private.h
+new file mode 100644
+index 0000000..b38415c
+--- /dev/null
++++ b/drivers/of/of_private.h
+@@ -0,0 +1,41 @@
++/*
++ * Procedures for creating, accessing and interpreting the device tree.
++ *
++ * Paul Mackerras	August 1996.
++ * Copyright (C) 1996-2005 Paul Mackerras.
++ *
++ *  Adapted for 64bit PowerPC by Dave Engebretsen and Peter Bergner.
++ *    {engebret|bergner}@us.ibm.com
++ *
++ *  Adapted for sparc and sparc64 by David S. Miller davem at davemloft.net
++ *
++ *  Reconsolidated from arch/x/kernel/prom.c by Stephen Rothwell and
++ *  Grant Likely.
++ *
++ *      This program is free software; you can redistribute it and/or
++ *      modify it under the terms of the GNU General Public License
++ *      as published by the Free Software Foundation; either version
++ *      2 of the License, or (at your option) any later version.
++ */
++
++/**
++ * struct alias_prop - Alias property in 'aliases' node
++ * @link:	List node to link the structure in aliases_lookup list
++ * @alias:	Alias property name
++ * @np:		Pointer to device_node that the alias stands for
++ * @id:		Index value from end of alias name
++ * @stem:	Alias string without the index
++ *
++ * The structure represents one alias property of 'aliases' node as
++ * an entry in aliases_lookup list.
++ */
++struct alias_prop {
++	struct list_head link;
++	const char *alias;
++	struct device_node *np;
++	int id;
++	char stem[0];
++};
++
++extern struct mutex of_aliases_mutex;
++extern struct list_head aliases_lookup;
+--
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
