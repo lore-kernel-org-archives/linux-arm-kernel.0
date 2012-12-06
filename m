@@ -1,84 +1,59 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 06 Dec 2012 18:11:06 +0000
-Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
- across all cpus
-Message-ID: <1354817466.30905.13.camel@linaro1.home>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 06 Dec 2012 11:52:53 -0700
+Subject: [PATCH V2 1/6] ARM: tegra: add pending SGI checking API
+In-Reply-To: <1354777471.13857.9.camel@jlo-ubuntu-64.nvidia.com>
+References: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
+ <1354701715-24150-2-git-send-email-josephl@nvidia.com>
+ <50BFC605.3000402@wwwdotorg.org>
+ <1354777471.13857.9.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <50C0E985.2020604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the generic ftrace implementation modifies code for trace-points it
-uses stop_machine() to call ftrace_modify_all_code() on one CPU. This
-ultimately calls the ARM specific function ftrace_modify_code() which
-updates the instruction and then does flush_icache_range(). As this
-cache flushing only operates on the local CPU then other cores may end
-up executing the old instruction if it's still in their icaches.
+On 12/06/2012 12:04 AM, Joseph Lo wrote:
+> On Thu, 2012-12-06 at 06:09 +0800, Stephen Warren wrote:
+>> On 12/05/2012 03:01 AM, Joseph Lo wrote:
+>>> The "powered-down" CPU idle mode of Tegra cut off the vdd_cpu rail, it
+>>> include the power of GIC. That caused the SGI (Software Generated
+>>> Interrupt) been lost. Because the SGI can't wake up the CPU that in
+>>> the "powered-down" CPU idle mode. We need to check if there is any
+>>> pending SGI when go into "powered-down" CPU idle mode. This is important
+>>> especially when applying the coupled cpuidle framework into "power-down"
+>>> cpuidle dirver. Because the coupled cpuidle framework may have the
+>>> chance that misses IPI_SINGLE_FUNC handling sometimes.
+>>>
+>>> For the PPI or SPI, something like the legacy peripheral interrupt. It
+>>> still can be maintained by Tegra legacy interrupt controller. If there
+>>> is any pending PPI or SPI when CPU in "powered-down" CPU idle mode. The
+>>> CPU can be woken up immediately. So we don't need to take care the same
+>>> situation for PPI or SPI.
+>>
+>> Is this feature something that can/should be added to the core GIC
+>> driver, rather than something custom in the Tegra code?
+>>
+> This function is SoC specific code not a generic common code even I
+> modify it to more generic for checking the pending irq (SGI, PPI and
+> SPI). Different SoC had different design about it. For ex, some SoC only
+> put CPU core to power saving mode not include GIC, or there is another
+> irq controller can handle the case when CPU go into power saving mode.
+> Differenc SoC had different usage here (some need to check all pending
+> irq, some need to check SGI only and some even no need to consider
+> this).
 
-This may or may not cause problems for the use of ftrace on kernels
-compiled for ARM instructions. However, Thumb2 instructions can straddle
-two cache lines so its possible for half the old instruction to be in
-the cache and half the new one, leading to the CPU executing garbage.
+Hmmm. OK.
 
-This patch fixes this situation by providing an arch-specific
-implementation of arch_ftrace_update_code() which ensures that after one
-core has modified all the code, the other cores invalidate their icaches
-before continuing.
+>> Part of the reason I ask is that I'd like to avoid any more:
+>>
+>> static void __iomem *distbase = IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE);
+>>
+>> since that requires static page tables to be set up, whereas I'd like to
+>> reduce, as much as possible, the set of pages Tegra maps statically.
+> 
+> I can move this into the function as a temp variable.
 
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
----
- arch/arm/kernel/ftrace.c |   34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
-
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index 34e5664..38b670c 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -14,6 +14,7 @@
- 
- #include <linux/ftrace.h>
- #include <linux/uaccess.h>
-+#include <linux/stop_machine.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/opcodes.h>
-@@ -156,6 +157,39 @@ int ftrace_make_nop(struct module *mod,
- 	return ret;
- }
- 
-+struct afmc_data {
-+	int command;
-+	atomic_t cpu;
-+	atomic_t done;
-+};
-+
-+static int __arch_ftrace_modify_code(void *data)
-+{
-+	struct afmc_data *afmcd = data;
-+
-+	if (atomic_inc_return(&afmcd->cpu) == num_online_cpus()) {
-+		/* Last cpu to get into this function does the actual work */
-+		ftrace_modify_all_code(afmcd->command);
-+		wmb();
-+		atomic_set(&afmcd->done, true);
-+	} else {
-+		/* Other cpus wait for the code modifications to be done */
-+		rmb();
-+		while (!atomic_read(&afmcd->done))
-+			cpu_relax();
-+		/* Ensure icache is consistent with the code changes */
-+		__flush_icache_all();
-+	}
-+
-+	return 0;
-+}
-+
-+void arch_ftrace_update_code(int command)
-+{
-+	struct afmc_data afmcd = { command };
-+	stop_machine(__arch_ftrace_modify_code, &afmcd, cpu_online_mask);
-+}
-+
- int __init ftrace_dyn_arch_init(void *data)
- {
- 	*(unsigned long *)data = 0;
--- 
-1.7.10.4
+Well, the issue here is use of the IO_ADDRESS() macro at all; ioremap()
+at run-time would be better, which I imagine is what the core GIC driver
+does when intialized from DT. Still, I suppose there are many instance
+of IO_ADDRESS() in the mach-tegra directory right now, so adding one
+more won't hurt too much; we still need to do a big pass to get rid of
+them sometime if possible.
