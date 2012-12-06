@@ -1,74 +1,86 @@
-From: js1304@gmail.com (JoonSoo Kim)
-Date: Fri, 7 Dec 2012 01:18:16 +0900
-Subject: [PATCH v2 0/3] introduce static_vm for ARM-specific static mapped
- area
-In-Reply-To: <1354033730-850-1-git-send-email-js1304@gmail.com>
-References: <1354033730-850-1-git-send-email-js1304@gmail.com>
-Message-ID: <CAAmzW4Ng8S_O4SEoANCWz3jsW3h3ucGSM9=Ld-n9aLuHcdgprw@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 6 Dec 2012 10:19:55 -0600
+Subject: [PATCH v7 5/5] ARM: OMAP: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <20121205232426.BAD573E0E22@localhost>
+References: <1354734571-10774-1-git-send-email-zonque@gmail.com>
+ <1354734571-10774-6-git-send-email-zonque@gmail.com>
+ <20121205222232.67B2B3E0E22@localhost> <50BFCBCC.6030706@ti.com>
+ <20121205232426.BAD573E0E22@localhost>
+Message-ID: <50C0C5AB.3030201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/11/28 Joonsoo Kim <js1304@gmail.com>:
-> In current implementation, we used ARM-specific flag, that is,
-> VM_ARM_STATIC_MAPPING, for distinguishing ARM specific static mapped area.
-> The purpose of static mapped area is to re-use static mapped area when
-> entire physical address range of the ioremap request can be covered
-> by this area.
->
-> This implementation causes needless overhead for some cases.
-> For example, assume that there is only one static mapped area and
-> vmlist has 300 areas. Every time we call ioremap, we check 300 areas for
-> deciding whether it is matched or not. Moreover, even if there is
-> no static mapped area and vmlist has 300 areas, every time we call
-> ioremap, we check 300 areas in now.
->
-> If we construct a extra list for static mapped area, we can eliminate
-> above mentioned overhead.
-> With a extra list, if there is one static mapped area,
-> we just check only one area and proceed next operation quickly.
->
-> In fact, it is not a critical problem, because ioremap is not frequently
-> used. But reducing overhead is better idea.
->
-> Another reason for doing this work is for removing architecture dependency
-> on vmalloc layer. I think that vmlist and vmlist_lock is internal data
-> structure for vmalloc layer. Some codes for debugging and stat inevitably
-> use vmlist and vmlist_lock. But it is preferable that they are used
-> as least as possible in outside of vmalloc.c
->
-> Changelog
-> v1->v2:
->   [2/3]: patch description is improved.
->   Rebased on v3.7-rc7
->
-> Joonsoo Kim (3):
->   ARM: vmregion: remove vmregion code entirely
->   ARM: static_vm: introduce an infrastructure for static mapped area
->   ARM: mm: use static_vm for managing static mapped areas
->
->  arch/arm/include/asm/mach/static_vm.h |   51 ++++++++
->  arch/arm/mm/Makefile                  |    2 +-
->  arch/arm/mm/ioremap.c                 |   69 ++++-------
->  arch/arm/mm/mm.h                      |   10 --
->  arch/arm/mm/mmu.c                     |   55 +++++----
->  arch/arm/mm/static_vm.c               |   97 ++++++++++++++++
->  arch/arm/mm/vmregion.c                |  205 ---------------------------------
->  arch/arm/mm/vmregion.h                |   31 -----
->  8 files changed, 208 insertions(+), 312 deletions(-)
->  create mode 100644 arch/arm/include/asm/mach/static_vm.h
->  create mode 100644 arch/arm/mm/static_vm.c
->  delete mode 100644 arch/arm/mm/vmregion.c
->  delete mode 100644 arch/arm/mm/vmregion.h
->
-> --
-> 1.7.9.5
->
 
-Hello, Russell.
+On 12/05/2012 05:24 PM, Grant Likely wrote:
+> On Wed, 5 Dec 2012 16:33:48 -0600, Jon Hunter <jon-hunter@ti.com> wrote:
+>> Hi Grant,
+>>
+>> On 12/05/2012 04:22 PM, Grant Likely wrote:
+>>> On Wed,  5 Dec 2012 20:09:31 +0100, Daniel Mack <zonque@gmail.com> wrote:
+>>>> This patch adds basic DT bindings for OMAP GPMC.
+>>>>
+>>>> The actual peripherals are instantiated from child nodes within the GPMC
+>>>> node, and the only type of device that is currently supported is NAND.
+>>>>
+>>>> Code was added to parse the generic GPMC timing parameters and some
+>>>> documentation with examples on how to use them.
+>>>>
+>>>> Successfully tested on an AM33xx board.
+>>>>
+>>>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/bus/ti-gpmc.txt  |  77 ++++++++++
+>>>>  .../devicetree/bindings/mtd/gpmc-nand.txt          |  76 +++++++++
+>>>>  arch/arm/mach-omap2/gpmc.c                         | 171 ++++++++++++++++++++-
+>>>>  3 files changed, 323 insertions(+), 1 deletion(-)
+>>>>  create mode 100644 Documentation/devicetree/bindings/bus/ti-gpmc.txt
+>>>>  create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/bus/ti-gpmc.txt b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
+>>>> new file mode 100644
+>>>> index 0000000..7d2a645
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
+>>>> @@ -0,0 +1,77 @@
+>>>> +Device tree bindings for OMAP general purpose memory controllers (GPMC)
+>>>> +
+>>>> +The actual devices are instantiated from the child nodes of a GPMC node.
+>>>> +
+>>>> +Required properties:
+>>>> +
+>>>> + - compatible:		Should be set to "ti,gpmc"
+>>>
+>>> Please, be specific. Use something like "ti,am3340-gpmc" or
+>>> "ti,omap3430-gpmc". The compatible property is a list so that new
+>>> devices can claim compatibility with old. Compatible strings that are
+>>> overly generic are a pet-peave of mine.
+>>
+>> We aim to use the binding for omap2,3,4,5 as well as the am33xx devices
+>> (which are omap based). Would it be sufficient to have "ti,omap2-gpmc"
+>> implying all omap2+ based devices or should we have a compatible string
+>> for each device supported?
+> 
+> Are they each register-level compatible with one another?
 
-Could you review this patchset, please?
-I send another patchset to mm community on top of this.
-That one is related to this patchset,
-so I want to get a review about this patchset :)
+They are not 100% register compatible. There are a couple fields in the
+binding that are only applicable to OMAP3+ devices.
 
-Thanks.
+> The general recommended approach here is to make subsequent silicon
+> claim compatibility with the first compatible implementation.
+> 
+> So, for an am3358 board:
+> 	compatible = "ti,am3358-gpmc", "ti,omap2420-gpmc";
+> 
+> Essentially, what this means is that "ti,omap2420-gpmc" is the generic
+> value instead of "omap2-gpmc". The reason for this is so that the value
+> is anchored against a specific implementation, and not against something
+> completely imaginary or idealized. If a newer version isn't quite
+> compatible with the omap2420-gpmc, then it can drop the compatible claim
+> and the driver really should be told about the new device.
+
+Ok, gotcha! I will do a register comparison and may be recommend to
+Daniel which compatible strings we will need.
+
+Thanks!
+Jon
