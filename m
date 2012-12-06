@@ -1,71 +1,62 @@
-From: wfp5p@virginia.edu (Bill Pemberton)
-Date: Thu,  6 Dec 2012 12:35:12 -0500
-Subject: [PATCH 03/20] ALSA: pxa2xx: remove __dev* attributes
-In-Reply-To: <1354815329-20221-1-git-send-email-wfp5p@virginia.edu>
-References: <1354815329-20221-1-git-send-email-wfp5p@virginia.edu>
-Message-ID: <1354815329-20221-4-git-send-email-wfp5p@virginia.edu>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 6 Dec 2012 17:45:39 +0000
+Subject: About the workaround for the 484863 L220 erratum
+In-Reply-To: <4AE7B88EC8BA74469869BB7EEB7D66671BCA7C88@g01jpexmbyt23>
+References: <4AE7B88EC8BA74469869BB7EEB7D66671BCA3685@g01jpexmbyt23>
+ <20121204132950.GO23368@mudshark.cambridge.arm.com>
+ <CAHkRjk7+EgN67VoJaS2e+PryJy-hyOx4-RJASzkLcaEidSLGxA@mail.gmail.com>
+ <4AE7B88EC8BA74469869BB7EEB7D66671BCA7C88@g01jpexmbyt23>
+Message-ID: <CAHkRjk6Uhj2T8KVzgow096WH+CcfxfaZ2JbbExt_11R6-wn1gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_HOTPLUG is going away as an option.  As result the __dev*
-markings will be going away.
+On 6 December 2012 12:44, Asano, Yasushi <yasushi.asano@jp.fujitsu.com> wrote:
+>> On 4 December 2012 13:29, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Tue, Dec 04, 2012 at 12:57:57PM +0000, Asano, Yasushi wrote:
+>> >> I am looking for a workaround for the 484863 L220 erratum.
+>> >> "484863: The Cache Sync operation does not guarantee that the Eviction
+>> Buffer is empty"
+>> >>
+>> >> Then I found a patch as below.
+>> >>
+>> http://www.linux-arm.org/git?p=linux-2.6-stable.git;a=commitdiff;h=6
+>> 1
+>> >> f0ab1658f41f34c1910848063c565095a47864
+>> ...
+>> >> Could you please tell me if you know the reason why it does not get
+>> into the mainline.
+>> >
+>> > Probably because, looking at the patch in question, it uses a swp
+>> > instruction in the kernel which could be fatal if we have swp
+>> > emulation enabled (we only emulate for user mode).
+>>
+>> Another reason I remember is that swp on that register caused hardware
+>> deadlocks on some platforms. So the workaround is highly dependent on
+>> the L2 wiring.
+>
+> Thank you so much for your prompt reply, Will and Catalin.
+> I understood using a swp instruction is not stable for some platforms.
+> That is the reason why it has not been merged into the mainline.
+> However, I would like to know how to avoid this erratum.
+> Could you please tell me if you know about another workaround.
 
-Remove use of __devinit, __devexit_p, __devinitdata, __devinitconst,
-and __devexit.
+It looks like the errata doc was update and states that the swp must
+not target the PL220 peripheral port.
 
-Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: linux-arm-kernel at lists.infradead.org
----
- sound/arm/pxa2xx-ac97-lib.c | 2 +-
- sound/arm/pxa2xx-ac97.c     | 6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
+Anyway, the two workarounds listed in the doc are:
 
-diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
-index 48d7c0a..6fc0ae9 100644
---- a/sound/arm/pxa2xx-ac97-lib.c
-+++ b/sound/arm/pxa2xx-ac97-lib.c
-@@ -314,7 +314,7 @@ int pxa2xx_ac97_hw_resume(void)
- EXPORT_SYMBOL_GPL(pxa2xx_ac97_hw_resume);
- #endif
- 
--int __devinit pxa2xx_ac97_hw_probe(struct platform_device *dev)
-+int pxa2xx_ac97_hw_probe(struct platform_device *dev)
- {
- 	int ret;
- 	pxa2xx_audio_ops_t *pdata = dev->dev.platform_data;
-diff --git a/sound/arm/pxa2xx-ac97.c b/sound/arm/pxa2xx-ac97.c
-index 4e1fda7..ec54be4 100644
---- a/sound/arm/pxa2xx-ac97.c
-+++ b/sound/arm/pxa2xx-ac97.c
-@@ -163,7 +163,7 @@ static int pxa2xx_ac97_resume(struct device *dev)
- static SIMPLE_DEV_PM_OPS(pxa2xx_ac97_pm_ops, pxa2xx_ac97_suspend, pxa2xx_ac97_resume);
- #endif
- 
--static int __devinit pxa2xx_ac97_probe(struct platform_device *dev)
-+static int pxa2xx_ac97_probe(struct platform_device *dev)
- {
- 	struct snd_card *card;
- 	struct snd_ac97_bus *ac97_bus;
-@@ -224,7 +224,7 @@ err_dev:
- 	return ret;
- }
- 
--static int __devexit pxa2xx_ac97_remove(struct platform_device *dev)
-+static int pxa2xx_ac97_remove(struct platform_device *dev)
- {
- 	struct snd_card *card = platform_get_drvdata(dev);
- 
-@@ -239,7 +239,7 @@ static int __devexit pxa2xx_ac97_remove(struct platform_device *dev)
- 
- static struct platform_driver pxa2xx_ac97_driver = {
- 	.probe		= pxa2xx_ac97_probe,
--	.remove		= __devexit_p(pxa2xx_ac97_remove),
-+	.remove		= pxa2xx_ac97_remove,
- 	.driver		= {
- 		.name	= "pxa2xx-ac97",
- 		.owner	= THIS_MODULE,
+* Replace the Cache Sync operation by a dummy SWP to an L1
+non-cacheable and L2 cacheable or non-cacheable memory area that will
+go through one of the two main L220 slave ports (S0 or S1). The AXI
+locked transactions received by these slave ports are only treated
+once all buffers are empty, including the Eviction Buffer. This dummy
+SWP must not target the L220 Peripheral port.
+
+* Do a dummy STR to L1 and L2 Normal Memory Non-cacheable memory area
+that will go into the L220 Write Buffer before launching the Cache
+Sync operation. This guarantees that the last eviction resulting from
+the clean operation has been written to L3 when the Cache Sync
+operation completes.
+
 -- 
-1.8.0.1
+Catalin
