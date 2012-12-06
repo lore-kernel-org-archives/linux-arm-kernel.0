@@ -1,24 +1,51 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 6 Dec 2012 13:11:42 +0900
-Subject: [PATCH V4 0/2] Add DT support for i2s
-In-Reply-To: <CAAgF-Bc4t6WL4vswP6CFeSQrPZBmOuYfVt6_JoB1Za9TBX7mvA@mail.gmail.com>
-References: <1354099669-1735-1-git-send-email-padma.v@samsung.com>
- <CAAgF-Bc4t6WL4vswP6CFeSQrPZBmOuYfVt6_JoB1Za9TBX7mvA@mail.gmail.com>
-Message-ID: <20121206041141.GA10867@opensource.wolfsonmicro.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Thu, 6 Dec 2012 15:04:31 +0800
+Subject: [PATCH V2 1/6] ARM: tegra: add pending SGI checking API
+In-Reply-To: <50BFC605.3000402@wwwdotorg.org>
+References: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
+ <1354701715-24150-2-git-send-email-josephl@nvidia.com>
+ <50BFC605.3000402@wwwdotorg.org>
+Message-ID: <1354777471.13857.9.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 06, 2012 at 09:31:40AM +0530, Padma Venkat wrote:
-> On Wed, Nov 28, 2012 at 4:17 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
+On Thu, 2012-12-06 at 06:09 +0800, Stephen Warren wrote:
+> On 12/05/2012 03:01 AM, Joseph Lo wrote:
+> > The "powered-down" CPU idle mode of Tegra cut off the vdd_cpu rail, it
+> > include the power of GIC. That caused the SGI (Software Generated
+> > Interrupt) been lost. Because the SGI can't wake up the CPU that in
+> > the "powered-down" CPU idle mode. We need to check if there is any
+> > pending SGI when go into "powered-down" CPU idle mode. This is important
+> > especially when applying the coupled cpuidle framework into "power-down"
+> > cpuidle dirver. Because the coupled cpuidle framework may have the
+> > chance that misses IPI_SINGLE_FUNC handling sometimes.
+> > 
+> > For the PPI or SPI, something like the legacy peripheral interrupt. It
+> > still can be maintained by Tegra legacy interrupt controller. If there
+> > is any pending PPI or SPI when CPU in "powered-down" CPU idle mode. The
+> > CPU can be woken up immediately. So we don't need to take care the same
+> > situation for PPI or SPI.
+> 
+> Is this feature something that can/should be added to the core GIC
+> driver, rather than something custom in the Tegra code?
+> 
+This function is SoC specific code not a generic common code even I
+modify it to more generic for checking the pending irq (SGI, PPI and
+SPI). Different SoC had different design about it. For ex, some SoC only
+put CPU core to power saving mode not include GIC, or there is another
+irq controller can handle the case when CPU go into power saving mode.
+Differenc SoC had different usage here (some need to check all pending
+irq, some need to check SGI only and some even no need to consider
+this).
 
-> > Padmavathi Venna (2):
-> >   ASoC: Samsung: Get I2S src_clk from clock alias id.
-> >   ASoC: SAMSUNG: Add DT support for i2s
+> Part of the reason I ask is that I'd like to avoid any more:
+> 
+> static void __iomem *distbase = IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE);
+> 
+> since that requires static page tables to be set up, whereas I'd like to
+> reduce, as much as possible, the set of pages Tegra maps statically.
 
-> Any comments on DT support for i2s patch?  If not when this patch can be pulled?
+I can move this into the function as a temp variable.
 
-Don't send contentless pings.
-
-I still don't really like what's going on with aliases here, I need to
-understand why things are structured the way they are to say something
-about that.
+Thanks,
+Joseph
