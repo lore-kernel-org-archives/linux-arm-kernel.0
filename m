@@ -1,49 +1,49 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 6 Dec 2012 08:42:15 +0100
-Subject: [PATCH] pwm: i.MX: eliminate build warning
-In-Reply-To: <1354721681-31843-1-git-send-email-LW@KARO-electronics.de>
-References: <1354721681-31843-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20121206074215.GS10369@pengutronix.de>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Thu, 6 Dec 2012 16:45:17 +0900
+Subject: [RFC] gpiolib: introduce descriptor-based GPIO interface
+Message-ID: <1354779918-4028-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 05, 2012 at 04:34:41PM +0100, Lothar Wa?mann wrote:
-> compiling the i.MX pwm driver produces the following warning:
-> |drivers/pwm/pwm-imx.c: In function 'imx_pwm_probe':
-> |drivers/pwm/pwm-imx.c:281:7: warning: assignment discards qualifiers from pointer target type
-> 
-> Apply a 'const' attribute to the affected variable declaration.
-> 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+Just a RFC to check if the direction seems good before going onward with more
+serious work. This patch introduces a set of gpiod_* functions that work like
+their gpio_* counterparts, but use opaque descriptors instead of integers.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+The current integer-based GPIO namespace is bad because it allows GPIOs to be
+used without being properly allocated, and poses portability concerns with the
+maximum number of GPIOs of the system being a compile-time constant. Some
+implementation details could also be improved by an opaque handler, e.g. the
+GPIO descriptors could be moved from the current static array to a more flexible
+list of GPIO chips containing their own descriptors.
 
-Sascha
+With this patch GPIO handles can only be obtained by calling gpio_to_desc(),
+which converts a valid GPIO number to its descriptor - proper lookup functions
+that totally get rid of GPIO numbers are the next step if this first patch is
+received positively.
 
-> ---
->  drivers/pwm/pwm-imx.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-> index 8f26e9f..65a86bd 100644
-> --- a/drivers/pwm/pwm-imx.c
-> +++ b/drivers/pwm/pwm-imx.c
-> @@ -235,7 +235,7 @@ static int imx_pwm_probe(struct platform_device *pdev)
->  {
->  	const struct of_device_id *of_id =
->  			of_match_device(imx_pwm_dt_ids, &pdev->dev);
-> -	struct imx_pwm_data *data;
-> +	const struct imx_pwm_data *data;
->  	struct imx_chip *imx;
->  	struct resource *r;
->  	int ret = 0;
-> -- 
-> 1.7.2.5
-> 
-> 
+This is only a first step towards a bigger gpiolib rework. Getting rid of the
+integer handles for GPIOs will allow us to continue on with the following:
+* Proper GPIO lookup functions a la regulator, pwm, etc.
+* Getting rid of ARCH_NR_GPIO,
+* Tearing out asm-generic/gpio.h into consumer/driver include files,
+* ...
+
+This API is only available if gpiolib is compiled in. One could however easily
+implement a set of gpiod_* functions that would wrap around the old interface if
+that was deemed necessary.
+
+Comments and thoughts on potential issues are welcome, at this stage it is very
+possible that I missed a few issues that will arise in later stages of this
+project.
+
+Alexandre Courbot (1):
+  gpiolib: introduce descriptor-based GPIO interface
+
+ drivers/gpio/gpiolib.c        | 302 ++++++++++++++++++++++--------------------
+ include/asm-generic/gpio.h    |  74 ++++++++---
+ include/linux/gpio/consumer.h |  45 +++++++
+ 3 files changed, 261 insertions(+), 160 deletions(-)
+ create mode 100644 include/linux/gpio/consumer.h
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.0.1
