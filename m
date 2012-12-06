@@ -1,45 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 6 Dec 2012 21:19:47 +0100
-Subject: [RFC] gpiolib: introduce descriptor-based GPIO interface
-In-Reply-To: <1354779918-4028-2-git-send-email-acourbot@nvidia.com>
-References: <1354779918-4028-1-git-send-email-acourbot@nvidia.com>
- <1354779918-4028-2-git-send-email-acourbot@nvidia.com>
-Message-ID: <CACRpkdY3mJL00e0Yq7RBRyHxR9AKMTj7um4Upq3Mh2kxMPqdww@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 06 Dec 2012 14:33:36 -0600
+Subject: [PATCH 4/9] ARM: GIC: remove direct use of gic_raise_softirq
+In-Reply-To: <50B3E10F.9070500@gmail.com>
+References: <1353466713-18967-1-git-send-email-robherring2@gmail.com>
+ <1353466713-18967-5-git-send-email-robherring2@gmail.com>
+ <50B3E10F.9070500@gmail.com>
+Message-ID: <50C10120.7030805@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 6, 2012 at 8:45 AM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+On 11/26/2012 03:37 PM, Rob Herring wrote:
+> Russell,
+> 
+> On 11/20/2012 08:58 PM, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> In preparation of moving gic code to drivers/irqchip, remove the direct
+>> platform dependencies on gic_raise_softirq. Move the setup of
+>> smp_cross_call into the gic code. All platforms are using IPI#0 for
+>> core wakeup, so create a common wakeup ipi function.
+> 
+> snip
+> 
+>> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+>> index 2e3be16..7933eb1 100644
+>> --- a/arch/arm/include/asm/smp.h
+>> +++ b/arch/arm/include/asm/smp.h
+>> @@ -79,6 +79,7 @@ extern void cpu_die(void);
+>>  
+>>  extern void arch_send_call_function_single_ipi(int cpu);
+>>  extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
+>> +extern void arch_send_wakeup_ipi(int cpu);
+> 
+> I found there is already an arch_send_wakeup_ipi_mask() in your for-next
+> tree, so I have rebased this to use it instead. Is your for-next branch
+> stable for 3.8 and if not can you make commit b62655f4c6f3e4d21934e
+> (ARM: 7571/1: SMP: add function arch_send_wakeup_ipi_mask()) available
+> in a stable branch.
 
-> With the current API, GPIOs are manipulated through an integer which
-> represents their unique number across the system. This poses problems in
-> terms of portability, scalability and flexibility: for instance, the
-> number of valid GPIOs for a given system is fixed at system time, and a
-> large array of that size is statically allocated to hold the GPIO
-> descriptors. Worse, GPIOs can be used without being properly allocated.
->
-> In order to improve the situation, the integer namespace must first get
-> away. This patch introduces an alternative GPIO API that uses opaque
-> handlers and refactor gpiolib's internals to work with these handlers
-> instead of GPIO numbers. The former integer-based API is still available
-> as a light wrapper around this new API.
->
-> This first step will then us to build more improvements for gpiolib,
-> like proper GPIO lookup functions per device and provider, and getting
-> rid of the static GPIO array and the ARCH_NR_GPIO configuration option.
->
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+I'm still sitting on this series which ready to go. I need a stable base
+and I can send to Russell or arm-soc.
 
-I really like this. It is looking very good.
-
-Especially it's nice that it makes GPIO descriptors the norm
-rather than a bolt-on, and the old linear GPIO space is turned
-into a comaptibility layer using static inlines.
-
-I'd like to see some love for Documentation/gpio.txt to reflect
-the changes, plus considering Grants note, and I will be happy
-to add Reviewed-by on this.
-
-Especially the lookups will be nice to see going forward!
-
-Yours,
-Linus Walleij
+Rob
