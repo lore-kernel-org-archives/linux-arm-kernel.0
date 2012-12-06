@@ -1,62 +1,49 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Thu, 06 Dec 2012 08:28:02 +0100
-Subject: [PATCH 3/6 v9] gpio: Add userland device interface to block GPIO
-In-Reply-To: <50BFC8C9.5070504@antcom.de>
-References: <1354653588-4018-1-git-send-email-stigge@antcom.de>
- <1354653588-4018-4-git-send-email-stigge@antcom.de>
- <50BF99F3.4060207@grandegger.com> <50BFC8C9.5070504@antcom.de>
-Message-ID: <50C04902.7010505@grandegger.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 6 Dec 2012 08:42:15 +0100
+Subject: [PATCH] pwm: i.MX: eliminate build warning
+In-Reply-To: <1354721681-31843-1-git-send-email-LW@KARO-electronics.de>
+References: <1354721681-31843-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20121206074215.GS10369@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2012 11:20 PM, Roland Stigge wrote:
-> Hi Wolfgang,
+On Wed, Dec 05, 2012 at 04:34:41PM +0100, Lothar Wa?mann wrote:
+> compiling the i.MX pwm driver produces the following warning:
+> |drivers/pwm/pwm-imx.c: In function 'imx_pwm_probe':
+> |drivers/pwm/pwm-imx.c:281:7: warning: assignment discards qualifiers from pointer target type
 > 
-> On 05/12/12 20:01, Wolfgang Grandegger wrote:
->>> +	for (i = 0; i < block->ngpio; i++) {
->>> +		status = gpio_request(block->gpio[i], "gpioblock dev");
->>
->> You could use the name of the GPIO block.
+> Apply a 'const' attribute to the affected variable declaration.
 > 
-> OK.
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Sascha
+
+> ---
+>  drivers/pwm/pwm-imx.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
->>> +		if (status)
->>> +			goto err1;
->>> +
->>> +		irq = gpio_to_irq(block->gpio[i]);
->>> +		if (irq >= 0 &&
->>> +		    !test_bit(FLAG_IS_OUT, &gpio_desc[block->gpio[i]].flags) &&
->>> +		    !gpio_block_is_irq_duplicate(block, i)) {
->>> +			status = request_irq(irq, gpio_block_irq_handler,
->>> +					     IRQF_TRIGGER_FALLING,
->>> +					     block->name, block);
->>> +			if (status)
->>> +				goto err2;
->>> +
->>> +			block->irq_controlled = true;
->>> +		}
->>> +	}
->>
->> There is no need to request IRQs if "O_NONBLOCK" is specified.
+> diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+> index 8f26e9f..65a86bd 100644
+> --- a/drivers/pwm/pwm-imx.c
+> +++ b/drivers/pwm/pwm-imx.c
+> @@ -235,7 +235,7 @@ static int imx_pwm_probe(struct platform_device *pdev)
+>  {
+>  	const struct of_device_id *of_id =
+>  			of_match_device(imx_pwm_dt_ids, &pdev->dev);
+> -	struct imx_pwm_data *data;
+> +	const struct imx_pwm_data *data;
+>  	struct imx_chip *imx;
+>  	struct resource *r;
+>  	int ret = 0;
+> -- 
+> 1.7.2.5
 > 
-> Sure? Regarding this, I found: "The poll() function shall not be
-> affected by the O_NONBLOCK flag." [1]
-
-Ah, didn't know that.
-
->> I observed that the read returns once immediately (without blocking)
->> after reboot. I did not look into that yet.
 > 
-> Didn't happen to me. Can you tell how this can be reproduced?
 
-I think there is an interrupt pending for some reason. It might not be
-the case with your setup.
-
-Feel free to add my:
-
-"Tested by: Wolfgang Grandegger <wg@grandegger.com>".
-
-Will do some more tests when time permits, especially with mixed GPIO
-input and output.
-
-Wolfgang.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
