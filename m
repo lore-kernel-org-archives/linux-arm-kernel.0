@@ -1,49 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 5 Dec 2012 16:03:03 -0800
-Subject: [PATCH v7 5/5] ARM: OMAP: gpmc: add DT bindings for GPMC
- timings and NAND
-In-Reply-To: <20121205232426.BAD573E0E22@localhost>
-References: <1354734571-10774-1-git-send-email-zonque@gmail.com>
- <1354734571-10774-6-git-send-email-zonque@gmail.com>
- <20121205222232.67B2B3E0E22@localhost> <50BFCBCC.6030706@ti.com>
- <20121205232426.BAD573E0E22@localhost>
-Message-ID: <20121206000302.GM21682@atomide.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Thu, 6 Dec 2012 00:54:48 +0000
+Subject: [v2 PATCH 2/8] watchdog/at91sam9_wdt: Convert to use the
+ watchdog framework
+In-Reply-To: <3976223.KImVV2lC5B@flexo>
+References: <1354671267-19277-1-git-send-email-wenyou.yang@atmel.com>
+ <1354671267-19277-3-git-send-email-wenyou.yang@atmel.com>
+ <3976223.KImVV2lC5B@flexo>
+Message-ID: <B256D81BAE5131468A838E5D7A2436413A01D599@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grant Likely <grant.likely@secretlab.ca> [121205 15:26]:
-> On Wed, 5 Dec 2012 16:33:48 -0600, Jon Hunter <jon-hunter@ti.com> wrote:
-> > On 12/05/2012 04:22 PM, Grant Likely wrote:
-> > > 
-> > > Please, be specific. Use something like "ti,am3340-gpmc" or
-> > > "ti,omap3430-gpmc". The compatible property is a list so that new
-> > > devices can claim compatibility with old. Compatible strings that are
-> > > overly generic are a pet-peave of mine.
-> > 
-> > We aim to use the binding for omap2,3,4,5 as well as the am33xx devices
-> > (which are omap based). Would it be sufficient to have "ti,omap2-gpmc"
-> > implying all omap2+ based devices or should we have a compatible string
-> > for each device supported?
-> 
-> Are they each register-level compatible with one another?
-> 
-> The general recommended approach here is to make subsequent silicon
-> claim compatibility with the first compatible implementation.
-> 
-> So, for an am3358 board:
-> 	compatible = "ti,am3358-gpmc", "ti,omap2420-gpmc";
-> 
-> Essentially, what this means is that "ti,omap2420-gpmc" is the generic
-> value instead of "omap2-gpmc". The reason for this is so that the value
-> is anchored against a specific implementation, and not against something
-> completely imaginary or idealized. If a newer version isn't quite
-> compatible with the omap2420-gpmc, then it can drop the compatible claim
-> and the driver really should be told about the new device.
+Hi Florian,
 
-The compatible property can also be used to figure out which ones
-need the workarounds in patch #4 of this series for the DT case.
-So we should be specific with the compatible.
+> -----Original Message-----
+> From: Florian Fainelli [mailto:f.fainelli at gmail.com] On Behalf Of Florian Fainelli
+> Sent: 2012?12?5? 18:48
+> To: Yang, Wenyou
+> Cc: linux-arm-kernel at lists.infradead.org; Ferre, Nicolas; plagnioj at jcrosoft.com; Lin,
+> JM; wim at iguana.be; linux-watchdog at vger.kernel.org; linux-kernel at vger.kernel.org
+> Subject: Re: [v2 PATCH 2/8] watchdog/at91sam9_wdt: Convert to use the watchdog
+> framework
+> 
+> Hello Wenyou,
+> 
+> On Wednesday 05 December 2012 09:34:21 Wenyou Yang wrote:
+> > According to the kernel document: convert_drivers_to_kernel_api.txt,
+> > remove the file_operations struct, miscdevice, and obsolete includes
+> >
+> > Since the at91sam watchdog inherent characteristics, add the watchdog
+> > operations: at91wdt_start, at91wdt_stop and at91wdt_ping.
+> >
+> 
+> [snip]
+> 
+> >
+> > +static inline bool watchdog_is_open(struct watchdog_device *wddev)
+> > +{
+> > +	return test_bit(WDOG_DEV_OPEN, &wddev->status);
+> > +}
+> 
+> This helper should be moved to include/linux/watchdog.h as it can be useful
+> for other watchdog drivers as well.
 
-Regards,
+Thanks, I will move it in next version.
 
-Tony
+> --
+> Florian
+
+Best Regards
+Wenyou Yang
