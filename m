@@ -1,39 +1,56 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 06 Dec 2012 21:16:08 +0300
-Subject: [v2 PATCH 6/8] watchdog/at91sam9_wdt: Use module_platform_driver()
-In-Reply-To: <1354671267-19277-7-git-send-email-wenyou.yang@atmel.com>
-References: <1354671267-19277-1-git-send-email-wenyou.yang@atmel.com>
- <1354671267-19277-7-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <50C0E0E8.3020809@mvista.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 6 Dec 2012 10:25:04 -0700
+Subject: [PATCH] ARM: Kirkwood: Add SPI_CHPA and SPI_CPOL support to
+ spi-orion
+In-Reply-To: <20121206142521.4185A3E0948@localhost>
+References: <20121121192335.GA14868@obsidianresearch.com>
+ <20121206142521.4185A3E0948@localhost>
+Message-ID: <20121206172504.GB9676@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 12/05/2012 04:34 AM, Wenyou Yang wrote:
-
-> Using module_platform_driver() replaces module_init() and module_exit()
-> and makes the code simpler.
-
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> Cc: wim at iguana.be
-> Cc: linux-watchdog at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/watchdog/at91sam9_wdt.c |   14 ++------------
->  1 file changed, 2 insertions(+), 12 deletions(-)
+On Thu, Dec 06, 2012 at 02:25:21PM +0000, Grant Likely wrote:
+> On Wed, 21 Nov 2012 12:23:35 -0700, Jason Gunthorpe <jgunthorpe@obsidianresearch.com> wrote:
+> > Support these transfer modes from the SPI layer by setting
+> > the appropriate register bits before doing the transfer.
+> > 
+> > This was tested on the Marvell kirkwood SOC that uses this driver.
 > 
-> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-> index 5afd3fb..a7c0881 100644
-> --- a/drivers/watchdog/at91sam9_wdt.c
-> +++ b/drivers/watchdog/at91sam9_wdt.c
-> @@ -278,6 +278,7 @@ MODULE_DEVICE_TABLE(of, at91_wdt_dt_ids);
->  #endif
->  
->  static struct platform_driver at91wdt_driver = {
-> +	.probe		= at91wdt_probe,
+> Woo! a note about how it was tested. I can't (and often don't) see
+> enough of these.  :-)
 
-   You also need to remove '__init' annotation from that function since the
-driver becomes hot-plug aware now.
+Thanks for looking at this Grant,
 
-WBR, Sergei
+But I think that Jason's comment (see
+https://patchwork.kernel.org/patch/1782061/) is valid.
+
+This will likely switch all current users from using 'whatever the
+firmware left behind' to 'whatever the kernel default is' - which will
+surely break something here and there??
+
+I was thinking of a transitory patch that did:
+
+reg = readl(spi_reg(orion_spi, ORION_SPI_IF_CONFIG_REG));
+nreg = reg & ~ORION_SPI_MODE_MASK;
+if (spi->mode & SPI_CPOL)
+	nreg |= ORION_SPI_MODE_CPOL;
+if (spi->mode & SPI_CPHA)
+	nreg |= ORION_SPI_MODE_CPHA;
+#ifdef TRANSITION
+ if (nreg != reg)
+        dev_error(..,"Not allowing a SPI mode change away from firmware
+ defaults. Board support needs to be updated!");
+#else
+ writel(nreg, spi_reg(orion_spi, ORION_SPI_IF_CONFIG_REG));
+#endif
+
+At least that way there is a warning and the DTSs can be fixed up.
+
+I haven't had a moment to look into that though..
+
+But I'm not sure that is in line with kernel philosophy WRT to DT..
+
+What do you think?
+
+Regards,
+Jason
