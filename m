@@ -1,20 +1,23 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 06 Dec 2012 14:14:15 +0000
-Subject: [PATCH 3/4] spi: sh-msiof: Add device tree parsing to driver
-In-Reply-To: <1352288407-20594-4-git-send-email-hechtb@gmail.com>
-References: <1352288407-20594-1-git-send-email-hechtb@gmail.com>
- <1352288407-20594-4-git-send-email-hechtb@gmail.com>
-Message-ID: <20121206141415.10BB43E0948@localhost>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 6 Dec 2012 15:23:14 +0100
+Subject: Sharing PCIE driver between Microblaze and Arm zynq
+Message-ID: <CAHTX3dLxbVxn+D+AV7L0VsGYFOjas3AJ_3M_xncVfxp02FCy=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  7 Nov 2012 12:40:06 +0100, Bastian Hecht <hechtb@gmail.com> wrote:
-> This adds the capability to retrieve setup data from the device tree
-> node. The usage of platform data is still available.
-> 
-> Signed-off-by: Bastian Hecht <hechtb@gmail.com>
+Hi guys,
 
-Aside from the binding issues I've pointed out on patch 4, this change
-looks fine. I'll wait for an updated patch before committing.
+I have a question regarding to sharing generic OF pcie driver between
+two architectures MB and ARM Zynq.
+Is drivers/pci/pcie location good for it?
+Make no sense to have the same driver in two locations.
+Is using readl/writel IO functions in this driver the best option
+which we can have?
+Or is there any other recommendation?
 
-g.
+Also just want to check if it is correct to use pcie device_type.
+The rest should be the same with pci description:
+(http://devicetree.org/MPC5200:PCI#PCI_Address_Translation).
+
+Thanks,
+Michal
