@@ -1,411 +1,73 @@
-From: linux-arm@overkiz.com (Boris BREZILLON)
-Date: Thu,  6 Dec 2012 17:45:23 +0100
-Subject: [PATCH 1/1] pwm: atmel: add Timer Counter Block PWM driver
-In-Reply-To: <cover.1354810562.git.linux-arm@overkiz.com>
-References: <cover.1354810562.git.linux-arm@overkiz.com>
-Message-ID: <2ab3d3afe800febece9994d55813ab71b27c2d25.1354810562.git.linux-arm@overkiz.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 06 Dec 2012 17:54:08 +0100
+Subject: [PATCH v7 5/5] ARM: OMAP: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <50C0C646.9000802@ti.com>
+References: <1354734571-10774-1-git-send-email-zonque@gmail.com>
+ <1354734571-10774-6-git-send-email-zonque@gmail.com>
+ <20121205222232.67B2B3E0E22@localhost> <50BFCBCC.6030706@ti.com>
+ <20121205232426.BAD573E0E22@localhost> <20121206000302.GM21682@atomide.com>
+ <50C0C646.9000802@ti.com>
+Message-ID: <50C0CDB0.5050008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add TCB PWM driver.
-Add device tree binding.
+On 06.12.2012 17:22, Jon Hunter wrote:
+> 
+> On 12/05/2012 06:03 PM, Tony Lindgren wrote:
+>> * Grant Likely <grant.likely@secretlab.ca> [121205 15:26]:
+>>> On Wed, 5 Dec 2012 16:33:48 -0600, Jon Hunter <jon-hunter@ti.com> wrote:
+>>>> On 12/05/2012 04:22 PM, Grant Likely wrote:
+>>>>>
+>>>>> Please, be specific. Use something like "ti,am3340-gpmc" or
+>>>>> "ti,omap3430-gpmc". The compatible property is a list so that new
+>>>>> devices can claim compatibility with old. Compatible strings that are
+>>>>> overly generic are a pet-peave of mine.
+>>>>
+>>>> We aim to use the binding for omap2,3,4,5 as well as the am33xx devices
+>>>> (which are omap based). Would it be sufficient to have "ti,omap2-gpmc"
+>>>> implying all omap2+ based devices or should we have a compatible string
+>>>> for each device supported?
+>>>
+>>> Are they each register-level compatible with one another?
+>>>
+>>> The general recommended approach here is to make subsequent silicon
+>>> claim compatibility with the first compatible implementation.
+>>>
+>>> So, for an am3358 board:
+>>> 	compatible = "ti,am3358-gpmc", "ti,omap2420-gpmc";
+>>>
+>>> Essentially, what this means is that "ti,omap2420-gpmc" is the generic
+>>> value instead of "omap2-gpmc". The reason for this is so that the value
+>>> is anchored against a specific implementation, and not against something
+>>> completely imaginary or idealized. If a newer version isn't quite
+>>> compatible with the omap2420-gpmc, then it can drop the compatible claim
+>>> and the driver really should be told about the new device.
+>>
+>> The compatible property can also be used to figure out which ones
+>> need the workarounds in patch #4 of this series for the DT case.
+>> So we should be specific with the compatible.
+> 
+> We should not merged patch #4. Daniel included this here because he is
+> using this on the current mainline, however, this is not needed for
+> linux-next and so we should drop it.
 
-Signed-off-by: Boris BREZILLON <linux-arm@overkiz.com>
---
- create mode 100644 Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
- create mode 100644 drivers/pwm/pwm-atmel-tcb.c
+I think we're talking about different things here since awhile.
 
-diff --git a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
-new file mode 100644
-index 0000000..7644889
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
-@@ -0,0 +1,15 @@
-+Atmel TCB PWM controller
-+
-+Required properties:
-+- compatible: should be "atmel,tcb-pwm"
-+- #pwm-cells: should be 2.  The first cell specifies the per-chip index
-+  of the PWM to use and the second cell is the period in nanoseconds.
-+- atmel,tc-block: the Timer Counter block to use as a PWM chip.
-+
-+Example:
-+
-+pwm: pwm at 80064000 {
-+	compatible = "fsl,imx28-pwm", "fsl,imx23-pwm";
-+	#pwm-cells = <2>;
-+	atmel,tc-block = <1>;
-+};
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index e513cd9..bda52f7 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -37,6 +37,14 @@ config PWM_AB8500
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-ab8500.
- 
-+config PWM_ATMEL_TCB
-+	bool "TC Block PWM"
-+	depends on ATMEL_TCLIB
-+	select HAVE_PWM
-+	default y
-+	help
-+	  Select this to get 6 PWM devices.
-+
- config PWM_BFIN
- 	tristate "Blackfin PWM support"
- 	depends on BFIN_GPTIMERS
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index 62a2963..94ba21e 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -1,5 +1,6 @@
- obj-$(CONFIG_PWM)		+= core.o
- obj-$(CONFIG_PWM_AB8500)	+= pwm-ab8500.o
-+obj-$(CONFIG_PWM_ATMEL_TCB)	+= pwm-atmel-tcb.o
- obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
- obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
- obj-$(CONFIG_PWM_JZ4740)	+= pwm-jz4740.o
-diff --git a/drivers/pwm/pwm-atmel-tcb.c b/drivers/pwm/pwm-atmel-tcb.c
-new file mode 100644
-index 0000000..d5a87cc
---- /dev/null
-+++ b/drivers/pwm/pwm-atmel-tcb.c
-@@ -0,0 +1,335 @@
-+/*
-+ * Copyright (C) Overkiz SAS 2012
-+ *
-+ * Author: Boris BREZILLON <b.brezillon@overkiz.com>
-+ * License terms: GNU General Public License (GPL) version 2
-+ */
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/clocksource.h>
-+#include <linux/clockchips.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/ioport.h>
-+#include <linux/io.h>
-+#include <linux/platform_device.h>
-+#include <linux/atmel_tc.h>
-+#include <linux/pwm.h>
-+#include <linux/of_device.h>
-+#include <linux/slab.h>
-+
-+#define NPWM	6
-+
-+struct atmel_tcb_pwm_device {
-+	u8 polarity : 1;
-+	u8 clk : 3;
-+	u32 duty;
-+	u32 period;
-+};
-+
-+struct atmel_tcb_pwm_chip {
-+	struct pwm_chip chip;
-+	spinlock_t lock;
-+	struct atmel_tc *tc;
-+	struct atmel_tcb_pwm_device pwms[NPWM];
-+};
-+
-+static inline struct atmel_tcb_pwm_chip *to_atmel_tcb_pwm_chip(struct pwm_chip *chip)
-+{
-+	return container_of(chip, struct atmel_tcb_pwm_chip, chip);
-+}
-+
-+static int atmel_tcb_pwm_set_polarity (struct pwm_chip *chip, struct pwm_device *pwm,
-+					  enum pwm_polarity polarity)
-+{
-+	struct atmel_tcb_pwm_device *tcbpwm =
-+			(struct atmel_tcb_pwm_device *)pwm_get_chip_data(pwm);
-+
-+	tcbpwm->polarity = polarity;
-+
-+	return 0;
-+}
-+
-+static int atmel_tcb_pwm_request (struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct atmel_tcb_pwm_chip *tcbpwmc = to_atmel_tcb_pwm_chip(chip);
-+	struct atmel_tcb_pwm_device *tcbpwm = &(tcbpwmc->pwms[pwm->hwpwm]);
-+	struct atmel_tc *tc = tcbpwmc->tc;
-+	void __iomem *regs = tc->regs;
-+	u32 reg;
-+
-+	pwm_set_chip_data(pwm, tcbpwm);
-+	tcbpwm->polarity = PWM_POLARITY_NORMAL;
-+	tcbpwm->duty = 0;
-+	tcbpwm->period = 0;
-+	tcbpwm->clk = 0;
-+	spin_lock(&tcbpwmc->lock);
-+	reg = __raw_readl (regs + ATMEL_TC_REG(pwm->hwpwm / 2, CMR));
-+	if (reg & ATMEL_TC_WAVE) {
-+		tcbpwm->duty = __raw_readl (regs + ((pwm->hwpwm % 2) ?
-+				ATMEL_TC_REG(pwm->hwpwm / 2, RB) :
-+				ATMEL_TC_REG(pwm->hwpwm / 2, RA)));
-+
-+
-+		tcbpwm->clk = reg & ATMEL_TC_TCCLKS;
-+		tcbpwm->period = __raw_readl (regs + ATMEL_TC_REG(pwm->hwpwm / 2, RC));
-+		reg &= (ATMEL_TC_TCCLKS |
-+				ATMEL_TC_ACPA | ATMEL_TC_ACPC | ATMEL_TC_AEEVT | ATMEL_TC_ASWTRG |
-+				ATMEL_TC_BCPB | ATMEL_TC_BCPC | ATMEL_TC_BEEVT | ATMEL_TC_BSWTRG);
-+	}
-+	else
-+		reg = 0;
-+	reg |= ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO | ATMEL_TC_EEVT_XC0;
-+	__raw_writel (reg, regs + ATMEL_TC_REG(pwm->hwpwm / 2, CMR));
-+	spin_unlock(&tcbpwmc->lock);
-+
-+	clk_enable (tc->clk[pwm->hwpwm / 2]);
-+
-+	return 0;
-+}
-+
-+static void atmel_tcb_pwm_free (struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct atmel_tcb_pwm_chip *tcbpwmc = to_atmel_tcb_pwm_chip(chip);
-+	struct atmel_tc *tc = tcbpwmc->tc;
-+
-+	clk_disable (tc->clk[pwm->hwpwm / 2]);
-+}
-+
-+static void atmel_tcb_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct atmel_tcb_pwm_chip *tcbpwmc = to_atmel_tcb_pwm_chip(chip);
-+	struct atmel_tcb_pwm_device *tcbpwm =
-+			(struct atmel_tcb_pwm_device *)pwm_get_chip_data(pwm);
-+	struct atmel_tc *tc = tcbpwmc->tc;
-+	void __iomem *regs = tc->regs;
-+	u32 reg;
-+	u32 cmr = 0;
-+	u8 shift = pwm->hwpwm % 2 ? 8 : 0;
-+	enum pwm_polarity polarity = tcbpwm->polarity;
-+
-+	if (tcbpwm->duty == 0)
-+		polarity = !polarity;
-+
-+	if (polarity)
-+		cmr |= ATMEL_TC_ASWTRG_CLEAR;
-+	else
-+		cmr |= ATMEL_TC_ASWTRG_SET;
-+
-+	cmr <<= shift;
-+
-+	spin_lock(&tcbpwmc->lock);
-+	reg = __raw_readl(regs + ATMEL_TC_REG(pwm->hwpwm / 2, CMR));
-+	reg &= ~((ATMEL_TC_ACPA | ATMEL_TC_ACPC | ATMEL_TC_AEEVT | ATMEL_TC_BSWTRG) << shift);
-+	reg |= cmr;
-+	__raw_writel (reg, regs + ATMEL_TC_REG(pwm->hwpwm / 2, CMR));
-+	__raw_writel (ATMEL_TC_SWTRG, regs + ATMEL_TC_REG(pwm->hwpwm / 2, CCR));
-+	if (!(reg & (ATMEL_TC_ACPC | ATMEL_TC_BCPC)))
-+		__raw_writel(ATMEL_TC_SWTRG | ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(pwm->hwpwm / 2, CCR));
-+	else
-+		__raw_writel (ATMEL_TC_SWTRG, regs + ATMEL_TC_REG(pwm->hwpwm / 2, CCR));
-+	spin_unlock(&tcbpwmc->lock);
-+}
-+
-+static int atmel_tcb_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct atmel_tcb_pwm_chip *tcbpwmc = to_atmel_tcb_pwm_chip(chip);
-+	struct atmel_tcb_pwm_device *tcbpwm =
-+			(struct atmel_tcb_pwm_device *)pwm_get_chip_data(pwm);
-+	struct atmel_tc *tc = tcbpwmc->tc;
-+	void __iomem *regs = tc->regs;
-+	u32 reg;
-+	u32 cmr = 0;
-+	u8 shift = pwm->hwpwm % 2 ? 8 : 0;
-+	enum pwm_polarity polarity = tcbpwm->polarity;
-+
-+	if (tcbpwm->duty == 0)
-+		polarity = !polarity;
-+
-+	if (polarity)
-+		cmr |= ATMEL_TC_ASWTRG_CLEAR;
-+	else
-+		cmr |= ATMEL_TC_ASWTRG_SET;
-+
-+	if (tcbpwm->duty != tcbpwm->period && tcbpwm->duty > 0) {
-+		if (polarity)
-+			cmr |= ATMEL_TC_ACPA_SET | ATMEL_TC_ACPC_CLEAR;
-+		else
-+			cmr |= ATMEL_TC_ACPA_CLEAR | ATMEL_TC_ACPC_SET;
-+	}
-+
-+	cmr <<= shift;
-+	cmr |= tcbpwm->clk;
-+
-+	spin_lock(&tcbpwmc->lock);
-+	reg = __raw_readl(regs + ATMEL_TC_REG(pwm->hwpwm / 2, CMR));
-+	reg &= ~(((ATMEL_TC_ACPA |
-+				ATMEL_TC_ACPC |
-+				ATMEL_TC_AEEVT |
-+				ATMEL_TC_ASWTRG) << shift) |
-+			ATMEL_TC_TCCLKS);
-+	reg |= cmr;
-+	__raw_writel (reg, regs + ATMEL_TC_REG(pwm->hwpwm / 2, CMR));
-+	__raw_writel(tcbpwm->duty, regs + ((pwm->hwpwm % 2) ? ATMEL_TC_REG(pwm->hwpwm / 2, RB) : ATMEL_TC_REG(pwm->hwpwm / 2, RA)));
-+	__raw_writel(tcbpwm->period, regs + ATMEL_TC_REG(pwm->hwpwm / 2, RC));
-+	__raw_writel (ATMEL_TC_CLKEN | ATMEL_TC_SWTRG, regs + ATMEL_TC_REG(pwm->hwpwm / 2, CCR));
-+	spin_unlock(&tcbpwmc->lock);
-+	return 0;
-+}
-+
-+static int atmel_tcb_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+		int duty_ns, int period_ns)
-+{
-+	struct atmel_tcb_pwm_chip *tcbpwmc = to_atmel_tcb_pwm_chip(chip);
-+	struct atmel_tcb_pwm_device *tcbpwm =
-+			(struct atmel_tcb_pwm_device *)pwm_get_chip_data(pwm);
-+	struct atmel_tcb_pwm_device *atcbpwm = &(tcbpwmc->pwms[pwm->hwpwm % 2 ? pwm->hwpwm - 1 : pwm->hwpwm + 1]);
-+	struct atmel_tc *tc = tcbpwmc->tc;
-+	int i;
-+	int slowclk = 0;
-+	u32 period;
-+	u32 rate = clk_get_rate(tc->clk[pwm->hwpwm / 2]);
-+	u64 min;
-+	u64 max;
-+	u64 duty;
-+
-+	for (i = 0; i < 5; ++i) {
-+		if (atmel_tc_divisors[i] == 0) {
-+			slowclk = i;
-+			continue;
-+		}
-+		min = div_u64 (1000000000, div_u64 (rate, atmel_tc_divisors[i]));
-+		max = min << tc->tcb_config->counter_width;
-+		if (max >= period_ns)
-+			break;
-+	}
-+
-+	if (i == 5) {
-+		i = slowclk;
-+		rate = 32768;
-+		min = div_u64 (1000000000, rate);
-+		max = min << 16;
-+
-+		if (max < period_ns)
-+			return -ERANGE;
-+	}
-+
-+	duty = div_u64 (duty_ns, min);
-+	duty &=  ((u64)(1 << tc->tcb_config->counter_width) - 1);
-+
-+	period = div_u64 (period_ns, min);
-+	period &= ((u64)(1 << tc->tcb_config->counter_width) - 1);
-+
-+	if ((atcbpwm->duty > 0 && atcbpwm->duty != atcbpwm->period) &&
-+		(atcbpwm->clk != i || atcbpwm->period != period)) {
-+		dev_err(chip->dev, "failed to configure period_ns\n");
-+		return -EINVAL;
-+	}
-+
-+	tcbpwm->period = period;
-+	tcbpwm->clk = i;
-+	tcbpwm->duty = duty;
-+
-+	if (test_bit(PWMF_ENABLED, &pwm->flags))
-+		atmel_tcb_pwm_enable(chip, pwm);
-+
-+	return 0;
-+}
-+
-+static const struct pwm_ops atmel_tcb_pwm_ops = {
-+	.set_polarity = atmel_tcb_pwm_set_polarity,
-+	.request = atmel_tcb_pwm_request,
-+	.free = atmel_tcb_pwm_free,
-+	.config = atmel_tcb_pwm_config,
-+	.enable = atmel_tcb_pwm_enable,
-+	.disable = atmel_tcb_pwm_disable,
-+};
-+
-+static int __devinit atmel_tcb_pwm_probe(struct platform_device *pdev)
-+{
-+	struct atmel_tcb_pwm_chip *tcbpwm;
-+	struct device_node *np = pdev->dev.of_node;
-+	struct atmel_tc *tc;
-+	int err;
-+	int tcblock;
-+
-+
-+	err = of_property_read_u32(np, "tc-block", &tcblock);
-+	if (err < 0) {
-+		dev_err(&pdev->dev,
-+				"failed to get tc block number from device tree (error: %d)\n", err);
-+		return err;
-+	}
-+
-+	tc = atmel_tc_alloc(tcblock, "tcb-pwm");
-+	if (tc == NULL) {
-+		dev_err(&pdev->dev, "failed to allocate Timer Counter Block\n");
-+		return -ENOMEM;
-+	}
-+
-+	tcbpwm = kzalloc(sizeof(*tcbpwm), GFP_KERNEL);
-+	if (tcbpwm == NULL) {
-+		dev_err(&pdev->dev, "failed to allocate memory\n");
-+		return -ENOMEM;
-+	}
-+
-+	tcbpwm->chip.dev = &pdev->dev;
-+	tcbpwm->chip.ops = &atmel_tcb_pwm_ops;
-+	tcbpwm->chip.base = pdev->id;
-+	tcbpwm->chip.npwm = NPWM;
-+	tcbpwm->tc = tc;
-+
-+	spin_lock_init(&tcbpwm->lock);
-+
-+	err = pwmchip_add(&tcbpwm->chip);
-+	if (err < 0) {
-+		kfree(tcbpwm);
-+		return err;
-+	}
-+
-+	dev_dbg(&pdev->dev, "pwm probe successful\n");
-+	platform_set_drvdata(pdev, tcbpwm);
-+
-+	return 0;
-+}
-+
-+static int __devexit atmel_tcb_pwm_remove(struct platform_device *pdev)
-+{
-+	struct atmel_tcb_pwm_chip *tcbpwm = platform_get_drvdata(pdev);
-+	int err;
-+
-+	err = pwmchip_remove(&tcbpwm->chip);
-+	if (err < 0)
-+		return err;
-+
-+	atmel_tc_free(tcbpwm->tc);
-+
-+	dev_dbg(&pdev->dev, "pwm driver removed\n");
-+	kfree(tcbpwm);
-+
-+	return 0;
-+}
-+
-+static struct of_device_id atmel_tcb_pwm_dt_ids[] = {
-+	{ .compatible = "atmel,tcb-pwm", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mxs_pwm_dt_ids);
-+
-+static struct platform_driver atmel_tcb_pwm_driver = {
-+	.driver = {
-+		.name = "atmel-tcb-pwm",
-+		.of_match_table = of_match_ptr(atmel_tcb_pwm_dt_ids),
-+	},
-+	.probe = atmel_tcb_pwm_probe,
-+	.remove = __devexit_p(atmel_tcb_pwm_remove),
-+};
-+module_platform_driver(atmel_tcb_pwm_driver);
-+
-+MODULE_AUTHOR("Boris BREZILLON <b.brezillon@overkiz.com>");
-+MODULE_DESCRIPTION("Atmel Timer Counter Pulse Width Modulation Driver");
-+MODULE_ALIAS("platform:atmel-tcb-pwm");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.0.4
+The patch I pointed you which is in mainline and which removes the
+reference to <plat/gpmc.h> from drivers/mtd/nand/omap2.c has nothing to
+do with my patch #4. It just solves Tony's concern that regarding the
+multi-arch zImages.
+
+My code in gpmc.c calls gpmc_nand_init() which in turn calls
+gpmc_hwecc_bch_capable(). Without path #4, gpmc_hwecc_bch_capable() will
+return 0, and the nand init will fail consequently, in mainline as well
+as in linux-next.
+
+I understood Tony that he wanted to remove the entiry function and do
+the check based on DT properties, which will then solve the problem on a
+different level. However, that change is planned for *after* the merge
+window.
+
+
+Daniel
