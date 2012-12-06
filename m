@@ -1,54 +1,244 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 6 Dec 2012 10:22:30 -0600
-Subject: [PATCH v7 5/5] ARM: OMAP: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <20121206000302.GM21682@atomide.com>
-References: <1354734571-10774-1-git-send-email-zonque@gmail.com>
- <1354734571-10774-6-git-send-email-zonque@gmail.com>
- <20121205222232.67B2B3E0E22@localhost> <50BFCBCC.6030706@ti.com>
- <20121205232426.BAD573E0E22@localhost> <20121206000302.GM21682@atomide.com>
-Message-ID: <50C0C646.9000802@ti.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches)
+Date: Thu, 6 Dec 2012 17:37:29 +0100
+Subject: [v2 PATCH 13/14] ARM: dts: add spi nodes for atmel SoC
+In-Reply-To: <1354607640-13229-14-git-send-email-wenyou.yang@atmel.com>
+References: <1354607640-13229-1-git-send-email-wenyou.yang@atmel.com>
+ <1354607640-13229-14-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <50C0C9C9.9000108@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On 12/05/2012 06:03 PM, Tony Lindgren wrote:
-> * Grant Likely <grant.likely@secretlab.ca> [121205 15:26]:
->> On Wed, 5 Dec 2012 16:33:48 -0600, Jon Hunter <jon-hunter@ti.com> wrote:
->>> On 12/05/2012 04:22 PM, Grant Likely wrote:
->>>>
->>>> Please, be specific. Use something like "ti,am3340-gpmc" or
->>>> "ti,omap3430-gpmc". The compatible property is a list so that new
->>>> devices can claim compatibility with old. Compatible strings that are
->>>> overly generic are a pet-peave of mine.
->>>
->>> We aim to use the binding for omap2,3,4,5 as well as the am33xx devices
->>> (which are omap based). Would it be sufficient to have "ti,omap2-gpmc"
->>> implying all omap2+ based devices or should we have a compatible string
->>> for each device supported?
->>
->> Are they each register-level compatible with one another?
->>
->> The general recommended approach here is to make subsequent silicon
->> claim compatibility with the first compatible implementation.
->>
->> So, for an am3358 board:
->> 	compatible = "ti,am3358-gpmc", "ti,omap2420-gpmc";
->>
->> Essentially, what this means is that "ti,omap2420-gpmc" is the generic
->> value instead of "omap2-gpmc". The reason for this is so that the value
->> is anchored against a specific implementation, and not against something
->> completely imaginary or idealized. If a newer version isn't quite
->> compatible with the omap2420-gpmc, then it can drop the compatible claim
->> and the driver really should be told about the new device.
-> 
-> The compatible property can also be used to figure out which ones
-> need the workarounds in patch #4 of this series for the DT case.
-> So we should be specific with the compatible.
+On 12/04/2012 08:53 AM, Wenyou Yang wrote:
+> From: Richard Genoud <richard.genoud@gmail.com>
+>
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> [wenyou.yang at atmel.com: add spi nodes for other atmel SOC]
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> Cc: linux at arm.linux.org.uk
+> ---
+>   arch/arm/boot/dts/at91sam9260.dtsi |   30 ++++++++++++++++++++++++++++++
+>   arch/arm/boot/dts/at91sam9263.dtsi |   30 ++++++++++++++++++++++++++++++
+>   arch/arm/boot/dts/at91sam9g45.dtsi |   30 ++++++++++++++++++++++++++++++
+>   arch/arm/boot/dts/at91sam9n12.dtsi |   30 ++++++++++++++++++++++++++++++
+>   arch/arm/boot/dts/at91sam9x5.dtsi  |   30 ++++++++++++++++++++++++++++++
+>   5 files changed, 150 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+> index d410581..87254aa 100644
+> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+> @@ -212,6 +212,36 @@
+>   				status = "disabled";
+>   			};
+>
+> +			spi0: spi at fffc8000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "atmel,at91sam9260-spi";
+> +				reg = <0xfffc8000 0x200>;
+> +				interrupts = <12 4 3>;
+> +				cs-gpios = <&pioA 3 0
+> +					    &pioC 11 0
+> +					    &pioC 16 0
+> +					    &pioC 17 0
+> +					   >;
 
-We should not merged patch #4. Daniel included this here because he is
-using this on the current mainline, however, this is not needed for
-linux-next and so we should drop it.
+ From my point of view, the cs-gpios stuff should be in board dts files 
+instead of the SoC dtsi file.
 
-Cheers
-Jon
+These pios can be shared with other devices. If only one chip select 
+gpio is used on the board, it could avoid some useless pin conflicts.
+
+Regards
+
+Ludovic
+
+> +				dma-mask = <0xffffffff>;
+> +				status = "disabled";
+> +			};
+> +
+> +			spi1: spi at fffcc000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "atmel,at91sam9260-spi";
+> +				reg = <0xfffcc000 0x200>;
+> +				interrupts = <13 4 3>;
+> +				cs-gpios = <&pioB 3 0
+> +					    &pioC 5 0
+> +					    &pioC 4 0
+> +					    &pioC 3 0
+> +					   >;
+> +				dma-mask = <0xffffffff>;
+> +				status = "disabled";
+> +			};
+> +
+>   			adc0: adc at fffe0000 {
+>   				compatible = "atmel,at91sam9260-adc";
+>   				reg = <0xfffe0000 0x100>;
+> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+> index 3e6e5c1..528395d 100644
+> --- a/arch/arm/boot/dts/at91sam9263.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+> @@ -195,6 +195,36 @@
+>   				#size-cells = <0>;
+>   				status = "disabled";
+>   			};
+> +
+> +			spi0: spi at fffa4000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "atmel,at91sam9260-spi";
+> +				reg = <0xfffa4000 0x200>;
+> +				interrupts = <14 4 3>;
+> +				cs-gpios = <&pioA 5 0
+> +					    &pioA 3 0
+> +					    &pioA 4 0
+> +					    &pioB 11 0
+> +					   >;
+> +				dma-mask = <0xffffffff>;
+> +				status = "disabled";
+> +			};
+> +
+> +			spi1: spi at fffa8000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "atmel,at91sam9260-spi";
+> +				reg = <0xfffa8000 0x200>;
+> +				interrupts = <15 4 3>;
+> +				cs-gpios = <&pioB 15 0
+> +					    &pioB 16 0
+> +					    &pioB 17 0
+> +					    &pioB 18 0
+> +					   >;
+> +				dma-mask = <0xffffffff>;
+> +				status = "disabled";
+> +			};
+>   		};
+>
+>   		nand0: nand at 40000000 {
+> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> index 3add030..8a6aae92 100644
+> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> @@ -262,6 +262,36 @@
+>   					trigger-value = <0x6>;
+>   				};
+>   			};
+> +
+> +			spi0: spi at fffa4000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "atmel,at91sam9260-spi";
+> +				reg = <0xfffa4000 0x200>;
+> +				interrupts = <14 4 3>;
+> +				cs-gpios = <&pioB 3 0
+> +					    &pioB 18 0
+> +					    &pioB 19 0
+> +					    &pioD 27 0
+> +					   >;
+> +				dma-mask = <0xffffffff>;
+> +				status = "disabled";
+> +			};
+> +
+> +			spi1: spi at fffa8000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "atmel,at91sam9260-spi";
+> +				reg = <0xfffa8000 0x200>;
+> +				interrupts = <15 4 3>;
+> +				cs-gpios = <&pioB 17 0
+> +					    &pioD 28 0
+> +					    &pioD 18 0
+> +					    &pioD 19 0
+> +					   >;
+> +				dma-mask = <0xffffffff>;
+> +				status = "disabled";
+> +			};
+>   		};
+>
+>   		nand0: nand at 40000000 {
+> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+> index 82508d6..183cacf 100644
+> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+> @@ -202,6 +202,36 @@
+>   				#size-cells = <0>;
+>   				status = "disabled";
+>   			};
+> +
+> +			spi0: spi at f0000000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "atmel,at91sam9x5-spi";
+> +				reg = <0xf0000000 0x100>;
+> +				interrupts = <13 4 3>;
+> +				cs-gpios = <&pioA 14 0
+> +					    &pioA 7 0
+> +					    &pioA 1 0
+> +					    &pioB 3 0
+> +					   >;
+> +				dma-mask = <0xffffffff>;
+> +				status = "disabled";
+> +			};
+> +
+> +			spi1: spi at f0004000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "atmel,at91sam9x5-spi";
+> +				reg = <0xf0004000 0x100>;
+> +				interrupts = <14 4 3>;
+> +				cs-gpios = <&pioA 8 0
+> +					    &pioA 0 0
+> +					    &pioA 31 0
+> +					    &pioA 30 0
+> +					   >;
+> +				dma-mask = <0xffffffff>;
+> +				status = "disabled";
+> +			};
+>   		};
+>
+>   		nand0: nand at 40000000 {
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index 03fc136..95b55fd 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -263,6 +263,36 @@
+>   					trigger-value = <0x6>;
+>   				};
+>   			};
+> +
+> +			spi0: spi at f0000000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "atmel,at91sam9x5-spi";
+> +				reg = <0xf0000000 0x100>;
+> +				interrupts = <13 4 3>;
+> +				cs-gpios = <&pioA 14 0
+> +					    &pioA 7 0 /* conflicts with TXD2 */
+> +					    &pioA 1 0 /* conflicts with RXD0 */
+> +					    &pioB 3 0 /* conflicts with ERXDV */
+> +					   >;
+> +				dma-mask = <0xffffffff>;
+> +				status = "disabled";
+> +			};
+> +
+> +			spi1: spi at f0004000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "atmel,at91sam9x5-spi";
+> +				reg = <0xf0004000 0x100>;
+> +				interrupts = <14 4 3>;
+> +				cs-gpios = <&pioA 8 0 /* conflitcs with RXD2 */
+> +					    &pioA 0 0 /* conflitcs with TXD0 */
+> +					    &pioA 31 0 /* conflitcs with TWCK0 */
+> +					    &pioA 30 0 /* conflitcs with TWD0 */
+> +					   >;
+> +				dma-mask = <0xffffffff>;
+> +				status = "disabled";
+> +			};
+>   		};
+>
+>   		nand0: nand at 40000000 {
+>
