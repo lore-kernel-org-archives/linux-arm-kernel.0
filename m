@@ -1,42 +1,45 @@
-From: Andrew_Gabbasov@mentor.com (Gabbasov, Andrew)
-Date: Thu, 6 Dec 2012 10:15:41 +0000
-Subject: [PATCH] ARM: pass syscall return value to sys_exit tracepoint
-In-Reply-To: <20121206095739.GA749@mudshark.cambridge.arm.com>
-References: <1354369134-20296-1-git-send-email-andrew_gabbasov@mentor.com>
- <20121203133735.GG20074@mudshark.cambridge.arm.com>
- <20121203141251.GB14363@n2100.arm.linux.org.uk>
- <6C5EA58090A5ED459815C4D04C2B466F8C567A21@EU-MBX-01.mgc.mentorg.com>
- <20121204103809.GD14363@n2100.arm.linux.org.uk>
- <20121204104038.GA23368@mudshark.cambridge.arm.com>
- <20121204115526.GK23368@mudshark.cambridge.arm.com>
- <6C5EA58090A5ED459815C4D04C2B466F8C567E42@EU-MBX-01.mgc.mentorg.com>,
- <20121206095739.GA749@mudshark.cambridge.arm.com>
-Message-ID: <6C5EA58090A5ED459815C4D04C2B466F8C567E6C@EU-MBX-01.mgc.mentorg.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 06 Dec 2012 10:16:45 +0000
+Subject: [PATCH v2 1/2] ARM: Exynos5250: Enabling ehci-s5p driver
+In-Reply-To: <1352357665-7435-2-git-send-email-gautam.vivek@samsung.com>
+References: <1352357665-7435-1-git-send-email-gautam.vivek@samsung.com>
+ <1352357665-7435-2-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <20121206101645.4C28E3E05A4@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Dec 06, 2012 at 09:53:58AM +0000, Gabbasov, Andrew wrote:
-> > Hi Will,
+On Thu, 08 Nov 2012 12:24:24 +0530, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+> Adding EHCI device tree node for Exynos5250 along with
+> the device base adress and gpio line for vbus.
 > 
-> Hello Andrew,
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Acked-by: Jingoo Han <jg1.han@samsung.com>
+> ---
+>  .../devicetree/bindings/usb/exynos-usb.txt         |   25 ++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts          |    4 +++
+>  arch/arm/boot/dts/exynos5250.dtsi                  |    6 ++++
+>  arch/arm/mach-exynos/include/mach/map.h            |    1 +
+>  arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +
+>  5 files changed, 38 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/usb/exynos-usb.txt
 > 
-> > Thank you for the patch, I was thinking about something like this too, but was in a doubt
-> > that reverse order could be for a purpose ;-)
-> 
-> Nope, it think it was an oversight when the entry path was cleaned up.
-> 
-> > Minor question: what is the version this patch is against? The latest version in Linus'es tree
-> > does not have "current_thread_info()->syscall = scno;" at the beginning of
-> > syscall_trace_exit. Or is it just a "proof of concept" patch and will be modified before
-> > merging to the source?
-> 
-> It's based on what Russell has queued for 3.8 (there is some seccomp stuff
-> in there). If you're happy with the patch, I can stick it in the patch
-> system once I've given it some more testing.
-> 
-> Will
+> diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+> new file mode 100644
+> index 0000000..833f5cf
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+> @@ -0,0 +1,25 @@
+> +Samsung Exynos SoC USB controller
+> +
+> +The USB devices interface with USB controllers on Exynos SOCs.
+> +The device node has following properties.
+> +
+> +EHCI
+> +Required properties:
+> + - compatible: should be "samsung,exynos-ehci" for USB 2.0
 
-Yes, the patch looks good to me.
+Ditto here. Please be specific in compatible strings.  "samsung,exynos5250-ehci"
 
-Thanks.
-Andrew
+Otherwise the binding looks fine to me.
+
+g.
