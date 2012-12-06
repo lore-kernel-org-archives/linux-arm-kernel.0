@@ -1,55 +1,68 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Thu,  6 Dec 2012 15:38:32 +0100
-Subject: [PATCH 2/2] ARM: net: bpf_jit_32: fix sp-relative load/stores offsets.
-In-Reply-To: <1354804718-1662-1-git-send-email-nschichan@freebox.fr>
-References: <1354804718-1662-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <1354804718-1662-2-git-send-email-nschichan@freebox.fr>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 06 Dec 2012 14:42:59 +0000
+Subject: [RFC] gpiolib: introduce descriptor-based GPIO interface
+In-Reply-To: <1354779918-4028-2-git-send-email-acourbot@nvidia.com>
+References: <1354779918-4028-1-git-send-email-acourbot@nvidia.com>
+ <1354779918-4028-2-git-send-email-acourbot@nvidia.com>
+Message-ID: <20121206144259.136693E0950@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The offset must be multiplied by 4 to be sure to access the correct
-32bit word in the stack scratch space.
+On Thu, 6 Dec 2012 16:45:18 +0900, Alexandre Courbot <acourbot@nvidia.com> wrote:
+> With the current API, GPIOs are manipulated through an integer which
+> represents their unique number across the system. This poses problems in
+> terms of portability, scalability and flexibility: for instance, the
+> number of valid GPIOs for a given system is fixed at system time, and a
+> large array of that size is statically allocated to hold the GPIO
+> descriptors. Worse, GPIOs can be used without being properly allocated.
+> 
+> In order to improve the situation, the integer namespace must first get
+> away. This patch introduces an alternative GPIO API that uses opaque
+> handlers and refactor gpiolib's internals to work with these handlers
+> instead of GPIO numbers. The former integer-based API is still available
+> as a light wrapper around this new API.
+> 
+> This first step will then us to build more improvements for gpiolib,
+> like proper GPIO lookup functions per device and provider, and getting
+> rid of the static GPIO array and the ARCH_NR_GPIO configuration option.
+> 
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> ---
+>  drivers/gpio/gpiolib.c        | 302 ++++++++++++++++++++++--------------------
+>  include/asm-generic/gpio.h    |  74 ++++++++---
+>  include/linux/gpio/consumer.h |  45 +++++++
+>  3 files changed, 261 insertions(+), 160 deletions(-)
+>  create mode 100644 include/linux/gpio/consumer.h
+> 
+> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+> index 1c8d9e3..bf32511 100644
+> --- a/drivers/gpio/gpiolib.c
+> +++ b/drivers/gpio/gpiolib.c
+> @@ -83,6 +83,32 @@ static inline void desc_set_label(struct gpio_desc *d, const char *label)
+>  #endif
+>  }
+>  
+> +/**
+> + * Convert a GPIO descriptor to the integer namespace.
+> + * This should disappear in the future but is needed since we still
+> + * use GPIO numbers for error messages and sysfs nodes
+> + */
+> +static inline int desc_to_gpio(struct gpio_desc *desc)
+> +{
+> +	return desc - &gpio_desc[0];
+> +}
+> +
+> +/**
+> + * Return the GPIO number of the passed descriptor relative to its chip
+> + */
+> +int gpio_chip_offset(struct gpio_desc *desc)
+> +{
+> +	return (desc - &gpio_desc[0]) - desc->chip->base;
+> +}
 
-For instance, a store at scratch memory cell #1 was generating the
-following:
+how about "gpio_chip_hwnum()" to somewhat match irqdomain convention?
 
-st	r4, [sp, #1]
+I've only lightly scanned this patch, but I like what I see. I would
+keep going with it.
 
-While the correct code for this is:
-
-st	r4, [sp, #4]
-
-To reproduce the bug (assuming your system has a NIC with the mac
-address 52:54:00:12:34:56):
-
-echo 0 > /proc/sys/net/core/bpf_jit_enable
-tcpdump -ni eth0 "ether[1] + ether[2] - ether[3] * ether[4] - ether[5] \
-	== -0x3AA" # this will capture packets as expected
-
-echo 1 > /proc/sys/net/core/bpf_jit_enable
-tcpdump -ni eth0 "ether[1] + ether[2] - ether[3] * ether[4] - ether[5] \
-	== -0x3AA" # this will not.
-
-This bug was present since the original inclusion of bpf_jit for ARM
-(ddecdfce: ARM: 7259/3: net: JIT compiler for packet filters).
-
-Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
----
- arch/arm/net/bpf_jit_32.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index a64d349..b6f305e 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -42,7 +42,7 @@
- #define r_skb_hl	ARM_R8
- 
- #define SCRATCH_SP_OFFSET	0
--#define SCRATCH_OFF(k)		(SCRATCH_SP_OFFSET + (k))
-+#define SCRATCH_OFF(k)		(SCRATCH_SP_OFFSET + 4 * (k))
- 
- #define SEEN_MEM		((1 << BPF_MEMWORDS) - 1)
- #define SEEN_MEM_WORD(k)	(1 << (k))
--- 
-1.7.5.4
+g.
