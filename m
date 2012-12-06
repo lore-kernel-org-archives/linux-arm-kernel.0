@@ -1,40 +1,119 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 6 Dec 2012 14:27:06 -0700
-Subject: Sharing PCIE driver between Microblaze and Arm zynq
-In-Reply-To: <CAHTX3dLxbVxn+D+AV7L0VsGYFOjas3AJ_3M_xncVfxp02FCy=Q@mail.gmail.com>
-References: <CAHTX3dLxbVxn+D+AV7L0VsGYFOjas3AJ_3M_xncVfxp02FCy=Q@mail.gmail.com>
-Message-ID: <CAErSpo6xRdwzTuPPqnmvmHSp7awnV7=Z85eWFfktb_hm9Aad_A@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu,  6 Dec 2012 22:47:30 +0100
+Subject: [PATCH 0/6 v10] gpio: Add block GPIO
+Message-ID: <1354830456-17590-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc linux-pci]
+This set of patches adds:
 
-On Thu, Dec 6, 2012 at 7:23 AM, Michal Simek <michal.simek@xilinx.com> wrote:
-> Hi guys,
->
-> I have a question regarding to sharing generic OF pcie driver between
-> two architectures MB and ARM Zynq.
-> Is drivers/pci/pcie location good for it?
-> Make no sense to have the same driver in two locations.
+* Block GPIO API to gpiolib
+* Sysfs support for GPIO API, to provide userland access
+* Device interface for userland access (alternative to sysfs)
+* Devicetree support to instantiate GPIO blocks via DT
+* Example implementations in several gpio drivers since they need
+  special accessor functions for block wise GPIO access
+* Fix for race condition in gpiolib on device creation
 
-I think you're talking about a PCI host bridge driver.  It would
-definitely be nice to move toward a generic, shared driver.  Host
-bridge drivers are responsible for enumerating the PCI hierarchy below
-the bridge.  Enumeration is not really PCIe-specific, so I wouldn't
-put it in drivers/pci/pcie.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+Tested by: Wolfgang Grandegger <wg@grandegger.com>
+--
 
-> Is using readl/writel IO functions in this driver the best option
-> which we can have?
-> Or is there any other recommendation?
+Changed since v9:
+* Changed IRQ flags for device interface's poll() from IRQF_TRIGGER_FALLING
+  to IRQF_SHARED
+* Use block name on gpio_request
+* Added spinlock for ISR manipulated data (dev interface / poll())
 
-I'm not really a driver person, but if you're writing a new driver,
-wouldn't you use the iomap interfaces (ioremap(), ioread32(), etc)
-rather than readl()?
+Changed since v8:
+* Added poll() function to dev interface for IRQ handling
+* Fixed gpio_block_register() in case of missing CONFIG_GPIO_SYSFS
+* Fixed mask handling in sysfs interface
+* Fixed get_user/put_user pointer (cast)
 
-> Also just want to check if it is correct to use pcie device_type.
+Changes since v7:
+* Fixed error in API documentation (name arg missing in prototype)
+* Fixed compile error if sysfs is missing: Moved gpio_block_is_output()
+  out of sysfs-ifdef
+* Added error handling to gpio_block_register()
+* Added mask attribute to sysfs (although dev interface exists now)
 
-I don't know what you're asking here.  Can you elaborate or give a
-specific example?
+Changes since v6:
+* Changed realloc to list handling
+* Added mask to kernel API
+* Added device interface as userspace API
+* Changed sizeof() to BITS_PER_LONG
+* Fixed multiline comment style
+* Documented direction setting by the user
+* Documented order of handled chips in case of multiple chips in one block
 
-> The rest should be the same with pci description:
-> (http://devicetree.org/MPC5200:PCI#PCI_Address_Translation).
+Changes since v5:
+* Documented sysfs: elaborated on "exported" and "values" attributes
+* Documented sysfs: gpiochip is a separate class now
+* Aggregated driver support patches for block gpio into one single patch
+* Added gpio block driver support for twl6040 and pch
+
+Changes since v4:
+* Documented word width
+* Bugfix: export/unexport on register/unregister
+* Using default dev_attrs for gpio_block_class
+* Fix gpiolib: race condition on device creation
+* Added driver support for ucb14500, vt8500, xilinx
+
+Changes since v3:
+* Added driver support for pca953x, em, pl061, max732x, pcf857x
+* Coding style improvements
+* Fixed krealloc memory leak in error case
+* sysfs: values in hex
+* Register blocks in a list
+* Narrowing lock scope
+* Use S_IWUSR and S_IRUGO instead of direct octal values
+* Use for_each_set_bit()
+* Change from unsigned to unsigned long for masks and values
+
+Changes since v2:
+* Added sysfs support
+* Added devicetree support
+* Added support for lpc32xx, generic
+* Added functions for GPIO block registration
+* Added more error checking
+* Bit remapping bugfix
+
+Changes since v1:
+* API change to 32/64 bit word, bit masks
+
+Thanks to Ryan Mallon, Linus Walleij, Stijn Devriendt, Jean-Christophe
+Plagniol-Villard, Mark Brown, Greg Kroah-Hartman, Grant Likely, Stefan
+Roese and Wolfgang Grandegger for reviewing!
+
+Roland Stigge (6):
+ gpio: Add a block GPIO API to gpiolib
+ gpio: Add sysfs support to block GPIO API
+ gpio: Add userland device interface to block GPIO
+ gpiolib: Fix default attributes for class
+ gpio: Add device tree support to block GPIO API
+ gpio: Add block gpio to several gpio drivers
+
+ Documentation/ABI/testing/dev-gpioblock               |   34 
+ Documentation/ABI/testing/sysfs-gpio                  |   31 
+ Documentation/devicetree/bindings/gpio/gpio-block.txt |   36 
+ Documentation/gpio.txt                                |   58 +
+ drivers/gpio/Makefile                                 |    1 
+ drivers/gpio/gpio-em.c                                |   23 
+ drivers/gpio/gpio-generic.c                           |   56 +
+ drivers/gpio/gpio-lpc32xx.c                           |   82 +
+ drivers/gpio/gpio-max730x.c                           |   61 +
+ drivers/gpio/gpio-max732x.c                           |   59 +
+ drivers/gpio/gpio-pca953x.c                           |   64 +
+ drivers/gpio/gpio-pcf857x.c                           |   24 
+ drivers/gpio/gpio-pch.c                               |   27 
+ drivers/gpio/gpio-pl061.c                             |   17 
+ drivers/gpio/gpio-twl6040.c                           |   32 
+ drivers/gpio/gpio-ucb1400.c                           |   23 
+ drivers/gpio/gpio-vt8500.c                            |   24 
+ drivers/gpio/gpio-xilinx.c                            |   44 +
+ drivers/gpio/gpioblock-of.c                           |   84 +
+ drivers/gpio/gpiolib.c                                |  780 ++++++++++++++++--
+ include/asm-generic/gpio.h                            |   28 
+ include/linux/gpio.h                                  |  125 ++
+ 22 files changed, 1666 insertions(+), 47 deletions(-)
