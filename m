@@ -1,121 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 6 Dec 2012 20:07:42 +0100
-Subject: [PATCH 1/2] clk: introduce optional disable_unused callback
-In-Reply-To: <1354654823-1576-2-git-send-email-mturquette@linaro.org>
-References: <1354654823-1576-1-git-send-email-mturquette@linaro.org>
- <1354654823-1576-2-git-send-email-mturquette@linaro.org>
-Message-ID: <CACRpkdbRK6qpO74pU=fKL8Jz0_ENV_SJjvyFXEYKEpx802rnog@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 06 Dec 2012 14:19:41 -0500
+Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
+ across all cpus
+In-Reply-To: <1354817466.30905.13.camel@linaro1.home>
+References: <1354817466.30905.13.camel@linaro1.home>
+Message-ID: <1354821581.17101.17.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 4, 2012 at 10:00 PM, Mike Turquette <mturquette@linaro.org> wrote:
+On Thu, 2012-12-06 at 18:11 +0000, Jon Medhurst (Tixy) wrote:
+> When the generic ftrace implementation modifies code for trace-points it
+> uses stop_machine() to call ftrace_modify_all_code() on one CPU. This
+> ultimately calls the ARM specific function ftrace_modify_code() which
+> updates the instruction and then does flush_icache_range(). As this
+> cache flushing only operates on the local CPU then other cores may end
+> up executing the old instruction if it's still in their icaches.
+> 
+> This may or may not cause problems for the use of ftrace on kernels
+> compiled for ARM instructions. However, Thumb2 instructions can straddle
+> two cache lines so its possible for half the old instruction to be in
+> the cache and half the new one, leading to the CPU executing garbage.
 
-> Some gate clocks have special needs which must be handled during the
-> disable-unused clocks sequence.  These needs might be driven by software
-> due to the fact that we're disabling a clock outside of the normal
-> clk_disable path and a clk's enable_count will not be accurate.  On the
-> other hand a specific hardware programming sequence might need to be
-> followed for this corner case.
->
-> This change is needed for the upcoming OMAP port to the common clock
-> framework.  Specifically, it is undesirable to treat the disable-unused
-> path identically to the normal clk_disable path since other software
-> layers are involved.  In this case OMAP's clockdomain code throws WARNs
-> and bails early due to the clock's enable_count being set to zero.  A
-> custom callback mitigates this problem nicely.
->
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+Hmm, your use of "may or may not" seems as you may not know this answer.
+I wonder if you can use the break point method as x86 does now, and
+remove the stop machine completely. Basically this is how it works:
 
-This semantic change:
+add sw breakpoints to all locations to modify (the bp handler just does
+a nop over the instruction).
 
-> -       if (__clk_is_enabled(clk) && clk->ops->disable)
-> -               clk->ops->disable(clk->hw);
-> +       /*
-> +        * some gate clocks have special needs during the disable-unused
-> +        * sequence.  call .disable_unused if available, otherwise fall
-> +        * back to .disable
-> +        */
-> +       if (__clk_is_enabled(clk)) {
-> +               if (clk->ops->disable_unused)
-> +                       clk->ops->disable_unused(clk->hw);
-> +               else if (clk->ops->disable)
-> +                       clk->ops->disable(clk->hw);
-> +       }
+send an IPI to all CPUs to flush their icache.
 
-Means that you should probably go into all drivers and set their
-.disable_unused to point to the clk_disable() implentation. Something
-like the below (untested, Signed-off-by: Linus Walleij
-<linus.walleij@linaro.org>
+Modify the non breakpoint part of the instruction with the new
+instruction.
 
-diff --git a/drivers/clk/clk-u300.c b/drivers/clk/clk-u300.c
-index a15f792..504abde 100644
---- a/drivers/clk/clk-u300.c
-+++ b/drivers/clk/clk-u300.c
-@@ -340,6 +340,7 @@ static const struct clk_ops syscon_clk_ops = {
- 	.unprepare = syscon_clk_unprepare,
- 	.enable = syscon_clk_enable,
- 	.disable = syscon_clk_disable,
-+	.disable_unused = syscon_clk_disable,
- 	.is_enabled = syscon_clk_is_enabled,
- 	.recalc_rate = syscon_clk_recalc_rate,
- 	.round_rate = syscon_clk_round_rate,
-diff --git a/drivers/clk/ux500/clk-prcc.c b/drivers/clk/ux500/clk-prcc.c
-index 7eee7f7..1d3ff60 100644
---- a/drivers/clk/ux500/clk-prcc.c
-+++ b/drivers/clk/ux500/clk-prcc.c
-@@ -84,12 +84,14 @@ static int clk_prcc_is_enabled(struct clk_hw *hw)
- static struct clk_ops clk_prcc_pclk_ops = {
- 	.enable = clk_prcc_pclk_enable,
- 	.disable = clk_prcc_pclk_disable,
-+	.disable_unused = clk_prcc_pclk_disable,
- 	.is_enabled = clk_prcc_is_enabled,
- };
+send an IPI to all CPUs to flush their icache
 
- static struct clk_ops clk_prcc_kclk_ops = {
- 	.enable = clk_prcc_kclk_enable,
- 	.disable = clk_prcc_kclk_disable,
-+	.disable_unused = clk_prcc_kclk_disable,
- 	.is_enabled = clk_prcc_is_enabled,
- };
+Replace the breakpoint with the finished instruction.
 
-diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
-index 74faa7e..00498f2 100644
---- a/drivers/clk/ux500/clk-prcmu.c
-+++ b/drivers/clk/ux500/clk-prcmu.c
-@@ -172,6 +172,7 @@ static struct clk_ops clk_prcmu_scalable_ops = {
- 	.unprepare = clk_prcmu_unprepare,
- 	.enable = clk_prcmu_enable,
- 	.disable = clk_prcmu_disable,
-+	.disable_unused = clk_prcmu_disable,
- 	.is_enabled = clk_prcmu_is_enabled,
- 	.recalc_rate = clk_prcmu_recalc_rate,
- 	.round_rate = clk_prcmu_round_rate,
-@@ -183,6 +184,7 @@ static struct clk_ops clk_prcmu_gate_ops = {
- 	.unprepare = clk_prcmu_unprepare,
- 	.enable = clk_prcmu_enable,
- 	.disable = clk_prcmu_disable,
-+	.disable_unused = clk_prcmu_disable,
- 	.is_enabled = clk_prcmu_is_enabled,
- 	.recalc_rate = clk_prcmu_recalc_rate,
- };
-@@ -204,6 +206,7 @@ static struct clk_ops clk_prcmu_opp_gate_ops = {
- 	.unprepare = clk_prcmu_opp_unprepare,
- 	.enable = clk_prcmu_enable,
- 	.disable = clk_prcmu_disable,
-+	.disable_unused = clk_prcmu_disable,
- 	.is_enabled = clk_prcmu_is_enabled,
- 	.recalc_rate = clk_prcmu_recalc_rate,
- };
-@@ -213,6 +216,7 @@ static struct clk_ops clk_prcmu_opp_volt_scalable_ops = {
- 	.unprepare = clk_prcmu_opp_volt_unprepare,
- 	.enable = clk_prcmu_enable,
- 	.disable = clk_prcmu_disable,
-+	.disable_unused = clk_prcmu_disable,
- 	.is_enabled = clk_prcmu_is_enabled,
- 	.recalc_rate = clk_prcmu_recalc_rate,
- 	.round_rate = clk_prcmu_round_rate,
+Then you don't suffer the stomp_machine() latency hit. The system will
+slow a bit due to the breakpoints but there wont be a huge "halt" in the
+middle of processing.
 
+-- Steve
 
-Yours,
-Linus Walleij
+> 
+> This patch fixes this situation by providing an arch-specific
+> implementation of arch_ftrace_update_code() which ensures that after one
+> core has modified all the code, the other cores invalidate their icaches
+> before continuing.
+> 
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> ---
