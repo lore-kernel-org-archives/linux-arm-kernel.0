@@ -1,222 +1,84 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 6 Dec 2012 16:25:22 +0800
-Subject: [PATCH V2 2/6] ARM: tegra20: cpuidle: add powered-down state
- for secondary CPU
-In-Reply-To: <20121205105010.GA12999@e102568-lin.cambridge.arm.com>
-References: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
- <1354701715-24150-3-git-send-email-josephl@nvidia.com>
- <20121205105010.GA12999@e102568-lin.cambridge.arm.com>
-Message-ID: <1354782322.13857.78.camel@jlo-ubuntu-64.nvidia.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 6 Dec 2012 17:34:47 +0800
+Subject: [PATCH v2 1/4] ARM: imx: allow timer counter to roll over
+In-Reply-To: <20121205120900.GN14363@n2100.arm.linux.org.uk>
+References: <1354632915-27134-1-git-send-email-shawn.guo@linaro.org>
+ <1354632915-27134-2-git-send-email-shawn.guo@linaro.org>
+ <20121204154459.GG14363@n2100.arm.linux.org.uk>
+ <20121205121449.GA26180@S2100-06.ap.freescale.net>
+ <20121205120900.GN14363@n2100.arm.linux.org.uk>
+Message-ID: <20121206093445.GA27003@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-12-05 at 18:50 +0800, Lorenzo Pieralisi wrote:
-> On Wed, Dec 05, 2012 at 10:01:49AM +0000, Joseph Lo wrote:
-> >  static struct cpuidle_driver tegra_idle_driver = {
-> >         .name = "tegra_idle",
-> >         .owner = THIS_MODULE,
-> >         .en_core_tk_irqen = 1,
-> > +#ifdef CONFIG_PM_SLEEP
-> > +       .state_count = 2,
-> > +#else
-> >         .state_count = 1,
-> > +#endif
+On Wed, Dec 05, 2012 at 12:09:00PM +0000, Russell King - ARM Linux wrote:
+> Well, let's look at the maths here.
 > 
-> These hardcoded values are not nice.
+> Let's say that the counter value is at 0xfffffff0, and the desired timeout
+> is 32.  This makes tcmp 0x00000010.  Let's say that the counter has only
+> incremented a small amount to 0xfffffff8:
 > 
-OK. I will change it to runtime detection when idle driver registration.
+> (int)(tcmp - __raw_readl(timer_base + MX1_2_TCN)
+> 
+> So this becomes 0x10 - 0xfffffff8, which will be 0x18.  So the return value
+> in this case will be zero.
+> 
+> Now lets consider what happens if the timer has wrapped to 0x00000008.  The
+> calculation becomes 0x10 - 0x08, which is 0x08.  Again, this is still
+> positive, so the resulting return value will still be zero.
+> 
+> Now for the boundary condition.  Lets say the timer has incremented to 0x10.
+> 0x10 - 0x10 is 0x00, which is still positive, so the return value will be
+> zero.  But the next count, 0x11 produces a difference.  0x10 - 0x11 is
+> negative, so the return value will be -ETIME.
+> 
+> It appears that the original code here is doing the right thing: it's
+> returning -ETIME if the event which has been programmed has already passed.
 
-> >         .states = {
-> >                 [0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
-> > +#ifdef CONFIG_PM_SLEEP
-> > +               [1] = {
-> > +                       .enter                  = tegra20_idle_lp2,
-> > +                       .exit_latency           = 5000,
-> > +                       .target_residency       = 10000,
-> > +                       .power_usage            = 0,
-> > +                       .flags                  = CPUIDLE_FLAG_TIME_VALID,
-> > +                       .name                   = "powered-down",
-> > +                       .desc                   = "CPU power gated",
-> > +               },
-> > +#endif
-> >         },
-> >  };
-> >
-> >  static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
-> >
-> > +#ifdef CONFIG_PM_SLEEP
-> > +#ifdef CONFIG_SMP
-> > +static bool tegra20_idle_enter_lp2_cpu_1(struct cpuidle_device *dev,
-> > +                                        struct cpuidle_driver *drv,
-> > +                                        int index)
-> > +{
-> > +       clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-> > +
-> > +       smp_wmb();
-> 
-> Can you explain to me the need for this barrier ?
-> 
-Ah. The barrier was no need here. This function was been designed for
-MPCore usage before. After some migrations, now it was be used for CPU1
-only. Will remove it. Good catch here, thanks.
+This is a helpful explanation.  I was indeed fix my problem in a wrong
+way.
 
-> > +
-> > +       cpu_suspend(0, tegra20_sleep_cpu_secondary_finish);
-> > +
-> > +       tegra20_cpu_clear_resettable();
-> > +
-> > +       clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-> > +
-> > +       return true;
-> > +}
-> > +#ifdef CONFIG_PM_SLEEP
-> > +/*
-> > + * tegra_pen_lock
-> > + *
-> > + * spinlock implementation with no atomic test-and-set and no coherence
-> > + * using Peterson's algorithm on strongly-ordered registers
-> > + * used to synchronize a cpu waking up from wfi with entering lp2 on idle
-> > + *
-> > + * SCRATCH37 = r1 = !turn (inverted from Peterson's algorithm)
-> > + * on cpu 0:
-> > + * SCRATCH38 = r2 = flag[0]
-> > + * SCRATCH39 = r3 = flag[1]
-> > + * on cpu1:
-> > + * SCRATCH39 = r2 = flag[1]
-> > + * SCRATCH38 = r3 = flag[0]
-> > + *
-> > + * must be called with MMU on
-> > + * corrupts r0-r3, r12
-> > + */
-> > +ENTRY(tegra_pen_lock)
-> > +       mov32   r3, TEGRA_PMC_VIRT
-> > +       cpu_id  r0
-> > +       add     r1, r3, #PMC_SCRATCH37
-> > +       cmp     r0, #0
-> > +       addeq   r2, r3, #PMC_SCRATCH38
-> > +       addeq   r3, r3, #PMC_SCRATCH39
-> > +       addne   r2, r3, #PMC_SCRATCH39
-> > +       addne   r3, r3, #PMC_SCRATCH38
-> > +
-> > +       mov     r12, #1
-> > +       str     r12, [r2]               @ flag[cpu] = 1
-> > +       dsb
-> > +       str     r12, [r1]               @ !turn = cpu
-> > +1:     dsb
-> > +       ldr     r12, [r3]
-> > +       cmp     r12, #1                 @ flag[!cpu] == 1?
-> > +       ldreq   r12, [r1]
-> > +       cmpeq   r12, r0                 @ !turn == cpu?
-> > +       beq     1b                      @ while !turn == cpu && flag[!cpu] == 1
-> > +
-> > +       mov     pc, lr                  @ locked
-> > +ENDPROC(tegra_pen_lock)
-> > +
-> > +ENTRY(tegra_pen_unlock)
-> > +       dsb
-> > +       mov32   r3, TEGRA_PMC_VIRT
-> > +       cpu_id  r0
-> > +       cmp     r0, #0
-> > +       addeq   r2, r3, #PMC_SCRATCH38
-> > +       addne   r2, r3, #PMC_SCRATCH39
-> > +       mov     r12, #0
-> > +       str     r12, [r2]
-> > +       mov     pc, lr
-> > +ENDPROC(tegra_pen_unlock)
+> > > That to me sounds 100% correct.  Your replacement code of always returning
+> > > zero looks wrong.
+> > 
+> > The code change is fixing a problem seen with WAIT mode support, without
+> > introducing any regression from what I've seen.
+> > 
+> > Enabling WAIT mode support with the original code, we will easily run
+> > into an infinite loop in tick_handle_oneshot_broadcast() - "goto again;"
+> > This happens because when global event did not expire any CPU local
+> > events, the broadcast device will be rearmed to a CPU local next_event,
+> > which could be far away from now and result in a max_delta_tick
+> > programming in set_next_event().
 > 
-> There is an ongoing work to make this locking scheme for MMU/coherency off
-> paths ARM generic, and we do not want to merge yet another platform specific
-> locking mechanism. I will point you to the patchset when it hits LAK.
+> Ah, so it's not a wrap of the counter caused by too small an increment,
+> but a wrap of the timeout value causing the timeout value to potentially
+> appear wrapped.  That's a slightly more complex case to deal with; how
+> sa11x0 and PXA deals with this by restricting the max_delta_tick to avoid
+> the problem:
 > 
-OK. So I need to wait the common locking scheme for this patchset. Does
-it possible available before K3.9? Please remind me when it show up
-here. Thanks.
-
-> > +/*
-> > + * tegra20_sleep_cpu_secondary_finish(unsigned long v2p)
-> > + *
-> > + * Enters WFI on secondary CPU by exiting coherency.
-> > + */
-> > +ENTRY(tegra20_sleep_cpu_secondary_finish)
-> > +       mrc     p15, 0, r11, c1, c0, 1  @ save actlr before exiting coherency
-> > +
-> > +       /* Flush and disable the L1 data cache */
-> > +       bl      tegra_disable_clean_inv_dcache
-> > +
-> > +       mov32   r0, TEGRA_PMC_VIRT + PMC_SCRATCH41
-> > +       mov     r3, #CPU_RESETTABLE
-> > +       str     r3, [r0]
-> > +
-> > +       bl      cpu_do_idle
-> > +
-> > +       /*
-> > +        * cpu may be reset while in wfi, which will return through
-> > +        * tegra_resume to cpu_resume
-> > +        * or interrupt may wake wfi, which will return here
-> > +        * cpu state is unchanged - MMU is on, cache is on, coherency
-> > +        * is off, and the data cache is off
-> > +        *
-> > +        * r11 contains the original actlr
-> > +        */
-> > +
-> > +       bl      tegra_pen_lock
-> > +
-> > +       mov32   r3, TEGRA_PMC_VIRT
-> > +       add     r0, r3, #PMC_SCRATCH41
-> > +       mov     r3, #CPU_NOT_RESETTABLE
-> > +       str     r3, [r0]
-> > +
-> > +       bl      tegra_pen_unlock
-> > +
-> > +       /* Re-enable the data cache */
-> > +       mrc     p15, 0, r10, c1, c0, 0
-> > +       orr     r10, r10, #CR_C
-> > +       mcr     p15, 0, r10, c1, c0, 0
-> > +       isb
-> > +
-> > +       mcr     p15, 0, r11, c1, c0, 1  @ reenable coherency
-> > +
-> > +       /* Invalidate the TLBs & BTAC */
-> > +       mov     r1, #0
-> > +       mcr     p15, 0, r1, c8, c3, 0   @ invalidate shared TLBs
-> > +       mcr     p15, 0, r1, c7, c1, 6   @ invalidate shared BTAC
-> > +       dsb
-> > +       isb
-> > +
-> > +       /* the cpu was running with coherency disabled,
-> > +        * caches may be out of date */
-> > +       bl      v7_flush_kern_cache_louis
-> > +
-> > +       ldmia   sp!, {r1 - r3}          @ pop phys pgd, virt SP, phys resume fn
-> > +       mov     r0, #0                  @ return success
-> > +       mov     sp, r2                  @ sp is stored in r2 by __cpu_suspend
+>         ckevt_sa1100_osmr0.max_delta_ns =
+>                 clockevent_delta2ns(0x7fffffff, &ckevt_sa1100_osmr0);
+>         ckevt_pxa_osmr0.max_delta_ns =
+>                 clockevent_delta2ns(0x7fffffff, &ckevt_pxa_osmr0);
 > 
-> This is not true. sp is retrieved from the r2 value popped above.
-> Anyway, all this code is a copy'n'paste from __cpu_suspend. Now if I got
-> what you want to do right, all you want to do is return to cpu_suspend
-> with r0 == 0.
+> Another solution which avoids restricting max_delta_tick would be to
+> detect the large increment and avoid the check in that case, so:
 > 
-> (1) You should not rely on the register layout of __cpu_suspend since if
->     it changes we have to patch this code as well. Do not rely on that.
-> (2) Why do you want to return with r0 == 0 ? To me that's a mistery.
->     Is that because you want cpu_suspend to restore the page table
->     pointer ? Even in that case I am afraid I am against this code.
->     Usage of cpu_suspend must be consistent and you *must* not use it as a
->     plaster or rely on any specific register layout, it has to be used
->     for the purpose it has been designed for.
+> 	return evt < ((u32)~0) / 2 &&
+> 		(int)(tcmp - __raw_readl(timer_base + MX1_2_TCN)) < 0 ?
+> 				-ETIME : 0;
 > 
-Thank you for reviewing this so carefully.
-I re-traced the sequence today. I think I only need to do something
-below. And rely on the "cpu_suspend_abort" in "__cpu_suspend" to abort
-"cpu_suspend".
+I will go for this one, since it keeps max_delta_tick stay as big as
+possible.
 
-ENTRY(tegra20_sleep_cpu_secondary_finish)
-	stmfd sp!, {r4-r11, lr}
+> > One thing I do not understand is why tick_broadcast_set_event() is being
+> > called with parameter "force" being 0 in tick_handle_oneshot_broadcast().
+> 
+> Presumably because the design of the code is to detect whenever the
+> requested event has passed, and recalculate the expiry time, rather
+> than just trying to set a timeout that will occur immediately.
 
-	...
+Thanks for help understand all these, Russell.
 
-	ldmfd sp!, {r4-r11, pc}
-ENDPROC(tegra20_sleep_cpu_secondary_finish)
-
-Thanks,
-Joseph
+Shawn
