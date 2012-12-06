@@ -1,53 +1,135 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 06 Dec 2012 14:19:41 -0500
-Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
- across all cpus
-In-Reply-To: <1354817466.30905.13.camel@linaro1.home>
-References: <1354817466.30905.13.camel@linaro1.home>
-Message-ID: <1354821581.17101.17.camel@gandalf.local.home>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 06 Dec 2012 19:24:59 +0000
+Subject: [PATCH v2] of: Output devicetree alias names in uevent
+In-Reply-To: <1354780165-872-1-git-send-email-stepanm@codeaurora.org>
+References: <20121205230318.013053E0E22@localhost>
+ <1354780165-872-1-git-send-email-stepanm@codeaurora.org>
+Message-ID: <20121206192500.0BF073E3A5E@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-12-06 at 18:11 +0000, Jon Medhurst (Tixy) wrote:
-> When the generic ftrace implementation modifies code for trace-points it
-> uses stop_machine() to call ftrace_modify_all_code() on one CPU. This
-> ultimately calls the ARM specific function ftrace_modify_code() which
-> updates the instruction and then does flush_icache_range(). As this
-> cache flushing only operates on the local CPU then other cores may end
-> up executing the old instruction if it's still in their icaches.
+On Wed,  5 Dec 2012 23:49:25 -0800, Stepan Moskovchenko <stepanm@codeaurora.org> wrote:
+> In some situations, userspace may want to resolve a
+> device by function and logical number (ie, "serial0")
+> rather than by the base address or full device path. Being
+> able to resolve a device by alias frees userspace from the
+> burden of otherwise having to maintain a mapping between
+> device addresses and their logical assignments on each
+> platform when multiple instances of the same hardware block
+> are present in the system.
 > 
-> This may or may not cause problems for the use of ftrace on kernels
-> compiled for ARM instructions. However, Thumb2 instructions can straddle
-> two cache lines so its possible for half the old instruction to be in
-> the cache and half the new one, leading to the CPU executing garbage.
-
-Hmm, your use of "may or may not" seems as you may not know this answer.
-I wonder if you can use the break point method as x86 does now, and
-remove the stop machine completely. Basically this is how it works:
-
-add sw breakpoints to all locations to modify (the bp handler just does
-a nop over the instruction).
-
-send an IPI to all CPUs to flush their icache.
-
-Modify the non breakpoint part of the instruction with the new
-instruction.
-
-send an IPI to all CPUs to flush their icache
-
-Replace the breakpoint with the finished instruction.
-
-Then you don't suffer the stomp_machine() latency hit. The system will
-slow a bit due to the breakpoints but there wont be a huge "halt" in the
-middle of processing.
-
--- Steve
-
+> Although the uevent device attribute contains devicetree
+> compatible information and the full device path, the uevent
+> does not list the alises that may have been defined for the
+> device.
 > 
-> This patch fixes this situation by providing an arch-specific
-> implementation of arch_ftrace_update_code() which ensures that after one
-> core has modified all the code, the other cores invalidate their icaches
-> before continuing.
-> 
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 > ---
+> v2: Create of_private.h and move struct alias_prop there
+>     Add alias uevent variables from of_device_uevent
+>     Use app->alias instead of app->stem / app->id directly
+>     Expose alias_lookup and of_alias_mutex
+> 
+>  drivers/of/base.c       |   23 +++--------------------
+>  drivers/of/device.c     |   17 +++++++++++++++++
+>  drivers/of/of_private.h |   33 +++++++++++++++++++++++++++++++++
+>  3 files changed, 53 insertions(+), 20 deletions(-)
+>  create mode 100644 drivers/of/of_private.h
+> 
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 5806449..715aef2 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -24,32 +24,15 @@
+>  #include <linux/slab.h>
+>  #include <linux/proc_fs.h>
+> 
+> -/**
+> - * struct alias_prop - Alias property in 'aliases' node
+> - * @link:	List node to link the structure in aliases_lookup list
+> - * @alias:	Alias property name
+> - * @np:		Pointer to device_node that the alias stands for
+> - * @id:		Index value from end of alias name
+> - * @stem:	Alias string without the index
+> - *
+> - * The structure represents one alias property of 'aliases' node as
+> - * an entry in aliases_lookup list.
+> - */
+> -struct alias_prop {
+> -	struct list_head link;
+> -	const char *alias;
+> -	struct device_node *np;
+> -	int id;
+> -	char stem[0];
+> -};
+> +#include "of_private.h"
+> 
+> -static LIST_HEAD(aliases_lookup);
+> +LIST_HEAD(aliases_lookup);
+> 
+>  struct device_node *allnodes;
+>  struct device_node *of_chosen;
+>  struct device_node *of_aliases;
+> 
+> -static DEFINE_MUTEX(of_aliases_mutex);
+> +DEFINE_MUTEX(of_aliases_mutex);
+> 
+>  /* use when traversing tree through the allnext, child, sibling,
+>   * or parent members of struct device_node.
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index 4c74e4f..b8d31db 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -8,6 +8,7 @@
+>  #include <linux/slab.h>
+> 
+>  #include <asm/errno.h>
+> +#include "of_private.h"
+> 
+>  /**
+>   * of_match_device - Tell if a struct device matches an of_device_id list
+> @@ -131,6 +132,7 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
+>  void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
+>  {
+>  	const char *compat;
+> +	struct alias_prop *app;
+>  	int seen = 0, cplen, sl;
+> 
+>  	if ((!dev) || (!dev->of_node))
+> @@ -153,6 +155,21 @@ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
+>  		seen++;
+>  	}
+>  	add_uevent_var(env, "OF_COMPATIBLE_N=%d", seen);
+> +
+> +	seen = 0;
+> +	mutex_lock(&of_aliases_mutex);
+> +	list_for_each_entry(app, &aliases_lookup, link) {
+> +		if (dev->of_node == app->np) {
+> +			add_uevent_var(env, "OF_ALIAS_%d=%s", seen,
+> +				       app->alias);
+> +			seen++;
+> +		}
+> +	}
+> +
+> +	if (seen)
+> +		add_uevent_var(env, "OF_ALIAS_N=%d", seen);
+> +
+> +	mutex_unlock(&of_aliases_mutex);
+>  }
+> 
+>  int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env)
+> diff --git a/drivers/of/of_private.h b/drivers/of/of_private.h
+> new file mode 100644
+> index 0000000..031608f
+> --- /dev/null
+> +++ b/drivers/of/of_private.h
+> @@ -0,0 +1,33 @@
+> +/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+
+Oops, that doesn't look right. You need to preserve the copyright
+messages from the file this came from. You didn't write this code, you
+only moved it about.
+
+Otherwise the patch looks good. Can you please respin with that change?
+
+g.
