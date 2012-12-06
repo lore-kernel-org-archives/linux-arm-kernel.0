@@ -1,80 +1,182 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu,  6 Dec 2012 14:00:06 +0200
-Subject: [PATCH] ARM: OMAP3: cm-t3517: add MMC support
-Message-ID: <1354795206-12048-1-git-send-email-grinberg@compulab.co.il>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Thu,  6 Dec 2012 13:08:39 +0100
+Subject: [PATCH 2/2] ARM: SH-Mobile: sh73a0: Add CPU Hotplug
+In-Reply-To: <1354795719-5578-1-git-send-email-hechtb+renesas@gmail.com>
+References: <1354795719-5578-1-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <1354795719-5578-2-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cm-t3517 uses two MMC interfaces. Add support for both.
+From: Bastian Hecht <hechtb@gmail.com>
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+Add the capability to add and remove CPUs on the fly.
+The Cortex-A9 offers the possibility to take single cores out of the
+MP Core. We add this capabilty taking care that caches are kept
+coherent. For the actual shutdown via a WFI instruction, a code snippet
+from the omap2 code tree is copied. Thanks for that! For verifying the
+shutdown we rely on the internal SH73A0 Power Status Register
+PSTR.
+
+Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
 ---
- arch/arm/mach-omap2/board-cm-t3517.c |   25 +++++++++++++++++++++++++
- 1 files changed, 25 insertions(+), 0 deletions(-)
+ arch/arm/mach-shmobile/headsmp-sh73a0.S      |   46 ++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/common.h |    1 +
+ arch/arm/mach-shmobile/smp-sh73a0.c          |   41 +++++++++++++++++++----
+ 3 files changed, 82 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
-index ebbc2ad..fb1f993 100644
---- a/arch/arm/mach-omap2/board-cm-t3517.c
-+++ b/arch/arm/mach-omap2/board-cm-t3517.c
-@@ -32,6 +32,7 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
- #include <linux/mtd/partitions.h>
-+#include <linux/mmc/host.h>
- #include <linux/can/platform/ti_hecc.h>
+diff --git a/arch/arm/mach-shmobile/headsmp-sh73a0.S b/arch/arm/mach-shmobile/headsmp-sh73a0.S
+index bec4c0d..be463a3 100644
+--- a/arch/arm/mach-shmobile/headsmp-sh73a0.S
++++ b/arch/arm/mach-shmobile/headsmp-sh73a0.S
+@@ -23,6 +23,52 @@
+ #include <linux/init.h>
+ #include <asm/memory.h>
  
- #include <asm/mach-types.h>
-@@ -46,6 +47,7 @@
- 
- #include "mux.h"
- #include "control.h"
-+#include "hsmmc.h"
- #include "common-board-devices.h"
- #include "am35xx-emac.h"
- #include "gpmc-nand.h"
-@@ -121,6 +123,24 @@ static void cm_t3517_init_hecc(void)
- static inline void cm_t3517_init_hecc(void) {}
- #endif
- 
-+#if defined(CONFIG_MMC) || defined(CONFIG_MMC_MODULE)
-+static struct omap2_hsmmc_info mmc[] = {
-+	{
-+		.mmc		= 1,
-+		.caps		= MMC_CAP_4_BIT_DATA,
-+		.gpio_cd	= 144,
-+		.gpio_wp	= 59,
-+	},
-+	{
-+		.mmc		= 2,
-+		.caps		= MMC_CAP_4_BIT_DATA,
-+		.gpio_cd	= -EINVAL,
-+		.gpio_wp	= -EINVAL,
-+	},
-+	{}	/* Terminator */
-+};
-+#endif
++/* Taken from arch/arm/mach-omap2/sleep44xx.S. Thanks! */
++ENTRY(sh73a0_do_wfi)
++        stmfd   sp!, {lr}
 +
- #if defined(CONFIG_RTC_DRV_V3020) || defined(CONFIG_RTC_DRV_V3020_MODULE)
- #define RTC_IO_GPIO		(153)
- #define RTC_WR_GPIO		(154)
-@@ -271,6 +291,10 @@ static struct omap_board_mux board_mux[] __initdata = {
- 	/* CM-T3517 USB HUB nRESET */
- 	OMAP3_MUX(MCBSP4_CLKX, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
- 
-+	/* CD - GPIO144 and WP - GPIO59 for MMC1 - SB-T35 */
-+	OMAP3_MUX(UART2_CTS, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
-+	OMAP3_MUX(GPMC_CLK, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
++        /*
++         * Execute an ISB instruction to ensure that all of the
++         * CP15 register changes have been committed.
++         */
++        isb
 +
- 	{ .reg_offset = OMAP_MUX_TERMINATOR },
- };
- #endif
-@@ -286,6 +310,7 @@ static void __init cm_t3517_init(void)
- 	cm_t3517_init_usbh();
- 	cm_t3517_init_hecc();
- 	am35xx_emac_init(AM35XX_DEFAULT_MDIO_FREQUENCY, 1);
-+	omap_hsmmc_init(mmc);
++        /*
++         * Execute a barrier instruction to ensure that all cache,
++         * TLB and branch predictor maintenance operations issued
++         * by any CPU in the cluster have completed.
++         */
++        dsb
++        dmb
++
++        /*
++         * Execute a WFI instruction and wait until the
++         * STANDBYWFI output is asserted to indicate that the
++         * CPU is in idle and low power state. CPU can specualatively
++         * prefetch the instructions so add NOPs after WFI. Sixteen
++         * NOPs as per Cortex-A9 pipeline.
++         */
++        wfi                                     @ Wait For Interrupt
++        nop
++        nop
++        nop
++        nop
++        nop
++        nop
++        nop
++        nop
++        nop
++        nop
++        nop
++        nop
++        nop
++        nop
++        nop
++        nop
++
++        ldmfd   sp!, {pc}
++ENDPROC(sh73a0_do_wfi)
++
+ 	__CPUINIT
+ /*
+  * Reset vector for secondary CPUs.
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index f2e2c29..40f767e 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -55,6 +55,7 @@ extern void sh73a0_add_standard_devices(void);
+ extern void sh73a0_clock_init(void);
+ extern void sh73a0_pinmux_init(void);
+ extern void sh73a0_secondary_vector(void);
++extern void sh73a0_do_wfi(void);
+ extern struct clk sh73a0_extal1_clk;
+ extern struct clk sh73a0_extal2_clk;
+ extern struct clk sh73a0_extcki_clk;
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index 5e36f5d..9237e13 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -24,6 +24,7 @@
+ #include <linux/io.h>
+ #include <linux/delay.h>
+ #include <mach/common.h>
++#include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ #include <mach/sh73a0.h>
+ #include <asm/smp_scu.h>
+@@ -36,6 +37,8 @@
+ #define SBAR		IOMEM(0xe6180020)
+ #define APARMBAREA	IOMEM(0xe6f10020)
+ 
++#define PSTR_SHUTDOWN_MODE	3
++
+ static void __iomem *scu_base_addr(void)
+ {
+ 	return (void __iomem *)0xf0000000;
+@@ -92,16 +95,20 @@ static void __init sh73a0_smp_init_cpus(void)
+ 	shmobile_smp_init_cpus(ncores);
  }
  
- MACHINE_START(CM_T3517, "Compulab CM-T3517")
+-static int __maybe_unused sh73a0_cpu_kill(unsigned int cpu)
++#ifdef CONFIG_HOTPLUG_CPU
++static int sh73a0_cpu_kill(unsigned int cpu)
+ {
++
+ 	int k;
++	u32 pstr;
+ 
+-	/* this function is running on another CPU than the offline target,
+-	 * here we need wait for shutdown code in platform_cpu_die() to
+-	 * finish before asking SoC-specific code to power off the CPU core.
++	/*
++	 * wait until the power status register confirms the shutdown of the
++	 * offline target
+ 	 */
+ 	for (k = 0; k < 1000; k++) {
+-		if (shmobile_cpu_is_dead(cpu))
++		pstr = (__raw_readl(PSTR) >> (4 * cpu)) & 3;
++		if (pstr == PSTR_SHUTDOWN_MODE)
+ 			return 1;
+ 
+ 		mdelay(1);
+@@ -110,6 +117,28 @@ static int __maybe_unused sh73a0_cpu_kill(unsigned int cpu)
+ 	return 0;
+ }
+ 
++static void sh73a0_cpu_die(unsigned int cpu)
++{
++	/*
++	 * The ARM MPcore does not issue a cache coherency request for the L1
++	 * cache when powering off single CPUs. We must take care of this and
++	 * further caches.
++	 */
++	dsb();
++	flush_cache_all();
++
++	/* Set power off mode. This takes the CPU out of the MP cluster */
++	scu_power_mode(scu_base_addr(), SCU_PM_POWEROFF);
++
++	/* Enter shutdown mode */
++	sh73a0_do_wfi();
++
++	/* We assume success always. We never reach this */
++	pr_err("Shutting down CPU failed. This should never happen!\n");
++	for (;;)
++		;
++}
++#endif /* CONFIG_HOTPLUG_CPU */
+ 
+ struct smp_operations sh73a0_smp_ops __initdata = {
+ 	.smp_init_cpus		= sh73a0_smp_init_cpus,
+@@ -118,7 +147,7 @@ struct smp_operations sh73a0_smp_ops __initdata = {
+ 	.smp_boot_secondary	= sh73a0_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_kill		= sh73a0_cpu_kill,
+-	.cpu_die		= shmobile_cpu_die,
++	.cpu_die		= sh73a0_cpu_die,
+ 	.cpu_disable		= shmobile_cpu_disable,
+ #endif
+ };
 -- 
-1.7.3.4
+1.7.9.5
