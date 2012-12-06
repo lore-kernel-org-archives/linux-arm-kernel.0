@@ -1,68 +1,91 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 06 Dec 2012 14:42:59 +0000
-Subject: [RFC] gpiolib: introduce descriptor-based GPIO interface
-In-Reply-To: <1354779918-4028-2-git-send-email-acourbot@nvidia.com>
-References: <1354779918-4028-1-git-send-email-acourbot@nvidia.com>
- <1354779918-4028-2-git-send-email-acourbot@nvidia.com>
-Message-ID: <20121206144259.136693E0950@localhost>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Thu, 6 Dec 2012 09:58:13 -0500
+Subject: [PATCH] mtd: nand: gpmi: reset BCH earlier, too, to avoid NAND
+ startup problems
+In-Reply-To: <20121206095213.GA2589@pengutronix.de>
+References: <1354740362-20412-1-git-send-email-w.sang@pengutronix.de>
+ <50BFFFE8.8040002@freescale.com>
+ <20121206095213.GA2589@pengutronix.de>
+Message-ID: <CAMiH66EPDKhd=pBJWhtm3P+qgGcdVbHD-hb93ZB7Ou7Sc=vByg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Dec 2012 16:45:18 +0900, Alexandre Courbot <acourbot@nvidia.com> wrote:
-> With the current API, GPIOs are manipulated through an integer which
-> represents their unique number across the system. This poses problems in
-> terms of portability, scalability and flexibility: for instance, the
-> number of valid GPIOs for a given system is fixed at system time, and a
-> large array of that size is statically allocated to hold the GPIO
-> descriptors. Worse, GPIOs can be used without being properly allocated.
-> 
-> In order to improve the situation, the integer namespace must first get
-> away. This patch introduces an alternative GPIO API that uses opaque
-> handlers and refactor gpiolib's internals to work with these handlers
-> instead of GPIO numbers. The former integer-based API is still available
-> as a light wrapper around this new API.
-> 
-> This first step will then us to build more improvements for gpiolib,
-> like proper GPIO lookup functions per device and provider, and getting
-> rid of the static GPIO array and the ARCH_NR_GPIO configuration option.
-> 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> ---
->  drivers/gpio/gpiolib.c        | 302 ++++++++++++++++++++++--------------------
->  include/asm-generic/gpio.h    |  74 ++++++++---
->  include/linux/gpio/consumer.h |  45 +++++++
->  3 files changed, 261 insertions(+), 160 deletions(-)
->  create mode 100644 include/linux/gpio/consumer.h
-> 
-> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-> index 1c8d9e3..bf32511 100644
-> --- a/drivers/gpio/gpiolib.c
-> +++ b/drivers/gpio/gpiolib.c
-> @@ -83,6 +83,32 @@ static inline void desc_set_label(struct gpio_desc *d, const char *label)
->  #endif
->  }
->  
-> +/**
-> + * Convert a GPIO descriptor to the integer namespace.
-> + * This should disappear in the future but is needed since we still
-> + * use GPIO numbers for error messages and sysfs nodes
-> + */
-> +static inline int desc_to_gpio(struct gpio_desc *desc)
-> +{
-> +	return desc - &gpio_desc[0];
-> +}
-> +
-> +/**
-> + * Return the GPIO number of the passed descriptor relative to its chip
-> + */
-> +int gpio_chip_offset(struct gpio_desc *desc)
-> +{
-> +	return (desc - &gpio_desc[0]) - desc->chip->base;
-> +}
+On Thu, Dec 6, 2012 at 4:52 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> On Thu, Dec 06, 2012 at 10:16:08AM +0800, Huang Shijie wrote:
+>> ? 2012?12?06? 04:46, Wolfram Sang ??:
+>> > correctly after warm rebooting, so the kernel could not find the UBI or
+>> which Soc do you meet this issue? the mx23 or mx28?
+>
+> MX28.
+>
+>> It's bad news to me. I ever thought the BCH-reset-issue is gone.
+>> I ever tested many times in mx28(> 10000 times) with freescale's uboot.
+>
+> Did you power-cycle between each test or reboot? I still need to test if
+What's the meaning of "power-cycle"?
+I only tested with the soft reset, the power is never shut down.
 
-how about "gpio_chip_hwnum()" to somewhat match irqdomain convention?
 
-I've only lightly scanned this patch, but I like what I see. I would
-keep going with it.
+> this really makes a difference, but I think the issue shows more often
+> when only rebooting.
+>
+>> I guest you are not use the freescale's uboot. The uboot also will reset
+>> the BCH/GPMI.
+>
+> I just checked its sources. It also has this flaw. GPMI and BCH need to
+> be reset at the same time, i.e. before first commands are sent to the
+> NAND (although they don't need ECC).
+>
 
-g.
+With your patch, we have resetted the BCH twice in the driver. Could
+we only reset BCH one time?
+Do you ever remove another reset-bch code, and test it?
+Frankly speaking, it's strange to reset the BCH twice, and it makes no sense. :(
+I am afraid that we have to add three-reset-bch in the future, if we
+can not find the root cause.
+If you can remove another reset-bch code, i will ack the patch.
+
+
+> I use barebox, but that isn't of importance here. If I don't fix
+> barebox, I see NAND issues in barebox or the kernel. If I fix barebox, I
+> still see issues in the kernel, but not in barebox anymore.
+>
+I ever met the same case with the freescale's BSP code.
+I fixed the issue in uboot, and fixed the driver too.
+
+
+
+> The setup needs to be done properly to ensure a consistent state at the
+> beginning, especially when somebody used the NAND before (ROM code,
+At the beginning? it's really interesting.
+I want to test it myself.
+
+could you wait for some time?
+
+Best Regards
+Huang Shijie
+
+
+> bootloader). Fixing the bootloader alone is not enough.
+>
+> Thanks,
+>
+>    Wolfram
+>
+> --
+> Pengutronix e.K.                           | Wolfram Sang                |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>
+> -----BEGIN PGP SIGNATURE-----
+> Version: GnuPG v1.4.10 (GNU/Linux)
+>
+> iEYEARECAAYFAlDAas0ACgkQD27XaX1/VRs8iQCgrqb5nADGL5Dyi+csfSdSLWSR
+> /mUAoJN91gz+1QiqVUsNdHtwX9jpAdZC
+> =nMk3
+> -----END PGP SIGNATURE-----
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
