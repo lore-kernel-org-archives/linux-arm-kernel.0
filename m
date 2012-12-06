@@ -1,46 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 6 Dec 2012 22:54:41 +0800
-Subject: [PATCH v3 1/4] ARM: imx: return zero in case next event gets a large
- increment
-In-Reply-To: <1354632915-27134-2-git-send-email-shawn.guo@linaro.org>
-References: <1354632915-27134-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1354805681-29436-1-git-send-email-shawn.guo@linaro.org>
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Thu,  6 Dec 2012 15:38:31 +0100
+Subject: [PATCH 1/2] ARM: net: bpf_jit_32: fix kzalloc gfp/size mismatch.
+Message-ID: <1354804718-1662-1-git-send-email-nschichan@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The return of v2_set_next_event() will lead to an infinite loop in
-tick_handle_oneshot_broadcast() - "goto again;" with imx6q WAIT mode
-(to be enabled).  This happens because when global event did not expire
-any CPU local events, the broadcast device will be rearmed to a CPU
-local next_event, which could be far away from now and result in a
-max_delta_tick programming in set_next_event().
+Official prototype for kzalloc is:
 
-Fix the problem by detecting those next events with increments larger
-than 0x7fffffff, and simply return zero in that case.
+void *kzalloc(size_t, gfp_t);
 
-It leaves mx1_2_set_next_event() unchanged since only v2_set_next_event()
-will be running with imx6q WAIT mode support.
+The ARM bpf_jit code was having the assumption that it was:
 
-Thanks Russell King for helping understand the problem.
+void *kzalloc(gfp_t, size);
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+This was resulting the use of some random GFP flags depending on the
+size requested and some random overflows once the really needed size
+was more than the value of GFP_KERNEL.
+
+This bug was present since the original inclusion of bpf_jit for ARM
+(ddecdfce: ARM: 7259/3: net: JIT compiler for packet filters).
+
+Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
 ---
- arch/arm/mach-imx/time.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/net/bpf_jit_32.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index f017302..5d7eb48 100644
---- a/arch/arm/mach-imx/time.c
-+++ b/arch/arm/mach-imx/time.c
-@@ -152,7 +152,8 @@ static int v2_set_next_event(unsigned long evt,
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index c641fb6..a64d349 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -845,7 +845,7 @@ void bpf_jit_compile(struct sk_filter *fp)
+ 	ctx.skf		= fp;
+ 	ctx.ret0_fp_idx = -1;
  
- 	__raw_writel(tcmp, timer_base + V2_TCMP);
+-	ctx.offsets = kzalloc(GFP_KERNEL, 4 * (ctx.skf->len + 1));
++	ctx.offsets = kzalloc(4 * (ctx.skf->len + 1), GFP_KERNEL);
+ 	if (ctx.offsets == NULL)
+ 		return;
  
--	return (int)(tcmp - __raw_readl(timer_base + V2_TCN)) < 0 ?
-+	return evt < 0x7fffffff &&
-+		(int)(tcmp - __raw_readl(timer_base + V2_TCN)) < 0 ?
- 				-ETIME : 0;
- }
+@@ -864,7 +864,7 @@ void bpf_jit_compile(struct sk_filter *fp)
  
+ 	ctx.idx += ctx.imm_count;
+ 	if (ctx.imm_count) {
+-		ctx.imms = kzalloc(GFP_KERNEL, 4 * ctx.imm_count);
++		ctx.imms = kzalloc(4 * ctx.imm_count, GFP_KERNEL);
+ 		if (ctx.imms == NULL)
+ 			goto out;
+ 	}
 -- 
-1.7.9.5
+1.7.5.4
