@@ -1,63 +1,29 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Thu, 6 Dec 2012 16:08:46 +0530
-Subject: [PATCH v2 1/2] ARM: Exynos5250: Enabling ehci-s5p driver
-In-Reply-To: <20121206101645.4C28E3E05A4@localhost>
-References: <1352357665-7435-1-git-send-email-gautam.vivek@samsung.com>
- <1352357665-7435-2-git-send-email-gautam.vivek@samsung.com>
- <20121206101645.4C28E3E05A4@localhost>
-Message-ID: <CAFp+6iGWngzZN-C3UrvXwT=6PNZqYfrpAjD1_8DTS257v7cJFw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Dec 2012 10:47:10 +0000
+Subject: [PATCH] nommu: Enable the strict alignment (CR_A) bit only if
+ ARCH < v6
+In-Reply-To: <20121205195134.GD3384@pengutronix.de>
+References: <1354187042-28568-1-git-send-email-armando.visconti@st.com>
+ <50BCD6DB.2030200@st.com>
+ <20121203172553.GC14363@n2100.arm.linux.org.uk>
+ <20121203174617.GL20074@mudshark.cambridge.arm.com>
+ <20121205195134.GD3384@pengutronix.de>
+Message-ID: <20121206104710.GB749@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 6, 2012 at 3:46 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Thu, 08 Nov 2012 12:24:24 +0530, Vivek Gautam <gautam.vivek@samsung.com> wrote:
->> Adding EHCI device tree node for Exynos5250 along with
->> the device base adress and gpio line for vbus.
->>
->> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->> Acked-by: Jingoo Han <jg1.han@samsung.com>
->> ---
->>  .../devicetree/bindings/usb/exynos-usb.txt         |   25 ++++++++++++++++++++
->>  arch/arm/boot/dts/exynos5250-smdk5250.dts          |    4 +++
->>  arch/arm/boot/dts/exynos5250.dtsi                  |    6 ++++
->>  arch/arm/mach-exynos/include/mach/map.h            |    1 +
->>  arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +
->>  5 files changed, 38 insertions(+), 0 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/usb/exynos-usb.txt
->>
->> diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
->> new file mode 100644
->> index 0000000..833f5cf
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
->> @@ -0,0 +1,25 @@
->> +Samsung Exynos SoC USB controller
->> +
->> +The USB devices interface with USB controllers on Exynos SOCs.
->> +The device node has following properties.
->> +
->> +EHCI
->> +Required properties:
->> + - compatible: should be "samsung,exynos-ehci" for USB 2.0
->
-> Ditto here. Please be specific in compatible strings.  "samsung,exynos5250-ehci"
->
-> Otherwise the binding looks fine to me.
->
+On Wed, Dec 05, 2012 at 07:51:34PM +0000, Uwe Kleine-K?nig wrote:
+> Hello,
 
-Again here, the compatible string is added as per
-"drivers/usb/host/ehci-s5p.c", since same driver works across exynos.
-Please suggest do we need driver side change also to accomodate this ?
+Hi Uwe,
 
-> g.
->
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+> On Mon, Dec 03, 2012 at 05:46:17PM +0000, Will Deacon wrote:
+> > I think Uwe also requires some of the stuff there for his M3 port.
+> I didn't check more context than available in the patch and I also
+> didn't double-check the M3-docs, but AFAIK the M3 doesn't have a cp15
+> and I noopt this code out.
 
+I was thinking more about the word-at-a-time stuff, which relies on
+efficient unaligned access for the dcache accesses.
 
-
--- 
-Thanks & Regards
-Vivek
+Will
