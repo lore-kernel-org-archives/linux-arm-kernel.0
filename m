@@ -1,49 +1,160 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Thu, 6 Dec 2012 16:45:17 +0900
-Subject: [RFC] gpiolib: introduce descriptor-based GPIO interface
-Message-ID: <1354779918-4028-1-git-send-email-acourbot@nvidia.com>
+From: stepanm@codeaurora.org (Stepan Moskovchenko)
+Date: Wed,  5 Dec 2012 23:49:25 -0800
+Subject: [PATCH v2] of: Output devicetree alias names in uevent
+In-Reply-To: <20121205230318.013053E0E22@localhost>
+References: <20121205230318.013053E0E22@localhost>
+Message-ID: <1354780165-872-1-git-send-email-stepanm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just a RFC to check if the direction seems good before going onward with more
-serious work. This patch introduces a set of gpiod_* functions that work like
-their gpio_* counterparts, but use opaque descriptors instead of integers.
+In some situations, userspace may want to resolve a
+device by function and logical number (ie, "serial0")
+rather than by the base address or full device path. Being
+able to resolve a device by alias frees userspace from the
+burden of otherwise having to maintain a mapping between
+device addresses and their logical assignments on each
+platform when multiple instances of the same hardware block
+are present in the system.
 
-The current integer-based GPIO namespace is bad because it allows GPIOs to be
-used without being properly allocated, and poses portability concerns with the
-maximum number of GPIOs of the system being a compile-time constant. Some
-implementation details could also be improved by an opaque handler, e.g. the
-GPIO descriptors could be moved from the current static array to a more flexible
-list of GPIO chips containing their own descriptors.
+Although the uevent device attribute contains devicetree
+compatible information and the full device path, the uevent
+does not list the alises that may have been defined for the
+device.
 
-With this patch GPIO handles can only be obtained by calling gpio_to_desc(),
-which converts a valid GPIO number to its descriptor - proper lookup functions
-that totally get rid of GPIO numbers are the next step if this first patch is
-received positively.
+Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+---
+v2: Create of_private.h and move struct alias_prop there
+    Add alias uevent variables from of_device_uevent
+    Use app->alias instead of app->stem / app->id directly
+    Expose alias_lookup and of_alias_mutex
 
-This is only a first step towards a bigger gpiolib rework. Getting rid of the
-integer handles for GPIOs will allow us to continue on with the following:
-* Proper GPIO lookup functions a la regulator, pwm, etc.
-* Getting rid of ARCH_NR_GPIO,
-* Tearing out asm-generic/gpio.h into consumer/driver include files,
-* ...
+ drivers/of/base.c       |   23 +++--------------------
+ drivers/of/device.c     |   17 +++++++++++++++++
+ drivers/of/of_private.h |   33 +++++++++++++++++++++++++++++++++
+ 3 files changed, 53 insertions(+), 20 deletions(-)
+ create mode 100644 drivers/of/of_private.h
 
-This API is only available if gpiolib is compiled in. One could however easily
-implement a set of gpiod_* functions that would wrap around the old interface if
-that was deemed necessary.
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 5806449..715aef2 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -24,32 +24,15 @@
+ #include <linux/slab.h>
+ #include <linux/proc_fs.h>
 
-Comments and thoughts on potential issues are welcome, at this stage it is very
-possible that I missed a few issues that will arise in later stages of this
-project.
+-/**
+- * struct alias_prop - Alias property in 'aliases' node
+- * @link:	List node to link the structure in aliases_lookup list
+- * @alias:	Alias property name
+- * @np:		Pointer to device_node that the alias stands for
+- * @id:		Index value from end of alias name
+- * @stem:	Alias string without the index
+- *
+- * The structure represents one alias property of 'aliases' node as
+- * an entry in aliases_lookup list.
+- */
+-struct alias_prop {
+-	struct list_head link;
+-	const char *alias;
+-	struct device_node *np;
+-	int id;
+-	char stem[0];
+-};
++#include "of_private.h"
 
-Alexandre Courbot (1):
-  gpiolib: introduce descriptor-based GPIO interface
+-static LIST_HEAD(aliases_lookup);
++LIST_HEAD(aliases_lookup);
 
- drivers/gpio/gpiolib.c        | 302 ++++++++++++++++++++++--------------------
- include/asm-generic/gpio.h    |  74 ++++++++---
- include/linux/gpio/consumer.h |  45 +++++++
- 3 files changed, 261 insertions(+), 160 deletions(-)
- create mode 100644 include/linux/gpio/consumer.h
+ struct device_node *allnodes;
+ struct device_node *of_chosen;
+ struct device_node *of_aliases;
 
--- 
-1.8.0.1
+-static DEFINE_MUTEX(of_aliases_mutex);
++DEFINE_MUTEX(of_aliases_mutex);
+
+ /* use when traversing tree through the allnext, child, sibling,
+  * or parent members of struct device_node.
+diff --git a/drivers/of/device.c b/drivers/of/device.c
+index 4c74e4f..b8d31db 100644
+--- a/drivers/of/device.c
++++ b/drivers/of/device.c
+@@ -8,6 +8,7 @@
+ #include <linux/slab.h>
+
+ #include <asm/errno.h>
++#include "of_private.h"
+
+ /**
+  * of_match_device - Tell if a struct device matches an of_device_id list
+@@ -131,6 +132,7 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
+ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
+ {
+ 	const char *compat;
++	struct alias_prop *app;
+ 	int seen = 0, cplen, sl;
+
+ 	if ((!dev) || (!dev->of_node))
+@@ -153,6 +155,21 @@ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
+ 		seen++;
+ 	}
+ 	add_uevent_var(env, "OF_COMPATIBLE_N=%d", seen);
++
++	seen = 0;
++	mutex_lock(&of_aliases_mutex);
++	list_for_each_entry(app, &aliases_lookup, link) {
++		if (dev->of_node == app->np) {
++			add_uevent_var(env, "OF_ALIAS_%d=%s", seen,
++				       app->alias);
++			seen++;
++		}
++	}
++
++	if (seen)
++		add_uevent_var(env, "OF_ALIAS_N=%d", seen);
++
++	mutex_unlock(&of_aliases_mutex);
+ }
+
+ int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env)
+diff --git a/drivers/of/of_private.h b/drivers/of/of_private.h
+new file mode 100644
+index 0000000..031608f
+--- /dev/null
++++ b/drivers/of/of_private.h
+@@ -0,0 +1,33 @@
++/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/**
++ * struct alias_prop - Alias property in 'aliases' node
++ * @link:	List node to link the structure in aliases_lookup list
++ * @alias:	Alias property name
++ * @np:		Pointer to device_node that the alias stands for
++ * @id:		Index value from end of alias name
++ * @stem:	Alias string without the index
++ *
++ * The structure represents one alias property of 'aliases' node as
++ * an entry in aliases_lookup list.
++ */
++struct alias_prop {
++	struct list_head link;
++	const char *alias;
++	struct device_node *np;
++	int id;
++	char stem[0];
++};
++
++extern struct mutex of_aliases_mutex;
++extern struct list_head aliases_lookup;
+--
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
