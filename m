@@ -1,32 +1,28 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Thu, 6 Dec 2012 13:21:14 +0530
-Subject: [PATCH 444/493] media: remove use of __devexit
-In-Reply-To: <1353349642-3677-444-git-send-email-wfp5p@virginia.edu>
-References: <1353349642-3677-1-git-send-email-wfp5p@virginia.edu>
- <1353349642-3677-444-git-send-email-wfp5p@virginia.edu>
-Message-ID: <CA+V-a8v4ykW+=2iv8t_N+Uaqyzm6b96UZ=oE_bOgpg+dSnsUuw@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 6 Dec 2012 08:52:57 +0100
+Subject: [PATCH] pwm: i.MX: eliminate build warning
+In-Reply-To: <1354721681-31843-1-git-send-email-LW@KARO-electronics.de>
+References: <1354721681-31843-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20121206075256.GB25316@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2012 at 11:56 PM, Bill Pemberton <wfp5p@virginia.edu> wrote:
-> CONFIG_HOTPLUG is going away as an option so __devexit is no
-> longer needed.
-[snip]
-...
->  drivers/media/platform/davinci/vpfe_capture.c            | 2 +-
->  drivers/media/platform/davinci/vpif.c                    | 2 +-
->  drivers/media/platform/davinci/vpss.c                    | 2 +-
+On Wed, Dec 05, 2012 at 04:34:41PM +0100, Lothar Wa?mann wrote:
+> compiling the i.MX pwm driver produces the following warning:
+> |drivers/pwm/pwm-imx.c: In function 'imx_pwm_probe':
+> |drivers/pwm/pwm-imx.c:281:7: warning: assignment discards qualifiers from pointer target type
+> 
+> Apply a 'const' attribute to the affected variable declaration.
+> 
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
-Acked-by: Prabhakar Lad <prabhakar.lad@ti.com>
+Applied, thanks.
 
-Regards,
---Prabhakar
-
-[snip]
-> --
-> 1.8.0
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121206/3963751c/attachment.sig>
