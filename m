@@ -1,32 +1,27 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Thu, 6 Dec 2012 10:52:03 +0800
-Subject: common clock framwork: clk_set_rate issue
-Message-ID: <CADApbej+f9P1sgLMR8_McoCCSLDjJt_qitWdNd8X1v6PwZqsnQ@mail.gmail.com>
+From: narkewoody@gmail.com (Woody Wu)
+Date: Thu, 6 Dec 2012 02:57:34 +0000 (UTC)
+Subject: s3c2410 lcd driver maximum resolution?
+Message-ID: <slrnkc02b3.4ir.narkewoody@zuhnb712.local.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi
-When develop the clk drivers for SOCs based on common clock framework.
-I met a issue.
-For example there is a uart device, it's function clock comes from a
-divider, and the divider's parent is a mux. It means
+Hi, list
 
-MUX --> DIV --> UART
+Does anyone know what's the maximum display resolution I can expect for
+the s3c2410-lcd frame buffer driver (s3c2410fb.c)? I am about to use
+8bpp color mode only.
 
-As we know that UART can work at low baudrate for a terminal, while it
-can also connect to GPS module which needs a high rate. So the MUX
-will provide two clock source, a low clock rate and high clock rate.
+Is there any other requirements for the LCD module to ensure it
+compatiable with s3c2410+Linux? One thing I am thinking is, that since
+the s3c2410 already has a buid in LCD controller, so there is no
+controller needed in the LCD module side, this should give me a chance
+to use a low price LCD other than those kind of expensive LCD which
+embedded a processor.  Do I understand right?
 
-The MUX clk driver clk-mux.c does not implement a ->round_rate callbacks.
-It means that when uart driver is used for a GPS and it want to change
-it clock, the driver will call clk_set_rate(); clk_set_rate will loop
-upward to DIV, and DIV will try to set its divider, and it need loop
-upward to MUX.
-In fact the current clk drivers have some issue.
-MUX clk driver should provide the round_rate callback, it then can
-provide a new_rate. It means that in clk_calc_subtree MUX can switch
-the clock source.
 
-So in the uart driver we can depends on the configuration passed by
-device tree to initiaze the clock for different purpose. This driver
-may be shared by many SOCs, so it does not care the clock framework.
+Thanks in advance.
+
+
+-- 
+woody
+I can't go back to yesterday - because I was a different person then.
