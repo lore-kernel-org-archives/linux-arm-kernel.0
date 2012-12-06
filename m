@@ -1,73 +1,76 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 06 Dec 2012 17:54:08 +0100
-Subject: [PATCH v7 5/5] ARM: OMAP: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <50C0C646.9000802@ti.com>
-References: <1354734571-10774-1-git-send-email-zonque@gmail.com>
- <1354734571-10774-6-git-send-email-zonque@gmail.com>
- <20121205222232.67B2B3E0E22@localhost> <50BFCBCC.6030706@ti.com>
- <20121205232426.BAD573E0E22@localhost> <20121206000302.GM21682@atomide.com>
- <50C0C646.9000802@ti.com>
-Message-ID: <50C0CDB0.5050008@gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 6 Dec 2012 17:58:00 +0100
+Subject: [PATCH] mtd: nand: gpmi: reset BCH earlier, too, to avoid NAND
+ startup problems
+In-Reply-To: <CAMiH66EPDKhd=pBJWhtm3P+qgGcdVbHD-hb93ZB7Ou7Sc=vByg@mail.gmail.com>
+References: <1354740362-20412-1-git-send-email-w.sang@pengutronix.de>
+ <50BFFFE8.8040002@freescale.com>
+ <20121206095213.GA2589@pengutronix.de>
+ <CAMiH66EPDKhd=pBJWhtm3P+qgGcdVbHD-hb93ZB7Ou7Sc=vByg@mail.gmail.com>
+Message-ID: <20121206165800.GA17129@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.12.2012 17:22, Jon Hunter wrote:
+
+> > Did you power-cycle between each test or reboot? I still need to test if
+> What's the meaning of "power-cycle"?
+
+power off - power on
+
+> I only tested with the soft reset, the power is never shut down.
+
+OK.
+
+> With your patch, we have resetted the BCH twice in the driver. Could
+> we only reset BCH one time?
+
+You tell me, please :) Is it needed when changing the layout? I don't
+have any setup to test that. Unless I can test that, I prefer to not
+remove it. I am a bit anxious, because the reason for the stalled BCH is
+not fully understood and all I can reliably say is that resetting twice
+does not hurt.
+
+> Do you ever remove another reset-bch code, and test it?
+
+It will probably work, but we don't cover the case of changing the
+layout?
+
+> Frankly speaking, it's strange to reset the BCH twice, and it makes no sense. :(
+
+The stalled BCH makes no sense either, currently.
+
+> I am afraid that we have to add three-reset-bch in the future, if we
+> can not find the root cause.
+
+Well, ask the IC guys if something can go wrong when the BCH has been
+active and the GPMI gets reset and issues NAND commands (without needing
+ECC).
+
+> If you can remove another reset-bch code, i will ack the patch.
+
+Removing code that late in the cycle without proof sounds dangerous to
+me.
+
+> > The setup needs to be done properly to ensure a consistent state at the
+> > beginning, especially when somebody used the NAND before (ROM code,
+> At the beginning? it's really interesting.
+> I want to test it myself.
 > 
-> On 12/05/2012 06:03 PM, Tony Lindgren wrote:
->> * Grant Likely <grant.likely@secretlab.ca> [121205 15:26]:
->>> On Wed, 5 Dec 2012 16:33:48 -0600, Jon Hunter <jon-hunter@ti.com> wrote:
->>>> On 12/05/2012 04:22 PM, Grant Likely wrote:
->>>>>
->>>>> Please, be specific. Use something like "ti,am3340-gpmc" or
->>>>> "ti,omap3430-gpmc". The compatible property is a list so that new
->>>>> devices can claim compatibility with old. Compatible strings that are
->>>>> overly generic are a pet-peave of mine.
->>>>
->>>> We aim to use the binding for omap2,3,4,5 as well as the am33xx devices
->>>> (which are omap based). Would it be sufficient to have "ti,omap2-gpmc"
->>>> implying all omap2+ based devices or should we have a compatible string
->>>> for each device supported?
->>>
->>> Are they each register-level compatible with one another?
->>>
->>> The general recommended approach here is to make subsequent silicon
->>> claim compatibility with the first compatible implementation.
->>>
->>> So, for an am3358 board:
->>> 	compatible = "ti,am3358-gpmc", "ti,omap2420-gpmc";
->>>
->>> Essentially, what this means is that "ti,omap2420-gpmc" is the generic
->>> value instead of "omap2-gpmc". The reason for this is so that the value
->>> is anchored against a specific implementation, and not against something
->>> completely imaginary or idealized. If a newer version isn't quite
->>> compatible with the omap2420-gpmc, then it can drop the compatible claim
->>> and the driver really should be told about the new device.
->>
->> The compatible property can also be used to figure out which ones
->> need the workarounds in patch #4 of this series for the DT case.
->> So we should be specific with the compatible.
-> 
-> We should not merged patch #4. Daniel included this here because he is
-> using this on the current mainline, however, this is not needed for
-> linux-next and so we should drop it.
+> could you wait for some time?
 
-I think we're talking about different things here since awhile.
+What is some time? :)
 
-The patch I pointed you which is in mainline and which removes the
-reference to <plat/gpmc.h> from drivers/mtd/nand/omap2.c has nothing to
-do with my patch #4. It just solves Tony's concern that regarding the
-multi-arch zImages.
+Thanks,
 
-My code in gpmc.c calls gpmc_nand_init() which in turn calls
-gpmc_hwecc_bch_capable(). Without path #4, gpmc_hwecc_bch_capable() will
-return 0, and the nand init will fail consequently, in mainline as well
-as in linux-next.
+   Wolfram
 
-I understood Tony that he wanted to remove the entiry function and do
-the check based on DT properties, which will then solve the problem on a
-different level. However, that change is planned for *after* the merge
-window.
-
-
-Daniel
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121206/7fba6926/attachment.sig>
