@@ -1,19 +1,80 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 06 Dec 2012 11:03:00 +0000
-Subject: [PATCH V2 6/6] ARM: tegra20: cpuidle: apply coupled cpuidle for
- powered-down mode
-In-Reply-To: <1354702227.25317.0.camel@jlo-ubuntu-64.nvidia.com>
-References: <1354701715-24150-1-git-send-email-josephl@nvidia.com>
- <1354701715-24150-8-git-send-email-josephl@nvidia.com>
- <1354702227.25317.0.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <20121206110300.227B33E0E22@localhost>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu,  6 Dec 2012 14:00:06 +0200
+Subject: [PATCH] ARM: OMAP3: cm-t3517: add MMC support
+Message-ID: <1354795206-12048-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 5 Dec 2012 18:10:27 +0800, Joseph Lo <josephl@nvidia.com> wrote:
-> Sorry, there is something wrong.
-> Please ignore this mail.
+cm-t3517 uses two MMC interfaces. Add support for both.
 
-Hahaha. Okay, I was about to write a very confused reply.
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+---
+ arch/arm/mach-omap2/board-cm-t3517.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
-g.
+diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
+index ebbc2ad..fb1f993 100644
+--- a/arch/arm/mach-omap2/board-cm-t3517.c
++++ b/arch/arm/mach-omap2/board-cm-t3517.c
+@@ -32,6 +32,7 @@
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/nand.h>
+ #include <linux/mtd/partitions.h>
++#include <linux/mmc/host.h>
+ #include <linux/can/platform/ti_hecc.h>
+ 
+ #include <asm/mach-types.h>
+@@ -46,6 +47,7 @@
+ 
+ #include "mux.h"
+ #include "control.h"
++#include "hsmmc.h"
+ #include "common-board-devices.h"
+ #include "am35xx-emac.h"
+ #include "gpmc-nand.h"
+@@ -121,6 +123,24 @@ static void cm_t3517_init_hecc(void)
+ static inline void cm_t3517_init_hecc(void) {}
+ #endif
+ 
++#if defined(CONFIG_MMC) || defined(CONFIG_MMC_MODULE)
++static struct omap2_hsmmc_info mmc[] = {
++	{
++		.mmc		= 1,
++		.caps		= MMC_CAP_4_BIT_DATA,
++		.gpio_cd	= 144,
++		.gpio_wp	= 59,
++	},
++	{
++		.mmc		= 2,
++		.caps		= MMC_CAP_4_BIT_DATA,
++		.gpio_cd	= -EINVAL,
++		.gpio_wp	= -EINVAL,
++	},
++	{}	/* Terminator */
++};
++#endif
++
+ #if defined(CONFIG_RTC_DRV_V3020) || defined(CONFIG_RTC_DRV_V3020_MODULE)
+ #define RTC_IO_GPIO		(153)
+ #define RTC_WR_GPIO		(154)
+@@ -271,6 +291,10 @@ static struct omap_board_mux board_mux[] __initdata = {
+ 	/* CM-T3517 USB HUB nRESET */
+ 	OMAP3_MUX(MCBSP4_CLKX, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
+ 
++	/* CD - GPIO144 and WP - GPIO59 for MMC1 - SB-T35 */
++	OMAP3_MUX(UART2_CTS, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
++	OMAP3_MUX(GPMC_CLK, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
++
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+ };
+ #endif
+@@ -286,6 +310,7 @@ static void __init cm_t3517_init(void)
+ 	cm_t3517_init_usbh();
+ 	cm_t3517_init_hecc();
+ 	am35xx_emac_init(AM35XX_DEFAULT_MDIO_FREQUENCY, 1);
++	omap_hsmmc_init(mmc);
+ }
+ 
+ MACHINE_START(CM_T3517, "Compulab CM-T3517")
+-- 
+1.7.3.4
