@@ -1,56 +1,71 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 6 Dec 2012 10:25:04 -0700
-Subject: [PATCH] ARM: Kirkwood: Add SPI_CHPA and SPI_CPOL support to
- spi-orion
-In-Reply-To: <20121206142521.4185A3E0948@localhost>
-References: <20121121192335.GA14868@obsidianresearch.com>
- <20121206142521.4185A3E0948@localhost>
-Message-ID: <20121206172504.GB9676@obsidianresearch.com>
+From: wfp5p@virginia.edu (Bill Pemberton)
+Date: Thu,  6 Dec 2012 12:35:12 -0500
+Subject: [PATCH 03/20] ALSA: pxa2xx: remove __dev* attributes
+In-Reply-To: <1354815329-20221-1-git-send-email-wfp5p@virginia.edu>
+References: <1354815329-20221-1-git-send-email-wfp5p@virginia.edu>
+Message-ID: <1354815329-20221-4-git-send-email-wfp5p@virginia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 06, 2012 at 02:25:21PM +0000, Grant Likely wrote:
-> On Wed, 21 Nov 2012 12:23:35 -0700, Jason Gunthorpe <jgunthorpe@obsidianresearch.com> wrote:
-> > Support these transfer modes from the SPI layer by setting
-> > the appropriate register bits before doing the transfer.
-> > 
-> > This was tested on the Marvell kirkwood SOC that uses this driver.
-> 
-> Woo! a note about how it was tested. I can't (and often don't) see
-> enough of these.  :-)
+CONFIG_HOTPLUG is going away as an option.  As result the __dev*
+markings will be going away.
 
-Thanks for looking at this Grant,
+Remove use of __devinit, __devexit_p, __devinitdata, __devinitconst,
+and __devexit.
 
-But I think that Jason's comment (see
-https://patchwork.kernel.org/patch/1782061/) is valid.
+Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ sound/arm/pxa2xx-ac97-lib.c | 2 +-
+ sound/arm/pxa2xx-ac97.c     | 6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-This will likely switch all current users from using 'whatever the
-firmware left behind' to 'whatever the kernel default is' - which will
-surely break something here and there??
-
-I was thinking of a transitory patch that did:
-
-reg = readl(spi_reg(orion_spi, ORION_SPI_IF_CONFIG_REG));
-nreg = reg & ~ORION_SPI_MODE_MASK;
-if (spi->mode & SPI_CPOL)
-	nreg |= ORION_SPI_MODE_CPOL;
-if (spi->mode & SPI_CPHA)
-	nreg |= ORION_SPI_MODE_CPHA;
-#ifdef TRANSITION
- if (nreg != reg)
-        dev_error(..,"Not allowing a SPI mode change away from firmware
- defaults. Board support needs to be updated!");
-#else
- writel(nreg, spi_reg(orion_spi, ORION_SPI_IF_CONFIG_REG));
-#endif
-
-At least that way there is a warning and the DTSs can be fixed up.
-
-I haven't had a moment to look into that though..
-
-But I'm not sure that is in line with kernel philosophy WRT to DT..
-
-What do you think?
-
-Regards,
-Jason
+diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
+index 48d7c0a..6fc0ae9 100644
+--- a/sound/arm/pxa2xx-ac97-lib.c
++++ b/sound/arm/pxa2xx-ac97-lib.c
+@@ -314,7 +314,7 @@ int pxa2xx_ac97_hw_resume(void)
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_hw_resume);
+ #endif
+ 
+-int __devinit pxa2xx_ac97_hw_probe(struct platform_device *dev)
++int pxa2xx_ac97_hw_probe(struct platform_device *dev)
+ {
+ 	int ret;
+ 	pxa2xx_audio_ops_t *pdata = dev->dev.platform_data;
+diff --git a/sound/arm/pxa2xx-ac97.c b/sound/arm/pxa2xx-ac97.c
+index 4e1fda7..ec54be4 100644
+--- a/sound/arm/pxa2xx-ac97.c
++++ b/sound/arm/pxa2xx-ac97.c
+@@ -163,7 +163,7 @@ static int pxa2xx_ac97_resume(struct device *dev)
+ static SIMPLE_DEV_PM_OPS(pxa2xx_ac97_pm_ops, pxa2xx_ac97_suspend, pxa2xx_ac97_resume);
+ #endif
+ 
+-static int __devinit pxa2xx_ac97_probe(struct platform_device *dev)
++static int pxa2xx_ac97_probe(struct platform_device *dev)
+ {
+ 	struct snd_card *card;
+ 	struct snd_ac97_bus *ac97_bus;
+@@ -224,7 +224,7 @@ err_dev:
+ 	return ret;
+ }
+ 
+-static int __devexit pxa2xx_ac97_remove(struct platform_device *dev)
++static int pxa2xx_ac97_remove(struct platform_device *dev)
+ {
+ 	struct snd_card *card = platform_get_drvdata(dev);
+ 
+@@ -239,7 +239,7 @@ static int __devexit pxa2xx_ac97_remove(struct platform_device *dev)
+ 
+ static struct platform_driver pxa2xx_ac97_driver = {
+ 	.probe		= pxa2xx_ac97_probe,
+-	.remove		= __devexit_p(pxa2xx_ac97_remove),
++	.remove		= pxa2xx_ac97_remove,
+ 	.driver		= {
+ 		.name	= "pxa2xx-ac97",
+ 		.owner	= THIS_MODULE,
+-- 
+1.8.0.1
