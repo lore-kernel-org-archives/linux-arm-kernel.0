@@ -1,66 +1,59 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 07 Dec 2012 14:11:15 +0000
-Subject: Sharing PCIE driver between Microblaze and Arm zynq
-In-Reply-To: <50C1BA9D.5010406@monstr.eu>
-References: <CAHTX3dLxbVxn+D+AV7L0VsGYFOjas3AJ_3M_xncVfxp02FCy=Q@mail.gmail.com>
- <CAErSpo6xRdwzTuPPqnmvmHSp7awnV7=Z85eWFfktb_hm9Aad_A@mail.gmail.com>
- <50C1BA9D.5010406@monstr.eu>
-Message-ID: <20121207141115.EFC903E0B87@localhost>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 7 Dec 2012 22:40:10 +0800
+Subject: [PATCH 1/2] mmc: slot-gpio: use devm_* managed functions to ease
+ users
+In-Reply-To: <Pine.LNX.4.64.1212071438010.24520@axis700.grange>
+References: <1354887168-3073-1-git-send-email-shawn.guo@linaro.org>
+ <Pine.LNX.4.64.1212071438010.24520@axis700.grange>
+Message-ID: <20121207144006.GB30468@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 07 Dec 2012 10:45:01 +0100, Michal Simek <monstr@monstr.eu> wrote:
-> On 12/06/2012 10:27 PM, Bjorn Helgaas wrote:
-> > [+cc linux-pci]
-> >
-> > On Thu, Dec 6, 2012 at 7:23 AM, Michal Simek <michal.simek@xilinx.com> wrote:
-> >> Hi guys,
-> >>
-> >> I have a question regarding to sharing generic OF pcie driver between
-> >> two architectures MB and ARM Zynq.
-> >> Is drivers/pci/pcie location good for it?
-> >> Make no sense to have the same driver in two locations.
-> >
-> > I think you're talking about a PCI host bridge driver.  It would
-> > definitely be nice to move toward a generic, shared driver.  Host
-> > bridge drivers are responsible for enumerating the PCI hierarchy below
-> > the bridge.  Enumeration is not really PCIe-specific, so I wouldn't
-> > put it in drivers/pci/pcie.
+On Fri, Dec 07, 2012 at 02:49:43PM +0100, Guennadi Liakhovetski wrote:
+> Hi Shawn
 > 
-> Not a PCI expert, just trying to find out the proper location for this shared driver.
+> On Fri, 7 Dec 2012, Shawn Guo wrote:
 > 
+> > Use devm_* managed functions, so that slot-gpio users do not have to
+> > call mmc_gpio_free_ro/cd to free up resources requested in
+> > mmc_gpio_request_ro/cd.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > 
-> >> Is using readl/writel IO functions in this driver the best option
-> >> which we can have?
-> >> Or is there any other recommendation?
-> >
-> > I'm not really a driver person, but if you're writing a new driver,
-> > wouldn't you use the iomap interfaces (ioremap(), ioread32(), etc)
-> > rather than readl()?
-> 
-> That driver exists but it is not in mainline and it is better to directly
-> add it to proper location with correct io functions.
-> The question is if ioread/iowrite functions are correct one.
-> PowerPC io-defs.h suggests that readl/writel should be used for PCI.
-> 
-> 
-> >> Also just want to check if it is correct to use pcie device_type.
-> >
-> > I don't know what you're asking here.  Can you elaborate or give a
-> > specific example?
-> 
-> If node property device_type pcie should be used.
-> device_type = "pcie";
-> 
-> For pci it is device_type = "pci";
-> For network it is device_type = "network"
-> the same for serial, watchdogs.
-> 
-> Do we have any list of device_types which we should use?
+> Thanks for the patch, but I'm not sure this is a good idea. Firstly, using 
+> devm_* allocation functions means, that normally you don't have to free 
+> these resources explicitly any more. So, actually you would have to remove 
+> free_irq() and gpio_free() calls completely from the API instead of 
+> replacing them with devm_* analogs.
 
-Don't use them unless a binding requires it. PCI address lookup code
-uses it, so we put it in those nodes. Otherwise device_type is
-deprecated and has been for a long time now. You should not be using it
-in .dts files.
+With the changes, most of the slot-gpio users will only need to call
+mmc_gpio_request_* functions at probe time, nothing else.  That said,
+they will not call mmc_gpio_free_* functions at all.  I patched
+mmc_gpio_free_* functions replacing free_irq() and gpio_free() with
+devm_* versions to 1) ease the migration of exiting users calling
+mmc_gpio_free_*; 2) provide a mean for users to manually free resources
+for whatever reasons.
 
-g.
+> Secondly, I do use devm_kzalloc() in 
+> the API because I really want that allocated memory to just be allocated 
+> once and stay there until the device is freed. Whereas with with card 
+> detection and write-protect pins - usually you're right, you would only 
+> allocate those once during the lifetime of your host device. But - are we 
+> sure there cannot be exceptions? What if someone decides to switch between 
+> CD-IRQ and CD-polling at runtime? Or do something equally weird with their 
+> GPIOs... At least I personally don't think I have sufficient knowledge of 
+> all possible configurations to make such a decision. Think about pinctrl 
+> etc. What if at runtime the CD pin has to be released by mmc to be used 
+> by some other device?
+
+mmc_gpio_request_* and mmc_gpio_free_* pair are still there anyway.
+Users can manually call them in any way they want.
+
+> Anyway, I'm fine either way, but I'm just not sure 
+> how reasonable this change is.
+
+My intension is to save slot-gpio users from checking GPIO CD/WP cases
+and calling mmc_gpio_request_* functions, so that we can have a cleaner
+.probe error path and .remove function.
+
+Shawn
