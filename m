@@ -1,9 +1,9 @@
 From: wfp5p@virginia.edu (Bill Pemberton)
-Date: Fri,  7 Dec 2012 09:26:17 -0500
-Subject: [PATCH 05/25] ASoC: pxa: remove __dev* attributes
+Date: Fri,  7 Dec 2012 09:26:15 -0500
+Subject: [PATCH 03/25] ASoC: Samsung: remove __dev* attributes
 In-Reply-To: <1354890397-28568-1-git-send-email-wfp5p@virginia.edu>
 References: <1354890397-28568-1-git-send-email-wfp5p@virginia.edu>
-Message-ID: <1354890397-28568-6-git-send-email-wfp5p@virginia.edu>
+Message-ID: <1354890397-28568-4-git-send-email-wfp5p@virginia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,541 +14,592 @@ Remove use of __devinit, __devexit_p, __devinitdata, __devinitconst,
 and __devexit.
 
 Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Sangbeom Kim <sbkim73@samsung.com>
 Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
 ---
- sound/soc/pxa/brownstone.c     | 6 +++---
- sound/soc/pxa/corgi.c          | 6 +++---
- sound/soc/pxa/e740_wm9705.c    | 6 +++---
- sound/soc/pxa/e750_wm9705.c    | 6 +++---
- sound/soc/pxa/e800_wm9712.c    | 6 +++---
- sound/soc/pxa/imote2.c         | 6 +++---
- sound/soc/pxa/mioa701_wm9713.c | 6 +++---
- sound/soc/pxa/mmp-pcm.c        | 6 +++---
- sound/soc/pxa/mmp-sspa.c       | 6 +++---
- sound/soc/pxa/palm27x.c        | 4 ++--
- sound/soc/pxa/poodle.c         | 6 +++---
- sound/soc/pxa/pxa-ssp.c        | 6 +++---
- sound/soc/pxa/pxa2xx-ac97.c    | 8 ++++----
- sound/soc/pxa/pxa2xx-i2s.c     | 4 ++--
- sound/soc/pxa/pxa2xx-pcm.c     | 6 +++---
- sound/soc/pxa/tosa.c           | 6 +++---
- sound/soc/pxa/ttc-dkb.c        | 6 +++---
- 17 files changed, 50 insertions(+), 50 deletions(-)
+ sound/soc/samsung/ac97.c                       | 6 +++---
+ sound/soc/samsung/bells.c                      | 6 +++---
+ sound/soc/samsung/dma.c                        | 4 ++--
+ sound/soc/samsung/i2s.c                        | 9 ++++-----
+ sound/soc/samsung/idma.c                       | 6 +++---
+ sound/soc/samsung/littlemill.c                 | 6 +++---
+ sound/soc/samsung/lowland.c                    | 6 +++---
+ sound/soc/samsung/pcm.c                        | 6 +++---
+ sound/soc/samsung/s3c2412-i2s.c                | 6 +++---
+ sound/soc/samsung/s3c24xx-i2s.c                | 6 +++---
+ sound/soc/samsung/s3c24xx_simtec.c             | 6 +++---
+ sound/soc/samsung/s3c24xx_simtec_hermes.c      | 4 ++--
+ sound/soc/samsung/s3c24xx_simtec_tlv320aic23.c | 4 ++--
+ sound/soc/samsung/smdk_wm8580pcm.c             | 6 +++---
+ sound/soc/samsung/smdk_wm8994.c                | 6 +++---
+ sound/soc/samsung/smdk_wm8994pcm.c             | 6 +++---
+ sound/soc/samsung/spdif.c                      | 6 +++---
+ sound/soc/samsung/speyside.c                   | 6 +++---
+ sound/soc/samsung/tobermory.c                  | 6 +++---
+ 19 files changed, 55 insertions(+), 56 deletions(-)
 
-diff --git a/sound/soc/pxa/brownstone.c b/sound/soc/pxa/brownstone.c
-index 5e666e0..4ad7609 100644
---- a/sound/soc/pxa/brownstone.c
-+++ b/sound/soc/pxa/brownstone.c
-@@ -140,7 +140,7 @@ static struct snd_soc_card brownstone = {
- 	.num_dapm_routes = ARRAY_SIZE(brownstone_audio_map),
+diff --git a/sound/soc/samsung/ac97.c b/sound/soc/samsung/ac97.c
+index cd6c707..0df3c56 100644
+--- a/sound/soc/samsung/ac97.c
++++ b/sound/soc/samsung/ac97.c
+@@ -370,7 +370,7 @@ static struct snd_soc_dai_driver s3c_ac97_dai[] = {
+ 	},
  };
  
--static int __devinit brownstone_probe(struct platform_device *pdev)
-+static int brownstone_probe(struct platform_device *pdev)
+-static __devinit int s3c_ac97_probe(struct platform_device *pdev)
++static int s3c_ac97_probe(struct platform_device *pdev)
  {
- 	int ret;
- 
-@@ -152,7 +152,7 @@ static int __devinit brownstone_probe(struct platform_device *pdev)
+ 	struct resource *mem_res, *dmatx_res, *dmarx_res, *dmamic_res, *irq_res;
+ 	struct s3c_audio_pdata *ac97_pdata;
+@@ -485,7 +485,7 @@ err1:
  	return ret;
  }
  
--static int __devexit brownstone_remove(struct platform_device *pdev)
-+static int brownstone_remove(struct platform_device *pdev)
+-static __devexit int s3c_ac97_remove(struct platform_device *pdev)
++static int s3c_ac97_remove(struct platform_device *pdev)
  {
- 	snd_soc_unregister_card(&brownstone);
+ 	struct resource *mem_res, *irq_res;
+ 
+@@ -510,7 +510,7 @@ static __devexit int s3c_ac97_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver s3c_ac97_driver = {
+ 	.probe  = s3c_ac97_probe,
+-	.remove = __devexit_p(s3c_ac97_remove),
++	.remove = s3c_ac97_remove,
+ 	.driver = {
+ 		.name = "samsung-ac97",
+ 		.owner = THIS_MODULE,
+diff --git a/sound/soc/samsung/bells.c b/sound/soc/samsung/bells.c
+index 01c1c5a..ceed466 100644
+--- a/sound/soc/samsung/bells.c
++++ b/sound/soc/samsung/bells.c
+@@ -412,7 +412,7 @@ static struct snd_soc_card bells_cards[] = {
+ };
+ 
+ 
+-static __devinit int bells_probe(struct platform_device *pdev)
++static int bells_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+ 
+@@ -429,7 +429,7 @@ static __devinit int bells_probe(struct platform_device *pdev)
  	return 0;
-@@ -164,7 +164,7 @@ static struct platform_driver mmp_driver = {
- 		.owner	= THIS_MODULE,
- 	},
- 	.probe		= brownstone_probe,
--	.remove		= __devexit_p(brownstone_remove),
-+	.remove		= brownstone_remove,
- };
+ }
  
- module_platform_driver(mmp_driver);
-diff --git a/sound/soc/pxa/corgi.c b/sound/soc/pxa/corgi.c
-index 863367a..f4cce1e 100644
---- a/sound/soc/pxa/corgi.c
-+++ b/sound/soc/pxa/corgi.c
-@@ -303,7 +303,7 @@ static struct snd_soc_card corgi = {
- 	.num_dapm_routes = ARRAY_SIZE(corgi_audio_map),
- };
- 
--static int __devinit corgi_probe(struct platform_device *pdev)
-+static int corgi_probe(struct platform_device *pdev)
+-static int __devexit bells_remove(struct platform_device *pdev)
++static int bells_remove(struct platform_device *pdev)
  {
- 	struct snd_soc_card *card = &corgi;
- 	int ret;
-@@ -317,7 +317,7 @@ static int __devinit corgi_probe(struct platform_device *pdev)
+ 	snd_soc_unregister_card(&bells_cards[pdev->id]);
+ 
+@@ -443,7 +443,7 @@ static struct platform_driver bells_driver = {
+ 		.pm = &snd_soc_pm_ops,
+ 	},
+ 	.probe = bells_probe,
+-	.remove = __devexit_p(bells_remove),
++	.remove = bells_remove,
+ };
+ 
+ module_platform_driver(bells_driver);
+diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
+index 6452990..db87628 100644
+--- a/sound/soc/samsung/dma.c
++++ b/sound/soc/samsung/dma.c
+@@ -432,13 +432,13 @@ static struct snd_soc_platform_driver samsung_asoc_platform = {
+ 	.pcm_free	= dma_free_dma_buffers,
+ };
+ 
+-int __devinit asoc_dma_platform_register(struct device *dev)
++int asoc_dma_platform_register(struct device *dev)
+ {
+ 	return snd_soc_register_platform(dev, &samsung_asoc_platform);
+ }
+ EXPORT_SYMBOL_GPL(asoc_dma_platform_register);
+ 
+-void __devexit asoc_dma_platform_unregister(struct device *dev)
++void asoc_dma_platform_unregister(struct device *dev)
+ {
+ 	snd_soc_unregister_platform(dev);
+ }
+diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+index 0aa0451..d2d124f 100644
+--- a/sound/soc/samsung/i2s.c
++++ b/sound/soc/samsung/i2s.c
+@@ -952,8 +952,7 @@ static const struct snd_soc_dai_ops samsung_i2s_dai_ops = {
+ 					SNDRV_PCM_FMTBIT_S16_LE | \
+ 					SNDRV_PCM_FMTBIT_S24_LE)
+ 
+-static __devinit
+-struct i2s_dai *i2s_alloc_dai(struct platform_device *pdev, bool sec)
++static struct i2s_dai *i2s_alloc_dai(struct platform_device *pdev, bool sec)
+ {
+ 	struct i2s_dai *i2s;
+ 
+@@ -994,7 +993,7 @@ struct i2s_dai *i2s_alloc_dai(struct platform_device *pdev, bool sec)
+ 	return i2s;
+ }
+ 
+-static __devinit int samsung_i2s_probe(struct platform_device *pdev)
++static int samsung_i2s_probe(struct platform_device *pdev)
+ {
+ 	u32 dma_pl_chan, dma_cp_chan, dma_pl_sec_chan;
+ 	struct i2s_dai *pri_dai, *sec_dai = NULL;
+@@ -1117,7 +1116,7 @@ err:
  	return ret;
  }
  
--static int __devexit corgi_remove(struct platform_device *pdev)
-+static int corgi_remove(struct platform_device *pdev)
+-static __devexit int samsung_i2s_remove(struct platform_device *pdev)
++static int samsung_i2s_remove(struct platform_device *pdev)
+ {
+ 	struct i2s_dai *i2s, *other;
+ 	struct resource *res;
+@@ -1146,7 +1145,7 @@ static __devexit int samsung_i2s_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver samsung_i2s_driver = {
+ 	.probe  = samsung_i2s_probe,
+-	.remove = __devexit_p(samsung_i2s_remove),
++	.remove = samsung_i2s_remove,
+ 	.driver = {
+ 		.name = "samsung-i2s",
+ 		.owner = THIS_MODULE,
+diff --git a/sound/soc/samsung/idma.c b/sound/soc/samsung/idma.c
+index c227c31..a07950b 100644
+--- a/sound/soc/samsung/idma.c
++++ b/sound/soc/samsung/idma.c
+@@ -416,12 +416,12 @@ static struct snd_soc_platform_driver asoc_idma_platform = {
+ 	.pcm_free = idma_free,
+ };
+ 
+-static int __devinit asoc_idma_platform_probe(struct platform_device *pdev)
++static int asoc_idma_platform_probe(struct platform_device *pdev)
+ {
+ 	return snd_soc_register_platform(&pdev->dev, &asoc_idma_platform);
+ }
+ 
+-static int __devexit asoc_idma_platform_remove(struct platform_device *pdev)
++static int asoc_idma_platform_remove(struct platform_device *pdev)
+ {
+ 	snd_soc_unregister_platform(&pdev->dev);
+ 	return 0;
+@@ -434,7 +434,7 @@ static struct platform_driver asoc_idma_driver = {
+ 	},
+ 
+ 	.probe = asoc_idma_platform_probe,
+-	.remove = __devexit_p(asoc_idma_platform_remove),
++	.remove = asoc_idma_platform_remove,
+ };
+ 
+ module_platform_driver(asoc_idma_driver);
+diff --git a/sound/soc/samsung/littlemill.c b/sound/soc/samsung/littlemill.c
+index de4cfdf..bfb91f3 100644
+--- a/sound/soc/samsung/littlemill.c
++++ b/sound/soc/samsung/littlemill.c
+@@ -297,7 +297,7 @@ static struct snd_soc_card littlemill = {
+ 	.late_probe = littlemill_late_probe,
+ };
+ 
+-static __devinit int littlemill_probe(struct platform_device *pdev)
++static int littlemill_probe(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card = &littlemill;
+ 	int ret;
+@@ -314,7 +314,7 @@ static __devinit int littlemill_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __devexit littlemill_remove(struct platform_device *pdev)
++static int littlemill_remove(struct platform_device *pdev)
  {
  	struct snd_soc_card *card = platform_get_drvdata(pdev);
  
-@@ -331,7 +331,7 @@ static struct platform_driver corgi_driver = {
- 		.owner	= THIS_MODULE,
+@@ -330,7 +330,7 @@ static struct platform_driver littlemill_driver = {
+ 		.pm = &snd_soc_pm_ops,
  	},
- 	.probe		= corgi_probe,
--	.remove		= __devexit_p(corgi_remove),
-+	.remove		= corgi_remove,
+ 	.probe = littlemill_probe,
+-	.remove = __devexit_p(littlemill_remove),
++	.remove = littlemill_remove,
  };
  
- module_platform_driver(corgi_driver);
-diff --git a/sound/soc/pxa/e740_wm9705.c b/sound/soc/pxa/e740_wm9705.c
-index 7b1bc2390..70d799b 100644
---- a/sound/soc/pxa/e740_wm9705.c
-+++ b/sound/soc/pxa/e740_wm9705.c
-@@ -144,7 +144,7 @@ static struct gpio e740_audio_gpios[] = {
- 	{ GPIO_E740_WM9705_nAVDD2, GPIOF_OUT_INIT_HIGH, "Audio power" },
+ module_platform_driver(littlemill_driver);
+diff --git a/sound/soc/samsung/lowland.c b/sound/soc/samsung/lowland.c
+index a71c31a..570cf52 100644
+--- a/sound/soc/samsung/lowland.c
++++ b/sound/soc/samsung/lowland.c
+@@ -180,7 +180,7 @@ static struct snd_soc_card lowland = {
+ 	.num_dapm_routes = ARRAY_SIZE(audio_paths),
  };
  
--static int __devinit e740_probe(struct platform_device *pdev)
-+static int e740_probe(struct platform_device *pdev)
+-static __devinit int lowland_probe(struct platform_device *pdev)
++static int lowland_probe(struct platform_device *pdev)
  {
- 	struct snd_soc_card *card = &e740;
+ 	struct snd_soc_card *card = &lowland;
  	int ret;
-@@ -165,7 +165,7 @@ static int __devinit e740_probe(struct platform_device *pdev)
+@@ -197,7 +197,7 @@ static __devinit int lowland_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __devexit lowland_remove(struct platform_device *pdev)
++static int lowland_remove(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card = platform_get_drvdata(pdev);
+ 
+@@ -213,7 +213,7 @@ static struct platform_driver lowland_driver = {
+ 		.pm = &snd_soc_pm_ops,
+ 	},
+ 	.probe = lowland_probe,
+-	.remove = __devexit_p(lowland_remove),
++	.remove = lowland_remove,
+ };
+ 
+ module_platform_driver(lowland_driver);
+diff --git a/sound/soc/samsung/pcm.c b/sound/soc/samsung/pcm.c
+index ecd5090..13bab79 100644
+--- a/sound/soc/samsung/pcm.c
++++ b/sound/soc/samsung/pcm.c
+@@ -490,7 +490,7 @@ static struct snd_soc_dai_driver s3c_pcm_dai[] = {
+ 	},
+ };
+ 
+-static __devinit int s3c_pcm_dev_probe(struct platform_device *pdev)
++static int s3c_pcm_dev_probe(struct platform_device *pdev)
+ {
+ 	struct s3c_pcm_info *pcm;
+ 	struct resource *mem_res, *dmatx_res, *dmarx_res;
+@@ -613,7 +613,7 @@ err1:
  	return ret;
  }
  
--static int __devexit e740_remove(struct platform_device *pdev)
-+static int e740_remove(struct platform_device *pdev)
+-static __devexit int s3c_pcm_dev_remove(struct platform_device *pdev)
++static int s3c_pcm_dev_remove(struct platform_device *pdev)
  {
- 	struct snd_soc_card *card = platform_get_drvdata(pdev);
+ 	struct s3c_pcm_info *pcm = &s3c_pcm[pdev->id];
+ 	struct resource *mem_res;
+@@ -638,7 +638,7 @@ static __devexit int s3c_pcm_dev_remove(struct platform_device *pdev)
  
-@@ -180,7 +180,7 @@ static struct platform_driver e740_driver = {
- 		.owner	= THIS_MODULE,
- 	},
- 	.probe		= e740_probe,
--	.remove		= __devexit_p(e740_remove),
-+	.remove		= e740_remove,
+ static struct platform_driver s3c_pcm_driver = {
+ 	.probe  = s3c_pcm_dev_probe,
+-	.remove = __devexit_p(s3c_pcm_dev_remove),
++	.remove = s3c_pcm_dev_remove,
+ 	.driver = {
+ 		.name = "samsung-pcm",
+ 		.owner = THIS_MODULE,
+diff --git a/sound/soc/samsung/s3c2412-i2s.c b/sound/soc/samsung/s3c2412-i2s.c
+index edf5f527..2213377 100644
+--- a/sound/soc/samsung/s3c2412-i2s.c
++++ b/sound/soc/samsung/s3c2412-i2s.c
+@@ -160,7 +160,7 @@ static struct snd_soc_dai_driver s3c2412_i2s_dai = {
+ 	.ops = &s3c2412_i2s_dai_ops,
  };
  
- module_platform_driver(e740_driver);
-diff --git a/sound/soc/pxa/e750_wm9705.c b/sound/soc/pxa/e750_wm9705.c
-index 47b89d7..f94d2ab 100644
---- a/sound/soc/pxa/e750_wm9705.c
-+++ b/sound/soc/pxa/e750_wm9705.c
-@@ -126,7 +126,7 @@ static struct gpio e750_audio_gpios[] = {
- 	{ GPIO_E750_SPK_AMP_OFF, GPIOF_OUT_INIT_HIGH, "Speaker amp" },
- };
- 
--static int __devinit e750_probe(struct platform_device *pdev)
-+static int e750_probe(struct platform_device *pdev)
+-static __devinit int s3c2412_iis_dev_probe(struct platform_device *pdev)
++static int s3c2412_iis_dev_probe(struct platform_device *pdev)
  {
- 	struct snd_soc_card *card = &e750;
- 	int ret;
-@@ -147,7 +147,7 @@ static int __devinit e750_probe(struct platform_device *pdev)
+ 	int ret = 0;
+ 
+@@ -182,7 +182,7 @@ err:
  	return ret;
  }
  
--static int __devexit e750_remove(struct platform_device *pdev)
-+static int e750_remove(struct platform_device *pdev)
+-static __devexit int s3c2412_iis_dev_remove(struct platform_device *pdev)
++static int s3c2412_iis_dev_remove(struct platform_device *pdev)
  {
- 	struct snd_soc_card *card = platform_get_drvdata(pdev);
+ 	asoc_dma_platform_unregister(&pdev->dev);
+ 	snd_soc_unregister_dai(&pdev->dev);
+@@ -191,7 +191,7 @@ static __devexit int s3c2412_iis_dev_remove(struct platform_device *pdev)
  
-@@ -162,7 +162,7 @@ static struct platform_driver e750_driver = {
- 		.owner	= THIS_MODULE,
- 	},
- 	.probe		= e750_probe,
--	.remove		= __devexit_p(e750_remove),
-+	.remove		= e750_remove,
+ static struct platform_driver s3c2412_iis_driver = {
+ 	.probe  = s3c2412_iis_dev_probe,
+-	.remove = __devexit_p(s3c2412_iis_dev_remove),
++	.remove = s3c2412_iis_dev_remove,
+ 	.driver = {
+ 		.name = "s3c2412-iis",
+ 		.owner = THIS_MODULE,
+diff --git a/sound/soc/samsung/s3c24xx-i2s.c b/sound/soc/samsung/s3c24xx-i2s.c
+index 0022d51..ee10e87 100644
+--- a/sound/soc/samsung/s3c24xx-i2s.c
++++ b/sound/soc/samsung/s3c24xx-i2s.c
+@@ -465,7 +465,7 @@ static struct snd_soc_dai_driver s3c24xx_i2s_dai = {
+ 	.ops = &s3c24xx_i2s_dai_ops,
  };
  
- module_platform_driver(e750_driver);
-diff --git a/sound/soc/pxa/e800_wm9712.c b/sound/soc/pxa/e800_wm9712.c
-index ea9707e..8768a64 100644
---- a/sound/soc/pxa/e800_wm9712.c
-+++ b/sound/soc/pxa/e800_wm9712.c
-@@ -116,7 +116,7 @@ static struct gpio e800_audio_gpios[] = {
- 	{ GPIO_E800_HP_AMP_OFF, GPIOF_OUT_INIT_HIGH, "Speaker amp" },
- };
- 
--static int __devinit e800_probe(struct platform_device *pdev)
-+static int e800_probe(struct platform_device *pdev)
+-static __devinit int s3c24xx_iis_dev_probe(struct platform_device *pdev)
++static int s3c24xx_iis_dev_probe(struct platform_device *pdev)
  {
- 	struct snd_soc_card *card = &e800;
- 	int ret;
-@@ -137,7 +137,7 @@ static int __devinit e800_probe(struct platform_device *pdev)
+ 	int ret = 0;
+ 
+@@ -487,7 +487,7 @@ err:
  	return ret;
  }
  
--static int __devexit e800_remove(struct platform_device *pdev)
-+static int e800_remove(struct platform_device *pdev)
+-static __devexit int s3c24xx_iis_dev_remove(struct platform_device *pdev)
++static int s3c24xx_iis_dev_remove(struct platform_device *pdev)
+ {
+ 	asoc_dma_platform_unregister(&pdev->dev);
+ 	snd_soc_unregister_dai(&pdev->dev);
+@@ -496,7 +496,7 @@ static __devexit int s3c24xx_iis_dev_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver s3c24xx_iis_driver = {
+ 	.probe  = s3c24xx_iis_dev_probe,
+-	.remove = __devexit_p(s3c24xx_iis_dev_remove),
++	.remove = s3c24xx_iis_dev_remove,
+ 	.driver = {
+ 		.name = "s3c24xx-iis",
+ 		.owner = THIS_MODULE,
+diff --git a/sound/soc/samsung/s3c24xx_simtec.c b/sound/soc/samsung/s3c24xx_simtec.c
+index 335a7d8..2c015f6 100644
+--- a/sound/soc/samsung/s3c24xx_simtec.c
++++ b/sound/soc/samsung/s3c24xx_simtec.c
+@@ -313,8 +313,8 @@ const struct dev_pm_ops simtec_audio_pmops = {
+ EXPORT_SYMBOL_GPL(simtec_audio_pmops);
+ #endif
+ 
+-int __devinit simtec_audio_core_probe(struct platform_device *pdev,
+-				      struct snd_soc_card *card)
++int simtec_audio_core_probe(struct platform_device *pdev,
++			    struct snd_soc_card *card)
+ {
+ 	struct platform_device *snd_dev;
+ 	int ret;
+@@ -371,7 +371,7 @@ err_clk:
+ }
+ EXPORT_SYMBOL_GPL(simtec_audio_core_probe);
+ 
+-int __devexit simtec_audio_remove(struct platform_device *pdev)
++int simtec_audio_remove(struct platform_device *pdev)
+ {
+ 	struct platform_device *snd_dev = platform_get_drvdata(pdev);
+ 
+diff --git a/sound/soc/samsung/s3c24xx_simtec_hermes.c b/sound/soc/samsung/s3c24xx_simtec_hermes.c
+index befabe8..d8a0543 100644
+--- a/sound/soc/samsung/s3c24xx_simtec_hermes.c
++++ b/sound/soc/samsung/s3c24xx_simtec_hermes.c
+@@ -99,7 +99,7 @@ static struct snd_soc_card snd_soc_machine_simtec_aic33 = {
+ 	.num_dapm_routes = ARRAY_SIZE(base_map),
+ };
+ 
+-static int __devinit simtec_audio_hermes_probe(struct platform_device *pd)
++static int simtec_audio_hermes_probe(struct platform_device *pd)
+ {
+ 	dev_info(&pd->dev, "probing....\n");
+ 	return simtec_audio_core_probe(pd, &snd_soc_machine_simtec_aic33);
+@@ -112,7 +112,7 @@ static struct platform_driver simtec_audio_hermes_platdrv = {
+ 		.pm	= simtec_audio_pm,
+ 	},
+ 	.probe	= simtec_audio_hermes_probe,
+-	.remove	= __devexit_p(simtec_audio_remove),
++	.remove	= simtec_audio_remove,
+ };
+ 
+ module_platform_driver(simtec_audio_hermes_platdrv);
+diff --git a/sound/soc/samsung/s3c24xx_simtec_tlv320aic23.c b/sound/soc/samsung/s3c24xx_simtec_tlv320aic23.c
+index 5552f82..1ac0d7a 100644
+--- a/sound/soc/samsung/s3c24xx_simtec_tlv320aic23.c
++++ b/sound/soc/samsung/s3c24xx_simtec_tlv320aic23.c
+@@ -88,7 +88,7 @@ static struct snd_soc_card snd_soc_machine_simtec_aic23 = {
+ 	.num_dapm_routes = ARRAY_SIZE(base_map),
+ };
+ 
+-static int __devinit simtec_audio_tlv320aic23_probe(struct platform_device *pd)
++static int simtec_audio_tlv320aic23_probe(struct platform_device *pd)
+ {
+ 	return simtec_audio_core_probe(pd, &snd_soc_machine_simtec_aic23);
+ }
+@@ -100,7 +100,7 @@ static struct platform_driver simtec_audio_tlv320aic23_driver = {
+ 		.pm	= simtec_audio_pm,
+ 	},
+ 	.probe	= simtec_audio_tlv320aic23_probe,
+-	.remove	= __devexit_p(simtec_audio_remove),
++	.remove	= simtec_audio_remove,
+ };
+ 
+ module_platform_driver(simtec_audio_tlv320aic23_driver);
+diff --git a/sound/soc/samsung/smdk_wm8580pcm.c b/sound/soc/samsung/smdk_wm8580pcm.c
+index 34239fe..e43bd42 100644
+--- a/sound/soc/samsung/smdk_wm8580pcm.c
++++ b/sound/soc/samsung/smdk_wm8580pcm.c
+@@ -153,7 +153,7 @@ static struct snd_soc_card smdk_pcm = {
+  * is absent (or not connected), so we connect EXT_VOICE_CLK(OSC4),
+  * 2.0484Mhz, directly with MCLK both Codec and SoC.
+  */
+-static int __devinit snd_smdk_probe(struct platform_device *pdev)
++static int snd_smdk_probe(struct platform_device *pdev)
+ {
+ 	int ret = 0;
+ 
+@@ -173,7 +173,7 @@ static int __devinit snd_smdk_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __devexit snd_smdk_remove(struct platform_device *pdev)
++static int snd_smdk_remove(struct platform_device *pdev)
+ {
+ 	snd_soc_unregister_card(&smdk_pcm);
+ 	platform_set_drvdata(pdev, NULL);
+@@ -186,7 +186,7 @@ static struct platform_driver snd_smdk_driver = {
+ 		.name = "samsung-smdk-pcm",
+ 	},
+ 	.probe = snd_smdk_probe,
+-	.remove = __devexit_p(snd_smdk_remove),
++	.remove = snd_smdk_remove,
+ };
+ 
+ module_platform_driver(snd_smdk_driver);
+diff --git a/sound/soc/samsung/smdk_wm8994.c b/sound/soc/samsung/smdk_wm8994.c
+index dd0aa8c..b0d0ab8 100644
+--- a/sound/soc/samsung/smdk_wm8994.c
++++ b/sound/soc/samsung/smdk_wm8994.c
+@@ -150,7 +150,7 @@ static struct snd_soc_card smdk = {
+ };
+ 
+ 
+-static int __devinit smdk_audio_probe(struct platform_device *pdev)
++static int smdk_audio_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+ 	struct snd_soc_card *card = &smdk;
+@@ -164,7 +164,7 @@ static int __devinit smdk_audio_probe(struct platform_device *pdev)
+ 	return ret;
+ }
+ 
+-static int __devexit smdk_audio_remove(struct platform_device *pdev)
++static int smdk_audio_remove(struct platform_device *pdev)
  {
  	struct snd_soc_card *card = platform_get_drvdata(pdev);
  
-@@ -152,7 +152,7 @@ static struct platform_driver e800_driver = {
+@@ -179,7 +179,7 @@ static struct platform_driver smdk_audio_driver = {
  		.owner	= THIS_MODULE,
  	},
- 	.probe		= e800_probe,
--	.remove		= __devexit_p(e800_remove),
-+	.remove		= e800_remove,
+ 	.probe		= smdk_audio_probe,
+-	.remove		= __devexit_p(smdk_audio_remove),
++	.remove		= smdk_audio_remove,
  };
  
- module_platform_driver(e800_driver);
-diff --git a/sound/soc/pxa/imote2.c b/sound/soc/pxa/imote2.c
-index b93dafd..eef1f7b 100644
---- a/sound/soc/pxa/imote2.c
-+++ b/sound/soc/pxa/imote2.c
-@@ -65,7 +65,7 @@ static struct snd_soc_card imote2 = {
+ module_platform_driver(smdk_audio_driver);
+diff --git a/sound/soc/samsung/smdk_wm8994pcm.c b/sound/soc/samsung/smdk_wm8994pcm.c
+index 15f6b44..3688a32 100644
+--- a/sound/soc/samsung/smdk_wm8994pcm.c
++++ b/sound/soc/samsung/smdk_wm8994pcm.c
+@@ -129,7 +129,7 @@ static struct snd_soc_card smdk_pcm = {
  	.num_links = 1,
  };
  
--static int __devinit imote2_probe(struct platform_device *pdev)
-+static int imote2_probe(struct platform_device *pdev)
+-static int __devinit snd_smdk_probe(struct platform_device *pdev)
++static int snd_smdk_probe(struct platform_device *pdev)
  {
- 	struct snd_soc_card *card = &imote2;
+ 	int ret = 0;
+ 
+@@ -143,7 +143,7 @@ static int __devinit snd_smdk_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __devexit snd_smdk_remove(struct platform_device *pdev)
++static int snd_smdk_remove(struct platform_device *pdev)
+ {
+ 	snd_soc_unregister_card(&smdk_pcm);
+ 	platform_set_drvdata(pdev, NULL);
+@@ -156,7 +156,7 @@ static struct platform_driver snd_smdk_driver = {
+ 		.name = "samsung-smdk-pcm",
+ 	},
+ 	.probe = snd_smdk_probe,
+-	.remove = __devexit_p(snd_smdk_remove),
++	.remove = snd_smdk_remove,
+ };
+ 
+ module_platform_driver(snd_smdk_driver);
+diff --git a/sound/soc/samsung/spdif.c b/sound/soc/samsung/spdif.c
+index 8606fc6..5008e5b 100644
+--- a/sound/soc/samsung/spdif.c
++++ b/sound/soc/samsung/spdif.c
+@@ -357,7 +357,7 @@ static struct snd_soc_dai_driver samsung_spdif_dai = {
+ 	.resume = spdif_resume,
+ };
+ 
+-static __devinit int spdif_probe(struct platform_device *pdev)
++static int spdif_probe(struct platform_device *pdev)
+ {
+ 	struct s3c_audio_pdata *spdif_pdata;
+ 	struct resource *mem_res, *dma_res;
+@@ -460,7 +460,7 @@ err0:
+ 	return ret;
+ }
+ 
+-static __devexit int spdif_remove(struct platform_device *pdev)
++static int spdif_remove(struct platform_device *pdev)
+ {
+ 	struct samsung_spdif_info *spdif = &spdif_info;
+ 	struct resource *mem_res;
+@@ -484,7 +484,7 @@ static __devexit int spdif_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver samsung_spdif_driver = {
+ 	.probe	= spdif_probe,
+-	.remove	= __devexit_p(spdif_remove),
++	.remove	= spdif_remove,
+ 	.driver	= {
+ 		.name	= "samsung-spdif",
+ 		.owner	= THIS_MODULE,
+diff --git a/sound/soc/samsung/speyside.c b/sound/soc/samsung/speyside.c
+index d7906a1..57df90d 100644
+--- a/sound/soc/samsung/speyside.c
++++ b/sound/soc/samsung/speyside.c
+@@ -320,7 +320,7 @@ static struct snd_soc_card speyside = {
+ 	.late_probe = speyside_late_probe,
+ };
+ 
+-static __devinit int speyside_probe(struct platform_device *pdev)
++static int speyside_probe(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card = &speyside;
  	int ret;
-@@ -79,7 +79,7 @@ static int __devinit imote2_probe(struct platform_device *pdev)
- 	return ret;
+@@ -337,7 +337,7 @@ static __devinit int speyside_probe(struct platform_device *pdev)
+ 	return 0;
  }
  
--static int __devexit imote2_remove(struct platform_device *pdev)
-+static int imote2_remove(struct platform_device *pdev)
+-static int __devexit speyside_remove(struct platform_device *pdev)
++static int speyside_remove(struct platform_device *pdev)
  {
  	struct snd_soc_card *card = platform_get_drvdata(pdev);
  
-@@ -93,7 +93,7 @@ static struct platform_driver imote2_driver = {
- 		.owner	= THIS_MODULE,
+@@ -353,7 +353,7 @@ static struct platform_driver speyside_driver = {
+ 		.pm = &snd_soc_pm_ops,
  	},
- 	.probe		= imote2_probe,
--	.remove		= __devexit_p(imote2_remove),
-+	.remove		= imote2_remove,
+ 	.probe = speyside_probe,
+-	.remove = __devexit_p(speyside_remove),
++	.remove = speyside_remove,
  };
  
- module_platform_driver(imote2_driver);
-diff --git a/sound/soc/pxa/mioa701_wm9713.c b/sound/soc/pxa/mioa701_wm9713.c
-index 8687c1c..97b711e 100644
---- a/sound/soc/pxa/mioa701_wm9713.c
-+++ b/sound/soc/pxa/mioa701_wm9713.c
-@@ -186,7 +186,7 @@ static struct snd_soc_card mioa701 = {
- 	.num_links = ARRAY_SIZE(mioa701_dai),
+ module_platform_driver(speyside_driver);
+diff --git a/sound/soc/samsung/tobermory.c b/sound/soc/samsung/tobermory.c
+index 42e4c8e..f21ff60 100644
+--- a/sound/soc/samsung/tobermory.c
++++ b/sound/soc/samsung/tobermory.c
+@@ -214,7 +214,7 @@ static struct snd_soc_card tobermory = {
+ 	.late_probe = tobermory_late_probe,
  };
  
--static int __devinit mioa701_wm9713_probe(struct platform_device *pdev)
-+static int mioa701_wm9713_probe(struct platform_device *pdev)
+-static __devinit int tobermory_probe(struct platform_device *pdev)
++static int tobermory_probe(struct platform_device *pdev)
  {
- 	int rc;
- 
-@@ -202,7 +202,7 @@ static int __devinit mioa701_wm9713_probe(struct platform_device *pdev)
- 	return rc;
- }
- 
--static int __devexit mioa701_wm9713_remove(struct platform_device *pdev)
-+static int mioa701_wm9713_remove(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = platform_get_drvdata(pdev);
- 
-@@ -212,7 +212,7 @@ static int __devexit mioa701_wm9713_remove(struct platform_device *pdev)
- 
- static struct platform_driver mioa701_wm9713_driver = {
- 	.probe		= mioa701_wm9713_probe,
--	.remove		= __devexit_p(mioa701_wm9713_remove),
-+	.remove		= mioa701_wm9713_remove,
- 	.driver		= {
- 		.name		= "mioa701-wm9713",
- 		.owner		= THIS_MODULE,
-diff --git a/sound/soc/pxa/mmp-pcm.c b/sound/soc/pxa/mmp-pcm.c
-index e834faf..190eb0b 100644
---- a/sound/soc/pxa/mmp-pcm.c
-+++ b/sound/soc/pxa/mmp-pcm.c
-@@ -257,7 +257,7 @@ struct snd_soc_platform_driver mmp_soc_platform = {
- 	.pcm_free	= mmp_pcm_free_dma_buffers,
- };
- 
--static __devinit int mmp_pcm_probe(struct platform_device *pdev)
-+static int mmp_pcm_probe(struct platform_device *pdev)
- {
- 	struct mmp_audio_platdata *pdata = pdev->dev.platform_data;
- 
-@@ -274,7 +274,7 @@ static __devinit int mmp_pcm_probe(struct platform_device *pdev)
- 	return snd_soc_register_platform(&pdev->dev, &mmp_soc_platform);
- }
- 
--static int __devexit mmp_pcm_remove(struct platform_device *pdev)
-+static int mmp_pcm_remove(struct platform_device *pdev)
- {
- 	snd_soc_unregister_platform(&pdev->dev);
- 	return 0;
-@@ -287,7 +287,7 @@ static struct platform_driver mmp_pcm_driver = {
- 	},
- 
- 	.probe = mmp_pcm_probe,
--	.remove = __devexit_p(mmp_pcm_remove),
-+	.remove = mmp_pcm_remove,
- };
- 
- module_platform_driver(mmp_pcm_driver);
-diff --git a/sound/soc/pxa/mmp-sspa.c b/sound/soc/pxa/mmp-sspa.c
-index 4d6cb8a..41c3a09 100644
---- a/sound/soc/pxa/mmp-sspa.c
-+++ b/sound/soc/pxa/mmp-sspa.c
-@@ -405,7 +405,7 @@ struct snd_soc_dai_driver mmp_sspa_dai = {
- 	.ops = &mmp_sspa_dai_ops,
- };
- 
--static __devinit int asoc_mmp_sspa_probe(struct platform_device *pdev)
-+static int asoc_mmp_sspa_probe(struct platform_device *pdev)
- {
- 	struct sspa_priv *priv;
- 	struct resource *res;
-@@ -453,7 +453,7 @@ static __devinit int asoc_mmp_sspa_probe(struct platform_device *pdev)
- 	return snd_soc_register_dai(&pdev->dev, &mmp_sspa_dai);
- }
- 
--static int __devexit asoc_mmp_sspa_remove(struct platform_device *pdev)
-+static int asoc_mmp_sspa_remove(struct platform_device *pdev)
- {
- 	struct sspa_priv *priv = platform_get_drvdata(pdev);
- 
-@@ -470,7 +470,7 @@ static struct platform_driver asoc_mmp_sspa_driver = {
- 		.owner = THIS_MODULE,
- 	},
- 	.probe = asoc_mmp_sspa_probe,
--	.remove = __devexit_p(asoc_mmp_sspa_remove),
-+	.remove = asoc_mmp_sspa_remove,
- };
- 
- module_platform_driver(asoc_mmp_sspa_driver);
-diff --git a/sound/soc/pxa/palm27x.c b/sound/soc/pxa/palm27x.c
-index aa3da91..2074e2d 100644
---- a/sound/soc/pxa/palm27x.c
-+++ b/sound/soc/pxa/palm27x.c
-@@ -187,7 +187,7 @@ put_device:
- 	return ret;
- }
- 
--static int __devexit palm27x_asoc_remove(struct platform_device *pdev)
-+static int palm27x_asoc_remove(struct platform_device *pdev)
- {
- 	platform_device_unregister(palm27x_snd_device);
- 	return 0;
-@@ -195,7 +195,7 @@ static int __devexit palm27x_asoc_remove(struct platform_device *pdev)
- 
- static struct platform_driver palm27x_wm9712_driver = {
- 	.probe		= palm27x_asoc_probe,
--	.remove		= __devexit_p(palm27x_asoc_remove),
-+	.remove		= palm27x_asoc_remove,
- 	.driver		= {
- 		.name		= "palm27x-asoc",
- 		.owner		= THIS_MODULE,
-diff --git a/sound/soc/pxa/poodle.c b/sound/soc/pxa/poodle.c
-index d2cc8173..fafe463 100644
---- a/sound/soc/pxa/poodle.c
-+++ b/sound/soc/pxa/poodle.c
-@@ -269,7 +269,7 @@ static struct snd_soc_card poodle = {
- 	.num_dapm_routes = ARRAY_SIZE(poodle_audio_map),
- };
- 
--static int __devinit poodle_probe(struct platform_device *pdev)
-+static int poodle_probe(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = &poodle;
+ 	struct snd_soc_card *card = &tobermory;
  	int ret;
-@@ -291,7 +291,7 @@ static int __devinit poodle_probe(struct platform_device *pdev)
- 	return ret;
+@@ -231,7 +231,7 @@ static __devinit int tobermory_probe(struct platform_device *pdev)
+ 	return 0;
  }
  
--static int __devexit poodle_remove(struct platform_device *pdev)
-+static int poodle_remove(struct platform_device *pdev)
+-static int __devexit tobermory_remove(struct platform_device *pdev)
++static int tobermory_remove(struct platform_device *pdev)
  {
  	struct snd_soc_card *card = platform_get_drvdata(pdev);
  
-@@ -305,7 +305,7 @@ static struct platform_driver poodle_driver = {
- 		.owner	= THIS_MODULE,
+@@ -247,7 +247,7 @@ static struct platform_driver tobermory_driver = {
+ 		.pm = &snd_soc_pm_ops,
  	},
- 	.probe		= poodle_probe,
--	.remove		= __devexit_p(poodle_remove),
-+	.remove		= poodle_remove,
+ 	.probe = tobermory_probe,
+-	.remove = __devexit_p(tobermory_remove),
++	.remove = tobermory_remove,
  };
  
- module_platform_driver(poodle_driver);
-diff --git a/sound/soc/pxa/pxa-ssp.c b/sound/soc/pxa/pxa-ssp.c
-index 4da5fc5..d3eb0c2 100644
---- a/sound/soc/pxa/pxa-ssp.c
-+++ b/sound/soc/pxa/pxa-ssp.c
-@@ -794,12 +794,12 @@ static struct snd_soc_dai_driver pxa_ssp_dai = {
- 		.ops = &pxa_ssp_dai_ops,
- };
- 
--static __devinit int asoc_ssp_probe(struct platform_device *pdev)
-+static int asoc_ssp_probe(struct platform_device *pdev)
- {
- 	return snd_soc_register_dai(&pdev->dev, &pxa_ssp_dai);
- }
- 
--static int __devexit asoc_ssp_remove(struct platform_device *pdev)
-+static int asoc_ssp_remove(struct platform_device *pdev)
- {
- 	snd_soc_unregister_dai(&pdev->dev);
- 	return 0;
-@@ -812,7 +812,7 @@ static struct platform_driver asoc_ssp_driver = {
- 	},
- 
- 	.probe = asoc_ssp_probe,
--	.remove = __devexit_p(asoc_ssp_remove),
-+	.remove = asoc_ssp_remove,
- };
- 
- module_platform_driver(asoc_ssp_driver);
-diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
-index 06ea2744..4b0a009 100644
---- a/sound/soc/pxa/pxa2xx-ac97.c
-+++ b/sound/soc/pxa/pxa2xx-ac97.c
-@@ -104,7 +104,7 @@ static int pxa2xx_ac97_resume(struct snd_soc_dai *dai)
- #define pxa2xx_ac97_resume	NULL
- #endif
- 
--static int __devinit pxa2xx_ac97_probe(struct snd_soc_dai *dai)
-+static int pxa2xx_ac97_probe(struct snd_soc_dai *dai)
- {
- 	return pxa2xx_ac97_hw_probe(to_platform_device(dai->dev));
- }
-@@ -234,7 +234,7 @@ static struct snd_soc_dai_driver pxa_ac97_dai_driver[] = {
- 
- EXPORT_SYMBOL_GPL(soc_ac97_ops);
- 
--static __devinit int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
-+static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
- {
- 	if (pdev->id != -1) {
- 		dev_err(&pdev->dev, "PXA2xx has only one AC97 port.\n");
-@@ -249,7 +249,7 @@ static __devinit int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
- 			ARRAY_SIZE(pxa_ac97_dai_driver));
- }
- 
--static int __devexit pxa2xx_ac97_dev_remove(struct platform_device *pdev)
-+static int pxa2xx_ac97_dev_remove(struct platform_device *pdev)
- {
- 	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(pxa_ac97_dai_driver));
- 	return 0;
-@@ -257,7 +257,7 @@ static int __devexit pxa2xx_ac97_dev_remove(struct platform_device *pdev)
- 
- static struct platform_driver pxa2xx_ac97_driver = {
- 	.probe		= pxa2xx_ac97_dev_probe,
--	.remove		= __devexit_p(pxa2xx_ac97_dev_remove),
-+	.remove		= pxa2xx_ac97_dev_remove,
- 	.driver		= {
- 		.name	= "pxa2xx-ac97",
- 		.owner	= THIS_MODULE,
-diff --git a/sound/soc/pxa/pxa2xx-i2s.c b/sound/soc/pxa/pxa2xx-i2s.c
-index 3075a42..6b1a06f 100644
---- a/sound/soc/pxa/pxa2xx-i2s.c
-+++ b/sound/soc/pxa/pxa2xx-i2s.c
-@@ -365,7 +365,7 @@ static int pxa2xx_i2s_drv_probe(struct platform_device *pdev)
- 	return snd_soc_register_dai(&pdev->dev, &pxa_i2s_dai);
- }
- 
--static int __devexit pxa2xx_i2s_drv_remove(struct platform_device *pdev)
-+static int pxa2xx_i2s_drv_remove(struct platform_device *pdev)
- {
- 	snd_soc_unregister_dai(&pdev->dev);
- 	return 0;
-@@ -373,7 +373,7 @@ static int __devexit pxa2xx_i2s_drv_remove(struct platform_device *pdev)
- 
- static struct platform_driver pxa2xx_i2s_driver = {
- 	.probe = pxa2xx_i2s_drv_probe,
--	.remove = __devexit_p(pxa2xx_i2s_drv_remove),
-+	.remove = pxa2xx_i2s_drv_remove,
- 
- 	.driver = {
- 		.name = "pxa2xx-i2s",
-diff --git a/sound/soc/pxa/pxa2xx-pcm.c b/sound/soc/pxa/pxa2xx-pcm.c
-index fdd6bed..ecff116 100644
---- a/sound/soc/pxa/pxa2xx-pcm.c
-+++ b/sound/soc/pxa/pxa2xx-pcm.c
-@@ -120,12 +120,12 @@ static struct snd_soc_platform_driver pxa2xx_soc_platform = {
- 	.pcm_free	= pxa2xx_pcm_free_dma_buffers,
- };
- 
--static int __devinit pxa2xx_soc_platform_probe(struct platform_device *pdev)
-+static int pxa2xx_soc_platform_probe(struct platform_device *pdev)
- {
- 	return snd_soc_register_platform(&pdev->dev, &pxa2xx_soc_platform);
- }
- 
--static int __devexit pxa2xx_soc_platform_remove(struct platform_device *pdev)
-+static int pxa2xx_soc_platform_remove(struct platform_device *pdev)
- {
- 	snd_soc_unregister_platform(&pdev->dev);
- 	return 0;
-@@ -138,7 +138,7 @@ static struct platform_driver pxa_pcm_driver = {
- 	},
- 
- 	.probe = pxa2xx_soc_platform_probe,
--	.remove = __devexit_p(pxa2xx_soc_platform_remove),
-+	.remove = pxa2xx_soc_platform_remove,
- };
- 
- module_platform_driver(pxa_pcm_driver);
-diff --git a/sound/soc/pxa/tosa.c b/sound/soc/pxa/tosa.c
-index 2aec63f..a3fe191 100644
---- a/sound/soc/pxa/tosa.c
-+++ b/sound/soc/pxa/tosa.c
-@@ -241,7 +241,7 @@ static struct snd_soc_card tosa = {
- 	.num_links = ARRAY_SIZE(tosa_dai),
- };
- 
--static int __devinit tosa_probe(struct platform_device *pdev)
-+static int tosa_probe(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = &tosa;
- 	int ret;
-@@ -262,7 +262,7 @@ static int __devinit tosa_probe(struct platform_device *pdev)
- 	return ret;
- }
- 
--static int __devexit tosa_remove(struct platform_device *pdev)
-+static int tosa_remove(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = platform_get_drvdata(pdev);
- 
-@@ -277,7 +277,7 @@ static struct platform_driver tosa_driver = {
- 		.owner	= THIS_MODULE,
- 	},
- 	.probe		= tosa_probe,
--	.remove		= __devexit_p(tosa_remove),
-+	.remove		= tosa_remove,
- };
- 
- module_platform_driver(tosa_driver);
-diff --git a/sound/soc/pxa/ttc-dkb.c b/sound/soc/pxa/ttc-dkb.c
-index 935491a..f4ea4f6 100644
---- a/sound/soc/pxa/ttc-dkb.c
-+++ b/sound/soc/pxa/ttc-dkb.c
-@@ -131,7 +131,7 @@ static struct snd_soc_card ttc_dkb_card = {
- 	.num_dapm_routes = ARRAY_SIZE(ttc_audio_map),
- };
- 
--static int __devinit ttc_dkb_probe(struct platform_device *pdev)
-+static int ttc_dkb_probe(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = &ttc_dkb_card;
- 	int ret;
-@@ -146,7 +146,7 @@ static int __devinit ttc_dkb_probe(struct platform_device *pdev)
- 	return ret;
- }
- 
--static int __devexit ttc_dkb_remove(struct platform_device *pdev)
-+static int ttc_dkb_remove(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = platform_get_drvdata(pdev);
- 
-@@ -161,7 +161,7 @@ static struct platform_driver ttc_dkb_driver = {
- 		.owner	= THIS_MODULE,
- 	},
- 	.probe		= ttc_dkb_probe,
--	.remove		= __devexit_p(ttc_dkb_remove),
-+	.remove		= ttc_dkb_remove,
- };
- 
- module_platform_driver(ttc_dkb_driver);
+ module_platform_driver(tobermory_driver);
 -- 
 1.8.0.1
