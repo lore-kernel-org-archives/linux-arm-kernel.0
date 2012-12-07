@@ -1,69 +1,64 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 7 Dec 2012 14:26:34 -0600
-Subject: [PATCH] ARM: OMAP4: Fix EMU clock domain always on
-Message-ID: <1354911994-20045-1-git-send-email-jon-hunter@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri,  7 Dec 2012 21:06:26 +0000
+Subject: [PATCH 1/7] arm: Move sp810.h to include/linux/amba/
+In-Reply-To: <1354914392-9634-1-git-send-email-catalin.marinas@arm.com>
+References: <1354914392-9634-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1354914392-9634-2-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit d043d87 (ARM: OMAP2+: clockdomain: bypass clockdomain handling
-when disabling unused clks) skips the decrementing of a clock-domains
-use count if the clocks use count is zero. However, for OMAP4 devices
-this is causing the EMU clock-domain to be stuck ON as the use count is
-not getting decremented correctly.
+Since it is now used by code under drivers/clk/ it makes sense for this
+file to be in a more generic location. This is required for building
+vexpress support on arm64.
 
-The scenario that leads to this problem is described below ...
-
-omap_hwmod_setup_all
---> _setup
-    --> clkdm_hwmod_enable
-    	--> EMU clock domain usecount = 1
-    --> _enable_clocks
-        --> clk_enable
-	    --> trace_clk_div_div usecount = 1
-            --> clkdm_hwmod_enable
-    	        --> EMU clock domain usecount = 2
---> _idle
-    --> _disable_clocks
-	--> clk_disable
-            --> trace_clk_div_div usecount = 0
-            --> clkdm_hwmod_disable
-                --> skips decrement of EMU clock domain usecount
-		    because trace_clk_div_div is 0!
-    	        --> EMU clock domain usecount = 2
-    --> clkdm_hwmod_disable
-    	--> EMU clock domain usecount = 1
-
-Hence, due to the order that a clocks use count is decremented and the
-clock domain is disabled, it is possible that the clock domain can have
-a non-zero use count when the actual clock has a use count of 0.
-Therefore, we should only bypass the clock-domain handling when both the
-clock-domain and clock in the clock-domain have a use count of 0 and
-warn when the clock-domain has a zero use count and the clock has a
-non-zero use count.
-
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Acked-by: Pawel Moll <pawel.moll@arm.com>
+Cc: Shiraz Hashim <shiraz.hashim@st.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
+ arch/arm/plat-spear/restart.c                                 | 2 +-
+ drivers/clk/versatile/clk-vexpress.c                          | 3 +--
+ {arch/arm/include/asm/hardware => include/linux/amba}/sp810.h | 0
+ 3 files changed, 2 insertions(+), 3 deletions(-)
+ rename {arch/arm/include/asm/hardware => include/linux/amba}/sp810.h (100%)
 
-Based and test on current linux-next tree. This has been boot tested
-on OMAP2420, OMAP3430 and OMAP4430. I have validated suspend is working
-on OMAP3430.
-
- arch/arm/mach-omap2/clockdomain.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 3848735..0b5452d 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -998,7 +998,8 @@ int clkdm_clk_disable(struct clockdomain *clkdm, struct clk *clk)
- 	spin_lock_irqsave(&clkdm->lock, flags);
+diff --git a/arch/arm/plat-spear/restart.c b/arch/arm/plat-spear/restart.c
+index 4f99011..7d4616d 100644
+--- a/arch/arm/plat-spear/restart.c
++++ b/arch/arm/plat-spear/restart.c
+@@ -11,8 +11,8 @@
+  * warranty of any kind, whether express or implied.
+  */
+ #include <linux/io.h>
++#include <linux/amba/sp810.h>
+ #include <asm/system_misc.h>
+-#include <asm/hardware/sp810.h>
+ #include <mach/spear.h>
+ #include <mach/generic.h>
  
- 	/* corner case: disabling unused clocks */
--	if (__clk_get_enable_count(clk) == 0)
-+	if ((__clk_get_enable_count(clk) == 0) &&
-+			(atomic_read(&clkdm->usecount) == 0))
- 		goto ccd_exit;
+diff --git a/drivers/clk/versatile/clk-vexpress.c b/drivers/clk/versatile/clk-vexpress.c
+index c742ac7..4f83ff9 100644
+--- a/drivers/clk/versatile/clk-vexpress.c
++++ b/drivers/clk/versatile/clk-vexpress.c
+@@ -11,6 +11,7 @@
+  * Copyright (C) 2012 ARM Limited
+  */
  
- 	if (atomic_read(&clkdm->usecount) == 0) {
--- 
-1.7.10.4
++#include <linux/amba/sp810.h>
+ #include <linux/clkdev.h>
+ #include <linux/clk-provider.h>
+ #include <linux/err.h>
+@@ -18,8 +19,6 @@
+ #include <linux/of_address.h>
+ #include <linux/vexpress.h>
+ 
+-#include <asm/hardware/sp810.h>
+-
+ static struct clk *vexpress_sp810_timerclken[4];
+ static DEFINE_SPINLOCK(vexpress_sp810_lock);
+ 
+diff --git a/arch/arm/include/asm/hardware/sp810.h b/include/linux/amba/sp810.h
+similarity index 100%
+rename from arch/arm/include/asm/hardware/sp810.h
+rename to include/linux/amba/sp810.h
