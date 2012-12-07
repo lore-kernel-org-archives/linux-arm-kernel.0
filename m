@@ -1,66 +1,37 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu,  6 Dec 2012 17:28:37 -0700
-Subject: [PATCH 3/3] ARM: tegra: paz00: enable HDMI port
-In-Reply-To: <1354840117-31264-1-git-send-email-swarren@wwwdotorg.org>
-References: <1354840117-31264-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1354840117-31264-4-git-send-email-swarren@wwwdotorg.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 6 Dec 2012 19:49:33 -0500
+Subject: [PATCH] ARM: Kirkwood: Add SPI_CHPA and SPI_CPOL support to
+ spi-orion
+In-Reply-To: <20121207001433.GG25069@obsidianresearch.com>
+References: <20121121192335.GA14868@obsidianresearch.com>
+ <20121206142521.4185A3E0948@localhost>
+ <20121206172504.GB9676@obsidianresearch.com>
+ <20121206232305.719E23E0B24@localhost>
+ <20121206234917.GF25069@obsidianresearch.com>
+ <20121206235311.GB21694@titan.lakedaemon.net>
+ <20121207001433.GG25069@obsidianresearch.com>
+Message-ID: <20121207004933.GC21694@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Thu, Dec 06, 2012 at 05:14:33PM -0700, Jason Gunthorpe wrote:
+> On Thu, Dec 06, 2012 at 06:53:11PM -0500, Jason Cooper wrote:
+> > On Thu, Dec 06, 2012 at 04:49:17PM -0700, Jason Gunthorpe wrote:
+> > > Jason: Do you have any of these possibly affected boards with a SPI
+> > > flash to test linux-next? dove, dreamplug, ts219 and lsxl
+> > 
+> > Yep, dreamplug ought to do.
+> 
+> Hmm, I just reviewed all the FLASH P/Ns datasheets in the affected DT
+> files, and they are all mode 0/mode 3 compatible - that is the linux
+> default mode so I expect everything to work OK.
+> 
+> If your dreamplug is fine lets just leave it?
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/boot/dts/tegra20-paz00.dts |   18 +++++++++++++++---
- 1 file changed, 15 insertions(+), 3 deletions(-)
+Unfortunately, I'm unable to test until next week.  If Grant is
+comfortable with it as is, I have no objection.  If he isn't, I'll try
+to test it next week when I return home.
 
-diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
-index 6a93d14..1062798 100644
---- a/arch/arm/boot/dts/tegra20-paz00.dts
-+++ b/arch/arm/boot/dts/tegra20-paz00.dts
-@@ -10,6 +10,18 @@
- 		reg = <0x00000000 0x20000000>;
- 	};
- 
-+	host1x {
-+		hdmi {
-+			status = "okay";
-+
-+			vdd-supply = <&hdmi_vdd_reg>;
-+			pll-supply = <&hdmi_pll_reg>;
-+
-+			nvidia,ddc-i2c-bus = <&hdmi_ddc>;
-+			nvidia,hpd-gpio = <&gpio 111 0>; /* PN7 */
-+		};
-+	};
-+
- 	pinmux {
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&state_default>;
-@@ -252,7 +264,7 @@
- 		};
- 	};
- 
--	i2c at 7000c400 {
-+	hdmi_ddc: i2c at 7000c400 {
- 		status = "okay";
- 		clock-frequency = <400000>;
- 	};
-@@ -367,13 +379,13 @@
- 					regulator-max-microvolt = <1800000>;
- 				};
- 
--				ldo7 {
-+				hdmi_vdd_reg: ldo7 {
- 					regulator-name = "+3.3vs_ldo7,avdd_hdmi";
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 				};
- 
--				ldo8 {
-+				hdmi_pll_reg: ldo8 {
- 					regulator-name = "+1.8vs_ldo8,avdd_hdmi_pll";
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
--- 
-1.7.10.4
+thx,
+
+Jason.
