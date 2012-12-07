@@ -1,46 +1,38 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  7 Dec 2012 23:10:19 +0100
-Subject: [RFC v1 RESEND 16/16] arm: mvebu: update defconfig with PCI and USB
- support
-In-Reply-To: <1354918219-32364-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1354918219-32364-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1354918219-32364-17-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri,  7 Dec 2012 23:04:30 +0100
+Subject: [RFC v1 07/16] arm: plat-orion: make common PCIe code usable on mvebu
+In-Reply-To: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1354917879-32073-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have the necessary drivers and Device Tree informations to
-support PCIe on Armada 370 and Armada XP, enable the CONFIG_PCI
-option.
+mvebu is a new-style Orion platform, so it only selects PLAT_ORION,
+but not PLAT_ORION_LEGACY. It will however need the common PCIe code
+from plat-orion, so make this code available for PLAT_ORION platforms
+as a whole, and not only PLAT_ORION_LEGACY platforms.
 
-Also, since the Armada 370 Mirabox has a built-in USB XHCI controller
-connected on the PCIe bus, enable the corresponding options as well.
+We also take this opportunity to build the PCIe code only when
+CONFIG_PCI is enabled.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/configs/mvebu_defconfig |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/plat-orion/Makefile |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index a702fb3..cf597db 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -13,6 +13,7 @@ CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_XP=y
- # CONFIG_CACHE_L2X0 is not set
- # CONFIG_SWP_EMULATE is not set
-+CONFIG_PCI=y
- CONFIG_SMP=y
- # CONFIG_LOCAL_TIMERS is not set
- CONFIG_AEABI=y
-@@ -38,7 +39,8 @@ CONFIG_I2C=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB=y
-+CONFIG_USB_XHCI_HCD=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_S35390A=y
- CONFIG_DMADEVICES=y
+diff --git a/arch/arm/plat-orion/Makefile b/arch/arm/plat-orion/Makefile
+index a82cecb..1aca22b 100644
+--- a/arch/arm/plat-orion/Makefile
++++ b/arch/arm/plat-orion/Makefile
+@@ -4,7 +4,8 @@
+ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
+ 
+ obj-y                             += addr-map.o
++obj-$(CONFIG_PCI)                 += pcie.o
+ 
+ orion-gpio-$(CONFIG_GENERIC_GPIO) += gpio.o
+-obj-$(CONFIG_PLAT_ORION_LEGACY)   += irq.o pcie.o time.o common.o mpp.o
++obj-$(CONFIG_PLAT_ORION_LEGACY)   += irq.o time.o common.o mpp.o
+ obj-$(CONFIG_PLAT_ORION_LEGACY)   += $(orion-gpio-y)
 -- 
 1.7.9.5
