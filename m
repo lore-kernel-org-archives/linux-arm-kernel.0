@@ -1,44 +1,68 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 07 Dec 2012 10:08:20 -0700
-Subject: [PATCH V3 11/11] ARM: delete struct sys_timer
-In-Reply-To: <50C1BC10.8000506@compulab.co.il>
-References: <1353349867-28494-1-git-send-email-swarren@wwwdotorg.org>
- <1353349867-28494-12-git-send-email-swarren@wwwdotorg.org>
- <50C1BC10.8000506@compulab.co.il>
-Message-ID: <50C22284.8050704@wwwdotorg.org>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 07 Dec 2012 12:13:56 -0500
+Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
+ across all cpus
+In-Reply-To: <20121207164530.GX14363@n2100.arm.linux.org.uk>
+References: <1354817466.30905.13.camel@linaro1.home>
+ <1354821581.17101.17.camel@gandalf.local.home>
+ <1354872138.3176.15.camel@computer5.home>
+ <1354888985.17101.41.camel@gandalf.local.home>
+ <1354892111.13000.50.camel@linaro1.home>
+ <1354894134.17101.44.camel@gandalf.local.home>
+ <20121207162346.GW14363@n2100.arm.linux.org.uk>
+ <1354898200.17101.50.camel@gandalf.local.home>
+ <20121207164530.GX14363@n2100.arm.linux.org.uk>
+Message-ID: <1354900436.17101.58.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/2012 02:51 AM, Igor Grinberg wrote:
-> Hi Stephen,
+On Fri, 2012-12-07 at 16:45 +0000, Russell King - ARM Linux wrote:
+> On Fri, Dec 07, 2012 at 11:36:40AM -0500, Steven Rostedt wrote:
+
+> > But what about the limitations that the function tracer imposes on the
+> > code that gets modified by stop_machine()?
+> > 
+> > 1) the original code is simply a call to mcount
+> > 
+> > 2) on boot up, that call gets converted into a nop
+> > 
+> > 3) the code that gets changed will only be converting a nop to a call
+> > into the function tracer, and back again.
+> > 
+> > IOW, it's a very limited subset of the ARM assembly that gets touched.
+> > I'm not sure what the op codes are for the above, but I can imagine they
+> > don't impose the prefixes as you described.
+> > 
+> > If that's the case, is it still possible to change to the breakpoint
+> > method?
 > 
-> I've only now bumped into the patchset (working the back log on linux-arm).
-> Sorry for late reply, but I guess you should have Cc'd the relevant
-> mailing lists with such changes.
-> Cc'd now.
+> I have no idea; I've no idea how ftrace works on ARM.
 
-Perhaps. There's a trade-off with spamming tens of subarch lists though,
-and the OMAP maintainer and LAKML were CC'd.
+I know how ftrace works on ARM, I'm just asking about the way the
+architecture works in general. So to answer my question, you don't need
+to know anything about ftrace. I'll make my question more general:
 
-> On 11/19/12 20:31, Stephen Warren wrote:
->> Now that the only field in struct sys_timer is .init, delete the struct,
->> and replace the machine descriptor .timer field with the initialization
->> function itself.
->>
->> This will enable moving timer drivers into drivers/clocksource without
->> having to place a public prototype of each struct sys_timer object into
->> include/linux; the intent is to create a single of_clocksource_init()
->> function that determines which timer driver to initialize by scanning
->> the device dtree, much like the proposed irqchip_init() at:
->> http://www.spinics.net/lists/arm-kernel/msg203686.html
-...
->> The patch is very large, so I've trimmed it for the mailing list, leaving
->> only the core ARM changes, changes outside arch/arm, and a single machine
->> example. The full series can be found at:
->>
->> git://nv-tegra.nvidia.com/user/swarren/linux-2.6 arm_timer_rework
-...
-> I've looked at the omap2+ changes and I think OMAP4 and 5 got messed up a bit...
-> the below (compile tested on omap2plus only) should be applied:
+If I have a nop, that is a size of a call (branch and link), which is
+near the beginning of a function and not part of any conditional, and I
+want to convert it into a call (branch and link), would adding a
+breakpoint to it, modifying it to the call, and then removing the
+breakpoint be possible? Of course it would require syncing in between
+steps, but my question is, if the above is possible on a thumb2 ARM
+processor?
 
-Thanks; your patch looks correct. I'll fold it into my series.
+
+>   That's something
+> other people use and deal with.  Last (and only) time I used the built-in
+> kernel tracing facilities I ended up giving up with it and going back to
+> using my sched-clock+record+printk based approaches instead on account
+> of the kernels built-in tracing being far too heavy.
+
+Too bad. Which tracing facilities did you use? Function tracing? And
+IIRC, ARM originally had only the static tracing, which was extremely
+heavy weight. Have you tried tracepoints? Also, have you tried my
+favorite way of debugging: trace_printk(). It acts just like printk but
+instead of recording to the console, it records into the ftrace buffer
+which can be read via the /debug/tracing/trace or dumped to the console
+with a sysrq-z.
+
+-- Steve
