@@ -1,316 +1,111 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 7 Dec 2012 07:58:13 +0100
-Subject: [v2 PATCH 07/14] spi/atmel_spi: add DT support
-In-Reply-To: <1354607640-13229-8-git-send-email-wenyou.yang@atmel.com>
-References: <1354607640-13229-1-git-send-email-wenyou.yang@atmel.com>
- <1354607640-13229-8-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20121207065813.GH4398@game.jcrosoft.org>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Fri, 7 Dec 2012 16:02:02 +0900
+Subject: [RFC] gpiolib: introduce descriptor-based GPIO interface
+In-Reply-To: <20121207024947.GA25121@roeck-us.net>
+References: <1354779918-4028-1-git-send-email-acourbot@nvidia.com>
+ <1354779918-4028-2-git-send-email-acourbot@nvidia.com>
+ <20121207024947.GA25121@roeck-us.net>
+Message-ID: <2562815.JQOcF2Dmj3@percival>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:53 Tue 04 Dec     , Wenyou Yang wrote:
-> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> 
-> The atmel_spi use only gpio for chip select.
-no this patch need go on the TOP of mine
+Hi Guenter,
 
-that is plan for 3.8
+On Friday 07 December 2012 10:49:47 Guenter Roeck wrote:
+> My own idea for a solution was to keep integer based handles, but replace
+> gpio_desc[] with a hash table. But ultimately I don't really care how
+> it is done.
+> 
+> Do you have a solution for gpiochip_find_base() in mind, and how to handle
+> reservations ? I had thought about using bit maps, but maybe there is
+> a better solution.
 
-Best Regards,
-J.
+My plan so far is to use a sorted linked list of gpio_chips. Each chip 
+contains its base address and size, so this will make it possible to find 
+usable areas through a single parse. Current gpiochip_find_base() start from 
+ARCH_NR_GPIOS and look backwards in the integer space to find a free range, a 
+similar behavior can also be done if this is deemed better (GPIO numbers might 
+become high, but since we want to hide them this should not matter).
+
+The counterpart of the list is that fetching the descriptor corresponding to a 
+GPIO number is going to be linear instead of constant, but (1) the number of 
+gpio_chips on the system should never grow very high and (2) this is a good 
+incentive to use the descriptor-based API instead. :) Existing code could 
+easily be converted - once a GPIO is acquired, its number should be converted 
+immediatly to a descriptor and the gpiod_* functions used from them on. We can 
+probably write a sed or Coccinelle rule to do that through the whole kernel.
+
+gpiochip_reserve() will require some more thinking using this model, but 
+something like a dummy chip can probably be introduced in the list. It will 
+need to be statically allocated however since memory allocation cannot be used 
+there.
+
+Actually the only user of gpiochip_reserve() seems to be Tosa, so I wonder if 
+there would be no way to simply get rid of it?
+
+> If/when you have some code to test, please let me know.
+
+Sure!
+
+> > +     mutex_lock(&sysfs_lock);
+> > 
+> >       /* can't export until sysfs is available ... */
+> >       if (!gpio_class.p) {
+> > 
+> > @@ -713,13 +743,7 @@ int gpio_export(unsigned gpio, bool
+> > direction_may_change)> 
+> >               return -ENOENT;
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> [wenyou.yang at atmel.com: Add driver data and compatible "atmel,at91sam9260-spi", "atmel,at91sam9x5-spi"]
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: spi-devel-general at lists.sourceforge.net
-> Cc: grant.likely at secretlab.ca
-> Cc: rob.herring at calxeda.com
-> Cc: rob at landley.net
-> Cc: linux-doc at vger.kernel.org
-> Cc: richard.genoud at gmail.com
-> ---
-> Hi, Richard,
+> mutex is not released here.
+
+Oops.
+
+> > -     chip = gpio_to_chip(gpio);
+> > +     chip = desc->chip;
+> > +     gpio = gpio_chip_offset(desc);
 > 
-> This patches is based on the original patch from Jean-Christophe
-> 	[PATCH] spi/atmel: add DT support
-> and merge the patch from Richard Genoud
-> 	[PATCH] spi-atmel OF: complete documentation
-> ane wenyou yang add more compatible "atmel,at91sam9260-spi", "atmel,at91sam9x5-spi", 
-> 	add driver data to get IP version and dma support.
+> Might be better to use a separate variable named 'offset' when dealing with
+> the offset, to avoid confusion and accidential bugs. You are doing it
+> below, so you might as well do it everywhere. This would also simplify the
+> code in a couple of places where gpio is first converted into an offset
+> only to use "chip->base + gpio" later on.
+
+Makes sense. Fixed, thanks.
+
+> > -                                     __func__, gpio, err);
+> > +                                     __func__, offset + chip->base, err);
 > 
-> Could you sign your signature in this patch?
+> I know I am nitpicking, but everywhere in the existing code it is
+> "chip->base + offset/gpio".
+
+Fixed.
+
+> >       return chip->to_irq ? chip->to_irq(chip, gpio - chip->base) :
+> >       -ENXIO;
 > 
-> Best Regards,
-> Wenyou Yang
+> s/gpio - chip->base/gpio_chip_offset(desc)/
 > 
->  .../devicetree/bindings/spi/spi_atmel.txt          |   23 +++++
->  drivers/spi/spi-atmel.c                            |  102 +++++++++++++++++---
->  2 files changed, 113 insertions(+), 12 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel.txt
+> then you don't need gpio at all.
+
+Done, thanks.
+
+> > -     chip = gpio_to_chip(gpio);
+> > +     chip = desc->chip;
+> > +     gpio = desc_to_gpio(desc);
+> > 
+> >       trace_gpio_value(gpio, 0, value);
+> >       if (test_bit(FLAG_OPEN_DRAIN,  &gpio_desc[gpio].flags))
 > 
-> diff --git a/Documentation/devicetree/bindings/spi/spi_atmel.txt b/Documentation/devicetree/bindings/spi/spi_atmel.txt
-> new file mode 100644
-> index 0000000..20cdc91
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/spi/spi_atmel.txt
-> @@ -0,0 +1,23 @@
-> +Atmel SPI device
-> +
-> +Required properties:
-> +- compatible : should be "atmel,at91rm9200-spi".
-> +- reg: Address and length of the register set for the device
-> +- interrupts: Should contain macb interrupt
-> +- cs-gpio: Should contain the GPIOs used for chipselect.
-> +- dma-mask: device coherent dma mask.
-> +
-> +spi0: spi at f0000000 {
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	compatible = "atmel,at91rm9200-spi";
-> +	reg = <0xf0000000 0x100>;
-> +	interrupts = <13 4>;
-> +	cs-gpios = <&pioA 14 0
-> +		    &pioA 7 0 /* conflicts with TXD2 */
-> +		    &pioA 1 0 /* conflicts with RXD0 */
-> +		    &pioB 3 0 /* conflicts with ERXDV */
-> +		   >;
-> +	dma-mask = <0xffffffff>;
-> +	status = "disabled";
-> +};
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 37f54c3..e032e3d 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -19,6 +19,7 @@
->  #include <linux/interrupt.h>
->  #include <linux/spi/spi.h>
->  #include <linux/slab.h>
-> +#include <linux/of.h>
->  
->  #include <asm/io.h>
->  #include <mach/board.h>
-> @@ -185,6 +186,10 @@
->   * DMA transfers; transfer queue progress is driven by IRQs.  The clock
->   * framework provides the base clock, subdivided for each spi_device.
->   */
-> +struct atmel_spi_pdata {
-> +	u8			version;
-> +};
-> +
->  struct atmel_spi {
->  	spinlock_t		lock;
->  	unsigned long		flags;
-> @@ -203,6 +208,7 @@ struct atmel_spi {
->  	struct spi_transfer	*next_transfer;
->  	unsigned long		next_remaining_bytes;
->  	int			done_status;
-> +	struct atmel_spi_pdata	*pdata;
->  
->  	void			*buffer;
->  	dma_addr_t		buffer_dma;
-> @@ -217,6 +223,51 @@ struct atmel_spi_device {
->  #define BUFFER_SIZE		PAGE_SIZE
->  #define INVALID_DMA_ADDRESS	0xffffffff
->  
-> +static struct atmel_spi_pdata at91rm9200_config = {
-> +	.version = 1,
-> +};
-> +
-> +static struct atmel_spi_pdata at91sam9260_config = {
-> +	.version = 2,
-> +};
-> +
-> +static struct atmel_spi_pdata at91sam9x5_config = {
-> +	.version = 2,
-> +};
-> +
-> +static const struct platform_device_id atmel_spi_devtypes[] = {
-> +	{
-> +		.name = "spi-at91rm9200",
-> +		.driver_data = (unsigned long) &at91rm9200_config,
-> +	}, {
-> +		.name = "spi-at91sam9260",
-> +		.driver_data = (unsigned long) &at91sam9260_config,
-> +	}, {
-> +		.name = "spi-at91sam9x5",
-> +		.driver_data = (unsigned long) &at91sam9x5_config,
-> +	}, {
-> +		/* sentinel */
-> +	}
-> +};
-> +
-> +#if defined(CONFIG_OF)
-> +static const struct of_device_id atmel_spi_dt_ids[] = {
-> +	{
-> +		.compatible = "atmel,at91rm9200-spi",
-> +		.data = &at91rm9200_config,
-> +	} , {
-> +		.compatible = "atmel,at91sam9260-spi",
-> +		.data = &at91sam9260_config,
-> +	} , {
-> +		.compatible = "atmel,at91sam9x5-spi",
-> +		.data = &at91sam9x5_config,
-> +	}, {
-> +		/* sentinel */
-> +	}
-> +};
-> +MODULE_DEVICE_TABLE(of, atmel_spi_dt_ids);
-> +#endif
-> +
->  /*
->   * Version 2 of the SPI controller has
->   *  - CR.LASTXFER
-> @@ -229,11 +280,15 @@ struct atmel_spi_device {
->   * register, but I haven't checked that it exists on all chips, and
->   * this is cheaper anyway.
->   */
-> -static bool atmel_spi_is_v2(void)
-> +static bool atmel_spi_is_v2(struct atmel_spi *as)
->  {
-> -	return !cpu_is_at91rm9200();
-> +	if (as->pdata->version == 2)
-> +		return true;
-> +	else
-> +		return false;
->  }
->  
-> +
->  /*
->   * Earlier SPI controllers (e.g. on at91rm9200) have a design bug whereby
->   * they assume that spi slave device state will not change on deselect, so
-> @@ -265,7 +320,7 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
->  	unsigned active = spi->mode & SPI_CS_HIGH;
->  	u32 mr;
->  
-> -	if (atmel_spi_is_v2()) {
-> +	if (atmel_spi_is_v2(as)) {
->  		/*
->  		 * Always use CSR0. This ensures that the clock
->  		 * switches to the correct idle polarity before we
-> @@ -320,7 +375,7 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
->  			asd->npcs_pin, active ? " (low)" : "",
->  			mr);
->  
-> -	if (atmel_spi_is_v2() || spi->chip_select != 0)
-> +	if (atmel_spi_is_v2(as) || spi->chip_select != 0)
->  		gpio_set_value(asd->npcs_pin, !active);
->  }
->  
-> @@ -710,7 +765,7 @@ static int atmel_spi_setup(struct spi_device *spi)
->  	u32			scbr, csr;
->  	unsigned int		bits = spi->bits_per_word;
->  	unsigned long		bus_hz;
-> -	unsigned int		npcs_pin;
-> +	int			npcs_pin;
->  	int			ret;
->  
->  	as = spi_master_get_devdata(spi->master);
-> @@ -733,7 +788,7 @@ static int atmel_spi_setup(struct spi_device *spi)
->  	}
->  
->  	/* see notes above re chipselect */
-> -	if (!atmel_spi_is_v2()
-> +	if (!atmel_spi_is_v2(as)
->  			&& spi->chip_select == 0
->  			&& (spi->mode & SPI_CS_HIGH)) {
->  		dev_dbg(&spi->dev, "setup: can't be active-high\n");
-> @@ -742,7 +797,7 @@ static int atmel_spi_setup(struct spi_device *spi)
->  
->  	/* v1 chips start out at half the peripheral bus speed. */
->  	bus_hz = clk_get_rate(as->clk);
-> -	if (!atmel_spi_is_v2())
-> +	if (!atmel_spi_is_v2(as))
->  		bus_hz /= 2;
->  
->  	if (spi->max_speed_hz) {
-> @@ -782,7 +837,9 @@ static int atmel_spi_setup(struct spi_device *spi)
->  	csr |= SPI_BF(DLYBCT, 0);
->  
->  	/* chipselect must have been muxed as GPIO (e.g. in board setup) */
-> -	npcs_pin = (unsigned int)spi->controller_data;
-> +	if (!gpio_is_valid(spi->cs_gpio))
-> +		spi->cs_gpio = (int)spi->controller_data;
-> +	npcs_pin = spi->cs_gpio;
->  	asd = spi->controller_state;
->  	if (!asd) {
->  		asd = kzalloc(sizeof(struct atmel_spi_device), GFP_KERNEL);
-> @@ -812,7 +869,7 @@ static int atmel_spi_setup(struct spi_device *spi)
->  		"setup: %lu Hz bpw %u mode 0x%x -> csr%d %08x\n",
->  		bus_hz / scbr, bits, spi->mode, spi->chip_select, csr);
->  
-> -	if (!atmel_spi_is_v2())
-> +	if (!atmel_spi_is_v2(as))
->  		spi_writel(as, CSR0 + 4 * spi->chip_select, csr);
->  
->  	return 0;
-> @@ -899,7 +956,7 @@ static void atmel_spi_cleanup(struct spi_device *spi)
->  {
->  	struct atmel_spi	*as = spi_master_get_devdata(spi->master);
->  	struct atmel_spi_device	*asd = spi->controller_state;
-> -	unsigned		gpio = (unsigned) spi->controller_data;
-> +	unsigned		gpio = spi->cs_gpio;
->  
->  	if (!asd)
->  		return;
-> @@ -916,6 +973,21 @@ static void atmel_spi_cleanup(struct spi_device *spi)
->  	kfree(asd);
->  }
->  
-> +static struct atmel_spi_pdata * __devinit atmel_spi_get_driver_data(
-> +					struct platform_device *pdev)
-> +{
-> +	if (pdev->dev.of_node) {
-> +		const struct of_device_id *match;
-> +		match = of_match_node(atmel_spi_dt_ids, pdev->dev.of_node);
-> +		if (!match)
-> +			return NULL;
-> +		return (struct atmel_spi_pdata *) match->data;
-> +	}
-> +
-> +	return (struct atmel_spi_pdata *)
-> +			platform_get_device_id(pdev)->driver_data;
-> +}
-> +
->  /*-------------------------------------------------------------------------*/
->  
->  static int __devinit atmel_spi_probe(struct platform_device *pdev)
-> @@ -949,7 +1021,8 @@ static int __devinit atmel_spi_probe(struct platform_device *pdev)
->  	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
->  
->  	master->bus_num = pdev->id;
-> -	master->num_chipselect = 4;
-> +	master->dev.of_node = pdev->dev.of_node;
-> +	master->num_chipselect = master->dev.of_node ? 0 : 4;
->  	master->setup = atmel_spi_setup;
->  	master->transfer = atmel_spi_transfer;
->  	master->cleanup = atmel_spi_cleanup;
-> @@ -981,6 +1054,10 @@ static int __devinit atmel_spi_probe(struct platform_device *pdev)
->  	if (ret)
->  		goto out_unmap_regs;
->  
-> +	as->pdata = atmel_spi_get_driver_data(pdev);
-> +	if (!as->pdata)
-> +		goto out_unmap_regs;
-> +
->  	/* Initialize the hardware */
->  	clk_enable(clk);
->  	spi_writel(as, CR, SPI_BIT(SWRST));
-> @@ -1078,12 +1155,13 @@ static int atmel_spi_resume(struct platform_device *pdev)
->  #define	atmel_spi_resume	NULL
->  #endif
->  
-> -
->  static struct platform_driver atmel_spi_driver = {
->  	.driver		= {
->  		.name	= "atmel_spi",
->  		.owner	= THIS_MODULE,
-> +		.of_match_table	= of_match_ptr(atmel_spi_dt_ids),
->  	},
-> +	.id_table	= atmel_spi_devtypes,
->  	.suspend	= atmel_spi_suspend,
->  	.resume		= atmel_spi_resume,
->  	.probe		= atmel_spi_probe,
-> -- 
-> 1.7.9.5
+> Use desc directly.
 > 
+> > -             _gpio_set_open_drain_value(gpio, chip, value);
+> > +             _gpio_set_open_drain_value(desc, value);
+> > 
+> >       else if (test_bit(FLAG_OPEN_SOURCE,  &gpio_desc[gpio].flags))
+> 
+> Use desc directly.
+
+Right.
+
+Thanks,
+Alex.
