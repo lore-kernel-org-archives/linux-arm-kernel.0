@@ -1,53 +1,44 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Fri, 7 Dec 2012 17:02:15 +0000
-Subject: [PATCH 0/6 v10] gpio: Add block GPIO
-In-Reply-To: <50C1DE21.8050709@antcom.de>
-References: <1354830456-17590-1-git-send-email-stigge@antcom.de>
- <20121207103643.34ca6dc5@pyramind.ukuu.org.uk>
- <50C1DBD4.1040007@antcom.de> <50C1DE21.8050709@antcom.de>
-Message-ID: <20121207170215.0057f791@pyramind.ukuu.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 07 Dec 2012 10:08:20 -0700
+Subject: [PATCH V3 11/11] ARM: delete struct sys_timer
+In-Reply-To: <50C1BC10.8000506@compulab.co.il>
+References: <1353349867-28494-1-git-send-email-swarren@wwwdotorg.org>
+ <1353349867-28494-12-git-send-email-swarren@wwwdotorg.org>
+ <50C1BC10.8000506@compulab.co.il>
+Message-ID: <50C22284.8050704@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 07 Dec 2012 13:16:33 +0100
-Roland Stigge <stigge@antcom.de> wrote:
-
-> On 12/07/2012 01:06 PM, Roland Stigge wrote:
-> > On 12/07/2012 11:36 AM, Alan Cox wrote:
-> >>> * Device interface for userland access (alternative to sysfs)
-> >>
-> >> Currently we can set different permissions on different GPIO lines. Your
-> >> driver change drives a truck through this facility.
+On 12/07/2012 02:51 AM, Igor Grinberg wrote:
+> Hi Stephen,
 > 
-> What I maybe misread in your concern: The dev interface is actually an
-> "alternative to sysfs for block GPIO", not considered as a replacement
-> for the current sysfs interface for _single_ GPIOs.
+> I've only now bumped into the patchset (working the back log on linux-arm).
+> Sorry for late reply, but I guess you should have Cc'd the relevant
+> mailing lists with such changes.
+> Cc'd now.
 
-That is the problem. If you add the driver then you can no longer
-implement the same permissions per node. If I've got a typical hardened
-embedded device running something like SMACK I can tie a few gpio lines
-to specific tasks in the security model.
+Perhaps. There's a trade-off with spamming tens of subarch lists though,
+and the OMAP maintainer and LAKML were CC'd.
 
-The moment there is another driver anyone who can open that driver can
-bypass all the security rules being imposed.
+> On 11/19/12 20:31, Stephen Warren wrote:
+>> Now that the only field in struct sys_timer is .init, delete the struct,
+>> and replace the machine descriptor .timer field with the initialization
+>> function itself.
+>>
+>> This will enable moving timer drivers into drivers/clocksource without
+>> having to place a public prototype of each struct sys_timer object into
+>> include/linux; the intent is to create a single of_clocksource_init()
+>> function that determines which timer driver to initialize by scanning
+>> the device dtree, much like the proposed irqchip_init() at:
+>> http://www.spinics.net/lists/arm-kernel/msg203686.html
+...
+>> The patch is very large, so I've trimmed it for the mailing list, leaving
+>> only the core ARM changes, changes outside arch/arm, and a single machine
+>> example. The full series can be found at:
+>>
+>> git://nv-tegra.nvidia.com/user/swarren/linux-2.6 arm_timer_rework
+...
+> I've looked at the omap2+ changes and I think OMAP4 and 5 got messed up a bit...
+> the below (compile tested on omap2plus only) should be applied:
 
-The basic problem is that right now our mapping is
-
-"gpio line is a file system object"
-
-you change it to
-
-"all gpio lines are a single file system object"
-
-Thats a bit like moving from "each document has permissions" to "allo my
-documents have one permission set between them"
-
-That makes it a very big step backwards and a fundamental change to the
-entire auth model. It's not too horrendous in the case that the block
-GPIO interface is the least restrictive case, but its very bad the
-other way around.
-
-The problem isn't the block API, the problem is changing the entire file
-system level view of what a GPIO is and how it is access controlled.
-
-Alan
+Thanks; your patch looks correct. I'll fold it into my series.
