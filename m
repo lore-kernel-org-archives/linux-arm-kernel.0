@@ -1,182 +1,54 @@
-From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
-Date: Sat,  8 Dec 2012 08:15:50 +0900
-Subject: [PATCH 1/2] thermal: Add support for thermal sensor for Kirkwood SoC
-Message-ID: <1354922151-3250-1-git-send-email-iwamatsu@nigauri.org>
+From: mgherzan@gmail.com (Mircea Gherzan)
+Date: Sat, 08 Dec 2012 00:04:42 +0100
+Subject: [PATCH 1/2] ARM: net: bpf_jit_32: fix kzalloc gfp/size mismatch.
+In-Reply-To: <1354804718-1662-1-git-send-email-nschichan@freebox.fr>
+References: <1354804718-1662-1-git-send-email-nschichan@freebox.fr>
+Message-ID: <50C2760A.9070406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some kirkwood SoC has thermal sensor.
-This patch adds support for 88F6282 and 88F6283.
+Am 06.12.2012 15:38, schrieb Nicolas Schichan:
+> Official prototype for kzalloc is:
+> 
+> void *kzalloc(size_t, gfp_t);
+> 
+> The ARM bpf_jit code was having the assumption that it was:
+> 
+> void *kzalloc(gfp_t, size);
+> 
+> This was resulting the use of some random GFP flags depending on the
+> size requested and some random overflows once the really needed size
+> was more than the value of GFP_KERNEL.
+> 
+> This bug was present since the original inclusion of bpf_jit for ARM
+> (ddecdfce: ARM: 7259/3: net: JIT compiler for packet filters).
+> 
+> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+> ---
+>  arch/arm/net/bpf_jit_32.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+> index c641fb6..a64d349 100644
+> --- a/arch/arm/net/bpf_jit_32.c
+> +++ b/arch/arm/net/bpf_jit_32.c
+> @@ -845,7 +845,7 @@ void bpf_jit_compile(struct sk_filter *fp)
+>  	ctx.skf		= fp;
+>  	ctx.ret0_fp_idx = -1;
+>  
+> -	ctx.offsets = kzalloc(GFP_KERNEL, 4 * (ctx.skf->len + 1));
+> +	ctx.offsets = kzalloc(4 * (ctx.skf->len + 1), GFP_KERNEL);
+>  	if (ctx.offsets == NULL)
+>  		return;
+>  
+> @@ -864,7 +864,7 @@ void bpf_jit_compile(struct sk_filter *fp)
+>  
+>  	ctx.idx += ctx.imm_count;
+>  	if (ctx.imm_count) {
+> -		ctx.imms = kzalloc(GFP_KERNEL, 4 * ctx.imm_count);
+> +		ctx.imms = kzalloc(4 * ctx.imm_count, GFP_KERNEL);
+>  		if (ctx.imms == NULL)
+>  			goto out;
+>  	}
 
-Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
----
- drivers/thermal/Kconfig            |    7 ++
- drivers/thermal/Makefile           |    1 +
- drivers/thermal/kirkwood_thermal.c |  131 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 139 insertions(+)
- create mode 100644 drivers/thermal/kirkwood_thermal.c
-
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index e1cb6bd..8710ac2 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -55,3 +55,10 @@ config EXYNOS_THERMAL
- 	help
- 	  If you say yes here you get support for TMU (Thermal Managment
- 	  Unit) on SAMSUNG EXYNOS series of SoC.
-+
-+config KIRKWOOD_THERMAL
-+	tristate "Temperature sensor on Marvel Kirkwood"
-+	depends on ARCH_KIRKWOOD && THERMAL
-+	help
-+	  Support for the Kirkwood thermal sensor driver into the Linux thermal
-+	  framework. This supports only 88F6282 and 88F6283.
-diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-index 885550d..4dbe5e1 100644
---- a/drivers/thermal/Makefile
-+++ b/drivers/thermal/Makefile
-@@ -6,4 +6,5 @@ obj-$(CONFIG_THERMAL)		+= thermal_sys.o
- obj-$(CONFIG_CPU_THERMAL)		+= cpu_cooling.o
- obj-$(CONFIG_SPEAR_THERMAL)		+= spear_thermal.o
- obj-$(CONFIG_RCAR_THERMAL)	+= rcar_thermal.o
-+obj-$(CONFIG_KIRKWOOD_THERMAL)         += kirkwood_thermal.o
- obj-$(CONFIG_EXYNOS_THERMAL)		+= exynos_thermal.o
-diff --git a/drivers/thermal/kirkwood_thermal.c b/drivers/thermal/kirkwood_thermal.c
-new file mode 100644
-index 0000000..bddcf49
---- /dev/null
-+++ b/drivers/thermal/kirkwood_thermal.c
-@@ -0,0 +1,131 @@
-+/*
-+ * kirkwood thermal sensor driver
-+ *
-+ * Copyright (C) 2012 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/thermal.h>
-+
-+#define THERMAL_VALID_OFFSET	9
-+#define THERMAL_VALID_MASK	0x1
-+#define THERMAL_TEMP_OFFSET	10
-+#define THERMAL_TEMP_MASK	0x1FF
-+
-+/* Kirkwood Thermal Sensor Dev Structure */
-+struct kirkwood_thermal_dev {
-+	void __iomem *base_addr;
-+};
-+
-+static inline int kirkwood_get_temp(struct thermal_zone_device *thermal,
-+			unsigned long *temp)
-+{
-+	unsigned long reg;
-+	struct kirkwood_thermal_dev *thermal_dev = thermal->devdata;
-+
-+	reg = readl_relaxed(thermal_dev->base_addr);
-+
-+	/* Valid check */
-+	if (!(reg >> THERMAL_VALID_OFFSET) & THERMAL_VALID_MASK) {
-+		dev_info(&thermal->device, "Reading temperature is not valid\n");
-+		return -EIO;
-+	}
-+
-+	reg = (reg >> THERMAL_TEMP_OFFSET) & THERMAL_TEMP_MASK;
-+	/* Calculate temperature. See Table 814 in hardware manual. */
-+	*temp = ((322 - reg) * 10000) / 13625;
-+
-+	return 0;
-+}
-+
-+static struct thermal_zone_device_ops ops = {
-+	.get_temp = kirkwood_get_temp,
-+};
-+
-+static int kirkwood_thermal_probe(struct platform_device *pdev)
-+{
-+	struct thermal_zone_device *thermal = NULL;
-+	struct kirkwood_thermal_dev *thermal_dev;
-+	struct resource *res;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "Failed to get platform resource\n");
-+		return -ENODEV;
-+	}
-+
-+	thermal_dev
-+		= devm_kzalloc(&pdev->dev, sizeof(*thermal_dev), GFP_KERNEL);
-+	if (!thermal_dev) {
-+		dev_err(&pdev->dev, "kzalloc fail\n");
-+		return -ENOMEM;
-+	}
-+
-+	thermal_dev->base_addr = devm_ioremap(&pdev->dev, res->start,
-+				resource_size(res));
-+	if (!thermal_dev->base_addr) {
-+		dev_err(&pdev->dev, "Failed to ioremap memory\n");
-+		return -ENOMEM;
-+	}
-+
-+	thermal = thermal_zone_device_register("kirkwood_thermal", 0, 0,
-+				   thermal_dev, &ops, 0, 0);
-+	if (IS_ERR(thermal)) {
-+		dev_err(&pdev->dev, "Failed to register thermal zone device\n");
-+		return  PTR_ERR(thermal);
-+	}
-+
-+	platform_set_drvdata(pdev, thermal);
-+
-+	dev_info(&thermal->device, KBUILD_MODNAME ": Thermal sensor registered\n");
-+
-+	return 0;
-+}
-+
-+static int kirkwood_thermal_exit(struct platform_device *pdev)
-+{
-+	struct thermal_zone_device *kirkwood_thermal
-+			= platform_get_drvdata(pdev);
-+
-+	thermal_zone_device_unregister(kirkwood_thermal);
-+	platform_set_drvdata(pdev, NULL);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id kirkwood_thermal_id_table[] = {
-+	{ .compatible = "marvel,thermal-kirkwood" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, kirkwood_thermal_id_table);
-+
-+static struct platform_driver kirkwood_thermal_driver = {
-+	.probe = kirkwood_thermal_probe,
-+	.remove = kirkwood_thermal_exit,
-+	.driver = {
-+		.name = "kirkwood_thermal",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(kirkwood_thermal_id_table),
-+	},
-+};
-+
-+module_platform_driver(kirkwood_thermal_driver);
-+
-+MODULE_AUTHOR("Nobuhiro Iwamatsu <iwamatsu@nigauri.org>");
-+MODULE_DESCRIPTION("kirkwood thermal driver");
-+MODULE_LICENSE("GPL");
--- 
-1.7.10.4
+Acked-by: Mircea Gherzan <mgherzan@gmail.com>
