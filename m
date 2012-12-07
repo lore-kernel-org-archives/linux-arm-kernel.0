@@ -1,79 +1,56 @@
-From: elen.song@atmel.com (Elen Song)
-Date: Fri,  7 Dec 2012 17:12:09 +0800
-Subject: [PATCH 3/3] DMA: AT91: Check fifo empty
-Message-ID: <1354871529-14976-1-git-send-email-elen.song@atmel.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 07 Dec 2012 09:22:18 +0000
+Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
+ across all cpus
+In-Reply-To: <1354821581.17101.17.camel@gandalf.local.home>
+References: <1354817466.30905.13.camel@linaro1.home>
+ <1354821581.17101.17.camel@gandalf.local.home>
+Message-ID: <1354872138.3176.15.camel@computer5.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The data may still remain in dma fifo when caculate the residue,
-check fifo empty flag until dma timeout, if not, restart a new tasklet to finish remain data.
+On Thu, 2012-12-06 at 14:19 -0500, Steven Rostedt wrote:
+> Hmm, your use of "may or may not" seems as you may not know this answer.
+> I wonder if you can use the break point method as x86 does now, and
+> remove the stop machine completely. Basically this is how it works:
+> 
+> add sw breakpoints to all locations to modify (the bp handler just does
+> a nop over the instruction).
+> 
+> send an IPI to all CPUs to flush their icache.
+> 
+> Modify the non breakpoint part of the instruction with the new
+> instruction.
+> 
+> send an IPI to all CPUs to flush their icache
+> 
+> Replace the breakpoint with the finished instruction.
 
-Signed-off-by: Elen Song <elen.song@atmel.com>
----
- drivers/dma/at_hdmac.c |   20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+If I understand correctly then this method can't work on ARM because a
+'software breakpoint' is 'replace an instruction with a known undefined
+instruction _of the same size_'. It haa to be the same size because code
+like this:
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index d076fb7..e773303 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -24,6 +24,7 @@
- #include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/jiffies.h>
- 
- #include "at_hdmac_regs.h"
- #include "dmaengine.h"
-@@ -41,6 +42,8 @@
- #define	ATC_DEFAULT_CTRLB	(ATC_SIF(AT_DMA_MEM_IF) \
- 				|ATC_DIF(AT_DMA_MEM_IF))
- 
-+/* DMA timeout (10ms)*/
-+#define DMA_TIMEOUT		10
- /*
-  * Initial number of descriptors to allocate for each channel. This could
-  * be increased during dma usage.
-@@ -268,9 +271,12 @@ static struct at_desc *atc_get_current_descriptors(struct at_dma_chan *atchan,
- static int atc_get_bytes_left(struct dma_chan *chan)
- {
- 	struct at_dma_chan      *atchan = to_at_dma_chan(chan);
-+	struct at_dma           *atdma = to_at_dma(chan->device);
-+	int	chan_id = atchan->chan_common.chan_id;
- 	struct at_desc *desc_first = atc_first_active(atchan);
- 	struct at_desc *desc_cur;
- 	int ret = 0, count = 0;
-+	unsigned long timeout = jiffies + msecs_to_jiffies(DMA_TIMEOUT);
- 
- 	/*
- 	 * Initialize necessary values in the first time.
-@@ -280,6 +286,7 @@ static int atc_get_bytes_left(struct dma_chan *chan)
- 		/* First descriptor embedds the transaction length */
- 		atchan->remain_desc = desc_first->len;
- 
-+start:
- 	/* Channel should be paused before get residue */
- 	if (!atc_chan_is_paused(atchan))
- 		atc_control(chan, DMA_PAUSE, 0);
-@@ -311,7 +318,18 @@ static int atc_get_bytes_left(struct dma_chan *chan)
- 				<< (desc_first->tx_buswidth);
- 		ret = atchan->remain_desc - count;
- 	}
--
-+	/*
-+	 * Check fifo empty in pre-determined time, if not,
-+	 * restart a new taskelt to finish remain task.
-+	 */
-+	if (!(dma_readl(atdma, CHSR) & AT_DMA_EMPT(chan_id))) {
-+		if (time_before(jiffies, timeout)) {
-+			goto start;
-+		} else {
-+			dev_vdbg(chan2dev(chan), "fifo is not empty, restart a new tasklet\n");
-+			tasklet_schedule(&atchan->tasklet);
-+		}
-+	}
- out:
- 	if (atc_chan_is_paused(atchan))
- 		atc_control(chan, DMA_RESUME, 0);
+	it eq       /* If condition code 'eq' true */
+        insA        /* then execute this instruction */
+        insB        /* Always execute this */
+
+if we replace insA with a breakpoint which is shorter, then we have
+
+	it eq       /* If condition code 'eq' true */
+        bkpt        /* then execute the breakpoint */
+        insA-part2  /* Always execute this garbage */
+        insB        /* Always execute this */
+
+and to complicate matters more, the 'it' instruction can make up to the
+next four instructions conditional, so you can't reverse decode the
+instruction stream reliably to even detect such code.
+
+And further, it's implementation defined (up to who every creates the
+silicon) whether an undefined instructions actually causes an abort when
+it occurs in such an 'it' block, it may just execute as a nop.
+
+Welcome to the work of ARM :-)
+
 -- 
-1.7.9.5
+Tixy
