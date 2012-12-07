@@ -1,15 +1,11 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  7 Dec 2012 23:10:03 +0100
-Subject: [RFC v1 RESEND] PCIe support for the Armada 370 and Armada XP SoCs
-Message-ID: <1354918219-32364-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri,  7 Dec 2012 23:04:23 +0100
+Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
+Message-ID: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
-
-(Sorry to the people receiving this series for the second time. The
-first series will not make it to LAKML due to an incorrect From
-address. My apologizes.)
 
 This series of patches introduces PCIe support for the Marvell Armada
 370 and Armada XP. Even though the code is working, this first posting
