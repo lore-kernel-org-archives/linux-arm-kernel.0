@@ -1,58 +1,111 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 7 Dec 2012 13:49:29 +0000
-Subject: [ARM] head.S change broke platform device registration?
-In-Reply-To: <20121207122809.GT14363@n2100.arm.linux.org.uk>
-References: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
- <50B88A59.6070207@arm.com>
- <CAHod+GeZQx6-pUHPocbyMJCLawMUhrZuZf=mrgWax=L7eNJGhg@mail.gmail.com>
- <20121130143435.GP19440@n2100.arm.linux.org.uk>
- <CAHod+GdXfZb1OHapJBYpCD74svYyaGaiZpqHLPtjHbWGa-3eLA@mail.gmail.com>
- <20121204221851.GJ14363@n2100.arm.linux.org.uk>
- <CAHod+Gd6NJsuJVRos52e9+NcweqcSu=HArT_qoV0ygb_Xbfaiw@mail.gmail.com>
- <20121205235836.GR14363@n2100.arm.linux.org.uk>
- <20121207122809.GT14363@n2100.arm.linux.org.uk>
-Message-ID: <20121207134929.GA1969@linaro.org>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 7 Dec 2012 14:49:43 +0100 (CET)
+Subject: [PATCH 1/2] mmc: slot-gpio: use devm_* managed functions to ease
+ users
+In-Reply-To: <1354887168-3073-1-git-send-email-shawn.guo@linaro.org>
+References: <1354887168-3073-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <Pine.LNX.4.64.1212071438010.24520@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 07, 2012 at 12:28:09PM +0000, Russell King - ARM Linux wrote:
+Hi Shawn
 
-[...]
+On Fri, 7 Dec 2012, Shawn Guo wrote:
 
-> Having thought about this for quite a while, I think there's three
-> options:
+> Use devm_* managed functions, so that slot-gpio users do not have to
+> call mmc_gpio_free_ro/cd to free up resources requested in
+> mmc_gpio_request_ro/cd.
 > 
-> 1. The Sharp Zaurus code is unmaintained.  Declare it to be broken, and
->    remove all the Sharp code from the kernel so that people aren't tempted
->    to think it's something that the kernel supports.  (In light of the
->    lack of maintainer for these platforms which almost no one knows much
->    about, that will lower the maintanence burden on everyone else.)
-> 
-> 2. Revert the hyp-mode support and say that we can't accept _any_ change
->    whatsoever to the decompressor head.S through fear that it will cause
->    a regression for Sharp Zaurus platforms.  (This effectively means we
->    can't support virtualization on ARM - which is not acceptable.)
-> 
-> 3. Revert the hyp-mode support and make it conditional on CPUs that have
->    hyp-mode support.
-> 
-> Out of those three, (3) is the best way forward.  So, unless I hear any
-> objections, I'm going to revert 424e5994e63 in mainline, and wait for a
-> patch to safe_svcmode_maskall so that it can be switched between the
-> hyp-mode version and the non-hyp-mode.
-> 
-> This shouldn't be a problem for the single-zImage people; the break-point
-> is the ARMv5/ARMv6 boundary which we're already keeping as separate kernels.
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-I've posted a separate patch which ought to accomplish the appropriate
-change to safe_svc_maskall
-([PATCH] ARM: head: Remove boot-time HYP mode check for v5 and below)
+Thanks for the patch, but I'm not sure this is a good idea. Firstly, using 
+devm_* allocation functions means, that normally you don't have to free 
+these resources explicitly any more. So, actually you would have to remove 
+free_irq() and gpio_free() calls completely from the API instead of 
+replacing them with devm_* analogs. Secondly, I do use devm_kzalloc() in 
+the API because I really want that allocated memory to just be allocated 
+once and stay there until the device is freed. Whereas with with card 
+detection and write-protect pins - usually you're right, you would only 
+allocate those once during the lifetime of your host device. But - are we 
+sure there cannot be exceptions? What if someone decides to switch between 
+CD-IRQ and CD-polling at runtime? Or do something equally weird with their 
+GPIOs... At least I personally don't think I have sufficient knowledge of 
+all possible configurations to make such a decision. Think about pinctrl 
+etc. What if at runtime the CD pin has to be released by mmc to be used 
+by some other device? Anyway, I'm fine either way, but I'm just not sure 
+how reasonable this change is.
 
-I've done a compile-disassemble sanity-check for v5 and v7 to make sure
-that the results are sane, but I can't check whether it fixed the
-problem for the affected hardware.
+Thanks
+Guennadi
 
-Marko, can you give it a try?
+> ---
+>  drivers/mmc/core/slot-gpio.c |   15 +++++++++------
+>  1 file changed, 9 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/mmc/core/slot-gpio.c b/drivers/mmc/core/slot-gpio.c
+> index 16a1c0b..8b55748 100644
+> --- a/drivers/mmc/core/slot-gpio.c
+> +++ b/drivers/mmc/core/slot-gpio.c
+> @@ -106,7 +106,8 @@ int mmc_gpio_request_ro(struct mmc_host *host, unsigned int gpio)
+>  
+>  	ctx = host->slot.handler_priv;
+>  
+> -	ret = gpio_request_one(gpio, GPIOF_DIR_IN, ctx->ro_label);
+> +	ret = devm_gpio_request_one(&host->class_dev, gpio, GPIOF_DIR_IN,
+> +				    ctx->ro_label);
+>  	if (ret < 0)
+>  		return ret;
+>  
+> @@ -128,7 +129,8 @@ int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio)
+>  
+>  	ctx = host->slot.handler_priv;
+>  
+> -	ret = gpio_request_one(gpio, GPIOF_DIR_IN, ctx->cd_label);
+> +	ret = devm_gpio_request_one(&host->class_dev, gpio, GPIOF_DIR_IN,
+> +				    ctx->cd_label);
+>  	if (ret < 0)
+>  		/*
+>  		 * don't bother freeing memory. It might still get used by other
+> @@ -146,7 +148,8 @@ int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio)
+>  		irq = -EINVAL;
+>  
+>  	if (irq >= 0) {
+> -		ret = request_threaded_irq(irq, NULL, mmc_gpio_cd_irqt,
+> +		ret = devm_request_threaded_irq(&host->class_dev, irq,
+> +			NULL, mmc_gpio_cd_irqt,
+>  			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+>  			ctx->cd_label, host);
+>  		if (ret < 0)
+> @@ -175,7 +178,7 @@ void mmc_gpio_free_ro(struct mmc_host *host)
+>  	gpio = ctx->ro_gpio;
+>  	ctx->ro_gpio = -EINVAL;
+>  
+> -	gpio_free(gpio);
+> +	devm_gpio_free(&host->class_dev, gpio);
+>  }
+>  EXPORT_SYMBOL(mmc_gpio_free_ro);
+>  
+> @@ -188,13 +191,13 @@ void mmc_gpio_free_cd(struct mmc_host *host)
+>  		return;
+>  
+>  	if (host->slot.cd_irq >= 0) {
+> -		free_irq(host->slot.cd_irq, host);
+> +		devm_free_irq(&host->class_dev, host->slot.cd_irq, host);
+>  		host->slot.cd_irq = -EINVAL;
+>  	}
+>  
+>  	gpio = ctx->cd_gpio;
+>  	ctx->cd_gpio = -EINVAL;
+>  
+> -	gpio_free(gpio);
+> +	devm_gpio_free(&host->class_dev, gpio);
+>  }
+>  EXPORT_SYMBOL(mmc_gpio_free_cd);
+> -- 
+> 1.7.9.5
+> 
 
-Cheers
----Dave
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
