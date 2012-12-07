@@ -1,40 +1,66 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 07 Dec 2012 14:05:37 +0000
-Subject: [PATCH] ARM: Kirkwood: Add SPI_CHPA and SPI_CPOL support to
- spi-orion
-In-Reply-To: <20121207004933.GC21694@titan.lakedaemon.net>
-References: <20121121192335.GA14868@obsidianresearch.com>
- <20121206142521.4185A3E0948@localhost>
- <20121206172504.GB9676@obsidianresearch.com>
- <20121206232305.719E23E0B24@localhost>
- <20121206234917.GF25069@obsidianresearch.com>
- <20121206235311.GB21694@titan.lakedaemon.net>
- <20121207001433.GG25069@obsidianresearch.com>
- <20121207004933.GC21694@titan.lakedaemon.net>
-Message-ID: <20121207140537.EB2873E0B87@localhost>
+Date: Fri, 07 Dec 2012 14:11:15 +0000
+Subject: Sharing PCIE driver between Microblaze and Arm zynq
+In-Reply-To: <50C1BA9D.5010406@monstr.eu>
+References: <CAHTX3dLxbVxn+D+AV7L0VsGYFOjas3AJ_3M_xncVfxp02FCy=Q@mail.gmail.com>
+ <CAErSpo6xRdwzTuPPqnmvmHSp7awnV7=Z85eWFfktb_hm9Aad_A@mail.gmail.com>
+ <50C1BA9D.5010406@monstr.eu>
+Message-ID: <20121207141115.EFC903E0B87@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Dec 2012 19:49:33 -0500, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Thu, Dec 06, 2012 at 05:14:33PM -0700, Jason Gunthorpe wrote:
-> > On Thu, Dec 06, 2012 at 06:53:11PM -0500, Jason Cooper wrote:
-> > > On Thu, Dec 06, 2012 at 04:49:17PM -0700, Jason Gunthorpe wrote:
-> > > > Jason: Do you have any of these possibly affected boards with a SPI
-> > > > flash to test linux-next? dove, dreamplug, ts219 and lsxl
-> > > 
-> > > Yep, dreamplug ought to do.
-> > 
-> > Hmm, I just reviewed all the FLASH P/Ns datasheets in the affected DT
-> > files, and they are all mode 0/mode 3 compatible - that is the linux
-> > default mode so I expect everything to work OK.
-> > 
-> > If your dreamplug is fine lets just leave it?
+On Fri, 07 Dec 2012 10:45:01 +0100, Michal Simek <monstr@monstr.eu> wrote:
+> On 12/06/2012 10:27 PM, Bjorn Helgaas wrote:
+> > [+cc linux-pci]
+> >
+> > On Thu, Dec 6, 2012 at 7:23 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+> >> Hi guys,
+> >>
+> >> I have a question regarding to sharing generic OF pcie driver between
+> >> two architectures MB and ARM Zynq.
+> >> Is drivers/pci/pcie location good for it?
+> >> Make no sense to have the same driver in two locations.
+> >
+> > I think you're talking about a PCI host bridge driver.  It would
+> > definitely be nice to move toward a generic, shared driver.  Host
+> > bridge drivers are responsible for enumerating the PCI hierarchy below
+> > the bridge.  Enumeration is not really PCIe-specific, so I wouldn't
+> > put it in drivers/pci/pcie.
 > 
-> Unfortunately, I'm unable to test until next week.  If Grant is
-> comfortable with it as is, I have no objection.  If he isn't, I'll try
-> to test it next week when I return home.
+> Not a PCI expert, just trying to find out the proper location for this shared driver.
+> 
+> 
+> >> Is using readl/writel IO functions in this driver the best option
+> >> which we can have?
+> >> Or is there any other recommendation?
+> >
+> > I'm not really a driver person, but if you're writing a new driver,
+> > wouldn't you use the iomap interfaces (ioremap(), ioread32(), etc)
+> > rather than readl()?
+> 
+> That driver exists but it is not in mainline and it is better to directly
+> add it to proper location with correct io functions.
+> The question is if ioread/iowrite functions are correct one.
+> PowerPC io-defs.h suggests that readl/writel should be used for PCI.
+> 
+> 
+> >> Also just want to check if it is correct to use pcie device_type.
+> >
+> > I don't know what you're asking here.  Can you elaborate or give a
+> > specific example?
+> 
+> If node property device_type pcie should be used.
+> device_type = "pcie";
+> 
+> For pci it is device_type = "pci";
+> For network it is device_type = "network"
+> the same for serial, watchdogs.
+> 
+> Do we have any list of device_types which we should use?
 
-I'm comfortable taking it. In the unlikely event it breaks then it can
-be fixed up during stablization.
+Don't use them unless a binding requires it. PCI address lookup code
+uses it, so we put it in those nodes. Otherwise device_type is
+deprecated and has been for a long time now. You should not be using it
+in .dts files.
 
 g.
