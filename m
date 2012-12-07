@@ -1,68 +1,66 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 07 Dec 2012 12:13:56 -0500
-Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
- across all cpus
-In-Reply-To: <20121207164530.GX14363@n2100.arm.linux.org.uk>
-References: <1354817466.30905.13.camel@linaro1.home>
- <1354821581.17101.17.camel@gandalf.local.home>
- <1354872138.3176.15.camel@computer5.home>
- <1354888985.17101.41.camel@gandalf.local.home>
- <1354892111.13000.50.camel@linaro1.home>
- <1354894134.17101.44.camel@gandalf.local.home>
- <20121207162346.GW14363@n2100.arm.linux.org.uk>
- <1354898200.17101.50.camel@gandalf.local.home>
- <20121207164530.GX14363@n2100.arm.linux.org.uk>
-Message-ID: <1354900436.17101.58.camel@gandalf.local.home>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 07 Dec 2012 18:33:28 +0100
+Subject: [PATCH 0/6 v10] gpio: Add block GPIO
+In-Reply-To: <20121207170215.0057f791@pyramind.ukuu.org.uk>
+References: <1354830456-17590-1-git-send-email-stigge@antcom.de>
+ <20121207103643.34ca6dc5@pyramind.ukuu.org.uk> <50C1DBD4.1040007@antcom.de>
+ <50C1DE21.8050709@antcom.de> <20121207170215.0057f791@pyramind.ukuu.org.uk>
+Message-ID: <50C22868.4070405@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-12-07 at 16:45 +0000, Russell King - ARM Linux wrote:
-> On Fri, Dec 07, 2012 at 11:36:40AM -0500, Steven Rostedt wrote:
-
-> > But what about the limitations that the function tracer imposes on the
-> > code that gets modified by stop_machine()?
-> > 
-> > 1) the original code is simply a call to mcount
-> > 
-> > 2) on boot up, that call gets converted into a nop
-> > 
-> > 3) the code that gets changed will only be converting a nop to a call
-> > into the function tracer, and back again.
-> > 
-> > IOW, it's a very limited subset of the ARM assembly that gets touched.
-> > I'm not sure what the op codes are for the above, but I can imagine they
-> > don't impose the prefixes as you described.
-> > 
-> > If that's the case, is it still possible to change to the breakpoint
-> > method?
+On 12/07/2012 06:02 PM, Alan Cox wrote:
+>>>> Currently we can set different permissions on different GPIO lines. Your
+>>>> driver change drives a truck through this facility.
+>>
+>> What I maybe misread in your concern: The dev interface is actually an
+>> "alternative to sysfs for block GPIO", not considered as a replacement
+>> for the current sysfs interface for _single_ GPIOs.
 > 
-> I have no idea; I've no idea how ftrace works on ARM.
+> That is the problem. If you add the driver then you can no longer
+> implement the same permissions per node. If I've got a typical hardened
+> embedded device running something like SMACK I can tie a few gpio lines
+> to specific tasks in the security model.
+> 
+> The moment there is another driver anyone who can open that driver can
+> bypass all the security rules being imposed.
+> 
+> The basic problem is that right now our mapping is
+> 
+> "gpio line is a file system object"
+> 
+> you change it to
+> 
+> "all gpio lines are a single file system object"
 
-I know how ftrace works on ARM, I'm just asking about the way the
-architecture works in general. So to answer my question, you don't need
-to know anything about ftrace. I'll make my question more general:
+No - maybe that's still not documented well enough: Upon defining a GPIO
+block, you can specify each individual GPIO that's contained therein.
+Define as many (disjoint) blocks as you want with as many permission
+sets as you want, right away.
 
-If I have a nop, that is a size of a call (branch and link), which is
-near the beginning of a function and not part of any conditional, and I
-want to convert it into a call (branch and link), would adding a
-breakpoint to it, modifying it to the call, and then removing the
-breakpoint be possible? Of course it would require syncing in between
-steps, but my question is, if the above is possible on a thumb2 ARM
-processor?
+In the extreme case, define blocks with only a single GPIO in each of
+them, and the interface should still be faster than the sysfs one. Each
+block is a separate device node with separate permissions.
 
+Further, block GPIOs only need to be present on systems where firmware
+tells via DT (or the kernel itself in setup code) explicitely which
+GPIOs should be in a certain block to be accessed efficiently.
 
->   That's something
-> other people use and deal with.  Last (and only) time I used the built-in
-> kernel tracing facilities I ended up giving up with it and going back to
-> using my sched-clock+record+printk based approaches instead on account
-> of the kernels built-in tracing being far too heavy.
+Sysfs can still work as expected, at least for the remaining GPIOs.
 
-Too bad. Which tracing facilities did you use? Function tracing? And
-IIRC, ARM originally had only the static tracing, which was extremely
-heavy weight. Have you tried tracepoints? Also, have you tried my
-favorite way of debugging: trace_printk(). It acts just like printk but
-instead of recording to the console, it records into the ftrace buffer
-which can be read via the /debug/tracing/trace or dumped to the console
-with a sysrq-z.
+So I don't see a contradiction here, considering that you can still
+organize permissions for the (optional) GPIO block, as you do currently
+via sysfs.
 
--- Steve
+You can also compare sysfs and block GPIO interfaces to block devices
+where you create file systems on top. Userspace can access both, but
+it's not very useful to access the underlying block device at the same
+time when it's also mounted as an fs. The good thing about the sysfs and
+block GPIO case is that you can use both at the same time: Consider a
+single controller/gpio_chip containing 32 lines. You can define a GPIO
+block of 16 of them for use as an efficient 16 bit bus, and use the rest
+via single GPIO sysfs as you described.
+
+Thanks for considering,
+
+Roland
