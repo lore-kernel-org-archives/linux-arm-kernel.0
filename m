@@ -1,42 +1,34 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  7 Dec 2012 23:10:18 +0100
-Subject: [RFC v1 RESEND 15/16] arm: mvebu: PCIe Device Tree informations for
- Armada 370 DB
-In-Reply-To: <1354918219-32364-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1354918219-32364-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1354918219-32364-16-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri,  7 Dec 2012 23:04:35 +0100
+Subject: [RFC v1 12/16] arm: mvebu: PCIe Device Tree informations for
+ OpenBlocks AX3-4
+In-Reply-To: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1354917879-32073-13-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell evaluation board (DB) for the Armada 370 SoC has 2
-physical full-size PCIe slots, so we enable the corresponding PCIe
-interfaces in the Device Tree.
+The PlatHome OpenBlocks AX3-4 has an internal mini-PCIe slot that can
+be used to plug mini-PCIe devices. We therefore enable the PCIe
+interface that corresponds to this slot.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-db.dts |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index 0004402..56f2c14 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -59,5 +59,20 @@
- 			phy = <&phy1>;
- 			phy-mode = "rgmii-id";
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index b42652f..d9912df 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -121,5 +121,12 @@
+ 			nr-ports = <2>;
+ 			status = "okay";
  		};
-+
 +		pcie-controller {
 +			status = "okay";
-+			/*
-+			 * The two PCIe units are accessible through
-+			 * both standard PCIe slots and mini-PCIe
-+			 * slots on the board.
-+			 */
-+			pcie0 at 0xd0040000 {
-+				status = "okay";
-+			};
-+			pcie1 at 0xd0080000 {
++			/* Internal mini-PCIe connector */
++			pcie0.0 at 0xd0040000 {
 +				status = "okay";
 +			};
 +		};
