@@ -1,252 +1,316 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 7 Dec 2012 07:56:45 +0100
-Subject: [v2 PATCH 13/14] ARM: dts: add spi nodes for atmel SoC
-In-Reply-To: <50C0C9C9.9000108@atmel.com>
+Date: Fri, 7 Dec 2012 07:58:13 +0100
+Subject: [v2 PATCH 07/14] spi/atmel_spi: add DT support
+In-Reply-To: <1354607640-13229-8-git-send-email-wenyou.yang@atmel.com>
 References: <1354607640-13229-1-git-send-email-wenyou.yang@atmel.com>
- <1354607640-13229-14-git-send-email-wenyou.yang@atmel.com>
- <50C0C9C9.9000108@atmel.com>
-Message-ID: <20121207065645.GG4398@game.jcrosoft.org>
+ <1354607640-13229-8-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20121207065813.GH4398@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:37 Thu 06 Dec     , ludovic.desroches wrote:
-> Hi,
+On 15:53 Tue 04 Dec     , Wenyou Yang wrote:
+> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > 
-> On 12/04/2012 08:53 AM, Wenyou Yang wrote:
-> >From: Richard Genoud <richard.genoud@gmail.com>
-> >
-> >Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> >[wenyou.yang at atmel.com: add spi nodes for other atmel SOC]
-> >Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> >Cc: linux at arm.linux.org.uk
-> >---
-> >  arch/arm/boot/dts/at91sam9260.dtsi |   30 ++++++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/at91sam9263.dtsi |   30 ++++++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/at91sam9g45.dtsi |   30 ++++++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/at91sam9n12.dtsi |   30 ++++++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/at91sam9x5.dtsi  |   30 ++++++++++++++++++++++++++++++
-> >  5 files changed, 150 insertions(+)
-> >
-> >diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-> >index d410581..87254aa 100644
-> >--- a/arch/arm/boot/dts/at91sam9260.dtsi
-> >+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> >@@ -212,6 +212,36 @@
-> >  				status = "disabled";
-> >  			};
-> >
-> >+			spi0: spi at fffc8000 {
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+				compatible = "atmel,at91sam9260-spi";
-> >+				reg = <0xfffc8000 0x200>;
-> >+				interrupts = <12 4 3>;
-> >+				cs-gpios = <&pioA 3 0
-> >+					    &pioC 11 0
-> >+					    &pioC 16 0
-> >+					    &pioC 17 0
-> >+					   >;
-> 
-> From my point of view, the cs-gpios stuff should be in board dts
-> files instead of the SoC dtsi file.
-> 
-> These pios can be shared with other devices. If only one chip select
-> gpio is used on the board, it could avoid some useless pin
-> conflicts.
-agree and you MUST based on work on what I send on the ML and Grant applyed
+> The atmel_spi use only gpio for chip select.
+no this patch need go on the TOP of mine
+
+that is plan for 3.8
 
 Best Regards,
 J.
 > 
-> Regards
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> [wenyou.yang at atmel.com: Add driver data and compatible "atmel,at91sam9260-spi", "atmel,at91sam9x5-spi"]
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: spi-devel-general at lists.sourceforge.net
+> Cc: grant.likely at secretlab.ca
+> Cc: rob.herring at calxeda.com
+> Cc: rob at landley.net
+> Cc: linux-doc at vger.kernel.org
+> Cc: richard.genoud at gmail.com
+> ---
+> Hi, Richard,
 > 
-> Ludovic
+> This patches is based on the original patch from Jean-Christophe
+> 	[PATCH] spi/atmel: add DT support
+> and merge the patch from Richard Genoud
+> 	[PATCH] spi-atmel OF: complete documentation
+> ane wenyou yang add more compatible "atmel,at91sam9260-spi", "atmel,at91sam9x5-spi", 
+> 	add driver data to get IP version and dma support.
 > 
-> >+				dma-mask = <0xffffffff>;
-> >+				status = "disabled";
-> >+			};
-> >+
-> >+			spi1: spi at fffcc000 {
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+				compatible = "atmel,at91sam9260-spi";
-> >+				reg = <0xfffcc000 0x200>;
-> >+				interrupts = <13 4 3>;
-> >+				cs-gpios = <&pioB 3 0
-> >+					    &pioC 5 0
-> >+					    &pioC 4 0
-> >+					    &pioC 3 0
-> >+					   >;
-> >+				dma-mask = <0xffffffff>;
-> >+				status = "disabled";
-> >+			};
-> >+
-> >  			adc0: adc at fffe0000 {
-> >  				compatible = "atmel,at91sam9260-adc";
-> >  				reg = <0xfffe0000 0x100>;
-> >diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> >index 3e6e5c1..528395d 100644
-> >--- a/arch/arm/boot/dts/at91sam9263.dtsi
-> >+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> >@@ -195,6 +195,36 @@
-> >  				#size-cells = <0>;
-> >  				status = "disabled";
-> >  			};
-> >+
-> >+			spi0: spi at fffa4000 {
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+				compatible = "atmel,at91sam9260-spi";
-> >+				reg = <0xfffa4000 0x200>;
-> >+				interrupts = <14 4 3>;
-> >+				cs-gpios = <&pioA 5 0
-> >+					    &pioA 3 0
-> >+					    &pioA 4 0
-> >+					    &pioB 11 0
-> >+					   >;
-> >+				dma-mask = <0xffffffff>;
-> >+				status = "disabled";
-> >+			};
-> >+
-> >+			spi1: spi at fffa8000 {
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+				compatible = "atmel,at91sam9260-spi";
-> >+				reg = <0xfffa8000 0x200>;
-> >+				interrupts = <15 4 3>;
-> >+				cs-gpios = <&pioB 15 0
-> >+					    &pioB 16 0
-> >+					    &pioB 17 0
-> >+					    &pioB 18 0
-> >+					   >;
-> >+				dma-mask = <0xffffffff>;
-> >+				status = "disabled";
-> >+			};
-> >  		};
-> >
-> >  		nand0: nand at 40000000 {
-> >diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> >index 3add030..8a6aae92 100644
-> >--- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> >+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> >@@ -262,6 +262,36 @@
-> >  					trigger-value = <0x6>;
-> >  				};
-> >  			};
-> >+
-> >+			spi0: spi at fffa4000 {
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+				compatible = "atmel,at91sam9260-spi";
-> >+				reg = <0xfffa4000 0x200>;
-> >+				interrupts = <14 4 3>;
-> >+				cs-gpios = <&pioB 3 0
-> >+					    &pioB 18 0
-> >+					    &pioB 19 0
-> >+					    &pioD 27 0
-> >+					   >;
-> >+				dma-mask = <0xffffffff>;
-> >+				status = "disabled";
-> >+			};
-> >+
-> >+			spi1: spi at fffa8000 {
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+				compatible = "atmel,at91sam9260-spi";
-> >+				reg = <0xfffa8000 0x200>;
-> >+				interrupts = <15 4 3>;
-> >+				cs-gpios = <&pioB 17 0
-> >+					    &pioD 28 0
-> >+					    &pioD 18 0
-> >+					    &pioD 19 0
-> >+					   >;
-> >+				dma-mask = <0xffffffff>;
-> >+				status = "disabled";
-> >+			};
-> >  		};
-> >
-> >  		nand0: nand at 40000000 {
-> >diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> >index 82508d6..183cacf 100644
-> >--- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> >+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> >@@ -202,6 +202,36 @@
-> >  				#size-cells = <0>;
-> >  				status = "disabled";
-> >  			};
-> >+
-> >+			spi0: spi at f0000000 {
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+				compatible = "atmel,at91sam9x5-spi";
-> >+				reg = <0xf0000000 0x100>;
-> >+				interrupts = <13 4 3>;
-> >+				cs-gpios = <&pioA 14 0
-> >+					    &pioA 7 0
-> >+					    &pioA 1 0
-> >+					    &pioB 3 0
-> >+					   >;
-> >+				dma-mask = <0xffffffff>;
-> >+				status = "disabled";
-> >+			};
-> >+
-> >+			spi1: spi at f0004000 {
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+				compatible = "atmel,at91sam9x5-spi";
-> >+				reg = <0xf0004000 0x100>;
-> >+				interrupts = <14 4 3>;
-> >+				cs-gpios = <&pioA 8 0
-> >+					    &pioA 0 0
-> >+					    &pioA 31 0
-> >+					    &pioA 30 0
-> >+					   >;
-> >+				dma-mask = <0xffffffff>;
-> >+				status = "disabled";
-> >+			};
-> >  		};
-> >
-> >  		nand0: nand at 40000000 {
-> >diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> >index 03fc136..95b55fd 100644
-> >--- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> >+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> >@@ -263,6 +263,36 @@
-> >  					trigger-value = <0x6>;
-> >  				};
-> >  			};
-> >+
-> >+			spi0: spi at f0000000 {
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+				compatible = "atmel,at91sam9x5-spi";
-> >+				reg = <0xf0000000 0x100>;
-> >+				interrupts = <13 4 3>;
-> >+				cs-gpios = <&pioA 14 0
-> >+					    &pioA 7 0 /* conflicts with TXD2 */
-> >+					    &pioA 1 0 /* conflicts with RXD0 */
-> >+					    &pioB 3 0 /* conflicts with ERXDV */
-> >+					   >;
-> >+				dma-mask = <0xffffffff>;
-> >+				status = "disabled";
-> >+			};
-> >+
-> >+			spi1: spi at f0004000 {
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+				compatible = "atmel,at91sam9x5-spi";
-> >+				reg = <0xf0004000 0x100>;
-> >+				interrupts = <14 4 3>;
-> >+				cs-gpios = <&pioA 8 0 /* conflitcs with RXD2 */
-> >+					    &pioA 0 0 /* conflitcs with TXD0 */
-> >+					    &pioA 31 0 /* conflitcs with TWCK0 */
-> >+					    &pioA 30 0 /* conflitcs with TWD0 */
-> >+					   >;
-> >+				dma-mask = <0xffffffff>;
-> >+				status = "disabled";
-> >+			};
-> >  		};
-> >
-> >  		nand0: nand at 40000000 {
-> >
+> Could you sign your signature in this patch?
+> 
+> Best Regards,
+> Wenyou Yang
+> 
+>  .../devicetree/bindings/spi/spi_atmel.txt          |   23 +++++
+>  drivers/spi/spi-atmel.c                            |  102 +++++++++++++++++---
+>  2 files changed, 113 insertions(+), 12 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi_atmel.txt b/Documentation/devicetree/bindings/spi/spi_atmel.txt
+> new file mode 100644
+> index 0000000..20cdc91
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/spi/spi_atmel.txt
+> @@ -0,0 +1,23 @@
+> +Atmel SPI device
+> +
+> +Required properties:
+> +- compatible : should be "atmel,at91rm9200-spi".
+> +- reg: Address and length of the register set for the device
+> +- interrupts: Should contain macb interrupt
+> +- cs-gpio: Should contain the GPIOs used for chipselect.
+> +- dma-mask: device coherent dma mask.
+> +
+> +spi0: spi at f0000000 {
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	compatible = "atmel,at91rm9200-spi";
+> +	reg = <0xf0000000 0x100>;
+> +	interrupts = <13 4>;
+> +	cs-gpios = <&pioA 14 0
+> +		    &pioA 7 0 /* conflicts with TXD2 */
+> +		    &pioA 1 0 /* conflicts with RXD0 */
+> +		    &pioB 3 0 /* conflicts with ERXDV */
+> +		   >;
+> +	dma-mask = <0xffffffff>;
+> +	status = "disabled";
+> +};
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index 37f54c3..e032e3d 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/spi/spi.h>
+>  #include <linux/slab.h>
+> +#include <linux/of.h>
+>  
+>  #include <asm/io.h>
+>  #include <mach/board.h>
+> @@ -185,6 +186,10 @@
+>   * DMA transfers; transfer queue progress is driven by IRQs.  The clock
+>   * framework provides the base clock, subdivided for each spi_device.
+>   */
+> +struct atmel_spi_pdata {
+> +	u8			version;
+> +};
+> +
+>  struct atmel_spi {
+>  	spinlock_t		lock;
+>  	unsigned long		flags;
+> @@ -203,6 +208,7 @@ struct atmel_spi {
+>  	struct spi_transfer	*next_transfer;
+>  	unsigned long		next_remaining_bytes;
+>  	int			done_status;
+> +	struct atmel_spi_pdata	*pdata;
+>  
+>  	void			*buffer;
+>  	dma_addr_t		buffer_dma;
+> @@ -217,6 +223,51 @@ struct atmel_spi_device {
+>  #define BUFFER_SIZE		PAGE_SIZE
+>  #define INVALID_DMA_ADDRESS	0xffffffff
+>  
+> +static struct atmel_spi_pdata at91rm9200_config = {
+> +	.version = 1,
+> +};
+> +
+> +static struct atmel_spi_pdata at91sam9260_config = {
+> +	.version = 2,
+> +};
+> +
+> +static struct atmel_spi_pdata at91sam9x5_config = {
+> +	.version = 2,
+> +};
+> +
+> +static const struct platform_device_id atmel_spi_devtypes[] = {
+> +	{
+> +		.name = "spi-at91rm9200",
+> +		.driver_data = (unsigned long) &at91rm9200_config,
+> +	}, {
+> +		.name = "spi-at91sam9260",
+> +		.driver_data = (unsigned long) &at91sam9260_config,
+> +	}, {
+> +		.name = "spi-at91sam9x5",
+> +		.driver_data = (unsigned long) &at91sam9x5_config,
+> +	}, {
+> +		/* sentinel */
+> +	}
+> +};
+> +
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id atmel_spi_dt_ids[] = {
+> +	{
+> +		.compatible = "atmel,at91rm9200-spi",
+> +		.data = &at91rm9200_config,
+> +	} , {
+> +		.compatible = "atmel,at91sam9260-spi",
+> +		.data = &at91sam9260_config,
+> +	} , {
+> +		.compatible = "atmel,at91sam9x5-spi",
+> +		.data = &at91sam9x5_config,
+> +	}, {
+> +		/* sentinel */
+> +	}
+> +};
+> +MODULE_DEVICE_TABLE(of, atmel_spi_dt_ids);
+> +#endif
+> +
+>  /*
+>   * Version 2 of the SPI controller has
+>   *  - CR.LASTXFER
+> @@ -229,11 +280,15 @@ struct atmel_spi_device {
+>   * register, but I haven't checked that it exists on all chips, and
+>   * this is cheaper anyway.
+>   */
+> -static bool atmel_spi_is_v2(void)
+> +static bool atmel_spi_is_v2(struct atmel_spi *as)
+>  {
+> -	return !cpu_is_at91rm9200();
+> +	if (as->pdata->version == 2)
+> +		return true;
+> +	else
+> +		return false;
+>  }
+>  
+> +
+>  /*
+>   * Earlier SPI controllers (e.g. on at91rm9200) have a design bug whereby
+>   * they assume that spi slave device state will not change on deselect, so
+> @@ -265,7 +320,7 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
+>  	unsigned active = spi->mode & SPI_CS_HIGH;
+>  	u32 mr;
+>  
+> -	if (atmel_spi_is_v2()) {
+> +	if (atmel_spi_is_v2(as)) {
+>  		/*
+>  		 * Always use CSR0. This ensures that the clock
+>  		 * switches to the correct idle polarity before we
+> @@ -320,7 +375,7 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
+>  			asd->npcs_pin, active ? " (low)" : "",
+>  			mr);
+>  
+> -	if (atmel_spi_is_v2() || spi->chip_select != 0)
+> +	if (atmel_spi_is_v2(as) || spi->chip_select != 0)
+>  		gpio_set_value(asd->npcs_pin, !active);
+>  }
+>  
+> @@ -710,7 +765,7 @@ static int atmel_spi_setup(struct spi_device *spi)
+>  	u32			scbr, csr;
+>  	unsigned int		bits = spi->bits_per_word;
+>  	unsigned long		bus_hz;
+> -	unsigned int		npcs_pin;
+> +	int			npcs_pin;
+>  	int			ret;
+>  
+>  	as = spi_master_get_devdata(spi->master);
+> @@ -733,7 +788,7 @@ static int atmel_spi_setup(struct spi_device *spi)
+>  	}
+>  
+>  	/* see notes above re chipselect */
+> -	if (!atmel_spi_is_v2()
+> +	if (!atmel_spi_is_v2(as)
+>  			&& spi->chip_select == 0
+>  			&& (spi->mode & SPI_CS_HIGH)) {
+>  		dev_dbg(&spi->dev, "setup: can't be active-high\n");
+> @@ -742,7 +797,7 @@ static int atmel_spi_setup(struct spi_device *spi)
+>  
+>  	/* v1 chips start out at half the peripheral bus speed. */
+>  	bus_hz = clk_get_rate(as->clk);
+> -	if (!atmel_spi_is_v2())
+> +	if (!atmel_spi_is_v2(as))
+>  		bus_hz /= 2;
+>  
+>  	if (spi->max_speed_hz) {
+> @@ -782,7 +837,9 @@ static int atmel_spi_setup(struct spi_device *spi)
+>  	csr |= SPI_BF(DLYBCT, 0);
+>  
+>  	/* chipselect must have been muxed as GPIO (e.g. in board setup) */
+> -	npcs_pin = (unsigned int)spi->controller_data;
+> +	if (!gpio_is_valid(spi->cs_gpio))
+> +		spi->cs_gpio = (int)spi->controller_data;
+> +	npcs_pin = spi->cs_gpio;
+>  	asd = spi->controller_state;
+>  	if (!asd) {
+>  		asd = kzalloc(sizeof(struct atmel_spi_device), GFP_KERNEL);
+> @@ -812,7 +869,7 @@ static int atmel_spi_setup(struct spi_device *spi)
+>  		"setup: %lu Hz bpw %u mode 0x%x -> csr%d %08x\n",
+>  		bus_hz / scbr, bits, spi->mode, spi->chip_select, csr);
+>  
+> -	if (!atmel_spi_is_v2())
+> +	if (!atmel_spi_is_v2(as))
+>  		spi_writel(as, CSR0 + 4 * spi->chip_select, csr);
+>  
+>  	return 0;
+> @@ -899,7 +956,7 @@ static void atmel_spi_cleanup(struct spi_device *spi)
+>  {
+>  	struct atmel_spi	*as = spi_master_get_devdata(spi->master);
+>  	struct atmel_spi_device	*asd = spi->controller_state;
+> -	unsigned		gpio = (unsigned) spi->controller_data;
+> +	unsigned		gpio = spi->cs_gpio;
+>  
+>  	if (!asd)
+>  		return;
+> @@ -916,6 +973,21 @@ static void atmel_spi_cleanup(struct spi_device *spi)
+>  	kfree(asd);
+>  }
+>  
+> +static struct atmel_spi_pdata * __devinit atmel_spi_get_driver_data(
+> +					struct platform_device *pdev)
+> +{
+> +	if (pdev->dev.of_node) {
+> +		const struct of_device_id *match;
+> +		match = of_match_node(atmel_spi_dt_ids, pdev->dev.of_node);
+> +		if (!match)
+> +			return NULL;
+> +		return (struct atmel_spi_pdata *) match->data;
+> +	}
+> +
+> +	return (struct atmel_spi_pdata *)
+> +			platform_get_device_id(pdev)->driver_data;
+> +}
+> +
+>  /*-------------------------------------------------------------------------*/
+>  
+>  static int __devinit atmel_spi_probe(struct platform_device *pdev)
+> @@ -949,7 +1021,8 @@ static int __devinit atmel_spi_probe(struct platform_device *pdev)
+>  	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
+>  
+>  	master->bus_num = pdev->id;
+> -	master->num_chipselect = 4;
+> +	master->dev.of_node = pdev->dev.of_node;
+> +	master->num_chipselect = master->dev.of_node ? 0 : 4;
+>  	master->setup = atmel_spi_setup;
+>  	master->transfer = atmel_spi_transfer;
+>  	master->cleanup = atmel_spi_cleanup;
+> @@ -981,6 +1054,10 @@ static int __devinit atmel_spi_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		goto out_unmap_regs;
+>  
+> +	as->pdata = atmel_spi_get_driver_data(pdev);
+> +	if (!as->pdata)
+> +		goto out_unmap_regs;
+> +
+>  	/* Initialize the hardware */
+>  	clk_enable(clk);
+>  	spi_writel(as, CR, SPI_BIT(SWRST));
+> @@ -1078,12 +1155,13 @@ static int atmel_spi_resume(struct platform_device *pdev)
+>  #define	atmel_spi_resume	NULL
+>  #endif
+>  
+> -
+>  static struct platform_driver atmel_spi_driver = {
+>  	.driver		= {
+>  		.name	= "atmel_spi",
+>  		.owner	= THIS_MODULE,
+> +		.of_match_table	= of_match_ptr(atmel_spi_dt_ids),
+>  	},
+> +	.id_table	= atmel_spi_devtypes,
+>  	.suspend	= atmel_spi_suspend,
+>  	.resume		= atmel_spi_resume,
+>  	.probe		= atmel_spi_probe,
+> -- 
+> 1.7.9.5
 > 
