@@ -1,88 +1,32 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Fri,  7 Dec 2012 11:05:55 +0200
-Subject: [PATCH v2] ARM: OMAP3: cm-t3517: add MMC support
-In-Reply-To: <1354795206-12048-1-git-send-email-grinberg@compulab.co.il>
-References: <1354795206-12048-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1354871155-32528-1-git-send-email-grinberg@compulab.co.il>
+From: elen.song@atmel.com (Elen Song)
+Date: Fri,  7 Dec 2012 17:10:58 +0800
+Subject: [PATCH 0/3] DMA: AT91: Fix get residue function in at_hdmac.c 
+Message-ID: <1354871458-13930-1-git-send-email-elen.song@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cm-t3517 uses two MMC interfaces. Add support for both.
+The residue actually means the bytes remain in transfer identified by current cookie.
+The get residue api did not return the correct values in at_hdmac.c.
+This patch serial focus on fix the issue.
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
----
-v2: Use CONFIG_MMC_OMAP_HS instead of plain CONFIG_MMC, so it will be stubbed
-    out with the same defines as omap_hsmmc_init() function.
-    Fix the !CONFIG_MMC_OMAP_HS case.
+This patch serials is based on DMA: AT91: Get residual bytes in dma buffer v2.
+It is split into 3 aimed patch, the first one is to get transmit buswidth,
+the second one is to get resiude in cookie, it use the buswidth to get residual bytes,
+the third part is to handle the status that there are still some bytes remain in dma fifo.
 
- arch/arm/mach-omap2/board-cm-t3517.c |   27 +++++++++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
+Compare to v2, this patch serials improve:
+1) consider buswidth to get correct residue.
+2) handle dma fifo empty status.
 
-diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
-index ebbc2ad..792d684 100644
---- a/arch/arm/mach-omap2/board-cm-t3517.c
-+++ b/arch/arm/mach-omap2/board-cm-t3517.c
-@@ -32,6 +32,7 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
- #include <linux/mtd/partitions.h>
-+#include <linux/mmc/host.h>
- #include <linux/can/platform/ti_hecc.h>
- 
- #include <asm/mach-types.h>
-@@ -46,6 +47,7 @@
- 
- #include "mux.h"
- #include "control.h"
-+#include "hsmmc.h"
- #include "common-board-devices.h"
- #include "am35xx-emac.h"
- #include "gpmc-nand.h"
-@@ -121,6 +123,26 @@ static void cm_t3517_init_hecc(void)
- static inline void cm_t3517_init_hecc(void) {}
- #endif
- 
-+#if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
-+static struct omap2_hsmmc_info cm_t3517_mmc[] = {
-+	{
-+		.mmc		= 1,
-+		.caps		= MMC_CAP_4_BIT_DATA,
-+		.gpio_cd	= 144,
-+		.gpio_wp	= 59,
-+	},
-+	{
-+		.mmc		= 2,
-+		.caps		= MMC_CAP_4_BIT_DATA,
-+		.gpio_cd	= -EINVAL,
-+		.gpio_wp	= -EINVAL,
-+	},
-+	{}	/* Terminator */
-+};
-+#else
-+#define cm_t3517_mmc NULL
-+#endif
-+
- #if defined(CONFIG_RTC_DRV_V3020) || defined(CONFIG_RTC_DRV_V3020_MODULE)
- #define RTC_IO_GPIO		(153)
- #define RTC_WR_GPIO		(154)
-@@ -271,6 +293,10 @@ static struct omap_board_mux board_mux[] __initdata = {
- 	/* CM-T3517 USB HUB nRESET */
- 	OMAP3_MUX(MCBSP4_CLKX, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
- 
-+	/* CD - GPIO144 and WP - GPIO59 for MMC1 - SB-T35 */
-+	OMAP3_MUX(UART2_CTS, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
-+	OMAP3_MUX(GPMC_CLK, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
-+
- 	{ .reg_offset = OMAP_MUX_TERMINATOR },
- };
- #endif
-@@ -286,6 +312,7 @@ static void __init cm_t3517_init(void)
- 	cm_t3517_init_usbh();
- 	cm_t3517_init_hecc();
- 	am35xx_emac_init(AM35XX_DEFAULT_MDIO_FREQUENCY, 1);
-+	omap_hsmmc_init(cm_t3517_mmc);
- }
- 
- MACHINE_START(CM_T3517, "Compulab CM-T3517")
+
+Elen Song (3):
+  DMA: AT91: Add value about transmit buswidth
+  DMA: AT91: Get residual bytes in dma buffer
+  DMA: AT91: Check fifo empty
+
+ drivers/dma/at_hdmac.c      |  151 ++++++++++++++++++++++++++++++++++++++-----
+ drivers/dma/at_hdmac_regs.h |    5 ++
+ 2 files changed, 139 insertions(+), 17 deletions(-)
+
 -- 
-1.7.3.4
+1.7.9.5
