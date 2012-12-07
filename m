@@ -1,57 +1,58 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Fri,  7 Dec 2012 13:45:59 +0000
-Subject: [PATCH] ARM: head: Remove boot-time HYP mode check for v5 and below
-Message-ID: <1354887959-14863-1-git-send-email-dave.martin@linaro.org>
+Date: Fri, 7 Dec 2012 13:49:29 +0000
+Subject: [ARM] head.S change broke platform device registration?
+In-Reply-To: <20121207122809.GT14363@n2100.arm.linux.org.uk>
+References: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
+ <50B88A59.6070207@arm.com>
+ <CAHod+GeZQx6-pUHPocbyMJCLawMUhrZuZf=mrgWax=L7eNJGhg@mail.gmail.com>
+ <20121130143435.GP19440@n2100.arm.linux.org.uk>
+ <CAHod+GdXfZb1OHapJBYpCD74svYyaGaiZpqHLPtjHbWGa-3eLA@mail.gmail.com>
+ <20121204221851.GJ14363@n2100.arm.linux.org.uk>
+ <CAHod+Gd6NJsuJVRos52e9+NcweqcSu=HArT_qoV0ygb_Xbfaiw@mail.gmail.com>
+ <20121205235836.GR14363@n2100.arm.linux.org.uk>
+ <20121207122809.GT14363@n2100.arm.linux.org.uk>
+Message-ID: <20121207134929.GA1969@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel can only be entered on HYP mode on CPUs which actually
-support it, i.e.  >= ARMv7.  pre-v6 platform support cannot coexist
-in the same kernel as support for v7 and higher, so there is no
-advantage in having the HYP mode check on pre-v6 hardware.
+On Fri, Dec 07, 2012 at 12:28:09PM +0000, Russell King - ARM Linux wrote:
 
-At least one pre-v6 board is known to fail when the HYP mode check
-code is present, although the exact cause remains unknown and may
-be unrelated.  [1]
+[...]
 
-This patch restores the old behaviour for pre-v6 platforms, whereby
-the CPSR is forced directly to SVC mode with IRQs and FIQs masked.
-All kernels capable of booting on v7 hardware will retain the
-check, so this should not impair functionality.
+> Having thought about this for quite a while, I think there's three
+> options:
+> 
+> 1. The Sharp Zaurus code is unmaintained.  Declare it to be broken, and
+>    remove all the Sharp code from the kernel so that people aren't tempted
+>    to think it's something that the kernel supports.  (In light of the
+>    lack of maintainer for these platforms which almost no one knows much
+>    about, that will lower the maintanence burden on everyone else.)
+> 
+> 2. Revert the hyp-mode support and say that we can't accept _any_ change
+>    whatsoever to the decompressor head.S through fear that it will cause
+>    a regression for Sharp Zaurus platforms.  (This effectively means we
+>    can't support virtualization on ARM - which is not acceptable.)
+> 
+> 3. Revert the hyp-mode support and make it conditional on CPUs that have
+>    hyp-mode support.
+> 
+> Out of those three, (3) is the best way forward.  So, unless I hear any
+> objections, I'm going to revert 424e5994e63 in mainline, and wait for a
+> patch to safe_svcmode_maskall so that it can be switched between the
+> hyp-mode version and the non-hyp-mode.
+> 
+> This shouldn't be a problem for the single-zImage people; the break-point
+> is the ARMv5/ARMv6 boundary which we're already keeping as separate kernels.
 
-[1] http://lists.arm.linux.org.uk/lurker/message/20121130.013814.19218413.en.html
-([ARM] head.S change broke platform device registration?)
+I've posted a separate patch which ought to accomplish the appropriate
+change to safe_svc_maskall
+([PATCH] ARM: head: Remove boot-time HYP mode check for v5 and below)
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/include/asm/assembler.h |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+I've done a compile-disassemble sanity-check for v5 and v7 to make sure
+that the results are sane, but I can't check whether it fixed the
+problem for the affected hardware.
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 2ef9581..eb87200 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -250,6 +250,7 @@
-  * Beware, it also clobers LR.
-  */
- .macro safe_svcmode_maskall reg:req
-+#if __LINUX_ARM_ARCH__ >= 6
- 	mrs	\reg , cpsr
- 	mov	lr , \reg
- 	and	lr , lr , #MODE_MASK
-@@ -266,6 +267,13 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- 	__ERET
- 1:	msr	cpsr_c, \reg
- 2:
-+#else
-+/*
-+ * workaround for possibly broken pre-v6 hardware
-+ * (akita, Sharp Zaurus C-1000, PXA270-based)
-+ */
-+	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, \reg
-+#endif
- .endm
- 
- /*
--- 
-1.7.4.1
+Marko, can you give it a try?
+
+Cheers
+---Dave
