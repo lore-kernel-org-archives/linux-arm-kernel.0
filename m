@@ -1,167 +1,62 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Fri, 07 Dec 2012 11:51:12 +0200
-Subject: [PATCH V3 11/11] ARM: delete struct sys_timer
-In-Reply-To: <1353349867-28494-12-git-send-email-swarren@wwwdotorg.org>
-References: <1353349867-28494-1-git-send-email-swarren@wwwdotorg.org>
- <1353349867-28494-12-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <50C1BC10.8000506@compulab.co.il>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Dec 2012 10:04:40 +0000
+Subject: What value for max_pfn on ARM ?
+In-Reply-To: <20121207094348.GB32721@izard-pc>
+References: <20121207094348.GB32721@izard-pc>
+Message-ID: <20121207100440.GS14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-I've only now bumped into the patchset (working the back log on linux-arm).
-Sorry for late reply, but I guess you should have Cc'd the relevant
-mailing lists with such changes.
-Cc'd now.
-
-On 11/19/12 20:31, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Fri, Dec 07, 2012 at 10:43:49AM +0100, Romain Izard wrote:
+> Hello,
 > 
-> Now that the only field in struct sys_timer is .init, delete the struct,
-> and replace the machine descriptor .timer field with the initialization
-> function itself.
+> While trying to use the /proc/kpagecount and /proc/kpageflags to debug a
+> memory issue on a 2.6.32 kernel, I encountered a code segment that does
+> not seem to work to work as designed on my ARM platform.  The kpage*
+> entries provide information on memory PFNs, and are supposed to return 8
+> bytes of data for each page frame of physical memory in the system. 
+> (see Documentation/vm/pagemap.txt for more details)
 > 
-> This will enable moving timer drivers into drivers/clocksource without
-> having to place a public prototype of each struct sys_timer object into
-> include/linux; the intent is to create a single of_clocksource_init()
-> function that determines which timer driver to initialize by scanning
-> the device dtree, much like the proposed irqchip_init() at:
-> http://www.spinics.net/lists/arm-kernel/msg203686.html
+> Both entries use the same algorithm to determine a conversion between
+> the file offset and the PFN. This conversion takes the following
+> assumption as granted: valid memory PFNs are comprised between 0 and
+> max_pfn-1. After returning values for (max_pfn-1), the proc entry
+> reports an End-Of-File condition.
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
-> v3: Minor merge conflicts due to rebasing onto next-20121115.
-> v2: Converted all platforms, not just Tegra.
+> But on my platform, which uses the flat memory modem, the physical
+> memory is located at 0xC0000000, and thus the valid PFN range starts at
+> 0xC00000. This means that when I use ?od? to read the contents of the
+> entry, I only get information for invalid entries, between 0 and
+> max_pfn, and thus I get no relevant information.
 > 
-> The patch is very large, so I've trimmed it for the mailing list, leaving
-> only the core ARM changes, changes outside arch/arm, and a single machine
-> example. The full series can be found at:
+> It is possible to seek after the EOF, to start reading the PFNs at an
+> arbitrary offset. It is the most logical way of using this facility, as
+> the values recovered in /proc/<pid>/pagemap are the absolute value of
+> the PFN. As a result, this means that this issue is not blocking when
+> using tools like smem (http://www.selenic.com/smem/), which were
+> designed to work with this subsystem.
 > 
-> git://nv-tegra.nvidia.com/user/swarren/linux-2.6 arm_timer_rework
-> ---
+> From what I read in other architectures, it seems that the most common
+> case for max_pfn is that this variable really contains the maximum value
+> for all PFNs in the system, the first valid PFN is ARCH_PFN_OFFSET, and
+> the number of valid PFNs is max_mapnr. In the FLATMEM model, the
+> assertion (max_pfn - ARCH_PFN_OFFSET == max_mapnr) is true. 
+> 
+> But for ARM and ARM64, we are using PHYS_PFN_OFFSET in addition to
+> ARCH_PFN_OFFSET, and in the FLATMEM model (max_pfn == max_mapnr) is true.
+> 
+> I am looking for answers to the following questions:
+> - What is the use of PHYS_PFN_OFFSET in ARM platforms ?
+> - Can we safely stop to use it, and use the more common case, with only
+>   ARCH_PFN_OFFSET ?
+> - If not, how can we recover the number of the last valid PFN, for all
+>   architectures ?
 
-[...]
+Welcome to the crappyness of the Linux kernel.  What we have for max_pfn
+is what we've found to be required on our platforms for various parts of
+the kernel to work correctly.
 
->  arch/arm/mach-omap1/board-ams-delta.c          |    2 +-
->  arch/arm/mach-omap1/board-fsample.c            |    2 +-
->  arch/arm/mach-omap1/board-generic.c            |    2 +-
->  arch/arm/mach-omap1/board-h2.c                 |    2 +-
->  arch/arm/mach-omap1/board-h3.c                 |    2 +-
->  arch/arm/mach-omap1/board-htcherald.c          |    2 +-
->  arch/arm/mach-omap1/board-innovator.c          |    2 +-
->  arch/arm/mach-omap1/board-nokia770.c           |    2 +-
->  arch/arm/mach-omap1/board-osk.c                |    2 +-
->  arch/arm/mach-omap1/board-palmte.c             |    2 +-
->  arch/arm/mach-omap1/board-palmtt.c             |    2 +-
->  arch/arm/mach-omap1/board-palmz71.c            |    2 +-
->  arch/arm/mach-omap1/board-perseus2.c           |    2 +-
->  arch/arm/mach-omap1/board-sx1.c                |    2 +-
->  arch/arm/mach-omap1/board-voiceblue.c          |    2 +-
->  arch/arm/mach-omap1/common.h                   |    2 +-
->  arch/arm/mach-omap1/time.c                     |    6 +-----
->  arch/arm/mach-omap2/board-2430sdp.c            |    2 +-
->  arch/arm/mach-omap2/board-3430sdp.c            |    2 +-
->  arch/arm/mach-omap2/board-3630sdp.c            |    2 +-
->  arch/arm/mach-omap2/board-4430sdp.c            |    2 +-
->  arch/arm/mach-omap2/board-am3517crane.c        |    2 +-
->  arch/arm/mach-omap2/board-am3517evm.c          |    2 +-
->  arch/arm/mach-omap2/board-apollon.c            |    2 +-
->  arch/arm/mach-omap2/board-cm-t35.c             |    4 ++--
->  arch/arm/mach-omap2/board-cm-t3517.c           |    2 +-
->  arch/arm/mach-omap2/board-devkit8000.c         |    2 +-
->  arch/arm/mach-omap2/board-generic.c            |   12 ++++++------
->  arch/arm/mach-omap2/board-h4.c                 |    2 +-
->  arch/arm/mach-omap2/board-igep0020.c           |    4 ++--
->  arch/arm/mach-omap2/board-ldp.c                |    2 +-
->  arch/arm/mach-omap2/board-n8x0.c               |    6 +++---
->  arch/arm/mach-omap2/board-omap3beagle.c        |    2 +-
->  arch/arm/mach-omap2/board-omap3evm.c           |    2 +-
->  arch/arm/mach-omap2/board-omap3logic.c         |    4 ++--
->  arch/arm/mach-omap2/board-omap3pandora.c       |    2 +-
->  arch/arm/mach-omap2/board-omap3stalker.c       |    2 +-
->  arch/arm/mach-omap2/board-omap3touchbook.c     |    2 +-
->  arch/arm/mach-omap2/board-omap4panda.c         |    2 +-
->  arch/arm/mach-omap2/board-overo.c              |    2 +-
->  arch/arm/mach-omap2/board-rm680.c              |    4 ++--
->  arch/arm/mach-omap2/board-rx51.c               |    2 +-
->  arch/arm/mach-omap2/board-ti8168evm.c          |    4 ++--
->  arch/arm/mach-omap2/board-zoom.c               |    4 ++--
->  arch/arm/mach-omap2/common.h                   |   12 ++++++------
->  arch/arm/mach-omap2/timer.c                    |   17 +++--------------
-
-[...]
-
->  492 files changed, 622 insertions(+), 1199 deletions(-)
-
-I've looked at the omap2+ changes and I think OMAP4 and 5 got messed up a bit...
-the below (compile tested on omap2plus only) should be applied:
-
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 2e0c446..f5d5f59 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -725,6 +725,6 @@ MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= omap_4430sdp_init,
- 	.init_late	= omap4430_init_late,
--	.init_time	= omap4_sync32k_timer_init,
-+	.init_time	= omap4_local_timer_init,
- 	.restart	= omap44xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 5da84a9..8a5f814 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -159,7 +159,7 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= omap_generic_init,
- 	.init_late	= omap4430_init_late,
--	.init_time	= omap4_sync32k_timer_init,
-+	.init_time	= omap4_local_timer_init,
- 	.dt_compat	= omap4_boards_compat,
- 	.restart	= omap44xx_restart,
- MACHINE_END
-@@ -179,7 +179,7 @@ DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
- 	.init_irq	= omap_gic_of_init,
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= omap_generic_init,
--	.init_time	= omap5_sync32k_timer_init,
-+	.init_time	= omap5_realtime_timer_init,
- 	.dt_compat	= omap5_boards_compat,
- 	.restart	= omap44xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index fcae01e..ed8240c 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -456,6 +456,6 @@ MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= omap4_panda_init,
- 	.init_late	= omap4430_init_late,
--	.init_time	= omap4_sync32k_timer_init,
-+	.init_time	= omap4_local_timer_init,
- 	.restart	= omap44xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 56a3281..b435027 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -84,8 +84,8 @@ extern void omap3_sync32k_timer_init(void);
- extern void omap3_secure_sync32k_timer_init(void);
- extern void omap3_gp_gptimer_timer_init(void);
- extern void omap3_am33xx_gptimer_timer_init(void);
--extern void omap4_sync32k_timer_init(void);
--extern void omap5_sync32k_timer_init(void);
-+extern void omap4_local_timer_init(void);
-+extern void omap5_realtime_timer_init(void);
- 
- void omap2420_init_early(void);
- void omap2430_init_early(void);
-
-
-
--- 
-Regards,
-Igor.
+Unfortunately, many people assume that RAM will always start at phys
+address zero and they size things according to max_pfn being the
+actual RAM size.  As long as there is this usage in the kernel we can't
+change the max_pfn value.
