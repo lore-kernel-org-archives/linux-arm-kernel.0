@@ -1,59 +1,56 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 7 Dec 2012 22:40:10 +0800
-Subject: [PATCH 1/2] mmc: slot-gpio: use devm_* managed functions to ease
- users
-In-Reply-To: <Pine.LNX.4.64.1212071438010.24520@axis700.grange>
-References: <1354887168-3073-1-git-send-email-shawn.guo@linaro.org>
- <Pine.LNX.4.64.1212071438010.24520@axis700.grange>
-Message-ID: <20121207144006.GB30468@S2100-06.ap.freescale.net>
+From: wfp5p@virginia.edu (Bill Pemberton)
+Date: Fri,  7 Dec 2012 09:26:14 -0500
+Subject: [PATCH 02/25] ASoC: pxa/hx4700: remove __dev* attributes
+In-Reply-To: <1354890397-28568-1-git-send-email-wfp5p@virginia.edu>
+References: <1354890397-28568-1-git-send-email-wfp5p@virginia.edu>
+Message-ID: <1354890397-28568-3-git-send-email-wfp5p@virginia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 07, 2012 at 02:49:43PM +0100, Guennadi Liakhovetski wrote:
-> Hi Shawn
-> 
-> On Fri, 7 Dec 2012, Shawn Guo wrote:
-> 
-> > Use devm_* managed functions, so that slot-gpio users do not have to
-> > call mmc_gpio_free_ro/cd to free up resources requested in
-> > mmc_gpio_request_ro/cd.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> Thanks for the patch, but I'm not sure this is a good idea. Firstly, using 
-> devm_* allocation functions means, that normally you don't have to free 
-> these resources explicitly any more. So, actually you would have to remove 
-> free_irq() and gpio_free() calls completely from the API instead of 
-> replacing them with devm_* analogs.
+CONFIG_HOTPLUG is going away as an option.  As result the __dev*
+markings will be going away.
 
-With the changes, most of the slot-gpio users will only need to call
-mmc_gpio_request_* functions at probe time, nothing else.  That said,
-they will not call mmc_gpio_free_* functions at all.  I patched
-mmc_gpio_free_* functions replacing free_irq() and gpio_free() with
-devm_* versions to 1) ease the migration of exiting users calling
-mmc_gpio_free_*; 2) provide a mean for users to manually free resources
-for whatever reasons.
+Remove use of __devinit, __devexit_p, __devinitdata, __devinitconst,
+and __devexit.
 
-> Secondly, I do use devm_kzalloc() in 
-> the API because I really want that allocated memory to just be allocated 
-> once and stay there until the device is freed. Whereas with with card 
-> detection and write-protect pins - usually you're right, you would only 
-> allocate those once during the lifetime of your host device. But - are we 
-> sure there cannot be exceptions? What if someone decides to switch between 
-> CD-IRQ and CD-polling at runtime? Or do something equally weird with their 
-> GPIOs... At least I personally don't think I have sufficient knowledge of 
-> all possible configurations to make such a decision. Think about pinctrl 
-> etc. What if at runtime the CD pin has to be released by mmc to be used 
-> by some other device?
+Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
+Cc: Philipp Zabel <philipp.zabel@gmail.com>
+Cc: Paul Parsons <lost.distance@yahoo.com>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ sound/soc/pxa/hx4700.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-mmc_gpio_request_* and mmc_gpio_free_* pair are still there anyway.
-Users can manually call them in any way they want.
-
-> Anyway, I'm fine either way, but I'm just not sure 
-> how reasonable this change is.
-
-My intension is to save slot-gpio users from checking GPIO CD/WP cases
-and calling mmc_gpio_request_* functions, so that we can have a cleaner
-.probe error path and .remove function.
-
-Shawn
+diff --git a/sound/soc/pxa/hx4700.c b/sound/soc/pxa/hx4700.c
+index 2a342c9..dcc9b04 100644
+--- a/sound/soc/pxa/hx4700.c
++++ b/sound/soc/pxa/hx4700.c
+@@ -183,7 +183,7 @@ static struct gpio hx4700_audio_gpios[] = {
+ 	{ GPIO92_HX4700_HP_DRIVER, GPIOF_OUT_INIT_LOW, "EP_POWER" },
+ };
+ 
+-static int __devinit hx4700_audio_probe(struct platform_device *pdev)
++static int hx4700_audio_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+ 
+@@ -204,7 +204,7 @@ static int __devinit hx4700_audio_probe(struct platform_device *pdev)
+ 	return ret;
+ }
+ 
+-static int __devexit hx4700_audio_remove(struct platform_device *pdev)
++static int hx4700_audio_remove(struct platform_device *pdev)
+ {
+ 	snd_soc_jack_free_gpios(&hs_jack, 1, &hs_jack_gpio);
+ 	snd_soc_unregister_card(&snd_soc_card_hx4700);
+@@ -223,7 +223,7 @@ static struct platform_driver hx4700_audio_driver = {
+ 		.pm = &snd_soc_pm_ops,
+ 	},
+ 	.probe	= hx4700_audio_probe,
+-	.remove	= __devexit_p(hx4700_audio_remove),
++	.remove	= hx4700_audio_remove,
+ };
+ 
+ module_platform_driver(hx4700_audio_driver);
+-- 
+1.8.0.1
