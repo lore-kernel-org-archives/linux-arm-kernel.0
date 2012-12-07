@@ -1,111 +1,27 @@
-From: acourbot@nvidia.com (Alex Courbot)
-Date: Fri, 7 Dec 2012 16:02:02 +0900
-Subject: [RFC] gpiolib: introduce descriptor-based GPIO interface
-In-Reply-To: <20121207024947.GA25121@roeck-us.net>
-References: <1354779918-4028-1-git-send-email-acourbot@nvidia.com>
- <1354779918-4028-2-git-send-email-acourbot@nvidia.com>
- <20121207024947.GA25121@roeck-us.net>
-Message-ID: <2562815.JQOcF2Dmj3@percival>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 6 Dec 2012 23:04:12 -0800
+Subject: [PATCH 6/6 v9] cpufreq, highbank: add support for highbank cpufreq
+In-Reply-To: <1354833773-22845-7-git-send-email-mark.langsdorf@calxeda.com>
+References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1354833773-22845-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1354833773-22845-7-git-send-email-mark.langsdorf@calxeda.com>
+Message-ID: <CAPtuhTi3Gvb0CQFiAe_bNRQ4k0xfzN9amQvwTeUsaJ7HLJsNHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+On Thu, Dec 6, 2012 at 2:42 PM, Mark Langsdorf
+<mark.langsdorf@calxeda.com> wrote:
+> Highbank processors depend on the external ECME to perform voltage
+> management based on a requested frequency. Communication between the
+> A9 cores and the ECME happens over the pl320 IPC channel.
+>
+> Signed-off-by: Mark Langsdorf <mark.langsdorf@calxeda.com>
+> Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: mturquette at linaro.org
 
-On Friday 07 December 2012 10:49:47 Guenter Roeck wrote:
-> My own idea for a solution was to keep integer based handles, but replace
-> gpio_desc[] with a hash table. But ultimately I don't really care how
-> it is done.
-> 
-> Do you have a solution for gpiochip_find_base() in mind, and how to handle
-> reservations ? I had thought about using bit maps, but maybe there is
-> a better solution.
+Looks good to me.
 
-My plan so far is to use a sorted linked list of gpio_chips. Each chip 
-contains its base address and size, so this will make it possible to find 
-usable areas through a single parse. Current gpiochip_find_base() start from 
-ARCH_NR_GPIOS and look backwards in the integer space to find a free range, a 
-similar behavior can also be done if this is deemed better (GPIO numbers might 
-become high, but since we want to hide them this should not matter).
+Reviewed-by: Mike Turquette <mturquette@linaro.org>
 
-The counterpart of the list is that fetching the descriptor corresponding to a 
-GPIO number is going to be linear instead of constant, but (1) the number of 
-gpio_chips on the system should never grow very high and (2) this is a good 
-incentive to use the descriptor-based API instead. :) Existing code could 
-easily be converted - once a GPIO is acquired, its number should be converted 
-immediatly to a descriptor and the gpiod_* functions used from them on. We can 
-probably write a sed or Coccinelle rule to do that through the whole kernel.
-
-gpiochip_reserve() will require some more thinking using this model, but 
-something like a dummy chip can probably be introduced in the list. It will 
-need to be statically allocated however since memory allocation cannot be used 
-there.
-
-Actually the only user of gpiochip_reserve() seems to be Tosa, so I wonder if 
-there would be no way to simply get rid of it?
-
-> If/when you have some code to test, please let me know.
-
-Sure!
-
-> > +     mutex_lock(&sysfs_lock);
-> > 
-> >       /* can't export until sysfs is available ... */
-> >       if (!gpio_class.p) {
-> > 
-> > @@ -713,13 +743,7 @@ int gpio_export(unsigned gpio, bool
-> > direction_may_change)> 
-> >               return -ENOENT;
-> 
-> mutex is not released here.
-
-Oops.
-
-> > -     chip = gpio_to_chip(gpio);
-> > +     chip = desc->chip;
-> > +     gpio = gpio_chip_offset(desc);
-> 
-> Might be better to use a separate variable named 'offset' when dealing with
-> the offset, to avoid confusion and accidential bugs. You are doing it
-> below, so you might as well do it everywhere. This would also simplify the
-> code in a couple of places where gpio is first converted into an offset
-> only to use "chip->base + gpio" later on.
-
-Makes sense. Fixed, thanks.
-
-> > -                                     __func__, gpio, err);
-> > +                                     __func__, offset + chip->base, err);
-> 
-> I know I am nitpicking, but everywhere in the existing code it is
-> "chip->base + offset/gpio".
-
-Fixed.
-
-> >       return chip->to_irq ? chip->to_irq(chip, gpio - chip->base) :
-> >       -ENXIO;
-> 
-> s/gpio - chip->base/gpio_chip_offset(desc)/
-> 
-> then you don't need gpio at all.
-
-Done, thanks.
-
-> > -     chip = gpio_to_chip(gpio);
-> > +     chip = desc->chip;
-> > +     gpio = desc_to_gpio(desc);
-> > 
-> >       trace_gpio_value(gpio, 0, value);
-> >       if (test_bit(FLAG_OPEN_DRAIN,  &gpio_desc[gpio].flags))
-> 
-> Use desc directly.
-> 
-> > -             _gpio_set_open_drain_value(gpio, chip, value);
-> > +             _gpio_set_open_drain_value(desc, value);
-> > 
-> >       else if (test_bit(FLAG_OPEN_SOURCE,  &gpio_desc[gpio].flags))
-> 
-> Use desc directly.
-
-Right.
-
-Thanks,
-Alex.
+Regards,
+Mike
