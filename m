@@ -1,94 +1,217 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  7 Dec 2012 23:04:27 +0100
-Subject: [RFC v1 04/16] arm: plat-orion: refactor the orion_disable_wins()
- function
+Date: Fri,  7 Dec 2012 23:04:29 +0100
+Subject: [RFC v1 06/16] arm: mvebu: add functions to alloc/free PCIe decoding
+ windows
 In-Reply-To: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1354917879-32073-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1354917879-32073-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the address decoding code, the orion_disable_wins() function is
-used at boot time to disable all address decoding windows, before
-configuring only the ones that are needed. This allows to make sure
-that no configuration is left from the bootloader.
+This commit adds two functions armada_370_xp_alloc_pcie_window() and
+armada_370_xp_free_pcie_window() that respectively allocate and free
+an address decoding window pointing to either a memory or I/O region
+of a PCIe device.
 
-As a preparation for the introduction of address decoding window
-allocation/deallocation function, we refactor this function into an
-orion_disable_cpu_win() which disables a single window.
-
-The orion_config_wins() function is changed to call
-orion_disable_cpu_win() in a loop, to preserve an identical behavior.
+Those functions will be used by the PCIe driver to create and remove
+those regions depending on the PCIe devices that are detected.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/plat-orion/addr-map.c |   35 +++++++++++++++++------------------
- 1 file changed, 17 insertions(+), 18 deletions(-)
+ arch/arm/mach-mvebu/addr-map.c |  156 ++++++++++++++++++++++++++++++++++++++--
+ arch/arm/mach-mvebu/common.h   |    4 ++
+ 2 files changed, 156 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/plat-orion/addr-map.c b/arch/arm/plat-orion/addr-map.c
-index 4dec3db..dd98638 100644
---- a/arch/arm/plat-orion/addr-map.c
-+++ b/arch/arm/plat-orion/addr-map.c
-@@ -95,6 +95,19 @@ void __init orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
- 	}
- }
+diff --git a/arch/arm/mach-mvebu/addr-map.c b/arch/arm/mach-mvebu/addr-map.c
+index ab9b3bd..c21aa7b 100644
+--- a/arch/arm/mach-mvebu/addr-map.c
++++ b/arch/arm/mach-mvebu/addr-map.c
+@@ -24,14 +24,10 @@
+ #define ARMADA_XP_TARGET_DEV_BUS	1
+ #define   ARMADA_XP_ATTR_DEV_BOOTROM    0x1D
+ #define ARMADA_XP_TARGET_ETH1		3
+-#define ARMADA_XP_TARGET_PCIE_0_2	4
+ #define ARMADA_XP_TARGET_ETH0		7
+-#define ARMADA_XP_TARGET_PCIE_1_3	8
  
-+static void __init orion_disable_cpu_win(const struct orion_addr_map_cfg *cfg,
-+					 const int win)
-+{
-+	void __iomem *addr = cfg->win_cfg_base(cfg, win);
+ #define ARMADA_370_TARGET_DEV_BUS       1
+ #define   ARMADA_370_ATTR_DEV_BOOTROM   0x1D
+-#define ARMADA_370_TARGET_PCIE_0        4
+-#define ARMADA_370_TARGET_PCIE_1        8
+ 
+ #define ARMADA_WINDOW_8_PLUS_OFFSET       0x90
+ #define ARMADA_SDRAM_ADDR_DECODING_OFFSET 0x180
+@@ -89,6 +85,158 @@ static struct __initdata orion_addr_map_cfg addr_map_cfg = {
+ 	.win_cfg_base = armada_cfg_base,
+ };
+ 
++#ifdef CONFIG_PCI
++/*
++ * PCIe windows allocation code.
++ */
++#define ARMADA_370_XP_PCIE_MEM_START 0xC0000000
++#define ARMADA_370_XP_PCIE_MEM_END   (ARMADA_370_XP_PCIE_MEM_START + SZ_256M)
++#define ARMADA_370_XP_PCIE_IO_START  0xF2000000
++#define ARMADA_370_XP_PCIE_IO_END    (ARMADA_370_XP_PCIE_IO_START + SZ_1M)
 +
-+	writel(0, addr + WIN_BASE_OFF);
-+	writel(0, addr + WIN_CTRL_OFF);
-+	if (cfg->cpu_win_can_remap(cfg, win)) {
-+		writel(0, addr + WIN_REMAP_LO_OFF);
-+		writel(0, addr + WIN_REMAP_HI_OFF);
-+	}
++static unsigned long armada_370_xp_pcie_memaddr = ARMADA_370_XP_PCIE_MEM_START;
++static unsigned long armada_370_xp_pcie_ioaddr = ARMADA_370_XP_PCIE_IO_START;
++
++/*
++ * This structure and the following arrays allow to map a PCIe (port,
++ * lane) tuple to the corresponding (target, attribute) tuple needed
++ * to configure an address decoding window for the given PCIe (port,
++ * lane).
++ */
++struct pcie_mapping {
++	int port;
++	int lane;
++	u8  target;
++	u8  attr;
++};
++
++struct pcie_mapping armada_xp_pcie_mappings[] = {
++	{ .port = 0, .lane = 0, .target = 4, .attr = 0xE0 },
++	{ .port = 0, .lane = 1, .target = 4, .attr = 0xD0 },
++	{ .port = 0, .lane = 2, .target = 4, .attr = 0xB0 },
++	{ .port = 0, .lane = 3, .target = 4, .attr = 0x70 },
++	{ .port = 1, .lane = 0, .target = 8, .attr = 0xE0 },
++	{ .port = 1, .lane = 1, .target = 8, .attr = 0xD0 },
++	{ .port = 1, .lane = 2, .target = 8, .attr = 0xB0 },
++	{ .port = 1, .lane = 3, .target = 8, .attr = 0x70 },
++	{ .port = 2, .lane = 0, .target = 4, .attr = 0xF0 },
++	{ .port = 3, .lane = 0, .target = 8, .attr = 0xF0 },
++	{ .port = -1 },
++};
++
++struct pcie_mapping armada_370_pcie_mappings[] = {
++	{ .port = 0, .lane = 0, .target = 4, .attr = 0xE0 },
++	{ .port = 1, .lane = 0, .target = 8, .attr = 0xE0 },
++	{ .port = -1 },
++};
++
++/*
++ * This function finds an available physical address range between
++ * ARMADA_370_XP_PCIE_MEM_START and ARMADA_370_XP_PCIE_MEM_END (for
++ * PCIe memory regions) or between ARMADA_370_XP_PCIE_IO_START and
++ * ARMADA_370_XP_PCIE_IO_END (for PCIe I/O regions) and creates an
++ * address decoding window from this allocated address pointing to the
++ * right PCIe device.
++ *
++ * An error code is returned, the allocated base address is returned
++ * through the 'outbase' argument.
++ */
++int __init armada_370_xp_alloc_pcie_window(int pcie_port, int pcie_lane,
++					   int type, u32 size,
++					   unsigned long *outbase)
++{
++	struct pcie_mapping *mapping, *mappings;
++	u8 target, attr;
++	u32 base;
++	int ret;
++
++	if (of_machine_is_compatible("marvell,armadaxp"))
++		mappings = armada_xp_pcie_mappings;
++	else if (of_machine_is_compatible("marvell,armada370"))
++		mappings = armada_370_pcie_mappings;
++	else
++		return -ENODEV;
++
++	for (mapping = mappings; mapping->port != -1; mapping++)
++		if (mapping->port == pcie_port && mapping->lane == pcie_lane)
++			break;
++
++	if (mapping->port == -1)
++		return -ENODEV;
++
++	target = mapping->target;
++	attr = mapping->attr;
++
++	if (type == IORESOURCE_MEM) {
++		/*
++		 * Bit 3 of the attributes indicates that it is a
++		 * memory region, as opposed to an I/O region
++		 */
++		attr |= (1 << 3);
++
++		if (armada_370_xp_pcie_memaddr + size >
++		    ARMADA_370_XP_PCIE_MEM_END)
++			return -ENOMEM;
++
++		base = armada_370_xp_pcie_memaddr;
++		armada_370_xp_pcie_memaddr += size;
++
++		ret = orion_alloc_cpu_win(&addr_map_cfg, base, size, target,
++					  attr, -1);
++		if (ret) {
++			armada_370_xp_pcie_memaddr -= size;
++			return ret;
++		}
++	} else if (type == IORESOURCE_IO) {
++		if (armada_370_xp_pcie_ioaddr + size >
++		    ARMADA_370_XP_PCIE_IO_END)
++			return -ENOMEM;
++
++		base = armada_370_xp_pcie_ioaddr;
++		armada_370_xp_pcie_ioaddr += size;
++
++		ret = orion_alloc_cpu_win(&addr_map_cfg, base, size, target,
++					  attr, -1);
++		if (ret) {
++			armada_370_xp_pcie_ioaddr -= size;
++			return ret;
++		}
++	} else
++		return -ENODEV;
++
++	*outbase = base;
++	return 0;
 +}
 +
- /*
-  * Configure a number of windows.
-  */
-@@ -108,36 +121,22 @@ static void __init orion_setup_cpu_wins(const struct orion_addr_map_cfg * cfg,
- 	}
- }
- 
--static void __init orion_disable_wins(const struct orion_addr_map_cfg * cfg)
--{
--	void __iomem *addr;
--	int i;
--
--	for (i = 0; i < cfg->num_wins; i++) {
--		addr = cfg->win_cfg_base(cfg, i);
--
--		writel(0, addr + WIN_BASE_OFF);
--		writel(0, addr + WIN_CTRL_OFF);
--		if (cfg->cpu_win_can_remap(cfg, i)) {
--			writel(0, addr + WIN_REMAP_LO_OFF);
--			writel(0, addr + WIN_REMAP_HI_OFF);
--		}
--	}
--}
--
- /*
-  * Disable, clear and configure windows.
-  */
- void __init orion_config_wins(struct orion_addr_map_cfg * cfg,
- 			      const struct orion_addr_map_info *info)
- {
-+	int win;
++/*
++ * Frees an address decoding window previously allocated by
++ * armada_370_xp_alloc_pcie_window(). Note that only the last window
++ * allocated for a given type (MEM or IO) can be freed, due to the
++ * simplicity of the allocator. This is however sufficient to handle
++ * the error cases when initializing one PCIe device.
++ */
++int __init armada_370_xp_free_pcie_window(int type, unsigned long base,
++					  u32 size)
++{
++	if (type == IORESOURCE_MEM) {
++		/* We can only free the last allocated window */
++		if (base + size != armada_370_xp_pcie_memaddr)
++			return -EINVAL;
++		orion_free_cpu_win(&addr_map_cfg, base);
++		armada_370_xp_pcie_memaddr -= size;
++	} else if (type == IORESOURCE_IO) {
++		/* We can only free the last allocated window */
++		if (base + size != armada_370_xp_pcie_ioaddr)
++			return -EINVAL;
++		orion_free_cpu_win(&addr_map_cfg, base);
++		armada_370_xp_pcie_ioaddr -= size;
++	} else
++		return -EINVAL;
 +
- 	if (!cfg->cpu_win_can_remap)
- 		cfg->cpu_win_can_remap = orion_cpu_win_can_remap;
- 
- 	if (!cfg->win_cfg_base)
- 		cfg->win_cfg_base = orion_win_cfg_base;
- 
--	orion_disable_wins(cfg);
-+	for (win = 0; win < cfg->num_wins; win++)
-+		orion_disable_cpu_win(cfg, win);
- 
- 	if (info)
- 		orion_setup_cpu_wins(cfg, info);
++	return 0;
++}
++#endif
++
+ static int __init armada_setup_cpu_mbus(void)
+ {
+ 	struct device_node *np;
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+index aa27bc2..3cef81a 100644
+--- a/arch/arm/mach-mvebu/common.h
++++ b/arch/arm/mach-mvebu/common.h
+@@ -25,4 +25,8 @@ int armada_370_xp_coherency_init(void);
+ int armada_370_xp_pmsu_init(void);
+ void armada_xp_secondary_startup(void);
+ extern struct smp_operations armada_xp_smp_ops;
++
++int armada_370_xp_alloc_pcie_window(int pcie_port, int pcie_lane,
++				    int type, u32 size, unsigned long *outbase);
++int armada_370_xp_free_pcie_window(int type, unsigned long base, u32 size);
+ #endif
 -- 
 1.7.9.5
