@@ -1,31 +1,40 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu,  6 Dec 2012 17:21:12 -0700
-Subject: [PATCH 2/2] ARM: tegra: enable gpio-poweroff driver in defconfig
-In-Reply-To: <1354839672-31187-1-git-send-email-swarren@wwwdotorg.org>
-References: <1354839672-31187-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1354839672-31187-2-git-send-email-swarren@wwwdotorg.org>
+Date: Thu,  6 Dec 2012 17:28:34 -0700
+Subject: [PATCH 0/3] ARM: tegra: enable HDMI port on various boards
+Message-ID: <1354840117-31264-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/configs/tegra_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+When tegradrm came along, I chose not to allow HDMI ports to be enabled
+on boards that had built-in LCDs, since tegradrm had issues when multiple
+outputs were enabled, and I wanted to bias towards internal LCDs working
+first. However, that bug has now been squashed, so we can now enable HDMI
+anywhere it works. In fact, enabling the LCD outputs may be delayed a
+while, as we sort out power sequences vs. generic panel drivers vs. ...
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index a7827fd..a568c34 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -127,6 +127,8 @@ CONFIG_GPIO_TPS6586X=y
- CONFIG_GPIO_TPS65910=y
- CONFIG_POWER_SUPPLY=y
- CONFIG_BATTERY_SBS=y
-+CONFIG_POWER_RESET=y
-+CONFIG_POWER_RESET_GPIO=y
- CONFIG_SENSORS_LM90=y
- CONFIG_MFD_TPS6586X=y
- CONFIG_MFD_TPS65910=y
+Note that if you have a bootloader that turns on the LCD, and the kernel
+doesn't have the LCD output enabled (which is always true right now), the
+kernel doesn't disable the LCD scanout. I've filed a bug internally for
+Mark Zhang to look into this. However, the HDMI output should still work
+fine; the LCD will just display various odd things.
+
+In theory, we could enable HDMI on Cardhu, but I haven't in this series
+because doing so causes memory fetch underflow (at least for some external
+display resolutions) (since the LCD is enabled too, and not turned off)
+since we aren't programming the memory controller correctly yet. As such,
+HDMI doesn't actually work well on Cardhu yet.
+
+Stephen Warren (3):
+  ARM: tegra: seaboard: enable HDMI port
+  ARM: tegra: ventana: enable HDMI port
+  ARM: tegra: paz00: enable HDMI port
+
+ arch/arm/boot/dts/tegra20-paz00.dts    |   18 +++++++++++++++---
+ arch/arm/boot/dts/tegra20-seaboard.dts |   18 +++++++++++++++---
+ arch/arm/boot/dts/tegra20-ventana.dts  |   18 +++++++++++++++---
+ 3 files changed, 45 insertions(+), 9 deletions(-)
+
 -- 
 1.7.10.4
