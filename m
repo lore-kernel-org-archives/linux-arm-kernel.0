@@ -1,42 +1,38 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  7 Dec 2012 23:04:26 +0100
-Subject: [RFC v1 03/16] arm: plat-orion: introduce WIN_CTRL_ENABLE in address
- mapping code
-In-Reply-To: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1354917879-32073-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri,  7 Dec 2012 23:10:15 +0100
+Subject: [RFC v1 RESEND 12/16] arm: mvebu: PCIe Device Tree informations for
+ OpenBlocks AX3-4
+In-Reply-To: <1354918219-32364-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1354918219-32364-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1354918219-32364-13-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of hardcoding "1" as being the bit value to enable an address
-decoding window, introduce and use a WIN_CTRL_ENABLE definition.
+The PlatHome OpenBlocks AX3-4 has an internal mini-PCIe slot that can
+be used to plug mini-PCIe devices. We therefore enable the PCIe
+interface that corresponds to this slot.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/plat-orion/addr-map.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/plat-orion/addr-map.c b/arch/arm/plat-orion/addr-map.c
-index febe386..4dec3db 100644
---- a/arch/arm/plat-orion/addr-map.c
-+++ b/arch/arm/plat-orion/addr-map.c
-@@ -38,6 +38,7 @@ EXPORT_SYMBOL_GPL(mv_mbus_dram_info);
-  * CPU Address Decode Windows registers
-  */
- #define WIN_CTRL_OFF		0x0000
-+#define   WIN_CTRL_ENABLE       BIT(0)
- #define WIN_BASE_OFF		0x0004
- #define WIN_REMAP_LO_OFF	0x0008
- #define WIN_REMAP_HI_OFF	0x000c
-@@ -79,7 +80,8 @@ void __init orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
- 	}
- 
- 	base_high = base & 0xffff0000;
--	ctrl = ((size - 1) & 0xffff0000) | (attr << 8) | (target << 4) | 1;
-+	ctrl = ((size - 1) & 0xffff0000) | (attr << 8) | (target << 4) |
-+		WIN_CTRL_ENABLE;
- 
- 	writel(base_high, addr + WIN_BASE_OFF);
- 	writel(ctrl, addr + WIN_CTRL_OFF);
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index b42652f..d9912df 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -121,5 +121,12 @@
+ 			nr-ports = <2>;
+ 			status = "okay";
+ 		};
++		pcie-controller {
++			status = "okay";
++			/* Internal mini-PCIe connector */
++			pcie0.0 at 0xd0040000 {
++				status = "okay";
++			};
++		};
+ 	};
+ };
 -- 
 1.7.9.5
