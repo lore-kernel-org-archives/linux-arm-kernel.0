@@ -1,29 +1,47 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 6 Dec 2012 17:14:33 -0700
-Subject: [PATCH] ARM: Kirkwood: Add SPI_CHPA and SPI_CPOL support to
- spi-orion
-In-Reply-To: <20121206235311.GB21694@titan.lakedaemon.net>
-References: <20121121192335.GA14868@obsidianresearch.com>
- <20121206142521.4185A3E0948@localhost>
- <20121206172504.GB9676@obsidianresearch.com>
- <20121206232305.719E23E0B24@localhost>
- <20121206234917.GF25069@obsidianresearch.com>
- <20121206235311.GB21694@titan.lakedaemon.net>
-Message-ID: <20121207001433.GG25069@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu,  6 Dec 2012 17:21:11 -0700
+Subject: [PATCH 1/2] ARM: tegra: trimslice: add gpio-poweroff node to DT
+Message-ID: <1354839672-31187-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 06, 2012 at 06:53:11PM -0500, Jason Cooper wrote:
-> On Thu, Dec 06, 2012 at 04:49:17PM -0700, Jason Gunthorpe wrote:
-> > Jason: Do you have any of these possibly affected boards with a SPI
-> > flash to test linux-next? dove, dreamplug, ts219 and lsxl
-> 
-> Yep, dreamplug ought to do.
+From: Stephen Warren <swarren@nvidia.com>
 
-Hmm, I just reviewed all the FLASH P/Ns datasheets in the affected DT
-files, and they are all mode 0/mode 3 compatible - that is the linux
-default mode so I expect everything to work OK.
+... and disable tri-state from the pingroup that contains the poweroff
+GPIO.
 
-If your dreamplug is fine lets just leave it?
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20-trimslice.dts |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Jason
+diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
+index b70b4cb..4b6c486 100644
+--- a/arch/arm/boot/dts/tegra20-trimslice.dts
++++ b/arch/arm/boot/dts/tegra20-trimslice.dts
+@@ -249,6 +249,11 @@
+ 					"ld23_22";
+ 				nvidia,pull = <1>;
+ 			};
++			conf_spif {
++				nvidia,pins = "spif";
++				nvidia,pull = <1>;
++				nvidia,tristate = <0>;
++			};
+ 		};
+ 	};
+ 
+@@ -322,6 +327,11 @@
+ 		bus-width = <4>;
+ 	};
+ 
++	poweroff {
++		compatible = "gpio-poweroff";
++		gpios = <&gpio 191 1>; /* gpio PX7, active low */
++	};
++
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+-- 
+1.7.10.4
