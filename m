@@ -1,45 +1,110 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Fri, 07 Dec 2012 14:48:54 +0000
-Subject: [PATCH v2] ARM: Kconfig: Do not force selection of ARCH_VEXPRESS
- by ARCH_MULTI_V7
-In-Reply-To: <1353431918-9326-1-git-send-email-festevam@gmail.com>
-References: <1353431918-9326-1-git-send-email-festevam@gmail.com>
-Message-ID: <50C201D6.7060408@arm.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 07 Dec 2012 14:55:11 +0000
+Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
+ across all cpus
+In-Reply-To: <1354888985.17101.41.camel@gandalf.local.home>
+References: <1354817466.30905.13.camel@linaro1.home>
+ <1354821581.17101.17.camel@gandalf.local.home>
+ <1354872138.3176.15.camel@computer5.home>
+ <1354888985.17101.41.camel@gandalf.local.home>
+Message-ID: <1354892111.13000.50.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/12 17:18, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, 2012-12-07 at 09:03 -0500, Steven Rostedt wrote:
+> On Fri, 2012-12-07 at 09:22 +0000, Jon Medhurst (Tixy) wrote:
+> > On Thu, 2012-12-06 at 14:19 -0500, Steven Rostedt wrote:
+> > > Hmm, your use of "may or may not" seems as you may not know this answer.
+> > > I wonder if you can use the break point method as x86 does now, and
+> > > remove the stop machine completely. Basically this is how it works:
+> > > 
+> > > add sw breakpoints to all locations to modify (the bp handler just does
+> > > a nop over the instruction).
+> > > 
+> > > send an IPI to all CPUs to flush their icache.
+> > > 
+> > > Modify the non breakpoint part of the instruction with the new
+> > > instruction.
+> > > 
+> > > send an IPI to all CPUs to flush their icache
+> > > 
+> > > Replace the breakpoint with the finished instruction.
+> > 
+> > If I understand correctly then this method can't work on ARM because a
+> > 'software breakpoint' is 'replace an instruction with a known undefined
+> > instruction _of the same size_'. It haa to be the same size because code
+> > like this:
+> > 
+> > 	it eq       /* If condition code 'eq' true */
+> >         insA        /* then execute this instruction */
+> >         insB        /* Always execute this */
+> > 
+> > if we replace insA with a breakpoint which is shorter, then we have
+> > 
+> > 	it eq       /* If condition code 'eq' true */
+> >         bkpt        /* then execute the breakpoint */
+> >         insA-part2  /* Always execute this garbage */
 > 
-> When building a kernel using imx_v6_v7_defconfig, it is not possible to unselect
-> ARCH_VEXPRESS due to the fact that it is automatically selected by ARCH_MULTI_V7.
+> Why always execute the garbage? Do what we do in x86, where the
+> breakpoint is only 1 byte and the instruction being replaced is 5 bytes.
+
+We don't get any say in the matter, if the condition is false, then the
+CPU will skip over bkpt and go on to execute insA-part2, that's how the
+instruction set works. If the condition is true, then it's
+implementation defined whether the CPU will skip bkt or not.
+
+The 'it' instruction is a separate instruction to insA, it's not any
+kind of prefix used to make a more complex single instruction. You can
+do something like:
+
+	iteet eq   /* if-then-else-else-then */
+        insA       /* executed if 'eq' */
+        insB       /* executed if not 'eq' */
+        insC       /* executed if not 'eq' */
+        insD       /* executed if 'eq' */
+
+which is five separate CPU instructions, and you can get interrupted
+after any of them (the current state of conditional instruction
+execution is stored in the status register). Replacing insB with a
+shorter 'breakpoint' would give...
+
+	iteet eq   /* if-then-else-else-then */
+        insA       /* executed if 'eq' */
+        bkpt       /* executed if not 'eq' (implementation defined) */
+        insB-part2 /* executed if not 'eq' (garbage) */
+        insC       /* executed if 'eq' */
+        insD       /* always executed */
+
+which is not good ;-)
+
+> The breakpoint handler returns to the instruction after the
+> "garbage" (insB).
 > 
-> This is not good when someone wants to create a minimal kernel build, so let
-> multi_v7_defconfig select ARCH_VEXPRESS instead.
+> >         insB        /* Always execute this */
+> > 
+> > and to complicate matters more, the 'it' instruction can make up to the
+> > next four instructions conditional, so you can't reverse decode the
+> > instruction stream reliably to even detect such code.
+> > 
+> > And further, it's implementation defined (up to who every creates the
+> > silicon) whether an undefined instructions actually causes an abort when
+> > it occurs in such an 'it' block, it may just execute as a nop.
+> > 
+> > Welcome to the work of ARM :-)
+> > 
+> 
+> But also realize that function tracing is special :-) We have no cases
+> like this. The instruction being replaced is a call to mcount. In fact,
+> we replace it at boot with a nop. And this method only replaces that nop
+> into a call to function tracer, or replaces the call to function tracer
+> back to a nop. Always at the start of the function, and never involved
+> with conditionals. This limitation that function tracing imposes on what
+> we replace makes things a bit more sane in how we replace it.
 
-This patch solves one aspect of a problem previously discussed for !MMU [1], but
-we still have the dependency of ARCH_MULTI_V7 for ARCH_VEXPRESS. ARCH_MULTI_V7
-doesn't make very much sense without an MMU because we need to hardcode things
-like PHYS_OFFSET and the vectors.
+Then perhaps the method you suggest will work on ARM :-). However, that
+is not something I personally propose to implement at this time. (I was
+doing my good Samaritan act by trying to fix the crashes which another
+team was getting when trying to use ftrace.)
 
-Looking back though the log, I can't see quite why we need this dependency. With
-Fabio's patch that selects ARCH_VEXPRESS in the defconfig, is it still required?
-
-How do people feel about something like the patch below, to allow NOMMU things
-to use Versatile Express without MULTI_V7?
-
-Jonny
-[1]http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/129976.html
-
------8<-----------
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index c952960..7d3fff4 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -1,5 +1,5 @@
- config ARCH_VEXPRESS
--       bool "ARM Ltd. Versatile Express family" if ARCH_MULTI_V7
-+       bool "ARM Ltd. Versatile Express family" if (ARCH_MULTI_V7 || !MMU)
-        select ARCH_WANT_OPTIONAL_GPIOLIB
-        select ARM_AMBA
-        select ARM_GIC
+-- 
+Tixy
