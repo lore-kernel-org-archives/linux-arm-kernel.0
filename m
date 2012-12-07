@@ -1,45 +1,38 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  7 Dec 2012 23:04:39 +0100
-Subject: [RFC v1 16/16] arm: mvebu: update defconfig with PCI and USB support
+Date: Fri,  7 Dec 2012 23:04:25 +0100
+Subject: [RFC v1 02/16] clk: mvebu: create parent-child relation for PCIe
+ clocks on Armada 370
 In-Reply-To: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1354917879-32073-17-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1354917879-32073-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have the necessary drivers and Device Tree informations to
-support PCIe on Armada 370 and Armada XP, enable the CONFIG_PCI
-option.
-
-Also, since the Armada 370 Mirabox has a built-in USB XHCI controller
-connected on the PCIe bus, enable the corresponding options as well.
+The Armada 370 has two gatable clocks for each PCIe interface, and we
+want both of them to be enabled. We therefore make one of the two
+clocks a child of the other, as we did for the sataX and sataXlnk
+clocks on Armada XP.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Mike Turquette <mturquette@linaro.org>
 ---
- arch/arm/configs/mvebu_defconfig |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/clk/mvebu/clk-gating-ctrl.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index a702fb3..cf597db 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -13,6 +13,7 @@ CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_XP=y
- # CONFIG_CACHE_L2X0 is not set
- # CONFIG_SWP_EMULATE is not set
-+CONFIG_PCI=y
- CONFIG_SMP=y
- # CONFIG_LOCAL_TIMERS is not set
- CONFIG_AEABI=y
-@@ -38,7 +39,8 @@ CONFIG_I2C=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB=y
-+CONFIG_USB_XHCI_HCD=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_S35390A=y
- CONFIG_DMADEVICES=y
+diff --git a/drivers/clk/mvebu/clk-gating-ctrl.c b/drivers/clk/mvebu/clk-gating-ctrl.c
+index c6d3c26..a328be5 100644
+--- a/drivers/clk/mvebu/clk-gating-ctrl.c
++++ b/drivers/clk/mvebu/clk-gating-ctrl.c
+@@ -119,8 +119,8 @@ static const struct mvebu_soc_descr __initconst armada_370_gating_descr[] = {
+ 	{ "pex1_en", NULL,  2 },
+ 	{ "ge1", NULL, 3 },
+ 	{ "ge0", NULL, 4 },
+-	{ "pex0", NULL, 5 },
+-	{ "pex1", NULL, 9 },
++	{ "pex0", "pex0_en", 5 },
++	{ "pex1", "pex1_en", 9 },
+ 	{ "sata0", NULL, 15 },
+ 	{ "sdio", NULL, 17 },
+ 	{ "tdm", NULL, 25 },
 -- 
 1.7.9.5
