@@ -1,54 +1,58 @@
 From: mgherzan@gmail.com (Mircea Gherzan)
-Date: Sat, 08 Dec 2012 00:04:42 +0100
-Subject: [PATCH 1/2] ARM: net: bpf_jit_32: fix kzalloc gfp/size mismatch.
-In-Reply-To: <1354804718-1662-1-git-send-email-nschichan@freebox.fr>
+Date: Sat, 08 Dec 2012 00:15:56 +0100
+Subject: [PATCH 2/2] ARM: net: bpf_jit_32: fix sp-relative load/stores
+ offsets.
+In-Reply-To: <1354804718-1662-2-git-send-email-nschichan@freebox.fr>
 References: <1354804718-1662-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <50C2760A.9070406@gmail.com>
+ <1354804718-1662-2-git-send-email-nschichan@freebox.fr>
+Message-ID: <50C278AC.5050205@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Am 06.12.2012 15:38, schrieb Nicolas Schichan:
-> Official prototype for kzalloc is:
+> The offset must be multiplied by 4 to be sure to access the correct
+> 32bit word in the stack scratch space.
 > 
-> void *kzalloc(size_t, gfp_t);
+> For instance, a store at scratch memory cell #1 was generating the
+> following:
 > 
-> The ARM bpf_jit code was having the assumption that it was:
+> st	r4, [sp, #1]
 > 
-> void *kzalloc(gfp_t, size);
+> While the correct code for this is:
 > 
-> This was resulting the use of some random GFP flags depending on the
-> size requested and some random overflows once the really needed size
-> was more than the value of GFP_KERNEL.
+> st	r4, [sp, #4]
+> 
+> To reproduce the bug (assuming your system has a NIC with the mac
+> address 52:54:00:12:34:56):
+> 
+> echo 0 > /proc/sys/net/core/bpf_jit_enable
+> tcpdump -ni eth0 "ether[1] + ether[2] - ether[3] * ether[4] - ether[5] \
+> 	== -0x3AA" # this will capture packets as expected
+> 
+> echo 1 > /proc/sys/net/core/bpf_jit_enable
+> tcpdump -ni eth0 "ether[1] + ether[2] - ether[3] * ether[4] - ether[5] \
+> 	== -0x3AA" # this will not.
 > 
 > This bug was present since the original inclusion of bpf_jit for ARM
 > (ddecdfce: ARM: 7259/3: net: JIT compiler for packet filters).
 > 
 > Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
 > ---
->  arch/arm/net/bpf_jit_32.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/net/bpf_jit_32.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
 > diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-> index c641fb6..a64d349 100644
+> index a64d349..b6f305e 100644
 > --- a/arch/arm/net/bpf_jit_32.c
 > +++ b/arch/arm/net/bpf_jit_32.c
-> @@ -845,7 +845,7 @@ void bpf_jit_compile(struct sk_filter *fp)
->  	ctx.skf		= fp;
->  	ctx.ret0_fp_idx = -1;
+> @@ -42,7 +42,7 @@
+>  #define r_skb_hl	ARM_R8
 >  
-> -	ctx.offsets = kzalloc(GFP_KERNEL, 4 * (ctx.skf->len + 1));
-> +	ctx.offsets = kzalloc(4 * (ctx.skf->len + 1), GFP_KERNEL);
->  	if (ctx.offsets == NULL)
->  		return;
+>  #define SCRATCH_SP_OFFSET	0
+> -#define SCRATCH_OFF(k)		(SCRATCH_SP_OFFSET + (k))
+> +#define SCRATCH_OFF(k)		(SCRATCH_SP_OFFSET + 4 * (k))
 >  
-> @@ -864,7 +864,7 @@ void bpf_jit_compile(struct sk_filter *fp)
->  
->  	ctx.idx += ctx.imm_count;
->  	if (ctx.imm_count) {
-> -		ctx.imms = kzalloc(GFP_KERNEL, 4 * ctx.imm_count);
-> +		ctx.imms = kzalloc(4 * ctx.imm_count, GFP_KERNEL);
->  		if (ctx.imms == NULL)
->  			goto out;
->  	}
+>  #define SEEN_MEM		((1 << BPF_MEMWORDS) - 1)
+>  #define SEEN_MEM_WORD(k)	(1 << (k))
 
 Acked-by: Mircea Gherzan <mgherzan@gmail.com>
