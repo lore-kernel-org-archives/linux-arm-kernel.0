@@ -1,37 +1,38 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri,  7 Dec 2012 16:24:50 +0100
-Subject: [PATCH 1/4] iio: mxs: Remove unused struct mxs_lradc_chan
-Message-ID: <1354893893-26338-1-git-send-email-marex@denx.de>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 07 Dec 2012 10:28:54 -0500
+Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
+ across all cpus
+In-Reply-To: <1354892111.13000.50.camel@linaro1.home>
+References: <1354817466.30905.13.camel@linaro1.home>
+ <1354821581.17101.17.camel@gandalf.local.home>
+ <1354872138.3176.15.camel@computer5.home>
+ <1354888985.17101.41.camel@gandalf.local.home>
+ <1354892111.13000.50.camel@linaro1.home>
+Message-ID: <1354894134.17101.44.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This structure definition seems to be some kind of remnant from
-previous development that accidentally made it mainline. Remove
-it as it's unused.
+On Fri, 2012-12-07 at 14:55 +0000, Jon Medhurst (Tixy) wrote:
+>  
+> > But also realize that function tracing is special :-) We have no cases
+> > like this. The instruction being replaced is a call to mcount. In fact,
+> > we replace it at boot with a nop. And this method only replaces that nop
+> > into a call to function tracer, or replaces the call to function tracer
+> > back to a nop. Always at the start of the function, and never involved
+> > with conditionals. This limitation that function tracing imposes on what
+> > we replace makes things a bit more sane in how we replace it.
+> 
+> Then perhaps the method you suggest will work on ARM :-). However, that
+> is not something I personally propose to implement at this time. (I was
+> doing my good Samaritan act by trying to fix the crashes which another
+> team was getting when trying to use ftrace.)
+> 
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Jonathan Cameron <jic23@kernel.org>
-Cc: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/staging/iio/adc/mxs-lradc.c |    5 -----
- 1 file changed, 5 deletions(-)
+I'm not NACKing your previous patch, I was just suggesting to bring ARM
+up to the future :-)
 
-diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
-index ca7c1fa..67abf50 100644
---- a/drivers/staging/iio/adc/mxs-lradc.c
-+++ b/drivers/staging/iio/adc/mxs-lradc.c
-@@ -75,11 +75,6 @@ static const char * const mxs_lradc_irq_name[] = {
- 	"mxs-lradc-button1",
- };
- 
--struct mxs_lradc_chan {
--	uint8_t				slot;
--	uint8_t				flags;
--};
--
- struct mxs_lradc {
- 	struct device		*dev;
- 	void __iomem		*base;
--- 
-1.7.10.4
+I have no problems with the patch, but I just want to put it out there
+that there's better ways. It's part of the remove stomp_machine()
+crusade ;-)
+
+-- Steve
