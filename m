@@ -1,128 +1,88 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Fri, 07 Dec 2012 13:59:22 +0530
-Subject: [PATCH RESEND V2 2/2] ASoC: SMDK: WM8994: Add device tree support for
- machine file
-In-Reply-To: <1354868962-7862-1-git-send-email-padma.v@samsung.com>
-References: <1354868962-7862-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1354868962-7862-3-git-send-email-padma.v@samsung.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Fri,  7 Dec 2012 11:05:55 +0200
+Subject: [PATCH v2] ARM: OMAP3: cm-t3517: add MMC support
+In-Reply-To: <1354795206-12048-1-git-send-email-grinberg@compulab.co.il>
+References: <1354795206-12048-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <1354871155-32528-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the basic device tree based lookup.
+cm-t3517 uses two MMC interfaces. Add support for both.
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
- .../bindings/sound/samsung,smdk-wm8994.txt         |   14 ++++++++++
- arch/arm/boot/dts/exynos5250-smdk5250.dts          |   12 +++++++++
- sound/soc/samsung/smdk_wm8994.c                    |   26 ++++++++++++++++++++
- 3 files changed, 52 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/samsung,smdk-wm8994.txt
+v2: Use CONFIG_MMC_OMAP_HS instead of plain CONFIG_MMC, so it will be stubbed
+    out with the same defines as omap_hsmmc_init() function.
+    Fix the !CONFIG_MMC_OMAP_HS case.
 
-diff --git a/Documentation/devicetree/bindings/sound/samsung,smdk-wm8994.txt b/Documentation/devicetree/bindings/sound/samsung,smdk-wm8994.txt
-new file mode 100644
-index 0000000..13cb189
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/samsung,smdk-wm8994.txt
-@@ -0,0 +1,14 @@
-+Samsung SMDK audio complex
-+
-+Required properties:
-+- compatible : "samsung,smdk-wm8994"
-+- samsung,i2s-controller: The phandle of the Samsung I2S0 controller
-+- samsung,audio-codec: The phandle of the WM8994 audio codec
-+Example:
-+
-+sound {
-+		compatible = "samsung,smdk-wm8994";
-+
-+		samsung,i2s-controller = <&i2s_0>;
-+		samsung,audio-codec = <&wm8994>;
+ arch/arm/mach-omap2/board-cm-t3517.c |   27 +++++++++++++++++++++++++++
+ 1 files changed, 27 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
+index ebbc2ad..792d684 100644
+--- a/arch/arm/mach-omap2/board-cm-t3517.c
++++ b/arch/arm/mach-omap2/board-cm-t3517.c
+@@ -32,6 +32,7 @@
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/nand.h>
+ #include <linux/mtd/partitions.h>
++#include <linux/mmc/host.h>
+ #include <linux/can/platform/ti_hecc.h>
+ 
+ #include <asm/mach-types.h>
+@@ -46,6 +47,7 @@
+ 
+ #include "mux.h"
+ #include "control.h"
++#include "hsmmc.h"
+ #include "common-board-devices.h"
+ #include "am35xx-emac.h"
+ #include "gpmc-nand.h"
+@@ -121,6 +123,26 @@ static void cm_t3517_init_hecc(void)
+ static inline void cm_t3517_init_hecc(void) {}
+ #endif
+ 
++#if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
++static struct omap2_hsmmc_info cm_t3517_mmc[] = {
++	{
++		.mmc		= 1,
++		.caps		= MMC_CAP_4_BIT_DATA,
++		.gpio_cd	= 144,
++		.gpio_wp	= 59,
++	},
++	{
++		.mmc		= 2,
++		.caps		= MMC_CAP_4_BIT_DATA,
++		.gpio_cd	= -EINVAL,
++		.gpio_wp	= -EINVAL,
++	},
++	{}	/* Terminator */
 +};
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index a352df4..5cbb08d 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -53,6 +53,11 @@
- 			compatible = "samsung,s524ad0xd1";
- 			reg = <0x51>;
- 		};
++#else
++#define cm_t3517_mmc NULL
++#endif
 +
-+		wm8994: wm8994 at 1a {
-+			 compatible = "wlf,wm8994";
-+			 reg = <0x1a>;
-+		};
- 	};
+ #if defined(CONFIG_RTC_DRV_V3020) || defined(CONFIG_RTC_DRV_V3020_MODULE)
+ #define RTC_IO_GPIO		(153)
+ #define RTC_WR_GPIO		(154)
+@@ -271,6 +293,10 @@ static struct omap_board_mux board_mux[] __initdata = {
+ 	/* CM-T3517 USB HUB nRESET */
+ 	OMAP3_MUX(MCBSP4_CLKX, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
  
- 	i2c at 12C80000 {
-@@ -166,4 +171,11 @@
- 	spi_2: spi at 12d40000 {
- 		status = "disabled";
- 	};
++	/* CD - GPIO144 and WP - GPIO59 for MMC1 - SB-T35 */
++	OMAP3_MUX(UART2_CTS, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
++	OMAP3_MUX(GPMC_CLK, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
 +
-+	sound {
-+		compatible = "samsung,smdk-wm8994";
-+
-+		samsung,i2s-controller = <&i2s_0>;
-+		samsung,audio-codec = <&wm8994>;
-+	};
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
  };
-diff --git a/sound/soc/samsung/smdk_wm8994.c b/sound/soc/samsung/smdk_wm8994.c
-index dd0aa8c..2f3e2b8 100644
---- a/sound/soc/samsung/smdk_wm8994.c
-+++ b/sound/soc/samsung/smdk_wm8994.c
-@@ -10,6 +10,7 @@
- #include "../codecs/wm8994.h"
- #include <sound/pcm_params.h>
- #include <linux/module.h>
-+#include <linux/of.h>
- 
-  /*
-   * Default CFG switch settings to use this driver:
-@@ -153,9 +154,25 @@ static struct snd_soc_card smdk = {
- static int __devinit smdk_audio_probe(struct platform_device *pdev)
- {
- 	int ret;
-+	struct device_node *np = pdev->dev.of_node;
- 	struct snd_soc_card *card = &smdk;
- 
- 	card->dev = &pdev->dev;
-+
-+	if (np) {
-+		smdk_dai[0].cpu_dai_name = NULL;
-+		smdk_dai[0].cpu_of_node = of_parse_phandle(np,
-+				"samsung,i2s-controller", 0);
-+		if (!smdk_dai[0].cpu_of_node) {
-+			dev_err(&pdev->dev,
-+			   "Property 'samsung,i2s-controller' missing or invalid\n");
-+			ret = -EINVAL;
-+		}
-+
-+		smdk_dai[0].platform_name = NULL;
-+		smdk_dai[0].platform_of_node = smdk_dai[0].cpu_of_node;
-+	}
-+
- 	ret = snd_soc_register_card(card);
- 
- 	if (ret)
-@@ -173,10 +190,19 @@ static int __devexit smdk_audio_remove(struct platform_device *pdev)
- 	return 0;
+ #endif
+@@ -286,6 +312,7 @@ static void __init cm_t3517_init(void)
+ 	cm_t3517_init_usbh();
+ 	cm_t3517_init_hecc();
+ 	am35xx_emac_init(AM35XX_DEFAULT_MDIO_FREQUENCY, 1);
++	omap_hsmmc_init(cm_t3517_mmc);
  }
  
-+#ifdef CONFIG_OF
-+static const struct of_device_id samsung_wm8994_of_match[] = {
-+	{ .compatible = "samsung,smdk-wm8994", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, samsung_wm8994_of_match);
-+#endif /* CONFIG_OF */
-+
- static struct platform_driver smdk_audio_driver = {
- 	.driver		= {
- 		.name	= "smdk-audio",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(samsung_wm8994_of_match),
- 	},
- 	.probe		= smdk_audio_probe,
- 	.remove		= __devexit_p(smdk_audio_remove),
+ MACHINE_START(CM_T3517, "Compulab CM-T3517")
 -- 
-1.7.4.4
+1.7.3.4
