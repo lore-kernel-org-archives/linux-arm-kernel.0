@@ -1,63 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Dec 2012 19:07:38 +0000
-Subject: Sharing PCIE driver between Microblaze and Arm zynq
-In-Reply-To: <50C1BA9D.5010406@monstr.eu>
-References: <CAHTX3dLxbVxn+D+AV7L0VsGYFOjas3AJ_3M_xncVfxp02FCy=Q@mail.gmail.com>
- <CAErSpo6xRdwzTuPPqnmvmHSp7awnV7=Z85eWFfktb_hm9Aad_A@mail.gmail.com>
- <50C1BA9D.5010406@monstr.eu>
-Message-ID: <201212071907.38366.arnd@arndb.de>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 07 Dec 2012 15:01:42 -0500
+Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
+ across all cpus
+In-Reply-To: <20121207190244.GB29618@mudshark.cambridge.arm.com>
+References: <1354872138.3176.15.camel@computer5.home>
+ <1354888985.17101.41.camel@gandalf.local.home>
+ <1354892111.13000.50.camel@linaro1.home>
+ <1354894134.17101.44.camel@gandalf.local.home>
+ <20121207162346.GW14363@n2100.arm.linux.org.uk>
+ <1354898200.17101.50.camel@gandalf.local.home>
+ <20121207164530.GX14363@n2100.arm.linux.org.uk>
+ <1354900436.17101.58.camel@gandalf.local.home>
+ <20121207181309.GY14363@n2100.arm.linux.org.uk>
+ <1354905805.17101.86.camel@gandalf.local.home>
+ <20121207190244.GB29618@mudshark.cambridge.arm.com>
+Message-ID: <1354910502.17101.89.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 December 2012, Michal Simek wrote:
-> On 12/06/2012 10:27 PM, Bjorn Helgaas wrote:
-> > [+cc linux-pci]
-> >
-> > On Thu, Dec 6, 2012 at 7:23 AM, Michal Simek <michal.simek@xilinx.com> wrote:
-> >> Hi guys,
-> >>
-> >> I have a question regarding to sharing generic OF pcie driver between
-> >> two architectures MB and ARM Zynq.
-> >> Is drivers/pci/pcie location good for it?
-> >> Make no sense to have the same driver in two locations.
-> >
-> > I think you're talking about a PCI host bridge driver.  It would
-> > definitely be nice to move toward a generic, shared driver.  Host
-> > bridge drivers are responsible for enumerating the PCI hierarchy below
-> > the bridge.  Enumeration is not really PCIe-specific, so I wouldn't
-> > put it in drivers/pci/pcie.
+On Fri, 2012-12-07 at 19:02 +0000, Will Deacon wrote:
+
+> For ARMv7, there are small subsets of instructions for ARM and Thumb which
+> are guaranteed to be atomic wrt concurrent modification and execution of
+> the instruction stream between different processors:
 > 
-> Not a PCI expert, just trying to find out the proper location for this shared driver.
-
-I'd suggest creating a drivers/pci/host directory. We will have more of
-these in the future. AFAIK, there is no fully generic (architecture
-independent) way to interface a PCI host driver to the PCI subsystem,
-but I think we are getting closer to that. You are probably fairly
-free to modify the microblaze architecture specific code though if needed.
-
-> >> Is using readl/writel IO functions in this driver the best option
-> >> which we can have?
-> >> Or is there any other recommendation?
-> >
-> > I'm not really a driver person, but if you're writing a new driver,
-> > wouldn't you use the iomap interfaces (ioremap(), ioread32(), etc)
-> > rather than readl()?
+> Thumb:	The 16-bit encodings of the B, NOP, BKPT, and SVC instructions.
+> ARM:	The B, BL, NOP, BKPT, SVC, HVC, and SMC instructions.
 > 
-> That driver exists but it is not in mainline and it is better to directly
-> add it to proper location with correct io functions.
-> The question is if ioread/iowrite functions are correct one.
-> PowerPC io-defs.h suggests that readl/writel should be used for PCI.
+> but before your eyes light up at the presence of the BKPT instruction in
+> that list; we don't actually use that in Linux and instead leave it for
+> external (i.e. JTAG) debuggers so that they can operate without getting
+> tangled up with spurious traps from the OS. Linux actually picks its own
+> undefined instructions, which are obviously not included in the lists above.
 
-ioread32/iowrite32 are defined to behave the same way readl/writel regarding
-addressing modes and barriers, but also allow operating on __iomem pointers
-that were returned from ioport_map(). You probably don't need that.
+My eyes actually lit up with the B instruction :-)  As Jon showed, we
+could use a 16bit jump instead. Add the B to jump over the other half of
+the call (to all places that you want to modify). Send a sync to all
+CPUs to flush their caches. Modify the other half of the call, send
+another sync, and then modify the first half.
 
-Some architectures like powerpc have their own accessors for on-chip MMIO
-areas, but ARM does not. The PowerPC rule is that you must use either
-readl/writel or ioread32/iowrite32 to access devices connected to a PCI
-bus, but you would not necessarily do that for the PCI host controller
-itself on PowerPC.
+> 
+> Also note that the 16-bit limitation for Thumb instructions above can
+> actually be used to modify *half* of a BL instruction but, to keep things
+> exciting, the PC-relative immediate is split across the two halves. However,
+> you could in theory mess around with bottom 10 bits or so, depending on the
+> exact encoding...
+> 
+> Obviously this doesn't preclude the need for cache maintenance on both D and
+> I side, but the atomicity guarantees are as I've described above.
 
-	Arnd
+Right. Thanks for the update.
 
-	Arnd
+-- Steve
