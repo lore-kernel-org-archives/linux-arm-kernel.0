@@ -1,31 +1,34 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Fri, 7 Dec 2012 13:47:30 +0530
-Subject: [PATCH V2 1/2] ASoC: Samsung: Do not register samsung audio dma
- device as pdev
-In-Reply-To: <20121207064644.GI26070@opensource.wolfsonmicro.com>
-References: <1354765837-3469-1-git-send-email-padma.v@samsung.com>
- <1354765837-3469-2-git-send-email-padma.v@samsung.com>
- <20121207064644.GI26070@opensource.wolfsonmicro.com>
-Message-ID: <CAAgF-BdWSNpeh6nKeUsPwP-R19kZF9cbRm9akumjDFs74phyTA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 7 Dec 2012 09:24:06 +0100
+Subject: [RFC] gpiolib: introduce descriptor-based GPIO interface
+In-Reply-To: <1985305.LiOKDTFPq4@percival>
+References: <1354779918-4028-1-git-send-email-acourbot@nvidia.com>
+ <1354779918-4028-2-git-send-email-acourbot@nvidia.com>
+ <20121206144259.136693E0950@localhost>
+ <1985305.LiOKDTFPq4@percival>
+Message-ID: <CACRpkdYvsSqMrwY9UPLkDLat=tCn4+4t0nB37RmsM0-EGW-bJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Fri, Dec 7, 2012 at 12:16 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Thu, Dec 06, 2012 at 09:20:36AM +0530, Padmavathi Venna wrote:
->> Previously, the ASoC 'platform' (PCM/DMA) object was instantiated via a
->> platform_device. This didn't represent the hardware well, since there
->> was no separate hardware associated with this platform_device; it was a
->> virtual device with sole purpose to call snd_soc_register_platform().
+On Fri, Dec 7, 2012 at 3:06 AM, Alex Courbot <acourbot@nvidia.com> wrote:
+> On Thursday 06 December 2012 22:42:59 Grant Likely wrote:
+>> how about "gpio_chip_hwnum()" to somewhat match irqdomain convention?
 >
-> Looks good however this doesn't apply against my topic/samsung branch -
-> can you please check if I need anything from Kukjin's tree?  Though I
-> guess the easiest thing is just to wait until the merge window is over,
-> we're near to the next release.
+> Sure, matching existing interfaces is better. "git grep hwnum" does not seem
+> to reveal much related to irqdomain though?
 
-I will resend the patches re-based on your topic/samsung branch.
+I think Grant is referring to the similarity with hwirq. Check:
+include/linux/irqdomain.h
 
-Thanks
-Padma
+For example GPIO drivers using irqdomain often look up the
+trigging local GPIO pin offset from the irqdomain descriptor
+passed with the interrupt like this:
+
+static void foo_gpio_irq_unmask(struct irq_data *d)
+    int offset = d->hwirq;
+    (...)
+
+Maybe "hwgpio" is an even better choice for the name of this.
+
+Yours,
+Linus Walleij
