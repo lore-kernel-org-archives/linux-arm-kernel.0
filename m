@@ -1,97 +1,59 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 7 Dec 2012 16:49:47 +0200
-Subject: [PATCH] arm: omap: make wakeupgen_lock raw
-Message-ID: <1354891787-24119-1-git-send-email-balbi@ti.com>
+From: groeck-dsl@sbcglobal.net (Guenter Roeck)
+Date: Fri, 7 Dec 2012 07:07:44 -0800
+Subject: [RFC] gpiolib: introduce descriptor-based GPIO interface
+In-Reply-To: <2562815.JQOcF2Dmj3@percival>
+References: <1354779918-4028-1-git-send-email-acourbot@nvidia.com>
+ <1354779918-4028-2-git-send-email-acourbot@nvidia.com>
+ <20121207024947.GA25121@roeck-us.net> <2562815.JQOcF2Dmj3@percival>
+Message-ID: <20121207150744.GB28704@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Gleixner <tglx@linutronix.de>
+On Fri, Dec 07, 2012 at 04:02:02PM +0900, Alex Courbot wrote:
+> Hi Guenter,
+> 
+> On Friday 07 December 2012 10:49:47 Guenter Roeck wrote:
+> > My own idea for a solution was to keep integer based handles, but replace
+> > gpio_desc[] with a hash table. But ultimately I don't really care how
+> > it is done.
+> > 
+> > Do you have a solution for gpiochip_find_base() in mind, and how to handle
+> > reservations ? I had thought about using bit maps, but maybe there is
+> > a better solution.
+> 
+> My plan so far is to use a sorted linked list of gpio_chips. Each chip 
+> contains its base address and size, so this will make it possible to find 
+> usable areas through a single parse. Current gpiochip_find_base() start from 
 
-When applying RT patch on top of Linux, spinlocks are
-implemented as RT-mutexes, which means they are preemptable.
+Excellent idea.
 
-Current GIC implementation on OMAP is using a spinlock
-to protect against preemption. As it turns out, we need
-to convert that lock into a raw_spinlock so that OMAP's
-interrupt controller works as expected after RT-patch
-is applied.
+> ARCH_NR_GPIOS and look backwards in the integer space to find a free range, a 
+> similar behavior can also be done if this is deemed better (GPIO numbers might 
+> become high, but since we want to hide them this should not matter).
+> 
+You can not completely hide them, I would guess - you'd still want to export
+them. Anyway, a simpler method would be to keep the list sorted in increasing
+order and simply search for a large enough gap. If there is none, add the new
+chip to the end of the list.
 
-This patch is simply to decrease the amount of changes
-RT-team needs to carry out of tree. It doesn't cause any
-changes in behavior.
+> The counterpart of the list is that fetching the descriptor corresponding to a 
+> GPIO number is going to be linear instead of constant, but (1) the number of 
+> gpio_chips on the system should never grow very high and (2) this is a good 
+> incentive to use the descriptor-based API instead. :) Existing code could 
+> easily be converted - once a GPIO is acquired, its number should be converted 
+> immediatly to a descriptor and the gpiod_* functions used from them on. We can 
+> probably write a sed or Coccinelle rule to do that through the whole kernel.
+> 
+Since the current approach loops through all gpio pins, it is still much better
+than that - the complexity would be O(chips), not O(ngpios). As you said, there
+won't be many chips, so that should scale for a long time.
 
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
+> gpiochip_reserve() will require some more thinking using this model, but 
+> something like a dummy chip can probably be introduced in the list. It will 
+> need to be statically allocated however since memory allocation cannot be used 
+> there.
+> 
+Introducing a dummy chip sounds like a good idea, and would have very low overhead.
 
-Thomas, all I did here was take the patch from v3.6.2-rt21
-patchset, apply to current Linus' tree (v3.7-rc8) and compile
-test with our omap2plus_defconfig.
-
-If you think the commit log I wrong is lacking, please suggest
-changes and I will fix it up. Just thought this is the kind of
-patch which can go to mainline today and decrease the amount of
-patches out-of-tree regarding RT support.
-
-cheers
-
- arch/arm/mach-omap2/omap-wakeupgen.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index 5d3b4f4..8633a43 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -46,7 +46,7 @@
- 
- static void __iomem *wakeupgen_base;
- static void __iomem *sar_base;
--static DEFINE_SPINLOCK(wakeupgen_lock);
-+static DEFINE_RAW_SPINLOCK(wakeupgen_lock);
- static unsigned int irq_target_cpu[MAX_IRQS];
- static unsigned int irq_banks = MAX_NR_REG_BANKS;
- static unsigned int max_irqs = MAX_IRQS;
-@@ -134,9 +134,9 @@ static void wakeupgen_mask(struct irq_data *d)
- {
- 	unsigned long flags;
- 
--	spin_lock_irqsave(&wakeupgen_lock, flags);
-+	raw_spin_lock_irqsave(&wakeupgen_lock, flags);
- 	_wakeupgen_clear(d->irq, irq_target_cpu[d->irq]);
--	spin_unlock_irqrestore(&wakeupgen_lock, flags);
-+	raw_spin_unlock_irqrestore(&wakeupgen_lock, flags);
- }
- 
- /*
-@@ -146,9 +146,9 @@ static void wakeupgen_unmask(struct irq_data *d)
- {
- 	unsigned long flags;
- 
--	spin_lock_irqsave(&wakeupgen_lock, flags);
-+	raw_spin_lock_irqsave(&wakeupgen_lock, flags);
- 	_wakeupgen_set(d->irq, irq_target_cpu[d->irq]);
--	spin_unlock_irqrestore(&wakeupgen_lock, flags);
-+	raw_spin_unlock_irqrestore(&wakeupgen_lock, flags);
- }
- 
- #ifdef CONFIG_HOTPLUG_CPU
-@@ -189,7 +189,7 @@ static void wakeupgen_irqmask_all(unsigned int cpu, unsigned int set)
- {
- 	unsigned long flags;
- 
--	spin_lock_irqsave(&wakeupgen_lock, flags);
-+	raw_spin_lock_irqsave(&wakeupgen_lock, flags);
- 	if (set) {
- 		_wakeupgen_save_masks(cpu);
- 		_wakeupgen_set_all(cpu, WKG_MASK_ALL);
-@@ -197,7 +197,7 @@ static void wakeupgen_irqmask_all(unsigned int cpu, unsigned int set)
- 		_wakeupgen_set_all(cpu, WKG_UNMASK_ALL);
- 		_wakeupgen_restore_masks(cpu);
- 	}
--	spin_unlock_irqrestore(&wakeupgen_lock, flags);
-+	raw_spin_unlock_irqrestore(&wakeupgen_lock, flags);
- }
- #endif
- 
--- 
-1.8.0.1
+Thanks,
+Guenter
