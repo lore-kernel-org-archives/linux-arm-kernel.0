@@ -1,57 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Dec 2012 16:45:30 +0000
-Subject: [PATCH] ARM: ftrace: Ensure code modifications are
- synchronised across all cpus
-In-Reply-To: <1354898200.17101.50.camel@gandalf.local.home>
-References: <1354817466.30905.13.camel@linaro1.home>
- <1354821581.17101.17.camel@gandalf.local.home>
- <1354872138.3176.15.camel@computer5.home>
- <1354888985.17101.41.camel@gandalf.local.home>
- <1354892111.13000.50.camel@linaro1.home>
- <1354894134.17101.44.camel@gandalf.local.home>
- <20121207162346.GW14363@n2100.arm.linux.org.uk>
- <1354898200.17101.50.camel@gandalf.local.home>
-Message-ID: <20121207164530.GX14363@n2100.arm.linux.org.uk>
+From: ffainelli@freebox.fr (Florian Fainelli)
+Date: Fri, 07 Dec 2012 17:51:39 +0100
+Subject: [PATCH 1/2] ARM: net: bpf_jit_32: fix kzalloc gfp/size mismatch.
+In-Reply-To: <1354804718-1662-1-git-send-email-nschichan@freebox.fr>
+References: <1354804718-1662-1-git-send-email-nschichan@freebox.fr>
+Message-ID: <2962422.LznIlvkqaJ@flexo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 07, 2012 at 11:36:40AM -0500, Steven Rostedt wrote:
-> On Fri, 2012-12-07 at 16:23 +0000, Russell King - ARM Linux wrote:
+On Thursday 06 December 2012 15:38:31 Nicolas Schichan wrote:
+> Official prototype for kzalloc is:
 > 
-> > That's fine if there are better ways.  If your view is that this would
-> > bring things "up to the future" consider this: what you suggest is possible
-> > with the standard ARM 32-bit instruction set.  With the more modern Thumb
-> > instruction set, because we now effectively have prefixes, where those
-> > prefixes control the execution of the following instructions, what you
-> > suggest becomes no longer possible.
-> > 
-> > So, it's not a question of bringing stuff up to the future at all... you
-> > can call it a design regression of you will, but you're really making
-> > demands about how CPUs work which are outside of your remit.
-> > 
-> > Think of this a bit like you changing the opcodes immediately following a
-> > 'LOCK' prefix on x86.  I suspect divorsing the following opcodes from its
-> > prefix would be very bad for the instructions atomicity.
+> void *kzalloc(size_t, gfp_t);
 > 
-> But what about the limitations that the function tracer imposes on the
-> code that gets modified by stop_machine()?
+> The ARM bpf_jit code was having the assumption that it was:
 > 
-> 1) the original code is simply a call to mcount
+> void *kzalloc(gfp_t, size);
 > 
-> 2) on boot up, that call gets converted into a nop
+> This was resulting the use of some random GFP flags depending on the
+> size requested and some random overflows once the really needed size
+> was more than the value of GFP_KERNEL.
 > 
-> 3) the code that gets changed will only be converting a nop to a call
-> into the function tracer, and back again.
+> This bug was present since the original inclusion of bpf_jit for ARM
+> (ddecdfce: ARM: 7259/3: net: JIT compiler for packet filters).
 > 
-> IOW, it's a very limited subset of the ARM assembly that gets touched.
-> I'm not sure what the op codes are for the above, but I can imagine they
-> don't impose the prefixes as you described.
-> 
-> If that's the case, is it still possible to change to the breakpoint
-> method?
+> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
 
-I have no idea; I've no idea how ftrace works on ARM.  That's something
-other people use and deal with.  Last (and only) time I used the built-in
-kernel tracing facilities I ended up giving up with it and going back to
-using my sched-clock+record+printk based approaches instead on account
-of the kernels built-in tracing being far too heavy.
+This patch is a stable candidate for kernels 3.4+.
+
+> ---
+>  arch/arm/net/bpf_jit_32.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+> index c641fb6..a64d349 100644
+> --- a/arch/arm/net/bpf_jit_32.c
+> +++ b/arch/arm/net/bpf_jit_32.c
+> @@ -845,7 +845,7 @@ void bpf_jit_compile(struct sk_filter *fp)
+>  	ctx.skf		= fp;
+>  	ctx.ret0_fp_idx = -1;
+>  
+> -	ctx.offsets = kzalloc(GFP_KERNEL, 4 * (ctx.skf->len + 1));
+> +	ctx.offsets = kzalloc(4 * (ctx.skf->len + 1), GFP_KERNEL);
+>  	if (ctx.offsets == NULL)
+>  		return;
+>  
+> @@ -864,7 +864,7 @@ void bpf_jit_compile(struct sk_filter *fp)
+>  
+>  	ctx.idx += ctx.imm_count;
+>  	if (ctx.imm_count) {
+> -		ctx.imms = kzalloc(GFP_KERNEL, 4 * ctx.imm_count);
+> +		ctx.imms = kzalloc(4 * ctx.imm_count, GFP_KERNEL);
+>  		if (ctx.imms == NULL)
+>  			goto out;
+>  	}
+> -- 
+> 1.7.5.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
