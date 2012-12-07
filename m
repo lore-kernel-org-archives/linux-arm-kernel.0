@@ -1,79 +1,245 @@
-From: harvey.huawei.yang@gmail.com (harvey yang)
-Date: Fri, 7 Dec 2012 17:16:12 +0800
-Subject: Help: A strange kernel panic with r0 corrupted by cpsr
-Message-ID: <CAFCUKTSrjii95Z8rJWbzgzG5jSpDLg1_1A+N9yK1YZwvDKksZQ@mail.gmail.com>
+From: elen.song@atmel.com (Elen Song)
+Date: Fri,  7 Dec 2012 17:11:49 +0800
+Subject: [PATCH 2/3] DMA: AT91: Get residual bytes in dma buffer
+Message-ID: <1354871509-14690-1-git-send-email-elen.song@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-I met a strange problem, in an interrupt handler kernel panic happened
-when requesting at virtual address 602acba3. From the log I find that
-r0 is the same value with cpsr while it shoud be the base address of a
-global structure 0xd6800000.
-So when I reference a feild of that structure, kernel panics :(. I
-really do not know what gose wrong. A corrupted stack? The following
-is the log. Any advice will be appreciated!
+Add support for returning the residue for current transfer cookie by
+reading the transfered buffer size(BTSIZE) in CTRLA register.
 
-/ # Unable to handle kernel paging request at virtual address 602acba3
-pgd = c0004000
-[602acba3] *pgd=00000000
-Internal error: Oops: 5 [#1] PREEMPT
-Modules linked in:
-CPU: 0    Tainted: G        W    (3.0.0-14.1-build3 #647)
-PC is at active_true_index_check+0x28/0x4c
-LR is at cap_dl_res_adjust+0x3f8/0xa40
-pc : [<c01fb26c>]    lr : [<c01f3004>]    psr: 60000193
-sp : c0449e30  ip : 00000515  fp : d68079f8
-r10: 00000000  r9 : 00000000  r8 : 000079f8
-r7 : 00000100  r6 : d6aaa788  r5 : 00000006  r4 : d6800000
-r3 : 00000001  r2 : 00000288  r1 : 002aca10  r0 : 60000193
-Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-Control: 18c5387d  Table: 123b0059  DAC: 00000015
-Process swapper (pid: 0, stack limit = 0xc04482e8)
-Stack: (0xc0449e30 to 0xc044a000)
-9e20:                                     00000002 c01eb06c d6aa9bac d6800000
-9e40: 00000004 00000000 00000000 00000013 d68079f8 0000015b 0000e3b7 00000000
-9e60: 00000006 00000003 d6aa99bc c01f2364 d6800000 c08a1910 0000011d d6800000
-9e80: 00000006 0000b335 091be1c1 c08a17cc d6804a10 00000047 00000000 c01f9d28
-9ea0: c08a17cc c08a17cc 091be1c2 c01f9de4 c08a17cc d6800000 ffdf22e0 c01e91f4
-9ec0: d6800000 0003806d 000166f8 c08a17cc c08a17cc 80c60052 c0452e24 00000000
-9ee0: 00000000 c0448000 00000000 c01e99f4 0c8fdb11 00000016 0c8fdb11 00000016
-9f00: c0453fdc c0453d8c c0462554 0000005b c0452e24 00000000 00000000 c0448000
-9f20: 00000000 c006b028 c0452e24 c0462554 c0452e24 c0448000 c0462554 00000002
-9f40: 00000001 c0448000 00000000 c006b1c8 c0452e24 00000000 0000005b c006d070
-9f60: 0000005b c006ab7c 0000005b c0025060 60000013 ffffffff f8f00100 c002a08c
-9f80: c0448000 c0448008 c0449fc8 00000000 c044d0a4 00000000 c1503b00 c044d09c
-9fa0: 00004059 413fc090 00000000 00000000 00000000 c0449fc8 c002aef4 c002aef8
-9fc0: 60000013 ffffffff 00000000 c002b03c c044a104 c00088b8 c0008328 03bff7d0
-9fe0: 01000000 c0472300 18c5387d c044a040 c0021678 00008044 00000000 00000000
-[<c01fb26c>] (active_true_index_check+0x28/0x4c) from [<c01f3004>]
-(cap_dl_res_adjust+0x3f8/0xa40)
-[<c01f3004>] (cap_dl_res_adjust+0x3f8/0xa40) from [<c01f9d28>]
-(cap_rt_sched_disp+0x14/0xbc)
-[<c01f9d28>] (cap_rt_sched_disp+0x14/0xbc) from [<c01f9de4>]
-(cap_rt_rtn+0x14/0x34)
-[<c01f9de4>] (cap_rt_rtn+0x14/0x34) from [<c01e91f4>] (rcvIntDisp+0x1c4/0x594)
-[<c01e91f4>] (rcvIntDisp+0x1c4/0x594) from [<c01e99f4>]
-(cap_mac_interrupt+0x430/0x5dc)
-[<c01e99f4>] (cap_mac_interrupt+0x430/0x5dc) from [<c006b028>]
-(handle_irq_event_percpu+0x28/0x170)
-[<c006b028>] (handle_irq_event_percpu+0x28/0x170) from [<c006b1c8>]
-(handle_irq_event+0x58/0x74)
-[<c006b1c8>] (handle_irq_event+0x58/0x74) from [<c006d070>]
-(handle_fasteoi_irq+0xb4/0x108)
-[<c006d070>] (handle_fasteoi_irq+0xb4/0x108) from [<c006ab7c>]
-(generic_handle_irq+0x20/0x30)
-[<c006ab7c>] (generic_handle_irq+0x20/0x30) from [<c0025060>]
-(asm_do_IRQ+0x60/0x84)
-[<c0025060>] (asm_do_IRQ+0x60/0x84) from [<c002a08c>] (__irq_svc+0x4c/0xcc)
-Exception stack(0xc0449f80 to 0xc0449fc8)
-9f80: c0448000 c0448008 c0449fc8 00000000 c044d0a4 00000000 c1503b00 c044d09c
-9fa0: 00004059 413fc090 00000000 00000000 00000000 c0449fc8 c002aef4 c002aef8
-9fc0: 60000013 ffffffff
-[<c002a08c>] (__irq_svc+0x4c/0xcc) from [<c002aef8>] (default_idle+0x24/0x28)
-[<c002aef8>] (default_idle+0x24/0x28) from [<c002b03c>] (cpu_idle+0x34/0x94)
-[<c002b03c>] (cpu_idle+0x34/0x94) from [<c00088b8>] (start_kernel+0x280/0x2d4)
-[<c00088b8>] (start_kernel+0x280/0x2d4) from [<00008044>] (0x8044)
-Code: e7d03001 e3530001 1a000005 e59f101c (e7903001)
----[ end trace 1b75b31a2719ed1e ]---
-Kernel panic - not syncing: Fatal exception in interrupt
+For a single buffer cookie, the descriptor length minus BTSIZE
+can get the residue.
+
+For a lli cookie, remain_desc will record remain descriptor length
+when last descriptor finish, the remain_desc minus BTSIZE can get the
+current residue.
+
+If the cookie has completed successfully, the residue will be zero.
+If the cookie is in progress or the channel is paused, it will be
+the number of bytes yet to be transferred.If get residue error,
+the cookie will be turn into error status.
+
+Signed-off-by: Elen Song <elen.song@atmel.com>
+---
+ drivers/dma/at_hdmac.c      |  130 +++++++++++++++++++++++++++++++++++++------
+ drivers/dma/at_hdmac_regs.h |    3 +
+ 2 files changed, 116 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index c9d05b9..d076fb7 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -53,6 +53,8 @@ MODULE_PARM_DESC(init_nr_desc_per_channel,
+ 
+ /* prototypes */
+ static dma_cookie_t atc_tx_submit(struct dma_async_tx_descriptor *tx);
++static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
++			unsigned long arg);
+ 
+ 
+ /*----------------------------------------------------------------------*/
+@@ -229,6 +231,94 @@ static void atc_dostart(struct at_dma_chan *atchan, struct at_desc *first)
+ 	vdbg_dump_regs(atchan);
+ }
+ 
++/*
++ * atc_get_current_descriptors -
++ * locate the descriptor which equal to physical address in DSCR
++ * @atchan: the channel we want to start
++ * @dscr_addr: physical descriptor address in DSCR
++ */
++static struct at_desc *atc_get_current_descriptors(struct at_dma_chan *atchan,
++							u32 dscr_addr)
++{
++	struct at_desc  *desc, *_desc, *child, *desc_cur = NULL;
++
++	list_for_each_entry_safe(desc, _desc, &atchan->active_list, desc_node) {
++		if (desc->lli.dscr == dscr_addr) {
++			desc_cur = desc;
++			break;
++		}
++
++		list_for_each_entry(child, &desc->tx_list, desc_node) {
++			if (child->lli.dscr == dscr_addr) {
++				desc_cur = child;
++				break;
++			}
++		}
++	}
++
++	return desc_cur;
++}
++
++/*
++ * atc_get_bytes_left -
++ * Get the number of bytes residue in dma buffer,
++ * the channel should be paused when calling this
++ * @chan: the channel we want to start
++ */
++static int atc_get_bytes_left(struct dma_chan *chan)
++{
++	struct at_dma_chan      *atchan = to_at_dma_chan(chan);
++	struct at_desc *desc_first = atc_first_active(atchan);
++	struct at_desc *desc_cur;
++	int ret = 0, count = 0;
++
++	/*
++	 * Initialize necessary values in the first time.
++	 * remain_desc record remain desc length.
++	 */
++	if (atchan->remain_desc == 0)
++		/* First descriptor embedds the transaction length */
++		atchan->remain_desc = desc_first->len;
++
++	/* Channel should be paused before get residue */
++	if (!atc_chan_is_paused(atchan))
++		atc_control(chan, DMA_PAUSE, 0);
++	/*
++	 * This happens when current descriptor transfer complete.
++	 * The residual buffer size should reduce current descriptor length.
++	 */
++	if (unlikely(test_bit(ATC_IS_BTC, &atchan->status))) {
++		clear_bit(ATC_IS_BTC, &atchan->status);
++		desc_cur = atc_get_current_descriptors(atchan,
++						channel_readl(atchan, DSCR));
++		if (!desc_cur) {
++			ret = -EINVAL;
++			goto out;
++		}
++		atchan->remain_desc -= (desc_cur->lli.ctrla & ATC_BTSIZE_MAX)
++						<< (desc_first->tx_buswidth);
++		if (atchan->remain_desc < 0) {
++			ret = -EINVAL;
++			goto out;
++		} else
++			ret = atchan->remain_desc;
++	} else {
++		/*
++		 * Get residual bytes when current
++		 * descriptor transfer in progress.
++		 */
++		count = (channel_readl(atchan, CTRLA) & ATC_BTSIZE_MAX)
++				<< (desc_first->tx_buswidth);
++		ret = atchan->remain_desc - count;
++	}
++
++out:
++	if (atc_chan_is_paused(atchan))
++		atc_control(chan, DMA_RESUME, 0);
++
++	return ret;
++}
++
+ /**
+  * atc_chain_complete - finish work for one transaction chain
+  * @atchan: channel we work on
+@@ -494,6 +584,8 @@ static irqreturn_t at_dma_interrupt(int irq, void *dev_id)
+ 					/* Give information to tasklet */
+ 					set_bit(ATC_IS_ERROR, &atchan->status);
+ 				}
++				if (pending & AT_DMA_BTC(i))
++					set_bit(ATC_IS_BTC, &atchan->status);
+ 				tasklet_schedule(&atchan->tasklet);
+ 				ret = IRQ_HANDLED;
+ 			}
+@@ -1033,34 +1125,36 @@ atc_tx_status(struct dma_chan *chan,
+ 		struct dma_tx_state *txstate)
+ {
+ 	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+-	dma_cookie_t		last_used;
+-	dma_cookie_t		last_complete;
+ 	unsigned long		flags;
+ 	enum dma_status		ret;
+-
+-	spin_lock_irqsave(&atchan->lock, flags);
++	int bytes = 0;
+ 
+ 	ret = dma_cookie_status(chan, cookie, txstate);
+-	if (ret != DMA_SUCCESS) {
+-		atc_cleanup_descriptors(atchan);
++	if (ret == DMA_SUCCESS)
++		return ret;
++	/*
++	 * There's no point calculating the residue if there's
++	 * no txstate to store the value.
++	 */
++	if (!txstate)
++		return DMA_ERROR;
+ 
+-		ret = dma_cookie_status(chan, cookie, txstate);
+-	}
++	spin_lock_irqsave(&atchan->lock, flags);
+ 
+-	last_complete = chan->completed_cookie;
+-	last_used = chan->cookie;
++	/*  Get number of bytes left in the active transactions */
++	bytes = atc_get_bytes_left(chan);
+ 
+ 	spin_unlock_irqrestore(&atchan->lock, flags);
+ 
+-	if (ret != DMA_SUCCESS)
+-		dma_set_residue(txstate, atc_first_active(atchan)->len);
++	if (unlikely(bytes < 0)) {
++		dev_vdbg(chan2dev(chan), "get residual bytes error\n");
++		return DMA_ERROR;
++	} else
++		dma_set_residue(txstate, bytes);
+ 
+-	if (atc_chan_is_paused(atchan))
+-		ret = DMA_PAUSED;
+ 
+-	dev_vdbg(chan2dev(chan), "tx_status %d: cookie = %d (d%d, u%d)\n",
+-		 ret, cookie, last_complete ? last_complete : 0,
+-		 last_used ? last_used : 0);
++	dev_vdbg(chan2dev(chan), "tx_status %d: cookie = %d residue = %d\n",
++		 ret, cookie, bytes);
+ 
+ 	return ret;
+ }
+@@ -1146,6 +1240,7 @@ static int atc_alloc_chan_resources(struct dma_chan *chan)
+ 
+ 	spin_lock_irqsave(&atchan->lock, flags);
+ 	atchan->descs_allocated = i;
++	atchan->remain_desc = 0;
+ 	list_splice(&tmp_list, &atchan->free_list);
+ 	dma_cookie_init(chan);
+ 	spin_unlock_irqrestore(&atchan->lock, flags);
+@@ -1188,6 +1283,7 @@ static void atc_free_chan_resources(struct dma_chan *chan)
+ 	list_splice_init(&atchan->free_list, &list);
+ 	atchan->descs_allocated = 0;
+ 	atchan->status = 0;
++	atchan->remain_desc = 0;
+ 
+ 	dev_vdbg(chan2dev(chan), "free_chan_resources: done\n");
+ }
+diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+index d758f33..8e5caf7 100644
+--- a/drivers/dma/at_hdmac_regs.h
++++ b/drivers/dma/at_hdmac_regs.h
+@@ -213,6 +213,7 @@ txd_to_at_desc(struct dma_async_tx_descriptor *txd)
+ enum atc_status {
+ 	ATC_IS_ERROR = 0,
+ 	ATC_IS_PAUSED = 1,
++	ATC_IS_BTC = 2,
+ 	ATC_IS_CYCLIC = 24,
+ };
+ 
+@@ -228,6 +229,7 @@ enum atc_status {
+  * @save_cfg: configuration register that is saved on suspend/resume cycle
+  * @save_dscr: for cyclic operations, preserve next descriptor address in
+  *             the cyclic list on suspend/resume cycle
++ * @remain_desc: to save remain desc length
+  * @dma_sconfig: configuration for slave transfers, passed via DMA_SLAVE_CONFIG
+  * @lock: serializes enqueue/dequeue operations to descriptors lists
+  * @active_list: list of descriptors dmaengine is being running on
+@@ -244,6 +246,7 @@ struct at_dma_chan {
+ 	struct tasklet_struct	tasklet;
+ 	u32			save_cfg;
+ 	u32			save_dscr;
++	u32			remain_desc;
+ 	struct dma_slave_config dma_sconfig;
+ 
+ 	spinlock_t		lock;
+-- 
+1.7.9.5
