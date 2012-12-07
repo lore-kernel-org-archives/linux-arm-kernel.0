@@ -1,32 +1,66 @@
 From: elen.song@atmel.com (Elen Song)
-Date: Fri,  7 Dec 2012 17:10:58 +0800
-Subject: [PATCH 0/3] DMA: AT91: Fix get residue function in at_hdmac.c 
-Message-ID: <1354871458-13930-1-git-send-email-elen.song@atmel.com>
+Date: Fri,  7 Dec 2012 17:11:24 +0800
+Subject: [PATCH 1/3] DMA: AT91: Add value about transmit buswidth
+Message-ID: <1354871484-14342-1-git-send-email-elen.song@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The residue actually means the bytes remain in transfer identified by current cookie.
-The get residue api did not return the correct values in at_hdmac.c.
-This patch serial focus on fix the issue.
+The transmit buswidth is limited by peripheral buswidth,
+tx_buswidth will save the peripheral buswidth, but to memcpy, either src width or dst width is the buswidth
 
-This patch serials is based on DMA: AT91: Get residual bytes in dma buffer v2.
-It is split into 3 aimed patch, the first one is to get transmit buswidth,
-the second one is to get resiude in cookie, it use the buswidth to get residual bytes,
-the third part is to handle the status that there are still some bytes remain in dma fifo.
+Signed-off-by: Elen Song <elen.song@atmel.com>
+---
+ drivers/dma/at_hdmac.c      |    3 +++
+ drivers/dma/at_hdmac_regs.h |    2 ++
+ 2 files changed, 5 insertions(+)
 
-Compare to v2, this patch serials improve:
-1) consider buswidth to get correct residue.
-2) handle dma fifo empty status.
-
-
-Elen Song (3):
-  DMA: AT91: Add value about transmit buswidth
-  DMA: AT91: Get residual bytes in dma buffer
-  DMA: AT91: Check fifo empty
-
- drivers/dma/at_hdmac.c      |  151 ++++++++++++++++++++++++++++++++++++++-----
- drivers/dma/at_hdmac_regs.h |    5 ++
- 2 files changed, 139 insertions(+), 17 deletions(-)
-
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index 13a02f4..c9d05b9 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -613,6 +613,7 @@ atc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+ 	/* First descriptor of the chain embedds additional information */
+ 	first->txd.cookie = -EBUSY;
+ 	first->len = len;
++	first->tx_buswidth = src_width;
+ 
+ 	/* set end-of-link to the last link descriptor of list*/
+ 	set_desc_eol(desc);
+@@ -759,6 +760,7 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 	/* First descriptor of the chain embedds additional information */
+ 	first->txd.cookie = -EBUSY;
+ 	first->len = total_len;
++	first->tx_buswidth = reg_width;
+ 
+ 	/* first link descriptor of list is responsible of flags */
+ 	first->txd.flags = flags; /* client is in control of this ack */
+@@ -917,6 +919,7 @@ atc_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+ 	/* First descriptor of the chain embedds additional information */
+ 	first->txd.cookie = -EBUSY;
+ 	first->len = buf_len;
++	first->tx_buswidth = reg_width;
+ 
+ 	return &first->txd;
+ 
+diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+index 116e4ad..d758f33 100644
+--- a/drivers/dma/at_hdmac_regs.h
++++ b/drivers/dma/at_hdmac_regs.h
+@@ -182,6 +182,7 @@ struct at_lli {
+  * @txd: support for the async_tx api
+  * @desc_node: node on the channed descriptors list
+  * @len: total transaction bytecount
++ * @tx_buswidth: transmit buswidth
+  */
+ struct at_desc {
+ 	/* FIRST values the hardware uses */
+@@ -192,6 +193,7 @@ struct at_desc {
+ 	struct dma_async_tx_descriptor	txd;
+ 	struct list_head		desc_node;
+ 	size_t				len;
++	u32				tx_buswidth;
+ };
+ 
+ static inline struct at_desc *
 -- 
 1.7.9.5
