@@ -1,38 +1,42 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  7 Dec 2012 23:10:05 +0100
-Subject: [RFC v1 RESEND 02/16] clk: mvebu: create parent-child relation for
- PCIe clocks on Armada 370
+Date: Fri,  7 Dec 2012 23:10:06 +0100
+Subject: [RFC v1 RESEND 03/16] arm: plat-orion: introduce WIN_CTRL_ENABLE in
+ address mapping code
 In-Reply-To: <1354918219-32364-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1354918219-32364-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1354918219-32364-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1354918219-32364-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 370 has two gatable clocks for each PCIe interface, and we
-want both of them to be enabled. We therefore make one of the two
-clocks a child of the other, as we did for the sataX and sataXlnk
-clocks on Armada XP.
+Instead of hardcoding "1" as being the bit value to enable an address
+decoding window, introduce and use a WIN_CTRL_ENABLE definition.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Mike Turquette <mturquette@linaro.org>
 ---
- drivers/clk/mvebu/clk-gating-ctrl.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/plat-orion/addr-map.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/mvebu/clk-gating-ctrl.c b/drivers/clk/mvebu/clk-gating-ctrl.c
-index c6d3c26..a328be5 100644
---- a/drivers/clk/mvebu/clk-gating-ctrl.c
-+++ b/drivers/clk/mvebu/clk-gating-ctrl.c
-@@ -119,8 +119,8 @@ static const struct mvebu_soc_descr __initconst armada_370_gating_descr[] = {
- 	{ "pex1_en", NULL,  2 },
- 	{ "ge1", NULL, 3 },
- 	{ "ge0", NULL, 4 },
--	{ "pex0", NULL, 5 },
--	{ "pex1", NULL, 9 },
-+	{ "pex0", "pex0_en", 5 },
-+	{ "pex1", "pex1_en", 9 },
- 	{ "sata0", NULL, 15 },
- 	{ "sdio", NULL, 17 },
- 	{ "tdm", NULL, 25 },
+diff --git a/arch/arm/plat-orion/addr-map.c b/arch/arm/plat-orion/addr-map.c
+index febe386..4dec3db 100644
+--- a/arch/arm/plat-orion/addr-map.c
++++ b/arch/arm/plat-orion/addr-map.c
+@@ -38,6 +38,7 @@ EXPORT_SYMBOL_GPL(mv_mbus_dram_info);
+  * CPU Address Decode Windows registers
+  */
+ #define WIN_CTRL_OFF		0x0000
++#define   WIN_CTRL_ENABLE       BIT(0)
+ #define WIN_BASE_OFF		0x0004
+ #define WIN_REMAP_LO_OFF	0x0008
+ #define WIN_REMAP_HI_OFF	0x000c
+@@ -79,7 +80,8 @@ void __init orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
+ 	}
+ 
+ 	base_high = base & 0xffff0000;
+-	ctrl = ((size - 1) & 0xffff0000) | (attr << 8) | (target << 4) | 1;
++	ctrl = ((size - 1) & 0xffff0000) | (attr << 8) | (target << 4) |
++		WIN_CTRL_ENABLE;
+ 
+ 	writel(base_high, addr + WIN_BASE_OFF);
+ 	writel(ctrl, addr + WIN_CTRL_OFF);
 -- 
 1.7.9.5
