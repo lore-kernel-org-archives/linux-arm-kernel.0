@@ -1,92 +1,53 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Dec 2012 16:17:54 +0000
-Subject: Question: Multiple board support is broken
-In-Reply-To: <20121207193143.2d2029daf2041683bc7b2474@mail.ru>
-References: <20121207193143.2d2029daf2041683bc7b2474@mail.ru>
-Message-ID: <20121207161754.GV14363@n2100.arm.linux.org.uk>
+Date: Fri, 7 Dec 2012 16:23:46 +0000
+Subject: [PATCH] ARM: ftrace: Ensure code modifications are
+ synchronised across all cpus
+In-Reply-To: <1354894134.17101.44.camel@gandalf.local.home>
+References: <1354817466.30905.13.camel@linaro1.home>
+ <1354821581.17101.17.camel@gandalf.local.home>
+ <1354872138.3176.15.camel@computer5.home>
+ <1354888985.17101.41.camel@gandalf.local.home>
+ <1354892111.13000.50.camel@linaro1.home>
+ <1354894134.17101.44.camel@gandalf.local.home>
+Message-ID: <20121207162346.GW14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 07, 2012 at 07:31:43PM +0400, Alexander Shiyan wrote:
-> Hello.
+On Fri, Dec 07, 2012 at 10:28:54AM -0500, Steven Rostedt wrote:
+> On Fri, 2012-12-07 at 14:55 +0000, Jon Medhurst (Tixy) wrote:
+> >  
+> > > But also realize that function tracing is special :-) We have no cases
+> > > like this. The instruction being replaced is a call to mcount. In fact,
+> > > we replace it at boot with a nop. And this method only replaces that nop
+> > > into a call to function tracer, or replaces the call to function tracer
+> > > back to a nop. Always at the start of the function, and never involved
+> > > with conditionals. This limitation that function tracing imposes on what
+> > > we replace makes things a bit more sane in how we replace it.
+> > 
+> > Then perhaps the method you suggest will work on ARM :-). However, that
+> > is not something I personally propose to implement at this time. (I was
+> > doing my good Samaritan act by trying to fix the crashes which another
+> > team was getting when trying to use ftrace.)
+> > 
 > 
-> Today I was tested multiple boards (not multiplatform) in the kernel
-> and found problems with booting.
+> I'm not NACKing your previous patch, I was just suggesting to bring ARM
+> up to the future :-)
+> 
+> I have no problems with the patch, but I just want to put it out there
+> that there's better ways. It's part of the remove stomp_machine()
+> crusade ;-)
 
-Err, I test this almost constantly and it works, and it's been working
-100% correctly for about the last 12 years.  There is no problem here.
+That's fine if there are better ways.  If your view is that this would
+bring things "up to the future" consider this: what you suggest is possible
+with the standard ARM 32-bit instruction set.  With the more modern Thumb
+instruction set, because we now effectively have prefixes, where those
+prefixes control the execution of the following instructions, what you
+suggest becomes no longer possible.
 
-> Exacly, if multiple boards defined
-> in. config, we can proceed to boot only the last (determined by mach number).
+So, it's not a question of bringing stuff up to the future at all... you
+can call it a design regression of you will, but you're really making
+demands about how CPUs work which are outside of your remit.
 
-The mach-types file doesn't have anything to do with which board gets chosen.
-That file just provides the IDs, and a bunch of _optimized_ macros to
-allow the compiler to perform optimizations.
-
-Let's look at how this works today - let me pull out two entries:
-
-#ifdef CONFIG_ARCH_EBSA285
-# ifdef machine_arch_type
-#  undef machine_arch_type
-#  define machine_arch_type     __machine_arch_type
-# else
-#  define machine_arch_type     MACH_TYPE_EBSA285
-# endif
-# define machine_is_ebsa285()   (machine_arch_type == MACH_TYPE_EBSA285)
-#else
-# define machine_is_ebsa285()   (0)
-#endif
-
-#ifdef CONFIG_ARCH_NETWINDER
-# ifdef machine_arch_type
-#  undef machine_arch_type
-#  define machine_arch_type     __machine_arch_type
-# else
-#  define machine_arch_type     MACH_TYPE_NETWINDER
-# endif
-# define machine_is_netwinder() (machine_arch_type == MACH_TYPE_NETWINDER)
-#else
-# define machine_is_netwinder() (0)
-#endif
-
-#ifndef machine_arch_type
-#define machine_arch_type       __machine_arch_type
-#endif
-
-Now, if CONFIG_ARCH_EBSA285=y and CONFIG_ARCH_NETWINDER=n, then follow
-through what the preprocessor does.  In the first case, machine_arch_type
-is _not_ defined as a pre-processor symbol, so the "ifdef" is false.
-That means machine_arch_type gets defined as MACH_TYPE_EBSA285.
-
-machine_is_ebsa285() gets defined as (machine_arch_type == MACH_TYPE_EBSA285)
-and when all the macro subsitutions occur (which happens where it's used)
-this ends up becoming (MACH_TYPE_EBSA285 == MACH_TYPE_EBSA285).  This is
-always true, so any code inside an if (machine_is_ebsa285()) {} block will
-be compiled into the kernel and will be executed unconditionally - which
-is exactly what we want.
-
-Now, machine_is_netwinder() gets defined as constant (0).  This is always
-false, so any code inside an if (machine_is_netwinder()) {} block will
-be optimized away - exactly what we want.  This isn't affected by the
-machine_arch_type definition.
-
-Next, you can do the same thing for the CONFIG_ARCH_EBSA285=n and
-CONFIG_ARCH_NETWINDER=y case, and you'll end up with similar results.
-
-Finally for the case where CONFIG_ARCH_EBSA285=y and CONFIG_ARCH_NETWINDER=y.
-In this case, it starts off just like the CONFIG_ARCH_EBSA285=y case above.
-When we hit the CONFIG_ARCH_NETWINDER block a very important change happens.
-This time machine_arch_type is already defined.
-
-So, what happens is machine_arch_type first gets undefined to avoid any
-compiler warnings about multiple definitions.  We then define
-machine_arch_type to be the C variable __machine_arch_type.
-
-This makes any references to (machine_arch_type == MACH_TYPE_WHATEVER)
-become a runtime interpreted condition, which occurs for any machine type
-that has its config symbol enabled.  So, machine_is_ebsa285() becomes
-(__machine_arch_type == MACH_TYPE_EBSA285) and machine_is_netwinder()
-becomes (__machine_arch_type == MACH_TYPE_NETWINDER), while other
-platforms machine_is_xxx() macros remain defined to constant 0.
-
-So, this all works exactly as we want.  There is no bug here.
+Think of this a bit like you changing the opcodes immediately following a
+'LOCK' prefix on x86.  I suspect divorsing the following opcodes from its
+prefix would be very bad for the instructions atomicity.
