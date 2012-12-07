@@ -1,64 +1,76 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri,  7 Dec 2012 21:06:26 +0000
-Subject: [PATCH 1/7] arm: Move sp810.h to include/linux/amba/
+Date: Fri,  7 Dec 2012 21:06:28 +0000
+Subject: [PATCH 3/7] arm64: SoC infrastructure preparation
 In-Reply-To: <1354914392-9634-1-git-send-email-catalin.marinas@arm.com>
 References: <1354914392-9634-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1354914392-9634-2-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1354914392-9634-4-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since it is now used by code under drivers/clk/ it makes sense for this
-file to be in a more generic location. This is required for building
-vexpress support on arm64.
+This patch adds the necessary Kconfig and Makefile modifications
+together with skeleton.dtsi for SoC support.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Acked-by: Pawel Moll <pawel.moll@arm.com>
-Cc: Shiraz Hashim <shiraz.hashim@st.com>
-Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/plat-spear/restart.c                                 | 2 +-
- drivers/clk/versatile/clk-vexpress.c                          | 3 +--
- {arch/arm/include/asm/hardware => include/linux/amba}/sp810.h | 0
- 3 files changed, 2 insertions(+), 3 deletions(-)
- rename {arch/arm/include/asm/hardware => include/linux/amba}/sp810.h (100%)
+ arch/arm64/Kconfig                |  4 +++-
+ arch/arm64/Makefile               |  3 ++-
+ arch/arm64/boot/dts/skeleton.dtsi | 13 +++++++++++++
+ 3 files changed, 18 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/skeleton.dtsi
+ create mode 100644 arch/arm64/platforms/Kconfig
+ create mode 100644 arch/arm64/platforms/Makefile
 
-diff --git a/arch/arm/plat-spear/restart.c b/arch/arm/plat-spear/restart.c
-index 4f99011..7d4616d 100644
---- a/arch/arm/plat-spear/restart.c
-+++ b/arch/arm/plat-spear/restart.c
-@@ -11,8 +11,8 @@
-  * warranty of any kind, whether express or implied.
-  */
- #include <linux/io.h>
-+#include <linux/amba/sp810.h>
- #include <asm/system_misc.h>
--#include <asm/hardware/sp810.h>
- #include <mach/spear.h>
- #include <mach/generic.h>
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 0f87a49..e58a35a 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -95,7 +95,9 @@ source "init/Kconfig"
  
-diff --git a/drivers/clk/versatile/clk-vexpress.c b/drivers/clk/versatile/clk-vexpress.c
-index c742ac7..4f83ff9 100644
---- a/drivers/clk/versatile/clk-vexpress.c
-+++ b/drivers/clk/versatile/clk-vexpress.c
-@@ -11,6 +11,7 @@
-  * Copyright (C) 2012 ARM Limited
-  */
+ source "kernel/Kconfig.freezer"
  
-+#include <linux/amba/sp810.h>
- #include <linux/clkdev.h>
- #include <linux/clk-provider.h>
- #include <linux/err.h>
-@@ -18,8 +19,6 @@
- #include <linux/of_address.h>
- #include <linux/vexpress.h>
+-menu "System Type"
++menu "Platform selection"
++
++source "arch/arm64/platforms/Kconfig"
  
--#include <asm/hardware/sp810.h>
--
- static struct clk *vexpress_sp810_timerclken[4];
- static DEFINE_SPINLOCK(vexpress_sp810_lock);
+ endmenu
  
-diff --git a/arch/arm/include/asm/hardware/sp810.h b/include/linux/amba/sp810.h
-similarity index 100%
-rename from arch/arm/include/asm/hardware/sp810.h
-rename to include/linux/amba/sp810.h
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 64089bc..ddadd27 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -36,7 +36,8 @@ TEXT_OFFSET := 0x00080000
+ 
+ export	TEXT_OFFSET GZFLAGS
+ 
+-core-y		+= arch/arm64/kernel/ arch/arm64/mm/
++core-y		+= arch/arm64/kernel/ arch/arm64/mm/ \
++		   arch/arm64/platforms/
+ libs-y		:= arch/arm64/lib/ $(libs-y)
+ libs-y		+= $(LIBGCC)
+ 
+diff --git a/arch/arm64/boot/dts/skeleton.dtsi b/arch/arm64/boot/dts/skeleton.dtsi
+new file mode 100644
+index 0000000..38ead82
+--- /dev/null
++++ b/arch/arm64/boot/dts/skeleton.dtsi
+@@ -0,0 +1,13 @@
++/*
++ * Skeleton device tree; the bare minimum needed to boot; just include and
++ * add a compatible value.  The bootloader will typically populate the memory
++ * node.
++ */
++
++/ {
++	#address-cells = <2>;
++	#size-cells = <1>;
++	chosen { };
++	aliases { };
++	memory { device_type = "memory"; reg = <0 0 0>; };
++};
+diff --git a/arch/arm64/platforms/Kconfig b/arch/arm64/platforms/Kconfig
+new file mode 100644
+index 0000000..e69de29
+diff --git a/arch/arm64/platforms/Makefile b/arch/arm64/platforms/Makefile
+new file mode 100644
+index 0000000..e69de29
