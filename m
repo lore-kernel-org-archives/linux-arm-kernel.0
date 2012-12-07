@@ -1,217 +1,55 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  7 Dec 2012 23:04:29 +0100
-Subject: [RFC v1 06/16] arm: mvebu: add functions to alloc/free PCIe decoding
- windows
+Date: Fri,  7 Dec 2012 23:04:33 +0100
+Subject: [RFC v1 10/16] arm: mvebu: add PCIe Device Tree informations for
+ Armada 370
 In-Reply-To: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1354917879-32073-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1354917879-32073-11-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds two functions armada_370_xp_alloc_pcie_window() and
-armada_370_xp_free_pcie_window() that respectively allocate and free
-an address decoding window pointing to either a memory or I/O region
-of a PCIe device.
-
-Those functions will be used by the PCIe driver to create and remove
-those regions depending on the PCIe devices that are detected.
+The Armada 370 SoC has two 1x PCIe 2.0 interfaces, so we add the
+necessary Device Tree informations to make these interfaces availabel.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/addr-map.c |  156 ++++++++++++++++++++++++++++++++++++++--
- arch/arm/mach-mvebu/common.h   |    4 ++
- 2 files changed, 156 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/armada-370.dtsi |   25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/addr-map.c b/arch/arm/mach-mvebu/addr-map.c
-index ab9b3bd..c21aa7b 100644
---- a/arch/arm/mach-mvebu/addr-map.c
-+++ b/arch/arm/mach-mvebu/addr-map.c
-@@ -24,14 +24,10 @@
- #define ARMADA_XP_TARGET_DEV_BUS	1
- #define   ARMADA_XP_ATTR_DEV_BOOTROM    0x1D
- #define ARMADA_XP_TARGET_ETH1		3
--#define ARMADA_XP_TARGET_PCIE_0_2	4
- #define ARMADA_XP_TARGET_ETH0		7
--#define ARMADA_XP_TARGET_PCIE_1_3	8
- 
- #define ARMADA_370_TARGET_DEV_BUS       1
- #define   ARMADA_370_ATTR_DEV_BOOTROM   0x1D
--#define ARMADA_370_TARGET_PCIE_0        4
--#define ARMADA_370_TARGET_PCIE_1        8
- 
- #define ARMADA_WINDOW_8_PLUS_OFFSET       0x90
- #define ARMADA_SDRAM_ADDR_DECODING_OFFSET 0x180
-@@ -89,6 +85,158 @@ static struct __initdata orion_addr_map_cfg addr_map_cfg = {
- 	.win_cfg_base = armada_cfg_base,
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 636cf7d..2e3c8e0 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -132,5 +132,30 @@
+ 				dmacap,memset;
+ 			};
+ 		};
++
++		pcie-controller {
++			compatible = "marvell,armada-370-xp-pcie";
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0      0xd0040000 0x2000
++			          0x2000 0xd0080000 0x2000>;
++
++			pcie0 at 0xd0040000 {
++				reg = <0x0 0x2000>;
++				interrupts = <58>;
++				clocks = <&gateclk 5>;
++				status = "disabled";
++				marvell,pcie-port = <0>;
++			};
++
++			pcie1 at 0xd0080000 {
++				reg = <0x2000 0x2000>;
++				interrupts = <62>;
++				clocks = <&gateclk 9>;
++				status = "disabled";
++				marvell,pcie-port = <1>;
++			};
++		};
+ 	};
  };
- 
-+#ifdef CONFIG_PCI
-+/*
-+ * PCIe windows allocation code.
-+ */
-+#define ARMADA_370_XP_PCIE_MEM_START 0xC0000000
-+#define ARMADA_370_XP_PCIE_MEM_END   (ARMADA_370_XP_PCIE_MEM_START + SZ_256M)
-+#define ARMADA_370_XP_PCIE_IO_START  0xF2000000
-+#define ARMADA_370_XP_PCIE_IO_END    (ARMADA_370_XP_PCIE_IO_START + SZ_1M)
-+
-+static unsigned long armada_370_xp_pcie_memaddr = ARMADA_370_XP_PCIE_MEM_START;
-+static unsigned long armada_370_xp_pcie_ioaddr = ARMADA_370_XP_PCIE_IO_START;
-+
-+/*
-+ * This structure and the following arrays allow to map a PCIe (port,
-+ * lane) tuple to the corresponding (target, attribute) tuple needed
-+ * to configure an address decoding window for the given PCIe (port,
-+ * lane).
-+ */
-+struct pcie_mapping {
-+	int port;
-+	int lane;
-+	u8  target;
-+	u8  attr;
-+};
-+
-+struct pcie_mapping armada_xp_pcie_mappings[] = {
-+	{ .port = 0, .lane = 0, .target = 4, .attr = 0xE0 },
-+	{ .port = 0, .lane = 1, .target = 4, .attr = 0xD0 },
-+	{ .port = 0, .lane = 2, .target = 4, .attr = 0xB0 },
-+	{ .port = 0, .lane = 3, .target = 4, .attr = 0x70 },
-+	{ .port = 1, .lane = 0, .target = 8, .attr = 0xE0 },
-+	{ .port = 1, .lane = 1, .target = 8, .attr = 0xD0 },
-+	{ .port = 1, .lane = 2, .target = 8, .attr = 0xB0 },
-+	{ .port = 1, .lane = 3, .target = 8, .attr = 0x70 },
-+	{ .port = 2, .lane = 0, .target = 4, .attr = 0xF0 },
-+	{ .port = 3, .lane = 0, .target = 8, .attr = 0xF0 },
-+	{ .port = -1 },
-+};
-+
-+struct pcie_mapping armada_370_pcie_mappings[] = {
-+	{ .port = 0, .lane = 0, .target = 4, .attr = 0xE0 },
-+	{ .port = 1, .lane = 0, .target = 8, .attr = 0xE0 },
-+	{ .port = -1 },
-+};
-+
-+/*
-+ * This function finds an available physical address range between
-+ * ARMADA_370_XP_PCIE_MEM_START and ARMADA_370_XP_PCIE_MEM_END (for
-+ * PCIe memory regions) or between ARMADA_370_XP_PCIE_IO_START and
-+ * ARMADA_370_XP_PCIE_IO_END (for PCIe I/O regions) and creates an
-+ * address decoding window from this allocated address pointing to the
-+ * right PCIe device.
-+ *
-+ * An error code is returned, the allocated base address is returned
-+ * through the 'outbase' argument.
-+ */
-+int __init armada_370_xp_alloc_pcie_window(int pcie_port, int pcie_lane,
-+					   int type, u32 size,
-+					   unsigned long *outbase)
-+{
-+	struct pcie_mapping *mapping, *mappings;
-+	u8 target, attr;
-+	u32 base;
-+	int ret;
-+
-+	if (of_machine_is_compatible("marvell,armadaxp"))
-+		mappings = armada_xp_pcie_mappings;
-+	else if (of_machine_is_compatible("marvell,armada370"))
-+		mappings = armada_370_pcie_mappings;
-+	else
-+		return -ENODEV;
-+
-+	for (mapping = mappings; mapping->port != -1; mapping++)
-+		if (mapping->port == pcie_port && mapping->lane == pcie_lane)
-+			break;
-+
-+	if (mapping->port == -1)
-+		return -ENODEV;
-+
-+	target = mapping->target;
-+	attr = mapping->attr;
-+
-+	if (type == IORESOURCE_MEM) {
-+		/*
-+		 * Bit 3 of the attributes indicates that it is a
-+		 * memory region, as opposed to an I/O region
-+		 */
-+		attr |= (1 << 3);
-+
-+		if (armada_370_xp_pcie_memaddr + size >
-+		    ARMADA_370_XP_PCIE_MEM_END)
-+			return -ENOMEM;
-+
-+		base = armada_370_xp_pcie_memaddr;
-+		armada_370_xp_pcie_memaddr += size;
-+
-+		ret = orion_alloc_cpu_win(&addr_map_cfg, base, size, target,
-+					  attr, -1);
-+		if (ret) {
-+			armada_370_xp_pcie_memaddr -= size;
-+			return ret;
-+		}
-+	} else if (type == IORESOURCE_IO) {
-+		if (armada_370_xp_pcie_ioaddr + size >
-+		    ARMADA_370_XP_PCIE_IO_END)
-+			return -ENOMEM;
-+
-+		base = armada_370_xp_pcie_ioaddr;
-+		armada_370_xp_pcie_ioaddr += size;
-+
-+		ret = orion_alloc_cpu_win(&addr_map_cfg, base, size, target,
-+					  attr, -1);
-+		if (ret) {
-+			armada_370_xp_pcie_ioaddr -= size;
-+			return ret;
-+		}
-+	} else
-+		return -ENODEV;
-+
-+	*outbase = base;
-+	return 0;
-+}
-+
-+/*
-+ * Frees an address decoding window previously allocated by
-+ * armada_370_xp_alloc_pcie_window(). Note that only the last window
-+ * allocated for a given type (MEM or IO) can be freed, due to the
-+ * simplicity of the allocator. This is however sufficient to handle
-+ * the error cases when initializing one PCIe device.
-+ */
-+int __init armada_370_xp_free_pcie_window(int type, unsigned long base,
-+					  u32 size)
-+{
-+	if (type == IORESOURCE_MEM) {
-+		/* We can only free the last allocated window */
-+		if (base + size != armada_370_xp_pcie_memaddr)
-+			return -EINVAL;
-+		orion_free_cpu_win(&addr_map_cfg, base);
-+		armada_370_xp_pcie_memaddr -= size;
-+	} else if (type == IORESOURCE_IO) {
-+		/* We can only free the last allocated window */
-+		if (base + size != armada_370_xp_pcie_ioaddr)
-+			return -EINVAL;
-+		orion_free_cpu_win(&addr_map_cfg, base);
-+		armada_370_xp_pcie_ioaddr -= size;
-+	} else
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+#endif
-+
- static int __init armada_setup_cpu_mbus(void)
- {
- 	struct device_node *np;
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index aa27bc2..3cef81a 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -25,4 +25,8 @@ int armada_370_xp_coherency_init(void);
- int armada_370_xp_pmsu_init(void);
- void armada_xp_secondary_startup(void);
- extern struct smp_operations armada_xp_smp_ops;
-+
-+int armada_370_xp_alloc_pcie_window(int pcie_port, int pcie_lane,
-+				    int type, u32 size, unsigned long *outbase);
-+int armada_370_xp_free_pcie_window(int type, unsigned long base, u32 size);
- #endif
 -- 
 1.7.9.5
