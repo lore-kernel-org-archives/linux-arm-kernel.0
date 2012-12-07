@@ -1,224 +1,427 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri,  7 Dec 2012 21:06:30 +0000
-Subject: [PATCH 5/7] arm64: ARMv8 RTSM model (SoC) support
+Date: Fri,  7 Dec 2012 21:06:31 +0000
+Subject: [PATCH 6/7] arm64: Add dts files for the ARMv8 RTSM model
 In-Reply-To: <1354914392-9634-1-git-send-email-catalin.marinas@arm.com>
 References: <1354914392-9634-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1354914392-9634-6-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1354914392-9634-7-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces support for the ARMv8 software model (Versatile
-Express platform). The aim is to reduce the SoC code to a single file
-and pass the driver specific data in FDT. Single kernel Image file for
-multiple SoCs is mandatory.
+From: Pawel Moll <Pawel.Moll@arm.com>
 
+Signed-off-by: Pawel Moll <Pawel.Moll@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/Kconfig                    |  3 ++
- arch/arm64/configs/vexpress_defconfig | 90 +++++++++++++++++++++++++++++++++++
- arch/arm64/platforms/Kconfig          | 11 +++++
- arch/arm64/platforms/Makefile         |  1 +
- arch/arm64/platforms/vexpress.c       | 38 +++++++++++++++
- drivers/net/ethernet/smsc/Kconfig     |  4 +-
- 6 files changed, 145 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/configs/vexpress_defconfig
- create mode 100644 arch/arm64/platforms/vexpress.c
+ arch/arm64/boot/dts/Makefile                 |   1 +
+ arch/arm64/boot/dts/rtsm_ve-aemv8a.dts       | 154 ++++++++++++++++++
+ arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi | 234 +++++++++++++++++++++++++++
+ 3 files changed, 389 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
+ create mode 100644 arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index e58a35a..d66a444 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -91,6 +91,9 @@ config SWIOTLB
- config IOMMU_HELPER
- 	def_bool SWIOTLB
- 
-+config GENERIC_GPIO
-+	bool
-+
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
-diff --git a/arch/arm64/configs/vexpress_defconfig b/arch/arm64/configs/vexpress_defconfig
-new file mode 100644
-index 0000000..c1ee86d
---- /dev/null
-+++ b/arch/arm64/configs/vexpress_defconfig
-@@ -0,0 +1,90 @@
-+# CONFIG_LOCALVERSION_AUTO is not set
-+# CONFIG_SWAP is not set
-+CONFIG_SYSVIPC=y
-+CONFIG_POSIX_MQUEUE=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+CONFIG_BSD_PROCESS_ACCT_V3=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=14
-+# CONFIG_UTS_NS is not set
-+# CONFIG_IPC_NS is not set
-+# CONFIG_PID_NS is not set
-+# CONFIG_NET_NS is not set
-+CONFIG_SCHED_AUTOGROUP=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_KALLSYMS_ALL=y
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_PROFILING=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_ARCH_VEXPRESS=y
-+CONFIG_SMP=y
-+CONFIG_PREEMPT_VOLUNTARY=y
-+CONFIG_CMDLINE="console=ttyAMA0"
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_COMPAT=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+# CONFIG_INET_LRO is not set
-+# CONFIG_IPV6 is not set
-+# CONFIG_WIRELESS is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+# CONFIG_BLK_DEV is not set
-+CONFIG_SCSI=y
-+# CONFIG_SCSI_PROC_FS is not set
-+CONFIG_BLK_DEV_SD=y
-+# CONFIG_SCSI_LOWLEVEL is not set
-+CONFIG_NETDEVICES=y
-+# CONFIG_NET_CADENCE is not set
-+CONFIG_SMC91X=y
-+# CONFIG_WLAN is not set
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_SERIO_I8042 is not set
-+# CONFIG_SERIO_SERPORT is not set
-+CONFIG_SERIO_AMBAKMI=y
-+CONFIG_LEGACY_PTY_COUNT=16
-+CONFIG_SERIAL_AMBA_PL011=y
-+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_HWMON is not set
-+CONFIG_FB=y
-+# CONFIG_VGA_CONSOLE is not set
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_LOGO=y
-+# CONFIG_LOGO_LINUX_MONO is not set
-+# CONFIG_LOGO_LINUX_VGA16 is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+# CONFIG_EXT3_FS_XATTR is not set
-+CONFIG_FUSE_FS=y
-+CONFIG_CUSE=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+# CONFIG_MISC_FILESYSTEMS is not set
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_SCHED_DEBUG is not set
-+CONFIG_DEBUG_INFO=y
-+CONFIG_RCU_CPU_STALL_TIMEOUT=60
-+# CONFIG_FTRACE is not set
-+CONFIG_ATOMIC64_SELFTEST=y
-+CONFIG_DEBUG_ERRORS=y
-diff --git a/arch/arm64/platforms/Kconfig b/arch/arm64/platforms/Kconfig
-index e69de29..3533d71 100644
---- a/arch/arm64/platforms/Kconfig
-+++ b/arch/arm64/platforms/Kconfig
-@@ -0,0 +1,11 @@
-+config ARCH_VEXPRESS
-+	bool "ARMv8 software model (Versatile Express)"
-+	select ARCH_REQUIRE_GPIOLIB
-+	select ARM_AMBA
-+	select ARM_GIC
-+	select COMMON_CLK_VERSATILE
-+	select GENERIC_GPIO
-+	select VEXPRESS_CONFIG
-+	help
-+	  This enables support for the ARMv8 software model (Versatile
-+	  Express).
-diff --git a/arch/arm64/platforms/Makefile b/arch/arm64/platforms/Makefile
-index e69de29..2e3fcba 100644
---- a/arch/arm64/platforms/Makefile
-+++ b/arch/arm64/platforms/Makefile
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index e69de29..d7837c0 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
 @@ -0,0 +1 @@
-+obj-$(CONFIG_ARCH_VEXPRESS)	:= vexpress.o
-diff --git a/arch/arm64/platforms/vexpress.c b/arch/arm64/platforms/vexpress.c
++dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
+diff --git a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
 new file mode 100644
-index 0000000..a484aac
+index 0000000..15df04c
 --- /dev/null
-+++ b/arch/arm64/platforms/vexpress.c
-@@ -0,0 +1,38 @@
++++ b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
+@@ -0,0 +1,154 @@
 +/*
-+ * ARMv8 software model (Versatile Express) support
++ * ARM Ltd. Fast Models
 + *
-+ * Copyright (C) 2012 ARM Ltd.
++ * Architecture Envelope Model (AEM) ARMv8-A
++ * ARMAEMv8AMPCT
 + *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * RTSM_VE_AEMv8A.lisa
 + */
 +
-+#include <linux/init.h>
-+#include <linux/of_fdt.h>
-+#include <linux/vexpress.h>
++/dts-v1/;
 +
-+static const char *vexpress_dt_match[] __initdata = {
-+	"arm,vexpress",
-+	NULL,
++/memreserve/ 0x80000000 0x00010000;
++
++/ {
++	model = "RTSM_VE_AEMv8A";
++	compatible = "arm,rtsm_ve,aemv8a", "arm,vexpress";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	chosen { };
++
++	aliases {
++		serial0 = &v2m_serial0;
++		serial1 = &v2m_serial1;
++		serial2 = &v2m_serial2;
++		serial3 = &v2m_serial3;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <1>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <2>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <3>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x0 0x8000fff8>;
++		};
++	};
++
++	memory at 80000000 {
++		device_type = "memory";
++		reg = <0x00000000 0x80000000 0 0x80000000>,
++		      <0x00000008 0x80000000 0 0x80000000>;
++	};
++
++	gic: interrupt-controller at 2c001000 {
++		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++		interrupt-controller;
++		reg = <0 0x2c001000 0 0x1000>,
++		      <0 0x2c002000 0 0x100>;
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <1 14 0xff01>;
++		clock-frequency = <100000000>;
++	};
++
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <0 60 4>,
++			     <0 61 4>,
++			     <0 62 4>,
++			     <0 63 4>;
++	};
++
++	smb {
++		compatible = "simple-bus";
++
++		#address-cells = <2>;
++		#size-cells = <1>;
++		ranges = <0 0 0 0x08000000 0x04000000>,
++			 <1 0 0 0x14000000 0x04000000>,
++			 <2 0 0 0x18000000 0x04000000>,
++			 <3 0 0 0x1c000000 0x04000000>,
++			 <4 0 0 0x0c000000 0x04000000>,
++			 <5 0 0 0x10000000 0x04000000>;
++
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 63>;
++		interrupt-map = <0 0  0 &gic 0  0 4>,
++				<0 0  1 &gic 0  1 4>,
++				<0 0  2 &gic 0  2 4>,
++				<0 0  3 &gic 0  3 4>,
++				<0 0  4 &gic 0  4 4>,
++				<0 0  5 &gic 0  5 4>,
++				<0 0  6 &gic 0  6 4>,
++				<0 0  7 &gic 0  7 4>,
++				<0 0  8 &gic 0  8 4>,
++				<0 0  9 &gic 0  9 4>,
++				<0 0 10 &gic 0 10 4>,
++				<0 0 11 &gic 0 11 4>,
++				<0 0 12 &gic 0 12 4>,
++				<0 0 13 &gic 0 13 4>,
++				<0 0 14 &gic 0 14 4>,
++				<0 0 15 &gic 0 15 4>,
++				<0 0 16 &gic 0 16 4>,
++				<0 0 17 &gic 0 17 4>,
++				<0 0 18 &gic 0 18 4>,
++				<0 0 19 &gic 0 19 4>,
++				<0 0 20 &gic 0 20 4>,
++				<0 0 21 &gic 0 21 4>,
++				<0 0 22 &gic 0 22 4>,
++				<0 0 23 &gic 0 23 4>,
++				<0 0 24 &gic 0 24 4>,
++				<0 0 25 &gic 0 25 4>,
++				<0 0 26 &gic 0 26 4>,
++				<0 0 27 &gic 0 27 4>,
++				<0 0 28 &gic 0 28 4>,
++				<0 0 29 &gic 0 29 4>,
++				<0 0 30 &gic 0 30 4>,
++				<0 0 31 &gic 0 31 4>,
++				<0 0 32 &gic 0 32 4>,
++				<0 0 33 &gic 0 33 4>,
++				<0 0 34 &gic 0 34 4>,
++				<0 0 35 &gic 0 35 4>,
++				<0 0 36 &gic 0 36 4>,
++				<0 0 37 &gic 0 37 4>,
++				<0 0 38 &gic 0 38 4>,
++				<0 0 39 &gic 0 39 4>,
++				<0 0 40 &gic 0 40 4>,
++				<0 0 41 &gic 0 41 4>,
++				<0 0 42 &gic 0 42 4>;
++
++		/include/ "rtsm_ve-motherboard.dtsi"
++	};
 +};
 +
-+static int __init vexpress_init(void)
-+{
-+	if (!of_flat_dt_match(of_get_flat_dt_root(), vexpress_dt_match))
-+		return 0;
+diff --git a/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
+new file mode 100644
+index 0000000..62a20d1
+--- /dev/null
++++ b/arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
+@@ -0,0 +1,234 @@
++/*
++ * ARM Ltd. Fast Models
++ *
++ * Versatile Express (VE) system model
++ * Motherboard component
++ *
++ * VEMotherBoard.lisa
++ */
 +
-+	vexpress_sysreg_of_early_init();
-+	vexpress_clk_of_init();
++	motherboard {
++		arm,v2m-memory-map = "rs1";
++		compatible = "arm,vexpress,v2m-p1", "simple-bus";
++		#address-cells = <2>; /* SMB chipselect number and offset */
++		#size-cells = <1>;
++		#interrupt-cells = <1>;
++		ranges;
 +
-+	return 0;
-+}
-+arch_initcall(vexpress_init);
-diff --git a/drivers/net/ethernet/smsc/Kconfig b/drivers/net/ethernet/smsc/Kconfig
-index 5a689af..bb4c167 100644
---- a/drivers/net/ethernet/smsc/Kconfig
-+++ b/drivers/net/ethernet/smsc/Kconfig
-@@ -5,7 +5,7 @@
- config NET_VENDOR_SMSC
- 	bool "SMC (SMSC)/Western Digital devices"
- 	default y
--	depends on ARM || ISA || MAC || ARM || MIPS || M32R || SUPERH || \
-+	depends on ARM || ISA || MAC || ARM64 || MIPS || M32R || SUPERH || \
- 		BLACKFIN || MN10300 || COLDFIRE || PCI || PCMCIA
- 	---help---
- 	  If you have a network (Ethernet) card belonging to this class, say Y
-@@ -40,7 +40,7 @@ config SMC91X
- 	select NET_CORE
- 	select MII
- 	depends on (ARM || M32R || SUPERH || MIPS || BLACKFIN || \
--		    MN10300 || COLDFIRE)
-+		    MN10300 || COLDFIRE || ARM64)
- 	---help---
- 	  This is a driver for SMC's 91x series of Ethernet chipsets,
- 	  including the SMC91C94 and the SMC91C111. Say Y if you want it
++		flash at 0,00000000 {
++			compatible = "arm,vexpress-flash", "cfi-flash";
++			reg = <0 0x00000000 0x04000000>,
++			      <4 0x00000000 0x04000000>;
++			bank-width = <4>;
++		};
++
++		vram at 2,00000000 {
++			compatible = "arm,vexpress-vram";
++			reg = <2 0x00000000 0x00800000>;
++		};
++
++		ethernet at 2,02000000 {
++			compatible = "smsc,lan91c111";
++			reg = <2 0x02000000 0x10000>;
++			interrupts = <15>;
++		};
++
++		iofpga at 3,00000000 {
++			compatible = "arm,amba-bus", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 3 0 0x200000>;
++
++			v2m_sysreg: sysreg at 010000 {
++				compatible = "arm,vexpress-sysreg";
++				reg = <0x010000 0x1000>;
++				gpio-controller;
++				#gpio-cells = <2>;
++			};
++
++			v2m_sysctl: sysctl at 020000 {
++				compatible = "arm,sp810", "arm,primecell";
++				reg = <0x020000 0x1000>;
++				clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&v2m_clk24mhz>;
++				clock-names = "refclk", "timclk", "apb_pclk";
++				#clock-cells = <1>;
++				clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
++			};
++
++			aaci at 040000 {
++				compatible = "arm,pl041", "arm,primecell";
++				reg = <0x040000 0x1000>;
++				interrupts = <11>;
++				clocks = <&v2m_clk24mhz>;
++				clock-names = "apb_pclk";
++			};
++
++			mmci at 050000 {
++				compatible = "arm,pl180", "arm,primecell";
++				reg = <0x050000 0x1000>;
++				interrupts = <9 10>;
++				cd-gpios = <&v2m_sysreg 0 0>;
++				wp-gpios = <&v2m_sysreg 1 0>;
++				max-frequency = <12000000>;
++				vmmc-supply = <&v2m_fixed_3v3>;
++				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
++				clock-names = "mclk", "apb_pclk";
++			};
++
++			kmi at 060000 {
++				compatible = "arm,pl050", "arm,primecell";
++				reg = <0x060000 0x1000>;
++				interrupts = <12>;
++				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
++				clock-names = "KMIREFCLK", "apb_pclk";
++			};
++
++			kmi at 070000 {
++				compatible = "arm,pl050", "arm,primecell";
++				reg = <0x070000 0x1000>;
++				interrupts = <13>;
++				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
++				clock-names = "KMIREFCLK", "apb_pclk";
++			};
++
++			v2m_serial0: uart at 090000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x090000 0x1000>;
++				interrupts = <5>;
++				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
++				clock-names = "uartclk", "apb_pclk";
++			};
++
++			v2m_serial1: uart at 0a0000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x0a0000 0x1000>;
++				interrupts = <6>;
++				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
++				clock-names = "uartclk", "apb_pclk";
++			};
++
++			v2m_serial2: uart at 0b0000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x0b0000 0x1000>;
++				interrupts = <7>;
++				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
++				clock-names = "uartclk", "apb_pclk";
++			};
++
++			v2m_serial3: uart at 0c0000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x0c0000 0x1000>;
++				interrupts = <8>;
++				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
++				clock-names = "uartclk", "apb_pclk";
++			};
++
++			wdt at 0f0000 {
++				compatible = "arm,sp805", "arm,primecell";
++				reg = <0x0f0000 0x1000>;
++				interrupts = <0>;
++				clocks = <&v2m_refclk32khz>, <&v2m_clk24mhz>;
++				clock-names = "wdogclk", "apb_pclk";
++			};
++
++			v2m_timer01: timer at 110000 {
++				compatible = "arm,sp804", "arm,primecell";
++				reg = <0x110000 0x1000>;
++				interrupts = <2>;
++				clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&v2m_clk24mhz>;
++				clock-names = "timclken1", "timclken2", "apb_pclk";
++			};
++
++			v2m_timer23: timer at 120000 {
++				compatible = "arm,sp804", "arm,primecell";
++				reg = <0x120000 0x1000>;
++				interrupts = <3>;
++				clocks = <&v2m_sysctl 2>, <&v2m_sysctl 3>, <&v2m_clk24mhz>;
++				clock-names = "timclken1", "timclken2", "apb_pclk";
++			};
++
++			rtc at 170000 {
++				compatible = "arm,pl031", "arm,primecell";
++				reg = <0x170000 0x1000>;
++				interrupts = <4>;
++				clocks = <&v2m_clk24mhz>;
++				clock-names = "apb_pclk";
++			};
++
++			clcd at 1f0000 {
++				compatible = "arm,pl111", "arm,primecell";
++				reg = <0x1f0000 0x1000>;
++				interrupts = <14>;
++				clocks = <&v2m_oscclk1>, <&v2m_clk24mhz>;
++				clock-names = "clcdclk", "apb_pclk";
++			};
++		};
++
++		v2m_fixed_3v3: fixedregulator at 0 {
++			compatible = "regulator-fixed";
++			regulator-name = "3V3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++
++		v2m_clk24mhz: clk24mhz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <24000000>;
++			clock-output-names = "v2m:clk24mhz";
++		};
++
++		v2m_refclk1mhz: refclk1mhz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <1000000>;
++			clock-output-names = "v2m:refclk1mhz";
++		};
++
++		v2m_refclk32khz: refclk32khz {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <32768>;
++			clock-output-names = "v2m:refclk32khz";
++		};
++
++		mcc {
++			compatible = "arm,vexpress,config-bus", "simple-bus";
++			arm,vexpress,config-bridge = <&v2m_sysreg>;
++
++			v2m_oscclk1: osc at 1 {
++				/* CLCD clock */
++				compatible = "arm,vexpress-osc";
++				arm,vexpress-sysreg,func = <1 1>;
++				freq-range = <23750000 63500000>;
++				#clock-cells = <0>;
++				clock-output-names = "v2m:oscclk1";
++			};
++
++			reset at 0 {
++				compatible = "arm,vexpress-reset";
++				arm,vexpress-sysreg,func = <5 0>;
++			};
++
++			muxfpga at 0 {
++				compatible = "arm,vexpress-muxfpga";
++				arm,vexpress-sysreg,func = <7 0>;
++			};
++
++			shutdown at 0 {
++				compatible = "arm,vexpress-shutdown";
++				arm,vexpress-sysreg,func = <8 0>;
++			};
++
++			reboot at 0 {
++				compatible = "arm,vexpress-reboot";
++				arm,vexpress-sysreg,func = <9 0>;
++			};
++
++			dvimode at 0 {
++				compatible = "arm,vexpress-dvimode";
++				arm,vexpress-sysreg,func = <11 0>;
++			};
++		};
++	};
