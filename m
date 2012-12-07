@@ -1,53 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Dec 2012 16:23:46 +0000
-Subject: [PATCH] ARM: ftrace: Ensure code modifications are
- synchronised across all cpus
-In-Reply-To: <1354894134.17101.44.camel@gandalf.local.home>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 07 Dec 2012 11:36:40 -0500
+Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
+ across all cpus
+In-Reply-To: <20121207162346.GW14363@n2100.arm.linux.org.uk>
 References: <1354817466.30905.13.camel@linaro1.home>
  <1354821581.17101.17.camel@gandalf.local.home>
  <1354872138.3176.15.camel@computer5.home>
  <1354888985.17101.41.camel@gandalf.local.home>
  <1354892111.13000.50.camel@linaro1.home>
  <1354894134.17101.44.camel@gandalf.local.home>
-Message-ID: <20121207162346.GW14363@n2100.arm.linux.org.uk>
+ <20121207162346.GW14363@n2100.arm.linux.org.uk>
+Message-ID: <1354898200.17101.50.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 07, 2012 at 10:28:54AM -0500, Steven Rostedt wrote:
-> On Fri, 2012-12-07 at 14:55 +0000, Jon Medhurst (Tixy) wrote:
-> >  
-> > > But also realize that function tracing is special :-) We have no cases
-> > > like this. The instruction being replaced is a call to mcount. In fact,
-> > > we replace it at boot with a nop. And this method only replaces that nop
-> > > into a call to function tracer, or replaces the call to function tracer
-> > > back to a nop. Always at the start of the function, and never involved
-> > > with conditionals. This limitation that function tracing imposes on what
-> > > we replace makes things a bit more sane in how we replace it.
-> > 
-> > Then perhaps the method you suggest will work on ARM :-). However, that
-> > is not something I personally propose to implement at this time. (I was
-> > doing my good Samaritan act by trying to fix the crashes which another
-> > team was getting when trying to use ftrace.)
-> > 
+On Fri, 2012-12-07 at 16:23 +0000, Russell King - ARM Linux wrote:
+
+> That's fine if there are better ways.  If your view is that this would
+> bring things "up to the future" consider this: what you suggest is possible
+> with the standard ARM 32-bit instruction set.  With the more modern Thumb
+> instruction set, because we now effectively have prefixes, where those
+> prefixes control the execution of the following instructions, what you
+> suggest becomes no longer possible.
 > 
-> I'm not NACKing your previous patch, I was just suggesting to bring ARM
-> up to the future :-)
+> So, it's not a question of bringing stuff up to the future at all... you
+> can call it a design regression of you will, but you're really making
+> demands about how CPUs work which are outside of your remit.
 > 
-> I have no problems with the patch, but I just want to put it out there
-> that there's better ways. It's part of the remove stomp_machine()
-> crusade ;-)
+> Think of this a bit like you changing the opcodes immediately following a
+> 'LOCK' prefix on x86.  I suspect divorsing the following opcodes from its
+> prefix would be very bad for the instructions atomicity.
 
-That's fine if there are better ways.  If your view is that this would
-bring things "up to the future" consider this: what you suggest is possible
-with the standard ARM 32-bit instruction set.  With the more modern Thumb
-instruction set, because we now effectively have prefixes, where those
-prefixes control the execution of the following instructions, what you
-suggest becomes no longer possible.
+But what about the limitations that the function tracer imposes on the
+code that gets modified by stop_machine()?
 
-So, it's not a question of bringing stuff up to the future at all... you
-can call it a design regression of you will, but you're really making
-demands about how CPUs work which are outside of your remit.
+1) the original code is simply a call to mcount
 
-Think of this a bit like you changing the opcodes immediately following a
-'LOCK' prefix on x86.  I suspect divorsing the following opcodes from its
-prefix would be very bad for the instructions atomicity.
+2) on boot up, that call gets converted into a nop
+
+3) the code that gets changed will only be converting a nop to a call
+into the function tracer, and back again.
+
+IOW, it's a very limited subset of the ARM assembly that gets touched.
+I'm not sure what the op codes are for the above, but I can imagine they
+don't impose the prefixes as you described.
+
+If that's the case, is it still possible to change to the breakpoint
+method?
+
+-- Steve
