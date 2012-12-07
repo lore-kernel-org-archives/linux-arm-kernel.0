@@ -1,33 +1,131 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 7 Dec 2012 08:07:58 -0200
-Subject: [PATCH v2] ARM: Kconfig: Do not force selection of ARCH_VEXPRESS
- by ARCH_MULTI_V7
-In-Reply-To: <1353431918-9326-1-git-send-email-festevam@gmail.com>
-References: <1353431918-9326-1-git-send-email-festevam@gmail.com>
-Message-ID: <CAOMZO5CQZbRub5ZWHzsNfewcRh5T7pPQuKNaTDYaFg-j1HzN0A@mail.gmail.com>
+From: anilkumar.v@ti.com (Kumar, Anil)
+Date: Fri, 7 Dec 2012 15:57:30 +0530
+Subject: [PATCH 1/2] ARM: davinci: da850: add pinctrl driver entries
+In-Reply-To: <1354876051-25938-1-git-send-email-anilkumar.v@ti.com>
+References: <1354876051-25938-1-git-send-email-anilkumar.v@ti.com>
+Message-ID: <1354876051-25938-2-git-send-email-anilkumar.v@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+For DT, DaVinci platform can use pinctrl-single driver for handling
+padconf registers.
 
-On Tue, Nov 20, 2012 at 3:18 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> When building a kernel using imx_v6_v7_defconfig, it is not possible to unselect
-> ARCH_VEXPRESS due to the fact that it is automatically selected by ARCH_MULTI_V7.
->
-> This is not good when someone wants to create a minimal kernel build, so let
-> multi_v7_defconfig select ARCH_VEXPRESS instead.
->
-> Also avoid build breakage when randconfig selects no platform.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Avoid build breakage on randconfig for the case that no platform is selected.
+Enable PINCTRL Kconfig for all DaVinci platform. Add required
+pinctrl DT entries in da850 dts file.
 
-Does this version look good?
+Test procedure
+ 1)Populate DT file with NAND node information.
+ 2)Populate board DT file with pinmux information for NAND.
+ 3)Boot and confirm NAND is detected by the kernel.
+ 4)cat /proc/mtd to show partitions.
 
-Regards,
+Signed-off-by: Kumar, Anil <anilkumar.v@ti.com>
+---
+:000000 100644 0000000... f999d9e... A	Documentation/devicetree/bindings/arm/davinci/pinctrl.txt
+:100644 100644 06e0adf... 54a5405... M	arch/arm/Kconfig
+:100644 100644 37dc5a3... 8cac9d2... M	arch/arm/boot/dts/da850-evm.dts
+:100644 100644 fbada87... 94471bc... M	arch/arm/boot/dts/da850.dtsi
+:100644 100644 f292239... 0892db4... M	arch/arm/configs/da8xx_omapl_defconfig
+ .../devicetree/bindings/arm/davinci/pinctrl.txt    |   29 ++++++++++++++++++++
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/boot/dts/da850-evm.dts                    |    3 ++
+ arch/arm/boot/dts/da850.dtsi                       |   10 +++++++
+ arch/arm/configs/da8xx_omapl_defconfig             |    1 +
+ 5 files changed, 44 insertions(+), 0 deletions(-)
 
-Fabio Estevam
+diff --git a/Documentation/devicetree/bindings/arm/davinci/pinctrl.txt b/Documentation/devicetree/bindings/arm/davinci/pinctrl.txt
+new file mode 100644
+index 0000000..f999d9e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/davinci/pinctrl.txt
+@@ -0,0 +1,29 @@
++* Texas Instruments Davinci pinctrl-single
++
++This file provides information, what the device node for the
++davinci pinctrl-single interface contain.
++
++Required properties:
++- compatible: "pinctrl-single";
++
++- reg : offset and length of the register set for the mux registers
++
++- pinctrl-single,bit-per-mux: mask of allowed pinmux function bits in the
++  pinmux register
++
++- pinctrl-single,register-width: pinmux register access width in bits
++
++- pinctrl-single,function-mask:  mask of allowed pinmux function bits in
++  the pinmux register
++
++Example:
++pmx_core:pinmux at 14120 {
++		compatible = "pinctrl-single";
++		reg = <0x14120 0x50>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-single,bit-per-mux;
++		pinctrl-single,register-width = <32>;
++		pinctrl-single,function-mask = <0xffffffff>;
++};
++~
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 06e0adf..54a5405 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -924,6 +924,7 @@ config ARCH_DAVINCI
+ 	select GENERIC_IRQ_CHIP
+ 	select HAVE_IDE
+ 	select NEED_MACH_GPIO_H
++	select PINCTRL
+ 	select USE_OF
+ 	select ZONE_DMA
+ 	help
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index 37dc5a3..8cac9d2 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -15,6 +15,9 @@
+ 	model = "DA850/AM1808/OMAP-L138 EVM";
+ 
+ 	soc {
++		pmx_core:pinmux at 14120 {
++			status = "okay";
++		};
+ 		serial0: serial at 1c42000 {
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index fbada87..94471bc 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -29,6 +29,16 @@
+ 		#size-cells = <1>;
+ 		ranges = <0x0 0x01c00000 0x400000>;
+ 
++		pmx_core:pinmux at 14120 {
++			compatible = "pinctrl-single";
++			reg = <0x14120 0x50>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			pinctrl-single,bit-per-mux;
++			pinctrl-single,register-width = <32>;
++			pinctrl-single,function-mask = <0xffffffff>;
++			status = "disabled";
++		};
+ 		serial0: serial at 1c42000 {
+ 			compatible = "ns16550a";
+ 			reg = <0x42000 0x100>;
+diff --git a/arch/arm/configs/da8xx_omapl_defconfig b/arch/arm/configs/da8xx_omapl_defconfig
+index f292239..0892db4 100644
+--- a/arch/arm/configs/da8xx_omapl_defconfig
++++ b/arch/arm/configs/da8xx_omapl_defconfig
+@@ -81,6 +81,7 @@ CONFIG_SERIAL_OF_PLATFORM=y
+ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_DAVINCI=y
++CONFIG_PINCTRL_SINGLE=y
+ # CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y
+ CONFIG_REGULATOR=y
+-- 
+1.7.4.1
