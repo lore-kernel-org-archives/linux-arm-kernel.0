@@ -1,54 +1,66 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri, 7 Dec 2012 10:43:49 +0100
-Subject: What value for max_pfn on ARM ?
-Message-ID: <20121207094348.GB32721@izard-pc>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 07 Dec 2012 10:45:01 +0100
+Subject: Sharing PCIE driver between Microblaze and Arm zynq
+In-Reply-To: <CAErSpo6xRdwzTuPPqnmvmHSp7awnV7=Z85eWFfktb_hm9Aad_A@mail.gmail.com>
+References: <CAHTX3dLxbVxn+D+AV7L0VsGYFOjas3AJ_3M_xncVfxp02FCy=Q@mail.gmail.com>
+ <CAErSpo6xRdwzTuPPqnmvmHSp7awnV7=Z85eWFfktb_hm9Aad_A@mail.gmail.com>
+Message-ID: <50C1BA9D.5010406@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 12/06/2012 10:27 PM, Bjorn Helgaas wrote:
+> [+cc linux-pci]
+>
+> On Thu, Dec 6, 2012 at 7:23 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> Hi guys,
+>>
+>> I have a question regarding to sharing generic OF pcie driver between
+>> two architectures MB and ARM Zynq.
+>> Is drivers/pci/pcie location good for it?
+>> Make no sense to have the same driver in two locations.
+>
+> I think you're talking about a PCI host bridge driver.  It would
+> definitely be nice to move toward a generic, shared driver.  Host
+> bridge drivers are responsible for enumerating the PCI hierarchy below
+> the bridge.  Enumeration is not really PCIe-specific, so I wouldn't
+> put it in drivers/pci/pcie.
 
-While trying to use the /proc/kpagecount and /proc/kpageflags to debug a
-memory issue on a 2.6.32 kernel, I encountered a code segment that does
-not seem to work to work as designed on my ARM platform.  The kpage*
-entries provide information on memory PFNs, and are supposed to return 8
-bytes of data for each page frame of physical memory in the system. 
-(see Documentation/vm/pagemap.txt for more details)
+Not a PCI expert, just trying to find out the proper location for this shared driver.
 
-Both entries use the same algorithm to determine a conversion between
-the file offset and the PFN. This conversion takes the following
-assumption as granted: valid memory PFNs are comprised between 0 and
-max_pfn-1. After returning values for (max_pfn-1), the proc entry
-reports an End-Of-File condition.
 
-But on my platform, which uses the flat memory modem, the physical
-memory is located at 0xC0000000, and thus the valid PFN range starts at
-0xC00000. This means that when I use ?od? to read the contents of the
-entry, I only get information for invalid entries, between 0 and
-max_pfn, and thus I get no relevant information.
+>> Is using readl/writel IO functions in this driver the best option
+>> which we can have?
+>> Or is there any other recommendation?
+>
+> I'm not really a driver person, but if you're writing a new driver,
+> wouldn't you use the iomap interfaces (ioremap(), ioread32(), etc)
+> rather than readl()?
 
-It is possible to seek after the EOF, to start reading the PFNs at an
-arbitrary offset. It is the most logical way of using this facility, as
-the values recovered in /proc/<pid>/pagemap are the absolute value of
-the PFN. As a result, this means that this issue is not blocking when
-using tools like smem (http://www.selenic.com/smem/), which were
-designed to work with this subsystem.
+That driver exists but it is not in mainline and it is better to directly
+add it to proper location with correct io functions.
+The question is if ioread/iowrite functions are correct one.
+PowerPC io-defs.h suggests that readl/writel should be used for PCI.
 
->From what I read in other architectures, it seems that the most common
-case for max_pfn is that this variable really contains the maximum value
-for all PFNs in the system, the first valid PFN is ARCH_PFN_OFFSET, and
-the number of valid PFNs is max_mapnr. In the FLATMEM model, the
-assertion (max_pfn - ARCH_PFN_OFFSET == max_mapnr) is true. 
 
-But for ARM and ARM64, we are using PHYS_PFN_OFFSET in addition to
-ARCH_PFN_OFFSET, and in the FLATMEM model (max_pfn == max_mapnr) is true.
+>> Also just want to check if it is correct to use pcie device_type.
+>
+> I don't know what you're asking here.  Can you elaborate or give a
+> specific example?
 
-I am looking for answers to the following questions:
-- What is the use of PHYS_PFN_OFFSET in ARM platforms ?
-- Can we safely stop to use it, and use the more common case, with only
-  ARCH_PFN_OFFSET ?
-- If not, how can we recover the number of the last valid PFN, for all
-  architectures ?
+If node property device_type pcie should be used.
+device_type = "pcie";
 
-Best regards,
+For pci it is device_type = "pci";
+For network it is device_type = "network"
+the same for serial, watchdogs.
+
+Do we have any list of device_types which we should use?
+
+Thanks,
+Michal
+
 -- 
-Romain Izard
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
+Microblaze U-BOOT custodian
