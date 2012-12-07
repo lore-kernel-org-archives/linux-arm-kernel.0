@@ -1,42 +1,94 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  7 Dec 2012 23:04:24 +0100
-Subject: [RFC v1 01/16] lib: devres: don't enclose pcim_*() functions in
- CONFIG_HAS_IOPORT
+Date: Fri,  7 Dec 2012 23:04:27 +0100
+Subject: [RFC v1 04/16] arm: plat-orion: refactor the orion_disable_wins()
+ function
 In-Reply-To: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1354917879-32073-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1354917879-32073-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pcim_*() functions are used by the libata-sff subsystem, and this
-subsystem is used for many SATA drivers on ARM platforms that do not
-necessarily have I/O ports.
+In the address decoding code, the orion_disable_wins() function is
+used at boot time to disable all address decoding windows, before
+configuring only the ones that are needed. This allows to make sure
+that no configuration is left from the bootloader.
+
+As a preparation for the introduction of address decoding window
+allocation/deallocation function, we refactor this function into an
+orion_disable_cpu_win() which disables a single window.
+
+The orion_config_wins() function is changed to call
+orion_disable_cpu_win() in a loop, to preserve an identical behavior.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
-Cc: Jesse Barnes <jbarnes@virtuousgeek.org>
-Cc: Yinghai Lu <yinghai@kernel.org>
-Cc: linux-kernel at vger.kernel.org
 ---
- lib/devres.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/plat-orion/addr-map.c |   35 +++++++++++++++++------------------
+ 1 file changed, 17 insertions(+), 18 deletions(-)
 
-diff --git a/lib/devres.c b/lib/devres.c
-index 80b9c76..5639c3e 100644
---- a/lib/devres.c
-+++ b/lib/devres.c
-@@ -195,6 +195,7 @@ void devm_ioport_unmap(struct device *dev, void __iomem *addr)
- 			       devm_ioport_map_match, (void *)addr));
+diff --git a/arch/arm/plat-orion/addr-map.c b/arch/arm/plat-orion/addr-map.c
+index 4dec3db..dd98638 100644
+--- a/arch/arm/plat-orion/addr-map.c
++++ b/arch/arm/plat-orion/addr-map.c
+@@ -95,6 +95,19 @@ void __init orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
+ 	}
  }
- EXPORT_SYMBOL(devm_ioport_unmap);
-+#endif /* CONFIG_HAS_IOPORT */
  
- #ifdef CONFIG_PCI
++static void __init orion_disable_cpu_win(const struct orion_addr_map_cfg *cfg,
++					 const int win)
++{
++	void __iomem *addr = cfg->win_cfg_base(cfg, win);
++
++	writel(0, addr + WIN_BASE_OFF);
++	writel(0, addr + WIN_CTRL_OFF);
++	if (cfg->cpu_win_can_remap(cfg, win)) {
++		writel(0, addr + WIN_REMAP_LO_OFF);
++		writel(0, addr + WIN_REMAP_HI_OFF);
++	}
++}
++
  /*
-@@ -400,4 +401,3 @@ void pcim_iounmap_regions(struct pci_dev *pdev, int mask)
+  * Configure a number of windows.
+  */
+@@ -108,36 +121,22 @@ static void __init orion_setup_cpu_wins(const struct orion_addr_map_cfg * cfg,
+ 	}
  }
- EXPORT_SYMBOL(pcim_iounmap_regions);
- #endif /* CONFIG_PCI */
--#endif /* CONFIG_HAS_IOPORT */
+ 
+-static void __init orion_disable_wins(const struct orion_addr_map_cfg * cfg)
+-{
+-	void __iomem *addr;
+-	int i;
+-
+-	for (i = 0; i < cfg->num_wins; i++) {
+-		addr = cfg->win_cfg_base(cfg, i);
+-
+-		writel(0, addr + WIN_BASE_OFF);
+-		writel(0, addr + WIN_CTRL_OFF);
+-		if (cfg->cpu_win_can_remap(cfg, i)) {
+-			writel(0, addr + WIN_REMAP_LO_OFF);
+-			writel(0, addr + WIN_REMAP_HI_OFF);
+-		}
+-	}
+-}
+-
+ /*
+  * Disable, clear and configure windows.
+  */
+ void __init orion_config_wins(struct orion_addr_map_cfg * cfg,
+ 			      const struct orion_addr_map_info *info)
+ {
++	int win;
++
+ 	if (!cfg->cpu_win_can_remap)
+ 		cfg->cpu_win_can_remap = orion_cpu_win_can_remap;
+ 
+ 	if (!cfg->win_cfg_base)
+ 		cfg->win_cfg_base = orion_win_cfg_base;
+ 
+-	orion_disable_wins(cfg);
++	for (win = 0; win < cfg->num_wins; win++)
++		orion_disable_cpu_win(cfg, win);
+ 
+ 	if (info)
+ 		orion_setup_cpu_wins(cfg, info);
 -- 
 1.7.9.5
