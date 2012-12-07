@@ -1,18 +1,34 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 7 Dec 2012 19:37:46 +0900
-Subject: [PATCH RESEND V2 1/2] ASoC: Samsung: Do not register samsung
- audio dma device as pdev
-In-Reply-To: <1354868962-7862-2-git-send-email-padma.v@samsung.com>
-References: <1354868962-7862-1-git-send-email-padma.v@samsung.com>
- <1354868962-7862-2-git-send-email-padma.v@samsung.com>
-Message-ID: <20121207103745.GK26070@opensource.wolfsonmicro.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 7 Dec 2012 16:10:04 +0530
+Subject: [PATCH v3 1/3] mtd: nand: omap2: Update nerrors using ecc.strength
+In-Reply-To: <518397C60809E147AF5323E0420B992E3EA1139B@DBDE01.ent.ti.com>
+References: <1354189595-12784-1-git-send-email-avinashphilip@ti.com>
+ <1354189595-12784-2-git-send-email-avinashphilip@ti.com>
+ <50BF3819.9010200@ti.com>
+ <518397C60809E147AF5323E0420B992E3EA1139B@DBDE01.ent.ti.com>
+Message-ID: <50C1C784.4040209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 07, 2012 at 01:59:21PM +0530, Padmavathi Venna wrote:
-> Previously, the ASoC 'platform' (PCM/DMA) object was instantiated via a
-> platform_device. This didn't represent the hardware well, since there
-> was no separate hardware associated with this platform_device; it was a
-> virtual device with sole purpose to call snd_soc_register_platform().
+On 12/5/2012 6:13 PM, Philip, Avinash wrote:
+> On Wed, Dec 05, 2012 at 17:33:37, Nori, Sekhar wrote:
+>> Hi Avinash,
+>>
+>> On 11/29/2012 5:16 PM, Philip, Avinash wrote:
+>>> Update number of errors using nand ecc strength.
+>>> Also add macro definitions BCH8_ERROR_MAX & BCH4_ERROR_MAX
+>>
+>> Can you please describe why the original method of setting nerrors was
+>> incorrect? Was it causing any issues in any particular configuration?
+> 
+> It affects the reusability of the code. For example BCH8 with AM335x RBL 
+> compatibility requires  14 bytes instead of 13 byte. So setting nerrors
+> with
+> 	nerrors = (info->nand.ecc.bytes == 13) ? 8 : 4;
+> will break am335x RBL compatibility.
 
-Applied, thanks.
+This should be summarized in the patch description so the motivation is
+clear to those who read the history later.
+
+Thanks,
+Sekhar
