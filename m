@@ -1,34 +1,58 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  7 Dec 2012 23:10:12 +0100
-Subject: [RFC v1 RESEND 09/16] arm: mvebu: PCIe support is now available on
- mvebu
+Date: Fri,  7 Dec 2012 23:10:16 +0100
+Subject: [RFC v1 RESEND 13/16] arm: mvebu: PCIe Device Tree informations for
+ Armada XP DB
 In-Reply-To: <1354918219-32364-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1354918219-32364-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1354918219-32364-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1354918219-32364-14-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the PCIe driver for mvebu has been integrated and all its
-relevant dependencies, we can mark the ARCH_MVEBU platform has
-MIGHT_HAVE_PCI, which allows to select the PCI bus support if needed.
+The Marvell evaluation board (DB) for the Armada XP SoC has 6
+physicals full-size PCIe slots, so we enable the corresponding PCIe
+interfaces in the Device Tree.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/armada-xp-db.dts |   27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 440b13e..f12e475 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -13,6 +13,8 @@ config ARCH_MVEBU
- 	select MVEBU_CLK_CORE
- 	select MVEBU_CLK_CPU
- 	select MVEBU_CLK_GATING
-+	select MIGHT_HAVE_PCI
-+	select PCI_QUIRKS if PCI
- 
- if ARCH_MVEBU
- 
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index 8e53b25..cd378ae 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -90,5 +90,32 @@
+ 			phy = <&phy3>;
+ 			phy-mode = "sgmii";
+ 		};
++
++		pcie-controller {
++			status = "okay";
++
++			/*
++			 * All 6 slots are physically present as
++			 * standard PCIe slots on the board.
++			 */
++			pcie0.0 at 0xd0040000 {
++				status = "okay";
++			};
++			pcie0.1 at 0xd0044000 {
++				status = "okay";
++			};
++			pcie0.2 at 0xd0048000 {
++				status = "okay";
++			};
++			pcie0.3 at 0xd004C000 {
++				status = "okay";
++			};
++			pcie2 at 0xd0042000 {
++				status = "okay";
++			};
++			pcie3 at 0xd0082000 {
++				status = "okay";
++			};
++		};
+ 	};
+ };
 -- 
 1.7.9.5
