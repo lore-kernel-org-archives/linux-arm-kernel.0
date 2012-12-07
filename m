@@ -1,41 +1,77 @@
-From: rob.herring@calxeda.com (Rob Herring)
-Date: Fri, 07 Dec 2012 07:25:10 -0600
-Subject: [PATCH v2] ARM: Kconfig: Do not force selection of ARCH_VEXPRESS
- by ARCH_MULTI_V7
-In-Reply-To: <CAOMZO5CQZbRub5ZWHzsNfewcRh5T7pPQuKNaTDYaFg-j1HzN0A@mail.gmail.com>
-References: <1353431918-9326-1-git-send-email-festevam@gmail.com>
- <CAOMZO5CQZbRub5ZWHzsNfewcRh5T7pPQuKNaTDYaFg-j1HzN0A@mail.gmail.com>
-Message-ID: <50C1EE36.6000202@calxeda.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri,  7 Dec 2012 21:32:47 +0800
+Subject: [PATCH 1/2] mmc: slot-gpio: use devm_* managed functions to ease users
+Message-ID: <1354887168-3073-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/2012 04:07 AM, Fabio Estevam wrote:
-> Hi Rob,
-> 
-> On Tue, Nov 20, 2012 at 3:18 PM, Fabio Estevam <festevam@gmail.com> wrote:
->> From: Fabio Estevam <fabio.estevam@freescale.com>
->>
->> When building a kernel using imx_v6_v7_defconfig, it is not possible to unselect
->> ARCH_VEXPRESS due to the fact that it is automatically selected by ARCH_MULTI_V7.
->>
->> This is not good when someone wants to create a minimal kernel build, so let
->> multi_v7_defconfig select ARCH_VEXPRESS instead.
->>
->> Also avoid build breakage when randconfig selects no platform.
->>
->> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->> ---
->> Changes since v1:
->> - Avoid build breakage on randconfig for the case that no platform is selected.
-> 
-> Does this version look good?
+Use devm_* managed functions, so that slot-gpio users do not have to
+call mmc_gpio_free_ro/cd to free up resources requested in
+mmc_gpio_request_ro/cd.
 
-Yes.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/mmc/core/slot-gpio.c |   15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
-> 
-> Regards,
-> 
-> Fabio Estevam
-> 
+diff --git a/drivers/mmc/core/slot-gpio.c b/drivers/mmc/core/slot-gpio.c
+index 16a1c0b..8b55748 100644
+--- a/drivers/mmc/core/slot-gpio.c
++++ b/drivers/mmc/core/slot-gpio.c
+@@ -106,7 +106,8 @@ int mmc_gpio_request_ro(struct mmc_host *host, unsigned int gpio)
+ 
+ 	ctx = host->slot.handler_priv;
+ 
+-	ret = gpio_request_one(gpio, GPIOF_DIR_IN, ctx->ro_label);
++	ret = devm_gpio_request_one(&host->class_dev, gpio, GPIOF_DIR_IN,
++				    ctx->ro_label);
+ 	if (ret < 0)
+ 		return ret;
+ 
+@@ -128,7 +129,8 @@ int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio)
+ 
+ 	ctx = host->slot.handler_priv;
+ 
+-	ret = gpio_request_one(gpio, GPIOF_DIR_IN, ctx->cd_label);
++	ret = devm_gpio_request_one(&host->class_dev, gpio, GPIOF_DIR_IN,
++				    ctx->cd_label);
+ 	if (ret < 0)
+ 		/*
+ 		 * don't bother freeing memory. It might still get used by other
+@@ -146,7 +148,8 @@ int mmc_gpio_request_cd(struct mmc_host *host, unsigned int gpio)
+ 		irq = -EINVAL;
+ 
+ 	if (irq >= 0) {
+-		ret = request_threaded_irq(irq, NULL, mmc_gpio_cd_irqt,
++		ret = devm_request_threaded_irq(&host->class_dev, irq,
++			NULL, mmc_gpio_cd_irqt,
+ 			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+ 			ctx->cd_label, host);
+ 		if (ret < 0)
+@@ -175,7 +178,7 @@ void mmc_gpio_free_ro(struct mmc_host *host)
+ 	gpio = ctx->ro_gpio;
+ 	ctx->ro_gpio = -EINVAL;
+ 
+-	gpio_free(gpio);
++	devm_gpio_free(&host->class_dev, gpio);
+ }
+ EXPORT_SYMBOL(mmc_gpio_free_ro);
+ 
+@@ -188,13 +191,13 @@ void mmc_gpio_free_cd(struct mmc_host *host)
+ 		return;
+ 
+ 	if (host->slot.cd_irq >= 0) {
+-		free_irq(host->slot.cd_irq, host);
++		devm_free_irq(&host->class_dev, host->slot.cd_irq, host);
+ 		host->slot.cd_irq = -EINVAL;
+ 	}
+ 
+ 	gpio = ctx->cd_gpio;
+ 	ctx->cd_gpio = -EINVAL;
+ 
+-	gpio_free(gpio);
++	devm_gpio_free(&host->class_dev, gpio);
+ }
+ EXPORT_SYMBOL(mmc_gpio_free_cd);
+-- 
+1.7.9.5
