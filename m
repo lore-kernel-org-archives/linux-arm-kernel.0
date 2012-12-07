@@ -1,30 +1,41 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 07 Dec 2012 13:17:06 +0000
-Subject: Sharing PCIE driver between Microblaze and Arm zynq
-In-Reply-To: <CAHTX3dLxbVxn+D+AV7L0VsGYFOjas3AJ_3M_xncVfxp02FCy=Q@mail.gmail.com>
-References: <CAHTX3dLxbVxn+D+AV7L0VsGYFOjas3AJ_3M_xncVfxp02FCy=Q@mail.gmail.com>
-Message-ID: <20121207131706.EC9273E0B87@localhost>
+From: rob.herring@calxeda.com (Rob Herring)
+Date: Fri, 07 Dec 2012 07:25:10 -0600
+Subject: [PATCH v2] ARM: Kconfig: Do not force selection of ARCH_VEXPRESS
+ by ARCH_MULTI_V7
+In-Reply-To: <CAOMZO5CQZbRub5ZWHzsNfewcRh5T7pPQuKNaTDYaFg-j1HzN0A@mail.gmail.com>
+References: <1353431918-9326-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5CQZbRub5ZWHzsNfewcRh5T7pPQuKNaTDYaFg-j1HzN0A@mail.gmail.com>
+Message-ID: <50C1EE36.6000202@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Dec 2012 15:23:14 +0100, Michal Simek <michal.simek@xilinx.com> wrote:
-> Hi guys,
+On 12/07/2012 04:07 AM, Fabio Estevam wrote:
+> Hi Rob,
 > 
-> I have a question regarding to sharing generic OF pcie driver between
-> two architectures MB and ARM Zynq.
-> Is drivers/pci/pcie location good for it?
-> Make no sense to have the same driver in two locations.
-> Is using readl/writel IO functions in this driver the best option
-> which we can have?
-> Or is there any other recommendation?
+> On Tue, Nov 20, 2012 at 3:18 PM, Fabio Estevam <festevam@gmail.com> wrote:
+>> From: Fabio Estevam <fabio.estevam@freescale.com>
+>>
+>> When building a kernel using imx_v6_v7_defconfig, it is not possible to unselect
+>> ARCH_VEXPRESS due to the fact that it is automatically selected by ARCH_MULTI_V7.
+>>
+>> This is not good when someone wants to create a minimal kernel build, so let
+>> multi_v7_defconfig select ARCH_VEXPRESS instead.
+>>
+>> Also avoid build breakage when randconfig selects no platform.
+>>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> ---
+>> Changes since v1:
+>> - Avoid build breakage on randconfig for the case that no platform is selected.
 > 
-> Also just want to check if it is correct to use pcie device_type.
-> The rest should be the same with pci description:
-> (http://devicetree.org/MPC5200:PCI#PCI_Address_Translation).
+> Does this version look good?
 
-Yes. device_type may be deprecated, but the PCI binding predates that.
-PowerPC uses pcie in the device type. arch/powerpc/kernel/of_platform.c
+Yes.
 
-Some of that powerpc DT PCI support code really should be made generic.
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-g.
+> 
+> Regards,
+> 
+> Fabio Estevam
+> 
