@@ -1,37 +1,28 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 6 Dec 2012 19:49:33 -0500
-Subject: [PATCH] ARM: Kirkwood: Add SPI_CHPA and SPI_CPOL support to
- spi-orion
-In-Reply-To: <20121207001433.GG25069@obsidianresearch.com>
-References: <20121121192335.GA14868@obsidianresearch.com>
- <20121206142521.4185A3E0948@localhost>
- <20121206172504.GB9676@obsidianresearch.com>
- <20121206232305.719E23E0B24@localhost>
- <20121206234917.GF25069@obsidianresearch.com>
- <20121206235311.GB21694@titan.lakedaemon.net>
- <20121207001433.GG25069@obsidianresearch.com>
-Message-ID: <20121207004933.GC21694@titan.lakedaemon.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 7 Dec 2012 00:59:10 +0000 (UTC)
+Subject: linux-next: manual merge of the arm-soc tree with the iommu tree
+In-Reply-To: <CAJ6Av5OBhpsSRiZNOa1a65yMT04Evaja6j8qPBiSuVM1DPdB1Q@mail.gmail.com>
+References: <20121204154203.f0e7e87d1ae99e5c528434f8@canb.auug.org.au>
+ <20121204110655.GE18368@8bytes.org>
+ <CAK=WgbYDKN1deDTw3KvymvhoE1h_apX2E8zK=cDbu68+Gwcayw@mail.gmail.com>
+ <CAJ6Av5OBhpsSRiZNOa1a65yMT04Evaja6j8qPBiSuVM1DPdB1Q@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1212070057240.22351@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 06, 2012 at 05:14:33PM -0700, Jason Gunthorpe wrote:
-> On Thu, Dec 06, 2012 at 06:53:11PM -0500, Jason Cooper wrote:
-> > On Thu, Dec 06, 2012 at 04:49:17PM -0700, Jason Gunthorpe wrote:
-> > > Jason: Do you have any of these possibly affected boards with a SPI
-> > > flash to test linux-next? dove, dreamplug, ts219 and lsxl
-> > 
-> > Yep, dreamplug ought to do.
-> 
-> Hmm, I just reviewed all the FLASH P/Ns datasheets in the affected DT
-> files, and they are all mode 0/mode 3 compatible - that is the linux
-> default mode so I expect everything to work OK.
-> 
-> If your dreamplug is fine lets just leave it?
+Hi Omar,
 
-Unfortunately, I'm unable to test until next week.  If Grant is
-comfortable with it as is, I have no objection.  If he isn't, I'll try
-to test it next week when I return home.
+On Thu, 6 Dec 2012, Omar Ramirez Luna wrote:
 
-thx,
+> I have checked next-20121206, it's OK to delete that file as the patch
+> from Paul is doing that for common clock framework migration; now the
+> only missing hunk from my original patch should apply to
+> arch/arm/mach-omap2/cclock44xx_data.c which is the file that now has
+> ipu_fck and dsp_fck (unused) clocks, I can send a patch to remove them
+> through linux-omap tree.
 
-Jason.
+OK, will you add the mach-omap2/omap_hwmod_44xx_data.c changes in the same 
+patch?
+
+
+- Paul
