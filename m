@@ -1,33 +1,42 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  7 Dec 2012 23:04:32 +0100
-Subject: [RFC v1 09/16] arm: mvebu: PCIe support is now available on mvebu
+Date: Fri,  7 Dec 2012 23:04:26 +0100
+Subject: [RFC v1 03/16] arm: plat-orion: introduce WIN_CTRL_ENABLE in address
+ mapping code
 In-Reply-To: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1354917879-32073-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1354917879-32073-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the PCIe driver for mvebu has been integrated and all its
-relevant dependencies, we can mark the ARCH_MVEBU platform has
-MIGHT_HAVE_PCI, which allows to select the PCI bus support if needed.
+Instead of hardcoding "1" as being the bit value to enable an address
+decoding window, introduce and use a WIN_CTRL_ENABLE definition.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/plat-orion/addr-map.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 440b13e..f12e475 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -13,6 +13,8 @@ config ARCH_MVEBU
- 	select MVEBU_CLK_CORE
- 	select MVEBU_CLK_CPU
- 	select MVEBU_CLK_GATING
-+	select MIGHT_HAVE_PCI
-+	select PCI_QUIRKS if PCI
+diff --git a/arch/arm/plat-orion/addr-map.c b/arch/arm/plat-orion/addr-map.c
+index febe386..4dec3db 100644
+--- a/arch/arm/plat-orion/addr-map.c
++++ b/arch/arm/plat-orion/addr-map.c
+@@ -38,6 +38,7 @@ EXPORT_SYMBOL_GPL(mv_mbus_dram_info);
+  * CPU Address Decode Windows registers
+  */
+ #define WIN_CTRL_OFF		0x0000
++#define   WIN_CTRL_ENABLE       BIT(0)
+ #define WIN_BASE_OFF		0x0004
+ #define WIN_REMAP_LO_OFF	0x0008
+ #define WIN_REMAP_HI_OFF	0x000c
+@@ -79,7 +80,8 @@ void __init orion_setup_cpu_win(const struct orion_addr_map_cfg *cfg,
+ 	}
  
- if ARCH_MVEBU
+ 	base_high = base & 0xffff0000;
+-	ctrl = ((size - 1) & 0xffff0000) | (attr << 8) | (target << 4) | 1;
++	ctrl = ((size - 1) & 0xffff0000) | (attr << 8) | (target << 4) |
++		WIN_CTRL_ENABLE;
  
+ 	writel(base_high, addr + WIN_BASE_OFF);
+ 	writel(ctrl, addr + WIN_CTRL_OFF);
 -- 
 1.7.9.5
