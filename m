@@ -1,605 +1,970 @@
-From: wfp5p@virginia.edu (Bill Pemberton)
-Date: Fri,  7 Dec 2012 09:26:15 -0500
-Subject: [PATCH 03/25] ASoC: Samsung: remove __dev* attributes
-In-Reply-To: <1354890397-28568-1-git-send-email-wfp5p@virginia.edu>
-References: <1354890397-28568-1-git-send-email-wfp5p@virginia.edu>
-Message-ID: <1354890397-28568-4-git-send-email-wfp5p@virginia.edu>
+From: bevenson@melinkcorp.com (Bryan Evenson)
+Date: Fri, 7 Dec 2012 09:47:52 -0500
+Subject: at91: Status of NAND flash access
+In-Reply-To: <50C1B741.9030209@atmel.com>
+References: <91586D499ADFD74FBCFB8425266A5DE4013765CC370A@pluto.melinkcorp.local>
+ <50BDD661.7070803@atmel.com>
+ <91586D499ADFD74FBCFB8425266A5DE4013765CC3D14@pluto.melinkcorp.local>
+ <50BEF0C0.7060807@atmel.com>
+ <91586D499ADFD74FBCFB8425266A5DE4013765D969EE@pluto.melinkcorp.local>
+ <91586D499ADFD74FBCFB8425266A5DE4013765D96E77@pluto.melinkcorp.local>
+ <50C073BD.7060604@atmel.com>
+ <91586D499ADFD74FBCFB8425266A5DE4013765D96EA5@pluto.melinkcorp.local>
+ <50C1B741.9030209@atmel.com>
+Message-ID: <91586D499ADFD74FBCFB8425266A5DE4013765D973C9@pluto.melinkcorp.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_HOTPLUG is going away as an option.  As result the __dev*
-markings will be going away.
+Josh,
 
-Remove use of __devinit, __devexit_p, __devinitdata, __devinitconst,
-and __devexit.
+Answers below.
 
-Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Sangbeom Kim <sbkim73@samsung.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
----
- sound/soc/samsung/ac97.c                       | 6 +++---
- sound/soc/samsung/bells.c                      | 6 +++---
- sound/soc/samsung/dma.c                        | 4 ++--
- sound/soc/samsung/i2s.c                        | 9 ++++-----
- sound/soc/samsung/idma.c                       | 6 +++---
- sound/soc/samsung/littlemill.c                 | 6 +++---
- sound/soc/samsung/lowland.c                    | 6 +++---
- sound/soc/samsung/pcm.c                        | 6 +++---
- sound/soc/samsung/s3c2412-i2s.c                | 6 +++---
- sound/soc/samsung/s3c24xx-i2s.c                | 6 +++---
- sound/soc/samsung/s3c24xx_simtec.c             | 6 +++---
- sound/soc/samsung/s3c24xx_simtec_hermes.c      | 4 ++--
- sound/soc/samsung/s3c24xx_simtec_tlv320aic23.c | 4 ++--
- sound/soc/samsung/smdk_wm8580pcm.c             | 6 +++---
- sound/soc/samsung/smdk_wm8994.c                | 6 +++---
- sound/soc/samsung/smdk_wm8994pcm.c             | 6 +++---
- sound/soc/samsung/spdif.c                      | 6 +++---
- sound/soc/samsung/speyside.c                   | 6 +++---
- sound/soc/samsung/tobermory.c                  | 6 +++---
- 19 files changed, 55 insertions(+), 56 deletions(-)
+Regards,
+Bryan
 
-diff --git a/sound/soc/samsung/ac97.c b/sound/soc/samsung/ac97.c
-index cd6c707..0df3c56 100644
---- a/sound/soc/samsung/ac97.c
-+++ b/sound/soc/samsung/ac97.c
-@@ -370,7 +370,7 @@ static struct snd_soc_dai_driver s3c_ac97_dai[] = {
- 	},
- };
- 
--static __devinit int s3c_ac97_probe(struct platform_device *pdev)
-+static int s3c_ac97_probe(struct platform_device *pdev)
- {
- 	struct resource *mem_res, *dmatx_res, *dmarx_res, *dmamic_res, *irq_res;
- 	struct s3c_audio_pdata *ac97_pdata;
-@@ -485,7 +485,7 @@ err1:
- 	return ret;
- }
- 
--static __devexit int s3c_ac97_remove(struct platform_device *pdev)
-+static int s3c_ac97_remove(struct platform_device *pdev)
- {
- 	struct resource *mem_res, *irq_res;
- 
-@@ -510,7 +510,7 @@ static __devexit int s3c_ac97_remove(struct platform_device *pdev)
- 
- static struct platform_driver s3c_ac97_driver = {
- 	.probe  = s3c_ac97_probe,
--	.remove = __devexit_p(s3c_ac97_remove),
-+	.remove = s3c_ac97_remove,
- 	.driver = {
- 		.name = "samsung-ac97",
- 		.owner = THIS_MODULE,
-diff --git a/sound/soc/samsung/bells.c b/sound/soc/samsung/bells.c
-index 01c1c5a..ceed466 100644
---- a/sound/soc/samsung/bells.c
-+++ b/sound/soc/samsung/bells.c
-@@ -412,7 +412,7 @@ static struct snd_soc_card bells_cards[] = {
- };
- 
- 
--static __devinit int bells_probe(struct platform_device *pdev)
-+static int bells_probe(struct platform_device *pdev)
- {
- 	int ret;
- 
-@@ -429,7 +429,7 @@ static __devinit int bells_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int __devexit bells_remove(struct platform_device *pdev)
-+static int bells_remove(struct platform_device *pdev)
- {
- 	snd_soc_unregister_card(&bells_cards[pdev->id]);
- 
-@@ -443,7 +443,7 @@ static struct platform_driver bells_driver = {
- 		.pm = &snd_soc_pm_ops,
- 	},
- 	.probe = bells_probe,
--	.remove = __devexit_p(bells_remove),
-+	.remove = bells_remove,
- };
- 
- module_platform_driver(bells_driver);
-diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
-index 6452990..db87628 100644
---- a/sound/soc/samsung/dma.c
-+++ b/sound/soc/samsung/dma.c
-@@ -432,13 +432,13 @@ static struct snd_soc_platform_driver samsung_asoc_platform = {
- 	.pcm_free	= dma_free_dma_buffers,
- };
- 
--int __devinit asoc_dma_platform_register(struct device *dev)
-+int asoc_dma_platform_register(struct device *dev)
- {
- 	return snd_soc_register_platform(dev, &samsung_asoc_platform);
- }
- EXPORT_SYMBOL_GPL(asoc_dma_platform_register);
- 
--void __devexit asoc_dma_platform_unregister(struct device *dev)
-+void asoc_dma_platform_unregister(struct device *dev)
- {
- 	snd_soc_unregister_platform(dev);
- }
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index 0aa0451..d2d124f 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -952,8 +952,7 @@ static const struct snd_soc_dai_ops samsung_i2s_dai_ops = {
- 					SNDRV_PCM_FMTBIT_S16_LE | \
- 					SNDRV_PCM_FMTBIT_S24_LE)
- 
--static __devinit
--struct i2s_dai *i2s_alloc_dai(struct platform_device *pdev, bool sec)
-+static struct i2s_dai *i2s_alloc_dai(struct platform_device *pdev, bool sec)
- {
- 	struct i2s_dai *i2s;
- 
-@@ -994,7 +993,7 @@ struct i2s_dai *i2s_alloc_dai(struct platform_device *pdev, bool sec)
- 	return i2s;
- }
- 
--static __devinit int samsung_i2s_probe(struct platform_device *pdev)
-+static int samsung_i2s_probe(struct platform_device *pdev)
- {
- 	u32 dma_pl_chan, dma_cp_chan, dma_pl_sec_chan;
- 	struct i2s_dai *pri_dai, *sec_dai = NULL;
-@@ -1117,7 +1116,7 @@ err:
- 	return ret;
- }
- 
--static __devexit int samsung_i2s_remove(struct platform_device *pdev)
-+static int samsung_i2s_remove(struct platform_device *pdev)
- {
- 	struct i2s_dai *i2s, *other;
- 	struct resource *res;
-@@ -1146,7 +1145,7 @@ static __devexit int samsung_i2s_remove(struct platform_device *pdev)
- 
- static struct platform_driver samsung_i2s_driver = {
- 	.probe  = samsung_i2s_probe,
--	.remove = __devexit_p(samsung_i2s_remove),
-+	.remove = samsung_i2s_remove,
- 	.driver = {
- 		.name = "samsung-i2s",
- 		.owner = THIS_MODULE,
-diff --git a/sound/soc/samsung/idma.c b/sound/soc/samsung/idma.c
-index c227c31..a07950b 100644
---- a/sound/soc/samsung/idma.c
-+++ b/sound/soc/samsung/idma.c
-@@ -416,12 +416,12 @@ static struct snd_soc_platform_driver asoc_idma_platform = {
- 	.pcm_free = idma_free,
- };
- 
--static int __devinit asoc_idma_platform_probe(struct platform_device *pdev)
-+static int asoc_idma_platform_probe(struct platform_device *pdev)
- {
- 	return snd_soc_register_platform(&pdev->dev, &asoc_idma_platform);
- }
- 
--static int __devexit asoc_idma_platform_remove(struct platform_device *pdev)
-+static int asoc_idma_platform_remove(struct platform_device *pdev)
- {
- 	snd_soc_unregister_platform(&pdev->dev);
- 	return 0;
-@@ -434,7 +434,7 @@ static struct platform_driver asoc_idma_driver = {
- 	},
- 
- 	.probe = asoc_idma_platform_probe,
--	.remove = __devexit_p(asoc_idma_platform_remove),
-+	.remove = asoc_idma_platform_remove,
- };
- 
- module_platform_driver(asoc_idma_driver);
-diff --git a/sound/soc/samsung/littlemill.c b/sound/soc/samsung/littlemill.c
-index de4cfdf..bfb91f3 100644
---- a/sound/soc/samsung/littlemill.c
-+++ b/sound/soc/samsung/littlemill.c
-@@ -297,7 +297,7 @@ static struct snd_soc_card littlemill = {
- 	.late_probe = littlemill_late_probe,
- };
- 
--static __devinit int littlemill_probe(struct platform_device *pdev)
-+static int littlemill_probe(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = &littlemill;
- 	int ret;
-@@ -314,7 +314,7 @@ static __devinit int littlemill_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int __devexit littlemill_remove(struct platform_device *pdev)
-+static int littlemill_remove(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = platform_get_drvdata(pdev);
- 
-@@ -330,7 +330,7 @@ static struct platform_driver littlemill_driver = {
- 		.pm = &snd_soc_pm_ops,
- 	},
- 	.probe = littlemill_probe,
--	.remove = __devexit_p(littlemill_remove),
-+	.remove = littlemill_remove,
- };
- 
- module_platform_driver(littlemill_driver);
-diff --git a/sound/soc/samsung/lowland.c b/sound/soc/samsung/lowland.c
-index a71c31a..570cf52 100644
---- a/sound/soc/samsung/lowland.c
-+++ b/sound/soc/samsung/lowland.c
-@@ -180,7 +180,7 @@ static struct snd_soc_card lowland = {
- 	.num_dapm_routes = ARRAY_SIZE(audio_paths),
- };
- 
--static __devinit int lowland_probe(struct platform_device *pdev)
-+static int lowland_probe(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = &lowland;
- 	int ret;
-@@ -197,7 +197,7 @@ static __devinit int lowland_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int __devexit lowland_remove(struct platform_device *pdev)
-+static int lowland_remove(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = platform_get_drvdata(pdev);
- 
-@@ -213,7 +213,7 @@ static struct platform_driver lowland_driver = {
- 		.pm = &snd_soc_pm_ops,
- 	},
- 	.probe = lowland_probe,
--	.remove = __devexit_p(lowland_remove),
-+	.remove = lowland_remove,
- };
- 
- module_platform_driver(lowland_driver);
-diff --git a/sound/soc/samsung/pcm.c b/sound/soc/samsung/pcm.c
-index ecd5090..13bab79 100644
---- a/sound/soc/samsung/pcm.c
-+++ b/sound/soc/samsung/pcm.c
-@@ -490,7 +490,7 @@ static struct snd_soc_dai_driver s3c_pcm_dai[] = {
- 	},
- };
- 
--static __devinit int s3c_pcm_dev_probe(struct platform_device *pdev)
-+static int s3c_pcm_dev_probe(struct platform_device *pdev)
- {
- 	struct s3c_pcm_info *pcm;
- 	struct resource *mem_res, *dmatx_res, *dmarx_res;
-@@ -613,7 +613,7 @@ err1:
- 	return ret;
- }
- 
--static __devexit int s3c_pcm_dev_remove(struct platform_device *pdev)
-+static int s3c_pcm_dev_remove(struct platform_device *pdev)
- {
- 	struct s3c_pcm_info *pcm = &s3c_pcm[pdev->id];
- 	struct resource *mem_res;
-@@ -638,7 +638,7 @@ static __devexit int s3c_pcm_dev_remove(struct platform_device *pdev)
- 
- static struct platform_driver s3c_pcm_driver = {
- 	.probe  = s3c_pcm_dev_probe,
--	.remove = __devexit_p(s3c_pcm_dev_remove),
-+	.remove = s3c_pcm_dev_remove,
- 	.driver = {
- 		.name = "samsung-pcm",
- 		.owner = THIS_MODULE,
-diff --git a/sound/soc/samsung/s3c2412-i2s.c b/sound/soc/samsung/s3c2412-i2s.c
-index edf5f527..2213377 100644
---- a/sound/soc/samsung/s3c2412-i2s.c
-+++ b/sound/soc/samsung/s3c2412-i2s.c
-@@ -160,7 +160,7 @@ static struct snd_soc_dai_driver s3c2412_i2s_dai = {
- 	.ops = &s3c2412_i2s_dai_ops,
- };
- 
--static __devinit int s3c2412_iis_dev_probe(struct platform_device *pdev)
-+static int s3c2412_iis_dev_probe(struct platform_device *pdev)
- {
- 	int ret = 0;
- 
-@@ -182,7 +182,7 @@ err:
- 	return ret;
- }
- 
--static __devexit int s3c2412_iis_dev_remove(struct platform_device *pdev)
-+static int s3c2412_iis_dev_remove(struct platform_device *pdev)
- {
- 	asoc_dma_platform_unregister(&pdev->dev);
- 	snd_soc_unregister_dai(&pdev->dev);
-@@ -191,7 +191,7 @@ static __devexit int s3c2412_iis_dev_remove(struct platform_device *pdev)
- 
- static struct platform_driver s3c2412_iis_driver = {
- 	.probe  = s3c2412_iis_dev_probe,
--	.remove = __devexit_p(s3c2412_iis_dev_remove),
-+	.remove = s3c2412_iis_dev_remove,
- 	.driver = {
- 		.name = "s3c2412-iis",
- 		.owner = THIS_MODULE,
-diff --git a/sound/soc/samsung/s3c24xx-i2s.c b/sound/soc/samsung/s3c24xx-i2s.c
-index 0022d51..ee10e87 100644
---- a/sound/soc/samsung/s3c24xx-i2s.c
-+++ b/sound/soc/samsung/s3c24xx-i2s.c
-@@ -465,7 +465,7 @@ static struct snd_soc_dai_driver s3c24xx_i2s_dai = {
- 	.ops = &s3c24xx_i2s_dai_ops,
- };
- 
--static __devinit int s3c24xx_iis_dev_probe(struct platform_device *pdev)
-+static int s3c24xx_iis_dev_probe(struct platform_device *pdev)
- {
- 	int ret = 0;
- 
-@@ -487,7 +487,7 @@ err:
- 	return ret;
- }
- 
--static __devexit int s3c24xx_iis_dev_remove(struct platform_device *pdev)
-+static int s3c24xx_iis_dev_remove(struct platform_device *pdev)
- {
- 	asoc_dma_platform_unregister(&pdev->dev);
- 	snd_soc_unregister_dai(&pdev->dev);
-@@ -496,7 +496,7 @@ static __devexit int s3c24xx_iis_dev_remove(struct platform_device *pdev)
- 
- static struct platform_driver s3c24xx_iis_driver = {
- 	.probe  = s3c24xx_iis_dev_probe,
--	.remove = __devexit_p(s3c24xx_iis_dev_remove),
-+	.remove = s3c24xx_iis_dev_remove,
- 	.driver = {
- 		.name = "s3c24xx-iis",
- 		.owner = THIS_MODULE,
-diff --git a/sound/soc/samsung/s3c24xx_simtec.c b/sound/soc/samsung/s3c24xx_simtec.c
-index 335a7d8..2c015f6 100644
---- a/sound/soc/samsung/s3c24xx_simtec.c
-+++ b/sound/soc/samsung/s3c24xx_simtec.c
-@@ -313,8 +313,8 @@ const struct dev_pm_ops simtec_audio_pmops = {
- EXPORT_SYMBOL_GPL(simtec_audio_pmops);
- #endif
- 
--int __devinit simtec_audio_core_probe(struct platform_device *pdev,
--				      struct snd_soc_card *card)
-+int simtec_audio_core_probe(struct platform_device *pdev,
-+			    struct snd_soc_card *card)
- {
- 	struct platform_device *snd_dev;
- 	int ret;
-@@ -371,7 +371,7 @@ err_clk:
- }
- EXPORT_SYMBOL_GPL(simtec_audio_core_probe);
- 
--int __devexit simtec_audio_remove(struct platform_device *pdev)
-+int simtec_audio_remove(struct platform_device *pdev)
- {
- 	struct platform_device *snd_dev = platform_get_drvdata(pdev);
- 
-diff --git a/sound/soc/samsung/s3c24xx_simtec_hermes.c b/sound/soc/samsung/s3c24xx_simtec_hermes.c
-index befabe8..d8a0543 100644
---- a/sound/soc/samsung/s3c24xx_simtec_hermes.c
-+++ b/sound/soc/samsung/s3c24xx_simtec_hermes.c
-@@ -99,7 +99,7 @@ static struct snd_soc_card snd_soc_machine_simtec_aic33 = {
- 	.num_dapm_routes = ARRAY_SIZE(base_map),
- };
- 
--static int __devinit simtec_audio_hermes_probe(struct platform_device *pd)
-+static int simtec_audio_hermes_probe(struct platform_device *pd)
- {
- 	dev_info(&pd->dev, "probing....\n");
- 	return simtec_audio_core_probe(pd, &snd_soc_machine_simtec_aic33);
-@@ -112,7 +112,7 @@ static struct platform_driver simtec_audio_hermes_platdrv = {
- 		.pm	= simtec_audio_pm,
- 	},
- 	.probe	= simtec_audio_hermes_probe,
--	.remove	= __devexit_p(simtec_audio_remove),
-+	.remove	= simtec_audio_remove,
- };
- 
- module_platform_driver(simtec_audio_hermes_platdrv);
-diff --git a/sound/soc/samsung/s3c24xx_simtec_tlv320aic23.c b/sound/soc/samsung/s3c24xx_simtec_tlv320aic23.c
-index 5552f82..1ac0d7a 100644
---- a/sound/soc/samsung/s3c24xx_simtec_tlv320aic23.c
-+++ b/sound/soc/samsung/s3c24xx_simtec_tlv320aic23.c
-@@ -88,7 +88,7 @@ static struct snd_soc_card snd_soc_machine_simtec_aic23 = {
- 	.num_dapm_routes = ARRAY_SIZE(base_map),
- };
- 
--static int __devinit simtec_audio_tlv320aic23_probe(struct platform_device *pd)
-+static int simtec_audio_tlv320aic23_probe(struct platform_device *pd)
- {
- 	return simtec_audio_core_probe(pd, &snd_soc_machine_simtec_aic23);
- }
-@@ -100,7 +100,7 @@ static struct platform_driver simtec_audio_tlv320aic23_driver = {
- 		.pm	= simtec_audio_pm,
- 	},
- 	.probe	= simtec_audio_tlv320aic23_probe,
--	.remove	= __devexit_p(simtec_audio_remove),
-+	.remove	= simtec_audio_remove,
- };
- 
- module_platform_driver(simtec_audio_tlv320aic23_driver);
-diff --git a/sound/soc/samsung/smdk_wm8580pcm.c b/sound/soc/samsung/smdk_wm8580pcm.c
-index 34239fe..e43bd42 100644
---- a/sound/soc/samsung/smdk_wm8580pcm.c
-+++ b/sound/soc/samsung/smdk_wm8580pcm.c
-@@ -153,7 +153,7 @@ static struct snd_soc_card smdk_pcm = {
-  * is absent (or not connected), so we connect EXT_VOICE_CLK(OSC4),
-  * 2.0484Mhz, directly with MCLK both Codec and SoC.
-  */
--static int __devinit snd_smdk_probe(struct platform_device *pdev)
-+static int snd_smdk_probe(struct platform_device *pdev)
- {
- 	int ret = 0;
- 
-@@ -173,7 +173,7 @@ static int __devinit snd_smdk_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int __devexit snd_smdk_remove(struct platform_device *pdev)
-+static int snd_smdk_remove(struct platform_device *pdev)
- {
- 	snd_soc_unregister_card(&smdk_pcm);
- 	platform_set_drvdata(pdev, NULL);
-@@ -186,7 +186,7 @@ static struct platform_driver snd_smdk_driver = {
- 		.name = "samsung-smdk-pcm",
- 	},
- 	.probe = snd_smdk_probe,
--	.remove = __devexit_p(snd_smdk_remove),
-+	.remove = snd_smdk_remove,
- };
- 
- module_platform_driver(snd_smdk_driver);
-diff --git a/sound/soc/samsung/smdk_wm8994.c b/sound/soc/samsung/smdk_wm8994.c
-index dd0aa8c..b0d0ab8 100644
---- a/sound/soc/samsung/smdk_wm8994.c
-+++ b/sound/soc/samsung/smdk_wm8994.c
-@@ -150,7 +150,7 @@ static struct snd_soc_card smdk = {
- };
- 
- 
--static int __devinit smdk_audio_probe(struct platform_device *pdev)
-+static int smdk_audio_probe(struct platform_device *pdev)
- {
- 	int ret;
- 	struct snd_soc_card *card = &smdk;
-@@ -164,7 +164,7 @@ static int __devinit smdk_audio_probe(struct platform_device *pdev)
- 	return ret;
- }
- 
--static int __devexit smdk_audio_remove(struct platform_device *pdev)
-+static int smdk_audio_remove(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = platform_get_drvdata(pdev);
- 
-@@ -179,7 +179,7 @@ static struct platform_driver smdk_audio_driver = {
- 		.owner	= THIS_MODULE,
- 	},
- 	.probe		= smdk_audio_probe,
--	.remove		= __devexit_p(smdk_audio_remove),
-+	.remove		= smdk_audio_remove,
- };
- 
- module_platform_driver(smdk_audio_driver);
-diff --git a/sound/soc/samsung/smdk_wm8994pcm.c b/sound/soc/samsung/smdk_wm8994pcm.c
-index 15f6b44..3688a32 100644
---- a/sound/soc/samsung/smdk_wm8994pcm.c
-+++ b/sound/soc/samsung/smdk_wm8994pcm.c
-@@ -129,7 +129,7 @@ static struct snd_soc_card smdk_pcm = {
- 	.num_links = 1,
- };
- 
--static int __devinit snd_smdk_probe(struct platform_device *pdev)
-+static int snd_smdk_probe(struct platform_device *pdev)
- {
- 	int ret = 0;
- 
-@@ -143,7 +143,7 @@ static int __devinit snd_smdk_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int __devexit snd_smdk_remove(struct platform_device *pdev)
-+static int snd_smdk_remove(struct platform_device *pdev)
- {
- 	snd_soc_unregister_card(&smdk_pcm);
- 	platform_set_drvdata(pdev, NULL);
-@@ -156,7 +156,7 @@ static struct platform_driver snd_smdk_driver = {
- 		.name = "samsung-smdk-pcm",
- 	},
- 	.probe = snd_smdk_probe,
--	.remove = __devexit_p(snd_smdk_remove),
-+	.remove = snd_smdk_remove,
- };
- 
- module_platform_driver(snd_smdk_driver);
-diff --git a/sound/soc/samsung/spdif.c b/sound/soc/samsung/spdif.c
-index 8606fc6..5008e5b 100644
---- a/sound/soc/samsung/spdif.c
-+++ b/sound/soc/samsung/spdif.c
-@@ -357,7 +357,7 @@ static struct snd_soc_dai_driver samsung_spdif_dai = {
- 	.resume = spdif_resume,
- };
- 
--static __devinit int spdif_probe(struct platform_device *pdev)
-+static int spdif_probe(struct platform_device *pdev)
- {
- 	struct s3c_audio_pdata *spdif_pdata;
- 	struct resource *mem_res, *dma_res;
-@@ -460,7 +460,7 @@ err0:
- 	return ret;
- }
- 
--static __devexit int spdif_remove(struct platform_device *pdev)
-+static int spdif_remove(struct platform_device *pdev)
- {
- 	struct samsung_spdif_info *spdif = &spdif_info;
- 	struct resource *mem_res;
-@@ -484,7 +484,7 @@ static __devexit int spdif_remove(struct platform_device *pdev)
- 
- static struct platform_driver samsung_spdif_driver = {
- 	.probe	= spdif_probe,
--	.remove	= __devexit_p(spdif_remove),
-+	.remove	= spdif_remove,
- 	.driver	= {
- 		.name	= "samsung-spdif",
- 		.owner	= THIS_MODULE,
-diff --git a/sound/soc/samsung/speyside.c b/sound/soc/samsung/speyside.c
-index d7906a1..57df90d 100644
---- a/sound/soc/samsung/speyside.c
-+++ b/sound/soc/samsung/speyside.c
-@@ -320,7 +320,7 @@ static struct snd_soc_card speyside = {
- 	.late_probe = speyside_late_probe,
- };
- 
--static __devinit int speyside_probe(struct platform_device *pdev)
-+static int speyside_probe(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = &speyside;
- 	int ret;
-@@ -337,7 +337,7 @@ static __devinit int speyside_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int __devexit speyside_remove(struct platform_device *pdev)
-+static int speyside_remove(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = platform_get_drvdata(pdev);
- 
-@@ -353,7 +353,7 @@ static struct platform_driver speyside_driver = {
- 		.pm = &snd_soc_pm_ops,
- 	},
- 	.probe = speyside_probe,
--	.remove = __devexit_p(speyside_remove),
-+	.remove = speyside_remove,
- };
- 
- module_platform_driver(speyside_driver);
-diff --git a/sound/soc/samsung/tobermory.c b/sound/soc/samsung/tobermory.c
-index 42e4c8e..f21ff60 100644
---- a/sound/soc/samsung/tobermory.c
-+++ b/sound/soc/samsung/tobermory.c
-@@ -214,7 +214,7 @@ static struct snd_soc_card tobermory = {
- 	.late_probe = tobermory_late_probe,
- };
- 
--static __devinit int tobermory_probe(struct platform_device *pdev)
-+static int tobermory_probe(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = &tobermory;
- 	int ret;
-@@ -231,7 +231,7 @@ static __devinit int tobermory_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int __devexit tobermory_remove(struct platform_device *pdev)
-+static int tobermory_remove(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = platform_get_drvdata(pdev);
- 
-@@ -247,7 +247,7 @@ static struct platform_driver tobermory_driver = {
- 		.pm = &snd_soc_pm_ops,
- 	},
- 	.probe = tobermory_probe,
--	.remove = __devexit_p(tobermory_remove),
-+	.remove = tobermory_remove,
- };
- 
- module_platform_driver(tobermory_driver);
--- 
-1.8.0.1
+> -----Original Message-----
+> From: Josh Wu [mailto:josh.wu at atmel.com]
+> Sent: Friday, December 07, 2012 4:31 AM
+> To: Bryan Evenson
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: Re: at91: Status of NAND flash access
+>
+> Hi, Bryan
+>
+> Thanks for doing such test. see my comment below:
+>
+> On 12/6/2012 9:20 PM, Bryan Evenson wrote:
+> >> -----Original Message-----
+> >> From: Josh Wu [mailto:josh.wu at atmel.com]
+> >> Sent: Thursday, December 06, 2012 5:30 AM
+> >> To: Bryan Evenson
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> Subject: Re: at91: Status of NAND flash access
+> >>
+> >> On 12/6/2012 11:13 AM, Bryan Evenson wrote:
+> >>> Josh,
+> >>>
+> >>> I spoke too soon.  I was able to read and use the filesystem from
+> >> NAND
+> >>> flash with the patch you provided when I applied it to the Atmel
+> 3.4
+> >>> kernel fork over at https://github.com/linux4sam/linux-at91/
+> (master
+> >> branch).
+> >>> When I applied the same patch to the recent mainline kernel (3.7-
+> >> rc8),
+> >>> it's still having problems accessing flash.  The boot log shows
+> that
+> >>> it is setting up for PMECC correctly, but it has errors when it
+> >>> tries to read from the filesystem.
+> >> It is strange.  The 3.4 kernel from at91 github just have a few
+> >> changes.
+> >> so rationally it behavior the same at PMECC function. From your log,
+> >> the
+> >> 3.7-rc8 kernel says the PMECC found uncorrectable errors.
+> >>
+> >> Can you try to dump or read from the u-boot? to see whether u-boot
+> >> can recognize the same nand page that "too many errors" happened in
+> kernel?
+> >> I will do some test to see whether the 3.7-rc8 can work in my side
+> or
+> >> not.
+> > U-Boot> nand read 0x22000000 0x800000 0x1D00000
+> >
+> > NAND read: device 0 offset 0x800000, size 0x1d00000
+> > PMECC: Too many errors
+> > NAND read from offset 800000 failed -5
+> >   0 bytes read: ERROR
+> >
+> > So u-boot has the same issue.
+> seems some page are really damaged or the error correction code has
+> bugs.
+>
+> > However, changing the kernel to the linux-at91 forked kernel produced
+> > different results.  That kernel noted the PMECC errors but was still
+> > able to load the filesystem.
+> I don't find the 3.4 kernel noted the PMECC errors in your attached
+> log.
+>
+> >    My boot output from the successful
+> > filesystem load is below.  Is the 3.4 kernel performing corrections
+> > that the mainline is not,
+>
+> no. I don't think so. The PMECC part of patch is the almost same. Only
+> some minor change are made in v3.4 for back port.
+>
+> > or is it just ignoring errors that it should not be ignoring?
+>
+> This is more possible. I means maybe 3.4 kernel doesn't check some area
+> 3.7-rc8 checked.
+>
+> >
+> > I'm hesitant to make any filesystem changes on this board because I
+> > know test cases like this where it works one way but not the other
+> are
+> > kind of rare.  Let me know if you have similar results on your end.
+> I tested in two version of kernel my side:
+>   1. https://github.com/linux4sam/linux-at91/commits/at91-3.4-
+> trunk_merge
+>            fcf88e036fce6c382510874b1dc90e9b49608ccf (Merge branch
+> 'at91-3.4-trunk/v3.4.x_gmac' into at91-3.4-trunk_merge)
+>   2. v3.7-rc8 plus the patch I sent to you to enable PMECC in dtsi.
+>
+> I cannot reproduce the situation you met In my side. Both can boot the
+> ubi rootfs system correctly.
+>
+> So the your case is rare.
+>
+> To find out why those two kernel work differently, could you help me to
+> do:
+>
+>     1. use u-boot "nand read" to do some bisect in nand flash offset,
+> which we can narrow down the page that has uncorrectable pmecc errors.
+>
+After trial and error, I got down to this:
+nand read 0x22000000 0x865000 0x100
+
+NAND read: device 0 offset 0x865000, size 0x100
+PMECC: Too many errors
+NAND read from offset 865000 failed -5
+ 0 bytes read: ERROR
+
+>     2. use u-boot "nand dump offset" to show the raw data of that page.
+> please send me the log. I can generate the same page from your log. and
+> check whether it can be corrected in my side.
+
+U-Boot> nand dump 0x865000
+Page 00865000 dump:
+        31 18 10 06 52 bd c6 c9  5d 44 02 00 00 00 00 00
+        00 02 00 00 07 00 00 00  04 15 00 00 00 00 00 00
+        05 00 00 00 00 00 00 00  03 00 00 00 04 00 00 00
+        0f 01 00 00 c8 5a 00 00  58 00 00 00 d8 00 00 00
+        0f 01 00 00 00 60 00 00  30 3b 0b 00 00 00 00 00
+        00 18 7a 0c 00 00 00 00  08 2f 84 00 00 00 00 00
+        c8 ad b6 01 00 00 00 00  c0 5a 02 00 00 00 00 00
+        08 06 a3 00 00 00 00 00  08 00 00 00 e2 28 00 00
+        08 00 00 00 00 30 00 00  08 00 00 00 00 28 00 00
+        00 00 00 00 00 00 00 00  67 01 00 00 6e 06 00 00
+        07 00 00 00 a8 07 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        31 18 10 06 ef de 0e ee  00 00 00 00 00 00 00 00
+        1c 00 00 00 05 00 00 00  e4 05 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+        00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+OOB:
+        ff ff ff ff ff ff ff ff
+        ff ff ff ff ff ff ff ff
+        ff ff ff ff ff ff ff ff
+        ff ff ff ff ff ff ff ff
+        ff ff ff ff ff ff ff ff
+        ff ff ff ff ff ff ff ff
+        ff ff ff ff ff ff ff ff
+        ff ff ff ff 3f 00 02 00
+>
+>     3. in 3.4 kernel, use dd command to read that page, to see any
+> uncorrectable pmecc error happen.
+>           if no error happens in 3.4, then it means it correct that
+> v3.7-rc8 cannot. There mush be something different in 3.4 kernel pmecc
+> between mainline.
+>           if error happens, that means 3.4 kernel skips those area but
+> 3.7-rc8 does not. So I suspect it maybe caused by some code of UBI part
+> changes.
+
+root at at91sam9x5ek:~# dd if=/dev/mtd1 of=/var/log/dump.bin bs=1k count=1 skip=65
+1+0 records in
+1+0 records out
+1024 bytes (1.0KB) copied, 0.001962 seconds, 509.7KB/s
+
+If I understand dd correctly, that should be reading 1KB of data starting at
+0x865000 (/dev/mtd1 starts at 0x800000, plus offset of 65 1KB blocks).  If I
+read the wrong block, let me know what the correct command line should be.
+
+>
+> Best Regards,
+> Josh Wu
+>
+> >
+> > -Bryan
+> >
+> > Uncompressing Linux... done, booting the kernel.
+> > Booting Linux on physical CPU 0
+> > Linux version 3.4.0 (xxxx at xxxx) (gcc version 4.5.3 20110311
+> > (prerelease) (
+> > GCC) ) #2 Wed Dec 5 15:36:29 EST 2012
+> > CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+> > CPU: VIVT data cache, VIVT instruction cache
+> > Machine: Atmel AT91SAM (Device Tree), model: Atmel AT91SAM9G25-EK
+> > Memory policy: ECC disabled, Data cache writeback
+> > AT91: Detected soc type: at91sam9x5
+> > AT91: Detected soc subtype: at91sam9g25
+> > AT91: sram at 0x300000 of 0x8000 mapped at 0xfef70000
+> > Clocks: CPU 400 MHz, master 133 MHz, main 12.000 MHz
+> > gpiochip_add: registered GPIOs 0 to 31 on device: pioA
+> > gpiochip_add: registered GPIOs 32 to 63 on device: pioB
+> > gpiochip_add: registered GPIOs 64 to 95 on device: pioC
+> > gpiochip_add: registered GPIOs 96 to 127 on device: pioD Built 1
+> > zonelists in Zone order, mobility grouping on.  Total pages: 32512
+> > Kernel command line: mem=128M console=ttyS0,115200
+> > mtdparts=atmel_nand:8M(bootst
+> > rap/uboot/kernel)ro,-(rootfs) root=/dev/mtdblock1 rw rootfstype=ubifs
+> > ubi.mtd=1 root=ubi0:rootfs PID hash table entries: 512 (order: -1,
+> > 2048 bytes) Dentry cache hash table entries: 16384 (order: 4, 65536
+> > bytes) Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
+> > Memory: 128MB = 128MB total
+> > Memory: 119856k/119856k available, 11216k reserved, 0K highmem
+> Virtual
+> > kernel memory layout:
+> >      vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+> >      fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+> >      vmalloc : 0xc8800000 - 0xff000000   ( 872 MB)
+> >      lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
+> >      modules : 0xbf000000 - 0xc0000000   (  16 MB)
+> >        .text : 0xc0008000 - 0xc04650d4   (4469 kB)
+> >        .init : 0xc0466000 - 0xc048a000   ( 144 kB)
+> >        .data : 0xc048a000 - 0xc04c4420   ( 234 kB)
+> >         .bss : 0xc04c4444 - 0xc09c66e4   (5129 kB)
+> > NR_IRQS:192
+> > sched_clock: 32 bits at 100 Hz, resolution 10000000ns, wraps every
+> > 4294967286ms
+> > Console: colour dummy device 80x30
+> > Lock dependency validator: Copyright (c) 2006 Red Hat, Inc., Ingo
+> > Molnar ... MAX_LOCKDEP_SUBCLASSES:  8
+> > ... MAX_LOCK_DEPTH:          48
+> > ... MAX_LOCKDEP_KEYS:        8191
+> > ... CLASSHASH_SIZE:          4096
+> > ... MAX_LOCKDEP_ENTRIES:     16384
+> > ... MAX_LOCKDEP_CHAINS:      32768
+> > ... CHAINHASH_SIZE:          16384
+> >   memory used by lock dependency info: 3695 kB
+> >   per task-struct memory footprint: 1152 bytes
+> > ------------------------
+> > | Locking API testsuite:
+> > ---------------------------------------------------------------------
+> -------
+> >                                   | spin |wlock |rlock |mutex | wsem
+> | rsem |
+> >    ------------------------------------------------------------------
+> --------
+> >                       A-A deadlock:  ok  |  ok  |  ok  |  ok  |  ok
+> |  ok  |
+> >                   A-B-B-A deadlock:  ok  |  ok  |  ok  |  ok  |  ok
+> |  ok  |
+> >               A-B-B-C-C-A deadlock:  ok  |  ok  |  ok  |  ok  |  ok
+> |  ok  |
+> >               A-B-C-A-B-C deadlock:  ok  |  ok  |  ok  |  ok  |  ok
+> |  ok  |
+> >           A-B-B-C-C-D-D-A deadlock:  ok  |  ok  |  ok  |  ok  |  ok
+> |  ok  |
+> >           A-B-C-D-B-D-D-A deadlock:  ok  |  ok  |  ok  |  ok  |  ok
+> |  ok  |
+> >           A-B-C-D-B-C-D-A deadlock:  ok  |  ok  |  ok  |  ok  |  ok
+> |  ok  |
+> >                      double unlock:  ok  |  ok  |  ok  |  ok  |  ok
+> |  ok  |
+> >                    initialize held:  ok  |  ok  |  ok  |  ok  |  ok
+> |  ok  |
+> >                   bad unlock order:  ok  |  ok  |  ok  |  ok  |  ok
+> |  ok  |
+> >    ------------------------------------------------------------------
+> --------
+> >                recursive read-lock:             |  ok  |
+> |  ok  |
+> >             recursive read-lock #2:             |  ok  |
+> |  ok  |
+> >              mixed read-write-lock:             |  ok  |
+> |  ok  |
+> >              mixed write-read-lock:             |  ok  |
+> |  ok  |
+> >    ------------------------------------------------------------------
+> --------
+> >       hard-irqs-on + irq-safe-A/12:  ok  |  ok  |  ok  |
+> >       soft-irqs-on + irq-safe-A/12:  ok  |  ok  |  ok  |
+> >       hard-irqs-on + irq-safe-A/21:  ok  |  ok  |  ok  |
+> >       soft-irqs-on + irq-safe-A/21:  ok  |  ok  |  ok  |
+> >         sirq-safe-A => hirqs-on/12:  ok  |  ok  |  ok  |
+> >         sirq-safe-A => hirqs-on/21:  ok  |  ok  |  ok  |
+> >           hard-safe-A + irqs-on/12:  ok  |  ok  |  ok  |
+> >           soft-safe-A + irqs-on/12:  ok  |  ok  |  ok  |
+> >           hard-safe-A + irqs-on/21:  ok  |  ok  |  ok  |
+> >           soft-safe-A + irqs-on/21:  ok  |  ok  |  ok  |
+> >      hard-safe-A + unsafe-B #1/123:  ok  |  ok  |  ok  |
+> >      soft-safe-A + unsafe-B #1/123:  ok  |  ok  |  ok  |
+> >      hard-safe-A + unsafe-B #1/132:  ok  |  ok  |  ok  |
+> >      soft-safe-A + unsafe-B #1/132:  ok  |  ok  |  ok  |
+> >      hard-safe-A + unsafe-B #1/213:  ok  |  ok  |  ok  |
+> >      soft-safe-A + unsafe-B #1/213:  ok  |  ok  |  ok  |
+> >      hard-safe-A + unsafe-B #1/231:  ok  |  ok  |  ok  |
+> >      soft-safe-A + unsafe-B #1/231:  ok  |  ok  |  ok  |
+> >      hard-safe-A + unsafe-B #1/312:  ok  |  ok  |  ok  |
+> >      soft-safe-A + unsafe-B #1/312:  ok  |  ok  |  ok  |
+> >      hard-safe-A + unsafe-B #1/321:  ok  |  ok  |  ok  |
+> >      soft-safe-A + unsafe-B #1/321:  ok  |  ok  |  ok  |
+> >      hard-safe-A + unsafe-B #2/123:  ok  |  ok  |  ok  |
+> >      soft-safe-A + unsafe-B #2/123:  ok  |  ok  |  ok  |
+> >      hard-safe-A + unsafe-B #2/132:  ok  |  ok  |  ok  |
+> >      soft-safe-A + unsafe-B #2/132:  ok  |  ok  |  ok  |
+> >      hard-safe-A + unsafe-B #2/213:  ok  |  ok  |  ok  |
+> >      soft-safe-A + unsafe-B #2/213:  ok  |  ok  |  ok  |
+> >      hard-safe-A + unsafe-B #2/231:  ok  |  ok  |  ok  |
+> >      soft-safe-A + unsafe-B #2/231:  ok  |  ok  |  ok  |
+> >      hard-safe-A + unsafe-B #2/312:  ok  |  ok  |  ok  |
+> >      soft-safe-A + unsafe-B #2/312:  ok  |  ok  |  ok  |
+> >      hard-safe-A + unsafe-B #2/321:  ok  |  ok  |  ok  |
+> >      soft-safe-A + unsafe-B #2/321:  ok  |  ok  |  ok  |
+> >        hard-irq lock-inversion/123:  ok  |  ok  |  ok  |
+> >        soft-irq lock-inversion/123:  ok  |  ok  |  ok  |
+> >        hard-irq lock-inversion/132:  ok  |  ok  |  ok  |
+> >        soft-irq lock-inversion/132:  ok  |  ok  |  ok  |
+> >        hard-irq lock-inversion/213:  ok  |  ok  |  ok  |
+> >        soft-irq lock-inversion/213:  ok  |  ok  |  ok  |
+> >        hard-irq lock-inversion/231:  ok  |  ok  |  ok  |
+> >        soft-irq lock-inversion/231:  ok  |  ok  |  ok  |
+> >        hard-irq lock-inversion/312:  ok  |  ok  |  ok  |
+> >        soft-irq lock-inversion/312:  ok  |  ok  |  ok  |
+> >        hard-irq lock-inversion/321:  ok  |  ok  |  ok  |
+> >        soft-irq lock-inversion/321:  ok  |  ok  |  ok  |
+> >        hard-irq read-recursion/123:  ok  |
+> >        soft-irq read-recursion/123:  ok  |
+> >        hard-irq read-recursion/132:  ok  |
+> >        soft-irq read-recursion/132:  ok  |
+> >        hard-irq read-recursion/213:  ok  |
+> >        soft-irq read-recursion/213:  ok  |
+> >        hard-irq read-recursion/231:  ok  |
+> >        soft-irq read-recursion/231:  ok  |
+> >        hard-irq read-recursion/312:  ok  |
+> >        soft-irq read-recursion/312:  ok  |
+> >        hard-irq read-recursion/321:  ok  |
+> >        soft-irq read-recursion/321:  ok  |
+> > -------------------------------------------------------
+> > Good, all 218 testcases passed! |
+> > ---------------------------------
+> > Calibrating delay loop... 198.04 BogoMIPS (lpj=990208)
+> > pid_max: default: 32768 minimum: 301
+> > Mount-cache hash table entries: 512
+> > CPU: Testing write buffer coherency: ok Setting up static identity
+> map
+> > for 0x2033ced8 - 0x2033cf30
+> > devtmpfs: initialized
+> > dummy:
+> > NET: Registered protocol family 16
+> > AT91: Power Management (with slow clock mode)
+> > AT91: Starting after power-restored wakeup
+> > bio: create slab <bio-0> at 0
+> > at_hdmac ffffec00.dma-controller: Atmel AHB DMA Controller ( cpy
+> slave
+> > ), 8 chan nels at_hdmac ffffee00.dma-controller: Atmel AHB DMA
+> > Controller ( cpy slave ), 8 chan nels SCSI subsystem initialized
+> > usbcore: registered new interface driver usbfs
+> > usbcore: registered new interface driver hub
+> > usbcore: registered new device driver usb
+> > cfg80211: Calling CRDA to update world regulatory domain Switching to
+> > clocksource tcb_clksrc
+> > NET: Registered protocol family 2
+> > IP route cache hash table entries: 1024 (order: 0, 4096 bytes) TCP
+> > established hash table entries: 4096 (order: 3, 32768 bytes) TCP bind
+> > hash table entries: 4096 (order: 5, 147456 bytes)
+> > TCP: Hash tables configured (established 4096 bind 4096)
+> > TCP: reno registered
+> > UDP hash table entries: 64 (order: 0, 5120 bytes) UDP-Lite hash table
+> > entries: 64 (order: 0, 5120 bytes)
+> > NET: Registered protocol family 1
+> > RPC: Registered named UNIX socket transport module.
+> > RPC: Registered udp transport module.
+> > RPC: Registered tcp transport module.
+> > RPC: Registered tcp NFSv4.1 backchannel transport module.
+> > NFS: Registering the id_resolver key type
+> > jffs2: version 2.2. (NAND) (SUMMARY)   ? 2001-2006 Red Hat, Inc.
+> > msgmni has been set to 234
+> > Block layer SCSI generic (bsg) driver version 0.4 loaded (major 252)
+> > io scheduler noop registered (default)
+> > fffff200.serial: ttyS0 at MMIO 0xfffff200 (irq = 1) is a ATMEL_SERIAL
+> > console [ttyS0] enabled
+> > f801c000.serial: ttyS1 at MMIO 0xf801c000 (irq = 5) is a ATMEL_SERIAL
+> > f8020000.serial: ttyS2 at MMIO 0xf8020000 (irq = 6) is a ATMEL_SERIAL
+> > f8028000.serial: ttyS4 at MMIO 0xf8028000 (irq = 8) is a ATMEL_SERIAL
+> > brd: module loaded
+> > loop: module loaded
+> > mtdoops: mtd device (mtddev=name/number) must be supplied
+> > atmel_nand: Use On Flash BBT
+> > atmel_nand 40000000.nand: No DMA support for NAND access.
+> > ONFI param page 0 valid
+> > ONFI flash detected
+> > NAND device: Manufacturer ID: 0x2c, Chip ID: 0xda (Micron
+> > MT29F2G08AAD) Bad block table found at page 131008, version 0x01 Bad
+> > block table found at page 130944, version 0x01
+> > nand_read_bbt: bad block at 0x000009380000
+> > 2 cmdlinepart partitions found on MTD device atmel_nand Creating 2
+> MTD
+> > partitions on "atmel_nand":
+> > 0x000000000000-0x000000800000 : "bootstrap/uboot/kernel"
+> > 0x000000800000-0x000010000000 : "rootfs"
+> > UBI: attaching mtd1 to ubi0
+> > UBI: physical eraseblock size:   131072 bytes (128 KiB)
+> > UBI: logical eraseblock size:    126976 bytes
+> > UBI: smallest flash I/O unit:    2048
+> > UBI: VID header offset:          2048 (aligned 2048)
+> > UBI: data offset:                4096
+> > UBI: max. sequence number:       4249
+> > UBI warning: print_rsvd_warning: cannot reserve enough PEBs for bad
+> > PEB handling , reserved 15, need 19
+> > UBI: attached mtd1 to ubi0
+> > UBI: MTD device name:            "rootfs"
+> > UBI: MTD device size:            248 MiB
+> > UBI: number of good PEBs:        1979
+> > UBI: number of bad PEBs:         5
+> > UBI: number of corrupted PEBs:   0
+> > UBI: max. allowed volumes:       128
+> > UBI: wear-leveling threshold:    4096
+> > UBI: number of internal volumes: 1
+> > UBI: number of user volumes:     1
+> > UBI: available PEBs:             0
+> > UBI: total number of reserved PEBs: 1979
+> > UBI: number of PEBs reserved for bad PEB handling: 15
+> > UBI: max/mean erase counter: 5/2
+> > UBI: image sequence number:  191777507
+> > UBI: background thread "ubi_bgt0d" started, PID 31 UBI error:
+> > ubi_init: cannot attach mtd1
+> > tun: Universal TUN/TAP device driver, 1.6
+> > tun: (C) 1999-2004 Max Krasnyansky <maxk@qualcomm.com> macb
+> > f802c000.ethernet: (unregistered net_device): invalid hw address,
+> > using ran dom
+> > MACB_mii_bus: probed
+> > macb f802c000.ethernet: eth0: Cadence MACB at 0xf802c000 irq 24
+> (4a:15:f4:49:94:
+> > a4)
+> > macb f802c000.ethernet: eth0: attached PHY driver [Davicom DM9161A]
+> > (mii_bus:phy _addr=f802c000.etherne:00, irq=-1) PPP generic driver
+> > version 2.4.2
+> > NET: Registered protocol family 24
+> > usbcore: registered new interface driver asix
+> > usbcore: registered new interface driver cdc_ether
+> > usbcore: registered new interface driver cdc_eem
+> > usbcore: registered new interface driver net1080
+> > usbcore: registered new interface driver cdc_subset
+> > usbcore: registered new interface driver zaurus
+> > usbcore: registered new interface driver ipheth
+> > usbcore: registered new interface driver cdc_ncm
+> > ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver atmel-ehci
+> > 700000.ehci: Atmel EHCI UHP HS atmel-ehci 700000.ehci: new USB bus
+> > registered, assigned bus number 1 atmel-ehci 700000.ehci: irq 22, io
+> > mem 0x00700000 atmel-ehci 700000.ehci: USB 2.0 started, EHCI 1.00 usb
+> > usb1: New USB device found, idVendor=1d6b, idProduct=0002 usb usb1:
+> > New USB device strings: Mfr=3, Product=2, SerialNumber=1 usb usb1:
+> > Product: Atmel EHCI UHP HS usb usb1: Manufacturer: Linux 3.4.0
+> > ehci_hcd usb usb1: SerialNumber: 700000.ehci hub 1-0:1.0: USB hub
+> > found hub 1-0:1.0: 3 ports detected
+> > ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver at91_ohci
+> > 600000.ohci: AT91 OHCI at91_ohci 600000.ohci: new USB bus registered,
+> > assigned bus number 2 at91_ohci 600000.ohci: irq 22, io mem
+> 0x00600000
+> > usb usb2: New USB device found, idVendor=1d6b, idProduct=0001 usb
+> > usb2: New USB device strings: Mfr=3, Product=2, SerialNumber=1 usb
+> > usb2: Product: AT91 OHCI usb usb2: Manufacturer: Linux 3.4.0 ohci_hcd
+> > usb usb2: SerialNumber: at91 hub 2-0:1.0: USB hub found hub 2-0:1.0:
+> 2
+> > ports detected
+> > usbcore: registered new interface driver cdc_acm
+> > cdc_acm: USB Abstract Control Model driver for USB modems and ISDN
+> > adapters Initializing USB Mass Storage driver...
+> > usbcore: registered new interface driver usb-storage USB Mass Storage
+> > support registered.
+> > usbcore: registered new interface driver libusual
+> > usbcore: registered new interface driver usbserial
+> > usbcore: registered new interface driver usbserial_generic USB Serial
+> > support registered for generic
+> > usbserial: USB Serial Driver core
+> > usbcore: registered new interface driver moto-modem USB Serial
+> support
+> > registered for moto-modem
+> > usbcore: registered new interface driver opticon USB Serial support
+> > registered for opticon
+> > usbcore: registered new interface driver pl2303 USB Serial support
+> > registered for pl2303
+> > usbcore: registered new interface driver qcserial USB Serial support
+> > registered for Qualcomm USB modem
+> > usbcore: registered new interface driver symbol USB Serial support
+> > registered for symbol i2c /dev entries driver
+> > usbcore: registered new interface driver usbhid
+> > usbhid: USB HID core driver
+> > nf_conntrack version 0.5.0 (1872 buckets, 7488 max)
+> > IPv4 over IPv4 tunneling driver
+> > ip_tables: (C) 2000-2006 Netfilter Core Team
+> > TCP: cubic registered
+> > NET: Registered protocol family 17
+> > lib80211: common routines for IEEE802.11 drivers Registering the
+> > dns_resolver key type
+> > drivers/rtc/hctosys.c: unable to open rtc device (rtc0)
+> > UBIFS: recovery needed
+> > UBIFS: recovery completed
+> > UBIFS: mounted UBI device 0, volume 0, name "rootfs"
+> > UBIFS: file system size:   247476224 bytes (241676 KiB, 236 MiB, 1949
+> LEBs)
+> > UBIFS: journal size:       9023488 bytes (8812 KiB, 8 MiB, 72 LEBs)
+> > UBIFS: media format:       w4/r0 (latest is w4/r0)
+> > UBIFS: default compressor: lzo
+> > UBIFS: reserved for root:  0 bytes (0 KiB)
+> > VFS: Mounted root (ubifs filesystem) on device 0:11.
+> > devtmpfs: mounted
+> > Freeing init memory: 144K
+> > INIT: version 2.86 booting
+> > Please wait: booting...
+> > Starting udev
+> > udev[62]: starting version 165
+> > Root filesystem already rw, not remounting Caching udev devnodes
+> > Populating dev cache
+> > logger: mount: mount point /proc/bus/usb does not exist
+> > ALSA: Restoring mixer settings...
+> > /usr/sbin/alsactl: load_state:1625: No soundcards found...
+> > Configuring network interfaces... eth0      no wireless extensions.
+> >
+> > udhcpc (v1.18.3) started
+> > run-parts: /etc/udhcpc.d/00avahi-autoipd exited with code 1 Sending
+> > discover...
+> > Sending discover...
+> > Sending discover...
+> > netlink: 12 bytes leftover after parsing attributes.
+> > netlink: 12 bytes leftover after parsing attributes.
+> > netlink: 12 bytes leftover after parsing attributes.
+> > No lease, failing
+> > done.
+> > Starting portmap daemon: portmap.
+> > net.ipv4.conf.default.rp_filter = 1
+> > net.ipv4.conf.all.rp_filter = 1
+> > kernel.panic = 10
+> > hwclock: can't open '/dev/misc/rtc': No such file or directory Mon
+> Nov
+> > 5 09:47:00 EST 2012
+> > hwclock: can't open '/dev/misc/rtc': No such file or directory
+> > INIT: Entering runlevel: 5
+> > Starting system message bus: dbus.
+> > Starting Dropbear SSH server: dropbear.
+> > starting Busybox HTTP Daemon: httpd... done.
+> > Starting Vixie-cron.
+> > Starting ntpd: done
+> > Starting syslogd/klogd: done
+> >   * Starting Avahi mDNS/DNS-SD Daemon: avahi-daemon
+> >     ...done.
+> >
+> >>> I noticed over at the linux-at91 fork that you had applied the
+> PMECC
+> >>> support on the 3.4.x_pmecc_dt_9x5 branch a few months ago.  From
+> >>> browsing the mainline I didn't see some of your changes from that
+> >>> branch in the mainline.  Are there some changes from the linux-at91
+> >> fork that are still scheduled for mainlining?
+> >> yes, this patch is not push to mainline yet. Currently the only
+> >> concern is we are think about the PMECC error correct bits need to
+> >> adjust by ONFI parameters that read from nand flash.
+> >> But it is not decide yet. if no exception, this patch will push to
+> >> mainline soon.
+> >>
+> >> Best Regards,
+> >> Josh Wu
+> >>
+> >>> If it helps, here is the boot log when I tried to boot using a 3.7-
+> >> rc8
+> >>> kernel and DT.
+> >>>
+> >>> Thanks,
+> >>> Bryan
+> >>>
+> >>> Uncompressing Linux... done, booting the kernel.
+> >>> [    0.000000] Booting Linux on physical CPU 0
+> >>> [    0.000000] Linux version 3.7.0-rc8-armv5-x0.16 (xxxx at xxxx) (gcc
+> >> versio
+> >>> n 4.6.2 20121016 (release) [ARM/embedded-4_6-branch revision
+> 192487]
+> >>> (GNU Tools for ARM Embedded Processors) ) #1 Wed Dec 5 16:11:30 EST
+> >> 2012
+> >>> [    0.000000] CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ),
+> >> cr=00053177
+> >>> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
+> >>> [    0.000000] Machine: Atmel AT91SAM (Device Tree), model: Atmel
+> >> AT91SAM9G25-EK
+> >>> [    0.000000] Memory policy: ECC disabled, Data cache writeback
+> >>> [    0.000000] AT91: Detected soc type: at91sam9x5
+> >>> [    0.000000] AT91: Detected soc subtype: at91sam9g25
+> >>> [    0.000000] AT91: sram at 0x300000 of 0x8000 mapped at
+> 0xfef70000
+> >>> [    0.000000] Clocks: CPU 400 MHz, master 133 MHz, main 12.000 MHz
+> >>> [    0.000000] Built 1 zonelists in Zone order, mobility grouping
+> on.
+> >> Total pag
+> >>> es: 32512
+> >>> [    0.000000] Kernel command line: mem=128M console=ttyS0,115200
+> >> mtdparts=atmel
+> >>> _nand:8M(bootstrap/uboot/kernel)ro,-(rootfs) root=/dev/mtdblock1 rw
+> >>> rootfstype=u bifs ubi.mtd=1 root=ubi0:rootfs
+> >>> [    0.000000] PID hash table entries: 512 (order: -1, 2048 bytes)
+> >>> [    0.000000] Dentry cache hash table entries: 16384 (order: 4,
+> >> 65536 bytes)
+> >>> [    0.000000] Inode-cache hash table entries: 8192 (order: 3,
+> 32768
+> >> bytes)
+> >>> [    0.000000] Memory: 128MB = 128MB total
+> >>> [    0.000000] Memory: 124276k/124276k available, 6796k reserved,
+> 0K
+> >> highmem
+> >>> [    0.000000] Virtual kernel memory layout:
+> >>> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+> >>> [    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+> >>> [    0.000000]     vmalloc : 0xc8800000 - 0xff000000   ( 872 MB)
+> >>> [    0.000000]     lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
+> >>> [    0.000000]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
+> >>> [    0.000000]       .text : 0xc0008000 - 0xc04b8630   (4802 kB)
+> >>> [    0.000000]       .init : 0xc04b9000 - 0xc04e45c4   ( 174 kB)
+> >>> [    0.000000]       .data : 0xc04e6000 - 0xc0516ce0   ( 196 kB)
+> >>> [    0.000000]        .bss : 0xc0516d04 - 0xc05760bc   ( 381 kB)
+> >>> [    0.000000] NR_IRQS:16 nr_irqs:16 16
+> >>> [    0.000000] sched_clock: 32 bits at 256 Hz, resolution
+> 3906250ns,
+> >> wraps every
+> >>>    3892314108ms
+> >>> [    0.000000] Console: colour dummy device 80x30
+> >>> [    0.035156] Calibrating delay loop... 199.80 BogoMIPS
+> (lpj=389120)
+> >>> [    0.035156] pid_max: default: 32768 minimum: 301
+> >>> [    0.035156] Mount-cache hash table entries: 512
+> >>> [    0.039062] CPU: Testing write buffer coherency: ok
+> >>> [    0.039062] Setting up static identity map for 0x20371d48 -
+> >> 0x20371da0
+> >>> [    0.039062] devtmpfs: initialized
+> >>> [    0.042968] NET: Registered protocol family 16
+> >>> [    0.042968] DMA: preallocated 256 KiB pool for atomic coherent
+> >> allocations
+> >>> [    0.070312] No ATAGs?
+> >>> [    0.070312] AT91: Power Management
+> >>> [    0.070312] AT91: Starting after power-restored wakeup
+> >>> [    0.121093] bio: create slab <bio-0> at 0
+> >>> [    0.125000] SCSI subsystem initialized
+> >>> [    0.128906] usbcore: registered new interface driver usbfs
+> >>> [    0.128906] usbcore: registered new interface driver hub
+> >>> [    0.128906] usbcore: registered new device driver usb
+> >>> [    0.132812] at91_i2c f8010000.i2c: AT91 i2c bus driver.
+> >>> [    0.132812] at91_i2c f8014000.i2c: AT91 i2c bus driver.
+> >>> [    0.136718] at91_i2c f8018000.i2c: AT91 i2c bus driver.
+> >>> [    0.140625] Switching to clocksource tcb_clksrc
+> >>> [    0.195312] NET: Registered protocol family 2
+> >>> [    0.199218] TCP established hash table entries: 4096 (order: 3,
+> >> 32768 bytes)
+> >>> [    0.199218] TCP bind hash table entries: 4096 (order: 2, 16384
+> >> bytes)
+> >>> [    0.199218] TCP: Hash tables configured (established 4096 bind
+> >> 4096)
+> >>> [    0.199218] TCP: reno registered
+> >>> [    0.199218] UDP hash table entries: 256 (order: 0, 4096 bytes)
+> >>> [    0.199218] UDP-Lite hash table entries: 256 (order: 0, 4096
+> >> bytes)
+> >>> [    0.199218] NET: Registered protocol family 1
+> >>> [    0.199218] RPC: Registered named UNIX socket transport module.
+> >>> [    0.199218] RPC: Registered udp transport module.
+> >>> [    0.199218] RPC: Registered tcp transport module.
+> >>> [    0.199218] RPC: Registered tcp NFSv4.1 backchannel transport
+> >> module.
+> >>> [    0.207031] NFS: Registering the id_resolver key type
+> >>> [    0.207031] Key type id_resolver registered
+> >>> [    0.207031] Key type id_legacy registered
+> >>> [    0.207031] jffs2: version 2.2. (NAND) ????? 2001-2006 Red Hat,
+> >> Inc.
+> >>> [    0.207031] msgmni has been set to 242
+> >>> [    0.210937] io scheduler noop registered (default)
+> >>> [    0.218750] fffff200.serial: ttyS0 at MMIO 0xfffff200 (irq = 18)
+> >> is a ATMEL_S
+> >>> ERIAL
+> >>> [    0.609375] console [ttyS0] enabled
+> >>> [    0.613281] f801c000.serial: ttyS1 at MMIO 0xf801c000 (irq = 22)
+> >> is a ATMEL_S
+> >>> ERIAL
+> >>> [    0.632812] brd: module loaded
+> >>> [    0.652343] loop: module loaded
+> >>> [    0.667968] atmel_nand: Use On Flash BBT
+> >>> [    0.671875] atmel_nand 40000000.nand: No DMA support for NAND
+> >> access.
+> >>> [    0.675781] ONFI param page 0 valid
+> >>> [    0.679687] ONFI flash detected
+> >>> [    0.683593] NAND device: Manufacturer ID: 0x2c, Chip ID: 0xda
+> >> (Micron MT29F2G
+> >>> 08AAD), page size: 2048, OOB size: 64
+> >>> [    0.695312] atmel_nand 40000000.nand: Initialize PMECC params,
+> >> cap: 2, sector
+> >>> : 512
+> >>> [    0.703125] Bad block table found at page 131008, version 0x01
+> >>> [    0.707031] Bad block table found at page 130944, version 0x01
+> >>> [    0.714843] nand_read_bbt: bad block at 0x000009380000
+> >>> [    0.718750] 2 cmdlinepart partitions found on MTD device
+> >> atmel_nand
+> >>> [    0.726562] Creating 2 MTD partitions on "atmel_nand":
+> >>> [    0.730468] 0x000000000000-0x000000800000 :
+> >> "bootstrap/uboot/kernel"
+> >>> [    0.742187] 0x000000800000-0x000010000000 : "rootfs"
+> >>> [    0.757812] macb f802c000.ethernet (unregistered net_device):
+> >> invalid hw addr
+> >>> ess, using random
+> >>> [    0.773437] libphy: MACB_mii_bus: probed
+> >>> [    0.777343] macb f802c000.ethernet eth0: Cadence MACB at
+> >> 0xf802c000 irq 23 (c
+> >>> a:2c:e6:c3:59:8f)
+> >>> [    0.785156] macb f802c000.ethernet eth0: attached PHY driver
+> >> [Davicom DM9161A
+> >>> ] (mii_bus:phy_addr=f802c000.etherne:00, irq=-1)
+> >>> [    0.796875] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI)
+> >> Driver
+> >>> [    0.804687] atmel-ehci 700000.ehci: Atmel EHCI UHP HS
+> >>> [    0.808593] atmel-ehci 700000.ehci: new USB bus registered,
+> >> assigned bus numb
+> >>> er 1
+> >>> [    0.816406] atmel-ehci 700000.ehci: irq 28, io mem 0x00700000
+> >>> [    0.835937] atmel-ehci 700000.ehci: USB 2.0 started, EHCI 1.00
+> >>> [    0.839843] usb usb1: New USB device found, idVendor=1d6b,
+> >> idProduct=0002
+> >>> [    0.847656] usb usb1: New USB device strings: Mfr=3, Product=2,
+> >> SerialNumber=
+> >>> 1
+> >>> [    0.855468] usb usb1: Product: Atmel EHCI UHP HS
+> >>> [    0.859375] usb usb1: Manufacturer: Linux 3.7.0-rc8-armv5-x0.16
+> >> ehci_hcd
+> >>> [    0.867187] usb usb1: SerialNumber: 700000.ehci
+> >>> [    0.871093] hub 1-0:1.0: USB hub found
+> >>> [    0.875000] hub 1-0:1.0: 3 ports detected
+> >>> [    0.878906] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI)
+> Driver
+> >>> [    0.886718] at91_ohci 600000.ohci: AT91 OHCI
+> >>> [    0.890625] at91_ohci 600000.ohci: new USB bus registered,
+> >> assigned bus numbe
+> >>> r 2
+> >>> [    0.898437] at91_ohci 600000.ohci: irq 28, io mem 0x00600000
+> >>> [    0.964843] usb usb2: New USB device found, idVendor=1d6b,
+> >> idProduct=0001
+> >>> [    0.968750] usb usb2: New USB device strings: Mfr=3, Product=2,
+> >> SerialNumber=
+> >>> 1
+> >>> [    0.976562] usb usb2: Product: AT91 OHCI
+> >>> [    0.980468] usb usb2: Manufacturer: Linux 3.7.0-rc8-armv5-x0.16
+> >> ohci_hcd
+> >>> [    0.988281] usb usb2: SerialNumber: at91
+> >>> [    0.992187] hub 2-0:1.0: USB hub found
+> >>> [    0.996093] hub 2-0:1.0: 2 ports detected
+> >>> [    1.003906] usbcore: registered new interface driver cdc_acm
+> >>> [    1.007812] cdc_acm: USB Abstract Control Model driver for USB
+> >> modems and ISD
+> >>> N adapters
+> >>> [    1.019531] usbcore: registered new interface driver uas
+> >>> [    1.023437] Initializing USB Mass Storage driver...
+> >>> [    1.027343] usbcore: registered new interface driver usb-storage
+> >>> [    1.035156] USB Mass Storage support registered.
+> >>> [    1.039062] usbcore: registered new interface driver ums-alauda
+> >>> [    1.046875] usbcore: registered new interface driver ums-cypress
+> >>> [    1.054687] usbcore: registered new interface driver ums-datafab
+> >>> [    1.058593] usbcore: registered new interface driver
+> ums_eneub6250
+> >>> [    1.066406] usbcore: registered new interface driver ums-freecom
+> >>> [    1.074218] usbcore: registered new interface driver ums-isd200
+> >>> [    1.078125] usbcore: registered new interface driver ums-
+> jumpshot
+> >>> [    1.085937] usbcore: registered new interface driver ums-karma
+> >>> [    1.093750] usbcore: registered new interface driver ums-
+> onetouch
+> >>> [    1.097656] usbcore: registered new interface driver ums-realtek
+> >>> [    1.105468] usbcore: registered new interface driver ums-sddr09
+> >>> [    1.113281] usbcore: registered new interface driver ums-sddr55
+> >>> [    1.117187] usbcore: registered new interface driver ums-usbat
+> >>> [    1.125000] usbcore: registered new interface driver usbserial
+> >>> [    1.132812] usbcore: registered new interface driver
+> >> usbserial_generic
+> >>> [    1.140625] usbserial: USB Serial support registered for generic
+> >>> [    1.144531] usbcore: registered new interface driver ftdi_sio
+> >>> [    1.152343] usbserial: USB Serial support registered for FTDI
+> USB
+> >> Serial Devi
+> >>> ce
+> >>> [    1.160156] usbcore: registered new interface driver pl2303
+> >>> [    1.167968] usbserial: USB Serial support registered for pl2303
+> >>> [    1.171875] mousedev: PS/2 mouse device common for all mice
+> >>> [    1.179687] i2c /dev entries driver
+> >>> [    1.191406] usbcore: registered new interface driver usbhid
+> >>> [    1.199218] usbhid: USB HID core driver
+> >>> [    1.207031] usb 1-2: new high-speed USB device number 2 using
+> >> atmel-ehci
+> >>> [    1.214843] TCP: cubic registered
+> >>> [    1.218750] NET: Registered protocol family 10
+> >>> [    1.222656] sit: IPv6 over IPv4 tunneling driver
+> >>> [    1.230468] NET: Registered protocol family 17
+> >>> [    1.234375] Key type dns_resolver registered
+> >>> [    1.246093] UBI: attaching mtd1 to ubi0
+> >>> [    1.253906] atmel_nand 40000000.nand: PMECC: Too many errors
+> >>> [    1.261718] UBI warning: ubi_io_read: error -5 while reading 64
+> >> bytes from PE
+> >>> B 10:0, read only 0 bytes, retry
+> >>> [    1.269531] atmel_nand 40000000.nand: PMECC: Too many errors
+> >>> [    1.277343] UBI warning: ubi_io_read: error -5 while reading 64
+> >> bytes from PE
+> >>> B 10:0, read only 0 bytes, retry
+> >>> [    1.285156] atmel_nand 40000000.nand: PMECC: Too many errors
+> >>> [    1.292968] UBI warning: ubi_io_read: error -5 while reading 64
+> >> bytes from PE
+> >>> B 10:0, read only 0 bytes, retry
+> >>> [    1.304687] atmel_nand 40000000.nand: PMECC: Too many errors
+> >>> [    1.308593] UBI error: ubi_io_read: error -5 while reading 64
+> >> bytes from PEB
+> >>> 10:0, read 0 bytes
+> >>> [    1.316406] [<c000d2bc>] (unwind_backtrace+0x0/0xe0) from
+> >> [<c0243a10>] (ubi_i
+> >>> o_read+0x1d4/0x2a4)
+> >>> [    1.328125] [<c0243a10>] (ubi_io_read+0x1d4/0x2a4) from
+> >> [<c0243d20>] (ubi_io_
+> >>> read_ec_hdr+0x68/0x214)
+> >>> [    1.335937] [<c0243d20>] (ubi_io_read_ec_hdr+0x68/0x214) from
+> >> [<c024804c>] (u
+> >>> bi_attach+0x104/0x13e4)
+> >>> [    1.343750] [<c024804c>] (ubi_attach+0x104/0x13e4) from
+> >> [<c023e514>] (ubi_att
+> >>> ach_mtd_dev+0x5a4/0xb94)
+> >>> [    1.355468] [<c023e514>] (ubi_attach_mtd_dev+0x5a4/0xb94) from
+> >> [<c04d09dc>] (
+> >>> ubi_init+0x1d8/0x2d8)
+> >>> [    1.363281] [<c04d09dc>] (ubi_init+0x1d8/0x2d8) from
+> [<c0008860>]
+> >> (do_one_ini
+> >>> tcall+0x90/0x168)
+> >>> [    1.371093] [<c0008860>] (do_one_initcall+0x90/0x168) from
+> >> [<c03686a4>] (kern
+> >>> el_init+0xe8/0x2a0)
+> >>> [    1.378906] [<c03686a4>] (kernel_init+0xe8/0x2a0) from
+> >> [<c00093f0>] (ret_from
+> >>> _fork+0x14/0x24)
+> >>> [    1.386718] UBI error: ubi_attach_mtd_dev: failed to attach
+> mtd1,
+> >> error -5
+> >>> [    1.394531] UBI error: ubi_init: cannot attach mtd1
+> >>> [    1.402343] drivers/rtc/hctosys.c: unable to open rtc device
+> >> (rtc0)
+> >>> [    1.410156] UBIFS error (pid 1): ubifs_mount: cannot open
+> >> "ubi0:rootfs", erro
+> >>> r -19
+> >>> [    1.417968] VFS: Cannot open root device "ubi0:rootfs" or
+> unknown-
+> >> block(0,0):
+> >>>    error -19
+> >>> [    1.425781] Please append a correct "root=" boot option; here
+> are
+> >> the availab
+> >>> le partitions:
+> >>> [    1.433593] 1f00            8192 mtdblock0  (driver?)
+> >>> [    1.437500] 1f01          253952 mtdblock1  (driver?)
+> >>> [    1.441406] Kernel panic - not syncing: VFS: Unable to mount
+> root
+> >> fs on unkno
+> >>> wn-block(0,0)
+> >>>
+> >>>
