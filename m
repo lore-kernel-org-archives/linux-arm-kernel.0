@@ -1,58 +1,37 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 8 Dec 2012 01:07:08 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 8 Dec 2012 00:08:50 +0000
 Subject: [PATCH 1/2] thermal: Add support for thermal sensor for
  Kirkwood SoC
-In-Reply-To: <1354922151-3250-1-git-send-email-iwamatsu@nigauri.org>
+In-Reply-To: <20121207235904.GA15078@obsidianresearch.com>
 References: <1354922151-3250-1-git-send-email-iwamatsu@nigauri.org>
-Message-ID: <20121208010708.260209f5@skate>
+ <20121207232459.GA4304@obsidianresearch.com>
+ <20121207235904.GA15078@obsidianresearch.com>
+Message-ID: <20121208000850.GZ14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Dec 07, 2012 at 04:59:04PM -0700, Jason Gunthorpe wrote:
+> On Fri, Dec 07, 2012 at 04:24:59PM -0700, Jason Gunthorpe wrote:
+> > On Sat, Dec 08, 2012 at 08:15:50AM +0900, Nobuhiro Iwamatsu wrote:
+> > > Some kirkwood SoC has thermal sensor.
+> > > This patch adds support for 88F6282 and 88F6283.
+> > 
+> > Thanks! I was just about to write this.. Looks good here.
+> 
+> Ah, looking closer:
+> 
+> $ cat /sys/class/thermal/thermal_zone0/temp 
+> 37
+> 
+> That should be 37000, the value out of the driver should be in
+> milli-Celsius.
+> 
+> I'd use this equation instead:
+> 
+> 	*temp = ((322 - reg) * 10000 * 1000) / 13625;
 
-On Sat,  8 Dec 2012 08:15:50 +0900, Nobuhiro Iwamatsu wrote:
-
-> +config KIRKWOOD_THERMAL
-> +	tristate "Temperature sensor on Marvel Kirkwood"
-
-Marvell
-
-> +	/* Valid check */
-> +	if (!(reg >> THERMAL_VALID_OFFSET) & THERMAL_VALID_MASK) {
-> +		dev_info(&thermal->device, "Reading temperature is not valid\n");
-
-"Temperature read is not valid" maybe? An native english speaker could
-say.
-
-> +	thermal_dev
-> +		= devm_kzalloc(&pdev->dev, sizeof(*thermal_dev), GFP_KERNEL);
-
-I think the usual coding style is to have the = on the first line.
-
-> +static int kirkwood_thermal_exit(struct platform_device *pdev)
-> +{
-> +	struct thermal_zone_device *kirkwood_thermal
-> +			= platform_get_drvdata(pdev);
-
-Ditto.
-
-> +static const struct of_device_id kirkwood_thermal_id_table[] = {
-> +	{ .compatible = "marvel,thermal-kirkwood" },
-
-marvel -> marvell
-
-Also, I think it should be marvell,kirkwood-thermal, since most other
-DT compatible strings that we have for Marvell SoCs are
-marvell,<soc>-<function>.
-
-Also, the Device Tree binding documentation is missing (even though it
-is admittedly going to be a very short documentation).
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Be careful of math overflows... make sure you do this calculation using
+unsigned arithmetic as temperatures above 157 degress will cause this
+to look like a negative number using signed math... However, that
+probably won't ever be noticed because at 157 degrees, you'll definitely
+be outside the operating limits of the device.
