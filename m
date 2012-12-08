@@ -1,30 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 8 Dec 2012 00:11:52 +0000
-Subject: [PATCH 1/2] thermal: Add support for thermal sensor for
- Kirkwood SoC
-In-Reply-To: <20121208010708.260209f5@skate>
-References: <1354922151-3250-1-git-send-email-iwamatsu@nigauri.org>
- <20121208010708.260209f5@skate>
-Message-ID: <20121208001152.GA14363@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 7 Dec 2012 16:30:09 -0800
+Subject: [GIT PULL] Various fixes for sunxi in 3.8
+In-Reply-To: <1354787457-29172-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1354787457-29172-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAOesGMhrfBsLLk+tPw+Ec-BjwQJNaNvBkJhu6Qye=kGB9P28uQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 08, 2012 at 01:07:08AM +0100, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Sat,  8 Dec 2012 08:15:50 +0900, Nobuhiro Iwamatsu wrote:
-> > +static const struct of_device_id kirkwood_thermal_id_table[] = {
-> > +	{ .compatible = "marvel,thermal-kirkwood" },
-> 
-> marvel -> marvell
-> 
-> Also, I think it should be marvell,kirkwood-thermal, since most other
-> DT compatible strings that we have for Marvell SoCs are
-> marvell,<soc>-<function>.
-> 
-> Also, the Device Tree binding documentation is missing (even though it
-> is admittedly going to be a very short documentation).
+On Thu, Dec 6, 2012 at 1:50 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Arnd, Olof,
+>
+> Please consider pulling these two patches that fixes array non-null terminated
+> in the sunxi drivers.
+>
+> Thanks,
+>
+> Maxime
+>
+> The following changes since commit 67bea88dd842deb3ed8327ad101970dbd615ddcb:
+>
+>   ARM: sunxi: Add sunxi restart function via onchip watchdog (2012-11-21 09:25:25 +0100)
+>
+> are available in the git repository at:
+>
+>   git://github.com/mripard/linux.git tags/sunxi-fixes-for-3.8
 
-Is this in any way compatible with the thermal monitoring found on
-Dove (510) stuff?  If so, should it have the SoC prefix in there,
-or should it be "armada-thermal" for the SoC family?
+Thanks, pulled.
+
+
+-Olof
