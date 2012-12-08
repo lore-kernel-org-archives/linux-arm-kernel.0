@@ -1,28 +1,95 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 8 Dec 2012 11:23:53 +0000
-Subject: Question: Multiple board support is broken
-In-Reply-To: <20121208151859.622041461fd51b347e4b44c3@mail.ru>
-References: <20121207193143.2d2029daf2041683bc7b2474@mail.ru>
- <20121207161754.GV14363@n2100.arm.linux.org.uk>
- <20121208122811.31c7b9b3a57b898c25204252@mail.ru>
- <20121208092618.GB14363@n2100.arm.linux.org.uk>
- <20121208135845.707d9f50ba9b2aaaef66bb3a@mail.ru>
- <20121208103812.GC14363@n2100.arm.linux.org.uk>
- <20121208151859.622041461fd51b347e4b44c3@mail.ru>
-Message-ID: <20121208112353.GD14363@n2100.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 8 Dec 2012 12:26:24 +0100
+Subject: [PATCH] ARM: Orion: Hoist bridge interrupt handling out of the
+ timer
+In-Reply-To: <20121207225507.GB29262@obsidianresearch.com>
+References: <20121207225507.GB29262@obsidianresearch.com>
+Message-ID: <20121208112624.GD25315@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 08, 2012 at 03:18:59PM +0400, Alexander Shiyan wrote:
-> Well, I understand your position on optimization. Can we at least replace
-> definition machine_arch_type by variable __machine_arch_type, which is passed
-> to the function setup_machine_tags() in setup_arch() procedure? Or have I
-> misunderstood something again?
+On Fri, Dec 07, 2012 at 03:55:07PM -0700, Jason Gunthorpe wrote:
+> The intent of this patch is to expose the other bridge cause
+> interrupts to users in the kernel.
+> 
+> - Add orion_bridge_irq_init to create a new edge triggered interrupt
+>   chip based on the bridge cause register
+> - Remove all interrupt register code from time.c and use normal
+>   interrupt functions instead
+> - Update the machines that use orion_time_init to call
+>   orion_bridge_irq_init and use the new signature
 
-Err, no I don't think you have.  Looks like the initial erroring out got
-broken by the addition of DT support and all the changes that happened
-after that.
+Hi Jason
 
-Given that the initial assembly code which errored out on non-supported
-platforms seems to have been deleted, that does need to be changed.
-Please send a patch just for that.
+I like the idea, but i think it needs to go a bit further. 
+
+1) It should have an IRQ domain, like the other IRQ chips we have.
+2) It should have a DT binding, like the other IRQ chips we have.
+3) We then pass the timer interrupt via DT to the timer driver.
+4) We than pass the watchdog interrupt via DT.
+
+We plan to remove old style platforms in the next few cycles, so its
+important that changes like this are orientated towards DT but have
+the necessary backward compatibility for the old ways for the boards
+not yet converted. I think for Dove all boards are DT based...
+
+3) is not so simple, because we currently don't have a timer binding
+for Orion SoC. However, with this cleanup, we are much closer to being
+able to use the 370/XP timer code.
+
+
+> @@ -534,8 +535,9 @@ static void __init kirkwood_timer_init(void)
+>  {
+>  	kirkwood_tclk = kirkwood_find_tclk();
+>  
+> -	orion_time_init(BRIDGE_VIRT_BASE, BRIDGE_INT_TIMER1_CLR,
+> -			IRQ_KIRKWOOD_BRIDGE, kirkwood_tclk);
+> +	orion_bridge_irq_init(IRQ_KIRKWOOD_BRIDGE, IRQ_KIRKWOOD_BRIDGE_START,
+> +			      BRIDGE_CAUSE);
+> +	orion_time_init(IRQ_KIRKWOOD_BRIDGE_TIMER1, kirkwood_tclk);
+>  }
+
+I think it would be better to do this in kirkwood_init_irq(). Same for
+the other platforms. 
+
+> +static void bridge_irq_handler(unsigned irq, struct irq_desc *desc)
+> +{
+> +	struct irq_chip_generic *gc = irq_get_handler_data(irq);
+> +	u32 cause;
+> +	int i;
+> +
+> +	cause = readl(gc->reg_base) & readl(gc->reg_base + 4);
+
+Could you add a #define for this 4. I guess its an interrupt enable
+mask? Could regs.mask be used?
+
+> +	for (i = 0; i < 6; i++)
+> +		if ((cause & (1 << i)))
+> +			generic_handle_irq(i + gc->irq_base);
+> +}
+> +
+> +static void irq_gc_eoi_inv(struct irq_data *d)
+> +{
+> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> +	u32 mask = 1 << (d->irq - gc->irq_base);
+> +	struct irq_chip_regs *regs;
+> +
+> +	regs = &container_of(d->chip, struct irq_chip_type, chip)->regs;
+> +	irq_gc_lock(gc);
+> +	irq_reg_writel(~mask, gc->reg_base + regs->eoi);
+> +	irq_gc_unlock(gc);
+> +}
+> +
+> +void __init orion_bridge_irq_init(unsigned int bridge_irq,
+> +				  unsigned int irq_start,
+> +				  void __iomem *causeaddr)
+> +{
+> +	struct irq_chip_generic *gc;
+> +	struct irq_chip_type *ct;
+> +
+> +	gc = irq_alloc_generic_chip("orion_irq_edge", 1, irq_start,
+
+Maybe the name orion_bridge would be better?
+
+Thanks
+      Andrew
