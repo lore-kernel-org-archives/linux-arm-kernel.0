@@ -1,80 +1,67 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 7 Dec 2012 16:35:40 -0800
-Subject: [PATCH] mfd: vexpress-sysreg: Remove LEDs code
-In-Reply-To: <1354102731.2987.18.camel@hornet>
-References: <1353332344-16754-1-git-send-email-pawel.moll@arm.com>
- <20121121085539.GR7615@quad.lixom.net>
- <CAOesGMgJqPCXNxfEA+=NVE_yMtSKS_vnzNkT9Of9bqw0t5iMww@mail.gmail.com>
- <50B4FFB2.6050601@wwwdotorg.org> <1354102731.2987.18.camel@hornet>
-Message-ID: <CAOesGMjVwhOEDXXmb0=Ex8s29HqyGw7nH+fRfevT27n4H9N-ZQ@mail.gmail.com>
+From: rtivy@ti.com (Tivy, Robert)
+Date: Sat, 8 Dec 2012 01:04:09 +0000
+Subject: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
+ OMAP-L138 DSP
+In-Reply-To: <50C1A7B7.1020502@ti.com>
+References: <1352853207-20602-1-git-send-email-rtivy@ti.com>
+ <1352853207-20602-5-git-send-email-rtivy@ti.com> <50AB76FA.1050505@ti.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311F952B@DFLE08.ent.ti.com>
+ <50B88F7C.5000705@ti.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311FAC29@DFLE08.ent.ti.com>
+ <50BCBA26.4070608@ti.com> <50BD07D8.5000305@ti.com>
+ <50BD90F6.4080102@ti.com> <50BE0E54.5060607@ti.com>
+ <50BE2115.4000606@ti.com> <50C1A7B7.1020502@ti.com>
+Message-ID: <13514BD7FAEBA745BBD7D8A672905C14311FBA17@DFLE08.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2012 at 3:38 AM, Pawel Moll <pawel.moll@arm.com> wrote:
-> On Tue, 2012-11-27 at 18:00 +0000, Stephen Warren wrote:
->> On 11/21/2012 02:04 AM, Olof Johansson wrote:
->> > On Wed, Nov 21, 2012 at 12:55 AM, Olof Johansson <olof@lixom.net> wrote:
->> >> On Mon, Nov 19, 2012 at 01:39:04PM +0000, Pawel Moll wrote:
->> >>> As the current LEDs code breaks other platform, remove it.
->> >>>
->> >>> It shall be replaced by a generic "MMIO LEDs" driver.
->> >>>
->> >>> Reported-by: Stephen Warren <swarren@wwwdotorg.org>
->> >>> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
->> >>> ---
->> >>>  drivers/mfd/vexpress-sysreg.c |   77 -----------------------------------------
->> >>>  1 file changed, 77 deletions(-)
->> >>>
->> >>> Hi Arnd,
->> >>>
->> >>> As I haven't managed to get any feedback on the generic MMIO
->> >>> LEDs driver so far, I have to postpone it till next cycle and
->> >>> completely remove the LED-related code from the vexpress-sysreg
->> >>> driver, as it breaks other platforms today.
->> >>>
->> >>> Would you be so kind to apply this patch, please? Alternatively
->> >>> you can pull it from here:
->> >>>
->> >>>   git://git.linaro.org/people/pawelmoll/linux.git vexpress-soc2
->> >>>
->> >>> (this branch is based on the vexpress-soc you already have)
->> >>
->> >> Applied the patch on top of vexpress/soc, and merged in that branch into
->> >> next/soc again (it had been reverted due to the issues)
->> >
->> > Actually, I replaced our current vexpress/soc with the latest one you
->> > had sent a pull request from before, since it had the appropriate
->> > dependencies with the clock tree sorted out
->> > (git://git.linaro.org/people/pawelmoll/linux.git vexpress-clk-soc).
->>
->> In next-20121127, I still see that drivers/mfd/vexpress-sysreg.c has the
->> following code:
->>
->> > static int __init vexpress_sysreg_init_leds(void)
->> > {
->> >         struct vexpress_sysreg_led *led;
->> >         int i;
->> >
->> >         /* Clear all user LEDs */
->> >         writel(0, vexpress_sysreg_base + SYS_LED);
->> ...
->> > }
->> > device_initcall(vexpress_sysreg_init_leds);
->>
->> ... and on systems where vexpress_sysreg_base is not set, this crashes
->> the kernel on boot.
->>
->> Shouldn't the patch "mfd: vexpress-sysreg: Remove LEDs code" be applied
->> to solve this?
->
-> By all means... I had an impression that Olof re-pulled the
-> vexpress-soc2 branch which has it, but apparently not.
->
-> Olof, would you be so kind to apply the patch then?
+> -----Original Message-----
+> From: Nori, Sekhar
+> Sent: Friday, December 07, 2012 12:24 AM
+> On 12/4/2012 9:43 PM, Murali Karicheri wrote:
+> > On 12/04/2012 09:53 AM, Murali Karicheri wrote:
+> >> I believe this is addressing the same issue. This is a DT based
+> >> solution, which I believe should add a framework and enhance it to
+> >> support DT.
+> > Forgot to paste the link. Here we go
+> >
+> > https://patchwork.kernel.org/patch/1635051/
+> 
+> Rob,
+> 
+> Since there is a solution for reset handling proposed but seems to be
+> slightly far from taking a concrete shape, I suggest you go ahead and
+> implement davinci reset using a platform private API ala Tegra.
+> 
+> You can create and send the patches. I will review and accept them but
+> not send them upstream immediately.
+> 
+> Lets wait till v3.8-rc4. If there is a generic solution that is merged
+> by that time, I will ask you to use that instead of your API (this will
+> give you about 2 weeks to convert). If the generic solution is not
+> merged by that time, I will send your private API to the upstreams for
+> v3.9 and we can convert to generic solution for later kernel versions.
+> 
+> This should give you a fair chance to get remoteproc working on DA850
+> for v3.9.
+> 
+> Sounds like a plan? The remoteproc folks need to agree too. I am
+> copying
+> Ohad here.
 
+I'm on board with that plan, thanks very much for the suggestion, I agree completely.
 
-Applied now, sorry for dropping the ball on this one. Thanks for the
-reminders on IRC, Stephen.
+> 
+> Meanwhile I do suggest you work with Stephen and Mike in giving shape
+> to
+> the reset API so it suits your needs when it gets ready.
 
+Will do.
 
--Olof
+Thanks & Regards,
+
+- Rob
+
+> 
+> Thanks,
+> Sekhar
