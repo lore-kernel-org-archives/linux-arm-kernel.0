@@ -1,315 +1,163 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Sat, 8 Dec 2012 00:15:44 -0800
-Subject: [PATCH V2] ARM: bcm281xx: Add timer driver
-Message-ID: <1354954544-21429-1-git-send-email-csd@broadcom.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 8 Dec 2012 12:28:11 +0400
+Subject: Question: Multiple board support is broken
+In-Reply-To: <20121207161754.GV14363@n2100.arm.linux.org.uk>
+References: <20121207193143.2d2029daf2041683bc7b2474@mail.ru>
+ <20121207161754.GV14363@n2100.arm.linux.org.uk>
+Message-ID: <20121208122811.31c7b9b3a57b898c25204252@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the Broadcom timer, used in the following SoCs:
-BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
+On Fri, 7 Dec 2012 16:17:54 +0000
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-This patch needs the arm-soc/soc/next branch
+> > Today I was tested multiple boards (not multiplatform) in the kernel
+> > and found problems with booting.
+> 
+> Err, I test this almost constantly and it works, and it's been working
+> 100% correctly for about the last 12 years.  There is no problem here.
+> 
+> > Exacly, if multiple boards defined
+> > in. config, we can proceed to boot only the last (determined by mach number).
+> 
+> The mach-types file doesn't have anything to do with which board gets chosen.
+> That file just provides the IDs, and a bunch of _optimized_ macros to
+> allow the compiler to perform optimizations.
+> 
+> Let's look at how this works today - let me pull out two entries:
+> 
+> #ifdef CONFIG_ARCH_EBSA285
+> # ifdef machine_arch_type
+> #  undef machine_arch_type
+> #  define machine_arch_type     __machine_arch_type
+> # else
+> #  define machine_arch_type     MACH_TYPE_EBSA285
+> # endif
+> # define machine_is_ebsa285()   (machine_arch_type == MACH_TYPE_EBSA285)
+> #else
+> # define machine_is_ebsa285()   (0)
+> #endif
+> 
+> #ifdef CONFIG_ARCH_NETWINDER
+> # ifdef machine_arch_type
+> #  undef machine_arch_type
+> #  define machine_arch_type     __machine_arch_type
+> # else
+> #  define machine_arch_type     MACH_TYPE_NETWINDER
+> # endif
+> # define machine_is_netwinder() (machine_arch_type == MACH_TYPE_NETWINDER)
+> #else
+> # define machine_is_netwinder() (0)
+> #endif
+> 
+> #ifndef machine_arch_type
+> #define machine_arch_type       __machine_arch_type
+> #endif
+> 
+> Now, if CONFIG_ARCH_EBSA285=y and CONFIG_ARCH_NETWINDER=n, then follow
+> through what the preprocessor does.  In the first case, machine_arch_type
+> is _not_ defined as a pre-processor symbol, so the "ifdef" is false.
+> That means machine_arch_type gets defined as MACH_TYPE_EBSA285.
+> 
+> machine_is_ebsa285() gets defined as (machine_arch_type == MACH_TYPE_EBSA285)
+> and when all the macro subsitutions occur (which happens where it's used)
+> this ends up becoming (MACH_TYPE_EBSA285 == MACH_TYPE_EBSA285).  This is
+> always true, so any code inside an if (machine_is_ebsa285()) {} block will
+> be compiled into the kernel and will be executed unconditionally - which
+> is exactly what we want.
+> 
+> Now, machine_is_netwinder() gets defined as constant (0).  This is always
+> false, so any code inside an if (machine_is_netwinder()) {} block will
+> be optimized away - exactly what we want.  This isn't affected by the
+> machine_arch_type definition.
+> 
+> Next, you can do the same thing for the CONFIG_ARCH_EBSA285=n and
+> CONFIG_ARCH_NETWINDER=y case, and you'll end up with similar results.
+> 
+> Finally for the case where CONFIG_ARCH_EBSA285=y and CONFIG_ARCH_NETWINDER=y.
+> In this case, it starts off just like the CONFIG_ARCH_EBSA285=y case above.
+> When we hit the CONFIG_ARCH_NETWINDER block a very important change happens.
+> This time machine_arch_type is already defined.
+> 
+> So, what happens is machine_arch_type first gets undefined to avoid any
+> compiler warnings about multiple definitions.  We then define
+> machine_arch_type to be the C variable __machine_arch_type.
+> 
+> This makes any references to (machine_arch_type == MACH_TYPE_WHATEVER)
+> become a runtime interpreted condition, which occurs for any machine type
+> that has its config symbol enabled.  So, machine_is_ebsa285() becomes
+> (__machine_arch_type == MACH_TYPE_EBSA285) and machine_is_netwinder()
+> becomes (__machine_arch_type == MACH_TYPE_NETWINDER), while other
+> platforms machine_is_xxx() macros remain defined to constant 0.
+> 
+> So, this all works exactly as we want.  There is no bug here.
 
-Updates from V1:
- - Rename bcm_timer.c to bcm_kona_timer.c
- - Pull .h into bcm_kona_timer.c
- - Make timers static
- - Clean up comment block
- - Switched to using clockevents_config_and_register
- - Added an error to the get_timer loop if it repeats too much
- - Added to Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
- - Added missing readl to timer_disable_and_clear
+Apparently the problem is that I have a custom symbol for their own board,
+but I specify an existing ID in the MACHINE_START. The initial boot is fine,
+because support for the ID is in the kernel, but the mach_desc is taken from
+a different machine. Below is a test program to demonstrate. In this test I
+boot kernel with ID=4 and I have a valid machines with ID=4 and 5, but symbol
+associated with ID=4 is missing. This case will a result boot a machine ID=5.
+How to solve the problem, I do not know yet...
 
-Note: bcm,kona-timer was kept as the 'compatible' field to make it
-specific enough for when there are multiple bcm timers (bcm,timer is
-too generic).
+<<< test.c
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
-Signed-off-by: Christian Daudt <csd@broadcom.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+//#define CONFIG_ARCH_EBSA285 1
+#define CONFIG_ARCH_NETWINDER 1
 
-diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt b/Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
-new file mode 100644
-index 0000000..59fa6e6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
-@@ -0,0 +1,19 @@
-+Broadcom Kona Family timer
-+-----------------------------------------------------
-+This timer is used in the following Broadcom SoCs:
-+ BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
-+
-+Required properties:
-+- compatible : "bcm,kona-timer"
-+- reg : Register range for the timer
-+- interrupts : interrupt for the timer
-+- clock-frequency: frequency that the clock operates
-+
-+Example:
-+	timer at 35006000 {
-+		compatible = "bcm,kona-timer";
-+		reg = <0x35006000 0x1000>;
-+		interrupts = <0x0 7 0x4>;
-+		clock-frequency = <32768>;
-+	};
-+
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index ad13588..8f71f40 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -47,4 +47,12 @@
- 		    cache-unified;
- 		    cache-level = <2>;
- 	};
-+
-+	timer at 35006000 {
-+		compatible = "bcm,kona-timer";
-+		reg = <0x35006000 0x1000>;
-+		interrupts = <0x0 7 0x4>;
-+		clock-frequency = <32768>;
-+	};
-+
- };
-diff --git a/arch/arm/mach-bcm/board_bcm.c b/arch/arm/mach-bcm/board_bcm.c
-index 3a62f1b..2457010 100644
---- a/arch/arm/mach-bcm/board_bcm.c
-+++ b/arch/arm/mach-bcm/board_bcm.c
-@@ -27,12 +27,10 @@ static const struct of_device_id irq_match[] = {
- 	{}
- };
- 
--static void timer_init(void)
--{
--}
-+extern void bcm_timer_init(void);
- 
- static struct sys_timer timer = {
--	.init = timer_init,
-+	.init = bcm_timer_init,
- };
- 
- static void __init init_irq(void)
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 603be36..885afc5 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -14,5 +14,6 @@ obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
- obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
- obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
- obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
-+obj-$(CONFIG_ARCH_BCM)		+= bcm_kona_timer.o
- 
- obj-$(CONFIG_CLKSRC_ARM_GENERIC)	+= arm_generic.o
-diff --git a/drivers/clocksource/bcm_kona_timer.c b/drivers/clocksource/bcm_kona_timer.c
-new file mode 100644
-index 0000000..dbc54c2
---- /dev/null
-+++ b/drivers/clocksource/bcm_kona_timer.c
-@@ -0,0 +1,206 @@
-+/*
-+ * Copyright (C) 2012 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/irq.h>
-+#include <linux/interrupt.h>
-+#include <linux/jiffies.h>
-+#include <linux/clockchips.h>
-+#include <linux/types.h>
-+
-+#include <linux/io.h>
-+#include <asm/mach/time.h>
-+
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+
-+
-+#define KONA_GPTIMER_STCS_OFFSET			0x00000000
-+#define KONA_GPTIMER_STCLO_OFFSET			0x00000004
-+#define KONA_GPTIMER_STCHI_OFFSET			0x00000008
-+#define KONA_GPTIMER_STCM0_OFFSET			0x0000000C
-+
-+#define KONA_GPTIMER_STCS_TIMER_MATCH_SHIFT		0
-+#define KONA_GPTIMER_STCS_COMPARE_ENABLE_SHIFT		4
-+
-+struct bcm_timers {
-+	int tmr_irq;
-+	void __iomem *tmr_regs;
-+};
-+
-+static struct bcm_timers timers;
-+
-+static u32 arch_timer_rate;
-+
-+/*
-+ * We use the peripheral timers for system tick, the cpu global timer for
-+ * profile tick
-+ */
-+static void timer_disable_and_clear(void __iomem *base)
-+{
-+	uint32_t reg;
-+
-+	/*
-+	 * clear and disable interrupts
-+	 * We are using compare/match register 0 for our system interrupts
-+	 */
-+	reg = readl(base + KONA_GPTIMER_STCS_OFFSET);
-+
-+	/* Clear compare (0) interrupt */
-+	reg |= 1 << KONA_GPTIMER_STCS_TIMER_MATCH_SHIFT;
-+	/* disable compare */
-+	reg &= ~(1 << KONA_GPTIMER_STCS_COMPARE_ENABLE_SHIFT);
-+
-+	writel(reg, base + KONA_GPTIMER_STCS_OFFSET);
-+
-+}
-+
-+static void
-+timer_get_counter(void *timer_base, uint32_t *msw, uint32_t *lsw)
-+{
-+	void __iomem *base = IOMEM(timer_base);
-+	int loop_limit = 4;
-+
-+	/* Read 64-bit free running counter
-+	 * 1. Read hi-word
-+	 * 2. Read low-word
-+	 * 3. Read hi-word again
-+	 * 4.1
-+	 *      if new hi-word is not equal to previously read hi-word, then
-+	 *      start from #1
-+	 * 4.2
-+	 *      if new hi-word is equal to previously read hi-word then stop.
-+	 */
-+
-+	while (--loop_limit) {
-+		*msw = readl(base + KONA_GPTIMER_STCHI_OFFSET);
-+		*lsw = readl(base + KONA_GPTIMER_STCLO_OFFSET);
-+		if (*msw == readl(base + KONA_GPTIMER_STCHI_OFFSET))
-+			break;
-+	}
-+	if (!loop_limit) {
-+		pr_err("bcm_kona_timer: getting counter failed.\n");
-+		pr_err(" Timer will be impacted\n");
-+	}
-+
-+	return;
-+}
-+
-+static const struct of_device_id bcm_timer_ids[] __initconst = {
-+	{.compatible = "bcm,kona-timer"},
-+	{},
-+};
-+
-+static void __init timers_init(void)
-+{
-+	struct device_node *node;
-+	u32 freq;
-+
-+	node = of_find_matching_node(NULL, bcm_timer_ids);
-+
-+	if (!node)
-+		panic("No timer");
-+
-+	if (!of_property_read_u32(node, "clock-frequency", &freq))
-+		arch_timer_rate = freq;
-+	else
-+		panic("clock-frequency not set in the .dts file");
-+
-+	/* Setup IRQ numbers */
-+	timers.tmr_irq = irq_of_parse_and_map(node, 0);
-+
-+	/* Setup IO addresses */
-+	timers.tmr_regs = of_iomap(node, 0);
-+
-+	timer_disable_and_clear(timers.tmr_regs);
-+}
-+
-+static int timer_set_next_event(unsigned long clc,
-+				  struct clock_event_device *unused)
-+{
-+	/* timer (0) is disabled by the timer interrupt already
-+	 * so, here we reload the next event value and re-enable
-+	 * the timer
-+	 *
-+	 * This way, we are potentially losing the time between
-+	 * timer-interrupt->set_next_event. CPU local timers, when
-+	 * they come in should get rid of skew
-+	 */
-+
-+	uint32_t lsw, msw;
-+	uint32_t reg;
-+
-+	timer_get_counter(timers.tmr_regs, &msw, &lsw);
-+
-+	/* Load the "next" event tick value */
-+	writel(lsw + clc, timers.tmr_regs + KONA_GPTIMER_STCM0_OFFSET);
-+
-+	/* Enable compare */
-+	reg = readl(timers.tmr_regs + KONA_GPTIMER_STCS_OFFSET);
-+	reg |= (1 << KONA_GPTIMER_STCS_COMPARE_ENABLE_SHIFT);
-+	writel(reg, timers.tmr_regs + KONA_GPTIMER_STCS_OFFSET);
-+
-+	return 0;
-+}
-+
-+static void timer_set_mode(enum clock_event_mode mode,
-+			     struct clock_event_device *unused)
-+{
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		/* by default mode is one shot don't do any thing */
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	default:
-+		timer_disable_and_clear(timers.tmr_regs);
-+	}
-+}
-+
-+static struct clock_event_device clockevent_timer = {
-+	.name = "timer 1",
-+	.features = CLOCK_EVT_FEAT_ONESHOT,
-+	.set_next_event = timer_set_next_event,
-+	.set_mode = timer_set_mode
-+};
-+
-+static void __init timer_clockevents_init(void)
-+{
-+	clockevent_timer.cpumask = cpumask_of(0);
-+	clockevents_config_and_register(&clockevent_timer,
-+		arch_timer_rate, 6, 0xffffffff);
-+}
-+
-+static irqreturn_t timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = &clockevent_timer;
-+
-+	timer_disable_and_clear(timers.tmr_regs);
-+	evt->event_handler(evt);
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction timer_irq = {
-+	.name = "Kona Timer Tick",
-+	.flags = IRQF_TIMER,
-+	.handler = timer_interrupt,
-+};
-+
-+void __init bcm_timer_init(void)
-+{
-+	timers_init();
-+	timer_clockevents_init();
-+	setup_irq(timers.tmr_irq, &timer_irq);
-+	timer_set_next_event((arch_timer_rate / HZ), NULL);
-+}
+#define MACH_TYPE_EBSA285 4
+#define MACH_TYPE_NETWINDER 5
+
+#ifdef CONFIG_ARCH_EBSA285
+# ifdef machine_arch_type
+# undef machine_arch_type
+# define machine_arch_type __machine_arch_type
+# else
+# define machine_arch_type MACH_TYPE_EBSA285
+# endif
+# define machine_is_ebsa285() (machine_arch_type == MACH_TYPE_EBSA285)
+#else
+# define machine_is_ebsa285() (0)
+#endif
+
+#ifdef CONFIG_ARCH_NETWINDER
+# ifdef machine_arch_type
+# undef machine_arch_type
+# define machine_arch_type __machine_arch_type
+# else
+# define machine_arch_type MACH_TYPE_NETWINDER
+# endif
+# define machine_is_netwinder() (machine_arch_type == MACH_TYPE_NETWINDER)
+#else
+# define machine_is_netwinder() (0)
+#endif
+
+#ifndef machine_arch_type
+#define machine_arch_type __machine_arch_type
+#endif
+
+unsigned int __machine_arch_type = MACH_TYPE_EBSA285; //From bootloader
+
+int main(int argc, char** argv)
+{
+	if (machine_is_ebsa285())
+		printf("machine_is_ebsa285()\n");
+	if (machine_is_netwinder())
+		printf("machine_is_netwinder()\n");
+	printf("  machine_arch_type=%u\n", machine_arch_type);
+	printf("__machine_arch_type=%u\n", __machine_arch_type);
+
+	return 0;
+}
+>>>
+
+shc at shc /home/git/test $ ./test 
+machine_is_netwinder()
+  machine_arch_type=5
+__machine_arch_type=4
+
 -- 
-1.7.1
+Alexander Shiyan <shc_work@mail.ru>
