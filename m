@@ -1,111 +1,161 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat,  8 Dec 2012 14:23:22 +0100
-Subject: [PATCH] ASoC: atmel-soc: make it buildable on other architectures
-Message-ID: <1354973002-13588-1-git-send-email-manabian@gmail.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sat,  8 Dec 2012 17:31:28 +0100
+Subject: [PATCH] drivers/video/wm8505fb.c: use devm_ functions
+Message-ID: <1354984288-773-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not very useful on non AT91/AVR32 platforms but it provides
-more build coverage and prepares for ARM multiplatform.
+From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Also fixes a couple of format type warnings.
+The various devm_ functions allocate memory that is released when a driver
+detaches.  This patch uses these functions for data that is allocated in
+the probe function of a platform device and is only freed in the remove
+function.
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+The patch makes some other cleanups.  First, the original code used
+devm_kzalloc, but kfree.  This would lead to a double free.  The problem
+was found using the following semantic match (http://coccinelle.lip6.fr/):
+
+// <smpl>
+@@
+expression x,e;
+@@
+x = devm_kzalloc(...)
+... when != x = e
+?-kfree(x,...);
+// </smpl>
+
+The error-handling code for the call to dma_alloc_coherent is copied to the
+end of the function, like the other error-handling code.  Given the
+introduction of the devm functions, this is just for uniformity, because
+the label at the end of the function now just returns the error code.
+
+A semicolon is removed at the end of this error handling code.
+
+The call platform_set_drvdata(pdev, NULL); is moved up under the label
+failed_free_cmap, because platform_set_drvdata(pdev, fbi); doesn't happen
+in the function until after gotos to this label are reached.
+
+The initializations of fbi and ret are not necessary and are removed.
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
 ---
+ drivers/video/wm8505fb.c |   44 ++++++++------------------------------------
+ 1 file changed, 8 insertions(+), 36 deletions(-)
 
-Hi,
-
-Build tested on RM9200 and x86_64.
-
-ARCH_AT91 depend is pushed down to the machine drivers
-since they still relies on mach includes.
-
-regards
-Joachim Eastwood
-
- sound/soc/atmel/Kconfig         | 6 +++---
- sound/soc/atmel/atmel-pcm-pdc.c | 4 ++--
- sound/soc/atmel/atmel-pcm.c     | 2 +-
- sound/soc/atmel/atmel_ssc_dai.c | 2 --
- 4 files changed, 6 insertions(+), 8 deletions(-)
-
-diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
-index d1b691b..3fdd87f 100644
---- a/sound/soc/atmel/Kconfig
-+++ b/sound/soc/atmel/Kconfig
-@@ -1,6 +1,6 @@
- config SND_ATMEL_SOC
- 	tristate "SoC Audio for the Atmel System-on-Chip"
--	depends on ARCH_AT91
-+	depends on HAS_IOMEM
- 	help
- 	  Say Y or M if you want to add support for codecs attached to
- 	  the ATMEL SSC interface. You will also need
-@@ -24,7 +24,7 @@ config SND_ATMEL_SOC_SSC
+diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
+index 77539c1..3bad805 100644
+--- a/drivers/video/wm8505fb.c
++++ b/drivers/video/wm8505fb.c
+@@ -274,9 +274,6 @@ static int __devinit wm8505fb_probe(struct platform_device *pdev)
+ 	unsigned long fb_mem_len;
+ 	void *fb_mem_virt;
  
- config SND_AT91_SOC_SAM9G20_WM8731
- 	tristate "SoC Audio support for WM8731-based At91sam9g20 evaluation board"
--	depends on ATMEL_SSC && SND_ATMEL_SOC && AT91_PROGRAMMABLE_CLOCKS
-+	depends on ARCH_AT91 && ATMEL_SSC && SND_ATMEL_SOC && AT91_PROGRAMMABLE_CLOCKS
- 	select SND_ATMEL_SOC_PDC
- 	select SND_ATMEL_SOC_SSC
- 	select SND_SOC_WM8731
-@@ -34,7 +34,7 @@ config SND_AT91_SOC_SAM9G20_WM8731
- 
- config SND_AT91_SOC_AFEB9260
- 	tristate "SoC Audio support for AFEB9260 board"
--	depends on ATMEL_SSC && ARCH_AT91 && MACH_AFEB9260 && SND_ATMEL_SOC
-+	depends on ARCH_AT91 && ATMEL_SSC && ARCH_AT91 && MACH_AFEB9260 && SND_ATMEL_SOC
- 	select SND_ATMEL_SOC_PDC
- 	select SND_ATMEL_SOC_SSC
- 	select SND_SOC_TLV320AIC23
-diff --git a/sound/soc/atmel/atmel-pcm-pdc.c b/sound/soc/atmel/atmel-pcm-pdc.c
-index 6a293c7..054ea4d 100644
---- a/sound/soc/atmel/atmel-pcm-pdc.c
-+++ b/sound/soc/atmel/atmel-pcm-pdc.c
-@@ -159,7 +159,7 @@ static int atmel_pcm_hw_params(struct snd_pcm_substream *substream,
- 
- 	pr_debug("atmel-pcm: "
- 		"hw_params: DMA for %s initialized "
--		"(dma_bytes=%u, period_size=%u)\n",
-+		"(dma_bytes=%zu, period_size=%zu)\n",
- 		prtd->params->name,
- 		runtime->dma_bytes,
- 		prtd->period_size);
-@@ -201,7 +201,7 @@ static int atmel_pcm_trigger(struct snd_pcm_substream *substream,
- 	int ret = 0;
- 
- 	pr_debug("atmel-pcm:buffer_size = %ld,"
--		"dma_area = %p, dma_bytes = %u\n",
-+		"dma_area = %p, dma_bytes = %zu\n",
- 		rtd->buffer_size, rtd->dma_area, rtd->dma_bytes);
- 
- 	switch (cmd) {
-diff --git a/sound/soc/atmel/atmel-pcm.c b/sound/soc/atmel/atmel-pcm.c
-index e99f181..3109db7 100644
---- a/sound/soc/atmel/atmel-pcm.c
-+++ b/sound/soc/atmel/atmel-pcm.c
-@@ -49,7 +49,7 @@ static int atmel_pcm_preallocate_dma_buffer(struct snd_pcm *pcm,
- 	buf->private_data = NULL;
- 	buf->area = dma_alloc_coherent(pcm->card->dev, size,
- 			&buf->addr, GFP_KERNEL);
--	pr_debug("atmel-pcm: alloc dma buffer: area=%p, addr=%p, size=%d\n",
-+	pr_debug("atmel-pcm: alloc dma buffer: area=%p, addr=%p, size=%zu\n",
- 			(void *)buf->area, (void *)buf->addr, size);
- 
- 	if (!buf->area)
-diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-index 1c76634..2755750 100644
---- a/sound/soc/atmel/atmel_ssc_dai.c
-+++ b/sound/soc/atmel/atmel_ssc_dai.c
-@@ -42,8 +42,6 @@
- #include <sound/initval.h>
- #include <sound/soc.h>
- 
--#include <mach/hardware.h>
+-	ret = -ENOMEM;
+-	fbi = NULL;
 -
- #include "atmel-pcm.h"
- #include "atmel_ssc_dai.h"
+ 	fbi = devm_kzalloc(&pdev->dev, sizeof(struct wm8505fb_info) +
+ 			sizeof(u32) * 16, GFP_KERNEL);
+ 	if (!fbi) {
+@@ -308,31 +305,19 @@ static int __devinit wm8505fb_probe(struct platform_device *pdev)
+ 	fbi->fb.pseudo_palette	= addr;
  
--- 
-1.8.0
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (res == NULL) {
+-		dev_err(&pdev->dev, "no I/O memory resource defined\n");
+-		ret = -ENODEV;
+-		goto failed_fbi;
+-	}
+-
+-	res = request_mem_region(res->start, resource_size(res), DRIVER_NAME);
+-	if (res == NULL) {
+-		dev_err(&pdev->dev, "failed to request I/O memory\n");
+-		ret = -EBUSY;
+-		goto failed_fbi;
+-	}
+ 
+-	fbi->regbase = ioremap(res->start, resource_size(res));
++	fbi->regbase = devm_request_and_ioremap(&pdev->dev, res);
+ 	if (fbi->regbase == NULL) {
+ 		dev_err(&pdev->dev, "failed to map I/O memory\n");
+ 		ret = -EBUSY;
+-		goto failed_free_res;
++		goto failed;
+ 	}
+ 
+ 	np = of_parse_phandle(pdev->dev.of_node, "default-mode", 0);
+ 	if (!np) {
+ 		pr_err("%s: No display description in Device Tree\n", __func__);
+ 		ret = -EINVAL;
+-		goto failed_free_res;
++		goto failed;
+ 	}
+ 
+ 	/*
+@@ -351,7 +336,7 @@ static int __devinit wm8505fb_probe(struct platform_device *pdev)
+ 	ret |= of_property_read_u32(np, "bpp", &bpp);
+ 	if (ret) {
+ 		pr_err("%s: Unable to read display properties\n", __func__);
+-		goto failed_free_res;
++		goto failed;
+ 	}
+ 
+ 	of_mode.vmode = FB_VMODE_NONINTERLACED;
+@@ -369,8 +354,9 @@ static int __devinit wm8505fb_probe(struct platform_device *pdev)
+ 				GFP_KERNEL);
+ 	if (!fb_mem_virt) {
+ 		pr_err("%s: Failed to allocate framebuffer\n", __func__);
+-		return -ENOMEM;
+-	};
++		ret = -ENOMEM;
++		goto failed;
++	}
+ 
+ 	fbi->fb.var.xres_virtual	= of_mode.xres;
+ 	fbi->fb.var.yres_virtual	= of_mode.yres * 2;
+@@ -384,7 +370,7 @@ static int __devinit wm8505fb_probe(struct platform_device *pdev)
+ 	if (fb_alloc_cmap(&fbi->fb.cmap, 256, 0) < 0) {
+ 		dev_err(&pdev->dev, "Failed to allocate color map\n");
+ 		ret = -ENOMEM;
+-		goto failed_free_io;
++		goto failed;
+ 	}
+ 
+ 	wm8505fb_init_hw(&fbi->fb);
+@@ -420,13 +406,7 @@ static int __devinit wm8505fb_probe(struct platform_device *pdev)
+ failed_free_cmap:
+ 	if (fbi->fb.cmap.len)
+ 		fb_dealloc_cmap(&fbi->fb.cmap);
+-failed_free_io:
+-	iounmap(fbi->regbase);
+-failed_free_res:
+-	release_mem_region(res->start, resource_size(res));
+-failed_fbi:
+ 	platform_set_drvdata(pdev, NULL);
+-	kfree(fbi);
+ failed:
+ 	return ret;
+ }
+@@ -434,7 +414,6 @@ failed:
+ static int __devexit wm8505fb_remove(struct platform_device *pdev)
+ {
+ 	struct wm8505fb_info *fbi = platform_get_drvdata(pdev);
+-	struct resource *res;
+ 
+ 	device_remove_file(&pdev->dev, &dev_attr_contrast);
+ 
+@@ -445,13 +424,6 @@ static int __devexit wm8505fb_remove(struct platform_device *pdev)
+ 	if (fbi->fb.cmap.len)
+ 		fb_dealloc_cmap(&fbi->fb.cmap);
+ 
+-	iounmap(fbi->regbase);
+-
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	release_mem_region(res->start, resource_size(res));
+-
+-	kfree(fbi);
+-
+ 	return 0;
+ }
+ 
