@@ -1,34 +1,44 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Sat, 8 Dec 2012 16:52:42 +0100 (CET)
-Subject: question about drivers/pinctrl/pinctrl-at91.c
-Message-ID: <alpine.DEB.2.02.1212081643590.1984@hadrien>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sun, 9 Dec 2012 00:20:43 +0800
+Subject: [PATCH 05/25] ASoC: pxa: remove __dev* attributes
+In-Reply-To: <1354890397-28568-6-git-send-email-wfp5p@virginia.edu>
+References: <1354890397-28568-1-git-send-email-wfp5p@virginia.edu>
+ <1354890397-28568-6-git-send-email-wfp5p@virginia.edu>
+Message-ID: <CAN1soZyzNaEfmtKPoPOuLw-9ZPe4O7og5r803qOtzSf=RD2jEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function at91_dt_node_to_map in drivers/pinctrl/pinctrl-at91.c 
-contains the following code:
+On Fri, Dec 7, 2012 at 10:26 PM, Bill Pemberton <wfp5p@virginia.edu> wrote:
+> CONFIG_HOTPLUG is going away as an option.  As result the __dev*
+> markings will be going away.
+>
+> Remove use of __devinit, __devexit_p, __devinitdata, __devinitconst,
+> and __devexit.
+>
+> Signed-off-by: Bill Pemberton <wfp5p@virginia.edu>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  sound/soc/pxa/brownstone.c     | 6 +++---
+>  sound/soc/pxa/corgi.c          | 6 +++---
+>  sound/soc/pxa/e740_wm9705.c    | 6 +++---
+>  sound/soc/pxa/e750_wm9705.c    | 6 +++---
+>  sound/soc/pxa/e800_wm9712.c    | 6 +++---
+>  sound/soc/pxa/imote2.c         | 6 +++---
+>  sound/soc/pxa/mioa701_wm9713.c | 6 +++---
+>  sound/soc/pxa/mmp-pcm.c        | 6 +++---
+>  sound/soc/pxa/mmp-sspa.c       | 6 +++---
+>  sound/soc/pxa/palm27x.c        | 4 ++--
+>  sound/soc/pxa/poodle.c         | 6 +++---
+>  sound/soc/pxa/pxa-ssp.c        | 6 +++---
+>  sound/soc/pxa/pxa2xx-ac97.c    | 8 ++++----
+>  sound/soc/pxa/pxa2xx-i2s.c     | 4 ++--
+>  sound/soc/pxa/pxa2xx-pcm.c     | 6 +++---
+>  sound/soc/pxa/tosa.c           | 6 +++---
+>  sound/soc/pxa/ttc-dkb.c        | 6 +++---
+>  17 files changed, 50 insertions(+), 50 deletions(-)
+>
 
-        new_map = devm_kzalloc(pctldev->dev, sizeof(*new_map) * map_num, GFP_KERNEL);
-         if (!new_map)
-                 return -ENOMEM;
-
-         *map = new_map;
-         *num_maps = map_num;
-
-         /* create mux map */
-         parent = of_get_parent(np);
-         if (!parent) {
-                 kfree(new_map);
-                 return -EINVAL;
-         }
-
-This is clearly not correct, because the combination of devm_kzalloc and 
-kfree risks creating a double free.  But I am not sure how best to fix it. 
-Is the data structure intended to normally exist until the driver's remove 
-function is called?  If so, perhaps the devm_kzalloc is OK.  If I just 
-remove the kfree, then the structure will persist until the remove 
-function is called, even though there was an error, which is perhaps not 
-good.  So I could change the kfree to devm_kfree?
-
-thanks,
-julia
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
