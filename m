@@ -1,45 +1,30 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 8 Dec 2012 17:42:36 -0200
-Subject: [PATCH 3/4] iio: mxs: Implement support for touchscreen
-In-Reply-To: <1354893893-26338-3-git-send-email-marex@denx.de>
-References: <1354893893-26338-1-git-send-email-marex@denx.de>
- <1354893893-26338-3-git-send-email-marex@denx.de>
-Message-ID: <CAOMZO5B_Dx_+KRn6h+erCj+CY3zk06MXODX-Nm1tcpao9mL2zg@mail.gmail.com>
+Date: Sat, 8 Dec 2012 17:45:28 -0200
+Subject: [PATCH v2] ARM: eukrea_mbimx27-baseboard - use stock
+ get_pendown_state() in ads7846
+In-Reply-To: <20121208111629.GG10369@pengutronix.de>
+References: <20121124082529.GA7687@core.coreip.homeip.net>
+ <20121127074209.GL10369@pengutronix.de>
+ <20121127090356.GA25658@core.coreip.homeip.net>
+ <20121208111629.GG10369@pengutronix.de>
+Message-ID: <CAOMZO5B8UXt+tBg7S1A=sBPQB-tCjVjARfDzNmEV8_m5a-qg0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 7, 2012 at 1:24 PM, Marek Vasut <marex@denx.de> wrote:
-> This patch implements support for sampling of a touchscreen into
-> the MXS LRADC driver. The LRADC block allows configuring some of
-> it's channels into special mode where they either output the drive
-> voltage or sample it, allowing it to operate a 4-wire or 5-wire
-> resistive touchscreen.
->
-> In case the touchscreen mode is enabled, the LRADC slot #7 is
-> reserved for touchscreen only, therefore it is not possible to
-> sample 8 LRADC channels at time, but only 7 channels.
->
-> The touchscreen controller is configured such that the PENDOWN event
-> disables touchscreen interrupts and triggers execution of worker
-> thread, which then polls the touchscreen controller for X, Y and
-> Pressure values. This reduces the overhead of interrupt-driven
-> operation. Upon the PENUP event, the worker thread re-enables the
-> PENDOWN detection interrupt and exits.
->
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Jonathan Cameron <jic23@kernel.org>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  .../bindings/staging/iio/adc/mxs-lradc.txt         |    6 +
->  drivers/staging/iio/adc/mxs-lradc.c                |  435 +++++++++++++++++++-
+Hi Sascha,
 
-What about adding the touchscreen support into a separate file, so
-that users can select/deselect it via Kconfig option?
+On Sat, Dec 8, 2012 at 9:16 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Tue, Nov 27, 2012 at 01:03:56AM -0800, Dmitry Torokhov wrote:
+>> The default implementation matches exactly our custom one so we can switch
+>> to using the default one. As a bonus the driver will take care of setting
+>> GPIO line for us.
+>>
+>> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>
+> Applied, thanks
 
-Not everyone using lradc would be necessarily interested in the
-touchscreen functionality, so better to let it optional.
+Which tree did you apply this against? I cannot see it in git.pengutronix.de.
 
-Thanks,
+Regards,
 
 Fabio Estevam
