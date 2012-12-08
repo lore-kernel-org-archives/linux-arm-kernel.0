@@ -1,67 +1,49 @@
-From: rtivy@ti.com (Tivy, Robert)
-Date: Sat, 8 Dec 2012 01:04:09 +0000
-Subject: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
- OMAP-L138 DSP
-In-Reply-To: <50C1A7B7.1020502@ti.com>
-References: <1352853207-20602-1-git-send-email-rtivy@ti.com>
- <1352853207-20602-5-git-send-email-rtivy@ti.com> <50AB76FA.1050505@ti.com>
- <13514BD7FAEBA745BBD7D8A672905C14311F952B@DFLE08.ent.ti.com>
- <50B88F7C.5000705@ti.com>
- <13514BD7FAEBA745BBD7D8A672905C14311FAC29@DFLE08.ent.ti.com>
- <50BCBA26.4070608@ti.com> <50BD07D8.5000305@ti.com>
- <50BD90F6.4080102@ti.com> <50BE0E54.5060607@ti.com>
- <50BE2115.4000606@ti.com> <50C1A7B7.1020502@ti.com>
-Message-ID: <13514BD7FAEBA745BBD7D8A672905C14311FBA17@DFLE08.ent.ti.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Sat, 8 Dec 2012 10:07:54 +0530
+Subject: [PATCH V4 0/2] Add DT support for i2s
+In-Reply-To: <20121207135131.A53643E0B87@localhost>
+References: <1354099669-1735-1-git-send-email-padma.v@samsung.com>
+ <CAAgF-Bc4t6WL4vswP6CFeSQrPZBmOuYfVt6_JoB1Za9TBX7mvA@mail.gmail.com>
+ <20121206041141.GA10867@opensource.wolfsonmicro.com>
+ <20121207135131.A53643E0B87@localhost>
+Message-ID: <CAAgF-BenOdFJK2LMot73_B=wHOFgD2sq8x-Ou=1CvpkiJpmeQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Nori, Sekhar
-> Sent: Friday, December 07, 2012 12:24 AM
-> On 12/4/2012 9:43 PM, Murali Karicheri wrote:
-> > On 12/04/2012 09:53 AM, Murali Karicheri wrote:
-> >> I believe this is addressing the same issue. This is a DT based
-> >> solution, which I believe should add a framework and enhance it to
-> >> support DT.
-> > Forgot to paste the link. Here we go
-> >
-> > https://patchwork.kernel.org/patch/1635051/
-> 
-> Rob,
-> 
-> Since there is a solution for reset handling proposed but seems to be
-> slightly far from taking a concrete shape, I suggest you go ahead and
-> implement davinci reset using a platform private API ala Tegra.
-> 
-> You can create and send the patches. I will review and accept them but
-> not send them upstream immediately.
-> 
-> Lets wait till v3.8-rc4. If there is a generic solution that is merged
-> by that time, I will ask you to use that instead of your API (this will
-> give you about 2 weeks to convert). If the generic solution is not
-> merged by that time, I will send your private API to the upstreams for
-> v3.9 and we can convert to generic solution for later kernel versions.
-> 
-> This should give you a fair chance to get remoteproc working on DA850
-> for v3.9.
-> 
-> Sounds like a plan? The remoteproc folks need to agree too. I am
-> copying
-> Ohad here.
+Hi,
 
-I'm on board with that plan, thanks very much for the suggestion, I agree completely.
+On Fri, Dec 7, 2012 at 7:21 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Thu, 6 Dec 2012 13:11:42 +0900, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+>> On Thu, Dec 06, 2012 at 09:31:40AM +0530, Padma Venkat wrote:
+>> > On Wed, Nov 28, 2012 at 4:17 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
+>>
+>> > > Padmavathi Venna (2):
+>> > >   ASoC: Samsung: Get I2S src_clk from clock alias id.
+>> > >   ASoC: SAMSUNG: Add DT support for i2s
+>>
+>> > Any comments on DT support for i2s patch?  If not when this patch can be pulled?
+>>
+>> Don't send contentless pings.
+>>
+>> I still don't really like what's going on with aliases here, I need to
+>> understand why things are structured the way they are to say something
+>> about that.
+>
+> Right. On a brief look, it appears that the binding is using aliases as
+> a way to encode implementation specific details of the driver.
 
-> 
-> Meanwhile I do suggest you work with Stephen and Mike in giving shape
-> to
-> the reset API so it suits your needs when it gets ready.
+Samsung i2s driver registers the platform device twice one for the
+samsung-i2s.0,1 or 2 and two for samsung-i2s.4(which actually doesn't
+represent any H/W peripheral). The max number of I2S blocks on any
+Samsung SoC are 3, the secondary device registration starts with
+device number 4.The second time registration is for the secondary fifo
+interface of a CPU dai if any exists.
 
-Will do.
+With DT support the device number in the driver is always -1, I used
+alias id for the above purpose.
 
-Thanks & Regards,
-
-- Rob
-
-> 
-> Thanks,
-> Sekhar
+>
+> g.
+>
+Thanks
+Padma
