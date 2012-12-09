@@ -1,7 +1,7 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun,  9 Dec 2012 19:08:11 +0100
-Subject: [PATCH] drivers/video/wm8505fb.c: use devm_ functions
-Message-ID: <1355076491-2246-1-git-send-email-Julia.Lawall@lip6.fr>
+Date: Sun,  9 Dec 2012 19:21:26 +0100
+Subject: [PATCH] drivers/video/vt8500lcdfb.c: use devm_ functions
+Message-ID: <1355077286-3871-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,16 +28,16 @@ x = devm_kzalloc(...)
 The error-handing code of devm_request_and_ioremap does not print any
 warning message, because devm_request_and_ioremap does this.
 
-The call to dma_alloc_coherent is converted to its devm equivalent,
+The first call to dma_alloc_coherent is converted to its devm equivalent,
 dmam_alloc_coherent.  This implicitly introduces a call to
 dmam_free_coherent, which was completly missing in the original code.
 
-A semicolon is removed at the end of the error-handling code for the call
-to dma_alloc_coherent.
+A semicolon is removed at the end of the error-handling code for the first
+call to dma_alloc_coherent.
 
 The block of code calling fb_alloc_cmap is moved below the block of code
-calling wm8505fb_set_par, so that the error-handing code of the call to
-wm8505fb_set_par can just return ret.  This way there is only one block of
+calling vt8500lcd_set_par, so that the error-handing code of the call to
+vt8500lcd_set_par can just return ret.  This way there is only one block of
 error-handling code that needs to call fb_dealloc_cmap, and so this is
 moved up to the place where it is needed, eliminating the need for all
 gotos and labels in the function.  This was suggested by Tony Prisk.
@@ -51,22 +51,23 @@ Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 ---
 Only compiled.  Not tested.
 
- drivers/video/wm8505fb.c |   78 +++++++++++------------------------------------
- 1 file changed, 19 insertions(+), 59 deletions(-)
+ drivers/video/vt8500lcdfb.c |  107 +++++++++++---------------------------------
+ 1 file changed, 27 insertions(+), 80 deletions(-)
 
-diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
-index 77539c1..1c3ce2c 100644
---- a/drivers/video/wm8505fb.c
-+++ b/drivers/video/wm8505fb.c
-@@ -274,15 +274,11 @@ static int __devinit wm8505fb_probe(struct platform_device *pdev)
+diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
+index 9af8da7..fae2456 100644
+--- a/drivers/video/vt8500lcdfb.c
++++ b/drivers/video/vt8500lcdfb.c
+@@ -287,15 +287,11 @@ static int __devinit vt8500lcd_probe(struct platform_device *pdev)
  	unsigned long fb_mem_len;
  	void *fb_mem_virt;
  
 -	ret = -ENOMEM;
 -	fbi = NULL;
 -
- 	fbi = devm_kzalloc(&pdev->dev, sizeof(struct wm8505fb_info) +
- 			sizeof(u32) * 16, GFP_KERNEL);
+ 	fbi = devm_kzalloc(&pdev->dev, sizeof(struct vt8500lcd_info)
+-			+ sizeof(u32) * 16, GFP_KERNEL);
++			   + sizeof(u32) * 16, GFP_KERNEL);
  	if (!fbi) {
  		dev_err(&pdev->dev, "Failed to initialize framebuffer device\n");
 -		ret = -ENOMEM;
@@ -74,8 +75,8 @@ index 77539c1..1c3ce2c 100644
 +		return -ENOMEM;
  	}
  
- 	strcpy(fbi->fb.fix.id, DRIVER_NAME);
-@@ -308,31 +304,15 @@ static int __devinit wm8505fb_probe(struct platform_device *pdev)
+ 	strcpy(fbi->fb.fix.id, "VT8500 LCD");
+@@ -326,31 +322,15 @@ static int __devinit vt8500lcd_probe(struct platform_device *pdev)
  	fbi->fb.pseudo_palette	= addr;
  
  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -84,14 +85,14 @@ index 77539c1..1c3ce2c 100644
 -		ret = -ENODEV;
 -		goto failed_fbi;
 -	}
--
--	res = request_mem_region(res->start, resource_size(res), DRIVER_NAME);
+ 
+-	res = request_mem_region(res->start, resource_size(res), "vt8500lcd");
 -	if (res == NULL) {
 -		dev_err(&pdev->dev, "failed to request I/O memory\n");
 -		ret = -EBUSY;
 -		goto failed_fbi;
 -	}
- 
+-
 -	fbi->regbase = ioremap(res->start, resource_size(res));
 -	if (fbi->regbase == NULL) {
 -		dev_err(&pdev->dev, "failed to map I/O memory\n");
@@ -111,16 +112,14 @@ index 77539c1..1c3ce2c 100644
  	}
  
  	/*
-@@ -351,7 +331,7 @@ static int __devinit wm8505fb_probe(struct platform_device *pdev)
+@@ -369,54 +349,44 @@ static int __devinit vt8500lcd_probe(struct platform_device *pdev)
  	ret |= of_property_read_u32(np, "bpp", &bpp);
  	if (ret) {
  		pr_err("%s: Unable to read display properties\n", __func__);
 -		goto failed_free_res;
 +		return ret;
  	}
- 
  	of_mode.vmode = FB_VMODE_NONINTERLACED;
-@@ -365,12 +345,12 @@ static int __devinit wm8505fb_probe(struct platform_device *pdev)
  
  	/* try allocating the framebuffer */
  	fb_mem_len = of_mode.xres * of_mode.yres * 2 * (bpp / 8);
@@ -133,56 +132,91 @@ index 77539c1..1c3ce2c 100644
 -	};
 +	}
  
- 	fbi->fb.var.xres_virtual	= of_mode.xres;
- 	fbi->fb.var.yres_virtual	= of_mode.yres * 2;
-@@ -381,28 +361,29 @@ static int __devinit wm8505fb_probe(struct platform_device *pdev)
- 	fbi->fb.screen_base		= fb_mem_virt;
- 	fbi->fb.screen_size		= fb_mem_len;
+ 	fbi->fb.fix.smem_start	= fb_mem_phys;
+ 	fbi->fb.fix.smem_len	= fb_mem_len;
+ 	fbi->fb.screen_base	= fb_mem_virt;
  
+ 	fbi->palette_size	= PAGE_ALIGN(512);
+-	fbi->palette_cpu	= dma_alloc_coherent(&pdev->dev,
++	fbi->palette_cpu	= dmam_alloc_coherent(&pdev->dev,
+ 						     fbi->palette_size,
+ 						     &fbi->palette_phys,
+ 						     GFP_KERNEL);
+ 	if (fbi->palette_cpu == NULL) {
+ 		dev_err(&pdev->dev, "Failed to allocate palette buffer\n");
+-		ret = -ENOMEM;
+-		goto failed_free_io;
++		return -ENOMEM;
+ 	}
+ 
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0) {
+ 		dev_err(&pdev->dev, "no IRQ defined\n");
+-		ret = -ENODEV;
+-		goto failed_free_palette;
++		return -ENODEV;
+ 	}
+ 
+-	ret = request_irq(irq, vt8500lcd_handle_irq, 0, "LCD", fbi);
++	ret = devm_request_irq(&pdev->dev, irq, vt8500lcd_handle_irq, 0,
++			       "LCD", fbi);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "request_irq failed: %d\n", ret);
+-		ret = -EBUSY;
+-		goto failed_free_palette;
+-	}
+-
+-	init_waitqueue_head(&fbi->wait);
+-
 -	if (fb_alloc_cmap(&fbi->fb.cmap, 256, 0) < 0) {
 -		dev_err(&pdev->dev, "Failed to allocate color map\n");
 -		ret = -ENOMEM;
--		goto failed_free_io;
--	}
--
--	wm8505fb_init_hw(&fbi->fb);
--
- 	fbi->contrast = 0x80;
- 	ret = wm8505fb_set_par(&fbi->fb);
+-		goto failed_free_irq;
++		return -EBUSY;
+ 	}
+ 
+ 	fb_videomode_to_var(&fbi->fb.var, &of_mode);
+@@ -428,7 +398,14 @@ static int __devinit vt8500lcd_probe(struct platform_device *pdev)
+ 	ret = vt8500lcd_set_par(&fbi->fb);
  	if (ret) {
  		dev_err(&pdev->dev, "Failed to set parameters\n");
 -		goto failed_free_cmap;
 +		return ret;
- 	}
- 
++	}
++
++	init_waitqueue_head(&fbi->wait);
++
 +	if (fb_alloc_cmap(&fbi->fb.cmap, 256, 0) < 0) {
 +		dev_err(&pdev->dev, "Failed to allocate color map\n");
 +		return -ENOMEM;
-+	}
-+
-+	wm8505fb_init_hw(&fbi->fb);
-+
- 	platform_set_drvdata(pdev, fbi);
+ 	}
  
- 	ret = register_framebuffer(&fbi->fb);
+ 	writel(fbi->fb.fix.smem_start >> 22, fbi->regbase + 0x1c);
+@@ -440,7 +417,10 @@ static int __devinit vt8500lcd_probe(struct platform_device *pdev)
  	if (ret < 0) {
  		dev_err(&pdev->dev,
  			"Failed to register framebuffer device: %d\n", ret);
 -		goto failed_free_cmap;
 +		if (fbi->fb.cmap.len)
 +			fb_dealloc_cmap(&fbi->fb.cmap);
++		platform_set_drvdata(pdev, NULL);
 +		return ret;
  	}
  
- 	ret = device_create_file(&pdev->dev, &dev_attr_contrast);
-@@ -416,25 +397,11 @@ static int __devinit wm8505fb_probe(struct platform_device *pdev)
- 	       fbi->fb.fix.smem_start + fbi->fb.fix.smem_len - 1);
+ 	/*
+@@ -449,31 +429,11 @@ static int __devinit vt8500lcd_probe(struct platform_device *pdev)
+ 	writel(readl(fbi->regbase) | 1, fbi->regbase);
  
  	return 0;
 -
 -failed_free_cmap:
 -	if (fbi->fb.cmap.len)
 -		fb_dealloc_cmap(&fbi->fb.cmap);
+-failed_free_irq:
+-	free_irq(irq, fbi);
+-failed_free_palette:
+-	dma_free_coherent(&pdev->dev, fbi->palette_size,
+-			  fbi->palette_cpu, fbi->palette_phys);
 -failed_free_io:
 -	iounmap(fbi->regbase);
 -failed_free_res:
@@ -194,17 +228,24 @@ index 77539c1..1c3ce2c 100644
 -	return ret;
  }
  
- static int __devexit wm8505fb_remove(struct platform_device *pdev)
+ static int __devexit vt8500lcd_remove(struct platform_device *pdev)
  {
- 	struct wm8505fb_info *fbi = platform_get_drvdata(pdev);
+ 	struct vt8500lcd_info *fbi = platform_get_drvdata(pdev);
 -	struct resource *res;
+-	int irq;
  
- 	device_remove_file(&pdev->dev, &dev_attr_contrast);
+ 	unregister_framebuffer(&fbi->fb);
  
-@@ -445,13 +412,6 @@ static int __devexit wm8505fb_remove(struct platform_device *pdev)
+@@ -482,19 +442,6 @@ static int __devexit vt8500lcd_remove(struct platform_device *pdev)
  	if (fbi->fb.cmap.len)
  		fb_dealloc_cmap(&fbi->fb.cmap);
  
+-	irq = platform_get_irq(pdev, 0);
+-	free_irq(irq, fbi);
+-
+-	dma_free_coherent(&pdev->dev, fbi->palette_size,
+-			  fbi->palette_cpu, fbi->palette_phys);
+-
 -	iounmap(fbi->regbase);
 -
 -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
