@@ -1,73 +1,61 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 09 Dec 2012 10:53:32 -0700
-Subject: [PATCH 09/12] ARM: OMAP2+: powerdomain: add ability to test for
- supported power states
+Date: Sun, 09 Dec 2012 10:53:37 -0700
+Subject: [PATCH 11/12] ARM: OMAP2+: powerdomain: program memory bank
+ next-power-state upon init
 In-Reply-To: <20121209174545.6933.59371.stgit@dusk.lan>
 References: <20121209174545.6933.59371.stgit@dusk.lan>
-Message-ID: <20121209175326.6933.2601.stgit@dusk.lan>
+Message-ID: <20121209175335.6933.37266.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pwrdm_supports_fpwrst(), intended for use by the PM code to avoid
-attempting to program a powerdomain to a power state that it doesn't
-support.
+During powerdomain init, we were previously programming a reasonable
+default for the powerdomain and logic next-power-state fields, but not
+touching the memory bank next-power-state fields.  To ensure that the
+previous OS or bootloader didn't leave the system in a bad state, program
+the memory bank next-power-state bitfields to reasonable defaults.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/powerdomain.c |   33 +++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/powerdomain.h |    1 +
- 2 files changed, 34 insertions(+)
+ arch/arm/mach-omap2/powerdomain.c |   21 ++++++++++++++-------
+ 1 file changed, 14 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 86fe84c..6ba79df 100644
+index fdeabbf..a70e3f6 100644
 --- a/arch/arm/mach-omap2/powerdomain.c
 +++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -1495,3 +1495,36 @@ int pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm)
- 	return ret;
+@@ -563,21 +563,28 @@ int pwrdm_register_pwrdms(struct powerdomain **ps)
+  *
+  * Do whatever is necessary to initialize registered powerdomains and
+  * powerdomain code.  Currently, this programs the next power state
+- * for each powerdomain to ON.  This prevents powerdomains from
+- * unexpectedly losing context or entering high wakeup latency modes
+- * with non-power-management-enabled kernels.  Must be called after
+- * pwrdm_register_pwrdms().  Returns -EACCES if called before
+- * pwrdm_register_pwrdms(), or 0 upon success.
++ * for each powerdomain to ON, and programs the memory bank power
++ * states to follow the powerdomain power states.  This prevents
++ * powerdomains from unexpectedly losing context or entering high
++ * wakeup latency modes with non-power-management-enabled kernels.
++ * Must be called after pwrdm_register_pwrdms().  Returns -EACCES if
++ * called before pwrdm_register_pwrdms(), or 0 upon success.
+  */
+ int pwrdm_complete_init(void)
+ {
+ 	struct powerdomain *temp_p;
++	int i;
+ 
+ 	if (list_empty(&pwrdm_list))
+ 		return -EACCES;
+ 
+-	list_for_each_entry(temp_p, &pwrdm_list, node)
+-		pwrdm_set_next_fpwrst(temp_p, PWRDM_FUNC_PWRST_ON);
++	list_for_each_entry(temp_p, &pwrdm_list, node) {
++		for (i = 0; i < temp_p->banks; i++) {
++			pwrdm_set_mem_onst(temp_p, i, PWRDM_POWER_ON);
++			pwrdm_set_mem_retst(temp_p, i, PWRDM_POWER_RET);
++		}
++		WARN_ON(pwrdm_set_next_fpwrst(temp_p, PWRDM_FUNC_PWRST_ON));
++	}
+ 
+ 	return 0;
  }
- 
-+/**
-+ * pwrdm_supports_fpwrst - does the powerdomain @pwrdm support the @fpwrst power
-+ * state?
-+ * @pwrdm: struct powerdomain * pointing to a powerdomain to test
-+ * @fpwrst: functional power state
-+ *
-+ * Returns true if the powerdomain pointed to by @pwrdm can enter the
-+ * functional power state @fpwrst, or false if not.
-+ */
-+bool pwrdm_supports_fpwrst(struct powerdomain *pwrdm, u8 fpwrst)
-+{
-+	u8 pwrst, logic;
-+	int ret;
-+
-+	if (!pwrdm || IS_ERR(pwrdm))
-+		return false;
-+
-+	ret = _pwrdm_fpwrst_to_pwrst(pwrdm, fpwrst, &pwrst, &logic);
-+	if (ret)
-+		return false;
-+
-+	pr_debug("%s: pwrdm %s: set fpwrst %0x\n", __func__, pwrdm->name,
-+		 fpwrst);
-+
-+	if (pwrdm->pwrsts_logic_ret && pwrst == PWRDM_POWER_RET &&
-+	    !(pwrdm->pwrsts_logic_ret & (1 << logic)))
-+		return false;
-+
-+	if (!(pwrdm->pwrsts & (1 << pwrst)))
-+		return false;
-+
-+	return true;
-+}
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index aa1c9ae..52be8cd 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -260,6 +260,7 @@ extern int pwrdm_set_fpwrst(struct powerdomain *pwrdm,
- 			    enum pwrdm_func_state fpwrst);
- extern int pwrdm_read_fpwrst(struct powerdomain *pwrdm);
- extern int pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm);
-+extern bool pwrdm_supports_fpwrst(struct powerdomain *pwrdm, u8 fpwrst);
- 
- extern void omap242x_powerdomains_init(void);
- extern void omap243x_powerdomains_init(void);
