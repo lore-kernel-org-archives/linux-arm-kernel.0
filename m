@@ -1,84 +1,106 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 08 Dec 2012 18:23:41 -0700
-Subject: [PATCH 07/10] ARM: OMAP2xxx: CM: remove autodep handling
+Date: Sat, 08 Dec 2012 18:23:38 -0700
+Subject: [PATCH 03/10] ARM: OMAP2xxx: PM: clean up some crufty powerstate
+ programming code
 In-Reply-To: <20121209011755.19716.25244.stgit@dusk.lan>
 References: <20121209011755.19716.25244.stgit@dusk.lan>
-Message-ID: <20121209012341.19716.32063.stgit@dusk.lan>
+Message-ID: <20121209012337.19716.8908.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no need to preserve the autodep handling code in
-mach-omap2/cm2xxx.c, since no autodeps are defined for these chips.
-Hopefully they'll never be needed, but if in some future case they are,
-this code can be added back in.
+Don't attempt to put clockdomains to sleep; this should be handled by the
+clock framework.  It should be enough to program the next-power-state,
+and then let the code in omap_pm_clkdms_setup() deal with the rest.
+
+Start out by programming the MPU and CORE powerdomains to stay ON.
+Then control the MPU and CORE powerdomain states directly in
+omap2_enter_full_retention() and omap2_enter_mpu_retention().  Not the
+most optimal way to do it, but certainly is the most conservative until
+OMAP2xxx PM is working again.
+
+Get rid of the open-coded PM_PWSTCTRL_MPU writes in
+omap2_enter_mpu_retention(); use the powerdomain code instead.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/cm2xxx.c |   33 ++++-----------------------------
- 1 file changed, 4 insertions(+), 29 deletions(-)
+ arch/arm/mach-omap2/pm24xx.c |   30 ++++++++++--------------------
+ 1 file changed, 10 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
-index db65069..6774a53 100644
---- a/arch/arm/mach-omap2/cm2xxx.c
-+++ b/arch/arm/mach-omap2/cm2xxx.c
-@@ -273,9 +273,6 @@ int omap2xxx_cm_wait_module_ready(s16 prcm_mod, u8 idlest_id, u8 idlest_shift)
+diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+index 83815dd..4c06d8a 100644
+--- a/arch/arm/mach-omap2/pm24xx.c
++++ b/arch/arm/mach-omap2/pm24xx.c
+@@ -89,11 +89,7 @@ static int omap2_enter_full_retention(void)
+ 	omap2_prm_write_mod_reg(0xffffffff, CORE_MOD, OMAP24XX_PM_WKST2);
+ 	omap2_prm_write_mod_reg(0xffffffff, WKUP_MOD, PM_WKST);
  
- static void omap2xxx_clkdm_allow_idle(struct clockdomain *clkdm)
- {
--	if (atomic_read(&clkdm->usecount) > 0)
--		_clkdm_add_autodeps(clkdm);
--
- 	omap2xxx_cm_clkdm_enable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
- 				       clkdm->clktrctrl_mask);
- }
-@@ -284,9 +281,6 @@ static void omap2xxx_clkdm_deny_idle(struct clockdomain *clkdm)
- {
- 	omap2xxx_cm_clkdm_disable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
- 					clkdm->clktrctrl_mask);
--
--	if (atomic_read(&clkdm->usecount) > 0)
--		_clkdm_del_autodeps(clkdm);
- }
+-	/*
+-	 * Set MPU powerdomain's next power state to RETENTION;
+-	 * preserve logic state during retention
+-	 */
+-	pwrdm_set_logic_retst(mpu_pwrdm, PWRDM_POWER_RET);
++	pwrdm_set_next_pwrst(core_pwrdm, PWRDM_POWER_RET);
+ 	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
  
- static int omap2xxx_clkdm_clk_enable(struct clockdomain *clkdm)
-@@ -298,18 +292,8 @@ static int omap2xxx_clkdm_clk_enable(struct clockdomain *clkdm)
+ 	/* Workaround to kill USB */
+@@ -136,6 +132,9 @@ no_sleep:
+ 	/* Mask future PRCM-to-MPU interrupts */
+ 	omap2_prm_write_mod_reg(0x0, OCP_MOD, OMAP2_PRCM_IRQSTATUS_MPU_OFFSET);
  
- 	hwsup = omap2xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
- 					      clkdm->clktrctrl_mask);
--
--	if (hwsup) {
--		/* Disable HW transitions when we are changing deps */
--		omap2xxx_cm_clkdm_disable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
--						clkdm->clktrctrl_mask);
--		_clkdm_add_autodeps(clkdm);
--		omap2xxx_cm_clkdm_enable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
--					       clkdm->clktrctrl_mask);
--	} else {
--		if (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
--			omap2xxx_clkdm_wakeup(clkdm);
--	}
-+	if (!hwsup && clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
-+		omap2xxx_clkdm_wakeup(clkdm);
- 
++	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
++	pwrdm_set_next_pwrst(core_pwrdm, PWRDM_POWER_ON);
++
  	return 0;
  }
-@@ -324,17 +308,8 @@ static int omap2xxx_clkdm_clk_disable(struct clockdomain *clkdm)
- 	hwsup = omap2xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
- 					      clkdm->clktrctrl_mask);
  
--	if (hwsup) {
--		/* Disable HW transitions when we are changing deps */
--		omap2xxx_cm_clkdm_disable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
--						clkdm->clktrctrl_mask);
--		_clkdm_del_autodeps(clkdm);
--		omap2xxx_cm_clkdm_enable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
--					       clkdm->clktrctrl_mask);
--	} else {
--		if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
--			omap2xxx_clkdm_sleep(clkdm);
--	}
-+	if (!hwsup && clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
-+		omap2xxx_clkdm_sleep(clkdm);
+@@ -185,17 +184,16 @@ static void omap2_enter_mpu_retention(void)
+ 		omap2_prm_write_mod_reg(0xffffffff, WKUP_MOD, PM_WKST);
  
- 	return 0;
+ 		/* Try to enter MPU retention */
+-		omap2_prm_write_mod_reg((0x01 << OMAP_POWERSTATE_SHIFT) |
+-				  OMAP_LOGICRETSTATE_MASK,
+-				  MPU_MOD, OMAP2_PM_PWSTCTRL);
++		pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
++
+ 	} else {
+ 		/* Block MPU retention */
+-
+-		omap2_prm_write_mod_reg(OMAP_LOGICRETSTATE_MASK, MPU_MOD,
+-						 OMAP2_PM_PWSTCTRL);
++		pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
+ 	}
+ 
+ 	omap2_sram_idle();
++
++	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
  }
+ 
+ static int omap2_can_sleep(void)
+@@ -250,25 +248,17 @@ static void __init prcm_setup_regs(void)
+ 	for (i = 0; i < num_mem_banks; i++)
+ 		pwrdm_set_mem_retst(core_pwrdm, i, PWRDM_POWER_RET);
+ 
+-	/* Set CORE powerdomain's next power state to RETENTION */
+-	pwrdm_set_next_pwrst(core_pwrdm, PWRDM_POWER_RET);
++	pwrdm_set_logic_retst(core_pwrdm, PWRDM_POWER_RET);
+ 
+-	/*
+-	 * Set MPU powerdomain's next power state to RETENTION;
+-	 * preserve logic state during retention
+-	 */
+ 	pwrdm_set_logic_retst(mpu_pwrdm, PWRDM_POWER_RET);
+-	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
+ 
+ 	/* Force-power down DSP, GFX powerdomains */
+ 
+ 	pwrdm = clkdm_get_pwrdm(dsp_clkdm);
+ 	pwrdm_set_next_pwrst(pwrdm, PWRDM_POWER_OFF);
+-	clkdm_sleep(dsp_clkdm);
+ 
+ 	pwrdm = clkdm_get_pwrdm(gfx_clkdm);
+ 	pwrdm_set_next_pwrst(pwrdm, PWRDM_POWER_OFF);
+-	clkdm_sleep(gfx_clkdm);
+ 
+ 	/* Enable hardware-supervised idle for all clkdms */
+ 	clkdm_for_each(omap_pm_clkdms_setup, NULL);
