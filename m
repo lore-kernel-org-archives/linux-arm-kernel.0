@@ -1,32 +1,84 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 08 Dec 2012 18:23:37 -0700
-Subject: [PATCH 02/10] ARM: OMAP2+: clockdomain: add pwrdm_state_switch()
- call to clkdm_sleep()
+Date: Sat, 08 Dec 2012 18:23:41 -0700
+Subject: [PATCH 07/10] ARM: OMAP2xxx: CM: remove autodep handling
 In-Reply-To: <20121209011755.19716.25244.stgit@dusk.lan>
 References: <20121209011755.19716.25244.stgit@dusk.lan>
-Message-ID: <20121209012337.19716.98362.stgit@dusk.lan>
+Message-ID: <20121209012341.19716.32063.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In clkdm_sleep(), the powerdomain should be eligible to switch power
-states right after the call to the low-level clockdomain sleep
-function.  We should have been tracking that with the
-pwrdm_state_switch() code, but we weren't, for whatever reason.  Fix that.
+There's no need to preserve the autodep handling code in
+mach-omap2/cm2xxx.c, since no autodeps are defined for these chips.
+Hopefully they'll never be needed, but if in some future case they are,
+this code can be added back in.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clockdomain.c |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-omap2/cm2xxx.c |   33 ++++-----------------------------
+ 1 file changed, 4 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 64e5046..18f65fd 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -763,6 +763,7 @@ int clkdm_sleep(struct clockdomain *clkdm)
- 	spin_lock_irqsave(&clkdm->lock, flags);
- 	clkdm->_flags &= ~_CLKDM_FLAG_HWSUP_ENABLED;
- 	ret = arch_clkdm->clkdm_sleep(clkdm);
-+	ret |= pwrdm_state_switch(clkdm->pwrdm.ptr);
- 	spin_unlock_irqrestore(&clkdm->lock, flags);
- 	return ret;
+diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
+index db65069..6774a53 100644
+--- a/arch/arm/mach-omap2/cm2xxx.c
++++ b/arch/arm/mach-omap2/cm2xxx.c
+@@ -273,9 +273,6 @@ int omap2xxx_cm_wait_module_ready(s16 prcm_mod, u8 idlest_id, u8 idlest_shift)
+ 
+ static void omap2xxx_clkdm_allow_idle(struct clockdomain *clkdm)
+ {
+-	if (atomic_read(&clkdm->usecount) > 0)
+-		_clkdm_add_autodeps(clkdm);
+-
+ 	omap2xxx_cm_clkdm_enable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+ 				       clkdm->clktrctrl_mask);
+ }
+@@ -284,9 +281,6 @@ static void omap2xxx_clkdm_deny_idle(struct clockdomain *clkdm)
+ {
+ 	omap2xxx_cm_clkdm_disable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+ 					clkdm->clktrctrl_mask);
+-
+-	if (atomic_read(&clkdm->usecount) > 0)
+-		_clkdm_del_autodeps(clkdm);
+ }
+ 
+ static int omap2xxx_clkdm_clk_enable(struct clockdomain *clkdm)
+@@ -298,18 +292,8 @@ static int omap2xxx_clkdm_clk_enable(struct clockdomain *clkdm)
+ 
+ 	hwsup = omap2xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+ 					      clkdm->clktrctrl_mask);
+-
+-	if (hwsup) {
+-		/* Disable HW transitions when we are changing deps */
+-		omap2xxx_cm_clkdm_disable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+-						clkdm->clktrctrl_mask);
+-		_clkdm_add_autodeps(clkdm);
+-		omap2xxx_cm_clkdm_enable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+-					       clkdm->clktrctrl_mask);
+-	} else {
+-		if (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
+-			omap2xxx_clkdm_wakeup(clkdm);
+-	}
++	if (!hwsup && clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
++		omap2xxx_clkdm_wakeup(clkdm);
+ 
+ 	return 0;
+ }
+@@ -324,17 +308,8 @@ static int omap2xxx_clkdm_clk_disable(struct clockdomain *clkdm)
+ 	hwsup = omap2xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+ 					      clkdm->clktrctrl_mask);
+ 
+-	if (hwsup) {
+-		/* Disable HW transitions when we are changing deps */
+-		omap2xxx_cm_clkdm_disable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+-						clkdm->clktrctrl_mask);
+-		_clkdm_del_autodeps(clkdm);
+-		omap2xxx_cm_clkdm_enable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+-					       clkdm->clktrctrl_mask);
+-	} else {
+-		if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
+-			omap2xxx_clkdm_sleep(clkdm);
+-	}
++	if (!hwsup && clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
++		omap2xxx_clkdm_sleep(clkdm);
+ 
+ 	return 0;
  }
