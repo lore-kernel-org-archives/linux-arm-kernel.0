@@ -1,23 +1,28 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 9 Dec 2012 20:34:42 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP4: Fix EMU clock domain always on
-In-Reply-To: <1354911994-20045-1-git-send-email-jon-hunter@ti.com>
-References: <1354911994-20045-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <alpine.DEB.2.00.1212092033450.351@utopia.booyaka.com>
+Date: Sun, 9 Dec 2012 20:38:37 +0000 (UTC)
+Subject: [PATCH V2 0/4] ARM: OMAP4: Clock fixes
+In-Reply-To: <1354567275-6447-1-git-send-email-jon-hunter@ti.com>
+References: <1354567275-6447-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <alpine.DEB.2.00.1212092038240.351@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+On Mon, 3 Dec 2012, Jon Hunter wrote:
 
-On Fri, 7 Dec 2012, Jon Hunter wrote:
+> Fixes included, fixing up timer clock aliases for v3.8 and working
+> around ABE DPLL issue seen with latest u-boot bootloader (v2012.10).
+> 
+> Testing includes:
+> - Boot testing on OMAP4460 Panda and verifying that all dmtimers are
+>   working.
+> 
+> V2 changes:
+> - Updated series to latest ARM-SoC for-next branch that includes common
+>   clock updates for OMAP4.
+> - Added new function table for non-M4X DPLLs which is now required after
+>   enhancing support for OMAP4 DPLLs for 4X multiplier.
 
-> Commit d043d87 (ARM: OMAP2+: clockdomain: bypass clockdomain handling
-> when disabling unused clks) skips the decrementing of a clock-domains
-> use count if the clocks use count is zero. However, for OMAP4 devices
-> this is causing the EMU clock-domain to be stuck ON as the use count is
-> not getting decremented correctly.
-
-Thanks for the fix and the great patch description; queued for v3.8-rc.
+Thanks, queued for 3.8-rc.
 
 
 - Paul
