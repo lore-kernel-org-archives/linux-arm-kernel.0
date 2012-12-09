@@ -1,83 +1,50 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 09 Dec 2012 14:06:48 +0100
-Subject: [PATCH] ARM: Orion: Hoist bridge interrupt handling out of the
- timer
-In-Reply-To: <20121209083046.GA25466@lunn.ch>
-References: <20121207225507.GB29262@obsidianresearch.com>
- <20121208112624.GD25315@lunn.ch>
- <20121209025748.GA10405@obsidianresearch.com>
- <20121209083046.GA25466@lunn.ch>
-Message-ID: <50C48CE8.9070400@gmail.com>
+Date: Sun, 09 Dec 2012 14:54:58 +0100
+Subject: [PATCH 1/2] thermal: Add support for thermal sensor for Kirkwood
+ SoC
+In-Reply-To: <20121208001152.GA14363@n2100.arm.linux.org.uk>
+References: <1354922151-3250-1-git-send-email-iwamatsu@nigauri.org>
+ <20121208010708.260209f5@skate>
+ <20121208001152.GA14363@n2100.arm.linux.org.uk>
+Message-ID: <50C49832.7070503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2012 09:30 AM, Andrew Lunn wrote:
-> On Sat, Dec 08, 2012 at 07:57:48PM -0700, Jason Gunthorpe wrote:
->> On Sat, Dec 08, 2012 at 12:26:24PM +0100, Andrew Lunn wrote:
+On 12/08/2012 01:11 AM, Russell King - ARM Linux wrote:
+> On Sat, Dec 08, 2012 at 01:07:08AM +0100, Thomas Petazzoni wrote:
+>> Hello,
 >>
->>> 1) It should have an IRQ domain, like the other IRQ chips we have.
->>> 2) It should have a DT binding, like the other IRQ chips we have.
+>> On Sat,  8 Dec 2012 08:15:50 +0900, Nobuhiro Iwamatsu wrote:
+>>> +static const struct of_device_id kirkwood_thermal_id_table[] = {
+>>> +	{ .compatible = "marvel,thermal-kirkwood" },
 >>
->> I was going to look at a DT binding for this as a follow on, since
->> I'll want to bind to these interrupts.
+>> marvel ->  marvell
 >>
->> Are you OK with keeping this patch as is and seeing DT in a follow up,
->> or as a series? It is already pretty big.
+>> Also, I think it should be marvell,kirkwood-thermal, since most other
+>> DT compatible strings that we have for Marvell SoCs are
+>> marvell,<soc>-<function>.
+>>
+>> Also, the Device Tree binding documentation is missing (even though it
+>> is admittedly going to be a very short documentation).
 >
-> Hi Jason
->
-> A patch series is great. However, its not so good practice to add
-> something on the first patch, and then move it somewhere else in the
-> next. So i would suggest initializing the controller in
-> kirkwood_irq_init(), etc as its added.
+> Is this in any way compatible with the thermal monitoring found on
+> Dove (510) stuff?  If so, should it have the SoC prefix in there,
+> or should it be "armada-thermal" for the SoC family?
 
-Hi Andrew, Jason,
+I haven't checked the driver in detail but at least register offsets
+and the register-to-temperature function are different for Dove.
+This is no big deal and can be handled with compatible strings.
 
-first of all I have adjusted the Cc list a little bit: Gregory is missing,
-and I removed Mike and Olof as they might not be that interested in discussing
-mvebu internals. Please re-add if I am wrong.
+But more important, "kirkwood" includes 88f618x, 88f619x, and 88f6281
+that have no thermal diode - at least it is not mentioned in the public
+datasheet. So, finally for Nobuhiro's patch I suggest to have two
+compatible strings, one for marvell,88f6282-thermal and one for
+marvell,88f6282-thermal. Numbering scheme of Marvell SoCs is a mess..
 
-I have an irqchip driver for orion that I wrote some weeks ago. I can
-prepare a patch today. I will allow to have main irq controller by DT
-and I can also add a secondary irq controller for the bridge registers
-as chained irq handler.
-
-If I dig hard enough in my branches I will also find time-orion drivers,
-that are either "standalone" (i.e. orion only) or merged with time-mvebu.
-
-The main irq controller will be required for sure, but for the secondary
-irq controller we had a discussion long ago. IIRC Gregory proposed to have
-shared irqs handled by timer and watchdog, I was proposing chained irqs.
-
-For mvebu archs, IIRC, we have wrt to timer-related irqs:
-- Armada 370/XP with different irq handler and timer irq handling within
-   timer registers.
-- Orion SoCs with Bridge irq registers for timer related stuff (timer0/1)
-- Kirkwood and Dove with watchdog timers (both with wdt irq in bridge irqs)
-- RTC in bridge irqs, but Dove with RTC connected to PMU irqs
-
-I think we should have patches for irqchip-orion first and then rethink
-if we want a standalone timer-orion or merge it with timer-mvebu. Having
-watchdog using irqs is kind of independent from this.
-
-> ...
->>> 3) We then pass the timer interrupt via DT to the timer driver.
->>> 3) is not so simple, because we currently don't have a timer binding
->>> for Orion SoC. However, with this cleanup, we are much closer to being
->>> able to use the 370/XP timer code.
->>
->> Interesting.. The 370/XP is a more advanced version of the same timer
->> IP, there are several registers that driver is touching that are not
->> HW supported, at least on kirkwood.
->
-> Yes, the 25MHz and the divider for example. I'm not 100% sure it will
-> actually work, it will need a different compatibility string, and a
-> bit of configuration based on that string, but i think it goes. If you
-> compare the two different drivers, they are very similar.
-
-Back in the days when Gregory, Thomas, and I were looking into merged timer
-we agreed not to have an extra check on 25MHz support. If you put the
-property in the node, it will try to set the timer to fixed 25MHz. If you
-use the property on Orion timer, it will just break timer handling.
+For the driver, the name should be either orion_thermal.c (as we will
+reuse it for Dove), or mvebu_thermal.c if there is also a thermal diode
+on Armada 370/XP. Using "armada" alone is not a good idea, as it also
+includes some pxa-based SoCs - naming scheme of Marvell SoCs is even
+more broken than numbering scheme ;)
 
 Sebastian
