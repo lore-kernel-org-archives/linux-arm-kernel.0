@@ -1,56 +1,46 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 09 Dec 2012 13:03:33 -0700
-Subject: [PATCH 12/12] ARM: OMAP2xxx: PM: add pwrdm_(pre|post)_transition()
- calls to the 2xxx PM code
+Date: Sun, 09 Dec 2012 13:03:31 -0700
+Subject: [PATCH 11/12] ARM: OMAP2xxx: powerdomain: add previous power state
+ tracking
 In-Reply-To: <20121209200108.3196.12452.stgit@dusk.lan>
 References: <20121209200108.3196.12452.stgit@dusk.lan>
-Message-ID: <20121209200331.3196.9787.stgit@dusk.lan>
+Message-ID: <20121209200330.3196.10124.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP2xxx PM code was missing calls to pwrdm_pre_transition() and
-pwrdm_post_transition().  This prevented the power state debugging
-from working correctly, and also violated some assumptions that are
-used in future power state caching patches.
+The OMAP2xxx PRM does support a form of powerdomain previous-power-state
+tracking; so add it.  This allows the power state tracking and debugging
+code to do something useful on this platform.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/pm24xx.c |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/mach-omap2/prm2xxx.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index 99c16c2..896727c 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -98,6 +98,8 @@ static int omap2_enter_full_retention(void)
- 
- 	omap2_gpio_prepare_for_idle(0);
- 
-+	pwrdm_pre_transition(NULL);
-+
- 	/* One last check for pending IRQs to avoid extra latency due
- 	 * to sleeping unnecessarily. */
- 	if (omap_irq_pending())
-@@ -109,6 +111,8 @@ static int omap2_enter_full_retention(void)
- 			   OMAP_SDRC_REGADDR(SDRC_POWER));
- 
- no_sleep:
-+	pwrdm_post_transition(NULL);
-+
- 	omap2_gpio_resume_after_idle();
- 
- 	clk_enable(osc_ck);
-@@ -191,8 +195,12 @@ static void omap2_enter_mpu_retention(void)
- 		WARN_ON(pwrdm_set_next_fpwrst(mpu_pwrdm, PWRDM_FUNC_PWRST_ON));
- 	}
- 
-+	pwrdm_pre_transition(mpu_pwrdm);
-+
- 	omap2_sram_idle();
- 
-+	pwrdm_post_transition(mpu_pwrdm);
-+
- 	WARN_ON(pwrdm_set_next_fpwrst(mpu_pwrdm, PWRDM_FUNC_PWRST_ON));
+diff --git a/arch/arm/mach-omap2/prm2xxx.c b/arch/arm/mach-omap2/prm2xxx.c
+index e4cdb69..2d3c905 100644
+--- a/arch/arm/mach-omap2/prm2xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx.c
+@@ -180,10 +180,22 @@ static int omap2xxx_pwrdm_read_pwrst(struct powerdomain *pwrdm)
+ 	return omap2xxx_pwrst_to_common_pwrst(omap2xxx_pwrst);
  }
  
++static int omap2xxx_pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
++{
++	u8 omap2xxx_pwrst;
++
++	omap2xxx_pwrst = omap2_prm_read_mod_bits_shift(pwrdm->prcm_offs,
++						       OMAP2_PM_PWSTST,
++						       OMAP24XX_LASTSTATEENTERED_MASK);
++
++	return omap2xxx_pwrst_to_common_pwrst(omap2xxx_pwrst);
++}
++
+ struct pwrdm_ops omap2_pwrdm_operations = {
+ 	.pwrdm_set_next_pwrst	= omap2xxx_pwrdm_set_next_pwrst,
+ 	.pwrdm_read_next_pwrst	= omap2xxx_pwrdm_read_next_pwrst,
+ 	.pwrdm_read_pwrst	= omap2xxx_pwrdm_read_pwrst,
++	.pwrdm_read_prev_pwrst	= omap2xxx_pwrdm_read_prev_pwrst,
+ 	.pwrdm_set_logic_retst	= omap2_pwrdm_set_logic_retst,
+ 	.pwrdm_set_mem_onst	= omap2_pwrdm_set_mem_onst,
+ 	.pwrdm_set_mem_retst	= omap2_pwrdm_set_mem_retst,
