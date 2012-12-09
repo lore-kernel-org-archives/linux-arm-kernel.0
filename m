@@ -1,46 +1,189 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 09 Dec 2012 13:03:31 -0700
-Subject: [PATCH 11/12] ARM: OMAP2xxx: powerdomain: add previous power state
- tracking
+Date: Sun, 09 Dec 2012 13:03:28 -0700
+Subject: [PATCH 09/12] ARM: OMAP2+: powerdomain: skip register reads for
+ powerdomains known to be on
 In-Reply-To: <20121209200108.3196.12452.stgit@dusk.lan>
 References: <20121209200108.3196.12452.stgit@dusk.lan>
-Message-ID: <20121209200330.3196.10124.stgit@dusk.lan>
+Message-ID: <20121209200327.3196.27686.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP2xxx PRM does support a form of powerdomain previous-power-state
-tracking; so add it.  This allows the power state tracking and debugging
-code to do something useful on this platform.
+There's no need to determine the current power state for powerdomains
+that must be on while the kernel is running.  We mark these
+powerdomains with a new flag, PWRDM_ACTIVE_WITH_KERNEL.  Any
+powerdomain marked with that flag is reported as being in the ON power
+state while the kernel is running.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
 ---
- arch/arm/mach-omap2/prm2xxx.c |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/mach-omap2/powerdomain.c           |    9 ++++++---
+ arch/arm/mach-omap2/powerdomain.h           |    4 ++++
+ arch/arm/mach-omap2/powerdomains2xxx_data.c |    2 ++
+ arch/arm/mach-omap2/powerdomains33xx_data.c |    3 ++-
+ arch/arm/mach-omap2/powerdomains3xxx_data.c |    9 ++++++---
+ arch/arm/mach-omap2/powerdomains44xx_data.c |    5 ++++-
+ 6 files changed, 24 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prm2xxx.c b/arch/arm/mach-omap2/prm2xxx.c
-index e4cdb69..2d3c905 100644
---- a/arch/arm/mach-omap2/prm2xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx.c
-@@ -180,10 +180,22 @@ static int omap2xxx_pwrdm_read_pwrst(struct powerdomain *pwrdm)
- 	return omap2xxx_pwrst_to_common_pwrst(omap2xxx_pwrst);
- }
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index f5e2727..a4bb0bb 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -462,7 +462,8 @@ static int _pwrdm_read_fpwrst(struct powerdomain *pwrdm)
+ 	int pwrst, logic_pwrst, ret;
+ 	u8 fpwrst;
  
-+static int omap2xxx_pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
-+{
-+	u8 omap2xxx_pwrst;
+-	if (!_pwrdm_pwrst_can_change(pwrdm))
++	if (!_pwrdm_pwrst_can_change(pwrdm) ||
++	    pwrdm->flags & PWRDM_ACTIVE_WITH_KERNEL)
+ 		return PWRDM_FUNC_PWRST_ON;
+ 
+ 	pwrst = arch_pwrdm->pwrdm_read_pwrst(pwrdm);
+@@ -1104,12 +1105,14 @@ bool pwrdm_has_hdwr_sar(struct powerdomain *pwrdm)
+ 
+ int pwrdm_state_switch_nolock(struct powerdomain *pwrdm)
+ {
+-	int ret;
++	int ret = 0;
+ 
+ 	if (!pwrdm || !arch_pwrdm)
+ 		return -EINVAL;
+ 
+-	ret = arch_pwrdm->pwrdm_wait_transition(pwrdm);
++	if (!(pwrdm->flags & PWRDM_ACTIVE_WITH_KERNEL))
++		ret = arch_pwrdm->pwrdm_wait_transition(pwrdm);
 +
-+	omap2xxx_pwrst = omap2_prm_read_mod_bits_shift(pwrdm->prcm_offs,
-+						       OMAP2_PM_PWSTST,
-+						       OMAP24XX_LASTSTATEENTERED_MASK);
-+
-+	return omap2xxx_pwrst_to_common_pwrst(omap2xxx_pwrst);
-+}
-+
- struct pwrdm_ops omap2_pwrdm_operations = {
- 	.pwrdm_set_next_pwrst	= omap2xxx_pwrdm_set_next_pwrst,
- 	.pwrdm_read_next_pwrst	= omap2xxx_pwrdm_read_next_pwrst,
- 	.pwrdm_read_pwrst	= omap2xxx_pwrdm_read_pwrst,
-+	.pwrdm_read_prev_pwrst	= omap2xxx_pwrdm_read_prev_pwrst,
- 	.pwrdm_set_logic_retst	= omap2_pwrdm_set_logic_retst,
- 	.pwrdm_set_mem_onst	= omap2_pwrdm_set_mem_onst,
- 	.pwrdm_set_mem_retst	= omap2_pwrdm_set_mem_retst,
+ 	if (!ret)
+ 		_pwrdm_state_switch(pwrdm);
+ 
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index f4a189a..10941fd 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -78,10 +78,14 @@ enum pwrdm_func_state {
+  *
+  * PWRDM_HAS_LOWPOWERSTATECHANGE - can transition from a sleep state
+  * to a lower sleep state without waking up the powerdomain
++ *
++ * PWRDM_ACTIVE_WITH_KERNEL - this powerdomain's current power state is
++ * guaranteed to be ON whenever the kernel is running
+  */
+ #define PWRDM_HAS_HDWR_SAR		BIT(0)
+ #define PWRDM_HAS_MPU_QUIRK		BIT(1)
+ #define PWRDM_HAS_LOWPOWERSTATECHANGE	BIT(2)
++#define PWRDM_ACTIVE_WITH_KERNEL	BIT(3)
+ 
+ /*
+  * Powerdomain internal flags (struct powerdomain._flags)
+diff --git a/arch/arm/mach-omap2/powerdomains2xxx_data.c b/arch/arm/mach-omap2/powerdomains2xxx_data.c
+index 578eef8..112927f 100644
+--- a/arch/arm/mach-omap2/powerdomains2xxx_data.c
++++ b/arch/arm/mach-omap2/powerdomains2xxx_data.c
+@@ -54,6 +54,7 @@ static struct powerdomain mpu_24xx_pwrdm = {
+ 		[0] = PWRSTS_ON,
+ 	},
+ 	.voltdm		  = { .name = "core" },
++	.flags		  = PWRDM_ACTIVE_WITH_KERNEL,
+ };
+ 
+ static struct powerdomain core_24xx_pwrdm = {
+@@ -73,6 +74,7 @@ static struct powerdomain core_24xx_pwrdm = {
+ 		[2] = PWRSTS_OFF_RET_ON, /* MEM3ONSTATE */
+ 	},
+ 	.voltdm		  = { .name = "core" },
++	.flags		  = PWRDM_ACTIVE_WITH_KERNEL,
+ };
+ 
+ 
+diff --git a/arch/arm/mach-omap2/powerdomains33xx_data.c b/arch/arm/mach-omap2/powerdomains33xx_data.c
+index 869adb8..acb148a 100644
+--- a/arch/arm/mach-omap2/powerdomains33xx_data.c
++++ b/arch/arm/mach-omap2/powerdomains33xx_data.c
+@@ -123,7 +123,8 @@ static struct powerdomain mpu_33xx_pwrdm = {
+ 	.pwrstst_offs		= AM33XX_PM_MPU_PWRSTST_OFFSET,
+ 	.pwrsts			= PWRSTS_OFF_RET_ON,
+ 	.pwrsts_logic_ret	= PWRSTS_OFF_RET,
+-	.flags			= PWRDM_HAS_LOWPOWERSTATECHANGE,
++	.flags			= (PWRDM_HAS_LOWPOWERSTATECHANGE |
++				   PWRDM_ACTIVE_WITH_KERNEL),
+ 	.banks			= 3,
+ 	.logicretstate_mask	= AM33XX_LOGICRETSTATE_MASK,
+ 	.mem_on_mask		= {
+diff --git a/arch/arm/mach-omap2/powerdomains3xxx_data.c b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+index f0e14e9ef..ade93d3 100644
+--- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
++++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+@@ -58,7 +58,7 @@ static struct powerdomain mpu_3xxx_pwrdm = {
+ 	.prcm_offs	  = MPU_MOD,
+ 	.pwrsts		  = PWRSTS_OFF_RET_ON,
+ 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
+-	.flags		  = PWRDM_HAS_MPU_QUIRK,
++	.flags		  = (PWRDM_HAS_MPU_QUIRK | PWRDM_ACTIVE_WITH_KERNEL),
+ 	.banks		  = 1,
+ 	.pwrsts_mem_ret	  = {
+ 		[0] = PWRSTS_OFF_RET,
+@@ -74,7 +74,7 @@ static struct powerdomain mpu_am35x_pwrdm = {
+ 	.prcm_offs	  = MPU_MOD,
+ 	.pwrsts		  = PWRSTS_ON,
+ 	.pwrsts_logic_ret = PWRSTS_ON,
+-	.flags		  = PWRDM_HAS_MPU_QUIRK,
++	.flags		  = (PWRDM_HAS_MPU_QUIRK | PWRDM_ACTIVE_WITH_KERNEL),
+ 	.banks		  = 1,
+ 	.pwrsts_mem_ret	  = {
+ 		[0] = PWRSTS_ON,
+@@ -110,6 +110,7 @@ static struct powerdomain core_3xxx_pre_es3_1_pwrdm = {
+ 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
+ 	},
+ 	.voltdm		  = { .name = "core" },
++	.flags		  = PWRDM_ACTIVE_WITH_KERNEL,
+ };
+ 
+ static struct powerdomain core_3xxx_es3_1_pwrdm = {
+@@ -121,7 +122,8 @@ static struct powerdomain core_3xxx_es3_1_pwrdm = {
+ 	 * Setting the SAR flag for errata ID i478 which applies
+ 	 *  to 3430 <= ES3.1
+ 	 */
+-	.flags		  = PWRDM_HAS_HDWR_SAR, /* for USBTLL only */
++	.flags		  = (PWRDM_HAS_HDWR_SAR |  /* for USBTLL only */
++			     PWRDM_ACTIVE_WITH_KERNEL),
+ 	.banks		  = 2,
+ 	.pwrsts_mem_ret	  = {
+ 		[0] = PWRSTS_OFF_RET,	 /* MEM1RETSTATE */
+@@ -149,6 +151,7 @@ static struct powerdomain core_am35x_pwrdm = {
+ 		[1] = PWRSTS_ON, /* MEM2ONSTATE */
+ 	},
+ 	.voltdm		  = { .name = "core" },
++	.flags		  = PWRDM_ACTIVE_WITH_KERNEL,
+ };
+ 
+ static struct powerdomain dss_pwrdm = {
+diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
+index 704664c..b64213c 100644
+--- a/arch/arm/mach-omap2/powerdomains44xx_data.c
++++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
+@@ -53,7 +53,8 @@ static struct powerdomain core_44xx_pwrdm = {
+ 		[3] = PWRSTS_ON,	/* ducati_l2ram */
+ 		[4] = PWRSTS_ON,	/* ducati_unicache */
+ 	},
+-	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
++	.flags		  = (PWRDM_HAS_LOWPOWERSTATECHANGE |
++			     PWRDM_ACTIVE_WITH_KERNEL),
+ };
+ 
+ /* gfx_44xx_pwrdm: 3D accelerator power domain */
+@@ -164,6 +165,7 @@ static struct powerdomain cpu0_44xx_pwrdm = {
+ 	.pwrsts_mem_on	= {
+ 		[0] = PWRSTS_ON,	/* cpu0_l1 */
+ 	},
++	.flags		  = PWRDM_ACTIVE_WITH_KERNEL,
+ };
+ 
+ /* cpu1_44xx_pwrdm: MPU1 processor and Neon coprocessor power domain */
+@@ -218,6 +220,7 @@ static struct powerdomain mpu_44xx_pwrdm = {
+ 		[1] = PWRSTS_ON,	/* mpu_l2 */
+ 		[2] = PWRSTS_ON,	/* mpu_ram */
+ 	},
++	.flags		  = PWRDM_ACTIVE_WITH_KERNEL,
+ };
+ 
+ /* ivahd_44xx_pwrdm: IVA-HD power domain */
