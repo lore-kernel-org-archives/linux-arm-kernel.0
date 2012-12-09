@@ -1,130 +1,104 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 09 Dec 2012 13:02:59 -0700
-Subject: [PATCH 01/12] ARM: OMAP2+: powerdomain: consolidate arch_pwrdm
- check code
+Date: Sun, 09 Dec 2012 13:03:25 -0700
+Subject: [PATCH 06/12] ARM: OMAP2+: CM: use the cached copy of the
+ clockdomain's hwsup state
 In-Reply-To: <20121209200108.3196.12452.stgit@dusk.lan>
 References: <20121209200108.3196.12452.stgit@dusk.lan>
-Message-ID: <20121209200257.3196.38184.stgit@dusk.lan>
+Message-ID: <20121209200324.3196.65545.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check for the presence of some of the arch_pwrdm function pointers
-during powerdomain setup, rather than in the individual functions.
-The primary motivation is to make the code slightly easier to read, but it
-also should avoid a few instructions in some hot paths.
+Avoid some unnecessary CM IP block reads by using the cached copy of
+the clockdomain's hardware-supervised idle state.  This should
+simplify the code slightly and save a few hundred nanoseconds in these
+paths.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/powerdomain.c |   43 +++++++++++++++----------------------
- 1 file changed, 18 insertions(+), 25 deletions(-)
+ arch/arm/mach-omap2/cm2xxx.c |   19 ++-----------------
+ arch/arm/mach-omap2/cm3xxx.c |   14 ++------------
+ 2 files changed, 4 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index f81aee1..b67d721 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -385,9 +385,6 @@ static int _set_logic_retst_and_pwrdm_pwrst(struct powerdomain *pwrdm,
- 	if (!_pwrdm_pwrst_is_controllable(pwrdm))
- 		return 0;
+diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
+index 6774a53..8ca13cd 100644
+--- a/arch/arm/mach-omap2/cm2xxx.c
++++ b/arch/arm/mach-omap2/cm2xxx.c
+@@ -285,14 +285,7 @@ static void omap2xxx_clkdm_deny_idle(struct clockdomain *clkdm)
  
--	if (!arch_pwrdm || !arch_pwrdm->pwrdm_set_next_pwrst)
--		return -EINVAL;
--
- 	if (!(pwrdm->pwrsts & (1 << pwrst)))
- 		return -EINVAL;
- 
-@@ -395,13 +392,11 @@ static int _set_logic_retst_and_pwrdm_pwrst(struct powerdomain *pwrdm,
- 		if (!(pwrdm->pwrsts_logic_ret & (1 << logic)))
- 			return -EINVAL;
- 
--		if (arch_pwrdm->pwrdm_set_logic_retst) {
--			ret = arch_pwrdm->pwrdm_set_logic_retst(pwrdm, logic);
--			if (ret) {
--				pr_err("%s: unable to set logic state %0x of powerdomain: %s\n",
--				       __func__, logic, pwrdm->name);
--				return ret;
--			}
-+		ret = arch_pwrdm->pwrdm_set_logic_retst(pwrdm, logic);
-+		if (ret) {
-+			pr_err("%s: unable to set logic state %0x of powerdomain: %s\n",
-+			       __func__, logic, pwrdm->name);
-+			return ret;
- 		}
- 	}
- 
-@@ -426,9 +421,6 @@ static int _pwrdm_read_next_fpwrst(struct powerdomain *pwrdm)
- 	int next_pwrst, next_logic, ret;
- 	u8 fpwrst;
- 
--	if (!arch_pwrdm || !arch_pwrdm->pwrdm_read_next_pwrst)
--		return -EINVAL;
--
- 	next_pwrst = arch_pwrdm->pwrdm_read_next_pwrst(pwrdm);
- 	if (next_pwrst < 0)
- 		return next_pwrst;
-@@ -653,9 +645,12 @@ static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
-  *
-  * Register the list of function pointers used to implement the
-  * powerdomain functions on different OMAP SoCs.  Should be called
-- * before any other pwrdm_register*() function.  Returns -EINVAL if
-- * @po is null, -EEXIST if platform functions have already been
-- * registered, or 0 upon success.
-+ * before any other pwrdm_register*() function.  Several function
-+ * pointers in @po are required to be non-null for the powerdomain
-+ * code to function: pwrdm_wait_transition, pwrdm_read_next_pwrst,
-+ * pwrdm_read_pwrst, pwrdm_set_next_pwrst, pwrdm_set_logic_retst, and
-+ * pwrdm_read_prev_pwrst.  Returns -EINVAL if @po is null, -EEXIST if
-+ * platform functions have already been registered, or 0 upon success.
-  */
- int pwrdm_register_platform_funcs(struct pwrdm_ops *po)
+ static int omap2xxx_clkdm_clk_enable(struct clockdomain *clkdm)
  {
-@@ -665,6 +660,11 @@ int pwrdm_register_platform_funcs(struct pwrdm_ops *po)
- 	if (arch_pwrdm)
- 		return -EEXIST;
- 
-+	if (!po->pwrdm_wait_transition || !po->pwrdm_read_next_pwrst ||
-+	    !po->pwrdm_read_pwrst || !po->pwrdm_set_next_pwrst ||
-+	    !po->pwrdm_set_logic_retst || !po->pwrdm_read_prev_pwrst)
-+		return -ENOENT;
-+
- 	arch_pwrdm = po;
+-	bool hwsup = false;
+-
+-	if (!clkdm->clktrctrl_mask)
+-		return 0;
+-
+-	hwsup = omap2xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+-					      clkdm->clktrctrl_mask);
+-	if (!hwsup && clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
++	if (!clkdm_in_hwsup(clkdm) && clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
+ 		omap2xxx_clkdm_wakeup(clkdm);
  
  	return 0;
-@@ -1221,7 +1221,7 @@ int pwrdm_read_next_fpwrst(struct powerdomain *pwrdm)
- 	int next_pwrst, next_logic, ret;
- 	u8 fpwrst;
+@@ -300,15 +293,7 @@ static int omap2xxx_clkdm_clk_enable(struct clockdomain *clkdm)
  
--	if (!arch_pwrdm || !arch_pwrdm->pwrdm_read_next_pwrst)
-+	if (!arch_pwrdm)
- 		return -EINVAL;
- 
- 	pwrdm_lock(pwrdm);
-@@ -1264,8 +1264,7 @@ int pwrdm_set_fpwrst(struct powerdomain *pwrdm, enum pwrdm_func_state fpwrst)
- 	int ret = 0;
- 	bool hwsup = false;
- 
--	if (!pwrdm || IS_ERR(pwrdm) || !arch_pwrdm ||
--	    !arch_pwrdm->pwrdm_read_pwrst)
-+	if (!pwrdm || IS_ERR(pwrdm) || !arch_pwrdm)
- 		return -EINVAL;
- 
- 	/*
-@@ -1334,9 +1333,6 @@ int pwrdm_read_fpwrst(struct powerdomain *pwrdm)
- 	if (!_pwrdm_pwrst_can_change(pwrdm))
- 		return PWRDM_FUNC_PWRST_ON;
- 
--	if (!arch_pwrdm->pwrdm_read_pwrst)
--		return -EINVAL;
+ static int omap2xxx_clkdm_clk_disable(struct clockdomain *clkdm)
+ {
+-	bool hwsup = false;
 -
- 	pwrdm_lock(pwrdm);
- 	ret = _pwrdm_read_fpwrst(pwrdm);
- 	pwrdm_unlock(pwrdm);
-@@ -1362,9 +1358,6 @@ int pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm)
- 	if (!_pwrdm_pwrst_can_change(pwrdm))
- 		return PWRDM_FUNC_PWRST_ON;
- 
--	if (!arch_pwrdm->pwrdm_read_prev_pwrst)
--		return -EINVAL;
+-	if (!clkdm->clktrctrl_mask)
+-		return 0;
 -
- 	pwrdm_lock(pwrdm);
- 	ret = _pwrdm_read_prev_fpwrst(pwrdm);
- 	pwrdm_unlock(pwrdm);
+-	hwsup = omap2xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+-					      clkdm->clktrctrl_mask);
+-
+-	if (!hwsup && clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
++	if (!clkdm_in_hwsup(clkdm) && clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
+ 		omap2xxx_clkdm_sleep(clkdm);
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
+index 9061c30..75872134 100644
+--- a/arch/arm/mach-omap2/cm3xxx.c
++++ b/arch/arm/mach-omap2/cm3xxx.c
+@@ -227,8 +227,6 @@ static void omap3xxx_clkdm_deny_idle(struct clockdomain *clkdm)
+ 
+ static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
+ {
+-	bool hwsup = false;
+-
+ 	if (!clkdm->clktrctrl_mask)
+ 		return 0;
+ 
+@@ -243,10 +241,7 @@ static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
+ 		return 0;
+ 	}
+ 
+-	hwsup = omap3xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+-					      clkdm->clktrctrl_mask);
+-
+-	if (hwsup) {
++	if (clkdm_in_hwsup(clkdm)) {
+ 		/* Disable HW transitions when we are changing deps */
+ 		omap3xxx_cm_clkdm_disable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+ 						clkdm->clktrctrl_mask);
+@@ -263,8 +258,6 @@ static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
+ 
+ static int omap3xxx_clkdm_clk_disable(struct clockdomain *clkdm)
+ {
+-	bool hwsup = false;
+-
+ 	if (!clkdm->clktrctrl_mask)
+ 		return 0;
+ 
+@@ -280,10 +273,7 @@ static int omap3xxx_clkdm_clk_disable(struct clockdomain *clkdm)
+ 		return 0;
+ 	}
+ 
+-	hwsup = omap3xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+-					      clkdm->clktrctrl_mask);
+-
+-	if (hwsup) {
++	if (clkdm_in_hwsup(clkdm)) {
+ 		/* Disable HW transitions when we are changing deps */
+ 		omap3xxx_cm_clkdm_disable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+ 						clkdm->clktrctrl_mask);
