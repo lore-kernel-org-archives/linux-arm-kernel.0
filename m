@@ -1,106 +1,147 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 08 Dec 2012 18:23:38 -0700
-Subject: [PATCH 03/10] ARM: OMAP2xxx: PM: clean up some crufty powerstate
- programming code
+Date: Sat, 08 Dec 2012 18:23:37 -0700
+Subject: [PATCH 01/10] ARM: OMAP3/4: cpuidle: fix sparse and checkpatch
+ warnings
 In-Reply-To: <20121209011755.19716.25244.stgit@dusk.lan>
 References: <20121209011755.19716.25244.stgit@dusk.lan>
-Message-ID: <20121209012337.19716.8908.stgit@dusk.lan>
+Message-ID: <20121209012334.19716.44831.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't attempt to put clockdomains to sleep; this should be handled by the
-clock framework.  It should be enough to program the next-power-state,
-and then let the code in omap_pm_clkdms_setup() deal with the rest.
+Fix the following sparse warnings in the OMAP3/4 CPUIdle code:
 
-Start out by programming the MPU and CORE powerdomains to stay ON.
-Then control the MPU and CORE powerdomain states directly in
-omap2_enter_full_retention() and omap2_enter_mpu_retention().  Not the
-most optimal way to do it, but certainly is the most conservative until
-OMAP2xxx PM is working again.
+arch/arm/mach-omap2/cpuidle34xx.c:272:1: warning: symbol 'omap3_idle_dev' was not declared. Should it be static?
+arch/arm/mach-omap2/cpuidle34xx.c:274:23: warning: symbol 'omap3_idle_driver' was not declared. Should it be static?
+arch/arm/mach-omap2/cpuidle44xx.c:164:1: warning: symbol 'omap4_idle_dev' was not declared. Should it be static?
+arch/arm/mach-omap2/cpuidle44xx.c:166:23: warning: symbol 'omap4_idle_driver' was not declared. Should it be static?
 
-Get rid of the open-coded PM_PWSTCTRL_MPU writes in
-omap2_enter_mpu_retention(); use the powerdomain code instead.
+Also fix the following checkpatch warnings:
+
+WARNING: please, no space before tabs
+#44: FILE: arch/arm/mach-omap2/cpuidle34xx.c:105:
++^I.name = ^I"omap3_idle",$
+
+WARNING: please, no space before tabs
+#45: FILE: arch/arm/mach-omap2/cpuidle34xx.c:106:
++^I.owner = ^ITHIS_MODULE,$
+
+ERROR: code indent should use tabs where possible
+#211: FILE: arch/arm/mach-omap2/cpuidle44xx.c:74:
++                        /* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */$
+
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/pm24xx.c |   30 ++++++++++--------------------
- 1 file changed, 10 insertions(+), 20 deletions(-)
+ arch/arm/mach-omap2/cpuidle34xx.c |   14 +++++++++-----
+ arch/arm/mach-omap2/cpuidle44xx.c |   28 ++++++++++++++++------------
+ 2 files changed, 25 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index 83815dd..4c06d8a 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -89,11 +89,7 @@ static int omap2_enter_full_retention(void)
- 	omap2_prm_write_mod_reg(0xffffffff, CORE_MOD, OMAP24XX_PM_WKST2);
- 	omap2_prm_write_mod_reg(0xffffffff, WKUP_MOD, PM_WKST);
+diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+index ad70220..e6215b5 100644
+--- a/arch/arm/mach-omap2/cpuidle34xx.c
++++ b/arch/arm/mach-omap2/cpuidle34xx.c
+@@ -53,6 +53,8 @@ struct omap3_idle_statedata {
+  */
+ #define OMAP_CPUIDLE_CX_NO_CLKDM_IDLE		BIT(0)
  
--	/*
--	 * Set MPU powerdomain's next power state to RETENTION;
--	 * preserve logic state during retention
--	 */
--	pwrdm_set_logic_retst(mpu_pwrdm, PWRDM_POWER_RET);
-+	pwrdm_set_next_pwrst(core_pwrdm, PWRDM_POWER_RET);
- 	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
- 
- 	/* Workaround to kill USB */
-@@ -136,6 +132,9 @@ no_sleep:
- 	/* Mask future PRCM-to-MPU interrupts */
- 	omap2_prm_write_mod_reg(0x0, OCP_MOD, OMAP2_PRCM_IRQSTATUS_MPU_OFFSET);
- 
-+	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
-+	pwrdm_set_next_pwrst(core_pwrdm, PWRDM_POWER_ON);
++static struct powerdomain *mpu_pd, *core_pd, *per_pd, *cam_pd;
 +
- 	return 0;
+ /*
+  * Prevent PER OFF if CORE is not in RETention or OFF as this would
+  * disable PER wakeups completely.
+@@ -97,7 +99,7 @@ static struct omap3_idle_statedata omap3_idle_data[] = {
+ 	},
+ };
+ 
+-static struct powerdomain *mpu_pd, *core_pd, *per_pd, *cam_pd;
++/* Private functions */
+ 
+ static int __omap3_enter_idle(struct cpuidle_device *dev,
+ 				struct cpuidle_driver *drv,
+@@ -269,11 +271,11 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+ 	return ret;
  }
  
-@@ -185,17 +184,16 @@ static void omap2_enter_mpu_retention(void)
- 		omap2_prm_write_mod_reg(0xffffffff, WKUP_MOD, PM_WKST);
+-DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
++static DEFINE_PER_CPU(struct cpuidle_device, omap3_idle_dev);
  
- 		/* Try to enter MPU retention */
--		omap2_prm_write_mod_reg((0x01 << OMAP_POWERSTATE_SHIFT) |
--				  OMAP_LOGICRETSTATE_MASK,
--				  MPU_MOD, OMAP2_PM_PWSTCTRL);
-+		pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
-+
- 	} else {
- 		/* Block MPU retention */
--
--		omap2_prm_write_mod_reg(OMAP_LOGICRETSTATE_MASK, MPU_MOD,
--						 OMAP2_PM_PWSTCTRL);
-+		pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
- 	}
+-struct cpuidle_driver omap3_idle_driver = {
+-	.name = 	"omap3_idle",
+-	.owner = 	THIS_MODULE,
++static struct cpuidle_driver omap3_idle_driver = {
++	.name =		"omap3_idle",
++	.owner =	THIS_MODULE,
+ 	.states = {
+ 		{
+ 			.enter		  = omap3_enter_idle_bm,
+@@ -336,6 +338,8 @@ struct cpuidle_driver omap3_idle_driver = {
+ 	.safe_state_index = 0,
+ };
  
- 	omap2_sram_idle();
++/* Public functions */
 +
-+	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
+ /**
+  * omap3_idle_init - Init routine for OMAP3 idle
+  *
+diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+index 288bee6..d639aef 100644
+--- a/arch/arm/mach-omap2/cpuidle44xx.c
++++ b/arch/arm/mach-omap2/cpuidle44xx.c
+@@ -54,6 +54,8 @@ static struct clockdomain *cpu_clkdm[NR_CPUS];
+ static atomic_t abort_barrier;
+ static bool cpu_done[NR_CPUS];
+ 
++/* Private functions */
++
+ /**
+  * omap4_enter_idle_coupled_[simple/coupled] - OMAP4 cpuidle entry functions
+  * @dev: cpuidle device
+@@ -161,9 +163,19 @@ fail:
+ 	return index;
  }
  
- static int omap2_can_sleep(void)
-@@ -250,25 +248,17 @@ static void __init prcm_setup_regs(void)
- 	for (i = 0; i < num_mem_banks; i++)
- 		pwrdm_set_mem_retst(core_pwrdm, i, PWRDM_POWER_RET);
+-DEFINE_PER_CPU(struct cpuidle_device, omap4_idle_dev);
++/*
++ * For each cpu, setup the broadcast timer because local timers
++ * stops for the states above C1.
++ */
++static void omap_setup_broadcast_timer(void *arg)
++{
++	int cpu = smp_processor_id();
++	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu);
++}
++
++static DEFINE_PER_CPU(struct cpuidle_device, omap4_idle_dev);
  
--	/* Set CORE powerdomain's next power state to RETENTION */
--	pwrdm_set_next_pwrst(core_pwrdm, PWRDM_POWER_RET);
-+	pwrdm_set_logic_retst(core_pwrdm, PWRDM_POWER_RET);
+-struct cpuidle_driver omap4_idle_driver = {
++static struct cpuidle_driver omap4_idle_driver = {
+ 	.name				= "omap4_idle",
+ 	.owner				= THIS_MODULE,
+ 	.en_core_tk_irqen		= 1,
+@@ -178,7 +190,7 @@ struct cpuidle_driver omap4_idle_driver = {
+ 			.desc = "MPUSS ON"
+ 		},
+ 		{
+-                        /* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */
++			/* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */
+ 			.exit_latency = 328 + 440,
+ 			.target_residency = 960,
+ 			.flags = CPUIDLE_FLAG_TIME_VALID | CPUIDLE_FLAG_COUPLED,
+@@ -200,15 +212,7 @@ struct cpuidle_driver omap4_idle_driver = {
+ 	.safe_state_index = 0,
+ };
  
--	/*
--	 * Set MPU powerdomain's next power state to RETENTION;
--	 * preserve logic state during retention
--	 */
- 	pwrdm_set_logic_retst(mpu_pwrdm, PWRDM_POWER_RET);
--	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
+-/*
+- * For each cpu, setup the broadcast timer because local timers
+- * stops for the states above C1.
+- */
+-static void omap_setup_broadcast_timer(void *arg)
+-{
+-	int cpu = smp_processor_id();
+-	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu);
+-}
++/* Public functions */
  
- 	/* Force-power down DSP, GFX powerdomains */
- 
- 	pwrdm = clkdm_get_pwrdm(dsp_clkdm);
- 	pwrdm_set_next_pwrst(pwrdm, PWRDM_POWER_OFF);
--	clkdm_sleep(dsp_clkdm);
- 
- 	pwrdm = clkdm_get_pwrdm(gfx_clkdm);
- 	pwrdm_set_next_pwrst(pwrdm, PWRDM_POWER_OFF);
--	clkdm_sleep(gfx_clkdm);
- 
- 	/* Enable hardware-supervised idle for all clkdms */
- 	clkdm_for_each(omap_pm_clkdms_setup, NULL);
+ /**
+  * omap4_idle_init - Init routine for OMAP4 idle
