@@ -1,42 +1,289 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 09 Dec 2012 13:03:30 -0700
-Subject: [PATCH 10/12] ARM: OMAP2+: powerdomain: skip previous-power-state
- read if next_pwrst is ON
+Date: Sun, 09 Dec 2012 13:03:22 -0700
+Subject: [PATCH 04/12] ARM: OMAP2+: PM: clean up some debugfs functions
 In-Reply-To: <20121209200108.3196.12452.stgit@dusk.lan>
 References: <20121209200108.3196.12452.stgit@dusk.lan>
-Message-ID: <20121209200328.3196.96843.stgit@dusk.lan>
+Message-ID: <20121209200321.3196.37332.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the powerdomain's next-power-state is set to ON, then we can skip
-the powerdomain previous-power-state read during
-pwrdm_post_transition().  This is both an optimization (for all OMAPs)
-and a fix (for OMAP2xxx).  It turns out the OMAP2xxx previous power
-state mechanism is slightly different than the OMAP3+ mechanism. The
-bitfield can't be cleared, and it's only updated after a powerdomain
-power state transition.  So reading this value before any powerdomain
-power state transition occurred will always return OFF (the reset
-value).  After this patch, if the power domain was programmed to stay
-ON before pwrdm_pre_transition() is called, the previous power state
-code will return ON during pwrdm_post_transition().
+Move some debugfs functions into the powerdomain and clockdomain code;
+the ultimate goal is to stop exporting some of the
+powerdomain/clockdomain functions.  Get rid of the nasty hacks that
+avoid executing some of the debug functions based on string
+comparisons on powerdomain and clockdomain names.  Lock the
+powerdomain for the duration of these functions so that the debug
+information doesn't change during execution.  Also, while here, fix a
+whitespace issue in mach-omap2/pm-debug.c.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/powerdomain.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/clockdomain.c |   18 +++++++-
+ arch/arm/mach-omap2/clockdomain.h |    2 +
+ arch/arm/mach-omap2/pm-debug.c    |   77 ++--------------------------------
+ arch/arm/mach-omap2/powerdomain.c |   85 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/powerdomain.h |    4 ++
+ 5 files changed, 111 insertions(+), 75 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
+index a90c0c8..bc9b79e 100644
+--- a/arch/arm/mach-omap2/clockdomain.c
++++ b/arch/arm/mach-omap2/clockdomain.c
+@@ -22,9 +22,8 @@
+ #include <linux/clk.h>
+ #include <linux/limits.h>
+ #include <linux/err.h>
+-
++#include <linux/seq_file.h>
+ #include <linux/io.h>
+-
+ #include <linux/bitops.h>
+ 
+ #include "soc.h"
+@@ -1281,3 +1280,18 @@ int clkdm_hwmod_disable(struct clockdomain *clkdm, struct omap_hwmod *oh)
+ 	return _clkdm_clk_hwmod_disable(clkdm);
+ }
+ 
++/* Clockdomain debugfs functions */
++
++int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *seq_file)
++{
++	struct seq_file *s = (struct seq_file *)seq_file;
++
++	if (!clkdm->flags)
++		return 0;
++
++	seq_printf(s, "%s->%s (%d)\n", clkdm->name, clkdm->pwrdm.ptr->name,
++		   clkdm->usecount);
++
++	return 0;
++}
++
+diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
+index 2da3765..95e473b 100644
+--- a/arch/arm/mach-omap2/clockdomain.h
++++ b/arch/arm/mach-omap2/clockdomain.h
+@@ -229,4 +229,6 @@ extern struct clkdm_dep gfx_24xx_wkdeps[];
+ extern struct clkdm_dep dsp_24xx_wkdeps[];
+ extern struct clockdomain wkup_common_clkdm;
+ 
++extern int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *seq_file);
++
+ #endif
+diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+index 80c001a..9861069 100644
+--- a/arch/arm/mach-omap2/pm-debug.c
++++ b/arch/arm/mach-omap2/pm-debug.c
+@@ -53,75 +53,6 @@ enum {
+ 	DEBUG_FILE_TIMERS,
+ };
+ 
+-static int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *user)
+-{
+-	struct seq_file *s = (struct seq_file *)user;
+-
+-	/* XXX This needs to be implemented in a better way */
+-	if (strcmp(clkdm->name, "emu_clkdm") == 0 ||
+-		strcmp(clkdm->name, "wkup_clkdm") == 0 ||
+-		strncmp(clkdm->name, "dpll", 4) == 0)
+-		return 0;
+-
+-	seq_printf(s, "%s->%s (%d)\n", clkdm->name, clkdm->pwrdm.ptr->name,
+-		   clkdm->usecount);
+-
+-	return 0;
+-}
+-
+-static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
+-{
+-	struct seq_file *s = (struct seq_file *)user;
+-	int i;
+-	int curr_fpwrst;
+-
+-	if (strcmp(pwrdm->name, "emu_pwrdm") == 0 ||
+-		strcmp(pwrdm->name, "wkup_pwrdm") == 0 ||
+-		strncmp(pwrdm->name, "dpll", 4) == 0)
+-		return 0;
+-
+-	curr_fpwrst = pwrdm_read_fpwrst(pwrdm);
+-	if (pwrdm->fpwrst != curr_fpwrst)
+-		pr_err("pwrdm state mismatch(%s) %s != %s\n",
+-		       pwrdm->name,
+-		       pwrdm_convert_fpwrst_to_name(pwrdm->fpwrst),
+-		       pwrdm_convert_fpwrst_to_name(curr_fpwrst));
+-
+-	seq_printf(s, "%s (%s)", pwrdm->name,
+-		   pwrdm_convert_fpwrst_to_name(pwrdm->fpwrst));
+-	for (i = PWRDM_FPWRST_OFFSET; i < PWRDM_MAX_FUNC_PWRSTS; i++)
+-		seq_printf(s, ",%s:%d", pwrdm_convert_fpwrst_to_name(i),
+-			   pwrdm->fpwrst_counter[i - PWRDM_FPWRST_OFFSET]);
+-
+-	seq_printf(s, "\n");
+-
+-	return 0;
+-}
+-
+-static int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *user)
+-{
+-	struct seq_file *s = (struct seq_file *)user;
+-	int i;
+-
+-	if (strcmp(pwrdm->name, "emu_pwrdm") == 0 ||
+-		strcmp(pwrdm->name, "wkup_pwrdm") == 0 ||
+-		strncmp(pwrdm->name, "dpll", 4) == 0)
+-		return 0;
+-
+-	pwrdm_state_switch(pwrdm);
+-
+-	seq_printf(s, "%s (%s)", pwrdm->name,
+-		   pwrdm_convert_fpwrst_to_name(pwrdm->fpwrst));
+-
+-	for (i = 0; i < PWRDM_FPWRSTS_COUNT; i++)
+-		seq_printf(s, ",%s:%lld",
+-			   pwrdm_convert_fpwrst_to_name(i + PWRDM_FPWRST_OFFSET),
+-			   pwrdm->fpwrst_timer[i]);
+-
+-	seq_printf(s, "\n");
+-	return 0;
+-}
+-
+ static int pm_dbg_show_counters(struct seq_file *s, void *unused)
+ {
+ 	pwrdm_for_each(pwrdm_dbg_show_counter, s);
+@@ -150,10 +81,10 @@ static int pm_dbg_open(struct inode *inode, struct file *file)
+ }
+ 
+ static const struct file_operations debug_fops = {
+-	.open           = pm_dbg_open,
+-	.read           = seq_read,
+-	.llseek         = seq_lseek,
+-	.release        = single_release,
++	.open		= pm_dbg_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= single_release,
+ };
+ 
+ static int pwrdm_suspend_get(void *data, u64 *val)
 diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index a4bb0bb..72d6ce0 100644
+index d38f493..658f4ed 100644
 --- a/arch/arm/mach-omap2/powerdomain.c
 +++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -681,7 +681,9 @@ static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
- 	int prev, fpwrst;
- 	int trace_state = 0;
+@@ -8,6 +8,10 @@
+  * Added OMAP4 specific support by Abhijit Pagare <abhijitpagare@ti.com>
+  * State counting code by Tero Kristo <tero.kristo@nokia.com>
+  *
++ * Contains some code previously from mach-omap2/pm-debug.c, which was:
++ * Copyright (C) 2005 Texas Instruments, Inc.
++ * Copyright (C) 2006-2008 Nokia Corporation
++ *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+@@ -21,6 +25,7 @@
+ #include <linux/string.h>
+ #include <linux/spinlock.h>
+ #include <linux/sched.h>
++#include <linux/seq_file.h>
  
--	prev = _pwrdm_read_prev_fpwrst(pwrdm);
-+	prev = (pwrdm->next_fpwrst == PWRDM_FUNC_PWRST_ON) ?
-+		PWRDM_FUNC_PWRST_ON : _pwrdm_read_prev_fpwrst(pwrdm);
+ #include <trace/events/power.h>
+ 
+@@ -1447,3 +1452,83 @@ bool pwrdm_supports_fpwrst(struct powerdomain *pwrdm, u8 fpwrst)
+ 
+ 	return true;
+ }
 +
- 	if (pwrdm->fpwrst != prev)
- 		pwrdm->fpwrst_counter[prev - PWRDM_FPWRST_OFFSET]++;
++/* Powerdomain debugfs-related functions */
++
++/**
++ * pwrdm_dbg_show_counter - generate debugfs data for the pwrdm pwrst counters
++ * @pwrdm: struct powerdomain * to generate debugfs data for
++ * @seq_file: struct seq_file * to write data to
++ *
++ * Dump the powerdomain @pwrdm's power state counters (and current
++ * power state) to the seq_file @seq_file.  Currently called by the
++ * mach-omap2/pm-debug.c code.  Returns 0.
++ */
++int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *seq_file)
++{
++	struct seq_file *s = (struct seq_file *)seq_file;
++	int i;
++	u8 curr_fpwrst;
++
++	if (!_pwrdm_pwrst_can_change(pwrdm))
++		return 0;
++
++	pwrdm_lock(pwrdm);
++
++	curr_fpwrst = _pwrdm_read_fpwrst(pwrdm);
++	if (pwrdm->fpwrst != curr_fpwrst)
++		pr_err("pwrdm state mismatch(%s) %s != %s\n",
++		       pwrdm->name,
++		       pwrdm_convert_fpwrst_to_name(pwrdm->fpwrst),
++		       pwrdm_convert_fpwrst_to_name(curr_fpwrst));
++
++	seq_printf(s, "%s (%s)", pwrdm->name,
++		   pwrdm_convert_fpwrst_to_name(pwrdm->fpwrst));
++	for (i = PWRDM_FPWRST_OFFSET; i < PWRDM_MAX_FUNC_PWRSTS; i++)
++		seq_printf(s, ",%s:%d", pwrdm_convert_fpwrst_to_name(i),
++			   pwrdm->fpwrst_counter[i - PWRDM_FPWRST_OFFSET]);
++
++	seq_printf(s, "\n");
++
++	pwrdm_unlock(pwrdm);
++
++	return 0;
++}
++
++/**
++ * pwrdm_dbg_show_timer - generate debugfs data for the pwrdm pwrst timers
++ * @pwrdm: struct powerdomain * to generate debugfs data for
++ * @seq_file: struct seq_file * to write data to
++ *
++ * Dump the powerdomain @pwrdm's power state residency duration timings
++ * to the seq_file @seq_file.  Currently called by the mach-omap2/pm-debug.c
++ * code.  Returns 0.
++ */
++int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *seq_file)
++{
++#ifdef CONFIG_PM_DEBUG
++	struct seq_file *s = (struct seq_file *)seq_file;
++	int i;
++
++	if (!_pwrdm_pwrst_can_change(pwrdm))
++		return 0;
++
++	pwrdm_lock(pwrdm);
++
++	pwrdm_state_switch_nolock(pwrdm);
++
++	seq_printf(s, "%s (%s)", pwrdm->name,
++		   pwrdm_convert_fpwrst_to_name(pwrdm->fpwrst));
++
++	for (i = 0; i < PWRDM_FPWRSTS_COUNT; i++)
++		seq_printf(s, ",%s:%lld",
++			   pwrdm_convert_fpwrst_to_name(i + PWRDM_FPWRST_OFFSET),
++			   pwrdm->fpwrst_timer[i]);
++
++	seq_printf(s, "\n");
++
++	pwrdm_unlock(pwrdm);
++#endif
++	return 0;
++}
++
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index ef51987b..c19bdc3 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -276,4 +276,8 @@ extern struct powerdomain gfx_omap2_pwrdm;
+ extern void pwrdm_lock(struct powerdomain *pwrdm);
+ extern void pwrdm_unlock(struct powerdomain *pwrdm);
  
++/* Debugfs functions */
++extern int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *seq_file);
++extern int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *seq_file);
++
+ #endif
