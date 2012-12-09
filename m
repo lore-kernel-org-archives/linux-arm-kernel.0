@@ -1,85 +1,101 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 09 Dec 2012 10:52:49 -0700
-Subject: [PATCH 00/12] ARM: OMAP2+: powerdomain/PM: convert to functional
- power states
-Message-ID: <20121209174545.6933.59371.stgit@dusk.lan>
+Date: Sun, 09 Dec 2012 10:53:12 -0700
+Subject: [PATCH 04/12] ARM: OMAP2xxx: PM: convert to use the functional
+ power states API
+In-Reply-To: <20121209174545.6933.59371.stgit@dusk.lan>
+References: <20121209174545.6933.59371.stgit@dusk.lan>
+Message-ID: <20121209175309.6933.49486.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+From: Jean Pihet <jean.pihet@newoldbits.com>
 
-This series converts the OMAP2+ powerdomain and PM code to use
-"functional power states" - high-level power states such as "OSWR",
-which reflect changes in multiple underlying registers, rather than
-expecting high-level PM code to program the registers directly.  This
-is intended to reduce the complexity of the high-level PM code and to
-make it easier to implement register caching of the various
-powerdomain registers, some of which are quite slow to access.
+Use the functional power states as the API to control power domains:
 
+- use the PWRDM_FUNC_PWRST_* macros for the power states and logic
+  settings,
 
-- Paul
+- the function pwrdm_set_next_fpwrst(), which controls the power domains
+  next power and logic settings, shall be used instead of
+  pwrdm_set_next_pwrst() to program the power domains next states,
 
+- the function pwrdm_set_fpwrst(), which programs the power domains
+  power and logic settings, shall be used instead of
+  omap_set_pwrdm_state().
+
+Signed-off-by: Jean Pihet <j-pihet@ti.com>
+[paul at pwsan.com: split the original patch into OMAP2/3/4 variants; fix
+ commit message; update the power state programming to make sense;
+ warn if sets fail]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
+ arch/arm/mach-omap2/pm24xx.c |   24 ++++++++++--------------
+ 1 file changed, 10 insertions(+), 14 deletions(-)
 
-vmlinux object size
-(delta in bytes from TEST_pm_cleanup_fixes_b_3.9 (2f8d7b1f0048df431ca226d81c5c27c4dd21953b)):
-   text     data      bss    total  kernel
-   +456      -56        0     +400  am33xx_only
-   +448      -96        0     +352  n800_multi_omap2xxx
-   +448      -96        0     +352  n800_only_a
-      0        0        0        0  omap1_defconfig
-      0        0        0        0  omap1_defconfig_1510innovator_only
-      0        0        0        0  omap1_defconfig_5912osk_only
-  +1180     -744        0     +436  omap2plus_defconfig
-   +584      -72        0     +512  omap2plus_defconfig_2430sdp_only
-  +1244     -808        0     +436  omap2plus_defconfig_cpupm
-   +976    -1224        0     -248  omap2plus_defconfig_no_pm
-   +844     -408        0     +436  omap2plus_defconfig_omap2_4_only
-  +1088     -624        0     +464  omap2plus_defconfig_omap3_4_only
-  +1292    -1232     -352     -292  rmk_omap3430_ldp_allnoconfig
-   +916     -720        0     +196  rmk_omap3430_ldp_oldconfig
-  +1292    -1232     -352     -292  rmk_omap4430_sdp_allnoconfig
-   +840     -392        0     +448  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from TEST_pm_cleanup_fixes_b_3.9 (2f8d7b1f0048df431ca226d81c5c27c4dd21953b))
-  avail  rsrvd   high  freed  board          kconfig
-    -8k     8k      .      .  2430sdp        omap2plus_defconfig
-    -8k     8k      .      .  3517evm        omap2plus_defconfig
-    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
-    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
-    -8k     8k      .      .  37xxevm        omap2plus_defconfig
-    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
-    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
-    -8k     8k      .      .  cmt3517        omap2plus_defconfig
-
-Jean Pihet (6):
-      ARM: OMAP2+: PM: introduce power domains functional states
-      ARM: OMAP2+: PM debug: trace the functional power domains states
-      ARM: OMAP2xxx: PM: convert to use the functional power states API
-      ARM: OMAP3xxx: PM: convert to use the functional power states API
-      ARM: OMAP44xx: PM: convert to use the functional power states API
-      ARM: OMAP2+: PM: use power domain functional state in stats counters
-
-Paul Walmsley (6):
-      ARM: OMAP2+: powerdomain: add functions that report on powerdomain capabilities
-      ARM: OMAP2+: powerdomain: drop many low-level powerdomain funcs
-      ARM: OMAP2+: powerdomain: add ability to test for supported power states
-      ARM: OMAP2+: powerdomain/PM: only program supported power states
-      ARM: OMAP2+: powerdomain: program memory bank next-power-state upon init
-      ARM: OMAP2+: powerdomain: assume memory bank power states follow powerdomain
-
-
- arch/arm/mach-omap2/common.h              |    7 
- arch/arm/mach-omap2/cpuidle34xx.c         |   95 +-
- arch/arm/mach-omap2/cpuidle44xx.c         |   32 -
- arch/arm/mach-omap2/omap-hotplug.c        |    2 
- arch/arm/mach-omap2/omap-mpuss-lowpower.c |   69 +-
- arch/arm/mach-omap2/pm-debug.c            |   46 -
- arch/arm/mach-omap2/pm.h                  |    2 
- arch/arm/mach-omap2/pm24xx.c              |   33 -
- arch/arm/mach-omap2/pm34xx.c              |  188 +++-
- arch/arm/mach-omap2/pm44xx.c              |   47 +
- arch/arm/mach-omap2/powerdomain.c         | 1235 +++++++++++++++++------------
- arch/arm/mach-omap2/powerdomain.h         |   69 +-
- 12 files changed, 1040 insertions(+), 785 deletions(-)
+diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+index 4c06d8a..29abb63 100644
+--- a/arch/arm/mach-omap2/pm24xx.c
++++ b/arch/arm/mach-omap2/pm24xx.c
+@@ -89,8 +89,8 @@ static int omap2_enter_full_retention(void)
+ 	omap2_prm_write_mod_reg(0xffffffff, CORE_MOD, OMAP24XX_PM_WKST2);
+ 	omap2_prm_write_mod_reg(0xffffffff, WKUP_MOD, PM_WKST);
+ 
+-	pwrdm_set_next_pwrst(core_pwrdm, PWRDM_POWER_RET);
+-	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
++	WARN_ON(pwrdm_set_next_fpwrst(core_pwrdm, PWRDM_FUNC_PWRST_CSWR));
++	WARN_ON(pwrdm_set_next_fpwrst(mpu_pwrdm, PWRDM_FUNC_PWRST_CSWR));
+ 
+ 	/* Workaround to kill USB */
+ 	l = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0) | OMAP24XX_USBSTANDBYCTRL;
+@@ -132,8 +132,8 @@ no_sleep:
+ 	/* Mask future PRCM-to-MPU interrupts */
+ 	omap2_prm_write_mod_reg(0x0, OCP_MOD, OMAP2_PRCM_IRQSTATUS_MPU_OFFSET);
+ 
+-	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
+-	pwrdm_set_next_pwrst(core_pwrdm, PWRDM_POWER_ON);
++	WARN_ON(pwrdm_set_next_fpwrst(mpu_pwrdm, PWRDM_FUNC_PWRST_ON));
++	WARN_ON(pwrdm_set_next_fpwrst(core_pwrdm, PWRDM_FUNC_PWRST_ON));
+ 
+ 	return 0;
+ }
+@@ -184,16 +184,16 @@ static void omap2_enter_mpu_retention(void)
+ 		omap2_prm_write_mod_reg(0xffffffff, WKUP_MOD, PM_WKST);
+ 
+ 		/* Try to enter MPU retention */
+-		pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
+-
++		WARN_ON(pwrdm_set_next_fpwrst(mpu_pwrdm,
++					      PWRDM_FUNC_PWRST_CSWR));
+ 	} else {
+ 		/* Block MPU retention */
+-		pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
++		WARN_ON(pwrdm_set_next_fpwrst(mpu_pwrdm, PWRDM_FUNC_PWRST_ON));
+ 	}
+ 
+ 	omap2_sram_idle();
+ 
+-	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_ON);
++	WARN_ON(pwrdm_set_next_fpwrst(mpu_pwrdm, PWRDM_FUNC_PWRST_ON));
+ }
+ 
+ static int omap2_can_sleep(void)
+@@ -248,17 +248,13 @@ static void __init prcm_setup_regs(void)
+ 	for (i = 0; i < num_mem_banks; i++)
+ 		pwrdm_set_mem_retst(core_pwrdm, i, PWRDM_POWER_RET);
+ 
+-	pwrdm_set_logic_retst(core_pwrdm, PWRDM_POWER_RET);
+-
+-	pwrdm_set_logic_retst(mpu_pwrdm, PWRDM_POWER_RET);
+-
+ 	/* Force-power down DSP, GFX powerdomains */
+ 
+ 	pwrdm = clkdm_get_pwrdm(dsp_clkdm);
+-	pwrdm_set_next_pwrst(pwrdm, PWRDM_POWER_OFF);
++	WARN_ON(pwrdm_set_next_fpwrst(pwrdm, PWRDM_FUNC_PWRST_OFF));
+ 
+ 	pwrdm = clkdm_get_pwrdm(gfx_clkdm);
+-	pwrdm_set_next_pwrst(pwrdm, PWRDM_POWER_OFF);
++	WARN_ON(pwrdm_set_next_fpwrst(pwrdm, PWRDM_FUNC_PWRST_OFF));
+ 
+ 	/* Enable hardware-supervised idle for all clkdms */
+ 	clkdm_for_each(omap_pm_clkdms_setup, NULL);
