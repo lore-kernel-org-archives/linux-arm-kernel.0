@@ -1,37 +1,83 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun, 9 Dec 2012 14:24:05 +0400
-Subject: Question2: Determine subarch type
-In-Reply-To: <20121209101358.GG14363@n2100.arm.linux.org.uk>
-References: <20121209105117.1f96e5c80560a8431a9eecee@mail.ru>
- <20121209095137.GF14363@n2100.arm.linux.org.uk>
- <20121209135551.f26ed91782f759add2cdf603@mail.ru>
- <20121209101358.GG14363@n2100.arm.linux.org.uk>
-Message-ID: <20121209142405.4e199831b4f455daf1818459@mail.ru>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun, 09 Dec 2012 14:06:48 +0100
+Subject: [PATCH] ARM: Orion: Hoist bridge interrupt handling out of the
+ timer
+In-Reply-To: <20121209083046.GA25466@lunn.ch>
+References: <20121207225507.GB29262@obsidianresearch.com>
+ <20121208112624.GD25315@lunn.ch>
+ <20121209025748.GA10405@obsidianresearch.com>
+ <20121209083046.GA25466@lunn.ch>
+Message-ID: <50C48CE8.9070400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 9 Dec 2012 10:13:59 +0000
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On 12/09/2012 09:30 AM, Andrew Lunn wrote:
+> On Sat, Dec 08, 2012 at 07:57:48PM -0700, Jason Gunthorpe wrote:
+>> On Sat, Dec 08, 2012 at 12:26:24PM +0100, Andrew Lunn wrote:
+>>
+>>> 1) It should have an IRQ domain, like the other IRQ chips we have.
+>>> 2) It should have a DT binding, like the other IRQ chips we have.
+>>
+>> I was going to look at a DT binding for this as a follow on, since
+>> I'll want to bind to these interrupts.
+>>
+>> Are you OK with keeping this patch as is and seeing DT in a follow up,
+>> or as a series? It is already pretty big.
+>
+> Hi Jason
+>
+> A patch series is great. However, its not so good practice to add
+> something on the first patch, and then move it somewhere else in the
+> next. So i would suggest initializing the controller in
+> kirkwood_irq_init(), etc as its added.
 
-> > > > How can we determine the sub-architecture type from the driver code?
-> > > > For example, we are building a multi-platform kernel for subarch A and B.
-> > > > One of the drivers should be used for subarch A only, and can not be used for
-> > > > subarch B. So, we need to avoid load this driver for other sub-architectures.
-> > > > Of course, we can check all machines in the subarch with machine_is_xx() macro,
-> > > > but I think that this is not the best way to do it.
-> > > > Do we have another way to do this?
-> > > 
-> > > You control this by only registering the appropriate struct devices rather
-> > > than controlling this in the driver.
-> > 
-> > Yes, but if driver is compiled as module?
-> 
-> Makes no difference.
+Hi Andrew, Jason,
 
-Do you mean that all the drivers for multi-platform targets should be
-converted to platform_drivers?
-OK, and what about (arch/fs/core/postcore)_initcall-s? Current multiplatform
-targets use these calls.
+first of all I have adjusted the Cc list a little bit: Gregory is missing,
+and I removed Mike and Olof as they might not be that interested in discussing
+mvebu internals. Please re-add if I am wrong.
 
--- 
-Alexander Shiyan <shc_work@mail.ru>
+I have an irqchip driver for orion that I wrote some weeks ago. I can
+prepare a patch today. I will allow to have main irq controller by DT
+and I can also add a secondary irq controller for the bridge registers
+as chained irq handler.
+
+If I dig hard enough in my branches I will also find time-orion drivers,
+that are either "standalone" (i.e. orion only) or merged with time-mvebu.
+
+The main irq controller will be required for sure, but for the secondary
+irq controller we had a discussion long ago. IIRC Gregory proposed to have
+shared irqs handled by timer and watchdog, I was proposing chained irqs.
+
+For mvebu archs, IIRC, we have wrt to timer-related irqs:
+- Armada 370/XP with different irq handler and timer irq handling within
+   timer registers.
+- Orion SoCs with Bridge irq registers for timer related stuff (timer0/1)
+- Kirkwood and Dove with watchdog timers (both with wdt irq in bridge irqs)
+- RTC in bridge irqs, but Dove with RTC connected to PMU irqs
+
+I think we should have patches for irqchip-orion first and then rethink
+if we want a standalone timer-orion or merge it with timer-mvebu. Having
+watchdog using irqs is kind of independent from this.
+
+> ...
+>>> 3) We then pass the timer interrupt via DT to the timer driver.
+>>> 3) is not so simple, because we currently don't have a timer binding
+>>> for Orion SoC. However, with this cleanup, we are much closer to being
+>>> able to use the 370/XP timer code.
+>>
+>> Interesting.. The 370/XP is a more advanced version of the same timer
+>> IP, there are several registers that driver is touching that are not
+>> HW supported, at least on kirkwood.
+>
+> Yes, the 25MHz and the divider for example. I'm not 100% sure it will
+> actually work, it will need a different compatibility string, and a
+> bit of configuration based on that string, but i think it goes. If you
+> compare the two different drivers, they are very similar.
+
+Back in the days when Gregory, Thomas, and I were looking into merged timer
+we agreed not to have an extra check on 25MHz support. If you put the
+property in the node, it will try to set the timer to fixed 25MHz. If you
+use the property on Orion timer, it will just break timer handling.
+
+Sebastian
