@@ -1,39 +1,37 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sun, 09 Dec 2012 23:21:53 +1300
-Subject: [PATCH] drivers/video/wm8505fb.c: use devm_ functions
-In-Reply-To: <alpine.DEB.2.02.1212090820270.2028@localhost6.localdomain6>
-References: <1354984288-773-1-git-send-email-Julia.Lawall@lip6.fr>
- <1355002958.14981.11.camel@gitbox>
- <alpine.DEB.2.02.1212090820270.2028@localhost6.localdomain6>
-Message-ID: <1355048513.9812.7.camel@gitbox>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sun, 9 Dec 2012 14:24:05 +0400
+Subject: Question2: Determine subarch type
+In-Reply-To: <20121209101358.GG14363@n2100.arm.linux.org.uk>
+References: <20121209105117.1f96e5c80560a8431a9eecee@mail.ru>
+ <20121209095137.GF14363@n2100.arm.linux.org.uk>
+ <20121209135551.f26ed91782f759add2cdf603@mail.ru>
+ <20121209101358.GG14363@n2100.arm.linux.org.uk>
+Message-ID: <20121209142405.4e199831b4f455daf1818459@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2012-12-09 at 08:21 +0100, Julia Lawall wrote:
-> > Rather than the goto, add the fail path code in directly, and return.
-> >
-> >
-> > ret = register_framebuffer(&fbi->fb);
-> > if (ret < 0) {
-> >  dev_err(&pdev->dev,
-> >  "Failed to register framebuffer device: %d\n", ret);
-> >  if (fbi->fb.cmap.len)
-> >    fb_dealloc_cmap(&fbi->fb.cmap);
-> >  return ret;
-> > }
+On Sun, 9 Dec 2012 10:13:59 +0000
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> > > > How can we determine the sub-architecture type from the driver code?
+> > > > For example, we are building a multi-platform kernel for subarch A and B.
+> > > > One of the drivers should be used for subarch A only, and can not be used for
+> > > > subarch B. So, we need to avoid load this driver for other sub-architectures.
+> > > > Of course, we can check all machines in the subarch with machine_is_xx() macro,
+> > > > but I think that this is not the best way to do it.
+> > > > Do we have another way to do this?
+> > > 
+> > > You control this by only registering the appropriate struct devices rather
+> > > than controlling this in the driver.
+> > 
+> > Yes, but if driver is compiled as module?
 > 
-> So there is no need for the platform_set_drvdata(pdev, NULL); ?
+> Makes no difference.
 
-Unless there is some kind of reference counting, I can't see any reason
-for this.
+Do you mean that all the drivers for multi-platform targets should be
+converted to platform_drivers?
+OK, and what about (arch/fs/core/postcore)_initcall-s? Current multiplatform
+targets use these calls.
 
-> 
-> Also, do you know if it is correct that the original code does not include
-> a call to dma_free_coherent?
-
-No, that is not correct - there definitely should be a
-dma_free_coherent, both in the fail path and in the remove(). Appears
-they are both missing.
-
-Regards
-Tony P
+-- 
+Alexander Shiyan <shc_work@mail.ru>
