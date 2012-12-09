@@ -1,64 +1,40 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 10 Dec 2012 12:44:38 +1300
-Subject: [Bulk] [PATCH] drivers/video/wm8505fb.c: use devm_ functions
-In-Reply-To: <1355076491-2246-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1355076491-2246-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1355096678.6821.3.camel@gitbox>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 9 Dec 2012 18:57:29 -0500
+Subject: [PATCH v2] ARM: kirkwood: convert Guruplug Server Plus to use
+ the device tree
+In-Reply-To: <20121209223753.GE28052@1wt.eu>
+References: <20121202155124.GA30807@1wt.eu>
+ <20121202230926.GJ12509@titan.lakedaemon.net>
+ <20121202232226.GL30822@1wt.eu>
+ <20121202234110.GM12509@titan.lakedaemon.net>
+ <20121209184004.GC28052@1wt.eu>
+ <20121209220245.GF21694@titan.lakedaemon.net>
+ <20121209223753.GE28052@1wt.eu>
+Message-ID: <20121209235729.GG21694@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2012-12-09 at 19:08 +0100, Julia Lawall wrote:
-> From: Julia Lawall <Julia.Lawall@lip6.fr>
+On Sun, Dec 09, 2012 at 11:37:53PM +0100, Willy Tarreau wrote:
+> On Sun, Dec 09, 2012 at 05:02:45PM -0500, Jason Cooper wrote:
+> > > +	model = "Globalscale Technologies Guruplug Server Plus";
+> > > +	compatible = "globalscale,guruplug-server-plug", "globalscale,guruplug", "marvell,kirkwood-88f6281", "marvell,kirkwood";
+> > 
+> > One small typo, should be "...server-plus".  If there are no other
+> > comments over the next few days, I'll tweak it when I pull it in.
 > 
-> The various devm_ functions allocate memory that is released when a driver
-> detaches.  This patch uses these functions for data that is allocated in
-> the probe function of a platform device and is only freed in the remove
-> function.
-> 
-> The patch makes some other cleanups.  First, the original code used
-> devm_kzalloc, but kfree.  This would lead to a double free.  The problem
-> was found using the following semantic match (http://coccinelle.lip6.fr/):
-> 
-> // <smpl>
-> @@
-> expression x,e;
-> @@
-> x = devm_kzalloc(...)
-> ... when != x = e
-> ?-kfree(x,...);
-> // </smpl>
-> 
-> The error-handing code of devm_request_and_ioremap does not print any
-> warning message, because devm_request_and_ioremap does this.
-> 
-> The call to dma_alloc_coherent is converted to its devm equivalent,
-> dmam_alloc_coherent.  This implicitly introduces a call to
-> dmam_free_coherent, which was completly missing in the original code.
-> 
-> A semicolon is removed at the end of the error-handling code for the call
-> to dma_alloc_coherent.
-> 
-> The block of code calling fb_alloc_cmap is moved below the block of code
-> calling wm8505fb_set_par, so that the error-handing code of the call to
-> wm8505fb_set_par can just return ret.  This way there is only one block of
-> error-handling code that needs to call fb_dealloc_cmap, and so this is
-> moved up to the place where it is needed, eliminating the need for all
-> gotos and labels in the function.  This was suggested by Tony Prisk.
-> 
-> The initializations of fbi and ret at the beginning of the function are not
-> necessary and are removed.  The call platform_set_drvdata(pdev, NULL); at
-> the end of the function is also removed.
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
-> ---
-> Only compiled.  Not tested.
+> I'm amazed, because you did exactly the same one in your initial review
+> last week and I noticed it back then. Then I did this one without copy-
+> pasting yours! It seems like our brain is too much attracted by those
+> similarly looking letters. Sorry for this one.
 
+It's probably more of a pattern-completion mechanism in the brain.  We
+type/think p-l-u-g more often than p-l-u-s.  So, when you are on
+auto-pilot doing a simple change, the brain prefers 'g' over 's' to
+complete p-l-u... Or, we're both just dumb. ;-)
 
-Thanks Julia,
+I'm pretty sure there's a PhD candidate neurobiologist lurking on the
+list who just found their thesis topic...
 
-I will include this with the other patches we have for fbdev. I have
-tested this on WM8650 and all appears fine.
+thx,
 
-Regards
-Tony P
+Jason.
