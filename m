@@ -1,332 +1,310 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 08 Dec 2012 18:23:43 -0700
-Subject: [PATCH 09/10] ARM: OMAP2+: clockdomain: convert existing atomic
- usecounts into spinlock-protected shorts/ints
+Date: Sat, 08 Dec 2012 18:23:44 -0700
+Subject: [PATCH 10/10] ARM: OMAP2+: powerdomain: fix whitespace,
+ improve flag comments
 In-Reply-To: <20121209011755.19716.25244.stgit@dusk.lan>
 References: <20121209011755.19716.25244.stgit@dusk.lan>
-Message-ID: <20121209012342.19716.66436.stgit@dusk.lan>
+Message-ID: <20121209012343.19716.48213.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The atomic usecounts seem to be confusing, and are no longer needed
-since the operations that they are attached to really should take
-place under lock.  Replace the atomic counters with simple integers,
-protected by the enclosing powerdomain spinlock.
+Fix some whitespace problems introduced by commit
+da03ce65b5431245b9cd20db3edaaa6b9f5c8dc1 ("OMAP3: powerdomain data:
+add voltage domains").  Also, improve the documentation for the struct
+powerdomain.flags field.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/clockdomain.c  |   88 +++++++++++++++++++++++++++++++-----
- arch/arm/mach-omap2/clockdomain.h  |    6 +-
- arch/arm/mach-omap2/cm3xxx.c       |    6 +-
- arch/arm/mach-omap2/cminst44xx.c   |    2 -
- arch/arm/mach-omap2/pm-debug.c     |    6 +-
- arch/arm/mach-omap2/pm.c           |    3 +
- arch/arm/mach-omap2/prm2xxx_3xxx.c |    3 +
- 7 files changed, 88 insertions(+), 26 deletions(-)
+ arch/arm/mach-omap2/powerdomain.h                |   26 +++++++------
+ arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c |    4 +-
+ arch/arm/mach-omap2/powerdomains2xxx_data.c      |    8 ++--
+ arch/arm/mach-omap2/powerdomains3xxx_data.c      |   44 +++++++++++-----------
+ 4 files changed, 42 insertions(+), 40 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 9d5b69f..ed8ac2f 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -210,7 +210,8 @@ static int _clkdm_add_wkdep(struct clockdomain *clkdm1,
- 		return ret;
- 	}
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index 83b4892..842ba46 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -43,18 +43,20 @@
+ #define PWRSTS_OFF_RET_ON	(PWRSTS_OFF_RET | PWRSTS_ON)
  
--	if (atomic_inc_return(&cd->wkdep_usecount) == 1) {
-+	cd->wkdep_usecount++;
-+	if (cd->wkdep_usecount == 1) {
- 		pr_debug("clockdomain: hardware will wake up %s when %s wakes up\n",
- 			 clkdm1->name, clkdm2->name);
  
-@@ -252,7 +253,8 @@ static int _clkdm_del_wkdep(struct clockdomain *clkdm1,
- 		return ret;
- 	}
+-/* Powerdomain flags */
+-#define PWRDM_HAS_HDWR_SAR	(1 << 0) /* hardware save-and-restore support */
+-#define PWRDM_HAS_MPU_QUIRK	(1 << 1) /* MPU pwr domain has MEM bank 0 bits
+-					  * in MEM bank 1 position. This is
+-					  * true for OMAP3430
+-					  */
+-#define PWRDM_HAS_LOWPOWERSTATECHANGE	(1 << 2) /*
+-						  * support to transition from a
+-						  * sleep state to a lower sleep
+-						  * state without waking up the
+-						  * powerdomain
+-						  */
++/*
++ * Powerdomain flags (struct powerdomain.flags)
++ *
++ * PWRDM_HAS_HDWR_SAR - powerdomain has hardware save-and-restore support
++ *
++ * PWRDM_HAS_MPU_QUIRK - MPU pwr domain has MEM bank 0 bits in MEM
++ * bank 1 position. This is true for OMAP3430
++ *
++ * PWRDM_HAS_LOWPOWERSTATECHANGE - can transition from a sleep state
++ * to a lower sleep state without waking up the powerdomain
++ */
++#define PWRDM_HAS_HDWR_SAR		BIT(0)
++#define PWRDM_HAS_MPU_QUIRK		BIT(1)
++#define PWRDM_HAS_LOWPOWERSTATECHANGE	BIT(2)
  
--	if (atomic_dec_return(&cd->wkdep_usecount) == 0) {
-+	cd->wkdep_usecount--;
-+	if (cd->wkdep_usecount == 0) {
- 		pr_debug("clockdomain: hardware will no longer wake up %s after %s wakes up\n",
- 			 clkdm1->name, clkdm2->name);
- 
-@@ -296,7 +298,8 @@ static int _clkdm_add_sleepdep(struct clockdomain *clkdm1,
- 		return ret;
- 	}
- 
--	if (atomic_inc_return(&cd->sleepdep_usecount) == 1) {
-+	cd->sleepdep_usecount++;
-+	if (cd->sleepdep_usecount == 1) {
- 		pr_debug("clockdomain: will prevent %s from sleeping if %s is active\n",
- 			 clkdm1->name, clkdm2->name);
- 
-@@ -340,7 +343,8 @@ static int _clkdm_del_sleepdep(struct clockdomain *clkdm1,
- 		return ret;
- 	}
- 
--	if (atomic_dec_return(&cd->sleepdep_usecount) == 0) {
-+	cd->sleepdep_usecount--;
-+	if (cd->sleepdep_usecount == 0) {
- 		pr_debug("clockdomain: will no longer prevent %s from sleeping if %s is active\n",
- 			 clkdm1->name, clkdm2->name);
- 
-@@ -567,7 +571,21 @@ struct powerdomain *clkdm_get_pwrdm(struct clockdomain *clkdm)
-  */
- int clkdm_add_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
- {
--	return _clkdm_add_wkdep(clkdm1, clkdm2);
-+	struct clkdm_dep *cd;
-+	int ret;
-+
-+	if (!clkdm1 || !clkdm2)
-+		return -EINVAL;
-+
-+	cd = _clkdm_deps_lookup(clkdm2, clkdm1->wkdep_srcs);
-+	if (IS_ERR(cd))
-+		return PTR_ERR(cd);
-+
-+	pwrdm_lock(cd->clkdm->pwrdm.ptr);
-+	ret = _clkdm_add_wkdep(clkdm1, clkdm2);
-+	pwrdm_unlock(cd->clkdm->pwrdm.ptr);
-+
-+	return ret;
- }
- 
- /**
-@@ -582,7 +600,21 @@ int clkdm_add_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
-  */
- int clkdm_del_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
- {
--	return _clkdm_del_wkdep(clkdm1, clkdm2);
-+	struct clkdm_dep *cd;
-+	int ret;
-+
-+	if (!clkdm1 || !clkdm2)
-+		return -EINVAL;
-+
-+	cd = _clkdm_deps_lookup(clkdm2, clkdm1->wkdep_srcs);
-+	if (IS_ERR(cd))
-+		return PTR_ERR(cd);
-+
-+	pwrdm_lock(cd->clkdm->pwrdm.ptr);
-+	ret = _clkdm_del_wkdep(clkdm1, clkdm2);
-+	pwrdm_unlock(cd->clkdm->pwrdm.ptr);
-+
-+	return ret;
- }
- 
- /**
-@@ -620,7 +652,7 @@ int clkdm_read_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
- 		return ret;
- 	}
- 
--	/* XXX It's faster to return the atomic wkdep_usecount */
-+	/* XXX It's faster to return the wkdep_usecount */
- 	return arch_clkdm->clkdm_read_wkdep(clkdm1, clkdm2);
- }
- 
-@@ -659,7 +691,21 @@ int clkdm_clear_all_wkdeps(struct clockdomain *clkdm)
-  */
- int clkdm_add_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
- {
--	return _clkdm_add_sleepdep(clkdm1, clkdm2);
-+	struct clkdm_dep *cd;
-+	int ret;
-+
-+	if (!clkdm1 || !clkdm2)
-+		return -EINVAL;
-+
-+	cd = _clkdm_deps_lookup(clkdm2, clkdm1->wkdep_srcs);
-+	if (IS_ERR(cd))
-+		return PTR_ERR(cd);
-+
-+	pwrdm_lock(cd->clkdm->pwrdm.ptr);
-+	ret = _clkdm_add_sleepdep(clkdm1, clkdm2);
-+	pwrdm_unlock(cd->clkdm->pwrdm.ptr);
-+
-+	return ret;
- }
- 
- /**
-@@ -676,7 +722,21 @@ int clkdm_add_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
-  */
- int clkdm_del_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
- {
--	return _clkdm_del_sleepdep(clkdm1, clkdm2);
-+	struct clkdm_dep *cd;
-+	int ret;
-+
-+	if (!clkdm1 || !clkdm2)
-+		return -EINVAL;
-+
-+	cd = _clkdm_deps_lookup(clkdm2, clkdm1->wkdep_srcs);
-+	if (IS_ERR(cd))
-+		return PTR_ERR(cd);
-+
-+	pwrdm_lock(cd->clkdm->pwrdm.ptr);
-+	ret = _clkdm_del_sleepdep(clkdm1, clkdm2);
-+	pwrdm_unlock(cd->clkdm->pwrdm.ptr);
-+
-+	return ret;
- }
- 
- /**
-@@ -716,7 +776,7 @@ int clkdm_read_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
- 		return ret;
- 	}
- 
--	/* XXX It's faster to return the atomic sleepdep_usecount */
-+	/* XXX It's faster to return the sleepdep_usecount */
- 	return arch_clkdm->clkdm_read_sleepdep(clkdm1, clkdm2);
- }
- 
-@@ -1063,7 +1123,8 @@ static int _clkdm_clk_hwmod_enable(struct clockdomain *clkdm)
- 	 * should be called for every clock instance or hwmod that is
- 	 * enabled, so the clkdm can be force woken up.
- 	 */
--	if ((atomic_inc_return(&clkdm->usecount) > 1) && autodeps) {
-+	clkdm->usecount++;
-+	if (clkdm->usecount > 1 && autodeps) {
- 		pwrdm_unlock(clkdm->pwrdm.ptr);
- 		return 0;
- 	}
-@@ -1084,13 +1145,14 @@ static int _clkdm_clk_hwmod_disable(struct clockdomain *clkdm)
- 
- 	pwrdm_lock(clkdm->pwrdm.ptr);
- 
--	if (atomic_read(&clkdm->usecount) == 0) {
-+	if (clkdm->usecount == 0) {
- 		pwrdm_unlock(clkdm->pwrdm.ptr);
- 		WARN_ON(1); /* underflow */
- 		return -ERANGE;
- 	}
- 
--	if (atomic_dec_return(&clkdm->usecount) > 0) {
-+	clkdm->usecount--;
-+	if (clkdm->usecount > 0) {
- 		pwrdm_unlock(clkdm->pwrdm.ptr);
- 		return 0;
- 	}
-diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
-index 50c3cd8..2da3765 100644
---- a/arch/arm/mach-omap2/clockdomain.h
-+++ b/arch/arm/mach-omap2/clockdomain.h
-@@ -91,8 +91,8 @@ struct clkdm_autodep {
- struct clkdm_dep {
- 	const char *clkdm_name;
- 	struct clockdomain *clkdm;
--	atomic_t wkdep_usecount;
--	atomic_t sleepdep_usecount;
-+	s16 wkdep_usecount;
-+	s16 sleepdep_usecount;
+ /*
+  * Number of memory banks that are power-controllable.	On OMAP4430, the
+diff --git a/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c b/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
+index d3a5399..7b946f1 100644
+--- a/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
++++ b/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
+@@ -54,12 +54,12 @@ struct powerdomain gfx_omap2_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
  };
  
- /* Possible flags for struct clockdomain._flags */
-@@ -136,7 +136,7 @@ struct clockdomain {
- 	const u16 clkdm_offs;
- 	struct clkdm_dep *wkdep_srcs;
- 	struct clkdm_dep *sleepdep_srcs;
--	atomic_t usecount;
-+	int usecount;
- 	struct list_head node;
+ struct powerdomain wkup_omap2_pwrdm = {
+ 	.name		= "wkup_pwrdm",
+ 	.prcm_offs	= WKUP_MOD,
+ 	.pwrsts		= PWRSTS_ON,
+-	.voltdm         = { .name = "wakeup" },
++	.voltdm		= { .name = "wakeup" },
+ };
+diff --git a/arch/arm/mach-omap2/powerdomains2xxx_data.c b/arch/arm/mach-omap2/powerdomains2xxx_data.c
+index 01abc1e..578eef8 100644
+--- a/arch/arm/mach-omap2/powerdomains2xxx_data.c
++++ b/arch/arm/mach-omap2/powerdomains2xxx_data.c
+@@ -38,7 +38,7 @@ static struct powerdomain dsp_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
  };
  
-diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
-index b94af4c..9061c30 100644
---- a/arch/arm/mach-omap2/cm3xxx.c
-+++ b/arch/arm/mach-omap2/cm3xxx.c
-@@ -186,7 +186,7 @@ static int omap3xxx_clkdm_clear_all_sleepdeps(struct clockdomain *clkdm)
- 			continue; /* only happens if data is erroneous */
+ static struct powerdomain mpu_24xx_pwrdm = {
+@@ -53,7 +53,7 @@ static struct powerdomain mpu_24xx_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
  
- 		mask |= 1 << cd->clkdm->dep_bit;
--		atomic_set(&cd->sleepdep_usecount, 0);
-+		cd->sleepdep_usecount = 0;
- 	}
- 	omap2_cm_clear_mod_reg_bits(mask, clkdm->pwrdm.ptr->prcm_offs,
- 				    OMAP3430_CM_SLEEPDEP);
-@@ -209,7 +209,7 @@ static int omap3xxx_clkdm_wakeup(struct clockdomain *clkdm)
+ static struct powerdomain core_24xx_pwrdm = {
+@@ -72,7 +72,7 @@ static struct powerdomain core_24xx_pwrdm = {
+ 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
+ 		[2] = PWRSTS_OFF_RET_ON, /* MEM3ONSTATE */
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
  
- static void omap3xxx_clkdm_allow_idle(struct clockdomain *clkdm)
- {
--	if (atomic_read(&clkdm->usecount) > 0)
-+	if (clkdm->usecount > 0)
- 		clkdm_add_autodeps(clkdm);
  
- 	omap3xxx_cm_clkdm_enable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
-@@ -221,7 +221,7 @@ static void omap3xxx_clkdm_deny_idle(struct clockdomain *clkdm)
- 	omap3xxx_cm_clkdm_disable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
- 					clkdm->clktrctrl_mask);
+@@ -94,7 +94,7 @@ static struct powerdomain mdm_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
  
--	if (atomic_read(&clkdm->usecount) > 0)
-+	if (clkdm->usecount > 0)
- 		clkdm_del_autodeps(clkdm);
- }
+ /*
+diff --git a/arch/arm/mach-omap2/powerdomains3xxx_data.c b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+index 8b23d23..f0e14e9ef 100644
+--- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
++++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+@@ -50,7 +50,7 @@ static struct powerdomain iva2_pwrdm = {
+ 		[2] = PWRSTS_OFF_ON,
+ 		[3] = PWRSTS_ON,
+ 	},
+-	.voltdm           = { .name = "mpu_iva" },
++	.voltdm		  = { .name = "mpu_iva" },
+ };
  
-diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
-index 7f9a464..f0290f5 100644
---- a/arch/arm/mach-omap2/cminst44xx.c
-+++ b/arch/arm/mach-omap2/cminst44xx.c
-@@ -393,7 +393,7 @@ static int omap4_clkdm_clear_all_wkup_sleep_deps(struct clockdomain *clkdm)
- 			continue; /* only happens if data is erroneous */
+ static struct powerdomain mpu_3xxx_pwrdm = {
+@@ -66,7 +66,7 @@ static struct powerdomain mpu_3xxx_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_OFF_ON,
+ 	},
+-	.voltdm           = { .name = "mpu_iva" },
++	.voltdm		  = { .name = "mpu_iva" },
+ };
  
- 		mask |= 1 << cd->clkdm->dep_bit;
--		atomic_set(&cd->wkdep_usecount, 0);
-+		cd->wkdep_usecount = 0;
- 	}
+ static struct powerdomain mpu_am35x_pwrdm = {
+@@ -82,7 +82,7 @@ static struct powerdomain mpu_am35x_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,
+ 	},
+-	.voltdm           = { .name = "mpu_iva" },
++	.voltdm		  = { .name = "mpu_iva" },
+ };
  
- 	omap4_cminst_clear_inst_reg_bits(mask, clkdm->prcm_partition,
-diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-index 3cf4fdf..806a06b 100644
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -84,10 +84,8 @@ static int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *user)
- 		strncmp(clkdm->name, "dpll", 4) == 0)
- 		return 0;
+ /*
+@@ -109,7 +109,7 @@ static struct powerdomain core_3xxx_pre_es3_1_pwrdm = {
+ 		[0] = PWRSTS_OFF_RET_ON, /* MEM1ONSTATE */
+ 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
  
--	seq_printf(s, "%s->%s (%d)", clkdm->name,
--			clkdm->pwrdm.ptr->name,
--			atomic_read(&clkdm->usecount));
--	seq_printf(s, "\n");
-+	seq_printf(s, "%s->%s (%d)\n", clkdm->name, clkdm->pwrdm.ptr->name,
-+		   clkdm->usecount);
+ static struct powerdomain core_3xxx_es3_1_pwrdm = {
+@@ -131,7 +131,7 @@ static struct powerdomain core_3xxx_es3_1_pwrdm = {
+ 		[0] = PWRSTS_OFF_RET_ON, /* MEM1ONSTATE */
+ 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
  
- 	return 0;
- }
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index 2e2a897..6b7cb7c 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -78,11 +78,12 @@ static void __init omap2_init_processor_devices(void)
+ static struct powerdomain core_am35x_pwrdm = {
+@@ -148,7 +148,7 @@ static struct powerdomain core_am35x_pwrdm = {
+ 		[0] = PWRSTS_ON, /* MEM1ONSTATE */
+ 		[1] = PWRSTS_ON, /* MEM2ONSTATE */
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
  
- int __init omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused)
- {
-+	/* XXX The usecount test is racy */
- 	if ((clkdm->flags & CLKDM_CAN_ENABLE_AUTO) &&
- 	    !(clkdm->flags & CLKDM_MISSING_IDLE_REPORTING))
- 		clkdm_allow_idle(clkdm);
- 	else if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP &&
--		 atomic_read(&clkdm->usecount) == 0)
-+		 clkdm->usecount == 0)
- 		clkdm_sleep(clkdm);
- 	return 0;
- }
-diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-index a3e121f..947f6ad 100644
---- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-@@ -210,6 +210,7 @@ int omap2_clkdm_read_wkdep(struct clockdomain *clkdm1,
- 					     PM_WKDEP, (1 << clkdm2->dep_bit));
- }
+ static struct powerdomain dss_pwrdm = {
+@@ -163,7 +163,7 @@ static struct powerdomain dss_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
  
-+/* XXX Caller must hold the clkdm's powerdomain lock */
- int omap2_clkdm_clear_all_wkdeps(struct clockdomain *clkdm)
- {
- 	struct clkdm_dep *cd;
-@@ -221,7 +222,7 @@ int omap2_clkdm_clear_all_wkdeps(struct clockdomain *clkdm)
+ static struct powerdomain dss_am35x_pwrdm = {
+@@ -178,7 +178,7 @@ static struct powerdomain dss_am35x_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
  
- 		/* PRM accesses are slow, so minimize them */
- 		mask |= 1 << cd->clkdm->dep_bit;
--		atomic_set(&cd->wkdep_usecount, 0);
-+		cd->wkdep_usecount = 0;
- 	}
+ /*
+@@ -199,7 +199,7 @@ static struct powerdomain sgx_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
  
- 	omap2_prm_clear_mod_reg_bits(mask, clkdm->pwrdm.ptr->prcm_offs,
+ static struct powerdomain sgx_am35x_pwrdm = {
+@@ -214,7 +214,7 @@ static struct powerdomain sgx_am35x_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
+ 
+ static struct powerdomain cam_pwrdm = {
+@@ -229,7 +229,7 @@ static struct powerdomain cam_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
+ 
+ static struct powerdomain per_pwrdm = {
+@@ -244,7 +244,7 @@ static struct powerdomain per_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
+ 
+ static struct powerdomain per_am35x_pwrdm = {
+@@ -259,13 +259,13 @@ static struct powerdomain per_am35x_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
+ 
+ static struct powerdomain emu_pwrdm = {
+ 	.name		= "emu_pwrdm",
+ 	.prcm_offs	= OMAP3430_EMU_MOD,
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
+ 
+ static struct powerdomain neon_pwrdm = {
+@@ -273,7 +273,7 @@ static struct powerdomain neon_pwrdm = {
+ 	.prcm_offs	  = OMAP3430_NEON_MOD,
+ 	.pwrsts		  = PWRSTS_OFF_RET_ON,
+ 	.pwrsts_logic_ret = PWRSTS_RET,
+-	.voltdm           = { .name = "mpu_iva" },
++	.voltdm		  = { .name = "mpu_iva" },
+ };
+ 
+ static struct powerdomain neon_am35x_pwrdm = {
+@@ -281,7 +281,7 @@ static struct powerdomain neon_am35x_pwrdm = {
+ 	.prcm_offs	  = OMAP3430_NEON_MOD,
+ 	.pwrsts		  = PWRSTS_ON,
+ 	.pwrsts_logic_ret = PWRSTS_ON,
+-	.voltdm           = { .name = "mpu_iva" },
++	.voltdm		  = { .name = "mpu_iva" },
+ };
+ 
+ static struct powerdomain usbhost_pwrdm = {
+@@ -303,37 +303,37 @@ static struct powerdomain usbhost_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
+ 
+ static struct powerdomain dpll1_pwrdm = {
+ 	.name		= "dpll1_pwrdm",
+ 	.prcm_offs	= MPU_MOD,
+-	.voltdm           = { .name = "mpu_iva" },
++	.voltdm		  = { .name = "mpu_iva" },
+ };
+ 
+ static struct powerdomain dpll2_pwrdm = {
+ 	.name		= "dpll2_pwrdm",
+ 	.prcm_offs	= OMAP3430_IVA2_MOD,
+-	.voltdm           = { .name = "mpu_iva" },
++	.voltdm		  = { .name = "mpu_iva" },
+ };
+ 
+ static struct powerdomain dpll3_pwrdm = {
+ 	.name		= "dpll3_pwrdm",
+ 	.prcm_offs	= PLL_MOD,
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
+ 
+ static struct powerdomain dpll4_pwrdm = {
+ 	.name		= "dpll4_pwrdm",
+ 	.prcm_offs	= PLL_MOD,
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
+ 
+ static struct powerdomain dpll5_pwrdm = {
+ 	.name		= "dpll5_pwrdm",
+ 	.prcm_offs	= PLL_MOD,
+-	.voltdm           = { .name = "core" },
++	.voltdm		  = { .name = "core" },
+ };
+ 
+ /* As powerdomains are added or removed above, this list must also be changed */
