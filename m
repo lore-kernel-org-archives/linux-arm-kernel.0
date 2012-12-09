@@ -1,87 +1,85 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 09 Dec 2012 10:52:53 -0700
-Subject: [PATCH 01/12] ARM: OMAP2+: powerdomain: add functions that report
- on powerdomain capabilities
-In-Reply-To: <20121209174545.6933.59371.stgit@dusk.lan>
-References: <20121209174545.6933.59371.stgit@dusk.lan>
-Message-ID: <20121209175249.6933.71752.stgit@dusk.lan>
+Date: Sun, 09 Dec 2012 10:52:49 -0700
+Subject: [PATCH 00/12] ARM: OMAP2+: powerdomain/PM: convert to functional
+ power states
+Message-ID: <20121209174545.6933.59371.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add several functions to report on whether powerdomains can change their
-power state or logic retention power state, and whether those abilities
-can be controlled by the kernel.  This code is used in subsequent patches
-that add the functional power state code.
+Hi
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
+This series converts the OMAP2+ powerdomain and PM code to use
+"functional power states" - high-level power states such as "OSWR",
+which reflect changes in multiple underlying registers, rather than
+expecting high-level PM code to program the registers directly.  This
+is intended to reduce the complexity of the high-level PM code and to
+make it easier to implement register caching of the various
+powerdomain registers, some of which are quite slow to access.
+
+
+- Paul
+
 ---
- arch/arm/mach-omap2/powerdomain.c |   56 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 2a5f15b..94b89a25 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -203,6 +203,62 @@ static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
- 	return 0;
- }
- 
-+/**
-+ * _pwrdm_pwrst_is_controllable - can software change the powerdomain pwrst?
-+ * @pwrdm: struct powerdomain * to test
-+ *
-+ * If the kernel can program the power state that the powerdomain
-+ * @pwrdm should enter next, return 1; otherwise, return 0.
-+ */
-+static bool _pwrdm_pwrst_is_controllable(struct powerdomain *pwrdm)
-+{
-+	return (!pwrdm->pwrsts || pwrdm->pwrsts == PWRSTS_ON) ? 0 : 1;
-+}
-+
-+/**
-+ * _pwrdm_pwrst_can_change - can the power state of @pwrdm change?
-+ * @pwrdm: struct powerdomain * to test
-+ *
-+ * If the power state of the powerdomain represented by @pwrdm can
-+ * change (i.e., is not always on), and the kernel has some way to
-+ * detect this, return 1; otherwise, return 0.  XXX The current
-+ * implementation of this is based on an assumption and has not been
-+ * verified against all OMAPs.
-+ */
-+static bool _pwrdm_pwrst_can_change(struct powerdomain *pwrdm)
-+{
-+	return _pwrdm_pwrst_is_controllable(pwrdm);
-+}
-+
-+/**
-+ * _pwrdm_logic_retst_is_controllable - can software change the logic retst?
-+ * @pwrdm: struct powerdomain * to test
-+ *
-+ * If the kernel can program the power state that the powerdomain
-+ * @pwrdm logic should enter when the @pwrdm enters the RETENTION
-+ * power state, return 1; otherwise, return 0.
-+ */
-+static bool _pwrdm_logic_retst_is_controllable(struct powerdomain *pwrdm)
-+{
-+	return (!pwrdm->pwrsts_logic_ret ||
-+		pwrdm->pwrsts_logic_ret == PWRSTS_RET) ? 0 : 1;
-+}
-+
-+/**
-+ * _pwrdm_logic_retst_can_change - can the logic retst change on @pwrdm?
-+ * @pwrdm: struct powerdomain * to test
-+ *
-+ * If the logic powerstate for the powerdomain represented by @pwrdm
-+ * can ever be something other than the powerdomain's powerstate, and
-+ * the kernel has some way to detect this, return 1; otherwise, return
-+ * 0.  XXX The current implementation of this is based on an
-+ * assumption and has not been verified against all OMAPs.
-+ */
-+static bool _pwrdm_logic_retst_can_change(struct powerdomain *pwrdm)
-+{
-+	return _pwrdm_logic_retst_is_controllable(pwrdm);
-+}
-+
- /* Public functions */
- 
- /**
+vmlinux object size
+(delta in bytes from TEST_pm_cleanup_fixes_b_3.9 (2f8d7b1f0048df431ca226d81c5c27c4dd21953b)):
+   text     data      bss    total  kernel
+   +456      -56        0     +400  am33xx_only
+   +448      -96        0     +352  n800_multi_omap2xxx
+   +448      -96        0     +352  n800_only_a
+      0        0        0        0  omap1_defconfig
+      0        0        0        0  omap1_defconfig_1510innovator_only
+      0        0        0        0  omap1_defconfig_5912osk_only
+  +1180     -744        0     +436  omap2plus_defconfig
+   +584      -72        0     +512  omap2plus_defconfig_2430sdp_only
+  +1244     -808        0     +436  omap2plus_defconfig_cpupm
+   +976    -1224        0     -248  omap2plus_defconfig_no_pm
+   +844     -408        0     +436  omap2plus_defconfig_omap2_4_only
+  +1088     -624        0     +464  omap2plus_defconfig_omap3_4_only
+  +1292    -1232     -352     -292  rmk_omap3430_ldp_allnoconfig
+   +916     -720        0     +196  rmk_omap3430_ldp_oldconfig
+  +1292    -1232     -352     -292  rmk_omap4430_sdp_allnoconfig
+   +840     -392        0     +448  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from TEST_pm_cleanup_fixes_b_3.9 (2f8d7b1f0048df431ca226d81c5c27c4dd21953b))
+  avail  rsrvd   high  freed  board          kconfig
+    -8k     8k      .      .  2430sdp        omap2plus_defconfig
+    -8k     8k      .      .  3517evm        omap2plus_defconfig
+    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
+    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
+    -8k     8k      .      .  37xxevm        omap2plus_defconfig
+    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
+    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
+    -8k     8k      .      .  cmt3517        omap2plus_defconfig
+
+Jean Pihet (6):
+      ARM: OMAP2+: PM: introduce power domains functional states
+      ARM: OMAP2+: PM debug: trace the functional power domains states
+      ARM: OMAP2xxx: PM: convert to use the functional power states API
+      ARM: OMAP3xxx: PM: convert to use the functional power states API
+      ARM: OMAP44xx: PM: convert to use the functional power states API
+      ARM: OMAP2+: PM: use power domain functional state in stats counters
+
+Paul Walmsley (6):
+      ARM: OMAP2+: powerdomain: add functions that report on powerdomain capabilities
+      ARM: OMAP2+: powerdomain: drop many low-level powerdomain funcs
+      ARM: OMAP2+: powerdomain: add ability to test for supported power states
+      ARM: OMAP2+: powerdomain/PM: only program supported power states
+      ARM: OMAP2+: powerdomain: program memory bank next-power-state upon init
+      ARM: OMAP2+: powerdomain: assume memory bank power states follow powerdomain
+
+
+ arch/arm/mach-omap2/common.h              |    7 
+ arch/arm/mach-omap2/cpuidle34xx.c         |   95 +-
+ arch/arm/mach-omap2/cpuidle44xx.c         |   32 -
+ arch/arm/mach-omap2/omap-hotplug.c        |    2 
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |   69 +-
+ arch/arm/mach-omap2/pm-debug.c            |   46 -
+ arch/arm/mach-omap2/pm.h                  |    2 
+ arch/arm/mach-omap2/pm24xx.c              |   33 -
+ arch/arm/mach-omap2/pm34xx.c              |  188 +++-
+ arch/arm/mach-omap2/pm44xx.c              |   47 +
+ arch/arm/mach-omap2/powerdomain.c         | 1235 +++++++++++++++++------------
+ arch/arm/mach-omap2/powerdomain.h         |   69 +-
+ 12 files changed, 1040 insertions(+), 785 deletions(-)
