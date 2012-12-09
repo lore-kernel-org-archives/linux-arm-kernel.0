@@ -1,104 +1,138 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 09 Dec 2012 13:03:25 -0700
-Subject: [PATCH 06/12] ARM: OMAP2+: CM: use the cached copy of the
- clockdomain's hwsup state
+Date: Sun, 09 Dec 2012 13:03:17 -0700
+Subject: [PATCH 02/12] ARM: OMAP2+: PM/powerdomain: move the power state
+ time tracking into the powerdomain code
 In-Reply-To: <20121209200108.3196.12452.stgit@dusk.lan>
 References: <20121209200108.3196.12452.stgit@dusk.lan>
-Message-ID: <20121209200324.3196.65545.stgit@dusk.lan>
+Message-ID: <20121209200259.3196.84569.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid some unnecessary CM IP block reads by using the cached copy of
-the clockdomain's hardware-supervised idle state.  This should
-simplify the code slightly and save a few hundred nanoseconds in these
-paths.
+Move the power state time tracking code into the powerdomain code.
+This code accesses internal powerdomain state, so this change will
+allow us to reduce what is exported from the powerdomain code.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/cm2xxx.c |   19 ++-----------------
- arch/arm/mach-omap2/cm3xxx.c |   14 ++------------
- 2 files changed, 4 insertions(+), 29 deletions(-)
+ arch/arm/mach-omap2/pm-debug.c    |   24 ------------------------
+ arch/arm/mach-omap2/pm.h          |    6 ------
+ arch/arm/mach-omap2/powerdomain.c |   22 +++++++++++++++++++++-
+ 3 files changed, 21 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
-index 6774a53..8ca13cd 100644
---- a/arch/arm/mach-omap2/cm2xxx.c
-+++ b/arch/arm/mach-omap2/cm2xxx.c
-@@ -285,14 +285,7 @@ static void omap2xxx_clkdm_deny_idle(struct clockdomain *clkdm)
+diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+index 03da2e3..80c001a 100644
+--- a/arch/arm/mach-omap2/pm-debug.c
++++ b/arch/arm/mach-omap2/pm-debug.c
+@@ -53,21 +53,6 @@ enum {
+ 	DEBUG_FILE_TIMERS,
+ };
  
- static int omap2xxx_clkdm_clk_enable(struct clockdomain *clkdm)
+-void pm_dbg_update_time(struct powerdomain *pwrdm, int prev)
+-{
+-	s64 t;
+-
+-	if (!pm_dbg_init_done)
+-		return ;
+-
+-	/* Update timer for previous state */
+-	t = sched_clock();
+-
+-	pwrdm->fpwrst_timer[prev - PWRDM_FPWRST_OFFSET] += t - pwrdm->timer;
+-
+-	pwrdm->timer = t;
+-}
+-
+ static int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *user)
  {
--	bool hwsup = false;
+ 	struct seq_file *s = (struct seq_file *)user;
+@@ -197,17 +182,8 @@ DEFINE_SIMPLE_ATTRIBUTE(pwrdm_suspend_fops, pwrdm_suspend_get,
+ 
+ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *dir)
+ {
+-	int i;
+-	s64 t;
+ 	struct dentry *d;
+ 
+-	t = sched_clock();
 -
--	if (!clkdm->clktrctrl_mask)
--		return 0;
+-	for (i = 0; i < PWRDM_FPWRSTS_COUNT; i++)
+-		pwrdm->fpwrst_timer[i] = 0;
 -
--	hwsup = omap2xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
--					      clkdm->clktrctrl_mask);
--	if (!hwsup && clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
-+	if (!clkdm_in_hwsup(clkdm) && clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
- 		omap2xxx_clkdm_wakeup(clkdm);
+-	pwrdm->timer = t;
+-
+ 	if (strncmp(pwrdm->name, "dpll", 4) == 0)
+ 		return 0;
+ 
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 19ef376..c496f27 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -59,12 +59,6 @@ extern u32 enable_off_mode;
+ #define enable_off_mode 0
+ #endif
+ 
+-#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
+-extern void pm_dbg_update_time(struct powerdomain *pwrdm, int prev);
+-#else
+-#define pm_dbg_update_time(pwrdm, prev) do {} while (0);
+-#endif /* CONFIG_PM_DEBUG */
+-
+ /* 24xx */
+ extern void omap24xx_idle_loop_suspend(void);
+ extern unsigned int omap24xx_idle_loop_suspend_sz;
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index b67d721..53bc852 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -20,6 +20,8 @@
+ #include <linux/errno.h>
+ #include <linux/string.h>
+ #include <linux/spinlock.h>
++#include <linux/sched.h>
++
+ #include <trace/events/power.h>
+ 
+ #include "cm2xxx_3xxx.h"
+@@ -126,6 +128,9 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
+ 	arch_pwrdm->pwrdm_wait_transition(pwrdm);
+ 	pwrdm->fpwrst = pwrdm_read_fpwrst(pwrdm);
+ 	pwrdm->fpwrst_counter[pwrdm->fpwrst - PWRDM_FPWRST_OFFSET] = 1;
++#ifdef CONFIG_PM_DEBUG
++	pwrdm->timer = sched_clock();
++#endif
  
  	return 0;
-@@ -300,15 +293,7 @@ static int omap2xxx_clkdm_clk_enable(struct clockdomain *clkdm)
+ }
+@@ -579,6 +584,21 @@ static int _pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
+ 	return ret;
+ }
  
- static int omap2xxx_clkdm_clk_disable(struct clockdomain *clkdm)
- {
--	bool hwsup = false;
--
--	if (!clkdm->clktrctrl_mask)
--		return 0;
--
--	hwsup = omap2xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
--					      clkdm->clktrctrl_mask);
--
--	if (!hwsup && clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
-+	if (!clkdm_in_hwsup(clkdm) && clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
- 		omap2xxx_clkdm_sleep(clkdm);
++/* XXX prev is wrong type */
++/* XXX is sched_clock() correct to use here? */
++/* Update timer for previous state */
++static void _pwrdm_update_pwrst_time(struct powerdomain *pwrdm, int prev)
++{
++#ifdef CONFIG_PM_DEBUG
++	s64 t;
++
++	t = sched_clock();
++
++	pwrdm->fpwrst_timer[prev - PWRDM_FPWRST_OFFSET] += t - pwrdm->timer;
++
++	pwrdm->timer = t;
++#endif
++}
  
- 	return 0;
-diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
-index 9061c30..75872134 100644
---- a/arch/arm/mach-omap2/cm3xxx.c
-+++ b/arch/arm/mach-omap2/cm3xxx.c
-@@ -227,8 +227,6 @@ static void omap3xxx_clkdm_deny_idle(struct clockdomain *clkdm)
+ /* XXX Caller must hold pwrdm->_lock */
+ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+@@ -617,7 +637,7 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+ 	if (fpwrst != prev)
+ 		pwrdm->fpwrst_counter[fpwrst - PWRDM_FPWRST_OFFSET]++;
  
- static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
- {
--	bool hwsup = false;
--
- 	if (!clkdm->clktrctrl_mask)
- 		return 0;
+-	pm_dbg_update_time(pwrdm, prev);
++	_pwrdm_update_pwrst_time(pwrdm, prev);
  
-@@ -243,10 +241,7 @@ static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
- 		return 0;
- 	}
+ 	pwrdm->fpwrst = fpwrst;
  
--	hwsup = omap3xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
--					      clkdm->clktrctrl_mask);
--
--	if (hwsup) {
-+	if (clkdm_in_hwsup(clkdm)) {
- 		/* Disable HW transitions when we are changing deps */
- 		omap3xxx_cm_clkdm_disable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
- 						clkdm->clktrctrl_mask);
-@@ -263,8 +258,6 @@ static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
- 
- static int omap3xxx_clkdm_clk_disable(struct clockdomain *clkdm)
- {
--	bool hwsup = false;
--
- 	if (!clkdm->clktrctrl_mask)
- 		return 0;
- 
-@@ -280,10 +273,7 @@ static int omap3xxx_clkdm_clk_disable(struct clockdomain *clkdm)
- 		return 0;
- 	}
- 
--	hwsup = omap3xxx_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
--					      clkdm->clktrctrl_mask);
--
--	if (hwsup) {
-+	if (clkdm_in_hwsup(clkdm)) {
- 		/* Disable HW transitions when we are changing deps */
- 		omap3xxx_cm_clkdm_disable_hwsup(clkdm->pwrdm.ptr->prcm_offs,
- 						clkdm->clktrctrl_mask);
