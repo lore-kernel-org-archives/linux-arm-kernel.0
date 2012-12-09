@@ -1,108 +1,56 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 09 Dec 2012 13:03:27 -0700
-Subject: [PATCH 08/12] ARM: OMAP2+: powerdomain: cache the powerdomain's
- previous power state
+Date: Sun, 09 Dec 2012 13:03:33 -0700
+Subject: [PATCH 12/12] ARM: OMAP2xxx: PM: add pwrdm_(pre|post)_transition()
+ calls to the 2xxx PM code
 In-Reply-To: <20121209200108.3196.12452.stgit@dusk.lan>
 References: <20121209200108.3196.12452.stgit@dusk.lan>
-Message-ID: <20121209200326.3196.35867.stgit@dusk.lan>
+Message-ID: <20121209200331.3196.9787.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cache the powerdomain previous power state registers.  The objective
-here is to avoid unneeded reads from the previous power state
-registers.  Reads from these registers can be extremely slow, even by
-I/O device standards.  I no longer recall the exact measurements, but
-my recollection was that they cost several microseconds.
-
-The cache is invalidated as part of the powerdomain pre-transition
-code, which runs shortly before WFI/WFE.
+The OMAP2xxx PM code was missing calls to pwrdm_pre_transition() and
+pwrdm_post_transition().  This prevented the power state debugging
+from working correctly, and also violated some assumptions that are
+used in future power state caching patches.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 Cc: Kevin Hilman <khilman@deeprootsystems.com>
 ---
- arch/arm/mach-omap2/powerdomain.c |    9 +++++++++
- arch/arm/mach-omap2/powerdomain.h |   14 ++++++++++++++
- 2 files changed, 23 insertions(+)
+ arch/arm/mach-omap2/pm24xx.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 425c868..f5e2727 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -499,6 +499,9 @@ static int _pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm)
- 	if (!_pwrdm_pwrst_can_change(pwrdm))
- 		return PWRDM_FUNC_PWRST_ON;
+diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+index 99c16c2..896727c 100644
+--- a/arch/arm/mach-omap2/pm24xx.c
++++ b/arch/arm/mach-omap2/pm24xx.c
+@@ -98,6 +98,8 @@ static int omap2_enter_full_retention(void)
  
-+	if (pwrdm->_flags & _PWRDM_PREV_FPWRST_IS_VALID)
-+		return pwrdm->prev_fpwrst;
+ 	omap2_gpio_prepare_for_idle(0);
+ 
++	pwrdm_pre_transition(NULL);
 +
- 	pwrst = arch_pwrdm->pwrdm_read_prev_pwrst(pwrdm);
- 	if (pwrst < 0)
- 		return pwrst;
-@@ -512,6 +515,10 @@ static int _pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm)
+ 	/* One last check for pending IRQs to avoid extra latency due
+ 	 * to sleeping unnecessarily. */
+ 	if (omap_irq_pending())
+@@ -109,6 +111,8 @@ static int omap2_enter_full_retention(void)
+ 			   OMAP_SDRC_REGADDR(SDRC_POWER));
+ 
+ no_sleep:
++	pwrdm_post_transition(NULL);
++
+ 	omap2_gpio_resume_after_idle();
+ 
+ 	clk_enable(osc_ck);
+@@ -191,8 +195,12 @@ static void omap2_enter_mpu_retention(void)
+ 		WARN_ON(pwrdm_set_next_fpwrst(mpu_pwrdm, PWRDM_FUNC_PWRST_ON));
  	}
  
- 	ret = _pwrdm_pwrst_to_fpwrst(pwrdm, pwrst, logic_pwrst, &fpwrst);
-+	if (!ret) {
-+		pwrdm->prev_fpwrst = fpwrst;
-+		pwrdm->_flags |= _PWRDM_PREV_FPWRST_IS_VALID;
-+	}
- 
- 	return (ret) ? ret : fpwrst;
- }
-@@ -1017,6 +1024,8 @@ int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm)
- 	pr_debug("powerdomain: %s: clearing previous power state reg\n",
- 		 pwrdm->name);
- 
-+	pwrdm->_flags &= ~_PWRDM_PREV_FPWRST_IS_VALID;
++	pwrdm_pre_transition(mpu_pwrdm);
 +
- 	if (arch_pwrdm && arch_pwrdm->pwrdm_clear_all_prev_pwrst)
- 		ret = arch_pwrdm->pwrdm_clear_all_prev_pwrst(pwrdm);
+ 	omap2_sram_idle();
  
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index 1fb21f5..f4a189a 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -90,8 +90,17 @@ enum pwrdm_func_state {
-  *    powerdomain's next-functional-power-state -- struct
-  *    powerdomain.next_fpwrst -- is valid.  If this bit is not set,
-  *    the code needs to load the current value from the hardware.
-+ *
-+ * _PWRDM_PREV_FPWRST_IS_VALID: the locally-cached copy of the
-+ *    powerdomain's previous-functional-power-state -- struct
-+ *    powerdomain.prev_fpwrst -- is valid.  If this bit is not set,
-+ *    the code needs to load the current value from the hardware.  The
-+ *    previous-functional-power-state cache for the CORE and MPU needs
-+ *    to be invalidated right before WFI, unless they were not programmed
-+ *    to change power states.
-  */
- #define _PWRDM_NEXT_FPWRST_IS_VALID	BIT(0)
-+#define _PWRDM_PREV_FPWRST_IS_VALID	BIT(1)
++	pwrdm_post_transition(mpu_pwrdm);
++
+ 	WARN_ON(pwrdm_set_next_fpwrst(mpu_pwrdm, PWRDM_FUNC_PWRST_ON));
+ }
  
- /*
-  * Number of memory banks that are power-controllable.	On OMAP4430, the
-@@ -138,6 +147,7 @@ struct powerdomain;
-  * @fpwrst: current func power state (set in pwrdm_state_switch() or post_trans)
-  * @fpwrst_counter: estimated number of times the pwrdm entered the power states
-  * @next_fpwrst: cache of the powerdomain's next-power-state
-+ * @prev_fpwrst: cache of the powerdomain's previous-power-state bitfield
-  * @timer: sched_clock() timestamp of last pwrdm_state_switch()
-  * @fpwrst_timer: estimated nanoseconds of residency in the various power states
-  * @_lock: spinlock used to serialize powerdomain and some clockdomain ops
-@@ -146,6 +156,9 @@ struct powerdomain;
-  *
-  * @prcm_partition possible values are defined in mach-omap2/prcm44xx.h.
-  *
-+ * @prev_fpwrst is updated during pwrdm_pre_transition(), but presumably
-+ * should also be updated upon clock/IP block idle transitions.
-+ *
-  * Possible values for @_flags are documented above in the
-  * "Powerdomain internal flags (struct powerdomain._flags)" comments.
-  */
-@@ -165,6 +178,7 @@ struct powerdomain {
- 	const u8 prcm_partition;
- 	u8 fpwrst;
- 	u8 next_fpwrst;
-+	u8 prev_fpwrst;
- 	u8 _flags;
- 	struct clockdomain *pwrdm_clkdms[PWRDM_MAX_CLKDMS];
- 	struct list_head node;
