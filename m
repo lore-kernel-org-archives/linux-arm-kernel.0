@@ -1,215 +1,196 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 09 Dec 2012 13:03:26 -0700
-Subject: [PATCH 07/12] ARM: OMAP2+: powerdomain: cache the powerdomain next
- power state
+Date: Sun, 09 Dec 2012 13:03:21 -0700
+Subject: [PATCH 03/12] ARM: OMAP2+: powerdomain: split pwrdm_state_switch()
 In-Reply-To: <20121209200108.3196.12452.stgit@dusk.lan>
 References: <20121209200108.3196.12452.stgit@dusk.lan>
-Message-ID: <20121209200325.3196.52729.stgit@dusk.lan>
+Message-ID: <20121209200317.3196.54821.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cache the powerdomain next power state registers.  The objective here
-is to avoid unneeded reads and writes to the next power state
-registers, which are slow compared to RAM & CPU cache.
+Move the pwrdm_state_switch() code that deals with previous power
+states into the post-transition callback.  This improves the clarity
+of pwrdm_state_switch() considerably.  Add some sorely-needed
+kerneldoc for these functions.
+
+It should be possible to drop pwrdm_state_switch() completely during
+3.9.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/powerdomain.c |   64 +++++++++++++++++--------------------
- arch/arm/mach-omap2/powerdomain.h |   17 ++++++++++
- 2 files changed, 46 insertions(+), 35 deletions(-)
+ arch/arm/mach-omap2/powerdomain.c |  118 ++++++++++++++++++++++++-------------
+ arch/arm/mach-omap2/powerdomain.h |    1 
+ 2 files changed, 76 insertions(+), 43 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 62e2f75..425c868 100644
+index 53bc852..d38f493 100644
 --- a/arch/arm/mach-omap2/powerdomain.c
 +++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -376,7 +376,7 @@ static int _pwrdm_pwrst_to_fpwrst(struct powerdomain *pwrdm, u8 pwrst, u8 logic,
-  * software-controllable, returns 0; otherwise, passes along the
-  * return value from pwrdm_set_logic_retst() if there is an error
-  * returned by that function, otherwise, passes along the return value
-- * from pwrdm_set_next_pwrst()
-+ * from pwrdm_set_next_fpwrst()
-  */
- static int _set_logic_retst_and_pwrdm_pwrst(struct powerdomain *pwrdm,
- 					    u8 logic, u8 pwrst)
-@@ -426,6 +426,9 @@ static int _pwrdm_read_next_fpwrst(struct powerdomain *pwrdm)
- 	int next_pwrst, next_logic, ret;
- 	u8 fpwrst;
+@@ -40,11 +40,6 @@
  
-+	if (pwrdm->_flags & _PWRDM_NEXT_FPWRST_IS_VALID)
-+		return pwrdm->next_fpwrst;
-+
- 	next_pwrst = arch_pwrdm->pwrdm_read_next_pwrst(pwrdm);
- 	if (next_pwrst < 0)
- 		return next_pwrst;
-@@ -438,6 +441,10 @@ static int _pwrdm_read_next_fpwrst(struct powerdomain *pwrdm)
- 			return next_logic;
- 	}
- 	ret = _pwrdm_pwrst_to_fpwrst(pwrdm, next_pwrst, next_logic, &fpwrst);
-+	if (!ret) {
-+		pwrdm->next_fpwrst = fpwrst;
-+		pwrdm->_flags |= _PWRDM_NEXT_FPWRST_IS_VALID;
-+	}
+ #define PWRDM_TRACE_STATES_FLAG	(1<<31)
  
- 	return (ret) ? ret : fpwrst;
+-enum {
+-	PWRDM_STATE_NOW = 0,
+-	PWRDM_STATE_PREV,
+-};
+-
+ /* Types of sleep_switch used in pwrdm_set_fpwrst() */
+ #define ALREADYACTIVE_SWITCH		0
+ #define FORCEWAKEUP_SWITCH		1
+@@ -600,60 +595,97 @@ static void _pwrdm_update_pwrst_time(struct powerdomain *pwrdm, int prev)
+ #endif
  }
-@@ -663,7 +670,7 @@ static int _pwrdm_pre_transition_cb(struct powerdomain *pwrdm, void *unused)
-  */
+ 
+-/* XXX Caller must hold pwrdm->_lock */
+-static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
++/**
++ * _pwrdm_state_switch - record powerdomain usage data; track power state
++ * (before powerdomain state transition)
++ * @pwrdm: struct powerdomain * to observe
++ *
++ * If the powerdomain @pwrdm's current power state is not what we last
++ * observed it to be, then increment the counter for that power state.
++ * This is used to track context loss events, and for debugging.  Also
++ * if CONFIG_PM_DEBUG=y, track the amount of time the powerdomain has
++ * spent in the current power state.  Caller must hold pwrdm->_lock.
++ * Intended to be called immediately before the powerdomain's power
++ * state is likely to change.  XXX Note that the counts and durations
++ * observed by this function may be inaccurate.  Powerdomains can
++ * transition power states automatically, without the kernel being
++ * involved -- for example, a device can DMA data from memory while
++ * the MPU is asleep.  This function does not attempt to account for
++ * that.  XXX It may be possible to skip this function completely if
++ * PM debugging is not needed and off-mode and OSWR is disabled (e.g.,
++ * no context loss events).  No return value.
++ */
++static void _pwrdm_state_switch(struct powerdomain *pwrdm)
+ {
+-	int prev, next, fpwrst, trace_state = 0;
+-
+-	if (pwrdm == NULL)
+-		return -EINVAL;
++	int fpwrst;
+ 
+ 	fpwrst = _pwrdm_read_fpwrst(pwrdm);
+-
+-	switch (flag) {
+-	case PWRDM_STATE_NOW:
+-		prev = pwrdm->fpwrst;
+-		break;
+-	case PWRDM_STATE_PREV:
+-		prev = _pwrdm_read_prev_fpwrst(pwrdm);
+-		if (pwrdm->fpwrst != prev)
+-			pwrdm->fpwrst_counter[prev - PWRDM_FPWRST_OFFSET]++;
+-		/*
+-		 * If the power domain did not hit the desired state,
+-		 * generate a trace event with both the desired and hit states
+-		 */
+-		next = _pwrdm_read_next_fpwrst(pwrdm);
+-		if (next != prev) {
+-			trace_state = (PWRDM_TRACE_STATES_FLAG | next << 8 |
+-				       prev);
+-			trace_power_domain_target(pwrdm->name, trace_state,
+-						  smp_processor_id());
+-		}
+-		break;
+-	default:
+-		return -EINVAL;
+-	}
+-
+-	if (fpwrst != prev)
++	if (fpwrst != pwrdm->fpwrst)
+ 		pwrdm->fpwrst_counter[fpwrst - PWRDM_FPWRST_OFFSET]++;
+ 
+-	_pwrdm_update_pwrst_time(pwrdm, prev);
++	_pwrdm_update_pwrst_time(pwrdm, pwrdm->fpwrst);
+ 
+ 	pwrdm->fpwrst = fpwrst;
+-
+-	return 0;
+ }
+ 
+ static int _pwrdm_pre_transition_cb(struct powerdomain *pwrdm, void *unused)
+ {
+ 	pwrdm_clear_all_prev_pwrst(pwrdm);
+-	_pwrdm_state_switch(pwrdm, PWRDM_STATE_NOW);
++	_pwrdm_state_switch(pwrdm);
+ 	return 0;
+ }
+ 
++/**
++ * _pwrdm_post_transition_cb - record powerdomain usage data; track power state
++ * (after powerdomain power state transition)
++ * @pwrdm: struct powerdomain * to observe
++ *
++ * If the powerdomain @pwrdm's previous power state doesn't match our
++ * recollection of the powerdomain's current power state, then
++ * increment the counter for the previous power state.  And if the
++ * powerdomain's previous power state doesn't match the current power
++ * state, increment the counter for the current power state.  This
++ * function is used to track context loss events, and for debugging.
++ * Also if CONFIG_PM_DEBUG=y, track the approximate amount of time the
++ * powerdomain has spent in the previous power state.  Caller must
++ * hold pwrdm->_lock.  XXX Note that the counts and durations observed
++ * by this function may be inaccurate.  Powerdomains can transition
++ * power states automatically, without the kernel being involved --
++ * for example, a device can DMA data from memory while the MPU is
++ * asleep.  This function does not attempt to account for that.  XXX
++ * It may be possible to skip this function completely if PM debugging
++ * is not needed and off-mode and OSWR is disabled (e.g., no context
++ * loss events).  No return value.
++ */
  static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
  {
--	int prev, next, fpwrst;
-+	int prev, fpwrst;
- 	int trace_state = 0;
- 
- 	prev = _pwrdm_read_prev_fpwrst(pwrdm);
-@@ -676,10 +683,9 @@ static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
- 	 * If the power domain did not hit the desired state,
- 	 * generate a trace event with both the desired and hit states
- 	 */
--	next = _pwrdm_read_next_fpwrst(pwrdm);
--	if (next != prev) {
--		trace_state = (PWRDM_TRACE_STATES_FLAG | next << 8 |
--			       prev);
-+	if (pwrdm->next_fpwrst != prev) {
-+		trace_state = (PWRDM_TRACE_STATES_FLAG |
-+			       pwrdm->next_fpwrst << 8 | prev);
- 		trace_power_domain_target(pwrdm->name, trace_state,
- 					  smp_processor_id());
- 	}
-@@ -1256,6 +1262,10 @@ int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm, u8 fpwrst)
- 	if (ret)
- 		return ret;
- 
-+	if (pwrdm->_flags & _PWRDM_NEXT_FPWRST_IS_VALID &&
-+	    pwrdm->next_fpwrst == fpwrst)
-+		return 0;
+-	_pwrdm_state_switch(pwrdm, PWRDM_STATE_PREV);
++	int prev, next, fpwrst;
++	int trace_state = 0;
 +
- 	pr_debug("%s: set fpwrst %0x to pwrdm %s\n", __func__, fpwrst,
- 		 pwrdm->name);
- 
-@@ -1264,6 +1274,10 @@ int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm, u8 fpwrst)
- 
- 	pwrdm_lock(pwrdm);
- 	ret = _set_logic_retst_and_pwrdm_pwrst(pwrdm, logic, pwrst);
-+	if (!ret) {
-+		pwrdm->next_fpwrst = fpwrst;
-+		pwrdm->_flags |= _PWRDM_NEXT_FPWRST_IS_VALID;
++	prev = _pwrdm_read_prev_fpwrst(pwrdm);
++	if (pwrdm->fpwrst != prev)
++		pwrdm->fpwrst_counter[prev - PWRDM_FPWRST_OFFSET]++;
++
++	_pwrdm_update_pwrst_time(pwrdm, prev);
++
++	/*
++	 * If the power domain did not hit the desired state,
++	 * generate a trace event with both the desired and hit states
++	 */
++	next = _pwrdm_read_next_fpwrst(pwrdm);
++	if (next != prev) {
++		trace_state = (PWRDM_TRACE_STATES_FLAG | next << 8 |
++			       prev);
++		trace_power_domain_target(pwrdm->name, trace_state,
++					  smp_processor_id());
 +	}
- 	pwrdm_unlock(pwrdm);
- 
- 	return ret;
-@@ -1279,36 +1293,16 @@ int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm, u8 fpwrst)
-  */
- int pwrdm_read_next_fpwrst(struct powerdomain *pwrdm)
- {
--	int next_pwrst, next_logic, ret;
--	u8 fpwrst;
-+	int ret;
- 
--	if (!arch_pwrdm)
-+	if (!pwrdm)
- 		return -EINVAL;
- 
- 	pwrdm_lock(pwrdm);
--
--	next_pwrst = arch_pwrdm->pwrdm_read_next_pwrst(pwrdm);
--	if (next_pwrst < 0) {
--		ret = next_pwrst;
--		goto prnf_out;
--	}
--
--	next_logic = next_pwrst;
--	if (_pwrdm_logic_retst_can_change(pwrdm) &&
--	    arch_pwrdm->pwrdm_read_logic_pwrst) {
--		next_logic = arch_pwrdm->pwrdm_read_logic_pwrst(pwrdm);
--		if (next_logic < 0) {
--			ret = next_logic;
--			goto prnf_out;
--		}
--	}
--
--	ret = _pwrdm_pwrst_to_fpwrst(pwrdm, next_pwrst, next_logic, &fpwrst);
--
--prnf_out:
-+	ret = _pwrdm_read_next_fpwrst(pwrdm);
- 	pwrdm_unlock(pwrdm);
- 
--	return (ret) ? ret : fpwrst;
-+	return ret;
++
++	fpwrst = _pwrdm_read_fpwrst(pwrdm);
++	if (fpwrst != prev)
++		pwrdm->fpwrst_counter[fpwrst - PWRDM_FPWRST_OFFSET]++;
++
++	pwrdm->fpwrst = fpwrst;
++
+ 	return 0;
  }
  
- /**
-@@ -1344,10 +1338,6 @@ int pwrdm_set_fpwrst(struct powerdomain *pwrdm, enum pwrdm_func_state fpwrst)
+@@ -1055,7 +1087,7 @@ int pwrdm_state_switch_nolock(struct powerdomain *pwrdm)
  
- 	pwrdm_lock(pwrdm);
+ 	ret = arch_pwrdm->pwrdm_wait_transition(pwrdm);
+ 	if (!ret)
+-		ret = _pwrdm_state_switch(pwrdm, PWRDM_STATE_NOW);
++		_pwrdm_state_switch(pwrdm);
  
--	/*
--	 * XXX quite heavyweight for what this is intended to do; the
--	 * next fpwrst should simply be cached
--	 */
- 	next_fpwrst = _pwrdm_read_next_fpwrst(pwrdm);
- 	if (next_fpwrst == fpwrst)
- 		goto psf_out;
-@@ -1364,9 +1354,13 @@ int pwrdm_set_fpwrst(struct powerdomain *pwrdm, enum pwrdm_func_state fpwrst)
- 	}
- 
- 	ret = _set_logic_retst_and_pwrdm_pwrst(pwrdm, logic, pwrst);
--	if (ret)
-+	if (ret) {
- 		pr_err("%s: unable to set power state of powerdomain: %s\n",
- 		       __func__, pwrdm->name);
-+	} else {
-+		pwrdm->next_fpwrst = fpwrst;
-+		pwrdm->_flags |= _PWRDM_NEXT_FPWRST_IS_VALID;
-+	}
- 
- 	_pwrdm_restore_clkdm_state(pwrdm, sleep_switch, hwsup);
- 
+ 	return ret;
+ }
 diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index c19bdc3..1fb21f5 100644
+index 48bb325..ef51987b 100644
 --- a/arch/arm/mach-omap2/powerdomain.h
 +++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -84,6 +84,16 @@ enum pwrdm_func_state {
- #define PWRDM_HAS_LOWPOWERSTATECHANGE	BIT(2)
+@@ -237,6 +237,7 @@ bool pwrdm_has_hdwr_sar(struct powerdomain *pwrdm);
  
- /*
-+ * Powerdomain internal flags (struct powerdomain._flags)
-+ *
-+ * _PWRDM_NEXT_FPWRST_IS_VALID: the locally-cached copy of the
-+ *    powerdomain's next-functional-power-state -- struct
-+ *    powerdomain.next_fpwrst -- is valid.  If this bit is not set,
-+ *    the code needs to load the current value from the hardware.
-+ */
-+#define _PWRDM_NEXT_FPWRST_IS_VALID	BIT(0)
-+
-+/*
-  * Number of memory banks that are power-controllable.	On OMAP4430, the
-  * maximum is 5.
-  */
-@@ -127,12 +137,17 @@ struct powerdomain;
-  *	in @pwrstctrl_offs
-  * @fpwrst: current func power state (set in pwrdm_state_switch() or post_trans)
-  * @fpwrst_counter: estimated number of times the pwrdm entered the power states
-+ * @next_fpwrst: cache of the powerdomain's next-power-state
-  * @timer: sched_clock() timestamp of last pwrdm_state_switch()
-  * @fpwrst_timer: estimated nanoseconds of residency in the various power states
-  * @_lock: spinlock used to serialize powerdomain and some clockdomain ops
-  * @_lock_flags: stored flags when @_lock is taken
-+ * @_flags: flags (for internal use only)
-  *
-  * @prcm_partition possible values are defined in mach-omap2/prcm44xx.h.
-+ *
-+ * Possible values for @_flags are documented above in the
-+ * "Powerdomain internal flags (struct powerdomain._flags)" comments.
-  */
- struct powerdomain {
- 	const char *name;
-@@ -149,6 +164,8 @@ struct powerdomain {
- 	const u8 pwrsts_mem_on[PWRDM_MAX_MEM_BANKS];
- 	const u8 prcm_partition;
- 	u8 fpwrst;
-+	u8 next_fpwrst;
-+	u8 _flags;
- 	struct clockdomain *pwrdm_clkdms[PWRDM_MAX_CLKDMS];
- 	struct list_head node;
- 	struct list_head voltdm_node;
+ int pwrdm_state_switch_nolock(struct powerdomain *pwrdm);
+ int pwrdm_state_switch(struct powerdomain *pwrdm);
++int pwrdm_state_switch_nolock(struct powerdomain *pwrdm);
+ int pwrdm_pre_transition(struct powerdomain *pwrdm);
+ int pwrdm_post_transition(struct powerdomain *pwrdm);
+ int pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
