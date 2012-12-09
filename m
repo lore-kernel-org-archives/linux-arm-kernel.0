@@ -1,63 +1,87 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 09 Dec 2012 10:53:09 -0700
-Subject: [PATCH 03/12] ARM: OMAP2+: PM debug: trace the functional power
- domains states
+Date: Sun, 09 Dec 2012 10:52:53 -0700
+Subject: [PATCH 01/12] ARM: OMAP2+: powerdomain: add functions that report
+ on powerdomain capabilities
 In-Reply-To: <20121209174545.6933.59371.stgit@dusk.lan>
 References: <20121209174545.6933.59371.stgit@dusk.lan>
-Message-ID: <20121209175301.6933.81855.stgit@dusk.lan>
+Message-ID: <20121209175249.6933.71752.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <jean.pihet@newoldbits.com>
+Add several functions to report on whether powerdomains can change their
+power state or logic retention power state, and whether those abilities
+can be controlled by the kernel.  This code is used in subsequent patches
+that add the functional power state code.
 
-Trace the power domain transitions using the functional power states,
-which include the power and logic states.
-
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
-[paul at pwsan.com: split the fix that was originally part of this patch into a
- separate patch]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/powerdomain.c |   14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/powerdomain.c |   56 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
 
 diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 18f33de..2c732b6 100644
+index 2a5f15b..94b89a25 100644
 --- a/arch/arm/mach-omap2/powerdomain.c
 +++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -881,13 +881,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
- 	pr_debug("powerdomain: %s: setting next powerstate to %0x\n",
- 		 pwrdm->name, pwrst);
- 
--	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
--		/* Trace the pwrdm desired target state */
--		trace_power_domain_target(pwrdm->name, pwrst,
--					  smp_processor_id());
--		/* Program the pwrdm desired target state */
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst)
- 		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
--	}
- 
- 	return ret;
+@@ -203,6 +203,62 @@ static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
+ 	return 0;
  }
-@@ -1571,6 +1566,9 @@ int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm, u8 fpwrst)
- 	pr_debug("%s: set fpwrst %0x to pwrdm %s\n", __func__, fpwrst,
- 		 pwrdm->name);
  
-+	/* Trace the pwrdm desired target state */
-+	trace_power_domain_target(pwrdm->name, fpwrst, smp_processor_id());
++/**
++ * _pwrdm_pwrst_is_controllable - can software change the powerdomain pwrst?
++ * @pwrdm: struct powerdomain * to test
++ *
++ * If the kernel can program the power state that the powerdomain
++ * @pwrdm should enter next, return 1; otherwise, return 0.
++ */
++static bool _pwrdm_pwrst_is_controllable(struct powerdomain *pwrdm)
++{
++	return (!pwrdm->pwrsts || pwrdm->pwrsts == PWRSTS_ON) ? 0 : 1;
++}
 +
- 	pwrdm_lock(pwrdm);
- 	ret = _set_logic_retst_and_pwrdm_pwrst(pwrdm, logic, pwrst);
- 	pwrdm_unlock(pwrdm);
-@@ -1658,6 +1656,10 @@ int pwrdm_set_fpwrst(struct powerdomain *pwrdm, enum pwrdm_func_state fpwrst)
- 	if (next_fpwrst == fpwrst)
- 		goto psf_out;
- 
-+	/* Trace the pwrdm desired target state */
-+	trace_power_domain_target(pwrdm->name, next_fpwrst,
-+				  smp_processor_id());
++/**
++ * _pwrdm_pwrst_can_change - can the power state of @pwrdm change?
++ * @pwrdm: struct powerdomain * to test
++ *
++ * If the power state of the powerdomain represented by @pwrdm can
++ * change (i.e., is not always on), and the kernel has some way to
++ * detect this, return 1; otherwise, return 0.  XXX The current
++ * implementation of this is based on an assumption and has not been
++ * verified against all OMAPs.
++ */
++static bool _pwrdm_pwrst_can_change(struct powerdomain *pwrdm)
++{
++	return _pwrdm_pwrst_is_controllable(pwrdm);
++}
 +
- 	sleep_switch = _pwrdm_save_clkdm_state_and_activate(pwrdm, pwrst,
- 							    &hwsup);
++/**
++ * _pwrdm_logic_retst_is_controllable - can software change the logic retst?
++ * @pwrdm: struct powerdomain * to test
++ *
++ * If the kernel can program the power state that the powerdomain
++ * @pwrdm logic should enter when the @pwrdm enters the RETENTION
++ * power state, return 1; otherwise, return 0.
++ */
++static bool _pwrdm_logic_retst_is_controllable(struct powerdomain *pwrdm)
++{
++	return (!pwrdm->pwrsts_logic_ret ||
++		pwrdm->pwrsts_logic_ret == PWRSTS_RET) ? 0 : 1;
++}
++
++/**
++ * _pwrdm_logic_retst_can_change - can the logic retst change on @pwrdm?
++ * @pwrdm: struct powerdomain * to test
++ *
++ * If the logic powerstate for the powerdomain represented by @pwrdm
++ * can ever be something other than the powerdomain's powerstate, and
++ * the kernel has some way to detect this, return 1; otherwise, return
++ * 0.  XXX The current implementation of this is based on an
++ * assumption and has not been verified against all OMAPs.
++ */
++static bool _pwrdm_logic_retst_can_change(struct powerdomain *pwrdm)
++{
++	return _pwrdm_logic_retst_is_controllable(pwrdm);
++}
++
+ /* Public functions */
  
+ /**
