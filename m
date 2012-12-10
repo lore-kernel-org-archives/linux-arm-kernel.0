@@ -1,49 +1,56 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 10 Dec 2012 10:53:09 +0900
-Subject: [PATCH] samsung: Add missing include guard to gpio-core.h
-In-Reply-To: <1354749432-6028-1-git-send-email-spang@chromium.org>
-References: <1354749432-6028-1-git-send-email-spang@chromium.org>
-Message-ID: <032201cdd679$1afe4230$50fac690$%kim@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 10 Dec 2012 09:59:18 +0800
+Subject: [PATCH] ARM: decompressor: include CONFIG_DEBUG_LL_INCLUDE
+ rather than mach/debug-macro.S
+In-Reply-To: <1355104168-30581-1-git-send-email-shawn.guo@linaro.org>
+References: <1355104168-30581-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20121210015916.GA30766@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Spang wrote:
+On Mon, Dec 10, 2012 at 09:49:28AM +0800, Shawn Guo wrote:
+> Commit 91a9fec (ARM: move debug macros to common location) moves
+> arch/arm/kernel/debug.S and arch/arm/kernel/head.S to
+> CONFIG_DEBUG_LL_INCLUDE, but leaves arch/arm/boot/compressed/head.S
+> still with mach/debug-macro.S.  This causes the following build error
+> on platforms that moved to new DEBUG_LL inclusion mechanism, when
+> arch/arm/boot/compressed/head.S is compiled with DEBUG turned on.
 > 
-> Signed-off-by: Michael Spang <spang@chromium.org>
+>   AS      arch/arm/boot/compressed/head.o
+> arch/arm/boot/compressed/head.S:49:30: fatal error: mach/debug-macro.S: No such file or directory
+> compilation terminated.
+> 
+> Fix the problem by replacing mach/debug-macro.S inclusion with
+> CONFIG_DEBUG_LL_INCLUDE one.
+> 
+> Reported-by: Steev Klimaszewski <steev@genesi-usa.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: stable at vger.kernel.org
+
+I copied stable with assuming that the patch is not going to catch
+on the final 3.7 release.  If it's not the case or maintainer does not
+think it's a stable material at all, we can just drop the tag.
+
+Shawn
+
 > ---
->  arch/arm/plat-samsung/include/plat/gpio-core.h |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
+>  arch/arm/boot/compressed/head.S |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h
-> b/arch/arm/plat-samsung/include/plat/gpio-core.h
-> index 1fe6917..8622c9a 100644
-> --- a/arch/arm/plat-samsung/include/plat/gpio-core.h
-> +++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
-> @@ -11,6 +11,9 @@
->   * published by the Free Software Foundation.
->  */
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 49ca86e..fe4d9c3 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -44,7 +44,7 @@
+>  
+>  #else
+>  
+> -#include <mach/debug-macro.S>
+> +#include CONFIG_DEBUG_LL_INCLUDE
+>  
+>  		.macro	writeb,	ch, rb
+>  		senduart \ch, \rb
+> -- 
+> 1.7.9.5
 > 
-> +#ifndef __PLAT_SAMSUNG_GPIO_CORE_H
-> +#define __PLAT_SAMSUNG_GPIO_CORE_H
-> +
->  #define GPIOCON_OFF	(0x00)
->  #define GPIODAT_OFF	(0x04)
 > 
-> @@ -122,3 +125,5 @@ extern struct samsung_gpio_pm samsung_gpio_pm_4bit;
->  /* locking wrappers to deal with multiple access to the same gpio bank */
->  #define samsung_gpio_lock(_oc, _fl) spin_lock_irqsave(&(_oc)->lock, _fl)
->  #define samsung_gpio_unlock(_oc, _fl)
-spin_unlock_irqrestore(&(_oc)->lock,
-> _fl)
-> +
-> +#endif /* __PLAT_SAMSUNG_GPIO_CORE_H */
-> --
-> 1.7.7.3
-
-Applied, thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
