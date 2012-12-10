@@ -1,50 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Dec 2012 22:08:51 +0000
-Subject: [PATCH V3 2/3] dmaengine: dw_dmac: Enhance device tree support
-In-Reply-To: <169edae67b9a051ca7448e5b62c3cd2c5c1db470.1350360935.git.viresh.kumar@linaro.org>
-References: <3100e691db3f94c22afd98b609a1568d7e70dfe7.1350360935.git.viresh.kumar@linaro.org>
- <169edae67b9a051ca7448e5b62c3cd2c5c1db470.1350360935.git.viresh.kumar@linaro.org>
-Message-ID: <201212102208.52347.arnd@arndb.de>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 10 Dec 2012 14:15:44 -0800
+Subject: [PATCH v4 0/7] enable support for AMBA drivers under x86
+In-Reply-To: <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
+References: <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
+Message-ID: <20121210221544.GA7621@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 October 2012, Viresh Kumar wrote:
-> dw_dmac driver already supports device tree but it used to have its platform
-> data passed the non-DT way.
+On Mon, Dec 10, 2012 at 02:42:29PM +0100, Davide Ciminaghi wrote:
+> Acked-by/Reviewed-by situation:
 > 
-> This patch does following changes:
-> - pass platform data via DT, non-DT way still takes precedence if both are used.
-> - create generic filter routine
-> - Earlier slave information was made available by slave specific filter routines
->   in chan->private field. Now, this information would be passed from within dmac
->   DT node. Slave drivers would now be required to pass bus_id (a string) as
->   parameter to this generic filter(), which would be compared against the slave
->   data passed from DT, by the generic filter routine.
-> - Update binding document
+> v1:
 > 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> "mmc: use the new <linux/sizes.h>"
+> Acked by David Brown (see https://lkml.org/lkml/2012/9/14/613)
 
-I'm deeply sorry for the very late complaint on this, but I only now
-noticed this patch as I was seeing build breakage in linux-next
-because of it.
+The change doesn't look substantially different, you can keep my Ack
+for it.
 
-The build bug is not the problem however, but the abuse of the
-API is. Andy, are you sure you understood what this does when
-you gave you Reviewed-by comment?
+David
 
-Viresh, there are multiple problems with your approach unfortunately:
-
-* It does not follow the binding from
-  Documentation/devicetree/bindings/dma/dma.txt
-
-* It requires slave drivers to know that they are using the dw_dmac
-  driver and pass a pointer to dw_generic_filter, which is not
-  generic at all
-
-* It requires the dmac node to have information about all slaves
-
-There are also some minor issues, such as the naming of DT
-properties, but the above need to be resolved first.
-
-	Arnd
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
