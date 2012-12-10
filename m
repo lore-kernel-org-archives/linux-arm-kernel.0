@@ -1,35 +1,61 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Mon, 10 Dec 2012 11:16:08 +0900
-Subject: [PATCH] ARM: EXYNOS: fix GIC using for EXYNOS5440
-In-Reply-To: <030c01cdd672$cb1b6b40$615241c0$%kim@samsung.com>
-References: <030c01cdd672$cb1b6b40$615241c0$%kim@samsung.com>
-Message-ID: <50C545E8.8050301@samsung.com>
+From: narkewoody@gmail.com (Woody Wu)
+Date: Mon, 10 Dec 2012 06:25:38 +0000 (UTC)
+Subject: Serial8250 doesn't populate in /proc/iomem?
+Message-ID: <slrnkcb014.77o.narkewoody@zuhnb712.local.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, list
 
-On 12/10/2012 10:07 AM, Kukjin Kim wrote:
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->   arch/arm/mach-exynos/common.c |    3 ++-
->   1 files changed, 2 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-> index 0eb3b9a..9ecda37 100644
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
-> @@ -684,7 +684,8 @@ void __init exynos5_init_irq(void)
->   	 * Theses parameters should be NULL and 0 because EXYNOS4
->   	 * uses GIC instead of VIC.
->   	 */
-> -	s5p_init_irq(NULL, 0);
-> +	if (!of_machine_is_compatible("samsung,exynos5440"))
-> +		s5p_init_irq(NULL, 0);
+I found some io memory information is lost from /dev/iomem and want to
+find out why.
 
-How about remove to call s5p_init_irq() here because All exynos SoCs use
-GIC instead of VIC?
+I have a 2.6.16 kernel running on a ARM board (Samsung S3C2410). From
+the kernel log, I see 16 8250 serial ports were detected, and each of
+thoese ports has a memory address:
 
->   
->   	gic_arch_extn.irq_set_wake = s3c_irq_wake;
->   }
+Serial: 8250/16550 driver $Revision: 1.90 $ 16 ports, IRQ sharing enabled
+serial8250: tts0 at MMIO 0xe1400000 (irq = 16) is a 16550A
+serial8250: tts1 at MMIO 0xe1400008 (irq = 16) is a 16550A
+serial8250: tts2 at MMIO 0xe1400010 (irq = 17) is a 16550A
+serial8250: tts3 at MMIO 0xe1400018 (irq = 17) is a 16550A
+serial8250: tts4 at MMIO 0xe1400020 (irq = 18) is a 16550A
+serial8250: tts5 at MMIO 0xe1400028 (irq = 18) is a 16550A
+serial8250: tts6 at MMIO 0xe1400030 (irq = 19) is a 16550A
+serial8250: tts7 at MMIO 0xe1400038 (irq = 19) is a 16550A
+serial8250: tts8 at MMIO 0xe1400040 (irq = 48) is a 16550A
+serial8250: tts9 at MMIO 0xe1400048 (irq = 48) is a 16550A
+serial8250: tts10 at MMIO 0xe1400050 (irq = 49) is a 16550A
+serial8250: tts11 at MMIO 0xe1400058 (irq = 49) is a 16550A
+serial8250: tts12 at MMIO 0xe1400060 (irq = 60) is a 16550A
+serial8250: tts13 at MMIO 0xe1400068 (irq = 60) is a 16550A
+serial8250: tts14 at MMIO 0xe1400070 (irq = 61) is a 16550A
+serial8250: tts15 at MMIO 0xe1400078 (irq = 61) is a 16550A
+
+I can read/write these serial ports from /dev/ttys*, in other words,
+they do exist.  I also can find the driver info from /proc/devices:
+
+Character devices:                                               
+
+  ...
+  4 /dev/vc/0
+  4 tty
+  4 tts
+  5 /dev/tty
+  5 /dev/console
+  5 /dev/ptmx
+  7 vcs
+  ...
+
+The problem is, I don't understand why there is no information about
+these ports in /proc/iomem file. The 'iomem' file now contains:
+
+11000000-11000ffe : AX88796B
+19000000-19000ffe : AX88796B
+30000000-33ffffff : System RAM
+  3001c000-301e826b : Kernel text
+  301ea000-302234a3 : Kernel data
+
+-- 
+woody
+I can't go back to yesterday - because I was a different person then.
