@@ -1,83 +1,45 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 10 Dec 2012 13:31:22 +0200
-Subject: [PATCH v4 23/23] mfd: omap-usb-host: Don't spam console on
- clk_set_parent failure
-In-Reply-To: <50C5C666.9050105@ti.com>
-References: <1355134833-5199-1-git-send-email-rogerq@ti.com>
- <1355134833-5199-24-git-send-email-rogerq@ti.com> <50C5C666.9050105@ti.com>
-Message-ID: <50C5C80A.3090307@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 10 Dec 2012 13:06:29 +0100
+Subject: [PATCH 11/12] ARM: ux500: Use the GPIO regulator framework for
+ SDI0's 'en' and 'vsel'
+In-Reply-To: <20121210103050.GE9362@gmail.com>
+References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
+ <1355129761-8088-12-git-send-email-lee.jones@linaro.org>
+ <CAPDyKFo8NjiYdcyx3pk8byc1N2f7r+erQj74A1zhOaNK_WbkZA@mail.gmail.com>
+ <20121210103050.GE9362@gmail.com>
+Message-ID: <CAPDyKFo22kNjiqc+pnR51g3KH-ExM=eOKRBRkWm0r6XmgOH9uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2012 01:24 PM, Rajendra Nayak wrote:
-> On Monday 10 December 2012 03:50 PM, Roger Quadros wrote:
->> clk_set_parent is expected to fail on OMAP3 platforms. We don't
->> consider that as fatal so don't spam console.
-> 
-> And what if it fails on a non-OMAP3 platform?
+On 10 December 2012 11:30, Lee Jones <lee.jones@linaro.org> wrote:
+>> > +        .constraints = {
+>> > +                .min_uV         = 1800000,
+>>
+>> 2.9V, not 3.3V
+>
+>> > +static struct gpio_regulator_state sdi0_reg_states[] = {
+>> > +        { .value = 3300000, .gpios = (0 << 0) },
+>>
+>> 2.9V, not 3.3V
+>
+> I'm still a little unsure about this. I know the actual
+> voltage is v2.9, but the supported/requested MMC voltage
+> from the driver is v3.3.
+>
+> Will it still work if I set it all up as v2.9?
+>
 
-The driver just prints a debug message and continues to work just as
-before. The USB port will not work for the user in that case. He will
-have to enable DEBUG flag to see the debug message. I see this behaviour
-better than before where all OMAP3 users see the error message for no
-reason.
+So that is if course important to consider. Although the regulator
+must nu lie about what it actually supports.
 
-cheers,
--roger
+In this case mmci driver will have to decide what to do when 3.3V is
+requested, but only 2.9 is supported.
 
-> 
->>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> ---
->>   drivers/mfd/omap-usb-host.c |   18 +++++++++---------
->>   1 files changed, 9 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
->> index 0bb54393..344ce09 100644
->> --- a/drivers/mfd/omap-usb-host.c
->> +++ b/drivers/mfd/omap-usb-host.c
->> @@ -657,32 +657,32 @@ static int __devinit usbhs_omap_probe(struct
->> platform_device *pdev)
->>       }
->>
->>       if (is_ehci_phy_mode(pdata->port_mode[0])) {
->> -        /* for OMAP3 , the clk set paretn fails */
->> +        /* for OMAP3, clk_set_parent fails */
->>           ret = clk_set_parent(omap->utmi_clk[0],
->>                       omap->xclk60mhsp1_ck);
->>           if (ret != 0)
->> -            dev_err(dev, "xclk60mhsp1_ck set parent"
->> -                "failed error:%d\n", ret);
->> +            dev_dbg(dev, "xclk60mhsp1_ck set parent failed: %d\n",
->> +                    ret);
->>       } else if (is_ehci_tll_mode(pdata->port_mode[0])) {
->>           ret = clk_set_parent(omap->utmi_clk[0],
->>                       omap->init_60m_fclk);
->>           if (ret != 0)
->> -            dev_err(dev, "init_60m_fclk set parent"
->> -                "failed error:%d\n", ret);
->> +            dev_dbg(dev, "P0 init_60m_fclk set parent failed: %d\n",
->> +                    ret);
->>       }
->>
->>       if (is_ehci_phy_mode(pdata->port_mode[1])) {
->>           ret = clk_set_parent(omap->utmi_clk[1],
->>                       omap->xclk60mhsp2_ck);
->>           if (ret != 0)
->> -            dev_err(dev, "xclk60mhsp2_ck set parent"
->> -                    "failed error:%d\n", ret);
->> +            dev_dbg(dev, "xclk60mhsp2_ck set parent failed: %d\n",
->> +                    ret);
->>       } else if (is_ehci_tll_mode(pdata->port_mode[1])) {
->>           ret = clk_set_parent(omap->utmi_clk[1],
->>                           omap->init_60m_fclk);
->>           if (ret != 0)
->> -            dev_err(dev, "init_60m_fclk set parent"
->> -                "failed error:%d\n", ret);
->> +            dev_dbg(dev, "P1 init_60m_fclk set parent failed: %d\n",
->> +                    ret);
->>       }
->>
->>       omap_usbhs_init(dev);
->>
-> 
+> --
+> Lee Jones
+> Linaro ST-Ericsson Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
+
+Kind regards
+Ulf Hansson
