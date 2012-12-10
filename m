@@ -1,142 +1,198 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 10 Dec 2012 11:04:43 +0100
-Subject: [PATCH] ASoC: atmel-soc: make it buildable on other architectures
-In-Reply-To: <50C5B14C.4050107@atmel.com>
-References: <1354973002-13588-1-git-send-email-manabian@gmail.com>
- <50C5B14C.4050107@atmel.com>
-Message-ID: <50C5B3BB.6070700@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Dec 2012 10:07:54 +0000
+Subject: [PATCH 1/1 v2] gpio: Provide the STMPE GPIO driver with its own IRQ
+ Domain
+In-Reply-To: <1353683949-9275-1-git-send-email-lee.jones@linaro.org>
+References: <1353683949-9275-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20121210100754.GB9362@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2012 10:54 AM, Bo Shen :
-> Hi Joachim Eastwood,
-> 
-> On 12/8/2012 21:23, Joachim Eastwood wrote:
->> Not very useful on non AT91/AVR32 platforms but it provides
->> more build coverage and prepares for ARM multiplatform.
->>
->> Also fixes a couple of format type warnings.
->>
->> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
->> ---
->>
->> Hi,
->>
->> Build tested on RM9200 and x86_64.
->>
->> ARCH_AT91 depend is pushed down to the machine drivers
->> since they still relies on mach includes.
->>
->> regards
->> Joachim Eastwood
->>
->>   sound/soc/atmel/Kconfig         | 6 +++---
->>   sound/soc/atmel/atmel-pcm-pdc.c | 4 ++--
->>   sound/soc/atmel/atmel-pcm.c     | 2 +-
->>   sound/soc/atmel/atmel_ssc_dai.c | 2 --
->>   4 files changed, 6 insertions(+), 8 deletions(-)
->>
->> diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
->> index d1b691b..3fdd87f 100644
->> --- a/sound/soc/atmel/Kconfig
->> +++ b/sound/soc/atmel/Kconfig
->> @@ -1,6 +1,6 @@
->>   config SND_ATMEL_SOC
->>       tristate "SoC Audio for the Atmel System-on-Chip"
->> -    depends on ARCH_AT91
->> +    depends on HAS_IOMEM
-> 
-> I don't think this change needed. This is not a physical device.
+Author: Lee Jones <lee.jones@linaro.org>
+Date:   Fri Nov 23 12:36:23 2012 +0000
 
-It is needed to prevent the restriction of this driver to AT91 only.
-This move is interesting for build coverage and ARM multiplatform as
-indicated by Joachim.
+    gpio: Provide the STMPE GPIO driver with its own IRQ Domain
+    
+    The STMPE GPIO driver can be used as an IRQ controller by some
+    related devices. Here we provide it with its very own IRQ Domain
+    so that IRQs can be issued dynamically. This will stand the
+    driver in good stead when it is enabled for Device Tree, as this
+    it a prerequisite.
+    
+    Cc: Grant Likely <grant.likely@secretlab.ca>
+    Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+    Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Bye,
-
->>       help
->>         Say Y or M if you want to add support for codecs attached to
->>         the ATMEL SSC interface. You will also need
->> @@ -24,7 +24,7 @@ config SND_ATMEL_SOC_SSC
->>
->>   config SND_AT91_SOC_SAM9G20_WM8731
->>       tristate "SoC Audio support for WM8731-based At91sam9g20
->> evaluation board"
->> -    depends on ATMEL_SSC && SND_ATMEL_SOC && AT91_PROGRAMMABLE_CLOCKS
->> +    depends on ARCH_AT91 && ATMEL_SSC && SND_ATMEL_SOC &&
->> AT91_PROGRAMMABLE_CLOCKS
->>       select SND_ATMEL_SOC_PDC
->>       select SND_ATMEL_SOC_SSC
->>       select SND_SOC_WM8731
->> @@ -34,7 +34,7 @@ config SND_AT91_SOC_SAM9G20_WM8731
->>
->>   config SND_AT91_SOC_AFEB9260
->>       tristate "SoC Audio support for AFEB9260 board"
->> -    depends on ATMEL_SSC && ARCH_AT91 && MACH_AFEB9260 && SND_ATMEL_SOC
->> +    depends on ARCH_AT91 && ATMEL_SSC && ARCH_AT91 && MACH_AFEB9260
->> && SND_ATMEL_SOC
->>       select SND_ATMEL_SOC_PDC
->>       select SND_ATMEL_SOC_SSC
->>       select SND_SOC_TLV320AIC23
->> diff --git a/sound/soc/atmel/atmel-pcm-pdc.c
->> b/sound/soc/atmel/atmel-pcm-pdc.c
->> index 6a293c7..054ea4d 100644
->> --- a/sound/soc/atmel/atmel-pcm-pdc.c
->> +++ b/sound/soc/atmel/atmel-pcm-pdc.c
->> @@ -159,7 +159,7 @@ static int atmel_pcm_hw_params(struct
->> snd_pcm_substream *substream,
->>
->>       pr_debug("atmel-pcm: "
->>           "hw_params: DMA for %s initialized "
->> -        "(dma_bytes=%u, period_size=%u)\n",
->> +        "(dma_bytes=%zu, period_size=%zu)\n",
->>           prtd->params->name,
->>           runtime->dma_bytes,
->>           prtd->period_size);
->> @@ -201,7 +201,7 @@ static int atmel_pcm_trigger(struct
->> snd_pcm_substream *substream,
->>       int ret = 0;
->>
->>       pr_debug("atmel-pcm:buffer_size = %ld,"
->> -        "dma_area = %p, dma_bytes = %u\n",
->> +        "dma_area = %p, dma_bytes = %zu\n",
->>           rtd->buffer_size, rtd->dma_area, rtd->dma_bytes);
->>
->>       switch (cmd) {
->> diff --git a/sound/soc/atmel/atmel-pcm.c b/sound/soc/atmel/atmel-pcm.c
->> index e99f181..3109db7 100644
->> --- a/sound/soc/atmel/atmel-pcm.c
->> +++ b/sound/soc/atmel/atmel-pcm.c
->> @@ -49,7 +49,7 @@ static int atmel_pcm_preallocate_dma_buffer(struct
->> snd_pcm *pcm,
->>       buf->private_data = NULL;
->>       buf->area = dma_alloc_coherent(pcm->card->dev, size,
->>               &buf->addr, GFP_KERNEL);
->> -    pr_debug("atmel-pcm: alloc dma buffer: area=%p, addr=%p, size=%d\n",
->> +    pr_debug("atmel-pcm: alloc dma buffer: area=%p, addr=%p,
->> size=%zu\n",
->>               (void *)buf->area, (void *)buf->addr, size);
->>
->>       if (!buf->area)
->> diff --git a/sound/soc/atmel/atmel_ssc_dai.c
->> b/sound/soc/atmel/atmel_ssc_dai.c
->> index 1c76634..2755750 100644
->> --- a/sound/soc/atmel/atmel_ssc_dai.c
->> +++ b/sound/soc/atmel/atmel_ssc_dai.c
->> @@ -42,8 +42,6 @@
->>   #include <sound/initval.h>
->>   #include <sound/soc.h>
->>
->> -#include <mach/hardware.h>
->> -
->>   #include "atmel-pcm.h"
->>   #include "atmel_ssc_dai.h"
->>
->>
-> 
-> 
-> 
-
-
--- 
-Nicolas Ferre
+diff --git a/drivers/gpio/gpio-stmpe.c b/drivers/gpio/gpio-stmpe.c
+index dce3472..6365cd0 100644
+--- a/drivers/gpio/gpio-stmpe.c
++++ b/drivers/gpio/gpio-stmpe.c
+@@ -11,6 +11,7 @@
+ #include <linux/slab.h>
+ #include <linux/gpio.h>
+ #include <linux/irq.h>
++#include <linux/irqdomain.h>
+ #include <linux/interrupt.h>
+ #include <linux/mfd/stmpe.h>
+ 
+@@ -28,6 +29,7 @@ struct stmpe_gpio {
+ 	struct stmpe *stmpe;
+ 	struct device *dev;
+ 	struct mutex irq_lock;
++	struct irq_domain *domain;
+ 
+ 	int irq_base;
+ 	unsigned norequest_mask;
+@@ -103,7 +105,7 @@ static int stmpe_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+ {
+ 	struct stmpe_gpio *stmpe_gpio = to_stmpe_gpio(chip);
+ 
+-	return stmpe_gpio->irq_base + offset;
++	return irq_create_mapping(stmpe_gpio->domain, offset);
+ }
+ 
+ static int stmpe_gpio_request(struct gpio_chip *chip, unsigned offset)
+@@ -132,7 +134,7 @@ static struct gpio_chip template_chip = {
+ static int stmpe_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+ {
+ 	struct stmpe_gpio *stmpe_gpio = irq_data_get_irq_chip_data(d);
+-	int offset = d->irq - stmpe_gpio->irq_base;
++	int offset = d->hwirq;
+ 	int regoffset = offset / 8;
+ 	int mask = 1 << (offset % 8);
+ 
+@@ -199,7 +201,7 @@ static void stmpe_gpio_irq_sync_unlock(struct irq_data *d)
+ static void stmpe_gpio_irq_mask(struct irq_data *d)
+ {
+ 	struct stmpe_gpio *stmpe_gpio = irq_data_get_irq_chip_data(d);
+-	int offset = d->irq - stmpe_gpio->irq_base;
++	int offset = d->hwirq;
+ 	int regoffset = offset / 8;
+ 	int mask = 1 << (offset % 8);
+ 
+@@ -209,7 +211,7 @@ static void stmpe_gpio_irq_mask(struct irq_data *d)
+ static void stmpe_gpio_irq_unmask(struct irq_data *d)
+ {
+ 	struct stmpe_gpio *stmpe_gpio = irq_data_get_irq_chip_data(d);
+-	int offset = d->irq - stmpe_gpio->irq_base;
++	int offset = d->hwirq;
+ 	int regoffset = offset / 8;
+ 	int mask = 1 << (offset % 8);
+ 
+@@ -251,8 +253,9 @@ static irqreturn_t stmpe_gpio_irq(int irq, void *dev)
+ 		while (stat) {
+ 			int bit = __ffs(stat);
+ 			int line = bank * 8 + bit;
++			int virq = irq_find_mapping(stmpe_gpio->domain, line);
+ 
+-			handle_nested_irq(stmpe_gpio->irq_base + line);
++			handle_nested_irq(virq);
+ 			stat &= ~(1 << bit);
+ 		}
+ 
+@@ -267,38 +270,55 @@ static irqreturn_t stmpe_gpio_irq(int irq, void *dev)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int __devinit stmpe_gpio_irq_init(struct stmpe_gpio *stmpe_gpio)
++int stmpe_gpio_irq_map(struct irq_domain *d, unsigned int virq,
++		       irq_hw_number_t hwirq)
+ {
+-	int base = stmpe_gpio->irq_base;
+-	int irq;
++	struct stmpe_gpio *stmpe_gpio = d->host_data;
++
++	if (!stmpe_gpio)
++		return -EINVAL;
+ 
+-	for (irq = base; irq < base + stmpe_gpio->chip.ngpio; irq++) {
+-		irq_set_chip_data(irq, stmpe_gpio);
+-		irq_set_chip_and_handler(irq, &stmpe_gpio_irq_chip,
+-					 handle_simple_irq);
+-		irq_set_nested_thread(irq, 1);
++	irq_set_chip_data(hwirq, stmpe_gpio);
++	irq_set_chip_and_handler(hwirq, &stmpe_gpio_irq_chip,
++				 handle_simple_irq);
++	irq_set_nested_thread(hwirq, 1);
+ #ifdef CONFIG_ARM
+-		set_irq_flags(irq, IRQF_VALID);
++	set_irq_flags(hwirq, IRQF_VALID);
+ #else
+-		irq_set_noprobe(irq);
++	irq_set_noprobe(hwirq);
+ #endif
+-	}
+ 
+ 	return 0;
+ }
+ 
+-static void stmpe_gpio_irq_remove(struct stmpe_gpio *stmpe_gpio)
++void stmpe_gpio_irq_unmap(struct irq_domain *d, unsigned int virq)
+ {
+-	int base = stmpe_gpio->irq_base;
+-	int irq;
+-
+-	for (irq = base; irq < base + stmpe_gpio->chip.ngpio; irq++) {
+ #ifdef CONFIG_ARM
+-		set_irq_flags(irq, 0);
++	set_irq_flags(virq, 0);
+ #endif
+-		irq_set_chip_and_handler(irq, NULL, NULL);
+-		irq_set_chip_data(irq, NULL);
++	irq_set_chip_and_handler(virq, NULL, NULL);
++	irq_set_chip_data(virq, NULL);
++}
++
++static const struct irq_domain_ops stmpe_gpio_irq_simple_ops = {
++	.unmap = stmpe_gpio_irq_unmap,
++	.map = stmpe_gpio_irq_map,
++	.xlate = irq_domain_xlate_twocell,
++};
++
++static int __devinit stmpe_gpio_irq_init(struct stmpe_gpio *stmpe_gpio)
++{
++	int base = stmpe_gpio->irq_base;
++
++	stmpe_gpio->domain = irq_domain_add_simple(NULL,
++				stmpe_gpio->chip.ngpio, base,
++				&stmpe_gpio_irq_simple_ops, stmpe_gpio);
++	if (!stmpe_gpio->domain) {
++		dev_err(stmpe_gpio->dev, "failed to create irqdomain\n");
++		return -ENOSYS;
+ 	}
++
++	return 0;
+ }
+ 
+ static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
+@@ -348,7 +368,7 @@ static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
+ 				IRQF_ONESHOT, "stmpe-gpio", stmpe_gpio);
+ 		if (ret) {
+ 			dev_err(&pdev->dev, "unable to get irq: %d\n", ret);
+-			goto out_removeirq;
++			goto out_disable;
+ 		}
+ 	}
+ 
+@@ -368,9 +388,6 @@ static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
+ out_freeirq:
+ 	if (irq >= 0)
+ 		free_irq(irq, stmpe_gpio);
+-out_removeirq:
+-	if (irq >= 0)
+-		stmpe_gpio_irq_remove(stmpe_gpio);
+ out_disable:
+ 	stmpe_disable(stmpe, STMPE_BLOCK_GPIO);
+ out_free:
+@@ -398,10 +415,9 @@ static int __devexit stmpe_gpio_remove(struct platform_device *pdev)
+ 
+ 	stmpe_disable(stmpe, STMPE_BLOCK_GPIO);
+ 
+-	if (irq >= 0) {
++	if (irq >= 0)
+ 		free_irq(irq, stmpe_gpio);
+-		stmpe_gpio_irq_remove(stmpe_gpio);
+-	}
++
+ 	platform_set_drvdata(pdev, NULL);
+ 	kfree(stmpe_gpio);
