@@ -1,35 +1,31 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 10 Dec 2012 12:08:25 -0700
-Subject: [RFC v1 08/16] arm: mvebu: the core PCIe driver
-In-Reply-To: <1354917879-32073-9-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1354917879-32073-9-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20121210190825.GC4687@obsidianresearch.com>
+From: frank.rowand@am.sony.com (Frank Rowand)
+Date: Mon, 10 Dec 2012 11:08:54 -0800
+Subject: [PATCH RT 2/2][RFC] let RCU stall messages escape with
+ CONFIG_PREEMPT_RT_FULL
+In-Reply-To: <20121210142914.GP2516@linux.vnet.ibm.com>
+References: <50BED1DA.7070907@am.sony.com> <50BED305.9090308@am.sony.com>
+ <20121210142914.GP2516@linux.vnet.ibm.com>
+Message-ID: <50C63346.8000802@am.sony.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 07, 2012 at 11:04:31PM +0100, Thomas Petazzoni wrote:
+On 12/10/12 06:29, Paul E. McKenney wrote:
+> On Tue, Dec 04, 2012 at 08:52:21PM -0800, Frank Rowand wrote:
+>>
+>> The printk()s in RCU stall warnings do not get flushed to the console
+>> on ARM.  Add the oops_in_progress flag back into the special trylock case in
+>> console_trylock_for_printk(), and set the flag using "bust_spinlocks(1)".
+>> This allows the printk() output to be flushed to the console.
+>>
+>> Signed-off-by: Frank Rowand <frank.rowand@am.sony.com>
+> 
+> Is bust_spinlocks(1) appropriate for all architectures, or should this
+> be conditioned on architectures that need oops_in_progress to be set?
+> 
+> 							Thanx, Paul
 
-> +static void __devinit rc_pci_fixup(struct pci_dev *dev)
-> +{
-> +	/*
-> +	 * Prevent enumeration of root complex.
-> +	 */
-> +	if (dev->bus->parent == NULL && dev->devfn == 0) {
-> +		int i;
-> +
-> +		for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
-> +			dev->resource[i].start = 0;
-> +			dev->resource[i].end   = 0;
-> +			dev->resource[i].flags = 0;
-> +		}
-> +	}
-> +}
-> +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MARVELL, PCI_ANY_ID, rc_pci_fixup);
+Good question.  I don't know if the architectures that do not set
+oops_in_progress do not need it, or if they just overlooked it.
+I'll have to look a little bit deeper.
 
-You should grab my fixup for this function in the kirkwood code:
-
-1dc831bf53fddcc6443f74a39e72db5bcea4f15d
-
-Regards,
-Jason
+-Frank
