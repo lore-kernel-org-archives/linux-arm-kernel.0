@@ -1,66 +1,54 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 10 Dec 2012 12:20:33 +0200
-Subject: [PATCH v4 23/23] mfd: omap-usb-host: Don't spam console on
- clk_set_parent failure
-In-Reply-To: <1355134833-5199-1-git-send-email-rogerq@ti.com>
-References: <1355134833-5199-1-git-send-email-rogerq@ti.com>
-Message-ID: <1355134833-5199-24-git-send-email-rogerq@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Dec 2012 10:26:12 +0000
+Subject: [PATCH 1/1 v2] gpio: Provide the STMPE GPIO driver with its own
+ IRQ Domain
+In-Reply-To: <CACRpkdYe1YbeyxC0OWqAY_MFq6oXVLzr0+s50O7X0LZducL4rg@mail.gmail.com>
+References: <1353683949-9275-1-git-send-email-lee.jones@linaro.org>
+ <20121210100754.GB9362@gmail.com>
+ <CACRpkdYe1YbeyxC0OWqAY_MFq6oXVLzr0+s50O7X0LZducL4rg@mail.gmail.com>
+Message-ID: <20121210102612.GD9362@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_set_parent is expected to fail on OMAP3 platforms. We don't
-consider that as fatal so don't spam console.
+On Mon, 10 Dec 2012, Linus Walleij wrote:
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- drivers/mfd/omap-usb-host.c |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
+> On Mon, Dec 10, 2012 at 11:07 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > Author: Lee Jones <lee.jones@linaro.org>
+> > Date:   Fri Nov 23 12:36:23 2012 +0000
+> >
+> >     gpio: Provide the STMPE GPIO driver with its own IRQ Domain
+> >
+> >     The STMPE GPIO driver can be used as an IRQ controller by some
+> 
+> What is this funny citing and indentation business here... I stripped
+> all the whitespace by hand, no big deal, just curious.
+> 
+> Looks like you e.g. copy/pasted from a "git log" command log rather
+> than from an actual patch.
 
-diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index 0bb54393..344ce09 100644
---- a/drivers/mfd/omap-usb-host.c
-+++ b/drivers/mfd/omap-usb-host.c
-@@ -657,32 +657,32 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
- 	}
- 
- 	if (is_ehci_phy_mode(pdata->port_mode[0])) {
--		/* for OMAP3 , the clk set paretn fails */
-+		/* for OMAP3, clk_set_parent fails */
- 		ret = clk_set_parent(omap->utmi_clk[0],
- 					omap->xclk60mhsp1_ck);
- 		if (ret != 0)
--			dev_err(dev, "xclk60mhsp1_ck set parent"
--				"failed error:%d\n", ret);
-+			dev_dbg(dev, "xclk60mhsp1_ck set parent failed: %d\n",
-+					ret);
- 	} else if (is_ehci_tll_mode(pdata->port_mode[0])) {
- 		ret = clk_set_parent(omap->utmi_clk[0],
- 					omap->init_60m_fclk);
- 		if (ret != 0)
--			dev_err(dev, "init_60m_fclk set parent"
--				"failed error:%d\n", ret);
-+			dev_dbg(dev, "P0 init_60m_fclk set parent failed: %d\n",
-+					ret);
- 	}
- 
- 	if (is_ehci_phy_mode(pdata->port_mode[1])) {
- 		ret = clk_set_parent(omap->utmi_clk[1],
- 					omap->xclk60mhsp2_ck);
- 		if (ret != 0)
--			dev_err(dev, "xclk60mhsp2_ck set parent"
--					"failed error:%d\n", ret);
-+			dev_dbg(dev, "xclk60mhsp2_ck set parent failed: %d\n",
-+					ret);
- 	} else if (is_ehci_tll_mode(pdata->port_mode[1])) {
- 		ret = clk_set_parent(omap->utmi_clk[1],
- 						omap->init_60m_fclk);
- 		if (ret != 0)
--			dev_err(dev, "init_60m_fclk set parent"
--				"failed error:%d\n", ret);
-+			dev_dbg(dev, "P1 init_60m_fclk set parent failed: %d\n",
-+					ret);
- 	}
- 
- 	omap_usbhs_init(dev);
+Yeah, for v2 review, I usually use `git show` and copy from "Author:".
+
+> >     related devices. Here we provide it with its very own IRQ Domain
+> >     so that IRQs can be issued dynamically. This will stand the
+> >     driver in good stead when it is enabled for Device Tree, as this
+> >     it a prerequisite.
+> >
+> >     Cc: Grant Likely <grant.likely@secretlab.ca>
+> >     Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+> >     Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Applied.
+
+Thanks dude.
+
+> I apply this late because not using an irqdomain when we can is
+> an abomination so I'm taking the risk.
+
+NP.
+
 -- 
-1.7.4.1
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
