@@ -1,49 +1,76 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 10 Dec 2012 12:42:27 +0530
-Subject: [PATCH 0/9] memory: emif: miscellaneous bug fixes for EMIF driver
-In-Reply-To: <1355123324-5228-1-git-send-email-a>
-References: <1355123324-5228-1-git-send-email-a>
-Message-ID: <50C58B5B.4030606@ti.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 10 Dec 2012 08:34:15 +0100
+Subject: Sharing PCIE driver between Microblaze and Arm zynq
+In-Reply-To: <20121207141115.EFC903E0B87@localhost>
+References: <CAHTX3dLxbVxn+D+AV7L0VsGYFOjas3AJ_3M_xncVfxp02FCy=Q@mail.gmail.com>
+ <CAErSpo6xRdwzTuPPqnmvmHSp7awnV7=Z85eWFfktb_hm9Aad_A@mail.gmail.com>
+ <50C1BA9D.5010406@monstr.eu> <20121207141115.EFC903E0B87@localhost>
+Message-ID: <CAHTX3dJLa3e_za-wx8VY9FWqc-GMe_hB-hwzOZqyP-u3hD=3Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry to Spam you in-box.
-Please discard this message...
+2012/12/7 Grant Likely <grant.likely@secretlab.ca>:
+> On Fri, 07 Dec 2012 10:45:01 +0100, Michal Simek <monstr@monstr.eu> wrote:
+>> On 12/06/2012 10:27 PM, Bjorn Helgaas wrote:
+>> > [+cc linux-pci]
+>> >
+>> > On Thu, Dec 6, 2012 at 7:23 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> >> Hi guys,
+>> >>
+>> >> I have a question regarding to sharing generic OF pcie driver between
+>> >> two architectures MB and ARM Zynq.
+>> >> Is drivers/pci/pcie location good for it?
+>> >> Make no sense to have the same driver in two locations.
+>> >
+>> > I think you're talking about a PCI host bridge driver.  It would
+>> > definitely be nice to move toward a generic, shared driver.  Host
+>> > bridge drivers are responsible for enumerating the PCI hierarchy below
+>> > the bridge.  Enumeration is not really PCIe-specific, so I wouldn't
+>> > put it in drivers/pci/pcie.
+>>
+>> Not a PCI expert, just trying to find out the proper location for this shared driver.
+>>
+>>
+>> >> Is using readl/writel IO functions in this driver the best option
+>> >> which we can have?
+>> >> Or is there any other recommendation?
+>> >
+>> > I'm not really a driver person, but if you're writing a new driver,
+>> > wouldn't you use the iomap interfaces (ioremap(), ioread32(), etc)
+>> > rather than readl()?
+>>
+>> That driver exists but it is not in mainline and it is better to directly
+>> add it to proper location with correct io functions.
+>> The question is if ioread/iowrite functions are correct one.
+>> PowerPC io-defs.h suggests that readl/writel should be used for PCI.
+>>
+>>
+>> >> Also just want to check if it is correct to use pcie device_type.
+>> >
+>> > I don't know what you're asking here.  Can you elaborate or give a
+>> > specific example?
+>>
+>> If node property device_type pcie should be used.
+>> device_type = "pcie";
+>>
+>> For pci it is device_type = "pci";
+>> For network it is device_type = "network"
+>> the same for serial, watchdogs.
+>>
+>> Do we have any list of device_types which we should use?
+>
+> Don't use them unless a binding requires it. PCI address lookup code
+> uses it, so we put it in those nodes. Otherwise device_type is
+> deprecated and has been for a long time now. You should not be using it
+> in .dts files.
 
-Thanks
-Lokesh
 
-On Monday 10 December 2012 12:38 PM, a at dbdp33.itg.ti.com wrote:
-> From: Lokesh Vutla <lokeshvutla@ti.com>
->
-> This series resolves a few minor issues for EMIF driver.
->
-> Tested all the patches on OMAP4-sdp, OMAP5-sevm.
-> Patch : "memory: emif: setup LP settings on freq update"
-> is tested on a local tree, since freq update cannot be
-> tested on mainline.
->
-> Ambresh K (1):
->    memory: emif: use default custom config parameter.
->
-> Lokesh Vutla (1):
->    memory: emif: Correct the lpmode timeout calculation
->
-> Nishanth Menon (5):
->    memory: emif: setup LP settings on freq update
->    memory: emif: handle overflow for timing for LP mode
->    memory: emif: Handle devices which are not rated for >85C
->    memory: emif: use restart if power_off not present when out of spec
->    memory: emif: disable phy_fast_dll_lock
->
-> Oleksandr Dmytryshyn (1):
->    memory: emif: fix timings initialization issue
->
-> Severine Glock (1):
->    memory: emif: debugfs: Remove MR4= string print
->
->   drivers/memory/emif.c                   |   92 +++++++++++++++++++++++++------
->   drivers/memory/emif.h                   |    2 +-
->   include/linux/platform_data/emif_plat.h |    1 +
->   3 files changed, 78 insertions(+), 17 deletions(-)
->
+Thanks,
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
+Microblaze U-BOOT custodian
