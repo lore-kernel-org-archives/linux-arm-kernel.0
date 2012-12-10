@@ -1,33 +1,29 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Dec 2012 10:30:50 +0000
-Subject: [PATCH 11/12] ARM: ux500: Use the GPIO regulator framework for
- SDI0's 'en' and 'vsel'
-In-Reply-To: <CAPDyKFo8NjiYdcyx3pk8byc1N2f7r+erQj74A1zhOaNK_WbkZA@mail.gmail.com>
-References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
- <1355129761-8088-12-git-send-email-lee.jones@linaro.org>
- <CAPDyKFo8NjiYdcyx3pk8byc1N2f7r+erQj74A1zhOaNK_WbkZA@mail.gmail.com>
-Message-ID: <20121210103050.GE9362@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 10 Dec 2012 11:42:00 +0100
+Subject: [PATCH 0/2] add RTC support for Armada 370 and Armada XP
+Message-ID: <1355136122-30729-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +        .constraints = {
-> > +                .min_uV         = 1800000,
-> 
-> 2.9V, not 3.3V
+Hello Jason,
 
-> > +static struct gpio_regulator_state sdi0_reg_states[] = {
-> > +        { .value = 3300000, .gpios = (0 << 0) },
-> 
-> 2.9V, not 3.3V
+This small patchset adds RTC support for Armada 370 and Armada XP. It
+was succesfully tested on the evaluation board. The second patch add
+the lacking documentation for the device tree binding. This serie is
+3.9 material.
 
-I'm still a little unsure about this. I know the actual
-voltage is v2.9, but the supported/requested MMC voltage
-from the driver is v3.3.
+Thanks,
 
-Will it still work if I set it all up as v2.9?
+
+Gregory CLEMENT (2):
+  arm: mvebu: add RTC support for Armada 370 and Armada XP
+  rtc: rtc-mv: Add the device tree binding documentation
+
+ .../devicetree/bindings/rtc/orion-rtc.txt          |   18 ++++++++++++++++++
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    6 ++++++
+ drivers/rtc/Kconfig                                |    2 +-
+ 3 files changed, 25 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/orion-rtc.txt
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
