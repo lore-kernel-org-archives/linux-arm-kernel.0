@@ -1,34 +1,42 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 10 Dec 2012 12:39:15 +0530
-Subject: [PATCH 6/9] memory: emif: debugfs: Remove MR4= string print
+Date: Mon, 10 Dec 2012 12:39:18 +0530
+Subject: [PATCH 9/9] memory: emif: use default custom config parameter.
 In-Reply-To: <1355123358-5273-1-git-send-email-lokeshvutla@ti.com>
 References: <1355123358-5273-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1355123358-5273-7-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1355123358-5273-10-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Severine Glock <s-glock@ti.com>
+From: Ambresh K <ambresh@ti.com>
 
-MR4 is reported under debugfs with following format MR4=%d.
-Remove MR4= string for better convenience.
+In-case of low power mode selected and custom parameters
+are not configured, then use default configuration.
 
-Signed-off-by: Severine Glock <s-glock@ti.com>
+Signed-off-by: Ambresh K <ambresh@ti.com>
 ---
- drivers/memory/emif.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/memory/emif.c |   10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
-index 625732d..32ce601 100644
+index 70f6e0f..e58fde4 100644
 --- a/drivers/memory/emif.c
 +++ b/drivers/memory/emif.c
-@@ -147,7 +147,7 @@ static int emif_mr4_show(struct seq_file *s, void *unused)
- {
- 	struct emif_data *emif = s->private;
+@@ -722,9 +722,13 @@ static u32 get_pwr_mgmt_ctrl(u32 freq, struct emif_data *emif, u32 ip_rev)
  
--	seq_printf(s, "MR4=%d\n", emif->temperature_level);
-+	seq_printf(s, "%d\n", emif->temperature_level);
- 	return 0;
- }
+ 	if (cust_cfgs && (cust_cfgs->mask & EMIF_CUSTOM_CONFIG_LPMODE)) {
+ 		lpmode		= cust_cfgs->lpmode;
+-		timeout_perf	= cust_cfgs->lpmode_timeout_performance;
+-		timeout_pwr	= cust_cfgs->lpmode_timeout_power;
+-		freq_threshold  = cust_cfgs->lpmode_freq_threshold;
++
++		if (cust_cfgs->lpmode_timeout_performance)
++			timeout_perf	= cust_cfgs->lpmode_timeout_performance;
++		if (cust_cfgs->lpmode_timeout_power)
++			timeout_pwr	= cust_cfgs->lpmode_timeout_power;
++		if (cust_cfgs->lpmode_freq_threshold)
++			freq_threshold  = cust_cfgs->lpmode_freq_threshold;
+ 	}
  
+ 	/* Timeout based on DDR frequency */
 -- 
 1.7.9.5
