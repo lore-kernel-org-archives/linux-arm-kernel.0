@@ -1,91 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 10 Dec 2012 14:56:58 +0000
-Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
- across all cpus
-In-Reply-To: <20121210134000.GQ26936@jl-vm1.vm.bytemark.co.uk>
-References: <1354892111.13000.50.camel@linaro1.home>
- <1354894134.17101.44.camel@gandalf.local.home>
- <20121207162346.GW14363@n2100.arm.linux.org.uk>
- <1354898200.17101.50.camel@gandalf.local.home>
- <20121207164530.GX14363@n2100.arm.linux.org.uk>
- <1354900436.17101.58.camel@gandalf.local.home>
- <1354902347.8263.12.camel@linaro1.home>
- <20121210100433.GB6624@mudshark.cambridge.arm.com>
- <1355144537.17101.155.camel@gandalf.local.home>
- <20121210134000.GQ26936@jl-vm1.vm.bytemark.co.uk>
-Message-ID: <20121210145658.GE7869@mudshark.cambridge.arm.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 10 Dec 2012 16:25:37 +0100
+Subject: [RESEND PATCH 0/5] cpufreq: db8500: Rename driver and update some
+ parts
+Message-ID: <1355153142-9534-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jamie,
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Thanks for summarising the thread so far.
+This patchset starts by renaming the db8500 cpufreq driver to a more generic
+name. There are new variants which rely on it too, so instead we give it a
+family name of dbx500.
 
-On Mon, Dec 10, 2012 at 01:40:01PM +0000, Jamie Lokier wrote:
-> On Fri, 2012-12-07 at 19:02 +0000, Will Deacon wrote:
-> > For ARMv7, there are small subsets of instructions for ARM and Thumb which
-> > are guaranteed to be atomic wrt concurrent modification and execution of
-> > the instruction stream between different processors:
-> >
-> > Thumb:      The 16-bit encodings of the B, NOP, BKPT, and SVC instructions.
-> > ARM:        The B, BL, NOP, BKPT, SVC, HVC, and SMC instructions.
-> 
-> Thumb 32-bit ftrace call isn't in the above list.
-> 
-> Questions: does the above concurrent modification guarantee require
-> both the old instruction _and_ the new one to be among those listed,
-> or is it enough to be just the new one (for example when setting a
-> normal software breakpoint, that would be useful)?  Can it be the old
-> one and not the new (for example when removing a software breakpoint,
-> that would be useful)?  Does that subset mean replacing any of the
-> listed instructions by any of the others is ok, or any of the listed
-> with another of the same type?
+On top of that a fixup patch for initialization of the driver and some minor
+cleanup patches are included as well.
 
-Yes, the target instruction also has to be listed. However,  I only described
-the simple cases above... there are a number of exceptions when it comes to
-32-bit Thumb-2 encodings of BL (I hinted at one of them before):
+These patches can be material for 3.8.
 
-	- The two halfwords of a 32-bit BL instruction can each be replaced
-	  with the relevant halfword from another BL instruction. This
-	  basically means you can change the immediate fields, as I
-	  mentioned earlier.
+Since some patches for the db8500 cpufreq driver has recently been merged
+through Mike Turquette's clk tree, I decided to base these patches on top
+of the clk-next branch. So I hope Mike is fine by merging these patches
+through his tree.
 
-	- The most-significant halfword of a 32-bit BL instruction can be
-	  replaced with B, BKPT or SVC (i.e. not NOP).
+So I will try to collect ACKs from Rafael for the cpufreq patches. The
+mfd patch has already been ACKED by Samuel.
 
-	- A 16-bit B, BKPT, or SVC instruction can be replaced with the
-	  most-significant halfword of a BL instruction.
+Jonas Aaberg (1):
+  cpufreq: dbx500: Minor code cleanup
 
-The latter points mean we can effectively nop out bl instructions, and put
-them back again.
+Lee Jones (3):
+  cpufreq: Give driver used for dbx500 family a more generic name
+  mfd: db8500: Update cpufreq device name
+  cpufreq: dbx500: Update file header
 
-> This is what makes me wonder, if it's safe to replace the 32-bit
-> mcount call with a 16-bit short jump:
-> 
-> > On Mon, Dec 10, 2012 at 11:04:05AM +0000, Jon Medhurst (Tixy) wrote:
-> > > So this means for things like kprobes which can modify arbitrary kernel
-> > > code we are going to need to continue to always use some form of
-> > > stop_the_whole_system() function?
-> > >
-> > > Also, kprobes currently uses patch_text() which only uses stop_machine
-> > > for Thumb2 instructions which straddle a word boundary, so this needs
-> > > changing?
-> 
-> Will Deacon replied:
-> > Yes; if you're modifying instructions other than those mentioned above, then
-> > you'll need to synchronise the CPUs, update the instructions, perform
-> > cache-maintenance on the writing CPU and then execute an isb on the
-> > executing core (this last bit isn't needed if you're going to go through an
-> > exception return to get back to the new code -- depends on how your
-> > stop/resume code works).
-> 
-> If I've understood that exchange, it implies that using patch_text()
-> to replace an instruction not in the list of special ones, with a trap
-> or jump, isn't ok?  And so it's ok to replace the NOP with a short
-> branch (since 16-bit "B" is in the list), but it's not ok to replace
-> 16-bit "B" with the 32-bit ftrace call; and the same going the other way?
+Ulf Hansson (1):
+  cpufreq: dbx500: Move clk_get to probe
 
-Well, these restrictions only apply if you want to avoid synchronising the
-CPUs. Hopefully my explanation above answers your questions!
+ drivers/cpufreq/Makefile         |    2 +-
+ drivers/cpufreq/db8500-cpufreq.c |  179 -------------------------------------
+ drivers/cpufreq/dbx500-cpufreq.c |  180 ++++++++++++++++++++++++++++++++++++++
+ drivers/mfd/db8500-prcmu.c       |    4 +-
+ 4 files changed, 183 insertions(+), 182 deletions(-)
+ delete mode 100644 drivers/cpufreq/db8500-cpufreq.c
+ create mode 100644 drivers/cpufreq/dbx500-cpufreq.c
 
-Will
+-- 
+1.7.10
