@@ -1,34 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Dec 2012 13:57:48 +0000
-Subject: [PATCH] ARM: ftrace: Ensure code modifications are
- synchronised across all cpus
-In-Reply-To: <1355144537.17101.155.camel@gandalf.local.home>
-References: <1354888985.17101.41.camel@gandalf.local.home>
- <1354892111.13000.50.camel@linaro1.home>
- <1354894134.17101.44.camel@gandalf.local.home>
- <20121207162346.GW14363@n2100.arm.linux.org.uk>
- <1354898200.17101.50.camel@gandalf.local.home>
- <20121207164530.GX14363@n2100.arm.linux.org.uk>
- <1354900436.17101.58.camel@gandalf.local.home>
- <1354902347.8263.12.camel@linaro1.home>
- <20121210100433.GB6624@mudshark.cambridge.arm.com>
- <1355144537.17101.155.camel@gandalf.local.home>
-Message-ID: <20121210135747.GK14363@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 10 Dec 2012 23:03:09 +0900
+Subject: [PATCH V4 0/2] Add DT support for i2s
+In-Reply-To: <CAAgF-Bd3=W7+kd-uDASva_ofLySvVm1skpLij9WvSyhbfiP5-w@mail.gmail.com>
+References: <1354099669-1735-1-git-send-email-padma.v@samsung.com>
+ <CAAgF-Bc4t6WL4vswP6CFeSQrPZBmOuYfVt6_JoB1Za9TBX7mvA@mail.gmail.com>
+ <20121206041141.GA10867@opensource.wolfsonmicro.com>
+ <20121207135131.A53643E0B87@localhost>
+ <CAAgF-BenOdFJK2LMot73_B=wHOFgD2sq8x-Ou=1CvpkiJpmeQQ@mail.gmail.com>
+ <20121209072607.GD6511@opensource.wolfsonmicro.com>
+ <CAAgF-Bd3=W7+kd-uDASva_ofLySvVm1skpLij9WvSyhbfiP5-w@mail.gmail.com>
+Message-ID: <20121210140306.GA6103@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 08:02:17AM -0500, Steven Rostedt wrote:
-> On Mon, 2012-12-10 at 10:04 +0000, Will Deacon wrote:
-> > Yes, and I think if you do use two 16-bit nops, you can even get rid of all
-> > the intermediate `sync' operations (I guess you might want one at the end if
-> > you want the call to become visible at a particular point).
-> 
-> Wont work. We are replacing a 32bit call with a nop. That nop must also
-> be 32bits, because we could eventually replace the nop(s) with a 32bit
-> call.
+On Mon, Dec 10, 2012 at 04:30:50PM +0530, Padma Venkat wrote:
 
-... which, if it's misaligned to a 32-bit boundary, which can happen with
-Thumb-2 code, will require the replacement to be done atomically; you will
-need to use stop_machine() to ensure that other CPUs don't try to execute
-the instruction mid-way through modification... as I have already
-explained in my previous mails.
+> Could you please explain me in more detail about "single DT link
+> automatically expanded into two DAI links".
+> How this can be done?
+
+The device tree should only represent the single physical link that
+exists and the handling of the DAIs should be done at runtime by some
+piece of software.
