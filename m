@@ -1,84 +1,26 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 10 Dec 2012 16:25:40 +0100
-Subject: [RESEND PATCH 3/5] cpufreq: dbx500: Move clk_get to probe
-In-Reply-To: <1355153142-9534-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1355153142-9534-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1355153142-9534-4-git-send-email-ulf.hansson@stericsson.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 10 Dec 2012 16:27:29 +0100
+Subject: Your kernel patches for the Marvell Mirabox
+In-Reply-To: <20121210140202.GI21694@titan.lakedaemon.net>
+References: <50C4AC68.7090709@gmail.com>
+ <20121210140202.GI21694@titan.lakedaemon.net>
+Message-ID: <20121210162729.21f2f053@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+Dear Jason Cooper,
 
-The armss clock shall only be fetched at probe thus move this here.
-Same thing goes for the printing of the available frequencies.
+On Mon, 10 Dec 2012 09:02:02 -0500, Jason Cooper wrote:
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-Reviewed-by: Jonas Aaberg <jonas.aberg@stericsson.com>
----
- drivers/cpufreq/dbx500-cpufreq.c |   29 ++++++++++++++---------------
- 1 file changed, 14 insertions(+), 15 deletions(-)
+> In u-boot you'll need to change the boardid environment variable to
+> 0xffffffff, which needs to be in unsigned integer notation, 4294967295.
 
-diff --git a/drivers/cpufreq/dbx500-cpufreq.c b/drivers/cpufreq/dbx500-cpufreq.c
-index 0a411b5..d974a8e 100644
---- a/drivers/cpufreq/dbx500-cpufreq.c
-+++ b/drivers/cpufreq/dbx500-cpufreq.c
-@@ -90,28 +90,14 @@ static unsigned int dbx500_cpufreq_getspeed(unsigned int cpu)
- 
- static int __cpuinit dbx500_cpufreq_init(struct cpufreq_policy *policy)
- {
--	int i = 0;
- 	int res;
- 
--	armss_clk = clk_get(NULL, "armss");
--	if (IS_ERR(armss_clk)) {
--		pr_err("dbx500-cpufreq : Failed to get armss clk\n");
--		return PTR_ERR(armss_clk);
--	}
--
--	pr_info("dbx500-cpufreq : Available frequencies:\n");
--	while (freq_table[i].frequency != CPUFREQ_TABLE_END) {
--		pr_info("  %d Mhz\n", freq_table[i].frequency/1000);
--		i++;
--	}
--
- 	/* get policy fields based on the table */
- 	res = cpufreq_frequency_table_cpuinfo(policy, freq_table);
- 	if (!res)
- 		cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
- 	else {
- 		pr_err("dbx500-cpufreq : Failed to read policy table\n");
--		clk_put(armss_clk);
- 		return res;
- 	}
- 
-@@ -147,13 +133,26 @@ static struct cpufreq_driver dbx500_cpufreq_driver = {
- 
- static int dbx500_cpufreq_probe(struct platform_device *pdev)
- {
--	freq_table = dev_get_platdata(&pdev->dev);
-+	int i = 0;
- 
-+	freq_table = dev_get_platdata(&pdev->dev);
- 	if (!freq_table) {
- 		pr_err("dbx500-cpufreq: Failed to fetch cpufreq table\n");
- 		return -ENODEV;
- 	}
- 
-+	armss_clk = clk_get(&pdev->dev, "armss");
-+	if (IS_ERR(armss_clk)) {
-+		pr_err("dbx500-cpufreq : Failed to get armss clk\n");
-+		return PTR_ERR(armss_clk);
-+	}
-+
-+	pr_info("dbx500-cpufreq : Available frequencies:\n");
-+	while (freq_table[i].frequency != CPUFREQ_TABLE_END) {
-+		pr_info("  %d Mhz\n", freq_table[i].frequency/1000);
-+		i++;
-+	}
-+
- 	return cpufreq_register_driver(&dbx500_cpufreq_driver);
- }
- 
+I'm not sure this is strictly necessary. I've never done that on any
+Marvell U-Boot's and I'm happily booting DT-only kernels.
+
+Thomas
 -- 
-1.7.10
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
