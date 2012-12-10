@@ -1,89 +1,92 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 10 Dec 2012 12:39:12 +0530
-Subject: [PATCH 3/9] memory: emif: handle overflow for timing for LP mode
+Date: Mon, 10 Dec 2012 12:39:13 +0530
+Subject: [PATCH 4/9] memory: emif: Handle devices which are not rated for >85C
 In-Reply-To: <1355123358-5273-1-git-send-email-lokeshvutla@ti.com>
 References: <1355123358-5273-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1355123358-5273-4-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1355123358-5273-5-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-In case the custom timings provide values which overflow
-the maximum possible field value, warn and use maximum
-permissible value.
+As per JESD209-2E specification for LPDDR2,
+      http://www.jedec.org/standards-documents/results/jesd209-2E
+Table 73, LPDDR2 memories come in two flavors - Standard and
+Extended. The Standard types can operate from -25C to +85C
+However, beyond that and upto +105C can only be supported by
+Extended types.
 
+Unfortunately, it seems there is no info in MR0(device info) or
+MR[1,2](device feature) for run time detection of this capability
+as far as seen on the spec. Hence, we provide a custom_config
+flag to be populated by platforms which have these "extended"
+type memories.
+
+For the "Standard" memories, we need to consider MR4 notifications
+of temperature triggers >85C as equivalent to thermal shutdown
+events (equivalent to Spec specified thermal shutdown events for
+"extended" parts).
+
+Reported-by: Richard Woodruff <r-woodruff2@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- drivers/memory/emif.c |   36 ++++++++++++++++++++++++++++--------
- 1 file changed, 28 insertions(+), 8 deletions(-)
+ drivers/memory/emif.c                   |   24 ++++++++++++++++++++++++
+ include/linux/platform_data/emif_plat.h |    1 +
+ 2 files changed, 25 insertions(+)
 
 diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
-index 69a480d..27a3ce1 100644
+index 27a3ce1..ffbdf9e 100644
 --- a/drivers/memory/emif.c
 +++ b/drivers/memory/emif.c
-@@ -714,6 +714,8 @@ static u32 get_pwr_mgmt_ctrl(u32 freq, struct emif_data *emif, u32 ip_rev)
- 	u32 timeout_perf	= EMIF_LP_MODE_TIMEOUT_PERFORMANCE;
- 	u32 timeout_pwr		= EMIF_LP_MODE_TIMEOUT_POWER;
- 	u32 freq_threshold	= EMIF_LP_MODE_FREQ_THRESHOLD;
-+	u32 mask;
-+	u8 shift;
+@@ -916,6 +916,7 @@ static irqreturn_t handle_temp_alert(void __iomem *base, struct emif_data *emif)
+ {
+ 	u32		old_temp_level;
+ 	irqreturn_t	ret = IRQ_HANDLED;
++	struct emif_custom_configs *custom_configs;
  
- 	struct emif_custom_configs *cust_cfgs = emif->plat_data->custom_configs;
- 
-@@ -738,27 +740,45 @@ static u32 get_pwr_mgmt_ctrl(u32 freq, struct emif_data *emif, u32 ip_rev)
- 
- 	switch (lpmode) {
- 	case EMIF_LP_MODE_CLOCK_STOP:
--		pwr_mgmt_ctrl = (timeout << CS_TIM_SHIFT) |
--					SR_TIM_MASK | PD_TIM_MASK;
-+		shift = CS_TIM_SHIFT;
-+		mask = CS_TIM_MASK;
- 		break;
- 	case EMIF_LP_MODE_SELF_REFRESH:
- 		/* Workaround for errata i735 */
- 		if (timeout < 6)
- 			timeout = 6;
- 
--		pwr_mgmt_ctrl = (timeout << SR_TIM_SHIFT) |
--					CS_TIM_MASK | PD_TIM_MASK;
-+		shift = SR_TIM_SHIFT;
-+		mask = SR_TIM_MASK;
- 		break;
- 	case EMIF_LP_MODE_PWR_DN:
--		pwr_mgmt_ctrl = (timeout << PD_TIM_SHIFT) |
--					CS_TIM_MASK | SR_TIM_MASK;
-+		shift = PD_TIM_SHIFT;
-+		mask = PD_TIM_MASK;
- 		break;
- 	case EMIF_LP_MODE_DISABLE:
- 	default:
--		pwr_mgmt_ctrl = CS_TIM_MASK |
--					PD_TIM_MASK | SR_TIM_MASK;
-+		mask = 0;
-+		shift = 0;
-+		break;
-+	}
-+	/* Round to maximum in case of overflow, BUT warn! */
-+	if (lpmode != EMIF_LP_MODE_DISABLE && timeout > mask >> shift) {
-+		pr_err("TIMEOUT Overflow - lpmode=%d perf=%d pwr=%d freq=%d\n",
-+		       lpmode,
-+		       timeout_perf,
-+		       timeout_pwr,
-+		       freq_threshold);
-+		WARN(1, "timeout=0x%02x greater than 0x%02x. Using max\n",
-+		     timeout, mask >> shift);
-+		timeout = mask >> shift;
+ 	spin_lock_irqsave(&emif_lock, irq_state);
+ 	old_temp_level = emif->temperature_level;
+@@ -928,6 +929,29 @@ static irqreturn_t handle_temp_alert(void __iomem *base, struct emif_data *emif)
+ 		goto out;
  	}
  
-+	/* Setup required timing */
-+	pwr_mgmt_ctrl = (timeout << shift) & mask;
-+	/* setup a default mask for rest of the modes */
-+	pwr_mgmt_ctrl |= (SR_TIM_MASK | CS_TIM_MASK | PD_TIM_MASK) &
-+			  ~mask;
++	custom_configs = emif->plat_data->custom_configs;
 +
- 	/* No CS_TIM in EMIF_4D5 */
- 	if (ip_rev == EMIF_4D5)
- 		pwr_mgmt_ctrl &= ~CS_TIM_MASK;
++	/*
++	 * IF we detect higher than "nominal rating" from DDR sensor
++	 * on an unsupported DDR part, shutdown system
++	 */
++	if (custom_configs && !(custom_configs->mask &
++				EMIF_CUSTOM_CONFIG_EXTENDED_TEMP_PART)) {
++		if (emif->temperature_level >= SDRAM_TEMP_HIGH_DERATE_REFRESH) {
++			dev_err(emif->dev,
++				"%s:NOT Extended temperature capable memory."
++				"Converting MR4=0x%02x as shutdown event\n",
++				__func__, emif->temperature_level);
++			/*
++			 * Temperature far too high - do kernel_power_off()
++			 * from thread context
++			 */
++			emif->temperature_level = SDRAM_TEMP_VERY_HIGH_SHUTDOWN;
++			ret = IRQ_WAKE_THREAD;
++			goto out;
++		}
++	}
++
+ 	if (emif->temperature_level < old_temp_level ||
+ 		emif->temperature_level == SDRAM_TEMP_VERY_HIGH_SHUTDOWN) {
+ 		/*
+diff --git a/include/linux/platform_data/emif_plat.h b/include/linux/platform_data/emif_plat.h
+index 03378ca..5c19a2a 100644
+--- a/include/linux/platform_data/emif_plat.h
++++ b/include/linux/platform_data/emif_plat.h
+@@ -40,6 +40,7 @@
+ /* Custom config requests */
+ #define EMIF_CUSTOM_CONFIG_LPMODE			0x00000001
+ #define EMIF_CUSTOM_CONFIG_TEMP_ALERT_POLL_INTERVAL	0x00000002
++#define EMIF_CUSTOM_CONFIG_EXTENDED_TEMP_PART		0x00000004
+ 
+ #ifndef __ASSEMBLY__
+ /**
 -- 
 1.7.9.5
