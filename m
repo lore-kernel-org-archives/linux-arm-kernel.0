@@ -1,61 +1,44 @@
-From: narkewoody@gmail.com (Woody Wu)
-Date: Mon, 10 Dec 2012 06:25:38 +0000 (UTC)
-Subject: Serial8250 doesn't populate in /proc/iomem?
-Message-ID: <slrnkcb014.77o.narkewoody@zuhnb712.local.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 10 Dec 2012 17:40:57 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the sound-asoc tree
+Message-ID: <20121210174057.9862b43ff7350ba20c048df3@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, list
+Hi all,
 
-I found some io memory information is lost from /dev/iomem and want to
-find out why.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/plat-samsung/include/plat/devs.h between commit a08485d8fdf6
+("ASoC: Samsung: Do not register samsung audio dma device as pdev") from
+the sound-asoc tree and commit 0a9d5ac307ae ("ARM: EXYNOS: removing
+exynos-drm device registration from non-dt platforms") from the arm-soc
+tree.
 
-I have a 2.6.16 kernel running on a ARM board (Samsung S3C2410). From
-the kernel log, I see 16 8250 serial ports were detected, and each of
-thoese ports has a memory address:
-
-Serial: 8250/16550 driver $Revision: 1.90 $ 16 ports, IRQ sharing enabled
-serial8250: tts0 at MMIO 0xe1400000 (irq = 16) is a 16550A
-serial8250: tts1 at MMIO 0xe1400008 (irq = 16) is a 16550A
-serial8250: tts2 at MMIO 0xe1400010 (irq = 17) is a 16550A
-serial8250: tts3 at MMIO 0xe1400018 (irq = 17) is a 16550A
-serial8250: tts4 at MMIO 0xe1400020 (irq = 18) is a 16550A
-serial8250: tts5 at MMIO 0xe1400028 (irq = 18) is a 16550A
-serial8250: tts6 at MMIO 0xe1400030 (irq = 19) is a 16550A
-serial8250: tts7 at MMIO 0xe1400038 (irq = 19) is a 16550A
-serial8250: tts8 at MMIO 0xe1400040 (irq = 48) is a 16550A
-serial8250: tts9 at MMIO 0xe1400048 (irq = 48) is a 16550A
-serial8250: tts10 at MMIO 0xe1400050 (irq = 49) is a 16550A
-serial8250: tts11 at MMIO 0xe1400058 (irq = 49) is a 16550A
-serial8250: tts12 at MMIO 0xe1400060 (irq = 60) is a 16550A
-serial8250: tts13 at MMIO 0xe1400068 (irq = 60) is a 16550A
-serial8250: tts14 at MMIO 0xe1400070 (irq = 61) is a 16550A
-serial8250: tts15 at MMIO 0xe1400078 (irq = 61) is a 16550A
-
-I can read/write these serial ports from /dev/ttys*, in other words,
-they do exist.  I also can find the driver info from /proc/devices:
-
-Character devices:                                               
-
-  ...
-  4 /dev/vc/0
-  4 tty
-  4 tts
-  5 /dev/tty
-  5 /dev/console
-  5 /dev/ptmx
-  7 vcs
-  ...
-
-The problem is, I don't understand why there is no information about
-these ports in /proc/iomem file. The 'iomem' file now contains:
-
-11000000-11000ffe : AX88796B
-19000000-19000ffe : AX88796B
-30000000-33ffffff : System RAM
-  3001c000-301e826b : Kernel text
-  301ea000-302234a3 : Kernel data
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
 -- 
-woody
-I can't go back to yesterday - because I was a different person then.
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/plat-samsung/include/plat/devs.h
+index c45f70c,f53beba..0000000
+--- a/arch/arm/plat-samsung/include/plat/devs.h
++++ b/arch/arm/plat-samsung/include/plat/devs.h
+@@@ -133,8 -132,7 +132,6 @@@ extern struct platform_device exynos4_d
+  extern struct platform_device exynos4_device_pcm2;
+  extern struct platform_device exynos4_device_spdif;
+  
+- extern struct platform_device exynos_device_drm;
+- 
+ -extern struct platform_device samsung_asoc_dma;
+  extern struct platform_device samsung_asoc_idma;
+  extern struct platform_device samsung_device_keypad;
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121210/46f5b15e/attachment-0001.sig>
