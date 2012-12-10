@@ -1,23 +1,91 @@
-From: jrnieder@gmail.com (Jonathan Nieder)
-Date: Mon, 10 Dec 2012 06:46:36 -0800
-Subject: [PATCH] ARM: decompressor: include CONFIG_DEBUG_LL_INCLUDE
- rather than mach/debug-macro.S
-In-Reply-To: <20121210140250.GL14363@n2100.arm.linux.org.uk>
-References: <1355104168-30581-1-git-send-email-shawn.guo@linaro.org>
- <20121210015916.GA30766@S2101-09.ap.freescale.net>
- <20121210140250.GL14363@n2100.arm.linux.org.uk>
-Message-ID: <20121210144350.GA3373@elie.Belkin>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 10 Dec 2012 14:56:58 +0000
+Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
+ across all cpus
+In-Reply-To: <20121210134000.GQ26936@jl-vm1.vm.bytemark.co.uk>
+References: <1354892111.13000.50.camel@linaro1.home>
+ <1354894134.17101.44.camel@gandalf.local.home>
+ <20121207162346.GW14363@n2100.arm.linux.org.uk>
+ <1354898200.17101.50.camel@gandalf.local.home>
+ <20121207164530.GX14363@n2100.arm.linux.org.uk>
+ <1354900436.17101.58.camel@gandalf.local.home>
+ <1354902347.8263.12.camel@linaro1.home>
+ <20121210100433.GB6624@mudshark.cambridge.arm.com>
+ <1355144537.17101.155.camel@gandalf.local.home>
+ <20121210134000.GQ26936@jl-vm1.vm.bytemark.co.uk>
+Message-ID: <20121210145658.GE7869@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+Hi Jamie,
 
-> That worries me a bit because I can see this ending up getting applied to
-> multiple stable kernel trees, even those without CONFIG_DEBUG_LL_INCLUDE.
-> So, let's have it in the patch system without the stable tag.
+Thanks for summarising the thread so far.
 
-If it should only be included in 3.7-stable, a line like
-"Cc: stable at vger.kernel.org # 3.7+" would work fine.
+On Mon, Dec 10, 2012 at 01:40:01PM +0000, Jamie Lokier wrote:
+> On Fri, 2012-12-07 at 19:02 +0000, Will Deacon wrote:
+> > For ARMv7, there are small subsets of instructions for ARM and Thumb which
+> > are guaranteed to be atomic wrt concurrent modification and execution of
+> > the instruction stream between different processors:
+> >
+> > Thumb:      The 16-bit encodings of the B, NOP, BKPT, and SVC instructions.
+> > ARM:        The B, BL, NOP, BKPT, SVC, HVC, and SMC instructions.
+> 
+> Thumb 32-bit ftrace call isn't in the above list.
+> 
+> Questions: does the above concurrent modification guarantee require
+> both the old instruction _and_ the new one to be among those listed,
+> or is it enough to be just the new one (for example when setting a
+> normal software breakpoint, that would be useful)?  Can it be the old
+> one and not the new (for example when removing a software breakpoint,
+> that would be useful)?  Does that subset mean replacing any of the
+> listed instructions by any of the others is ok, or any of the listed
+> with another of the same type?
 
-Hope that helps,
-Jonathan
+Yes, the target instruction also has to be listed. However,  I only described
+the simple cases above... there are a number of exceptions when it comes to
+32-bit Thumb-2 encodings of BL (I hinted at one of them before):
+
+	- The two halfwords of a 32-bit BL instruction can each be replaced
+	  with the relevant halfword from another BL instruction. This
+	  basically means you can change the immediate fields, as I
+	  mentioned earlier.
+
+	- The most-significant halfword of a 32-bit BL instruction can be
+	  replaced with B, BKPT or SVC (i.e. not NOP).
+
+	- A 16-bit B, BKPT, or SVC instruction can be replaced with the
+	  most-significant halfword of a BL instruction.
+
+The latter points mean we can effectively nop out bl instructions, and put
+them back again.
+
+> This is what makes me wonder, if it's safe to replace the 32-bit
+> mcount call with a 16-bit short jump:
+> 
+> > On Mon, Dec 10, 2012 at 11:04:05AM +0000, Jon Medhurst (Tixy) wrote:
+> > > So this means for things like kprobes which can modify arbitrary kernel
+> > > code we are going to need to continue to always use some form of
+> > > stop_the_whole_system() function?
+> > >
+> > > Also, kprobes currently uses patch_text() which only uses stop_machine
+> > > for Thumb2 instructions which straddle a word boundary, so this needs
+> > > changing?
+> 
+> Will Deacon replied:
+> > Yes; if you're modifying instructions other than those mentioned above, then
+> > you'll need to synchronise the CPUs, update the instructions, perform
+> > cache-maintenance on the writing CPU and then execute an isb on the
+> > executing core (this last bit isn't needed if you're going to go through an
+> > exception return to get back to the new code -- depends on how your
+> > stop/resume code works).
+> 
+> If I've understood that exchange, it implies that using patch_text()
+> to replace an instruction not in the list of special ones, with a trap
+> or jump, isn't ok?  And so it's ok to replace the NOP with a short
+> branch (since 16-bit "B" is in the list), but it's not ok to replace
+> 16-bit "B" with the 32-bit ftrace call; and the same going the other way?
+
+Well, these restrictions only apply if you want to avoid synchronising the
+CPUs. Hopefully my explanation above answers your questions!
+
+Will
