@@ -1,28 +1,33 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 10 Dec 2012 10:08:56 +0900
-Subject: [PATCH] ARM: EXYNOS: fix skip scu_enable() for EXYNOS5440
-Message-ID: <030d01cdd672$ed68da20$c83a8e60$%kim@samsung.com>
+Date: Mon, 10 Dec 2012 10:13:30 +0900
+Subject: [PATCH] ARM: dts: cleanup exynos5440.dtsi
+Message-ID: <031b01cdd673$90cb7b50$b26271f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+remove duplicated compatible
+
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/platsmp.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/boot/dts/exynos5440.dtsi |    5 -----
+ 1 files changed, 0 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 4ca8ff1..c5c840e 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -198,7 +198,7 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	int i;
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index 024269d..5406689 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -58,11 +58,6 @@
+ 		};
+ 	};
  
--	if (!soc_is_exynos5250())
-+	if (!(soc_is_exynos5250() || soc_is_exynos5440()))
- 		scu_enable(scu_base_addr());
- 
- 	/*
+-	common {
+-		compatible = "samsung,exynos5440";
+-
+-	};
+-
+ 	serial at B0000 {
+ 		compatible = "samsung,exynos4210-uart";
+ 		reg = <0xB0000 0x1000>;
 -- 
 1.7.4.1
