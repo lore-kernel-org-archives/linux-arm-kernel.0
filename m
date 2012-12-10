@@ -1,63 +1,109 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 10 Dec 2012 19:05:52 +0100
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <50C62161.9080708@wwwdotorg.org>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121207233317.GB4304@obsidianresearch.com>
- <50C62161.9080708@wwwdotorg.org>
-Message-ID: <20121210190552.74acbe5a@skate>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 10 Dec 2012 18:08:16 +0000
+Subject: [PATCH] ARM: head: Remove boot-time HYP mode check for v5 and
+ below
+In-Reply-To: <20121210180235.GC1953@linaro.org>
+References: <1354887959-14863-1-git-send-email-dave.martin@linaro.org>
+ <20121210105743.GA1953@linaro.org>
+ <CAHod+GdDN-hMKreQNXfGpe9vDLV8+a55JFM2R4wW_r5kyFaYww@mail.gmail.com>
+ <20121210180235.GC1953@linaro.org>
+Message-ID: <50C62510.7050204@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Stephen Warren,
-
-On Mon, 10 Dec 2012 10:52:33 -0700, Stephen Warren wrote:
-
-> Mainly as background:
+On 10/12/12 18:02, Dave Martin wrote:
+> On Mon, Dec 10, 2012 at 06:39:55PM +0100, Marko Kati? wrote:
+>> On Mon, Dec 10, 2012 at 11:57 AM, Dave Martin <dave.martin@linaro.org> wrote:
+>>> Hi Russell,
+>>>
+>>> Do you want me to send this patch to the patch system?
+>>>
+>>> Until we have confirmation from Marko (or someone else with a board)
+>>> there's no way to know whether it fixes the problem.  But it should
+>>> restore us back to the old behaviour older hardware, reducing the
+>>> likelihood of side issues.
+>>>
+>>> This could be reverted later if it proves to be unnecessary.
+>>>
+>>> Cheers
+>>> ---Dave
+>>>
+>>> On Fri, Dec 07, 2012 at 01:45:59PM +0000, Dave Martin wrote:
+>>>> The kernel can only be entered on HYP mode on CPUs which actually
+>>>> support it, i.e.  >= ARMv7.  pre-v6 platform support cannot coexist
+>>>> in the same kernel as support for v7 and higher, so there is no
+>>>> advantage in having the HYP mode check on pre-v6 hardware.
+>>>>
+>>>> At least one pre-v6 board is known to fail when the HYP mode check
+>>>> code is present, although the exact cause remains unknown and may
+>>>> be unrelated.  [1]
+>>>>
+>>>> This patch restores the old behaviour for pre-v6 platforms, whereby
+>>>> the CPSR is forced directly to SVC mode with IRQs and FIQs masked.
+>>>> All kernels capable of booting on v7 hardware will retain the
+>>>> check, so this should not impair functionality.
+>>>>
+>>>> [1] http://lists.arm.linux.org.uk/lurker/message/20121130.013814.19218413.en.html
+>>>> ([ARM] head.S change broke platform device registration?)
+>>>>
+>>>> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+>>>> ---
+>>>>  arch/arm/include/asm/assembler.h |    8 ++++++++
+>>>>  1 files changed, 8 insertions(+), 0 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+>>>> index 2ef9581..eb87200 100644
+>>>> --- a/arch/arm/include/asm/assembler.h
+>>>> +++ b/arch/arm/include/asm/assembler.h
+>>>> @@ -250,6 +250,7 @@
+>>>>   * Beware, it also clobers LR.
+>>>>   */
+>>>>  .macro safe_svcmode_maskall reg:req
+>>>> +#if __LINUX_ARM_ARCH__ >= 6
+>>>>       mrs     \reg , cpsr
+>>>>       mov     lr , \reg
+>>>>       and     lr , lr , #MODE_MASK
+>>>> @@ -266,6 +267,13 @@ THUMB(   orr     \reg , \reg , #PSR_T_BIT        )
+>>>>       __ERET
+>>>>  1:   msr     cpsr_c, \reg
+>>>>  2:
+>>>> +#else
+>>>> +/*
+>>>> + * workaround for possibly broken pre-v6 hardware
+>>>> + * (akita, Sharp Zaurus C-1000, PXA270-based)
+>>>> + */
+>>>> +     setmode PSR_F_BIT | PSR_I_BIT | SVC_MODE, \reg
+>>>> +#endif
+>>>>  .endm
+>>>>
+>>>>  /*
+>>>> --
+>>>> 1.7.4.1
+>>>>
+>>
+>> I confirm that this patch fixes the regression on Akita machines
+>> introduced with commit:
+>>
+>> 424e5994e63326a42012f003f1174f3c363c7b62
+>> ARM: zImage/virt: hyp mode entry support for the zImage loader
+>>
+>> The abovementioned commit breaks Zaurus machine ID detection code
+>> (arm/boot/compressed/head-sharpsl.S)
+>> causing Akita machines to boot with the wrong machine ID.
 > 
-> I /think/ Tegra has a similar HW setup (but perhaps not identical)
-> (based on a very brief reading of your emails and brief knowledge of
-> this aspect of the Tegra HW).
+> Thanks for testing.  I've now posted the patch to the patch system.
 > 
-> On Tegra, there is a 1GB physical address window that the PCIe
-> controller serves. The controller has 2 or 3 ports, each a separate PCIe
-> domain I believe. There are registers in the PCIe controller which route
-> accessed made to the 1GB physical window to the various child ports and
-> transaction types.
-
-On Marvell SoCs, this is even more flexible: you have 20 configurable
-address decoding windows. For each of them, you can configure the base
-address, size, and target device (i.e PCIe port x.y, NAND, or some
-other devices). And since we have up to 10 PCIe interfaces, we really
-don't want to over-allocate hundreds of MB of physical address space for
-each device, since most of them need only a few dozens of KB.
-
-> IIRC, the bindings Thierry came up with for the Tegra PCIe controller
-> statically describe the setup of those mappings (e.g. it could assign a
-> 256MB physical address region to port 1, and a 768MB physical address
-> region to port 2 perhaps?).
+>> Just a minor nitpick:
+>> s/clobers/clobbers/g
 > 
-> It sounds like Jason is advocating a much more dynamic approach on the
-> Marvell HW. Perhaps this is related to whether the n host ports driven
-> by the controller are separate PCIe domains (as I believe they are or
-> can be on Tegra) or not.
+> Good spot, but I'll leave the patch unchanged for now.
+> 
+> This typo is in the existing code, not part of the fix.
+> I'll try to tidy this up if I touch this code again.
 
-The code I'm proposing for the Marvell PCIe is already dynamic it
-doesn't describe the addresses in the DT, but instead dynamically
-allocates address decoding windows according to the number of PCIe
-devices that are found.
+I think Will already carries a patch authored by RMK, getting rid of the
+use of LR and of my spelling mistake.
 
-However, I haven't found yet how to get, during the ARM pcibios
-initialization, the memory size needed for each device, so that I could
-size the address decoding windows correctly instead of over-allocating
-them (currently I allocate SZ_64MB for each window, even for my e1000e
-PCIe card that needs only SZ_32K of PCI memory space).
-
-Best regards,
-
-Thomas
+	M.
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
