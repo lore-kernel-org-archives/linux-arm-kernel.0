@@ -1,59 +1,70 @@
-From: giridhar.maruthy@linaro.org (Giridhar Maruthy)
-Date: Mon, 10 Dec 2012 15:02:28 +0530
-Subject: [PATCH] I2C: EXYNOS: Add slave support to i2c
-In-Reply-To: <20121207123343.GU14363@n2100.arm.linux.org.uk>
-References: <1354354961-28833-1-git-send-email-giridhar.maruthy@linaro.org>
- <CAHuqX+EQ0pZnm27yAVqC=NRX8huQ5EvbC8PGn2G3xYw4D71gQA@mail.gmail.com>
- <50C1DB05.7090500@linaro.org>
- <20121207123343.GU14363@n2100.arm.linux.org.uk>
-Message-ID: <CAHuqX+G7e4bR_xK2BAEdm4dedaBHE=CG3sHmzHamgCiOtivNwQ@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 10 Dec 2012 17:53:07 +0800
+Subject: [PATCH] ASoC: atmel-ssc: make it buildable on other architectures
+In-Reply-To: <1354970801-9185-1-git-send-email-manabian@gmail.com>
+References: <1354970801-9185-1-git-send-email-manabian@gmail.com>
+Message-ID: <50C5B103.2050508@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
+Hi Joachim Eastwood,
 
-Thanks for review and please find my replies below.
-
-On 7 December 2012 18:03, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Dec 07, 2012 at 05:33:17PM +0530, Tushar Behera wrote:
->> On 12/03/2012 05:46 PM, Giridhar Maruthy wrote:
->> > This patch adds slave support to i2c. The dt entry i2c-mode
->> > decides at probe time if the controller needs to work in
->> > slave mode and the controller is accordingly programmed.
+On 12/8/2012 20:46, Joachim Eastwood wrote:
+> Not very useful on non AT91/AVR32 platforms but it provides
+> more build coverage and prepares for ARM multiplatform.
 >
-> (I don't have the original patches.)
+> Also fixes a truncated warning that would come when
+> building on a 64-bit arch.
 >
-> Hmm.  How has slave-mode support been tested?
-
-I have taken two I2C controllers in exynos5250.
-I configured one as slave and the other as master port.
-Then physically connected the pins of the two ports.
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
 >
-> Remembering that I2C slave devices do not initiate bus accesses, all
-> accesses will be started by some other master.  How are you dealing
-> with the bytes received from the master,
-
-I run the slave read application in background.
-The resulting slave read will sleep till all bytes are received
-(wait_event_interruptible)
-
-once the master sends the data, an ack is given out by the slave controller
-in the ISR and the data is cached in the buffer(
-buffer sent by slave receive application).
-After all data is received, the read wakes up and the
-slave receive program gets the data.
-
-> and how are you returning a response to the master in reply to a read request?
-
-Similarl logic works in slave transmit mode (read request). Slave
-sleeps till the master initiates the transfer.
+> Hi Mark,
 >
-> We had support for this on PXA I2C through a callback from the driver
-> into PXA code (used for the Psion Teklogix Netbook device) and it worked
-> really well, but what you can't do is use the standard I2C interfaces
-> for slave mode.
+> Sending it to you since seem like you're the last one who
+> commited changes to the driver and the driver is mostly
+> used on ASoC.
+>
+> Tested on RM9200 and build tested on x86_64.
+>
+> regards
+> Joachim Eastwood
+>
+>   drivers/misc/Kconfig     | 2 +-
+>   drivers/misc/atmel-ssc.c | 2 +-
+>   2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+> index b151b7c..8f59d88 100644
+> --- a/drivers/misc/Kconfig
+> +++ b/drivers/misc/Kconfig
+> @@ -192,7 +192,7 @@ config ICS932S401
+>
+>   config ATMEL_SSC
+>   	tristate "Device driver for Atmel SSC peripheral"
+> -	depends on AVR32 || ARCH_AT91
+> +	depends on HAS_IOMEM
+>   	---help---
+>   	  This option enables device driver support for Atmel Synchronized
+>   	  Serial Communication peripheral (SSC).
+> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
+> index 158da5a..0cee274 100644
+> --- a/drivers/misc/atmel-ssc.c
+> +++ b/drivers/misc/atmel-ssc.c
+> @@ -167,7 +167,7 @@ static int ssc_probe(struct platform_device *pdev)
+>
+>   	/* disable all interrupts */
+>   	clk_enable(ssc->clk);
+> -	ssc_writel(ssc->regs, IDR, ~0UL);
+> +	ssc_writel(ssc->regs, IDR, -1);
 
-I have a question here. Since the same framework can work for both
-master and slave, is there any technical limitations I have overseen
-which prevents the slave mode to work?
+I don't meet building warning on x86_64 machine. So, would you please 
+explain more why need change this?
+
+Best Regards,
+Bo Shen
+
+>   	ssc_readl(ssc->regs, SR);
+>   	clk_disable(ssc->clk);
+>
+>
