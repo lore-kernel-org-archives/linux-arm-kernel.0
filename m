@@ -1,103 +1,57 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 10 Dec 2012 18:02:35 +0000
-Subject: [PATCH] ARM: head: Remove boot-time HYP mode check for v5 and
- below
-In-Reply-To: <CAHod+GdDN-hMKreQNXfGpe9vDLV8+a55JFM2R4wW_r5kyFaYww@mail.gmail.com>
-References: <1354887959-14863-1-git-send-email-dave.martin@linaro.org>
- <20121210105743.GA1953@linaro.org>
- <CAHod+GdDN-hMKreQNXfGpe9vDLV8+a55JFM2R4wW_r5kyFaYww@mail.gmail.com>
-Message-ID: <20121210180235.GC1953@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Dec 2012 18:04:42 +0000
+Subject: [PATCH 2/7] arm64: Add dtbs target for building all the
+ enabled dtb files
+In-Reply-To: <50C263EC.70209@gmail.com>
+References: <1354914392-9634-1-git-send-email-catalin.marinas@arm.com>
+ <1354914392-9634-3-git-send-email-catalin.marinas@arm.com>
+ <50C263EC.70209@gmail.com>
+Message-ID: <20121210180442.GA691@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 06:39:55PM +0100, Marko Kati? wrote:
-> On Mon, Dec 10, 2012 at 11:57 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> > Hi Russell,
-> >
-> > Do you want me to send this patch to the patch system?
-> >
-> > Until we have confirmation from Marko (or someone else with a board)
-> > there's no way to know whether it fixes the problem.  But it should
-> > restore us back to the old behaviour older hardware, reducing the
-> > likelihood of side issues.
-> >
-> > This could be reverted later if it proves to be unnecessary.
-> >
-> > Cheers
-> > ---Dave
-> >
-> > On Fri, Dec 07, 2012 at 01:45:59PM +0000, Dave Martin wrote:
-> >> The kernel can only be entered on HYP mode on CPUs which actually
-> >> support it, i.e.  >= ARMv7.  pre-v6 platform support cannot coexist
-> >> in the same kernel as support for v7 and higher, so there is no
-> >> advantage in having the HYP mode check on pre-v6 hardware.
-> >>
-> >> At least one pre-v6 board is known to fail when the HYP mode check
-> >> code is present, although the exact cause remains unknown and may
-> >> be unrelated.  [1]
-> >>
-> >> This patch restores the old behaviour for pre-v6 platforms, whereby
-> >> the CPSR is forced directly to SVC mode with IRQs and FIQs masked.
-> >> All kernels capable of booting on v7 hardware will retain the
-> >> check, so this should not impair functionality.
-> >>
-> >> [1] http://lists.arm.linux.org.uk/lurker/message/20121130.013814.19218413.en.html
-> >> ([ARM] head.S change broke platform device registration?)
-> >>
-> >> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> >> ---
-> >>  arch/arm/include/asm/assembler.h |    8 ++++++++
-> >>  1 files changed, 8 insertions(+), 0 deletions(-)
-> >>
-> >> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> >> index 2ef9581..eb87200 100644
-> >> --- a/arch/arm/include/asm/assembler.h
-> >> +++ b/arch/arm/include/asm/assembler.h
-> >> @@ -250,6 +250,7 @@
-> >>   * Beware, it also clobers LR.
-> >>   */
-> >>  .macro safe_svcmode_maskall reg:req
-> >> +#if __LINUX_ARM_ARCH__ >= 6
-> >>       mrs     \reg , cpsr
-> >>       mov     lr , \reg
-> >>       and     lr , lr , #MODE_MASK
-> >> @@ -266,6 +267,13 @@ THUMB(   orr     \reg , \reg , #PSR_T_BIT        )
-> >>       __ERET
-> >>  1:   msr     cpsr_c, \reg
-> >>  2:
-> >> +#else
-> >> +/*
-> >> + * workaround for possibly broken pre-v6 hardware
-> >> + * (akita, Sharp Zaurus C-1000, PXA270-based)
-> >> + */
-> >> +     setmode PSR_F_BIT | PSR_I_BIT | SVC_MODE, \reg
-> >> +#endif
-> >>  .endm
-> >>
-> >>  /*
-> >> --
-> >> 1.7.4.1
-> >>
+On Fri, Dec 07, 2012 at 09:47:24PM +0000, Rob Herring wrote:
+> On 12/07/2012 03:06 PM, Catalin Marinas wrote:
+> > Based on Rob Herring's patches for arch/arm, this patch adds a dtbs
+> > target to arch/arm64/boot/Makefile. In the process, also clean up the
+> > unused MACHINE variable.
+> > 
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > ---
+> > 
+> > I'll drop this patch once Rob pushes his version into linux-next (or
+> > mainline).
 > 
-> I confirm that this patch fixes the regression on Akita machines
-> introduced with commit:
-> 
-> 424e5994e63326a42012f003f1174f3c363c7b62
-> ARM: zImage/virt: hyp mode entry support for the zImage loader
-> 
-> The abovementioned commit breaks Zaurus machine ID detection code
-> (arm/boot/compressed/head-sharpsl.S)
-> causing Akita machines to boot with the wrong machine ID.
+> This and Stephen's dtb rule series are in linux-next now.
 
-Thanks for testing.  I've now posted the patch to the patch system.
+One minor fix needed. Please merge or fold it, whatever is easier.
+Thanks.
 
-> Just a minor nitpick:
-> s/clobers/clobbers/g
+-----------------------8<------------------------------
 
-Good spot, but I'll leave the patch unchanged for now.
+>From addc6b45f915f6bbab238a2edd2072f3b474e673 Mon Sep 17 00:00:00 2001
+From: Catalin Marinas <catalin.marinas@arm.com>
+Date: Wed, 21 Nov 2012 11:44:59 +0000
+Subject: [PATCH] arm64: Fix the dtbs target building
 
-This typo is in the existing code, not part of the fix.
-I'll try to tidy this up if I touch this code again.
+The arch/arm64/Makefile was not passing the right target to the
+boot/dts/Makefile.
 
-Cheers
----Dave
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 11c3599..c95c5cb 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -58,7 +58,7 @@ zinstall install: vmlinux
+ 	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
+ 
+ dtbs: scripts
+-	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
++	$(Q)$(MAKE) $(build)=$(boot)/dts dtbs
+ 
+ # We use MRPROPER_FILES and CLEAN_FILES now
+ archclean:
