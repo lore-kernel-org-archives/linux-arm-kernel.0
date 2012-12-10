@@ -1,67 +1,108 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 10 Dec 2012 09:02:02 -0500
-Subject: Your kernel patches for the Marvell Mirabox
-In-Reply-To: <50C4AC68.7090709@gmail.com>
-References: <50C4AC68.7090709@gmail.com>
-Message-ID: <20121210140202.GI21694@titan.lakedaemon.net>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 10 Dec 2012 09:02:48 -0500
+Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
+ across all cpus
+In-Reply-To: <20121210112408.GC6988@mudshark.cambridge.arm.com>
+References: <1354892111.13000.50.camel@linaro1.home>
+ <1354894134.17101.44.camel@gandalf.local.home>
+ <20121207162346.GW14363@n2100.arm.linux.org.uk>
+ <1354898200.17101.50.camel@gandalf.local.home>
+ <20121207164530.GX14363@n2100.arm.linux.org.uk>
+ <1354900436.17101.58.camel@gandalf.local.home>
+ <20121207181309.GY14363@n2100.arm.linux.org.uk>
+ <1354905805.17101.86.camel@gandalf.local.home>
+ <20121207190244.GB29618@mudshark.cambridge.arm.com>
+ <1355137445.3386.7.camel@linaro1.home>
+ <20121210112408.GC6988@mudshark.cambridge.arm.com>
+Message-ID: <1355148168.17101.165.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 09, 2012 at 04:21:12PM +0100, Bernd wrote:
-> Hello Jason,
-
-Hi Bernd!
-
-> If you don't take questions about your patches by direct email, could
-> you point me to a mailing list which is more appropriate for asking such
-> a question?
-
-I prefer including, at a minimum, the Linux ARM Kernel mailinglist in
-the discussion.  I've included it in the CC: now.  Adding my address to
-the To: or CC: helps it stand out from the crowd, so no problem there.
-
-> If you do take questions about it, here is what I did:
+On Mon, 2012-12-10 at 11:24 +0000, Will Deacon wrote:
+> On Mon, Dec 10, 2012 at 11:04:05AM +0000, Jon Medhurst (Tixy) wrote:
+> > On Fri, 2012-12-07 at 19:02 +0000, Will Deacon wrote:
+> > > For ARMv7, there are small subsets of instructions for ARM and Thumb which
+> > > are guaranteed to be atomic wrt concurrent modification and execution of
+> > > the instruction stream between different processors:
+> > > 
+> > > Thumb:	The 16-bit encodings of the B, NOP, BKPT, and SVC instructions.
+> > > ARM:	The B, BL, NOP, BKPT, SVC, HVC, and SMC instructions.
+> > > 
+> > 
+> > So this means for things like kprobes which can modify arbitrary kernel
+> > code we are going to need to continue to always use some form of
+> > stop_the_whole_system() function?
+> > 
+> > Also, kprobes currently uses patch_text() which only uses stop_machine
+> > for Thumb2 instructions which straddle a word boundary, so this needs
+> > changing?
 > 
-> I got the kernel source from
+> Yes; if you're modifying instructions other than those mentioned above, then
+> you'll need to synchronise the CPUs, update the instructions, perform
+> cache-maintenance on the writing CPU and then execute an isb on the
+> executing core (this last bit isn't needed if you're going to go through an
+> exception return to get back to the new code -- depends on how your
+> stop/resume code works).
+
+Yeah, kprobe optimizing will probably require stop_machine() always, as
+it's modifying random code, or adding breakpoints into random places.
+That's another adventure to deal with at another time.
+
 > 
-> git://github.com/MISL-EBU-System-SW/mainline-public.git
-> 
-> commit 0c0029cb1806601430692d48c130a17302a18225, where Olof Johannson
-> merged your changes for initial Mirabox support on top of Linus
-> Torvalds' 3.7-rc7.
-> 
-> I built the kernel using the cross toolchain for ARM EABI from
-> https://sourcery.mentor.com/GNUToolchain/release2322?lite=arm and
-> uboot-mkimage from
-> http://rapidlibrary.com/files/uboot-mkimage-0-4-tar-gz_ulzywyzvfni89on.html:
+> For ftrace we can (hopefully) avoid a lot of this when we have known points
+> of modification.
 
-Most linux distro's I've seen include a 'uboot-tools' or 'uboot-utils'
-that you can install via the package manager.  No need to pull it from
-unknown places.
+I'm also thinking about tracepoints which behave almost the same as
+ftrace. They have nop place holders too. They happen to be 32bits too,
+but may only need to be 16 bit. The way tracepoints work is with the use
+of asm goto. For example we have:
 
-> $ make ARCH=arm mvebu_defconfig
-> $ make -j4 ARCH=arm CROSS_COMPILE=../arm-2012.09/bin/arm-none-eabi- uImage
+arch/arm/include/asm/jump_label.h
 
-Here's the problem.  The stock u-boot installed by the manufacturer
-doesn't support devicetree.  It uses the old method of handing the
-kernel a mach_type number to tell the kernel which board init it should
-call.  'boardid' in the u-boot environment.
+#ifdef CONFIG_THUMB2_KERNEL
+#define JUMP_LABEL_NOP	"nop.w"
+#else
+#define JUMP_LABEL_NOP	"nop"
+#endif
 
-The new method is to hand the kernel an address where the dtb (device
-tree blob) was loaded into RAM.
+static __always_inline bool arch_static_branch(struct static_key *key)
+{
+	asm goto("1:\n\t"
+		 JUMP_LABEL_NOP "\n\t"
+		 ".pushsection __jump_table,  \"aw\"\n\t"
+		 ".word 1b, %l[l_yes], %c0\n\t"
+		 ".popsection\n\t"
+		 : :  "i" (key) :  : l_yes);
 
-You have two choices, upgrade u-boot (sizeable task), or use a developer
-configuration option included in the kernel, CONFIG_ARM_APPENDED_DTB.
-Once set, you need to make a zImage, append
-arch/arm/boot/armada-<board>.dtb to the zImage, then turn the zImage
-into a uImage.
+	return false;
+l_yes:
+	return true;
+}
 
-In u-boot you'll need to change the boardid environment variable to
-0xffffffff, which needs to be in unsigned integer notation, 4294967295.
+Tracepoints use the jump-label "static branch" logic, which uses a gcc
+4.6 feature called asm goto. The asm goto allows the internal asm to
+reference a label outside the asm stamement and the compiler is aware
+that the asm statement may jump to that label. Thus the compiler treats
+that asm statement as a possible branch to the given label and it wont
+optimize required statements after the asm, if they are needed for the
+jump to the label.
 
-In general, you'll want to enable CONFIG_EARLY_PRINTK, and make sure
-earlyprintk is in your kernel command line options.
+Now in include/linux/tracepoint.h we have:
 
-hth,
+	static inline void trace_##name(proto)				\
+	{								\
+		if (static_key_false(&__tracepoint_##name.key))		\
+			__DO_TRACE(&__tracepoint_##name,		\
+				TP_PROTO(data_proto),			\
+				TP_ARGS(data_args),			\
+				TP_CONDITION(cond),,);			\
+	}								\
 
-Jason.
+Where the static_key_false() is an "unlikely" version of the
+static_branch() that tells gcc the result of the if statement goes into
+the unlikely location (end of function perhaps).
+
+But this doesn't guarantee that it becomes part of some if statement, so
+this doesn't have all the limitations that ftrace mcount call has.
+
+-- Steve
