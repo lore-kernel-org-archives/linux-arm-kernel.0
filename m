@@ -1,125 +1,23 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 10 Dec 2012 09:46:41 -0500
-Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
- across all cpus
-In-Reply-To: <20121210140749.GM14363@n2100.arm.linux.org.uk>
-References: <1354894134.17101.44.camel@gandalf.local.home>
- <20121207162346.GW14363@n2100.arm.linux.org.uk>
- <1354898200.17101.50.camel@gandalf.local.home>
- <20121207164530.GX14363@n2100.arm.linux.org.uk>
- <1354900436.17101.58.camel@gandalf.local.home>
- <1354902347.8263.12.camel@linaro1.home>
- <20121210100433.GB6624@mudshark.cambridge.arm.com>
- <1355144537.17101.155.camel@gandalf.local.home>
- <20121210135747.GK14363@n2100.arm.linux.org.uk>
- <1355148365.17101.168.camel@gandalf.local.home>
- <20121210140749.GM14363@n2100.arm.linux.org.uk>
-Message-ID: <1355150801.17101.197.camel@gandalf.local.home>
+From: jrnieder@gmail.com (Jonathan Nieder)
+Date: Mon, 10 Dec 2012 06:46:36 -0800
+Subject: [PATCH] ARM: decompressor: include CONFIG_DEBUG_LL_INCLUDE
+ rather than mach/debug-macro.S
+In-Reply-To: <20121210140250.GL14363@n2100.arm.linux.org.uk>
+References: <1355104168-30581-1-git-send-email-shawn.guo@linaro.org>
+ <20121210015916.GA30766@S2101-09.ap.freescale.net>
+ <20121210140250.GL14363@n2100.arm.linux.org.uk>
+Message-ID: <20121210144350.GA3373@elie.Belkin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-12-10 at 14:07 +0000, Russell King - ARM Linux wrote:
->  
-> > If there's no way to modify a 32bit operation without stop_machine(),
-> > ever with a breakpoint, than we can stop the discussion here. ARM will
-> > forever require stop_machine() for use with tracepoints and ftrace. Too
-> > bad, as ARM was the x86 competitor. Here's something that x86 has a one
-> > up on ARM.
-> 
-> You think that kind of blackmail makes a difference?
+Russell King - ARM Linux wrote:
 
-I'm not trying to blackmail. How does one blackmail to change facts? I
-was just showing my disappointment, as I'm starting to grow fond of ARM.
-Although I wouldn't mind sending out some blackmail to the ARM HW
-vendors (got any pictures of them cheating on their spouses?) to make
-them come up with a standardize way to make all this easy :-)
+> That worries me a bit because I can see this ending up getting applied to
+> multiple stable kernel trees, even those without CONFIG_DEBUG_LL_INCLUDE.
+> So, let's have it in the patch system without the stable tag.
 
+If it should only be included in 3.7-stable, a line like
+"Cc: stable at vger.kernel.org # 3.7+" would work fine.
 
->   Look closely at what
-> I've written - I didn't say that there's no way to modify any 32-bit
-> operation without stop_machine().
-
-Again, you and I are having a disconnect. I'm not a HW expert. I'm
-trying to get a total understanding of what you, Will, Jon and others
-are trying to say.
-
-Lets look at what you last said:
-
-
-> ... which, if it's misaligned to a 32-bit boundary, which can happen with
-> Thumb-2 code, will require the replacement to be done atomically; you will
-> need to use stop_machine() to ensure that other CPUs don't try to execute
-> the instruction mid-way through modification... as I have already
-> explained in my previous mails.
-
-I'm confused to what is wrong to "misaligned to a 32-bit boundery".
-Isn't it best if it is on a 32-bit boundary? Or do you mean that it's
-misaligned across a 32-bit boundary? I guess I just read it wrong.
-
-Either way, I said there's probably no guarantee that the 32-bit calls
-to mcount that gcc has inserted (or the tracepoints) are going to be
-aligned to 32-bit boundaries. But I'm wondering if that's still a
-problem. Let's look at the ways another CPU could get the 32-bit
-instruction if it is misaligned, and across two different cache lines,
-or even two different pages:
-
-
-1) the CPU gets the full 32bits as it was on the other CPU, or how it
-will be.
-
-2) The CPU gets the first 16bits as it was on the other CPU an the
-second 16bits with the update.
-
-3) The CPU gets the first 16bits with the update and the second 16bits
-as it use to be.
-
-
-The first case isn't interesting, so lets jump to the 2 and 3rd cases.
-
-On an update of a 32bit nop to a 16bit breakpoint or branch (jump over
-second half).
-
-
-As we only modify the first half of the 32bit operation, and the second
-half still contains the second half of the 32bit nop, the other CPU will
-see:
-
-<first 16bits of 32bit nop><second 16bits of 32bit nop>
-
-That doesn't look so bad. Or:
-
-<breakpoint/branch><second 16bits of 32bit nop>
-
-If it sees the breakpoint or branch, then it should just jump over the
-second part of the nop, and not execute it. If this is an issue, then we
-need stop_machine() otherwise, I'll continue.
-
-Now before changing the second half of the 32bits, we send a sync (IPI
-maybe) to all other CPUs, so that we now guarantee that all CPUs sees
-the added breakpoint/branch.
-
-As the breakpoint and branch will return pass the second half of the
-nop, modifying it shouldn't bother the other CPUs. If it does, then we
-have to stay with stop_machine(). If not, let me continue.
-
-We need to send another sync to guarantee that all the other CPUs see
-the second half of the jump to ftrace code.
-
-Now the second half matches the second half of the jump to the ftrace
-code, and the first half is still the breakpoint/branch. So lets change
-that to the first half of the jump to the ftrace code. Now the other
-CPUs will see:
-
-<breakpoint/branch><second 16bits of jump to ftrace>
-
-The above should still skip the second half. Or:
-
-<first 16bits of jump to ftrace><second 16bits of jump to ftrace>
-
-The above is what we want CPUs to see.
-
-If my assumptions about the changes above can't be done, then yes we are
-stuck with stop_machine(). If they can be done, then we have hope to
-remove it.
-
--- Steve
+Hope that helps,
+Jonathan
