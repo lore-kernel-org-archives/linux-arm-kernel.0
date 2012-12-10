@@ -1,160 +1,91 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Dec 2012 11:08:07 +0000
-Subject: [PATCH 11/12 v2] ARM: ux500: Use the GPIO regulator framework for
- SDI0's 'en' and 'vsel'
-In-Reply-To: <1355129761-8088-12-git-send-email-lee.jones@linaro.org>
-References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
- <1355129761-8088-12-git-send-email-lee.jones@linaro.org>
-Message-ID: <20121210110807.GF9362@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 10 Dec 2012 11:09:41 +0000
+Subject: [PATCH 06/10] arm: arch_timer: divorce from local_timer api
+In-Reply-To: <50C26ACA.4050509@codeaurora.org>
+References: <1354297568-26366-1-git-send-email-mark.rutland@arm.com>
+ <1354297568-26366-7-git-send-email-mark.rutland@arm.com>
+ <50C26ACA.4050509@codeaurora.org>
+Message-ID: <20121210110754.GA18328@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To prevent lots of unnecessary call-backs into platform code, we're
-now using the GPIO regulator framework to control the 'enable' (en)
-and 'voltage select' (vsel) GPIO pins which in turn control the
-MMCI's secondary regulator settings. This already works with Device
-Tree, but when booting with ATAGs we need to register it as a
-platform device.
+On Fri, Dec 07, 2012 at 10:16:42PM +0000, Stephen Boyd wrote:
+> On 11/30/12 09:46, Mark Rutland wrote:
+> > Currently, the arch_timer driver is tied to the arm port, as it relies
+> > on code in arch/arm/smp.c to setup and teardown timers as cores are
+> > hotplugged on and off. The timer is registered through an arm-specific
+> > registration mechanism, preventing sharing the driver with the arm64
+> > port.
+> >
+> > This patch moves the driver to using a cpu notifier instead, making it
+> > easier to port.
+> 
+> How does ipi_timer() work after this change? Don't we need it because of
+> FEAT_C3_STOP?
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/board-mop500-regulators.c |   14 ++++++++
- arch/arm/mach-ux500/board-mop500-regulators.h |    1 +
- arch/arm/mach-ux500/board-mop500.c            |   44 +++++++++++++++++++++++++
- 3 files changed, 59 insertions(+)
+The unfortunate answer is it doesn't, and we'll need broadcast for any systems
+where the timers turn off in low power states.
 
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
-index 2a17bc5..cb75405 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.c
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.c
-@@ -28,6 +28,20 @@ struct regulator_init_data gpio_en_3v3_regulator = {
-        .consumer_supplies = gpio_en_3v3_consumers,
- };
- 
-+static struct regulator_consumer_supply sdi0_reg_consumers[] = {
-+        REGULATOR_SUPPLY("vqmmc", "sdi0"),
-+};
-+
-+struct regulator_init_data sdi0_reg_init_data = {
-+        .constraints = {
-+                .min_uV         = 1800000,
-+                .max_uV         = 2900000,
-+                .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|REGULATOR_CHANGE_STATUS,
-+        },
-+        .num_consumer_supplies  = ARRAY_SIZE(sdi0_reg_consumers),
-+        .consumer_supplies      = sdi0_reg_consumers,
-+};
-+
- /*
-  * TPS61052 regulator
-  */
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.h b/arch/arm/mach-ux500/board-mop500-regulators.h
-index 78a0642..0c79d90 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.h
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.h
-@@ -19,5 +19,6 @@ ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS];
- extern struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS];
- extern struct regulator_init_data tps61052_regulator;
- extern struct regulator_init_data gpio_en_3v3_regulator;
-+extern struct regulator_init_data sdi0_reg_init_data;
- 
- #endif
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index daa4237..1d721ea 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -24,6 +24,8 @@
- #include <linux/mfd/abx500/ab8500.h>
- #include <linux/regulator/ab8500.h>
- #include <linux/regulator/fixed.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/regulator/gpio-regulator.h>
- #include <linux/mfd/tc3589x.h>
- #include <linux/mfd/tps6105x.h>
- #include <linux/mfd/abx500/ab8500-gpio.h>
-@@ -91,6 +93,37 @@ static struct platform_device snowball_gpio_en_3v3_regulator_dev = {
-        },
- };
- 
-+/* Dynamically populated. */
-+static struct gpio sdi0_reg_gpios[] = {
-+        { 0, GPIOF_OUT_INIT_LOW, "mmci_vsel" },
-+};
-+
-+static struct gpio_regulator_state sdi0_reg_states[] = {
-+        { .value = 2900000, .gpios = (0 << 0) },
-+        { .value = 1800000, .gpios = (1 << 0) },
-+};
-+
-+static struct gpio_regulator_config sdi0_reg_info = {
-+	.supply_name           = "ab8500-ext-supply3",
-+	.gpios                 = sdi0_reg_gpios,
-+	.nr_gpios              = ARRAY_SIZE(sdi0_reg_gpios),
-+	.states                = sdi0_reg_states,
-+	.nr_states             = ARRAY_SIZE(sdi0_reg_states),
-+	.type                  = REGULATOR_VOLTAGE,
-+	.enable_high           = 1,
-+	.enabled_at_boot       = 0,
-+	.init_data             = &sdi0_reg_init_data,
-+	.startup_delay         = 100,
-+};
-+
-+static struct platform_device sdi0_regulator = {
-+        .name = "gpio-regulator",
-+        .id   = -1,
-+        .dev  = {
-+                .platform_data = &sdi0_reg_info,
-+        },
-+};
-+
- static struct ab8500_gpio_platform_data ab8500_gpio_pdata = {
- 	.gpio_base		= MOP500_AB8500_PIN_GPIO(1),
- 	.irq_base		= MOP500_AB8500_VIR_GPIO_IRQ_BASE,
-@@ -440,6 +473,7 @@ static struct hash_platform_data u8500_hash1_platform_data = {
- /* add any platform devices here - TODO */
- static struct platform_device *mop500_platform_devs[] __initdata = {
- 	&mop500_gpio_keys_device,
-+	&sdi0_regulator,
- };
- 
- #ifdef CONFIG_STE_DMA40
-@@ -581,6 +615,7 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
- 	&snowball_key_dev,
- 	&snowball_sbnet_dev,
- 	&snowball_gpio_en_3v3_regulator_dev,
-+	&sdi0_regulator,
- };
- 
- static void __init mop500_init_machine(void)
-@@ -591,6 +626,9 @@ static void __init mop500_init_machine(void)
- 
- 	mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
- 
-+	sdi0_reg_info.enable_gpio = GPIO_SDMMC_EN;
-+	sdi0_reg_info.gpios[0].gpio = GPIO_SDMMC_1V8_3V_SEL;
-+
- 	mop500_pinmaps_init();
- 	parent = u8500_init_devices(&ab8500_platdata);
- 
-@@ -623,6 +661,9 @@ static void __init snowball_init_machine(void)
- 	struct device *parent = NULL;
- 	int i;
- 
-+	sdi0_reg_info.enable_gpio = SNOWBALL_SDMMC_EN_GPIO;
-+	sdi0_reg_info.gpios[0].gpio = SNOWBALL_SDMMC_1V8_3V_GPIO;
-+
- 	snowball_pinmaps_init();
- 	parent = u8500_init_devices(&ab8500_platdata);
- 
-@@ -655,6 +696,9 @@ static void __init hrefv60_init_machine(void)
- 	 */
- 	mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
- 
-+	sdi0_reg_info.enable_gpio = HREFV60_SDMMC_EN_GPIO;
-+	sdi0_reg_info.gpios[0].gpio = HREFV60_SDMMC_1V8_3V_GPIO;
-+
- 	hrefv60_pinmaps_init();
- 	parent = u8500_init_devices(&ab8500_platdata);
- 
--- 
-1.7.9.5
+I'll take a look at decoupling the broadcast mechanism from the drivers, it's
+not really a property of the clock hardware and it would be nice to split it.
+
+> >
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> [snip]
+> > @@ -245,12 +244,28 @@ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
+> >  	clk->set_mode(CLOCK_EVT_MODE_UNUSED, clk);
+> >  }
+> >  
+> > -static struct local_timer_ops arch_timer_ops __cpuinitdata = {
+> > -	.setup	= arch_timer_setup,
+> > -	.stop	= arch_timer_stop,
+> > -};
+> > +static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
+> > +					   unsigned long action, void *hcpu)
+> > +{
+> > +	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
+> > +
+> > +	switch (action) {
+> > +	case CPU_STARTING:
+> > +	case CPU_STARTING_FROZEN:
+> > +		arch_timer_setup(evt);
+> > +		break;
+> > +	case CPU_DYING:
+> > +	case CPU_DYING_FROZEN:
+> > +		arch_timer_stop(evt);
+> > +		break;
+> > +	}
+> 
+> You can save 2 lines with a switch (action & ~CPU_TASKS_FROZEN) here.
+
+Sure. I'll fold that in.
+
+> > +
+> > +	return NOTIFY_OK;
+> > +}
+> >  
+> > -static struct clock_event_device arch_timer_global_evt;
+> > +static struct notifier_block __cpuinitdata arch_timer_cpu_nb = {
+> 
+> __cpuinitdata goes last before the equals sign.
+
+I'll fix that up.
+
+> > +	.notifier_call = arch_timer_cpu_notify,
+> > +};
+> >  
+> >  static int __init arch_timer_register(void)
+> >  {
+> >
+> 
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
+> 
+
+Thanks,
+Mark.
