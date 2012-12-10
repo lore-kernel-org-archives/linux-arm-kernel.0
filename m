@@ -1,44 +1,97 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 10 Dec 2012 17:40:57 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the sound-asoc tree
-Message-ID: <20121210174057.9862b43ff7350ba20c048df3@canb.auug.org.au>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Mon, 10 Dec 2012 06:43:17 +0000
+Subject: [PATCH v3 2/3] mtd: devices: elm: Add support for ELM error
+ correction
+In-Reply-To: <50C1C6E3.5020300@ti.com>
+References: <1354189595-12784-1-git-send-email-avinashphilip@ti.com>
+ <1354189595-12784-3-git-send-email-avinashphilip@ti.com>
+ <50C1C6E3.5020300@ti.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3EA1FA14@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Fri, Dec 07, 2012 at 16:07:23, Nori, Sekhar wrote:
+> On 11/29/2012 5:16 PM, Philip, Avinash wrote:
+> > The ELM hardware module can be used to speedup BCH 4/8/16 ECC scheme
+> > error correction.
+> > For now only 4 & 8 bit support is added
+> > 
+> > Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Rob Landley <rob@landley.net>
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/plat-samsung/include/plat/devs.h between commit a08485d8fdf6
-("ASoC: Samsung: Do not register samsung audio dma device as pdev") from
-the sound-asoc tree and commit 0a9d5ac307ae ("ARM: EXYNOS: removing
-exynos-drm device registration from non-dt platforms") from the arm-soc
-tree.
+[...]
+/**
+> > + * elm_config - Configure ELM module
+> > + * @info:	elm info
+> > + */
+> > +static void elm_config(struct elm_info *info)
+> 
+> This is called "config", but there is no configuration information
+> passed which looks odd..
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+The config information is bch_type, encapsulated in struct elm_info.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+> 
+> > +{
+> > +	u32 reg_val;
+> > +
+> > +	reg_val = (info->bch_type & ECC_BCH_LEVEL_MASK) | (ELM_ECC_SIZE << 16);
+> > +	elm_write_reg(info, ELM_LOCATION_CONFIG, reg_val);
+> > +}
+> 
+> Is there a use case where BCH type needs to be changed after NAND has
+> been probed?
 
-diff --cc arch/arm/plat-samsung/include/plat/devs.h
-index c45f70c,f53beba..0000000
---- a/arch/arm/plat-samsung/include/plat/devs.h
-+++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@@ -133,8 -132,7 +132,6 @@@ extern struct platform_device exynos4_d
-  extern struct platform_device exynos4_device_pcm2;
-  extern struct platform_device exynos4_device_spdif;
-  
-- extern struct platform_device exynos_device_drm;
-- 
- -extern struct platform_device samsung_asoc_dma;
-  extern struct platform_device samsung_asoc_idma;
-  extern struct platform_device samsung_device_keypad;
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121210/46f5b15e/attachment-0001.sig>
+No, I think kernel handles the entire NAND part with a single ecc layout.
+Hence there is no run time BCH switching. But ELM driver should support BCH
+4 & 8. Selection of BCH information comes from DT of NAND driver.
+
+As NAND driver supporting BCH4 & 8 ecc scheme ELM module support
+configuration of both.  Configuration of ELM module should done as part
+of NAND driver probing.
+
+
+> You will have to erase any existing data written to NAND if
+> you change the ECC type. That sounds destructive enough to avoid such a
+> thing.
+
+There is no support for BCH switching after NAND driver probing.
+
+[...]
+> > +struct device *elm_request(enum bch_ecc bch_type)
+> > +{
+> > +	struct elm_info *info;
+> > +
+> > +	list_for_each_entry(info, &elm_devices, list) {
+> > +		if (info && info->dev) {
+> > +				info->bch_type = bch_type;
+> > +				elm_config(info);
+> > +				return info->dev;
+> > +		}
+> > +	}
+> 
+> This will always return the first ELM device probed since you never
+> remove the allocated device from the list.
+
+But now I realized that, there is no mechanism of freeing the requested
+resource.
+
+So I will add mechanism to request ELM module successfully only if ELM
+module is not requested already and add mechanism to free it, on NAND
+driver module unload (loadable module support). This way ELM driver
+can achieve multi instance support.
+
+> I wonder why you really need a list?
+
+The prime motivation for the list is the driver should support multi
+instances of ELM by removing global symbols.
+
+Thanks
+Avinash
+
+> 
+> Thanks,
+> Sekhar
+> 
