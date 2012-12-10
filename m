@@ -1,44 +1,86 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Dec 2012 08:55:53 +0000
-Subject: [PATCH 04/12] regulator: gpio-regulator: gpio_set_value should use
- cansleep
+Date: Mon, 10 Dec 2012 08:55:54 +0000
+Subject: [PATCH 05/12] mmc: mmci: Move ios_handler functionality into the
+ driver
 In-Reply-To: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
 References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1355129761-8088-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1355129761-8088-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If it's possible for gpio_set_value to sleep, we should be using
-the *_cansleep call instead. This patch fixes multiple warnings
-from gpiolib.
+There are currently two instances of the ios_handler being used.
+Both of which mearly toy with some regulator settings. Now there
+is a GPIO regulator API, we can use that instead, and lessen the
+per platform burden. By doing this, we also become more Device
+Tree compatible.
 
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Chris Ball <cjb@laptop.org>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Acked-by: Ulf Hansson <ulf.hansson@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/regulator/gpio-regulator.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/mmc/host/mmci.c |   22 ++++++++++++++++++++++
+ drivers/mmc/host/mmci.h |    1 +
+ 2 files changed, 23 insertions(+)
 
-diff --git a/drivers/regulator/gpio-regulator.c b/drivers/regulator/gpio-regulator.c
-index 5462c28..90f5221 100644
---- a/drivers/regulator/gpio-regulator.c
-+++ b/drivers/regulator/gpio-regulator.c
-@@ -82,7 +82,7 @@ static int gpio_regulator_set_voltage(struct regulator_dev *dev,
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index edc3e9b..d45c931 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1091,6 +1091,16 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	case MMC_POWER_OFF:
+ 		if (host->vcc)
+ 			ret = mmc_regulator_set_ocr(mmc, host->vcc, 0);
++
++		if (host->vqmmc) {
++			if (regulator_is_enabled(host->vqmmc)) {
++				ret = regulator_disable(host->vqmmc);
++				if (ret < 0)
++					dev_warn(mmc_dev(mmc),
++						 "unable to disable vmmc-ios\n");
++			}
++		}
++
+ 		break;
+ 	case MMC_POWER_UP:
+ 		if (host->vcc) {
+@@ -1115,6 +1125,14 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
  
- 	for (ptr = 0; ptr < data->nr_gpios; ptr++) {
- 		state = (target & (1 << ptr)) >> ptr;
--		gpio_set_value(data->gpios[ptr].gpio, state);
-+		gpio_set_value_cansleep(data->gpios[ptr].gpio, state);
+ 		break;
+ 	case MMC_POWER_ON:
++		if (host->vqmmc)
++			if (!regulator_is_enabled(host->vqmmc)) {
++				ret = regulator_enable(host->vqmmc);
++				if (ret < 0)
++					dev_warn(mmc_dev(mmc),
++						 "unable to enable vmmc-ios\n");
++			}
++
+ 		pwr |= MCI_PWR_ON;
+ 		break;
  	}
- 	data->state = target;
- 
-@@ -119,7 +119,7 @@ static int gpio_regulator_set_current_limit(struct regulator_dev *dev,
- 
- 	for (ptr = 0; ptr < data->nr_gpios; ptr++) {
- 		state = (target & (1 << ptr)) >> ptr;
--		gpio_set_value(data->gpios[ptr].gpio, state);
-+		gpio_set_value_cansleep(data->gpios[ptr].gpio, state);
+@@ -1379,6 +1397,10 @@ static int __devinit mmci_probe(struct amba_device *dev,
+ 				 "(using regulator instead)\n");
+ 		}
  	}
- 	data->state = target;
++
++	host->vqmmc = regulator_get(&dev->dev, "vqmmc");
++	if (IS_ERR(host->vqmmc))
++		host->vqmmc = NULL;
+ #endif
+ 	/* Fall back to platform data if no regulator is found */
+ 	if (host->vcc == NULL)
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index d437ccf..b87d9e2 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -194,6 +194,7 @@ struct mmci_host {
+ 	struct sg_mapping_iter	sg_miter;
+ 	unsigned int		size;
+ 	struct regulator	*vcc;
++	struct regulator	*vqmmc;
  
+ #ifdef CONFIG_DMA_ENGINE
+ 	/* DMA stuff */
 -- 
 1.7.9.5
