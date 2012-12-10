@@ -1,22 +1,25 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 10 Dec 2012 16:27:29 +0100
-Subject: Your kernel patches for the Marvell Mirabox
-In-Reply-To: <20121210140202.GI21694@titan.lakedaemon.net>
-References: <50C4AC68.7090709@gmail.com>
- <20121210140202.GI21694@titan.lakedaemon.net>
-Message-ID: <20121210162729.21f2f053@skate>
+Date: Mon, 10 Dec 2012 16:28:19 +0100
+Subject: [PATCH 1/2] arm: mvebu: add RTC support for Armada 370 and
+ Armada XP
+In-Reply-To: <1355136122-30729-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1355136122-30729-1-git-send-email-gregory.clement@free-electrons.com>
+ <1355136122-30729-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20121210162819.46fe4f91@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+Dear Gregory CLEMENT,
 
-On Mon, 10 Dec 2012 09:02:02 -0500, Jason Cooper wrote:
+On Mon, 10 Dec 2012 11:42:01 +0100, Gregory CLEMENT wrote:
 
-> In u-boot you'll need to change the boardid environment variable to
-> 0xffffffff, which needs to be in unsigned integer notation, 4294967295.
+> +		rtc at 10300 {
+> +			compatible = "marvell,orion-rtc";
+> +			reg = <0xd0010300 0x20>;
+> +			interrupts = <50>;
+> +		};
 
-I'm not sure this is strictly necessary. I've never done that on any
-Marvell U-Boot's and I'm happily booting DT-only kernels.
+Maybe an explicit status = "okay" here?
 
 Thomas
 -- 
