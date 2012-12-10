@@ -1,36 +1,36 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 10 Dec 2012 12:39:17 +0530
-Subject: [PATCH 8/9] memory: emif: fix timings initialization issue
+Date: Mon, 10 Dec 2012 12:39:10 +0530
+Subject: [PATCH 1/9] memory: emif: Correct the lpmode timeout calculation
 In-Reply-To: <1355123358-5273-1-git-send-email-lokeshvutla@ti.com>
 References: <1355123358-5273-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1355123358-5273-9-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1355123358-5273-2-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Oleksandr Dmytryshyn <oleksandr.dmytryshyn@ti.com>
+The driver tries to round up the specified timeout cycles to
+next power of 2 value. But this is done wrongly.
+Correcting this here.
 
-The issue was that only the first timings table was added to the
-emif platform data at the emif driver registration. All other
-timings tables was filled with zeros. Now all emif timings table
-are added to the platform data.
-
-Signed-off-by: Oleksandr Dmytryshyn <oleksandr.dmytryshyn@ti.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- drivers/memory/emif.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/memory/emif.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
-index 32ce601..70f6e0f 100644
+index 06d31c9..8589aba 100644
 --- a/drivers/memory/emif.c
 +++ b/drivers/memory/emif.c
-@@ -1462,7 +1462,7 @@ static struct emif_data *__init_or_module get_device_details(
- 	if (pd->timings) {
- 		temp = devm_kzalloc(dev, size, GFP_KERNEL);
- 		if (temp) {
--			memcpy(temp, pd->timings, sizeof(*pd->timings));
-+			memcpy(temp, pd->timings, size);
- 			pd->timings = temp;
- 		} else {
- 			dev_warn(dev, "%s:%d: allocation error\n", __func__,
+@@ -731,9 +731,9 @@ static u32 get_pwr_mgmt_ctrl(u32 freq, struct emif_data *emif, u32 ip_rev)
+ 	if (timeout < 16) {
+ 		timeout = 0;
+ 	} else {
+-		timeout = __fls(timeout) - 3;
+ 		if (timeout & (timeout - 1))
+-			timeout++;
++			timeout <<= 1;
++		timeout = __fls(timeout) - 3;
+ 	}
+ 
+ 	switch (lpmode) {
 -- 
 1.7.9.5
