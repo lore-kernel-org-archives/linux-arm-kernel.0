@@ -1,116 +1,42 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 10 Dec 2012 12:20:21 +0200
-Subject: [PATCH v4 11/23] mfd: omap_usb_host: Avoid creating copy of
- platform_data
-In-Reply-To: <1355134833-5199-1-git-send-email-rogerq@ti.com>
-References: <1355134833-5199-1-git-send-email-rogerq@ti.com>
-Message-ID: <1355134833-5199-12-git-send-email-rogerq@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Dec 2012 11:21:11 +0100
+Subject: [PATCH 1/1 v2] gpio: Provide the STMPE GPIO driver with its own
+ IRQ Domain
+In-Reply-To: <20121210100754.GB9362@gmail.com>
+References: <1353683949-9275-1-git-send-email-lee.jones@linaro.org>
+ <20121210100754.GB9362@gmail.com>
+Message-ID: <CACRpkdYe1YbeyxC0OWqAY_MFq6oXVLzr0+s50O7X0LZducL4rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can just hold the pointer to the platform data instead
-of creating a copy of it.
+On Mon, Dec 10, 2012 at 11:07 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Also get rid of the unnecessary missing platform data checks
-in runtime_suspend/resume. We are already checking for missing
-platform data in probe.
+> Author: Lee Jones <lee.jones@linaro.org>
+> Date:   Fri Nov 23 12:36:23 2012 +0000
+>
+>     gpio: Provide the STMPE GPIO driver with its own IRQ Domain
+>
+>     The STMPE GPIO driver can be used as an IRQ controller by some
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
----
- drivers/mfd/omap-usb-host.c |   30 ++++++++----------------------
- 1 files changed, 8 insertions(+), 22 deletions(-)
+What is this funny citing and indentation business here... I stripped
+all the whitespace by hand, no big deal, just curious.
 
-diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index fe7906b..8b8f1da 100644
---- a/drivers/mfd/omap-usb-host.c
-+++ b/drivers/mfd/omap-usb-host.c
-@@ -103,7 +103,7 @@ struct usbhs_hcd_omap {
- 
- 	void __iomem			*uhh_base;
- 
--	struct usbhs_omap_platform_data	platdata;
-+	struct usbhs_omap_platform_data	*pdata;
- 
- 	u32				usbhs_rev;
- 	spinlock_t			lock;
-@@ -195,8 +195,8 @@ static int omap_usbhs_alloc_children(struct platform_device *pdev)
- 	int					ret;
- 
- 	omap = platform_get_drvdata(pdev);
--	ehci_data = omap->platdata.ehci_data;
--	ohci_data = omap->platdata.ohci_data;
-+	ehci_data = omap->pdata->ehci_data;
-+	ohci_data = omap->pdata->ohci_data;
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ehci");
- 	if (!res) {
-@@ -279,16 +279,11 @@ static bool is_ohci_port(enum usbhs_omap_port_mode pmode)
- static int usbhs_runtime_resume(struct device *dev)
- {
- 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
--	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
- 	unsigned long			flags;
-+	struct usbhs_omap_platform_data *pdata = omap->pdata;
- 
- 	dev_dbg(dev, "usbhs_runtime_resume\n");
- 
--	if (!pdata) {
--		dev_dbg(dev, "missing platform_data\n");
--		return  -ENODEV;
--	}
--
- 	omap_tll_enable();
- 	spin_lock_irqsave(&omap->lock, flags);
- 
-@@ -311,16 +306,11 @@ static int usbhs_runtime_resume(struct device *dev)
- static int usbhs_runtime_suspend(struct device *dev)
- {
- 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
--	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
- 	unsigned long			flags;
-+	struct usbhs_omap_platform_data *pdata = omap->pdata;
- 
- 	dev_dbg(dev, "usbhs_runtime_suspend\n");
- 
--	if (!pdata) {
--		dev_dbg(dev, "missing platform_data\n");
--		return  -ENODEV;
--	}
--
- 	spin_lock_irqsave(&omap->lock, flags);
- 
- 	if (is_ehci_tll_mode(pdata->port_mode[0]))
-@@ -343,7 +333,7 @@ static int usbhs_runtime_suspend(struct device *dev)
- static void omap_usbhs_init(struct device *dev)
- {
- 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
--	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
-+	struct usbhs_omap_platform_data	*pdata = omap->pdata;
- 	unsigned long			flags;
- 	unsigned			reg;
- 
-@@ -450,7 +440,7 @@ static void omap_usbhs_init(struct device *dev)
- static void omap_usbhs_deinit(struct device *dev)
- {
- 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
--	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
-+	struct usbhs_omap_platform_data	*pdata = omap->pdata;
- 
- 	if (pdata->ehci_data->phy_reset) {
- 		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
-@@ -491,11 +481,7 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
- 
- 	spin_lock_init(&omap->lock);
- 
--	for (i = 0; i < OMAP3_HS_USB_PORTS; i++)
--		omap->platdata.port_mode[i] = pdata->port_mode[i];
--
--	omap->platdata.ehci_data = pdata->ehci_data;
--	omap->platdata.ohci_data = pdata->ohci_data;
-+	omap->pdata = pdata;
- 
- 	pm_runtime_enable(dev);
- 
--- 
-1.7.4.1
+Looks like you e.g. copy/pasted from a "git log" command log rather
+than from an actual patch.
+
+>     related devices. Here we provide it with its very own IRQ Domain
+>     so that IRQs can be issued dynamically. This will stand the
+>     driver in good stead when it is enabled for Device Tree, as this
+>     it a prerequisite.
+>
+>     Cc: Grant Likely <grant.likely@secretlab.ca>
+>     Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+>     Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
+Applied.
+
+I apply this late because not using an irqdomain when we can is
+an abomination so I'm taking the risk.
+
+Yours,
+Linus Walleij
