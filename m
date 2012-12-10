@@ -1,121 +1,59 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 10 Dec 2012 17:54:20 +0800
-Subject: [PATCH] ASoC: atmel-soc: make it buildable on other architectures
-In-Reply-To: <1354973002-13588-1-git-send-email-manabian@gmail.com>
-References: <1354973002-13588-1-git-send-email-manabian@gmail.com>
-Message-ID: <50C5B14C.4050107@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 10 Dec 2012 10:04:33 +0000
+Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
+ across all cpus
+In-Reply-To: <1354902347.8263.12.camel@linaro1.home>
+References: <1354821581.17101.17.camel@gandalf.local.home>
+ <1354872138.3176.15.camel@computer5.home>
+ <1354888985.17101.41.camel@gandalf.local.home>
+ <1354892111.13000.50.camel@linaro1.home>
+ <1354894134.17101.44.camel@gandalf.local.home>
+ <20121207162346.GW14363@n2100.arm.linux.org.uk>
+ <1354898200.17101.50.camel@gandalf.local.home>
+ <20121207164530.GX14363@n2100.arm.linux.org.uk>
+ <1354900436.17101.58.camel@gandalf.local.home>
+ <1354902347.8263.12.camel@linaro1.home>
+Message-ID: <20121210100433.GB6624@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joachim Eastwood,
+Hi Jon,
 
-On 12/8/2012 21:23, Joachim Eastwood wrote:
-> Not very useful on non AT91/AVR32 platforms but it provides
-> more build coverage and prepares for ARM multiplatform.
->
-> Also fixes a couple of format type warnings.
->
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
->
-> Hi,
->
-> Build tested on RM9200 and x86_64.
->
-> ARCH_AT91 depend is pushed down to the machine drivers
-> since they still relies on mach includes.
->
-> regards
-> Joachim Eastwood
->
->   sound/soc/atmel/Kconfig         | 6 +++---
->   sound/soc/atmel/atmel-pcm-pdc.c | 4 ++--
->   sound/soc/atmel/atmel-pcm.c     | 2 +-
->   sound/soc/atmel/atmel_ssc_dai.c | 2 --
->   4 files changed, 6 insertions(+), 8 deletions(-)
->
-> diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
-> index d1b691b..3fdd87f 100644
-> --- a/sound/soc/atmel/Kconfig
-> +++ b/sound/soc/atmel/Kconfig
-> @@ -1,6 +1,6 @@
->   config SND_ATMEL_SOC
->   	tristate "SoC Audio for the Atmel System-on-Chip"
-> -	depends on ARCH_AT91
-> +	depends on HAS_IOMEM
+Back-pedalling a bit here, but I'm confused by one of your points below:
 
-I don't think this change needed. This is not a physical device.
+On Fri, Dec 07, 2012 at 05:45:47PM +0000, Jon Medhurst (Tixy) wrote:
+> On Fri, 2012-12-07 at 12:13 -0500, Steven Rostedt wrote:
+> > I'll make my question more general:
+> > 
+> > If I have a nop, that is a size of a call (branch and link), which is
+> > near the beginning of a function and not part of any conditional, and I
+> > want to convert it into a call (branch and link), would adding a
+> > breakpoint to it, modifying it to the call, and then removing the
+> > breakpoint be possible? Of course it would require syncing in between
+> > steps, but my question is, if the above is possible on a thumb2 ARM
+> > processor?
+> 
+> I believe so. The details are (repeating your earlier explanation) ...
+> 
+> 1. Replace first half of nop with 16bit 'breakpoint' instruction.
 
-Best Regards,
-Bo Shen
+Sort of -- you'd actually need 2x16-bit nops to make this work.
 
->   	help
->   	  Say Y or M if you want to add support for codecs attached to
->   	  the ATMEL SSC interface. You will also need
-> @@ -24,7 +24,7 @@ config SND_ATMEL_SOC_SSC
->
->   config SND_AT91_SOC_SAM9G20_WM8731
->   	tristate "SoC Audio support for WM8731-based At91sam9g20 evaluation board"
-> -	depends on ATMEL_SSC && SND_ATMEL_SOC && AT91_PROGRAMMABLE_CLOCKS
-> +	depends on ARCH_AT91 && ATMEL_SSC && SND_ATMEL_SOC && AT91_PROGRAMMABLE_CLOCKS
->   	select SND_ATMEL_SOC_PDC
->   	select SND_ATMEL_SOC_SSC
->   	select SND_SOC_WM8731
-> @@ -34,7 +34,7 @@ config SND_AT91_SOC_SAM9G20_WM8731
->
->   config SND_AT91_SOC_AFEB9260
->   	tristate "SoC Audio support for AFEB9260 board"
-> -	depends on ATMEL_SSC && ARCH_AT91 && MACH_AFEB9260 && SND_ATMEL_SOC
-> +	depends on ARCH_AT91 && ATMEL_SSC && ARCH_AT91 && MACH_AFEB9260 && SND_ATMEL_SOC
->   	select SND_ATMEL_SOC_PDC
->   	select SND_ATMEL_SOC_SSC
->   	select SND_SOC_TLV320AIC23
-> diff --git a/sound/soc/atmel/atmel-pcm-pdc.c b/sound/soc/atmel/atmel-pcm-pdc.c
-> index 6a293c7..054ea4d 100644
-> --- a/sound/soc/atmel/atmel-pcm-pdc.c
-> +++ b/sound/soc/atmel/atmel-pcm-pdc.c
-> @@ -159,7 +159,7 @@ static int atmel_pcm_hw_params(struct snd_pcm_substream *substream,
->
->   	pr_debug("atmel-pcm: "
->   		"hw_params: DMA for %s initialized "
-> -		"(dma_bytes=%u, period_size=%u)\n",
-> +		"(dma_bytes=%zu, period_size=%zu)\n",
->   		prtd->params->name,
->   		runtime->dma_bytes,
->   		prtd->period_size);
-> @@ -201,7 +201,7 @@ static int atmel_pcm_trigger(struct snd_pcm_substream *substream,
->   	int ret = 0;
->
->   	pr_debug("atmel-pcm:buffer_size = %ld,"
-> -		"dma_area = %p, dma_bytes = %u\n",
-> +		"dma_area = %p, dma_bytes = %zu\n",
->   		rtd->buffer_size, rtd->dma_area, rtd->dma_bytes);
->
->   	switch (cmd) {
-> diff --git a/sound/soc/atmel/atmel-pcm.c b/sound/soc/atmel/atmel-pcm.c
-> index e99f181..3109db7 100644
-> --- a/sound/soc/atmel/atmel-pcm.c
-> +++ b/sound/soc/atmel/atmel-pcm.c
-> @@ -49,7 +49,7 @@ static int atmel_pcm_preallocate_dma_buffer(struct snd_pcm *pcm,
->   	buf->private_data = NULL;
->   	buf->area = dma_alloc_coherent(pcm->card->dev, size,
->   			&buf->addr, GFP_KERNEL);
-> -	pr_debug("atmel-pcm: alloc dma buffer: area=%p, addr=%p, size=%d\n",
-> +	pr_debug("atmel-pcm: alloc dma buffer: area=%p, addr=%p, size=%zu\n",
->   			(void *)buf->area, (void *)buf->addr, size);
->
->   	if (!buf->area)
-> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-> index 1c76634..2755750 100644
-> --- a/sound/soc/atmel/atmel_ssc_dai.c
-> +++ b/sound/soc/atmel/atmel_ssc_dai.c
-> @@ -42,8 +42,6 @@
->   #include <sound/initval.h>
->   #include <sound/soc.h>
->
-> -#include <mach/hardware.h>
-> -
->   #include "atmel-pcm.h"
->   #include "atmel_ssc_dai.h"
->
->
+> 2. Sync.(cache flush to PoU + IPIs to make other cores invalidate the
+> icache for changed part of the nop instruction).
+
+Why do you need to use IPIs for I-cache invalidation on other cores? For
+ARMv7 SMP (i.e. the multi-processing extensions) doing I-cache invalidation
+by MVA to PoU will be broadcast to the applicable domain for the
+shareability attributes of the address. So if you do icimvau with an
+inner-shareable virtual address, it will be broadcast by the hardware.
+
+> However, wouldn't we need any of this breakpoint malarkey, why not just
+> just use a 16-bit branch instruction which branches over the second half
+> of the nop? :-)
+
+Yes, and I think if you do use two 16-bit nops, you can even get rid of all
+the intermediate `sync' operations (I guess you might want one at the end if
+you want the call to become visible at a particular point).
+
+Will
