@@ -1,29 +1,53 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 10 Dec 2012 23:08:21 +0100
-Subject: [PATCH 6/6] ARM: sunxi: olinuxino: Add muxing for the uart
+Date: Mon, 10 Dec 2012 23:08:20 +0100
+Subject: [PATCH 5/6] tty: of_serial: Add pinctrl support
 In-Reply-To: <1355177301-31928-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1355177301-31928-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1355177301-31928-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1355177301-31928-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun5i-olinuxino.dts |    2 ++
- 1 file changed, 2 insertions(+)
+Use pinctrl to configure the SoCs pins directly from the driver.
 
-diff --git a/arch/arm/boot/dts/sun5i-olinuxino.dts b/arch/arm/boot/dts/sun5i-olinuxino.dts
-index d6ff889..598c1aa 100644
---- a/arch/arm/boot/dts/sun5i-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun5i-olinuxino.dts
-@@ -24,6 +24,8 @@
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Alan Cox <alan@linux.intel.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-serial at vger.kernel.org
+---
+ drivers/tty/serial/of_serial.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
+index df443b9..f66bdab 100644
+--- a/drivers/tty/serial/of_serial.c
++++ b/drivers/tty/serial/of_serial.c
+@@ -13,6 +13,7 @@
+ #include <linux/module.h>
+ #include <linux/slab.h>
+ #include <linux/delay.h>
++#include <linux/pinctrl/consumer.h>
+ #include <linux/serial_core.h>
+ #include <linux/serial_8250.h>
+ #include <linux/serial_reg.h>
+@@ -54,6 +55,7 @@ static int __devinit of_platform_serial_setup(struct platform_device *ofdev,
+ 					int type, struct uart_port *port)
+ {
+ 	struct resource resource;
++	struct pinctrl *pinctrl;
+ 	struct device_node *np = ofdev->dev.of_node;
+ 	u32 clk, spd, prop;
+ 	int ret;
+@@ -73,6 +75,11 @@ static int __devinit of_platform_serial_setup(struct platform_device *ofdev,
+ 		return ret;
+ 	}
  
- 	soc {
- 		uart1: uart at 01c28400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart1_pins_b>;
- 			status = "okay";
- 		};
- 	};
++	pinctrl = devm_pinctrl_get_select_default(&ofdev->dev);
++	if (IS_ERR(pinctrl))
++		dev_warn(&ofdev->dev,
++			"pins are not configured from the driver\n");
++
+ 	spin_lock_init(&port->lock);
+ 	port->mapbase = resource.start;
+ 
 -- 
 1.7.9.5
