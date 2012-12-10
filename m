@@ -1,77 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 10 Dec 2012 13:33:13 +0000
-Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
- across all cpus
-In-Reply-To: <1355144537.17101.155.camel@gandalf.local.home>
-References: <1354888985.17101.41.camel@gandalf.local.home>
- <1354892111.13000.50.camel@linaro1.home>
- <1354894134.17101.44.camel@gandalf.local.home>
- <20121207162346.GW14363@n2100.arm.linux.org.uk>
- <1354898200.17101.50.camel@gandalf.local.home>
- <20121207164530.GX14363@n2100.arm.linux.org.uk>
- <1354900436.17101.58.camel@gandalf.local.home>
- <1354902347.8263.12.camel@linaro1.home>
- <20121210100433.GB6624@mudshark.cambridge.arm.com>
- <1355144537.17101.155.camel@gandalf.local.home>
-Message-ID: <20121210133313.GB7869@mudshark.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 10 Dec 2012 08:39:14 -0500
+Subject: [PATCH 2/2] rtc: rtc-mv: Add the device tree binding documentation
+In-Reply-To: <1355136122-30729-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1355136122-30729-1-git-send-email-gregory.clement@free-electrons.com>
+ <1355136122-30729-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20121210133914.GH21694@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 01:02:17PM +0000, Steven Rostedt wrote:
-> On Mon, 2012-12-10 at 10:04 +0000, Will Deacon wrote:
-> > Hi Jon,
-> > 
-> > Back-pedalling a bit here, but I'm confused by one of your points below:
-> > 
-> > On Fri, Dec 07, 2012 at 05:45:47PM +0000, Jon Medhurst (Tixy) wrote:
-> > > On Fri, 2012-12-07 at 12:13 -0500, Steven Rostedt wrote:
-> > > > I'll make my question more general:
-> > > > 
-> > > > If I have a nop, that is a size of a call (branch and link), which is
-> > > > near the beginning of a function and not part of any conditional, and I
-> > > > want to convert it into a call (branch and link), would adding a
-> > > > breakpoint to it, modifying it to the call, and then removing the
-> > > > breakpoint be possible? Of course it would require syncing in between
-> > > > steps, but my question is, if the above is possible on a thumb2 ARM
-> > > > processor?
-> > > 
-> > > I believe so. The details are (repeating your earlier explanation) ...
-> > > 
-> > > 1. Replace first half of nop with 16bit 'breakpoint' instruction.
-> > 
-> > Sort of -- you'd actually need 2x16-bit nops to make this work.
+On Mon, Dec 10, 2012 at 11:42:02AM +0100, Gregory CLEMENT wrote:
+> The support was already written, but the binding documentation was
+> lacking.
+
+Thanks for doing this, Gregory.  I missed this the first time around
+when we added the DT bindings to the rtc driver.
+
+thx,
+
+Jason.
+
 > 
-> Why?
-
-Because the architecture doesn't provide any guarantees about concurrent
-modification of 32-bit nop instructions. If you stop the world every time,
-fine, but that's what we're trying to avoid, right?
-
-> > > However, wouldn't we need any of this breakpoint malarkey, why not just
-> > > just use a 16-bit branch instruction which branches over the second half
-> > > of the nop? :-)
-> > 
-> > Yes, and I think if you do use two 16-bit nops, you can even get rid of all
-> > the intermediate `sync' operations (I guess you might want one at the end if
-> > you want the call to become visible at a particular point).
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  .../devicetree/bindings/rtc/orion-rtc.txt          |   18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/orion-rtc.txt
 > 
-> Wont work. We are replacing a 32bit call with a nop. That nop must also
-> be 32bits, because we could eventually replace the nop(s) with a 32bit
-> call. Basically, we can never allow the second 16bit part ever be the
-> next instruction. If the first 16bit nop is executed, and then the task
-> gets preempted. The nops get converted to a 32bit call. The task gets
-> scheduled again and now is executing the second 16bits of the 32bit call
-> and we get unexpected (probably crashing) results.
-
-Damn, I didn't realise you wanted to put the 32-bit call back on
-pre-emption. Still, the `sync' is not needed when patching in a b for a nop.
-
-> By having either a 16bit breakpoint whose handler returns after the
-> second 16bit part, or a 16bit jump that simply jumps over the second
-> half, then all this should work. When the CPU processes a 32bit
-> instruction, it either processes all or non of it, correct?
-
-If you have two 16-bit nops, patching the first to branch over the second
-will work.
-
-Will
+> diff --git a/Documentation/devicetree/bindings/rtc/orion-rtc.txt b/Documentation/devicetree/bindings/rtc/orion-rtc.txt
+> new file mode 100644
+> index 0000000..3bf63ff
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/orion-rtc.txt
+> @@ -0,0 +1,18 @@
+> +* Mvebu Real Time Clock
+> +
+> +RTC controller for the Kirkwood, the Dove, the Armada 370 and the
+> +Armada XP SoCs
+> +
+> +Required properties:
+> +- compatible : Should be "marvell,orion-rtc"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: IRQ line for the RTC.
+> +
+> +Example:
+> +
+> +rtc at 10300 {
+> +        compatible = "marvell,orion-rtc";
+> +        reg = <0xd0010300 0x20>;
+> +        interrupts = <50>;
+> +};
+> -- 
+> 1.7.9.5
+> 
