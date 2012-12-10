@@ -1,47 +1,39 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Mon, 10 Dec 2012 16:30:50 +0530
-Subject: [PATCH V4 0/2] Add DT support for i2s
-In-Reply-To: <20121209072607.GD6511@opensource.wolfsonmicro.com>
-References: <1354099669-1735-1-git-send-email-padma.v@samsung.com>
- <CAAgF-Bc4t6WL4vswP6CFeSQrPZBmOuYfVt6_JoB1Za9TBX7mvA@mail.gmail.com>
- <20121206041141.GA10867@opensource.wolfsonmicro.com>
- <20121207135131.A53643E0B87@localhost>
- <CAAgF-BenOdFJK2LMot73_B=wHOFgD2sq8x-Ou=1CvpkiJpmeQQ@mail.gmail.com>
- <20121209072607.GD6511@opensource.wolfsonmicro.com>
-Message-ID: <CAAgF-Bd3=W7+kd-uDASva_ofLySvVm1skpLij9WvSyhbfiP5-w@mail.gmail.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 10 Dec 2012 11:04:05 +0000
+Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
+ across all cpus
+In-Reply-To: <20121207190244.GB29618@mudshark.cambridge.arm.com>
+References: <1354872138.3176.15.camel@computer5.home>
+ <1354888985.17101.41.camel@gandalf.local.home>
+ <1354892111.13000.50.camel@linaro1.home>
+ <1354894134.17101.44.camel@gandalf.local.home>
+ <20121207162346.GW14363@n2100.arm.linux.org.uk>
+ <1354898200.17101.50.camel@gandalf.local.home>
+ <20121207164530.GX14363@n2100.arm.linux.org.uk>
+ <1354900436.17101.58.camel@gandalf.local.home>
+ <20121207181309.GY14363@n2100.arm.linux.org.uk>
+ <1354905805.17101.86.camel@gandalf.local.home>
+ <20121207190244.GB29618@mudshark.cambridge.arm.com>
+Message-ID: <1355137445.3386.7.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Fri, 2012-12-07 at 19:02 +0000, Will Deacon wrote:
+> For ARMv7, there are small subsets of instructions for ARM and Thumb which
+> are guaranteed to be atomic wrt concurrent modification and execution of
+> the instruction stream between different processors:
+> 
+> Thumb:	The 16-bit encodings of the B, NOP, BKPT, and SVC instructions.
+> ARM:	The B, BL, NOP, BKPT, SVC, HVC, and SMC instructions.
+> 
 
-On Sun, Dec 9, 2012 at 12:56 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Sat, Dec 08, 2012 at 10:07:54AM +0530, Padma Venkat wrote:
->
->> Samsung i2s driver registers the platform device twice one for the
->> samsung-i2s.0,1 or 2 and two for samsung-i2s.4(which actually doesn't
->> represent any H/W peripheral). The max number of I2S blocks on any
->> Samsung SoC are 3, the secondary device registration starts with
->> device number 4.The second time registration is for the secondary fifo
->> interface of a CPU dai if any exists.
->
->> With DT support the device number in the driver is always -1, I used
->> alias id for the above purpose.
->
-> So, the thing here is that while the numbers were totally OK for
-> platform device use they really don't fit into DT at all well.  I think
-> the thing here is to either have a node for the second CPU side DAI or
-> to have a single DT link automatically expanded into two DAI links.  I
-> think the second option is much better - there's only one link on the
-> board, it just happens to get expanded into two the way things are
-> currently implemented in ASoC.
+So this means for things like kprobes which can modify arbitrary kernel
+code we are going to need to continue to always use some form of
+stop_the_whole_system() function?
 
-Could you please explain me in more detail about "single DT link
-automatically expanded into two DAI links".
-How this can be done?
+Also, kprobes currently uses patch_text() which only uses stop_machine
+for Thumb2 instructions which straddle a word boundary, so this needs
+changing?
 
->
-> This stuff probably also ought to be moved over to soc-pcm as well by
-> the way.
-Thanks
-Padma
+-- 
+Tixy
