@@ -1,39 +1,34 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 10 Dec 2012 12:39:11 +0530
-Subject: [PATCH 2/9] memory: emif: setup LP settings on freq update
+Date: Mon, 10 Dec 2012 12:39:15 +0530
+Subject: [PATCH 6/9] memory: emif: debugfs: Remove MR4= string print
 In-Reply-To: <1355123358-5273-1-git-send-email-lokeshvutla@ti.com>
 References: <1355123358-5273-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1355123358-5273-3-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1355123358-5273-7-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+From: Severine Glock <s-glock@ti.com>
 
-Program the power management shadow register on freq update
-else the concept of threshold frequencies dont really matter
-as the system always uses the performance mode timing for LP
-which is programmed in at init time.
+MR4 is reported under debugfs with following format MR4=%d.
+Remove MR4= string for better convenience.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Severine Glock <s-glock@ti.com>
 ---
- drivers/memory/emif.c |    5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/memory/emif.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
-index 8589aba..69a480d 100644
+index 625732d..32ce601 100644
 --- a/drivers/memory/emif.c
 +++ b/drivers/memory/emif.c
-@@ -815,6 +815,11 @@ static void setup_registers(struct emif_data *emif, struct emif_regs *regs)
- 	writel(regs->sdram_tim2_shdw, base + EMIF_SDRAM_TIMING_2_SHDW);
- 	writel(regs->phy_ctrl_1_shdw, base + EMIF_DDR_PHY_CTRL_1_SHDW);
+@@ -147,7 +147,7 @@ static int emif_mr4_show(struct seq_file *s, void *unused)
+ {
+ 	struct emif_data *emif = s->private;
  
-+	if (emif->lpmode != EMIF_LP_MODE_DISABLE) {
-+		writel(regs->pwr_mgmt_ctrl_shdw,
-+		       base + EMIF_POWER_MANAGEMENT_CTRL_SHDW);
-+	}
-+
- 	/* Settings specific for EMIF4D5 */
- 	if (emif->plat_data->ip_rev != EMIF_4D5)
- 		return;
+-	seq_printf(s, "MR4=%d\n", emif->temperature_level);
++	seq_printf(s, "%d\n", emif->temperature_level);
+ 	return 0;
+ }
+ 
 -- 
 1.7.9.5
