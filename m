@@ -1,32 +1,48 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 10 Dec 2012 20:49:11 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
-In-Reply-To: <509F8D6B.5070504@compulab.co.il>
-References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
- <509AD478.1050904@ti.com> <509B666F.6080507@compulab.co.il>
- <509BDAF5.1010703@ti.com>
- <79CD15C6BA57404B839C016229A409A83EB68589@DBDE01.ent.ti.com>
- <509BEE6D.9000902@ti.com>
- <alpine.DEB.2.00.1211081754390.20703@utopia.booyaka.com>
- <509BF525.80309@ti.com>
- <alpine.DEB.2.00.1211081809470.20703@utopia.booyaka.com>
- <509BFB4E.2090802@ti.com> <509F8D6B.5070504@compulab.co.il>
-Message-ID: <alpine.DEB.2.00.1212102047170.1982@utopia.booyaka.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Mon, 10 Dec 2012 22:21:19 +0100
+Subject: [PATCH] ARM: ep93xx: properly wait for UART FIFO to be empty
+Message-ID: <1836468.ZU3cPkV103@bender>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 11 Nov 2012, Igor Grinberg wrote:
+This patch changes the busy-waiting loop around in the decompressor
+putc() function on the UART FIFO register. Without a proper wait, the
+output of the decompressor was corrupted like this:
 
-> Yep, but the /800 do not get you the 32768...
-> and that makes the timer suck.
-> Of course this can be dealt with in the clock subsystem
-> (I remember Paul said that he will look into that), but it will take time.
+Uncompressing Linx. done, booting th enl
 
-It should be possible to implement this now that the CCF conversion is 
-done.  Not sure if I'll be able to get to it soon, though.
+To highlight the issue more evidently, looping 100 times instead of 1000
+makes the issue appear much faster. This patch takes the approach of
+using an active while loop until the FIFO is empty (not FULL).
+This issue happened to me on Sim.One running at 200Mhz.
 
-Is there anyone out there at TI who is focused on AM3517/3505 upstream 
-work?
+Signed-off-by: Florian Fainelli <florian@openwrt.org>
+---
+Ryan, this is based on your ep93xx-fixes branch, thanks!
 
+ arch/arm/mach-ep93xx/include/mach/uncompress.h |   10 +++-------
+ 1 file changed, 3 insertions(+), 7 deletions(-)
 
-- Paul
+diff --git a/arch/arm/mach-ep93xx/include/mach/uncompress.h b/arch/arm/mach-ep93xx/include/mach/uncompress.h
+index 16026c2..d64274f 100644
+--- a/arch/arm/mach-ep93xx/include/mach/uncompress.h
++++ b/arch/arm/mach-ep93xx/include/mach/uncompress.h
+@@ -47,13 +47,9 @@ static void __raw_writel(unsigned int value, unsigned int ptr)
+ 
+ static inline void putc(int c)
+ {
+-	int i;
+-
+-	for (i = 0; i < 1000; i++) {
+-		/* Transmit fifo not full?  */
+-		if (!(__raw_readb(PHYS_UART_FLAG) & UART_FLAG_TXFF))
+-			break;
+-	}
++	/* Transmit fifo not full?  */
++	while (__raw_readb(PHYS_UART_FLAG) & UART_FLAG_TXFF)
++		;
+ 
+ 	__raw_writeb(c, PHYS_UART_DATA);
+ }
+-- 
+1.7.10.4
