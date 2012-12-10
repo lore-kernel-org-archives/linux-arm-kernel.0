@@ -1,92 +1,38 @@
 From: avinashphilip@ti.com (Philip, Avinash)
-Date: Mon, 10 Dec 2012 06:43:17 +0000
-Subject: [PATCH v3 2/3] mtd: devices: elm: Add support for ELM error
- correction
-In-Reply-To: <50C1C6E3.5020300@ti.com>
+Date: Mon, 10 Dec 2012 06:44:02 +0000
+Subject: [PATCH v3 1/3] mtd: nand: omap2: Update nerrors using ecc.strength
+In-Reply-To: <50C1C784.4040209@ti.com>
 References: <1354189595-12784-1-git-send-email-avinashphilip@ti.com>
- <1354189595-12784-3-git-send-email-avinashphilip@ti.com>
- <50C1C6E3.5020300@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EA1FA14@DBDE01.ent.ti.com>
+ <1354189595-12784-2-git-send-email-avinashphilip@ti.com>
+ <50BF3819.9010200@ti.com>
+ <518397C60809E147AF5323E0420B992E3EA1139B@DBDE01.ent.ti.com>
+ <50C1C784.4040209@ti.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3EA1FA1B@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 07, 2012 at 16:07:23, Nori, Sekhar wrote:
-> On 11/29/2012 5:16 PM, Philip, Avinash wrote:
-> > The ELM hardware module can be used to speedup BCH 4/8/16 ECC scheme
-> > error correction.
-> > For now only 4 & 8 bit support is added
+On Fri, Dec 07, 2012 at 16:10:04, Nori, Sekhar wrote:
+> On 12/5/2012 6:13 PM, Philip, Avinash wrote:
+> > On Wed, Dec 05, 2012 at 17:33:37, Nori, Sekhar wrote:
+> >> Hi Avinash,
+> >>
+> >> On 11/29/2012 5:16 PM, Philip, Avinash wrote:
+> >>> Update number of errors using nand ecc strength.
+> >>> Also add macro definitions BCH8_ERROR_MAX & BCH4_ERROR_MAX
+> >>
+> >> Can you please describe why the original method of setting nerrors was
+> >> incorrect? Was it causing any issues in any particular configuration?
 > > 
-> > Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Rob Landley <rob@landley.net>
-
-[...]
-/**
-> > + * elm_config - Configure ELM module
-> > + * @info:	elm info
-> > + */
-> > +static void elm_config(struct elm_info *info)
+> > It affects the reusability of the code. For example BCH8 with AM335x RBL 
+> > compatibility requires  14 bytes instead of 13 byte. So setting nerrors
+> > with
+> > 	nerrors = (info->nand.ecc.bytes == 13) ? 8 : 4;
+> > will break am335x RBL compatibility.
 > 
-> This is called "config", but there is no configuration information
-> passed which looks odd..
+> This should be summarized in the patch description so the motivation is
+> clear to those who read the history later.
 
-The config information is bch_type, encapsulated in struct elm_info.
-
-> 
-> > +{
-> > +	u32 reg_val;
-> > +
-> > +	reg_val = (info->bch_type & ECC_BCH_LEVEL_MASK) | (ELM_ECC_SIZE << 16);
-> > +	elm_write_reg(info, ELM_LOCATION_CONFIG, reg_val);
-> > +}
-> 
-> Is there a use case where BCH type needs to be changed after NAND has
-> been probed?
-
-No, I think kernel handles the entire NAND part with a single ecc layout.
-Hence there is no run time BCH switching. But ELM driver should support BCH
-4 & 8. Selection of BCH information comes from DT of NAND driver.
-
-As NAND driver supporting BCH4 & 8 ecc scheme ELM module support
-configuration of both.  Configuration of ELM module should done as part
-of NAND driver probing.
-
-
-> You will have to erase any existing data written to NAND if
-> you change the ECC type. That sounds destructive enough to avoid such a
-> thing.
-
-There is no support for BCH switching after NAND driver probing.
-
-[...]
-> > +struct device *elm_request(enum bch_ecc bch_type)
-> > +{
-> > +	struct elm_info *info;
-> > +
-> > +	list_for_each_entry(info, &elm_devices, list) {
-> > +		if (info && info->dev) {
-> > +				info->bch_type = bch_type;
-> > +				elm_config(info);
-> > +				return info->dev;
-> > +		}
-> > +	}
-> 
-> This will always return the first ELM device probed since you never
-> remove the allocated device from the list.
-
-But now I realized that, there is no mechanism of freeing the requested
-resource.
-
-So I will add mechanism to request ELM module successfully only if ELM
-module is not requested already and add mechanism to free it, on NAND
-driver module unload (loadable module support). This way ELM driver
-can achieve multi instance support.
-
-> I wonder why you really need a list?
-
-The prime motivation for the list is the driver should support multi
-instances of ELM by removing global symbols.
+Ok I will add the details in patch description in next version.
 
 Thanks
 Avinash
