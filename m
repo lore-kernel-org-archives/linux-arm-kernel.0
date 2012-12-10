@@ -1,48 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 10 Dec 2012 11:24:08 +0000
-Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
- across all cpus
-In-Reply-To: <1355137445.3386.7.camel@linaro1.home>
-References: <1354892111.13000.50.camel@linaro1.home>
- <1354894134.17101.44.camel@gandalf.local.home>
- <20121207162346.GW14363@n2100.arm.linux.org.uk>
- <1354898200.17101.50.camel@gandalf.local.home>
- <20121207164530.GX14363@n2100.arm.linux.org.uk>
- <1354900436.17101.58.camel@gandalf.local.home>
- <20121207181309.GY14363@n2100.arm.linux.org.uk>
- <1354905805.17101.86.camel@gandalf.local.home>
- <20121207190244.GB29618@mudshark.cambridge.arm.com>
- <1355137445.3386.7.camel@linaro1.home>
-Message-ID: <20121210112408.GC6988@mudshark.cambridge.arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 10 Dec 2012 16:54:22 +0530
+Subject: [PATCH v4 23/23] mfd: omap-usb-host: Don't spam console on
+ clk_set_parent failure
+In-Reply-To: <1355134833-5199-24-git-send-email-rogerq@ti.com>
+References: <1355134833-5199-1-git-send-email-rogerq@ti.com>
+ <1355134833-5199-24-git-send-email-rogerq@ti.com>
+Message-ID: <50C5C666.9050105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 11:04:05AM +0000, Jon Medhurst (Tixy) wrote:
-> On Fri, 2012-12-07 at 19:02 +0000, Will Deacon wrote:
-> > For ARMv7, there are small subsets of instructions for ARM and Thumb which
-> > are guaranteed to be atomic wrt concurrent modification and execution of
-> > the instruction stream between different processors:
-> > 
-> > Thumb:	The 16-bit encodings of the B, NOP, BKPT, and SVC instructions.
-> > ARM:	The B, BL, NOP, BKPT, SVC, HVC, and SMC instructions.
-> > 
-> 
-> So this means for things like kprobes which can modify arbitrary kernel
-> code we are going to need to continue to always use some form of
-> stop_the_whole_system() function?
-> 
-> Also, kprobes currently uses patch_text() which only uses stop_machine
-> for Thumb2 instructions which straddle a word boundary, so this needs
-> changing?
+On Monday 10 December 2012 03:50 PM, Roger Quadros wrote:
+> clk_set_parent is expected to fail on OMAP3 platforms. We don't
+> consider that as fatal so don't spam console.
 
-Yes; if you're modifying instructions other than those mentioned above, then
-you'll need to synchronise the CPUs, update the instructions, perform
-cache-maintenance on the writing CPU and then execute an isb on the
-executing core (this last bit isn't needed if you're going to go through an
-exception return to get back to the new code -- depends on how your
-stop/resume code works).
+And what if it fails on a non-OMAP3 platform?
 
-For ftrace we can (hopefully) avoid a lot of this when we have known points
-of modification.
-
-Will
+>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>   drivers/mfd/omap-usb-host.c |   18 +++++++++---------
+>   1 files changed, 9 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+> index 0bb54393..344ce09 100644
+> --- a/drivers/mfd/omap-usb-host.c
+> +++ b/drivers/mfd/omap-usb-host.c
+> @@ -657,32 +657,32 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
+>   	}
+>
+>   	if (is_ehci_phy_mode(pdata->port_mode[0])) {
+> -		/* for OMAP3 , the clk set paretn fails */
+> +		/* for OMAP3, clk_set_parent fails */
+>   		ret = clk_set_parent(omap->utmi_clk[0],
+>   					omap->xclk60mhsp1_ck);
+>   		if (ret != 0)
+> -			dev_err(dev, "xclk60mhsp1_ck set parent"
+> -				"failed error:%d\n", ret);
+> +			dev_dbg(dev, "xclk60mhsp1_ck set parent failed: %d\n",
+> +					ret);
+>   	} else if (is_ehci_tll_mode(pdata->port_mode[0])) {
+>   		ret = clk_set_parent(omap->utmi_clk[0],
+>   					omap->init_60m_fclk);
+>   		if (ret != 0)
+> -			dev_err(dev, "init_60m_fclk set parent"
+> -				"failed error:%d\n", ret);
+> +			dev_dbg(dev, "P0 init_60m_fclk set parent failed: %d\n",
+> +					ret);
+>   	}
+>
+>   	if (is_ehci_phy_mode(pdata->port_mode[1])) {
+>   		ret = clk_set_parent(omap->utmi_clk[1],
+>   					omap->xclk60mhsp2_ck);
+>   		if (ret != 0)
+> -			dev_err(dev, "xclk60mhsp2_ck set parent"
+> -					"failed error:%d\n", ret);
+> +			dev_dbg(dev, "xclk60mhsp2_ck set parent failed: %d\n",
+> +					ret);
+>   	} else if (is_ehci_tll_mode(pdata->port_mode[1])) {
+>   		ret = clk_set_parent(omap->utmi_clk[1],
+>   						omap->init_60m_fclk);
+>   		if (ret != 0)
+> -			dev_err(dev, "init_60m_fclk set parent"
+> -				"failed error:%d\n", ret);
+> +			dev_dbg(dev, "P1 init_60m_fclk set parent failed: %d\n",
+> +					ret);
+>   	}
+>
+>   	omap_usbhs_init(dev);
+>
