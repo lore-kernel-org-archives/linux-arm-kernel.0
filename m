@@ -1,33 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Dec 2012 14:16:04 +0000
-Subject: [PATCH 1/3] ARM: MM: Add the workaround of Errata 774769
-In-Reply-To: <50C5ED3E.2050308@ti.com>
-References: <001701cdd669$19e8cdd0$4dba6970$%kim@samsung.com>
- <50C5ED3E.2050308@ti.com>
-Message-ID: <20121210141604.GN14363@n2100.arm.linux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 10 Dec 2012 15:17:35 +0100
+Subject: [PATCH 0/2] add RTC support for Armada 370 and Armada XP
+In-Reply-To: <20121210150101.4efe862a@skate>
+References: <1355136122-30729-1-git-send-email-gregory.clement@free-electrons.com>
+ <20121210150101.4efe862a@skate>
+Message-ID: <50C5EEFF.1000106@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 07:40:06PM +0530, Santosh Shilimkar wrote:
-> Whats the stand on such erratas ? I saw on one of thread one of
-> you suggesting to stop patching kernel where secure/non-secure
-> kernel will need different errata WA.
+On 12/10/2012 03:01 PM, Thomas Petazzoni wrote:
+> Dear Gregory CLEMENT,
+> 
+> On Mon, 10 Dec 2012 11:42:00 +0100, Gregory CLEMENT wrote:
+> 
+>> This small patchset adds RTC support for Armada 370 and Armada XP. It
+>> was succesfully tested on the evaluation board. The second patch add
+>> the lacking documentation for the device tree binding. This serie is
+>> 3.9 material.
+>>
+>> Thanks,
+>>
+>>
+>> Gregory CLEMENT (2):
+>>   arm: mvebu: add RTC support for Armada 370 and Armada XP
+>>   rtc: rtc-mv: Add the device tree binding documentation
+> 
+> Would you mind adding a patch that updates the mvebu_defconfig to
+> include the RTC driver by default?
 
-Well, yes, there's that too.  I think were we got to was deciding that
-it is impossible to tell whether an errata is required for any particular
-SoC: even when you know the rXpX number of the core, you don't know if,
-as part of the design, the manufacturer incorporated some fix.
+Sure. I will.
 
-So, the conclusion we came to was that the _only_ place that work-arounds
-like these can be enabled is before we get anywhere near the kernel - in
-whatever pre-kernel code the platform has, and doing whatever platform
-specific magic is required to get those work-arounds enabled.
+> 
+> Thanks!
+> 
+> Thomas
+> 
 
-What that means is that having the work-arounds in the kernel is pretty
-pointless when it's a matter of enabling a bit or two in some secure-only
-register.
 
-I don't think I heard any objections to removing those work-arounds which
-fall into this category from the kernel; I think that's something we need
-to schedule for a few kernel versions time, after we've put them into the
-feature-removal file, and marked them in the config as going away.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
