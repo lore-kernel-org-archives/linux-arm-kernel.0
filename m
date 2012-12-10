@@ -1,37 +1,125 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 10 Dec 2012 16:38:06 +0200
-Subject: [PATCH v4 23/23] mfd: omap-usb-host: Don't spam console on
- clk_set_parent failure
-In-Reply-To: <50C5C80A.3090307@ti.com>
-References: <1355134833-5199-1-git-send-email-rogerq@ti.com>
- <1355134833-5199-24-git-send-email-rogerq@ti.com>
- <50C5C666.9050105@ti.com> <50C5C80A.3090307@ti.com>
-Message-ID: <20121210143806.GI11038@arwen.pp.htv.fi>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 10 Dec 2012 09:46:41 -0500
+Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
+ across all cpus
+In-Reply-To: <20121210140749.GM14363@n2100.arm.linux.org.uk>
+References: <1354894134.17101.44.camel@gandalf.local.home>
+ <20121207162346.GW14363@n2100.arm.linux.org.uk>
+ <1354898200.17101.50.camel@gandalf.local.home>
+ <20121207164530.GX14363@n2100.arm.linux.org.uk>
+ <1354900436.17101.58.camel@gandalf.local.home>
+ <1354902347.8263.12.camel@linaro1.home>
+ <20121210100433.GB6624@mudshark.cambridge.arm.com>
+ <1355144537.17101.155.camel@gandalf.local.home>
+ <20121210135747.GK14363@n2100.arm.linux.org.uk>
+ <1355148365.17101.168.camel@gandalf.local.home>
+ <20121210140749.GM14363@n2100.arm.linux.org.uk>
+Message-ID: <1355150801.17101.197.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 01:31:22PM +0200, Roger Quadros wrote:
-> On 12/10/2012 01:24 PM, Rajendra Nayak wrote:
-> > On Monday 10 December 2012 03:50 PM, Roger Quadros wrote:
-> >> clk_set_parent is expected to fail on OMAP3 platforms. We don't
-> >> consider that as fatal so don't spam console.
-> > 
-> > And what if it fails on a non-OMAP3 platform?
+On Mon, 2012-12-10 at 14:07 +0000, Russell King - ARM Linux wrote:
+>  
+> > If there's no way to modify a 32bit operation without stop_machine(),
+> > ever with a breakpoint, than we can stop the discussion here. ARM will
+> > forever require stop_machine() for use with tracepoints and ftrace. Too
+> > bad, as ARM was the x86 competitor. Here's something that x86 has a one
+> > up on ARM.
 > 
-> The driver just prints a debug message and continues to work just as
-> before. The USB port will not work for the user in that case. He will
-> have to enable DEBUG flag to see the debug message. I see this behaviour
-> better than before where all OMAP3 users see the error message for no
-> reason.
+> You think that kind of blackmail makes a difference?
 
-I agree with Roger here.
+I'm not trying to blackmail. How does one blackmail to change facts? I
+was just showing my disappointment, as I'm starting to grow fond of ARM.
+Although I wouldn't mind sending out some blackmail to the ARM HW
+vendors (got any pictures of them cheating on their spouses?) to make
+them come up with a standardize way to make all this easy :-)
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121210/79cce1c9/attachment.sig>
+
+>   Look closely at what
+> I've written - I didn't say that there's no way to modify any 32-bit
+> operation without stop_machine().
+
+Again, you and I are having a disconnect. I'm not a HW expert. I'm
+trying to get a total understanding of what you, Will, Jon and others
+are trying to say.
+
+Lets look at what you last said:
+
+
+> ... which, if it's misaligned to a 32-bit boundary, which can happen with
+> Thumb-2 code, will require the replacement to be done atomically; you will
+> need to use stop_machine() to ensure that other CPUs don't try to execute
+> the instruction mid-way through modification... as I have already
+> explained in my previous mails.
+
+I'm confused to what is wrong to "misaligned to a 32-bit boundery".
+Isn't it best if it is on a 32-bit boundary? Or do you mean that it's
+misaligned across a 32-bit boundary? I guess I just read it wrong.
+
+Either way, I said there's probably no guarantee that the 32-bit calls
+to mcount that gcc has inserted (or the tracepoints) are going to be
+aligned to 32-bit boundaries. But I'm wondering if that's still a
+problem. Let's look at the ways another CPU could get the 32-bit
+instruction if it is misaligned, and across two different cache lines,
+or even two different pages:
+
+
+1) the CPU gets the full 32bits as it was on the other CPU, or how it
+will be.
+
+2) The CPU gets the first 16bits as it was on the other CPU an the
+second 16bits with the update.
+
+3) The CPU gets the first 16bits with the update and the second 16bits
+as it use to be.
+
+
+The first case isn't interesting, so lets jump to the 2 and 3rd cases.
+
+On an update of a 32bit nop to a 16bit breakpoint or branch (jump over
+second half).
+
+
+As we only modify the first half of the 32bit operation, and the second
+half still contains the second half of the 32bit nop, the other CPU will
+see:
+
+<first 16bits of 32bit nop><second 16bits of 32bit nop>
+
+That doesn't look so bad. Or:
+
+<breakpoint/branch><second 16bits of 32bit nop>
+
+If it sees the breakpoint or branch, then it should just jump over the
+second part of the nop, and not execute it. If this is an issue, then we
+need stop_machine() otherwise, I'll continue.
+
+Now before changing the second half of the 32bits, we send a sync (IPI
+maybe) to all other CPUs, so that we now guarantee that all CPUs sees
+the added breakpoint/branch.
+
+As the breakpoint and branch will return pass the second half of the
+nop, modifying it shouldn't bother the other CPUs. If it does, then we
+have to stay with stop_machine(). If not, let me continue.
+
+We need to send another sync to guarantee that all the other CPUs see
+the second half of the jump to ftrace code.
+
+Now the second half matches the second half of the jump to the ftrace
+code, and the first half is still the breakpoint/branch. So lets change
+that to the first half of the jump to the ftrace code. Now the other
+CPUs will see:
+
+<breakpoint/branch><second 16bits of jump to ftrace>
+
+The above should still skip the second half. Or:
+
+<first 16bits of jump to ftrace><second 16bits of jump to ftrace>
+
+The above is what we want CPUs to see.
+
+If my assumptions about the changes above can't be done, then yes we are
+stuck with stop_machine(). If they can be done, then we have hope to
+remove it.
+
+-- Steve
