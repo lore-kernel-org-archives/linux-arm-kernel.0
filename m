@@ -1,44 +1,47 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 10 Dec 2012 11:16:04 -0700
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <20121210190552.74acbe5a@skate>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121207233317.GB4304@obsidianresearch.com> <50C62161.9080708@wwwdotorg.org>
- <20121210190552.74acbe5a@skate>
-Message-ID: <50C626E4.1010808@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 10 Dec 2012 18:18:40 +0000
+Subject: Coresight bus and drivers from CodeAurora
+In-Reply-To: <CACRpkdYeFw3YqYqgNAKUv1U4edyzzUa9x6xBSoBU4BbBoc6q5Q@mail.gmail.com>
+References: <CACRpkdYeFw3YqYqgNAKUv1U4edyzzUa9x6xBSoBU4BbBoc6q5Q@mail.gmail.com>
+Message-ID: <20121210181840.GI12030@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2012 11:05 AM, Thomas Petazzoni wrote:
-> Dear Stephen Warren,
-> 
-> On Mon, 10 Dec 2012 10:52:33 -0700, Stephen Warren wrote:
-> 
->> Mainly as background:
->>
->> I /think/ Tegra has a similar HW setup (but perhaps not identical)
->> (based on a very brief reading of your emails and brief knowledge of
->> this aspect of the Tegra HW).
->>
->> On Tegra, there is a 1GB physical address window that the PCIe
->> controller serves. The controller has 2 or 3 ports, each a separate PCIe
->> domain I believe. There are registers in the PCIe controller which route
->> accessed made to the 1GB physical window to the various child ports and
->> transaction types.
-> 
-> On Marvell SoCs, this is even more flexible: you have 20 configurable
-> address decoding windows. For each of them, you can configure the base
-> address, size, and target device (i.e PCIe port x.y, NAND, or some
-> other devices). And since we have up to 10 PCIe interfaces, we really
-> don't want to over-allocate hundreds of MB of physical address space for
-> each device, since most of them need only a few dozens of KB.
+Hi Linus,
 
-OK, that all makes sense.
+On Mon, Dec 10, 2012 at 12:40:20PM +0000, Linus Walleij wrote:
+> recently my colleague Magnus (@ST-Ericsson) found this bus and
+> implementations for the ARM Coresight and drivers for the ARM Coresight
+> blocks ETB, ETM, Funnel, Replicator, STM, TMC and TPIU. The
+> code is here:
+> https://www.codeaurora.org/gitweb/quic/le/?p=kernel/msm.git;a=tree;f=drivers/coresight;h=f0221ea9a55c1e8bcd63f36ec28abb6d5406e63d;hb=refs/heads/msm-3.4
+> 
+> What is your intention with this? Do you have any intention to mainline?
+> 
+> We can see it has references to Qualcomm in the device tree strings even
+> though they are ARM Coresight HW blocks, for example, so some changes
+> are likely necessary, and such bindings should pass the devicetree-discuss
+> list.
+> 
+> Will: what is ARM Ltd. position on these blocks and their drivers? Any plans
+> from your side?
+>
 
-One question though: When you say "device" in the line above, I assume
-the device you're referring to is the PCIe host device, and not the
-individual PCIe devices themselves; with 20 address decoding windows and
-10 PCIe ports, and those windows apparently being used for on-SoC
-devices too (e.g. you mention NAND above), I assume you'd want to limit
-the number of windows you use per PCIe bus/port to just 1, rather than 1
-per enumerated PCIe device?
+>From what I understand, ARM has looked at the idea of self-hosted tracing
+using Coresight but we couldn't find a compelling use-case and, as such,
+don't currently have any plans in this area.
+
+That's not to say it's been written off if somebody has good use for it.
+What exactly is your use-case and why is there yet another driver on the
+cards? I have some personal opinions about what we should/shouldn't do in
+this space, but that can come later.
+
+> The design is nice, but maybe this is one of the few cases where the
+> drivers should actually live under arch/arm/common/* or similar.
+
+Well, if the code is useful on arm64 then a directory outside of arch/ could
+be beneficial.
+
+Cheers,
+
+Will
