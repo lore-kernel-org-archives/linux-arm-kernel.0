@@ -1,69 +1,78 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 10 Dec 2012 19:59:35 +0100
+Date: Mon, 10 Dec 2012 20:03:50 +0100
 Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <50C626E4.1010808@wwwdotorg.org>
+In-Reply-To: <20121210184439.GA4687@obsidianresearch.com>
 References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
  <20121207233317.GB4304@obsidianresearch.com>
- <50C62161.9080708@wwwdotorg.org> <20121210190552.74acbe5a@skate>
- <50C626E4.1010808@wwwdotorg.org>
-Message-ID: <20121210195935.1b8a7797@skate>
+ <50C62161.9080708@wwwdotorg.org>
+ <20121210184439.GA4687@obsidianresearch.com>
+Message-ID: <20121210200350.0f930e27@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Stephen Warren,
+Dear Jason Gunthorpe,
 
-On Mon, 10 Dec 2012 11:16:04 -0700, Stephen Warren wrote:
+On Mon, 10 Dec 2012 11:44:39 -0700, Jason Gunthorpe wrote:
 
-> > On Marvell SoCs, this is even more flexible: you have 20 configurable
-> > address decoding windows. For each of them, you can configure the base
-> > address, size, and target device (i.e PCIe port x.y, NAND, or some
-> > other devices). And since we have up to 10 PCIe interfaces, we really
-> > don't want to over-allocate hundreds of MB of physical address space for
-> > each device, since most of them need only a few dozens of KB.
+> Fundamentally this is similar to what Marvell did, the routing
+> registers are functionally identical to PCI-E bridges, but don't use
+> PCI-E standard configuration.
 > 
-> OK, that all makes sense.
+> Look at how Intel models their PCI-E and you can see the same
+> functional elements:
 > 
-> One question though: When you say "device" in the line above, I assume
-> the device you're referring to is the PCIe host device, and not the
-> individual PCIe devices themselves; with 20 address decoding windows and
-> 10 PCIe ports, and those windows apparently being used for on-SoC
-> devices too (e.g. you mention NAND above), I assume you'd want to limit
-> the number of windows you use per PCIe bus/port to just 1, rather than 1
-> per enumerated PCIe device?
+> 00:00.0 Host bridge: Intel Corporation 2nd Generation Core Processor Family DRAM Controller (rev 09)
+> 00:1c.0 PCI bridge: Intel Corporation 6 Series/C200 Series Chipset Family PCI Express Root Port 1 (rev b4)
+> 00:1c.4 PCI bridge: Intel Corporation 6 Series/C200 Series Chipset Family PCI Express Root Port 5 (rev b4)
+> 00:1c.6 PCI bridge: Intel Corporation 6 Series/C200 Series Chipset Family PCI Express Root Port 7 (rev b4)
+> 00:1c.7 PCI bridge: Intel Corporation 6 Series/C200 Series Chipset Family PCI Express Root Port 8 (rev b4)
+> 
+> 1c.x are *physical* PCI-E ports, while 00 represents the internal ring
+> bus. All of the above devices are on the CPU SOC.
+> 
+> The address decoding windows of the physical ports are configured via
+> standard PCI-E bridge configuration space accesses and control which
+> addresses from the internal ring bus go out the port, as well as which
+> bus number range the port handles. This the same function as the
+> address decoding windows, just expressed via a standard register
+> layout instead of as a SOC specific feature.
+> 
+> By providing actual PCI configuration space to control all this it is
+> automatically compatible with standard PCI configuration code.
+> 
+> The mistake these SOCs are making is not using standard PCI modeling
+> to describe their PCI functional blocks :|
+> 
+> What you'd want to see is the same arrangement as Intel:
+> 
+> 00:00.0 Host bridge: SOC software emulated host bridge
+> 00:01.1 PCI bridge: SOC software emulated PCI-E root port 1
+> 00:01.2 PCI bridge: SOC software emulated PCI-E root port 2
+> 00:02.0 Ethernet device..
+> 
+> With a tree like:
+>   00:00.0 -> 0:01.1
+>           -> 0:01.2 -> 00:02.0
+> 
+> Discovery is started from 00:00.0 and flows through all the ports in
+> one pass.
 
-Well, I am not a PCI or PCIe expert, so my terminology might be wrong.
-Basically, on Armada XP, you have:
+Hum, ok, this makes sense. I have no idea at the moment how to achieve
+that, but I'll try to have a look. Do you have pointers to code doing
+this?
 
- PCIe 0.0 (can be x4, in which case PCIe 0.{1,2,3} can't be used, or x1)
- PCIe 0.1 x1
- PCIe 0.2 x1
- PCIe 0.3 x1
- PCIe 1.0 (can be x4, in which case PCIe 1.{1,2,3} can't be used, or x1)
- PCIe 1.1 x1
- PCIe 1.2 x1
- PCIe 1.3 x1
- PCIe 2.0 (x4/x1)
- PCIe 3.0 (x4/x1)
+> It sounds like the concept of a PCI-E bridge with internal
+> configuration could be generalized for more types of hardware that the
+> Marvell case. Pretty much all socs will have a similar design, a
+> number of PCI-E ports, a collection of address decoding/routing
+> windows and some registers to control them, someplace...
 
-On the Armada XP evaluation board, I have one slot for each of those
-interfaces (well, actually I don't have slots for the PCIe1.{0,1,2,3}),
-so I can connect only one PCIe device (i.e a NIC card over PCIe, or a
-SATA card over PCIe, or a USB controller over PCIe) per PCIe interface.
+Indeed. But for example, in Marvell's case, the address decoding
+windows mechanism is not specific to PCIe, it is also used for other
+devices, so the management of those decoding windows cannot be entirely
+left to the PCIe driver.
 
-And the address decoding windows are associated to a PCIe interface
-(through its x.y number). So for now, there is a one-to-one mapping
-between a PCIe interface and a PCIe device, and therefore with an
-address decoding window.
-
-That said, I suppose that what you're thinking of are PCIe bridges, is
-that correct? So those would allow to connect multiple PCIe devices on
-a single PCIe interface (for example PCIe 3.0 listed above). In that
-case, I suppose my address decoding window would have to have a size
-greater than or equal to the sum of the size of all BARs of the PCIe
-devices found on the downstream bus. Lior, could you confirm or infirm
-my statement?
-
-Does that answer your question?
+Best regards,
 
 Thomas
 -- 
