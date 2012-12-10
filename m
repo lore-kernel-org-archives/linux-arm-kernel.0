@@ -1,29 +1,28 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 10 Dec 2012 10:07:58 +0900
-Subject: [PATCH] ARM: EXYNOS: fix GIC using for EXYNOS5440
-Message-ID: <030c01cdd672$cb1b6b40$615241c0$%kim@samsung.com>
+Date: Mon, 10 Dec 2012 10:08:56 +0900
+Subject: [PATCH] ARM: EXYNOS: fix skip scu_enable() for EXYNOS5440
+Message-ID: <030d01cdd672$ed68da20$c83a8e60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/common.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/mach-exynos/platsmp.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 0eb3b9a..9ecda37 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -684,7 +684,8 @@ void __init exynos5_init_irq(void)
- 	 * Theses parameters should be NULL and 0 because EXYNOS4
- 	 * uses GIC instead of VIC.
- 	 */
--	s5p_init_irq(NULL, 0);
-+	if (!of_machine_is_compatible("samsung,exynos5440"))
-+		s5p_init_irq(NULL, 0);
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 4ca8ff1..c5c840e 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -198,7 +198,7 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	int i;
  
- 	gic_arch_extn.irq_set_wake = s3c_irq_wake;
- }
+-	if (!soc_is_exynos5250())
++	if (!(soc_is_exynos5250() || soc_is_exynos5440()))
+ 		scu_enable(scu_base_addr());
+ 
+ 	/*
 -- 
 1.7.4.1
