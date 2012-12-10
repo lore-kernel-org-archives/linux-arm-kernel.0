@@ -1,30 +1,69 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 10 Dec 2012 11:42:38 -0500
-Subject: Your kernel patches for the Marvell Mirabox
-In-Reply-To: <20121210162729.21f2f053@skate>
-References: <50C4AC68.7090709@gmail.com>
- <20121210140202.GI21694@titan.lakedaemon.net>
- <20121210162729.21f2f053@skate>
-Message-ID: <20121210164238.GJ21694@titan.lakedaemon.net>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 10 Dec 2012 16:45:33 +0000
+Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
+ across all cpus
+In-Reply-To: <20121210100433.GB6624@mudshark.cambridge.arm.com>
+References: <1354821581.17101.17.camel@gandalf.local.home>
+ <1354872138.3176.15.camel@computer5.home>
+ <1354888985.17101.41.camel@gandalf.local.home>
+ <1354892111.13000.50.camel@linaro1.home>
+ <1354894134.17101.44.camel@gandalf.local.home>
+ <20121207162346.GW14363@n2100.arm.linux.org.uk>
+ <1354898200.17101.50.camel@gandalf.local.home>
+ <20121207164530.GX14363@n2100.arm.linux.org.uk>
+ <1354900436.17101.58.camel@gandalf.local.home>
+ <1354902347.8263.12.camel@linaro1.home>
+ <20121210100433.GB6624@mudshark.cambridge.arm.com>
+Message-ID: <1355157933.3386.55.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 04:27:29PM +0100, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
+On Mon, 2012-12-10 at 10:04 +0000, Will Deacon wrote:
+> Hi Jon,
 > 
-> On Mon, 10 Dec 2012 09:02:02 -0500, Jason Cooper wrote:
+> Back-pedalling a bit here, but I'm confused by one of your points below:
 > 
-> > In u-boot you'll need to change the boardid environment variable to
-> > 0xffffffff, which needs to be in unsigned integer notation, 4294967295.
+> On Fri, Dec 07, 2012 at 05:45:47PM +0000, Jon Medhurst (Tixy) wrote:
+> > On Fri, 2012-12-07 at 12:13 -0500, Steven Rostedt wrote:
+> > > I'll make my question more general:
+> > > 
+> > > If I have a nop, that is a size of a call (branch and link), which is
+> > > near the beginning of a function and not part of any conditional, and I
+> > > want to convert it into a call (branch and link), would adding a
+> > > breakpoint to it, modifying it to the call, and then removing the
+> > > breakpoint be possible? Of course it would require syncing in between
+> > > steps, but my question is, if the above is possible on a thumb2 ARM
+> > > processor?
+> > 
+> > I believe so. The details are (repeating your earlier explanation) ...
+> > 
+> > 1. Replace first half of nop with 16bit 'breakpoint' instruction.
 > 
-> I'm not sure this is strictly necessary. I've never done that on any
-> Marvell U-Boot's and I'm happily booting DT-only kernels.
+> Sort of -- you'd actually need 2x16-bit nops to make this work.
+> 
+> > 2. Sync.(cache flush to PoU + IPIs to make other cores invalidate the
+> > icache for changed part of the nop instruction).
+> 
+> Why do you need to use IPIs for I-cache invalidation on other cores? For
+> ARMv7 SMP (i.e. the multi-processing extensions) doing I-cache invalidation
+> by MVA to PoU will be broadcast to the applicable domain for the
+> shareability attributes of the address. So if you do icimvau with an
+> inner-shareable virtual address, it will be broadcast by the hardware.
 
-Yeah, I know it helped the topkick boot up.  I probably needed this for
-kirkwood_defconfig, which includes support for legacy boards.
-mvebu_defconfig wouldn't need it then, since everything in mvebu is DT.
-Thanks for clarifying the point.
+That was a clue I was missing, and it means that my patch which spawned
+this thread is flawed. The original problem I was trying to cure was
+random crashes whilst ftrace_modify_all_code() was going round modifying
+kernel functions, and I fixed this by getting all cores to
+__flush_icache_all() after the modifications had been made. But if cache
+flushes are broadcast across all cores then my reasoning for the fix is
+wrong.
 
-hth,
+As this only seems to surface on TC2 perhaps CCI doesn't do the magic we
+want, or we have it misconfigured, or were been hit by cache differences
+between A7 and A15? (I've seen comments somewhere which says A7 has VIPT
+aliasing I-cache, and A15 is PIPT non-aliasing).
 
-Jason.
+Will need to some more detailed investigation when I get time.
+
+-- 
+Tixy
