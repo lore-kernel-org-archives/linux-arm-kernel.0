@@ -1,58 +1,44 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Mon, 10 Dec 2012 10:19:03 +0900
-Subject: [PATCH 1/3] ARM: MM: Add the workaround of Errata 774769
-In-Reply-To: <20121210000825.GH14363@n2100.arm.linux.org.uk>
-References: <001701cdd669$19e8cdd0$4dba6970$%kim@samsung.com>
- <20121210000825.GH14363@n2100.arm.linux.org.uk>
-Message-ID: <002101cdd674$57884070$0698c150$%kim@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 10 Dec 2012 09:49:28 +0800
+Subject: [PATCH] ARM: decompressor: include CONFIG_DEBUG_LL_INCLUDE rather
+ than mach/debug-macro.S
+Message-ID: <1355104168-30581-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+Commit 91a9fec (ARM: move debug macros to common location) moves
+arch/arm/kernel/debug.S and arch/arm/kernel/head.S to
+CONFIG_DEBUG_LL_INCLUDE, but leaves arch/arm/boot/compressed/head.S
+still with mach/debug-macro.S.  This causes the following build error
+on platforms that moved to new DEBUG_LL inclusion mechanism, when
+arch/arm/boot/compressed/head.S is compiled with DEBUG turned on.
 
-> > -3:	mov	r10, #0
-> > +	/* Cortex-A15 Errata */
-> > +3:	ldr	r10, =0x00000c0f		@ Cortex-A15 primary part number
-> > +	teq	r0, r10
-> > +	bne	4f
-> > +#ifdef CONFIG_ARM_ERRATA_774769
->
-> There's not much point testing for the part number of the work-around isn't
-> enabled.
-The errata 773022 on second patch series is also required to checking the part number.
-In my opinion, the testing for Cortex-A15 primary part number is required
-before working the work-around to support several A15 errata.
+  AS      arch/arm/boot/compressed/head.o
+arch/arm/boot/compressed/head.S:49:30: fatal error: mach/debug-macro.S: No such file or directory
+compilation terminated.
 
->
-> > +	teq	r6, #0x4			@ present in r0p4
-> > +	mrceq	p15, 0, r10, c1, c0, 1		@ read aux control register
->
-> 	tsteq	r10, #1 << 15
->
-> to avoid writing to the aux control register if the errata has already been
-> applied.
-Do you mean "tsteq	r10, #1 << 25" ?
-If yes, it needs to branch and will make a little complicated
-And, I think maybe this function could be the first step to configure this erratum.
+Fix the problem by replacing mach/debug-macro.S inclusion with
+CONFIG_DEBUG_LL_INCLUDE one.
 
-Thanks for your review
+Reported-by: Steev Klimaszewski <steev@genesi-usa.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: stable at vger.kernel.org
+---
+ arch/arm/boot/compressed/head.S |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->
-> > +	orreq	r10, r10, #1 << 25		@ set bit #25
-> > +	mcreq	p15, 0, r10, c1, c0, 1		@ write aux control register
-> > +#endif
-> > +
-> > +4:	mov	r10, #0
-> >  	mcr	p15, 0, r10, c7, c5, 0		@ I+BTB cache invalidate
-> >  	dsb
-> >  #ifdef CONFIG_MMU
-> > --
-> > 1.7.5.4
-> >
-> >
-> >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 49ca86e..fe4d9c3 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -44,7 +44,7 @@
+ 
+ #else
+ 
+-#include <mach/debug-macro.S>
++#include CONFIG_DEBUG_LL_INCLUDE
+ 
+ 		.macro	writeb,	ch, rb
+ 		senduart \ch, \rb
+-- 
+1.7.9.5
