@@ -1,28 +1,32 @@
 From: jhovold@gmail.com (Johan Hovold)
-Date: Mon, 10 Dec 2012 13:28:47 +0100
-Subject: [PATCH 0/3] atmel_lcdfb: fix 16-bpp regression
-Message-ID: <1355142530-10366-1-git-send-email-jhovold@gmail.com>
+Date: Mon, 10 Dec 2012 13:28:50 +0100
+Subject: [PATCH 3/3] atmel_lcdfb: remove unsupported 15-bpp mode
+In-Reply-To: <1355142530-10366-1-git-send-email-jhovold@gmail.com>
+References: <1355142530-10366-1-git-send-email-jhovold@gmail.com>
+Message-ID: <1355142530-10366-4-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches fix a regression in 16-bpp support for older SOCs which use
-IBGR:555 rather than BGR:565 pixel layout. Use SOC-type to determine if the
-controller uses the intensity-bit and restore the old layout in that case.
+Since commit 787f9fd23283 ("atmel_lcdfb: support 16bit BGR:565 mode,
+remove unsupported 15bit modes") atmel_lcdfb_check_var does not accept
+15-bpp mode so remove it from atmel_lcdfb_set_par as well.
 
-The third patch is simply a clean up.
+Signed-off-by: Johan Hovold <jhovold@gmail.com>
+---
+ drivers/video/atmel_lcdfb.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Thanks,
-Johan
-
-Johan Hovold (3):
-  atmel_lcdfb: fix 16-bpp modes on older SOCs
-  ARM: at91/neocore926: fix LCD-wiring mode
-  atmel_lcdfb: remove unsupported 15-bpp mode
-
- arch/arm/mach-at91/board-neocore926.c |  2 +-
- drivers/video/atmel_lcdfb.c           | 23 +++++++++++++++--------
- include/video/atmel_lcdc.h            |  2 +-
- 3 files changed, 17 insertions(+), 10 deletions(-)
-
+diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
+index 1f68fa6..3cdbd53 100644
+--- a/drivers/video/atmel_lcdfb.c
++++ b/drivers/video/atmel_lcdfb.c
+@@ -567,7 +567,6 @@ static int atmel_lcdfb_set_par(struct fb_info *info)
+ 		case 2: value |= ATMEL_LCDC_PIXELSIZE_2; break;
+ 		case 4: value |= ATMEL_LCDC_PIXELSIZE_4; break;
+ 		case 8: value |= ATMEL_LCDC_PIXELSIZE_8; break;
+-		case 15: /* fall through */
+ 		case 16: value |= ATMEL_LCDC_PIXELSIZE_16; break;
+ 		case 24: value |= ATMEL_LCDC_PIXELSIZE_24; break;
+ 		case 32: value |= ATMEL_LCDC_PIXELSIZE_32; break;
 -- 
 1.8.0
