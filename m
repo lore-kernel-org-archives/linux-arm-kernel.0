@@ -1,43 +1,27 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Mon, 10 Dec 2012 06:44:02 +0000
-Subject: [PATCH v3 1/3] mtd: nand: omap2: Update nerrors using ecc.strength
-In-Reply-To: <50C1C784.4040209@ti.com>
-References: <1354189595-12784-1-git-send-email-avinashphilip@ti.com>
- <1354189595-12784-2-git-send-email-avinashphilip@ti.com>
- <50BF3819.9010200@ti.com>
- <518397C60809E147AF5323E0420B992E3EA1139B@DBDE01.ent.ti.com>
- <50C1C784.4040209@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EA1FA1B@DBDE01.ent.ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 9 Dec 2012 22:49:59 -0800
+Subject: linux-next: manual merge of the arm-soc tree with the sound-asoc
+ tree
+In-Reply-To: <20121210174057.9862b43ff7350ba20c048df3@canb.auug.org.au>
+References: <20121210174057.9862b43ff7350ba20c048df3@canb.auug.org.au>
+Message-ID: <CAOesGMixeGKmie_dioz24O1MD+2KJEn2z-gvHtZojgjCnsdJXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 07, 2012 at 16:10:04, Nori, Sekhar wrote:
-> On 12/5/2012 6:13 PM, Philip, Avinash wrote:
-> > On Wed, Dec 05, 2012 at 17:33:37, Nori, Sekhar wrote:
-> >> Hi Avinash,
-> >>
-> >> On 11/29/2012 5:16 PM, Philip, Avinash wrote:
-> >>> Update number of errors using nand ecc strength.
-> >>> Also add macro definitions BCH8_ERROR_MAX & BCH4_ERROR_MAX
-> >>
-> >> Can you please describe why the original method of setting nerrors was
-> >> incorrect? Was it causing any issues in any particular configuration?
-> > 
-> > It affects the reusability of the code. For example BCH8 with AM335x RBL 
-> > compatibility requires  14 bytes instead of 13 byte. So setting nerrors
-> > with
-> > 	nerrors = (info->nand.ecc.bytes == 13) ? 8 : 4;
-> > will break am335x RBL compatibility.
-> 
-> This should be summarized in the patch description so the motivation is
-> clear to those who read the history later.
+On Sun, Dec 9, 2012 at 10:40 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi all,
+>
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/plat-samsung/include/plat/devs.h between commit a08485d8fdf6
+> ("ASoC: Samsung: Do not register samsung audio dma device as pdev") from
+> the sound-asoc tree and commit 0a9d5ac307ae ("ARM: EXYNOS: removing
+> exynos-drm device registration from non-dt platforms") from the arm-soc
+> tree.
+>
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
 
-Ok I will add the details in patch description in next version.
+Looks good, thanks.
 
-Thanks
-Avinash
 
-> 
-> Thanks,
-> Sekhar
-> 
+-Olof
