@@ -1,34 +1,35 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Dec 2012 08:55:57 +0000
-Subject: [PATCH 08/12] ARM: ux500: Specify which IOS regulator to use for MMCI
+Date: Mon, 10 Dec 2012 08:55:56 +0000
+Subject: [PATCH 07/12] ARM: ux500: Specify the ux5x0 MMCI regulator's on/off
+ GPIO as high-enable
 In-Reply-To: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
 References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1355129761-8088-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1355129761-8088-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In an effort to move platform specific GPIO controlled regulators
-out from platform code we've created a new mechanism to specify
-them from within the MMCI driver using the supply name 'vmmc-ios'.
-For that to happen when booting device tree, we need to supply it
-in the MMCI (SDI) node.
+If not specified, the GPIO control bit is inverted by default i.e.
+low-enable and high-disable. This is not the case with the MMCI
+regulator, hence it will turn on during a disable and off when
+regulator_enable() is invoked.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/href.dtsi |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/dbx5x0.dtsi |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/href.dtsi b/arch/arm/boot/dts/href.dtsi
-index 592fb9d..f2c0f66 100644
---- a/arch/arm/boot/dts/href.dtsi
-+++ b/arch/arm/boot/dts/href.dtsi
-@@ -87,6 +87,7 @@
- 			mmc-cap-sd-highspeed;
- 			mmc-cap-mmc-highspeed;
- 			vmmc-supply = <&ab8500_ldo_aux3_reg>;
-+			vqmmc-supply = <&vmmci>;
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index bbea89a..0523681 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -638,6 +638,8 @@
+ 			regulator-name = "mmci-reg";
+ 			regulator-type = "voltage";
  
- 			cd-gpios  = <&tc3589x_gpio 3 0x4>;
++			enable-active-high;
++
+ 			states = <1800000 0x1
+ 				  3300000 0x0>;
  
 -- 
 1.7.9.5
