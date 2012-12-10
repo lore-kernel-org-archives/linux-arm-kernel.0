@@ -1,57 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 10 Dec 2012 18:04:42 +0000
-Subject: [PATCH 2/7] arm64: Add dtbs target for building all the
- enabled dtb files
-In-Reply-To: <50C263EC.70209@gmail.com>
-References: <1354914392-9634-1-git-send-email-catalin.marinas@arm.com>
- <1354914392-9634-3-git-send-email-catalin.marinas@arm.com>
- <50C263EC.70209@gmail.com>
-Message-ID: <20121210180442.GA691@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 10 Dec 2012 19:05:52 +0100
+Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
+In-Reply-To: <50C62161.9080708@wwwdotorg.org>
+References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121207233317.GB4304@obsidianresearch.com>
+ <50C62161.9080708@wwwdotorg.org>
+Message-ID: <20121210190552.74acbe5a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 07, 2012 at 09:47:24PM +0000, Rob Herring wrote:
-> On 12/07/2012 03:06 PM, Catalin Marinas wrote:
-> > Based on Rob Herring's patches for arch/arm, this patch adds a dtbs
-> > target to arch/arm64/boot/Makefile. In the process, also clean up the
-> > unused MACHINE variable.
-> > 
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > ---
-> > 
-> > I'll drop this patch once Rob pushes his version into linux-next (or
-> > mainline).
+Dear Stephen Warren,
+
+On Mon, 10 Dec 2012 10:52:33 -0700, Stephen Warren wrote:
+
+> Mainly as background:
 > 
-> This and Stephen's dtb rule series are in linux-next now.
+> I /think/ Tegra has a similar HW setup (but perhaps not identical)
+> (based on a very brief reading of your emails and brief knowledge of
+> this aspect of the Tegra HW).
+> 
+> On Tegra, there is a 1GB physical address window that the PCIe
+> controller serves. The controller has 2 or 3 ports, each a separate PCIe
+> domain I believe. There are registers in the PCIe controller which route
+> accessed made to the 1GB physical window to the various child ports and
+> transaction types.
 
-One minor fix needed. Please merge or fold it, whatever is easier.
-Thanks.
+On Marvell SoCs, this is even more flexible: you have 20 configurable
+address decoding windows. For each of them, you can configure the base
+address, size, and target device (i.e PCIe port x.y, NAND, or some
+other devices). And since we have up to 10 PCIe interfaces, we really
+don't want to over-allocate hundreds of MB of physical address space for
+each device, since most of them need only a few dozens of KB.
 
------------------------8<------------------------------
+> IIRC, the bindings Thierry came up with for the Tegra PCIe controller
+> statically describe the setup of those mappings (e.g. it could assign a
+> 256MB physical address region to port 1, and a 768MB physical address
+> region to port 2 perhaps?).
+> 
+> It sounds like Jason is advocating a much more dynamic approach on the
+> Marvell HW. Perhaps this is related to whether the n host ports driven
+> by the controller are separate PCIe domains (as I believe they are or
+> can be on Tegra) or not.
 
->From addc6b45f915f6bbab238a2edd2072f3b474e673 Mon Sep 17 00:00:00 2001
-From: Catalin Marinas <catalin.marinas@arm.com>
-Date: Wed, 21 Nov 2012 11:44:59 +0000
-Subject: [PATCH] arm64: Fix the dtbs target building
+The code I'm proposing for the Marvell PCIe is already dynamic it
+doesn't describe the addresses in the DT, but instead dynamically
+allocates address decoding windows according to the number of PCIe
+devices that are found.
 
-The arch/arm64/Makefile was not passing the right target to the
-boot/dts/Makefile.
+However, I haven't found yet how to get, during the ARM pcibios
+initialization, the memory size needed for each device, so that I could
+size the address decoding windows correctly instead of over-allocating
+them (currently I allocate SZ_64MB for each window, even for my e1000e
+PCIe card that needs only SZ_32K of PCI memory space).
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Best regards,
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 11c3599..c95c5cb 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -58,7 +58,7 @@ zinstall install: vmlinux
- 	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
- 
- dtbs: scripts
--	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
-+	$(Q)$(MAKE) $(build)=$(boot)/dts dtbs
- 
- # We use MRPROPER_FILES and CLEAN_FILES now
- archclean:
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
