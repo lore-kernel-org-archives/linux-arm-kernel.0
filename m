@@ -1,45 +1,31 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 10 Dec 2012 13:06:29 +0100
-Subject: [PATCH 11/12] ARM: ux500: Use the GPIO regulator framework for
- SDI0's 'en' and 'vsel'
-In-Reply-To: <20121210103050.GE9362@gmail.com>
-References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
- <1355129761-8088-12-git-send-email-lee.jones@linaro.org>
- <CAPDyKFo8NjiYdcyx3pk8byc1N2f7r+erQj74A1zhOaNK_WbkZA@mail.gmail.com>
- <20121210103050.GE9362@gmail.com>
-Message-ID: <CAPDyKFo22kNjiqc+pnR51g3KH-ExM=eOKRBRkWm0r6XmgOH9uw@mail.gmail.com>
+From: subashrp@gmail.com (Subash Patel)
+Date: Mon, 10 Dec 2012 17:39:29 +0530
+Subject: [PATCH] OF: update coherent_dma_mask
+Message-ID: <1355141369-30030-1-git-send-email-subash.rp@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 December 2012 11:30, Lee Jones <lee.jones@linaro.org> wrote:
->> > +        .constraints = {
->> > +                .min_uV         = 1800000,
->>
->> 2.9V, not 3.3V
->
->> > +static struct gpio_regulator_state sdi0_reg_states[] = {
->> > +        { .value = 3300000, .gpios = (0 << 0) },
->>
->> 2.9V, not 3.3V
->
-> I'm still a little unsure about this. I know the actual
-> voltage is v2.9, but the supported/requested MMC voltage
-> from the driver is v3.3.
->
-> Will it still work if I set it all up as v2.9?
->
+This patch is tested in ARM:exynos5250 with LPAE enabled. The coherent_dma_mask
+needs to be defined to DMA_BIT_MASK(64) as dma-mapping API's check it against
+64-bit mask.
 
-So that is if course important to consider. Although the regulator
-must nu lie about what it actually supports.
+Signed-off-by: Subash Patel <subash.rp@samsung.com>
+---
+ drivers/of/platform.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-In this case mmci driver will have to decide what to do when 3.3V is
-requested, but only 2.9 is supported.
-
-> --
-> Lee Jones
-> Linaro ST-Ericsson Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
-
-Kind regards
-Ulf Hansson
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 9bdeaf30..3c5417b 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -214,7 +214,7 @@ struct platform_device *of_platform_device_create_pdata(
+ #if defined(CONFIG_MICROBLAZE)
+ 	dev->archdata.dma_mask = 0xffffffffUL;
+ #endif
+-	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
++	dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
+ 	dev->dev.bus = &platform_bus_type;
+ 	dev->dev.platform_data = platform_data;
+ 
+-- 
+1.7.5.4
