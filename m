@@ -1,42 +1,23 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 10 Dec 2012 09:45:00 +0100
-Subject: [RFC v1 08/16] arm: mvebu: the core PCIe driver
-In-Reply-To: <20121210082847.GH26922@lunn.ch>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1354917879-32073-9-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121210082847.GH26922@lunn.ch>
-Message-ID: <20121210094500.59d7863c@skate>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Dec 2012 08:55:49 +0000
+Subject: [PATCH 00/12] Functionality add and bug-fixes related to MMCI
+ regulators
+Message-ID: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+The main purpose of this patch-set is to move the MMCI's secondary
+(platform specific) regulator implementation out of platform code
+and into use the regulator frame-work. A few bugs were encountered
+along the way, so we've fixed those too and bundled them in for
+completeness.
 
-On Mon, 10 Dec 2012 09:28:47 +0100, Andrew Lunn wrote:
-
-> pcie_rd_conf, pcie_wr_conf and pci_ops_pcie_ops are common on orion5x,
-> dove and kirkwood. Could you maybe factor these functions out and
-> place them in plat-orion/pcie.c?
-
-Indeed.
-
-> rc_pci_fixup is also identical for all orion platforms, so is another
-> candidate for plat-orion/pcie.c
-
-Sure.
-
-> These are all exact copies, so are easy to cleanup. With more effort
-> there is more code which can be refactored and centralized, but that
-> is maybe too much work for the moment?
-
-I indeed plan to do more refactoring. In the end, my goal is to have
-one single PCIe driver for kirkwood/mvebu/etc, but let's do it step by
-step :-)
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+ arch/arm/boot/dts/dbx5x0.dtsi          |    7 ++--
+ arch/arm/boot/dts/href.dtsi            |    1 +
+ arch/arm/boot/dts/hrefprev60.dts       |    2 +-
+ arch/arm/mach-ux500/board-mop500-sdi.c |   52 ---------------------------
+ arch/arm/mach-ux500/board-mop500.c     |   61 ++++++++++++++++++++++++++++++++
+ drivers/mmc/host/mmci.c                |   18 ++++++++--
+ drivers/mmc/host/mmci.h                |    1 +
+ drivers/regulator/gpio-regulator.c     |   17 ++++++---
+ 8 files changed, 96 insertions(+), 63 deletions(-)
