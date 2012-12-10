@@ -1,69 +1,88 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 10 Dec 2012 16:45:33 +0000
-Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
- across all cpus
-In-Reply-To: <20121210100433.GB6624@mudshark.cambridge.arm.com>
-References: <1354821581.17101.17.camel@gandalf.local.home>
- <1354872138.3176.15.camel@computer5.home>
- <1354888985.17101.41.camel@gandalf.local.home>
- <1354892111.13000.50.camel@linaro1.home>
- <1354894134.17101.44.camel@gandalf.local.home>
- <20121207162346.GW14363@n2100.arm.linux.org.uk>
- <1354898200.17101.50.camel@gandalf.local.home>
- <20121207164530.GX14363@n2100.arm.linux.org.uk>
- <1354900436.17101.58.camel@gandalf.local.home>
- <1354902347.8263.12.camel@linaro1.home>
- <20121210100433.GB6624@mudshark.cambridge.arm.com>
-Message-ID: <1355157933.3386.55.camel@linaro1.home>
+From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
+Date: Mon, 10 Dec 2012 18:21:52 +0100
+Subject: [ARM] head.S change broke platform device registration?
+In-Reply-To: <20121205235836.GR14363@n2100.arm.linux.org.uk>
+References: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
+ <50B88A59.6070207@arm.com>
+ <CAHod+GeZQx6-pUHPocbyMJCLawMUhrZuZf=mrgWax=L7eNJGhg@mail.gmail.com>
+ <20121130143435.GP19440@n2100.arm.linux.org.uk>
+ <CAHod+GdXfZb1OHapJBYpCD74svYyaGaiZpqHLPtjHbWGa-3eLA@mail.gmail.com>
+ <20121204221851.GJ14363@n2100.arm.linux.org.uk>
+ <CAHod+Gd6NJsuJVRos52e9+NcweqcSu=HArT_qoV0ygb_Xbfaiw@mail.gmail.com>
+ <20121205235836.GR14363@n2100.arm.linux.org.uk>
+Message-ID: <CAHod+Gf2z-S6B_Z6o_QHbvoLY7L-oYmPVgBzGW3rvKyWAS5apA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-12-10 at 10:04 +0000, Will Deacon wrote:
-> Hi Jon,
-> 
-> Back-pedalling a bit here, but I'm confused by one of your points below:
-> 
-> On Fri, Dec 07, 2012 at 05:45:47PM +0000, Jon Medhurst (Tixy) wrote:
-> > On Fri, 2012-12-07 at 12:13 -0500, Steven Rostedt wrote:
-> > > I'll make my question more general:
-> > > 
-> > > If I have a nop, that is a size of a call (branch and link), which is
-> > > near the beginning of a function and not part of any conditional, and I
-> > > want to convert it into a call (branch and link), would adding a
-> > > breakpoint to it, modifying it to the call, and then removing the
-> > > breakpoint be possible? Of course it would require syncing in between
-> > > steps, but my question is, if the above is possible on a thumb2 ARM
-> > > processor?
-> > 
-> > I believe so. The details are (repeating your earlier explanation) ...
-> > 
-> > 1. Replace first half of nop with 16bit 'breakpoint' instruction.
-> 
-> Sort of -- you'd actually need 2x16-bit nops to make this work.
-> 
-> > 2. Sync.(cache flush to PoU + IPIs to make other cores invalidate the
-> > icache for changed part of the nop instruction).
-> 
-> Why do you need to use IPIs for I-cache invalidation on other cores? For
-> ARMv7 SMP (i.e. the multi-processing extensions) doing I-cache invalidation
-> by MVA to PoU will be broadcast to the applicable domain for the
-> shareability attributes of the address. So if you do icimvau with an
-> inner-shareable virtual address, it will be broadcast by the hardware.
+> The code which distinguishes between Borzoi and Akita is this:
+>
+> /* Check for a second SCOOP chip - if found we have Borzoi */
+>         ldr     r1, .SCOOP2ADDR
+> ==cacheline boundary without patch (0x120)=====
+>         ldr     r7, .BORZOIID
+>         mov     r6, #0x0140
+>         strh    r6, [r1]
+> ==cacheline boundary with patch (0x160)======
+>         ldrh    r6, [r1]
+>         cmp     r6, #0x0140
+>         beq     .SHARPEND                       @ We have Borzoi
+>
+> /* Must be Akita */
+>         ldr     r7, .AKITAID
+>         b       .SHARPEND                       @ We have Borzoi
+>
+> and I've marked where the cache line boundary ends up with the patch
+> in place... except of course that the caches are off here, so the
+> placement of the code should be irrelevant.  It also would have the
+> reverse results from those that you're experiencing.
+>
+> My guess is that because the Scoop2 device is not present, the strh
+> access places 0x140 onto the data bus.  By the time the ldrh is
+> executed, it reads the data bus, and because nothing drives it, it
+> reads back the value last present on the bus, which happens to be
+> 0x140 - and this allows us to think we have the Scoop2 device.
+>
+> In theory, because the caches are off (including the instruction
+> cache) the CPU should fetch ldrh between the strh write and the
+> ldrh access to the same address.
+>
+> Having said all that, I'm not impressed by the above code; to write to
+> a memory region which may or may not have a device, and immediately
+> read it back is a recipe for exactly this kind of stuff happening.  If
+> anyone has looked at any real device detection code, they'll know that
+> this sequence is typical:
+>
+>         ldr     r0, =address
+>         mov     r1, #probe_data
+>         eor     r2, r1, #~0
+>         str     r1, [r0, #reg1]
+>         str     r2, [r0, #reg2]
+>         ldr     r3, [r0, #reg1]
+>         ldr     r0, [r0, #reg2]
+>         teq     r1, r3
+>         teqeq   r2, r0
+>         beq     found
+>
+> This sequence _purposely_ writes the opposite value between the first
+> store and the read-back of it to perturb the bus in case it's floating,
+> to prevent exactly these kinds of false positives.  The second check is
+> additional belt and braces to make the check even more secure.
+>
+> Can we do that with Scoop2?  I've no idea, I don't know what the weird
+> 0x40 offset is that's being probed by this code.  We need whoever wrote
+> this code, but I suspect they've long since moved on and aren't
+> interested in it.
+>
+> The alternative is we can rip out all this autodetection code and go
+> in the exact opposite direction to arm-soc and force Sharp kernels
+> to be built for the exact machine that they're to be run on.  Not
+> particularly desirable, but I don't have any other answers to this
+> without more information about the hardware.
 
-That was a clue I was missing, and it means that my patch which spawned
-this thread is flawed. The original problem I was trying to cure was
-random crashes whilst ftrace_modify_all_code() was going round modifying
-kernel functions, and I fixed this by getting all cores to
-__flush_icache_all() after the modifications had been made. But if cache
-flushes are broadcast across all cores then my reasoning for the fix is
-wrong.
+The scoop device is a gate array, it's programming was never disclosed.
+It's datasheet can be found here (if it's of any use):
 
-As this only seems to surface on TC2 perhaps CCI doesn't do the magic we
-want, or we have it misconfigured, or were been hit by cache differences
-between A7 and A15? (I've seen comments somewhere which says A7 has VIPT
-aliasing I-cache, and A15 is PIPT non-aliasing).
+http://www.penguin.cz/~utx/zaurus/datasheets/ASIC_S1L50752B26B200/
 
-Will need to some more detailed investigation when I get time.
-
--- 
-Tixy
+So the only documentation we have is the arm/common/scoop.c driver.
+Richard might have more information on it, I CC-ed him.
