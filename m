@@ -1,160 +1,47 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 10 Dec 2012 12:20:29 +0200
-Subject: [PATCH v4 19/23] mfd: omap-usb-host: clean up omap_usbhs_init()
+Date: Mon, 10 Dec 2012 12:20:30 +0200
+Subject: [PATCH v4 20/23] USB: ehci-omap: Don't free gpios that we didn't
+ request
 In-Reply-To: <1355134833-5199-1-git-send-email-rogerq@ti.com>
 References: <1355134833-5199-1-git-send-email-rogerq@ti.com>
-Message-ID: <1355134833-5199-20-git-send-email-rogerq@ti.com>
+Message-ID: <1355134833-5199-21-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We split initializing revision 1 and revision 2 into different
-functions. Initialization is now done dynamically so that only
-the number of ports available on the system are initialized.
+This driver does not request any gpios so don't free them.
+Fixes L3 bus error on multiple modprobe/rmmod of ehci_hcd
+with ehci-omap in use.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- drivers/mfd/omap-usb-host.c |  122 +++++++++++++++++++++++++-----------------
- 1 files changed, 73 insertions(+), 49 deletions(-)
+ drivers/usb/host/ehci-omap.c |    8 --------
+ 1 files changed, 0 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index 289b356..0bb54393 100644
---- a/drivers/mfd/omap-usb-host.c
-+++ b/drivers/mfd/omap-usb-host.c
-@@ -363,6 +363,75 @@ static int usbhs_runtime_suspend(struct device *dev)
+diff --git a/drivers/usb/host/ehci-omap.c b/drivers/usb/host/ehci-omap.c
+index 0d5ac36..9f7441b 100644
+--- a/drivers/usb/host/ehci-omap.c
++++ b/drivers/usb/host/ehci-omap.c
+@@ -291,7 +291,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+ {
+ 	struct device *dev				= &pdev->dev;
+ 	struct usb_hcd *hcd				= dev_get_drvdata(dev);
+-	struct ehci_hcd_omap_platform_data *pdata	= dev->platform_data;
+ 
+ 	usb_remove_hcd(hcd);
+ 	disable_put_regulator(dev->platform_data);
+@@ -301,13 +300,6 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
+ 	pm_runtime_put_sync(dev);
+ 	pm_runtime_disable(dev);
+ 
+-	if (pdata->phy_reset) {
+-		if (gpio_is_valid(pdata->reset_gpio_port[0]))
+-			gpio_free(pdata->reset_gpio_port[0]);
+-
+-		if (gpio_is_valid(pdata->reset_gpio_port[1]))
+-			gpio_free(pdata->reset_gpio_port[1]);
+-	}
  	return 0;
  }
  
-+static unsigned omap_usbhs_rev1_hostconfig(struct usbhs_hcd_omap *omap,
-+						unsigned reg)
-+{
-+	struct usbhs_omap_platform_data	*pdata = omap->pdata;
-+	int i;
-+
-+	for (i = 0; i < omap->nports; i++) {
-+		switch (pdata->port_mode[i]) {
-+		case OMAP_USBHS_PORT_MODE_UNUSED:
-+			reg &= ~(OMAP_UHH_HOSTCONFIG_P1_CONNECT_STATUS << i);
-+			break;
-+		case OMAP_EHCI_PORT_MODE_PHY:
-+			if (pdata->single_ulpi_bypass)
-+				break;
-+
-+			if (i == 0)
-+				reg &= ~OMAP_UHH_HOSTCONFIG_ULPI_P1_BYPASS;
-+			else
-+				reg &= ~(OMAP_UHH_HOSTCONFIG_ULPI_P2_BYPASS
-+								<< (i-1));
-+			break;
-+		default:
-+			if (pdata->single_ulpi_bypass)
-+				break;
-+
-+			if (i == 0)
-+				reg |= OMAP_UHH_HOSTCONFIG_ULPI_P1_BYPASS;
-+			else
-+				reg |= OMAP_UHH_HOSTCONFIG_ULPI_P2_BYPASS
-+								<< (i-1);
-+			break;
-+		}
-+	}
-+
-+	if (pdata->single_ulpi_bypass) {
-+		/* bypass ULPI only if none of the ports use PHY mode */
-+		reg |= OMAP_UHH_HOSTCONFIG_ULPI_BYPASS;
-+
-+		for (i = 0; i < omap->nports; i++) {
-+			if (is_ehci_phy_mode(pdata->port_mode[i])) {
-+				reg &= OMAP_UHH_HOSTCONFIG_ULPI_BYPASS;
-+				break;
-+			}
-+		}
-+	}
-+
-+	return reg;
-+}
-+
-+static unsigned omap_usbhs_rev2_hostconfig(struct usbhs_hcd_omap *omap,
-+						unsigned reg)
-+{
-+	struct usbhs_omap_platform_data	*pdata = omap->pdata;
-+	int i;
-+
-+	for (i = 0; i < omap->nports; i++) {
-+		/* Clear port mode fields for PHY mode */
-+		reg &= ~(OMAP4_P1_MODE_CLEAR << 2 * i);
-+
-+		if (is_ehci_tll_mode(pdata->port_mode[i]) ||
-+				(is_ohci_port(pdata->port_mode[i])))
-+			reg |= OMAP4_P1_MODE_TLL << 2 * i;
-+		else if (is_ehci_hsic_mode(pdata->port_mode[i]))
-+			reg |= OMAP4_P1_MODE_HSIC << 2 * i;
-+	}
-+
-+	return reg;
-+}
-+
- static void omap_usbhs_init(struct device *dev)
- {
- 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
-@@ -394,55 +463,10 @@ static void omap_usbhs_init(struct device *dev)
- 	reg |= OMAP4_UHH_HOSTCONFIG_APP_START_CLK;
- 	reg &= ~OMAP_UHH_HOSTCONFIG_INCRX_ALIGN_EN;
- 
--	if (is_omap_usbhs_rev1(omap)) {
--		if (pdata->port_mode[0] == OMAP_USBHS_PORT_MODE_UNUSED)
--			reg &= ~OMAP_UHH_HOSTCONFIG_P1_CONNECT_STATUS;
--		if (pdata->port_mode[1] == OMAP_USBHS_PORT_MODE_UNUSED)
--			reg &= ~OMAP_UHH_HOSTCONFIG_P2_CONNECT_STATUS;
--		if (pdata->port_mode[2] == OMAP_USBHS_PORT_MODE_UNUSED)
--			reg &= ~OMAP_UHH_HOSTCONFIG_P3_CONNECT_STATUS;
--
--		/* Bypass the TLL module for PHY mode operation */
--		if (pdata->single_ulpi_bypass) {
--			dev_dbg(dev, "OMAP3 ES version <= ES2.1\n");
--			if (is_ehci_phy_mode(pdata->port_mode[0]) ||
--				is_ehci_phy_mode(pdata->port_mode[1]) ||
--					is_ehci_phy_mode(pdata->port_mode[2]))
--				reg &= ~OMAP_UHH_HOSTCONFIG_ULPI_BYPASS;
--			else
--				reg |= OMAP_UHH_HOSTCONFIG_ULPI_BYPASS;
--		} else {
--			dev_dbg(dev, "OMAP3 ES version > ES2.1\n");
--			if (is_ehci_phy_mode(pdata->port_mode[0]))
--				reg &= ~OMAP_UHH_HOSTCONFIG_ULPI_P1_BYPASS;
--			else
--				reg |= OMAP_UHH_HOSTCONFIG_ULPI_P1_BYPASS;
--			if (is_ehci_phy_mode(pdata->port_mode[1]))
--				reg &= ~OMAP_UHH_HOSTCONFIG_ULPI_P2_BYPASS;
--			else
--				reg |= OMAP_UHH_HOSTCONFIG_ULPI_P2_BYPASS;
--			if (is_ehci_phy_mode(pdata->port_mode[2]))
--				reg &= ~OMAP_UHH_HOSTCONFIG_ULPI_P3_BYPASS;
--			else
--				reg |= OMAP_UHH_HOSTCONFIG_ULPI_P3_BYPASS;
--		}
--	} else if (is_omap_usbhs_rev2(omap)) {
--		/* Clear port mode fields for PHY mode*/
--		reg &= ~OMAP4_P1_MODE_CLEAR;
--		reg &= ~OMAP4_P2_MODE_CLEAR;
--
--		if (is_ehci_tll_mode(pdata->port_mode[0]) ||
--			(is_ohci_port(pdata->port_mode[0])))
--			reg |= OMAP4_P1_MODE_TLL;
--		else if (is_ehci_hsic_mode(pdata->port_mode[0]))
--			reg |= OMAP4_P1_MODE_HSIC;
--
--		if (is_ehci_tll_mode(pdata->port_mode[1]) ||
--			(is_ohci_port(pdata->port_mode[1])))
--			reg |= OMAP4_P2_MODE_TLL;
--		else if (is_ehci_hsic_mode(pdata->port_mode[1]))
--			reg |= OMAP4_P2_MODE_HSIC;
--	}
-+	if (is_omap_usbhs_rev1(omap))
-+		reg = omap_usbhs_rev1_hostconfig(omap, reg);
-+	else if (is_omap_usbhs_rev2(omap))
-+		reg = omap_usbhs_rev2_hostconfig(omap, reg);
- 
- 	usbhs_write(omap->uhh_base, OMAP_UHH_HOSTCONFIG, reg);
- 	dev_dbg(dev, "UHH setup done, uhh_hostconfig=%x\n", reg);
 -- 
 1.7.4.1
