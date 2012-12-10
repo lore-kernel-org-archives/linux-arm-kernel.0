@@ -1,75 +1,153 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 10 Dec 2012 08:36:40 +0100
-Subject: Sharing PCIE driver between Microblaze and Arm zynq
-In-Reply-To: <201212071907.38366.arnd@arndb.de>
-References: <CAHTX3dLxbVxn+D+AV7L0VsGYFOjas3AJ_3M_xncVfxp02FCy=Q@mail.gmail.com>
- <CAErSpo6xRdwzTuPPqnmvmHSp7awnV7=Z85eWFfktb_hm9Aad_A@mail.gmail.com>
- <50C1BA9D.5010406@monstr.eu> <201212071907.38366.arnd@arndb.de>
-Message-ID: <CAHTX3dJ-x2ewDWjbSp0kOwJ5N0XtKa98gFOAKD_AiYeyJp4RYA@mail.gmail.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Mon, 10 Dec 2012 13:07:32 +0530
+Subject: [PATCH 1/1] net: ethernet: davinci_cpdma: Add boundary for rx and tx
+ descriptors
+Message-ID: <1355125052-28448-1-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/12/7 Arnd Bergmann <arnd@arndb.de>:
-> On Friday 07 December 2012, Michal Simek wrote:
->> On 12/06/2012 10:27 PM, Bjorn Helgaas wrote:
->> > [+cc linux-pci]
->> >
->> > On Thu, Dec 6, 2012 at 7:23 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->> >> Hi guys,
->> >>
->> >> I have a question regarding to sharing generic OF pcie driver between
->> >> two architectures MB and ARM Zynq.
->> >> Is drivers/pci/pcie location good for it?
->> >> Make no sense to have the same driver in two locations.
->> >
->> > I think you're talking about a PCI host bridge driver.  It would
->> > definitely be nice to move toward a generic, shared driver.  Host
->> > bridge drivers are responsible for enumerating the PCI hierarchy below
->> > the bridge.  Enumeration is not really PCIe-specific, so I wouldn't
->> > put it in drivers/pci/pcie.
->>
->> Not a PCI expert, just trying to find out the proper location for this shared driver.
->
-> I'd suggest creating a drivers/pci/host directory. We will have more of
-> these in the future. AFAIK, there is no fully generic (architecture
-> independent) way to interface a PCI host driver to the PCI subsystem,
-> but I think we are getting closer to that. You are probably fairly
-> free to modify the microblaze architecture specific code though if needed.
+When there is heavy transmission traffic in the CPDMA, then Rx descriptors
+memory is also utilized as tx desc memory this leads to reduced rx desc memory
+which leads to poor performance.
 
-yep.
+This patch adds boundary for tx and rx descriptors in bd ram dividing the
+descriptor memory to ensure that during heavy transmission tx doesn't use
+rx descriptors.
 
+This patch is already applied to davinci_emac driver, since CPSW and
+davici_dmac uses the same CPDMA, moving the boundry seperation from
+Davinci EMAC driver to CPDMA driver which was done in the following
+commit
 
->> >> Is using readl/writel IO functions in this driver the best option
->> >> which we can have?
->> >> Or is there any other recommendation?
->> >
->> > I'm not really a driver person, but if you're writing a new driver,
->> > wouldn't you use the iomap interfaces (ioremap(), ioread32(), etc)
->> > rather than readl()?
->>
->> That driver exists but it is not in mainline and it is better to directly
->> add it to proper location with correct io functions.
->> The question is if ioread/iowrite functions are correct one.
->> PowerPC io-defs.h suggests that readl/writel should be used for PCI.
->
-> ioread32/iowrite32 are defined to behave the same way readl/writel regarding
-> addressing modes and barriers, but also allow operating on __iomem pointers
-> that were returned from ioport_map(). You probably don't need that.
->
-> Some architectures like powerpc have their own accessors for on-chip MMIO
-> areas, but ARM does not. The PowerPC rule is that you must use either
-> readl/writel or ioread32/iowrite32 to access devices connected to a PCI
-> bus, but you would not necessarily do that for the PCI host controller
-> itself on PowerPC.
+commit 86d8c07ff2448eb4e860e50f34ef6ee78e45c40c
+Author: Sascha Hauer <s.hauer@pengutronix.de>
+Date:   Tue Jan 3 05:27:47 2012 +0000
 
-ok.
+    net/davinci: do not use all descriptors for tx packets
 
-Thanks,
-Michal
+    The driver uses a shared pool for both rx and tx descriptors.
+    During open it queues fixed number of 128 descriptors for receive
+    packets. For each received packet it tries to queue another
+    descriptor. If this fails the descriptor is lost for rx.
+    The driver has no limitation on tx descriptors to use, so it
+    can happen during a nmap / ping -f attack that the driver
+    allocates all descriptors for tx and looses all rx descriptors.
+    The driver stops working then.
+    To fix this limit the number of tx descriptors used to half of
+    the descriptors available, the rx path uses the other half.
 
+    Tested on a custom board using nmap / ping -f to the board from
+    two different hosts.
 
+Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+---
+ drivers/net/ethernet/ti/davinci_cpdma.c |   20 ++++++++++++++------
+ drivers/net/ethernet/ti/davinci_emac.c  |    8 --------
+ 2 files changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/net/ethernet/ti/davinci_cpdma.c b/drivers/net/ethernet/ti/davinci_cpdma.c
+index 4995673..d37f546 100644
+--- a/drivers/net/ethernet/ti/davinci_cpdma.c
++++ b/drivers/net/ethernet/ti/davinci_cpdma.c
+@@ -105,13 +105,13 @@ struct cpdma_ctlr {
+ };
+ 
+ struct cpdma_chan {
++	struct cpdma_desc __iomem	*head, *tail;
++	void __iomem			*hdp, *cp, *rxfree;
+ 	enum cpdma_state		state;
+ 	struct cpdma_ctlr		*ctlr;
+ 	int				chan_num;
+ 	spinlock_t			lock;
+-	struct cpdma_desc __iomem	*head, *tail;
+ 	int				count;
+-	void __iomem			*hdp, *cp, *rxfree;
+ 	u32				mask;
+ 	cpdma_handler_fn		handler;
+ 	enum dma_data_direction		dir;
+@@ -217,7 +217,7 @@ desc_from_phys(struct cpdma_desc_pool *pool, dma_addr_t dma)
+ }
+ 
+ static struct cpdma_desc __iomem *
+-cpdma_desc_alloc(struct cpdma_desc_pool *pool, int num_desc)
++cpdma_desc_alloc(struct cpdma_desc_pool *pool, int num_desc, bool is_rx)
+ {
+ 	unsigned long flags;
+ 	int index;
+@@ -225,8 +225,14 @@ cpdma_desc_alloc(struct cpdma_desc_pool *pool, int num_desc)
+ 
+ 	spin_lock_irqsave(&pool->lock, flags);
+ 
+-	index = bitmap_find_next_zero_area(pool->bitmap, pool->num_desc, 0,
+-					   num_desc, 0);
++	if (is_rx) {
++		index = bitmap_find_next_zero_area(pool->bitmap,
++				pool->num_desc/2, 0, num_desc, 0);
++	 } else {
++		index = bitmap_find_next_zero_area(pool->bitmap,
++				pool->num_desc, pool->num_desc/2, num_desc, 0);
++	}
++
+ 	if (index < pool->num_desc) {
+ 		bitmap_set(pool->bitmap, index, num_desc);
+ 		desc = pool->iomap + pool->desc_size * index;
+@@ -660,6 +666,7 @@ int cpdma_chan_submit(struct cpdma_chan *chan, void *token, void *data,
+ 	unsigned long			flags;
+ 	u32				mode;
+ 	int				ret = 0;
++	bool                            is_rx;
+ 
+ 	spin_lock_irqsave(&chan->lock, flags);
+ 
+@@ -668,7 +675,8 @@ int cpdma_chan_submit(struct cpdma_chan *chan, void *token, void *data,
+ 		goto unlock_ret;
+ 	}
+ 
+-	desc = cpdma_desc_alloc(ctlr->pool, 1);
++	is_rx = (chan->rxfree != 0);
++	desc = cpdma_desc_alloc(ctlr->pool, 1, is_rx);
+ 	if (!desc) {
+ 		chan->stats.desc_alloc_fail++;
+ 		ret = -ENOMEM;
+diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
+index fce89a0..f349273 100644
+--- a/drivers/net/ethernet/ti/davinci_emac.c
++++ b/drivers/net/ethernet/ti/davinci_emac.c
+@@ -120,7 +120,6 @@ static const char emac_version_string[] = "TI DaVinci EMAC Linux v6.1";
+ #define EMAC_DEF_TX_CH			(0) /* Default 0th channel */
+ #define EMAC_DEF_RX_CH			(0) /* Default 0th channel */
+ #define EMAC_DEF_RX_NUM_DESC		(128)
+-#define EMAC_DEF_TX_NUM_DESC		(128)
+ #define EMAC_DEF_MAX_TX_CH		(1) /* Max TX channels configured */
+ #define EMAC_DEF_MAX_RX_CH		(1) /* Max RX channels configured */
+ #define EMAC_POLL_WEIGHT		(64) /* Default NAPI poll weight */
+@@ -342,7 +341,6 @@ struct emac_priv {
+ 	u32 mac_hash2;
+ 	u32 multicast_hash_cnt[EMAC_NUM_MULTICAST_BITS];
+ 	u32 rx_addr_type;
+-	atomic_t cur_tx;
+ 	const char *phy_id;
+ #ifdef CONFIG_OF
+ 	struct device_node *phy_node;
+@@ -1050,9 +1048,6 @@ static void emac_tx_handler(void *token, int len, int status)
+ {
+ 	struct sk_buff		*skb = token;
+ 	struct net_device	*ndev = skb->dev;
+-	struct emac_priv	*priv = netdev_priv(ndev);
+-
+-	atomic_dec(&priv->cur_tx);
+ 
+ 	if (unlikely(netif_queue_stopped(ndev)))
+ 		netif_start_queue(ndev);
+@@ -1101,9 +1096,6 @@ static int emac_dev_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 		goto fail_tx;
+ 	}
+ 
+-	if (atomic_inc_return(&priv->cur_tx) >= EMAC_DEF_TX_NUM_DESC)
+-		netif_stop_queue(ndev);
+-
+ 	return NETDEV_TX_OK;
+ 
+ fail_tx:
 -- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+1.7.9.5
