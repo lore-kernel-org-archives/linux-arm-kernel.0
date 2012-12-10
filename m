@@ -1,53 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 10 Dec 2012 23:08:20 +0100
-Subject: [PATCH 5/6] tty: of_serial: Add pinctrl support
-In-Reply-To: <1355177301-31928-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1355177301-31928-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1355177301-31928-6-git-send-email-maxime.ripard@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Dec 2012 22:08:51 +0000
+Subject: [PATCH V3 2/3] dmaengine: dw_dmac: Enhance device tree support
+In-Reply-To: <169edae67b9a051ca7448e5b62c3cd2c5c1db470.1350360935.git.viresh.kumar@linaro.org>
+References: <3100e691db3f94c22afd98b609a1568d7e70dfe7.1350360935.git.viresh.kumar@linaro.org>
+ <169edae67b9a051ca7448e5b62c3cd2c5c1db470.1350360935.git.viresh.kumar@linaro.org>
+Message-ID: <201212102208.52347.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use pinctrl to configure the SoCs pins directly from the driver.
+On Tuesday 16 October 2012, Viresh Kumar wrote:
+> dw_dmac driver already supports device tree but it used to have its platform
+> data passed the non-DT way.
+> 
+> This patch does following changes:
+> - pass platform data via DT, non-DT way still takes precedence if both are used.
+> - create generic filter routine
+> - Earlier slave information was made available by slave specific filter routines
+>   in chan->private field. Now, this information would be passed from within dmac
+>   DT node. Slave drivers would now be required to pass bus_id (a string) as
+>   parameter to this generic filter(), which would be compared against the slave
+>   data passed from DT, by the generic filter routine.
+> - Update binding document
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Alan Cox <alan@linux.intel.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-serial at vger.kernel.org
----
- drivers/tty/serial/of_serial.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+I'm deeply sorry for the very late complaint on this, but I only now
+noticed this patch as I was seeing build breakage in linux-next
+because of it.
 
-diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
-index df443b9..f66bdab 100644
---- a/drivers/tty/serial/of_serial.c
-+++ b/drivers/tty/serial/of_serial.c
-@@ -13,6 +13,7 @@
- #include <linux/module.h>
- #include <linux/slab.h>
- #include <linux/delay.h>
-+#include <linux/pinctrl/consumer.h>
- #include <linux/serial_core.h>
- #include <linux/serial_8250.h>
- #include <linux/serial_reg.h>
-@@ -54,6 +55,7 @@ static int __devinit of_platform_serial_setup(struct platform_device *ofdev,
- 					int type, struct uart_port *port)
- {
- 	struct resource resource;
-+	struct pinctrl *pinctrl;
- 	struct device_node *np = ofdev->dev.of_node;
- 	u32 clk, spd, prop;
- 	int ret;
-@@ -73,6 +75,11 @@ static int __devinit of_platform_serial_setup(struct platform_device *ofdev,
- 		return ret;
- 	}
- 
-+	pinctrl = devm_pinctrl_get_select_default(&ofdev->dev);
-+	if (IS_ERR(pinctrl))
-+		dev_warn(&ofdev->dev,
-+			"pins are not configured from the driver\n");
-+
- 	spin_lock_init(&port->lock);
- 	port->mapbase = resource.start;
- 
--- 
-1.7.9.5
+The build bug is not the problem however, but the abuse of the
+API is. Andy, are you sure you understood what this does when
+you gave you Reviewed-by comment?
+
+Viresh, there are multiple problems with your approach unfortunately:
+
+* It does not follow the binding from
+  Documentation/devicetree/bindings/dma/dma.txt
+
+* It requires slave drivers to know that they are using the dw_dmac
+  driver and pass a pointer to dw_generic_filter, which is not
+  generic at all
+
+* It requires the dmac node to have information about all slaves
+
+There are also some minor issues, such as the naming of DT
+properties, but the above need to be resolved first.
+
+	Arnd
