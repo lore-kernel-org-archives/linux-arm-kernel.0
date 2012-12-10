@@ -1,77 +1,26 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 10 Dec 2012 08:02:17 -0500
-Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
- across all cpus
-In-Reply-To: <20121210100433.GB6624@mudshark.cambridge.arm.com>
-References: <1354821581.17101.17.camel@gandalf.local.home>
- <1354872138.3176.15.camel@computer5.home>
- <1354888985.17101.41.camel@gandalf.local.home>
- <1354892111.13000.50.camel@linaro1.home>
- <1354894134.17101.44.camel@gandalf.local.home>
- <20121207162346.GW14363@n2100.arm.linux.org.uk>
- <1354898200.17101.50.camel@gandalf.local.home>
- <20121207164530.GX14363@n2100.arm.linux.org.uk>
- <1354900436.17101.58.camel@gandalf.local.home>
- <1354902347.8263.12.camel@linaro1.home>
- <20121210100433.GB6624@mudshark.cambridge.arm.com>
-Message-ID: <1355144537.17101.155.camel@gandalf.local.home>
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Mon, 10 Dec 2012 14:18:59 +0100
+Subject: [PATCH 1/2] ARM: net: bpf_jit_32: fix kzalloc gfp/size mismatch.
+In-Reply-To: <50C2760A.9070406@gmail.com>
+References: <1354804718-1662-1-git-send-email-nschichan@freebox.fr>
+ <50C2760A.9070406@gmail.com>
+Message-ID: <50C5E143.4070306@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-12-10 at 10:04 +0000, Will Deacon wrote:
-> Hi Jon,
-> 
-> Back-pedalling a bit here, but I'm confused by one of your points below:
-> 
-> On Fri, Dec 07, 2012 at 05:45:47PM +0000, Jon Medhurst (Tixy) wrote:
-> > On Fri, 2012-12-07 at 12:13 -0500, Steven Rostedt wrote:
-> > > I'll make my question more general:
-> > > 
-> > > If I have a nop, that is a size of a call (branch and link), which is
-> > > near the beginning of a function and not part of any conditional, and I
-> > > want to convert it into a call (branch and link), would adding a
-> > > breakpoint to it, modifying it to the call, and then removing the
-> > > breakpoint be possible? Of course it would require syncing in between
-> > > steps, but my question is, if the above is possible on a thumb2 ARM
-> > > processor?
-> > 
-> > I believe so. The details are (repeating your earlier explanation) ...
-> > 
-> > 1. Replace first half of nop with 16bit 'breakpoint' instruction.
-> 
-> Sort of -- you'd actually need 2x16-bit nops to make this work.
+On 12/08/2012 12:04 AM, Mircea Gherzan wrote:
+> Am 06.12.2012 15:38, schrieb Nicolas Schichan:
+[...]
+> Acked-by: Mircea Gherzan<mgherzan@gmail.com>
 
-Why?
+Hi,
 
-> 
-> > 2. Sync.(cache flush to PoU + IPIs to make other cores invalidate the
-> > icache for changed part of the nop instruction).
-> 
-> Why do you need to use IPIs for I-cache invalidation on other cores? For
-> ARMv7 SMP (i.e. the multi-processing extensions) doing I-cache invalidation
-> by MVA to PoU will be broadcast to the applicable domain for the
-> shareability attributes of the address. So if you do icimvau with an
-> inner-shareable virtual address, it will be broadcast by the hardware.
-> 
-> > However, wouldn't we need any of this breakpoint malarkey, why not just
-> > just use a 16-bit branch instruction which branches over the second half
-> > of the nop? :-)
-> 
-> Yes, and I think if you do use two 16-bit nops, you can even get rid of all
-> the intermediate `sync' operations (I guess you might want one at the end if
-> you want the call to become visible at a particular point).
+Thanks for acking those two patches.
 
-Wont work. We are replacing a 32bit call with a nop. That nop must also
-be 32bits, because we could eventually replace the nop(s) with a 32bit
-call. Basically, we can never allow the second 16bit part ever be the
-next instruction. If the first 16bit nop is executed, and then the task
-gets preempted. The nops get converted to a 32bit call. The task gets
-scheduled again and now is executing the second 16bits of the 32bit call
-and we get unexpected (probably crashing) results.
+Shall I send them to the patch system now ?
 
-By having either a 16bit breakpoint whose handler returns after the
-second 16bit part, or a 16bit jump that simply jumps over the second
-half, then all this should work. When the CPU processes a 32bit
-instruction, it either processes all or non of it, correct?
+Regards,
 
--- Steve
+-- 
+Nicolas Schichan
+Freebox SAS
