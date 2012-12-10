@@ -1,91 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 10 Dec 2012 11:09:41 +0000
-Subject: [PATCH 06/10] arm: arch_timer: divorce from local_timer api
-In-Reply-To: <50C26ACA.4050509@codeaurora.org>
-References: <1354297568-26366-1-git-send-email-mark.rutland@arm.com>
- <1354297568-26366-7-git-send-email-mark.rutland@arm.com>
- <50C26ACA.4050509@codeaurora.org>
-Message-ID: <20121210110754.GA18328@e106331-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 10 Dec 2012 11:24:08 +0000
+Subject: [PATCH] ARM: ftrace: Ensure code modifications are synchronised
+ across all cpus
+In-Reply-To: <1355137445.3386.7.camel@linaro1.home>
+References: <1354892111.13000.50.camel@linaro1.home>
+ <1354894134.17101.44.camel@gandalf.local.home>
+ <20121207162346.GW14363@n2100.arm.linux.org.uk>
+ <1354898200.17101.50.camel@gandalf.local.home>
+ <20121207164530.GX14363@n2100.arm.linux.org.uk>
+ <1354900436.17101.58.camel@gandalf.local.home>
+ <20121207181309.GY14363@n2100.arm.linux.org.uk>
+ <1354905805.17101.86.camel@gandalf.local.home>
+ <20121207190244.GB29618@mudshark.cambridge.arm.com>
+ <1355137445.3386.7.camel@linaro1.home>
+Message-ID: <20121210112408.GC6988@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 07, 2012 at 10:16:42PM +0000, Stephen Boyd wrote:
-> On 11/30/12 09:46, Mark Rutland wrote:
-> > Currently, the arch_timer driver is tied to the arm port, as it relies
-> > on code in arch/arm/smp.c to setup and teardown timers as cores are
-> > hotplugged on and off. The timer is registered through an arm-specific
-> > registration mechanism, preventing sharing the driver with the arm64
-> > port.
-> >
-> > This patch moves the driver to using a cpu notifier instead, making it
-> > easier to port.
+On Mon, Dec 10, 2012 at 11:04:05AM +0000, Jon Medhurst (Tixy) wrote:
+> On Fri, 2012-12-07 at 19:02 +0000, Will Deacon wrote:
+> > For ARMv7, there are small subsets of instructions for ARM and Thumb which
+> > are guaranteed to be atomic wrt concurrent modification and execution of
+> > the instruction stream between different processors:
+> > 
+> > Thumb:	The 16-bit encodings of the B, NOP, BKPT, and SVC instructions.
+> > ARM:	The B, BL, NOP, BKPT, SVC, HVC, and SMC instructions.
+> > 
 > 
-> How does ipi_timer() work after this change? Don't we need it because of
-> FEAT_C3_STOP?
-
-The unfortunate answer is it doesn't, and we'll need broadcast for any systems
-where the timers turn off in low power states.
-
-I'll take a look at decoupling the broadcast mechanism from the drivers, it's
-not really a property of the clock hardware and it would be nice to split it.
-
-> >
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> [snip]
-> > @@ -245,12 +244,28 @@ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
-> >  	clk->set_mode(CLOCK_EVT_MODE_UNUSED, clk);
-> >  }
-> >  
-> > -static struct local_timer_ops arch_timer_ops __cpuinitdata = {
-> > -	.setup	= arch_timer_setup,
-> > -	.stop	= arch_timer_stop,
-> > -};
-> > +static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
-> > +					   unsigned long action, void *hcpu)
-> > +{
-> > +	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
-> > +
-> > +	switch (action) {
-> > +	case CPU_STARTING:
-> > +	case CPU_STARTING_FROZEN:
-> > +		arch_timer_setup(evt);
-> > +		break;
-> > +	case CPU_DYING:
-> > +	case CPU_DYING_FROZEN:
-> > +		arch_timer_stop(evt);
-> > +		break;
-> > +	}
+> So this means for things like kprobes which can modify arbitrary kernel
+> code we are going to need to continue to always use some form of
+> stop_the_whole_system() function?
 > 
-> You can save 2 lines with a switch (action & ~CPU_TASKS_FROZEN) here.
+> Also, kprobes currently uses patch_text() which only uses stop_machine
+> for Thumb2 instructions which straddle a word boundary, so this needs
+> changing?
 
-Sure. I'll fold that in.
+Yes; if you're modifying instructions other than those mentioned above, then
+you'll need to synchronise the CPUs, update the instructions, perform
+cache-maintenance on the writing CPU and then execute an isb on the
+executing core (this last bit isn't needed if you're going to go through an
+exception return to get back to the new code -- depends on how your
+stop/resume code works).
 
-> > +
-> > +	return NOTIFY_OK;
-> > +}
-> >  
-> > -static struct clock_event_device arch_timer_global_evt;
-> > +static struct notifier_block __cpuinitdata arch_timer_cpu_nb = {
-> 
-> __cpuinitdata goes last before the equals sign.
+For ftrace we can (hopefully) avoid a lot of this when we have known points
+of modification.
 
-I'll fix that up.
-
-> > +	.notifier_call = arch_timer_cpu_notify,
-> > +};
-> >  
-> >  static int __init arch_timer_register(void)
-> >  {
-> >
-> 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-> 
-
-Thanks,
-Mark.
+Will
