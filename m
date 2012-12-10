@@ -1,103 +1,104 @@
 From: ciminaghi@gnudd.com (Davide Ciminaghi)
-Date: Mon, 10 Dec 2012 14:42:29 +0100
-Subject: [PATCH v4 0/7] enable support for AMBA drivers under x86
-Message-ID: <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
+Date: Mon, 10 Dec 2012 14:42:31 +0100
+Subject: [PATCH v4 2/7] pl080.h: moved from arm/include/asm/hardware to
+ include/linux/amba/
+In-Reply-To: <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
+References: <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
+Message-ID: <1355146956-6009-3-git-send-email-ciminaghi@gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Alessandro Rubini <rubini@gnudd.com>
 
-this is v4 of a patchset already submitted on Sep 14th
-(see https://lkml.org/lkml/2012/9/14/412) and
-Nov 23rd (see https://lkml.org/lkml/2012/11/23/272).
-Then 1/8 and 3/8 only were resubmitted (as v3) with the following changes:
+The header is used by drivers/dma/amba-pl08x.c, which can be compiled
+under x86, where PL080 exists under a PCI-to-AMBA bridge. This patche
+moves it where it can be accessed by other architectures, and fixes
+all users.
 
-* The output of git diff --word-diff was added to 1/8 as additional
-  information for reviewers (see https://lkml.org/lkml/2012/11/23/415).
-* 3/8 was generated with git format-patch -C -M to detect copies and moves
-  (see https://lkml.org/lkml/2012/11/23/404).
-
-Changes in v4 are:
-
-* Rebased to next-20121210
-* All patches generated with git format-patch -C -M.
-* "DMA: PL330: use prefix in reg names to build under x86" : only registers
-  names were prefixed (no PL330_ prefix for bitfields), as requested by
-  Jassi Brar (see https://lkml.org/lkml/2012/11/24/46). Please note that this
-  change was done by myself. I let Alessandro as the patch author, and just
-  added my Signed-off-by with a very short explanation of my change. I'm not
-  sure I did the right thing because, although my change is a small one from
-  a logical point of view, it results in a much smaller patch, so this version
-  is actually very different from v3.
-* "gpio: pl061 depends on ARM": removed as it has already applied to
-  linux-next (see https://lkml.org/lkml/2012/12/1/77)
-
-Acked-by/Reviewed-by situation:
-
-v1:
-
-"DMA: PL330: use prefix in reg names to build under x86"
-Acked by Vinod Koul (see https://lkml.org/lkml/2012/9/16/271) and
-Linus Walleij (see https://lkml.org/lkml/2012/9/16/93).
-
-"mmc: use the new <linux/sizes.h>"
-Acked by David Brown (see https://lkml.org/lkml/2012/9/14/613)
-
-"pl080.h: moved from arm/include/asm/hardware to include/linux/amba/"
-Acked by Linus Walleij (see https://lkml.org/lkml/2012/9/16/92).
-
-
-v2:
-
-"watchdog: sp805_wdt depends on ARM"
-Acked by Viresh Kumar (see https://lkml.org/lkml/2012/11/23/296)
-Acked by Linus Walleij (see https://lkml.org/lkml/2012/11/28/259).
-
-"mmc: use the new <linux/sizes.h>"
-Reviewed by Viresh Kumar (see https://lkml.org/lkml/2012/11/23/328)
-Acked by David Brown (see https://lkml.org/lkml/2012/11/26/625)
-Acked by Linus Walleij (see https://lkml.org/lkml/2012/12/1/105).
-
-"mmci: replace readsl/writesl with ioread32_rep/iowrite32_rep"
-Acked by Linus Walleij (see https://lkml.org/lkml/2012/11/28/266)
-Acked by Will Deacon (see https://lkml.org/lkml/2012/12/3/202).
-
-"pl080.h: moved from arm/include/asm/hardware to include/linux/amba/"
-Acked by Linus Walleij (see https://lkml.org/lkml/2012/11/28/265).
-
-
-Alessandro Rubini (6):
-  DMA: PL330: use prefix in reg names to build under x86
-  pl080.h: moved from arm/include/asm/hardware to include/linux/amba/
-  watchdog: sp805_wdt depends on ARM
-  mmc: use the new <linux/sizes.h>
-  drivers/amba: add support for a PCI bridge
-  x86: add CONFIG_ARM_AMBA, selected by STA2X11
-
-Davide Ciminaghi (1):
-  mmci: replace readsl/writesl with ioread32_rep/iowrite32_rep
-
- arch/arm/mach-s3c64xx/dma.c                        |    2 +-
- arch/arm/mach-spear3xx/spear3xx.c                  |    2 +-
- arch/arm/mach-spear6xx/spear6xx.c                  |    2 +-
- arch/x86/Kconfig                                   |    4 +
- drivers/Kconfig                                    |    2 +
- drivers/amba/Kconfig                               |   10 ++
- drivers/amba/Makefile                              |    1 +
- drivers/amba/pci-amba.c                            |   93 +++++++++++++++++
- drivers/dma/amba-pl08x.c                           |    2 +-
- drivers/dma/pl330.c                                |  107 ++++++++++----------
- drivers/mmc/host/mmci.c                            |   10 +-
- drivers/mmc/host/msm_sdcc.c                        |    2 +-
- drivers/mmc/host/mvsdio.c                          |    2 +-
- drivers/mmc/host/mxcmmc.c                          |    2 +-
- drivers/mmc/host/pxamci.c                          |    3 +-
- drivers/watchdog/Kconfig                           |    2 +-
- .../asm/hardware => include/linux/amba}/pl080.h    |    2 +-
- 17 files changed, 179 insertions(+), 69 deletions(-)
- create mode 100644 drivers/amba/Kconfig
- create mode 100644 drivers/amba/pci-amba.c
+Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
+Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+---
+ arch/arm/mach-s3c64xx/dma.c                                   |    2 +-
+ arch/arm/mach-spear3xx/spear3xx.c                             |    2 +-
+ arch/arm/mach-spear6xx/spear6xx.c                             |    2 +-
+ drivers/dma/amba-pl08x.c                                      |    2 +-
+ {arch/arm/include/asm/hardware => include/linux/amba}/pl080.h |    2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
  rename {arch/arm/include/asm/hardware => include/linux/amba}/pl080.h (99%)
 
+diff --git a/arch/arm/mach-s3c64xx/dma.c b/arch/arm/mach-s3c64xx/dma.c
+index f2a7a17..a77f521 100644
+--- a/arch/arm/mach-s3c64xx/dma.c
++++ b/arch/arm/mach-s3c64xx/dma.c
+@@ -23,6 +23,7 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
++#include <linux/amba/pl080.h>
+ 
+ #include <mach/dma.h>
+ #include <mach/map.h>
+@@ -30,7 +31,6 @@
+ 
+ #include <mach/regs-sys.h>
+ 
+-#include <asm/hardware/pl080.h>
+ 
+ /* dma channel state information */
+ 
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index 38fe95d..88be9a3 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -16,9 +16,9 @@
+ #include <linux/amba/pl022.h>
+ #include <linux/amba/pl08x.h>
+ #include <linux/irqchip/spear-shirq.h>
++#include <linux/amba/pl080.h>
+ #include <linux/of_irq.h>
+ #include <linux/io.h>
+-#include <asm/hardware/pl080.h>
+ #include <asm/hardware/vic.h>
+ #include <plat/pl080.h>
+ #include <mach/generic.h>
+diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+index 5a5a52d..8ce65a2 100644
+--- a/arch/arm/mach-spear6xx/spear6xx.c
++++ b/arch/arm/mach-spear6xx/spear6xx.c
+@@ -20,7 +20,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+-#include <asm/hardware/pl080.h>
++#include <linux/amba/pl080.h>
+ #include <asm/hardware/vic.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 6eb6a5c..8bad254 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -83,7 +83,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/seq_file.h>
+ #include <linux/slab.h>
+-#include <asm/hardware/pl080.h>
++#include <linux/amba/pl080.h>
+ 
+ #include "dmaengine.h"
+ #include "virt-dma.h"
+diff --git a/arch/arm/include/asm/hardware/pl080.h b/include/linux/amba/pl080.h
+similarity index 99%
+rename from arch/arm/include/asm/hardware/pl080.h
+rename to include/linux/amba/pl080.h
+index 4eea210..3e7b62f 100644
+--- a/arch/arm/include/asm/hardware/pl080.h
++++ b/include/linux/amba/pl080.h
+@@ -1,4 +1,4 @@
+-/* arch/arm/include/asm/hardware/pl080.h
++/* include/linux/amba/pl080.h
+  *
+  * Copyright 2008 Openmoko, Inc.
+  * Copyright 2008 Simtec Electronics
 -- 
 1.7.10.4
