@@ -1,42 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Dec 2012 00:08:25 +0000
-Subject: [PATCH 1/3] ARM: MM: Add the workaround of Errata 774769
-In-Reply-To: <001701cdd669$19e8cdd0$4dba6970$%kim@samsung.com>
-References: <001701cdd669$19e8cdd0$4dba6970$%kim@samsung.com>
-Message-ID: <20121210000825.GH14363@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 10 Dec 2012 10:06:05 +0900
+Subject: [PATCH] ARM: EXYNOS: fix build error when MFC is not selected
+Message-ID: <030b01cdd672$89b21e60$9d165b20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 08:58:35AM +0900, Boojin Kim wrote:
-> 
-> -3:	mov	r10, #0
-> +	/* Cortex-A15 Errata */
-> +3:	ldr	r10, =0x00000c0f		@ Cortex-A15 primary part number
-> +	teq	r0, r10
-> +	bne	4f
-> +#ifdef CONFIG_ARM_ERRATA_774769
 
-There's not much point testing for the part number of the work-around isn't
-enabled.
+This fixes following:
+arch/arm/mach-exynos/built-in.o: In function `exynos5_reserve':
+arch/arm/mach-exynos/mach-exynos5-dt.c:177: undefined reference to `s5p_fdt_find_mfc_mem'
+arch/arm/mach-exynos/mach-exynos5-dt.c:177: undefined reference to `s5p_fdt_find_mfc_mem'
+arch/arm/mach-exynos/mach-exynos5-dt.c:178: undefined reference to `s5p_mfc_reserve_mem'
 
-> +	teq	r6, #0x4			@ present in r0p4
-> +	mrceq	p15, 0, r10, c1, c0, 1		@ read aux control register
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-exynos/mach-exynos5-dt.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-	tsteq	r10, #1 << 15
-
-to avoid writing to the aux control register if the errata has already been
-applied.
-
-> +	orreq	r10, r10, #1 << 25		@ set bit #25
-> +	mcreq	p15, 0, r10, c1, c0, 1		@ write aux control register
-> +#endif
-> +
-> +4:	mov	r10, #0
->  	mcr	p15, 0, r10, c7, c5, 0		@ I+BTB cache invalidate
->  	dsb
->  #ifdef CONFIG_MMU
-> --
-> 1.7.5.4
-> 
-> 
-> 
+diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+index f5c6976..133abfd 100644
+--- a/arch/arm/mach-exynos/mach-exynos5-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+@@ -169,6 +169,7 @@ static char const *exynos5_dt_compat[] __initdata = {
+ 
+ static void __init exynos5_reserve(void)
+ {
++#ifdef CONFIG_S5P_DEV_MFC
+ 	struct s5p_mfc_dt_meminfo mfc_mem;
+ 
+ 	/* Reserve memory for MFC only if it's available */
+@@ -176,6 +177,7 @@ static void __init exynos5_reserve(void)
+ 	if (of_scan_flat_dt(s5p_fdt_find_mfc_mem, &mfc_mem))
+ 		s5p_mfc_reserve_mem(mfc_mem.roff, mfc_mem.rsize, mfc_mem.loff,
+ 				mfc_mem.lsize);
++#endif
+ }
+ 
+ DT_MACHINE_START(EXYNOS5_DT, "SAMSUNG EXYNOS5 (Flattened Device Tree)")
+-- 
+1.7.4.1
