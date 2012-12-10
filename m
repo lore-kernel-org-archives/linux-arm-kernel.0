@@ -1,35 +1,24 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 10 Dec 2012 23:37:23 +0100
-Subject: [PATCH 1/2] arm: mvebu: add RTC support for Armada 370 and
- Armada XP
-In-Reply-To: <20121210214755.9CD823E0C7C@localhost>
-References: <1355136122-30729-1-git-send-email-gregory.clement@free-electrons.com>
- <1355136122-30729-2-git-send-email-gregory.clement@free-electrons.com>
- <20121210162819.46fe4f91@skate>
- <20121210214755.9CD823E0C7C@localhost>
-Message-ID: <20121210233723.1f3656d0@skate>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 10 Dec 2012 22:34:25 +0000
+Subject: [RFC] gpiolib: introduce descriptor-based GPIO interface
+In-Reply-To: <1985305.LiOKDTFPq4@percival>
+References: <1354779918-4028-1-git-send-email-acourbot@nvidia.com>
+ <1354779918-4028-2-git-send-email-acourbot@nvidia.com>
+ <20121206144259.136693E0950@localhost> <1985305.LiOKDTFPq4@percival>
+Message-ID: <20121210223425.DC2783E0796@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Grant Likely,
-
-On Mon, 10 Dec 2012 21:47:55 +0000, Grant Likely wrote:
-
-> > Maybe an explicit status = "okay" here?
+On Fri, 7 Dec 2012 11:06:34 +0900, Alex Courbot <acourbot@nvidia.com> wrote:
+> On Thursday 06 December 2012 22:42:59 Grant Likely wrote:
+> > how about "gpio_chip_hwnum()" to somewhat match irqdomain convention?
 > 
-> Only necessary if it is typical for the device to get disabled. I don't
-> add status="okay" properties unless it is to enable a device previously
-> disabled with status="disabled"
+> Sure, matching existing interfaces is better. "git grep hwnum" does not seem 
+> to reveal much related to irqdomain though?
 
-Ok, thanks for clarifying what the best practice is. This device being
-internal to the SoC and having no dependency on external components, it
-is indeed always available.
+irqdomain actually uses "hwirq". "hwgpio" would be a closer analog than
+'hwnum'.  At first I though hwgpio to be too goofy, but on further
+reflection it probably has the least likelyhood of getting used
+incorrectly.
 
-Thanks again for the clarification!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+g.
