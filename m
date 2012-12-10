@@ -1,46 +1,18 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  7 Dec 2012 23:04:38 +0100
-Subject: [RFC v1 15/16] arm: mvebu: PCIe Device Tree informations for Armada
- 370 DB
-In-Reply-To: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1354917879-32073-16-git-send-email-thomas.petazzoni@free-electrons.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 10 Dec 2012 23:12:52 +0900
+Subject: [PATCH 03/12] regulator: gpio-regulator: Fix logical error in
+ for() loop
+In-Reply-To: <1355129761-8088-4-git-send-email-lee.jones@linaro.org>
+References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
+ <1355129761-8088-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <20121210141251.GD6103@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell evaluation board (DB) for the Armada 370 SoC has 2
-physical full-size PCIe slots, so we enable the corresponding PCIe
-interfaces in the Device Tree.
+On Mon, Dec 10, 2012 at 08:55:52AM +0000, Lee Jones wrote:
+> The cond-statement of this particular for() loop will always be
+> true as long as at least one voltage-shifting GPIO is present.
+> If it wasn't for the break below, we'd be stuck in a forever loop.
+> This patch inserts the correct cond-statement into the statement.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-db.dts |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index 0004402..56f2c14 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -59,5 +59,20 @@
- 			phy = <&phy1>;
- 			phy-mode = "rgmii-id";
- 		};
-+
-+		pcie-controller {
-+			status = "okay";
-+			/*
-+			 * The two PCIe units are accessible through
-+			 * both standard PCIe slots and mini-PCIe
-+			 * slots on the board.
-+			 */
-+			pcie0 at 0xd0040000 {
-+				status = "okay";
-+			};
-+			pcie1 at 0xd0080000 {
-+				status = "okay";
-+			};
-+		};
- 	};
- };
--- 
-1.7.9.5
+Applied, thanks.
