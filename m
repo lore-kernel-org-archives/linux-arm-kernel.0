@@ -1,167 +1,119 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 10 Dec 2012 12:20:27 +0200
-Subject: [PATCH v4 17/23] mfd: omap-usb-host: Manage HSIC clocks for HSIC mode
+Date: Mon, 10 Dec 2012 12:20:28 +0200
+Subject: [PATCH v4 18/23] mfd: omap-usb-host: Get rid of unnecessary spinlock
 In-Reply-To: <1355134833-5199-1-git-send-email-rogerq@ti.com>
 References: <1355134833-5199-1-git-send-email-rogerq@ti.com>
-Message-ID: <1355134833-5199-18-git-send-email-rogerq@ti.com>
+Message-ID: <1355134833-5199-19-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the optional HSIC clocks (60MHz and 480MHz) for the ports
-that are configured in HSIC mode.
+The driver does not have an interrupt handler and
+we don't really need a spinlock, so get rid of it.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- drivers/mfd/omap-usb-host.c |   77 +++++++++++++++++++++++++++++++++++++++---
- 1 files changed, 71 insertions(+), 6 deletions(-)
+ drivers/mfd/omap-usb-host.c |   16 ----------------
+ 1 files changed, 0 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index 6294f13..90dbd17 100644
+index 90dbd17..289b356 100644
 --- a/drivers/mfd/omap-usb-host.c
 +++ b/drivers/mfd/omap-usb-host.c
-@@ -94,6 +94,8 @@
- struct usbhs_hcd_omap {
- 	int				nports;
- 	struct clk			**utmi_clk;
-+	struct clk			**hsic60m_clk;
-+	struct clk			**hsic480m_clk;
+@@ -23,7 +23,6 @@
+ #include <linux/delay.h>
+ #include <linux/clk.h>
+ #include <linux/dma-mapping.h>
+-#include <linux/spinlock.h>
+ #include <linux/gpio.h>
+ #include <plat/cpu.h>
+ #include <linux/platform_device.h>
+@@ -107,7 +106,6 @@ struct usbhs_hcd_omap {
+ 	struct usbhs_omap_platform_data	*pdata;
  
- 	struct clk			*xclk60mhsp1_ck;
- 	struct clk			*xclk60mhsp2_ck;
-@@ -291,7 +293,28 @@ static int usbhs_runtime_resume(struct device *dev)
+ 	u32				usbhs_rev;
+-	spinlock_t			lock;
+ };
+ /*-------------------------------------------------------------------------*/
+ 
+@@ -280,14 +278,12 @@ static bool is_ohci_port(enum usbhs_omap_port_mode pmode)
+ static int usbhs_runtime_resume(struct device *dev)
+ {
+ 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
+-	unsigned long			flags;
+ 	struct usbhs_omap_platform_data *pdata = omap->pdata;
+ 	int i, r;
+ 
+ 	dev_dbg(dev, "usbhs_runtime_resume\n");
+ 
+ 	omap_tll_enable();
+-	spin_lock_irqsave(&omap->lock, flags);
+ 
+ 	if (omap->ehci_logic_fck && !IS_ERR(omap->ehci_logic_fck))
  		clk_enable(omap->ehci_logic_fck);
- 
- 	for (i = 0; i < omap->nports; i++) {
--		if (is_ehci_tll_mode(pdata->port_mode[i])) {
-+		switch (pdata->port_mode[i]) {
-+		case OMAP_EHCI_PORT_MODE_HSIC:
-+			if (omap->hsic60m_clk[i]) {
-+				r = clk_enable(omap->hsic60m_clk[i]);
-+				if (r) {
-+					dev_err(dev,
-+					 "Can't enable port %d hsic60m clk:%d\n",
-+					 i, r);
-+				}
-+			}
-+
-+			if (omap->hsic480m_clk[i]) {
-+				r = clk_enable(omap->hsic480m_clk[i]);
-+				if (r) {
-+					dev_err(dev,
-+					 "Can't enable port %d hsic480m clk:%d\n",
-+					 i, r);
-+				}
-+			}
-+		/* Fall through as HSIC mode needs utmi_clk */
-+
-+		case OMAP_EHCI_PORT_MODE_TLL:
- 			if (omap->utmi_clk[i]) {
- 				r = clk_enable(omap->utmi_clk[i]);
- 				if (r) {
-@@ -300,6 +323,9 @@ static int usbhs_runtime_resume(struct device *dev)
- 					 i, r);
- 				}
- 			}
-+			break;
-+		default:
-+			break;
+@@ -329,22 +325,17 @@ static int usbhs_runtime_resume(struct device *dev)
  		}
  	}
  
-@@ -320,9 +346,21 @@ static int usbhs_runtime_suspend(struct device *dev)
- 	spin_lock_irqsave(&omap->lock, flags);
+-	spin_unlock_irqrestore(&omap->lock, flags);
+-
+ 	return 0;
+ }
  
+ static int usbhs_runtime_suspend(struct device *dev)
+ {
+ 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
+-	unsigned long			flags;
+ 	struct usbhs_omap_platform_data *pdata = omap->pdata;
+ 	int i;
+ 
+ 	dev_dbg(dev, "usbhs_runtime_suspend\n");
+ 
+-	spin_lock_irqsave(&omap->lock, flags);
+-
  	for (i = 0; i < omap->nports; i++) {
--		if (is_ehci_tll_mode(pdata->port_mode[i])) {
-+		switch (pdata->port_mode[i]) {
-+		case OMAP_EHCI_PORT_MODE_HSIC:
-+			if (omap->hsic60m_clk[i])
-+				clk_disable(omap->hsic60m_clk[i]);
-+
-+			if (omap->hsic480m_clk[i])
-+				clk_disable(omap->hsic480m_clk[i]);
-+		/* Fall through as utmi_clks were used in HSIC mode */
-+
-+		case OMAP_EHCI_PORT_MODE_TLL:
- 			if (omap->utmi_clk[i])
- 				clk_disable(omap->utmi_clk[i]);
-+			break;
-+		default:
-+			break;
- 		}
+ 		switch (pdata->port_mode[i]) {
+ 		case OMAP_EHCI_PORT_MODE_HSIC:
+@@ -367,7 +358,6 @@ static int usbhs_runtime_suspend(struct device *dev)
+ 	if (omap->ehci_logic_fck && !IS_ERR(omap->ehci_logic_fck))
+ 		clk_disable(omap->ehci_logic_fck);
+ 
+-	spin_unlock_irqrestore(&omap->lock, flags);
+ 	omap_tll_disable();
+ 
+ 	return 0;
+@@ -377,7 +367,6 @@ static void omap_usbhs_init(struct device *dev)
+ {
+ 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
+ 	struct usbhs_omap_platform_data	*pdata = omap->pdata;
+-	unsigned long			flags;
+ 	unsigned			reg;
+ 
+ 	dev_dbg(dev, "starting TI HSUSB Controller\n");
+@@ -396,7 +385,6 @@ static void omap_usbhs_init(struct device *dev)
  	}
  
-@@ -527,7 +565,10 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
+ 	pm_runtime_get_sync(dev);
+-	spin_lock_irqsave(&omap->lock, flags);
  
- 	i = sizeof(struct clk *) * omap->nports;
- 	omap->utmi_clk = devm_kzalloc(dev, i, GFP_KERNEL);
--	if (!omap->utmi_clk) {
-+	omap->hsic480m_clk = devm_kzalloc(dev, i, GFP_KERNEL);
-+	omap->hsic60m_clk = devm_kzalloc(dev, i, GFP_KERNEL);
-+
-+	if (!omap->utmi_clk || !omap->hsic480m_clk || !omap->hsic60m_clk) {
- 		dev_err(dev, "Memory allocation failed\n");
- 		ret = -ENOMEM;
- 		goto err_mem;
-@@ -571,7 +612,7 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
+ 	reg = usbhs_read(omap->uhh_base, OMAP_UHH_HOSTCONFIG);
+ 	/* setup ULPI bypass and burst configurations */
+@@ -459,8 +447,6 @@ static void omap_usbhs_init(struct device *dev)
+ 	usbhs_write(omap->uhh_base, OMAP_UHH_HOSTCONFIG, reg);
+ 	dev_dbg(dev, "UHH setup done, uhh_hostconfig=%x\n", reg);
  
- 	for (i = 0; i < omap->nports; i++) {
- 		struct clk *pclk;
--		char clkname[] = "usb_host_hs_utmi_px_clk";
-+		char clkname[] = "usb_host_hs_hsic480m_px_clk";
+-	spin_unlock_irqrestore(&omap->lock, flags);
+-
+ 	pm_runtime_put_sync(dev);
+ 	if (pdata->ehci_data->phy_reset) {
+ 		/* Hold the PHY in RESET for enough time till
+@@ -524,8 +510,6 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
+ 	if (!omap->uhh_base)
+ 		return -EADDRNOTAVAIL;
  
- 		/* clock names are indexed from 1*/
- 		snprintf(clkname, sizeof(clkname),
-@@ -587,6 +628,24 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
- 				clkname, PTR_ERR(pclk));
- 		else
- 			omap->utmi_clk[i] = pclk;
-+
-+		snprintf(clkname, sizeof(clkname),
-+				"usb_host_hs_hsic480m_p%d_clk", i + 1);
-+		pclk = clk_get(dev, clkname);
-+		if (IS_ERR(pclk))
-+			dev_dbg(dev, "Failed to get clock : %s : %ld\n",
-+				clkname, PTR_ERR(pclk));
-+		else
-+			omap->hsic480m_clk[i] = pclk;
-+
-+		snprintf(clkname, sizeof(clkname),
-+				"usb_host_hs_hsic60m_p%d_clk", i + 1);
-+		pclk = clk_get(dev, clkname);
-+		if (IS_ERR(pclk))
-+			dev_dbg(dev, "Failed to get clock : %s : %ld\n",
-+				clkname, PTR_ERR(pclk));
-+		else
-+			omap->hsic60m_clk[i] = pclk;
- 	}
+-	spin_lock_init(&omap->lock);
+-
+ 	omap->pdata = pdata;
  
- 	if (is_ehci_phy_mode(pdata->port_mode[0])) {
-@@ -630,8 +689,11 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
- err_alloc:
- 	omap_usbhs_deinit(&pdev->dev);
- 
--	for (i = 0; i < omap->nports; i++)
-+	for (i = 0; i < omap->nports; i++) {
- 		clk_put(omap->utmi_clk[i]);
-+		clk_put(omap->hsic60m_clk[i]);
-+		clk_put(omap->hsic480m_clk[i]);
-+	}
- 
- 	clk_put(omap->init_60m_fclk);
- 
-@@ -662,8 +724,11 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
- 
- 	omap_usbhs_deinit(&pdev->dev);
- 
--	for (i = 0; i < omap->nports; i++)
-+	for (i = 0; i < omap->nports; i++) {
- 		clk_put(omap->utmi_clk[i]);
-+		clk_put(omap->hsic60m_clk[i]);
-+		clk_put(omap->hsic480m_clk[i]);
-+	}
- 
- 	clk_put(omap->init_60m_fclk);
- 	clk_put(omap->xclk60mhsp2_ck);
+ 	pm_runtime_enable(dev);
 -- 
 1.7.4.1
