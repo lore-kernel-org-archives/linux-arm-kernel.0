@@ -1,25 +1,22 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 10 Dec 2012 14:15:44 -0800
-Subject: [PATCH v4 0/7] enable support for AMBA drivers under x86
-In-Reply-To: <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
-References: <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
-Message-ID: <20121210221544.GA7621@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Dec 2012 22:21:06 +0000
+Subject: [PATCH V3 2/3] dmaengine: dw_dmac: Enhance device tree support
+In-Reply-To: <201212102208.52347.arnd@arndb.de>
+References: <3100e691db3f94c22afd98b609a1568d7e70dfe7.1350360935.git.viresh.kumar@linaro.org>
+ <169edae67b9a051ca7448e5b62c3cd2c5c1db470.1350360935.git.viresh.kumar@linaro.org>
+ <201212102208.52347.arnd@arndb.de>
+Message-ID: <201212102221.06614.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 02:42:29PM +0100, Davide Ciminaghi wrote:
-> Acked-by/Reviewed-by situation:
+On Monday 10 December 2012, Arnd Bergmann wrote:
+> The build bug is not the problem however, but the abuse of the
+> API is. Andy, are you sure you understood what this does when
+> you gave you Reviewed-by comment?
 > 
-> v1:
-> 
-> "mmc: use the new <linux/sizes.h>"
-> Acked by David Brown (see https://lkml.org/lkml/2012/9/14/613)
 
-The change doesn't look substantially different, you can keep my Ack
-for it.
+Ah, I just saw that Andy had the right intuition when commenting on
+it at first, but Viresh managed to convince him otherwise, and appearently
+neither had followed the discussion about the dmaengine bindings...
 
-David
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+	Arnd
