@@ -1,40 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Dec 2012 14:02:50 +0000
-Subject: [PATCH] ARM: decompressor: include CONFIG_DEBUG_LL_INCLUDE
- rather than mach/debug-macro.S
-In-Reply-To: <20121210015916.GA30766@S2101-09.ap.freescale.net>
-References: <1355104168-30581-1-git-send-email-shawn.guo@linaro.org>
- <20121210015916.GA30766@S2101-09.ap.freescale.net>
-Message-ID: <20121210140250.GL14363@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 10 Dec 2012 23:07:52 +0900
+Subject: [PATCH 01/12] regulator: gpio-regulator: Demote GPIO Regulator
+ driver to start later
+In-Reply-To: <1355129761-8088-2-git-send-email-lee.jones@linaro.org>
+References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
+ <1355129761-8088-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <20121210140751.GB6103@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 09:59:18AM +0800, Shawn Guo wrote:
-> On Mon, Dec 10, 2012 at 09:49:28AM +0800, Shawn Guo wrote:
-> > Commit 91a9fec (ARM: move debug macros to common location) moves
-> > arch/arm/kernel/debug.S and arch/arm/kernel/head.S to
-> > CONFIG_DEBUG_LL_INCLUDE, but leaves arch/arm/boot/compressed/head.S
-> > still with mach/debug-macro.S.  This causes the following build error
-> > on platforms that moved to new DEBUG_LL inclusion mechanism, when
-> > arch/arm/boot/compressed/head.S is compiled with DEBUG turned on.
-> > 
-> >   AS      arch/arm/boot/compressed/head.o
-> > arch/arm/boot/compressed/head.S:49:30: fatal error: mach/debug-macro.S: No such file or directory
-> > compilation terminated.
-> > 
-> > Fix the problem by replacing mach/debug-macro.S inclusion with
-> > CONFIG_DEBUG_LL_INCLUDE one.
-> > 
-> > Reported-by: Steev Klimaszewski <steev@genesi-usa.com>
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: stable at vger.kernel.org
-> 
-> I copied stable with assuming that the patch is not going to catch
-> on the final 3.7 release.  If it's not the case or maintainer does not
-> think it's a stable material at all, we can just drop the tag.
+On Mon, Dec 10, 2012 at 08:55:50AM +0000, Lee Jones wrote:
 
-That worries me a bit because I can see this ending up getting applied to
-multiple stable kernel trees, even those without CONFIG_DEBUG_LL_INCLUDE.
-So, let's have it in the patch system without the stable tag.
+> The normal course of action would be to defer the MMCI driver too,
+> but these IOS level-shifter regulators aren't present on all
+> platforms, so deferring until one is found would be incorrect.
 
-Thanks.
+> So the best solution is to demote the GPIO Regulator driver, so
+> it starts later than the TC35892 GPIO controller, which is also
+> configured to start at subsys_initcall() time, but before deferred
+> probing time, which starts at late_initcall(), after many of the
+> drivers requiring these regulators would have already started.
+
+This really isn't a good solution, especially not for a system that's DT
+based - on a DT system we can tell if there should be a GPIO present so
+we should be able to defer only when there's something that might
+provide the GPIO later on.
