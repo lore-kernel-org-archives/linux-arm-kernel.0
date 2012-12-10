@@ -1,34 +1,33 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Dec 2012 08:55:58 +0000
-Subject: [PATCH 09/12] ARM: ux500: Use the correct name when supplying a GPIO
- enable pin
+Date: Mon, 10 Dec 2012 08:55:59 +0000
+Subject: [PATCH 10/12] ARM: ux500: Setup correct settling time for the MMCI
+ regulator
 In-Reply-To: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
 References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1355129761-8088-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1355129761-8088-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct a typo in the Device Tree source file, where instead of
-specifying property 'enable-gpio', which the driver is expecting
-we specified 'gpio-enable' instead.
+The GPIO controlled MMCI regulator used on the ux5x0 boards takes
+100us to settle. There's already a binding to provide such
+information. Let's make use of it.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/hrefprev60.dts |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/dbx5x0.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/hrefprev60.dts b/arch/arm/boot/dts/hrefprev60.dts
-index eec29c4..9194fb6 100644
---- a/arch/arm/boot/dts/hrefprev60.dts
-+++ b/arch/arm/boot/dts/hrefprev60.dts
-@@ -40,7 +40,7 @@
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index 0523681..2337b74 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -638,6 +638,7 @@
+ 			regulator-name = "mmci-reg";
+ 			regulator-type = "voltage";
  
- 		vmmci: regulator-gpio {
- 			gpios = <&tc3589x_gpio 18 0x4>;
--			gpio-enable = <&tc3589x_gpio 17 0x4>;
-+			enable-gpio = <&tc3589x_gpio 17 0x4>;
++			startup-delay-us = <100>;
+ 			enable-active-high;
  
- 			status = "okay";
- 		};
+ 			states = <1800000 0x1
 -- 
 1.7.9.5
