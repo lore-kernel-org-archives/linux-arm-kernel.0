@@ -1,22 +1,30 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 10 Dec 2012 22:06:02 +0000
-Subject: [PATCH] ARM: Kirkwood: Add SPI_CHPA and SPI_CPOL support to
- spi-orion
-In-Reply-To: <20121210133800.GA20001@lunn.ch>
-References: <20121210133800.GA20001@lunn.ch>
-Message-ID: <20121210220602.2EB3D3E0D80@localhost>
+Date: Mon, 10 Dec 2012 21:47:55 +0000
+Subject: [PATCH 1/2] arm: mvebu: add RTC support for Armada 370 and Armada
+ XP
+In-Reply-To: <20121210162819.46fe4f91@skate>
+References: <1355136122-30729-1-git-send-email-gregory.clement@free-electrons.com>
+ <1355136122-30729-2-git-send-email-gregory.clement@free-electrons.com>
+ <20121210162819.46fe4f91@skate>
+Message-ID: <20121210214755.9CD823E0C7C@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Dec 2012 14:38:00 +0100, Andrew Lunn <andrew@lunn.ch> wrote:
-> Hi Jason
+On Mon, 10 Dec 2012 16:28:19 +0100, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+> Dear Gregory CLEMENT,
 > 
-> I tested your patch to add SPI_CHPA and SPI_CPOL on a QNAP box which
-> has SPI NAND. No problems seen.
+> On Mon, 10 Dec 2012 11:42:01 +0100, Gregory CLEMENT wrote:
 > 
-> Tested-by: Andrew Lunn <andrew@lunn.ch>
+> > +		rtc at 10300 {
+> > +			compatible = "marvell,orion-rtc";
+> > +			reg = <0xd0010300 0x20>;
+> > +			interrupts = <50>;
+> > +		};
 > 
+> Maybe an explicit status = "okay" here?
 
-Thanks Andrew.
+Only necessary if it is typical for the device to get disabled. I don't
+add status="okay" properties unless it is to enable a device previously
+disabled with status="disabled"
 
 g.
