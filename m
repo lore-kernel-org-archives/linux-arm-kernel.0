@@ -1,92 +1,49 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 10 Dec 2012 12:39:13 +0530
-Subject: [PATCH 4/9] memory: emif: Handle devices which are not rated for >85C
-In-Reply-To: <1355123358-5273-1-git-send-email-lokeshvutla@ti.com>
-References: <1355123358-5273-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1355123358-5273-5-git-send-email-lokeshvutla@ti.com>
+Date: Mon, 10 Dec 2012 12:42:27 +0530
+Subject: [PATCH 0/9] memory: emif: miscellaneous bug fixes for EMIF driver
+In-Reply-To: <1355123324-5228-1-git-send-email-a>
+References: <1355123324-5228-1-git-send-email-a>
+Message-ID: <50C58B5B.4030606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+Sorry to Spam you in-box.
+Please discard this message...
 
-As per JESD209-2E specification for LPDDR2,
-      http://www.jedec.org/standards-documents/results/jesd209-2E
-Table 73, LPDDR2 memories come in two flavors - Standard and
-Extended. The Standard types can operate from -25C to +85C
-However, beyond that and upto +105C can only be supported by
-Extended types.
+Thanks
+Lokesh
 
-Unfortunately, it seems there is no info in MR0(device info) or
-MR[1,2](device feature) for run time detection of this capability
-as far as seen on the spec. Hence, we provide a custom_config
-flag to be populated by platforms which have these "extended"
-type memories.
-
-For the "Standard" memories, we need to consider MR4 notifications
-of temperature triggers >85C as equivalent to thermal shutdown
-events (equivalent to Spec specified thermal shutdown events for
-"extended" parts).
-
-Reported-by: Richard Woodruff <r-woodruff2@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- drivers/memory/emif.c                   |   24 ++++++++++++++++++++++++
- include/linux/platform_data/emif_plat.h |    1 +
- 2 files changed, 25 insertions(+)
-
-diff --git a/drivers/memory/emif.c b/drivers/memory/emif.c
-index 27a3ce1..ffbdf9e 100644
---- a/drivers/memory/emif.c
-+++ b/drivers/memory/emif.c
-@@ -916,6 +916,7 @@ static irqreturn_t handle_temp_alert(void __iomem *base, struct emif_data *emif)
- {
- 	u32		old_temp_level;
- 	irqreturn_t	ret = IRQ_HANDLED;
-+	struct emif_custom_configs *custom_configs;
- 
- 	spin_lock_irqsave(&emif_lock, irq_state);
- 	old_temp_level = emif->temperature_level;
-@@ -928,6 +929,29 @@ static irqreturn_t handle_temp_alert(void __iomem *base, struct emif_data *emif)
- 		goto out;
- 	}
- 
-+	custom_configs = emif->plat_data->custom_configs;
-+
-+	/*
-+	 * IF we detect higher than "nominal rating" from DDR sensor
-+	 * on an unsupported DDR part, shutdown system
-+	 */
-+	if (custom_configs && !(custom_configs->mask &
-+				EMIF_CUSTOM_CONFIG_EXTENDED_TEMP_PART)) {
-+		if (emif->temperature_level >= SDRAM_TEMP_HIGH_DERATE_REFRESH) {
-+			dev_err(emif->dev,
-+				"%s:NOT Extended temperature capable memory."
-+				"Converting MR4=0x%02x as shutdown event\n",
-+				__func__, emif->temperature_level);
-+			/*
-+			 * Temperature far too high - do kernel_power_off()
-+			 * from thread context
-+			 */
-+			emif->temperature_level = SDRAM_TEMP_VERY_HIGH_SHUTDOWN;
-+			ret = IRQ_WAKE_THREAD;
-+			goto out;
-+		}
-+	}
-+
- 	if (emif->temperature_level < old_temp_level ||
- 		emif->temperature_level == SDRAM_TEMP_VERY_HIGH_SHUTDOWN) {
- 		/*
-diff --git a/include/linux/platform_data/emif_plat.h b/include/linux/platform_data/emif_plat.h
-index 03378ca..5c19a2a 100644
---- a/include/linux/platform_data/emif_plat.h
-+++ b/include/linux/platform_data/emif_plat.h
-@@ -40,6 +40,7 @@
- /* Custom config requests */
- #define EMIF_CUSTOM_CONFIG_LPMODE			0x00000001
- #define EMIF_CUSTOM_CONFIG_TEMP_ALERT_POLL_INTERVAL	0x00000002
-+#define EMIF_CUSTOM_CONFIG_EXTENDED_TEMP_PART		0x00000004
- 
- #ifndef __ASSEMBLY__
- /**
--- 
-1.7.9.5
+On Monday 10 December 2012 12:38 PM, a at dbdp33.itg.ti.com wrote:
+> From: Lokesh Vutla <lokeshvutla@ti.com>
+>
+> This series resolves a few minor issues for EMIF driver.
+>
+> Tested all the patches on OMAP4-sdp, OMAP5-sevm.
+> Patch : "memory: emif: setup LP settings on freq update"
+> is tested on a local tree, since freq update cannot be
+> tested on mainline.
+>
+> Ambresh K (1):
+>    memory: emif: use default custom config parameter.
+>
+> Lokesh Vutla (1):
+>    memory: emif: Correct the lpmode timeout calculation
+>
+> Nishanth Menon (5):
+>    memory: emif: setup LP settings on freq update
+>    memory: emif: handle overflow for timing for LP mode
+>    memory: emif: Handle devices which are not rated for >85C
+>    memory: emif: use restart if power_off not present when out of spec
+>    memory: emif: disable phy_fast_dll_lock
+>
+> Oleksandr Dmytryshyn (1):
+>    memory: emif: fix timings initialization issue
+>
+> Severine Glock (1):
+>    memory: emif: debugfs: Remove MR4= string print
+>
+>   drivers/memory/emif.c                   |   92 +++++++++++++++++++++++++------
+>   drivers/memory/emif.h                   |    2 +-
+>   include/linux/platform_data/emif_plat.h |    1 +
+>   3 files changed, 78 insertions(+), 17 deletions(-)
+>
