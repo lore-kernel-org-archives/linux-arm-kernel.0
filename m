@@ -1,198 +1,163 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Dec 2012 10:07:54 +0000
-Subject: [PATCH 1/1 v2] gpio: Provide the STMPE GPIO driver with its own IRQ
- Domain
-In-Reply-To: <1353683949-9275-1-git-send-email-lee.jones@linaro.org>
-References: <1353683949-9275-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20121210100754.GB9362@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 10 Dec 2012 11:18:48 +0100
+Subject: [PATCH 11/12] ARM: ux500: Use the GPIO regulator framework for
+ SDI0's 'en' and 'vsel'
+In-Reply-To: <1355129761-8088-12-git-send-email-lee.jones@linaro.org>
+References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
+ <1355129761-8088-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAPDyKFo8NjiYdcyx3pk8byc1N2f7r+erQj74A1zhOaNK_WbkZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Author: Lee Jones <lee.jones@linaro.org>
-Date:   Fri Nov 23 12:36:23 2012 +0000
+On 10 December 2012 09:56, Lee Jones <lee.jones@linaro.org> wrote:
+> To prevent lots of unnecessary call-backs into platform code, we're
+> now using the GPIO regulator framework to control the 'enable' (en)
+> and 'voltage select' (vsel) GPIO pins which in turn control the
+> MMCI's secondary regulator settings. This already works with Device
+> Tree, but when booting with ATAGs we need to register it as a
+> platform device.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/mach-ux500/board-mop500.c |   61 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 61 insertions(+)
+>
+> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+> index daa4237..9f9fe7f 100644
+> --- a/arch/arm/mach-ux500/board-mop500.c
+> +++ b/arch/arm/mach-ux500/board-mop500.c
+> @@ -24,6 +24,8 @@
+>  #include <linux/mfd/abx500/ab8500.h>
+>  #include <linux/regulator/ab8500.h>
+>  #include <linux/regulator/fixed.h>
+> +#include <linux/regulator/driver.h>
+> +#include <linux/regulator/gpio-regulator.h>
+>  #include <linux/mfd/tc3589x.h>
+>  #include <linux/mfd/tps6105x.h>
+>  #include <linux/mfd/abx500/ab8500-gpio.h>
+> @@ -91,6 +93,54 @@ static struct platform_device snowball_gpio_en_3v3_regulator_dev = {
+>         },
+>  };
+>
+> +static struct regulator_consumer_supply sdi0_reg_consumers[] = {
+> +        REGULATOR_SUPPLY("vqmmc", NULL),
 
-    gpio: Provide the STMPE GPIO driver with its own IRQ Domain
-    
-    The STMPE GPIO driver can be used as an IRQ controller by some
-    related devices. Here we provide it with its very own IRQ Domain
-    so that IRQs can be issued dynamically. This will stand the
-    driver in good stead when it is enabled for Device Tree, as this
-    it a prerequisite.
-    
-    Cc: Grant Likely <grant.likely@secretlab.ca>
-    Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-    Signed-off-by: Lee Jones <lee.jones@linaro.org>
+REGULATOR_SUPPLY("vqmmc", "sdi0"),
 
-diff --git a/drivers/gpio/gpio-stmpe.c b/drivers/gpio/gpio-stmpe.c
-index dce3472..6365cd0 100644
---- a/drivers/gpio/gpio-stmpe.c
-+++ b/drivers/gpio/gpio-stmpe.c
-@@ -11,6 +11,7 @@
- #include <linux/slab.h>
- #include <linux/gpio.h>
- #include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/interrupt.h>
- #include <linux/mfd/stmpe.h>
- 
-@@ -28,6 +29,7 @@ struct stmpe_gpio {
- 	struct stmpe *stmpe;
- 	struct device *dev;
- 	struct mutex irq_lock;
-+	struct irq_domain *domain;
- 
- 	int irq_base;
- 	unsigned norequest_mask;
-@@ -103,7 +105,7 @@ static int stmpe_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
- {
- 	struct stmpe_gpio *stmpe_gpio = to_stmpe_gpio(chip);
- 
--	return stmpe_gpio->irq_base + offset;
-+	return irq_create_mapping(stmpe_gpio->domain, offset);
- }
- 
- static int stmpe_gpio_request(struct gpio_chip *chip, unsigned offset)
-@@ -132,7 +134,7 @@ static struct gpio_chip template_chip = {
- static int stmpe_gpio_irq_set_type(struct irq_data *d, unsigned int type)
- {
- 	struct stmpe_gpio *stmpe_gpio = irq_data_get_irq_chip_data(d);
--	int offset = d->irq - stmpe_gpio->irq_base;
-+	int offset = d->hwirq;
- 	int regoffset = offset / 8;
- 	int mask = 1 << (offset % 8);
- 
-@@ -199,7 +201,7 @@ static void stmpe_gpio_irq_sync_unlock(struct irq_data *d)
- static void stmpe_gpio_irq_mask(struct irq_data *d)
- {
- 	struct stmpe_gpio *stmpe_gpio = irq_data_get_irq_chip_data(d);
--	int offset = d->irq - stmpe_gpio->irq_base;
-+	int offset = d->hwirq;
- 	int regoffset = offset / 8;
- 	int mask = 1 << (offset % 8);
- 
-@@ -209,7 +211,7 @@ static void stmpe_gpio_irq_mask(struct irq_data *d)
- static void stmpe_gpio_irq_unmask(struct irq_data *d)
- {
- 	struct stmpe_gpio *stmpe_gpio = irq_data_get_irq_chip_data(d);
--	int offset = d->irq - stmpe_gpio->irq_base;
-+	int offset = d->hwirq;
- 	int regoffset = offset / 8;
- 	int mask = 1 << (offset % 8);
- 
-@@ -251,8 +253,9 @@ static irqreturn_t stmpe_gpio_irq(int irq, void *dev)
- 		while (stat) {
- 			int bit = __ffs(stat);
- 			int line = bank * 8 + bit;
-+			int virq = irq_find_mapping(stmpe_gpio->domain, line);
- 
--			handle_nested_irq(stmpe_gpio->irq_base + line);
-+			handle_nested_irq(virq);
- 			stat &= ~(1 << bit);
- 		}
- 
-@@ -267,38 +270,55 @@ static irqreturn_t stmpe_gpio_irq(int irq, void *dev)
- 	return IRQ_HANDLED;
- }
- 
--static int __devinit stmpe_gpio_irq_init(struct stmpe_gpio *stmpe_gpio)
-+int stmpe_gpio_irq_map(struct irq_domain *d, unsigned int virq,
-+		       irq_hw_number_t hwirq)
- {
--	int base = stmpe_gpio->irq_base;
--	int irq;
-+	struct stmpe_gpio *stmpe_gpio = d->host_data;
-+
-+	if (!stmpe_gpio)
-+		return -EINVAL;
- 
--	for (irq = base; irq < base + stmpe_gpio->chip.ngpio; irq++) {
--		irq_set_chip_data(irq, stmpe_gpio);
--		irq_set_chip_and_handler(irq, &stmpe_gpio_irq_chip,
--					 handle_simple_irq);
--		irq_set_nested_thread(irq, 1);
-+	irq_set_chip_data(hwirq, stmpe_gpio);
-+	irq_set_chip_and_handler(hwirq, &stmpe_gpio_irq_chip,
-+				 handle_simple_irq);
-+	irq_set_nested_thread(hwirq, 1);
- #ifdef CONFIG_ARM
--		set_irq_flags(irq, IRQF_VALID);
-+	set_irq_flags(hwirq, IRQF_VALID);
- #else
--		irq_set_noprobe(irq);
-+	irq_set_noprobe(hwirq);
- #endif
--	}
- 
- 	return 0;
- }
- 
--static void stmpe_gpio_irq_remove(struct stmpe_gpio *stmpe_gpio)
-+void stmpe_gpio_irq_unmap(struct irq_domain *d, unsigned int virq)
- {
--	int base = stmpe_gpio->irq_base;
--	int irq;
--
--	for (irq = base; irq < base + stmpe_gpio->chip.ngpio; irq++) {
- #ifdef CONFIG_ARM
--		set_irq_flags(irq, 0);
-+	set_irq_flags(virq, 0);
- #endif
--		irq_set_chip_and_handler(irq, NULL, NULL);
--		irq_set_chip_data(irq, NULL);
-+	irq_set_chip_and_handler(virq, NULL, NULL);
-+	irq_set_chip_data(virq, NULL);
-+}
-+
-+static const struct irq_domain_ops stmpe_gpio_irq_simple_ops = {
-+	.unmap = stmpe_gpio_irq_unmap,
-+	.map = stmpe_gpio_irq_map,
-+	.xlate = irq_domain_xlate_twocell,
-+};
-+
-+static int __devinit stmpe_gpio_irq_init(struct stmpe_gpio *stmpe_gpio)
-+{
-+	int base = stmpe_gpio->irq_base;
-+
-+	stmpe_gpio->domain = irq_domain_add_simple(NULL,
-+				stmpe_gpio->chip.ngpio, base,
-+				&stmpe_gpio_irq_simple_ops, stmpe_gpio);
-+	if (!stmpe_gpio->domain) {
-+		dev_err(stmpe_gpio->dev, "failed to create irqdomain\n");
-+		return -ENOSYS;
- 	}
-+
-+	return 0;
- }
- 
- static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
-@@ -348,7 +368,7 @@ static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
- 				IRQF_ONESHOT, "stmpe-gpio", stmpe_gpio);
- 		if (ret) {
- 			dev_err(&pdev->dev, "unable to get irq: %d\n", ret);
--			goto out_removeirq;
-+			goto out_disable;
- 		}
- 	}
- 
-@@ -368,9 +388,6 @@ static int __devinit stmpe_gpio_probe(struct platform_device *pdev)
- out_freeirq:
- 	if (irq >= 0)
- 		free_irq(irq, stmpe_gpio);
--out_removeirq:
--	if (irq >= 0)
--		stmpe_gpio_irq_remove(stmpe_gpio);
- out_disable:
- 	stmpe_disable(stmpe, STMPE_BLOCK_GPIO);
- out_free:
-@@ -398,10 +415,9 @@ static int __devexit stmpe_gpio_remove(struct platform_device *pdev)
- 
- 	stmpe_disable(stmpe, STMPE_BLOCK_GPIO);
- 
--	if (irq >= 0) {
-+	if (irq >= 0)
- 		free_irq(irq, stmpe_gpio);
--		stmpe_gpio_irq_remove(stmpe_gpio);
--	}
-+
- 	platform_set_drvdata(pdev, NULL);
- 	kfree(stmpe_gpio);
+> +};
+> +
+> +static struct regulator_init_data sdi0_reg_init_data = {
+
+The levelshifter uses the ab8500-ext-supply3. Reflect that here.
+
+.supply_regulator = "ab8500-ext-supply3"
+
+
+> +        .constraints = {
+> +                .min_uV         = 1800000,
+
+2.9V, not 3.3V
+
+> +                .max_uV         = 3300000,
+> +                .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|REGULATOR_CHANGE_STATUS,
+> +        },
+> +        .num_consumer_supplies  = ARRAY_SIZE(sdi0_reg_consumers),
+> +        .consumer_supplies      = sdi0_reg_consumers,
+> +};
+> +
+> +/* Dynamically populated. */
+> +static struct gpio sdi0_reg_gpios[] = {
+> +        { 0, GPIOF_OUT_INIT_LOW, "mmci_vsel" },
+> +};
+> +
+> +static struct gpio_regulator_state sdi0_reg_states[] = {
+> +        { .value = 3300000, .gpios = (0 << 0) },
+
+2.9V, not 3.3V
+
+> +        { .value = 1800000, .gpios = (1 << 0) },
+> +};
+> +
+> +static struct gpio_regulator_config sdi0_reg_info = {
+> +        .supply_name = "mmci-reg",
+> +
+> +        .enable_high = 1,
+> +        .enabled_at_boot = 0,
+> +
+> +        .gpios = sdi0_reg_gpios,
+> +        .nr_gpios = ARRAY_SIZE(sdi0_reg_gpios),
+> +
+> +        .states = sdi0_reg_states,
+> +        .nr_states = ARRAY_SIZE(sdi0_reg_states),
+> +
+> +        .type = REGULATOR_VOLTAGE,
+> +        .init_data = &sdi0_reg_init_data,
+> +};
+> +
+> +static struct platform_device sdi0_regulator = {
+> +        .name = "gpio-regulator",
+> +        .id   = -1,
+> +        .dev  = {
+> +                .platform_data = &sdi0_reg_info,
+> +        },
+> +};
+> +
+>  static struct ab8500_gpio_platform_data ab8500_gpio_pdata = {
+>         .gpio_base              = MOP500_AB8500_PIN_GPIO(1),
+>         .irq_base               = MOP500_AB8500_VIR_GPIO_IRQ_BASE,
+> @@ -440,6 +490,7 @@ static struct hash_platform_data u8500_hash1_platform_data = {
+>  /* add any platform devices here - TODO */
+>  static struct platform_device *mop500_platform_devs[] __initdata = {
+>         &mop500_gpio_keys_device,
+> +       &sdi0_regulator,
+>  };
+>
+>  #ifdef CONFIG_STE_DMA40
+> @@ -581,6 +632,7 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+>         &snowball_key_dev,
+>         &snowball_sbnet_dev,
+>         &snowball_gpio_en_3v3_regulator_dev,
+> +       &sdi0_regulator,
+>  };
+>
+>  static void __init mop500_init_machine(void)
+> @@ -591,6 +643,9 @@ static void __init mop500_init_machine(void)
+>
+>         mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
+>
+> +       sdi0_reg_info.enable_gpio = GPIO_SDMMC_EN;
+> +       sdi0_reg_info.gpios[0].gpio = GPIO_SDMMC_1V8_3V_SEL;
+> +
+>         mop500_pinmaps_init();
+>         parent = u8500_init_devices(&ab8500_platdata);
+>
+> @@ -623,6 +678,9 @@ static void __init snowball_init_machine(void)
+>         struct device *parent = NULL;
+>         int i;
+>
+> +       sdi0_reg_info.enable_gpio = SNOWBALL_SDMMC_EN_GPIO;
+> +       sdi0_reg_info.gpios[0].gpio = SNOWBALL_SDMMC_1V8_3V_GPIO;
+> +
+>         snowball_pinmaps_init();
+>         parent = u8500_init_devices(&ab8500_platdata);
+>
+> @@ -655,6 +713,9 @@ static void __init hrefv60_init_machine(void)
+>          */
+>         mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
+>
+> +       sdi0_reg_info.enable_gpio = HREFV60_SDMMC_EN_GPIO;
+> +       sdi0_reg_info.gpios[0].gpio = HREFV60_SDMMC_1V8_3V_GPIO;
+> +
+>         hrefv60_pinmaps_init();
+>         parent = u8500_init_devices(&ab8500_platdata);
+>
+> --
+> 1.7.9.5
+>
+
+Finally, I suppose regulator inits i located in
+board-mop500-regulators.c, so I would suggest to move most of this
+code in there instead.
+
+Kind regards
+Ulf Hansson
