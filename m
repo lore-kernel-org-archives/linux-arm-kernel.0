@@ -1,72 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Dec 2012 22:34:42 +0000
-Subject: [RFC v1 01/16] lib: devres: don't enclose pcim_*() functions in
- CONFIG_HAS_IOPORT
-In-Reply-To: <20121211162325.GR14363@n2100.arm.linux.org.uk>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201212111615.03262.arnd@arndb.de>
- <20121211162325.GR14363@n2100.arm.linux.org.uk>
-Message-ID: <201212112234.42352.arnd@arndb.de>
+Date: Tue, 11 Dec 2012 22:38:19 +0000
+Subject: [PATCH V3] ARM: bcm281xx: Add timer driver
+In-Reply-To: <50C7993B.4070201@wwwdotorg.org>
+References: <1355250387-622-1-git-send-email-csd@broadcom.com>
+ <50C785DD.8030407@broadcom.com> <50C7993B.4070201@wwwdotorg.org>
+Message-ID: <201212112238.19528.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 December 2012, Russell King - ARM Linux wrote:
+On Tuesday 11 December 2012, Stephen Warren wrote:
+> Olof, Arnd, that brings me to the question of:
 > 
-> On Tue, Dec 11, 2012 at 04:15:02PM +0000, Arnd Bergmann wrote:
-> > On Tuesday 11 December 2012, Thomas Petazzoni wrote:
-> > > On Tue, 11 Dec 2012 10:43:49 +0000, Arnd Bergmann wrote:
-> > > > On Friday 07 December 2012, Thomas Petazzoni wrote:
-> > > > > The pcim_*() functions are used by the libata-sff subsystem, and this
-> > > > > subsystem is used for many SATA drivers on ARM platforms that do not
-> > > > > necessarily have I/O ports.
-> > > > 
-> > > > I think this one is wrong as the CONFIG_HAS_IOPORT does not refer to the
-> > > > presence of PIO ports but to whether or not they provide an ioport_map
-> > > > function. If there is no ioport_map(), devm_pci_iomap will fail to link
-> > > > as far as I can tell.
-> > > 
-> > > The problem is that on ARCH_MULTI_V7, ARCH_VEXPRESS is forcefully
-> > > enabled. And ARCH_VEXPRESS selects NO_IOPORT.. so you don't have the
-> > > pcim_*() functions, and therefore libata-sff.c (needed for many SATA
-> > > drivers) will not build. How do you solve this?
-> > 
-> > What you describe here are probable two bugs, and we should fix both:
-> > 
-> > * ARCH_VEXPRESS should not select NO_IOPORT. It's generally wrong
-> >   to select this in combination with ARCH_MULTIPLATFORM, when some
-> >   of the other platforms you may enable actually have IOPORT mapping
-> >   support.
+> Should I:
 > 
-> No.  ARCH_VEXPRESS selects NO_IOPORT because it does not support
-> PCI/ISA IO space.  That in itself is reasonable, but what isn't
-> reasonable is the negative logic being used.  Negative logic in
-> the config system always tends to provoke this kind of sillyness
-> because you're selecting something to be excluded which another
-> platform may require.
+> a) Add that branch into linux-next (e.g. via the Tegra tree's for-next)
+> right after v3.8-rc1, let is sit there for a week or two (to allow
+> rebasing to squash in any fixes that show up as being needed), and then
+> send a pull request to arm-soc as a stable branch,
+> 
+> or:
+> 
+> b) Send a pull request to arm-soc right after 3.8-rc1, and let you do
+> any rebasing/squashing needed, before declaring it stable say around
+> 3.8-rc2 or 3.8-rc3?
 
-Exactly, that is what I meant. Sorry if I wasn't clear enough.
-
-> We should instead have HAVE_IOPORT and platforms which need ISA/PCI IO
-> space support should select this symbol instead - so it becomes an
-> inclusive feature rather than an exclusive feature.
-
-Right. Note that HAS_IOPORT already exists and is defined as
-
-config HAS_IOPORT
-        boolean
-        depends on HAS_IOMEM && !NO_IOPORT
-        default y
-
-If we change it to
-
-config HAS_IOPORT
-        boolean
-        depends on HAS_IOMEM
-        default !NO_IOPORT
-
-then we can actually select both NO_IOPORT and HAS_IOPORT with the result
-of getting HAS_IOPORT. It is a bit confusing though to have both enabled,
-so we might still want to use an approach where we only select NO_IOPORT
-if we are sure that we can't have it.
+I think either way works fine. The first one is less work for us though ;-)
 
 	Arnd
