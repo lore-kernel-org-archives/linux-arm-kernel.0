@@ -1,26 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Dec 2012 10:15:51 +0100
-Subject: [RESEND PATCH 0/5] cpufreq: db8500: Rename driver and update some
- parts
-In-Reply-To: <1355153142-9534-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1355153142-9534-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdYE+WcOqbB0whqW+bKVOXmdAmF0rCFacsYkREu=gPGXew@mail.gmail.com>
+Date: Tue, 11 Dec 2012 10:17:13 +0100
+Subject: [PATCH 06/12] ARM: ux500: Set correct MMCI regulator voltages in
+ the ux5x0 Device Tree
+In-Reply-To: <1355129761-8088-7-git-send-email-lee.jones@linaro.org>
+References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
+ <1355129761-8088-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZJFbHSwowKnfWyXLckVePHrC6o2CtDJaFb+dXTkNYPjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 4:25 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+On Mon, Dec 10, 2012 at 9:55 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> From: Ulf Hansson <ulf.hansson@linaro.org>
+> The voltages for the MMCI GPIO controlled voltage regulation differ
+> depending on who you believe and where you pick the information up
+> from. More recent internal code suggests that the true upper voltage
+> from the shifter is actually v3.3, instead of the previously
+> indicated v2.9. Let's mirror that change in the Device Tree file.
 >
-> This patchset starts by renaming the db8500 cpufreq driver to a more generic
-> name. There are new variants which rely on it too, so instead we give it a
-> family name of dbx500.
->
-> On top of that a fixup patch for initialization of the driver and some minor
-> cleanup patches are included as well.
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-For all patches.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
