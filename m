@@ -1,48 +1,64 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Mon, 10 Dec 2012 20:58:09 -0500
-Subject: [PATCH 1/2] mmc: slot-gpio: use devm_* managed functions to ease
- users
-In-Reply-To: <20121207144006.GB30468@S2100-06.ap.freescale.net> (Shawn Guo's
- message of "Fri, 7 Dec 2012 22:40:10 +0800")
-References: <1354887168-3073-1-git-send-email-shawn.guo@linaro.org>
- <Pine.LNX.4.64.1212071438010.24520@axis700.grange>
- <20121207144006.GB30468@S2100-06.ap.freescale.net>
-Message-ID: <87d2yh4afi.fsf@octavius.laptop.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 10 Dec 2012 20:30:25 -0600
+Subject: [PATCH 2/7] arm64: Add dtbs target for building all the enabled
+ dtb files
+In-Reply-To: <20121210180442.GA691@arm.com>
+References: <1354914392-9634-1-git-send-email-catalin.marinas@arm.com>
+ <1354914392-9634-3-git-send-email-catalin.marinas@arm.com>
+ <50C263EC.70209@gmail.com> <20121210180442.GA691@arm.com>
+Message-ID: <50C69AC1.2050401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn, Guennadi,
+On 12/10/2012 12:04 PM, Catalin Marinas wrote:
+> On Fri, Dec 07, 2012 at 09:47:24PM +0000, Rob Herring wrote:
+>> On 12/07/2012 03:06 PM, Catalin Marinas wrote:
+>>> Based on Rob Herring's patches for arch/arm, this patch adds a dtbs
+>>> target to arch/arm64/boot/Makefile. In the process, also clean up the
+>>> unused MACHINE variable.
+>>>
+>>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+>>> ---
+>>>
+>>> I'll drop this patch once Rob pushes his version into linux-next (or
+>>> mainline).
+>>
+>> This and Stephen's dtb rule series are in linux-next now.
+> 
+> One minor fix needed. Please merge or fold it, whatever is easier.
+> Thanks.
+> 
+> -----------------------8<------------------------------
+> 
+> From addc6b45f915f6bbab238a2edd2072f3b474e673 Mon Sep 17 00:00:00 2001
+> From: Catalin Marinas <catalin.marinas@arm.com>
+> Date: Wed, 21 Nov 2012 11:44:59 +0000
+> Subject: [PATCH] arm64: Fix the dtbs target building
+> 
+> The arch/arm64/Makefile was not passing the right target to the
+> boot/dts/Makefile.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 
-On Fri, Dec 07 2012, Shawn Guo wrote:
->> > Use devm_* managed functions, so that slot-gpio users do not have to
->> > call mmc_gpio_free_ro/cd to free up resources requested in
->> > mmc_gpio_request_ro/cd.
->> > 
->> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->> 
->> Thanks for the patch, but I'm not sure this is a good idea. Firstly, using 
->> devm_* allocation functions means, that normally you don't have to free 
->> these resources explicitly any more. So, actually you would have to remove 
->> free_irq() and gpio_free() calls completely from the API instead of 
->> replacing them with devm_* analogs.
->
-> With the changes, most of the slot-gpio users will only need to call
-> mmc_gpio_request_* functions at probe time, nothing else.  That said,
-> they will not call mmc_gpio_free_* functions at all.  I patched
-> mmc_gpio_free_* functions replacing free_irq() and gpio_free() with
-> devm_* versions to 1) ease the migration of exiting users calling
-> mmc_gpio_free_*; 2) provide a mean for users to manually free resources
-> for whatever reasons.
+Applied. Thanks.
 
-I'd like to find a way to merge this -- maybe we can compromise by
-adding a comment or some documentation that explains that you need to be
-careful (and use _request_* and _free_*) to avoid allocating more than
-once if you're doing something odd like runtime switching between CD
-methods?
+Rob
 
-Thanks!
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+> ---
+>  arch/arm64/Makefile | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index 11c3599..c95c5cb 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -58,7 +58,7 @@ zinstall install: vmlinux
+>  	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
+>  
+>  dtbs: scripts
+> -	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
+> +	$(Q)$(MAKE) $(build)=$(boot)/dts dtbs
+>  
+>  # We use MRPROPER_FILES and CLEAN_FILES now
+>  archclean:
+> 
