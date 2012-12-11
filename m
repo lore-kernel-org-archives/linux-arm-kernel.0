@@ -1,163 +1,216 @@
-From: rbernd@gmail.com (Bernd)
-Date: Tue, 11 Dec 2012 01:43:28 +0100
-Subject: Your kernel patches for the Marvell Mirabox
-In-Reply-To: <20121210140202.GI21694@titan.lakedaemon.net>
-References: <50C4AC68.7090709@gmail.com>
- <20121210140202.GI21694@titan.lakedaemon.net>
-Message-ID: <50C681B0.4030801@gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 10 Dec 2012 18:18:02 -0700
+Subject: [PATCH 2/3] ARM: Orion: Bind the orion bridge interrupt controller
+ through DT
+In-Reply-To: <1355188683-18208-1-git-send-email-jgunthorpe@obsidianresearch.com>
+References: <1355188683-18208-1-git-send-email-jgunthorpe@obsidianresearch.com>
+Message-ID: <1355188683-18208-2-git-send-email-jgunthorpe@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+This adds the common DT code and board support for kirkwood and dove
 
-Thanks for your explanations on the dtb. I tried it but it didn't work
-for me:
+- Add the marvell,orion-bridge-intc DT node to the DTSI file
+- Make the call to orion_bridge_irq_init happen only in the non-DT
+  case
 
-1. Turns out that mvebu_defconfig has the right settings already:
+Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+---
+ .../devicetree/bindings/arm/mrvl/intc.txt          |   21 ++++++++++++++++++++
+ arch/arm/boot/dts/dove.dtsi                        |   10 +++++++++
+ arch/arm/boot/dts/kirkwood.dtsi                    |   12 +++++++++++
+ arch/arm/mach-dove/common.c                        |    4 ---
+ arch/arm/mach-dove/irq.c                           |    5 ++++
+ arch/arm/mach-kirkwood/common.c                    |    4 ---
+ arch/arm/mach-kirkwood/irq.c                       |    5 ++++
+ arch/arm/plat-orion/irq.c                          |   20 +++++++++++++++++++
+ 8 files changed, 73 insertions(+), 8 deletions(-)
 
-CONFIG_ARM_APPENDED_DTB=y
-
-and, for enabling early debug messages:
-
-CONFIG_DEBUG_LL=y
-CONFIG_DEBUG_MVEBU_UART=y
-CONFIG_DEBUG_LL_INCLUDE="debug/mvebu.S"
-CONFIG_EARLY_PRINTK=y
-
-2. So this is what I am using to build the kernel:
-
-$ make ARCH=arm mvebu_defconfig
-$ make -j4 ARCH=arm CROSS_COMPILE=../arm-2012.09/bin/arm-none-eabi- zImage
-$ make ARCH=arm CROSS_COMPILE=../arm-2012.09/bin/arm-none-eabi-
-armada-370-mirabox.dtb
-$ cat arch/arm/boot/armada-370-mirabox.dtb >> arch/arm/boot/zImage
-$ make ARCH=arm CROSS_COMPILE=../arm-2012.09/bin/arm-none-eabi- uImage
-
-That builds a legacy uImage which, the way I understand your
-explanations, hides the dtb from my old u-boot but the kernel will find
-it anyway:
-
-$ mkimage -l arch/arm/boot/uImage
-Image Name:   Linux-3.7.0-rc7-00250-g0c0029c
-Created:      Tue Dec 11 01:13:13 2012
-Image Type:   ARM Linux Kernel Image (uncompressed)
-Data Size:    1885555 Bytes = 1841.36 kB = 1.80 MB
-Load Address: fffffff2
-Entry Point:  fffffff2
-
-3. My host distro doesn't have the uboot-tools in the package
-repository, but I downloaded the most current uboot distribution
-ftp://ftp.denx.de/pub/u-boot/u-boot-2012.10.tar.bz2 and now use the
-mkimage tool produced by 'make tools', just to be sure I am not using a
-broken mkimage.
-
-4. In u-boot, I've set bootargs to:
-
-Marvell>> printenv bootargs
-bootargs=console=ttyS0,115200 root=/dev/sdb2 rootdelay=2 rootfstype=ext4
-earlyprintk=serial,uart0,115200
-
-so earlyprintk is set on the kernel command line.
-
-5. When booting the kernel via tftp, I get:
---------------------------------------------
-Marvell>> tftpboot 0x6400000 uImage3.7.0-rc7mirabox ; bootm 0x6400000
-phyaddr= 0
-Using egiga0 device
-TFTP from server 192.168.1.10; our IP address is 192.168.1.138
-Filename 'uImage3.7.0-rc7mirabox'.
-Load address: 0x6400000
-Loading: #################################################################
-################################################################
-done
-Bytes transferred = 1885619 (1cc5b3 hex)
-## Booting kernel from Legacy Image at 06400000 ...
-   Image Name:   Linux-3.7.0-rc7-00250-g0c0029c
-   Created:      2012-12-11   0:13:13 UTC
-   Image Type:   ARM Linux Kernel Image (uncompressed)
-   Data Size:    1885555 Bytes =  1.8 MB
-   Load Address: fffffff2
-   Entry Point:  fffffff2
-   Verifying Checksum ... OK
-   Loading Kernel Image ... OK
-OK
-
-Starting kernel ...
-
---------------------------------------------
-
-No debug messages and the box hangs.
-
-When that failed, I tried to set in addition the configuration parameters
-
-CONFIG_ARM_ATAG_DTB_COMPAT=y
-CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
-
-and rebuilt the kernel, but got the same result.
-
-Any idea?
-
-Cheers,
-
-Bernd
-
-
-On 2012-12-10 15:02, Jason Cooper wrote:
-> On Sun, Dec 09, 2012 at 04:21:12PM +0100, Bernd wrote:
->> Hello Jason,
-> 
-> Hi Bernd!
-> 
->> If you don't take questions about your patches by direct email, could
->> you point me to a mailing list which is more appropriate for asking such
->> a question?
-> 
-> I prefer including, at a minimum, the Linux ARM Kernel mailinglist in
-> the discussion.  I've included it in the CC: now.  Adding my address to
-> the To: or CC: helps it stand out from the crowd, so no problem there.
-> 
->> If you do take questions about it, here is what I did:
->>
->> I got the kernel source from
->>
->> git://github.com/MISL-EBU-System-SW/mainline-public.git
->>
->> commit 0c0029cb1806601430692d48c130a17302a18225, where Olof Johannson
->> merged your changes for initial Mirabox support on top of Linus
->> Torvalds' 3.7-rc7.
->>
->> I built the kernel using the cross toolchain for ARM EABI from
->> https://sourcery.mentor.com/GNUToolchain/release2322?lite=arm and
->> uboot-mkimage from
->> http://rapidlibrary.com/files/uboot-mkimage-0-4-tar-gz_ulzywyzvfni89on.html:
-> 
-> Most linux distro's I've seen include a 'uboot-tools' or 'uboot-utils'
-> that you can install via the package manager.  No need to pull it from
-> unknown places.
-> 
->> $ make ARCH=arm mvebu_defconfig
->> $ make -j4 ARCH=arm CROSS_COMPILE=../arm-2012.09/bin/arm-none-eabi- uImage
-> 
-> Here's the problem.  The stock u-boot installed by the manufacturer
-> doesn't support devicetree.  It uses the old method of handing the
-> kernel a mach_type number to tell the kernel which board init it should
-> call.  'boardid' in the u-boot environment.
-> 
-> The new method is to hand the kernel an address where the dtb (device
-> tree blob) was loaded into RAM.
-> 
-> You have two choices, upgrade u-boot (sizeable task), or use a developer
-> configuration option included in the kernel, CONFIG_ARM_APPENDED_DTB.
-> Once set, you need to make a zImage, append
-> arch/arm/boot/armada-<board>.dtb to the zImage, then turn the zImage
-> into a uImage.
-> 
-> In u-boot you'll need to change the boardid environment variable to
-> 0xffffffff, which needs to be in unsigned integer notation, 4294967295.
-> 
-> In general, you'll want to enable CONFIG_EARLY_PRINTK, and make sure
-> earlyprintk is in your kernel command line options.
-> 
-> hth,
-> 
-> Jason.
+diff --git a/Documentation/devicetree/bindings/arm/mrvl/intc.txt b/Documentation/devicetree/bindings/arm/mrvl/intc.txt
+index 8b53273..cf633f1 100644
+--- a/Documentation/devicetree/bindings/arm/mrvl/intc.txt
++++ b/Documentation/devicetree/bindings/arm/mrvl/intc.txt
+@@ -58,3 +58,24 @@ Example:
+                 reg = <0xfed20204 0x04>,
+ 		      <0xfed20214 0x04>;
+         };
++
++* Marvell Orion Bridge Interrupt controller
++
++Required properties
++- compatible :  Should be "marvell,orion-bridge-intc".
++- #interrupt-cells: Specifies the number of cells needed to encode an
++  interrupt source. Supported value is <1>.
++- interrupt-controller : Declare this node to be an interrupt controller.
++- interrupts: The interrupt number the bridge is attached to on the main
++              controller.
++- reg : Interrupt cause address.
++
++Example:
++
++	bridge_intc: bridge_intc at 20110 {
++		compatible = "marvell,orion-bridge-intc";
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		interrupts = <1>;
++		reg = <0x20110 0x08>;
++        };
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 5a00022..b726ba8 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -67,6 +67,8 @@
+ 			status = "disabled";
+ 		};
+ 
++		/* The interrupt controller stanzas are in an
++		 * order that matches irqs.h */
+ 		gpio0: gpio at d0400 {
+ 			compatible = "marvell,orion-gpio";
+ 			#gpio-cells = <2>;
+@@ -93,6 +95,14 @@
+ 			ngpio = <8>;
+ 		};
+ 
++		bridge_intc: bridge_intc at 20110 {
++			compatible = "marvell,orion-bridge-intc";
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			interrupts = <0>;
++			reg = <0x20110 0x08>;
++		};
++
+ 		spi0: spi at 10600 {
+ 			compatible = "marvell,orion-spi";
+ 			#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 4e5b815..854e532 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -19,6 +19,8 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 
++		/* The interrupt controller stanzas are in an
++		 * order that matches irqs.h */
+ 		gpio0: gpio at 10100 {
+ 			compatible = "marvell,orion-gpio";
+ 			#gpio-cells = <2>;
+@@ -37,6 +39,14 @@
+ 			interrupts = <39>, <40>, <41>;
+ 		};
+ 
++		bridge_intc: bridge_intc at 20110 {
++			compatible = "marvell,orion-bridge-intc";
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			interrupts = <1>;
++			reg = <0x20110 0x08>;
++		};
++
+ 		serial at 12000 {
+ 			compatible = "ns16550a";
+ 			reg = <0x12000 0x100>;
+@@ -73,6 +83,8 @@
+ 
+ 		wdt at 20300 {
+ 			compatible = "marvell,orion-wdt";
++			interrupt-parent = <&bridge_intc>;
++			interrupts = <3>;
+ 			reg = <0x20300 0x28>;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index 6bad21b..b570211 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -243,10 +243,6 @@ static int __init dove_find_tclk(void)
+ static void __init dove_timer_init(void)
+ {
+ 	dove_tclk = dove_find_tclk();
+-	if (orion_bridge_irq_init(IRQ_DOVE_BRIDGE,
+-				  IRQ_DOVE_BRIDGE_START,
+-				  BRIDGE_CAUSE, NULL))
+-		panic("Unable to setup bridge irqs");
+ 	orion_time_init(IRQ_DOVE_BRIDGE_TIMER1, dove_tclk);
+ }
+ 
+diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
+index bc4344a..bcb193f 100644
+--- a/arch/arm/mach-dove/irq.c
++++ b/arch/arm/mach-dove/irq.c
+@@ -139,4 +139,9 @@ void __init dove_init_irq(void)
+ 		set_irq_flags(i, IRQF_VALID);
+ 	}
+ 	irq_set_chained_handler(IRQ_DOVE_PMU, pmu_irq_handler);
++
++	if (orion_bridge_irq_init(IRQ_DOVE_BRIDGE,
++				  IRQ_DOVE_BRIDGE_START,
++				  BRIDGE_CAUSE, NULL))
++		panic("Unable to setup bridge irqs");
+ }
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index ccd3ed5..7398f8b 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -535,10 +535,6 @@ static void __init kirkwood_timer_init(void)
+ {
+ 	kirkwood_tclk = kirkwood_find_tclk();
+ 
+-	if (orion_bridge_irq_init(IRQ_KIRKWOOD_BRIDGE,
+-				  IRQ_KIRKWOOD_BRIDGE_START,
+-				  BRIDGE_CAUSE, NULL))
+-		panic("Unable to setup bridge irqs");
+ 	orion_time_init(IRQ_KIRKWOOD_BRIDGE_TIMER1, kirkwood_tclk);
+ }
+ 
+diff --git a/arch/arm/mach-kirkwood/irq.c b/arch/arm/mach-kirkwood/irq.c
+index 8847035..a1388ef 100644
+--- a/arch/arm/mach-kirkwood/irq.c
++++ b/arch/arm/mach-kirkwood/irq.c
+@@ -41,4 +41,9 @@ void __init kirkwood_init_irq(void)
+ 			IRQ_KIRKWOOD_GPIO_START, gpio0_irqs);
+ 	orion_gpio_init(NULL, 32, 18, GPIO_HIGH_VIRT_BASE, 0,
+ 			IRQ_KIRKWOOD_GPIO_START + 32, gpio1_irqs);
++
++	if (orion_bridge_irq_init(IRQ_KIRKWOOD_BRIDGE,
++				  IRQ_KIRKWOOD_BRIDGE_START,
++				  BRIDGE_CAUSE, NULL))
++		panic("Unable to setup bridge irqs");
+ }
+diff --git a/arch/arm/plat-orion/irq.c b/arch/arm/plat-orion/irq.c
+index a903012..2dcccda 100644
+--- a/arch/arm/plat-orion/irq.c
++++ b/arch/arm/plat-orion/irq.c
+@@ -131,9 +131,29 @@ static int __init orion_add_irq_domain(struct device_node *np,
+ 	return 0;
+ }
+ 
++static int __init orion_add_bridge_irq_domain(
++	struct device_node *np, struct device_node *interrupt_parent)
++{
++	void __iomem *base;
++	int bridge_irq;
++
++	base = of_iomap(np, 0);
++	if (!base)
++		return -ENODEV;
++	bridge_irq = irq_of_parse_and_map(np, 0);
++	/* FIXME: irq_of_parse_and_map returns 0 on error, but on Dove the
++	 * bridge IRQ is 0.
++	if (!bridge_irq)
++		return -ENODEV;*/
++
++	return orion_bridge_irq_init(bridge_irq, -1, base, np);
++}
++
+ static const struct of_device_id orion_irq_match[] = {
+ 	{ .compatible = "marvell,orion-intc",
+ 	  .data = orion_add_irq_domain, },
++	{ .compatible = "marvell,orion-bridge-intc",
++	  .data = orion_add_bridge_irq_domain, },
+ 	{},
+ };
+ 
+-- 
+1.7.5.4
