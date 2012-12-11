@@ -1,45 +1,53 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Dec 2012 13:36:11 -0700
-Subject: [PATCH V3] ARM: bcm281xx: Add timer driver
-In-Reply-To: <50C785DD.8030407@broadcom.com>
-References: <1355250387-622-1-git-send-email-csd@broadcom.com>
- <50C78330.7040605@wwwdotorg.org> <50C785DD.8030407@broadcom.com>
-Message-ID: <50C7993B.4070201@wwwdotorg.org>
+Date: Tue, 11 Dec 2012 13:49:05 -0700
+Subject: [PATCH 2/2] pinctrl: skip deferral of hogs
+In-Reply-To: <1355232965-16596-1-git-send-email-linus.walleij@stericsson.com>
+References: <1355232965-16596-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <50C79C41.8070305@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2012 12:13 PM, Christian Daudt wrote:
-> On 12-12-11 11:02 AM, Stephen Warren wrote:
->> On 12/11/2012 11:26 AM, Christian Daudt wrote:
->>> This adds support for the Broadcom timer, used in the following SoCs:
->>> BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
+On 12/11/2012 06:36 AM, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Up until now, as hogs were always taken at the end of the
+> pin control device registration, it didn't cause any problem.
+> But when starting to hog pins from the device core it will
+> cause deferral of the pin controller device itself since the
+> default pin fetch is done *before* the device probes, so
+> let's fix this annoyance (which is also aesthetically ugly).
 
->> For 3.9, you'll need to rebase it on top of my struct sys_timer removal
->> series, which I hope to put into linux-next ASAP after 3.8-rc1 comes out.
->
-> Is there a git repo where I can look into this right now ? If so I can
-> already look at what diffs will be required for this.
+I guess this is OK, although I can't quite get over the feeling of it
+being a bit of a hack.
 
-Sure, it's at:
+The issue is IIUC that the driver core is going to call pinctrl_get()
+for any device before it's probed, and if it succeeds it will select the
+default state, but this patch deliberately fails the pinctrl_get() for a
+pin controller, and hence relies on pinctrl_register() making a second
+attempt at pinctrl_get(), and also activating the default state there.
+That's a bit of duplication and rather asymmetric.
 
-git://nv-tegra.nvidia.com/user/swarren/linux-2.6 arm_timer_rework
+That all said, I don't really see what we can do better, so I won't object!
 
-Note that branch gets rebased, as I move it forward on to newer linux
-next periodically. Once 3.8-rc1 comes out and I have a final stable
-version, I'll arrange to get it into arm-soc, so it can be used as a
-base for other people's patches.
+Oh, one comment on the patch. It returns -ENODEV as soon as any hog is
+seen. Just in case someone does something wierd, shouldn't it accumulate
+the "worst-case" return value and not return early? Consider a pin
+controller whose mapping table entries contain both hogs, /and/ entries
+that use a different pin controller. That's a little contrived, but
+trivial to actually do. As such, I think we want something more like:
 
-Olof, Arnd, that brings me to the question of:
+ret = 0
+for every mapping table entry:
+    if can't find pinctrl device:
+        if map entry is a hog:
+            # Requiring defer is a worst case, so defer the return!
+            ret = -ENODEV
+        else:
+            # This is worst-case, so can return now
+            return -EPROBE_DEFER
+if ret:
+    cleanup
+return ret
 
-Should I:
-
-a) Add that branch into linux-next (e.g. via the Tegra tree's for-next)
-right after v3.8-rc1, let is sit there for a week or two (to allow
-rebasing to squash in any fixes that show up as being needed), and then
-send a pull request to arm-soc as a stable branch,
-
-or:
-
-b) Send a pull request to arm-soc right after 3.8-rc1, and let you do
-any rebasing/squashing needed, before declaring it stable say around
-3.8-rc2 or 3.8-rc3?
+That way, if a mapping table entry requiring defer comes after a hog,
+we'll still return the correct value.
