@@ -1,111 +1,359 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 11 Dec 2012 21:13:20 +0800
-Subject: [PATCH 3/7] ARM i.MX5: switch IPU clk support to devicetree
- bindings
-In-Reply-To: <20121211091453.GO10369@pengutronix.de>
-References: <1352733809-27230-1-git-send-email-s.hauer@pengutronix.de>
- <1352733809-27230-4-git-send-email-s.hauer@pengutronix.de>
- <20121211055657.GA28581@S2101-09.ap.freescale.net>
- <20121211091453.GO10369@pengutronix.de>
-Message-ID: <20121211131317.GB10128@S2101-09.ap.freescale.net>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Tue, 11 Dec 2012 14:06:32 +0100
+Subject: [PATCH] mmc: mmci: Fixup and cleanup code for DMA handling
+Message-ID: <1355231192-4035-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 11, 2012 at 10:14:53AM +0100, Sascha Hauer wrote:
-> I just tested it, this seems to be a bit complicated. I can confirm that
-> with IPU disabled the last message I see from the kernel is:
-> 
-> IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
-> 
-> When the IPU is enabled everything is fine. In my testing the IPU was
-> enabled, in the end that was the motivation of the whole series.
-> 
-> It seems to be that the system does not work when the MIPI/HSP clocks
-> are enabled and the IPU clock is disabled. I found some reserved bits
-> in the reference manual. Could you try the following and see if it fixes
-> your problem?
-> 
-Yes, it fixes my problem.  Thanks for the quick fixing.
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-> 
-> From 7d6eca0b10c1a1e2f13c229f6c6c8d6541926dd5 Mon Sep 17 00:00:00 2001
-> From: Sascha Hauer <s.hauer@pengutronix.de>
-> Date: Tue, 11 Dec 2012 10:08:50 +0100
-> Subject: [PATCH] ARM i.MX51 clock: Fix regression since enabling MIPI/HSP
->  clocks
-> 
-> The MIPI/HSP clocks were recently turned on in the i.MX51 clock tree.
-> It turned out that the system does not work properly when the MIPI/HSP
-> clocks are enabled, but the IPU clock is disabled. This happens when
-> IPU support is disabled. In this case the IPU clock gets disabled when
-> the clock framework turns off unused clock in a late_initcall. This
-> is broken since:
-> 
-> | commit 9a2d4825a9368e018003a2732a61be063d178f67
-> | Author: Sascha Hauer <s.hauer@pengutronix.de>
-> | Date:   Tue Jun 5 13:53:32 2012 +0200
-> |
-> |     ARM i.MX5: switch IPU clk support to devicetree bindings
-> |
-> |     The i.MX5 clk support has platform based clock bindings for the
-> |     IPU. IPU support is devicetree only, so move them over to devicetree
-> |     based bindings. Also, enable MIPI clocks which do not have a device
-> |     associated with, but still need to be enabled to do graphics on
-> |     i.MX51.
-> 
-> This patch fixes this by setting some reserved bits in the CCM as recommended
-> in the reference manual.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+The cookie is now used to indicate if dma_unmap_sg shall be
+done in post_request. At DMA errors, the DMA job is immediately
+not only terminated but also unmapped. To indicate that this
+has been done the cookie is reset to zero. post_request will
+thus only do dma_umap_sg for requests which has a cookie not set
+to zero.
 
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
+Some corresponding duplicated code could then be removed and
+moreover some corrections at DMA errors for terminating the same
+DMA job twice has also been fixed.
 
-Shawn
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Per Forlin <per.forlin@stericsson.com>
+---
 
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c |   16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index e8c0473..579023f 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -319,6 +319,7 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
->  			unsigned long rate_ckih1, unsigned long rate_ckih2)
->  {
->  	int i;
-> +	u32 val;
->  	struct device_node *np;
->  
->  	clk[pll1_sw] = imx_clk_pllv2("pll1_sw", "osc", MX51_DPLL1_BASE);
-> @@ -390,6 +391,21 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
->  	imx_print_silicon_rev("i.MX51", mx51_revision());
->  	clk_disable_unprepare(clk[iim_gate]);
->  
-> +	/*
-> +	 * Reference Manual says: Functionality of CCDR[18] and CLPCR[23] is no
-> +	 * longer supported. Set to one for better power saving.
-> +	 *
-> +	 * The effect of not setting these bits is that MIPI clocks can't be
-> +	 * enabled without the IPU clock being enabled aswell.
-> +	 */
-> +	val = readl(MXC_CCM_CCDR);
-> +	val |= 1 << 18;
-> +	writel(val, MXC_CCM_CCDR);
-> +
-> +	val = readl(MXC_CCM_CLPCR);
-> +	val |= 1 << 23;
-> +	writel(val, MXC_CCM_CLPCR);
-> +
->  	return 0;
->  }
->  
-> -- 
-> 1.7.10.4
-> 
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Changes in v2:
+	Rebased patch on top of Linux 3.7
+
+---
+ drivers/mmc/host/mmci.c |  190 ++++++++++++++++++++++++++---------------------
+ 1 file changed, 106 insertions(+), 84 deletions(-)
+
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index aa04b42..cd76793 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -134,6 +134,24 @@ static struct variant_data variant_ux500v2 = {
+ };
+ 
+ /*
++ * Validate mmc prerequisites
++ */
++static int mmci_validate_data(struct mmci_host *host,
++			      struct mmc_data *data)
++{
++	if (!data)
++		return 0;
++
++	if (!is_power_of_2(data->blksz)) {
++		dev_err(mmc_dev(host->mmc),
++			"unsupported block size (%d bytes)\n", data->blksz);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++/*
+  * This must be called with host->lock held
+  */
+ static void mmci_write_clkreg(struct mmci_host *host, u32 clk)
+@@ -352,10 +370,33 @@ static inline void mmci_dma_release(struct mmci_host *host)
+ 	host->dma_rx_channel = host->dma_tx_channel = NULL;
+ }
+ 
++static void mmci_dma_data_error(struct mmci_host *host)
++{
++	dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
++	dmaengine_terminate_all(host->dma_current);
++	host->dma_current = NULL;
++	host->dma_desc_current = NULL;
++	host->data->host_cookie = 0;
++}
++
+ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
+ {
+-	struct dma_chan *chan = host->dma_current;
++	struct dma_chan *chan;
+ 	enum dma_data_direction dir;
++
++	if (data->flags & MMC_DATA_READ) {
++		dir = DMA_FROM_DEVICE;
++		chan = host->dma_rx_channel;
++	} else {
++		dir = DMA_TO_DEVICE;
++		chan = host->dma_tx_channel;
++	}
++
++	dma_unmap_sg(chan->device->dev, data->sg, data->sg_len, dir);
++}
++
++static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
++{
+ 	u32 status;
+ 	int i;
+ 
+@@ -374,19 +415,12 @@ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
+ 	 * contiguous buffers.  On TX, we'll get a FIFO underrun error.
+ 	 */
+ 	if (status & MCI_RXDATAAVLBLMASK) {
+-		dmaengine_terminate_all(chan);
+-		if (!data->error)
+-			data->error = -EIO;
+-	}
+-
+-	if (data->flags & MMC_DATA_WRITE) {
+-		dir = DMA_TO_DEVICE;
+-	} else {
+-		dir = DMA_FROM_DEVICE;
++		data->error = -EIO;
++		mmci_dma_data_error(host);
+ 	}
+ 
+ 	if (!data->host_cookie)
+-		dma_unmap_sg(chan->device->dev, data->sg, data->sg_len, dir);
++		mmci_dma_unmap(host, data);
+ 
+ 	/*
+ 	 * Use of DMA with scatter-gather is impossible.
+@@ -396,16 +430,15 @@ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
+ 		dev_err(mmc_dev(host->mmc), "buggy DMA detected. Taking evasive action.\n");
+ 		mmci_dma_release(host);
+ 	}
+-}
+ 
+-static void mmci_dma_data_error(struct mmci_host *host)
+-{
+-	dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
+-	dmaengine_terminate_all(host->dma_current);
++	host->dma_current = NULL;
++	host->dma_desc_current = NULL;
+ }
+ 
+-static int mmci_dma_prep_data(struct mmci_host *host, struct mmc_data *data,
+-			      struct mmci_host_next *next)
++/* prepares DMA channel and DMA descriptor, returns non-zero on failure */
++static int __mmci_dma_prep_data(struct mmci_host *host, struct mmc_data *data,
++				struct dma_chan **dma_chan,
++				struct dma_async_tx_descriptor **dma_desc)
+ {
+ 	struct variant_data *variant = host->variant;
+ 	struct dma_slave_config conf = {
+@@ -423,16 +456,6 @@ static int mmci_dma_prep_data(struct mmci_host *host, struct mmc_data *data,
+ 	enum dma_data_direction buffer_dirn;
+ 	int nr_sg;
+ 
+-	/* Check if next job is already prepared */
+-	if (data->host_cookie && !next &&
+-	    host->dma_current && host->dma_desc_current)
+-		return 0;
+-
+-	if (!next) {
+-		host->dma_current = NULL;
+-		host->dma_desc_current = NULL;
+-	}
+-
+ 	if (data->flags & MMC_DATA_READ) {
+ 		conf.direction = DMA_DEV_TO_MEM;
+ 		buffer_dirn = DMA_FROM_DEVICE;
+@@ -462,29 +485,41 @@ static int mmci_dma_prep_data(struct mmci_host *host, struct mmc_data *data,
+ 	if (!desc)
+ 		goto unmap_exit;
+ 
+-	if (next) {
+-		next->dma_chan = chan;
+-		next->dma_desc = desc;
+-	} else {
+-		host->dma_current = chan;
+-		host->dma_desc_current = desc;
+-	}
++	*dma_chan = chan;
++	*dma_desc = desc;
+ 
+ 	return 0;
+ 
+  unmap_exit:
+-	if (!next)
+-		dmaengine_terminate_all(chan);
+ 	dma_unmap_sg(device->dev, data->sg, data->sg_len, buffer_dirn);
+ 	return -ENOMEM;
+ }
+ 
++static inline int mmci_dma_prep_data(struct mmci_host *host,
++				     struct mmc_data *data)
++{
++	/* Check if next job is already prepared. */
++	if (host->dma_current && host->dma_desc_current)
++		return 0;
++
++	/* No job were prepared thus do it now. */
++	return __mmci_dma_prep_data(host, data, &host->dma_current,
++				    &host->dma_desc_current);
++}
++
++static inline int mmci_dma_prep_next(struct mmci_host *host,
++				     struct mmc_data *data)
++{
++	struct mmci_host_next *nd = &host->next_data;
++	return __mmci_dma_prep_data(host, data, &nd->dma_chan, &nd->dma_desc);
++}
++
+ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
+ {
+ 	int ret;
+ 	struct mmc_data *data = host->data;
+ 
+-	ret = mmci_dma_prep_data(host, host->data, NULL);
++	ret = mmci_dma_prep_data(host, host->data);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -514,19 +549,11 @@ static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
+ {
+ 	struct mmci_host_next *next = &host->next_data;
+ 
+-	if (data->host_cookie && data->host_cookie != next->cookie) {
+-		pr_warning("[%s] invalid cookie: data->host_cookie %d"
+-		       " host->next_data.cookie %d\n",
+-		       __func__, data->host_cookie, host->next_data.cookie);
+-		data->host_cookie = 0;
+-	}
+-
+-	if (!data->host_cookie)
+-		return;
++	WARN_ON(data->host_cookie && data->host_cookie != next->cookie);
++	WARN_ON(!data->host_cookie && (next->dma_desc || next->dma_chan));
+ 
+ 	host->dma_desc_current = next->dma_desc;
+ 	host->dma_current = next->dma_chan;
+-
+ 	next->dma_desc = NULL;
+ 	next->dma_chan = NULL;
+ }
+@@ -541,19 +568,13 @@ static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq,
+ 	if (!data)
+ 		return;
+ 
+-	if (data->host_cookie) {
+-		data->host_cookie = 0;
++	BUG_ON(data->host_cookie);
++
++	if (mmci_validate_data(host, data))
+ 		return;
+-	}
+ 
+-	/* if config for dma */
+-	if (((data->flags & MMC_DATA_WRITE) && host->dma_tx_channel) ||
+-	    ((data->flags & MMC_DATA_READ) && host->dma_rx_channel)) {
+-		if (mmci_dma_prep_data(host, data, nd))
+-			data->host_cookie = 0;
+-		else
+-			data->host_cookie = ++nd->cookie < 0 ? 1 : nd->cookie;
+-	}
++	if (!mmci_dma_prep_next(host, data))
++		data->host_cookie = ++nd->cookie < 0 ? 1 : nd->cookie;
+ }
+ 
+ static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
+@@ -561,29 +582,23 @@ static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
+ {
+ 	struct mmci_host *host = mmc_priv(mmc);
+ 	struct mmc_data *data = mrq->data;
+-	struct dma_chan *chan;
+-	enum dma_data_direction dir;
+ 
+-	if (!data)
++	if (!data || !data->host_cookie)
+ 		return;
+ 
+-	if (data->flags & MMC_DATA_READ) {
+-		dir = DMA_FROM_DEVICE;
+-		chan = host->dma_rx_channel;
+-	} else {
+-		dir = DMA_TO_DEVICE;
+-		chan = host->dma_tx_channel;
+-	}
++	mmci_dma_unmap(host, data);
+ 
++	if (err) {
++		struct mmci_host_next *next = &host->next_data;
++		struct dma_chan *chan;
++		if (data->flags & MMC_DATA_READ)
++			chan = host->dma_rx_channel;
++		else
++			chan = host->dma_tx_channel;
++		dmaengine_terminate_all(chan);
+ 
+-	/* if config for dma */
+-	if (chan) {
+-		if (err)
+-			dmaengine_terminate_all(chan);
+-		if (data->host_cookie)
+-			dma_unmap_sg(mmc_dev(host->mmc), data->sg,
+-				     data->sg_len, dir);
+-		mrq->data->host_cookie = 0;
++		next->dma_desc = NULL;
++		next->dma_chan = NULL;
+ 	}
+ }
+ 
+@@ -604,6 +619,11 @@ static inline void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
+ {
+ }
+ 
++static inline void mmci_dma_finalize(struct mmci_host *host,
++				     struct mmc_data *data)
++{
++}
++
+ static inline void mmci_dma_data_error(struct mmci_host *host)
+ {
+ }
+@@ -751,8 +771,10 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 		u32 remain, success;
+ 
+ 		/* Terminate the DMA transfer */
+-		if (dma_inprogress(host))
++		if (dma_inprogress(host)) {
+ 			mmci_dma_data_error(host);
++			mmci_dma_unmap(host, data);
++		}
+ 
+ 		/*
+ 		 * Calculate how far we are into the transfer.  Note that
+@@ -791,7 +813,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 
+ 	if (status & MCI_DATAEND || data->error) {
+ 		if (dma_inprogress(host))
+-			mmci_dma_unmap(host, data);
++			mmci_dma_finalize(host, data);
+ 		mmci_stop_data(host);
+ 
+ 		if (!data->error)
+@@ -828,8 +850,10 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
+ 	if (!cmd->data || cmd->error) {
+ 		if (host->data) {
+ 			/* Terminate the DMA transfer */
+-			if (dma_inprogress(host))
++			if (dma_inprogress(host)) {
+ 				mmci_dma_data_error(host);
++				mmci_dma_unmap(host, host->data);
++			}
+ 			mmci_stop_data(host);
+ 		}
+ 		mmci_request_end(host, cmd->mrq);
+@@ -1055,10 +1079,8 @@ static void mmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
+ 
+ 	WARN_ON(host->mrq != NULL);
+ 
+-	if (mrq->data && !is_power_of_2(mrq->data->blksz)) {
+-		dev_err(mmc_dev(mmc), "unsupported block size (%d bytes)\n",
+-			mrq->data->blksz);
+-		mrq->cmd->error = -EINVAL;
++	mrq->cmd->error = mmci_validate_data(host, mrq->data);
++	if (mrq->cmd->error) {
+ 		mmc_request_done(mmc, mrq);
+ 		return;
+ 	}
+-- 
+1.7.10
