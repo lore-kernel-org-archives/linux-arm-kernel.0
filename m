@@ -1,81 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 11 Dec 2012 17:45:37 +0000
-Subject: [PATCH 5/7] arm64: ARMv8 RTSM model (SoC) support
-In-Reply-To: <1355246519.19818.20.camel@hornet>
-References: <1354914392-9634-1-git-send-email-catalin.marinas@arm.com>
- <1354914392-9634-6-git-send-email-catalin.marinas@arm.com>
- <201212111541.16479.arnd@arndb.de> <20121211163932.GC16071@arm.com>
- <1355246519.19818.20.camel@hornet>
-Message-ID: <20121211174537.GD16071@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Dec 2012 17:47:05 +0000
+Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
+ cache LoUIS operations
+In-Reply-To: <Pine.LNX.4.64.1212111807170.2140@axis700.grange>
+References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <20120919134658.GA2111@linaro.org>
+ <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
+ <20120920110439.GB2117@linaro.org>
+ <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
+ <20121211163313.GG16759@mudshark.cambridge.arm.com>
+ <20121211163843.GH16759@mudshark.cambridge.arm.com>
+ <Pine.LNX.4.64.1212111807170.2140@axis700.grange>
+Message-ID: <20121211174705.GL16759@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 11, 2012 at 05:21:59PM +0000, Pawel Moll wrote:
-> On Tue, 2012-12-11 at 16:39 +0000, Catalin Marinas wrote:
-> > > > diff --git a/arch/arm6
-> > > > +static const char *vexpress_dt_match[] __initdata = {
-> > > > +       "arm,vexpress",
-> > > > +       NULL,
-> > > > +};
-> > > > +
-> > > > +static int __init vexpress_init(void)
-> > > > +{
-> > > > +       if (!of_flat_dt_match(of_get_flat_dt_root(), vexpress_dt_match))
-> > > > +               return 0;
-> > > > +
-> > > > +       vexpress_sysreg_of_early_init();
-> > > > +       vexpress_clk_of_init();
-> > > > +
-> > > > +       return 0;
-> > > > +}
-> > > > +arch_initcall(vexpress_init);
+On Tue, Dec 11, 2012 at 05:07:35PM +0000, Guennadi Liakhovetski wrote:
+> Hi Will
+> 
+> On Tue, 11 Dec 2012, Will Deacon wrote:
+> 
+> > On Tue, Dec 11, 2012 at 04:33:13PM +0000, Will Deacon wrote:
+> > > On Tue, Dec 11, 2012 at 04:07:56PM +0000, Guennadi Liakhovetski wrote:
+> > > > Git bisect identified this patch, in the mainline as
+> > > > 
+> > > > commit dbee0c6fb4c1269b2dfc8b0b7a29907ea7fed560
+> > > > Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > > Date:   Fri Sep 7 11:06:57 2012 +0530
+> > > > 
+> > > >     ARM: kernel: update cpu_suspend code to use cache LoUIS operations
+> > > > 
+> > > > as the culprit of the broken wake up from STR on mackerel, based on an 
+> > > > sh7372 A8 SoC. .config attached.
 > > > 
-> > > I think it would be more appropriate for these two to check the presence of
-> > > the individual devices, and move the caller into the actual device driver,
-> > > rather than checking for the root node of the device tree.
+> > > My guess is that because Cortex-A8 does not implement the MP extensions,
+> > > the LoUIS field of the CLIDR reads as zero, and the cache isn't flushed at
+> > > all (I can see an early exit in v7_flush_dcache_louis).
 > > > 
-> > > There may be cases where we want to check the root node, but both the clock
-> > > setup and the sysreg should both be detectable.
+> > > Lorenzo -- how is this supposed to work for uniprocessor CPUs?
 > > 
-> > I cc'ed Pawel as well since it's touching his code. We've been through
-> > several versions internally and didn't find a clear winner. Currently,
-> > vexpress_clk_of_init() requires vexpress_sysreg_of_early_init() to be
-> > called first. Pawel has a patch to allow sysreg self-initialisation when
-> > called from vexpress_clk_of_init().
-> > 
-> > This leaves us with a way to call vexpress_clk_of_init() directly from
-> > clk-vexpress.c. There are two ways:
-> > 
-> > 1. arch_initcall() in clk-vexpress.c, checking for the DT match.
-> > 2. driver registration (arch_initcall) and later probing when
-> >    of_platform_populate() is called from the arch/arm64 code.
-> > 
-> > The 2nd option above relies on the DT order since the clocks must be
-> > registered before any AMBA device is registered, so I'm not too keen.
-> > This leaves us with option 1 or any other suggestion you may have.
+> > Bah, forgot to ask you if the following patch helps...
 > 
-> The idea I had was to associate the root of the device tree with the
-> "platform" device, see below. This makes it possible to write a platform
-> driver for the particular platform, so the code for the vexpress could
-> look more or less like this...
-> 
-> static int __devinit vexpress_probe(struct platform_device *dev)
-> {
->         vexpress_sysreg_of_early_init();
->         vexpress_clk_of_init();
-> 
->         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> 
->         return 0;
-> }
+> Yes, it does.
 
-This changes the way vexpress_probe() is done. Either direct DT match
-check or platform device probing work for me. But I think Arnd's
-suggestion was to get rid of the platform file entirely and just get the
-clocks register/probe themselves. Unfortunately, the clocks subsystem
-doesn't really follow the device/driver model and they need to be
-initialised before registering any AMBA device. I don't really have a
-clean solution here.
+Cracking, can I add you tested-by please?
 
--- 
-Catalin
+Will
