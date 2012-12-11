@@ -1,56 +1,52 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 11 Dec 2012 16:34:27 +0000
-Subject: [RFC PATCH 2/2] ARM: SMP support for mach-virt
-In-Reply-To: <20121211160956.GF16759@mudshark.cambridge.arm.com>
-References: <20121204124047.GM23368@mudshark.cambridge.arm.com>
- <20121204133326.GE14363@n2100.arm.linux.org.uk>
- <20121204134010.GP23368@mudshark.cambridge.arm.com>
- <20121204143724.GF14363@n2100.arm.linux.org.uk>
- <20121204161113.GT23368@mudshark.cambridge.arm.com>
- <50BE28C6.2010403@gmail.com>
- <20121204171628.GF5314@mudshark.cambridge.arm.com> <50BE31E9.3040404@arm.com>
- <20121204173045.GI5314@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1212111558270.17523@kaball.uk.xensource.com>
- <20121211160956.GF16759@mudshark.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.02.1212111621220.17523@kaball.uk.xensource.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 11 Dec 2012 17:38:19 +0100
+Subject: [RFC v1 01/16] lib: devres: don't enclose pcim_*() functions in
+ CONFIG_HAS_IOPORT
+In-Reply-To: <20121211162325.GR14363@n2100.arm.linux.org.uk>
+References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201212111043.50627.arnd@arndb.de> <20121211170338.4859ddf0@skate>
+ <201212111615.03262.arnd@arndb.de>
+ <20121211162325.GR14363@n2100.arm.linux.org.uk>
+Message-ID: <20121211173819.6f2cf32b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Dec 2012, Will Deacon wrote:
-> On Tue, Dec 11, 2012 at 04:04:20PM +0000, Stefano Stabellini wrote:
-> > Hi!
+Russell,
+
+On Tue, 11 Dec 2012 16:23:25 +0000, Russell King - ARM Linux wrote:
+
+> > * ARCH_VEXPRESS should not select NO_IOPORT. It's generally wrong
+> >   to select this in combination with ARCH_MULTIPLATFORM, when some
+> >   of the other platforms you may enable actually have IOPORT mapping
+> >   support.
 > 
-> Hi Stefano,
-> 
-> > Sorry for taking so long to reply but I admit I missed the thread
-> > entirely until now. I would appreciate if you could CC
-> > xen-devel at lists.xen.org and/or me for virtualization related
-> > discussions.
-> 
-> I did CC xen-arm at lists.xen.org,
-  
-Thanks!
-I don't know why I didn't receive it then :-\
+> No.  ARCH_VEXPRESS selects NO_IOPORT because it _does_ _not_ support
+> PCI/ISA IO space.  That in itself is reasonable, but what isn't
+> reasonable is the _negative_ logic being used.  Negative logic in
+> the config system always tends to provoke this kind of sillyness
+> because you're selecting something to be excluded which another
+> platform may require.
 
-In any case xen-devel is the right place for upstream related
-discussion.
+Could you enlighten my very naive understanding of things about PCI/ISA
+IO space? On x86, I seem to understand this is the separate address
+space accessed by the special in/out CPU instructions. Are there ARM
+platforms with the same sort of things?
 
+As far as I understand, on my ARM Marvell system, everything is
+memory-mapped, so there isn't such a separate PCI/ISA IO space.
 
-> but you've dropped that list in your
-> reply...
+Therefore, why would I need to "select HAVE_IOPORT" simply to be able
+to build libata-sff.c, that is used for PCI drivers that work fine with
+purely memory-mapped registers?
 
-Yeah.. that's because I didn't receive the original email and I had to
-download the mailing list archives, sorry about that.
+Sorry for the stupid/naive questions, but it'll definitely help to
+understand the matter.
 
+Thanks,
 
-> > On the Xen side there are not going to be any problems related to SMP
-> > and holding pens, because secondary CPUs only come into existence after
-> > the first CPU calls the HYPERVISOR_vcpu_op hypercall (still missing on
-> > ARM).
-> 
-> Ok. Would you be willing/able to wrap this in a PSCI interface when you do
-> add SMP support for ARM?
-
-I grepped for PSCI in the Linux tree but I couldn't find anything.
-Also I googled for ARM PSCI and nothing of value came up. Can I find a
-doc that explains what PSCI is anywhere?
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
