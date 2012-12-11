@@ -1,156 +1,32 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Tue, 11 Dec 2012 09:13:53 +0530
-Subject: [PATCH v2 1/1] net: ethernet: davinci_cpdma: Add boundary for rx and
- tx descriptors
-Message-ID: <1355197433-7492-1-git-send-email-mugunthanvnm@ti.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Tue, 11 Dec 2012 09:55:08 +0530
+Subject: [PATCH v4 1/7] DMA: PL330: use prefix in reg names to build under
+ x86
+In-Reply-To: <1355146956-6009-2-git-send-email-ciminaghi@gnudd.com>
+References: <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
+ <1355146956-6009-2-git-send-email-ciminaghi@gnudd.com>
+Message-ID: <CAJe_ZhfE9-kvB9s5=VZ5tgzXa7GsQj_1rt232aCsrfJ-KiTP1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When there is heavy transmission traffic in the CPDMA, then Rx descriptors
-memory is also utilized as tx desc memory looses all rx descriptors and the
-driver stops working then.
+On 10 December 2012 19:12, Davide Ciminaghi <ciminaghi@gnudd.com> wrote:
+> From: Alessandro Rubini <rubini@gnudd.com>
+>
+>     This driver would not compile if ARM_AMBA is selected under x86,
+>     because "CS" and "DS" are already defined there.  But AMBA
+>     is used in the x86 world by a PCI-to-AMBA bridge, to be submitted.
+>
+>     The patch just adds the "PL330_" prefix to all registers,
+>     so it can be built by randomconfig after ARM_AMBA appears within x86.
+>     No other technical changes have been performed.
+>     The patch was build-tested only.
+>
+> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
+> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+> [Davide Ciminaghi <ciminaghi@gnudd.com>: only registers prefixed]
+> Signed-off-by: Davide Ciminaghi <ciminaghi@gnudd.com>
+> ---
 
-This patch adds boundary for tx and rx descriptors in bd ram dividing the
-descriptor memory to ensure that during heavy transmission tx doesn't use
-rx descriptors.
+ Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
 
-This patch is already applied to davinci_emac driver, since CPSW and
-davici_dmac shares the same CPDMA, moving the boundry seperation from
-Davinci EMAC driver to CPDMA driver which was done in the following
-commit
-
-commit 86d8c07ff2448eb4e860e50f34ef6ee78e45c40c
-Author: Sascha Hauer <s.hauer@pengutronix.de>
-Date:   Tue Jan 3 05:27:47 2012 +0000
-
-    net/davinci: do not use all descriptors for tx packets
-
-    The driver uses a shared pool for both rx and tx descriptors.
-    During open it queues fixed number of 128 descriptors for receive
-    packets. For each received packet it tries to queue another
-    descriptor. If this fails the descriptor is lost for rx.
-    The driver has no limitation on tx descriptors to use, so it
-    can happen during a nmap / ping -f attack that the driver
-    allocates all descriptors for tx and looses all rx descriptors.
-    The driver stops working then.
-    To fix this limit the number of tx descriptors used to half of
-    the descriptors available, the rx path uses the other half.
-
-    Tested on a custom board using nmap / ping -f to the board from
-    two different hosts.
-
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
-Changes from initial patch:
-* Modified commit message with proper description as in previous commit message
-
- drivers/net/ethernet/ti/davinci_cpdma.c |   20 ++++++++++++++------
- drivers/net/ethernet/ti/davinci_emac.c  |    8 --------
- 2 files changed, 14 insertions(+), 14 deletions(-)
-
-diff --git a/drivers/net/ethernet/ti/davinci_cpdma.c b/drivers/net/ethernet/ti/davinci_cpdma.c
-index 4995673..d37f546 100644
---- a/drivers/net/ethernet/ti/davinci_cpdma.c
-+++ b/drivers/net/ethernet/ti/davinci_cpdma.c
-@@ -105,13 +105,13 @@ struct cpdma_ctlr {
- };
- 
- struct cpdma_chan {
-+	struct cpdma_desc __iomem	*head, *tail;
-+	void __iomem			*hdp, *cp, *rxfree;
- 	enum cpdma_state		state;
- 	struct cpdma_ctlr		*ctlr;
- 	int				chan_num;
- 	spinlock_t			lock;
--	struct cpdma_desc __iomem	*head, *tail;
- 	int				count;
--	void __iomem			*hdp, *cp, *rxfree;
- 	u32				mask;
- 	cpdma_handler_fn		handler;
- 	enum dma_data_direction		dir;
-@@ -217,7 +217,7 @@ desc_from_phys(struct cpdma_desc_pool *pool, dma_addr_t dma)
- }
- 
- static struct cpdma_desc __iomem *
--cpdma_desc_alloc(struct cpdma_desc_pool *pool, int num_desc)
-+cpdma_desc_alloc(struct cpdma_desc_pool *pool, int num_desc, bool is_rx)
- {
- 	unsigned long flags;
- 	int index;
-@@ -225,8 +225,14 @@ cpdma_desc_alloc(struct cpdma_desc_pool *pool, int num_desc)
- 
- 	spin_lock_irqsave(&pool->lock, flags);
- 
--	index = bitmap_find_next_zero_area(pool->bitmap, pool->num_desc, 0,
--					   num_desc, 0);
-+	if (is_rx) {
-+		index = bitmap_find_next_zero_area(pool->bitmap,
-+				pool->num_desc/2, 0, num_desc, 0);
-+	 } else {
-+		index = bitmap_find_next_zero_area(pool->bitmap,
-+				pool->num_desc, pool->num_desc/2, num_desc, 0);
-+	}
-+
- 	if (index < pool->num_desc) {
- 		bitmap_set(pool->bitmap, index, num_desc);
- 		desc = pool->iomap + pool->desc_size * index;
-@@ -660,6 +666,7 @@ int cpdma_chan_submit(struct cpdma_chan *chan, void *token, void *data,
- 	unsigned long			flags;
- 	u32				mode;
- 	int				ret = 0;
-+	bool                            is_rx;
- 
- 	spin_lock_irqsave(&chan->lock, flags);
- 
-@@ -668,7 +675,8 @@ int cpdma_chan_submit(struct cpdma_chan *chan, void *token, void *data,
- 		goto unlock_ret;
- 	}
- 
--	desc = cpdma_desc_alloc(ctlr->pool, 1);
-+	is_rx = (chan->rxfree != 0);
-+	desc = cpdma_desc_alloc(ctlr->pool, 1, is_rx);
- 	if (!desc) {
- 		chan->stats.desc_alloc_fail++;
- 		ret = -ENOMEM;
-diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
-index fce89a0..f349273 100644
---- a/drivers/net/ethernet/ti/davinci_emac.c
-+++ b/drivers/net/ethernet/ti/davinci_emac.c
-@@ -120,7 +120,6 @@ static const char emac_version_string[] = "TI DaVinci EMAC Linux v6.1";
- #define EMAC_DEF_TX_CH			(0) /* Default 0th channel */
- #define EMAC_DEF_RX_CH			(0) /* Default 0th channel */
- #define EMAC_DEF_RX_NUM_DESC		(128)
--#define EMAC_DEF_TX_NUM_DESC		(128)
- #define EMAC_DEF_MAX_TX_CH		(1) /* Max TX channels configured */
- #define EMAC_DEF_MAX_RX_CH		(1) /* Max RX channels configured */
- #define EMAC_POLL_WEIGHT		(64) /* Default NAPI poll weight */
-@@ -342,7 +341,6 @@ struct emac_priv {
- 	u32 mac_hash2;
- 	u32 multicast_hash_cnt[EMAC_NUM_MULTICAST_BITS];
- 	u32 rx_addr_type;
--	atomic_t cur_tx;
- 	const char *phy_id;
- #ifdef CONFIG_OF
- 	struct device_node *phy_node;
-@@ -1050,9 +1048,6 @@ static void emac_tx_handler(void *token, int len, int status)
- {
- 	struct sk_buff		*skb = token;
- 	struct net_device	*ndev = skb->dev;
--	struct emac_priv	*priv = netdev_priv(ndev);
--
--	atomic_dec(&priv->cur_tx);
- 
- 	if (unlikely(netif_queue_stopped(ndev)))
- 		netif_start_queue(ndev);
-@@ -1101,9 +1096,6 @@ static int emac_dev_xmit(struct sk_buff *skb, struct net_device *ndev)
- 		goto fail_tx;
- 	}
- 
--	if (atomic_inc_return(&priv->cur_tx) >= EMAC_DEF_TX_NUM_DESC)
--		netif_stop_queue(ndev);
--
- 	return NETDEV_TX_OK;
- 
- fail_tx:
--- 
-1.7.9.5
+Thanks.
