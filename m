@@ -1,52 +1,32 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 11 Dec 2012 11:56:50 +0100
-Subject: [PATCH] ARM: shmobile: r8a7779: Fix GPIO input reg addresses
-In-Reply-To: <1355219295-4279-1-git-send-email-phil.edworthy@renesas.com>
-References: <1355219295-4279-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <16942826.W5hEBZUpzF@avalon>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 11 Dec 2012 11:05:30 +0000
+Subject: [PATCH] ARM: head: Remove boot-time HYP mode check for v5 and
+ below
+In-Reply-To: <20121210191611.GJ12030@mudshark.cambridge.arm.com>
+References: <1354887959-14863-1-git-send-email-dave.martin@linaro.org>
+ <20121210105743.GA1953@linaro.org>
+ <CAHod+GdDN-hMKreQNXfGpe9vDLV8+a55JFM2R4wW_r5kyFaYww@mail.gmail.com>
+ <20121210180235.GC1953@linaro.org> <50C62510.7050204@arm.com>
+ <20121210191611.GJ12030@mudshark.cambridge.arm.com>
+Message-ID: <20121211110530.GA1956@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Phil,
-
-Thank you for the patch.
-
-Your SoB line is missing, have you forgotten to commit with -s ?
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-On Tuesday 11 December 2012 09:48:15 Phil Edworthy wrote:
-> The INDTx register addresses were wrong.
-> ---
->  arch/arm/mach-shmobile/pfc-r8a7779.c |   14 +++++++-------
->  1 files changed, 7 insertions(+), 7 deletions(-)
+On Mon, Dec 10, 2012 at 07:16:11PM +0000, Will Deacon wrote:
+> On Mon, Dec 10, 2012 at 06:08:16PM +0000, Marc Zyngier wrote:
+> > On 10/12/12 18:02, Dave Martin wrote:
+> > > This typo is in the existing code, not part of the fix.
+> > > I'll try to tidy this up if I touch this code again.
+> > 
+> > I think Will already carries a patch authored by RMK, getting rid of the
+> > use of LR and of my spelling mistake.
 > 
-> diff --git a/arch/arm/mach-shmobile/pfc-r8a7779.c
-> b/arch/arm/mach-shmobile/pfc-r8a7779.c index 15f6a48..717e058 100644
-> --- a/arch/arm/mach-shmobile/pfc-r8a7779.c
-> +++ b/arch/arm/mach-shmobile/pfc-r8a7779.c
-> @@ -2585,13 +2585,13 @@ static struct pinmux_cfg_reg pinmux_config_regs[] =
-> { };
-> 
->  static struct pinmux_data_reg pinmux_data_regs[] = {
-> -	{ PINMUX_DATA_REG("INDT0", 0xffc40008, 32) { GP_INDT(0) } },
-> -	{ PINMUX_DATA_REG("INDT1", 0xffc41008, 32) { GP_INDT(1) } },
-> -	{ PINMUX_DATA_REG("INDT2", 0xffc42008, 32) { GP_INDT(2) } },
-> -	{ PINMUX_DATA_REG("INDT3", 0xffc43008, 32) { GP_INDT(3) } },
-> -	{ PINMUX_DATA_REG("INDT4", 0xffc44008, 32) { GP_INDT(4) } },
-> -	{ PINMUX_DATA_REG("INDT5", 0xffc45008, 32) { GP_INDT(5) } },
-> -	{ PINMUX_DATA_REG("INDT6", 0xffc46008, 32) {
-> +	{ PINMUX_DATA_REG("INDT0", 0xffc4000c, 32) { GP_INDT(0) } },
-> +	{ PINMUX_DATA_REG("INDT1", 0xffc4100c, 32) { GP_INDT(1) } },
-> +	{ PINMUX_DATA_REG("INDT2", 0xffc4200c, 32) { GP_INDT(2) } },
-> +	{ PINMUX_DATA_REG("INDT3", 0xffc4300c, 32) { GP_INDT(3) } },
-> +	{ PINMUX_DATA_REG("INDT4", 0xffc4400c, 32) { GP_INDT(4) } },
-> +	{ PINMUX_DATA_REG("INDT5", 0xffc4500c, 32) { GP_INDT(5) } },
-> +	{ PINMUX_DATA_REG("INDT6", 0xffc4600c, 32) {
->  		0, 0, 0, 0, 0, 0, 0, 0,	0, 0, 0, 0, 0, 0, 0, 0,
->  		0, 0, 0, 0, 0, 0, 0, GP_6_8_DATA,
->  		GP_6_7_DATA, GP_6_6_DATA, GP_6_5_DATA, GP_6_4_DATA,
--- 
-Regards,
+> Yup, I was planning to post a patch series after the merge window which
+> removed the CONFIG_ARM_VIRT_EXT option entirely. However, given the Zaurus
+> breakage I'll rework that series to default the option to y and hide it from
+> the user, so this patch will ultimately disappear (but is a good short-term
+> fix).
 
-Laurent Pinchart
+Jolly good
+
+---Dave
