@@ -1,57 +1,50 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 11 Dec 2012 09:03:56 +0000
-Subject: [PATCH v3 2/3] mtd: devices: elm: Add support for ELM error
- correction
-In-Reply-To: <1354189595-12784-3-git-send-email-avinashphilip@ti.com>
-References: <1354189595-12784-1-git-send-email-avinashphilip@ti.com>
- <1354189595-12784-3-git-send-email-avinashphilip@ti.com>
-Message-ID: <20121211090356.8D3D93E076D@localhost>
+Date: Tue, 11 Dec 2012 09:06:59 +0000
+Subject: question about drivers/pinctrl/pinctrl-at91.c
+In-Reply-To: <alpine.DEB.2.02.1212081643590.1984@hadrien>
+References: <alpine.DEB.2.02.1212081643590.1984@hadrien>
+Message-ID: <20121211090659.DAC4C3E076D@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Nov 2012 17:16:33 +0530, "Philip, Avinash" <avinashphilip@ti.com> wrote:
-> The ELM hardware module can be used to speedup BCH 4/8/16 ECC scheme
-> error correction.
-> For now only 4 & 8 bit support is added
+On Sat, 8 Dec 2012 16:52:42 +0100 (CET), Julia Lawall <julia.lawall@lip6.fr> wrote:
+> The function at91_dt_node_to_map in drivers/pinctrl/pinctrl-at91.c 
+> contains the following code:
 > 
-> Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Rob Landley <rob@landley.net>
-> ---
-> Changes since v2:
-> 	- Remove __devinit & __devexit annotations
+>         new_map = devm_kzalloc(pctldev->dev, sizeof(*new_map) * map_num, GFP_KERNEL);
+>          if (!new_map)
+>                  return -ENOMEM;
 > 
-> Changes since v1:
-> 	- Change build attribute to CONFIG_MTD_NAND_OMAP_BCH
-> 	- Reduced indentation using by passing elm_info , offset
-> 	  to elm_read & elm_write
-> 	- Removed syndrome manipulation functions.
+>          *map = new_map;
+>          *num_maps = map_num;
 > 
-> :000000 100644 0000000... b88ee83... A	Documentation/devicetree/bindings/mtd/elm.txt
-> :100644 100644 395733a... 369a194... M	drivers/mtd/devices/Makefile
-> :000000 100644 0000000... d2667f3... A	drivers/mtd/devices/elm.c
-> :000000 100644 0000000... d4fce31... A	include/linux/platform_data/elm.h
->  Documentation/devicetree/bindings/mtd/elm.txt |   17 +
->  drivers/mtd/devices/Makefile                  |    4 +-
->  drivers/mtd/devices/elm.c                     |  418 +++++++++++++++++++++++++
->  include/linux/platform_data/elm.h             |   54 ++++
->  4 files changed, 493 insertions(+), 1 deletions(-)
+>          /* create mux map */
+>          parent = of_get_parent(np);
+>          if (!parent) {
+>                  kfree(new_map);
+>                  return -EINVAL;
+>          }
 > 
-> diff --git a/Documentation/devicetree/bindings/mtd/elm.txt b/Documentation/devicetree/bindings/mtd/elm.txt
-> new file mode 100644
-> index 0000000..b88ee83
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/elm.txt
-> @@ -0,0 +1,17 @@
-> +Error location module
-> +
-> +Required properties:
-> +- compatible: Must be "ti,elm"
+> This is clearly not correct, because the combination of devm_kzalloc and 
+> kfree risks creating a double free.  But I am not sure how best to fix it. 
+> Is the data structure intended to normally exist until the driver's remove 
+> function is called?  If so, perhaps the devm_kzalloc is OK.  If I just 
+> remove the kfree, then the structure will persist until the remove 
+> function is called, even though there was an error, which is perhaps not 
+> good.  So I could change the kfree to devm_kfree?
 
-Compatible string is too generic. Need to specify a specific SoC here.
-ie: "ti,omap3430-elm"
+Hi Julia,
 
-Otherwise the binding looks fine. I haven't reviewed the code though.
+I don't have that file in my tree. Is it in linux-next? (I'm too lazy to
+go and look)
+
+Yes, devm_kfree() is the right thing to call, but I'd be tempted to just
+drop the free entirely. If it fails there is something wrong and it will
+get cleaned up when the probe returns a fail code... but look at the
+code; if failing there is a valid way for the driver to operate, then
+doing the cleanup is the right thing....
+
+Alternately the of_get_parent() call could simply be moved above the
+devm_kzalloc() and then the issue becomes moot.  :-)
 
 g.
