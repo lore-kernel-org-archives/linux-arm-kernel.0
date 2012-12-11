@@ -1,45 +1,73 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 11 Dec 2012 08:13:33 +0100
-Subject: [PATCH 2/3] ARM: Orion: Bind the orion bridge interrupt
- controller through DT
-In-Reply-To: <20121211065813.GA14843@obsidianresearch.com>
-References: <1355188683-18208-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <1355188683-18208-2-git-send-email-jgunthorpe@obsidianresearch.com>
- <20121211062430.GD25466@lunn.ch>
- <20121211065813.GA14843@obsidianresearch.com>
-Message-ID: <20121211071333.GR17242@lunn.ch>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 11 Dec 2012 15:23:42 +0800
+Subject: [PATCH] mmc: sdhci: query card presence from cd-gpio before asking
+ SDHCI
+Message-ID: <1355210622-9753-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 11:58:13PM -0700, Jason Gunthorpe wrote:
-> > > +	bridge_irq = irq_of_parse_and_map(np, 0);
-> > > +	/* FIXME: irq_of_parse_and_map returns 0 on error, but on Dove the
-> > > +	 * bridge IRQ is 0.
-> > > +	if (!bridge_irq)
-> > > +		return -ENODEV;*/
-> > > +
-> > > +	return orion_bridge_irq_init(bridge_irq, -1, base, np);
-> > 
-> > So does this mean for Dove it will currently always fail?
-> 
-> I guess that is hard to read without syntax hi-lighting, the 'if' is
-> also commented out.
-> 
-> I was hopefull it would work as is, but looking deeper at
-> irq_of_parse_and_map and its call tree makes me doubtfull now..
-> 
-> Fixing irq_of_parse_and_map is way to big a job for me :(
+Call mmc_gpio_get_cd() to query card presence from cd-gpio before
+asking SDHCI.  The rationale behind this change is that flag
+SDHCI_QUIRK_BROKEN_CARD_DETECTION is designed for SDHCI controller to
+tell that SDHCI_PRESENT_STATE is broken, and it should be used for this
+case only.  So when cd-gpio is being used, the controller should set
+the flag to tell that SDHCI_PRESENT_STATE is not available.
 
-Hi Jason
+However, the existing code will skip checking cd-gpio as long as flag
+SDHCI_QUIRK_BROKEN_CARD_DETECTION is set.  Change the querying order
+between cd-gpio and SDHCI to support the rationale above.
 
-https://lwn.net/Articles/470820/
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/mmc/host/sdhci.c |   29 ++++++++++++++++-------------
+ 1 file changed, 16 insertions(+), 13 deletions(-)
 
-I don't think its fixable. 
-
-> What to do from here? Add a dummy 0 interrupt to dove? Take dove out
-> of this patch series?
-
-We need to see how other machine remap 0 to some other value and
-implement that for Dove.
-
-	  Andrew
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 0d2dbf8..037bd55 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1258,7 +1258,7 @@ static int sdhci_set_power(struct sdhci_host *host, unsigned short power)
+ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
+ {
+ 	struct sdhci_host *host;
+-	bool present;
++	int present;
+ 	unsigned long flags;
+ 	u32 tuning_opcode;
+ 
+@@ -1287,18 +1287,21 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
+ 
+ 	host->mrq = mrq;
+ 
+-	/* If polling, assume that the card is always present. */
+-	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
+-		present = true;
+-	else
+-		present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
+-				SDHCI_CARD_PRESENT;
+-
+-	/* If we're using a cd-gpio, testing the presence bit might fail. */
+-	if (!present) {
+-		int ret = mmc_gpio_get_cd(host->mmc);
+-		if (ret > 0)
+-			present = true;
++	/*
++	 * Firstly check card presence from cd-gpio.  The return could
++	 * be one of the following possibilities:
++	 *     negative: cd-gpio is not available
++	 *     zero: cd-gpio is used, and card is removed
++	 *     one: cd-gpio is used, and card is present
++	 */
++	present = mmc_gpio_get_cd(host->mmc);
++	if (present < 0) {
++		/* If polling, assume that the card is always present. */
++		if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
++			present = 1;
++		else
++			present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
++					SDHCI_CARD_PRESENT;
+ 	}
+ 
+ 	if (!present || host->flags & SDHCI_DEVICE_DEAD) {
+-- 
+1.7.9.5
