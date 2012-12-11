@@ -1,32 +1,90 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 11 Dec 2012 11:05:30 +0000
-Subject: [PATCH] ARM: head: Remove boot-time HYP mode check for v5 and
- below
-In-Reply-To: <20121210191611.GJ12030@mudshark.cambridge.arm.com>
-References: <1354887959-14863-1-git-send-email-dave.martin@linaro.org>
- <20121210105743.GA1953@linaro.org>
- <CAHod+GdDN-hMKreQNXfGpe9vDLV8+a55JFM2R4wW_r5kyFaYww@mail.gmail.com>
- <20121210180235.GC1953@linaro.org> <50C62510.7050204@arm.com>
- <20121210191611.GJ12030@mudshark.cambridge.arm.com>
-Message-ID: <20121211110530.GA1956@linaro.org>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Tue, 11 Dec 2012 20:07:09 +0900
+Subject: [PATCH v5 00/12] iommu/exynos: Fixes and Enhancements of System MMU
+ driver with DT
+Message-ID: <003001cdd78f$a9bb1e00$fd315a00$%cho@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 07:16:11PM +0000, Will Deacon wrote:
-> On Mon, Dec 10, 2012 at 06:08:16PM +0000, Marc Zyngier wrote:
-> > On 10/12/12 18:02, Dave Martin wrote:
-> > > This typo is in the existing code, not part of the fix.
-> > > I'll try to tidy this up if I touch this code again.
-> > 
-> > I think Will already carries a patch authored by RMK, getting rid of the
-> > use of LR and of my spelling mistake.
-> 
-> Yup, I was planning to post a patch series after the merge window which
-> removed the CONFIG_ARM_VIRT_EXT option entirely. However, given the Zaurus
-> breakage I'll rework that series to default the option to y and hide it from
-> the user, so this patch will ultimately disappear (but is a good short-term
-> fix).
+The current exynos-iommu(System MMU) driver does not work autonomously
+since it is lack of support for power management of peripheral blocks.
+For example, MFC device driver must ensure that its System MMU is disabled
+before MFC block is power-down not to invalidate IOTLB in the System MMU
+when I/O memory mapping is changed. Because A System MMU is resides in the
+same H/W block, access to control registers of System MMU while the H/W
+block is turned off must be prohibited.
 
-Jolly good
+This set of changes solves the above problem with setting each System MMUs
+as the parent of the device which owns the System MMU to receive the
+information when the device is turned off or turned on.
 
----Dave
+Another big change to the driver is the support for devicetree.
+The bindings for System MMU is described in
+Documentation/devicetree/bindings/arm/samsung/system-mmu.txt
+
+In addition, this patchset also includes several bug fixes and enhancements
+of the current driver.
+
+Change log:
+v5:
+- new bugfix: patch 01
+- Reordered patches
+  * patch 01 ~ 05: Bugfix and enhancements of the existing driver
+  * patch 06 ~ 10: Device Tree support and callbacks for power management
+  * patch 11     : System MMU 3.2 and 3.3 support
+  * patch 12 ~ 14: Debugging features
+- Additional code compaction
+
+v4:
+- Remove Change-Id from v3 patches
+- Change the order of the third and the first patch
+  Thanks to Kukjin Kim.
+- Fix memory leak when allocating and assigning exynos_iommu_owner to client
+  device if the client device has multiple System MMUs.
+  Thanks to Rahul Sharma.
+
+v3:
+- Fix prefetch buffer flag definition for System MMU 3.3 (patch 10/12)
+- Fix incorrect setting for SET_RUNTIME_PM_OPS (patch 09/12)
+  Thanks to Prathyush.
+
+v2:
+- Split the patch to iommu/exynos into 9 patches
+- Support for System MMU 3.3
+- Some code compaction
+
+Patch summary:
+[PATCH v5 01/14] iommu/exynos: add missing cache flush for removed pagetable entries
+[PATCH v5 02/14] iommu/exynos: always use iommu fault handler
+[PATCH v5 03/14] iommu/exynos: allocate lv2 page table from own slab
+[PATCH v5 04/14] iommu/exynos: change rwlock to spinlock
+[PATCH v5 05/14] ARM: EXYNOS: Add clk_ops for gating clocks of System MMU
+[PATCH v5 06/14] ARM: EXYNOS: add System MMU definition to DT
+[PATCH v5 07/14] iommu/exynos: support for device tree
+[PATCH v5 08/14] iommu/exynos: set System MMU as the parent of client device
+[PATCH v5 09/14] ARM: EXYNOS: remove system mmu initialization from exynos tree
+[PATCH v5 10/14] iommu/exynos: add support for runtime pm and suspend/resume
+[PATCH v5 11/14] iommu/exynos: add support for System MMU 3.2 and 3.3
+[PATCH v5 12/14] iommu/exynos: pass version information from DT
+[PATCH v5 13/14] iommu/exynos: add literal name of System MMU for debugging
+[PATCH v5 14/14] iommu/exynos: add debugfs entries for System MMU
+
+Diffstats:
+ .../devicetree/bindings/arm/exynos/system-mmu.txt  |   86 ++
+ arch/arm/boot/dts/exynos4210.dtsi                  |   96 ++
+ arch/arm/boot/dts/exynos4x12.dtsi                  |  124 ++
+ arch/arm/boot/dts/exynos5250.dtsi                  |  154 +-
+ arch/arm/mach-exynos/Kconfig                       |    5 -
+ arch/arm/mach-exynos/Makefile                      |    1 -
+ arch/arm/mach-exynos/clock-exynos4.c               |   41 +-
+ arch/arm/mach-exynos/clock-exynos4210.c            |    9 +-
+ arch/arm/mach-exynos/clock-exynos4212.c            |   23 +-
+ arch/arm/mach-exynos/clock-exynos5.c               |   86 +-
+ arch/arm/mach-exynos/dev-sysmmu.c                  |  274 ----
+ arch/arm/mach-exynos/include/mach/sysmmu.h         |   66 -
+ arch/arm/mach-exynos/mach-exynos4-dt.c             |   34 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |   30 +
+ drivers/iommu/Kconfig                              |    2 +-
+ drivers/iommu/Makefile                             |    2 +-
+ drivers/iommu/exynos-iommu.c                       | 1477 +++++++++++++++-----
+ 17 files changed, 1745 insertions(+), 765 deletions(-)
