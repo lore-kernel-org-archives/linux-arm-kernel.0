@@ -1,48 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Dec 2012 22:20:03 +0000
+Date: Tue, 11 Dec 2012 22:28:53 +0000
 Subject: [RFC v1 01/16] lib: devres: don't enclose pcim_*() functions in
  CONFIG_HAS_IOPORT
-In-Reply-To: <20121211172916.2668a5be@pyramind.ukuu.org.uk>
+In-Reply-To: <20121211173232.43668ab3@pyramind.ukuu.org.uk>
 References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121211173819.6f2cf32b@skate>
- <20121211172916.2668a5be@pyramind.ukuu.org.uk>
-Message-ID: <201212112220.04597.arnd@arndb.de>
+ <20121211164608.GT14363@n2100.arm.linux.org.uk>
+ <20121211173232.43668ab3@pyramind.ukuu.org.uk>
+Message-ID: <201212112228.53720.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday 11 December 2012, Alan Cox wrote:
-> The "no I/O space" case really applies to things like the S/390 mainframe
-> which simply have no such concept on the system or the devices. In the
-> ARM case the bus has an I/O space and the bridge glues the processors
-> simpler model to the bridge model.
+> > Plus, if you have IO space support, you must have some MMIO region for
+> > them to target - doing what many platforms have done to date and targetted
+> > ISA IO address 0 at virtual address 0 is just not on because as soon as
+> > you build a device driver which probes ISA addresses into your kernel,
+> > you will oops.
+> 
+> There shouldn't really be anything poking around that is modern - this is
+> true of some PC stuff too.
+> 
+> In general however if its because you have a window partly mapped you
+> could just catch the exception and load 0xFF for reads (and probably
+> whine with a backtrace so you know who to moan at).
 
-While we are getting slightly offtopic, s390 is actually gaining PCI support
-now: https://patchwork.kernel.org/patch/1740231/ For all I can tell, they
-would theoretically support an I/O space, but none of the supported
-add-on cards use it, so the kernel implementation doesn't need to bother.
+The problem that Russell refers to is that some platforms define a window
+that is 4GB large and starts at NULL. They then ioremap their PCI
+or PCMCIA I/O space window and use the virtual __iomem address as the
+offset into the 4GB I/O space window. Any driver (e.g. vgacon, /dev/port
+or some legacy alsa sound driver) that tries to access a low port number
+then ends up in user space memory, typically in an unmapped area there.
 
-One architecture that never has an I/O space is the arch/um, but that is
-special in a lot of ways, e.g. since it also never has MMIO.
-
-On ARM, we have platforms that fall into four categories:
-
-1. Full PCI or PCMCIA or ISA support with directly mapped I/O space
-
-2. No PCI or PCMCIA or ISA support, and consequently no I/O space
-
-3. PCI support but no I/O space because of limitations or bugs in
-   the PCI hardware implementation.
-
-4. ISA-style I/O space that is not offsettable (CONFIG_NO_IOPORT)
-   but still has inb/outb accessors.
-
-For cases 2 and 3, we can undefine the __io() macro, which leads to
-intentional build errors someone tries to build code that uses the
-inb/outb accessors. One missing piece that I have been working on
-in the past and been meaning to pick up again is a patch set to
-globally rename CONFIG_NO_IOPORT to the more appropriate
-CONFIG_NO_IOPORT_MAP, and introduce a new CONFIG_NO_IOPORT that
-signifies whether inb/outb are supported or not, rather than whether
-you can access the I/O ports through ioport_map() and ioread/iowrite.
+We definitely don't want to catch and fixup those exceptions. The solution
+is to change the platforms so they actually use the proper I/O window
+at a virtual address that is not used for anything else.
 
 	Arnd
