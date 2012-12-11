@@ -1,48 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Dec 2012 17:51:13 +0000
-Subject: [RFC v1 01/16] lib: devres: don't enclose pcim_*() functions
- in CONFIG_HAS_IOPORT
-In-Reply-To: <20121211174509.69c8c66e@pyramind.ukuu.org.uk>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1354917879-32073-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <201212111043.50627.arnd@arndb.de>
- <20121211162647.GS14363@n2100.arm.linux.org.uk>
- <20121211171610.01c2de16@pyramind.ukuu.org.uk>
- <20121211173450.GW14363@n2100.arm.linux.org.uk>
- <20121211174509.69c8c66e@pyramind.ukuu.org.uk>
-Message-ID: <20121211175113.GX14363@n2100.arm.linux.org.uk>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 11 Dec 2012 18:55:04 +0100 (CET)
+Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
+ cache LoUIS operations
+In-Reply-To: <20121211163843.GH16759@mudshark.cambridge.arm.com>
+References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <20120919134658.GA2111@linaro.org>
+ <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
+ <20120920110439.GB2117@linaro.org>
+ <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
+ <20121211163313.GG16759@mudshark.cambridge.arm.com>
+ <20121211163843.GH16759@mudshark.cambridge.arm.com>
+Message-ID: <Pine.LNX.4.64.1212111854200.2140@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 11, 2012 at 05:45:09PM +0000, Alan Cox wrote:
-> > The problem comes when you end up trying to deal with stuff which
-> > uses ioread{8,16} on ioport_map() cookies where it's assumed that
-> > adding N to the cookie is the same as adding N to the port address.
+On Tue, 11 Dec 2012, Will Deacon wrote:
+
+> On Tue, Dec 11, 2012 at 04:33:13PM +0000, Will Deacon wrote:
+> > On Tue, Dec 11, 2012 at 04:07:56PM +0000, Guennadi Liakhovetski wrote:
+> > > Git bisect identified this patch, in the mainline as
+> > > 
+> > > commit dbee0c6fb4c1269b2dfc8b0b7a29907ea7fed560
+> > > Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Date:   Fri Sep 7 11:06:57 2012 +0530
+> > > 
+> > >     ARM: kernel: update cpu_suspend code to use cache LoUIS operations
+> > > 
+> > > as the culprit of the broken wake up from STR on mackerel, based on an 
+> > > sh7372 A8 SoC. .config attached.
+> > 
+> > My guess is that because Cortex-A8 does not implement the MP extensions,
+> > the LoUIS field of the CLIDR reads as zero, and the cache isn't flushed at
+> > all (I can see an early exit in v7_flush_dcache_louis).
+> > 
+> > Lorenzo -- how is this supposed to work for uniprocessor CPUs?
 > 
-> It's a cookie - this isn't a problem, you can support it via the mapping
-> approah. Whether you want to is another question.
+> Bah, forgot to ask you if the following patch helps...
+> 
+> Will
+> 
+> --->8
+> 
+> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> index cd95664..f58248f 100644
+> --- a/arch/arm/mm/cache-v7.S
+> +++ b/arch/arm/mm/cache-v7.S
+> @@ -44,7 +44,8 @@ ENDPROC(v7_flush_icache_all)
+>  ENTRY(v7_flush_dcache_louis)
+>         dmb                                     @ ensure ordering with previous memory accesses
+>         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
+> -       ands    r3, r0, #0xe00000               @ extract LoUIS from clidr
+> +       ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
+> +       ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
+>         mov     r3, r3, lsr #20                 @ r3 = LoUIS * 2
+>         moveq   pc, lr                          @ return if level == 0
+>         mov     r10, #0                         @ r10 (starting level) = 0
 
-We're drifting off the topic of whether these things should be provided
-and whether the config symbols should be selected...
+[... later]
 
-For a kernel configuration which includes platforms where there is are no
-ISA peripherals, no PCI bridge present, and no PCMCIA support, there's
-little point to having IO space support present.
-
-However, the platform should still work correctly if IO space support is
-configured into the kernel (in other words, it shouldn't cause a failure)
-so that such a platform can co-operate with those platforms which do
-require IO space support.
-
-Now, there was an idea a while back about having a common virtual address
-space to map PCI/ISA IO space to - which we have in the kernel - 1MB at
-0xfee00000.
-
-If PCI is disabled, the ends up being a 1:1 conversion between IO offset
-and CPU virtual address - that's partly there because no one's fixed up
-the soc-common PCMCIA stuff to dea with the PCMCIA socket IO spaces
-there.  We really need to be fixing some of this stuff...
-
-(Unfortunately, my SA11x0 platform with the dual PCMCIA/CF sockets is now
-my firewall so its out of the question to mess around with it on an ad-hoc
-basis.)
+> > Yes, it does.
+>
+> Cracking, can I add you tested-by please?
+ 
+Sure:
+ 
+Tested-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+  
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
