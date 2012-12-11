@@ -1,51 +1,35 @@
 From: cesarb@cesarb.net (Cesar Eduardo Barros)
-Date: Tue, 11 Dec 2012 19:49:45 -0200
-Subject: [PATCH 03/19] MAINTAINERS: remove arch/arm/plat-s5p/
+Date: Tue, 11 Dec 2012 19:49:52 -0200
+Subject: [PATCH 10/19] MAINTAINERS: fix .../plat-mxc/include/mach/imxfb.h
 In-Reply-To: <1355262601-4263-1-git-send-email-cesarb@cesarb.net>
 References: <1355262601-4263-1-git-send-email-cesarb@cesarb.net>
-Message-ID: <1355262601-4263-4-git-send-email-cesarb@cesarb.net>
+Message-ID: <1355262601-4263-11-git-send-email-cesarb@cesarb.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These files were merged into plat-samsung.
+This file was moved to include/linux/platform_data/video-imxfb.h by
+commit 82906b1 (ARM: imx: move platform_data definitions).
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: linux-fbdev at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
 Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
 ---
- MAINTAINERS | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ MAINTAINERS | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index f4890a3..e013f00 100644
+index 3bf84d4..9bc4861d 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -1074,7 +1074,6 @@ W:	http://www.fluff.org/ben/linux/
+@@ -3138,7 +3138,7 @@ M:	Sascha Hauer <kernel@pengutronix.de>
+ L:	linux-fbdev at vger.kernel.org
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
  S:	Maintained
- F:	arch/arm/plat-samsung/
- F:	arch/arm/plat-s3c24xx/
--F:	arch/arm/plat-s5p/
- F:	arch/arm/mach-s3c24*/
- F:	arch/arm/mach-s3c64xx/
- F:	drivers/*/*s3c2410*
-@@ -1105,7 +1104,6 @@ M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
- L:	linux-arm-kernel at lists.infradead.org
- L:	linux-media at vger.kernel.org
- S:	Maintained
--F:	arch/arm/plat-s5p/dev-fimc*
- F:	arch/arm/plat-samsung/include/plat/*fimc*
- F:	drivers/media/platform/s5p-fimc/
+-F:	arch/arm/plat-mxc/include/mach/imxfb.h
++F:	include/linux/platform_data/video-imxfb.h
+ F:	drivers/video/imxfb.c
  
-@@ -1116,7 +1114,7 @@ M:	Jeongtae Park <jtp.park@samsung.com>
- L:	linux-arm-kernel at lists.infradead.org
- L:	linux-media at vger.kernel.org
- S:	Maintained
--F:	arch/arm/plat-s5p/dev-mfc.c
-+F:	arch/arm/plat-samsung/s5p-dev-mfc.c
- F:	drivers/media/platform/s5p-mfc/
- 
- ARM/SAMSUNG S5P SERIES TV SUBSYSTEM SUPPORT
+ FREESCALE SOC FS_ENET DRIVER
 -- 
 1.7.11.7
