@@ -1,69 +1,42 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 11 Dec 2012 08:52:10 +0100
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <50C62161.9080708@wwwdotorg.org>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121207233317.GB4304@obsidianresearch.com>
- <50C62161.9080708@wwwdotorg.org>
-Message-ID: <20121211075207.GA29977@avionic-0098.adnet.avionic-design.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 11 Dec 2012 09:18:16 +0100
+Subject: [PATCH 1/2] arm: mvebu: add RTC support for Armada 370 and
+ Armada XP
+In-Reply-To: <20121211060050.GC25466@lunn.ch>
+References: <1355136122-30729-1-git-send-email-gregory.clement@free-electrons.com>
+ <1355136122-30729-2-git-send-email-gregory.clement@free-electrons.com>
+ <20121210162819.46fe4f91@skate>
+ <20121210214755.9CD823E0C7C@localhost>
+ <20121210233723.1f3656d0@skate> <20121211060050.GC25466@lunn.ch>
+Message-ID: <20121211091816.63e99769@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 10:52:33AM -0700, Stephen Warren wrote:
-> On 12/07/2012 04:33 PM, Jason Gunthorpe wrote:
-> > On Fri, Dec 07, 2012 at 11:04:23PM +0100, Thomas Petazzoni wrote:
-> > 
-> >>  * The most annoying problem is that when the hw_pci->setup()
-> >>    operation is called, we don't know the size of the memory and I/O
-> >>    regions that each PCI device will need. And on Marvell SoCs, for
-> >>    each PCI device, we have to set up an address decoding window that
-> >>    associates a portion of the physical address space with a given
-> > 
-> > I think a sane way to address this is to model the SOC as the root of
-> > the PCI-E and then model each of the ports as a non-compliant PCI-E
-> > bridge. The internal memory windows functionally map exactly to a
-> > PCI-E bridge memory window - just with annoyingly different register
-> > settings.
+Dear Andrew Lunn,
+
+On Tue, 11 Dec 2012 07:00:50 +0100, Andrew Lunn wrote:
+
+> This is not actually true. Its dependent on at least one external
+> component, a battery. The driver determines at load time if the clock
+> is ticking.
 > 
-> Mainly as background:
+> There are a few Kirkwood and XP designs which use an external i2c RTC,
+> because the battery recommended by Marvell is mechanically not so easy
+> to attached to the board, in a robust way.
 > 
-> I /think/ Tegra has a similar HW setup (but perhaps not identical)
-> (based on a very brief reading of your emails and brief knowledge of
-> this aspect of the Tegra HW).
-> 
-> On Tegra, there is a 1GB physical address window that the PCIe
-> controller serves. The controller has 2 or 3 ports, each a separate PCIe
-> domain I believe. There are registers in the PCIe controller which route
-> accessed made to the 1GB physical window to the various child ports and
-> transaction types.
+> So i expect some boards will disable this from there own .dts file.
+> However, defaulting to enabled would make sense.
 
-No, the ports on Tegra are not separate PCIe domains. The configuration
-space mapping is shared between all ports and is programmed in the
-register space of the PCIe controller. This is what PCIe refers to as
-ECAM, only with a slightly incompatible mapping.
+Ok, thanks for the clarification!
 
-The registers that I think you're referring to allow the type of access
-for a given region (I/O, prefetchable and non-prefetchable MMIO) to be
-specified. They cannot be programmed to route accesses to a specific
-port. The most recent bit of information was that this is derived from
-the standard PCI registers that are available for each port.
+Indeed, the OpenBlocks for example has a RTC on I2C, so maybe it'll
+want to disable the on-SoC RTC.
 
-> IIRC, the bindings Thierry came up with for the Tegra PCIe controller
-> statically describe the setup of those mappings (e.g. it could assign a
-> 256MB physical address region to port 1, and a 768MB physical address
-> region to port 2 perhaps?).
+Best regards,
 
-Yes, that's correct. I also have experimental patches that add a
-bus-range property to be assigned to each port, but that doesn't quite
-work yet. The PCI core keeps complaining about the assigned bus range
-conflicting with [0x00-0xff], which AFAICT is the one assigned by
-default if no bus-range was specified by the driver.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121211/6a8de55c/attachment-0001.sig>
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
