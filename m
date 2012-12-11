@@ -1,113 +1,119 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 12 Dec 2012 09:15:52 +1100
-Subject: linux-next: some merging notes
-Message-ID: <20121212091552.02c72c8926f9f9147b080d68@canb.auug.org.au>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 11 Dec 2012 22:17:36 +0000 (UTC)
+Subject: OMAP baseline test results for v3.7
+Message-ID: <alpine.DEB.2.00.1212112213100.26612@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
 
-Just some notes about the current state of some of the merges in
-linux-next.
+Here are some basic OMAP test results for Linux v3.7.
+Logs and other details at:
 
-The powerpc tree
-(git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc.git#next)
-contains a commit that breaks the building of
-lib/pSeries-reconfig-notifier-error-inject.c.  I applied a patch to
-linux-next to disable CONFIG_PSERIES_RECONFIG_NOTIFIER_ERROR_INJECT.
+    http://www.pwsan.com/omap/testlogs/test_v3.7/20121211094536/
 
-The virtio tree
-(git://git.kernel.org/pub/scm/linux/kernel/git/rusty/linux.git#virtio-next)
-has a conflict with the net-next tree
-(git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git#master)
-that requires the following extra fix up patch:
 
-diff --git a/drivers/net/virtio_net.c b/drivers/net/virtio_net.c
-index 33d6f6f..8afe32d 100644
---- a/drivers/net/virtio_net.c
-+++ b/drivers/net/virtio_net.c
-@@ -147,7 +147,7 @@ struct padded_vnet_hdr {
-  */
- static int vq2txq(struct virtqueue *vq)
- {
--	return (virtqueue_get_queue_index(vq) - 1) / 2;
-+	return (vq->index - 1) / 2;
- }
- 
- static int txq2vq(int txq)
-@@ -157,7 +157,7 @@ static int txq2vq(int txq)
- 
- static int vq2rxq(struct virtqueue *vq)
- {
--	return virtqueue_get_queue_index(vq) / 2;
-+	return vq->index / 2;
- }
- 
- static int rxq2vq(int rxq)
+Test summary
+------------
 
-The tty tree
-(git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git#tty-next)
-contains a new driver (SystemBase Multi-2/PCI) that fails to build for
-(at least) the powerpc architecture.  I have applied a patch that
-disables the driver (I made CONFIG_SB105X in
-drivers/staging/sb105x/Kconfig depend on BROKEN).
+Boot to userspace:
+    Pass (10/11): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
+    	  	  3730beaglexm, 37xxevm, 4430es2panda, 5912osk,
+		  am335xbone, 4460pandaes
+    FAIL ( 1/11): cmt3517 
+  
+PM ret/off, suspend + dynamic idle:
+    Pass (3/3): 3530es3beagle, 3730beaglexm, 37xxevm
 
-The arm-soc tree
-(git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git#for-next)
-(which you will get in pieces) has a merge conflict against the omap_dss2
-tree (git://gitorious.org/linux-omap-dss2/linux.git#for-next) that
-requires the followin fix up patch:
+PM ret, suspend + dynamic idle:
+    FAIL (1/1): 4430es2panda
 
-diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
-index 5c2fd48..2dabb9e 100644
---- a/arch/arm/mach-omap2/common.c
-+++ b/arch/arm/mach-omap2/common.c
-@@ -16,8 +16,6 @@
- #include <linux/init.h>
- #include <linux/platform_data/dsp-omap.h>
- 
--#include <plat/vram.h>
--
- #include "common.h"
- #include "omap-secure.h"
- 
-@@ -32,7 +30,6 @@ int __weak omap_secure_ram_reserve_memblock(void)
- 
- void __init omap_reserve(void)
- {
--	omap_vram_reserve_sdram_memblock();
- 	omap_dsp_reserve_sdram_memblock();
- 	omap_secure_ram_reserve_memblock();
- 	omap_barrier_reserve_memblock();
 
-Part of the arm-soc tree also requires the following fixup patch due to a
-conflict with the powerpc tree (patch from N, Mugunthan V
-<mugunthanvnm@ti.com>):
+Failing tests: fixed by posted patches
+--------------------------------------
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 099e406..5fd5e23 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -192,7 +192,7 @@ static struct device_node * __init omap_get_timer_dt
-(struct of_device_id *match, continue;
- 		}
- 
--		prom_add_property(np, &device_disabled);
-+		of_add_property(np, &device_disabled);
- 		return np;
- 	}
- 
-There are also lots of conflicts due to the __dev* annotation removals -
-a lot of which are in the driver-core tree
-(git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/driver-core.git#driver-core-next).
+Other:
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121212/65d101f8/attachment.sig>
+* 2420N800: powers down 30 seconds after boot
+  - Presumably due to missing CBUS patches for watchdog control
+  - http://lkml.org/lkml/2012/9/3/265
+  - http://marc.info/?l=linux-omap&m=135274739624125&w=2
+
+
+Failing tests: needing investigation
+------------------------------------
+
+Boot tests:
+
+* CM-T3517: L3 in-band error with IPSS during boot
+  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
+  - Longstanding issue; does not occur on the 3517EVM
+
+* 3517EVM & CM-T3517: boot hangs with NFS root
+  - Likely some Kconfig, board file, and PM issues with EMAC
+
+* CM-T3517: boot hangs with MMC root
+  - Due to missing MMC setup in board file
+
+PM tests:
+
+* 3730 Beagle XM: does not serial wake from off-idle suspend when console
+  UART doesn't clock gate ("debug ignore_loglevel")
+  - Cause unknown
+  - Not yet part of the automated test suite
+  - Re-tested at v3.7; still failing:
+    http://www.pwsan.com/omap/transcripts/20121211-3730beaglexm-3.7-pm-offmode-fail-debug.txt
+
+Other:
+
+* 4430es2panda: omap_hwmod: l3_instr: _wait_target_disable failed
+  - Unknown cause; could be due to the lack of hierarchical enable/disable
+    in hwmod code
+  - Jon Hunter reports this does not appear with the same X-loader/bootloader
+    on his 4430ES2.3 Panda, so could be ES-level dependent
+
+
+Failing tests: needing local investigation (may be due to testbed issues)
+-------------------------------------------------------------------------
+
+Boot tests:
+
+* AM335x Beaglebone: omap2plus_defconfig kernels don't boot
+  - May be fixed now, pending retest:
+    - http://marc.info/?l=linux-omap&m=135082257727502&w=2
+  - Not yet part of the automated test suite
+  * May be due to an old U-boot with FDT support problems used here?
+    Pending local investigation and re-test
+
+
+vmlinux object size
+(delta in bytes from test_v3.6 (a0d271cbfed1dd50278c6b06bead3d00ba0a88f9)):
+   text     data      bss    total  kernel
++122692   -66544    +2224   +58372  am33xx_only
+ +65113   -88872    +2100   -21659  n800_multi_omap2xxx
+ +61845   -86344    +2132   -22367  n800_only_a
+ +60069    +5472     -104   +65437  omap1_defconfig
+ +59297    +3136      -72   +62361  omap1_defconfig_1510innovator_only
+ +60293    +3152     -104   +63341  omap1_defconfig_5912osk_only
++137078   -67552    +2080   +71606  omap2plus_defconfig
++110984   -83632    +1968   +29320  omap2plus_defconfig_2430sdp_only
++133010   -67560    +2016   +67466  omap2plus_defconfig_cpupm
++134877   -67432    +1888   +69333  omap2plus_defconfig_no_pm
++112176   -88776    +2016   +25416  omap2plus_defconfig_omap2_4_only
++111951   -88104    +2016   +25863  omap2plus_defconfig_omap3_4_only
++134205   -66896    +2348   +69657  rmk_omap3430_ldp_oldconfig
++110261   -47016    +2760   +66005  rmk_omap4430_sdp_oldconfig
+
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.6 (a0d271cbfed1dd50278c6b06bead3d00ba0a88f9))
+  avail  rsrvd   high  freed  board          kconfig
+    20k   -20k      .      .  2420n800       n800_only_a
+   -72k    72k      .     4k  2430sdp        omap2plus_defconfig
+   -72k    72k      .     4k  3517evm        omap2plus_defconfig
+   -72k    72k      .     4k  3530es3beagle  omap2plus_defconfig
+   -72k    72k      .     4k  3730beaglexm   omap2plus_defconfig
+   -72k    72k      .     4k  37xxevm        omap2plus_defconfig
+   -72k    72k      .     4k  4430es2panda   omap2plus_defconfig
+   -64k    64k      .      .  5912osk        omap1_defconfig
+   -72k    72k      .      .  cmt3517        omap2plus_defconfig
