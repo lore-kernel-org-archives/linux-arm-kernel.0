@@ -1,51 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Dec 2012 16:33:14 +0000
-Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
- cache LoUIS operations
-In-Reply-To: <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
-References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
- <20120919134658.GA2111@linaro.org>
- <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
- <20120920110439.GB2117@linaro.org>
- <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
-Message-ID: <20121211163313.GG16759@mudshark.cambridge.arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 11 Dec 2012 16:34:27 +0000
+Subject: [RFC PATCH 2/2] ARM: SMP support for mach-virt
+In-Reply-To: <20121211160956.GF16759@mudshark.cambridge.arm.com>
+References: <20121204124047.GM23368@mudshark.cambridge.arm.com>
+ <20121204133326.GE14363@n2100.arm.linux.org.uk>
+ <20121204134010.GP23368@mudshark.cambridge.arm.com>
+ <20121204143724.GF14363@n2100.arm.linux.org.uk>
+ <20121204161113.GT23368@mudshark.cambridge.arm.com>
+ <50BE28C6.2010403@gmail.com>
+ <20121204171628.GF5314@mudshark.cambridge.arm.com> <50BE31E9.3040404@arm.com>
+ <20121204173045.GI5314@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1212111558270.17523@kaball.uk.xensource.com>
+ <20121211160956.GF16759@mudshark.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1212111621220.17523@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 11, 2012 at 04:07:56PM +0000, Guennadi Liakhovetski wrote:
-> Hi all
+On Tue, 11 Dec 2012, Will Deacon wrote:
+> On Tue, Dec 11, 2012 at 04:04:20PM +0000, Stefano Stabellini wrote:
+> > Hi!
 > 
-> On Thu, 20 Sep 2012, Dave Martin wrote:
+> Hi Stefano,
 > 
-> > On Thu, Sep 20, 2012 at 11:25:14AM +0100, Lorenzo Pieralisi wrote:
-> > > On Wed, Sep 19, 2012 at 02:46:58PM +0100, Dave Martin wrote:
-> > > > On Tue, Sep 18, 2012 at 05:35:33PM +0100, Lorenzo Pieralisi wrote:
-> > > > > In processors like A15/A7 L2 cache is unified and integrated within the
-> > > > > processor cache hierarchy, so that it is not considered an outer cache
-> > > > > anymore. For processors like A15/A7 flush_cache_all() ends up cleaning
-> > > > > all cache levels up to Level of Coherency (LoC) that includes
-> > > > > the L2 unified cache.
-> > > > > 
-> > > > > When a single CPU is suspended (CPU idle) a complete L2 clean is not
-> > > > > required, so generic cpu_suspend code must clean the data cache using the
-> > > > > newly introduced cache LoUIS function.
+> > Sorry for taking so long to reply but I admit I missed the thread
+> > entirely until now. I would appreciate if you could CC
+> > xen-devel at lists.xen.org and/or me for virtualization related
+> > discussions.
 > 
-> Git bisect identified this patch, in the mainline as
-> 
-> commit dbee0c6fb4c1269b2dfc8b0b7a29907ea7fed560
-> Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Date:   Fri Sep 7 11:06:57 2012 +0530
-> 
->     ARM: kernel: update cpu_suspend code to use cache LoUIS operations
-> 
-> as the culprit of the broken wake up from STR on mackerel, based on an 
-> sh7372 A8 SoC. .config attached.
+> I did CC xen-arm at lists.xen.org,
+  
+Thanks!
+I don't know why I didn't receive it then :-\
 
-My guess is that because Cortex-A8 does not implement the MP extensions,
-the LoUIS field of the CLIDR reads as zero, and the cache isn't flushed at
-all (I can see an early exit in v7_flush_dcache_louis).
+In any case xen-devel is the right place for upstream related
+discussion.
 
-Lorenzo -- how is this supposed to work for uniprocessor CPUs?
 
-Will
+> but you've dropped that list in your
+> reply...
+
+Yeah.. that's because I didn't receive the original email and I had to
+download the mailing list archives, sorry about that.
+
+
+> > On the Xen side there are not going to be any problems related to SMP
+> > and holding pens, because secondary CPUs only come into existence after
+> > the first CPU calls the HYPERVISOR_vcpu_op hypercall (still missing on
+> > ARM).
+> 
+> Ok. Would you be willing/able to wrap this in a PSCI interface when you do
+> add SMP support for ARM?
+
+I grepped for PSCI in the Linux tree but I couldn't find anything.
+Also I googled for ARM PSCI and nothing of value came up. Can I find a
+doc that explains what PSCI is anywhere?
