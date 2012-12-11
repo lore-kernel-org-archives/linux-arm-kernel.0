@@ -1,31 +1,56 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Dec 2012 14:11:48 -0700
-Subject: [PATCH 1/2] pinctrl: add sleep mode management for hogs
-In-Reply-To: <1355234393-17368-1-git-send-email-linus.walleij@stericsson.com>
-References: <1355234393-17368-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <50C7A194.7070102@wwwdotorg.org>
+From: rbernd@gmail.com (Bernd)
+Date: Tue, 11 Dec 2012 22:15:06 +0100
+Subject: Your kernel patches for the Marvell Mirabox
+In-Reply-To: <20121211161557.6819daa9@skate>
+References: <50C4AC68.7090709@gmail.com>
+ <20121210140202.GI21694@titan.lakedaemon.net> <50C681B0.4030801@gmail.com>
+ <20121211161557.6819daa9@skate>
+Message-ID: <50C7A25A.2090602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2012 06:59 AM, Linus Walleij wrote:
-> From: Julien Delacou <julien.delacou@stericsson.com>
+Hi Thomas,
+
+Thanks, that did the trick! Now the kernel boots OK until it can't find
+the root filesystem (I know the reason for that).
+
+It appears that there is a bug in
+
+$ make ARCH=arm CROSS_COMPILE=../arm-2012.09/bin/arm-none-eabi- uImage
+
+The command it uses to create the uImage is (got it from
+arch/arm/boot/.uImage.cmd):
+
+/bin/sh /home/bernd/mirabox-dev/marvell-boards/scripts/mkuboot.sh -A arm
+-O linux -C none  -T kernel -a  -e  -n 'Linux-3.7.0-rc7-00250-g0c0029c'
+-d arch/arm/boot/zImage arch/arm/boot/uImage
+
+So no value given for parameters -a and -e.
+
+Best regards,
+
+Bernd
+
+
+On 2012-12-11 16:15, Thomas Petazzoni wrote:
+> Dear Bernd,
 > 
-> This fix allows handling sleep mode for hogged
-> pins in pinctrl. It provides functions to set pins
-> to sleep/default configurations according to their
-> current state from the individual pinctrl drivers.
-
-> diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
-
-> +extern int pinctrl_force_sleep(struct pinctrl_dev *pctldev);
-> +extern int pinctrl_force_default(struct pinctrl_dev *pctldev);
-
-Since I assume those function are only supposed to be used by pinctrl
-drivers themselves, should the prototypes go into drivers/pinctrl/core.h
-or similar, rather than something in include/linux/pinctrl?
-
-Oh, and don't you need EXPORT_SYMBOL in case the pinctrl driver is a module?
-
-Aside from that,
-
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
+> On Tue, 11 Dec 2012 01:43:28 +0100, Bernd wrote:
+> 
+>> Data Size:    1885555 Bytes = 1841.36 kB = 1.80 MB
+>> Load Address: fffffff2
+>> Entry Point:  fffffff2
+> 
+> Those Load address and Entry Point are incorrect.
+> 
+> I think this is due to the fact that mach-mvebu is now part of the
+> ARCH_MULTIPLATFORM thing and therefore no longer defines its own
+> zreladdr-y, but I'm not sure. In any case, what I'm doing here is:
+> 
+> ./scripts/mkuboot.sh -A arm -O linux -T kernel -C none -a 0x00008000 -e
+> 0x00008000 -n 'Linux-marvell' -d myzImage-with-dtb-appended myuImage.
+> 
+> Best regards,
+> 
+> Thomas
+> 
