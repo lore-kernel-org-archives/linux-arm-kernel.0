@@ -1,34 +1,47 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 11 Dec 2012 13:01:34 +0000
-Subject: linker problem with xip kernel and recent toolchains
-In-Reply-To: <50BE0CDB.5000704@pengutronix.de>
-References: <50BE0CDB.5000704@pengutronix.de>
-Message-ID: <1355230894.19818.1.camel@hornet>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 11 Dec 2012 17:00:37 +0400
+Subject: [PATCH] drivers/pinctrl/pinctrl-at91.c: convert kfree to
+ devm_kfree
+In-Reply-To: <1355223525-19165-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1355223525-19165-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <50C72E75.8030706@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hello.
 
-On Tue, 2012-12-04 at 14:46 +0000, Marc Kleine-Budde wrote:
-> we've just discovered a linker problem with newer toolchains, that
-> support --build-id and xip kernels. The resulting vmlinux is about 13
-> MiB big, but the xipimage ~2GiB.
-> 
-> A look at the vmlinux's objdump shows that the .notes section is around
-> 2 GiB and it's placed by the linker script into the RAM. With the ROM
-> starting at 0x0 this results into a ~2 GiB big image.
-> 
-> >   [16] .data             PROGBITS        88008000 0a0000 012aa0 00  WA  0   0 256
-> >   [17] .notes            NOTE            8801aaa0 0b2aa0 000024 00  AX  0   0  4
-> >   [18] .bss              NOBITS          8801aae0 0b2ac4 005414 00  WA  0   0 32
-> 
-> After discarding the .notes section in the objcopy (see patch below) the
-> resulting binary images has a proper size again.
+On 11-12-2012 14:58, Julia Lawall wrote:
 
-Could you please send me the configuration you're using to get the XIP
-kernel? I'll try to get my head around this problem and check how other
-architectures are dealing with the problem.
+> From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Thanks!
+> The function at91_dt_node_to_map is ultimately called by the function
+> pinctrl_get, which is an exported function.  Since it is possible that this
+> function is not called from within a probe function, for safety, the kfree
+> is converted to a devm_kfree, to both free the data and remove it from the
+> device in a failure situation.
 
-Pawe?
+> A newline is added in the call to devm_kfree to avoid exceeding the 80
+
+    devm_kzalloc() you mean?
+
+> character limit.
+
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
+> ---
+>   drivers/pinctrl/pinctrl-at91.c |    5 +++--
+>   1 file changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index c5e7571..0da8a5f 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -255,7 +255,8 @@ static int at91_dt_node_to_map(struct pinctrl_dev *pctldev,
+>   	}
+>
+>   	map_num += grp->npins;
+> -	new_map = devm_kzalloc(pctldev->dev, sizeof(*new_map) * map_num, GFP_KERNEL);
+> +	new_map = devm_kzalloc(pctldev->dev, sizeof(*new_map) * map_num,
+> +			       GFP_KERNEL);
+
+WBR, Sergei
