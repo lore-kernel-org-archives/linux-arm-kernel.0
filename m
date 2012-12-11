@@ -1,82 +1,98 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 11 Dec 2012 12:07:28 +0900
-Subject: [PATCH 0/6 v3] ARM: mach-shmobile: kzm9g: Reference DT implementation
-Message-ID: <1355195254-4563-1-git-send-email-horms+renesas@verge.net.au>
+Date: Tue, 11 Dec 2012 12:07:30 +0900
+Subject: [PATCH 2/6] ARM: mach-shmobile: sh73a0: Allow initialisation of GIC
+ by DT
+In-Reply-To: <1355195254-4563-1-git-send-email-horms+renesas@verge.net.au>
+References: <1355195254-4563-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1355195254-4563-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this is a third pass at at providing a refernce DT implementation
-for the kzm9g baord which is intended to act as a guide for mach-shmobile
-developers.
+This allows the GIC interrupt controller of the sh73a0 SoC to be
+initialised using a flattened device tree blob.
 
-It provides a minimal setup of the board using as little C code as
-possible.
+It does not allow the INTC interrupt controller which is also present on
+the sh73a0 SoC to be enabled via device tree.  Nor does it handle sharing
+of interrupts between the GIC and INTC interrupt controllers.
 
-It may be used by selecting CONFIG_MACH_KZM9G_REFERENCE
-and using sh73a0-kzm9g-reference.dtb
+This limits the usefulness of this code to applications which only wish to
+access devices which use interrupts that can be handled by the GIC
+interrupt controller. Other applications should, for now, continue using
+non-device tree initialisation of the sh72a0 interrupt controllers.
 
-*** Please note that the clock initialisation shcheme used in
-    this series does not currently work with SMP as there
-    is a yet to be resolved lock-up in workqueue initialisation.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-    Resolving this problem is currently regarded as future-work.
+---
 
-    CONFIG_SMP must be disabled when using this code. ***
+v3
+* No change
 
-Major difference between v2 and v3:
-* Allow UP boot to complete by initialiing CMT earlier.
-  This is achieved by changing the position of clocsources/
-  in drivers/Makefile
+v2
+* No change
+---
+ arch/arm/boot/dts/sh73a0.dtsi                |    9 +++++++++
+ arch/arm/mach-shmobile/include/mach/common.h |    1 +
+ arch/arm/mach-shmobile/intc-sh73a0.c         |   14 ++++++++++++++
+ 3 files changed, 24 insertions(+)
 
-Major difference between v1 and v2:
-* Drop touchscreen initialisation, it requires INTC
-* Drop SDHI initialisation, the driver seems to need some work
-* Add extra entries to clock-sh73a0.c:lookups[] and
-  remove auxdata. Ultimtely the clocks will be described
-  in DT, but the code isn't there yet.
-* Drop MMCIF patch, it is not needed if regulators are enabled
-* Drop PCF hacks, instead, the series is based on Laruent Pinchart's *
-* series: [PATCH v2 00/77] SH pin control and GPIO rework with OF support
-* Use shmobile_setup_delay()
-
-Git and diffstat information provided to aid review.
-
-----------------------------------------------------------------
-The following changes since commit 940956fe1d8de5cbcc963214fe592f76d8354bef:
-
-  ARM: shmobile: kzm9g: Add LED1-LED4 to the device tree (2012-11-27 00:59:10 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git devel/of-kzm9g
-
-for you to fetch changes up to e64ad872028f921a7a30be325fbdecc725958b40:
-
-  ARM: mach-shmobile: kzm9g: Reference DT implementation (2012-12-11 11:51:56 +0900)
-
-----------------------------------------------------------------
-Simon Horman (6):
-      ARM: clocksource: Initialise early
-      ARM: mach-shmobile: sh73a0: Allow initialisation of GIC by DT
-      ARM: mach-shmobile: sh73a0: Minimal setup using DT
-      ARM: mach-shmobile: sh73a0: Initialise MMCIF using DT
-      ARM: mach-shmobile: kzm9g: use voltage regulators by default
-      ARM: mach-shmobile: kzm9g: Reference DT implementation
-
- arch/arm/boot/dts/Makefile                     |    3 +-
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts   |   37 +++++++++
- arch/arm/boot/dts/sh73a0-reference.dtsi        |   24 ++++++
- arch/arm/boot/dts/sh73a0.dtsi                  |   69 +++++++++++++++++
- arch/arm/configs/kzm9g_defconfig               |    2 +
- arch/arm/mach-shmobile/Kconfig                 |   10 +++
- arch/arm/mach-shmobile/Makefile                |    1 +
- arch/arm/mach-shmobile/board-kzm9g-reference.c |   99 ++++++++++++++++++++++++
- arch/arm/mach-shmobile/clock-sh73a0.c          |   13 ++++
- arch/arm/mach-shmobile/include/mach/common.h   |    3 +
- arch/arm/mach-shmobile/intc-sh73a0.c           |   14 ++++
- arch/arm/mach-shmobile/setup-sh73a0.c          |   68 +++++++++++++++-
- drivers/Makefile                               |    8 +-
- 13 files changed, 346 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
- create mode 100644 arch/arm/boot/dts/sh73a0-reference.dtsi
- create mode 100644 arch/arm/mach-shmobile/board-kzm9g-reference.c
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 6b374ff..77c8e43 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -29,4 +29,13 @@
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
+ 	};
++
++	gic: interrupt-controller at f0001000 {
++		compatible = "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <1>;
++		interrupt-controller;
++		reg = <0xf0001000 0x1000>,
++		      <0xf0000100 0x100>;
++	};
+ };
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index d47e215..b50447e 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -49,6 +49,7 @@ extern struct clk sh7372_extal1_clk;
+ extern struct clk sh7372_extal2_clk;
+ 
+ extern void sh73a0_init_irq(void);
++extern void sh73a0_init_irq_dt(void);
+ extern void sh73a0_map_io(void);
+ extern void sh73a0_add_early_devices(void);
+ extern void sh73a0_add_standard_devices(void);
+diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
+index f0c5e51..e492350 100644
+--- a/arch/arm/mach-shmobile/intc-sh73a0.c
++++ b/arch/arm/mach-shmobile/intc-sh73a0.c
+@@ -21,6 +21,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/module.h>
+ #include <linux/irq.h>
++#include <linux/of_irq.h>
+ #include <linux/io.h>
+ #include <linux/sh_intc.h>
+ #include <mach/intc.h>
+@@ -464,3 +465,16 @@ void __init sh73a0_init_irq(void)
+ 	sh73a0_pint1_cascade.handler = sh73a0_pint1_demux;
+ 	setup_irq(gic_spi(34), &sh73a0_pint1_cascade);
+ }
++
++#ifdef CONFIG_OF
++static const struct of_device_id irq_of_match[] __initconst = {
++	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
++	{ },
++};
++
++void __init sh73a0_init_irq_dt(void)
++{
++	of_irq_init(irq_of_match);
++	gic_arch_extn.irq_set_wake = sh73a0_set_wake;
++}
++#endif
+-- 
+1.7.10.4
