@@ -1,235 +1,40 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 11 Dec 2012 17:07:56 +0100 (CET)
-Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
- cache LoUIS operations
-In-Reply-To: <20120920110439.GB2117@linaro.org>
-References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
- <20120919134658.GA2111@linaro.org>
- <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
- <20120920110439.GB2117@linaro.org>
-Message-ID: <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Dec 2012 16:09:56 +0000
+Subject: [RFC PATCH 2/2] ARM: SMP support for mach-virt
+In-Reply-To: <alpine.DEB.2.02.1212111558270.17523@kaball.uk.xensource.com>
+References: <20121204124047.GM23368@mudshark.cambridge.arm.com>
+ <20121204133326.GE14363@n2100.arm.linux.org.uk>
+ <20121204134010.GP23368@mudshark.cambridge.arm.com>
+ <20121204143724.GF14363@n2100.arm.linux.org.uk>
+ <20121204161113.GT23368@mudshark.cambridge.arm.com>
+ <50BE28C6.2010403@gmail.com>
+ <20121204171628.GF5314@mudshark.cambridge.arm.com>
+ <50BE31E9.3040404@arm.com>
+ <20121204173045.GI5314@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1212111558270.17523@kaball.uk.xensource.com>
+Message-ID: <20121211160956.GF16759@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all
+On Tue, Dec 11, 2012 at 04:04:20PM +0000, Stefano Stabellini wrote:
+> Hi!
 
-On Thu, 20 Sep 2012, Dave Martin wrote:
+Hi Stefano,
 
-> On Thu, Sep 20, 2012 at 11:25:14AM +0100, Lorenzo Pieralisi wrote:
-> > On Wed, Sep 19, 2012 at 02:46:58PM +0100, Dave Martin wrote:
-> > > On Tue, Sep 18, 2012 at 05:35:33PM +0100, Lorenzo Pieralisi wrote:
-> > > > In processors like A15/A7 L2 cache is unified and integrated within the
-> > > > processor cache hierarchy, so that it is not considered an outer cache
-> > > > anymore. For processors like A15/A7 flush_cache_all() ends up cleaning
-> > > > all cache levels up to Level of Coherency (LoC) that includes
-> > > > the L2 unified cache.
-> > > > 
-> > > > When a single CPU is suspended (CPU idle) a complete L2 clean is not
-> > > > required, so generic cpu_suspend code must clean the data cache using the
-> > > > newly introduced cache LoUIS function.
+> Sorry for taking so long to reply but I admit I missed the thread
+> entirely until now. I would appreciate if you could CC
+> xen-devel at lists.xen.org and/or me for virtualization related
+> discussions.
 
-Git bisect identified this patch, in the mainline as
+I did CC xen-arm at lists.xen.org, but you've dropped that list in your
+reply...
 
-commit dbee0c6fb4c1269b2dfc8b0b7a29907ea7fed560
-Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Date:   Fri Sep 7 11:06:57 2012 +0530
+> On the Xen side there are not going to be any problems related to SMP
+> and holding pens, because secondary CPUs only come into existence after
+> the first CPU calls the HYPERVISOR_vcpu_op hypercall (still missing on
+> ARM).
 
-    ARM: kernel: update cpu_suspend code to use cache LoUIS operations
+Ok. Would you be willing/able to wrap this in a PSCI interface when you do
+add SMP support for ARM?
 
-as the culprit of the broken wake up from STR on mackerel, based on an 
-sh7372 A8 SoC. .config attached.
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
--------------- next part --------------
-# CONFIG_ARM_PATCH_PHYS_VIRT is not set
-CONFIG_EXPERIMENTAL=y
-CONFIG_CROSS_COMPILE="arm-none-linux-gnueabi-"
-CONFIG_LOCALVERSION="-ap4"
-# CONFIG_LOCALVERSION_AUTO is not set
-CONFIG_SYSVIPC=y
-CONFIG_IKCONFIG=y
-CONFIG_IKCONFIG_PROC=y
-CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-CONFIG_SYSCTL_SYSCALL=y
-CONFIG_KALLSYMS_ALL=y
-CONFIG_EMBEDDED=y
-CONFIG_SLAB=y
-CONFIG_MODULES=y
-CONFIG_MODULE_UNLOAD=y
-# CONFIG_LBDAF is not set
-# CONFIG_BLK_DEV_BSG is not set
-# CONFIG_IOSCHED_DEADLINE is not set
-# CONFIG_IOSCHED_CFQ is not set
-CONFIG_ARCH_SHMOBILE=y
-CONFIG_ARCH_SH7372=y
-CONFIG_MACH_AP4EVB=y
-CONFIG_MACH_MACKEREL=y
-CONFIG_MEMORY_SIZE=0x20000000
-# CONFIG_SH_TIMER_CMT is not set
-# CONFIG_EM_TIMER_STI is not set
-# CONFIG_ARM_THUMB is not set
-CONFIG_AEABI=y
-CONFIG_FORCE_MAX_ZONEORDER=12
-CONFIG_USE_OF=y
-CONFIG_ZBOOT_ROM_TEXT=0x0
-CONFIG_ZBOOT_ROM_BSS=0x0
-CONFIG_ARM_APPENDED_DTB=y
-CONFIG_ARM_ATAG_DTB_COMPAT=y
-CONFIG_CMDLINE="console=ttySC0,115200 console=tty1 earlyprintk=sh-sci.0,115200"
-CONFIG_KEXEC=y
-CONFIG_VFP=y
-CONFIG_NEON=y
-# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-CONFIG_PM_RUNTIME=y
-CONFIG_NET=y
-CONFIG_PACKET=m
-CONFIG_UNIX=y
-CONFIG_INET=y
-CONFIG_IP_MULTICAST=y
-CONFIG_IP_PNP=y
-CONFIG_IP_PNP_DHCP=y
-CONFIG_IP_PNP_BOOTP=y
-# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-# CONFIG_INET_XFRM_MODE_BEET is not set
-CONFIG_INET_DIAG=m
-CONFIG_INET_UDP_DIAG=m
-# CONFIG_INET6_XFRM_MODE_TRANSPORT is not set
-# CONFIG_INET6_XFRM_MODE_TUNNEL is not set
-# CONFIG_INET6_XFRM_MODE_BEET is not set
-# CONFIG_IPV6_SIT is not set
-CONFIG_CFG80211=m
-CONFIG_CFG80211_WEXT=y
-CONFIG_MAC80211=m
-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-# CONFIG_FIRMWARE_IN_KERNEL is not set
-CONFIG_PROC_DEVICETREE=y
-# CONFIG_BLK_DEV is not set
-CONFIG_NETDEVICES=y
-CONFIG_NETCONSOLE=y
-# CONFIG_NET_VENDOR_BROADCOM is not set
-# CONFIG_NET_VENDOR_CHELSIO is not set
-# CONFIG_NET_VENDOR_CIRRUS is not set
-# CONFIG_NET_VENDOR_FARADAY is not set
-# CONFIG_NET_VENDOR_INTEL is not set
-# CONFIG_NET_VENDOR_MARVELL is not set
-# CONFIG_NET_VENDOR_MICREL is not set
-# CONFIG_NET_VENDOR_NATSEMI is not set
-# CONFIG_NET_VENDOR_SEEQ is not set
-CONFIG_SMSC911X=y
-# CONFIG_NET_VENDOR_STMICRO is not set
-# CONFIG_NET_VENDOR_WIZNET is not set
-CONFIG_MDIO_BITBANG=y
-# CONFIG_WLAN is not set
-CONFIG_INPUT_MOUSEDEV=m
-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-CONFIG_INPUT_EVDEV=y
-# CONFIG_KEYBOARD_ATKBD is not set
-CONFIG_KEYBOARD_TCA6416=y
-CONFIG_KEYBOARD_SH_KEYSC=y
-# CONFIG_INPUT_MOUSE is not set
-CONFIG_INPUT_TOUCHSCREEN=y
-CONFIG_TOUCHSCREEN_TSC2007=y
-CONFIG_TOUCHSCREEN_ST1232=y
-CONFIG_INPUT_MISC=y
-CONFIG_INPUT_ADXL34X=m
-# CONFIG_SERIO is not set
-# CONFIG_LEGACY_PTYS is not set
-CONFIG_SERIAL_SH_SCI=y
-CONFIG_SERIAL_SH_SCI_NR_UARTS=8
-CONFIG_SERIAL_SH_SCI_CONSOLE=y
-CONFIG_SERIAL_SH_SCI_DMA=y
-CONFIG_I2C=y
-CONFIG_I2C_CHARDEV=y
-CONFIG_I2C_SH_MOBILE=y
-CONFIG_SPI=y
-CONFIG_SPI_GPIO=m
-CONFIG_GPIO_SYSFS=y
-CONFIG_POWER_SUPPLY=y
-# CONFIG_HWMON is not set
-CONFIG_SSB=m
-CONFIG_SSB_SDIOHOST=y
-CONFIG_REGULATOR=y
-CONFIG_REGULATOR_DUMMY=y
-CONFIG_MEDIA_SUPPORT=m
-CONFIG_MEDIA_CAMERA_SUPPORT=y
-CONFIG_MEDIA_CONTROLLER=y
-CONFIG_VIDEO_V4L2_SUBDEV_API=y
-CONFIG_VIDEO_ADV_DEBUG=y
-CONFIG_VIDEO_OV7670=m
-CONFIG_VIDEO_VIVI=m
-CONFIG_V4L_PLATFORM_DRIVERS=y
-CONFIG_VIDEO_SH_VOU=m
-CONFIG_SOC_CAMERA=m
-CONFIG_SOC_CAMERA_IMX074=m
-CONFIG_SOC_CAMERA_MT9M111=m
-CONFIG_SOC_CAMERA_MT9T112=m
-CONFIG_SOC_CAMERA_MT9V022=m
-CONFIG_SOC_CAMERA_PLATFORM=m
-CONFIG_SOC_CAMERA_OV5642=m
-CONFIG_VIDEO_SH_MOBILE_CSI2=m
-CONFIG_VIDEO_SH_MOBILE_CEU=m
-CONFIG_V4L_MEM2MEM_DRIVERS=y
-CONFIG_VIDEO_MEM2MEM_TESTDEV=m
-CONFIG_FB=y
-CONFIG_FB_SH_MOBILE_LCDC=y
-# CONFIG_LCD_CLASS_DEVICE is not set
-# CONFIG_BACKLIGHT_GENERIC is not set
-CONFIG_FRAMEBUFFER_CONSOLE=y
-CONFIG_LOGO=y
-# CONFIG_LOGO_LINUX_MONO is not set
-# CONFIG_LOGO_LINUX_VGA16 is not set
-CONFIG_SOUND=m
-CONFIG_SND=m
-# CONFIG_SND_SUPPORT_OLD_API is not set
-# CONFIG_SND_DRIVERS is not set
-# CONFIG_SND_ARM is not set
-# CONFIG_SND_SPI is not set
-CONFIG_SND_SOC=m
-CONFIG_SND_SOC_SH4_FSI=m
-# CONFIG_USB_SUPPORT is not set
-CONFIG_MMC=m
-CONFIG_MMC_CLKGATE=y
-CONFIG_MMC_SDHI=m
-CONFIG_MMC_SH_MMCIF=m
-CONFIG_RTC_CLASS=y
-# CONFIG_RTC_HCTOSYS is not set
-CONFIG_DMADEVICES=y
-CONFIG_SH_DMAE=m
-CONFIG_DMATEST=m
-# CONFIG_IOMMU_SUPPORT is not set
-CONFIG_EXT3_FS=y
-# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-# CONFIG_DNOTIFY is not set
-CONFIG_FANOTIFY=y
-CONFIG_VFAT_FS=m
-CONFIG_TMPFS=y
-# CONFIG_MISC_FILESYSTEMS is not set
-CONFIG_NFS_FS=y
-CONFIG_ROOT_NFS=y
-CONFIG_NLS_CODEPAGE_437=m
-CONFIG_NLS_ISO8859_1=m
-CONFIG_NLS_ISO8859_15=m
-CONFIG_PRINTK_TIME=y
-CONFIG_MAGIC_SYSRQ=y
-CONFIG_LOCKUP_DETECTOR=y
-# CONFIG_SCHED_DEBUG is not set
-CONFIG_DEBUG_OBJECTS=y
-CONFIG_DEBUG_OBJECTS_FREE=y
-CONFIG_DEBUG_SLAB=y
-CONFIG_DEBUG_ATOMIC_SLEEP=y
-# CONFIG_FTRACE is not set
-# CONFIG_ARM_UNWIND is not set
-CONFIG_DEBUG_USER=y
-CONFIG_CRYPTO=y
-CONFIG_CRYPTO_CBC=m
-CONFIG_CRYPTO_ECB=m
-CONFIG_CRYPTO_MD5=m
-CONFIG_CRYPTO_AES=y
-CONFIG_CRYPTO_DES=m
+Will
