@@ -1,40 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Dec 2012 16:09:56 +0000
-Subject: [RFC PATCH 2/2] ARM: SMP support for mach-virt
-In-Reply-To: <alpine.DEB.2.02.1212111558270.17523@kaball.uk.xensource.com>
-References: <20121204124047.GM23368@mudshark.cambridge.arm.com>
- <20121204133326.GE14363@n2100.arm.linux.org.uk>
- <20121204134010.GP23368@mudshark.cambridge.arm.com>
- <20121204143724.GF14363@n2100.arm.linux.org.uk>
- <20121204161113.GT23368@mudshark.cambridge.arm.com>
- <50BE28C6.2010403@gmail.com>
- <20121204171628.GF5314@mudshark.cambridge.arm.com>
- <50BE31E9.3040404@arm.com>
- <20121204173045.GI5314@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1212111558270.17523@kaball.uk.xensource.com>
-Message-ID: <20121211160956.GF16759@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Dec 2012 16:15:02 +0000
+Subject: [RFC v1 01/16] lib: devres: don't enclose pcim_*() functions in
+ CONFIG_HAS_IOPORT
+In-Reply-To: <20121211170338.4859ddf0@skate>
+References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201212111043.50627.arnd@arndb.de> <20121211170338.4859ddf0@skate>
+Message-ID: <201212111615.03262.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 11, 2012 at 04:04:20PM +0000, Stefano Stabellini wrote:
-> Hi!
+On Tuesday 11 December 2012, Thomas Petazzoni wrote:
+> On Tue, 11 Dec 2012 10:43:49 +0000, Arnd Bergmann wrote:
+> > On Friday 07 December 2012, Thomas Petazzoni wrote:
+> > > The pcim_*() functions are used by the libata-sff subsystem, and this
+> > > subsystem is used for many SATA drivers on ARM platforms that do not
+> > > necessarily have I/O ports.
+> > 
+> > I think this one is wrong as the CONFIG_HAS_IOPORT does not refer to the
+> > presence of PIO ports but to whether or not they provide an ioport_map
+> > function. If there is no ioport_map(), devm_pci_iomap will fail to link
+> > as far as I can tell.
+> 
+> The problem is that on ARCH_MULTI_V7, ARCH_VEXPRESS is forcefully
+> enabled. And ARCH_VEXPRESS selects NO_IOPORT.. so you don't have the
+> pcim_*() functions, and therefore libata-sff.c (needed for many SATA
+> drivers) will not build. How do you solve this?
 
-Hi Stefano,
+What you describe here are probable two bugs, and we should fix both:
 
-> Sorry for taking so long to reply but I admit I missed the thread
-> entirely until now. I would appreciate if you could CC
-> xen-devel at lists.xen.org and/or me for virtualization related
-> discussions.
+* ARCH_VEXPRESS should not select NO_IOPORT. It's generally wrong
+  to select this in combination with ARCH_MULTIPLATFORM, when some
+  of the other platforms you may enable actually have IOPORT mapping
+  support.
 
-I did CC xen-arm at lists.xen.org, but you've dropped that list in your
-reply...
+* We should not unconditionally select ARCH_VEXPRESS from ARCH_MULTIPLATFORM.
+  There is no reason why we would enable that platform for building
+  a kernel that runs on only one other platform.
 
-> On the Xen side there are not going to be any problems related to SMP
-> and holding pens, because secondary CPUs only come into existence after
-> the first CPU calls the HYPERVISOR_vcpu_op hypercall (still missing on
-> ARM).
+> I'm not sure which devm_pci_iomap() you're referring to since my patch
+> makes only the pcim_iomap_table(), pcim_iomap(), pcim_iounmap(),
+> pcim_iomap_regions(), pcim_iomap_regions_request_all() and
+> pcim_iounmap_regions() available under CONFIG_PCI instead of CONFIG_PCI
+> && CONFIG_HAS_IOPORT.
 
-Ok. Would you be willing/able to wrap this in a PSCI interface when you do
-add SMP support for ARM?
+Sorry, I meant pcim_iomap.
 
-Will
+> So maybe you were referring to pcim_iomap(). I haven't checked in
+> details, but I guess it builds because ioport_map() is implemented in
+> arch/arm/mm/iomap.c.
+
+Right. If an ioport_map function is provided for a given platform,
+we should also set HAVE_IOPORT and vice versa. This is probably
+fallout of the io.h conversion for multiplatform.
+
+	Arnd
