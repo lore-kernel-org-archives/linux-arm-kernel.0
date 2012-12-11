@@ -1,61 +1,50 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 11 Dec 2012 18:11:08 +0000
-Subject: linker problem with xip kernel and recent toolchains
-In-Reply-To: <50C7386E.70305@pengutronix.de>
-References: <50BE0CDB.5000704@pengutronix.de>
- <1355230894.19818.1.camel@hornet> <50C7386E.70305@pengutronix.de>
-Message-ID: <1355249468.19818.23.camel@hornet>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 11 Dec 2012 10:13:36 -0800
+Subject: [PATCH] drivers/pinctrl: grab default handles from device core
+In-Reply-To: <1355233246-16694-1-git-send-email-linus.walleij@stericsson.com>
+References: <1355233246-16694-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20121211181336.GD25714@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-12-11 at 13:43 +0000, Marc Kleine-Budde wrote:
-> What about putting the notes section into the read only segment, i.e.
-> the ROM?
+On Tue, Dec 11, 2012 at 02:40:46PM +0100, Linus Walleij wrote:
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index 86ef6ab..dc399ab 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -21,6 +21,7 @@
+>  #include <linux/compiler.h>
+>  #include <linux/types.h>
+>  #include <linux/mutex.h>
+> +#include <linux/pinctrl/devinfo.h>
+>  #include <linux/pm.h>
+>  #include <linux/atomic.h>
+>  #include <linux/ratelimit.h>
+> @@ -605,6 +606,8 @@ struct device_dma_parameters {
+>   * @pm_domain:	Provide callbacks that are executed during system suspend,
+>   * 		hibernation, system resume and during runtime PM transitions
+>   * 		along with subsystem-level and driver-level callbacks.
+> + * @pins:	For device pin management.
+> + *		See Documentation/pinctrl.txt for details.
+>   * @numa_node:	NUMA node this device is close to.
+>   * @dma_mask:	Dma mask (if dma'ble device).
+>   * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
+> @@ -656,6 +659,10 @@ struct device {
+>  	struct dev_pm_info	power;
+>  	struct dev_pm_domain	*pm_domain;
+>  
+> +#ifdef CONFIG_PINCTRL
+> +	struct dev_pin_info	pins;
+> +#endif
 
-Could you, please, try the change below? It seems to do the job for me.
+Can't you just make this a * to the structure, saving a bit of space for
+those that don't use this structure?  Ok, it's only saving one pointer,
+so it's really not a big deal to me if you don't want to do this, just
+asking...
 
-Pawe?
+Also, this will have to wait until after 3.8-rc1 before I can consider
+merging it, I'm a bit busy for the next two weeks at the least...
 
-8<-------------------------
->From 01fe7810cfded11aff03d216d2adbcf673e78f65 Mon Sep 17 00:00:00 2001
-From: Pawel Moll <pawel.moll@arm.com>
-Date: Tue, 11 Dec 2012 18:09:14 +0000
-Subject: [PATCH] ARM: vmlinux.lds: Move .notes section next to the rodata
+thanks,
 
-The .notes, being read-only data by nature, was placed between
-read-write .data and .bss. This was harmful in case of XIP
-images, as it was placed in the RAM range, most likely far
-from the ROM address, inflating the XIP images.
-
-Moving the .notes at the end of the read-only section
-(consisting of .text, .rodata and unwind info) fixes the problem.
-
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
- arch/arm/kernel/vmlinux.lds.S |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 36ff15b..31fa80e 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -131,6 +131,8 @@ SECTIONS
- 	}
- #endif
- 
-+	NOTES
-+
- 	_etext = .;			/* End of text and rodata section */
- 
- #ifndef CONFIG_XIP_KERNEL
-@@ -296,8 +298,6 @@ SECTIONS
- 	}
- #endif
- 
--	NOTES
--
- 	BSS_SECTION(0, 0, 0)
- 	_end = .;
- 
--- 
-1.7.10.4
+greg k-h
