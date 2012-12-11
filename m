@@ -1,34 +1,32 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Tue, 11 Dec 2012 17:16:10 +0000
-Subject: [RFC v1 01/16] lib: devres: don't enclose pcim_*() functions in
- CONFIG_HAS_IOPORT
-In-Reply-To: <20121211162647.GS14363@n2100.arm.linux.org.uk>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1354917879-32073-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <201212111043.50627.arnd@arndb.de>
- <20121211162647.GS14363@n2100.arm.linux.org.uk>
-Message-ID: <20121211171610.01c2de16@pyramind.ukuu.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 11 Dec 2012 19:04:56 +0200
+Subject: [PATCH] arm: omap: add read permission to mux debugfs files
+Message-ID: <1355245496-19180-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Correct.  If HAS_IOPORT is not selected then we are potentially missing
-> the dependent functions (because the platform has no IOPORT support) _or_
-> it does have ISA/PCI IO spaces _but_ they're not mappable via the
-> ioport_map() mechanism due to some non-linearity involved in the
-> translation.
-> 
-> To make that second point clear, that's platforms where:
-> 
-> 	ioport_map(addr + 4) != ioport_map(addr) + 4.
+All those files provide a ->read() method on their
+file_operations structure.
 
-For inb/inw and friends this shouldn't matter.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/mach-omap2/mux.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-You can implement inl for example 
-
-as
-
-	if (unlikely(addr & 3))
-		// or in fact BUG on this for almost all h/w
-		uninlined_hard_slow_inl(addr);
-	else
-		return *(u32 *)iospace_map[addr];
+diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+index 2612634..6701f31 100644
+--- a/arch/arm/mach-omap2/mux.c
++++ b/arch/arm/mach-omap2/mux.c
+@@ -742,8 +742,8 @@ static void __init omap_mux_dbg_create_entry(
+ 	list_for_each_entry(e, &partition->muxmodes, node) {
+ 		struct omap_mux *m = &e->mux;
+ 
+-		(void)debugfs_create_file(m->muxnames[0], S_IWUSR, mux_dbg_dir,
+-					  m, &omap_mux_dbg_signal_fops);
++		(void)debugfs_create_file(m->muxnames[0], S_IWUSR | S_IRUSR,
++				mux_dbg_dir, m, &omap_mux_dbg_signal_fops);
+ 	}
+ }
+ 
+-- 
+1.8.1.rc1.5.g7e0651a
