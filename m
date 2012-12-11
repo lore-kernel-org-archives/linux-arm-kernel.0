@@ -1,52 +1,100 @@
-From: pratikp@codeaurora.org (Pratik Patel)
-Date: Tue, 11 Dec 2012 13:39:16 -0800
-Subject: Coresight bus and drivers from CodeAurora
-In-Reply-To: <CACRpkdYeFw3YqYqgNAKUv1U4edyzzUa9x6xBSoBU4BbBoc6q5Q@mail.gmail.com>
-References: <CACRpkdYeFw3YqYqgNAKUv1U4edyzzUa9x6xBSoBU4BbBoc6q5Q@mail.gmail.com>
-Message-ID: <20121211213916.GB7214@pratikp-linux.qualcomm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 11 Dec 2012 19:47:43 -0200
+Subject: [PATCH 1/2] ARM: mx25pdk: Add device tree support
+Message-ID: <1355262464-25401-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Mon, Dec 10, 2012 at 01:40:20PM +0100, Linus Walleij wrote:
-> Hi Pratik,
-> 
-> recently my colleague Magnus (@ST-Ericsson) found this bus and
-> implementations for the ARM Coresight and drivers for the ARM Coresight
-> blocks ETB, ETM, Funnel, Replicator, STM, TMC and TPIU. The
-> code is here:
-> https://www.codeaurora.org/gitweb/quic/le/?p=kernel/msm.git;a=tree;f=drivers/coresight;h=f0221ea9a55c1e8bcd63f36ec28abb6d5406e63d;hb=refs/heads/msm-3.4
-> 
-> What is your intention with this? Do you have any intention to mainline?
-> 
+Add basic device tree support for mx25pdk board.
 
-Thanks for the quick evaluation. I will be working on cleaning up
-the drivers for upstream submission in the coming weeks.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ Documentation/devicetree/bindings/arm/fsl.txt |    4 +++
+ arch/arm/boot/dts/Makefile                    |    3 +-
+ arch/arm/boot/dts/imx25-pdk.dts               |   44 +++++++++++++++++++++++++
+ 3 files changed, 50 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/imx25-pdk.dts
 
-> We can see it has references to Qualcomm in the device tree strings even
-> though they are ARM Coresight HW blocks, for example, so some changes
-> are likely necessary, and such bindings should pass the devicetree-discuss
-> list.
-> 
-
-Yes, will clean it up.
-
-> Will: what is ARM Ltd. position on these blocks and their drivers? Any plans
-> from your side?
-> 
-> Douglas: look another STM driver... :-)
-> 
-> John Stultz has recently been working on some PTM extensions
-> submitted by Arve Hj?nnev?g as well, relating quite closely to this.
-> 
-> The design is nice, but maybe this is one of the few cases where the
-> drivers should actually live under arch/arm/common/* or similar.
-> 
-> Yours,
-> Linus Walleij
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index f798187..b98530c 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -5,6 +5,10 @@ i.MX23 Evaluation Kit
+ Required root node properties:
+     - compatible = "fsl,imx23-evk", "fsl,imx23";
+ 
++i.MX25 Product Evaluation Kit
++Required root node properties:
++    - compatible = "fsl,imx25-pdk", "fsl,imx25";
++
+ i.MX28 Evaluation Kit
+ Required root node properties:
+     - compatible = "fsl,imx28-evk", "fsl,imx28";
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 2beab0c..b2df1e7 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -79,7 +79,8 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+ 	armada-370-mirabox.dtb \
+ 	armada-xp-db.dtb \
+ 	armada-xp-openblocks-ax3-4.dtb
+-dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
++dtb-$(CONFIG_ARCH_MXC) += imx25-pdk.dtb \
++	imx51-babbage.dtb \
+ 	imx53-ard.dtb \
+ 	imx53-evk.dtb \
+ 	imx53-qsb.dtb \
+diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
+new file mode 100644
+index 0000000..bcdd393
+--- /dev/null
++++ b/arch/arm/boot/dts/imx25-pdk.dts
+@@ -0,0 +1,44 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "imx25.dtsi"
++
++/ {
++	model = "Freescale i.MX25 Product Development Kit";
++	compatible = "freescale,imx25pdk", "fsl,imx25";
++
++	memory {
++		reg = <0x80000000 0x4000000>;
++	};
++
++	soc {
++		aips at 43f00000 {
++			uart1: serial at 43f90000 {
++				status = "okay";
++			};
++		};
++
++		spba at 50000000 {
++			fec: ethernet at 50038000 {
++				status = "okay";
++				phy-mode = "rmii";
++			};
++		};
++
++		emi at 80000000 {
++			nand at bb000000 {
++				nand-on-flash-bbt;
++				status = "okay";
++			};
++		};
++	};
++};
+-- 
+1.7.9.5
