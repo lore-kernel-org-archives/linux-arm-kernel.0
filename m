@@ -1,259 +1,156 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 11 Dec 2012 12:07:34 +0900
-Subject: [PATCH 6/6] ARM: mach-shmobile: kzm9g: Reference DT implementation
-In-Reply-To: <1355195254-4563-1-git-send-email-horms+renesas@verge.net.au>
-References: <1355195254-4563-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1355195254-4563-7-git-send-email-horms+renesas@verge.net.au>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Tue, 11 Dec 2012 09:13:53 +0530
+Subject: [PATCH v2 1/1] net: ethernet: davinci_cpdma: Add boundary for rx and
+ tx descriptors
+Message-ID: <1355197433-7492-1-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide alternate board code for the kzm9g to demonstrate
-how DT may be used given the current state of driver
-device tree support. This is intended to act as a reference
-for mach-shmobile developers.
+When there is heavy transmission traffic in the CPDMA, then Rx descriptors
+memory is also utilized as tx desc memory looses all rx descriptors and the
+driver stops working then.
 
-Some notes:
+This patch adds boundary for tx and rx descriptors in bd ram dividing the
+descriptor memory to ensure that during heavy transmission tx doesn't use
+rx descriptors.
 
-* Brings up the GIC interrupt handler using device tree
-* Brings up the following device using device tree:
-  - MMCIF (MMC)
-* Does not bring up the INTC interrupt controller at all,
-  thus external devices may not be used. In particular,
-  the SMSC ethernet device may not be used and thus
-  NFS root may not be used.
-* Uses existing C code and not device tree to initialise the following,
-  which are needed for a working board:
-  - SCIF (Serial)
-  - CMT (Clock)
-  - PFC (GPIO)
+This patch is already applied to davinci_emac driver, since CPSW and
+davici_dmac shares the same CPDMA, moving the boundry seperation from
+Davinci EMAC driver to CPDMA driver which was done in the following
+commit
 
-To use this alternate board code instead of the normal board code,
-CONFIG_MACH_KZM9G_REFERENCE should be selected in the kernel config.
-And the sh73a0-kzm9g-reference.dtb flattened device tree blob should be used.
+commit 86d8c07ff2448eb4e860e50f34ef6ee78e45c40c
+Author: Sascha Hauer <s.hauer@pengutronix.de>
+Date:   Tue Jan 3 05:27:47 2012 +0000
 
-*** Please note that the clock initialisation shcheme used in
-    this patch does not currently work with SMP as there
-    is a yet to be resolved lock-up in workqueue initialisation.
+    net/davinci: do not use all descriptors for tx packets
 
-    CONFIG_SMP must be disabled when using this code. ***
+    The driver uses a shared pool for both rx and tx descriptors.
+    During open it queues fixed number of 128 descriptors for receive
+    packets. For each received packet it tries to queue another
+    descriptor. If this fails the descriptor is lost for rx.
+    The driver has no limitation on tx descriptors to use, so it
+    can happen during a nmap / ping -f attack that the driver
+    allocates all descriptors for tx and looses all rx descriptors.
+    The driver stops working then.
+    To fix this limit the number of tx descriptors used to half of
+    the descriptors available, the rx path uses the other half.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+    Tested on a custom board using nmap / ping -f to the board from
+    two different hosts.
 
+Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
 ---
+Changes from initial patch:
+* Modified commit message with proper description as in previous commit message
 
-v3
-* Compile board-kzm9g.c even if CONFIG_MACH_KZM9G_REFERENCE is selected,
-  it can co-exist with board-kzm9g-reference.c
+ drivers/net/ethernet/ti/davinci_cpdma.c |   20 ++++++++++++++------
+ drivers/net/ethernet/ti/davinci_emac.c  |    8 --------
+ 2 files changed, 14 insertions(+), 14 deletions(-)
 
-v2
-* Do not initialise touchscreen, it requires the INTC interrupt controller
-  but for now this configuration only has the GIC interrupt controller.
-* Define mmcif and sdhi in SoC dtsi and reference in board dts.
-* Do not initialise SDHI, the driver needs to be updated
----
- arch/arm/boot/dts/Makefile                     |    3 +-
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts   |   37 +++++++++
- arch/arm/mach-shmobile/Kconfig                 |   10 +++
- arch/arm/mach-shmobile/Makefile                |    1 +
- arch/arm/mach-shmobile/board-kzm9g-reference.c |   99 ++++++++++++++++++++++++
- 5 files changed, 149 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
- create mode 100644 arch/arm/mach-shmobile/board-kzm9g-reference.c
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f37cf9f..c606375 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -77,7 +77,8 @@ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
- dtb-$(CONFIG_ARCH_U8500) += snowball.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
- 	r8a7740-armadillo800eva.dtb \
--	sh73a0-kzm9g.dtb
-+	sh73a0-kzm9g.dtb \
-+	sh73a0-kzm9g-reference.dtb
- dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
- 	spear1340-evb.dtb
- dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-new file mode 100644
-index 0000000..588016e
---- /dev/null
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -0,0 +1,37 @@
-+/*
-+ * Device Tree Source for the KZM-A9-GT board
-+ *
-+ * Copyright (C) 2012 Horms Solutions Ltd.
-+ *
-+ * Based on sh73a0-kzm9g.dts
-+ * Copyright (C) 2012 Renesas Solutions Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+/include/ "sh73a0-reference.dtsi"
-+
-+/ {
-+	model = "KZM-A9-GT";
-+	compatible = "renesas,kzm9g-reference", "renesas,sh73a0";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x41000000 0x1e800000>;
-+	};
-+
-+	fixedregulator1v8: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-1.8V";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
-+};
-+
-+&mmcif {
-+	vmmc-supply = <&fixedregulator1v8>;
-+	vqmmc-supply = <&fixedregulator1v8>;
-+};
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 8ae100c..ca95c2b 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -136,6 +136,16 @@ config MACH_KZM9G
- 	select SND_SOC_AK4642 if SND_SIMPLE_CARD
- 	select USE_OF
+diff --git a/drivers/net/ethernet/ti/davinci_cpdma.c b/drivers/net/ethernet/ti/davinci_cpdma.c
+index 4995673..d37f546 100644
+--- a/drivers/net/ethernet/ti/davinci_cpdma.c
++++ b/drivers/net/ethernet/ti/davinci_cpdma.c
+@@ -105,13 +105,13 @@ struct cpdma_ctlr {
+ };
  
-+config MACH_KZM9G_REFERENCE
-+	bool "KZM-A9-GT board - Reference Device Tree Implementation"
-+	depends on MACH_KZM9G
-+	---help---
-+	   Use reference implementation of KZM-A9-GT board support
-+	   which makes as greater use of device tree at the expense
-+	   of not supporting a number of devices.
-+
-+	   This is intended to aid developers
-+
- comment "SH-Mobile System Configuration"
+ struct cpdma_chan {
++	struct cpdma_desc __iomem	*head, *tail;
++	void __iomem			*hdp, *cp, *rxfree;
+ 	enum cpdma_state		state;
+ 	struct cpdma_ctlr		*ctlr;
+ 	int				chan_num;
+ 	spinlock_t			lock;
+-	struct cpdma_desc __iomem	*head, *tail;
+ 	int				count;
+-	void __iomem			*hdp, *cp, *rxfree;
+ 	u32				mask;
+ 	cpdma_handler_fn		handler;
+ 	enum dma_data_direction		dir;
+@@ -217,7 +217,7 @@ desc_from_phys(struct cpdma_desc_pool *pool, dma_addr_t dma)
+ }
  
- config CPU_HAS_INTEVT
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index e3556c6..b4d3920 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -52,6 +52,7 @@ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
- obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
- obj-$(CONFIG_MACH_KZM9D)	+= board-kzm9d.o
- obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
-+obj-$(CONFIG_MACH_KZM9G_REFERENCE)	+= board-kzm9g-reference.o
+ static struct cpdma_desc __iomem *
+-cpdma_desc_alloc(struct cpdma_desc_pool *pool, int num_desc)
++cpdma_desc_alloc(struct cpdma_desc_pool *pool, int num_desc, bool is_rx)
+ {
+ 	unsigned long flags;
+ 	int index;
+@@ -225,8 +225,14 @@ cpdma_desc_alloc(struct cpdma_desc_pool *pool, int num_desc)
  
- # Framework support
- obj-$(CONFIG_SMP)		+= $(smp-y)
-diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-new file mode 100644
-index 0000000..140781c
---- /dev/null
-+++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-@@ -0,0 +1,99 @@
-+/*
-+ * KZM-A9-GT board support - Reference Device Tree Implementation
-+ *
-+ * Copyright (C) 2012	Horms Solutions Ltd.
-+ *
-+ * Based on board-kzm9g.c
-+ * Copyright (C) 2012	Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-+ */
+ 	spin_lock_irqsave(&pool->lock, flags);
+ 
+-	index = bitmap_find_next_zero_area(pool->bitmap, pool->num_desc, 0,
+-					   num_desc, 0);
++	if (is_rx) {
++		index = bitmap_find_next_zero_area(pool->bitmap,
++				pool->num_desc/2, 0, num_desc, 0);
++	 } else {
++		index = bitmap_find_next_zero_area(pool->bitmap,
++				pool->num_desc, pool->num_desc/2, num_desc, 0);
++	}
 +
-+#include <linux/delay.h>
-+#include <linux/gpio.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/input.h>
-+#include <linux/of_platform.h>
-+#include <mach/sh73a0.h>
-+#include <mach/common.h>
-+#include <asm/hardware/cache-l2x0.h>
-+#include <asm/hardware/gic.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+
-+static void __init kzm_init(void)
-+{
-+	/* enable SCIFA4 */
-+	gpio_request(GPIO_FN_SCIFA4_TXD, NULL);
-+	gpio_request(GPIO_FN_SCIFA4_RXD, NULL);
-+	gpio_request(GPIO_FN_SCIFA4_RTS_, NULL);
-+	gpio_request(GPIO_FN_SCIFA4_CTS_, NULL);
-+
-+	/* enable MMCIF */
-+	gpio_request(GPIO_FN_MMCCLK0,		NULL);
-+	gpio_request(GPIO_FN_MMCCMD0_PU,	NULL);
-+	gpio_request(GPIO_FN_MMCD0_0_PU,	NULL);
-+	gpio_request(GPIO_FN_MMCD0_1_PU,	NULL);
-+	gpio_request(GPIO_FN_MMCD0_2_PU,	NULL);
-+	gpio_request(GPIO_FN_MMCD0_3_PU,	NULL);
-+	gpio_request(GPIO_FN_MMCD0_4_PU,	NULL);
-+	gpio_request(GPIO_FN_MMCD0_5_PU,	NULL);
-+	gpio_request(GPIO_FN_MMCD0_6_PU,	NULL);
-+	gpio_request(GPIO_FN_MMCD0_7_PU,	NULL);
-+
-+	/* I2C 3 */
-+	gpio_request(GPIO_FN_PORT27_I2C_SCL3, NULL);
-+	gpio_request(GPIO_FN_PORT28_I2C_SDA3, NULL);
-+
-+#ifdef CONFIG_CACHE_L2X0
-+	/* Early BRESP enable, Shared attribute override enable, 64K*8way */
-+	l2x0_init(IOMEM(0xf0100000), 0x40460000, 0x82000fff);
-+#endif
-+
-+	sh73a0_add_standard_devices_dt();
-+}
-+
-+static void kzm9g_restart(char mode, const char *cmd)
-+{
-+#define RESCNT2 IOMEM(0xe6188020)
-+	/* Do soft power on reset */
-+	writel((1 << 31), RESCNT2);
-+}
-+
-+static const char *kzm9g_boards_compat_dt[] __initdata = {
-+	"renesas,kzm9g-reference",
-+	NULL,
-+};
-+
-+/* Please note that the clock initialisation shcheme used in
-+ * sh73a0_add_early_devices_dt() and sh73a0_add_standard_devices_dt()
-+ * does not work with SMP as there is a yet to be resolved lock-up in
-+ * workqueue initialisation.
-+ *
-+ * CONFIG_SMP should be disabled when using this code.
-+ */
-+DT_MACHINE_START(KZM9G_DT, "kzm9g-reference")
-+	.smp		= smp_ops(sh73a0_smp_ops),
-+	.map_io		= sh73a0_map_io,
-+	.init_early	= sh73a0_add_early_devices_dt,
-+	.nr_irqs	= NR_IRQS_LEGACY,
-+	.init_irq	= sh73a0_init_irq_dt,
-+	.handle_irq	= gic_handle_irq,
-+	.init_machine	= kzm_init,
-+	.init_late	= shmobile_init_late,
-+	.timer		= &shmobile_timer,
-+	.restart	= kzm9g_restart,
-+	.dt_compat	= kzm9g_boards_compat_dt,
-+MACHINE_END
+ 	if (index < pool->num_desc) {
+ 		bitmap_set(pool->bitmap, index, num_desc);
+ 		desc = pool->iomap + pool->desc_size * index;
+@@ -660,6 +666,7 @@ int cpdma_chan_submit(struct cpdma_chan *chan, void *token, void *data,
+ 	unsigned long			flags;
+ 	u32				mode;
+ 	int				ret = 0;
++	bool                            is_rx;
+ 
+ 	spin_lock_irqsave(&chan->lock, flags);
+ 
+@@ -668,7 +675,8 @@ int cpdma_chan_submit(struct cpdma_chan *chan, void *token, void *data,
+ 		goto unlock_ret;
+ 	}
+ 
+-	desc = cpdma_desc_alloc(ctlr->pool, 1);
++	is_rx = (chan->rxfree != 0);
++	desc = cpdma_desc_alloc(ctlr->pool, 1, is_rx);
+ 	if (!desc) {
+ 		chan->stats.desc_alloc_fail++;
+ 		ret = -ENOMEM;
+diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
+index fce89a0..f349273 100644
+--- a/drivers/net/ethernet/ti/davinci_emac.c
++++ b/drivers/net/ethernet/ti/davinci_emac.c
+@@ -120,7 +120,6 @@ static const char emac_version_string[] = "TI DaVinci EMAC Linux v6.1";
+ #define EMAC_DEF_TX_CH			(0) /* Default 0th channel */
+ #define EMAC_DEF_RX_CH			(0) /* Default 0th channel */
+ #define EMAC_DEF_RX_NUM_DESC		(128)
+-#define EMAC_DEF_TX_NUM_DESC		(128)
+ #define EMAC_DEF_MAX_TX_CH		(1) /* Max TX channels configured */
+ #define EMAC_DEF_MAX_RX_CH		(1) /* Max RX channels configured */
+ #define EMAC_POLL_WEIGHT		(64) /* Default NAPI poll weight */
+@@ -342,7 +341,6 @@ struct emac_priv {
+ 	u32 mac_hash2;
+ 	u32 multicast_hash_cnt[EMAC_NUM_MULTICAST_BITS];
+ 	u32 rx_addr_type;
+-	atomic_t cur_tx;
+ 	const char *phy_id;
+ #ifdef CONFIG_OF
+ 	struct device_node *phy_node;
+@@ -1050,9 +1048,6 @@ static void emac_tx_handler(void *token, int len, int status)
+ {
+ 	struct sk_buff		*skb = token;
+ 	struct net_device	*ndev = skb->dev;
+-	struct emac_priv	*priv = netdev_priv(ndev);
+-
+-	atomic_dec(&priv->cur_tx);
+ 
+ 	if (unlikely(netif_queue_stopped(ndev)))
+ 		netif_start_queue(ndev);
+@@ -1101,9 +1096,6 @@ static int emac_dev_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 		goto fail_tx;
+ 	}
+ 
+-	if (atomic_inc_return(&priv->cur_tx) >= EMAC_DEF_TX_NUM_DESC)
+-		netif_stop_queue(ndev);
+-
+ 	return NETDEV_TX_OK;
+ 
+ fail_tx:
 -- 
-1.7.10.4
+1.7.9.5
