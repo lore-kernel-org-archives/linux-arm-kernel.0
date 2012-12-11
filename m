@@ -1,20 +1,21 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 11 Dec 2012 13:57:59 -0500 (EST)
-Subject: [PATCH v2 1/1] net: ethernet: davinci_cpdma: Add boundary for
- rx and tx descriptors
-In-Reply-To: <1355252096.27891.130.camel@edumazet-glaptop>
-References: <20121211.133058.2238010228178961245.davem@davemloft.net>
- <20121211.133426.484976995112519196.davem@davemloft.net>
- <1355252096.27891.130.camel@edumazet-glaptop>
-Message-ID: <20121211.135759.1010213285970148974.davem@davemloft.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 11 Dec 2012 12:02:08 -0700
+Subject: [PATCH V3] ARM: bcm281xx: Add timer driver
+In-Reply-To: <1355250387-622-1-git-send-email-csd@broadcom.com>
+References: <1355250387-622-1-git-send-email-csd@broadcom.com>
+Message-ID: <50C78330.7040605@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Dumazet <erdnetdev@gmail.com>
-Date: Tue, 11 Dec 2012 10:54:56 -0800
+On 12/11/2012 11:26 AM, Christian Daudt wrote:
+> This adds support for the Broadcom timer, used in the following SoCs:
+> BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
 
-> Suggested fix : add a TCQ_F_MQSLAVE flag to allow dequeue_skb() to test
-> the netif_xmit_frozen_or_stopped() status _before_ dequeing packet from
-> qdisc.
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
 
-This sounds fine to me.
+> This patch needs the arm-soc/soc/next branch
+
+Only if it goes into 3.8, which I assume it won't?
+
+For 3.9, you'll need to rebase it on top of my struct sys_timer removal
+series, which I hope to put into linux-next ASAP after 3.8-rc1 comes out.
