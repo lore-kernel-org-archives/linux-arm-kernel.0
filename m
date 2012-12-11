@@ -1,64 +1,94 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 10 Dec 2012 20:30:25 -0600
-Subject: [PATCH 2/7] arm64: Add dtbs target for building all the enabled
- dtb files
-In-Reply-To: <20121210180442.GA691@arm.com>
-References: <1354914392-9634-1-git-send-email-catalin.marinas@arm.com>
- <1354914392-9634-3-git-send-email-catalin.marinas@arm.com>
- <50C263EC.70209@gmail.com> <20121210180442.GA691@arm.com>
-Message-ID: <50C69AC1.2050401@gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 10 Dec 2012 19:54:03 -0700
+Subject: Serial8250 doesn't populate in /proc/iomem?
+In-Reply-To: <slrnkcb00b.77o.narkewoody@zuhnb712.local.com>
+References: <slrnkcb00b.77o.narkewoody@zuhnb712.local.com>
+Message-ID: <CAErSpo6uWigsw160BfD1ei0M4hQ+wbK1K4Q37+6+_-+iAV3frg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2012 12:04 PM, Catalin Marinas wrote:
-> On Fri, Dec 07, 2012 at 09:47:24PM +0000, Rob Herring wrote:
->> On 12/07/2012 03:06 PM, Catalin Marinas wrote:
->>> Based on Rob Herring's patches for arch/arm, this patch adds a dtbs
->>> target to arch/arm64/boot/Makefile. In the process, also clean up the
->>> unused MACHINE variable.
->>>
->>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->>> ---
->>>
->>> I'll drop this patch once Rob pushes his version into linux-next (or
->>> mainline).
->>
->> This and Stephen's dtb rule series are in linux-next now.
-> 
-> One minor fix needed. Please merge or fold it, whatever is easier.
-> Thanks.
-> 
-> -----------------------8<------------------------------
-> 
-> From addc6b45f915f6bbab238a2edd2072f3b474e673 Mon Sep 17 00:00:00 2001
-> From: Catalin Marinas <catalin.marinas@arm.com>
-> Date: Wed, 21 Nov 2012 11:44:59 +0000
-> Subject: [PATCH] arm64: Fix the dtbs target building
-> 
-> The arch/arm64/Makefile was not passing the right target to the
-> boot/dts/Makefile.
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+[+cc linux-arm, linux-samsung-soc, linux-serial]
 
-Applied. Thanks.
+On Sun, Dec 9, 2012 at 11:25 PM, Woody Wu <narkewoody@gmail.com> wrote:
+> Hi, list
+>
+> I found some io memory information is lost from /dev/iomem and want to
+> find out why.
+>
+> I have a 2.6.16 kernel running on a ARM board (Samsung S3C2410). From
+> the kernel log, I see 16 8250 serial ports were detected, and each of
+> thoese ports has a memory address:
+>
+> Serial: 8250/16550 driver $Revision: 1.90 $ 16 ports, IRQ sharing enabled
+> serial8250: tts0 at MMIO 0xe1400000 (irq = 16) is a 16550A
+> serial8250: tts1 at MMIO 0xe1400008 (irq = 16) is a 16550A
+> serial8250: tts2 at MMIO 0xe1400010 (irq = 17) is a 16550A
+> serial8250: tts3 at MMIO 0xe1400018 (irq = 17) is a 16550A
+> serial8250: tts4 at MMIO 0xe1400020 (irq = 18) is a 16550A
+> serial8250: tts5 at MMIO 0xe1400028 (irq = 18) is a 16550A
+> serial8250: tts6 at MMIO 0xe1400030 (irq = 19) is a 16550A
+> serial8250: tts7 at MMIO 0xe1400038 (irq = 19) is a 16550A
+> serial8250: tts8 at MMIO 0xe1400040 (irq = 48) is a 16550A
+> serial8250: tts9 at MMIO 0xe1400048 (irq = 48) is a 16550A
+> serial8250: tts10 at MMIO 0xe1400050 (irq = 49) is a 16550A
+> serial8250: tts11 at MMIO 0xe1400058 (irq = 49) is a 16550A
+> serial8250: tts12 at MMIO 0xe1400060 (irq = 60) is a 16550A
+> serial8250: tts13 at MMIO 0xe1400068 (irq = 60) is a 16550A
+> serial8250: tts14 at MMIO 0xe1400070 (irq = 61) is a 16550A
+> serial8250: tts15 at MMIO 0xe1400078 (irq = 61) is a 16550A
+>
+> I can read/write these serial ports from /dev/ttys*, in other words,
+> they do exist.  I also can find the driver info from /proc/devices:
+>
+> Character devices:
+>
+>   ...
+>   4 /dev/vc/0
+>   4 tty
+>   4 tts
+>   5 /dev/tty
+>   5 /dev/console
+>   5 /dev/ptmx
+>   7 vcs
+>   ...
+>
+> The problem is, I don't understand why there is no information about
+> these ports in /proc/iomem file. The 'iomem' file now contains:
+>
+> 11000000-11000ffe : AX88796B
+> 19000000-19000ffe : AX88796B
+> 30000000-33ffffff : System RAM
+>   3001c000-301e826b : Kernel text
+>   301ea000-302234a3 : Kernel data
+> 49000000-490fffff : s3c2410-ohci
+>   49000000-490fffff : ohci_hcd
+> 4e000000-4e0fffff : s3c2410-nand
+>   4e000000-4e0fffff : s3c2410-nand
+> 50000000-50003fff : s3c2410-uart.0
+>   50000000-500000ff : s3c2410-uart
+> 50004000-50007fff : s3c2410-uart.1
+>   50004000-500040ff : s3c2410-uart
+> 50008000-5000bfff : s3c2410-uart.2
+>   50008000-500080ff : s3c2410-uart
+> 53000000-530fffff : s3c2410-wdt
+> 54000000-540fffff : s3c2410-i2c
+> 5a000000-5a0fffff : s3c2410-sdi
+>   5a000000-5a0fffff : mmci-s3c2410
+>
+> You see, there is no serial8250 informations.
+>
+> Can anyone here please tell me how this can happen?  Does it mean the
+> serial8250 driver don't populate or register in the /proc/iomem?
 
-Rob
+That looks like a bug to me.  There should be entries in /proc/iomem
+for the hardware device (showing that something responds at that
+address) and for the driver that claims the device.
 
-> ---
->  arch/arm64/Makefile | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> index 11c3599..c95c5cb 100644
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -58,7 +58,7 @@ zinstall install: vmlinux
->  	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
->  
->  dtbs: scripts
-> -	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
-> +	$(Q)$(MAKE) $(build)=$(boot)/dts dtbs
->  
->  # We use MRPROPER_FILES and CLEAN_FILES now
->  archclean:
-> 
+I think the 8250 core does the reservation in
+serial8250_request_std_resource().  You could try putting some printks
+in that path to see whether it's exercised.
+
+You're running a fairly old kernel, so it's possible the bug has
+already been fixed.
+
+Bjorn
