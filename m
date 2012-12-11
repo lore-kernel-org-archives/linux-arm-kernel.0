@@ -1,65 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Dec 2012 10:56:58 +0000
-Subject: [RFC v1 08/16] arm: mvebu: the core PCIe driver
-In-Reply-To: <1354917879-32073-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 11 Dec 2012 10:43:49 +0000
+Subject: [RFC v1 01/16] lib: devres: don't enclose pcim_*() functions in
+ CONFIG_HAS_IOPORT
+In-Reply-To: <1354917879-32073-2-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1354917879-32073-9-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <201212111056.58970.arnd@arndb.de>
+ <1354917879-32073-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <201212111043.50627.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 07 December 2012, Thomas Petazzoni wrote:
-> This driver implements the hw_pci operations needed by the core ARM
-> PCI code to setup PCI devices and get their corresponding IRQs, and
-> the pci_ops operations that are used by the PCI core to read/write the
-> configuration space of PCI devices.
-> 
-> In addition, this driver enumerates the different PCIe slots, and for
-> those having a device plugged in, it allocates the necessary address
-> decoding windows, using the new armada_370_xp_alloc_pcie_window()
-> function from mach-mvebu/addr-map.c.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> The pcim_*() functions are used by the libata-sff subsystem, and this
+> subsystem is used for many SATA drivers on ARM platforms that do not
+> necessarily have I/O ports.
 
-It seems that this is not following the IEEE PCI bindings, which will
-cause problems as soon as you try to connect PCI cards with bridges
-bto it.
-
-> diff --git a/Documentation/devicetree/bindings/pci/armada-370-xp-pcie.txt b/Documentation/devicetree/bindings/pci/armada-370-xp-pcie.txt
-> new file mode 100644
-> index 0000000..daf0775
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/armada-370-xp-pcie.txt
-> @@ -0,0 +1,136 @@
-> +* Marvell Armada 370/XP PCIe interfaces
-> +
-> +Mandatory properties:
-> +- compatible: must be "marvell,armada-370-xp-pcie"
-> +- status: either "disabled" or "okay"
-> +- #address-cells, set to <1>
-> +- #size-cells, set to <1>
-> +- ranges: describes the association between the physical addresses of
-> +  the PCIe registers for each PCIe interface with "virtual" addresses
-> +  as seen by the sub-nodes. One entry per PCIe interface. Each entry
-> +  must have 3 values: the "virtual" address seen by the sub-nodes, the
-> +  real physical address of the PCIe registers, and the size.
-> +
-> +In addition, the Device Tree node must have sub-nodes describing each
-> +PCIe interface, having the following mandatory properties:
-> +- reg: the address and size of the PCIe registers (translated
-> +  addresses according to the ranges property of the parent)
-> +- interrupts: the interrupt number of this PCIe interface
-> +- clocks: the clock associated to this PCIe interface
-> +- marvell,pcie-port: the physical PCIe port number
-> +- status: either "disabled" or "okay"
-> +
-> +and the following optional properties:
-> +- marvell,pcie-lane: the physical PCIe lane number, for ports having
-> +  multiple lanes. If this property is not found, we assume that the
-> +  value is 0.
-
-A PCI host controller should set #interrupt-cells=<1>, #size-cells=<2>
-and #address-cells=<3>, and provide an interrupt map that describes how
-the intA-intD lines for each slot are connected to the host interrupts.
+I think this one is wrong as the CONFIG_HAS_IOPORT does not refer to the
+presence of PIO ports but to whether or not they provide an ioport_map
+function. If there is no ioport_map(), devm_pci_iomap will fail to link
+as far as I can tell.
 
 	Arnd
+
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
+> Cc: Jesse Barnes <jbarnes@virtuousgeek.org>
+> Cc: Yinghai Lu <yinghai@kernel.org>
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  lib/devres.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/lib/devres.c b/lib/devres.c
+> index 80b9c76..5639c3e 100644
+> --- a/lib/devres.c
+> +++ b/lib/devres.c
+> @@ -195,6 +195,7 @@ void devm_ioport_unmap(struct device *dev, void __iomem *addr)
+>  			       devm_ioport_map_match, (void *)addr));
+>  }
+>  EXPORT_SYMBOL(devm_ioport_unmap);
+> +#endif /* CONFIG_HAS_IOPORT */
+>  
+>  #ifdef CONFIG_PCI
+>  /*
+> @@ -400,4 +401,3 @@ void pcim_iounmap_regions(struct pci_dev *pdev, int mask)
+>  }
+>  EXPORT_SYMBOL(pcim_iounmap_regions);
+>  #endif /* CONFIG_PCI */
+> -#endif /* CONFIG_HAS_IOPORT */
