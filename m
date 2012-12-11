@@ -1,19 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Dec 2012 14:52:43 +0000
-Subject: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save power
-In-Reply-To: <1355235474-12783-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1355235474-12783-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20121211145243.GQ14363@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 11 Dec 2012 16:15:57 +0100
+Subject: Your kernel patches for the Marvell Mirabox
+In-Reply-To: <50C681B0.4030801@gmail.com>
+References: <50C4AC68.7090709@gmail.com>
+ <20121210140202.GI21694@titan.lakedaemon.net>
+ <50C681B0.4030801@gmail.com>
+Message-ID: <20121211161557.6819daa9@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 11, 2012 at 03:17:54PM +0100, Ulf Hansson wrote:
-> From: Ulf Hansson <ulf.hansson@linaro.org>
-> 
-> The amba bus is already performing same actions but for the apb_pclk.
-> So here we just make sure the clock to card is gated as well to save
-> more power. At runtime resume we will thus restore the clock again.
+Dear Bernd,
 
-And how exactly do you ensure the requirement that a certain number of
-clocks is supplied to the card after the last command before you cut
-the clock?
+On Tue, 11 Dec 2012 01:43:28 +0100, Bernd wrote:
+
+> Data Size:    1885555 Bytes = 1841.36 kB = 1.80 MB
+> Load Address: fffffff2
+> Entry Point:  fffffff2
+
+Those Load address and Entry Point are incorrect.
+
+I think this is due to the fact that mach-mvebu is now part of the
+ARCH_MULTIPLATFORM thing and therefore no longer defines its own
+zreladdr-y, but I'm not sure. In any case, what I'm doing here is:
+
+./scripts/mkuboot.sh -A arm -O linux -T kernel -C none -a 0x00008000 -e
+0x00008000 -n 'Linux-marvell' -d myzImage-with-dtb-appended myuImage.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
