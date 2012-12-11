@@ -1,21 +1,20 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Dec 2012 10:17:13 +0100
-Subject: [PATCH 06/12] ARM: ux500: Set correct MMCI regulator voltages in
- the ux5x0 Device Tree
-In-Reply-To: <1355129761-8088-7-git-send-email-lee.jones@linaro.org>
+Date: Tue, 11 Dec 2012 10:17:49 +0100
+Subject: [PATCH 07/12] ARM: ux500: Specify the ux5x0 MMCI regulator's
+ on/off GPIO as high-enable
+In-Reply-To: <1355129761-8088-8-git-send-email-lee.jones@linaro.org>
 References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
- <1355129761-8088-7-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZJFbHSwowKnfWyXLckVePHrC6o2CtDJaFb+dXTkNYPjw@mail.gmail.com>
+ <1355129761-8088-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdaDoLnyn4DHoEnha7zxxYA7v7nyte1CeeRyp87O6EE3xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Dec 10, 2012 at 9:55 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> The voltages for the MMCI GPIO controlled voltage regulation differ
-> depending on who you believe and where you pick the information up
-> from. More recent internal code suggests that the true upper voltage
-> from the shifter is actually v3.3, instead of the previously
-> indicated v2.9. Let's mirror that change in the Device Tree file.
+> If not specified, the GPIO control bit is inverted by default i.e.
+> low-enable and high-disable. This is not the case with the MMCI
+> regulator, hence it will turn on during a disable and off when
+> regulator_enable() is invoked.
 >
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
