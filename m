@@ -1,78 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 11 Dec 2012 13:57:00 +0800
-Subject: [PATCH 3/7] ARM i.MX5: switch IPU clk support to devicetree
- bindings
-In-Reply-To: <1352733809-27230-4-git-send-email-s.hauer@pengutronix.de>
-References: <1352733809-27230-1-git-send-email-s.hauer@pengutronix.de>
- <1352733809-27230-4-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20121211055657.GA28581@S2101-09.ap.freescale.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 11 Dec 2012 07:00:50 +0100
+Subject: [PATCH 1/2] arm: mvebu: add RTC support for Armada 370 and
+ Armada XP
+In-Reply-To: <20121210233723.1f3656d0@skate>
+References: <1355136122-30729-1-git-send-email-gregory.clement@free-electrons.com>
+ <1355136122-30729-2-git-send-email-gregory.clement@free-electrons.com>
+ <20121210162819.46fe4f91@skate>
+ <20121210214755.9CD823E0C7C@localhost>
+ <20121210233723.1f3656d0@skate>
+Message-ID: <20121211060050.GC25466@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-On Mon, Nov 12, 2012 at 04:23:25PM +0100, Sascha Hauer wrote:
-> The i.MX5 clk support has platform based clock bindings for the
-> IPU. IPU support is devicetree only, so move them over to devicetree
-> based bindings. Also, enable MIPI clocks which do not have a device
-> associated with, but still need to be enabled to do graphics on
-> i.MX51.
+On Mon, Dec 10, 2012 at 11:37:23PM +0100, Thomas Petazzoni wrote:
+> Dear Grant Likely,
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c |   19 +++++++++++--------
->  1 file changed, 11 insertions(+), 8 deletions(-)
+> On Mon, 10 Dec 2012 21:47:55 +0000, Grant Likely wrote:
 > 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index a0bf848..02932da 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -306,6 +306,10 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
->  	clk_prepare_enable(clk[spba]);
->  	clk_prepare_enable(clk[emi_fast_gate]); /* fec */
->  	clk_prepare_enable(clk[emi_slow_gate]); /* eim */
-> +	clk_prepare_enable(clk[mipi_hsc1_gate]);
-> +	clk_prepare_enable(clk[mipi_hsc2_gate]);
-> +	clk_prepare_enable(clk[mipi_esc_gate]);
-> +	clk_prepare_enable(clk[mipi_hsp_gate]);
-
-I just noticed that enabling these clocks will stop my imx51-babbage
-board from booting to console.  Can you please investigate it?
-
-Shawn
-
->  	clk_prepare_enable(clk[tmax1]);
->  	clk_prepare_enable(clk[tmax2]); /* esdhc2, fec */
->  	clk_prepare_enable(clk[tmax3]); /* esdhc1, esdhc4 */
-> @@ -349,10 +353,9 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
->  	clk_register_clkdev(clk[mx51_mipi], "mipi_hsp", NULL);
->  	clk_register_clkdev(clk[vpu_gate], NULL, "imx51-vpu.0");
->  	clk_register_clkdev(clk[fec_gate], NULL, "imx27-fec.0");
-> -	clk_register_clkdev(clk[ipu_gate], "bus", "imx51-ipu");
-> -	clk_register_clkdev(clk[ipu_di0_gate], "di0", "imx51-ipu");
-> -	clk_register_clkdev(clk[ipu_di1_gate], "di1", "imx51-ipu");
-> -	clk_register_clkdev(clk[ipu_gate], "hsp", "imx51-ipu");
-> +	clk_register_clkdev(clk[ipu_gate], "bus", "40000000.ipu");
-> +	clk_register_clkdev(clk[ipu_di0_gate], "di0", "40000000.ipu");
-> +	clk_register_clkdev(clk[ipu_di1_gate], "di1", "40000000.ipu");
->  	clk_register_clkdev(clk[usb_phy_gate], "phy", "mxc-ehci.0");
->  	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx51.0");
->  	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx51.0");
-> @@ -442,10 +445,10 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
->  	clk_register_clkdev(clk[vpu_gate], NULL, "imx53-vpu.0");
->  	clk_register_clkdev(clk[i2c3_gate], NULL, "imx-i2c.2");
->  	clk_register_clkdev(clk[fec_gate], NULL, "imx25-fec.0");
-> -	clk_register_clkdev(clk[ipu_gate], "bus", "imx53-ipu");
-> -	clk_register_clkdev(clk[ipu_di0_gate], "di0", "imx53-ipu");
-> -	clk_register_clkdev(clk[ipu_di1_gate], "di1", "imx53-ipu");
-> -	clk_register_clkdev(clk[ipu_gate], "hsp", "imx53-ipu");
-> +	clk_register_clkdev(clk[ipu_gate], "bus", "18000000.ipu");
-> +	clk_register_clkdev(clk[ipu_di0_gate], "di0", "18000000.ipu");
-> +	clk_register_clkdev(clk[ipu_di1_gate], "di1", "18000000.ipu");
-> +	clk_register_clkdev(clk[ipu_gate], "hsp", "18000000.ipu");
->  	clk_register_clkdev(clk[usb_phy1_gate], "usb_phy1", "mxc-ehci.0");
->  	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx53.0");
->  	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx53.0");
-> -- 
-> 1.7.10.4
+> > > Maybe an explicit status = "okay" here?
+> > 
+> > Only necessary if it is typical for the device to get disabled. I don't
+> > add status="okay" properties unless it is to enable a device previously
+> > disabled with status="disabled"
 > 
+> Ok, thanks for clarifying what the best practice is. This device being
+> internal to the SoC and having no dependency on external components, it
+> is indeed always available.
+
+Hi Thomas
+
+This is not actually true. Its dependent on at least one external
+component, a battery. The driver determines at load time if the clock
+is ticking.
+
+There are a few Kirkwood and XP designs which use an external i2c RTC,
+because the battery recommended by Marvell is mechanically not so easy
+to attached to the board, in a robust way.
+
+So i expect some boards will disable this from there own .dts file.
+However, defaulting to enabled would make sense.
+
+   Andrew
