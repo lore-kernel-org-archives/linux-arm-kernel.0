@@ -1,25 +1,33 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Tue, 11 Dec 2012 11:07:19 -0800
-Subject: [PATCH v2 1/1] net: ethernet: davinci_cpdma: Add boundary for
- rx and tx descriptors
-In-Reply-To: <20121211.135759.1010213285970148974.davem@davemloft.net>
-References: <20121211.133058.2238010228178961245.davem@davemloft.net>
- <20121211.133426.484976995112519196.davem@davemloft.net>
- <1355252096.27891.130.camel@edumazet-glaptop>
- <20121211.135759.1010213285970148974.davem@davemloft.net>
-Message-ID: <1355252839.27891.131.camel@edumazet-glaptop>
+From: csd@broadcom.com (Christian Daudt)
+Date: Tue, 11 Dec 2012 11:13:33 -0800
+Subject: [PATCH V3] ARM: bcm281xx: Add timer driver
+In-Reply-To: <50C78330.7040605@wwwdotorg.org>
+References: <1355250387-622-1-git-send-email-csd@broadcom.com>
+ <50C78330.7040605@wwwdotorg.org>
+Message-ID: <50C785DD.8030407@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-12-11 at 13:57 -0500, David Miller wrote:
-> From: Eric Dumazet <erdnetdev@gmail.com>
-> Date: Tue, 11 Dec 2012 10:54:56 -0800
-> 
-> > Suggested fix : add a TCQ_F_MQSLAVE flag to allow dequeue_skb() to test
-> > the netif_xmit_frozen_or_stopped() status _before_ dequeing packet from
-> > qdisc.
-> 
-> This sounds fine to me.
-> --
+On 12-12-11 11:02 AM, Stephen Warren wrote:
+> On 12/11/2012 11:26 AM, Christian Daudt wrote:
+>> This adds support for the Broadcom timer, used in the following SoCs:
+>> BCM11130, BCM11140, BCM11351, BCM28145, BCM28155
+> Reviewed-by: Stephen Warren<swarren@nvidia.com>
+>
+Thanks.
 
-By the way we also could set this 'flag' for non multi queue devices.
+>> This patch needs the arm-soc/soc/next branch
+> Only if it goes into 3.8, which I assume it won't?
+>
+Ok, I wasn't clear on that. I meant that this patch only applies on top 
+of arm-soc/soc/next as it needs the mach-bcm patch which is sitting only 
+there at the moment. I'm fine with having this in 3.8 as this patch only 
+affects the above SoCs. But I'll leave that to Olof and Arnd.
+> For 3.9, you'll need to rebase it on top of my struct sys_timer removal
+> series, which I hope to put into linux-next ASAP after 3.8-rc1 comes out.
+>
+Is there a git repo where I can look into this right now ? If so I can 
+already look at what diffs will be required for this.
+
+  Thanks,
+    csd
