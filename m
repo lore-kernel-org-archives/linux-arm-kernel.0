@@ -1,49 +1,97 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 11 Dec 2012 12:07:29 +0900
-Subject: [PATCH 1/6] ARM: clocksource: Initialise early
+Date: Tue, 11 Dec 2012 12:07:32 +0900
+Subject: [PATCH 4/6] ARM: mach-shmobile: sh73a0: Initialise MMCIF using DT
 In-Reply-To: <1355195254-4563-1-git-send-email-horms+renesas@verge.net.au>
 References: <1355195254-4563-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1355195254-4563-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1355195254-4563-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialise clock sources early, since some subsystems rely on them to initialize
+This device also requires a voltage regulator which
+should be defined in a board-specific maner. An example
+dts snipped follows.
+
+/ {
+	fixedregulator1v8: fixedregulator at 0 {
+		compatible = "regulator-fixed";
+		regulator-name = "fixed-1.8V";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+	};
+};
+
+&mmcif {
+	vmmc-supply = <&fixedregulator1v8>;
+	vqmmc-supply = <&fixedregulator1v8>;
+};
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 ---
 
 v3
-* Initial post
----
- drivers/Makefile |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+* No change
 
-diff --git a/drivers/Makefile b/drivers/Makefile
-index a16a8d0..eba9b58 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -37,6 +37,11 @@ obj-$(CONFIG_XEN)		+= xen/
- # regulators early, since some subsystems rely on them to initialize
- obj-$(CONFIG_REGULATOR)		+= regulator/
- 
-+# clocksource early, since some subsystems rely on them to initialize
-+ifndef CONFIG_ARCH_USES_GETTIMEOFFSET
-+obj-y				+= clocksource/
-+endif
+v2
+* Removed SDHI initialisation as the driver needs updating first
+* Moved MMC DT from sh73a0.dtsi to sh73a0-reference.dtsi
+  as it is not appropriate for use by sh73a0-kzm9g.dts yet.
+  This is because sh73a0-kzm9g.dts and board-kzm9g.c use
+  both the GIC and INTC interrupt controllers to provide
+  access to a rich set of devices. This is achieved by initialising
+  the interrupt controllers using C code. Work on allowing the INC
+  controller to be initialised using DT is in progress, however,
+  until that is complete only GIC may be initialised using DT.
+* Add extra entries to clock-sh73a0.c:lookups[] and
+  remove auxdata. Ultimately the clocks will be described
+  in DT, but the code isn't there yet.
+---
+ arch/arm/boot/dts/sh73a0-reference.dtsi |   24 ++++++++++++++++++++++++
+ arch/arm/mach-shmobile/clock-sh73a0.c   |    1 +
+ 2 files changed, 25 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sh73a0-reference.dtsi
+
+diff --git a/arch/arm/boot/dts/sh73a0-reference.dtsi b/arch/arm/boot/dts/sh73a0-reference.dtsi
+new file mode 100644
+index 0000000..d4bb012
+--- /dev/null
++++ b/arch/arm/boot/dts/sh73a0-reference.dtsi
+@@ -0,0 +1,24 @@
++/*
++ * Device Tree Source for the SH73A0 SoC
++ *
++ * Copyright (C) 2012 Renesas Solutions Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
- # tty/ comes before char/ so that the VT console is the boot-time
- # default.
- obj-y				+= tty/
-@@ -114,9 +119,6 @@ obj-y				+= firmware/
- obj-$(CONFIG_CRYPTO)		+= crypto/
- obj-$(CONFIG_SUPERH)		+= sh/
- obj-$(CONFIG_ARCH_SHMOBILE)	+= sh/
--ifndef CONFIG_ARCH_USES_GETTIMEOFFSET
--obj-y				+= clocksource/
--endif
- obj-$(CONFIG_DCA)		+= dca/
- obj-$(CONFIG_HID)		+= hid/
- obj-$(CONFIG_PPC_PS3)		+= ps3/
++/include/ "sh73a0.dtsi"
++
++/ {
++	compatible = "renesas,sh73a0";
++
++	mmcif: mmcif at 0x10010000 {
++		compatible = "renesas,sh-mmcif";
++		reg = <0xe6bd0000 0x100>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 140 0x4
++			      0 141 0x4>;
++		reg-io-width = <4>;
++	};
++};
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index 22af74f2..2216b6b 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -583,6 +583,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]), /* SDHI0 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP313]), /* SDHI1 */
+ 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP312]), /* MMCIF0 */
++	CLKDEV_DEV_ID("e6bd0000.mmcif", &mstp_clks[MSTP312]), /* MMCIF0 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP311]), /* SDHI2 */
+ 	CLKDEV_DEV_ID("leds-renesas-tpu.12", &mstp_clks[MSTP303]), /* TPU1 */
+ 	CLKDEV_DEV_ID("leds-renesas-tpu.21", &mstp_clks[MSTP302]), /* TPU2 */
 -- 
 1.7.10.4
