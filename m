@@ -1,119 +1,62 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 11 Dec 2012 14:59:53 +0100
-Subject: [PATCH 1/2] pinctrl: add sleep mode management for hogs
-Message-ID: <1355234393-17368-1-git-send-email-linus.walleij@stericsson.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Tue, 11 Dec 2012 15:17:54 +0100
+Subject: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save power
+Message-ID: <1355235474-12783-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Delacou <julien.delacou@stericsson.com>
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-This fix allows handling sleep mode for hogged
-pins in pinctrl. It provides functions to set pins
-to sleep/default configurations according to their
-current state from the individual pinctrl drivers.
+The amba bus is already performing same actions but for the apb_pclk.
+So here we just make sure the clock to card is gated as well to save
+more power. At runtime resume we will thus restore the clock again.
 
-Signed-off-by: Julien Delacou <julien.delacou@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/pinctrl/core.c          | 35 ++++++++++++++++++++++++++++++++---
- drivers/pinctrl/core.h          |  4 ++++
- include/linux/pinctrl/pinctrl.h |  2 ++
- 3 files changed, 38 insertions(+), 3 deletions(-)
+ drivers/mmc/host/mmci.c |   29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
-index 5cdee86..f9c50bb 100644
---- a/drivers/pinctrl/core.c
-+++ b/drivers/pinctrl/core.c
-@@ -1055,6 +1055,28 @@ void pinctrl_unregister_map(struct pinctrl_map const *map)
- 	}
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index aa04b42..0f397a2 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1636,8 +1636,37 @@ static int mmci_resume(struct device *dev)
  }
- 
-+/**
-+ * pinctrl_force_sleep() - turn a given controller device into sleep state
-+ * @pctldev: pin controller device
-+ */
-+int pinctrl_force_sleep(struct pinctrl_dev *pctldev)
-+{
-+	if (!IS_ERR(pctldev->p) && !IS_ERR(pctldev->hog_sleep))
-+		return pinctrl_select_state(pctldev->p, pctldev->hog_sleep);
-+	return 0;
-+}
-+
-+/**
-+ * pinctrl_force_default() - turn a given controller device into default state
-+ * @pctldev: pin controller device
-+ */
-+int pinctrl_force_default(struct pinctrl_dev *pctldev)
-+{
-+	if (!IS_ERR(pctldev->p) && !IS_ERR(pctldev->hog_default))
-+		return pinctrl_select_state(pctldev->p, pctldev->hog_default);
-+	return 0;
-+}
-+
- #ifdef CONFIG_DEBUG_FS
- 
- static int pinctrl_pins_show(struct seq_file *s, void *what)
-@@ -1500,16 +1522,23 @@ struct pinctrl_dev *pinctrl_register(struct pinctrl_desc *pctldesc,
- 
- 	pctldev->p = pinctrl_get_locked(pctldev->dev);
- 	if (!IS_ERR(pctldev->p)) {
--		struct pinctrl_state *s =
-+		pctldev->hog_default =
- 			pinctrl_lookup_state_locked(pctldev->p,
- 						    PINCTRL_STATE_DEFAULT);
--		if (IS_ERR(s)) {
-+		if (IS_ERR(pctldev->hog_default)) {
- 			dev_dbg(dev, "failed to lookup the default state\n");
- 		} else {
--			if (pinctrl_select_state_locked(pctldev->p, s))
-+			if (pinctrl_select_state_locked(pctldev->p,
-+						pctldev->hog_default))
- 				dev_err(dev,
- 					"failed to select default state\n");
- 		}
-+
-+		pctldev->hog_sleep =
-+			pinctrl_lookup_state_locked(pctldev->p,
-+						    PINCTRL_STATE_SLEEP);
-+		if (IS_ERR(pctldev->hog_sleep))
-+			dev_dbg(dev, "failed to lookup the sleep state\n");
- 	}
- 
- 	mutex_unlock(&pinctrl_mutex);
-diff --git a/drivers/pinctrl/core.h b/drivers/pinctrl/core.h
-index 12f5694..b5bbb09 100644
---- a/drivers/pinctrl/core.h
-+++ b/drivers/pinctrl/core.h
-@@ -30,6 +30,8 @@ struct pinctrl_gpio_range;
-  * @driver_data: driver data for drivers registering to the pin controller
-  *	subsystem
-  * @p: result of pinctrl_get() for this device
-+ * @hog_default: default state for pins hogged by this device
-+ * @hog_sleep: sleep state for pins hogged by this device
-  * @device_root: debugfs root for this device
-  */
- struct pinctrl_dev {
-@@ -41,6 +43,8 @@ struct pinctrl_dev {
- 	struct module *owner;
- 	void *driver_data;
- 	struct pinctrl *p;
-+	struct pinctrl_state *hog_default;
-+	struct pinctrl_state *hog_sleep;
- #ifdef CONFIG_DEBUG_FS
- 	struct dentry *device_root;
  #endif
-diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
-index 04d6700..814cb56 100644
---- a/include/linux/pinctrl/pinctrl.h
-+++ b/include/linux/pinctrl/pinctrl.h
-@@ -155,6 +155,8 @@ struct pinctrl_dev *of_pinctrl_get(struct device_node *np)
  
- extern const char *pinctrl_dev_get_name(struct pinctrl_dev *pctldev);
- extern void *pinctrl_dev_get_drvdata(struct pinctrl_dev *pctldev);
-+extern int pinctrl_force_sleep(struct pinctrl_dev *pctldev);
-+extern int pinctrl_force_default(struct pinctrl_dev *pctldev);
- #else
++#ifdef CONFIG_PM_RUNTIME
++static int mmci_runtime_suspend(struct device *dev)
++{
++	struct amba_device *adev = to_amba_device(dev);
++	struct mmc_host *mmc = amba_get_drvdata(adev);
++
++	if (mmc) {
++		struct mmci_host *host = mmc_priv(mmc);
++		clk_disable_unprepare(host->clk);
++	}
++
++	return 0;
++}
++
++static int mmci_runtime_resume(struct device *dev)
++{
++	struct amba_device *adev = to_amba_device(dev);
++	struct mmc_host *mmc = amba_get_drvdata(adev);
++
++	if (mmc) {
++		struct mmci_host *host = mmc_priv(mmc);
++		clk_prepare_enable(host->clk);
++	}
++
++	return 0;
++}
++#endif
++
+ static const struct dev_pm_ops mmci_dev_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(mmci_suspend, mmci_resume)
++	SET_RUNTIME_PM_OPS(mmci_runtime_suspend, mmci_runtime_resume, NULL)
+ };
  
- struct pinctrl_dev;
+ static struct amba_id mmci_ids[] = {
 -- 
-1.7.11.3
+1.7.10
