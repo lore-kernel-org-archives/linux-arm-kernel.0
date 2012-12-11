@@ -1,54 +1,52 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Dec 2012 14:21:09 -0700
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <20121211075207.GA29977@avionic-0098.adnet.avionic-design.de>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121207233317.GB4304@obsidianresearch.com> <50C62161.9080708@wwwdotorg.org>
- <20121211075207.GA29977@avionic-0098.adnet.avionic-design.de>
-Message-ID: <50C7A3C5.7050100@wwwdotorg.org>
+From: pratikp@codeaurora.org (Pratik Patel)
+Date: Tue, 11 Dec 2012 13:39:16 -0800
+Subject: Coresight bus and drivers from CodeAurora
+In-Reply-To: <CACRpkdYeFw3YqYqgNAKUv1U4edyzzUa9x6xBSoBU4BbBoc6q5Q@mail.gmail.com>
+References: <CACRpkdYeFw3YqYqgNAKUv1U4edyzzUa9x6xBSoBU4BbBoc6q5Q@mail.gmail.com>
+Message-ID: <20121211213916.GB7214@pratikp-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2012 12:52 AM, Thierry Reding wrote:
-> On Mon, Dec 10, 2012 at 10:52:33AM -0700, Stephen Warren wrote:
->> On 12/07/2012 04:33 PM, Jason Gunthorpe wrote:
->>> On Fri, Dec 07, 2012 at 11:04:23PM +0100, Thomas Petazzoni
->>> wrote:
->>> 
->>>> * The most annoying problem is that when the hw_pci->setup() 
->>>> operation is called, we don't know the size of the memory and
->>>> I/O regions that each PCI device will need. And on Marvell
->>>> SoCs, for each PCI device, we have to set up an address
->>>> decoding window that associates a portion of the physical
->>>> address space with a given
->>> 
->>> I think a sane way to address this is to model the SOC as the
->>> root of the PCI-E and then model each of the ports as a
->>> non-compliant PCI-E bridge. The internal memory windows
->>> functionally map exactly to a PCI-E bridge memory window - just
->>> with annoyingly different register settings.
->> 
->> Mainly as background:
->> 
->> I /think/ Tegra has a similar HW setup (but perhaps not
->> identical) (based on a very brief reading of your emails and
->> brief knowledge of this aspect of the Tegra HW).
->> 
->> On Tegra, there is a 1GB physical address window that the PCIe 
->> controller serves. The controller has 2 or 3 ports, each a
->> separate PCIe domain I believe. There are registers in the PCIe
->> controller which route accessed made to the 1GB physical window
->> to the various child ports and transaction types.
-> 
-> No, the ports on Tegra are not separate PCIe domains. The
-> configuration space mapping is shared between all ports and is
-> programmed in the register space of the PCIe controller. This is
-> what PCIe refers to as ECAM, only with a slightly incompatible
-> mapping.
+Hi Linus
 
-OK, so can you please remind me why the top-level PCIe controller node
-has a child node for each port, with hard-coded non-intersecting
-ranges for configuration space access? If they all go through the same
-address range, and use standard PCI bridge registers to route
-transactions to the separate ports, I would have expected no need for
-explicit per-port sub-nodes or static address allocations.
+On Mon, Dec 10, 2012 at 01:40:20PM +0100, Linus Walleij wrote:
+> Hi Pratik,
+> 
+> recently my colleague Magnus (@ST-Ericsson) found this bus and
+> implementations for the ARM Coresight and drivers for the ARM Coresight
+> blocks ETB, ETM, Funnel, Replicator, STM, TMC and TPIU. The
+> code is here:
+> https://www.codeaurora.org/gitweb/quic/le/?p=kernel/msm.git;a=tree;f=drivers/coresight;h=f0221ea9a55c1e8bcd63f36ec28abb6d5406e63d;hb=refs/heads/msm-3.4
+> 
+> What is your intention with this? Do you have any intention to mainline?
+> 
+
+Thanks for the quick evaluation. I will be working on cleaning up
+the drivers for upstream submission in the coming weeks.
+
+> We can see it has references to Qualcomm in the device tree strings even
+> though they are ARM Coresight HW blocks, for example, so some changes
+> are likely necessary, and such bindings should pass the devicetree-discuss
+> list.
+> 
+
+Yes, will clean it up.
+
+> Will: what is ARM Ltd. position on these blocks and their drivers? Any plans
+> from your side?
+> 
+> Douglas: look another STM driver... :-)
+> 
+> John Stultz has recently been working on some PTM extensions
+> submitted by Arve Hj?nnev?g as well, relating quite closely to this.
+> 
+> The design is nice, but maybe this is one of the few cases where the
+> drivers should actually live under arch/arm/common/* or similar.
+> 
+> Yours,
+> Linus Walleij
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
