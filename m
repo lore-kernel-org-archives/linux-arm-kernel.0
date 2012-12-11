@@ -1,31 +1,78 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 10 Dec 2012 21:32:26 -0800
-Subject: Errata on multiplatform kernels
-In-Reply-To: <1355203223.16750.2.camel@gitbox>
-References: <1355203223.16750.2.camel@gitbox>
-Message-ID: <CAOesGMjJ=y4J70CaYYaEem0ni7Vb48KuEZKxaVYuCCCoMYwjPw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 11 Dec 2012 13:57:00 +0800
+Subject: [PATCH 3/7] ARM i.MX5: switch IPU clk support to devicetree
+ bindings
+In-Reply-To: <1352733809-27230-4-git-send-email-s.hauer@pengutronix.de>
+References: <1352733809-27230-1-git-send-email-s.hauer@pengutronix.de>
+ <1352733809-27230-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20121211055657.GA28581@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sascha,
 
-On Mon, Dec 10, 2012 at 9:20 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
-> How are errata handled on multiplatform kernels?
->
-> There don't appear to be any errata selected by default in any of the
-> current multiplatform options, but presumably it will happen eventually.
->
-> Does that mean the errata will be applied to all machines that boot with
-> the errata selected, even if not required?
+On Mon, Nov 12, 2012 at 04:23:25PM +0100, Sascha Hauer wrote:
+> The i.MX5 clk support has platform based clock bindings for the
+> IPU. IPU support is devicetree only, so move them over to devicetree
+> based bindings. Also, enable MIPI clocks which do not have a device
+> associated with, but still need to be enabled to do graphics on
+> i.MX51.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/mach-imx/clk-imx51-imx53.c |   19 +++++++++++--------
+>  1 file changed, 11 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+> index a0bf848..02932da 100644
+> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
+> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+> @@ -306,6 +306,10 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+>  	clk_prepare_enable(clk[spba]);
+>  	clk_prepare_enable(clk[emi_fast_gate]); /* fec */
+>  	clk_prepare_enable(clk[emi_slow_gate]); /* eim */
+> +	clk_prepare_enable(clk[mipi_hsc1_gate]);
+> +	clk_prepare_enable(clk[mipi_hsc2_gate]);
+> +	clk_prepare_enable(clk[mipi_esc_gate]);
+> +	clk_prepare_enable(clk[mipi_hsp_gate]);
 
-Yes. To date I believe most errata we have are just performance hits
-on platforms that don't need it.
+I just noticed that enabling these clocks will stop my imx51-babbage
+board from booting to console.  Can you please investigate it?
 
-Other architectures have in some cases added runtime patching (out) of
-workarounds that aren't needed on the current platform for the ones
-that have significant performance impact. I'm guessing we'll end up
-with something similar eventually but until then we'll try to just go
-with the superset of needed errata.
+Shawn
 
-
--Olof
+>  	clk_prepare_enable(clk[tmax1]);
+>  	clk_prepare_enable(clk[tmax2]); /* esdhc2, fec */
+>  	clk_prepare_enable(clk[tmax3]); /* esdhc1, esdhc4 */
+> @@ -349,10 +353,9 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+>  	clk_register_clkdev(clk[mx51_mipi], "mipi_hsp", NULL);
+>  	clk_register_clkdev(clk[vpu_gate], NULL, "imx51-vpu.0");
+>  	clk_register_clkdev(clk[fec_gate], NULL, "imx27-fec.0");
+> -	clk_register_clkdev(clk[ipu_gate], "bus", "imx51-ipu");
+> -	clk_register_clkdev(clk[ipu_di0_gate], "di0", "imx51-ipu");
+> -	clk_register_clkdev(clk[ipu_di1_gate], "di1", "imx51-ipu");
+> -	clk_register_clkdev(clk[ipu_gate], "hsp", "imx51-ipu");
+> +	clk_register_clkdev(clk[ipu_gate], "bus", "40000000.ipu");
+> +	clk_register_clkdev(clk[ipu_di0_gate], "di0", "40000000.ipu");
+> +	clk_register_clkdev(clk[ipu_di1_gate], "di1", "40000000.ipu");
+>  	clk_register_clkdev(clk[usb_phy_gate], "phy", "mxc-ehci.0");
+>  	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx51.0");
+>  	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx51.0");
+> @@ -442,10 +445,10 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+>  	clk_register_clkdev(clk[vpu_gate], NULL, "imx53-vpu.0");
+>  	clk_register_clkdev(clk[i2c3_gate], NULL, "imx-i2c.2");
+>  	clk_register_clkdev(clk[fec_gate], NULL, "imx25-fec.0");
+> -	clk_register_clkdev(clk[ipu_gate], "bus", "imx53-ipu");
+> -	clk_register_clkdev(clk[ipu_di0_gate], "di0", "imx53-ipu");
+> -	clk_register_clkdev(clk[ipu_di1_gate], "di1", "imx53-ipu");
+> -	clk_register_clkdev(clk[ipu_gate], "hsp", "imx53-ipu");
+> +	clk_register_clkdev(clk[ipu_gate], "bus", "18000000.ipu");
+> +	clk_register_clkdev(clk[ipu_di0_gate], "di0", "18000000.ipu");
+> +	clk_register_clkdev(clk[ipu_di1_gate], "di1", "18000000.ipu");
+> +	clk_register_clkdev(clk[ipu_gate], "hsp", "18000000.ipu");
+>  	clk_register_clkdev(clk[usb_phy1_gate], "usb_phy1", "mxc-ehci.0");
+>  	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx53.0");
+>  	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx53.0");
+> -- 
+> 1.7.10.4
+> 
