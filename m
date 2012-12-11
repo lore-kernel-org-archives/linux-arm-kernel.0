@@ -1,62 +1,27 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Tue, 11 Dec 2012 15:17:54 +0100
-Subject: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save power
-Message-ID: <1355235474-12783-1-git-send-email-ulf.hansson@stericsson.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 11 Dec 2012 22:32:17 +0800
+Subject: [PATCH v2 0/3] Use devm_* managed functions to ease slot-gpio users
+Message-ID: <1355236340-21304-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+Changes since v1:
+ * Add kernel doc for mmc_gpio_request/free_ro/cd() to document the
+   use cases.
+ * Add a patch to remove unncessary mmc_gpio_free_cd() call from
+   existing slot-gpio users.
 
-The amba bus is already performing same actions but for the apb_pclk.
-So here we just make sure the clock to card is gated as well to save
-more power. At runtime resume we will thus restore the clock again.
+Shawn Guo (3):
+  mmc: slot-gpio: use devm_* managed functions to ease users
+  mmc: remove unncessary mmc_gpio_free_cd() call from slot-gpio users
+  mmc: sdhci-esdhc-imx: use slot-gpio helpers for CD and WP
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/mmc/host/mmci.c |   29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ drivers/mmc/core/slot-gpio.c       |   57 ++++++++++++++++++++++++++++++++----
+ drivers/mmc/host/sdhci-esdhc-imx.c |   56 ++++++++++-------------------------
+ drivers/mmc/host/sdhci-pxav3.c     |    5 ----
+ drivers/mmc/host/sh_mmcif.c        |    6 ----
+ drivers/mmc/host/tmio_mmc_pio.c    |    8 -----
+ 5 files changed, 67 insertions(+), 65 deletions(-)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index aa04b42..0f397a2 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1636,8 +1636,37 @@ static int mmci_resume(struct device *dev)
- }
- #endif
- 
-+#ifdef CONFIG_PM_RUNTIME
-+static int mmci_runtime_suspend(struct device *dev)
-+{
-+	struct amba_device *adev = to_amba_device(dev);
-+	struct mmc_host *mmc = amba_get_drvdata(adev);
-+
-+	if (mmc) {
-+		struct mmci_host *host = mmc_priv(mmc);
-+		clk_disable_unprepare(host->clk);
-+	}
-+
-+	return 0;
-+}
-+
-+static int mmci_runtime_resume(struct device *dev)
-+{
-+	struct amba_device *adev = to_amba_device(dev);
-+	struct mmc_host *mmc = amba_get_drvdata(adev);
-+
-+	if (mmc) {
-+		struct mmci_host *host = mmc_priv(mmc);
-+		clk_prepare_enable(host->clk);
-+	}
-+
-+	return 0;
-+}
-+#endif
-+
- static const struct dev_pm_ops mmci_dev_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(mmci_suspend, mmci_resume)
-+	SET_RUNTIME_PM_OPS(mmci_runtime_suspend, mmci_runtime_resume, NULL)
- };
- 
- static struct amba_id mmci_ids[] = {
 -- 
-1.7.10
+1.7.9.5
