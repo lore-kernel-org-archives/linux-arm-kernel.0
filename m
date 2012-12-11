@@ -1,32 +1,47 @@
-From: bard.shen@gmail.com (Bo Shen)
-Date: Tue, 11 Dec 2012 17:55:42 +0800
-Subject: need help in porting wm8731 codec on SAMSUNG S3C2416
-In-Reply-To: <CALM_QrWRk9FCS6t3Gs=7qF8fWHM9zoKFY_K67LAGjGHa5CZ9cw@mail.gmail.com>
-References: <CALM_QrWRk9FCS6t3Gs=7qF8fWHM9zoKFY_K67LAGjGHa5CZ9cw@mail.gmail.com>
-Message-ID: <50C7031E.2020107@gmail.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Tue, 11 Dec 2012 11:58:45 +0100
+Subject: [PATCH] drivers/pinctrl/pinctrl-at91.c: convert kfree to devm_kfree
+Message-ID: <1355223525-19165-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ratheendran R,
+From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-On 12/11/2012 14:44, Ratheendran R wrote:
-> Dear All,
->
-> We are using kit2416 board based samsung s3c2416 SOC using linux kernel
-> 2.6.21, wm8731 codec is used with the soc on i2s bus.
->
-> I am trying porting linux3.6.8 on the same board,now porting older soc
-> audio driver for codec onto the newer kernel.
->
-> I am getting the below kernel messages, snapshot on audio driver
-> registration.
->
-> /soc-audio soc-audio: ASoC machine SMDK2416wm8731 should use
-> snd_soc_register_card()
-> soc-audio soc-audio: CODEC wm8731 not registered
+The function at91_dt_node_to_map is ultimately called by the function
+pinctrl_get, which is an exported function.  Since it is possible that this
+function is not called from within a probe function, for safety, the kfree
+is converted to a devm_kfree, to both free the data and remove it from the
+device in a failure situation.
 
-For your reference, my codec name is: ".codec_name = "wm8731.0-001b","
-Please check it in your system. The path is /sys/devices/...
+A newline is added in the call to devm_kfree to avoid exceeding the 80
+character limit.
 
-Best Regards,
-Bo Shen
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
+---
+ drivers/pinctrl/pinctrl-at91.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index c5e7571..0da8a5f 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -255,7 +255,8 @@ static int at91_dt_node_to_map(struct pinctrl_dev *pctldev,
+ 	}
+ 
+ 	map_num += grp->npins;
+-	new_map = devm_kzalloc(pctldev->dev, sizeof(*new_map) * map_num, GFP_KERNEL);
++	new_map = devm_kzalloc(pctldev->dev, sizeof(*new_map) * map_num,
++			       GFP_KERNEL);
+ 	if (!new_map)
+ 		return -ENOMEM;
+ 
+@@ -265,7 +266,7 @@ static int at91_dt_node_to_map(struct pinctrl_dev *pctldev,
+ 	/* create mux map */
+ 	parent = of_get_parent(np);
+ 	if (!parent) {
+-		kfree(new_map);
++		devm_kfree(pctldev->dev, new_map);
+ 		return -EINVAL;
+ 	}
+ 	new_map[0].type = PIN_MAP_TYPE_MUX_GROUP;
