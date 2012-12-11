@@ -1,17 +1,64 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 11 Dec 2012 13:52:00 +0000
-Subject: linker problem with xip kernel and recent toolchains
-In-Reply-To: <50C7386E.70305@pengutronix.de>
-References: <50BE0CDB.5000704@pengutronix.de>
- <1355230894.19818.1.camel@hornet> <50C7386E.70305@pengutronix.de>
-Message-ID: <1355233920.19818.12.camel@hornet>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 11 Dec 2012 15:00:04 +0100
+Subject: [PATCH 2/2] pinctrl/nomadik: adopt pinctrl sleep mode management
+Message-ID: <1355234404-17405-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-12-11 at 13:43 +0000, Marc Kleine-Budde wrote:
-> What about putting the notes section into the read only segment, i.e.
-> the ROM?
+From: Julien Delacou <julien.delacou@stericsson.com>
 
-Yes, this is probably a good idea. I'll see to it, thanks!
+This fix makes pinctrl-nomadik able to handle suspend/resume
+events and change hogged pins states accordingly.
 
-Pawe?
+Signed-off-by: Julien Delacou <julien.delacou@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-nomadik.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+index 8ef3e85..1068faa 100644
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@ -1847,6 +1847,28 @@ static const struct of_device_id nmk_pinctrl_match[] = {
+ 	{},
+ };
+ 
++static int nmk_pinctrl_suspend(struct platform_device *pdev, pm_message_t state)
++{
++	struct nmk_pinctrl *npct;
++
++	npct = platform_get_drvdata(pdev);
++	if (!npct)
++		return -EINVAL;
++
++	return pinctrl_force_sleep(npct->pctl);
++}
++
++static int nmk_pinctrl_resume(struct platform_device *pdev)
++{
++	struct nmk_pinctrl *npct;
++
++	npct = platform_get_drvdata(pdev);
++	if (!npct)
++		return -EINVAL;
++
++	return pinctrl_force_default(npct->pctl);
++}
++
+ static int __devinit nmk_pinctrl_probe(struct platform_device *pdev)
+ {
+ 	const struct platform_device_id *platid = platform_get_device_id(pdev);
+@@ -1955,6 +1977,10 @@ static struct platform_driver nmk_pinctrl_driver = {
+ 	},
+ 	.probe = nmk_pinctrl_probe,
+ 	.id_table = nmk_pinctrl_id,
++#ifdef CONFIG_PM
++	.suspend = nmk_pinctrl_suspend,
++	.resume = nmk_pinctrl_resume,
++#endif
+ };
+ 
+ static int __init nmk_gpio_init(void)
+-- 
+1.7.11.3
