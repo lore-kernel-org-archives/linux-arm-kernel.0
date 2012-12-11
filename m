@@ -1,75 +1,44 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 11 Dec 2012 18:55:04 +0100 (CET)
-Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
- cache LoUIS operations
-In-Reply-To: <20121211163843.GH16759@mudshark.cambridge.arm.com>
-References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
- <20120919134658.GA2111@linaro.org>
- <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
- <20120920110439.GB2117@linaro.org>
- <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
- <20121211163313.GG16759@mudshark.cambridge.arm.com>
- <20121211163843.GH16759@mudshark.cambridge.arm.com>
-Message-ID: <Pine.LNX.4.64.1212111854200.2140@axis700.grange>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 11 Dec 2012 10:01:38 -0800
+Subject: Errata on multiplatform kernels
+In-Reply-To: <CAOesGMjJ=y4J70CaYYaEem0ni7Vb48KuEZKxaVYuCCCoMYwjPw@mail.gmail.com>
+References: <1355203223.16750.2.camel@gitbox>
+ <CAOesGMjJ=y4J70CaYYaEem0ni7Vb48KuEZKxaVYuCCCoMYwjPw@mail.gmail.com>
+Message-ID: <20121211180138.GB4989@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Dec 2012, Will Deacon wrote:
+* Olof Johansson <olof@lixom.net> [121210 21:38]:
+> Hi,
+> 
+> On Mon, Dec 10, 2012 at 9:20 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
+> > How are errata handled on multiplatform kernels?
+> >
+> > There don't appear to be any errata selected by default in any of the
+> > current multiplatform options, but presumably it will happen eventually.
+> >
+> > Does that mean the errata will be applied to all machines that boot with
+> > the errata selected, even if not required?
+> 
+> Yes. To date I believe most errata we have are just performance hits
+> on platforms that don't need it.
+> 
+> Other architectures have in some cases added runtime patching (out) of
+> workarounds that aren't needed on the current platform for the ones
+> that have significant performance impact. I'm guessing we'll end up
+> with something similar eventually but until then we'll try to just go
+> with the superset of needed errata.
 
-> On Tue, Dec 11, 2012 at 04:33:13PM +0000, Will Deacon wrote:
-> > On Tue, Dec 11, 2012 at 04:07:56PM +0000, Guennadi Liakhovetski wrote:
-> > > Git bisect identified this patch, in the mainline as
-> > > 
-> > > commit dbee0c6fb4c1269b2dfc8b0b7a29907ea7fed560
-> > > Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > Date:   Fri Sep 7 11:06:57 2012 +0530
-> > > 
-> > >     ARM: kernel: update cpu_suspend code to use cache LoUIS operations
-> > > 
-> > > as the culprit of the broken wake up from STR on mackerel, based on an 
-> > > sh7372 A8 SoC. .config attached.
-> > 
-> > My guess is that because Cortex-A8 does not implement the MP extensions,
-> > the LoUIS field of the CLIDR reads as zero, and the cache isn't flushed at
-> > all (I can see an early exit in v7_flush_dcache_louis).
-> > 
-> > Lorenzo -- how is this supposed to work for uniprocessor CPUs?
-> 
-> Bah, forgot to ask you if the following patch helps...
-> 
-> Will
-> 
-> --->8
-> 
-> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-> index cd95664..f58248f 100644
-> --- a/arch/arm/mm/cache-v7.S
-> +++ b/arch/arm/mm/cache-v7.S
-> @@ -44,7 +44,8 @@ ENDPROC(v7_flush_icache_all)
->  ENTRY(v7_flush_dcache_louis)
->         dmb                                     @ ensure ordering with previous memory accesses
->         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
-> -       ands    r3, r0, #0xe00000               @ extract LoUIS from clidr
-> +       ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
-> +       ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
->         mov     r3, r3, lsr #20                 @ r3 = LoUIS * 2
->         moveq   pc, lr                          @ return if level == 0
->         mov     r10, #0                         @ r10 (starting level) = 0
+We can't enable any of the errata if there's a chance that it will behave
+in a different way for secure mode devices compared to non-secure devices.
 
-[... later]
+The discussion is in the thread "[PATCH] ARM: Fix errata 751472 handling
+on Cortex-A9 r1p*".
 
-> > Yes, it does.
->
-> Cracking, can I add you tested-by please?
- 
-Sure:
- 
-Tested-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-  
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+The conclusion was that we cannot enable any errata for multiplatform,
+and must assume the errata is handled by the bootloader. Multiplatform
+image is already broken for at least omap4 as 751472 is selected.
+
+Regards,
+
+Tony
