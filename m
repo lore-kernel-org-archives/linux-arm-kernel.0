@@ -1,56 +1,116 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Dec 2012 16:15:02 +0000
-Subject: [RFC v1 01/16] lib: devres: don't enclose pcim_*() functions in
- CONFIG_HAS_IOPORT
-In-Reply-To: <20121211170338.4859ddf0@skate>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201212111043.50627.arnd@arndb.de> <20121211170338.4859ddf0@skate>
-Message-ID: <201212111615.03262.arnd@arndb.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 11 Dec 2012 16:19:55 +0000
+Subject: [RFC PATCH 0/2] Add support for a fake, para-virtualised machine
+In-Reply-To: <20121204123001.GL23368@mudshark.cambridge.arm.com>
+References: <1354557160-20144-1-git-send-email-will.deacon@arm.com>
+ <50BD1F81.9080304@gmail.com>
+ <20121204123001.GL23368@mudshark.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1212111616330.17523@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 December 2012, Thomas Petazzoni wrote:
-> On Tue, 11 Dec 2012 10:43:49 +0000, Arnd Bergmann wrote:
-> > On Friday 07 December 2012, Thomas Petazzoni wrote:
-> > > The pcim_*() functions are used by the libata-sff subsystem, and this
-> > > subsystem is used for many SATA drivers on ARM platforms that do not
-> > > necessarily have I/O ports.
+sorry if I missed anybody from CC, I don't have the original list
+
+On Tue, 4 Dec 2012, Will Deacon wrote:
+> On Mon, Dec 03, 2012 at 09:54:09PM +0000, Rob Herring wrote:
+> > On 12/03/2012 11:52 AM, Will Deacon wrote:
+> > > When running Linux on a para-virtualised platform (that is, one where
+> > > the guest is aware that it is dealing with virtual devices sitting on
+> > > things like virtio or xenbus) we require very little in the way of
+> > > platform code and piggy-backing on top of an existing platform can
+> > > require a lot of device emulation for very little gain.
+> > > 
+> > > These two patches introduce mach-virt: a very simple, DT-based machine
+> > > which can be used with kvmtool in conjunction with virtio-based devices.
+> > > It's not hard to imagine the same machine being targetted by Xen, which
+> > > currently emulates a minimal variant of the vexpress platform.
+> > > 
+> > > Note that this patch series depends on the timer rework from Mark
+> > > Rutland, posted on Friday:
+> > > 
+> > >   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-November/135651.html
+> > > 
+> > > All feedback welcome. We suspect that most controversy will be around
+> > > the name of the thing :)
 > > 
-> > I think this one is wrong as the CONFIG_HAS_IOPORT does not refer to the
-> > presence of PIO ports but to whether or not they provide an ioport_map
-> > function. If there is no ioport_map(), devm_pci_iomap will fail to link
-> > as far as I can tell.
+> > We've discussed this before at conferences. I don't know that we
+> > concluded this wasn't needed, but it certainly leaned that direction.
 > 
-> The problem is that on ARCH_MULTI_V7, ARCH_VEXPRESS is forcefully
-> enabled. And ARCH_VEXPRESS selects NO_IOPORT.. so you don't have the
-> pcim_*() functions, and therefore libata-sff.c (needed for many SATA
-> drivers) will not build. How do you solve this?
+> I too leaned that direction before I started looking at kvm in detail and,
+> since then, I've changed my mind when it comes to para-virtualisation.
+> 
+> The reason for this is that there is absolutely no reason to emulate some
+> components of a real platform and then bolt virtual devices onto it once
+> you've got enough to get it going. It leads to a right royal mess in
+> userspace, where you have to write a load of non-reusable emulation code and
+> it leads to churn in the kernel because you're constantly at odds with
+> people trying to develop the platform code based on the actual hardware
+> they have.
+> 
+> With a virtualisation-capable ARMv7 system, all you *need* to boot SMP
+> Debian is:
+> 
+> 	- A v7 CPU with virt extensions
+> 	- vGIC
+> 	- architected timers
+> 
+> *everything* else can be described using virtio devices in the device-tree,
+> essentially allowing you to generate platforms based on the above and boot
+> the same kernel on them.
 
-What you describe here are probable two bugs, and we should fix both:
+That's right, however for Xen there would be a single hypervisor node
+and no virtio devices: everything else is going to be on xenbus.
 
-* ARCH_VEXPRESS should not select NO_IOPORT. It's generally wrong
-  to select this in combination with ARCH_MULTIPLATFORM, when some
-  of the other platforms you may enable actually have IOPORT mapping
-  support.
 
-* We should not unconditionally select ARCH_VEXPRESS from ARCH_MULTIPLATFORM.
-  There is no reason why we would enable that platform for building
-  a kernel that runs on only one other platform.
+> > So what has changed? You're not going to save code space because we're
+> > building multiple platforms together. You'll save some boot time, but a
+> > stripped down dtb with only the minimal peripherals would probably save
+> > nearly as much time. 
+> 
+> It's really got nothing to do with code space or boot speed. What it *is*
+> about is avoiding the tight coupling with a real platform and suffering as a
+> result. Yes, you can strip down the DT for a real platform but you'll likely
+> still have to emulate things like the SP804 in order to boot. That's not to
+> mention any platform-specific system register interfaces which are required
+> early on.
+> 
+> We can't even re-use the socfpga code (which is incredibly minimal) without
+> emulating the dw_apb_timer.
+> 
+> > However, I do have concerns with using VExpress as
+> > the guest. For example, you can't support a non-PAE guest with 4GB of
+> > RAM on VExpress (maybe if the vexpress code gets all memory map info
+> > from DT).
+> 
+> Yes, vexpress is even less suitable for this.
 
-> I'm not sure which devm_pci_iomap() you're referring to since my patch
-> makes only the pcim_iomap_table(), pcim_iomap(), pcim_iounmap(),
-> pcim_iomap_regions(), pcim_iomap_regions_request_all() and
-> pcim_iounmap_regions() available under CONFIG_PCI instead of CONFIG_PCI
-> && CONFIG_HAS_IOPORT.
+My understanding was that vexpress was supposed to become a machine
+fully discoverable via DT, and that of course includes the memory map.
+Actually I think that we are pretty close to that already.
 
-Sorry, I meant pcim_iomap.
+However if you prefer to introduce a new machine for that purpose, I am
+OK with that too. I am sure we can base xenvm on that.
 
-> So maybe you were referring to pcim_iomap(). I haven't checked in
-> details, but I guess it builds because ioport_map() is implemented in
-> arch/arm/mm/iomap.c.
 
-Right. If an ioport_map function is provided for a given platform,
-we should also set HAVE_IOPORT and vice versa. This is probably
-fallout of the io.h conversion for multiplatform.
+> > Is this really complete? Will we need reset, poweroff, hotplug, and
+> > suspend/resume support for example? Unlike most initial platform
+> > submissions which are minimal, I think seeing full support would be
+> > useful here. Then we can better gauge how much we are really saving.
+> 
+> The code is complete in the sense that you can boot an SMP guest running
+> Debian with console, network, block etc. etc. but you're right to point out
+> the absence of power-management support.
+> 
+> However, power-management in KVM guests is a *much* larger problem and not
+> one that has been solved adequately as of yet. There are suggestions that it
+> should be handled entirely in firmware, with the guest making smc calls to
+> request power-management operations but this is yet to materialise and, as
+> such, we can't yet use it here.
+> 
+> We could look at building a virtio-based power controller but that's going
+> to come up too late for SMP booting (although will give us hotplug, reset
+> etc).
 
-	Arnd
+In Xen x86 we implement hotplug via xenbus and power management via
+hypercalls. So we should be able to get away with it wihout doing any
+emulation or virtio.
