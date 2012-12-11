@@ -1,33 +1,39 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 11 Dec 2012 10:37:28 +0100
-Subject: [PATCH 06/12] ARM: ux500: Set correct MMCI regulator voltages in
- the ux5x0 Device Tree
-In-Reply-To: <CACRpkdZJFbHSwowKnfWyXLckVePHrC6o2CtDJaFb+dXTkNYPjw@mail.gmail.com>
-References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
- <1355129761-8088-7-git-send-email-lee.jones@linaro.org>
- <CACRpkdZJFbHSwowKnfWyXLckVePHrC6o2CtDJaFb+dXTkNYPjw@mail.gmail.com>
-Message-ID: <CAPDyKFo6KhshYJfSvodPK4e7zC25etz0G8fV4jnAssZX3BDZBg@mail.gmail.com>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Tue, 11 Dec 2012 09:48:15 +0000
+Subject: [PATCH] ARM: shmobile: r8a7779: Fix GPIO input reg addresses
+Message-ID: <1355219295-4279-1-git-send-email-phil.edworthy@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 December 2012 10:17, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Dec 10, 2012 at 9:55 AM, Lee Jones <lee.jones@linaro.org> wrote:
->
->> The voltages for the MMCI GPIO controlled voltage regulation differ
->> depending on who you believe and where you pick the information up
->> from. More recent internal code suggests that the true upper voltage
->> from the shifter is actually v3.3, instead of the previously
->> indicated v2.9. Let's mirror that change in the Device Tree file.
+The INDTx register addresses were wrong.
+---
+ arch/arm/mach-shmobile/pfc-r8a7779.c |   14 +++++++-------
+ 1 files changed, 7 insertions(+), 7 deletions(-)
 
-This is wrong. The value should be 2.9V nothing else!
-
->>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Yours,
-> Linus Walleij
-
-Kind regards
-Ulf Hansson
+diff --git a/arch/arm/mach-shmobile/pfc-r8a7779.c b/arch/arm/mach-shmobile/pfc-r8a7779.c
+index 15f6a48..717e058 100644
+--- a/arch/arm/mach-shmobile/pfc-r8a7779.c
++++ b/arch/arm/mach-shmobile/pfc-r8a7779.c
+@@ -2585,13 +2585,13 @@ static struct pinmux_cfg_reg pinmux_config_regs[] = {
+ };
+ 
+ static struct pinmux_data_reg pinmux_data_regs[] = {
+-	{ PINMUX_DATA_REG("INDT0", 0xffc40008, 32) { GP_INDT(0) } },
+-	{ PINMUX_DATA_REG("INDT1", 0xffc41008, 32) { GP_INDT(1) } },
+-	{ PINMUX_DATA_REG("INDT2", 0xffc42008, 32) { GP_INDT(2) } },
+-	{ PINMUX_DATA_REG("INDT3", 0xffc43008, 32) { GP_INDT(3) } },
+-	{ PINMUX_DATA_REG("INDT4", 0xffc44008, 32) { GP_INDT(4) } },
+-	{ PINMUX_DATA_REG("INDT5", 0xffc45008, 32) { GP_INDT(5) } },
+-	{ PINMUX_DATA_REG("INDT6", 0xffc46008, 32) {
++	{ PINMUX_DATA_REG("INDT0", 0xffc4000c, 32) { GP_INDT(0) } },
++	{ PINMUX_DATA_REG("INDT1", 0xffc4100c, 32) { GP_INDT(1) } },
++	{ PINMUX_DATA_REG("INDT2", 0xffc4200c, 32) { GP_INDT(2) } },
++	{ PINMUX_DATA_REG("INDT3", 0xffc4300c, 32) { GP_INDT(3) } },
++	{ PINMUX_DATA_REG("INDT4", 0xffc4400c, 32) { GP_INDT(4) } },
++	{ PINMUX_DATA_REG("INDT5", 0xffc4500c, 32) { GP_INDT(5) } },
++	{ PINMUX_DATA_REG("INDT6", 0xffc4600c, 32) {
+ 		0, 0, 0, 0, 0, 0, 0, 0,	0, 0, 0, 0, 0, 0, 0, 0,
+ 		0, 0, 0, 0, 0, 0, 0, GP_6_8_DATA,
+ 		GP_6_7_DATA, GP_6_6_DATA, GP_6_5_DATA, GP_6_4_DATA,
+-- 
+1.7.5.4
