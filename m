@@ -1,26 +1,51 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Tue, 11 Dec 2012 17:45:09 +0000
-Subject: [RFC v1 01/16] lib: devres: don't enclose pcim_*() functions in
- CONFIG_HAS_IOPORT
-In-Reply-To: <20121211173450.GW14363@n2100.arm.linux.org.uk>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1354917879-32073-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <201212111043.50627.arnd@arndb.de>
- <20121211162647.GS14363@n2100.arm.linux.org.uk>
- <20121211171610.01c2de16@pyramind.ukuu.org.uk>
- <20121211173450.GW14363@n2100.arm.linux.org.uk>
-Message-ID: <20121211174509.69c8c66e@pyramind.ukuu.org.uk>
+From: csd@broadcom.com (Christian Daudt)
+Date: Tue, 11 Dec 2012 09:39:02 -0800
+Subject: [PATCH V2] ARM: bcm281xx: Add timer driver
+In-Reply-To: <50C63285.1030605@us.ibm.com>
+References: <1354954544-21429-1-git-send-email-csd@broadcom.com>
+ <CAOesGMg3-=ywfgp365_zumsBWBKC+ASxwYpobbkV4_x37P0NoQ@mail.gmail.com>
+ <50C63285.1030605@us.ibm.com>
+Message-ID: <50C76FB6.5040306@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The problem comes when you end up trying to deal with stuff which
-> uses ioread{8,16} on ioport_map() cookies where it's assumed that
-> adding N to the cookie is the same as adding N to the port address.
+On 12-12-10 11:05 AM, John Stultz wrote:
+>
+> But since you pulled me in here, I've got a bike-shedding nit below 
+> (Sorry!).
+>
+>>> diff --git a/drivers/clocksource/bcm_kona_timer.c 
+>>> b/drivers/clocksource/bcm_kona_timer.c
+>>> new file mode 100644
+>>> index 0000000..dbc54c2
+>>> --- /dev/null
+>>> +++ b/drivers/clocksource/bcm_kona_timer.c
+>>>
+>>> +static void __init timers_init(void)
+>>> +static int timer_set_next_event(unsigned long clc,
+>>> +                                 struct clock_event_device *unused)
+>>> +static void timer_set_mode(enum clock_event_mode mode,
+>>> +                            struct clock_event_device *unused)
+>>> +static void __init timer_clockevents_init(void)
+>>>
+>>> +static irqreturn_t timer_interrupt(int irq, void *dev_id)
+>>>
+>
+> These are all terribly generic function names. I know they're static 
+> (and plenty of other driver do the same thing), but it makes grepping 
+> for similar code a pain and can cause confusing backtraces.   Maybe 
+> consider using the kona_timer_... prefix?
+>
+Fair enough. I've slapped kona_ in front of all the funcs+vars that 
+previously did not have it. V3 coming out soon.
 
-It's a cookie - this isn't a problem, you can support it via the mapping
-approah. Whether you want to is another question.
+  Thanks,
+    csd
 
-> Thankfully those platforms aren't going to be a part of the single
-> zImage project...
-
-Don't blame you 8)
+> Other then that, for what its worth,
+> Acked-by: John Stultz <johnstul@us.ibm.com>
+>
+> thanks
+> -john
+>
+>
