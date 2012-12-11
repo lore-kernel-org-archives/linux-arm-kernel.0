@@ -1,72 +1,34 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 11 Dec 2012 18:07:35 +0100 (CET)
-Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
- cache LoUIS operations
-In-Reply-To: <20121211163843.GH16759@mudshark.cambridge.arm.com>
-References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
- <20120919134658.GA2111@linaro.org>
- <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
- <20120920110439.GB2117@linaro.org>
- <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
- <20121211163313.GG16759@mudshark.cambridge.arm.com>
- <20121211163843.GH16759@mudshark.cambridge.arm.com>
-Message-ID: <Pine.LNX.4.64.1212111807170.2140@axis700.grange>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Tue, 11 Dec 2012 17:16:10 +0000
+Subject: [RFC v1 01/16] lib: devres: don't enclose pcim_*() functions in
+ CONFIG_HAS_IOPORT
+In-Reply-To: <20121211162647.GS14363@n2100.arm.linux.org.uk>
+References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1354917879-32073-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201212111043.50627.arnd@arndb.de>
+ <20121211162647.GS14363@n2100.arm.linux.org.uk>
+Message-ID: <20121211171610.01c2de16@pyramind.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will
-
-On Tue, 11 Dec 2012, Will Deacon wrote:
-
-> On Tue, Dec 11, 2012 at 04:33:13PM +0000, Will Deacon wrote:
-> > On Tue, Dec 11, 2012 at 04:07:56PM +0000, Guennadi Liakhovetski wrote:
-> > > Git bisect identified this patch, in the mainline as
-> > > 
-> > > commit dbee0c6fb4c1269b2dfc8b0b7a29907ea7fed560
-> > > Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > Date:   Fri Sep 7 11:06:57 2012 +0530
-> > > 
-> > >     ARM: kernel: update cpu_suspend code to use cache LoUIS operations
-> > > 
-> > > as the culprit of the broken wake up from STR on mackerel, based on an 
-> > > sh7372 A8 SoC. .config attached.
-> > 
-> > My guess is that because Cortex-A8 does not implement the MP extensions,
-> > the LoUIS field of the CLIDR reads as zero, and the cache isn't flushed at
-> > all (I can see an early exit in v7_flush_dcache_louis).
-> > 
-> > Lorenzo -- how is this supposed to work for uniprocessor CPUs?
+> Correct.  If HAS_IOPORT is not selected then we are potentially missing
+> the dependent functions (because the platform has no IOPORT support) _or_
+> it does have ISA/PCI IO spaces _but_ they're not mappable via the
+> ioport_map() mechanism due to some non-linearity involved in the
+> translation.
 > 
-> Bah, forgot to ask you if the following patch helps...
-
-Yes, it does.
-
-Thanks
-Guennadi
-
+> To make that second point clear, that's platforms where:
 > 
-> Will
-> 
-> --->8
-> 
-> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-> index cd95664..f58248f 100644
-> --- a/arch/arm/mm/cache-v7.S
-> +++ b/arch/arm/mm/cache-v7.S
-> @@ -44,7 +44,8 @@ ENDPROC(v7_flush_icache_all)
->  ENTRY(v7_flush_dcache_louis)
->         dmb                                     @ ensure ordering with previous memory accesses
->         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
-> -       ands    r3, r0, #0xe00000               @ extract LoUIS from clidr
-> +       ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
-> +       ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
->         mov     r3, r3, lsr #20                 @ r3 = LoUIS * 2
->         moveq   pc, lr                          @ return if level == 0
->         mov     r10, #0                         @ r10 (starting level) = 0
-> 
+> 	ioport_map(addr + 4) != ioport_map(addr) + 4.
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+For inb/inw and friends this shouldn't matter.
+
+You can implement inl for example 
+
+as
+
+	if (unlikely(addr & 3))
+		// or in fact BUG on this for almost all h/w
+		uninlined_hard_slow_inl(addr);
+	else
+		return *(u32 *)iospace_map[addr];
