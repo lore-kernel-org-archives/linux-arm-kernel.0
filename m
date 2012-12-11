@@ -1,97 +1,82 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 11 Dec 2012 12:07:32 +0900
-Subject: [PATCH 4/6] ARM: mach-shmobile: sh73a0: Initialise MMCIF using DT
-In-Reply-To: <1355195254-4563-1-git-send-email-horms+renesas@verge.net.au>
-References: <1355195254-4563-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1355195254-4563-5-git-send-email-horms+renesas@verge.net.au>
+Date: Tue, 11 Dec 2012 12:07:28 +0900
+Subject: [PATCH 0/6 v3] ARM: mach-shmobile: kzm9g: Reference DT implementation
+Message-ID: <1355195254-4563-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This device also requires a voltage regulator which
-should be defined in a board-specific maner. An example
-dts snipped follows.
+this is a third pass at at providing a refernce DT implementation
+for the kzm9g baord which is intended to act as a guide for mach-shmobile
+developers.
 
-/ {
-	fixedregulator1v8: fixedregulator at 0 {
-		compatible = "regulator-fixed";
-		regulator-name = "fixed-1.8V";
-		regulator-min-microvolt = <1800000>;
-		regulator-max-microvolt = <1800000>;
-	};
-};
+It provides a minimal setup of the board using as little C code as
+possible.
 
-&mmcif {
-	vmmc-supply = <&fixedregulator1v8>;
-	vqmmc-supply = <&fixedregulator1v8>;
-};
+It may be used by selecting CONFIG_MACH_KZM9G_REFERENCE
+and using sh73a0-kzm9g-reference.dtb
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+*** Please note that the clock initialisation shcheme used in
+    this series does not currently work with SMP as there
+    is a yet to be resolved lock-up in workqueue initialisation.
 
----
+    Resolving this problem is currently regarded as future-work.
 
-v3
-* No change
+    CONFIG_SMP must be disabled when using this code. ***
 
-v2
-* Removed SDHI initialisation as the driver needs updating first
-* Moved MMC DT from sh73a0.dtsi to sh73a0-reference.dtsi
-  as it is not appropriate for use by sh73a0-kzm9g.dts yet.
-  This is because sh73a0-kzm9g.dts and board-kzm9g.c use
-  both the GIC and INTC interrupt controllers to provide
-  access to a rich set of devices. This is achieved by initialising
-  the interrupt controllers using C code. Work on allowing the INC
-  controller to be initialised using DT is in progress, however,
-  until that is complete only GIC may be initialised using DT.
+Major difference between v2 and v3:
+* Allow UP boot to complete by initialiing CMT earlier.
+  This is achieved by changing the position of clocsources/
+  in drivers/Makefile
+
+Major difference between v1 and v2:
+* Drop touchscreen initialisation, it requires INTC
+* Drop SDHI initialisation, the driver seems to need some work
 * Add extra entries to clock-sh73a0.c:lookups[] and
-  remove auxdata. Ultimately the clocks will be described
+  remove auxdata. Ultimtely the clocks will be described
   in DT, but the code isn't there yet.
----
- arch/arm/boot/dts/sh73a0-reference.dtsi |   24 ++++++++++++++++++++++++
- arch/arm/mach-shmobile/clock-sh73a0.c   |    1 +
- 2 files changed, 25 insertions(+)
- create mode 100644 arch/arm/boot/dts/sh73a0-reference.dtsi
+* Drop MMCIF patch, it is not needed if regulators are enabled
+* Drop PCF hacks, instead, the series is based on Laruent Pinchart's *
+* series: [PATCH v2 00/77] SH pin control and GPIO rework with OF support
+* Use shmobile_setup_delay()
 
-diff --git a/arch/arm/boot/dts/sh73a0-reference.dtsi b/arch/arm/boot/dts/sh73a0-reference.dtsi
-new file mode 100644
-index 0000000..d4bb012
---- /dev/null
-+++ b/arch/arm/boot/dts/sh73a0-reference.dtsi
-@@ -0,0 +1,24 @@
-+/*
-+ * Device Tree Source for the SH73A0 SoC
-+ *
-+ * Copyright (C) 2012 Renesas Solutions Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/include/ "sh73a0.dtsi"
-+
-+/ {
-+	compatible = "renesas,sh73a0";
-+
-+	mmcif: mmcif at 0x10010000 {
-+		compatible = "renesas,sh-mmcif";
-+		reg = <0xe6bd0000 0x100>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 140 0x4
-+			      0 141 0x4>;
-+		reg-io-width = <4>;
-+	};
-+};
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index 22af74f2..2216b6b 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -583,6 +583,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]), /* SDHI0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP313]), /* SDHI1 */
- 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP312]), /* MMCIF0 */
-+	CLKDEV_DEV_ID("e6bd0000.mmcif", &mstp_clks[MSTP312]), /* MMCIF0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP311]), /* SDHI2 */
- 	CLKDEV_DEV_ID("leds-renesas-tpu.12", &mstp_clks[MSTP303]), /* TPU1 */
- 	CLKDEV_DEV_ID("leds-renesas-tpu.21", &mstp_clks[MSTP302]), /* TPU2 */
--- 
-1.7.10.4
+Git and diffstat information provided to aid review.
+
+----------------------------------------------------------------
+The following changes since commit 940956fe1d8de5cbcc963214fe592f76d8354bef:
+
+  ARM: shmobile: kzm9g: Add LED1-LED4 to the device tree (2012-11-27 00:59:10 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git devel/of-kzm9g
+
+for you to fetch changes up to e64ad872028f921a7a30be325fbdecc725958b40:
+
+  ARM: mach-shmobile: kzm9g: Reference DT implementation (2012-12-11 11:51:56 +0900)
+
+----------------------------------------------------------------
+Simon Horman (6):
+      ARM: clocksource: Initialise early
+      ARM: mach-shmobile: sh73a0: Allow initialisation of GIC by DT
+      ARM: mach-shmobile: sh73a0: Minimal setup using DT
+      ARM: mach-shmobile: sh73a0: Initialise MMCIF using DT
+      ARM: mach-shmobile: kzm9g: use voltage regulators by default
+      ARM: mach-shmobile: kzm9g: Reference DT implementation
+
+ arch/arm/boot/dts/Makefile                     |    3 +-
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts   |   37 +++++++++
+ arch/arm/boot/dts/sh73a0-reference.dtsi        |   24 ++++++
+ arch/arm/boot/dts/sh73a0.dtsi                  |   69 +++++++++++++++++
+ arch/arm/configs/kzm9g_defconfig               |    2 +
+ arch/arm/mach-shmobile/Kconfig                 |   10 +++
+ arch/arm/mach-shmobile/Makefile                |    1 +
+ arch/arm/mach-shmobile/board-kzm9g-reference.c |   99 ++++++++++++++++++++++++
+ arch/arm/mach-shmobile/clock-sh73a0.c          |   13 ++++
+ arch/arm/mach-shmobile/include/mach/common.h   |    3 +
+ arch/arm/mach-shmobile/intc-sh73a0.c           |   14 ++++
+ arch/arm/mach-shmobile/setup-sh73a0.c          |   68 +++++++++++++++-
+ drivers/Makefile                               |    8 +-
+ 13 files changed, 346 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+ create mode 100644 arch/arm/boot/dts/sh73a0-reference.dtsi
+ create mode 100644 arch/arm/mach-shmobile/board-kzm9g-reference.c
