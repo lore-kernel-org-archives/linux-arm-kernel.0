@@ -1,405 +1,266 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 11 Dec 2012 00:05:50 +0000 (UTC)
-Subject: [PATCH 1/8] ARM: OMAP2+: PM QoS: control the power domains next
- state from the constraints
-In-Reply-To: <1347958332-2205-2-git-send-email-j-pihet@ti.com>
-References: <1347958332-2205-1-git-send-email-j-pihet@ti.com>
- <1347958332-2205-2-git-send-email-j-pihet@ti.com>
-Message-ID: <alpine.DEB.2.00.1212110002020.1982@utopia.booyaka.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 11 Dec 2012 01:28:20 +0100
+Subject: [PATCH 1/6] ARM: sunxi: Add pinctrl driver for Allwinner SoCs
+In-Reply-To: <1355177301-31928-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1355177301-31928-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1355177301-31928-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CACRpkdbE=y377X4_5c0wD+U3+drBBptDB8x_s-dQjNBemnbsyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Mon, Dec 10, 2012 at 11:08 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-On Tue, 18 Sep 2012, Jean Pihet wrote:
+> This IP has 8 banks of 32 bits, with a number of pins actually useful
+> for each of these banks varying from one to another, and depending on
+> the SoC used on the board.
+>
+> This driver only implements the pinctrl part, the gpio part will come
+> eventually.
 
-> When a PM QoS device latency constraint is requested or removed the
-> constraint is stored in the constraints list of the corresponding power
-> domain, then the aggregated constraint value is applied by programming
-> the next functional power state using pwrdm_set_fpwrst.
-> 
-> The per-device PM QoS locking requires a spinlock to be used. The reasons
-> is that some drivers need to use the per-device PM QoS functionality from
-> interrupt context or spinlock protected context, as reported by Djamil.
-> An example of such a driver is the OMAP HSI (high-speed synchronous serial
-> interface) driver which needs to control the IP block idle state from
-> the FIFO empty state, from interrupt context.
-> 
-> Tested on OMAP3 Beagleboard and OMAP4 Pandaboard in RET/OFF using
-> wake-up latency constraints on MPU, CORE and PER.
-> 
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> Cc: Djamil Elaidi <d-elaidi@ti.com>
+It's looking pretty nice already :-)
 
-This patch has been changed here.  Details below, but the major changes 
-were to fix the locking and to not attempt GFP_ATOMIC allocations.
-Hopefully the reasons why are clear, but if not, feel free to ask.
+Of course I have some comments...
 
-The following patch has only been compile-tested, and a few more minor 
-changes will probably be needed.
+OK will it be a combined driver so the same file implement both pinctrl
+and gpio?
 
+(...)
+> +- allwinner,pin-ids: An integer array. Each integer in the array
+> +  specify a pin with given mux function, with bank, pin and mux packed
+> +  as below.
+> +
+> +    [15..12] : bank number
+> +    [11..4]  : pin number
+> +    [3..0]   : mux selection
 
-- Paul
+Why are you using this scheme instead of just open-coding the three
+things? Well maybe I'm not getting it... Device Trees are usually for reading,
+not for bitstuffing, that's why I ask.
 
-From: Jean Pihet <jean.pihet@newoldbits.com>
-Date: Sun, 9 Dec 2012 18:38:12 -0700
-Subject: [PATCH] ARM: OMAP2+: PM QoS: control the power domains next state
- from the constraints
+You should pass all this DT stuff to the devicetree-discuss list because
+I'm not any good at this (paging Stephen Warren.)
 
-When a PM QoS device latency constraint is requested or removed the
-constraint is stored in the constraints list of the corresponding power
-domain, then the aggregated constraint value is applied by programming
-the next functional power state using pwrdm_set_fpwrst.
+> +- allwinner,pull: Integer.
+> +    0: No resistor
+> +    1: Pull-up resistor
+> +    2: Pull-down resistor
 
-The per-device PM QoS locking requires a spinlock to be used. The reasons
-is that some drivers need to use the per-device PM QoS functionality from
-interrupt context or spinlock protected context, as reported by Djamil.
-An example of such a driver is the OMAP HSI (high-speed synchronous serial
-interface) driver which needs to control the IP block idle state from
-the FIFO empty state, from interrupt context.
+This seems legit.
 
-Tested on OMAP3 Beagleboard and OMAP4 Pandaboard in RET/OFF using
-wake-up latency constraints on MPU, CORE and PER.
+> +config PINCTRL_SUNXI
+> +       bool
+> +       select PINMUX
+> +       select PINCONF
 
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
-Cc: Djamil Elaidi <d-elaidi@ti.com>
-[paul at pwsan.com: updated to apply; renamed *state to *fpwrst and
- define as u8; use existing powerdomain spinlock; pack the struct powerdomain
- variables; removed the GFP_ATOMIC allocation; drop expensive operations
- from the _pwrdm_wakeuplat_update_pwrst() debug; ensure that the entire
- wakeuplat update process takes place under the spinlock; remove
- UNSUP_STATE; remove assumption that fpwrsts start at 0; remove
- unnecessary plist_empty test from update path; standardize 'wakeuplat'
- naming; add kerneldoc]
+If your SoC is only simple pinconfig like pull-up/pull-down, why are
+you not using PINCONF_GENERIC and <linux/pinctrl/pinconf-generic.h>?
 
-XXX conform debug to other powerdomain debugging
----
- arch/arm/mach-omap2/powerdomain.c |  208 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/powerdomain.h |   27 ++++-
- 2 files changed, 233 insertions(+), 2 deletions(-)
+(...)
+> +       ret = of_property_read_u32(node, "allwinner,drive", &val);
+> +       if (!ret)
+> +               config |= val << DLEVEL_SHIFT | DLEVEL_PRESENT;
+> +
+> +       ret = of_property_read_u32(node, "allwinner,pull", &val);
+> +       if (!ret)
+> +               config |= val << PULL_SHIFT | PULL_PRESENT;
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 7caceaa..bcba0af 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -21,8 +21,10 @@
- #include <linux/kernel.h>
- #include <linux/types.h>
- #include <linux/list.h>
-+#include <linux/slab.h>
- #include <linux/errno.h>
- #include <linux/string.h>
-+#include <linux/pm_qos.h>
- #include <linux/spinlock.h>
- #include <linux/sched.h>
- #include <linux/seq_file.h>
-@@ -125,6 +127,9 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
- 	for (i = 0; i < PWRDM_FPWRSTS_COUNT; i++)
- 		pwrdm->fpwrst_counter[i] = 0;
- 
-+	plist_head_init(&pwrdm->wakeuplat_plist_head);
-+	pwrdm->wakeuplat_next_fpwrst = PWRDM_FUNC_PWRST_OFF;
-+
- 	arch_pwrdm->pwrdm_wait_transition(pwrdm);
- 	pwrdm->fpwrst = pwrdm_read_fpwrst(pwrdm);
- 	pwrdm->fpwrst_counter[pwrdm->fpwrst - PWRDM_FPWRST_OFFSET] = 1;
-@@ -765,6 +770,58 @@ static int _pwrdm_set_fpwrst(struct powerdomain *pwrdm,
- 	return ret;
- }
- 
-+/**
-+ * _pwrdm_wakeuplat_update_pwrst - Update power domain power state if needed
-+ * @pwrdm: struct powerdomain * to which requesting device belongs to.
-+ * @min_latency: the allowed wake-up latency for the given power domain. A
-+ *  value of PM_QOS_DEV_LAT_DEFAULT_VALUE means 'no constraint' on the pwrdm.
-+ *
-+ * Finds the power domain next power state that fulfills the constraint.
-+ * Programs a new target state if it is different from current power state.
-+ * The power domains get the next power state programmed directly in the
-+ * registers.
-+ *
-+ * Must be called with the powerdomain lock held.
-+ *
-+ * Returns 0 in case of success, -EINVAL in case of invalid parameters,
-+ * or the return value from _pwrdm_set_fpwrst().
-+ */
-+static int _pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm,
-+					 long min_latency)
-+{
-+	int ret = 0, new_fpwrst = PWRDM_FUNC_PWRST_ON;
-+	int fpwrst, pwl_index;
-+
-+	/*
-+	 * Find the next supported power state with
-+	 *  wakeup latency <= min_latency.
-+	 * Pick the lower state if no constraint on the pwrdm
-+	 *  (min_latency == PM_QOS_DEV_LAT_DEFAULT_VALUE).
-+	 * Skip unsupported functional power states.
-+	 * If no power state found, fall back to PWRDM_FUNC_PWRST_ON.
-+	 */
-+	for (fpwrst = PWRDM_FUNC_PWRST_OFF; fpwrst < PWRDM_MAX_FUNC_PWRSTS;
-+	     fpwrst++) {
-+		if (!pwrdm_supports_fpwrst(pwrdm, fpwrst))
-+			continue;
-+
-+		pwl_index = fpwrst - PWRDM_FPWRST_OFFSET;
-+		if ((min_latency == PM_QOS_DEV_LAT_DEFAULT_VALUE) ||
-+		    (pwrdm->wakeuplat[pwl_index] <= min_latency)) {
-+			new_fpwrst = fpwrst;
-+			break;
-+		}
-+	}
-+
-+	pwrdm->wakeuplat_next_fpwrst = new_fpwrst;
-+	ret = _pwrdm_set_fpwrst(pwrdm, new_fpwrst);
-+
-+	pr_debug("%s: fpwrst for %s: min_latency=%ld, new_state=%d, ret=%d\n",
-+		 __func__, pwrdm->name, min_latency, new_fpwrst, ret);
-+
-+	return ret;
-+}
-+
- /* Public functions */
- 
- /**
-@@ -1209,6 +1266,157 @@ int pwrdm_post_transition(struct powerdomain *pwrdm)
- }
- 
- /**
-+ * pwrdm_wakeuplat_update_constraint - Set or update a powerdomain wakeup
-+ *  latency constraint and apply it
-+ * @pwrdm: struct powerdomain * which the constraint applies to
-+ * @cookie: constraint identifier, used for tracking
-+ * @min_latency: minimum wakeup latency constraint (in microseconds) for
-+ *  the given pwrdm
-+ *
-+ * Tracks the constraints by @cookie.
-+ * Constraint set/update: Adds a new entry to powerdomain's wake-up latency
-+ * constraint list. If the constraint identifier already exists in the list,
-+ * the old value is overwritten.
-+ *
-+ * Applies the aggregated constraint value for the given pwrdm by calling
-+ * _pwrdm_wakeuplat_update_pwrst().
-+ *
-+ * Returns 0 upon success, -ENOMEM in case of memory shortage, -EINVAL in
-+ * case of invalid latency value, or the return value from
-+ * _pwrdm_wakeuplat_update_pwrst().
-+ *
-+ * The caller must check the validity of the parameters.
-+ */
-+int pwrdm_wakeuplat_update_constraint(struct powerdomain *pwrdm, void *cookie,
-+				      long min_latency)
-+{
-+	struct pwrdm_wkup_constraints_entry *tmp_user, *new_user;
-+	struct pwrdm_wkup_constraints_entry *user = NULL;
-+	long value = PM_QOS_DEV_LAT_DEFAULT_VALUE;
-+	int ret = 0;
-+	bool new_node = false;
-+
-+	pr_debug("powerdomain: %s: pwrdm %s, cookie=0x%p, min_latency=%ld\n",
-+		 __func__, pwrdm->name, cookie, min_latency);
-+
-+	if (min_latency <= PM_QOS_DEV_LAT_DEFAULT_VALUE) {
-+		pr_warn("%s: min_latency >= PM_QOS_DEV_LAT_DEFAULT_VALUE\n",
-+			__func__);
-+		return -EINVAL;
-+	}
-+
-+	/* Allocate a new entry for insertion in the list */
-+	new_user = kzalloc(sizeof(struct pwrdm_wkup_constraints_entry),
-+			   GFP_KERNEL);
-+	if (!new_user) {
-+		pr_err("%s: FATAL ERROR: kzalloc failed\n", __func__);
-+		return -ENOMEM;
-+	}
-+
-+	pwrdm_lock(pwrdm);
-+
-+	/* Check if there already is a constraint for cookie */
-+	plist_for_each_entry(tmp_user, &pwrdm->wakeuplat_plist_head, node) {
-+		if (tmp_user->cookie == cookie) {
-+			user = tmp_user;
-+			break;
-+		}
-+	}
-+
-+	if (!user) {
-+		new_user->cookie = cookie;
-+		user = new_user;
-+		new_node = true;
-+	} else {
-+		/* If nothing to update, job done */
-+		if (user->node.prio == min_latency)
-+			goto pwuc_out;
-+		/* Update existing entry */
-+		plist_del(&user->node, &pwrdm->wakeuplat_plist_head);
-+	}
-+
-+	plist_node_init(&user->node, min_latency);
-+	plist_add(&user->node, &pwrdm->wakeuplat_plist_head);
-+
-+	/* Find the aggregated constraint value from the list */
-+	value = plist_first(&pwrdm->wakeuplat_plist_head)->prio;
-+
-+	pr_debug("powerdomain: %s: pwrdm %s, value=%ld\n",
-+		 __func__, pwrdm->name, value);
-+
-+	/* Apply the constraint to the pwrdm */
-+	ret = _pwrdm_wakeuplat_update_pwrst(pwrdm, value);
-+
-+pwuc_out:
-+	pwrdm_unlock(pwrdm);
-+	if (!new_node)
-+		kfree(new_user);
-+	return ret;
-+}
-+
-+/**
-+ * pwrdm_wakeuplat_remove_constraint - Release a powerdomain wakeup latency
-+ *  constraint and apply it
-+ * @pwrdm: struct powerdomain * which the constraint applies to
-+ * @cookie: constraint identifier, used for tracking
-+ *
-+ * Tracks the constraints by @cookie.
-+ * Constraint removal: Removes the identifier's entry from powerdomain's
-+ * wakeup latency constraint list.
-+ *
-+ * Applies the aggregated constraint value for the given pwrdm by calling
-+ * _pwrdm_wakeuplat_update_pwrst().
-+ *
-+ * Returns 0 upon success, -EINVAL in case the constraint to remove is not
-+ * existing, or the return value from _pwrdm_wakeuplat_update_pwrst().
-+ *
-+ * The caller must check the validity of the parameters.
-+ */
-+int pwrdm_wakeuplat_remove_constraint(struct powerdomain *pwrdm, void *cookie)
-+{
-+	struct pwrdm_wkup_constraints_entry *tmp_user, *user = NULL;
-+	long value = PM_QOS_DEV_LAT_DEFAULT_VALUE;
-+
-+	pr_debug("powerdomain: %s: pwrdm %s, cookie=0x%p\n",
-+		 __func__, pwrdm->name, cookie);
-+
-+	pwrdm_lock(pwrdm);
-+
-+	/* Check if there is a constraint for cookie */
-+	plist_for_each_entry(tmp_user, &pwrdm->wakeuplat_plist_head, node) {
-+		if (tmp_user->cookie == cookie) {
-+			user = tmp_user;
-+			break;
-+		}
-+	}
-+
-+	/* If constraint not existing or list empty, return -EINVAL */
-+	if (!user)
-+		goto out;
-+
-+	/* Remove the constraint from the list */
-+	plist_del(&user->node, &pwrdm->wakeuplat_plist_head);
-+
-+	/* Find the aggregated constraint value from the list */
-+	if (!plist_head_empty(&pwrdm->wakeuplat_plist_head))
-+		value = plist_first(&pwrdm->wakeuplat_plist_head)->prio;
-+
-+	pwrdm_unlock(pwrdm);
-+
-+	/* Release the constraint memory */
-+	kfree(user);
-+
-+	/* Apply the constraint to the pwrdm */
-+	pr_debug("powerdomain: %s: pwrdm %s, value=%ld\n",
-+		 __func__, pwrdm->name, value);
-+	return _pwrdm_wakeuplat_update_pwrst(pwrdm, value);
-+
-+out:
-+	pwrdm_unlock(pwrdm);
-+	return -EINVAL;
-+}
-+
-+/**
-  * pwrdm_get_context_loss_count - get powerdomain's context loss count
-  * @pwrdm: struct powerdomain * to wait for
-  *
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index 10941fd..3971ee8 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -19,6 +19,7 @@
- 
- #include <linux/types.h>
- #include <linux/list.h>
-+#include <linux/plist.h>
- #include <linux/spinlock.h>
- 
- #include "voltage.h"
-@@ -152,6 +153,9 @@ struct powerdomain;
-  * @fpwrst_counter: estimated number of times the pwrdm entered the power states
-  * @next_fpwrst: cache of the powerdomain's next-power-state
-  * @prev_fpwrst: cache of the powerdomain's previous-power-state bitfield
-+ * @wakeuplat: array of powerdomain wakeup latencies at OPP50, in ns
-+ * @wakeuplat_plist_head: plist of active pwrdm wakeup lat constraints
-+ * @wakeuplat_next_fpwrst: func power state lower bound, by wakeup lat constrs
-  * @timer: sched_clock() timestamp of last pwrdm_state_switch()
-  * @fpwrst_timer: estimated nanoseconds of residency in the various power states
-  * @_lock: spinlock used to serialize powerdomain and some clockdomain ops
-@@ -180,9 +184,12 @@ struct powerdomain {
- 	const u8 pwrsts_mem_ret[PWRDM_MAX_MEM_BANKS];
- 	const u8 pwrsts_mem_on[PWRDM_MAX_MEM_BANKS];
- 	const u8 prcm_partition;
-+	const u8 pwrstctrl_offs;
-+	const u8 pwrstst_offs;
- 	u8 fpwrst;
- 	u8 next_fpwrst;
- 	u8 prev_fpwrst;
-+	u8 wakeuplat_next_fpwrst;
- 	u8 _flags;
- 	struct clockdomain *pwrdm_clkdms[PWRDM_MAX_CLKDMS];
- 	struct list_head node;
-@@ -190,13 +197,13 @@ struct powerdomain {
- 	unsigned fpwrst_counter[PWRDM_FPWRSTS_COUNT];
- 	spinlock_t _lock;
- 	unsigned long _lock_flags;
--	const u8 pwrstctrl_offs;
--	const u8 pwrstst_offs;
- 	const u32 logicretstate_mask;
- 	const u32 mem_on_mask[PWRDM_MAX_MEM_BANKS];
- 	const u32 mem_ret_mask[PWRDM_MAX_MEM_BANKS];
- 	const u32 mem_pwrst_mask[PWRDM_MAX_MEM_BANKS];
- 	const u32 mem_retst_mask[PWRDM_MAX_MEM_BANKS];
-+	const s32 wakeuplat[PWRDM_MAX_FUNC_PWRSTS];
-+	struct plist_head wakeuplat_plist_head;
- 
- #ifdef CONFIG_PM_DEBUG
- 	s64 timer;
-@@ -204,6 +211,18 @@ struct powerdomain {
- #endif
- };
- 
-+
-+/**
-+ * struct pwrdm_wkup_constraints_entry - Linked list for the wake-up latency
-+ * constraints
-+ * @cookie: constraint identifier, used for tracking
-+ * @node: plist node
-+ */
-+struct pwrdm_wkup_constraints_entry {
-+	void			*cookie;
-+	struct plist_node	node;
-+};
-+
- /**
-  * struct pwrdm_ops - Arch specific function implementations
-  * @pwrdm_set_next_pwrst: Set the target power state for a pd
-@@ -295,6 +314,10 @@ extern void omap3xxx_powerdomains_init(void);
- extern void am33xx_powerdomains_init(void);
- extern void omap44xx_powerdomains_init(void);
- 
-+int pwrdm_wakeuplat_update_constraint(struct powerdomain *pwrdm, void *cookie,
-+				      long min_latency);
-+int pwrdm_wakeuplat_remove_constraint(struct powerdomain *pwrdm, void *cookie);
-+
- extern struct pwrdm_ops omap2_pwrdm_operations;
- extern struct pwrdm_ops omap3_pwrdm_operations;
- extern struct pwrdm_ops am33xx_pwrdm_operations;
--- 
-1.7.10.4
+So looks nice... but can you use generic pinconfig?
+
+> +static void sunxi_pmx_set_config(struct pinctrl_dev *pctldev,
+> +                                unsigned pin,
+> +                                u8 config)
+> +{
+> +       struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
+> +
+> +       u32 val = readl(pctl->membase + CFG_REG(pin));
+> +       u32 mask = ((1 << CFG_PINS_BITS) - 1) << CFG_OFFSET(pin);
+> +       writel((val & ~mask) | config << CFG_OFFSET(pin),
+> +               pctl->membase + CFG_REG(pin));
+> +}
+
+There is something a bit confusing with the naming here, this is
+configuring the multiplexing (mux) but named config and CFG,
+which makes for great misunderstandings... can it be changed
+to eg just pmx_set() and MUX_OFFSET and MUX_REG() for
+example?
+
+> +static struct of_device_id sunxi_pinctrl_match[] __devinitconst = {
+> +       {}
+> +};
+> +MODULE_DEVICE_TABLE(of, sunxi_pinctrl_match);
+
+This table will not match very much :-/
+
+You should put one example in atleast? Something must have
+been used to test this...
+
+> +static int __devinit sunxi_pinctrl_parse_group(struct platform_device *pdev,
+> +                                              struct device_node *node,
+> +                                              int idx,
+> +                                              const char **out_name)
+> +{
+> +       struct sunxi_pinctrl *pctl = platform_get_drvdata(pdev);
+> +       struct sunxi_pinctrl_group *group = pctl->groups + idx;
+> +       struct property *prop;
+> +       char *group_name;
+> +       int i;
+> +       u32 val, proplen;
+> +
+> +       group_name = devm_kzalloc(&pdev->dev, strlen(node->name) + 4,
+> +                                 GFP_KERNEL);
+> +       if (!group_name)
+> +               return -ENOMEM;
+> +       if (of_property_read_u32(node, "reg", &val))
+> +               snprintf(group_name, strlen(node->name), "%s", node->name);
+> +       else
+> +               snprintf(group_name, strlen(node->name) + 4,
+> +                        "%s.%d", node->name, val);
+> +       group->name = group_name;
+> +
+> +       prop = of_find_property(node, "allwinner,pin-ids", &proplen);
+> +       if (!prop)
+> +               return -EINVAL;
+> +       group->npins = proplen / sizeof(u32);
+
+So storing one u32 for every pin I guess.
+
+> +       group->pins = devm_kzalloc(&pdev->dev,
+> +                                  group->npins * sizeof(*group->pins),
+> +                                  GFP_KERNEL);
+> +       if (!group->pins)
+> +               return -ENOMEM;
+> +
+> +       group->muxcfg = devm_kzalloc(&pdev->dev,
+> +                                    group->npins * sizeof(*group->muxcfg),
+> +                                    GFP_KERNEL);
+> +       if (!group->muxcfg)
+> +               return -ENOMEM;
+> +
+> +       of_property_read_u32_array(node, "allwinner,pin-ids", group->pins,
+> +                                  group->npins);
+> +       for (i = 0; i < group->npins; i++) {
+> +               group->muxcfg[i] = MUXID_TO_MUXCFG(group->pins[i]);
+> +               group->pins[i] = MUXID_TO_PIN(group->pins[i]);
+> +       }
+
+This loop is rather awkward I mean, instead of bitstuffing muxcfg and
+pin ID into a single u32 why not just have them as separate attributes.
+
+Then there was somthing about bank ID which I guess is just
+discarded here?
+
+(...)
+> +static int __devinit sunxi_pinctrl_probe(struct platform_device *pdev)
+> +{
+> +       struct sunxi_pinctrl *pctl;
+> +       int i, ret;
+> +
+> +       pctl = devm_kzalloc(&pdev->dev, sizeof(*pctl), GFP_KERNEL);
+> +       if (!pctl)
+> +               return -ENOMEM;
+> +       platform_set_drvdata(pdev, pctl);
+> +
+> +       ret = sunxi_pinctrl_probe_dt(pdev, pctl);
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "dt probe failed: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       pctl->data = (struct sunxi_pinctrl_data *)of_match_device(sunxi_pinctrl_match, &pdev->dev)->data;
+
+I can't parse this, what is going on here?
+Can you break this statement apart somehow?
+
+(...)
+> +++ b/drivers/pinctrl/pinctrl-sunxi.h
+
+> +#define PINS_PER_BANK  32
+> +
+> +#define CFG_REG(pin)   (round_down(                                    \
+> +                               (pin / PINS_PER_BANK) * 0x24 +          \
+> +                               ((pin % PINS_PER_BANK) / 8) * 0x04, 4))
+> +#define CFG_OFFSET(pin)        ((pin % 8) * 4)
+> +
+> +#define DLEVEL_REG(pin)        (round_down(                                    \
+> +                               (pin / PINS_PER_BANK) * 0x24 +          \
+> +                               ((pin % PINS_PER_BANK) / 16) * 0x04 +   \
+> +                               0x14, 4))
+> +#define DLEVEL_OFFSET(pin)     ((pin % 16) * 2)
+> +
+> +#define PULL_REG(pin)  (round_down(                                    \
+> +                               (pin / PINS_PER_BANK) * 0x24 +          \
+> +                               ((pin % PINS_PER_BANK) / 16) * 0x04 +   \
+> +                               0x1c, 4))
+> +#define PULL_OFFSET(pin)       ((pin % 16) * 2)
+
+These are impossible to understand. Please convert these to
+documented static inline functions instead so the code can
+be maintained in the future.
+
+> +#define CFG_PINS_PER_REG       8
+> +#define CFG_PINS_BITS          4
+> +#define DLEVEL_PINS_PER_REG    16
+> +#define DLEVEL_PINS_BITS       2
+> +#define PULL_PINS_PER_REG      16
+> +#define PULL_PINS_BITS         2
+> +
+> +#define MUXID_TO_PIN(id)       ((((id) >> 12 & 0xf) * 32) + ((id) >> 4 & 0xff))
+> +#define MUXID_TO_MUXCFG(id)    ((id) & 0xf)
+
+Same here.
+
+> +#define SUNXI_PINCTRL_PIN_PA0  PINCTRL_PIN(0 + 0, "PA0")
+> +#define SUNXI_PINCTRL_PIN_PA1  PINCTRL_PIN(0 + 1, "PA1")
+> +#define SUNXI_PINCTRL_PIN_PA2  PINCTRL_PIN(0 + 2, "PA2")
+> +#define SUNXI_PINCTRL_PIN_PA3  PINCTRL_PIN(0 + 3, "PA3")
+> +#define SUNXI_PINCTRL_PIN_PA4  PINCTRL_PIN(0 + 4, "PA4")
+> +#define SUNXI_PINCTRL_PIN_PA5  PINCTRL_PIN(0 + 5, "PA5")
+> +#define SUNXI_PINCTRL_PIN_PA6  PINCTRL_PIN(0 + 6, "PA6")
+> +#define SUNXI_PINCTRL_PIN_PA7  PINCTRL_PIN(0 + 7, "PA7")
+> +#define SUNXI_PINCTRL_PIN_PA8  PINCTRL_PIN(0 + 8, "PA8")
+> +#define SUNXI_PINCTRL_PIN_PA9  PINCTRL_PIN(0 + 9, "PA9")
+> +#define SUNXI_PINCTRL_PIN_PA10 PINCTRL_PIN(0 + 10, "PA10")
+> +#define SUNXI_PINCTRL_PIN_PA11 PINCTRL_PIN(0 + 11, "PA11")
+> +#define SUNXI_PINCTRL_PIN_PA12 PINCTRL_PIN(0 + 12, "PA12")
+> +#define SUNXI_PINCTRL_PIN_PA13 PINCTRL_PIN(0 + 13, "PA13")
+> +#define SUNXI_PINCTRL_PIN_PA14 PINCTRL_PIN(0 + 14, "PA14")
+> +#define SUNXI_PINCTRL_PIN_PA15 PINCTRL_PIN(0 + 15, "PA15")
+> +#define SUNXI_PINCTRL_PIN_PA16 PINCTRL_PIN(0 + 16, "PA16")
+> +#define SUNXI_PINCTRL_PIN_PA17 PINCTRL_PIN(0 + 17, "PA17")
+> +#define SUNXI_PINCTRL_PIN_PA18 PINCTRL_PIN(0 + 18, "PA18")
+> +#define SUNXI_PINCTRL_PIN_PA19 PINCTRL_PIN(0 + 19, "PA19")
+> +#define SUNXI_PINCTRL_PIN_PA20 PINCTRL_PIN(0 + 20, "PA20")
+> +#define SUNXI_PINCTRL_PIN_PA21 PINCTRL_PIN(0 + 21, "PA21")
+> +#define SUNXI_PINCTRL_PIN_PA22 PINCTRL_PIN(0 + 22, "PA22")
+> +#define SUNXI_PINCTRL_PIN_PA23 PINCTRL_PIN(0 + 23, "PA23")
+> +#define SUNXI_PINCTRL_PIN_PA24 PINCTRL_PIN(0 + 24, "PA24")
+> +#define SUNXI_PINCTRL_PIN_PA25 PINCTRL_PIN(0 + 25, "PA25")
+> +#define SUNXI_PINCTRL_PIN_PA26 PINCTRL_PIN(0 + 26, "PA26")
+> +#define SUNXI_PINCTRL_PIN_PA27 PINCTRL_PIN(0 + 27, "PA27")
+> +#define SUNXI_PINCTRL_PIN_PA28 PINCTRL_PIN(0 + 28, "PA28")
+> +#define SUNXI_PINCTRL_PIN_PA29 PINCTRL_PIN(0 + 29, "PA29")
+> +#define SUNXI_PINCTRL_PIN_PA30 PINCTRL_PIN(0 + 30, "PA30")
+> +#define SUNXI_PINCTRL_PIN_PA31 PINCTRL_PIN(0 + 31, "PA31")
+
+0+0, 0+1, 0+2 .... why not just use the scalar? 0, 1, 2, ... 31?
+
+I understand that the zero denotes bank 0 or bank A or somtheing
+(PA, PB etc) so if you need to keep that, use something like
+
+#define PA_BASE 0
+
+Then
+
+#define SUNXI_PINCTRL_PIN_PA28 PINCTRL_PIN(PA_BASE + 28, "PA28")
+
+which makes more sense.
+
+> +#define SUNXI_PINCTRL_PIN_PB0  PINCTRL_PIN(32 + 0, "PB0")
+> +#define SUNXI_PINCTRL_PIN_PB1  PINCTRL_PIN(32 + 1, "PB1")
+(...)
+
+Dito for C, D, E, F, G...
+
+Yours,
+Linus Walleij
