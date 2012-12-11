@@ -1,32 +1,35 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Tue, 11 Dec 2012 17:32:32 +0000
-Subject: [RFC v1 01/16] lib: devres: don't enclose pcim_*() functions in
- CONFIG_HAS_IOPORT
-In-Reply-To: <20121211164608.GT14363@n2100.arm.linux.org.uk>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201212111043.50627.arnd@arndb.de> <20121211170338.4859ddf0@skate>
- <201212111615.03262.arnd@arndb.de> <20121211173013.0ceea196@skate>
- <20121211164608.GT14363@n2100.arm.linux.org.uk>
-Message-ID: <20121211173232.43668ab3@pyramind.ukuu.org.uk>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 11 Dec 2012 21:26:48 +0300
+Subject: [PATCH] drivers/pinctrl/pinctrl-at91.c: convert kfree to
+ devm_kfree
+In-Reply-To: <alpine.DEB.2.02.1212111407570.2091@hadrien>
+References: <1355223525-19165-1-git-send-email-Julia.Lawall@lip6.fr>
+ <50C72E75.8030706@mvista.com> <alpine.DEB.2.02.1212111407570.2091@hadrien>
+Message-ID: <50C77AE8.8090008@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> with it.  It's very simple.  The IO port space is for ISA/PCMCIA and
-> PCI IO port regions.  It is nothing more than that.
+Hello.
 
-And on a lot of devices the LPC bus.
+On 12/11/2012 04:08 PM, Julia Lawall wrote:
 
-> Plus, if you _have_ IO space support, you must have some MMIO region for
-> them to target - doing what many platforms have done to date and targetted
-> ISA IO address 0 at virtual address 0 is just not on because as soon as
-> you build a device driver which probes ISA addresses into your kernel,
-> you will oops.
+>>> From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-There shouldn't really be anything poking around that is modern - this is
-true of some PC stuff too.
+>>> The function at91_dt_node_to_map is ultimately called by the function
+>>> pinctrl_get, which is an exported function.  Since it is possible that this
+>>> function is not called from within a probe function, for safety, the kfree
+>>> is converted to a devm_kfree, to both free the data and remove it from the
+>>> device in a failure situation.
+>>
+>>> A newline is added in the call to devm_kfree to avoid exceeding the 80
+>>
+>>    devm_kzalloc() you mean?
 
-In general however if its because you have a window partly mapped you
-could just catch the exception and load 0xFF for reads (and probably
-whine with a backtrace so you know who to moan at).
+> Yes, sorry.  Should I send a new patch?
 
-Alan
+   Up to the maintainer I guess...
+
+> thanks,
+> julia
+
+WBR, Sergei
