@@ -1,65 +1,69 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 11 Dec 2012 08:32:14 +0100 (CET)
-Subject: [PATCH 1/2] mmc: slot-gpio: use devm_* managed functions to ease
- users
-In-Reply-To: <87d2yh4afi.fsf@octavius.laptop.org>
-References: <1354887168-3073-1-git-send-email-shawn.guo@linaro.org>
- <Pine.LNX.4.64.1212071438010.24520@axis700.grange>
- <20121207144006.GB30468@S2100-06.ap.freescale.net>
- <87d2yh4afi.fsf@octavius.laptop.org>
-Message-ID: <Pine.LNX.4.64.1212110814330.29758@axis700.grange>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 11 Dec 2012 08:52:10 +0100
+Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
+In-Reply-To: <50C62161.9080708@wwwdotorg.org>
+References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121207233317.GB4304@obsidianresearch.com>
+ <50C62161.9080708@wwwdotorg.org>
+Message-ID: <20121211075207.GA29977@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Dec 2012, Chris Ball wrote:
-
-> Hi Shawn, Guennadi,
+On Mon, Dec 10, 2012 at 10:52:33AM -0700, Stephen Warren wrote:
+> On 12/07/2012 04:33 PM, Jason Gunthorpe wrote:
+> > On Fri, Dec 07, 2012 at 11:04:23PM +0100, Thomas Petazzoni wrote:
+> > 
+> >>  * The most annoying problem is that when the hw_pci->setup()
+> >>    operation is called, we don't know the size of the memory and I/O
+> >>    regions that each PCI device will need. And on Marvell SoCs, for
+> >>    each PCI device, we have to set up an address decoding window that
+> >>    associates a portion of the physical address space with a given
+> > 
+> > I think a sane way to address this is to model the SOC as the root of
+> > the PCI-E and then model each of the ports as a non-compliant PCI-E
+> > bridge. The internal memory windows functionally map exactly to a
+> > PCI-E bridge memory window - just with annoyingly different register
+> > settings.
 > 
-> On Fri, Dec 07 2012, Shawn Guo wrote:
-> >> > Use devm_* managed functions, so that slot-gpio users do not have to
-> >> > call mmc_gpio_free_ro/cd to free up resources requested in
-> >> > mmc_gpio_request_ro/cd.
-> >> > 
-> >> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> >> 
-> >> Thanks for the patch, but I'm not sure this is a good idea. Firstly, using 
-> >> devm_* allocation functions means, that normally you don't have to free 
-> >> these resources explicitly any more. So, actually you would have to remove 
-> >> free_irq() and gpio_free() calls completely from the API instead of 
-> >> replacing them with devm_* analogs.
-> >
-> > With the changes, most of the slot-gpio users will only need to call
-> > mmc_gpio_request_* functions at probe time, nothing else.  That said,
-> > they will not call mmc_gpio_free_* functions at all.  I patched
-> > mmc_gpio_free_* functions replacing free_irq() and gpio_free() with
-> > devm_* versions to 1) ease the migration of exiting users calling
-> > mmc_gpio_free_*; 2) provide a mean for users to manually free resources
-> > for whatever reasons.
+> Mainly as background:
 > 
-> I'd like to find a way to merge this -- maybe we can compromise by
-> adding a comment or some documentation that explains that you need to be
-> careful (and use _request_* and _free_*) to avoid allocating more than
-> once if you're doing something odd like runtime switching between CD
-> methods?
+> I /think/ Tegra has a similar HW setup (but perhaps not identical)
+> (based on a very brief reading of your emails and brief knowledge of
+> this aspect of the Tegra HW).
+> 
+> On Tegra, there is a 1GB physical address window that the PCIe
+> controller serves. The controller has 2 or 3 ports, each a separate PCIe
+> domain I believe. There are registers in the PCIe controller which route
+> accessed made to the 1GB physical window to the various child ports and
+> transaction types.
 
-Ok, so, you agree, that the normal case is, when these GPIO functions are 
-requested only once during probing and are released during driver 
-unbinding, and that it's worth optimisine for this case. In principle I 
-agree, and so far all 3 users of this API do that. So, maybe it would be 
-good to extend this patch series with a patch (or 3 patches, if per-driver 
-is preferred), removing mmc_gpio_free_*() calls from those drivers. I 
-think, however, there is one more thing to consider here: the slot-gpio 
-API contains a GPIO CD IRQ handler, which after these changes will only be 
-freed after the calls to mmc_remove_host() and mmc_free_host(). This 
-should be safe, because mmc_remove_host() sets the .rescan_disable flag. 
-After the recent patch the GPIO CD ISR also calls host->ops->card_event(), 
-so, hosts muct make sure, that this function is safe to call even after 
-the driver's .remove() method has completed. With that in mind, I think, 
-we're fine with this patch.
+No, the ports on Tegra are not separate PCIe domains. The configuration
+space mapping is shared between all ports and is programmed in the
+register space of the PCIe controller. This is what PCIe refers to as
+ECAM, only with a slightly incompatible mapping.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+The registers that I think you're referring to allow the type of access
+for a given region (I/O, prefetchable and non-prefetchable MMIO) to be
+specified. They cannot be programmed to route accesses to a specific
+port. The most recent bit of information was that this is derived from
+the standard PCI registers that are available for each port.
+
+> IIRC, the bindings Thierry came up with for the Tegra PCIe controller
+> statically describe the setup of those mappings (e.g. it could assign a
+> 256MB physical address region to port 1, and a 768MB physical address
+> region to port 2 perhaps?).
+
+Yes, that's correct. I also have experimental patches that add a
+bus-range property to be assigned to each port, but that doesn't quite
+work yet. The PCI core keeps complaining about the assigned bus range
+conflicting with [0x00-0xff], which AFAICT is the one assigned by
+default if no bus-range was specified by the driver.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121211/6a8de55c/attachment-0001.sig>
