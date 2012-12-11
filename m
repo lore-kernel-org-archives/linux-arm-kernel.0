@@ -1,70 +1,51 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 11 Dec 2012 17:30:13 +0100
-Subject: [RFC v1 01/16] lib: devres: don't enclose pcim_*() functions in
- CONFIG_HAS_IOPORT
-In-Reply-To: <201212111615.03262.arnd@arndb.de>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201212111043.50627.arnd@arndb.de> <20121211170338.4859ddf0@skate>
- <201212111615.03262.arnd@arndb.de>
-Message-ID: <20121211173013.0ceea196@skate>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Dec 2012 16:33:14 +0000
+Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
+ cache LoUIS operations
+In-Reply-To: <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
+References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <20120919134658.GA2111@linaro.org>
+ <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
+ <20120920110439.GB2117@linaro.org>
+ <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
+Message-ID: <20121211163313.GG16759@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
-
-On Tue, 11 Dec 2012 16:15:02 +0000, Arnd Bergmann wrote:
-
-> What you describe here are probable two bugs, and we should fix both:
+On Tue, Dec 11, 2012 at 04:07:56PM +0000, Guennadi Liakhovetski wrote:
+> Hi all
 > 
-> * ARCH_VEXPRESS should not select NO_IOPORT. It's generally wrong
->   to select this in combination with ARCH_MULTIPLATFORM, when some
->   of the other platforms you may enable actually have IOPORT mapping
->   support.
-
-Indeed, but I guess the "select NO_IOPORT" on vexpress is here for a
-reason, no?
-
-That said, unless I don't understand what IOPORTs are, I don't think my
-platform has any of them, so why should I "select HAVE_IOPORT" ?
-
-> * We should not unconditionally select ARCH_VEXPRESS from ARCH_MULTIPLATFORM.
->   There is no reason why we would enable that platform for building
->   a kernel that runs on only one other platform.
-
-This one is already being worked on by Fabio Estevam, see [PATCH v2]
-ARM: Kconfig: Do not force selection of ARCH_VEXPRESS by ARCH_MULTI_V7.
-
-> > I'm not sure which devm_pci_iomap() you're referring to since my patch
-> > makes only the pcim_iomap_table(), pcim_iomap(), pcim_iounmap(),
-> > pcim_iomap_regions(), pcim_iomap_regions_request_all() and
-> > pcim_iounmap_regions() available under CONFIG_PCI instead of CONFIG_PCI
-> > && CONFIG_HAS_IOPORT.
+> On Thu, 20 Sep 2012, Dave Martin wrote:
 > 
-> Sorry, I meant pcim_iomap.
+> > On Thu, Sep 20, 2012 at 11:25:14AM +0100, Lorenzo Pieralisi wrote:
+> > > On Wed, Sep 19, 2012 at 02:46:58PM +0100, Dave Martin wrote:
+> > > > On Tue, Sep 18, 2012 at 05:35:33PM +0100, Lorenzo Pieralisi wrote:
+> > > > > In processors like A15/A7 L2 cache is unified and integrated within the
+> > > > > processor cache hierarchy, so that it is not considered an outer cache
+> > > > > anymore. For processors like A15/A7 flush_cache_all() ends up cleaning
+> > > > > all cache levels up to Level of Coherency (LoC) that includes
+> > > > > the L2 unified cache.
+> > > > > 
+> > > > > When a single CPU is suspended (CPU idle) a complete L2 clean is not
+> > > > > required, so generic cpu_suspend code must clean the data cache using the
+> > > > > newly introduced cache LoUIS function.
 > 
-> > So maybe you were referring to pcim_iomap(). I haven't checked in
-> > details, but I guess it builds because ioport_map() is implemented in
-> > arch/arm/mm/iomap.c.
+> Git bisect identified this patch, in the mainline as
 > 
-> Right. If an ioport_map function is provided for a given platform,
-> we should also set HAVE_IOPORT and vice versa. This is probably
-> fallout of the io.h conversion for multiplatform.
+> commit dbee0c6fb4c1269b2dfc8b0b7a29907ea7fed560
+> Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Date:   Fri Sep 7 11:06:57 2012 +0530
+> 
+>     ARM: kernel: update cpu_suspend code to use cache LoUIS operations
+> 
+> as the culprit of the broken wake up from STR on mackerel, based on an 
+> sh7372 A8 SoC. .config attached.
 
-arch/arm/mm/iomap.c is unconditionally compiled in all ARM kernels. And
-in this file, ioport_map() and ioport_unmap() are implement as soon as
-__io is defined. And basically, in arch/arm/include/asm/io.h, __io is
-defined for all platforms, except maybe on some platforms having their
-own mach/io.h file, but those are quite limited in number (ebsa110, rpc,
-at91, s3c24xx, pxa, omap1, footbridge and ixp4xx). So if __io is
-defined, says on VEXPRESS, why does it "select NO_IOPORT" ? Essentially
-all ARM platforms should select HAVE_IOPORT, except the few ones that
-don't define __io. Correct?
+My guess is that because Cortex-A8 does not implement the MP extensions,
+the LoUIS field of the CLIDR reads as zero, and the cache isn't flushed at
+all (I can see an early exit in v7_flush_dcache_louis).
 
-Thanks,
+Lorenzo -- how is this supposed to work for uniprocessor CPUs?
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
