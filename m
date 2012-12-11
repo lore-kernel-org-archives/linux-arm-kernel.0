@@ -1,38 +1,23 @@
-From: cesarb@cesarb.net (Cesar Eduardo Barros)
-Date: Tue, 11 Dec 2012 19:49:57 -0200
-Subject: [PATCH 15/19] MAINTAINERS: remove drivers/mmc/host/imxmmc.*
-In-Reply-To: <1355262601-4263-1-git-send-email-cesarb@cesarb.net>
-References: <1355262601-4263-1-git-send-email-cesarb@cesarb.net>
-Message-ID: <1355262601-4263-16-git-send-email-cesarb@cesarb.net>
+From: amery@geeks.cl (Alejandro Mery)
+Date: Tue, 11 Dec 2012 22:58:17 +0100
+Subject: [PATCH 0/6] Add pinctrl driver for Allwinner A1X SoCs
+In-Reply-To: <1355177301-31928-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1355177301-31928-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <50C7AC79.5010006@geeks.cl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver was removed by commit 6187fee (mmc: remove imxmmc driver).
+On 10/12/12 23:08, Maxime Ripard wrote:
+> Hi everyone,
+>
+> This patch set adds a pinctrl driver for the IP found in the Allwinner A10
+> and A13, and the SoC-specific bits for the A13. It also adds the documentation
+> for the device tree bindings.
 
-Acked-by: Pavel Pisa <pisa@cmp.felk.cvut.cz>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Cesar Eduardo Barros <cesarb@cesarb.net>
----
- MAINTAINERS | 6 ------
- 1 file changed, 6 deletions(-)
+Hi. I just wanted to comment that there are 3 known sun5i SoCs, not only 
+the A13. The A10s and the A12 are also sun5i. For A10s and A13 there are 
+datasheets available with the pin info. So please don't assume the A13's 
+pins are "sun5i" pins, they are merely aw1626 (aka A13) pins.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 6b9fc9e..eb0cc18 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4908,12 +4908,6 @@ F:	Documentation/video4linux/meye.txt
- F:	drivers/media/pci/meye/
- F:	include/uapi/linux/meye.h
- 
--MOTOROLA IMX MMC/SD HOST CONTROLLER INTERFACE DRIVER
--M:	Pavel Pisa <ppisa@pikron.com>
--L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--S:	Maintained
--F:	drivers/mmc/host/imxmmc.*
--
- MOXA SMARTIO/INDUSTIO/INTELLIO SERIAL CARD
- M:	Jiri Slaby <jirislaby@gmail.com>
- S:	Maintained
--- 
-1.7.11.7
+cheers,
+Alejandro Mery
