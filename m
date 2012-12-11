@@ -1,20 +1,36 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 12 Dec 2012 10:19:19 +1100
-Subject: linux-next: some merging notes
-In-Reply-To: <20121212091552.02c72c8926f9f9147b080d68@canb.auug.org.au>
-References: <20121212091552.02c72c8926f9f9147b080d68@canb.auug.org.au>
-Message-ID: <1355267959.19932.40.camel@pasglop>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 11 Dec 2012 15:27:39 -0800
+Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
+ cache LoUIS operations
+In-Reply-To: <20121211163843.GH16759@mudshark.cambridge.arm.com>
+References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <20120919134658.GA2111@linaro.org>
+ <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
+ <20120920110439.GB2117@linaro.org>
+ <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
+ <20121211163313.GG16759@mudshark.cambridge.arm.com>
+ <20121211163843.GH16759@mudshark.cambridge.arm.com>
+Message-ID: <50C7C16B.7050106@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-12-12 at 09:15 +1100, Stephen Rothwell wrote:
-> The powerpc tree
-> (git://git.kernel.org/pub/scm/linux/kernel/git/benh/powerpc.git#next)
-> contains a commit that breaks the building of
-> lib/pSeries-reconfig-notifier-error-inject.c.  I applied a patch to
-> linux-next to disable CONFIG_PSERIES_RECONFIG_NOTIFIER_ERROR_INJECT.
+On 12/11/12 08:38, Will Deacon wrote:
+> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> index cd95664..f58248f 100644
+> --- a/arch/arm/mm/cache-v7.S
+> +++ b/arch/arm/mm/cache-v7.S
+> @@ -44,7 +44,8 @@ ENDPROC(v7_flush_icache_all)
+>  ENTRY(v7_flush_dcache_louis)
+>         dmb                                     @ ensure ordering with previous memory accesses
+>         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
+> -       ands    r3, r0, #0xe00000               @ extract LoUIS from clidr
+> +       ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
+> +       ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
+>         mov     r3, r3, lsr #20                 @ r3 = LoUIS * 2
 
-I will put a fix in before I send the pull request.
+You need to fix this mov as well, right?
 
-Cheers,
-Ben.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
