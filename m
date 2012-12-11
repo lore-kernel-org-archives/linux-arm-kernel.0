@@ -1,45 +1,34 @@
-From: ratheendran.s@gmail.com (Ratheendran R)
-Date: Tue, 11 Dec 2012 12:14:58 +0530
-Subject: need help in porting wm8731 codec on SAMSUNG S3C2416
-Message-ID: <CALM_QrWRk9FCS6t3Gs=7qF8fWHM9zoKFY_K67LAGjGHa5CZ9cw@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 10 Dec 2012 23:58:13 -0700
+Subject: [PATCH 2/3] ARM: Orion: Bind the orion bridge interrupt
+ controller through DT
+In-Reply-To: <20121211062430.GD25466@lunn.ch>
+References: <1355188683-18208-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1355188683-18208-2-git-send-email-jgunthorpe@obsidianresearch.com>
+ <20121211062430.GD25466@lunn.ch>
+Message-ID: <20121211065813.GA14843@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear All,
+> > +	bridge_irq = irq_of_parse_and_map(np, 0);
+> > +	/* FIXME: irq_of_parse_and_map returns 0 on error, but on Dove the
+> > +	 * bridge IRQ is 0.
+> > +	if (!bridge_irq)
+> > +		return -ENODEV;*/
+> > +
+> > +	return orion_bridge_irq_init(bridge_irq, -1, base, np);
+> 
+> So does this mean for Dove it will currently always fail?
 
-We are using kit2416 board based samsung s3c2416 SOC using linux kernel
-2.6.21, wm8731 codec is used with the soc on i2s bus.
+I guess that is hard to read without syntax hi-lighting, the 'if' is
+also commented out.
 
-I am trying porting linux3.6.8 on the same board,now porting older soc
-audio driver for codec onto the newer kernel.
+I was hopefull it would work as is, but looking deeper at
+irq_of_parse_and_map and its call tree makes me doubtfull now..
 
-I am getting the below kernel messages, snapshot on audio driver
-registration.
+Fixing irq_of_parse_and_map is way to big a job for me :(
 
-*soc-audio soc-audio: ASoC machine SMDK2416wm8731 should use
-snd_soc_register_card()
-soc-audio soc-audio: CODEC wm8731 not registered
-soc-audio soc-audio: Failed to register card
-platform soc-audio: Driver soc-audio requests probe deferral
-TCP: cubic registered
-NET: Registered protocol family 17
-drivers/rtc/hctosys.c: unable to open rtc device (rtc0)
-ALSA device list:
-  No soundcards found.
+What to do from here? Add a dummy 0 interrupt to dove? Take dove out
+of this patch series?
 
-*
-I have attached the modified driver for reference.
-
-kindly give your valuable suggestions.
-
-Thanks,
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121211/3d5da970/attachment.html>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smdk2416_wm8731.c
-Type: text/x-csrc
-Size: 5459 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121211/3d5da970/attachment.bin>
+Jason
