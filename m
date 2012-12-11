@@ -1,44 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 11 Dec 2012 10:01:38 -0800
-Subject: Errata on multiplatform kernels
-In-Reply-To: <CAOesGMjJ=y4J70CaYYaEem0ni7Vb48KuEZKxaVYuCCCoMYwjPw@mail.gmail.com>
-References: <1355203223.16750.2.camel@gitbox>
- <CAOesGMjJ=y4J70CaYYaEem0ni7Vb48KuEZKxaVYuCCCoMYwjPw@mail.gmail.com>
-Message-ID: <20121211180138.GB4989@atomide.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 11 Dec 2012 18:11:08 +0000
+Subject: linker problem with xip kernel and recent toolchains
+In-Reply-To: <50C7386E.70305@pengutronix.de>
+References: <50BE0CDB.5000704@pengutronix.de>
+ <1355230894.19818.1.camel@hornet> <50C7386E.70305@pengutronix.de>
+Message-ID: <1355249468.19818.23.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [121210 21:38]:
-> Hi,
-> 
-> On Mon, Dec 10, 2012 at 9:20 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
-> > How are errata handled on multiplatform kernels?
-> >
-> > There don't appear to be any errata selected by default in any of the
-> > current multiplatform options, but presumably it will happen eventually.
-> >
-> > Does that mean the errata will be applied to all machines that boot with
-> > the errata selected, even if not required?
-> 
-> Yes. To date I believe most errata we have are just performance hits
-> on platforms that don't need it.
-> 
-> Other architectures have in some cases added runtime patching (out) of
-> workarounds that aren't needed on the current platform for the ones
-> that have significant performance impact. I'm guessing we'll end up
-> with something similar eventually but until then we'll try to just go
-> with the superset of needed errata.
+On Tue, 2012-12-11 at 13:43 +0000, Marc Kleine-Budde wrote:
+> What about putting the notes section into the read only segment, i.e.
+> the ROM?
 
-We can't enable any of the errata if there's a chance that it will behave
-in a different way for secure mode devices compared to non-secure devices.
+Could you, please, try the change below? It seems to do the job for me.
 
-The discussion is in the thread "[PATCH] ARM: Fix errata 751472 handling
-on Cortex-A9 r1p*".
+Pawe?
 
-The conclusion was that we cannot enable any errata for multiplatform,
-and must assume the errata is handled by the bootloader. Multiplatform
-image is already broken for at least omap4 as 751472 is selected.
+8<-------------------------
+>From 01fe7810cfded11aff03d216d2adbcf673e78f65 Mon Sep 17 00:00:00 2001
+From: Pawel Moll <pawel.moll@arm.com>
+Date: Tue, 11 Dec 2012 18:09:14 +0000
+Subject: [PATCH] ARM: vmlinux.lds: Move .notes section next to the rodata
 
-Regards,
+The .notes, being read-only data by nature, was placed between
+read-write .data and .bss. This was harmful in case of XIP
+images, as it was placed in the RAM range, most likely far
+from the ROM address, inflating the XIP images.
 
-Tony
+Moving the .notes at the end of the read-only section
+(consisting of .text, .rodata and unwind info) fixes the problem.
+
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/kernel/vmlinux.lds.S |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 36ff15b..31fa80e 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -131,6 +131,8 @@ SECTIONS
+ 	}
+ #endif
+ 
++	NOTES
++
+ 	_etext = .;			/* End of text and rodata section */
+ 
+ #ifndef CONFIG_XIP_KERNEL
+@@ -296,8 +298,6 @@ SECTIONS
+ 	}
+ #endif
+ 
+-	NOTES
+-
+ 	BSS_SECTION(0, 0, 0)
+ 	_end = .;
+ 
+-- 
+1.7.10.4
