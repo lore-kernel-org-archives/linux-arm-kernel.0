@@ -1,43 +1,39 @@
-From: amery@geeks.cl (Alejandro Mery)
-Date: Wed, 12 Dec 2012 13:49:25 +0100
-Subject: [PATCH 0/6] Add pinctrl driver for Allwinner A1X SoCs
-In-Reply-To: <50C84A46.2090503@free-electrons.com>
-References: <1355177301-31928-1-git-send-email-maxime.ripard@free-electrons.com>
- <50C7AC79.5010006@geeks.cl> <50C84A46.2090503@free-electrons.com>
-Message-ID: <50C87D55.6020006@geeks.cl>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 12 Dec 2012 21:01:17 +0800
+Subject: [PATCH] ARM: decompress: remove unused ARCH_HAS_DECOMP_WDOG
+Message-ID: <1355317277-32192-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/12 10:11, Maxime Ripard wrote:
-> Hi Alejandro,
->
-> Le 11/12/2012 22:58, Alejandro Mery a ?crit :
->> On 10/12/12 23:08, Maxime Ripard wrote:
->>> Hi everyone,
->>>
->>> This patch set adds a pinctrl driver for the IP found in the Allwinner
->>> A10
->>> and A13, and the SoC-specific bits for the A13. It also adds the
->>> documentation
->>> for the device tree bindings.
->>
->> Hi. I just wanted to comment that there are 3 known sun5i SoCs, not only
->> the A13. The A10s and the A12 are also sun5i. For A10s and A13 there are
->> datasheets available with the pin info. So please don't assume the A13's
->> pins are "sun5i" pins, they are merely aw1626 (aka A13) pins.
->
-> Ok, I will change the naming scheme to something like sun5i-a13. For the
-> other SoC codenames like sun4i, are you aware of several actual SoCs
-> using the same codename, or do we have only sun4i == A10?
+ARCH_HAS_DECOMP_WDOG is only used in lib/inflate.c which is not
+included in arch/arm/boot/compressed/decompress.c now.  That said,
+ARCH_HAS_DECOMP_WDOG is not used at all.  Let's remove it.
 
-the A10 is the only sun4i we know of, the A31 is the only sun6i we know 
-of, and the A20 is the only sun7i we know of... they'll soon run out of 
-numbers... :|
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+Russell,
 
-Also, to avoid confusions with their poorly chosen marketing name, you 
-could use the internal chip name aw1623 for the A10 and aw1626 for the 
-A13 instead. This value can be read from the BROM and it's commonly used 
-in allwinner sources.
+If you're fine with patch, I will send a follow-up patch to remove all
+those arch_decomp_wdog() from platform uncompress.h which does nothing
+at all.
 
-regards,
-Alejandro Mery
+Shawn
+
+ arch/arm/boot/compressed/decompress.c |    2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
+index 9deb56a..24b0475 100644
+--- a/arch/arm/boot/compressed/decompress.c
++++ b/arch/arm/boot/compressed/decompress.c
+@@ -13,8 +13,6 @@ extern void error(char *);
+ #define STATIC static
+ #define STATIC_RW_DATA	/* non-static please */
+ 
+-#define ARCH_HAS_DECOMP_WDOG
+-
+ /* Diagnostic functions */
+ #ifdef DEBUG
+ #  define Assert(cond,msg) {if(!(cond)) error(msg);}
+-- 
+1.7.9.5
