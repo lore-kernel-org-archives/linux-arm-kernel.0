@@ -1,56 +1,117 @@
-From: arve@android.com (=?ISO-8859-1?Q?Arve_Hj=F8nnev=E5g?=)
-Date: Wed, 12 Dec 2012 14:27:22 -0800
-Subject: [PATCH] ARM: decompressor: Flush tlb before swiching domain 0 to
- client mode
-In-Reply-To: <50C85807.2000609@ti.com>
-References: <1355276466-18295-1-git-send-email-arve@android.com>
- <50C85807.2000609@ti.com>
-Message-ID: <CAMP5Xgdj_w_Kdek2WY-k73Od9DRfMpwnBuTfu9WKJFJnQ3VARQ@mail.gmail.com>
+From: richard.purdie@linuxfoundation.org (Richard Purdie)
+Date: Wed, 12 Dec 2012 22:29:13 +0000
+Subject: [ARM] head.S change broke platform device registration?
+In-Reply-To: <20121212175925.GA14363@n2100.arm.linux.org.uk>
+References: <50B88A59.6070207@arm.com>
+ <CAHod+GeZQx6-pUHPocbyMJCLawMUhrZuZf=mrgWax=L7eNJGhg@mail.gmail.com>
+ <20121130143435.GP19440@n2100.arm.linux.org.uk>
+ <CAHod+GdXfZb1OHapJBYpCD74svYyaGaiZpqHLPtjHbWGa-3eLA@mail.gmail.com>
+ <20121204221851.GJ14363@n2100.arm.linux.org.uk>
+ <CAHod+Gd6NJsuJVRos52e9+NcweqcSu=HArT_qoV0ygb_Xbfaiw@mail.gmail.com>
+ <20121205235836.GR14363@n2100.arm.linux.org.uk>
+ <CAHod+Gf2z-S6B_Z6o_QHbvoLY7L-oYmPVgBzGW3rvKyWAS5apA@mail.gmail.com>
+ <20121211002500.GP14363@n2100.arm.linux.org.uk>
+ <1355327745.6771.56.camel@ted>
+ <20121212175925.GA14363@n2100.arm.linux.org.uk>
+Message-ID: <1355351353.6771.92.camel@ted>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 12, 2012 at 2:10 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On Wednesday 12 December 2012 02:41 AM, Arve Hj?nnev?g wrote:
->>
->> If the bootloader used a page table that is incompatible with domain 0
->> in client mode, then swithing domain 0 to client mode causes a fault
->> if we don't flush the tlb after updating the page table pointer.
->>
->> Signed-off-by: Arve Hj?nnev?g <arve@android.com>
->> ---
->>   arch/arm/boot/compressed/head.S |    1 +
->>   1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/compressed/head.S
->> b/arch/arm/boot/compressed/head.S
->> index 90275f0..9c8034c 100644
->> --- a/arch/arm/boot/compressed/head.S
->> +++ b/arch/arm/boot/compressed/head.S
->> @@ -704,6 +704,7 @@ __armv7_mmu_cache_on:
->>                 bic     r6, r6, #1 << 31        @ 32-bit translation
->> system
->>                 bic     r6, r6, #3 << 0         @ use only ttbr0
->>                 mcrne   p15, 0, r3, c2, c0, 0   @ load page table pointer
->> +               mcrne   p15, 0, r0, c8, c7, 0   @ flush I,D TLBs
->>                 mcrne   p15, 0, r1, c3, c0, 0   @ load domain access
->> control
->>                 mcrne   p15, 0, r6, c2, c0, 2   @ load ttb control
->>   #endif
->>
-> The TLB's are already flushed few lines above so above patching
-> shouldn't help if it was really dirty TLB entry issue. I suspect that
-> your boot-loader clean-up [1] function may not be taking care of
-> flushing caches which could potetially lead to the issue.
->
-> Have you checked that ?
->
+On Wed, 2012-12-12 at 17:59 +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 12, 2012 at 03:55:45PM +0000, Richard Purdie wrote:
+> > On Tue, 2012-12-11 at 00:25 +0000, Russell King - ARM Linux wrote:
+> > > On Mon, Dec 10, 2012 at 06:21:52PM +0100, Marko Kati? wrote:
+> > > > > The code which distinguishes between Borzoi and Akita is this:
+> > > > >
+> > > > > /* Check for a second SCOOP chip - if found we have Borzoi */
+> > > > >         ldr     r1, .SCOOP2ADDR
+> > > > > ==cacheline boundary without patch (0x120)=====
+> > > > >         ldr     r7, .BORZOIID
+> > > > >         mov     r6, #0x0140
+> > > > >         strh    r6, [r1]
+> > > > > ==cacheline boundary with patch (0x160)======
+> > > > >         ldrh    r6, [r1]
+> > > > >         cmp     r6, #0x0140
+> > > > >         beq     .SHARPEND                       @ We have Borzoi
+> > > > >
+> > > > > /* Must be Akita */
+> > > > >         ldr     r7, .AKITAID
+> > > > >         b       .SHARPEND                       @ We have Borzoi
+> > > > >
+> > > > > and I've marked where the cache line boundary ends up with the patch
+> > > > > in place... except of course that the caches are off here, so the
+> > > > > placement of the code should be irrelevant.  It also would have the
+> > > > > reverse results from those that you're experiencing.
+> > > > >
+> > > > > My guess is that because the Scoop2 device is not present, the strh
+> > > > > access places 0x140 onto the data bus.  By the time the ldrh is
+> > > > > executed, it reads the data bus, and because nothing drives it, it
+> > > > > reads back the value last present on the bus, which happens to be
+> > > > > 0x140 - and this allows us to think we have the Scoop2 device.
+> > > > >
+> > > > > In theory, because the caches are off (including the instruction
+> > > > > cache) the CPU should fetch ldrh between the strh write and the
+> > > > > ldrh access to the same address.
+> > > > >
+> > > > > Having said all that, I'm not impressed by the above code; to write to
+> > > > > a memory region which may or may not have a device, and immediately
+> > > > > read it back is a recipe for exactly this kind of stuff happening.  If
+> > > > > anyone has looked at any real device detection code, they'll know that
+> > > > > this sequence is typical:
+> > > > >
+> > > > >         ldr     r0, =address
+> > > > >         mov     r1, #probe_data
+> > > > >         eor     r2, r1, #~0
+> > > > >         str     r1, [r0, #reg1]
+> > > > >         str     r2, [r0, #reg2]
+> > > > >         ldr     r3, [r0, #reg1]
+> > > > >         ldr     r0, [r0, #reg2]
+> > > > >         teq     r1, r3
+> > > > >         teqeq   r2, r0
+> > > > >         beq     found
+> > > > >
+> > > > > This sequence _purposely_ writes the opposite value between the first
+> > > > > store and the read-back of it to perturb the bus in case it's floating,
+> > > > > to prevent exactly these kinds of false positives.  The second check is
+> > > > > additional belt and braces to make the check even more secure.
+> > > > >
+> > > > > Can we do that with Scoop2?  I've no idea, I don't know what the weird
+> > > > > 0x40 offset is that's being probed by this code.  We need whoever wrote
+> > > > > this code, but I suspect they've long since moved on and aren't
+> > > > > interested in it.
+> > 
+> > I suspect this was me and I was missing some of the subtleties in this
+> > case. I think the eor to perturb the bus should be fine and fix this
+> > code.
+> 
+> Except... we're currently hitting the register at 0x08800040 (presumably
+> a 64-byte offset) which doesn't appear in the scoop header file... so
+> I'm not sure if this is a special register or not for this.  Also we need
+> to know another register for the 2nd access which isn't going to cause
+> problems.  Any suggestions?
 
-No, the problem is that the mmu is on when that first tlb flush
-happens so the tlb entry for the code that is executing gets reloaded
-from the old page table. This is probably a bootloader bug, but I
-don't have the bootloader source and 3.4 boots with the same
-bootloader.
+Looking at spitz.c (which is the one which handles borzoi):
 
--- 
-Arve Hj?nnev?g
+/* SCOOP Device #2 */
+static struct resource spitz_scoop_2_resources[] = {
+	[0] = {
+		.start		= 0x08800040,
+		.end		= 0x08800fff,
+		.flags		= IORESOURCE_MEM,
+	},
+};
+
+so we're reading SCOOP_MCR (offset 0x00). For the second register, I'd
+suggest something from the reset code in scoop.c: 	iowrite16(0x00FF,
+sdev->base + SCOOP_IRM)
+
+looks appropriate since the 0x00ff value should perturb the bus. I'm
+guessing MCR is some kind of memory control and handles device reset,
+IRM is probably interrupt related and we don't use interrupt
+functionality of the GPIO expander.
+
+Does that help?
+
+Cheers,
+
+Richard
