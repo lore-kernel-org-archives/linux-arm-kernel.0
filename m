@@ -1,34 +1,78 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Dec 2012 08:39:42 -0800
-Subject: [GIT PULL 0/5] ARM: arm-soc: First batch of updates for 3.8
-Message-ID: <20121212163942.GA16036@quad.lixom.net>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 12 Dec 2012 17:43:21 +0100 (CET)
+Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
+ cache LoUIS operations
+In-Reply-To: <20121212103338.GB23022@e102568-lin.cambridge.arm.com>
+References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <20120919134658.GA2111@linaro.org>
+ <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
+ <20120920110439.GB2117@linaro.org>
+ <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
+ <20121211163313.GG16759@mudshark.cambridge.arm.com>
+ <20121211163843.GH16759@mudshark.cambridge.arm.com>
+ <50C7C16B.7050106@codeaurora.org>
+ <20121212103338.GB23022@e102568-lin.cambridge.arm.com>
+Message-ID: <Pine.LNX.4.64.1212121743000.10522@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Lorenzo
 
-Here is the first set of pull requests for arm-soc for this merge window.
+On Wed, 12 Dec 2012, Lorenzo Pieralisi wrote:
 
-Unfortunately we seem to have quite a few of little nagging merge conflicts for
-this release. There's been some bugfixes upstream that conflicted with cleanups
-and refactorings, and there's been a lot of header file moves that resulted in
-include-section conflicts.
+> On Tue, Dec 11, 2012 at 11:27:39PM +0000, Stephen Boyd wrote:
+> > On 12/11/12 08:38, Will Deacon wrote:
+> > > diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> > > index cd95664..f58248f 100644
+> > > --- a/arch/arm/mm/cache-v7.S
+> > > +++ b/arch/arm/mm/cache-v7.S
+> > > @@ -44,7 +44,8 @@ ENDPROC(v7_flush_icache_all)
+> > >  ENTRY(v7_flush_dcache_louis)
+> > >         dmb                                     @ ensure ordering with previous memory accesses
+> > >         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
+> > > -       ands    r3, r0, #0xe00000               @ extract LoUIS from clidr
+> > > +       ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
+> > > +       ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
+> > >         mov     r3, r3, lsr #20                 @ r3 = LoUIS * 2
+> > 
+> > You need to fix this mov as well, right?
+> 
+> And after doing that I think the suspend finisher will still have
+> to call flush_cache_all() since LoUU == 1 on A8, L2 is not cleaned
+> and that's probably what we want if it can be retained.
+> 
+> What about this (compile tested) ?
 
-I've documented my proposed resolution in each pull request, and as usual
-I have also pushed up my resulting merge as <branch>-resolved, in case you want
-to diff.
+Works too.
 
-There's only one gotcha that I am aware of, and that is for the 'cleanup'
-branch, where a build break will be introduced if you don't fixup a
-function name rename/conflict that isn't detected by git since the new
-code was added with the old name in one of the branches. Not a big deal
-if you miss it, we'll submit a patch to fix it up in that case.
+Thanks
+Guennadi
 
-I've got more to come, but wanted to break it up in a couple of batches. More
-details in each pull request.
+> 
+> Lorenzo
+> 
+> --->8
+> 
+> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> index cd95664..036f80f 100644
+> --- a/arch/arm/mm/cache-v7.S
+> +++ b/arch/arm/mm/cache-v7.S
+> @@ -44,8 +44,9 @@ ENDPROC(v7_flush_icache_all)
+>  ENTRY(v7_flush_dcache_louis)
+>  	dmb					@ ensure ordering with previous memory accesses
+>  	mrc	p15, 1, r0, c0, c0, 1		@ read clidr, r0 = clidr
+> -	ands	r3, r0, #0xe00000		@ extract LoUIS from clidr
+> -	mov	r3, r3, lsr #20			@ r3 = LoUIS * 2
+> +	ALT_SMP(lsr	r3, r0, #20)		@ r3 = clidr[31:20]
+> +	ALT_UP(lsr	r3, r0, #26)		@ r3 = clidr[31:26]
+> +	ands	r3, r3, #0xe			@ r3 = LoUIS/LoUU * 2
+>  	moveq	pc, lr				@ return if level == 0
+>  	mov	r10, #0				@ r10 (starting level) = 0
+>  	b	flush_levels			@ start flushing cache levels
+> 
 
-
-Thanks!
-
-
--Olof
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
