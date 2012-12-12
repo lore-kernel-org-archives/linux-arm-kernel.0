@@ -1,57 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 12 Dec 2012 10:10:00 +0100
-Subject: [PATCH V2 0/4] add RTC support for Armada 370 and Armada XP
-In-Reply-To: <1355303186-9267-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1355303186-9267-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <50C849E8.70105@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 12 Dec 2012 10:11:34 +0100
+Subject: [PATCH 0/6] Add pinctrl driver for Allwinner A1X SoCs
+In-Reply-To: <50C7AC79.5010006@geeks.cl>
+References: <1355177301-31928-1-git-send-email-maxime.ripard@free-electrons.com>
+ <50C7AC79.5010006@geeks.cl>
+Message-ID: <50C84A46.2090503@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2012 10:06 AM, Gregory CLEMENT wrote:
-> Hello,
-> 
-> This small patch set adds RTC support for Armada 370 and Armada XP. It
-> was successfully tested on the evaluation board. The third patch add
-> the lacking documentation for the device tree binding and was already
-> taken by Grant Likely, I keep this one in the series for
-> coherency. The only differences with the previous patch set was the
-> add of the Acked-by from Andrew Lunn and a new small patch to update
-> of the mvebu_configuration. I also split the patch wich add the RTC
-> support in two part, one for the RTC subsytem and on for
-> mach-mvebu. This series is 3.9 material.
-> 
-> Alessandro,
-> could you take the first patches if you agree with it?
+Hi Alejandro,
 
-Oups, I meant the first one not the first patches.
+Le 11/12/2012 22:58, Alejandro Mery a ?crit :
+> On 10/12/12 23:08, Maxime Ripard wrote:
+>> Hi everyone,
+>>
+>> This patch set adds a pinctrl driver for the IP found in the Allwinner
+>> A10
+>> and A13, and the SoC-specific bits for the A13. It also adds the
+>> documentation
+>> for the device tree bindings.
+> 
+> Hi. I just wanted to comment that there are 3 known sun5i SoCs, not only
+> the A13. The A10s and the A12 are also sun5i. For A10s and A13 there are
+> datasheets available with the pin info. So please don't assume the A13's
+> pins are "sun5i" pins, they are merely aw1626 (aka A13) pins.
 
-> 
-> Jason,
-> 
-> I wait for a while if there any feedback, then I will send you a git
-> pull request. If I understood well your workflow I will do 2 git pull
-> one for dt and one for defconfig.
-> 
-> Thanks
-> 
-> 
-> Gregory CLEMENT (4):
->   rtc: Add support of rtc-mv for MVEBU SoCs
->   arm: mvebu: Add RTC support for Armada 370 and Armada XP
->   rtc: rtc-mv: Add the device tree binding documentation
->   arm: mvebu: Update defconfig with Marvell RTC support
-> 
->  .../devicetree/bindings/rtc/orion-rtc.txt          |   18 ++++++++++++++++++
->  arch/arm/boot/dts/armada-370-xp.dtsi               |    6 ++++++
->  arch/arm/configs/mvebu_defconfig                   |    1 +
->  drivers/rtc/Kconfig                                |    2 +-
->  4 files changed, 26 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/rtc/orion-rtc.txt
-> 
+Ok, I will change the naming scheme to something like sun5i-a13. For the
+other SoC codenames like sun4i, are you aware of several actual SoCs
+using the same codename, or do we have only sun4i == A10?
+
+Thanks,
+Maxime
 
 
 -- 
-Gregory Clement, Free Electrons
+Maxime Ripard, Free Electrons
 Kernel, drivers, real-time and embedded Linux
 development, consulting, training and support.
 http://free-electrons.com
