@@ -1,62 +1,46 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Wed, 12 Dec 2012 12:42:25 +0100
-Subject: [PATCH v3 0/3] ARM/dts: omap3: Add DT support for IGEP devices
-In-Reply-To: <50C85850.7010906@ti.com>
-References: <1354538503-22671-1-git-send-email-javier.martinez@collabora.co.uk>
- <CAAwP0s2qXuJzwEh-AVORbPApr6XT0JAfsFjrxKDvXArqYk0qXQ@mail.gmail.com>
- <50C85850.7010906@ti.com>
-Message-ID: <CAAwP0s3gf16hZi6RVhsi7ee0YW_boPRy9--pukRcKJfMiWFKDg@mail.gmail.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Wed, 12 Dec 2012 12:54:46 +0100
+Subject: [PATCH 1/4 v2] spi: sh-msiof: Remove unneeded clock name
+Message-ID: <1355313289-29769-1-git-send-email-hechtb+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 12, 2012 at 11:11 AM, Benoit Cousson <b-cousson@ti.com> wrote:
-> Hi Javier,
->
-> On 12/12/2012 09:25 AM, Javier Martinez Canillas wrote:
->> On Mon, Dec 3, 2012 at 1:41 PM, Javier Martinez Canillas
->> <javier.martinez@collabora.co.uk> wrote:
->>> IGEP technology devices are TI OMAP3 SoC based industrial embedded
->>> and computer-on-module boards. This patch-set adds initial device
->>> tree support for these devices.
->>>
->>> The device trees allows to boot from an MMC and are working all the
->>> components that already have device tree support on OMAP3 SoCs:
->>>
->>> - MMC/SD
->>> - UARTs
->>> - GPIO LEDs
->>> - TWL4030 codec audio
->>> - pinmux/pinconf pinctrl
->>>
->>> Some peripheral are still not working such as Flash storage and
->>> Ethernet but support for these will also be included once the
->>> OMAP GPMC device tree binding patches land on mainline.
->>>
->>> This is a v3 of the patch-set that solves issues pointed out by
->>> Enric Balletbo and Benoit Cousson.
->>>
->>> The patch-set is composed of the following patches:
->>>
->>> [PATCH v3 1/3] ARM/dts: omap3: Add generic DT support for IGEP devices
->>> [PATCH v3 2/3] ARM/dts: omap3: Add support for IGEPv2 board
->>> [PATCH v3 3/3] ARM/dts: omap3: Add support for IGEP COM Module
->>>
->>> Best regards,
->>> Javier
->>> --
->>
->> Hi Benoit and Tony,
->>
->> Any comments on these?
->
-> Nope, that's fine. I'll applied the series for 3.9.
->
-> Thanks,
-> Benoit
->
->
+From: Bastian Hecht <hechtb@gmail.com>
 
-Great, thanks a lot for!
+clk_get() no longer needs a character string for associating the right
+clock as this is done via the device struct now.
 
-Best regards,
-Javier
+Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+---
+v2: no changes
+
+ drivers/spi/spi-sh-msiof.c |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/spi/spi-sh-msiof.c b/drivers/spi/spi-sh-msiof.c
+index 1f466bc..96358d0 100644
+--- a/drivers/spi/spi-sh-msiof.c
++++ b/drivers/spi/spi-sh-msiof.c
+@@ -597,7 +597,6 @@ static int sh_msiof_spi_probe(struct platform_device *pdev)
+ 	struct resource	*r;
+ 	struct spi_master *master;
+ 	struct sh_msiof_spi_priv *p;
+-	char clk_name[16];
+ 	int i;
+ 	int ret;
+ 
+@@ -614,10 +613,9 @@ static int sh_msiof_spi_probe(struct platform_device *pdev)
+ 	p->info = pdev->dev.platform_data;
+ 	init_completion(&p->done);
+ 
+-	snprintf(clk_name, sizeof(clk_name), "msiof%d", pdev->id);
+-	p->clk = clk_get(&pdev->dev, clk_name);
++	p->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(p->clk)) {
+-		dev_err(&pdev->dev, "cannot get clock \"%s\"\n", clk_name);
++		dev_err(&pdev->dev, "cannot get clock\n");
+ 		ret = PTR_ERR(p->clk);
+ 		goto err1;
+ 	}
+-- 
+1.7.9.5
