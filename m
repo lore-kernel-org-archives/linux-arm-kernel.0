@@ -1,60 +1,47 @@
-From: amery@geeks.cl (Alejandro Mery)
-Date: Wed, 12 Dec 2012 14:43:08 +0100
-Subject: [PATCH 0/6] Add pinctrl driver for Allwinner A1X SoCs
-In-Reply-To: <50C8879E.5070401@free-electrons.com>
-References: <1355177301-31928-1-git-send-email-maxime.ripard@free-electrons.com>
- <50C7AC79.5010006@geeks.cl> <50C84A46.2090503@free-electrons.com>
- <50C87D55.6020006@geeks.cl> <50C8879E.5070401@free-electrons.com>
-Message-ID: <50C889EC.3020308@geeks.cl>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 12 Dec 2012 21:45:41 +0800
+Subject: [PATCH 0/4] Support uncompress debug message for multiplatform build
+Message-ID: <1355319945-3199-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/12 14:33, Maxime Ripard wrote:
-> Le 12/12/2012 13:49, Alejandro Mery a ?crit :
->> On 12/12/12 10:11, Maxime Ripard wrote:
->>> Hi Alejandro,
->>>
->>> Le 11/12/2012 22:58, Alejandro Mery a ?crit :
->>>> On 10/12/12 23:08, Maxime Ripard wrote:
->>>>> Hi everyone,
->>>>>
->>>>> This patch set adds a pinctrl driver for the IP found in the Allwinner
->>>>> A10
->>>>> and A13, and the SoC-specific bits for the A13. It also adds the
->>>>> documentation
->>>>> for the device tree bindings.
->>>>
->>>> Hi. I just wanted to comment that there are 3 known sun5i SoCs, not only
->>>> the A13. The A10s and the A12 are also sun5i. For A10s and A13 there are
->>>> datasheets available with the pin info. So please don't assume the A13's
->>>> pins are "sun5i" pins, they are merely aw1626 (aka A13) pins.
->>>
->>> Ok, I will change the naming scheme to something like sun5i-a13. For the
->>> other SoC codenames like sun4i, are you aware of several actual SoCs
->>> using the same codename, or do we have only sun4i == A10?
->>
->> the A10 is the only sun4i we know of, the A31 is the only sun6i we know
->> of, and the A20 is the only sun7i we know of... they'll soon run out of
->> numbers... :|
->>
->> Also, to avoid confusions with their poorly chosen marketing name, you
->> could use the internal chip name aw1623 for the A10 and aw1626 for the
->> A13 instead. This value can be read from the BROM and it's commonly used
->> in allwinner sources.
->
-> In what aspect are they poorly named? I'd really like to keep it as
-> understandable as possible, at least in the device tree.
->
-> I guess renaming the sun5i dtsi already there and all that relates to
-> the A13 to sun5i-a13 would remove that collision of names, don't you
-> think? Or am I missing something?
+After moving i.MX to multiplatform build, I hear people complaining
+that it's bad to lose the uncompress debug message, because not only
+does it mean that we will never see message "Uncompressing Linux...
+done, booting the kernel.", but also that the debug facility in
+arch/arm/boot/compressed/head.S outputs nothing even DEBUG is turned on.
 
-fine with me, but "The A10 is an A8, same as the A10s and A13, but the 
-A13 is less than the A10 but larger and A10s is not the plural of A10. 
-And the A20 been like an A10 but A7" doesn't make you dizzy? ;-)
+The series follows the approach handling DEBUG_LL to create a Kconfig
+symbol CONFIG_UNCOMPRESS_INCLUDE for choosing the correct uncompress
+header.  For traditional build, mach/uncompress.h will be included in
+arch/arm/boot/compressed/misc.c, and nothing changes than before. For
+multiplatform build with none DEBUG_LL port enabled, a set of empty
+functions defined in debug/uncompress/dummy.h will be used.  And for
+multiplatform build with a DEBUG_LL port, platform specific
+uncompress header like debug/uncompress/imx.h will come to play.
 
-sure prefixing the marketing name with sunxi- or sunNi- removes the 
-ambiguity.
+Different from traditional build that uncompress output and DEBUG_LL
+are two separate pieces, for multiplatform build uncompress output
+becomes a subset of DEBUG_LL and relies on DEBUG_LL to select the uart
+port, so it only works when DEBUG_LL is enabled.  I think it's an
+acceptable compromise to have the uncompress debug facility back.
 
-cheers,
-Alejandro Mery
+Shawn Guo (4):
+  ARM: imx: use separated debug uart symbol for imx31 and imx35
+  ARM: imx: support DEBUG_LL uart port selection for all i.MX SoCs
+  ARM: imx: restore uncompress.h to a common place
+  ARM: uncompress: support uncompress debug for multiplatform build
+
+ arch/arm/Kconfig.debug                    |   44 ++++++++++++---
+ arch/arm/boot/compressed/misc.c           |    8 +--
+ arch/arm/include/debug/imx-uart.h         |   88 +++++++++++++++++++++++++++++
+ arch/arm/include/debug/imx.S              |   29 +---------
+ arch/arm/include/debug/uncompress/dummy.h |    3 +
+ arch/arm/include/debug/uncompress/imx.h   |   63 +++++++++++++++++++++
+ 6 files changed, 191 insertions(+), 44 deletions(-)
+ create mode 100644 arch/arm/include/debug/imx-uart.h
+ create mode 100644 arch/arm/include/debug/uncompress/dummy.h
+ create mode 100644 arch/arm/include/debug/uncompress/imx.h
+
+-- 
+1.7.9.5
