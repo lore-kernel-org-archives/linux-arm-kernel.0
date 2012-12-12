@@ -1,110 +1,61 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 12 Dec 2012 16:04:07 +0530
-Subject: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
- OMAP-L138 DSP
-In-Reply-To: <13514BD7FAEBA745BBD7D8A672905C14311FBDA3@DFLE08.ent.ti.com>
-References: <1352853207-20602-1-git-send-email-rtivy@ti.com>
- <1352853207-20602-5-git-send-email-rtivy@ti.com> <50AB76FA.1050505@ti.com>
- <13514BD7FAEBA745BBD7D8A672905C14311F952B@DFLE08.ent.ti.com>
- <50B88F7C.5000705@ti.com>
- <13514BD7FAEBA745BBD7D8A672905C14311FBDA3@DFLE08.ent.ti.com>
-Message-ID: <50C85D9F.6050306@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 12 Dec 2012 10:33:38 +0000
+Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
+ cache LoUIS operations
+In-Reply-To: <50C7C16B.7050106@codeaurora.org>
+References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <20120919134658.GA2111@linaro.org>
+ <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
+ <20120920110439.GB2117@linaro.org>
+ <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
+ <20121211163313.GG16759@mudshark.cambridge.arm.com>
+ <20121211163843.GH16759@mudshark.cambridge.arm.com>
+ <50C7C16B.7050106@codeaurora.org>
+Message-ID: <20121212103338.GB23022@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2012 7:06 AM, Tivy, Robert wrote:
->> -----Original Message-----
->> From: Nori, Sekhar
->> Sent: Friday, November 30, 2012 2:51 AM
->>
->> Hi Rob,
->>
->> On 11/29/2012 7:08 AM, Tivy, Robert wrote:
->>> Hi Sekhar,
->>>
->>> Please see comments and noob questions below...
->>>
->>> They can run a single image if the image supports overriding the
->> Kconfig settings with kernel command-line arguments.
->>>
->>> The most basic solution is constants in the .c file itself.  A better
->> solution is Kconfig settings used by the .c file.  An even better
->> solution is Kconfig settings with kernel command-line overrides.
->>
->> If you have kernel command line, you could default to some values which
->> are sane in most cases if they are not provided. No, need to have a
->> Kconfig as well. That will be too many hooks to control the same things
->> and probably not necessary.
->>
->>>
->>>> If you want the remoteproc driver to allocate a certain area of
->> memory
->>>> to the dsp, why don't you take that value as a module parameter so
->>>> people who need different values can pass them differently? It is
->> not
->>>> clear to me why this memory management needs to be dealt with in
->>>> platform code.
->>>
->>> Unfortunetly we need to reserve this dsp memory during early boot,
->> using CMA.  Runtime module insertion is too late.
->>
->> Then I guess most of the time the module would be built into the kernel
->> and will be initialized using an early enough initcall.
+On Tue, Dec 11, 2012 at 11:27:39PM +0000, Stephen Boyd wrote:
+> On 12/11/12 08:38, Will Deacon wrote:
+> > diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> > index cd95664..f58248f 100644
+> > --- a/arch/arm/mm/cache-v7.S
+> > +++ b/arch/arm/mm/cache-v7.S
+> > @@ -44,7 +44,8 @@ ENDPROC(v7_flush_icache_all)
+> >  ENTRY(v7_flush_dcache_louis)
+> >         dmb                                     @ ensure ordering with previous memory accesses
+> >         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
+> > -       ands    r3, r0, #0xe00000               @ extract LoUIS from clidr
+> > +       ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
+> > +       ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
+> >         mov     r3, r3, lsr #20                 @ r3 = LoUIS * 2
 > 
-> That's right, a .reserve function is assigned to the MACHINE_START structure, and this function calls dma_declare_contiguous().
+> You need to fix this mov as well, right?
 
-I meant use an early initcall in the driver.
+And after doing that I think the suspend finisher will still have
+to call flush_cache_all() since LoUU == 1 on A8, L2 is not cleaned
+and that's probably what we want if it can be retained.
 
-> 
->>>>> +
->>>>> +static int __init early_rproc_mem(char *p) {
->>>>> +	char *endp;
->>>>> +
->>>>> +	rproc_size = memparse(p, &endp);
->>>>> +	if (*endp == '@')
->>>>> +		rproc_base = memparse(endp + 1, NULL);
->>>>> +
->>>>> +	return 0;
->>>>> +}
->>>>> +early_param("rproc_mem", early_rproc_mem);
->>>>
->>>> Use of non-standard kernel parameters is discouraged. All kernel
->>>> parameters should be documented in Documentation/kernel-
->> parameters.txt
->>>> (this means each and every kernel parameter needs to be justified
->>>> well).
->>>
->>> Can I use the kernel command-line (i.e., u-boot bootargs variable) to
->> specify non-kernel parameters?  I guess my question is more one about
->> the terminology "kernel parameter" - is there a way to specify a module
->> parameter on the kernel command line (like, perhaps, rproc.membase and
->> rproc.memsize)?
->>
->> Right. Module parameters are passed from kernel command line when the
->> module is built into the kernel.
-> 
-> Unfortunately, it seems that module parameters, when stated on the kernel command line with module-name.var-name syntax, are not yet assigned when the kernel calls the early init .reserve functions.  For the "char *" I'm using, I observed a NULL value during the early init call and the proper assigned value during a later normal __init function.
+What about this (compile tested) ?
 
-By "later normal __init" you mean module_init()? And you see
-dma_declare_contiguous() returning error by this time?
+Lorenzo
 
-> 
-> Is there any other method that allows specifying a parameter for an early CMA reservation without having to rebuild the kernel?
+--->8
 
-Nothing else comes to mind. Can you share your code in some public repo?
-It will allow me to try if something comes to mind.
-
-> 
-> If not, is this a strong enough use case to justify a new kernel parameter?
-
-May be it it is. You could try adding it. Just update the documentation
-too. And add the documentation maintainers when you respin the patch.
-
-> 
-> I guess I don't understand why non-standard kernel parameters are discouraged.  I can adorn the name with enough module-specific naming to reduce the chances of any namespace collisions to a minimum.
-
-I guess it is to make sure generic solutions are followed and every
-problem is not seen as unique.
-
-Thanks,
-Sekhar
+diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+index cd95664..036f80f 100644
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -44,8 +44,9 @@ ENDPROC(v7_flush_icache_all)
+ ENTRY(v7_flush_dcache_louis)
+ 	dmb					@ ensure ordering with previous memory accesses
+ 	mrc	p15, 1, r0, c0, c0, 1		@ read clidr, r0 = clidr
+-	ands	r3, r0, #0xe00000		@ extract LoUIS from clidr
+-	mov	r3, r3, lsr #20			@ r3 = LoUIS * 2
++	ALT_SMP(lsr	r3, r0, #20)		@ r3 = clidr[31:20]
++	ALT_UP(lsr	r3, r0, #26)		@ r3 = clidr[31:26]
++	ands	r3, r3, #0xe			@ r3 = LoUIS/LoUU * 2
+ 	moveq	pc, lr				@ return if level == 0
+ 	mov	r10, #0				@ r10 (starting level) = 0
+ 	b	flush_levels			@ start flushing cache levels
