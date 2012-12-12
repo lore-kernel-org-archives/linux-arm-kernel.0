@@ -1,20 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Dec 2012 18:01:21 +0000
-Subject: [RFC PATCH 1/3] ARM: mm: Add discontiguous memory support.
-In-Reply-To: <1355334049-10247-2-git-send-email-steve.capper@arm.com>
-References: <1355334049-10247-1-git-send-email-steve.capper@arm.com>
- <1355334049-10247-2-git-send-email-steve.capper@arm.com>
-Message-ID: <20121212180121.GB14363@n2100.arm.linux.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 12 Dec 2012 18:05:19 +0000
+Subject: [PATCH v4] video: Versatile Express DVI output driver
+In-Reply-To: <1353343147-15654-1-git-send-email-pawel.moll@arm.com>
+References: <1353342376.3303.32.camel@hornet>
+ <1353343147-15654-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1355335519.19818.46.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 12, 2012 at 05:40:47PM +0000, Steve Capper wrote:
-> This patch adds support for discontiguous memory, with a view to
-> each discontiguous block being assigned to a NUMA node (in a future
-> patch).
-> 
-> Discontiguous memory should only be used to back NUMA on systems
-> where sparse memory is not available.
+Hi Arnd,
 
-Err, we had this, and then we ripped it all out.  Do we have any NUMA ARM
-systems?  I don't think we do.
+On Mon, 2012-11-19 at 16:39 +0000, Pawel Moll wrote:
+> Versatile Express' DVI video output can be connected to one the three
+> sources - motherboard's CLCD controller or a video signal generated
+> by one of the daughterboards.
+> 
+> This driver configures the muxer FPGA so the output displays content
+> of one of the framebuffers in the system (0 by default, can be changed
+> by user writing to the "fb" sysfs attribute of the muxfpga device).
+> 
+> It will also set up the display formatter mode and keep it up
+> to date with mode changes requested by the user (eg. with fbset
+> tool).
+> 
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+
+Could I just politely remind about this one?
+
+Pawe?
