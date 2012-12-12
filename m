@@ -1,35 +1,27 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 12 Dec 2012 13:06:14 +0530
-Subject: [PATCH 4/4] DMA: PL330: add device tree property for DMA_MEMCPY
- capability
-In-Reply-To: <201211301156.08060.b.zolnierkie@samsung.com>
-References: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
- <201210301021.42803.b.zolnierkie@samsung.com>
- <CAJe_ZhdOt+T65FdkE0SpQ37uGsS8SkFyJ9hHM3B_8S8f7GQAcQ@mail.gmail.com>
- <201211301156.08060.b.zolnierkie@samsung.com>
-Message-ID: <CABb+yY0FxsZyBy=scTF31+QMWgHzKf7bNz8vsPowtiMkve7igg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Dec 2012 09:00:29 +0100
+Subject: Coresight bus and drivers from CodeAurora
+In-Reply-To: <20121211213916.GB7214@pratikp-linux.qualcomm.com>
+References: <CACRpkdYeFw3YqYqgNAKUv1U4edyzzUa9x6xBSoBU4BbBoc6q5Q@mail.gmail.com>
+ <20121211213916.GB7214@pratikp-linux.qualcomm.com>
+Message-ID: <CACRpkdYYhAyLXJL6ns5mfFQOethihabfPpPuqz9Unq_SCJqLig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 30, 2012 at 4:26 PM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
+On Tue, Dec 11, 2012 at 10:39 PM, Pratik Patel <pratikp@codeaurora.org> wrote:
 
-> Thank you for explaining it.  Here is a patch implementing the idea:
->
-> From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Subject: [PATCH] DMA: PL330: add peripherals map to the device tree
->
-> Add device tree (DT) property ("peri-map") for storing indices
-> of peripherals connected to DMAC and fix DT nodes of client
-> drivers to use 'dma peripheral id' instead of 'dma request id'.
-> Also instead of setting DMA_MEMCPY capability unconditionally in
-> pl330_probe() do it only when "peri-map" DT property is present
-> (idea from Jassi Brar).  It fixes the issue on ARM EXYNOS
-> platforms using DT where pdma controller erroneously was used
-> for DMA_MEMCPY operations instead of mdma one (it seems to work
-> correctly but at the cost of worse performance).
->
-Sorry, we need to change it as per new generic dma DT bindings
-  http://git.infradead.org/users/vkoul/slave-dma.git/blob/refs/heads/next:/Documentation/devicetree/bindings/dma/dma.txt
+> Thanks for the quick evaluation. I will be working on cleaning up
+> the drivers for upstream submission in the coming weeks.
 
-Thanks.
+This is exactly what I like to hear :-)
+
+Can you preserver the CC line from this mail on your subsequent
+posts so the involved experts can follow the discussions?
+
+It seems like keeping this new framework in drivers/ and actually refactoring
+the old stuff in arch/arm/kernel/etm.c etc is the way forward, but doing that
+may require some patch to support the old style of things. As the older code
+may be stale maybe just depend on !CONFIG_OC_ETM is a way forward.
+
+Yours,
+Linus Walleij
