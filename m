@@ -1,39 +1,99 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 12 Dec 2012 12:56:48 -0800
-Subject: [RESEND PATCH 0/5] cpufreq: db8500: Rename driver and update some
- parts
-In-Reply-To: <1355153142-9534-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1355153142-9534-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CAPtuhTgcmdxtG9B6L5NMyLCrhQh2o0DFkq47e_YCMoBzVhaF=g@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 12 Dec 2012 14:04:43 -0700
+Subject: [PATCH] NTP: Add a CONFIG_RTC_SYSTOHC configuration
+In-Reply-To: <50C8DDAA.5010101@linaro.org>
+References: <20121212055643.GA18078@obsidianresearch.com>
+ <50C8DDAA.5010101@linaro.org>
+Message-ID: <20121212210443.GB11530@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 10, 2012 at 7:25 AM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-> From: Ulf Hansson <ulf.hansson@linaro.org>
->
-> This patchset starts by renaming the db8500 cpufreq driver to a more generic
-> name. There are new variants which rely on it too, so instead we give it a
-> family name of dbx500.
->
-> On top of that a fixup patch for initialization of the driver and some minor
-> cleanup patches are included as well.
->
-> These patches can be material for 3.8.
->
-> Since some patches for the db8500 cpufreq driver has recently been merged
-> through Mike Turquette's clk tree, I decided to base these patches on top
-> of the clk-next branch. So I hope Mike is fine by merging these patches
-> through his tree.
->
-> So I will try to collect ACKs from Rafael for the cpufreq patches. The
-> mfd patch has already been ACKED by Samuel.
->
+On Wed, Dec 12, 2012 at 11:40:26AM -0800, John Stultz wrote:
 
-Ulf,
+> >The option also overrides the call to any platform update_persistent_clock
+> >so that the RTC subsystem completely and generically replaces this
+> >functionality.
+> >
+> >Tested on ARM kirkwood and PPC405
 
-Just FYI clk-next has been pulled by Linus for 3.8.  I can still take
-this branch once Rafael ACKs the CPUfreq bits if you want, but I think
-you have more options now that clk-next is merged in.  It's up to you.
+> So I'm initially mixed on this, as it feels a little redundant (esp
+> given it may override a higher precision arch-specific function).
+> But from the perspective of this being a generic RTC function,
+> instead of an per-arch implementation, it does seem reasonable.
 
-Regards,
-Mike
+It isn't really redundant. The kernel still has two RTC subsystems,
+'class RTC' and various platform specific
+things. update_persisent_clock is the entry for the platform specific
+RTC, while rtc_update_persistent_clock is the entry for class RTC.
+
+The issue is on platforms like PPC where both co-exist. On PPC
+update_persisent_clock just calls through a function pointer
+(set_rtc_time) to the machine description to do whatever that mach
+needs. Currently all the PPC mach's that use class RTC drivers via DTS
+set set_rtc_time to null. Only the machs that implement a non class
+RTC driver provide an implementation.
+
+So it is an either/or case - either rtc_update_persistent_clock works
+or update_persistent_clock does, never both.
+
+> >diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+> >index 19c03ab..30a866a 100644
+> >+++ b/drivers/rtc/Kconfig
+> >@@ -48,6 +48,14 @@ config RTC_HCTOSYS_DEVICE
+> >  	  sleep states. Do not specify an RTC here unless it stays powered
+> >  	  during all this system's supported sleep states.
+> >
+> >+config RTC_SYSTOHC
+> >+	bool "Set the RTC time based on NTP synchronization"
+> >+	default y
+> >+	help
+> >+	  If you say yes here, the system time (wall clock) will be stored
+> >+          in the RTC specified by RTC_HCTOSYS_DEVICE approximately every 11
+> >+  	  minutes if the NTP status is synchronized.
+> >+
+> Nit: Does this need to depend on RTC_HCTOSYS_DEVICE being set?
+
+Yes, it looks like RTC_HCTOSYS_DEVICE should have:
+ depends on RTC_SYSTOHC = y
+
+I will correct that
+
+> Hrm. So on architectures that support GENERIC_CMOS_UPDATE already,
+> this creates a duplicated code path that is slightly different. I'd
+> like to avoid this if possible.  Since you're plugging
+> rtc_update_persistent_clock into the GENERIC_CMOS_UPDATE code, we
+> can't just have this option depend on !GENERIC_CMOS_UPDATE.
+
+It isn't duplicate, we need to keep update_persistent_clock to support
+non-class RTC machines.
+
+I thought about this:
+
+        if (abs(now.tv_nsec - (NSEC_PER_SEC / 2)) <= tick_nsec / 2) {
+	        fail = -1;
+#ifdef CONFIG_RTC_SYSTOHC
+	        fail = rtc_update_persistent_clock(now);
+#endif
+#ifdef CONFIG_GENERIC_CMOS_UPDATE
+                if (fail)
+                         fail = update_persistent_clock(now);
+#endif
+       }
+
+Try the RTC function first, then fall back to the legacy platform
+function if it didn't work.
+
+That seems better to me, do you agree?
+
+> So this might need a slightly deeper rework?
+> I'd suggest the following:
+> 1) Convert GENERIC_CMOS_UPDATE into SUPPORTS_UPDATE_PERSISTENT_CLOCK.
+> 2) Add RTC_SYSTOHC but make it depend on !SUPPORTS_UPDATE_PERSISTENT_CLOCK
+
+This would only work for ARM, not PPC..
+
+Ultimately I suspect the clean up needed is to convert more things to
+class rtc drivers and remove update_persistent_clock.
+ppc is pretty close already, and I think ARM is already there.
+
+Jason
