@@ -1,49 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 12 Dec 2012 07:53:37 +0100
-Subject: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save power
-In-Reply-To: <20121211145243.GQ14363@n2100.arm.linux.org.uk>
-References: <1355235474-12783-1-git-send-email-ulf.hansson@stericsson.com>
- <20121211145243.GQ14363@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdbZSFQ1HvXZ3Op093CediAm9rPHwHX38h_sxwE9ARSe5A@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 12 Dec 2012 13:06:14 +0530
+Subject: [PATCH 4/4] DMA: PL330: add device tree property for DMA_MEMCPY
+ capability
+In-Reply-To: <201211301156.08060.b.zolnierkie@samsung.com>
+References: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
+ <201210301021.42803.b.zolnierkie@samsung.com>
+ <CAJe_ZhdOt+T65FdkE0SpQ37uGsS8SkFyJ9hHM3B_8S8f7GQAcQ@mail.gmail.com>
+ <201211301156.08060.b.zolnierkie@samsung.com>
+Message-ID: <CABb+yY0FxsZyBy=scTF31+QMWgHzKf7bNz8vsPowtiMkve7igg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 11, 2012 at 3:52 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Dec 11, 2012 at 03:17:54PM +0100, Ulf Hansson wrote:
->> From: Ulf Hansson <ulf.hansson@linaro.org>
->>
->> The amba bus is already performing same actions but for the apb_pclk.
->> So here we just make sure the clock to card is gated as well to save
->> more power. At runtime resume we will thus restore the clock again.
+On Fri, Nov 30, 2012 at 4:26 PM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+
+> Thank you for explaining it.  Here is a patch implementing the idea:
 >
-> And how exactly do you ensure the requirement that a certain number of
-> clocks is supplied to the card after the last command before you cut
-> the clock?
+> From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Subject: [PATCH] DMA: PL330: add peripherals map to the device tree
+>
+> Add device tree (DT) property ("peri-map") for storing indices
+> of peripherals connected to DMAC and fix DT nodes of client
+> drivers to use 'dma peripheral id' instead of 'dma request id'.
+> Also instead of setting DMA_MEMCPY capability unconditionally in
+> pl330_probe() do it only when "peri-map" DT property is present
+> (idea from Jassi Brar).  It fixes the issue on ARM EXYNOS
+> platforms using DT where pdma controller erroneously was used
+> for DMA_MEMCPY operations instead of mdma one (it seems to work
+> correctly but at the cost of worse performance).
+>
+Sorry, we need to change it as per new generic dma DT bindings
+  http://git.infradead.org/users/vkoul/slave-dma.git/blob/refs/heads/next:/Documentation/devicetree/bindings/dma/dma.txt
 
-Oh, that's gonna be a problem.
-
-So I can see a quite straight-forward way to do this actually:
-
-1) Turn on MMC_CLKGATE for this driver (select from Kconfig)
-which means that the ios will be called with f=0 whenever
-the card is unused, taking into account the required number
-of clocks to the card.
-
-2) Implement handling of f=0 from the ios in the ios callback.
-Then clk_disable(host->clk). I did a hack at this some months
-back but never got around to finish it, sorry for not doing
-that even though this clock gating was invented for the MMCI
-in the first place :-(
-
-3) In the suspend() callback, sleep until the clock indicates
-that the card is declocked with something like:
-while (clk_is_enabled(host->clk)) { sleep(1) }
-However the clk framework does not have clk_is_enabled()
-so you'd either have to add that or use a local atomic
-variable host_clk_enabled set in (2).
-
-Should work, I think?
-
-Yours,
-Linus Walleij
+Thanks.
