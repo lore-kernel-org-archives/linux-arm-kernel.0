@@ -1,58 +1,62 @@
-From: keyuan.liu@gmail.com (Kevin Liu)
-Date: Wed, 12 Dec 2012 19:39:05 +0800
-Subject: FW: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save
- power
-In-Reply-To: <25B60CDC2F704E4E9D88FFD52780CB4C08B00BD138@SC-VEXCH1.marvell.com>
-References: <25B60CDC2F704E4E9D88FFD52780CB4C08B00BD138@SC-VEXCH1.marvell.com>
-Message-ID: <CADz5_g+_wC7wWbiDx_MqG25FGQXwTaz0M_0AR65Um36jaq713A@mail.gmail.com>
+From: martinez.javier@gmail.com (Javier Martinez Canillas)
+Date: Wed, 12 Dec 2012 12:42:25 +0100
+Subject: [PATCH v3 0/3] ARM/dts: omap3: Add DT support for IGEP devices
+In-Reply-To: <50C85850.7010906@ti.com>
+References: <1354538503-22671-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CAAwP0s2qXuJzwEh-AVORbPApr6XT0JAfsFjrxKDvXArqYk0qXQ@mail.gmail.com>
+ <50C85850.7010906@ti.com>
+Message-ID: <CAAwP0s3gf16hZi6RVhsi7ee0YW_boPRy9--pukRcKJfMiWFKDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-owner at vger.kernel.org] On Behalf Of Linus Walleij
-> Sent: Wednesday, December 12, 2012 2:54 PM
-> To: Russell King - ARM Linux; Ulf Hansson
-> Cc: linux-mmc at vger.kernel.org; Chris Ball; linux-arm-kernel at lists.infradead.org; Ulf Hansson
-> Subject: Re: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save power
+On Wed, Dec 12, 2012 at 11:11 AM, Benoit Cousson <b-cousson@ti.com> wrote:
+> Hi Javier,
 >
-> On Tue, Dec 11, 2012 at 3:52 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Tue, Dec 11, 2012 at 03:17:54PM +0100, Ulf Hansson wrote:
->>> From: Ulf Hansson <ulf.hansson@linaro.org>
+> On 12/12/2012 09:25 AM, Javier Martinez Canillas wrote:
+>> On Mon, Dec 3, 2012 at 1:41 PM, Javier Martinez Canillas
+>> <javier.martinez@collabora.co.uk> wrote:
+>>> IGEP technology devices are TI OMAP3 SoC based industrial embedded
+>>> and computer-on-module boards. This patch-set adds initial device
+>>> tree support for these devices.
 >>>
->>> The amba bus is already performing same actions but for the apb_pclk.
->>> So here we just make sure the clock to card is gated as well to save
->>> more power. At runtime resume we will thus restore the clock again.
+>>> The device trees allows to boot from an MMC and are working all the
+>>> components that already have device tree support on OMAP3 SoCs:
+>>>
+>>> - MMC/SD
+>>> - UARTs
+>>> - GPIO LEDs
+>>> - TWL4030 codec audio
+>>> - pinmux/pinconf pinctrl
+>>>
+>>> Some peripheral are still not working such as Flash storage and
+>>> Ethernet but support for these will also be included once the
+>>> OMAP GPMC device tree binding patches land on mainline.
+>>>
+>>> This is a v3 of the patch-set that solves issues pointed out by
+>>> Enric Balletbo and Benoit Cousson.
+>>>
+>>> The patch-set is composed of the following patches:
+>>>
+>>> [PATCH v3 1/3] ARM/dts: omap3: Add generic DT support for IGEP devices
+>>> [PATCH v3 2/3] ARM/dts: omap3: Add support for IGEPv2 board
+>>> [PATCH v3 3/3] ARM/dts: omap3: Add support for IGEP COM Module
+>>>
+>>> Best regards,
+>>> Javier
+>>> --
 >>
->> And how exactly do you ensure the requirement that a certain number of
->> clocks is supplied to the card after the last command before you cut
->> the clock?
+>> Hi Benoit and Tony,
+>>
+>> Any comments on these?
 >
-> Oh, that's gonna be a problem.
+> Nope, that's fine. I'll applied the series for 3.9.
 >
-> So I can see a quite straight-forward way to do this actually:
+> Thanks,
+> Benoit
 >
-> 1) Turn on MMC_CLKGATE for this driver (select from Kconfig)
-> which means that the ios will be called with f=0 whenever
-> the card is unused, taking into account the required number
-> of clocks to the card.
->
-> 2) Implement handling of f=0 from the ios in the ios callback.
-> Then clk_disable(host->clk). I did a hack at this some months
-> back but never got around to finish it, sorry for not doing
-> that even though this clock gating was invented for the MMCI
-> in the first place :-(
->
-> 3) In the suspend() callback, sleep until the clock indicates
-> that the card is declocked with something like:
-> while (clk_is_enabled(host->clk)) { sleep(1) }
-> However the clk framework does not have clk_is_enabled()
-> so you'd either have to add that or use a local atomic
-> variable host_clk_enabled set in (2).
->
-> Should work, I think?
 >
 
-Since we use pm runtime with delay setting to 50ms, so there is no such problem?
+Great, thanks a lot for!
 
-Thanks
-Kevin
+Best regards,
+Javier
