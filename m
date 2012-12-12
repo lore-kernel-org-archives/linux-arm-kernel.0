@@ -1,24 +1,56 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 12 Dec 2012 15:26:08 -0700
-Subject: [PATCH 2/2 v2] pinctrl: skip deferral of hogs
-In-Reply-To: <1355342027-2287-1-git-send-email-linus.walleij@stericsson.com>
-References: <1355342027-2287-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <50C90480.2010703@wwwdotorg.org>
+From: arve@android.com (=?ISO-8859-1?Q?Arve_Hj=F8nnev=E5g?=)
+Date: Wed, 12 Dec 2012 14:27:22 -0800
+Subject: [PATCH] ARM: decompressor: Flush tlb before swiching domain 0 to
+ client mode
+In-Reply-To: <50C85807.2000609@ti.com>
+References: <1355276466-18295-1-git-send-email-arve@android.com>
+ <50C85807.2000609@ti.com>
+Message-ID: <CAMP5Xgdj_w_Kdek2WY-k73Od9DRfMpwnBuTfu9WKJFJnQ3VARQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2012 12:53 PM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Up until now, as hogs were always taken at the end of the
-> pin control device registration, it didn't cause any problem.
-> But when starting to hog pins from the device core it will
-> cause deferral of the pin controller device itself since the
-> default pin fetch is done *before* the device probes, so
-> let's fix this annoyance (which is also aesthetically ugly).
-> 
-> Also take some care to make sure that if any one map entry
-> results in a deferral rather than a failure, then that
-> deferral will take precedence.
+On Wed, Dec 12, 2012 at 2:10 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> On Wednesday 12 December 2012 02:41 AM, Arve Hj?nnev?g wrote:
+>>
+>> If the bootloader used a page table that is incompatible with domain 0
+>> in client mode, then swithing domain 0 to client mode causes a fault
+>> if we don't flush the tlb after updating the page table pointer.
+>>
+>> Signed-off-by: Arve Hj?nnev?g <arve@android.com>
+>> ---
+>>   arch/arm/boot/compressed/head.S |    1 +
+>>   1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/compressed/head.S
+>> b/arch/arm/boot/compressed/head.S
+>> index 90275f0..9c8034c 100644
+>> --- a/arch/arm/boot/compressed/head.S
+>> +++ b/arch/arm/boot/compressed/head.S
+>> @@ -704,6 +704,7 @@ __armv7_mmu_cache_on:
+>>                 bic     r6, r6, #1 << 31        @ 32-bit translation
+>> system
+>>                 bic     r6, r6, #3 << 0         @ use only ttbr0
+>>                 mcrne   p15, 0, r3, c2, c0, 0   @ load page table pointer
+>> +               mcrne   p15, 0, r0, c8, c7, 0   @ flush I,D TLBs
+>>                 mcrne   p15, 0, r1, c3, c0, 0   @ load domain access
+>> control
+>>                 mcrne   p15, 0, r6, c2, c0, 2   @ load ttb control
+>>   #endif
+>>
+> The TLB's are already flushed few lines above so above patching
+> shouldn't help if it was really dirty TLB entry issue. I suspect that
+> your boot-loader clean-up [1] function may not be taking care of
+> flushing caches which could potetially lead to the issue.
+>
+> Have you checked that ?
+>
 
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
+No, the problem is that the mmu is on when that first tlb flush
+happens so the tlb entry for the code that is executing gets reloaded
+from the old page table. This is probably a bootloader bug, but I
+don't have the bootloader source and 3.4 boots with the same
+bootloader.
+
+-- 
+Arve Hj?nnev?g
