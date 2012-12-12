@@ -1,109 +1,111 @@
-From: richard.purdie@linuxfoundation.org (Richard Purdie)
-Date: Wed, 12 Dec 2012 15:55:45 +0000
-Subject: [ARM] head.S change broke platform device registration?
-In-Reply-To: <20121211002500.GP14363@n2100.arm.linux.org.uk>
-References: <CAHod+GdVobkgOj6bsFhn6qqLhysQoEzcDtAS05u1kPnssSfObg@mail.gmail.com>
- <50B88A59.6070207@arm.com>
- <CAHod+GeZQx6-pUHPocbyMJCLawMUhrZuZf=mrgWax=L7eNJGhg@mail.gmail.com>
- <20121130143435.GP19440@n2100.arm.linux.org.uk>
- <CAHod+GdXfZb1OHapJBYpCD74svYyaGaiZpqHLPtjHbWGa-3eLA@mail.gmail.com>
- <20121204221851.GJ14363@n2100.arm.linux.org.uk>
- <CAHod+Gd6NJsuJVRos52e9+NcweqcSu=HArT_qoV0ygb_Xbfaiw@mail.gmail.com>
- <20121205235836.GR14363@n2100.arm.linux.org.uk>
- <CAHod+Gf2z-S6B_Z6o_QHbvoLY7L-oYmPVgBzGW3rvKyWAS5apA@mail.gmail.com>
- <20121211002500.GP14363@n2100.arm.linux.org.uk>
-Message-ID: <1355327745.6771.56.camel@ted>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 12 Dec 2012 16:58:33 +0100
+Subject: [RFC v1 08/16] arm: mvebu: the core PCIe driver
+In-Reply-To: <201212111056.58970.arnd@arndb.de>
+References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1354917879-32073-9-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201212111056.58970.arnd@arndb.de>
+Message-ID: <20121212165833.6a35a6ec@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-12-11 at 00:25 +0000, Russell King - ARM Linux wrote:
-> On Mon, Dec 10, 2012 at 06:21:52PM +0100, Marko Kati? wrote:
-> > > The code which distinguishes between Borzoi and Akita is this:
-> > >
-> > > /* Check for a second SCOOP chip - if found we have Borzoi */
-> > >         ldr     r1, .SCOOP2ADDR
-> > > ==cacheline boundary without patch (0x120)=====
-> > >         ldr     r7, .BORZOIID
-> > >         mov     r6, #0x0140
-> > >         strh    r6, [r1]
-> > > ==cacheline boundary with patch (0x160)======
-> > >         ldrh    r6, [r1]
-> > >         cmp     r6, #0x0140
-> > >         beq     .SHARPEND                       @ We have Borzoi
-> > >
-> > > /* Must be Akita */
-> > >         ldr     r7, .AKITAID
-> > >         b       .SHARPEND                       @ We have Borzoi
-> > >
-> > > and I've marked where the cache line boundary ends up with the patch
-> > > in place... except of course that the caches are off here, so the
-> > > placement of the code should be irrelevant.  It also would have the
-> > > reverse results from those that you're experiencing.
-> > >
-> > > My guess is that because the Scoop2 device is not present, the strh
-> > > access places 0x140 onto the data bus.  By the time the ldrh is
-> > > executed, it reads the data bus, and because nothing drives it, it
-> > > reads back the value last present on the bus, which happens to be
-> > > 0x140 - and this allows us to think we have the Scoop2 device.
-> > >
-> > > In theory, because the caches are off (including the instruction
-> > > cache) the CPU should fetch ldrh between the strh write and the
-> > > ldrh access to the same address.
-> > >
-> > > Having said all that, I'm not impressed by the above code; to write to
-> > > a memory region which may or may not have a device, and immediately
-> > > read it back is a recipe for exactly this kind of stuff happening.  If
-> > > anyone has looked at any real device detection code, they'll know that
-> > > this sequence is typical:
-> > >
-> > >         ldr     r0, =address
-> > >         mov     r1, #probe_data
-> > >         eor     r2, r1, #~0
-> > >         str     r1, [r0, #reg1]
-> > >         str     r2, [r0, #reg2]
-> > >         ldr     r3, [r0, #reg1]
-> > >         ldr     r0, [r0, #reg2]
-> > >         teq     r1, r3
-> > >         teqeq   r2, r0
-> > >         beq     found
-> > >
-> > > This sequence _purposely_ writes the opposite value between the first
-> > > store and the read-back of it to perturb the bus in case it's floating,
-> > > to prevent exactly these kinds of false positives.  The second check is
-> > > additional belt and braces to make the check even more secure.
-> > >
-> > > Can we do that with Scoop2?  I've no idea, I don't know what the weird
-> > > 0x40 offset is that's being probed by this code.  We need whoever wrote
-> > > this code, but I suspect they've long since moved on and aren't
-> > > interested in it.
+Dear Arnd Bergmann,
 
-I suspect this was me and I was missing some of the subtleties in this
-case. I think the eor to perturb the bus should be fine and fix this
-code.
+On Tue, 11 Dec 2012 10:56:58 +0000, Arnd Bergmann wrote:
 
-> > > The alternative is we can rip out all this autodetection code and go
-> > > in the exact opposite direction to arm-soc and force Sharp kernels
-> > > to be built for the exact machine that they're to be run on.  Not
-> > > particularly desirable, but I don't have any other answers to this
-> > > without more information about the hardware.
+> > In addition, this driver enumerates the different PCIe slots, and
+> > for those having a device plugged in, it allocates the necessary
+> > address decoding windows, using the new
+> > armada_370_xp_alloc_pcie_window() function from
+> > mach-mvebu/addr-map.c.
 > > 
-> > The scoop device is a gate array, it's programming was never disclosed.
-> > It's datasheet can be found here (if it's of any use):
-> > 
-> > http://www.penguin.cz/~utx/zaurus/datasheets/ASIC_S1L50752B26B200/
-> > 
-> > So the only documentation we have is the arm/common/scoop.c driver.
-> > Richard might have more information on it, I CC-ed him.
+> > Signed-off-by: Thomas Petazzoni
+> > <thomas.petazzoni@free-electrons.com>
 > 
-> Or maybe Richard can suggest a more secure probing solution along the
-> lines of the above given his experience with these platforms.
+> It seems that this is not following the IEEE PCI bindings, which will
+> cause problems as soon as you try to connect PCI cards with bridges
+> bto it.
 
-I think the proposal above should work. I don't have a borzoi device to
-test with however and have always been reliant on others for testing of
-that device detection. The above link is more documentation than I've
-ever seen before on scoop, I didn't have that when I wrote the driver, I
-just had to guess from other code from the Sharp 2.4 kernels.
+[...]
 
-Cheers,
+> A PCI host controller should set #interrupt-cells=<1>, #size-cells=<2>
+> and #address-cells=<3>, and provide an interrupt map that describes
+> how the intA-intD lines for each slot are connected to the host
+> interrupts.
 
-Richard
+As the "RFC" suggested in the title, I was of course pretty sure that
+the DT binding was not correct. However, the reason I did the DT
+binding the way I did it is because I really don't understand how to
+map the DT binding visible at http://devicetree.org/MPC5200:PCI with
+the hardware we have. I'll need a little bit of guidance to understand
+how to map our hardware features to such a DT binding. So let me
+describe briefly how the Marvell PCIe stuff works, by taking example on
+the Armada XP.
+
+Armada XP supports 10 PCIe interfaces, each of them can physically
+correspond to a PCIe slot on the board in which you can plug a PCIe
+device.
+
+Each of those PCIe interfaces is associated to a range of registers
+inside the SoC that are used to see if the PCIe link is up or down on
+this interface, access the PCIe configuration space of the device
+connected on this interface, get the status of PCIe interrupts, etc.
+Those registers are available at physical addresses 0xD004000,
+0xD0042000, 0xD0044000, 0xD0048000, 0xD004C000, 0xD008000,
+0xD0082000, 0xD0084000, 0xD0088000, 0xD008C000 (one address = one PCIe
+interface). I need to ioremap() those registers in order to interact
+with the PCIe interface, and that's the reason why I have put these
+addresses in the reg = <...> property of the DT sub-nodes in my
+proposal.
+
+Then, to access the PCIe device memory and I/O BARs, there are no fixed
+addresses in the CPU physical address space. The Armada XP (and other
+earlier Marvell SoCs) have a number of configurable address decoding
+windows. Those windows allow the programmer to tell the CPU that a
+window of physical addresses starting at address X of size S points to
+device D (where device D can be "PCIe interface n?8"). So, in my
+driver, I set up one PCI memory window and one PCI I/O window per PCIe
+device dynamically depending on which PCIe interfaces actually have a
+device connected to them. Since those windows are limited in number,
+and the global physical address space is limited in size, we definitely
+do not want to have static mappings at fixed physical addresses
+hardcoded in the Device Tree.
+
+That's my main problem: the DT binding at
+http://devicetree.org/MPC5200:PCI seems to assume that the PCIe memory
+and I/O BARs are accessible at fixed CPU physical addresses. This is
+definitely not the case on Armada XP: the CPU physical address for a
+given device will change from one boot to another depending on how many
+PCIe interfaces actually have a device plugged into them. And we
+clearly do not want to make those addresses fixed and static. If you
+could guide me on how the approach to make those standard DT bindings
+compatible with the specificities of the Marvell hardware, it'd be nice.
+
+Same thing for the "interrupt mapping" thing: the "unit interrupt
+specifier" is explained at http://devicetree.org/MPC5200:PCI as "The
+only missing part for now are the weird numbers int the PCI bus unit
+interrupt specifier. Now we have to look into the schematics[6] of the
+Lite5200b board. Here you can see that the IDSEL line of PCI slot 1 is
+tied to PCI address line 24 and the IDSEL line of PCI slot 2 to PCI
+address line 25[7]. The IDSEL lines are used to determine the PCI
+device number." Again, we don't have such hardcoded relation between a
+PCIe interface and "PCI address lines", so I really don't see how to
+use this "interrupt mapping" representation.
+
+Unfortunately, for now, the binding at
+http://devicetree.org/MPC5200:PCI does not make any sense to me
+compared to the hardware that we have. I would definitely appreciate if
+someone could enlighten me on how to properly use such bindings,
+considering the specificities of the hardware we have.
+
+Of course, do not hesitate to get back to me if you need further
+details about the hardware.
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
