@@ -1,42 +1,63 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 12 Dec 2012 16:25:15 +0100
-Subject: [PATCH] ARM: sunxi: Change dtsi naming scheme for sun5i
-Message-ID: <1355325915-22375-1-git-send-email-maxime.ripard@free-electrons.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 12 Dec 2012 16:33:42 +0100
+Subject: [PATCH] arm: dts: Add uart1 and uart2 to igep boards.
+Message-ID: <1355326422-12357-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is several different SoCs sharing the sun5i codename: A10s, A12
-and A13. Since there is enough differences to not consider those the
-same SoCs, change a bit the naming scheme to reflect this.
+This patch is a follow-up patch for Javier Martinez effort adding initial
+device tree support to IGEP technology devices. [1]
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+It adds uart1 and uart2 bindings to the generic dtsi for the IGEP boards.
+
+[1] http://www.spinics.net/lists/linux-omap/msg83409.html
+
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- arch/arm/boot/dts/{sun5i.dtsi => sun5i-a13.dtsi} |    0
- arch/arm/boot/dts/sun5i-olinuxino.dts            |    4 ++--
- 2 files changed, 2 insertions(+), 2 deletions(-)
- rename arch/arm/boot/dts/{sun5i.dtsi => sun5i-a13.dtsi} (100%)
+ arch/arm/boot/dts/omap3-igep.dtsi |   24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-similarity index 100%
-rename from arch/arm/boot/dts/sun5i.dtsi
-rename to arch/arm/boot/dts/sun5i-a13.dtsi
-diff --git a/arch/arm/boot/dts/sun5i-olinuxino.dts b/arch/arm/boot/dts/sun5i-olinuxino.dts
-index d6ff889..498a091 100644
---- a/arch/arm/boot/dts/sun5i-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun5i-olinuxino.dts
-@@ -12,11 +12,11 @@
-  */
+diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+index 125fe00..c02e3c0 100644
+--- a/arch/arm/boot/dts/omap3-igep.dtsi
++++ b/arch/arm/boot/dts/omap3-igep.dtsi
+@@ -27,6 +27,20 @@
+ };
  
- /dts-v1/;
--/include/ "sun5i.dtsi"
-+/include/ "sun5i-a13.dtsi"
+ &omap3_pmx_core {
++	uart1_pins: pinmux_uart1_pins {
++		pinctrl-single,pins = <
++			0x152 0x100	/* uart1_rx.uart1_rx INPUT | MODE0 */
++			0x14c 0		/* uart1_tx.uart1_tx OUTPUT | MODE0 */
++		>;
++	};
++
++	uart2_pins: pinmux_uart2_pins {
++		pinctrl-single,pins = <
++			0x14a 0x100	/* uart2_rx.uart2_rx INPUT | MODE0 */
++			0x148 0		/* uart2_tx.uart2_tx OUTPUT | MODE0 */
++		>;
++	};
++
+ 	uart3_pins: pinmux_uart3_pins {
+ 		pinctrl-single,pins = <
+ 			0x16e 0x100	/* uart3_rx.uart3_rx INPUT | MODE0 */
+@@ -77,6 +91,16 @@
+ 	status = "disabled";
+ };
  
- / {
- 	model = "Olimex A13-Olinuxino";
--	compatible = "olimex,a13-olinuxino", "allwinner,sun5i";
-+	compatible = "olimex,a13-olinuxino", "allwinner,sun5i-a13";
- 
- 	chosen {
- 		bootargs = "earlyprintk console=ttyS0,115200";
++&uart1 {
++       pinctrl-names = "default";
++       pinctrl-0 = <&uart1_pins>;
++};
++
++&uart2 {
++       pinctrl-names = "default";
++       pinctrl-0 = <&uart2_pins>;
++};
++
+ &uart3 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&uart3_pins>;
 -- 
 1.7.9.5
