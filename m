@@ -1,39 +1,72 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 12 Dec 2012 22:20:21 +0000
-Subject: [PATCH v4 3/7] watchdog: sp805_wdt depends on ARM
-In-Reply-To: <20121212212124.GB31853@spo001.leaseweb.com>
-References: <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
- <1355146956-6009-4-git-send-email-ciminaghi@gnudd.com>
- <20121212212124.GB31853@spo001.leaseweb.com>
-Message-ID: <CACxGe6vaAAj_HNc5hzFAk-xL+PA=mj9S3DgL1yArjuQ5-e8iSA@mail.gmail.com>
+From: contato@commcoop.com.br (=?ISO-8859-1?Q?Nota_Certa_Boletins_Jur=EDdicos_Ltda=2E?=)
+Date: Wed, 12 Dec 2012 22:22:59 +0000
+Subject: =?ISO-8859-1?Q?Por_apenas_R=24_9=2C90_n=E3o_perca_seus_prazos_da_justi=E7?=
+ =?ISO-8859-1?Q?a?=
+Message-ID: <90e6ba614b0cb05ef404d0af3d24@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 12, 2012 at 9:21 PM, Wim Van Sebroeck <wim@iguana.be> wrote:
-> Hi Davide
->
->> From: Alessandro Rubini <rubini@gnudd.com>
->>
->> The SP805 driver is only used by the Spear machines, and uses
->> writel_relaxed, which is not available on all architectures.
->>
->> The dependency from CONFIG_ARM avoids compilation problems under
->> randomconfig when CONFIG_ARM_AMBA is enabled for x86 builds.
->>
->> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
->> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
->> Signed-off-by: Davide Ciminaghi <ciminaghi@gnudd.com>
->
-> Signed-off-by: Wim Van Sebroeck <wim@iguana.be>
+NOTA CERTA
+Sua vantagem competitiva no desempenho de suas atividades profissionais.
 
-Point of order. Adding Signed-off-by is only appropriate if you have
-actually "handled" a patch (ie. either applied it to your own git tree
-or you are reposting it). If you're merely stating that you're okay
-with the patch then "Acked-by" is what you should use.
 
-Signed-off-by is more properly about asserting that you received the
-patch under licensing terms compatible with the current. See
-Developer's Certificate of Origin in Documentation/SubmittingPatches
-for details.
+Ainda que voc? tenha contratado um servi?o similar, aproveite este valor  
+promocional e garanta o recebimento de seus acompanhamentos processuais,  
+evitando perda de prazos. Afinal, sua imagem profissional ? o seu maior  
+patrim?nio.
 
-g.
+
+Obtenha suas informa??es jur?dicas, utilizando-se de nosso servi?o de  
+separa??o e identifica??o
+nos di?rios oficiais e receba-as imediatamente quando da disponibiliza??o,  
+atrav?s de uma conta
+espec?fica de email Nota Certa.
+
+
+Apenas R$ 9,90 por estado + IS.
+
+
+Antecipe suas a??es investindo de forma certa, com agilidade e efici?ncia.
+
+
+Se preferir fa?a-nos uma consulta para maiores informa??es ou acesse nosso  
+site e assine de forma
+pr?tica e r?pida para obter de imediato ?s suas informa??es judici?rias  
+publicadas, envie-nos um
+email para admnota at notacerta.com.br com as informa??es abaixo e receba 30  
+dias de cortesia.
+
+
+Marque abaixo as op??es de leituras de sua necessidade
+
+
+( ) Rio Grande do Sul
+( ) Santa Catarina
+( ) Paran?
+( ) S?o Paulo
+( ) Rio de Janeiro
+( ) Mato Grosso
+( ) Mato Grosso do Sul
+( ) Espirito Santo
+( ) Minas Gerais
+( ) Bahia
+( ) Distrito Federal
+
+
+Nome :
+Varia??o do nome nas publica??es:
+N?mero da OAB :
+E-mail:
+Fone: (   )
+Data de Nascimento:
+
+
+Se desejar entre em contato conosco pelo telefone (51) 3212-5890
+
+
+Atenciosamente,
+
+
+Equipe Nota Certa
+www.notacerta.com.br
+Fone: (51) 3212.5890
