@@ -1,36 +1,57 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 11 Dec 2012 15:27:39 -0800
-Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
- cache LoUIS operations
-In-Reply-To: <20121211163843.GH16759@mudshark.cambridge.arm.com>
-References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
- <20120919134658.GA2111@linaro.org>
- <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
- <20120920110439.GB2117@linaro.org>
- <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
- <20121211163313.GG16759@mudshark.cambridge.arm.com>
- <20121211163843.GH16759@mudshark.cambridge.arm.com>
-Message-ID: <50C7C16B.7050106@codeaurora.org>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Wed, 12 Dec 2012 11:25:02 +1100
+Subject: [PATCH] ARM: ep93xx: properly wait for UART FIFO to be empty
+In-Reply-To: <1836468.ZU3cPkV103@bender>
+References: <1836468.ZU3cPkV103@bender>
+Message-ID: <50C7CEDE.4030703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/12 08:38, Will Deacon wrote:
-> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-> index cd95664..f58248f 100644
-> --- a/arch/arm/mm/cache-v7.S
-> +++ b/arch/arm/mm/cache-v7.S
-> @@ -44,7 +44,8 @@ ENDPROC(v7_flush_icache_all)
->  ENTRY(v7_flush_dcache_louis)
->         dmb                                     @ ensure ordering with previous memory accesses
->         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
-> -       ands    r3, r0, #0xe00000               @ extract LoUIS from clidr
-> +       ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
-> +       ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
->         mov     r3, r3, lsr #20                 @ r3 = LoUIS * 2
+On 11/12/12 08:21, Florian Fainelli wrote:
+> This patch changes the busy-waiting loop around in the decompressor
+> putc() function on the UART FIFO register. Without a proper wait, the
+> output of the decompressor was corrupted like this:
+> 
+> Uncompressing Linx. done, booting th enl
+> 
+> To highlight the issue more evidently, looping 100 times instead of 1000
+> makes the issue appear much faster. This patch takes the approach of
+> using an active while loop until the FIFO is empty (not FULL).
+> This issue happened to me on Sim.One running at 200Mhz.
+> 
+> Signed-off-by: Florian Fainelli <florian@openwrt.org>
+> ---
+> Ryan, this is based on your ep93xx-fixes branch, thanks!
 
-You need to fix this mov as well, right?
+Thank you,
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Applied to ep93xx-fixes.
+
+~Ryan
+
+> 
+>  arch/arm/mach-ep93xx/include/mach/uncompress.h |   10 +++-------
+>  1 file changed, 3 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ep93xx/include/mach/uncompress.h b/arch/arm/mach-ep93xx/include/mach/uncompress.h
+> index 16026c2..d64274f 100644
+> --- a/arch/arm/mach-ep93xx/include/mach/uncompress.h
+> +++ b/arch/arm/mach-ep93xx/include/mach/uncompress.h
+> @@ -47,13 +47,9 @@ static void __raw_writel(unsigned int value, unsigned int ptr)
+>  
+>  static inline void putc(int c)
+>  {
+> -	int i;
+> -
+> -	for (i = 0; i < 1000; i++) {
+> -		/* Transmit fifo not full?  */
+> -		if (!(__raw_readb(PHYS_UART_FLAG) & UART_FLAG_TXFF))
+> -			break;
+> -	}
+> +	/* Transmit fifo not full?  */
+> +	while (__raw_readb(PHYS_UART_FLAG) & UART_FLAG_TXFF)
+> +		;
+>  
+>  	__raw_writeb(c, PHYS_UART_DATA);
+>  }
+> 
