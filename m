@@ -1,60 +1,36 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 12 Dec 2012 15:43:05 -0600
-Subject: [RFC 2/5] ARM: dts: Add Cross Trigger Interface binding
+Date: Wed, 12 Dec 2012 15:43:08 -0600
+Subject: [RFC 5/5] ARM: OMAP4: Add AMBA APB Clock
 In-Reply-To: <1355348588-22318-1-git-send-email-jon-hunter@ti.com>
 References: <1355348588-22318-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1355348588-22318-3-git-send-email-jon-hunter@ti.com>
+Message-ID: <1355348588-22318-6-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a device-tree binding for the ARM Cross Trigger Interface (CTI).
-The ARM Cross Trigger Interface provides a way to route events between
-processor modules. For example, on OMAP4430 we use the CTI module to
-route PMU events to the GIC interrupt module.
+For OMAP4 devices, ARM AMBA peripherals such as program trace module
+(PTM) or cross trigger interface (CTI) require that the DEBUG Sub-system
+power and clock domain is turned on. Normally, the OMAP device and HMWOD
+frameworks would be used to enable the power and clock domains, but
+currently these frameworks only support platform devices and not AMBA
+devices. Therefore, add a clock alias for the AMBA APB clock for OMAP4
+devices to turn on the DEBUGSS power and clock domain.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- Documentation/devicetree/bindings/arm/cti.txt |   32 +++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/cti.txt
+ arch/arm/mach-omap2/cclock44xx_data.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/cti.txt b/Documentation/devicetree/bindings/arm/cti.txt
-new file mode 100644
-index 0000000..4a0e2d3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/cti.txt
-@@ -0,0 +1,32 @@
-+* ARM Cross Trigger Interface (CTI)
-+
-+The ARM Cross Trigger Interface provides a way to route events between
-+processor modules. For example, debug events from one processor can be
-+broadcasted to other processors. The events that can be routed between
-+processors are specific to the device.
-+
-+Required properties:
-+
-+- compatible:			Should be "arm,primecell".
-+- interrupts:			Interrupt associated with CTI module.
-+- reg:				Contains timer register address range (base
-+				address and length).
-+- arm,cti-name:			A unique name for the CTI module, that will be
-+				used when requesting the CTI module instance.
-+
-+
-+Optional properties:
-+
-+- arm-primecell-periphid:	Primecell peripheral ID associated with CTI
-+				module.
-+
-+
-+Example:
-+
-+cti0: cti at 0x54148000 {
-+	compatible = "arm,primecell";
-+	interrupts = <0 1 0x4>;
-+	reg = <0x54148000 0x1000>;
-+	arm,cti-name = "cti0";
-+	arm,primecell-periphid = <0x003bb906>;
-+};
+diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
+index aa56c3e..1ac3dc5 100644
+--- a/arch/arm/mach-omap2/cclock44xx_data.c
++++ b/arch/arm/mach-omap2/cclock44xx_data.c
+@@ -1940,6 +1940,7 @@ static struct omap_clk omap44xx_clks[] = {
+ 	CLK("4903c000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+ 	CLK("4903e000.timer",	"timer_sys_ck",	&syc_clk_div_ck,	CK_443X),
+ 	CLK(NULL,	"cpufreq_ck",	&dpll_mpu_ck,	CK_443X),
++	CLK(NULL,	"apb_pclk",		&trace_clk_div_ck,	CK_443X),
+ };
+ 
+ static const char *enable_init_clks[] = {
 -- 
 1.7.10.4
