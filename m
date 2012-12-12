@@ -1,50 +1,34 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 12 Dec 2012 17:31:53 +0100
-Subject: [PATCH] mxs: uart: allow setting RTS from software
-Message-ID: <1355329913-27666-1-git-send-email-s.trumtrar@pengutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Dec 2012 08:39:42 -0800
+Subject: [GIT PULL 0/5] ARM: arm-soc: First batch of updates for 3.8
+Message-ID: <20121212163942.GA16036@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the patch "serial: mxs-auart: fix the wrong RTS hardware flow control" the
-mainline mxs-uart driver now sets RTSEN only when hardware flow control is
-enabled via software. It is not possible any longer to set RTS manually via
-software. However, the manual modification is a valid operation.
-Regain the possibility to set RTS via software and only set RTSEN when hardware
-flow control is explicitly enabled via settermios cflag CRTSCTS.
+Hi Linus,
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
- drivers/tty/serial/mxs-auart.c |    8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+Here is the first set of pull requests for arm-soc for this merge window.
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 6db23b0..9b62c4b 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -412,10 +412,12 @@ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
- 
- 	u32 ctrl = readl(u->membase + AUART_CTRL2);
- 
--	ctrl &= ~AUART_CTRL2_RTSEN;
-+	ctrl &= ~(AUART_CTRL2_RTSEN | AUART_CTRL2_RTS);
- 	if (mctrl & TIOCM_RTS) {
- 		if (tty_port_cts_enabled(&u->state->port))
- 			ctrl |= AUART_CTRL2_RTSEN;
-+		else
-+			ctrl |= AUART_CTRL2_RTS;
- 	}
- 
- 	s->ctrl = mctrl;
-@@ -678,6 +680,10 @@ static void mxs_auart_settermios(struct uart_port *u,
- 		}
- 		ctrl2 |= AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN;
- 	} else {
-+		u->flags |= ASYNC_CTS_FLOW;
-+		ctrl2 |= AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN;
-+	} else {
-+		u->flags &= ~ASYNC_CTS_FLOW;
- 		ctrl2 &= ~(AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN);
- 	}
- 
--- 
-1.7.10.4
+Unfortunately we seem to have quite a few of little nagging merge conflicts for
+this release. There's been some bugfixes upstream that conflicted with cleanups
+and refactorings, and there's been a lot of header file moves that resulted in
+include-section conflicts.
+
+I've documented my proposed resolution in each pull request, and as usual
+I have also pushed up my resulting merge as <branch>-resolved, in case you want
+to diff.
+
+There's only one gotcha that I am aware of, and that is for the 'cleanup'
+branch, where a build break will be introduced if you don't fixup a
+function name rename/conflict that isn't detected by git since the new
+code was added with the old name in one of the branches. Not a big deal
+if you miss it, we'll submit a patch to fix it up in that case.
+
+I've got more to come, but wanted to break it up in a couple of batches. More
+details in each pull request.
+
+
+Thanks!
+
+
+-Olof
