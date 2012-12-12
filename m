@@ -1,62 +1,120 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 12 Dec 2012 23:46:13 +0100
-Subject: [PATCH] ARM: decompressor: Flush tlb before swiching domain 0
- to client mode
-In-Reply-To: <CAMP5Xgdj_w_Kdek2WY-k73Od9DRfMpwnBuTfu9WKJFJnQ3VARQ@mail.gmail.com>
-References: <1355276466-18295-1-git-send-email-arve@android.com>
- <50C85807.2000609@ti.com>
- <CAMP5Xgdj_w_Kdek2WY-k73Od9DRfMpwnBuTfu9WKJFJnQ3VARQ@mail.gmail.com>
-Message-ID: <50C90935.5050404@ti.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 12 Dec 2012 17:02:10 -0600
+Subject: [PATCH v7 5/5] ARM: OMAP: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <50C84AC6.5030307@gmail.com>
+References: <1354734571-10774-1-git-send-email-zonque@gmail.com>
+ <1354734571-10774-6-git-send-email-zonque@gmail.com>
+ <20121205222232.67B2B3E0E22@localhost> <50BFCBCC.6030706@ti.com>
+ <20121205232426.BAD573E0E22@localhost> <50C0C5AB.3030201@ti.com>
+ <50C84AC6.5030307@gmail.com>
+Message-ID: <50C90CF2.1090405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 December 2012 11:27 PM, Arve Hj?nnev?g wrote:
-> On Wed, Dec 12, 2012 at 2:10 AM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
->> On Wednesday 12 December 2012 02:41 AM, Arve Hj?nnev?g wrote:
->>>
->>> If the bootloader used a page table that is incompatible with domain 0
->>> in client mode, then swithing domain 0 to client mode causes a fault
->>> if we don't flush the tlb after updating the page table pointer.
->>>
->>> Signed-off-by: Arve Hj?nnev?g <arve@android.com>
->>> ---
->>>    arch/arm/boot/compressed/head.S |    1 +
->>>    1 files changed, 1 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/compressed/head.S
->>> b/arch/arm/boot/compressed/head.S
->>> index 90275f0..9c8034c 100644
->>> --- a/arch/arm/boot/compressed/head.S
->>> +++ b/arch/arm/boot/compressed/head.S
->>> @@ -704,6 +704,7 @@ __armv7_mmu_cache_on:
->>>                  bic     r6, r6, #1 << 31        @ 32-bit translation
->>> system
->>>                  bic     r6, r6, #3 << 0         @ use only ttbr0
->>>                  mcrne   p15, 0, r3, c2, c0, 0   @ load page table pointer
->>> +               mcrne   p15, 0, r0, c8, c7, 0   @ flush I,D TLBs
->>>                  mcrne   p15, 0, r1, c3, c0, 0   @ load domain access
->>> control
->>>                  mcrne   p15, 0, r6, c2, c0, 2   @ load ttb control
->>>    #endif
->>>
->> The TLB's are already flushed few lines above so above patching
->> shouldn't help if it was really dirty TLB entry issue. I suspect that
->> your boot-loader clean-up [1] function may not be taking care of
->> flushing caches which could potetially lead to the issue.
->>
->> Have you checked that ?
->>
->
-> No, the problem is that the mmu is on when that first tlb flush
-> happens so the tlb entry for the code that is executing gets reloaded
-> from the old page table. This is probably a bootloader bug, but I
-> don't have the bootloader source and 3.4 boots with the same
-> bootloader.
->
-Yes. The MMU is suppose to be turned off by boot-loader before jumping
-to the kernel. That explains the problem. No need to patch
-the kernel here.
 
-Regards
-Santosh
+On 12/12/2012 03:13 AM, Daniel Mack wrote:
+> On 06.12.2012 17:19, Jon Hunter wrote:
+>>
+>> On 12/05/2012 05:24 PM, Grant Likely wrote:
+>>> On Wed, 5 Dec 2012 16:33:48 -0600, Jon Hunter <jon-hunter@ti.com> wrote:
+>>>> Hi Grant,
+>>>>
+>>>> On 12/05/2012 04:22 PM, Grant Likely wrote:
+>>>>> On Wed,  5 Dec 2012 20:09:31 +0100, Daniel Mack <zonque@gmail.com> wrote:
+>>>>>> This patch adds basic DT bindings for OMAP GPMC.
+>>>>>>
+>>>>>> The actual peripherals are instantiated from child nodes within the GPMC
+>>>>>> node, and the only type of device that is currently supported is NAND.
+>>>>>>
+>>>>>> Code was added to parse the generic GPMC timing parameters and some
+>>>>>> documentation with examples on how to use them.
+>>>>>>
+>>>>>> Successfully tested on an AM33xx board.
+>>>>>>
+>>>>>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>>>>>> ---
+>>>>>>  Documentation/devicetree/bindings/bus/ti-gpmc.txt  |  77 ++++++++++
+>>>>>>  .../devicetree/bindings/mtd/gpmc-nand.txt          |  76 +++++++++
+>>>>>>  arch/arm/mach-omap2/gpmc.c                         | 171 ++++++++++++++++++++-
+>>>>>>  3 files changed, 323 insertions(+), 1 deletion(-)
+>>>>>>  create mode 100644 Documentation/devicetree/bindings/bus/ti-gpmc.txt
+>>>>>>  create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/bus/ti-gpmc.txt b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
+>>>>>> new file mode 100644
+>>>>>> index 0000000..7d2a645
+>>>>>> --- /dev/null
+>>>>>> +++ b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
+>>>>>> @@ -0,0 +1,77 @@
+>>>>>> +Device tree bindings for OMAP general purpose memory controllers (GPMC)
+>>>>>> +
+>>>>>> +The actual devices are instantiated from the child nodes of a GPMC node.
+>>>>>> +
+>>>>>> +Required properties:
+>>>>>> +
+>>>>>> + - compatible:		Should be set to "ti,gpmc"
+>>>>>
+>>>>> Please, be specific. Use something like "ti,am3340-gpmc" or
+>>>>> "ti,omap3430-gpmc". The compatible property is a list so that new
+>>>>> devices can claim compatibility with old. Compatible strings that are
+>>>>> overly generic are a pet-peave of mine.
+>>>>
+>>>> We aim to use the binding for omap2,3,4,5 as well as the am33xx devices
+>>>> (which are omap based). Would it be sufficient to have "ti,omap2-gpmc"
+>>>> implying all omap2+ based devices or should we have a compatible string
+>>>> for each device supported?
+>>>
+>>> Are they each register-level compatible with one another?
+>>
+>> They are not 100% register compatible. There are a couple fields in the
+>> binding that are only applicable to OMAP3+ devices.
+>>
+>>> The general recommended approach here is to make subsequent silicon
+>>> claim compatibility with the first compatible implementation.
+>>>
+>>> So, for an am3358 board:
+>>> 	compatible = "ti,am3358-gpmc", "ti,omap2420-gpmc";
+>>>
+>>> Essentially, what this means is that "ti,omap2420-gpmc" is the generic
+>>> value instead of "omap2-gpmc". The reason for this is so that the value
+>>> is anchored against a specific implementation, and not against something
+>>> completely imaginary or idealized. If a newer version isn't quite
+>>> compatible with the omap2420-gpmc, then it can drop the compatible claim
+>>> and the driver really should be told about the new device.
+>>
+>> Ok, gotcha! I will do a register comparison and may be recommend to
+>> Daniel which compatible strings we will need.
+> 
+> Any idea yet how we want to continue on this? I'm asking because I'm
+> leaving for a longer trip by the end of this week, and so anything I
+> haven't finished until then will have to be postponed until February or
+> be taken over by someone else :)
+
+Thanks for the reminder!
+
+So looking at this today, here is what I see when comparing the
+registers ...
+
+omap2430 != omap2420
+omap3430 != omap2430
+omap3630 == omap3430
+omap4430 != omap3430
+omap4460 == omap4430
+omap543x == omap4430
+am335x != omap4430
+
+Therefore, I believe that we need to have the following compatible
+strings ...
+
+ti,omap2420-gpmc
+ti,omap2430-gpmc
+ti,omap3430-gpmc (omap3430 & omap3630)
+ti,omap4430-gpmc (omap4430 & omap4460 & omap543x)
+ti,am3352-gpmc (am335x devices)
+
+Probably worth adding a comment to the Documentation what should be used
+for which device.
+
+Cheers
+Jon
