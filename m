@@ -1,61 +1,57 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 12 Dec 2012 12:56:24 +0100
-Subject: [PATCH] drivers/pinctrl/pinctrl-at91.c: convert kfree to
- devm_kfree
-In-Reply-To: <1355223525-19165-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1355223525-19165-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20121212115624.GI4398@game.jcrosoft.org>
+Date: Wed, 12 Dec 2012 12:58:28 +0100
+Subject: [PATCH] drivers/pinctrl: grab default handles from device core
+In-Reply-To: <20121211181336.GD25714@kroah.com>
+References: <1355233246-16694-1-git-send-email-linus.walleij@stericsson.com>
+ <20121211181336.GD25714@kroah.com>
+Message-ID: <20121212115828.GJ4398@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:58 Tue 11 Dec     , Julia Lawall wrote:
-> From: Julia Lawall <Julia.Lawall@lip6.fr>
+On 10:13 Tue 11 Dec     , Greg Kroah-Hartman wrote:
+> On Tue, Dec 11, 2012 at 02:40:46PM +0100, Linus Walleij wrote:
+> > diff --git a/include/linux/device.h b/include/linux/device.h
+> > index 86ef6ab..dc399ab 100644
+> > --- a/include/linux/device.h
+> > +++ b/include/linux/device.h
+> > @@ -21,6 +21,7 @@
+> >  #include <linux/compiler.h>
+> >  #include <linux/types.h>
+> >  #include <linux/mutex.h>
+> > +#include <linux/pinctrl/devinfo.h>
+> >  #include <linux/pm.h>
+> >  #include <linux/atomic.h>
+> >  #include <linux/ratelimit.h>
+> > @@ -605,6 +606,8 @@ struct device_dma_parameters {
+> >   * @pm_domain:	Provide callbacks that are executed during system suspend,
+> >   * 		hibernation, system resume and during runtime PM transitions
+> >   * 		along with subsystem-level and driver-level callbacks.
+> > + * @pins:	For device pin management.
+> > + *		See Documentation/pinctrl.txt for details.
+> >   * @numa_node:	NUMA node this device is close to.
+> >   * @dma_mask:	Dma mask (if dma'ble device).
+> >   * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
+> > @@ -656,6 +659,10 @@ struct device {
+> >  	struct dev_pm_info	power;
+> >  	struct dev_pm_domain	*pm_domain;
+> >  
+> > +#ifdef CONFIG_PINCTRL
+> > +	struct dev_pin_info	pins;
+> > +#endif
 > 
-> The function at91_dt_node_to_map is ultimately called by the function
-> pinctrl_get, which is an exported function.  Since it is possible that this
-> function is not called from within a probe function, for safety, the kfree
-> is converted to a devm_kfree, to both free the data and remove it from the
-> device in a failure situation.
+> Can't you just make this a * to the structure, saving a bit of space for
+> those that don't use this structure?  Ok, it's only saving one pointer,
+> so it's really not a big deal to me if you don't want to do this, just
+> asking...
 > 
-> A newline is added in the call to devm_kfree to avoid exceeding the 80
-> character limit.
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
-> ---
->  drivers/pinctrl/pinctrl-at91.c |    5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index c5e7571..0da8a5f 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -255,7 +255,8 @@ static int at91_dt_node_to_map(struct pinctrl_dev *pctldev,
->  	}
->  
->  	map_num += grp->npins;
-> -	new_map = devm_kzalloc(pctldev->dev, sizeof(*new_map) * map_num, GFP_KERNEL);
-> +	new_map = devm_kzalloc(pctldev->dev, sizeof(*new_map) * map_num,
-> +			       GFP_KERNEL);
-not related please drop
->  	if (!new_map)
->  		return -ENOMEM;
->  
-> @@ -265,7 +266,7 @@ static int at91_dt_node_to_map(struct pinctrl_dev *pctldev,
->  	/* create mux map */
->  	parent = of_get_parent(np);
->  	if (!parent) {
-> -		kfree(new_map);
-> +		devm_kfree(pctldev->dev, new_map);
-ok
->  		return -EINVAL;
->  	}
->  	new_map[0].type = PIN_MAP_TYPE_MUX_GROUP;
->
+> Also, this will have to wait until after 3.8-rc1 before I can consider
+> merging it, I'm a bit busy for the next two weeks at the least...
+can do do not put ifdef in the struct as if will force us to put ifdef in the
+c code too instead of just use a inline function
+
 Best Regards,
 J.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> thanks,
+> 
+> greg k-h
