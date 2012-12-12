@@ -1,99 +1,94 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 12 Dec 2012 14:04:43 -0700
-Subject: [PATCH] NTP: Add a CONFIG_RTC_SYSTOHC configuration
-In-Reply-To: <50C8DDAA.5010101@linaro.org>
-References: <20121212055643.GA18078@obsidianresearch.com>
- <50C8DDAA.5010101@linaro.org>
-Message-ID: <20121212210443.GB11530@obsidianresearch.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 12 Dec 2012 15:15:36 -0600
+Subject: [PATCH 3/3] ARM: MM: Add the workaround of Errata 766421
+In-Reply-To: <001901cdd669$4cd77070$e6865150$%kim@samsung.com>
+References: <001901cdd669$4cd77070$e6865150$%kim@samsung.com>
+Message-ID: <50C8F3F8.1020102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 12, 2012 at 11:40:26AM -0800, John Stultz wrote:
+On 12/09/2012 06:00 PM, Boojin Kim wrote:
+> This patch adds the workaround of errata 766421 that adds 'dmb' when changing
+> the translation regime after conditions that the errata 766421 may occur.
+> Concretely, Add 'dmb' when changing ASID and secure state for cortex-A15 r0p4.
+> 
+> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> ---
+>  arch/arm/Kconfig             |   13 +++++++++++++
+>  arch/arm/mach-exynos/Kconfig |    1 +
+>  arch/arm/mm/proc-v7-2level.S |    2 ++
+>  3 files changed, 16 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 93397da..9bd34dd 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1417,6 +1417,19 @@ config ARM_ERRATA_775420
+>  	 to deadlock. This workaround puts DSB before executing ISB if
+>  	 an abort may occur on cache maintenance.
+> 
+> +config ARM_ERRATA_766421
+> +	bool "ARM errata: Strongly-Ordered/Device load or NC LDREX could return incorrect data"
+> +	depends on CPU_V7
+> +	help
+> +	  This option enables the workaround for the erratum 766421 affecting
+> +	  Cortex-A15 erratum (r0p4).
+> +	  In certain situations, a strongly ordered or device load instruction,
+> +	  or a non-cacheable normal memory load-exclusive instruction could
+> +	  match multiple fill buffers and return incorrect data.
+> +	  This workaround is add DMB instruction when making any change to the
+> +	  translation regime and before doing any new loads/stores/preloads
+> +	  in the new translation regime.
+> +
+>  config ARM_ERRATA_773022
+>  	bool "ARM errata: incorrect instructions may be executed from loop buffer"
+>  	depends on CPU_V7
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index bb92f4c..4e28e1c 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -66,6 +66,7 @@ config SOC_EXYNOS5250
+>  	select S5P_PM if PM
+>  	select S5P_SLEEP if PM
+>  	select SAMSUNG_DMADEV
+> +	select ARM_ERRATA_766421
+>  	help
+>  	  Enable EXYNOS5250 SoC support
+> 
+> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+> index fd045e7..c663b2e 100644
+> --- a/arch/arm/mm/proc-v7-2level.S
+> +++ b/arch/arm/mm/proc-v7-2level.S
+> @@ -53,6 +53,8 @@ ENTRY(cpu_v7_switch_mm)
+>  #endif
+>  #ifdef CONFIG_ARM_ERRATA_754322
+>  	dsb
+> +#elif CONFIG_ARM_ERRATA_766421
+> +	dmb
 
-> >The option also overrides the call to any platform update_persistent_clock
-> >so that the RTC subsystem completely and generically replaces this
-> >functionality.
-> >
-> >Tested on ARM kirkwood and PPC405
+Despite the comments on the 1st patch, this one would still be needed as
+it cannot be done before the kernel runs.
 
-> So I'm initially mixed on this, as it feels a little redundant (esp
-> given it may override a higher precision arch-specific function).
-> But from the perspective of this being a generic RTC function,
-> instead of an per-arch implementation, it does seem reasonable.
+However, if you have 754322 and 766421 enabled, we would have dsb and
+dmb. We do something like this instead:
 
-It isn't really redundant. The kernel still has two RTC subsystems,
-'class RTC' and various platform specific
-things. update_persisent_clock is the entry for the platform specific
-RTC, while rtc_update_persistent_clock is the entry for class RTC.
-
-The issue is on platforms like PPC where both co-exist. On PPC
-update_persisent_clock just calls through a function pointer
-(set_rtc_time) to the machine description to do whatever that mach
-needs. Currently all the PPC mach's that use class RTC drivers via DTS
-set set_rtc_time to null. Only the machs that implement a non class
-RTC driver provide an implementation.
-
-So it is an either/or case - either rtc_update_persistent_clock works
-or update_persistent_clock does, never both.
-
-> >diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-> >index 19c03ab..30a866a 100644
-> >+++ b/drivers/rtc/Kconfig
-> >@@ -48,6 +48,14 @@ config RTC_HCTOSYS_DEVICE
-> >  	  sleep states. Do not specify an RTC here unless it stays powered
-> >  	  during all this system's supported sleep states.
-> >
-> >+config RTC_SYSTOHC
-> >+	bool "Set the RTC time based on NTP synchronization"
-> >+	default y
-> >+	help
-> >+	  If you say yes here, the system time (wall clock) will be stored
-> >+          in the RTC specified by RTC_HCTOSYS_DEVICE approximately every 11
-> >+  	  minutes if the NTP status is synchronized.
-> >+
-> Nit: Does this need to depend on RTC_HCTOSYS_DEVICE being set?
-
-Yes, it looks like RTC_HCTOSYS_DEVICE should have:
- depends on RTC_SYSTOHC = y
-
-I will correct that
-
-> Hrm. So on architectures that support GENERIC_CMOS_UPDATE already,
-> this creates a duplicated code path that is slightly different. I'd
-> like to avoid this if possible.  Since you're plugging
-> rtc_update_persistent_clock into the GENERIC_CMOS_UPDATE code, we
-> can't just have this option depend on !GENERIC_CMOS_UPDATE.
-
-It isn't duplicate, we need to keep update_persistent_clock to support
-non-class RTC machines.
-
-I thought about this:
-
-        if (abs(now.tv_nsec - (NSEC_PER_SEC / 2)) <= tick_nsec / 2) {
-	        fail = -1;
-#ifdef CONFIG_RTC_SYSTOHC
-	        fail = rtc_update_persistent_clock(now);
+#if defined(CONFIG_ARM_ERRATA_754322) || defined(CONFIG_ARM_ERRATA_766421)
+  	dsb
 #endif
-#ifdef CONFIG_GENERIC_CMOS_UPDATE
-                if (fail)
-                         fail = update_persistent_clock(now);
-#endif
-       }
 
-Try the RTC function first, then fall back to the legacy platform
-function if it didn't work.
+Rob
 
-That seems better to me, do you agree?
-
-> So this might need a slightly deeper rework?
-> I'd suggest the following:
-> 1) Convert GENERIC_CMOS_UPDATE into SUPPORTS_UPDATE_PERSISTENT_CLOCK.
-> 2) Add RTC_SYSTOHC but make it depend on !SUPPORTS_UPDATE_PERSISTENT_CLOCK
-
-This would only work for ARM, not PPC..
-
-Ultimately I suspect the clean up needed is to convert more things to
-class rtc drivers and remove update_persistent_clock.
-ppc is pretty close already, and I think ARM is already there.
-
-Jason
+>  #endif
+>  	mcr	p15, 0, r1, c13, c0, 1		@ set context ID
+>  	isb
+> --
+> 1.7.5.4
+> 
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
