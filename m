@@ -1,80 +1,80 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 12 Dec 2012 08:30:35 +0530
-Subject: [PATCH V3 2/3] dmaengine: dw_dmac: Enhance device tree support
-In-Reply-To: <201212102208.52347.arnd@arndb.de>
-References: <3100e691db3f94c22afd98b609a1568d7e70dfe7.1350360935.git.viresh.kumar@linaro.org>
- <169edae67b9a051ca7448e5b62c3cd2c5c1db470.1350360935.git.viresh.kumar@linaro.org>
- <201212102208.52347.arnd@arndb.de>
-Message-ID: <CAKohpo=FjZuMOC-wuNc3q_FXbk546ttCLr55GkW9AL0Tz-HoBA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 11 Dec 2012 21:01:02 -0600
+Subject: Errata on multiplatform kernels
+In-Reply-To: <20121212005154.GY14363@n2100.arm.linux.org.uk>
+References: <1355203223.16750.2.camel@gitbox>
+ <CAOesGMjJ=y4J70CaYYaEem0ni7Vb48KuEZKxaVYuCCCoMYwjPw@mail.gmail.com>
+ <20121211180138.GB4989@atomide.com> <50C7D2AE.7050301@jonmasters.org>
+ <20121212005154.GY14363@n2100.arm.linux.org.uk>
+Message-ID: <50C7F36E.3090308@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for replying late, was too busy with other work yesterday.
+On 12/11/2012 06:51 PM, Russell King - ARM Linux wrote:
+> On Tue, Dec 11, 2012 at 07:41:18PM -0500, Jon Masters wrote:
+>> On 12/11/2012 01:01 PM, Tony Lindgren wrote:
+>>> * Olof Johansson <olof@lixom.net> [121210 21:38]:
+>>>> Hi,
+>>>>
+>>>> On Mon, Dec 10, 2012 at 9:20 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
+>>>>> How are errata handled on multiplatform kernels?
+>>>>>
+>>>>> There don't appear to be any errata selected by default in any of the
+>>>>> current multiplatform options, but presumably it will happen eventually.
+>>>>>
+>>>>> Does that mean the errata will be applied to all machines that boot with
+>>>>> the errata selected, even if not required?
+>>>>
+>>>> Yes. To date I believe most errata we have are just performance hits
+>>>> on platforms that don't need it.
+>>>>
+>>>> Other architectures have in some cases added runtime patching (out) of
+>>>> workarounds that aren't needed on the current platform for the ones
+>>>> that have significant performance impact. I'm guessing we'll end up
+>>>> with something similar eventually but until then we'll try to just go
+>>>> with the superset of needed errata.
+>>>
+>>> We can't enable any of the errata if there's a chance that it will behave
+>>> in a different way for secure mode devices compared to non-secure devices.
+>>>
+>>> The discussion is in the thread "[PATCH] ARM: Fix errata 751472 handling
+>>> on Cortex-A9 r1p*".
+>>>
+>>> The conclusion was that we cannot enable any errata for multiplatform,
+>>> and must assume the errata is handled by the bootloader. Multiplatform
+>>> image is already broken for at least omap4 as 751472 is selected.
+>>
+>> On some platforms with a PL310 we have errata 588369 and 727915
+>> (especially enabled on OMAP4 targets) which will cause an external abort
+>> when enabled and then booted on highbank systems. This has taken the
+>> last couple of days on and off to track down. So I guess we need to
+>> basically disable these in our (Fedora) multiplatform kernel and then
+>> assume that e.g. PandaBoard will implement some U-Boot fix if it needs
+>> to have one? Not sure exactly what that fix is going to look like :)
+> 
+> Neither 588369 nor 727915 are something a boot loader can do - they have
+> to be done in the kernel.  If they're causing highbank systems to fail
+> that needs to be debugged.
+> 
+> My guess is that highbank is another non-secure system, and the L2x0
+> code is trying to use pl310_set_debug() which will fail on non-secure
+> systems as the 'set_debug' hook is not being overriden.
+> 
+> If there was a way to tell that we're running on a non-secure system,
+> we could automatically point set_debug() to a nop function, but it
+> would be far more preferable for highbank to provide the hook.  (That
+> could be itself a no-op if it doesn't require the work-around.)
 
-On 11 December 2012 03:38, Arnd Bergmann <arnd@arndb.de> wrote:
-> I'm deeply sorry for the very late complaint on this, but I only now
+Actually, we should check the pl310 revision and set .set_debug to NULL
+on r3p1 and later. This will fix highbank and any other platform that
+doesn't need the work-around. I'd assume platforms that are non-secure
+and need this work-around will override .set_debug. I'll work on a patch.
 
-Better late than never :)
+Rob
 
-> noticed this patch as I was seeing build breakage in linux-next
-> because of it.
-
-Oops!! Here is a fix for that
-
-Author: Viresh Kumar <viresh.kumar@linaro.org>
-Date:   Wed Dec 12 08:28:07 2012 +0530
-
-    ARM: SPEAr1310: Fix CF DMA data
-
-    We need to pass string with device-channel name to dma controller
-instead of dma
-    controller specific dma struct. Fix CF dma data.
-
-    Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm/mach-spear13xx/spear1310.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-spear13xx/spear1310.c
-b/arch/arm/mach-spear13xx/spear1310.c
-index f65ad5b..54f0e2e 100644
---- a/arch/arm/mach-spear13xx/spear1310.c
-+++ b/arch/arm/mach-spear13xx/spear1310.c
-@@ -36,7 +36,7 @@
- static struct arasan_cf_pdata cf_pdata = {
-        .cf_if_clk = CF_IF_CLK_166M,
-        .quirk = CF_BROKEN_UDMA,
--       .dma_priv = &cf_dma_priv,
-+       .dma_priv = "cf",
- };
-
-> Viresh, there are multiple problems with your approach unfortunately:
->
-> * It does not follow the binding from
->   Documentation/devicetree/bindings/dma/dma.txt
-
-When i patched it, this patch wasn't there in linux-next/master.
-Probably was getting reviewed somewhere :)
-
-> * It requires slave drivers to know that they are using the dw_dmac
->   driver and pass a pointer to dw_generic_filter, which is not
->   generic at all
->
-> * It requires the dmac node to have information about all slaves
->
-> There are also some minor issues, such as the naming of DT
-> properties, but the above need to be resolved first.
-
-I saw the binding document and it looks it can be applied to dw_dmac
-too, as there is nothing special for it.
-
-The question is how? We are already late for merge window and this
-one is queued. Supplying a new patch, getting it reviewed/tested and
-being pulled by Linus is not so easy :)
-
-Two ways:
-- Keep it as is, and i will fix it separately and quickly
-- Drop it :(
-
---
-viresh
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
