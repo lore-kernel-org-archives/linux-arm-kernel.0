@@ -1,204 +1,110 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 12 Dec 2012 11:33:19 +0100
-Subject: [PATCH 02/12] ARM: OMAP2+: PM: introduce power domains functional
- states
-In-Reply-To: <20121209175253.6933.87846.stgit@dusk.lan>
-References: <20121209174545.6933.59371.stgit@dusk.lan>
- <20121209175253.6933.87846.stgit@dusk.lan>
-Message-ID: <CAORVsuXnbNLm3i=W2yb682qC1QH673nM3nPpNM_9OMds8SdzQA@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 12 Dec 2012 16:04:07 +0530
+Subject: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
+ OMAP-L138 DSP
+In-Reply-To: <13514BD7FAEBA745BBD7D8A672905C14311FBDA3@DFLE08.ent.ti.com>
+References: <1352853207-20602-1-git-send-email-rtivy@ti.com>
+ <1352853207-20602-5-git-send-email-rtivy@ti.com> <50AB76FA.1050505@ti.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311F952B@DFLE08.ent.ti.com>
+ <50B88F7C.5000705@ti.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311FBDA3@DFLE08.ent.ti.com>
+Message-ID: <50C85D9F.6050306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On 12/12/2012 7:06 AM, Tivy, Robert wrote:
+>> -----Original Message-----
+>> From: Nori, Sekhar
+>> Sent: Friday, November 30, 2012 2:51 AM
+>>
+>> Hi Rob,
+>>
+>> On 11/29/2012 7:08 AM, Tivy, Robert wrote:
+>>> Hi Sekhar,
+>>>
+>>> Please see comments and noob questions below...
+>>>
+>>> They can run a single image if the image supports overriding the
+>> Kconfig settings with kernel command-line arguments.
+>>>
+>>> The most basic solution is constants in the .c file itself.  A better
+>> solution is Kconfig settings used by the .c file.  An even better
+>> solution is Kconfig settings with kernel command-line overrides.
+>>
+>> If you have kernel command line, you could default to some values which
+>> are sane in most cases if they are not provided. No, need to have a
+>> Kconfig as well. That will be too many hooks to control the same things
+>> and probably not necessary.
+>>
+>>>
+>>>> If you want the remoteproc driver to allocate a certain area of
+>> memory
+>>>> to the dsp, why don't you take that value as a module parameter so
+>>>> people who need different values can pass them differently? It is
+>> not
+>>>> clear to me why this memory management needs to be dealt with in
+>>>> platform code.
+>>>
+>>> Unfortunetly we need to reserve this dsp memory during early boot,
+>> using CMA.  Runtime module insertion is too late.
+>>
+>> Then I guess most of the time the module would be built into the kernel
+>> and will be initialized using an early enough initcall.
+> 
+> That's right, a .reserve function is assigned to the MACHINE_START structure, and this function calls dma_declare_contiguous().
 
--resending in plain text only, sorry about that-
+I meant use an early initcall in the driver.
 
-On Sun, Dec 9, 2012 at 6:53 PM, Paul Walmsley <paul@pwsan.com> wrote:
->
-> From: Jean Pihet <jean.pihet@newoldbits.com>
->
-> Introduce the functional states for power domains, which include
-> the power states and the logic states.
-> This patch provides the API functions to set and read the power
-> domains functional state and internal functions to convert between
-> the functional (i.e. logical) and the internal (or registers) values.
->
-> In the new API only the functions pwrdm_set_next_fpwrst() and
-> pwrdm_set_fpwrst() shall be used to change a power domain target
-> state, along with the associated PWRDM_FUNC_* macros as the state
-> parameters.
->
-> Note about the power domains allowed states:
-> Power domains have varied capabilities, as defined by the value of
-> the pwrsts and pwrsts_logic_ret fields of the powerdomain struct.
-> When reading or setting a low power state such as OFF/RET, a specific
-> requested state may not be supported on the given power domain.
-> In the states conversion functions a power or logic state is first
-> looked for in the lower power states in order to maximize the power
-> savings, then if not found in the higher power states. An iteration
-> function is used, as suggested by Rajendra Nayak <rnayak@ti.com>
-> This function is temporary and will be removed later in the series.
->
-> This functionality brings consistency in the functional power states
-> core code and acts as a guard against hardware implementations
-> discrepancies, e.g. some power domains only support the RET logic
-> state although reading the logic state registers (previous, current
-> and next) always returns OFF. The DSS power domain on OMAP3 is an
-> example.
->
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> [paul at pwsan.com: add offset for functional powerstates so it's not
->  possible to confuse them with the old API; use one fn to convert func
->  pwrsts to low-level hardware bits; skip hardware reads when hardware
->  logic retst and logic pwrst bits are missing; fix kerneldoc and
->  commit message; remove unnecessary PWRDM_LOGIC_MEM_PWRST_* macros;
->  combine spinlock patch into this patch; expand the number of operations
->  which take the spinlock]
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> ---
->  arch/arm/mach-omap2/powerdomain.c |  525 +++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/powerdomain.h |   33 ++
->  2 files changed, 553 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> index 94b89a25..18f33de 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -1,7 +1,7 @@
+> 
+>>>>> +
+>>>>> +static int __init early_rproc_mem(char *p) {
+>>>>> +	char *endp;
+>>>>> +
+>>>>> +	rproc_size = memparse(p, &endp);
+>>>>> +	if (*endp == '@')
+>>>>> +		rproc_base = memparse(endp + 1, NULL);
+>>>>> +
+>>>>> +	return 0;
+>>>>> +}
+>>>>> +early_param("rproc_mem", early_rproc_mem);
+>>>>
+>>>> Use of non-standard kernel parameters is discouraged. All kernel
+>>>> parameters should be documented in Documentation/kernel-
+>> parameters.txt
+>>>> (this means each and every kernel parameter needs to be justified
+>>>> well).
+>>>
+>>> Can I use the kernel command-line (i.e., u-boot bootargs variable) to
+>> specify non-kernel parameters?  I guess my question is more one about
+>> the terminology "kernel parameter" - is there a way to specify a module
+>> parameter on the kernel command line (like, perhaps, rproc.membase and
+>> rproc.memsize)?
+>>
+>> Right. Module parameters are passed from kernel command line when the
+>> module is built into the kernel.
+> 
+> Unfortunately, it seems that module parameters, when stated on the kernel command line with module-name.var-name syntax, are not yet assigned when the kernel calls the early init .reserve functions.  For the "char *" I'm using, I observed a NULL value during the early init call and the proper assigned value during a later normal __init function.
 
+By "later normal __init" you mean module_init()? And you see
+dma_declare_contiguous() returning error by this time?
 
-...
+> 
+> Is there any other method that allows specifying a parameter for an early CMA reservation without having to rebuild the kernel?
 
-> +/**
-> + * _match_pwrst: determine the closest supported power state
-> + * @pwrsts: list of allowed states, defined as a bitmask
-> + * @pwrst: initial state to be used as a starting point
-> + * @min: minimum (i.e. lowest consumption) allowed state
-> + * @max: maximum (i.e. highest consumption) allowed state
-> + *
-> + * Search down then up for a valid state from a list of allowed
-> + * states.  Used by states conversion functions (_pwrdm_fpwrst_to_*)
-> + * to look for allowed power and logic states for a powerdomain.
-> + * Returns the matching allowed state.  XXX Deprecated.  The software
-> + * should not try to program unsupported powerstates.
+Nothing else comes to mind. Can you share your code in some public repo?
+It will allow me to try if something comes to mind.
 
+> 
+> If not, is this a strong enough use case to justify a new kernel parameter?
 
-Why is this new code already deprecated? Does this require a rewrite?
+May be it it is. You could try adding it. Just update the documentation
+too. And add the documentation maintainers when you respin the patch.
 
-> + */
-> +static int _match_pwrst(u32 pwrsts, int pwrst, int min, int max)
-> +{
-> +       int found = 1, new_pwrst = pwrst;
-> +
-> +       /*
-> +        * If the power domain does not allow any state programmation
-> +        * return the max state which is always allowed
-> +        */
-> +       if (!pwrsts)
-> +               return max;
-> +
-> +       /*
-> +        * Search lower: if the requested state is not supported
-> +        * try the lower states, stopping at the minimum allowed
-> +        * state
-> +        */
-> +       while (!(pwrsts & (1 << new_pwrst))) {
-> +               if (new_pwrst <= min) {
-> +                       found = 0;
-> +                       break;
-> +               }
-> +               new_pwrst--;
-> +       }
-> +
-> +       /*
-> +        * Search higher: if no lower state found fallback to the higher
-> +        * states, stopping at the maximum allowed state
-> +        */
-> +       if (!found) {
-> +               new_pwrst = pwrst;
-> +               while (!(pwrsts & (1 << new_pwrst))) {
-> +                       if (new_pwrst >= max) {
-> +                               new_pwrst = max;
-> +                               break;
-> +                       }
-> +                       new_pwrst++;
-> +               }
-> +       }
-> +
-> +       return new_pwrst;
-> +}
-> +
-> +/**
-> + * _pwrdm_fpwrst_to_pwrst - Convert functional (i.e. logical) to
-> + * internal (i.e. registers) values for the power domains states.
-> + * @pwrdm: struct powerdomain * to convert the values for
-> + * @fpwrst: functional power state
-> + * @pwrdm_pwrst: ptr to u8 to return the power state in
-> + * @logic_retst: ptr to u8 to return the logic retention state in
-> + *
-> + * Returns the internal power state value for the power domain, or
-> + * -EINVAL in case of invalid parameters passed in.
-> + */
-> +static int _pwrdm_fpwrst_to_pwrst(struct powerdomain *pwrdm, u8 fpwrst,
-> +                                 u8 *pwrdm_pwrst, u8 *logic_retst)
-> +{
-> +       if (!pwrdm || !pwrdm_pwrst || !logic_retst)
-> +               return -EINVAL;
-> +
-> +       switch (fpwrst) {
-> +       case PWRDM_FUNC_PWRST_ON:
-> +               *pwrdm_pwrst = PWRDM_POWER_ON;
-> +               *logic_retst = PWRDM_POWER_RET;
-> +               break;
-> +       case PWRDM_FUNC_PWRST_INACTIVE:
-> +               *pwrdm_pwrst = PWRDM_POWER_INACTIVE;
-> +               *logic_retst = PWRDM_POWER_RET;
-> +               break;
-> +       case PWRDM_FUNC_PWRST_CSWR:
-> +               *pwrdm_pwrst = PWRDM_POWER_RET;
-> +               *logic_retst = PWRDM_POWER_RET;
-> +               break;
-> +       case PWRDM_FUNC_PWRST_OSWR:
-> +               *pwrdm_pwrst = PWRDM_POWER_RET;
-> +               *logic_retst = PWRDM_POWER_OFF;
-> +               break;
-> +       case PWRDM_FUNC_PWRST_OFF:
-> +               *pwrdm_pwrst = PWRDM_POWER_OFF;
-> +               /*
-> +                * logic_retst is set to PWRDM_POWER_RET in this case
-> +                * since the actual value does not matter, and because
-> +                * some powerdomains don't support a logic_retst of
-> +                * OFF.  XXX Maybe there's some way to indicate a
-> +                * 'don't care' value here?
-> +                */
-> +               *logic_retst = PWRDM_POWER_RET;
-> +               break;
-> +       default:
-> +               return -EINVAL;
-> +       }
-> +
-> +       /* XXX deprecated */
+> 
+> I guess I don't understand why non-standard kernel parameters are discouraged.  I can adorn the name with enough module-specific naming to reduce the chances of any namespace collisions to a minimum.
 
+I guess it is to make sure generic solutions are followed and every
+problem is not seen as unique.
 
-Same here
-
->
-> +       *pwrdm_pwrst = _match_pwrst(pwrdm->pwrsts, *pwrdm_pwrst,
-> +                                   PWRDM_POWER_OFF, PWRDM_POWER_ON);
-> +
-> +       *logic_retst = _match_pwrst(pwrdm->pwrsts_logic_ret, *logic_retst,
-> +                                   PWRDM_POWER_OFF, PWRDM_POWER_RET);
-> +
-> +       pr_debug("powerdomain %s: convert fpwrst %0x to pwrst %0x\n",
-> +                pwrdm->name, fpwrst, *pwrdm_pwrst);
-> +
-> +       return 0;
-> +}
-
-
-
-Thanks & regards,
-Jean
+Thanks,
+Sekhar
