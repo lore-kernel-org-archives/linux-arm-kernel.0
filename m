@@ -1,40 +1,93 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Wed, 12 Dec 2012 15:22:44 +0100 (CET)
-Subject: [PATCH] drivers/pinctrl/pinctrl-at91.c: convert kfree to
- devm_kfree
-In-Reply-To: <20121212115624.GI4398@game.jcrosoft.org>
-References: <1355223525-19165-1-git-send-email-Julia.Lawall@lip6.fr>
- <20121212115624.GI4398@game.jcrosoft.org>
-Message-ID: <alpine.DEB.2.02.1212121521590.1995@hadrien>
+From: bevenson@melinkcorp.com (Bryan Evenson)
+Date: Wed, 12 Dec 2012 09:29:46 -0500
+Subject: Kernel failed to boot when add more drivers
+In-Reply-To: <50C88E3B.8090108@ronetix.at>
+References: <50C881C6.7070806@ronetix.at>
+ <91586D499ADFD74FBCFB8425266A5DE4013765E58576@pluto.melinkcorp.local>
+ <50C88E3B.8090108@ronetix.at>
+Message-ID: <91586D499ADFD74FBCFB8425266A5DE4013765E585C6@pluto.melinkcorp.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <Julia.Lawall@lip6.fr>
+Martin,
 
-The function at91_dt_node_to_map is ultimately called by the function
-pinctrl_get, which is an exported function.  Since it is possible that this
-function is not called from within a probe function, for safety, the kfree
-is converted to a devm_kfree, to both free the data and remove it from the
-device in a failure situation.
+Answers below.
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Regards,
+Bryan Evenson
 
----
-v2: Drop cleanup of the call to devm_kzalloc at the same time.
+> -----Original Message-----
+> From: Martin Peevski [mailto:martin at ronetix.at]
+> Sent: Wednesday, December 12, 2012 9:02 AM
+> To: Bryan Evenson
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: Re: Kernel failed to boot when add more drivers
+> 
+> On 12/12/12 15:53, Bryan Evenson wrote:
+> > Martin,
+> >
+> > Whenever I've had similar issues it's because I have a U-Boot
+> > environment variable that assumes the kernel is smaller than it is.
+> > So U-Boot may not be loading the entire kernel which would cause your
+> > CRC errors.  Could you you provide the following information:
+> >
+> > How are you loading the kernel?  From NAND flash, SD card, TFTP boot?
+> 
+> I'm loading the Kernel from NAND
+> 
+> > Could you show us your U-Boot environment variables (result of
+> "printenv"
+> > U-Boot command)?
+> 
+> U-Boot> printenv
+> bootargs=mem=128M console=ttyS0,115200
+> mtdparts=atmel_nand:8M(bootstrap/uboot/kernel)ro,-(rootfs)
+> root=/dev/mtdblock1 rw rootfstype=ubifs ubi.mtd=1 root=ubi0:rootfs
+> bootcmd=nand read.jffs2 0x22000000 0x200000 0x250000; bootm 0x22000000
+> bootdelay=1
+> baudrate=115200
+> ethact=macb0
+> 
+> Environment size: 277/131067 bytes
+> U-Boot>
 
- drivers/pinctrl/pinctrl-at91.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The bootcmd is set to read 0x250000 bytes from NAND flash for the kernel,
+Which is about 2.31 MB.  Change the bootcmd to read as follows:
 
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index c5e7571..bff54bf 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -265,7 +265,7 @@ static int at91_dt_node_to_map(struct pinctrl_dev *pctldev,
- 	/* create mux map */
- 	parent = of_get_parent(np);
- 	if (!parent) {
--		kfree(new_map);
-+		devm_kfree(pctldev->dev, new_map);
- 		return -EINVAL;
- 	}
- 	new_map[0].type = PIN_MAP_TYPE_MUX_GROUP;
+bootcmd=nand read.jffs2 0x22000000 0x200000 0x300000; bootm 0x22000000
+
+then you should be good with kernel sizes up to 3 MB.  Remember to adjust
+as needed based upon the size of your kernel.
+
+> 
+> 
+> > Thanks,
+> > Bryan Evenson
+> >
+> >
+> >> -----Original Message-----
+> >> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
+> arm-
+> >> kernel-bounces at lists.infradead.org] On Behalf Of Martin Peevski
+> >> Sent: Wednesday, December 12, 2012 8:08 AM
+> >> To: linux-arm-kernel at lists.infradead.org
+> >> Subject: Kernel failed to boot when add more drivers
+> >>
+> >>       Hello! Can you, please, help me!
+> >>
+> >>       I'm building Linux Kernel version 2.6.39 for at91sam9x5ek.
+> When
+> >> I want to add more drivers the U-boot is imposible to load the
+> Kernel
+> >> because CRC error. The size of the uImage is 2.38MB. When I remove
+> >> some driversand uImage become around 2.31MB the Kernel is loading
+> >> successfully. Do you know what is the reason, I want to use more
+> >> drivers?
+> >>
+> >>       Many thanks!
+> >>       Martin Peevski.
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
