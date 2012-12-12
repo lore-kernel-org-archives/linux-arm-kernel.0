@@ -1,94 +1,51 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 12 Dec 2012 15:15:36 -0600
-Subject: [PATCH 3/3] ARM: MM: Add the workaround of Errata 766421
-In-Reply-To: <001901cdd669$4cd77070$e6865150$%kim@samsung.com>
-References: <001901cdd669$4cd77070$e6865150$%kim@samsung.com>
-Message-ID: <50C8F3F8.1020102@gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 12 Dec 2012 15:43:03 -0600
+Subject: [RFC 0/5] ARM: Add Cross Trigger Interface driver
+Message-ID: <1355348588-22318-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2012 06:00 PM, Boojin Kim wrote:
-> This patch adds the workaround of errata 766421 that adds 'dmb' when changing
-> the translation regime after conditions that the errata 766421 may occur.
-> Concretely, Add 'dmb' when changing ASID and secure state for cortex-A15 r0p4.
-> 
-> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> ---
->  arch/arm/Kconfig             |   13 +++++++++++++
->  arch/arm/mach-exynos/Kconfig |    1 +
->  arch/arm/mm/proc-v7-2level.S |    2 ++
->  3 files changed, 16 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 93397da..9bd34dd 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1417,6 +1417,19 @@ config ARM_ERRATA_775420
->  	 to deadlock. This workaround puts DSB before executing ISB if
->  	 an abort may occur on cache maintenance.
-> 
-> +config ARM_ERRATA_766421
-> +	bool "ARM errata: Strongly-Ordered/Device load or NC LDREX could return incorrect data"
-> +	depends on CPU_V7
-> +	help
-> +	  This option enables the workaround for the erratum 766421 affecting
-> +	  Cortex-A15 erratum (r0p4).
-> +	  In certain situations, a strongly ordered or device load instruction,
-> +	  or a non-cacheable normal memory load-exclusive instruction could
-> +	  match multiple fill buffers and return incorrect data.
-> +	  This workaround is add DMB instruction when making any change to the
-> +	  translation regime and before doing any new loads/stores/preloads
-> +	  in the new translation regime.
-> +
->  config ARM_ERRATA_773022
->  	bool "ARM errata: incorrect instructions may be executed from loop buffer"
->  	depends on CPU_V7
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index bb92f4c..4e28e1c 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -66,6 +66,7 @@ config SOC_EXYNOS5250
->  	select S5P_PM if PM
->  	select S5P_SLEEP if PM
->  	select SAMSUNG_DMADEV
-> +	select ARM_ERRATA_766421
->  	help
->  	  Enable EXYNOS5250 SoC support
-> 
-> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
-> index fd045e7..c663b2e 100644
-> --- a/arch/arm/mm/proc-v7-2level.S
-> +++ b/arch/arm/mm/proc-v7-2level.S
-> @@ -53,6 +53,8 @@ ENTRY(cpu_v7_switch_mm)
->  #endif
->  #ifdef CONFIG_ARM_ERRATA_754322
->  	dsb
-> +#elif CONFIG_ARM_ERRATA_766421
-> +	dmb
+Adds AMBA driver for ARM Coresight Cross Trigger Interface (CTI) driver
+and device-tree binding for CTI module.
 
-Despite the comments on the 1st patch, this one would still be needed as
-it cannot be done before the kernel runs.
+I have tested the driver on an OMAP4430 device and include the relevant
+patches needed to enable CTI on OMAP4 devices for reference.
 
-However, if you have 754322 and 766421 enabled, we would have dsb and
-dmb. We do something like this instead:
+I would like to get some feedback on the binding, CTI APIs and usage of
+the APB clock for OMAP4. I have seen that there has been some recent
+discussion around adding other coresight drivers for ARM devices [1]
+and so it would be also good to align on the appropriate location for
+coresight drivers in general.
 
-#if defined(CONFIG_ARM_ERRATA_754322) || defined(CONFIG_ARM_ERRATA_766421)
-  	dsb
-#endif
+This series is based on the ARM-SOC for-next branch and Will Deacon's
+patch for the CTI lock registers [2].
 
-Rob
+[1] http://article.gmane.org/gmane.linux.ports.arm.kernel/204591/match=coresight+bus
+[2] http://article.gmane.org/gmane.linux.ports.arm.kernel/200199/match=fix+manipulation+debug+lock+register
 
->  #endif
->  	mcr	p15, 0, r1, c13, c0, 1		@ set context ID
->  	isb
-> --
-> 1.7.5.4
-> 
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Jon Hunter (5):
+  ARM: CORESIGHT: Add generic lock/unlock helpers
+  ARM: dts: Add Cross Trigger Interface binding
+  ARM: CTI: Convert CTI helpers to AMBA bus driver
+  ARM: dts: OMAP4: Add CTI nodes
+  ARM: OMAP4: Add AMBA APB Clock
+
+ Documentation/devicetree/bindings/arm/cti.txt |   32 +++
+ arch/arm/boot/dts/omap4.dtsi                  |   23 ++
+ arch/arm/include/asm/cti.h                    |  163 --------------
+ arch/arm/include/asm/hardware/coresight.h     |   16 +-
+ arch/arm/mach-omap2/cclock44xx_data.c         |    1 +
+ drivers/Kconfig                               |    2 +
+ drivers/amba/Kconfig                          |   20 ++
+ drivers/amba/Makefile                         |    1 +
+ drivers/amba/cti.c                            |  284 +++++++++++++++++++++++++
+ include/linux/amba/cti.h                      |   82 +++++++
+ 10 files changed, 453 insertions(+), 171 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/cti.txt
+ delete mode 100644 arch/arm/include/asm/cti.h
+ create mode 100644 drivers/amba/Kconfig
+ create mode 100644 drivers/amba/cti.c
+ create mode 100644 include/linux/amba/cti.h
+
+-- 
+1.7.10.4
