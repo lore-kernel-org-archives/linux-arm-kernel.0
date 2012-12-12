@@ -1,207 +1,55 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 12 Dec 2012 11:00:19 +0100
-Subject: [PATCH 02/12] ARM: OMAP2+: PM: introduce power domains functional
- states
-In-Reply-To: <20121209175253.6933.87846.stgit@dusk.lan>
+Date: Wed, 12 Dec 2012 11:18:23 +0100
+Subject: [PATCH 05/12] ARM: OMAP3xxx: PM: convert to use the functional
+ power states API
+In-Reply-To: <20121209175312.6933.92995.stgit@dusk.lan>
 References: <20121209174545.6933.59371.stgit@dusk.lan>
- <20121209175253.6933.87846.stgit@dusk.lan>
-Message-ID: <CAORVsuVX5AHocHSAg7aMbnLy9FaaPDS5doTCY4_G_-3r+AWEgw@mail.gmail.com>
+ <20121209175312.6933.92995.stgit@dusk.lan>
+Message-ID: <CAORVsuXaVZL3u5eGDVG+pmec+zCUZip6JBWoUUQzt_9itkezLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Paul,
 
 On Sun, Dec 9, 2012 at 6:53 PM, Paul Walmsley <paul@pwsan.com> wrote:
 
 > From: Jean Pihet <jean.pihet@newoldbits.com>
 >
-> Introduce the functional states for power domains, which include
-> the power states and the logic states.
-> This patch provides the API functions to set and read the power
-> domains functional state and internal functions to convert between
-> the functional (i.e. logical) and the internal (or registers) values.
+> Use the functional power states as the API to control power domains:
 >
-> In the new API only the functions pwrdm_set_next_fpwrst() and
-> pwrdm_set_fpwrst() shall be used to change a power domain target
-> state, along with the associated PWRDM_FUNC_* macros as the state
-> parameters.
+> - use the PWRDM_FUNC_PWRST_* macros for the power states and logic
+>   settings,
 >
-> Note about the power domains allowed states:
-> Power domains have varied capabilities, as defined by the value of
-> the pwrsts and pwrsts_logic_ret fields of the powerdomain struct.
-> When reading or setting a low power state such as OFF/RET, a specific
-> requested state may not be supported on the given power domain.
-> In the states conversion functions a power or logic state is first
-> looked for in the lower power states in order to maximize the power
-> savings, then if not found in the higher power states. An iteration
-> function is used, as suggested by Rajendra Nayak <rnayak@ti.com>
-> This function is temporary and will be removed later in the series.
+> - the function pwrdm_set_next_fpwrst(), which controls the power domains
+>   next power and logic settings, shall be used instead of
+>   pwrdm_set_next_pwrst() to program the power domains next states,
 >
-> This functionality brings consistency in the functional power states
-> core code and acts as a guard against hardware implementations
-> discrepancies, e.g. some power domains only support the RET logic
-> state although reading the logic state registers (previous, current
-> and next) always returns OFF. The DSS power domain on OMAP3 is an
-> example.
+> - the function pwrdm_set_fpwrst(), which programs the power domains
+>   power and logic settings, shall be used instead of
+>   omap_set_pwrdm_state().
 >
 > Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> [paul at pwsan.com: add offset for functional powerstates so it's not
->  possible to confuse them with the old API; use one fn to convert func
->  pwrsts to low-level hardware bits; skip hardware reads when hardware
->  logic retst and logic pwrst bits are missing; fix kerneldoc and
->  commit message; remove unnecessary PWRDM_LOGIC_MEM_PWRST_* macros;
->  combine spinlock patch into this patch; expand the number of operations
->  which take the spinlock]
+> [paul at pwsan.com: split the original patch into OMAP2/3/4 variants;
+>  clean up omap3_save_secure_ram_context(); fix commit message;
+>  warn if sets fail; various other changes]
+>
+
+There are a lot of 'XXX' comments, can this be fixed by a proper comment?
+
+Regards,
+Jean
+
+
 > Signed-off-by: Paul Walmsley <paul@pwsan.com>
 > ---
->  arch/arm/mach-omap2/powerdomain.c |  525
-> +++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/powerdomain.h |   33 ++
->  2 files changed, 553 insertions(+), 5 deletions(-)
+>  arch/arm/mach-omap2/cpuidle34xx.c |   95 ++++++++++++-----------
+>  arch/arm/mach-omap2/pm.h          |    2
+>  arch/arm/mach-omap2/pm34xx.c      |  156
+> +++++++++++++++++++------------------
+>  3 files changed, 130 insertions(+), 123 deletions(-)
 >
-> diff --git a/arch/arm/mach-omap2/powerdomain.c
-> b/arch/arm/mach-omap2/powerdomain.c
-> index 94b89a25..18f33de 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -1,7 +1,7 @@
 >
-
-...
-
-+/**
-> + * _match_pwrst: determine the closest supported power state
-> + * @pwrsts: list of allowed states, defined as a bitmask
-> + * @pwrst: initial state to be used as a starting point
-> + * @min: minimum (i.e. lowest consumption) allowed state
-> + * @max: maximum (i.e. highest consumption) allowed state
-> + *
-> + * Search down then up for a valid state from a list of allowed
-> + * states.  Used by states conversion functions (_pwrdm_fpwrst_to_*)
-> + * to look for allowed power and logic states for a powerdomain.
-> + * Returns the matching allowed state.  XXX Deprecated.  The software
-> + * should not try to program unsupported powerstates.
 >
-
-Why is this new code already deprecated? Does this require a rewrite?
-
-+ */
-> +static int _match_pwrst(u32 pwrsts, int pwrst, int min, int max)
-> +{
-> +       int found = 1, new_pwrst = pwrst;
-> +
-> +       /*
-> +        * If the power domain does not allow any state programmation
-> +        * return the max state which is always allowed
-> +        */
-> +       if (!pwrsts)
-> +               return max;
-> +
-> +       /*
-> +        * Search lower: if the requested state is not supported
-> +        * try the lower states, stopping at the minimum allowed
-> +        * state
-> +        */
-> +       while (!(pwrsts & (1 << new_pwrst))) {
-> +               if (new_pwrst <= min) {
-> +                       found = 0;
-> +                       break;
-> +               }
-> +               new_pwrst--;
-> +       }
-> +
-> +       /*
-> +        * Search higher: if no lower state found fallback to the higher
-> +        * states, stopping at the maximum allowed state
-> +        */
-> +       if (!found) {
-> +               new_pwrst = pwrst;
-> +               while (!(pwrsts & (1 << new_pwrst))) {
-> +                       if (new_pwrst >= max) {
-> +                               new_pwrst = max;
-> +                               break;
-> +                       }
-> +                       new_pwrst++;
-> +               }
-> +       }
-> +
-> +       return new_pwrst;
-> +}
-> +
-> +/**
-> + * _pwrdm_fpwrst_to_pwrst - Convert functional (i.e. logical) to
-> + * internal (i.e. registers) values for the power domains states.
-> + * @pwrdm: struct powerdomain * to convert the values for
-> + * @fpwrst: functional power state
-> + * @pwrdm_pwrst: ptr to u8 to return the power state in
-> + * @logic_retst: ptr to u8 to return the logic retention state in
-> + *
-> + * Returns the internal power state value for the power domain, or
-> + * -EINVAL in case of invalid parameters passed in.
-> + */
-> +static int _pwrdm_fpwrst_to_pwrst(struct powerdomain *pwrdm, u8 fpwrst,
-> +                                 u8 *pwrdm_pwrst, u8 *logic_retst)
-> +{
-> +       if (!pwrdm || !pwrdm_pwrst || !logic_retst)
-> +               return -EINVAL;
-> +
-> +       switch (fpwrst) {
-> +       case PWRDM_FUNC_PWRST_ON:
-> +               *pwrdm_pwrst = PWRDM_POWER_ON;
-> +               *logic_retst = PWRDM_POWER_RET;
-> +               break;
-> +       case PWRDM_FUNC_PWRST_INACTIVE:
-> +               *pwrdm_pwrst = PWRDM_POWER_INACTIVE;
-> +               *logic_retst = PWRDM_POWER_RET;
-> +               break;
-> +       case PWRDM_FUNC_PWRST_CSWR:
-> +               *pwrdm_pwrst = PWRDM_POWER_RET;
-> +               *logic_retst = PWRDM_POWER_RET;
-> +               break;
-> +       case PWRDM_FUNC_PWRST_OSWR:
-> +               *pwrdm_pwrst = PWRDM_POWER_RET;
-> +               *logic_retst = PWRDM_POWER_OFF;
-> +               break;
-> +       case PWRDM_FUNC_PWRST_OFF:
-> +               *pwrdm_pwrst = PWRDM_POWER_OFF;
-> +               /*
-> +                * logic_retst is set to PWRDM_POWER_RET in this case
-> +                * since the actual value does not matter, and because
-> +                * some powerdomains don't support a logic_retst of
-> +                * OFF.  XXX Maybe there's some way to indicate a
-> +                * 'don't care' value here?
-> +                */
-> +               *logic_retst = PWRDM_POWER_RET;
-> +               break;
-> +       default:
-> +               return -EINVAL;
-> +       }
-> +
-> +       /* XXX deprecated */
->
-
-Same here
-
-
-> +       *pwrdm_pwrst = _match_pwrst(pwrdm->pwrsts, *pwrdm_pwrst,
-> +                                   PWRDM_POWER_OFF, PWRDM_POWER_ON);
-> +
-> +       *logic_retst = _match_pwrst(pwrdm->pwrsts_logic_ret, *logic_retst,
-> +                                   PWRDM_POWER_OFF, PWRDM_POWER_RET);
-> +
-> +       pr_debug("powerdomain %s: convert fpwrst %0x to pwrst %0x\n",
-> +                pwrdm->name, fpwrst, *pwrdm_pwrst);
-> +
-> +       return 0;
-> +}
->
-
-
-Thanks & regards,
-Jean
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121212/e558e7e1/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121212/77892ace/attachment-0001.html>
