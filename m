@@ -1,78 +1,152 @@
-From: jonathan@jonmasters.org (Jon Masters)
-Date: Tue, 11 Dec 2012 23:56:42 -0500
-Subject: Errata on multiplatform kernels
-In-Reply-To: <50C7F36E.3090308@gmail.com>
-References: <1355203223.16750.2.camel@gitbox>
- <CAOesGMjJ=y4J70CaYYaEem0ni7Vb48KuEZKxaVYuCCCoMYwjPw@mail.gmail.com>
- <20121211180138.GB4989@atomide.com> <50C7D2AE.7050301@jonmasters.org>
- <20121212005154.GY14363@n2100.arm.linux.org.uk> <50C7F36E.3090308@gmail.com>
-Message-ID: <50C80E8A.8080107@jonmasters.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 11 Dec 2012 22:56:43 -0700
+Subject: [PATCH] NTP: Add a CONFIG_RTC_SYSTOHC configuration
+Message-ID: <20121212055643.GA18078@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2012 10:01 PM, Rob Herring wrote:
-> On 12/11/2012 06:51 PM, Russell King - ARM Linux wrote:
->> On Tue, Dec 11, 2012 at 07:41:18PM -0500, Jon Masters wrote:
->>> On 12/11/2012 01:01 PM, Tony Lindgren wrote:
->>>> * Olof Johansson <olof@lixom.net> [121210 21:38]:
->>>>> Hi,
->>>>>
->>>>> On Mon, Dec 10, 2012 at 9:20 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
->>>>>> How are errata handled on multiplatform kernels?
->>>>>>
->>>>>> There don't appear to be any errata selected by default in any of the
->>>>>> current multiplatform options, but presumably it will happen eventually.
->>>>>>
->>>>>> Does that mean the errata will be applied to all machines that boot with
->>>>>> the errata selected, even if not required?
->>>>>
->>>>> Yes. To date I believe most errata we have are just performance hits
->>>>> on platforms that don't need it.
->>>>>
->>>>> Other architectures have in some cases added runtime patching (out) of
->>>>> workarounds that aren't needed on the current platform for the ones
->>>>> that have significant performance impact. I'm guessing we'll end up
->>>>> with something similar eventually but until then we'll try to just go
->>>>> with the superset of needed errata.
->>>>
->>>> We can't enable any of the errata if there's a chance that it will behave
->>>> in a different way for secure mode devices compared to non-secure devices.
->>>>
->>>> The discussion is in the thread "[PATCH] ARM: Fix errata 751472 handling
->>>> on Cortex-A9 r1p*".
->>>>
->>>> The conclusion was that we cannot enable any errata for multiplatform,
->>>> and must assume the errata is handled by the bootloader. Multiplatform
->>>> image is already broken for at least omap4 as 751472 is selected.
->>>
->>> On some platforms with a PL310 we have errata 588369 and 727915
->>> (especially enabled on OMAP4 targets) which will cause an external abort
->>> when enabled and then booted on highbank systems. This has taken the
->>> last couple of days on and off to track down. So I guess we need to
->>> basically disable these in our (Fedora) multiplatform kernel and then
->>> assume that e.g. PandaBoard will implement some U-Boot fix if it needs
->>> to have one? Not sure exactly what that fix is going to look like :)
->>
->> Neither 588369 nor 727915 are something a boot loader can do - they have
->> to be done in the kernel.  If they're causing highbank systems to fail
->> that needs to be debugged.
->>
->> My guess is that highbank is another non-secure system, and the L2x0
->> code is trying to use pl310_set_debug() which will fail on non-secure
->> systems as the 'set_debug' hook is not being overriden.
->>
->> If there was a way to tell that we're running on a non-secure system,
->> we could automatically point set_debug() to a nop function, but it
->> would be far more preferable for highbank to provide the hook.  (That
->> could be itself a no-op if it doesn't require the work-around.)
-> 
-> Actually, we should check the pl310 revision and set .set_debug to NULL
-> on r3p1 and later. This will fix highbank and any other platform that
-> doesn't need the work-around. I'd assume platforms that are non-secure
-> and need this work-around will override .set_debug. I'll work on a patch.
+The purpose of this option is to allow ARM/etc systems that rely on the
+class RTC subsystem to have the same kind of automatic NTP based
+synchronization that we have on PC platforms. Today ARM does not
+implement update_persistent_clock and makes extensive use of the
+class RTC system.
 
-Ok. But Tony had a good idea too on the secure vs. non-secure thing. For
-those cases where a fix can't be done in pre-boot platform code I think
-that's a good idea for future errata.
+When enabled CONFIG_RTC_SYSTOHC will provide a generic
+rtc_update_persistent_clock that stores the current time in the RTC
+and is intended complement the existing CONFIG_RTC_HCTOSYS option that
+loads the RTC at boot.
 
-Jon.
+The option also overrides the call to any platform update_persistent_clock
+so that the RTC subsystem completely and generically replaces this
+functionality.
+
+Tested on ARM kirkwood and PPC405
+
+Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+---
+ drivers/rtc/Kconfig   |    8 ++++++++
+ drivers/rtc/Makefile  |    1 +
+ drivers/rtc/systohc.c |   30 ++++++++++++++++++++++++++++++
+ include/linux/time.h  |    1 +
+ kernel/time/ntp.c     |   12 ++++++++++--
+ 5 files changed, 50 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/rtc/systohc.c
+
+I saw on Google an older version of a similar patch to this, but I
+couldn't find any indication what happened to it. So here is a
+slightly different take, tested on 3.7.
+
+I've been running basically this idea buried in PPC platform specific
+code since 2.6.16..
+
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index 19c03ab..30a866a 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -48,6 +48,14 @@ config RTC_HCTOSYS_DEVICE
+ 	  sleep states. Do not specify an RTC here unless it stays powered
+ 	  during all this system's supported sleep states.
+ 
++config RTC_SYSTOHC
++	bool "Set the RTC time based on NTP synchronization"
++	default y
++	help
++	  If you say yes here, the system time (wall clock) will be stored
++          in the RTC specified by RTC_HCTOSYS_DEVICE approximately every 11
++  	  minutes if the NTP status is synchronized.
++
+ config RTC_DEBUG
+ 	bool "RTC debug support"
+ 	help
+diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+index 56297f0..69d11f1 100644
+--- a/drivers/rtc/Makefile
++++ b/drivers/rtc/Makefile
+@@ -6,6 +6,7 @@ ccflags-$(CONFIG_RTC_DEBUG)	:= -DDEBUG
+ 
+ obj-$(CONFIG_RTC_LIB)		+= rtc-lib.o
+ obj-$(CONFIG_RTC_HCTOSYS)	+= hctosys.o
++obj-$(CONFIG_RTC_SYSTOHC)	+= systohc.o
+ obj-$(CONFIG_RTC_CLASS)		+= rtc-core.o
+ rtc-core-y			:= class.o interface.o
+ 
+diff --git a/drivers/rtc/systohc.c b/drivers/rtc/systohc.c
+new file mode 100644
+index 0000000..0536cae
+--- /dev/null
++++ b/drivers/rtc/systohc.c
+@@ -0,0 +1,30 @@
++/*
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ */
++#include <linux/rtc.h>
++#include <linux/time.h>
++
++/* Replacement for the NTP platform function 'update_persistent_clock'
++ * that does the opposite of rtc_hctosys.c */
++int rtc_update_persistent_clock(struct timespec now)
++{
++	struct rtc_device *rtc;
++	struct rtc_time tm;
++	int err = -ENODEV;
++
++	if (now.tv_nsec < (NSEC_PER_SEC >> 1))
++		rtc_time_to_tm(now.tv_sec, &tm);
++	else
++		rtc_time_to_tm(now.tv_sec + 1, &tm);
++
++	rtc = rtc_class_open(CONFIG_RTC_HCTOSYS_DEVICE);
++	if (rtc) {
++		err = rtc_set_mmss(rtc, now.tv_sec);
++		rtc_class_close(rtc);
++	}
++
++	return err;
++}
+diff --git a/include/linux/time.h b/include/linux/time.h
+index 4d358e9..d668f9c 100644
+--- a/include/linux/time.h
++++ b/include/linux/time.h
+@@ -118,6 +118,7 @@ static inline bool timespec_valid_strict(const struct timespec *ts)
+ extern void read_persistent_clock(struct timespec *ts);
+ extern void read_boot_clock(struct timespec *ts);
+ extern int update_persistent_clock(struct timespec now);
++extern int rtc_update_persistent_clock(struct timespec now);
+ void timekeeping_init(void);
+ extern int timekeeping_suspended;
+ 
+diff --git a/kernel/time/ntp.c b/kernel/time/ntp.c
+index 24174b4..f79ab16 100644
+--- a/kernel/time/ntp.c
++++ b/kernel/time/ntp.c
+@@ -483,7 +483,15 @@ out:
+ 	return leap;
+ }
+ 
+-#ifdef CONFIG_GENERIC_CMOS_UPDATE
++#if defined(CONFIG_GENERIC_CMOS_UPDATE) || defined(CONFIG_RTC_SYSTOHC)
++
++/* Only do one, if using CONFIG_RTC_SYSTOHC then the platform function
++ * might be mapped to the RTC code already. */
++#ifdef CONFIG_RTC_SYSTOHC
++#define __update_persistent_clock rtc_update_persistent_clock
++#else
++#define __update_persistent_clock update_persistent_clock
++#endif
+ 
+ static void sync_cmos_clock(struct work_struct *work);
+ 
+@@ -511,7 +519,7 @@ static void sync_cmos_clock(struct work_struct *work)
+ 
+ 	getnstimeofday(&now);
+ 	if (abs(now.tv_nsec - (NSEC_PER_SEC / 2)) <= tick_nsec / 2)
+-		fail = update_persistent_clock(now);
++		fail = __update_persistent_clock(now);
+ 
+ 	next.tv_nsec = (NSEC_PER_SEC / 2) - now.tv_nsec - (TICK_NSEC / 2);
+ 	if (next.tv_nsec <= 0)
+-- 
+1.7.5.4
