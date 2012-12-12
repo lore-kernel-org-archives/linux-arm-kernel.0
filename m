@@ -1,44 +1,53 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 12 Dec 2012 11:10:15 +0100
-Subject: [PATCH] ARM: decompressor: Flush tlb before swiching domain 0
- to client mode
-In-Reply-To: <1355276466-18295-1-git-send-email-arve@android.com>
-References: <1355276466-18295-1-git-send-email-arve@android.com>
-Message-ID: <50C85807.2000609@ti.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 12 Dec 2012 11:11:28 +0100
+Subject: [PATCH v3 0/3] ARM/dts: omap3: Add DT support for IGEP devices
+In-Reply-To: <CAAwP0s2qXuJzwEh-AVORbPApr6XT0JAfsFjrxKDvXArqYk0qXQ@mail.gmail.com>
+References: <1354538503-22671-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CAAwP0s2qXuJzwEh-AVORbPApr6XT0JAfsFjrxKDvXArqYk0qXQ@mail.gmail.com>
+Message-ID: <50C85850.7010906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 December 2012 02:41 AM, Arve Hj?nnev?g wrote:
-> If the bootloader used a page table that is incompatible with domain 0
-> in client mode, then swithing domain 0 to client mode causes a fault
-> if we don't flush the tlb after updating the page table pointer.
->
-> Signed-off-by: Arve Hj?nnev?g <arve@android.com>
-> ---
->   arch/arm/boot/compressed/head.S |    1 +
->   1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 90275f0..9c8034c 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -704,6 +704,7 @@ __armv7_mmu_cache_on:
->   		bic     r6, r6, #1 << 31        @ 32-bit translation system
->   		bic     r6, r6, #3 << 0         @ use only ttbr0
->   		mcrne	p15, 0, r3, c2, c0, 0	@ load page table pointer
-> +		mcrne	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
->   		mcrne	p15, 0, r1, c3, c0, 0	@ load domain access control
->   		mcrne   p15, 0, r6, c2, c0, 2   @ load ttb control
->   #endif
->
-The TLB's are already flushed few lines above so above patching
-shouldn't help if it was really dirty TLB entry issue. I suspect that
-your boot-loader clean-up [1] function may not be taking care of
-flushing caches which could potetially lead to the issue.
+Hi Javier,
 
-Have you checked that ?
+On 12/12/2012 09:25 AM, Javier Martinez Canillas wrote:
+> On Mon, Dec 3, 2012 at 1:41 PM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> IGEP technology devices are TI OMAP3 SoC based industrial embedded
+>> and computer-on-module boards. This patch-set adds initial device
+>> tree support for these devices.
+>>
+>> The device trees allows to boot from an MMC and are working all the
+>> components that already have device tree support on OMAP3 SoCs:
+>>
+>> - MMC/SD
+>> - UARTs
+>> - GPIO LEDs
+>> - TWL4030 codec audio
+>> - pinmux/pinconf pinctrl
+>>
+>> Some peripheral are still not working such as Flash storage and
+>> Ethernet but support for these will also be included once the
+>> OMAP GPMC device tree binding patches land on mainline.
+>>
+>> This is a v3 of the patch-set that solves issues pointed out by
+>> Enric Balletbo and Benoit Cousson.
+>>
+>> The patch-set is composed of the following patches:
+>>
+>> [PATCH v3 1/3] ARM/dts: omap3: Add generic DT support for IGEP devices
+>> [PATCH v3 2/3] ARM/dts: omap3: Add support for IGEPv2 board
+>> [PATCH v3 3/3] ARM/dts: omap3: Add support for IGEP COM Module
+>>
+>> Best regards,
+>> Javier
+>> --
+> 
+> Hi Benoit and Tony,
+> 
+> Any comments on these?
 
-Regards
-Santosh
+Nope, that's fine. I'll applied the series for 3.9.
 
-[1] http://www.arm.linux.org.uk/developer/noboot-checklist/
+Thanks,
+Benoit
