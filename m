@@ -1,55 +1,61 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 12 Dec 2012 11:18:23 +0100
-Subject: [PATCH 05/12] ARM: OMAP3xxx: PM: convert to use the functional
- power states API
-In-Reply-To: <20121209175312.6933.92995.stgit@dusk.lan>
-References: <20121209174545.6933.59371.stgit@dusk.lan>
- <20121209175312.6933.92995.stgit@dusk.lan>
-Message-ID: <CAORVsuXaVZL3u5eGDVG+pmec+zCUZip6JBWoUUQzt_9itkezLg@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 12 Dec 2012 16:04:18 +0100
+Subject: [PATCH 4/4] DMA: PL330: add device tree property for DMA_MEMCPY
+ capability
+In-Reply-To: <CABb+yY0FxsZyBy=scTF31+QMWgHzKf7bNz8vsPowtiMkve7igg@mail.gmail.com>
+References: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
+ <201211301156.08060.b.zolnierkie@samsung.com>
+ <CABb+yY0FxsZyBy=scTF31+QMWgHzKf7bNz8vsPowtiMkve7igg@mail.gmail.com>
+Message-ID: <201212121604.19112.b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
 
-On Sun, Dec 9, 2012 at 6:53 PM, Paul Walmsley <paul@pwsan.com> wrote:
+Hi,
 
-> From: Jean Pihet <jean.pihet@newoldbits.com>
->
-> Use the functional power states as the API to control power domains:
->
-> - use the PWRDM_FUNC_PWRST_* macros for the power states and logic
->   settings,
->
-> - the function pwrdm_set_next_fpwrst(), which controls the power domains
->   next power and logic settings, shall be used instead of
->   pwrdm_set_next_pwrst() to program the power domains next states,
->
-> - the function pwrdm_set_fpwrst(), which programs the power domains
->   power and logic settings, shall be used instead of
->   omap_set_pwrdm_state().
->
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> [paul at pwsan.com: split the original patch into OMAP2/3/4 variants;
->  clean up omap3_save_secure_ram_context(); fix commit message;
->  warn if sets fail; various other changes]
->
+On Wednesday 12 December 2012 08:36:14 Jassi Brar wrote:
+> On Fri, Nov 30, 2012 at 4:26 PM, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
+> 
+> > Thank you for explaining it.  Here is a patch implementing the idea:
+> >
+> > From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > Subject: [PATCH] DMA: PL330: add peripherals map to the device tree
+> >
+> > Add device tree (DT) property ("peri-map") for storing indices
+> > of peripherals connected to DMAC and fix DT nodes of client
+> > drivers to use 'dma peripheral id' instead of 'dma request id'.
+> > Also instead of setting DMA_MEMCPY capability unconditionally in
+> > pl330_probe() do it only when "peri-map" DT property is present
+> > (idea from Jassi Brar).  It fixes the issue on ARM EXYNOS
+> > platforms using DT where pdma controller erroneously was used
+> > for DMA_MEMCPY operations instead of mdma one (it seems to work
+> > correctly but at the cost of worse performance).
+> >
+> Sorry, we need to change it as per new generic dma DT bindings
+>   http://git.infradead.org/users/vkoul/slave-dma.git/blob/refs/heads/next:/Documentation/devicetree/bindings/dma/dma.txt
 
-There are a lot of 'XXX' comments, can this be fixed by a proper comment?
+>From looking at the new generic DMA DT bindings code it seems that:
 
-Regards,
-Jean
+- There is no way to specify different mappings of DMA request signals
+  for different DMA controllers using the same driver (cause different
+  of_dma_xlate translation functions would be needed in place of
+  "peri-map" DT properties).
 
+- There is no way to distinguish DMA capabilities for different DMA
+  controllers using the same driver (i.e. differentiate between
+  DMA_MEMCPY and DMA_SLAVE controllers, which is what I really wanted
+  to fix in the first place; now it seems that in order to add this
+  relatively trivial change I would have to do a major rewrite of
+  the whole DT support for PL330, hmmm...).
 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> ---
->  arch/arm/mach-omap2/cpuidle34xx.c |   95 ++++++++++++-----------
->  arch/arm/mach-omap2/pm.h          |    2
->  arch/arm/mach-omap2/pm34xx.c      |  156
-> +++++++++++++++++++------------------
->  3 files changed, 130 insertions(+), 123 deletions(-)
->
->
->
+Could you please describe how I should proceed with implementing 
+needed functionality in the PL330 driver or/and generic DMA DT layer?
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung Poland R&D Center
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121212/77892ace/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121212/01eb2dcb/attachment-0001.html>
