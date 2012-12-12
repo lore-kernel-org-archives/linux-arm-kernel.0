@@ -1,72 +1,43 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 12 Dec 2012 13:15:52 +0100
-Subject: FW: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save
- power
-In-Reply-To: <CADz5_g+_wC7wWbiDx_MqG25FGQXwTaz0M_0AR65Um36jaq713A@mail.gmail.com>
-References: <25B60CDC2F704E4E9D88FFD52780CB4C08B00BD138@SC-VEXCH1.marvell.com>
- <CADz5_g+_wC7wWbiDx_MqG25FGQXwTaz0M_0AR65Um36jaq713A@mail.gmail.com>
-Message-ID: <CAPDyKFouunFUCLOhYA8KRfxpGCnxnDBfL0cJ4aRj1kPZLDe9=A@mail.gmail.com>
+From: amery@geeks.cl (Alejandro Mery)
+Date: Wed, 12 Dec 2012 13:49:25 +0100
+Subject: [PATCH 0/6] Add pinctrl driver for Allwinner A1X SoCs
+In-Reply-To: <50C84A46.2090503@free-electrons.com>
+References: <1355177301-31928-1-git-send-email-maxime.ripard@free-electrons.com>
+ <50C7AC79.5010006@geeks.cl> <50C84A46.2090503@free-electrons.com>
+Message-ID: <50C87D55.6020006@geeks.cl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 December 2012 12:39, Kevin Liu <keyuan.liu@gmail.com> wrote:
->> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-owner at vger.kernel.org] On Behalf Of Linus Walleij
->> Sent: Wednesday, December 12, 2012 2:54 PM
->> To: Russell King - ARM Linux; Ulf Hansson
->> Cc: linux-mmc at vger.kernel.org; Chris Ball; linux-arm-kernel at lists.infradead.org; Ulf Hansson
->> Subject: Re: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save power
->>
->> On Tue, Dec 11, 2012 at 3:52 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Tue, Dec 11, 2012 at 03:17:54PM +0100, Ulf Hansson wrote:
->>>> From: Ulf Hansson <ulf.hansson@linaro.org>
->>>>
->>>> The amba bus is already performing same actions but for the apb_pclk.
->>>> So here we just make sure the clock to card is gated as well to save
->>>> more power. At runtime resume we will thus restore the clock again.
+On 12/12/12 10:11, Maxime Ripard wrote:
+> Hi Alejandro,
+>
+> Le 11/12/2012 22:58, Alejandro Mery a ?crit :
+>> On 10/12/12 23:08, Maxime Ripard wrote:
+>>> Hi everyone,
 >>>
->>> And how exactly do you ensure the requirement that a certain number of
->>> clocks is supplied to the card after the last command before you cut
->>> the clock?
+>>> This patch set adds a pinctrl driver for the IP found in the Allwinner
+>>> A10
+>>> and A13, and the SoC-specific bits for the A13. It also adds the
+>>> documentation
+>>> for the device tree bindings.
 >>
->> Oh, that's gonna be a problem.
->>
->> So I can see a quite straight-forward way to do this actually:
->>
->> 1) Turn on MMC_CLKGATE for this driver (select from Kconfig)
->> which means that the ios will be called with f=0 whenever
->> the card is unused, taking into account the required number
->> of clocks to the card.
->>
->> 2) Implement handling of f=0 from the ios in the ios callback.
->> Then clk_disable(host->clk). I did a hack at this some months
->> back but never got around to finish it, sorry for not doing
->> that even though this clock gating was invented for the MMCI
->> in the first place :-(
->>
->> 3) In the suspend() callback, sleep until the clock indicates
->> that the card is declocked with something like:
->> while (clk_is_enabled(host->clk)) { sleep(1) }
->> However the clk framework does not have clk_is_enabled()
->> so you'd either have to add that or use a local atomic
->> variable host_clk_enabled set in (2).
->>
->> Should work, I think?
->>
+>> Hi. I just wanted to comment that there are 3 known sun5i SoCs, not only
+>> the A13. The A10s and the A12 are also sun5i. For A10s and A13 there are
+>> datasheets available with the pin info. So please don't assume the A13's
+>> pins are "sun5i" pins, they are merely aw1626 (aka A13) pins.
 >
-> Since we use pm runtime with delay setting to 50ms, so there is no such problem?
+> Ok, I will change the naming scheme to something like sun5i-a13. For the
+> other SoC codenames like sun4i, are you aware of several actual SoCs
+> using the same codename, or do we have only sun4i == A10?
 
-Correct!
+the A10 is the only sun4i we know of, the A31 is the only sun6i we know 
+of, and the A20 is the only sun7i we know of... they'll soon run out of 
+numbers... :|
 
->
-> Thanks
-> Kevin
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Also, to avoid confusions with their poorly chosen marketing name, you 
+could use the internal chip name aw1623 for the A10 and aw1626 for the 
+A13 instead. This value can be read from the BROM and it's commonly used 
+in allwinner sources.
 
-
-Kind regards
-Ulf Hansson
+regards,
+Alejandro Mery
