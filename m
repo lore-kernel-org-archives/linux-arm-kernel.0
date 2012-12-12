@@ -1,91 +1,50 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Wed, 12 Dec 2012 14:01:05 +0530
-Subject: [PATCH 01/10] ARM: OMAP3/4: cpuidle: fix sparse and checkpatch
- warnings
-In-Reply-To: <20121209012334.19716.44831.stgit@dusk.lan>
-References: <20121209011755.19716.25244.stgit@dusk.lan>
- <20121209012334.19716.44831.stgit@dusk.lan>
-Message-ID: <50C840C9.5000407@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 12 Dec 2012 09:31:03 +0100
+Subject: Your kernel patches for the Marvell Mirabox
+In-Reply-To: <50C7A25A.2090602@gmail.com>
+References: <50C4AC68.7090709@gmail.com>
+ <20121210140202.GI21694@titan.lakedaemon.net>
+ <50C681B0.4030801@gmail.com> <20121211161557.6819daa9@skate>
+ <50C7A25A.2090602@gmail.com>
+Message-ID: <20121212093103.2f29494d@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Bernd,
 
+On Tue, 11 Dec 2012 22:15:06 +0100, Bernd wrote:
 
-On 12/9/2012 6:53 AM, Paul Walmsley wrote:
-> Fix the following sparse warnings in the OMAP3/4 CPUIdle code:
+> Thanks, that did the trick! Now the kernel boots OK until it can't find
+> the root filesystem (I know the reason for that).
 > 
-> arch/arm/mach-omap2/cpuidle34xx.c:272:1: warning: symbol 'omap3_idle_dev' was not declared. Should it be static?
-> arch/arm/mach-omap2/cpuidle34xx.c:274:23: warning: symbol 'omap3_idle_driver' was not declared. Should it be static?
-> arch/arm/mach-omap2/cpuidle44xx.c:164:1: warning: symbol 'omap4_idle_dev' was not declared. Should it be static?
-> arch/arm/mach-omap2/cpuidle44xx.c:166:23: warning: symbol 'omap4_idle_driver' was not declared. Should it be static?
+> It appears that there is a bug in
 > 
-> Also fix the following checkpatch warnings:
+> $ make ARCH=arm CROSS_COMPILE=../arm-2012.09/bin/arm-none-eabi- uImage
 > 
-> WARNING: please, no space before tabs
-> #44: FILE: arch/arm/mach-omap2/cpuidle34xx.c:105:
-> +^I.name = ^I"omap3_idle",$
+> The command it uses to create the uImage is (got it from
+> arch/arm/boot/.uImage.cmd):
 > 
-> WARNING: please, no space before tabs
-> #45: FILE: arch/arm/mach-omap2/cpuidle34xx.c:106:
-> +^I.owner = ^ITHIS_MODULE,$
+> /bin/sh /home/bernd/mirabox-dev/marvell-boards/scripts/mkuboot.sh -A arm
+> -O linux -C none  -T kernel -a  -e  -n 'Linux-3.7.0-rc7-00250-g0c0029c'
+> -d arch/arm/boot/zImage arch/arm/boot/uImage
 > 
-> ERROR: code indent should use tabs where possible
-> #211: FILE: arch/arm/mach-omap2/cpuidle44xx.c:74:
-> +                        /* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR */$
-> 
-> 
+> So no value given for parameters -a and -e.
 
-Paul,
+Indeed "make uImage" is broken for any multiplatform capable platform,
+because zreladdr is not defined (in order to be multiplatform, the
+multiplatform kernel use AUTO_ZRELADDR, so there is no fixed zreladdr).
+Since you're building a multiplatform kernel, there is no "one" entry
+point address and load address: it depends on which platform you are
+going to boot the kernel into.
 
-I am using your "paul-linux-pwrdm_post_fpwrst_devel_a_3.9" branch, where
-all the patches which you have posted are present (I believe so) and I
-am getting following sparse warning -
+I am not sure what is the plan forward. Maybe boot zImages directly
+from U-Boot? Let people build their uImage manually?
 
+Best regards,
 
-  CHECK   arch/arm/mach-omap2/powerdomain.c
-arch/arm/mach-omap2/powerdomain.c:811:2: warning: context imbalance in
-'pwrdm_lock': unexpected unlock
-arch/arm/mach-omap2/powerdomain.c:811:2:    default context: wanted 1, got 0
-include/linux/spinlock.h:340:2: warning: context problem in
-'pwrdm_unlock': '_raw_spin_unlock_irqrestore' expected different context
-include/linux/spinlock.h:340:2:    context 'lock': wanted >= 1, got 0
-arch/arm/mach-omap2/powerdomain.c:1130:14: warning: context problem in
-'pwrdm_state_switch': 'pwrdm_unlock' expected different context
-arch/arm/mach-omap2/powerdomain.c:1130:14:    default context: wanted >=
-1, got 0
-arch/arm/mach-omap2/powerdomain.c:1295:14: warning: context problem in
-'pwrdm_set_next_fpwrst': 'pwrdm_unlock' expected different context
-arch/arm/mach-omap2/powerdomain.c:1295:14:    default context: wanted >=
-1, got 0
-arch/arm/mach-omap2/powerdomain.c:1317:14: warning: context problem in
-'pwrdm_read_next_fpwrst': 'pwrdm_unlock' expected different context
-arch/arm/mach-omap2/powerdomain.c:1317:14:    default context: wanted >=
-1, got 0
-arch/arm/mach-omap2/powerdomain.c:1382:14: warning: context problem in
-'pwrdm_set_fpwrst': 'pwrdm_unlock' expected different context
-arch/arm/mach-omap2/powerdomain.c:1382:14:    default context: wanted >=
-1, got 0
-arch/arm/mach-omap2/powerdomain.c:1407:14: warning: context problem in
-'pwrdm_read_fpwrst': 'pwrdm_unlock' expected different context
-arch/arm/mach-omap2/powerdomain.c:1407:14:    default context: wanted >=
-1, got 0
-arch/arm/mach-omap2/powerdomain.c:1432:14: warning: context problem in
-'pwrdm_read_prev_fpwrst': 'pwrdm_unlock' expected different context
-arch/arm/mach-omap2/powerdomain.c:1432:14:    default context: wanted >=
-1, got 0
-arch/arm/mach-omap2/powerdomain.c:1505:14: warning: context problem in
-'pwrdm_dbg_show_counter': 'pwrdm_unlock' expected different context
-arch/arm/mach-omap2/powerdomain.c:1505:14:    default context: wanted >=
-1, got 0
-arch/arm/mach-omap2/powerdomain.c:1542:14: warning: context problem in
-'pwrdm_dbg_show_timer': 'pwrdm_unlock' expected different context
-arch/arm/mach-omap2/powerdomain.c:1542:14:    default context: wanted >=
-1, got 0
-  CC      arch/arm/mach-omap2/powerdomain.o
-
-
-
-On the other hand, I have boot tested it on BeagleBone platform.
-
-Thanks,
-Vaibhav
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
