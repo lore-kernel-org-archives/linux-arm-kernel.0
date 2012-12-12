@@ -1,100 +1,117 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 12 Dec 2012 14:31:27 +0100
-Subject: RFC PATCH v2 1/6] Revert "sched: introduce temporary FAIR_GROUP_SCHED
- dependency for load-tracking"
+Date: Wed, 12 Dec 2012 14:31:28 +0100
+Subject: [PATCH 2/6] sched: add a new SD SHARE_POWERLINE flag for sched_domain
 In-Reply-To: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
 References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1355319092-30980-2-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1355319092-30980-3-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit f4e26b120b9de84cb627bc7361ba43cfdc51341f
+This new flag SD_SHARE_POWERDOMAIN is used to reflect whether groups of CPU in
+a sched_domain level can or not reach a different power state. If clusters can
+be power gated independently, as an example, the flag should be cleared at CPU
+level. This information is used to decide if it's worth packing some tasks in
+a group of CPUs in order to power gated the other groups instead of spreading
+the tasks. The default behavior of the scheduler is to spread tasks so the
+flag is set into all sched_domains
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- include/linux/sched.h |    8 +-------
- kernel/sched/core.c   |    7 +------
- kernel/sched/fair.c   |    3 +--
- kernel/sched/sched.h  |    9 +--------
- 4 files changed, 4 insertions(+), 23 deletions(-)
+ arch/ia64/include/asm/topology.h |    1 +
+ arch/tile/include/asm/topology.h |    1 +
+ include/linux/sched.h            |    1 +
+ include/linux/topology.h         |    4 ++++
+ kernel/sched/core.c              |    6 ++++++
+ 5 files changed, 13 insertions(+)
 
+diff --git a/arch/ia64/include/asm/topology.h b/arch/ia64/include/asm/topology.h
+index a2496e4..6d0b617 100644
+--- a/arch/ia64/include/asm/topology.h
++++ b/arch/ia64/include/asm/topology.h
+@@ -65,6 +65,7 @@ void build_cpu_to_node_map(void);
+ 				| SD_BALANCE_EXEC	\
+ 				| SD_BALANCE_FORK	\
+ 				| SD_WAKE_AFFINE,	\
++				| arch_sd_local_flags(0)\
+ 	.last_balance		= jiffies,		\
+ 	.balance_interval	= 1,			\
+ 	.nr_balance_failed	= 0,			\
+diff --git a/arch/tile/include/asm/topology.h b/arch/tile/include/asm/topology.h
+index d5e86c9..adc8710 100644
+--- a/arch/tile/include/asm/topology.h
++++ b/arch/tile/include/asm/topology.h
+@@ -71,6 +71,7 @@ static inline const struct cpumask *cpumask_of_node(int node)
+ 				| 0*SD_WAKE_AFFINE			\
+ 				| 0*SD_SHARE_CPUPOWER			\
+ 				| 0*SD_SHARE_PKG_RESOURCES		\
++				| arch_sd_local_flags(0)		\
+ 				| 0*SD_SERIALIZE			\
+ 				,					\
+ 	.last_balance		= jiffies,				\
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index fd17ca3..046e39a 100644
+index 046e39a..3287be1 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
-@@ -1195,13 +1195,7 @@ struct sched_entity {
- 	/* rq "owned" by this entity/group: */
- 	struct cfs_rq		*my_q;
- #endif
--/*
-- * Load-tracking only depends on SMP, FAIR_GROUP_SCHED dependency below may be
-- * removed when useful for applications beyond shares distribution (e.g.
-- * load-balance).
-- */
--#if defined(CONFIG_SMP) && defined(CONFIG_FAIR_GROUP_SCHED)
--	/* Per-entity load-tracking */
-+#ifdef CONFIG_SMP
- 	struct sched_avg	avg;
- #endif
- };
+@@ -844,6 +844,7 @@ enum cpu_idle_type {
+ #define SD_BALANCE_WAKE		0x0010  /* Balance on wakeup */
+ #define SD_WAKE_AFFINE		0x0020	/* Wake task to waking CPU */
+ #define SD_SHARE_CPUPOWER	0x0080	/* Domain members share cpu power */
++#define SD_SHARE_POWERDOMAIN	0x0100	/* Domain members share power domain */
+ #define SD_SHARE_PKG_RESOURCES	0x0200	/* Domain members share cpu pkg resources */
+ #define SD_SERIALIZE		0x0400	/* Only a single load balancing instance */
+ #define SD_ASYM_PACKING		0x0800  /* Place busy groups earlier in the domain */
+diff --git a/include/linux/topology.h b/include/linux/topology.h
+index d3cf0d6..3eab293 100644
+--- a/include/linux/topology.h
++++ b/include/linux/topology.h
+@@ -99,6 +99,8 @@ int arch_update_cpu_topology(void);
+ 				| 1*SD_WAKE_AFFINE			\
+ 				| 1*SD_SHARE_CPUPOWER			\
+ 				| 1*SD_SHARE_PKG_RESOURCES		\
++				| arch_sd_local_flags(SD_SHARE_CPUPOWER|\
++						SD_SHARE_PKG_RESOURCES) \
+ 				| 0*SD_SERIALIZE			\
+ 				| 0*SD_PREFER_SIBLING			\
+ 				| arch_sd_sibling_asym_packing()	\
+@@ -131,6 +133,7 @@ int arch_update_cpu_topology(void);
+ 				| 1*SD_WAKE_AFFINE			\
+ 				| 0*SD_SHARE_CPUPOWER			\
+ 				| 1*SD_SHARE_PKG_RESOURCES		\
++				| arch_sd_local_flags(SD_SHARE_PKG_RESOURCES)\
+ 				| 0*SD_SERIALIZE			\
+ 				,					\
+ 	.last_balance		= jiffies,				\
+@@ -161,6 +164,7 @@ int arch_update_cpu_topology(void);
+ 				| 1*SD_WAKE_AFFINE			\
+ 				| 0*SD_SHARE_CPUPOWER			\
+ 				| 0*SD_SHARE_PKG_RESOURCES		\
++				| arch_sd_local_flags(0)		\
+ 				| 0*SD_SERIALIZE			\
+ 				| 1*SD_PREFER_SIBLING			\
+ 				,					\
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 8482628..c25c75d 100644
+index c25c75d..4f36e9d 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -1544,12 +1544,7 @@ static void __sched_fork(struct task_struct *p)
- 	p->se.vruntime			= 0;
- 	INIT_LIST_HEAD(&p->se.group_node);
- 
--/*
-- * Load-tracking only depends on SMP, FAIR_GROUP_SCHED dependency below may be
-- * removed when useful for applications beyond shares distribution (e.g.
-- * load-balance).
-- */
--#if defined(CONFIG_SMP) && defined(CONFIG_FAIR_GROUP_SCHED)
-+#ifdef CONFIG_SMP
- 	p->se.avg.runnable_avg_period = 0;
- 	p->se.avg.runnable_avg_sum = 0;
- #endif
-diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 61c7a10..9916d41 100644
---- a/kernel/sched/fair.c
-+++ b/kernel/sched/fair.c
-@@ -2820,8 +2820,7 @@ static inline void update_cfs_shares(struct cfs_rq *cfs_rq)
+@@ -5969,6 +5969,11 @@ int __weak arch_sd_sibling_asym_packing(void)
+        return 0*SD_ASYM_PACKING;
  }
- #endif /* CONFIG_FAIR_GROUP_SCHED */
  
--/* Only depends on SMP, FAIR_GROUP_SCHED may be removed when useful in lb */
--#if defined(CONFIG_SMP) && defined(CONFIG_FAIR_GROUP_SCHED)
-+#ifdef CONFIG_SMP
- /*
-  * We choose a half-life close to 1 scheduling period.
-  * Note: The tables below are dependent on this value.
-diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
-index f00eb80..92ba891 100644
---- a/kernel/sched/sched.h
-+++ b/kernel/sched/sched.h
-@@ -226,12 +226,6 @@ struct cfs_rq {
- #endif
- 
- #ifdef CONFIG_SMP
--/*
-- * Load-tracking only depends on SMP, FAIR_GROUP_SCHED dependency below may be
-- * removed when useful for applications beyond shares distribution (e.g.
-- * load-balance).
-- */
--#ifdef CONFIG_FAIR_GROUP_SCHED
- 	/*
- 	 * CFS Load tracking
- 	 * Under CFS, load is tracked on a per-entity basis and aggregated up.
-@@ -241,8 +235,7 @@ struct cfs_rq {
- 	u64 runnable_load_avg, blocked_load_avg;
- 	atomic64_t decay_counter, removed_load;
- 	u64 last_decay;
--#endif /* CONFIG_FAIR_GROUP_SCHED */
--/* These always depend on CONFIG_FAIR_GROUP_SCHED */
++int __weak arch_sd_local_flags(int level)
++{
++	return 1*SD_SHARE_POWERDOMAIN;
++}
 +
- #ifdef CONFIG_FAIR_GROUP_SCHED
- 	u32 tg_runnable_contrib;
- 	u64 tg_load_contrib;
+ /*
+  * Initializers for schedule domains
+  * Non-inlined to reduce accumulated stack pressure in build_sched_domains()
+@@ -6209,6 +6214,7 @@ sd_numa_init(struct sched_domain_topology_level *tl, int cpu)
+ 					| 0*SD_WAKE_AFFINE
+ 					| 0*SD_SHARE_CPUPOWER
+ 					| 0*SD_SHARE_PKG_RESOURCES
++					| 1*SD_SHARE_POWERDOMAIN
+ 					| 1*SD_SERIALIZE
+ 					| 0*SD_PREFER_SIBLING
+ 					| 1*SD_NUMA
 -- 
 1.7.9.5
