@@ -1,57 +1,52 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Wed, 12 Dec 2012 11:25:02 +1100
-Subject: [PATCH] ARM: ep93xx: properly wait for UART FIFO to be empty
-In-Reply-To: <1836468.ZU3cPkV103@bender>
-References: <1836468.ZU3cPkV103@bender>
-Message-ID: <50C7CEDE.4030703@gmail.com>
+From: jonathan@jonmasters.org (Jon Masters)
+Date: Tue, 11 Dec 2012 19:41:18 -0500
+Subject: Errata on multiplatform kernels
+In-Reply-To: <20121211180138.GB4989@atomide.com>
+References: <1355203223.16750.2.camel@gitbox>
+ <CAOesGMjJ=y4J70CaYYaEem0ni7Vb48KuEZKxaVYuCCCoMYwjPw@mail.gmail.com>
+ <20121211180138.GB4989@atomide.com>
+Message-ID: <50C7D2AE.7050301@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/12 08:21, Florian Fainelli wrote:
-> This patch changes the busy-waiting loop around in the decompressor
-> putc() function on the UART FIFO register. Without a proper wait, the
-> output of the decompressor was corrupted like this:
+On 12/11/2012 01:01 PM, Tony Lindgren wrote:
+> * Olof Johansson <olof@lixom.net> [121210 21:38]:
+>> Hi,
+>>
+>> On Mon, Dec 10, 2012 at 9:20 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
+>>> How are errata handled on multiplatform kernels?
+>>>
+>>> There don't appear to be any errata selected by default in any of the
+>>> current multiplatform options, but presumably it will happen eventually.
+>>>
+>>> Does that mean the errata will be applied to all machines that boot with
+>>> the errata selected, even if not required?
+>>
+>> Yes. To date I believe most errata we have are just performance hits
+>> on platforms that don't need it.
+>>
+>> Other architectures have in some cases added runtime patching (out) of
+>> workarounds that aren't needed on the current platform for the ones
+>> that have significant performance impact. I'm guessing we'll end up
+>> with something similar eventually but until then we'll try to just go
+>> with the superset of needed errata.
 > 
-> Uncompressing Linx. done, booting th enl
+> We can't enable any of the errata if there's a chance that it will behave
+> in a different way for secure mode devices compared to non-secure devices.
 > 
-> To highlight the issue more evidently, looping 100 times instead of 1000
-> makes the issue appear much faster. This patch takes the approach of
-> using an active while loop until the FIFO is empty (not FULL).
-> This issue happened to me on Sim.One running at 200Mhz.
+> The discussion is in the thread "[PATCH] ARM: Fix errata 751472 handling
+> on Cortex-A9 r1p*".
 > 
-> Signed-off-by: Florian Fainelli <florian@openwrt.org>
-> ---
-> Ryan, this is based on your ep93xx-fixes branch, thanks!
+> The conclusion was that we cannot enable any errata for multiplatform,
+> and must assume the errata is handled by the bootloader. Multiplatform
+> image is already broken for at least omap4 as 751472 is selected.
 
-Thank you,
+On some platforms with a PL310 we have errata 588369 and 727915
+(especially enabled on OMAP4 targets) which will cause an external abort
+when enabled and then booted on highbank systems. This has taken the
+last couple of days on and off to track down. So I guess we need to
+basically disable these in our (Fedora) multiplatform kernel and then
+assume that e.g. PandaBoard will implement some U-Boot fix if it needs
+to have one? Not sure exactly what that fix is going to look like :)
 
-Applied to ep93xx-fixes.
-
-~Ryan
-
-> 
->  arch/arm/mach-ep93xx/include/mach/uncompress.h |   10 +++-------
->  1 file changed, 3 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ep93xx/include/mach/uncompress.h b/arch/arm/mach-ep93xx/include/mach/uncompress.h
-> index 16026c2..d64274f 100644
-> --- a/arch/arm/mach-ep93xx/include/mach/uncompress.h
-> +++ b/arch/arm/mach-ep93xx/include/mach/uncompress.h
-> @@ -47,13 +47,9 @@ static void __raw_writel(unsigned int value, unsigned int ptr)
->  
->  static inline void putc(int c)
->  {
-> -	int i;
-> -
-> -	for (i = 0; i < 1000; i++) {
-> -		/* Transmit fifo not full?  */
-> -		if (!(__raw_readb(PHYS_UART_FLAG) & UART_FLAG_TXFF))
-> -			break;
-> -	}
-> +	/* Transmit fifo not full?  */
-> +	while (__raw_readb(PHYS_UART_FLAG) & UART_FLAG_TXFF)
-> +		;
->  
->  	__raw_writeb(c, PHYS_UART_DATA);
->  }
-> 
+Jon.
