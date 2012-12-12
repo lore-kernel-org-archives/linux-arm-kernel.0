@@ -1,17 +1,15 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Dec 2012 18:42:15 +0000
-Subject: [PATCH] ARM: decompress: remove unused ARCH_HAS_DECOMP_WDOG
-In-Reply-To: <1355317277-32192-1-git-send-email-shawn.guo@linaro.org>
-References: <1355317277-32192-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20121212184215.GC14363@n2100.arm.linux.org.uk>
+Date: Wed, 12 Dec 2012 18:48:28 +0000
+Subject: [RFC PATCH] ARM: Consider memblocks in mem_init and show_mem.
+In-Reply-To: <1355334000-10198-1-git-send-email-steve.capper@arm.com>
+References: <1355334000-10198-1-git-send-email-steve.capper@arm.com>
+Message-ID: <20121212184828.GD14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 12, 2012 at 09:01:17PM +0800, Shawn Guo wrote:
-> ARCH_HAS_DECOMP_WDOG is only used in lib/inflate.c which is not
-> included in arch/arm/boot/compressed/decompress.c now.  That said,
-> ARCH_HAS_DECOMP_WDOG is not used at all.  Let's remove it.
+On Wed, Dec 12, 2012 at 05:40:00PM +0000, Steve Capper wrote:
+> One consequence of using memblocks in show_mem, is that we are
+> unable to define ARCH_DISCARD_MEMBLOCK.
 
-There are some implementations of the watchdog callbacks - I wonder
-if the change to the decompressor code has broken those and no one's
-noticed.  They seem to be Samsung platforms.
+That's true anyway, because we use it for pfn_valid(), which gets used
+for ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM.
