@@ -1,53 +1,39 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 12 Dec 2012 11:11:28 +0100
-Subject: [PATCH v3 0/3] ARM/dts: omap3: Add DT support for IGEP devices
-In-Reply-To: <CAAwP0s2qXuJzwEh-AVORbPApr6XT0JAfsFjrxKDvXArqYk0qXQ@mail.gmail.com>
-References: <1354538503-22671-1-git-send-email-javier.martinez@collabora.co.uk>
- <CAAwP0s2qXuJzwEh-AVORbPApr6XT0JAfsFjrxKDvXArqYk0qXQ@mail.gmail.com>
-Message-ID: <50C85850.7010906@ti.com>
+From: phil.edworthy@renesas.com (phil.edworthy at renesas.com)
+Date: Wed, 12 Dec 2012 10:12:27 +0000
+Subject: [PATCH v2] ARM: shmobile: r8a7779: Fix GPIO input reg addresses
+In-Reply-To: <2861660.bMP77HcQxX@avalon>
+References: <16942826.W5hEBZUpzF@avalon>
+ <1355225657-18731-1-git-send-email-phil.edworthy@renesas.com>
+ <2861660.bMP77HcQxX@avalon>
+Message-ID: <OF613746CC.4E3EB4D0-ON80257AD2.0038052F-80257AD2.00381232@eu.necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+Hi Simon, Laurent,
 
-On 12/12/2012 09:25 AM, Javier Martinez Canillas wrote:
-> On Mon, Dec 3, 2012 at 1:41 PM, Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk> wrote:
->> IGEP technology devices are TI OMAP3 SoC based industrial embedded
->> and computer-on-module boards. This patch-set adds initial device
->> tree support for these devices.
->>
->> The device trees allows to boot from an MMC and are working all the
->> components that already have device tree support on OMAP3 SoCs:
->>
->> - MMC/SD
->> - UARTs
->> - GPIO LEDs
->> - TWL4030 codec audio
->> - pinmux/pinconf pinctrl
->>
->> Some peripheral are still not working such as Flash storage and
->> Ethernet but support for these will also be included once the
->> OMAP GPMC device tree binding patches land on mainline.
->>
->> This is a v3 of the patch-set that solves issues pointed out by
->> Enric Balletbo and Benoit Cousson.
->>
->> The patch-set is composed of the following patches:
->>
->> [PATCH v3 1/3] ARM/dts: omap3: Add generic DT support for IGEP devices
->> [PATCH v3 2/3] ARM/dts: omap3: Add support for IGEPv2 board
->> [PATCH v3 3/3] ARM/dts: omap3: Add support for IGEP COM Module
->>
->> Best regards,
->> Javier
->> --
+(resend as plain text)
+
+> From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> To: Phil Edworthy <phil.edworthy@renesas.com>, 
+> Cc: Simon <horms@verge.net.au>, linux-sh at vger.kernel.org, linux-arm-
+> kernel at lists.infradead.org, Magnus <magnus.damm@gmail.com>, Laurent 
+> Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Date: 11/12/2012 11:39
+> Subject: Re: [PATCH v2] ARM: shmobile: r8a7779: Fix GPIO input reg 
+addresses
 > 
-> Hi Benoit and Tony,
+> On Tuesday 11 December 2012 11:34:17 Phil Edworthy wrote:
+> > The INDTx register addresses were wrong.
+> > 
+> > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
 > 
-> Any comments on these?
+> You can add
+> 
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Nope, that's fine. I'll applied the series for 3.9.
+Please scrap this patch. I just found out that it screws up the GPIO 
+outputs. The current code assumes the same register is used for both input 
+and output, which is not the case. It needs a bit of work to fix this.
 
-Thanks,
-Benoit
+Thanks
+Phil
