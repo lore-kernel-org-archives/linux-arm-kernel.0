@@ -1,41 +1,35 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Wed, 12 Dec 2012 14:13:40 +0100
-Subject: [PATCH] mmc: mmci: Support MMC_PM_KEEP_POWER
-Message-ID: <1355318020-8169-1-git-send-email-ulf.hansson@stericsson.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Wed, 12 Dec 2012 14:21:23 +0100
+Subject: imx_v6_v7_defconfig: use v7 optimized atomic64* instead of
+ GENERIC_ATOMIC64?
+Message-ID: <50C884D3.2070605@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Add MMC_PM_KEEP_POWER to pm_caps so SDIO clients are able
-to use this option to prevent power off in suspend.
+Working mainly with the i.MX6 using the imx_v6_v7_defconfig, we get 
+CONFIG_GENERIC_ATOMIC64=y due to
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/mmc/host/mmci.c |    4 ++++
- 1 file changed, 4 insertions(+)
+CONFIG_CPU_V6=y
+CONFIG_CPU_V6K=y
+CONFIG_CPU_V7=y
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index edc3e9b..2fe532e 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -20,6 +20,7 @@
- #include <linux/err.h>
- #include <linux/highmem.h>
- #include <linux/log2.h>
-+#include <linux/mmc/pm.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/card.h>
- #include <linux/amba/bus.h>
-@@ -1386,6 +1387,9 @@ static int __devinit mmci_probe(struct amba_device *dev,
- 	mmc->caps = plat->capabilities;
- 	mmc->caps2 = plat->capabilities2;
- 
-+	/* We support these PM capabilities. */
-+	mmc->pm_caps = MMC_PM_KEEP_POWER;
-+
- 	/*
- 	 * We can do SGIO
- 	 */
--- 
-1.7.10
+and
+
+select GENERIC_ATOMIC64 if (CPU_V6 || !CPU_32v6K || !AEABI)
+
+in arch/arm/Kconfig.
+
+With this, on the V7 i.MX6 we use the (non-optimized) generic atomic64* 
+implementation from lib/atomic64.c instead of the V7 optimized ones from 
+arch/arm/include/asm/atomic.h.
+
+Is this intended using imx_v6_v7_defconfig on V7 devices?
+
+Is there any chance to use the optimized atomic64* functionality on V7 
+with imx_v6_v7_defconfig? Or is this only possible by disabling 
+CONFIG_CPU_V6 and CONFIG_CPU_V6K in the imx_v6_v7_defconfig?
+
+Many thanks and best regards
+
+Dirk
