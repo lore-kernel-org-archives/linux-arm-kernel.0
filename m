@@ -1,82 +1,66 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 12 Dec 2012 13:54:04 -0800
-Subject: [PATCH v2] drivers/pinctrl: grab default handles from device core
-In-Reply-To: <1355343907-11535-1-git-send-email-linus.walleij@stericsson.com>
-References: <1355343907-11535-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20121212215404.GA18555@kroah.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 12 Dec 2012 16:12:35 -0600
+Subject: [RFC 2/5] ARM: dts: Add Cross Trigger Interface binding
+In-Reply-To: <1355348588-22318-3-git-send-email-jon-hunter@ti.com>
+References: <1355348588-22318-1-git-send-email-jon-hunter@ti.com>
+ <1355348588-22318-3-git-send-email-jon-hunter@ti.com>
+Message-ID: <50C90153.9070002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 12, 2012 at 09:25:07PM +0100, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On 12/12/2012 03:43 PM, Jon Hunter wrote:
+> Adds a device-tree binding for the ARM Cross Trigger Interface (CTI).
+> The ARM Cross Trigger Interface provides a way to route events between
+> processor modules. For example, on OMAP4430 we use the CTI module to
+> route PMU events to the GIC interrupt module.
+
+Do you need to describe the PMU-CTI-GIC connection in DT?
+
+Rob
+
 > 
-> This makes the device core auto-grab the pinctrl handle and set
-> the "default" (PINCTRL_STATE_DEFAULT) state for every device
-> that is present in the device model right before probe. This will
-> account for the lion's share of embedded silicon devcies.
-> 
-> A modification of the semantics for pinctrl_get() is also done:
-> previously if the pinctrl handle for a certain device was already
-> taken, the pinctrl core would return an error. Now, since the
-> core may have already default-grabbed the handle and set its
-> state to "default", if the handle was already taken, this will
-> be disregarded and the located, previously instanitated handle
-> will be returned to the caller.
-> 
-> This way all code in drivers explicitly requesting their pinctrl
-> handlers will still be functional, and drivers that want to
-> explicitly retrieve and switch their handles can still do that.
-> But if the desired functionality is just boilerplate of this
-> type in the probe() function:
-> 
-> struct pinctrl  *p;
-> 
-> p = devm_pinctrl_get_select_default(&dev);
-> if (IS_ERR(p)) {
->    if (PTR_ERR(p) == -EPROBE_DEFER)
->         return -EPROBE_DEFER;
->         dev_warn(&dev, "no pinctrl handle\n");
-> }
-> 
-> The discussion began with the addition of such boilerplate
-> to the omap4 keypad driver:
-> http://marc.info/?l=linux-input&m=135091157719300&w=2
-> 
-> A previous approach using notifiers was discussed:
-> http://marc.info/?l=linux-kernel&m=135263661110528&w=2
-> This failed because it could not handle deferred probes.
-> 
-> This patch alone does not solve the entire dilemma faced:
-> whether code should be distributed into the drivers or
-> if it should be centralized to e.g. a PM domain. But it
-> solves the immediate issue of the addition of boilerplate
-> to a lot of drivers that just want to grab the default
-> state. As mentioned, they can later explicitly retrieve
-> the handle and set different states, and this could as
-> well be done by e.g. PM domains as it is only related
-> to a certain struct device * pointer.
-> 
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Mitch Bradley <wmb@firmworks.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Rafael J. Wysocki <rjw@sisk.pl>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Rickard Andersson <rickard.andersson@stericsson.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 > ---
-> ChangeLog v1->v2:
-> - Only store a pointer in the device struct, and only allocate
->   this if it's really used by the device.
-> - Seeking ACK on this from Greg (and others who like it) so I
->   can merge it through the pinctrl subsystem.
-
-It looks ok, but this can't go in for 3.8, sorry, please wait for 3.9.
-
-greg k-h
+>  Documentation/devicetree/bindings/arm/cti.txt |   32 +++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/cti.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/cti.txt b/Documentation/devicetree/bindings/arm/cti.txt
+> new file mode 100644
+> index 0000000..4a0e2d3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/cti.txt
+> @@ -0,0 +1,32 @@
+> +* ARM Cross Trigger Interface (CTI)
+> +
+> +The ARM Cross Trigger Interface provides a way to route events between
+> +processor modules. For example, debug events from one processor can be
+> +broadcasted to other processors. The events that can be routed between
+> +processors are specific to the device.
+> +
+> +Required properties:
+> +
+> +- compatible:			Should be "arm,primecell".
+> +- interrupts:			Interrupt associated with CTI module.
+> +- reg:				Contains timer register address range (base
+> +				address and length).
+> +- arm,cti-name:			A unique name for the CTI module, that will be
+> +				used when requesting the CTI module instance.
+> +
+> +
+> +Optional properties:
+> +
+> +- arm-primecell-periphid:	Primecell peripheral ID associated with CTI
+> +				module.
+> +
+> +
+> +Example:
+> +
+> +cti0: cti at 0x54148000 {
+> +	compatible = "arm,primecell";
+> +	interrupts = <0 1 0x4>;
+> +	reg = <0x54148000 0x1000>;
+> +	arm,cti-name = "cti0";
+> +	arm,primecell-periphid = <0x003bb906>;
+> +};
+> 
