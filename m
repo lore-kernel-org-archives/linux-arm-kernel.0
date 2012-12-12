@@ -1,49 +1,33 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 12 Dec 2012 09:49:47 +0100
-Subject: linker problem with xip kernel and recent toolchains
-In-Reply-To: <20121212084414.GF18999@sapphire.tkos.co.il>
-References: <50BE0CDB.5000704@pengutronix.de>
- <1355230894.19818.1.camel@hornet> <50C7386E.70305@pengutronix.de>
- <1355249468.19818.23.camel@hornet> <50C83EB1.5050509@pengutronix.de>
- <20121212084414.GF18999@sapphire.tkos.co.il>
-Message-ID: <50C8452B.4060205@pengutronix.de>
+From: Claudio.Fontana@huawei.com (Claudio Fontana)
+Date: Wed, 12 Dec 2012 09:59:02 +0100
+Subject: [PATCH RESEND 3] ARM: plat-versatile: move secondary CPU startup into
+ cpuinit
+In-Reply-To: <50B47C31.2040709@huawei.com>
+References: <50B47C31.2040709@huawei.com>
+Message-ID: <50C84756.60200@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2012 09:44 AM, Baruch Siach wrote:
-> Hi Marc,
-> 
-> On Wed, Dec 12, 2012 at 09:22:09AM +0100, Marc Kleine-Budde wrote:
->> On 12/11/2012 07:11 PM, Pawel Moll wrote:
->>> On Tue, 2012-12-11 at 13:43 +0000, Marc Kleine-Budde wrote:
->>>> What about putting the notes section into the read only segment, i.e.
->>>> the ROM?
->>>
->>> Could you, please, try the change below? It seems to do the job for me.
->>
->> Works for me. The kernel image links to 640 KiB again.
-> 
-> Thant's the lowest figure I've ever seen for a kernel image. How do you get 
-> there?
 
-It's for a nommu, armv7-m with thumb2 code. It doesn't have much
-features, it lack /proc, /sys and even the networking subsystem. You can
-find the .config in my previous mail [1].
+Using __CPUINIT instead of __INIT puts the secondary CPU startup code
+into the "right" section: it will not be freed in hotplug configurations,
+allowing hot-add of cpus, while still getting freed in non-hotplug configs.
 
-Marc
+Signed-off-by: Claudio Fontana <claudio.fontana@huawei.com>
+Tested-by: Claudio Fontana <claudio.fontana@huawei.com>
 
-[1] http://www.spinics.net/lists/arm-kernel/msg212007.html
-
+diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
+index dd703ef..19fe180 100644
+--- a/arch/arm/plat-versatile/headsmp.S
++++ b/arch/arm/plat-versatile/headsmp.S
+@@ -11,7 +11,7 @@
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+ 
+-	__INIT
++	__CPUINIT
+ 
+ /*
+  * Realview/Versatile Express specific entry point for secondary CPUs.
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 261 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121212/97d8261d/attachment.sig>
+1.7.12.1
