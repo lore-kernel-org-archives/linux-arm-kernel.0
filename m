@@ -1,65 +1,44 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Wed, 12 Dec 2012 10:37:21 +0100
-Subject: [PATCH 7/7] dmaengine: ste_dma40: support fixed physical channel
- allocation
-In-Reply-To: <1355305041-2338-1-git-send-email-fabio.baltieri@linaro.org>
-References: <1355305041-2338-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <1355305041-2338-8-git-send-email-fabio.baltieri@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 12 Dec 2012 11:10:15 +0100
+Subject: [PATCH] ARM: decompressor: Flush tlb before swiching domain 0
+ to client mode
+In-Reply-To: <1355276466-18295-1-git-send-email-arve@android.com>
+References: <1355276466-18295-1-git-send-email-arve@android.com>
+Message-ID: <50C85807.2000609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gerald Baeza <gerald.baeza@stericsson.com>
+On Wednesday 12 December 2012 02:41 AM, Arve Hj?nnev?g wrote:
+> If the bootloader used a page table that is incompatible with domain 0
+> in client mode, then swithing domain 0 to client mode causes a fault
+> if we don't flush the tlb after updating the page table pointer.
+>
+> Signed-off-by: Arve Hj?nnev?g <arve@android.com>
+> ---
+>   arch/arm/boot/compressed/head.S |    1 +
+>   1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 90275f0..9c8034c 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -704,6 +704,7 @@ __armv7_mmu_cache_on:
+>   		bic     r6, r6, #1 << 31        @ 32-bit translation system
+>   		bic     r6, r6, #3 << 0         @ use only ttbr0
+>   		mcrne	p15, 0, r3, c2, c0, 0	@ load page table pointer
+> +		mcrne	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
+>   		mcrne	p15, 0, r1, c3, c0, 0	@ load domain access control
+>   		mcrne   p15, 0, r6, c2, c0, 2   @ load ttb control
+>   #endif
+>
+The TLB's are already flushed few lines above so above patching
+shouldn't help if it was really dirty TLB entry issue. I suspect that
+your boot-loader clean-up [1] function may not be taking care of
+flushing caches which could potetially lead to the issue.
 
-This patch makes existing use_fixed_channel field (of stedma40_chan_cfg
-structure) applicable to physical channels.
+Have you checked that ?
 
-Signed-off-by: Gerald Baeza <gerald.baeza@stericsson.com>
-Tested-by: Yannick Fertre <yannick.fertre@stericsson.com>
-Reviewed-by: Per Forlin <per.forlin@stericsson.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
----
- drivers/dma/ste_dma40.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+Regards
+Santosh
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index f871df6..efe8be7 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -1712,10 +1712,12 @@ static int d40_allocate_channel(struct d40_chan *d40c, bool *first_phy_user)
- 	int i;
- 	int j;
- 	int log_num;
-+	int num_phy_chans;
- 	bool is_src;
- 	bool is_log = d40c->dma_cfg.mode == STEDMA40_MODE_LOGICAL;
- 
- 	phys = d40c->base->phy_res;
-+	num_phy_chans = d40c->base->num_phy_chans;
- 
- 	if (d40c->dma_cfg.dir == STEDMA40_PERIPH_TO_MEM) {
- 		dev_type = d40c->dma_cfg.src_dev_type;
-@@ -1736,12 +1738,19 @@ static int d40_allocate_channel(struct d40_chan *d40c, bool *first_phy_user)
- 	if (!is_log) {
- 		if (d40c->dma_cfg.dir == STEDMA40_MEM_TO_MEM) {
- 			/* Find physical half channel */
--			for (i = 0; i < d40c->base->num_phy_chans; i++) {
--
-+			if (d40c->dma_cfg.use_fixed_channel) {
-+				i = d40c->dma_cfg.phy_channel;
- 				if (d40_alloc_mask_set(&phys[i], is_src,
- 						       0, is_log,
- 						       first_phy_user))
- 					goto found_phy;
-+			} else {
-+				for (i = 0; i < num_phy_chans; i++) {
-+					if (d40_alloc_mask_set(&phys[i], is_src,
-+						       0, is_log,
-+						       first_phy_user))
-+						goto found_phy;
-+				}
- 			}
- 		} else
- 			for (j = 0; j < d40c->base->num_phy_chans; j += 8) {
--- 
-1.7.12.1
+[1] http://www.arm.linux.org.uk/developer/noboot-checklist/
