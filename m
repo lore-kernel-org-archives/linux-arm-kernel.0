@@ -1,20 +1,32 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 12 Dec 2012 14:13:03 +0530
-Subject: [PATCH V3 2/3] dmaengine: dw_dmac: Enhance device tree support
-In-Reply-To: <1355301621.31620.66.camel@smile>
-References: <3100e691db3f94c22afd98b609a1568d7e70dfe7.1350360935.git.viresh.kumar@linaro.org>
- <169edae67b9a051ca7448e5b62c3cd2c5c1db470.1350360935.git.viresh.kumar@linaro.org>
- <201212102208.52347.arnd@arndb.de>
- <CAKohpo=FjZuMOC-wuNc3q_FXbk546ttCLr55GkW9AL0Tz-HoBA@mail.gmail.com>
- <1355301621.31620.66.camel@smile>
-Message-ID: <CAKohpom2h4ZrO_vFVUDOA_KfDmA-PpG1aPDMnufbM9kcUhc_OA@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 12 Dec 2012 10:44:15 +0200
+Subject: linker problem with xip kernel and recent toolchains
+In-Reply-To: <50C83EB1.5050509@pengutronix.de>
+References: <50BE0CDB.5000704@pengutronix.de> <1355230894.19818.1.camel@hornet>
+ <50C7386E.70305@pengutronix.de> <1355249468.19818.23.camel@hornet>
+ <50C83EB1.5050509@pengutronix.de>
+Message-ID: <20121212084414.GF18999@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 December 2012 14:10, Andy Shevchenko
-<andriy.shevchenko@linux.intel.com> wrote:
-> Will we survive if the patch is in mainline? I mean how big the impact
-> of it is?
+Hi Marc,
 
-It doesn't fail to do fulfill its purpose and even ALL DT stuff would work well.
-Its just the matter of using the right API's, design and bindings :)
+On Wed, Dec 12, 2012 at 09:22:09AM +0100, Marc Kleine-Budde wrote:
+> On 12/11/2012 07:11 PM, Pawel Moll wrote:
+> > On Tue, 2012-12-11 at 13:43 +0000, Marc Kleine-Budde wrote:
+> >> What about putting the notes section into the read only segment, i.e.
+> >> the ROM?
+> > 
+> > Could you, please, try the change below? It seems to do the job for me.
+> 
+> Works for me. The kernel image links to 640 KiB again.
+
+Thant's the lowest figure I've ever seen for a kernel image. How do you get 
+there?
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
