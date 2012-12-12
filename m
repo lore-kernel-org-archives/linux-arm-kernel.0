@@ -1,152 +1,49 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 11 Dec 2012 22:56:43 -0700
-Subject: [PATCH] NTP: Add a CONFIG_RTC_SYSTOHC configuration
-Message-ID: <20121212055643.GA18078@obsidianresearch.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Dec 2012 07:53:37 +0100
+Subject: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save power
+In-Reply-To: <20121211145243.GQ14363@n2100.arm.linux.org.uk>
+References: <1355235474-12783-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121211145243.GQ14363@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdbZSFQ1HvXZ3Op093CediAm9rPHwHX38h_sxwE9ARSe5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The purpose of this option is to allow ARM/etc systems that rely on the
-class RTC subsystem to have the same kind of automatic NTP based
-synchronization that we have on PC platforms. Today ARM does not
-implement update_persistent_clock and makes extensive use of the
-class RTC system.
+On Tue, Dec 11, 2012 at 3:52 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Dec 11, 2012 at 03:17:54PM +0100, Ulf Hansson wrote:
+>> From: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> The amba bus is already performing same actions but for the apb_pclk.
+>> So here we just make sure the clock to card is gated as well to save
+>> more power. At runtime resume we will thus restore the clock again.
+>
+> And how exactly do you ensure the requirement that a certain number of
+> clocks is supplied to the card after the last command before you cut
+> the clock?
 
-When enabled CONFIG_RTC_SYSTOHC will provide a generic
-rtc_update_persistent_clock that stores the current time in the RTC
-and is intended complement the existing CONFIG_RTC_HCTOSYS option that
-loads the RTC at boot.
+Oh, that's gonna be a problem.
 
-The option also overrides the call to any platform update_persistent_clock
-so that the RTC subsystem completely and generically replaces this
-functionality.
+So I can see a quite straight-forward way to do this actually:
 
-Tested on ARM kirkwood and PPC405
+1) Turn on MMC_CLKGATE for this driver (select from Kconfig)
+which means that the ios will be called with f=0 whenever
+the card is unused, taking into account the required number
+of clocks to the card.
 
-Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
----
- drivers/rtc/Kconfig   |    8 ++++++++
- drivers/rtc/Makefile  |    1 +
- drivers/rtc/systohc.c |   30 ++++++++++++++++++++++++++++++
- include/linux/time.h  |    1 +
- kernel/time/ntp.c     |   12 ++++++++++--
- 5 files changed, 50 insertions(+), 2 deletions(-)
- create mode 100644 drivers/rtc/systohc.c
+2) Implement handling of f=0 from the ios in the ios callback.
+Then clk_disable(host->clk). I did a hack at this some months
+back but never got around to finish it, sorry for not doing
+that even though this clock gating was invented for the MMCI
+in the first place :-(
 
-I saw on Google an older version of a similar patch to this, but I
-couldn't find any indication what happened to it. So here is a
-slightly different take, tested on 3.7.
+3) In the suspend() callback, sleep until the clock indicates
+that the card is declocked with something like:
+while (clk_is_enabled(host->clk)) { sleep(1) }
+However the clk framework does not have clk_is_enabled()
+so you'd either have to add that or use a local atomic
+variable host_clk_enabled set in (2).
 
-I've been running basically this idea buried in PPC platform specific
-code since 2.6.16..
+Should work, I think?
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 19c03ab..30a866a 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -48,6 +48,14 @@ config RTC_HCTOSYS_DEVICE
- 	  sleep states. Do not specify an RTC here unless it stays powered
- 	  during all this system's supported sleep states.
- 
-+config RTC_SYSTOHC
-+	bool "Set the RTC time based on NTP synchronization"
-+	default y
-+	help
-+	  If you say yes here, the system time (wall clock) will be stored
-+          in the RTC specified by RTC_HCTOSYS_DEVICE approximately every 11
-+  	  minutes if the NTP status is synchronized.
-+
- config RTC_DEBUG
- 	bool "RTC debug support"
- 	help
-diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-index 56297f0..69d11f1 100644
---- a/drivers/rtc/Makefile
-+++ b/drivers/rtc/Makefile
-@@ -6,6 +6,7 @@ ccflags-$(CONFIG_RTC_DEBUG)	:= -DDEBUG
- 
- obj-$(CONFIG_RTC_LIB)		+= rtc-lib.o
- obj-$(CONFIG_RTC_HCTOSYS)	+= hctosys.o
-+obj-$(CONFIG_RTC_SYSTOHC)	+= systohc.o
- obj-$(CONFIG_RTC_CLASS)		+= rtc-core.o
- rtc-core-y			:= class.o interface.o
- 
-diff --git a/drivers/rtc/systohc.c b/drivers/rtc/systohc.c
-new file mode 100644
-index 0000000..0536cae
---- /dev/null
-+++ b/drivers/rtc/systohc.c
-@@ -0,0 +1,30 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ */
-+#include <linux/rtc.h>
-+#include <linux/time.h>
-+
-+/* Replacement for the NTP platform function 'update_persistent_clock'
-+ * that does the opposite of rtc_hctosys.c */
-+int rtc_update_persistent_clock(struct timespec now)
-+{
-+	struct rtc_device *rtc;
-+	struct rtc_time tm;
-+	int err = -ENODEV;
-+
-+	if (now.tv_nsec < (NSEC_PER_SEC >> 1))
-+		rtc_time_to_tm(now.tv_sec, &tm);
-+	else
-+		rtc_time_to_tm(now.tv_sec + 1, &tm);
-+
-+	rtc = rtc_class_open(CONFIG_RTC_HCTOSYS_DEVICE);
-+	if (rtc) {
-+		err = rtc_set_mmss(rtc, now.tv_sec);
-+		rtc_class_close(rtc);
-+	}
-+
-+	return err;
-+}
-diff --git a/include/linux/time.h b/include/linux/time.h
-index 4d358e9..d668f9c 100644
---- a/include/linux/time.h
-+++ b/include/linux/time.h
-@@ -118,6 +118,7 @@ static inline bool timespec_valid_strict(const struct timespec *ts)
- extern void read_persistent_clock(struct timespec *ts);
- extern void read_boot_clock(struct timespec *ts);
- extern int update_persistent_clock(struct timespec now);
-+extern int rtc_update_persistent_clock(struct timespec now);
- void timekeeping_init(void);
- extern int timekeeping_suspended;
- 
-diff --git a/kernel/time/ntp.c b/kernel/time/ntp.c
-index 24174b4..f79ab16 100644
---- a/kernel/time/ntp.c
-+++ b/kernel/time/ntp.c
-@@ -483,7 +483,15 @@ out:
- 	return leap;
- }
- 
--#ifdef CONFIG_GENERIC_CMOS_UPDATE
-+#if defined(CONFIG_GENERIC_CMOS_UPDATE) || defined(CONFIG_RTC_SYSTOHC)
-+
-+/* Only do one, if using CONFIG_RTC_SYSTOHC then the platform function
-+ * might be mapped to the RTC code already. */
-+#ifdef CONFIG_RTC_SYSTOHC
-+#define __update_persistent_clock rtc_update_persistent_clock
-+#else
-+#define __update_persistent_clock update_persistent_clock
-+#endif
- 
- static void sync_cmos_clock(struct work_struct *work);
- 
-@@ -511,7 +519,7 @@ static void sync_cmos_clock(struct work_struct *work)
- 
- 	getnstimeofday(&now);
- 	if (abs(now.tv_nsec - (NSEC_PER_SEC / 2)) <= tick_nsec / 2)
--		fail = update_persistent_clock(now);
-+		fail = __update_persistent_clock(now);
- 
- 	next.tv_nsec = (NSEC_PER_SEC / 2) - now.tv_nsec - (TICK_NSEC / 2);
- 	if (next.tv_nsec <= 0)
--- 
-1.7.5.4
+Yours,
+Linus Walleij
