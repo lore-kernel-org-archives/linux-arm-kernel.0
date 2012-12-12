@@ -1,43 +1,22 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 12 Dec 2012 17:41:16 +0900
-Subject: [PATCH v4] backlight: corgi_lcd: Use gpio_set_value_cansleep() to
- avoid WARN_ON
-In-Reply-To: <000801cdd6ae$da095270$8e1bf750$%han@samsung.com>
-References: <000201cdd283$baf50160$30df0420$%han@samsung.com>
- <20121205093027.GK14363@n2100.arm.linux.org.uk>
- <CAHod+Gdb_LEnhx5cz9j=q9PyS4L=Yjxs303dHon9i-tgjJRtDA@mail.gmail.com>
- <20121205192141.GQ14363@n2100.arm.linux.org.uk>
- <000801cdd6ae$da095270$8e1bf750$%han@samsung.com>
-Message-ID: <000001cdd844$7326c9b0$59745d10$%han@samsung.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Wed, 12 Dec 2012 10:42:02 +0200
+Subject: [PATCH V3 2/3] dmaengine: dw_dmac: Enhance device tree support
+In-Reply-To: <201212102208.52347.arnd@arndb.de>
+References: <3100e691db3f94c22afd98b609a1568d7e70dfe7.1350360935.git.viresh.kumar@linaro.org>
+ <169edae67b9a051ca7448e5b62c3cd2c5c1db470.1350360935.git.viresh.kumar@linaro.org>
+ <201212102208.52347.arnd@arndb.de>
+Message-ID: <1355301722.31620.68.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, December 10, 2012 5:18 PM, Jingoo Han wrote
-> On Thursday, December 06, 2012 4:22 AM, Russell King - ARM Linux wrote
-> > On Wed, Dec 05, 2012 at 07:20:00PM +0100, Marko Kati? wrote:
-> > > On Wed, Dec 5, 2012 at 10:30 AM, Russell King - ARM Linux
-> > > <linux@arm.linux.org.uk> wrote:
-> > > > On Wed, Dec 05, 2012 at 09:59:07AM +0900, Jingoo Han wrote:
-...
-> > Eric shares my opinion of the _cansleep() mess, but unfortunately it's
-> > what we have and no one's come up with any better solutions to it.  (I
-> > argued from the outset that the gpio_xxx_cansleep() should've been
-> > gpio_xxx() and the non-cansleep() version should be called
-> > gpio_xxx_atomic() so that by default people use the version which _can_
-> > sleep, but have to think about it when they want to manipulate GPIOs in
-> > non-task contexts.)
-> 
-> Hi Russell,
-> 
-> Thank you for your explanation. It is very helpful for getting hold of.
-> I have been confused by the current function name such as gpio_xxx_cansleep().
-> As you mentioned, gpio_xxx_cansleep()and gpio_xxx_atomic() would be better.
+On Mon, 2012-12-10 at 22:08 +0000, Arnd Bergmann wrote: 
+> The build bug is not the problem however, but the abuse of the
+> API is. Andy, are you sure you understood what this does when
+> you gave you Reviewed-by comment?
 
-Oh, sorry. There is a mistake.
+Thank you for pointing this out to refresh my memories and go through
+documentation again.
 
-It should be as below:
-'gpio_xxx()and gpio_xxx_atomic() would be better'.
-
-
-Best regards,
-Jingoo Han
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
