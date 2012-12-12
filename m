@@ -1,58 +1,61 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 12 Dec 2012 14:33:18 +0100
-Subject: [PATCH 0/6] Add pinctrl driver for Allwinner A1X SoCs
-In-Reply-To: <50C87D55.6020006@geeks.cl>
-References: <1355177301-31928-1-git-send-email-maxime.ripard@free-electrons.com>
- <50C7AC79.5010006@geeks.cl> <50C84A46.2090503@free-electrons.com>
- <50C87D55.6020006@geeks.cl>
-Message-ID: <50C8879E.5070401@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 12 Dec 2012 13:36:50 +0000
+Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
+ cache LoUIS operations
+In-Reply-To: <20121212103338.GB23022@e102568-lin.cambridge.arm.com>
+References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <20120919134658.GA2111@linaro.org>
+ <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
+ <20120920110439.GB2117@linaro.org>
+ <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
+ <20121211163313.GG16759@mudshark.cambridge.arm.com>
+ <20121211163843.GH16759@mudshark.cambridge.arm.com>
+ <50C7C16B.7050106@codeaurora.org>
+ <20121212103338.GB23022@e102568-lin.cambridge.arm.com>
+Message-ID: <20121212133650.GJ6195@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/12/2012 13:49, Alejandro Mery a ?crit :
-> On 12/12/12 10:11, Maxime Ripard wrote:
->> Hi Alejandro,
->>
->> Le 11/12/2012 22:58, Alejandro Mery a ?crit :
->>> On 10/12/12 23:08, Maxime Ripard wrote:
->>>> Hi everyone,
->>>>
->>>> This patch set adds a pinctrl driver for the IP found in the Allwinner
->>>> A10
->>>> and A13, and the SoC-specific bits for the A13. It also adds the
->>>> documentation
->>>> for the device tree bindings.
->>>
->>> Hi. I just wanted to comment that there are 3 known sun5i SoCs, not only
->>> the A13. The A10s and the A12 are also sun5i. For A10s and A13 there are
->>> datasheets available with the pin info. So please don't assume the A13's
->>> pins are "sun5i" pins, they are merely aw1626 (aka A13) pins.
->>
->> Ok, I will change the naming scheme to something like sun5i-a13. For the
->> other SoC codenames like sun4i, are you aware of several actual SoCs
->> using the same codename, or do we have only sun4i == A10?
+On Wed, Dec 12, 2012 at 10:33:38AM +0000, Lorenzo Pieralisi wrote:
+> On Tue, Dec 11, 2012 at 11:27:39PM +0000, Stephen Boyd wrote:
+> > On 12/11/12 08:38, Will Deacon wrote:
+> > > diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> > > index cd95664..f58248f 100644
+> > > --- a/arch/arm/mm/cache-v7.S
+> > > +++ b/arch/arm/mm/cache-v7.S
+> > > @@ -44,7 +44,8 @@ ENDPROC(v7_flush_icache_all)
+> > >  ENTRY(v7_flush_dcache_louis)
+> > >         dmb                                     @ ensure ordering with previous memory accesses
+> > >         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
+> > > -       ands    r3, r0, #0xe00000               @ extract LoUIS from clidr
+> > > +       ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
+> > > +       ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
+> > >         mov     r3, r3, lsr #20                 @ r3 = LoUIS * 2
+> > 
+> > You need to fix this mov as well, right?
 > 
-> the A10 is the only sun4i we know of, the A31 is the only sun6i we know
-> of, and the A20 is the only sun7i we know of... they'll soon run out of
-> numbers... :|
-> 
-> Also, to avoid confusions with their poorly chosen marketing name, you
-> could use the internal chip name aw1623 for the A10 and aw1626 for the
-> A13 instead. This value can be read from the BROM and it's commonly used
-> in allwinner sources.
+> And after doing that I think the suspend finisher will still have
+> to call flush_cache_all() since LoUU == 1 on A8, L2 is not cleaned
+> and that's probably what we want if it can be retained.
 
-In what aspect are they poorly named? I'd really like to keep it as
-understandable as possible, at least in the device tree.
+At some point we probably want to describe the level of flushing required in
+the device tree as a property of the CPU node (or something similar). That
+would allow us to have *one* function for flushing,
+e.g. cpu_suspend_flush_cache which flushes to the appropriate level. Then
+we could remove the louis flush from the CPU suspend code and instead make
+it the finisher's responsibility to call our flushing function when it's
+done, which helps to avoid over/under-flushing the cache.
 
-I guess renaming the sun5i dtsi already there and all that relates to
-the A13 to sun5i-a13 would remove that collision of names, don't you
-think? Or am I missing something?
+In the meantime, fixing louis as we've suggested should work.
 
-Thanks,
-Maxime
+Back to the case in hand.... Lorenzo just pointed out to me that the
+finished in question (sh7372_do_idle_sysc) calls v7_flush_dcache_all, so
+the louis stuff should be irrelevant. The problem may actually be that the
+finisher disables the L2 cache prior to cleaning/invalidating it, which is
+the opposite order to that described by the A8 TRM.
 
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Guennadi -- can you try moving the kernel_flush call before the L2 disable
+in sh7372_do_idle_sysc please?
+
+Will
