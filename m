@@ -1,97 +1,72 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 12 Dec 2012 17:08:23 +0100
-Subject: [PATCHv2] ARM: sunxi: Change device tree naming scheme for sunxi
-Message-ID: <1355328503-25315-1-git-send-email-maxime.ripard@free-electrons.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 12 Dec 2012 17:09:32 +0100
+Subject: [PATCH] arm: dts: Add uart1 and uart2 to igep boards.
+In-Reply-To: <1355326422-12357-1-git-send-email-matthias.bgg@gmail.com>
+References: <1355326422-12357-1-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <50C8AC3C.9020908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is several different SoCs sharing the sun5i codename: A10s, A12
-and A13. Since there is enough differences to not consider those the
-same SoCs, change a bit the naming scheme to reflect this.
+Hi Matthias,
 
-Moreover, some boards like the olinuxino come in A10s and A13 variants,
-which also share the same SoC codename.
+On 12/12/2012 04:33 PM, Matthias Brugger wrote:
+> This patch is a follow-up patch for Javier Martinez effort adding initial
+> device tree support to IGEP technology devices. [1]
+> 
+> It adds uart1 and uart2 bindings to the generic dtsi for the IGEP boards.
+> 
+> [1] http://www.spinics.net/lists/linux-omap/msg83409.html
+> 
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  arch/arm/boot/dts/omap3-igep.dtsi |   24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+> index 125fe00..c02e3c0 100644
+> --- a/arch/arm/boot/dts/omap3-igep.dtsi
+> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
+> @@ -27,6 +27,20 @@
+>  };
+>  
+>  &omap3_pmx_core {
+> +	uart1_pins: pinmux_uart1_pins {
+> +		pinctrl-single,pins = <
+> +			0x152 0x100	/* uart1_rx.uart1_rx INPUT | MODE0 */
+> +			0x14c 0		/* uart1_tx.uart1_tx OUTPUT | MODE0 */
+> +		>;
+> +	};
+> +
+> +	uart2_pins: pinmux_uart2_pins {
+> +		pinctrl-single,pins = <
+> +			0x14a 0x100	/* uart2_rx.uart2_rx INPUT | MODE0 */
+> +			0x148 0		/* uart2_tx.uart2_tx OUTPUT | MODE0 */
+> +		>;
+> +	};
+> +
+>  	uart3_pins: pinmux_uart3_pins {
+>  		pinctrl-single,pins = <
+>  			0x16e 0x100	/* uart3_rx.uart3_rx INPUT | MODE0 */
+> @@ -77,6 +91,16 @@
+>  	status = "disabled";
+>  };
+>  
+> +&uart1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&uart1_pins>;
+> +};
+> +
+> +&uart2 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&uart2_pins>;
+> +};
+> +
+>  &uart3 {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&uart3_pins>;
+> 
 
-So change the naming scheme to reflect both the codename and the market
-name of the SoCs used in the dtsi and in the board files
+That looks good to me. I'll apply it on top of javier's series for 3.9.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/Makefile                         |    4 ++--
- ...n4i-cubieboard.dts => sun4i-a10-cubieboard.dts} |    4 ++--
- arch/arm/boot/dts/{sun4i.dtsi => sun4i-a10.dtsi}   |    0
- ...sun5i-olinuxino.dts => sun5i-a13-olinuxino.dts} |    4 ++--
- arch/arm/boot/dts/{sun5i.dtsi => sun5i-a13.dtsi}   |    0
- 5 files changed, 6 insertions(+), 6 deletions(-)
- rename arch/arm/boot/dts/{sun4i-cubieboard.dts => sun4i-a10-cubieboard.dts} (87%)
- rename arch/arm/boot/dts/{sun4i.dtsi => sun4i-a10.dtsi} (100%)
- rename arch/arm/boot/dts/{sun5i-olinuxino.dts => sun5i-a13-olinuxino.dts} (86%)
- rename arch/arm/boot/dts/{sun5i.dtsi => sun5i-a13.dtsi} (100%)
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 4dd567b..021d480 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -84,8 +84,8 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
- 	spear310-evb.dtb \
- 	spear320-evb.dtb
- dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
--dtb-$(CONFIG_ARCH_SUNXI) += sun4i-cubieboard.dtb \
--	sun5i-olinuxino.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun4i-a10-cubieboard.dtb \
-+	sun5i-a13-olinuxino.dtb
- dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
- 	tegra20-medcom-wide.dtb \
- 	tegra20-paz00.dtb \
-diff --git a/arch/arm/boot/dts/sun4i-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-similarity index 87%
-rename from arch/arm/boot/dts/sun4i-cubieboard.dts
-rename to arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index f4ca126..5cab825 100644
---- a/arch/arm/boot/dts/sun4i-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -11,11 +11,11 @@
-  */
- 
- /dts-v1/;
--/include/ "sun4i.dtsi"
-+/include/ "sun4i-a10.dtsi"
- 
- / {
- 	model = "Cubietech Cubieboard";
--	compatible = "cubietech,cubieboard", "allwinner,sun4i";
-+	compatible = "cubietech,a10-cubieboard", "allwinner,sun4i-a10";
- 
- 	aliases {
- 		serial0 = &uart0;
-diff --git a/arch/arm/boot/dts/sun4i.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-similarity index 100%
-rename from arch/arm/boot/dts/sun4i.dtsi
-rename to arch/arm/boot/dts/sun4i-a10.dtsi
-diff --git a/arch/arm/boot/dts/sun5i-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-similarity index 86%
-rename from arch/arm/boot/dts/sun5i-olinuxino.dts
-rename to arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-index d6ff889..498a091 100644
---- a/arch/arm/boot/dts/sun5i-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-@@ -12,11 +12,11 @@
-  */
- 
- /dts-v1/;
--/include/ "sun5i.dtsi"
-+/include/ "sun5i-a13.dtsi"
- 
- / {
- 	model = "Olimex A13-Olinuxino";
--	compatible = "olimex,a13-olinuxino", "allwinner,sun5i";
-+	compatible = "olimex,a13-olinuxino", "allwinner,sun5i-a13";
- 
- 	chosen {
- 		bootargs = "earlyprintk console=ttyS0,115200";
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-similarity index 100%
-rename from arch/arm/boot/dts/sun5i.dtsi
-rename to arch/arm/boot/dts/sun5i-a13.dtsi
--- 
-1.7.9.5
+Thanks,
+Benoit
