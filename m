@@ -1,53 +1,47 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 12 Dec 2012 09:22:09 +0100
-Subject: linker problem with xip kernel and recent toolchains
-In-Reply-To: <1355249468.19818.23.camel@hornet>
-References: <50BE0CDB.5000704@pengutronix.de>
- <1355230894.19818.1.camel@hornet> <50C7386E.70305@pengutronix.de>
- <1355249468.19818.23.camel@hornet>
-Message-ID: <50C83EB1.5050509@pengutronix.de>
+From: martinez.javier@gmail.com (Javier Martinez Canillas)
+Date: Wed, 12 Dec 2012 09:25:10 +0100
+Subject: [PATCH v3 0/3] ARM/dts: omap3: Add DT support for IGEP devices
+In-Reply-To: <1354538503-22671-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1354538503-22671-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CAAwP0s2qXuJzwEh-AVORbPApr6XT0JAfsFjrxKDvXArqYk0qXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/2012 07:11 PM, Pawel Moll wrote:
-> On Tue, 2012-12-11 at 13:43 +0000, Marc Kleine-Budde wrote:
->> What about putting the notes section into the read only segment, i.e.
->> the ROM?
-> 
-> Could you, please, try the change below? It seems to do the job for me.
+On Mon, Dec 3, 2012 at 1:41 PM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> IGEP technology devices are TI OMAP3 SoC based industrial embedded
+> and computer-on-module boards. This patch-set adds initial device
+> tree support for these devices.
+>
+> The device trees allows to boot from an MMC and are working all the
+> components that already have device tree support on OMAP3 SoCs:
+>
+> - MMC/SD
+> - UARTs
+> - GPIO LEDs
+> - TWL4030 codec audio
+> - pinmux/pinconf pinctrl
+>
+> Some peripheral are still not working such as Flash storage and
+> Ethernet but support for these will also be included once the
+> OMAP GPMC device tree binding patches land on mainline.
+>
+> This is a v3 of the patch-set that solves issues pointed out by
+> Enric Balletbo and Benoit Cousson.
+>
+> The patch-set is composed of the following patches:
+>
+> [PATCH v3 1/3] ARM/dts: omap3: Add generic DT support for IGEP devices
+> [PATCH v3 2/3] ARM/dts: omap3: Add support for IGEPv2 board
+> [PATCH v3 3/3] ARM/dts: omap3: Add support for IGEP COM Module
+>
+> Best regards,
+> Javier
+> --
 
-Works for me. The kernel image links to 640 KiB again.
+Hi Benoit and Tony,
 
-> 8<-------------------------
-> From 01fe7810cfded11aff03d216d2adbcf673e78f65 Mon Sep 17 00:00:00 2001
-> From: Pawel Moll <pawel.moll@arm.com>
-> Date: Tue, 11 Dec 2012 18:09:14 +0000
-> Subject: [PATCH] ARM: vmlinux.lds: Move .notes section next to the rodata
-> 
-> The .notes, being read-only data by nature, was placed between
-> read-write .data and .bss. This was harmful in case of XIP
-> images, as it was placed in the RAM range, most likely far
-> from the ROM address, inflating the XIP images.
-> 
-> Moving the .notes at the end of the read-only section
-> (consisting of .text, .rodata and unwind info) fixes the problem.
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-Reported-by: Marc Kleine-Budde <mkl@pengutronix.de>
-Tested-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Any comments on these?
 
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 261 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121212/6059476d/attachment.sig>
+Best regards,
+Javier
