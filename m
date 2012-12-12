@@ -1,406 +1,125 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 12 Dec 2012 11:46:10 +0100
-Subject: [PATCH 07/12] ARM: OMAP2+: PM: use power domain functional state
- in stats counters
-In-Reply-To: <20121209175314.6933.92188.stgit@dusk.lan>
-References: <20121209174545.6933.59371.stgit@dusk.lan>
- <20121209175314.6933.92188.stgit@dusk.lan>
-Message-ID: <CAORVsuXd4J8ycE4ZdVNG9b9v5z0ZNZ6oUYhpb-EKzDSau7QRjA@mail.gmail.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Wed, 12 Dec 2012 16:31:11 +0530
+Subject: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
+ OMAP-L138 DSP
+In-Reply-To: <50C85D9F.6050306@ti.com>
+References: <1352853207-20602-1-git-send-email-rtivy@ti.com>
+ <1352853207-20602-5-git-send-email-rtivy@ti.com> <50AB76FA.1050505@ti.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311F952B@DFLE08.ent.ti.com>
+ <50B88F7C.5000705@ti.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311FBDA3@DFLE08.ent.ti.com>
+ <50C85D9F.6050306@ti.com>
+Message-ID: <CA+V-a8sTBXMCXoTAjbuT9HUJkw_Na5SRUz2qAwvrebQXPWg6Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
+Hi Sekhar,
 
-On Sun, Dec 9, 2012 at 6:53 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> From: Jean Pihet <jean.pihet@newoldbits.com>
+On Wed, Dec 12, 2012 at 4:04 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On 12/12/2012 7:06 AM, Tivy, Robert wrote:
+>>> -----Original Message-----
+>>> From: Nori, Sekhar
+>>> Sent: Friday, November 30, 2012 2:51 AM
+>>>
+>>> Hi Rob,
+>>>
+>>> On 11/29/2012 7:08 AM, Tivy, Robert wrote:
+>>>> Hi Sekhar,
+>>>>
+>>>> Please see comments and noob questions below...
+>>>>
+>>>> They can run a single image if the image supports overriding the
+>>> Kconfig settings with kernel command-line arguments.
+>>>>
+>>>> The most basic solution is constants in the .c file itself.  A better
+>>> solution is Kconfig settings used by the .c file.  An even better
+>>> solution is Kconfig settings with kernel command-line overrides.
+>>>
+>>> If you have kernel command line, you could default to some values which
+>>> are sane in most cases if they are not provided. No, need to have a
+>>> Kconfig as well. That will be too many hooks to control the same things
+>>> and probably not necessary.
+>>>
+>>>>
+>>>>> If you want the remoteproc driver to allocate a certain area of
+>>> memory
+>>>>> to the dsp, why don't you take that value as a module parameter so
+>>>>> people who need different values can pass them differently? It is
+>>> not
+>>>>> clear to me why this memory management needs to be dealt with in
+>>>>> platform code.
+>>>>
+>>>> Unfortunetly we need to reserve this dsp memory during early boot,
+>>> using CMA.  Runtime module insertion is too late.
+>>>
+>>> Then I guess most of the time the module would be built into the kernel
+>>> and will be initialized using an early enough initcall.
+>>
+>> That's right, a .reserve function is assigned to the MACHINE_START structure, and this function calls dma_declare_contiguous().
 >
-> The PM code uses some counters to keep track of the power domains
-> transitions, in order to provide the information to drivers (in
-> pwrdm_get_context_loss_count) and to expose the information to
-> sysfs for debug purpose.
+> I meant use an early initcall in the driver.
 >
-> This patch provides the information for each functional state.
+>>
+>>>>>> +
+>>>>>> +static int __init early_rproc_mem(char *p) {
+>>>>>> + char *endp;
+>>>>>> +
+>>>>>> + rproc_size = memparse(p, &endp);
+>>>>>> + if (*endp == '@')
+>>>>>> +         rproc_base = memparse(endp + 1, NULL);
+>>>>>> +
+>>>>>> + return 0;
+>>>>>> +}
+>>>>>> +early_param("rproc_mem", early_rproc_mem);
+>>>>>
+>>>>> Use of non-standard kernel parameters is discouraged. All kernel
+>>>>> parameters should be documented in Documentation/kernel-
+>>> parameters.txt
+>>>>> (this means each and every kernel parameter needs to be justified
+>>>>> well).
+>>>>
+>>>> Can I use the kernel command-line (i.e., u-boot bootargs variable) to
+>>> specify non-kernel parameters?  I guess my question is more one about
+>>> the terminology "kernel parameter" - is there a way to specify a module
+>>> parameter on the kernel command line (like, perhaps, rproc.membase and
+>>> rproc.memsize)?
+>>>
+>>> Right. Module parameters are passed from kernel command line when the
+>>> module is built into the kernel.
+>>
+>> Unfortunately, it seems that module parameters, when stated on the kernel command line with module-name.var-name syntax, are not yet assigned when the kernel calls the early init .reserve functions.  For the "char *" I'm using, I observed a NULL value during the early init call and the proper assigned value during a later normal __init function.
 >
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> [paul at pwsan.com: use PWRDM_FPWRSTS_COUNT due to functional power state offset;
->  use powerdomain.c fn to convert func pwrsts to names; rename 'state' to
->  'fpwrst' to indicate use of func pwrsts; convert remaining users of the
->  non-func pwrst API; add some kerneldoc]
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-
-The patch does more than the description is telling. The function
-_update_logic_membank_counters is removed by this patch, is this
-intentional?
-
-> ---
->  arch/arm/mach-omap2/pm-debug.c    |   42 ++++-----
->  arch/arm/mach-omap2/powerdomain.c |  167 ++++++++++++++++++-------------------
->  arch/arm/mach-omap2/powerdomain.h |   17 ++--
->  3 files changed, 108 insertions(+), 118 deletions(-)
+> By "later normal __init" you mean module_init()? And you see
+> dma_declare_contiguous() returning error by this time?
 >
-> diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-> index 806a06b..72cf9e0 100644
-> --- a/arch/arm/mach-omap2/pm-debug.c
-> +++ b/arch/arm/mach-omap2/pm-debug.c
-> @@ -53,13 +53,6 @@ enum {
->         DEBUG_FILE_TIMERS,
->  };
+>>
+>> Is there any other method that allows specifying a parameter for an early CMA reservation without having to rebuild the kernel?
 >
-> -static const char pwrdm_state_names[][PWRDM_MAX_PWRSTS] = {
-> -       "OFF",
-> -       "RET",
-> -       "INA",
-> -       "ON"
-> -};
-> -
->  void pm_dbg_update_time(struct powerdomain *pwrdm, int prev)
->  {
->         s64 t;
-> @@ -70,7 +63,7 @@ void pm_dbg_update_time(struct powerdomain *pwrdm, int prev)
->         /* Update timer for previous state */
->         t = sched_clock();
+> Nothing else comes to mind. Can you share your code in some public repo?
+> It will allow me to try if something comes to mind.
 >
-> -       pwrdm->state_timer[prev] += t - pwrdm->timer;
-> +       pwrdm->fpwrst_timer[prev - PWRDM_FPWRST_OFFSET] += t - pwrdm->timer;
+>>
+>> If not, is this a strong enough use case to justify a new kernel parameter?
 >
->         pwrdm->timer = t;
->  }
-> @@ -79,6 +72,7 @@ static int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *user)
->  {
->         struct seq_file *s = (struct seq_file *)user;
+> May be it it is. You could try adding it. Just update the documentation
+> too. And add the documentation maintainers when you respin the patch.
 >
-> +       /* XXX This needs to be implemented in a better way */
->         if (strcmp(clkdm->name, "emu_clkdm") == 0 ||
->                 strcmp(clkdm->name, "wkup_clkdm") == 0 ||
->                 strncmp(clkdm->name, "dpll", 4) == 0)
-> @@ -94,23 +88,26 @@ static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
->  {
->         struct seq_file *s = (struct seq_file *)user;
->         int i;
-> +       int curr_fpwrst;
->
->         if (strcmp(pwrdm->name, "emu_pwrdm") == 0 ||
->                 strcmp(pwrdm->name, "wkup_pwrdm") == 0 ||
->                 strncmp(pwrdm->name, "dpll", 4) == 0)
->                 return 0;
->
-> -       if (pwrdm->state != pwrdm_read_pwrst(pwrdm))
-> -               printk(KERN_ERR "pwrdm state mismatch(%s) %d != %d\n",
-> -                       pwrdm->name, pwrdm->state, pwrdm_read_pwrst(pwrdm));
-> +       curr_fpwrst = pwrdm_read_fpwrst(pwrdm);
-> +       if (pwrdm->fpwrst != curr_fpwrst)
-> +               pr_err("pwrdm state mismatch(%s) %s != %s\n",
-> +                      pwrdm->name,
-> +                      pwrdm_convert_fpwrst_to_name(pwrdm->fpwrst),
-> +                      pwrdm_convert_fpwrst_to_name(curr_fpwrst));
->
->         seq_printf(s, "%s (%s)", pwrdm->name,
-> -                       pwrdm_state_names[pwrdm->state]);
-> -       for (i = 0; i < PWRDM_MAX_PWRSTS; i++)
-> -               seq_printf(s, ",%s:%d", pwrdm_state_names[i],
-> -                       pwrdm->state_counter[i]);
-> +                  pwrdm_convert_fpwrst_to_name(pwrdm->fpwrst));
-> +       for (i = PWRDM_FPWRST_OFFSET; i < PWRDM_MAX_FUNC_PWRSTS; i++)
-> +               seq_printf(s, ",%s:%d", pwrdm_convert_fpwrst_to_name(i),
-> +                          pwrdm->fpwrst_counter[i - PWRDM_FPWRST_OFFSET]);
->
-> -       seq_printf(s, ",RET-LOGIC-OFF:%d", pwrdm->ret_logic_off_counter);
->         for (i = 0; i < pwrdm->banks; i++)
->                 seq_printf(s, ",RET-MEMBANK%d-OFF:%d", i + 1,
->                                 pwrdm->ret_mem_off_counter[i]);
-> @@ -133,11 +130,12 @@ static int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *user)
->         pwrdm_state_switch(pwrdm);
->
->         seq_printf(s, "%s (%s)", pwrdm->name,
-> -               pwrdm_state_names[pwrdm->state]);
-> +                  pwrdm_convert_fpwrst_to_name(pwrdm->fpwrst));
->
-> -       for (i = 0; i < 4; i++)
-> -               seq_printf(s, ",%s:%lld", pwrdm_state_names[i],
-> -                       pwrdm->state_timer[i]);
-> +       for (i = 0; i < PWRDM_FPWRSTS_COUNT; i++)
-> +               seq_printf(s, ",%s:%lld",
-> +                          pwrdm_convert_fpwrst_to_name(i + PWRDM_FPWRST_OFFSET),
-> +                          pwrdm->fpwrst_timer[i]);
->
->         seq_printf(s, "\n");
->         return 0;
-> @@ -209,8 +207,8 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *dir)
->
->         t = sched_clock();
->
-> -       for (i = 0; i < 4; i++)
-> -               pwrdm->state_timer[i] = 0;
-> +       for (i = 0; i < PWRDM_FPWRSTS_COUNT; i++)
-> +               pwrdm->fpwrst_timer[i] = 0;
->
->         pwrdm->timer = t;
->
-> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> index 2c732b6..3e2e263 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -115,97 +115,16 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
->         list_add(&pwrdm->node, &pwrdm_list);
->
->         /* Initialize the powerdomain's state counter */
-> -       for (i = 0; i < PWRDM_MAX_PWRSTS; i++)
-> -               pwrdm->state_counter[i] = 0;
-> +       for (i = 0; i < PWRDM_FPWRSTS_COUNT; i++)
-> +               pwrdm->fpwrst_counter[i] = 0;
->
-> -       pwrdm->ret_logic_off_counter = 0;
->         for (i = 0; i < pwrdm->banks; i++)
->                 pwrdm->ret_mem_off_counter[i] = 0;
->
->         arch_pwrdm->pwrdm_wait_transition(pwrdm);
-> -       pwrdm->state = pwrdm_read_pwrst(pwrdm);
-> -       pwrdm->state_counter[pwrdm->state] = 1;
-> +       pwrdm->fpwrst = pwrdm_read_fpwrst(pwrdm);
-> +       pwrdm->fpwrst_counter[pwrdm->fpwrst - PWRDM_FPWRST_OFFSET] = 1;
->
-> -       pr_debug("powerdomain: registered %s\n", pwrdm->name);
-> -
-> -       return 0;
-> -}
-> -
-> -static void _update_logic_membank_counters(struct powerdomain *pwrdm)
-> -{
-> -       int i;
-> -       u8 prev_logic_pwrst, prev_mem_pwrst;
-> -
-> -       prev_logic_pwrst = pwrdm_read_prev_logic_pwrst(pwrdm);
-> -       if ((pwrdm->pwrsts_logic_ret == PWRSTS_OFF_RET) &&
-> -           (prev_logic_pwrst == PWRDM_POWER_OFF))
-> -               pwrdm->ret_logic_off_counter++;
-> -
-> -       for (i = 0; i < pwrdm->banks; i++) {
-> -               prev_mem_pwrst = pwrdm_read_prev_mem_pwrst(pwrdm, i);
-> -
-> -               if ((pwrdm->pwrsts_mem_ret[i] == PWRSTS_OFF_RET) &&
-> -                   (prev_mem_pwrst == PWRDM_POWER_OFF))
-> -                       pwrdm->ret_mem_off_counter[i]++;
-> -       }
-> -}
-> -
-> -static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
-> -{
-> -       int prev, next, state, trace_state = 0;
-> -
-> -       if (pwrdm == NULL)
-> -               return -EINVAL;
-> -
-> -       state = pwrdm_read_pwrst(pwrdm);
-> -
-> -       switch (flag) {
-> -       case PWRDM_STATE_NOW:
-> -               prev = pwrdm->state;
-> -               break;
-> -       case PWRDM_STATE_PREV:
-> -               prev = pwrdm_read_prev_pwrst(pwrdm);
-> -               if (pwrdm->state != prev)
-> -                       pwrdm->state_counter[prev]++;
-> -               if (prev == PWRDM_POWER_RET)
-> -                       _update_logic_membank_counters(pwrdm);
-> -               /*
-> -                * If the power domain did not hit the desired state,
-> -                * generate a trace event with both the desired and hit states
-> -                */
-> -               next = pwrdm_read_next_pwrst(pwrdm);
-> -               if (next != prev) {
-> -                       trace_state = (PWRDM_TRACE_STATES_FLAG |
-> -                                      ((next & OMAP_POWERSTATE_MASK) << 8) |
-> -                                      ((prev & OMAP_POWERSTATE_MASK) << 0));
-> -                       trace_power_domain_target(pwrdm->name, trace_state,
-> -                                                 smp_processor_id());
-> -               }
-> -               break;
-> -       default:
-> -               return -EINVAL;
-> -       }
-> -
-> -       if (state != prev)
-> -               pwrdm->state_counter[state]++;
-> -
-> -       pm_dbg_update_time(pwrdm, prev);
-> -
-> -       pwrdm->state = state;
-> -
-> -       return 0;
-> -}
-> -
-> -static int _pwrdm_pre_transition_cb(struct powerdomain *pwrdm, void *unused)
-> -{
-> -       pwrdm_clear_all_prev_pwrst(pwrdm);
-> -       _pwrdm_state_switch(pwrdm, PWRDM_STATE_NOW);
-> -       return 0;
-> -}
-> -
-> -static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
-> -{
-> -       _pwrdm_state_switch(pwrdm, PWRDM_STATE_PREV);
->         return 0;
->  }
->
-> @@ -568,6 +487,76 @@ static int _pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm)
->         return (ret) ? ret : fpwrst;
->  }
->
-> +/* XXX Caller must hold pwrdm->_lock */
-XXX should be replaced with a proper comment.
-
-> +static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
-> +{
-> +       int prev, next, fpwrst, trace_state = 0;
-> +       int i;
-> +       u8 prev_mem_pwrst;
-> +
-> +       if (pwrdm == NULL)
-> +               return -EINVAL;
-> +
-> +       fpwrst = _pwrdm_read_fpwrst(pwrdm);
-> +
-> +       switch (flag) {
-> +       case PWRDM_STATE_NOW:
-> +               prev = pwrdm->fpwrst;
-> +               break;
-> +       case PWRDM_STATE_PREV:
-> +               prev = _pwrdm_read_prev_fpwrst(pwrdm);
-> +               if (pwrdm->fpwrst != prev)
-> +                       pwrdm->fpwrst_counter[prev - PWRDM_FPWRST_OFFSET]++;
-> +               if (prev == PWRDM_FUNC_PWRST_CSWR ||
-> +                   prev == PWRDM_FUNC_PWRST_OSWR) {
-> +                       for (i = 0; i < pwrdm->banks; i++) {
-> +                               prev_mem_pwrst =
-> +                                       pwrdm_read_prev_mem_pwrst(pwrdm, i);
-> +                               if ((pwrdm->pwrsts_mem_ret[i] ==
-> +                                    PWRSTS_OFF_RET) &&
-> +                                   (prev_mem_pwrst == PWRDM_POWER_OFF))
-> +                                       pwrdm->ret_mem_off_counter[i]++;
-> +                       }
-> +               }
-> +               /*
-> +                * If the power domain did not hit the desired state,
-> +                * generate a trace event with both the desired and hit states
-> +                */
-> +               next = _pwrdm_read_next_fpwrst(pwrdm);
-> +               if (next != prev) {
-> +                       trace_state = (PWRDM_TRACE_STATES_FLAG | next << 8 |
-> +                                      prev);
-> +                       trace_power_domain_target(pwrdm->name, trace_state,
-> +                                                 smp_processor_id());
-> +               }
-> +               break;
-> +       default:
-> +               return -EINVAL;
-> +       }
-> +
-> +       if (fpwrst != prev)
-> +               pwrdm->fpwrst_counter[fpwrst - PWRDM_FPWRST_OFFSET]++;
-> +
-> +       pm_dbg_update_time(pwrdm, prev);
-> +
-> +       pwrdm->fpwrst = fpwrst;
-> +
-> +       return 0;
-> +}
-> +
-> +static int _pwrdm_pre_transition_cb(struct powerdomain *pwrdm, void *unused)
-> +{
-> +       pwrdm_clear_all_prev_pwrst(pwrdm);
-> +       _pwrdm_state_switch(pwrdm, PWRDM_STATE_NOW);
-> +       return 0;
-> +}
-> +
-> +static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
-> +{
-> +       _pwrdm_state_switch(pwrdm, PWRDM_STATE_PREV);
-> +       return 0;
-> +}
-> +
->  /* Public functions */
->
->  /**
-> @@ -638,7 +627,7 @@ int pwrdm_complete_init(void)
->                 return -EACCES;
->
->         list_for_each_entry(temp_p, &pwrdm_list, node)
-> -               pwrdm_set_next_pwrst(temp_p, PWRDM_POWER_ON);
-> +               pwrdm_set_next_fpwrst(temp_p, PWRDM_FUNC_PWRST_ON);
->
->         return 0;
->  }
-> @@ -1459,8 +1448,10 @@ int pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
->                 return -ENODEV;
->         }
->
-> -       count = pwrdm->state_counter[PWRDM_POWER_OFF];
-> -       count += pwrdm->ret_logic_off_counter;
-> +       count = pwrdm->fpwrst_counter[PWRDM_FUNC_PWRST_OFF -
-> +                                     PWRDM_FPWRST_OFFSET];
-> +       count += pwrdm->fpwrst_counter[PWRDM_FUNC_PWRST_OSWR -
-> +                                      PWRDM_FPWRST_OFFSET];
->
->         for (i = 0; i < pwrdm->banks; i++)
->                 count += pwrdm->ret_mem_off_counter[i];
-> diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-> index be835ff..849bc55 100644
-> --- a/arch/arm/mach-omap2/powerdomain.h
-> +++ b/arch/arm/mach-omap2/powerdomain.h
-> @@ -46,6 +46,8 @@ enum pwrdm_func_state {
->         PWRDM_MAX_FUNC_PWRSTS           /* Last value, used as the max value */
->  };
->
-> +#define PWRDM_FPWRSTS_COUNT    (PWRDM_MAX_FUNC_PWRSTS - PWRDM_FPWRST_OFFSET)
-> +
->  /* Powerdomain basic power states */
->  #define PWRDM_POWER_OFF                0x0
->  #define PWRDM_POWER_RET                0x1
-> @@ -123,10 +125,10 @@ struct powerdomain;
->   * @mem_pwrst_mask: (AM33XX only) mask for mem state bitfield in @pwrstst_offs
->   * @mem_retst_mask: (AM33XX only) mask for mem retention state bitfield
->   *     in @pwrstctrl_offs
-> - * @state:
-> - * @state_counter:
-> - * @timer:
-> - * @state_timer:
-> + * @fpwrst: current func power state (set during pwrdm_(pre|post)_transition())
-> + * @fpwrst_counter: estimated number of times the pwrdm entered the power states
-> + * @timer: sched_clock() timestamp of last pwrdm_state_switch()
-> + * @fpwrst_timer: estimated nanoseconds of residency in the various power states
->   * @_lock: spinlock used to serialize powerdomain and some clockdomain ops
->   * @_lock_flags: stored flags when @_lock is taken
->   *
-> @@ -146,12 +148,11 @@ struct powerdomain {
->         const u8 pwrsts_mem_ret[PWRDM_MAX_MEM_BANKS];
->         const u8 pwrsts_mem_on[PWRDM_MAX_MEM_BANKS];
->         const u8 prcm_partition;
-> +       u8 fpwrst;
->         struct clockdomain *pwrdm_clkdms[PWRDM_MAX_CLKDMS];
->         struct list_head node;
->         struct list_head voltdm_node;
-> -       int state;
-> -       unsigned state_counter[PWRDM_MAX_PWRSTS];
-> -       unsigned ret_logic_off_counter;
-> +       unsigned fpwrst_counter[PWRDM_FPWRSTS_COUNT];
->         unsigned ret_mem_off_counter[PWRDM_MAX_MEM_BANKS];
->         spinlock_t _lock;
->         unsigned long _lock_flags;
-> @@ -165,7 +166,7 @@ struct powerdomain {
->
->  #ifdef CONFIG_PM_DEBUG
->         s64 timer;
-> -       s64 state_timer[PWRDM_MAX_PWRSTS];
-> +       s64 fpwrst_timer[PWRDM_FPWRSTS_COUNT];
->  #endif
->  };
->
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I tried finding some alternatives apart from early_param, but there aren?t any.
+The only thought I got from Marek is to have device tree support. How about
+that as an option ?
 
 Regards,
-Jean
+--Prabhakar Lad
+
+>>
+>> I guess I don't understand why non-standard kernel parameters are discouraged.  I can adorn the name with enough module-specific naming to reduce the chances of any namespace collisions to a minimum.
+>
+> I guess it is to make sure generic solutions are followed and every
+> problem is not seen as unique.
+>
+> Thanks,
+> Sekhar
+> _______________________________________________
+> Davinci-linux-open-source mailing list
+> Davinci-linux-open-source at linux.davincidsp.com
+> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
