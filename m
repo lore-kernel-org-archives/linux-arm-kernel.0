@@ -1,51 +1,41 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 12 Dec 2012 15:43:03 -0600
-Subject: [RFC 0/5] ARM: Add Cross Trigger Interface driver
-Message-ID: <1355348588-22318-1-git-send-email-jon-hunter@ti.com>
+Date: Wed, 12 Dec 2012 15:50:44 -0600
+Subject: Coresight bus and drivers from CodeAurora
+In-Reply-To: <CACRpkdYYhAyLXJL6ns5mfFQOethihabfPpPuqz9Unq_SCJqLig@mail.gmail.com>
+References: <CACRpkdYeFw3YqYqgNAKUv1U4edyzzUa9x6xBSoBU4BbBoc6q5Q@mail.gmail.com>
+ <20121211213916.GB7214@pratikp-linux.qualcomm.com>
+ <CACRpkdYYhAyLXJL6ns5mfFQOethihabfPpPuqz9Unq_SCJqLig@mail.gmail.com>
+Message-ID: <50C8FC34.3010505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds AMBA driver for ARM Coresight Cross Trigger Interface (CTI) driver
-and device-tree binding for CTI module.
 
-I have tested the driver on an OMAP4430 device and include the relevant
-patches needed to enable CTI on OMAP4 devices for reference.
+On 12/12/2012 02:00 AM, Linus Walleij wrote:
+> On Tue, Dec 11, 2012 at 10:39 PM, Pratik Patel <pratikp@codeaurora.org> wrote:
+> 
+>> Thanks for the quick evaluation. I will be working on cleaning up
+>> the drivers for upstream submission in the coming weeks.
+> 
+> This is exactly what I like to hear :-)
+> 
+> Can you preserver the CC line from this mail on your subsequent
+> posts so the involved experts can follow the discussions?
+> 
+> It seems like keeping this new framework in drivers/ and actually refactoring
+> the old stuff in arch/arm/kernel/etm.c etc is the way forward, but doing that
+> may require some patch to support the old style of things. As the older code
+> may be stale maybe just depend on !CONFIG_OC_ETM is a way forward.
 
-I would like to get some feedback on the binding, CTI APIs and usage of
-the APB clock for OMAP4. I have seen that there has been some recent
-discussion around adding other coresight drivers for ARM devices [1]
-and so it would be also good to align on the appropriate location for
-coresight drivers in general.
+I have also been working to migrate the coresight cross-trigger
+interface (CTI) helpers from Ming Lei to a driver [1]. In the current
+implementation I have opted to make the CTI driver an AMBA device (like
+the existing ETM and ETB drivers). Therefore, I am curious if the plan
+is to migrate these other coresight devices to AMBA versus adding this
+new coresight bus?
 
-This series is based on the ARM-SOC for-next branch and Will Deacon's
-patch for the CTI lock registers [2].
+It would be good to align on a plan here for coresight devices in general.
 
-[1] http://article.gmane.org/gmane.linux.ports.arm.kernel/204591/match=coresight+bus
-[2] http://article.gmane.org/gmane.linux.ports.arm.kernel/200199/match=fix+manipulation+debug+lock+register
+Cheers
+Jon
 
-Jon Hunter (5):
-  ARM: CORESIGHT: Add generic lock/unlock helpers
-  ARM: dts: Add Cross Trigger Interface binding
-  ARM: CTI: Convert CTI helpers to AMBA bus driver
-  ARM: dts: OMAP4: Add CTI nodes
-  ARM: OMAP4: Add AMBA APB Clock
-
- Documentation/devicetree/bindings/arm/cti.txt |   32 +++
- arch/arm/boot/dts/omap4.dtsi                  |   23 ++
- arch/arm/include/asm/cti.h                    |  163 --------------
- arch/arm/include/asm/hardware/coresight.h     |   16 +-
- arch/arm/mach-omap2/cclock44xx_data.c         |    1 +
- drivers/Kconfig                               |    2 +
- drivers/amba/Kconfig                          |   20 ++
- drivers/amba/Makefile                         |    1 +
- drivers/amba/cti.c                            |  284 +++++++++++++++++++++++++
- include/linux/amba/cti.h                      |   82 +++++++
- 10 files changed, 453 insertions(+), 171 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/cti.txt
- delete mode 100644 arch/arm/include/asm/cti.h
- create mode 100644 drivers/amba/Kconfig
- create mode 100644 drivers/amba/cti.c
- create mode 100644 include/linux/amba/cti.h
-
--- 
-1.7.10.4
+[1] https://github.com/jonhunter/linux/commits/dev-cti
