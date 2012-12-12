@@ -1,39 +1,19 @@
-From: phil.edworthy@renesas.com (phil.edworthy at renesas.com)
-Date: Wed, 12 Dec 2012 10:12:27 +0000
-Subject: [PATCH v2] ARM: shmobile: r8a7779: Fix GPIO input reg addresses
-In-Reply-To: <2861660.bMP77HcQxX@avalon>
-References: <16942826.W5hEBZUpzF@avalon>
- <1355225657-18731-1-git-send-email-phil.edworthy@renesas.com>
- <2861660.bMP77HcQxX@avalon>
-Message-ID: <OF613746CC.4E3EB4D0-ON80257AD2.0038052F-80257AD2.00381232@eu.necel.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Wed, 12 Dec 2012 11:16:03 +0100
+Subject: [PATCH 0/7] various ste_dma40 fixes
+In-Reply-To: <1355305041-2338-1-git-send-email-fabio.baltieri@linaro.org>
+References: <1355305041-2338-1-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <20121212101603.GC26515@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon, Laurent,
+On Wed, Dec 12, 2012 at 10:37:14AM +0100, Fabio Baltieri wrote:
+> this patch set contains some fixes for the ste_dma40 driver.
 
-(resend as plain text)
+Adding DMA maintainers to the thread.  Want me to resend the whole set?
 
-> From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> To: Phil Edworthy <phil.edworthy@renesas.com>, 
-> Cc: Simon <horms@verge.net.au>, linux-sh at vger.kernel.org, linux-arm-
-> kernel at lists.infradead.org, Magnus <magnus.damm@gmail.com>, Laurent 
-> Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Date: 11/12/2012 11:39
-> Subject: Re: [PATCH v2] ARM: shmobile: r8a7779: Fix GPIO input reg 
-addresses
-> 
-> On Tuesday 11 December 2012 11:34:17 Phil Edworthy wrote:
-> > The INDTx register addresses were wrong.
-> > 
-> > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-> 
-> You can add
-> 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Thanks,
+Fabio
 
-Please scrap this patch. I just found out that it screws up the GPIO 
-outputs. The current code assumes the same register is used for both input 
-and output, which is not the case. It needs a bit of work to fix this.
-
-Thanks
-Phil
+-- 
+Fabio Baltieri
