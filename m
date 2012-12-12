@@ -1,50 +1,40 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 12 Dec 2012 14:31:31 +0100
-Subject: [RFC PATCH v2 5/6] sched: pack the idle load balance
+Date: Wed, 12 Dec 2012 14:31:32 +0100
+Subject: [RFC PATCH v2 6/6] ARM: sched: clear SD_SHARE_POWERLINE
 In-Reply-To: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
 References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1355319092-30980-6-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1355319092-30980-7-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Look for an idle CPU close to the pack buddy CPU whenever possible.
-The goal is to prevent the wake up of a CPU which doesn't share the power
-domain of the pack buddy CPU.
+The ARM platforms take advantage of packing small tasks on few cores.
+This is true even when the cores of a cluster can't be power gated
+independantly. So we clear SD_SHARE_POWERDOMAIN at MC and CPU level.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- kernel/sched/fair.c |   18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/kernel/topology.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index f1a4c24..6475f54 100644
---- a/kernel/sched/fair.c
-+++ b/kernel/sched/fair.c
-@@ -7274,7 +7274,25 @@ static struct {
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 79282eb..f89a4a2 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -201,6 +201,15 @@ static inline void update_cpu_power(unsigned int cpuid, unsigned int mpidr) {}
+  */
+ struct cputopo_arm cpu_topology[NR_CPUS];
  
- static inline int find_new_ilb(int call_cpu)
++int arch_sd_local_flags(int level)
++{
++	/* Powergate at threading level doesn't make sense */
++	if (level & SD_SHARE_CPUPOWER)
++		return 1*SD_SHARE_POWERDOMAIN;
++
++	return 0*SD_SHARE_POWERDOMAIN;
++}
++
+ const struct cpumask *cpu_coregroup_mask(int cpu)
  {
-+	struct sched_domain *sd;
- 	int ilb = cpumask_first(nohz.idle_cpus_mask);
-+	int buddy = per_cpu(sd_pack_buddy, call_cpu);
-+
-+	/*
-+	 * If we have a pack buddy CPU, we try to run load balance on a CPU
-+	 * that is close to the buddy.
-+	 */
-+	if (buddy != -1)
-+		for_each_domain(buddy, sd) {
-+			if (sd->flags & SD_SHARE_CPUPOWER)
-+				continue;
-+
-+			ilb = cpumask_first_and(sched_domain_span(sd),
-+					nohz.idle_cpus_mask);
-+
-+			if (ilb < nr_cpu_ids)
-+				break;
-+		}
- 
- 	if (ilb < nr_cpu_ids && idle_cpu(ilb))
- 		return ilb;
+ 	return &cpu_topology[cpu].core_sibling;
 -- 
 1.7.9.5
