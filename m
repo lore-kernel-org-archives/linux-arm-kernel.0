@@ -1,47 +1,62 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 12 Dec 2012 21:45:41 +0800
-Subject: [PATCH 0/4] Support uncompress debug message for multiplatform build
-Message-ID: <1355319945-3199-1-git-send-email-shawn.guo@linaro.org>
+Date: Wed, 12 Dec 2012 21:45:42 +0800
+Subject: [PATCH 1/4] ARM: imx: use separated debug uart symbol for imx31 and
+ imx35
+In-Reply-To: <1355319945-3199-1-git-send-email-shawn.guo@linaro.org>
+References: <1355319945-3199-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1355319945-3199-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After moving i.MX to multiplatform build, I hear people complaining
-that it's bad to lose the uncompress debug message, because not only
-does it mean that we will never see message "Uncompressing Linux...
-done, booting the kernel.", but also that the debug facility in
-arch/arm/boot/compressed/head.S outputs nothing even DEBUG is turned on.
+It's improper to use combined symbol DEBUG_IMX31_IMX35_UART for
+imx31 and imx35, because imx31 has 5 UARTs while imx35 only has 3.
+So later when we add UART port selection for DEBUG_IMX31_IMX35_UART,
+we will have problem.
 
-The series follows the approach handling DEBUG_LL to create a Kconfig
-symbol CONFIG_UNCOMPRESS_INCLUDE for choosing the correct uncompress
-header.  For traditional build, mach/uncompress.h will be included in
-arch/arm/boot/compressed/misc.c, and nothing changes than before. For
-multiplatform build with none DEBUG_LL port enabled, a set of empty
-functions defined in debug/uncompress/dummy.h will be used.  And for
-multiplatform build with a DEBUG_LL port, platform specific
-uncompress header like debug/uncompress/imx.h will come to play.
+Use separated Kconfig options for imx31 and imx35 debug uart selection.
 
-Different from traditional build that uncompress output and DEBUG_LL
-are two separate pieces, for multiplatform build uncompress output
-becomes a subset of DEBUG_LL and relies on DEBUG_LL to select the uart
-port, so it only works when DEBUG_LL is enabled.  I think it's an
-acceptable compromise to have the uncompress debug facility back.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/Kconfig.debug |   18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
 
-Shawn Guo (4):
-  ARM: imx: use separated debug uart symbol for imx31 and imx35
-  ARM: imx: support DEBUG_LL uart port selection for all i.MX SoCs
-  ARM: imx: restore uncompress.h to a common place
-  ARM: uncompress: support uncompress debug for multiplatform build
-
- arch/arm/Kconfig.debug                    |   44 ++++++++++++---
- arch/arm/boot/compressed/misc.c           |    8 +--
- arch/arm/include/debug/imx-uart.h         |   88 +++++++++++++++++++++++++++++
- arch/arm/include/debug/imx.S              |   29 +---------
- arch/arm/include/debug/uncompress/dummy.h |    3 +
- arch/arm/include/debug/uncompress/imx.h   |   63 +++++++++++++++++++++
- 6 files changed, 191 insertions(+), 44 deletions(-)
- create mode 100644 arch/arm/include/debug/imx-uart.h
- create mode 100644 arch/arm/include/debug/uncompress/dummy.h
- create mode 100644 arch/arm/include/debug/uncompress/imx.h
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 661030d..ae2ee04 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -205,12 +205,19 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on i.MX28.
+ 
+-	config DEBUG_IMX31_IMX35_UART
+-		bool "i.MX31 and i.MX35 Debug UART"
+-		depends on SOC_IMX31 || SOC_IMX35
++	config DEBUG_IMX31_UART
++		bool "i.MX31 Debug UART"
++		depends on SOC_IMX31
+ 		help
+ 		  Say Y here if you want kernel low-level debugging support
+-		  on i.MX31 or i.MX35.
++		  on i.MX31.
++
++	config DEBUG_IMX35_UART
++		bool "i.MX35 Debug UART"
++		depends on SOC_IMX35
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX35.
+ 
+ 	config DEBUG_IMX51_UART
+ 		bool "i.MX51 Debug UART"
+@@ -495,7 +502,8 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/imx.S" if DEBUG_IMX1_UART || \
+ 				 DEBUG_IMX25_UART || \
+ 				 DEBUG_IMX21_IMX27_UART || \
+-				 DEBUG_IMX31_IMX35_UART || \
++				 DEBUG_IMX31_UART || \
++				 DEBUG_IMX35_UART || \
+ 				 DEBUG_IMX51_UART || \
+ 				 DEBUG_IMX50_IMX53_UART ||\
+ 				 DEBUG_IMX6Q_UART
 -- 
 1.7.9.5
