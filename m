@@ -1,63 +1,40 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 12 Dec 2012 16:33:42 +0100
-Subject: [PATCH] arm: dts: Add uart1 and uart2 to igep boards.
-Message-ID: <1355326422-12357-1-git-send-email-matthias.bgg@gmail.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Wed, 12 Dec 2012 16:50:21 +0100
+Subject: [PATCH] mmc: mmci: Gate the clock when freq is 0
+Message-ID: <1355327421-20187-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is a follow-up patch for Javier Martinez effort adding initial
-device tree support to IGEP technology devices. [1]
+From: Johan Rudholm <johan.rudholm@stericsson.com>
 
-It adds uart1 and uart2 bindings to the generic dtsi for the IGEP boards.
+In the ST Micro variant, the MMCI_CLOCK register should not be used to
+gate the clock. Use MMCI_POWER to do this.
 
-[1] http://www.spinics.net/lists/linux-omap/msg83409.html
-
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+Signed-off-by: Johan Rudholm <johan.rudholm@stericsson.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm/boot/dts/omap3-igep.dtsi |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ drivers/mmc/host/mmci.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
-index 125fe00..c02e3c0 100644
---- a/arch/arm/boot/dts/omap3-igep.dtsi
-+++ b/arch/arm/boot/dts/omap3-igep.dtsi
-@@ -27,6 +27,20 @@
- };
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index edc3e9b..bf07823 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1147,6 +1147,15 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		}
+ 	}
  
- &omap3_pmx_core {
-+	uart1_pins: pinmux_uart1_pins {
-+		pinctrl-single,pins = <
-+			0x152 0x100	/* uart1_rx.uart1_rx INPUT | MODE0 */
-+			0x14c 0		/* uart1_tx.uart1_tx OUTPUT | MODE0 */
-+		>;
-+	};
++	/*
++	 * If clock = 0 and the block needs a certain value in the clreg
++	 * to function, we need to gate the clock by removing MCI_PWR_ON.
++	 * This is a special case for ST Micro variants, since the power
++	 * register in the ARM legacy case is used for powering the cards.
++	 */
++	if (!ios->clock && variant->clkreg)
++		pwr &= ~MCI_PWR_ON;
 +
-+	uart2_pins: pinmux_uart2_pins {
-+		pinctrl-single,pins = <
-+			0x14a 0x100	/* uart2_rx.uart2_rx INPUT | MODE0 */
-+			0x148 0		/* uart2_tx.uart2_tx OUTPUT | MODE0 */
-+		>;
-+	};
-+
- 	uart3_pins: pinmux_uart3_pins {
- 		pinctrl-single,pins = <
- 			0x16e 0x100	/* uart3_rx.uart3_rx INPUT | MODE0 */
-@@ -77,6 +91,16 @@
- 	status = "disabled";
- };
+ 	spin_lock_irqsave(&host->lock, flags);
  
-+&uart1 {
-+       pinctrl-names = "default";
-+       pinctrl-0 = <&uart1_pins>;
-+};
-+
-+&uart2 {
-+       pinctrl-names = "default";
-+       pinctrl-0 = <&uart2_pins>;
-+};
-+
- &uart3 {
-        pinctrl-names = "default";
-        pinctrl-0 = <&uart3_pins>;
+ 	mmci_set_clkreg(host, ios->clock);
 -- 
-1.7.9.5
+1.7.10
