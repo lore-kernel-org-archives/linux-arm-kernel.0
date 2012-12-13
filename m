@@ -1,29 +1,70 @@
-From: tomba@iki.fi (Tomi Valkeinen)
-Date: Thu, 13 Dec 2012 13:07:37 +0200
-Subject: [PATCH 1/1] net: cpts: fix for build break after ARM SoC
- integration
-In-Reply-To: <1354012034-31686-1-git-send-email-mugunthanvnm@ti.com>
-References: <1354012034-31686-1-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <50C9B6F9.9020300@iki.fi>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 13 Dec 2012 12:17:52 +0100
+Subject: [PATCH] ASoC: atmel-ssc: make it buildable on other architectures
+In-Reply-To: <1354970801-9185-1-git-send-email-manabian@gmail.com>
+References: <1354970801-9185-1-git-send-email-manabian@gmail.com>
+Message-ID: <50C9B960.6000407@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 2012-11-27 12:27, Mugunthan V N wrote:
->   CC      drivers/net/ethernet/ti/cpts.o
-> drivers/net/ethernet/ti/cpts.c:30:24: fatal error: plat/clock.h: No such file or directory
-> compilation terminated.
-> make[4]: *** [drivers/net/ethernet/ti/cpts.o] Error 1
-> make[3]: *** [drivers/net/ethernet/ti] Error 2
-> make[2]: *** [drivers/net/ethernet] Error 2
-> make[1]: *** [drivers/net] Error 2
+On 12/08/2012 01:46 PM, Joachim Eastwood :
+> Not very useful on non AT91/AVR32 platforms but it provides
+> more build coverage and prepares for ARM multiplatform.
 > 
-> fix for build break as the header file is removed from plat-omap as part of
-> the below patch
+> Also fixes a truncated warning that would come when
+> building on a 64-bit arch.
+> 
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 
-linux-next still has this build problem, I guess this patch is lingering
-somewhere. Somewhat annoying, as the driver is enabled by default. (btw,
-why is it "default y"?)
+It if needs it to go forward:
 
- Tomi
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> ---
+> 
+> Hi Mark,
+> 
+> Sending it to you since seem like you're the last one who
+> commited changes to the driver and the driver is mostly
+> used on ASoC.
+> 
+> Tested on RM9200 and build tested on x86_64.
+> 
+> regards
+> Joachim Eastwood
+> 
+>  drivers/misc/Kconfig     | 2 +-
+>  drivers/misc/atmel-ssc.c | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+> index b151b7c..8f59d88 100644
+> --- a/drivers/misc/Kconfig
+> +++ b/drivers/misc/Kconfig
+> @@ -192,7 +192,7 @@ config ICS932S401
+>  
+>  config ATMEL_SSC
+>  	tristate "Device driver for Atmel SSC peripheral"
+> -	depends on AVR32 || ARCH_AT91
+> +	depends on HAS_IOMEM
+>  	---help---
+>  	  This option enables device driver support for Atmel Synchronized
+>  	  Serial Communication peripheral (SSC).
+> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
+> index 158da5a..0cee274 100644
+> --- a/drivers/misc/atmel-ssc.c
+> +++ b/drivers/misc/atmel-ssc.c
+> @@ -167,7 +167,7 @@ static int ssc_probe(struct platform_device *pdev)
+>  
+>  	/* disable all interrupts */
+>  	clk_enable(ssc->clk);
+> -	ssc_writel(ssc->regs, IDR, ~0UL);
+> +	ssc_writel(ssc->regs, IDR, -1);
+>  	ssc_readl(ssc->regs, SR);
+>  	clk_disable(ssc->clk);
+>  
+> 
+
+
+-- 
+Nicolas Ferre
