@@ -1,46 +1,75 @@
-From: pratikp@codeaurora.org (Pratik Patel)
-Date: Wed, 12 Dec 2012 23:46:26 -0800
-Subject: Coresight bus and drivers from CodeAurora
-In-Reply-To: <50C8FC34.3010505@ti.com>
-References: <CACRpkdYeFw3YqYqgNAKUv1U4edyzzUa9x6xBSoBU4BbBoc6q5Q@mail.gmail.com>
- <20121211213916.GB7214@pratikp-linux.qualcomm.com>
- <CACRpkdYYhAyLXJL6ns5mfFQOethihabfPpPuqz9Unq_SCJqLig@mail.gmail.com>
- <50C8FC34.3010505@ti.com>
-Message-ID: <20121213074626.GB31717@pratikp-linux.qualcomm.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 13 Dec 2012 01:04:15 -0700
+Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
+In-Reply-To: <20121213070332.GA9946@avionic-0098.adnet.avionic-design.de>
+References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121207233317.GB4304@obsidianresearch.com>
+ <50C62161.9080708@wwwdotorg.org>
+ <20121211075207.GA29977@avionic-0098.adnet.avionic-design.de>
+ <50C7A3C5.7050100@wwwdotorg.org>
+ <20121212203433.GA7898@avionic-0098.adnet.avionic-design.de>
+ <50C9056D.2050309@wwwdotorg.org>
+ <20121213070332.GA9946@avionic-0098.adnet.avionic-design.de>
+Message-ID: <20121213080415.GA21178@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 12, 2012 at 03:50:44PM -0600, Jon Hunter wrote:
-> 
-> On 12/12/2012 02:00 AM, Linus Walleij wrote:
-> > On Tue, Dec 11, 2012 at 10:39 PM, Pratik Patel <pratikp@codeaurora.org> wrote:
-> > 
-> >> Thanks for the quick evaluation. I will be working on cleaning up
-> >> the drivers for upstream submission in the coming weeks.
-> > 
-> > This is exactly what I like to hear :-)
-> > 
-> > Can you preserver the CC line from this mail on your subsequent
-> > posts so the involved experts can follow the discussions?
-> > 
-> > It seems like keeping this new framework in drivers/ and actually refactoring
-> > the old stuff in arch/arm/kernel/etm.c etc is the way forward, but doing that
-> > may require some patch to support the old style of things. As the older code
-> > may be stale maybe just depend on !CONFIG_OC_ETM is a way forward.
-> 
-> I have also been working to migrate the coresight cross-trigger
-> interface (CTI) helpers from Ming Lei to a driver [1]. In the current
-> implementation I have opted to make the CTI driver an AMBA device (like
-> the existing ETM and ETB drivers). Therefore, I am curious if the plan
-> is to migrate these other coresight devices to AMBA versus adding this
-> new coresight bus?
-> 
-> It would be good to align on a plan here for coresight devices in general.
-> 
+On Thu, Dec 13, 2012 at 08:03:32AM +0100, Thierry Reding wrote:
 
-AMBA bus is for PrimeCell devices (class 0xF) as opposed to
-CoreSight devices (class 0x9).
+> I don't think that's the way it works. The PCIe controller is what the
+> PCIe specification refers to as root complex. The root complex can have
+> one or more root ports. 
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+PCIe is very specific about what a root complex is:
+
+Root Complex =
+ An entity that includes a Host Bridge, zero or more Root Complex Integrated
+ Endpoints, zero or more Root Complex Event Collectors, and one or more
+ Root Ports.
+
+It also has other specific text requiring that each of the root
+complex items conform to the software configuration interface -
+they must be discoverable, they must have device numbers, they must
+have configuration space.
+
+Stephen is correct in how things should work - the physical PCI-E link
+off the SOC should be reporting to linux as the secondary port on a
+PCIe-PCIe bridge, and discovery should naturally follow along it from
+the host bridge with no additional configuration or DT modeling
+required.
+
+When linux starts enumeration the bus 0, device 0, function 0
+configuration space should be a host bridge. Bus 0 devices XX should be
+the virtual PCI-PCI bridges.
+
+> Tegra30 has 3. Each of these root ports is a virtual PCI-PCI bridge
+> within the root complex. However, they don't "appear" on the bus since
+> they are the origins of two busses.
+
+This is not compliant.
+
+When the spec talks about a 'virtual PCI-PCI bridge' it means virtual
+in the sense that it is not seperate physical hardware. It absolutely
+must appear in PCI device enumeration.
+
+The spec is very clear on this point:
+
+bridge =
+   A device that virtually or actually connects a PCI/PCI-X segment or
+   PCI Express Port with an internal component interconnect or with another
+   PCI/PCI-X segment or PCI Express Port. A virtual Bridge in a Root
+   Complex or Switch must use the software configuration interface
+   described in this specification.
+
+> Perhaps it will even work the way you suggested if instead we removed
+> the special-case for root ports and enumerate only one root bus. I'll
+> need to check that.
+
+You might be missing the host bridge. If the SOC is providing
+compliant PCIe bridges with configuration space for the root ports but
+does not provide the host bridge configuration space then you may need
+to provide the host bridge in software to tie it all together into a
+compliant root complex.
+
+Regards,
+Jason
