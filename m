@@ -1,77 +1,172 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Dec 2012 17:57:54 -0800
-Subject: [GIT PULL 5/5] ARM: arm-soc board updates, take 2
-In-Reply-To: <20121213015543.GA18953@quad.lixom.net>
-References: <20121213015543.GA18953@quad.lixom.net>
-Message-ID: <20121213015754.GE28281@quad.lixom.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 13 Dec 2012 16:49:28 +0000
+Subject: [RFCv2 2/2] ARM: add functions to parse irq affinity from dt
+In-Reply-To: <1355417368-6861-1-git-send-email-mark.rutland@arm.com>
+References: <1355417368-6861-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1355417368-6861-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+This patch adds functions to handle parsing the CPU affinity of
+interrupts from devicetree, based on an "interrupts-affinity" parameter
+list. It is assumed that drivers which may optionally use this parameter
+implement their own fallback behaviour.
 
-This branch contains board updates for shmobile that had dependencies
-on earlier branches past the first driver branch, and thus are merged
-separately.
+The patch adds:
+* arm_dt_has_irq_affinity : returns whether or not a device_node has
+  interrupts-affinity information
+* arm_dt_affine_irq_is_single : returns whether an interrupt targets a single
+  CPU (i.e. is an SPI) or multiple CPUs (i.e. is a PPI). This test is
+  independent of the number of affine CPUs we can logically map.
+* arm_dt_irq_get_affinity : fills a cpumask with the CPUs an interrupt is
+  affine to.
 
-Most of these are to enable audio and USB on shmobile. They contain a
-dependent ASoC branch that has been coordinated with Mark Brown.
+The "interrupts-affinity" property consists of a list of pairs of cells
+specifying how to test if a CPU is affine. This test specification consists of
+a most significant affinity level to match, and values for the MPIDR affinity
+bits down to this level. Each pair of cells has the form:
 
+	< N 0x00AABBCC >
+	   \   \ \ \ \__ MPIDR.Aff0
+	    \   \ \ \___ MPIDR.Aff1
+	     \   \ \____ MPIDR.Aff2
+	      \   \_____ [must be zero]
+	       \________ level-specifier
 
-Conflict seen with this merge:
+The level-specifier is in the range [0-3]. When the value is 3, MPIDR
+affinity levels 2,1,0 are ignored, and all CPUs are matched. Affinity
+bits which are not to be matched should be set to zero.
 
-None
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm/include/asm/dt_irq.h |    9 ++++
+ arch/arm/kernel/devtree.c     |   91 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 100 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/dt_irq.h
 
-----------------------------------------------------------------
-
-The following changes since commit 370cdda68eb40e69a7a8950abec230976e5d9117:
-
-  Merge branch 'next/drivers' into HEAD
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/boards2
-
-for you to fetch changes up to d7460f4a3d75469deb1c6c028961da69608d02d9:
-
-  Merge branch 'boards3' of git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas into next/boards2
-
-----------------------------------------------------------------
-
-Arnd Bergmann (3):
-      Merge branches 'depends/asoc', 'renesas/boards' and 'renesas/soc' into next/boards2
-      Merge branches 'depends/asoc', 'renesas/boards', 'renesas/soc' and 'renesas/soc2' into next/boards2
-      Merge branch 'boards' of git://git.kernel.org/.../horms/renesas into next/boards2
-
-Bastian Hecht (1):
-      ARM: shmobile: mackerel: Add FLCTL IRQ resource
-
-Kuninori Morimoto (12):
-      ASoC: fsi: fixup channels_min/max
-      ASoC: fsi: use devm_request_irq()
-      ASoC: fsi: fsi_set_master_clk() was called from fsi_hw_xxx() only
-      ASoC: fsi: care fsi_hw_start/stop() return value
-      ASoC: fsi: add master clock control functions
-      ARM: shmobile: marzen: add USB phy support
-      ARM: shmobile: marzen: add USB EHCI driver support
-      ARM: shmobile: marzen: add USB OHCI driver support
-      ARM: shmobile: mackerel: enable DMAEngine on USB Host
-      ARM: shmobile: use FSI driver's audio clock on armadillo800eva
-      ARM: shmobile: use FSI driver's audio clock on mackerel
-      ARM: shmobile: use FSI driver's audio clock on ap4evb
-
-Olof Johansson (1):
-      Merge branch 'boards3' of git://git.kernel.org/.../horms/renesas into next/boards2
-
-Simon Horman (1):
-      Merge branch 'soc' into boards
-
-
- arch/arm/configs/marzen_defconfig              |  14 +-
- arch/arm/mach-shmobile/Kconfig                 |   2 +
- arch/arm/mach-shmobile/board-ap4evb.c          | 139 +-----
- arch/arm/mach-shmobile/board-armadillo800eva.c |  38 +-
- arch/arm/mach-shmobile/board-mackerel.c        |  80 +---
- arch/arm/mach-shmobile/board-marzen.c          | 186 ++++++++-
- include/sound/sh_fsi.h                         |   6 +
- sound/soc/sh/fsi.c                             | 441 ++++++++++++++++++--
- 8 files changed, 617 insertions(+), 289 deletions(-)
+diff --git a/arch/arm/include/asm/dt_irq.h b/arch/arm/include/asm/dt_irq.h
+new file mode 100644
+index 0000000..431eeda
+--- /dev/null
++++ b/arch/arm/include/asm/dt_irq.h
+@@ -0,0 +1,9 @@
++#ifndef ARM_ASM_DT_IRQ_H
++#define ARM_ASM_DT_IRQ_H
++
++bool arm_dt_has_irq_affinity(struct device_node *node);
++bool arm_dt_affine_irq_is_single(struct device_node *node, int idx);
++int arm_dt_irq_get_affinity(struct device_node *node, int idx,
++			    cpumask_t *mask);
++
++#endif /* ARM_ASM_DT_IRQ_H */
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 70f1bde..65d5052 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -20,6 +20,7 @@
+ #include <linux/of_platform.h>
+ 
+ #include <asm/cputype.h>
++#include <asm/dt_irq.h>
+ #include <asm/setup.h>
+ #include <asm/page.h>
+ #include <asm/smp_plat.h>
+@@ -165,6 +166,96 @@ void __init arm_dt_init_cpu_maps(void)
+ 	}
+ }
+ 
++#define PROP_IRQ_AFFINITY	"interrupts-affinity"
++#define AFFINE_LEVEL_IDX(i)	(2*(i))
++#define AFFINE_MPIDR_IDX(i)	(2*(i) + 1)
++
++/*
++ * Check whether the device has irq affinity information.
++ * Allows drivers to fall back to current behaviour with a single check.
++ */
++bool arm_dt_has_irq_affinity(struct device_node *node)
++{
++	return of_find_property(node, PROP_IRQ_AFFINITY, NULL) != NULL;
++}
++
++/*
++ * Check whether an irq with affinity information is a single cpu
++ * interrupt (rather than percpu). The node paramenter should be
++ * checked with arm_dt_has_irq_affinity first.
++ */
++bool arm_dt_affine_irq_is_single(struct device_node *node, int idx)
++{
++	u32 level;
++	of_property_read_u32_index(node, PROP_IRQ_AFFINITY, &level,
++				   AFFINE_LEVEL_IDX(idx));
++	return level == 0;
++}
++
++struct affine_match_spec {
++	u32 level;
++	u32 aff;
++};
++
++static bool arm_dt_affine_mpidr_match(u32 mpidr, struct affine_match_spec *match)
++{
++	u32 mask = 0xFFFFFFFF << (8*(match->level));
++	return (mpidr & mask) == (match->aff & mask);
++}
++
++static int arm_dt_irq_read_match(struct device_node *node, int idx,
++				 struct affine_match_spec *match)
++{
++	int ret;
++	if (!node)
++		return -EINVAL;
++
++	ret = of_property_read_u32_index(node, PROP_IRQ_AFFINITY, &match->aff,
++					 AFFINE_MPIDR_IDX(idx));
++	if (ret)
++		return ret;
++
++	ret = of_property_read_u32_index(node, PROP_IRQ_AFFINITY, &match->level,
++					 AFFINE_LEVEL_IDX(idx));
++	if (ret)
++		return ret;
++
++	/*
++	 * To match all cpus regardless of Aff{2,1,0}, we match at the
++	 * nonexistent Aff3.
++	 */
++	if (match->level > 3)
++		return -EINVAL;
++
++	return ret;
++
++}
++
++/*
++ * Get the set of possible cpus that an interrupt at idx is affine to.
++ */
++int arm_dt_irq_get_affinity(struct device_node *node, int idx,
++			    cpumask_t *mask)
++{
++	int i, ret;
++	struct affine_match_spec match;
++	u32 mpidr;
++
++	ret = arm_dt_irq_read_match(node, idx, &match);
++	if (ret)
++		return ret;
++
++	cpumask_clear(mask);
++
++	for_each_possible_cpu(i) {
++		mpidr = cpu_logical_map(i);
++		if (arm_dt_affine_mpidr_match(mpidr, &match))
++			cpumask_set_cpu(i, mask);
++	}
++
++	return 0;
++}
++
+ /**
+  * setup_machine_fdt - Machine setup when an dtb was passed to the kernel
+  * @dt_phys: physical address of dt blob
+-- 
+1.7.0.4
