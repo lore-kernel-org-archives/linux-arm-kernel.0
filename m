@@ -1,70 +1,76 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 13 Dec 2012 15:53:51 +0100
-Subject: [RFC PATCH v2 3/6] sched: pack small tasks
-In-Reply-To: <50C9E552.1010600@intel.com>
-References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
- <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
- <50C93AC1.1060202@intel.com>
- <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
- <50C9E552.1010600@intel.com>
-Message-ID: <CAKfTPtCUDEC50xexmLQ1d9qvBz1iJnf4aGSGjN==jqZwpxrwiQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Dec 2012 14:58:03 +0000
+Subject: [RFC 1/5] ARM: CORESIGHT: Add generic lock/unlock helpers
+In-Reply-To: <1355348588-22318-2-git-send-email-jon-hunter@ti.com>
+References: <1355348588-22318-1-git-send-email-jon-hunter@ti.com>
+ <1355348588-22318-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <20121213145803.GL26540@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 December 2012 15:25, Alex Shi <alex.shi@intel.com> wrote:
-> On 12/13/2012 06:11 PM, Vincent Guittot wrote:
->> On 13 December 2012 03:17, Alex Shi <alex.shi@intel.com> wrote:
->>> On 12/12/2012 09:31 PM, Vincent Guittot wrote:
->>>> During the creation of sched_domain, we define a pack buddy CPU for each CPU
->>>> when one is available. We want to pack at all levels where a group of CPU can
->>>> be power gated independently from others.
->>>> On a system that can't power gate a group of CPUs independently, the flag is
->>>> set at all sched_domain level and the buddy is set to -1. This is the default
->>>> behavior.
->>>> On a dual clusters / dual cores system which can power gate each core and
->>>> cluster independently, the buddy configuration will be :
->>>>
->>>>       | Cluster 0   | Cluster 1   |
->>>>       | CPU0 | CPU1 | CPU2 | CPU3 |
->>>> -----------------------------------
->>>> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
->>>>
->>>> Small tasks tend to slip out of the periodic load balance so the best place
->>>> to choose to migrate them is during their wake up. The decision is in O(1) as
->>>> we only check again one buddy CPU
->>>
->>> Just have a little worry about the scalability on a big machine, like on
->>> a 4 sockets NUMA machine * 8 cores * HT machine, the buddy cpu in whole
->>> system need care 64 LCPUs. and in your case cpu0 just care 4 LCPU. That
->>> is different on task distribution decision.
->>
->> The buddy CPU should probably not be the same for all 64 LCPU it
->> depends on where it's worth packing small tasks
->
-> Do you have further ideas for buddy cpu on such example?
+Hi Jon,
 
-yes, I have several ideas which were not really relevant for small
-system but could be interesting for larger system
+On Wed, Dec 12, 2012 at 09:43:04PM +0000, Jon Hunter wrote:
+> The Cross Trigger Interface (CTI) helpers in cti.h include definitions
+> for the Coresight Lock Access Register (LAR) and Lock Status Register
+> (LSR). These registers are already defined in coresight.h and so rather
+> than having multiple definitions, just use the definitions from
+> coresight.h.
+> 
+> Add the following coresight macros ...
+> - coresight_unlock() --> Unlocks coresight module
+> - coresight_lock()   --> Locks coresight module
+> 
+> Use the above macros for ETB, ETM and CTI. The do-while(0) statement
+> has been removed from the macro as it is not a multi-line macro.
+> 
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+>  arch/arm/include/asm/cti.h                |   16 +++-------------
+>  arch/arm/include/asm/hardware/coresight.h |   16 ++++++++--------
+>  2 files changed, 11 insertions(+), 21 deletions(-)
 
-We keep the same algorithm in a socket but we could either use another
-LCPU in the targeted socket (conf0) or chain the socket (conf1)
-instead of packing directly in one LCPU
+[...]
 
-The scheme below tries to summaries the idea:
+> diff --git a/arch/arm/include/asm/hardware/coresight.h b/arch/arm/include/asm/hardware/coresight.h
+> index 7ecd793..dcd0e66 100644
+> --- a/arch/arm/include/asm/hardware/coresight.h
+> +++ b/arch/arm/include/asm/hardware/coresight.h
+> @@ -141,17 +141,17 @@
+>  #define ETBFF_TRIGEVT		BIT(9)
+>  #define ETBFF_TRIGFL		BIT(10)
+>  
+> -#define etb_writel(t, v, x) \
+> -	(__raw_writel((v), (t)->etb_regs + (x)))
+> +#define etb_writel(t, v, x) (__raw_writel((v), (t)->etb_regs + (x)))
+>  #define etb_readl(t, x) (__raw_readl((t)->etb_regs + (x)))
+>  
+> -#define etm_lock(t) do { etm_writel((t), 0, CSMR_LOCKACCESS); } while (0)
+> -#define etm_unlock(t) \
+> -	do { etm_writel((t), UNLOCK_MAGIC, CSMR_LOCKACCESS); } while (0)
+> +#define etb_lock(t) coresight_lock((t)->etb_regs)
+> +#define etb_unlock(t) coresight_unlock((t)->etb_regs)
+> +#define etm_lock(t) coresight_lock((t)->etm_regs)
+> +#define etm_unlock(t) coresight_unlock((t)->etm_regs)
+>  
+> -#define etb_lock(t) do { etb_writel((t), 0, CSMR_LOCKACCESS); } while (0)
+> -#define etb_unlock(t) \
+> -	do { etb_writel((t), UNLOCK_MAGIC, CSMR_LOCKACCESS); } while (0)
+> +#define coresight_lock(base) (__raw_writel(0, base + CSMR_LOCKACCESS))
+> +#define coresight_unlock(base) \
+> +	(__raw_writel(UNLOCK_MAGIC, base + CSMR_LOCKACCESS))
+>  
+>  #endif /* __ASM_HARDWARE_CORESIGHT_H */
 
-Socket      | socket 0 | socket 1   | socket 2   | socket 3   |
-LCPU        | 0 | 1-15 | 16 | 17-31 | 32 | 33-47 | 48 | 49-63 |
-buddy conf0 | 0 | 0    | 1  | 16    | 2  | 32    | 3  | 48    |
-buddy conf1 | 0 | 0    | 0  | 16    | 16 | 32    | 32 | 48    |
-buddy conf2 | 0 | 0    | 16 | 16    | 32 | 32    | 48 | 48    |
+How about we take this opportunity to divorce the more general coresight
+bits from the etb specific parts, like you've done for the cti. We could
+move the ETB stuff out into asm/etb.h (although it might be nice to keep all
+the coresight device headers in one place... answers on a postcard) and just
+have the architected coresight functionality in this header.
 
-But, I don't know how this can interact with NUMA load balance and the
-better might be to use conf3.
+Will
 
->>
->> Which kind of sched_domain configuration have you for such system ?
->> and how many sched_domain level have you ?
->
-> it is general X86 domain configuration. with 4 levels,
-> sibling/core/cpu/numa.
->>
+> -- 
+> 1.7.10.4
+> 
+> 
