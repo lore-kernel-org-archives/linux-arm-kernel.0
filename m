@@ -1,160 +1,98 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Thu, 13 Dec 2012 22:17:43 +0530
-Subject: [PATCH v3] ARM: Exynos5250: Enabling dwc3-exynos driver
-In-Reply-To: <CAFp+6iFjY9gp1x6eDCLP-WJvv++wO7fw+U_9U+0OnNb99baeEA@mail.gmail.com>
-References: <CAFp+6iFjY9gp1x6eDCLP-WJvv++wO7fw+U_9U+0OnNb99baeEA@mail.gmail.com>
-Message-ID: <1355417263-27369-1-git-send-email-gautam.vivek@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 13 Dec 2012 16:49:26 +0000
+Subject: [RFCv2 0/2] Representing interrupt affinity in devicetree
+Message-ID: <1355417368-6861-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding DWC3 device tree node for Exynos5250 along with the
-device address and clock support needed for the controller.
+[This is an updated version of my previous RFC, which can be found at
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/128205.html]
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
----
-Changes from v2:
- - Changed the compatible string to chip specific(samsung,exynos5250),
-   since dwc3-exynos is being used from exynso5250 onwards.
- - Based on changes for USB 2.0:
-   https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-December/024413.html
+Current devicetree bindings for devices which use cpu-affine shared interrupts
+assume that interrupts are listed in ascending order of physical cpu id
+(MPIDR.Aff{2,1,0}). This is problematic for drivers because:
 
-Changes from v1:
- - Changed the device node name from 'dwc3' to 'usb at 12000000'.
- - Added the documentation for device tree bindings for dwc3 controller.
+(1) The driver must convert each physical id to a logical id for the purpose of
+    managing interrupts.
 
+(2) In multi-cluster systems the physical ids are not necessarily contiguous,
+    and drivers cannot simply iterate over ids from 0 to NR_CPUS.
 
- .../devicetree/bindings/usb/exynos-usb.txt         |   14 +++++++++++
- arch/arm/boot/dts/exynos5250.dtsi                  |    6 +++++
- arch/arm/mach-exynos/Kconfig                       |    1 +
- arch/arm/mach-exynos/clock-exynos5.c               |   24 ++++++++++++++++++++
- arch/arm/mach-exynos/include/mach/map.h            |    1 +
- arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +
- 6 files changed, 48 insertions(+), 0 deletions(-)
+(3) It is not possible to specify sets of interrupts which are wired to a
+    subset of cpus (i.e. clusters) not starting at physical id 0, as we can't
+    specify which cpu to start from, and can't skip cpus. This makes it
+    impossible to represent some devices (e.g. cpu PMUs) which may not exist
+    in the first cluster.
 
-diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-index f66fcdd..d660410 100644
---- a/Documentation/devicetree/bindings/usb/exynos-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-@@ -38,3 +38,17 @@ Example:
- 		reg = <0x12120000 0x100>;
- 		interrupts = <0 71 0>;
- 	};
-+
-+DWC3
-+Required properties:
-+ - compatible: should be "samsung,exynos5250-dwc3" for USB 3.0 DWC3 controller.
-+ - reg: physical base address of the controller and length of memory mapped
-+   region.
-+ - interrupts: interrupt number to the cpu.
-+
-+Example:
-+	usb at 12000000 {
-+		compatible = "samsung,exynos5250-dwc3";
-+		reg = <0x12000000 0x10000>;
-+		interrupts = <0 72 0>;
-+	};
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 75510d1..001a31b 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -299,6 +299,12 @@
- 		rx-dma-channel = <&pdma0 11>; /* preliminary */
- 	};
- 
-+	usb at 12000000 {
-+		compatible = "samsung,exynos5250-dwc3";
-+		reg = <0x12000000 0x10000>;
-+		interrupts = <0 72 0>;
-+	};
-+
- 	usb at 12110000 {
- 		compatible = "samsung,exynos4210-ehci";
- 		reg = <0x12110000 0x100>;
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 91d5b6f..09f9587 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -426,6 +426,7 @@ config MACH_EXYNOS5_DT
- 	depends on ARCH_EXYNOS5
- 	select ARM_AMBA
- 	select USE_OF
-+	select USB_ARCH_HAS_XHCI
- 	help
- 	  Machine support for Samsung EXYNOS5 machine with device tree enabled.
- 	  Select this if a fdt blob is available for the EXYNOS5 SoC based board.
-diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-index 5c63bc7..f2214a0 100644
---- a/arch/arm/mach-exynos/clock-exynos5.c
-+++ b/arch/arm/mach-exynos/clock-exynos5.c
-@@ -768,6 +768,11 @@ static struct clk exynos5_init_clocks_off[] = {
- 		.enable		= exynos5_clk_ip_fsys_ctrl ,
- 		.ctrlbit	= (1 << 18),
- 	}, {
-+		.name		= "usbdrd30",
-+		.parent		= &exynos5_clk_aclk_200.clk,
-+		.enable		= exynos5_clk_ip_fsys_ctrl,
-+		.ctrlbit	= (1 << 19),
-+	}, {
- 		.name		= "usbotg",
- 		.enable		= exynos5_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 7),
-@@ -1121,6 +1126,16 @@ static struct clksrc_sources exynos5_clkset_group = {
- 	.nr_sources	= ARRAY_SIZE(exynos5_clkset_group_list),
- };
- 
-+struct clk *exynos5_clkset_usbdrd30_list[] = {
-+	[0] = &exynos5_clk_mout_mpll.clk,
-+	[1] = &exynos5_clk_mout_cpll.clk,
-+};
-+
-+struct clksrc_sources exynos5_clkset_usbdrd30 = {
-+	.sources        = exynos5_clkset_usbdrd30_list,
-+	.nr_sources     = ARRAY_SIZE(exynos5_clkset_usbdrd30_list),
-+};
-+
- /* Possible clock sources for aclk_266_gscl_sub Mux */
- static struct clk *clk_src_gscl_266_list[] = {
- 	[0] = &clk_ext_xtal_mux,
-@@ -1415,6 +1430,15 @@ static struct clksrc_clk exynos5_clksrcs[] = {
- 			.parent		= &exynos5_clk_mout_cpll.clk,
- 		},
- 		.reg_div = { .reg = EXYNOS5_CLKDIV_GEN, .shift = 4, .size = 3 },
-+	}, {
-+		.clk    = {
-+			.name           = "sclk_usbdrd30",
-+			.enable         = exynos5_clksrc_mask_fsys_ctrl,
-+			.ctrlbit        = (1 << 28),
-+		},
-+		.sources = &exynos5_clkset_usbdrd30,
-+		.reg_src = { .reg = EXYNOS5_CLKSRC_FSYS, .shift = 28, .size = 1 },
-+		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS0, .shift = 24, .size = 4 },
- 	},
- };
- 
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 4bf6fd9..74470ca 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -201,6 +201,7 @@
- #define EXYNOS4_PA_EHCI			0x12580000
- #define EXYNOS4_PA_OHCI			0x12590000
- #define EXYNOS4_PA_HSPHY		0x125B0000
-+#define EXYNOS5_PA_DRD			0x12000000
- #define EXYNOS5_PA_EHCI			0x12110000
- #define EXYNOS5_PA_OHCI			0x12120000
- #define EXYNOS4_PA_MFC			0x13400000
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index 07aa586..26dd6c8 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -114,6 +114,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
- 				"s5p-ehci", NULL),
- 	OF_DEV_AUXDATA("samsung,exynos4210-ohci", EXYNOS5_PA_OHCI,
- 				"exynos-ohci", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos5250-dwc3", EXYNOS5_PA_DRD,
-+				"exynos-dwc3", NULL),
- 	{},
- };
- 
--- 
-1.7.6.5
+(4) Some devices may either be wired with PPIs or SPIs. It is not possible to
+    differentiate the two cases in general from the interrupts list (e.g. when
+    a device has multiple PPIs wired to all cpus).
+
+To represent the general case, we require a mechanism to describe the cpu
+affinity of a device, and a consistent way to map each interrupt to a cpu (or
+set of cpus). So far, the only workable mechanism I've been able to come up
+with is the following:
+
+In addition to the interrupts list we add an optional 'interrupts-affinity'
+list which describes how to map an interrupt to cpu(s). Each interrupt would
+have a corresponding element in the interrupts-affinity list.
+
+Each element consists of a pair of cells specifying how to test if a cpu is
+affine. This test specification consists of a most significant affinity level
+to match, and values for the MPIDR affinity bits down to this level. Each pair
+of cells has the form:
+
+    < N 0x00AABBCC >
+       \   \ \ \ \__ MPIDR.Aff0
+        \   \ \ \___ MPIDR.Aff1
+         \   \ \____ MPIDR.Aff2
+          \   \_____ [must be zero]
+           \________ level-specifier
+
+The level-specifier is in the range [0-3]. When the value is 3, MPIDR affinity
+levels 2,1,0 are ignored, and thus all cpus are matched. When the value is 0,
+levels 2,1,0 must all be matched for a cpu to be considered affine. Affinity
+bits which are not to be matched should be set to zero.
+
+In practice, use of the binding would look something like:
+
+> device at 0 {
+> 	compatible = "example,example-affine-device";
+> 	interrupts = <0 130 4>,
+> 	             <0 131 4>,
+> 	             <1 12 4>;
+> 	interrupts-affinity = <0 0x00000000>,
+>	                      <0 0x00000001>,
+> 	                      <1 0x00000100>;
+> };
+
+To request/free interrupts, drivers would walk over all interrupts, and request
+the affine cpu(s), which can be automatically mapped to logical ids by common
+code. This fixes issues 1, 2, and 3. 4 is partially solved, in that we know
+whether an interrupt is targeted at a single cpu or multiple cpus (i.e.
+whether it's an SPI or a PPI), but we can't differentiate multiple interrupts
+targeted at the same cpu. We could solve this with an additional
+"interrupt-names" property, or something of that sort.
+
+The following patches implement common code that could be used by drivers to
+deal with this affinity information, allowing drivers to extract a (logical)
+cpumask specifying the affinity of each interrupt, and additional information
+specifying whether an interrupt targets multiple cpus.
+
+The patches are based on rmk's for-next branch.
+
+Any thoughts?
+
+Thanks,
+Mark.
+
+Mark Rutland (2):
+  of: add of_property_read_u32_index
+  ARM: add functions to parse irq affinity from dt
+
+ arch/arm/include/asm/dt_irq.h |    9 ++++
+ arch/arm/kernel/devtree.c     |   91 +++++++++++++++++++++++++++++++++++++++++
+ drivers/of/base.c             |   36 ++++++++++++++++
+ include/linux/of.h            |   11 +++++
+ 4 files changed, 147 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/dt_irq.h
