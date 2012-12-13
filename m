@@ -1,52 +1,49 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 13 Dec 2012 09:18:18 +0000
-Subject: [PATCH 01/10] ARM: OMAP3/4: cpuidle: fix sparse and checkpatch
- warnings
-In-Reply-To: <alpine.DEB.2.00.1212130726160.25415@utopia.booyaka.com>
-References: <20121209011755.19716.25244.stgit@dusk.lan>
- <20121209012334.19716.44831.stgit@dusk.lan> <50C840C9.5000407@ti.com>
- <alpine.DEB.2.00.1212130541320.25415@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EBAF47B@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1212130726160.25415@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EBAF7FB@DBDE01.ent.ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 13 Dec 2012 10:20:49 +0100
+Subject: [RESEND PATCH 0/5] cpufreq: db8500: Rename driver and update some
+ parts
+In-Reply-To: <CAPtuhTgcmdxtG9B6L5NMyLCrhQh2o0DFkq47e_YCMoBzVhaF=g@mail.gmail.com>
+References: <1355153142-9534-1-git-send-email-ulf.hansson@stericsson.com>
+ <CAPtuhTgcmdxtG9B6L5NMyLCrhQh2o0DFkq47e_YCMoBzVhaF=g@mail.gmail.com>
+Message-ID: <CAPDyKFpN_MM+3N6U07UFu71rEPFkjwExCsnTwMkXbt0ei9ryfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 13, 2012 at 12:59:49, Paul Walmsley wrote:
-> On Thu, 13 Dec 2012, Hiremath, Vaibhav wrote:
-> 
-> > On Thu, Dec 13, 2012 at 11:11:49, Paul Walmsley wrote:
-> > > 
-> > > The branch name to use is:
-> > > 
-> > > "TEST_pwrdm_post_fpwrst_devel_a_3.9"
-> > 
-> > If I am correct, it only includes one additional patch (merge commit), 
-> > right???
-> > 
-> > commit d94831e0005fee743cefd28f4c20b7c435c71236
-> > Merge: 3e885c6 80ab3b2
-> > Author: Paul Walmsley <paul@pwsan.com>
-> > Date:   Sun Dec 9 13:06:51 2012 -0700
-> > 
-> >     build fixes
-> > 
-> > 
-> > 
-> > Does this also fix sparse warnings? 
-> 
-> Just ran a quick sparse check on mach-omap2 at 3e885c6 and d94831e with 
-> 'make -j4 C=2 arch/arm/mach-omap2', and no warnings showed up.  There were 
-> some sparse issues that got fixed at an earlier point, though, so perhaps 
-> you have an older copy of the branches somehow?
-> 
+On 12 December 2012 21:56, Mike Turquette <mturquette@linaro.org> wrote:
+> On Mon, Dec 10, 2012 at 7:25 AM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+>> From: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> This patchset starts by renaming the db8500 cpufreq driver to a more generic
+>> name. There are new variants which rely on it too, so instead we give it a
+>> family name of dbx500.
+>>
+>> On top of that a fixup patch for initialization of the driver and some minor
+>> cleanup patches are included as well.
+>>
+>> These patches can be material for 3.8.
+>>
+>> Since some patches for the db8500 cpufreq driver has recently been merged
+>> through Mike Turquette's clk tree, I decided to base these patches on top
+>> of the clk-next branch. So I hope Mike is fine by merging these patches
+>> through his tree.
+>>
+>> So I will try to collect ACKs from Rafael for the cpufreq patches. The
+>> mfd patch has already been ACKED by Samuel.
+>>
+>
+> Ulf,
+>
+> Just FYI clk-next has been pulled by Linus for 3.8.  I can still take
+> this branch once Rafael ACKs the CPUfreq bits if you want, but I think
+> you have more options now that clk-next is merged in.  It's up to you.
 
-Ignore my earlier comment on sparse warning, it was my wrong sparse tool 
-which was culprit here. I am working on remote server, which has sparse 
-present inside /usr/bin, and somehow my default config using that one 
-instead of what I was building.
+I think the easiest way forward (at least for me :-) ) would be if we
+could send them as for 3.8 rcs. Is that possible for you Mike?
 
-I fixed this by changing the PATH, and now I do not see any issues/warnings.
+>
+> Regards,
+> Mike
 
-Thanks,
-Vaibhav
+Thanks!
+
+Ulf Hansson
