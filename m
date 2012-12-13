@@ -1,43 +1,17 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 13 Dec 2012 11:01:31 -0700
-Subject: [PATCH] clk: debug clock tree
-In-Reply-To: <CAPtuhThBigSQMkNDf16Fo1tddTKo=rPEydHmzep0DqtgLrB+HA@mail.gmail.com>
-References: <1355370586-6600-1-git-send-email-pgaikwad@nvidia.com>
- <CAPtuhThBigSQMkNDf16Fo1tddTKo=rPEydHmzep0DqtgLrB+HA@mail.gmail.com>
-Message-ID: <50CA17FB.9060606@wwwdotorg.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 13 Dec 2012 18:03:48 +0000
+Subject: [TRIVIAL PATCH 04/26] arm64: Convert print_symbol to %pSR
+In-Reply-To: <c5cb06461153912fe383547a267aaea6e8b4976a.1355335227.git.joe@perches.com>
+References: <cover.1355335227.git.joe@perches.com>
+ <c5cb06461153912fe383547a267aaea6e8b4976a.1355335227.git.joe@perches.com>
+Message-ID: <20121213180348.GD16532@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/2012 09:27 AM, Mike Turquette wrote:
-> On Wed, Dec 12, 2012 at 7:49 PM, Prashant Gaikwad <pgaikwad@nvidia.com> wrote:
->> Adds debug file "clock_tree" in /sys/kernel/debug/clk dir.
->> It helps to view all the clock registered in tree format.
->>
+On Wed, Dec 12, 2012 at 06:18:53PM +0000, Joe Perches wrote:
+> Use the new vsprintf extension to avoid any possible
+> message interleaving.
 > 
-> Prashant,
-> 
-> Thanks for submitting this.  We've been talking about having a single
-> file for representing the tree for some time.
-> 
-> Regarding the output format had you considered using a well known
-> format which can be parsed using well known parsing libs?  This avoids
-> needing a custom parser just for this one file.  JSON springs to mind
-> as something lightweight and well-understood.
+> Signed-off-by: Joe Perches <joe@perches.com>
 
-One advantage of the format below is that it's very easily
-human-readable, and it's not too hard to parse (although I guess you'd
-have to parse the indent level to get parent/child relation, which would
-suck a bit). Is there room to provide both? Otherwise, I guess the
-kernel could include a script to convert from JSON/whatever into the
-format below.
-
->> For example:
->>    clock                        enable_cnt  prepare_cnt  rate
->> ---------------------------------------------------------------------
->>  i2s0_sync                      0           0            24000000
->>  spdif_in_sync                  0           0            24000000
->>     spdif_mux                   0           0            24000000
->>        spdif                    0           0            24000000
->>           spdif_doubler         0           0            48000000
->>              spdif_div          0           0            48000000
->>                 spdif_2x        0           0            48000000
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
