@@ -1,92 +1,40 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Wed, 12 Dec 2012 16:18:31 -0800
-Subject: [PATCH] NTP: Add a CONFIG_RTC_SYSTOHC configuration
-In-Reply-To: <20121212210443.GB11530@obsidianresearch.com>
-References: <20121212055643.GA18078@obsidianresearch.com>
- <50C8DDAA.5010101@linaro.org> <20121212210443.GB11530@obsidianresearch.com>
-Message-ID: <50C91ED7.5050905@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 13 Dec 2012 09:33:50 +0900
+Subject: [PATCH v2] ARM: shmobile: r8a7779: Fix GPIO input reg addresses
+In-Reply-To: <OF613746CC.4E3EB4D0-ON80257AD2.0038052F-80257AD2.00381232@eu.necel.com>
+References: <16942826.W5hEBZUpzF@avalon>
+ <1355225657-18731-1-git-send-email-phil.edworthy@renesas.com>
+ <2861660.bMP77HcQxX@avalon>
+ <OF613746CC.4E3EB4D0-ON80257AD2.0038052F-80257AD2.00381232@eu.necel.com>
+Message-ID: <20121213003350.GG13343@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2012 01:04 PM, Jason Gunthorpe wrote:
-> On Wed, Dec 12, 2012 at 11:40:26AM -0800, John Stultz wrote:
->
->>> The option also overrides the call to any platform update_persistent_clock
->>> so that the RTC subsystem completely and generically replaces this
->>> functionality.
->>>
->>> Tested on ARM kirkwood and PPC405
->> So I'm initially mixed on this, as it feels a little redundant (esp
->> given it may override a higher precision arch-specific function).
->> But from the perspective of this being a generic RTC function,
->> instead of an per-arch implementation, it does seem reasonable.
-> It isn't really redundant. The kernel still has two RTC subsystems,
-> 'class RTC' and various platform specific
-> things. update_persisent_clock is the entry for the platform specific
-> RTC, while rtc_update_persistent_clock is the entry for class RTC.
->
-> The issue is on platforms like PPC where both co-exist. On PPC
-> update_persisent_clock just calls through a function pointer
-> (set_rtc_time) to the machine description to do whatever that mach
-> needs. Currently all the PPC mach's that use class RTC drivers via DTS
-> set set_rtc_time to null. Only the machs that implement a non class
-> RTC driver provide an implementation.
->
-> So it is an either/or case - either rtc_update_persistent_clock works
-> or update_persistent_clock does, never both.
-Right.  I just want to make sure that we reduce the duplication between 
-the two paths (and ensure sane defaults, so users don't have to go 
-hunting for the right config for things to work properly). The other 
-complication is that in some cases, the arch specific path is much finer 
-grained then the RTC layer's second granularity, so we need to ensure we 
-prefer the arch specific path in those cases.
+On Wed, Dec 12, 2012 at 10:12:27AM +0000, phil.edworthy at renesas.com wrote:
+> Hi Simon, Laurent,
+> 
+> (resend as plain text)
+> 
+> > From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > To: Phil Edworthy <phil.edworthy@renesas.com>, 
+> > Cc: Simon <horms@verge.net.au>, linux-sh at vger.kernel.org, linux-arm-
+> > kernel at lists.infradead.org, Magnus <magnus.damm@gmail.com>, Laurent 
+> > Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > Date: 11/12/2012 11:39
+> > Subject: Re: [PATCH v2] ARM: shmobile: r8a7779: Fix GPIO input reg 
+> addresses
+> > 
+> > On Tuesday 11 December 2012 11:34:17 Phil Edworthy wrote:
+> > > The INDTx register addresses were wrong.
+> > > 
+> > > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> > 
+> > You can add
+> > 
+> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> 
+> Please scrap this patch. I just found out that it screws up the GPIO 
+> outputs. The current code assumes the same register is used for both input 
+> and output, which is not the case. It needs a bit of work to fix this.
 
->> Hrm. So on architectures that support GENERIC_CMOS_UPDATE already,
->> this creates a duplicated code path that is slightly different. I'd
->> like to avoid this if possible.  Since you're plugging
->> rtc_update_persistent_clock into the GENERIC_CMOS_UPDATE code, we
->> can't just have this option depend on !GENERIC_CMOS_UPDATE.
-> It isn't duplicate, we need to keep update_persistent_clock to support
-> non-class RTC machines.
->
-> I thought about this:
->
->          if (abs(now.tv_nsec - (NSEC_PER_SEC / 2)) <= tick_nsec / 2) {
-> 	        fail = -1;
-> #ifdef CONFIG_RTC_SYSTOHC
-> 	        fail = rtc_update_persistent_clock(now);
-> #endif
-> #ifdef CONFIG_GENERIC_CMOS_UPDATE
->                  if (fail)
->                           fail = update_persistent_clock(now);
-> #endif
->         }
->
-> Try the RTC function first, then fall back to the legacy platform
-> function if it didn't work.
->
-> That seems better to me, do you agree?
-
-I do, although again, in the case where the arch specific implementation 
-is "better", we end up losing granularity (s390 is the specific example 
-I'm thinking of), since this prefers the RTC implementation over the 
-arch specific one.  So maybe I'd suggest switching it so we prefer the 
-arch specific one, and then remove the arch specific implementations 
-where they are inferior to the RTC one.
-
->
->> So this might need a slightly deeper rework?
->> I'd suggest the following:
->> 1) Convert GENERIC_CMOS_UPDATE into SUPPORTS_UPDATE_PERSISTENT_CLOCK.
->> 2) Add RTC_SYSTOHC but make it depend on !SUPPORTS_UPDATE_PERSISTENT_CLOCK
-> This would only work for ARM, not PPC..
->
-> Ultimately I suspect the clean up needed is to convert more things to
-> class rtc drivers and remove update_persistent_clock.
-> ppc is pretty close already, and I think ARM is already there.
-As long as we have a clear iterative path forward, with a solution for 
-the cases where the arch method is actually preferred, I think it sounds 
-like a reasonable approach.
-
-thanks
--john
+Thanks, I have marked v1 and v2 as Rejected in patchwork.
