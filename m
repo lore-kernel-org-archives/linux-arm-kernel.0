@@ -1,33 +1,66 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Thu, 13 Dec 2012 13:13:25 +0000
-Subject: [RFC PATCH 1/3] ARM: mm: Add discontiguous memory support.
-In-Reply-To: <20121212180121.GB14363@n2100.arm.linux.org.uk>
-References: <1355334049-10247-1-git-send-email-steve.capper@arm.com>
- <1355334049-10247-2-git-send-email-steve.capper@arm.com>
- <20121212180121.GB14363@n2100.arm.linux.org.uk>
-Message-ID: <20121213131324.GA2154@e103986-lin>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Thu, 13 Dec 2012 14:19:12 +0100
+Subject: [PATCH v2] mxs: uart: allow setting RTS from software
+In-Reply-To: <50C9ABB4.8010900@freescale.com>
+References: <1355388135-3676-1-git-send-email-s.trumtrar@pengutronix.de>
+ <50C9ABB4.8010900@freescale.com>
+Message-ID: <20121213131912.GB27832@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 12, 2012 at 06:01:21PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Dec 12, 2012 at 05:40:47PM +0000, Steve Capper wrote:
-> > This patch adds support for discontiguous memory, with a view to
-> > each discontiguous block being assigned to a NUMA node (in a future
-> > patch).
-> > 
-> > Discontiguous memory should only be used to back NUMA on systems
-> > where sparse memory is not available.
-> 
-> Err, we had this, and then we ripped it all out.  Do we have any NUMA ARM
-> systems?  I don't think we do.
+On Thu, Dec 13, 2012 at 06:19:32PM +0800, Huang Shijie wrote:
+> ? 2012?12?13? 16:42, Steffen Trumtrar ??:
+> > With the patch "serial: mxs-auart: fix the wrong RTS hardware flow control" the
+> > mainline mxs-uart driver now sets RTSEN only when hardware flow control is
+> > enabled via software. It is not possible any longer to set RTS manually via
+> > software. However, the manual modification is a valid operation.
+> > Regain the possibility to set RTS via software and only set RTSEN when hardware
+> > flow control is explicitly enabled via settermios cflag CRTSCTS.
+> >
+> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > ---
+> >  drivers/tty/serial/mxs-auart.c |    6 +++++-
+> >  1 file changed, 5 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+> > index 6db23b0..21d9b12 100644
+> > --- a/drivers/tty/serial/mxs-auart.c
+> > +++ b/drivers/tty/serial/mxs-auart.c
+> > @@ -412,10 +412,12 @@ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
+> >  
+> >  	u32 ctrl = readl(u->membase + AUART_CTRL2);
+> >  
+> > -	ctrl &= ~AUART_CTRL2_RTSEN;
+> > +	ctrl &= ~(AUART_CTRL2_RTSEN | AUART_CTRL2_RTS);
+> >  	if (mctrl & TIOCM_RTS) {
+> >  		if (tty_port_cts_enabled(&u->state->port))
+> >  			ctrl |= AUART_CTRL2_RTSEN;
+> > +		else
+> > +			ctrl |= AUART_CTRL2_RTS;
+> >  	}
+> >  
+> >  	s->ctrl = mctrl;
+> > @@ -676,8 +678,10 @@ static void mxs_auart_settermios(struct uart_port *u,
+> >  				ctrl2 |= AUART_CTRL2_TXDMAE | AUART_CTRL2_RXDMAE
+> >  				       | AUART_CTRL2_DMAONERR;
+> >  		}
+> > +		u->flags |= ASYNC_CTS_FLOW;
+> >  		ctrl2 |= AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN;
+> >  	} else {
+> > +		u->flags &= ~ASYNC_CTS_FLOW;
+> I think these two lines is not needed.
+> uart_change_speed() has set/unset ASYNC_CTS_FLOW for us.
 
-Hi Russell,
-There aren't any ARM NUMA systems out at the moment, but the Linux NUMA
-subsystem can be used to group cores that share an L2 cache together into the
-same node. This can then potentially reduce the L3 traffic required to run
-certain tasks, as the scheduler has a notion of memory topology that matches
-the cache topology. (An example platform where this can be beneficial is the TC2).
+I don't know that much of the inner workings of the serial framework, but it
+seems like it is guaranteed, that uart_change_speed is called before the
+mxs_auart_settermios. And therefore you are right and the two lines can be
+dropped.
 
-Best,
+Regards,
+Steffen
+
 -- 
-Steve
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
