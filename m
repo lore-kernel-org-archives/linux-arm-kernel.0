@@ -1,38 +1,39 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 13 Dec 2012 10:49:38 +0000
-Subject: Coresight bus and drivers from CodeAurora
-In-Reply-To: <20121213074626.GB31717@pratikp-linux.qualcomm.com>
-References: <CACRpkdYeFw3YqYqgNAKUv1U4edyzzUa9x6xBSoBU4BbBoc6q5Q@mail.gmail.com>
- <20121211213916.GB7214@pratikp-linux.qualcomm.com>
- <CACRpkdYYhAyLXJL6ns5mfFQOethihabfPpPuqz9Unq_SCJqLig@mail.gmail.com>
- <50C8FC34.3010505@ti.com>
- <20121213074626.GB31717@pratikp-linux.qualcomm.com>
-Message-ID: <20121213104938.GA26540@mudshark.cambridge.arm.com>
+Date: Thu, 13 Dec 2012 10:51:09 +0000
+Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
+ cache LoUIS operations
+In-Reply-To: <Pine.LNX.4.64.1212130909190.18586@axis700.grange>
+References: <20120919134658.GA2111@linaro.org>
+ <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
+ <20120920110439.GB2117@linaro.org>
+ <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
+ <20121211163313.GG16759@mudshark.cambridge.arm.com>
+ <20121211163843.GH16759@mudshark.cambridge.arm.com>
+ <50C7C16B.7050106@codeaurora.org>
+ <20121212103338.GB23022@e102568-lin.cambridge.arm.com>
+ <20121212133650.GJ6195@mudshark.cambridge.arm.com>
+ <Pine.LNX.4.64.1212130909190.18586@axis700.grange>
+Message-ID: <20121213105109.GB26540@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 13, 2012 at 07:46:26AM +0000, Pratik Patel wrote:
-> On Wed, Dec 12, 2012 at 03:50:44PM -0600, Jon Hunter wrote:
-> > I have also been working to migrate the coresight cross-trigger
-> > interface (CTI) helpers from Ming Lei to a driver [1]. In the current
-> > implementation I have opted to make the CTI driver an AMBA device (like
-> > the existing ETM and ETB drivers). Therefore, I am curious if the plan
-> > is to migrate these other coresight devices to AMBA versus adding this
-> > new coresight bus?
+On Thu, Dec 13, 2012 at 08:09:33AM +0000, Guennadi Liakhovetski wrote:
+> On Wed, 12 Dec 2012, Will Deacon wrote:
+> > Back to the case in hand.... Lorenzo just pointed out to me that the
+> > finished in question (sh7372_do_idle_sysc) calls v7_flush_dcache_all, so
+> > the louis stuff should be irrelevant. The problem may actually be that the
+> > finisher disables the L2 cache prior to cleaning/invalidating it, which is
+> > the opposite order to that described by the A8 TRM.
 > > 
-> > It would be good to align on a plan here for coresight devices in general.
+> > Guennadi -- can you try moving the kernel_flush call before the L2 disable
+> > in sh7372_do_idle_sysc please?
+> 
+> Yes, this works too.
 
-Having glanced at your patch series (I'll find some time to review it
-properly) I think it looks like the right sort of thing to be doing. The
-contentious part is likely to be exposing trace data from coresight devices
-to userspace in a self-hosted environment. What we absolutely do *not* want
-is a collection of disparate stream decoders in the kernel with a
-corresponding set of magic ioctls/filehandles to expose proprietary binary data.
- 
-> AMBA bus is for PrimeCell devices (class 0xF) as opposed to
-> CoreSight devices (class 0x9).
+That's good to know. Please can you send a patch for that? The sequence
+currently being used by the finisher *is* buggy, and should be fixed
+independently of the louis stuff.
 
-Yes, but if we can re-use all of that infrastructure on the software side of
-things then there's really no reason not to.
+Cheers,
 
 Will
