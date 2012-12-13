@@ -1,49 +1,81 @@
-From: alex.shi@intel.com (Alex Shi)
-Date: Thu, 13 Dec 2012 22:25:22 +0800
-Subject: [RFC PATCH v2 3/6] sched: pack small tasks
-In-Reply-To: <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
-References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
- <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
- <50C93AC1.1060202@intel.com>
- <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
-Message-ID: <50C9E552.1010600@intel.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 13 Dec 2012 15:32:46 +0100 (CET)
+Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
+ cache LoUIS operations
+In-Reply-To: <20121213105109.GB26540@mudshark.cambridge.arm.com>
+References: <20120919134658.GA2111@linaro.org>
+ <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
+ <20120920110439.GB2117@linaro.org>
+ <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
+ <20121211163313.GG16759@mudshark.cambridge.arm.com>
+ <20121211163843.GH16759@mudshark.cambridge.arm.com>
+ <50C7C16B.7050106@codeaurora.org>
+ <20121212103338.GB23022@e102568-lin.cambridge.arm.com>
+ <20121212133650.GJ6195@mudshark.cambridge.arm.com>
+ <Pine.LNX.4.64.1212130909190.18586@axis700.grange>
+ <20121213105109.GB26540@mudshark.cambridge.arm.com>
+Message-ID: <Pine.LNX.4.64.1212131522430.18586@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/2012 06:11 PM, Vincent Guittot wrote:
-> On 13 December 2012 03:17, Alex Shi <alex.shi@intel.com> wrote:
->> On 12/12/2012 09:31 PM, Vincent Guittot wrote:
->>> During the creation of sched_domain, we define a pack buddy CPU for each CPU
->>> when one is available. We want to pack at all levels where a group of CPU can
->>> be power gated independently from others.
->>> On a system that can't power gate a group of CPUs independently, the flag is
->>> set at all sched_domain level and the buddy is set to -1. This is the default
->>> behavior.
->>> On a dual clusters / dual cores system which can power gate each core and
->>> cluster independently, the buddy configuration will be :
->>>
->>>       | Cluster 0   | Cluster 1   |
->>>       | CPU0 | CPU1 | CPU2 | CPU3 |
->>> -----------------------------------
->>> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
->>>
->>> Small tasks tend to slip out of the periodic load balance so the best place
->>> to choose to migrate them is during their wake up. The decision is in O(1) as
->>> we only check again one buddy CPU
->>
->> Just have a little worry about the scalability on a big machine, like on
->> a 4 sockets NUMA machine * 8 cores * HT machine, the buddy cpu in whole
->> system need care 64 LCPUs. and in your case cpu0 just care 4 LCPU. That
->> is different on task distribution decision.
-> 
-> The buddy CPU should probably not be the same for all 64 LCPU it
-> depends on where it's worth packing small tasks
+On Thu, 13 Dec 2012, Will Deacon wrote:
 
-Do you have further ideas for buddy cpu on such example?
+> On Thu, Dec 13, 2012 at 08:09:33AM +0000, Guennadi Liakhovetski wrote:
+> > On Wed, 12 Dec 2012, Will Deacon wrote:
+> > > Back to the case in hand.... Lorenzo just pointed out to me that the
+> > > finished in question (sh7372_do_idle_sysc) calls v7_flush_dcache_all, so
+> > > the louis stuff should be irrelevant. The problem may actually be that the
+> > > finisher disables the L2 cache prior to cleaning/invalidating it, which is
+> > > the opposite order to that described by the A8 TRM.
+> > > 
+> > > Guennadi -- can you try moving the kernel_flush call before the L2 disable
+> > > in sh7372_do_idle_sysc please?
+> > 
+> > Yes, this works too.
 > 
-> Which kind of sched_domain configuration have you for such system ?
-> and how many sched_domain level have you ?
+> That's good to know. Please can you send a patch for that? The sequence
+> currently being used by the finisher *is* buggy, and should be fixed
+> independently of the louis stuff.
 
-it is general X86 domain configuration. with 4 levels,
-sibling/core/cpu/numa.
-> 
+Well, the fix is yours, so, it should be "From: you." I can certainly send 
+it just copying your description above, but I'd also need your Sob. 
+Something like the below (feel free to improve the subject line and the 
+description):
+
+From: Will Deacon <will.deacon@arm.com>
+Subject: [PATCH] ARM: sh7372: fix cache clean / invalidate order
+
+According to the Cortex A8 TRM the L2 cache should be first cleaned and 
+then disabled. Fix the swapped order on sh7372.
+
+Signed-off-by: <you>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+(or even just)
+Tested-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+
+diff --git a/arch/arm/mach-shmobile/sleep-sh7372.S b/arch/arm/mach-shmobile/sleep-sh7372.S
+index 1d56467..df15d8a 100644
+--- a/arch/arm/mach-shmobile/sleep-sh7372.S
++++ b/arch/arm/mach-shmobile/sleep-sh7372.S
+@@ -59,16 +59,16 @@ sh7372_do_idle_sysc:
+ 	mcr	p15, 0, r0, c1, c0, 0
+ 	isb
+ 
+-	/* disable L2 cache in the aux control register */
+-	mrc     p15, 0, r10, c1, c0, 1
+-	bic     r10, r10, #2
+-	mcr     p15, 0, r10, c1, c0, 1
+-
+ 	/*
+ 	 * Invalidate data cache again.
+ 	 */
+ 	ldr	r1, kernel_flush
+ 	blx	r1
++
++	/* disable L2 cache in the aux control register */
++	mrc     p15, 0, r10, c1, c0, 1
++	bic     r10, r10, #2
++	mcr     p15, 0, r10, c1, c0, 1
+ 	/*
+ 	 * The kernel doesn't interwork: v7_flush_dcache_all in particluar will
+ 	 * always return in Thumb state when CONFIG_THUMB2_KERNEL is enabled.
