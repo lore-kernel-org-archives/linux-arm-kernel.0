@@ -1,23 +1,67 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Wed, 12 Dec 2012 16:37:58 -0800
-Subject: [PATCH v4 0/7] enable support for AMBA drivers under x86
-In-Reply-To: <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
-References: <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
-Message-ID: <50C92366.8030604@zytor.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 13 Dec 2012 09:41:44 +0900
+Subject: [PATCH 1/6] ARM: clocksource: Initialise early
+In-Reply-To: <19362966.Oyuy1aUOFc@avalon>
+References: <1355195254-4563-1-git-send-email-horms+renesas@verge.net.au>
+ <1355195254-4563-2-git-send-email-horms+renesas@verge.net.au>
+ <19362966.Oyuy1aUOFc@avalon>
+Message-ID: <20121213004144.GJ13343@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OK, so I'm not 100% sure how to best handle this patchset.  I can carry 
-it in the x86 tree with the appropriate ACKs... which could lead to ugly 
-merge conflicts, or we can ask the respective driver authors to take 
-their bits... but that gives a sequencing problem (the core patchset 
-depends on a bunch of outside trees in order to be tested.)
+On Tue, Dec 11, 2012 at 01:51:27PM +0100, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> Thanks for the patch.
+> 
+> Could you please CC LKML on this one ? It targets a wider audience than the 
+> SH-specific patches.
 
-Either way it is a late pull for 3.8 at best... however, the risk seems 
-low so *maybe* that is acceptable.
+Sure, good thinking.
 
-	-hpa
-
--- 
-H. Peter Anvin, Intel Open Source Technology Center
-I work for Intel.  I don't speak on their behalf.
+> 
+> On Tuesday 11 December 2012 12:07:29 Simon Horman wrote:
+> > Initialise clock sources early, since some subsystems rely on them to
+> > initialize
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > 
+> > ---
+> > 
+> > v3
+> > * Initial post
+> > ---
+> >  drivers/Makefile |    8 +++++---
+> >  1 file changed, 5 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/Makefile b/drivers/Makefile
+> > index a16a8d0..eba9b58 100644
+> > --- a/drivers/Makefile
+> > +++ b/drivers/Makefile
+> > @@ -37,6 +37,11 @@ obj-$(CONFIG_XEN)		+= xen/
+> >  # regulators early, since some subsystems rely on them to initialize
+> >  obj-$(CONFIG_REGULATOR)		+= regulator/
+> > 
+> > +# clocksource early, since some subsystems rely on them to initialize
+> > +ifndef CONFIG_ARCH_USES_GETTIMEOFFSET
+> > +obj-y				+= clocksource/
+> > +endif
+> > +
+> >  # tty/ comes before char/ so that the VT console is the boot-time
+> >  # default.
+> >  obj-y				+= tty/
+> > @@ -114,9 +119,6 @@ obj-y				+= firmware/
+> >  obj-$(CONFIG_CRYPTO)		+= crypto/
+> >  obj-$(CONFIG_SUPERH)		+= sh/
+> >  obj-$(CONFIG_ARCH_SHMOBILE)	+= sh/
+> > -ifndef CONFIG_ARCH_USES_GETTIMEOFFSET
+> > -obj-y				+= clocksource/
+> > -endif
+> >  obj-$(CONFIG_DCA)		+= dca/
+> >  obj-$(CONFIG_HID)		+= hid/
+> >  obj-$(CONFIG_PPC_PS3)		+= ps3/
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
