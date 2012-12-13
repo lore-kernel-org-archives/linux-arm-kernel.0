@@ -1,31 +1,53 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Wed, 12 Dec 2012 17:16:17 -0800
-Subject: [PATCH v4 0/7] enable support for AMBA drivers under x86
-In-Reply-To: <CACxGe6v97ZnJpggcSE2HEE0S7wZFrYgFW0Hmok7D9h8ByufqGg@mail.gmail.com>
-References: <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
- <50C92366.8030604@zytor.com>
- <CACxGe6v97ZnJpggcSE2HEE0S7wZFrYgFW0Hmok7D9h8ByufqGg@mail.gmail.com>
-Message-ID: <50C92C61.8060104@zytor.com>
+From: keyuan.liu@gmail.com (Kevin Liu)
+Date: Thu, 13 Dec 2012 09:51:38 +0800
+Subject: FW: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save
+ power
+In-Reply-To: <25B60CDC2F704E4E9D88FFD52780CB4C08B00BD3B1@SC-VEXCH1.marvell.com>
+References: <25B60CDC2F704E4E9D88FFD52780CB4C08B00BD3B1@SC-VEXCH1.marvell.com>
+Message-ID: <CADz5_gJ70KrHL5NoSPQbFdeHnQxWLh87zq6N+-V7J7Yq7t+aPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2012 05:10 PM, Grant Likely wrote:
-> On Thu, Dec 13, 2012 at 12:37 AM, H. Peter Anvin <hpa@zytor.com> wrote:
->> OK, so I'm not 100% sure how to best handle this patchset.  I can carry it
->> in the x86 tree with the appropriate ACKs... which could lead to ugly merge
->> conflicts, or we can ask the respective driver authors to take their bits...
->> but that gives a sequencing problem (the core patchset depends on a bunch of
->> outside trees in order to be tested.)
+> -----Original Message-----
+> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-owner at vger.kernel.org] On Behalf Of Linus Walleij
+> Sent: Thursday, December 13, 2012 2:54 AM
+> To: Ulf Hansson
+> Cc: Russell King - ARM Linux; Ulf Hansson; linux-mmc at vger.kernel.org; Chris Ball; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save power
+>
+> On Wed, Dec 12, 2012 at 12:02 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> On 12 December 2012 07:53, Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+>>> 1) Turn on MMC_CLKGATE for this driver (select from Kconfig)
+>>> which means that the ios will be called with f=0 whenever
+>>> the card is unused, taking into account the required number
+>>> of clocks to the card.
 >>
->> Either way it is a late pull for 3.8 at best... however, the risk seems low
->> so *maybe* that is acceptable.
-> 
-> I'd put the whole series into a separate branch by itself and any
-> subsystems with problematic conflicts can merge it into their trees
-> also. I'm fine with putting it in the x86 tree for v3.9. I don't think
-> there is any huge rush on it.
-> 
+>> I think MMC_CLKGATE was a good initiative in the past. But that was
+>> before runtime pm was there to use. Runtime pm suits much better for
+>> handling clock gating and other runtime power save actions that could
+>> be possible for a host driver to do.
+>>
+>> I would even suggest the MMC_CLKGATE should be removed from the
+>> protocol layer, once we see that all host drivers that used it has
+>> switch to runtime pm.
+>
+> Ah now I remember that you've actually even explained this to me ...
+> memory is too short sometimes. But I follow this idea.
+>
+> Then we have only the coordination between runtime suspend
+> and suspend proper to iron out.
+>
+> Russell's concern is valid if suspend() will not wait for runtime_suspend()
+> to complete the last cycle before suspending.
+>
 
-That was pretty much my preferred option.  I'll put it into tip:x86/amba.
+pm_runtime_get_noresume is called before suspend and there are
+sdhci_runtime_pm_get/sdhci_runtime_pm_put within sdhci suspend/resume
+function. So the actual runtime_suspend won't be called after suspend
+finished. So it's same as original code without pm_runtime during
+suspend/resume.
 
-	-hpa
+> Hm this sounds scaringly familiar to what we've discussed with
+> Kevin Hilman et al recently...
+>
