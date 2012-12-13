@@ -1,48 +1,34 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 13 Dec 2012 11:12:29 -0700
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <20121213082323.GA13620@avionic-0098.adnet.avionic-design.de>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121207233317.GB4304@obsidianresearch.com> <50C62161.9080708@wwwdotorg.org>
- <20121211075207.GA29977@avionic-0098.adnet.avionic-design.de>
- <50C7A3C5.7050100@wwwdotorg.org>
- <20121212203433.GA7898@avionic-0098.adnet.avionic-design.de>
- <50C9056D.2050309@wwwdotorg.org>
- <20121213070332.GA9946@avionic-0098.adnet.avionic-design.de>
- <20121213080415.GA21178@obsidianresearch.com>
- <20121213082323.GA13620@avionic-0098.adnet.avionic-design.de>
-Message-ID: <50CA1A8D.9070504@wwwdotorg.org>
+From: rubini@gnudd.com (Alessandro Rubini)
+Date: Thu, 13 Dec 2012 19:14:49 +0100
+Subject: [PATCH v4 0/7] enable support for AMBA drivers under x86
+In-Reply-To: <50C93A83.8040106@zytor.com>
+References: <50C93A83.8040106@zytor.com>
+ <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
+ <50C93718.2090706@zytor.com>
+Message-ID: <20121213181449.GA15966@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/2012 01:23 AM, Thierry Reding wrote:
-...
-> Okay, so I gather that all of the above means that *if* the Tegra
-> PCIe controller is compliant, it should just work if we remove any
-> of the special cases. I'm not sure if anybody's actually tested
-> this or if it just isn't compliant. I'll see if I can find some
-> time to test this. Obviously it would be a whole lot nicer if the
-> hardware really was compliant so that we don't have to emulate the
-> host bridge in software.
+Hello.
 
-A little background here:
+> Build failure:
+> 
+> o.i386-allconfig/make.log:make[4]: *** [drivers/gpio/gpio-pl061.o] Error 1
+> o.i386-allconfig/make.log:make[3]: *** [drivers/gpio] Error 2
 
-IIUC, the Tegra PCIe controller is at least partially derived from
-previous MCP projects, which I /assume/ must have been fully compliant
-since they were standard x86 HW. I'm basing the derivation comment on
-the fact that certain aspects of the HW are the same as previous MCP
-designs apparently: the configuration space access register fields,
-and the physical (internal bus) addresses you write into PCIe
-controller's memory windows.
+This happens because the pl061 is not in this checkout.
 
-So, this implies it's entirely possible that the PCIe controller is in
-fact fully compliant.
+I also got a message from the "kbuild test robot", which results from
+the same kind of problem.
 
-That all said, it's quite possible that the parts which made it
-compliant were stripped out when taking the IP block out of MCP (where
-the upstream bus was probably HyperTransport?) and dumping it into
-Tegra, which required different logic to interface to the upstream bus.
+I'll check the details later, identifying the missing patches and whether
+there are remaining warnings.
 
-Hmmm. I guess all this still means that you just need to try it and
-see. If you need me to try to track down any answers about the HW, let
-me know.
+> /home/hpa/kernel/tip.x86-amba/arch/x86/pci/sta2x11-fixup.c:186:2: 
+> warning: initialization from incompatible pointer type [enabled by default]
+
+This is a long-standing problem, but with not practical effects. I
+proposed a pair of different fixes quite some months ago. I'll respin
+the problem tomorrow.
+
+/alessandro
