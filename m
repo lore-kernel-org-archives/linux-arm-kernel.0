@@ -1,75 +1,53 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 13 Dec 2012 16:48:23 +0100
-Subject: [RFC PATCH v2 3/6] sched: pack small tasks
-In-Reply-To: <CAKfTPtCUDEC50xexmLQ1d9qvBz1iJnf4aGSGjN==jqZwpxrwiQ@mail.gmail.com>
-References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
- <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
- <50C93AC1.1060202@intel.com>
- <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
- <50C9E552.1010600@intel.com>
- <CAKfTPtCUDEC50xexmLQ1d9qvBz1iJnf4aGSGjN==jqZwpxrwiQ@mail.gmail.com>
-Message-ID: <CAKfTPtAhFtGKOtwumuav+pndoAZiKjHvYoE2NZxtgP+qHuHY3g@mail.gmail.com>
+From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
+Date: Thu, 13 Dec 2012 16:54:05 +0100
+Subject: [PATCH] [ARM] sharpsl_param: fix invalid memory access in
+ sharpsl_save_param()
+In-Reply-To: <20121213145012.GJ26540@mudshark.cambridge.arm.com>
+References: <1355409893-24200-1-git-send-email-dromede@gmail.com>
+ <20121213145012.GJ26540@mudshark.cambridge.arm.com>
+Message-ID: <CAHod+GdXTJ95S=U12M-Dxp+WTmbGhmDo9icMncRZ1zNQA8JiQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 December 2012 15:53, Vincent Guittot <vincent.guittot@linaro.org> wrote:
-> On 13 December 2012 15:25, Alex Shi <alex.shi@intel.com> wrote:
->> On 12/13/2012 06:11 PM, Vincent Guittot wrote:
->>> On 13 December 2012 03:17, Alex Shi <alex.shi@intel.com> wrote:
->>>> On 12/12/2012 09:31 PM, Vincent Guittot wrote:
->>>>> During the creation of sched_domain, we define a pack buddy CPU for each CPU
->>>>> when one is available. We want to pack at all levels where a group of CPU can
->>>>> be power gated independently from others.
->>>>> On a system that can't power gate a group of CPUs independently, the flag is
->>>>> set at all sched_domain level and the buddy is set to -1. This is the default
->>>>> behavior.
->>>>> On a dual clusters / dual cores system which can power gate each core and
->>>>> cluster independently, the buddy configuration will be :
->>>>>
->>>>>       | Cluster 0   | Cluster 1   |
->>>>>       | CPU0 | CPU1 | CPU2 | CPU3 |
->>>>> -----------------------------------
->>>>> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
->>>>>
->>>>> Small tasks tend to slip out of the periodic load balance so the best place
->>>>> to choose to migrate them is during their wake up. The decision is in O(1) as
->>>>> we only check again one buddy CPU
->>>>
->>>> Just have a little worry about the scalability on a big machine, like on
->>>> a 4 sockets NUMA machine * 8 cores * HT machine, the buddy cpu in whole
->>>> system need care 64 LCPUs. and in your case cpu0 just care 4 LCPU. That
->>>> is different on task distribution decision.
->>>
->>> The buddy CPU should probably not be the same for all 64 LCPU it
->>> depends on where it's worth packing small tasks
+On Thu, Dec 13, 2012 at 3:50 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Marko,
+>
+> On Thu, Dec 13, 2012 at 02:44:53PM +0000, dromede at gmail.com wrote:
+>> From: Marko Katic <dromede.gmail.com>
 >>
->> Do you have further ideas for buddy cpu on such example?
->
-> yes, I have several ideas which were not really relevant for small
-> system but could be interesting for larger system
->
-> We keep the same algorithm in a socket but we could either use another
-> LCPU in the targeted socket (conf0) or chain the socket (conf1)
-> instead of packing directly in one LCPU
->
-> The scheme below tries to summaries the idea:
->
-> Socket      | socket 0 | socket 1   | socket 2   | socket 3   |
-> LCPU        | 0 | 1-15 | 16 | 17-31 | 32 | 33-47 | 48 | 49-63 |
-> buddy conf0 | 0 | 0    | 1  | 16    | 2  | 32    | 3  | 48    |
-> buddy conf1 | 0 | 0    | 0  | 16    | 16 | 32    | 32 | 48    |
-> buddy conf2 | 0 | 0    | 16 | 16    | 32 | 32    | 48 | 48    |
->
-> But, I don't know how this can interact with NUMA load balance and the
-> better might be to use conf3.
-
-I mean conf2 not conf3
-
->
->>>
->>> Which kind of sched_domain configuration have you for such system ?
->>> and how many sched_domain level have you ?
+>> Devices that call sharpsl_save_param() will hang on boot due to
+>> a memcpy call that uses physical addresses that are no longer
+>> valid. This is caused by the following commit:
 >>
->> it is general X86 domain configuration. with 4 levels,
->> sibling/core/cpu/numa.
->>>
+>> commit 72662e01088394577be4a3f14da94cf87bea2591
+>> Author: Will Deacon <will.deacon@arm.com>
+>> Date:   Wed Nov 23 12:03:27 2011 +0000
+>>
+>>     ARM: head.S: only include __turn_mmu_on in the initial identity mapping
+>>
+>> Tested  on Zaurus corgi/poodle/spitz devices.
+>>
+>> Signed-off-by: Marko Katic <dromede@gmail.com>
+>
+> Interesting find! Now, I wonder, if you revert Dave's patch conditionalising
+> the hyp mode entry (1ecec696c8bb "ARM: 7599/1: head: Remove boot-time HYP
+> mode check for v5 and below") and apply your patch below, does your i2c
+> still work?
+
+If i revert 1ecec696c8bb my machine simply would not boot. This was
+nicely explained by Russell in this post:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/136218.html
+
+In a nutshell, there never was a problem with i2c devices, the problem
+was the kernel
+booted with the wrong machine ID  and thus machine_is_xxx() checks
+would fail and break
+i2c init code in mach-pxa/spitz.c.
+
+Sharpsl_param.c patch is a separate issue and is not related to issues
+mentioned above.
+This is also and older issue, dating back to 3.3-rc1 when 72662e0108
+was commited. I posted
+this patch earlier but either nobody noticed or my commit message was
+bad. Probably the latter.
