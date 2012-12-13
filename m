@@ -1,71 +1,51 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 13 Dec 2012 10:04:46 +0100
-Subject: FW: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save
- power
-In-Reply-To: <CADz5_gJ70KrHL5NoSPQbFdeHnQxWLh87zq6N+-V7J7Yq7t+aPQ@mail.gmail.com>
-References: <25B60CDC2F704E4E9D88FFD52780CB4C08B00BD3B1@SC-VEXCH1.marvell.com>
- <CADz5_gJ70KrHL5NoSPQbFdeHnQxWLh87zq6N+-V7J7Yq7t+aPQ@mail.gmail.com>
-Message-ID: <CAPDyKFrt4zWmhyO-UJAFPOH=90n4OwRPv3nczr4jPGBnc_jT5w@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 13 Dec 2012 09:10:04 +0000
+Subject: [PATCH] input:stmpe-ts: Add support to report BTN_TOUCH event
+In-Reply-To: <7c50ed5f531db8ab992ebeaf1a48853a6274faf2.1355376050.git.vipulkumar.samar@st.com>
+References: <7c50ed5f531db8ab992ebeaf1a48853a6274faf2.1355376050.git.vipulkumar.samar@st.com>
+Message-ID: <20121213091004.GF27617@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 December 2012 02:51, Kevin Liu <keyuan.liu@gmail.com> wrote:
->> -----Original Message-----
->> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-owner at vger.kernel.org] On Behalf Of Linus Walleij
->> Sent: Thursday, December 13, 2012 2:54 AM
->> To: Ulf Hansson
->> Cc: Russell King - ARM Linux; Ulf Hansson; linux-mmc at vger.kernel.org; Chris Ball; linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save power
->>
->> On Wed, Dec 12, 2012 at 12:02 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> On 12 December 2012 07:53, Linus Walleij <linus.walleij@linaro.org> wrote:
->>
->>>> 1) Turn on MMC_CLKGATE for this driver (select from Kconfig)
->>>> which means that the ios will be called with f=0 whenever
->>>> the card is unused, taking into account the required number
->>>> of clocks to the card.
->>>
->>> I think MMC_CLKGATE was a good initiative in the past. But that was
->>> before runtime pm was there to use. Runtime pm suits much better for
->>> handling clock gating and other runtime power save actions that could
->>> be possible for a host driver to do.
->>>
->>> I would even suggest the MMC_CLKGATE should be removed from the
->>> protocol layer, once we see that all host drivers that used it has
->>> switch to runtime pm.
->>
->> Ah now I remember that you've actually even explained this to me ...
->> memory is too short sometimes. But I follow this idea.
->>
->> Then we have only the coordination between runtime suspend
->> and suspend proper to iron out.
->>
->> Russell's concern is valid if suspend() will not wait for runtime_suspend()
->> to complete the last cycle before suspending.
+On Thu, 13 Dec 2012, Vipul Kumar Samar wrote:
 
-A valid point, thanks for pointing this out clearly Linus!
+> stmpe touchscreen supports BTN_TOUCH event but doesn't report it. Add
+> BTN_TOUCH reporting capability to the stmpe touchscreen driver.
+> 
+> Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
+> ---
+>  drivers/input/touchscreen/stmpe-ts.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/input/touchscreen/stmpe-ts.c b/drivers/input/touchscreen/stmpe-ts.c
+> index 076442a..c3399a1 100644
+> --- a/drivers/input/touchscreen/stmpe-ts.c
+> +++ b/drivers/input/touchscreen/stmpe-ts.c
+> @@ -121,6 +121,7 @@ static void stmpe_work(struct work_struct *work)
+>  	__stmpe_reset_fifo(ts->stmpe);
+>  
+>  	input_report_abs(ts->idev, ABS_PRESSURE, 0);
+> +	input_report_key(ts->idev, BTN_TOUCH, 0);
+>  	input_sync(ts->idev);
+>  }
+>  
+> @@ -154,6 +155,7 @@ static irqreturn_t stmpe_ts_handler(int irq, void *data)
+>  	input_report_abs(ts->idev, ABS_X, x);
+>  	input_report_abs(ts->idev, ABS_Y, y);
+>  	input_report_abs(ts->idev, ABS_PRESSURE, z);
+> +	input_report_key(ts->idev, BTN_TOUCH, 1);
+>  	input_sync(ts->idev);
+>  
+>         /* flush the FIFO after we have read out our values. */
+> -- 
+> 1.7.2.2
 
-Anyway, this need to be thought of as future step, since this patch is
-not changing anything to that sequence as Kevin also is pointing out.
+So long as it's tested/working, the code looks fine so:
 
-So, the next step is to figure how we can properly do similar actions
-as in the runtime_suspend callback but as part of the suspend sequence
-instead and at the same time cope with 8 clock cycles. I will push a
-patch for this later, so then we can discuss more about that.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
->>
->
-> pm_runtime_get_noresume is called before suspend and there are
-> sdhci_runtime_pm_get/sdhci_runtime_pm_put within sdhci suspend/resume
-> function. So the actual runtime_suspend won't be called after suspend
-> finished. So it's same as original code without pm_runtime during
-> suspend/resume.
->
->> Hm this sounds scaringly familiar to what we've discussed with
->> Kevin Hilman et al recently...
->>
-
-May I have your Acks on this patch?
-
-Kind regards
-Ulf Hansson
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
