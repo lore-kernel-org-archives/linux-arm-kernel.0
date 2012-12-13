@@ -1,35 +1,59 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 13 Dec 2012 10:10:35 +0800
-Subject: [Resend PATCH v6 1/4] pinctrl: atmel-ssc: add pinctrl support
-In-Reply-To: <50BC3F1A.1030808@atmel.com>
-References: <1353464229-20846-1-git-send-email-voice.shen@atmel.com>
- <20121121022441.GJ4673@opensource.wolfsonmicro.com>
- <50BC3F1A.1030808@atmel.com>
-Message-ID: <50C9391B.7080204@atmel.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 13 Dec 2012 10:20:27 +0800
+Subject: [PATCH] mxs: uart: allow setting RTS from software
+In-Reply-To: <1355329913-27666-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1355329913-27666-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <50C93B6B.7090206@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/3/2012 13:56, Bo Shen wrote:
-> Hi J,
+? 2012?12?13? 00:31, Steffen Trumtrar ??:
+> With the patch "serial: mxs-auart: fix the wrong RTS hardware flow control" the
+> mainline mxs-uart driver now sets RTSEN only when hardware flow control is
+> enabled via software. It is not possible any longer to set RTS manually via
+> software. However, the manual modification is a valid operation.
+> Regain the possibility to set RTS via software and only set RTSEN when hardware
+Is there any user case to set the RTS via software?
+I am confused at this.
+> flow control is explicitly enabled via settermios cflag CRTSCTS.
 >
-> On 11/21/2012 10:24, Mark Brown wrote:
->> On Wed, Nov 21, 2012 at 10:17:09AM +0800, Bo Shen wrote:
->>> Add pinctrl support for atmel ssc peripheral
->>>
->>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->>
->> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
->>
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> ---
+>  drivers/tty/serial/mxs-auart.c |    8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
 >
-> Ping?
-> Will you pick up this patch, if not, the linux-next (20121130) build
-> will report following error:
-> ---<8---
-> ERROR (phandle_references): Reference to non-existent node or label
-> "pinctrl_ssc0_tx
-> --->8---
+> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+> index 6db23b0..9b62c4b 100644
+> --- a/drivers/tty/serial/mxs-auart.c
+> +++ b/drivers/tty/serial/mxs-auart.c
+> @@ -412,10 +412,12 @@ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
+>  
+>  	u32 ctrl = readl(u->membase + AUART_CTRL2);
+>  
+> -	ctrl &= ~AUART_CTRL2_RTSEN;
+> +	ctrl &= ~(AUART_CTRL2_RTSEN | AUART_CTRL2_RTS);
+>  	if (mctrl & TIOCM_RTS) {
+>  		if (tty_port_cts_enabled(&u->state->port))
+>  			ctrl |= AUART_CTRL2_RTSEN;
+> +		else
+> +			ctrl |= AUART_CTRL2_RTS;
+>  	}
+>  
+>  	s->ctrl = mctrl;
+> @@ -678,6 +680,10 @@ static void mxs_auart_settermios(struct uart_port *u,
+>  		}
+>  		ctrl2 |= AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN;
+>  	} else {
+> +		u->flags |= ASYNC_CTS_FLOW;
+> +		ctrl2 |= AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN;
+> +	} else {
+> +		u->flags &= ~ASYNC_CTS_FLOW;
+bug.
 
-Ping again?
+Your code adds TWO "else" here.
 
-> Best Regards,
-> Bo Shen
+thanks
+Huang Shijie
+>  		ctrl2 &= ~(AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN);
+>  	}
+>  
