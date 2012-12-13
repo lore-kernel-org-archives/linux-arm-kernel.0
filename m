@@ -1,103 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 13 Dec 2012 12:08:44 -0700
-Subject: [PATCH] pinctrl/nomadik: Add Device Tree support
-In-Reply-To: <1355405825-19400-1-git-send-email-linus.walleij@stericsson.com>
-References: <1355405825-19400-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <50CA27BC.6060304@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 13 Dec 2012 20:09:28 +0100
+Subject: [RFC v1 08/16] arm: mvebu: the core PCIe driver
+In-Reply-To: <20121213174032.GB14619@obsidianresearch.com>
+References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121212165833.6a35a6ec@skate>
+ <20121212215138.GC11530@obsidianresearch.com>
+ <201212131458.55020.arnd@arndb.de>
+ <20121213174032.GB14619@obsidianresearch.com>
+Message-ID: <20121213200928.2f70c125@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/2012 06:37 AM, Linus Walleij wrote:
-> This implements pin multiplexing and pin configuration for the
-> Nomadik pin controller using the device tree.
+Dear Jason Gunthorpe,
 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
+On Thu, 13 Dec 2012 10:40:32 -0700, Jason Gunthorpe wrote:
 
-> +Required properties:
-> +- compatible: "stericsson,nmk_pinctrl"
+> > If the IntA to IntD lines are all on the same host interrupt, you
+> > might only need one line above and make the map-mask all zeroes.
+> 
+> Well, no that is where the existing stuff goes wrong..
+> 
+> Each of the four INTx's on each port need a dedicated linux interrupt
+> vector. Sharing interrupts is bad. The chip has dedicated cause and
+> mask bits so there is no reason to share.
+> 
+> To do this the pex driver has to allocate 4 irq descs per port, setup
+> a generic irq chip for the driver, use irq_set_chained_handler on the
+> summary interrupt in the main cause register and then decode the INTx
+> bits in the chained handler function. This is very straightforward and
+> very much worth doing.
 
-Minor nit: Is it more common to use - rather than _ in compatible values?
+Yes, this is definitely part of my plans. For now, I kept the existing
+PCIe implementation of Kirkwood and al with regard to IRQs, but when I
+read more about INT{A,B,C,D} and the cause register that is available,
+I immediately noted in my TODO-list: use a generic irq chip to
+demultiplex those IRQ events.
 
-> +ST Ericsson's pin configuration nodes act as a container for an abitrary number of
+Best regards,
 
-Typo in "arbitrary" above.
-
-> +subnodes. Each of these subnodes represents some desired configuration for a
-> +pin, a group, or a list of pins or groups. This configuration can include the
-> +mux function to select on those pin(s)/group(s), and various pin configuration
-> +parameters, such as inputn output, pull up, pull down...
-
-Typo in "input" above.
-
-> +The name of each subnode is not important; all subnodes should be enumerated
-> +and processed purely based on their content.
-> +
-> +Required subnode-properties:
-> +- ste,pins : An array of strings. Each string contains the name of a pin or
-> +    group.
-
-The vendor prefix here is ste, but it's stericsson in the compatible
-value above. They should be consistent. ste is nice since it's shorter,
-but I see stericsson in
-Documentation/devicetree/bindings/vendor-prefixes.txt... I wonder if you
-could register ste there too?
-
-> +Optional subnode-properties:
-> +- ste,function: A string containing the name of the function to mux to the
-> +  pin or group.
-> +
-> +- ste,input:			no parameter, set pin in input with no pull mode.
-> +- ste,input_pull_up:		no parameter, set pin in input with pull up mode.
-> +- ste,input_pull_down:		no parameter, set pin in input with pull down mode.
-
-DT property names should definitely use - not _ as a delimiter.
-
-> +- ste,sleep_input:		no parameter, set pin in sleep input with no pull mode.
-> +- ste,sleep_input_pull_up:	no parameter, set pin in sleep input with pull up mode.
-> +- ste,sleep_input_pull_down:	no parameter, set pin in sleep input with pull down mode.
-
-Would ste,sleep-input = <0/1/2> be better? Not really a big deal either way.
-
-> +- ste,sleep_pdis_mode:		integer, 0: pdis disabled, 1: pdis enable.
-
-Should the binding document mention what "pdis" is. It's probably not
-necessary so long as "pdis" is something you can search for in the HW
-documentation.
-
-> +Valid values for pin and group name are in Drivers/pinctrl/pinctrl-nomadik-db8500.c
-
-Hmm. That's rather tying the DT binding documentation to Linux code, and
-DT binding docs should be OS-agnostic. Are the names identical to the HW
-documentation? If so, perhaps you could reference that instead of the
-Linux driver.
-
-> diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-
-> +static int nmk_dt_reserve_map(struct pinctrl_map **map, unsigned *reserved_maps,
-> +static int nmk_dt_add_map_mux(struct pinctrl_map **map, unsigned *reserved_maps,
-> +static int nmk_dt_add_map_configs(struct pinctrl_map **map,
-
-Those (and hence perhaps code that calls it?) is cut/paste from
-pinctrl-tegra.c. Is it worth lifting the functions out into some common
-code to share it?
-
-> +static const char * nmk_find_pin_name(struct pinctrl_dev *pctldev, const char *pin_name)
-
-> +	if (sscanf((char *) pin_name, "GPIO%d",&pin_number) == 1)
-> +		for(i = 0; i < npct->soc->npins; i++)
-
-There are some white-space issues there:
-
-* Shouldn't be a space after the cast in sscanf() call.
-* Should be a space after comma in sscanf() call.
-* Should be a space after "for".
-
-> +int nmk_pinctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
-
-> +	for (i = 0; i < ARRAY_SIZE(nmk_cfg_params); i++) {
-> +		unsigned long cfg = 0;
-> +		int val;
-> +
-> +		ret = of_property_read_u32(np, nmk_cfg_params[i].property, &val);
-
-A lot of those are Booleans not U32s...
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
