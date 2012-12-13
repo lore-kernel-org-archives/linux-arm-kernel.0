@@ -1,93 +1,40 @@
 From: alex.shi@intel.com (Alex Shi)
-Date: Thu, 13 Dec 2012 10:24:00 +0800
-Subject: [PATCH 2/6] sched: add a new SD SHARE_POWERLINE flag for
- sched_domain
-In-Reply-To: <1355319092-30980-3-git-send-email-vincent.guittot@linaro.org>
+Date: Thu, 13 Dec 2012 10:43:52 +0800
+Subject: [RFC PATCH v2 3/6] sched: pack small tasks
+In-Reply-To: <50C93AC1.1060202@intel.com>
 References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
- <1355319092-30980-3-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <50C93C40.8020101@intel.com>
+ <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
+ <50C93AC1.1060202@intel.com>
+Message-ID: <50C940E8.2020001@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2012 09:31 PM, Vincent Guittot wrote:
-> This new flag SD_SHARE_POWERDOMAIN is used to reflect whether groups of CPU in
-> a sched_domain level can or not reach a different power state. If clusters can
-> be power gated independently, as an example, the flag should be cleared at CPU
-> level. This information is used to decide if it's worth packing some tasks in
-> a group of CPUs in order to power gated the other groups instead of spreading
-> the tasks. The default behavior of the scheduler is to spread tasks so the
-> flag is set into all sched_domains
+On 12/13/2012 10:17 AM, Alex Shi wrote:
+> On 12/12/2012 09:31 PM, Vincent Guittot wrote:
+>> During the creation of sched_domain, we define a pack buddy CPU for each CPU
+>> when one is available. We want to pack at all levels where a group of CPU can
+>> be power gated independently from others.
+>> On a system that can't power gate a group of CPUs independently, the flag is
+>> set at all sched_domain level and the buddy is set to -1. This is the default
+>> behavior.
+>> On a dual clusters / dual cores system which can power gate each core and
+>> cluster independently, the buddy configuration will be :
+>>
+>>       | Cluster 0   | Cluster 1   |
+>>       | CPU0 | CPU1 | CPU2 | CPU3 |
+>> -----------------------------------
+>> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
+>>
+>> Small tasks tend to slip out of the periodic load balance so the best place
+>> to choose to migrate them is during their wake up. The decision is in O(1) as
+>> we only check again one buddy CPU
 > 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
->  arch/ia64/include/asm/topology.h |    1 +
->  arch/tile/include/asm/topology.h |    1 +
->  include/linux/sched.h            |    1 +
->  include/linux/topology.h         |    4 ++++
->  kernel/sched/core.c              |    6 ++++++
->  5 files changed, 13 insertions(+)
-> 
-> diff --git a/arch/ia64/include/asm/topology.h b/arch/ia64/include/asm/topology.h
-> index a2496e4..6d0b617 100644
-> --- a/arch/ia64/include/asm/topology.h
-> +++ b/arch/ia64/include/asm/topology.h
-> @@ -65,6 +65,7 @@ void build_cpu_to_node_map(void);
->  				| SD_BALANCE_EXEC	\
->  				| SD_BALANCE_FORK	\
->  				| SD_WAKE_AFFINE,	\
-> +				| arch_sd_local_flags(0)\
->  	.last_balance		= jiffies,		\
->  	.balance_interval	= 1,			\
->  	.nr_balance_failed	= 0,			\
-> diff --git a/arch/tile/include/asm/topology.h b/arch/tile/include/asm/topology.h
-> index d5e86c9..adc8710 100644
-> --- a/arch/tile/include/asm/topology.h
-> +++ b/arch/tile/include/asm/topology.h
-> @@ -71,6 +71,7 @@ static inline const struct cpumask *cpumask_of_node(int node)
->  				| 0*SD_WAKE_AFFINE			\
->  				| 0*SD_SHARE_CPUPOWER			\
->  				| 0*SD_SHARE_PKG_RESOURCES		\
-> +				| arch_sd_local_flags(0)		\
->  				| 0*SD_SERIALIZE			\
->  				,					\
->  	.last_balance		= jiffies,				\
-> diff --git a/include/linux/sched.h b/include/linux/sched.h
-> index 046e39a..3287be1 100644
-> --- a/include/linux/sched.h
-> +++ b/include/linux/sched.h
-> @@ -844,6 +844,7 @@ enum cpu_idle_type {
->  #define SD_BALANCE_WAKE		0x0010  /* Balance on wakeup */
->  #define SD_WAKE_AFFINE		0x0020	/* Wake task to waking CPU */
->  #define SD_SHARE_CPUPOWER	0x0080	/* Domain members share cpu power */
-> +#define SD_SHARE_POWERDOMAIN	0x0100	/* Domain members share power domain */
->  #define SD_SHARE_PKG_RESOURCES	0x0200	/* Domain members share cpu pkg resources */
->  #define SD_SERIALIZE		0x0400	/* Only a single load balancing instance */
->  #define SD_ASYM_PACKING		0x0800  /* Place busy groups earlier in the domain */
-> diff --git a/include/linux/topology.h b/include/linux/topology.h
-> index d3cf0d6..3eab293 100644
-> --- a/include/linux/topology.h
-> +++ b/include/linux/topology.h
-> @@ -99,6 +99,8 @@ int arch_update_cpu_topology(void);
->  				| 1*SD_WAKE_AFFINE			\
->  				| 1*SD_SHARE_CPUPOWER			\
->  				| 1*SD_SHARE_PKG_RESOURCES		\
-> +				| arch_sd_local_flags(SD_SHARE_CPUPOWER|\
-> +						SD_SHARE_PKG_RESOURCES) \
->  				| 0*SD_SERIALIZE			\
->  				| 0*SD_PREFER_SIBLING			\
->  				| arch_sd_sibling_asym_packing()	\
-> @@ -131,6 +133,7 @@ int arch_update_cpu_topology(void);
->  				| 1*SD_WAKE_AFFINE			\
->  				| 0*SD_SHARE_CPUPOWER			\
->  				| 1*SD_SHARE_PKG_RESOURCES		\
-> +				| arch_sd_local_flags(SD_SHARE_PKG_RESOURCES)\
->  				| 0*SD_SERIALIZE			\
->  				,					\
->  	.last_balance		= jiffies,				\
-> @@ -161,6 +164,7 @@ int arch_update_cpu_topology(void);
->  				| 1*SD_WAKE_AFFINE			\
->  				| 0*SD_SHARE_CPUPOWER			\
->  				| 0*SD_SHARE_PKG_RESOURCES		\
-> +				| arch_sd_local_flags(0)		\
+> Just have a little worry about the scalability on a big machine, like on
+> a 4 sockets NUMA machine * 8 cores * HT machine, the buddy cpu in whole
+> system need care 64 LCPUs. and in your case cpu0 just care 4 LCPU. That
+> is different on task distribution decision.
 
-The general style looks like prefering SD_XXX flag directly.
+In above big machine example, only one buddy cpu is not sufficient on
+each of level, like for 4 sockets level, maybe tasks can just full fill
+2 sockets, then we just use 2 sockets, that is more performance/power
+efficient. But one buddy cpu here need to spread tasks to 4 sockets all.
