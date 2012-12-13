@@ -1,32 +1,32 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 13 Dec 2012 17:24:04 +0530
-Subject: [PATCH 3/3] arm: exynos: skip wakeup interrupt registration for
- exynos5250 if pinctrl is enabled
-In-Reply-To: <1355399644-29417-1-git-send-email-thomas.abraham@linaro.org>
-References: <1355399644-29417-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1355399644-29417-4-git-send-email-thomas.abraham@linaro.org>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 13 Dec 2012 13:41:02 +0200
+Subject: [PATCH] mtd: nand: gpmi: reset BCH earlier, too, to avoid NAND
+ startup problems
+In-Reply-To: <20121212160108.GA2607@pengutronix.de>
+References: <1354740362-20412-1-git-send-email-w.sang@pengutronix.de>
+ <1355325103.3400.2.camel@sauron.fi.intel.com>
+ <20121212160108.GA2607@pengutronix.de>
+Message-ID: <1355398862.3400.49.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Skip the wakeup interrupt registration for Exynos5250 if pinctrl support
-is enabled for Exynos5250.
+On Wed, 2012-12-12 at 17:01 +0100, Wolfram Sang wrote:
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/mach-exynos/common.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+> > If you believe this is suitable for stable, please let me know.
+> 
+> I strongly believe that.
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 73b940f..7ad5011 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -1019,6 +1019,7 @@ static int __init exynos_init_irq_eint(void)
- 	static const struct of_device_id exynos_pinctrl_ids[] = {
- 		{ .compatible = "samsung,pinctrl-exynos4210", },
- 		{ .compatible = "samsung,pinctrl-exynos4x12", },
-+		{ .compatible = "samsung,pinctrl-exynos5250", },
- 	};
- 	struct device_node *pctrl_np, *wkup_np;
- 	const char *wkup_compat = "samsung,exynos4210-wakeup-eint";
+OK, added
+
+Cc: stable at vger.kernel.org
+
 -- 
-1.6.6.rc2
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121213/1ebdd226/attachment.sig>
