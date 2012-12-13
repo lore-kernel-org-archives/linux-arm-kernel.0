@@ -1,72 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 13 Dec 2012 15:08:26 +0000
-Subject: [RFC 3/5] ARM: CTI: Convert CTI helpers to AMBA bus driver
-In-Reply-To: <1355348588-22318-4-git-send-email-jon-hunter@ti.com>
-References: <1355348588-22318-1-git-send-email-jon-hunter@ti.com>
- <1355348588-22318-4-git-send-email-jon-hunter@ti.com>
-Message-ID: <20121213150826.GM26540@mudshark.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 13 Dec 2012 23:36:25 +0800
+Subject: [PATCH] ARM: decompress: remove unused ARCH_HAS_DECOMP_WDOG
+In-Reply-To: <20121212184215.GC14363@n2100.arm.linux.org.uk>
+References: <1355317277-32192-1-git-send-email-shawn.guo@linaro.org>
+ <20121212184215.GC14363@n2100.arm.linux.org.uk>
+Message-ID: <20121213153623.GA1856@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 12, 2012 at 09:43:06PM +0000, Jon Hunter wrote:
-> Convert the Cross Trigger Interface (CTI) helpers in cti.h into a
-> AMBA bus driver so that we can use device-tree to look-up the hardware
-> specific information such as base address and interrupt number during
-> the device probe. This also add APIs to request, cti_get() and release,
-> cti_put(), a CTI module so that drivers can allocate a module at
-> runtime.
+On Wed, Dec 12, 2012 at 06:42:15PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 12, 2012 at 09:01:17PM +0800, Shawn Guo wrote:
+> > ARCH_HAS_DECOMP_WDOG is only used in lib/inflate.c which is not
+> > included in arch/arm/boot/compressed/decompress.c now.  That said,
+> > ARCH_HAS_DECOMP_WDOG is not used at all.  Let's remove it.
 > 
-> Currently, the driver only supports looking-up the CTI hardware
-> information via device-tree, however, the driver could be extended to
-> support non-device-tree configurations if needed for a particular
-> architecture.
-> 
-> The CTI driver only currently supports CTI modules that have a single
-> CPU interrupt, however, could be extended in the future to support more
-> interrupts if a device requires this.
+> There are some implementations of the watchdog callbacks - I wonder
+> if the change to the decompressor code has broken those and no one's
+> noticed.  They seem to be Samsung platforms.
 
-Aha, so elaborating on my earlier comments, we basically want to do the same
-thing for ETB I reckon. This does raise the question about namespaces
-though...
+I noticed the implementations on Samsung platforms.  But they are all
+wrapped by CONFIG_S3C_BOOT_WATCHDOG which is not defined any where.
+So if you agree with the patch, I will send another follow-up to
+Samsung maintainer removing all those dead codes.
 
-> +/**
-> + * struct cti - Cross Trigger Interface (CTI) struct
-> + *
-> + * @node:      Connects CTI instance to list of CTI instances
-> + * @dev:       Pointer to device structure
-> + * @base:      Mapped virtual address of the CTI module
-> + * @name:      Name associated with CTI instance
-> + * @irq:       Interrupt associated with CTI instance
-> + * @trig_out:  Trigger output associated with interrupt (@irq)
-> + * @reserved:  Used to indicate if CTI instance has been allocated
-> + * @enabled:   Used to indicate if CTI instance has been enabled
-> + */
-> +struct cti {
-> +       struct list_head node;
-> +       struct device *dev;
-> +       void __iomem *base;
-> +       const char *name;
-> +       int irq;
-> +       int trig_out;
-> +       bool reserved;
-> +       bool enabled;
-> +};
-> +
-> +#ifdef CONFIG_ARM_AMBA_CTI
-> +
-> +int cti_map_trigger(struct cti *cti, int trig_in, int trig_out, int chan);
-> +int cti_enable(struct cti *cti);
-> +int cti_disable(struct cti *cti);
-> +int cti_irq_ack(struct cti *cti);
-> +struct cti *cti_get(const char *name);
-> +void cti_put(struct cti *cti);
-
-I wonder whether we should stick these all into a struct and have a general
-way to see which coresight devices we have and then retrieve their ops
-structures (so things like perf can walk a virtual coresight bus containing
-initialised devices). It might also help if we decide to describe the
-plumbing in the device tree, like Rob suggested.
-
-What do you reckon?
-
-Will
+Shawn
