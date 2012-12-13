@@ -1,30 +1,103 @@
-From: behanw@websterwood.com (Behan Webster)
-Date: Thu, 13 Dec 2012 14:07:57 -0500
-Subject: vexpress compilation error in next-20121127
-In-Reply-To: <50B56601.5010305@broadcom.com>
-References: <50B56601.5010305@broadcom.com>
-Message-ID: <50CA278D.4030409@websterwood.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 13 Dec 2012 12:08:44 -0700
+Subject: [PATCH] pinctrl/nomadik: Add Device Tree support
+In-Reply-To: <1355405825-19400-1-git-send-email-linus.walleij@stericsson.com>
+References: <1355405825-19400-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <50CA27BC.6060304@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/12 20:16, Markus Mayer wrote:
-> Hi Pawel,
->
-> There seems to be an issue compiling vexpress at this point. The 
-> problem being that vexpress' makefile references reset.o, but there's 
-> no reset.c in arch/arm/mach-vexpress.
->
-> [...]
->   CC      arch/arm/mach-bcm/board_bcm.o
->   LD      arch/arm/mach-bcm/built-in.o
->   CC      arch/arm/mach-vexpress/v2m.o
-> make[1]: *** No rule to make target `arch/arm/mach-vexpress/reset.o', 
-> needed by `arch/arm/mach-vexpress/built-in.o'.  Stop.
-> make: *** [arch/arm/mach-vexpress] Error 2
-Same issue in mainline now too: arch/arm/mach-vexpress/reset.c is missing.
+On 12/13/2012 06:37 AM, Linus Walleij wrote:
+> This implements pin multiplexing and pin configuration for the
+> Nomadik pin controller using the device tree.
 
-Behan
+> diff --git a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
 
--- 
-Behan Webster
-behanw at websterwood.com
+> +Required properties:
+> +- compatible: "stericsson,nmk_pinctrl"
+
+Minor nit: Is it more common to use - rather than _ in compatible values?
+
+> +ST Ericsson's pin configuration nodes act as a container for an abitrary number of
+
+Typo in "arbitrary" above.
+
+> +subnodes. Each of these subnodes represents some desired configuration for a
+> +pin, a group, or a list of pins or groups. This configuration can include the
+> +mux function to select on those pin(s)/group(s), and various pin configuration
+> +parameters, such as inputn output, pull up, pull down...
+
+Typo in "input" above.
+
+> +The name of each subnode is not important; all subnodes should be enumerated
+> +and processed purely based on their content.
+> +
+> +Required subnode-properties:
+> +- ste,pins : An array of strings. Each string contains the name of a pin or
+> +    group.
+
+The vendor prefix here is ste, but it's stericsson in the compatible
+value above. They should be consistent. ste is nice since it's shorter,
+but I see stericsson in
+Documentation/devicetree/bindings/vendor-prefixes.txt... I wonder if you
+could register ste there too?
+
+> +Optional subnode-properties:
+> +- ste,function: A string containing the name of the function to mux to the
+> +  pin or group.
+> +
+> +- ste,input:			no parameter, set pin in input with no pull mode.
+> +- ste,input_pull_up:		no parameter, set pin in input with pull up mode.
+> +- ste,input_pull_down:		no parameter, set pin in input with pull down mode.
+
+DT property names should definitely use - not _ as a delimiter.
+
+> +- ste,sleep_input:		no parameter, set pin in sleep input with no pull mode.
+> +- ste,sleep_input_pull_up:	no parameter, set pin in sleep input with pull up mode.
+> +- ste,sleep_input_pull_down:	no parameter, set pin in sleep input with pull down mode.
+
+Would ste,sleep-input = <0/1/2> be better? Not really a big deal either way.
+
+> +- ste,sleep_pdis_mode:		integer, 0: pdis disabled, 1: pdis enable.
+
+Should the binding document mention what "pdis" is. It's probably not
+necessary so long as "pdis" is something you can search for in the HW
+documentation.
+
+> +Valid values for pin and group name are in Drivers/pinctrl/pinctrl-nomadik-db8500.c
+
+Hmm. That's rather tying the DT binding documentation to Linux code, and
+DT binding docs should be OS-agnostic. Are the names identical to the HW
+documentation? If so, perhaps you could reference that instead of the
+Linux driver.
+
+> diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+
+> +static int nmk_dt_reserve_map(struct pinctrl_map **map, unsigned *reserved_maps,
+> +static int nmk_dt_add_map_mux(struct pinctrl_map **map, unsigned *reserved_maps,
+> +static int nmk_dt_add_map_configs(struct pinctrl_map **map,
+
+Those (and hence perhaps code that calls it?) is cut/paste from
+pinctrl-tegra.c. Is it worth lifting the functions out into some common
+code to share it?
+
+> +static const char * nmk_find_pin_name(struct pinctrl_dev *pctldev, const char *pin_name)
+
+> +	if (sscanf((char *) pin_name, "GPIO%d",&pin_number) == 1)
+> +		for(i = 0; i < npct->soc->npins; i++)
+
+There are some white-space issues there:
+
+* Shouldn't be a space after the cast in sscanf() call.
+* Should be a space after comma in sscanf() call.
+* Should be a space after "for".
+
+> +int nmk_pinctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+
+> +	for (i = 0; i < ARRAY_SIZE(nmk_cfg_params); i++) {
+> +		unsigned long cfg = 0;
+> +		int val;
+> +
+> +		ret = of_property_read_u32(np, nmk_cfg_params[i].property, &val);
+
+A lot of those are Booleans not U32s...
