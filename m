@@ -1,625 +1,289 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 12 Dec 2012 15:43:06 -0600
-Subject: [RFC 3/5] ARM: CTI: Convert CTI helpers to AMBA bus driver
-In-Reply-To: <1355348588-22318-1-git-send-email-jon-hunter@ti.com>
-References: <1355348588-22318-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1355348588-22318-4-git-send-email-jon-hunter@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Dec 2012 17:57:09 -0800
+Subject: [GIT PULL 3/5] ARM: arm-soc: power management and clock changes
+In-Reply-To: <20121213015543.GA18953@quad.lixom.net>
+References: <20121213015543.GA18953@quad.lixom.net>
+Message-ID: <20121213015709.GC28281@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the Cross Trigger Interface (CTI) helpers in cti.h into a
-AMBA bus driver so that we can use device-tree to look-up the hardware
-specific information such as base address and interrupt number during
-the device probe. This also add APIs to request, cti_get() and release,
-cti_put(), a CTI module so that drivers can allocate a module at
-runtime.
+This branch contains a largeish set of updates of power management and
+clock setup. The bulk of it is for OMAP/AM33xx platforms, but also a
+few around hotplug/suspend/resume on Exynos.
 
-Currently, the driver only supports looking-up the CTI hardware
-information via device-tree, however, the driver could be extended to
-support non-device-tree configurations if needed for a particular
-architecture.
+It includes a split-up of some of the OMAP clock data into separate
+files which adds to the diffstat, but gross delta is fairly reasonable.
 
-The CTI driver only currently supports CTI modules that have a single
-CPU interrupt, however, could be extended in the future to support more
-interrupts if a device requires this.
+Conflicts seen with this merge:
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/include/asm/cti.h |  153 ------------------------
- drivers/Kconfig            |    2 +
- drivers/amba/Kconfig       |   20 ++++
- drivers/amba/Makefile      |    1 +
- drivers/amba/cti.c         |  284 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/amba/cti.h   |   82 +++++++++++++
- 6 files changed, 389 insertions(+), 153 deletions(-)
- delete mode 100644 arch/arm/include/asm/cti.h
- create mode 100644 drivers/amba/Kconfig
- create mode 100644 drivers/amba/cti.c
- create mode 100644 include/linux/amba/cti.h
+None
 
-diff --git a/arch/arm/include/asm/cti.h b/arch/arm/include/asm/cti.h
-deleted file mode 100644
-index 00add00..0000000
---- a/arch/arm/include/asm/cti.h
-+++ /dev/null
-@@ -1,153 +0,0 @@
--#ifndef __ASMARM_CTI_H
--#define __ASMARM_CTI_H
--
--#include	<asm/io.h>
--#include	<asm/hardware/coresight.h>
--
--/* The registers' definition is from section 3.2 of
-- * Embedded Cross Trigger Revision: r0p0
-- */
--#define		CTICONTROL		0x000
--#define		CTISTATUS		0x004
--#define		CTILOCK			0x008
--#define		CTIPROTECTION		0x00C
--#define		CTIINTACK		0x010
--#define		CTIAPPSET		0x014
--#define		CTIAPPCLEAR		0x018
--#define		CTIAPPPULSE		0x01c
--#define		CTIINEN			0x020
--#define		CTIOUTEN		0x0A0
--#define		CTITRIGINSTATUS		0x130
--#define		CTITRIGOUTSTATUS	0x134
--#define		CTICHINSTATUS		0x138
--#define		CTICHOUTSTATUS		0x13c
--#define		CTIPERIPHID0		0xFE0
--#define		CTIPERIPHID1		0xFE4
--#define		CTIPERIPHID2		0xFE8
--#define		CTIPERIPHID3		0xFEC
--#define		CTIPCELLID0		0xFF0
--#define		CTIPCELLID1		0xFF4
--#define		CTIPCELLID2		0xFF8
--#define		CTIPCELLID3		0xFFC
--
--/**
-- * struct cti - cross trigger interface struct
-- * @base: mapped virtual address for the cti base
-- * @irq: irq number for the cti
-- * @trig_out_for_irq: triger out number which will cause
-- *	the @irq happen
-- *
-- * cti struct used to operate cti registers.
-- */
--struct cti {
--	void __iomem *base;
--	int irq;
--	int trig_out_for_irq;
--};
--
--/**
-- * cti_init - initialize the cti instance
-- * @cti: cti instance
-- * @base: mapped virtual address for the cti base
-- * @irq: irq number for the cti
-- * @trig_out: triger out number which will cause
-- *	the @irq happen
-- *
-- * called by machine code to pass the board dependent
-- * @base, @irq and @trig_out to cti.
-- */
--static inline void cti_init(struct cti *cti,
--	void __iomem *base, int irq, int trig_out)
--{
--	cti->base = base;
--	cti->irq  = irq;
--	cti->trig_out_for_irq = trig_out;
--}
--
--/**
-- * cti_map_trigger - use the @chan to map @trig_in to @trig_out
-- * @cti: cti instance
-- * @trig_in: trigger in number
-- * @trig_out: trigger out number
-- * @channel: channel number
-- *
-- * This function maps one trigger in of @trig_in to one trigger
-- * out of @trig_out using the channel @chan.
-- */
--static inline void cti_map_trigger(struct cti *cti,
--	int trig_in, int trig_out, int chan)
--{
--	void __iomem *base = cti->base;
--	unsigned long val;
--
--	val = __raw_readl(base + CTIINEN + trig_in * 4);
--	val |= BIT(chan);
--	__raw_writel(val, base + CTIINEN + trig_in * 4);
--
--	val = __raw_readl(base + CTIOUTEN + trig_out * 4);
--	val |= BIT(chan);
--	__raw_writel(val, base + CTIOUTEN + trig_out * 4);
--}
--
--/**
-- * cti_enable - enable the cti module
-- * @cti: cti instance
-- *
-- * enable the cti module
-- */
--static inline void cti_enable(struct cti *cti)
--{
--	__raw_writel(0x1, cti->base + CTICONTROL);
--}
--
--/**
-- * cti_disable - disable the cti module
-- * @cti: cti instance
-- *
-- * enable the cti module
-- */
--static inline void cti_disable(struct cti *cti)
--{
--	__raw_writel(0, cti->base + CTICONTROL);
--}
--
--/**
-- * cti_irq_ack - clear the cti irq
-- * @cti: cti instance
-- *
-- * clear the cti irq
-- */
--static inline void cti_irq_ack(struct cti *cti)
--{
--	void __iomem *base = cti->base;
--	unsigned long val;
--
--	val = __raw_readl(base + CTIINTACK);
--	val |= BIT(cti->trig_out_for_irq);
--	__raw_writel(val, base + CTIINTACK);
--}
--
--/**
-- * cti_unlock - unlock cti module
-- * @cti: cti instance
-- *
-- * unlock the cti module, or else any writes to the cti
-- * module is not allowed.
-- */
--static inline void cti_unlock(struct cti *cti)
--{
--	coresight_unlock(cti->base);
--}
--
--/**
-- * cti_lock - lock cti module
-- * @cti: cti instance
-- *
-- * lock the cti module, so any writes to the cti
-- * module will be not allowed.
-- */
--static inline void cti_lock(struct cti *cti)
--{
--	coresight_lock(cti->base);
--}
--#endif
-diff --git a/drivers/Kconfig b/drivers/Kconfig
-index dbdefa3..e857075 100644
---- a/drivers/Kconfig
-+++ b/drivers/Kconfig
-@@ -2,6 +2,8 @@ menu "Device Drivers"
- 
- source "drivers/base/Kconfig"
- 
-+source "drivers/amba/Kconfig"
-+
- source "drivers/bus/Kconfig"
- 
- source "drivers/connector/Kconfig"
-diff --git a/drivers/amba/Kconfig b/drivers/amba/Kconfig
-new file mode 100644
-index 0000000..b97ea23
---- /dev/null
-+++ b/drivers/amba/Kconfig
-@@ -0,0 +1,20 @@
-+#
-+# AMBA Devices
-+#
-+
-+menu "AMBA devices"
-+
-+config ARM_AMBA_CTI
-+	bool "Cross-Trigger Interface"
-+	depends on ARM && OF
-+	select ARM_AMBA
-+	help
-+	  The ARM Cross Trigger Interface provides a way to route events
-+	  between processor modules. For example, debug events from one
-+	  processor can be broadcasted to other processors. The events that
-+	  can be routed between processors are specific to the device.
-+	  Currently, the driver only supports looking-up the CTI hardware
-+	  information (base address and interrupts) from device-tree (and
-+	  hence, is dependent upon CONFIG_OF).
-+
-+endmenu
-diff --git a/drivers/amba/Makefile b/drivers/amba/Makefile
-index 66e81c2..f74abe9 100644
---- a/drivers/amba/Makefile
-+++ b/drivers/amba/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_ARM_AMBA)		+= bus.o
-+obj-$(CONFIG_ARM_AMBA_CTI)	+= cti.o
- obj-$(CONFIG_TEGRA_AHB)		+= tegra-ahb.o
-diff --git a/drivers/amba/cti.c b/drivers/amba/cti.c
-new file mode 100644
-index 0000000..04debe7
---- /dev/null
-+++ b/drivers/amba/cti.c
-@@ -0,0 +1,284 @@
-+/*
-+ * ARM Cross Trigger Interface (CTI) Driver
-+ *
-+ * Copyright (C) 2012 Texas Instruments, Inc.
-+ *  Jon Hunter <jon-hunter@ti.com>
-+ *
-+ * Based upon CTI Helpers by Ming Lei <ming.lei@canonical.com>.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <asm/hardware/coresight.h>
-+
-+#include <linux/amba/bus.h>
-+#include <linux/amba/cti.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/slab.h>
-+
-+/* The registers' definition is from section 3.2 of
-+ * Embedded Cross Trigger Revision: r0p0
-+ */
-+#define		CTICONTROL		0x000
-+#define		CTISTATUS		0x004
-+#define		CTILOCK			0x008
-+#define		CTIPROTECTION		0x00C
-+#define		CTIINTACK		0x010
-+#define		CTIAPPSET		0x014
-+#define		CTIAPPCLEAR		0x018
-+#define		CTIAPPPULSE		0x01c
-+#define		CTIINEN			0x020
-+#define		CTIOUTEN		0x0A0
-+#define		CTITRIGINSTATUS		0x130
-+#define		CTITRIGOUTSTATUS	0x134
-+#define		CTICHINSTATUS		0x138
-+#define		CTICHOUTSTATUS		0x13c
-+#define		CTIPERIPHID0		0xFE0
-+#define		CTIPERIPHID1		0xFE4
-+#define		CTIPERIPHID2		0xFE8
-+#define		CTIPERIPHID3		0xFEC
-+#define		CTIPCELLID0		0xFF0
-+#define		CTIPCELLID1		0xFF4
-+#define		CTIPCELLID2		0xFF8
-+#define		CTIPCELLID3		0xFFC
-+#define		CTI_MAX_CHANNELS	15
-+#define		CTI_MAX_TRIGGERS	7
-+
-+#define cti_writel(v, c, x) (__raw_writel((v), (c)->base + (x)))
-+#define cti_readl(c, x) (__raw_readl((c)->base + (x)))
-+
-+static DEFINE_SPINLOCK(cti_lock);
-+static LIST_HEAD(cti_list);
-+
-+/**
-+ * cti_map_trigger - use the @chan to map @trig_in to @trig_out
-+ * @cti:	CTI instance
-+ * @trig_in:	trigger in number
-+ * @trig_out:	trigger out number
-+ * @chan:	channel number
-+ *
-+ * Maps one trigger in of @trig_in to one trigger out of @trig_out
-+ * using the channel @chan. The CTI module must not be enabled when
-+ * calling this function.
-+ */
-+int cti_map_trigger(struct cti *cti, int trig_in, int trig_out, int chan)
-+{
-+	u32 v;
-+
-+	if (!cti)
-+		return -EINVAL;
-+
-+	if (cti->enabled)
-+		return -EBUSY;
-+
-+	if (chan > CTI_MAX_CHANNELS)
-+		return -EINVAL;
-+
-+	if ((trig_in > CTI_MAX_TRIGGERS) || (trig_out > CTI_MAX_TRIGGERS))
-+		return -EINVAL;
-+
-+	coresight_unlock(cti->base);
-+
-+	v = cti_readl(cti, CTIINEN + trig_in * 4);
-+	v |= BIT(chan);
-+	cti_writel(v, cti, CTIINEN + trig_in * 4);
-+	v = cti_readl(cti, CTIOUTEN + trig_out * 4);
-+	v |= BIT(chan);
-+	cti_writel(v, cti, CTIOUTEN + trig_out * 4);
-+	cti->trig_out = trig_out;
-+
-+	coresight_lock(cti->base);
-+
-+	return 0;
-+}
-+
-+/**
-+ * cti_enable - enable the CTI module
-+ * @cti: CTI instance
-+ *
-+ * Unlocks and enables the CTI module. The CTI module cannot be
-+ * programmed again until it has been disabled.
-+ */
-+int cti_enable(struct cti *cti)
-+{
-+	if (!cti || cti->enabled)
-+			return -EINVAL;
-+
-+	coresight_unlock(cti->base);
-+	cti_writel(1, cti, CTICONTROL);
-+	cti->enabled = true;
-+
-+	return 0;
-+}
-+
-+/**
-+ * cti_disable - disable the CTI module
-+ * @cti: CTI instance
-+ *
-+ * Disables and locks the CTI module.
-+ */
-+int cti_disable(struct cti *cti)
-+{
-+	if (!cti || !cti->enabled)
-+		return -EINVAL;
-+
-+	cti_writel(0, cti, CTICONTROL);
-+	cti->enabled = false;
-+	coresight_lock(cti->base);
-+
-+	return 0;
-+}
-+
-+/**
-+ * cti_irq_ack - acknowledges the CTI trigger output
-+ * @cti: CTI instance
-+ *
-+ * Acknowledges the CTI trigger output by writting to the appropriate
-+ * bit in the CTI interrupt acknowledge register.
-+ */
-+int cti_irq_ack(struct cti *cti)
-+{
-+	u32 v;
-+
-+	if (!cti || !cti->enabled)
-+		return -EINVAL;
-+
-+	v = cti_readl(cti, CTIINTACK);
-+	v |= BIT(cti->trig_out);
-+	cti_writel(v, cti, CTIINTACK);
-+
-+	return 0;
-+}
-+
-+/**
-+ * cti_get - acquire a CTI module
-+ * @name: name of CTI instance
-+ *
-+ * Acquires a CTI module from a list of CTI modules by name. If the CTI
-+ * module is already in use then return NULL, otherwise return a valid
-+ * handle to the CTI module.
-+ */
-+struct cti *cti_get(const char *name)
-+{
-+	struct cti *cti = NULL;
-+	unsigned long flags;
-+
-+	if (!name)
-+		return NULL;
-+
-+	spin_lock_irqsave(&cti_lock, flags);
-+
-+	if (list_empty(&cti_list))
-+		goto out;
-+
-+	list_for_each_entry(cti, &cti_list, node) {
-+		if (!strcmp(cti->name, name) && (!cti->reserved)) {
-+			cti->reserved = true;
-+			goto out;
-+		}
-+	}
-+
-+out:
-+	spin_unlock_irqrestore(&cti_lock, flags);
-+
-+	if (cti)
-+		pm_runtime_get_sync(cti->dev);
-+
-+	return cti;
-+}
-+
-+/**
-+ * cti_put - release handle to CTI module
-+ * @cti: CTI instance
-+ *
-+ * Releases a handle to CTI module that was previously acquired.
-+ */
-+void cti_put(struct cti *cti)
-+{
-+	if (!cti || !cti->reserved)
-+		return;
-+
-+	cti->reserved = false;
-+
-+	pm_runtime_put(cti->dev);
-+}
-+
-+static int cti_probe(struct amba_device *dev, const struct amba_id *id)
-+{
-+	struct cti *cti;
-+	struct device_node *np = dev->dev.of_node;
-+	int rc;
-+
-+	if (!np) {
-+		dev_err(&dev->dev, "device-tree not found!\n");
-+		return -ENODEV;
-+	}
-+
-+	cti = devm_kzalloc(&dev->dev, sizeof(struct cti), GFP_KERNEL);
-+	if (!cti) {
-+		dev_err(&dev->dev, "memory allocation failed!\n");
-+		return -ENOMEM;
-+	}
-+
-+	rc = of_property_read_string_index(np, "arm,cti-name", 0, &cti->name);
-+	if (rc) {
-+		dev_err(&dev->dev, "no name found for CTI!\n");
-+		return rc;
-+	}
-+
-+	if (!dev->irq[0]) {
-+		dev_err(&dev->dev, "no CTI interrupt found!\n");
-+		return -ENODEV;
-+	}
-+
-+	cti->irq = dev->irq[0];
-+	cti->base = of_iomap(np, 0);
-+	if (!cti->base) {
-+		dev_err(&dev->dev, "unable to map CTI registers!\n");
-+		return -ENOMEM;
-+	}
-+
-+	cti->dev = &dev->dev;
-+	amba_set_drvdata(dev, cti);
-+	list_add_tail(&cti->node, &cti_list);
-+
-+	/*
-+	 * AMBA bus driver has already enabled RPM and incremented
-+	 * use-count, so now we can safely decrement the use-count
-+	 * and allow the CTI driver to manage RPM for the device.
-+	 */
-+	pm_runtime_put(&dev->dev);
-+
-+	dev_info(&dev->dev, "ARM CTI driver");
-+
-+	return 0;
-+}
-+
-+static const struct amba_id cti_ids[] = {
-+	{
-+		.id	= 0x003bb906,
-+		.mask	= 0x00ffffff,
-+	},
-+	{ 0, 0 },
-+};
-+
-+static struct amba_driver cti_driver = {
-+	.drv		= {
-+		.name	= "cti",
-+	},
-+	.id_table	= cti_ids,
-+	.probe		= cti_probe,
-+};
-+
-+static int __init cti_init(void)
-+{
-+	return amba_driver_register(&cti_driver);
-+}
-+subsys_initcall(cti_init);
-diff --git a/include/linux/amba/cti.h b/include/linux/amba/cti.h
-new file mode 100644
-index 0000000..a82ae76
---- /dev/null
-+++ b/include/linux/amba/cti.h
-@@ -0,0 +1,82 @@
-+/*
-+ * ARM Cross Trigger Interface Platform Driver
-+ *
-+ * Copyright (C) 2012 Texas Instruments, Inc.
-+ *  Jon Hunter <jon-hunter@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#ifndef AMBA_CTI_H
-+#define AMBA_CTI_H
-+
-+#include <linux/io.h>
-+
-+/**
-+ * struct cti - Cross Trigger Interface (CTI) struct
-+ *
-+ * @node:	Connects CTI instance to list of CTI instances
-+ * @dev:	Pointer to device structure
-+ * @base:	Mapped virtual address of the CTI module
-+ * @name:	Name associated with CTI instance
-+ * @irq:	Interrupt associated with CTI instance
-+ * @trig_out:	Trigger output associated with interrupt (@irq)
-+ * @reserved:	Used to indicate if CTI instance has been allocated
-+ * @enabled:	Used to indicate if CTI instance has been enabled
-+ */
-+struct cti {
-+	struct list_head node;
-+	struct device *dev;
-+	void __iomem *base;
-+	const char *name;
-+	int irq;
-+	int trig_out;
-+	bool reserved;
-+	bool enabled;
-+};
-+
-+#ifdef CONFIG_ARM_AMBA_CTI
-+
-+int cti_map_trigger(struct cti *cti, int trig_in, int trig_out, int chan);
-+int cti_enable(struct cti *cti);
-+int cti_disable(struct cti *cti);
-+int cti_irq_ack(struct cti *cti);
-+struct cti *cti_get(const char *name);
-+void cti_put(struct cti *cti);
-+
-+#else
-+
-+static inline int cti_map_trigger(struct cti *cti, int trig_in, int trig_out,
-+				  int chan)
-+{
-+	return 0;
-+}
-+
-+static inline int cti_enable(struct cti *cti)
-+{
-+	return 0;
-+}
-+
-+static inline int cti_disable(struct cti *cti)
-+{
-+	return 0;
-+}
-+
-+static inline int cti_irq_ack(struct cti *cti)
-+{
-+	return 0;
-+}
-+
-+static inline struct cti *cti_get(const char *name)
-+{
-+	return NULL;
-+}
-+
-+static inline void cti_put(struct cti *cti) {}
-+
-+#endif /* ARM_AMBA_CTI */
-+
-+#endif /* AMBA_CTI_H */
--- 
-1.7.10.4
+----------------------------------------------------------------
+
+The following changes since commit 348064b46c96ab3012427a080340e81f617a94f5:
+
+  Merge branch 'next/multiplatform' into HEAD
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/pm-merge
+
+for you to fetch changes up to 9c7466b217af784280d9fc841bbd559ef3bf33e9:
+
+  ARM: arm-soc: Merge branch 'next/pm2' into next/pm
+
+----------------------------------------------------------------
+
+Abhilash Kesavan (3):
+      ARM: EXYNOS: fix the hotplug for Cortex-A15
+      ARM: EXYNOS: Remove scu_enable from cpuidle
+      ARM: EXYNOS: Add flush_cache_all in suspend finisher
+
+Arnd Bergmann (3):
+      Merge tag 'omap-for-v3.8/pm-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/pm
+      Merge tag 'omap-for-v3.8/clock-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/clk
+      Merge tag 'omap-for-v3.8/pm-part2-v3-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/pm
+
+Inderpal Singh (2):
+      ARM: EXYNOS: Add support for rtc wakeup
+      ARM: EXYNOS: Fix soft reboot hang after suspend/resume
+
+Jean Pihet (2):
+      ARM: OMAP: hwmod: align the SmartReflex fck names
+      ARM: OMAP: SmartReflex: pass device dependent data via platform data
+
+Kevin Hilman (1):
+      ARM: OMAP2+: voltage: fixup oscillator handling when CONFIG_PM=n
+
+Mike Turquette (3):
+      ARM: OMAP4: clock: Convert to common clk
+      ARM: OMAP2+: clockdomain: bypass clockdomain handling when disabling unused clks
+      ARM: OMAP2+: clock: Cleanup !CONFIG_COMMON_CLK parts
+
+Nishanth Menon (2):
+      ARM: OMAP2+: PM: VP: minor pr_warn updates
+      ARM: OMAP3+: PM: VP: use uV for max and min voltage limits
+
+Olof Johansson (7):
+      Merge branch 'next/cleanup' into next/pm2
+      Merge branch 'next/dt' into next/pm2
+      Merge tag 'omap-for-v3.8/devel-prcm-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/pm2
+      Merge branch 'next/pm-samsung' of git://git.kernel.org/.../kgene/linux-samsung into next/pm
+      Merge tag 'tags/omap-for-v3.8/cleanup-multiplatform-no-clock-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/pm2
+      ARM: arm-soc: Merge branch 'next/clk' into next/pm
+      ARM: arm-soc: Merge branch 'next/pm2' into next/pm
+
+Paul Walmsley (8):
+      ARM: OMAP2xxx: clock: add APLL rate recalculation functions
+      ARM: OMAP2+: clock: add OMAP CCF convenience macros to mach-omap2/clock.h
+      ARM: OMAP44xx: clock: drop obsolete clock data
+      ARM: OMAP3xxx: clk: drop obsolete clock data
+      ARM: AM33xx: clock: drop obsolete clock data
+      ARM: OMAP3+: DPLL: drop !CONFIG_COMMON_CLK sections
+      ARM: OMAP2xxx: clock: drop obsolete clock data
+      ARM: OMAP2+: PRM: initialize some PRM functions early
+
+Peter Ujfalusi (2):
+      ARM: OMAP2+: hwmod: Add possibility to count hwmod resources based on type
+      ARM: OMAP2+: omap_device: Correct resource handling for DT boot
+
+Rajendra Nayak (17):
+      ARM: OMAP4: suspend: Program all domains to retention
+      ARM: OMAP: clock: Nuke plat/clock.c & reuse struct clk as clk_hw_omap
+      ARM: OMAP: hwmod: Fix up hwmod based clkdm accesses
+      ARM: OMAP3: clock: Convert to common clk
+      ARM: OMAP2: clock: Convert to common clk
+      ARM: OMAP: clock: list all clk_hw_omap clks to enable/disable autoidle
+      ARM: OMAP: clock: Define a function to enable clocks at init
+      ARM: OMAP: clock: Get rid of some clkdm assocations within clks
+      ARM: OMAP4: clock: Add 44xx data using common struct clk
+      ARM: OMAP3: clock: Add 3xxx data using common struct clk
+      ARM: OMAP2: clock: Add 24xx data using common struct clk
+      ARM: OMAP: clock: Switch to COMMON clk
+      ARM: OMAP: hwmod: Cleanup !CONFIG_COMMON_CLK parts
+      ARM: OMAP4: clock: Cleanup !CONFIG_COMMON_CLK parts
+      ARM: OMAP3: clock: Cleanup !CONFIG_COMMON_CLK parts
+      ARM: OMAP2: clock: Cleanup !CONFIG_COMMON_CLK parts
+      ARM: OMAP2+: hwmod: Add support for per hwmod/module context lost count
+
+Tero Kristo (14):
+      ARM: OMAP: voltage: renamed vp_vddmin and vp_vddmax fields
+      ARM: OMAP3+: voltage: introduce omap vc / vp params for voltagedomains
+      ARM: OMAP3: VC: calculate ramp times
+      ARM: OMAP4: voltage: add support for VOLTSETUP_x_OFF register
+      ARM: OMAP4: VC: calculate ramp times
+      ARM: OMAP: add support for oscillator setup
+      ARM: OMAP3+: vp: use new vp_params for calculating vddmin and vddmax
+      ARM: OMAP3+: voltage: use oscillator data to calculate setup times
+      ARM: OMAP: TWL: change the vddmin / vddmax voltages to spec
+      ARM: OMAP3+: voltage: remove unused volt_setup_time parameter
+      ARM: OMAP4: vc: fix channel configuration
+      ARM: OMAP4: VC: setup I2C parameters based on board data
+      ARM: OMAP4: TWL: enable high speed mode for PMIC communication
+      ARM: OMAP4: USB: power down MUSB PHY during boot
+
+Tony Lindgren (12):
+      Merge tag 'for_3.8-cleanup-pm' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-for-v3.8/pm
+      Merge tag 'for_3.8-pm-sr' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-for-v3.8/pm
+      Merge tag 'for_3.8-pm-voltage' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-for-v3.8/pm
+      Merge branch 'omap-for-v3.8/pm' into omap-for-v3.8/clock
+      Merge tag 'omap-cleanup-c-for-3.8' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.8/clock
+      Merge tag 'for_3.8-pm-omap4-core-ret' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-for-v3.8/pm-part2
+      Merge branch 'omap-for-v3.8/pm' into omap-for-v3.8/pm-part2
+      Merge tag 'omap-devel-a-for-3.8' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.8/devel-pcrm
+      Merge tag 'tags/omap-for-v3.8/devel-prcm-signed' into omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3
+      watchdog: OMAP: fixup for ARM multiplatform support
+      ASoC: OMAP: mcbsp fixes for enabling ARM multiplatform support
+      ARM: OMAP: Move plat-omap/dma-omap.h to include/linux/omap-dma.h
+
+Vaibhav Hiremath (2):
+      ARM: OMAP2+: hwmod: Invoke init_clkdm before other init functions
+      ARM: AM33XX: clock: add clock data in common clock format
+
+Vishwanath Sripathy (1):
+      ARM: OMAP4: OPP: add OMAP4460 definitions
+
+
+ arch/arm/mach-exynos/common.c                   |    2 +
+ arch/arm/mach-exynos/cpuidle.c                  |    3 +-
+ arch/arm/mach-exynos/hotplug.c                  |   45 +-
+ arch/arm/mach-exynos/pm.c                       |    7 +
+ arch/arm/mach-omap1/board-h2.c                  |    2 +-
+ arch/arm/mach-omap1/board-h3.c                  |    2 +-
+ arch/arm/mach-omap1/board-palmte.c              |    2 +-
+ arch/arm/mach-omap1/board-palmtt.c              |    2 +-
+ arch/arm/mach-omap1/board-palmz71.c             |    2 +-
+ arch/arm/mach-omap1/board-sx1.c                 |    2 +-
+ arch/arm/mach-omap1/dma.c                       |    2 +-
+ arch/arm/mach-omap1/io.c                        |    2 +-
+ arch/arm/mach-omap1/lcd_dma.c                   |    2 +-
+ arch/arm/mach-omap1/mcbsp.c                     |    2 +-
+ arch/arm/mach-omap1/pm.c                        |    2 +-
+ arch/arm/mach-omap2/Kconfig                     |    5 +
+ arch/arm/mach-omap2/Makefile                    |   10 +-
+ arch/arm/mach-omap2/board-3430sdp.c             |    2 +-
+ arch/arm/mach-omap2/board-h4.c                  |    2 +-
+ arch/arm/mach-omap2/board-rx51-peripherals.c    |    2 +-
+ arch/arm/mach-omap2/board-rx51.c                |    2 +-
+ arch/arm/mach-omap2/cclock2420_data.c           | 1950 ++++++++++
+ arch/arm/mach-omap2/cclock2430_data.c           | 2065 ++++++++++
+ arch/arm/mach-omap2/cclock33xx_data.c           |  961 +++++
+ arch/arm/mach-omap2/cclock3xxx_data.c           | 3595 +++++++++++++++++
+ arch/arm/mach-omap2/cclock44xx_data.c           | 1987 ++++++++++
+ arch/arm/mach-omap2/clkt2xxx_apll.c             |   62 +-
+ arch/arm/mach-omap2/clkt2xxx_dpll.c             |    8 +-
+ arch/arm/mach-omap2/clkt2xxx_dpllcore.c         |   13 +-
+ arch/arm/mach-omap2/clkt2xxx_osc.c              |   13 +-
+ arch/arm/mach-omap2/clkt2xxx_sys.c              |    7 +-
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c    |    9 +-
+ arch/arm/mach-omap2/clkt34xx_dpll3m2.c          |    8 +-
+ arch/arm/mach-omap2/clkt_clksel.c               |  194 +-
+ arch/arm/mach-omap2/clkt_dpll.c                 |   28 +-
+ arch/arm/mach-omap2/clkt_iclk.c                 |   30 +-
+ arch/arm/mach-omap2/clock.c                     |  910 ++---
+ arch/arm/mach-omap2/clock.h                     |  329 +-
+ arch/arm/mach-omap2/clock2420_data.c            | 1972 ----------
+ arch/arm/mach-omap2/clock2430.c                 |    8 +-
+ arch/arm/mach-omap2/clock2430_data.c            | 2071 ----------
+ arch/arm/mach-omap2/clock2xxx.c                 |    1 +
+ arch/arm/mach-omap2/clock2xxx.h                 |   41 +-
+ arch/arm/mach-omap2/clock33xx_data.c            | 1109 ------
+ arch/arm/mach-omap2/clock34xx.c                 |   51 +-
+ arch/arm/mach-omap2/clock3517.c                 |   24 +-
+ arch/arm/mach-omap2/clock36xx.c                 |   22 +-
+ arch/arm/mach-omap2/clock36xx.h                 |    2 +-
+ arch/arm/mach-omap2/clock3xxx.c                 |    6 +-
+ arch/arm/mach-omap2/clock3xxx.h                 |    6 +-
+ arch/arm/mach-omap2/clock3xxx_data.c            | 3613 ------------------
+ arch/arm/mach-omap2/clock44xx_data.c            | 3398 ----------------
+ arch/arm/mach-omap2/clock_common_data.c         |   22 +-
+ arch/arm/mach-omap2/clockdomain.c               |   89 +-
+ arch/arm/mach-omap2/cm-regbits-24xx.h           |    5 +
+ arch/arm/mach-omap2/cm-regbits-34xx.h           |   31 +
+ arch/arm/mach-omap2/cm2xxx_3xxx.h               |    1 +
+ arch/arm/mach-omap2/control.h                   |    1 +
+ arch/arm/mach-omap2/devices.c                   |    2 +-
+ arch/arm/mach-omap2/dma.c                       |    2 +-
+ arch/arm/mach-omap2/dpll3xxx.c                  |  183 +-
+ arch/arm/mach-omap2/dpll44xx.c                  |   21 +-
+ arch/arm/mach-omap2/io.c                        |   18 +-
+ arch/arm/mach-omap2/mcbsp.c                     |    2 +-
+ arch/arm/mach-omap2/omap_device.c               |   87 +-
+ arch/arm/mach-omap2/omap_hwmod.c                |  145 +-
+ arch/arm/mach-omap2/omap_hwmod.h                |   12 +-
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c      |    4 +-
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c      |    4 +-
+ .../omap_hwmod_2xxx_3xxx_ipblock_data.c         |    3 +-
+ .../mach-omap2/omap_hwmod_2xxx_ipblock_data.c   |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c      |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c      |    3 +-
+ arch/arm/mach-omap2/omap_opp_data.h             |    9 +-
+ arch/arm/mach-omap2/omap_phy_internal.c         |   32 +
+ arch/arm/mach-omap2/omap_twl.c                  |   73 +-
+ arch/arm/mach-omap2/opp4xxx_data.c              |   98 +-
+ arch/arm/mach-omap2/pm.c                        |   32 +
+ arch/arm/mach-omap2/pm.h                        |   10 +
+ arch/arm/mach-omap2/pm24xx.c                    |    6 +-
+ arch/arm/mach-omap2/pm34xx.c                    |    3 +-
+ arch/arm/mach-omap2/pm44xx.c                    |    7 -
+ arch/arm/mach-omap2/prm-regbits-24xx.h          |    2 +
+ arch/arm/mach-omap2/prm-regbits-34xx.h          |    1 +
+ arch/arm/mach-omap2/prm.h                       |   11 +-
+ arch/arm/mach-omap2/prm2xxx.c                   |    3 +-
+ arch/arm/mach-omap2/prm2xxx.h                   |    3 +-
+ arch/arm/mach-omap2/prm2xxx_3xxx.h              |    1 +
+ arch/arm/mach-omap2/prm3xxx.c                   |   17 +-
+ arch/arm/mach-omap2/prm3xxx.h                   |    1 +
+ arch/arm/mach-omap2/prm44xx.c                   |   49 +-
+ arch/arm/mach-omap2/prm44xx.h                   |    1 +
+ arch/arm/mach-omap2/prm_common.c                |   45 +
+ arch/arm/mach-omap2/scrm44xx.h                  |    2 +
+ arch/arm/mach-omap2/serial.c                    |    2 +-
+ arch/arm/mach-omap2/sr_device.c                 |   13 +
+ arch/arm/mach-omap2/vc.c                        |  453 ++-
+ arch/arm/mach-omap2/vc.h                        |    8 +-
+ arch/arm/mach-omap2/vc3xxx_data.c               |   22 +
+ arch/arm/mach-omap2/vc44xx_data.c               |   28 +
+ arch/arm/mach-omap2/voltage.h                   |   44 +-
+ arch/arm/mach-omap2/voltagedomains3xxx_data.c   |    5 +
+ arch/arm/mach-omap2/voltagedomains44xx_data.c   |   25 +-
+ arch/arm/mach-omap2/vp.c                        |   19 +-
+ arch/arm/mach-omap2/vp.h                        |    7 +
+ arch/arm/mach-omap2/vp3xxx_data.c               |   10 +
+ arch/arm/mach-omap2/vp44xx_data.c               |   15 +
+ arch/arm/plat-omap/dma.c                        |    2 +-
+ arch/arm/plat-omap/include/plat-omap/dma-omap.h |  377 --
+ arch/arm/plat-samsung/include/plat/pm.h         |    2 +
+ drivers/crypto/omap-aes.c                       |    2 +-
+ drivers/crypto/omap-sham.c                      |    2 +-
+ drivers/dma/omap-dma.c                          |    2 -
+ drivers/media/platform/omap/omap_vout.c         |    2 +-
+ drivers/media/platform/omap/omap_vout_vrfb.c    |    2 +-
+ drivers/media/platform/omap3isp/ispstat.h       |    2 +-
+ .../media/platform/soc_camera/omap1_camera.c    |    2 +-
+ drivers/mtd/nand/omap2.c                        |    1 -
+ drivers/mtd/onenand/omap2.c                     |    2 +-
+ drivers/power/avs/smartreflex.c                 |   54 +-
+ drivers/usb/gadget/omap_udc.c                   |    2 +-
+ drivers/usb/musb/tusb6010_omap.c                |    2 +-
+ drivers/video/omap/lcdc.c                       |    2 +-
+ drivers/video/omap/omapfb_main.c                |    2 +-
+ drivers/video/omap/sossi.c                      |    2 +-
+ drivers/watchdog/omap_wdt.c                     |    2 -
+ include/linux/omap-dma.h                        |  366 ++
+ include/linux/power/smartreflex.h               |   14 +-
+ sound/soc/omap/mcbsp.c                          |    4 +-
+ sound/soc/omap/mcbsp.h                          |    6 +
+ sound/soc/omap/omap-mcbsp.c                     |    5 +-
+ 131 files changed, 13015 insertions(+), 14135 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/cclock2420_data.c
+ create mode 100644 arch/arm/mach-omap2/cclock2430_data.c
+ create mode 100644 arch/arm/mach-omap2/cclock33xx_data.c
+ create mode 100644 arch/arm/mach-omap2/cclock3xxx_data.c
+ create mode 100644 arch/arm/mach-omap2/cclock44xx_data.c
+ delete mode 100644 arch/arm/mach-omap2/clock2420_data.c
+ delete mode 100644 arch/arm/mach-omap2/clock2430_data.c
+ delete mode 100644 arch/arm/mach-omap2/clock33xx_data.c
+ delete mode 100644 arch/arm/mach-omap2/clock3xxx_data.c
+ delete mode 100644 arch/arm/mach-omap2/clock44xx_data.c
+ delete mode 100644 arch/arm/plat-omap/include/plat-omap/dma-omap.h
