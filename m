@@ -1,85 +1,35 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 13 Dec 2012 13:22:03 +0000
-Subject: [PATCH 1/8] mmc: mmci: Move ios_handler functionality into the driver
+Date: Thu, 13 Dec 2012 13:22:04 +0000
+Subject: [PATCH 2/8] ARM: ux500: Set correct MMCI regulator voltages in the
+ ux5x0 Device Tree
 In-Reply-To: <1355404930-5691-1-git-send-email-lee.jones@linaro.org>
 References: <1355404930-5691-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1355404930-5691-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1355404930-5691-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are currently two instances of the ios_handler being used.
-Both of which mearly toy with some regulator settings. Now there
-is a GPIO regulator API, we can use that instead, and lessen the
-per platform burden. By doing this, we also become more Device
-Tree compatible.
+Correct the voltage specified by the mmci regulator node in Device
+Tree. Despite the MMC subsystem insisting on v3.3, we actually only
+offer v2.9, and not v2.6 which must have actually been a typo.
 
-Cc: Chris Ball <cjb@laptop.org>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Acked-by: Ulf Hansson <ulf.hansson@stericsson.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mmc/host/mmci.c |   22 ++++++++++++++++++++++
- drivers/mmc/host/mmci.h |    1 +
- 2 files changed, 23 insertions(+)
+ arch/arm/boot/dts/dbx5x0.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index edc3e9b..d45c931 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1091,6 +1091,16 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 	case MMC_POWER_OFF:
- 		if (host->vcc)
- 			ret = mmc_regulator_set_ocr(mmc, host->vcc, 0);
-+
-+		if (host->vqmmc) {
-+			if (regulator_is_enabled(host->vqmmc)) {
-+				ret = regulator_disable(host->vqmmc);
-+				if (ret < 0)
-+					dev_warn(mmc_dev(mmc),
-+						 "unable to disable vmmc-ios\n");
-+			}
-+		}
-+
- 		break;
- 	case MMC_POWER_UP:
- 		if (host->vcc) {
-@@ -1115,6 +1125,14 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index 9f55363..6b1aa6d 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -634,7 +634,7 @@
+ 			compatible = "regulator-gpio";
  
- 		break;
- 	case MMC_POWER_ON:
-+		if (host->vqmmc)
-+			if (!regulator_is_enabled(host->vqmmc)) {
-+				ret = regulator_enable(host->vqmmc);
-+				if (ret < 0)
-+					dev_warn(mmc_dev(mmc),
-+						 "unable to enable vmmc-ios\n");
-+			}
-+
- 		pwr |= MCI_PWR_ON;
- 		break;
- 	}
-@@ -1379,6 +1397,10 @@ static int __devinit mmci_probe(struct amba_device *dev,
- 				 "(using regulator instead)\n");
- 		}
- 	}
-+
-+	host->vqmmc = regulator_get(&dev->dev, "vqmmc");
-+	if (IS_ERR(host->vqmmc))
-+		host->vqmmc = NULL;
- #endif
- 	/* Fall back to platform data if no regulator is found */
- 	if (host->vcc == NULL)
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index d437ccf..b87d9e2 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -194,6 +194,7 @@ struct mmci_host {
- 	struct sg_mapping_iter	sg_miter;
- 	unsigned int		size;
- 	struct regulator	*vcc;
-+	struct regulator	*vqmmc;
+ 			regulator-min-microvolt = <1800000>;
+-			regulator-max-microvolt = <2600000>;
++			regulator-max-microvolt = <2900000>;
+ 			regulator-name = "mmci-reg";
+ 			regulator-type = "voltage";
  
- #ifdef CONFIG_DMA_ENGINE
- 	/* DMA stuff */
 -- 
 1.7.9.5
