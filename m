@@ -1,87 +1,35 @@
 From: voice.shen@atmel.com (Bo Shen)
-Date: Thu, 13 Dec 2012 10:05:07 +0800
-Subject: [PATCH] ASoC: atmel-ssc: change disable to disable in dts node
-Message-ID: <1355364307-31584-1-git-send-email-voice.shen@atmel.com>
+Date: Thu, 13 Dec 2012 10:10:35 +0800
+Subject: [Resend PATCH v6 1/4] pinctrl: atmel-ssc: add pinctrl support
+In-Reply-To: <50BC3F1A.1030808@atmel.com>
+References: <1353464229-20846-1-git-send-email-voice.shen@atmel.com>
+ <20121121022441.GJ4673@opensource.wolfsonmicro.com>
+ <50BC3F1A.1030808@atmel.com>
+Message-ID: <50C9391B.7080204@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the value of status to disabled to keep the consistent
+On 12/3/2012 13:56, Bo Shen wrote:
+> Hi J,
+>
+> On 11/21/2012 10:24, Mark Brown wrote:
+>> On Wed, Nov 21, 2012 at 10:17:09AM +0800, Bo Shen wrote:
+>>> Add pinctrl support for atmel ssc peripheral
+>>>
+>>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>>
+>> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>>
+>
+> Ping?
+> Will you pick up this patch, if not, the linux-next (20121130) build
+> will report following error:
+> ---<8---
+> ERROR (phandle_references): Reference to non-existent node or label
+> "pinctrl_ssc0_tx
+> --->8---
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
- arch/arm/boot/dts/at91sam9260.dtsi |    2 +-
- arch/arm/boot/dts/at91sam9263.dtsi |    4 ++--
- arch/arm/boot/dts/at91sam9g45.dtsi |    4 ++--
- arch/arm/boot/dts/at91sam9x5.dtsi  |    2 +-
- 4 files changed, 6 insertions(+), 6 deletions(-)
+Ping again?
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index aaa42d8..03c56cb 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -217,7 +217,7 @@
- 				compatible = "atmel,at91rm9200-ssc";
- 				reg = <0xfffbc000 0x4000>;
- 				interrupts = <14 4 5>;
--				status = "disable";
-+				status = "disabled";
- 			};
- 
- 			adc0: adc at fffe0000 {
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 3b721ee..15f12dd 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -179,14 +179,14 @@
- 				compatible = "atmel,at91rm9200-ssc";
- 				reg = <0xfff98000 0x4000>;
- 				interrupts = <16 4 5>;
--				status = "disable";
-+				status = "disabled";
- 			};
- 
- 			ssc1: ssc at fff9c000 {
- 				compatible = "atmel,at91rm9200-ssc";
- 				reg = <0xfff9c000 0x4000>;
- 				interrupts = <17 4 5>;
--				status = "disable";
-+				status = "disabled";
- 			};
- 
- 			macb0: ethernet at fffbc000 {
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index acfa207..44a38d0 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -232,14 +232,14 @@
- 				compatible = "atmel,at91sam9g45-ssc";
- 				reg = <0xfff9c000 0x4000>;
- 				interrupts = <16 4 5>;
--				status = "disable";
-+				status = "disabled";
- 			};
- 
- 			ssc1: ssc at fffa0000 {
- 				compatible = "atmel,at91sam9g45-ssc";
- 				reg = <0xfffa0000 0x4000>;
- 				interrupts = <17 4 5>;
--				status = "disable";
-+				status = "disabled";
- 			};
- 
- 			adc0: adc at fffb0000 {
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 69667d0..0beff72 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -92,7 +92,7 @@
- 				compatible = "atmel,at91sam9g45-ssc";
- 				reg = <0xf0010000 0x4000>;
- 				interrupts = <28 4 5>;
--				status = "disable";
-+				status = "disabled";
- 			};
- 
- 			tcb0: timer at f8008000 {
--- 
-1.7.9.5
+> Best Regards,
+> Bo Shen
