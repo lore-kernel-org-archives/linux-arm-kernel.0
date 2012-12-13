@@ -1,46 +1,62 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 13 Dec 2012 10:54:42 -0700
-Subject: [RFC v1 08/16] arm: mvebu: the core PCIe driver
-In-Reply-To: <201212131219.39764.arnd@arndb.de>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201212111056.58970.arnd@arndb.de> <20121212165833.6a35a6ec@skate>
- <201212131219.39764.arnd@arndb.de>
-Message-ID: <20121213175442.GC14619@obsidianresearch.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Thu, 13 Dec 2012 18:55:47 +0100
+Subject: ARM realview breakages w/ 3.7 under qemu
+In-Reply-To: <20121213174817.GB12946@mudshark.cambridge.arm.com>
+References: <50CA0FC1.5090009@openwrt.org>
+ <20121213174817.GB12946@mudshark.cambridge.arm.com>
+Message-ID: <50CA16A3.4020108@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 13, 2012 at 12:19:39PM +0000, Arnd Bergmann wrote:
- 
-> Do those ten ports have a shared I/O space window, or does each one
-> have its own 64K? 
+Le 12/13/12 18:48, Will Deacon a ?crit :
+> On Thu, Dec 13, 2012 at 05:26:25PM +0000, Florian Fainelli wrote:
+>> Hi,
+> Hi Florian,
+>
+>> I am experiencing several issues with the ARM RealView platform under qemu:
+>>
+>> 1) The RealView EB MP-Core is stuck in the timer calibration, this
+>> isssue was already present in all 3.6 kernels, and I have not yet been
+>> able to find the root cause of this. PBX A9 with the same kernel binary
+>> works flawlessly.
+> Can you try picking 810883f05982 ("ARM: 7594/1: Add .smp entry for
+> REALVIEW_EB") please?
 
-The smallest mbus routing window size is 64k, and you need to use a
-mbus routing window per PEX to decode into IO.
+I picked that up and it did not make any difference we are still stuck 
+calibrating the timer.
 
-Thomas: Note this complicates my earlier suggestion of just using
-config transactions because this is horribly non-conformant, PCIe
-requires a much finer granularity for the root port bridge, it would
-need some kind of specialness to make the standard Linux resource
-allocator work properly.... :|
+>
+>> 2) There are some strange things happening with the RAM on these
+>> platforms too, for instance:
+>>
+>> - EB MP-Core: booting with 128MBytes of RAM does not work, booting with
+>> more than 256Mbytes results in the amount of RAM seen by the kernel
+>> truncated to 256Mbytes
+>>
+>> - PBX A9: booting with less than 1024MBytes of RAM causes this:
+>> [    0.000000] Truncating RAM at 20000000-3fffffff to -3f7fffff (vmalloc
+>> region overlap).
+>> [    0.000000] Ignoring RAM at 80000000-8fffffff (vmalloc region overlap).
+>>
+>> Do these issues sounds familiar to any of you? The kernel config is
+>> attached in case that helps.
+> I'm afraid these memory issues don't ring any bells with me, but I do
+> actually have hardware for EB MP and PBX so I can see if that works with
+> your .config (although you may have to wait until next week).
+>
+> Can you provide your command lines please? I'm also assuming you're using
+> 3.7?
 
-> Similarly, how is the config space set up: Does each port have its own
-> config space with 256 buses, or is there a fixed (or variable) mapping
-> of bus numbers to ports?
+The qemu command-line is the following:
+qemu-system-arm -M realview-eb-mpcore -kernel 
+bin/realview/openwrt-realview-vmlinux.elf -nographic -m 768 -append 
+"earlyprintk console=ttyAMA0"
 
-Each PEX has it's own configuration cycle generation register, and is
-completely independent of other PEX's. They could be seperate domains
-in Linux, but lets not do that :)
+And the kernel command-line is:
+console=ttyAMA0 mem=128M
+CMDLINE_FROM_BOOTLOADER is set, so only the command-line from qemu 
+actually matters.
 
-Marvell did not design a root complex for this chip. The PEX is an end
-port core with some additional stuff bodged on to handle root port TLP
-processing requirements, but none of the other root port and root
-complex requirements are met.
-
-Ideally SW could bodge it into a sort of compliant root complex, but
-that is looking like some level of core PCI changes would be needed..
-
-By far the easiest thing is to keep them as separate PCI busses and
-require DT to manage each one individually, address ranges and
-all. :(
-
-Jason
+Thanks!
+--
+Florian
