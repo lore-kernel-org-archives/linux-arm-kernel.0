@@ -1,105 +1,48 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 13 Dec 2012 20:36:56 +0100
-Subject: [RFC 1/5] ARM: CORESIGHT: Add generic lock/unlock helpers
-In-Reply-To: <50CA2A13.9090005@ti.com>
-References: <1355348588-22318-1-git-send-email-jon-hunter@ti.com>
- <1355348588-22318-2-git-send-email-jon-hunter@ti.com>
- <20121213145803.GL26540@mudshark.cambridge.arm.com>
- <50CA2A13.9090005@ti.com>
-Message-ID: <CAORVsuXmKFNuHG+RoDaLehX0-1m=F5Uayvrs9NDRHW4C+9U4Lw@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Fri, 14 Dec 2012 08:50:33 +1300
+Subject: clock_enable mismatches in pwm-backlight/pwm_enable
+Message-ID: <1355428233.2159.15.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon, Will,
+Hi Thierry,
 
-On Thu, Dec 13, 2012 at 8:18 PM, Jon Hunter <jon-hunter@ti.com> wrote:
->
-> On 12/13/2012 08:58 AM, Will Deacon wrote:
->> Hi Jon,
->>
->> On Wed, Dec 12, 2012 at 09:43:04PM +0000, Jon Hunter wrote:
->>> The Cross Trigger Interface (CTI) helpers in cti.h include definitions
->>> for the Coresight Lock Access Register (LAR) and Lock Status Register
->>> (LSR). These registers are already defined in coresight.h and so rather
->>> than having multiple definitions, just use the definitions from
->>> coresight.h.
->>>
->>> Add the following coresight macros ...
->>> - coresight_unlock() --> Unlocks coresight module
->>> - coresight_lock()   --> Locks coresight module
->>>
->>> Use the above macros for ETB, ETM and CTI. The do-while(0) statement
->>> has been removed from the macro as it is not a multi-line macro.
->>>
->>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->>> ---
->>>  arch/arm/include/asm/cti.h                |   16 +++-------------
->>>  arch/arm/include/asm/hardware/coresight.h |   16 ++++++++--------
->>>  2 files changed, 11 insertions(+), 21 deletions(-)
->>
->> [...]
->>
->>> diff --git a/arch/arm/include/asm/hardware/coresight.h b/arch/arm/include/asm/hardware/coresight.h
->>> index 7ecd793..dcd0e66 100644
->>> --- a/arch/arm/include/asm/hardware/coresight.h
->>> +++ b/arch/arm/include/asm/hardware/coresight.h
->>> @@ -141,17 +141,17 @@
->>>  #define ETBFF_TRIGEVT               BIT(9)
->>>  #define ETBFF_TRIGFL                BIT(10)
->>>
->>> -#define etb_writel(t, v, x) \
->>> -    (__raw_writel((v), (t)->etb_regs + (x)))
->>> +#define etb_writel(t, v, x) (__raw_writel((v), (t)->etb_regs + (x)))
->>>  #define etb_readl(t, x) (__raw_readl((t)->etb_regs + (x)))
->>>
->>> -#define etm_lock(t) do { etm_writel((t), 0, CSMR_LOCKACCESS); } while (0)
->>> -#define etm_unlock(t) \
->>> -    do { etm_writel((t), UNLOCK_MAGIC, CSMR_LOCKACCESS); } while (0)
->>> +#define etb_lock(t) coresight_lock((t)->etb_regs)
->>> +#define etb_unlock(t) coresight_unlock((t)->etb_regs)
->>> +#define etm_lock(t) coresight_lock((t)->etm_regs)
->>> +#define etm_unlock(t) coresight_unlock((t)->etm_regs)
->>>
->>> -#define etb_lock(t) do { etb_writel((t), 0, CSMR_LOCKACCESS); } while (0)
->>> -#define etb_unlock(t) \
->>> -    do { etb_writel((t), UNLOCK_MAGIC, CSMR_LOCKACCESS); } while (0)
->>> +#define coresight_lock(base) (__raw_writel(0, base + CSMR_LOCKACCESS))
->>> +#define coresight_unlock(base) \
->>> +    (__raw_writel(UNLOCK_MAGIC, base + CSMR_LOCKACCESS))
->>>
->>>  #endif /* __ASM_HARDWARE_CORESIGHT_H */
->>
->> How about we take this opportunity to divorce the more general coresight
->> bits from the etb specific parts, like you've done for the cti. We could
->> move the ETB stuff out into asm/etb.h (although it might be nice to keep all
->> the coresight device headers in one place... answers on a postcard) and just
->> have the architected coresight functionality in this header.
->
-> Yes I have been wondering about that too. Long term it would be good to
-> find a home in the drivers directory for all these coresight devices
-> too. For now, we could extract the etb/etm parts from coresight.h into
-> etb.h and etm.h, respectively.
+This works out quite well with you looking after pwm and pwm-backlight.
 
-I am now writing a HW trace driver that extracts traces from the CMI
-and PMI IP blocks (and later L2CC). It is still in early development
-status.
+I noticed while troubleshooting pwm on arch-vt8500 last night that the
+clk_enable count was getting huge for no obvious reason, and I narrowed
+it down to the pwm-backlight driver.
 
-The idea I have in mind is to have the implementation in
-drivers/power/hw_trace. Eventually this directory would contain the
-drivers for ETM/ETB, CMI, PMI and also the coresight support. It would
-be architected so that the lower level drivers export the necessary
-functions for the higher level code to use the resource. Example: the
-PMI driver would use the ETB and coresight drivers.
+in pwm-bl.c::pwm_backlight_update_status()
 
-What do you think?
+if (brightness == 0) {
+		pwm_config(pb->pwm, 0, pb->period);
+		pwm_disable(pb->pwm);
+	} else {
+		...
+		pwm_config(pb->pwm, duty_cycle, pb->period);
+		pwm_enable(pb->pwm);
+	}
 
-Regards,
-Jean
+Which looks fine on its own, except that in pwm_enable() it's not
+uncommon to have clk_<prepare_>enable calls.
 
->
-> Cheers
-> Jon
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+What happens is everytime the backlight level is changed to anything
+except 0, pwm_enable() is called, which calls clk_enable() and the
+counter goes up. Only when brightness=0 does pwm_disable() get called
+and the accompanying clk_disable().
+
+If you change brightness 3-4 times, then set brightness=0, the clock is
+enable 3-4 times, but only disabled 1.
+
+At first I thought it was my bad, but it seems Tegra and IMX suffer from
+this problem as well - they both do clk_ calls in pwm_enable - which
+doesn't seem unreasonable.
+
+Any thoughts on how this could be rectified?
+
+Regards
+Tony Prisk
+
+PS: I have cc: Stephen for Tegra and Sascha for IMX as I don't know who
+looks after pwm on those systems.
