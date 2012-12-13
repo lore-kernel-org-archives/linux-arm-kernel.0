@@ -1,32 +1,53 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 13 Dec 2012 11:22:24 +0100
-Subject: FW: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save
- power
-In-Reply-To: <20121213101117.GF14363@n2100.arm.linux.org.uk>
-References: <25B60CDC2F704E4E9D88FFD52780CB4C08B00BD3B1@SC-VEXCH1.marvell.com>
- <CADz5_gJ70KrHL5NoSPQbFdeHnQxWLh87zq6N+-V7J7Yq7t+aPQ@mail.gmail.com>
- <CAPDyKFrt4zWmhyO-UJAFPOH=90n4OwRPv3nczr4jPGBnc_jT5w@mail.gmail.com>
- <20121213101117.GF14363@n2100.arm.linux.org.uk>
-Message-ID: <CAPDyKFrkNnudy_rCL4P3GjRjh3zZ0aGVLti8uLJaW4FfuXm9JQ@mail.gmail.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Thu, 13 Dec 2012 16:12:51 +0530
+Subject: [PATCH V5 0/2]  Add DT support for i2s
+Message-ID: <1355395373-22058-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 December 2012 11:11, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Dec 13, 2012 at 10:04:46AM +0100, Ulf Hansson wrote:
->> Anyway, this need to be thought of as future step, since this patch is
->> not changing anything to that sequence as Kevin also is pointing out.
->
-> Given that Kevin is talking about stuff in sdhci as if it affects MMCI,
-> and that neither of you have picked that up, you're *still* not gaining
-> any confidence from me that you're actually thinking about the changes
-> you're making.  So I'm not really caring about how many acks your patches
-> get, I'm still going to be reluctant to apply them without thinking about
-> them for a bit.
+V5 patches are based on Mark Brown's for-next branch of
+"git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git"
 
-MMCI is doing "pm_runtime_get_sync" in it suspend. So the same
-principles as Kevin is describing for sdhci goes for MMCI. Sorry if
-this was not clearly pointed out.
+Changes since V4:
+	- Add a new patch for renaming the samsung i2s secondary fifo interface
+	  device name from "samsung-i2s.4" to "samsung-i2s-sec"
+	- Add platform_device_id table for the primary and secondary DAIs
+	- Avoid using of alias ids in the i2s driver by adding of_device_id
+	  table. Primary device can get registered via dt or non-dt but secondary
+	  device can get registered only at runtime because the secondary is not
+	  physically present on the board.
 
-Kind regards
-Ulf Hansson
+Changes since V3:
+        - Added syntex of gpio specifier as suggested by Mark Brown in
+          DT document file
+        - Added the requirement for having I2S alias ids
+        - Explained about gpio lines
+        - Made a seperate patch to get the I2S rclk src clk from alias ID
+
+Changes since V2:
+        - Rebased on 3.7-rc3
+        - Custom DT bindings are prefixed with samsung
+        - As generic device tree DMA helpers not yet mainlined
+          I am still using custom dma bindings. So added a
+          priliminary statement regarding the same. I will rework
+          on my patch once generic DMA helpers are mainlined.
+
+Chnages since V1:
+        - Rebased on 3.6-rc6
+
+Padmavathi Venna (2):
+  ASoC: Samsung: Rename samsung i2s secondary device name
+  ASoC: SAMSUNG: Add DT support for i2s
+
+ .../devicetree/bindings/sound/samsung-i2s.txt      |   75 ++++++
+ sound/soc/samsung/dma.c                            |    1 +
+ sound/soc/samsung/dma.h                            |    1 +
+ sound/soc/samsung/i2s.c                            |  262 ++++++++++++++++----
+ sound/soc/samsung/i2s.h                            |    7 -
+ sound/soc/samsung/smdk_wm8580.c                    |    7 +-
+ sound/soc/samsung/smdk_wm8994.c                    |    4 +-
+ 7 files changed, 300 insertions(+), 57 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/samsung-i2s.txt
+
+-- 
+1.7.4.4
