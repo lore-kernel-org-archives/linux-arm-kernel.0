@@ -1,59 +1,49 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 13 Dec 2012 10:20:27 +0800
-Subject: [PATCH] mxs: uart: allow setting RTS from software
-In-Reply-To: <1355329913-27666-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1355329913-27666-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <50C93B6B.7090206@freescale.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Wed, 12 Dec 2012 18:16:35 -0800
+Subject: [PATCH v4 0/7] enable support for AMBA drivers under x86
+In-Reply-To: <50C93718.2090706@zytor.com>
+References: <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
+ <50C93718.2090706@zytor.com>
+Message-ID: <50C93A83.8040106@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?12?13? 00:31, Steffen Trumtrar ??:
-> With the patch "serial: mxs-auart: fix the wrong RTS hardware flow control" the
-> mainline mxs-uart driver now sets RTSEN only when hardware flow control is
-> enabled via software. It is not possible any longer to set RTS manually via
-> software. However, the manual modification is a valid operation.
-> Regain the possibility to set RTS via software and only set RTSEN when hardware
-Is there any user case to set the RTS via software?
-I am confused at this.
-> flow control is explicitly enabled via settermios cflag CRTSCTS.
+On 12/12/2012 06:02 PM, H. Peter Anvin wrote:
+> Hmm... with this patchset on top of v3.7 I still get a bunch of warnings
+> and errors.
 >
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
->  drivers/tty/serial/mxs-auart.c |    8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
+> More details when the build completes (if it does.)  I might still push
+> out the branch to let Fengguang's test robot take it for a spin.
 >
-> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-> index 6db23b0..9b62c4b 100644
-> --- a/drivers/tty/serial/mxs-auart.c
-> +++ b/drivers/tty/serial/mxs-auart.c
-> @@ -412,10 +412,12 @@ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
->  
->  	u32 ctrl = readl(u->membase + AUART_CTRL2);
->  
-> -	ctrl &= ~AUART_CTRL2_RTSEN;
-> +	ctrl &= ~(AUART_CTRL2_RTSEN | AUART_CTRL2_RTS);
->  	if (mctrl & TIOCM_RTS) {
->  		if (tty_port_cts_enabled(&u->state->port))
->  			ctrl |= AUART_CTRL2_RTSEN;
-> +		else
-> +			ctrl |= AUART_CTRL2_RTS;
->  	}
->  
->  	s->ctrl = mctrl;
-> @@ -678,6 +680,10 @@ static void mxs_auart_settermios(struct uart_port *u,
->  		}
->  		ctrl2 |= AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN;
->  	} else {
-> +		u->flags |= ASYNC_CTS_FLOW;
-> +		ctrl2 |= AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN;
-> +	} else {
-> +		u->flags &= ~ASYNC_CTS_FLOW;
-bug.
 
-Your code adds TWO "else" here.
+Build failure:
 
-thanks
-Huang Shijie
->  		ctrl2 &= ~(AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN);
->  	}
->  
+o.i386-allconfig/make.log:make[4]: *** [drivers/gpio/gpio-pl061.o] Error 1
+o.i386-allconfig/make.log:make[3]: *** [drivers/gpio] Error 2
+
+Warnings:
+
+/home/hpa/kernel/tip.x86-amba/drivers/dma/amba-pl08x.c:848:3: warning: 
+format ?%x? expects argument of type ?unsigned int?, but argument 4 has 
+type ?dma_addr_t? [-Wformat]
+/home/hpa/kernel/tip.x86-amba/drivers/dma/amba-pl08x.c:848:3: warning: 
+format ?%x? expects argument of type ?unsigned int?, but argument 7 has 
+type ?dma_addr_t? [-Wformat]
+/home/hpa/kernel/tip.x86-amba/arch/x86/pci/sta2x11-fixup.c:186:2: 
+warning: initialization from incompatible pointer type [enabled by default]
+/home/hpa/kernel/tip.x86-amba/arch/x86/pci/sta2x11-fixup.c:186:2: 
+warning: (near initialization for ?sta2x11_dma_ops.free?) [enabled by 
+default]
+/home/hpa/kernel/tip.x86-amba/drivers/extcon/extcon-max77693.c:355:10: 
+warning: ?adclow? may be used uninitialized in this function 
+[-Wmaybe-uninitialized]
+/home/hpa/kernel/tip.x86-amba/drivers/extcon/extcon-max77693.c:355:10: 
+warning: ?adc1k? may be used uninitialized in this function 
+[-Wmaybe-uninitialized]
+/home/hpa/kernel/tip.x86-amba/drivers/extcon/extcon-max77693.c:355:10: 
+warning: ?adc? may be used uninitialized in this function 
+[-Wmaybe-uninitialized]
+
+-- 
+H. Peter Anvin, Intel Open Source Technology Center
+I work for Intel.  I don't speak on their behalf.
