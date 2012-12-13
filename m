@@ -1,98 +1,144 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 13 Dec 2012 16:49:26 +0000
-Subject: [RFCv2 0/2] Representing interrupt affinity in devicetree
-Message-ID: <1355417368-6861-1-git-send-email-mark.rutland@arm.com>
+From: dromede@gmail.com (dromede at gmail.com)
+Date: Thu, 13 Dec 2012 17:56:27 +0100
+Subject: [PATCH] [ARM] pxamci: Refactor regulator support
+Message-ID: <1355417787-8681-1-git-send-email-dromede@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[This is an updated version of my previous RFC, which can be found at
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/128205.html]
+From: Marko Katic <dromede.gmail.com>
 
-Current devicetree bindings for devices which use cpu-affine shared interrupts
-assume that interrupts are listed in ascending order of physical cpu id
-(MPIDR.Aff{2,1,0}). This is problematic for drivers because:
+Here's an interesting scenario. The spitz machine has an
+Intersil 6271A voltage regulator and an ADS7846 touchscreen
+controller.
 
-(1) The driver must convert each physical id to a logical id for the purpose of
-    managing interrupts.
+The ADS7846 driver _requires_ the use of a voltage regulator
+or if not present, CONFIG_REGULATOR_DUMMY should be used for proper operation.
+This was made mandatory by the following commit:
 
-(2) In multi-cluster systems the physical ids are not necessarily contiguous,
-    and drivers cannot simply iterate over ids from 0 to NR_CPUS.
+========================================
+91143379b01b2020d8878d627ebe9dfb9d6eb4c8
+Input: ads7846 - add regulator support
 
-(3) It is not possible to specify sets of interrupts which are wired to a
-    subset of cpus (i.e. clusters) not starting at physical id 0, as we can't
-    specify which cpu to start from, and can't skip cpus. This makes it
-    impossible to represent some devices (e.g. cpu PMUs) which may not exist
-    in the first cluster.
+The ADS7846/TSC2046 touchscreen controllers can (and usually are)
+connected to various regulators for power, so add regulator support.
 
-(4) Some devices may either be wired with PPIs or SPIs. It is not possible to
-    differentiate the two cases in general from the interrupts list (e.g. when
-    a device has multiple PPIs wired to all cpus).
+Valid regulator will now be required, so boards without complete
+regulator setup should either disable regulator framework or enable
+CONFIG_REGULATOR_DUMMY.
+========================================
 
-To represent the general case, we require a mechanism to describe the cpu
-affinity of a device, and a consistent way to map each interrupt to a cpu (or
-set of cpus). So far, the only workable mechanism I've been able to come up
-with is the following:
+The ADS7846 in spitz machines is not connected to
+any power regulator so it needs CONFIG_REGULATOR_DUMMY enabled.
+So to support both the Intersil 6271A regulator and
+the ADS7846 controller, CONFIG_REGULATOR and CONFIG_REGULATOR_DUMMY have
+to be defined.
 
-In addition to the interrupts list we add an optional 'interrupts-affinity'
-list which describes how to map an interrupt to cpu(s). Each interrupt would
-have a corresponding element in the interrupts-affinity list.
+However, enabling CONFIG_REGULATOR and CONFIG_REGULATOR_DUMMY
+will break pxamci driver and cause the following error output:
 
-Each element consists of a pair of cells specifying how to test if a cpu is
-affine. This test specification consists of a most significant affinity level
-to match, and values for the MPIDR affinity bits down to this level. Each pair
-of cells has the form:
+pxa2xx-mci.0 supply vmmc not found, using dummy regulator
+pxa2xx-mci pxa2xx-mci.0: ocr_mask/setpower will not be used
+pxa2xx-mci pxa2xx-mci.0: could not set regulator OCR (-22)
+pxa2xx-mci pxa2xx-mci.0: unable to set power
+pxa2xx-mci pxa2xx-mci.0: could not set regulator OCR (-22)
+pxa2xx-mci pxa2xx-mci.0: unable to set power
 
-    < N 0x00AABBCC >
-       \   \ \ \ \__ MPIDR.Aff0
-        \   \ \ \___ MPIDR.Aff1
-         \   \ \____ MPIDR.Aff2
-          \   \_____ [must be zero]
-           \________ level-specifier
+Above failures occur in two functions;
+pxamci_init_ocr() and pxamci_set_power().
 
-The level-specifier is in the range [0-3]. When the value is 3, MPIDR affinity
-levels 2,1,0 are ignored, and thus all cpus are matched. When the value is 0,
-levels 2,1,0 must all be matched for a cpu to be considered affine. Affinity
-bits which are not to be matched should be set to zero.
+Regulator support in pxamci_init_ocr() is not
+written with the existence of the dummy regulator driver in
+mind. It does not check the return value of mmc_regulator_get_ocrmask()
+and it will only fall back to platform data if no regulator was found.
 
-In practice, use of the binding would look something like:
+pxamci_set_power() fails because it does not even try to fall back
+to platform data if mmc_regulator_set_ocr() fails. It
+expects a proper regulator or no regulator at all. It will
+only fall back to platform data if no regulator was found. It does
+not properly handle the possible existence of the dummy regulator.
 
-> device at 0 {
-> 	compatible = "example,example-affine-device";
-> 	interrupts = <0 130 4>,
-> 	             <0 131 4>,
-> 	             <1 12 4>;
-> 	interrupts-affinity = <0 0x00000000>,
->	                      <0 0x00000001>,
-> 	                      <1 0x00000100>;
-> };
+This patch refactors pxamci_init_ocr() and  pxamci_set_power() regulator
+support to be more modular, to do more checks and to always fall back
+to platform data.
 
-To request/free interrupts, drivers would walk over all interrupts, and request
-the affine cpu(s), which can be automatically mapped to logical ids by common
-code. This fixes issues 1, 2, and 3. 4 is partially solved, in that we know
-whether an interrupt is targeted at a single cpu or multiple cpus (i.e.
-whether it's an SPI or a PPI), but we can't differentiate multiple interrupts
-targeted at the same cpu. We could solve this with an additional
-"interrupt-names" property, or something of that sort.
+Signed-off-by: Marko Katic <dromede@gmail.com>
+---
+ drivers/mmc/host/pxamci.c |   37 ++++++++++++++++++++++++-------------
+ 1 file changed, 24 insertions(+), 13 deletions(-)
 
-The following patches implement common code that could be used by drivers to
-deal with this affinity information, allowing drivers to extract a (logical)
-cpumask specifying the affinity of each interrupt, and additional information
-specifying whether an interrupt targets multiple cpus.
-
-The patches are based on rmk's for-next branch.
-
-Any thoughts?
-
-Thanks,
-Mark.
-
-Mark Rutland (2):
-  of: add of_property_read_u32_index
-  ARM: add functions to parse irq affinity from dt
-
- arch/arm/include/asm/dt_irq.h |    9 ++++
- arch/arm/kernel/devtree.c     |   91 +++++++++++++++++++++++++++++++++++++++++
- drivers/of/base.c             |   36 ++++++++++++++++
- include/linux/of.h            |   11 +++++
- 4 files changed, 147 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/dt_irq.h
+diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
+index 2b2f65a..6ec1566 100644
+--- a/drivers/mmc/host/pxamci.c
++++ b/drivers/mmc/host/pxamci.c
+@@ -83,18 +83,24 @@ struct pxamci_host {
+ static inline void pxamci_init_ocr(struct pxamci_host *host)
+ {
+ #ifdef CONFIG_REGULATOR
++	int ocr_mask;
+ 	host->vcc = regulator_get(mmc_dev(host->mmc), "vmmc");
+ 
+ 	if (IS_ERR(host->vcc))
+ 		host->vcc = NULL;
+ 	else {
+-		host->mmc->ocr_avail = mmc_regulator_get_ocrmask(host->vcc);
+-		if (host->pdata && host->pdata->ocr_mask)
++		ocr_mask = mmc_regulator_get_ocrmask(host->vcc);
++		if (ocr_mask <= 0)
++			host->mmc->ocr_avail = 0;
++		else
++			host->mmc->ocr_avail = ocr_mask;
++
++		if (host->pdata && host->pdata->ocr_mask && host->mmc->ocr_avail)
+ 			dev_warn(mmc_dev(host->mmc),
+ 				"ocr_mask/setpower will not be used\n");
+ 	}
+ #endif
+-	if (host->vcc == NULL) {
++	if (host->vcc == NULL || host->mmc->ocr_avail == 0) {
+ 		/* fall-back to platform data */
+ 		host->mmc->ocr_avail = host->pdata ?
+ 			host->pdata->ocr_mask :
+@@ -108,26 +114,31 @@ static inline int pxamci_set_power(struct pxamci_host *host,
+ {
+ 	int on;
+ 
++#ifdef CONFIG_REGULATOR
+ 	if (host->vcc) {
+-		int ret;
++		int ret = 0;
+ 
+-		if (power_mode == MMC_POWER_UP) {
++		if (power_mode == MMC_POWER_UP)
+ 			ret = mmc_regulator_set_ocr(host->mmc, host->vcc, vdd);
+-			if (ret)
+-				return ret;
+-		} else if (power_mode == MMC_POWER_OFF) {
++
++		if (power_mode == MMC_POWER_OFF)
+ 			ret = mmc_regulator_set_ocr(host->mmc, host->vcc, 0);
+-			if (ret)
+-				return ret;
+-		}
++
++		if (ret == 0)
++			return 0;
++		else
++			dev_warn(mmc_dev(host->mmc),
++			 "mmc_regulator_set_ocr failed, falling back to platform data\n");
+ 	}
+-	if (!host->vcc && host->pdata &&
++#endif
++
++	if (host->pdata &&
+ 	    gpio_is_valid(host->pdata->gpio_power)) {
+ 		on = ((1 << vdd) & host->pdata->ocr_mask);
+ 		gpio_set_value(host->pdata->gpio_power,
+ 			       !!on ^ host->pdata->gpio_power_invert);
+ 	}
+-	if (!host->vcc && host->pdata && host->pdata->setpower)
++	if (host->pdata && host->pdata->setpower)
+ 		host->pdata->setpower(mmc_dev(host->mmc), vdd);
+ 
+ 	return 0;
+-- 
+1.7.10.4
