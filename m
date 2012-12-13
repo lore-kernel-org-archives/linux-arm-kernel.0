@@ -1,71 +1,30 @@
-From: dromede@gmail.com (dromede at gmail.com)
-Date: Thu, 13 Dec 2012 19:49:15 +0100
-Subject: [PATCH] [ARM] scoop.c: Use devm_xxx functions in scoop_probe()
-Message-ID: <1355424555-13504-1-git-send-email-dromede@gmail.com>
+From: behanw@websterwood.com (Behan Webster)
+Date: Thu, 13 Dec 2012 14:07:57 -0500
+Subject: vexpress compilation error in next-20121127
+In-Reply-To: <50B56601.5010305@broadcom.com>
+References: <50B56601.5010305@broadcom.com>
+Message-ID: <50CA278D.4030409@websterwood.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marko Katic <dromede.gmail.com>
+On 11/27/12 20:16, Markus Mayer wrote:
+> Hi Pawel,
+>
+> There seems to be an issue compiling vexpress at this point. The 
+> problem being that vexpress' makefile references reset.o, but there's 
+> no reset.c in arch/arm/mach-vexpress.
+>
+> [...]
+>   CC      arch/arm/mach-bcm/board_bcm.o
+>   LD      arch/arm/mach-bcm/built-in.o
+>   CC      arch/arm/mach-vexpress/v2m.o
+> make[1]: *** No rule to make target `arch/arm/mach-vexpress/reset.o', 
+> needed by `arch/arm/mach-vexpress/built-in.o'.  Stop.
+> make: *** [arch/arm/mach-vexpress] Error 2
+Same issue in mainline now too: arch/arm/mach-vexpress/reset.c is missing.
 
-Use devm_kzalloc and devm_ioremap and reduce the
-amount of error  handling and deallocation code.
+Behan
 
-Signed-off-by: Marko Katic <dromede@gmail.com>
----
- arch/arm/common/scoop.c |   18 ++++++------------
- 1 file changed, 6 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/common/scoop.c b/arch/arm/common/scoop.c
-index 0c616d5..1901b4e 100644
---- a/arch/arm/common/scoop.c
-+++ b/arch/arm/common/scoop.c
-@@ -187,19 +187,18 @@ static int __devinit scoop_probe(struct platform_device *pdev)
- 	if (!mem)
- 		return -EINVAL;
- 
--	devptr = kzalloc(sizeof(struct scoop_dev), GFP_KERNEL);
-+	devptr = devm_kzalloc(&pdev->dev, sizeof(struct scoop_dev), GFP_KERNEL);
-+
- 	if (!devptr)
- 		return -ENOMEM;
- 
- 	spin_lock_init(&devptr->scoop_lock);
- 
- 	inf = pdev->dev.platform_data;
--	devptr->base = ioremap(mem->start, resource_size(mem));
-+	devptr->base = devm_ioremap(&pdev->dev, mem->start, resource_size(mem));
- 
--	if (!devptr->base) {
--		ret = -ENOMEM;
--		goto err_ioremap;
--	}
-+	if (!devptr->base)
-+		return -ENOMEM;
- 
- 	platform_set_drvdata(pdev, devptr);
- 
-@@ -234,12 +233,9 @@ static int __devinit scoop_probe(struct platform_device *pdev)
- 
- 	if (devptr->gpio.base != -1)
- 		temp = gpiochip_remove(&devptr->gpio);
-+
- err_gpio:
- 	platform_set_drvdata(pdev, NULL);
--err_ioremap:
--	iounmap(devptr->base);
--	kfree(devptr);
--
- 	return ret;
- }
- 
-@@ -260,8 +256,6 @@ static int __devexit scoop_remove(struct platform_device *pdev)
- 	}
- 
- 	platform_set_drvdata(pdev, NULL);
--	iounmap(sdev->base);
--	kfree(sdev);
- 
- 	return 0;
- }
 -- 
-1.7.10.4
+Behan Webster
+behanw at websterwood.com
