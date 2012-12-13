@@ -1,42 +1,43 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Dec 2012 20:09:28 +0100
+Date: Thu, 13 Dec 2012 20:12:06 +0100
 Subject: [RFC v1 08/16] arm: mvebu: the core PCIe driver
-In-Reply-To: <20121213174032.GB14619@obsidianresearch.com>
+In-Reply-To: <20121213175442.GC14619@obsidianresearch.com>
 References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121212165833.6a35a6ec@skate>
- <20121212215138.GC11530@obsidianresearch.com>
- <201212131458.55020.arnd@arndb.de>
- <20121213174032.GB14619@obsidianresearch.com>
-Message-ID: <20121213200928.2f70c125@skate>
+ <201212111056.58970.arnd@arndb.de> <20121212165833.6a35a6ec@skate>
+ <201212131219.39764.arnd@arndb.de>
+ <20121213175442.GC14619@obsidianresearch.com>
+Message-ID: <20121213201206.69452b8f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Jason Gunthorpe,
 
-On Thu, 13 Dec 2012 10:40:32 -0700, Jason Gunthorpe wrote:
-
-> > If the IntA to IntD lines are all on the same host interrupt, you
-> > might only need one line above and make the map-mask all zeroes.
+On Thu, 13 Dec 2012 10:54:42 -0700, Jason Gunthorpe wrote:
+> On Thu, Dec 13, 2012 at 12:19:39PM +0000, Arnd Bergmann wrote:
+>  
+> > Do those ten ports have a shared I/O space window, or does each one
+> > have its own 64K? 
 > 
-> Well, no that is where the existing stuff goes wrong..
-> 
-> Each of the four INTx's on each port need a dedicated linux interrupt
-> vector. Sharing interrupts is bad. The chip has dedicated cause and
-> mask bits so there is no reason to share.
-> 
-> To do this the pex driver has to allocate 4 irq descs per port, setup
-> a generic irq chip for the driver, use irq_set_chained_handler on the
-> summary interrupt in the main cause register and then decode the INTx
-> bits in the chained handler function. This is very straightforward and
-> very much worth doing.
+> The smallest mbus routing window size is 64k, and you need to use a
+> mbus routing window per PEX to decode into IO.
 
-Yes, this is definitely part of my plans. For now, I kept the existing
-PCIe implementation of Kirkwood and al with regard to IRQs, but when I
-read more about INT{A,B,C,D} and the cause register that is available,
-I immediately noted in my TODO-list: use a generic irq chip to
-demultiplex those IRQ events.
+Correct.
 
-Best regards,
+> Thomas: Note this complicates my earlier suggestion of just using
+> config transactions because this is horribly non-conformant, PCIe
+> requires a much finer granularity for the root port bridge, it would
+> need some kind of specialness to make the standard Linux resource
+> allocator work properly.... :|
+
+Hum, not sure to follow you here. What sort of finer granularity does
+PCIe requires?
+
+> By far the easiest thing is to keep them as separate PCI busses and
+> require DT to manage each one individually, address ranges and
+> all. :(
+
+Does that mean that your earlier suggestion of emulating a PCI-to-PCI
+bridge in software is no longer your preferred suggestion?
 
 Thomas
 -- 
