@@ -1,35 +1,33 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Thu, 13 Dec 2012 14:03:36 +0100
-Subject: [PATCH 1/1] net: cpts: fix for build break after ARM SoC
- integration
-In-Reply-To: <50C9B6F9.9020300@iki.fi>
-References: <1354012034-31686-1-git-send-email-mugunthanvnm@ti.com>
- <50C9B6F9.9020300@iki.fi>
-Message-ID: <20121213130335.GA10703@netboy.at.omicron.at>
+From: steve.capper@arm.com (Steve Capper)
+Date: Thu, 13 Dec 2012 13:13:25 +0000
+Subject: [RFC PATCH 1/3] ARM: mm: Add discontiguous memory support.
+In-Reply-To: <20121212180121.GB14363@n2100.arm.linux.org.uk>
+References: <1355334049-10247-1-git-send-email-steve.capper@arm.com>
+ <1355334049-10247-2-git-send-email-steve.capper@arm.com>
+ <20121212180121.GB14363@n2100.arm.linux.org.uk>
+Message-ID: <20121213131324.GA2154@e103986-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 13, 2012 at 01:07:37PM +0200, Tomi Valkeinen wrote:
-> Hi,
-> 
-> On 2012-11-27 12:27, Mugunthan V N wrote:
-> >   CC      drivers/net/ethernet/ti/cpts.o
-> > drivers/net/ethernet/ti/cpts.c:30:24: fatal error: plat/clock.h: No such file or directory
-> > compilation terminated.
-> > make[4]: *** [drivers/net/ethernet/ti/cpts.o] Error 1
-> > make[3]: *** [drivers/net/ethernet/ti] Error 2
-> > make[2]: *** [drivers/net/ethernet] Error 2
-> > make[1]: *** [drivers/net] Error 2
+On Wed, Dec 12, 2012 at 06:01:21PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 12, 2012 at 05:40:47PM +0000, Steve Capper wrote:
+> > This patch adds support for discontiguous memory, with a view to
+> > each discontiguous block being assigned to a NUMA node (in a future
+> > patch).
 > > 
-> > fix for build break as the header file is removed from plat-omap as part of
-> > the below patch
+> > Discontiguous memory should only be used to back NUMA on systems
+> > where sparse memory is not available.
 > 
-> linux-next still has this build problem, I guess this patch is lingering
-> somewhere. Somewhat annoying, as the driver is enabled by default. (btw,
-> why is it "default y"?)
+> Err, we had this, and then we ripped it all out.  Do we have any NUMA ARM
+> systems?  I don't think we do.
 
-Um, in Linus' master, net, and net-next, neither TI_CPSW nor TI_CPTS
-are default y, so I don't know where you are coming from on that.
+Hi Russell,
+There aren't any ARM NUMA systems out at the moment, but the Linux NUMA
+subsystem can be used to group cores that share an L2 cache together into the
+same node. This can then potentially reduce the L3 traffic required to run
+certain tasks, as the scheduler has a notion of memory topology that matches
+the cache topology. (An example platform where this can be beneficial is the TC2).
 
-Sorry,
-Richard
+Best,
+-- 
+Steve
