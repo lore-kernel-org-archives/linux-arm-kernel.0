@@ -1,165 +1,204 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 13 Dec 2012 16:09:48 +0100
-Subject: [PATCH 7/8] ARM: ux500: Use the GPIO regulator framework for
- SDI0's 'en' and 'vsel'
-In-Reply-To: <1355404930-5691-8-git-send-email-lee.jones@linaro.org>
-References: <1355404930-5691-1-git-send-email-lee.jones@linaro.org>
- <1355404930-5691-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAPDyKFo2VbEfFXe_HYTk9KyzbDgTa3Aj_kTC-2tYUJ4TMMxaJw@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 13 Dec 2012 16:27:33 +0100
+Subject: [PATCH] pinctrl/nomadik: Add Device Tree support
+In-Reply-To: <1355405825-19400-1-git-send-email-linus.walleij@stericsson.com>
+References: <1355405825-19400-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20121213152733.GE23971@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 December 2012 14:22, Lee Jones <lee.jones@linaro.org> wrote:
-> To prevent lots of unnecessary call-backs into platform code, we're
-> now using the GPIO regulator framework to control the 'enable' (en)
-> and 'voltage select' (vsel) GPIO pins which in turn control the
-> MMCI's secondary regulator settings. This already works with Device
-> Tree, but when booting with ATAGs we need to register it as a
-> platform device.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On 14:37 Thu 13 Dec     , Linus Walleij wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
+> 
+> This implements pin multiplexing and pin configuration for the
+> Nomadik pin controller using the device tree.
+> 
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  arch/arm/mach-ux500/board-mop500-regulators.c |   14 ++++++++
->  arch/arm/mach-ux500/board-mop500-regulators.h |    1 +
->  arch/arm/mach-ux500/board-mop500.c            |   44 +++++++++++++++++++++++++
->  3 files changed, 59 insertions(+)
->
-> diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
-> index 2a17bc5..cb75405 100644
-> --- a/arch/arm/mach-ux500/board-mop500-regulators.c
-> +++ b/arch/arm/mach-ux500/board-mop500-regulators.c
-> @@ -28,6 +28,20 @@ struct regulator_init_data gpio_en_3v3_regulator = {
->         .consumer_supplies = gpio_en_3v3_consumers,
->  };
->
-> +static struct regulator_consumer_supply sdi0_reg_consumers[] = {
-> +        REGULATOR_SUPPLY("vqmmc", "sdi0"),
-> +};
+>  .../devicetree/bindings/pinctrl/ste,nomadik.txt    | 111 +++++++++
+>  drivers/pinctrl/pinctrl-nomadik.c                  | 250 +++++++++++++++++++++
+>  2 files changed, 361 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
+> new file mode 100644
+> index 0000000..02ff731
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
+> @@ -0,0 +1,111 @@
+> +ST Ericsson Nomadik pinmux controller
 > +
-> +struct regulator_init_data sdi0_reg_init_data = {
-> +        .constraints = {
-> +                .min_uV         = 1800000,
-> +                .max_uV         = 2900000,
-> +                .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE|REGULATOR_CHANGE_STATUS,
-> +        },
-> +        .num_consumer_supplies  = ARRAY_SIZE(sdi0_reg_consumers),
-> +        .consumer_supplies      = sdi0_reg_consumers,
-> +};
+> +Required properties:
+> +- compatible: "stericsson,nmk_pinctrl"
+> +- reg: Should contain the register physical address and length of the PRCMU.
 > +
->  /*
->   * TPS61052 regulator
->   */
-> diff --git a/arch/arm/mach-ux500/board-mop500-regulators.h b/arch/arm/mach-ux500/board-mop500-regulators.h
-> index 78a0642..0c79d90 100644
-> --- a/arch/arm/mach-ux500/board-mop500-regulators.h
-> +++ b/arch/arm/mach-ux500/board-mop500-regulators.h
-> @@ -19,5 +19,6 @@ ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS];
->  extern struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS];
->  extern struct regulator_init_data tps61052_regulator;
->  extern struct regulator_init_data gpio_en_3v3_regulator;
-> +extern struct regulator_init_data sdi0_reg_init_data;
->
->  #endif
-> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-> index daa4237..e934176 100644
-> --- a/arch/arm/mach-ux500/board-mop500.c
-> +++ b/arch/arm/mach-ux500/board-mop500.c
-> @@ -24,6 +24,8 @@
->  #include <linux/mfd/abx500/ab8500.h>
->  #include <linux/regulator/ab8500.h>
->  #include <linux/regulator/fixed.h>
-> +#include <linux/regulator/driver.h>
-> +#include <linux/regulator/gpio-regulator.h>
->  #include <linux/mfd/tc3589x.h>
->  #include <linux/mfd/tps6105x.h>
->  #include <linux/mfd/abx500/ab8500-gpio.h>
-> @@ -91,6 +93,37 @@ static struct platform_device snowball_gpio_en_3v3_regulator_dev = {
->         },
->  };
->
-> +/* Dynamically populated. */
-> +static struct gpio sdi0_reg_gpios[] = {
-> +        { 0, GPIOF_OUT_INIT_LOW, "mmci_vsel" },
-> +};
+> +Please refer to pinctrl-bindings.txt in this directory for details of the
+> +common pinctrl bindings used by client devices, including the meaning of the
+> +phrase "pin configuration node".
 > +
-> +static struct gpio_regulator_state sdi0_reg_states[] = {
-> +        { .value = 2900000, .gpios = (0 << 0) },
-> +        { .value = 1800000, .gpios = (1 << 0) },
-> +};
+> +ST Ericsson's pin configuration nodes act as a container for an abitrary number of
+> +subnodes. Each of these subnodes represents some desired configuration for a
+> +pin, a group, or a list of pins or groups. This configuration can include the
+> +mux function to select on those pin(s)/group(s), and various pin configuration
+> +parameters, such as inputn output, pull up, pull down...
 > +
-> +static struct gpio_regulator_config sdi0_reg_info = {
-> +       .supply_name           = "ext-mmc-level-shifter",
-> +       .gpios                 = sdi0_reg_gpios,
-> +       .nr_gpios              = ARRAY_SIZE(sdi0_reg_gpios),
-> +       .states                = sdi0_reg_states,
-> +       .nr_states             = ARRAY_SIZE(sdi0_reg_states),
-> +       .type                  = REGULATOR_VOLTAGE,
-> +       .enable_high           = 1,
-> +       .enabled_at_boot       = 0,
-> +       .init_data             = &sdi0_reg_init_data,
-> +       .startup_delay         = 100,
-> +};
+> +The name of each subnode is not important; all subnodes should be enumerated
+> +and processed purely based on their content.
 > +
-> +static struct platform_device sdi0_regulator = {
-> +        .name = "gpio-regulator",
-> +        .id   = -1,
-> +        .dev  = {
-> +                .platform_data = &sdi0_reg_info,
-> +        },
-> +};
+> +Required subnode-properties:
+> +- ste,pins : An array of strings. Each string contains the name of a pin or
+> +    group.
 > +
->  static struct ab8500_gpio_platform_data ab8500_gpio_pdata = {
->         .gpio_base              = MOP500_AB8500_PIN_GPIO(1),
->         .irq_base               = MOP500_AB8500_VIR_GPIO_IRQ_BASE,
-> @@ -440,6 +473,7 @@ static struct hash_platform_data u8500_hash1_platform_data = {
->  /* add any platform devices here - TODO */
->  static struct platform_device *mop500_platform_devs[] __initdata = {
->         &mop500_gpio_keys_device,
-> +       &sdi0_regulator,
->  };
->
->  #ifdef CONFIG_STE_DMA40
-> @@ -581,6 +615,7 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
->         &snowball_key_dev,
->         &snowball_sbnet_dev,
->         &snowball_gpio_en_3v3_regulator_dev,
-> +       &sdi0_regulator,
->  };
->
->  static void __init mop500_init_machine(void)
-> @@ -591,6 +626,9 @@ static void __init mop500_init_machine(void)
->
->         mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
->
-> +       sdi0_reg_info.enable_gpio = GPIO_SDMMC_EN;
-> +       sdi0_reg_info.gpios[0].gpio = GPIO_SDMMC_1V8_3V_SEL;
+> +Optional subnode-properties:
+> +- ste,function: A string containing the name of the function to mux to the
+> +  pin or group.
 > +
->         mop500_pinmaps_init();
->         parent = u8500_init_devices(&ab8500_platdata);
->
-> @@ -623,6 +661,9 @@ static void __init snowball_init_machine(void)
->         struct device *parent = NULL;
->         int i;
->
-> +       sdi0_reg_info.enable_gpio = SNOWBALL_SDMMC_EN_GPIO;
-> +       sdi0_reg_info.gpios[0].gpio = SNOWBALL_SDMMC_1V8_3V_GPIO;
+> +- ste,input:			no parameter, set pin in input with no pull mode.
+> +- ste,input_pull_up:		no parameter, set pin in input with pull up mode.
+> +- ste,input_pull_down:		no parameter, set pin in input with pull down mode.
 > +
->         snowball_pinmaps_init();
->         parent = u8500_init_devices(&ab8500_platdata);
->
-> @@ -655,6 +696,9 @@ static void __init hrefv60_init_machine(void)
->          */
->         mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
->
-> +       sdi0_reg_info.enable_gpio = HREFV60_SDMMC_EN_GPIO;
-> +       sdi0_reg_info.gpios[0].gpio = HREFV60_SDMMC_1V8_3V_GPIO;
+> +- ste,output:			integer, 0: output low, 1: output high, 2: output (value is not specified).
+> +- ste,sleep_mode:		integer, 0: sleep mode disable, 1: sleep mode enable.
 > +
->         hrefv60_pinmaps_init();
->         parent = u8500_init_devices(&ab8500_platdata);
->
-> --
-> 1.7.9.5
->
+> +- ste,sleep_input:		no parameter, set pin in sleep input with no pull mode.
+> +- ste,sleep_input_pull_up:	no parameter, set pin in sleep input with pull up mode.
+> +- ste,sleep_input_pull_down:	no parameter, set pin in sleep input with pull down mode.
+> +
+> +- ste,sleep_output:		integer, 0: sleep output low, 1: sleep output high, 2: sleep output (value is not specified).
+> +
+> +- ste,sleep_wakeup:		interger, 0: disable sleep wakeup mode, 1: enable sleep wake up mode.
+> +- ste,sleep_gpio:		interger, 0: disable sleep gpio mode, 1: enable sleep gpio mode.
+> +
+> +- ste,sleep_pdis_mode:		integer, 0: pdis disabled, 1: pdis enable.
+> +
+> +
+> +Valid values for pin and group name are in Drivers/pinctrl/pinctrl-nomadik-db8500.c
+> +
+> +Example board file extract:
+> +
+> +	pinctrl {
+> +		compatible = "stericsson,nmk_pinctrl";
+> +		reg = <0x80157000 0x2000>;
+> +
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&uart0_default_mode>;
+???
+
+those 2 are wired
 
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+> +
+> +		uart0 {
+> +			uart0_default_mux: uart0_mux {
+> +				u0_default_mux {
+> +					ste,function = "u0";
+> +					ste,pins = "u0_a_1";
+> +					};
+> +			};
+> +			uart0_default_mode: uart0_default {
+> +				uart0_default_cfg1 {
+> +					ste,pins = "GPIO0", "GPIO2";
+> +					ste,input_pull_up;
+> +				};
+> +
+> +				uart0_default_cfg2 {
+> +					ste,pins = "GPIO1", "GPIO3";
+> +					ste,output = <1>;
+> +				};
+> +			};
+> +			uart0_sleep_mode: uart0_sleep {
+> +				uart0_sleep_cfg1 {
+> +					ste,pins = "GPIO0", "GPIO2";
+> +					ste,sleep_mode = <0>;
+> +					ste,sleep_input;
+> +					ste,sleep_wakeup_mode = <1>;
+> +					ste,sleep_pdis_mode = <0>;
+> +				};
+> +				uart0_sleep_cfg2 {
+> +					ste,pins = "GPIO1";
+> +					ste,sleep_mode = <0>;
+> +					ste,sleep_output = <1>;
+> +					ste,sleep_wakeup_mode = <1>;
+> +					ste,sleep_pdis_mode = <0>;
+> +				};
+> +				uart0_sleep_cfg3 {
+> +					ste,pins = "GPIO3";
+> +					ste,sleep_mode = <0>;
+> +					ste,sleep_output = <2>;
+> +					ste,sleep_wakeup_mode = <1>;
+> +					ste,sleep_pdis_mode = <0>;
+> +				};
+
+with such bindings you will endup with 1000s of node
+
+take a loook on at91 how we did to avoid this
+> +			};
+> +		};
+> +	};
+> +
+> +	uart at 80120000 {
+> +		compatible = "arm,pl011", "arm,primecell";
+> +		reg = <0x80120000 0x1000>;
+> +		interrupts = <0 11 0x4>;
+> +
+> +		pinctrl-names = "default","sleep";
+> +		pinctrl-0 = <&uart0_default_mux>, <&uart0_default_mode>;
+> +		pinctrl-1 = <&uart0_sleep_mode>;
+> +	};
+> +
+> diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+> index 1068faa..90b25ee 100644
+> --- a/drivers/pinctrl/pinctrl-nomadik.c
+> +++ b/drivers/pinctrl/pinctrl-nomadik.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/irqdomain.h>
+>  #include <linux/slab.h>
+>  #include <linux/of_device.h>
+> +#include <linux/pinctrl/machine.h>
+>  #include <linux/pinctrl/pinctrl.h>
+>  #include <linux/pinctrl/pinmux.h>
+>  #include <linux/pinctrl/pinconf.h>
+> @@ -1503,11 +1504,260 @@ static void nmk_pin_dbg_show(struct pinctrl_dev *pctldev, struct seq_file *s,
+>  	nmk_gpio_dbg_show_one(s, pctldev, chip, offset - chip->base, offset);
+>  }
+>  
+> +static void nmk_pinctrl_dt_free_map(struct pinctrl_dev *pctldev,
+> +		struct pinctrl_map *map, unsigned num_maps)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < num_maps; i++)
+> +		if (map[i].type == PIN_MAP_TYPE_CONFIGS_PIN)
+> +			kfree(map[i].data.configs.configs);
+> +	kfree(map);
+> +}
+> +
+> +static int nmk_dt_reserve_map(struct pinctrl_map **map, unsigned *reserved_maps,
+> +		unsigned *num_maps, unsigned reserve)
+> +{
+> +	unsigned old_num = *reserved_maps;
+> +	unsigned new_num = *num_maps + reserve;
+> +	struct pinctrl_map *new_map;
+> +
+> +	if (old_num >= new_num)
+> +		return 0;
+> +
+> +	new_map = krealloc(*map, sizeof(*new_map) * new_num, GFP_KERNEL);
+> +	if (!new_map)
+> +		return -ENOMEM;
+devm_
+> +
+> +	memset(new_map + old_num, 0, (new_num - old_num) * sizeof(*new_map));
+> +
+> +	*map = new_map;
+> +	*reserved_maps = new_num;
+> +
+> +	return 0;
+> +}
+> +
+
+Best Regards,
+J.
