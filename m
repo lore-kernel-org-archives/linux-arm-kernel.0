@@ -1,75 +1,71 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 13 Dec 2012 01:04:15 -0700
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <20121213070332.GA9946@avionic-0098.adnet.avionic-design.de>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121207233317.GB4304@obsidianresearch.com>
- <50C62161.9080708@wwwdotorg.org>
- <20121211075207.GA29977@avionic-0098.adnet.avionic-design.de>
- <50C7A3C5.7050100@wwwdotorg.org>
- <20121212203433.GA7898@avionic-0098.adnet.avionic-design.de>
- <50C9056D.2050309@wwwdotorg.org>
- <20121213070332.GA9946@avionic-0098.adnet.avionic-design.de>
-Message-ID: <20121213080415.GA21178@obsidianresearch.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 13 Dec 2012 09:09:33 +0100 (CET)
+Subject: [RFC PATCH v2 3/5] ARM: kernel: update cpu_suspend code to use
+ cache LoUIS operations
+In-Reply-To: <20121212133650.GJ6195@mudshark.cambridge.arm.com>
+References: <1347986135-17979-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1347986135-17979-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <20120919134658.GA2111@linaro.org>
+ <20120920102514.GD4588@e102568-lin.cambridge.arm.com>
+ <20120920110439.GB2117@linaro.org>
+ <Pine.LNX.4.64.1212111655050.29758@axis700.grange>
+ <20121211163313.GG16759@mudshark.cambridge.arm.com>
+ <20121211163843.GH16759@mudshark.cambridge.arm.com>
+ <50C7C16B.7050106@codeaurora.org>
+ <20121212103338.GB23022@e102568-lin.cambridge.arm.com>
+ <20121212133650.GJ6195@mudshark.cambridge.arm.com>
+Message-ID: <Pine.LNX.4.64.1212130909190.18586@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 13, 2012 at 08:03:32AM +0100, Thierry Reding wrote:
+On Wed, 12 Dec 2012, Will Deacon wrote:
 
-> I don't think that's the way it works. The PCIe controller is what the
-> PCIe specification refers to as root complex. The root complex can have
-> one or more root ports. 
+> On Wed, Dec 12, 2012 at 10:33:38AM +0000, Lorenzo Pieralisi wrote:
+> > On Tue, Dec 11, 2012 at 11:27:39PM +0000, Stephen Boyd wrote:
+> > > On 12/11/12 08:38, Will Deacon wrote:
+> > > > diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> > > > index cd95664..f58248f 100644
+> > > > --- a/arch/arm/mm/cache-v7.S
+> > > > +++ b/arch/arm/mm/cache-v7.S
+> > > > @@ -44,7 +44,8 @@ ENDPROC(v7_flush_icache_all)
+> > > >  ENTRY(v7_flush_dcache_louis)
+> > > >         dmb                                     @ ensure ordering with previous memory accesses
+> > > >         mrc     p15, 1, r0, c0, c0, 1           @ read clidr, r0 = clidr
+> > > > -       ands    r3, r0, #0xe00000               @ extract LoUIS from clidr
+> > > > +       ALT_SMP(ands    r3, r0, #(7 << 21))     @ extract LoUIS from clidr
+> > > > +       ALT_UP(ands     r3, r0, #(7 << 27))     @ extract LoUU from clidr
+> > > >         mov     r3, r3, lsr #20                 @ r3 = LoUIS * 2
+> > > 
+> > > You need to fix this mov as well, right?
+> > 
+> > And after doing that I think the suspend finisher will still have
+> > to call flush_cache_all() since LoUU == 1 on A8, L2 is not cleaned
+> > and that's probably what we want if it can be retained.
+> 
+> At some point we probably want to describe the level of flushing required in
+> the device tree as a property of the CPU node (or something similar). That
+> would allow us to have *one* function for flushing,
+> e.g. cpu_suspend_flush_cache which flushes to the appropriate level. Then
+> we could remove the louis flush from the CPU suspend code and instead make
+> it the finisher's responsibility to call our flushing function when it's
+> done, which helps to avoid over/under-flushing the cache.
+> 
+> In the meantime, fixing louis as we've suggested should work.
+> 
+> Back to the case in hand.... Lorenzo just pointed out to me that the
+> finished in question (sh7372_do_idle_sysc) calls v7_flush_dcache_all, so
+> the louis stuff should be irrelevant. The problem may actually be that the
+> finisher disables the L2 cache prior to cleaning/invalidating it, which is
+> the opposite order to that described by the A8 TRM.
+> 
+> Guennadi -- can you try moving the kernel_flush call before the L2 disable
+> in sh7372_do_idle_sysc please?
 
-PCIe is very specific about what a root complex is:
+Yes, this works too.
 
-Root Complex =
- An entity that includes a Host Bridge, zero or more Root Complex Integrated
- Endpoints, zero or more Root Complex Event Collectors, and one or more
- Root Ports.
-
-It also has other specific text requiring that each of the root
-complex items conform to the software configuration interface -
-they must be discoverable, they must have device numbers, they must
-have configuration space.
-
-Stephen is correct in how things should work - the physical PCI-E link
-off the SOC should be reporting to linux as the secondary port on a
-PCIe-PCIe bridge, and discovery should naturally follow along it from
-the host bridge with no additional configuration or DT modeling
-required.
-
-When linux starts enumeration the bus 0, device 0, function 0
-configuration space should be a host bridge. Bus 0 devices XX should be
-the virtual PCI-PCI bridges.
-
-> Tegra30 has 3. Each of these root ports is a virtual PCI-PCI bridge
-> within the root complex. However, they don't "appear" on the bus since
-> they are the origins of two busses.
-
-This is not compliant.
-
-When the spec talks about a 'virtual PCI-PCI bridge' it means virtual
-in the sense that it is not seperate physical hardware. It absolutely
-must appear in PCI device enumeration.
-
-The spec is very clear on this point:
-
-bridge =
-   A device that virtually or actually connects a PCI/PCI-X segment or
-   PCI Express Port with an internal component interconnect or with another
-   PCI/PCI-X segment or PCI Express Port. A virtual Bridge in a Root
-   Complex or Switch must use the software configuration interface
-   described in this specification.
-
-> Perhaps it will even work the way you suggested if instead we removed
-> the special-case for root ports and enumerate only one root bus. I'll
-> need to check that.
-
-You might be missing the host bridge. If the SOC is providing
-compliant PCIe bridges with configuration space for the root ports but
-does not provide the host bridge configuration space then you may need
-to provide the host bridge in software to tie it all together into a
-compliant root complex.
-
-Regards,
-Jason
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
