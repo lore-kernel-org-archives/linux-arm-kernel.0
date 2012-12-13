@@ -1,90 +1,75 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 13 Dec 2012 09:23:23 +0100
-Subject: [RFC v1] PCIe support for the Armada 370 and Armada XP SoCs
-In-Reply-To: <20121213080415.GA21178@obsidianresearch.com>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121207233317.GB4304@obsidianresearch.com>
- <50C62161.9080708@wwwdotorg.org>
- <20121211075207.GA29977@avionic-0098.adnet.avionic-design.de>
- <50C7A3C5.7050100@wwwdotorg.org>
- <20121212203433.GA7898@avionic-0098.adnet.avionic-design.de>
- <50C9056D.2050309@wwwdotorg.org>
- <20121213070332.GA9946@avionic-0098.adnet.avionic-design.de>
- <20121213080415.GA21178@obsidianresearch.com>
-Message-ID: <20121213082323.GA13620@avionic-0098.adnet.avionic-design.de>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Thu, 13 Dec 2012 09:40:17 +0100
+Subject: [PATCH] mxs: uart: allow setting RTS from software
+In-Reply-To: <50C93B6B.7090206@freescale.com>
+References: <1355329913-27666-1-git-send-email-s.trumtrar@pengutronix.de>
+ <50C93B6B.7090206@freescale.com>
+Message-ID: <20121213084017.GA27832@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 13, 2012 at 01:04:15AM -0700, Jason Gunthorpe wrote:
-> On Thu, Dec 13, 2012 at 08:03:32AM +0100, Thierry Reding wrote:
-> 
-> > I don't think that's the way it works. The PCIe controller is what the
-> > PCIe specification refers to as root complex. The root complex can have
-> > one or more root ports. 
-> 
-> PCIe is very specific about what a root complex is:
-> 
-> Root Complex =
->  An entity that includes a Host Bridge, zero or more Root Complex Integrated
->  Endpoints, zero or more Root Complex Event Collectors, and one or more
->  Root Ports.
-> 
-> It also has other specific text requiring that each of the root
-> complex items conform to the software configuration interface -
-> they must be discoverable, they must have device numbers, they must
-> have configuration space.
-> 
-> Stephen is correct in how things should work - the physical PCI-E link
-> off the SOC should be reporting to linux as the secondary port on a
-> PCIe-PCIe bridge, and discovery should naturally follow along it from
-> the host bridge with no additional configuration or DT modeling
-> required.
-> 
-> When linux starts enumeration the bus 0, device 0, function 0
-> configuration space should be a host bridge. Bus 0 devices XX should be
-> the virtual PCI-PCI bridges.
-> 
-> > Tegra30 has 3. Each of these root ports is a virtual PCI-PCI bridge
-> > within the root complex. However, they don't "appear" on the bus since
-> > they are the origins of two busses.
-> 
-> This is not compliant.
-> 
-> When the spec talks about a 'virtual PCI-PCI bridge' it means virtual
-> in the sense that it is not seperate physical hardware. It absolutely
-> must appear in PCI device enumeration.
-> 
-> The spec is very clear on this point:
-> 
-> bridge =
->    A device that virtually or actually connects a PCI/PCI-X segment or
->    PCI Express Port with an internal component interconnect or with another
->    PCI/PCI-X segment or PCI Express Port. A virtual Bridge in a Root
->    Complex or Switch must use the software configuration interface
->    described in this specification.
-> 
-> > Perhaps it will even work the way you suggested if instead we removed
-> > the special-case for root ports and enumerate only one root bus. I'll
-> > need to check that.
-> 
-> You might be missing the host bridge. If the SOC is providing
-> compliant PCIe bridges with configuration space for the root ports but
-> does not provide the host bridge configuration space then you may need
-> to provide the host bridge in software to tie it all together into a
-> compliant root complex.
+Hi,
 
-Okay, so I gather that all of the above means that *if* the Tegra PCIe
-controller is compliant, it should just work if we remove any of the
-special cases. I'm not sure if anybody's actually tested this or if it
-just isn't compliant. I'll see if I can find some time to test this.
-Obviously it would be a whole lot nicer if the hardware really was
-compliant so that we don't have to emulate the host bridge in software.
+On Thu, Dec 13, 2012 at 10:20:27AM +0800, Huang Shijie wrote:
+> ? 2012?12?13? 00:31, Steffen Trumtrar ??:
+> > With the patch "serial: mxs-auart: fix the wrong RTS hardware flow control" the
+> > mainline mxs-uart driver now sets RTSEN only when hardware flow control is
+> > enabled via software. It is not possible any longer to set RTS manually via
+> > software. However, the manual modification is a valid operation.
+> > Regain the possibility to set RTS via software and only set RTSEN when hardware
+> Is there any user case to set the RTS via software?
+> I am confused at this.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121213/20939022/attachment.sig>
+there are cases where the RTS is used in a non-standard way. And the always-on
+hardware flowcontrol breaks these (e.g. Echelon FT5000).
+And as stated in the commit message, it is a valid operation to use software
+flow control.
+
+> > flow control is explicitly enabled via settermios cflag CRTSCTS.
+> >
+> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > ---
+> >  drivers/tty/serial/mxs-auart.c |    8 +++++++-
+> >  1 file changed, 7 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+> > index 6db23b0..9b62c4b 100644
+> > --- a/drivers/tty/serial/mxs-auart.c
+> > +++ b/drivers/tty/serial/mxs-auart.c
+> > @@ -412,10 +412,12 @@ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
+> >  
+> >  	u32 ctrl = readl(u->membase + AUART_CTRL2);
+> >  
+> > -	ctrl &= ~AUART_CTRL2_RTSEN;
+> > +	ctrl &= ~(AUART_CTRL2_RTSEN | AUART_CTRL2_RTS);
+> >  	if (mctrl & TIOCM_RTS) {
+> >  		if (tty_port_cts_enabled(&u->state->port))
+> >  			ctrl |= AUART_CTRL2_RTSEN;
+> > +		else
+> > +			ctrl |= AUART_CTRL2_RTS;
+> >  	}
+> >  
+> >  	s->ctrl = mctrl;
+> > @@ -678,6 +680,10 @@ static void mxs_auart_settermios(struct uart_port *u,
+> >  		}
+> >  		ctrl2 |= AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN;
+> >  	} else {
+> > +		u->flags |= ASYNC_CTS_FLOW;
+> > +		ctrl2 |= AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN;
+> > +	} else {
+> > +		u->flags &= ~ASYNC_CTS_FLOW;
+> bug.
+> 
+> Your code adds TWO "else" here.
+> 
+
+Oops, wrong merge resolution. Will fix that.
+
+Regards,
+Steffen
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
