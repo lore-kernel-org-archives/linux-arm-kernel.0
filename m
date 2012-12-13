@@ -1,38 +1,38 @@
-From: keyuan.liu@gmail.com (Kevin Liu)
-Date: Thu, 13 Dec 2012 19:45:36 +0800
-Subject: FW: [PATCH] mmc: mmci: Gate the clock in runtime suspend to save
- power
-In-Reply-To: <CAPDyKFrkNnudy_rCL4P3GjRjh3zZ0aGVLti8uLJaW4FfuXm9JQ@mail.gmail.com>
-References: <25B60CDC2F704E4E9D88FFD52780CB4C08B00BD3B1@SC-VEXCH1.marvell.com>
- <CADz5_gJ70KrHL5NoSPQbFdeHnQxWLh87zq6N+-V7J7Yq7t+aPQ@mail.gmail.com>
- <CAPDyKFrt4zWmhyO-UJAFPOH=90n4OwRPv3nczr4jPGBnc_jT5w@mail.gmail.com>
- <20121213101117.GF14363@n2100.arm.linux.org.uk>
- <CAPDyKFrkNnudy_rCL4P3GjRjh3zZ0aGVLti8uLJaW4FfuXm9JQ@mail.gmail.com>
-Message-ID: <CADz5_gJ+8D_vm8SnfsnbheFpwarAxGSmY27FW_cvc7YdDH9pow@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 13 Dec 2012 11:48:18 +0000
+Subject: [PATCH 02/12] regulator: gpio-regulator: Only read GPIO
+ [dis|en]able pin if not always-on
+In-Reply-To: <20121210141000.GC6103@opensource.wolfsonmicro.com>
+References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
+ <1355129761-8088-3-git-send-email-lee.jones@linaro.org>
+ <20121210141000.GC6103@opensource.wolfsonmicro.com>
+Message-ID: <20121213114818.GH27617@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/12/13 Ulf Hansson <ulf.hansson@linaro.org>:
-> On 13 December 2012 11:11, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Thu, Dec 13, 2012 at 10:04:46AM +0100, Ulf Hansson wrote:
->>> Anyway, this need to be thought of as future step, since this patch is
->>> not changing anything to that sequence as Kevin also is pointing out.
->>
->> Given that Kevin is talking about stuff in sdhci as if it affects MMCI,
->> and that neither of you have picked that up, you're *still* not gaining
->> any confidence from me that you're actually thinking about the changes
->> you're making.  So I'm not really caring about how many acks your patches
->> get, I'm still going to be reluctant to apply them without thinking about
->> them for a bit.
->
-> MMCI is doing "pm_runtime_get_sync" in it suspend. So the same
-> principles as Kevin is describing for sdhci goes for MMCI. Sorry if
-> this was not clearly pointed out.
->
-sorry for my unclear words. I just use sdhci directly to explain this.
-It's similar for sdhci and mmci on this point. pm_runtime is
-temporarily disabled during suspend/resume.
+On Mon, 10 Dec 2012, Mark Brown wrote:
 
-Thanks
-Kevin
+> On Mon, Dec 10, 2012 at 08:55:51AM +0000, Lee Jones wrote:
+> > If a regulator is specified as always-on, then it can't have an
+> > enable/disable pin, as it can't be turned off.
+> 
+> Sometimes always on gets set for regulators which do have a physical
+> control wired up - the control might exist for use in suspend mode for
+> example.  Is the ability to specify an enable pin causing a practical
+> problem for systems?  If it is we should fix that.
+
+I'm not sure I understand.
+
+My logic is that there is no point in requesting a pin which can
+disable a regulator that can't be disabled. Then we can follow
+on from that logic and say that if a regulator is _not_ always on
+this we _require_ a way to disable it, thus we insist on an enable
+GPIO pin.
+
+With me?
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
