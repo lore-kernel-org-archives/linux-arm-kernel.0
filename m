@@ -1,57 +1,47 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 13 Dec 2012 17:41:40 +0000
-Subject: [RFC 2/5] ARM: dts: Add Cross Trigger Interface binding
-In-Reply-To: <1355348588-22318-3-git-send-email-jon-hunter@ti.com>
-References: <1355348588-22318-1-git-send-email-jon-hunter@ti.com>
- <1355348588-22318-3-git-send-email-jon-hunter@ti.com>
-Message-ID: <20121213174139.GA12946@mudshark.cambridge.arm.com>
+Date: Thu, 13 Dec 2012 17:48:17 +0000
+Subject: ARM realview breakages w/ 3.7 under qemu
+In-Reply-To: <50CA0FC1.5090009@openwrt.org>
+References: <50CA0FC1.5090009@openwrt.org>
+Message-ID: <20121213174817.GB12946@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 12, 2012 at 09:43:05PM +0000, Jon Hunter wrote:
-> Adds a device-tree binding for the ARM Cross Trigger Interface (CTI).
-> The ARM Cross Trigger Interface provides a way to route events between
-> processor modules. For example, on OMAP4430 we use the CTI module to
-> route PMU events to the GIC interrupt module.
-> 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
->  Documentation/devicetree/bindings/arm/cti.txt |   32 +++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/cti.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/cti.txt b/Documentation/devicetree/bindings/arm/cti.txt
-> new file mode 100644
-> index 0000000..4a0e2d3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/cti.txt
-> @@ -0,0 +1,32 @@
-> +* ARM Cross Trigger Interface (CTI)
-> +
-> +The ARM Cross Trigger Interface provides a way to route events between
-> +processor modules. For example, debug events from one processor can be
-> +broadcasted to other processors. The events that can be routed between
-> +processors are specific to the device.
-> +
-> +Required properties:
-> +
-> +- compatible:			Should be "arm,primecell".
-> +- interrupts:			Interrupt associated with CTI module.
-> +- reg:				Contains timer register address range (base
-> +				address and length).
-> +- arm,cti-name:			A unique name for the CTI module, that will be
-> +				used when requesting the CTI module instance.
-> +
-> +
-> +Optional properties:
-> +
-> +- arm-primecell-periphid:	Primecell peripheral ID associated with CTI
-> +				module.
+On Thu, Dec 13, 2012 at 05:26:25PM +0000, Florian Fainelli wrote:
+> Hi,
 
-For multi-cluster systems, I wouldn't be surprised to see multiple CTI
-instances, each with different CPU affinities. Can we include an affinity
-property following Mark's proposed binding?
+Hi Florian,
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137290.html
+> I am experiencing several issues with the ARM RealView platform under qemu:
+> 
+> 1) The RealView EB MP-Core is stuck in the timer calibration, this 
+> isssue was already present in all 3.6 kernels, and I have not yet been 
+> able to find the root cause of this. PBX A9 with the same kernel binary 
+> works flawlessly.
+
+Can you try picking 810883f05982 ("ARM: 7594/1: Add .smp entry for
+REALVIEW_EB") please?
+
+> 2) There are some strange things happening with the RAM on these 
+> platforms too, for instance:
+> 
+> - EB MP-Core: booting with 128MBytes of RAM does not work, booting with 
+> more than 256Mbytes results in the amount of RAM seen by the kernel 
+> truncated to 256Mbytes
+> 
+> - PBX A9: booting with less than 1024MBytes of RAM causes this:
+> [    0.000000] Truncating RAM at 20000000-3fffffff to -3f7fffff (vmalloc 
+> region overlap).
+> [    0.000000] Ignoring RAM at 80000000-8fffffff (vmalloc region overlap).
+> 
+> Do these issues sounds familiar to any of you? The kernel config is 
+> attached in case that helps.
+
+I'm afraid these memory issues don't ring any bells with me, but I do
+actually have hardware for EB MP and PBX so I can see if that works with
+your .config (although you may have to wait until next week).
+
+Can you provide your command lines please? I'm also assuming you're using
+3.7?
 
 Will
