@@ -1,62 +1,43 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Thu, 13 Dec 2012 18:55:47 +0100
-Subject: ARM realview breakages w/ 3.7 under qemu
-In-Reply-To: <20121213174817.GB12946@mudshark.cambridge.arm.com>
-References: <50CA0FC1.5090009@openwrt.org>
- <20121213174817.GB12946@mudshark.cambridge.arm.com>
-Message-ID: <50CA16A3.4020108@openwrt.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 13 Dec 2012 11:01:31 -0700
+Subject: [PATCH] clk: debug clock tree
+In-Reply-To: <CAPtuhThBigSQMkNDf16Fo1tddTKo=rPEydHmzep0DqtgLrB+HA@mail.gmail.com>
+References: <1355370586-6600-1-git-send-email-pgaikwad@nvidia.com>
+ <CAPtuhThBigSQMkNDf16Fo1tddTKo=rPEydHmzep0DqtgLrB+HA@mail.gmail.com>
+Message-ID: <50CA17FB.9060606@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/13/12 18:48, Will Deacon a ?crit :
-> On Thu, Dec 13, 2012 at 05:26:25PM +0000, Florian Fainelli wrote:
->> Hi,
-> Hi Florian,
->
->> I am experiencing several issues with the ARM RealView platform under qemu:
+On 12/13/2012 09:27 AM, Mike Turquette wrote:
+> On Wed, Dec 12, 2012 at 7:49 PM, Prashant Gaikwad <pgaikwad@nvidia.com> wrote:
+>> Adds debug file "clock_tree" in /sys/kernel/debug/clk dir.
+>> It helps to view all the clock registered in tree format.
 >>
->> 1) The RealView EB MP-Core is stuck in the timer calibration, this
->> isssue was already present in all 3.6 kernels, and I have not yet been
->> able to find the root cause of this. PBX A9 with the same kernel binary
->> works flawlessly.
-> Can you try picking 810883f05982 ("ARM: 7594/1: Add .smp entry for
-> REALVIEW_EB") please?
+> 
+> Prashant,
+> 
+> Thanks for submitting this.  We've been talking about having a single
+> file for representing the tree for some time.
+> 
+> Regarding the output format had you considered using a well known
+> format which can be parsed using well known parsing libs?  This avoids
+> needing a custom parser just for this one file.  JSON springs to mind
+> as something lightweight and well-understood.
 
-I picked that up and it did not make any difference we are still stuck 
-calibrating the timer.
+One advantage of the format below is that it's very easily
+human-readable, and it's not too hard to parse (although I guess you'd
+have to parse the indent level to get parent/child relation, which would
+suck a bit). Is there room to provide both? Otherwise, I guess the
+kernel could include a script to convert from JSON/whatever into the
+format below.
 
->
->> 2) There are some strange things happening with the RAM on these
->> platforms too, for instance:
->>
->> - EB MP-Core: booting with 128MBytes of RAM does not work, booting with
->> more than 256Mbytes results in the amount of RAM seen by the kernel
->> truncated to 256Mbytes
->>
->> - PBX A9: booting with less than 1024MBytes of RAM causes this:
->> [    0.000000] Truncating RAM at 20000000-3fffffff to -3f7fffff (vmalloc
->> region overlap).
->> [    0.000000] Ignoring RAM at 80000000-8fffffff (vmalloc region overlap).
->>
->> Do these issues sounds familiar to any of you? The kernel config is
->> attached in case that helps.
-> I'm afraid these memory issues don't ring any bells with me, but I do
-> actually have hardware for EB MP and PBX so I can see if that works with
-> your .config (although you may have to wait until next week).
->
-> Can you provide your command lines please? I'm also assuming you're using
-> 3.7?
-
-The qemu command-line is the following:
-qemu-system-arm -M realview-eb-mpcore -kernel 
-bin/realview/openwrt-realview-vmlinux.elf -nographic -m 768 -append 
-"earlyprintk console=ttyAMA0"
-
-And the kernel command-line is:
-console=ttyAMA0 mem=128M
-CMDLINE_FROM_BOOTLOADER is set, so only the command-line from qemu 
-actually matters.
-
-Thanks!
---
-Florian
+>> For example:
+>>    clock                        enable_cnt  prepare_cnt  rate
+>> ---------------------------------------------------------------------
+>>  i2s0_sync                      0           0            24000000
+>>  spdif_in_sync                  0           0            24000000
+>>     spdif_mux                   0           0            24000000
+>>        spdif                    0           0            24000000
+>>           spdif_doubler         0           0            48000000
+>>              spdif_div          0           0            48000000
+>>                 spdif_2x        0           0            48000000
