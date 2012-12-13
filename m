@@ -1,76 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 13 Dec 2012 14:58:03 +0000
-Subject: [RFC 1/5] ARM: CORESIGHT: Add generic lock/unlock helpers
-In-Reply-To: <1355348588-22318-2-git-send-email-jon-hunter@ti.com>
-References: <1355348588-22318-1-git-send-email-jon-hunter@ti.com>
- <1355348588-22318-2-git-send-email-jon-hunter@ti.com>
-Message-ID: <20121213145803.GL26540@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 13 Dec 2012 12:00:48 +0000
+Subject: [PATCHv2] ARM: sunxi: Change device tree naming scheme for sunxi
+In-Reply-To: <1355328503-25315-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1355328503-25315-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <201212131200.48413.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Wed, Dec 12, 2012 at 09:43:04PM +0000, Jon Hunter wrote:
-> The Cross Trigger Interface (CTI) helpers in cti.h include definitions
-> for the Coresight Lock Access Register (LAR) and Lock Status Register
-> (LSR). These registers are already defined in coresight.h and so rather
-> than having multiple definitions, just use the definitions from
-> coresight.h.
+On Wednesday 12 December 2012, Maxime Ripard wrote:
+> There is several different SoCs sharing the sun5i codename: A10s, A12
+> and A13. Since there is enough differences to not consider those the
+> same SoCs, change a bit the naming scheme to reflect this.
 > 
-> Add the following coresight macros ...
-> - coresight_unlock() --> Unlocks coresight module
-> - coresight_lock()   --> Locks coresight module
+> Moreover, some boards like the olinuxino come in A10s and A13 variants,
+> which also share the same SoC codename.
 > 
-> Use the above macros for ETB, ETM and CTI. The do-while(0) statement
-> has been removed from the macro as it is not a multi-line macro.
+> So change the naming scheme to reflect both the codename and the market
+> name of the SoCs used in the dtsi and in the board files
 > 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
->  arch/arm/include/asm/cti.h                |   16 +++-------------
->  arch/arm/include/asm/hardware/coresight.h |   16 ++++++++--------
->  2 files changed, 11 insertions(+), 21 deletions(-)
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-[...]
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-> diff --git a/arch/arm/include/asm/hardware/coresight.h b/arch/arm/include/asm/hardware/coresight.h
-> index 7ecd793..dcd0e66 100644
-> --- a/arch/arm/include/asm/hardware/coresight.h
-> +++ b/arch/arm/include/asm/hardware/coresight.h
-> @@ -141,17 +141,17 @@
->  #define ETBFF_TRIGEVT		BIT(9)
->  #define ETBFF_TRIGFL		BIT(10)
->  
-> -#define etb_writel(t, v, x) \
-> -	(__raw_writel((v), (t)->etb_regs + (x)))
-> +#define etb_writel(t, v, x) (__raw_writel((v), (t)->etb_regs + (x)))
->  #define etb_readl(t, x) (__raw_readl((t)->etb_regs + (x)))
->  
-> -#define etm_lock(t) do { etm_writel((t), 0, CSMR_LOCKACCESS); } while (0)
-> -#define etm_unlock(t) \
-> -	do { etm_writel((t), UNLOCK_MAGIC, CSMR_LOCKACCESS); } while (0)
-> +#define etb_lock(t) coresight_lock((t)->etb_regs)
-> +#define etb_unlock(t) coresight_unlock((t)->etb_regs)
-> +#define etm_lock(t) coresight_lock((t)->etm_regs)
-> +#define etm_unlock(t) coresight_unlock((t)->etm_regs)
->  
-> -#define etb_lock(t) do { etb_writel((t), 0, CSMR_LOCKACCESS); } while (0)
-> -#define etb_unlock(t) \
-> -	do { etb_writel((t), UNLOCK_MAGIC, CSMR_LOCKACCESS); } while (0)
-> +#define coresight_lock(base) (__raw_writel(0, base + CSMR_LOCKACCESS))
-> +#define coresight_unlock(base) \
-> +	(__raw_writel(UNLOCK_MAGIC, base + CSMR_LOCKACCESS))
->  
->  #endif /* __ASM_HARDWARE_CORESIGHT_H */
+Side note:
+I just read about the A20 and A31, is there any information and/or
+source code available for those already, or are they again kept
+hidden by Allwinner?
 
-How about we take this opportunity to divorce the more general coresight
-bits from the etb specific parts, like you've done for the cti. We could
-move the ETB stuff out into asm/etb.h (although it might be nice to keep all
-the coresight device headers in one place... answers on a postcard) and just
-have the architected coresight functionality in this header.
-
-Will
-
-> -- 
-> 1.7.10.4
-> 
-> 
+	Arnd
