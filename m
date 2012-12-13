@@ -1,37 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 13 Dec 2012 16:19:07 -0700
-Subject: [GIT PULL] ARM: tegra: fixes for 3.8
-Message-ID: <1355440747-22295-1-git-send-email-swarren@wwwdotorg.org>
+From: martinez.javier@gmail.com (Javier Martinez Canillas)
+Date: Fri, 14 Dec 2012 00:58:53 +0100
+Subject: [PATCH 1/1] ARM: OMAP2+: omap2plus_defconfig: enable twl4030 SoC
+ audio
+In-Reply-To: <50B48EB2.1040804@ti.com>
+References: <1353979275-6237-1-git-send-email-javier.martinez@collabora.co.uk>
+ <50B48EB2.1040804@ti.com>
+Message-ID: <CAAwP0s2p+eSe5Xzip+vOtOhKFNsbdLsqcHy7CcFVv7O8CAXmdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch contains a few miscellaneous fixes that have shown up in the
-last few weeks.
+On Tue, Nov 27, 2012 at 10:58 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+> On 11/27/2012 02:21 AM, Javier Martinez Canillas wrote:
+>> Many TI OMAP SoC based boards that uses twl4030 as codec have
+>> been updated to use the unified audio driver (omap-twl4030)
+>> since they have similar audio setup.
+>>
+>> So, is good to have it built to add audio support to these boards.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>
+> I also agree that it is a good practice to enable this in the defconfig.
+>
+> Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>
 
-----------------------------------------------------------------
+Hi Tony,
 
-The following changes since commit 9489e9dcae718d5fde988e4a684a0f55b5f94d17:
+Any comments on this patch?
 
-  Linux 3.7-rc7
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.8-fixes-for-rc1
-
-for you to fetch changes up to f110174910896b7a7d91c0c60d19136815f68c54:
-
-  amba: tegra-ahb: Fix warning w/o PM_SLEEP
-
-----------------------------------------------------------------
-
-Hiroshi Doyu (1):
-      amba: tegra-ahb: Fix warning w/o PM_SLEEP
-
-Sivaram Nair (2):
-      ARM: tegra: select correct parent clk for pll_p
-      ARM: tegra: fix comment in dsib clk set_parent
-
- arch/arm/mach-tegra/common.c         |    2 +-
- arch/arm/mach-tegra/tegra30_clocks.c |    4 +---
- drivers/amba/tegra-ahb.c             |    2 ++
- 3 files changed, 4 insertions(+), 4 deletions(-)
+Best regards,
+Javier
