@@ -1,86 +1,16 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 14 Dec 2012 23:11:59 +0100
-Subject: [PATCH 1/2] thermal: Add support for thermal sensor for Orion SoC
-In-Reply-To: <CABMQnV+zNWz4UJ_127Xe+MkTt9eQVPA8StJzyEXt58Z4OqZBYw@mail.gmail.com>
-References: <1355482986-885-1-git-send-email-andrew@lunn.ch>
- <1355482986-885-2-git-send-email-andrew@lunn.ch>
- <CABMQnV+zNWz4UJ_127Xe+MkTt9eQVPA8StJzyEXt58Z4OqZBYw@mail.gmail.com>
-Message-ID: <20121214221159.GE7717@lunn.ch>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 14 Dec 2012 15:50:32 -0700
+Subject: [PATCH v2] pinctrl: add sleep mode management
+In-Reply-To: <1355515233-23663-1-git-send-email-linus.walleij@stericsson.com>
+References: <1355515233-23663-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <50CBAD38.1030104@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 15, 2012 at 06:54:17AM +0900, Nobuhiro Iwamatsu wrote:
-> Hi,
-> 
-> Thanks you for your work.
-> Sorry, I dont hava a time at this week about this.
+On 12/14/2012 01:00 PM, Linus Walleij wrote:
+> This fix allows handling sleep mode for hogged
+> pins in pinctrl. It provides functions to set pins
+> to sleep/default configurations according to their
+> current state.
 
-Its not a problem. We have plenty of time before the next merge
-window. I was just interested in seeing it work on my QNAP device, so
-did some of the cleanup work.
-
-> On Fri, Dec 14, 2012 at 8:03 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> > From: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> >
-> > Some Orion SoC has thermal sensor.
-> > This patch adds support for 88F6282 and 88F6283.
-> >
-> > Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > ---
-> >  .../devicetree/bindings/thermal/orion-thermal.txt  |   16 +++
-> >  drivers/thermal/Kconfig                            |    7 ++
-> >  drivers/thermal/Makefile                           |    1 +
-> >  drivers/thermal/orion_thermal.c                    |  133 ++++++++++++++++++++
-> >  4 files changed, 157 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/thermal/orion-thermal.txt
-> >  create mode 100644 drivers/thermal/orion_thermal.c
-> >
-> > diff --git a/Documentation/devicetree/bindings/thermal/orion-thermal.txt b/Documentation/devicetree/bindings/thermal/orion-thermal.txt
-> > new file mode 100644
-> > index 0000000..5ce925d
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/thermal/orion-thermal.txt
-> > @@ -0,0 +1,16 @@
-> > +* Orion Thermal
-> > +
-> > +This initial version is for Kirkwood 88F8262 & 88F6283 SoCs, however
-> > +it is expected the driver will sometime in the future be expanded to
-> > +also support Dove, using a different compatibility string.
-> > +
-> > +Required properties:
-> > +- compatible : "marvell,kirkwood-thermal"
-> > +- reg : Address range of the thermal registers
-> > +
-> > +Example:
-> > +
-> > +       thermal at 10078 {
-> > +               compatible = "marvell,kirkwood";
-> 
-> compatible = "marvell,kirkwood-thermal"; ?
-
-Yep, my error.
-
-> > +               reg = <0x10078 0x4>;
-> > +       };
-> > diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> > index e1cb6bd..3bba13f 100644
-> > --- a/drivers/thermal/Kconfig
-> > +++ b/drivers/thermal/Kconfig
-> > @@ -55,3 +55,10 @@ config EXYNOS_THERMAL
-> >         help
-> >           If you say yes here you get support for TMU (Thermal Managment
-> >           Unit) on SAMSUNG EXYNOS series of SoC.
-> > +
-> > +config ORION_THERMAL
-> > +       tristate "Temperature sensor on Marvel Orion SoCs"
-> 
-> Marvel -> Marvell
-
-Missed that one, thanks.
-
-Thanks for the Tested-by. I will add it to the next version.  I
-started work on Dove support, so i will probably repost when i have
-that ready for testing.
-
-     Andrew
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
