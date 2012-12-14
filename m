@@ -1,125 +1,119 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 14 Dec 2012 09:25:21 +0100
-Subject: [PATCH 8/8] ARM: ux500: Remove traces of the ios_handler from
- platform code
-In-Reply-To: <1355404930-5691-9-git-send-email-lee.jones@linaro.org>
-References: <1355404930-5691-1-git-send-email-lee.jones@linaro.org>
- <1355404930-5691-9-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAPDyKFosXFxQCAeKNnmvM4rY5_otj=FfYdR1Vi_HBq_kk130eQ@mail.gmail.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Fri, 14 Dec 2012 17:15:59 +0800
+Subject: [PATCH] pinctrl: sirf: enable GPIO pullup/down configuration from dts
+Message-ID: <1355476559-27550-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 December 2012 14:22, Lee Jones <lee.jones@linaro.org> wrote:
-> Now MMCI on/off functionality is using the regulator framework
-> from the MMCI driver, there is no need to keep the ios_handler
-> laying around, duplicating functionality. So we're removing it.
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/mach-ux500/board-mop500-sdi.c |   52 --------------------------------
->  1 file changed, 52 deletions(-)
->
-> diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
-> index 9c8e4a9..5a798d6 100644
-> --- a/arch/arm/mach-ux500/board-mop500-sdi.c
-> +++ b/arch/arm/mach-ux500/board-mop500-sdi.c
-> @@ -31,35 +31,6 @@
->   * SDI 0 (MicroSD slot)
->   */
->
-> -/* GPIO pins used by the sdi0 level shifter */
-> -static int sdi0_en = -1;
-> -static int sdi0_vsel = -1;
-> -
-> -static int mop500_sdi0_ios_handler(struct device *dev, struct mmc_ios *ios)
-> -{
-> -       switch (ios->power_mode) {
-> -       case MMC_POWER_UP:
-> -       case MMC_POWER_ON:
-> -               /*
-> -                * Level shifter voltage should depend on vdd to when deciding
-> -                * on either 1.8V or 2.9V. Once the decision has been made the
-> -                * level shifter must be disabled and re-enabled with a changed
-> -                * select signal in order to switch the voltage. Since there is
-> -                * no framework support yet for indicating 1.8V in vdd, use the
-> -                * default 2.9V.
-> -                */
-> -               gpio_direction_output(sdi0_vsel, 0);
-> -               gpio_direction_output(sdi0_en, 1);
-> -               break;
-> -       case MMC_POWER_OFF:
-> -               gpio_direction_output(sdi0_vsel, 0);
-> -               gpio_direction_output(sdi0_en, 0);
-> -               break;
-> -       }
-> -
-> -       return 0;
-> -}
-> -
->  #ifdef CONFIG_STE_DMA40
->  struct stedma40_chan_cfg mop500_sdi0_dma_cfg_rx = {
->         .mode = STEDMA40_MODE_LOGICAL,
-> @@ -81,7 +52,6 @@ static struct stedma40_chan_cfg mop500_sdi0_dma_cfg_tx = {
->  #endif
->
->  struct mmci_platform_data mop500_sdi0_data = {
-> -       .ios_handler    = mop500_sdi0_ios_handler,
->         .ocr_mask       = MMC_VDD_29_30,
->         .f_max          = 50000000,
->         .capabilities   = MMC_CAP_4_BIT_DATA |
-> @@ -101,22 +71,6 @@ struct mmci_platform_data mop500_sdi0_data = {
->
->  static void sdi0_configure(struct device *parent)
->  {
-> -       int ret;
-> -
-> -       ret = gpio_request(sdi0_en, "level shifter enable");
-> -       if (!ret)
-> -               ret = gpio_request(sdi0_vsel,
-> -                                  "level shifter 1v8-3v select");
-> -
-> -       if (ret) {
-> -               pr_warning("unable to config sdi0 gpios for level shifter.\n");
-> -               return;
-> -       }
-> -
-> -       /* Select the default 2.9V and enable level shifter */
-> -       gpio_direction_output(sdi0_vsel, 0);
-> -       gpio_direction_output(sdi0_en, 1);
-> -
->         /* Add the device, force v2 to subrevision 1 */
->         db8500_add_sdi0(parent, &mop500_sdi0_data, U8500_SDI_V2_PERIPHID);
->  }
-> @@ -124,8 +78,6 @@ static void sdi0_configure(struct device *parent)
->  void mop500_sdi_tc35892_init(struct device *parent)
->  {
->         mop500_sdi0_data.gpio_cd = GPIO_SDMMC_CD;
-> -       sdi0_en = GPIO_SDMMC_EN;
-> -       sdi0_vsel = GPIO_SDMMC_1V8_3V_SEL;
->         sdi0_configure(parent);
->  }
->
-> @@ -264,8 +216,6 @@ void __init snowball_sdi_init(struct device *parent)
->         /* External Micro SD slot */
->         mop500_sdi0_data.gpio_cd = SNOWBALL_SDMMC_CD_GPIO;
->         mop500_sdi0_data.cd_invert = true;
-> -       sdi0_en = SNOWBALL_SDMMC_EN_GPIO;
-> -       sdi0_vsel = SNOWBALL_SDMMC_1V8_3V_GPIO;
->         sdi0_configure(parent);
->  }
->
-> @@ -277,8 +227,6 @@ void __init hrefv60_sdi_init(struct device *parent)
->         db8500_add_sdi4(parent, &mop500_sdi4_data, U8500_SDI_V2_PERIPHID);
->         /* External Micro SD slot */
->         mop500_sdi0_data.gpio_cd = HREFV60_SDMMC_CD_GPIO;
-> -       sdi0_en = HREFV60_SDMMC_EN_GPIO;
-> -       sdi0_vsel = HREFV60_SDMMC_1V8_3V_GPIO;
->         sdi0_configure(parent);
->         /* WLAN SDIO channel */
->         db8500_add_sdi1(parent, &mop500_sdi1_data, U8500_SDI_V2_PERIPHID);
-> --
-> 1.7.9.5
->
+From: Barry Song <Baohua.Song@csr.com>
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+commit 7bec207427c2efb794 remove sirfsoc_gpio_set_pull function,
+this patches takes the feature back by adding sirf,pullups and
+sirf,pulldowns prop in dts, and the driver will set the GPIO
+pull according to the dts.
+
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ Depends on:
+ [PATCH] pinctrl: sirf: add missing DT-binding document
+ http://www.spinics.net/lists/arm-kernel/msg212485.html
+
+ .../devicetree/bindings/pinctrl/pinctrl-sirf.txt   |    3 +
+ drivers/pinctrl/pinctrl-sirf.c                     |   48 ++++++++++++++++++++
+ 2 files changed, 51 insertions(+), 0 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt
+index a2896df..c596a6a 100644
+--- a/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt
++++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt
+@@ -6,6 +6,9 @@ Required properties:
+ - interrupts    : Interrupts used by every GPIO group
+ - gpio-controller : Indicates this device is a GPIO controller
+ - interrupt-controller  : Marks the device node as an interrupt controller
++Optional properties:
++- sirf,pullups : if n-th bit of m-th bank is set, set a pullup on GPIO-n of bank m
++- sirf,pulldowns : if n-th bit of m-th bank is set, set a pulldown on GPIO-n of bank m
+ 
+ Please refer to pinctrl-bindings.txt in this directory for details of the common
+ pinctrl bindings used by client devices.
+diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
+index 09eadb5..22a408c 100644
+--- a/drivers/pinctrl/pinctrl-sirf.c
++++ b/drivers/pinctrl/pinctrl-sirf.c
+@@ -1663,6 +1663,44 @@ const struct irq_domain_ops sirfsoc_gpio_irq_simple_ops = {
+ 	.xlate = irq_domain_xlate_twocell,
+ };
+ 
++static void sirfsoc_gpio_set_pullup(const u32 *pullups)
++{
++	int i, n;
++	const unsigned long *p = (const unsigned long *)pullups;
++
++	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
++		n = find_first_bit(p + i, BITS_PER_LONG);
++		while (n < BITS_PER_LONG) {
++			u32 offset = SIRFSOC_GPIO_CTRL(i, n);
++			u32 val = readl(sgpio_bank[i].chip.regs + offset);
++			val |= SIRFSOC_GPIO_CTL_PULL_MASK;
++			val |= SIRFSOC_GPIO_CTL_PULL_HIGH;
++			writel(val, sgpio_bank[i].chip.regs + offset);
++
++			n = find_next_bit(p + i, BITS_PER_LONG, n + 1);
++		}
++	}
++}
++
++static void sirfsoc_gpio_set_pulldown(const u32 *pulldowns)
++{
++	int i, n;
++	const unsigned long *p = (const unsigned long *)pulldowns;
++
++	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
++		n = find_first_bit(p + i, BITS_PER_LONG);
++		while (n < BITS_PER_LONG) {
++			u32 offset = SIRFSOC_GPIO_CTRL(i, n);
++			u32 val = readl(sgpio_bank[i].chip.regs + offset);
++			val |= SIRFSOC_GPIO_CTL_PULL_MASK;
++			val &= ~SIRFSOC_GPIO_CTL_PULL_HIGH;
++			writel(val, sgpio_bank[i].chip.regs + offset);
++
++			n = find_next_bit(p + i, BITS_PER_LONG, n + 1);
++		}
++	}
++}
++
+ static int __devinit sirfsoc_gpio_probe(struct device_node *np)
+ {
+ 	int i, err = 0;
+@@ -1671,6 +1709,8 @@ static int __devinit sirfsoc_gpio_probe(struct device_node *np)
+ 	struct platform_device *pdev;
+ 	bool is_marco = false;
+ 
++	u32 pullups[SIRFSOC_GPIO_NO_OF_BANKS], pulldowns[SIRFSOC_GPIO_NO_OF_BANKS];
++
+ 	pdev = of_find_device_by_node(np);
+ 	if (!pdev)
+ 		return -ENODEV;
+@@ -1734,6 +1774,14 @@ static int __devinit sirfsoc_gpio_probe(struct device_node *np)
+ 		irq_set_handler_data(bank->parent_irq, bank);
+ 	}
+ 
++	if (!of_property_read_u32_array(np, "sirf,pullups", pullups,
++		SIRFSOC_GPIO_NO_OF_BANKS))
++		sirfsoc_gpio_set_pullup(pullups);
++
++	if (!of_property_read_u32_array(np, "sirf,pulldowns", pulldowns,
++		SIRFSOC_GPIO_NO_OF_BANKS))
++		sirfsoc_gpio_set_pulldown(pulldowns);
++
+ 	return 0;
+ 
+ out:
+-- 
+1.7.5.4
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
