@@ -1,93 +1,36 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Fri, 14 Dec 2012 18:59:22 +0800
-Subject: [PATCH v2] DMAEngine: sirf: add DMA pause/resume support
-Message-ID: <1355482762-28688-1-git-send-email-Barry.Song@csr.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 14 Dec 2012 12:03:04 +0100
+Subject: [PATCH 0/2] Thermal sensor for Orion/Kirkwood
+Message-ID: <1355482986-885-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+This patchset adds thermal support for Orion Kirkwood devices, based
+on code from Nobuhiro Iwamatsu. This provides a framework to later add
+support for the thermal sensor on Dove.
 
-pause/resume are important for users like ALSA sound drivers,
-this patches make the sirf prima2/marco support DMA commands
-DMA_PAUSE and DMA_RESUME.
+The comments raised when the code was first posted have now been
+addressed:
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
-Cc: Russell King <linux@arm.linux.org.uk>
----
- -v2:
- lock the critical section of writing shared hardware registers
+* Temperature Reading in milligrad
+* marvel -> marvell
+* generalized to Orion
+* Compatibility string marvell,kirkwood-thermal
+* Arithmetic using unsigned long
 
- drivers/dma/sirf-dma.c |   46 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 46 insertions(+), 0 deletions(-)
+Nobuhiro Iwamatsu (2):
+  thermal: Add support for thermal sensor for Orion SoC
+  ARM: Kirkwood: Add support thermal sensor for 88F6282 and 88F6283
 
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 212f69f..623f195 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -313,6 +313,48 @@ static int sirfsoc_dma_terminate_all(struct sirfsoc_dma_chan *schan)
- 	return 0;
- }
- 
-+static int sirfsoc_dma_pause_chan(struct sirfsoc_dma_chan *schan)
-+{
-+	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
-+	int cid = schan->chan.chan_id;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&schan->lock, flags);
-+
-+	if (!sdma->is_marco)
-+		writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL)
-+			& ~((1 << cid) | 1 << (cid + 16)),
-+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
-+	else
-+		writel_relaxed((1 << cid) | 1 << (cid + 16),
-+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL_CLR);
-+
-+	spin_unlock_irqrestore(&schan->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int sirfsoc_dma_resume_chan(struct sirfsoc_dma_chan *schan)
-+{
-+	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
-+	int cid = schan->chan.chan_id;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&schan->lock, flags);
-+
-+	if (!sdma->is_marco)
-+		writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL)
-+			| ((1 << cid) | 1 << (cid + 16)),
-+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
-+	else
-+		writel_relaxed((1 << cid) | 1 << (cid + 16),
-+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
-+
-+	spin_unlock_irqrestore(&schan->lock, flags);
-+
-+	return 0;
-+}
-+
- static int sirfsoc_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 	unsigned long arg)
- {
-@@ -320,6 +362,10 @@ static int sirfsoc_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
- 
- 	switch (cmd) {
-+	case DMA_PAUSE:
-+		return sirfsoc_dma_pause_chan(schan);
-+	case DMA_RESUME:
-+		return sirfsoc_dma_resume_chan(schan);
- 	case DMA_TERMINATE_ALL:
- 		return sirfsoc_dma_terminate_all(schan);
- 	case DMA_SLAVE_CONFIG:
+ .../devicetree/bindings/thermal/orion-thermal.txt  |   16 +++
+ arch/arm/boot/dts/kirkwood-6282.dtsi               |    7 ++
+ arch/arm/configs/kirkwood_defconfig                |    2 +
+ drivers/thermal/Kconfig                            |    7 ++
+ drivers/thermal/Makefile                           |    1 +
+ drivers/thermal/orion_thermal.c                    |  133 ++++++++++++++++++++
+ 6 files changed, 166 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/orion-thermal.txt
+ create mode 100644 drivers/thermal/orion_thermal.c
+
 -- 
-1.7.5.4
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+1.7.10.4
