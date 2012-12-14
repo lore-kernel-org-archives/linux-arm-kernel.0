@@ -1,120 +1,54 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 14 Dec 2012 21:00:33 +0100
-Subject: [PATCH v2] pinctrl: add sleep mode management
-Message-ID: <1355515233-23663-1-git-send-email-linus.walleij@stericsson.com>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Fri, 14 Dec 2012 15:20:32 -0500
+Subject: [RFC v2 1/1] RTL8712 alignment bug in 3.6 and up on ARMV5
+In-Reply-To: <CAMW5UfZmptBK5sLq3zMdPJ6C3Arqfyy4SY5BOPfqcOB1T-sbSg@mail.gmail.com>
+References: <CAMW5UfZmptBK5sLq3zMdPJ6C3Arqfyy4SY5BOPfqcOB1T-sbSg@mail.gmail.com>
+Message-ID: <CAMW5UfYKHMscL6CTRzRjBPJCgYKoRTNz5_y3eN-XjT1pcoU=dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Delacou <julien.delacou@stericsson.com>
+Given 3.7 has shipped, should I rebase on release and put a new RFC
+post up, rebase on linux-next, wait for a 3.8-rc or just post it up as
+v2 for submission this time as is?
 
-This fix allows handling sleep mode for hogged
-pins in pinctrl. It provides functions to set pins
-to sleep/default configurations according to their
-current state.
+Josh C
 
-Signed-off-by: Julien Delacou <julien.delacou@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Move function prototypes to the local pinctrl/core.h header file
-- Added exports
----
- drivers/pinctrl/core.c | 37 ++++++++++++++++++++++++++++++++++---
- drivers/pinctrl/core.h |  7 +++++++
- 2 files changed, 41 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
-index 5b4885c..3611753 100644
---- a/drivers/pinctrl/core.c
-+++ b/drivers/pinctrl/core.c
-@@ -1076,6 +1076,30 @@ void pinctrl_unregister_map(struct pinctrl_map const *map)
- 	}
- }
- 
-+/**
-+ * pinctrl_force_sleep() - turn a given controller device into sleep state
-+ * @pctldev: pin controller device
-+ */
-+int pinctrl_force_sleep(struct pinctrl_dev *pctldev)
-+{
-+	if (!IS_ERR(pctldev->p) && !IS_ERR(pctldev->hog_sleep))
-+		return pinctrl_select_state(pctldev->p, pctldev->hog_sleep);
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(pinctrl_force_sleep);
-+
-+/**
-+ * pinctrl_force_default() - turn a given controller device into default state
-+ * @pctldev: pin controller device
-+ */
-+int pinctrl_force_default(struct pinctrl_dev *pctldev)
-+{
-+	if (!IS_ERR(pctldev->p) && !IS_ERR(pctldev->hog_default))
-+		return pinctrl_select_state(pctldev->p, pctldev->hog_default);
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(pinctrl_force_default);
-+
- #ifdef CONFIG_DEBUG_FS
- 
- static int pinctrl_pins_show(struct seq_file *s, void *what)
-@@ -1521,16 +1545,23 @@ struct pinctrl_dev *pinctrl_register(struct pinctrl_desc *pctldesc,
- 
- 	pctldev->p = pinctrl_get_locked(pctldev->dev);
- 	if (!IS_ERR(pctldev->p)) {
--		struct pinctrl_state *s =
-+		pctldev->hog_default =
- 			pinctrl_lookup_state_locked(pctldev->p,
- 						    PINCTRL_STATE_DEFAULT);
--		if (IS_ERR(s)) {
-+		if (IS_ERR(pctldev->hog_default)) {
- 			dev_dbg(dev, "failed to lookup the default state\n");
- 		} else {
--			if (pinctrl_select_state_locked(pctldev->p, s))
-+			if (pinctrl_select_state_locked(pctldev->p,
-+						pctldev->hog_default))
- 				dev_err(dev,
- 					"failed to select default state\n");
- 		}
-+
-+		pctldev->hog_sleep =
-+			pinctrl_lookup_state_locked(pctldev->p,
-+						    PINCTRL_STATE_SLEEP);
-+		if (IS_ERR(pctldev->hog_sleep))
-+			dev_dbg(dev, "failed to lookup the sleep state\n");
- 	}
- 
- 	mutex_unlock(&pinctrl_mutex);
-diff --git a/drivers/pinctrl/core.h b/drivers/pinctrl/core.h
-index 12f5694..232a9f6 100644
---- a/drivers/pinctrl/core.h
-+++ b/drivers/pinctrl/core.h
-@@ -30,6 +30,8 @@ struct pinctrl_gpio_range;
-  * @driver_data: driver data for drivers registering to the pin controller
-  *	subsystem
-  * @p: result of pinctrl_get() for this device
-+ * @hog_default: default state for pins hogged by this device
-+ * @hog_sleep: sleep state for pins hogged by this device
-  * @device_root: debugfs root for this device
-  */
- struct pinctrl_dev {
-@@ -41,6 +43,8 @@ struct pinctrl_dev {
- 	struct module *owner;
- 	void *driver_data;
- 	struct pinctrl *p;
-+	struct pinctrl_state *hog_default;
-+	struct pinctrl_state *hog_sleep;
- #ifdef CONFIG_DEBUG_FS
- 	struct dentry *device_root;
- #endif
-@@ -164,5 +168,8 @@ int pinctrl_register_map(struct pinctrl_map const *maps, unsigned num_maps,
- 			 bool dup, bool locked);
- void pinctrl_unregister_map(struct pinctrl_map const *map);
- 
-+extern int pinctrl_force_sleep(struct pinctrl_dev *pctldev);
-+extern int pinctrl_force_default(struct pinctrl_dev *pctldev);
-+
- extern struct mutex pinctrl_mutex;
- extern struct list_head pinctrldev_list;
--- 
-1.7.11.3
+On Mon, Nov 26, 2012 at 4:38 PM, Josh Coombs <josh.coombs@gmail.com> wrote:
+> I've been banging on my test setup for the past week.  I haven't
+> tracked down the cause yet, but something in my prior build system
+> results in this problem being masked with some builds.  Doing pure
+> vanilla builds from git I'm able to reproduce with 3.6 and the 3.7-rc
+> series reliably.  Support for my GFN doesn't exist officially prior to
+> 3.6 and I didn't want to introduce new variables by back porting
+> support and trying to test with that patch set so I was unable to
+> isolate a start point for the failure I found.  I can reproduce the
+> failure with 3.7-rc6 currently.
+>
+> Currently I'm running stable on 3.7-rc6 with the below patch and my
+> RealTek 8712 USB NIC.
+>
+> I'm open to any and all suggestions on how to test further.
+>
+> Signed-off-by: Joshua Coombs <josh.coombs@gmail.com>
+> --
+> diff -ruN a/drivers/staging/rtl8712/rtl871x_sta_mgt.c
+> b/drivers/staging/rtl8712/rtl871x_sta_mgt.c
+> --- a/drivers/staging/rtl8712/rtl871x_sta_mgt.c 2012-11-17
+> 16:21:23.000000000 -0500
+> +++ b/drivers/staging/rtl8712/rtl871x_sta_mgt.c 2012-11-18
+> 14:58:27.000000000 -0500
+> @@ -52,11 +52,11 @@
+>   s32 i;
+>
+>   pstapriv->pallocated_stainfo_buf = _malloc(sizeof(struct sta_info) *
+> -   NUM_STA + 4);
+> +   NUM_STA + 8);
+>   if (pstapriv->pallocated_stainfo_buf == NULL)
+>   return _FAIL;
+> - pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 4 -
+> - ((addr_t)(pstapriv->pallocated_stainfo_buf) & 3);
+> + pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 8 -
+> + ((addr_t)(pstapriv->pallocated_stainfo_buf) & 7);
+>   _init_queue(&pstapriv->free_sta_queue);
+>   spin_lock_init(&pstapriv->sta_hash_lock);
+>   pstapriv->asoc_sta_count = 0;
