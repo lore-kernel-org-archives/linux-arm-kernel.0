@@ -1,65 +1,55 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 14 Dec 2012 17:45:28 +0100
-Subject: [PATCH 4/7] ARM: sh7372: add clock lookup entries for DT-based devices
-In-Reply-To: <1355503531-7276-1-git-send-email-g.liakhovetski@gmx.de>
-References: <1355503531-7276-1-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <1355503531-7276-5-git-send-email-g.liakhovetski@gmx.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 14 Dec 2012 08:46:27 -0800
+Subject: [PATCH 1/2] ARM: OMAP4: clock data: div_iva_hs_clk is a
+ power-of-two divider
+In-Reply-To: <20121214073248.24383.76201.stgit@dusk.lan>
+References: <20121214072028.24383.41000.stgit@dusk.lan>
+ <20121214073248.24383.76201.stgit@dusk.lan>
+Message-ID: <CAPtuhTgvNw+Pzggi7OybygY0JJ+r-_HeYHQ0j5t8vdd6jPuhqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting with DT, devices are named differently. To get their clocks
-additional entries have to be added to the lookup table.
+On Thu, Dec 13, 2012 at 11:32 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> The OMAP4 clock divider "div_iva_hs_clk" is listed in the clock data
+> as an OMAP HSDIVIDER, but it's actually a power-of-two divider.  This
+> causes a warning during boot on an OMAP4460 Pandaboard-ES with a
+> recent u-boot:
+>
+> WARNING: at arch/arm/mach-omap2/clkt_clksel.c:143 omap2_clksel_recalc+0xf4/0x12c()
+> clock: div_iva_hs_clk: could not find fieldval 0 for parent dpll_core_m5x2_ck
+>
+> Fix by converting the data for this clock to a power-of-two divider.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> ---
+>  arch/arm/mach-omap2/cclock44xx_data.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
+> index aa56c3e..a3c54b2 100644
+> --- a/arch/arm/mach-omap2/cclock44xx_data.c
+> +++ b/arch/arm/mach-omap2/cclock44xx_data.c
+> @@ -286,9 +286,9 @@ DEFINE_CLK_DIVIDER(div_core_ck, "dpll_core_m5x2_ck", &dpll_core_m5x2_ck, 0x0,
+>                    OMAP4430_CM_CLKSEL_CORE, OMAP4430_CLKSEL_CORE_SHIFT,
+>                    OMAP4430_CLKSEL_CORE_WIDTH, 0x0, NULL);
+>
+> -DEFINE_CLK_OMAP_HSDIVIDER(div_iva_hs_clk, "dpll_core_m5x2_ck",
+> -                         &dpll_core_m5x2_ck, 0x0, OMAP4430_CM_BYPCLK_DPLL_IVA,
+> -                         OMAP4430_CLKSEL_0_1_MASK);
+> +DEFINE_CLK_DIVIDER(div_iva_hs_clk, "dpll_core_m5x2_ck", &dpll_core_m5x2_ck,
+> +                  0x0, OMAP4430_CM_BYPCLK_DPLL_IVA, OMAP4430_CLKSEL_0_1_SHIFT,
+> +                  OMAP4430_CLKSEL_0_1_WIDTH, CLK_DIVIDER_POWER_OF_TWO, NULL);
+>
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
----
- arch/arm/mach-shmobile/clock-sh7372.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+Hi Paul,
 
-diff --git a/arch/arm/mach-shmobile/clock-sh7372.c b/arch/arm/mach-shmobile/clock-sh7372.c
-index 430a90f..2471f77 100644
---- a/arch/arm/mach-shmobile/clock-sh7372.c
-+++ b/arch/arm/mach-shmobile/clock-sh7372.c
-@@ -618,6 +618,7 @@ static struct clk_lookup lookups[] = {
- 
- 	/* MSTP32 clocks */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.2", &mstp_clks[MSTP001]), /* IIC2 */
-+	CLKDEV_DEV_ID("fff30000.i2c", &mstp_clks[MSTP001]), /* IIC2 */
- 	CLKDEV_DEV_ID("spi_sh_msiof.0", &mstp_clks[MSTP000]), /* MSIOF0 */
- 	CLKDEV_DEV_ID("uio_pdrv_genirq.4", &mstp_clks[MSTP131]), /* VEU3 */
- 	CLKDEV_DEV_ID("uio_pdrv_genirq.3", &mstp_clks[MSTP130]), /* VEU2 */
-@@ -630,6 +631,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-mipi-dsi.0", &mstp_clks[MSTP118]), /* DSITX0 */
- 	CLKDEV_DEV_ID("sh_mobile_lcdc_fb.1", &mstp_clks[MSTP117]), /* LCDC1 */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.0", &mstp_clks[MSTP116]), /* IIC0 */
-+	CLKDEV_DEV_ID("fff20000.i2c", &mstp_clks[MSTP116]), /* IIC0 */
- 	CLKDEV_DEV_ID("sh_mobile_meram.0", &mstp_clks[MSTP113]), /* MERAM */
- 	CLKDEV_DEV_ID("uio_pdrv_genirq.5", &mstp_clks[MSTP106]), /* JPU */
- 	CLKDEV_DEV_ID("uio_pdrv_genirq.0", &mstp_clks[MSTP101]), /* VPU */
-@@ -651,18 +653,25 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP200]), /* SCIFA4 */
- 	CLKDEV_DEV_ID("sh_fsi2", &mstp_clks[MSTP328]), /* FSI2 */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.1", &mstp_clks[MSTP323]), /* IIC1 */
-+	CLKDEV_DEV_ID("e6c20000.i2c", &mstp_clks[MSTP323]), /* IIC1 */
- 	CLKDEV_DEV_ID("r8a66597_hcd.0", &mstp_clks[MSTP322]), /* USB0 */
- 	CLKDEV_DEV_ID("r8a66597_udc.0", &mstp_clks[MSTP322]), /* USB0 */
- 	CLKDEV_DEV_ID("renesas_usbhs.0", &mstp_clks[MSTP322]), /* USB0 */
- 	CLKDEV_DEV_ID("sh_flctl.0", &mstp_clks[MSTP315]), /* FLCTL */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]), /* SDHI0 */
-+	CLKDEV_DEV_ID("e6850000.sdhi", &mstp_clks[MSTP314]), /* SDHI0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP313]), /* SDHI1 */
-+	CLKDEV_DEV_ID("e6860000.sdhi", &mstp_clks[MSTP313]), /* SDHI1 */
- 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP312]), /* MMC */
-+	CLKDEV_DEV_ID("e6bd0000.mmcif", &mstp_clks[MSTP312]), /* MMC */
- 	CLKDEV_DEV_ID("sh-mipi-dsi.1", &mstp_clks[MSTP423]), /* DSITX1 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP415]), /* SDHI2 */
-+	CLKDEV_DEV_ID("e6870000.sdhi", &mstp_clks[MSTP415]), /* SDHI2 */
- 	CLKDEV_DEV_ID("sh-mobile-hdmi", &mstp_clks[MSTP413]), /* HDMI */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.3", &mstp_clks[MSTP411]), /* IIC3 */
-+	CLKDEV_DEV_ID("e6d20000.i2c", &mstp_clks[MSTP411]), /* IIC3 */
- 	CLKDEV_DEV_ID("i2c-sh_mobile.4", &mstp_clks[MSTP410]), /* IIC4 */
-+	CLKDEV_DEV_ID("e6d30000.i2c", &mstp_clks[MSTP410]), /* IIC4 */
- 	CLKDEV_DEV_ID("sh-dma-engine.4", &mstp_clks[MSTP407]), /* USB-DMAC1 */
- 	CLKDEV_DEV_ID("r8a66597_hcd.1", &mstp_clks[MSTP406]), /* USB1 */
- 	CLKDEV_DEV_ID("r8a66597_udc.1", &mstp_clks[MSTP406]), /* USB1 */
--- 
-1.7.2.5
+Looks good to me.
+
+Regards,
+Mike
+
+>  DEFINE_CLK_DIVIDER(div_mpu_hs_clk, "dpll_core_m5x2_ck", &dpll_core_m5x2_ck,
+>                    0x0, OMAP4430_CM_BYPCLK_DPLL_MPU, OMAP4430_CLKSEL_0_1_SHIFT,
+>
+>
