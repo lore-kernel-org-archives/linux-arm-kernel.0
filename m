@@ -1,38 +1,39 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 14 Dec 2012 10:45:31 -0600
-Subject: [GIT PULL] ARM: OMAP2+: Timer build warnings fixes for v3.8-rc
-Message-ID: <50CB57AB.8080503@ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 14 Dec 2012 17:45:25 +0100
+Subject: [PATCH 1/7] ARM: sh7372: add missing "#interrupt-cells" properties
+In-Reply-To: <1355503531-7276-1-git-send-email-g.liakhovetski@gmx.de>
+References: <1355503531-7276-1-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <1355503531-7276-2-git-send-email-g.liakhovetski@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 698d601224824bc1a5bf17f3d86be902e2aabff0:
+Two of four interrupt controllers in sh7372.dtsi are missing the compulsory
+"#interrupt-cells" properties. Fix this.
 
-  Merge tag 'drivers' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2012-12-13 10:59:11 -0800)
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+---
+ arch/arm/boot/dts/sh7372.dtsi |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-are available in the git repository at:
-
-
-  git://github.com/jonhunter/linux.git fixes-timer-build
-
-for you to fetch changes up to bf85f205d95eb223e849914101e0db1a5a576a3c:
-
-  ARM: OMAP2+: Fix sparse warnings in timer.c (2012-12-14 10:14:55 -0600)
-
-----------------------------------------------------------------
-Fixes for a few timer warnings observed with different kernel
-configurations for OMAP2+ devices.
-
-I have dropped the patch to fix a build error for OMAP4 in the
-timer code as Olof already has this fix merged.
-----------------------------------------------------------------
-
-Jon Hunter (2):
-      ARM: OMAP2+: Fix realtime_counter_init warning in timer.c
-      ARM: AM335x: Fix warning in timer.c
-
-Vaibhav Hiremath (1):
-      ARM: OMAP2+: Fix sparse warnings in timer.c
-
- arch/arm/mach-omap2/Kconfig |    3 ++-
- arch/arm/mach-omap2/timer.c |    6 +++---
- 2 files changed, 5 insertions(+), 4 deletions(-)
+diff --git a/arch/arm/boot/dts/sh7372.dtsi b/arch/arm/boot/dts/sh7372.dtsi
+index da03ee6..00f1645 100644
+--- a/arch/arm/boot/dts/sh7372.dtsi
++++ b/arch/arm/boot/dts/sh7372.dtsi
+@@ -943,6 +943,7 @@
+ 			interrupt-controller;
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
++			#interrupt-cells = <1>;
+ 			ranges;
+ 
+ 			reg = <0xe6900000 0x70>;
+@@ -1052,6 +1053,7 @@
+ 			interrupt-controller;
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
++			#interrupt-cells = <1>;
+ 			ranges;
+ 
+ 			reg = <0xe6900008 0x70>;
+-- 
+1.7.2.5
