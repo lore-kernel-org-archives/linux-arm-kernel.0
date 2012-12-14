@@ -1,77 +1,155 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 14 Dec 2012 15:17:02 +0100
-Subject: [PATCH] ARM: u300: delete custom pin hog code
-Message-ID: <1355494622-26022-1-git-send-email-linus.walleij@stericsson.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 14 Dec 2012 15:26:24 +0100
+Subject: [PATCH RESEND 5/6 v10] gpio: Add device tree support to block GPIO API
+In-Reply-To: <1355495185-24220-1-git-send-email-stigge@antcom.de>
+References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
+Message-ID: <1355495185-24220-6-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+This patch adds device tree support to the block GPIO API.
 
-With recent changes in the kernel, the MMCI and PL011 UART
-drivers will autonomously request their pins to be muxed in,
-so this machine-specific pin hogging code is just interfering
-with the proper mechanism and causing regressions in the v3.8
-kernel. Delete it and the problems go away.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Hi ARM SoC guys: please line up this one U300 patch for the
-ARM fixes during/following the v3.8 merge window.
----
- arch/arm/mach-u300/core.c | 34 ----------------------------------
- 1 file changed, 34 deletions(-)
+ Documentation/devicetree/bindings/gpio/gpio-block.txt |   36 +++++++
+ drivers/gpio/Makefile                                 |    1 
+ drivers/gpio/gpioblock-of.c                           |   84 ++++++++++++++++++
+ 3 files changed, 121 insertions(+)
 
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index 12f3994..0374b98 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -27,7 +27,6 @@
- #include <linux/mtd/nand.h>
- #include <linux/mtd/fsmc.h>
- #include <linux/pinctrl/machine.h>
--#include <linux/pinctrl/consumer.h>
- #include <linux/pinctrl/pinconf-generic.h>
- #include <linux/dma-mapping.h>
- #include <linux/platform_data/clk-u300.h>
-@@ -1543,39 +1542,6 @@ static struct pinctrl_map __initdata u300_pinmux_map[] = {
- 				    pin_highz_conf),
- };
+--- /dev/null
++++ linux-2.6/Documentation/devicetree/bindings/gpio/gpio-block.txt
+@@ -0,0 +1,36 @@
++Block GPIO definition
++=====================
++
++This binding specifies arbitrary blocks of gpios, combining gpios from one or
++more GPIO controllers together, to form a word for r/w access.
++
++Required property:
++- compatible: must be "linux,gpio-block"
++
++Required subnodes:
++- the name will be the registered name of the block
++- property "gpios" is a list of gpios for the respective block
++
++Example:
++
++        blockgpio {
++                compatible = "linux,gpio-block";
++
++                block0 {
++                        gpios = <&gpio 3 0 0>,
++                                <&gpio 3 1 0>;
++                };
++                block1 {
++                        gpios = <&gpio 4 1 0>,
++                                <&gpio 4 3 0>,
++                                <&gpio 4 2 0>,
++                                <&gpio 4 4 0>,
++                                <&gpio 4 5 0>,
++                                <&gpio 4 6 0>,
++                                <&gpio 4 7 0>,
++                                <&gpio 4 8 0>,
++                                <&gpio 4 9 0>,
++                                <&gpio 4 10 0>,
++                                <&gpio 4 19 0>;
++                };
++        };
+--- linux-2.6.orig/drivers/gpio/Makefile
++++ linux-2.6/drivers/gpio/Makefile
+@@ -4,6 +4,7 @@ ccflags-$(CONFIG_DEBUG_GPIO)	+= -DDEBUG
  
--struct u300_mux_hog {
--	struct device *dev;
--	struct pinctrl *p;
--};
--
--static struct u300_mux_hog u300_mux_hogs[] = {
--	{
--		.dev = &uart0_device.dev,
--	},
--	{
--		.dev = &mmcsd_device.dev,
--	},
--};
--
--static int __init u300_pinctrl_fetch(void)
--{
--	int i;
--
--	for (i = 0; i < ARRAY_SIZE(u300_mux_hogs); i++) {
--		struct pinctrl *p;
--
--		p = pinctrl_get_select_default(u300_mux_hogs[i].dev);
--		if (IS_ERR(p)) {
--			pr_err("u300: could not get pinmux hog for dev %s\n",
--			       dev_name(u300_mux_hogs[i].dev));
--			continue;
--		}
--		u300_mux_hogs[i].p = p;
--	}
--	return 0;
--}
--subsys_initcall(u300_pinctrl_fetch);
--
- /*
-  * Notice that AMBA devices are initialized before platform devices.
-  *
--- 
-1.7.11.3
+ obj-$(CONFIG_GPIOLIB)		+= gpiolib.o devres.o
+ obj-$(CONFIG_OF_GPIO)		+= gpiolib-of.o
++obj-$(CONFIG_OF_GPIO)		+= gpioblock-of.o
+ 
+ # Device drivers. Generally keep list sorted alphabetically
+ obj-$(CONFIG_GPIO_GENERIC)	+= gpio-generic.o
+--- /dev/null
++++ linux-2.6/drivers/gpio/gpioblock-of.c
+@@ -0,0 +1,84 @@
++/*
++ * OF implementation for Block GPIO
++ *
++ * Copyright (C) 2012 Roland Stigge <stigge@antcom.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
++#include <linux/of.h>
++#include <linux/of_gpio.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/err.h>
++
++static int __devinit gpioblock_of_probe(struct platform_device *pdev)
++{
++	struct device_node *block;
++	unsigned *gpios;
++	int ngpio;
++	int ret;
++	struct gpio_block *gb;
++
++	for_each_available_child_of_node(pdev->dev.of_node, block) {
++		int i;
++
++		ngpio = of_gpio_count(block);
++		gpios = kzalloc(ngpio * sizeof(*gpios), GFP_KERNEL);
++		if (!gpios)
++			return -ENOMEM;
++		for (i = 0; i < ngpio; i++) {
++			ret = of_get_gpio(block, i);
++			if (ret < 0)
++				return ret; /* expect -EPROBE_DEFER */
++			gpios[i] = ret;
++		}
++		gb = gpio_block_create(gpios, ngpio, block->name);
++		if (IS_ERR(gb)) {
++			dev_err(&pdev->dev,
++				"Error creating GPIO block from device tree\n");
++			return PTR_ERR(gb);
++		}
++		ret = gpio_block_register(gb);
++		if (ret < 0) {
++			gpio_block_free(gb);
++			return ret;
++		}
++		kfree(gpios);
++		dev_info(&pdev->dev, "Registered gpio block %s: %d gpios\n",
++			 block->name, ngpio);
++	}
++	return 0;
++}
++
++#ifdef CONFIG_OF
++static struct of_device_id gpioblock_of_match[] __devinitdata = {
++	{ .compatible = "linux,gpio-block", },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, gpioblock_of_match);
++#endif
++
++static struct platform_driver gpioblock_of_driver = {
++	.driver	= {
++		.name = "gpio-block",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(gpioblock_of_match),
++
++	},
++	.probe	= gpioblock_of_probe,
++};
++
++module_platform_driver(gpioblock_of_driver);
++
++MODULE_DESCRIPTION("GPIO Block driver");
++MODULE_AUTHOR("Roland Stigge <stigge@antcom.de>");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:gpioblock-of");
