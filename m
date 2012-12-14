@@ -1,44 +1,73 @@
-From: behanw@websterwood.com (Behan Webster)
-Date: Fri, 14 Dec 2012 09:47:17 -0500
-Subject: vexpress compilation error in next-20121127
-In-Reply-To: <1355478545.26914.2.camel@hornet>
-References: <50B56601.5010305@broadcom.com> <50CA278D.4030409@websterwood.com>
- <1355478545.26914.2.camel@hornet>
-Message-ID: <50CB3BF5.4000202@websterwood.com>
+From: tobetter@gmail.com (Dongjin Kim)
+Date: Fri, 14 Dec 2012 23:59:44 +0900
+Subject: [PATCH] ARM: EXYNOS: Fix MSHC clocks instance names
+Message-ID: <1355497184-26825-1-git-send-email-tobetter@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/12 04:49, Pawel Moll wrote:
-> On Thu, 2012-12-13 at 19:07 +0000, Behan Webster wrote:
->> On 11/27/12 20:16, Markus Mayer wrote:
->>> Hi Pawel,
->>>
->>> There seems to be an issue compiling vexpress at this point. The
->>> problem being that vexpress' makefile references reset.o, but there's
->>> no reset.c in arch/arm/mach-vexpress.
->>>
->>> [...]
->>>    CC      arch/arm/mach-bcm/board_bcm.o
->>>    LD      arch/arm/mach-bcm/built-in.o
->>>    CC      arch/arm/mach-vexpress/v2m.o
->>> make[1]: *** No rule to make target `arch/arm/mach-vexpress/reset.o',
->>> needed by `arch/arm/mach-vexpress/built-in.o'.  Stop.
->>> make: *** [arch/arm/mach-vexpress] Error 2
->> Same issue in mainline now too: arch/arm/mach-vexpress/reset.c is missing.
-> Yes, I've noticed this myself. It's just that the pull request for the
-> arm-soc drivers branch went out in the second batch yesterday
-> (http://article.gmane.org/gmane.linux.kernel/1409413), while the soc one
-> in the first one.
-I see it now. Thanks!
+Replace clock instance name of MSHC controller for BIC and CIU of Exynos4412.
 
->   This was a bad decision to split the reset driver from
-> the main update series, apologies about this.
-No worries. Just making sure the issue didn't go unnoticed.
+Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+---
+ arch/arm/mach-exynos/clock-exynos4.c |   25 ++++++++++++++-----------
+ 1 file changed, 14 insertions(+), 11 deletions(-)
 
-Thanks again,
-
-Behan
-
+diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
+index efead60..ae83011 100644
+--- a/arch/arm/mach-exynos/clock-exynos4.c
++++ b/arch/arm/mach-exynos/clock-exynos4.c
+@@ -529,8 +529,8 @@ static struct clk exynos4_init_clocks_off[] = {
+ 		.enable		= exynos4_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 8),
+ 	}, {
+-		.name		= "dwmmc",
+-		.parent		= &exynos4_clk_aclk_133.clk,
++		.name		= "biu",
++		.parent		= &exynos4_clk_aclk_200.clk,
+ 		.enable		= exynos4_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 9),
+ 	}, {
+@@ -1132,15 +1132,7 @@ static struct clksrc_clk exynos4_clksrcs[] = {
+ 		.sources = &exynos4_clkset_mout_mfc,
+ 		.reg_src = { .reg = EXYNOS4_CLKSRC_MFC, .shift = 8, .size = 1 },
+ 		.reg_div = { .reg = EXYNOS4_CLKDIV_MFC, .shift = 0, .size = 4 },
+-	}, {
+-		.clk	= {
+-			.name		= "sclk_dwmmc",
+-			.parent		= &exynos4_clk_dout_mmc4.clk,
+-			.enable		= exynos4_clksrc_mask_fsys_ctrl,
+-			.ctrlbit	= (1 << 16),
+-		},
+-		.reg_div = { .reg = EXYNOS4_CLKDIV_FSYS3, .shift = 8, .size = 8 },
+-	}
++	},
+ };
+ 
+ static struct clksrc_clk exynos4_clk_sclk_uart0 = {
+@@ -1235,6 +1227,16 @@ static struct clksrc_clk exynos4_clk_sclk_mmc3 = {
+ 	.reg_div = { .reg = EXYNOS4_CLKDIV_FSYS2, .shift = 24, .size = 8 },
+ };
+ 
++static struct clksrc_clk exynos4_clk_sclk_dwmci = {
++	.clk    = {
++		.name           = "ciu",
++		.parent         = &exynos4_clk_dout_mmc4.clk,
++		.enable         = exynos4_clksrc_mask_fsys_ctrl,
++		.ctrlbit        = (1 << 16),
++	},
++	.reg_div = { .reg = EXYNOS4_CLKDIV_FSYS3, .shift = 8, .size = 8 },
++};
++
+ static struct clksrc_clk exynos4_clk_mdout_spi0 = {
+ 	.clk	= {
+ 		.name		= "mdout_spi",
+@@ -1348,6 +1350,7 @@ static struct clksrc_clk *exynos4_clksrc_cdev[] = {
+ 	&exynos4_clk_sclk_mmc1,
+ 	&exynos4_clk_sclk_mmc2,
+ 	&exynos4_clk_sclk_mmc3,
++	&exynos4_clk_sclk_dwmci,
+ 	&exynos4_clk_sclk_spi0,
+ 	&exynos4_clk_sclk_spi1,
+ 	&exynos4_clk_sclk_spi2,
 -- 
-Behan Webster
-behanw at websterwood.com
+1.7.9.5
