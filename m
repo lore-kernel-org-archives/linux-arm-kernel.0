@@ -1,53 +1,32 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Fri, 14 Dec 2012 19:06:58 +0800
-Subject: [PATCH] DMAEngine: sirf: lock the shared registers access in
- sirfsoc_dma_terminate_all
-Message-ID: <1355483218-28814-1-git-send-email-Barry.Song@csr.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 14 Dec 2012 12:09:18 +0100
+Subject: cpts: Fix build error caused by include of plat/clock.h
+In-Reply-To: <45364223-10C6-430A-9085-9DE1C79030AF@dominion.thruhere.net>
+References: <20121213213641.GF4989@atomide.com>
+ <20121214071300.GA2253@netboy.at.omicron.at>
+ <45364223-10C6-430A-9085-9DE1C79030AF@dominion.thruhere.net>
+Message-ID: <20121214110918.GA7982@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+On Fri, Dec 14, 2012 at 10:55:56AM +0100, Koen Kooi wrote:
+> 
+> Op 14 dec. 2012, om 08:13 heeft Richard Cochran <richardcochran@gmail.com> het volgende geschreven:
+> 
+> > On Thu, Dec 13, 2012 at 01:36:41PM -0800, Tony Lindgren wrote:
+> >> Commit 87c0e764 (cpts: introduce time stamping code and a PTP hardware clock)
+> >> mistakenly included plat/clock.h that should not be included by drivers
+> >> even if it exists.
+> > 
+> > Hasn't this already been fixed?
+> > 
+> >  https://patchwork.kernel.org/patch/1810481/
+> >  http://www.spinics.net/lists/linux-omap/msg83132.html
+> 
+> That patch didn't get applied, so it's still broken in Linus' tree :(
 
-Just like Russell pointed out in "DMAEngine: sirf: add DMA
-pause/resume support" at
-http://www.spinics.net/lists/arm-kernel/msg212496.html
-here I find sirfsoc_dma_terminate_all() has same problem,
-so move the locking to the front of registers access.
+In netdev's patchwork, this was marked "Not Applicable." Dave, can you
+possibly take this patch? If not, who should I ask next?
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
-Cc: Russell King <linux@arm.linux.org.uk>
----
- drivers/dma/sirf-dma.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 623f195..df8e2e6 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -291,6 +291,8 @@ static int sirfsoc_dma_terminate_all(struct sirfsoc_dma_chan *schan)
- 	int cid = schan->chan.chan_id;
- 	unsigned long flags;
- 
-+	spin_lock_irqsave(&schan->lock, flags);
-+
- 	if (!sdma->is_marco) {
- 		writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_INT_EN) &
- 			~(1 << cid), sdma->base + SIRFSOC_DMA_INT_EN);
-@@ -305,9 +307,9 @@ static int sirfsoc_dma_terminate_all(struct sirfsoc_dma_chan *schan)
- 
- 	writel_relaxed(1 << cid, sdma->base + SIRFSOC_DMA_CH_VALID);
- 
--	spin_lock_irqsave(&schan->lock, flags);
- 	list_splice_tail_init(&schan->active, &schan->free);
- 	list_splice_tail_init(&schan->queued, &schan->free);
-+
- 	spin_unlock_irqrestore(&schan->lock, flags);
- 
- 	return 0;
--- 
-1.7.5.4
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Thanks,
+Richard
