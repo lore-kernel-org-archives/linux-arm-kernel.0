@@ -1,41 +1,35 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 14 Dec 2012 10:27:24 +0800
-Subject: [PATCH v3] mxs: uart: allow setting RTS from software
-In-Reply-To: <1355405263-29625-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1355405263-29625-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <50CA8E8C.5060906@freescale.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 14 Dec 2012 11:46:28 +0900
+Subject: [PATCH 02/12] regulator: gpio-regulator: Only read GPIO
+ [dis|en]able pin if not always-on
+In-Reply-To: <20121213114818.GH27617@gmail.com>
+References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
+ <1355129761-8088-3-git-send-email-lee.jones@linaro.org>
+ <20121210141000.GC6103@opensource.wolfsonmicro.com>
+ <20121213114818.GH27617@gmail.com>
+Message-ID: <20121214024626.GA4478@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?12?13? 21:27, Steffen Trumtrar ??:
-> With the patch "serial: mxs-auart: fix the wrong RTS hardware flow control" the
-> mainline mxs-uart driver now sets RTSEN only when hardware flow control is
-> enabled via software. It is not possible any longer to set RTS manually via
-> software. However, the manual modification is a valid operation.
-> Regain the possibility to set RTS via software and only set RTSEN when hardware
-> flow control is explicitly enabled via settermios cflag CRTSCTS.
->
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
->  drivers/tty/serial/mxs-auart.c |    4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-> index 6db23b0..9f63f88 100644
-> --- a/drivers/tty/serial/mxs-auart.c
-> +++ b/drivers/tty/serial/mxs-auart.c
-> @@ -412,10 +412,12 @@ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
->  
->  	u32 ctrl = readl(u->membase + AUART_CTRL2);
->  
-> -	ctrl &= ~AUART_CTRL2_RTSEN;
-> +	ctrl &= ~(AUART_CTRL2_RTSEN | AUART_CTRL2_RTS);
->  	if (mctrl & TIOCM_RTS) {
->  		if (tty_port_cts_enabled(&u->state->port))
->  			ctrl |= AUART_CTRL2_RTSEN;
-> +		else
-> +			ctrl |= AUART_CTRL2_RTS;
->  	}
->  
->  	s->ctrl = mctrl;
-Reviewed-by: Huang Shijie <b32955@freescale.com>
+On Thu, Dec 13, 2012 at 11:48:18AM +0000, Lee Jones wrote:
+> On Mon, 10 Dec 2012, Mark Brown wrote:
+> > On Mon, Dec 10, 2012 at 08:55:51AM +0000, Lee Jones wrote:
+> > > If a regulator is specified as always-on, then it can't have an
+> > > enable/disable pin, as it can't be turned off.
+
+> > Sometimes always on gets set for regulators which do have a physical
+> > control wired up - the control might exist for use in suspend mode for
+> > example.  Is the ability to specify an enable pin causing a practical
+> > problem for systems?  If it is we should fix that.
+
+> My logic is that there is no point in requesting a pin which can
+> disable a regulator that can't be disabled. Then we can follow
+> on from that logic and say that if a regulator is _not_ always on
+> this we _require_ a way to disable it, thus we insist on an enable
+> GPIO pin.
+
+> With me?
+
+No.  Making the enable pin optional for always on regulators is fine,
+forbidding it is not - that won't work for things like the suspend case
+I mentioned.
