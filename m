@@ -1,145 +1,125 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 14 Dec 2012 13:47:27 +0530
-Subject: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
- OMAP-L138 DSP
-In-Reply-To: <CA+V-a8sGKjRVe4Qm85rSZzToNNZEe29hcug2CY5a_yi60bmBaQ@mail.gmail.com>
-References: <1352853207-20602-1-git-send-email-rtivy@ti.com>
- <1352853207-20602-5-git-send-email-rtivy@ti.com> <50AB76FA.1050505@ti.com>
- <13514BD7FAEBA745BBD7D8A672905C14311F952B@DFLE08.ent.ti.com>
- <50B88F7C.5000705@ti.com>
- <13514BD7FAEBA745BBD7D8A672905C14311FBDA3@DFLE08.ent.ti.com>
- <50C85D9F.6050306@ti.com>
- <CA+V-a8sTBXMCXoTAjbuT9HUJkw_Na5SRUz2qAwvrebQXPWg6Rg@mail.gmail.com>
- <50C8816F.5020801@ti.com>
- <CA+V-a8uAoM78=2O5XdVvbu75ChxHAhudZN09fO8xcUu3SCLa0w@mail.gmail.com>
- <CA+V-a8sGKjRVe4Qm85rSZzToNNZEe29hcug2CY5a_yi60bmBaQ@mail.gmail.com>
-Message-ID: <50CAE097.5000504@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 14 Dec 2012 09:25:21 +0100
+Subject: [PATCH 8/8] ARM: ux500: Remove traces of the ios_handler from
+ platform code
+In-Reply-To: <1355404930-5691-9-git-send-email-lee.jones@linaro.org>
+References: <1355404930-5691-1-git-send-email-lee.jones@linaro.org>
+ <1355404930-5691-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAPDyKFosXFxQCAeKNnmvM4rY5_otj=FfYdR1Vi_HBq_kk130eQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/13/2012 1:48 PM, Prabhakar Lad wrote:
-> Sekhar,
-> 
-> On Wed, Dec 12, 2012 at 6:43 PM, Prabhakar Lad
-> <prabhakar.csengg@gmail.com> wrote:
->> On Wed, Dec 12, 2012 at 6:36 PM, Sekhar Nori <nsekhar@ti.com> wrote:
->>> On 12/12/2012 4:31 PM, Prabhakar Lad wrote:
->>>> Hi Sekhar,
->>>>
->>>> On Wed, Dec 12, 2012 at 4:04 PM, Sekhar Nori <nsekhar@ti.com> wrote:
->>>>> On 12/12/2012 7:06 AM, Tivy, Robert wrote:
->>>>>>> -----Original Message-----
->>>>>>> From: Nori, Sekhar
->>>>>>> Sent: Friday, November 30, 2012 2:51 AM
->>>>>>>
->>>>>>> Hi Rob,
->>>>>>>
->>>>>>> On 11/29/2012 7:08 AM, Tivy, Robert wrote:
->>>>>>>> Hi Sekhar,
->>>>>>>>
->>>>>>>> Please see comments and noob questions below...
->>>>>>>>
->>>>>>>> They can run a single image if the image supports overriding the
->>>>>>> Kconfig settings with kernel command-line arguments.
->>>>>>>>
->>>>>>>> The most basic solution is constants in the .c file itself.  A better
->>>>>>> solution is Kconfig settings used by the .c file.  An even better
->>>>>>> solution is Kconfig settings with kernel command-line overrides.
->>>>>>>
->>>>>>> If you have kernel command line, you could default to some values which
->>>>>>> are sane in most cases if they are not provided. No, need to have a
->>>>>>> Kconfig as well. That will be too many hooks to control the same things
->>>>>>> and probably not necessary.
->>>>>>>
->>>>>>>>
->>>>>>>>> If you want the remoteproc driver to allocate a certain area of
->>>>>>> memory
->>>>>>>>> to the dsp, why don't you take that value as a module parameter so
->>>>>>>>> people who need different values can pass them differently? It is
->>>>>>> not
->>>>>>>>> clear to me why this memory management needs to be dealt with in
->>>>>>>>> platform code.
->>>>>>>>
->>>>>>>> Unfortunetly we need to reserve this dsp memory during early boot,
->>>>>>> using CMA.  Runtime module insertion is too late.
->>>>>>>
->>>>>>> Then I guess most of the time the module would be built into the kernel
->>>>>>> and will be initialized using an early enough initcall.
->>>>>>
->>>>>> That's right, a .reserve function is assigned to the MACHINE_START structure, and this function calls dma_declare_contiguous().
->>>>>
->>>>> I meant use an early initcall in the driver.
->>>>>
->>>>>>
->>>>>>>>>> +
->>>>>>>>>> +static int __init early_rproc_mem(char *p) {
->>>>>>>>>> + char *endp;
->>>>>>>>>> +
->>>>>>>>>> + rproc_size = memparse(p, &endp);
->>>>>>>>>> + if (*endp == '@')
->>>>>>>>>> +         rproc_base = memparse(endp + 1, NULL);
->>>>>>>>>> +
->>>>>>>>>> + return 0;
->>>>>>>>>> +}
->>>>>>>>>> +early_param("rproc_mem", early_rproc_mem);
->>>>>>>>>
->>>>>>>>> Use of non-standard kernel parameters is discouraged. All kernel
->>>>>>>>> parameters should be documented in Documentation/kernel-
->>>>>>> parameters.txt
->>>>>>>>> (this means each and every kernel parameter needs to be justified
->>>>>>>>> well).
->>>>>>>>
->>>>>>>> Can I use the kernel command-line (i.e., u-boot bootargs variable) to
->>>>>>> specify non-kernel parameters?  I guess my question is more one about
->>>>>>> the terminology "kernel parameter" - is there a way to specify a module
->>>>>>> parameter on the kernel command line (like, perhaps, rproc.membase and
->>>>>>> rproc.memsize)?
->>>>>>>
->>>>>>> Right. Module parameters are passed from kernel command line when the
->>>>>>> module is built into the kernel.
->>>>>>
->>>>>> Unfortunately, it seems that module parameters, when stated on the kernel command line with module-name.var-name syntax, are not yet assigned when the kernel calls the early init .reserve functions.  For the "char *" I'm using, I observed a NULL value during the early init call and the proper assigned value during a later normal __init function.
->>>>>
->>>>> By "later normal __init" you mean module_init()? And you see
->>>>> dma_declare_contiguous() returning error by this time?
->>>>>
->>>>>>
->>>>>> Is there any other method that allows specifying a parameter for an early CMA reservation without having to rebuild the kernel?
->>>>>
->>>>> Nothing else comes to mind. Can you share your code in some public repo?
->>>>> It will allow me to try if something comes to mind.
->>>>>
->>>>>>
->>>>>> If not, is this a strong enough use case to justify a new kernel parameter?
->>>>>
->>>>> May be it it is. You could try adding it. Just update the documentation
->>>>> too. And add the documentation maintainers when you respin the patch.
->>>>>
->>>> I tried finding some alternatives apart from early_param, but there aren?t any.
->>>> The only thought I got from Marek is to have device tree support. How about
->>>> that as an option ?
->>>
->>> Can you explain some more? How does device tree help here? May be give a
->>> link to this discussion so I can read?
->>>
->> This patch http://thread.gmane.org/gmane.linux.kernel.samsung-soc/12911/
->> should explain it.
->>
-> Sorry for my previous short mail.
-> 
->>From the chain of previous mails what I understand is you need to pass
-> the base and size which is user provided, currently which is implemented
-> using early_param(), but use of non-standard kernel parameters is discouraged,
-> The only alternative could be pass the base address through device tree,
-> As similarly implemented in the patch pointed above that would avoid
-> rebuilding the kernel
-> and just build/rebuild the dtbs changing the bases.
+On 13 December 2012 14:22, Lee Jones <lee.jones@linaro.org> wrote:
+> Now MMCI on/off functionality is using the regulator framework
+> from the MMCI driver, there is no need to keep the ios_handler
+> laying around, duplicating functionality. So we're removing it.
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/mach-ux500/board-mop500-sdi.c |   52 --------------------------------
+>  1 file changed, 52 deletions(-)
+>
+> diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
+> index 9c8e4a9..5a798d6 100644
+> --- a/arch/arm/mach-ux500/board-mop500-sdi.c
+> +++ b/arch/arm/mach-ux500/board-mop500-sdi.c
+> @@ -31,35 +31,6 @@
+>   * SDI 0 (MicroSD slot)
+>   */
+>
+> -/* GPIO pins used by the sdi0 level shifter */
+> -static int sdi0_en = -1;
+> -static int sdi0_vsel = -1;
+> -
+> -static int mop500_sdi0_ios_handler(struct device *dev, struct mmc_ios *ios)
+> -{
+> -       switch (ios->power_mode) {
+> -       case MMC_POWER_UP:
+> -       case MMC_POWER_ON:
+> -               /*
+> -                * Level shifter voltage should depend on vdd to when deciding
+> -                * on either 1.8V or 2.9V. Once the decision has been made the
+> -                * level shifter must be disabled and re-enabled with a changed
+> -                * select signal in order to switch the voltage. Since there is
+> -                * no framework support yet for indicating 1.8V in vdd, use the
+> -                * default 2.9V.
+> -                */
+> -               gpio_direction_output(sdi0_vsel, 0);
+> -               gpio_direction_output(sdi0_en, 1);
+> -               break;
+> -       case MMC_POWER_OFF:
+> -               gpio_direction_output(sdi0_vsel, 0);
+> -               gpio_direction_output(sdi0_en, 0);
+> -               break;
+> -       }
+> -
+> -       return 0;
+> -}
+> -
+>  #ifdef CONFIG_STE_DMA40
+>  struct stedma40_chan_cfg mop500_sdi0_dma_cfg_rx = {
+>         .mode = STEDMA40_MODE_LOGICAL,
+> @@ -81,7 +52,6 @@ static struct stedma40_chan_cfg mop500_sdi0_dma_cfg_tx = {
+>  #endif
+>
+>  struct mmci_platform_data mop500_sdi0_data = {
+> -       .ios_handler    = mop500_sdi0_ios_handler,
+>         .ocr_mask       = MMC_VDD_29_30,
+>         .f_max          = 50000000,
+>         .capabilities   = MMC_CAP_4_BIT_DATA |
+> @@ -101,22 +71,6 @@ struct mmci_platform_data mop500_sdi0_data = {
+>
+>  static void sdi0_configure(struct device *parent)
+>  {
+> -       int ret;
+> -
+> -       ret = gpio_request(sdi0_en, "level shifter enable");
+> -       if (!ret)
+> -               ret = gpio_request(sdi0_vsel,
+> -                                  "level shifter 1v8-3v select");
+> -
+> -       if (ret) {
+> -               pr_warning("unable to config sdi0 gpios for level shifter.\n");
+> -               return;
+> -       }
+> -
+> -       /* Select the default 2.9V and enable level shifter */
+> -       gpio_direction_output(sdi0_vsel, 0);
+> -       gpio_direction_output(sdi0_en, 1);
+> -
+>         /* Add the device, force v2 to subrevision 1 */
+>         db8500_add_sdi0(parent, &mop500_sdi0_data, U8500_SDI_V2_PERIPHID);
+>  }
+> @@ -124,8 +78,6 @@ static void sdi0_configure(struct device *parent)
+>  void mop500_sdi_tc35892_init(struct device *parent)
+>  {
+>         mop500_sdi0_data.gpio_cd = GPIO_SDMMC_CD;
+> -       sdi0_en = GPIO_SDMMC_EN;
+> -       sdi0_vsel = GPIO_SDMMC_1V8_3V_SEL;
+>         sdi0_configure(parent);
+>  }
+>
+> @@ -264,8 +216,6 @@ void __init snowball_sdi_init(struct device *parent)
+>         /* External Micro SD slot */
+>         mop500_sdi0_data.gpio_cd = SNOWBALL_SDMMC_CD_GPIO;
+>         mop500_sdi0_data.cd_invert = true;
+> -       sdi0_en = SNOWBALL_SDMMC_EN_GPIO;
+> -       sdi0_vsel = SNOWBALL_SDMMC_1V8_3V_GPIO;
+>         sdi0_configure(parent);
+>  }
+>
+> @@ -277,8 +227,6 @@ void __init hrefv60_sdi_init(struct device *parent)
+>         db8500_add_sdi4(parent, &mop500_sdi4_data, U8500_SDI_V2_PERIPHID);
+>         /* External Micro SD slot */
+>         mop500_sdi0_data.gpio_cd = HREFV60_SDMMC_CD_GPIO;
+> -       sdi0_en = HREFV60_SDMMC_EN_GPIO;
+> -       sdi0_vsel = HREFV60_SDMMC_1V8_3V_GPIO;
+>         sdi0_configure(parent);
+>         /* WLAN SDIO channel */
+>         db8500_add_sdi1(parent, &mop500_sdi1_data, U8500_SDI_V2_PERIPHID);
+> --
+> 1.7.9.5
+>
 
-Right, thanks for the link. Samsung did solve this by passing the
-addresses from DT (I have my reservations with the approach though since
-this is not strictly hardware data). We support non-DT boot also. Unless
-Rob is okay to have a DT only version of the driver, we still need a
-solution for the non-DT case.
-
-Thanks,
-Sekhar
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
