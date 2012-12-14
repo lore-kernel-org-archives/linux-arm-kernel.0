@@ -1,34 +1,40 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 14 Dec 2012 13:18:39 -0500 (EST)
-Subject: cpts: Fix build error caused by include of plat/clock.h
-In-Reply-To: <20121214110918.GA7982@netboy.at.omicron.at>
-References: <20121214071300.GA2253@netboy.at.omicron.at>
- <45364223-10C6-430A-9085-9DE1C79030AF@dominion.thruhere.net>
- <20121214110918.GA7982@netboy.at.omicron.at>
-Message-ID: <20121214.131839.1828185049500547514.davem@davemloft.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 14 Dec 2012 10:19:03 -0800
+Subject: [PATCH -next] ARM: OMAP4: remove duplicated include from
+ omap_hwmod_44xx_data.c
+In-Reply-To: <CAPgLHd-WVCm8Ewndtu4THRW4gg+tOE6dBj9LDfRfA7MoKgXpBg@mail.gmail.com>
+References: <CAPgLHd-WVCm8Ewndtu4THRW4gg+tOE6dBj9LDfRfA7MoKgXpBg@mail.gmail.com>
+Message-ID: <20121214181902.GA4989@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Cochran <richardcochran@gmail.com>
-Date: Fri, 14 Dec 2012 12:09:18 +0100
-
-> On Fri, Dec 14, 2012 at 10:55:56AM +0100, Koen Kooi wrote:
->> 
->> Op 14 dec. 2012, om 08:13 heeft Richard Cochran <richardcochran@gmail.com> het volgende geschreven:
->> 
->> > On Thu, Dec 13, 2012 at 01:36:41PM -0800, Tony Lindgren wrote:
->> >> Commit 87c0e764 (cpts: introduce time stamping code and a PTP hardware clock)
->> >> mistakenly included plat/clock.h that should not be included by drivers
->> >> even if it exists.
->> > 
->> > Hasn't this already been fixed?
->> > 
->> >  https://patchwork.kernel.org/patch/1810481/
->> >  http://www.spinics.net/lists/linux-omap/msg83132.html
->> 
->> That patch didn't get applied, so it's still broken in Linus' tree :(
+* Wei Yongjun <weiyj.lk@gmail.com> [121128 18:48]:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > 
-> In netdev's patchwork, this was marked "Not Applicable." Dave, can you
-> possibly take this patch? If not, who should I ask next?
+> Remove duplicated include.
 
-That's strange, when I look at that patch it's marked "Accepted" ;-)
+Thanks applying into omap-for-v3.8/fixes-for-merge-window.
+
+Regards,
+
+Tony
+ 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> index e5eda55..f13fdbb 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -26,7 +26,6 @@
+>  
+>  #include <plat-omap/dma-omap.h>
+>  
+> -#include <linux/platform_data/omap_ocp2scp.h>
+>  #include <linux/platform_data/spi-omap2-mcspi.h>
+>  #include <linux/platform_data/asoc-ti-mcbsp.h>
+>  #include <plat/dmtimer.h>
+> 
+> 
