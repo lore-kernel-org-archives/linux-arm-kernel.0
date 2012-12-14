@@ -1,38 +1,45 @@
-From: tobetter@gmail.com (Dongjin Kim)
-Date: Sat, 15 Dec 2012 01:13:28 +0900
-Subject: [PATCH] ARM: EXYNOS: Fix MSHC clocks instance names
-Message-ID: <1355501608-2955-1-git-send-email-tobetter@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 14 Dec 2012 16:33:29 +0000
+Subject: [PATCH V2 2/2] mmc: mmci: Move ios_handler functionality into
+ the driver
+In-Reply-To: <20121214151002.GK14363@n2100.arm.linux.org.uk>
+References: <1355495429-12510-1-git-send-email-ulf.hansson@stericsson.com>
+ <1355495429-12510-3-git-send-email-ulf.hansson@stericsson.com>
+ <20121214151002.GK14363@n2100.arm.linux.org.uk>
+Message-ID: <20121214163329.GS27617@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace clock instance name of MSHC controller for BIC and CIU of Exynos4412.
+On Fri, 14 Dec 2012, Russell King - ARM Linux wrote:
 
-Signed-off-by: Dongjin Kim <tobetter@gmail.com>
----
- arch/arm/mach-exynos/clock-exynos4.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> On Fri, Dec 14, 2012 at 03:30:29PM +0100, Ulf Hansson wrote:
+> > From: Lee Jones <lee.jones@linaro.org>
+> > 
+> > There are currently two instances of the ios_handler being used.
+> > Both of which mearly toy with some regulator settings. Now there
+> > is a GPIO regulator API, we can use that instead, and lessen the
+> > per platform burden. By doing this, we also become more Device
+> > Tree compatible.
+> 
+> Err, why is this needed?  What's wrong with using the 'vmmc' for this?
 
-diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
-index efead60..bbcb3de 100644
---- a/arch/arm/mach-exynos/clock-exynos4.c
-+++ b/arch/arm/mach-exynos/clock-exynos4.c
-@@ -529,7 +529,7 @@ static struct clk exynos4_init_clocks_off[] = {
- 		.enable		= exynos4_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 8),
- 	}, {
--		.name		= "dwmmc",
-+		.name		= "biu",
- 		.parent		= &exynos4_clk_aclk_133.clk,
- 		.enable		= exynos4_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 9),
-@@ -1134,7 +1134,7 @@ static struct clksrc_clk exynos4_clksrcs[] = {
- 		.reg_div = { .reg = EXYNOS4_CLKDIV_MFC, .shift = 0, .size = 4 },
- 	}, {
- 		.clk	= {
--			.name		= "sclk_dwmmc",
-+			.name		= "ciu",
- 			.parent		= &exynos4_clk_dout_mmc4.clk,
- 			.enable		= exynos4_clksrc_mask_fsys_ctrl,
- 			.ctrlbit	= (1 << 16),
+It's a different regulator. The core knows about 'vmmc', which is the
+primary one, then there is a regulator called 'vqmmc' which is for I/O
+voltage. Until now this was done in a very platform specific way.
+Normally by doing gpio_set's. Now there is a regulator API which can
+deal with GPIO controlled regulators and there is provision for it in
+MMC core also, so it's time to move it to the driver.
+
+> From what I read in the mmc core, vmmc handling via mmc_regulator_set_ocr()
+> can cope with GPIO-based regulators, and if you have a single GPIO signal
+> then you have a single supply (it's either on or off).  So what's wrong
+> with using the existing regulator hooks for this which are already there?
+
+In our case it's not a 'fixed' regulator (i.e. on/off). The new GPIO
+regulator API can also control voltage selection using GPIOs too.
+
 -- 
-1.7.9.5
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
