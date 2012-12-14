@@ -1,120 +1,31 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 14 Dec 2012 21:21:02 +0100
-Subject: [PATCH 1/2 v2] pinctrl: add sleep mode management for hogs
-Message-ID: <1355516462-24724-1-git-send-email-linus.walleij@stericsson.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 14 Dec 2012 14:34:18 -0600
+Subject: [PATCH] ARM: dts: OMAP2420: Correct H4 board memory size
+Message-ID: <1355517258-30745-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Delacou <julien.delacou@stericsson.com>
+The system memory node for the OMAP2420 H4 was incorrectly defined as
+start address followed by end address, instead of start address and
+size. No noticable side-effects were observed but fix this for
+correctness.
 
-This fix allows handling sleep mode for hogged
-pins in pinctrl. It provides functions to set pins
-to sleep/default configurations according to their
-current state.
-
-Signed-off-by: Julien Delacou <julien.delacou@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
-ChangeLog v1->v2:
-- Move function prototypes to the local pinctrl/core.h header file
-- Added exports
----
- drivers/pinctrl/core.c | 37 ++++++++++++++++++++++++++++++++++---
- drivers/pinctrl/core.h |  7 +++++++
- 2 files changed, 41 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/omap2420-h4.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
-index 5b4885c..3611753 100644
---- a/drivers/pinctrl/core.c
-+++ b/drivers/pinctrl/core.c
-@@ -1076,6 +1076,30 @@ void pinctrl_unregister_map(struct pinctrl_map const *map)
- 	}
- }
+diff --git a/arch/arm/boot/dts/omap2420-h4.dts b/arch/arm/boot/dts/omap2420-h4.dts
+index 77b84e1..9b0d077 100644
+--- a/arch/arm/boot/dts/omap2420-h4.dts
++++ b/arch/arm/boot/dts/omap2420-h4.dts
+@@ -15,6 +15,6 @@
  
-+/**
-+ * pinctrl_force_sleep() - turn a given controller device into sleep state
-+ * @pctldev: pin controller device
-+ */
-+int pinctrl_force_sleep(struct pinctrl_dev *pctldev)
-+{
-+	if (!IS_ERR(pctldev->p) && !IS_ERR(pctldev->hog_sleep))
-+		return pinctrl_select_state(pctldev->p, pctldev->hog_sleep);
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(pinctrl_force_sleep);
-+
-+/**
-+ * pinctrl_force_default() - turn a given controller device into default state
-+ * @pctldev: pin controller device
-+ */
-+int pinctrl_force_default(struct pinctrl_dev *pctldev)
-+{
-+	if (!IS_ERR(pctldev->p) && !IS_ERR(pctldev->hog_default))
-+		return pinctrl_select_state(pctldev->p, pctldev->hog_default);
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(pinctrl_force_default);
-+
- #ifdef CONFIG_DEBUG_FS
- 
- static int pinctrl_pins_show(struct seq_file *s, void *what)
-@@ -1521,16 +1545,23 @@ struct pinctrl_dev *pinctrl_register(struct pinctrl_desc *pctldesc,
- 
- 	pctldev->p = pinctrl_get_locked(pctldev->dev);
- 	if (!IS_ERR(pctldev->p)) {
--		struct pinctrl_state *s =
-+		pctldev->hog_default =
- 			pinctrl_lookup_state_locked(pctldev->p,
- 						    PINCTRL_STATE_DEFAULT);
--		if (IS_ERR(s)) {
-+		if (IS_ERR(pctldev->hog_default)) {
- 			dev_dbg(dev, "failed to lookup the default state\n");
- 		} else {
--			if (pinctrl_select_state_locked(pctldev->p, s))
-+			if (pinctrl_select_state_locked(pctldev->p,
-+						pctldev->hog_default))
- 				dev_err(dev,
- 					"failed to select default state\n");
- 		}
-+
-+		pctldev->hog_sleep =
-+			pinctrl_lookup_state_locked(pctldev->p,
-+						    PINCTRL_STATE_SLEEP);
-+		if (IS_ERR(pctldev->hog_sleep))
-+			dev_dbg(dev, "failed to lookup the sleep state\n");
- 	}
- 
- 	mutex_unlock(&pinctrl_mutex);
-diff --git a/drivers/pinctrl/core.h b/drivers/pinctrl/core.h
-index 12f5694..232a9f6 100644
---- a/drivers/pinctrl/core.h
-+++ b/drivers/pinctrl/core.h
-@@ -30,6 +30,8 @@ struct pinctrl_gpio_range;
-  * @driver_data: driver data for drivers registering to the pin controller
-  *	subsystem
-  * @p: result of pinctrl_get() for this device
-+ * @hog_default: default state for pins hogged by this device
-+ * @hog_sleep: sleep state for pins hogged by this device
-  * @device_root: debugfs root for this device
-  */
- struct pinctrl_dev {
-@@ -41,6 +43,8 @@ struct pinctrl_dev {
- 	struct module *owner;
- 	void *driver_data;
- 	struct pinctrl *p;
-+	struct pinctrl_state *hog_default;
-+	struct pinctrl_state *hog_sleep;
- #ifdef CONFIG_DEBUG_FS
- 	struct dentry *device_root;
- #endif
-@@ -164,5 +168,8 @@ int pinctrl_register_map(struct pinctrl_map const *maps, unsigned num_maps,
- 			 bool dup, bool locked);
- void pinctrl_unregister_map(struct pinctrl_map const *map);
- 
-+extern int pinctrl_force_sleep(struct pinctrl_dev *pctldev);
-+extern int pinctrl_force_default(struct pinctrl_dev *pctldev);
-+
- extern struct mutex pinctrl_mutex;
- extern struct list_head pinctrldev_list;
+ 	memory {
+ 		device_type = "memory";
+-		reg = <0x80000000 0x84000000>; /* 64 MB */
++		reg = <0x80000000 0x4000000>; /* 64 MB */
+ 	};
+ };
 -- 
-1.7.11.3
+1.7.10.4
