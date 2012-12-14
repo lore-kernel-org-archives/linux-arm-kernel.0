@@ -1,55 +1,37 @@
-From: bitbucket@online.de (Mike Galbraith)
-Date: Fri, 14 Dec 2012 05:45:56 +0100
-Subject: [RFC PATCH v2 3/6] sched: pack small tasks
-In-Reply-To: <50C9E552.1010600@intel.com>
-References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
- <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
- <50C93AC1.1060202@intel.com>
- <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
- <50C9E552.1010600@intel.com>
-Message-ID: <1355460356.5777.12.camel@marge.simpson.net>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Fri, 14 Dec 2012 11:02:58 +0530
+Subject: [PATCH v2 2/8] ARM: OMAP2+: omap2plus_defconfig: Enable tps65910 PMIC
+In-Reply-To: <1355463184-16283-1-git-send-email-anilkumar@ti.com>
+References: <1355463184-16283-1-git-send-email-anilkumar@ti.com>
+Message-ID: <1355463184-16283-3-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-12-13 at 22:25 +0800, Alex Shi wrote: 
-> On 12/13/2012 06:11 PM, Vincent Guittot wrote:
-> > On 13 December 2012 03:17, Alex Shi <alex.shi@intel.com> wrote:
-> >> On 12/12/2012 09:31 PM, Vincent Guittot wrote:
-> >>> During the creation of sched_domain, we define a pack buddy CPU for each CPU
-> >>> when one is available. We want to pack at all levels where a group of CPU can
-> >>> be power gated independently from others.
-> >>> On a system that can't power gate a group of CPUs independently, the flag is
-> >>> set at all sched_domain level and the buddy is set to -1. This is the default
-> >>> behavior.
-> >>> On a dual clusters / dual cores system which can power gate each core and
-> >>> cluster independently, the buddy configuration will be :
-> >>>
-> >>>       | Cluster 0   | Cluster 1   |
-> >>>       | CPU0 | CPU1 | CPU2 | CPU3 |
-> >>> -----------------------------------
-> >>> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
-> >>>
-> >>> Small tasks tend to slip out of the periodic load balance so the best place
-> >>> to choose to migrate them is during their wake up. The decision is in O(1) as
-> >>> we only check again one buddy CPU
-> >>
-> >> Just have a little worry about the scalability on a big machine, like on
-> >> a 4 sockets NUMA machine * 8 cores * HT machine, the buddy cpu in whole
-> >> system need care 64 LCPUs. and in your case cpu0 just care 4 LCPU. That
-> >> is different on task distribution decision.
-> > 
-> > The buddy CPU should probably not be the same for all 64 LCPU it
-> > depends on where it's worth packing small tasks
-> 
-> Do you have further ideas for buddy cpu on such example?
-> > 
-> > Which kind of sched_domain configuration have you for such system ?
-> > and how many sched_domain level have you ?
-> 
-> it is general X86 domain configuration. with 4 levels,
-> sibling/core/cpu/numa.
+AM335X-EVM and AM335X-EVMSK devices have tps65910 PMIC regulator, one
+has to manually enable this support to use regulators. So this patch
+enables tps65910 mfd and regulator driver in omap2plus_defconfig.
 
-CPU is a bug that slipped into domain degeneration.  You should have
-SIBLING/MC/NUMA (chasing that down is on todo).
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ arch/arm/configs/omap2plus_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
--Mike
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 19b7311..27bf465 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -133,10 +133,12 @@ CONFIG_WATCHDOG=y
+ CONFIG_OMAP_WATCHDOG=y
+ CONFIG_TWL4030_WATCHDOG=y
+ CONFIG_MFD_TPS65217=y
++CONFIG_MFD_TPS65910=y
+ CONFIG_REGULATOR_TWL4030=y
+ CONFIG_REGULATOR_TPS65023=y
+ CONFIG_REGULATOR_TPS6507X=y
+ CONFIG_REGULATOR_TPS65217=y
++CONFIG_REGULATOR_TPS65910=y
+ CONFIG_FB=y
+ CONFIG_FIRMWARE_EDID=y
+ CONFIG_FB_MODE_HELPERS=y
+-- 
+1.7.9.5
