@@ -1,35 +1,43 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Fri, 14 Dec 2012 18:58:03 +0100
-Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
-In-Reply-To: <1355495185-24220-1-git-send-email-stigge@antcom.de>
-References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
-Message-ID: <50CB68AB.5070806@grandegger.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 14 Dec 2012 19:02:48 +0100
+Subject: [PATCH v2 1/1] ARM: OMAP2+: omap2plus_defconfig: enable devtmpfs and
+ automount
+Message-ID: <1355508168-32565-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2012 03:26 PM, Roland Stigge wrote:
-> This set of patches adds:
-> 
-> * Block GPIO API to gpiolib
-> * Sysfs support for GPIO API, to provide userland access
-> * Device interface for userland access (alternative to sysfs)
-> * Devicetree support to instantiate GPIO blocks via DT
-> * Example implementations in several gpio drivers since they need
->   special accessor functions for block wise GPIO access
-> * Fix for race condition in gpiolib on device creation
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> Tested by: Wolfgang Grandegger <wg@grandegger.com>
+Since udev-176 [1], udev no longer creates device nodes under
+/dev and this has to be managed by the kernel devtmpfs filesystem.
 
-I'm going to re-test this version next week. Attached you will find my
-GPIO block adoptions for the AT91.
+This makes devtmpfs filesystem a requirement on newer systems and
+a kernel built with the current OMAP2+ config will not boot on them.
 
-Wolfgang
+Also, it is good to have devtmpfs at /dev automount enabled by default.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-gpio-add-GPIO-block-callback-functions-for-AT91.patch
-Type: text/x-diff
-Size: 2721 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121214/29dc065d/attachment-0001.bin>
+[1]: http://permalink.gmane.org/gmane.linux.hotplug.devel/17230
+
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+
+Changes since v1:
+    - Point to correct udev version that first this a requirement
+      as suggested by Sekhar Nori
+
+ arch/arm/configs/omap2plus_defconfig |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index a1dc5c0..ad41190 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -65,6 +65,8 @@ CONFIG_MAC80211_RC_PID=y
+ CONFIG_MAC80211_RC_DEFAULT_PID=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_CONNECTOR=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_MTD=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_CHAR=y
+-- 
+1.7.7.6
