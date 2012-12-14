@@ -1,132 +1,66 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 14 Dec 2012 00:32:52 -0700
-Subject: [PATCH 2/2] ARM: OMAP4: clock data: DPLLs are missing bypass clocks
- in their parent lists
-In-Reply-To: <20121214072028.24383.41000.stgit@dusk.lan>
-References: <20121214072028.24383.41000.stgit@dusk.lan>
-Message-ID: <20121214073251.24383.67602.stgit@dusk.lan>
+From: bitbucket@online.de (Mike Galbraith)
+Date: Fri, 14 Dec 2012 08:45:46 +0100
+Subject: [RFC PATCH v2 3/6] sched: pack small tasks
+In-Reply-To: <50CAC905.9070100@intel.com>
+References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
+ <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
+ <50C93AC1.1060202@intel.com>
+ <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
+ <50C9E552.1010600@intel.com> <1355460356.5777.12.camel@marge.simpson.net>
+ <50CAC905.9070100@intel.com>
+Message-ID: <1355471146.7641.13.camel@marge.simpson.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Booting OMAP4460 Pandaboard ES with a recent u-boot results in this
-warning:
+On Fri, 2012-12-14 at 14:36 +0800, Alex Shi wrote: 
+> On 12/14/2012 12:45 PM, Mike Galbraith wrote:
+> >> > Do you have further ideas for buddy cpu on such example?
+> >>> > > 
+> >>> > > Which kind of sched_domain configuration have you for such system ?
+> >>> > > and how many sched_domain level have you ?
+> >> > 
+> >> > it is general X86 domain configuration. with 4 levels,
+> >> > sibling/core/cpu/numa.
+> > CPU is a bug that slipped into domain degeneration.  You should have
+> > SIBLING/MC/NUMA (chasing that down is on todo).
+> 
+> Maybe.
+> the CPU/NUMA is different on domain flags, CPU has SD_PREFER_SIBLING.
 
-WARNING: at arch/arm/mach-omap2/dpll3xxx.c:427 omap3_noncore_dpll_enable+0xf4/0x110()
+What I noticed during (an unrelated) bisection on a 40 core box was
+domains going from so..
 
-The OMAP4 DPLL parent clock name arrays only listed the reference
-clocks, not the bypass clocks.  Fix by adding the bypass clocks to the
-DPLL parent lists.
+3.4.0-bisect (virgin)
+[    5.056214] CPU0 attaching sched-domain:
+[    5.065009]  domain 0: span 0,32 level SIBLING
+[    5.075011]   groups: 0 (cpu_power = 589) 32 (cpu_power = 589)
+[    5.088381]   domain 1: span 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 level MC
+[    5.107669]    groups: 0,32 (cpu_power = 1178)  4,36 (cpu_power = 1178)  8,40 (cpu_power = 1178) 12,44 (cpu_power = 1178)
+                         16,48 (cpu_power = 1177) 20,52 (cpu_power = 1178) 24,56 (cpu_power = 1177) 28,60 (cpu_power = 1177)
+                         64,72 (cpu_power = 1176) 68,76 (cpu_power = 1176)
+[    5.162115]    domain 2: span 0-79 level NODE
+[    5.171927]     groups: 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 (cpu_power = 11773)
+                           1,5,9,13,17,21,25,29,33,37,41,45,49,53,57,61,65,69,73,77 (cpu_power = 11772)
+                           2,6,10,14,18,22,26,30,34,38,42,46,50,54,58,62,66,70,74,78 (cpu_power = 11773)
+                           3,7,11,15,19,23,27,31,35,39,43,47,51,55,59,63,67,71,75,79 (cpu_power = 11770)
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Mike Turquette <mturquette@linaro.org>
----
- arch/arm/mach-omap2/cclock44xx_data.c |   31 +++++++++++++++++++++++++------
- 1 file changed, 25 insertions(+), 6 deletions(-)
+..to so, which looks a little bent.  CPU and MC have identical spans, so
+CPU should have gone away, as it used to do.
 
-diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-index a3c54b2..4536bae 100644
---- a/arch/arm/mach-omap2/cclock44xx_data.c
-+++ b/arch/arm/mach-omap2/cclock44xx_data.c
-@@ -233,7 +233,7 @@ static struct dpll_data dpll_core_dd = {
- 
- 
- static const char *dpll_core_ck_parents[] = {
--	"sys_clkin_ck",
-+	"sys_clkin_ck", "core_hsd_byp_clk_mux_ck"
- };
- 
- static struct clk dpll_core_ck;
-@@ -363,6 +363,10 @@ static struct dpll_data dpll_iva_dd = {
- 	.min_divider	= 1,
- };
- 
-+static const char *dpll_iva_ck_parents[] = {
-+	"sys_clkin_ck", "iva_hsd_byp_clk_mux_ck"
-+};
-+
- static struct clk dpll_iva_ck;
- 
- static struct clk_hw_omap dpll_iva_ck_hw = {
-@@ -373,7 +377,7 @@ static struct clk_hw_omap dpll_iva_ck_hw = {
- 	.ops		= &clkhwops_omap3_dpll,
- };
- 
--DEFINE_STRUCT_CLK(dpll_iva_ck, dpll_core_ck_parents, dpll_abe_ck_ops);
-+DEFINE_STRUCT_CLK(dpll_iva_ck, dpll_iva_ck_parents, dpll_abe_ck_ops);
- 
- static const char *dpll_iva_x2_ck_parents[] = {
- 	"dpll_iva_ck",
-@@ -416,6 +420,10 @@ static struct dpll_data dpll_mpu_dd = {
- 	.min_divider	= 1,
- };
- 
-+static const char *dpll_mpu_ck_parents[] = {
-+	"sys_clkin_ck", "div_mpu_hs_clk"
-+};
-+
- static struct clk dpll_mpu_ck;
- 
- static struct clk_hw_omap dpll_mpu_ck_hw = {
-@@ -426,7 +434,7 @@ static struct clk_hw_omap dpll_mpu_ck_hw = {
- 	.ops		= &clkhwops_omap3_dpll,
- };
- 
--DEFINE_STRUCT_CLK(dpll_mpu_ck, dpll_core_ck_parents, dpll_abe_ck_ops);
-+DEFINE_STRUCT_CLK(dpll_mpu_ck, dpll_mpu_ck_parents, dpll_abe_ck_ops);
- 
- DEFINE_CLK_FIXED_FACTOR(mpu_periphclk, "dpll_mpu_ck", &dpll_mpu_ck, 0x0, 1, 2);
- 
-@@ -464,6 +472,9 @@ static struct dpll_data dpll_per_dd = {
- 	.min_divider	= 1,
- };
- 
-+static const char *dpll_per_ck_parents[] = {
-+	"sys_clkin_ck", "per_hsd_byp_clk_mux_ck"
-+};
- 
- static struct clk dpll_per_ck;
- 
-@@ -475,7 +486,7 @@ static struct clk_hw_omap dpll_per_ck_hw = {
- 	.ops		= &clkhwops_omap3_dpll,
- };
- 
--DEFINE_STRUCT_CLK(dpll_per_ck, dpll_core_ck_parents, dpll_abe_ck_ops);
-+DEFINE_STRUCT_CLK(dpll_per_ck, dpll_per_ck_parents, dpll_abe_ck_ops);
- 
- DEFINE_CLK_DIVIDER(dpll_per_m2_ck, "dpll_per_ck", &dpll_per_ck, 0x0,
- 		   OMAP4430_CM_DIV_M2_DPLL_PER, OMAP4430_DPLL_CLKOUT_DIV_SHIFT,
-@@ -559,6 +570,10 @@ static struct dpll_data dpll_usb_dd = {
- 	.min_divider	= 1,
- };
- 
-+static const char *dpll_usb_ck_parents[] = {
-+	"sys_clkin_ck", "usb_hs_clk_div_ck"
-+};
-+
- static struct clk dpll_usb_ck;
- 
- static struct clk_hw_omap dpll_usb_ck_hw = {
-@@ -569,7 +584,7 @@ static struct clk_hw_omap dpll_usb_ck_hw = {
- 	.ops		= &clkhwops_omap3_dpll,
- };
- 
--DEFINE_STRUCT_CLK(dpll_usb_ck, dpll_core_ck_parents, dpll_abe_ck_ops);
-+DEFINE_STRUCT_CLK(dpll_usb_ck, dpll_usb_ck_parents, dpll_abe_ck_ops);
- 
- static const char *dpll_usb_clkdcoldo_ck_parents[] = {
- 	"dpll_usb_ck",
-@@ -696,9 +711,13 @@ DEFINE_CLK_DIVIDER(syc_clk_div_ck, "sys_clkin_ck", &sys_clkin_ck, 0x0,
- 		   OMAP4430_CM_ABE_DSS_SYS_CLKSEL, OMAP4430_CLKSEL_0_0_SHIFT,
- 		   OMAP4430_CLKSEL_0_0_WIDTH, 0x0, NULL);
- 
-+static const char *dbgclk_mux_ck_parents[] = {
-+	"sys_clkin_ck"
-+};
-+
- static struct clk dbgclk_mux_ck;
- DEFINE_STRUCT_CLK_HW_OMAP(dbgclk_mux_ck, NULL);
--DEFINE_STRUCT_CLK(dbgclk_mux_ck, dpll_core_ck_parents,
-+DEFINE_STRUCT_CLK(dbgclk_mux_ck, dbgclk_mux_ck_parents,
- 		  dpll_usb_clkdcoldo_ck_ops);
- 
- /* Leaf clocks controlled by modules */
+3.6.0-bisect (virgin)
+[    3.978338] CPU0 attaching sched-domain:
+[    3.987125]  domain 0: span 0,32 level SIBLING
+[    3.997125]   groups: 0 (cpu_power = 588) 32 (cpu_power = 589)
+[    4.010477]   domain 1: span 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 level MC
+[    4.029748]    groups: 0,32 (cpu_power = 1177)  4,36 (cpu_power = 1177)  8,40 (cpu_power = 1178) 12,44 (cpu_power = 1178)
+                         16,48 (cpu_power = 1178) 20,52 (cpu_power = 1178) 24,56 (cpu_power = 1178) 28,60 (cpu_power = 1178)
+                         64,72 (cpu_power = 1178) 68,76 (cpu_power = 1177)
+[    4.084143]    domain 2: span 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 level CPU
+[    4.103796]     groups: 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 (cpu_power = 11777)
+[    4.124373]     domain 3: span 0-79 level NUMA
+[    4.134369]      groups: 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 (cpu_power = 11777)
+                            1,5,9,13,17,21,25,29,33,37,41,45,49,53,57,61,65,69,73,77 (cpu_power = 11778)
+                            2,6,10,14,18,22,26,30,34,38,42,46,50,54,58,62,66,70,74 ,78 (cpu_power = 11778)
+                            3,7,11,15,19,23,27,31,35,39,43,47,51,55,59,63,67,71,75,79 (cpu_power = 11780)
+
+	-Mike
