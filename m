@@ -1,155 +1,48 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 14 Dec 2012 12:50:40 +0100
-Subject: [PATCH 1/2] thermal: Add support for thermal sensor for Orion SoC
-In-Reply-To: <4D68720C2E767A4AA6A8796D42C8EB59249564@BGSMSX101.gar.corp.intel.com>
-References: <1355482986-885-1-git-send-email-andrew@lunn.ch>
- <1355482986-885-2-git-send-email-andrew@lunn.ch>
- <4D68720C2E767A4AA6A8796D42C8EB59249564@BGSMSX101.gar.corp.intel.com>
-Message-ID: <20121214115040.GB7717@lunn.ch>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 14 Dec 2012 12:51:27 +0100
+Subject: [PATCH 0/3] pinctrl: exynos: add support for Samsung's Exynos5250
+In-Reply-To: <1355399644-29417-1-git-send-email-thomas.abraham@linaro.org>
+References: <1355399644-29417-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <2775095.1QDAgbYSYJ@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 14, 2012 at 11:30:41AM +0000, R, Durgadoss wrote:
-> > -----Original Message-----
-> > From: linux-pm-owner at vger.kernel.org [mailto:linux-pm-
-> > owner at vger.kernel.org] On Behalf Of Andrew Lunn
-> > Sent: Friday, December 14, 2012 4:33 PM
-> > To: linux ARM; iwamatsu at nigauri.org; linux-pm at vger.kernel.org
-> > Cc: Jason Cooper; Sebastian Hesselbarth; Thomas Petazzoni;
-> > jgunthorpe at obsidianresearch.com; Andrew Lunn
-> > Subject: [PATCH 1/2] thermal: Add support for thermal sensor for Orion SoC
-> > 
-> > From: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> > 
-> > Some Orion SoC has thermal sensor.
-> > This patch adds support for 88F6282 and 88F6283.
-> > 
-> > Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > ---
-> >  .../devicetree/bindings/thermal/orion-thermal.txt  |   16 +++
-> >  drivers/thermal/Kconfig                            |    7 ++
-> >  drivers/thermal/Makefile                           |    1 +
-> >  drivers/thermal/orion_thermal.c                    |  133 ++++++++++++++++++++
-> >  4 files changed, 157 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/thermal/orion-
-> > thermal.txt
-> >  create mode 100644 drivers/thermal/orion_thermal.c
-> > 
-> > diff --git a/Documentation/devicetree/bindings/thermal/orion-thermal.txt
-> > b/Documentation/devicetree/bindings/thermal/orion-thermal.txt
-> > new file mode 100644
-> > index 0000000..5ce925d
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/thermal/orion-thermal.txt
-> > @@ -0,0 +1,16 @@
-> > +* Orion Thermal
-> > +
-> > +This initial version is for Kirkwood 88F8262 & 88F6283 SoCs, however
-> > +it is expected the driver will sometime in the future be expanded to
-> > +also support Dove, using a different compatibility string.
-> > +
-> > +Required properties:
-> > +- compatible : "marvell,kirkwood-thermal"
-> > +- reg : Address range of the thermal registers
-> > +
-> > +Example:
-> > +
-> > +	thermal at 10078 {
-> > +		compatible = "marvell,kirkwood";
-> > +		reg = <0x10078 0x4>;
-> > +	};
-> > diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> > index e1cb6bd..3bba13f 100644
-> > --- a/drivers/thermal/Kconfig
-> > +++ b/drivers/thermal/Kconfig
-> > @@ -55,3 +55,10 @@ config EXYNOS_THERMAL
-> >  	help
-> >  	  If you say yes here you get support for TMU (Thermal Managment
-> >  	  Unit) on SAMSUNG EXYNOS series of SoC.
-> > +
-> > +config ORION_THERMAL
-> > +	tristate "Temperature sensor on Marvel Orion SoCs"
-> > +	depends on PLAT_ORION && THERMAL
+Hi Thomas,
+
+On Thursday 13 of December 2012 17:24:01 Thomas Abraham wrote:
+> This patch series adds pinctrl driver support for Samsung's Exynos5250
+> SoC. The first patch adds the required Exynos5250 SoC specific data
+> which is used by the Samsung pinctrl driver to setup the
+> pinctrl/pinmux/eint controllers. The second and third patches skips the
+> wakeup interrupt and gpiolib registration if the pinctrl support is
+> enabled for Exynos5250.
 > 
-> On what tree is this patch set based on ?
-
-Not a good one. arm-soc/for-next
-
-I posted these patches to let other know i'm working in the driver and
-to get further feedback. I've also started on adding support for Dove,
-which is similar, but different.
-
-It will get rebased onto -rc1 in a couple of weeks time and by then i
-hope i will have Dove support.
-
-> If it is, then you don't need '&& THERMAL' in Kconfig.
-> > +	reg = (reg >> THERMAL_TEMP_OFFSET) & THERMAL_TEMP_MASK;
-> > +	/* Calculate temperature. See Table 814 in 8262 hardware manual. */
+> Thomas Abraham (3):
+>   pinctrl: exynos: add exynos5250 SoC specific data
+>   gpio: samsung: skip gpiolib registration if pinctrl support is enabled
+> for exynos5250 arm: exynos: skip wakeup interrupt registration for
+> exynos5250 if pinctrl is enabled
 > 
-> Thanks for the comment.
-> Can we move this comment one line above ? like below:
+>  arch/arm/mach-exynos/common.c     |    1 +
+>  drivers/gpio/gpio-samsung.c       |    1 +
+>  drivers/pinctrl/pinctrl-exynos.c  |  108
+> +++++++++++++++++++++++++++++++++++++ drivers/pinctrl/pinctrl-samsung.c
+> |    2 +
+>  drivers/pinctrl/pinctrl-samsung.h |    1 +
+>  5 files changed, 113 insertions(+), 0 deletions(-)
 > 
-> /* comment */
-> reg = 
-> *temp =
+> --
+> To unsubscribe from this list: send the line "unsubscribe
+> linux-samsung-soc" in the body of a message to
+> majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Sure.
+Looks good. For the whole series:
 
-> BTW, is this datasheet public ?
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-Humm, think so. Take a look at Documentation/arm/Marvell/REAMDE. I
-will check and add a reference to this README file and the specific
-datasheet.
-
-> If so, could you please add the link to the datasheet at the top ?
-> 
-> > +	*temp = ((322UL - reg) * 10000UL * 1000UL) / 13625UL;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static struct thermal_zone_device_ops ops = {
-> > +	.get_temp = orion_get_temp,
-> > +};
-> > +
-> > +static int orion_thermal_probe(struct platform_device *pdev)
-> > +{
-> > +	struct thermal_zone_device *thermal = NULL;
-> > +	struct orion_thermal_dev *thermal_dev;
-> > +	struct resource *res;
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	if (!res) {
-> > +		dev_err(&pdev->dev, "Failed to get platform resource\n");
-> > +		return -ENODEV;
-> > +	}
-> > +
-> > +	thermal_dev = devm_kzalloc(&pdev->dev, sizeof(*thermal_dev),
-> > +				   GFP_KERNEL);
-> > +	if (!thermal_dev) {
-> > +		dev_err(&pdev->dev, "kzalloc fail\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	thermal_dev->base_addr = devm_ioremap(&pdev->dev, res->start,
-> > +					      resource_size(res));
-> > +	if (!thermal_dev->base_addr) {
-> > +		dev_err(&pdev->dev, "Failed to ioremap memory\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	thermal = thermal_zone_device_register("orion_thermal", 0, 0,
-> > +				   thermal_dev, &ops, 0, 0);
-> > +	if (IS_ERR(thermal)) {
-> > +		dev_err(&pdev->dev,
-> > +			"Failed to register thermal zone device\n");
-> 
-> Don't we have to free ioremap resource ? Or devm_ takes care of that ?
-> please educate me :-)
-
-devm_ should take care of that. If the probe function returns an
-error, or the driver is unloaded, all resources allocated with devm_
-get automagically freed.
-
-    Andrew
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Linux Platform
