@@ -1,179 +1,26 @@
-From: anilkumar@ti.com (AnilKumar Ch)
-Date: Fri, 14 Dec 2012 11:33:14 +0530
-Subject: [PATCH v4 1/4] rtc: OMAP: Add system pm_power_off to rtc driver
-In-Reply-To: <1355464997-19367-1-git-send-email-anilkumar@ti.com>
-References: <1355464997-19367-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1355464997-19367-2-git-send-email-anilkumar@ti.com>
+From: alex.shi@intel.com (Alex Shi)
+Date: Fri, 14 Dec 2012 14:36:53 +0800
+Subject: [RFC PATCH v2 3/6] sched: pack small tasks
+In-Reply-To: <1355460356.5777.12.camel@marge.simpson.net>
+References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
+ <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
+ <50C93AC1.1060202@intel.com>
+ <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
+ <50C9E552.1010600@intel.com> <1355460356.5777.12.camel@marge.simpson.net>
+Message-ID: <50CAC905.9070100@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Foe-Parker <colin.foeparker@logicpd.com>
+On 12/14/2012 12:45 PM, Mike Galbraith wrote:
+>> > Do you have further ideas for buddy cpu on such example?
+>>> > > 
+>>> > > Which kind of sched_domain configuration have you for such system ?
+>>> > > and how many sched_domain level have you ?
+>> > 
+>> > it is general X86 domain configuration. with 4 levels,
+>> > sibling/core/cpu/numa.
+> CPU is a bug that slipped into domain degeneration.  You should have
+> SIBLING/MC/NUMA (chasing that down is on todo).
 
-Add system power off control to rtc driver which is the in-charge
-of controlling the BeagleBone system power. The power_off routine
-can be hooked up to "pm_power_off" system call.
-
-System power off sequence:-
-* Set PMIC STATUS_OFF when PMIC_POWER_EN is pulled low
-* Enable PMIC_POWER_EN in rtc module
-* Set rtc ALARM2 time
-* Enable ALARM2 interrupt
-
-Signed-off-by: Colin Foe-Parker <colin.foeparker@logicpd.com>
-[anilkumar at ti.com: move poweroff additions to rtc driver]
-Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
----
- Documentation/devicetree/bindings/rtc/rtc-omap.txt |    5 ++
- drivers/rtc/rtc-omap.c                             |   74 +++++++++++++++++++-
- 2 files changed, 78 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-index b47aa41..8d9f4f9 100644
---- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-+++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-@@ -6,6 +6,10 @@ Required properties:
- - interrupts: rtc timer, alarm interrupts in order
- - interrupt-parent: phandle for the interrupt controller
- 
-+Optional properties:
-+- ti,system-power-controller: Telling whether or not rtc is controlling
-+  the system power.
-+
- Example:
- 
- rtc at 1c23000 {
-@@ -14,4 +18,5 @@ rtc at 1c23000 {
- 	interrupts = <19
- 		      19>;
- 	interrupt-parent = <&intc>;
-+	ti,system-power-controller;
- };
-diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index 6009714..e6d4878 100644
---- a/drivers/rtc/rtc-omap.c
-+++ b/drivers/rtc/rtc-omap.c
-@@ -72,6 +72,14 @@
- #define OMAP_RTC_KICK0_REG		0x6c
- #define OMAP_RTC_KICK1_REG		0x70
- 
-+#define OMAP_RTC_ALARM2_SECONDS_REG	0x80
-+#define OMAP_RTC_ALARM2_MINUTES_REG	0x84
-+#define OMAP_RTC_ALARM2_HOURS_REG	0x88
-+#define OMAP_RTC_ALARM2_DAYS_REG	0x8c
-+#define OMAP_RTC_ALARM2_MONTHS_REG	0x90
-+#define OMAP_RTC_ALARM2_YEARS_REG	0x94
-+#define OMAP_RTC_PMIC_REG		0x98
-+
- /* OMAP_RTC_CTRL_REG bit fields: */
- #define OMAP_RTC_CTRL_SPLIT		(1<<7)
- #define OMAP_RTC_CTRL_DISABLE		(1<<6)
-@@ -93,15 +101,21 @@
- #define OMAP_RTC_STATUS_BUSY            (1<<0)
- 
- /* OMAP_RTC_INTERRUPTS_REG bit fields: */
-+#define OMAP_RTC_INTERRUPTS_IT_ALARM2   (1<<4)
- #define OMAP_RTC_INTERRUPTS_IT_ALARM    (1<<3)
- #define OMAP_RTC_INTERRUPTS_IT_TIMER    (1<<2)
- 
-+/* OMAP_RTC_PMIC_REG bit fields: */
-+#define OMAP_RTC_PMIC_POWER_EN_EN       (1<<16)
-+
- /* OMAP_RTC_KICKER values */
- #define	KICK0_VALUE			0x83e70b13
- #define	KICK1_VALUE			0x95a4f1e0
- 
- #define	OMAP_RTC_HAS_KICKER		0x1
- 
-+#define SHUTDOWN_TIME_SEC		2
-+
- static void __iomem	*rtc_base;
- 
- #define rtc_read(addr)		readb(rtc_base + (addr))
-@@ -290,6 +304,56 @@ static int omap_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
- 	return 0;
- }
- 
-+/*
-+ * rtc_power_off: Set the pmic power off sequence. The RTC generates
-+ * pmic_pwr_enable control, which can be used to control an external
-+ * PMIC.
-+ */
-+static void rtc_power_off(void)
-+{
-+	u32 val;
-+	struct rtc_time tm;
-+	unsigned long time;
-+
-+	/* Set PMIC power enable */
-+	val = readl(rtc_base + OMAP_RTC_PMIC_REG);
-+	writel(val | OMAP_RTC_PMIC_POWER_EN_EN, rtc_base + OMAP_RTC_PMIC_REG);
-+
-+	/* Read rtc time */
-+	omap_rtc_read_time(NULL, &tm);
-+
-+	/* Convert Gregorian date to seconds since 01-01-1970 00:00:00 */
-+	rtc_tm_to_time(&tm, &time);
-+
-+	/* Add shutdown time to the current value */
-+	time += SHUTDOWN_TIME_SEC;
-+
-+	/* Convert seconds since 01-01-1970 00:00:00 to Gregorian date */
-+	rtc_time_to_tm(time, &tm);
-+
-+	if (tm2bcd(&tm) < 0)
-+		return;
-+
-+	pr_info("System will go to power_off state in approx. %d secs\n",
-+			SHUTDOWN_TIME_SEC);
-+
-+	/*
-+	 * pmic_pwr_enable is controlled by means of ALARM2 event. So here
-+	 * programming alarm2 expiry time and enabling alarm2 interrupt
-+	 */
-+	rtc_write(tm.tm_sec, OMAP_RTC_ALARM2_SECONDS_REG);
-+	rtc_write(tm.tm_min, OMAP_RTC_ALARM2_MINUTES_REG);
-+	rtc_write(tm.tm_hour, OMAP_RTC_ALARM2_HOURS_REG);
-+	rtc_write(tm.tm_mday, OMAP_RTC_ALARM2_DAYS_REG);
-+	rtc_write(tm.tm_mon, OMAP_RTC_ALARM2_MONTHS_REG);
-+	rtc_write(tm.tm_year, OMAP_RTC_ALARM2_YEARS_REG);
-+
-+	/* Enable alarm2 interrupt */
-+	val = readl(rtc_base + OMAP_RTC_INTERRUPTS_REG);
-+	writel(val | OMAP_RTC_INTERRUPTS_IT_ALARM2,
-+				rtc_base + OMAP_RTC_INTERRUPTS_REG);
-+}
-+
- static struct rtc_class_ops omap_rtc_ops = {
- 	.read_time	= omap_rtc_read_time,
- 	.set_time	= omap_rtc_set_time,
-@@ -327,12 +391,16 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 	struct resource		*res, *mem;
- 	struct rtc_device	*rtc;
- 	u8			reg, new_ctrl;
-+	bool			pm_off = false;
- 	const struct platform_device_id *id_entry;
- 	const struct of_device_id *of_id;
- 
- 	of_id = of_match_device(omap_rtc_of_match, &pdev->dev);
--	if (of_id)
-+	if (of_id) {
- 		pdev->id_entry = of_id->data;
-+		pm_off = of_property_read_bool(pdev->dev.of_node,
-+					"ti,system-power-controller");
-+	}
- 
- 	omap_rtc_timer = platform_get_irq(pdev, 0);
- 	if (omap_rtc_timer <= 0) {
-@@ -385,6 +453,10 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, rtc);
- 	dev_set_drvdata(&rtc->dev, mem);
- 
-+	/* RTC power off */
-+	if (pm_off && !pm_power_off)
-+		pm_power_off = rtc_power_off;
-+
- 	/* clear pending irqs, and set 1/second periodic,
- 	 * which we'll use instead of update irqs
- 	 */
--- 
-1.7.9.5
+Maybe.
+the CPU/NUMA is different on domain flags, CPU has SD_PREFER_SIBLING.
