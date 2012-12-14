@@ -1,100 +1,22 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 14 Dec 2012 10:33:39 +0100
-Subject: [RFC PATCH v2 3/6] sched: pack small tasks
-In-Reply-To: <50CA84FF.5070907@intel.com>
-References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
- <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
- <50C93AC1.1060202@intel.com>
- <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
- <50C9E552.1010600@intel.com>
- <CAKfTPtCUDEC50xexmLQ1d9qvBz1iJnf4aGSGjN==jqZwpxrwiQ@mail.gmail.com>
- <CAKfTPtAhFtGKOtwumuav+pndoAZiKjHvYoE2NZxtgP+qHuHY3g@mail.gmail.com>
- <50CA84FF.5070907@intel.com>
-Message-ID: <CAKfTPtCarhT3J3xOD6jOh_91Pm5FK4V_DAk5QLs_=8rVF+-fsQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Dec 2012 09:40:12 +0000
+Subject: ARM realview breakages w/ 3.7 under qemu
+In-Reply-To: <20121213174817.GB12946@mudshark.cambridge.arm.com>
+References: <50CA0FC1.5090009@openwrt.org>
+ <20121213174817.GB12946@mudshark.cambridge.arm.com>
+Message-ID: <20121214094012.GG14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 December 2012 02:46, Alex Shi <alex.shi@intel.com> wrote:
-> On 12/13/2012 11:48 PM, Vincent Guittot wrote:
->> On 13 December 2012 15:53, Vincent Guittot <vincent.guittot@linaro.org> wrote:
->>> On 13 December 2012 15:25, Alex Shi <alex.shi@intel.com> wrote:
->>>> On 12/13/2012 06:11 PM, Vincent Guittot wrote:
->>>>> On 13 December 2012 03:17, Alex Shi <alex.shi@intel.com> wrote:
->>>>>> On 12/12/2012 09:31 PM, Vincent Guittot wrote:
->>>>>>> During the creation of sched_domain, we define a pack buddy CPU for each CPU
->>>>>>> when one is available. We want to pack at all levels where a group of CPU can
->>>>>>> be power gated independently from others.
->>>>>>> On a system that can't power gate a group of CPUs independently, the flag is
->>>>>>> set at all sched_domain level and the buddy is set to -1. This is the default
->>>>>>> behavior.
->>>>>>> On a dual clusters / dual cores system which can power gate each core and
->>>>>>> cluster independently, the buddy configuration will be :
->>>>>>>
->>>>>>>       | Cluster 0   | Cluster 1   |
->>>>>>>       | CPU0 | CPU1 | CPU2 | CPU3 |
->>>>>>> -----------------------------------
->>>>>>> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
->>>>>>>
->>>>>>> Small tasks tend to slip out of the periodic load balance so the best place
->>>>>>> to choose to migrate them is during their wake up. The decision is in O(1) as
->>>>>>> we only check again one buddy CPU
->>>>>>
->>>>>> Just have a little worry about the scalability on a big machine, like on
->>>>>> a 4 sockets NUMA machine * 8 cores * HT machine, the buddy cpu in whole
->>>>>> system need care 64 LCPUs. and in your case cpu0 just care 4 LCPU. That
->>>>>> is different on task distribution decision.
->>>>>
->>>>> The buddy CPU should probably not be the same for all 64 LCPU it
->>>>> depends on where it's worth packing small tasks
->>>>
->>>> Do you have further ideas for buddy cpu on such example?
->>>
->>> yes, I have several ideas which were not really relevant for small
->>> system but could be interesting for larger system
->>>
->>> We keep the same algorithm in a socket but we could either use another
->>> LCPU in the targeted socket (conf0) or chain the socket (conf1)
->>> instead of packing directly in one LCPU
->>>
->>> The scheme below tries to summaries the idea:
->>>
->>> Socket      | socket 0 | socket 1   | socket 2   | socket 3   |
->>> LCPU        | 0 | 1-15 | 16 | 17-31 | 32 | 33-47 | 48 | 49-63 |
->>> buddy conf0 | 0 | 0    | 1  | 16    | 2  | 32    | 3  | 48    |
->>> buddy conf1 | 0 | 0    | 0  | 16    | 16 | 32    | 32 | 48    |
->>> buddy conf2 | 0 | 0    | 16 | 16    | 32 | 32    | 48 | 48    |
->>>
->>> But, I don't know how this can interact with NUMA load balance and the
->>> better might be to use conf3.
->>
->> I mean conf2 not conf3
->
-> So, it has 4 levels 0/16/32/ for socket 3 and 0 level for socket 0, it
-> is unbalanced for different socket.
+On Thu, Dec 13, 2012 at 05:48:17PM +0000, Will Deacon wrote:
+> On Thu, Dec 13, 2012 at 05:26:25PM +0000, Florian Fainelli wrote:
+> > - PBX A9: booting with less than 1024MBytes of RAM causes this:
+> > [    0.000000] Truncating RAM at 20000000-3fffffff to -3f7fffff (vmalloc 
+> > region overlap).
+> > [    0.000000] Ignoring RAM at 80000000-8fffffff (vmalloc region overlap).
+> > 
+> > Do these issues sounds familiar to any of you? The kernel config is 
+> > attached in case that helps.
 
-That the target because we have decided to pack the small tasks in
-socket 0 when we have parsed the topology at boot.
-We don't have to loop into sched_domain or sched_group anymore to find
-the best LCPU when a small tasks wake up.
-
->
-> And the ground level has just one buddy for 16 LCPUs - 8 cores, that's
-> not a good design, consider my previous examples: if there are 4 or 8
-> tasks in one socket, you just has 2 choices: spread them into all cores,
-> or pack them into one LCPU. Actually, moving them just into 2 or 4 cores
-> maybe a better solution. but the design missed this.
-
-You speak about tasks without any notion of load. This patch only care
-of small tasks and light LCPU load, but it falls back to default
-behavior for other situation. So if there are 4 or 8 small tasks, they
-will migrate to the socket 0 after 1 or up to 3 migration (it depends
-of the conf and the LCPU they come from).
-
-Then, if too much small tasks wake up simultaneously on the same LCPU,
-the default load balance will spread them in the core/cluster/socket
-
->
-> Obviously, more and more cores is the trend on any kinds of CPU, the
-> buddy system seems hard to catch up this.
->
->
+I don't have the original email to reply to (so I don't have the .config
+either) but my guess for the above would be that HIGHMEM is disabled.
