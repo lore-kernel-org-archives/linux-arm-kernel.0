@@ -1,119 +1,100 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Fri, 14 Dec 2012 17:15:59 +0800
-Subject: [PATCH] pinctrl: sirf: enable GPIO pullup/down configuration from dts
-Message-ID: <1355476559-27550-1-git-send-email-Barry.Song@csr.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 14 Dec 2012 10:33:39 +0100
+Subject: [RFC PATCH v2 3/6] sched: pack small tasks
+In-Reply-To: <50CA84FF.5070907@intel.com>
+References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
+ <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
+ <50C93AC1.1060202@intel.com>
+ <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
+ <50C9E552.1010600@intel.com>
+ <CAKfTPtCUDEC50xexmLQ1d9qvBz1iJnf4aGSGjN==jqZwpxrwiQ@mail.gmail.com>
+ <CAKfTPtAhFtGKOtwumuav+pndoAZiKjHvYoE2NZxtgP+qHuHY3g@mail.gmail.com>
+ <50CA84FF.5070907@intel.com>
+Message-ID: <CAKfTPtCarhT3J3xOD6jOh_91Pm5FK4V_DAk5QLs_=8rVF+-fsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+On 14 December 2012 02:46, Alex Shi <alex.shi@intel.com> wrote:
+> On 12/13/2012 11:48 PM, Vincent Guittot wrote:
+>> On 13 December 2012 15:53, Vincent Guittot <vincent.guittot@linaro.org> wrote:
+>>> On 13 December 2012 15:25, Alex Shi <alex.shi@intel.com> wrote:
+>>>> On 12/13/2012 06:11 PM, Vincent Guittot wrote:
+>>>>> On 13 December 2012 03:17, Alex Shi <alex.shi@intel.com> wrote:
+>>>>>> On 12/12/2012 09:31 PM, Vincent Guittot wrote:
+>>>>>>> During the creation of sched_domain, we define a pack buddy CPU for each CPU
+>>>>>>> when one is available. We want to pack at all levels where a group of CPU can
+>>>>>>> be power gated independently from others.
+>>>>>>> On a system that can't power gate a group of CPUs independently, the flag is
+>>>>>>> set at all sched_domain level and the buddy is set to -1. This is the default
+>>>>>>> behavior.
+>>>>>>> On a dual clusters / dual cores system which can power gate each core and
+>>>>>>> cluster independently, the buddy configuration will be :
+>>>>>>>
+>>>>>>>       | Cluster 0   | Cluster 1   |
+>>>>>>>       | CPU0 | CPU1 | CPU2 | CPU3 |
+>>>>>>> -----------------------------------
+>>>>>>> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
+>>>>>>>
+>>>>>>> Small tasks tend to slip out of the periodic load balance so the best place
+>>>>>>> to choose to migrate them is during their wake up. The decision is in O(1) as
+>>>>>>> we only check again one buddy CPU
+>>>>>>
+>>>>>> Just have a little worry about the scalability on a big machine, like on
+>>>>>> a 4 sockets NUMA machine * 8 cores * HT machine, the buddy cpu in whole
+>>>>>> system need care 64 LCPUs. and in your case cpu0 just care 4 LCPU. That
+>>>>>> is different on task distribution decision.
+>>>>>
+>>>>> The buddy CPU should probably not be the same for all 64 LCPU it
+>>>>> depends on where it's worth packing small tasks
+>>>>
+>>>> Do you have further ideas for buddy cpu on such example?
+>>>
+>>> yes, I have several ideas which were not really relevant for small
+>>> system but could be interesting for larger system
+>>>
+>>> We keep the same algorithm in a socket but we could either use another
+>>> LCPU in the targeted socket (conf0) or chain the socket (conf1)
+>>> instead of packing directly in one LCPU
+>>>
+>>> The scheme below tries to summaries the idea:
+>>>
+>>> Socket      | socket 0 | socket 1   | socket 2   | socket 3   |
+>>> LCPU        | 0 | 1-15 | 16 | 17-31 | 32 | 33-47 | 48 | 49-63 |
+>>> buddy conf0 | 0 | 0    | 1  | 16    | 2  | 32    | 3  | 48    |
+>>> buddy conf1 | 0 | 0    | 0  | 16    | 16 | 32    | 32 | 48    |
+>>> buddy conf2 | 0 | 0    | 16 | 16    | 32 | 32    | 48 | 48    |
+>>>
+>>> But, I don't know how this can interact with NUMA load balance and the
+>>> better might be to use conf3.
+>>
+>> I mean conf2 not conf3
+>
+> So, it has 4 levels 0/16/32/ for socket 3 and 0 level for socket 0, it
+> is unbalanced for different socket.
 
-commit 7bec207427c2efb794 remove sirfsoc_gpio_set_pull function,
-this patches takes the feature back by adding sirf,pullups and
-sirf,pulldowns prop in dts, and the driver will set the GPIO
-pull according to the dts.
+That the target because we have decided to pack the small tasks in
+socket 0 when we have parsed the topology at boot.
+We don't have to loop into sched_domain or sched_group anymore to find
+the best LCPU when a small tasks wake up.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- Depends on:
- [PATCH] pinctrl: sirf: add missing DT-binding document
- http://www.spinics.net/lists/arm-kernel/msg212485.html
+>
+> And the ground level has just one buddy for 16 LCPUs - 8 cores, that's
+> not a good design, consider my previous examples: if there are 4 or 8
+> tasks in one socket, you just has 2 choices: spread them into all cores,
+> or pack them into one LCPU. Actually, moving them just into 2 or 4 cores
+> maybe a better solution. but the design missed this.
 
- .../devicetree/bindings/pinctrl/pinctrl-sirf.txt   |    3 +
- drivers/pinctrl/pinctrl-sirf.c                     |   48 ++++++++++++++++++++
- 2 files changed, 51 insertions(+), 0 deletions(-)
+You speak about tasks without any notion of load. This patch only care
+of small tasks and light LCPU load, but it falls back to default
+behavior for other situation. So if there are 4 or 8 small tasks, they
+will migrate to the socket 0 after 1 or up to 3 migration (it depends
+of the conf and the LCPU they come from).
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt
-index a2896df..c596a6a 100644
---- a/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-sirf.txt
-@@ -6,6 +6,9 @@ Required properties:
- - interrupts    : Interrupts used by every GPIO group
- - gpio-controller : Indicates this device is a GPIO controller
- - interrupt-controller  : Marks the device node as an interrupt controller
-+Optional properties:
-+- sirf,pullups : if n-th bit of m-th bank is set, set a pullup on GPIO-n of bank m
-+- sirf,pulldowns : if n-th bit of m-th bank is set, set a pulldown on GPIO-n of bank m
- 
- Please refer to pinctrl-bindings.txt in this directory for details of the common
- pinctrl bindings used by client devices.
-diff --git a/drivers/pinctrl/pinctrl-sirf.c b/drivers/pinctrl/pinctrl-sirf.c
-index 09eadb5..22a408c 100644
---- a/drivers/pinctrl/pinctrl-sirf.c
-+++ b/drivers/pinctrl/pinctrl-sirf.c
-@@ -1663,6 +1663,44 @@ const struct irq_domain_ops sirfsoc_gpio_irq_simple_ops = {
- 	.xlate = irq_domain_xlate_twocell,
- };
- 
-+static void sirfsoc_gpio_set_pullup(const u32 *pullups)
-+{
-+	int i, n;
-+	const unsigned long *p = (const unsigned long *)pullups;
-+
-+	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
-+		n = find_first_bit(p + i, BITS_PER_LONG);
-+		while (n < BITS_PER_LONG) {
-+			u32 offset = SIRFSOC_GPIO_CTRL(i, n);
-+			u32 val = readl(sgpio_bank[i].chip.regs + offset);
-+			val |= SIRFSOC_GPIO_CTL_PULL_MASK;
-+			val |= SIRFSOC_GPIO_CTL_PULL_HIGH;
-+			writel(val, sgpio_bank[i].chip.regs + offset);
-+
-+			n = find_next_bit(p + i, BITS_PER_LONG, n + 1);
-+		}
-+	}
-+}
-+
-+static void sirfsoc_gpio_set_pulldown(const u32 *pulldowns)
-+{
-+	int i, n;
-+	const unsigned long *p = (const unsigned long *)pulldowns;
-+
-+	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
-+		n = find_first_bit(p + i, BITS_PER_LONG);
-+		while (n < BITS_PER_LONG) {
-+			u32 offset = SIRFSOC_GPIO_CTRL(i, n);
-+			u32 val = readl(sgpio_bank[i].chip.regs + offset);
-+			val |= SIRFSOC_GPIO_CTL_PULL_MASK;
-+			val &= ~SIRFSOC_GPIO_CTL_PULL_HIGH;
-+			writel(val, sgpio_bank[i].chip.regs + offset);
-+
-+			n = find_next_bit(p + i, BITS_PER_LONG, n + 1);
-+		}
-+	}
-+}
-+
- static int __devinit sirfsoc_gpio_probe(struct device_node *np)
- {
- 	int i, err = 0;
-@@ -1671,6 +1709,8 @@ static int __devinit sirfsoc_gpio_probe(struct device_node *np)
- 	struct platform_device *pdev;
- 	bool is_marco = false;
- 
-+	u32 pullups[SIRFSOC_GPIO_NO_OF_BANKS], pulldowns[SIRFSOC_GPIO_NO_OF_BANKS];
-+
- 	pdev = of_find_device_by_node(np);
- 	if (!pdev)
- 		return -ENODEV;
-@@ -1734,6 +1774,14 @@ static int __devinit sirfsoc_gpio_probe(struct device_node *np)
- 		irq_set_handler_data(bank->parent_irq, bank);
- 	}
- 
-+	if (!of_property_read_u32_array(np, "sirf,pullups", pullups,
-+		SIRFSOC_GPIO_NO_OF_BANKS))
-+		sirfsoc_gpio_set_pullup(pullups);
-+
-+	if (!of_property_read_u32_array(np, "sirf,pulldowns", pulldowns,
-+		SIRFSOC_GPIO_NO_OF_BANKS))
-+		sirfsoc_gpio_set_pulldown(pulldowns);
-+
- 	return 0;
- 
- out:
--- 
-1.7.5.4
+Then, if too much small tasks wake up simultaneously on the same LCPU,
+the default load balance will spread them in the core/cluster/socket
 
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+>
+> Obviously, more and more cores is the trend on any kinds of CPU, the
+> buddy system seems hard to catch up this.
+>
+>
