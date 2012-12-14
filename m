@@ -1,26 +1,63 @@
-From: alex.shi@intel.com (Alex Shi)
-Date: Fri, 14 Dec 2012 14:36:53 +0800
-Subject: [RFC PATCH v2 3/6] sched: pack small tasks
-In-Reply-To: <1355460356.5777.12.camel@marge.simpson.net>
-References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
- <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
- <50C93AC1.1060202@intel.com>
- <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
- <50C9E552.1010600@intel.com> <1355460356.5777.12.camel@marge.simpson.net>
-Message-ID: <50CAC905.9070100@intel.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 14 Dec 2012 07:48:05 +0100
+Subject: clock_enable mismatches in pwm-backlight/pwm_enable
+In-Reply-To: <1355428233.2159.15.camel@gitbox>
+References: <1355428233.2159.15.camel@gitbox>
+Message-ID: <20121214064805.GA24094@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2012 12:45 PM, Mike Galbraith wrote:
->> > Do you have further ideas for buddy cpu on such example?
->>> > > 
->>> > > Which kind of sched_domain configuration have you for such system ?
->>> > > and how many sched_domain level have you ?
->> > 
->> > it is general X86 domain configuration. with 4 levels,
->> > sibling/core/cpu/numa.
-> CPU is a bug that slipped into domain degeneration.  You should have
-> SIBLING/MC/NUMA (chasing that down is on todo).
+On Fri, Dec 14, 2012 at 08:50:33AM +1300, Tony Prisk wrote:
+> Hi Thierry,
+> 
+> This works out quite well with you looking after pwm and pwm-backlight.
+> 
+> I noticed while troubleshooting pwm on arch-vt8500 last night that the
+> clk_enable count was getting huge for no obvious reason, and I narrowed
+> it down to the pwm-backlight driver.
+> 
+> in pwm-bl.c::pwm_backlight_update_status()
+> 
+> if (brightness == 0) {
+> 		pwm_config(pb->pwm, 0, pb->period);
+> 		pwm_disable(pb->pwm);
+> 	} else {
+> 		...
+> 		pwm_config(pb->pwm, duty_cycle, pb->period);
+> 		pwm_enable(pb->pwm);
+> 	}
+> 
+> Which looks fine on its own, except that in pwm_enable() it's not
+> uncommon to have clk_<prepare_>enable calls.
+> 
+> What happens is everytime the backlight level is changed to anything
+> except 0, pwm_enable() is called, which calls clk_enable() and the
+> counter goes up. Only when brightness=0 does pwm_disable() get called
+> and the accompanying clk_disable().
+> 
+> If you change brightness 3-4 times, then set brightness=0, the clock is
+> enable 3-4 times, but only disabled 1.
+> 
+> At first I thought it was my bad, but it seems Tegra and IMX suffer from
+> this problem as well - they both do clk_ calls in pwm_enable - which
+> doesn't seem unreasonable.
+> 
+> Any thoughts on how this could be rectified?
 
-Maybe.
-the CPU/NUMA is different on domain flags, CPU has SD_PREFER_SIBLING.
+What you describe above should not happen. If you look at the core code,
+you'll see that pwm_enable() and pwm_disable() keep track of the enable
+status of PWM devices and only call the driver's .enable() or .disable()
+if it is actually needed.
+
+I've just checked the pwm-vt8500 driver and it looks like clk_enable()
+and clk_disable() are properly balanced everywhere, so I can't explain
+why this would happen.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121214/74808cb5/attachment.sig>
