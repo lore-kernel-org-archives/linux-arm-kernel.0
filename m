@@ -1,41 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 14 Dec 2012 10:06:53 -0800
-Subject: [PATCHv2] ARM: sunxi: Change device tree naming scheme for sunxi
-In-Reply-To: <50CB5D93.7080405@free-electrons.com>
-References: <1355328503-25315-1-git-send-email-maxime.ripard@free-electrons.com>
- <201212131200.48413.arnd@arndb.de>
- <50CB5D93.7080405@free-electrons.com>
-Message-ID: <CAOesGMgX6Ta9bduBEpuY-eLg_9Lvm19OMJMj2MPbHcfvj69wiw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 14 Dec 2012 10:06:45 -0800
+Subject: [PATCH 1/7] ir-rx51: Handle signals properly
+In-Reply-To: <20121214174918.GA11029@arwen.pp.htv.fi>
+References: <1353251589-26143-1-git-send-email-timo.t.kokkonen@iki.fi>
+ <1353251589-26143-2-git-send-email-timo.t.kokkonen@iki.fi>
+ <20121120195755.GM18567@atomide.com>
+ <20121214172809.GT4989@atomide.com>
+ <20121214172616.GC9620@arwen.pp.htv.fi>
+ <20121214174629.GV4989@atomide.com>
+ <20121214174918.GA11029@arwen.pp.htv.fi>
+Message-ID: <20121214180645.GW4989@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Felipe Balbi <balbi@ti.com> [121214 09:59]:
+> On Fri, Dec 14, 2012 at 09:46:29AM -0800, Tony Lindgren wrote:
+> > * Felipe Balbi <balbi@ti.com> [121214 09:36]:
+> > > 
+> > > if it's really for PWM, shouldn't we be using drivers/pwm/ ??
+> > > 
+> > > Meaning that $SUBJECT would just request a PWM device and use it. That
+> > > doesn't solve the whole problem, however, as pwm-omap.c would still need
+> > > access to timer-omap.h.
+> > 
+> > That would only help with omap_dm_timer_set_pwm() I think.
+> > 
+> > The other functions are also needed by the clocksource and clockevent
+> > drivers. And tidspbridge too:
+> 
+> well, we _do_ have drivers/clocksource ;-)
 
-On Fri, Dec 14, 2012 at 9:10 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Arnd,
->
-> Le 13/12/2012 13:00, Arnd Bergmann a ?crit :
->> On Wednesday 12 December 2012, Maxime Ripard wrote:
->>> There is several different SoCs sharing the sun5i codename: A10s, A12
->>> and A13. Since there is enough differences to not consider those the
->>> same SoCs, change a bit the naming scheme to reflect this.
->>>
->>> Moreover, some boards like the olinuxino come in A10s and A13 variants,
->>> which also share the same SoC codename.
->>>
->>> So change the naming scheme to reflect both the codename and the market
->>> name of the SoCs used in the dtsi and in the board files
->>>
->>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
-> Will you take it directly, or do you want a pull request?
+That's where the dmtimer code should live. But still it does not help
+with the header.
 
-We can take it directly, but I'm not picking up patches until after
-the final 4 branches have been sent up and merged.
+Thomas, maybe we could use the hrtimer framework for it if there was
+some way to completely leave out the rb tree for the dedicated hardware
+timers? There's no queue needed as there's always just one value tied to
+a specific timer.
 
+Regards,
 
-
--Olof
+Tony
