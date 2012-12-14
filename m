@@ -1,30 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 14 Dec 2012 21:42:48 +0100
-Subject: [PATCH] pinctrl: sirf: add missing DT-binding document
-In-Reply-To: <1355469841-24457-1-git-send-email-Barry.Song@csr.com>
-References: <1355469841-24457-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <CACRpkdY1yT5xR7ghMCC=07ghQn_EfBx9Mn0txsPnEfPWz_uGdA@mail.gmail.com>
+Date: Fri, 14 Dec 2012 21:44:08 +0100
+Subject: [PATCH] pinctrl: sirf: enable GPIO pullup/down configuration from
+ dts
+In-Reply-To: <1355476559-27550-1-git-send-email-Barry.Song@csr.com>
+References: <1355476559-27550-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <CACRpkdZ4_8OiXWJ3WWggXOMyu+mAsBWiMEz4V9-xZYVnL=qyTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 14, 2012 at 8:24 AM, Barry Song <Barry.Song@csr.com> wrote:
+On Fri, Dec 14, 2012 at 10:15 AM, Barry Song <Barry.Song@csr.com> wrote:
 
 > From: Barry Song <Baohua.Song@csr.com>
 >
-> While sending email to Linus for reviewing:
-> "pinctrl: sirf: add DT-binding pinmux mapping support"
-> https://patchwork.kernel.org/patch/1364361/
+> commit 7bec207427c2efb794 remove sirfsoc_gpio_set_pull function,
+> this patches takes the feature back by adding sirf,pullups and
+> sirf,pulldowns prop in dts, and the driver will set the GPIO
+> pull according to the dts.
 >
-> i have included the devicetree/bindings/pinctrl/pinctrl-sirf.txt
->
-> But while sending pull request with commit 056876f6c73406c,
-> i missed the document.
->
-> this patch takes the document back.
->
+> Cc: Arnd Bergmann <arnd@arndb.de>
 > Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-Applied to my "fixes" branch.
+Applied, thanks.
 
 Yours,
 Linus Walleij
