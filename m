@@ -1,39 +1,34 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Fri, 14 Dec 2012 19:16:31 +0100
-Subject: [PATCH 1/1] ARM: OMAP2+: enable devtmpfs and devtmpfs automount
-In-Reply-To: <20121214181051.GY4989@atomide.com>
-References: <1353504411-19811-1-git-send-email-javier.martinez@collabora.co.uk>
- <20121214181051.GY4989@atomide.com>
-Message-ID: <CAAwP0s1d4xPfYyaU+Cu=fH6YL5gmyYF+6x0aHOmNVeHshZ1ZeA@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 14 Dec 2012 13:18:39 -0500 (EST)
+Subject: cpts: Fix build error caused by include of plat/clock.h
+In-Reply-To: <20121214110918.GA7982@netboy.at.omicron.at>
+References: <20121214071300.GA2253@netboy.at.omicron.at>
+ <45364223-10C6-430A-9085-9DE1C79030AF@dominion.thruhere.net>
+ <20121214110918.GA7982@netboy.at.omicron.at>
+Message-ID: <20121214.131839.1828185049500547514.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 14, 2012 at 7:10 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Javier Martinez Canillas <javier.martinez@collabora.co.uk> [121121 05:29]:
->> Since udev-182, udev no longer creates device nodes under /dev
->> and this has to be managed by the kernel devtmpfs filesystem.
->>
->> This means that a kernel built with the current OMAP2+ config
->> will not boot on a system with a recent udev.
->>
->> Also, it is good to have /dev automatically mounted since some
->> non-initramfs based setups assumes this and don't manually mount it.
->
-> Thanks applying into omap-for-v3.8/fixes-for-merge-window.
->
-> Regards,
->
-> Tony
->
+From: Richard Cochran <richardcochran@gmail.com>
+Date: Fri, 14 Dec 2012 12:09:18 +0100
 
-Hi Tony,
+> On Fri, Dec 14, 2012 at 10:55:56AM +0100, Koen Kooi wrote:
+>> 
+>> Op 14 dec. 2012, om 08:13 heeft Richard Cochran <richardcochran@gmail.com> het volgende geschreven:
+>> 
+>> > On Thu, Dec 13, 2012 at 01:36:41PM -0800, Tony Lindgren wrote:
+>> >> Commit 87c0e764 (cpts: introduce time stamping code and a PTP hardware clock)
+>> >> mistakenly included plat/clock.h that should not be included by drivers
+>> >> even if it exists.
+>> > 
+>> > Hasn't this already been fixed?
+>> > 
+>> >  https://patchwork.kernel.org/patch/1810481/
+>> >  http://www.spinics.net/lists/linux-omap/msg83132.html
+>> 
+>> That patch didn't get applied, so it's still broken in Linus' tree :(
+> 
+> In netdev's patchwork, this was marked "Not Applicable." Dave, can you
+> possibly take this patch? If not, who should I ask next?
 
-I resend a v2 today: [PATCH v2 1/1] ARM: OMAP2+: omap2plus_defconfig:
-enable devtmpfs and automount
-
-That fixes an issue in the patch comments. Sekar Nori pointed out that
-the first udev to make this a requirement was 176 not 182.
-So probably is better if you can apply that one instead.
-
-Thanks a lot and best regards,
-Javier
+That's strange, when I look at that patch it's marked "Accepted" ;-)
