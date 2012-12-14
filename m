@@ -1,26 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 14 Dec 2012 11:53:09 +0900
-Subject: [PATCH 01/12] regulator: gpio-regulator: Demote GPIO Regulator
- driver to start later
-In-Reply-To: <20121213115524.GI27617@gmail.com>
-References: <1355129761-8088-1-git-send-email-lee.jones@linaro.org>
- <1355129761-8088-2-git-send-email-lee.jones@linaro.org>
- <20121210140751.GB6103@opensource.wolfsonmicro.com>
- <20121210142836.GG9362@gmail.com>
- <20121210143141.GG6103@opensource.wolfsonmicro.com>
- <20121213115524.GI27617@gmail.com>
-Message-ID: <20121214025307.GB4478@opensource.wolfsonmicro.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 14 Dec 2012 12:20:29 +0900
+Subject: [PATCH 1/2] ARM: SH-Mobile: sh73a0: Secondary CPUs handle own SCU
+ flags
+In-Reply-To: <1354795719-5578-1-git-send-email-hechtb+renesas@gmail.com>
+References: <1354795719-5578-1-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <CANqRtoR-HeWVgWsL654aVEx9BuHKBpSVXzRYBZY9=1JZFi267g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 13, 2012 at 11:55:24AM +0000, Lee Jones wrote:
+On Thu, Dec 6, 2012 at 9:08 PM, Bastian Hecht <hechtb@gmail.com> wrote:
+> From: Bastian Hecht <hechtb@gmail.com>
+>
+> When booting secondary CPUs we have used the main CPU to set up the
+> Snoop Control Unit flags of these CPUs. It is a cleaner approach
+> if every CPU takes care of its own flags. We avoid the need for
+> locking and the program logic is more concise. With this patch the file
+> headsmp-sh73a0.S is added that contains a startup vector for secondary CPUs
+> that sets up its own SCU flags.
+> Further in sh73a0_smp_prepare_cpus() we can rely on the generic ARM helper
+> scu_power_mode(). This is possible as we don't cross borders anymore (every
+> CPU handles its own flags) and need no locking. So we can throw out the
+> needless function modify_scu_cpu_psr().
+>
+> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
 
-> I understand your logic, hence why I wrote such a lengthy commit
-> message. However, I'm not sure I see a logical way around it. Asking
-> all users of MMCI to provide a not-regulator to declare that a
-> secondary regulator isn't available seems a little unreasonable to me.
-
-> Is there anything else we can do?
-
-Have all the people setting up this secondary regulator explicitly
-declare it?
+Acked-by: Magnus Damm <damm@opensource.se>
