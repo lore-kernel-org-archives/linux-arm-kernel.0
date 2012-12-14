@@ -1,40 +1,92 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 14 Dec 2012 18:34:05 +0200
-Subject: [PATCH REBASE 2/6] i2c: omap: also complete() when stat becomes zero
+Date: Fri, 14 Dec 2012 18:34:06 +0200
+Subject: [PATCH REBASE 3/6] i2c: omap: improve 'rev' a little bit
 In-Reply-To: <1355502849-9289-1-git-send-email-balbi@ti.com>
 References: <1355502849-9289-1-git-send-email-balbi@ti.com>
-Message-ID: <1355502849-9289-3-git-send-email-balbi@ti.com>
+Message-ID: <1355502849-9289-4-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case we loop on IRQ handler until stat is
-finally zero, we would end up in a situation
-where all I2C transfers would misteriously
-timeout because we were not calling complete()
-in that situation.
+a later patch will use scheme detection at
+another part of the code, but current scheme
+detection implementation relies on the fact that
+we still hold scheme on the first 16 bits of our
+rev variable, which won't be true as soon as
+we move away from probe() because we left shift
+it by 16 in case of newer IP versions in order
+to fit other revision data in the lower 16 bits.
 
-Fix the issue by moving omap_i2c_complete_cmd()
-call inside the 'out' label.
+To fix that, we are changing scheme implementation
+to assume scheme is always placed on the top 16
+bits.
+
+While at that, also move those macro definitions
+to the top of the source file, where they should've
+been to start with, because a later patch will use
+them.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-omap.c | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 9a9cf7c..fcecb0b 100644
+index fcecb0b..c93eb17 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1022,9 +1022,8 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 		}
- 	} while (stat);
+@@ -60,6 +60,17 @@
+ /* timeout for pm runtime autosuspend */
+ #define OMAP_I2C_PM_TIMEOUT		1000	/* ms */
  
--	omap_i2c_complete_cmd(dev, err);
++#define OMAP_I2C_SCHEME(rev)		((rev & 0xc0000000) >> 30)
++
++#define OMAP_I2C_SCHEME_0		0
++#define OMAP_I2C_SCHEME_1		1
++
++#define OMAP_I2C_REV_SCHEME_0_MAJOR(rev) (rev >> 4)
++#define OMAP_I2C_REV_SCHEME_0_MINOR(rev) (rev & 0xf)
++
++#define OMAP_I2C_REV_SCHEME_1_MAJOR(rev) ((rev & 0x0700) >> 7)
++#define OMAP_I2C_REV_SCHEME_1_MINOR(rev) (rev & 0x1f)
++
+ /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
+ enum {
+ 	OMAP_I2C_REV_REG = 0,
+@@ -1058,16 +1069,6 @@ static const struct of_device_id omap_i2c_of_match[] = {
+ MODULE_DEVICE_TABLE(of, omap_i2c_of_match);
+ #endif
+ 
+-#define OMAP_I2C_SCHEME(rev)		((rev & 0xc000) >> 14)
 -
- out:
-+	omap_i2c_complete_cmd(dev, err);
- 	spin_unlock_irqrestore(&dev->lock, flags);
+-#define OMAP_I2C_REV_SCHEME_0_MAJOR(rev) (rev >> 4)
+-#define OMAP_I2C_REV_SCHEME_0_MINOR(rev) (rev & 0xf)
+-
+-#define OMAP_I2C_REV_SCHEME_1_MAJOR(rev) ((rev & 0x0700) >> 7)
+-#define OMAP_I2C_REV_SCHEME_1_MINOR(rev) (rev & 0x1f)
+-#define OMAP_I2C_SCHEME_0		0
+-#define OMAP_I2C_SCHEME_1		1
+-
+ static int __devinit
+ omap_i2c_probe(struct platform_device *pdev)
+ {
+@@ -1158,7 +1159,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	 * Also since the omap_i2c_read_reg uses reg_map_ip_* a
+ 	 * raw_readw is done.
+ 	 */
+-	rev = __raw_readw(dev->base + 0x04);
++	rev = __raw_readw(dev->base + 0x04) << 16;
  
- 	return IRQ_HANDLED;
+ 	scheme = OMAP_I2C_SCHEME(rev);
+ 	switch (scheme) {
+@@ -1172,8 +1173,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		/* FALLTHROUGH */
+ 	default:
+ 		dev->regs = (u8 *)reg_map_ip_v2;
+-		rev = (rev << 16) |
+-			omap_i2c_read_reg(dev, OMAP_I2C_IP_V2_REVNB_LO);
++		rev |= omap_i2c_read_reg(dev, OMAP_I2C_IP_V2_REVNB_LO);
+ 		minor = OMAP_I2C_REV_SCHEME_1_MINOR(rev);
+ 		major = OMAP_I2C_REV_SCHEME_1_MAJOR(rev);
+ 		dev->rev = rev;
 -- 
 1.8.1.rc1.5.g7e0651a
