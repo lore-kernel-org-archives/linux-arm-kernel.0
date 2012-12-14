@@ -1,132 +1,102 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 14 Dec 2012 14:05:20 -0800
-Subject: [GIT PULL 1/3] ARM: arm-soc: SoC updates, take 2
+Date: Fri, 14 Dec 2012 14:06:04 -0800
+Subject: [GIT PULL 2/3] ARM: arm-soc: Device-tree updates, take 2
 In-Reply-To: <20121214220441.GA11363@quad.lixom.net>
 References: <20121214220441.GA11363@quad.lixom.net>
-Message-ID: <20121214220520.GB11363@quad.lixom.net>
+Message-ID: <20121214220604.GC11363@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Linus,
 
-This is the second batch of SoC updates for the 3.8 merge window,
-containing parts that had dependencies on earlier branches such that we
-couldn't include them with the first branch.
-
-These are general updates for Samsung Exynos, Renesas/shmobile and a
-topic branch that adds SMP support to Altera's socfpga platform.
-
+This branch contains device-tree updates for the SPEAr platform.
+They had dependencies on earlier branches from this merge window,
+which is why they were broken out in a separate branch.
 
 Conflicts seen with this merge:
 
-arch/arm/boot/dts/exynos5250.dtsi:
-First is add/add. Keep both sides.
-For the i2c node, keep the one with the label in front from the branch.
-
-arch/arm/mach-exynos/include/mach/regs-pmu.h:
-Add/remove. Keep the SYS_I2C_CFG one, drop USB_CFG.
-
-arch/arm/mach-exynos/mach-exynos5-dt.c:
-Include conflict: Keep and of_fdt.h and io.h
-Second conflict: Keep contents from branch, but replace last
-of_platform_populate with the chunk from HEAD.
+None.
 
 ----------------------------------------------------------------
 
-The following changes since commit d42b3a2906a10b732ea7d7f849d49be79d242ef0:
+The following changes since commit b035668887bb39bc76d14a5898b597e43b3c5710:
 
-  Merge branch 'core-efi-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
+  Merge branch 'next/soc2' into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/soc2
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/dt2
 
-for you to fetch changes up to c91321e8ff338a88a9272dcd938f085955cd5846:
+for you to fetch changes up to eabc5fa51c1fae4b66cf883e3a3c2b3ca794494c:
 
-  ARM: arm-soc: Merge branch 'next/smp' into next/soc2
+  Merge branch 'spear-for-3.8' of git://git.linaro.org/people/vireshk/linux into next/dt2
 
 ----------------------------------------------------------------
 
-Abhilash Kesavan (4):
-      ARM: EXYNOS: Setup legacy i2c controller interrupts
-      ARM: EXYNOS: Add aliases for i2c controller
-      ARM: EXYNOS: Fix i2c suspend/resume for legacy controller
-      ARM: EXYNOS: Add ARM down clock support
+Arnd Bergmann (1):
+      Merge branch 'spear-for-3.8' of git://git.linaro.org/people/vireshk/linux into next/dt2
 
-Arnd Bergmann (7):
-      Merge branch 'socfpga/smp' into next/smp
-      Merge branch 'vexpress-clk-soc' of git://git.linaro.org/people/pawelmoll/linux into next/soc2
-      ARM: socfpga: mark secondary_trampoline as cpuinit
-      Merge branch 'next/boards2' into next/soc2
-      Merge branch 'soc2' of git://git.kernel.org/.../horms/renesas into next/soc2
-      Merge branches 'devel/debug_ll_init' and 'calxeda/ecx-2000' into next/soc2
-      Merge branch 'soc4' of git://git.kernel.org/.../horms/renesas into next/soc2
+Deepak Sikri (1):
+      ARM: SPEAr: DT: Modify DT bindings for STMMAC
 
-Colin Cross (2):
-      ARM: SAMSUNG: add clock_tree debugfs file in clock
-      ARM: SAMSUNG: call clk_get_rate for debugfs rate files
+Shiraz Hashim (6):
+      ARM: SPEAr13xx: DT: Add spics gpio controller nodes
+      ARM: SPEAr: DT: Update device nodes
+      ARM: SPEAr13xx: Remove fields not required for ssp controller
+      ARM: SPEAr3xx: shirq: simplify and move the shared irq multiplexor to DT
+      ARM: SPEAr3xx: DT: add shirq node for interrupt multiplexor
+      ARM: SPEAr320: DT: Add SPEAr 320 HMI board support
 
-Dinh Nguyen (1):
-      ARM: socfpga: Enable SMP for socfpga
+Vipin Kumar (1):
+      ARM: SPEAr: DT: Update partition info for MTD devices
 
-Jingoo Han (1):
-      ARM: EXYNOS: Add dp clock support for EXYNOS5
+Vipul Kumar Samar (5):
+      ARM: SPEAr: DT: Update pinctrl list
+      ARM: SPEAr: DT: Fix existing DT support
+      ARM: SPEAr: DT: add uart state to fix warning
+      ARM: SPEAr1310: Move 1310 specific misc register into machine specific files
+      ARM: SPEAr1310: Fix AUXDATA for compact flash controller
 
-Kukjin Kim (1):
-      Merge branch 'next/hdmi-samsung' into next/devel-samsung
-
-Kuninori Morimoto (3):
-      ARM: shmobile: sh7372: remove fsidivx clock
-      ARM: shmobile: sh7372: sh7372_fsiXck_clk become non-global
-      sh: clkfwk: fixup unsed variable warning
-
-Olof Johansson (2):
-      Merge branch 'next/devel-samsung' of git://git.kernel.org/.../kgene/linux-samsung into next/soc2
-      ARM: arm-soc: Merge branch 'next/smp' into next/soc2
-
-Pavel Machek (2):
-      ARM: socfpga: fix build break for allyesconfig
-      socfpga: map uart into virtual address space so that early_printk() works
-
-Rob Herring (1):
-      ARM: highbank: use common debug_ll_io_init
-
-Simon Horman (3):
-      Revert "ARM: shmobile: emev2: Replace modify_scu_cpu_psr with scu_power_mode"
-      Revert "ARM: shmobile: sh73a0: Replace modify_scu_cpu_psr with scu_power_mode"
-      Revert "ARM: shmobile: r8a7779: Replace modify_scu_cpu_psr with scu_power_mode"
-
-Vasanth Ananthan (1):
-      ARM: EXYNOS: Clock settings for SATA and SATA PHY
+Viresh Kumar (3):
+      Merge commit 'pinctrl/devel 4ddb1c2' into spear-for-3.8
+      Merge commit 'gpio-lw/devel' into spear-for-3.8
+      ARM: SPEAr3xx: Shirq: Move shirq controller out of plat/
 
 
- .../bindings/arm/altera/socfpga-reset.txt       |  11 ++
- .../bindings/arm/altera/socfpga-system.txt      |  11 ++
- arch/arm/boot/dts/exynos5250.dtsi               |  27 +++--
- arch/arm/boot/dts/socfpga.dtsi                  |  10 ++
- arch/arm/configs/socfpga_defconfig              |   3 +-
- arch/arm/mach-exynos/clock-exynos5.c            |  28 ++++-
- arch/arm/mach-exynos/cpuidle.c                  |  36 ++++++
- arch/arm/mach-exynos/include/mach/regs-clock.h  |  19 +++
- arch/arm/mach-exynos/include/mach/regs-pmu.h    |   3 +
- arch/arm/mach-exynos/mach-exynos5-dt.c          |  25 +++-
- arch/arm/mach-exynos/pm.c                       |   9 ++
- arch/arm/mach-shmobile/clock-sh7372.c           |  20 ++--
- arch/arm/mach-shmobile/include/mach/sh7372.h    |   2 -
- arch/arm/mach-shmobile/smp-emev2.c              |  22 +++-
- arch/arm/mach-shmobile/smp-r8a7779.c            |  25 +++-
- arch/arm/mach-shmobile/smp-sh73a0.c             |  23 +++-
- arch/arm/mach-socfpga/Kconfig                   |   1 +
- arch/arm/mach-socfpga/Makefile                  |   1 +
- arch/arm/mach-socfpga/core.h                    |  34 ++++++
- arch/arm/mach-socfpga/headsmp.S                 |  25 ++++
- arch/arm/mach-socfpga/platsmp.c                 | 116 +++++++++++++++++++
- arch/arm/mach-socfpga/socfpga.c                 |  54 ++++++++-
- arch/arm/plat-samsung/clock.c                   |  75 +++++++++++-
- drivers/sh/clk/cpg.c                            |   1 -
- 24 files changed, 544 insertions(+), 37 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt
- create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
- create mode 100644 arch/arm/mach-socfpga/core.h
- create mode 100644 arch/arm/mach-socfpga/headsmp.S
- create mode 100644 arch/arm/mach-socfpga/platsmp.c
+ .../devicetree/bindings/arm/spear/shirq.txt     |  48 +++
+ arch/arm/boot/dts/Makefile                      |   3 +-
+ arch/arm/boot/dts/spear1310-evb.dts             | 165 ++++++++--
+ arch/arm/boot/dts/spear1310.dtsi                |  32 +-
+ arch/arm/boot/dts/spear1340-evb.dts             | 253 +++++++++++++--
+ arch/arm/boot/dts/spear1340.dtsi                |  61 ++++
+ arch/arm/boot/dts/spear13xx.dtsi                |  72 ++++-
+ arch/arm/boot/dts/spear300-evb.dts              |  20 +-
+ arch/arm/boot/dts/spear300.dtsi                 |  14 +-
+ arch/arm/boot/dts/spear310-evb.dts              |  30 +-
+ arch/arm/boot/dts/spear310.dtsi                 |  18 ++
+ arch/arm/boot/dts/spear320-evb.dts              |  35 +-
+ arch/arm/boot/dts/spear320-hmi.dts              | 305 ++++++++++++++++++
+ arch/arm/boot/dts/spear320.dtsi                 |  39 ++-
+ arch/arm/boot/dts/spear3xx.dtsi                 |   5 +-
+ arch/arm/boot/dts/spear600-evb.dts              |  46 ++-
+ arch/arm/boot/dts/spear600.dtsi                 |  16 +
+ arch/arm/mach-spear13xx/include/mach/spear.h    |   8 -
+ arch/arm/mach-spear13xx/spear1310.c             |  16 +-
+ arch/arm/mach-spear13xx/spear13xx.c             |   2 -
+ arch/arm/mach-spear3xx/include/mach/irqs.h      |  10 +-
+ arch/arm/mach-spear3xx/spear300.c               | 103 ------
+ arch/arm/mach-spear3xx/spear310.c               | 202 ------------
+ arch/arm/mach-spear3xx/spear320.c               | 205 +-----------
+ arch/arm/mach-spear3xx/spear3xx.c               |   4 +
+ arch/arm/plat-spear/Makefile                    |   2 +-
+ arch/arm/plat-spear/shirq.c                     | 118 -------
+ drivers/clk/spear/spear1310_clock.c             |   1 +
+ drivers/irqchip/Makefile                        |   1 +
+ drivers/irqchip/spear-shirq.c                   | 316 +++++++++++++++++++
+ .../linux/irqchip/spear-shirq.h                 |  49 ++-
+ 31 files changed, 1425 insertions(+), 774 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/spear/shirq.txt
+ create mode 100644 arch/arm/boot/dts/spear320-hmi.dts
+ delete mode 100644 arch/arm/plat-spear/shirq.c
+ create mode 100644 drivers/irqchip/spear-shirq.c
+ rename arch/arm/plat-spear/include/plat/shirq.h => include/linux/irqchip/spear-shirq.h (60%)
