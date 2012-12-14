@@ -1,33 +1,33 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 14 Dec 2012 09:49:05 +0000
-Subject: vexpress compilation error in next-20121127
-In-Reply-To: <50CA278D.4030409@websterwood.com>
-References: <50B56601.5010305@broadcom.com> <50CA278D.4030409@websterwood.com>
-Message-ID: <1355478545.26914.2.camel@hornet>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Dec 2012 09:54:02 +0000
+Subject: [PATCH] DMAEngine: sirf: add DMA pause/resume support
+In-Reply-To: <1355478282-27908-1-git-send-email-Barry.Song@csr.com>
+References: <1355478282-27908-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <20121214095402.GH14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-12-13 at 19:07 +0000, Behan Webster wrote:
-> On 11/27/12 20:16, Markus Mayer wrote:
-> > Hi Pawel,
-> >
-> > There seems to be an issue compiling vexpress at this point. The 
-> > problem being that vexpress' makefile references reset.o, but there's 
-> > no reset.c in arch/arm/mach-vexpress.
-> >
-> > [...]
-> >   CC      arch/arm/mach-bcm/board_bcm.o
-> >   LD      arch/arm/mach-bcm/built-in.o
-> >   CC      arch/arm/mach-vexpress/v2m.o
-> > make[1]: *** No rule to make target `arch/arm/mach-vexpress/reset.o', 
-> > needed by `arch/arm/mach-vexpress/built-in.o'.  Stop.
-> > make: *** [arch/arm/mach-vexpress] Error 2
-> Same issue in mainline now too: arch/arm/mach-vexpress/reset.c is missing.
+On Fri, Dec 14, 2012 at 05:44:42PM +0800, Barry Song wrote:
+> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+> index 212f69f..ffe05bb 100644
+> --- a/drivers/dma/sirf-dma.c
+> +++ b/drivers/dma/sirf-dma.c
+> @@ -313,6 +313,38 @@ static int sirfsoc_dma_terminate_all(struct sirfsoc_dma_chan *schan)
+>  	return 0;
+>  }
+>  
+> +static int sirfsoc_dma_pause_chan(struct sirfsoc_dma_chan *schan)
+> +{
+> +	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
+> +	int cid = schan->chan.chan_id;
+> +
+> +	if (!sdma->is_marco)
+> +		writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL)
+> +			& ~((1 << cid) | 1 << (cid + 16)),
+> +			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
+> +	else
+> +		writel_relaxed((1 << cid) | 1 << (cid + 16),
+> +			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL_CLR);
 
-Yes, I've noticed this myself. It's just that the pull request for the
-arm-soc drivers branch went out in the second batch yesterday
-(http://article.gmane.org/gmane.linux.kernel/1409413), while the soc one
-in the first one. This was a bad decision to split the reset driver from
-the main update series, apologies about this.
-
-Pawe?
+You're doing a read-modify-write to what looks like a shared register.
+What makes this code safe in a preempt or SMP environment?
