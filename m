@@ -1,73 +1,55 @@
-From: tobetter@gmail.com (Dongjin Kim)
-Date: Fri, 14 Dec 2012 23:59:44 +0900
-Subject: [PATCH] ARM: EXYNOS: Fix MSHC clocks instance names
-Message-ID: <1355497184-26825-1-git-send-email-tobetter@gmail.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Fri, 14 Dec 2012 15:30:29 +0100
+Subject: [PATCH V2 2/2] mmc: mmci: Move ios_handler functionality into the
+ driver
+In-Reply-To: <1355495429-12510-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1355495429-12510-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1355495429-12510-3-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace clock instance name of MSHC controller for BIC and CIU of Exynos4412.
+From: Lee Jones <lee.jones@linaro.org>
 
-Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+There are currently two instances of the ios_handler being used.
+Both of which mearly toy with some regulator settings. Now there
+is a GPIO regulator API, we can use that instead, and lessen the
+per platform burden. By doing this, we also become more Device
+Tree compatible.
+
+Cc: Chris Ball <cjb@laptop.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm/mach-exynos/clock-exynos4.c |   25 ++++++++++++++-----------
- 1 file changed, 14 insertions(+), 11 deletions(-)
+ drivers/mmc/host/mmci.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
-index efead60..ae83011 100644
---- a/arch/arm/mach-exynos/clock-exynos4.c
-+++ b/arch/arm/mach-exynos/clock-exynos4.c
-@@ -529,8 +529,8 @@ static struct clk exynos4_init_clocks_off[] = {
- 		.enable		= exynos4_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 8),
- 	}, {
--		.name		= "dwmmc",
--		.parent		= &exynos4_clk_aclk_133.clk,
-+		.name		= "biu",
-+		.parent		= &exynos4_clk_aclk_200.clk,
- 		.enable		= exynos4_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 9),
- 	}, {
-@@ -1132,15 +1132,7 @@ static struct clksrc_clk exynos4_clksrcs[] = {
- 		.sources = &exynos4_clkset_mout_mfc,
- 		.reg_src = { .reg = EXYNOS4_CLKSRC_MFC, .shift = 8, .size = 1 },
- 		.reg_div = { .reg = EXYNOS4_CLKDIV_MFC, .shift = 0, .size = 4 },
--	}, {
--		.clk	= {
--			.name		= "sclk_dwmmc",
--			.parent		= &exynos4_clk_dout_mmc4.clk,
--			.enable		= exynos4_clksrc_mask_fsys_ctrl,
--			.ctrlbit	= (1 << 16),
--		},
--		.reg_div = { .reg = EXYNOS4_CLKDIV_FSYS3, .shift = 8, .size = 8 },
--	}
-+	},
- };
- 
- static struct clksrc_clk exynos4_clk_sclk_uart0 = {
-@@ -1235,6 +1227,16 @@ static struct clksrc_clk exynos4_clk_sclk_mmc3 = {
- 	.reg_div = { .reg = EXYNOS4_CLKDIV_FSYS2, .shift = 24, .size = 8 },
- };
- 
-+static struct clksrc_clk exynos4_clk_sclk_dwmci = {
-+	.clk    = {
-+		.name           = "ciu",
-+		.parent         = &exynos4_clk_dout_mmc4.clk,
-+		.enable         = exynos4_clksrc_mask_fsys_ctrl,
-+		.ctrlbit        = (1 << 16),
-+	},
-+	.reg_div = { .reg = EXYNOS4_CLKDIV_FSYS3, .shift = 8, .size = 8 },
-+};
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 9da5f24..e56655a 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1097,6 +1097,11 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	case MMC_POWER_OFF:
+ 		if (!IS_ERR(mmc->supply.vmmc))
+ 			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
 +
- static struct clksrc_clk exynos4_clk_mdout_spi0 = {
- 	.clk	= {
- 		.name		= "mdout_spi",
-@@ -1348,6 +1350,7 @@ static struct clksrc_clk *exynos4_clksrc_cdev[] = {
- 	&exynos4_clk_sclk_mmc1,
- 	&exynos4_clk_sclk_mmc2,
- 	&exynos4_clk_sclk_mmc3,
-+	&exynos4_clk_sclk_dwmci,
- 	&exynos4_clk_sclk_spi0,
- 	&exynos4_clk_sclk_spi1,
- 	&exynos4_clk_sclk_spi2,
++		if (!IS_ERR(mmc->supply.vqmmc) &&
++		    regulator_is_enabled(mmc->supply.vqmmc))
++			regulator_disable(mmc->supply.vqmmc);
++
+ 		break;
+ 	case MMC_POWER_UP:
+ 		if (!IS_ERR(mmc->supply.vmmc))
+@@ -1111,6 +1116,10 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 
+ 		break;
+ 	case MMC_POWER_ON:
++		if (!IS_ERR(mmc->supply.vqmmc) &&
++		    !regulator_is_enabled(mmc->supply.vqmmc))
++			regulator_enable(mmc->supply.vqmmc);
++
+ 		pwr |= MCI_PWR_ON;
+ 		break;
+ 	}
 -- 
-1.7.9.5
+1.7.10
