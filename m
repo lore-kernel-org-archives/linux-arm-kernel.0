@@ -1,32 +1,38 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 14 Dec 2012 02:46:38 +0100
-Subject: [PATCH 3/3] iio: mxs: Enable touchscreen on m28evk
-In-Reply-To: <1355449598-15980-1-git-send-email-marex@denx.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 13 Dec 2012 23:58:59 -0200
+Subject: [PATCH 2/3 V2] iio: mxs: Implement support for touchscreen
+In-Reply-To: <1355449598-15980-2-git-send-email-marex@denx.de>
 References: <1355449598-15980-1-git-send-email-marex@denx.de>
-Message-ID: <1355449598-15980-3-git-send-email-marex@denx.de>
+ <1355449598-15980-2-git-send-email-marex@denx.de>
+Message-ID: <CAOMZO5DDcPpePEiJe0hg0Er60OBuJM+Rik1CSc9zcphycpEr4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds necessary DT properties to m28evk to enable touchscreen
-in the LRADC block. The M28EVK is shipped with 4-wire resistive touchscreen.
+Hi Marek,
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx28-m28evk.dts |    1 +
- 1 file changed, 1 insertion(+)
+On Thu, Dec 13, 2012 at 11:46 PM, Marek Vasut <marex@denx.de> wrote:
 
-diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
-index c718f91..712d99a 100644
---- a/arch/arm/boot/dts/imx28-m28evk.dts
-+++ b/arch/arm/boot/dts/imx28-m28evk.dts
-@@ -213,6 +213,7 @@
- 
- 			lradc at 80050000 {
- 				status = "okay";
-+				fsl,lradc-touchscreen-wires = <4>;
- 			};
- 
- 			duart: serial at 80074000 {
--- 
-1.7.10.4
+> +static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
+> +{
+> +       struct input_dev *input;
+> +       struct device *dev = lradc->dev;
+> +       int ret;
+> +
+> +       if (!lradc->use_touchscreen)
+> +               return 0;
+
+Shouldn't we return an error code here?
+
+> +
+> +       input = input_allocate_device();
+> +       if (!input) {
+> +               dev_warn(dev, "Failed to allocate TS device, disabling.\n");
+> +               lradc->use_touchscreen = MXS_LRADC_TOUCHSCREEN_NONE;
+> +               return 0;
+> +       }
+
+Shouldn't we return an error code here?
+
+Regards,
+
+Fabio Estevam
