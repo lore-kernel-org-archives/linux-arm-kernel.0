@@ -1,49 +1,120 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 14 Dec 2012 13:53:31 -0600
-Subject: [RFC 2/5] ARM: dts: Add Cross Trigger Interface binding
-In-Reply-To: <50C9120F.7080809@ti.com>
-References: <1355348588-22318-1-git-send-email-jon-hunter@ti.com>
- <1355348588-22318-3-git-send-email-jon-hunter@ti.com>
- <50C90153.9070002@gmail.com> <50C9120F.7080809@ti.com>
-Message-ID: <50CB83BB.6080901@gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 14 Dec 2012 21:00:33 +0100
+Subject: [PATCH v2] pinctrl: add sleep mode management
+Message-ID: <1355515233-23663-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2012 05:23 PM, Jon Hunter wrote:
-> 
-> On 12/12/2012 04:12 PM, Rob Herring wrote:
->> On 12/12/2012 03:43 PM, Jon Hunter wrote:
->>> Adds a device-tree binding for the ARM Cross Trigger Interface (CTI).
->>> The ARM Cross Trigger Interface provides a way to route events between
->>> processor modules. For example, on OMAP4430 we use the CTI module to
->>> route PMU events to the GIC interrupt module.
->>
->> Do you need to describe the PMU-CTI-GIC connection in DT?
-> 
-> We definitely could. This is achieved by mapping a trigger-input to a
-> trigger-output. So we could list the trigger outputs and inputs in the
-> binding. For omap4430 we would have ...
-> 
-> arm,cti-trigin = <0 1 2 3 4 5 6>;
+From: Julien Delacou <julien.delacou@stericsson.com>
 
-I'd prefer to just spell it out: arm,cti-trigger-in
+This fix allows handling sleep mode for hogged
+pins in pinctrl. It provides functions to set pins
+to sleep/default configurations according to their
+current state.
 
-> arm,cti-trigin-names =  "dbgack", "pmuirq", "ptmextout0",
-> 			"ptmextout1", "commtx", "commrx",
-> 			"ptmtrigger";
-> arm,cti-trigout = <0 1 2 3 4 6 7>;
-> arm,cti-trigout-names = "edbgreq", "ptmextin0", "ptmextin1",
-> 			"ptmextin2", "ptmextin3","mpuirq",
-> 			"dbgrestart";
-> 
-> So to map the PMU to GIC, we would map the "pmuirq" trigger input to the
-> "mpuirq" trigger output. Then we could setup the mapping by name instead
-> of index.
+Signed-off-by: Julien Delacou <julien.delacou@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Move function prototypes to the local pinctrl/core.h header file
+- Added exports
+---
+ drivers/pinctrl/core.c | 37 ++++++++++++++++++++++++++++++++++---
+ drivers/pinctrl/core.h |  7 +++++++
+ 2 files changed, 41 insertions(+), 3 deletions(-)
 
-I'm not crazy about the name strings and would prefer something with
-phandles. The above binding doesn't really describe the connection of
-the CTI to the GIC. The GIC node would need to define some inputs and
-then you show the connection to the CTI outputs. This may be similar to
-an interrupt nexus node.
-
-Rob
+diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+index 5b4885c..3611753 100644
+--- a/drivers/pinctrl/core.c
++++ b/drivers/pinctrl/core.c
+@@ -1076,6 +1076,30 @@ void pinctrl_unregister_map(struct pinctrl_map const *map)
+ 	}
+ }
+ 
++/**
++ * pinctrl_force_sleep() - turn a given controller device into sleep state
++ * @pctldev: pin controller device
++ */
++int pinctrl_force_sleep(struct pinctrl_dev *pctldev)
++{
++	if (!IS_ERR(pctldev->p) && !IS_ERR(pctldev->hog_sleep))
++		return pinctrl_select_state(pctldev->p, pctldev->hog_sleep);
++	return 0;
++}
++EXPORT_SYMBOL_GPL(pinctrl_force_sleep);
++
++/**
++ * pinctrl_force_default() - turn a given controller device into default state
++ * @pctldev: pin controller device
++ */
++int pinctrl_force_default(struct pinctrl_dev *pctldev)
++{
++	if (!IS_ERR(pctldev->p) && !IS_ERR(pctldev->hog_default))
++		return pinctrl_select_state(pctldev->p, pctldev->hog_default);
++	return 0;
++}
++EXPORT_SYMBOL_GPL(pinctrl_force_default);
++
+ #ifdef CONFIG_DEBUG_FS
+ 
+ static int pinctrl_pins_show(struct seq_file *s, void *what)
+@@ -1521,16 +1545,23 @@ struct pinctrl_dev *pinctrl_register(struct pinctrl_desc *pctldesc,
+ 
+ 	pctldev->p = pinctrl_get_locked(pctldev->dev);
+ 	if (!IS_ERR(pctldev->p)) {
+-		struct pinctrl_state *s =
++		pctldev->hog_default =
+ 			pinctrl_lookup_state_locked(pctldev->p,
+ 						    PINCTRL_STATE_DEFAULT);
+-		if (IS_ERR(s)) {
++		if (IS_ERR(pctldev->hog_default)) {
+ 			dev_dbg(dev, "failed to lookup the default state\n");
+ 		} else {
+-			if (pinctrl_select_state_locked(pctldev->p, s))
++			if (pinctrl_select_state_locked(pctldev->p,
++						pctldev->hog_default))
+ 				dev_err(dev,
+ 					"failed to select default state\n");
+ 		}
++
++		pctldev->hog_sleep =
++			pinctrl_lookup_state_locked(pctldev->p,
++						    PINCTRL_STATE_SLEEP);
++		if (IS_ERR(pctldev->hog_sleep))
++			dev_dbg(dev, "failed to lookup the sleep state\n");
+ 	}
+ 
+ 	mutex_unlock(&pinctrl_mutex);
+diff --git a/drivers/pinctrl/core.h b/drivers/pinctrl/core.h
+index 12f5694..232a9f6 100644
+--- a/drivers/pinctrl/core.h
++++ b/drivers/pinctrl/core.h
+@@ -30,6 +30,8 @@ struct pinctrl_gpio_range;
+  * @driver_data: driver data for drivers registering to the pin controller
+  *	subsystem
+  * @p: result of pinctrl_get() for this device
++ * @hog_default: default state for pins hogged by this device
++ * @hog_sleep: sleep state for pins hogged by this device
+  * @device_root: debugfs root for this device
+  */
+ struct pinctrl_dev {
+@@ -41,6 +43,8 @@ struct pinctrl_dev {
+ 	struct module *owner;
+ 	void *driver_data;
+ 	struct pinctrl *p;
++	struct pinctrl_state *hog_default;
++	struct pinctrl_state *hog_sleep;
+ #ifdef CONFIG_DEBUG_FS
+ 	struct dentry *device_root;
+ #endif
+@@ -164,5 +168,8 @@ int pinctrl_register_map(struct pinctrl_map const *maps, unsigned num_maps,
+ 			 bool dup, bool locked);
+ void pinctrl_unregister_map(struct pinctrl_map const *map);
+ 
++extern int pinctrl_force_sleep(struct pinctrl_dev *pctldev);
++extern int pinctrl_force_default(struct pinctrl_dev *pctldev);
++
+ extern struct mutex pinctrl_mutex;
+ extern struct list_head pinctrldev_list;
+-- 
+1.7.11.3
