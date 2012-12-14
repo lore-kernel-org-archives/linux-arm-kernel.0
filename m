@@ -1,51 +1,34 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Fri, 14 Dec 2012 11:33:13 +0530
-Subject: [PATCH v4 0/4] pm: Add power off control
-Message-ID: <1355464997-19367-1-git-send-email-anilkumar@ti.com>
+Date: Fri, 14 Dec 2012 11:33:15 +0530
+Subject: [PATCH v4 2/4] ARM: dts: AM33XX: Set pmic-shutdown-controller for
+ BeagleBone
+In-Reply-To: <1355464997-19367-1-git-send-email-anilkumar@ti.com>
+References: <1355464997-19367-1-git-send-email-anilkumar@ti.com>
+Message-ID: <1355464997-19367-3-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PM power_off control to rtc driver and PMIC status is set to
-STATUS_OFF to shutdown PMIC if PWR_EN is toggled by RTC module.
+Set ti,pmic-shutdown-controller for BeagleBone in am335x-bone.dts
+file, this flag is used by the driver to set tps65217 PMIC status
+to OFF when PWR_EN toggle.
 
-System power off sequence:-
-* Set PMIC STATUS_OFF when PMIC_POWER_EN is pulled low
-* Enable PMIC_POWER_EN in rtc module
-* Set rtc ALARM2 time
-* Enable ALARM2 interrupt
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ arch/arm/boot/dts/am335x-bone.dts |    2 ++
+ 1 file changed, 2 insertions(+)
 
-These patches were tested on am335x-bone (BeagleBone). These patchs
-are based on linux-next.
-
-Changes from v3:
-	- TPS65217 mfd driver changes are accepted so dropped
-	  from this series.
-	- With recent changes in the kernel, reboot_mutex held BUG()
-	  is not seen so removed while(1); from rtc_power_off.
-	- Removed spinlock before while(1); which is not necessary.
-
-Changes from v2:
-	- Incorporated Kevin's comment on v2
-	  * Enabled RTC in ompa2plus_defconfig
-
-Changes from v1:
-	- Incorporated Vaibhav's comments on v1
-	  * Changed the time rollover logic with the help of
-	    rtc-lib APIs
-
-AnilKumar Ch (3):
-  ARM: dts: AM33XX: Set pmic-shutdown-controller for BeagleBone
-  ARM: dts: AM33XX: Enable system power off control in am335x-bone
-  ARM: OMAP2+: omap2plus_defconfig: Enable RTC support
-
-Colin Foe-Parker (1):
-  rtc: OMAP: Add system pm_power_off to rtc driver
-
- Documentation/devicetree/bindings/rtc/rtc-omap.txt |    5 ++
- arch/arm/boot/dts/am335x-bone.dts                  |    6 ++
- arch/arm/configs/omap2plus_defconfig               |    1 +
- drivers/rtc/rtc-omap.c                             |   74 +++++++++++++++++++-
- 4 files changed, 85 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index 5302f79..e7dff9d 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -88,6 +88,8 @@
+ /include/ "tps65217.dtsi"
+ 
+ &tps {
++	ti,pmic-shutdown-controller;
++
+ 	regulators {
+ 		dcdc1_reg: regulator at 0 {
+ 			regulator-always-on;
 -- 
 1.7.9.5
