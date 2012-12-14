@@ -1,78 +1,33 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Fri, 14 Dec 2012 17:44:42 +0800
-Subject: [PATCH] DMAEngine: sirf: add DMA pause/resume support
-Message-ID: <1355478282-27908-1-git-send-email-Barry.Song@csr.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 14 Dec 2012 09:49:05 +0000
+Subject: vexpress compilation error in next-20121127
+In-Reply-To: <50CA278D.4030409@websterwood.com>
+References: <50B56601.5010305@broadcom.com> <50CA278D.4030409@websterwood.com>
+Message-ID: <1355478545.26914.2.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+On Thu, 2012-12-13 at 19:07 +0000, Behan Webster wrote:
+> On 11/27/12 20:16, Markus Mayer wrote:
+> > Hi Pawel,
+> >
+> > There seems to be an issue compiling vexpress at this point. The 
+> > problem being that vexpress' makefile references reset.o, but there's 
+> > no reset.c in arch/arm/mach-vexpress.
+> >
+> > [...]
+> >   CC      arch/arm/mach-bcm/board_bcm.o
+> >   LD      arch/arm/mach-bcm/built-in.o
+> >   CC      arch/arm/mach-vexpress/v2m.o
+> > make[1]: *** No rule to make target `arch/arm/mach-vexpress/reset.o', 
+> > needed by `arch/arm/mach-vexpress/built-in.o'.  Stop.
+> > make: *** [arch/arm/mach-vexpress] Error 2
+> Same issue in mainline now too: arch/arm/mach-vexpress/reset.c is missing.
 
-pause/resume are important for users like sound drivers,
-this patches make the sirf prima2/marco support
+Yes, I've noticed this myself. It's just that the pull request for the
+arm-soc drivers branch went out in the second batch yesterday
+(http://article.gmane.org/gmane.linux.kernel/1409413), while the soc one
+in the first one. This was a bad decision to split the reset driver from
+the main update series, apologies about this.
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/dma/sirf-dma.c |   36 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 36 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 212f69f..ffe05bb 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -313,6 +313,38 @@ static int sirfsoc_dma_terminate_all(struct sirfsoc_dma_chan *schan)
- 	return 0;
- }
- 
-+static int sirfsoc_dma_pause_chan(struct sirfsoc_dma_chan *schan)
-+{
-+	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
-+	int cid = schan->chan.chan_id;
-+
-+	if (!sdma->is_marco)
-+		writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL)
-+			& ~((1 << cid) | 1 << (cid + 16)),
-+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
-+	else
-+		writel_relaxed((1 << cid) | 1 << (cid + 16),
-+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL_CLR);
-+
-+	return 0;
-+}
-+
-+static int sirfsoc_dma_resume_chan(struct sirfsoc_dma_chan *schan)
-+{
-+	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
-+	int cid = schan->chan.chan_id;
-+
-+	if (!sdma->is_marco)
-+		writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL)
-+			| ((1 << cid) | 1 << (cid + 16)),
-+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
-+	else
-+		writel_relaxed((1 << cid) | 1 << (cid + 16),
-+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
-+
-+	return 0;
-+}
-+
- static int sirfsoc_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 	unsigned long arg)
- {
-@@ -320,6 +352,10 @@ static int sirfsoc_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
- 
- 	switch (cmd) {
-+	case DMA_PAUSE:
-+		return sirfsoc_dma_pause_chan(schan);
-+	case DMA_RESUME:
-+		return sirfsoc_dma_resume_chan(schan);
- 	case DMA_TERMINATE_ALL:
- 		return sirfsoc_dma_terminate_all(schan);
- 	case DMA_SLAVE_CONFIG:
--- 
-1.7.5.4
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Pawe?
