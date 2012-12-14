@@ -1,31 +1,36 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 14 Dec 2012 13:34:08 -0600
-Subject: [RFC v1 08/16] arm: mvebu: the core PCIe driver
-In-Reply-To: <20121212215138.GC11530@obsidianresearch.com>
-References: <1354917879-32073-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1354917879-32073-9-git-send-email-thomas.petazzoni@free-electrons.com>
- <201212111056.58970.arnd@arndb.de> <20121212165833.6a35a6ec@skate>
- <20121212215138.GC11530@obsidianresearch.com>
-Message-ID: <50CB7F30.9090305@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 14 Dec 2012 11:41:16 -0800
+Subject: [PATCH 1/7] ir-rx51: Handle signals properly
+In-Reply-To: <50CB7E88.9050207@iki.fi>
+References: <1353251589-26143-1-git-send-email-timo.t.kokkonen@iki.fi>
+ <1353251589-26143-2-git-send-email-timo.t.kokkonen@iki.fi>
+ <20121120195755.GM18567@atomide.com>
+ <20121214172809.GT4989@atomide.com>
+ <20121214172616.GC9620@arwen.pp.htv.fi> <50CB7E88.9050207@iki.fi>
+Message-ID: <20121214194115.GL4989@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2012 03:51 PM, Jason Gunthorpe wrote:
-> On Wed, Dec 12, 2012 at 04:58:33PM +0100, Thomas Petazzoni wrote:
+* Timo Kokkonen <timo.t.kokkonen@iki.fi> [121214 11:33]:
+> On 12/14/12 19:26, Felipe Balbi wrote:
+> > 
+> > if it's really for PWM, shouldn't we be using drivers/pwm/ ??
+> > 
 > 
->> and the global physical address space is limited in size, we definitely
->> do not want to have static mappings at fixed physical addresses
->> hardcoded in the Device Tree.
-> 
-> Unfortunately DT pretty much requires that all PCI host bridges hard
-> code the addresess. The expectation seems in many cases that the BIOS
-> will do assignment and discovery and just propagate it into the DT
-> format.
+> Now that Neil Brown posted the PWM driver for omap, I've been thinking
+> about whether converting the ir-rx51 into the PWM API would work. Maybe
+> controlling the PWM itself would be sufficient, but the ir-rx51 uses
+> also another dmtimer for creating accurate (enough) timing source for
+> the IR pulse edges.
 
-The DT is not fixed. You can make run-time changes if needed. As I
-mentioned in the other thread on PCI and DT, you could set or update the
-ranges property within your PCI host driver with the addresses you end
-up using. Or omitting the ranges property would also work if you have no
-child devices (which is typical).
+OK.
+ 
+> I haven't tried whether the default 32kHz clock source is enough for
+> that. Now that I think about it, I don't see why it wouldn't be good
+> enough. I think it would even be possible to just use the PWM api alone
 
-Rob
+Cool.
+
+Regards,
+
+Tony
