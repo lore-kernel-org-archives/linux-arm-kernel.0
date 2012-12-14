@@ -1,37 +1,32 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Fri, 14 Dec 2012 11:02:56 +0530
-Subject: [PATCH v2 0/8] ARM: OMAP2+: AM33XX: Enable few drivers in
- omap2plus_defconfig
-Message-ID: <1355463184-16283-1-git-send-email-anilkumar@ti.com>
+Date: Fri, 14 Dec 2012 11:03:02 +0530
+Subject: [PATCH v2 6/8] ARM: OMAP2+: omap2plus_defconfig: Enable tmp275 sensor
+In-Reply-To: <1355463184-16283-1-git-send-email-anilkumar@ti.com>
+References: <1355463184-16283-1-git-send-email-anilkumar@ti.com>
+Message-ID: <1355463184-16283-7-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enable tps65910, lis3lv02d accelerometer, tsl2550
-ambient light sensor, matrix keypad, tmp275 temperature sensor, gpio
-leds and D_CAN drivers in omap2plus_defconfig.
+AM335x-evm device have temperature sensor, one has to manually
+enable this support to use of temperature sensor. So this patch
+enables tmp275 driver in omap2plus_defconfig.
 
-These are the peripherals present in AM33XX family of devices.
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ arch/arm/configs/omap2plus_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-Changes from v1:
-	- Incorporated martinez javier's comments on v1
-	  * Enabled few more triggers in omap2plus_defconfig
-	- Included Igor's patch, which modifies the omap2plus
-	  defconfig for AM33XX devices.
-
-AnilKumar Ch (7):
-  ARM: OMAP2+: omap2plus_defconfig: Enable tps65910 PMIC
-  ARM: OMAP2+: omap2plus_defconfig: Enable lis3lv02d accelerometer
-  ARM: OMAP2+: omap2plus_defconfig: Enable tsl2550 ambient light sensor
-  ARM: OMAP2+: omap2plus_defconfig: Enable matrix keypad driver
-  ARM: OMAP2+: omap2plus_defconfig: Enable tmp275 sensor
-  ARM: OMAP2+: omap2plus_defconfig: Enable leds-gpio driver
-  ARM: OMAP2+: omap2plus_defconfig: Enable DCAN controller
-
-Igor Mazanov (1):
-  ARM: OMAP2+: omap2plus_defconfig: Enable tps65217 PMIC
-
- arch/arm/configs/omap2plus_defconfig |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
-
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index c004d9b..e1d2385 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -133,6 +133,7 @@ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_TWL4030=y
+ CONFIG_W1=y
+ CONFIG_POWER_SUPPLY=y
++CONFIG_SENSORS_LM75=y
+ CONFIG_WATCHDOG=y
+ CONFIG_OMAP_WATCHDOG=y
+ CONFIG_TWL4030_WATCHDOG=y
 -- 
 1.7.9.5
