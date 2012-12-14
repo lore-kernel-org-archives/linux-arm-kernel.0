@@ -1,97 +1,38 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Fri, 14 Dec 2012 15:41:11 -0800
-Subject: [PATCH v2] NTP: Add a CONFIG_RTC_SYSTOHC configuration
-In-Reply-To: <20121214231933.GA15796@obsidianresearch.com>
-References: <20121214231933.GA15796@obsidianresearch.com>
-Message-ID: <50CBB917.7090502@linaro.org>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 15 Dec 2012 00:49:57 +0100
+Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
+In-Reply-To: <50CB68AB.5070806@grandegger.com>
+References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
+ <50CB68AB.5070806@grandegger.com>
+Message-ID: <50CBBB25.20002@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2012 03:19 PM, Jason Gunthorpe wrote:
-> The purpose of this option is to allow ARM/etc systems that rely on the
-> class RTC subsystem to have the same kind of automatic NTP based
-> synchronization that we have on PC platforms. Today ARM does not
-> implement update_persistent_clock and makes extensive use of the class
-> RTC system.
->
-> When enabled CONFIG_RTC_SYSTOHC will provide a generic
-> rtc_update_persistent_clock that stores the current time in the RTC and
-> is intended complement the existing CONFIG_RTC_HCTOSYS option that loads
-> the RTC at boot.
->
-> Like with RTC_HCTOSYS the platform's update_persistent_clock is used
-> first, if it works. Platforms with mixed class RTC and non-RTC drivers
-> need to return ENODEV when class RTC should be used. Such an update for
-> PPC is included in this patch.
->
-> Long term, implementations of update_persistent_clock should migrate to
-> proper class RTC drivers and use CONFIG_RTC_SYSTOHC instead.
+Hi Wolfgang,
 
-Ok. This all sounds good.
+thank you for the patch!
 
-
-Still one minor question below.
-> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-> index 19c03ab..7b3702b 100644
-> --- a/drivers/rtc/Kconfig
-> +++ b/drivers/rtc/Kconfig
-> @@ -28,6 +28,7 @@ config RTC_HCTOSYS
->   config RTC_HCTOSYS_DEVICE
->   	string "RTC used to set the system time"
->   	depends on RTC_HCTOSYS = y
-> +	depends on RTC_SYSTOHC = y
-
-Is this right?
-
-This should probably be a depends on RTC_HCTOSYS OR RTC_SYSTOCH.. 
-Otherwise you have to select both in order to change the default device.
-
-> diff --git a/drivers/rtc/systohc.c b/drivers/rtc/systohc.c
-> new file mode 100644
-> index 0000000..a625740
-> --- /dev/null
-> +++ b/drivers/rtc/systohc.c
-> @@ -0,0 +1,44 @@
-> +/*
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published by
-> + * the Free Software Foundation.
-> + *
-> + */
-> +#include <linux/rtc.h>
-> +#include <linux/time.h>
+On 14/12/12 18:58, Wolfgang Grandegger wrote:
+> +static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val)
+> +{
+> +	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+> +	void __iomem *pio = at91_gpio->regbase;
 > +
-> +/**
-> + * rtc_update_persistent_clock - Save NTP synchronized time to the RTC
-> + * @now: Current time of day
-> + *
-> + * Replacement for the NTP platform function update_persistent_clock
-> + * that stores time for later retrieval by rtc_hctosys
-> + *
-> + * Returns 0 on successful RTC update, -ENODEV if a RTC update is not
-> + * possible at all, and various other -errno for specific temporary failure
-> + * cases.
-> + *
-> + * If temporary failure is indicated the caller should try again 'soon'
-> + */
-> +int rtc_update_persistent_clock(struct timespec now)
+> +	__raw_writel(mask, pio + (val ? PIO_SODR : PIO_CODR));
+> +}
+> +
 
-If we're going to move away from update_persistent_clock across the 
-board (and as the update path doesn't have the same constraints of the 
-read_persistent_clock interface), might it be better just to name this: 
-rtc_update_clock()  (or something similar)?
+Without having an AT91 available right now, I guess the hardware
+interface of this GPIO chip is different from the GPIO block API. While
+the hardware has clear and set registers, the val parameter of
+at91_gpiolib_set_block() should be interpreted as the actual output
+values. See lpc32xx_gpo_set_block() for an example for handling set and
+clear registers like this: First, set_bits and clear_bits words are
+calculated from mask and val parameters, and finally written to the
+respective hardware registers.
 
-That way if/when we do finally remove the other users of 
-update_persistent_clock() and move them to an RTC driver, we will avoid 
-any confusion between read/update.
+Note that one .set_block() can result in writing both the set and clear
+registers of the hardware when val contains both 0s and 1s in
+respectively masked positions.
 
-This is in the similar vein of your suggestion of changing 
-update_persistent_clock to platform_save_ntp_time_to_rtc()..
-
-Sorry for the last minute nit! Other then these two issues, I'm happy to 
-queue this (if Alessandro doesn't object).  Although with the merge 
-window already open it may have to wait to 3.9, but I'll see what Thomas 
-says.
-
-thanks
--john
+Roland
