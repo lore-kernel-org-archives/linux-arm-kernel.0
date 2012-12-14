@@ -1,46 +1,132 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 14 Dec 2012 16:52:30 +0100
-Subject: [PATCH V2 2/2] mmc: mmci: Move ios_handler functionality into the
- driver
-In-Reply-To: <20121214151002.GK14363@n2100.arm.linux.org.uk>
-References: <1355495429-12510-1-git-send-email-ulf.hansson@stericsson.com>
- <1355495429-12510-3-git-send-email-ulf.hansson@stericsson.com>
- <20121214151002.GK14363@n2100.arm.linux.org.uk>
-Message-ID: <CAPDyKFogripZun48OFL4RfGh+sJD4037+kZe068CM86O8jhVYQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 14 Dec 2012 14:05:20 -0800
+Subject: [GIT PULL 1/3] ARM: arm-soc: SoC updates, take 2
+In-Reply-To: <20121214220441.GA11363@quad.lixom.net>
+References: <20121214220441.GA11363@quad.lixom.net>
+Message-ID: <20121214220520.GB11363@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, 14 December 2012, Russell King - ARM Linux <
-linux@arm.linux.org.uk> wrote:
-> On Fri, Dec 14, 2012 at 03:30:29PM +0100, Ulf Hansson wrote:
->> From: Lee Jones <lee.jones@linaro.org>
->>
->> There are currently two instances of the ios_handler being used.
->> Both of which mearly toy with some regulator settings. Now there
->> is a GPIO regulator API, we can use that instead, and lessen the
->> per platform burden. By doing this, we also become more Device
->> Tree compatible.
->
-> Err, why is this needed?  What's wrong with using the 'vmmc' for this?
+Hi Linus,
 
-This is not for power to the card, but for the I/O voltage. Before this was
-controlled by the ios_handler.
+This is the second batch of SoC updates for the 3.8 merge window,
+containing parts that had dependencies on earlier branches such that we
+couldn't include them with the first branch.
 
->
-> From what I read in the mmc core, vmmc handling via
-mmc_regulator_set_ocr()
-> can cope with GPIO-based regulators, and if you have a single GPIO signal
-> then you have a single supply (it's either on or off).  So what's wrong
-> with using the existing regulator hooks for this which are already there?
+These are general updates for Samsung Exynos, Renesas/shmobile and a
+topic branch that adds SMP support to Altera's socfpga platform.
 
-Kind regards
-Ulf Hansson
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121214/abf80c4c/attachment-0001.html>
+Conflicts seen with this merge:
+
+arch/arm/boot/dts/exynos5250.dtsi:
+First is add/add. Keep both sides.
+For the i2c node, keep the one with the label in front from the branch.
+
+arch/arm/mach-exynos/include/mach/regs-pmu.h:
+Add/remove. Keep the SYS_I2C_CFG one, drop USB_CFG.
+
+arch/arm/mach-exynos/mach-exynos5-dt.c:
+Include conflict: Keep and of_fdt.h and io.h
+Second conflict: Keep contents from branch, but replace last
+of_platform_populate with the chunk from HEAD.
+
+----------------------------------------------------------------
+
+The following changes since commit d42b3a2906a10b732ea7d7f849d49be79d242ef0:
+
+  Merge branch 'core-efi-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/soc2
+
+for you to fetch changes up to c91321e8ff338a88a9272dcd938f085955cd5846:
+
+  ARM: arm-soc: Merge branch 'next/smp' into next/soc2
+
+----------------------------------------------------------------
+
+Abhilash Kesavan (4):
+      ARM: EXYNOS: Setup legacy i2c controller interrupts
+      ARM: EXYNOS: Add aliases for i2c controller
+      ARM: EXYNOS: Fix i2c suspend/resume for legacy controller
+      ARM: EXYNOS: Add ARM down clock support
+
+Arnd Bergmann (7):
+      Merge branch 'socfpga/smp' into next/smp
+      Merge branch 'vexpress-clk-soc' of git://git.linaro.org/people/pawelmoll/linux into next/soc2
+      ARM: socfpga: mark secondary_trampoline as cpuinit
+      Merge branch 'next/boards2' into next/soc2
+      Merge branch 'soc2' of git://git.kernel.org/.../horms/renesas into next/soc2
+      Merge branches 'devel/debug_ll_init' and 'calxeda/ecx-2000' into next/soc2
+      Merge branch 'soc4' of git://git.kernel.org/.../horms/renesas into next/soc2
+
+Colin Cross (2):
+      ARM: SAMSUNG: add clock_tree debugfs file in clock
+      ARM: SAMSUNG: call clk_get_rate for debugfs rate files
+
+Dinh Nguyen (1):
+      ARM: socfpga: Enable SMP for socfpga
+
+Jingoo Han (1):
+      ARM: EXYNOS: Add dp clock support for EXYNOS5
+
+Kukjin Kim (1):
+      Merge branch 'next/hdmi-samsung' into next/devel-samsung
+
+Kuninori Morimoto (3):
+      ARM: shmobile: sh7372: remove fsidivx clock
+      ARM: shmobile: sh7372: sh7372_fsiXck_clk become non-global
+      sh: clkfwk: fixup unsed variable warning
+
+Olof Johansson (2):
+      Merge branch 'next/devel-samsung' of git://git.kernel.org/.../kgene/linux-samsung into next/soc2
+      ARM: arm-soc: Merge branch 'next/smp' into next/soc2
+
+Pavel Machek (2):
+      ARM: socfpga: fix build break for allyesconfig
+      socfpga: map uart into virtual address space so that early_printk() works
+
+Rob Herring (1):
+      ARM: highbank: use common debug_ll_io_init
+
+Simon Horman (3):
+      Revert "ARM: shmobile: emev2: Replace modify_scu_cpu_psr with scu_power_mode"
+      Revert "ARM: shmobile: sh73a0: Replace modify_scu_cpu_psr with scu_power_mode"
+      Revert "ARM: shmobile: r8a7779: Replace modify_scu_cpu_psr with scu_power_mode"
+
+Vasanth Ananthan (1):
+      ARM: EXYNOS: Clock settings for SATA and SATA PHY
+
+
+ .../bindings/arm/altera/socfpga-reset.txt       |  11 ++
+ .../bindings/arm/altera/socfpga-system.txt      |  11 ++
+ arch/arm/boot/dts/exynos5250.dtsi               |  27 +++--
+ arch/arm/boot/dts/socfpga.dtsi                  |  10 ++
+ arch/arm/configs/socfpga_defconfig              |   3 +-
+ arch/arm/mach-exynos/clock-exynos5.c            |  28 ++++-
+ arch/arm/mach-exynos/cpuidle.c                  |  36 ++++++
+ arch/arm/mach-exynos/include/mach/regs-clock.h  |  19 +++
+ arch/arm/mach-exynos/include/mach/regs-pmu.h    |   3 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c          |  25 +++-
+ arch/arm/mach-exynos/pm.c                       |   9 ++
+ arch/arm/mach-shmobile/clock-sh7372.c           |  20 ++--
+ arch/arm/mach-shmobile/include/mach/sh7372.h    |   2 -
+ arch/arm/mach-shmobile/smp-emev2.c              |  22 +++-
+ arch/arm/mach-shmobile/smp-r8a7779.c            |  25 +++-
+ arch/arm/mach-shmobile/smp-sh73a0.c             |  23 +++-
+ arch/arm/mach-socfpga/Kconfig                   |   1 +
+ arch/arm/mach-socfpga/Makefile                  |   1 +
+ arch/arm/mach-socfpga/core.h                    |  34 ++++++
+ arch/arm/mach-socfpga/headsmp.S                 |  25 ++++
+ arch/arm/mach-socfpga/platsmp.c                 | 116 +++++++++++++++++++
+ arch/arm/mach-socfpga/socfpga.c                 |  54 ++++++++-
+ arch/arm/plat-samsung/clock.c                   |  75 +++++++++++-
+ drivers/sh/clk/cpg.c                            |   1 -
+ 24 files changed, 544 insertions(+), 37 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
+ create mode 100644 arch/arm/mach-socfpga/core.h
+ create mode 100644 arch/arm/mach-socfpga/headsmp.S
+ create mode 100644 arch/arm/mach-socfpga/platsmp.c
