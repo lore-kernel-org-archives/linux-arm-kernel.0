@@ -1,52 +1,55 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 14 Dec 2012 11:33:16 +0800
-Subject: imx_v6_v7_defconfig: use v7 optimized atomic64* instead of
- GENERIC_ATOMIC64?
-In-Reply-To: <50C884D3.2070605@de.bosch.com>
-References: <50C884D3.2070605@de.bosch.com>
-Message-ID: <20121214033313.GA3604@S2101-09.ap.freescale.net>
+From: bitbucket@online.de (Mike Galbraith)
+Date: Fri, 14 Dec 2012 05:45:56 +0100
+Subject: [RFC PATCH v2 3/6] sched: pack small tasks
+In-Reply-To: <50C9E552.1010600@intel.com>
+References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
+ <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
+ <50C93AC1.1060202@intel.com>
+ <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
+ <50C9E552.1010600@intel.com>
+Message-ID: <1355460356.5777.12.camel@marge.simpson.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 12, 2012 at 02:21:23PM +0100, Dirk Behme wrote:
+On Thu, 2012-12-13 at 22:25 +0800, Alex Shi wrote: 
+> On 12/13/2012 06:11 PM, Vincent Guittot wrote:
+> > On 13 December 2012 03:17, Alex Shi <alex.shi@intel.com> wrote:
+> >> On 12/12/2012 09:31 PM, Vincent Guittot wrote:
+> >>> During the creation of sched_domain, we define a pack buddy CPU for each CPU
+> >>> when one is available. We want to pack at all levels where a group of CPU can
+> >>> be power gated independently from others.
+> >>> On a system that can't power gate a group of CPUs independently, the flag is
+> >>> set at all sched_domain level and the buddy is set to -1. This is the default
+> >>> behavior.
+> >>> On a dual clusters / dual cores system which can power gate each core and
+> >>> cluster independently, the buddy configuration will be :
+> >>>
+> >>>       | Cluster 0   | Cluster 1   |
+> >>>       | CPU0 | CPU1 | CPU2 | CPU3 |
+> >>> -----------------------------------
+> >>> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
+> >>>
+> >>> Small tasks tend to slip out of the periodic load balance so the best place
+> >>> to choose to migrate them is during their wake up. The decision is in O(1) as
+> >>> we only check again one buddy CPU
+> >>
+> >> Just have a little worry about the scalability on a big machine, like on
+> >> a 4 sockets NUMA machine * 8 cores * HT machine, the buddy cpu in whole
+> >> system need care 64 LCPUs. and in your case cpu0 just care 4 LCPU. That
+> >> is different on task distribution decision.
+> > 
+> > The buddy CPU should probably not be the same for all 64 LCPU it
+> > depends on where it's worth packing small tasks
 > 
-> Working mainly with the i.MX6 using the imx_v6_v7_defconfig, we get
-> CONFIG_GENERIC_ATOMIC64=y due to
+> Do you have further ideas for buddy cpu on such example?
+> > 
+> > Which kind of sched_domain configuration have you for such system ?
+> > and how many sched_domain level have you ?
 > 
-> CONFIG_CPU_V6=y
-> CONFIG_CPU_V6K=y
-> CONFIG_CPU_V7=y
-> 
-> and
-> 
-> select GENERIC_ATOMIC64 if (CPU_V6 || !CPU_32v6K || !AEABI)
-> 
-> in arch/arm/Kconfig.
-> 
-> With this, on the V7 i.MX6 we use the (non-optimized) generic
-> atomic64* implementation from lib/atomic64.c instead of the V7
-> optimized ones from arch/arm/include/asm/atomic.h.
-> 
-Yes, that's how single zImage for v6 and v7 works.
+> it is general X86 domain configuration. with 4 levels,
+> sibling/core/cpu/numa.
 
-> Is this intended using imx_v6_v7_defconfig on V7 devices?
-> 
-To maintain the compatibility between v6 and v7 build, we have to live
-with that.  Actually, there are much more than just this atomic64
-optimization losing.  For example, compiler has some level of
-optimization for Cortex-A series cpus with -march=armv7-a flag, but
-arch/arm/Makefile will force it to be -march=armv6k when you build
-the kernel for you v7 device using imx_v6_v7_defconfig.
+CPU is a bug that slipped into domain degeneration.  You should have
+SIBLING/MC/NUMA (chasing that down is on todo).
 
-> Is there any chance to use the optimized atomic64* functionality on
-> V7 with imx_v6_v7_defconfig? Or is this only possible by disabling
-> CONFIG_CPU_V6 and CONFIG_CPU_V6K in the imx_v6_v7_defconfig?
-> 
-If you are running a kernel with imx multiplatform support (will hit
-v3.8-rc1 if everything goes well), uncheck System Type --> Multiple
-platform selection --> ARMv6 based platforms, otherwise uncheck all
-imx31 and imx35 platforms under System Type --> Freescale MXC
-Implementations will allow you build a v7 only kernel to have all
-those v7 specific optimizations back.
-
-Shawn 
+-Mike
