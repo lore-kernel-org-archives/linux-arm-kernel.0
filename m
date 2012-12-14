@@ -1,42 +1,24 @@
-From: martinez.javier@gmail.com (Javier Martinez Canillas)
-Date: Fri, 14 Dec 2012 19:23:09 +0100
-Subject: [PATCH 1/1] ARM: OMAP3: igep0020: default boot status LED to On
- instead of Heartbeat
-In-Reply-To: <1353745771-29983-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1353745771-29983-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CAAwP0s2aTb5QzNopycuUMM=0Vj7OwDR9e1WaVCp5m+GvF-HHZA@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 14 Dec 2012 19:29:15 +0100
+Subject: [PATCH v2 1/1] ARM: OMAP2+: omap2plus_defconfig: enable devtmpfs
+ and automount
+In-Reply-To: <1355508168-32565-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1355508168-32565-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <50CB6FFB.2060600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 24, 2012 at 9:29 AM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> The IGEPv2 board uses an green GPIO LED to inform the user
-> that the kernel could boot.
+On Friday 14 December 2012 07:02 PM, Javier Martinez Canillas wrote:
+> Since udev-176 [1], udev no longer creates device nodes under
+> /dev and this has to be managed by the kernel devtmpfs filesystem.
 >
-> The green status GPIO LED was default to Heartbeat but On
-> is better to signal that is running correctly.
+> This makes devtmpfs filesystem a requirement on newer systems and
+> a kernel built with the current OMAP2+ config will not boot on them.
+>
+> Also, it is good to have devtmpfs at /dev automount enabled by default.
+>
+> [1]: http://permalink.gmane.org/gmane.linux.hotplug.devel/17230
 >
 > Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  arch/arm/mach-omap2/board-igep0020.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-> index 0f24cb8..e526228 100644
-> --- a/arch/arm/mach-omap2/board-igep0020.c
-> +++ b/arch/arm/mach-omap2/board-igep0020.c
-> @@ -313,7 +313,7 @@ static struct gpio_led igep_gpio_leds[] = {
->         },
->         [3] = {
->                 .name                   = "gpio-led:green:d1",
-> -               .default_trigger        = "heartbeat",
-> +               .default_trigger        = "default-on",
->                 .gpio                   = -EINVAL, /* gets replaced */
->                 .active_low             = 1,
->         },
-> --
 
-Please ignore this patch since another one was sent that supersedes it.
-
-Thanks a lot and sorry for the noise.
-Javier
+Acked-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
