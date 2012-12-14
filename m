@@ -1,45 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 14 Dec 2012 16:33:29 +0000
-Subject: [PATCH V2 2/2] mmc: mmci: Move ios_handler functionality into
- the driver
-In-Reply-To: <20121214151002.GK14363@n2100.arm.linux.org.uk>
-References: <1355495429-12510-1-git-send-email-ulf.hansson@stericsson.com>
- <1355495429-12510-3-git-send-email-ulf.hansson@stericsson.com>
- <20121214151002.GK14363@n2100.arm.linux.org.uk>
-Message-ID: <20121214163329.GS27617@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 14 Dec 2012 18:34:03 +0200
+Subject: [PATCH REBASE 0/6] i2c: omap: misc changes
+Message-ID: <1355502849-9289-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Dec 2012, Russell King - ARM Linux wrote:
+Hi,
 
-> On Fri, Dec 14, 2012 at 03:30:29PM +0100, Ulf Hansson wrote:
-> > From: Lee Jones <lee.jones@linaro.org>
-> > 
-> > There are currently two instances of the ios_handler being used.
-> > Both of which mearly toy with some regulator settings. Now there
-> > is a GPIO regulator API, we can use that instead, and lessen the
-> > per platform burden. By doing this, we also become more Device
-> > Tree compatible.
-> 
-> Err, why is this needed?  What's wrong with using the 'vmmc' for this?
+this is just a rebase of the previous series adding support
+for amount of bytes transferred upon NACK.
 
-It's a different regulator. The core knows about 'vmmc', which is the
-primary one, then there is a regulator called 'vqmmc' which is for I/O
-voltage. Until now this was done in a very platform specific way.
-Normally by doing gpio_set's. Now there is a regulator API which can
-deal with GPIO controlled regulators and there is provision for it in
-MMC core also, so it's time to move it to the driver.
+Well, actually the patches implementing transferred bytes
+reporting aren't here because we need to discuss how to move
+forward.
 
-> From what I read in the mmc core, vmmc handling via mmc_regulator_set_ocr()
-> can cope with GPIO-based regulators, and if you have a single GPIO signal
-> then you have a single supply (it's either on or off).  So what's wrong
-> with using the existing regulator hooks for this which are already there?
+This series is just a preparation for that, but it also
+contains a at least one bugfix.
 
-In our case it's not a 'fixed' regulator (i.e. on/off). The new GPIO
-regulator API can also control voltage selection using GPIOs too.
+Each and every patch has been tested with pandaboard, it
+would be nice to get Tested-bys from other folks on other
+platforms before pushing this for v3.9 (there's more than
+enough time for that).
+
+Note that we're also dropping b_hw flag since that becomes
+useless since we'll never set STT and STP together anymore.
+
+Give it a good round of test, please.
+
+Felipe Balbi (6):
+  i2c: omap: no need to access platform_device
+  i2c: omap: also complete() when stat becomes zero
+  i2c: omap: improve 'rev' a little bit
+  i2c: omap: in case of VERSION_2 read IRQSTATUS_RAW but write to
+    IRQSTATUS
+  i2c: omap: wait for transfer completion before sending STP bit
+  i2c: omap: get rid of b_hw flag
+
+ drivers/i2c/busses/i2c-omap.c | 184 +++++++++++++++++++++---------------------
+ 1 file changed, 93 insertions(+), 91 deletions(-)
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.1.rc1.5.g7e0651a
