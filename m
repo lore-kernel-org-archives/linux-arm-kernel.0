@@ -1,80 +1,80 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Thu, 13 Dec 2012 17:29:36 -0800
-Subject: [PATCH] NTP: Add a CONFIG_RTC_SYSTOHC configuration
-In-Reply-To: <20121213052132.GA19577@obsidianresearch.com>
-References: <20121212055643.GA18078@obsidianresearch.com>
- <50C8DDAA.5010101@linaro.org> <20121212210443.GB11530@obsidianresearch.com>
- <50C91ED7.5050905@linaro.org> <20121213052132.GA19577@obsidianresearch.com>
-Message-ID: <50CA8100.2060209@linaro.org>
+From: alex.shi@intel.com (Alex Shi)
+Date: Fri, 14 Dec 2012 09:46:39 +0800
+Subject: [RFC PATCH v2 3/6] sched: pack small tasks
+In-Reply-To: <CAKfTPtAhFtGKOtwumuav+pndoAZiKjHvYoE2NZxtgP+qHuHY3g@mail.gmail.com>
+References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
+ <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
+ <50C93AC1.1060202@intel.com>
+ <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
+ <50C9E552.1010600@intel.com>
+ <CAKfTPtCUDEC50xexmLQ1d9qvBz1iJnf4aGSGjN==jqZwpxrwiQ@mail.gmail.com>
+ <CAKfTPtAhFtGKOtwumuav+pndoAZiKjHvYoE2NZxtgP+qHuHY3g@mail.gmail.com>
+Message-ID: <50CA84FF.5070907@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2012 09:21 PM, Jason Gunthorpe wrote:
-> On Wed, Dec 12, 2012 at 04:18:31PM -0800, John Stultz wrote:
->
->> I do, although again, in the case where the arch specific
->> implementation is "better", we end up losing granularity (s390 is
->> the specific example I'm thinking of), since this prefers the RTC
->> implementation over the arch specific one.  So maybe I'd suggest
->> switching it so we prefer the arch specific one, and then remove the
->> arch specific implementations where they are inferior to the RTC
->> one.
-> Unfortunately I put rtc_update_persistent_clock first because it can
-> have sensible error reporting. update_persistent_clock will return 0
-> if there is no RTC device available, or if the RTC was successfully
-> updated.
+On 12/13/2012 11:48 PM, Vincent Guittot wrote:
+> On 13 December 2012 15:53, Vincent Guittot <vincent.guittot@linaro.org> wrote:
+>> On 13 December 2012 15:25, Alex Shi <alex.shi@intel.com> wrote:
+>>> On 12/13/2012 06:11 PM, Vincent Guittot wrote:
+>>>> On 13 December 2012 03:17, Alex Shi <alex.shi@intel.com> wrote:
+>>>>> On 12/12/2012 09:31 PM, Vincent Guittot wrote:
+>>>>>> During the creation of sched_domain, we define a pack buddy CPU for each CPU
+>>>>>> when one is available. We want to pack at all levels where a group of CPU can
+>>>>>> be power gated independently from others.
+>>>>>> On a system that can't power gate a group of CPUs independently, the flag is
+>>>>>> set at all sched_domain level and the buddy is set to -1. This is the default
+>>>>>> behavior.
+>>>>>> On a dual clusters / dual cores system which can power gate each core and
+>>>>>> cluster independently, the buddy configuration will be :
+>>>>>>
+>>>>>>       | Cluster 0   | Cluster 1   |
+>>>>>>       | CPU0 | CPU1 | CPU2 | CPU3 |
+>>>>>> -----------------------------------
+>>>>>> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
+>>>>>>
+>>>>>> Small tasks tend to slip out of the periodic load balance so the best place
+>>>>>> to choose to migrate them is during their wake up. The decision is in O(1) as
+>>>>>> we only check again one buddy CPU
+>>>>>
+>>>>> Just have a little worry about the scalability on a big machine, like on
+>>>>> a 4 sockets NUMA machine * 8 cores * HT machine, the buddy cpu in whole
+>>>>> system need care 64 LCPUs. and in your case cpu0 just care 4 LCPU. That
+>>>>> is different on task distribution decision.
+>>>>
+>>>> The buddy CPU should probably not be the same for all 64 LCPU it
+>>>> depends on where it's worth packing small tasks
+>>>
+>>> Do you have further ideas for buddy cpu on such example?
+>>
+>> yes, I have several ideas which were not really relevant for small
+>> system but could be interesting for larger system
+>>
+>> We keep the same algorithm in a socket but we could either use another
+>> LCPU in the targeted socket (conf0) or chain the socket (conf1)
+>> instead of packing directly in one LCPU
+>>
+>> The scheme below tries to summaries the idea:
+>>
+>> Socket      | socket 0 | socket 1   | socket 2   | socket 3   |
+>> LCPU        | 0 | 1-15 | 16 | 17-31 | 32 | 33-47 | 48 | 49-63 |
+>> buddy conf0 | 0 | 0    | 1  | 16    | 2  | 32    | 3  | 48    |
+>> buddy conf1 | 0 | 0    | 0  | 16    | 16 | 32    | 32 | 48    |
+>> buddy conf2 | 0 | 0    | 16 | 16    | 32 | 32    | 48 | 48    |
+>>
+>> But, I don't know how this can interact with NUMA load balance and the
+>> better might be to use conf3.
+> 
+> I mean conf2 not conf3
 
-Hrm.. Maybe update_persistent_clock() should be changed to return an error?
+So, it has 4 levels 0/16/32/ for socket 3 and 0 level for socket 0, it
+is unbalanced for different socket.
 
-> I can make rtc_update_persistent_clock return -ENODEV.
->
->> As long as we have a clear iterative path forward, with a solution
->> for the cases where the arch method is actually preferred, I think
->> it sounds like a reasonable approach.
-> I think it is fine to leave it as a configure option, archs can
-> default it to yes when it is appropriate for them.
->
-> A quick scan through the 3.7 tree for update_persistent_clock::
->   alpha - single non class RTC clock scheme
->   cris - printk's and does nothing
->   mips - weak function rtc_mips_set_time, all implementations are
->          non class rtc
->   mn10300 - single non class RTC clock scheme
->   powerpc - indirects through ppc_md.set_rtc_time, all implementations
->             do not use class RTC
->   sh - indirects through rtc_sh_set_time, two implementations, neither
->        use class RTC
->   sparc - Seems to be class rtc converted. Already implements this
->           patch's functionality in an arch specific file
->   x86 - All the functions under the set_wallclock indirection seem
->         to be non class RTC cases
->
-> No other arches seem to have update_persistent_clock in them.
->
-> I think the s390 functionality you are refering to is in its
-> read_persistant_clock, which looks like it has ns resolution.
->
-> That is also fine because s390 does not use class rtc so there is no
-> duplicate path to the 'tod' code either through
-> rtc_update_persistent_clock or through rtc_hctosys.
->
-> Basically, as far as I can tell, if rtc_update_persistent_clock
-> succeeds then update_persistent_clock is a nop. I can't find any case
-> where *both* could succeed. Thus trying rtc_update_persistent_clock
-> first is OK.
-Ok then. I think part of my confusion is that on the 
-read_persistent_clock/rtc_hctosys side of things, we are careful to 
-prioritize the read_persistent_clock implementation (since it has the 
-additional requirement to be safe to call in irq context, it allows us 
-to update the system time at resume earlier, avoiding time error).  So I 
-guess I just naturally expect the same prioritization on the write side.
+And the ground level has just one buddy for 16 LCPUs - 8 cores, that's
+not a good design, consider my previous examples: if there are 4 or 8
+tasks in one socket, you just has 2 choices: spread them into all cores,
+or pack them into one LCPU. Actually, moving them just into 2 or 4 cores
+maybe a better solution. but the design missed this.
 
-So yea, I guess your approach will work. Although I get the suspicion it 
-will require further cleanups down the road (just to help make the 
-various arches more consistent).
-
-Want to resend with the changes you suggested, and I'll take another 
-look at it?
-
-thanks
--john
+Obviously, more and more cores is the trend on any kinds of CPU, the
+buddy system seems hard to catch up this.
