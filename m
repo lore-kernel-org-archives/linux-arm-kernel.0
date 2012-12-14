@@ -1,57 +1,53 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 14 Dec 2012 10:50:34 -0800
-Subject: [RESEND] [PATCH 3.6.0- 5/6] ARM/omap: use
- module_platform_driver macro
-In-Reply-To: <1350025894-30625-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1350025894-30625-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <20121214185033.GH4989@atomide.com>
+Date: Fri, 14 Dec 2012 10:53:41 -0800
+Subject: [PATCH 6/8] arch/arm/mach-omap2/dpll3xxx.c: drop if around WARN_ON
+In-Reply-To: <1351974625-10282-7-git-send-email-Julia.Lawall@lip6.fr>
+References: <1351974625-10282-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1351974625-10282-7-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20121214185340.GJ4989@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Srinivas KANDAGATLA <srinivas.kandagatla@st.com> [121012 00:14]:
-> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+* Julia Lawall <Julia.Lawall@lip6.fr> [121103 13:32]:
+> From: Julia Lawall <Julia.Lawall@lip6.fr>
 > 
-> This patch removes some code duplication by using
-> module_platform_driver.
+> Just use WARN_ON rather than an if containing only WARN_ON(1).
 
-Thanks, applying this one into omap-for-v3.8/fixes-for-merge-window.
-Skipping the mailbox ones as they are getting moved to live
-under drivers. And the rng one should go via the rng maintainers.
+Thanks applying this one into omap-for-v3.8/fixes-for-merge-window.
 
 Regards,
 
 Tony
  
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> ---
->  arch/arm/plat-omap/dmtimer.c |   13 +------------
->  1 files changed, 1 insertions(+), 12 deletions(-)
+> A simplified version of the semantic patch that makes this transformation
+> is as follows: (http://coccinelle.lip6.fr/)
 > 
-> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-> index 938b50a..c89fc6a 100644
-> --- a/arch/arm/plat-omap/dmtimer.c
-> +++ b/arch/arm/plat-omap/dmtimer.c
-> @@ -786,19 +786,8 @@ static struct platform_driver omap_dm_timer_driver = {
->  	},
->  };
+> // <smpl>
+> @@
+> expression e;
+> @@
+> - if (e) WARN_ON(1);
+> + WARN_ON(e);
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> 
+> ---
+>  arch/arm/mach-omap2/dpll3xxx.c |    3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+> index eacf51f..ed855b0 100644
+> --- a/arch/arm/mach-omap2/dpll3xxx.c
+> +++ b/arch/arm/mach-omap2/dpll3xxx.c
+> @@ -478,8 +478,7 @@ int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate)
+>  		if (!soc_is_am33xx() && !cpu_is_omap44xx() && !cpu_is_omap3630()) {
+>  			freqsel = _omap3_dpll_compute_freqsel(clk,
+>  						dd->last_rounded_n);
+> -			if (!freqsel)
+> -				WARN_ON(1);
+> +			WARN_ON(!freqsel);
+>  		}
 >  
-> -static int __init omap_dm_timer_driver_init(void)
-> -{
-> -	return platform_driver_register(&omap_dm_timer_driver);
-> -}
-> -
-> -static void __exit omap_dm_timer_driver_exit(void)
-> -{
-> -	platform_driver_unregister(&omap_dm_timer_driver);
-> -}
-> -
->  early_platform_init("earlytimer", &omap_dm_timer_driver);
-> -module_init(omap_dm_timer_driver_init);
-> -module_exit(omap_dm_timer_driver_exit);
-> +module_platform_driver(omap_dm_timer_driver);
->  
->  MODULE_DESCRIPTION("OMAP Dual-Mode Timer Driver");
->  MODULE_LICENSE("GPL");
-> -- 
-> 1.7.0.4
+>  		pr_debug("clock: %s: set rate: locking rate to %lu.\n",
 > 
