@@ -1,52 +1,145 @@
-From: alex.shi@intel.com (Alex Shi)
-Date: Fri, 14 Dec 2012 15:57:19 +0800
-Subject: [RFC PATCH v2 3/6] sched: pack small tasks
-In-Reply-To: <1355471146.7641.13.camel@marge.simpson.net>
-References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
- <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
- <50C93AC1.1060202@intel.com>
- <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
- <50C9E552.1010600@intel.com> <1355460356.5777.12.camel@marge.simpson.net>
- <50CAC905.9070100@intel.com> <1355471146.7641.13.camel@marge.simpson.net>
-Message-ID: <50CADBDF.60305@intel.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 14 Dec 2012 13:47:27 +0530
+Subject: [PATCH v3 5/6] ARM: davinci: remoteproc board support for
+ OMAP-L138 DSP
+In-Reply-To: <CA+V-a8sGKjRVe4Qm85rSZzToNNZEe29hcug2CY5a_yi60bmBaQ@mail.gmail.com>
+References: <1352853207-20602-1-git-send-email-rtivy@ti.com>
+ <1352853207-20602-5-git-send-email-rtivy@ti.com> <50AB76FA.1050505@ti.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311F952B@DFLE08.ent.ti.com>
+ <50B88F7C.5000705@ti.com>
+ <13514BD7FAEBA745BBD7D8A672905C14311FBDA3@DFLE08.ent.ti.com>
+ <50C85D9F.6050306@ti.com>
+ <CA+V-a8sTBXMCXoTAjbuT9HUJkw_Na5SRUz2qAwvrebQXPWg6Rg@mail.gmail.com>
+ <50C8816F.5020801@ti.com>
+ <CA+V-a8uAoM78=2O5XdVvbu75ChxHAhudZN09fO8xcUu3SCLa0w@mail.gmail.com>
+ <CA+V-a8sGKjRVe4Qm85rSZzToNNZEe29hcug2CY5a_yi60bmBaQ@mail.gmail.com>
+Message-ID: <50CAE097.5000504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/14/2012 03:45 PM, Mike Galbraith wrote:
-> On Fri, 2012-12-14 at 14:36 +0800, Alex Shi wrote: 
->> On 12/14/2012 12:45 PM, Mike Galbraith wrote:
->>>>> Do you have further ideas for buddy cpu on such example?
+On 12/13/2012 1:48 PM, Prabhakar Lad wrote:
+> Sekhar,
+> 
+> On Wed, Dec 12, 2012 at 6:43 PM, Prabhakar Lad
+> <prabhakar.csengg@gmail.com> wrote:
+>> On Wed, Dec 12, 2012 at 6:36 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+>>> On 12/12/2012 4:31 PM, Prabhakar Lad wrote:
+>>>> Hi Sekhar,
+>>>>
+>>>> On Wed, Dec 12, 2012 at 4:04 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+>>>>> On 12/12/2012 7:06 AM, Tivy, Robert wrote:
+>>>>>>> -----Original Message-----
+>>>>>>> From: Nori, Sekhar
+>>>>>>> Sent: Friday, November 30, 2012 2:51 AM
 >>>>>>>
->>>>>>> Which kind of sched_domain configuration have you for such system ?
->>>>>>> and how many sched_domain level have you ?
+>>>>>>> Hi Rob,
+>>>>>>>
+>>>>>>> On 11/29/2012 7:08 AM, Tivy, Robert wrote:
+>>>>>>>> Hi Sekhar,
+>>>>>>>>
+>>>>>>>> Please see comments and noob questions below...
+>>>>>>>>
+>>>>>>>> They can run a single image if the image supports overriding the
+>>>>>>> Kconfig settings with kernel command-line arguments.
+>>>>>>>>
+>>>>>>>> The most basic solution is constants in the .c file itself.  A better
+>>>>>>> solution is Kconfig settings used by the .c file.  An even better
+>>>>>>> solution is Kconfig settings with kernel command-line overrides.
+>>>>>>>
+>>>>>>> If you have kernel command line, you could default to some values which
+>>>>>>> are sane in most cases if they are not provided. No, need to have a
+>>>>>>> Kconfig as well. That will be too many hooks to control the same things
+>>>>>>> and probably not necessary.
+>>>>>>>
+>>>>>>>>
+>>>>>>>>> If you want the remoteproc driver to allocate a certain area of
+>>>>>>> memory
+>>>>>>>>> to the dsp, why don't you take that value as a module parameter so
+>>>>>>>>> people who need different values can pass them differently? It is
+>>>>>>> not
+>>>>>>>>> clear to me why this memory management needs to be dealt with in
+>>>>>>>>> platform code.
+>>>>>>>>
+>>>>>>>> Unfortunetly we need to reserve this dsp memory during early boot,
+>>>>>>> using CMA.  Runtime module insertion is too late.
+>>>>>>>
+>>>>>>> Then I guess most of the time the module would be built into the kernel
+>>>>>>> and will be initialized using an early enough initcall.
+>>>>>>
+>>>>>> That's right, a .reserve function is assigned to the MACHINE_START structure, and this function calls dma_declare_contiguous().
 >>>>>
->>>>> it is general X86 domain configuration. with 4 levels,
->>>>> sibling/core/cpu/numa.
->>> CPU is a bug that slipped into domain degeneration.  You should have
->>> SIBLING/MC/NUMA (chasing that down is on todo).
+>>>>> I meant use an early initcall in the driver.
+>>>>>
+>>>>>>
+>>>>>>>>>> +
+>>>>>>>>>> +static int __init early_rproc_mem(char *p) {
+>>>>>>>>>> + char *endp;
+>>>>>>>>>> +
+>>>>>>>>>> + rproc_size = memparse(p, &endp);
+>>>>>>>>>> + if (*endp == '@')
+>>>>>>>>>> +         rproc_base = memparse(endp + 1, NULL);
+>>>>>>>>>> +
+>>>>>>>>>> + return 0;
+>>>>>>>>>> +}
+>>>>>>>>>> +early_param("rproc_mem", early_rproc_mem);
+>>>>>>>>>
+>>>>>>>>> Use of non-standard kernel parameters is discouraged. All kernel
+>>>>>>>>> parameters should be documented in Documentation/kernel-
+>>>>>>> parameters.txt
+>>>>>>>>> (this means each and every kernel parameter needs to be justified
+>>>>>>>>> well).
+>>>>>>>>
+>>>>>>>> Can I use the kernel command-line (i.e., u-boot bootargs variable) to
+>>>>>>> specify non-kernel parameters?  I guess my question is more one about
+>>>>>>> the terminology "kernel parameter" - is there a way to specify a module
+>>>>>>> parameter on the kernel command line (like, perhaps, rproc.membase and
+>>>>>>> rproc.memsize)?
+>>>>>>>
+>>>>>>> Right. Module parameters are passed from kernel command line when the
+>>>>>>> module is built into the kernel.
+>>>>>>
+>>>>>> Unfortunately, it seems that module parameters, when stated on the kernel command line with module-name.var-name syntax, are not yet assigned when the kernel calls the early init .reserve functions.  For the "char *" I'm using, I observed a NULL value during the early init call and the proper assigned value during a later normal __init function.
+>>>>>
+>>>>> By "later normal __init" you mean module_init()? And you see
+>>>>> dma_declare_contiguous() returning error by this time?
+>>>>>
+>>>>>>
+>>>>>> Is there any other method that allows specifying a parameter for an early CMA reservation without having to rebuild the kernel?
+>>>>>
+>>>>> Nothing else comes to mind. Can you share your code in some public repo?
+>>>>> It will allow me to try if something comes to mind.
+>>>>>
+>>>>>>
+>>>>>> If not, is this a strong enough use case to justify a new kernel parameter?
+>>>>>
+>>>>> May be it it is. You could try adding it. Just update the documentation
+>>>>> too. And add the documentation maintainers when you respin the patch.
+>>>>>
+>>>> I tried finding some alternatives apart from early_param, but there aren?t any.
+>>>> The only thought I got from Marek is to have device tree support. How about
+>>>> that as an option ?
+>>>
+>>> Can you explain some more? How does device tree help here? May be give a
+>>> link to this discussion so I can read?
+>>>
+>> This patch http://thread.gmane.org/gmane.linux.kernel.samsung-soc/12911/
+>> should explain it.
 >>
->> Maybe.
->> the CPU/NUMA is different on domain flags, CPU has SD_PREFER_SIBLING.
+> Sorry for my previous short mail.
 > 
-> What I noticed during (an unrelated) bisection on a 40 core box was
-> domains going from so..
-> 
-> 3.4.0-bisect (virgin)
-> [    5.056214] CPU0 attaching sched-domain:
-> [    5.065009]  domain 0: span 0,32 level SIBLING
-> [    5.075011]   groups: 0 (cpu_power = 589) 32 (cpu_power = 589)
-> [    5.088381]   domain 1: span 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 level MC
-> [    5.107669]    groups: 0,32 (cpu_power = 1178)  4,36 (cpu_power = 1178)  8,40 (cpu_power = 1178) 12,44 (cpu_power = 1178)
->                          16,48 (cpu_power = 1177) 20,52 (cpu_power = 1178) 24,56 (cpu_power = 1177) 28,60 (cpu_power = 1177)
->                          64,72 (cpu_power = 1176) 68,76 (cpu_power = 1176)
-> [    5.162115]    domain 2: span 0-79 level NODE
-> [    5.171927]     groups: 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 (cpu_power = 11773)
->                            1,5,9,13,17,21,25,29,33,37,41,45,49,53,57,61,65,69,73,77 (cpu_power = 11772)
->                            2,6,10,14,18,22,26,30,34,38,42,46,50,54,58,62,66,70,74,78 (cpu_power = 11773)
->                            3,7,11,15,19,23,27,31,35,39,43,47,51,55,59,63,67,71,75,79 (cpu_power = 11770)
-> 
-> ..to so, which looks a little bent.  CPU and MC have identical spans, so
-> CPU should have gone away, as it used to do.
-> 
+>>From the chain of previous mails what I understand is you need to pass
+> the base and size which is user provided, currently which is implemented
+> using early_param(), but use of non-standard kernel parameters is discouraged,
+> The only alternative could be pass the base address through device tree,
+> As similarly implemented in the patch pointed above that would avoid
+> rebuilding the kernel
+> and just build/rebuild the dtbs changing the bases.
 
-better to remove one, and believe you can make it. :)
+Right, thanks for the link. Samsung did solve this by passing the
+addresses from DT (I have my reservations with the approach though since
+this is not strictly hardware data). We support non-DT boot also. Unless
+Rob is okay to have a DT only version of the driver, we still need a
+solution for the non-DT case.
+
+Thanks,
+Sekhar
