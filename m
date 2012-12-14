@@ -1,53 +1,34 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 14 Dec 2012 10:53:41 -0800
-Subject: [PATCH 6/8] arch/arm/mach-omap2/dpll3xxx.c: drop if around WARN_ON
-In-Reply-To: <1351974625-10282-7-git-send-email-Julia.Lawall@lip6.fr>
-References: <1351974625-10282-1-git-send-email-Julia.Lawall@lip6.fr>
- <1351974625-10282-7-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20121214185340.GJ4989@atomide.com>
+Date: Fri, 14 Dec 2012 11:06:53 -0800
+Subject: [PATCH 0/2] ARM: OMAP2420: Fix ethernet support
+In-Reply-To: <1352844140-11103-1-git-send-email-jon-hunter@ti.com>
+References: <1352844140-11103-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <20121214190653.GK4989@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Julia Lawall <Julia.Lawall@lip6.fr> [121103 13:32]:
-> From: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
-> Just use WARN_ON rather than an if containing only WARN_ON(1).
+* Jon Hunter <jon-hunter@ti.com> [121113 14:04]:
+> Fix ethernet support for OMAP2420 and remove legacy code for ethernet
+> configuration.
 
-Thanks applying this one into omap-for-v3.8/fixes-for-merge-window.
+Thanks applying both into omap-for-v3.8/fixes-for-merge-window.
 
 Regards,
 
 Tony
  
-> A simplified version of the semantic patch that makes this transformation
-> is as follows: (http://coccinelle.lip6.fr/)
+> Jon Hunter (2):
+>   ARM: OMAP2420: Fix ethernet support for OMAP2420 H4
+>   ARM: OMAP: Remove debug-devices.c
 > 
-> // <smpl>
-> @@
-> expression e;
-> @@
-> - if (e) WARN_ON(1);
-> + WARN_ON(e);
-> // </smpl>
+>  arch/arm/mach-omap2/board-h4.c      |   80 +++++++-----------------------
+>  arch/arm/mach-omap2/debug-devices.h |    9 ----
+>  arch/arm/plat-omap/Makefile         |    1 -
+>  arch/arm/plat-omap/debug-devices.c  |   93 -----------------------------------
+>  4 files changed, 19 insertions(+), 164 deletions(-)
+>  delete mode 100644 arch/arm/mach-omap2/debug-devices.h
+>  delete mode 100644 arch/arm/plat-omap/debug-devices.c
 > 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
-> ---
->  arch/arm/mach-omap2/dpll3xxx.c |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-> index eacf51f..ed855b0 100644
-> --- a/arch/arm/mach-omap2/dpll3xxx.c
-> +++ b/arch/arm/mach-omap2/dpll3xxx.c
-> @@ -478,8 +478,7 @@ int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate)
->  		if (!soc_is_am33xx() && !cpu_is_omap44xx() && !cpu_is_omap3630()) {
->  			freqsel = _omap3_dpll_compute_freqsel(clk,
->  						dd->last_rounded_n);
-> -			if (!freqsel)
-> -				WARN_ON(1);
-> +			WARN_ON(!freqsel);
->  		}
->  
->  		pr_debug("clock: %s: set rate: locking rate to %lu.\n",
+> -- 
+> 1.7.9.5
 > 
