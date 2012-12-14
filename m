@@ -1,43 +1,132 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 14 Dec 2012 00:32:51 -0700
-Subject: [PATCH 1/2] ARM: OMAP4: clock data: div_iva_hs_clk is a
- power-of-two divider
+Date: Fri, 14 Dec 2012 00:32:52 -0700
+Subject: [PATCH 2/2] ARM: OMAP4: clock data: DPLLs are missing bypass clocks
+ in their parent lists
 In-Reply-To: <20121214072028.24383.41000.stgit@dusk.lan>
 References: <20121214072028.24383.41000.stgit@dusk.lan>
-Message-ID: <20121214073248.24383.76201.stgit@dusk.lan>
+Message-ID: <20121214073251.24383.67602.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP4 clock divider "div_iva_hs_clk" is listed in the clock data
-as an OMAP HSDIVIDER, but it's actually a power-of-two divider.  This
-causes a warning during boot on an OMAP4460 Pandaboard-ES with a
-recent u-boot:
+Booting OMAP4460 Pandaboard ES with a recent u-boot results in this
+warning:
 
-WARNING: at arch/arm/mach-omap2/clkt_clksel.c:143 omap2_clksel_recalc+0xf4/0x12c()
-clock: div_iva_hs_clk: could not find fieldval 0 for parent dpll_core_m5x2_ck
+WARNING: at arch/arm/mach-omap2/dpll3xxx.c:427 omap3_noncore_dpll_enable+0xf4/0x110()
 
-Fix by converting the data for this clock to a power-of-two divider.
+The OMAP4 DPLL parent clock name arrays only listed the reference
+clocks, not the bypass clocks.  Fix by adding the bypass clocks to the
+DPLL parent lists.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 Cc: Mike Turquette <mturquette@linaro.org>
 ---
- arch/arm/mach-omap2/cclock44xx_data.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/cclock44xx_data.c |   31 +++++++++++++++++++++++++------
+ 1 file changed, 25 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-index aa56c3e..a3c54b2 100644
+index a3c54b2..4536bae 100644
 --- a/arch/arm/mach-omap2/cclock44xx_data.c
 +++ b/arch/arm/mach-omap2/cclock44xx_data.c
-@@ -286,9 +286,9 @@ DEFINE_CLK_DIVIDER(div_core_ck, "dpll_core_m5x2_ck", &dpll_core_m5x2_ck, 0x0,
- 		   OMAP4430_CM_CLKSEL_CORE, OMAP4430_CLKSEL_CORE_SHIFT,
- 		   OMAP4430_CLKSEL_CORE_WIDTH, 0x0, NULL);
+@@ -233,7 +233,7 @@ static struct dpll_data dpll_core_dd = {
  
--DEFINE_CLK_OMAP_HSDIVIDER(div_iva_hs_clk, "dpll_core_m5x2_ck",
--			  &dpll_core_m5x2_ck, 0x0, OMAP4430_CM_BYPCLK_DPLL_IVA,
--			  OMAP4430_CLKSEL_0_1_MASK);
-+DEFINE_CLK_DIVIDER(div_iva_hs_clk, "dpll_core_m5x2_ck", &dpll_core_m5x2_ck,
-+		   0x0, OMAP4430_CM_BYPCLK_DPLL_IVA, OMAP4430_CLKSEL_0_1_SHIFT,
-+		   OMAP4430_CLKSEL_0_1_WIDTH, CLK_DIVIDER_POWER_OF_TWO, NULL);
  
- DEFINE_CLK_DIVIDER(div_mpu_hs_clk, "dpll_core_m5x2_ck", &dpll_core_m5x2_ck,
- 		   0x0, OMAP4430_CM_BYPCLK_DPLL_MPU, OMAP4430_CLKSEL_0_1_SHIFT,
+ static const char *dpll_core_ck_parents[] = {
+-	"sys_clkin_ck",
++	"sys_clkin_ck", "core_hsd_byp_clk_mux_ck"
+ };
+ 
+ static struct clk dpll_core_ck;
+@@ -363,6 +363,10 @@ static struct dpll_data dpll_iva_dd = {
+ 	.min_divider	= 1,
+ };
+ 
++static const char *dpll_iva_ck_parents[] = {
++	"sys_clkin_ck", "iva_hsd_byp_clk_mux_ck"
++};
++
+ static struct clk dpll_iva_ck;
+ 
+ static struct clk_hw_omap dpll_iva_ck_hw = {
+@@ -373,7 +377,7 @@ static struct clk_hw_omap dpll_iva_ck_hw = {
+ 	.ops		= &clkhwops_omap3_dpll,
+ };
+ 
+-DEFINE_STRUCT_CLK(dpll_iva_ck, dpll_core_ck_parents, dpll_abe_ck_ops);
++DEFINE_STRUCT_CLK(dpll_iva_ck, dpll_iva_ck_parents, dpll_abe_ck_ops);
+ 
+ static const char *dpll_iva_x2_ck_parents[] = {
+ 	"dpll_iva_ck",
+@@ -416,6 +420,10 @@ static struct dpll_data dpll_mpu_dd = {
+ 	.min_divider	= 1,
+ };
+ 
++static const char *dpll_mpu_ck_parents[] = {
++	"sys_clkin_ck", "div_mpu_hs_clk"
++};
++
+ static struct clk dpll_mpu_ck;
+ 
+ static struct clk_hw_omap dpll_mpu_ck_hw = {
+@@ -426,7 +434,7 @@ static struct clk_hw_omap dpll_mpu_ck_hw = {
+ 	.ops		= &clkhwops_omap3_dpll,
+ };
+ 
+-DEFINE_STRUCT_CLK(dpll_mpu_ck, dpll_core_ck_parents, dpll_abe_ck_ops);
++DEFINE_STRUCT_CLK(dpll_mpu_ck, dpll_mpu_ck_parents, dpll_abe_ck_ops);
+ 
+ DEFINE_CLK_FIXED_FACTOR(mpu_periphclk, "dpll_mpu_ck", &dpll_mpu_ck, 0x0, 1, 2);
+ 
+@@ -464,6 +472,9 @@ static struct dpll_data dpll_per_dd = {
+ 	.min_divider	= 1,
+ };
+ 
++static const char *dpll_per_ck_parents[] = {
++	"sys_clkin_ck", "per_hsd_byp_clk_mux_ck"
++};
+ 
+ static struct clk dpll_per_ck;
+ 
+@@ -475,7 +486,7 @@ static struct clk_hw_omap dpll_per_ck_hw = {
+ 	.ops		= &clkhwops_omap3_dpll,
+ };
+ 
+-DEFINE_STRUCT_CLK(dpll_per_ck, dpll_core_ck_parents, dpll_abe_ck_ops);
++DEFINE_STRUCT_CLK(dpll_per_ck, dpll_per_ck_parents, dpll_abe_ck_ops);
+ 
+ DEFINE_CLK_DIVIDER(dpll_per_m2_ck, "dpll_per_ck", &dpll_per_ck, 0x0,
+ 		   OMAP4430_CM_DIV_M2_DPLL_PER, OMAP4430_DPLL_CLKOUT_DIV_SHIFT,
+@@ -559,6 +570,10 @@ static struct dpll_data dpll_usb_dd = {
+ 	.min_divider	= 1,
+ };
+ 
++static const char *dpll_usb_ck_parents[] = {
++	"sys_clkin_ck", "usb_hs_clk_div_ck"
++};
++
+ static struct clk dpll_usb_ck;
+ 
+ static struct clk_hw_omap dpll_usb_ck_hw = {
+@@ -569,7 +584,7 @@ static struct clk_hw_omap dpll_usb_ck_hw = {
+ 	.ops		= &clkhwops_omap3_dpll,
+ };
+ 
+-DEFINE_STRUCT_CLK(dpll_usb_ck, dpll_core_ck_parents, dpll_abe_ck_ops);
++DEFINE_STRUCT_CLK(dpll_usb_ck, dpll_usb_ck_parents, dpll_abe_ck_ops);
+ 
+ static const char *dpll_usb_clkdcoldo_ck_parents[] = {
+ 	"dpll_usb_ck",
+@@ -696,9 +711,13 @@ DEFINE_CLK_DIVIDER(syc_clk_div_ck, "sys_clkin_ck", &sys_clkin_ck, 0x0,
+ 		   OMAP4430_CM_ABE_DSS_SYS_CLKSEL, OMAP4430_CLKSEL_0_0_SHIFT,
+ 		   OMAP4430_CLKSEL_0_0_WIDTH, 0x0, NULL);
+ 
++static const char *dbgclk_mux_ck_parents[] = {
++	"sys_clkin_ck"
++};
++
+ static struct clk dbgclk_mux_ck;
+ DEFINE_STRUCT_CLK_HW_OMAP(dbgclk_mux_ck, NULL);
+-DEFINE_STRUCT_CLK(dbgclk_mux_ck, dpll_core_ck_parents,
++DEFINE_STRUCT_CLK(dbgclk_mux_ck, dbgclk_mux_ck_parents,
+ 		  dpll_usb_clkdcoldo_ck_ops);
+ 
+ /* Leaf clocks controlled by modules */
