@@ -1,97 +1,47 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 14 Dec 2012 15:26:37 -0600
-Subject: [RESEND PATCH 2/2] ARM: dts: OMAP2+: Add PMU nodes
-In-Reply-To: <1355520397-5759-1-git-send-email-jon-hunter@ti.com>
-References: <1355520397-5759-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1355520397-5759-3-git-send-email-jon-hunter@ti.com>
+From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
+Date: Sat, 15 Dec 2012 06:31:20 +0900
+Subject: [PATCH 1/2] thermal: Add support for thermal sensor for Kirkwood
+ SoC
+In-Reply-To: <20121208001152.GA14363@n2100.arm.linux.org.uk>
+References: <1354922151-3250-1-git-send-email-iwamatsu@nigauri.org>
+ <20121208010708.260209f5@skate>
+ <20121208001152.GA14363@n2100.arm.linux.org.uk>
+Message-ID: <CABMQnVK4GkeNCJ59uZajBgd6N6JYcRsdQ9FxX-x+7+umm+8BCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PMU nodes for OMAP2, OMAP3 and OMAP4460 devices.
+Hi,
 
-Please note that the node for OMAP4460 has been placed in a separate
-header file for OMAP4460, because the node is not compatible with
-OMAP4430.
+On Sat, Dec 8, 2012 at 9:11 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Dec 08, 2012 at 01:07:08AM +0100, Thomas Petazzoni wrote:
+>> Hello,
+>>
+>> On Sat,  8 Dec 2012 08:15:50 +0900, Nobuhiro Iwamatsu wrote:
+>> > +static const struct of_device_id kirkwood_thermal_id_table[] = {
+>> > +   { .compatible = "marvel,thermal-kirkwood" },
+>>
+>> marvel -> marvell
+>>
+>> Also, I think it should be marvell,kirkwood-thermal, since most other
+>> DT compatible strings that we have for Marvell SoCs are
+>> marvell,<soc>-<function>.
+>>
+>> Also, the Device Tree binding documentation is missing (even though it
+>> is admittedly going to be a very short documentation).
+>
+> Is this in any way compatible with the thermal monitoring found on
+> Dove (510) stuff?  If so, should it have the SoC prefix in there,
+> or should it be "armada-thermal" for the SoC family?
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/boot/dts/omap2.dtsi         |    5 +++++
- arch/arm/boot/dts/omap3.dtsi         |    6 ++++++
- arch/arm/boot/dts/omap4-panda-es.dts |    2 ++
- arch/arm/boot/dts/omap4460.dtsi      |   18 ++++++++++++++++++
- 4 files changed, 31 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap4460.dtsi
+I have document of armada and kirkwood only.
+I dont know about Dove. if Dove has same device, we had better change
+it is a good idea.
 
-diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
-index 761c4b6..27f5ea1 100644
---- a/arch/arm/boot/dts/omap2.dtsi
-+++ b/arch/arm/boot/dts/omap2.dtsi
-@@ -26,6 +26,11 @@
- 		};
- 	};
- 
-+	pmu {
-+		compatible = "arm,arm1136-pmu";
-+		interrupts = <3>;
-+	};
-+
- 	soc {
- 		compatible = "ti,omap-infra";
- 		mpu {
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 1acc261..6c63118 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -26,6 +26,12 @@
- 		};
- 	};
- 
-+	pmu {
-+		compatible = "arm,cortex-a8-pmu";
-+		interrupts = <3>;
-+		ti,hwmods = "debugss";
-+	};
-+
- 	/*
- 	 * The soc node represents the soc top level view. It is uses for IPs
- 	 * that are not memory mapped in the MPU view or for the MPU itself.
-diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
-index 73bc1a6..2a6e344 100644
---- a/arch/arm/boot/dts/omap4-panda-es.dts
-+++ b/arch/arm/boot/dts/omap4-panda-es.dts
-@@ -5,7 +5,9 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+
- /include/ "omap4-panda.dts"
-+/include/ "omap4460.dtsi"
- 
- /* Audio routing is differnet between PandaBoard4430 and PandaBoardES */
- &sound {
-diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
-new file mode 100644
-index 0000000..1270890
---- /dev/null
-+++ b/arch/arm/boot/dts/omap4460.dtsi
-@@ -0,0 +1,18 @@
-+/*
-+ * Device Tree Source for OMAP4460 SoC
-+ *
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/ {
-+	pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupts = <0 54 0x4
-+			      0 55 0x4>;
-+		ti,hwmods = "debugss";
-+	};
-+};
+Best regards,
+  Nobuhiro
+
 -- 
-1.7.10.4
+Nobuhiro Iwamatsu
+   iwamatsu at {nigauri.org / debian.org}
+   GPG ID: 40AD1FA6
