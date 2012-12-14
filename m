@@ -1,31 +1,39 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 14 Dec 2012 14:34:18 -0600
-Subject: [PATCH] ARM: dts: OMAP2420: Correct H4 board memory size
-Message-ID: <1355517258-30745-1-git-send-email-jon-hunter@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Dec 2012 21:34:47 +0100
+Subject: [PATCH] ARM: dts: add pinctrl nodes for Exynos5250 SoC
+In-Reply-To: <1355403978-388-1-git-send-email-thomas.abraham@linaro.org>
+References: <1355403978-388-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CACRpkdZgSpkHW3mW_2ZhvUWVTX7Qppb5G8d+MdD3zUDOYCY-pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The system memory node for the OMAP2420 H4 was incorrectly defined as
-start address followed by end address, instead of start address and
-size. No noticable side-effects were observed but fix this for
-correctness.
+On Thu, Dec 13, 2012 at 2:06 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/boot/dts/omap2420-h4.dts |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Add pinctrl device nodes for Exynos5250 SoC.
+>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-diff --git a/arch/arm/boot/dts/omap2420-h4.dts b/arch/arm/boot/dts/omap2420-h4.dts
-index 77b84e1..9b0d077 100644
---- a/arch/arm/boot/dts/omap2420-h4.dts
-+++ b/arch/arm/boot/dts/omap2420-h4.dts
-@@ -15,6 +15,6 @@
- 
- 	memory {
- 		device_type = "memory";
--		reg = <0x80000000 0x84000000>; /* 64 MB */
-+		reg = <0x80000000 0x4000000>; /* 64 MB */
- 	};
- };
--- 
-1.7.10.4
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+> - The individual device nodes which are using the old style Samsung gpio
+>   bindings have not been converted over to pinctrl bindings yet. It might
+>   also be important to know if Linus's pinctrl grab in device core patch
+>   (http://comments.gmane.org/gmane.linux.kernel/1409263) gets accepted.
+
+Greg seems happy with it and the plan is to have it merged for kernel
+v3.9.
+
+I intend to push Greg for an ACK and queue it for linux-next right after the
+merge window.
+
+> - This patch should not be merged for now which otherwise would break existing
+>   platforms which are using the old samsung gpio driver bindings. This patch
+>   is intended to get started with the migration to pinctrl framework.
+>   It is probably better to first prepare all the migration patches and
+>   merge them as a bunch.
+
+Sure. I guess it'll be taken through the Samsung tree anyway, right?
+
+Yours,
+Linus Walleij
