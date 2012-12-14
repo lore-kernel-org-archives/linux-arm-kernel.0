@@ -1,38 +1,28 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 15 Dec 2012 00:49:57 +0100
-Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
-In-Reply-To: <50CB68AB.5070806@grandegger.com>
-References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
- <50CB68AB.5070806@grandegger.com>
-Message-ID: <50CBBB25.20002@antcom.de>
+From: russ.dill@gmail.com (Russ Dill)
+Date: Fri, 14 Dec 2012 15:58:06 -0800
+Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB68589@DBDE01.ent.ti.com>
+References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
+ <509AD478.1050904@ti.com> <509B666F.6080507@compulab.co.il>
+ <509BDAF5.1010703@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB68589@DBDE01.ent.ti.com>
+Message-ID: <CA+Bv8XbshAbjyVLH1ZH18Y4nv7k7nb7kym5gjk+ARjUnkFe3dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfgang,
+On Thu, Nov 8, 2012 at 9:08 AM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
+> No we do not have 32k_counter block in AM335x.
+>
+> If you are referring to 32Khz clock availability alone, then yes, we need to
+> get persistent clock and we use RTC 32Khz clock source for it.
+> But please note that this is not a 32k_counter block which OMAP family of
+> devices has.
+>
+> The way AM335x works is, we have timers (0-7), timer0 being secure timer.
+> We use timer1 and timer2 for clockevent and clocksource and they are driven
+> by 26MHz OSC clock currently. So when you go into Low power state, OSC is turned off and you need persistent clock for time keeping, right?
+>
+> And only persistent clock available is RTC 32khz crystal clock, being RTC is
+> in wakeup domain.
 
-thank you for the patch!
-
-On 14/12/12 18:58, Wolfgang Grandegger wrote:
-> +static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val)
-> +{
-> +	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-> +	void __iomem *pio = at91_gpio->regbase;
-> +
-> +	__raw_writel(mask, pio + (val ? PIO_SODR : PIO_CODR));
-> +}
-> +
-
-Without having an AT91 available right now, I guess the hardware
-interface of this GPIO chip is different from the GPIO block API. While
-the hardware has clear and set registers, the val parameter of
-at91_gpiolib_set_block() should be interpreted as the actual output
-values. See lpc32xx_gpo_set_block() for an example for handling set and
-clear registers like this: First, set_bits and clear_bits words are
-calculated from mask and val parameters, and finally written to the
-respective hardware registers.
-
-Note that one .set_block() can result in writing both the set and clear
-registers of the hardware when val contains both 0s and 1s in
-respectively masked positions.
-
-Roland
+RTC domain.
