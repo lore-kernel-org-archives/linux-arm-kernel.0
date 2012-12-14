@@ -1,52 +1,26 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 14 Dec 2012 21:50:59 +0100
-Subject: [RFC] drm/lcdc: add TI LCD Controller DRM driver
-In-Reply-To: <1355443446-8723-1-git-send-email-robdclark@gmail.com>
-References: <1355443446-8723-1-git-send-email-robdclark@gmail.com>
-Message-ID: <CAKMK7uHxABma1JO_WPT54_p3wXCP3-BVbo5_XnUox-fez+tV2A@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 14 Dec 2012 15:18:48 -0600
+Subject: [PATCH 0/2] ARM: dts: Add PMU support for OMAP2+
+Message-ID: <1355519930-3851-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 14, 2012 at 1:04 AM, Rob Clark <robdclark@gmail.com> wrote:
-> +static int lcdc_crtc_page_flip(struct drm_crtc *crtc,
-> +               struct drm_framebuffer *fb,
-> +               struct drm_pending_vblank_event *event)
-> +{
-> +       struct lcdc_crtc *lcdc_crtc = to_lcdc_crtc(crtc);
-> +       struct drm_device *dev = crtc->dev;
-> +
-> +       if (lcdc_crtc->event) {
-> +               dev_err(dev->dev, "already pending page flip!\n");
-> +               return -EBUSY;
-> +       }
-> +
-> +       // TODO we should hold a ref to the fb somewhere..
+Add device-tree PMU support for OMAP2, OMAP3 and OMAP4460.
 
-Note that with the current fb refcounting nothing prevents you from
-fixing this. The ugly problems I've had to solve for the locking
-rework are all due to the drm core (i.e. setcrtc/pageflip/...) ioctl
-functions assuming that an fb can't suddenly disappear while holding
-the mode_config lock. Since I wanted to remove that requirement I've
-had to changed the refcounting in the drm core functions.
+Tested with PERF on OMAP3430 Beagle Board and OMAP4460 Panda Board.
+Boot tested only on OMAP2420 H4.
 
-But drivers can already extend the lifetime of an fb simply by
-grabbing a reference (as long as they grab that reference while
-holding the struct mutex all the time between fb lookup and grabbing
-the reference). And it will continue to work the same with the new
-locking scheme.
--Daniel
+Jon Hunter (2):
+  ARM: OMAP2+: Prepare for device-tree PMU support
+  ARM: dts: OMAP2+: Add PMU nodes
 
-> +       crtc->fb = fb;
-> +       lcdc_crtc->event = event;
-> +       update_scanout(crtc);
-> +
-> +       return 0;
-> +}
-> +
-
-
+ arch/arm/boot/dts/omap2.dtsi         |    5 +++++
+ arch/arm/boot/dts/omap3.dtsi         |    6 ++++++
+ arch/arm/boot/dts/omap4-panda-es.dts |    2 ++
+ arch/arm/boot/dts/omap4460.dtsi      |   18 ++++++++++++++++++
+ arch/arm/mach-omap2/pmu.c            |   14 +++++++++++---
+ 5 files changed, 42 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap4460.dtsi
 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+1.7.10.4
