@@ -1,21 +1,24 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Fri, 14 Dec 2012 08:13:00 +0100
-Subject: cpts: Fix build error caused by include of plat/clock.h
-In-Reply-To: <20121213213641.GF4989@atomide.com>
-References: <20121213213641.GF4989@atomide.com>
-Message-ID: <20121214071300.GA2253@netboy.at.omicron.at>
+From: vbyravarasu@nvidia.com (Venu Byravarasu)
+Date: Fri, 14 Dec 2012 12:29:06 +0530
+Subject: [PATCH 0/2] usb: tegra: modifying port reset based on instance number
+Message-ID: <1355468348-8821-1-git-send-email-vbyravarasu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 13, 2012 at 01:36:41PM -0800, Tony Lindgren wrote:
-> Commit 87c0e764 (cpts: introduce time stamping code and a PTP hardware clock)
-> mistakenly included plat/clock.h that should not be included by drivers
-> even if it exists.
+Tegra USB host driver is using port instance number,
+to handle some of the hardware issues on SOC e.g. reset PORT0
+twice etc. As instance number based handling looks ugly,
+added a new property to USB DT node for this purpose.
+Modified host driver to make use of the information passed
+through DT to reset the port second time.
 
-Hasn't this already been fixed?
 
-  https://patchwork.kernel.org/patch/1810481/
-  http://www.spinics.net/lists/linux-omap/msg83132.html
+Venu Byravarasu (2):
+  arm: tegra: Add new DT property to USB node.
+  usb: host: tegra: Resetting PORT0 based on information received via
+    DT.
 
-Thanks,
-Richard
+ .../bindings/usb/nvidia,tegra20-ehci.txt           |    2 ++
+ arch/arm/boot/dts/tegra20.dtsi                     |    1 +
+ drivers/usb/host/ehci-tegra.c                      |    6 +++++-
+ 3 files changed, 8 insertions(+), 1 deletions(-)
