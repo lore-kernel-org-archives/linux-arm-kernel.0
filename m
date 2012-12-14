@@ -1,32 +1,86 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 14 Dec 2012 14:04:41 -0800
-Subject: [GIT PULL 0/3] ARM: arm-soc: Third and final batch foe 3.8
-Message-ID: <20121214220441.GA11363@quad.lixom.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 14 Dec 2012 23:11:59 +0100
+Subject: [PATCH 1/2] thermal: Add support for thermal sensor for Orion SoC
+In-Reply-To: <CABMQnV+zNWz4UJ_127Xe+MkTt9eQVPA8StJzyEXt58Z4OqZBYw@mail.gmail.com>
+References: <1355482986-885-1-git-send-email-andrew@lunn.ch>
+ <1355482986-885-2-git-send-email-andrew@lunn.ch>
+ <CABMQnV+zNWz4UJ_127Xe+MkTt9eQVPA8StJzyEXt58Z4OqZBYw@mail.gmail.com>
+Message-ID: <20121214221159.GE7717@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Sat, Dec 15, 2012 at 06:54:17AM +0900, Nobuhiro Iwamatsu wrote:
+> Hi,
+> 
+> Thanks you for your work.
+> Sorry, I dont hava a time at this week about this.
 
-Here is the last batch of branches for 3.8. It's wrapping up merges for
-SPEAr and socfpga, some additional contents for Exynos and shmobile and
-a large update for mvebu/kirkwood.
+Its not a problem. We have plenty of time before the next merge
+window. I was just interested in seeing it work on my QNAP device, so
+did some of the cleanup work.
 
-For kirkwood, we're working on figuring out the workflow better with the
-submaintainers, they have a rapid pace of development and end up with a
-lot of interdependent topic branches. So we grouped them in a topic on
-their own this merge window; something we're trying to avoid overall.
+> On Fri, Dec 14, 2012 at 8:03 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> > From: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> >
+> > Some Orion SoC has thermal sensor.
+> > This patch adds support for 88F6282 and 88F6283.
+> >
+> > Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > ---
+> >  .../devicetree/bindings/thermal/orion-thermal.txt  |   16 +++
+> >  drivers/thermal/Kconfig                            |    7 ++
+> >  drivers/thermal/Makefile                           |    1 +
+> >  drivers/thermal/orion_thermal.c                    |  133 ++++++++++++++++++++
+> >  4 files changed, 157 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/thermal/orion-thermal.txt
+> >  create mode 100644 drivers/thermal/orion_thermal.c
+> >
+> > diff --git a/Documentation/devicetree/bindings/thermal/orion-thermal.txt b/Documentation/devicetree/bindings/thermal/orion-thermal.txt
+> > new file mode 100644
+> > index 0000000..5ce925d
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/thermal/orion-thermal.txt
+> > @@ -0,0 +1,16 @@
+> > +* Orion Thermal
+> > +
+> > +This initial version is for Kirkwood 88F8262 & 88F6283 SoCs, however
+> > +it is expected the driver will sometime in the future be expanded to
+> > +also support Dove, using a different compatibility string.
+> > +
+> > +Required properties:
+> > +- compatible : "marvell,kirkwood-thermal"
+> > +- reg : Address range of the thermal registers
+> > +
+> > +Example:
+> > +
+> > +       thermal at 10078 {
+> > +               compatible = "marvell,kirkwood";
+> 
+> compatible = "marvell,kirkwood-thermal"; ?
 
-Same procedure as last time, merge conflicts documented in each request
-and *-resolved branches pushed for reference.
+Yep, my error.
 
-And thanks for your tolerance of merge conflicts in this merge window,
-it's been a relatively bad one and we'll work to avoid more of the silly
-ones for 3.9.
+> > +               reg = <0x10078 0x4>;
+> > +       };
+> > diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+> > index e1cb6bd..3bba13f 100644
+> > --- a/drivers/thermal/Kconfig
+> > +++ b/drivers/thermal/Kconfig
+> > @@ -55,3 +55,10 @@ config EXYNOS_THERMAL
+> >         help
+> >           If you say yes here you get support for TMU (Thermal Managment
+> >           Unit) on SAMSUNG EXYNOS series of SoC.
+> > +
+> > +config ORION_THERMAL
+> > +       tristate "Temperature sensor on Marvel Orion SoCs"
+> 
+> Marvel -> Marvell
 
->From here on out it'll mostly be fixes, and possibly a few straggling
-patches.
+Missed that one, thanks.
 
+Thanks for the Tested-by. I will add it to the next version.  I
+started work on Dove support, so i will probably repost when i have
+that ready for testing.
 
-Thanks,
-
--Olof
+     Andrew
