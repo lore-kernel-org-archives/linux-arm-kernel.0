@@ -1,60 +1,38 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 14 Dec 2012 11:36:41 +0100
-Subject: [PATCH v8 2/5] mtd: omap-nand: pass device_node in platform data
+Date: Fri, 14 Dec 2012 11:36:40 +0100
+Subject: [PATCH v8 1/5] ARM: OMAP: gpmc: don't create devices from initcall on
+ DT
 In-Reply-To: <1355481404-27695-1-git-send-email-zonque@gmail.com>
 References: <1355481404-27695-1-git-send-email-zonque@gmail.com>
-Message-ID: <1355481404-27695-3-git-send-email-zonque@gmail.com>
+Message-ID: <1355481404-27695-2-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pass an optional device_node pointer in the platform data, which in turn
-will be put into a mtd_part_parser_data. This way, code that sets up the
-platform devices can pass along the node from DT so that the partitions
-can be parsed.
-
-For non-DT boards, this change has no effect.
+On DT driven boards, the gpmc node will match the driver. Hence, there's
+no need to do that unconditionally from the initcall.
 
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- drivers/mtd/nand/omap2.c                     | 4 +++-
- include/linux/platform_data/mtd-nand-omap2.h | 4 +++-
- 2 files changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/gpmc.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index 0002d5e..1d333497c 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -1332,6 +1332,7 @@ static int omap_nand_probe(struct platform_device *pdev)
- 	dma_cap_mask_t mask;
- 	unsigned sig;
- 	struct resource			*res;
-+	struct mtd_part_parser_data	ppdata = {};
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 65468f6..d5cbd29 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -1214,6 +1214,13 @@ static int __init omap_gpmc_init(void)
+ 	struct platform_device *pdev;
+ 	char *oh_name = "gpmc";
  
- 	pdata = pdev->dev.platform_data;
- 	if (pdata == NULL) {
-@@ -1557,7 +1558,8 @@ static int omap_nand_probe(struct platform_device *pdev)
- 		goto out_release_mem_region;
- 	}
- 
--	mtd_device_parse_register(&info->mtd, NULL, NULL, pdata->parts,
-+	ppdata.of_node = pdata->of_node;
-+	mtd_device_parse_register(&info->mtd, NULL, &ppdata, pdata->parts,
- 				  pdata->nr_parts);
- 
- 	platform_set_drvdata(pdev, &info->mtd);
-diff --git a/include/linux/platform_data/mtd-nand-omap2.h b/include/linux/platform_data/mtd-nand-omap2.h
-index 24d32ca..6bf9ef4 100644
---- a/include/linux/platform_data/mtd-nand-omap2.h
-+++ b/include/linux/platform_data/mtd-nand-omap2.h
-@@ -60,6 +60,8 @@ struct omap_nand_platform_data {
- 	int			devsize;
- 	enum omap_ecc           ecc_opt;
- 	struct gpmc_nand_regs	reg;
--};
- 
-+	/* for passing the partitions */
-+	struct device_node	*of_node;
-+};
- #endif
++	/*
++	 * if the board boots up with a populated DT, do not
++	 * manually add the device from this initcall
++	 */
++	if (of_have_populated_dt())
++		return -ENODEV;
++
+ 	oh = omap_hwmod_lookup(oh_name);
+ 	if (!oh) {
+ 		pr_err("Could not look up %s\n", oh_name);
 -- 
 1.7.11.7
