@@ -1,207 +1,48 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 14 Dec 2012 16:19:33 -0700
-Subject: [PATCH v2] NTP: Add a CONFIG_RTC_SYSTOHC configuration
-Message-ID: <20121214231933.GA15796@obsidianresearch.com>
+From: amery@geeks.cl (Alejandro Mery)
+Date: Sat, 15 Dec 2012 00:34:57 +0100
+Subject: [PATCHv2] ARM: sunxi: Change device tree naming scheme for sunxi
+In-Reply-To: <201212131200.48413.arnd@arndb.de>
+References: <1355328503-25315-1-git-send-email-maxime.ripard@free-electrons.com>
+ <201212131200.48413.arnd@arndb.de>
+Message-ID: <50CBB7A1.5000201@geeks.cl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The purpose of this option is to allow ARM/etc systems that rely on the
-class RTC subsystem to have the same kind of automatic NTP based
-synchronization that we have on PC platforms. Today ARM does not
-implement update_persistent_clock and makes extensive use of the class
-RTC system.
+On 13/12/12 13:00, Arnd Bergmann wrote:
+> On Wednesday 12 December 2012, Maxime Ripard wrote:
+>> There is several different SoCs sharing the sun5i codename: A10s, A12
+>> and A13. Since there is enough differences to not consider those the
+>> same SoCs, change a bit the naming scheme to reflect this.
+>>
+>> Moreover, some boards like the olinuxino come in A10s and A13 variants,
+>> which also share the same SoC codename.
+>>
+>> So change the naming scheme to reflect both the codename and the market
+>> name of the SoCs used in the dtsi and in the board files
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>
+> Side note:
+> I just read about the A20 and A31, is there any information and/or
+> source code available for those already, or are they again kept
+> hidden by Allwinner?
 
-When enabled CONFIG_RTC_SYSTOHC will provide a generic
-rtc_update_persistent_clock that stores the current time in the RTC and
-is intended complement the existing CONFIG_RTC_HCTOSYS option that loads
-the RTC at boot.
+currently they don't even sell A20 samples, and it was mostly removed 
+from their website (to not compete with the A31 I suppose). for the A31 
+Tsvetan (olimex.com) was told not even the short datasheet (pins and 
+features) is written yet, and no devkits are available. All A31-based 
+products currently designed (PCBs) and integrated (android) within 
+Allwinner walls.
 
-Like with RTC_HCTOSYS the platform's update_persistent_clock is used
-first, if it works. Platforms with mixed class RTC and non-RTC drivers
-need to return ENODEV when class RTC should be used. Such an update for
-PPC is included in this patch.
+Chances are very high that the SDKs for these are similar to sun5i ones, 
+i.e. with all allwinner code provided as .o/.ko only... and just enough 
+.h files to be able to compile drivers.
 
-Long term, implementations of update_persistent_clock should migrate to
-proper class RTC drivers and use CONFIG_RTC_SYSTOHC instead.
+<rant>ARM should *force* all their licensees to respect the GPL. They 
+are profiting for this immoral negligence and that puts ARM itself in 
+the same bucket.</rant>
 
-Tested on ARM kirkwood and PPC405
-
-Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
----
- arch/powerpc/kernel/time.c |    2 +-
- drivers/rtc/Kconfig        |    9 +++++++++
- drivers/rtc/Makefile       |    1 +
- drivers/rtc/systohc.c      |   44 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/time.h       |    1 +
- kernel/time/ntp.c          |   15 +++++++++++----
- 6 files changed, 67 insertions(+), 5 deletions(-)
- create mode 100644 drivers/rtc/systohc.c
-
-v2 updates:
- - Be very careful to return ENODEV from rtc_update_persistent_clock,
-   we don't want to loop on the fast retry path of sync_cmos_clock
-   if there is no RTC set support available
- - Call the platform update_persistent_clock first. Only try
-   the RTC version if it is compiled out, or explicitly returns ENODEV
- - Added 'depends on RTC_SYSTOHC = y' to KConfig
- - Don't fast rety in sync_cmos_clock if ENODEV is returned
- - Update PPC to return ENODEV if there is no mach specific function
-   available in ppc_md. This will give rtc_update_persistent_clock
-   a chance.
- - Use rtc_set_time not mms since rtc_hctosys assumes UTC.
-
-diff --git a/arch/powerpc/kernel/time.c b/arch/powerpc/kernel/time.c
-index ce4cb77..bc844a8 100644
---- a/arch/powerpc/kernel/time.c
-+++ b/arch/powerpc/kernel/time.c
-@@ -667,7 +667,7 @@ int update_persistent_clock(struct timespec now)
- 	struct rtc_time tm;
- 
- 	if (!ppc_md.set_rtc_time)
--		return 0;
-+		return -ENODEV;
- 
- 	to_tm(now.tv_sec + 1 + timezone_offset, &tm);
- 	tm.tm_year -= 1900;
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 19c03ab..7b3702b 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -28,6 +28,7 @@ config RTC_HCTOSYS
- config RTC_HCTOSYS_DEVICE
- 	string "RTC used to set the system time"
- 	depends on RTC_HCTOSYS = y
-+	depends on RTC_SYSTOHC = y
- 	default "rtc0"
- 	help
- 	  The RTC device that will be used to (re)initialize the system
-@@ -48,6 +49,14 @@ config RTC_HCTOSYS_DEVICE
- 	  sleep states. Do not specify an RTC here unless it stays powered
- 	  during all this system's supported sleep states.
- 
-+config RTC_SYSTOHC
-+	bool "Set the RTC time based on NTP synchronization"
-+	default y
-+	help
-+	  If you say yes here, the system time (wall clock) will be stored
-+          in the RTC specified by RTC_HCTOSYS_DEVICE approximately every 11
-+  	  minutes if userspace reports synchronized NTP status.
-+
- config RTC_DEBUG
- 	bool "RTC debug support"
- 	help
-diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-index 56297f0..69d11f1 100644
---- a/drivers/rtc/Makefile
-+++ b/drivers/rtc/Makefile
-@@ -6,6 +6,7 @@ ccflags-$(CONFIG_RTC_DEBUG)	:= -DDEBUG
- 
- obj-$(CONFIG_RTC_LIB)		+= rtc-lib.o
- obj-$(CONFIG_RTC_HCTOSYS)	+= hctosys.o
-+obj-$(CONFIG_RTC_SYSTOHC)	+= systohc.o
- obj-$(CONFIG_RTC_CLASS)		+= rtc-core.o
- rtc-core-y			:= class.o interface.o
- 
-diff --git a/drivers/rtc/systohc.c b/drivers/rtc/systohc.c
-new file mode 100644
-index 0000000..a625740
---- /dev/null
-+++ b/drivers/rtc/systohc.c
-@@ -0,0 +1,44 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ */
-+#include <linux/rtc.h>
-+#include <linux/time.h>
-+
-+/**
-+ * rtc_update_persistent_clock - Save NTP synchronized time to the RTC
-+ * @now: Current time of day
-+ *
-+ * Replacement for the NTP platform function update_persistent_clock
-+ * that stores time for later retrieval by rtc_hctosys
-+ *
-+ * Returns 0 on successful RTC update, -ENODEV if a RTC update is not
-+ * possible at all, and various other -errno for specific temporary failure
-+ * cases.
-+ *
-+ * If temporary failure is indicated the caller should try again 'soon'
-+ */
-+int rtc_update_persistent_clock(struct timespec now)
-+{
-+	struct rtc_device *rtc;
-+	struct rtc_time tm;
-+	int err = -ENODEV;
-+
-+	if (now.tv_nsec < (NSEC_PER_SEC >> 1))
-+		rtc_time_to_tm(now.tv_sec, &tm);
-+	else
-+		rtc_time_to_tm(now.tv_sec + 1, &tm);
-+
-+	rtc = rtc_class_open(CONFIG_RTC_HCTOSYS_DEVICE);
-+	if (rtc) {
-+		/* rtc_hctosys exclusively uses UTC, so we call set_time here,
-+		 * not set_mmss. */
-+		if (rtc->ops && (rtc->ops->set_time && rtc->ops->set_mmss))
-+			err = rtc_set_time(rtc, &tm);
-+		rtc_class_close(rtc);
-+	}
-+
-+	return err;
-+}
-diff --git a/include/linux/time.h b/include/linux/time.h
-index 4d358e9..d668f9c 100644
---- a/include/linux/time.h
-+++ b/include/linux/time.h
-@@ -118,6 +118,7 @@ static inline bool timespec_valid_strict(const struct timespec *ts)
- extern void read_persistent_clock(struct timespec *ts);
- extern void read_boot_clock(struct timespec *ts);
- extern int update_persistent_clock(struct timespec now);
-+extern int rtc_update_persistent_clock(struct timespec now);
- void timekeeping_init(void);
- extern int timekeeping_suspended;
- 
-diff --git a/kernel/time/ntp.c b/kernel/time/ntp.c
-index 24174b4..0c5d1a1 100644
---- a/kernel/time/ntp.c
-+++ b/kernel/time/ntp.c
-@@ -483,8 +483,7 @@ out:
- 	return leap;
- }
- 
--#ifdef CONFIG_GENERIC_CMOS_UPDATE
--
-+#if defined(CONFIG_GENERIC_CMOS_UPDATE) || defined(CONFIG_RTC_SYSTOHC)
- static void sync_cmos_clock(struct work_struct *work);
- 
- static DECLARE_DELAYED_WORK(sync_cmos_work, sync_cmos_clock);
-@@ -510,14 +509,22 @@ static void sync_cmos_clock(struct work_struct *work)
- 	}
- 
- 	getnstimeofday(&now);
--	if (abs(now.tv_nsec - (NSEC_PER_SEC / 2)) <= tick_nsec / 2)
-+	if (abs(now.tv_nsec - (NSEC_PER_SEC / 2)) <= tick_nsec / 2) {
-+		fail = -ENODEV;
-+#ifdef CONFIG_GENERIC_CMOS_UPDATE
- 		fail = update_persistent_clock(now);
-+#endif
-+#ifdef CONFIG_RTC_SYSTOHC
-+		if (fail == -ENODEV)
-+			fail = rtc_update_persistent_clock(now);
-+#endif
-+	}
- 
- 	next.tv_nsec = (NSEC_PER_SEC / 2) - now.tv_nsec - (TICK_NSEC / 2);
- 	if (next.tv_nsec <= 0)
- 		next.tv_nsec += NSEC_PER_SEC;
- 
--	if (!fail)
-+	if (!fail || fail == -ENODEV)
- 		next.tv_sec = 659;
- 	else
- 		next.tv_sec = 0;
--- 
-1.7.5.4
+cheers,
+Alejandro Mery
