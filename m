@@ -1,33 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Dec 2012 09:54:02 +0000
-Subject: [PATCH] DMAEngine: sirf: add DMA pause/resume support
-In-Reply-To: <1355478282-27908-1-git-send-email-Barry.Song@csr.com>
-References: <1355478282-27908-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <20121214095402.GH14363@n2100.arm.linux.org.uk>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Fri, 14 Dec 2012 10:55:56 +0100
+Subject: cpts: Fix build error caused by include of plat/clock.h
+In-Reply-To: <20121214071300.GA2253@netboy.at.omicron.at>
+References: <20121213213641.GF4989@atomide.com>
+ <20121214071300.GA2253@netboy.at.omicron.at>
+Message-ID: <45364223-10C6-430A-9085-9DE1C79030AF@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 14, 2012 at 05:44:42PM +0800, Barry Song wrote:
-> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-> index 212f69f..ffe05bb 100644
-> --- a/drivers/dma/sirf-dma.c
-> +++ b/drivers/dma/sirf-dma.c
-> @@ -313,6 +313,38 @@ static int sirfsoc_dma_terminate_all(struct sirfsoc_dma_chan *schan)
->  	return 0;
->  }
->  
-> +static int sirfsoc_dma_pause_chan(struct sirfsoc_dma_chan *schan)
-> +{
-> +	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
-> +	int cid = schan->chan.chan_id;
-> +
-> +	if (!sdma->is_marco)
-> +		writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL)
-> +			& ~((1 << cid) | 1 << (cid + 16)),
-> +			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
-> +	else
-> +		writel_relaxed((1 << cid) | 1 << (cid + 16),
-> +			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL_CLR);
 
-You're doing a read-modify-write to what looks like a shared register.
-What makes this code safe in a preempt or SMP environment?
+Op 14 dec. 2012, om 08:13 heeft Richard Cochran <richardcochran@gmail.com> het volgende geschreven:
+
+> On Thu, Dec 13, 2012 at 01:36:41PM -0800, Tony Lindgren wrote:
+>> Commit 87c0e764 (cpts: introduce time stamping code and a PTP hardware clock)
+>> mistakenly included plat/clock.h that should not be included by drivers
+>> even if it exists.
+> 
+> Hasn't this already been fixed?
+> 
+>  https://patchwork.kernel.org/patch/1810481/
+>  http://www.spinics.net/lists/linux-omap/msg83132.html
+
+That patch didn't get applied, so it's still broken in Linus' tree :(
+
+regards,
+
+Koen
