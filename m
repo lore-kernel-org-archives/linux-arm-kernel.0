@@ -1,43 +1,41 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 14 Dec 2012 19:02:48 +0100
-Subject: [PATCH v2 1/1] ARM: OMAP2+: omap2plus_defconfig: enable devtmpfs and
- automount
-Message-ID: <1355508168-32565-1-git-send-email-javier.martinez@collabora.co.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 14 Dec 2012 10:06:53 -0800
+Subject: [PATCHv2] ARM: sunxi: Change device tree naming scheme for sunxi
+In-Reply-To: <50CB5D93.7080405@free-electrons.com>
+References: <1355328503-25315-1-git-send-email-maxime.ripard@free-electrons.com>
+ <201212131200.48413.arnd@arndb.de>
+ <50CB5D93.7080405@free-electrons.com>
+Message-ID: <CAOesGMgX6Ta9bduBEpuY-eLg_9Lvm19OMJMj2MPbHcfvj69wiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since udev-176 [1], udev no longer creates device nodes under
-/dev and this has to be managed by the kernel devtmpfs filesystem.
+Hi,
 
-This makes devtmpfs filesystem a requirement on newer systems and
-a kernel built with the current OMAP2+ config will not boot on them.
+On Fri, Dec 14, 2012 at 9:10 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Arnd,
+>
+> Le 13/12/2012 13:00, Arnd Bergmann a ?crit :
+>> On Wednesday 12 December 2012, Maxime Ripard wrote:
+>>> There is several different SoCs sharing the sun5i codename: A10s, A12
+>>> and A13. Since there is enough differences to not consider those the
+>>> same SoCs, change a bit the naming scheme to reflect this.
+>>>
+>>> Moreover, some boards like the olinuxino come in A10s and A13 variants,
+>>> which also share the same SoC codename.
+>>>
+>>> So change the naming scheme to reflect both the codename and the market
+>>> name of the SoCs used in the dtsi and in the board files
+>>>
+>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>
+> Will you take it directly, or do you want a pull request?
 
-Also, it is good to have devtmpfs at /dev automount enabled by default.
+We can take it directly, but I'm not picking up patches until after
+the final 4 branches have been sent up and merged.
 
-[1]: http://permalink.gmane.org/gmane.linux.hotplug.devel/17230
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
 
-Changes since v1:
-    - Point to correct udev version that first this a requirement
-      as suggested by Sekhar Nori
-
- arch/arm/configs/omap2plus_defconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index a1dc5c0..ad41190 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -65,6 +65,8 @@ CONFIG_MAC80211_RC_PID=y
- CONFIG_MAC80211_RC_DEFAULT_PID=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_CONNECTOR=y
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_CHAR=y
--- 
-1.7.7.6
+-Olof
