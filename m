@@ -1,27 +1,29 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 15 Dec 2012 10:45:39 +0000
-Subject: [PATCHv2] ARM: sunxi: Change device tree naming scheme for sunxi
-In-Reply-To: <50CBB7A1.5000201@geeks.cl>
-References: <1355328503-25315-1-git-send-email-maxime.ripard@free-electrons.com>
- <201212131200.48413.arnd@arndb.de> <50CBB7A1.5000201@geeks.cl>
-Message-ID: <20121215104539.GM14363@n2100.arm.linux.org.uk>
+Date: Sat, 15 Dec 2012 10:51:57 +0000
+Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
+In-Reply-To: <50CBBB25.20002@antcom.de>
+References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
+ <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
+Message-ID: <20121215105157.GN14363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 15, 2012 at 12:34:57AM +0100, Alejandro Mery wrote:
-> <rant>ARM should *force* all their licensees to respect the GPL. They  
-> are profiting for this immoral negligence and that puts ARM itself in  
-> the same bucket.</rant>
+On Sat, Dec 15, 2012 at 12:49:57AM +0100, Roland Stigge wrote:
+> Without having an AT91 available right now, I guess the hardware
+> interface of this GPIO chip is different from the GPIO block API. While
+> the hardware has clear and set registers, the val parameter of
+> at91_gpiolib_set_block() should be interpreted as the actual output
+> values. See lpc32xx_gpo_set_block() for an example for handling set and
+> clear registers like this: First, set_bits and clear_bits words are
+> calculated from mask and val parameters, and finally written to the
+> respective hardware registers.
+> 
+> Note that one .set_block() can result in writing both the set and clear
+> registers of the hardware when val contains both 0s and 1s in
+> respectively masked positions.
 
-Only the copyright holders or agents acting on their behalf have the
-legal power to do that.
-
-Also, it's not in ARMs interest to become a GPL enforcement agency for
-Linux kernel - their motivation here is to sell more ARM CPUs to that
-their revenue from their licenses continues to increase, and going after
-people like this would be counter-productive to that goal.
-
-However, there are organisations setup specifically to deal directly
-with infringements of open source software licenses on behalf of their
-copyright holders, and a number of Linux kernel copyright holders have
-"signed up" with them.
+Note also that if this is the same IP as found in SAM3N devices, that it's
+possible to write the bit values directly through the OWER/OWDR (output
+write enable register/disable register) plus the ODSR (output data status
+register) which will synchronously change the state of all the
+write-enabled output pins.  That may be important for some applications.
