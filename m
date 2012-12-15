@@ -1,116 +1,85 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sat, 15 Dec 2012 13:39:24 +0800
-Subject: [PATCH] arm: vexpress: hook platform_data to clcd_pl11x by amba
- bus_notify
-Message-ID: <1355549964-12893-1-git-send-email-21cnbao@gmail.com>
+From: bitbucket@online.de (Mike Galbraith)
+Date: Sat, 15 Dec 2012 07:40:34 +0100
+Subject: [RFC PATCH v2 3/6] sched: pack small tasks
+In-Reply-To: <CAKfTPtDw6Tk6oVut5REBsbCoHD3JE0ajHKp=aYhwx0j9NiTKGQ@mail.gmail.com>
+References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
+ <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
+ <50C93AC1.1060202@intel.com>
+ <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
+ <50C9E552.1010600@intel.com> <1355460356.5777.12.camel@marge.simpson.net>
+ <50CAC905.9070100@intel.com> <1355471146.7641.13.camel@marge.simpson.net>
+ <CAKfTPtDw6Tk6oVut5REBsbCoHD3JE0ajHKp=aYhwx0j9NiTKGQ@mail.gmail.com>
+Message-ID: <1355553634.4731.13.camel@marge.simpson.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+On Fri, 2012-12-14 at 11:43 +0100, Vincent Guittot wrote: 
+> On 14 December 2012 08:45, Mike Galbraith <bitbucket@online.de> wrote:
+> > On Fri, 2012-12-14 at 14:36 +0800, Alex Shi wrote:
+> >> On 12/14/2012 12:45 PM, Mike Galbraith wrote:
+> >> >> > Do you have further ideas for buddy cpu on such example?
+> >> >>> > >
+> >> >>> > > Which kind of sched_domain configuration have you for such system ?
+> >> >>> > > and how many sched_domain level have you ?
+> >> >> >
+> >> >> > it is general X86 domain configuration. with 4 levels,
+> >> >> > sibling/core/cpu/numa.
+> >> > CPU is a bug that slipped into domain degeneration.  You should have
+> >> > SIBLING/MC/NUMA (chasing that down is on todo).
+> >>
+> >> Maybe.
+> >> the CPU/NUMA is different on domain flags, CPU has SD_PREFER_SIBLING.
+> >
+> > What I noticed during (an unrelated) bisection on a 40 core box was
+> > domains going from so..
+> >
+> > 3.4.0-bisect (virgin)
+> > [    5.056214] CPU0 attaching sched-domain:
+> > [    5.065009]  domain 0: span 0,32 level SIBLING
+> > [    5.075011]   groups: 0 (cpu_power = 589) 32 (cpu_power = 589)
+> > [    5.088381]   domain 1: span 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 level MC
+> > [    5.107669]    groups: 0,32 (cpu_power = 1178)  4,36 (cpu_power = 1178)  8,40 (cpu_power = 1178) 12,44 (cpu_power = 1178)
+> >                          16,48 (cpu_power = 1177) 20,52 (cpu_power = 1178) 24,56 (cpu_power = 1177) 28,60 (cpu_power = 1177)
+> >                          64,72 (cpu_power = 1176) 68,76 (cpu_power = 1176)
+> > [    5.162115]    domain 2: span 0-79 level NODE
+> > [    5.171927]     groups: 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 (cpu_power = 11773)
+> >                            1,5,9,13,17,21,25,29,33,37,41,45,49,53,57,61,65,69,73,77 (cpu_power = 11772)
+> >                            2,6,10,14,18,22,26,30,34,38,42,46,50,54,58,62,66,70,74,78 (cpu_power = 11773)
+> >                            3,7,11,15,19,23,27,31,35,39,43,47,51,55,59,63,67,71,75,79 (cpu_power = 11770)
+> >
+> > ..to so, which looks a little bent.  CPU and MC have identical spans, so
+> > CPU should have gone away, as it used to do.
+> >
+> > 3.6.0-bisect (virgin)
+> > [    3.978338] CPU0 attaching sched-domain:
+> > [    3.987125]  domain 0: span 0,32 level SIBLING
+> > [    3.997125]   groups: 0 (cpu_power = 588) 32 (cpu_power = 589)
+> > [    4.010477]   domain 1: span 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 level MC
+> > [    4.029748]    groups: 0,32 (cpu_power = 1177)  4,36 (cpu_power = 1177)  8,40 (cpu_power = 1178) 12,44 (cpu_power = 1178)
+> >                          16,48 (cpu_power = 1178) 20,52 (cpu_power = 1178) 24,56 (cpu_power = 1178) 28,60 (cpu_power = 1178)
+> >                          64,72 (cpu_power = 1178) 68,76 (cpu_power = 1177)
+> > [    4.084143]    domain 2: span 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 level CPU
+> > [    4.103796]     groups: 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 (cpu_power = 11777)
+> > [    4.124373]     domain 3: span 0-79 level NUMA
+> > [    4.134369]      groups: 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 (cpu_power = 11777)
+> >                             1,5,9,13,17,21,25,29,33,37,41,45,49,53,57,61,65,69,73,77 (cpu_power = 11778)
+> >                             2,6,10,14,18,22,26,30,34,38,42,46,50,54,58,62,66,70,74 ,78 (cpu_power = 11778)
+> >                             3,7,11,15,19,23,27,31,35,39,43,47,51,55,59,63,67,71,75,79 (cpu_power = 11780)
+> >
+> 
+> Thanks. that's an interesting example of a numa topology
+> 
+> For your sched_domain difference,
+> On 3.4, SD_PREFER_SIBLING was set for both MC and CPU level thanks to
+> sd_balance_for_mc_power and  sd_balance_for_package_power
+> On 3.6, SD_PREFER_SIBLING is only set for CPU level and this flag
+> difference with MC level prevents the destruction of CPU sched_domain
+> during the degeneration
+> 
+> We may need to set SD_PREFER_SIBLING for MC level
 
-when using dtb to boot v2p-ca9, clcd probe will fail due to missed
-the platform_data:
-clcd-pl11x: probe of 10020000.clcd failed with error -22
-this patch hooks the platform_data to clcd and make lcd of v2p-ca9
-can work while booting vexpress by DTB.
-Tested on qemu by "qemu-system-arm -M vexpress-a9 -m 512M -kernel
-zImage -dtb ./vexpress-v2p-ca9.dtb"
+Ah, that explains oddity. (todo--).
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/mach-vexpress/ct-ca9x4.c                 |   30 +++++++++++++++++++++
- arch/arm/mach-vexpress/include/mach/motherboard.h |    1 +
- arch/arm/mach-vexpress/v2m.c                      |   10 +++++++
- 3 files changed, 41 insertions(+), 0 deletions(-)
+Hm, seems changing flags should trigger a rebuild. (todo++,drat).
 
-diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
-index 4f471fa..92b03e7 100644
---- a/arch/arm/mach-vexpress/ct-ca9x4.c
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@ -111,6 +111,35 @@ static struct amba_device *ct_ca9x4_amba_devs[] __initdata = {
- 	&gpio_device,
- };
- 
-+static int ct_ca9x4_of_amba_notify(struct notifier_block *nb, unsigned long action,
-+		void *data)
-+{
-+	struct device *dev = data;
-+
-+	/* We are only intereted in device addition */
-+	if (action != BUS_NOTIFY_ADD_DEVICE)
-+		return 0;
-+
-+	if (!of_find_compatible_node(NULL, NULL, "arm,vexpress,v2p-ca9"))
-+		return 0;
-+
-+	if (of_device_is_compatible(dev->of_node, "arm,pl111"))
-+		dev->platform_data = &ct_ca9x4_clcd_data;
-+
-+	return 0;
-+}
-+
-+static struct notifier_block ct_ca9x4_amba_nb = {
-+	.notifier_call = ct_ca9x4_of_amba_notify,
-+};
-+
-+static void ct_ca9x4_register_bus_nb(void)
-+{
-+	/* Register callbacks on OF amba device addition/removal
-+	 * to handle linking them to the right platform_data
-+	 */
-+	bus_register_notifier(&amba_bustype, &ct_ca9x4_amba_nb);
-+}
- 
- static struct v2m_osc ct_osc1 = {
- 	.osc = 1,
-@@ -211,6 +240,7 @@ struct ct_desc ct_ca9x4_desc __initdata = {
- 	.map_io		= ct_ca9x4_map_io,
- 	.init_irq	= ct_ca9x4_init_irq,
- 	.init_tile	= ct_ca9x4_init,
-+	.bus_notifer	= ct_ca9x4_register_bus_nb,
- #ifdef CONFIG_SMP
- 	.init_cpu_map	= ct_ca9x4_init_cpu_map,
- 	.smp_enable	= ct_ca9x4_smp_enable,
-diff --git a/arch/arm/mach-vexpress/include/mach/motherboard.h b/arch/arm/mach-vexpress/include/mach/motherboard.h
-index 1e388c7..f88982b 100644
---- a/arch/arm/mach-vexpress/include/mach/motherboard.h
-+++ b/arch/arm/mach-vexpress/include/mach/motherboard.h
-@@ -141,6 +141,7 @@ struct ct_desc {
- 	void			(*init_early)(void);
- 	void			(*init_irq)(void);
- 	void			(*init_tile)(void);
-+	void			(*bus_notifer)(void);
- #ifdef CONFIG_SMP
- 	void			(*init_cpu_map)(void);
- 	void			(*smp_enable)(unsigned int);
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 560e0df..e9147f8 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -431,6 +431,8 @@ static void __init v2m_clk_init(void)
- 	clk = v2m_osc_register("mb:osc1", &v2m_mb_osc1);
- 	for (i = 0; i < ARRAY_SIZE(v2m_osc1_periphs); i++)
- 		WARN_ON(clk_register_clkdev(clk, NULL, v2m_osc1_periphs[i]));
-+	if (of_find_compatible_node(NULL, NULL, "arm,vexpress,v2p-ca9"))
-+		WARN_ON(clk_register_clkdev(clk, NULL, "10020000.clcd"));
- 
- 	clk = clk_register_fixed_rate(NULL, "mb:osc2", NULL,
- 			CLK_IS_ROOT, 24000000);
-@@ -651,7 +653,15 @@ static struct of_dev_auxdata v2m_dt_auxdata_lookup[] __initdata = {
- 
- static void __init v2m_dt_init(void)
- {
-+	int i;
-+
- 	l2x0_of_init(0x00400000, 0xfe0fffff);
-+
-+	/* some devices need to hook platform_data */
-+	for (i = 0; i < ARRAY_SIZE(ct_descs); i++)
-+		if (ct_descs[i]->bus_notifer)
-+			ct_descs[i]->bus_notifer();
-+
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 			v2m_dt_auxdata_lookup, NULL);
- 	pm_power_off = v2m_power_off;
--- 
-1.7.1
+-Mike
