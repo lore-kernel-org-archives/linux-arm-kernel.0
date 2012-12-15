@@ -1,85 +1,55 @@
-From: bitbucket@online.de (Mike Galbraith)
-Date: Sat, 15 Dec 2012 07:40:34 +0100
-Subject: [RFC PATCH v2 3/6] sched: pack small tasks
-In-Reply-To: <CAKfTPtDw6Tk6oVut5REBsbCoHD3JE0ajHKp=aYhwx0j9NiTKGQ@mail.gmail.com>
-References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
- <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
- <50C93AC1.1060202@intel.com>
- <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
- <50C9E552.1010600@intel.com> <1355460356.5777.12.camel@marge.simpson.net>
- <50CAC905.9070100@intel.com> <1355471146.7641.13.camel@marge.simpson.net>
- <CAKfTPtDw6Tk6oVut5REBsbCoHD3JE0ajHKp=aYhwx0j9NiTKGQ@mail.gmail.com>
-Message-ID: <1355553634.4731.13.camel@marge.simpson.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 15 Dec 2012 16:52:00 +0900
+Subject: [PATCH 3/7] ARM: sh7372: support mixed DT and board code
+ interrupt controller init
+In-Reply-To: <1355503531-7276-4-git-send-email-g.liakhovetski@gmx.de>
+References: <1355503531-7276-1-git-send-email-g.liakhovetski@gmx.de>
+ <1355503531-7276-4-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <20121215075156.GD9073@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-12-14 at 11:43 +0100, Vincent Guittot wrote: 
-> On 14 December 2012 08:45, Mike Galbraith <bitbucket@online.de> wrote:
-> > On Fri, 2012-12-14 at 14:36 +0800, Alex Shi wrote:
-> >> On 12/14/2012 12:45 PM, Mike Galbraith wrote:
-> >> >> > Do you have further ideas for buddy cpu on such example?
-> >> >>> > >
-> >> >>> > > Which kind of sched_domain configuration have you for such system ?
-> >> >>> > > and how many sched_domain level have you ?
-> >> >> >
-> >> >> > it is general X86 domain configuration. with 4 levels,
-> >> >> > sibling/core/cpu/numa.
-> >> > CPU is a bug that slipped into domain degeneration.  You should have
-> >> > SIBLING/MC/NUMA (chasing that down is on todo).
-> >>
-> >> Maybe.
-> >> the CPU/NUMA is different on domain flags, CPU has SD_PREFER_SIBLING.
-> >
-> > What I noticed during (an unrelated) bisection on a 40 core box was
-> > domains going from so..
-> >
-> > 3.4.0-bisect (virgin)
-> > [    5.056214] CPU0 attaching sched-domain:
-> > [    5.065009]  domain 0: span 0,32 level SIBLING
-> > [    5.075011]   groups: 0 (cpu_power = 589) 32 (cpu_power = 589)
-> > [    5.088381]   domain 1: span 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 level MC
-> > [    5.107669]    groups: 0,32 (cpu_power = 1178)  4,36 (cpu_power = 1178)  8,40 (cpu_power = 1178) 12,44 (cpu_power = 1178)
-> >                          16,48 (cpu_power = 1177) 20,52 (cpu_power = 1178) 24,56 (cpu_power = 1177) 28,60 (cpu_power = 1177)
-> >                          64,72 (cpu_power = 1176) 68,76 (cpu_power = 1176)
-> > [    5.162115]    domain 2: span 0-79 level NODE
-> > [    5.171927]     groups: 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 (cpu_power = 11773)
-> >                            1,5,9,13,17,21,25,29,33,37,41,45,49,53,57,61,65,69,73,77 (cpu_power = 11772)
-> >                            2,6,10,14,18,22,26,30,34,38,42,46,50,54,58,62,66,70,74,78 (cpu_power = 11773)
-> >                            3,7,11,15,19,23,27,31,35,39,43,47,51,55,59,63,67,71,75,79 (cpu_power = 11770)
-> >
-> > ..to so, which looks a little bent.  CPU and MC have identical spans, so
-> > CPU should have gone away, as it used to do.
-> >
-> > 3.6.0-bisect (virgin)
-> > [    3.978338] CPU0 attaching sched-domain:
-> > [    3.987125]  domain 0: span 0,32 level SIBLING
-> > [    3.997125]   groups: 0 (cpu_power = 588) 32 (cpu_power = 589)
-> > [    4.010477]   domain 1: span 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 level MC
-> > [    4.029748]    groups: 0,32 (cpu_power = 1177)  4,36 (cpu_power = 1177)  8,40 (cpu_power = 1178) 12,44 (cpu_power = 1178)
-> >                          16,48 (cpu_power = 1178) 20,52 (cpu_power = 1178) 24,56 (cpu_power = 1178) 28,60 (cpu_power = 1178)
-> >                          64,72 (cpu_power = 1178) 68,76 (cpu_power = 1177)
-> > [    4.084143]    domain 2: span 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 level CPU
-> > [    4.103796]     groups: 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 (cpu_power = 11777)
-> > [    4.124373]     domain 3: span 0-79 level NUMA
-> > [    4.134369]      groups: 0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76 (cpu_power = 11777)
-> >                             1,5,9,13,17,21,25,29,33,37,41,45,49,53,57,61,65,69,73,77 (cpu_power = 11778)
-> >                             2,6,10,14,18,22,26,30,34,38,42,46,50,54,58,62,66,70,74 ,78 (cpu_power = 11778)
-> >                             3,7,11,15,19,23,27,31,35,39,43,47,51,55,59,63,67,71,75,79 (cpu_power = 11780)
-> >
-> 
-> Thanks. that's an interesting example of a numa topology
-> 
-> For your sched_domain difference,
-> On 3.4, SD_PREFER_SIBLING was set for both MC and CPU level thanks to
-> sd_balance_for_mc_power and  sd_balance_for_package_power
-> On 3.6, SD_PREFER_SIBLING is only set for CPU level and this flag
-> difference with MC level prevents the destruction of CPU sched_domain
-> during the degeneration
-> 
-> We may need to set SD_PREFER_SIBLING for MC level
+On Fri, Dec 14, 2012 at 05:45:27PM +0100, Guennadi Liakhovetski wrote:
+> Extend DT interrupt controller initialisation to automatically fall back to
+> platform data based configuration, if booting without DT. This simplifies
+> implementing boards, capable of booting in either mode with a single kernel.
 
-Ah, that explains oddity. (todo--).
+Hi Guennadi,
 
-Hm, seems changing flags should trigger a rebuild. (todo++,drat).
+Do you have a case in mind where this will be used?
+My thinking until now has been that sh7372_init_irq_of() should only be called
+when a board is being initialised using DT.
 
--Mike
+> 
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> ---
+>  arch/arm/mach-shmobile/intc-sh7372.c |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/intc-sh7372.c b/arch/arm/mach-shmobile/intc-sh7372.c
+> index c923518..9c13ecc 100644
+> --- a/arch/arm/mach-shmobile/intc-sh7372.c
+> +++ b/arch/arm/mach-shmobile/intc-sh7372.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/irq.h>
+>  #include <linux/io.h>
+>  #include <linux/sh_intc.h>
+> +#include <mach/common.h>
+>  #include <mach/intc.h>
+>  #include <mach/irqs.h>
+>  #include <asm/mach-types.h>
+> @@ -629,6 +630,11 @@ static const struct of_device_id irq_of_match[] __initconst = {
+>  
+>  void __init sh7372_init_irq_of(void)
+>  {
+> +	if (!of_have_populated_dt()) {
+> +		sh7372_init_irq();
+> +		return;
+> +	}
+> +
+>  	of_irq_init(irq_of_match);
+>  
+>  	sh7372_init_intc(0xe6940000, 0xe6950000, 0xffd20000, 0xffd50000,
+> -- 
+> 1.7.2.5
+> 
