@@ -1,10 +1,10 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 16 Dec 2012 00:41:29 +0800
+Date: Sun, 16 Dec 2012 00:42:26 +0800
 Subject: [PATCH] clk: factor: calculate rate by do_div
 In-Reply-To: <CAN1soZze6Ogn_zi7JJN0JNzoMFkHLJyKyjTV7rSWUmQhwRU0NQ@mail.gmail.com>
 References: <1354522477-11991-1-git-send-email-haojian.zhuang@gmail.com>
  <CAN1soZze6Ogn_zi7JJN0JNzoMFkHLJyKyjTV7rSWUmQhwRU0NQ@mail.gmail.com>
-Message-ID: <CAN1soZxJ_JCEVV5v99tFi22fq5AEOCBj1D5PY=vmGGW_gDWuJQ@mail.gmail.com>
+Message-ID: <CAN1soZw=TjxENOPLLHb08FuWpVYH-s-3mVvLd7yTymU2UGovww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -43,4 +43,4 @@ On Tue, Dec 4, 2012 at 9:32 AM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
 >
 > Correct Mike's email address.
 
-Any comments? Does it mean that nobody want to fix the bug?
+Any comments? It's the bug what needs to be fixed.
