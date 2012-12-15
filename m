@@ -1,54 +1,116 @@
-From: ccross@android.com (Colin Cross)
-Date: Fri, 14 Dec 2012 17:50:41 -0800
-Subject: [PATCH] cpuidle: coupled: fix the potensial race condition and
- deadlock
-In-Reply-To: <1354503541-13463-1-git-send-email-josephl@nvidia.com>
-References: <1354503541-13463-1-git-send-email-josephl@nvidia.com>
-Message-ID: <CAMbhsRSuff0_JXEsuPh4TMOB9Na2zpV2QXT=eeUKFAyMZcDRoA@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sat, 15 Dec 2012 13:39:24 +0800
+Subject: [PATCH] arm: vexpress: hook platform_data to clcd_pl11x by amba
+ bus_notify
+Message-ID: <1355549964-12893-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 2, 2012 at 6:59 PM, Joseph Lo <josephl@nvidia.com> wrote:
-> Considering the chance that two CPU come into cpuidle_enter_state_coupled at
-> very close time. The 1st CPU increases the waiting count and the 2nd CPU do the
-> same thing right away. The 2nd CPU found the 1st CPU already in waiting then
-> prepare to poke it.
->
-> Before the 2nd CPU to poke 1st CPU, the 1st found the waiting count already same
-> with cpu_online count. So the 1st won't go into waiting loop and the 2nd CPU
-> didn't poke it yet. The 1st CPU will go into ready loop directly.
->
-> Then the 2nd CPU set up the couple_cpuidle_mask for 1st CPU and poke it. But the
-> 1st CPU already lost the chance to handle the poke and clear the
-> couple_cpuidle_mask. Now whole MPcore are alredy to be coupled. The MPcore will
-> go into the power saving idle mode.
->
-> Because the poke was be implemented as a "smp_call_function_single", it's a
-> software intrrupt of "IPI_SINGLE_FUNC". If the power saving idle mode of the
-> platform can't retain the software interrupt of power saving idle mode, (e.g.
-> Tegra's powerd-down idle mode will shut off cpu power that include the power of
-> GIC) the software interrupt will got lost.
+From: Barry Song <Baohua.Song@csr.com>
 
-This is the root of your problem.  The cpu should never go to idle
-while an IPI is pending.  I thought we already had a patch to return
-an error from gic_cpu_save when an IPI was pending and abort the idle
-transition, but apparently not and I can't find any references to it.
+when using dtb to boot v2p-ca9, clcd probe will fail due to missed
+the platform_data:
+clcd-pl11x: probe of 10020000.clcd failed with error -22
+this patch hooks the platform_data to clcd and make lcd of v2p-ca9
+can work while booting vexpress by DTB.
+Tested on qemu by "qemu-system-arm -M vexpress-a9 -m 512M -kernel
+zImage -dtb ./vexpress-v2p-ca9.dtb"
 
-> When the CPU resumed from the power saving idle mode and the system still keep
-> idle, it will go into idle mode again immediately. Because the
-> "smp_call_function_single" not allow the same function be called for the same
-> cpu twice, or it will got a lock. So the "couple_cpuidle_mask" can't be cleared
-> by 1st CPU, the 2nd CPU also can't poke it again. Then the deadlock happens
-> here.
->
-> The fix here used different wake up mechanism. Because there are already two
-> loops and a gloable variable "ready_waiting_counts" to sync the status of
-> MPcore to coupled state, the "coupled_cpuidle_mask" was not really necessary.
-> Just waking up the CPU from waiting and checking if the CPU need resched at
-> outside world to take the CPU out of idle are enough. And this fix didn't
-> modify the original behavior of coupled cpuidle framework. It should still
-> compitable with the origianal. The cpuidle driver that already applies
-> coupled cpuidle not need to change as well.
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/mach-vexpress/ct-ca9x4.c                 |   30 +++++++++++++++++++++
+ arch/arm/mach-vexpress/include/mach/motherboard.h |    1 +
+ arch/arm/mach-vexpress/v2m.c                      |   10 +++++++
+ 3 files changed, 41 insertions(+), 0 deletions(-)
 
-I don't like using the arch IPI functions directly, especially not
-reusing arch_send_call_function_single_ipi without a function to call.
+diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
+index 4f471fa..92b03e7 100644
+--- a/arch/arm/mach-vexpress/ct-ca9x4.c
++++ b/arch/arm/mach-vexpress/ct-ca9x4.c
+@@ -111,6 +111,35 @@ static struct amba_device *ct_ca9x4_amba_devs[] __initdata = {
+ 	&gpio_device,
+ };
+ 
++static int ct_ca9x4_of_amba_notify(struct notifier_block *nb, unsigned long action,
++		void *data)
++{
++	struct device *dev = data;
++
++	/* We are only intereted in device addition */
++	if (action != BUS_NOTIFY_ADD_DEVICE)
++		return 0;
++
++	if (!of_find_compatible_node(NULL, NULL, "arm,vexpress,v2p-ca9"))
++		return 0;
++
++	if (of_device_is_compatible(dev->of_node, "arm,pl111"))
++		dev->platform_data = &ct_ca9x4_clcd_data;
++
++	return 0;
++}
++
++static struct notifier_block ct_ca9x4_amba_nb = {
++	.notifier_call = ct_ca9x4_of_amba_notify,
++};
++
++static void ct_ca9x4_register_bus_nb(void)
++{
++	/* Register callbacks on OF amba device addition/removal
++	 * to handle linking them to the right platform_data
++	 */
++	bus_register_notifier(&amba_bustype, &ct_ca9x4_amba_nb);
++}
+ 
+ static struct v2m_osc ct_osc1 = {
+ 	.osc = 1,
+@@ -211,6 +240,7 @@ struct ct_desc ct_ca9x4_desc __initdata = {
+ 	.map_io		= ct_ca9x4_map_io,
+ 	.init_irq	= ct_ca9x4_init_irq,
+ 	.init_tile	= ct_ca9x4_init,
++	.bus_notifer	= ct_ca9x4_register_bus_nb,
+ #ifdef CONFIG_SMP
+ 	.init_cpu_map	= ct_ca9x4_init_cpu_map,
+ 	.smp_enable	= ct_ca9x4_smp_enable,
+diff --git a/arch/arm/mach-vexpress/include/mach/motherboard.h b/arch/arm/mach-vexpress/include/mach/motherboard.h
+index 1e388c7..f88982b 100644
+--- a/arch/arm/mach-vexpress/include/mach/motherboard.h
++++ b/arch/arm/mach-vexpress/include/mach/motherboard.h
+@@ -141,6 +141,7 @@ struct ct_desc {
+ 	void			(*init_early)(void);
+ 	void			(*init_irq)(void);
+ 	void			(*init_tile)(void);
++	void			(*bus_notifer)(void);
+ #ifdef CONFIG_SMP
+ 	void			(*init_cpu_map)(void);
+ 	void			(*smp_enable)(unsigned int);
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index 560e0df..e9147f8 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -431,6 +431,8 @@ static void __init v2m_clk_init(void)
+ 	clk = v2m_osc_register("mb:osc1", &v2m_mb_osc1);
+ 	for (i = 0; i < ARRAY_SIZE(v2m_osc1_periphs); i++)
+ 		WARN_ON(clk_register_clkdev(clk, NULL, v2m_osc1_periphs[i]));
++	if (of_find_compatible_node(NULL, NULL, "arm,vexpress,v2p-ca9"))
++		WARN_ON(clk_register_clkdev(clk, NULL, "10020000.clcd"));
+ 
+ 	clk = clk_register_fixed_rate(NULL, "mb:osc2", NULL,
+ 			CLK_IS_ROOT, 24000000);
+@@ -651,7 +653,15 @@ static struct of_dev_auxdata v2m_dt_auxdata_lookup[] __initdata = {
+ 
+ static void __init v2m_dt_init(void)
+ {
++	int i;
++
+ 	l2x0_of_init(0x00400000, 0xfe0fffff);
++
++	/* some devices need to hook platform_data */
++	for (i = 0; i < ARRAY_SIZE(ct_descs); i++)
++		if (ct_descs[i]->bus_notifer)
++			ct_descs[i]->bus_notifer();
++
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			v2m_dt_auxdata_lookup, NULL);
+ 	pm_power_off = v2m_power_off;
+-- 
+1.7.1
