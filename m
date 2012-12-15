@@ -1,55 +1,73 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 15 Dec 2012 16:52:00 +0900
-Subject: [PATCH 3/7] ARM: sh7372: support mixed DT and board code
- interrupt controller init
-In-Reply-To: <1355503531-7276-4-git-send-email-g.liakhovetski@gmx.de>
-References: <1355503531-7276-1-git-send-email-g.liakhovetski@gmx.de>
- <1355503531-7276-4-git-send-email-g.liakhovetski@gmx.de>
-Message-ID: <20121215075156.GD9073@verge.net.au>
+From: pkluba@dension.com (Patrik, Kluba)
+Date: Sat, 15 Dec 2012 08:51:29 +0100
+Subject: Fw: [PATCH 01/01] arm: fix a preempt_count() corruption for
+ CONFIG_PREEMPT=n
+Message-ID: <20121215085129.71d203b2.pkluba@dension.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 14, 2012 at 05:45:27PM +0100, Guennadi Liakhovetski wrote:
-> Extend DT interrupt controller initialisation to automatically fall back to
-> platform data based configuration, if booting without DT. This simplifies
-> implementing boards, capable of booting in either mode with a single kernel.
 
-Hi Guennadi,
+Hi All,
 
-Do you have a case in mind where this will be used?
-My thinking until now has been that sh7372_init_irq_of() should only be called
-when a board is being initialised using DT.
+Maybe this list is a better place for the following request.
+I've checked, and this bug is also present in the linux-next tree.
 
-> 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> ---
->  arch/arm/mach-shmobile/intc-sh7372.c |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/intc-sh7372.c b/arch/arm/mach-shmobile/intc-sh7372.c
-> index c923518..9c13ecc 100644
-> --- a/arch/arm/mach-shmobile/intc-sh7372.c
-> +++ b/arch/arm/mach-shmobile/intc-sh7372.c
-> @@ -23,6 +23,7 @@
->  #include <linux/irq.h>
->  #include <linux/io.h>
->  #include <linux/sh_intc.h>
-> +#include <mach/common.h>
->  #include <mach/intc.h>
->  #include <mach/irqs.h>
->  #include <asm/mach-types.h>
-> @@ -629,6 +630,11 @@ static const struct of_device_id irq_of_match[] __initconst = {
->  
->  void __init sh7372_init_irq_of(void)
->  {
-> +	if (!of_have_populated_dt()) {
-> +		sh7372_init_irq();
-> +		return;
-> +	}
-> +
->  	of_irq_init(irq_of_match);
->  
->  	sh7372_init_intc(0xe6940000, 0xe6950000, 0xffd20000, 0xffd50000,
-> -- 
-> 1.7.2.5
-> 
+Regards,
+Patrik
+
+
+Begin forwarded message:
+
+Date: Fri, 14 Dec 2012 15:13:57 +0100
+From: "Patrik, Kluba" <pkluba@dension.com>
+To: linux-kernel at vger.kernel.org
+Subject: [PATCH 01/01] arm: fix a preempt_count() corruption for
+CONFIG_PREEMPT=n
+
+
+Hi All,
+
+After a hard days' work, I've managed to track down a ghost causing
+sporadic kernel warnings and system crashes. The patch applies for the
+HEAD of linux-stable. I don't know how to create and submit patches
+correctly, and hope that somebody will pick it up...
+
+Regards,
+Patrik
+---
+>From 4dd31e88a2715389e5ac198dcf00b48b4f148ea6 Mon Sep 17 00:00:00 2001
+From: Patrik Kluba <pkluba@dension.com>
+Date: Fri, 14 Dec 2012 14:36:27 +0100
+Subject: [PATCH] arm: fix a preempt_count() corruption for
+CONFIG_PREEMPT=n
+
+All the preempt-disabling assembly code is under CONFIG_PREEMPT,
+while VFP_bounce calls preempt_enable() uncoditionally, leading to
+a preempt_count() corruption (gets set to 0xffffffff). Fix the
+imbalance by adding #ifdef CONFIG_PREEMPT before preempt_enable().
+---
+ arch/arm/vfp/vfpmodule.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 3b44e0d..2184f7e 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -428,7 +428,10 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct
+pt_regs *regs) if (exceptions)
+ 		vfp_raise_exceptions(exceptions, trigger, orig_fpscr,
+regs); exit:
++#ifdef CONFIG_PREEMPT
+ 	preempt_enable();
++#endif
++	return;
+ }
+ 
+ static void vfp_enable(void *unused)
+-- 
+1.7.10.4
+--
+To unsubscribe from this list: send the line "unsubscribe linux-kernel"
+in the body of a message to majordomo at vger.kernel.org
+More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Please read the FAQ at  http://www.tux.org/lkml/
