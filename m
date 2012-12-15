@@ -1,62 +1,22 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat, 15 Dec 2012 12:19:01 +0100
-Subject: [PATCH 1/1] ARM: dts: omap3-igep: add mux pins for MMC device node
-Message-ID: <1355570341-6458-1-git-send-email-javier.martinez@collabora.co.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 15 Dec 2012 23:51:46 +0900
+Subject: [PATCH] ASoC: atmel-ssc: change disable to disable in dts node
+In-Reply-To: <1355364307-31584-1-git-send-email-voice.shen@atmel.com>
+References: <1355364307-31584-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <20121215145145.GE22033@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap_hsmmc driver now expects that Device Trees will
-set up the SD/MMC pin mux and not doing that leads to the
-mmc not been mounted:
+On Thu, Dec 13, 2012 at 10:05:07AM +0800, Bo Shen wrote:
+> Change the value of status to disabled to keep the consistent
+> 
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
 
-[    1.870300] omap_hsmmc mmc.20: pins are not configured from the driver
-[    2.025634] Waiting for root device /dev/mmcblk0p2...
-
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- arch/arm/boot/dts/omap3-igep.dtsi |   23 ++++++++++++++++++++---
- 1 files changed, 20 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
-index fdd9154..dd01c46 100644
---- a/arch/arm/boot/dts/omap3-igep.dtsi
-+++ b/arch/arm/boot/dts/omap3-igep.dtsi
-@@ -47,6 +47,21 @@
- 			0x170 0		/* uart3_tx.uart3_tx OUTPUT | MODE0 */
- 		>;
- 	};
-+
-+	mmc1_pins: pinmux_mmc1_pins {
-+		pinctrl-single,pins = <
-+			0x114 0x0118    /* sdmmc1_clk.sdmmc1_clk INPUT PULLUP | MODE 0 */
-+			0x116 0x0118    /* sdmmc1_cmd.sdmmc1_cmd INPUT PULLUP | MODE 0 */
-+			0x118 0x0118 	/* sdmmc1_dat0.sdmmc1_dat0 INPUT PULLUP | MODE 0 */
-+			0x11a 0x0118	/* sdmmc1_dat1.sdmmc1_dat1 INPUT PULLUP | MODE 0 */
-+			0x11c 0x0118	/* sdmmc1_dat2.sdmmc1_dat2 INPUT PULLUP | MODE 0 */
-+			0x11e 0x0118	/* sdmmc1_dat3.sdmmc1_dat3 INPUT PULLUP | MODE 0 */
-+			0x120 0x0100	/* sdmmc1_dat4.sdmmc1_dat4 INPUT | MODE 0 */
-+			0x122 0x0100	/* sdmmc1_dat5.sdmmc1_dat5 INPUT | MODE 0 */
-+			0x124 0x0100	/* sdmmc1_dat6.sdmmc1_dat6 INPUT | MODE 0 */
-+			0x126 0x0100	/* sdmmc1_dat7.sdmmc1_dat7 INPUT | MODE 0 */
-+		>;
-+	};
- };
- 
- &i2c1 {
-@@ -72,9 +87,11 @@
- };
- 
- &mmc1 {
--	vmmc-supply = <&vmmc1>;
--	vmmc_aux-supply = <&vsim>;
--	bus-width = <8>;
-+      pinctrl-names = "default";
-+      pinctrl-0 = <&mmc1_pins>;
-+      vmmc-supply = <&vmmc1>;
-+      vmmc_aux-supply = <&vsim>;
-+      bus-width = <8>;
- };
- 
- &mmc2 {
--- 
-1.7.7.6
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121215/df51d76c/attachment.sig>
