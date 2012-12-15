@@ -1,43 +1,51 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 15 Dec 2012 00:37:52 +0000
-Subject: [PATCH v7 5/5] ARM: OMAP: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <50C90CF2.1090405@ti.com>
-References: <1354734571-10774-1-git-send-email-zonque@gmail.com>
- <1354734571-10774-6-git-send-email-zonque@gmail.com>
- <20121205222232.67B2B3E0E22@localhost> <50BFCBCC.6030706@ti.com>
- <20121205232426.BAD573E0E22@localhost> <50C0C5AB.3030201@ti.com>
- <50C84AC6.5030307@gmail.com> <50C90CF2.1090405@ti.com>
-Message-ID: <20121215003752.D0BE63E0BEF@localhost>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Sat, 15 Dec 2012 01:52:20 +0100
+Subject: [PATCH 1/1] ARM: dts: omap3-igep: remove VSIM regulator
+Message-ID: <1355532740-5956-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Dec 2012 17:02:10 -0600, Jon Hunter <jon-hunter@ti.com> wrote:
-> 
-> So looking at this today, here is what I see when comparing the
-> registers ...
-> 
-> omap2430 != omap2420
-> omap3430 != omap2430
-> omap3630 == omap3430
-> omap4430 != omap3430
-> omap4460 == omap4430
-> omap543x == omap4430
-> am335x != omap4430
-> 
-> Therefore, I believe that we need to have the following compatible
-> strings ...
-> 
-> ti,omap2420-gpmc
-> ti,omap2430-gpmc
-> ti,omap3430-gpmc (omap3430 & omap3630)
-> ti,omap4430-gpmc (omap4430 & omap4460 & omap543x)
-> ti,am3352-gpmc (am335x devices)
-> 
-> Probably worth adding a comment to the Documentation what should be used
-> for which device.
+commit 5a8095e9 ARM: dts: Add omap3-beagle.dts
 
-Yes, it is completely appropriate to add a comment to the documentation
-here so this doesn't get lost.
+moved the VSIM regulator definition to the twl4030.dtsi to avoid
+duplication. A definition for the VSIM regulator was also present
+on omap3-igep.dtsi which leads to the following build error:
 
-g.
+DTC     arch/arm/boot/dts/omap3-igep0020.dtb
+DTC     arch/arm/boot/dts/omap3-igep0030.dtb
+ERROR (duplicate_label): Duplicate label 'vsim' on /ocp/i2c at 48070000/twl at 48/regulator-vsim and /ocp/i2c at 48070000/twl at 48/regulator at 10
+ERROR: Input tree has errors, aborting (use -f to force output)
+ERROR (duplicate_label): Duplicate label 'vsim' on /ocp/i2c at 48070000/twl at 48/regulator-vsim and /ocp/i2c at 48070000/twl at 48/regulator at 10
+ERROR: Input tree has errors, aborting (use -f to force output)
+make[1]: *** [arch/arm/boot/dts/omap3-igep0020.dtb] Error 2
+make[1]: *** Waiting for unfinished jobs....
+make[1]: *** [arch/arm/boot/dts/omap3-igep0030.dtb] Error 2
+make: *** [dtbs] Error 2
+
+Since IGEP devices uses the same PMIC as Beagle boards, the VSIM
+definition from twl4030.dtsi can be used.
+
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ arch/arm/boot/dts/omap3-igep.dtsi |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+index 125fe00..de708ca 100644
+--- a/arch/arm/boot/dts/omap3-igep.dtsi
++++ b/arch/arm/boot/dts/omap3-igep.dtsi
+@@ -43,12 +43,6 @@
+ 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+ 		interrupt-parent = <&intc>;
+ 
+-		vsim: regulator at 10 {
+-			compatible = "ti,twl4030-vsim";
+-			regulator-min-microvolt = <1800000>;
+-			regulator-max-microvolt = <3000000>;
+-		};
+-
+ 		twl_audio: audio {
+ 			compatible = "ti,twl4030-audio";
+ 			codec {
+-- 
+1.7.7.6
