@@ -1,29 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 15 Dec 2012 10:51:57 +0000
-Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
-In-Reply-To: <50CBBB25.20002@antcom.de>
-References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
- <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
-Message-ID: <20121215105157.GN14363@n2100.arm.linux.org.uk>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Sat, 15 Dec 2012 12:19:01 +0100
+Subject: [PATCH 1/1] ARM: dts: omap3-igep: add mux pins for MMC device node
+Message-ID: <1355570341-6458-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 15, 2012 at 12:49:57AM +0100, Roland Stigge wrote:
-> Without having an AT91 available right now, I guess the hardware
-> interface of this GPIO chip is different from the GPIO block API. While
-> the hardware has clear and set registers, the val parameter of
-> at91_gpiolib_set_block() should be interpreted as the actual output
-> values. See lpc32xx_gpo_set_block() for an example for handling set and
-> clear registers like this: First, set_bits and clear_bits words are
-> calculated from mask and val parameters, and finally written to the
-> respective hardware registers.
-> 
-> Note that one .set_block() can result in writing both the set and clear
-> registers of the hardware when val contains both 0s and 1s in
-> respectively masked positions.
+The omap_hsmmc driver now expects that Device Trees will
+set up the SD/MMC pin mux and not doing that leads to the
+mmc not been mounted:
 
-Note also that if this is the same IP as found in SAM3N devices, that it's
-possible to write the bit values directly through the OWER/OWDR (output
-write enable register/disable register) plus the ODSR (output data status
-register) which will synchronously change the state of all the
-write-enabled output pins.  That may be important for some applications.
+[    1.870300] omap_hsmmc mmc.20: pins are not configured from the driver
+[    2.025634] Waiting for root device /dev/mmcblk0p2...
+
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ arch/arm/boot/dts/omap3-igep.dtsi |   23 ++++++++++++++++++++---
+ 1 files changed, 20 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+index fdd9154..dd01c46 100644
+--- a/arch/arm/boot/dts/omap3-igep.dtsi
++++ b/arch/arm/boot/dts/omap3-igep.dtsi
+@@ -47,6 +47,21 @@
+ 			0x170 0		/* uart3_tx.uart3_tx OUTPUT | MODE0 */
+ 		>;
+ 	};
++
++	mmc1_pins: pinmux_mmc1_pins {
++		pinctrl-single,pins = <
++			0x114 0x0118    /* sdmmc1_clk.sdmmc1_clk INPUT PULLUP | MODE 0 */
++			0x116 0x0118    /* sdmmc1_cmd.sdmmc1_cmd INPUT PULLUP | MODE 0 */
++			0x118 0x0118 	/* sdmmc1_dat0.sdmmc1_dat0 INPUT PULLUP | MODE 0 */
++			0x11a 0x0118	/* sdmmc1_dat1.sdmmc1_dat1 INPUT PULLUP | MODE 0 */
++			0x11c 0x0118	/* sdmmc1_dat2.sdmmc1_dat2 INPUT PULLUP | MODE 0 */
++			0x11e 0x0118	/* sdmmc1_dat3.sdmmc1_dat3 INPUT PULLUP | MODE 0 */
++			0x120 0x0100	/* sdmmc1_dat4.sdmmc1_dat4 INPUT | MODE 0 */
++			0x122 0x0100	/* sdmmc1_dat5.sdmmc1_dat5 INPUT | MODE 0 */
++			0x124 0x0100	/* sdmmc1_dat6.sdmmc1_dat6 INPUT | MODE 0 */
++			0x126 0x0100	/* sdmmc1_dat7.sdmmc1_dat7 INPUT | MODE 0 */
++		>;
++	};
+ };
+ 
+ &i2c1 {
+@@ -72,9 +87,11 @@
+ };
+ 
+ &mmc1 {
+-	vmmc-supply = <&vmmc1>;
+-	vmmc_aux-supply = <&vsim>;
+-	bus-width = <8>;
++      pinctrl-names = "default";
++      pinctrl-0 = <&mmc1_pins>;
++      vmmc-supply = <&vmmc1>;
++      vmmc_aux-supply = <&vsim>;
++      bus-width = <8>;
+ };
+ 
+ &mmc2 {
+-- 
+1.7.7.6
