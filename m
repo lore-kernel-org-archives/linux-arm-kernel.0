@@ -1,51 +1,33 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat, 15 Dec 2012 01:52:20 +0100
-Subject: [PATCH 1/1] ARM: dts: omap3-igep: remove VSIM regulator
-Message-ID: <1355532740-5956-1-git-send-email-javier.martinez@collabora.co.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 15 Dec 2012 01:03:17 +0000
+Subject: [PATCH 1/1] spi/atmel: add DT support
+In-Reply-To: <20121212151308.GK4398@game.jcrosoft.org>
+References: <20121121151713.1F8873E0A47@localhost>
+ <1353674679-13158-1-git-send-email-plagnioj@jcrosoft.com>
+ <50AF7C19.8000306@atmel.com> <20121212151308.GK4398@game.jcrosoft.org>
+Message-ID: <20121215010317.C9C933E0BEC@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 5a8095e9 ARM: dts: Add omap3-beagle.dts
+On Wed, 12 Dec 2012 16:13:08 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> On 14:37 Fri 23 Nov     , Nicolas Ferre wrote:
+> > On 11/23/2012 01:44 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> > > the atmel_spi use only gpio for chip select
+> > > 
+> > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > 
+> > Seems simple and nice:
+> > 
+> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> grant is ok to have this for 3.8?
 
-moved the VSIM regulator definition to the twl4030.dtsi to avoid
-duplication. A definition for the VSIM regulator was also present
-on omap3-igep.dtsi which leads to the following build error:
+Not sure how I missed this one. It's pretty straight forward and not
+risky, so no problem. However;
 
-DTC     arch/arm/boot/dts/omap3-igep0020.dtb
-DTC     arch/arm/boot/dts/omap3-igep0030.dtb
-ERROR (duplicate_label): Duplicate label 'vsim' on /ocp/i2c at 48070000/twl at 48/regulator-vsim and /ocp/i2c at 48070000/twl at 48/regulator at 10
-ERROR: Input tree has errors, aborting (use -f to force output)
-ERROR (duplicate_label): Duplicate label 'vsim' on /ocp/i2c at 48070000/twl at 48/regulator-vsim and /ocp/i2c at 48070000/twl at 48/regulator at 10
-ERROR: Input tree has errors, aborting (use -f to force output)
-make[1]: *** [arch/arm/boot/dts/omap3-igep0020.dtb] Error 2
-make[1]: *** Waiting for unfinished jobs....
-make[1]: *** [arch/arm/boot/dts/omap3-igep0030.dtb] Error 2
-make: *** [dtbs] Error 2
+> > > the atmel_spi use only gpio for chip select
 
-Since IGEP devices uses the same PMIC as Beagle boards, the VSIM
-definition from twl4030.dtsi can be used.
+I know you know how to write a proper commit message. I'll need
+something better than the above before I commit it. I won't make you
+resubmit the patch, but do send me a better description.
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- arch/arm/boot/dts/omap3-igep.dtsi |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
-index 125fe00..de708ca 100644
---- a/arch/arm/boot/dts/omap3-igep.dtsi
-+++ b/arch/arm/boot/dts/omap3-igep.dtsi
-@@ -43,12 +43,6 @@
- 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
- 		interrupt-parent = <&intc>;
- 
--		vsim: regulator at 10 {
--			compatible = "ti,twl4030-vsim";
--			regulator-min-microvolt = <1800000>;
--			regulator-max-microvolt = <3000000>;
--		};
--
- 		twl_audio: audio {
- 			compatible = "ti,twl4030-audio";
- 			codec {
--- 
-1.7.7.6
+g.
