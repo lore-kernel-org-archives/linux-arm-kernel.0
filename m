@@ -1,86 +1,81 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 16 Dec 2012 18:25:46 +0100
-Subject: [PATCH/WIP/RFC 00/14] Renesas IPMMU driver work in progress
-In-Reply-To: <1350290093-998-1-git-send-email-hdk@igel.co.jp>
+Date: Sun, 16 Dec 2012 18:25:48 +0100
+Subject: [PATCH/WIP/RFC 02/14] shmobile-iommu: Move IPMMU driver to
+ drivers/iommu
+In-Reply-To: <1355678760-27357-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1350290093-998-1-git-send-email-hdk@igel.co.jp>
-Message-ID: <1355678760-27357-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1355678760-27357-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1355678760-27357-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Eiraku-san,
-
-Here's a couple of patches that rework your IPMMU driver in the direction
-pointed to by my comments. Feel free to use them as a base, squash them into
-your code (my name doesn't need to be kept in commit messages) or even ignore
-them completely where they make no sense.
-
-Patch 5/14 has been sent to the linux-arm-kernel mailing list already as it's
-an independent fix (but required by the next patches in the series).
-
-After these 14 patches I ran into the issue of matching devices with a
-particular IPMMU instance. This turned out to be more complex than I initially
-thought. There's currently no driver in mainline that performs that task, and
-I'm not sure whether the core infrastructure allows for doing so without
-resorting to hacks.
-
-The problem has been discussed very recently on the iommu list, you can find
-more information at http://patchwork.ozlabs.org/patch/203717/. No solution has
-been agreed on so far, maybe you could reply to the mail thread. Feel free to
-CC me.
-
-I'm unsure whether we should use a single ARM IOMMU mapping or one mapping per
-device. This needs to be investigated as there's little documentation on the
-subject. I would advice contacting Marek Szyprowski (the author of the ARM DMA
-IOMMU code) to discuss this matter. Once again feel free to CC me, as well as
-the appropriate mailing lists.
-
-In my opinion the shmobile_iommu_attach_all_devices() function should be
-removed, and devices should be attached with an IOMMU either as they are added
-to the system, or as they are probed. Bus notifiers might be usable to achieve
-that, as implemented in the above Tegra SMMU patch. This requires the IOMMU
-being registered and fully operational at attachment time, so explicit IOMMU
-attachment in driver code might be a better solution for now. That would
-likely require one ARM DMA IOMMU mapping per device, device drivers would
-explicitly call arm_iommu_create_mapping() and arm_iommu_attach_device().
-
-Laurent Pinchart (14):
-  ARM: sh-mobile: Protect ipmmu.h header with ifndef/define
-  shmobile-iommu: Move IPMMU driver to drivers/iommu
-  shmobile-iommu: Remove __devinit
-  shmobile-iommu: Use devm_* managed functions
-  ARM: iommu: Include linux/kref.h in asm/dma-iommu.h
-  shmobile-iommu: Sort header files alphabetically
-  shmobile-iommu: Move header file from arch/ to drivers/iommu/
-  shmobile-iommu: Rename shmobile_iommu_priv to shmobile_iommu_domain
-  shmobile-ipmmu: Rename ipmmu_priv to shmobile_ipmmu
-  shmobile-ipmmu: Pass a struct shmobile_ipmmu to IPMMU functions
-  shmobile-ipmmu: Store a struct shmobile_iommu_arch_data in
-    archdata.iommu
-  shmobile-ipmmu: Store ipmmu pointer in iommu arch data and iommu
-    domain
-  shmobile-ipmmu: Remove unneeded lock_add spinlock
-  shmobile-ipmmu: Store iommu_mapping in struct shmobile_ipmmu
-
- arch/arm/include/asm/dma-iommu.h                   |    1 +
- arch/arm/mach-shmobile/Kconfig                     |    6 -
- arch/arm/mach-shmobile/Makefile                    |    3 -
- arch/arm/mach-shmobile/board-ap4evb.c              |    2 +-
- arch/arm/mach-shmobile/board-mackerel.c            |    2 +-
- arch/arm/mach-shmobile/include/mach/ipmmu.h        |   16 --
- arch/arm/mach-shmobile/setup-sh7372.c              |    2 +-
- drivers/iommu/Kconfig                              |    6 +
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ arch/arm/mach-shmobile/Kconfig                     |    6 ------
+ arch/arm/mach-shmobile/Makefile                    |    3 ---
+ drivers/iommu/Kconfig                              |    6 ++++++
  drivers/iommu/Makefile                             |    1 +
- drivers/iommu/shmobile-iommu.c                     |  259 +++++++++++---------
- .../ipmmu.c => drivers/iommu/shmobile-ipmmu.c      |  107 ++++-----
- drivers/iommu/shmobile-ipmmu.h                     |   27 ++
- include/linux/sh_iommu.h                           |   20 ++
- 13 files changed, 248 insertions(+), 204 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/include/mach/ipmmu.h
- rename arch/arm/mach-shmobile/ipmmu.c => drivers/iommu/shmobile-ipmmu.c (51%)
- create mode 100644 drivers/iommu/shmobile-ipmmu.h
- create mode 100644 include/linux/sh_iommu.h
+ .../ipmmu.c => drivers/iommu/shmobile-ipmmu.c      |    0
+ 5 files changed, 7 insertions(+), 9 deletions(-)
+ rename arch/arm/mach-shmobile/ipmmu.c => drivers/iommu/shmobile-ipmmu.c (100%)
 
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index de69ab3..8ae100c 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -210,12 +210,6 @@ endmenu
+ config SH_CLK_CPG
+ 	bool
+ 
+-config SHMOBILE_IPMMU
+-	bool
+-
+-config SHMOBILE_IPMMU_TLB
+-	bool
+-
+ source "drivers/sh/Kconfig"
+ 
+ endif
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 4ffba9d..fe2c97c 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -60,6 +60,3 @@ obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o
+ # Framework support
+ obj-$(CONFIG_SMP)		+= $(smp-y)
+ obj-$(CONFIG_GENERIC_GPIO)	+= $(pfc-y)
+-
+-# IPMMU/IPMMUI
+-obj-$(CONFIG_SHMOBILE_IPMMU)	+= ipmmu.o
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index 265829f..cb2a3e8 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -187,6 +187,12 @@ config EXYNOS_IOMMU_DEBUG
+ 
+ 	  Say N unless you need kernel log message for IOMMU debugging
+ 
++config SHMOBILE_IPMMU
++	bool
++
++config SHMOBILE_IPMMU_TLB
++	bool
++
+ config SHMOBILE_IOMMU
+ 	bool "IOMMU for Renesas IPMMU/IPMMUI"
+ 	default n
+diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
+index 62cf917..e65384f 100644
+--- a/drivers/iommu/Makefile
++++ b/drivers/iommu/Makefile
+@@ -13,3 +13,4 @@ obj-$(CONFIG_TEGRA_IOMMU_GART) += tegra-gart.o
+ obj-$(CONFIG_TEGRA_IOMMU_SMMU) += tegra-smmu.o
+ obj-$(CONFIG_EXYNOS_IOMMU) += exynos-iommu.o
+ obj-$(CONFIG_SHMOBILE_IOMMU) += shmobile-iommu.o
++obj-$(CONFIG_SHMOBILE_IPMMU) += shmobile-ipmmu.o
+diff --git a/arch/arm/mach-shmobile/ipmmu.c b/drivers/iommu/shmobile-ipmmu.c
+similarity index 100%
+rename from arch/arm/mach-shmobile/ipmmu.c
+rename to drivers/iommu/shmobile-ipmmu.c
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.8.6
