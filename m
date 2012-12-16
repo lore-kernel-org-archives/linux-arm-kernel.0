@@ -1,60 +1,32 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sat, 15 Dec 2012 12:54:01 -0800
-Subject: [PATCH] clk: factor: calculate rate by do_div
-In-Reply-To: <CAN1soZxJ_JCEVV5v99tFi22fq5AEOCBj1D5PY=vmGGW_gDWuJQ@mail.gmail.com>
-References: <1354522477-11991-1-git-send-email-haojian.zhuang@gmail.com>
- <CAN1soZze6Ogn_zi7JJN0JNzoMFkHLJyKyjTV7rSWUmQhwRU0NQ@mail.gmail.com>
- <CAN1soZxJ_JCEVV5v99tFi22fq5AEOCBj1D5PY=vmGGW_gDWuJQ@mail.gmail.com>
-Message-ID: <CAPtuhTg4NZqSAAaRvOb+0E_Op0Ye8+h=XeRyees-M-DpXXziqQ@mail.gmail.com>
+From: viro@ZenIV.linux.org.uk (Al Viro)
+Date: Sun, 16 Dec 2012 00:25:57 +0000
+Subject: [PATCH] missing ->mmap_sem around find_vma() in swp_emulate.c
+Message-ID: <20121216002557.GY4939@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 15, 2012 at 8:41 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Tue, Dec 4, 2012 at 9:32 AM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
->> On Mon, Dec 3, 2012 at 4:14 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
->>> clk->rate = parent->rate / div * mult
->>>
->>> The formula is OK. But it may overflow while we do operate with
->>> unsigned long. So use do_div instead.
->>>
->>> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
->>> ---
->>>  drivers/clk/clk-fixed-factor.c |    5 ++++-
->>>  1 file changed, 4 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
->>> index a489985..1ef271e 100644
->>> --- a/drivers/clk/clk-fixed-factor.c
->>> +++ b/drivers/clk/clk-fixed-factor.c
->>> @@ -28,8 +28,11 @@ static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
->>>                 unsigned long parent_rate)
->>>  {
->>>         struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
->>> +       unsigned long long int rate;
->>>
->>> -       return parent_rate * fix->mult / fix->div;
->>> +       rate = (unsigned long long int)parent_rate * fix->mult;
->>> +       do_div(rate, fix->div);
->>> +       return (unsigned long)rate;
->>>  }
->>>
->>>  static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
->>> --
->>> 1.7.10.4
->>>
->>
->> Correct Mike's email address.
->
-> Any comments? Does it mean that nobody want to fix the bug?
+find_vma() is *not* safe when somebody else is removing vmas.  Not just
+the return value might get bogus just as you are getting it (this instance
+doesn't try to dereference the resulting vma), the search itself can get
+buggered in rather spectacular ways.  IOW, ->mmap_sem really, really is
+not optional here.
 
-Thanks for the patch.  My apologies for letting this one slip through
-the cracks but my normal email workflow was unavoidably disrupted and
-I find myself playing catch-up with pending patches.
-
-The patch looks good to me but I'll change the $SUBJECT to "clk:
-fixed-factor: round_rate should use do_div" and do some testing before
-taking it in.
-
-Regards,
-Mike
+Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
+---
+diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
+index df74518..ab1017b 100644
+--- a/arch/arm/kernel/swp_emulate.c
++++ b/arch/arm/kernel/swp_emulate.c
+@@ -109,10 +109,12 @@ static void set_segfault(struct pt_regs *regs, unsigned long addr)
+ {
+ 	siginfo_t info;
+ 
++	down_read(&current->mm->mmap_sem);
+ 	if (find_vma(current->mm, addr) == NULL)
+ 		info.si_code = SEGV_MAPERR;
+ 	else
+ 		info.si_code = SEGV_ACCERR;
++	up_read(&current->mm->mmap_sem);
+ 
+ 	info.si_signo = SIGSEGV;
+ 	info.si_errno = 0;
