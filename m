@@ -1,157 +1,81 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 16 Dec 2012 18:25:58 +0100
-Subject: [PATCH/WIP/RFC 12/14] shmobile-ipmmu: Store ipmmu pointer in iommu
- arch data and iommu domain
+Date: Sun, 16 Dec 2012 18:26:00 +0100
+Subject: [PATCH/WIP/RFC 14/14] shmobile-ipmmu: Store iommu_mapping in struct
+ shmobile_ipmmu
 In-Reply-To: <1355678760-27357-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1350290093-998-1-git-send-email-hdk@igel.co.jp>
  <1355678760-27357-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1355678760-27357-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1355678760-27357-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This gets rid of the global ipmmu_access_device pointer.
+And remove the global iommu_mapping variable.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/iommu/shmobile-iommu.c |   37 ++++++++++++++++++++++++++-----------
- include/linux/sh_iommu.h       |    2 ++
- 2 files changed, 28 insertions(+), 11 deletions(-)
+ drivers/iommu/shmobile-iommu.c |   14 ++++++++------
+ drivers/iommu/shmobile-ipmmu.h |    4 ++++
+ 2 files changed, 12 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/iommu/shmobile-iommu.c b/drivers/iommu/shmobile-iommu.c
-index f27d842..bf1d0a4 100644
+index 2592d25..8cf45df 100644
 --- a/drivers/iommu/shmobile-iommu.c
 +++ b/drivers/iommu/shmobile-iommu.c
-@@ -41,6 +41,7 @@ struct shmobile_iommu_domain_pgtable {
- };
- 
- struct shmobile_iommu_domain {
-+	struct shmobile_ipmmu *ipmmu;
- 	struct shmobile_iommu_domain_pgtable l1, l2[L1_LEN];
- 	spinlock_t map_lock;
+@@ -47,7 +47,6 @@ struct shmobile_iommu_domain {
  	atomic_t active;
-@@ -53,7 +54,17 @@ static spinlock_t lock;
- static DEFINE_SPINLOCK(lock_add);
- static struct shmobile_iommu_domain *attached;
- static int num_attached_devices;
--static struct shmobile_ipmmu *ipmmu_access_device;
-+
-+/**
-+ * dev_to_ipmmu() - retrieves an shmobile ipmmu object from a user device
-+ * @dev: ipmmu client device
-+ */
-+static inline struct shmobile_ipmmu *dev_to_ipmmu(struct device *dev)
-+{
-+	struct shmobile_iommu_arch_data *arch_data = dev->archdata.iommu;
-+
-+	return arch_data->ipmmu;
-+}
- 
- static int shmobile_iommu_domain_init(struct iommu_domain *domain)
- {
-@@ -97,6 +108,7 @@ static int shmobile_iommu_attach_device(struct iommu_domain *domain,
- 					struct device *dev)
- {
- 	struct shmobile_iommu_domain *sh_domain = domain->priv;
-+	struct shmobile_ipmmu *ipmmu = dev_to_ipmmu(dev);
- 	int ret = -EBUSY;
- 
- 	spin_lock(&lock);
-@@ -104,12 +116,12 @@ static int shmobile_iommu_attach_device(struct iommu_domain *domain,
- 		if (attached)
- 			goto err;
- 		atomic_set(&sh_domain->active, 1);
--		ipmmu_tlb_set(ipmmu_access_device, sh_domain->l1.handle, L1_SIZE,
--			      0);
-+		ipmmu_tlb_set(ipmmu, sh_domain->l1.handle, L1_SIZE, 0);
- 		wmb();
--		ipmmu_tlb_flush(ipmmu_access_device);
-+		ipmmu_tlb_flush(ipmmu);
- 		attached = sh_domain;
- 		num_attached_devices = 0;
-+		sh_domain->ipmmu = ipmmu;
- 	}
- 	num_attached_devices++;
- 	ret = 0;
-@@ -122,14 +134,16 @@ static void shmobile_iommu_detach_device(struct iommu_domain *domain,
- 					 struct device *dev)
- {
- 	struct shmobile_iommu_domain *sh_domain = domain->priv;
-+	struct shmobile_ipmmu *ipmmu = dev_to_ipmmu(dev);
- 
- 	spin_lock(&lock);
- 	atomic_set(&sh_domain->active, 0);
- 	num_attached_devices--;
- 	if (!num_attached_devices) {
--		ipmmu_tlb_set(ipmmu_access_device, 0, 0, 0);
--		ipmmu_tlb_flush(ipmmu_access_device);
-+		ipmmu_tlb_set(ipmmu, 0, 0, 0);
-+		ipmmu_tlb_flush(ipmmu);
- 		attached = NULL;
-+		sh_domain->ipmmu = NULL;
- 	}
- 	spin_unlock(&lock);
- }
-@@ -208,7 +222,7 @@ static int shmobile_iommu_map(struct iommu_domain *domain, unsigned long iova,
- 	}
- 	if (!ret && atomic_read(&sh_domain->active)) {
- 		wmb();
--		ipmmu_tlb_flush(ipmmu_access_device);
-+		ipmmu_tlb_flush(sh_domain->ipmmu);
- 		l2realfree(&l2);
- 	}
- 	return ret;
-@@ -252,7 +266,7 @@ static size_t shmobile_iommu_unmap(struct iommu_domain *domain,
- done:
- 	if (ret && atomic_read(&sh_domain->active)) {
- 		wmb();
--		ipmmu_tlb_flush(ipmmu_access_device);
-+		ipmmu_tlb_flush(sh_domain->ipmmu);
- 		l2realfree(&l2);
- 	}
- 	return ret;
-@@ -296,7 +310,7 @@ static struct iommu_ops shmobile_iommu_ops = {
- 	.pgsize_bitmap = 0x111000,
  };
  
--static int shmobile_iommu_attach_all_devices(void)
-+static int shmobile_iommu_attach_all_devices(struct shmobile_ipmmu *ipmmu)
+-static struct dma_iommu_mapping *iommu_mapping;
+ static struct device *ipmmu_devices;
+ static struct dma_pool *l1pool, *l2pool;
+ static spinlock_t lock;
+@@ -311,19 +310,22 @@ static struct iommu_ops shmobile_iommu_ops = {
+ 
+ static int shmobile_iommu_attach_all_devices(struct shmobile_ipmmu *ipmmu)
  {
++	struct dma_iommu_mapping *mapping;
  	struct device *dev;
- 	int ret = 0;
-@@ -311,6 +325,8 @@ static int shmobile_iommu_attach_all_devices(void)
+ 
+-	iommu_mapping = arm_iommu_create_mapping(&platform_bus_type, 0x0,
+-						 L1_LEN << 20, 0);
+-	if (IS_ERR_OR_NULL(iommu_mapping))
+-		return PTR_ERR(iommu_mapping);
++	mapping = arm_iommu_create_mapping(&platform_bus_type, 0,
++					   L1_LEN << 20, 0);
++	if (IS_ERR(mapping))
++		return PTR_ERR(mapping);
++
++	ipmmu->iommu_mapping = mapping;
+ 
  	for (dev = ipmmu_devices; dev; ) {
  		struct shmobile_iommu_arch_data *data = dev->archdata.iommu;
  
-+		data->ipmmu = ipmmu;
-+
- 		if (arm_iommu_attach_device(dev, iommu_mapping))
+ 		data->ipmmu = ipmmu;
+ 
+-		if (arm_iommu_attach_device(dev, iommu_mapping))
++		if (arm_iommu_attach_device(dev, mapping))
  			pr_err("arm_iommu_attach_device failed\n");
  
-@@ -356,9 +372,8 @@ int ipmmu_iommu_init(struct shmobile_ipmmu *ipmmu)
- 		goto nomem_pool2;
- 	spin_lock_init(&lock);
- 	attached = NULL;
--	ipmmu_access_device = ipmmu;
- 	bus_set_iommu(&platform_bus_type, &shmobile_iommu_ops);
--	if (shmobile_iommu_attach_all_devices())
-+	if (shmobile_iommu_attach_all_devices(ipmmu))
- 		pr_err("shmobile_iommu_attach_all_devices failed\n");
- 	return 0;
- nomem_pool2:
-diff --git a/include/linux/sh_iommu.h b/include/linux/sh_iommu.h
-index 8b7b51d..76b6e51 100644
---- a/include/linux/sh_iommu.h
-+++ b/include/linux/sh_iommu.h
-@@ -2,8 +2,10 @@
- #define __SH_IOMMU_H__
+ 		dev = data->next;
+diff --git a/drivers/iommu/shmobile-ipmmu.h b/drivers/iommu/shmobile-ipmmu.h
+index 1458a97..f8f0f57 100644
+--- a/drivers/iommu/shmobile-ipmmu.h
++++ b/drivers/iommu/shmobile-ipmmu.h
+@@ -1,11 +1,15 @@
+ #ifndef __SHMOBILE_IPMMU_H__
+ #define __SHMOBILE_IPMMU_H__
  
- struct device;
-+struct shmobile_ipmmu;
- 
- struct shmobile_iommu_arch_data {
-+	struct shmobile_ipmmu *ipmmu;
- 	struct device *next;
++struct dma_iommu_mapping;
++
+ struct shmobile_ipmmu {
+ 	struct device *dev;
+ 	void __iomem *ipmmu_base;
+ 	int tlb_enabled;
+ 	struct mutex flush_lock;
++
++	struct dma_iommu_mapping *iommu_mapping;
  };
  
+ #ifdef CONFIG_SHMOBILE_IPMMU_TLB
 -- 
 1.7.8.6
