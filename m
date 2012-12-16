@@ -1,67 +1,23 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 16 Dec 2012 14:27:58 +0800
-Subject: [PATCH] clk: factor: calculate rate by do_div
-In-Reply-To: <CAPtuhTg4NZqSAAaRvOb+0E_Op0Ye8+h=XeRyees-M-DpXXziqQ@mail.gmail.com>
-References: <1354522477-11991-1-git-send-email-haojian.zhuang@gmail.com>
- <CAN1soZze6Ogn_zi7JJN0JNzoMFkHLJyKyjTV7rSWUmQhwRU0NQ@mail.gmail.com>
- <CAN1soZxJ_JCEVV5v99tFi22fq5AEOCBj1D5PY=vmGGW_gDWuJQ@mail.gmail.com>
- <CAPtuhTg4NZqSAAaRvOb+0E_Op0Ye8+h=XeRyees-M-DpXXziqQ@mail.gmail.com>
-Message-ID: <CAN1soZzOy7K6u8Q-kCr0ZC9c2b8BBDpma_vbci1iFq7yCu1jqQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 15 Dec 2012 22:29:45 -0800
+Subject: [PATCH] ARM: sunxi: Change dtsi naming scheme for sun5i
+In-Reply-To: <1355325915-22375-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1355325915-22375-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20121216062945.GA20881@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 16, 2012 at 4:54 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> On Sat, Dec 15, 2012 at 8:41 AM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
->> On Tue, Dec 4, 2012 at 9:32 AM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
->>> On Mon, Dec 3, 2012 at 4:14 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
->>>> clk->rate = parent->rate / div * mult
->>>>
->>>> The formula is OK. But it may overflow while we do operate with
->>>> unsigned long. So use do_div instead.
->>>>
->>>> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
->>>> ---
->>>>  drivers/clk/clk-fixed-factor.c |    5 ++++-
->>>>  1 file changed, 4 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
->>>> index a489985..1ef271e 100644
->>>> --- a/drivers/clk/clk-fixed-factor.c
->>>> +++ b/drivers/clk/clk-fixed-factor.c
->>>> @@ -28,8 +28,11 @@ static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
->>>>                 unsigned long parent_rate)
->>>>  {
->>>>         struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
->>>> +       unsigned long long int rate;
->>>>
->>>> -       return parent_rate * fix->mult / fix->div;
->>>> +       rate = (unsigned long long int)parent_rate * fix->mult;
->>>> +       do_div(rate, fix->div);
->>>> +       return (unsigned long)rate;
->>>>  }
->>>>
->>>>  static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
->>>> --
->>>> 1.7.10.4
->>>>
->>>
->>> Correct Mike's email address.
->>
->> Any comments? Does it mean that nobody want to fix the bug?
->
-> Thanks for the patch.  My apologies for letting this one slip through
-> the cracks but my normal email workflow was unavoidably disrupted and
-> I find myself playing catch-up with pending patches.
->
-> The patch looks good to me but I'll change the $SUBJECT to "clk:
-> fixed-factor: round_rate should use do_div" and do some testing before
-> taking it in.
->
-> Regards,
-> Mike
+On Wed, Dec 12, 2012 at 04:25:15PM +0100, Maxime Ripard wrote:
+> There is several different SoCs sharing the sun5i codename: A10s, A12
+> and A13. Since there is enough differences to not consider those the
+> same SoCs, change a bit the naming scheme to reflect this.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-It's nice. Thank you.
+Hi,
 
-Best Regards
-Haojian
+Applied in fixes for 3.8, since it makes sense to take care of the rename right
+after introduction before it's out in a release with the other name.
+
+
+-Olof
