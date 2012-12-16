@@ -1,49 +1,40 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Mon, 17 Dec 2012 03:52:55 +0800
-Subject: [imx:work/efikasb 5/29] drivers/usb/chipidea/core.c:323:4:
- warning: large integer implicitly truncated to unsigned type
-Message-ID: <50ce2697.0463bOWc8yxBEQL0%fengguang.wu@intel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 16 Dec 2012 12:03:11 -0800
+Subject: [PATCH 0/2] drop plat/cpu.h for omap2plus
+Message-ID: <20121216200236.24238.38151.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.pengutronix.de/git/imx/linux-2.6.git work/efikasb
-head:   4de30514cbd7126ba06062e39ba4701f2bca1a37
-commit: 012289b901c5e60b6f0d215cef44697dc71b5d76 [5/29] usb: chipidea: add otg id switch and vbus connect/disconnect detect
-config: make ARCH=x86_64 allyesconfig
+Hi all,
 
-All warnings:
+Finally it can be dropped. Thanks for help everybody.
 
-drivers/usb/chipidea/core.c: In function 'ci_handle_id_switch':
-drivers/usb/chipidea/core.c:323:4: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+Regards,
 
-vim +323 drivers/usb/chipidea/core.c
-
-012289b9 Peter Chen         2012-11-19  307  
-012289b9 Peter Chen         2012-11-19  308  	}
-012289b9 Peter Chen         2012-11-19  309  }
-012289b9 Peter Chen         2012-11-19  310  
-012289b9 Peter Chen         2012-11-19  311  static void ci_handle_id_switch(struct ci13xxx *ci)
-5f36e231 Alexander Shishkin 2012-05-11  312  {
-5f36e231 Alexander Shishkin 2012-05-11  313  	enum ci_role role = ci_otg_role(ci);
-5f36e231 Alexander Shishkin 2012-05-11  314  
-5f36e231 Alexander Shishkin 2012-05-11  315  	if (role != ci->role) {
-5f36e231 Alexander Shishkin 2012-05-11  316  		dev_dbg(ci->dev, "switching from %s to %s\n",
-5f36e231 Alexander Shishkin 2012-05-11  317  			ci_role(ci)->name, ci->roles[role]->name);
-5f36e231 Alexander Shishkin 2012-05-11  318  
-012289b9 Peter Chen         2012-11-19  319  		/* 1. Finish the current role */
-012289b9 Peter Chen         2012-11-19  320  		if (ci->role == CI_ROLE_GADGET) {
-012289b9 Peter Chen         2012-11-19  321  			usb_gadget_vbus_disconnect(&ci->gadget);
-012289b9 Peter Chen         2012-11-19  322  			/* host doesn't care B_SESSION_VALID event */
-012289b9 Peter Chen         2012-11-19 @323  			hw_write(ci, OP_OTGSC, OTGSC_BSVIE, ~OTGSC_BSVIE);
-012289b9 Peter Chen         2012-11-19  324  			hw_write(ci, OP_OTGSC, OTGSC_BSVIS, OTGSC_BSVIS);
-012289b9 Peter Chen         2012-11-19  325  			ci->role = CI_ROLE_END;
-012289b9 Peter Chen         2012-11-19  326  			/* reset controller */
-012289b9 Peter Chen         2012-11-19  327  			hw_device_reset(ci, USBMODE_CM_IDLE);
-012289b9 Peter Chen         2012-11-19  328  		} else if (ci->role == CI_ROLE_HOST) {
-012289b9 Peter Chen         2012-11-19  329  			ci_role_stop(ci);
-012289b9 Peter Chen         2012-11-19  330  			/* reset controller */
-012289b9 Peter Chen         2012-11-19  331  			hw_device_reset(ci, USBMODE_CM_IDLE);
+Tony
 
 ---
-0-DAY kernel build testing backend         Open Source Technology Center
-Fengguang Wu, Yuanhan Liu                              Intel Corporation
+
+Tony Lindgren (2):
+      ARM: OMAP: Split vrfb.c to remove last remaining cpu_is_omap usage
+      ARM: OMAP2+: Drop plat/cpu.h for omap2plus
+
+
+ arch/arm/mach-omap1/Makefile          |    2 -
+ arch/arm/mach-omap1/fb.c              |   80 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/Makefile          |    2 -
+ arch/arm/mach-omap2/drm.c             |    1 
+ arch/arm/mach-omap2/dss-common.c      |    3 -
+ arch/arm/mach-omap2/fb.c              |   50 +--------------------
+ arch/arm/mach-omap2/prm2xxx.c         |    3 -
+ arch/arm/mach-omap2/prm3xxx.c         |    3 -
+ arch/arm/plat-omap/Makefile           |    2 -
+ arch/arm/plat-omap/include/plat/cpu.h |    4 --
+ drivers/media/platform/omap3isp/isp.c |    2 -
+ drivers/power/avs/smartreflex.c       |    2 -
+ 12 files changed, 88 insertions(+), 66 deletions(-)
+ create mode 100644 arch/arm/mach-omap1/fb.c
+ rename arch/arm/{plat-omap/fb.c => mach-omap2/fb.c} (76%)
+
+-- 
+Signature
