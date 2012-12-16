@@ -1,44 +1,67 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 15 Dec 2012 22:25:02 -0800
-Subject: [PATCH] ARM: ux500: fix missing include
-In-Reply-To: <1355498788-8702-1-git-send-email-linus.walleij@stericsson.com>
-References: <1355498788-8702-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20121216062502.GC15467@quad.lixom.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sun, 16 Dec 2012 14:27:58 +0800
+Subject: [PATCH] clk: factor: calculate rate by do_div
+In-Reply-To: <CAPtuhTg4NZqSAAaRvOb+0E_Op0Ye8+h=XeRyees-M-DpXXziqQ@mail.gmail.com>
+References: <1354522477-11991-1-git-send-email-haojian.zhuang@gmail.com>
+ <CAN1soZze6Ogn_zi7JJN0JNzoMFkHLJyKyjTV7rSWUmQhwRU0NQ@mail.gmail.com>
+ <CAN1soZxJ_JCEVV5v99tFi22fq5AEOCBj1D5PY=vmGGW_gDWuJQ@mail.gmail.com>
+ <CAPtuhTg4NZqSAAaRvOb+0E_Op0Ye8+h=XeRyees-M-DpXXziqQ@mail.gmail.com>
+Message-ID: <CAN1soZzOy7K6u8Q-kCr0ZC9c2b8BBDpma_vbci1iFq7yCu1jqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 14, 2012 at 04:26:28PM +0100, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Commit db298da2c31e1dcf7c9b7c9cef6217ad3449ebb7
-> "ARM: nomadik: move platform_data definition"
-> moved the Ux500-specific musb header from <mach/usb.h>
-> to <linux/platform_data/usb-musb-ux500.h>
-> 
-> However that makes some board code fail to compile
-> now:
-> 
-> CC      arch/arm/mach-ux500/board-mop500.o
-> linux/arch/arm/mach-ux500/cpu-db8500.c: In function 'u8500_init_devices':
-> linux/arch/arm/mach-ux500/cpu-db8500.c:226:2: error: implicit declaration of function 'ux500_add_usb' [-Werror=implicit-function-declaration]
-> cc1: some warnings being treated as errors
-> make[3]: *** [arch/arm/mach-ux500/cpu-db8500.o] Error 1
-> make[3]: *** Waiting for unfinished jobs....
-> make[2]: *** [arch/arm/mach-ux500] Error 2
-> make[2]: *** Waiting for unfinished jobs....
-> 
-> So fix this up by adding the proper include file that
-> appears to have been brought in implicitly one or another
-> way in the past.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Hi ARM SoC guys,
-> here is another patch I'd like to be applied right off on
-> the ARM SoC tree as a fixup for problems emerging during
-> the merge window.
+On Sun, Dec 16, 2012 at 4:54 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> On Sat, Dec 15, 2012 at 8:41 AM, Haojian Zhuang
+> <haojian.zhuang@gmail.com> wrote:
+>> On Tue, Dec 4, 2012 at 9:32 AM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+>>> On Mon, Dec 3, 2012 at 4:14 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+>>>> clk->rate = parent->rate / div * mult
+>>>>
+>>>> The formula is OK. But it may overflow while we do operate with
+>>>> unsigned long. So use do_div instead.
+>>>>
+>>>> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+>>>> ---
+>>>>  drivers/clk/clk-fixed-factor.c |    5 ++++-
+>>>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+>>>> index a489985..1ef271e 100644
+>>>> --- a/drivers/clk/clk-fixed-factor.c
+>>>> +++ b/drivers/clk/clk-fixed-factor.c
+>>>> @@ -28,8 +28,11 @@ static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
+>>>>                 unsigned long parent_rate)
+>>>>  {
+>>>>         struct clk_fixed_factor *fix = to_clk_fixed_factor(hw);
+>>>> +       unsigned long long int rate;
+>>>>
+>>>> -       return parent_rate * fix->mult / fix->div;
+>>>> +       rate = (unsigned long long int)parent_rate * fix->mult;
+>>>> +       do_div(rate, fix->div);
+>>>> +       return (unsigned long)rate;
+>>>>  }
+>>>>
+>>>>  static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
+>>>> --
+>>>> 1.7.10.4
+>>>>
+>>>
+>>> Correct Mike's email address.
+>>
+>> Any comments? Does it mean that nobody want to fix the bug?
+>
+> Thanks for the patch.  My apologies for letting this one slip through
+> the cracks but my normal email workflow was unavoidably disrupted and
+> I find myself playing catch-up with pending patches.
+>
+> The patch looks good to me but I'll change the $SUBJECT to "clk:
+> fixed-factor: round_rate should use do_div" and do some testing before
+> taking it in.
+>
+> Regards,
+> Mike
 
-Applied, thanks.
+It's nice. Thank you.
 
-
--Olof
+Best Regards
+Haojian
