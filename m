@@ -1,30 +1,38 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 17 Dec 2012 12:55:47 -0200
-Subject: [PATCH] ARM: mach-imx6q: Do not run error code path in success case
-Message-ID: <1355756147-24856-1-git-send-email-fabio.estevam@freescale.com>
+From: wg@grandegger.com (Wolfgang Grandegger)
+Date: Mon, 17 Dec 2012 15:57:39 +0100
+Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
+In-Reply-To: <20121217121026.GR14363@n2100.arm.linux.org.uk>
+References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
+ <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
+ <50CF03FB.2030100@grandegger.com> <50CF0744.7040404@grandegger.com>
+ <20121217121026.GR14363@n2100.arm.linux.org.uk>
+Message-ID: <50CF32E3.90305@grandegger.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'put_clk' path should only run in the case of failure, so provide a 'return'
-to avoid it running in the success case.
+On 12/17/2012 01:10 PM, Russell King - ARM Linux wrote:
+> On Mon, Dec 17, 2012 at 12:51:32PM +0100, Wolfgang Grandegger wrote:
+>> +static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val)
+>> +{
+>> +	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+>> +	void __iomem *pio = at91_gpio->regbase;
+>> +	u32 set_bits = val & mask;
+>> +	u32 clr_bits = ~val & mask;
+>> +
+>> +	/* GPIO outputs can only be set at once or cleared at once */
+>> +	if (set_bits)
+>> +		__raw_writel(set_bits, pio + PIO_SODR);
+>> +	if (clr_bits)
+>> +		__raw_writel(clr_bits, pio + PIO_CODR);
+>> +}
+> 
+> You obviously didn't see my email...
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/mach-imx6q.c |    2 ++
- 1 file changed, 2 insertions(+)
+Well, I did read you mail but it was not obvious to me how to maintain
+compatibility with the existing "set" method... at a first glance.
+But the synchronous data output is important and it's even simpler than
+I thought. The block-set callback can directly write to ODSR because
+"at91_set_gpio_output()" already has set OWER. Will give that a try
+later today.
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 4eb1b3a..61f50aa 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -134,6 +134,8 @@ static void __init imx6q_sabrelite_cko1_setup(void)
- 	clk_set_parent(cko1_sel, ahb);
- 	rate = clk_round_rate(cko1, 16000000);
- 	clk_set_rate(cko1, rate);
-+
-+	return;
- put_clk:
- 	if (!IS_ERR(cko1_sel))
- 		clk_put(cko1_sel);
--- 
-1.7.9.5
+Wolfgang.
