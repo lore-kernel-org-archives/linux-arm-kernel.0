@@ -1,67 +1,40 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 17 Dec 2012 17:09:15 +0100
-Subject: [QUESTION] mmc: mmci: Howto merge patches
-In-Reply-To: <20121217154602.GT14363@n2100.arm.linux.org.uk>
-References: <CAPDyKFpXyVCzFWkyL3+92Zb9hoyKaEV4hpaUYO9O5o71nNmk8w@mail.gmail.com>
- <20121217154602.GT14363@n2100.arm.linux.org.uk>
-Message-ID: <CAPDyKFqdAff2sdSFWd7VKfyrt8GrHytiQ4uVO+y8d-TMGzBnMg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 17 Dec 2012 16:10:42 +0000
+Subject: [PATCH] ARM: cache: flush to LoUU instead of LoUIS on uniprocessor
+ CPUs
+Message-ID: <1355760642-28559-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 December 2012 16:46, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Dec 17, 2012 at 04:29:51PM +0100, Ulf Hansson wrote:
->> Hi Russell and Chris,
->>
->> I would like to propose a change of how we handle mmci patches to be
->> merged. Instead of going through Russell's arm tree, I would like
->> Chris to handle the merge through his mmc tree.
->>
->> The reason is simply that patches can have dependencies to the
->> protocol layer and in seems a bit unnecessary to wait for another
->> merge window to occur to handle these patches.
->
-> You're going to have to wait another merge window _anyway_ because no
-> kernel developer should be stuffing their tree full of patches during
-> any merge window that have not already been in linux-next well _before_
-> the merge window.
->
+flush_cache_louis flushes the D-side caches to the point of unification
+inner-shareable. On uniprocessor CPUs, this is defined as zero and
+therefore no flushing will take place. Rather than invent a new interface
+for UP systems, instead use our SMP_ON_UP patching code to read the
+LoUU from the CLIDR instead.
 
-I think you misunderstood me here.
+Cc: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+Tested-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mm/cache-v7.S | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-If I add a patch on the protocol layer, that will provide a new option
-for a host driver to support, I can not in same patchset send the mmci
-patch. I will have to put the mmci patch on hold for the next merge
-window to be completed and take through your tree instead. Thus I can
-not provide a "proof of concept" patch for mmci driver. That is really
-bad I think.
-
-> So like it or not, this merge window already closed to new submissions
-> maybe two weeks ago.
-
-Not talking about _a_ specific merge window. Just how we could go
-forward with a more simpler setup of merging patches.
-
->
->> Moreover, if most of the mmci patches goes through Chris mmc tree, I
->> believe we would minimize the number of possible conflicts. Russell
->> will then only need to NACK patches to prevent them from being merged.
->>
->> Do you think this could be and acceptable setup for both of you?
->
-> The reason that you want to do this is because you're realising that it's
-> taking a long time for you to get your patches into mainline.  The reason
-> that I'm being slow with your patches is that you haven't built up the
-> trust on my side that I can simply say "yes that's fine, I trust your
-> patches."
-
-You will only have to NACK patches to prevent them from going in. So
-there is no difference here from what we have today.
-
-I realize that trust is important, I am working on it. :-)
-
->
-> That alone is good enough reason for me to say no way to this.
-
-Kind regards
-Ulf Hansson
+diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+index cd95664..7539ec2 100644
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -44,8 +44,10 @@ ENDPROC(v7_flush_icache_all)
+ ENTRY(v7_flush_dcache_louis)
+ 	dmb					@ ensure ordering with previous memory accesses
+ 	mrc	p15, 1, r0, c0, c0, 1		@ read clidr, r0 = clidr
+-	ands	r3, r0, #0xe00000		@ extract LoUIS from clidr
+-	mov	r3, r3, lsr #20			@ r3 = LoUIS * 2
++	ALT_SMP(ands	r3, r0, #(7 << 21))	@ extract LoUIS from clidr
++	ALT_UP(ands	r3, r0, #(7 << 27))	@ extract LoUU from clidr
++	ALT_SMP(mov	r3, r3, lsr #20)	@ r3 = LoUIS * 2
++	ALT_UP(mov	r3, r3, lsr #26)	@ r3 = LoUU * 2
+ 	moveq	pc, lr				@ return if level == 0
+ 	mov	r10, #0				@ r10 (starting level) = 0
+ 	b	flush_levels			@ start flushing cache levels
+-- 
+1.8.0
