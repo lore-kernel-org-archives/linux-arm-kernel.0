@@ -1,116 +1,30 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Mon, 17 Dec 2012 22:48:31 +0800
-Subject: [PATCH 4/4] FEC: Add time stamping code and a PTP hardware clock
-In-Reply-To: <20121217091345.GA753@pengutronix.de>
-References: <1351657531-25989-1-git-send-email-Frank.Li@freescale.com>
- <20121217091345.GA753@pengutronix.de>
-Message-ID: <CAHrpEqTVuSR_-Tpdzb98=VJbg7grSFvSQ9xA6mPsHpGb7RvNCg@mail.gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 17 Dec 2012 12:55:47 -0200
+Subject: [PATCH] ARM: mach-imx6q: Do not run error code path in success case
+Message-ID: <1355756147-24856-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/12/17 Sascha Hauer <s.hauer@pengutronix.de>:
-> On Wed, Oct 31, 2012 at 12:25:31PM +0800, Frank Li wrote:
->> This patch adds a driver for the FEC(MX6) that offers time
->> stamping and a PTP haderware clock. Because FEC\ENET(MX6)
->> hardware frequency adjustment is complex, we have implemented
->> this in software by changing the multiplication factor of the
->> timecounter.
->>
->> Signed-off-by: Frank Li <Frank.Li@freescale.com>
->> ---
->>  drivers/net/ethernet/freescale/Kconfig   |    9 +
->>  drivers/net/ethernet/freescale/Makefile  |    1 +
->>  drivers/net/ethernet/freescale/fec.c     |   88 +++++++-
->>  drivers/net/ethernet/freescale/fec.h     |   38 +++
->>  drivers/net/ethernet/freescale/fec_ptp.c |  386 ++++++++++++++++++++++++++++++
->>  5 files changed, 521 insertions(+), 1 deletions(-)
->>  create mode 100644 drivers/net/ethernet/freescale/fec_ptp.c
->>
->> diff --git a/drivers/net/ethernet/freescale/Kconfig b/drivers/net/ethernet/freescale/Kconfig
->> index feff516..ff3be53 100644
->> --- a/drivers/net/ethernet/freescale/Kconfig
->> +++ b/drivers/net/ethernet/freescale/Kconfig
->> @@ -92,4 +92,13 @@ config GIANFAR
->>         This driver supports the Gigabit TSEC on the MPC83xx, MPC85xx,
->>         and MPC86xx family of chips, and the FEC on the 8540.
->>
->> +config FEC_PTP
->> +     bool "PTP Hardware Clock (PHC)"
->> +     depends on FEC
->> +     select PPS
->> +     select PTP_1588_CLOCK
->> +     --help---
->> +       Say Y here if you want to use PTP Hardware Clock (PHC) in the
->> +       driver.  Only the basic clock operations have been implemented.
->> +
->>  endif # NET_VENDOR_FREESCALE
->> diff --git a/drivers/net/ethernet/freescale/Makefile b/drivers/net/ethernet/freescale/Makefile
->> index 3d1839a..d4d19b3 100644
->> --- a/drivers/net/ethernet/freescale/Makefile
->> +++ b/drivers/net/ethernet/freescale/Makefile
->> @@ -3,6 +3,7 @@
->>  #
->>
->>  obj-$(CONFIG_FEC) += fec.o
->> +obj-$(CONFIG_FEC_PTP) += fec_ptp.o
->>  obj-$(CONFIG_FEC_MPC52xx) += fec_mpc52xx.o
->>  ifeq ($(CONFIG_FEC_MPC52xx_MDIO),y)
->>       obj-$(CONFIG_FEC_MPC52xx) += fec_mpc52xx_phy.o
->> diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
->> index d0e1b33..2665162 100644
->> --- a/drivers/net/ethernet/freescale/fec.c
->> +++ b/drivers/net/ethernet/freescale/fec.c
->> @@ -280,6 +280,17 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
->>                       | BD_ENET_TX_LAST | BD_ENET_TX_TC);
->>       bdp->cbd_sc = status;
->>
->> +#ifdef CONFIG_FEC_PTP
->
-> This ifdef desert in the fec driver currently breaks all SoCs except
-> i.MX6 in the imx_v6_v7_defconfig.
->
-> Most of these could be fixed with something like if (fec_use_ptp(fep)),
->
->
->>  #if defined(CONFIG_M523x) || defined(CONFIG_M527x) || defined(CONFIG_M528x) || \
->>      defined(CONFIG_M520x) || defined(CONFIG_M532x) || \
->>      defined(CONFIG_ARCH_MXC) || defined(CONFIG_SOC_IMX28)
->> @@ -88,6 +94,13 @@ struct bufdesc {
->>       unsigned short cbd_datlen;      /* Data length */
->>       unsigned short cbd_sc;  /* Control and status info */
->>       unsigned long cbd_bufaddr;      /* Buffer address */
->> +#ifdef CONFIG_FEC_PTP
->> +     unsigned long cbd_esc;
->> +     unsigned long cbd_prot;
->> +     unsigned long cbd_bdu;
->> +     unsigned long ts;
->> +     unsigned short res0[4];
->> +#endif
->>  };
->
-> This one changes the layout of the hardware buffer description which is
-> not so easy to fix.
+The 'put_clk' path should only run in the case of failure, so provide a 'return'
+to avoid it running in the success case.
 
-Yes, it is not easy to fix if dynamic check mx6 or other devices.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/mach-imx6q.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
->
-> I don't know how to continue from here. Since the whole patch doesn't
-> seem to reviewed very much I tend to say we should revert it for now and
-> let Frank redo it for the next merge window.
->
-> Other opinions?
-
-Can we just disable CONFIG_FEC_PTP defaut instead of revert whole patch?
-
->
-> Sascha
->
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 4eb1b3a..61f50aa 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -134,6 +134,8 @@ static void __init imx6q_sabrelite_cko1_setup(void)
+ 	clk_set_parent(cko1_sel, ahb);
+ 	rate = clk_round_rate(cko1, 16000000);
+ 	clk_set_rate(cko1, rate);
++
++	return;
+ put_clk:
+ 	if (!IS_ERR(cko1_sel))
+ 		clk_put(cko1_sel);
+-- 
+1.7.9.5
