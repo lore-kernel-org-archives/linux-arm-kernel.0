@@ -1,320 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Dec 2012 16:35:39 +0000
-Subject: [PATCH v2 4/6] ARM: psci: add support for PSCI invocations from the
- kernel
-In-Reply-To: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
-References: <1355762141-29616-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1355762141-29616-5-git-send-email-will.deacon@arm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 17 Dec 2012 16:38:52 +0000
+Subject: [PATCH 6/7] ARM: mackerel: support booting with or without DT
+In-Reply-To: <Pine.LNX.4.64.1212162224380.20059@axis700.grange>
+References: <1355503531-7276-1-git-send-email-g.liakhovetski@gmx.de>
+ <1355503531-7276-7-git-send-email-g.liakhovetski@gmx.de>
+ <20121216204636.ACD283E0AE3@localhost>
+ <Pine.LNX.4.64.1212162224380.20059@axis700.grange>
+Message-ID: <20121217163852.C57FD3E0BDD@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the Power State Coordination Interface
-defined by ARM, allowing Linux to request CPU-centric power-management
-operations from firmware implementing the PSCI protocol.
+On Sun, 16 Dec 2012 22:36:56 +0100 (CET), Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> Hi Grant
+> 
+> On Sun, 16 Dec 2012, Grant Likely wrote:
+> 
+> > On Fri, 14 Dec 2012 17:45:30 +0100, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > > This patch adds dynamic switching to booting either with or without DT.
+> > > So far only a part of the board initialisation can be done via DT. Devices,
+> > > that still need platform data are kept that way. Devices, that can be
+> > > initialised from DT will not be supplied from the platform data, if a DT
+> > > image is detected.
+> > > 
+> > > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> > > ---
+> > >  
+> > > +static int mackerel_i2c_bus_notify(struct notifier_block *nb,
+> > > +				   unsigned long action, void *data)
+> > > +{
+> > > +	struct device *dev = data;
+> > > +
+> > > +	if (action != BUS_NOTIFY_ADD_DEVICE ||
+> > > +	    strcmp(dev_name(dev->parent), "fff20000.i2c"))
+> > > +		return NOTIFY_DONE;
+> > > +
+> > > +	i2c_new_device(to_i2c_adapter(dev), &i2c0_devices[1]);
+> > > +
+> > > +	return NOTIFY_OK;
+> > > +}
+> > > +
+> > > +static struct notifier_block mackerel_i2c_notifier = {
+> > > +	.notifier_call = mackerel_i2c_bus_notify,
+> > > +};
+> > 
+> > This looks dodgy. It appears that the purpose of this hook is to create
+> > the tca6408-keys device because it has some platform data. However,
+> > this hook will try to create the device every time BUS_NOTIFY_ADD_DEVICE
+> > happens on the fff20000.i2c bus *including* when the tca6408-keys device
+> > gets added.
+> 
+> I think, this is only called once, when the i2c adapter device is added in 
+> i2c_register_adapter(). I2C client devices have these adapter devices as 
+> their parents, and those devices have "i2c-%d" as their names. Since all 
+> client devices get destroyed when the adapter is unbound, the above should 
+> be safe.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/Kconfig            |  10 +++
- arch/arm/include/asm/psci.h |  36 ++++++++
- arch/arm/kernel/Makefile    |   1 +
- arch/arm/kernel/psci.c      | 214 ++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 261 insertions(+)
- create mode 100644 arch/arm/include/asm/psci.h
- create mode 100644 arch/arm/kernel/psci.c
+Take another look. The way the bus notifiers work is they get called once for every device registered with the given bus type. That means i2c_client objects, not i3c
+> 
+> > The correct approach when you need to add specific platform data is to
+> > still put the device into the device tree and make the notifier look for
+> > that specific device. Then the platform data pointer can be attached at
+> > BUS_NOTIFY_ADD_DEVICE time.
+> > 
+> > However, it doesn't look like you need a notifier at all. From what I
+> > can see the tca6408-keys device does have platform data, but it is all
+> > simple (no callback pointers). You should instead encode the platform
+> > data into device tree properties and extract them from the driver.
+> 
+> Yes, this is the ultimate goal. But the purpose of this patch series is to 
+> move whatever devices are possible right _now_ to DT. Ultimately all of 
+> them should be migrated. So, yes, we could try to begin with tca6408, 
+> because the above hack is certainly the ugliest one in this series, but in 
+> principle this is just one of several devices, that we have to keep in 
+> platform data for now and aim at removing these temporary hacks as soon as 
+> respective drivers implement sufficient DT support.
+> 
+> Thanks
+> Guennadi
+> ---
+> Guennadi Liakhovetski, Ph.D.
+> Freelance Open-Source Software Developer
+> http://www.open-technology.de/
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e4017ea..2a04375 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1611,6 +1611,16 @@ config HOTPLUG_CPU
- 	  Say Y here to experiment with turning CPUs off and on.  CPUs
- 	  can be controlled through /sys/devices/system/cpu.
- 
-+config ARM_PSCI
-+	bool "Support for the ARM Power State Coordination Interface (PSCI)"
-+	depends on CPU_V7
-+	help
-+	  Say Y here if you want Linux to communicate with system firmware
-+	  implementing the PSCI specification for CPU-centric power
-+	  management operations described in ARM document number ARM DEN
-+	  0022A ("Power State Coordination Interface System Software on
-+	  ARM processors").
-+
- config LOCAL_TIMERS
- 	bool "Use local timer interrupts"
- 	depends on SMP
-diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-new file mode 100644
-index 0000000..ce0dbe7
---- /dev/null
-+++ b/arch/arm/include/asm/psci.h
-@@ -0,0 +1,36 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Copyright (C) 2012 ARM Limited
-+ */
-+
-+#ifndef __ASM_ARM_PSCI_H
-+#define __ASM_ARM_PSCI_H
-+
-+#define PSCI_POWER_STATE_TYPE_STANDBY		0
-+#define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
-+
-+struct psci_power_state {
-+	u16	id;
-+	u8	type;
-+	u8	affinity_level;
-+};
-+
-+struct psci_operations {
-+	int (*cpu_suspend)(struct psci_power_state state,
-+			   unsigned long entry_point);
-+	int (*cpu_off)(struct psci_power_state state);
-+	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
-+	int (*migrate)(unsigned long cpuid);
-+};
-+
-+extern struct psci_operations psci_ops;
-+
-+#endif /* __ASM_ARM_PSCI_H */
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 5bbec7b..5f3338e 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -82,5 +82,6 @@ obj-$(CONFIG_DEBUG_LL)	+= debug.o
- obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
- 
- obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
-+obj-$(CONFIG_ARM_PSCI)		+= psci.o
- 
- extra-y := $(head-y) vmlinux.lds
-diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
-new file mode 100644
-index 0000000..e7fe909
---- /dev/null
-+++ b/arch/arm/kernel/psci.c
-@@ -0,0 +1,214 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ */
-+
-+#define pr_fmt(fmt) "psci: " fmt
-+
-+#include <linux/init.h>
-+#include <linux/of.h>
-+
-+#include <asm/compiler.h>
-+#include <asm/errno.h>
-+#include <asm/opcodes-sec.h>
-+#include <asm/opcodes-virt.h>
-+#include <asm/psci.h>
-+
-+struct psci_operations psci_ops;
-+
-+static int (*invoke_psci_fn)(u32, u32, u32, u32);
-+
-+enum psci_function {
-+	PSCI_FN_CPU_SUSPEND,
-+	PSCI_FN_CPU_ON,
-+	PSCI_FN_CPU_OFF,
-+	PSCI_FN_MIGRATE,
-+	PSCI_FN_MAX,
-+};
-+
-+static u32 psci_function_id[PSCI_FN_MAX];
-+
-+#define PSCI_RET_SUCCESS		0
-+#define PSCI_RET_EOPNOTSUPP		-1
-+#define PSCI_RET_EINVAL			-2
-+#define PSCI_RET_EPERM			-3
-+
-+static int psci_to_linux_errno(int errno)
-+{
-+	switch (errno) {
-+	case PSCI_RET_SUCCESS:
-+		return 0;
-+	case PSCI_RET_EOPNOTSUPP:
-+		return -EOPNOTSUPP;
-+	case PSCI_RET_EINVAL:
-+		return -EINVAL;
-+	case PSCI_RET_EPERM:
-+		return -EPERM;
-+	};
-+
-+	return -EINVAL;
-+}
-+
-+#define PSCI_POWER_STATE_ID_MASK	0xffff
-+#define PSCI_POWER_STATE_ID_SHIFT	0
-+#define PSCI_POWER_STATE_TYPE_MASK	0x1
-+#define PSCI_POWER_STATE_TYPE_SHIFT	16
-+#define PSCI_POWER_STATE_AFFL_MASK	0x3
-+#define PSCI_POWER_STATE_AFFL_SHIFT	24
-+
-+static u32 psci_power_state_pack(struct psci_power_state state)
-+{
-+	return	((state.id & PSCI_POWER_STATE_ID_MASK)
-+			<< PSCI_POWER_STATE_ID_SHIFT)	|
-+		((state.type & PSCI_POWER_STATE_TYPE_MASK)
-+			<< PSCI_POWER_STATE_TYPE_SHIFT)	|
-+		((state.affinity_level & PSCI_POWER_STATE_AFFL_MASK)
-+			<< PSCI_POWER_STATE_AFFL_SHIFT);
-+}
-+
-+/*
-+ * The following two functions are invoked via the invoke_psci_fn pointer
-+ * and will not be inlined, allowing us to piggyback on the AAPCS.
-+ */
-+static int __invoke_psci_fn_hvc(u32 function_id, u32 arg0, u32 arg1, u32 arg2)
-+{
-+	asm volatile(
-+			__asmeq("%0", "r0")
-+			__asmeq("%1", "r1")
-+			__asmeq("%2", "r2")
-+			__asmeq("%3", "r3")
-+			__HVC(0)
-+		: "+r" (function_id)
-+		: "r" (arg0), "r" (arg1), "r" (arg2));
-+
-+	return function_id;
-+}
-+
-+static int __invoke_psci_fn_smc(u32 function_id, u32 arg0, u32 arg1, u32 arg2)
-+{
-+	asm volatile(
-+			__asmeq("%0", "r0")
-+			__asmeq("%1", "r1")
-+			__asmeq("%2", "r2")
-+			__asmeq("%3", "r3")
-+			__SMC(0)
-+		: "+r" (function_id)
-+		: "r" (arg0), "r" (arg1), "r" (arg2));
-+
-+	return function_id;
-+}
-+
-+static int psci_cpu_suspend(struct psci_power_state state,
-+			    unsigned long entry_point)
-+{
-+	int err;
-+	u32 fn, power_state;
-+
-+	fn = psci_function_id[PSCI_FN_CPU_SUSPEND];
-+	power_state = psci_power_state_pack(state);
-+	err = invoke_psci_fn(fn, power_state, (u32)entry_point, 0);
-+	return psci_to_linux_errno(err);
-+}
-+
-+static int psci_cpu_off(struct psci_power_state state)
-+{
-+	int err;
-+	u32 fn, power_state;
-+
-+	fn = psci_function_id[PSCI_FN_CPU_OFF];
-+	power_state = psci_power_state_pack(state);
-+	err = invoke_psci_fn(fn, power_state, 0, 0);
-+	return psci_to_linux_errno(err);
-+}
-+
-+static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
-+{
-+	int err;
-+	u32 fn;
-+
-+	fn = psci_function_id[PSCI_FN_CPU_ON];
-+	err = invoke_psci_fn(fn, cpuid, entry_point, 0);
-+	return psci_to_linux_errno(err);
-+}
-+
-+static int psci_migrate(unsigned long cpuid)
-+{
-+	int err;
-+	u32 fn;
-+
-+	fn = psci_function_id[PSCI_FN_MIGRATE];
-+	err = invoke_psci_fn(fn, cpuid, 0, 0);
-+	return psci_to_linux_errno(err);
-+}
-+
-+static const struct of_device_id psci_of_match[] __initconst = {
-+	{ .compatible = "arm,psci",	},
-+	{},
-+};
-+
-+static int __init psci_init(void)
-+{
-+	struct device_node *np;
-+	const char *method;
-+	u32 base, id;
-+
-+	np = of_find_matching_node(NULL, psci_of_match);
-+	if (!np)
-+		return 0;
-+
-+	pr_info("probing function IDs from device-tree\n");
-+
-+	if (of_property_read_u32(np, "function-base", &base)) {
-+		pr_warning("missing \"function-base\" property\n");
-+		goto out_put_node;
-+	}
-+
-+	if (of_property_read_string(np, "method", &method)) {
-+		pr_warning("missing \"method\" property\n");
-+		goto out_put_node;
-+	}
-+
-+	if (!strcmp("hvc", method)) {
-+		invoke_psci_fn = __invoke_psci_fn_hvc;
-+	} else if (!strcmp("smc", method)) {
-+		invoke_psci_fn = __invoke_psci_fn_smc;
-+	} else {
-+		pr_warning("invalid \"method\" property: %s\n", method);
-+		goto out_put_node;
-+	}
-+
-+	if (!of_property_read_u32(np, "cpu_suspend", &id)) {
-+		psci_function_id[PSCI_FN_CPU_SUSPEND] = base + id;
-+		psci_ops.cpu_suspend = psci_cpu_suspend;
-+	}
-+
-+	if (!of_property_read_u32(np, "cpu_off", &id)) {
-+		psci_function_id[PSCI_FN_CPU_OFF] = base + id;
-+		psci_ops.cpu_off = psci_cpu_off;
-+	}
-+
-+	if (!of_property_read_u32(np, "cpu_on", &id)) {
-+		psci_function_id[PSCI_FN_CPU_ON] = base + id;
-+		psci_ops.cpu_on = psci_cpu_on;
-+	}
-+
-+	if (!of_property_read_u32(np, "migrate", &id)) {
-+		psci_function_id[PSCI_FN_MIGRATE] = base + id;
-+		psci_ops.migrate = psci_migrate;
-+	}
-+
-+out_put_node:
-+	of_node_put(np);
-+	return 0;
-+}
-+early_initcall(psci_init);
 -- 
-1.8.0
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
