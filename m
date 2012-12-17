@@ -1,57 +1,28 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Mon, 17 Dec 2012 18:37:18 +0100
-Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
-In-Reply-To: <50CF5327.6070205@antcom.de>
-References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
- <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
- <50CF03FB.2030100@grandegger.com> <50CF0744.7040404@grandegger.com>
- <50CF1EF1.2070601@antcom.de> <50CF237E.5020409@antcom.de>
- <50CF4838.9000401@grandegger.com> <50CF5327.6070205@antcom.de>
-Message-ID: <50CF584E.1040601@grandegger.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 17 Dec 2012 11:49:06 -0600
+Subject: [PATCH V2 0/2] ARM: dts: Add PMU support for OMAP2+
+Message-ID: <1355766548-5702-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2012 06:15 PM, Roland Stigge wrote:
-> On 12/17/2012 05:28 PM, Wolfgang Grandegger wrote:
->> On 12/17/2012 02:51 PM, Roland Stigge wrote:
->>> Hi Wolfgang,
->>>> And I guess Russell is right: If possible, we should write outputs
->>>> simultaneously via ODSR (plus OWER/OWDR/OWSR) instead of separate set/clear.
->>>>
->>>> I wonder if we need to save/restore the state of OWSR at every write
->>>> operation or if we need/can cache it. Assuming that block GPIO are the
->>>> only code in the kernel that manipulates ODSR.
->>>
->>> Can you please test the following:
->>>
->>> +static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val)
->>> +{
->>> +       struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
->>> +       void __iomem *pio = at91_gpio->regbase;
->>> +
->>> +       __raw_writel(~mask, pio + PIO_OWDR);
->>
->> This would also disable normal GPIOs configured for output! From the
->> manual I understand that if the pin is configured for output, we could
->> either use PIO_SODR/PIO_CODR to set/clear the bits individually or
->> PIO_ODSR for synchronous data output. But than we need to care about the
->> non-block GPIO outputs as well... requiring a read-modify-write cycle :(.
-> 
->>From the manual, I read about OWER: "Enables writing PIO_ODSR for the
-> I/O line" (analogous for OWDR). Would interpret this as affecting ODSR
-> (for block GPIO) but not SODR/CODR (as currently with single GPIOs).
-> 
-> Have you tried? ;-)
+Add device-tree PMU support for OMAP2, OMAP3 and OMAP4460. OMAP4430
+is not included because PMU is not currently supported on this device
+due to absence of a cross-trigger interface driver.
 
-Grrr, I mixed OER with OWER, sorry for the noise. Back to your approach,
-which works.
+Tested with PERF on OMAP3430 Beagle Board and OMAP4460 Panda Board.
+Boot tested only on OMAP2420 H4.
 
-	/* Do synchronous data output with a single write access */
-	__raw_writel(~mask, pio + PIO_OWDR);
-	__raw_writel(mask, pio + PIO_OWER);
-	__raw_writel(val, pio + PIO_ODSR);
+Jon Hunter (2):
+  ARM: OMAP2+: Prepare for device-tree PMU support
+  ARM: dts: OMAP2+: Add PMU nodes
 
-For caching we would need a storage. Not sure if it's worth compared to
-a context switch into the kernel.
+ arch/arm/boot/dts/omap2.dtsi         |    5 +++++
+ arch/arm/boot/dts/omap3.dtsi         |    6 ++++++
+ arch/arm/boot/dts/omap4-panda-es.dts |    2 ++
+ arch/arm/boot/dts/omap4460.dtsi      |   18 ++++++++++++++++++
+ arch/arm/mach-omap2/pmu.c            |   14 +++++++++++---
+ 5 files changed, 42 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap4460.dtsi
 
-Wolfgang.
+-- 
+1.7.10.4
