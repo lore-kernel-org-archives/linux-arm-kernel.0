@@ -1,59 +1,122 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 17 Dec 2012 11:48:11 +0100
-Subject: [PATCH 2/2] ARM: OMAP2+: Drop plat/cpu.h for omap2plus
-In-Reply-To: <20121216200317.24238.63954.stgit@muffinssi.local>
-References: <20121216200236.24238.38151.stgit@muffinssi.local>
- <20121216200317.24238.63954.stgit@muffinssi.local>
-Message-ID: <CAORVsuXOmzz1cSSrKOy+nCLGJkby+LycqOXXNddJJ4cbnjVGtg@mail.gmail.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Mon, 17 Dec 2012 12:01:07 +0100
+Subject: [PATCH 2/2] ARM: SH-Mobile: sh73a0: Add CPU Hotplug
+In-Reply-To: <50CB6B14.1070500@gmail.com>
+References: <1354795719-5578-1-git-send-email-hechtb+renesas@gmail.com>
+ <1354795719-5578-2-git-send-email-hechtb+renesas@gmail.com>
+ <50CB34F4.8060204@gmail.com>
+ <CABYn4syb8yBRwUqbS=2dp1i3FYFt1edYPRh9xa=aHTY9RsWw8A@mail.gmail.com>
+ <50CB6B14.1070500@gmail.com>
+Message-ID: <CABYn4syRwk3Jt4yhkCSyg58Viez+W0XxZZGewu3gDFaarCNkSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi Rob,
 
-On Sun, Dec 16, 2012 at 9:03 PM, Tony Lindgren <tony@atomide.com> wrote:
-> The cpu_is_omap macros are now local to arch/arm/mach-omap2
-> in soc.h and plat/cpu.h can finally be dropped for omap2+.
-> Thanks everybody for help with fixing the drivers.
-Great!
-
-> Note that we can now also remove the unused plat/cpu.h from
-> smartreflex.c and isp.c as they will cause compile errors
-> with ARCH_MULTIPLATFORM enabled.
+2012/12/14 Rob Herring <robherring2@gmail.com>:
+> On 12/14/2012 09:33 AM, Bastian Hecht wrote:
+>> Hi,
+>>
+>> 2012/12/14 Rob Herring <robherring2@gmail.com>:
+>>> On 12/06/2012 06:08 AM, Bastian Hecht wrote:
+>>>> From: Bastian Hecht <hechtb@gmail.com>
+>>>>
+>>>> Add the capability to add and remove CPUs on the fly.
+>>>> The Cortex-A9 offers the possibility to take single cores out of the
+>>>> MP Core. We add this capabilty taking care that caches are kept
+>>>> coherent. For the actual shutdown via a WFI instruction, a code snippet
+>>>> from the omap2 code tree is copied. Thanks for that! For verifying the
+>>>> shutdown we rely on the internal SH73A0 Power Status Register
+>>>> PSTR.
+>>>>
+>>>> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+>>>> ---
+>>>>  arch/arm/mach-shmobile/headsmp-sh73a0.S      |   46 ++++++++++++++++++++++++++
+>>>>  arch/arm/mach-shmobile/include/mach/common.h |    1 +
+>>>>  arch/arm/mach-shmobile/smp-sh73a0.c          |   41 +++++++++++++++++++----
+>>>>  3 files changed, 82 insertions(+), 6 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-shmobile/headsmp-sh73a0.S b/arch/arm/mach-shmobile/headsmp-sh73a0.S
+>>>> index bec4c0d..be463a3 100644
+>>>> --- a/arch/arm/mach-shmobile/headsmp-sh73a0.S
+>>>> +++ b/arch/arm/mach-shmobile/headsmp-sh73a0.S
+>>>> @@ -23,6 +23,52 @@
+>>>>  #include <linux/init.h>
+>>>>  #include <asm/memory.h>
+>>>>
+>>>> +/* Taken from arch/arm/mach-omap2/sleep44xx.S. Thanks! */
+>>>> +ENTRY(sh73a0_do_wfi)
+>>>> +        stmfd   sp!, {lr}
+>>>
+>>> Why does the lr need to be pushed to the stack?
+>>
+>> Yes I must admit this is paradox - we never return but prepare to do
+>> so... In the OMAP code they've got a lead out code in case the WFI
+>> doesn't succeed. I see no reason how this could ever happen here but
+>> to take a safe route I've decided to keep the mechanism to be able to
+>> return and spit out an error message back in the C code.
 >
-> Cc: Jean Pihet <jean.pihet@newoldbits.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/drm.c             |    1 -
->  arch/arm/mach-omap2/dss-common.c      |    3 +--
->  arch/arm/mach-omap2/prm2xxx.c         |    3 +--
->  arch/arm/mach-omap2/prm3xxx.c         |    3 +--
->  arch/arm/plat-omap/include/plat/cpu.h |    4 ----
->  drivers/media/platform/omap3isp/isp.c |    2 --
->  drivers/power/avs/smartreflex.c       |    2 --
->  7 files changed, 3 insertions(+), 15 deletions(-)
-
-For the smartreflex driver:
-Acked-by: Jean Pihet <j-pihet@ti.com>
-
-Regards,
-Jean
-
-...
-
-> diff --git a/drivers/power/avs/smartreflex.c b/drivers/power/avs/smartreflex.c
-> index a17d084..6b2238b 100644
-> --- a/drivers/power/avs/smartreflex.c
-> +++ b/drivers/power/avs/smartreflex.c
-> @@ -27,8 +27,6 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/power/smartreflex.h>
+> It's not clear to me that OMAP needed this either. The lr value would
+> have to get lost during wfi.
 >
-> -#include <plat/cpu.h>
-> -
->  #define SMARTREFLEX_NAME_LEN   16
->  #define NVALUE_NAME_LEN                40
->  #define SR_DISABLE_TIMEOUT     200
+>>>> +
+>>>> +        /*
+>>>> +         * Execute an ISB instruction to ensure that all of the
+>>>> +         * CP15 register changes have been committed.
+>>>> +         */
+>>>> +        isb
+>>>
+>>> Generally writes to cp15 registers that need an isb already do so.
+>>
+>> Ok nice, I'll check that and throw it out.
+>>
+>>>> +
+>>>> +        /*
+>>>> +         * Execute a barrier instruction to ensure that all cache,
+>>>> +         * TLB and branch predictor maintenance operations issued
+>>>> +         * by any CPU in the cluster have completed.
+>>>> +         */
+>>>> +        dsb
+>>>> +        dmb
+>>>
+>>> A dsb is a superset of a dmb, so you should not need both.
+>>
+>> Same here.
+>>
+>>>> +
+>>>> +        /*
+>>>> +         * Execute a WFI instruction and wait until the
+>>>> +         * STANDBYWFI output is asserted to indicate that the
+>>>> +         * CPU is in idle and low power state. CPU can specualatively
+>>>> +         * prefetch the instructions so add NOPs after WFI. Sixteen
+>>>> +         * NOPs as per Cortex-A9 pipeline.
+>>>
+>>> Why do you care what is prefetched? You're never coming back here, right?
+>>
+>> We can jump back to the paradox top. The idea seems to be to have a
+>> clean pipeline in case the WFI doesn't succeed.
+>> The thing about this whole code snippet is: I saw no reason to
+>> reinvent the wheel and tinker on my own solution when there is code
+>> that does the job in a clean way. I thought this could maybe be moved
+>> to a general ARM code base when more people rely on it.
+>>
+>
+> Blindly copying code is reinventing the wheel. You are making it appear
+> that this is needed, but don't seem to have any reason why other than
+> OMAP did it. If it is in fact needed, then it should be common.
+>
+> Use cpu_do_idle or figure out and explain why you can't. It's important
+> to know that if we do go and consolidate this code later.
+
+Yes after thinking about it a bit, I must completely agree to you.
+Copying OMAP's code was done because of hesitation and uncertainty
+that I could miss something and brings the drawbacks that you
+mentioned. It's much straighter to go with cpu_do_idle.
+
+Thanks!
+
+ Bastian
+
+
+> Rob
 >
