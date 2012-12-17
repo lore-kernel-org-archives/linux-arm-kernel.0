@@ -1,47 +1,156 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 17 Dec 2012 11:31:08 +0200
-Subject: [PATCH 1/2] ARM: OMAP: Split vrfb.c to remove last remaining
- cpu_is_omap usage
-In-Reply-To: <20121216200314.24238.9481.stgit@muffinssi.local>
-References: <20121216200236.24238.38151.stgit@muffinssi.local>
- <20121216200314.24238.9481.stgit@muffinssi.local>
-Message-ID: <50CEE65C.20009@ti.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 17 Dec 2012 10:40:40 +0100
+Subject: [RFC PATCH v2 3/6] sched: pack small tasks
+In-Reply-To: <50CD746E.7010807@intel.com>
+References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
+ <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
+ <50C93AC1.1060202@intel.com>
+ <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
+ <50C9E552.1010600@intel.com>
+ <CAKfTPtCUDEC50xexmLQ1d9qvBz1iJnf4aGSGjN==jqZwpxrwiQ@mail.gmail.com>
+ <CAKfTPtAhFtGKOtwumuav+pndoAZiKjHvYoE2NZxtgP+qHuHY3g@mail.gmail.com>
+ <50CA84FF.5070907@intel.com>
+ <CAKfTPtCarhT3J3xOD6jOh_91Pm5FK4V_DAk5QLs_=8rVF+-fsQ@mail.gmail.com>
+ <50CD746E.7010807@intel.com>
+Message-ID: <CAKfTPtAt-TUoJpXbL+dAQ2zGTYtewdXpFDN_mSeu4MnuC-2Xjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-12-16 22:03, Tony Lindgren wrote:
-> Looks like we missed plat-omap/fb.c for cpu_is_omap usage
-> mach-omap2. This is the last user of cpu_is_omap, so let's
-> quickly fix it up so we can finally remove plat/cpu.h for
-> omap2lus.
-> 
-> We want to limit cpu_is_omap macro usage to mach-omap2 only so
-> we can make plat/cpu.h private. After this we can finally drop
-> plat/cpu.h for omap2+.
-> 
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap1/Makefile |    2 +
->  arch/arm/mach-omap1/fb.c     |   80 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/Makefile |    2 +
->  arch/arm/mach-omap2/fb.c     |   50 +-------------------------
->  arch/arm/plat-omap/Makefile  |    2 +
->  5 files changed, 85 insertions(+), 51 deletions(-)
->  create mode 100644 arch/arm/mach-omap1/fb.c
->  rename arch/arm/{plat-omap/fb.c => mach-omap2/fb.c} (76%)
+On 16 December 2012 08:12, Alex Shi <alex.shi@intel.com> wrote:
+> On 12/14/2012 05:33 PM, Vincent Guittot wrote:
+>> On 14 December 2012 02:46, Alex Shi <alex.shi@intel.com> wrote:
+>>> On 12/13/2012 11:48 PM, Vincent Guittot wrote:
+>>>> On 13 December 2012 15:53, Vincent Guittot <vincent.guittot@linaro.org> wrote:
+>>>>> On 13 December 2012 15:25, Alex Shi <alex.shi@intel.com> wrote:
+>>>>>> On 12/13/2012 06:11 PM, Vincent Guittot wrote:
+>>>>>>> On 13 December 2012 03:17, Alex Shi <alex.shi@intel.com> wrote:
+>>>>>>>> On 12/12/2012 09:31 PM, Vincent Guittot wrote:
+>>>>>>>>> During the creation of sched_domain, we define a pack buddy CPU for each CPU
+>>>>>>>>> when one is available. We want to pack at all levels where a group of CPU can
+>>>>>>>>> be power gated independently from others.
+>>>>>>>>> On a system that can't power gate a group of CPUs independently, the flag is
+>>>>>>>>> set at all sched_domain level and the buddy is set to -1. This is the default
+>>>>>>>>> behavior.
+>>>>>>>>> On a dual clusters / dual cores system which can power gate each core and
+>>>>>>>>> cluster independently, the buddy configuration will be :
+>>>>>>>>>
+>>>>>>>>>       | Cluster 0   | Cluster 1   |
+>>>>>>>>>       | CPU0 | CPU1 | CPU2 | CPU3 |
+>>>>>>>>> -----------------------------------
+>>>>>>>>> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
+>>>>>>>>>
+>>>>>>>>> Small tasks tend to slip out of the periodic load balance so the best place
+>>>>>>>>> to choose to migrate them is during their wake up. The decision is in O(1) as
+>>>>>>>>> we only check again one buddy CPU
+>>>>>>>>
+>>>>>>>> Just have a little worry about the scalability on a big machine, like on
+>>>>>>>> a 4 sockets NUMA machine * 8 cores * HT machine, the buddy cpu in whole
+>>>>>>>> system need care 64 LCPUs. and in your case cpu0 just care 4 LCPU. That
+>>>>>>>> is different on task distribution decision.
+>>>>>>>
+>>>>>>> The buddy CPU should probably not be the same for all 64 LCPU it
+>>>>>>> depends on where it's worth packing small tasks
+>>>>>>
+>>>>>> Do you have further ideas for buddy cpu on such example?
+>>>>>
+>>>>> yes, I have several ideas which were not really relevant for small
+>>>>> system but could be interesting for larger system
+>>>>>
+>>>>> We keep the same algorithm in a socket but we could either use another
+>>>>> LCPU in the targeted socket (conf0) or chain the socket (conf1)
+>>>>> instead of packing directly in one LCPU
+>>>>>
+>>>>> The scheme below tries to summaries the idea:
+>>>>>
+>>>>> Socket      | socket 0 | socket 1   | socket 2   | socket 3   |
+>>>>> LCPU        | 0 | 1-15 | 16 | 17-31 | 32 | 33-47 | 48 | 49-63 |
+>>>>> buddy conf0 | 0 | 0    | 1  | 16    | 2  | 32    | 3  | 48    |
+>>>>> buddy conf1 | 0 | 0    | 0  | 16    | 16 | 32    | 32 | 48    |
+>>>>> buddy conf2 | 0 | 0    | 16 | 16    | 32 | 32    | 48 | 48    |
+>>>>>
+>>>>> But, I don't know how this can interact with NUMA load balance and the
+>>>>> better might be to use conf3.
+>>>>
+>>>> I mean conf2 not conf3
+>>>
+>>> So, it has 4 levels 0/16/32/ for socket 3 and 0 level for socket 0, it
+>>> is unbalanced for different socket.
+>>
+>> That the target because we have decided to pack the small tasks in
+>> socket 0 when we have parsed the topology at boot.
+>> We don't have to loop into sched_domain or sched_group anymore to find
+>> the best LCPU when a small tasks wake up.
+>
+> iteration on domain and group is a advantage feature for power efficient
+> requirement, not shortage. If some CPU are already idle before forking,
+> let another waking CPU check their load/util and then decide which one
+> is best CPU can reduce late migrations, that save both the performance
+> and power.
 
-Ok, I didn't realize that plat-omap cannot refer to cpu_is_omap either.
-The patch looks fine, except the subject should say "split fb.c", not
-"split vrfb.c".
+In fact, we have already done this job once at boot and we consider
+that moving small tasks in the buddy CPU is always benefit so we don't
+need to waste time looping sched_domain and sched_group to compute
+current capacity of each LCPU for each wake up of each small tasks. We
+want all small tasks and background activity waking up on the same
+buddy CPU and let the default behavior of the scheduler choosing the
+best CPU for heavy tasks or loaded CPUs.
 
- Tomi
+>
+> On the contrary, move task walking on each level buddies is not only bad
+> on performance but also bad on power. Consider the quite big latency of
+> waking a deep idle CPU. we lose too much..
+
+My result have shown different conclusion.
+In fact, there is much more chance that the buddy will not be in a
+deep idle as all the small tasks and background activity are already
+waking on this CPU.
+
+>
+>>
+>>>
+>>> And the ground level has just one buddy for 16 LCPUs - 8 cores, that's
+>>> not a good design, consider my previous examples: if there are 4 or 8
+>>> tasks in one socket, you just has 2 choices: spread them into all cores,
+>>> or pack them into one LCPU. Actually, moving them just into 2 or 4 cores
+>>> maybe a better solution. but the design missed this.
+>>
+>> You speak about tasks without any notion of load. This patch only care
+>> of small tasks and light LCPU load, but it falls back to default
+>> behavior for other situation. So if there are 4 or 8 small tasks, they
+>> will migrate to the socket 0 after 1 or up to 3 migration (it depends
+>> of the conf and the LCPU they come from).
+>
+> According to your patch, what your mean 'notion of load' is the
+> utilization of cpu, not the load weight of tasks, right?
+
+Yes but not only. The number of tasks that run simultaneously, is
+another important input
+
+>
+> Yes, I just talked about tasks numbers, but it naturally extends to the
+> task utilization on cpu. like 8 tasks with 25% util, that just can full
+> fill 2 CPUs. but clearly beyond the capacity of the buddy, so you need
+> to wake up another CPU socket while local socket has some LCPU idle...
+
+8 tasks with a running period of 25ms per 100ms that wake up
+simultaneously should probably run on 8 different LCPU in order to
+race to idle
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 899 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121217/f46adcb7/attachment.sig>
+Regards,
+Vincent
+
+>>
+>> Then, if too much small tasks wake up simultaneously on the same LCPU,
+>> the default load balance will spread them in the core/cluster/socket
+>>
+>>>
+>>> Obviously, more and more cores is the trend on any kinds of CPU, the
+>>> buddy system seems hard to catch up this.
+>>>
+>>>
+>
+>
+> --
+> Thanks
+>     Alex
