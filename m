@@ -1,7 +1,9 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Mon, 17 Dec 2012 23:21:57 +0530
+Date: Mon, 17 Dec 2012 23:21:58 +0530
 Subject: [PATCH] spi: remove check for bits_per_word on transfer
-Message-ID: <1355766718-2040-1-git-send-email-ldewangan@nvidia.com>
+In-Reply-To: <1355766718-2040-1-git-send-email-ldewangan@nvidia.com>
+References: <1355766718-2040-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1355766718-2040-2-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
