@@ -1,46 +1,57 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 17 Dec 2012 14:32:33 +0100
-Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
-In-Reply-To: <50CF0744.7040404@grandegger.com>
-References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
- <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
- <50CF03FB.2030100@grandegger.com> <50CF0744.7040404@grandegger.com>
-Message-ID: <50CF1EF1.2070601@antcom.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 17 Dec 2012 13:42:46 +0000
+Subject: ARM realview breakages w/ 3.7 under qemu
+In-Reply-To: <50CB0150.1000901@openwrt.org>
+References: <50CA0FC1.5090009@openwrt.org>
+ <20121213174817.GB12946@mudshark.cambridge.arm.com>
+ <20121214094012.GG14363@n2100.arm.linux.org.uk>
+ <50CB0150.1000901@openwrt.org>
+Message-ID: <20121217134246.GE11558@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2012 12:51 PM, Wolfgang Grandegger wrote:
->>> Without having an AT91 available right now, I guess the hardware
->>> interface of this GPIO chip is different from the GPIO block API. While
->>> the hardware has clear and set registers, the val parameter of
->>> at91_gpiolib_set_block() should be interpreted as the actual output
->>> values. See lpc32xx_gpo_set_block() for an example for handling set and
->>> clear registers like this: First, set_bits and clear_bits words are
->>> calculated from mask and val parameters, and finally written to the
->>> respective hardware registers.
->>>
->>> Note that one .set_block() can result in writing both the set and clear
->>> registers of the hardware when val contains both 0s and 1s in
->>> respectively masked positions.
->>
->> Oops, I obviously did not test GPIO block write. The patch below does
->> work now. Feel free to add it to the next version of your series.
+On Fri, Dec 14, 2012 at 10:37:04AM +0000, Florian Fainelli wrote:
+> Le 12/14/12 10:40, Russell King - ARM Linux a ?crit :
+> > On Thu, Dec 13, 2012 at 05:48:17PM +0000, Will Deacon wrote:
+> >> On Thu, Dec 13, 2012 at 05:26:25PM +0000, Florian Fainelli wrote:
+> >>> - PBX A9: booting with less than 1024MBytes of RAM causes this:
+> >>> [    0.000000] Truncating RAM at 20000000-3fffffff to -3f7fffff (vmalloc
+> >>> region overlap).
+> >>> [    0.000000] Ignoring RAM at 80000000-8fffffff (vmalloc region overlap).
+> >>>
+> >>> Do these issues sounds familiar to any of you? The kernel config is
+> >>> attached in case that helps.
+> > I don't have the original email to reply to (so I don't have the .config
+> > either) but my guess for the above would be that HIGHMEM is disabled.
+> The original mail containing the .config file was actually rejected by 
+> the mailing-list manager. I have uploaded it here: 
+> http://alphacore.org/~florian/openwrt/realview-eb-config
 > 
-> The patch lacks an important fix, sorry. Please consider the updated
-> patch below.
+> You are right, HIGHMEM is disabled. Even though enabling HIGHMEM does 
+> not allow me booting either without at least 1Gbyte of RAM:
+> 
+> [    0.000000] Memory policy: ECC disabled, Data cache writealloc
+> and we are stuck.
 
-Thanks!
+I just dusted off my pbx and it boots fine with your .config and a 3.7
+kernel when passing mem=128M on the command line.
 
-And I guess Russell is right: If possible, we should write outputs
-simultaneously via ODSR (plus OWER/OWDR/OWSR) instead of separate set/clear.
+For EB, can you try the following diff please?
 
-I wonder if we need to save/restore the state of OWSR at every write
-operation or if we need/can cache it. Assuming that block GPIO are the
-only code in the kernel that manipulates ODSR.
+Will
 
-Further: Can we include this patch for arch/arm/mach-at91 via the gpio
-subsystem or does it need to go separately via arm-soc.git?
+--->8
 
-Thanks,
-
-Roland
+diff --git a/arch/arm/mach-realview/include/mach/board-eb.h b/arch/arm/mach-realview/include/mach/board-eb.h
+index 124bce6..a301e61 100644
+--- a/arch/arm/mach-realview/include/mach/board-eb.h
++++ b/arch/arm/mach-realview/include/mach/board-eb.h
+@@ -47,7 +47,7 @@
+ #define REALVIEW_EB_USB_BASE           0x4F000000      /* USB */
+ 
+ #ifdef CONFIG_REALVIEW_EB_ARM11MP_REVB
+-#define REALVIEW_EB11MP_PRIV_MEM_BASE  0x1F000000
++#define REALVIEW_EB11MP_PRIV_MEM_BASE  0x10100000
+ #define REALVIEW_EB11MP_L220_BASE      0x10102000      /* L220 registers */
+ #define REALVIEW_EB11MP_SYS_PLD_CTRL1  0xD8            /* Register offset for MPCore sysctl */
+ #else
