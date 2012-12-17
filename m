@@ -1,47 +1,51 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 17 Dec 2012 18:15:19 +0100
-Subject: [PATCH RESEND 0/6 v10] gpio: Add block GPIO
-In-Reply-To: <50CF4838.9000401@grandegger.com>
-References: <1355495185-24220-1-git-send-email-stigge@antcom.de>
- <50CB68AB.5070806@grandegger.com> <50CBBB25.20002@antcom.de>
- <50CF03FB.2030100@grandegger.com> <50CF0744.7040404@grandegger.com>
- <50CF1EF1.2070601@antcom.de> <50CF237E.5020409@antcom.de>
- <50CF4838.9000401@grandegger.com>
-Message-ID: <50CF5327.6070205@antcom.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Dec 2012 09:19:38 -0800
+Subject: [PATCH 1/2] ARM: OMAP: Split vrfb.c to remove last remaining
+ cpu_is_omap usage
+In-Reply-To: <50CEE65C.20009@ti.com>
+References: <20121216200236.24238.38151.stgit@muffinssi.local>
+ <20121216200314.24238.9481.stgit@muffinssi.local>
+ <50CEE65C.20009@ti.com>
+Message-ID: <20121217171938.GS4989@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/17/2012 05:28 PM, Wolfgang Grandegger wrote:
-> On 12/17/2012 02:51 PM, Roland Stigge wrote:
->> Hi Wolfgang,
->>> And I guess Russell is right: If possible, we should write outputs
->>> simultaneously via ODSR (plus OWER/OWDR/OWSR) instead of separate set/clear.
->>>
->>> I wonder if we need to save/restore the state of OWSR at every write
->>> operation or if we need/can cache it. Assuming that block GPIO are the
->>> only code in the kernel that manipulates ODSR.
->>
->> Can you please test the following:
->>
->> +static void at91_gpiolib_set_block(struct gpio_chip *chip, unsigned long mask, unsigned long val)
->> +{
->> +       struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
->> +       void __iomem *pio = at91_gpio->regbase;
->> +
->> +       __raw_writel(~mask, pio + PIO_OWDR);
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [121217 01:33]:
+> On 2012-12-16 22:03, Tony Lindgren wrote:
+> > Looks like we missed plat-omap/fb.c for cpu_is_omap usage
+> > mach-omap2. This is the last user of cpu_is_omap, so let's
+> > quickly fix it up so we can finally remove plat/cpu.h for
+> > omap2lus.
+> > 
+> > We want to limit cpu_is_omap macro usage to mach-omap2 only so
+> > we can make plat/cpu.h private. After this we can finally drop
+> > plat/cpu.h for omap2+.
+> > 
+> > Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >  arch/arm/mach-omap1/Makefile |    2 +
+> >  arch/arm/mach-omap1/fb.c     |   80 ++++++++++++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-omap2/Makefile |    2 +
+> >  arch/arm/mach-omap2/fb.c     |   50 +-------------------------
+> >  arch/arm/plat-omap/Makefile  |    2 +
+> >  5 files changed, 85 insertions(+), 51 deletions(-)
+> >  create mode 100644 arch/arm/mach-omap1/fb.c
+> >  rename arch/arm/{plat-omap/fb.c => mach-omap2/fb.c} (76%)
 > 
-> This would also disable normal GPIOs configured for output! From the
-> manual I understand that if the pin is configured for output, we could
-> either use PIO_SODR/PIO_CODR to set/clear the bits individually or
-> PIO_ODSR for synchronous data output. But than we need to care about the
-> non-block GPIO outputs as well... requiring a read-modify-write cycle :(.
+> Ok, I didn't realize that plat-omap cannot refer to cpu_is_omap either.
 
->From the manual, I read about OWER: "Enables writing PIO_ODSR for the
-I/O line" (analogous for OWDR). Would interpret this as affecting ODSR
-(for block GPIO) but not SODR/CODR (as currently with single GPIOs).
+We could, but I'd rather not as what we have left in plat-omap should
+all be just drivers eventually. And in this case the fb code is already
+completely separate for omap1 and omap2+, so it's better just to split
+it up. It makes fixing up the initcalls for omap2+ multiplatform easier
+when booting on other SoCs than omap.
 
-Have you tried? ;-)
+> The patch looks fine, except the subject should say "split fb.c", not
+> "split vrfb.c".
 
-Thanks in advance,
+Thanks I'll update the subject.
 
-Roland
+Regards,
+
+Tony
