@@ -1,40 +1,140 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 17 Dec 2012 23:14:46 +0800
-Subject: [PATCH 4/4] FEC: Add time stamping code and a PTP hardware clock
-In-Reply-To: <CAHrpEqTVuSR_-Tpdzb98=VJbg7grSFvSQ9xA6mPsHpGb7RvNCg@mail.gmail.com>
-References: <1351657531-25989-1-git-send-email-Frank.Li@freescale.com>
- <20121217091345.GA753@pengutronix.de>
- <CAHrpEqTVuSR_-Tpdzb98=VJbg7grSFvSQ9xA6mPsHpGb7RvNCg@mail.gmail.com>
-Message-ID: <20121217151445.GA17907@S2101-09.ap.freescale.net>
+From: alex.shi@intel.com (Alex Shi)
+Date: Mon, 17 Dec 2012 23:24:06 +0800
+Subject: [RFC PATCH v2 3/6] sched: pack small tasks
+In-Reply-To: <CAKfTPtAt-TUoJpXbL+dAQ2zGTYtewdXpFDN_mSeu4MnuC-2Xjg@mail.gmail.com>
+References: <1355319092-30980-1-git-send-email-vincent.guittot@linaro.org>
+ <1355319092-30980-4-git-send-email-vincent.guittot@linaro.org>
+ <50C93AC1.1060202@intel.com>
+ <CAKfTPtB9iz1ePsS+juQVRhuWREYB1duGWRJT7ya8XBXPhC-mkw@mail.gmail.com>
+ <50C9E552.1010600@intel.com>
+ <CAKfTPtCUDEC50xexmLQ1d9qvBz1iJnf4aGSGjN==jqZwpxrwiQ@mail.gmail.com>
+ <CAKfTPtAhFtGKOtwumuav+pndoAZiKjHvYoE2NZxtgP+qHuHY3g@mail.gmail.com>
+ <50CA84FF.5070907@intel.com>
+ <CAKfTPtCarhT3J3xOD6jOh_91Pm5FK4V_DAk5QLs_=8rVF+-fsQ@mail.gmail.com>
+ <50CD746E.7010807@intel.com>
+ <CAKfTPtAt-TUoJpXbL+dAQ2zGTYtewdXpFDN_mSeu4MnuC-2Xjg@mail.gmail.com>
+Message-ID: <50CF3916.4010001@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-On Mon, Dec 17, 2012 at 10:48:31PM +0800, Frank Li wrote:
-> > I don't know how to continue from here. Since the whole patch doesn't
-> > seem to reviewed very much I tend to say we should revert it for now and
-> > let Frank redo it for the next merge window.
-> >
-> > Other opinions?
+>>>>>> The scheme below tries to summaries the idea:
+>>>>>>
+>>>>>> Socket      | socket 0 | socket 1   | socket 2   | socket 3   |
+>>>>>> LCPU        | 0 | 1-15 | 16 | 17-31 | 32 | 33-47 | 48 | 49-63 |
+>>>>>> buddy conf0 | 0 | 0    | 1  | 16    | 2  | 32    | 3  | 48    |
+>>>>>> buddy conf1 | 0 | 0    | 0  | 16    | 16 | 32    | 32 | 48    |
+>>>>>> buddy conf2 | 0 | 0    | 16 | 16    | 32 | 32    | 48 | 48    |
+>>>>>>
+>>>>>> But, I don't know how this can interact with NUMA load balance and the
+>>>>>> better might be to use conf3.
+>>>>>
+>>>>> I mean conf2 not conf3
+>>>>
+>>>> So, it has 4 levels 0/16/32/ for socket 3 and 0 level for socket 0, it
+>>>> is unbalanced for different socket.
+>>>
+>>> That the target because we have decided to pack the small tasks in
+>>> socket 0 when we have parsed the topology at boot.
+>>> We don't have to loop into sched_domain or sched_group anymore to find
+>>> the best LCPU when a small tasks wake up.
+>>
+>> iteration on domain and group is a advantage feature for power efficient
+>> requirement, not shortage. If some CPU are already idle before forking,
+>> let another waking CPU check their load/util and then decide which one
+>> is best CPU can reduce late migrations, that save both the performance
+>> and power.
 > 
-> Can we just disable CONFIG_FEC_PTP defaut instead of revert whole patch?
+> In fact, we have already done this job once at boot and we consider
+> that moving small tasks in the buddy CPU is always benefit so we don't
+> need to waste time looping sched_domain and sched_group to compute
+> current capacity of each LCPU for each wake up of each small tasks. We
+> want all small tasks and background activity waking up on the same
+> buddy CPU and let the default behavior of the scheduler choosing the
+> best CPU for heavy tasks or loaded CPUs.
+
+IMHO, the design should be very good for your scenario and your machine,
+but when the code move to general scheduler, we do want it can handle
+more general scenarios. like sometime the 'small task' is not as small
+as tasks in cyclictest which even hardly can run longer than migration
+granularity or one tick, thus we really don't need to consider task
+migration cost. But when the task are not too small, migration is more
+heavier than domain/group walking, that is the common sense in
+fork/exec/waking balance.
+
 > 
-To be clear, the following is what Frank meant.  Since Frank is out of
-office for some time, I will send this immediate fix to David, if you
-are fine with it.
+>>
+>> On the contrary, move task walking on each level buddies is not only bad
+>> on performance but also bad on power. Consider the quite big latency of
+>> waking a deep idle CPU. we lose too much..
+> 
+> My result have shown different conclusion.
 
-Shawn
+That should be due to your tasks are too small to need consider
+migration cost.
+> In fact, there is much more chance that the buddy will not be in a
+> deep idle as all the small tasks and background activity are already
+> waking on this CPU.
 
-diff --git a/drivers/net/ethernet/freescale/Kconfig b/drivers/net/ethernet/freescale/Kconfig
-index 5ba6e1c..d1edb2e 100644
---- a/drivers/net/ethernet/freescale/Kconfig
-+++ b/drivers/net/ethernet/freescale/Kconfig
-@@ -96,7 +96,6 @@ config FEC_PTP
-        bool "PTP Hardware Clock (PHC)"
-        depends on FEC && ARCH_MXC
-        select PTP_1588_CLOCK
--       default y if SOC_IMX6Q
-        --help---
-          Say Y here if you want to use PTP Hardware Clock (PHC) in the
-          driver.  Only the basic clock operations have been implemented.
+powertop is helpful to tune your system for more idle time. Another
+reason is current kernel just try to spread tasks on more cpu for
+performance consideration. My power scheduling patch should helpful on this.
+> 
+>>
+>>>
+>>>>
+>>>> And the ground level has just one buddy for 16 LCPUs - 8 cores, that's
+>>>> not a good design, consider my previous examples: if there are 4 or 8
+>>>> tasks in one socket, you just has 2 choices: spread them into all cores,
+>>>> or pack them into one LCPU. Actually, moving them just into 2 or 4 cores
+>>>> maybe a better solution. but the design missed this.
+>>>
+>>> You speak about tasks without any notion of load. This patch only care
+>>> of small tasks and light LCPU load, but it falls back to default
+>>> behavior for other situation. So if there are 4 or 8 small tasks, they
+>>> will migrate to the socket 0 after 1 or up to 3 migration (it depends
+>>> of the conf and the LCPU they come from).
+>>
+>> According to your patch, what your mean 'notion of load' is the
+>> utilization of cpu, not the load weight of tasks, right?
+> 
+> Yes but not only. The number of tasks that run simultaneously, is
+> another important input
+> 
+>>
+>> Yes, I just talked about tasks numbers, but it naturally extends to the
+>> task utilization on cpu. like 8 tasks with 25% util, that just can full
+>> fill 2 CPUs. but clearly beyond the capacity of the buddy, so you need
+>> to wake up another CPU socket while local socket has some LCPU idle...
+> 
+> 8 tasks with a running period of 25ms per 100ms that wake up
+> simultaneously should probably run on 8 different LCPU in order to
+> race to idle
+
+nope, it's a rare probability of 8 tasks wakeuping simultaneously. And
+even so they should run in the same socket for power saving
+consideration(my power scheduling patch can do this), instead of spread
+to all sockets.
+> 
+> 
+> Regards,
+> Vincent
+> 
+>>>
+>>> Then, if too much small tasks wake up simultaneously on the same LCPU,
+>>> the default load balance will spread them in the core/cluster/socket
+>>>
+>>>>
+>>>> Obviously, more and more cores is the trend on any kinds of CPU, the
+>>>> buddy system seems hard to catch up this.
+>>>>
+>>>>
+>>
+>>
+>> --
+>> Thanks
+>>     Alex
+
+
+-- 
+Thanks
+    Alex
